@@ -223,7 +223,7 @@ public:
                                                  unsigned Length) = 0;
 
   virtual bool recordAffectedRange(unsigned Offset, unsigned Length) = 0;
-  
+
   virtual bool recordAffectedLineRange(unsigned Line, unsigned Length) = 0;
 
   virtual bool recordFormattedText(StringRef Text) = 0;
@@ -258,6 +258,9 @@ struct CursorInfo {
   StringRef DocComment;
   StringRef TypeInterface;
   StringRef GroupName;
+  /// A key for documentation comment localization, if it exists in the doc
+  /// comment for the declaration.
+  StringRef LocalizationKey;
   /// Annotated XML pretty printed declaration.
   StringRef AnnotatedDeclaration;
   /// Fully annotated XML pretty printed declaration.
@@ -289,6 +292,13 @@ struct RangeInfo {
   UIdent RangeKind;
   StringRef ExprType;
   StringRef RangeContent;
+};
+
+struct NameTranslatingInfo {
+  bool IsCancelled = false;
+  UIdent NameKind;
+  StringRef BaseName;
+  std::vector<StringRef> ArgNames;
 };
 
 struct RelatedIdentsInfo {
@@ -323,6 +333,7 @@ struct DocEntityInfo {
   llvm::SmallString<64> ProvideImplementationOfUSR;
   llvm::SmallString<64> DocComment;
   llvm::SmallString<64> FullyAnnotatedDecl;
+  llvm::SmallString<64> LocalizationKey;
   std::vector<DocGenericParam> GenericParams;
   std::vector<std::string> GenericRequirements;
   unsigned Offset = 0;
@@ -460,6 +471,12 @@ public:
                              unsigned Length, bool Actionables,
                              ArrayRef<const char *> Args,
                           std::function<void(const CursorInfo &)> Receiver) = 0;
+
+
+  virtual void getNameInfo(StringRef Filename, unsigned Offset,
+                           NameTranslatingInfo &Input,
+                           ArrayRef<const char *> Args,
+                std::function<void(const NameTranslatingInfo &)> Receiver) = 0;
 
   virtual void getRangeInfo(StringRef Filename, unsigned Offset, unsigned Length,
                             ArrayRef<const char *> Args,

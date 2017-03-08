@@ -11,7 +11,25 @@ asdf // expected-error {{use of unresolved identifier}}
 jkl
 #endif
 
+#if swift(>=3.1)
+asdf // expected-error {{use of unresolved identifier}}
+#else
+jkl
+#endif
+
 #if swift(>=4)
+aoeu
+#else
+htn // expected-error {{use of unresolved identifier}}
+#endif
+
+#if swift(>=4.1)
+aoeu
+#else
+htn // expected-error {{use of unresolved identifier}}
+#endif
+
+#if swift(>=5)
 aoeu
 #else
 htn // expected-error {{use of unresolved identifier}}

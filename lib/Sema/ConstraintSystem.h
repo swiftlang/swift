@@ -29,7 +29,6 @@
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/NameLookup.h"
-#include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/Types.h"
 #include "swift/AST/TypeCheckerDebugConsumer.h"
 #include "llvm/ADT/ilist.h"
@@ -407,8 +406,10 @@ enum ScoreKind {
   SK_ScalarPointerConversion,
   /// A conversion from an array to a pointer of matching element type.
   SK_ArrayPointerConversion,
+  /// A conversion to an empty existential type ('Any' or '{}').
+  SK_EmptyExistentialConversion,
   
-  SK_LastScoreKind = SK_ArrayPointerConversion,
+  SK_LastScoreKind = SK_EmptyExistentialConversion,
 };
 
 /// The number of score kinds.
@@ -518,6 +519,8 @@ public:
 
   Solution(Solution &&other) = default;
   Solution &operator=(Solution &&other) = default;
+
+  size_t getTotalMemory() const;
 
   /// \brief Retrieve the constraint system that this solution solves.
   ConstraintSystem &getConstraintSystem() const { return *constraintSystem; }
@@ -873,6 +876,10 @@ private:
   /// or explore an option in a disjunction.
   unsigned CountScopes = 0;
 
+  /// High-water mark of measured memory usage in any sub-scope we
+  /// explored.
+  size_t MaxMemory = 0;
+
   /// \brief Cached member lookups.
   llvm::DenseMap<std::pair<Type, DeclName>, Optional<LookupResult>>
     MemberLookups;
@@ -1039,8 +1046,10 @@ private:
     /// \param scope The scope to associate with current solver state.
     void registerScope(SolverScope *scope) {
       CS.incrementScopeCounter();
-      scopes.insert({ scope, std::make_pair(retiredConstraints.begin(),
-                                            generatedConstraints.size()) });
+      auto scopeInfo =
+        std::make_tuple(scope, retiredConstraints.begin(),
+                        generatedConstraints.size());
+      scopes.push_back(scopeInfo);
     }
 
     /// \brief Check whether there are any retired constraints present.
@@ -1078,22 +1087,15 @@ private:
     ///
     /// \param constraint The constraint to erase.
     void removeGeneratedConstraint(Constraint *constraint) {
-      size_t index = 0;
-      for (auto generated : generatedConstraints) {
+      for (auto *&generated : generatedConstraints) {
+        // When we find the constraint we're erasing, overwrite its
+        // value with the last element in the generated constraints
+        // vector and then pop that element from the vector.
         if (generated == constraint) {
-          unsigned last = generatedConstraints.size() - 1;
-          auto lastConstraint = generatedConstraints[last];
-          if (lastConstraint == generated) {
-            generatedConstraints.pop_back();
-            break;
-          } else {
-            generatedConstraints[index] = lastConstraint;
-            generatedConstraints[last] = constraint;
-            generatedConstraints.pop_back();
-            break;
-          }
+          generated = generatedConstraints.back();
+          generatedConstraints.pop_back();
+          return;
         }
-        index++;
       }
     }
 
@@ -1105,18 +1107,16 @@ private:
     ///
     /// \param scope The solver scope to rollback.
     void rollback(SolverScope *scope) {
-      auto entry = scopes.find(scope);
-      assert(entry != scopes.end() && "Unknown solver scope");
-
-      // Remove given scope from the circulation.
-      scopes.erase(scope);
-
+      SolverScope *savedScope;
       // The position of last retired constraint before given scope.
       ConstraintList::iterator lastRetiredPos;
       // The original number of generated constraints before given scope.
       unsigned numGenerated;
 
-      std::tie(lastRetiredPos, numGenerated) = entry->getSecond();
+      std::tie(savedScope, lastRetiredPos, numGenerated) =
+        scopes.pop_back_val();
+
+      assert(savedScope == scope && "Scope rollback not in LIFO order!");
 
       // Restore all of the retired constraints.
       CS.InactiveConstraints.splice(CS.InactiveConstraints.end(),
@@ -1147,9 +1147,8 @@ private:
     /// constraints generated before registration of given scope,
     /// this helps to rollback all of the constraints retired/generated
     /// each of the registered scopes correct (LIFO) order.
-    llvm::SmallDenseMap<SolverScope *,
-                        std::pair<ConstraintList::iterator, unsigned>>
-        scopes;
+    llvm::SmallVector<
+      std::tuple<SolverScope *, ConstraintList::iterator, unsigned>, 4> scopes;
   };
 
   class CacheExprTypes : public ASTWalker {
@@ -1277,9 +1276,7 @@ private:
     return TypeCounter++;
   }
 
-  void incrementScopeCounter() {
-    CountScopes++;
-  }
+  void incrementScopeCounter();
 
 public:
   /// \brief Introduces a new solver scope, which any changes to the
@@ -1750,10 +1747,6 @@ public:
 
     /// Indicates we're matching an operator parameter.
     TMF_ApplyingOperatorParameter = 0x4,
-
-    /// Indicates we're unwrapping an optional type for a value-to-optional
-    /// conversion.
-    TMF_UnwrappingOptional = 0x8,
   };
 
   /// Options that govern how type matching should proceed.
@@ -2057,6 +2050,10 @@ public:
   ///
   /// \returns a possibly-sanitized initializer, or null if an error occurred.
   Type generateConstraints(Pattern *P, ConstraintLocatorBuilder locator);
+
+  /// \brief Propagate constraints in an effort to enforce local
+  /// consistency to reduce the time to solve the system.
+  void propagateConstraints();
 
   /// \brief The result of attempting to resolve a constraint or set of
   /// constraints.
@@ -2471,7 +2468,7 @@ public:
   
   /// \brief Determine if we've already explored too many paths in an
   /// attempt to solve this expression.
-  bool getExpressionTooComplex() {
+  bool getExpressionTooComplex(SmallVectorImpl<Solution> const &solutions) {
     if (!getASTContext().isSwiftVersion3()) {
       if (CountScopes < TypeCounter)
         return false;
@@ -2492,8 +2489,12 @@ public:
     }
 
     auto used = TC.Context.getSolverMemory();
+    for (auto const& s : solutions) {
+      used += s.getTotalMemory();
+    }
+    MaxMemory = std::max(used, MaxMemory);
     auto threshold = TC.Context.LangOpts.SolverMemoryThreshold;
-    return used > threshold;
+    return MaxMemory > threshold;
   }
 
   LLVM_ATTRIBUTE_DEPRECATED(

@@ -5,9 +5,7 @@
 // REQUIRES: CPU=x86_64
 // REQUIRES: objc_interop
 
-// CHECK: [[SGIZMO:%C19objc_attr_NSManaged10SwiftGizmo]] = type
-
-// CHECK: [[X:@[0-9+]]] = private unnamed_addr constant [2 x i8] c"x\00"
+// CHECK: [[SGIZMO:%T19objc_attr_NSManaged10SwiftGizmoC]] = type
 
 import Builtin
 import Swift
@@ -19,7 +17,9 @@ import Foundation
 sil_vtable X {}
 
 // The getter/setter should not show up in the Objective-C metadata.
-// CHECK: _INSTANCE_METHODS__TtC19objc_attr_NSManaged10SwiftGizmo = private constant { {{.*}}i32, i32, [2 x { i8*, i8*, i8* }] } { i32 24, i32 2, {{.*}} @"\01L_selector_data(initWithBellsOn:)", {{.*}} @"\01L_selector_data(init)",
+// CHECK: @_INSTANCE_METHODS__TtC19objc_attr_NSManaged10SwiftGizmo = private constant { i32, i32, [2 x { i8*, i8*, i8* }] } { i32 24, i32 2, {{.*}} @"\01L_selector_data(initWithBellsOn:)", {{.*}} @"\01L_selector_data(init)",
+
+// CHECK: [[X:@[0-9]+]] = private unnamed_addr constant [2 x i8] c"x\00"
 
 // The property 'x' should show up in the Objective-C metadata.
 // CHECK: @_PROPERTIES__TtC19objc_attr_NSManaged10SwiftGizmo = private constant { {{.*}}i32, i32, [1 x { i8*, i8* }] } { i32 16, i32 1, [1 x { i8*, i8* }] [{ i8*, i8* } { i8* getelementptr inbounds ([2 x i8], [2 x i8]* [[X]], i64 0, i64 0),
@@ -27,7 +27,7 @@ sil_vtable X {}
 // The getter/setter should not show up in the Swift metadata.
 /* FIXME: sil_vtable parser picks the wrong 'init' overload. Both vtable entries
    ought to be nonnull here. rdar://problem/19572342 */
-// CHECK: @_TMfC19objc_attr_NSManaged10SwiftGizmo = internal global <{ {{.*}} }> <{ void (%C19objc_attr_NSManaged10SwiftGizmo*)* @_TFC19objc_attr_NSManaged10SwiftGizmoD, i8** @_TWVBO, i64 ptrtoint (%objc_class* @"OBJC_METACLASS_$__TtC19objc_attr_NSManaged10SwiftGizmo" to i64), %objc_class* @"OBJC_CLASS_$_Gizmo", %swift.opaque* @_objc_empty_cache, %swift.opaque* null, i64 add (i64 ptrtoint ({ i32, i32, i32, i32, i8*, i8*, { i32, i32, [2 x { i8*, i8*, i8* }] }*, i8*, i8*, i8*, { i32, i32, [1 x { i8*, i8* }] }* }* @_DATA__TtC19objc_attr_NSManaged10SwiftGizmo to i64), i64 1), i32 1, i32 0, i32 16, i16 7, i16 0, i32 112, i32 16, {{.*}}* @_TMnC19objc_attr_NSManaged10SwiftGizmo {{.*}}, i8* null, %C19objc_attr_NSManaged10SwiftGizmo* (i64, %C19objc_attr_NSManaged10SwiftGizmo*)* @_TFC19objc_attr_NSManaged10SwiftGizmocfT7bellsOnSi_S0_, i8* bitcast (void ()* @swift_deletedMethodError to i8*) }>
+// CHECK: @_TMfC19objc_attr_NSManaged10SwiftGizmo = internal global <{ {{.*}} }> <{ void (%T19objc_attr_NSManaged10SwiftGizmoC*)* @_TFC19objc_attr_NSManaged10SwiftGizmoD, i8** @_TWVBO, i64 ptrtoint (%objc_class* @"OBJC_METACLASS_$__TtC19objc_attr_NSManaged10SwiftGizmo" to i64), %objc_class* @"OBJC_CLASS_$_Gizmo", %swift.opaque* @_objc_empty_cache, %swift.opaque* null, i64 add (i64 ptrtoint ({ i32, i32, i32, i32, i8*, i8*, { i32, i32, [2 x { i8*, i8*, i8* }] }*, i8*, i8*, i8*, { i32, i32, [1 x { i8*, i8* }] }* }* @_DATA__TtC19objc_attr_NSManaged10SwiftGizmo to i64), i64 1), i32 1, i32 0, i32 16, i16 7, i16 0, i32 112, i32 16, {{.*}}* @_TMnC19objc_attr_NSManaged10SwiftGizmo {{.*}}, i8* null, %T19objc_attr_NSManaged10SwiftGizmoC* (i64, %T19objc_attr_NSManaged10SwiftGizmoC*)* @_TFC19objc_attr_NSManaged10SwiftGizmocfT7bellsOnSi_S0_, i8* bitcast (void ()* @swift_deletedMethodError to i8*) }>
 
 @objc class SwiftGizmo : Gizmo {
   @objc @NSManaged var x: X

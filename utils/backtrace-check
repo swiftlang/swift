@@ -18,6 +18,8 @@
 # 11 libswiftCore.dylib 0x000000000dce84d0l _fatalErrorMessage(StaticString,
 # StaticString, StaticString, UInt, flags : UInt32) -> () + 444
 
+from __future__ import print_function
+
 import argparse
 import re
 import sys

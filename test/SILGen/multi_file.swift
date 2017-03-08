@@ -18,15 +18,21 @@ func lazyPropertiesAreNotStored(_ container: LazyContainer) {
 
 // CHECK-LABEL: sil hidden @_T010multi_file29lazyRefPropertiesAreNotStored{{[_0-9a-zA-Z]*}}F
 func lazyRefPropertiesAreNotStored(_ container: LazyContainerClass) {
-  // CHECK: {{%[0-9]+}} = class_method %0 : $LazyContainerClass, #LazyContainerClass.lazyVar!getter.1 : (LazyContainerClass) -> () -> Int, $@convention(method) (@guaranteed LazyContainerClass) -> Int
+  // CHECK: bb0([[ARG:%.*]] : $LazyContainerClass):
+  // CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
+  // CHECK:   {{%[0-9]+}} = class_method [[BORROWED_ARG]] : $LazyContainerClass, #LazyContainerClass.lazyVar!getter.1 : (LazyContainerClass) -> () -> Int, $@convention(method) (@guaranteed LazyContainerClass) -> Int
   markUsed(container.lazyVar)
 }
 
 // CHECK-LABEL: sil hidden @_T010multi_file25finalVarsAreDevirtualizedyAA18FinalPropertyClassCF
 func finalVarsAreDevirtualized(_ obj: FinalPropertyClass) {
-  // CHECK: ref_element_addr %0 : $FinalPropertyClass, #FinalPropertyClass.foo
+  // CHECK: bb0([[ARG:%.*]] : $FinalPropertyClass):
+  // CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
+  // CHECK:   ref_element_addr [[BORROWED_ARG]] : $FinalPropertyClass, #FinalPropertyClass.foo
+  // CHECK:   end_borrow [[BORROWED_ARG]] from [[ARG]]
   markUsed(obj.foo)
-  // CHECK: class_method %0 : $FinalPropertyClass, #FinalPropertyClass.bar!getter.1
+  // CHECK: [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
+  // CHECK: class_method [[BORROWED_ARG]] : $FinalPropertyClass, #FinalPropertyClass.bar!getter.1
   markUsed(obj.bar)
 }
 
@@ -46,5 +52,5 @@ class HasComputedProperty: ProtocolWithProperty {
     set {}
   }
 }
-// CHECK-LABEL: sil hidden @_T010multi_file19HasComputedPropertyC3fooSifm : $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @guaranteed HasComputedProperty) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>) {
-// CHECK-LABEL: sil hidden [transparent] [thunk] @_T010multi_file19HasComputedPropertyCAA012ProtocolWithE0AaaDP3fooSifmTW : $@convention(witness_method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout HasComputedProperty) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>) {
+// CHECK-LABEL: sil hidden [transparent] @_T010multi_file19HasComputedPropertyC3fooSifm : $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @guaranteed HasComputedProperty) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>) {
+// CHECK-LABEL: sil hidden [transparent] [thunk] @_T010multi_file19HasComputedPropertyCAA012ProtocolWithE0A2aDP3fooSifmTW : $@convention(witness_method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout HasComputedProperty) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>) {

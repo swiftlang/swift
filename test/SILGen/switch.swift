@@ -433,7 +433,8 @@ class E : C {}
 // CHECK-LABEL: sil hidden @_T06switch16test_isa_class_1yAA1BC1x_tF : $@convention(thin) (@owned B) -> () {
 func test_isa_class_1(x: B) {
   // CHECK: bb0([[X:%.*]] : $B):
-  // CHECK:   [[X_COPY:%.*]] = copy_value [[X]]
+  // CHECK:   [[BORROWED_X:%.*]] = begin_borrow [[X]]
+  // CHECK:   [[X_COPY:%.*]] = copy_value [[BORROWED_X]]
   // CHECK:   checked_cast_br [[X_COPY]] : $B to $D1, [[IS_D1:bb[0-9]+]], [[IS_NOT_D1:bb[0-9]+]]
   switch x {
 
@@ -526,7 +527,8 @@ func test_isa_class_1(x: B) {
 // CHECK-LABEL: sil hidden @_T06switch16test_isa_class_2s9AnyObject_pAA1BC1x_tF : $@convention(thin)
 func test_isa_class_2(x: B) -> AnyObject {
   // CHECK: bb0([[X:%.*]] : $B):
-  // CHECK:   [[X_COPY:%.*]] = copy_value [[X]]
+  // CHECK:   [[BORROWED_X:%.*]] = begin_borrow [[X]]
+  // CHECK:   [[X_COPY:%.*]] = copy_value [[BORROWED_X]]
   switch x {
 
   // CHECK:   checked_cast_br [[X_COPY]] : $B to $D1, [[IS_D1:bb[0-9]+]], [[IS_NOT_D1:bb[0-9]+]]
@@ -538,8 +540,10 @@ func test_isa_class_2(x: B) -> AnyObject {
 
   // CHECK: [[CASE1]]:
   // CHECK:   function_ref @_T06switch1ayyF
-  // CHECK:   [[CAST_D1_COPY_COPY:%.*]] = copy_value [[CAST_D1_COPY]]
+  // CHECK:   [[BORROWED_CAST_D1_COPY:%.*]] = begin_borrow [[CAST_D1_COPY]]
+  // CHECK:   [[CAST_D1_COPY_COPY:%.*]] = copy_value [[BORROWED_CAST_D1_COPY]]
   // CHECK:   [[RET:%.*]] = init_existential_ref [[CAST_D1_COPY_COPY]]
+  // CHECK:   end_borrow [[BORROWED_CAST_D1_COPY]] from [[CAST_D1_COPY]]
   // CHECK:   destroy_value [[CAST_D1_COPY]]
   // CHECK:   destroy_value [[X_COPY]] : $B
   // CHECK:   br [[CONT:bb[0-9]+]]([[RET]] : $AnyObject)
@@ -559,8 +563,10 @@ func test_isa_class_2(x: B) -> AnyObject {
   // CHECK: [[CASE2]]([[CAST_D2:%.*]]):
   // CHECK:   [[CAST_D2_COPY:%.*]] = copy_value [[CAST_D2]]
   // CHECK:   function_ref @_T06switch1byyF
-  // CHECK:   [[CAST_D2_COPY_COPY:%.*]] = copy_value [[CAST_D2_COPY]]
+  // CHECK:   [[BORROWED_CAST_D2_COPY:%.*]] = begin_borrow [[CAST_D2_COPY]]
+  // CHECK:   [[CAST_D2_COPY_COPY:%.*]] = copy_value [[BORROWED_CAST_D2_COPY]]
   // CHECK:   [[RET:%.*]] = init_existential_ref [[CAST_D2_COPY_COPY]]
+  // CHECK:   end_borrow [[BORROWED_CAST_D2_COPY]] from [[CAST_D2_COPY]]
   // CHECK:   destroy_value [[CAST_D2_COPY]]
   // CHECK:   destroy_value [[X_COPY]]
   // CHECK:   br [[CONT]]([[RET]] : $AnyObject)
@@ -580,8 +586,10 @@ func test_isa_class_2(x: B) -> AnyObject {
 
   // CHECK: [[CASE3]]:
   // CHECK:   function_ref @_T06switch1cyyF
-  // CHECK:   [[CAST_E_COPY_COPY:%.*]] = copy_value [[CAST_E_COPY]]
+  // CHECK:   [[BORROWED_CAST_E_COPY:%.*]] = begin_borrow [[CAST_E_COPY]]
+  // CHECK:   [[CAST_E_COPY_COPY:%.*]] = copy_value [[BORROWED_CAST_E_COPY]]
   // CHECK:   [[RET:%.*]] = init_existential_ref [[CAST_E_COPY_COPY]]
+  // CHECK:   end_borrow [[BORROWED_CAST_E_COPY]] from [[CAST_E_COPY]]
   // CHECK:   destroy_value [[CAST_E_COPY]]
   // CHECK:   destroy_value [[X_COPY]] : $B
   // CHECK:   br [[CONT]]([[RET]] : $AnyObject)
@@ -601,8 +609,10 @@ func test_isa_class_2(x: B) -> AnyObject {
   // CHECK: [[CASE4]]([[CAST_C:%.*]]):
   // CHECK:   [[CAST_C_COPY:%.*]] = copy_value [[CAST_C]]
   // CHECK:   function_ref @_T06switch1dyyF
-  // CHECK:   [[CAST_C_COPY_COPY:%.*]] = copy_value [[CAST_C_COPY]]
+  // CHECK:   [[BORROWED_CAST_C_COPY:%.*]] = begin_borrow [[CAST_C_COPY]]
+  // CHECK:   [[CAST_C_COPY_COPY:%.*]] = copy_value [[BORROWED_CAST_C_COPY]]
   // CHECK:   [[RET:%.*]] = init_existential_ref [[CAST_C_COPY_COPY]]
+  // CHECK:   end_borrow [[BORROWED_CAST_C_COPY]] from [[CAST_C_COPY]]
   // CHECK:   destroy_value [[CAST_C_COPY]]
   // CHECK:   destroy_value [[X_COPY]]
   // CHECK:   br [[CONT]]([[RET]] : $AnyObject)
@@ -616,8 +626,10 @@ func test_isa_class_2(x: B) -> AnyObject {
   default:
   // CHECK:   destroy_value [[X_COPY]]
   // CHECK:   function_ref @_T06switch1eyyF
-  // CHECK:   [[X_COPY_2:%.*]] = copy_value [[X]]
+  // CHECK:   [[BORROWED_X:%.*]] = begin_borrow [[X]]
+  // CHECK:   [[X_COPY_2:%.*]] = copy_value [[BORROWED_X]]
   // CHECK:   [[RET:%.*]] = init_existential_ref [[X_COPY_2]]
+  // CHECK:   end_borrow [[BORROWED_X]] from [[X]]
   // CHECK:   br [[CONT]]([[RET]] : $AnyObject)
     e()
     return x
@@ -720,7 +732,8 @@ func test_union_2(u: MaybePair) {
 // CHECK-LABEL: sil hidden  @_T06switch12test_union_3yAA9MaybePairO1u_tF : $@convention(thin) (@owned MaybePair) -> () {
 func test_union_3(u: MaybePair) {
   // CHECK: bb0([[ARG:%.*]] : $MaybePair):
-  // CHECK:   [[ARG_COPY:%.*]] = copy_value [[ARG]]
+  // CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
+  // CHECK:   [[ARG_COPY:%.*]] = copy_value [[BORROWED_ARG]]
   // CHECK:   switch_enum [[SUBJECT]] : $MaybePair,
   // CHECK:     case #MaybePair.Neither!enumelt: [[IS_NEITHER:bb[0-9]+]],
   // CHECK:     case #MaybePair.Left!enumelt.1: [[IS_LEFT:bb[0-9]+]],
@@ -1044,7 +1057,7 @@ func testOptionalPattern(_ value : Int?) {
 
 // x? and .none should both be considered "similar" and thus handled in the same
 // switch on the enum kind.  There should be no unreachable generated.
-// CHECK-LABEL: sil hidden @_T06switch19testOptionalEnumMixSiSiSgF
+// CHECK-LABEL: sil hidden @_T06switch19testOptionalEnumMixS2iSgF
 func testOptionalEnumMix(_ a : Int?) -> Int {
   // CHECK: debug_value %0 : $Optional<Int>, let, name "a"
   // CHECK-NEXT: switch_enum %0 : $Optional<Int>, case #Optional.some!enumelt.1: [[SOMEBB:bb[0-9]+]], case #Optional.none!enumelt: [[NILBB:bb[0-9]+]]
@@ -1066,7 +1079,7 @@ func testOptionalEnumMix(_ a : Int?) -> Int {
 
 // x? and nil should both be considered "similar" and thus handled in the same
 // switch on the enum kind.  There should be no unreachable generated.
-// CHECK-LABEL: sil hidden @_T06switch26testOptionalEnumMixWithNilSiSiSgF
+// CHECK-LABEL: sil hidden @_T06switch26testOptionalEnumMixWithNilS2iSgF
 func testOptionalEnumMixWithNil(_ a : Int?) -> Int {
   // CHECK: debug_value %0 : $Optional<Int>, let, name "a"
   // CHECK-NEXT: switch_enum %0 : $Optional<Int>, case #Optional.some!enumelt.1: [[SOMEBB:bb[0-9]+]], case #Optional.none!enumelt: [[NILBB:bb[0-9]+]]

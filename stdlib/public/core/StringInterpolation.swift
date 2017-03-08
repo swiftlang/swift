@@ -1,4 +1,4 @@
-//===--- StringInterpolation.swift - String Interpolation -----*- swift -*-===//
+//===--- StringInterpolation.swift - String Interpolation -----------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -74,7 +74,3 @@ extension String : _ExpressibleByStringInterpolation {
     self = _toStringReadOnlyStreamable(expr)
   }
 }
-
-// ${'Local Variables'}:
-// eval: (read-only-mode 1)
-// End:

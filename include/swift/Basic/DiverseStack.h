@@ -9,12 +9,14 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
-//
-// This file defines a data structure for representing a stack of
-// variably-sized objects.  It is a requirement that the object type
-// be trivially movable, meaning that it has a trivial move
-// constructor and a trivial destructor.
-//
+///
+/// \file
+///
+/// This file defines a data structure for representing a stack of
+/// variably-sized objects.  It is a requirement that the object type
+/// be trivially movable, meaning that it has a trivial move
+/// constructor and a trivial destructor.
+///
 //===----------------------------------------------------------------------===//
 
 #ifndef SWIFT_BASIC_DIVERSESTACK_H
@@ -115,6 +117,8 @@ public:
     bool isValid() const {
       return Depth != (std::size_t) -1;
     }
+
+    std::size_t getDepth() const { return Depth; }
 
     /// A helper class that wraps a stable_iterator as something that
     /// pretends to be a non-null pointer.
@@ -355,6 +359,17 @@ public:
     assert(!empty());
     assert(sizeof(U) == top().allocated_size());
     Begin += sizeof(U);
+  }
+
+  /// Pop objects off of the stack until \p the object pointed to by stable_iter
+  /// is the top element of the stack.
+  void pop(stable_iterator stable_iter) {
+    iterator iter = find(stable_iter);
+    checkIterator(iter);
+    while (Begin != iter.Ptr) {
+      pop();
+      checkIterator(iter);
+    }
   }
 };
 

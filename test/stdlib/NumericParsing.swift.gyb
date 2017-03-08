@@ -35,7 +35,7 @@ Note: the third parameter, zero, is not for user consumption.
   else:
     r = n % radix
     digit = chr((ord('0') + r) if r < 10 else (ord('a') + r - 10))
-    return inRadix(radix, n / radix, '') + digit
+    return inRadix(radix, int(n / radix), '') + digit
 
 # The maximal legal radix
 max_radix = ord('z') - ord('a') + 1 + 10
@@ -93,9 +93,9 @@ tests.test("${Self}/success") {
 
   // Do more exhaustive testing
   % for radix in radices_to_test:
-  %   for n in required_values + range(
+  %   for n in required_values + list(range(
   %     minValue + 1, maxValue - 1,
-  %     (maxValue - minValue - 2) / (number_of_values - len(required_values))):
+  %     int((maxValue - minValue - 2) / (number_of_values - len(required_values))))):
   %     prefix = '+' if n > 0 and n % 2 == 0 else '' # leading '+'
   %     text = inRadix(radix, n)
   expectEqual(${n}, ${Self}("${prefix + text}", radix: ${radix}))

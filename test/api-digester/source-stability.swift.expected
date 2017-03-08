@@ -17,25 +17,29 @@ Func Array.append(contentsOf:) has been removed
 Func ArraySlice.append(contentsOf:) has been removed
 Func ContiguousArray.append(contentsOf:) has been removed
 
+/* Unnecessary overload -- no functional change */
+Func Dictionary.removeValue(forKey:) has been removed
+Func Dictionary.updateValue(_:forKey:) has been removed
+
 /* FIXME: Bogus */
 Var Dictionary.endIndex has declared type change from DictionaryIndex<Key, Value> to Dictionary<Key, Value>.Index
 Var Dictionary.startIndex has declared type change from DictionaryIndex<Key, Value> to Dictionary<Key, Value>.Index
 Var Set.endIndex has declared type change from SetIndex<Element> to Set<Element>.Index
 Var Set.startIndex has declared type change from SetIndex<Element> to Set<Element>.Index
-Constructor AnyIterator.init(_:) has 1st parameter type change from () -> Element? to () -> AnyIterator.Element?
-Constructor BidirectionalSlice.init(base:bounds:) has 2nd parameter type change from Range<Base.Index> to Range<BidirectionalSlice.Index>
-Constructor MutableBidirectionalSlice.init(base:bounds:) has 2nd parameter type change from Range<Base.Index> to Range<MutableBidirectionalSlice.Index>
-Constructor MutableRandomAccessSlice.init(base:bounds:) has 2nd parameter type change from Range<Base.Index> to Range<MutableRandomAccessSlice.Index>
-Constructor MutableRangeReplaceableBidirectionalSlice.init(base:bounds:) has 2nd parameter type change from Range<Base.Index> to Range<MutableRangeReplaceableBidirectionalSlice.Index>
-Constructor MutableRangeReplaceableRandomAccessSlice.init(base:bounds:) has 2nd parameter type change from Range<Base.Index> to Range<MutableRangeReplaceableRandomAccessSlice.Index>
-Constructor MutableRangeReplaceableSlice.init(base:bounds:) has 2nd parameter type change from Range<Base.Index> to Range<MutableRangeReplaceableSlice.Index>
-Constructor MutableSlice.init(base:bounds:) has 2nd parameter type change from Range<Base.Index> to Range<MutableSlice.Index>
-Constructor RandomAccessSlice.init(base:bounds:) has 2nd parameter type change from Range<Base.Index> to Range<RandomAccessSlice.Index>
-Constructor RangeReplaceableBidirectionalSlice.init(base:bounds:) has 2nd parameter type change from Range<Base.Index> to Range<RangeReplaceableBidirectionalSlice.Index>
-Constructor RangeReplaceableRandomAccessSlice.init(base:bounds:) has 2nd parameter type change from Range<Base.Index> to Range<RangeReplaceableRandomAccessSlice.Index>
-Constructor RangeReplaceableSlice.init(base:bounds:) has 2nd parameter type change from Range<Base.Index> to Range<RangeReplaceableSlice.Index>
-Constructor Slice.init(base:bounds:) has 2nd parameter type change from Range<Base.Index> to Range<Slice.Index>
-Constructor String.init(stringInterpolationSegment:) has 1st parameter type change from String to T
+Constructor AnyIterator.init(_:) has parameter 0 type change from () -> Element? to () -> AnyIterator.Element?
+Constructor BidirectionalSlice.init(base:bounds:) has parameter 1 type change from Range<Base.Index> to Range<BidirectionalSlice.Index>
+Constructor MutableBidirectionalSlice.init(base:bounds:) has parameter 1 type change from Range<Base.Index> to Range<MutableBidirectionalSlice.Index>
+Constructor MutableRandomAccessSlice.init(base:bounds:) has parameter 1 type change from Range<Base.Index> to Range<MutableRandomAccessSlice.Index>
+Constructor MutableRangeReplaceableBidirectionalSlice.init(base:bounds:) has parameter 1 type change from Range<Base.Index> to Range<MutableRangeReplaceableBidirectionalSlice.Index>
+Constructor MutableRangeReplaceableRandomAccessSlice.init(base:bounds:) has parameter 1 type change from Range<Base.Index> to Range<MutableRangeReplaceableRandomAccessSlice.Index>
+Constructor MutableRangeReplaceableSlice.init(base:bounds:) has parameter 1 type change from Range<Base.Index> to Range<MutableRangeReplaceableSlice.Index>
+Constructor MutableSlice.init(base:bounds:) has parameter 1 type change from Range<Base.Index> to Range<MutableSlice.Index>
+Constructor RandomAccessSlice.init(base:bounds:) has parameter 1 type change from Range<Base.Index> to Range<RandomAccessSlice.Index>
+Constructor RangeReplaceableBidirectionalSlice.init(base:bounds:) has parameter 1 type change from Range<Base.Index> to Range<RangeReplaceableBidirectionalSlice.Index>
+Constructor RangeReplaceableRandomAccessSlice.init(base:bounds:) has parameter 1 type change from Range<Base.Index> to Range<RangeReplaceableRandomAccessSlice.Index>
+Constructor RangeReplaceableSlice.init(base:bounds:) has parameter 1 type change from Range<Base.Index> to Range<RangeReplaceableSlice.Index>
+Constructor Slice.init(base:bounds:) has parameter 1 type change from Range<Base.Index> to Range<Slice.Index>
+Constructor String.init(stringInterpolationSegment:) has parameter 0 type change from String to T
 Func AnyBidirectionalCollection.makeIterator() has return type change from AnyIterator<Element> to AnyBidirectionalCollection.Iterator
 Func AnyCollection.makeIterator() has return type change from AnyIterator<Element> to AnyCollection.Iterator
 Func AnyRandomAccessCollection.makeIterator() has return type change from AnyIterator<Element> to AnyRandomAccessCollection.Iterator
@@ -69,30 +73,30 @@ Func EnumeratedIterator.next() has return type change from (offset: Int, element
 Func FlattenBidirectionalCollection.index(after:) has return type change from FlattenBidirectionalCollectionIndex<Base> to FlattenBidirectionalCollection.Index
 Func FlattenBidirectionalCollection.index(before:) has return type change from FlattenBidirectionalCollectionIndex<Base> to FlattenBidirectionalCollection.Index
 Func FlattenCollection.index(after:) has return type change from FlattenCollectionIndex<Base> to FlattenCollection.Index
-Func LazyBidirectionalCollection.distance(from:to:) has 1st parameter type change from Base.Index to LazyBidirectionalCollection.Index
+Func LazyBidirectionalCollection.distance(from:to:) has parameter 0 type change from Base.Index to LazyBidirectionalCollection.Index
 Func LazyBidirectionalCollection.index(_:offsetBy:) has return type change from Base.Index to LazyBidirectionalCollection.Index
 Func LazyBidirectionalCollection.index(_:offsetBy:limitedBy:) has return type change from Base.Index? to LazyBidirectionalCollection.Index?
-Func LazyCollection.distance(from:to:) has 1st parameter type change from Base.Index to LazyCollection.Index
+Func LazyCollection.distance(from:to:) has parameter 0 type change from Base.Index to LazyCollection.Index
 Func LazyCollection.index(_:offsetBy:) has return type change from Base.Index to LazyCollection.Index
 Func LazyCollection.index(_:offsetBy:limitedBy:) has return type change from Base.Index? to LazyCollection.Index?
 Func LazyFilterBidirectionalCollection.index(after:) has return type change from LazyFilterIndex<Base> to LazyFilterBidirectionalCollection.Index
 Func LazyFilterBidirectionalCollection.index(before:) has return type change from LazyFilterIndex<Base> to LazyFilterBidirectionalCollection.Index
 Func LazyFilterCollection.index(after:) has return type change from LazyFilterIndex<Base> to LazyFilterCollection.Index
-Func LazyMapBidirectionalCollection.distance(from:to:) has 1st parameter type change from Base.Index to LazyMapBidirectionalCollection.Index
+Func LazyMapBidirectionalCollection.distance(from:to:) has parameter 0 type change from Base.Index to LazyMapBidirectionalCollection.Index
 Func LazyMapBidirectionalCollection.index(_:offsetBy:) has return type change from Base.Index to LazyMapBidirectionalCollection.Index
 Func LazyMapBidirectionalCollection.index(_:offsetBy:limitedBy:) has return type change from Base.Index? to LazyMapBidirectionalCollection.Index?
 Func LazyMapBidirectionalCollection.index(after:) has return type change from Base.Index to LazyMapBidirectionalCollection.Index
 Func LazyMapBidirectionalCollection.index(before:) has return type change from Base.Index to LazyMapBidirectionalCollection.Index
-Func LazyMapCollection.distance(from:to:) has 1st parameter type change from Base.Index to LazyMapCollection.Index
+Func LazyMapCollection.distance(from:to:) has parameter 0 type change from Base.Index to LazyMapCollection.Index
 Func LazyMapCollection.index(_:offsetBy:) has return type change from Base.Index to LazyMapCollection.Index
 Func LazyMapCollection.index(_:offsetBy:limitedBy:) has return type change from Base.Index? to LazyMapCollection.Index?
 Func LazyMapCollection.index(after:) has return type change from Base.Index to LazyMapCollection.Index
-Func LazyMapRandomAccessCollection.distance(from:to:) has 1st parameter type change from Base.Index to LazyMapRandomAccessCollection.Index
+Func LazyMapRandomAccessCollection.distance(from:to:) has parameter 0 type change from Base.Index to LazyMapRandomAccessCollection.Index
 Func LazyMapRandomAccessCollection.index(_:offsetBy:) has return type change from Base.Index to LazyMapRandomAccessCollection.Index
 Func LazyMapRandomAccessCollection.index(_:offsetBy:limitedBy:) has return type change from Base.Index? to LazyMapRandomAccessCollection.Index?
 Func LazyMapRandomAccessCollection.index(after:) has return type change from Base.Index to LazyMapRandomAccessCollection.Index
 Func LazyMapRandomAccessCollection.index(before:) has return type change from Base.Index to LazyMapRandomAccessCollection.Index
-Func LazyRandomAccessCollection.distance(from:to:) has 1st parameter type change from Base.Index to LazyRandomAccessCollection.Index
+Func LazyRandomAccessCollection.distance(from:to:) has parameter 0 type change from Base.Index to LazyRandomAccessCollection.Index
 Func LazyRandomAccessCollection.index(_:offsetBy:) has return type change from Base.Index to LazyRandomAccessCollection.Index
 Func LazyRandomAccessCollection.index(_:offsetBy:limitedBy:) has return type change from Base.Index? to LazyRandomAccessCollection.Index?
 Func MutableBidirectionalSlice.distance(from:to:) has return type change from Base.IndexDistance to MutableBidirectionalSlice.IndexDistance
@@ -110,30 +114,30 @@ Func MutableRangeReplaceableBidirectionalSlice.index(_:offsetBy:) has return typ
 Func MutableRangeReplaceableBidirectionalSlice.index(_:offsetBy:limitedBy:) has return type change from Base.Index? to MutableRangeReplaceableBidirectionalSlice.Index?
 Func MutableRangeReplaceableBidirectionalSlice.index(after:) has return type change from Base.Index to MutableRangeReplaceableBidirectionalSlice.Index
 Func MutableRangeReplaceableBidirectionalSlice.index(before:) has return type change from Base.Index to MutableRangeReplaceableBidirectionalSlice.Index
-Func MutableRangeReplaceableBidirectionalSlice.insert(_:at:) has 2nd parameter type change from Base.Index to MutableRangeReplaceableBidirectionalSlice.Index
-Func MutableRangeReplaceableBidirectionalSlice.insert(contentsOf:at:) has 2nd parameter type change from Base.Index to MutableRangeReplaceableBidirectionalSlice.Index
-Func MutableRangeReplaceableBidirectionalSlice.remove(at:) has 1st parameter type change from Base.Index to MutableRangeReplaceableBidirectionalSlice.Index
-Func MutableRangeReplaceableBidirectionalSlice.removeSubrange(_:) has 1st parameter type change from Range<Base.Index> to Range<MutableRangeReplaceableBidirectionalSlice.Index>
-Func MutableRangeReplaceableBidirectionalSlice.replaceSubrange(_:with:) has 1st parameter type change from Range<Base.Index> to Range<MutableRangeReplaceableBidirectionalSlice.Index>
+Func MutableRangeReplaceableBidirectionalSlice.insert(_:at:) has parameter 1 type change from Base.Index to MutableRangeReplaceableBidirectionalSlice.Index
+Func MutableRangeReplaceableBidirectionalSlice.insert(contentsOf:at:) has parameter 1 type change from Base.Index to MutableRangeReplaceableBidirectionalSlice.Index
+Func MutableRangeReplaceableBidirectionalSlice.remove(at:) has parameter 0 type change from Base.Index to MutableRangeReplaceableBidirectionalSlice.Index
+Func MutableRangeReplaceableBidirectionalSlice.removeSubrange(_:) has parameter 0 type change from Range<Base.Index> to Range<MutableRangeReplaceableBidirectionalSlice.Index>
+Func MutableRangeReplaceableBidirectionalSlice.replaceSubrange(_:with:) has parameter 0 type change from Range<Base.Index> to Range<MutableRangeReplaceableBidirectionalSlice.Index>
 Func MutableRangeReplaceableRandomAccessSlice.distance(from:to:) has return type change from Base.IndexDistance to MutableRangeReplaceableRandomAccessSlice.IndexDistance
 Func MutableRangeReplaceableRandomAccessSlice.index(_:offsetBy:) has return type change from Base.Index to MutableRangeReplaceableRandomAccessSlice.Index
 Func MutableRangeReplaceableRandomAccessSlice.index(_:offsetBy:limitedBy:) has return type change from Base.Index? to MutableRangeReplaceableRandomAccessSlice.Index?
 Func MutableRangeReplaceableRandomAccessSlice.index(after:) has return type change from Base.Index to MutableRangeReplaceableRandomAccessSlice.Index
 Func MutableRangeReplaceableRandomAccessSlice.index(before:) has return type change from Base.Index to MutableRangeReplaceableRandomAccessSlice.Index
-Func MutableRangeReplaceableRandomAccessSlice.insert(_:at:) has 2nd parameter type change from Base.Index to MutableRangeReplaceableRandomAccessSlice.Index
-Func MutableRangeReplaceableRandomAccessSlice.insert(contentsOf:at:) has 2nd parameter type change from Base.Index to MutableRangeReplaceableRandomAccessSlice.Index
-Func MutableRangeReplaceableRandomAccessSlice.remove(at:) has 1st parameter type change from Base.Index to MutableRangeReplaceableRandomAccessSlice.Index
-Func MutableRangeReplaceableRandomAccessSlice.removeSubrange(_:) has 1st parameter type change from Range<Base.Index> to Range<MutableRangeReplaceableRandomAccessSlice.Index>
-Func MutableRangeReplaceableRandomAccessSlice.replaceSubrange(_:with:) has 1st parameter type change from Range<Base.Index> to Range<MutableRangeReplaceableRandomAccessSlice.Index>
+Func MutableRangeReplaceableRandomAccessSlice.insert(_:at:) has parameter 1 type change from Base.Index to MutableRangeReplaceableRandomAccessSlice.Index
+Func MutableRangeReplaceableRandomAccessSlice.insert(contentsOf:at:) has parameter 1 type change from Base.Index to MutableRangeReplaceableRandomAccessSlice.Index
+Func MutableRangeReplaceableRandomAccessSlice.remove(at:) has parameter 0 type change from Base.Index to MutableRangeReplaceableRandomAccessSlice.Index
+Func MutableRangeReplaceableRandomAccessSlice.removeSubrange(_:) has parameter 0 type change from Range<Base.Index> to Range<MutableRangeReplaceableRandomAccessSlice.Index>
+Func MutableRangeReplaceableRandomAccessSlice.replaceSubrange(_:with:) has parameter 0 type change from Range<Base.Index> to Range<MutableRangeReplaceableRandomAccessSlice.Index>
 Func MutableRangeReplaceableSlice.distance(from:to:) has return type change from Base.IndexDistance to MutableRangeReplaceableSlice.IndexDistance
 Func MutableRangeReplaceableSlice.index(_:offsetBy:) has return type change from Base.Index to MutableRangeReplaceableSlice.Index
 Func MutableRangeReplaceableSlice.index(_:offsetBy:limitedBy:) has return type change from Base.Index? to MutableRangeReplaceableSlice.Index?
 Func MutableRangeReplaceableSlice.index(after:) has return type change from Base.Index to MutableRangeReplaceableSlice.Index
-Func MutableRangeReplaceableSlice.insert(_:at:) has 2nd parameter type change from Base.Index to MutableRangeReplaceableSlice.Index
-Func MutableRangeReplaceableSlice.insert(contentsOf:at:) has 2nd parameter type change from Base.Index to MutableRangeReplaceableSlice.Index
-Func MutableRangeReplaceableSlice.remove(at:) has 1st parameter type change from Base.Index to MutableRangeReplaceableSlice.Index
-Func MutableRangeReplaceableSlice.removeSubrange(_:) has 1st parameter type change from Range<Base.Index> to Range<MutableRangeReplaceableSlice.Index>
-Func MutableRangeReplaceableSlice.replaceSubrange(_:with:) has 1st parameter type change from Range<Base.Index> to Range<MutableRangeReplaceableSlice.Index>
+Func MutableRangeReplaceableSlice.insert(_:at:) has parameter 1 type change from Base.Index to MutableRangeReplaceableSlice.Index
+Func MutableRangeReplaceableSlice.insert(contentsOf:at:) has parameter 1 type change from Base.Index to MutableRangeReplaceableSlice.Index
+Func MutableRangeReplaceableSlice.remove(at:) has parameter 0 type change from Base.Index to MutableRangeReplaceableSlice.Index
+Func MutableRangeReplaceableSlice.removeSubrange(_:) has parameter 0 type change from Range<Base.Index> to Range<MutableRangeReplaceableSlice.Index>
+Func MutableRangeReplaceableSlice.replaceSubrange(_:with:) has parameter 0 type change from Range<Base.Index> to Range<MutableRangeReplaceableSlice.Index>
 Func MutableSlice.distance(from:to:) has return type change from Base.IndexDistance to MutableSlice.IndexDistance
 Func MutableSlice.index(_:offsetBy:) has return type change from Base.Index to MutableSlice.Index
 Func MutableSlice.index(_:offsetBy:limitedBy:) has return type change from Base.Index? to MutableSlice.Index?
@@ -142,7 +146,7 @@ Func OptionSet.insert(_:) has return type change from (inserted: Bool, memberAft
 Func OptionSet.remove(_:) has return type change from Self? to Self.Element?
 Func OptionSet.update(with:) has return type change from Self? to Self.Element?
 Func RandomAccessCollection.distance(from:to:) has return type change from Self.IndexDistance to Self.Index.Stride
-Func RandomAccessCollection.index(_:offsetBy:) has 2nd parameter type change from Self.IndexDistance to Self.Index.Stride
+Func RandomAccessCollection.index(_:offsetBy:) has parameter 1 type change from Self.IndexDistance to Self.Index.Stride
 Func RandomAccessSlice.distance(from:to:) has return type change from Base.IndexDistance to RandomAccessSlice.IndexDistance
 Func RandomAccessSlice.index(_:offsetBy:) has return type change from Base.Index to RandomAccessSlice.Index
 Func RandomAccessSlice.index(_:offsetBy:limitedBy:) has return type change from Base.Index? to RandomAccessSlice.Index?
@@ -153,30 +157,30 @@ Func RangeReplaceableBidirectionalSlice.index(_:offsetBy:) has return type chang
 Func RangeReplaceableBidirectionalSlice.index(_:offsetBy:limitedBy:) has return type change from Base.Index? to RangeReplaceableBidirectionalSlice.Index?
 Func RangeReplaceableBidirectionalSlice.index(after:) has return type change from Base.Index to RangeReplaceableBidirectionalSlice.Index
 Func RangeReplaceableBidirectionalSlice.index(before:) has return type change from Base.Index to RangeReplaceableBidirectionalSlice.Index
-Func RangeReplaceableBidirectionalSlice.insert(_:at:) has 2nd parameter type change from Base.Index to RangeReplaceableBidirectionalSlice.Index
-Func RangeReplaceableBidirectionalSlice.insert(contentsOf:at:) has 2nd parameter type change from Base.Index to RangeReplaceableBidirectionalSlice.Index
-Func RangeReplaceableBidirectionalSlice.remove(at:) has 1st parameter type change from Base.Index to RangeReplaceableBidirectionalSlice.Index
-Func RangeReplaceableBidirectionalSlice.removeSubrange(_:) has 1st parameter type change from Range<Base.Index> to Range<RangeReplaceableBidirectionalSlice.Index>
-Func RangeReplaceableBidirectionalSlice.replaceSubrange(_:with:) has 1st parameter type change from Range<Base.Index> to Range<RangeReplaceableBidirectionalSlice.Index>
+Func RangeReplaceableBidirectionalSlice.insert(_:at:) has parameter 1 type change from Base.Index to RangeReplaceableBidirectionalSlice.Index
+Func RangeReplaceableBidirectionalSlice.insert(contentsOf:at:) has parameter 1 type change from Base.Index to RangeReplaceableBidirectionalSlice.Index
+Func RangeReplaceableBidirectionalSlice.remove(at:) has parameter 0 type change from Base.Index to RangeReplaceableBidirectionalSlice.Index
+Func RangeReplaceableBidirectionalSlice.removeSubrange(_:) has parameter 0 type change from Range<Base.Index> to Range<RangeReplaceableBidirectionalSlice.Index>
+Func RangeReplaceableBidirectionalSlice.replaceSubrange(_:with:) has parameter 0 type change from Range<Base.Index> to Range<RangeReplaceableBidirectionalSlice.Index>
 Func RangeReplaceableRandomAccessSlice.distance(from:to:) has return type change from Base.IndexDistance to RangeReplaceableRandomAccessSlice.IndexDistance
 Func RangeReplaceableRandomAccessSlice.index(_:offsetBy:) has return type change from Base.Index to RangeReplaceableRandomAccessSlice.Index
 Func RangeReplaceableRandomAccessSlice.index(_:offsetBy:limitedBy:) has return type change from Base.Index? to RangeReplaceableRandomAccessSlice.Index?
 Func RangeReplaceableRandomAccessSlice.index(after:) has return type change from Base.Index to RangeReplaceableRandomAccessSlice.Index
 Func RangeReplaceableRandomAccessSlice.index(before:) has return type change from Base.Index to RangeReplaceableRandomAccessSlice.Index
-Func RangeReplaceableRandomAccessSlice.insert(_:at:) has 2nd parameter type change from Base.Index to RangeReplaceableRandomAccessSlice.Index
-Func RangeReplaceableRandomAccessSlice.insert(contentsOf:at:) has 2nd parameter type change from Base.Index to RangeReplaceableRandomAccessSlice.Index
-Func RangeReplaceableRandomAccessSlice.remove(at:) has 1st parameter type change from Base.Index to RangeReplaceableRandomAccessSlice.Index
-Func RangeReplaceableRandomAccessSlice.removeSubrange(_:) has 1st parameter type change from Range<Base.Index> to Range<RangeReplaceableRandomAccessSlice.Index>
-Func RangeReplaceableRandomAccessSlice.replaceSubrange(_:with:) has 1st parameter type change from Range<Base.Index> to Range<RangeReplaceableRandomAccessSlice.Index>
+Func RangeReplaceableRandomAccessSlice.insert(_:at:) has parameter 1 type change from Base.Index to RangeReplaceableRandomAccessSlice.Index
+Func RangeReplaceableRandomAccessSlice.insert(contentsOf:at:) has parameter 1 type change from Base.Index to RangeReplaceableRandomAccessSlice.Index
+Func RangeReplaceableRandomAccessSlice.remove(at:) has parameter 0 type change from Base.Index to RangeReplaceableRandomAccessSlice.Index
+Func RangeReplaceableRandomAccessSlice.removeSubrange(_:) has parameter 0 type change from Range<Base.Index> to Range<RangeReplaceableRandomAccessSlice.Index>
+Func RangeReplaceableRandomAccessSlice.replaceSubrange(_:with:) has parameter 0 type change from Range<Base.Index> to Range<RangeReplaceableRandomAccessSlice.Index>
 Func RangeReplaceableSlice.distance(from:to:) has return type change from Base.IndexDistance to RangeReplaceableSlice.IndexDistance
 Func RangeReplaceableSlice.index(_:offsetBy:) has return type change from Base.Index to RangeReplaceableSlice.Index
 Func RangeReplaceableSlice.index(_:offsetBy:limitedBy:) has return type change from Base.Index? to RangeReplaceableSlice.Index?
 Func RangeReplaceableSlice.index(after:) has return type change from Base.Index to RangeReplaceableSlice.Index
-Func RangeReplaceableSlice.insert(_:at:) has 2nd parameter type change from Base.Index to RangeReplaceableSlice.Index
-Func RangeReplaceableSlice.insert(contentsOf:at:) has 2nd parameter type change from Base.Index to RangeReplaceableSlice.Index
-Func RangeReplaceableSlice.remove(at:) has 1st parameter type change from Base.Index to RangeReplaceableSlice.Index
-Func RangeReplaceableSlice.removeSubrange(_:) has 1st parameter type change from Range<Base.Index> to Range<RangeReplaceableSlice.Index>
-Func RangeReplaceableSlice.replaceSubrange(_:with:) has 1st parameter type change from Range<Base.Index> to Range<RangeReplaceableSlice.Index>
+Func RangeReplaceableSlice.insert(_:at:) has parameter 1 type change from Base.Index to RangeReplaceableSlice.Index
+Func RangeReplaceableSlice.insert(contentsOf:at:) has parameter 1 type change from Base.Index to RangeReplaceableSlice.Index
+Func RangeReplaceableSlice.remove(at:) has parameter 0 type change from Base.Index to RangeReplaceableSlice.Index
+Func RangeReplaceableSlice.removeSubrange(_:) has parameter 0 type change from Range<Base.Index> to Range<RangeReplaceableSlice.Index>
+Func RangeReplaceableSlice.replaceSubrange(_:with:) has parameter 0 type change from Range<Base.Index> to Range<RangeReplaceableSlice.Index>
 Func ReversedCollection.distance(from:to:) has return type change from Base.IndexDistance to ReversedCollection.IndexDistance
 Func ReversedCollection.index(_:offsetBy:) has return type change from ReversedIndex<Base> to ReversedCollection.Index
 Func ReversedCollection.index(_:offsetBy:limitedBy:) has return type change from ReversedIndex<Base>? to ReversedCollection.Index?
@@ -187,19 +191,19 @@ Func ReversedRandomAccessCollection.index(_:offsetBy:) has return type change fr
 Func ReversedRandomAccessCollection.index(_:offsetBy:limitedBy:) has return type change from ReversedRandomAccessIndex<Base>? to ReversedRandomAccessCollection.Index?
 Func ReversedRandomAccessCollection.index(after:) has return type change from ReversedRandomAccessIndex<Base> to ReversedRandomAccessCollection.Index
 Func ReversedRandomAccessCollection.index(before:) has return type change from ReversedRandomAccessIndex<Base> to ReversedRandomAccessCollection.Index
-Func Set.formSymmetricDifference(_:) has 1st parameter type change from Set<Element> to Set<Set.Element>
+Func Set.formSymmetricDifference(_:) has parameter 0 type change from Set<Element> to Set<Set.Element>
 Func Set.index(after:) has return type change from SetIndex<Element> to Set<Element>.Index
 Func Set.index(of:) has return type change from SetIndex<Element>? to Set<Element>.Index?
 Func Set.intersection(_:) has return type change from Set<Element> to Set<Set.Element>
-Func Set.isDisjoint(with:) has 1st parameter type change from Set<Element> to Set<Set.Element>
-Func Set.isStrictSubset(of:) has 1st parameter type change from Set<Element> to Set<Set.Element>
-Func Set.isStrictSuperset(of:) has 1st parameter type change from Set<Element> to Set<Set.Element>
-Func Set.isSubset(of:) has 1st parameter type change from Set<Element> to Set<Set.Element>
-Func Set.isSuperset(of:) has 1st parameter type change from Set<Element> to Set<Set.Element>
+Func Set.isDisjoint(with:) has parameter 0 type change from Set<Element> to Set<Set.Element>
+Func Set.isStrictSubset(of:) has parameter 0 type change from Set<Element> to Set<Set.Element>
+Func Set.isStrictSuperset(of:) has parameter 0 type change from Set<Element> to Set<Set.Element>
+Func Set.isSubset(of:) has parameter 0 type change from Set<Element> to Set<Set.Element>
+Func Set.isSuperset(of:) has parameter 0 type change from Set<Element> to Set<Set.Element>
 Func Set.popFirst() has return type change from Element? to Set.Element?
-Func Set.remove(at:) has 1st parameter type change from SetIndex<Element> to Set<Element>.Index
+Func Set.remove(at:) has parameter 0 type change from SetIndex<Element> to Set<Element>.Index
 Func Set.removeFirst() has return type change from Element to Set.Element
-Func Set.subtract(_:) has 1st parameter type change from Set<Element> to Set<Set.Element>
+Func Set.subtract(_:) has parameter 0 type change from Set<Element> to Set<Set.Element>
 Func Set.subtracting(_:) has return type change from Set<Element> to Set<Set.Element>
 Func Set.symmetricDifference(_:) has return type change from Set<Element> to Set<Set.Element>
 Func Set.union(_:) has return type change from Set<Element> to Set<Set.Element>
@@ -209,7 +213,7 @@ Func Slice.index(_:offsetBy:limitedBy:) has return type change from Base.Index? 
 Func Slice.index(after:) has return type change from Base.Index to Slice.Index
 
 /* Function type change */
-Func UnsafePointer.withMemoryRebound(to:capacity:_:) has 3rd parameter type change from (UnsafeMutablePointer<T>) throws -> Result to (UnsafePointer<T>) throws -> Result
+Func UnsafePointer.withMemoryRebound(to:capacity:_:) has parameter 2 type change from (UnsafeMutablePointer<T>) throws -> Result to (UnsafePointer<T>) throws -> Result
 
 /* FIXME: Bogus */
 Func Zip2Iterator.next() has return type change from (Iterator1.Element, Iterator2.Element)? to Zip2Iterator.Element?

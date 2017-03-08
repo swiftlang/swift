@@ -31,7 +31,6 @@
 #include "swift/AST/TypeWalker.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Defer.h"
-#include "swift/Basic/Fallthrough.h"
 #include "swift/Basic/PrimitiveParsing.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/Basic/StringExtras.h"
@@ -44,6 +43,7 @@
 #include "clang/AST/DeclObjC.h"
 #include "clang/Basic/Module.h"
 #include "llvm/ADT/StringSwitch.h"
+#include "llvm/Support/Compiler.h"
 #include "llvm/Support/ConvertUTF.h"
 #include "llvm/Support/SaveAndRestore.h"
 #include "llvm/Support/raw_ostream.h"
@@ -224,19 +224,18 @@ struct SynthesizedExtensionAnalyzer::Implementation {
     // Get the substitutions from the generic signature of
     // the extension to the interface types of the base type's
     // declaration.
-    TypeSubstitutionMap subMap;
-    if (!BaseType->isExistentialType())
-      subMap = BaseType->getContextSubstitutions(Ext);
     auto *M = DC->getParentModule();
+    SubstitutionMap subMap;
+    if (!BaseType->isExistentialType())
+      subMap = BaseType->getContextSubstitutionMap(M, Ext);
 
     assert(Ext->getGenericSignature() && "No generic signature.");
     for (auto Req : Ext->getGenericSignature()->getRequirements()) {
       auto Kind = Req.getKind();
 
-      Type First = Req.getFirstType().subst(
-          M, subMap, SubstOptions());
-      Type Second = Req.getSecondType().subst(
-          M, subMap, SubstOptions());
+      Type First = Req.getFirstType().subst(subMap);
+      Type Second = Req.getSecondType().subst(subMap);
+
       if (!First || !Second) {
         // Substitution with interface type bases can only fail
         // if a concrete type fails to conform to a protocol.
@@ -582,17 +581,35 @@ ASTPrinter &ASTPrinter::operator<<(DeclName name) {
   return *this;
 }
 
-ASTPrinter &operator<<(ASTPrinter &printer, tok keyword) {
-  StringRef name;
+llvm::raw_ostream &swift::
+operator<<(llvm::raw_ostream &OS, tok keyword) {
   switch (keyword) {
-
-#define KEYWORD(KW) case tok::kw_##KW: name = #KW; break;
-#define POUND_KEYWORD(KW) case tok::pound_##KW: name = "#"#KW; break;
-#include "swift/Parse/Tokens.def"
+#define KEYWORD(KW) case tok::kw_##KW: OS << #KW; break;
+#define POUND_KEYWORD(KW) case tok::pound_##KW: OS << "#"#KW; break;
+#define PUNCTUATOR(PUN, TEXT) case tok::PUN: OS << TEXT; break;
+#include "swift/Syntax/TokenKinds.def"
   default:
-    llvm_unreachable("unexpected keyword kind");
+    llvm_unreachable("unexpected keyword or punctuator kind");
   }
-  printer.printKeyword(name);
+  return OS;
+}
+
+uint8_t swift::getKeywordLen(tok keyword) {
+  switch (keyword) {
+#define KEYWORD(KW) case tok::kw_##KW: return StringRef(#KW).size();
+#define POUND_KEYWORD(KW) case tok::pound_##KW: return StringRef("#"#KW).size();
+#define PUNCTUATOR(PUN, TEXT) case tok::PUN: return StringRef(TEXT).size();
+#include "swift/Syntax/TokenKinds.def"
+  default:
+    llvm_unreachable("unexpected keyword or punctuator kind");
+  }
+}
+
+ASTPrinter &operator<<(ASTPrinter &printer, tok keyword) {
+  SmallString<16> Buffer;
+  llvm::raw_svector_ostream OS(Buffer);
+  OS << keyword;
+  printer.printKeyword(Buffer.str());
   return printer;
 }
 
@@ -629,7 +646,7 @@ void ASTPrinter::printName(Identifier Name, PrintNameContext Context) {
   bool IsKeyword = llvm::StringSwitch<bool>(Name.str())
 #define KEYWORD(KW) \
       .Case(#KW, true)
-#include "swift/Parse/Tokens.def"
+#include "swift/Syntax/TokenKinds.def"
       .Default(false);
 
   if (IsKeyword)
@@ -874,9 +891,9 @@ class PrintAST : public ASTVisitor<PrintAST> {
       assert(DC->isTypeContext());
 
       // Get the substitutions from our base type.
-      auto subMap = CurrentType->getContextSubstitutions(DC);
       auto *M = DC->getParentModule();
-      T = T.subst(M, subMap, SubstFlags::DesugarMemberTypes);
+      auto subMap = CurrentType->getContextSubstitutionMap(M, DC);
+      T = T.subst(subMap, SubstFlags::DesugarMemberTypes);
     }
 
     printType(T);
@@ -995,9 +1012,9 @@ public:
     Type OldType = CurrentType;
     if (CurrentType && (Old != nullptr || Options.PrintAsMember)) {
       if (auto *NTD = dyn_cast<NominalTypeDecl>(D)) {
-        CurrentType = NTD->getDeclaredInterfaceType().subst(
-            Options.CurrentModule,
-            CurrentType->getContextSubstitutions(NTD->getDeclContext()));
+        auto Subs = CurrentType->getContextSubstitutionMap(
+          Options.CurrentModule, NTD->getDeclContext());
+        CurrentType = NTD->getDeclaredInterfaceType().subst(Subs);
       }
     }
 
@@ -1268,16 +1285,18 @@ void PrintAST::printSingleDepthOfGenericSignature(
   bool printParams = (flags & PrintParams);
   bool printRequirements = (flags & PrintRequirements);
 
-  TypeSubstitutionMap subMap;
-  ModuleDecl *M = nullptr;
-
+  SubstitutionMap subMap;
   if (CurrentType) {
     if (!CurrentType->isExistentialType()) {
       auto *DC = Current->getInnermostDeclContext()->getInnermostTypeContext();
-      subMap = CurrentType->getContextSubstitutions(DC);
-      M = DC->getParentModule();
+      auto *M = DC->getParentModule();
+      subMap = CurrentType->getContextSubstitutionMap(M, DC);
     }
   }
+
+  auto substParam = [&](Type param) -> Type {
+    return param.subst(subMap);
+  };
 
   if (printParams) {
     // Print the generic parameters.
@@ -1290,7 +1309,7 @@ void PrintAST::printSingleDepthOfGenericSignature(
         Printer << ", ";
 
       if (!subMap.empty()) {
-        if (auto argTy = Type(param).subst(M, subMap))
+        if (auto argTy = substParam(param))
           printType(argTy);
         else
           printType(param);
@@ -1305,7 +1324,6 @@ void PrintAST::printSingleDepthOfGenericSignature(
   }
 
   if (printRequirements) {
-    // Print the requirements.
     bool isFirstReq = true;
     for (const auto &req : requirements) {
       auto first = req.getFirstType();
@@ -1322,10 +1340,10 @@ void PrintAST::printSingleDepthOfGenericSignature(
       }
 
       if (!subMap.empty()) {
-        if (Type subFirst = first.subst(M, subMap))
+        if (Type subFirst = substParam(first))
           first = subFirst;
         if (second) {
-          if (Type subSecond = second.subst(M, subMap))
+          if (Type subSecond = substParam(second))
             second = subSecond;
           if (!(first->is<ArchetypeType>() || first->isTypeParameter()) &&
               !(second->is<ArchetypeType>() || second->isTypeParameter()))
@@ -1340,6 +1358,7 @@ void PrintAST::printSingleDepthOfGenericSignature(
         Printer << ", ";
       }
 
+      Printer.callPrintStructurePre(PrintStructureKind::GenericRequirement);
       if (second) {
         Requirement substReq(req.getKind(), first, second);
         printRequirement(substReq);
@@ -1347,6 +1366,7 @@ void PrintAST::printSingleDepthOfGenericSignature(
         Requirement substReq(req.getKind(), first, req.getLayoutConstraint());
         printRequirement(substReq);
       }
+      Printer.printStructurePost(PrintStructureKind::GenericRequirement);
     }
   }
 
@@ -2402,7 +2422,7 @@ void PrintAST::printOneParameter(const ParamDecl *param,
         Printer.printName(BodyName, PrintNameContext::FunctionParameterLocal);
         break;
       }
-      SWIFT_FALLTHROUGH;
+      LLVM_FALLTHROUGH;
     case PrintOptions::ArgAndParamPrintingMode::BothAlways:
       Printer.printName(ArgName, PrintNameContext::FunctionParameterExternal);
       Printer << " ";
@@ -4120,7 +4140,10 @@ void Requirement::dump() const {
   }
 
   if (getFirstType()) llvm::errs() << getFirstType() << " ";
-  if (getSecondType()) llvm::errs() << getSecondType();
+  if (getKind() != RequirementKind::Layout && getSecondType())
+    llvm::errs() << getSecondType();
+  else if (getLayoutConstraint())
+    llvm::errs() << getLayoutConstraint();
   llvm::errs() << "\n";
 }
 

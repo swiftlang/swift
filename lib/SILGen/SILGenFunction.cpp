@@ -18,7 +18,6 @@
 #include "SILGenFunction.h"
 #include "RValue.h"
 #include "Scope.h"
-#include "swift/Basic/Fallthrough.h"
 #include "swift/AST/AST.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Initializer.h"
@@ -52,8 +51,6 @@ SILGenFunction::~SILGenFunction() {
   // If we didn't clean up the rethrow destination, we screwed up somewhere.
   assert(!ThrowDest.isValid() &&
          "SILGenFunction did not emit throw destination");
-
-  freeWritebackStack();
 }
 
 //===----------------------------------------------------------------------===//
@@ -183,11 +180,11 @@ SILValue SILGenFunction::emitGlobalFunctionRef(SILLocation loc,
   return B.createFunctionRef(loc, f);
 }
 
-std::tuple<ManagedValue, SILType, ArrayRef<Substitution>>
+std::tuple<ManagedValue, SILType, SubstitutionList>
 SILGenFunction::emitSiblingMethodRef(SILLocation loc,
                                      SILValue selfValue,
                                      SILDeclRef methodConstant,
-                                     ArrayRef<Substitution> subs) {
+                                     SubstitutionList subs) {
   SILValue methodValue;
 
   // If the method is dynamic, access it through runtime-hookable virtual
@@ -365,7 +362,7 @@ void SILGenFunction::emitCaptures(SILLocation loc,
 ManagedValue
 SILGenFunction::emitClosureValue(SILLocation loc, SILDeclRef constant,
                                  CanType expectedType,
-                                 ArrayRef<Substitution> subs) {
+                                 SubstitutionList subs) {
   auto closure = *constant.getAnyFunctionRef();
   auto captureInfo = closure.getCaptureInfo();
   auto loweredCaptureInfo = SGM.Types.getLoweredLocalCaptures(closure);
@@ -742,7 +739,7 @@ static SILValue getNextUncurryLevelRef(SILGenFunction &gen,
                                        SILDeclRef next,
                                        bool direct,
                                        ArrayRef<SILValue> curriedArgs,
-                                       ArrayRef<Substitution> curriedSubs) {
+                                       SubstitutionList curriedSubs) {
   if (next.isForeign || next.isCurried || !next.hasDecl() || direct)
     return gen.emitGlobalFunctionRef(loc, next.asForeign(false));
 
@@ -828,7 +825,7 @@ void SILGenFunction::emitCurryThunk(ValueDecl *vd,
   }
 
   // Forward substitutions.
-  ArrayRef<Substitution> subs;
+  SubstitutionList subs;
   auto constantInfo = getConstantInfo(to);
   if (auto *env = constantInfo.GenericEnv)
     subs = env->getForwardingSubstitutions();

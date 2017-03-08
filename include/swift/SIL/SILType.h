@@ -28,8 +28,10 @@
 #include "swift/SIL/SILDeclRef.h"
 
 namespace swift {
-  class ASTContext;
-  class VarDecl;
+
+class ASTContext;
+class VarDecl;
+class SILFunction;
 
 namespace Lowering {
   class AbstractionPattern;
@@ -127,12 +129,6 @@ public:
     return SILType(T, SILValueCategory::Address);
   }
 
-  ///  Apply a substitution to the function type.
-  static CanSILFunctionType substFuncType(SILModule &silModule,
-                                          const SubstitutionMap &subs,
-                                          CanSILFunctionType SrcTy,
-                                          bool dropGenerics);
-
   bool isNull() const { return value.getPointer() == nullptr; }
   explicit operator bool() const { return bool(value.getPointer()); }
 
@@ -165,15 +161,6 @@ public:
   /// Returns the Swift type referenced by this SIL type.
   CanType getSwiftRValueType() const {
     return CanType(value.getPointer());
-  }
-
-  /// Returns the Swift type equivalent to this SIL type. If the SIL type is
-  /// an address type, returns an InOutType.
-  CanType getSwiftType() const {
-    CanType rvalueTy = getSwiftRValueType();
-    if (isAddress())
-      return CanInOutType::get(rvalueTy);
-    return rvalueTy;
   }
   
   /// Returns the AbstractCC of a function type.
@@ -434,13 +421,22 @@ public:
   ///
   /// Only call this with function types!
   SILType substGenericArgs(SILModule &M,
-                           ArrayRef<Substitution> Subs) const;
+                           SubstitutionList Subs) const;
+
+  /// If the original type is generic, pass the signature as genericSig.
+  ///
+  /// If the replacement types are generic, you must push a generic context
+  /// first.
+  SILType subst(SILModule &silModule,
+                TypeSubstitutionFn subs,
+                LookupConformanceFn conformances,
+                CanGenericSignature genericSig=CanGenericSignature()) const;
 
   SILType subst(SILModule &silModule, const SubstitutionMap &subs) const;
 
   /// If this is a specialized generic type, return all substitutions used to
   /// generate it.
-  ArrayRef<Substitution> gatherAllSubstitutions(SILModule &M);
+  SubstitutionList gatherAllSubstitutions(SILModule &M);
 
   /// Return true if this type references a "ref" type that has a single pointer
   /// representation. Class existentials do not always qualify.
@@ -467,6 +463,13 @@ public:
   /// Returns the lowered T if the given type is Optional<T>.
   /// Otherwise directly returns the given type.
   SILType unwrapAnyOptionalType() const;
+
+  /// Wraps one level of optional type.
+  ///
+  /// Returns the lowered Optional<T> if the given type is T.
+  ///
+  /// \arg F The SILFunction where the SILType is used.
+  SILType wrapAnyOptionalType(SILFunction &F) const;
 
   /// Returns true if this is the AnyObject SILType;
   bool isAnyObject() const { return getSwiftRValueType()->isAnyObject(); }

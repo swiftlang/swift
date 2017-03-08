@@ -52,12 +52,12 @@ NOTE(previous_decldef,none,
      "previous %select{declaration|definition}0 of %1 is here",
      (bool, Identifier))
 
+NOTE(brace_stmt_suggest_do,none,
+     "did you mean to use a 'do' statement?", ())
 
 // Generic disambiguation
 NOTE(while_parsing_as_left_angle_bracket,none,
      "while parsing this '<' as a type parameter bracket", ())
-NOTE(while_parsing_as_less_operator,none,
-     "while parsing this '<' as an operator", ())
 
 
 // FIXME: This is used both as a parse error (a literal "super" outside a

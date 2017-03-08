@@ -47,6 +47,8 @@ KNOWN_SETTINGS=(
     build-dir                   ""               "out-of-tree build directory; default is in-tree. **This argument is required**"
     host-cc                     ""               "the path to CC, the 'clang' compiler for the host platform. **This argument is required**"
     host-cxx                    ""               "the path to CXX, the 'clang++' compiler for the host platform. **This argument is required**"
+    host-lipo                   ""               "the path to lipo for creating universal binaries on Darwin"
+    host-libtool                ""               "the path to libtool"
     darwin-xcrun-toolchain      "default"        "the name of the toolchain to use on Darwin"
     ninja-bin                   ""               "the path to Ninja tool"
     cmark-build-type            "Debug"          "the CMake build variant for CommonMark (Debug, RelWithDebInfo, Release, MinSizeRel).  Defaults to Debug."
@@ -69,6 +71,7 @@ KNOWN_SETTINGS=(
     swift-stdlib-build-type     "Debug"          "the CMake build variant for Swift"
     swift-stdlib-enable-assertions "1"           "enable assertions in Swift"
     swift-stdlib-enable-resilience "0"           "build the Swift stdlib and overlays with resilience enabled"
+    swift-stdlib-use-nonatomic-rc "0"            "build the Swift stdlib and overlays with nonatomic reference count operations enabled"
     swift-stdlib-sil-serialize-all "1"           "build the Swift stdlib and overlays with all method bodies serialized"
     lldb-build-type             "Debug"          "the CMake build variant for LLDB"
     llbuild-build-type          "Debug"          "the CMake build variant for llbuild"
@@ -722,7 +725,6 @@ function set_build_options_for_host() {
     llvm_cmake_options+=(
         -DLLVM_TOOL_COMPILER_RT_BUILD:BOOL="$(false_true ${SKIP_BUILD_COMPILER_RT})"
         -DLLVM_BUILD_EXTERNAL_COMPILER_RT:BOOL="$(false_true ${SKIP_BUILD_COMPILER_RT})"
-        -DLLVM_DISABLE_ABI_BREAKING_CHECKS_ENFORCING:BOOL=TRUE
     )
 
     # If we are asked to not generate test targets for LLVM and or Swift,
@@ -1208,41 +1210,6 @@ LIBICU_SOURCE_DIR="${WORKSPACE}/icu"
 PLAYGROUNDLOGGER_SOURCE_DIR="${WORKSPACE}/swift-xcode-playground-support/PlaygroundLogger"
 PLAYGROUNDSUPPORT_SOURCE_DIR="${WORKSPACE}/swift-xcode-playground-support/PlaygroundSupport"
 
-if [[ ! -d ${CMARK_SOURCE_DIR} ]]; then
-    echo "Couldn't find cmark source directory."
-    exit 1
-fi
-
-if [[ ! "${SKIP_BUILD_LLBUILD}" && ! -d ${LLBUILD_SOURCE_DIR} ]]; then
-    echo "Couldn't find llbuild source directory."
-    exit 1
-fi
-
-if [[ ! "${SKIP_BUILD_SWIFTPM}" && ! -d ${SWIFTPM_SOURCE_DIR} ]]; then
-    echo "Couldn't find swiftpm source directory."
-    exit 1
-fi
-
-if [[ ! "${SKIP_BUILD_XCTEST}" && ! -d ${XCTEST_SOURCE_DIR} ]]; then
-    echo "Couldn't find XCTest source directory."
-    exit 1
-fi
-
-if [[ ! "${SKIP_BUILD_FOUNDATION}" && ! -d ${FOUNDATION_SOURCE_DIR} ]]; then
-    echo "Couldn't find Foundation source directory."
-    exit 1
-fi
-
-if [[ ! "${SKIP_BUILD_LIBDISPATCH}" && ! -d ${LIBDISPATCH_SOURCE_DIR} ]]; then
-    echo "Couldn't find libdispatch source directory."
-    exit 1
-fi
-
-if [[ ! "${SKIP_BUILD_LIBICU}" && ! -d ${LIBICU_SOURCE_DIR} ]]; then
-    echo "Couldn't find libicu source directory."
-    exit 1
-fi
-
 if [[ ! "${SKIP_BUILD_PLAYGROUNDLOGGER}" && ! -d ${PLAYGROUNDLOGGER_SOURCE_DIR} ]]; then
     echo "Couldn't find PlaygroundLogger source directory."
     exit 1
@@ -1687,6 +1654,9 @@ function swift_c_flags() {
     if [[ $(is_cmake_release_build_type "${SWIFT_BUILD_TYPE}") ]] ; then
         echo -n " -fno-stack-protector"
     fi
+    if [[ "$(true_false "${SWIFT_STDLIB_USE_NONATOMIC_RC}")" == "TRUE" ]]; then
+        echo -n " -DSWIFT_STDLIB_USE_NONATOMIC_RC"
+    fi
 }
 
 function cmake_config_opt() {
@@ -1986,6 +1956,13 @@ for host in "${ALL_HOSTS[@]}"; do
                     build_targets=(llvm-tblgen clang-headers)
                 fi
 
+                if [ "${HOST_LIBTOOL}" ] ; then
+                    cmake_options=(
+                        "${cmake_options[@]}"
+                        -DCMAKE_LIBTOOL:PATH="${HOST_LIBTOOL}"
+                    )
+                fi
+
                 # Note: we set the variable:
                 #
                 # LLVM_TOOL_SWIFT_BUILD
@@ -2120,6 +2097,13 @@ for host in "${ALL_HOSTS[@]}"; do
                     )
                 fi
 
+                if [ "${HOST_LIPO}" ] ; then
+                    cmake_options=(
+                        "${cmake_options[@]}"
+                        -DSWIFT_LIPO:PATH="${HOST_LIPO}"
+                    )
+                fi
+
                 cmake_options=(
                     "${cmake_options[@]}"
                     -DCMAKE_C_FLAGS="$(swift_c_flags ${host})"
@@ -2132,6 +2116,7 @@ for host in "${ALL_HOSTS[@]}"; do
                     -DSWIFT_STDLIB_BUILD_TYPE:STRING="${SWIFT_STDLIB_BUILD_TYPE}"
                     -DSWIFT_STDLIB_ASSERTIONS:BOOL=$(true_false "${SWIFT_STDLIB_ENABLE_ASSERTIONS}")
                     -DSWIFT_STDLIB_ENABLE_RESILIENCE:BOOL=$(true_false "${SWIFT_STDLIB_ENABLE_RESILIENCE}")
+                    -DSWIFT_STDLIB_USE_NONATOMIC_RC:BOOL=$(true_false "${SWIFT_STDLIB_USE_NONATOMIC_RC}")
                     -DSWIFT_STDLIB_SIL_SERIALIZE_ALL:BOOL=$(true_false "${SWIFT_STDLIB_SIL_SERIALIZE_ALL}")
                     -DSWIFT_NATIVE_LLVM_TOOLS_PATH:STRING="${native_llvm_tools_path}"
                     -DSWIFT_NATIVE_CLANG_TOOLS_PATH:STRING="${native_clang_tools_path}"
@@ -3384,7 +3369,13 @@ if [[ ${#LIPO_SRC_DIRS[@]} -gt 0 ]]; then
     
     echo "--- Merging and running lipo ---"
     
-    call "${SWIFT_SOURCE_DIR}"/utils/recursive-lipo --lipo=$(xcrun_find_tool lipo) --copy-subdirs="$(get_host_install_prefix ${host})lib/swift $(get_host_install_prefix ${host})lib/swift_static" --destination="$(get_host_install_destdir ${mergedHost})" ${LIPO_SRC_DIRS[@]}
+    # Allow passing lipo with --host-lipo
+    if [[ -z "${HOST_LIPO}" ]] ; then
+        LIPO_PATH=$(xcrun_find_tool lipo)
+    else
+        LIPO_PATH="${HOST_LIPO}"
+    fi
+    call "${SWIFT_SOURCE_DIR}"/utils/recursive-lipo --lipo=${LIPO_PATH} --copy-subdirs="$(get_host_install_prefix ${host})lib/swift $(get_host_install_prefix ${host})lib/swift_static" --destination="$(get_host_install_destdir ${mergedHost})" ${LIPO_SRC_DIRS[@]}
 
     # Build and test the lipo-ed package.
     build_and_test_installable_package ${mergedHost}

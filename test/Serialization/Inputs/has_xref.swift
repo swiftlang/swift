@@ -3,6 +3,7 @@ import has_alias
 
 public func numeric(_ x: MyInt64) {}
 public func conditional(_ x: AliasWrapper.Boolean) {}
+public func conditional2(_ x: ProtoWrapper.Boolean) {}
 public func longInt(_ x: Int.EspeciallyMagicalInt) {}
 
 public func numericArray(_ x: IntSlice) {}

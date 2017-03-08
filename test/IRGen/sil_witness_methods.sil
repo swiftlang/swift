@@ -19,14 +19,14 @@ protocol P {
   func generic_method<Z>(x: Z)
 }
 
-// CHECK-LABEL: define{{( protected)?}} %swift.type* @concrete_type_concrete_method_witness(%V19sil_witness_methods3Foo* noalias nocapture, %swift.type* %Self, i8** %SelfWitnessTable)
+// CHECK-LABEL: define{{( protected)?}} swiftcc %swift.type* @concrete_type_concrete_method_witness(%T19sil_witness_methods3FooV* noalias nocapture swiftself, %swift.type* %Self, i8** %SelfWitnessTable)
 sil @concrete_type_concrete_method_witness : $@convention(witness_method) (@in Foo) -> @thick Foo.Type {
 entry(%x : $*Foo):
   %m = metatype $@thick Foo.Type
   return %m : $@thick Foo.Type
 }
 
-// CHECK-LABEL: define{{( protected)?}} %swift.type* @generic_type_concrete_method_witness(%C19sil_witness_methods3Bar** noalias nocapture dereferenceable({{.*}}), %swift.type* %Self, i8** %SelfWitnessTable)
+// CHECK-LABEL: define{{( protected)?}} swiftcc %swift.type* @generic_type_concrete_method_witness(%T19sil_witness_methods3BarC** noalias nocapture swiftself dereferenceable({{.*}}), %swift.type* %Self, i8** %SelfWitnessTable)
 // CHECK:         [[T0:%.*]] = bitcast %swift.type* %Self to %swift.type**
 // CHECK:         [[T1:%.*]] = getelementptr inbounds %swift.type*, %swift.type** [[T0]], i64 10
 // CHECK:         %T = load %swift.type*, %swift.type** [[T1]], align 8
@@ -48,7 +48,7 @@ entry(%x : $*Bar<T, U, V>):
 
 // TODO: %Self Type arg is redundant for static method witness
 
-// CHECK-LABEL: define{{( protected)?}} %swift.type* @concrete_type_concrete_static_method_witness(%swift.type*, %swift.type* %Self, i8** %SelfWitnessTable)
+// CHECK-LABEL: define{{( protected)?}} swiftcc %swift.type* @concrete_type_concrete_static_method_witness(%swift.type* swiftself, %swift.type* %Self, i8** %SelfWitnessTable)
 sil @concrete_type_concrete_static_method_witness : $@convention(witness_method) (@thick Foo.Type) -> @thick Foo.Type {
 entry(%x : $@thick Foo.Type):
   %m = metatype $@thick Foo.Type
@@ -56,7 +56,7 @@ entry(%x : $@thick Foo.Type):
 }
 
 //   The use of %0 or %Self here is irrelevant.
-// CHECK-LABEL: define{{( protected)?}} %swift.type* @generic_type_concrete_static_method_witness(%swift.type*, %swift.type* %Self, i8** %SelfWitnessTable)
+// CHECK-LABEL: define{{( protected)?}} swiftcc %swift.type* @generic_type_concrete_static_method_witness(%swift.type* swiftself, %swift.type* %Self, i8** %SelfWitnessTable)
 // CHECK:         [[T0:%.*]] = bitcast %swift.type* %Self to %swift.type**
 // CHECK:         [[T1:%.*]] = getelementptr inbounds %swift.type*, %swift.type** [[T0]], i64 10
 // CHECK:         %T = load %swift.type*, %swift.type** [[T1]], align 8
@@ -78,14 +78,14 @@ entry(%x : $@thick Bar<T, U, V>.Type):
 
 // TODO: %Self Type arg is redundant for class method witness
 
-// CHECK-LABEL: define{{( protected)?}} %swift.type* @concrete_type_generic_method_witness(%swift.opaque* noalias nocapture, %swift.type* %Z, %V19sil_witness_methods3Foo* noalias nocapture, %swift.type* %Self, i8** %SelfWitnessTable)
+// CHECK-LABEL: define{{( protected)?}} swiftcc %swift.type* @concrete_type_generic_method_witness(%swift.opaque* noalias nocapture, %swift.type* %Z, %T19sil_witness_methods3FooV* noalias nocapture swiftself, %swift.type* %Self, i8** %SelfWitnessTable)
 sil @concrete_type_generic_method_witness : $@convention(witness_method) <Z> (@in Z, @in Foo) -> @thick Foo.Type {
 entry(%z : $*Z, %x : $*Foo):
   %m = metatype $@thick Foo.Type
   return %m : $@thick Foo.Type
 }
 
-// CHECK-LABEL: define{{( protected)?}} %swift.type* @generic_type_generic_method_witness(%swift.opaque* noalias nocapture, %swift.type* %Z, %C19sil_witness_methods3Bar** noalias nocapture dereferenceable({{.*}}), %swift.type* %Self, i8** %SelfWitnessTable)
+// CHECK-LABEL: define{{( protected)?}} swiftcc %swift.type* @generic_type_generic_method_witness(%swift.opaque* noalias nocapture, %swift.type* %Z, %T19sil_witness_methods3BarC{{.*}}** noalias nocapture swiftself dereferenceable(8), %swift.type* %Self, i8** %SelfWitnessTable)
 sil @generic_type_generic_method_witness : $@convention(witness_method) <T, U, V, Z> (@in Z, @in Bar<T, U, V>) -> @thick Bar<T, U, V>.Type {
 entry(%z : $*Z, %x : $*Bar<T, U, V>):
   %t = metatype $@thick T.Type
@@ -96,14 +96,14 @@ entry(%z : $*Z, %x : $*Bar<T, U, V>):
   return %m : $@thick Bar<T, U, V>.Type
 }
 
-// CHECK-LABEL: define{{( protected)?}} %swift.type* @concrete_type_generic_static_method_witness(%swift.opaque* noalias nocapture, %swift.type* %Z, %swift.type*, %swift.type* %Self, i8** %SelfWitnessTable)
+// CHECK-LABEL: define{{( protected)?}} swiftcc %swift.type* @concrete_type_generic_static_method_witness(%swift.opaque* noalias nocapture, %swift.type* %Z, %swift.type* swiftself, %swift.type* %Self, i8** %SelfWitnessTable)
 sil @concrete_type_generic_static_method_witness : $@convention(witness_method) <Z> (@in Z, @thick Foo.Type) -> @thick Foo.Type {
 entry(%z : $*Z, %x : $@thick Foo.Type):
   %m = metatype $@thick Foo.Type
   return %m : $@thick Foo.Type
 }
 
-// CHECK-LABEL: define{{( protected)?}} %swift.type* @generic_type_generic_static_method_witness(%swift.opaque* noalias nocapture, %swift.type* %Z, %swift.type*, %swift.type* %Self, i8** %SelfWitnessTable)
+// CHECK-LABEL: define{{( protected)?}} swiftcc %swift.type* @generic_type_generic_static_method_witness(%swift.opaque* noalias nocapture, %swift.type* %Z, %swift.type* swiftself, %swift.type* %Self, i8** %SelfWitnessTable)
 sil @generic_type_generic_static_method_witness : $@convention(witness_method) <T, U, V, Z> (@in Z, @thick Bar<T, U, V>.Type) -> @thick Bar<T, U, V>.Type {
 entry(%z : $*Z, %x : $@thick Bar<T, U, V>.Type):
   %t = metatype $@thick T.Type
@@ -114,8 +114,8 @@ entry(%z : $*Z, %x : $@thick Bar<T, U, V>.Type):
   return %m : $@thick Bar<T, U, V>.Type
 }
 
-// CHECK-LABEL: define{{( protected)?}} void @call_concrete_witness() {{.*}} {
-// CHECK:         call %swift.type* @concrete_type_concrete_method_witness(%V19sil_witness_methods3Foo* {{.*}}, %swift.type* {{.*}} @_TMfV19sil_witness_methods3Foo, {{.*}})
+// CHECK-LABEL: define{{( protected)?}} swiftcc void @call_concrete_witness() {{.*}} {
+// CHECK:         call swiftcc %swift.type* @concrete_type_concrete_method_witness(%T19sil_witness_methods3FooV* {{.*}}, %swift.type* {{.*}} @_TMfV19sil_witness_methods3Foo, {{.*}})
 sil @call_concrete_witness : $(Foo) -> () {
 entry(%x : $Foo):
   %m = alloc_stack $Foo
@@ -126,8 +126,8 @@ entry(%x : $Foo):
   return undef : $()
 }
 
-// CHECK-LABEL: define{{( protected)?}} void @call_concrete_static_witness() {{.*}} {
-// CHECK:         call %swift.type* @concrete_type_concrete_static_method_witness(%swift.type* {{.*}} @_TMfV19sil_witness_methods3Foo, {{.*}} %swift.type* {{.*}} @_TMfV19sil_witness_methods3Foo, {{.*}})
+// CHECK-LABEL: define{{( protected)?}} swiftcc void @call_concrete_static_witness() {{.*}} {
+// CHECK:         call swiftcc %swift.type* @concrete_type_concrete_static_method_witness(%swift.type* {{.*}} @_TMfV19sil_witness_methods3Foo, {{.*}} %swift.type* {{.*}} @_TMfV19sil_witness_methods3Foo, {{.*}})
 sil @call_concrete_static_witness : $() -> () {
 entry:
   %m = metatype $@thick Foo.Type
@@ -136,12 +136,12 @@ entry:
   return undef : $()
 }
 
-// CHECK-LABEL: define{{( protected)?}} { i8*, %swift.refcounted* } @partial_apply_concrete_witness() {{.*}} {
+// CHECK-LABEL: define{{( protected)?}} swiftcc { i8*, %swift.refcounted* } @partial_apply_concrete_witness() {{.*}} {
 // CHECK:         [[CONTEXT:%.*]] = call noalias %swift.refcounted* @swift_rt_swift_allocObject({{.*}})
 // CHECK:         [[LAYOUT:%.*]] = bitcast %swift.refcounted* [[CONTEXT]] to <{ %swift.refcounted, i8* }>*
 // CHECK:         [[WTABLE:%.*]] = getelementptr inbounds <{ %swift.refcounted, i8* }>, <{ %swift.refcounted, i8* }>* [[LAYOUT]], i32 0, i32 1
 // CHECK:         store i8* null, i8** [[WTABLE]]
-// CHECK:         [[RESULT:%.*]] = insertvalue { i8*, %swift.refcounted* } { i8* bitcast (%swift.type* (%GC19sil_witness_methods3BarVS_3FooS1_S1__**, %swift.refcounted*)* @_TPA_generic_type_concrete_method_witness to i8*), %swift.refcounted* undef }, %swift.refcounted* [[CONTEXT]], 1
+// CHECK:         [[RESULT:%.*]] = insertvalue { i8*, %swift.refcounted* } { i8* bitcast (%swift.type* (%T19sil_witness_methods3BarCyAA3FooVA2EG**, %swift.refcounted*)* @_TPA_generic_type_concrete_method_witness to i8*), %swift.refcounted* undef }, %swift.refcounted* [[CONTEXT]], 1
 // CHECK:         ret { i8*, %swift.refcounted* } [[RESULT]]
 
 sil @partial_apply_concrete_witness : $() -> @callee_owned (@in Bar<Foo, Foo, Foo>) -> @thick Bar<Foo, Foo, Foo>.Type {

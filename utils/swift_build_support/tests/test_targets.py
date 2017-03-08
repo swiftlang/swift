@@ -33,5 +33,6 @@ class PlatformTargetsTestCase(unittest.TestCase):
             self.assertFalse(platform.contains("fakeCPU-MSDOS"))
             self.assertFalse(platform.contains("singleTransistor-fakeOS"))
 
+
 if __name__ == '__main__':
     unittest.main()

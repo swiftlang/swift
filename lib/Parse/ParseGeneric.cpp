@@ -94,9 +94,10 @@ Parser::parseGenericParameters(SourceLoc LAngleLoc) {
     // We always create generic type parameters with a depth of zero.
     // Semantic analysis fills in the depth when it processes the generic
     // parameter list.
-    auto Param = new (Context) GenericTypeParamDecl(CurDeclContext, Name,
-                                                    NameLoc, /*depth=*/0,
-                                                    GenericParams.size());
+    auto Param = new (Context) GenericTypeParamDecl(
+        CurDeclContext, Name, NameLoc,
+        GenericTypeParamDecl::InvalidDepth,
+        GenericParams.size());
     if (!Inherited.empty())
       Param->setInherited(Context.AllocateCopy(Inherited));
     GenericParams.push_back(Param);
@@ -135,15 +136,8 @@ Parser::parseGenericParameters(SourceLoc LAngleLoc) {
     RAngleLoc = skipUntilGreaterInTypeList();
   }
 
-  if (GenericParams.empty() || Invalid) {
-    // FIXME: We should really return the generic parameter list here,
-    // even if some generic parameters were invalid, since we rely on
-    // decl->setGenericParams() to re-parent the GenericTypeParamDecls
-    // into the right DeclContext.
-    for (auto Param : GenericParams)
-      Param->setInvalid();
+  if (GenericParams.empty())
     return nullptr;
-  }
 
   return makeParserResult(GenericParamList::create(Context, LAngleLoc,
                                                    GenericParams, WhereLoc,
@@ -264,18 +258,19 @@ ParserStatus Parser::parseGenericWhereClause(
       SourceLoc ColonLoc = consumeToken();
 
       if (Tok.is(tok::identifier) &&
-          getLayoutConstraintInfo(Context.getIdentifier(Tok.getText()),
-                                  Context)) {
+          getLayoutConstraint(Context.getIdentifier(Tok.getText()), Context)
+              ->isKnownLayout()) {
         // Parse a layout constraint.
         auto LayoutName = Context.getIdentifier(Tok.getText());
         auto LayoutLoc = consumeToken();
         auto LayoutInfo = parseLayoutConstraint(LayoutName);
-        if (!LayoutInfo.isKnownLayout()) {
+        if (!LayoutInfo->isKnownLayout()) {
           // There was a bug in the layout constraint.
           Status.setIsParseError();
         }
-        auto Layout = LayoutConstraint(Context.AllocateObjectCopy(LayoutInfo));
-        if (!AllowLayoutConstraints) {
+        auto Layout = LayoutInfo;
+        // Types in SIL mode may contain layout constraints.
+        if (!AllowLayoutConstraints && !isInSILMode()) {
           diagnose(LayoutLoc,
                    diag::layout_constraints_only_inside_specialize_attr);
         } else {
@@ -330,6 +325,9 @@ ParserStatus Parser::parseGenericWhereClause(
     }
     // If there's a comma, keep parsing the list.
   } while (consumeIf(tok::comma));
+
+  if (Requirements.empty())
+    WhereLoc = SourceLoc();
 
   return Status;
 }

@@ -31,6 +31,8 @@ enum class CastConsumptionKind : unsigned char;
 
 namespace Lowering {
 
+class SILGenFunction;
+
 /// ManagedValue - represents a singular SIL value and an optional cleanup.
 /// Ownership of the ManagedValue can be "forwarded" to disable its cleanup when
 /// the rvalue is consumed. A ManagedValue can also represent an LValue used as
@@ -74,6 +76,10 @@ public:
   ManagedValue(SILValue value, CleanupHandle cleanup)
     : valueAndFlag(value, false), cleanup(cleanup) {
     assert(value && "No value specified?!");
+    assert((!getType().isObject() ||
+            value.getOwnershipKind() != ValueOwnershipKind::Trivial ||
+            !hasCleanup()) &&
+           "Objects with trivial ownership should never have a cleanup");
   }
 
   /// Create a managed value for a +0 rvalue.
@@ -208,6 +214,10 @@ public:
   
   SILType getType() const { return getValue()->getType(); }
 
+  ValueOwnershipKind getOwnershipKind() const {
+    return getValue().getOwnershipKind();
+  }
+
   /// Transform the given ManagedValue, replacing the underlying value, but
   /// keeping the same cleanup.
   ///
@@ -224,23 +234,25 @@ public:
     return M;
   }
 
-  CanType getSwiftType() const {
-    return isLValue()
-      ? getType().getSwiftType()
-      : getType().getSwiftRValueType();
-  }
-  
   /// Emit a copy of this value with independent ownership.
-  ManagedValue copy(SILGenFunction &gen, SILLocation l);
-  
+  ManagedValue copy(SILGenFunction &gen, SILLocation loc);
+
+  /// Emit a copy of this value with independent ownership into the current
+  /// formal evaluation scope.
+  ManagedValue formalAccessCopy(SILGenFunction &gen, SILLocation loc);
+
   /// Store a copy of this value with independent ownership into the given
   /// uninitialized address.
-  void copyInto(SILGenFunction &gen, SILValue dest, SILLocation L);
-  
+  void copyInto(SILGenFunction &gen, SILValue dest, SILLocation loc);
+
   /// This is the same operation as 'copy', but works on +0 values that don't
   /// have cleanups.  It returns a +1 value with one.
   ManagedValue copyUnmanaged(SILGenFunction &gen, SILLocation loc);
-  
+
+  /// This is the same operation as 'formalAccessCopy', but works on +0 values
+  /// that don't have cleanups.  It returns a +1 value with one.
+  ManagedValue formalAccessCopyUnmanaged(SILGenFunction &gen, SILLocation loc);
+
   bool hasCleanup() const { return cleanup.isValid(); }
   CleanupHandle getCleanup() const { return cleanup; }
 
@@ -249,9 +261,13 @@ public:
   /// An l-value is borrowed as itself.  A +1 r-value is borrowed as a
   /// +0 r-value, with the assumption that the original ManagedValue
   /// will not be forwarded until the borrowed value is fully used.
-  ManagedValue borrow() const {
-    assert(getValue() && "cannot borrow an invalid or in-context value");
-    return (isLValue() ? *this : ManagedValue::forUnmanaged(getValue()));
+  ManagedValue borrow(SILGenFunction &gen, SILLocation loc) const;
+
+  /// Return a formally evaluated "borrowed" version of this value.
+  ManagedValue formalAccessBorrow(SILGenFunction &gen, SILLocation loc) const;
+
+  ManagedValue unmanagedBorrow() const {
+    return isLValue() ? *this : ManagedValue::forUnmanaged(getValue());
   }
 
   /// Disable the cleanup for this value.
@@ -332,6 +348,9 @@ public:
 
   SILType getType() const { return Value.getType(); }
   SILValue getValue() const { return Value.getValue(); }
+  ValueOwnershipKind getOwnershipKind() const {
+    return Value.getOwnershipKind();
+  }
 
   /// Return a managed value appropriate for the final use of this CMV.
   ManagedValue getFinalManagedValue() const { return Value; }
@@ -354,8 +373,16 @@ public:
     return { asUnmanagedValue(), CastConsumptionKind::CopyOnSuccess };
   }
 };
-  
-} // end namespace Lowering
+
+} // namespace Lowering
+} // namespace swift
+
+namespace swift {
+
+template <typename To> inline bool isa(const Lowering::ManagedValue &M) {
+  return isa<To>(M.getValue());
+}
+
 } // end namespace swift
 
 #endif

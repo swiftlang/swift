@@ -14,7 +14,6 @@
 #include "swift/Serialization/ModuleFormat.h"
 #include "swift/AST/AST.h"
 #include "swift/AST/ASTContext.h"
-#include "swift/AST/ArchetypeBuilder.h"
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Initializer.h"
@@ -24,11 +23,14 @@
 #include "swift/Parse/Parser.h"
 #include "swift/Serialization/BCReadingExtras.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
+#include "swift/Basic/Defer.h"
 #include "llvm/ADT/Statistic.h"
+#include "llvm/Support/Compiler.h"
 #include "llvm/Support/raw_ostream.h"
 
 #define DEBUG_TYPE "Serialization"
 
+STATISTIC(NumDeclsLoaded, "# of decls deserialized");
 STATISTIC(NumMemberListsLoaded,
           "# of nominals/extensions whose members were loaded");
 STATISTIC(NumNestedTypeShortcuts,
@@ -89,7 +91,7 @@ namespace {
           os << IDAndKind{DeclOrOffset.get(), ID};
         }
       }
-      os << "in '" << getNameOfModule(MF) << "'\n";
+      os << " in '" << getNameOfModule(MF) << "'\n";
     }
   };
 
@@ -565,8 +567,7 @@ ProtocolConformanceRef ModuleFile::readConformance(
     ASTContext &ctx = getContext();
     Type conformingType = getType(conformingTypeID);
     if (genericEnv) {
-      conformingType = genericEnv->mapTypeIntoContext(getAssociatedModule(),
-                                                      conformingType);
+      conformingType = genericEnv->mapTypeIntoContext(conformingType);
     }
 
     PrettyStackTraceType trace(getAssociatedModule()->getASTContext(),
@@ -600,8 +601,7 @@ ProtocolConformanceRef ModuleFile::readConformance(
     ASTContext &ctx = getContext();
     Type conformingType = getType(conformingTypeID);
     if (genericEnv) {
-      conformingType = genericEnv->mapTypeIntoContext(getAssociatedModule(),
-                                                      conformingType);
+      conformingType = genericEnv->mapTypeIntoContext(conformingType);
     }
 
     PrettyStackTraceType trace(getAssociatedModule()->getASTContext(),
@@ -715,6 +715,15 @@ NormalProtocolConformance *ModuleFile::readNormalConformance(
   dc->getAsNominalTypeOrNominalTypeExtensionContext()
     ->registerProtocolConformance(conformance);
 
+  // Read requirement signature conformances.
+  SmallVector<ProtocolConformanceRef, 4> reqConformances;
+  for (auto req : proto->getRequirementSignature()->getRequirements()) {
+    if (req.getKind() == RequirementKind::Conformance) {
+      auto reqConformance = readConformance(DeclTypeCursor);
+      reqConformances.push_back(reqConformance);
+    }
+  }
+  conformance->setSignatureConformances(reqConformances);
 
   // Read inherited conformances.
   InheritedConformanceMap inheritedConformances;
@@ -762,8 +771,7 @@ ModuleFile::maybeReadSubstitution(llvm::BitstreamCursor &cursor,
 
   auto replacementTy = getType(replacementID);
   if (genericEnv) {
-    replacementTy = genericEnv->mapTypeIntoContext(getAssociatedModule(),
-                                                   replacementTy);
+    replacementTy = genericEnv->mapTypeIntoContext(replacementTy);
   }
 
   SmallVector<ProtocolConformanceRef, 4> conformanceBuf;
@@ -935,7 +943,7 @@ void ModuleFile::readGenericRequirements(
                                           size, alignment);
 
       auto first = getType(rawTypeID);
-      LayoutConstraintInfo layoutInfo;
+      LayoutConstraint layout;
       LayoutConstraintKind kind = LayoutConstraintKind::UnknownLayout;
       switch (rawKind) {
       default: {
@@ -969,13 +977,13 @@ void ModuleFile::readGenericRequirements(
       }
       }
 
+      ASTContext &ctx = getContext();
       if (kind != LayoutConstraintKind::TrivialOfAtMostSize &&
           kind != LayoutConstraintKind::TrivialOfExactSize)
-        layoutInfo = LayoutConstraintInfo(kind);
+        layout = LayoutConstraint::getLayoutConstraint(kind, ctx);
       else
-        layoutInfo = LayoutConstraintInfo(kind, size, alignment);
-
-      auto layout = getContext().AllocateObjectCopy(layoutInfo);
+        layout =
+            LayoutConstraint::getLayoutConstraint(kind, size, alignment, ctx);
 
       requirements.push_back(
           Requirement(RequirementKind::Layout, first, layout));
@@ -993,8 +1001,7 @@ void ModuleFile::readGenericRequirements(
 }
 
 void ModuleFile::configureGenericEnvironment(
-             llvm::PointerUnion3<GenericTypeDecl *, ExtensionDecl *,
-                                 AbstractFunctionDecl *> genericDecl,
+             GenericContext *genericDecl,
              serialization::GenericEnvironmentID envID) {
   if (envID == 0) return;
 
@@ -1003,33 +1010,15 @@ void ModuleFile::configureGenericEnvironment(
   // If we just have a generic signature, set up lazy generic environment
   // creation.
   if (auto genericSig = sigOrEnv.dyn_cast<GenericSignature *>()) {
-    if (auto type = genericDecl.dyn_cast<GenericTypeDecl *>()) {
-      type->setLazyGenericEnvironment(this, genericSig, envID);
-      DelayedGenericEnvironments.push_back(type);
-    } else if (auto func = genericDecl.dyn_cast<AbstractFunctionDecl *>()) {
-      func->setLazyGenericEnvironment(this, genericSig, envID);
-      DelayedGenericEnvironments.push_back(func);
-    } else {
-      auto ext = genericDecl.get<ExtensionDecl *>();
-      ext->setLazyGenericEnvironment(this, genericSig, envID);
-      DelayedGenericEnvironments.push_back(ext);
-    }
-
+    genericDecl->setLazyGenericEnvironment(this, genericSig, envID);
+    DelayedGenericEnvironments.push_back(genericDecl);
     return;
   }
 
   // If we have a full generic environment, it's because it happened to be
   // deserialized already. Record it directly.
   if (auto genericEnv = sigOrEnv.dyn_cast<GenericEnvironment *>()) {
-    if (auto type = genericDecl.dyn_cast<GenericTypeDecl *>()) {
-      type->setGenericEnvironment(genericEnv);
-    } else if (auto func = genericDecl.dyn_cast<AbstractFunctionDecl *>()) {
-      func->setGenericEnvironment(genericEnv);
-    } else {
-      auto ext = genericDecl.get<ExtensionDecl *>();
-      ext->setGenericEnvironment(genericEnv);
-    }
-
+    genericDecl->setGenericEnvironment(genericEnv);
     return;
   }
 }
@@ -1060,7 +1049,6 @@ ModuleFile::getGenericSignatureOrEnvironment(
   DeserializingEntityRAII deserializingEntity(*this);
 
   SmallVector<GenericTypeParamType *, 4> paramTypes;
-  SmallVector<uint64_t, 4> rawContextTypeIDs;
   {
     using namespace decls_block;
 
@@ -1085,15 +1073,9 @@ ModuleFile::getGenericSignatureOrEnvironment(
       ArrayRef<uint64_t> rawParamIDs;
       GenericEnvironmentLayout::readRecord(scratch, rawParamIDs);
 
-      if (rawParamIDs.size() % 2 != 0) {
-        error();
-        return result;
-      }
-
-      for (unsigned i = 0, n = rawParamIDs.size(); i != n; i += 2) {
+      for (unsigned i = 0, n = rawParamIDs.size(); i != n; ++i) {
         auto paramTy = getType(rawParamIDs[i])->castTo<GenericTypeParamType>();
         paramTypes.push_back(paramTy);
-        rawContextTypeIDs.push_back(rawParamIDs[i+1]);
       }
       break;
     }
@@ -1103,12 +1085,12 @@ ModuleFile::getGenericSignatureOrEnvironment(
       SILGenericEnvironmentLayout::readRecord(scratch, rawParamIDs);
       lastRecordOffset.reset();
 
-      if (rawParamIDs.size() % 3 != 0) {
+      if (rawParamIDs.size() % 2 != 0) {
         error();
         return result;
       }
 
-      for (unsigned i = 0, n = rawParamIDs.size(); i != n; i += 3) {
+      for (unsigned i = 0, n = rawParamIDs.size(); i != n; i += 2) {
         Identifier name = getIdentifier(rawParamIDs[i]);
         auto paramTy = getType(rawParamIDs[i+1])->castTo<GenericTypeParamType>();
 
@@ -1124,7 +1106,6 @@ ModuleFile::getGenericSignatureOrEnvironment(
         }
 
         paramTypes.push_back(paramTy);
-        rawContextTypeIDs.push_back(rawParamIDs[i+2]);
       }
       break;
     }
@@ -1161,17 +1142,9 @@ ModuleFile::getGenericSignatureOrEnvironment(
 
   // Form the generic environment. Record it now so that deserialization of
   // the archetypes in the environment can refer to this environment.
-  auto genericEnv = GenericEnvironment::getIncomplete(signature, nullptr);
+  auto genericEnv = signature->createGenericEnvironment(*getAssociatedModule());
   envOrOffset = genericEnv;
 
-  // Fill in the interface type -> context type mappings to complete the
-  // generic environment.
-  // FIXME: Eventually, these mappings will go away.
-  assert(paramTypes.size() == rawContextTypeIDs.size());
-  for (unsigned i : indices(paramTypes))
-    genericEnv->addMapping(paramTypes[i], getType(rawContextTypeIDs[i]));
-
-  // The generic environment is complete.
   return genericEnv;
 }
 
@@ -1270,7 +1243,7 @@ getActualCtorInitializerKind(uint8_t raw) {
 /// from Clang can also appear in any module.
 static void filterValues(Type expectedTy, ModuleDecl *expectedModule,
                          CanGenericSignature expectedGenericSig, bool isType,
-                         bool inProtocolExt,
+                         bool inProtocolExt, bool isStatic,
                          Optional<swift::CtorInitializerKind> ctorInit,
                          SmallVectorImpl<ValueDecl *> &values) {
   CanType canTy;
@@ -1284,6 +1257,8 @@ static void filterValues(Type expectedTy, ModuleDecl *expectedModule,
     if (!value->hasInterfaceType())
       return true;
     if (canTy && value->getInterfaceType()->getCanonicalType() != canTy)
+      return true;
+    if (value->isStatic() != isStatic)
       return true;
     // FIXME: Should be able to move a value from an extension in a derived
     // module to the original definition in a base module.
@@ -1326,10 +1301,11 @@ static void filterValues(Type expectedTy, ModuleDecl *expectedModule,
   values.erase(newEnd, values.end());
 }
 
-Decl *ModuleFile::resolveCrossReference(ModuleDecl *M, uint32_t pathLen) {
+Decl *ModuleFile::resolveCrossReference(ModuleDecl *baseModule,
+                                        uint32_t pathLen) {
   using namespace decls_block;
-  assert(M && "missing dependency");
-  PrettyXRefTrace pathTrace(*M);
+  assert(baseModule && "missing dependency");
+  PrettyXRefTrace pathTrace(*baseModule);
 
   auto entry = DeclTypeCursor.advance(AF_DontPopBlockAtEnd);
   if (entry.Kind != llvm::BitstreamEntry::Record) {
@@ -1354,12 +1330,13 @@ Decl *ModuleFile::resolveCrossReference(ModuleDecl *M, uint32_t pathLen) {
     IdentifierID IID;
     TypeID TID = 0;
     bool isType = (recordID == XREF_TYPE_PATH_PIECE);
-    bool onlyInNominal = false;
     bool inProtocolExt = false;
+    bool isStatic = false;
     if (isType)
-      XRefTypePathPieceLayout::readRecord(scratch, IID, onlyInNominal);
+      XRefTypePathPieceLayout::readRecord(scratch, IID, inProtocolExt);
     else
-      XRefValuePathPieceLayout::readRecord(scratch, TID, IID, inProtocolExt);
+      XRefValuePathPieceLayout::readRecord(scratch, TID, IID, inProtocolExt,
+                                           isStatic);
 
     Identifier name = getIdentifier(IID);
     pathTrace.addValue(name);
@@ -1371,19 +1348,19 @@ Decl *ModuleFile::resolveCrossReference(ModuleDecl *M, uint32_t pathLen) {
     bool retrying = false;
     retry:
 
-    M->lookupQualified(ModuleType::get(M), name,
-                       NL_QualifiedDefault | NL_KnownNoDependency,
-                       /*typeResolver=*/nullptr, values);
-    filterValues(filterTy, nullptr, nullptr, isType, inProtocolExt, None,
-                 values);
+    baseModule->lookupQualified(ModuleType::get(baseModule), name,
+                                NL_QualifiedDefault | NL_KnownNoDependency,
+                                /*typeResolver=*/nullptr, values);
+    filterValues(filterTy, nullptr, nullptr, isType, inProtocolExt, isStatic,
+                 None, values);
 
     // HACK HACK HACK: Omit-needless-words hack to try to cope with
     // the "NS" prefix being added/removed. No "real" compiler mode
     // has to go through this path, but it's an option we toggle for
     // testing.
     if (values.empty() && !retrying &&
-        (M->getName().str() == "ObjectiveC" ||
-         M->getName().str() == "Foundation")) {
+        (baseModule->getName().str() == "ObjectiveC" ||
+         baseModule->getName().str() == "Foundation")) {
       if (name.str().startswith("NS")) {
         if (name.str().size() > 2 && name.str() != "NSCocoaError") {
           auto known = getKnownFoundationEntity(name.str());
@@ -1420,13 +1397,13 @@ Decl *ModuleFile::resolveCrossReference(ModuleDecl *M, uint32_t pathLen) {
 
     switch (rawOpKind) {
     case OperatorKind::Infix:
-      return M->lookupInfixOperator(opName);
+      return baseModule->lookupInfixOperator(opName);
     case OperatorKind::Prefix:
-      return M->lookupPrefixOperator(opName);
+      return baseModule->lookupPrefixOperator(opName);
     case OperatorKind::Postfix:
-      return M->lookupPostfixOperator(opName);
+      return baseModule->lookupPostfixOperator(opName);
     case OperatorKind::PrecedenceGroup:
-      return M->lookupPrecedenceGroup(opName);
+      return baseModule->lookupPrecedenceGroup(opName);
     default:
       // Unknown operator kind.
       error();
@@ -1450,10 +1427,8 @@ Decl *ModuleFile::resolveCrossReference(ModuleDecl *M, uint32_t pathLen) {
     return nullptr;
   }
 
-  // Reset module filter.
-  M = nullptr;
-
-  /// The generic signature filter.
+  // Filters for values discovered in the remaining path pieces.
+  ModuleDecl *M = nullptr;
   CanGenericSignature genericSig = nullptr;
 
   // For remaining path pieces, filter or drill down into the results we have.
@@ -1521,7 +1496,7 @@ Decl *ModuleFile::resolveCrossReference(ModuleDecl *M, uint32_t pathLen) {
           pathTrace.removeLast();
         }
       }
-      SWIFT_FALLTHROUGH;
+      LLVM_FALLTHROUGH;
     }
     case XREF_VALUE_PATH_PIECE:
     case XREF_INITIALIZER_PATH_PIECE: {
@@ -1529,12 +1504,12 @@ Decl *ModuleFile::resolveCrossReference(ModuleDecl *M, uint32_t pathLen) {
       Identifier memberName;
       Optional<swift::CtorInitializerKind> ctorInit;
       bool isType = false;
-      bool onlyInNominal = false;
       bool inProtocolExt = false;
+      bool isStatic = false;
       switch (recordID) {
       case XREF_TYPE_PATH_PIECE: {
         IdentifierID IID;
-        XRefTypePathPieceLayout::readRecord(scratch, IID, onlyInNominal);
+        XRefTypePathPieceLayout::readRecord(scratch, IID, inProtocolExt);
         memberName = getIdentifier(IID);
         isType = true;
         break;
@@ -1542,7 +1517,8 @@ Decl *ModuleFile::resolveCrossReference(ModuleDecl *M, uint32_t pathLen) {
 
       case XREF_VALUE_PATH_PIECE: {
         IdentifierID IID;
-        XRefValuePathPieceLayout::readRecord(scratch, TID, IID, inProtocolExt);
+        XRefValuePathPieceLayout::readRecord(scratch, TID, IID, inProtocolExt,
+                                             isStatic);
         memberName = getIdentifier(IID);
         break;
       }
@@ -1579,10 +1555,10 @@ Decl *ModuleFile::resolveCrossReference(ModuleDecl *M, uint32_t pathLen) {
         return nullptr;
       }
 
-      auto members = nominal->lookupDirect(memberName, onlyInNominal);
+      auto members = nominal->lookupDirect(memberName);
       values.append(members.begin(), members.end());
-      filterValues(filterTy, M, genericSig, isType, inProtocolExt, ctorInit,
-                   values);
+      filterValues(filterTy, M, genericSig, isType, inProtocolExt, isStatic,
+                   ctorInit, values);
       break;
     }
 
@@ -1717,9 +1693,12 @@ Decl *ModuleFile::resolveCrossReference(ModuleDecl *M, uint32_t pathLen) {
       return nullptr;
     }
 
-    PrettyStackTraceModuleFile traceMsg(
-        "If you're seeing a crash here, check that your SDK and dependencies "
-        "match the versions used to build", this);
+    Optional<PrettyStackTraceModuleFile> traceMsg;
+    if (M != getAssociatedModule()) {
+      traceMsg.emplace("If you're seeing a crash here, check that your SDK "
+                         "and dependencies match the versions used to build",
+                       this);
+    }
 
     if (values.empty()) {
       error();
@@ -2174,6 +2153,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
   if (declOrOffset.isComplete())
     return declOrOffset;
 
+  ++NumDeclsLoaded;
   BCOffsetRAII restoreOffset(DeclTypeCursor);
   DeclTypeCursor.JumpToBit(declOrOffset);
   auto entry = DeclTypeCursor.advance();
@@ -2504,7 +2484,8 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     if (declOrOffset.isComplete())
       return declOrOffset;
 
-    auto alias = createDecl<TypeAliasDecl>(SourceLoc(), getIdentifier(nameID),
+    auto alias = createDecl<TypeAliasDecl>(SourceLoc(), SourceLoc(),
+                                           getIdentifier(nameID),
                                            SourceLoc(), genericParams, DC);
     declOrOffset = alias;
 
@@ -2577,13 +2558,21 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     if (declOrOffset.isComplete())
       return declOrOffset;
 
-    auto assocType = createDecl<AssociatedTypeDecl>(DC, SourceLoc(),
-                                                    getIdentifier(nameID),
-                                                    SourceLoc(), this,
-                                                    defaultDefinitionID);
+    // The where-clause information is pushed up into the protocol
+    // (specifically, into its requirement signature) and
+    // serialized/deserialized there, so the actual Decl doesn't need to store
+    // it.
+    TrailingWhereClause *trailingWhere = nullptr;
+    auto assocType = createDecl<AssociatedTypeDecl>(
+        DC, SourceLoc(), getIdentifier(nameID), SourceLoc(), trailingWhere,
+        this, defaultDefinitionID);
     declOrOffset = assocType;
 
     assocType->computeType();
+
+    assert(!assocType->getDeclaredInterfaceType()->hasError() &&
+           "erroneous associated type");
+
     Accessibility parentAccess = cast<ProtocolDecl>(DC)->getFormalAccess();
     assocType->setAccessibility(std::max(parentAccess,Accessibility::Internal));
     if (isImplicit)
@@ -2829,7 +2818,17 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
 
     declOrOffset = param;
 
-    param->setInterfaceType(getType(interfaceTypeID));
+    auto paramTy = getType(interfaceTypeID);
+    if (paramTy->hasError()) {
+      // FIXME: This should never happen, because we don't serialize
+      // error types.
+      DC->dumpContext();
+      paramTy->dump();
+      error();
+      return nullptr;
+    }
+
+    param->setInterfaceType(paramTy);
     break;
   }
 
@@ -3012,14 +3011,12 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     bool isImplicit, isClassBounded, isObjC;
     GenericEnvironmentID genericEnvID;
     uint8_t rawAccessLevel;
-    unsigned numProtocols;
-    ArrayRef<uint64_t> rawProtocolAndInheritedIDs;
+    ArrayRef<uint64_t> rawInheritedIDs;
 
     decls_block::ProtocolLayout::readRecord(scratch, nameID, contextID,
                                             isImplicit, isClassBounded, isObjC,
                                             genericEnvID, rawAccessLevel,
-                                            numProtocols,
-                                            rawProtocolAndInheritedIDs);
+                                            rawInheritedIDs);
 
     auto DC = getDeclContext(contextID);
     if (declOrOffset.isComplete())
@@ -3028,8 +3025,6 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     auto proto = createDecl<ProtocolDecl>(DC, SourceLoc(), SourceLoc(),
                                           getIdentifier(nameID), None);
     declOrOffset = proto;
-
-    configureGenericEnvironment(proto, genericEnvID);
 
     proto->setRequiresClass(isClassBounded);
     
@@ -3040,21 +3035,24 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
       return nullptr;
     }
 
-    auto protocols = ctx.Allocate<ProtocolDecl *>(numProtocols);
-    for_each(protocols, rawProtocolAndInheritedIDs.slice(0, numProtocols),
-             [this](ProtocolDecl *&p, uint64_t rawID) {
-               p = cast<ProtocolDecl>(getDecl(rawID));
-             });
-    proto->setInheritedProtocols(protocols);
+    auto genericParams = maybeReadGenericParams(DC);
+    assert(genericParams && "protocol with no generic parameters?");
+    proto->setGenericParams(genericParams);
 
-    handleInherited(proto, rawProtocolAndInheritedIDs.slice(numProtocols));
+    handleInherited(proto, rawInheritedIDs);
 
-    if (auto genericParams = maybeReadGenericParams(DC))
-      proto->setGenericParams(genericParams);
+    configureGenericEnvironment(proto, genericEnvID);
+
+    SmallVector<Requirement, 4> requirements;
+    readGenericRequirements(requirements, DeclTypeCursor);
 
     if (isImplicit)
       proto->setImplicit();
     proto->computeType();
+
+    auto signature = GenericSignature::get(
+                               { proto->getProtocolSelfType() }, requirements);
+    proto->setRequirementSignature(signature);
 
     proto->setMemberLoader(this, DeclTypeCursor.GetCurrentBitNo());
     proto->setCircularityCheck(CircularityCheck::Checked);
@@ -3355,6 +3353,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
   case decls_block::SUBSCRIPT_DECL: {
     DeclContextID contextID;
     bool isImplicit, isObjC;
+    GenericEnvironmentID genericEnvID;
     TypeID interfaceTypeID;
     DeclID getterID, setterID, materializeForSetID;
     DeclID addressorID, mutableAddressorID, willSetID, didSetID;
@@ -3365,6 +3364,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
 
     decls_block::SubscriptLayout::readRecord(scratch, contextID,
                                              isImplicit, isObjC, rawStorageKind,
+                                             genericEnvID,
                                              interfaceTypeID,
                                              getterID, setterID,
                                              materializeForSetID,
@@ -3373,7 +3373,11 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
                                              overriddenID, rawAccessLevel,
                                              rawSetterAccessLevel,
                                              argNameIDs);
-    auto DC = getDeclContext(contextID);
+    auto parent = getDeclContext(contextID);
+    if (declOrOffset.isComplete())
+      return declOrOffset;
+
+    auto *genericParams = maybeReadGenericParams(parent);
     if (declOrOffset.isComplete())
       return declOrOffset;
 
@@ -3384,8 +3388,11 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
 
     DeclName name(ctx, ctx.Id_subscript, argNames);
     auto subscript = createDecl<SubscriptDecl>(name, SourceLoc(), nullptr,
-                                               SourceLoc(), TypeLoc(), DC);
+                                               SourceLoc(), TypeLoc(),
+                                               parent, genericParams);
     declOrOffset = subscript;
+
+    configureGenericEnvironment(subscript, genericEnvID);
 
     subscript->setIndices(readParameterList());
 
@@ -3471,7 +3478,6 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
                                        DeclTypeCursor.GetCurrentBitNo()));
 
     nominal->addExtension(extension);
-    extension->setValidated(true);
 
     break;
   }
@@ -3533,7 +3539,9 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
   if (DAttrs)
     declOrOffset.get()->getAttrs().setRawAttributeChain(DAttrs);
 
-  return declOrOffset;
+  auto decl = declOrOffset.get();
+  decl->setValidationStarted();
+  return decl;
 }
 
 /// Translate from the Serialization function type repr enum values to the AST
@@ -3856,96 +3864,26 @@ Type ModuleFile::getType(TypeID TID) {
   }
 
   case decls_block::ARCHETYPE_TYPE: {
-    uint8_t isPrimary;
-    TypeID parentOrGenericEnvID;
-    DeclID assocTypeOrNameID;
-    TypeID superclassID;
-    ArrayRef<uint64_t> rawConformanceIDs;
+    GenericEnvironmentID envID;
+    TypeID interfaceTypeID;
 
-    decls_block::ArchetypeTypeLayout::readRecord(scratch, isPrimary,
-                                                 parentOrGenericEnvID,
-                                                 assocTypeOrNameID,
-                                                 superclassID,
-                                                 rawConformanceIDs);
+    decls_block::ArchetypeTypeLayout::readRecord(scratch, envID,
+                                                 interfaceTypeID);
 
-    GenericEnvironment *genericEnv = nullptr;
-    ArchetypeType *parent = nullptr;
-    if (isPrimary) {
-      genericEnv = getGenericEnvironment(parentOrGenericEnvID);
-    } else {
-      parent = getType(parentOrGenericEnvID)->castTo<ArchetypeType>();
-    }
-
-    Type superclass;
-    superclass = getType(superclassID);
-
-    // TODO: Read layout.
-    LayoutConstraint layout;
-
-    SmallVector<ProtocolDecl *, 4> conformances;
-    for (DeclID protoID : rawConformanceIDs)
-      conformances.push_back(cast<ProtocolDecl>(getDecl(protoID)));
-
-    // See if we triggered deserialization through our conformances.
-    if (typeOrOffset.isComplete())
-      break;
-
-    ArchetypeType *archetype;
-    if (parent) {
-      auto assocTypeDecl = cast<AssociatedTypeDecl>(getDecl(assocTypeOrNameID));
-      archetype = ArchetypeType::getNew(ctx, parent, assocTypeDecl,
-                                        conformances, superclass, layout);
-    } else {
-      archetype = ArchetypeType::getNew(ctx, genericEnv,
-                                        getIdentifier(assocTypeOrNameID),
-                                        conformances, superclass, layout);
-    }
-
-    typeOrOffset = archetype;
-    
-    // Read the associated type names.
-    auto entry = DeclTypeCursor.advance();
-    if (entry.Kind != llvm::BitstreamEntry::Record) {
+    auto env = getGenericEnvironment(envID);
+    if (!env) {
       error();
       break;
     }
 
-    scratch.clear();
-    unsigned kind = DeclTypeCursor.readRecord(entry.ID, scratch);
-    if (kind != decls_block::ARCHETYPE_NESTED_TYPE_NAMES) {
-      error();
-      break;
-    }
-    
-    ArrayRef<uint64_t> rawNameIDs;
-    decls_block::ArchetypeNestedTypeNamesLayout::readRecord(scratch,
-                                                            rawNameIDs);
-    
-    // Read the associated type ids.
-    entry = DeclTypeCursor.advance();
-    if (entry.Kind != llvm::BitstreamEntry::Record) {
-      error();
-      break;
-    }
+    Type interfaceType = getType(interfaceTypeID);
+    Type contextType = env->mapTypeIntoContext(interfaceType);
+    typeOrOffset = contextType;
 
-    SmallVector<uint64_t, 16> scratch2;
-    kind = DeclTypeCursor.readRecord(entry.ID, scratch2);
-    if (kind != decls_block::ARCHETYPE_NESTED_TYPES) {
+    if (contextType->hasError()) {
       error();
       break;
     }
-
-    ArrayRef<uint64_t> rawTypeIDs;
-    decls_block::ArchetypeNestedTypesLayout::readRecord(scratch2, rawTypeIDs);
-    
-    // Build the nested types array.
-    SmallVector<std::pair<Identifier, Type>, 4> nestedTypes;
-    for_each(rawNameIDs, rawTypeIDs,
-             [&](IdentifierID nameID, TypeID nestedID) {
-      Type type = getType(nestedID);
-      nestedTypes.push_back(std::make_pair(getIdentifier(nameID), type));
-    });
-    archetype->setNestedTypes(ctx, nestedTypes);
 
     break;
   }
@@ -4119,7 +4057,7 @@ Type ModuleFile::getType(TypeID TID) {
     
     SmallVector<Substitution, 4> genericArgs;
     if (auto sig = layout->getGenericSignature()) {
-      for (unsigned i : range(sig->getAllDependentTypes().size())) {
+      for (unsigned i : range(sig->getSubstitutionListSize())) {
         (void)i;
         auto sub = maybeReadSubstitution(DeclTypeCursor);
         if (!sub) {
@@ -4312,6 +4250,15 @@ Type ModuleFile::getType(TypeID TID) {
     return nullptr;
   }
 
+#ifndef NDEBUG
+  PrettyStackTraceType trace(ctx, "deserializing", typeOrOffset.get());
+  if (typeOrOffset.get()->hasError()) {
+    typeOrOffset.get()->dump();
+    llvm_unreachable("deserialization produced an invalid type "
+                     "(rdar://problem/30382791)");
+  }
+#endif
+
   // Invoke the callback on the deserialized type.
   DeserializedTypeCallback(typeOrOffset);
 
@@ -4398,11 +4345,18 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
                                               typeCount, inheritedCount,
                                               rawIDs);
 
+  // Skip requirement signature conformances.
+  auto proto = conformance->getProtocol();
+  for (auto req : proto->getRequirementSignature()->getRequirements()) {
+    if (req.getKind() == RequirementKind::Conformance) {
+      (void)readConformance(DeclTypeCursor);
+    }
+  }
+
   // Skip trailing inherited conformances.
   while (inheritedCount--)
     (void)readConformance(DeclTypeCursor);
 
-  ASTContext &ctx = getContext();
   ArrayRef<uint64_t>::iterator rawIDIter = rawIDs.begin();
 
   while (valueCount--) {
@@ -4410,7 +4364,7 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
     auto witness = cast_or_null<ValueDecl>(getDecl(*rawIDIter++));
     assert(witness ||
            req->getAttrs().hasAttribute<OptionalAttr>() ||
-           req->getAttrs().isUnavailable(ctx));
+           req->getAttrs().isUnavailable(getContext()));
     if (!witness) {
       conformance->setWitness(req, Witness());
       continue;
@@ -4421,8 +4375,7 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
     GenericEnvironment *syntheticEnv = nullptr;
 
     // Requirement -> synthetic map.
-    SubstitutionMap reqToSyntheticMap;
-    bool hasReqToSyntheticMap = false;
+    SmallVector<Substitution, 4> reqToSyntheticSubs;
     if (unsigned numGenericParams = *rawIDIter++) {
       // Generic parameters of the synthetic environment.
       SmallVector<GenericTypeParamType *, 2> genericParams;
@@ -4438,30 +4391,15 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
       // Form the generic signature for the synthetic environment.
       syntheticSig = GenericSignature::get(genericParams, requirements);
 
-      // Create an archetype builder, which will help us create the
-      // synthetic environment.
-      ArchetypeBuilder builder(
-                         getContext(),
-                         LookUpConformanceInModule(getAssociatedModule()));
-      builder.addGenericSignature(syntheticSig);
-      builder.finalize(SourceLoc());
-      syntheticEnv = builder.getGenericEnvironment(syntheticSig);
+      // Create the synthetic environment.
+      syntheticEnv =
+        syntheticSig->createGenericEnvironment(*getAssociatedModule());
 
-      // Requirement -> synthetic map.
-      hasReqToSyntheticMap = true;
-      auto reqSignature =
-        req->getInnermostDeclContext()->getGenericSignatureOfContext();
-      for (auto reqGP : reqSignature->getGenericParams()) {
-        auto canonicalGP =
-          cast<GenericTypeParamType>(reqGP->getCanonicalType());
-        auto concreteTy = getType(*rawIDIter++);
-        reqToSyntheticMap.addSubstitution(canonicalGP, concreteTy);
-
-        if (unsigned numConformances = *rawIDIter++) {
-          while (numConformances--) {
-            reqToSyntheticMap.addConformance(
-                canonicalGP, readConformance(DeclTypeCursor));
-          }
+      // Requirement -> synthetic substitutions.
+      if (unsigned numReqSubstitutions = *rawIDIter++) {
+        while (numReqSubstitutions--) {
+          auto sub = maybeReadSubstitution(DeclTypeCursor, nullptr);
+          reqToSyntheticSubs.push_back(*sub);
         }
       }
     }
@@ -4477,14 +4415,14 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
 
     // Handle simple witnesses.
     if (witnessSubstitutions.empty() && !syntheticSig && !syntheticEnv &&
-        !hasReqToSyntheticMap) {
+        reqToSyntheticSubs.empty()) {
       conformance->setWitness(req, Witness(witness));
       continue;
     }
 
     // Set the witness.
     conformance->setWitness(req, Witness(witness, witnessSubstitutions,
-                                         syntheticEnv, reqToSyntheticMap));
+                                         syntheticEnv, reqToSyntheticSubs));
   }
   assert(rawIDIter <= rawIDs.end() && "read too much");
 
@@ -4508,7 +4446,7 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
   }
 }
 
-GenericEnvironment *ModuleFile::loadGenericEnvironment(const Decl *decl,
+GenericEnvironment *ModuleFile::loadGenericEnvironment(const DeclContext *decl,
                                                        uint64_t contextData) {
   return getGenericEnvironment(contextData);
 }

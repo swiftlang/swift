@@ -13,9 +13,13 @@
 // RUN: %target-swift-frontend -emit-module %S/Inputs/SwiftModB.swift -module-name SwiftModB -F %t -o %t -module-cache-path %t/mcp
 
 // RUN: %target-swift-frontend -typecheck %s -I %t -module-cache-path %t/mcp
-// RUN: %target-swift-frontend -typecheck %s -Xcc -DFAIL -I %t -module-cache-path %t/mcp -show-diagnostics-after-fatal -verify
+// RUN: %target-swift-frontend -typecheck %s -Xcc -DFAIL -I %t -module-cache-path %t/mcp -show-diagnostics-after-fatal -verify -verify-ignore-unknown
 
 // XFAIL: linux
 
 import SwiftModB // expected-error {{missing required module}}
 _ = TyB() // expected-error {{use of unresolved identifier 'TyB'}}
+
+// -verify-ignore-unknown is for:
+// <unknown>:0: error: unexpected error produced: could not build Objective-C module 'ObjCFail'
+// <unknown>:0: error: unexpected error produced: missing required module 'ObjCFail'

@@ -117,7 +117,8 @@ SILFunction *SILLinkerVisitor::lookupFunction(StringRef Name,
 }
 
 /// Process Decl, recursively deserializing any thing Decl may reference.
-bool SILLinkerVisitor::hasFunction(StringRef Name, SILLinkage Linkage) {
+bool SILLinkerVisitor::hasFunction(StringRef Name,
+                                   Optional<SILLinkage> Linkage) {
   return Loader->hasSILFunction(Name, Linkage);
 }
 

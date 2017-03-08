@@ -4,7 +4,7 @@ protocol P {
   associatedtype A
   associatedtype B
 
-  func f<T: P>(_: T) where T.A == Self.A, T.A == Self.B // expected-warning{{adding constraint 'Self.B == Self.A' on 'Self' via instance method requirement 'f' is deprecated}}
+  func f<T: P>(_: T) where T.A == Self.A, T.A == Self.B // expected-warning{{adding constraint 'Self.A == Self.B' on 'Self' via instance method requirement 'f' is deprecated}}
   // expected-note@-1{{protocol requires function 'f' with type '<T> (T) -> ()'; do you want to add a stub?}}
 }
 

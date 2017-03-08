@@ -18,12 +18,12 @@
 #ifndef SWIFT_IRGEN_GENBUILTIN_H
 #define SWIFT_IRGEN_GENBUILTIN_H
 
+#include "swift/AST/SubstitutionList.h"
 #include "swift/Basic/LLVM.h"
 
 namespace swift {
   class Identifier;
   class SILType;
-  class Substitution;
 
 namespace irgen {
   class Explosion;
@@ -33,7 +33,7 @@ namespace irgen {
   void emitBuiltinCall(IRGenFunction &IGF, Identifier FnId,
                        SILType resultType,
                        Explosion &args, Explosion &result,
-                       ArrayRef<Substitution> substitutions);
+                       SubstitutionList substitutions);
 
 } // end namespace irgen
 } // end namespace swift

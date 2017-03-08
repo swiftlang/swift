@@ -37,6 +37,7 @@
 
 #if HAVE_UNICODE_LIBEDIT
 #include <histedit.h>
+#include <wchar.h>
 #endif
 
 using namespace swift;
@@ -361,10 +362,11 @@ public:
         CurrentLines.append(indent, ' ');
       }
       
-      convertToUTF8(llvm::makeArrayRef(WLine, WLine + wcslen(WLine)),
+      size_t WLineLength = wcslen(WLine);
+      convertToUTF8(llvm::makeArrayRef(WLine, WLine + WLineLength),
                     CurrentLines);
 
-      wcslcat(TotalLine, WLine, sizeof(TotalLine) / sizeof(*TotalLine));
+      wcsncat(TotalLine, WLine, WLineLength);
 
       ++CurChunkLines;
 
@@ -833,6 +835,7 @@ private:
                                  RC.CurIRGenElem);
       performSILLinking(sil.get());
       runSILDiagnosticPasses(*sil);
+      runSILLoweringPasses(*sil);
     }
 
     if (CI.getASTContext().hadError()) {
@@ -1045,7 +1048,7 @@ public:
                    L.peekNextToken().getText() == "exit") {
           return false;
         } else if (L.peekNextToken().getText() == "dump_ir") {
-          DumpModule.dump();
+          DumpModule.print(llvm::dbgs(), nullptr, false, true);
         } else if (L.peekNextToken().getText() == "dump_ast") {
           REPLInputFile.dump();
         } else if (L.peekNextToken().getText() == "dump_decl" ||

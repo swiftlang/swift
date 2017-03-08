@@ -22,9 +22,8 @@ func typoAssoc1<T : P1>(x: T.assoc) { }
 func typoAssoc2<T : P1, U : P1>() where T.assoc == U.assoc {}
 
 // CHECK-GENERIC-LABEL: .typoAssoc2
-// CHECK-GENERIC: Generic signature: <T, U where T : P1, U : P1, U.Assoc == T.Assoc>
+// CHECK-GENERIC: Generic signature: <T, U where T : P1, U : P1, T.Assoc == U.Assoc>
 
-// expected-error@+3{{'U.AssocP2' does not have a member type named 'assoc'; did you mean 'Assoc'?}}
 // expected-error@+3{{'T.AssocP2' does not have a member type named 'assoc'; did you mean 'Assoc'?}}{{42-47=Assoc}}
 // expected-error@+2{{'U.AssocP2' does not have a member type named 'assoc'; did you mean 'Assoc'?}}{{19-24=Assoc}}
 func typoAssoc3<T : P2, U : P2>()
@@ -38,12 +37,10 @@ func typoAssoc4<T : P2>(_: T) where T.Assocp2.assoc : P3 {}
 
 // CHECK-GENERIC-LABEL: .typoAssoc4@
 // CHECK-GENERIC-NEXT: Requirements:
-// CHECK-GENERIC-NEXT:   T : P2 [explicit
-// CHECK-GENERIC-NEXT:   T[.P2].AssocP2 : P1 [protocol
-// CHECK-GENERIC-NEXT:   T[.P2].AssocP2 == T[.P2].AssocP2 [redundant]
-// CHECK-GENERIC-NEXT:   T[.P2].AssocP2[.P1].Assoc : P3 [explicit
-// CHECK-GENERIC-NEXT:   T[.P2].AssocP2[.P1].Assoc == T[.P2].AssocP2[.P1].Assoc [redundant
-// CHECK-GENERIC-NEXT: Generic signature
+// CHECK-GENERIC-NEXT:   τ_0_0 : P2 [τ_0_0: Explicit @ {{.*}}:21]
+// CHECK-GENERIC-NEXT:   τ_0_0[.P2].AssocP2 : P1 [τ_0_0: Explicit @ {{.*}}:21 -> Protocol requirement (via Self.AssocP2 in P2)]
+// CHECK-GENERIC-NEXT:   τ_0_0[.P2].AssocP2[.P1].Assoc : P3 [τ_0_0[.P2].AssocP2.assoc: Explicit @ {{.*}}:53]
+// CHECK-GENERIC-NEXT: Potential archetypes
 
 // <rdar://problem/19620340>
 
@@ -70,11 +67,9 @@ public protocol Indexable : _Indexable1 {
 
 protocol Pattern {
   associatedtype Element : Equatable
-  
-  // FIXME: Diagnostics here are very poor
-  // expected-error@+3{{'C' does not have a member type named 'Iterator'; did you mean 'Slice'?}}
-  // expected-error@+2{{'C.Slice' does not have a member type named 'Element'; did you mean 'Slice'?}}
-  // expected-error@+1{{'C.Slice' does not have a member type named 'Iterator'; did you mean 'Slice'?}}
+
+  // FIXME: This works for all of the wrong reasons, but it is correct that
+  // it works.
   func matched<C: Indexable>(atStartOf c: C)
   where Element_<C> == Element
   , Element_<C.Slice> == Element

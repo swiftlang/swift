@@ -123,6 +123,10 @@ struct FooStruct6 {
   double y;
 };
 
+struct StructWithForwardDeclaredStruct {
+  struct ForwardDeclaredStruct *ptr;
+};
+
 //===---
 // Typedefs.
 //===---

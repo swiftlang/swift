@@ -19,6 +19,7 @@
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/GlobalVariable.h"
 #include "llvm/IR/Instructions.h"
+#include "clang/CodeGen/ConstantInitBuilder.h"
 
 #include "Address.h"
 #include "IRGenModule.h"
@@ -27,235 +28,104 @@
 namespace swift {
 namespace irgen {
 
-class ConstantBuilderBase {
-protected:
-  IRGenModule &IGM;
-  ConstantBuilderBase(IRGenModule &IGM) : IGM(IGM) {}
+class ConstantAggregateBuilderBase;
+class ConstantStructBuilder;
+class ConstantArrayBuilder;
+class ConstantInitBuilder;
+
+struct ConstantInitBuilderTraits {
+  using InitBuilder = ConstantInitBuilder;
+  using AggregateBuilderBase = ConstantAggregateBuilderBase;
+  using ArrayBuilder = ConstantArrayBuilder;
+  using StructBuilder = ConstantStructBuilder;
 };
 
-template <class Base = ConstantBuilderBase>
-class ConstantBuilder : public Base {
+/// A Swift customization of Clang's ConstantInitBuilder.
+class ConstantInitBuilder
+    : public clang::CodeGen::ConstantInitBuilderTemplateBase<
+                                                    ConstantInitBuilderTraits> {
+public:
+  IRGenModule &IGM;
+  ConstantInitBuilder(IRGenModule &IGM)
+    : ConstantInitBuilderTemplateBase(IGM.getClangCGM()),
+      IGM(IGM) {}
+};
+
+class ConstantAggregateBuilderBase
+       : public clang::CodeGen::ConstantAggregateBuilderBase {
+  using super = clang::CodeGen::ConstantAggregateBuilderBase;
 protected:
-  template <class... T>
-  ConstantBuilder(T &&...args) : Base(std::forward<T>(args)...) {}
+  ConstantAggregateBuilderBase(ConstantInitBuilder &builder,
+                               ConstantAggregateBuilderBase *parent)
+    : super(builder, parent) {}
 
-  IRGenModule &IGM = Base::IGM;
-
-private:
-  llvm::GlobalVariable *relativeAddressBase = nullptr;
-  llvm::SmallVector<llvm::Constant*, 16> Fields;
-  Size NextOffset = Size(0);
-
-protected:
-  Size getNextOffset() const { return NextOffset; }
-
-  void addStruct(llvm::Constant *st) {
-    assert(st->getType()->isStructTy());
-    Fields.push_back(st);
-    NextOffset += Size(IGM.DataLayout.getTypeStoreSize(st->getType()));
+  ConstantInitBuilder &getBuilder() const {
+    return static_cast<ConstantInitBuilder&>(Builder);
   }
-
-  /// Add a constant word-sized value.
-  void addConstantWord(int64_t value) {
-    addWord(llvm::ConstantInt::get(IGM.SizeTy, value));
-  }
-
-  /// Add a word-sized value.
-  void addWord(llvm::Constant *value) {
-    assert(value->getType() == IGM.IntPtrTy ||
-           value->getType()->isPointerTy());
-    Fields.push_back(value);
-    NextOffset += IGM.getPointerSize();
-  }
-
-  void setRelativeAddressBase(llvm::GlobalVariable *base) {
-    relativeAddressBase = base;
-  }
-
-  llvm::Constant *getRelativeAddressFromNextField(ConstantReference referent,
-                                            llvm::IntegerType *addressTy) {
-    assert(relativeAddressBase && "no relative address base set");
-    
-    // Determine the address of the next field in the initializer.
-    llvm::Constant *fieldAddr =
-      llvm::ConstantExpr::getPtrToInt(relativeAddressBase, IGM.IntPtrTy);
-    fieldAddr = llvm::ConstantExpr::getAdd(fieldAddr,
-                          llvm::ConstantInt::get(IGM.SizeTy,
-                                                 getNextOffset().getValue()));
-    llvm::Constant *referentValue =
-      llvm::ConstantExpr::getPtrToInt(referent.getValue(), IGM.IntPtrTy);
-
-    llvm::Constant *relative
-      = llvm::ConstantExpr::getSub(referentValue, fieldAddr);
-
-    if (relative->getType() != addressTy)
-      relative = llvm::ConstantExpr::getTrunc(relative, addressTy);
-
-    if (referent.isIndirect()) {
-      relative = llvm::ConstantExpr::getAdd(relative,
-                                       llvm::ConstantInt::get(addressTy, 1));
-    }
-    
-    return relative;
-  }
-
-  /// Add a 32-bit relative address from the current location in the local
-  /// being built to another global variable.
-  void addRelativeAddress(llvm::Constant *referent) {
-    addRelativeAddress({referent, ConstantReference::Direct});
-  }
-  void addRelativeAddress(ConstantReference referent) {
-    addInt32(getRelativeAddressFromNextField(referent, IGM.RelativeAddressTy));
-  }
-
-  /// Add a pointer-sized relative address from the current location in the
-  /// local being built to another global variable.
-  void addFarRelativeAddress(llvm::Constant *referent) {
-    addFarRelativeAddress({referent, ConstantReference::Direct});
-  }
-  void addFarRelativeAddress(ConstantReference referent) {
-    addWord(getRelativeAddressFromNextField(referent,
-                                            IGM.FarRelativeAddressTy));
-  }
-
-  /// Add a 32-bit relative address from the current location in the local
-  /// being built to another global variable, or null if a null referent
-  /// is passed.
-  void addRelativeAddressOrNull(llvm::Constant *referent) {
-    addRelativeAddressOrNull({referent, ConstantReference::Direct});
-  }
-  void addRelativeAddressOrNull(ConstantReference referent) {
-    if (referent)
-      addRelativeAddress(referent);
-    else
-      addConstantInt32(0);
-  }
-
-  /// Add a pointer-sized relative address from the current location in the
-  /// local being built to another global variable, or null if a null referent
-  /// is passed.
-  void addFarRelativeAddressOrNull(llvm::Constant *referent) {
-    addFarRelativeAddressOrNull({referent, ConstantReference::Direct});
-  }
-  void addFarRelativeAddressOrNull(ConstantReference referent) {
-    if (referent)
-      addFarRelativeAddress(referent);
-    else
-      addConstantWord(0);
-  }
-
-  /// Add a 32-bit relative address from the current location in the local
-  /// being built to another global variable. Pack a constant integer into
-  /// the alignment bits of the pointer.
-  void addRelativeAddressWithTag(llvm::Constant *referent,
-                                 unsigned tag) {
-    assert(tag < 4 && "tag too big to pack in relative address");
-    llvm::Constant *relativeAddr =
-      getRelativeAddressFromNextField({referent, ConstantReference::Direct},
-                                      IGM.RelativeAddressTy);
-    relativeAddr = llvm::ConstantExpr::getAdd(relativeAddr,
-                          llvm::ConstantInt::get(IGM.RelativeAddressTy, tag));
-    addInt32(relativeAddr);
-  }
-
-  /// Add a pointer-size relative address from the current location in the
-  /// local being built to another global variable. Pack a constant integer
-  /// into the alignment bits of the pointer.
-  void addFarRelativeAddressWithTag(llvm::Constant *referent,
-                                    unsigned tag) {
-    // FIXME: could be 8 when targeting 64-bit platforms
-    assert(tag < 4 && "tag too big to pack in relative address");
-    llvm::Constant *relativeAddr =
-      getRelativeAddressFromNextField(referent, IGM.FarRelativeAddressTy);
-    relativeAddr = llvm::ConstantExpr::getAdd(relativeAddr,
-                       llvm::ConstantInt::get(IGM.FarRelativeAddressTy, tag));
-    addWord(relativeAddr);
-  }
-
-  /// Add a uint32_t value that represents the given offset
-  /// scaled to a number of words.
-  void addConstantInt32InWords(Size value) {
-    addConstantInt32(IGM.getOffsetInWords(value));
-  }
-
-  /// Add a constant 32-bit value.
-  void addConstantInt32(int32_t value) {
-    addInt32(llvm::ConstantInt::get(IGM.Int32Ty, value));
-  }
-
-  /// Add a 32-bit value.
-  void addInt32(llvm::Constant *value) {
-    assert(value->getType() == IGM.Int32Ty);
-    Fields.push_back(value);
-    NextOffset += Size(4);
-  }
-
-  /// Add a constant 16-bit value.
-  void addConstantInt16(int16_t value) {
-    addInt16(llvm::ConstantInt::get(IGM.Int16Ty, value));
-  }
-
-  /// Add a 16-bit value.
-  void addInt16(llvm::Constant *value) {
-    assert(value->getType() == IGM.Int16Ty);
-    Fields.push_back(value);
-    NextOffset += Size(2);
-  }
-
-  /// Add a constant 8-bit value.
-  void addConstantInt8(int8_t value) {
-    addInt8(llvm::ConstantInt::get(IGM.Int8Ty, value));
-  }
-
-  /// Add an 8-bit value.
-  void addInt8(llvm::Constant *value) {
-    assert(value->getType() == IGM.Int8Ty);
-    Fields.push_back(value);
-    NextOffset += Size(1);
-  }
-
-  /// Add a constant of the given size.
-  void addStruct(llvm::Constant *value, Size size) {
-    assert(size.getValue()
-             == IGM.DataLayout.getTypeStoreSize(value->getType()));
-    Fields.push_back(value);
-    NextOffset += size;
-  }
-  
-  class ReservationToken {
-    size_t Index;
-    ReservationToken(size_t index) : Index(index) {}
-    friend ConstantBuilder<Base>;
-  };
-  ReservationToken reserveFields(unsigned numFields, Size size) {
-    unsigned index = Fields.size();
-    Fields.append(numFields, nullptr);
-    NextOffset += size;
-    return ReservationToken(index);
-  }
-  MutableArrayRef<llvm::Constant*> claimReservation(ReservationToken token,
-                                                    unsigned numFields) {
-    return MutableArrayRef<llvm::Constant*>(&Fields[0] + token.Index,
-                                            numFields);
-  }
+  IRGenModule &IGM() const { return getBuilder().IGM; }
 
 public:
-  llvm::Constant *getInit() const {
-    if (Fields.empty())
-      return nullptr;
-    return llvm::ConstantStruct::getAnon(Fields, /*packed*/ true);
+  void addInt16(uint16_t value) {
+    addInt(IGM().Int16Ty, value);
   }
 
-  /// An optimization of getInit for when we have a known type we
-  /// can use when there aren't any extra fields.
-  llvm::Constant *getInitWithSuggestedType(unsigned numFields,
-                                           llvm::StructType *type) {
-    if (Fields.size() == numFields) {
-      return llvm::ConstantStruct::get(type, Fields);
+  void addInt32(uint32_t value) {
+    addInt(IGM().Int32Ty, value);
+  }
+
+  void addRelativeAddressOrNull(llvm::Constant *target) {
+    if (target) {
+      addRelativeAddress(target);
     } else {
-      return getInit();
+      addInt(IGM().RelativeAddressTy, 0);
     }
   }
+
+  void addRelativeAddress(llvm::Constant *target) {
+    addRelativeOffset(IGM().RelativeAddressTy, target);
+  }
+
+  /// Add a tagged relative reference to the given address.  The direct
+  /// target must be defined within the current image, but it might be
+  /// a "GOT-equivalent", i.e. a pointer to an external object; if so,
+  /// set the low bit of the offset to indicate that this is true.
+  void addRelativeAddress(ConstantReference reference) {
+    addTaggedRelativeOffset(IGM().RelativeAddressTy,
+                            reference.getValue(),
+                            unsigned(reference.isIndirect()));
+  }
+
+  void addFarRelativeAddress(llvm::Constant *target) {
+    addRelativeOffset(IGM().FarRelativeAddressTy, target);
+  }
+
+  void addFarRelativeAddress(ConstantReference reference) {
+    addTaggedRelativeOffset(IGM().FarRelativeAddressTy,
+                            reference.getValue(),
+                            unsigned(reference.isIndirect()));
+  }
+
+  Size getNextOffsetFromGlobal() const {
+    return Size(super::getNextOffsetFromGlobal().getQuantity());
+  }
+};
+
+class ConstantArrayBuilder
+    : public clang::CodeGen::ConstantArrayBuilderTemplateBase<
+                                                    ConstantInitBuilderTraits> {
+public:
+  template <class... As>
+  ConstantArrayBuilder(As &&... args)
+    : ConstantArrayBuilderTemplateBase(std::forward<As>(args)...) {}
+};
+
+class ConstantStructBuilder
+    : public clang::CodeGen::ConstantStructBuilderTemplateBase<
+                                                    ConstantInitBuilderTraits> {
+public:
+  template <class... As>
+  ConstantStructBuilder(As &&... args)
+    : ConstantStructBuilderTemplateBase(std::forward<As>(args)...) {}
 };
 
 } // end namespace irgen

@@ -19,6 +19,7 @@
 
 #include "swift/Runtime/Metadata.h"
 #include "swift/Remote/MemoryReader.h"
+#include "swift/Basic/Demangler.h"
 #include "swift/Basic/Demangle.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Runtime/Unreachable.h"
@@ -105,8 +106,7 @@ class TypeDecoder {
         if (repr->getKind() != NodeKind::MetatypeRepresentation ||
             !repr->hasText())
           return BuiltType();
-        auto &str = repr->getText();
-        if (str != "@thin")
+        if (repr->getText() != "@thin")
           wasAbstract = true;
       }
       auto instance = decodeMangledType(Node->getChild(i));
@@ -142,12 +142,13 @@ class TypeDecoder {
       auto name = Node->getChild(1)->getText();
 
       // Consistent handling of protocols and protocol compositions
-      auto protocolList = Demangle::NodeFactory::create(NodeKind::ProtocolList);
-      auto typeList = Demangle::NodeFactory::create(NodeKind::TypeList);
-      auto type = Demangle::NodeFactory::create(NodeKind::Type);
-      type->addChild(Node);
-      typeList->addChild(type);
-      protocolList->addChild(typeList);
+      Demangle::Demangler Dem;
+      auto protocolList = Dem.createNode(NodeKind::ProtocolList);
+      auto typeList = Dem.createNode(NodeKind::TypeList);
+      auto type = Dem.createNode(NodeKind::Type);
+      type->addChild(Node, Dem);
+      typeList->addChild(type, Dem);
+      protocolList->addChild(typeList, Dem);
 
       auto mangledName = Demangle::mangleNode(protocolList);
       return Builder.createProtocolType(mangledName, moduleName, name);
@@ -199,9 +200,7 @@ class TypeDecoder {
           if (!child->hasText())
             return BuiltType();
 
-          auto &text = child->getText();
-
-          if (text == "@convention(thin)") {
+          if (child->getText() == "@convention(thin)") {
             flags =
               flags.withConvention(FunctionMetadataConvention::Thin);
           }
@@ -209,7 +208,7 @@ class TypeDecoder {
           if (!child->hasText())
             return BuiltType();
 
-          auto &text = child->getText();
+          StringRef text = child->getText();
           if (text == "@convention(c)") {
             flags =
               flags.withConvention(FunctionMetadataConvention::CFunctionPointer);
@@ -498,9 +497,46 @@ private:
   using OwnedProtocolDescriptorRef =
     std::unique_ptr<const TargetProtocolDescriptor<Runtime>, delete_with_free>;
 
-  /// Cached isa mask.
-  StoredPointer isaMask;
-  bool hasIsaMask = false;
+  enum class IsaEncodingKind {
+    /// We haven't checked yet.
+    Unknown,
+
+    /// There was an error trying to find out the isa encoding.
+    Error,
+
+    /// There's no special isa encoding.
+    None,
+
+    /// There's an unconditional mask to apply to the isa pointer.
+    ///   - IsaMask stores the mask.
+    Masked,
+
+    /// Isa pointers are indexed.  If applying a mask yields a magic value,
+    /// applying a different mask and shifting yields an index into a global
+    /// array of class pointers.  Otherwise, the isa pointer is just a raw
+    /// class pointer.
+    ///  - IsaIndexMask stores the index mask.
+    ///  - IsaIndexShift stores the index shift.
+    ///  - IsaMagicMask stores the magic value mask.
+    ///  - IsaMagicValue stores the magic value.
+    ///  - IndexedClassesPointer stores the pointer to the start of the
+    ///    indexed classes array; this is constant throughout the program.
+    ///  - IndexedClassesCountPointer stores a pointer to the number
+    ///    of elements in the indexed classes array.
+    Indexed
+  };
+
+  IsaEncodingKind IsaEncoding = IsaEncodingKind::Unknown;
+  union {
+    StoredPointer IsaMask;
+    StoredPointer IsaIndexMask;
+  };
+  StoredPointer IsaIndexShift;
+  StoredPointer IsaMagicMask;
+  StoredPointer IsaMagicValue;
+  StoredPointer IndexedClassesPointer;
+  StoredPointer IndexedClassesCountPointer;
+  StoredPointer LastIndexedClassesCount = 0;
 
 public:
   BuilderType Builder;
@@ -535,15 +571,12 @@ public:
 
   /// Get the remote process's swift_isaMask.
   std::pair<bool, StoredPointer> readIsaMask() {
-    auto address = Reader->getSymbolAddress("swift_isaMask");
-    if (!address)
-      return {false, 0};
+    auto encoding = getIsaEncoding();
+    if (encoding != IsaEncodingKind::Masked)
+      // Still return success if there's no isa encoding at all.
+      return {encoding == IsaEncodingKind::None, 0};
 
-    if (!Reader->readInteger(address, &isaMask))
-      return {false, 0};
-
-    hasIsaMask = true;
-    return {true, isaMask};
+    return {true, IsaMask};
   }
 
   /// Given a remote pointer to metadata, attempt to discover its MetadataKind.
@@ -592,7 +625,8 @@ public:
   }
 
   /// Given a remote pointer to metadata, attempt to turn it into a type.
-  BuiltType readTypeFromMetadata(StoredPointer MetadataAddress) {
+  BuiltType readTypeFromMetadata(StoredPointer MetadataAddress,
+                                 bool skipArtificialSubclasses = false) {
     auto Cached = TypeCache.find(MetadataAddress);
     if (Cached != TypeCache.end())
       return Cached->second;
@@ -609,7 +643,7 @@ public:
 
     switch (Meta->getKind()) {
     case MetadataKind::Class:
-      return readNominalTypeFromMetadata(Meta);
+      return readNominalTypeFromMetadata(Meta, skipArtificialSubclasses);
     case MetadataKind::Struct:
       return readNominalTypeFromMetadata(Meta);
     case MetadataKind::Enum:
@@ -698,7 +732,8 @@ public:
         if (!Reader->readString(RemoteAddress(ProtocolDescriptor->Name),
                                 MangledName))
           return BuiltType();
-        auto Demangled = Demangle::demangleSymbolAsNode(MangledName);
+        Demangle::Context DCtx;
+        auto Demangled = DCtx.demangleSymbolAsNode(MangledName);
         auto Protocol = decodeMangledType(Demangled);
         if (!Protocol)
           return BuiltType();
@@ -768,26 +803,74 @@ public:
 
   BuiltType readTypeFromMangledName(const char *MangledTypeName,
                                     size_t Length) {
-    auto Demangled = Demangle::demangleSymbolAsNode(MangledTypeName, Length);
+    Demangle::Demangler Dem;
+    Demangle::NodePointer Demangled =
+      Dem.demangleSymbol(StringRef(MangledTypeName, Length));
     return decodeMangledType(Demangled);
   }
 
   /// Read the isa pointer of a class or closure context instance and apply
   /// the isa mask.
-  std::pair<bool, StoredPointer> readMetadataFromInstance(
-      StoredPointer ObjectAddress) {
-    StoredPointer isaMaskValue = ~0;
-    auto isaMask = readIsaMask();
-    if (isaMask.first)
-      isaMaskValue = isaMask.second;
-
-    StoredPointer MetadataAddress;
-    if (!Reader->readBytes(RemoteAddress(ObjectAddress),
-                           (uint8_t*)&MetadataAddress,
-                           sizeof(StoredPointer)))
+  std::pair<bool, StoredPointer>
+  readMetadataFromInstance(StoredPointer objectAddress) {
+    StoredPointer isa;
+    if (!Reader->readInteger(RemoteAddress(objectAddress), &isa))
       return {false, 0};
 
-    return {true, MetadataAddress & isaMaskValue};
+    switch (getIsaEncoding()) {
+    case IsaEncodingKind::Unknown:
+    case IsaEncodingKind::Error:
+      return {false, 0};
+
+    case IsaEncodingKind::None:
+      return {true, isa};
+
+    case IsaEncodingKind::Masked:
+      return {true, isa & IsaMask};
+
+    case IsaEncodingKind::Indexed: {
+      // If applying the magic mask doesn't give us the magic value,
+      // it's not an indexed isa.
+      if ((isa & IsaMagicMask) != IsaMagicValue)
+        return {true, isa};
+
+      // Extract the index.
+      auto classIndex = (isa & IsaIndexMask) >> IsaIndexShift;
+
+      // 0 is never a valid index.
+      if (classIndex == 0) {
+        return {false, 0};
+
+      // If the index is out of range, it's an error; but check for an
+      // update first.  (This will also trigger the first time because
+      // we initialize LastIndexedClassesCount to 0).
+      } else if (classIndex >= LastIndexedClassesCount) {
+        StoredPointer count;
+        if (!Reader->readInteger(RemoteAddress(IndexedClassesCountPointer),
+                                 &count)) {
+          return {false, 0};
+        }
+
+        LastIndexedClassesCount = count;
+        if (classIndex >= count) {
+          return {false, 0};
+        }
+      }
+
+      // Find the address of the appropriate array element.
+      RemoteAddress eltPointer =
+        RemoteAddress(IndexedClassesPointer
+                        + classIndex * sizeof(StoredPointer));
+      StoredPointer metadataPointer;
+      if (!Reader->readInteger(eltPointer, &metadataPointer)) {
+        return {false, 0};
+      }
+
+      return {true, metadataPointer};
+    }
+    }
+
+    swift_runtime_unreachable("Unhandled IsaEncodingKind in switch.");
   }
 
   /// Read the parent type metadata from a nested nominal type metadata.
@@ -919,6 +1002,20 @@ protected:
     return targetAddress + signext;
   }
 
+  template<typename Offset>
+  llvm::Optional<StoredPointer>
+  resolveNullableRelativeOffset(StoredPointer targetAddress) {
+    Offset relative;
+    if (!Reader->readInteger(RemoteAddress(targetAddress), &relative))
+      return llvm::None;
+    if (relative == 0)
+      return 0;
+    using SignedOffset = typename std::make_signed<Offset>::type;
+    using SignedPointer = typename std::make_signed<StoredPointer>::type;
+    auto signext = (SignedPointer)(SignedOffset)relative;
+    return targetAddress + signext;
+  }
+
   /// Given a pointer to an Objective-C class, try to read its class name.
   bool readObjCClassName(StoredPointer classAddress, std::string &className) {
     // The following algorithm only works on the non-fragile Apple runtime.
@@ -1040,12 +1137,39 @@ private:
     return MetadataRef(address, metadata);
   }
 
-  StoredPointer readAddressOfNominalTypeDescriptor(MetadataRef metadata) {
+  StoredPointer readAddressOfNominalTypeDescriptor(MetadataRef &metadata,
+                                        bool skipArtificialSubclasses = false) {
     switch (metadata->getKind()) {
     case MetadataKind::Class: {
       auto classMeta = cast<TargetClassMetadata<Runtime>>(metadata);
-      return resolveRelativeOffset<StoredPointer>(metadata.getAddress() +
-                                       classMeta->offsetToDescriptorOffset());
+      while (true) {
+        auto descriptorAddress =
+          resolveNullableRelativeOffset<StoredPointer>(metadata.getAddress() +
+                                         classMeta->offsetToDescriptorOffset());
+
+        // Propagate errors reading the offset.
+        if (!descriptorAddress) return 0;
+
+        // If this class has a null descriptor, it's artificial,
+        // and we need to skip it upon request.  Otherwise, we're done.
+        if (*descriptorAddress || !skipArtificialSubclasses)
+          return *descriptorAddress;
+
+        auto superclassMetadataAddress = classMeta->SuperClass;
+        if (!superclassMetadataAddress)
+          return 0;
+
+        auto superMeta = readMetadata(superclassMetadataAddress);
+        if (!superMeta)
+          return 0;
+        auto superclassMeta =
+          dyn_cast<TargetClassMetadata<Runtime>>(superMeta);
+        if (!superclassMeta)
+          return 0;
+
+        classMeta = superclassMeta;
+        metadata = superMeta;
+      }
     }
 
     case MetadataKind::Struct:
@@ -1163,10 +1287,23 @@ private:
     return substitutions;
   }
 
-  BuiltType readNominalTypeFromMetadata(MetadataRef metadata) {
-    auto descriptorAddress = readAddressOfNominalTypeDescriptor(metadata);
+  BuiltType readNominalTypeFromMetadata(MetadataRef origMetadata,
+                                        bool skipArtificialSubclasses = false) {
+    auto metadata = origMetadata;
+    auto descriptorAddress =
+      readAddressOfNominalTypeDescriptor(metadata,
+                                         skipArtificialSubclasses);
     if (!descriptorAddress)
       return BuiltType();
+
+    // If we've skipped an artificial subclasses, check the cache at
+    // the superclass.  (This also protects against recursion.)
+    if (skipArtificialSubclasses &&
+        metadata.getAddress() != origMetadata.getAddress()) {
+      auto it = TypeCache.find(metadata.getAddress());
+      if (it != TypeCache.end())
+        return it->second;
+    }
 
     // Read the nominal type descriptor.
     auto descriptor = readNominalTypeDescriptor(descriptorAddress);
@@ -1199,6 +1336,14 @@ private:
     if (!nominal) return BuiltType();
 
     TypeCache[metadata.getAddress()] = nominal;
+
+    // If we've skipped an artificial subclass, remove the
+    // recursion-protection entry we made for it.
+    if (skipArtificialSubclasses &&
+        metadata.getAddress() != origMetadata.getAddress()) {
+      TypeCache.erase(origMetadata.getAddress());
+    }
+
     return nominal;
   }
 
@@ -1239,6 +1384,66 @@ private:
       return StoredPointer();
 
     return dataPtr;
+  }
+
+  IsaEncodingKind getIsaEncoding() {
+    if (IsaEncoding != IsaEncodingKind::Unknown)
+      return IsaEncoding;
+
+    auto finish = [&](IsaEncodingKind result) -> IsaEncodingKind {
+      IsaEncoding = result;
+      return result;
+    };
+
+    /// Look up the given global symbol and bind 'varname' to its
+    /// address if its exists.
+#   define tryFindSymbol(varname, symbolName)                \
+      auto varname = Reader->getSymbolAddress(symbolName);   \
+      if (!varname)                                          \
+        return finish(IsaEncodingKind::Error)
+    /// Read from the given pointer into 'dest'.
+#   define tryReadSymbol(varname, dest) do {                 \
+      if (!Reader->readInteger(varname, &dest))              \
+        return finish(IsaEncodingKind::Error);               \
+    } while (0)
+    /// Read from the given global symbol into 'dest'.
+#   define tryFindAndReadSymbol(dest, symbolName) do {       \
+      tryFindSymbol(_address, symbolName);                    \
+      tryReadSymbol(_address, dest);                          \
+    } while (0)
+
+    // Check for the magic-mask symbol that indicates that the ObjC
+    // runtime is using indexed ISAs.
+    if (auto magicMaskAddress =
+          Reader->getSymbolAddress("objc_debug_indexed_isa_magic_mask")) {
+      tryReadSymbol(magicMaskAddress, IsaMagicMask);
+      if (IsaMagicMask != 0) {
+        tryFindAndReadSymbol(IsaMagicValue,
+                             "objc_debug_indexed_isa_magic_value");
+        tryFindAndReadSymbol(IsaIndexMask,
+                             "objc_debug_indexed_isa_index_mask");
+        tryFindAndReadSymbol(IsaIndexShift,
+                             "objc_debug_indexed_isa_index_shift");
+        tryFindSymbol(indexedClasses, "objc_indexed_classes");
+        IndexedClassesPointer = indexedClasses.getAddressData();
+        tryFindSymbol(indexedClassesCount, "objc_indexed_classes_count");
+        IndexedClassesCountPointer = indexedClassesCount.getAddressData();
+
+        return finish(IsaEncodingKind::Indexed);
+      }
+    }
+
+    // Check for the ISA mask symbol.  This has to come second because
+    // the standard library will define this even if the ObjC runtime
+    // doesn't use it.
+    if (auto maskAddress = Reader->getSymbolAddress("swift_isaMask")) {
+      tryReadSymbol(maskAddress, IsaMask);
+      if (IsaMask != 0) {
+        return finish(IsaEncodingKind::Masked);
+      }
+    }
+
+    return finish(IsaEncodingKind::None);
   }
 
   template <class T>

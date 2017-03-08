@@ -310,19 +310,19 @@ class RootClassWithIVars {
 sil @rootclass_test1 : $@convention(method) (@owned RootClassWithIVars, Builtin.Int32) -> @owned RootClassWithIVars {
 bb0(%0 : @owned $RootClassWithIVars, %1 : @trivial $Builtin.Int32):
   %3 = mark_uninitialized [rootself] %0 : $RootClassWithIVars
-
-  %10 = ref_element_addr %3 : $RootClassWithIVars, #RootClassWithIVars.x
+  %4 = begin_borrow %3 : $RootClassWithIVars
+  %10 = ref_element_addr %4 : $RootClassWithIVars, #RootClassWithIVars.x
   assign %1 to %10 : $*Builtin.Int32
 
-  %11 = ref_element_addr %3 : $RootClassWithIVars, #RootClassWithIVars.y
+  %11 = ref_element_addr %4 : $RootClassWithIVars, #RootClassWithIVars.y
   assign %1 to %11 : $*Builtin.Int32
 
-  %12 = ref_element_addr %3 : $RootClassWithIVars, #RootClassWithIVars.z
+  %12 = ref_element_addr %4 : $RootClassWithIVars, #RootClassWithIVars.z
   %13 = tuple_element_addr %12 : $*(Builtin.Int32, Builtin.Int32), 0
   assign %1 to %13 : $*Builtin.Int32
   %14 = tuple_element_addr %12 : $*(Builtin.Int32, Builtin.Int32), 1
   assign %1 to %14 : $*Builtin.Int32
-
+  end_borrow %4 from %3 : $RootClassWithIVars, $RootClassWithIVars
   return %3 : $RootClassWithIVars
 }
 
@@ -425,8 +425,10 @@ sil @test_root_partial_release : $@convention(method) (@owned RootClassWithNontr
 bb0(%0 : @owned $RootClassWithNontrivialStoredProperties):
   %4 = mark_uninitialized [rootself] %0 : $RootClassWithNontrivialStoredProperties
   %1 = alloc_ref $SomeClass
-  %2 = ref_element_addr %4 : $RootClassWithNontrivialStoredProperties, #RootClassWithNontrivialStoredProperties.x
+  %5 = begin_borrow %4 : $RootClassWithNontrivialStoredProperties
+  %2 = ref_element_addr %5 : $RootClassWithNontrivialStoredProperties, #RootClassWithNontrivialStoredProperties.x
   assign %1 to %2 : $*SomeClass
+  end_borrow %5 from %4 : $RootClassWithNontrivialStoredProperties, $RootClassWithNontrivialStoredProperties
   destroy_value %4 : $RootClassWithNontrivialStoredProperties
   %13 = tuple ()
   return %13 : $()
@@ -511,8 +513,10 @@ bb0(%0 : @owned $DerivedClassWithIVars, %i : @trivial $Builtin.Int32):
 
   %a = load [take] %3 : $*DerivedClassWithIVars
   %b = upcast %a : $DerivedClassWithIVars to $RootClassWithIVars
-  %c = ref_element_addr %b : $RootClassWithIVars, #RootClassWithIVars.x
+  %borrowed_b = begin_borrow %b : $RootClassWithIVars
+  %c = ref_element_addr %borrowed_b : $RootClassWithIVars, #RootClassWithIVars.x
   load [trivial] %c : $*Builtin.Int32
+  end_borrow %borrowed_b from %b : $RootClassWithIVars, $RootClassWithIVars
   %14 = function_ref @superinit : $@convention(method) (@owned RootClassWithIVars) -> @owned RootClassWithIVars
   %15 = apply %14(%b) : $@convention(method) (@owned RootClassWithIVars) -> @owned RootClassWithIVars
 

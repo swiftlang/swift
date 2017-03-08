@@ -39,6 +39,10 @@ public:
     return Parts;
   }
 
+  ArrayRef<StringRef> getTags() const {
+    return Parts.Tags;
+  }
+
   Optional<const swift::markup::Paragraph *> getBrief() const {
     return Parts.Brief;
   }
@@ -57,6 +61,11 @@ public:
 
   ArrayRef<const swift::markup::MarkupASTNode *> getBodyNodes() const {
     return Parts.BodyNodes;
+  }
+
+  Optional<const markup::LocalizationKeyField *>
+  getLocalizationKeyField() const {
+    return Parts.LocalizationKeyField;
   }
 
   bool isEmpty() const {

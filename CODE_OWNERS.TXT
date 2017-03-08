@@ -13,7 +13,7 @@ D: Swift standard library
 
 N: David Farler
 E: dfarler@apple.com
-D: Markup, Swift Linux port
+D: Markup, lib/Syntax, Swift Linux port
 
 N: Doug Gregor
 E: dgregor@apple.com

@@ -14,20 +14,26 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef CLEANUP_H
-#define CLEANUP_H
+#ifndef SWIFT_SILGEN_CLEANUP_H
+#define SWIFT_SILGEN_CLEANUP_H
 
 #include "swift/Basic/DiverseStack.h"
 #include "swift/SIL/SILLocation.h"
+#include "llvm/ADT/SmallVector.h"
 
 namespace swift {
-  class SILBasicBlock;
-  class SILFunction;
-  class SILValue;
-  
+
+class SILBasicBlock;
+class SILFunction;
+class SILValue;
+
 namespace Lowering {
-  class JumpDest;
-  class SILGenFunction;
+
+class JumpDest;
+class SILGenFunction;
+class ManagedValue;
+class SharedBorrowFormalAccess;
+class FormalEvaluationScope;
 
 /// The valid states that a cleanup can be in.
 enum class CleanupState {
@@ -47,12 +53,15 @@ enum class CleanupState {
   PersistentlyActive
 };
 
+llvm::raw_ostream &operator<<(raw_ostream &os, CleanupState state);
+
 class LLVM_LIBRARY_VISIBILITY Cleanup {
   unsigned allocatedSize;
-  CleanupState state;
   
   friend class CleanupManager;
 protected:
+  CleanupState state;
+
   Cleanup() {}
   virtual ~Cleanup() {}
   
@@ -62,11 +71,14 @@ public:
   size_t allocated_size() const { return allocatedSize; }
   
   CleanupState getState() const { return state; }
-  void setState(CleanupState newState) { state = newState; }
+  virtual void setState(SILGenFunction &gen, CleanupState newState) {
+    state = newState;
+  }
   bool isActive() const { return state >= CleanupState::Active; }
   bool isDead() const { return state == CleanupState::Dead; }
 
-  virtual void emit(SILGenFunction &Gen, CleanupLocation L) = 0;
+  virtual void emit(SILGenFunction &gen, CleanupLocation loc) = 0;
+  virtual void dump(SILGenFunction &gen) const = 0;
 };
 
 /// A cleanup depth is generally used to denote the set of cleanups
@@ -112,7 +124,9 @@ class LLVM_LIBRARY_VISIBILITY CleanupManager {
   void setCleanupState(Cleanup &cleanup, CleanupState state);
 
   friend class CleanupStateRestorationScope;
-  
+  friend class SharedBorrowFormalEvaluation;
+  friend class FormalEvaluationScope;
+
 public:
   CleanupManager(SILGenFunction &Gen)
     : Gen(Gen), InnermostScope(Stack.stable_end()) {
@@ -192,6 +206,12 @@ public:
   /// True if there are any active cleanups in the scope between the specified
   /// cleanup handle and the current top of stack.
   bool hasAnyActiveCleanups(CleanupsDepth from);
+
+  /// Dump the output of each cleanup on this stack.
+  void dump() const;
+
+  /// Dump the given cleanup handle if it is on the current stack.
+  void dump(CleanupHandle handle) const;
 };
 
 /// An RAII object that allows the state of a cleanup to be
@@ -212,11 +232,12 @@ public:
   /// Just remember whatever the current state of the given cleanup is.
   void pushCurrentCleanupState(CleanupHandle handle);
 
-  void pop();
+  void pop() &&;
 
-  ~CleanupStateRestorationScope() {
-    pop();
-  }
+  ~CleanupStateRestorationScope() { popImpl(); }
+
+private:
+  void popImpl();
 };
 
 } // end namespace Lowering

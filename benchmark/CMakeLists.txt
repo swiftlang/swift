@@ -48,6 +48,7 @@ set(SWIFT_BENCH_MODULES
     single-source/GlobalClass
     single-source/Hanoi
     single-source/Hash
+    single-source/HashQuadratic
     single-source/Histogram
     single-source/Integrate
     single-source/IterateData
@@ -139,9 +140,18 @@ if(NOT SWIFT_LIBRARY_PATH)
   set(SWIFT_LIBRARY_PATH "${tmp_dir}/lib/swift")
 endif()
 
-runcmd(COMMAND "xcrun" "-toolchain" "${SWIFT_DARWIN_XCRUN_TOOLCHAIN}" "-f" "clang"
-       VARIABLE CLANG_EXEC
-       ERROR "Unable to find Clang driver")
+# If the CMAKE_C_COMPILER is already clang, don't find it again,
+# thus allowing the --host-cc build-script argument to work here.
+get_filename_component(c_compiler ${CMAKE_C_COMPILER} NAME)
+
+if(${c_compiler} STREQUAL "clang")
+  set(CLANG_EXEC ${CMAKE_C_COMPILER})
+else()
+  runcmd(COMMAND "xcrun" "-toolchain" "${SWIFT_DARWIN_XCRUN_TOOLCHAIN}" "-f" "clang"
+         VARIABLE CLANG_EXEC
+         ERROR "Unable to find Clang driver")
+endif()
+
 
 # You have to delete CMakeCache.txt in the swift build to force a
 # reconfiguration.

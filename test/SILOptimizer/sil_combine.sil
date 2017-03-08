@@ -1969,34 +1969,6 @@ class XXImpl : XX {
   init()
 }
 
-// CHECK-LABEL: sil @remove_release_objc_metatype_to_object
-// CHECK-NOT: strong_release {{%[0-9]+}} : $AnyObject
-sil @remove_release_objc_metatype_to_object : $@convention(thin) () -> () {
-bb0:
-  %0 = metatype $@thick XXImpl.Type                // user: %1
-  %1 = thick_to_objc_metatype %0 : $@thick XXImpl.Type to $@objc_metatype XXImpl.Type // user: %2
-  %2 = objc_metatype_to_object %1 : $@objc_metatype XXImpl.Type to $AnyObject // users: %3, %4
-  debug_value %2 : $AnyObject  // id: %3
-  strong_release %2 : $AnyObject                  // id: %4
-  %5 = tuple ()                                   // user: %6
-  return %5 : $()                                 // id: %6
-}
-
-// CHECK-LABEL: sil @remove_release_objc_existential_metatype_to_object
-// CHECK-NOT: strong_release {{%[0-9]+}} : $AnyObject
-sil @remove_release_objc_existential_metatype_to_object: $@convention(thin) (@owned XX) -> () {
-bb0(%0 : $XX):
-  debug_value %0 : $XX                   // id: %1
-  %2 = existential_metatype $@thick XX.Type, %0 : $XX // user: %3
-  %3 = thick_to_objc_metatype %2 : $@thick XX.Type to $@objc_metatype XX.Type // user: %4
-  %4 = objc_existential_metatype_to_object %3 : $@objc_metatype XX.Type to $AnyObject // users: %5, %6
-  debug_value %4 : $AnyObject, let, name "obj1" // id: %5
-  strong_release %4 : $AnyObject                  // id: %6
-  strong_release %0 : $XX                         // id: %7
-  %8 = tuple ()                                   // user: %9
-  return %8 : $()                                 // id: %9
-}
-
 // CHECK-LABEL: sil @unowned_round_trips : $@convention(thin) (B, @sil_unowned B, AnyObject, @sil_unmanaged AnyObject) -> (B, @sil_unowned B, AnyObject, @sil_unmanaged AnyObject) {
 // CHECK: bb0(
 // CHECK-NEXT: tuple
@@ -2522,7 +2494,7 @@ bb0(%0 : $*T):
   %4 = init_existential_addr %3 : $*someProtocol, $T // user: %5
   copy_addr %0 to [initialization] %4 : $*T       // id: %5
   destroy_addr %0 : $*T                           // id: %6
-  %7 = open_existential_addr %3 : $*someProtocol to $*@opened("105977B0-D8EB-11E4-AC00-3C0754644993") someProtocol // users: %8, %9
+  %7 = open_existential_addr immutable_access %3 : $*someProtocol to $*@opened("105977B0-D8EB-11E4-AC00-3C0754644993") someProtocol // users: %8, %9
   %8 = witness_method $@opened("105977B0-D8EB-11E4-AC00-3C0754644993") someProtocol, #someProtocol.i!getter.1, %7 : $*@opened("105977B0-D8EB-11E4-AC00-3C0754644993") someProtocol : $@convention(witness_method) <τ_0_0 where τ_0_0 : someProtocol> (@in_guaranteed τ_0_0) -> Int // user: %9
   %9 = apply %8<@opened("105977B0-D8EB-11E4-AC00-3C0754644993") someProtocol>(%7) : $@convention(witness_method) <τ_0_0 where τ_0_0 : someProtocol> (@in_guaranteed τ_0_0) -> Int
   destroy_addr %3 : $*someProtocol              // id: %13
@@ -2952,14 +2924,14 @@ bb0(%0 : $*T, %1 : $*T):
 
 // CHECK-LABEL: sil @test_existential_partial_apply_apply
 // CHECK: bb0(%0 : $*FakeProtocol):
-// CHECK-NEXT: [[OPEN:%.*]] = open_existential_addr
+// CHECK-NEXT: [[OPEN:%.*]] = open_existential_addr immutable_access
 // CHECK-NEXT: [[FN:%.*]] = witness_method
 // CHECK-NEXT: apply [[FN]]<@opened("5DD6F3D0-808A-11E6-93A0-34363BD08DA0") FakeProtocol>([[OPEN]])
 // CHECK-NEXT: tuple
 // CHECK-NEXT: return
 sil @test_existential_partial_apply_apply : $@convention(thin) (@in FakeProtocol) -> () {
 bb0(%0: $*FakeProtocol):
-  %o = open_existential_addr %0 : $*FakeProtocol to $*@opened("5DD6F3D0-808A-11E6-93A0-34363BD08DA0") FakeProtocol
+  %o = open_existential_addr immutable_access %0 : $*FakeProtocol to $*@opened("5DD6F3D0-808A-11E6-93A0-34363BD08DA0") FakeProtocol
   %f1 = witness_method $@opened("5DD6F3D0-808A-11E6-93A0-34363BD08DA0") FakeProtocol, #FakeProtocol.requirement!1, %o : $*@opened("5DD6F3D0-808A-11E6-93A0-34363BD08DA0") FakeProtocol : $@convention(witness_method) <T where T : FakeProtocol> (@in_guaranteed T) -> ()
   %pa = partial_apply %f1<@opened("5DD6F3D0-808A-11E6-93A0-34363BD08DA0") FakeProtocol>() : $@convention(witness_method) <T where T : FakeProtocol> (@in_guaranteed T) -> ()
   %a1 = apply %pa(%o) : $@callee_owned (@in_guaranteed @opened("5DD6F3D0-808A-11E6-93A0-34363BD08DA0") FakeProtocol) -> ()
@@ -3113,7 +3085,7 @@ sil @minus : $@convention(method) <Self where Self : PM> (@in_guaranteed Self) -
 
 // CHECK-LABEL: sil @silcombine_dont_change_allocstack_for_opened_archetypes
 // CHECK-NOT: alloc_stack{{.*}}opened
-// CHECK: open_existential_addr {{%[0-9]+}} : $*PM to $*@opened("090C3DB0-1C76-11E6-81C4-B8E856428C60") PM
+// CHECK: open_existential_addr immutable_access {{%[0-9]+}} : $*PM to $*@opened("090C3DB0-1C76-11E6-81C4-B8E856428C60") PM
 // CHECK: return
 sil @silcombine_dont_change_allocstack_for_opened_archetypes : $@convention(thin) (@owned VV) -> () {
 bb0(%0 : $VV):
@@ -3121,7 +3093,7 @@ bb0(%0 : $VV):
   %9 = ref_element_addr %0 : $VV, #VV.m
   %10 = alloc_stack $PM
   copy_addr %9 to [initialization] %10 : $*PM
-  %12 = open_existential_addr %10 : $*PM to $*@opened("090C3DB0-1C76-11E6-81C4-B8E856428C60") PM
+  %12 = open_existential_addr immutable_access %10 : $*PM to $*@opened("090C3DB0-1C76-11E6-81C4-B8E856428C60") PM
   %13 = init_existential_addr %8 : $*PM, $@opened("090C3DB0-1C76-11E6-81C4-B8E856428C60") PM
   %14 = function_ref @plus : $@convention(method) <τ_0_0 where τ_0_0 : PM> (@in_guaranteed τ_0_0) -> @out τ_0_0
   %15 = apply %14<@opened("090C3DB0-1C76-11E6-81C4-B8E856428C60") PM>(%13, %12) : $@convention(method) <τ_0_0 where τ_0_0 : PM> (@in_guaranteed τ_0_0) -> @out τ_0_0
@@ -3137,69 +3109,27 @@ bb0(%0 : $VV):
   return %26 : $()
 }
 
-protocol PPP : class {
-  func foo()
+// CHECK-LABEL: sil @remove_unused_alloc_ref
+// CHECK-NEXT: bb0
+// CHECK-NEXT: %0 = tuple ()
+// CHECK-NEXT: return %0 : $()
+sil @remove_unused_alloc_ref : $@convention(thin) () -> () {
+bb0:
+  %1 = alloc_ref $B
+  dealloc_ref %1 : $B
+  %3 = tuple ()
+  return %3 : $()
 }
 
-class BBB: PPP {
-  @inline(never)
-  func foo()
-}
-
-final class XXX : BBB {
-  @inline(never)
-  override func foo()
-}
-
-// Check that sil-combine does not crash on this example and does not generate a wrong
-// upcast.
-// CHECK-LABEL: sil @silcombine_dont_generate_wrong_upcasts_during_devirt
-// CHECK-NOT: upcast
-// CHECK: witness_method $XXX, #PPP.foo!1 : {{.*}} : $@convention(witness_method) <τ_0_0 where τ_0_0 : PPP> (@guaranteed τ_0_0) -> ()
-// CHECK-NOT: upcast
-// CHECK: return
-sil @silcombine_dont_generate_wrong_upcasts_during_devirt: $@convention(thin) (@owned BBB) -> () {
-bb0(%0 : $BBB):
-  strong_retain %0 : $BBB
-  %3 = init_existential_ref %0 : $BBB : $BBB, $PPP
-  %5 = open_existential_ref %3 : $PPP to $@opened("0AC9A62E-926E-11E6-8BF5-685B35C48C83") PPP
-  %6 = witness_method $XXX, #PPP.foo!1, %5 : $@opened("0AC9A62E-926E-11E6-8BF5-685B35C48C83") PPP : $@convention(witness_method) <τ_0_0 where τ_0_0 : PPP> (@guaranteed τ_0_0) -> ()
-  %7 = apply %6<@opened("0AC9A62E-926E-11E6-8BF5-685B35C48C83") PPP>(%5) : $@convention(witness_method) <τ_0_0 where τ_0_0 : PPP> (@guaranteed τ_0_0) -> ()
-  %8 = apply %6<@opened("0AC9A62E-926E-11E6-8BF5-685B35C48C83") PPP>(%5) : $@convention(witness_method) <τ_0_0 where τ_0_0 : PPP> (@guaranteed τ_0_0) -> ()
-  strong_release %3 : $PPP
-  %9 = tuple ()
-  strong_release %0 : $BBB
-  %11 = tuple ()
-  return %11 : $()
-}
-
-// Check that both applies can be devirtualized by means of propagating the concrete
-// type of the existential into witness_method and apply instructions.
-// CHECK-LABEL: sil @silcombine_devirt_both_applies_of_witness_method
-// CHECK-NOT: open_existential_ref
-// CHECK-NOT: witness_method
-// CHECK: [[FR1:%.*]] = function_ref @_TTWC4nix23XXXS_3PPPS_FS1_3foofT_T_
-// CHECK: apply [[FR1]](%0)
-// CHECK: [[FR2:%.*]] = function_ref @_TTWC4nix23XXXS_3PPPS_FS1_3foofT_T_
-// CHECK: apply [[FR2]](%0)
-// CHECK: return
-sil @silcombine_devirt_both_applies_of_witness_method : $@convention(thin) (@owned XXX) -> () {
-bb0(%0 : $XXX):
-  strong_retain %0 : $XXX
-  %3 = init_existential_ref %0 : $XXX : $XXX, $PPP
-  %5 = open_existential_ref %3 : $PPP to $@opened("0AC9A62E-926E-11E6-8BF5-685B35C48C83") PPP
-  %6 = witness_method $@opened("0AC9A62E-926E-11E6-8BF5-685B35C48C83") PPP, #PPP.foo!1, %5 : $@opened("0AC9A62E-926E-11E6-8BF5-685B35C48C83") PPP : $@convention(witness_method) <τ_0_0 where τ_0_0 : PPP> (@guaranteed τ_0_0) -> ()
-  %7 = apply %6<@opened("0AC9A62E-926E-11E6-8BF5-685B35C48C83") PPP>(%5) : $@convention(witness_method) <τ_0_0 where τ_0_0 : PPP> (@guaranteed τ_0_0) -> ()
-  %8 = apply %6<@opened("0AC9A62E-926E-11E6-8BF5-685B35C48C83") PPP>(%5) : $@convention(witness_method) <τ_0_0 where τ_0_0 : PPP> (@guaranteed τ_0_0) -> ()
-  strong_release %3 : $PPP
-  %9 = tuple ()
-  strong_release %0 : $XXX
-  %11 = tuple ()
-  return %11 : $()
-}
-
-sil @_TTWC4nix23XXXS_3PPPS_FS1_3foofT_T_ : $@convention(witness_method) (@guaranteed XXX) -> ()
-
-sil_witness_table XXX: PPP module nix2 {
-  method #PPP.foo!1: @_TTWC4nix23XXXS_3PPPS_FS1_3foofT_T_	// protocol witness for PPP.foo() -> () in conformance XXX
+// CHECK-LABEL: sil @remove_unused_alloc_ref_stack
+// CHECK-NEXT: bb0
+// CHECK-NEXT: %0 = tuple ()
+// CHECK-NEXT: return %0 : $()
+sil @remove_unused_alloc_ref_stack : $@convention(thin) () -> () {
+bb0:
+  %1 = alloc_ref [stack] $B
+  set_deallocating %1 : $B
+  dealloc_ref [stack] %1 : $B
+  %3 = tuple ()
+  return %3 : $()
 }

@@ -18,6 +18,7 @@
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/ProtocolConformance.h"
+#include "swift/AST/SubstitutionMap.h"
 #include "swift/Reflection/MetadataSourceBuilder.h"
 #include "swift/Reflection/Records.h"
 #include "swift/SIL/SILModule.h"
@@ -31,6 +32,7 @@
 #include "IRGenModule.h"
 #include "Linking.h"
 #include "LoadableTypeInfo.h"
+#include "IRGenMangler.h"
 
 using namespace swift;
 using namespace irgen;
@@ -174,8 +176,16 @@ public:
   }
 };
 
-class ReflectionMetadataBuilder : public ConstantBuilder<> {
+class ReflectionMetadataBuilder {
 protected:
+  IRGenModule &IGM;
+  ConstantInitBuilder InitBuilder;
+  ConstantStructBuilder B;
+
+  ReflectionMetadataBuilder(IRGenModule &IGM)
+    : IGM(IGM), InitBuilder(IGM), B(InitBuilder.beginStruct()) {}
+
+  virtual ~ReflectionMetadataBuilder() {}
 
   // Collect any builtin types referenced from this type.
   void addBuiltinTypeRefs(CanType type) {
@@ -213,37 +223,25 @@ protected:
     // for the purposes of reflection metadata
     assert(!type->hasArchetype() && "Forgot to map typeref out of context");
 
-    Mangle::Mangler mangler(/*DWARFMangling*/false,
-                            /*usePunyCode*/ true,
-                            /*OptimizeProtocolNames*/ false);
-    mangler.setModuleContext(ModuleContext);
-    
     // TODO: As a compatibility hack, mangle single-field boxes with the legacy
     // mangling in reflection metadata.
+    bool isSingleFieldOfBox = false;
     auto boxTy = dyn_cast<SILBoxType>(type);
     if (boxTy && boxTy->getLayout()->getFields().size() == 1) {
       GenericContextScope scope(IGM, Context);
-      mangler.mangleLegacyBoxType(
-        boxTy->getFieldLoweredType(IGM.getSILModule(), 0));
-    } else {
-      mangler.mangleType(type, 0);
+      type = boxTy->getFieldLoweredType(IGM.getSILModule(), 0);
+      isSingleFieldOfBox = true;
     }
-    auto mangledName = IGM.getAddrOfStringForTypeRef(mangler.finalize());
-    addRelativeAddress(mangledName);
+    IRGenMangler mangler;
+    std::string MangledStr = mangler.mangleTypeForReflection(type,
+                                            ModuleContext, isSingleFieldOfBox);
+    auto mangledName = IGM.getAddrOfStringForTypeRef(MangledStr);
+    B.addRelativeAddress(mangledName);
   }
 
   llvm::GlobalVariable *emit(Optional<LinkEntity> entity,
                              const char *section) {
-    auto tempBase = std::unique_ptr<llvm::GlobalVariable>(
-        new llvm::GlobalVariable(IGM.Int8Ty, /*isConstant*/ true,
-                                 llvm::GlobalValue::PrivateLinkage));
-    setRelativeAddressBase(tempBase.get());
-
     layout();
-
-    auto init = getInit();
-    if (!init)
-      return nullptr;
 
     llvm::GlobalVariable *var;
 
@@ -252,24 +250,20 @@ protected:
     if (entity) {
       auto info = LinkInfo::get(IGM, *entity, ForDefinition);
 
-      var = info.createVariable(IGM, init->getType(), Alignment(4));
+      auto init = B.finishAndCreateFuture();
+
+      var = info.createVariable(IGM, init.getType(), Alignment(4));
       var->setConstant(true);
-      var->setInitializer(init);
+      init.installInGlobal(var);
 
     // Others, such as capture descriptors, do not have a name.
     } else {
-      var = new llvm::GlobalVariable(*IGM.getModule(), init->getType(),
-                                     /*isConstant*/ true,
-                                     llvm::GlobalValue::PrivateLinkage,
-                                     init,
-                                     "\x01l__swift3_reflection_descriptor");
-      var->setAlignment(4);
+      var = B.finishAndCreateGlobal("\x01l__swift3_reflection_descriptor",
+                                    Alignment(4), /*isConstant*/ true,
+                                    llvm::GlobalValue::PrivateLinkage);
     }
 
     var->setSection(section);
-
-    auto replacer = llvm::ConstantExpr::getBitCast(var, IGM.Int8PtrTy);
-    tempBase->replaceAllUsesWith(replacer);
 
     IGM.addUsedGlobal(var);
 
@@ -277,12 +271,6 @@ protected:
   }
 
   virtual void layout() = 0;
-
-public:
-  ReflectionMetadataBuilder(IRGenModule &IGM)
-    : ConstantBuilder(IGM) {}
-
-  virtual ~ReflectionMetadataBuilder() {}
 };
 
 class AssociatedTypeMetadataBuilder : public ReflectionMetadataBuilder {
@@ -307,12 +295,12 @@ class AssociatedTypeMetadataBuilder : public ReflectionMetadataBuilder {
     auto ProtoTy = Conformance->getProtocol()->getDeclaredType();
     addTypeRef(M, ProtoTy->getCanonicalType());
 
-    addConstantInt32(AssociatedTypes.size());
-    addConstantInt32(AssociatedTypeRecordSize);
+    B.addInt32(AssociatedTypes.size());
+    B.addInt32(AssociatedTypeRecordSize);
 
     for (auto AssocTy : AssociatedTypes) {
       auto NameGlobal = IGM.getAddrOfStringForTypeRef(AssocTy.first);
-      addRelativeAddress(NameGlobal);
+      B.addRelativeAddress(NameGlobal);
       addBuiltinTypeRefs(AssocTy.second);
       addTypeRef(M, AssocTy.second);
     }
@@ -349,11 +337,11 @@ class SuperclassMetadataBuilder : public ReflectionMetadataBuilder {
     auto anyObjectDecl = IGM.Context.getProtocol(KnownProtocolKind::AnyObject);
     addTypeRef(M, anyObjectDecl->getDeclaredType()->getCanonicalType());
 
-    addConstantInt32(1);
-    addConstantInt32(AssociatedTypeRecordSize);
+    B.addInt32(1);
+    B.addInt32(AssociatedTypeRecordSize);
 
     auto NameGlobal = IGM.getAddrOfStringForTypeRef("super");
-    addRelativeAddress(NameGlobal);
+    B.addRelativeAddress(NameGlobal);
     addTypeRef(M, Superclass);
   }
 
@@ -380,10 +368,10 @@ class FieldTypeMetadataBuilder : public ReflectionMetadataBuilder {
     reflection::FieldRecordFlags flags;
     flags.setIsIndirectCase(indirect);
 
-    addConstantInt32(flags.getRawValue());
+    B.addInt32(flags.getRawValue());
 
     if (!type) {
-      addConstantInt32(0);
+      B.addInt32(0);
     } else {
       addTypeRef(value->getModuleContext(), type);
       addBuiltinTypeRefs(type);
@@ -391,9 +379,9 @@ class FieldTypeMetadataBuilder : public ReflectionMetadataBuilder {
 
     if (IGM.IRGen.Opts.EnableReflectionNames) {
       auto fieldName = IGM.getAddrOfFieldName(value->getNameStr());
-      addRelativeAddress(fieldName);
+      B.addRelativeAddress(fieldName);
     } else {
-      addConstantInt32(0);
+      B.addInt32(0);
     }
   }
 
@@ -408,18 +396,18 @@ class FieldTypeMetadataBuilder : public ReflectionMetadataBuilder {
         kind = FieldDescriptorKind::Class;
     }
 
-    addConstantInt16(uint16_t(kind));
-    addConstantInt16(fieldRecordSize);
+    B.addInt16(uint16_t(kind));
+    B.addInt16(fieldRecordSize);
 
     // Imported classes don't need field descriptors
     if (NTD->hasClangNode()) {
       assert(isa<ClassDecl>(NTD));
-      addConstantInt32(0);
+      B.addInt32(0);
       return;
     }
 
     auto properties = NTD->getStoredProperties();
-    addConstantInt32(std::distance(properties.begin(), properties.end()));
+    B.addInt32(std::distance(properties.begin(), properties.end()));
     for (auto property : properties)
       addFieldDecl(property,
                    property->getInterfaceType()
@@ -443,22 +431,22 @@ class FieldTypeMetadataBuilder : public ReflectionMetadataBuilder {
       IGM.OpaqueTypes.insert(enumDecl);
     }
 
-    addConstantInt16(uint16_t(kind));
-    addConstantInt16(fieldRecordSize);
-    addConstantInt32(strategy.getElementsWithPayload().size() +
-                     strategy.getElementsWithNoPayload().size());
+    B.addInt16(uint16_t(kind));
+    B.addInt16(fieldRecordSize);
+    B.addInt32(strategy.getElementsWithPayload().size()
+               + strategy.getElementsWithNoPayload().size());
 
     for (auto enumCase : strategy.getElementsWithPayload()) {
-        bool indirect = (enumCase.decl->isIndirect() ||
-                         enumDecl->isIndirect());
-        addFieldDecl(enumCase.decl,
-                     enumCase.decl->getArgumentInterfaceType()
-                                  ->getCanonicalType(),
-                     indirect);
+      bool indirect = (enumCase.decl->isIndirect() ||
+                       enumDecl->isIndirect());
+      addFieldDecl(enumCase.decl,
+                   enumCase.decl->getArgumentInterfaceType()
+                                ->getCanonicalType(),
+                   indirect);
     }
 
     for (auto enumCase : strategy.getElementsWithNoPayload()) {
-        addFieldDecl(enumCase.decl, CanType());
+      addFieldDecl(enumCase.decl, CanType());
     }
   }
 
@@ -471,9 +459,9 @@ class FieldTypeMetadataBuilder : public ReflectionMetadataBuilder {
       Kind = FieldDescriptorKind::ClassProtocol;
     else
       Kind = FieldDescriptorKind::Protocol;
-    addConstantInt16(uint16_t(Kind));
-    addConstantInt16(fieldRecordSize);
-    addConstantInt32(0);
+    B.addInt16(uint16_t(Kind));
+    B.addInt16(fieldRecordSize);
+    B.addInt32(0);
   }
 
   void layout() override {
@@ -487,22 +475,22 @@ class FieldTypeMetadataBuilder : public ReflectionMetadataBuilder {
       return;
 
     switch (NTD->getKind()) {
-      case DeclKind::Class:
-      case DeclKind::Struct:
-        layoutRecord();
-        break;
+    case DeclKind::Class:
+    case DeclKind::Struct:
+      layoutRecord();
+      break;
 
-      case DeclKind::Enum:
-        layoutEnum();
-        break;
+    case DeclKind::Enum:
+      layoutEnum();
+      break;
 
-      case DeclKind::Protocol:
-        layoutProtocol();
-        break;
+    case DeclKind::Protocol:
+      layoutProtocol();
+      break;
 
-      default:
-        llvm_unreachable("Not a nominal type");
-        break;
+    default:
+      llvm_unreachable("Not a nominal type");
+      break;
     }
   }
 
@@ -545,10 +533,10 @@ public:
   void layout() override {
     addTypeRef(module, type);
 
-    addConstantInt32(ti->getFixedSize().getValue());
-    addConstantInt32(ti->getFixedAlignment().getValue());
-    addConstantInt32(ti->getFixedStride().getValue());
-    addConstantInt32(ti->getFixedExtraInhabitantCount(IGM));
+    B.addInt32(ti->getFixedSize().getValue());
+    B.addInt32(ti->getFixedAlignment().getValue());
+    B.addInt32(ti->getFixedStride().getValue());
+    B.addInt32(ti->getFixedExtraInhabitantCount(IGM));
   }
 
   llvm::GlobalVariable *emit() {
@@ -589,9 +577,9 @@ public:
     : ReflectionMetadataBuilder(IGM), BoxedType(BoxedType) {}
 
   void layout() override {
-    addConstantInt32(1);
-    addConstantInt32(0); // Number of sources
-    addConstantInt32(0); // Number of generic bindings
+    B.addInt32(1);
+    B.addInt32(0); // Number of sources
+    B.addInt32(0); // Number of generic bindings
 
     addTypeRef(IGM.getSILModule().getSwiftModule(), BoxedType);
     addBuiltinTypeRefs(BoxedType);
@@ -611,14 +599,14 @@ class CaptureDescriptorBuilder : public ReflectionMetadataBuilder {
   SILFunction &Caller;
   CanSILFunctionType OrigCalleeType;
   CanSILFunctionType SubstCalleeType;
-  ArrayRef<Substitution> Subs;
+  SubstitutionList Subs;
   const HeapLayout &Layout;
 public:
   CaptureDescriptorBuilder(IRGenModule &IGM,
                            SILFunction &Caller,
                            CanSILFunctionType OrigCalleeType,
                            CanSILFunctionType SubstCalleeType,
-                           ArrayRef<Substitution> Subs,
+                           SubstitutionList Subs,
                            const HeapLayout &Layout)
     : ReflectionMetadataBuilder(IGM),
       Caller(Caller), OrigCalleeType(OrigCalleeType),
@@ -630,7 +618,7 @@ public:
 
   void addMetadataSource(const reflection::MetadataSource *Source) {
     if (Source == nullptr) {
-      addConstantInt32(0);
+      B.addInt32(0);
     } else {
       SmallString<16> EncodeBuffer;
       llvm::raw_svector_ostream OS(EncodeBuffer);
@@ -638,7 +626,7 @@ public:
       Encoder.visit(Source);
 
       auto EncodedSource = IGM.getAddrOfStringForTypeRef(OS.str());
-      addRelativeAddress(EncodedSource);
+      B.addRelativeAddress(EncodedSource);
     }
   }
 
@@ -753,9 +741,9 @@ public:
     auto CaptureTypes = getCaptureTypes();
     auto MetadataSources = getMetadataSourceMap();
 
-    addConstantInt32(CaptureTypes.size());
-    addConstantInt32(MetadataSources.size());
-    addConstantInt32(Layout.getBindings().size());
+    B.addInt32(CaptureTypes.size());
+    B.addInt32(MetadataSources.size());
+    B.addInt32(Layout.getBindings().size());
 
     // Now add typerefs of all of the captures.
     for (auto CaptureType : CaptureTypes) {
@@ -801,6 +789,9 @@ static std::string getReflectionSectionName(IRGenModule &IGM,
     assert(LongName.size() <= 7 &&
            "Mach-O section name length must be <= 16 characters");
     OS << "__TEXT,__swift3_" << LongName << ", regular, no_dead_strip";
+    break;
+  case llvm::Triple::Wasm:
+    llvm_unreachable("web assembly object format is not supported.");
     break;
   }
   return OS.str();
@@ -877,7 +868,7 @@ llvm::Constant *
 IRGenModule::getAddrOfCaptureDescriptor(SILFunction &Caller,
                                         CanSILFunctionType OrigCalleeType,
                                         CanSILFunctionType SubstCalleeType,
-                                        ArrayRef<Substitution> Subs,
+                                        SubstitutionList Subs,
                                         const HeapLayout &Layout) {
   if (!IRGen.Opts.EnableReflectionMetadata)
     return llvm::Constant::getNullValue(CaptureDescriptorPtrTy);

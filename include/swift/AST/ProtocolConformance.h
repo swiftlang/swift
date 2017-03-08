@@ -18,7 +18,6 @@
 
 #include "swift/AST/ConcreteDeclRef.h"
 #include "swift/AST/Decl.h"
-#include "swift/AST/ProtocolConformanceRef.h"
 #include "swift/AST/Substitution.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/Types.h"
@@ -160,12 +159,6 @@ public:
   getTypeWitnessSubstAndDecl(AssociatedTypeDecl *assocType,
                              LazyResolver *resolver) const;
 
-  static Type
-  getTypeWitnessByName(Type type,
-                       ProtocolConformanceRef conformance,
-                       Identifier name,
-                       LazyResolver *resolver);
-
   /// Apply the given function object to each type witness within this
   /// protocol conformance.
   ///
@@ -218,11 +211,9 @@ public:
       if (!valueReq || isa<AssociatedTypeDecl>(valueReq) ||
           valueReq->isInvalid())
         continue;
-      
-      // Ignore accessors.
-      if (auto *FD = dyn_cast<FuncDecl>(valueReq))
-        if (FD->isAccessor())
-          continue;
+
+      if (!valueReq->isProtocolRequirement())
+        continue;
 
       // If we don't have and cannot resolve witnesses, skip it.
       if (!resolver && !hasWitness(valueReq))
@@ -348,6 +339,10 @@ class NormalProtocolConformance : public ProtocolConformance,
   /// the requirements of those protocols.
   InheritedConformanceMap InheritedMapping;
 
+  /// Conformances that satisfy each of conformance requirements of the
+  /// requirement signature of the protocol.
+  ArrayRef<ProtocolConformanceRef> SignatureConformances;
+
   LazyMemberLoader *Resolver = nullptr;
   uint64_t ResolverContextData;
 
@@ -449,6 +444,18 @@ public:
                       const Substitution &substitution,
                       TypeDecl *typeDecl) const;
 
+  /// Given a dependent type expressed in terms of the self parameter,
+  /// map it into the context of this conformance.
+  Type getAssociatedType(Type assocType,
+                         LazyResolver *resolver = nullptr) const;
+
+  /// Given that the requirement signature of the protocol directly states
+  /// that the given dependent type must conform to the given protocol,
+  /// return its associated conformance.
+  ProtocolConformanceRef
+  getAssociatedConformance(Type assocType, ProtocolDecl *protocol,
+                           LazyResolver *resolver = nullptr) const;
+
   /// Retrieve the value witness corresponding to the given requirement.
   ///
   /// Note that a generic witness will only be specialized if the conformance
@@ -489,6 +496,17 @@ public:
     assert(!isComplete() && "Conformance already complete?");
     InheritedMapping[proto] = conformance;
   }
+
+  /// Retrieve the protocol conformances that satisfy the requirements of the
+  /// protocol, which line up with the conformance constraints in the
+  /// protocol's requirement signature.
+  ArrayRef<ProtocolConformanceRef> getSignatureConformances() const {
+    return SignatureConformances;
+  }
+
+  /// Copy the given protocol conformances for the requirement signature into
+  /// the normal conformance.
+  void setSignatureConformances(ArrayRef<ProtocolConformanceRef> conformances);
 
   /// Determine whether the witness for the given type requirement
   /// is the default definition.
@@ -535,7 +553,7 @@ class SpecializedProtocolConformance : public ProtocolConformance,
 
   /// The substitutions applied to the generic conformance to produce this
   /// conformance.
-  ArrayRef<Substitution> GenericSubstitutions;
+  SubstitutionList GenericSubstitutions;
 
   /// The mapping from associated type requirements to their substitutions.
   ///
@@ -547,7 +565,7 @@ class SpecializedProtocolConformance : public ProtocolConformance,
 
   SpecializedProtocolConformance(Type conformingType,
                                  ProtocolConformance *genericConformance,
-                                 ArrayRef<Substitution> substitutions);
+                                 SubstitutionList substitutions);
 
 public:
   /// Get the generic conformance from which this conformance was derived,
@@ -558,7 +576,7 @@ public:
 
   /// Get the substitutions used to produce this specialized conformance from
   /// the generic conformance.
-  ArrayRef<Substitution> getGenericSubstitutions() const {
+  SubstitutionList getGenericSubstitutions() const {
     return GenericSubstitutions;
   }
 

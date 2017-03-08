@@ -93,7 +93,7 @@ static SILInstruction *findOnlyApply(SILFunction *F) {
 ///
 /// TODO: we should teach the demangler to understand this suffix.
 static std::string getUniqueName(std::string Name, SILModule &M) {
-  if (!M.lookUpFunction(Name))
+  if (!M.hasFunction(Name))
     return Name;
   return getUniqueName(Name + "_unique_suffix", M);
 }
@@ -372,7 +372,7 @@ std::string FunctionSignatureTransform::createOptimizedSILFunctionName() {
   do {
     New = NewFM.mangle(UniqueID);
     ++UniqueID;
-  } while (M.lookUpFunction(New));
+  } while (M.hasFunction(New));
 
   return NewMangling::selectMangling(Old, New);
 }
@@ -487,18 +487,18 @@ void FunctionSignatureTransform::createFunctionSignatureOptimizedFunction() {
 
   DEBUG(llvm::dbgs() << "  -> create specialized function " << Name << "\n");
 
-  NewF = M.createFunction(
-      linkage, Name, createOptimizedSILFunctionType(), nullptr,
-      F->getLocation(), F->isBare(), F->isTransparent(), F->isFragile(),
-      F->isThunk(), F->getClassVisibility(), F->getInlineStrategy(),
-      F->getEffectsKind(), nullptr, F->getDebugScope(), F->getDeclContext());
+  NewF = M.createFunction(linkage, Name, createOptimizedSILFunctionType(),
+                          F->getGenericEnvironment(), F->getLocation(),
+                          F->isBare(), F->isTransparent(), F->isFragile(),
+                          F->isThunk(), F->getClassVisibility(),
+                          F->getInlineStrategy(), F->getEffectsKind(), nullptr,
+                          F->getDebugScope());
   if (F->hasUnqualifiedOwnership()) {
     NewF->setUnqualifiedOwnership();
   }
 
   // Then we transfer the body of F to NewF.
   NewF->spliceBody(F);
-  NewF->setDeclCtx(F->getDeclContext());
 
   // Array semantic clients rely on the signature being as in the original
   // version.
@@ -552,7 +552,7 @@ void FunctionSignatureTransform::createFunctionSignatureOptimizedFunction() {
         SILType::getPrimitiveObjectType(FunctionTy->getErrorResult().getType());
     auto *ErrorArg =
         ErrorBlock->createPHIArgument(Error, ValueOwnershipKind::Owned);
-    Builder.createTryApply(Loc, FRI, LoweredType, ArrayRef<Substitution>(),
+    Builder.createTryApply(Loc, FRI, LoweredType, SubstitutionList(),
                            ThunkArgs, NormalBlock, ErrorBlock);
 
     Builder.setInsertionPoint(ErrorBlock);
@@ -560,7 +560,7 @@ void FunctionSignatureTransform::createFunctionSignatureOptimizedFunction() {
     Builder.setInsertionPoint(NormalBlock);
   } else {
     ReturnValue = Builder.createApply(Loc, FRI, LoweredType, ResultType,
-                                      ArrayRef<Substitution>(), ThunkArgs,
+                                      SubstitutionList(), ThunkArgs,
                                       false);
   }
 
@@ -761,19 +761,19 @@ OwnedToGuaranteedAddArgumentRelease(ArgumentDescriptor &AD, SILBuilder &Builder,
     Builder.setInsertionPoint(&*std::next(SILBasicBlock::iterator(Call)));
     Builder.createReleaseValue(RegularLocation(SourceLoc()),
                                F->getArguments()[AD.Index],
-                               Atomicity::Atomic);
+                               Builder.getDefaultAtomicity());
   } else {
     SILBasicBlock *NormalBB = dyn_cast<TryApplyInst>(Call)->getNormalBB();
     Builder.setInsertionPoint(&*NormalBB->begin());
     Builder.createReleaseValue(RegularLocation(SourceLoc()),
                                F->getArguments()[AD.Index],
-                               Atomicity::Atomic);
+                               Builder.getDefaultAtomicity());
 
     SILBasicBlock *ErrorBB = dyn_cast<TryApplyInst>(Call)->getErrorBB();
     Builder.setInsertionPoint(&*ErrorBB->begin());
     Builder.createReleaseValue(RegularLocation(SourceLoc()),
                                F->getArguments()[AD.Index],
-                               Atomicity::Atomic);
+                               Builder.getDefaultAtomicity());
   }
 }
 
@@ -791,12 +791,12 @@ OwnedToGuaranteedAddResultRelease(ResultDescriptor &RD, SILBuilder &Builder,
   if (isa<ApplyInst>(Call)) {
     Builder.setInsertionPoint(&*std::next(SILBasicBlock::iterator(Call)));
     Builder.createRetainValue(RegularLocation(SourceLoc()), Call,
-                              Atomicity::Atomic);
+                              Builder.getDefaultAtomicity());
   } else {
     SILBasicBlock *NormalBB = dyn_cast<TryApplyInst>(Call)->getNormalBB();
     Builder.setInsertionPoint(&*NormalBB->begin());
     Builder.createRetainValue(RegularLocation(SourceLoc()),
-                              NormalBB->getArgument(0), Atomicity::Atomic);
+                              NormalBB->getArgument(0), Builder.getDefaultAtomicity());
   }
 }
 

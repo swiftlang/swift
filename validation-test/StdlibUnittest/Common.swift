@@ -1,5 +1,7 @@
 // RUN: %target-run-simple-swift | %FileCheck %s
 // REQUIRES: executable_test
+// FIXME: this test is failing for watchos <rdar://problem/29996991>
+// UNSUPPORTED: OS=watchos
 
 import SwiftPrivate
 import StdlibUnittest

@@ -51,7 +51,7 @@
                     font-lock-keyword-face)
 
    ;; Highlight attributes written in [...].
-   '("\\[\\(.+\\)\\]" 1 font-lock-keyword-face)
+   '("\\[\\(.+?\\)\\]" 1 font-lock-keyword-face)
 
    ;; SIL Instructions - Allocation/Deallocation.
    `(,(regexp-opt '("alloc_stack" "alloc_ref" "alloc_ref_dynamic" "alloc_box"
@@ -74,7 +74,10 @@
 
    ;; SIL Instructions - Borrowing
    `(,(regexp-opt '("load_borrow" "begin_borrow" "store_borrow" "end_borrow_argument") 'words) . font-lock-keyword-face)
-   '("\\(end_borrow\\) %[[:alnum:]] \\(from\\)" (1 font-lock-keyword-face) (2 font-lock-keyword-face))
+   '("\\(end_borrow\\) %[[:alnum:]]+ \\(from\\)" (1 font-lock-keyword-face) (2 font-lock-keyword-face))
+
+   ;; SIL Instructions - ownership
+   `(,(regexp-opt '("unchecked_ownership_conversion") 'words) . font-lock-keyword-face)
 
    ;; SIL Instructions - Reference Counting.
    `(,(regexp-opt '("strong_retain"
@@ -83,6 +86,7 @@
                     "load_weak" "store_weak"
                     "load_unowned" "store_unowned"
                     "fix_lifetime" "mark_dependence"
+                    "end_lifetime"
                     "is_unique" "is_unique_or_pinned"
                     "copy_block"
                     "strong_unpin" "strong_pin" "is_unique" "is_unique_or_pinned")
@@ -109,6 +113,7 @@
                     "struct_element_addr" "ref_element_addr"
                     "autorelease_value" "copy_value" "destroy_value"
                     "unmanaged_retain_value" "unmanaged_release_value"
+                    "unmanaged_autorelease_value"
                     "copy_unowned_value")
                   'words) . font-lock-keyword-face)
    ;; Enums. *NOTE* We do not include enum itself here since enum is a
@@ -120,6 +125,8 @@
    ;; Protocol and Protocol Composition Types
    `(,(regexp-opt '("init_existential_addr" "deinit_existential_addr"
                     "open_existential_addr"
+                    "init_existential_opaque" "deinit_existential_opaque"
+                    "open_existential_opaque"
                     "alloc_existential_box" "project_existential_box"
                     "open_existential_box" "dealloc_existential_box"
                     "init_existential_ref" "open_existential_ref"
@@ -151,7 +158,8 @@
                   'words) . font-lock-keyword-face)
 
    ;; Checked Conversions
-   `(,(regexp-opt '("unconditional_checked_cast" "unconditional_checked_cast_addr")
+   `(,(regexp-opt '("unconditional_checked_cast" "unconditional_checked_cast_addr"
+                    "unconditional_checked_cast_opaque")
                   'words) . font-lock-keyword-face)
    ;; Runtime Failures
    `(,(regexp-opt '("cond_fail")
@@ -160,7 +168,7 @@
    `(,(regexp-opt '("unreachable" "return" "br"
                     "cond_br" "switch_value" "switch_enum"
                     "switch_enum_addr" "dynamic_method_br"
-                    "checked_cast_br" "throw" "checked_cast_addr_br" "case")
+                    "checked_cast_br" "checked_cast_value_br" "throw" "checked_cast_addr_br" "case")
                   'words) . font-lock-keyword-face)
    ;; Blocks
    `(,(regexp-opt '("project_block_storage" "init_block_storage_header"

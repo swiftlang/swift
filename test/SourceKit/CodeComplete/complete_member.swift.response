@@ -8,7 +8,7 @@
       key.typename: "Double",
       key.context: source.codecompletion.context.thisclass,
       key.num_bytes_to_erase: 0,
-      key.associated_usrs: "s:FP15complete_member11FooProtocol16fooInstanceFunc0FT_Sd",
+      key.associated_usrs: "s:15complete_member11FooProtocolP16fooInstanceFunc0SdyF",
       key.modulename: "complete_member"
     },
     {
@@ -19,7 +19,7 @@
       key.typename: "Double",
       key.context: source.codecompletion.context.thisclass,
       key.num_bytes_to_erase: 0,
-      key.associated_usrs: "s:FP15complete_member11FooProtocol16fooInstanceFunc1FSiSd",
+      key.associated_usrs: "s:15complete_member11FooProtocolP16fooInstanceFunc1SdSiF",
       key.modulename: "complete_member"
     },
     {
@@ -31,7 +31,7 @@
       key.doc.brief: "fooInstanceVar Aaa. Bbb.",
       key.context: source.codecompletion.context.thisclass,
       key.num_bytes_to_erase: 0,
-      key.associated_usrs: "s:vP15complete_member11FooProtocol14fooInstanceVarSi",
+      key.associated_usrs: "s:15complete_member11FooProtocolP14fooInstanceVarSiv",
       key.modulename: "complete_member"
     }
   ]

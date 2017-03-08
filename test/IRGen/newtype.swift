@@ -12,9 +12,9 @@ import Newtype
 // Witness table for synthesized ClosedEnums : _ObjectiveCBridgeable.
 // CHECK: @_T0SC10ClosedEnumVs21_ObjectiveCBridgeable7NewtypeWP = linkonce_odr
 
-// CHECK-LABEL: define %CSo8NSString* @_T07newtype14getErrorDomainSC0cD0VyF()
+// CHECK-LABEL: define swiftcc %TSo8NSStringC* @_T07newtype14getErrorDomainSC0cD0VyF()
 public func getErrorDomain() -> ErrorDomain {
-  // CHECK: load %CSo8NSString*, %CSo8NSString** getelementptr inbounds (%VSC11ErrorDomain, %VSC11ErrorDomain* {{.*}}@SNTErrOne
+  // CHECK: load %TSo8NSStringC*, %TSo8NSStringC** getelementptr inbounds (%TSC11ErrorDomainV, %TSC11ErrorDomainV* {{.*}}@SNTErrOne
   return .one
 }
 
@@ -102,7 +102,7 @@ public func compareABIs() {
   // CHECK: declare void @takeMyABIOldTypeNonNullNS(%0*)
 }
 
-// OPT-LABEL: define i1 @_T07newtype12compareInitsSbyF
+// OPT-LABEL: define swiftcc i1 @_T07newtype12compareInitsSbyF
 public func compareInits() -> Bool {
   let mf = MyInt(rawValue: 1)
   let mfNoLabel = MyInt(1)
@@ -132,14 +132,14 @@ public func anchor() -> Bool {
 }
 
 class ObjCTest {
-  // CHECK-LABEL: define hidden %0* @_T07newtype8ObjCTestC19optionalPassThroughSC11ErrorDomainVSgAFSgFTo
+  // CHECK-LABEL: define hidden %0* @_T07newtype8ObjCTestC19optionalPassThroughSC11ErrorDomainVSgAGFTo
   // CHECK: [[CASTED:%.+]] = ptrtoint %0* %2 to i{{32|64}}
-  // CHECK: [[RESULT:%.+]] = call i{{32|64}} @_T07newtype8ObjCTestC19optionalPassThroughSC11ErrorDomainVSgAFSgF(i{{32|64}} [[CASTED]], %C7newtype8ObjCTest* {{%.+}})
+  // CHECK: [[RESULT:%.+]] = call swiftcc i{{32|64}} @_T07newtype8ObjCTestC19optionalPassThroughSC11ErrorDomainVSgAGF(i{{32|64}} [[CASTED]], %T7newtype8ObjCTestC* swiftself {{%.+}})
   // CHECK: [[OPAQUE_RESULT:%.+]] = inttoptr i{{32|64}} [[RESULT]] to %0*
   // CHECK: ret %0* [[OPAQUE_RESULT]]
   // CHECK: {{^}$}}
 
-  // OPT-LABEL: define hidden %0* @_T07newtype8ObjCTestC19optionalPassThroughSC11ErrorDomainVSgAFSgFTo
+  // OPT-LABEL: define hidden %0* @_T07newtype8ObjCTestC19optionalPassThroughSC11ErrorDomainVSgAGFTo
   // OPT: ret %0* %2
   // OPT: {{^}$}}
   @objc func optionalPassThrough(_ ed: ErrorDomain?) -> ErrorDomain? {
@@ -147,7 +147,7 @@ class ObjCTest {
   }
 
   // CHECK-LABEL: define hidden i32 @_T07newtype8ObjCTestC18integerPassThroughSC5MyIntVAFFTo
-  // CHECK: [[RESULT:%.+]] = call i32 @_T07newtype8ObjCTestC18integerPassThroughSC5MyIntVAFF(i32 %2, %C7newtype8ObjCTest* {{%.+}})
+  // CHECK: [[RESULT:%.+]] = call swiftcc i32 @_T07newtype8ObjCTestC18integerPassThroughSC5MyIntVAFF(i32 %2, %T7newtype8ObjCTestC* swiftself {{%.+}})
   // CHECK: ret i32 [[RESULT]]
   // CHECK: {{^}$}}
 

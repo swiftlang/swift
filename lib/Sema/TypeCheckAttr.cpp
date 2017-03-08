@@ -16,7 +16,7 @@
 
 #include "TypeChecker.h"
 #include "MiscDiagnostics.h"
-#include "swift/AST/ArchetypeBuilder.h"
+#include "swift/AST/GenericSignatureBuilder.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/NameLookup.h"
@@ -179,10 +179,19 @@ public:
       }
     }
 
-    // Accept and remove the 'final' attribute from members of protocol
-    // extensions.
+    if (isa<ClassDecl>(D))
+      return;
+
+    // 'final' only makes sense in the context of a class
+    // declaration or a protocol extension.  Reject it on global functions,
+    // structs, enums, etc.
     if (D->getDeclContext()->getAsProtocolExtensionContext()) {
+      // Accept and remove the 'final' attribute from members of protocol
+      // extensions.
       D->getAttrs().removeAttribute(attr);
+    } else if (!D->getDeclContext()->getAsClassOrClassExtensionContext()) {
+      diagnoseAndRemoveAttr(attr, diag::member_cannot_be_final);
+      return;
     }
   }
 
@@ -706,7 +715,6 @@ public:
     IGNORED_ATTR(IBOutlet) // checked early.
     IGNORED_ATTR(Indirect)
     IGNORED_ATTR(Inline)
-    IGNORED_ATTR(Inlineable)
     IGNORED_ATTR(Lazy)      // checked early.
     IGNORED_ATTR(LLDBDebuggerFunction)
     IGNORED_ATTR(Mutating)
@@ -768,6 +776,7 @@ public:
 
   void visitFixedLayoutAttr(FixedLayoutAttr *attr);
   void visitVersionedAttr(VersionedAttr *attr);
+  void visitInlineableAttr(InlineableAttr *attr);
   
   void visitDiscardableResultAttr(DiscardableResultAttr *attr);
 };
@@ -995,15 +1004,6 @@ void AttributeChecker::visitFinalAttr(FinalAttr *attr) {
   // final on classes marks all members with final.
   if (isa<ClassDecl>(D))
     return;
-
-  // 'final' only makes sense in the context of a class
-  // declaration or a protocol extension.  Reject it on global functions,
-  // structs, enums, etc.
-  if (!D->getDeclContext()->getAsClassOrClassExtensionContext() &&
-      !D->getDeclContext()->getAsProtocolExtensionContext()) {
-    TC.diagnose(attr->getLocation(), diag::member_cannot_be_final);
-    return;
-  }
 
   // We currently only support final on var/let, func and subscript
   // declarations.
@@ -1608,7 +1608,7 @@ void AttributeChecker::visitSpecializeAttr(SpecializeAttr *attr) {
   }
 
   // Form a new generic signature based on the old one.
-  ArchetypeBuilder Builder(D->getASTContext(),
+  GenericSignatureBuilder Builder(D->getASTContext(),
                            LookUpConformanceInModule(DC->getParentModule()));
 
   // First, add the old generic signature.
@@ -1650,9 +1650,6 @@ void AttributeChecker::visitSpecializeAttr(SpecializeAttr *attr) {
           secondType->is<ErrorType>())
         continue;
 
-      RequirementSource source(RequirementSource::Kind::Explicit,
-                               req.getEqualLoc());
-
       Type genericType;
       Type concreteType;
       if (interfaceFirstType->hasTypeParameter()) {
@@ -1672,7 +1669,6 @@ void AttributeChecker::visitSpecializeAttr(SpecializeAttr *attr) {
             TypeLoc(req.getFirstTypeRepr(), concreteType), req.getEqualLoc(),
             TypeLoc(req.getSecondTypeRepr(), genericType)));
       }
-      Builder.addRequirement(resolvedRequirements.back());
 
       // Convert the requirement into a form which uses canonical interface
       // types.
@@ -1707,7 +1703,6 @@ void AttributeChecker::visitSpecializeAttr(SpecializeAttr *attr) {
           req.getLayoutConstraintLoc());
 
       // Add a resolved requirement.
-      Builder.addRequirement(resolvedReq);
       resolvedRequirements.push_back(resolvedReq);
 
       // Convert the requirement into a form which uses canonical interface
@@ -1750,7 +1745,6 @@ void AttributeChecker::visitSpecializeAttr(SpecializeAttr *attr) {
           TypeLoc(req.getConstraintRepr(), interfaceLayoutConstraint));
 
       // Add a resolved requirement.
-      Builder.addRequirement(resolvedReq);
       resolvedRequirements.push_back(resolvedReq);
 
       // Convert the requirement into a form which uses canonical interface
@@ -1771,6 +1765,14 @@ void AttributeChecker::visitSpecializeAttr(SpecializeAttr *attr) {
   // Store converted requirements in the attribute so that they are
   // serialized later.
   attr->setRequirements(DC->getASTContext(), convertedRequirements);
+
+  // Add the requirements to the builder.
+  for (auto &req : resolvedRequirements)
+    Builder.addRequirement(&req);
+
+  // Check the result.
+  Builder.finalize(attr->getLocation(), genericSig->getGenericParams(),
+                   /*allowConcreteGenericParams=*/true);
 }
 
 static Accessibility getAccessForDiagnostics(const ValueDecl *D) {
@@ -1804,9 +1806,42 @@ void AttributeChecker::visitVersionedAttr(VersionedAttr *attr) {
     return;
   }
 
+  // @_versioned can only be applied to internal declarations.
   if (VD->getFormalAccess() != Accessibility::Internal) {
     TC.diagnose(attr->getLocation(),
                 diag::versioned_attr_with_explicit_accessibility,
+                VD->getName(),
+                getAccessForDiagnostics(VD))
+        .fixItRemove(attr->getRangeWithAt());
+    attr->setInvalid();
+    return;
+  }
+}
+
+void AttributeChecker::visitInlineableAttr(InlineableAttr *attr) {
+  // @_inlineable cannot be applied to stored properties.
+  //
+  // If the type is fixed-layout, the accessors are inlineable anyway;
+  // if the type is resilient, the accessors cannot be inlineable
+  // because clients cannot directly access storage.
+  if (auto *VD = dyn_cast<VarDecl>(D)) {
+    if (VD->hasStorage() || VD->getAttrs().hasAttribute<LazyAttr>()) {
+      TC.diagnose(attr->getLocation(),
+                  diag::inlineable_stored_property)
+        .fixItRemove(attr->getRangeWithAt());
+      attr->setInvalid();
+    }
+  }
+
+  auto *VD = cast<ValueDecl>(D);
+
+  // @_inlineable can only be applied to public or @_versioned
+  // declarations.
+  if (VD->getFormalAccess() < Accessibility::Internal ||
+      (!VD->getAttrs().hasAttribute<VersionedAttr>() &&
+       VD->getFormalAccess() < Accessibility::Public)) {
+    TC.diagnose(attr->getLocation(),
+                diag::inlineable_decl_not_public,
                 VD->getName(),
                 getAccessForDiagnostics(VD))
         .fixItRemove(attr->getRangeWithAt());

@@ -42,7 +42,7 @@ class TypeSubstCloner : public SILClonerWithScopes<ImplClass> {
 
   void computeSubsMap() {
     if (auto *env = Original.getGenericEnvironment()) {
-      SubsMap = env->getSubstitutionMap(SwiftMod, ApplySubs);
+      SubsMap = env->getSubstitutionMap(ApplySubs);
     }
   }
 
@@ -63,7 +63,7 @@ public:
 
   TypeSubstCloner(SILFunction &To,
                   SILFunction &From,
-                  ArrayRef<Substitution> ApplySubs,
+                  SubstitutionList ApplySubs,
                   SILOpenedArchetypesTracker &OpenedArchetypesTracker,
                   bool Inlining = false)
     : SILClonerWithScopes<ImplClass>(To, OpenedArchetypesTracker, Inlining),
@@ -76,7 +76,7 @@ public:
 
   TypeSubstCloner(SILFunction &To,
                   SILFunction &From,
-                  ArrayRef<Substitution> ApplySubs,
+                  SubstitutionList ApplySubs,
                   bool Inlining = false)
     : SILClonerWithScopes<ImplClass>(To, Inlining),
       SwiftMod(From.getModule().getSwiftModule()),
@@ -97,12 +97,12 @@ protected:
   }
 
   Substitution remapSubstitution(Substitution sub) {
-    sub = sub.subst(SwiftMod, SubsMap);
-
     // Remap opened archetypes into the cloned context.
-    return Substitution(getASTTypeInClonedContext(sub.getReplacement()
-                                                    ->getCanonicalType()),
-                        sub.getConformances());
+    sub = Substitution(
+        getASTTypeInClonedContext(sub.getReplacement()->getCanonicalType()),
+        sub.getConformances());
+    // Now remap the substitution. 
+    return sub.subst(SwiftMod, SubsMap);
   }
 
   ProtocolConformanceRef remapConformance(CanType type,
@@ -191,7 +191,7 @@ protected:
                                         &Builder.getFunction());
         Builder.createPartialApply(getOpLocation(Inst->getLoc()), FRI,
                                    getOpType(Inst->getSubstCalleeSILType()),
-                                   ArrayRef<Substitution>(),
+                                   SubstitutionList(),
                                    Args,
                                    getOpType(Inst->getType()));
         return;
@@ -292,7 +292,7 @@ protected:
   /// The original function to specialize.
   SILFunction &Original;
   /// The substitutions used at the call site.
-  ArrayRef<Substitution> ApplySubs;
+  SubstitutionList ApplySubs;
   /// True, if used for inlining.
   bool Inlining;
 };

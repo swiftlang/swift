@@ -277,3 +277,30 @@ class Derived24646184 : Base24646184 {
   override func foo(ok: Ty) { }
   override func foo(ok: SubTy) { }
 }
+
+
+// Generic subscripts
+
+class GenericSubscriptBase {
+  var dict: [AnyHashable : Any] = [:]
+
+  subscript<T : Hashable, U>(t: T) -> U {
+    get {
+      return dict[t] as! U
+    }
+    set {
+      dict[t] = newValue
+    }
+  }
+}
+
+class GenericSubscriptDerived : GenericSubscriptBase {
+  override subscript<K : Hashable, V>(t: K) -> V {
+    get {
+      return super[t]
+    }
+    set {
+      super[t] = newValue
+    }
+  }
+}

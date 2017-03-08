@@ -20,6 +20,9 @@
 // either archetypes or interface types. Care must be exercised to only look up
 // one or the other.
 //
+// SubstitutionMaps are constructed by calling the getSubstitutionMap() method
+// on a GenericSignature or GenericEnvironment.
+//
 //===----------------------------------------------------------------------===//
 
 #ifndef SWIFT_AST_SUBSTITUTION_MAP_H
@@ -35,6 +38,8 @@
 
 namespace swift {
 
+class GenericSignature;
+class GenericEnvironment;
 class SubstitutableType;
 
 template<class Type> class CanTypeWrapper;
@@ -43,6 +48,7 @@ typedef CanTypeWrapper<SubstitutableType> CanSubstitutableType;
 class SubstitutionMap {
   using ParentType = std::pair<CanType, AssociatedTypeDecl *>;
 
+  // FIXME: Switch to a more efficient representation.
   llvm::DenseMap<SubstitutableType *, Type> subMap;
   llvm::DenseMap<TypeBase *, SmallVector<ProtocolConformanceRef, 1>>
     conformanceMap;
@@ -74,23 +80,24 @@ public:
                 CanType type, ProtocolDecl *proto,
                 llvm::SmallPtrSetImpl<CanType> *visitedParents = nullptr) const;
 
-  const llvm::DenseMap<SubstitutableType *, Type> &getMap() const {
-    return subMap;
-  }
-
   /// Retrieve the conformances for the given type.
   ArrayRef<ProtocolConformanceRef> getConformances(CanType type) const;
 
-  void addSubstitution(CanSubstitutableType type, Type replacement);
-
-  void addConformance(CanType type, ProtocolConformanceRef conformance);
-
-  void addParent(CanType type, CanType parent,
-                 AssociatedTypeDecl *assocType);
-  
   bool empty() const {
     return subMap.empty();
   }
+
+  /// Query whether any replacement types in the map contain archetypes.
+  bool hasArchetypes() const;
+
+  /// Query whether any replacement type sin the map contain dynamic Self.
+  bool hasDynamicSelf() const;
+
+  /// Create a substitution map for a protocol conformance.
+  static SubstitutionMap
+  getProtocolSubstitutions(ProtocolDecl *protocol,
+                           Type selfType,
+                           ProtocolConformanceRef conformance);
 
   /// Given that 'derivedDecl' is an override of 'baseDecl' in a subclass,
   /// and 'derivedSubs' is a set of substitutions written in terms of the
@@ -112,10 +119,46 @@ public:
                            Optional<SubstitutionMap> derivedSubs,
                            LazyResolver *resolver);
 
+  /// Combine two substitution maps as follows.
+  ///
+  /// The result is written in terms of the generic parameters of 'baseSig'.
+  ///
+  /// Generic parameters with a depth less than 'baseDepth' come from
+  /// 'baseSubs'.
+  ///
+  /// Generic parameters with a depth greater than 'baseDepth' come from
+  /// 'origSubs', but are looked up starting with a depth of 'origDepth'.
+  static SubstitutionMap
+  combineSubstitutionMaps(const SubstitutionMap &baseSubMap,
+                          const SubstitutionMap &origSubMap,
+                          unsigned baseDepth,
+                          unsigned origDepth,
+                          GenericSignature *baseSig);
+
   /// Dump the contents of this substitution map for debugging purposes.
   void dump(llvm::raw_ostream &out) const;
 
   LLVM_ATTRIBUTE_DEPRECATED(void dump() const, "only for use in the debugger");
+
+private:
+  friend class GenericSignature;
+  friend class GenericEnvironment;
+  friend struct QuerySubstitutionMap;
+
+  /// Look up the replacement for the given type parameter or interface type.
+  /// Note that this only finds replacements for maps that are directly
+  /// stored inside the map. In most cases, you should call Type::subst()
+  /// instead, since that will resolve member types also.
+  Type lookupSubstitution(CanSubstitutableType type) const;
+
+  // You should not need to call these directly to build SubstitutionMaps;
+  // instead, use GenericSignature::getSubstitutionMap() or
+  // GenericEnvironment::getSubstitutionMap().
+
+  void addSubstitution(CanSubstitutableType type, Type replacement);
+  void addConformance(CanType type, ProtocolConformanceRef conformance);
+  void addParent(CanType type, CanType parent,
+                 AssociatedTypeDecl *assocType);
 };
 
 } // end namespace swift

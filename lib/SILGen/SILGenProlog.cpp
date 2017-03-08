@@ -17,7 +17,6 @@
 #include "swift/SIL/SILArgument.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/ParameterList.h"
-#include "swift/Basic/Fallthrough.h"
 
 using namespace swift;
 using namespace Lowering;
@@ -63,6 +62,13 @@ public:
   StrongReleaseCleanup(SILValue box) : box(box) {}
   void emit(SILGenFunction &gen, CleanupLocation l) override {
     gen.B.emitDestroyValueOperation(l, box);
+  }
+
+  void dump(SILGenFunction &) const override {
+#ifndef NDEBUG
+    llvm::errs() << "DeallocateValueBuffer\n"
+                 << "State: " << getState() << "box: " << box << "\n";
+#endif
   }
 };
 } // end anonymous namespace
@@ -163,7 +169,7 @@ public:
       elements.push_back(elt);
     }
 
-    if (tl.isLoadable()) {
+    if (tl.isLoadable() || !gen.silConv.useLoweredAddresses()) {
       SmallVector<SILValue, 4> elementValues;
       if (canBeGuaranteed) {
         // If all of the elements were guaranteed, we can form a guaranteed tuple.
@@ -346,7 +352,9 @@ void SILGenFunction::bindParametersForForwarding(const ParameterList *params,
   }
 }
 
-static void emitCaptureArguments(SILGenFunction &gen, CapturedValue capture,
+static void emitCaptureArguments(SILGenFunction &gen,
+                                 AnyFunctionRef closure,
+                                 CapturedValue capture,
                                  unsigned ArgNo) {
 
   auto *VD = capture.getDecl();
@@ -359,9 +367,13 @@ static void emitCaptureArguments(SILGenFunction &gen, CapturedValue capture,
     auto interfaceType = cast<VarDecl>(VD)->getInterfaceType();
     if (!interfaceType->hasTypeParameter()) return interfaceType;
 
-    auto genericEnv = gen.F.getGenericEnvironment();
-    return genericEnv->mapTypeIntoContext(gen.F.getModule().getSwiftModule(),
-                                          interfaceType);
+    // NB: The generic signature may be elided from the lowered function type
+    // if the function is in a fully-specialized context, but we still need to
+    // canonicalize references to the generic parameters that may appear in
+    // non-canonical types in that context. We need the original generic
+    // environment from the AST for that.
+    auto genericEnv = closure.getGenericEnvironment();
+    return genericEnv->mapTypeIntoContext(interfaceType);
   };
 
   switch (gen.SGM.Types.getDeclCaptureKind(capture)) {
@@ -448,7 +460,7 @@ void SILGenFunction::emitProlog(AnyFunctionRef TheClosure,
       return;
     }
 
-    emitCaptureArguments(*this, capture, ++ArgNo);
+    emitCaptureArguments(*this, TheClosure, capture, ++ArgNo);
   }
 }
 

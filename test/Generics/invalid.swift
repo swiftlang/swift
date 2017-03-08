@@ -9,7 +9,7 @@ class dalet where A : B {} // expected-error {{'where' clause cannot be attached
 
 protocol he where A : B { // expected-error {{'where' clause cannot be attached to a protocol declaration}}
 
-  associatedtype vav where A : B // expected-error {{'where' clause cannot be attached to an associated type declaration}}
+  associatedtype vav where A : B // expected-error {{where clauses on associated types are fragile; use '-swift-version 4' to experiment.}}
 }
 
 

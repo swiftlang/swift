@@ -234,8 +234,8 @@ func _HashedCollection<K, V>(x: Dictionary<K, V>, i: Dictionary<K, V>.Index, k: 
 
 func _ImplicitlyUnwrappedOptional<T>(x: ImplicitlyUnwrappedOptional<T>) {
   _ = ImplicitlyUnwrappedOptional<T>() // expected-error {{'init()' is unavailable: Please use nil literal instead.}} {{none}}
-  try! _ = ImplicitlyUnwrappedOptional<T>.map(x)() { _ in true } // expected-error {{'map' is unavailable: Has been removed in Swift 3.}}
-  try! _ = ImplicitlyUnwrappedOptional<T>.flatMap(x)() { _ in true } // expected-error {{'flatMap' is unavailable: Has been removed in Swift 3.}}
+  _ = ImplicitlyUnwrappedOptional<T>.map(x)() { _ in true } // expected-error {{'map' is unavailable: Has been removed in Swift 3.}}
+  _ = ImplicitlyUnwrappedOptional<T>.flatMap(x)() { _ in true } // expected-error {{'flatMap' is unavailable: Has been removed in Swift 3.}}
   // FIXME: No way to call map and flatMap as method?
   // _ = (x as ImplicitlyUnwrappedOptional).map { _ in true } // xpected-error {{}} {{none}}
   // _ = (x as ImplicitlyUnwrappedOptional).flatMap { _ in true } // xpected-error {{}} {{none}}

@@ -16,11 +16,20 @@ func downcast(b: B) -> D {
 
 // CHECK-LABEL: sil hidden @_T05casts3isa{{[_0-9a-zA-Z]*}}F
 func isa(b: B) -> Bool {
-  // CHECK: checked_cast_br {{%.*}}, [[YES:bb[0-9]+]], [[NO:bb[0-9]+]]
-  // CHECK: [[YES]]({{%.*}}):
+  // CHECK: bb0([[ARG:%.*]] : $B):
+  // CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
+  // CHECK:   [[COPIED_BORROWED_ARG:%.*]] = copy_value [[BORROWED_ARG]]
+  // CHECK:   checked_cast_br [[COPIED_BORROWED_ARG]] : $B to $D, [[YES:bb[0-9]+]], [[NO:bb[0-9]+]]
+  //
+  // CHECK: [[YES]]([[CASTED_VALUE:%.*]] : $D):
   // CHECK:   integer_literal {{.*}} -1
-  // CHECK: [[NO]]:
+  // CHECK:   destroy_value [[CASTED_VALUE]]
+  // CHECK:   end_borrow [[BORROWED_ARG]] from [[ARG]]
+  //
+  // CHECK: [[NO]]([[ORIGINAL_VALUE:%.*]] : $B):
+  // CHECK:   destroy_value [[ORIGINAL_VALUE]]
   // CHECK:   integer_literal {{.*}} 0
+  // CHECK:   end_borrow [[BORROWED_ARG]] from [[ARG]]
   return b is D
 }
 
@@ -42,15 +51,22 @@ func downcast_archetype<T : B>(b: B) -> T {
   return b as! T
 }
 
+// This is making sure that we do not have the default propagating behavior in
+// the address case.
+//
 // CHECK-LABEL: sil hidden @_T05casts12is_archetype{{[_0-9a-zA-Z]*}}F
 func is_archetype<T : B>(b: B, _: T) -> Bool {
-  // CHECK: checked_cast_br {{%.*}}, [[YES:bb[0-9]+]], [[NO:bb[0-9]+]]
-  // CHECK: [[YES]]({{%.*}}):
+  // CHECK: bb0([[ARG1:%.*]] : $B, [[ARG2:%.*]] : $T):
+  // CHECK:   checked_cast_br {{%.*}}, [[YES:bb[0-9]+]], [[NO:bb[0-9]+]]
+  // CHECK: [[YES]]([[CASTED_ARG:%.*]] : $T):
   // CHECK:   integer_literal {{.*}} -1
-  // CHECK: [[NO]]:
+  // CHECK:   destroy_value [[CASTED_ARG]]
+  // CHECK: [[NO]]([[ORIGINAL_VALUE:%.*]] : $B):
+  // CHCEK:   destroy_value [[CASTED_ARG]]
   // CHECK:   integer_literal {{.*}} 0
   return b is T
 }
+// CHECK: } // end sil function '_T05casts12is_archetype{{[_0-9a-zA-Z]*}}F'
 
 // CHECK: sil hidden @_T05casts20downcast_conditional{{[_0-9a-zA-Z]*}}F
 // CHECK:   checked_cast_br {{%.*}} : $B to $D

@@ -28,7 +28,7 @@
 
 namespace swift {
 
-class ArchetypeBuilder;
+class GenericSignatureBuilder;
 class ASTContext;
 class GenericTypeParamType;
 class SILModule;
@@ -41,7 +41,7 @@ class alignas(1 << DeclAlignInBits) GenericEnvironment final
                                         std::pair<ArchetypeType *,
                                                   GenericTypeParamType *>> {
   GenericSignature *Signature = nullptr;
-  ArchetypeBuilder *Builder = nullptr;
+  GenericSignatureBuilder *Builder = nullptr;
   DeclContext *OwningDC = nullptr;
 
   // The number of generic type parameter -> context type mappings we have
@@ -109,13 +109,12 @@ class alignas(1 << DeclAlignInBits) GenericEnvironment final
   }
 
   GenericEnvironment(GenericSignature *signature,
-                     ArchetypeBuilder *builder);
+                     GenericSignatureBuilder *builder);
 
   friend class ArchetypeType;
-  friend class ArchetypeBuilder;
+  friend class GenericSignatureBuilder;
   
-  ArchetypeBuilder *getArchetypeBuilder() const { return Builder; }
-  void clearArchetypeBuilder() { Builder = nullptr; }
+  GenericSignatureBuilder *getGenericSignatureBuilder() const { return Builder; }
 
   /// Query function suitable for use as a \c TypeSubstitutionFn that queries
   /// the mapping of interface types to archetypes.
@@ -143,6 +142,8 @@ class alignas(1 << DeclAlignInBits) GenericEnvironment final
   };
   friend class QueryArchetypeToInterfaceSubstitutions;
 
+  void populateParentMap(SubstitutionMap &subMap) const;
+
 public:
   GenericSignature *getGenericSignature() const {
     return Signature;
@@ -160,7 +161,7 @@ public:
   /// by calls to \c addMapping().
   static
   GenericEnvironment *getIncomplete(GenericSignature *signature,
-                                    ArchetypeBuilder *builder);
+                                    GenericSignatureBuilder *builder);
 
   /// Set the owning declaration context for this generic environment.
   void setOwningDeclContext(DeclContext *owningDC);
@@ -194,8 +195,7 @@ public:
   }
 
   /// Map an interface type to a contextual type.
-  static Type mapTypeIntoContext(ModuleDecl *M,
-                                 GenericEnvironment *genericEnv,
+  static Type mapTypeIntoContext(GenericEnvironment *genericEnv,
                                  Type type);
 
   /// Map a contextual type to an interface type.
@@ -206,7 +206,7 @@ public:
   Type mapTypeOutOfContext(Type type) const;
 
   /// Map an interface type to a contextual type.
-  Type mapTypeIntoContext(ModuleDecl *M, Type type) const;
+  Type mapTypeIntoContext(Type type) const;
 
   /// Map an interface type to a contextual type.
   Type mapTypeIntoContext(Type type,
@@ -232,16 +232,17 @@ public:
   /// This is just like GenericSignature::getSubstitutionMap(), except
   /// with contextual types instead of interface types.
   SubstitutionMap
-  getSubstitutionMap(ModuleDecl *mod,
-                     ArrayRef<Substitution> subs) const;
+  getSubstitutionMap(SubstitutionList subs) const;
 
-  /// Same as above, but updates an existing map.
-  void
-  getSubstitutionMap(ModuleDecl *mod,
-                     ArrayRef<Substitution> subs,
-                     SubstitutionMap &subMap) const;
+  /// Build a contextual type substitution map from a type substitution function
+  /// and conformance lookup function.
+  SubstitutionMap
+  getSubstitutionMap(TypeSubstitutionFn subs,
+                     LookupConformanceFn lookupConformance) const;
 
-  ArrayRef<Substitution> getForwardingSubstitutions() const;
+  SubstitutionList getForwardingSubstitutions() const;
+
+  void dump(raw_ostream &os) const;
 
   void dump() const;
 };

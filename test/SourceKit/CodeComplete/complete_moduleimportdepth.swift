@@ -18,7 +18,7 @@ func test() {
 // CHECK-NEXT:   key.context: source.codecompletion.context.othermodule,
 // CHECK-NEXT:   key.moduleimportdepth: 1,
 // CHECK-NEXT:   key.num_bytes_to_erase: 0,
-// CHECK:        key.associated_usrs: "s:Fs3absuRxs10Comparablexs16SignedArithmeticrFxx",
+// CHECK:        key.associated_usrs: "s:s3absxxs10ComparableRzs16SignedArithmeticRzlF",
 // CHECK-NEXT:   key.modulename: "Swift"
 // CHECK-NEXT: },
 
@@ -30,7 +30,7 @@ func test() {
 // CHECK-NEXT:   key.context: source.codecompletion.context.othermodule,
 // CHECK-NEXT:   key.moduleimportdepth: 1,
 // CHECK-NEXT:   key.num_bytes_to_erase: 0,
-// CHECK:        key.associated_usrs: "s:Fs3absuRxs13FloatingPointwx9MagnitudezxrFxx",
+// CHECK:        key.associated_usrs: "s:s3absxxs13FloatingPointRz9MagnitudeQzRszlF",
 // CHECK-NEXT:   key.modulename: "Swift"
 // CHECK-NEXT: },
 
@@ -42,7 +42,7 @@ func test() {
 // CHECK-NEXT:   key.context: source.codecompletion.context.othermodule,
 // CHECK-NEXT:   key.moduleimportdepth: 1,
 // CHECK-NEXT:   key.num_bytes_to_erase: 0,
-// CHECK:        key.associated_usrs: "s:Fs3absuRxs16SignedArithmeticwx9MagnitudezxrFxx",
+// CHECK:        key.associated_usrs: "s:s3absxxs16SignedArithmeticRz9MagnitudeQzRszlF",
 // CHECK-NEXT:   key.modulename: "Swift"
 // CHECK-NEXT: },
 

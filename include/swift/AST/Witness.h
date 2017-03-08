@@ -19,7 +19,7 @@
 #define SWIFT_AST_WITNESS_H
 
 #include "swift/AST/ConcreteDeclRef.h"
-#include "swift/AST/SubstitutionMap.h"
+#include "swift/AST/SubstitutionList.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/Support/Compiler.h"
 
@@ -93,7 +93,7 @@ class Witness {
     /// the witness declaration from the synthetic environment.
     ConcreteDeclRef declRef;
     GenericEnvironment *syntheticEnvironment;
-    SubstitutionMap reqToSyntheticEnvMap;
+    SubstitutionList reqToSyntheticEnvSubs;
   };
 
   llvm::PointerUnion<ValueDecl *, StoredWitness *> storage;
@@ -117,11 +117,12 @@ public:
   ///
   /// \param syntheticEnv The synthetic environment.
   ///
-  /// \param reqToSyntheticEnvMap The mapping from the interface types of the
+  /// \param reqToSyntheticEnvSubs The mapping from the interface types of the
   /// requirement into the interface types of the synthetic environment.
-  Witness(ValueDecl *decl, ArrayRef<Substitution> substitutions,
+  Witness(ValueDecl *decl,
+          SubstitutionList substitutions,
           GenericEnvironment *syntheticEnv,
-          SubstitutionMap reqToSyntheticEnvMap);
+          SubstitutionList reqToSyntheticEnvSubs);
 
   /// Retrieve the witness declaration reference, which includes the
   /// substitutions needed to use the witness from the synthetic environment
@@ -154,7 +155,7 @@ public:
   ///
   /// The substitutions are substitutions for the witness, providing interface
   /// types from the synthetic environment.
-  ArrayRef<Substitution> getSubstitutions() const {
+  SubstitutionList getSubstitutions() const {
     return getDeclRef().getSubstitutions();
   }
 
@@ -166,9 +167,9 @@ public:
 
   /// Retrieve the substitution map that maps the interface types of the
   /// requirement to the interface types of the synthetic environment.
-  const SubstitutionMap &getRequirementToSyntheticMap() const {
+  SubstitutionList getRequirementToSyntheticSubs() const {
     assert(requiresSubstitution() && "No substitutions required for witness");
-    return storage.get<StoredWitness *>()->reqToSyntheticEnvMap;
+    return storage.get<StoredWitness *>()->reqToSyntheticEnvSubs;
   }
 
   LLVM_ATTRIBUTE_DEPRECATED(

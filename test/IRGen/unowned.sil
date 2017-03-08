@@ -3,9 +3,9 @@
 // REQUIRES: CPU=x86_64
 
 // CHECK: [[TYPE:%swift.type]] = type
-// CHECK: [[C:%C7unowned1C]] = type <{ [[REF:%swift.refcounted]] }>
+// CHECK: [[C:%T7unowned1CC]] = type <{ [[REF:%swift.refcounted]] }>
 // CHECK: [[OPAQUE:%swift.opaque]] = type opaque
-// CHECK: [[A:%V7unowned1A]] = type <{ %swift.unowned }>
+// CHECK: [[A:%T7unowned1AV]] = type <{ %swift.unowned }>
 
 class C {}
 sil_vtable C {}
@@ -26,7 +26,7 @@ bb0(%0 : $@sil_unowned C):
   %3 = tuple ()
   %4 = return %3 : $()
 }
-// CHECK:    define{{( protected)?}} void @test_weak_rr_class([[C]]*) {{.*}} {
+// CHECK:    define{{( protected)?}} swiftcc void @test_weak_rr_class([[C]]*) {{.*}} {
 // CHECK:      call void bitcast (void ([[REF]]*)* @swift_rt_swift_unownedRetain to void ([[C]]*)*)([[C]]* %0)
 // CHECK-NEXT: call void bitcast (void ([[REF]]*)* @swift_rt_swift_unownedRelease to void ([[C]]*)*)([[C]]* %0)
 // CHECK-NEXT: ret void
@@ -38,7 +38,7 @@ bb0(%0 : $@sil_unowned P):
   %3 = tuple ()
   %4 = return %3 : $()
 }
-// CHECK:    define{{( protected)?}} void @test_weak_rr_proto(%swift.refcounted*, i8**) {{.*}} {
+// CHECK:    define{{( protected)?}} swiftcc void @test_weak_rr_proto(%swift.refcounted*, i8**) {{.*}} {
 // CHECK:      call void @swift_rt_swift_unownedRetain(%swift.refcounted* %0)
 // CHECK:      call void @swift_rt_swift_unownedRelease(%swift.refcounted* %0)
 // CHECK-NEXT: ret void

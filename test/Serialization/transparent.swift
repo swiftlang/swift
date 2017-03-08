@@ -10,7 +10,7 @@ import def_transparent
 
 // SIL-LABEL: sil @main : $@convention(c) (Int32, UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>) -> Int32 {
 // SIL: [[RAW:%.+]] = global_addr @_T011transparent3rawSbv : $*Bool
-// SIL: [[FUNC:%.+]] = function_ref @_T015def_transparent15testTransparentSbSb1x_tF : $@convention(thin) (Bool) -> Bool
+// SIL: [[FUNC:%.+]] = function_ref @_T015def_transparent15testTransparentS2b1x_tF : $@convention(thin) (Bool) -> Bool
 // SIL: [[RESULT:%.+]] = apply [[FUNC]]({{%.+}}) : $@convention(thin) (Bool) -> Bool
 // SIL: store [[RESULT]] to [trivial] [[RAW]] : $*Bool
 var raw = testTransparent(x: false)
@@ -21,7 +21,7 @@ var raw = testTransparent(x: false)
 // SIL: store [[RESULT2]] to [trivial] [[TMP]] : $*Int32
 var tmp = testBuiltin()
 
-// SIL-LABEL: sil public_external [transparent] [fragile] @_T015def_transparent15testTransparentSbSb1x_tF : $@convention(thin) (Bool) -> Bool {
+// SIL-LABEL: sil public_external [transparent] [fragile] @_T015def_transparent15testTransparentS2b1x_tF : $@convention(thin) (Bool) -> Bool {
 // SIL: bb0(%0 : $Bool):
 // SIL: return %0 : $Bool
 
@@ -67,7 +67,7 @@ func test_wrapper() {
 
 // SIL-LABEL: sil public_external [transparent] [fragile] @_T015def_transparent17open_existentialsyAA1P_p1p_AA2CP_p2cptF
 func test_open_existentials(p: P, cp: CP) {
-  // SIL: open_existential_addr [[EXIST:%[0-9]+]] : $*P to $*@opened([[N:".*"]]) P
+  // SIL: open_existential_addr immutable_access [[EXIST:%[0-9]+]] : $*P to $*@opened([[N:".*"]]) P
   // SIL: open_existential_ref [[EXIST:%[0-9]+]] : $CP to $@opened([[M:".*"]]) CP
   open_existentials(p: p, cp: cp)
 }

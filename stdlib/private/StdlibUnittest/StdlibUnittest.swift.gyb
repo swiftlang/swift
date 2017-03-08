@@ -572,14 +572,13 @@ public func _setTrappingExpectationFailedCallback(callback: @escaping () -> Void
 extension ProcessTerminationStatus {
   var isSwiftTrap: Bool {
     switch self {
-    case .exit(_):
-      return false
     case .signal(let signal):
       return CInt(signal) == SIGILL || CInt(signal) == SIGTRAP
     default:
       // This default case is needed for standard library builds where
       // resilience is enabled.
-      // FIXME: Need a way to suppress when not.
+      // FIXME: Add the .exit case when there is a way to suppress when not.
+      //   case .exit(_): return false
       return false
     }
   }
@@ -980,6 +979,9 @@ struct _ParentProcess {
       let crashOutput = crashStdout + crashStderr
       for expectedSubstring in t.crashOutputMatches {
         var found = false
+        if crashOutput.isEmpty && expectedSubstring.isEmpty {
+          found = true
+        }
         for s in crashOutput {
           if findSubstring(s, expectedSubstring) != nil {
             found = true
@@ -1321,7 +1323,7 @@ public final class TestSuite {
       case .single:
         return [nil]
       case .parameterized(code: _, count: let count):
-        return (0..<count).map { $0 }
+        return Array(0..<count)
       }
     }
   }

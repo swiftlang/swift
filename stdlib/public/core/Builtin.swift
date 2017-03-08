@@ -623,36 +623,109 @@ func _trueAfterDiagnostics() -> Builtin.Int1 {
 
 /// Returns the dynamic type of a value.
 ///
-/// - Parameter of: The value to take the dynamic type of.
-/// - Returns: The dynamic type, which will be a value of metatype type.
+/// You can use the `type(of:)` function to find the dynamic type of a value,
+/// particularly when the dynamic type is different from the static type. The
+/// *static type* of a value is the known, compile-time type of the value. The
+/// *dynamic type* of a value is the value's actual type at run-time, which
+/// may be nested inside its concrete type.
 ///
-/// - Remark: If the parameter is statically of a protocol or protocol
-///   composition type, the result will be an *existential metatype*
-///   (`P.Type` for a protocol `P`), and will represent the type of the value
-///   inside the existential container with the same protocol conformances
-///   as the value. Otherwise, the result will be a *concrete metatype*
-///   (`T.Type` for a non-protocol type `T`, or `P.Protocol` for a protocol
-///   `P`). Normally, this will do what you mean, but one wart to be aware
-///   of is when you use `type(of:)` in a generic context with a type
-///   parameter bound to a protocol type:
+/// In the following code, the `count` variable has the same static and dynamic
+/// type: `Int`. When `count` is passed to the `printInfo(_:)` function,
+/// however, the `value` parameter has a static type of `Any`, the type
+/// declared for the parameter, and a dynamic type of `Int`.
 ///
-///   ```
-///   func foo<T>(x: T) -> T.Type {
-///     return type(of: x)
-///   }
-///   protocol P {}
-///   func bar(x: P) {
-///     foo(x: x) // Call foo with T == P
-///   }
-///   ```
+///     func printInfo(_ value: Any) {
+///         let type = type(of: value)
+///         print("'\(value)' of type '\(type)'")
+///     }
 ///
-///   since the call to `type(of:)` inside `foo` only sees `T` as a concrete
-///   type, foo will end up returning `P.self` instead of the dynamic type
-///   inside `x`. This can be worked around by writing `type(of: x as Any)`
-///   to get the dynamic type inside `x` as an `Any.Type`.
+///     let count: Int = 5
+///     printInfo(count)
+///     // '5' of type 'Int'
+///
+/// The dynamic type returned from `type(of:)` is a *concrete metatype*
+/// (`T.Type`) for a class, structure, enumeration, or other non-protocol type
+/// `T`, or an *existential metatype* (`P.Type`) for a protocol or protocol
+/// composition `P`. When the static type of the value passed to `type(of:)`
+/// is constrained to a class or protocol, you can use that metatype to access
+/// initializers or other static members of the class or protocol.
+///
+/// For example, the parameter passed as `value` to the `printSmileyInfo(_:)`
+/// function in the example below is an instance of the `Smiley` class or one
+/// of its subclasses. The function uses `type(of:)` to find the dynamic type
+/// of `value`, which itself is an instance of the `Smiley.Type` metatype.
+///
+///     class Smiley {
+///         class var text: String {
+///             return ":)"
+///         }
+///     }
+///
+///     class EmojiSmiley : Smiley {
+///          override class var text: String {
+///             return "😀"
+///         }
+///     }
+///
+///     func printSmileyInfo(_ value: Smiley) {
+///         let smileyType = type(of: value)
+///         print("Smile!", smileyType.text)
+///     }
+///
+///     let emojiSmiley = EmojiSmiley()
+///     printSmileyInfo(emojiSmiley)
+///     // Smile! 😀
+///
+/// In this example, accessing the `text` property of the `smileyType` metatype
+/// retrieves the overridden value from the `EmojiSmiley` subclass, instead of
+/// the `Smiley` class's original definition.
+///
+/// Normally, you don't need to be aware of the difference between concrete and
+/// existential metatypes, but calling `type(of:)` can yield unexpected
+/// results in a generic context with a type parameter bound to a protocol. In
+/// a case like this, where a generic parameter `T` is bound to a protocol
+/// `P`, the type parameter is not statically known to be a protocol type in
+/// the body of the generic function, so `type(of:)` can only produce the
+/// concrete metatype `P.Protocol`.
+///
+/// The following example defines a `printGenericInfo(_:)` function that takes
+/// a generic parameter and declares the `String` type's conformance to a new
+/// protocol `P`. When `printGenericInfo(_:)` is called with a string that has
+/// `P` as its static type, the call to `type(of:)` returns `P.self` instead
+/// of the dynamic type inside the parameter, `String.self`.
+///
+///     func printGenericInfo<T>(_ value: T) {
+///         let type = type(of: value)
+///         print("'\(value)' of type '\(type)'")
+///     }
+///
+///     protocol P {}
+///     extension String: P {}
+///
+///     let stringAsP: P = "Hello!"
+///     printGenericInfo(stringAsP)
+///     // 'Hello!' of type 'P'
+///
+/// This unexpected result occurs because the call to `type(of: value)` inside
+/// `printGenericInfo(_:)` must return a metatype that is an instance of
+/// `T.Type`, but `String.self` (the expected dynamic type) is not an instance
+/// of `P.Type` (the concrete metatype of `value`). To get the dynamic type
+/// inside `value` in this generic context, cast the parameter to `Any` when
+/// calling `type(of:)`.
+///
+///     func betterPrintGenericInfo<T>(_ value: T) {
+///         let type = type(of: value as Any)
+///         print("'\(value)' of type '\(type)'")
+///     }
+///
+///     betterPrintGenericInfo(stringAsP)
+///     // 'Hello!' of type 'String'
+///
+/// - Parameter value: The value to find the dynamic type of.
+/// - Returns: The dynamic type, which is a value of metatype type.
 @_transparent
 @_semantics("typechecker.type(of:)")
-public func type<Type, Metatype>(of: Type) -> Metatype {
+public func type<T, Metatype>(of value: T) -> Metatype {
   // This implementation is never used, since calls to `Swift.type(of:)` are
   // resolved as a special case by the type checker.
   Builtin.staticReport(_trueAfterDiagnostics(), true._value,
@@ -661,73 +734,91 @@ public func type<Type, Metatype>(of: Type) -> Metatype {
   Builtin.unreachable()
 }
 
-/// Allows a nonescaping closure to temporarily be used as if it were
-/// allowed to escape.
+/// Allows a nonescaping closure to temporarily be used as if it were allowed
+/// to escape.
 ///
-/// This is useful when you need to pass a closure to an API that can't
-/// statically guarantee the closure won't escape when used in a way that
-/// won't allow it to escape in practice, such as in a lazy collection
-/// view:
+/// You can use this function to call an API that takes an escaping closure in
+/// a way that doesn't allow the closure to escape in practice. The examples
+/// below demonstrate how to use `withoutActuallyEscaping(_:do:)` in
+/// conjunction with two common APIs that use escaping closures: lazy
+/// collection views and asynchronous operations.
 ///
-/// ```
-/// func allValues(in array: [Int], matchPredicate: (Int) -> Bool) -> Bool {
-///   // Error because `lazy.filter` may escape the closure if the `lazy`
-///   // collection is persisted; however, in this case, we discard the
-///   // lazy collection immediately before returning.
-///   return array.lazy.filter { !matchPredicate($0) }.isEmpty
-/// }
-/// ```
+/// The following code declares an `allValues(in:match:)` function that checks
+/// whether all the elements in an array match a predicate. The function won't
+/// compile as written, because a lazy collection's `filter(_:)` method
+/// requires an escaping closure. The lazy collection isn't persisted, so the
+/// `predicate` closure won't actually escape the body of the function, but
+/// even so it can't be used in this way.
 ///
-/// or with `async`:
-///
-/// ```
-/// func perform(_ f: () -> Void, simultaneouslyWith g: () -> Void,
-///              on queue: DispatchQueue) {
-///   // Error: `async` normally escapes the closure, but in this case
-///   // we explicitly barrier before the closure would escape
-///   queue.async(f)
-///   queue.async(g)
-///   queue.sync(flags: .barrier) {}
-/// }
-/// ```
-///
-/// `withoutActuallyEscaping` provides a temporarily-escapable copy of the
-/// closure that can be used in these situations:
-///
-/// ```
-/// func allValues(in array: [Int], matchPredicate: (Int) -> Bool) -> Bool {
-///   return withoutActuallyEscaping(matchPredicate) { escapablePredicate in
-///     array.lazy.filter { !escapableMatchPredicate($0) }.isEmpty
-///   }
-/// }
-///
-/// func perform(_ f: () -> Void, simultaneouslyWith g: () -> Void,
-///              on queue: DispatchQueue) {
-///   withoutActuallyEscaping(f) { escapableF in
-///     withoutActuallyEscaping(g) { escapableG in
-///       queue.async(escapableF)
-///       queue.async(escapableG)
-///       queue.sync(flags: .barrier) {}
+///     func allValues(in array: [Int], match predicate: (Int) -> Bool) -> Bool {
+///         return array.lazy.filter { !predicate($0) }.isEmpty
 ///     }
-///   }
-/// }
-/// ```
+///     // error: closure use of non-escaping parameter 'predicate'...
+///
+/// `withoutActuallyEscaping(_:do:)` provides a temporarily-escapable copy of
+/// `predicate` that _can_ be used in a call to the lazy view's `filter(_:)`
+/// method. The second version of `allValues(in:match:)` compiles without
+/// error, with the compiler guaranteeing that the `escapablePredicate`
+/// closure doesn't last beyond the call to `withoutActuallyEscaping(_:do:)`.
+///
+///     func allValues(in array: [Int], match predicate: (Int) -> Bool) -> Bool {
+///         return withoutActuallyEscaping(predicate) { escapablePredicate in
+///             array.lazy.filter { !escapablePredicate($0) }.isEmpty
+///         }
+///     }
+///
+/// Asynchronous calls are another type of API that typically escape their
+/// closure arguments. The following code declares a
+/// `perform(_:simultaneouslyWith:)` function that uses a dispatch queue to
+/// execute two closures concurrently.
+///
+///     func perform(_ f: () -> Void, simultaneouslyWith g: () -> Void) {
+///         let queue = DispatchQueue(label: "perform", attributes: .concurrent)
+///         queue.async(execute: f)
+///         queue.async(execute: g)
+///         queue.sync(flags: .barrier) {}
+///     }
+///     // error: passing non-escaping parameter 'f'...
+///     // error: passing non-escaping parameter 'g'...
+///
+/// The `perform(_:simultaneouslyWith:)` function ends with a call to the
+/// `sync(flags:execute:)` method using the `.barrier` flag, which forces the
+/// function to wait until both closures have completed running before
+/// returning. Even though the barrier guarantees that neither closure will
+/// escape the function, the `async(execute:)` method still requires that the
+/// closures passed be marked as `@escaping`, so the first version of the
+/// function does not compile. To resolve this, you can use
+/// `withoutActuallyEscaping(_:do:)` to get copies of `f` and `g` that can be
+/// passed to `async(execute:)`.
+///
+///     func perform(_ f: () -> Void, simultaneouslyWith g: () -> Void) {
+///         withoutActuallyEscaping(f) { escapableF in
+///             withoutActuallyEscaping(g) { escapableG in
+///                 let queue = DispatchQueue(label: "perform", attributes: .concurrent)
+///                 queue.async(execute: escapableF)
+///                 queue.async(execute: escapableG)
+///                 queue.sync(flags: .barrier) {}
+///             }
+///         }
+///     }
+///
+/// - Important: The escapable copy of `closure` passed as `body` is only valid
+///   during the call to `withoutActuallyEscaping(_:do:)`. It is undefined
+///   behavior for the escapable closure to be stored, referenced, or executed
+///   after the function returns.
 ///
 /// - Parameter closure: A non-escaping closure value that will be made
-///   escapable for the duration of the execution of the `do` block.
-/// - Parameter do: A code block that will be immediately executed, receiving
-///   an escapable copy of `closure` as an argument.
-/// - Returns: the forwarded return value from the `do` block.
-/// - Remark: It is undefined behavior for the escapable closure to be stored,
-///   referenced, or executed after `withoutActuallyEscaping` returns. A
-///   future version of Swift will introduce a dynamic check to trap if
-///   the escapable closure is still referenced at the point
-///   `withoutActuallyEscaping` returns.
+///   escapable for the duration of the execution of the `body` closure. If
+///   `body` has a return value, it is used as the return value for the
+///   `withoutActuallyEscaping(_:do:)` function.
+/// - Parameter body: A closure that will be immediately executed, receiving an
+///   escapable copy of `closure` as an argument.
+/// - Returns: The return value of the `body` closure, if any.
 @_transparent
 @_semantics("typechecker.withoutActuallyEscaping(_:do:)")
 public func withoutActuallyEscaping<ClosureType, ResultType>(
   _ closure: ClosureType,
-  do: (_ escapingClosure: ClosureType) throws -> ResultType
+  do body: (_ escapingClosure: ClosureType) throws -> ResultType
 ) rethrows -> ResultType {
   // This implementation is never used, since calls to
   // `Swift.withoutActuallyEscaping(_:do:)` are resolved as a special case by

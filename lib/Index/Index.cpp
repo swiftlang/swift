@@ -132,14 +132,20 @@ class IndexSwiftASTWalker : public SourceEntityWalker {
   llvm::DenseMap<DeclAccessorPair, NameAndUSR> accessorNameAndUSRCache;
   StringScratchSpace stringStorage;
 
-  bool getNameAndUSR(ValueDecl *D, StringRef &name, StringRef &USR) {
-    auto &result = nameAndUSRCache[D];
+  bool getNameAndUSR(ValueDecl *D, ExtensionDecl *ExtD,
+                     StringRef &name, StringRef &USR) {
+    auto &result = nameAndUSRCache[ExtD ? (Decl*)ExtD : D];
     if (result.USR.empty()) {
       SmallString<128> storage;
       {
         llvm::raw_svector_ostream OS(storage);
-        if (ide::printDeclUSR(D, OS))
-          return true;
+        if (ExtD) {
+          if (ide::printExtensionUSR(ExtD, OS))
+            return true;
+        } else {
+          if (ide::printDeclUSR(D, OS))
+            return true;
+        }
         result.USR = stringStorage.copyString(OS.str());
       }
 
@@ -183,22 +189,34 @@ class IndexSwiftASTWalker : public SourceEntityWalker {
     return false;
   }
 
-  bool addRelation(IndexSymbol &Info, SymbolRoleSet RelationRoles, ValueDecl *D) {
+  bool addRelation(IndexSymbol &Info, SymbolRoleSet RelationRoles, Decl *D) {
     assert(D);
+    auto Match = std::find_if(Info.Relations.begin(), Info.Relations.end(),
+                              [D](IndexRelation R) { return R.decl == D; });
+    if (Match != Info.Relations.end()) {
+      Match->roles |= RelationRoles;
+      Info.roles |= RelationRoles;
+      return false;
+    }
+
     StringRef Name, USR;
     SymbolInfo SymInfo = getSymbolInfoForDecl(D);
 
     if (SymInfo.Kind == SymbolKind::Unknown)
       return true;
-    if (getNameAndUSR(D, Name, USR))
-      return true;
+    if (auto *ExtD = dyn_cast<ExtensionDecl>(D)) {
+      NominalTypeDecl *NTD = ExtD->getExtendedType()->getAnyNominal();
+      if (getNameAndUSR(NTD, ExtD, Name, USR))
+        return true;
+    } else {
+      if (getNameAndUSR(cast<ValueDecl>(D), /*ExtD=*/nullptr, Name, USR))
+        return true;
+    }
 
     Info.Relations.push_back(IndexRelation(RelationRoles, D, SymInfo, Name, USR));
     Info.roles |= RelationRoles;
     return false;
   }
-
-
 
 public:
   IndexSwiftASTWalker(IndexDataConsumer &IdxConsumer, ASTContext &Ctx,
@@ -278,7 +296,7 @@ private:
   }
 
   bool visitDeclReference(ValueDecl *D, CharSourceRange Range,
-                          TypeDecl *CtorTyRef, Type T,
+                          TypeDecl *CtorTyRef, ExtensionDecl *ExtTyRef, Type T,
                           SemaReferenceKind Kind) override {
     SourceLoc Loc = Range.getStart();
 
@@ -302,16 +320,23 @@ private:
   }
 
   void repressRefAtLoc(SourceLoc Loc) {
+    if (Loc.isInvalid()) return;
     assert(!EntitiesStack.empty());
     EntitiesStack.back().RefsToSuppress.push_back(Loc);
   }
 
   bool isRepressed(SourceLoc Loc) {
-    if (EntitiesStack.empty())
+    if (EntitiesStack.empty() || Loc.isInvalid())
       return false;
     auto &Suppressed = EntitiesStack.back().RefsToSuppress;
     return std::find(Suppressed.begin(), Suppressed.end(), Loc) != Suppressed.end();
 
+  }
+
+  Expr *getContainingExpr(size_t index) {
+    if (ExprStack.size() > index)
+      return ExprStack.end()[-(index + 1)];
+    return nullptr;
   }
 
   Expr *getCurrentExpr() {
@@ -319,9 +344,7 @@ private:
   }
 
   Expr *getParentExpr() {
-    if (ExprStack.size() >= 2)
-      return ExprStack.end()[-2];
-    return nullptr;
+    return getContainingExpr(1);
   }
 
 
@@ -332,9 +355,9 @@ private:
   bool startEntity(Decl *D, IndexSymbol &Info);
   bool startEntityDecl(ValueDecl *D);
 
-  bool reportRelatedRef(ValueDecl *D, SourceLoc Loc, SymbolRoleSet Relations, ValueDecl *Related);
-  bool reportRelatedTypeRef(const TypeLoc &Ty, SymbolRoleSet Relations, ValueDecl *Related);
-  bool reportInheritedTypeRefs(ArrayRef<TypeLoc> Inherited, ValueDecl *Inheritee);
+  bool reportRelatedRef(ValueDecl *D, SourceLoc Loc, bool isImplicit, SymbolRoleSet Relations, Decl *Related);
+  bool reportRelatedTypeRef(const TypeLoc &Ty, SymbolRoleSet Relations, Decl *Related);
+  bool reportInheritedTypeRefs(ArrayRef<TypeLoc> Inherited, Decl *Inheritee);
   NominalTypeDecl *getTypeLocAsNominalTypeDecl(const TypeLoc &Ty);
 
   bool reportPseudoGetterDecl(VarDecl *D) {
@@ -360,9 +383,10 @@ private:
 
   bool initIndexSymbol(ValueDecl *D, SourceLoc Loc, bool IsRef,
                        IndexSymbol &Info);
+  bool initIndexSymbol(ExtensionDecl *D, ValueDecl *ExtendedD, SourceLoc Loc,
+                       IndexSymbol &Info);
   bool initFuncDeclIndexSymbol(FuncDecl *D, IndexSymbol &Info);
-  bool initFuncRefIndexSymbol(Expr *CurrentE, Expr *ParentE, ValueDecl *D,
-                              SourceLoc Loc, IndexSymbol &Info);
+  bool initFuncRefIndexSymbol(ValueDecl *D, SourceLoc Loc, IndexSymbol &Info);
   bool initVarRefIndexSymbols(Expr *CurrentE, ValueDecl *D, SourceLoc Loc,
                               IndexSymbol &Info);
 
@@ -384,7 +408,8 @@ private:
   }
 
   bool isLocal(ValueDecl *D) const {
-    return D->getDeclContext()->getLocalContext();
+    return D->getDeclContext()->getLocalContext() &&
+      (!isa<ParamDecl>(D) || cast<ParamDecl>(D)->getArgumentNameLoc().isValid());
   }
 
   void getModuleHash(SourceFileOrModule SFOrMod, llvm::raw_ostream &OS);
@@ -568,13 +593,16 @@ bool IndexSwiftASTWalker::startEntityDecl(ValueDecl *D) {
     if (addRelation(Info, (SymbolRoleSet) SymbolRole::RelationOverrideOf, Overridden))
       return false;
   }
-  for (auto Conf : D->getSatisfiedProtocolRequirements()) {
-    if (addRelation(Info, (SymbolRoleSet) SymbolRole::RelationOverrideOf, Conf))
-      return false;
+  // FIXME: This is quite expensive and not worth the cost for indexing purposes
+  // of system modules. Revisit if this becomes more efficient.
+  if (!isSystemModule) {
+    for (auto Conf : D->getSatisfiedProtocolRequirements()) {
+      if (addRelation(Info, (SymbolRoleSet) SymbolRole::RelationOverrideOf, Conf))
+        return false;
+    }
   }
 
   if (auto Parent = getParentDecl()) {
-    // FIXME handle extensions properly
     if (auto ParentVD = dyn_cast<ValueDecl>(Parent)) {
       SymbolRoleSet RelationsToParent = (SymbolRoleSet)SymbolRole::RelationChildOf;
       if (Info.symInfo.SubKind == SymbolSubKind::AccessorGetter ||
@@ -586,8 +614,8 @@ bool IndexSwiftASTWalker::startEntityDecl(ValueDecl *D) {
         return false;
 
     } else if (auto ParentED = dyn_cast<ExtensionDecl>(Parent)) {
-      if (NominalTypeDecl *NTD = ParentED->getExtendedType()->getAnyNominal()) {
-        if (addRelation(Info, (SymbolRoleSet) SymbolRole::RelationChildOf, NTD))
+      if (ParentED->getExtendedType()->getAnyNominal()) {
+        if (addRelation(Info, (SymbolRoleSet) SymbolRole::RelationChildOf, ParentED))
           return false;
       }
     }
@@ -596,13 +624,16 @@ bool IndexSwiftASTWalker::startEntityDecl(ValueDecl *D) {
   return startEntity(D, Info);
 }
 
-bool IndexSwiftASTWalker::reportRelatedRef(ValueDecl *D, SourceLoc Loc, SymbolRoleSet Relations, ValueDecl *Related) {
+bool IndexSwiftASTWalker::reportRelatedRef(ValueDecl *D, SourceLoc Loc, bool isImplicit,
+                                           SymbolRoleSet Relations, Decl *Related) {
   if (!shouldIndex(D))
     return true;
 
   IndexSymbol Info;
   if (addRelation(Info, Relations, Related))
     return true;
+  if (isImplicit)
+    Info.roles |= (unsigned)SymbolRole::Implicit;
 
   // don't report this ref again when visitDeclReference reports it
   repressRefAtLoc(Loc);
@@ -615,7 +646,7 @@ bool IndexSwiftASTWalker::reportRelatedRef(ValueDecl *D, SourceLoc Loc, SymbolRo
   return !Cancelled;
 }
 
-bool IndexSwiftASTWalker::reportInheritedTypeRefs(ArrayRef<TypeLoc> Inherited, ValueDecl *Inheritee) {
+bool IndexSwiftASTWalker::reportInheritedTypeRefs(ArrayRef<TypeLoc> Inherited, Decl *Inheritee) {
   for (auto Base : Inherited) {
     if(!reportRelatedTypeRef(Base, (SymbolRoleSet) SymbolRole::RelationBaseOf, Inheritee))
       return false;
@@ -623,13 +654,28 @@ bool IndexSwiftASTWalker::reportInheritedTypeRefs(ArrayRef<TypeLoc> Inherited, V
   return true;
 }
 
-bool IndexSwiftASTWalker::reportRelatedTypeRef(const TypeLoc &Ty, SymbolRoleSet Relations, ValueDecl *Related) {
+bool IndexSwiftASTWalker::reportRelatedTypeRef(const TypeLoc &Ty, SymbolRoleSet Relations, Decl *Related) {
 
   if (IdentTypeRepr *T = dyn_cast_or_null<IdentTypeRepr>(Ty.getTypeRepr())) {
     auto Comps = T->getComponentRange();
-    if (auto NTD =
-            dyn_cast_or_null<NominalTypeDecl>(Comps.back()->getBoundDecl())) {
-      if (!reportRelatedRef(NTD, Comps.back()->getIdLoc(), Relations, Related))
+    SourceLoc IdLoc = Comps.back()->getIdLoc();
+    NominalTypeDecl *NTD = nullptr;
+    bool isImplicit = false;
+    if (auto *VD = Comps.back()->getBoundDecl()) {
+      if (auto *TAD = dyn_cast<TypeAliasDecl>(VD)) {
+        IndexSymbol Info;
+        if (!reportRef(TAD, IdLoc, Info))
+          return false;
+        if (auto Ty = TAD->getUnderlyingTypeLoc().getType()) {
+          NTD = Ty->getAnyNominal();
+          isImplicit = true;
+        }
+      } else {
+        NTD = dyn_cast<NominalTypeDecl>(VD);
+      }
+    }
+    if (NTD) {
+      if (!reportRelatedRef(NTD, IdLoc, isImplicit, Relations, Related))
         return false;
     }
     return true;
@@ -637,7 +683,7 @@ bool IndexSwiftASTWalker::reportRelatedTypeRef(const TypeLoc &Ty, SymbolRoleSet 
 
   if (Ty.getType()) {
     if (auto nominal = Ty.getType()->getAnyNominal())
-      if (!reportRelatedRef(nominal, Ty.getLoc(), Relations, Related))
+      if (!reportRelatedRef(nominal, Ty.getLoc(), /*isImplicit=*/false, Relations, Related))
         return false;
   }
   return true;
@@ -667,7 +713,7 @@ bool IndexSwiftASTWalker::reportPseudoAccessor(AbstractStorageDecl *D,
     // AbstractStorageDecl.
     assert(getParentDecl() == D);
     auto PreviousTop = EntitiesStack.pop_back_val();
-    bool initFailed = initFuncRefIndexSymbol(getCurrentExpr(), getParentExpr(), D, Loc, Info);
+    bool initFailed = initFuncRefIndexSymbol(D, Loc, Info);
     EntitiesStack.push_back(PreviousTop);
 
     if (initFailed)
@@ -705,7 +751,10 @@ IndexSwiftASTWalker::getTypeLocAsNominalTypeDecl(const TypeLoc &Ty) {
 }
 
 bool IndexSwiftASTWalker::reportExtension(ExtensionDecl *D) {
-  SourceLoc Loc = D->getExtendedTypeLoc().getSourceRange().Start;
+  // Use the 'End' token of the range, in case it is a compound name, e.g.
+  //   extension A.B {}
+  // we want the location of 'B' token.
+  SourceLoc Loc = D->getExtendedTypeLoc().getSourceRange().End;
   if (!D->getExtendedType())
     return true;
   NominalTypeDecl *NTD = D->getExtendedType()->getAnyNominal();
@@ -715,19 +764,16 @@ bool IndexSwiftASTWalker::reportExtension(ExtensionDecl *D) {
     return true;
 
   IndexSymbol Info;
-  if (initIndexSymbol(NTD, Loc, /*IsRef=*/false, Info))
+  if (initIndexSymbol(D, NTD, Loc, Info))
     return true;
-
-  Info.symInfo = getSymbolInfoForDecl(D);
 
   if (!startEntity(D, Info))
     return false;
 
-  // FIXME: make extensions their own entity
-  if (!reportRelatedRef(NTD, Loc, (SymbolRoleSet)SymbolRole::RelationExtendedBy,
-                        NTD))
+  if (!reportRelatedRef(NTD, Loc, /*isImplicit=*/false,
+                        (SymbolRoleSet)SymbolRole::RelationExtendedBy, D))
       return false;
-  if (!reportInheritedTypeRefs(D->getInherited(), NTD))
+  if (!reportInheritedTypeRefs(D->getInherited(), D))
       return false;
 
   return true;
@@ -786,27 +832,38 @@ bool IndexSwiftASTWalker::report(ValueDecl *D) {
   return !Cancelled;
 }
 
-//
+static bool hasUsefulRoleInSystemModule(SymbolRoleSet roles) {
+  return roles & ((SymbolRoleSet)SymbolRole::Definition |
+  (SymbolRoleSet)SymbolRole::Declaration |
+  (SymbolRoleSet)SymbolRole::RelationChildOf |
+  (SymbolRoleSet)SymbolRole::RelationBaseOf |
+  (SymbolRoleSet)SymbolRole::RelationOverrideOf |
+  (SymbolRoleSet)SymbolRole::RelationExtendedBy |
+  (SymbolRoleSet)SymbolRole::RelationAccessorOf |
+  (SymbolRoleSet)SymbolRole::RelationIBTypeOf);
+}
+
 bool IndexSwiftASTWalker::reportRef(ValueDecl *D, SourceLoc Loc,
                                     IndexSymbol &Info) {
   if (!shouldIndex(D))
     return true; // keep walking
 
   if (isa<AbstractFunctionDecl>(D)) {
-    if (initFuncRefIndexSymbol(getCurrentExpr(), getParentExpr(), D, Loc, Info))
+    if (initFuncRefIndexSymbol(D, Loc, Info))
       return true;
   } else if (isa<AbstractStorageDecl>(D)) {
     if (initVarRefIndexSymbols(getCurrentExpr(), D, Loc, Info))
       return true;
   } else {
-    if (initIndexSymbol(D, Loc, /*isRef=*/true, Info))
+    if (initIndexSymbol(D, Loc, /*IsRef=*/true, Info))
       return true;
   }
 
-
-  if (!startEntity(D, Info)) {
+  if (isSystemModule && !hasUsefulRoleInSystemModule(Info.roles))
     return true;
-  }
+
+  if (!startEntity(D, Info))
+    return true;
 
   // Report the accessors that were utilized.
   if (AbstractStorageDecl *ASD = dyn_cast<AbstractStorageDecl>(D)) {
@@ -836,12 +893,16 @@ bool IndexSwiftASTWalker::initIndexSymbol(ValueDecl *D, SourceLoc Loc,
 
   // Cannot be extension, which is not a ValueDecl.
 
-  if (IsRef)
+  if (IsRef) {
     Info.roles |= (unsigned)SymbolRole::Reference;
-  else
+    auto Parent = getParentDecl();
+    if (Parent && isa<AbstractFunctionDecl>(Parent))
+      addRelation(Info, (unsigned)SymbolRole::RelationContainedBy, Parent);
+  } else {
     Info.roles |= (unsigned)SymbolRole::Definition;
+  }
 
-  if (getNameAndUSR(D, Info.name, Info.USR))
+  if (getNameAndUSR(D, /*ExtD=*/nullptr, Info.name, Info.USR))
     return true;
 
   std::tie(Info.line, Info.column) = getLineCol(Loc);
@@ -852,6 +913,25 @@ bool IndexSwiftASTWalker::initIndexSymbol(ValueDecl *D, SourceLoc Loc,
   return false;
 }
 
+bool IndexSwiftASTWalker::initIndexSymbol(ExtensionDecl *ExtD, ValueDecl *ExtendedD,
+                                          SourceLoc Loc, IndexSymbol &Info) {
+  assert(ExtD && ExtendedD);
+  Info.decl = ExtendedD;
+  Info.symInfo = getSymbolInfoForDecl(ExtD);
+  if (Info.symInfo.Kind == SymbolKind::Unknown)
+    return true;
+
+  Info.roles |= (unsigned)SymbolRole::Definition;
+
+  if (getNameAndUSR(ExtendedD, ExtD, Info.name, Info.USR))
+    return true;
+
+  std::tie(Info.line, Info.column) = getLineCol(Loc);
+  if (auto Group = ExtD->getGroupName())
+    Info.group = Group.getValue();
+  return false;
+}
+
 static NominalTypeDecl *getNominalParent(ValueDecl *D) {
   Type Ty = D->getDeclContext()->getDeclaredTypeOfContext();
   if (!Ty)
@@ -859,71 +939,10 @@ static NominalTypeDecl *getNominalParent(ValueDecl *D) {
   return Ty->getAnyNominal();
 }
 
-/// \returns true if \c D is a subclass of 'XCTestCase'.
-static bool isUnitTestCase(const ClassDecl *D) {
-  if (!D)
-    return false;
-  while (auto *SuperD = D->getSuperclassDecl()) {
-    if (SuperD->getNameStr() == "XCTestCase")
-      return true;
-    D = SuperD;
-  }
-  return false;
-}
-
-static bool isUnitTest(ValueDecl *D) {
-  if (!D->hasName())
-    return false;
-
-  // A 'test candidate' is:
-  // 1. An instance method...
-  auto FD = dyn_cast<FuncDecl>(D);
-  if (!FD)
-    return false;
-  if (!D->isInstanceMember())
-    return false;
-
-  // 2. ...on a class or extension (not a struct) subclass of XCTestCase...
-  auto parentNTD = getNominalParent(D);
-  if (!parentNTD)
-    return false;
-  if (!isa<ClassDecl>(parentNTD))
-    return false;
-  if (!isUnitTestCase(cast<ClassDecl>(parentNTD)))
-    return false;
-
-  // 3. ...that returns void...
-  Type RetTy = FD->getResultInterfaceType();
-  if (RetTy && !RetTy->isVoid())
-    return false;
-
-  // 4. ...takes no parameters...
-  if (FD->getParameterLists().size() != 2)
-    return false;
-  if (FD->getParameterList(1)->size() != 0)
-    return false;
-
-  // 5. ...is of at least 'internal' accessibility (unless we can use
-  //    Objective-C reflection)...
-  if (!D->getASTContext().LangOpts.EnableObjCInterop &&
-      (D->getFormalAccess() < Accessibility::Internal ||
-      parentNTD->getFormalAccess() < Accessibility::Internal))
-    return false;
-
-  // 6. ...and starts with "test".
-  if (FD->getName().str().startswith("test"))
-    return true;
-
-  return false;
-}
-
 bool IndexSwiftASTWalker::initFuncDeclIndexSymbol(FuncDecl *D,
                                                   IndexSymbol &Info) {
   if (initIndexSymbol(D, D->getLoc(), /*IsRef=*/false, Info))
     return true;
-
-  if (isUnitTest(D))
-    Info.symInfo.Properties |= SymbolProperty::UnitTest;
 
   if (D->getAttrs().hasAttribute<IBActionAttr>()) {
     // Relate with type of the first parameter using RelationIBTypeOf.
@@ -973,33 +992,49 @@ static bool isDynamicCall(Expr *BaseE, ValueDecl *D) {
   return true;
 }
 
-bool IndexSwiftASTWalker::initFuncRefIndexSymbol(Expr *CurrentE, Expr *ParentE,
-                                                 ValueDecl *D, SourceLoc Loc,
+static bool isBeingCalled(Expr *Target, Expr *Parent, Expr *GrandParent) {
+    if (!Target || !Parent || !isa<ApplyExpr>(Parent))
+      return false;
+
+    if (!isa<SelfApplyExpr>(Parent))
+      return cast<ApplyExpr>(Parent)->getFn() == Target;
+
+  return GrandParent && isa<CallExpr>(GrandParent) &&
+    cast<CallExpr>(GrandParent)->getFn() == Parent;
+}
+
+bool IndexSwiftASTWalker::initFuncRefIndexSymbol(ValueDecl *D, SourceLoc Loc,
                                                  IndexSymbol &Info) {
 
   if (initIndexSymbol(D, Loc, /*IsRef=*/true, Info))
     return true;
 
+  Expr *CurrentE = getCurrentExpr();
   if (!CurrentE)
     return false;
 
-  // FIXME: the below check maintains existing indexing behaviour with
+  Expr *ParentE = getParentExpr();
+
+  // FIXME: the below check maintains existing indexing behavior with
   // pseudo/accessor output but seems incorrect. E.g otherGlobal in:
   // let global = otherGlobal
   // will not have a parent expression so no accessor call is reported
-  if (!ParentE)
+  if (isa<AbstractStorageDecl>(D) && !ParentE)
     return true;
 
-  Info.roles |= (unsigned)SymbolRole::Call;
+  if (!isa<AbstractStorageDecl>(D) &&
+      !isBeingCalled(CurrentE, ParentE, getContainingExpr(2)))
+    return false;
 
-  Decl *ParentD = getParentDecl();
-  if (ParentD && isa<ValueDecl>(ParentD)) {
-    if (addRelation(Info, (SymbolRoleSet) SymbolRole::RelationCalledBy, cast<ValueDecl>(ParentD)))
-        return true;
+
+  Info.roles |= (unsigned)SymbolRole::Call;
+  if (auto *Caller = dyn_cast_or_null<AbstractFunctionDecl>(getParentDecl())) {
+    if (addRelation(Info, (SymbolRoleSet) SymbolRole::RelationCalledBy, Caller))
+      return true;
   }
 
   Expr *BaseE = nullptr;
-  if (auto DotE = dyn_cast<DotSyntaxCallExpr>(ParentE))
+  if (auto DotE = dyn_cast_or_null<DotSyntaxCallExpr>(ParentE))
     BaseE = DotE->getBase();
   else if (auto MembE = dyn_cast<MemberRefExpr>(CurrentE))
     BaseE = MembE->getBase();

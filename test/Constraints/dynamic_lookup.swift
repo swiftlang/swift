@@ -1,6 +1,6 @@
 // RUN: rm -rf %t && mkdir -p %t
 // RUN: %target-swift-frontend -emit-module %S/Inputs/PrivateObjC.swift -o %t
-// RUN: %target-typecheck-verify-swift -I %t
+// RUN: %target-typecheck-verify-swift -I %t -verify-ignore-unknown
 
 // REQUIRES: objc_interop
 import Foundation
@@ -230,3 +230,24 @@ var anyDict: [String : Any] = Dictionary<String, Any>()
 anyDict["test"] = anyValue
 _ = anyDict["test"]!.bar() // expected-error {{value of type 'Any' has no member 'bar'}}
 // expected-note@-1 {{cast 'Any' to 'AnyObject' or use 'as!' to force downcast to a more specific type to access members}}{{5-5=(}}{{21-21= as AnyObject)}}
+
+// Test that overload resolution during constraint solving of values
+// looked-up dynamically through AnyObject are treated as conforming
+// to the protocols they are supposed to conform to.
+class NSObjDerived1 : NSObject {
+  var everything: [Any] = []
+}
+
+class NSObjDerived2 : NSObject {
+  var everything: Any = 1
+}
+
+func rdar29960565(_ o: AnyObject) {
+  for i in o.everything {
+    _ = i
+  }
+}
+
+// FIXME: Remove -verify-ignore-unknown.
+// <unknown>:0: error: unexpected note produced: 'privateFoo' declared here
+// <unknown>:0: error: unexpected note produced: 'internalFoo' declared here

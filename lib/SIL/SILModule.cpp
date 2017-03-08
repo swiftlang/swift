@@ -366,9 +366,7 @@ SILFunction *SILModule::getOrCreateFunction(SILLocation loc,
                                 None, IsNotBare, IsTrans, IsFrag, IsNotThunk,
                                 getClassVisibility(constant),
                                 inlineStrategy, EK);
-
-  if (forDefinition == ForDefinition_t::ForDefinition)
-    F->setDebugScope(new (*this) SILDebugScope(loc, F));
+  F->setDebugScope(new (*this) SILDebugScope(loc, F));
 
   F->setGlobalInit(constant.isGlobal());
   if (constant.hasDecl()) {
@@ -392,8 +390,6 @@ SILFunction *SILModule::getOrCreateFunction(SILLocation loc,
           *this, SA->getRequirements(), SA->isExported(), kind));
     }
   }
-
-  F->setDeclContext(constant.hasDecl() ? constant.getDecl() : nullptr);
 
   // If this function has a self parameter, make sure that it has a +0 calling
   // convention. This cannot be done for general function types, since
@@ -429,11 +425,11 @@ SILFunction *SILModule::createFunction(
     IsBare_t isBareSILFunction, IsTransparent_t isTrans, IsFragile_t isFragile,
     IsThunk_t isThunk, SILFunction::ClassVisibility_t classVisibility,
     Inline_t inlineStrategy, EffectsKind EK, SILFunction *InsertBefore,
-    const SILDebugScope *DebugScope, DeclContext *DC) {
-  return SILFunction::create(*this, linkage, name, loweredType,
-                             genericEnv, loc, isBareSILFunction,
-                             isTrans, isFragile, isThunk, classVisibility,
-                             inlineStrategy, EK, InsertBefore, DebugScope, DC);
+    const SILDebugScope *DebugScope) {
+  return SILFunction::create(*this, linkage, name, loweredType, genericEnv, loc,
+                             isBareSILFunction, isTrans, isFragile, isThunk,
+                             classVisibility, inlineStrategy, EK, InsertBefore,
+                             DebugScope);
 }
 
 const IntrinsicInfo &SILModule::getIntrinsicInfo(Identifier ID) {
@@ -503,7 +499,7 @@ bool SILModule::linkFunction(StringRef Name, SILModule::LinkingMode Mode) {
   return SILLinkerVisitor(*this, getSILLoader(), Mode).processFunction(Name);
 }
 
-SILFunction *SILModule::hasFunction(StringRef Name, SILLinkage Linkage) {
+SILFunction *SILModule::findFunction(StringRef Name, SILLinkage Linkage) {
   assert((Linkage == SILLinkage::Public ||
           Linkage == SILLinkage::PublicExternal) &&
          "Only a lookup of public functions is supported currently");
@@ -564,6 +560,14 @@ SILFunction *SILModule::hasFunction(StringRef Name, SILLinkage Linkage) {
     F->setFragile(IsFragile_t::IsNotFragile);
   F->setLinkage(Linkage);
   return F;
+}
+
+bool SILModule::hasFunction(StringRef Name) {
+  if (lookUpFunction(Name))
+    return true;
+  SILLinkerVisitor Visitor(*this, getSILLoader(),
+                           SILModule::LinkingMode::LinkNormal);
+  return Visitor.hasFunction(Name);
 }
 
 void SILModule::linkAllWitnessTables() {
@@ -780,5 +784,24 @@ removeDeleteNotificationHandler(DeleteNotificationHandler* Handler) {
 void SILModule::notifyDeleteHandlers(ValueBase *V) {
   for (auto *Handler : NotificationHandlers) {
     Handler->handleDeleteNotification(V);
+  }
+}
+
+// TODO: We should have an "isNoReturn" bit on Swift's BuiltinInfo, but for
+// now, let's recognize noreturn intrinsics and builtins specially here.
+bool SILModule::isNoReturnBuiltinOrIntrinsic(Identifier Name) {
+  const auto &IntrinsicInfo = getIntrinsicInfo(Name);
+  if (IntrinsicInfo.ID != llvm::Intrinsic::not_intrinsic) {
+    return IntrinsicInfo.hasAttribute(llvm::Attribute::NoReturn);
+  }
+  const auto &BuiltinInfo = getBuiltinInfo(Name);
+  switch (BuiltinInfo.ID) {
+  default:
+    return false;
+  case BuiltinValueKind::Unreachable:
+  case BuiltinValueKind::CondUnreachable:
+  case BuiltinValueKind::UnexpectedError:
+  case BuiltinValueKind::ErrorInMain:
+    return true;
   }
 }

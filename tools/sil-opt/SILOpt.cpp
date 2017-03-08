@@ -45,9 +45,7 @@ using namespace swift;
 
 namespace {
 
-enum class OptGroup {
-  Unknown, Diagnostics, Performance
-};
+enum class OptGroup { Unknown, Diagnostics, Performance, Lowering };
 
 } // end anonymous namespace
 
@@ -97,10 +95,11 @@ Target("target", llvm::cl::desc("target triple"));
 
 static llvm::cl::opt<OptGroup> OptimizationGroup(
     llvm::cl::desc("Predefined optimization groups:"),
-    llvm::cl::values(clEnumValN(OptGroup::Diagnostics, "diagnostics",
-                                "Run diagnostic passes"),
-                     clEnumValN(OptGroup::Performance, "O",
-                                "Run performance passes")),
+    llvm::cl::values(
+        clEnumValN(OptGroup::Diagnostics, "diagnostics",
+                   "Run diagnostic passes"),
+        clEnumValN(OptGroup::Performance, "O", "Run performance passes"),
+        clEnumValN(OptGroup::Lowering, "lowering", "Run lowering passes")),
     llvm::cl::init(OptGroup::Unknown));
 
 static llvm::cl::list<PassKind>
@@ -216,7 +215,11 @@ int main(int argc, char **argv) {
 
   // Give the context the list of search paths to use for modules.
   Invocation.setImportSearchPaths(ImportPaths);
-  Invocation.setFrameworkSearchPaths(FrameworkPaths);
+  std::vector<SearchPathOptions::FrameworkSearchPath> FramePaths;
+  for (const auto &path : FrameworkPaths) {
+    FramePaths.push_back({path, /*isSystem=*/false});
+  }
+  Invocation.setFrameworkSearchPaths(FramePaths);
   // Set the SDK path and target if given.
   if (SDKPath.getNumOccurrences() == 0) {
     const char *SDKROOT = getenv("SDKROOT");
@@ -237,6 +240,8 @@ int main(int argc, char **argv) {
   Invocation.getLangOptions().DisableAvailabilityChecking = true;
   Invocation.getLangOptions().EnableAccessControl = false;
   Invocation.getLangOptions().EnableObjCAttrRequiresFoundation = false;
+  Invocation.getLangOptions().EnableObjCInterop =
+    llvm::Triple(Target).isOSDarwin();
 
   Invocation.getLangOptions().ASTVerifierProcessCount =
       ASTVerifierProcessCount;
@@ -334,6 +339,8 @@ int main(int argc, char **argv) {
     runSILDiagnosticPasses(*CI.getSILModule());
   } else if (OptimizationGroup == OptGroup::Performance) {
     runSILOptimizationPasses(*CI.getSILModule());
+  } else if (OptimizationGroup == OptGroup::Lowering) {
+    runSILLoweringPasses(*CI.getSILModule());
   } else {
     auto *SILMod = CI.getSILModule();
     {
@@ -387,7 +394,8 @@ int main(int argc, char **argv) {
   // diagnostics.  Check now to ensure that they meet our expectations.
   if (VerifyMode) {
     HadError = verifyDiagnostics(CI.getSourceMgr(), CI.getInputBufferIDs(),
-                                 /*autoApplyFixes*/false);
+                                 /*autoApplyFixes*/false,
+                                 /*ignoreUnknown*/false);
     DiagnosticEngine &diags = CI.getDiags();
     if (diags.hasFatalErrorOccurred() &&
         !Invocation.getDiagnosticOptions().ShowDiagnosticsAfterFatalError) {

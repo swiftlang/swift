@@ -15,25 +15,6 @@
 
 #include "swift/Runtime/Config.h"
 
-typedef void (^NSDataDeallocator)(void *, NSUInteger);
-extern const NSDataDeallocator NSDataDeallocatorVM;
-extern const NSDataDeallocator NSDataDeallocatorUnmap;
-extern const NSDataDeallocator NSDataDeallocatorFree;
-extern const NSDataDeallocator NSDataDeallocatorNone;
-
-void __NSDataInvokeDeallocatorVM(void *mem, NSUInteger length) {
-  NSDataDeallocatorVM(mem, length);
-}
-
-void __NSDataInvokeDeallocatorUnmap(void *mem, NSUInteger length) {
-  NSDataDeallocatorUnmap(mem, length);
-}
-
-void __NSDataInvokeDeallocatorFree(void *mem, NSUInteger length) {
-  NSDataDeallocatorFree(mem, length);
-}
-
-
 #if TARGET_OS_IPHONE && !TARGET_OS_SIMULATOR
 static int __NSFileProtectionClassForOptions(NSUInteger options) {
     int result;
@@ -91,11 +72,47 @@ static NSInteger _NSWriteToFileDescriptor(int32_t fd, const void *buffer, NSUInt
     return length - numBytesRemaining;
 }
 
-extern NSError *_NSErrorWithFilePath(NSInteger code, id pathOrURL);
-extern NSError *_NSErrorWithFilePathAndErrno(NSInteger posixErrno, id pathOrURL, BOOL reading);
+static NSError *_NSErrorWithFilePath(NSInteger code, id pathOrURL) {
+    NSString *key = [pathOrURL isKindOfClass:[NSURL self]] ? NSURLErrorKey : NSFilePathErrorKey;
+    return [NSError errorWithDomain:NSCocoaErrorDomain code:code userInfo:[NSDictionary dictionaryWithObjectsAndKeys:pathOrURL, key, nil]];
+}
+
+static NSError *_NSErrorWithFilePathAndErrno(NSInteger posixErrno, id pathOrURL, BOOL reading) {
+    NSInteger code;
+    if (reading) {
+        switch (posixErrno) {
+            case EFBIG:          code = NSFileReadTooLargeError; break;
+            case ENOENT:         code = NSFileReadNoSuchFileError; break;
+            case EPERM:          // fallthrough
+            case EACCES:         code = NSFileReadNoPermissionError; break;
+            case ENAMETOOLONG:   code = NSFileReadInvalidFileNameError; break;
+            default:             code = NSFileReadUnknownError; break;
+        }
+    } else {
+        switch (posixErrno) {
+            case ENOENT:         code = NSFileNoSuchFileError; break;
+            case EPERM:          // fallthrough
+            case EACCES:         code = NSFileWriteNoPermissionError; break;
+            case ENAMETOOLONG:   code = NSFileWriteInvalidFileNameError; break;
+#if DEPLOYMENT_TARGET_MACOSX || DEPLOYMENT_TARGET_EMBEDDED
+            case EDQUOT:
+#endif
+            case ENOSPC:         code = NSFileWriteOutOfSpaceError; break;
+            case EROFS:          code = NSFileWriteVolumeReadOnlyError; break;
+            case EEXIST:         code = NSFileWriteFileExistsError; break;
+            default:             code = NSFileWriteUnknownError; break;
+        }
+    }
+    
+    NSString *key = [pathOrURL isKindOfClass:[NSURL self]] ? NSURLErrorKey : NSFilePathErrorKey;
+    NSDictionary *userInfo = [[NSDictionary alloc] initWithObjectsAndKeys:pathOrURL, key, [NSError errorWithDomain:NSPOSIXErrorDomain code:posixErrno userInfo:nil], NSUnderlyingErrorKey, nil];
+    NSError *error = [NSError errorWithDomain:NSCocoaErrorDomain code:code userInfo:userInfo];
+    [userInfo release];
+    return error;
+}
 
 SWIFT_CC(swift)
-BOOL _NSWriteDataToFile_Swift(NSURL * NS_RELEASES_ARGUMENT url, NSData * NS_RELEASES_ARGUMENT data, NSDataWritingOptions writingOptions, NSError **errorPtr) {
+BOOL __NSDataWriteToURL(NSData *NS_RELEASES_ARGUMENT data, NSURL *NS_RELEASES_ARGUMENT url, NSDataWritingOptions writingOptions, NSError **_Nullable errorPtr) {
     assert((writingOptions & NSDataWritingAtomic) == 0);
 
     NSString *path = url.path;

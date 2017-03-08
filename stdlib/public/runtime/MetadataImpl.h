@@ -47,6 +47,9 @@
 #if SWIFT_OBJC_INTEROP
 #include "swift/Runtime/ObjCBridge.h"
 #endif
+
+#include "WeakReference.h"
+
 #include <cstring>
 #include <type_traits>
 
@@ -188,6 +191,11 @@ template <class Impl, class T> struct RetainableBoxBase {
   static constexpr size_t stride = sizeof(T);
   static constexpr bool isPOD = false;
   static constexpr bool isBitwiseTakable = true;
+#ifdef SWIFT_STDLIB_USE_NONATOMIC_RC
+  static constexpr bool isAtomic = false;
+#else
+  static constexpr bool isAtomic = true;
+#endif
 
   static void destroy(T *addr) {
     Impl::release(*addr);
@@ -259,12 +267,20 @@ template <class Impl, class T> struct RetainableBoxBase {
 struct SwiftRetainableBox :
     RetainableBoxBase<SwiftRetainableBox, HeapObject*> {
   static HeapObject *retain(HeapObject *obj) {
-    swift_retain(obj);
+    if (isAtomic) {
+      swift_retain(obj);
+    } else {
+      swift_nonatomic_retain(obj);
+    }
     return obj;
   }
 
   static void release(HeapObject *obj) {
-    swift_release(obj);
+    if (isAtomic) {
+      swift_release(obj);
+    } else {
+      swift_nonatomic_release(obj);
+    }
   }
 };
 
@@ -272,12 +288,20 @@ struct SwiftRetainableBox :
 struct SwiftUnownedRetainableBox :
     RetainableBoxBase<SwiftUnownedRetainableBox, HeapObject*> {
   static HeapObject *retain(HeapObject *obj) {
-    swift_unownedRetain(obj);
+    if (isAtomic) {
+      swift_unownedRetain(obj);
+    } else {
+      swift_nonatomic_unownedRetain(obj);
+    }
     return obj;
   }
 
   static void release(HeapObject *obj) {
-    swift_unownedRelease(obj);
+    if (isAtomic) {
+      swift_unownedRelease(obj);
+    } else {
+      swift_nonatomic_unownedRelease(obj);
+    }
   }
 
 #if SWIFT_OBJC_INTEROP
@@ -465,7 +489,11 @@ struct UnknownRetainableBox : RetainableBoxBase<UnknownRetainableBox, void*> {
     swift_unknownRetain(obj);
     return obj;
 #else
-    swift_retain(static_cast<HeapObject *>(obj));
+    if (isAtomic) {
+      swift_retain(static_cast<HeapObject *>(obj));
+    } else {
+      swift_nonatomic_retain(static_cast<HeapObject *>(obj));
+    }
     return static_cast<HeapObject *>(obj);
 #endif
   }
@@ -474,7 +502,11 @@ struct UnknownRetainableBox : RetainableBoxBase<UnknownRetainableBox, void*> {
 #if SWIFT_OBJC_INTEROP
     swift_unknownRelease(obj);
 #else
-    swift_release(static_cast<HeapObject *>(obj));
+    if (isAtomic) {
+      swift_release(static_cast<HeapObject *>(obj));
+    } else {
+      swift_nonatomic_release(static_cast<HeapObject *>(obj));
+    }
 #endif
   }
 };
@@ -849,6 +881,7 @@ struct NonFixedBufferValueWitnesses : BufferValueWitnessesBase<Impl> {
 
   static OpaqueValue *projectBuffer(ValueBuffer *buffer, const Metadata *self) {
     auto vwtable = self->getValueWitnesses();
+    (void)vwtable;
     if (!IsKnownAllocated && vwtable->isValueInline()) {
       return reinterpret_cast<OpaqueValue*>(buffer);
     } else {
@@ -868,6 +901,7 @@ struct NonFixedBufferValueWitnesses : BufferValueWitnessesBase<Impl> {
                                                        ValueBuffer *src,
                                                        const Metadata *self) {
     auto vwtable = self->getValueWitnesses();
+    (void)vwtable;
     if (!IsKnownAllocated && !vwtable->isValueInline()) {
       return Impl::initializeWithTake(reinterpret_cast<OpaqueValue*>(dest),
                                       reinterpret_cast<OpaqueValue*>(src),

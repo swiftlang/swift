@@ -1,0 +1,39 @@
+//===--- FlatMapDiagnostics.swift -----------------------------------------===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+// RUN: rm -rf %t && mkdir -p %t
+// RUN: %gyb %s -o %t/FlatMapDiagnostics.swift
+// RUN: %target-swift-frontend -typecheck -verify %t/FlatMapDiagnostics.swift
+
+
+% for Type in [
+%   'Sequence',
+%   'Collection',
+%   'LazySequenceProtocol',
+%   'LazyCollectionProtocol']:
+
+func testGeneric${Type}<T : ${Type}>(xs: T) {
+  _ = xs.flatMap { $0 } // expected-warning {{Please use map instead.}}
+}
+
+% end
+
+func testArray(xs: [Int]) {
+ _ = xs.flatMap { $0 } // expected-warning {{Please use map instead.}}
+ _ = xs.lazy.flatMap { $0 } // expected-warning {{Please use map instead.}}
+}
+
+func testGenericLazyBidirectionalCollection<
+  T : LazyCollectionProtocol & BidirectionalCollection
+>(xs: T) where T.Elements : BidirectionalCollection {
+  _ = xs.flatMap { $0 } // expected-warning {{Please use map instead.}}
+}
+

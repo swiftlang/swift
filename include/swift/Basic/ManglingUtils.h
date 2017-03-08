@@ -91,9 +91,12 @@ struct WordReplacement {
 /// Current operator characters:   @/=-+*%<>!&|^~ and the special operator '..'
 char translateOperatorChar(char op);
 
-/// Returns a string where all characters of the operator \Op are translated to
-/// their mangled form.
+/// Returns a string where all characters of the operator \p Op are translated
+/// to their mangled form.
 std::string translateOperator(StringRef Op);
+
+/// Returns the standard type kind for an 'S' substitution, e.g. 'i' for "Int".
+char getStandardTypeSubst(StringRef TypeName);
 
 /// Mangles an identifier using a generic Mangler class.
 ///
@@ -157,7 +160,7 @@ void mangleIdentifier(Mangler &M, StringRef ident) {
         // We found a word substitution!
         assert(WordIdx < 26);
         M.SubstWordsInIdent.push_back({wordStartPos, WordIdx});
-      } else if (wordLen >= 2 && M.Words.size() < 26) {
+      } else if (wordLen >= 2 && M.Words.size() < M.MaxNumWords) {
         // It's a new word: remember it.
         // Note: at this time the word's start position is relative to the
         // begin of the identifier. We must update it afterwards so that it is
@@ -218,6 +221,94 @@ void mangleIdentifier(Mangler &M, StringRef ident) {
   }
   M.SubstWordsInIdent.clear();
 }
+
+/// Utility class for mangling merged substitutions.
+///
+/// Used in the Mangler and Remangler.
+class SubstitutionMerging {
+
+  /// The position of the last substitution mangling,
+  /// e.g. 3 for 'AabC' and 'Aab4C'
+  size_t lastSubstPosition = 0;
+
+  /// The size of the last substitution mangling,
+  /// e.g. 1 for 'AabC' or 2 for 'Aab4C'
+  size_t lastSubstSize = 0;
+
+  /// The repeat count of the last substitution,
+  /// e.g. 1 for 'AabC' or 4 for 'Aab4C'
+  size_t lastNumSubsts = 0;
+
+  /// True if the last substitution is an 'S' substitution,
+  /// false if the last substitution is an 'A' substitution.
+  bool lastSubstIsStandardSubst = false;
+
+public:
+
+  // The only reason to limit the number of repeated substitutions is that we
+  // don't want that the demangler blows up on a bogus substitution, e.g.
+  // ...A832456823746582B...
+  enum { MaxRepeatCount = 2048 };
+
+  void clear() {
+    lastNumSubsts = 0;
+  }
+
+  /// Tries to merge the substitution \p Subst with a previously mangled
+  /// substitution.
+  ///
+  /// Returns true on success. In case of false, the caller must mangle the
+  /// substitution separately in the form 'S<Subst>' or 'A<Subst>'.
+  ///
+  /// The Mangler class must provide the following:
+  /// *) Buffer: A stream where the mangled identifier is written to.
+  /// *) getBufferStr(): Returns a StringRef of the current content of Buffer.
+  /// *) resetBuffer(size_t): Resets the buffer to an old position.
+  template <typename Mangler>
+  bool tryMergeSubst(Mangler &M, char Subst, bool isStandardSubst) {
+    assert(isUpperLetter(Subst) || (isStandardSubst && isLowerLetter(Subst)));
+    StringRef BufferStr = M.getBufferStr();
+    if (lastNumSubsts > 0 && lastNumSubsts < MaxRepeatCount
+        && BufferStr.size() == lastSubstPosition + lastSubstSize
+        && lastSubstIsStandardSubst == isStandardSubst) {
+
+      // The last mangled thing is a substitution.
+      assert(lastSubstPosition > 0 && lastSubstPosition < BufferStr.size());
+      assert(lastSubstSize > 0);
+      char lastSubst = BufferStr.back();
+      assert(isUpperLetter(lastSubst)
+             || (isStandardSubst && isLowerLetter(lastSubst)));
+      if (lastSubst != Subst && !isStandardSubst) {
+        // We can merge with a different 'A' substitution,
+        // e.g. 'AB' -> 'AbC'.
+        lastSubstPosition = BufferStr.size();
+        lastNumSubsts = 1;
+        M.resetBuffer(BufferStr.size() - 1);
+        assert(isUpperLetter(lastSubst));
+        M.Buffer << (char)(lastSubst - 'A' + 'a') << Subst;
+        lastSubstSize = 1;
+        return true;
+      }
+      if (lastSubst == Subst) {
+        // We can merge with the same 'A' or 'S' substitution,
+        // e.g. 'AB' -> 'A2B', or 'S3i' -> 'S4i'
+        lastNumSubsts++;
+        M.resetBuffer(lastSubstPosition);
+        M.Buffer << lastNumSubsts;
+        M.Buffer << Subst;
+        lastSubstSize = M.getBufferStr().size() - lastSubstPosition;
+        return true;
+      }
+    }
+    // We can't merge with the previous substitution, but let's remember this
+    // substitution which will be mangled by the caller.
+    lastSubstPosition = BufferStr.size() + 1;
+    lastSubstSize = 1;
+    lastNumSubsts = 1;
+    lastSubstIsStandardSubst = isStandardSubst;
+    return false;
+  }
+};
 
 } // end namespace Mangle
 } // end namespace swift

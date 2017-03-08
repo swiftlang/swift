@@ -54,7 +54,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// in source control, you should also update the comment to briefly
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
-const uint16_t VERSION_MINOR = 309; // Last change: remove enum argument type
+const uint16_t VERSION_MINOR = 325; // Last change: unchecked_ownership_conver
 
 using DeclID = PointerEmbeddedInt<unsigned, 31>;
 using DeclIDField = BCFixed<31>;
@@ -549,6 +549,7 @@ namespace input_block {
   using SearchPathLayout = BCRecordLayout<
     SEARCH_PATH,
     BCFixed<1>, // framework?
+    BCFixed<1>, // system?
     BCBlob      // path
   >;
 }
@@ -642,12 +643,8 @@ namespace decls_block {
 
   using ArchetypeTypeLayout = BCRecordLayout<
     ARCHETYPE_TYPE,
-    BCFixed<1>,          // whether this is a primary archetype or not
-    TypeIDField,         // parent if non-primary, generic env if primary
-    DeclIDField,         // associated type decl if non-primary, name if primary
-    TypeIDField,         // superclass
-    BCArray<DeclIDField> // conformances
-    // Trailed by the nested types record.
+    GenericEnvironmentIDField, // generic environment
+    TypeIDField                // interface type
   >;
 
   using OpenedExistentialTypeLayout = BCRecordLayout<
@@ -660,16 +657,6 @@ namespace decls_block {
     TypeIDField          // self type
   >;
 
-  using ArchetypeNestedTypeNamesLayout = BCRecordLayout<
-    ARCHETYPE_NESTED_TYPE_NAMES,
-    BCArray<IdentifierIDField>
-  >;
-
-  using ArchetypeNestedTypesLayout = BCRecordLayout<
-    ARCHETYPE_NESTED_TYPES,
-    BCArray<TypeIDField>
-  >;
-  
   using ProtocolCompositionTypeLayout = BCRecordLayout<
     PROTOCOL_COMPOSITION_TYPE,
     BCArray<TypeIDField> // protocols
@@ -844,8 +831,7 @@ namespace decls_block {
     BCFixed<1>,             // objc?
     GenericEnvironmentIDField, // generic environment
     AccessibilityKindField, // accessibility
-    BCVBR<4>,               // number of protocols
-    BCArray<DeclIDField>    // protocols and inherited types
+    BCArray<DeclIDField>    // inherited types
     // Trailed by the generic parameters (if any), the members record, and
     // the default witness table record
   >;
@@ -989,6 +975,7 @@ namespace decls_block {
     BCFixed<1>,  // implicit?
     BCFixed<1>,  // objc?
     StorageKindField,   // StorageKind
+    GenericEnvironmentIDField, // generic environment
     TypeIDField, // interface type
     DeclIDField, // getter
     DeclIDField, // setter
@@ -1001,7 +988,9 @@ namespace decls_block {
     AccessibilityKindField, // accessibility
     AccessibilityKindField, // setter accessibility, if applicable
     BCArray<IdentifierIDField> // name components
-    // The indices pattern trails the record.
+    // Trailed by:
+    // - generic parameters, if any
+    // - the indices pattern
   >;
 
   using ExtensionLayout = BCRecordLayout<
@@ -1098,13 +1087,13 @@ namespace decls_block {
 
   using GenericEnvironmentLayout = BCRecordLayout<
     GENERIC_ENVIRONMENT,
-    BCArray<TypeIDField>         // (sugared interface type, contextual type)
+    BCArray<TypeIDField>         // sugared interface types
   >;
 
   using SILGenericEnvironmentLayout = BCRecordLayout<
     SIL_GENERIC_ENVIRONMENT,
     BCArray<TypeIDField>         // (generic parameter name, sugared interface
-                                 //  type, contextual type) triples
+                                 //  type) pairs
   >;
 
   using GenericRequirementLayout = BCRecordLayout<
@@ -1192,14 +1181,15 @@ namespace decls_block {
   using XRefTypePathPieceLayout = BCRecordLayout<
     XREF_TYPE_PATH_PIECE,
     IdentifierIDField, // name
-    BCFixed<1>         // only in nominal
+    BCFixed<1>         // restrict to protocol extension
   >;
 
   using XRefValuePathPieceLayout = BCRecordLayout<
     XREF_VALUE_PATH_PIECE,
     TypeIDField,       // type
     IdentifierIDField, // name
-    BCFixed<1>         // restrict to protocol extension
+    BCFixed<1>,        // restrict to protocol extension
+    BCFixed<1>         // static?
   >;
 
   using XRefInitializerPathPieceLayout = BCRecordLayout<
@@ -1487,6 +1477,12 @@ namespace index_block {
   using GroupNamesLayout = BCGenericRecordLayout<
     RecordIDField, // record ID
     BCBlob       // actual names
+  >;
+
+  using ExtensionTableLayout = BCRecordLayout<
+    EXTENSIONS, // record ID
+    BCVBR<16>,  // table offset within the blob (see below)
+    BCBlob  // map from identifier strings to decl kinds / decl IDs
   >;
 
   using ObjCMethodTableLayout = BCRecordLayout<

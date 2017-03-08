@@ -1,5 +1,6 @@
 #!/usr/bin/env python
-# utils/coverage/coverage-query-db - Find covering tests using coverage database
+# utils/coverage/coverage-query-db - Find covering tests using coverage
+# database
 #
 # This source file is part of the Swift.org open source project
 #
@@ -9,8 +10,8 @@
 # See https://swift.org/LICENSE.txt for license information
 # See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
-import subprocess
 import argparse
+import subprocess
 import sys
 
 

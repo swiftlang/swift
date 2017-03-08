@@ -39,7 +39,7 @@ protected:
   const DeclContext *DeclCtx = nullptr;
 
   /// Optimize out protocol names if a type only conforms to one protocol.
-  bool OptimizeProtocolNames;
+  bool OptimizeProtocolNames = true;
 
   /// If enabled, Arche- and Alias types are mangled with context.
   bool DWARFMangling;
@@ -54,12 +54,8 @@ public:
     DirectMethodReferenceThunk,
   };
 
-  ASTMangler(bool DWARFMangling = false,
-          bool usePunycode = true,
-          bool OptimizeProtocolNames = true)
-    : Mangler(usePunycode),
-      OptimizeProtocolNames(OptimizeProtocolNames),
-      DWARFMangling(DWARFMangling) {}
+  ASTMangler(bool DWARFMangling = false)
+    : DWARFMangling(DWARFMangling) {}
 
   std::string mangleClosureEntity(const AbstractClosureExpr *closure,
                                   SymbolKind SKind);
@@ -115,7 +111,11 @@ public:
 
   std::string mangleTypeForDebugger(Type decl, const DeclContext *DC);
 
-  std::string mangleTypeAsUSR(Type type);
+  std::string mangleObjCRuntimeName(const NominalTypeDecl *Nominal);
+
+  std::string mangleTypeAsUSR(Type type) {
+    return mangleTypeWithoutPrefix(type);
+  }
 
   std::string mangleTypeAsContextUSR(const NominalTypeDecl *type);
 
@@ -198,11 +198,11 @@ protected:
 
   void appendInitializerEntity(const VarDecl *var);
 
-  Type getDeclTypeForMangling(const ValueDecl *decl,
-                              ArrayRef<GenericTypeParamType *> &genericParams,
-                              unsigned &initialParamIndex,
-                              ArrayRef<Requirement> &requirements,
-                              SmallVectorImpl<Requirement> &requirementsBuf);
+  CanType getDeclTypeForMangling(const ValueDecl *decl,
+                                 ArrayRef<GenericTypeParamType *> &genericParams,
+                                 unsigned &initialParamIndex,
+                                 ArrayRef<Requirement> &requirements,
+                                 SmallVectorImpl<Requirement> &requirementsBuf);
 
   void appendDeclType(const ValueDecl *decl);
 
@@ -225,7 +225,10 @@ protected:
 
   void appendOpParamForLayoutConstraint(LayoutConstraint Layout);
 
-  static bool checkGenericParamsOrder(ArrayRef<GenericTypeParamType *> params);
+  std::string mangleTypeWithoutPrefix(Type type) {
+    appendType(type);
+    return finalize();
+  }
 };
 
 } // end namespace NewMangling

@@ -15,7 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/AST.h"
-#include "swift/AST/ArchetypeBuilder.h"
+#include "swift/AST/GenericSignatureBuilder.h"
 #include "swift/Basic/LLVMContext.h"
 #include "swift/AST/Builtins.h"
 #include "swift/AST/GenericEnvironment.h"
@@ -472,14 +472,18 @@ namespace {
       TheGenericParamList = getGenericParams(ctx, numGenericParams,
                                              GenericTypeParams);
 
-      ArchetypeBuilder Builder(ctx,
+      GenericSignatureBuilder Builder(ctx,
                                LookUpConformanceInModule(ctx.TheBuiltinModule));
-      for (auto gp : GenericTypeParams)
+      SmallVector<GenericTypeParamType *, 2> GenericTypeParamTypes;
+      for (auto gp : GenericTypeParams) {
         Builder.addGenericParameter(gp);
+        GenericTypeParamTypes.push_back(
+          gp->getDeclaredInterfaceType()->castTo<GenericTypeParamType>());
+      }
 
-      Builder.finalize(SourceLoc());
-      auto sig = Builder.getGenericSignature();
-      GenericEnv = Builder.getGenericEnvironment(sig);
+      Builder.finalize(SourceLoc(), GenericTypeParamTypes);
+      GenericEnv = Builder.getGenericSignature()->createGenericEnvironment(
+                                                        *ctx.TheBuiltinModule);
     }
 
     template <class G>
@@ -910,6 +914,14 @@ static ValueDecl *getGetObjCTypeEncodingOperation(ASTContext &Context,
   return builder.build(Id);
 }
 
+static ValueDecl *getTSanInoutAccess(ASTContext &Context, Identifier Id) {
+  // <T> T -> ()
+  BuiltinGenericSignatureBuilder builder(Context);
+  builder.addParameter(makeGenericParam());
+  builder.setResult(makeConcrete(Context.TheEmptyTupleType));
+  return builder.build(Id);
+}
+
 static ValueDecl *getAddressOfOperation(ASTContext &Context, Identifier Id) {
   // <T> (@inout T) -> RawPointer
   BuiltinGenericSignatureBuilder builder(Context);
@@ -1084,6 +1096,8 @@ static const OverloadedBuiltinKind OverloadedBuiltinKinds[] = {
    OverloadedBuiltinKind::overload,
 #define BUILTIN_MISC_OPERATION(id, name, attrs, overload) \
    OverloadedBuiltinKind::overload,
+#define BUILTIN_SANITIZER_OPERATION(id, name, attrs) \
+  OverloadedBuiltinKind::None,
 #define BUILTIN_TYPE_TRAIT_OPERATION(id, name) \
    OverloadedBuiltinKind::Special,
 #define BUILTIN_RUNTIME_CALL(id, attrs, name) \
@@ -1740,6 +1754,9 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
 
   case BuiltinValueKind::GetObjCTypeEncoding:
     return getGetObjCTypeEncodingOperation(Context, Id);
+
+  case BuiltinValueKind::TSanInoutAccess:
+    return getTSanInoutAccess(Context, Id);
   }
 
   llvm_unreachable("bad builtin value!");

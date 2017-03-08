@@ -19,6 +19,7 @@
 #ifndef SWIFT_RUNTIME_IMAGE_INSPECTION_H
 #define SWIFT_RUNTIME_IMAGE_INSPECTION_H
 
+#include "ImageInspectionELF.h"
 #include <cstdint>
 
 namespace swift {

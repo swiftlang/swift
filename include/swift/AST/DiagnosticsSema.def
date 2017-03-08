@@ -45,11 +45,6 @@ NOTE(decl_declared_here,none,
 NOTE(extended_type_declared_here,none,
      "extended type declared here", ())
 
-NOTE(while_converting_default_tuple_value,none,
-     "while converting default tuple value to element type %0", (Type))
-NOTE(while_converting_subscript_index,none,
-     "while converting subscript index to expected type %0", (Type))
-
 //------------------------------------------------------------------------------
 // Constraint solver diagnostics
 //------------------------------------------------------------------------------
@@ -164,6 +159,9 @@ ERROR(value_type_comparison_with_nil_illegal,none,
 ERROR(cannot_match_expr_pattern_with_value,none,
       "expression pattern of type %0 cannot match values of type %1",
       (Type, Type))
+ERROR(cannot_match_unresolved_expr_pattern_with_value,none,
+      "pattern cannot match values of type %0",
+      (Type))
 
 ERROR(cannot_reference_compare_types,none,
       "cannot check reference equality of functions; operands here have types "
@@ -230,9 +228,6 @@ ERROR(cannot_call_with_params, none,
 
 NOTE(pointer_init_to_type,none,
       "Pointer conversion restricted: use '.assumingMemoryBound(to:)' or '.bindMemory(to:capacity:)' to view memory as a type.", ())
-
-ERROR(expected_do_in_statement,none,
-      "expected 'do' keyword to designate a block of statements", ())
 
 ERROR(cannot_call_non_function_value,none,
       "cannot call value of non-function type %0", (Type))
@@ -915,8 +910,6 @@ ERROR(c_function_pointer_from_function_with_context,none,
       "%select{local function|closure}0 that captures "
       "%select{context|generic parameters|dynamic Self type}1",
       (bool, unsigned))
-NOTE(c_function_pointer_captures_here,none,
-     "%0 captured here", (Identifier))
 
 //------------------------------------------------------------------------------
 // Type Check Declarations
@@ -1508,8 +1501,6 @@ NOTE(declared_protocol_conformance_here,none,
 
 ERROR(redundant_conformance,none,
       "redundant conformance of %0 to protocol %1", (Type, DeclName))
-NOTE(protocol_conformance_implied_here,none,
-     "implied protocol conformance %0 here can be made explicit", (Identifier))
 
 // "Near matches"
 WARNING(optional_req_near_match,none,
@@ -1517,9 +1508,6 @@ WARNING(optional_req_near_match,none,
         (DescriptiveDeclKind, DeclName, DeclName, DeclName))
 NOTE(optional_req_nonobjc_near_match_add_objc,none,
      "add '@objc' to provide an Objective-C entrypoint", ())
-NOTE(optional_req_nonobjc_to_objc,none,
-     "rename to %0 to satisfy this requirement",
-     (DeclName))
 NOTE(optional_req_near_match_move,none,
      "move %0 to %select{an|another}1 extension to silence this warning",
      (DeclName, unsigned))
@@ -1561,13 +1549,10 @@ ERROR(requires_no_same_type_archetype,none,
       ())
 ERROR(requires_generic_params_made_equal,none,
       "same-type requirement makes generic parameters %0 and %1 equivalent",
-      (Identifier, Identifier))
+      (Type, Type))
 ERROR(requires_generic_param_made_equal_to_concrete,none,
       "same-type requirement makes generic parameter %0 non-generic",
-      (Identifier))
-ERROR(requires_superclass_conflict,none,
-      "generic parameter %0 cannot be a subclass of both %1 and %2",
-      (Identifier, Type, Type))
+      (Type))
 ERROR(recursive_type_reference,none,
       "%0 %1 references itself", (DescriptiveDeclKind, Identifier))
 ERROR(recursive_requirement_reference,none,
@@ -1575,13 +1560,32 @@ ERROR(recursive_requirement_reference,none,
 ERROR(recursive_same_type_constraint,none,
       "same-type constraint %0 == %1 is recursive", (Type, Type))
 ERROR(recursive_superclass_constraint,none,
-      "superclass constraint %0 is recursive", (Type))
+      "superclass constraint %0 : %1 is recursive", (Type, Type))
 ERROR(requires_same_type_conflict,none,
-      "generic parameter %0 cannot be equal to both %1 and %2",
-      (StringRef, Type, Type))
+      "%select{associated type|generic parameter}0 %1 cannot be equal to "
+      "both %2 and %3", (bool, Type, Type, Type))
 ERROR(requires_generic_param_same_type_does_not_conform,none,
       "same-type constraint type %0 does not conform to required protocol %1",
       (Type, Identifier))
+ERROR(requires_same_concrete_type,none,
+      "generic signature requires types %0 and %1 to be the same", (Type, Type))
+ERROR(protocol_typealias_conflict, none,
+      "typealias %0 requires types %1 and %2 to be the same",
+      (Identifier, Type, Type))
+WARNING(redundant_same_type_to_concrete,none,
+        "redundant same-type constraint %0 == %1", (Type, Type))
+NOTE(same_type_redundancy_here,none,
+     "same-type constraint %1 == %2 %select{written here|implied here}0",
+     (bool, Type, Type))
+ERROR(requires_superclass_conflict,none,
+      "%select{generic parameter |protocol |}0%1 cannot be a subclass of both "
+      "%2 and %3", (unsigned, Type, Type, Type))
+WARNING(redundant_superclass_constraint,none,
+        "redundant superclass constraint %0 : %1", (Type, Type))
+NOTE(superclass_redundancy_here,none,
+     "superclass constraint %1 : %2 %select{written here|implied here}0",
+     (bool, Type, Type))
+
 ERROR(mutiple_layout_constraints,none,
       "multiple layout constraints cannot be used at the same time: %0 and %1",
       (LayoutConstraint, LayoutConstraint))
@@ -1759,8 +1763,6 @@ ERROR(decl_already_final,none,
       "static declarations are already final", ())
 ERROR(open_decl_cannot_be_final,none,
       "%0 cannot be declared both 'final' and 'open'", (DescriptiveDeclKind))
-NOTE(decl_init_here,none,
-     "initial value is here", ())
 
 
 // Inheritance
@@ -2053,9 +2055,6 @@ ERROR(nscopying_doesnt_conform,none,
 #define SELECT_APPLICATION_MAIN "select{'UIApplicationMain'|'NSApplicationMain'}"
 #define SELECT_APPLICATION_DELEGATE "select{'UIApplicationDelegate'|'NSApplicationDelegate'}"
 
-ERROR(attr_ApplicationMain_not_class,none,
-      "%" SELECT_APPLICATION_MAIN "0 attribute may only be used on classes",
-      (unsigned))
 ERROR(attr_ApplicationMain_not_ApplicationDelegate,none,
       "%" SELECT_APPLICATION_MAIN "0 class must conform to the %" SELECT_APPLICATION_DELEGATE "0 protocol",
       (unsigned))
@@ -2109,17 +2108,7 @@ NOTE(found_candidate,none,
      "found this candidate", ())
 NOTE(found_candidate_type,none,
      "found candidate with type %0", (Type))
-NOTE(first_declaration,none,
-     "first declaration", ())
-NOTE(second_declaration,none,
-     "second declaration", ())
 
-ERROR(no_IntegerLiteralType_found,none,
-      "standard library error: IntegerLiteralType not defined", ())
-ERROR(no_FloatLiteralType_found,none,
-      "standard library error: FloatLiteralType not defined", ())
-ERROR(no_StringLiteralType_found,none,
-      "standard library error: StringLiteralType not defined", ())
 ERROR(no_MaxBuiltinIntegerType_found,none,
    "standard library error: _MaxBuiltinIntegerType is not properly defined", ())
 ERROR(no_MaxBuiltinFloatType_found,none,
@@ -2224,9 +2213,6 @@ ERROR(try_if_rhs_noncovering,none,
 ERROR(try_assign_rhs_noncovering,none,
       "'" TRY_KIND_SELECT(0) "' following assignment operator does not cover "
       "everything to its right", (unsigned))
-
-NOTE(subscript_decl_here,none,
-     "subscript operator declared here", ())
 
 ERROR(broken_bool,none, "type 'Bool' is broken", ())
 
@@ -2590,6 +2576,8 @@ WARNING(guard_always_succeeds,none,
         "'guard' condition is always true, body is unreachable", ())
 
 
+ERROR(expression_unused_closure,none,
+      "closure expression is unused", ())
 ERROR(expression_unused_function,none,
       "expression resolves to an unused function", ())
 ERROR(expression_unused_lvalue,none,
@@ -2679,6 +2667,8 @@ ERROR(trailing_closure_requires_parens,none,
       "trailing closure requires parentheses for disambiguation in this"
       " context", ())
 
+ERROR(empty_switch_stmt,none,
+"'switch' statement body must have at least one 'case' or 'default' block",())
 //------------------------------------------------------------------------------
 // Type Check Patterns
 //------------------------------------------------------------------------------
@@ -3368,9 +3358,22 @@ ERROR(designated_init_in_extension_resilient,none,
       "non-'@_fixed_layout' type %0 must delegate to another initializer", (Type))
 
 ERROR(designated_init_inlineable_resilient,none,
-      "initializer of non-'@_fixed_layout' type %0 is "
+      "initializer for non-'@_fixed_layout' type %0 is "
       "'%select{@_transparent|@inline(__always)|@_inlineable|%error}1' and must "
       "delegate to another initializer", (Type, unsigned))
+
+ERROR(class_designated_init_inlineable_resilient,none,
+      "initializer for class %0 is "
+      "'%select{@_transparent|@inline(__always)|@_inlineable|%error}1' and must "
+      "delegate to another initializer", (Type, unsigned))
+
+ERROR(inlineable_stored_property,
+      none, "'@_inlineable' attribute cannot be applied to stored properties", ())
+
+ERROR(inlineable_decl_not_public,
+      none, "'@_inlineable' attribute can only be applied to public declarations, "
+      "but %0 is %select{private|fileprivate|internal|%error|%error}1",
+      (Identifier, Accessibility))
 
 //------------------------------------------------------------------------------
 // @_specialize diagnostics
@@ -3431,10 +3434,6 @@ WARNING(variable_never_mutated, none,
 WARNING(variable_never_read, none,
         "%select{variable|parameter}1 %0 was written to, but never read",
         (Identifier, unsigned))
-
-WARNING(extraneous_default_args_in_call, none,
-        "call to %0 has extraneous arguments that could use defaults",
-        (DeclName))
 
 //------------------------------------------------------------------------------
 // Circular reference diagnostics

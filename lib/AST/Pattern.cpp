@@ -117,7 +117,7 @@ Type Pattern::getType() const {
 
     if (auto genericEnv = dc->getGenericEnvironmentOfContext()) {
       ctx.DelayedPatternContexts.erase(this);
-      Ty = genericEnv->mapTypeIntoContext(dc->getParentModule(), Ty);
+      Ty = genericEnv->mapTypeIntoContext(Ty);
       PatternBits.hasInterfaceType = false;
     }
   }

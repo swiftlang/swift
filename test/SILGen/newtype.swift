@@ -21,9 +21,11 @@ func createErrorDomain(str: String) -> ErrorDomain {
 // CHECK-RAW: [[SELF:%[0-9]+]] = project_box [[SELF_BOX]]
 // CHECK-RAW: [[UNINIT_SELF:%[0-9]+]] = mark_uninitialized [rootself] [[SELF]]
 // CHECK-RAW: [[BRIDGE_FN:%[0-9]+]] = function_ref @{{.*}}_bridgeToObjectiveC
-// CHECK-RAW: [[BRIDGED:%[0-9]+]] = apply [[BRIDGE_FN]]([[STR]])
+// CHECK-RAW: [[BORROWED_STR:%.*]] = begin_borrow [[STR]]
+// CHECK-RAW: [[BRIDGED:%[0-9]+]] = apply [[BRIDGE_FN]]([[BORROWED_STR]])
 // CHECK-RAW: [[RAWVALUE_ADDR:%[0-9]+]] = struct_element_addr [[UNINIT_SELF]]
 // CHECK-RAW: assign [[BRIDGED]] to [[RAWVALUE_ADDR]]
+// CHECK-RAW: end_borrow [[BORROWED_STR]] from [[STR]]
 
 func getRawValue(ed: ErrorDomain) -> String {
   return ed.rawValue
@@ -41,8 +43,8 @@ func getRawValue(ed: ErrorDomain) -> String {
 // CHECK-RAW: return [[STRING_RESULT]]
 
 class ObjCTest {
-  // CHECK-RAW-LABEL: sil hidden @_T07newtype8ObjCTestC19optionalPassThroughSC11ErrorDomainVSgAFSgF : $@convention(method) (@owned Optional<ErrorDomain>, @guaranteed ObjCTest) -> @owned Optional<ErrorDomain> {
-  // CHECK-RAW: sil hidden [thunk] @_T07newtype8ObjCTestC19optionalPassThroughSC11ErrorDomainVSgAFSgFTo : $@convention(objc_method) (Optional<ErrorDomain>, ObjCTest) -> Optional<ErrorDomain> {
+  // CHECK-RAW-LABEL: sil hidden @_T07newtype8ObjCTestC19optionalPassThroughSC11ErrorDomainVSgAGF : $@convention(method) (@owned Optional<ErrorDomain>, @guaranteed ObjCTest) -> @owned Optional<ErrorDomain> {
+  // CHECK-RAW: sil hidden [thunk] @_T07newtype8ObjCTestC19optionalPassThroughSC11ErrorDomainVSgAGFTo : $@convention(objc_method) (Optional<ErrorDomain>, ObjCTest) -> Optional<ErrorDomain> {
   @objc func optionalPassThrough(_ ed: ErrorDomain?) -> ErrorDomain? {
     return ed
   }  

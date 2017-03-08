@@ -37,23 +37,21 @@ protocol ABO : A, B, O { func abo() }
 // CHECK: }
 
 // -- @objc protocol O uses ObjC symbol mangling and layout
-// CHECK: @_PROTOCOL__TtP17protocol_metadata1O_ = private constant { {{.*}} i32, { [1 x i8*] }*, i8*, i8* } {
-// CHECK:   @_PROTOCOL_INSTANCE_METHODS__TtP17protocol_metadata1O_,
+// CHECK: @_PROTOCOL__TtP17protocol_metadata1O_ = private constant { {{.*}} i32, [1 x i8*]*, i8*, i8* } {
+// CHECK-SAME:   @_PROTOCOL_INSTANCE_METHODS__TtP17protocol_metadata1O_,
 // -- size, flags: 1 = Swift
-// CHECK:   i32 96, i32 1
-// CHECK: }
-// CHECK: @_PROTOCOL_METHOD_TYPES__TtP17protocol_metadata1O_
-// CHECK: }
+// CHECK-SAME:   i32 96, i32 1
+// CHECK-SAME: @_PROTOCOL_METHOD_TYPES__TtP17protocol_metadata1O_
+// CHECK-SAME: }
 
 // -- @objc protocol OPT uses ObjC symbol mangling and layout
-// CHECK: @_PROTOCOL__TtP17protocol_metadata3OPT_ = private constant { {{.*}} i32, { [4 x i8*] }*, i8*, i8* } {
-// CHECK:   @_PROTOCOL_INSTANCE_METHODS_OPT__TtP17protocol_metadata3OPT_,
-// CHECK:   @_PROTOCOL_CLASS_METHODS_OPT__TtP17protocol_metadata3OPT_,
+// CHECK: @_PROTOCOL__TtP17protocol_metadata3OPT_ = private constant { {{.*}} i32, [4 x i8*]*, i8*, i8* } {
+// CHECK-SAME:   @_PROTOCOL_INSTANCE_METHODS_OPT__TtP17protocol_metadata3OPT_,
+// CHECK-SAME:   @_PROTOCOL_CLASS_METHODS_OPT__TtP17protocol_metadata3OPT_,
 // -- size, flags: 1 = Swift
-// CHECK:   i32 96, i32 1
-// CHECK: }
-// CHECK: @_PROTOCOL_METHOD_TYPES__TtP17protocol_metadata3OPT_
-// CHECK: }
+// CHECK-SAME:   i32 96, i32 1
+// CHECK-SAME: @_PROTOCOL_METHOD_TYPES__TtP17protocol_metadata3OPT_
+// CHECK-SAME: }
 
 // -- inheritance lists for refined protocols
 
@@ -77,7 +75,7 @@ protocol ABO : A, B, O { func abo() }
 
 func reify_metadata<T>(_ x: T) {}
 
-// CHECK: define hidden void @_T017protocol_metadata0A6_types{{[_0-9a-zA-Z]*}}F
+// CHECK: define hidden swiftcc void @_T017protocol_metadata0A6_types{{[_0-9a-zA-Z]*}}F
 func protocol_types(_ a: A,
                     abc: A & B & C,
                     abco: A & B & C & O) {

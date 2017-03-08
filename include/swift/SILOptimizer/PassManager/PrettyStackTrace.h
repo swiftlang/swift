@@ -13,6 +13,7 @@
 #ifndef SWIFT_SILOPTIMIZER_PASSMANAGER_PRETTYSTACKTRACE_H
 #define SWIFT_SILOPTIMIZER_PASSMANAGER_PRETTYSTACKTRACE_H
 
+#include "swift/SIL/PrettyStackTrace.h"
 #include "llvm/Support/PrettyStackTrace.h"
 
 namespace swift {
@@ -21,14 +22,14 @@ class SILFunctionTransform;
 class SILModuleTransform;
 
 class PrettyStackTraceSILFunctionTransform
-    : public llvm::PrettyStackTraceEntry {
+    : public PrettyStackTraceSILFunction {
   SILFunctionTransform *SFT;
   unsigned PassNumber;
 
 public:
   PrettyStackTraceSILFunctionTransform(SILFunctionTransform *SFT,
-                                       unsigned PassNumber)
-      : SFT(SFT), PassNumber(PassNumber) {}
+                                       unsigned PassNumber);
+
   virtual void print(llvm::raw_ostream &OS) const;
 };
 

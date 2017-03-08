@@ -247,7 +247,7 @@ modifyCFGForFailurePreds(Optional<BasicBlockCloner> &Cloner) {
     return;
 
   assert(!Cloner.hasValue());
-  Cloner.emplace(BasicBlockCloner(CCBBlock));
+  Cloner.emplace(CCBBlock);
   Cloner->clone();
   SILBasicBlock *TargetFailureBB = Cloner->getDestBB();
   auto *TI = TargetFailureBB->getTerminator();
@@ -284,7 +284,7 @@ modifyCFGForSuccessPreds(Optional<BasicBlockCloner> &Cloner) {
       // Create a copy of the BB as a landing BB.
       // for all SuccessPreds.
       assert(!Cloner.hasValue());
-      Cloner.emplace(BasicBlockCloner(CCBBlock));
+      Cloner.emplace(CCBBlock);
       Cloner->clone();
       SILBasicBlock *TargetSuccessBB = Cloner->getDestBB();
       auto *TI = TargetSuccessBB->getTerminator();

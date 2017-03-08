@@ -130,6 +130,16 @@ DispatchAPI.test("DispatchWallTime.addSubtract") {
 	expectEqual(DispatchWallTime.distantFuture.rawValue - UInt64(1), then.rawValue)
 }
 
+DispatchAPI.test("DispatchTime.uptimeNanos") {
+	let seconds = 1
+	let nowMach = DispatchTime.now()
+	let oneSecondFromNowMach = nowMach + .seconds(seconds)
+	let nowNanos = nowMach.uptimeNanoseconds
+	let oneSecondFromNowNanos = oneSecondFromNowMach.uptimeNanoseconds 
+	let diffNanos = oneSecondFromNowNanos - nowNanos
+	expectEqual(NSEC_PER_SEC, diffNanos)
+}
+
 DispatchAPI.test("DispatchData.copyBytes") {
 	let source1: [UInt8] = [0, 1, 2, 3]
 	let srcPtr1 = UnsafeBufferPointer(start: source1, count: source1.count)
@@ -266,5 +276,28 @@ DispatchAPI.test("DispatchData.copyBytes") {
 	expectEqual(destPtr[3], 0xFF)
 	expectEqual(destPtr[4], 0xFF)
 	expectEqual(destPtr[5], 0xFF)
+}
+
+DispatchAPI.test("DispatchData.buffers") {
+	let bytes = [UInt8(0), UInt8(1), UInt8(2), UInt8(2)]
+	var ptr = UnsafeBufferPointer<UInt8>(start: bytes, count: bytes.count)
+	var data = DispatchData(bytes: ptr)
+	expectEqual(bytes.count, data.count)
+	for i in 0..<data.count {
+		expectEqual(data[i], bytes[i])
+	}
+
+	data = DispatchData(bytesNoCopy: ptr, deallocator: .custom(nil, {}))
+	expectEqual(bytes.count, data.count)
+	for i in 0..<data.count {
+		expectEqual(data[i], bytes[i])
+	}
+
+	ptr = UnsafeBufferPointer<UInt8>(start: nil, count: 0)
+	data = DispatchData(bytes: ptr)
+	expectEqual(data.count, 0)
+
+	data = DispatchData(bytesNoCopy: ptr, deallocator: .custom(nil, {}))
+	expectEqual(data.count, 0)
 }
 

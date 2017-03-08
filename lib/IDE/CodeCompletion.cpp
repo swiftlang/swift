@@ -19,9 +19,9 @@
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/ProtocolConformance.h"
+#include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/USRGeneration.h"
 #include "swift/Basic/Defer.h"
-#include "swift/Basic/Fallthrough.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/ClangImporter/ClangModule.h"
@@ -40,8 +40,9 @@
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringRef.h"
-#include "llvm/Support/SaveAndRestore.h"
+#include "llvm/Support/Compiler.h"
 #include "llvm/Support/raw_ostream.h"
+#include "llvm/Support/SaveAndRestore.h"
 #include <algorithm>
 #include <string>
 
@@ -464,7 +465,7 @@ void CodeCompletionString::print(raw_ostream &OS) const {
     case ChunkKind::Equal:
     case ChunkKind::Whitespace:
       AnnotatedTextChunk = C.isAnnotation();
-      SWIFT_FALLTHROUGH;
+      LLVM_FALLTHROUGH;
     case ChunkKind::CallParameterName:
     case ChunkKind::CallParameterInternalName:
     case ChunkKind::CallParameterColon:
@@ -692,7 +693,7 @@ void CodeCompletionResult::print(raw_ostream &OS) const {
 #define POUND_KEYWORD(X) case CodeCompletionKeywordKind::pound_##X: \
       Prefix.append("[#" #X "]"); \
       break;
-#include "swift/Parse/Tokens.def"
+#include "swift/Syntax/TokenKinds.def"
     }
     break;
   case ResultKind::Pattern:
@@ -1316,44 +1317,46 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks {
   bool DeliveredResults = false;
 
   bool typecheckContextImpl(DeclContext *DC) {
-    // Type check the function that contains the expression.
-    if (DC->getContextKind() == DeclContextKind::AbstractClosureExpr ||
-        DC->getContextKind() == DeclContextKind::AbstractFunctionDecl) {
-      SourceLoc EndTypeCheckLoc = P.Context.SourceMgr.getCodeCompletionLoc();
-      // Find the nearest containing function or nominal decl.
-      DeclContext *DCToTypeCheck = DC;
-      while (!DCToTypeCheck->isModuleContext() &&
-             !isa<AbstractFunctionDecl>(DCToTypeCheck) &&
-             !isa<NominalTypeDecl>(DCToTypeCheck) &&
-             !isa<TopLevelCodeDecl>(DCToTypeCheck))
-        DCToTypeCheck = DCToTypeCheck->getParent();
-      if (auto *AFD = dyn_cast<AbstractFunctionDecl>(DCToTypeCheck)) {
-        // We found a function.  First, type check the nominal decl that
-        // contains the function.  Then type check the function itself.
-        typecheckContextImpl(DCToTypeCheck->getParent());
-        return typeCheckAbstractFunctionBodyUntil(AFD, EndTypeCheckLoc);
-      }
-      if (isa<NominalTypeDecl>(DCToTypeCheck)) {
-        // We found a nominal decl (for example, the closure is used in an
-        // initializer of a property).
-        return typecheckContextImpl(DCToTypeCheck);
-      }
-      if (auto *TLCD = dyn_cast<TopLevelCodeDecl>(DCToTypeCheck)) {
-        return typeCheckTopLevelCodeDecl(TLCD);
-      }
+    // Nothing to type check in module context.
+    if (DC->isModuleScopeContext())
+      return true;
+
+    // Type check the parent context.
+    if (!typecheckContextImpl(DC->getParent()))
       return false;
+
+    // Type-check this context.
+    switch (DC->getContextKind()) {
+    case DeclContextKind::AbstractClosureExpr:
+    case DeclContextKind::Initializer:
+    case DeclContextKind::Module:
+    case DeclContextKind::SerializedLocal:
+      // Nothing to do for these.
+      return true;
+
+    case DeclContextKind::AbstractFunctionDecl:
+      return typeCheckAbstractFunctionBodyUntil(
+                                  cast<AbstractFunctionDecl>(DC),
+                                  P.Context.SourceMgr.getCodeCompletionLoc());
+
+    case DeclContextKind::ExtensionDecl:
+      return typeCheckCompletionDecl(cast<ExtensionDecl>(DC));
+
+    case DeclContextKind::GenericTypeDecl:
+      return typeCheckCompletionDecl(cast<GenericTypeDecl>(DC));
+
+    case DeclContextKind::FileUnit:
+      llvm_unreachable("module scope context handled above");
+
+    case DeclContextKind::SubscriptDecl:
+      // FIXME: what do we need to check here?
+      return true;
+
+    case DeclContextKind::TopLevelCodeDecl:
+      return typeCheckTopLevelCodeDecl(cast<TopLevelCodeDecl>(DC));
     }
-    if (auto *NTD = dyn_cast<NominalTypeDecl>(DC)) {
-      // First, type check the parent DeclContext.
-      typecheckContextImpl(DC->getParent());
-      if (NTD->hasInterfaceType())
-        return true;
-      return typeCheckCompletionDecl(cast<NominalTypeDecl>(DC));
-    }
-    if (auto *TLCD = dyn_cast<TopLevelCodeDecl>(DC)) {
-      return typeCheckTopLevelCodeDecl(TLCD);
-    }
-    return true;
+
+    llvm_unreachable("Unhandled DeclContextKind in switch.");
   }
 
   /// \returns true on success, false on failure.
@@ -2003,12 +2006,13 @@ public:
           return T;
 
         // For everything else, substitute in the base type.
-        auto Subs = MaybeNominalType->getMemberSubstitutions(VD);
+        auto Subs = MaybeNominalType->getMemberSubstitutionMap(M, VD);
 
         // Pass in DesugarMemberTypes so that we see the actual
         // concrete type witnesses instead of type alias types.
-        T = T.subst(M, Subs, (SubstFlags::DesugarMemberTypes |
-                              SubstFlags::UseErrorType));
+        T = T.subst(Subs,
+                    (SubstFlags::DesugarMemberTypes |
+                     SubstFlags::UseErrorType));
       }
     }
 
@@ -3592,6 +3596,7 @@ public:
                                         bool IncludeTopLevel = false,
                                         bool RequestCache = true,
                                         bool LiteralCompletions = true) {
+    ExprType = Type();
     Kind = LookupKind::ValueInDeclContext;
     NeedLeadingDot = false;
     FilteredDeclConsumer Consumer(*this, Filter);
@@ -4666,7 +4671,7 @@ static void addDeclKeywords(CodeCompletionResultSink &Sink) {
   };
 
 #define DECL_KEYWORD(kw) AddKeyword(#kw, CodeCompletionKeywordKind::kw_##kw);
-#include "swift/Parse/Tokens.def"
+#include "swift/Syntax/TokenKinds.def"
 
   // Context-sensitive keywords.
   auto AddCSKeyword = [&](StringRef Name) {
@@ -4700,7 +4705,7 @@ static void addStmtKeywords(CodeCompletionResultSink &Sink, bool MaybeFuncBody) 
     Builder.addTextChunk(Name);
   };
 #define STMT_KEYWORD(kw) AddKeyword(#kw, CodeCompletionKeywordKind::kw_##kw);
-#include "swift/Parse/Tokens.def"
+#include "swift/Syntax/TokenKinds.def"
 
   // Throw is not marked as a STMT_KEYWORD.
   AddKeyword("throw", CodeCompletionKeywordKind::kw_throw);
@@ -4774,7 +4779,7 @@ void CodeCompletionCallbacksImpl::addKeywords(CodeCompletionResultSink &Sink,
   case CompletionKind::StmtOrExpr:
     addDeclKeywords(Sink);
     addStmtKeywords(Sink, MaybeFuncBody);
-    SWIFT_FALLTHROUGH;
+    LLVM_FALLTHROUGH;
   case CompletionKind::AssignmentRHS:
   case CompletionKind::ReturnStmtExpr:
   case CompletionKind::PostfixExprBeginning:
@@ -5180,7 +5185,7 @@ void CodeCompletionCallbacksImpl::doneParsing() {
 
   case CompletionKind::KeyPathExprDot:
     Lookup.setHaveDot(SourceLoc());
-    SWIFT_FALLTHROUGH;
+    LLVM_FALLTHROUGH;
 
   case CompletionKind::KeyPathExpr: {
     Lookup.setIsKeyPathExpr();

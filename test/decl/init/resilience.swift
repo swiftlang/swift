@@ -1,8 +1,10 @@
 // RUN: rm -rf %t && mkdir %t
 // RUN: %target-swift-frontend -emit-module -enable-resilience -emit-module-path=%t/resilient_struct.swiftmodule -module-name=resilient_struct %S/../../Inputs/resilient_struct.swift
+// RUN: %target-swift-frontend -emit-module -enable-resilience -emit-module-path=%t/resilient_protocol.swiftmodule -module-name=resilient_protocol %S/../../Inputs/resilient_protocol.swift
 // RUN: %target-swift-frontend -typecheck -verify -enable-resilience -I %t %s
 
 import resilient_struct
+import resilient_protocol
 
 // Point is @_fixed_layout -- this is OK
 extension Point {
@@ -39,17 +41,17 @@ public struct Animal {
   public let name: String
 
   @_inlineable public init(name: String) {
-  // expected-error@-1 {{initializer of non-'@_fixed_layout' type 'Animal' is '@_inlineable' and must delegate to another initializer}}
+  // expected-error@-1 {{initializer for non-'@_fixed_layout' type 'Animal' is '@_inlineable' and must delegate to another initializer}}
     self.name = name
   }
 
   @inline(__always) public init(dog: String) {
-  // expected-error@-1 {{initializer of non-'@_fixed_layout' type 'Animal' is '@inline(__always)' and must delegate to another initializer}}
+  // expected-error@-1 {{initializer for non-'@_fixed_layout' type 'Animal' is '@inline(__always)' and must delegate to another initializer}}
     self.name = dog
   }
 
   @_transparent public init(cat: String) {
-  // expected-error@-1 {{initializer of non-'@_fixed_layout' type 'Animal' is '@_transparent' and must delegate to another initializer}}
+  // expected-error@-1 {{initializer for non-'@_fixed_layout' type 'Animal' is '@_transparent' and must delegate to another initializer}}
     self.name = cat
   }
 
@@ -61,7 +63,23 @@ public struct Animal {
   // FIXME: This should be allowed, but Sema doesn't distinguish this
   // case from memberwise initialization, and DI explodes the value type
   @_inlineable public init(other: Animal) {
-  // expected-error@-1 {{initializer of non-'@_fixed_layout' type 'Animal' is '@_inlineable' and must delegate to another initializer}}
+  // expected-error@-1 {{initializer for non-'@_fixed_layout' type 'Animal' is '@_inlineable' and must delegate to another initializer}}
+    self = other
+  }
+}
+
+public class Widget {
+  public let name: String
+
+  @_inlineable public init(name: String) {
+    // expected-error@-1 {{initializer for class 'Widget' is '@_inlineable' and must delegate to another initializer}}
+    self.name = name
+  }
+}
+
+// Protocol extension initializers are OK too
+extension OtherResilientProtocol {
+  public init(other: Self) {
     self = other
   }
 }

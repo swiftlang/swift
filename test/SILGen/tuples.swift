@@ -119,11 +119,11 @@ func testTupleUnsplat() {
   // CHECK: enum $GenericEnum<(Int, Int)>, #GenericEnum.one!enumelt.1, [[TUPLE]]
   _ = GenericEnum<(Int, Int)>.one(x, y)
 
-  // CHECK: [[THUNK:%.+]] = function_ref @_T0Si_SitIxi_SiSiIxyy_TR
+  // CHECK: [[THUNK:%.+]] = function_ref @_T0Si_SitIxi_S2iIxyy_TR
   // CHECK: [[REABSTRACTED:%.+]] = partial_apply [[THUNK]]({{%.+}})
   // CHECK: apply [[REABSTRACTED]]([[X]], [[Y]])
   _ = GenericEnum<(Int, Int)>.callback((x, y))
-  // CHECK: [[THUNK:%.+]] = function_ref @_T0Si_SitIxi_SiSiIxyy_TR
+  // CHECK: [[THUNK:%.+]] = function_ref @_T0Si_SitIxi_S2iIxyy_TR
   // CHECK: [[REABSTRACTED:%.+]] = partial_apply [[THUNK]]({{%.+}})
   // CHECK: apply [[REABSTRACTED]]([[X]], [[Y]])
   _ = GenericEnum<(Int, Int)>.callback(x, y)

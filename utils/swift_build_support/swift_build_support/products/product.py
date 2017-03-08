@@ -21,6 +21,16 @@ class Product(object):
         return cls.__name__.lower()
 
     @classmethod
+    def product_source_name(cls):
+        """product_source_name() -> str
+
+        The name of the source code directory of this product.
+        It provides a customization point for Product subclasses. It is set to
+        the value of product_name() by default for this reason.
+        """
+        return cls.product_name()
+
+    @classmethod
     def get_build_directory_name(cls, host_target):
         return "{}-{}".format(cls.product_name(),
                               host_target.name)

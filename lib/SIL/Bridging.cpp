@@ -21,7 +21,6 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/ProtocolConformance.h"
-#include "swift/Basic/Fallthrough.h"
 #include "clang/AST/DeclObjC.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/ErrorHandling.h"
@@ -225,7 +224,7 @@ Type TypeConverter::getLoweredCBridgedType(AbstractionPattern pattern,
     auto conformance = foreignRepresentation.second;
     assert(conformance && "Missing conformance?");
     Type bridgedTy =
-      ProtocolConformance::getTypeWitnessByName(
+      ProtocolConformanceRef::getTypeWitnessByName(
         t, ProtocolConformanceRef(conformance),
         M.getASTContext().Id_ObjectiveCType,
         nullptr);

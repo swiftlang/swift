@@ -14,9 +14,10 @@ class SomeDerivedClass : Parent {
     y = 42
 // CHECK-LABEL: sil hidden @_T030auto_generated_super_init_call16SomeDerivedClassC{{[_0-9a-zA-Z]*}}fc : $@convention(method) (@owned SomeDerivedClass) -> @owned SomeDerivedClass
 // CHECK: integer_literal $Builtin.Int2048, 42
-// CHECK: [[SELFLOAD:%[0-9]+]] = load_borrow [[SELF:%[0-9]+]] : $*SomeDerivedClass
+// CHECK: [[SELFLOAD:%[0-9]+]] = load [take] [[SELF:%[0-9]+]] : $*SomeDerivedClass
 // CHECK-NEXT: [[PARENT:%[0-9]+]] = upcast [[SELFLOAD]] : $SomeDerivedClass to $Parent
-// CHECK: [[INITCALL1:%[0-9]+]] = function_ref @_T030auto_generated_super_init_call6ParentCACycfc : $@convention(method) (@owned Parent) -> @owned Parent
+// CHECK-NEXT: // function_ref
+// CHECK-NEXT: [[INITCALL1:%[0-9]+]] = function_ref @_T030auto_generated_super_init_call6ParentCACycfc : $@convention(method) (@owned Parent) -> @owned Parent
 // CHECK-NEXT: [[RES1:%[0-9]+]] = apply [[INITCALL1]]([[PARENT]])
 // CHECK-NEXT: [[DOWNCAST:%[0-9]+]] = unchecked_ref_cast [[RES1]] : $Parent to $SomeDerivedClass
 // CHECK-NEXT: store [[DOWNCAST]] to [init] [[SELF]] : $*SomeDerivedClass 
@@ -41,15 +42,16 @@ class SomeDerivedClass : Parent {
 // CHECK-LABEL: sil hidden @_T030auto_generated_super_init_call16SomeDerivedClassC{{[_0-9a-zA-Z]*}}fc : $@convention(method) (Bool, @owned SomeDerivedClass) -> @owned SomeDerivedClass    
 // CHECK: bb4:
 // SEMANTIC ARC TODO: Another case of needing a mutable load_borrow.
-// CHECK: [[SELFLOAD:%[0-9]+]] = load_borrow [[SELF:%[0-9]+]] : $*SomeDerivedClass
-// CHECK: [[SELFLOAD_PARENT_CAST:%.*]] = upcast [[SELFLOAD]]
-// CHECK: [[PARENT_INIT:%.*]] = function_ref @_T030auto_generated_super_init_call6ParentCACycfc : $@convention(method) (@owned Parent) -> @owned Parent,
-// CHECK: [[PARENT:%.*]] = apply [[PARENT_INIT]]([[SELFLOAD_PARENT_CAST]])
-// CHECK: [[SELFAGAIN:%.*]] = unchecked_ref_cast [[PARENT]]
-// CHECK: store [[SELFAGAIN]] to [init] [[SELF]]
-// CHECK: [[SELFLOAD:%.*]] = load [copy] [[SELF]]
-// CHECK: destroy_value
-// CHECK: return [[SELFLOAD]]
+// CHECK-NEXT: [[SELFLOAD:%[0-9]+]] = load [take] [[SELF:%[0-9]+]] : $*SomeDerivedClass
+// CHECK-NEXT: [[SELFLOAD_PARENT_CAST:%.*]] = upcast [[SELFLOAD]]
+// CHECK-NEXT: // function_ref
+// CHECK-NEXT: [[PARENT_INIT:%.*]] = function_ref @_T030auto_generated_super_init_call6ParentCACycfc : $@convention(method) (@owned Parent) -> @owned Parent,
+// CHECK-NEXT: [[PARENT:%.*]] = apply [[PARENT_INIT]]([[SELFLOAD_PARENT_CAST]])
+// CHECK-NEXT: [[SELFAGAIN:%.*]] = unchecked_ref_cast [[PARENT]]
+// CHECK-NEXT: store [[SELFAGAIN]] to [init] [[SELF]]
+// CHECK-NEXT: [[SELFLOAD:%.*]] = load [copy] [[SELF]]
+// CHECK-NEXT: destroy_value
+// CHECK-NEXT: return [[SELFLOAD]]
   }
 // CHECK: } // end sil function '_T030auto_generated_super_init_call16SomeDerivedClassC{{[_0-9a-zA-Z]*}}fc'
 

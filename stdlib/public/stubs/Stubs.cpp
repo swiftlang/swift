@@ -64,7 +64,9 @@ static long double swift_strtold_l(const char *nptr,
 #include <xlocale.h>
 #endif
 #include <limits>
+#include <thread>
 #include "llvm/ADT/StringExtras.h"
+#include "llvm/Support/Compiler.h"
 #include "swift/Runtime/Debug.h"
 #include "swift/Basic/Lazy.h"
 
@@ -394,7 +396,13 @@ __muloti4(ti_int a, ti_int b, int* overflow)
 // some other lower-level architecture issue that I'm
 // missing.  Perhaps relevant bug report:
 // FIXME: https://llvm.org/bugs/show_bug.cgi?id=14469
-typedef int di_int __attribute__((__mode__(DI)));
+#if __has_attribute(__mode__)
+#define SWIFT_MODE_DI __attribute__((__mode__(DI)))
+#else
+#define SWIFT_MODE_DI
+#endif
+
+typedef int di_int SWIFT_MODE_DI;
 SWIFT_RUNTIME_STDLIB_INTERFACE
 di_int
 __mulodi4(di_int a, di_int b, int* overflow)
@@ -530,11 +538,5 @@ int swift::_swift_stdlib_putc_stderr(int C) {
 }
 
 size_t swift::_swift_stdlib_getHardwareConcurrency() {
-#if defined(_WIN32)
-  SYSTEM_INFO SystemInfo;
-  GetSystemInfo(&SystemInfo);
-  return SystemInfo.dwNumberOfProcessors;
-#else
-  return sysconf(_SC_NPROCESSORS_ONLN);
-#endif
+  return std::thread::hardware_concurrency();
 }

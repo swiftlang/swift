@@ -197,6 +197,10 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   }
 
   bool visitAbstractTypeParamDecl(AbstractTypeParamDecl *TPD) {
+    for (auto Inherit: TPD->getInherited()) {
+      if (doIt(Inherit))
+        return true;
+    }
     return false;
   }
 
@@ -207,10 +211,6 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
       for (auto GP : NTD->getGenericParams()->getParams()) {
         if (doIt(GP))
           return true;
-        for(auto Inherit: GP->getInherited()) {
-          if (doIt(Inherit))
-            return true;
-        }
       }
       // Visit param conformance
       for (auto &Req : NTD->getGenericParams()->getRequirements()) {
@@ -266,10 +266,6 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
       for (auto &P : AFD->getGenericParams()->getParams()) {
         if (doIt(P))
           return true;
-        for (auto Inherit : P->getInherited()) {
-          if (doIt(Inherit))
-            return true;
-        }
       }
 
       // Visit param conformance
@@ -660,8 +656,8 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
         return nullptr;
     }
 
-    Expr *body = expr->getClosureBody();
-    if ((body = doIt(body)))
+    ClosureExpr *body = expr->getClosureBody();
+    if ((body = cast_or_null<ClosureExpr>(doIt(body))))
       expr->setClosureBody(body);
     else
       return nullptr;

@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 @_exported import Foundation // Clang module
+import _SwiftFoundationOverlayShims
 
 extension IndexSet.Index {
     public static func ==(lhs: IndexSet.Index, rhs: IndexSet.Index) -> Bool {
@@ -785,7 +786,7 @@ extension IndexSet : CustomStringConvertible, CustomDebugStringConvertible, Cust
 
     public var customMirror: Mirror {
         var c: [(label: String?, value: Any)] = []
-        c.append((label: "ranges", value: rangeView.map { $0 }))
+        c.append((label: "ranges", value: Array(rangeView)))
         return Mirror(self, children: c, displayStyle: Mirror.DisplayStyle.struct)
     }
 }
@@ -897,15 +898,6 @@ extension NSIndexSet : _HasCustomAnyHashableRepresentation {
     }
 }
 
-@_silgen_name("__NSIndexSetRangeCount")
-internal func __NSIndexSetRangeCount(_ indexSet: NSIndexSet) -> UInt
-
-@_silgen_name("__NSIndexSetRangeAtIndex")
-internal func __NSIndexSetRangeAtIndex(_ indexSet: NSIndexSet, _ index: UInt, _ location : UnsafeMutablePointer<UInt>, _ length : UnsafeMutablePointer<UInt>)
-
-@_silgen_name("__NSIndexSetIndexOfRangeContainingIndex")
-internal func __NSIndexSetIndexOfRangeContainingIndex(_ indexSet: NSIndexSet, _ index: UInt) -> UInt
-
 // MARK: Protocol
 
 // TODO: This protocol should be replaced with a native Swift object like the other Foundation bridged types. However, NSIndexSet does not have an abstract zero-storage base class like NSCharacterSet, NSData, and NSAttributedString. Therefore the same trick of laying it out with Swift ref counting does not work.and
@@ -956,7 +948,7 @@ private final class _MutablePairHandle<ImmutableType : NSObject, MutableType : N
             return try whatToDo(i)
         case .Mutable(let m):
             // TODO: It should be possible to reflect the constraint that MutableType is a subtype of ImmutableType in the generics for the class, but I haven't figured out how yet. For now, cheat and unsafe bit cast.
-            return try whatToDo(unsafeBitCast(m, to: ImmutableType.self))
+            return try whatToDo(unsafeDowncast(m, to: ImmutableType.self))
         }
     }
     
@@ -966,7 +958,7 @@ private final class _MutablePairHandle<ImmutableType : NSObject, MutableType : N
             return i
         case .Mutable(let m):
             // TODO: It should be possible to reflect the constraint that MutableType is a subtype of ImmutableType in the generics for the class, but I haven't figured out how yet. For now, cheat and unsafe bit cast.
-            return unsafeBitCast(m, to: ImmutableType.self)
+            return unsafeDowncast(m, to: ImmutableType.self)
         }
     }
 }

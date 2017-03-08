@@ -13,7 +13,6 @@
 #define DEBUG_TYPE "arc-sequence-opts"
 
 #include "RCStateTransition.h"
-#include "swift/Basic/Fallthrough.h"
 #include "swift/SIL/SILInstruction.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/Support/Debug.h"

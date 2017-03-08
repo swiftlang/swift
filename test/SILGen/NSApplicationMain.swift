@@ -15,7 +15,7 @@ class MyDelegate: NSApplicationDelegate {}
 // CHECK-LABEL: sil @main
 // CHECK:         function_ref @NSApplicationMain
 // IR-LABEL: define{{( protected)?}} i32 @main
-// IR:            call i32 @NSApplicationMain
+// IR:            call swiftcc i32 @NSApplicationMain
 
 #if REFERENCE
 // Ensure that we coexist with normal references to the functions we

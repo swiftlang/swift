@@ -49,3 +49,48 @@ std::string IRGenMangler::manglePartialApplyForwarder(StringRef FuncName) {
   appendOperator("TA");
   return finalize();
 }
+
+std::string IRGenMangler::mangleTypeForReflection(Type Ty,
+                                                  ModuleDecl *Module,
+                                                  bool isSingleFieldOfBox) {
+  Mod = Module;
+  OptimizeProtocolNames = false;
+  appendType(Ty);
+  if (isSingleFieldOfBox)
+    appendOperator("Xb");
+  return finalize();
+}
+
+std::string IRGenMangler::mangleTypeForLLVMTypeName(CanType Ty) {
+  // To make LLVM IR more readable we always add a 'T' prefix so that type names
+  // don't start with a digit and don't need to be quoted.
+  Buffer << 'T';
+  if (auto P = dyn_cast<ProtocolType>(Ty)) {
+    appendProtocolName(P->getDecl());
+    appendOperator("P");
+  } else {
+    appendType(Ty);
+  }
+  return finalize();
+}
+
+std::string IRGenMangler::
+mangleProtocolForLLVMTypeName(ProtocolCompositionType *type) {
+  SmallVector<ProtocolDecl *, 4> protocols;
+  type->getAnyExistentialTypeProtocols(protocols);
+
+  if (protocols.empty()) {
+    Buffer << "Any";
+  } else {
+    // To make LLVM IR more readable we always add a 'T' prefix so that type names
+    // don't start with a digit and don't need to be quoted.
+    Buffer << 'T';
+    for (unsigned i = 0, e = protocols.size(); i != e; ++i) {
+      appendProtocolName(protocols[i]);
+      if (i == 0)
+        appendOperator("_");
+    }
+    appendOperator("p");
+  }
+  return finalize();
+}

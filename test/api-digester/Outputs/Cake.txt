@@ -7,8 +7,8 @@
 Func S1.foo5(x:y:) has been renamed to Func S1.foo5(x:y:z:)
 
 /* Type Changes */
-Constructor S1.init(_:) has 1st parameter type change from Int to Double
-Func C1.foo2(_:) has 1st parameter type change from Int to () -> ()
+Constructor S1.init(_:) has parameter 0 type change from Int to Double
+Func C1.foo2(_:) has parameter 0 type change from Int to () -> ()
 
 /* Decl Attribute changes */
 Var C1.CIIns1 changes from weak to strong

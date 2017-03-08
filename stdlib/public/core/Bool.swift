@@ -78,6 +78,9 @@ public struct Bool {
   @_transparent
   internal init(_ v: Builtin.Int1) { self._value = v }
   
+  /// Creates an instance equal to the given Boolean value.
+  ///
+  /// - Parameter value: The Boolean value to copy.
   public init(_ value: Bool) {
     self = value
   }
@@ -155,6 +158,12 @@ extension Bool : Equatable, Hashable {
 }
 
 extension Bool : LosslessStringConvertible {
+  /// Creates a new Boolean value from the given string.
+  ///
+  /// If `description` is any string other than `"true"` or `"false"`, the
+  /// result is `nil`. This initializer is case sensitive.
+  ///
+  /// - Parameter description: A string representation of the Boolean value.
   public init?(_ description: String) {
     if description == "true" {
       self = true

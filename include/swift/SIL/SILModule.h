@@ -72,6 +72,18 @@ enum class SILStage {
   /// dataflow errors, and some instructions must be canonicalized to simpler
   /// forms.
   Canonical,
+
+  /// \brief Lowered SIL, which has been prepared for IRGen and will no longer
+  /// be passed to canonical SIL transform passes.
+  ///
+  /// In lowered SIL, the SILType of all SILValues is its SIL storage
+  /// type. Explicit storage is required for all address-only and resilient
+  /// types.
+  ///
+  /// Generating the initial Raw SIL is typically referred to as lowering (from
+  /// the AST). To disambiguate, refer to the process of generating the lowered
+  /// stage of SIL as "address lowering".
+  Lowered,
 };
 
 /// \brief A SIL module. The SIL module owns all of the SILFunctions generated
@@ -430,12 +442,16 @@ public:
   bool linkFunction(StringRef Name,
                     LinkingMode LinkAll = LinkingMode::LinkNormal);
 
-  /// Check if a given function exists in the module,
-  /// i.e. it can be linked by linkFunction.
+  /// Check if a given function exists in any of the modules with a
+  /// required linkage, i.e. it can be linked by linkFunction.
   ///
   /// \return null if this module has no such function. Otherwise
   /// the declaration of a function.
-  SILFunction *hasFunction(StringRef Name, SILLinkage Linkage);
+  SILFunction *findFunction(StringRef Name, SILLinkage Linkage);
+
+  /// Check if a given function exists in any of the modules.
+  /// i.e. it can be linked by linkFunction.
+  bool hasFunction(StringRef Name);
 
   /// Link in all Witness Tables in the module.
   void linkAllWitnessTables();
@@ -486,7 +502,7 @@ public:
       Inline_t inlineStrategy = InlineDefault,
       EffectsKind EK = EffectsKind::Unspecified,
       SILFunction *InsertBefore = nullptr,
-      const SILDebugScope *DebugScope = nullptr, DeclContext *DC = nullptr);
+      const SILDebugScope *DebugScope = nullptr);
 
   /// Look up the SILWitnessTable representing the lowering of a protocol
   /// conformance, and collect the substitutions to apply to the referenced
@@ -623,6 +639,14 @@ public:
   /// \returns Returns builtin info of BuiltinValueKind::None kind if the
   /// declaration is not a builtin.
   const BuiltinInfo &getBuiltinInfo(Identifier ID);
+
+  /// Returns true if the builtin or intrinsic is no-return.
+  bool isNoReturnBuiltinOrIntrinsic(Identifier Name);
+
+  /// Returns true if the default atomicity of the module is Atomic.
+  bool isDefaultAtomic() const {
+    return ! getOptions().AssumeSingleThreaded;
+  }
 };
 
 inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, const SILModule &M){

@@ -17,6 +17,7 @@
 #include "swift/Basic/UUID.h"
 #include "swift/AST/Identifier.h"
 #include "llvm/ADT/StringRef.h"
+#include "llvm/Support/raw_ostream.h"
 #include "swift/AST/PrintOptions.h"
 
 namespace swift {
@@ -31,6 +32,8 @@ namespace swift {
   class ExtensionDecl;
   class NominalTypeDecl;
   class ValueDecl;
+  class SourceLoc;
+  enum class tok;
 
 /// Describes the context in which a name is being printed, which
 /// affects the keywords that need to be escaped.
@@ -297,6 +300,16 @@ bool shouldPrint(const Decl *D, PrintOptions &Options);
 bool shouldPrintPattern(const Pattern *P, PrintOptions &Options);
 
 void printContext(raw_ostream &os, DeclContext *dc);
+
+bool printRequirementStub(ValueDecl *Requirement, DeclContext *Adopter,
+                          Type AdopterTy, SourceLoc TypeLoc, raw_ostream &OS);
+
+/// Print a keyword or punctuator directly by its kind.
+llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, tok keyword);
+
+/// Get the length of a keyword or punctuator by its kind.
+uint8_t getKeywordLen(tok keyword);
+
 } // namespace swift
 
 #endif // LLVM_SWIFT_AST_ASTPRINTER_H

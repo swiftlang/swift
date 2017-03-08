@@ -31,7 +31,7 @@ enum class AvailabilitySpecKind {
     /// A platform-version constraint of the form "PlatformName X.Y.Z"
     PlatformVersionConstraint,
 
-    /// A wildcard constraint, spelled '*', that is be equivalent
+    /// A wildcard constraint, spelled '*', that is equivalent
     /// to CurrentPlatformName >= MinimumDeploymentTargetVersion
     OtherPlatform,
 

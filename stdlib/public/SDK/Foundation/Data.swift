@@ -31,18 +31,11 @@ internal func __NSDataInvokeDeallocatorFree(_ mem: UnsafeMutableRawPointer, _ le
 #else
 
 @_exported import Foundation // Clang module
+import _SwiftFoundationOverlayShims
+import _SwiftCoreFoundationOverlayShims
 
-@_silgen_name("__NSDataInvokeDeallocatorVM")
-internal func __NSDataInvokeDeallocatorVM(_ mem: UnsafeMutableRawPointer, _ length: Int)
-
-@_silgen_name("__NSDataInvokeDeallocatorUnmap")
-internal func __NSDataInvokeDeallocatorUnmap(_ mem: UnsafeMutableRawPointer, _ length: Int)
-
-@_silgen_name("__NSDataInvokeDeallocatorFree")
-internal func __NSDataInvokeDeallocatorFree(_ mem: UnsafeMutableRawPointer, _ length: Int)
-
-@_silgen_name("_NSWriteDataToFile_Swift")
-internal func _NSWriteDataToFile_Swift(url: NSURL, data: NSData, options: UInt, error: NSErrorPointer) -> Bool
+@_silgen_name("__NSDataWriteToURL")
+internal func __NSDataWriteToURL(_ data: NSData, _ url: NSURL, _ options: UInt, _ error: NSErrorPointer) -> Bool
 
 #endif
 
@@ -83,7 +76,7 @@ public final class _DataStorage {
         var dest = dest_
         var source = source_
         var num = num_
-        if _DataStorage.vmOpsThreshold <= num && ((unsafeBitCast(source, to: Int.self) | unsafeBitCast(dest, to: Int.self)) & (NSPageSize() - 1)) == 0 {
+        if _DataStorage.vmOpsThreshold <= num && ((unsafeBitCast(source, to: Int.self) | Int(bitPattern: dest)) & (NSPageSize() - 1)) == 0 {
             let pages = NSRoundDownToMultipleOfPageSize(num)
             NSCopyMemoryPages(source!, dest, pages)
             source = source!.advanced(by: pages)
@@ -678,34 +671,66 @@ public final class _DataStorage {
     }
     
     @inline(__always)
-    public func mutableCopy() -> _DataStorage {
+    public func mutableCopy(_ range: Range<Int>) -> _DataStorage {
         switch _backing {
         case .swift:
-            return _DataStorage(bytes: _bytes, length: _length, copy: true, deallocator: nil)
+            return _DataStorage(bytes: _bytes?.advanced(by: range.lowerBound), length: range.count, copy: true, deallocator: nil)
         case .immutable(let d):
-            return _DataStorage(mutableReference: d.mutableCopy() as! NSMutableData)
+            if range.lowerBound == 0 && range.upperBound == _length {
+                return _DataStorage(mutableReference: d.mutableCopy() as! NSMutableData)
+            } else {
+                return _DataStorage(mutableReference: d.subdata(with: NSRange(location: range.lowerBound, length: range.count))._bridgeToObjectiveC().mutableCopy() as! NSMutableData)
+            }
         case .mutable(let d):
-            return _DataStorage(mutableReference: d.mutableCopy() as! NSMutableData)
+            if range.lowerBound == 0 && range.upperBound == _length {
+                return _DataStorage(mutableReference: d.mutableCopy() as! NSMutableData)
+            } else {
+                return _DataStorage(mutableReference: d.subdata(with: NSRange(location: range.lowerBound, length: range.count))._bridgeToObjectiveC().mutableCopy() as! NSMutableData)
+            }
         case .customReference(let d):
-            return _DataStorage(customMutableReference: d.mutableCopy() as! NSMutableData)
+            if range.lowerBound == 0 && range.upperBound == _length {
+                return _DataStorage(mutableReference: d.mutableCopy() as! NSMutableData)
+            } else {
+                return _DataStorage(mutableReference: d.subdata(with: NSRange(location: range.lowerBound, length: range.count))._bridgeToObjectiveC().mutableCopy() as! NSMutableData)
+            }
         case .customMutableReference(let d):
-            return _DataStorage(customMutableReference: d.mutableCopy() as! NSMutableData)
+            if range.lowerBound == 0 && range.upperBound == _length {
+                return _DataStorage(mutableReference: d.mutableCopy() as! NSMutableData)
+            } else {
+                return _DataStorage(mutableReference: d.subdata(with: NSRange(location: range.lowerBound, length: range.count))._bridgeToObjectiveC().mutableCopy() as! NSMutableData)
+            }
         }
     }
     
-    public func withInteriorPointerReference<T>(_ work: (NSData) throws -> T) rethrows -> T {
+    public func withInteriorPointerReference<T>(_ range: Range<Int>, _ work: (NSData) throws -> T) rethrows -> T {
         switch _backing {
         case .swift:
-            let d = _bytes == nil ? NSData() : NSData(bytesNoCopy: _bytes!, length: _length, freeWhenDone: false)
+            let d = _bytes == nil ? NSData() : NSData(bytesNoCopy: _bytes!.advanced(by: range.lowerBound), length: range.count, freeWhenDone: false)
             return try work(d)
         case .immutable(let d):
-            return try work(d)
+            if range.lowerBound == 0 && range.upperBound == _length {
+                return try work(d)
+            } else {
+                return try work(d.subdata(with: NSRange(location: range.lowerBound, length: range.count))._bridgeToObjectiveC())
+            }
         case .mutable(let d):
-            return try work(d)
+            if range.lowerBound == 0 && range.upperBound == _length {
+                return try work(d)
+            } else {
+                return try work(d.subdata(with: NSRange(location: range.lowerBound, length: range.count))._bridgeToObjectiveC())
+            }
         case .customReference(let d):
-            return try work(d)
+            if range.lowerBound == 0 && range.upperBound == _length {
+                return try work(d)
+            } else {
+                return try work(d.subdata(with: NSRange(location: range.lowerBound, length: range.count))._bridgeToObjectiveC())
+            }
         case .customMutableReference(let d):
-            return try work(d)
+            if range.lowerBound == 0 && range.upperBound == _length {
+                return try work(d)
+            } else {
+                return try work(d.subdata(with: NSRange(location: range.lowerBound, length: range.count))._bridgeToObjectiveC())
+            }
         }
     }
     
@@ -723,71 +748,6 @@ public final class _DataStorage {
             // Because this is returning an object that may be mutated in the future it needs to create a copy to prevent
             // any further mutations out from under the receiver
             return d.copy() as! NSData
-        }
-    }
-    
-    public static func ==(_ lhs: _DataStorage, _ rhs: _DataStorage) -> Bool {
-        switch (lhs._backing, rhs._backing) {
-        case (.swift, .customReference(let d)):
-            return lhs.withInteriorPointerReference {
-                return $0.isEqual(d)
-            }
-        case (.swift, .customMutableReference(let d)):
-            return lhs.withInteriorPointerReference {
-                return $0.isEqual(d)
-            }
-        case (.immutable(let d1), .customReference(let d2)):
-            return d1.isEqual(d2)
-        case (.immutable(let d1), .customMutableReference(let d2)):
-            return d1.isEqual(d2)
-        case (.mutable(let d1), .customReference(let d2)):
-            return d1.isEqual(d2)
-        case (.mutable(let d1), .customMutableReference(let d2)):
-            return d1.isEqual(d2)
-        case (.customReference(let d), .swift):
-            return rhs.withInteriorPointerReference {
-                return d.isEqual($0)
-            }
-        case (.customReference(let d1), .immutable):
-            return rhs.withInteriorPointerReference {
-                return d1.isEqual($0)
-            }
-        case (.customReference(let d1), .mutable):
-            return rhs.withInteriorPointerReference {
-                return d1.isEqual($0)
-            }
-        case (.customReference(let d1), .customReference(let d2)):
-            return d1.isEqual(d2)
-        case (.customReference(let d1), .customMutableReference(let d2)):
-            return d1.isEqual(d2)
-        case (.customMutableReference(let d), .swift):
-            return rhs.withInteriorPointerReference {
-                return d.isEqual($0)
-            }
-        case (.customMutableReference(let d1), .immutable):
-            return rhs.withInteriorPointerReference {
-                return d1.isEqual($0)
-            }
-        case (.customMutableReference(let d1), .mutable):
-            return rhs.withInteriorPointerReference {
-                return d1.isEqual($0)
-            }
-        case (.customMutableReference(let d1), .customReference(let d2)):
-            return d1.isEqual(d2)
-        case (.customMutableReference(let d1), .customMutableReference(let d2)):
-            return d1.isEqual(d2)
-        default:
-            let length1 = lhs.length
-            if length1 != rhs.length {
-                return false
-            }
-            if lhs.bytes == rhs.bytes {
-                return true
-            }
-            if length1 > 0 {
-                return memcmp(lhs._bytes!, rhs._bytes!, length1) == 0
-            }
-            return true
         }
     }
     
@@ -872,9 +832,10 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
     
     public typealias Index = Int
     public typealias Indices = CountableRange<Int>
-
-    @_versioned
-    internal var _backing : _DataStorage
+    
+    @_versioned internal var _backing : _DataStorage
+    @_versioned internal var _sliceRange: Range<Index>
+    
     
     // A standard or custom deallocator for `Data`.
     ///
@@ -914,11 +875,11 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
 #else
             switch self {
             case .virtualMemory:
-                return { __NSDataInvokeDeallocatorVM($0, $1) }
+                return { NSDataDeallocatorVM($0, UInt($1)) }
             case .unmap:
-                return { __NSDataInvokeDeallocatorUnmap($0, $1) }
+                return { NSDataDeallocatorUnmap($0, UInt($1)) }
             case .free:
-                return { __NSDataInvokeDeallocatorFree($0, $1) }
+                return { NSDataDeallocatorFree($0, UInt($1)) }
             case .none:
                 return { _, _ in }
             case .custom(let b):
@@ -939,38 +900,47 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
     /// - parameter count: The number of bytes to copy.
     public init(bytes: UnsafeRawPointer, count: Int) {
         _backing = _DataStorage(bytes: bytes, length: count)
+        _sliceRange = 0..<count
     }
     
     /// Initialize a `Data` with copied memory content.
     ///
     /// - parameter buffer: A buffer pointer to copy. The size is calculated from `SourceType` and `buffer.count`.
     public init<SourceType>(buffer: UnsafeBufferPointer<SourceType>) {
-        _backing = _DataStorage(bytes: buffer.baseAddress, length: MemoryLayout<SourceType>.stride * buffer.count)
+        let count = MemoryLayout<SourceType>.stride * buffer.count
+        _backing = _DataStorage(bytes: buffer.baseAddress, length: count)
+        _sliceRange = 0..<count
     }
     
     /// Initialize a `Data` with copied memory content.
     ///
     /// - parameter buffer: A buffer pointer to copy. The size is calculated from `SourceType` and `buffer.count`.
     public init<SourceType>(buffer: UnsafeMutableBufferPointer<SourceType>) {
-        _backing = _DataStorage(bytes: buffer.baseAddress, length: MemoryLayout<SourceType>.stride * buffer.count)
+        let count = MemoryLayout<SourceType>.stride * buffer.count
+        _backing = _DataStorage(bytes: buffer.baseAddress, length: count)
+        _sliceRange = 0..<count
     }
     
     /// Initialize a `Data` with the contents of an Array.
     ///
     /// - parameter bytes: An array of bytes to copy.
     public init(bytes: Array<UInt8>) {
+        let count = bytes.count
         _backing = bytes.withUnsafeBufferPointer {
-            return _DataStorage(bytes: $0.baseAddress, length: $0.count)
+            return _DataStorage(bytes: $0.baseAddress, length: count)
         }
+        _sliceRange = 0..<count
     }
     
     /// Initialize a `Data` with the contents of an Array.
     ///
     /// - parameter bytes: An array of bytes to copy.
     public init(bytes: ArraySlice<UInt8>) {
+        let count = bytes.count
         _backing = bytes.withUnsafeBufferPointer {
-            return _DataStorage(bytes: $0.baseAddress, length: $0.count)
+            return _DataStorage(bytes: $0.baseAddress, length: count)
         }
+        _sliceRange = 0..<count
     }
 
     /// Initialize a `Data` with a repeating byte pattern
@@ -995,6 +965,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
     /// - parameter capacity: The size of the data.
     public init(capacity: Int) {
         _backing = _DataStorage(capacity: capacity)
+        _sliceRange = 0..<0
     }
     
     /// Initialize a `Data` with the specified count of zeroed bytes.
@@ -1002,11 +973,13 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
     /// - parameter count: The number of bytes the data initially contains.
     public init(count: Int) {
         _backing = _DataStorage(length: count)
+        _sliceRange = 0..<count
     }
     
     /// Initialize an empty `Data`.
     public init() {
         _backing = _DataStorage(length: 0)
+        _sliceRange = 0..<0
     }
     
     
@@ -1019,6 +992,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
     public init(bytesNoCopy bytes: UnsafeMutableRawPointer, count: Int, deallocator: Deallocator) {
         let whichDeallocator = deallocator._deallocator
         _backing = _DataStorage(bytes: bytes, length: count, copy: false, deallocator: whichDeallocator)
+        _sliceRange = 0..<count
     }
     
     /// Initialize a `Data` with the contents of a `URL`.
@@ -1027,7 +1001,9 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
     /// - parameter options: Options for the read operation. Default value is `[]`.
     /// - throws: An error in the Cocoa domain, if `url` cannot be read.
     public init(contentsOf url: URL, options: Data.ReadingOptions = []) throws {
-        _backing = _DataStorage(immutableReference: try NSData(contentsOf: url, options: ReadingOptions(rawValue: options.rawValue)))
+        let d = try NSData(contentsOf: url, options: ReadingOptions(rawValue: options.rawValue))
+        _backing = _DataStorage(immutableReference: d)
+        _sliceRange = 0..<d.length
     }
     
     /// Initialize a `Data` from a Base-64 encoded String using the given options.
@@ -1038,6 +1014,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
     public init?(base64Encoded base64String: String, options: Data.Base64DecodingOptions = []) {
         if let d = NSData(base64Encoded: base64String, options: Base64DecodingOptions(rawValue: options.rawValue)) {
             _backing = _DataStorage(immutableReference: d)
+            _sliceRange = 0..<d.length
         } else {
             return nil
         }
@@ -1052,6 +1029,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
     public init?(base64Encoded base64Data: Data, options: Data.Base64DecodingOptions = []) {
         if let d = NSData(base64Encoded: base64Data, options: Base64DecodingOptions(rawValue: options.rawValue)) {
             _backing = _DataStorage(immutableReference: d)
+            _sliceRange = 0..<d.length
         } else {
             return nil
         }
@@ -1072,10 +1050,18 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
 #endif
         if providesConcreteBacking {
             _backing = _DataStorage(immutableReference: reference.copy() as! NSData)
+            _sliceRange = 0..<reference.length
         } else {
             _backing = _DataStorage(customReference: reference.copy() as! NSData)
+            _sliceRange = 0..<reference.length
         }
 
+    }
+    
+    @_versioned
+    internal init(backing: _DataStorage, range: Range<Index>) {
+        _backing = backing
+        _sliceRange = range
     }
     
     // -----------------------------------
@@ -1086,14 +1072,15 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
     public var count: Int {
         @inline(__always)
         get {
-            return _backing.length
+            return _sliceRange.count
         }
         @inline(__always)
         set {
             if !isKnownUniquelyReferenced(&_backing) {
-                _backing = _backing.mutableCopy()
+                _backing = _backing.mutableCopy(_sliceRange)
             }
             _backing.length = newValue
+            _sliceRange = _sliceRange.lowerBound..<(_sliceRange.lowerBound + newValue)
         }
     }
     
@@ -1115,7 +1102,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
     @inline(__always)
     public mutating func withUnsafeMutableBytes<ResultType, ContentType>(_ body: (UnsafeMutablePointer<ContentType>) throws -> ResultType) rethrows -> ResultType {
         if !isKnownUniquelyReferenced(&_backing) {
-            _backing = _backing.mutableCopy()
+            _backing = _backing.mutableCopy(_sliceRange)
         }
         let mutableBytes = _backing.mutableBytes ?? UnsafeMutableRawPointer(bitPattern: 0xBAD0)!
         let contentPtr = mutableBytes.bindMemory(to: ContentType.self, capacity: count / MemoryLayout<ContentType>.stride)
@@ -1133,13 +1120,13 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
     @inline(__always)
     public func copyBytes(to pointer: UnsafeMutablePointer<UInt8>, count: Int) {
         if count == 0 { return }
-        memcpy(UnsafeMutableRawPointer(pointer), _backing.bytes!, count)
+        memcpy(UnsafeMutableRawPointer(pointer), _backing.bytes!.advanced(by: _sliceRange.lowerBound), count)
     }
     
     @inline(__always)
     private func _copyBytesHelper(to pointer: UnsafeMutableRawPointer, from range: NSRange) {
         if range.length == 0 { return }
-        memcpy(UnsafeMutableRawPointer(pointer), _backing.bytes!.advanced(by: range.location), range.length)
+        memcpy(UnsafeMutableRawPointer(pointer), _backing.bytes!.advanced(by: range.location + _sliceRange.lowerBound), range.length)
     }
     
     /// Copy a subset of the contents of the data to a pointer.
@@ -1207,15 +1194,13 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
     /// - parameter options: Options for writing the data. Default value is `[]`.
     /// - throws: An error in the Cocoa domain, if there is an error writing to the `URL`.
     public func write(to url: URL, options: Data.WritingOptions = []) throws {
-        try _backing.withInteriorPointerReference {
+        try _backing.withInteriorPointerReference(_sliceRange) {
 #if DEPLOYMENT_RUNTIME_SWIFT
             try $0.write(to: url, options: WritingOptions(rawValue: options.rawValue))
 #else
             if _shouldUseNonAtomicWriteReimplementation(options: options) {
-                var error : NSError?
-                if !_NSWriteDataToFile_Swift(url: url._bridgeToObjectiveC(), data: $0, options: options.rawValue, error: &error) {
-                    throw error!
-                }
+                var error: NSError? = nil
+                guard __NSDataWriteToURL($0, url as NSURL, options.rawValue, &error) else { throw error! }
             } else {
                 try $0.write(to: url, options: WritingOptions(rawValue: options.rawValue))
             }
@@ -1239,7 +1224,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
         } else {
             nsRange = NSMakeRange(0, _backing.length)
         }
-        let result = _backing.withInteriorPointerReference {
+        let result = _backing.withInteriorPointerReference(_sliceRange) {
             $0.range(of: dataToFind, options: options, in: nsRange)
         }
         if result.location == NSNotFound {
@@ -1260,17 +1245,19 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
     public mutating func append(_ bytes: UnsafePointer<UInt8>, count: Int) {
         if count == 0 { return }
         if !isKnownUniquelyReferenced(&_backing) {
-            _backing = _backing.mutableCopy()
+            _backing = _backing.mutableCopy(_sliceRange)
         }
         _backing.append(bytes, length: count)
+        _sliceRange = _sliceRange.lowerBound..<(_sliceRange.upperBound + count)
     }
     
     @inline(__always)
     public mutating func append(_ other: Data) {
         if !isKnownUniquelyReferenced(&_backing) {
-            _backing = _backing.mutableCopy()
+            _backing = _backing.mutableCopy(_sliceRange)
         }
         _backing.append(other._backing)
+        _sliceRange = _sliceRange.lowerBound..<(_sliceRange.upperBound + other.count)
     }
     
     /// Append a buffer of bytes to the data.
@@ -1280,9 +1267,10 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
     public mutating func append<SourceType>(_ buffer : UnsafeBufferPointer<SourceType>) {
         if buffer.count == 0 { return }
         if !isKnownUniquelyReferenced(&_backing) {
-            _backing = _backing.mutableCopy()
+            _backing = _backing.mutableCopy(_sliceRange)
         }
         _backing.append(buffer.baseAddress!, length: buffer.count * MemoryLayout<SourceType>.stride)
+        _sliceRange = _sliceRange.lowerBound..<(_sliceRange.upperBound + buffer.count * MemoryLayout<SourceType>.stride)
     }
     
     @inline(__always)
@@ -1298,9 +1286,6 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
     public mutating func append<S : Sequence>(contentsOf newElements: S) where S.Iterator.Element == Iterator.Element {
         let estimatedCount = newElements.underestimatedCount
         var idx = count
-        if !isKnownUniquelyReferenced(&_backing) {
-            _backing = _backing.mutableCopy()
-        }
         count += estimatedCount
         for byte in newElements {
             let newIndex = idx + 1
@@ -1329,9 +1314,13 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
     public mutating func resetBytes(in range: Range<Index>) {
         let range = NSMakeRange(range.lowerBound, range.upperBound - range.lowerBound)
         if !isKnownUniquelyReferenced(&_backing) {
-            _backing = _backing.mutableCopy()
+            _backing = _backing.mutableCopy(_sliceRange)
         }
         _backing.resetBytes(in: range)
+        if _sliceRange.count < range.location + range.length {
+            let newLength = range.location + range.length
+            _sliceRange = _sliceRange.lowerBound..<(_sliceRange.lowerBound + newLength)
+        }
     }
     
     /// Replace a region of bytes in the data with new data.
@@ -1346,10 +1335,13 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
         let nsRange = NSMakeRange(subrange.lowerBound, subrange.upperBound - subrange.lowerBound)
         let cnt = data.count
         if !isKnownUniquelyReferenced(&_backing) {
-            _backing = _backing.mutableCopy()
+            _backing = _backing.mutableCopy(_sliceRange)
         }
         data.withUnsafeBytes { (bytes: UnsafePointer<UInt8>) -> Void in
+            let currentLength = _backing.length
             _backing.replaceBytes(in: nsRange, with: bytes, length: cnt)
+            let resultingLength = currentLength - nsRange.length + cnt
+            _sliceRange = _sliceRange.lowerBound..<(_sliceRange.lowerBound + resultingLength)
         }
     }
     
@@ -1366,9 +1358,12 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
         let bufferCount = buffer.count * MemoryLayout<SourceType>.stride
         
         if !isKnownUniquelyReferenced(&_backing) {
-            _backing = _backing.mutableCopy()
+            _backing = _backing.mutableCopy(_sliceRange)
         }
+        let currentLength = _backing.length
         _backing.replaceBytes(in: nsRange, with: buffer.baseAddress, length: bufferCount)
+        let resultingLength = currentLength - nsRange.length + bufferCount
+        _sliceRange = _sliceRange.lowerBound..<(_sliceRange.lowerBound + resultingLength)
     }
     
     /// Replace a region of bytes in the data with new bytes from a collection.
@@ -1413,11 +1408,9 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
                 }
                 
                 if replacementCount != 0 {
-                    let buf = UnsafeMutableBufferPointer(start: bytes + start, 
-                                                         count: replacementCount)
+                    let buf = UnsafeMutableBufferPointer(start: bytes + start, count: replacementCount)
                     var (it,idx) = newElements._copyContents(initializing: buf)
-                    precondition(it.next() == nil && idx == buf.endIndex,
-                      "newElements iterator returned different count to newElements.count")
+                    precondition(it.next() == nil && idx == buf.endIndex, "newElements iterator returned different count to newElements.count")
                 }
             }
     }
@@ -1426,9 +1419,12 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
     public mutating func replaceSubrange(_ subrange: Range<Index>, with bytes: UnsafeRawPointer, count cnt: Int) {
         let nsRange = NSMakeRange(subrange.lowerBound, subrange.upperBound - subrange.lowerBound)
         if !isKnownUniquelyReferenced(&_backing) {
-            _backing = _backing.mutableCopy()
+            _backing = _backing.mutableCopy(_sliceRange)
         }
+        let currentLength = _backing.length
         _backing.replaceBytes(in: nsRange, with: bytes, length: cnt)
+        let resultingLength = currentLength - nsRange.length + cnt
+        _sliceRange = _sliceRange.lowerBound..<(_sliceRange.lowerBound + resultingLength)
     }
 
     /// Return a new copy of the data in a specified range.
@@ -1452,7 +1448,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
     /// - parameter options: The options to use for the encoding. Default value is `[]`.
     /// - returns: The Base-64 encoded string.
     public func base64EncodedString(options: Data.Base64EncodingOptions = []) -> String {
-        return _backing.withInteriorPointerReference {
+        return _backing.withInteriorPointerReference(_sliceRange) {
             return $0.base64EncodedString(options: options)
         }
     }
@@ -1462,7 +1458,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
     /// - parameter options: The options to use for the encoding. Default value is `[]`.
     /// - returns: The Base-64 encoded data.
     public func base64EncodedData(options: Data.Base64EncodingOptions = []) -> Data {
-        return _backing.withInteriorPointerReference {
+        return _backing.withInteriorPointerReference(_sliceRange) {
             return $0.base64EncodedData(options: options)
         }
     }
@@ -1500,20 +1496,20 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
         @inline(__always)
         set {
             if !isKnownUniquelyReferenced(&_backing) {
-                _backing = _backing.mutableCopy()
+                _backing = _backing.mutableCopy(_sliceRange)
             }
             _backing.set(index, to: newValue)
         }
     }
     
-    public subscript(bounds: Range<Index>) -> MutableRangeReplaceableRandomAccessSlice<Data> {
+    public subscript(bounds: Range<Index>) -> Data {
         @inline(__always)
         get {
-            return MutableRangeReplaceableRandomAccessSlice(base: self, bounds: bounds)
+            return Data(backing: _backing, range: bounds)
         }
         @inline(__always)
         set {
-            replaceSubrange(bounds, with: newValue.base)
+            replaceSubrange(bounds, with: newValue)
         }
     }
     
@@ -1522,7 +1518,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
     public var startIndex: Index {
         @inline(__always)
         get {
-            return 0
+            return _sliceRange.lowerBound
         }
     }
     
@@ -1532,7 +1528,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
     public var endIndex: Index {
         @inline(__always)
         get {
-            return count
+            return _sliceRange.upperBound
         }
     }
     
@@ -1573,7 +1569,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
         fileprivate init(_data: Data) {
             self._data = _data
             _buffer = (0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0)
-            _idx = 0
+            _idx = _data.startIndex
             _endIdx = _data.endIndex
         }
         
@@ -1583,7 +1579,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
             let bufferSize = MemoryLayout.size(ofValue: _buffer)
             return withUnsafeMutablePointer(to: &_buffer) { ptr_ in
                 let ptr = UnsafeMutableRawPointer(ptr_).assumingMemoryBound(to: UInt8.self)
-                let bufferIdx = _idx % bufferSize
+                let bufferIdx = (_idx - _data.startIndex) % bufferSize
                 if bufferIdx == 0 {
                     // populate the buffer
                     _data.copyBytes(to: ptr, from: _idx..<(_endIdx - _idx > bufferSize ? _idx + bufferSize : _endIdx))
@@ -1623,7 +1619,11 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
             return true
         }
         if length1 > 0 {
-            return memcmp(backing1.bytes!, backing2.bytes!, length1) == 0
+            return d1.withUnsafeBytes { (b1) in
+                return d2.withUnsafeBytes { (b2) in
+                    return memcmp(b1, b2, length1) == 0
+                }
+            }
         }
         return true
     }
@@ -1652,7 +1652,7 @@ extension Data : CustomStringConvertible, CustomDebugStringConvertible, CustomRe
         
         // Minimal size data is output as an array
         if nBytes < 64 {
-            children.append((label: "bytes", value: self[0..<nBytes].map { $0 }))
+            children.append((label: "bytes", value: Array(self[0..<nBytes])))
         }
         
         let m = Mirror(self, children:children, displayStyle: Mirror.DisplayStyle.struct)

@@ -64,24 +64,90 @@ func test13811882() {
 
 
 // <rdar://problem/21544303> QoI: "Unexpected trailing closure" should have a fixit to insert a 'do' statement
+// <https://bugs.swift.org/browse/SR-3671>
 func r21544303() {
   var inSubcall = true
-  {   // expected-error {{expected 'do' keyword to designate a block of statements}} {{3-3=do }}
-  }
+  {
+  }  // expected-error {{computed property must have accessors specified}}
   inSubcall = false
 
   // This is a problem, but isn't clear what was intended.
-  var somethingElse = true { // expected-error {{cannot call value of non-function type 'Bool'}}
-  }
+  var somethingElse = true {
+  }  // expected-error {{computed property must have accessors specified}}
   inSubcall = false
 
   var v2 : Bool = false
-  v2 = true
-  {  // expected-error {{expected 'do' keyword to designate a block of statements}}
+  v2 = inSubcall
+  {  // expected-error {{cannot call value of non-function type 'Bool'}} expected-note {{did you mean to use a 'do' statement?}} {{3-3=do }}
   }
 }
 
 
+// <https://bugs.swift.org/browse/SR-3671>
+func SR3671() {
+  let n = 42
+  func consume(_ x: Int) {}
+
+  { consume($0) }(42)
+  ;
+
+  ({ $0(42) } { consume($0) }) // expected-note {{callee is here}}
+
+  { print(42) }  // expected-warning {{braces here form a trailing closure separated from its callee by multiple newlines}} expected-note {{did you mean to use a 'do' statement?}} {{3-3=do }} expected-error {{cannot call value of non-function type '()'}}
+  ;
+
+  ({ $0(42) } { consume($0) }) // expected-note {{callee is here}}
+
+  { print($0) }  // expected-warning {{braces here form a trailing closure separated from its callee by multiple newlines}} expected-error {{cannot call value of non-function type '()'}}
+  ;
+
+  ({ $0(42) } { consume($0) }) // expected-note {{callee is here}}
+
+  { [n] in print(42) }  // expected-warning {{braces here form a trailing closure separated from its callee by multiple newlines}} expected-error {{cannot call value of non-function type '()'}}
+  ;
+
+  ({ $0(42) } { consume($0) }) // expected-note {{callee is here}}
+
+  { consume($0) }(42)  // expected-warning {{braces here form a trailing closure separated from its callee by multiple newlines}} expected-error {{cannot call value of non-function type '()'}}
+  ;
+
+  ({ $0(42) } { consume($0) }) // expected-note {{callee is here}}
+
+  { (x: Int) in consume(x) }(42)  // expected-warning {{braces here form a trailing closure separated from its callee by multiple newlines}} expected-error {{cannot call value of non-function type '()'}}
+  ;
+
+  // This is technically a valid call, so nothing goes wrong until (42)
+
+  { $0(3) }
+  { consume($0) }(42)  // expected-error {{cannot call value of non-function type '()'}}
+  ;
+  ({ $0(42) })
+  { consume($0) }(42)  // expected-error {{cannot call value of non-function type '()'}}
+  ;
+  { $0(3) }
+  { [n] in consume($0) }(42)  // expected-error {{cannot call value of non-function type '()'}}
+  ;
+  ({ $0(42) })
+  { [n] in consume($0) }(42)  // expected-error {{cannot call value of non-function type '()'}}
+  ;
+
+  // Equivalent but more obviously unintended.
+
+  { $0(3) }  // expected-note {{callee is here}}
+
+  { consume($0) }(42)  // expected-error {{cannot call value of non-function type '()'}}
+  // expected-warning@-1 {{braces here form a trailing closure separated from its callee by multiple newlines}}
+
+  ({ $0(3) })  // expected-note {{callee is here}}
+
+  { consume($0) }(42)  // expected-error {{cannot call value of non-function type '()'}}
+  // expected-warning@-1 {{braces here form a trailing closure separated from its callee by multiple newlines}}
+  ;
+
+  // Also a valid call (!!)
+  { $0 { $0 } } { $0 { 1 } }  // expected-error {{expression resolves to an unused function}}
+  consume(111)
+}
 
 
 // <rdar://problem/22162441> Crash from failing to diagnose nonexistent method access inside closure
@@ -200,10 +266,8 @@ struct S<T> {
 // Make sure we cannot infer an () argument from an empty parameter list.
 func acceptNothingToInt (_: () -> Int) {}
 func testAcceptNothingToInt(ac1: @autoclosure () -> Int) {
-  // expected-note@-1{{parameter 'ac1' is implicitly non-escaping because it was declared @autoclosure}}
   acceptNothingToInt({ac1($0)})
   // expected-error@-1{{contextual closure type '() -> Int' expects 0 arguments, but 1 was used in closure body}}
-  // FIXME: expected-error@-2{{closure use of non-escaping parameter 'ac1' may allow it to escape}}
 }
 
 // <rdar://problem/23570873> QoI: Poor error calling map without being able to infer "U" (closure result inference)
@@ -437,3 +501,20 @@ func sr3497_unfold<A, B>(_ a0: A, next: (inout A) -> B) {}
 func sr3497() {
   let _ = sr3497_unfold((0, 0)) { s in 0 } // ok
 }
+
+// SR-3758: Swift 3.1 fails to compile 3.0 code involving closures and IUOs
+let _: ((Any?) -> Void) = { (arg: Any!) in }
+// This example was rejected in 3.0 as well, but accepting it is correct.
+let _: ((Int?) -> Void) = { (arg: Int!) in }
+
+// rdar://30429709 - We should not attempt an implicit conversion from
+// () -> T to () -> Optional<()>.
+func returnsArray() -> [Int] { return [] }
+
+returnsArray().flatMap { $0 }.flatMap { }
+// expected-warning@-1 {{expression of type 'Int' is unused}}
+// expected-warning@-2 {{Please use map instead.}}
+// expected-warning@-3 {{result of call to 'flatMap' is unused}}
+
+// rdar://problem/30271695
+_ = ["hi"].flatMap { $0.isEmpty ? nil : $0 }

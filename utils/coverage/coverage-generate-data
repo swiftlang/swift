@@ -9,7 +9,6 @@
 # See https://swift.org/LICENSE.txt for license information
 # See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
-from multiprocessing import Pool
 import argparse
 import logging
 import multiprocessing
@@ -18,6 +17,7 @@ import pipes
 import subprocess
 import sys
 import timeit
+from multiprocessing import Pool
 
 NUM_CORES = multiprocessing.cpu_count()
 
@@ -194,8 +194,6 @@ def main():
     parser = argparse.ArgumentParser(
         description='Generate, parse test run profdata')
     parser.add_argument('swift_dir', metavar='swift-dir')
-    parser.add_argument('--build-dir')
-    parser.add_argument('--build-subdir', default='coverage')
     parser.add_argument('--log',
                         help='the level of information to log (default: info)',
                         metavar='LEVEL',
@@ -208,35 +206,16 @@ def main():
     logging.debug(args)
 
     swift_dir = os.path.realpath(os.path.abspath(args.swift_dir))
-    if args.build_dir:
-        build_dir = os.path.realpath(os.path.abspath(args.build_dir))
-    else:
-        build_dir = os.path.realpath(os.path.join(os.path.dirname(swift_dir),
-                                                  'build'))
-    build_subdir = os.path.join(build_dir, args.build_subdir)
+    build_dir = os.path.realpath(os.path.join(os.path.dirname(swift_dir),
+                                              'build'))
+    build_subdir = os.path.join(build_dir, 'buildbot_incremental_coverage')
 
     global_build_subdir = build_subdir
 
     build_script_cmd = [
         os.path.join(swift_dir, 'utils/build-script'),
-        '--release',
-        '--no-assertions',
-        '--swift-analyze-code-coverage', 'not-merged',
-        '--test',
-        '--validation-test',
-        '--skip-test-ios',
-        '--skip-test-tvos',
-        '--skip-test-watchos',
-        '--skip-build-benchmark',
-        '--verbose-build',
-        '--lit-args=-v',
-        '--reconfigure',
-        '--build-ninja',
-        '--build-subdir', build_subdir
+        '--preset=buildbot_incremental,tools=RDA,stdlib=RDA,coverage',
     ]
-
-    if args.build_dir:
-        build_script_cmd += ['--build-dir', build_dir]
 
     call(build_script_cmd)
 

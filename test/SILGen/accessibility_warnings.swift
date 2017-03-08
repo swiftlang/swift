@@ -104,8 +104,8 @@ public protocol PublicReadOnlyOperations {
 internal struct PrivateSettersForReadOnlyInternal : PublicReadOnlyOperations {
   // CHECK-DAG: sil hidden{{( \[.+\])*}} @_T022accessibility_warnings33PrivateSettersForReadOnlyInternalV4sizeSifg
   public private(set) var size = 0
-  // CHECK-DAG: sil hidden @_T022accessibility_warnings33PrivateSettersForReadOnlyInternalV9subscriptSiSicfg
-  // CHECK-DAG: sil private @_T022accessibility_warnings33PrivateSettersForReadOnlyInternalV9subscriptSiSicfs
+  // CHECK-DAG: sil hidden @_T022accessibility_warnings33PrivateSettersForReadOnlyInternalV9subscriptS2icfg
+  // CHECK-DAG: sil private @_T022accessibility_warnings33PrivateSettersForReadOnlyInternalV9subscriptS2icfs
   internal private(set) subscript (_: Int) -> Int { // no-warning
     get { return 42 }
     set {}
@@ -123,7 +123,7 @@ internal class InternalClass {
   // CHECK-DAG: sil hidden{{( \[.+\])*}} @_T022accessibility_warnings13InternalClassC9publicVarSifg
   public var publicVar = 0
 
-  // CHECK-DAG: sil hidden @_T022accessibility_warnings13InternalClassC19publicVarPrivateSetSifg
+  // CHECK-DAG: sil hidden [transparent] @_T022accessibility_warnings13InternalClassC19publicVarPrivateSetSifg
   public private(set) var publicVarPrivateSet = 0
 
   public public(set) var publicVarPublicSet = 0

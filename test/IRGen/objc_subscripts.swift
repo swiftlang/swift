@@ -32,7 +32,7 @@
 // CHECK:           i8* bitcast (void ([[OPAQUE6:%.*]]*, i8*, i64, [[OPAQUE7:%.*]]*)* @_T015objc_subscripts10SomeObjectC9subscriptSiACcfsTo to i8*)
 // CHECK:         },
 // CHECK:       { i8*, i8*, i8* } 
-// CHECK:         { i8* getelementptr inbounds ([5 x i8], [5 x i8]* @"\01L_selector_data(init)", i64 0, i64 0), i8* getelementptr inbounds ([8 x i8], [8 x i8]* @0, i64 0, i64 0), i8* bitcast ([[OPAQUE8:%.*]]* ([[OPAQUE9:%.*]]*, i8*)* @_T015objc_subscripts10SomeObjectCACycfcTo to i8*) }
+// CHECK:         { i8* getelementptr inbounds ([5 x i8], [5 x i8]* @"\01L_selector_data(init)", i64 0, i64 0), i8* getelementptr inbounds ([8 x i8], [8 x i8]* @{{[0-9]+}}, i64 0, i64 0), i8* bitcast ([[OPAQUE8:%.*]]* ([[OPAQUE9:%.*]]*, i8*)* @_T015objc_subscripts10SomeObjectCACycfcTo to i8*) }
 // CHECK:    ]
 // CHECK:  }, section "__DATA, __objc_const", align 8
 
@@ -40,26 +40,26 @@
   subscript (i : Int) -> SomeObject {
     // CHECK: define internal [[OPAQUE0:%.*]]* @_T015objc_subscripts10SomeObjectC9subscriptACSicfgTo([[OPAQUE1]]*, i8*, i64) unnamed_addr
     get {
-      // CHECK: call %C15objc_subscripts10SomeObject* @_T015objc_subscripts10SomeObjectC9subscriptACSicfg
+      // CHECK: call swiftcc %T15objc_subscripts10SomeObjectC* @_T015objc_subscripts10SomeObjectC9subscriptACSicfg
       return self
     }
 
     // CHECK-LABEL: define internal void @_T015objc_subscripts10SomeObjectC9subscriptACSicfsTo
     set {
-      // CHECK: void @_T015objc_subscripts10SomeObjectC9subscriptACSicfs
+      // CHECK: swiftcc void @_T015objc_subscripts10SomeObjectC9subscriptACSicfs
     }
   }
 
   subscript (s : SomeObject) -> Int {
   // CHECK-LABEL: define internal i64 @_T015objc_subscripts10SomeObjectC9subscriptSiACcfgTo
     get {
-      // CHECK: call i64 @_T015objc_subscripts10SomeObjectC9subscriptSiACcfg
+      // CHECK: call swiftcc i64 @_T015objc_subscripts10SomeObjectC9subscriptSiACcfg
       return 5
     }
 
     // CHECK-LABEL: define internal void @_T015objc_subscripts10SomeObjectC9subscriptSiACcfsTo
     set {
-      // CHECK: call void @_T015objc_subscripts10SomeObjectC9subscriptSiACcfs
+      // CHECK: call swiftcc void @_T015objc_subscripts10SomeObjectC9subscriptSiACcfs
     }
   }
 }

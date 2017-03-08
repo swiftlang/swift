@@ -423,7 +423,8 @@ public struct Unsafe${Mutable}RawPointer : Strideable, Hashable, _Pointer {
   ///
   /// - Parameters:
   ///   - size: The number of bytes to allocate. `size` must not be negative.
-  ///   - alignedTo: The alignment of the new region of allocated memory.
+  ///   - alignedTo: The alignment of the new region of allocated memory, in
+  ///     bytes.
   /// - Returns: A pointer to a newly allocated region of memory. The memory is
   ///   allocated, but not initialized.
   ///
@@ -444,7 +445,7 @@ public struct Unsafe${Mutable}RawPointer : Strideable, Hashable, _Pointer {
   ///
   /// - Parameters:
   ///   - size: The number of bytes to deallocate.
-  ///   - alignedTo: The alignment of the region to be deallocated.
+  ///   - alignedTo: The alignment of the region to be deallocated, in bytes.
   public func deallocate(bytes size: Int, alignedTo: Int) {
     Builtin.deallocRaw(
       _rawValue, size._builtinWordValue, alignedTo._builtinWordValue)

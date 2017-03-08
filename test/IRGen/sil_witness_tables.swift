@@ -39,13 +39,13 @@ struct Conformer: Q, QQ {
 // CHECK: [[EXTERNAL_CONFORMER_EXTERNAL_P_WITNESS_TABLE:@_T039sil_witness_tables_external_conformance17ExternalConformerVAA0F1PAAWP]] = external global i8*, align 8
 // CHECK: [[CONFORMER_Q_WITNESS_TABLE:@_T018sil_witness_tables9ConformerVAA1QAAWP]] = hidden constant [2 x i8*] [
 // CHECK:   i8* bitcast ([4 x i8*]* [[CONFORMER_P_WITNESS_TABLE:@_T018sil_witness_tables9ConformerVAA1PAAWP]] to i8*),
-// CHECK:   i8* bitcast (void (%V18sil_witness_tables9Conformer*, %swift.type*, i8**)* @_T018sil_witness_tables9ConformerVAA1QAaaDP7qMethod{{[_0-9a-zA-Z]*}}FTW to i8*)
+// CHECK:   i8* bitcast (void (%T18sil_witness_tables9ConformerV*, %swift.type*, i8**)* @_T018sil_witness_tables9ConformerVAA1QA2aDP7qMethod{{[_0-9a-zA-Z]*}}FTW to i8*)
 // CHECK: ]
 // CHECK: [[CONFORMER_P_WITNESS_TABLE]] = hidden constant [4 x i8*] [
 // CHECK:   i8* bitcast (%swift.type* ()* @_T018sil_witness_tables14AssocConformerVMa to i8*),
 // CHECK:   i8* bitcast (i8** ()* @_T018sil_witness_tables14AssocConformerVAA1AAAWa to i8*)
-// CHECK:   i8* bitcast (void (%swift.type*, %swift.type*, i8**)* @_T018sil_witness_tables9ConformerVAA1PAaaDP12staticMethod{{[_0-9a-zA-Z]*}}FZTW to i8*),
-// CHECK:   i8* bitcast (void (%V18sil_witness_tables9Conformer*, %swift.type*, i8**)* @_T018sil_witness_tables9ConformerVAA1PAaaDP14instanceMethod{{[_0-9a-zA-Z]*}}FTW to i8*)
+// CHECK:   i8* bitcast (void (%swift.type*, %swift.type*, i8**)* @_T018sil_witness_tables9ConformerVAA1PA2aDP12staticMethod{{[_0-9a-zA-Z]*}}FZTW to i8*),
+// CHECK:   i8* bitcast (void (%T18sil_witness_tables9ConformerV*, %swift.type*, i8**)* @_T018sil_witness_tables9ConformerVAA1PA2aDP14instanceMethod{{[_0-9a-zA-Z]*}}FTW to i8*)
 // CHECK: ]
 // CHECK: [[CONFORMER2_P_WITNESS_TABLE:@_T018sil_witness_tables10Conformer2VAA1PAAWP]] = hidden constant [4 x i8*]
 
@@ -57,15 +57,15 @@ struct Conformer2: Q {
   func qMethod() {}
 }
 
-// CHECK-LABEL: define hidden void @_T018sil_witness_tables7erasureAA2QQ_pAA9ConformerV1c_tF(%P18sil_witness_tables2QQ_* noalias nocapture sret)
-// CHECK:         [[WITNESS_TABLE_ADDR:%.*]] = getelementptr inbounds %P18sil_witness_tables2QQ_, %P18sil_witness_tables2QQ_* %0, i32 0, i32 2
+// CHECK-LABEL: define hidden swiftcc void @_T018sil_witness_tables7erasureAA2QQ_pAA9ConformerV1c_tF(%T18sil_witness_tables2QQP* noalias nocapture sret)
+// CHECK:         [[WITNESS_TABLE_ADDR:%.*]] = getelementptr inbounds %T18sil_witness_tables2QQP, %T18sil_witness_tables2QQP* %0, i32 0, i32 2
 // CHECK-NEXT:    store i8** getelementptr inbounds ([1 x i8*], [1 x i8*]* [[CONFORMER_QQ_WITNESS_TABLE:@_T0.*WP]], i32 0, i32 0), i8*** [[WITNESS_TABLE_ADDR]], align 8
 func erasure(c c: Conformer) -> QQ {
   return c
 }
 
-// CHECK-LABEL: define hidden void @_T018sil_witness_tables15externalErasure0a1_b1_c1_D12_conformance9ExternalP_pAC0G9ConformerV1c_tF(%P39sil_witness_tables_external_conformance9ExternalP_* noalias nocapture sret)
-// CHECK:         [[WITNESS_TABLE_ADDR:%.*]] = getelementptr inbounds %P39sil_witness_tables_external_conformance9ExternalP_, %P39sil_witness_tables_external_conformance9ExternalP_* %0, i32 0, i32 2
+// CHECK-LABEL: define hidden swiftcc void @_T018sil_witness_tables15externalErasure0a1_b1_c1_D12_conformance9ExternalP_pAC0G9ConformerV1c_tF(%T39sil_witness_tables_external_conformance9ExternalPP* noalias nocapture sret)
+// CHECK:         [[WITNESS_TABLE_ADDR:%.*]] = getelementptr inbounds %T39sil_witness_tables_external_conformance9ExternalPP, %T39sil_witness_tables_external_conformance9ExternalPP* %0, i32 0, i32 2
 // CHECK-NEXT:    store i8** [[EXTERNAL_CONFORMER_EXTERNAL_P_WITNESS_TABLE]], i8*** %2, align 8
 func externalErasure(c c: ExternalConformer) -> ExternalP {
   return c

@@ -16,11 +16,13 @@
 #
 # ----------------------------------------------------------------------------
 
+from __future__ import print_function
+
 import bisect
+import os
 import re
 import subprocess
 import sys
-import os
 
 line_pattern = re.compile(
     r'^// ###sourceLocation\(file:\s*"([^"]+)",\s*line:\s*([0-9]+)\s*\)')
@@ -48,6 +50,7 @@ def _make_line_map(target_filename, stream=None):
             result.append((i + 1, m.group(1), int(m.group(2))))
     return result
 
+
 _line_maps = {}
 
 
@@ -57,6 +60,7 @@ def fline_map(target_filename):
         map = _make_line_map(target_filename)
         _line_maps[target_filename] = map
     return map
+
 
 def map_line_to_source_file(target_filename, target_line_num):
     """
@@ -100,7 +104,10 @@ def map_line_to_source_file(target_filename, target_line_num):
     base = map[index - 1]
     return base[1], base[2] + (target_line_num - base[0] - 1)
 
-def map_line_from_source_file(source_filename, source_line_num, target_filename):
+
+def map_line_from_source_file(source_filename,
+                              source_line_num,
+                              target_filename):
     """
     >>> from tempfile import *
     >>> t = NamedTemporaryFile()
@@ -146,17 +153,22 @@ def map_line_from_source_file(source_filename, source_line_num, target_filename)
     assert(source_line_num > 0)
     map = fline_map(target_filename)
 
-    for i, (target_line_num, found_source_filename, found_source_line_num) in enumerate(map):
-        if found_source_filename != source_filename: continue
-        if found_source_line_num > source_line_num: continue
+    for i, (target_line_num, found_source_filename,
+            found_source_line_num) in enumerate(map):
+        if found_source_filename != source_filename:
+            continue
+        if found_source_line_num > source_line_num:
+            continue
         result = target_line_num + (source_line_num - found_source_line_num)
         if i + 1 == len(map) or map[i + 1][0] > result:
             return result + 1
     raise RuntimeError("line not found")
 
+
 def read_response_file(file_path):
     with open(file_path, 'r') as files:
         return filter(None, files.read().split(';'))
+
 
 def expand_response_files(files):
     expanded_files = []
@@ -168,6 +180,7 @@ def expand_response_files(files):
             expanded_files.append(file_path)
 
     return expanded_files
+
 
 def run():
     """Simulate a couple of gyb-generated files
@@ -220,13 +233,15 @@ def run():
 
     >>> import subprocess
     >>> output = subprocess.check_output([
-    ...    __file__, target1.name, target2.name, '--', 
-    ...    sys.executable, '-c', 
-    ...   'import sys;sys.stdout.write(open(sys.argv[1]).read())', raw_output.name])
+    ...    __file__, target1.name, target2.name, '--',
+    ...    sys.executable, '-c',
+    ...   'import sys;sys.stdout.write(open(sys.argv[1]).read())',
+    ...   raw_output.name])
 
     Replace temporary filenames and check it.
 
-    >>> print output.replace(target1.name,'TARGET1-NAME').replace(target2.name,'TARGET2-NAME') + 'EOF'
+    >>> print output.replace(target1.name,'TARGET1-NAME')
+    ...             .replace(target2.name,'TARGET2-NAME') + 'EOF'
     A
     TARGET1-NAME:2:111: error one
     B
@@ -242,9 +257,11 @@ def run():
     glitch in [fox.box, line 11 assert five
     glitch in [fox.box:28 assert six
     EOF
-    >>> print subprocess.check_output([__file__, 'foo.bar', '21', target1.name]),
+    >>> print subprocess.check_output([__file__, 'foo.bar', '21',
+    ...                                target1.name]),
     5
-    >>> print subprocess.check_output([__file__, 'foo.bar', '8', target2.name]),
+    >>> print subprocess.check_output([__file__, 'foo.bar', '8',
+    ...                                target2.name]),
     3
 
     """
@@ -263,9 +280,9 @@ def run():
         # The first argument of command_args is the process to open.
         # subprocess.Popen doesn't normalize arguments. This means that trying
         # to open a non-normalized file (e.g. C:/swift/./bin/swiftc.exe) on
-        # Windows results in file/directory not found errors, as Popen delegates
-        # to the Win32 CreateProcess API. Unix systems handle non-normalized
-        # paths, so don't have this problem.
+        # Windows results in file/directory not found errors, as Popen
+        # delegates to the Win32 CreateProcess API. Unix systems handle
+        # non-normalized paths, so don't have this problem.
         # Arguments passed to the process are normalized by the process.
         command_args = expand_response_files(sys.argv[dashes + 1:])
         command_args[0] = os.path.normpath(command_args[0])
@@ -280,7 +297,8 @@ def run():
         sources = '(?P<file>' + '|'.join(re.escape(s) for s in sources) + ')'
 
         error_pattern = re.compile(
-            '^' + sources + ':(?P<line>[0-9]+):(?P<column>[0-9]+):(?P<tail>.*?)\n?$')
+            '^' + sources +
+            ':(?P<line>[0-9]+):(?P<column>[0-9]+):;(?P<tail>.*?)\n?$')
 
         assertion_pattern = re.compile(
             '^(?P<head>.*( file | at |#[0-9]+: |[[]))' +
@@ -295,23 +313,26 @@ def run():
 
             def decode_match(p, l):
                 m = p.match(l)
-                if m is None: return ()
+                if m is None:
+                    return ()
                 file, line_num = map_line_to_source_file(
                     m.group('file'), int(m.group('line')))
                 return ((m, file, line_num),)
-                
+
             for (m, file, line_num) in decode_match(error_pattern, input):
                 output = '%s:%s:%s:%s\n' % (
                     file, line_num, int(m.group(3)), m.group(4))
                 break
-            else: 
-                for (m, file, line_num) in decode_match(assertion_pattern, input):
+            else:
+                for (m, file, line_num) in decode_match(assertion_pattern,
+                                                        input):
                     output = '%s%s%s%s%s\n' % (
                         m.group('head'), file, m.group('middle'), line_num,
                         m.group('tail'))
             sys.stdout.write(output)
 
         sys.exit(command.wait())
+
 
 if __name__ == '__main__':
     run()

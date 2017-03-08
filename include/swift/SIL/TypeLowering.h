@@ -420,14 +420,12 @@ class TypeConverter {
     GenericSignature *Sig;
     AbstractionPattern::CachingKey OrigType;
     CanType SubstType;
-    unsigned UncurryLevel;
 
     friend bool operator==(const CachingTypeKey &lhs,
                            const CachingTypeKey &rhs) {
       return lhs.Sig == rhs.Sig
           && lhs.OrigType == rhs.OrigType
-          && lhs.SubstType == rhs.SubstType
-          && lhs.UncurryLevel == rhs.UncurryLevel;
+          && lhs.SubstType == rhs.SubstType;
     }
     friend bool operator!=(const CachingTypeKey &lhs,
                            const CachingTypeKey &rhs) {
@@ -443,17 +441,13 @@ class TypeConverter {
     /// should be used in the lowered type.
     CanType SubstType;
 
-    /// The uncurrying level of the type.
-    unsigned UncurryLevel;
-
     CachingTypeKey getCachingKey() const {
       assert(isCacheable());
       return { (OrigType.hasGenericSignature()
                    ? OrigType.getGenericSignature()
                    : nullptr),
                OrigType.getCachingKey(),
-               SubstType,
-               UncurryLevel };
+               SubstType };
     }
 
     bool isCacheable() const {
@@ -469,9 +463,8 @@ class TypeConverter {
 
   friend struct llvm::DenseMapInfo<CachingTypeKey>;
   
-  TypeKey getTypeKey(AbstractionPattern origTy, CanType substTy,
-                     unsigned uncurryLevel) {
-    return {origTy, substTy, uncurryLevel};
+  TypeKey getTypeKey(AbstractionPattern origTy, CanType substTy) {
+    return {origTy, substTy};
   }
   
   struct OverrideKey {
@@ -583,16 +576,15 @@ public:
   
   /// Lowers a Swift type to a SILType, and returns the SIL TypeLowering
   /// for that type.
-  const TypeLowering &getTypeLowering(Type t, unsigned uncurryLevel = 0) {
+  const TypeLowering &getTypeLowering(Type t) {
     AbstractionPattern pattern(CurGenericContext, t->getCanonicalType());
-    return getTypeLowering(pattern, t, uncurryLevel);
+    return getTypeLowering(pattern, t);
   }
 
   /// Lowers a Swift type to a SILType according to the abstraction
   /// patterns of the given original type.
   const TypeLowering &getTypeLowering(AbstractionPattern origType,
-                                      Type substType,
-                                      unsigned uncurryLevel = 0);
+                                      Type substType);
 
   /// Returns the SIL TypeLowering for an already lowered SILType. If the
   /// SILType is an address, returns the TypeLowering for the pointed-to
@@ -600,18 +592,17 @@ public:
   const TypeLowering &getTypeLowering(SILType t);
 
   // Returns the lowered SIL type for a Swift type.
-  SILType getLoweredType(Type t, unsigned uncurryLevel = 0) {
-    return getTypeLowering(t, uncurryLevel).getLoweredType();
+  SILType getLoweredType(Type t) {
+    return getTypeLowering(t).getLoweredType();
   }
 
   // Returns the lowered SIL type for a Swift type.
-  SILType getLoweredType(AbstractionPattern origType, Type substType,
-                         unsigned uncurryLevel = 0) {
-    return getTypeLowering(origType, substType, uncurryLevel).getLoweredType();
+  SILType getLoweredType(AbstractionPattern origType, Type substType) {
+    return getTypeLowering(origType, substType).getLoweredType();
   }
 
-  SILType getLoweredLoadableType(Type t, unsigned uncurryLevel = 0) {
-    const TypeLowering &ti = getTypeLowering(t, uncurryLevel);
+  SILType getLoweredLoadableType(Type t) {
+    const TypeLowering &ti = getTypeLowering(t);
     assert(ti.isLoadable() && "unexpected address-only type");
     return ti.getLoweredType();
   }
@@ -631,12 +622,18 @@ public:
   CanSILFunctionType
   getMaterializeForSetCallbackType(AbstractStorageDecl *storage,
                                    CanGenericSignature genericSig,
-                                   Type selfType);
+                                   Type selfType,
+                                   SILFunctionTypeRepresentation rep);
 
   /// Return the SILFunctionType for a native function value of the
   /// given type.
   CanSILFunctionType getSILFunctionType(AbstractionPattern origType,
-                                        CanAnyFunctionType substType,
+                                        CanFunctionType substFnType);
+
+  /// Convert an AST function type into a SILFunctionType at a non-standard
+  /// uncurry level.
+  CanSILFunctionType getSILFunctionType(AbstractionPattern origType,
+                                        CanFunctionType substFnType,
                                         unsigned uncurryLevel);
 
   /// Returns the formal type, lowered AST type, and SILFunctionType
@@ -679,13 +676,6 @@ public:
   SILConstantInfo getConstantOverrideInfo(SILDeclRef constant,
                                           SILDeclRef base);
 
-  /// Substitute the given function type so that it implements the
-  /// given substituted type.
-  CanSILFunctionType substFunctionType(CanSILFunctionType origFnType,
-                                 CanAnyFunctionType origLoweredType,
-                                 CanAnyFunctionType substLoweredInterfaceType,
-                         const Optional<ForeignErrorConvention> &foreignError);
-  
   /// Get the empty tuple type as a SILType.
   SILType getEmptyTupleType() {
     return getLoweredType(TupleType::getEmpty(Context));
@@ -715,16 +705,16 @@ public:
   /// Convert a nested function type into an uncurried AST representation.
   CanAnyFunctionType getLoweredASTFunctionType(CanAnyFunctionType t,
                                                unsigned uncurryLevel,
-                                               Optional<SILDeclRef> constant) {
-    return getLoweredASTFunctionType(t, uncurryLevel, t->getExtInfo(),
-                                     constant);
-  }
+                                               AnyFunctionType::ExtInfo info,
+                                               Optional<SILDeclRef> constant);
 
   /// Convert a nested function type into an uncurried AST representation.
   CanAnyFunctionType getLoweredASTFunctionType(CanAnyFunctionType t,
                                                unsigned uncurryLevel,
-                                               AnyFunctionType::ExtInfo info,
-                                               Optional<SILDeclRef> constant);
+                                               Optional<SILDeclRef> constant) {
+    return getLoweredASTFunctionType(t, uncurryLevel, t->getExtInfo(),
+                                     constant);
+  }
 
   /// Given a referenced value and the substituted formal type of a
   /// resulting l-value expression, produce the substituted formal
@@ -816,8 +806,7 @@ public:
                               bool isMutable);
 
 private:
-  CanType getLoweredRValueType(AbstractionPattern origType, CanType substType,
-                               unsigned uncurryLevel);
+  CanType getLoweredRValueType(AbstractionPattern origType, CanType substType);
 
   Type getLoweredCBridgedType(AbstractionPattern pattern, Type t,
                               bool canBridgeBool,
@@ -880,10 +869,10 @@ namespace llvm {
 
     // Use the second field because the first field can validly be null.
     static CachingTypeKey getEmptyKey() {
-      return {nullptr, APCachingKey(), CanTypeInfo::getEmptyKey(), 0};
+      return {nullptr, APCachingKey(), CanTypeInfo::getEmptyKey()};
     }
     static CachingTypeKey getTombstoneKey() {
-      return {nullptr, APCachingKey(), CanTypeInfo::getTombstoneKey(), 0};
+      return {nullptr, APCachingKey(), CanTypeInfo::getTombstoneKey()};
     }
     static unsigned getHashValue(CachingTypeKey val) {
       auto hashSig =
@@ -892,7 +881,7 @@ namespace llvm {
         CachingKeyInfo::getHashValue(val.OrigType);
       auto hashSubst =
         DenseMapInfo<swift::CanType>::getHashValue(val.SubstType);
-      return hash_combine(hashSig, hashOrig, hashSubst, val.UncurryLevel);
+      return hash_combine(hashSig, hashOrig, hashSubst);
     }
     static bool isEqual(CachingTypeKey LHS, CachingTypeKey RHS) {
       return LHS == RHS;

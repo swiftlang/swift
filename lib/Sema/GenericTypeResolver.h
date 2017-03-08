@@ -23,7 +23,7 @@
 
 namespace swift {
 
-class ArchetypeBuilder;
+class GenericSignatureBuilder;
 class AssociatedTypeDecl;
 class Identifier;
 class ParamDecl;
@@ -87,6 +87,10 @@ public:
   /// \returns the type of the declaration in context..
   virtual Type resolveTypeOfDecl(TypeDecl *decl) = 0;
 
+  /// Determine whether the given types are equivalent within the generic
+  /// context.
+  virtual bool areSameType(Type type1, Type type2) = 0;
+
   /// Set the contextual type or the interface type of the parameter.
   virtual void recordParamType(ParamDecl *decl, Type ty) = 0;
 };
@@ -96,11 +100,13 @@ public:
 /// This generic type resolver leaves generic type parameter types alone
 /// and only trivially resolves dependent member types.
 class DependentGenericTypeResolver : public GenericTypeResolver {
-  ArchetypeBuilder &Builder;
+  GenericSignatureBuilder &Builder;
+  ArrayRef<GenericTypeParamType *> GenericParams;
 
 public:
-  explicit DependentGenericTypeResolver(ArchetypeBuilder &builder)
-    : Builder(builder) { }
+  DependentGenericTypeResolver(GenericSignatureBuilder &builder,
+                               ArrayRef<GenericTypeParamType *> genericParams)
+    : Builder(builder), GenericParams(genericParams) { }
 
   virtual Type resolveGenericTypeParamType(GenericTypeParamType *gp);
 
@@ -115,6 +121,8 @@ public:
   virtual Type resolveTypeOfContext(DeclContext *dc);
 
   virtual Type resolveTypeOfDecl(TypeDecl *decl);
+
+  virtual bool areSameType(Type type1, Type type2);
 
   virtual void recordParamType(ParamDecl *decl, Type ty);
 };
@@ -136,8 +144,7 @@ public:
 
   virtual Type resolveGenericTypeParamType(GenericTypeParamType *gp);
 
-  virtual Type resolveDependentMemberType(Type baseTy,
-                                          DeclContext *DC,
+  virtual Type resolveDependentMemberType(Type baseTy, DeclContext *DC,
                                           SourceRange baseRange,
                                           ComponentIdentTypeRepr *ref);
 
@@ -148,23 +155,57 @@ public:
 
   virtual Type resolveTypeOfDecl(TypeDecl *decl);
 
+  virtual bool areSameType(Type type1, Type type2);
+
+  virtual void recordParamType(ParamDecl *decl, Type ty);
+};
+
+/// Generic type resolver that only handles what can appear in a protocol
+/// definition, i.e. Self, and Self.A.B.C dependent types.
+///
+/// This should only be used when resolving/validating where clauses in
+/// protocols.
+class ProtocolRequirementTypeResolver : public GenericTypeResolver {
+  ProtocolDecl *Proto;
+
+public:
+  explicit ProtocolRequirementTypeResolver(ProtocolDecl *proto)
+      : Proto(proto) {}
+
+  virtual Type resolveGenericTypeParamType(GenericTypeParamType *gp);
+
+  virtual Type resolveDependentMemberType(Type baseTy, DeclContext *DC,
+                                          SourceRange baseRange,
+                                          ComponentIdentTypeRepr *ref);
+
+  virtual Type resolveSelfAssociatedType(Type selfTy,
+                                         AssociatedTypeDecl *assocType);
+
+  virtual Type resolveTypeOfContext(DeclContext *dc);
+
+  virtual Type resolveTypeOfDecl(TypeDecl *decl);
+
+  virtual bool areSameType(Type type1, Type type2);
+
   virtual void recordParamType(ParamDecl *decl, Type ty);
 };
 
 /// Generic type resolver that performs complete resolution of dependent
-/// types based on a given archetype builder.
+/// types based on a given generic signature builder.
 ///
 /// This generic type resolver should be used after all requirements have been
-/// introduced into the archetype builder, including inferred requirements,
+/// introduced into the generic signature builder, including inferred requirements,
 /// to check the signature of a generic declaration and resolve (for example)
 /// all dependent member refers to archetype members.
 class CompleteGenericTypeResolver : public GenericTypeResolver {
   TypeChecker &TC;
-  ArchetypeBuilder &Builder;
+  GenericSignatureBuilder &Builder;
+  ArrayRef<GenericTypeParamType *> GenericParams;
 
 public:
-  CompleteGenericTypeResolver(TypeChecker &tc, ArchetypeBuilder &builder)
-    : TC(tc), Builder(builder) { }
+  CompleteGenericTypeResolver(TypeChecker &tc, GenericSignatureBuilder &builder,
+                              ArrayRef<GenericTypeParamType *> genericParams)
+    : TC(tc), Builder(builder), GenericParams(genericParams) { }
 
   virtual Type resolveGenericTypeParamType(GenericTypeParamType *gp);
 
@@ -179,6 +220,8 @@ public:
   virtual Type resolveTypeOfContext(DeclContext *dc);
 
   virtual Type resolveTypeOfDecl(TypeDecl *decl);
+
+  virtual bool areSameType(Type type1, Type type2);
 
   virtual void recordParamType(ParamDecl *decl, Type ty);
 };

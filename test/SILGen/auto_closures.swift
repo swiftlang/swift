@@ -6,8 +6,10 @@ var false_ = Bool()
 // CHECK-LABEL: sil hidden @_T013auto_closures05call_A8_closureAA4BoolVADyXKF : $@convention(thin) (@owned @callee_owned () -> Bool) -> Bool
 func call_auto_closure(_ x: @autoclosure () -> Bool) -> Bool {
   // CHECK: bb0([[CLOSURE:%.*]] : $@callee_owned () -> Bool):
-  // CHECK: [[CLOSURE_COPY:%.*]] = copy_value [[CLOSURE]]
+  // CHECK: [[BORROWED_CLOSURE:%.*]] = begin_borrow [[CLOSURE]]
+  // CHECK: [[CLOSURE_COPY:%.*]] = copy_value [[BORROWED_CLOSURE]]
   // CHECK: [[RET:%.*]] = apply [[CLOSURE_COPY]]()
+  // CHECK: end_borrow [[BORROWED_CLOSURE]] from [[CLOSURE]]
   // CHECK: destroy_value [[CLOSURE]]
   // CHECK: return [[RET]]
   return x()
@@ -57,7 +59,7 @@ public class Sub : Base {
 // CHECK: }
 // CHECK-LABEL: sil shared [transparent] @_T013auto_closures20closureInAutoclosureAA4BoolVAD_ADtFADyXKfu_ : $@convention(thin) (Bool, Bool) -> Bool {
 // CHECK: }
-// CHECK-LABEL: sil shared @_T013auto_closures20closureInAutoclosureAA4BoolVAD_ADtFADyXKfu_AdDcfU_ : $@convention(thin) (Bool, Bool) -> Bool {
+// CHECK-LABEL: sil shared @_T013auto_closures20closureInAutoclosureAA4BoolVAD_ADtFADyXKfu_A2DcfU_ : $@convention(thin) (Bool, Bool) -> Bool {
 // CHECK: }
 func compareBool(_ lhs: Bool, _ rhs: Bool) -> Bool { return false_ }
 func testBool(_ x: Bool, _ pred: (Bool) -> Bool) -> Bool {

@@ -30,7 +30,7 @@ TupleInst *SILBuilder::createTuple(SILLocation loc, ArrayRef<SILValue> elts) {
 
 SILType SILBuilder::getPartialApplyResultType(SILType origTy, unsigned argCount,
                                         SILModule &M,
-                                        ArrayRef<Substitution> subs,
+                                        SubstitutionList subs,
                                         ParameterConvention calleeConvention) {
   CanSILFunctionType FTI = origTy.castTo<SILFunctionType>();
   if (!subs.empty())
@@ -245,7 +245,7 @@ SILBuilder::emitStrongRelease(SILLocation Loc, SILValue Operand) {
   }
 
   // If we didn't find a retain to fold this into, emit the release.
-  return createStrongRelease(Loc, Operand, Atomicity::Atomic);
+  return createStrongRelease(Loc, Operand, getDefaultAtomicity());
 }
 
 /// Emit a release_value instruction at the current location, attempting to
@@ -272,7 +272,7 @@ SILBuilder::emitReleaseValue(SILLocation Loc, SILValue Operand) {
   }
 
   // If we didn't find a retain to fold this into, emit the release.
-  return createReleaseValue(Loc, Operand, Atomicity::Atomic);
+  return createReleaseValue(Loc, Operand, getDefaultAtomicity());
 }
 
 PointerUnion<CopyValueInst *, DestroyValueInst *>

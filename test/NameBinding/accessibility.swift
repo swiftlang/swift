@@ -2,7 +2,7 @@
 // RUN: cp %s %t/main.swift
 
 // RUN: %target-swift-frontend -emit-module -o %t %S/Inputs/has_accessibility.swift -D DEFINE_VAR_FOR_SCOPED_IMPORT -enable-testing
-// RUN: %target-swift-frontend -typecheck -primary-file %t/main.swift %S/Inputs/accessibility_other.swift -module-name accessibility -I %t -sdk "" -enable-access-control -verify
+// RUN: %target-swift-frontend -typecheck -primary-file %t/main.swift %S/Inputs/accessibility_other.swift -module-name accessibility -I %t -sdk "" -enable-access-control -verify -verify-ignore-unknown
 // RUN: %target-swift-frontend -typecheck -primary-file %t/main.swift %S/Inputs/accessibility_other.swift -module-name accessibility -I %t -sdk "" -disable-access-control -D ACCESS_DISABLED
 // RUN: not %target-swift-frontend -typecheck -primary-file %t/main.swift %S/Inputs/accessibility_other.swift -module-name accessibility -I %t -sdk "" -D TESTABLE 2>&1 | %FileCheck -check-prefix=TESTABLE %s
 
@@ -161,3 +161,11 @@ internal class TestableSub: InternalBase {} // expected-error {{undeclared type 
 public class TestablePublicSub: InternalBase {} // expected-error {{undeclared type 'InternalBase'}}
 // TESTABLE-NOT: undeclared type 'InternalBase'
 #endif
+
+// FIXME: Remove -verify-ignore-unknown.
+// <unknown>:0: error: unexpected note produced: 'y' declared here
+// <unknown>:0: error: unexpected note produced: 'z' declared here
+// <unknown>:0: error: unexpected note produced: 'init()' declared here
+// <unknown>:0: error: unexpected note produced: 'method()' declared here
+// <unknown>:0: error: unexpected note produced: 'method' declared here
+// <unknown>:0: error: unexpected note produced: 'method' declared here

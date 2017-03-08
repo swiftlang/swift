@@ -15,9 +15,11 @@
 
 #include "swift/Basic/LLVM.h"
 #include "swift/AST/AttrKind.h"
+#include "swift/AST/Identifier.h"
 
 namespace swift {
   class ModuleDecl;
+  class ValueDecl;
 
   /// Print the Objective-C-compatible declarations in a module as a Clang
   /// header.

@@ -18,18 +18,75 @@
 #define SWIFT_AST_GENERIC_SIGNATURE_H
 
 #include "swift/AST/Requirement.h"
-#include "swift/AST/Substitution.h"
+#include "swift/AST/SubstitutionList.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/FoldingSet.h"
+#include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/TrailingObjects.h"
+#include <utility>
 
 namespace swift {
 
-class ArchetypeBuilder;
+class GenericSignatureBuilder;
 class ProtocolConformanceRef;
 class ProtocolType;
 class Substitution;
 class SubstitutionMap;
+
+/// An access path used to find a particular protocol conformance within
+/// a generic signature.
+///
+/// One can follow a conformance path to extract any conformance that is
+/// derivable within the generic signature. For example, given:
+///
+/// \code
+///   func f<C: Collection>(_: C) where C.Iterator.Element: Hashable { }
+/// \endcode
+///
+/// One can extract conformances for various types and protocols, including
+/// those written directly (\c C: Collection, \c C.Iterator.Element: Hashable),
+/// and others that can be derived (\c C: Sequence,
+/// \c C.Iterator: IteratorProtocol, \c C.Iterator.Element: Equatable).
+///
+/// A conformance access path is a sequence of (dependent type, protocol decl)
+/// pairs that starts at an explicit requirement in the generic signature
+/// (e.g., \c C: Collection). Each subsequent step names a dependent
+/// type and protocol that refers to an explicit requirement in the requirement
+/// signature of the previous step's protocol. For example, consider the
+/// derived conformance \c C.Iterator: IteratorProtocol, which has the
+/// following path:
+///
+/// \code
+/// (C, Collection) -> (Self, Sequence) -> (Self.Iterator, IteratorProtocol)
+/// \endcode
+///
+/// Therefore, the path starts at \c C: Collection. It then retrieves the
+/// \c Sequence conformance of \c C (because \c Collection inherits
+/// \c Sequence). Finally, it extracts the conformance of the associated type
+/// \c Iterator to \c IteratorProtocol from the \c Sequence protocol.
+class ConformanceAccessPath {
+public:
+  /// An entry in the conformance access path, which is described by the
+  /// dependent type on which the conformance is stated as the protocol to
+  /// which.
+  typedef std::pair<Type, ProtocolDecl *> Entry;
+
+private:
+  llvm::SmallVector<Entry, 2> path;
+
+  friend class GenericSignature;
+
+public:
+  typedef llvm::SmallVector<Entry, 2>::const_iterator iterator;
+  typedef llvm::SmallVector<Entry, 2>::const_iterator const_iterator;
+
+  const_iterator begin() const { return path.begin(); }
+  const_iterator end() const { return path.end(); }
+
+  void print(raw_ostream &OS) const;
+
+  LLVM_ATTRIBUTE_DEPRECATED(void dump() const, "only for use in a debugger");
+};
 
 /// Describes the generic signature of a particular declaration, including
 /// both the generic type parameters and the requirements placed on those
@@ -74,8 +131,10 @@ class alignas(1 << TypeAlignInBits) GenericSignature final
   static ASTContext &getASTContext(ArrayRef<GenericTypeParamType *> params,
                                    ArrayRef<Requirement> requirements);
 
-  /// Retrieve the archetype builder for the given generic signature.
-  ArchetypeBuilder *getArchetypeBuilder(ModuleDecl &mod);
+  /// Retrieve the generic signature builder for the given generic signature.
+  GenericSignatureBuilder *getGenericSignatureBuilder(ModuleDecl &mod);
+
+  void populateParentMap(SubstitutionMap &subMap) const;
 
   friend class ArchetypeType;
 
@@ -88,8 +147,9 @@ public:
 
   /// Create a new generic signature with the given type parameters and
   /// requirements, first canonicalizing the types.
-  static CanGenericSignature getCanonical(ArrayRef<GenericTypeParamType *> params,
-                                          ArrayRef<Requirement> requirements);
+  static CanGenericSignature getCanonical(
+                                      ArrayRef<GenericTypeParamType *> params,
+                                      ArrayRef<Requirement> requirements);
 
   /// Retrieve the generic parameters.
   ArrayRef<GenericTypeParamType *> getGenericParams() const {
@@ -112,19 +172,13 @@ public:
   /// \param substitutions The generic parameter -> generic argument
   /// substitutions that will have been applied to these types.
   /// These are used to produce the "parameter = argument" bindings in the test.
-  std::string gatherGenericParamBindingsText(
-      ArrayRef<Type> types, const TypeSubstitutionMap &substitutions) const;
+  std::string
+  gatherGenericParamBindingsText(ArrayRef<Type> types,
+                                 TypeSubstitutionFn substitutions) const;
 
   /// Retrieve the requirements.
   ArrayRef<Requirement> getRequirements() const {
     return const_cast<GenericSignature *>(this)->getRequirementsBuffer();
-  }
-
-  /// Check if the generic signature makes all generic parameters
-  /// concrete.
-  bool areAllParamsConcrete() const {
-    auto iter = getAllDependentTypes();
-    return iter.begin() == iter.end();
   }
 
   /// Only allow allocation by doing a placement new.
@@ -135,11 +189,19 @@ public:
 
   /// Build an interface type substitution map from a vector of Substitutions
   /// that correspond to the generic parameters in this generic signature.
-  SubstitutionMap getSubstitutionMap(ArrayRef<Substitution> args) const;
+  SubstitutionMap getSubstitutionMap(SubstitutionList args) const;
 
-  /// Same as above, but updates an existing map.
-  void getSubstitutionMap(ArrayRef<Substitution> args,
-                          SubstitutionMap &subMap) const;
+  /// Build an interface type substitution map from a type substitution function
+  /// and conformance lookup function.
+  SubstitutionMap
+  getSubstitutionMap(TypeSubstitutionFn subs,
+                     LookupConformanceFn lookupConformance) const;
+
+  /// Look up a stored conformance in the generic signature. These are formed
+  /// from same-type constraints placed on associated types of generic
+  /// parameters which have conformance constraints on them.
+  Optional<ProtocolConformanceRef>
+  lookupConformance(CanType depTy, ProtocolDecl *proto) const;
 
   using GenericFunction = auto(CanType canType, Type conformingReplacementType,
     ProtocolType *conformedProtocol)
@@ -163,11 +225,6 @@ public:
   void getSubstitutions(const SubstitutionMap &subMap,
                         SmallVectorImpl<Substitution> &result) const;
 
-  /// Return a range that iterates through all of the types that require
-  /// substitution, which includes the generic parameter types as well as
-  /// other dependent types that require additional conformances.
-  SmallVector<Type, 4> getAllDependentTypes() const;
-
   /// Enumerate all of the dependent types in the type signature that will
   /// occur in substitution lists (in order), along with the set of
   /// conformance requirements placed on that dependent type.
@@ -180,6 +237,33 @@ public:
   bool enumeratePairedRequirements(
          llvm::function_ref<bool(Type, ArrayRef<Requirement>)> fn) const;
 
+  /// Return a vector of all generic parameters that are not subject to
+  /// a concrete same-type constraint.
+  SmallVector<GenericTypeParamType *, 2> getSubstitutableParams() const;
+
+  /// Check if the generic signature makes all generic parameters
+  /// concrete.
+  bool areAllParamsConcrete() const {
+    return !enumeratePairedRequirements(
+      [](Type, ArrayRef<Requirement>) -> bool {
+        return true;
+      });
+  }
+
+  /// Return the size of a SubstitutionList built from this signature.
+  ///
+  /// Don't add new calls of this -- the representation of SubstitutionList
+  /// will be changing soon.
+  unsigned getSubstitutionListSize() const {
+    unsigned result = 0;
+    enumeratePairedRequirements(
+      [&](Type, ArrayRef<Requirement>) -> bool {
+        result++;
+        return false;
+      });
+    return result;
+  }
+
   /// Determines whether this GenericSignature is canonical.
   bool isCanonical() const;
   
@@ -187,6 +271,11 @@ public:
   
   /// Canonicalize the components of a generic signature.
   CanGenericSignature getCanonicalSignature() const;
+
+  /// Create a new generic environment that provides fresh contextual types
+  /// (archetypes) that correspond to the interface types in this generic
+  /// signature.
+  GenericEnvironment *createGenericEnvironment(ModuleDecl &mod);
 
   /// Uniquing for the ASTContext.
   void Profile(llvm::FoldingSetNodeID &ID) {
@@ -217,11 +306,6 @@ public:
   /// constraint.
   LayoutConstraint getLayoutConstraint(Type type, ModuleDecl &mod);
 
-  /// Return the preferred representative of the given type parameter within
-  /// this generic signature.  This may yield a concrete type or a
-  /// different type parameter.
-  Type getRepresentative(Type type, ModuleDecl &mod);
-
   /// Return whether two type parameters represent the same type under this
   /// generic signature.
   ///
@@ -235,8 +319,24 @@ public:
 
   /// Return the canonical version of the given type under this generic
   /// signature.
-  CanType getCanonicalTypeInContext(Type type, ArchetypeBuilder &builder);
-  bool isCanonicalTypeInContext(Type type, ArchetypeBuilder &builder);
+  CanType getCanonicalTypeInContext(Type type, GenericSignatureBuilder &builder);
+  bool isCanonicalTypeInContext(Type type, GenericSignatureBuilder &builder);
+
+  /// Retrieve the conformance access path used to extract the conformance of
+  /// interface \c type to the given \c protocol.
+  ///
+  /// \param type The interface type whose conformance access path is to be
+  /// queried.
+  /// \param protocol A protocol to which \c type conforms.
+  ///
+  /// \returns the conformance access path that starts at a requirement of
+  /// this generic signature and ends at the conformance that makes \c type
+  /// conform to \c protocol.
+  ///
+  /// \seealso ConformanceAccessPath
+  ConformanceAccessPath getConformanceAccessPath(Type type,
+                                                 ProtocolDecl *protocol,
+                                                 ModuleDecl &mod);
 
   static void Profile(llvm::FoldingSetNodeID &ID,
                       ArrayRef<GenericTypeParamType *> genericParams,

@@ -93,6 +93,9 @@ namespace {
     /// unexpected ones.
     bool verifyFile(unsigned BufferID, bool autoApplyFixes);
 
+    /// diagnostics for '<unknown>:0' should be considered as unexpected.
+    bool verifyUnknown();
+
     /// If there are any -verify errors (e.g. differences between expectations
     /// and actual diagnostics produced), apply fixits to the original source
     /// file and drop it back in place.
@@ -623,6 +626,24 @@ bool DiagnosticVerifier::verifyFile(unsigned BufferID,
   return !Errors.empty();
 }
 
+bool DiagnosticVerifier::verifyUnknown() {
+  bool HadError = false;
+  for (unsigned i = 0, e = CapturedDiagnostics.size(); i != e; ++i) {
+    if (CapturedDiagnostics[i].getFilename() != "<unknown>")
+      continue;
+
+    HadError = true;
+    std::string Message =
+      "unexpected "+getDiagKindString(CapturedDiagnostics[i].getKind())+
+      " produced: "+CapturedDiagnostics[i].getMessage().str();
+
+    auto diag = SM.GetMessage({}, llvm::SourceMgr::DK_Error, Message,
+                              {}, {});
+    SM.getLLVMSourceMgr().PrintMessage(llvm::errs(), diag);
+  }
+  return HadError;
+}
+
 /// If there are any -verify errors (e.g. differences between expectations
 /// and actual diagnostics produced), apply fixits to the original source
 /// file and drop it back in place.
@@ -694,7 +715,7 @@ void swift::enableDiagnosticVerifier(SourceManager &SM) {
 }
 
 bool swift::verifyDiagnostics(SourceManager &SM, ArrayRef<unsigned> BufferIDs,
-                              bool autoApplyFixes) {
+                              bool autoApplyFixes, bool ignoreUnknown) {
   auto *Verifier = (DiagnosticVerifier*)SM.getLLVMSourceMgr().getDiagContext();
   SM.getLLVMSourceMgr().setDiagHandler(nullptr, nullptr);
   
@@ -702,6 +723,8 @@ bool swift::verifyDiagnostics(SourceManager &SM, ArrayRef<unsigned> BufferIDs,
 
   for (auto &BufferID : BufferIDs)
     HadError |= Verifier->verifyFile(BufferID, autoApplyFixes);
+  if (!ignoreUnknown)
+    HadError |= Verifier->verifyUnknown();
 
   delete Verifier;
 

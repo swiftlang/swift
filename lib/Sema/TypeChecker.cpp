@@ -161,7 +161,7 @@ ProtocolDecl *TypeChecker::getLiteralProtocol(Expr *expr) {
 #define POUND_OBJECT_LITERAL(Name, Desc, Protocol)\
     case ObjectLiteralExpr::Name:\
       return getProtocol(expr->getLoc(), KnownProtocolKind::Protocol);
-#include "swift/Parse/Tokens.def"
+#include "swift/Syntax/TokenKinds.def"
     }
   }
 
@@ -348,7 +348,7 @@ static void bindExtensionDecl(ExtensionDecl *ED, TypeChecker &TC) {
   }
 
   // Cannot extend a bound generic type.
-  if (extendedType->isSpecialized() && extendedType->getAnyNominal()) {
+  if (extendedType->isSpecialized()) {
     TC.diagnose(ED->getLoc(), diag::extension_specialization,
                 extendedType->getAnyNominal()->getName())
       .highlight(ED->getExtendedTypeLoc().getSourceRange());
@@ -410,7 +410,8 @@ void TypeChecker::bindExtension(ExtensionDecl *ext) {
   ::bindExtensionDecl(ext, *this);
 }
 
-static bool shouldValidateDeclForLayout(NominalTypeDecl *nominal, ValueDecl *VD) {
+static bool shouldValidateMemberDuringFinalization(NominalTypeDecl *nominal,
+                                                   ValueDecl *VD) {
   // For enums, we only need to validate enum elements to know
   // the layout.
   if (isa<EnumDecl>(nominal) &&
@@ -440,7 +441,7 @@ static bool shouldValidateDeclForLayout(NominalTypeDecl *nominal, ValueDecl *VD)
   return false;
 }
 
-static void validateDeclForLayout(TypeChecker &TC, NominalTypeDecl *nominal) {
+static void finalizeType(TypeChecker &TC, NominalTypeDecl *nominal) {
   Optional<bool> lazyVarsAlreadyHaveImplementation;
 
   for (auto *D : nominal->getMembers()) {
@@ -448,7 +449,7 @@ static void validateDeclForLayout(TypeChecker &TC, NominalTypeDecl *nominal) {
     if (!VD)
       continue;
 
-    if (!shouldValidateDeclForLayout(nominal, VD))
+    if (!shouldValidateMemberDuringFinalization(nominal, VD))
       continue;
 
     TC.validateDecl(VD);
@@ -488,6 +489,15 @@ static void validateDeclForLayout(TypeChecker &TC, NominalTypeDecl *nominal) {
   if (auto *CD = dyn_cast<ClassDecl>(nominal)) {
     TC.addImplicitConstructors(CD);
     TC.addImplicitDestructor(CD);
+  }
+
+  // validateDeclForNameLookup will not trigger an immediate full
+  // validation of protocols, but clients will assume that things
+  // like the requirement signature have been set.
+  if (auto PD = dyn_cast<ProtocolDecl>(nominal)) {
+    if (!PD->isRequirementSignatureComputed()) {
+      TC.validateDecl(PD);
+    }
   }
 }
 
@@ -541,12 +551,12 @@ static void typeCheckFunctionsAndExternalDecls(TypeChecker &TC) {
     // Note: if we ever start putting extension members in vtables, we'll need
     // to validate those members too.
     // FIXME: If we're not planning to run SILGen, this is wasted effort.
-    while (!TC.ValidatedTypes.empty()) {
-      auto nominal = TC.ValidatedTypes.pop_back_val();
+    while (!TC.TypesToFinalize.empty()) {
+      auto nominal = TC.TypesToFinalize.pop_back_val();
       if (nominal->isInvalid() || TC.Context.hadError())
         continue;
 
-      validateDeclForLayout(TC, nominal);
+      finalizeType(TC, nominal);
     }
 
     // Complete any conformances that we used.
@@ -559,7 +569,7 @@ static void typeCheckFunctionsAndExternalDecls(TypeChecker &TC) {
 
   } while (currentFunctionIdx < TC.definedFunctions.size() ||
            currentExternalDef < TC.Context.ExternalDefinitions.size() ||
-           !TC.ValidatedTypes.empty() ||
+           !TC.TypesToFinalize.empty() ||
            !TC.UsedConformances.empty());
 
   // FIXME: Horrible hack. Store this somewhere more appropriate.
@@ -600,6 +610,13 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
   if (SF.ASTStage == SourceFile::TypeChecked)
     return;
 
+  auto &Ctx = SF.getASTContext();
+
+  // Make sure we have a type checker.
+  Optional<TypeChecker> MyTC;
+  if (!Ctx.getLazyResolver())
+    MyTC.emplace(Ctx);
+
   // Make sure that name binding has been completed before doing any type
   // checking.
   {
@@ -607,32 +624,35 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
     performNameBinding(SF, StartElem);
   }
 
-  auto &Ctx = SF.getASTContext();
   {
     // NOTE: The type checker is scoped to be torn down before AST
     // verification.
-    TypeChecker TC(Ctx);
     SharedTimer timer("Type checking / Semantic analysis");
 
-    TC.setWarnLongFunctionBodies(WarnLongFunctionBodies);
-    if (Options.contains(TypeCheckingFlags::DebugTimeFunctionBodies))
-      TC.enableDebugTimeFunctionBodies();
+    if (MyTC) {
+      MyTC->setWarnLongFunctionBodies(WarnLongFunctionBodies);
+      if (Options.contains(TypeCheckingFlags::DebugTimeFunctionBodies))
+        MyTC->enableDebugTimeFunctionBodies();
 
-    if (Options.contains(TypeCheckingFlags::DebugTimeExpressions))
-      TC.enableDebugTimeExpressions();
+      if (Options.contains(TypeCheckingFlags::DebugTimeExpressions))
+        MyTC->enableDebugTimeExpressions();
 
-    if (Options.contains(TypeCheckingFlags::ForImmediateMode))
-      TC.setInImmediateMode(true);
-    
-    // Lookup the swift module.  This ensures that we record all known
-    // protocols in the AST.
-    (void) TC.getStdlibModule(&SF);
+      if (Options.contains(TypeCheckingFlags::ForImmediateMode))
+        MyTC->setInImmediateMode(true);
+      
+      // Lookup the swift module.  This ensures that we record all known
+      // protocols in the AST.
+      (void) MyTC->getStdlibModule(&SF);
 
-    if (!Ctx.LangOpts.DisableAvailabilityChecking) {
-      // Build the type refinement hierarchy for the primary
-      // file before type checking.
-      TC.buildTypeRefinementContextHierarchy(SF, StartElem);
+      if (!Ctx.LangOpts.DisableAvailabilityChecking) {
+        // Build the type refinement hierarchy for the primary
+        // file before type checking.
+        MyTC->buildTypeRefinementContextHierarchy(SF, StartElem);
+      }
     }
+
+    TypeChecker &TC =
+      MyTC ? *MyTC : *static_cast<TypeChecker *>(Ctx.getLazyResolver());
 
     // Resolve extensions. This has to occur first during type checking,
     // because the extensions need to be wired into the AST for name lookup
@@ -689,11 +709,12 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
 
     // If we're in REPL mode, inject temporary result variables and other stuff
     // that the REPL needs to synthesize.
-    if (SF.Kind == SourceFileKind::REPL && !TC.Context.hadError())
+    if (SF.Kind == SourceFileKind::REPL && !Ctx.hadError())
       TC.processREPLTopLevel(SF, TLC, StartElem);
 
     typeCheckFunctionsAndExternalDecls(TC);
   }
+  MyTC.reset();
 
   // Checking that benefits from having the whole module available.
   if (!(Options & TypeCheckingFlags::DelayWholeModuleChecking)) {
@@ -788,7 +809,10 @@ bool swift::typeCheckCompletionDecl(Decl *D) {
   DiagnosticEngine Diags(Ctx.SourceMgr);
   TypeChecker TC(Ctx, Diags);
 
-  TC.typeCheckDecl(D, true);
+  if (auto ext = dyn_cast<ExtensionDecl>(D))
+    TC.validateExtension(ext);
+  else
+    TC.typeCheckDecl(D, true);
   return true;
 }
 

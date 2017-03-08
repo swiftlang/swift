@@ -23,7 +23,7 @@ extension _SwiftNewtypeWrapper where Self.RawValue : Hashable {
 
 % for op in ['<', '>', '<=', '>=']:
 public func ${op} <T: _SwiftNewtypeWrapper>(lhs: T, rhs: T) -> Bool
-  where T.RawValue : Comparable {
+  where T : Comparable, T.RawValue : Comparable {
   return lhs.rawValue ${op} rhs.rawValue
 }
 % end

@@ -34,5 +34,5 @@ bb0(%0 : $@thin Box<()>.Type):
   return %1 : $()
 }
 
-// CHECK-DAG: define linkonce_odr hidden void @_T04main3BoxV3fooyyFZyt_Tg5() {{.*}}{
-// CHECK-DAG: call void @_T04main3BoxV3fooyyFZyt_Tg5()
+// CHECK-DAG: define linkonce_odr hidden swiftcc void @_T04main3BoxV3fooyyFZyt_Tg5() {{.*}}{
+// CHECK-DAG: call swiftcc void @_T04main3BoxV3fooyyFZyt_Tg5()

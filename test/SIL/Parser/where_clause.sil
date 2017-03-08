@@ -10,7 +10,7 @@ protocol Runcible {
 
 struct Spoon<T: Runcible> {}
 
-// CHECK: sil @foo : $@convention(thin) <T where T : Runcible, T.Mince == T> () -> @out Spoon<T>
+// CHECK: sil @foo : $@convention(thin) <T where T : Runcible, T == T.Mince> () -> @out Spoon<T>
 sil @foo : $@convention(thin) <T where T: Runcible, T == T.Mince> () -> @out Spoon<T> {
 entry(%0 : $*Spoon<T>):
   return undef : $()

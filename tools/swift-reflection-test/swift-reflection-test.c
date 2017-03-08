@@ -17,6 +17,7 @@
 #define MAX(a,b) (((a)>(b))?(a):(b))
 
 #include "swift/SwiftRemoteMirror/SwiftRemoteMirror.h"
+#include "swift/Basic/ManglingMacros.h"
 #include "messages.h"
 #include "overrides.h"
 
@@ -428,7 +429,7 @@ int doDumpHeapInstance(const char *BinaryFilename) {
             return EXIT_SUCCESS;
           break;
         case Existential: {
-          static const char Name[] = "_TtP_";
+          static const char Name[] = MANGLING_PREFIX_STR "ypD";
           swift_typeref_t AnyTR
             = swift_reflection_typeRefForMangledTypeName(RC,
               Name, sizeof(Name)-1);
@@ -439,7 +440,7 @@ int doDumpHeapInstance(const char *BinaryFilename) {
           break;
         }
         case ErrorExistential: {
-          static const char ErrorName[] = "_TtPs5Error_";
+          static const char ErrorName[] = MANGLING_PREFIX_STR "s5Error_pD";
           swift_typeref_t ErrorTR
             = swift_reflection_typeRefForMangledTypeName(RC,
               ErrorName, sizeof(ErrorName)-1);

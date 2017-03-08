@@ -71,12 +71,13 @@ SourceManager &SemaLocResolver::getSourceMgr() const
 }
 
 bool SemaLocResolver::tryResolve(ValueDecl *D, TypeDecl *CtorTyRef,
-                                 SourceLoc Loc, bool IsRef, Type Ty) {
+                                 ExtensionDecl *ExtTyRef, SourceLoc Loc,
+                                 bool IsRef, Type Ty) {
   if (!D->hasName())
     return false;
 
   if (Loc == LocToResolve) {
-    SemaTok = { D, CtorTyRef, Loc, IsRef, Ty, ContainerType };
+    SemaTok = { D, CtorTyRef, ExtTyRef, Loc, IsRef, Ty, ContainerType };
     return true;
   }
   return false;
@@ -90,10 +91,26 @@ bool SemaLocResolver::tryResolve(ModuleEntity Mod, SourceLoc Loc) {
   return false;
 }
 
+bool SemaLocResolver::tryResolve(Stmt *St) {
+  if (auto *LST = dyn_cast<LabeledStmt>(St)) {
+    if (LST->getStartLoc() == LocToResolve) {
+      SemaTok = { St };
+      return true;
+    }
+  }
+  if (auto *CS = dyn_cast<CaseStmt>(St)) {
+    if (CS->getStartLoc() == LocToResolve) {
+      SemaTok = { St };
+      return true;
+    }
+  }
+  return false;
+}
+
 bool SemaLocResolver::visitSubscriptReference(ValueDecl *D, CharSourceRange Range,
                                               bool IsOpenBracket) {
   // We should treat both open and close brackets equally
-  return visitDeclReference(D, Range, nullptr, Type(),
+  return visitDeclReference(D, Range, nullptr, nullptr, Type(),
                             SemaReferenceKind::SubscriptRef);
 }
 
@@ -113,8 +130,8 @@ bool SemaLocResolver::walkToDeclPre(Decl *D, CharSourceRange Range) {
     return true;
 
   if (ValueDecl *VD = dyn_cast<ValueDecl>(D))
-    return !tryResolve(VD, /*CtorTyRef=*/nullptr, Range.getStart(),
-                       /*IsRef=*/false);
+    return !tryResolve(VD, /*CtorTyRef=*/nullptr, /*ExtTyRef=*/nullptr,
+                       Range.getStart(), /*IsRef=*/false);
 
   return true;
 }
@@ -132,7 +149,7 @@ bool SemaLocResolver::walkToStmtPre(Stmt *S) {
   // non-implicit Stmts (fix Stmts created for lazy vars).
   if (!S->isImplicit() && !rangeContainsLoc(S->getSourceRange()))
     return false;
-  return true;
+  return !tryResolve(S);
 }
 
 bool SemaLocResolver::walkToStmtPost(Stmt *S) {
@@ -147,11 +164,12 @@ bool SemaLocResolver::walkToStmtPost(Stmt *S) {
 }
 
 bool SemaLocResolver::visitDeclReference(ValueDecl *D, CharSourceRange Range,
-                                         TypeDecl *CtorTyRef, Type T,
+                                         TypeDecl *CtorTyRef,
+                                         ExtensionDecl *ExtTyRef, Type T,
                                          SemaReferenceKind Kind) {
   if (isDone())
     return false;
-  return !tryResolve(D, CtorTyRef, Range.getStart(), /*IsRef=*/true, T);
+  return !tryResolve(D, CtorTyRef, ExtTyRef, Range.getStart(), /*IsRef=*/true, T);
 }
 
 bool SemaLocResolver::walkToExprPre(Expr *E) {
@@ -174,7 +192,7 @@ bool SemaLocResolver::visitCallArgName(Identifier Name, CharSourceRange Range,
                                        ValueDecl *D) {
   if (isDone())
     return false;
-  bool Found = tryResolve(D, nullptr, Range.getStart(), /*IsRef=*/true);
+  bool Found = tryResolve(D, nullptr, nullptr, Range.getStart(), /*IsRef=*/true);
   if (Found)
     SemaTok.IsKeywordArgument = true;
   return !Found;
@@ -215,6 +233,25 @@ void ResolvedRangeInfo::print(llvm::raw_ostream &OS) {
     OS << "<Entry>Multi</Entry>\n";
   }
 
+  if (ThrowingUnhandledError) {
+    OS << "<Error>Throwing</Error>\n";
+  }
+
+  if (Orphan != OrphanKind::None) {
+    OS << "<Orphan>";
+    switch (Orphan) {
+    case OrphanKind::Continue:
+      OS << "Continue";
+      break;
+    case OrphanKind::Break:
+      OS << "Break";
+      break;
+    case OrphanKind::None:
+      llvm_unreachable("cannot enter here.");
+    }
+    OS << "</Orphan>";
+  }
+
   for (auto &VD : DeclaredDecls) {
     OS << "<Declared>" << VD.VD->getNameStr() << "</Declared>";
     OS << "<OutscopeReference>";
@@ -241,6 +278,43 @@ bool DeclaredDecl::operator==(const DeclaredDecl& Other) {
 
 bool ReferencedDecl::operator==(const ReferencedDecl& Other) {
   return VD == Other.VD && Ty.getPointer() == Other.Ty.getPointer();
+}
+
+static bool hasUnhandledError(ArrayRef<ASTNode> Nodes) {
+  class ThrowingEntityAnalyzer : public SourceEntityWalker {
+    bool Throwing;
+  public:
+    ThrowingEntityAnalyzer(): Throwing(false) {}
+    bool walkToStmtPre(Stmt *S) override {
+      if (auto DCS = dyn_cast<DoCatchStmt>(S)) {
+        if (DCS->isSyntacticallyExhaustive())
+          return false;
+        Throwing = true;
+      } else if (isa<ThrowStmt>(S)) {
+        Throwing = true;
+      }
+      return !Throwing;
+    }
+    bool walkToExprPre(Expr *E) override {
+      if (isa<TryExpr>(E)) {
+        Throwing = true;
+      }
+      return !Throwing;
+    }
+    bool walkToDeclPre(Decl *D, CharSourceRange Range) override {
+      return false;
+    }
+    bool walkToDeclPost(Decl *D) override { return !Throwing; }
+    bool walkToStmtPost(Stmt *S) override { return !Throwing; }
+    bool walkToExprPost(Expr *E) override { return !Throwing; }
+    bool isThrowing() { return Throwing; }
+  };
+
+  return Nodes.end() != std::find_if(Nodes.begin(), Nodes.end(), [](ASTNode N) {
+    ThrowingEntityAnalyzer Analyzer;
+    N.walk(Analyzer);
+    return Analyzer.isThrowing();
+  });
 }
 
 struct RangeResolver::Implementation {
@@ -302,16 +376,20 @@ private:
     assert(ContainedASTNodes.size() == 1);
     // Single node implies single entry point, or is it?
     bool SingleEntry = true;
+    bool UnhandledError = hasUnhandledError({Node});
+    OrphanKind Kind = getOrphanKind(ContainedASTNodes);
     if (Node.is<Expr*>())
       return ResolvedRangeInfo(RangeKind::SingleExpression,
                                resolveNodeType(Node), Content,
                                getImmediateContext(), SingleEntry,
+                               UnhandledError, Kind,
                                llvm::makeArrayRef(ContainedASTNodes),
                                llvm::makeArrayRef(DeclaredDecls),
                                llvm::makeArrayRef(ReferencedDecls));
     else if (Node.is<Stmt*>())
       return ResolvedRangeInfo(RangeKind::SingleStatement, resolveNodeType(Node),
                                Content, getImmediateContext(), SingleEntry,
+                               UnhandledError, Kind,
                                llvm::makeArrayRef(ContainedASTNodes),
                                llvm::makeArrayRef(DeclaredDecls),
                                llvm::makeArrayRef(ReferencedDecls));
@@ -319,6 +397,7 @@ private:
       assert(Node.is<Decl*>());
       return ResolvedRangeInfo(RangeKind::SingleDecl, Type(), Content,
                                getImmediateContext(), SingleEntry,
+                               UnhandledError, Kind,
                                llvm::makeArrayRef(ContainedASTNodes),
                                llvm::makeArrayRef(DeclaredDecls),
                                llvm::makeArrayRef(ReferencedDecls));
@@ -450,7 +529,7 @@ public:
       return true;
     }
     bool visitDeclReference(ValueDecl *D, CharSourceRange Range,
-                            TypeDecl *CtorTyRef, Type T,
+                            TypeDecl *CtorTyRef, ExtensionDecl *ExtTyRef, Type T,
                             SemaReferenceKind Kind) override {
       Impl->analyzeDeclRef(D, Range, T, Kind);
       return true;
@@ -464,7 +543,7 @@ public:
   class FurtherReferenceWalker : public SourceEntityWalker {
     Implementation *Impl;
     bool visitDeclReference(ValueDecl *D, CharSourceRange Range,
-                            TypeDecl *CtorTyRef, Type T,
+                            TypeDecl *CtorTyRef, ExtensionDecl *ExtTyRef, Type T,
                             SemaReferenceKind Kind) override {
       // If the reference is after the given range, continue logic.
       if (!Impl->SM.isBeforeInBuffer(Impl->End, Range.getStart()))
@@ -506,6 +585,42 @@ public:
     if (CaseCount > 1)
       return false;
     return true;
+  }
+
+  OrphanKind getOrphanKind(ArrayRef<ASTNode> Nodes) {
+
+    // Prepare the entire range.
+    SourceRange WholeRange(Nodes.front().getStartLoc(),
+                           Nodes.back().getEndLoc());
+    struct ControlFlowStmtSelector : public SourceEntityWalker {
+      std::vector<std::pair<SourceRange, OrphanKind>> Ranges;
+      bool walkToStmtPre(Stmt *S) override {
+        // For each continue/break statement, record its target's range and the
+        // orphan kind.
+        if (auto *CS = dyn_cast<ContinueStmt>(S)) {
+          Ranges.emplace_back(CS->getTarget()->getSourceRange(),
+                              OrphanKind::Continue);
+        } else if (auto *BS = dyn_cast<BreakStmt>(S)) {
+          Ranges.emplace_back(BS->getTarget()->getSourceRange(),
+                              OrphanKind::Break);
+        }
+        return true;
+      }
+    };
+    for (auto N : Nodes) {
+      ControlFlowStmtSelector TheWalker;
+      N.walk(TheWalker);
+      for (auto Pair : TheWalker.Ranges) {
+
+        // If the entire range does not include the target's range, we find
+        // an orphan.
+        if (!SM.rangeContains(WholeRange, Pair.first))
+          return Pair.second;
+      }
+    }
+
+    // We find no orphan.
+    return OrphanKind::None;
   }
 
   void analyze(ASTNode Node) {
@@ -552,6 +667,8 @@ public:
                 /* Last node has the type */
                 resolveNodeType(DCInfo.EndMatches.back()), Content,
                 getImmediateContext(), hasSingleEntryPoint(ContainedASTNodes),
+                hasUnhandledError(ContainedASTNodes),
+                getOrphanKind(ContainedASTNodes),
                 llvm::makeArrayRef(ContainedASTNodes),
                 llvm::makeArrayRef(DeclaredDecls),
                 llvm::makeArrayRef(ReferencedDecls)};
@@ -665,7 +782,7 @@ bool RangeResolver::walkToDeclPost(Decl *D) {
 
 bool RangeResolver::
 visitDeclReference(ValueDecl *D, CharSourceRange Range, TypeDecl *CtorTyRef,
-                   Type T, SemaReferenceKind Kind) {
+                   ExtensionDecl *ExtTyRef, Type T, SemaReferenceKind Kind) {
   Impl->analyzeDeclRef(D, Range, T, Kind);
   return true;
 }

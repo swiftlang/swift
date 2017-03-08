@@ -9,8 +9,10 @@ import Foundation
 
 // CHECK-LABEL: sil hidden @_T010objc_error20NSErrorError_erasures0D0_pSo0C0CF : $@convention(thin) (@owned NSError) -> @owned Error {
 // CHECK:         bb0([[ERROR:%.*]] : $NSError):
-// CHECK:           [[ERROR_COPY:%.*]] = copy_value [[ERROR]]
+// CHECK:           [[BORROWED_ERROR:%.*]] = begin_borrow [[ERROR]]
+// CHECK:           [[ERROR_COPY:%.*]] = copy_value [[BORROWED_ERROR]]
 // CHECK:           [[ERROR_TYPE:%.*]] = init_existential_ref [[ERROR_COPY]] : $NSError : $NSError, $Error
+// CHECK:           end_borrow [[BORROWED_ERROR]] from [[ERROR]]
 // CHECK:           destroy_value [[ERROR]]
 // CHECK:           return [[ERROR_TYPE]]
 // CHECK:       } // end sil function '_T010objc_error20NSErrorError_erasures0D0_pSo0C0CF'
@@ -20,9 +22,11 @@ func NSErrorError_erasure(_ x: NSError) -> Error {
 
 // CHECK-LABEL: sil hidden @_T010objc_error30NSErrorError_archetype_erasures0D0_pxSo0C0CRbzlF : $@convention(thin) <T where T : NSError> (@owned T) -> @owned Error {
 // CHECK:         bb0([[ERROR:%.*]] : $T):
-// CHECK:           [[ERROR_COPY:%.*]] = copy_value [[ERROR]]
+// CHECK:           [[BORROWED_ERROR:%.*]] = begin_borrow [[ERROR]]
+// CHECK:           [[ERROR_COPY:%.*]] = copy_value [[BORROWED_ERROR]]
 // CHECK:           [[T0:%.*]] = upcast [[ERROR_COPY]] : $T to $NSError
 // CHECK:           [[ERROR_TYPE:%.*]] = init_existential_ref [[T0]] : $NSError : $NSError, $Error
+// CHECK:           end_borrow [[BORROWED_ERROR]] from [[ERROR]]
 // CHECK:           destroy_value [[ERROR]]
 // CHECK:           return [[ERROR_TYPE]]
 // CHECK: } // end sil function '_T010objc_error30NSErrorError_archetype_erasures0D0_pxSo0C0CRbzlF'

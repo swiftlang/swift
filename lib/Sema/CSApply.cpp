@@ -19,10 +19,13 @@
 #include "ConstraintSystem.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
+#include "swift/AST/ProtocolConformance.h"
+#include "swift/AST/SubstitutionMap.h"
 #include "swift/Basic/StringExtras.h"
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/SmallString.h"
+#include "llvm/Support/Compiler.h"
 #include "llvm/Support/SaveAndRestore.h"
 
 using namespace swift;
@@ -265,17 +268,17 @@ void ConstraintSystem::propagateLValueAccessKind(Expr *E,
 }
 
 bool ConstraintSystem::isTypeReference(Expr *E) {
-  return E->isTypeReference([&](const Expr &E) -> Type { return getType(&E); });
+  return E->isTypeReference([&](const Expr *E) -> Type { return getType(E); });
 }
 
 bool ConstraintSystem::isStaticallyDerivedMetatype(Expr *E) {
   return E->isStaticallyDerivedMetatype(
-      [&](const Expr &E) -> Type { return getType(&E); });
+      [&](const Expr *E) -> Type { return getType(E); });
 }
 
 Type ConstraintSystem::getInstanceType(TypeExpr *E) {
-  return E->getInstanceType([&](const Expr &E) -> bool { return hasType(&E); },
-                            [&](const Expr &E) -> Type { return getType(&E); });
+  return E->getInstanceType([&](const Expr *E) -> bool { return hasType(E); },
+                            [&](const Expr *E) -> Type { return getType(E); });
 }
 
 namespace {
@@ -968,6 +971,7 @@ namespace {
           apply->setImplicit();
         }
       }
+
       return finishApply(apply, openedType, locator);
     }
     
@@ -1280,6 +1284,10 @@ namespace {
       if (!index)
         return nullptr;
 
+      auto getType = [&](const Expr *E) -> Type {
+        return cs.getType(E);
+      };
+
       // Form the subscript expression.
 
       // Handle dynamic lookup.
@@ -1293,7 +1301,7 @@ namespace {
         // TODO: diagnose if semantics != AccessSemantics::Ordinary?
         auto subscriptExpr = DynamicSubscriptExpr::create(tc.Context, base,
                                                           index, subscript,
-                                                          isImplicit);
+                                                          isImplicit, getType);
         cs.setType(subscriptExpr, resultTy);
         Expr *result = subscriptExpr;
         closeExistential(result, locator);
@@ -1323,12 +1331,10 @@ namespace {
           return nullptr;
 
         // Form the generic subscript expression.
-        auto subscriptExpr
-          = SubscriptExpr::create(tc.Context, base, index,
-                                  ConcreteDeclRef(tc.Context, subscript,
-                                                  substitutions),
-                                  isImplicit,
-                                  semantics);
+        auto subscriptExpr = SubscriptExpr::create(
+            tc.Context, base, index,
+            ConcreteDeclRef(tc.Context, subscript, substitutions), isImplicit,
+            semantics, getType);
         cs.setType(subscriptExpr, resultTy);
         subscriptExpr->setIsSuper(isSuper);
 
@@ -1349,9 +1355,8 @@ namespace {
         return nullptr;
 
       // Form a normal subscript.
-      auto *subscriptExpr
-        = SubscriptExpr::create(tc.Context, base, index, subscript,
-                                isImplicit, semantics);
+      auto *subscriptExpr = SubscriptExpr::create(
+          tc.Context, base, index, subscript, isImplicit, semantics, getType);
       cs.setType(subscriptExpr, resultTy);
       subscriptExpr->setIsSuper(isSuper);
       Expr *result = subscriptExpr;
@@ -1361,7 +1366,8 @@ namespace {
 
     /// \brief Build a new reference to another constructor.
     Expr *buildOtherConstructorRef(Type openedFullType,
-                                   ConstructorDecl *ctor, DeclNameLoc loc,
+                                   ConstructorDecl *ctor, Expr *base,
+                                   DeclNameLoc loc,
                                    ConstraintLocatorBuilder locator,
                                    bool implicit) {
       auto &tc = cs.getTypeChecker();
@@ -1398,8 +1404,21 @@ namespace {
                                    resultFnTy->getExtInfo());
 
       // Build the constructor reference.
-      return cs.cacheType(
+      Expr *ctorRef = cs.cacheType(
           new (ctx) OtherConstructorDeclRefExpr(ref, loc, implicit, resultTy));
+
+      // Wrap in covariant `Self` return if needed.
+      if (selfTy->hasReferenceSemantics()) {
+        auto covariantTy = resultTy
+          ->replaceCovariantResultType(base->getType()
+                                           ->getLValueOrInOutObjectType(),
+                                       ctor->getNumParameterLists());
+        if (!covariantTy->isEqual(resultTy))
+          ctorRef = cs.cacheType(
+               new (ctx) CovariantFunctionConversionExpr(ctorRef, covariantTy));
+      }
+
+      return ctorRef;
     }
 
     /// Bridge the given value (which is an error type) to NSError.
@@ -1418,10 +1437,17 @@ namespace {
       ConcreteDeclRef fnDeclRef(fn);
       auto fnRef = new (tc.Context) DeclRefExpr(fnDeclRef, DeclNameLoc(loc),
                                                 /*Implicit=*/true);
-      fnRef->setType(fn->getInterfaceType());
+      cs.setType(fnRef, fn->getInterfaceType());
       fnRef->setFunctionRefKind(FunctionRefKind::SingleApply);
-      cs.setExprTypes(value);
-      Expr *call = CallExpr::createImplicit(tc.Context, fnRef, { value }, { });
+
+      auto getType = [&](const Expr *E) -> Type {
+        return cs.getType(E);
+      };
+
+      Expr *call = CallExpr::createImplicit(tc.Context, fnRef, { value }, { },
+                                            getType);
+      cs.cacheSubExprTypes(call);
+      cs.setSubExprTypes(call);
       if (tc.typeCheckExpressionShallow(call, dc))
         return nullptr;
 
@@ -1506,11 +1532,15 @@ namespace {
                                                 AccessSemantics::Ordinary,
                                                 bridgeFnTy);
 
+      auto getType = [&](const Expr *E) -> Type {
+        return cs.getType(E);
+      };
+
       fnRef->setFunctionRefKind(FunctionRefKind::SingleApply);
       Expr *call = CallExpr::createImplicit(tc.Context, fnRef, valueParen,
-                                            { Identifier() });
+                                            { Identifier() }, getType);
       cs.setType(call, bridgeTy);
-      cs.cacheSubExprTypes(call);
+      cs.cacheExprTypes(call);
       return call;
     }
 
@@ -1570,52 +1600,53 @@ namespace {
       
       // Form a reference to the function. The bridging operations are generic,
       // so we need to form substitutions and compute the resulting type.
-      auto Conformances =
-        tc.Context.AllocateUninitialized<ProtocolConformanceRef>(
-                                        bridgedToObjectiveCConformance ? 1 : 0);
+      auto genericSig = fn->getGenericSignature();
 
-      if (bridgedToObjectiveCConformance) {
-        Conformances[0] = *bridgedToObjectiveCConformance;
-      }
+      auto subMap = genericSig->getSubstitutionMap(
+        [&](SubstitutableType *type) -> Type {
+          assert(type->isEqual(genericSig->getGenericParams()[0]));
+          return valueType;
+        },
+        [&](CanType origType, Type replacementType, ProtocolType *protoType)
+          -> ProtocolConformanceRef {
+          assert(bridgedToObjectiveCConformance);
+          return *bridgedToObjectiveCConformance;
+        });
 
-      auto fnGenericParams
-        = fn->getGenericSignatureOfContext()->getGenericParams();
+      SmallVector<Substitution, 1> subs;
+      genericSig->getSubstitutions(subMap, subs);
 
-      Substitution Subs[1] = {
-        Substitution(valueType, Conformances)
-      };
-
-      ConcreteDeclRef fnSpecRef(tc.Context, fn, Subs);
+      ConcreteDeclRef fnSpecRef(tc.Context, fn, subs);
       auto fnRef = new (tc.Context) DeclRefExpr(fnSpecRef,
                                                 DeclNameLoc(
                                                   object->getStartLoc()),
                                                 /*Implicit=*/true);
       fnRef->setFunctionRefKind(FunctionRefKind::SingleApply);
 
-      TypeSubstitutionMap subMap;
-      auto genericParam = fnGenericParams[0];
-      subMap[genericParam->getCanonicalType()->castTo<SubstitutableType>()]
-        = valueType;
-      cs.setType(fnRef, fn->getInterfaceType().subst(dc->getParentModule(),
-                                                     subMap,
-                                                     None));
+      cs.setType(fnRef,
+                 fn->getInterfaceType()->castTo<GenericFunctionType>()
+                   ->substGenericArgs(subMap));
 
       // Form the arguments.
       Expr *args[2] = {
         object,
-        cs.cacheType(new (tc.Context) DotSelfExpr(
-                         cs.cacheType(
+        new (tc.Context) DotSelfExpr(
                              TypeExpr::createImplicitHack(object->getLoc(),
                                                           valueType,
-                                                          tc.Context)),
-                         object->getLoc(), object->getLoc(),
-                         MetatypeType::get(valueType)))
+                                                          tc.Context),
+                             object->getLoc(), object->getLoc(),
+                             MetatypeType::get(valueType))
       };
       args[1]->setImplicit();
 
       // Form the call and type-check it.
+      auto getType = [&](const Expr *E) -> Type {
+        return cs.getType(E);
+      };
+
       Expr *call = CallExpr::createImplicit(tc.Context, fnRef, args,
-                                            { Identifier(), Identifier() });
+                                            { Identifier(), Identifier() },
+                                            getType);
       cs.cacheSubExprTypes(call);
       cs.setSubExprTypes(call);
 
@@ -2062,9 +2093,9 @@ namespace {
 
       // Build a reference to the init(stringInterpolation:) initializer.
       // FIXME: This location info is bogus.
-      auto *typeRef =
-        cs.cacheType(TypeExpr::createImplicitHack(expr->getStartLoc(),
-                                                  type, tc.Context));
+      auto *typeRef = TypeExpr::createImplicitHack(expr->getStartLoc(), type,
+                                                   tc.Context);
+
       Expr *memberRef =
         new (tc.Context) MemberRefExpr(typeRef,
                                        expr->getStartLoc(),
@@ -2082,17 +2113,23 @@ namespace {
       SmallVector<Expr *, 4> segments;
       SmallVector<Identifier, 4> names;
       ConstraintLocatorBuilder locatorBuilder(cs.getConstraintLocator(expr));
+      auto getType = [&](const Expr *E) -> Type {
+        return cs.getType(E);
+      };
+
       for (auto segment : expr->getSegments()) {
         ApplyExpr *apply =
           CallExpr::createImplicit(
             tc.Context, typeRef,
             { segment },
-            { tc.Context.Id_stringInterpolationSegment });
-        cs.cacheType(apply->getArg());
+            { tc.Context.Id_stringInterpolationSegment }, getType);
+        cs.cacheSubExprTypes(apply);
 
         Expr *convertedSegment = apply;
+        cs.setSubExprTypes(convertedSegment);
         if (tc.typeCheckExpressionShallow(convertedSegment, cs.DC))
           continue;
+        cs.cacheExprTypes(convertedSegment);
 
         segments.push_back(convertedSegment);
 
@@ -2109,8 +2146,8 @@ namespace {
 
       // Call the init(stringInterpolation:) initializer with the arguments.
       ApplyExpr *apply = CallExpr::createImplicit(tc.Context, memberRef,
-                                                  segments, names);
-      cs.cacheSubExprTypes(apply);
+                                                  segments, names, getType);
+      cs.cacheExprTypes(apply);
       expr->setSemanticExpr(finishApply(apply, openedType, locatorBuilder));
       return expr;
     }
@@ -2162,10 +2199,9 @@ namespace {
                               ConformanceCheckFlags::InExpression);
       assert(conformance && "object literal type conforms to protocol");
 
-      Expr *base =
-        cs.cacheType(TypeExpr::createImplicitHack(expr->getLoc(),
-                                                  conformingType,
-                                                  ctx));
+      Expr *base = TypeExpr::createImplicitHack(expr->getLoc(), conformingType,
+                                                ctx);
+      cs.cacheExprTypes(base);
         
       SmallVector<Expr *, 4> args;
       if (!isa<TupleExpr>(expr->getArg()))
@@ -2325,9 +2361,9 @@ namespace {
 
       // The base expression is simply the metatype of the base type.
       // FIXME: This location info is bogus.
-      auto base =
-        cs.cacheType(TypeExpr::createImplicitHack(expr->getDotLoc(),
-                                                  baseTy, tc.Context));
+      auto base = TypeExpr::createImplicitHack(expr->getDotLoc(), baseTy,
+                                               tc.Context);
+      cs.cacheExprTypes(base);
 
       // Build the member reference.
       bool isDynamic
@@ -2346,13 +2382,16 @@ namespace {
       if (!result)
         return nullptr;
 
+      auto getType = [&](const Expr *E) -> Type {
+        return cs.getType(E);
+      };
+
       // If there was an argument, apply it.
       if (auto arg = expr->getArgument()) {
-        ApplyExpr *apply = CallExpr::create(tc.Context, result, arg,
-                                            expr->getArgumentLabels(),
-                                            expr->getArgumentLabelLocs(),
-                                            expr->hasTrailingClosure(),
-                                            /*implicit=*/false);
+        ApplyExpr *apply = CallExpr::create(
+            tc.Context, result, arg, expr->getArgumentLabels(),
+            expr->getArgumentLabelLocs(), expr->hasTrailingClosure(),
+            /*implicit=*/false, Type(), getType);
         result = finishApply(apply, Type(), cs.getConstraintLocator(expr));
       }
 
@@ -2434,7 +2473,7 @@ namespace {
       }
 
       // Build a partial application of the delegated initializer.
-      Expr *ctorRef = buildOtherConstructorRef(openedType, ctor, nameLoc,
+      Expr *ctorRef = buildOtherConstructorRef(openedType, ctor, base, nameLoc,
                                                ctorLocator, implicit);
       auto *call = new (cs.getASTContext()) DotSyntaxCallExpr(ctorRef, dotLoc,
                                                               base);
@@ -2491,16 +2530,16 @@ namespace {
                                               baseMetaTy->getInstanceType());
           
           // FIXME: We're dropping side effects in the base here!
-          base =
-            cs.cacheType(TypeExpr::createImplicitHack(base->getLoc(), classTy,
-                                                      tc.Context));
+          base = TypeExpr::createImplicitHack(base->getLoc(), classTy,
+                                              tc.Context);
+          cs.cacheExprTypes(base);
         } else {
           // Bridge the base to its corresponding Objective-C object.
           base = bridgeToObjectiveC(base);
         }
 
         // Fall through to build the member reference.
-        SWIFT_FALLTHROUGH;
+        LLVM_FALLTHROUGH;
       }
 
       case OverloadChoiceKind::Decl:
@@ -2626,9 +2665,10 @@ namespace {
       // be nicer to re-use them.
 
       // FIXME: This location info is bogus.
-      Expr *typeRef =
-        cs.cacheType(TypeExpr::createImplicitHack(expr->getLoc(),
-                                                  arrayTy, tc.Context));
+      Expr *typeRef = TypeExpr::createImplicitHack(expr->getLoc(), arrayTy,
+                                                   tc.Context);
+      cs.cacheExprTypes(typeRef);
+
       DeclName name(tc.Context, tc.Context.Id_init,
                     { tc.Context.Id_arrayLiteral });
 
@@ -2704,9 +2744,9 @@ namespace {
       // It would be nicer to re-use them.
       // FIXME: Cache the name.
       // FIXME: This location info is bogus.
-      Expr *typeRef =
-        cs.cacheType(TypeExpr::createImplicitHack(expr->getLoc(),
-                                                  dictionaryTy, tc.Context));
+      Expr *typeRef = TypeExpr::createImplicitHack(expr->getLoc(), dictionaryTy,
+                                                   tc.Context);
+      cs.cacheExprTypes(typeRef);
 
       DeclName name(tc.Context, tc.Context.Id_init,
                     { tc.Context.Id_dictionaryLiteral });
@@ -3274,13 +3314,13 @@ namespace {
       // Warn about NSNumber and NSValue bridging coercions we accepted in
       // Swift 3 but which can fail at runtime.
       if (tc.Context.LangOpts.isSwiftVersion3()
-          && tc.typeCheckCheckedCast(sub->getType(), toInstanceType,
+          && tc.typeCheckCheckedCast(cs.getType(sub), toInstanceType,
                                      CheckedCastContextKind::None,
                                      dc, SourceLoc(), sub, SourceRange())
                == CheckedCastKind::Swift3BridgingDowncast) {
         tc.diagnose(expr->getLoc(),
                     diag::missing_forced_downcast_swift3_compat_warning,
-                    sub->getType(), toInstanceType)
+                    cs.getType(sub), toInstanceType)
           .fixItReplace(expr->getAsLoc(), "as!");
       }
       
@@ -3456,11 +3496,13 @@ namespace {
     Expr *visitUnresolvedPatternExpr(UnresolvedPatternExpr *expr) {
       // If we end up here, we should have diagnosed somewhere else
       // already.
-      if (!SuppressDiagnostics) {
-        cs.TC.diagnose(expr->getLoc(), diag::pattern_in_expr,
+      Expr *simplified = simplifyExprType(expr);
+      if (!SuppressDiagnostics
+          && !simplified->getType()->is<UnresolvedType>()) {
+        cs.TC.diagnose(simplified->getLoc(), diag::pattern_in_expr,
                        expr->getSubPattern()->getKind());
       }
-      return expr;
+      return simplified;
     }
     
     Expr *visitBindOptionalExpr(BindOptionalExpr *expr) {
@@ -3545,8 +3587,13 @@ namespace {
       StringRef msg = "attempt to evaluate editor placeholder";
       Expr *argExpr = new (ctx) StringLiteralExpr(msg, E->getLoc(),
                                                   /*implicit*/true);
+
+      auto getType = [&](const Expr *E) -> Type {
+        return cs.getType(E);
+      };
+
       Expr *callExpr = CallExpr::createImplicit(ctx, fnRef, { argExpr },
-                                                { Identifier() });
+                                                { Identifier() }, getType);
 
       bool invalid = tc.typeCheckExpression(callExpr, cs.DC,
                                             TypeLoc::withoutLoc(valueType),
@@ -3865,6 +3912,9 @@ namespace {
           .fixItInsert(cast->getStartLoc(), "(")
           .fixItInsertAfter(cast->getEndLoc(), ")");
       }
+
+      // Set the final types on the expression.
+      cs.setExprTypes(result);
     }
 
     /// Diagnose an optional injection that is probably not what the
@@ -5925,14 +5975,18 @@ Expr *ExprRewriter::convertLiteral(Expr *literal,
                                    Diag<> brokenBuiltinProtocolDiag) {
   auto &tc = cs.getTypeChecker();
 
+  auto getType = [&](const Expr *E) -> Type {
+    return cs.getType(E);
+  };
+
   // If coercing a literal to an unresolved type, we don't try to look up the
   // witness members, just do it.
   if (type->is<UnresolvedType>()) {
     // Instead of updating the literal expr in place, allocate a new node.  This
     // avoids issues where Builtin types end up on expr nodes and pollute
     // diagnostics.
-    literal = cast<LiteralExpr>(literal)->shallowClone(tc.Context);
-    
+    literal = cast<LiteralExpr>(literal)->shallowClone(tc.Context, getType);
+
     // The literal expression has this type.
     cs.setType(literal, type);
     return literal;
@@ -5966,7 +6020,7 @@ Expr *ExprRewriter::convertLiteral(Expr *literal,
     // Instead of updating the literal expr in place, allocate a new node.  This
     // avoids issues where Builtin types end up on expr nodes and pollute
     // diagnostics.
-    literal = cast<LiteralExpr>(literal)->shallowClone(tc.Context);
+    literal = cast<LiteralExpr>(literal)->shallowClone(tc.Context, getType);
 
     // The literal expression has this type.
     cs.setType(literal, argType);
@@ -6064,14 +6118,18 @@ Expr *ExprRewriter::convertLiteralInPlace(Expr *literal,
                                           Diag<> brokenBuiltinProtocolDiag) {
   auto &tc = cs.getTypeChecker();
 
+  auto getType = [&](const Expr *E) -> Type {
+    return cs.getType(E);
+  };
+
   // If coercing a literal to an unresolved type, we don't try to look up the
   // witness members, just do it.
   if (type->is<UnresolvedType>()) {
     // Instead of updating the literal expr in place, allocate a new node.  This
     // avoids issues where Builtin types end up on expr nodes and pollute
     // diagnostics.
-    literal = cast<LiteralExpr>(literal)->shallowClone(tc.Context);
-    
+    literal = cast<LiteralExpr>(literal)->shallowClone(tc.Context, getType);
+
     // The literal expression has this type.
     cs.setType(literal, type);
     return literal;
@@ -6095,9 +6153,9 @@ Expr *ExprRewriter::convertLiteralInPlace(Expr *literal,
 
     // Form a reference to the builtin conversion function.
     // FIXME: Bogus location info.
-    Expr *base =
-      cs.cacheType(TypeExpr::createImplicitHack(literal->getLoc(), type,
-                                                tc.Context));
+    Expr *base = TypeExpr::createImplicitHack(literal->getLoc(), type,
+                                              tc.Context);
+
     Expr *unresolvedDot = new (tc.Context) UnresolvedDotExpr(
                                              base, SourceLoc(),
                                              witness->getFullName(),
@@ -6160,9 +6218,9 @@ Expr *ExprRewriter::convertLiteralInPlace(Expr *literal,
 
   // Form a reference to the conversion function.
   // FIXME: Bogus location info.
-  Expr *base =
-    cs.cacheType(TypeExpr::createImplicitHack(literal->getLoc(), type,
-                                              tc.Context));
+  Expr *base = TypeExpr::createImplicitHack(literal->getLoc(), type,
+                                            tc.Context);
+
   Expr *unresolvedDot = new (tc.Context) UnresolvedDotExpr(
                                            base, SourceLoc(),
                                            witness->getFullName(),
@@ -6266,6 +6324,7 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
         auto arg = apply->getArg();
         if (auto tuple = dyn_cast<TupleExpr>(arg))
           arg = tuple->getElements()[0];
+        arg = cs.coerceToRValue(arg);
         auto replacement = new (tc.Context)
           DynamicTypeExpr(apply->getFn()->getLoc(),
                           apply->getArg()->getStartLoc(),
@@ -6295,11 +6354,14 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
         auto escapable = new (tc.Context)
           OpaqueValueExpr(apply->getFn()->getLoc(), Type());
         cs.setType(escapable, escapableType);
-        
-        auto callSubExpr = CallExpr::create(tc.Context, body, escapable,
-                                            {}, {},
+
+        auto getType = [&](const Expr *E) -> Type {
+          return cs.getType(E);
+        };
+
+        auto callSubExpr = CallExpr::create(tc.Context, body, escapable, {}, {},
                                             /*trailing closure*/ false,
-                                            /*implicit*/ true);
+                                            /*implicit*/ true, Type(), getType);
         cs.setType(callSubExpr, resultType);
         
         auto replacement = new (tc.Context)
@@ -7147,6 +7209,10 @@ Expr *TypeChecker::callWitness(Expr *base, DeclContext *dc,
                                   FunctionRefKind::DoubleApply,
                                   dotLocator);
 
+  auto getType = [&](const Expr *E) -> Type {
+    return cs.getType(E);
+  };
+
   // Form the call argument.
   // FIXME: Standardize all callers to always provide all argument names,
   // rather than hack around this.
@@ -7155,9 +7221,9 @@ Expr *TypeChecker::callWitness(Expr *base, DeclContext *dc,
   if (arguments.size() == 1 &&
       (isVariadicWitness(witness) ||
        argumentNamesMatch(arguments[0]->getType(), argLabels))) {
-    call = CallExpr::create(Context, unresolvedDot, arguments[0], { },
-                            { }, /*hasTrailingClosure=*/false,
-                            /*implicit=*/true);
+    call = CallExpr::create(Context, unresolvedDot, arguments[0], {}, {},
+                            /*hasTrailingClosure=*/false,
+                            /*implicit=*/true, Type(), getType);
   } else {
     // The tuple should have the source range enclosing its arguments unless
     // they are invalid or there are no arguments.
@@ -7172,12 +7238,10 @@ Expr *TypeChecker::callWitness(Expr *base, DeclContext *dc,
       }
     }
 
-    call = CallExpr::create(Context, unresolvedDot,
-                            TupleStartLoc,
-                            arguments, argLabels, { },
-                            TupleEndLoc,
+    call = CallExpr::create(Context, unresolvedDot, TupleStartLoc, arguments,
+                            argLabels, {}, TupleEndLoc,
                             /*trailingClosure=*/nullptr,
-                            /*implicit=*/true);
+                            /*implicit=*/true, getType);
   }
 
   // Add the conversion from the argument to the function parameter type.
@@ -7274,7 +7338,11 @@ Solution::convertBooleanTypeToBuiltinI1(Expr *expr, ConstraintLocator *locator) 
   (void)failed;
 
   // Call the builtin method.
-  expr = CallExpr::createImplicit(ctx, memberRef, { }, { });
+  auto getType = [&](const Expr *E) -> Type {
+    return cs.getType(E);
+  };
+
+  expr = CallExpr::createImplicit(ctx, memberRef, { }, { }, getType);
   cs.cacheSubExprTypes(expr);
   cs.setSubExprTypes(expr);
   failed = tc.typeCheckExpressionShallow(expr, cs.DC);

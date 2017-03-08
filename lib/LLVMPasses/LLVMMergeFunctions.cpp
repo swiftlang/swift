@@ -93,7 +93,7 @@ public:
 
   int cmpBasicBlocksIgnoringConsts(const BasicBlock *BBL, const BasicBlock *BBR);
 
-  int compareIngoringConsts();
+  int compareIgnoringConsts();
 };
 
 } // end anonymous namespace
@@ -147,7 +147,7 @@ cmpOperandsIgnoringConsts(const Instruction *L, const Instruction *R,
   return 0;
 }
 
-// Test whether two basic blocks have equivalent behaviour.
+// Test whether two basic blocks have equivalent behavior.
 int SwiftFunctionComparator::
 cmpBasicBlocksIgnoringConsts(const BasicBlock *BBL, const BasicBlock *BBR) {
   BasicBlock::const_iterator InstL = BBL->begin(), InstLE = BBL->end();
@@ -178,8 +178,8 @@ cmpBasicBlocksIgnoringConsts(const BasicBlock *BBL, const BasicBlock *BBR) {
   return 0;
 }
 
-// Test whether the two functions have equivalent behaviour.
-int SwiftFunctionComparator::compareIngoringConsts() {
+// Test whether the two functions have equivalent behavior.
+int SwiftFunctionComparator::compareIgnoringConsts() {
   beginCompare();
 
   if (int Res = compareSignature())
@@ -259,7 +259,7 @@ private:
       if (LHS.Hash != RHS.Hash)
         return LHS.Hash < RHS.Hash;
       SwiftFunctionComparator FCmp(LHS.First->F, RHS.First->F, GlobalNumbers);
-      return FCmp.compareIngoringConsts() == -1;
+      return FCmp.compareIgnoringConsts() == -1;
     }
   };
   typedef std::set<EquivalenceClass, FunctionNodeCmp> FnTreeType;
@@ -449,9 +449,9 @@ bool SwiftMergeFunctions::doSanityCheck(std::vector<WeakVH> &Worklist) {
         Function *F1 = cast<Function>(*I);
         Function *F2 = cast<Function>(*J);
         int Res1 = SwiftFunctionComparator(F1, F2, &GlobalNumbers).
-                     compareIngoringConsts();
+                     compareIgnoringConsts();
         int Res2 = SwiftFunctionComparator(F2, F1, &GlobalNumbers).
-                     compareIngoringConsts();
+                     compareIgnoringConsts();
 
         // If F1 <= F2, then F2 >= F1, otherwise report failure.
         if (Res1 != -Res2) {
@@ -473,9 +473,9 @@ bool SwiftMergeFunctions::doSanityCheck(std::vector<WeakVH> &Worklist) {
 
           Function *F3 = cast<Function>(*K);
           int Res3 = SwiftFunctionComparator(F1, F3, &GlobalNumbers).
-                       compareIngoringConsts();
+                       compareIgnoringConsts();
           int Res4 = SwiftFunctionComparator(F2, F3, &GlobalNumbers).
-                       compareIngoringConsts();
+                       compareIgnoringConsts();
 
           bool Transitive = true;
 

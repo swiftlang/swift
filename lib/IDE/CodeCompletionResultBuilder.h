@@ -274,7 +274,7 @@ public:
     if (escapeAllKeywords) {
 #define KEYWORD(kw) .Case(#kw, true)
       shouldEscape = llvm::StringSwitch<bool>(Word)
-#include "swift/Parse/Tokens.def"
+#include "swift/Syntax/TokenKinds.def"
         .Default(false);
     } else {
       shouldEscape = !canBeArgumentLabel(Word);

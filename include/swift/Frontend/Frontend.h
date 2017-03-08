@@ -133,11 +133,12 @@ public:
     return SearchPathOpts.ImportSearchPaths;
   }
 
-  void setFrameworkSearchPaths(const std::vector<std::string> &Paths) {
+  void setFrameworkSearchPaths(
+             const std::vector<SearchPathOptions::FrameworkSearchPath> &Paths) {
     SearchPathOpts.FrameworkSearchPaths = Paths;
   }
 
-  ArrayRef<std::string> getFrameworkSearchPaths() const {
+  ArrayRef<SearchPathOptions::FrameworkSearchPath> getFrameworkSearchPaths() const {
     return SearchPathOpts.FrameworkSearchPaths;
   }
 

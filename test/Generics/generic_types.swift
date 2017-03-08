@@ -221,9 +221,9 @@ struct X4 : P, Q {
   typealias AssocQ = String
 }
 
-struct X5<T, U> where T: P, T: Q, T.AssocP == T.AssocQ { } // expected-note{{requirement specified as 'T.AssocQ' == 'T.AssocP' [with T = X4]}}
+struct X5<T, U> where T: P, T: Q, T.AssocP == T.AssocQ { } // expected-note{{requirement specified as 'T.AssocP' == 'T.AssocQ' [with T = X4]}}
 
-var y: X5<X4, Int> // expected-error{{'X5' requires the types 'X4.AssocQ' (aka 'String') and 'X4.AssocP' (aka 'Int') be equivalent}}
+var y: X5<X4, Int> // expected-error{{'X5' requires the types 'X4.AssocP' (aka 'Int') and 'X4.AssocQ' (aka 'String') be equivalent}}
 
 // Recursive generic signature validation.
 class Top {}

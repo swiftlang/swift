@@ -81,7 +81,8 @@ void BuiltinUnit::LookupCache::lookupValue(
   ASTContext &Ctx = M.getParentModule()->getASTContext();
   if (!Entry) {
     if (Type Ty = getBuiltinType(Ctx, Name.str())) {
-      auto *TAD = new (Ctx) TypeAliasDecl(SourceLoc(), Name, SourceLoc(),
+      auto *TAD = new (Ctx) TypeAliasDecl(SourceLoc(), SourceLoc(),
+                                          Name, SourceLoc(),
                                           /*genericparams*/nullptr,
                                           const_cast<BuiltinUnit*>(&M));
       TAD->setUnderlyingType(Ty);
@@ -554,7 +555,7 @@ void ModuleDecl::getDisplayDecls(SmallVectorImpl<Decl*> &Results) const {
   FORWARD(getDisplayDecls, (Results));
 }
 
-ArrayRef<Substitution>
+SubstitutionList
 TypeBase::gatherAllSubstitutions(ModuleDecl *module,
                                  LazyResolver *resolver,
                                  DeclContext *gpContext) {
@@ -631,34 +632,13 @@ TypeBase::gatherAllSubstitutions(ModuleDecl *module,
                       {gp->getCanonicalType()->castTo<GenericTypeParamType>(),
                        genericEnv->mapTypeIntoContext(gp)});
       assert(result.second);
+      (void) result;
     }
   }
 
-  auto lookupConformanceFn =
-      [&](CanType original, Type replacement, ProtocolType *protoType)
-      -> Optional<ProtocolConformanceRef> {
-        auto *proto = protoType->getDecl();
-
-        // If the type is a type variable or is dependent, just fill in empty
-        // conformances.
-        if (replacement->isTypeVariableOrMember() ||
-            replacement->isTypeParameter())
-          return ProtocolConformanceRef(proto);
-
-        // Otherwise, try to find the conformance.
-        auto conforms = module->lookupConformance(replacement, proto, resolver);
-        if (conforms)
-          return *conforms;
-
-        // FIXME: Should we ever end up here?
-        // We should return None and let getSubstitutions handle the error
-        // if we do.
-        return ProtocolConformanceRef(proto);
-      };
-
   SmallVector<Substitution, 4> result;
   genericSig->getSubstitutions(substitutions,
-                               lookupConformanceFn,
+                               LookUpConformanceInModule(module),
                                result);
 
   // Before recording substitutions, make sure we didn't end up doing it
@@ -690,7 +670,7 @@ ModuleDecl::lookupConformance(Type type, ProtocolDecl *protocol,
   // constraint and the superclass conforms to the protocol.
   if (auto archetype = type->getAs<ArchetypeType>()) {
 
-    // The archetype builder drops conformance requirements that are made
+    // The generic signature builder drops conformance requirements that are made
     // redundant by a superclass requirement, so check for a concrete
     // conformance first, since an abstract conformance might not be
     // able to be resolved by a substitution that makes the archetype
@@ -762,9 +742,8 @@ ModuleDecl::lookupConformance(Type type, ProtocolDecl *protocol,
   }
 
   // Type variables have trivial conformances.
-  if (type->isTypeVariableOrMember()) {
+  if (type->isTypeVariableOrMember())
     return ProtocolConformanceRef(protocol);
-  }
 
   // UnresolvedType is a placeholder for an unknown type used when generating
   // diagnostics.  We consider it to conform to all protocols, since the

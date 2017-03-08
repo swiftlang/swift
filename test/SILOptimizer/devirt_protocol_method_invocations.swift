@@ -178,11 +178,13 @@ protocol MathP {
 }
 
 extension MathP {
+  @inline(never)
   func plus() -> Self {
     sum += 1
     return self
   }
 
+  @inline(never)
   func minus() {
     sum -= 1
     if sum == 0 {

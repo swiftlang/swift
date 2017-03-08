@@ -63,6 +63,8 @@ def verify : Flag<["-"], "verify">,
            "annotations">;
 def verify_apply_fixes : Flag<["-"], "verify-apply-fixes">,
   HelpText<"Like -verify, but updates the original source file">;
+def verify_ignore_unknown: Flag<["-"], "verify-ignore-unknown">,
+  HelpText<"Allow diagnostics for '<unknown>' location in verify mode">;
 
 def show_diagnostics_after_fatal : Flag<["-"], "show-diagnostics-after-fatal">,
   HelpText<"Keep emitting subsequent diagnostics after a fatal error">;
@@ -136,6 +138,9 @@ def debug_constraints : Flag<["-"], "debug-constraints">,
 
 def debug_constraints_attempt : Separate<["-"], "debug-constraints-attempt">,
   HelpText<"Debug the constraint solver at a given attempt">;
+
+def propagate_constraints : Flag<["-"], "propagate-constraints">,
+  HelpText<"Enable constraint propagation in the type checker">;
 
 def iterative_type_checker : Flag<["-"], "iterative-type-checker">,
   HelpText<"Enable the iterative type checker">;

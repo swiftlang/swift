@@ -15,6 +15,11 @@ import tokenize
 
 from bisect import bisect
 
+try:
+    basestring
+except NameError:
+    basestring = str
+
 
 def get_line_starts(s):
     """Return a list containing the start index of each line in s.
@@ -44,6 +49,7 @@ def split_lines(s):
     with a single appended newline.
     """
     return [l + '\n' for l in s.split('\n')]
+
 
 # text on a line up to the first '$$', '${', or '%%'
 literalText = r'(?: [^$\n%] | \$(?![${]) | %(?!%) )*'
@@ -716,7 +722,8 @@ class Code(ASTNode):
 
         # If we got a result, the code was an expression, so append
         # its value
-        if result is not None and result != '':
+        if result is not None \
+                or (isinstance(result, basestring) and result != ''):
             from numbers import Number, Integral
             result_string = None
             if isinstance(result, Number) and not isinstance(result, Integral):
@@ -1141,6 +1148,7 @@ def main():
     sys.path = [os.path.split(args.file.name)[0] or '.'] + sys.path
 
     args.target.write(execute_template(ast, args.line_directive, **bindings))
+
 
 if __name__ == '__main__':
     main()

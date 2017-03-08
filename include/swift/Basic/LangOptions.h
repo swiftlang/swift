@@ -29,6 +29,20 @@
 #include <vector>
 
 namespace swift {
+
+  /// Kind of implicit platform conditions.
+  enum class PlatformConditionKind {
+    /// The active os target (OSX, iOS, Linux, etc.)
+    OS,
+    /// The active arch target (x86_64, i386, arm, arm64, etc.)
+    Arch,
+    /// The active endianness target (big or little)
+    Endianness,
+    /// Runtime support (_ObjC or _Native)
+    Runtime,
+  };
+  enum { NumPlatformConditionKind = 4 };
+
   /// \brief A collection of options that affect the language dialect and
   /// provide compiler debugging facilities.
   class LangOptions {
@@ -114,10 +128,14 @@ namespace swift {
     /// solver should be debugged.
     unsigned DebugConstraintSolverAttempt = 0;
 
+    /// \brief Enable the experimental constraint propagation in the
+    /// type checker.
+    bool EnableConstraintPropagation = false;
+
     /// \brief Enable the iterative type checker.
     bool IterativeTypeChecker = false;
 
-    /// Debug the generic signatures computed by the archetype builder.
+    /// Debug the generic signatures computed by the generic signature builder.
     bool DebugGenericSignatures = false;
 
     /// Triggers llvm fatal_error if typechecker tries to typecheck a decl or an
@@ -133,7 +151,7 @@ namespace swift {
 
     /// \brief The upper bound, in bytes, of temporary data that can be
     /// allocated by the constraint solver.
-    unsigned SolverMemoryThreshold = 33554432; /* 32 * 1024 * 1024 */
+    unsigned SolverMemoryThreshold = 512 * 1024 * 1024;
 
     unsigned SolverBindingThreshold = 1024 * 1024;
 
@@ -198,14 +216,9 @@ namespace swift {
     }
 
     /// Sets an implicit platform condition.
-    ///
-    /// There are currently three supported platform conditions:
-    /// - os: The active os target (OSX or iOS)
-    /// - arch: The active arch target (x86_64, i386, arm, arm64)
-    /// - _runtime: Runtime support (_ObjC or _Native)
-    void addPlatformConditionValue(StringRef Name, StringRef Value) {
-      assert(!Name.empty() && !Value.empty());
-      PlatformConditionValues.emplace_back(Name, Value);
+    void addPlatformConditionValue(PlatformConditionKind Kind, StringRef Value) {
+      assert(!Value.empty());
+      PlatformConditionValues.emplace_back(Kind, Value);
     }
 
     /// Removes all values added with addPlatformConditionValue.
@@ -214,7 +227,7 @@ namespace swift {
     }
     
     /// Returns the value for the given platform condition or an empty string.
-    StringRef getPlatformConditionValue(StringRef Name) const;
+    StringRef getPlatformConditionValue(PlatformConditionKind Kind) const;
 
     /// Explicit conditional compilation flags, initialized via the '-D'
     /// compiler flag.
@@ -226,7 +239,7 @@ namespace swift {
     /// Determines if a given conditional compilation flag has been set.
     bool isCustomConditionalCompilationFlagSet(StringRef Name) const;
 
-    ArrayRef<std::pair<std::string, std::string>>
+    ArrayRef<std::pair<PlatformConditionKind, std::string>>
     getPlatformConditionValues() const {
       return PlatformConditionValues;
     }
@@ -240,35 +253,18 @@ namespace swift {
       return EffectiveLanguageVersion.isVersion3();
     }
 
-    /// Returns true if the 'os' platform condition argument represents
+    /// Returns true if the given platform condition argument represents
     /// a supported target operating system.
     ///
-    /// Note that this also canonicalizes the OS name if the check returns
-    /// true.
-    ///
     /// \param suggestions Populated with suggested replacements
     /// if a match is not found.
-    static bool checkPlatformConditionOS(
-      StringRef &OSName, std::vector<StringRef> &suggestions);
-
-    /// Returns true if the 'arch' platform condition argument represents
-    /// a supported target architecture.
-    ///
-    /// \param suggestions Populated with suggested replacements
-    /// if a match is not found.
-    static bool isPlatformConditionArchSupported(
-      StringRef ArchName, std::vector<StringRef> &suggestions);
-
-    /// Returns true if the 'endian' platform condition argument represents
-    /// a supported target endianness.
-    ///
-    /// \param suggestions Populated with suggested replacements
-    /// if a match is not found.
-    static bool isPlatformConditionEndiannessSupported(
-      StringRef endianness, std::vector<StringRef> &suggestions);
+    static bool checkPlatformConditionSupported(
+      PlatformConditionKind Kind, StringRef Value,
+      std::vector<StringRef> &suggestions);
 
   private:
-    llvm::SmallVector<std::pair<std::string, std::string>, 3>
+    llvm::SmallVector<std::pair<PlatformConditionKind, std::string>,
+                      NumPlatformConditionKind>
         PlatformConditionValues;
     llvm::SmallVector<std::string, 2> CustomConditionalCompilationFlags;
   };

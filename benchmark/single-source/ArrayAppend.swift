@@ -266,3 +266,46 @@ public func run_ArrayPlusEqualFiveElementCollection(_ N: Int) {
     }
   }
 }
+
+// Append the utf8 elements of an ascii string to a [UInt8]
+@inline(never)
+public func run_ArrayAppendAscii(_ N: Int) {
+  let s = "the quick brown fox jumps over the lazy dog!"
+  for _ in 0..<N {
+    for _ in 0..<10 {
+       var nums = [UInt8]()
+       for _ in 0..<10_000 {
+         nums += s.utf8
+       }
+    }
+  }
+}
+
+// Append the utf8 elements of an ascii string to a [UInt8]
+@inline(never)
+public func run_ArrayAppendLatin1(_ N: Int) {
+  let s = "the quick brown fox jumps over the lazy dog\u{00A1}"
+  for _ in 0..<N {
+    for _ in 0..<10 {
+       var nums = [UInt8]()
+       for _ in 0..<10_000 {
+         nums += s.utf8
+       }
+    }
+  }
+}
+
+// Append the utf8 elements of an ascii string to a [UInt8]
+@inline(never)
+public func run_ArrayAppendUTF16(_ N: Int) {
+  let s = "the quick brown 🦊 jumps over the lazy dog"
+  for _ in 0..<N {
+    for _ in 0..<10 {
+       var nums = [UInt8]()
+       for _ in 0..<10_000 {
+         nums += s.utf8
+       }
+    }
+  }
+}
+

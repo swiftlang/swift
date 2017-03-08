@@ -16,6 +16,7 @@
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILVisitor.h"
+#include "llvm/ADT/StringSwitch.h"
 
 using namespace swift;
 
@@ -143,6 +144,19 @@ ValueOwnershipKind::merge(ValueOwnershipKind RHS) const {
   return (LHSVal == RHSVal) ? Optional<ValueOwnershipKind>(*this) : None;
 }
 
+ValueOwnershipKind::ValueOwnershipKind(StringRef S) {
+  auto Result = llvm::StringSwitch<Optional<ValueOwnershipKind::innerty>>(S)
+                    .Case("trivial", ValueOwnershipKind::Trivial)
+                    .Case("unowned", ValueOwnershipKind::Unowned)
+                    .Case("owned", ValueOwnershipKind::Owned)
+                    .Case("guaranteed", ValueOwnershipKind::Guaranteed)
+                    .Case("any", ValueOwnershipKind::Any)
+                    .Default(None);
+  if (!Result.hasValue())
+    llvm_unreachable("Invalid string representation of ValueOwnershipKind");
+  Value = Result.getValue();
+}
+
 //===----------------------------------------------------------------------===//
 //                 Instruction ValueOwnershipKind Computation
 //===----------------------------------------------------------------------===//
@@ -159,7 +173,11 @@ public:
   ValueOwnershipKindVisitor(const ValueOwnershipKindVisitor &) = delete;
   ValueOwnershipKindVisitor(ValueOwnershipKindVisitor &&) = delete;
 
-  ValueOwnershipKind visitForwardingInst(SILInstruction *I);
+  ValueOwnershipKind visitForwardingInst(SILInstruction *I,
+                                         ArrayRef<Operand> Ops);
+  ValueOwnershipKind visitForwardingInst(SILInstruction *I) {
+    return visitForwardingInst(I, I->getAllOperands());
+  }
 
   ValueOwnershipKind visitValueBase(ValueBase *V) {
     llvm_unreachable("unimplemented method on ValueBaseOwnershipVisitor");
@@ -187,7 +205,7 @@ CONSTANT_OWNERSHIP_INST(Owned, AllocBox)
 CONSTANT_OWNERSHIP_INST(Owned, AllocExistentialBox)
 CONSTANT_OWNERSHIP_INST(Owned, AllocRef)
 CONSTANT_OWNERSHIP_INST(Owned, AllocRefDynamic)
-CONSTANT_OWNERSHIP_INST(Owned, AllocValueBuffer)
+CONSTANT_OWNERSHIP_INST(Trivial, AllocValueBuffer)
 CONSTANT_OWNERSHIP_INST(Owned, CopyBlock)
 CONSTANT_OWNERSHIP_INST(Owned, CopyValue)
 CONSTANT_OWNERSHIP_INST(Owned, CopyUnownedValue)
@@ -196,6 +214,8 @@ CONSTANT_OWNERSHIP_INST(Owned, LoadWeak)
 CONSTANT_OWNERSHIP_INST(Owned, PartialApply)
 CONSTANT_OWNERSHIP_INST(Owned, StrongPin)
 CONSTANT_OWNERSHIP_INST(Owned, ThinToThickFunction)
+CONSTANT_OWNERSHIP_INST(Owned, InitExistentialOpaque)
+CONSTANT_OWNERSHIP_INST(Owned, UnconditionalCheckedCastOpaque)
 
 // One would think that these /should/ be unowned. In truth they are owned since
 // objc metatypes do not go through the retain/release fast path. In their
@@ -279,7 +299,6 @@ CONSTANT_OWNERSHIP_INST(Unowned, UnownedToRef)
   }
 CONSTANT_OR_TRIVIAL_OWNERSHIP_INST(Guaranteed, StructExtract)
 CONSTANT_OR_TRIVIAL_OWNERSHIP_INST(Guaranteed, TupleExtract)
-CONSTANT_OR_TRIVIAL_OWNERSHIP_INST(Guaranteed, UncheckedEnumData)
 #undef CONSTANT_OR_TRIVIAL_OWNERSHIP_INST
 
 // These are instructions that do not have any result, so we should never reach
@@ -315,6 +334,7 @@ NO_RESULT_OWNERSHIP_INST(StrongRetainUnowned)
 NO_RESULT_OWNERSHIP_INST(StrongUnpin)
 NO_RESULT_OWNERSHIP_INST(UnmanagedRetainValue)
 NO_RESULT_OWNERSHIP_INST(UnmanagedReleaseValue)
+NO_RESULT_OWNERSHIP_INST(UnmanagedAutoreleaseValue)
 NO_RESULT_OWNERSHIP_INST(UnownedRetain)
 NO_RESULT_OWNERSHIP_INST(UnownedRelease)
 NO_RESULT_OWNERSHIP_INST(RetainValue)
@@ -326,7 +346,9 @@ NO_RESULT_OWNERSHIP_INST(DestroyValue)
 NO_RESULT_OWNERSHIP_INST(AllocGlobal)
 NO_RESULT_OWNERSHIP_INST(InjectEnumAddr)
 NO_RESULT_OWNERSHIP_INST(DeinitExistentialAddr)
+NO_RESULT_OWNERSHIP_INST(DeinitExistentialOpaque)
 NO_RESULT_OWNERSHIP_INST(CondFail)
+NO_RESULT_OWNERSHIP_INST(EndLifetime)
 
 // Terminators. These do not produce SILValue, so they do not have a
 // ValueOwnershipKind. They do have ownership implications in terms of the
@@ -342,14 +364,15 @@ NO_RESULT_OWNERSHIP_INST(SwitchEnum)
 NO_RESULT_OWNERSHIP_INST(SwitchEnumAddr)
 NO_RESULT_OWNERSHIP_INST(DynamicMethodBranch)
 NO_RESULT_OWNERSHIP_INST(CheckedCastBranch)
+NO_RESULT_OWNERSHIP_INST(CheckedCastValueBranch)
 NO_RESULT_OWNERSHIP_INST(CheckedCastAddrBranch)
 #undef NO_RESULT_OWNERSHIP_INST
 
 // For a forwarding instruction, we loop over all operands and make sure that
 // all non-trivial values have the same ownership.
 ValueOwnershipKind
-ValueOwnershipKindVisitor::visitForwardingInst(SILInstruction *I) {
-  ArrayRef<Operand> Ops = I->getAllOperands();
+ValueOwnershipKindVisitor::visitForwardingInst(SILInstruction *I,
+                                               ArrayRef<Operand> Ops) {
   // A forwarding inst without operands must be trivial.
   if (Ops.empty())
     return ValueOwnershipKind::Trivial;
@@ -388,6 +411,12 @@ ValueOwnershipKindVisitor::visitForwardingInst(SILInstruction *I) {
 
     auto MergedValue = Base.merge(OpKind.Value);
     if (!MergedValue.hasValue()) {
+      // If we have mismatched SILOwnership and sil ownership is not enabled,
+      // just return Any for staging purposes. If SILOwnership is enabled, then
+      // we must assert!
+      if (!I->getModule().getOptions().EnableSILOwnership) {
+        return ValueOwnershipKind::Any;
+      }
       llvm_unreachable("Forwarding inst with mismatching ownership kinds?!");
     }
   }
@@ -405,8 +434,8 @@ FORWARDING_OWNERSHIP_INST(BridgeObjectToRef)
 FORWARDING_OWNERSHIP_INST(ConvertFunction)
 FORWARDING_OWNERSHIP_INST(InitExistentialRef)
 FORWARDING_OWNERSHIP_INST(OpenExistentialRef)
+FORWARDING_OWNERSHIP_INST(OpenExistentialOpaque)
 FORWARDING_OWNERSHIP_INST(RefToBridgeObject)
-FORWARDING_OWNERSHIP_INST(SelectEnum)
 FORWARDING_OWNERSHIP_INST(SelectValue)
 FORWARDING_OWNERSHIP_INST(Struct)
 FORWARDING_OWNERSHIP_INST(Tuple)
@@ -414,11 +443,18 @@ FORWARDING_OWNERSHIP_INST(UncheckedRefCast)
 FORWARDING_OWNERSHIP_INST(UnconditionalCheckedCast)
 FORWARDING_OWNERSHIP_INST(Upcast)
 FORWARDING_OWNERSHIP_INST(MarkUninitialized)
+FORWARDING_OWNERSHIP_INST(UncheckedEnumData)
 #undef FORWARDING_OWNERSHIP_INST
 
 ValueOwnershipKind
-ValueOwnershipKindVisitor::
-visitUncheckedBitwiseCastInst(UncheckedBitwiseCastInst *UBCI) {
+ValueOwnershipKindVisitor::visitSelectEnumInst(SelectEnumInst *SEI) {
+  // We handle this specially, since a select enum forwards only its case
+  // values. We drop the first element since that is the condition element.
+  return visitForwardingInst(SEI, SEI->getAllOperands().drop_front());
+}
+
+ValueOwnershipKind ValueOwnershipKindVisitor::visitUncheckedBitwiseCastInst(
+    UncheckedBitwiseCastInst *UBCI) {
   ValueOwnershipKind OpOwnership = UBCI->getOperand().getOwnershipKind();
   bool ResultTypeIsTrivial = UBCI->getType().isTrivial(UBCI->getModule());
 
@@ -443,6 +479,12 @@ visitUncheckedBitwiseCastInst(UncheckedBitwiseCastInst *UBCI) {
 
   // Otherwise, we forward our ownership.
   return visitForwardingInst(UBCI);
+}
+
+ValueOwnershipKind
+ValueOwnershipKindVisitor::visitUncheckedOwnershipConversionInst(
+    UncheckedOwnershipConversionInst *I) {
+  return I->getConversionOwnershipKind();
 }
 
 // An enum without payload is trivial. One with non-trivial payload is
@@ -494,7 +536,7 @@ ValueOwnershipKindVisitor::visitApplyInst(ApplyInst *AI) {
   if (Iter == Results.end())
     return ValueOwnershipKind::Trivial;
 
-  ValueOwnershipKind Base = Iter->getOwnershipKind(M);
+  ValueOwnershipKind Base = Iter->getOwnershipKind(M, Sig);
 
   for (const SILResultInfo &ResultInfo :
        SILFunctionConventions::DirectSILResultRange(next(Iter),
@@ -573,6 +615,9 @@ struct ValueOwnershipKindBuiltinVisitor
   }
 CONSTANT_OWNERSHIP_BUILTIN(Owned, Take)
 CONSTANT_OWNERSHIP_BUILTIN(Owned, TryPin)
+// This returns a value at +1 that is destroyed strictly /after/ the
+// UnsafeGuaranteedEnd. This provides the guarantee that we want.
+CONSTANT_OWNERSHIP_BUILTIN(Owned, UnsafeGuaranteed)
 CONSTANT_OWNERSHIP_BUILTIN(Trivial, AShr)
 CONSTANT_OWNERSHIP_BUILTIN(Trivial, Add)
 CONSTANT_OWNERSHIP_BUILTIN(Trivial, And)
@@ -656,6 +701,7 @@ CONSTANT_OWNERSHIP_BUILTIN(Trivial, AddressOf)
 CONSTANT_OWNERSHIP_BUILTIN(Trivial, GepRaw)
 CONSTANT_OWNERSHIP_BUILTIN(Trivial, Gep)
 CONSTANT_OWNERSHIP_BUILTIN(Trivial, GetTailAddr)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, OnFastPath)
 CONSTANT_OWNERSHIP_BUILTIN(Trivial, IsUnique)
 CONSTANT_OWNERSHIP_BUILTIN(Trivial, IsUniqueOrPinned)
 CONSTANT_OWNERSHIP_BUILTIN(Trivial, IsUnique_native)
@@ -687,42 +733,34 @@ CONSTANT_OWNERSHIP_BUILTIN(Trivial, Unreachable)
 CONSTANT_OWNERSHIP_BUILTIN(Trivial, AtomicRMW)
 
 CONSTANT_OWNERSHIP_BUILTIN(Trivial, CondUnreachable)
-CONSTANT_OWNERSHIP_BUILTIN(Guaranteed, UnsafeGuaranteed)
 CONSTANT_OWNERSHIP_BUILTIN(Trivial, UnsafeGuaranteedEnd)
 CONSTANT_OWNERSHIP_BUILTIN(Trivial, GetObjCTypeEncoding)
 CONSTANT_OWNERSHIP_BUILTIN(Trivial, CanBeObjCClass)
 CONSTANT_OWNERSHIP_BUILTIN(Trivial, WillThrow)
-#undef CONSTANT_OWNERSHIP_BUILTIN
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, StaticReport)
 
-#define NO_OWNERSHIP_BUILTIN(ID)                                               \
-  ValueOwnershipKind ValueOwnershipKindBuiltinVisitor::visit##ID(              \
-      BuiltinInst *BI, StringRef Attr) {                                       \
-    assert(!BI->hasValue() && "Expected to not have a value");                 \
-    llvm_unreachable("Should never get a SILValue to a Builtin "               \
-                     "without result");                                        \
-  }
-NO_OWNERSHIP_BUILTIN(DestroyArray)
-NO_OWNERSHIP_BUILTIN(CopyArray)
-NO_OWNERSHIP_BUILTIN(TakeArrayFrontToBack)
-NO_OWNERSHIP_BUILTIN(TakeArrayBackToFront)
-NO_OWNERSHIP_BUILTIN(UnexpectedError)
-NO_OWNERSHIP_BUILTIN(ErrorInMain)
-NO_OWNERSHIP_BUILTIN(DeallocRaw)
-NO_OWNERSHIP_BUILTIN(Fence)
-NO_OWNERSHIP_BUILTIN(OnFastPath)
-NO_OWNERSHIP_BUILTIN(Retain)
-NO_OWNERSHIP_BUILTIN(Release)
-NO_OWNERSHIP_BUILTIN(CondFail)
-NO_OWNERSHIP_BUILTIN(FixLifetime)
-NO_OWNERSHIP_BUILTIN(Autorelease)
-NO_OWNERSHIP_BUILTIN(Unpin)
-NO_OWNERSHIP_BUILTIN(Destroy)
-NO_OWNERSHIP_BUILTIN(Assign)
-NO_OWNERSHIP_BUILTIN(Init)
-NO_OWNERSHIP_BUILTIN(AtomicStore)
-NO_OWNERSHIP_BUILTIN(StaticReport)
-NO_OWNERSHIP_BUILTIN(Once)
-#undef NO_OWNERSHIP_BUILTIN
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, DestroyArray)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, CopyArray)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, TakeArrayFrontToBack)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, TakeArrayBackToFront)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, UnexpectedError)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, ErrorInMain)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, DeallocRaw)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, Fence)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, Retain)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, Release)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, CondFail)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, FixLifetime)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, Autorelease)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, Unpin)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, Destroy)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, Assign)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, Init)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, AtomicStore)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, Once)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, TSanInoutAccess)
+
+#undef CONSTANT_OWNERSHIP_BUILTIN
 
 // Check all of these...
 #define UNOWNED_OR_TRIVIAL_DEPENDING_ON_RESULT(ID)                             \

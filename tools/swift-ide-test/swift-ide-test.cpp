@@ -23,7 +23,6 @@
 #include "swift/AST/RawComment.h"
 #include "swift/AST/SourceEntityWalker.h"
 #include "swift/AST/USRGeneration.h"
-#include "swift/AST/ASTMangler.h"
 #include "swift/Basic/Demangle.h"
 #include "swift/Basic/DemangleWrappers.h"
 #include "swift/Basic/DiagnosticConsumer.h"
@@ -1151,7 +1150,7 @@ private:
   }
 
   bool visitDeclReference(ValueDecl *D, CharSourceRange Range,
-                          TypeDecl *CtorTyRef, Type Ty,
+                          TypeDecl *CtorTyRef, ExtensionDecl *ExtTyRef, Type Ty,
                           SemaReferenceKind Kind) override {
     annotateSourceEntity({ Range, D, CtorTyRef, /*IsRef=*/true });
     return true;
@@ -1159,7 +1158,7 @@ private:
 
   bool visitSubscriptReference(ValueDecl *D, CharSourceRange Range,
                                bool IsOpenBracket) override {
-    return visitDeclReference(D, Range, nullptr, Type(),
+    return visitDeclReference(D, Range, nullptr, nullptr, Type(),
                               SemaReferenceKind::SubscriptRef);
   }
 
@@ -1411,8 +1410,8 @@ static int doPrintAST(const CompilerInvocation &InitInvok,
 
   // If we were given a mangled name, do a very simple form of LLDB's logic to
   // look up a type based on that name.
-  Demangle::NodePointer node =
-    demangle_wrappers::demangleSymbolAsNode(MangledNameToFind);
+  Demangle::Context DCtx;
+  Demangle::NodePointer node = DCtx.demangleSymbolAsNode(MangledNameToFind);
   using NodeKind = Demangle::Node::Kind;
 
   if (!node) {
@@ -1561,7 +1560,8 @@ static int doPrintLocalTypes(const CompilerInvocation &InitInvok,
     for (auto MangledName : MangledNames) {
 
       // Global
-      auto node = demangle_wrappers::demangleSymbolAsNode(MangledName);
+      Demangle::Context DCtx;
+      auto node = DCtx.demangleSymbolAsNode(MangledName);
 
       // TypeMangling
       node = node->getFirstChild();
@@ -2546,7 +2546,7 @@ public:
   }
 
   bool visitDeclReference(ValueDecl *D, CharSourceRange Range,
-                          TypeDecl *CtorTyRef, Type T,
+                          TypeDecl *CtorTyRef, ExtensionDecl *ExtTyRef, Type T,
                           SemaReferenceKind Kind) override {
     if (SeenDecls.insert(D).second)
       tryDemangleDecl(D, Range, /*isRef=*/true);
@@ -2714,6 +2714,8 @@ namespace {
       for (auto Relation : symbol.Relations) {
         OS << "  ";
         clang::index::printSymbolRoles(Relation.roles, OS);
+        OS << " | ";
+        printSymbolInfo(Relation.symInfo);
         OS << " | " << Relation.name << " | " << Relation.USR << "\n";
       }
       return Continue;
@@ -2957,18 +2959,21 @@ int main(int argc, char *argv[]) {
     if (auto swiftVersion =
           version::Version::parseVersionString(options::SwiftVersion,
                                                SourceLoc(), nullptr)) {
-      InitInvok.getLangOptions().EffectiveLanguageVersion = *swiftVersion;
+      if (auto actual = swiftVersion.getValue().getEffectiveLanguageVersion())
+        InitInvok.getLangOptions().EffectiveLanguageVersion = actual.getValue();
     }
   }
   InitInvok.getClangImporterOptions().ModuleCachePath =
     options::ModuleCachePath;
   InitInvok.setImportSearchPaths(options::ImportPaths);
-  InitInvok.setFrameworkSearchPaths(options::FrameworkPaths);
-  for (const auto &systemFrameworkPath : options::SystemFrameworkPaths) {
-    auto &extraArgs = InitInvok.getClangImporterOptions().ExtraArgs;
-    extraArgs.push_back("-iframework");
-    extraArgs.push_back(systemFrameworkPath);
+  std::vector<SearchPathOptions::FrameworkSearchPath> FramePaths;
+  for (const auto &path : options::FrameworkPaths) {
+    FramePaths.push_back({path, /*isSystem=*/false});
   }
+  for (const auto &path : options::SystemFrameworkPaths) {
+    FramePaths.push_back({path, /*isSystem=*/true});
+  }
+  InitInvok.setFrameworkSearchPaths(FramePaths);
   InitInvok.getFrontendOptions().EnableSourceImport |=
     options::EnableSourceImport;
   InitInvok.getFrontendOptions().ImplicitObjCHeaderPath =

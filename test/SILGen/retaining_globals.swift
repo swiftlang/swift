@@ -31,16 +31,16 @@ func main() {
   // CHECK: [[bridgedString:%.*]] = apply [[bridgeStringFunc]]([[wrappedString]], [[stringMetaType]]) : $@convention(method) (@owned Optional<NSString>, @thin String.Type) -> @owned String
   let string = globalString // Problematic case, wasn't being retained
 
-  // CHECK: load [copy] {{%.*}} : $*Optional<NSObject>
+  // CHECK: [[load_1:%.*]] = load [copy] {{%.*}} : $*Optional<NSObject>
   let object = globalObject
   
-  // CHECK: load [copy] {{%.*}} : $*Optional<AnyObject>
+  // CHECK: [[load_2:%.*]] = load [copy] {{%.*}} : $*Optional<AnyObject>
   let id = globalId
   
-  // CHECK: load [copy] {{%.*}} : $*Optional<NSArray>
+  // CHECK: [[load_3:%.*]] = load [copy] {{%.*}} : $*Optional<NSArray>
   let arr = globalArray
   
-  // CHECK: load [copy] {{%.*}} : $*Optional<NSArray>
+  // CHECK: [[load_4:%.*]] = load [copy] {{%.*}} : $*Optional<NSArray>
   let constArr = globalConstArray
 
   // Make sure there's no more copies
@@ -52,14 +52,17 @@ func main() {
   print(arr as Any)
   print(constArr as Any)
 
-  // CHECK: destroy_value
-  // CHECK: destroy_value
-  // CHECK: destroy_value
-  // CHECK: destroy_value
-  // CHECK: destroy_value
+  // CHECK: [[PRINT_FUN:%.*]] = function_ref @_TFs5printFTGSaP{{.*}} : $@convention(thin) (@owned Array<Any>, @owned String, @owned String) -> ()
+  // CHECK: apply [[PRINT_FUN]]({{.*}})
+  // CHECK: destroy_value [[load_4]]
+  // CHECK: destroy_value [[load_3]]
+  // CHECK: destroy_value [[load_2]]
+  // CHECK: destroy_value [[load_1]]
+  // CHECK: destroy_value [[bridgedString]]
 
   // Make sure there's no more destroys
   // CHECK-NOT: destroy_value
+  // CHECK: } // end sil function '_TF17retaining_globals4mainFT_T_'
 }
 
 

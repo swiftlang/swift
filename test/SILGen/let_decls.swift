@@ -74,8 +74,10 @@ func test3() {
   // CHECK-NOT: destroy_value
 
   // CHECK: [[USEFN:%[0-9]+]] = function_ref{{.*}}useAString
-  // CHECK-NEXT: [[STR_COPY:%.*]] = copy_value [[STR]]
+  // CHECK-NEXT: [[BORROWED_STR:%.*]] = begin_borrow [[STR]]
+  // CHECK-NEXT: [[STR_COPY:%.*]] = copy_value [[BORROWED_STR]]
   // CHECK-NEXT: [[USE:%[0-9]+]] = apply [[USEFN]]([[STR_COPY]])
+  // CHECK-NEXT: end_borrow [[BORROWED_STR]] from [[STR]]
   useAString(o)
   
   // CHECK: destroy_value [[STR]]
@@ -368,8 +370,10 @@ func member_ref_abstraction_change(_ x: GenericFunctionStruct<Int, Int>) -> (Int
 
 // CHECK-LABEL: sil hidden @{{.*}}call_auto_closure
 // CHECK: bb0([[CLOSURE:%.*]] : $@callee_owned () -> Bool):
-// CHECK:   [[CLOSURE_COPY:%.*]] = copy_value [[CLOSURE]]
+// CHECK:   [[BORROWED_CLOSURE:%.*]] = begin_borrow [[CLOSURE]]
+// CHECK:   [[CLOSURE_COPY:%.*]] = copy_value [[BORROWED_CLOSURE]]
 // CHECK:   apply [[CLOSURE_COPY]]() : $@callee_owned () -> Bool
+// CHECK:   end_borrow [[BORROWED_CLOSURE]] from [[CLOSURE]]
 // CHECK:   destroy_value [[CLOSURE]]
 // CHECK: } // end sil function '{{.*}}call_auto_closure{{.*}}'
 func call_auto_closure(x: @autoclosure () -> Bool) -> Bool {
@@ -468,7 +472,7 @@ struct LetPropertyStruct {
 // CHECK:  [[ABOX:%[0-9]+]] = alloc_box ${ var LetPropertyStruct }
 // CHECK:  [[A:%[0-9]+]] = project_box [[ABOX]]
 // CHECK:   store %0 to [trivial] [[A]] : $*LetPropertyStruct
-// CHECK:   [[STRUCT:%[0-9]+]] = load_borrow [[A]] : $*LetPropertyStruct
+// CHECK:   [[STRUCT:%[0-9]+]] = load [trivial] [[A]] : $*LetPropertyStruct
 // CHECK:   [[PROP:%[0-9]+]] = struct_extract [[STRUCT]] : $LetPropertyStruct, #LetPropertyStruct.lp
 // CHECK:   destroy_value [[ABOX]] : ${ var LetPropertyStruct }
 // CHECK:   return [[PROP]] : $Int

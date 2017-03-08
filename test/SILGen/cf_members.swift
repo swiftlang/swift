@@ -39,9 +39,11 @@ public func foo(_ x: Double) {
   // CHECK: [[THUNK:%.*]] = function_ref @_T0SC7Struct1VABSd5value_tcfCTcTO
   // CHECK: [[SELF_META:%.*]] = metatype $@thin Struct1.Type
   // CHECK: [[A:%.*]] = apply [[THUNK]]([[SELF_META]])
-  // CHECK: [[A_COPY:%.*]] = copy_value [[A]]
+  // CHECK: [[BORROWED_A:%.*]] = begin_borrow [[A]]
+  // CHECK: [[A_COPY:%.*]] = copy_value [[BORROWED_A]]
   let a: (Double) -> Struct1 = Struct1.init(value:)
   // CHECK: apply [[A_COPY]]([[X]])
+  // CHECK: end_borrow [[BORROWED_A]] from [[A]]
   z = a(x)
 
   // TODO: Support @convention(c) references that only capture thin metatype
@@ -61,9 +63,11 @@ public func foo(_ x: Double) {
   // CHECK: [[THUNK:%.*]] = function_ref [[THUNK_NAME:@_T0SC7Struct1V9translateABSd7radians_tFTcTO]]
   // CHECK: [[ZVAL:%.*]] = load [trivial] [[Z]]
   // CHECK: [[C:%.*]] = apply [[THUNK]]([[ZVAL]])
-  // CHECK: [[C_COPY:%.*]] = copy_value [[C]]
+  // CHECK: [[BORROWED_C:%.*]] = begin_borrow [[C]]
+  // CHECK: [[C_COPY:%.*]] = copy_value [[BORROWED_C]]
   let c: (Double) -> Struct1 = z.translate(radians:)
   // CHECK: apply [[C_COPY]]([[X]])
+  // CHECK: end_borrow [[BORROWED_C]] from [[C]]
   z = c(x)
   // CHECK: [[THUNK:%.*]] = function_ref [[THUNK_NAME]]
   // CHECK: thin_to_thick_function [[THUNK]]
@@ -85,9 +89,11 @@ public func foo(_ x: Double) {
   // CHECK: [[THUNK:%.*]] = function_ref @_T0SC7Struct1V5scaleABSdFTcTO
   // CHECK: [[ZVAL:%.*]] = load [trivial] [[Z]]
   // CHECK: [[F:%.*]] = apply [[THUNK]]([[ZVAL]])
-  // CHECK: [[F_COPY:%.*]] = copy_value [[F]]
+  // CHECK: [[BORROWED_F:%.*]] = begin_borrow [[F]]
+  // CHECK: [[F_COPY:%.*]] = copy_value [[BORROWED_F]]
   let f = z.scale
   // CHECK: apply [[F_COPY]]([[X]])
+  // CHECK: end_borrow [[BORROWED_F]] from [[F]]
   z = f(x)
   // CHECK: [[THUNK:%.*]] = function_ref @_T0SC7Struct1V5scaleABSdFTcTO
   // CHECK: thin_to_thick_function [[THUNK]]
@@ -129,9 +135,11 @@ public func foo(_ x: Double) {
   // CHECK: [[THUNK:%.*]] = function_ref @_T0SC7Struct1V12staticMethods5Int32VyFZTcTO
   // CHECK: [[SELF:%.*]] = metatype
   // CHECK: [[I:%.*]] = apply [[THUNK]]([[SELF]])
-  // CHECK: [[I_COPY:%.*]] = copy_value [[I]]
+  // CHECK: [[BORROWED_I:%.*]] = begin_borrow [[I]]
+  // CHECK: [[I_COPY:%.*]] = copy_value [[BORROWED_I]]
   let i = Struct1.staticMethod
   // CHECK: apply [[I_COPY]]()
+  // CHECK: end_borrow [[BORROWED_I]] from [[I]]
   y = i()
 
   // TODO: Support @convention(c) references that only capture thin metatype

@@ -25,15 +25,15 @@
 #include "swift/AST/Pattern.h"
 #include "swift/AST/SILOptions.h"
 #include "swift/AST/Types.h"
-#include "swift/Basic/Fallthrough.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/SIL/DynamicCasts.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILUndef.h"
 #include "swift/SIL/TypeLowering.h"
+#include "llvm/Support/Compiler.h"
+
 using namespace swift;
 using namespace Lowering;
-
 
 /// Shallow-dump a pattern node one level deep for debug purposes.
 static void dumpPattern(const Pattern *p, llvm::raw_ostream &os) {
@@ -258,7 +258,7 @@ static Pattern *getSimilarSpecializingPattern(Pattern *p, Pattern *first) {
     if ((isa<OptionalSomePattern>(p) && isa<EnumElementPattern>(first)) ||
         (isa<OptionalSomePattern>(first) && isa<EnumElementPattern>(p)))
       return p;
-    SWIFT_FALLTHROUGH;
+    LLVM_FALLTHROUGH;
   }
   case PatternKind::Tuple:
   case PatternKind::Named:
@@ -1527,16 +1527,16 @@ void PatternMatchEmission::emitIsDispatch(ArrayRef<RowToSpecialize> rows,
     innerFailure = &specializedFailure;
   
   // Perform a conditional cast branch.
-  SGF.emitCheckedCastBranch(loc, castOperand,
-                            sourceType, targetType, SGFContext(),
-    // Success block: recurse.
-    [&](ManagedValue castValue) {
-      handleCase(ConsumableManagedValue::forOwned(castValue),
-                 specializedRows, *innerFailure);
-      assert(!SGF.B.hasValidInsertionPoint() && "did not end block");
-    },
-    // Failure block: branch out to the continuation block.
-    [&] { (*innerFailure)(loc); });
+  SGF.emitCheckedCastBranchOld(
+      loc, castOperand, sourceType, targetType, SGFContext(),
+      // Success block: recurse.
+      [&](ManagedValue castValue) {
+        handleCase(ConsumableManagedValue::forOwned(castValue), specializedRows,
+                   *innerFailure);
+        assert(!SGF.B.hasValidInsertionPoint() && "did not end block");
+      },
+      // Failure block: branch out to the continuation block.
+      [&] { (*innerFailure)(loc); });
 }
 
 /// Perform specialized dispatch for a sequence of EnumElementPattern or an
@@ -1792,8 +1792,11 @@ emitEnumElementDispatch(ArrayRef<RowToSpecialize> rows,
       if (elt->isIndirect() || elt->getParentEnum()->isIndirect()) {
         SILValue boxedValue = SGF.B.createProjectBox(loc, origCMV.getValue(), 0);
         eltTL = &SGF.getTypeLowering(boxedValue->getType());
-        if (eltTL->isLoadable())
-          boxedValue = SGF.B.createLoadBorrow(loc, boxedValue);
+        if (eltTL->isLoadable()) {
+          ManagedValue newLoadedBoxValue = SGF.B.createLoadBorrow(
+              loc, ManagedValue::forUnmanaged(boxedValue));
+          boxedValue = newLoadedBoxValue.getUnmanagedValue();
+        }
 
         // The boxed value may be shared, so we always have to copy it.
         eltCMV = getManagedSubobject(SGF, boxedValue, *eltTL,
@@ -1803,8 +1806,7 @@ emitEnumElementDispatch(ArrayRef<RowToSpecialize> rows,
       // Reabstract to the substituted type, if needed.
 
       CanType substEltTy =
-        sourceType->getTypeOfMember(SGF.SGM.M.getSwiftModule(),
-                                    formalElt, nullptr,
+        sourceType->getTypeOfMember(SGF.SGM.M.getSwiftModule(), formalElt,
                                     formalElt->getArgumentInterfaceType())
                   ->getCanonicalType();
 
@@ -2184,14 +2186,8 @@ void SILGenFunction::emitSwitchStmt(SwitchStmt *S) {
         continue;
         for (auto var : Vars) {
           if (var->hasName() && var->getName() == expected->getName()) {
-            auto value = VarLocs[var].value;
-            
-            for (auto cmv : argArray) {
-              if (cmv.getValue() == value) {
-                value = B.emitCopyValueOperation(CurrentSILLoc, value);
-                break;
-              }
-            }
+            auto value = B.emitCopyValueOperation(CurrentSILLoc,
+                                                  VarLocs[var].value);
             args.push_back(value);
             break;
           }

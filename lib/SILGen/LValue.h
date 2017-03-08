@@ -21,15 +21,17 @@
 #ifndef SWIFT_LOWERING_LVALUE_H
 #define SWIFT_LOWERING_LVALUE_H
 
+#include "FormalEvaluation.h"
 #include "SILGenFunction.h"
+#include "Scope.h"
 
 namespace swift {
 namespace Lowering {
-  class SILGenFunction;
-  class ManagedValue;
 
-class PhysicalPathComponent;
 class LogicalPathComponent;
+class ManagedValue;
+class PhysicalPathComponent;
+class SILGenFunction;
 class TranslationPathComponent;
 
 /// Information about the type of an l-value.
@@ -388,7 +390,7 @@ public:
   /// Add a member component to the access path of this lvalue.
   void addMemberComponent(SILGenFunction &gen, SILLocation loc,
                           AbstractStorageDecl *storage,
-                          ArrayRef<Substitution> subs,
+                          SubstitutionList subs,
                           bool isSuper,
                           AccessKind accessKind,
                           AccessSemantics accessSemantics,
@@ -398,7 +400,7 @@ public:
 
   void addMemberVarComponent(SILGenFunction &gen, SILLocation loc,
                              VarDecl *var,
-                             ArrayRef<Substitution> subs,
+                             SubstitutionList subs,
                              bool isSuper,
                              AccessKind accessKind,
                              AccessSemantics accessSemantics,
@@ -407,7 +409,7 @@ public:
 
   void addMemberSubscriptComponent(SILGenFunction &gen, SILLocation loc,
                                    SubscriptDecl *subscript,
-                                   ArrayRef<Substitution> subs,
+                                   SubstitutionList subs,
                                    bool isSuper,
                                    AccessKind accessKind,
                                    AccessSemantics accessSemantics,
@@ -455,52 +457,6 @@ public:
   void print(raw_ostream &OS) const;
 };
   
-/// RAII object to enable writebacks for logical lvalues evaluated within the
-/// scope, which will be applied when the object goes out of scope.
-///
-/// A writeback scope is used to limit the extent of a formal access
-/// to an l-value, under the rules specified in the accessors
-/// proposal.  It should be entered at a point where it will conclude
-/// at the appropriate instant.
-///
-/// For example, the rules specify that a formal access for an inout
-/// argument begins immediately before the call and ends immediately
-/// after it.  This can be implemented by pushing a WritebackScope
-/// before the formal evaluation of the arguments and popping it
-/// immediately after the call.  (It must be pushed before the formal
-/// evaluation because, in some cases, the formal evaluation of a base
-/// l-value will immediately begin a formal access that must end at
-/// the same time as that of its projected subobject l-value.)
-class WritebackScope {
-  SILGenFunction *gen;
-  bool wasInWritebackScope;
-  size_t savedDepth;
-  void popImpl();
-public:
-  WritebackScope(SILGenFunction &gen);
-  ~WritebackScope() {
-    if (gen) {
-      popImpl();
-    }
-  }
-
-  bool isPopped() const {
-    return (gen == nullptr);
-  }
-
-  void pop() {
-    assert(!isPopped() && "popping an already-popped writeback scope!");
-    popImpl();
-    gen = nullptr;
-  }
-  
-  WritebackScope(const WritebackScope &) = delete;
-  WritebackScope &operator=(const WritebackScope &) = delete;
-  
-  WritebackScope(WritebackScope &&o);
-  WritebackScope &operator=(WritebackScope &&o);
-};
-  
 /// RAII object used to enter an inout conversion scope. Writeback scopes formed
 /// during the inout conversion scope will be no-ops.
 class InOutConversionScope {
@@ -510,7 +466,54 @@ public:
   ~InOutConversionScope();
 };
 
-} // end namespace Lowering
-} // end namespace swift
+struct LLVM_LIBRARY_VISIBILITY ExclusiveBorrowFormalAccess : FormalAccess {
+  std::unique_ptr<LogicalPathComponent> component;
+  ManagedValue base;
+  MaterializedLValue materialized;
+
+  ~ExclusiveBorrowFormalAccess() {}
+  ExclusiveBorrowFormalAccess(ExclusiveBorrowFormalAccess &&) = default;
+  ExclusiveBorrowFormalAccess &
+  operator=(ExclusiveBorrowFormalAccess &&) = default;
+
+  ExclusiveBorrowFormalAccess() = default;
+  ExclusiveBorrowFormalAccess(SILLocation loc,
+                              std::unique_ptr<LogicalPathComponent> &&comp,
+                              ManagedValue base,
+                              MaterializedLValue materialized,
+                              CleanupHandle cleanup)
+      : FormalAccess(sizeof(*this), FormalAccess::Exclusive, loc, cleanup),
+        component(std::move(comp)), base(base), materialized(materialized) {}
+
+  void diagnoseConflict(const ExclusiveBorrowFormalAccess &rhs,
+                        SILGenFunction &SGF) const {
+    // If the two writebacks we're comparing are of different kinds (e.g.
+    // ownership conversion vs a computed property) then they aren't the
+    // same and thus cannot conflict.
+    if (component->getKind() != rhs.component->getKind())
+      return;
+
+    // If the lvalues don't have the same base value, then they aren't the same.
+    // Note that this is the primary source of false negative for this
+    // diagnostic.
+    if (base.getValue() != rhs.base.getValue())
+      return;
+
+    component->diagnoseWritebackConflict(rhs.component.get(), loc, rhs.loc,
+                                         SGF);
+  }
+
+  void performWriteback(SILGenFunction &gen, bool isFinal) {
+    Scope S(gen.Cleanups, CleanupLocation::get(loc));
+    component->writeback(gen, loc, base, materialized, isFinal);
+  }
+
+  void finishImpl(SILGenFunction &gen) override {
+    performWriteback(gen, /*isFinal*/ true);
+  }
+};
+
+} // namespace Lowering
+} // namespace swift
 
 #endif

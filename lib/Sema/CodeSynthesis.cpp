@@ -23,6 +23,7 @@
 #include "swift/AST/Expr.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/ParameterList.h"
+#include "swift/AST/ProtocolConformance.h"
 #include "swift/Basic/Defer.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringExtras.h"
@@ -262,12 +263,31 @@ static void maybeMarkTransparent(FuncDecl *accessor,
                                  AbstractStorageDecl *storage,
                                  TypeChecker &TC) {
   auto *DC = storage->getDeclContext();
-  if (isa<ProtocolDecl>(DC) || isa<ClassDecl>(DC))
+  auto *nominalDecl = DC->getAsNominalTypeOrNominalTypeExtensionContext();
+
+  // Global variable accessors are not @_transparent.
+  if (!nominalDecl)
     return;
 
-  auto *nominal = DC->getAsNominalTypeOrNominalTypeExtensionContext();
-  if (nominal && nominal->hasFixedLayout())
-    accessor->getAttrs().add(new (TC.Context) TransparentAttr(IsImplicit));
+  // Accessors for stored properties of resilient types are not
+  // @_transparent.
+  if (!nominalDecl->hasFixedLayout())
+    return;
+
+  // Accessors for protocol storage requirements are never @_transparent
+  // since they do not have bodies.
+  //
+  // FIXME: Revisit this if we ever get 'real' default implementations.
+  if (isa<ProtocolDecl>(nominalDecl))
+    return;
+
+  // Accessors for classes with @objc ancestry are not @_transparent,
+  // since they use a field offset variable which is not exported.
+  if (auto *classDecl = dyn_cast<ClassDecl>(nominalDecl))
+    if (classDecl->checkObjCAncestry() != ObjCClassKind::NonObjC)
+      return;
+
+  accessor->getAttrs().add(new (TC.Context) TransparentAttr(IsImplicit));
 }
 
 static FuncDecl *createMaterializeForSetPrototype(AbstractStorageDecl *storage,
@@ -307,10 +327,20 @@ static FuncDecl *createMaterializeForSetPrototype(AbstractStorageDecl *storage,
   };
   Type retTy = TupleType::get(retElts, ctx);
 
+  // Accessors of generic subscripts get a copy of the subscript's
+  // generic parameter list, because they're not nested inside the
+  // subscript.
+  GenericParamList *genericParams = nullptr;
+  if (auto *subscript = dyn_cast<SubscriptDecl>(storage))
+    genericParams = subscript->getGenericParams();
+
   auto *materializeForSet = FuncDecl::create(
       ctx, /*StaticLoc=*/SourceLoc(), StaticSpellingKind::None, loc,
       Identifier(), loc, /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
-      /*AccessorKeywordLoc=*/SourceLoc(), /*GenericParams=*/nullptr,
+      /*AccessorKeywordLoc=*/SourceLoc(),
+      (genericParams
+       ? genericParams->clone(DC)
+       : nullptr),
       params, TypeLoc::withoutLoc(retTy), DC);
   materializeForSet->setImplicit();
   
@@ -814,6 +844,20 @@ static FuncDecl *addMaterializeForSet(AbstractStorageDecl *storage,
                              storage->getSetter());
   storage->setMaterializeForSetFunc(materializeForSet);
 
+  // Make sure we record the override.
+  //
+  // FIXME: Instead, we should just not call checkOverrides() on
+  // storage until all accessors are in place.
+  if (auto *baseASD = storage->getOverriddenDecl()) {
+    // If the base storage has a private setter, we're not overriding
+    // materializeForSet either.
+    auto *baseMFS = baseASD->getMaterializeForSetFunc();
+    if (baseMFS != nullptr &&
+        baseASD->isSetterAccessibleFrom(storage->getDeclContext())) {
+      materializeForSet->setOverriddenDecl(baseMFS);
+    }
+  }
+
   return materializeForSet;
 }
 
@@ -1122,8 +1166,8 @@ void TypeChecker::completePropertyBehaviorStorage(VarDecl *VD,
                                Type SelfTy,
                                Type StorageTy,
                                NormalProtocolConformance *BehaviorConformance,
-                               ArrayRef<Substitution> SelfInterfaceSubs,
-                               ArrayRef<Substitution> SelfContextSubs) {
+                               SubstitutionList SelfInterfaceSubs,
+                               SubstitutionList SelfContextSubs) {
   assert(BehaviorStorage);
   assert((bool)DefaultInitStorage != (bool)ParamInitStorage);
 
@@ -1131,11 +1175,11 @@ void TypeChecker::completePropertyBehaviorStorage(VarDecl *VD,
   auto sig = BehaviorConformance->getProtocol()->getGenericSignatureOfContext();
 
   auto interfaceMap = sig->getSubstitutionMap(SelfInterfaceSubs);
-  auto SubstStorageInterfaceTy = StorageTy.subst(interfaceMap, SubstOptions());
+  auto SubstStorageInterfaceTy = StorageTy.subst(interfaceMap);
   assert(SubstStorageInterfaceTy && "storage type substitution failed?!");
 
   auto contextMap = sig->getSubstitutionMap(SelfContextSubs);
-  auto SubstStorageContextTy = StorageTy.subst(contextMap, SubstOptions());
+  auto SubstStorageContextTy = StorageTy.subst(contextMap);
   assert(SubstStorageContextTy && "storage type substitution failed?!");
 
   auto DC = VD->getDeclContext();
@@ -1261,8 +1305,8 @@ void TypeChecker::completePropertyBehaviorStorage(VarDecl *VD,
 void TypeChecker::completePropertyBehaviorParameter(VarDecl *VD,
                                  FuncDecl *BehaviorParameter,
                                  NormalProtocolConformance *BehaviorConformance,
-                                 ArrayRef<Substitution> SelfInterfaceSubs,
-                                 ArrayRef<Substitution> SelfContextSubs) {
+                                 SubstitutionList SelfInterfaceSubs,
+                                 SubstitutionList SelfContextSubs) {
   // Create a method to witness the requirement.
   auto DC = VD->getDeclContext();
   SmallString<64> NameBuf = VD->getName().str();
@@ -1279,7 +1323,7 @@ void TypeChecker::completePropertyBehaviorParameter(VarDecl *VD,
   GenericEnvironment *genericEnv = nullptr;
 
   auto interfaceMap = sig->getSubstitutionMap(SelfInterfaceSubs);
-  auto SubstInterfaceTy = ParameterTy.subst(interfaceMap, SubstOptions());
+  auto SubstInterfaceTy = ParameterTy.subst(interfaceMap);
   assert(SubstInterfaceTy && "storage type substitution failed?!");
   
   auto contextMap = sig->getSubstitutionMap(SelfContextSubs);
@@ -1319,9 +1363,9 @@ void TypeChecker::completePropertyBehaviorParameter(VarDecl *VD,
   for (unsigned i : indices(*DeclaredParams)) {
     auto declaredParam = DeclaredParams->get(i);
     auto declaredParamTy = declaredParam->getInterfaceType();
-    auto interfaceTy = declaredParamTy.subst(interfaceMap, SubstOptions());
+    auto interfaceTy = declaredParamTy.subst(interfaceMap);
     assert(interfaceTy);
-    auto contextTy = declaredParamTy.subst(contextMap, SubstOptions());
+    auto contextTy = declaredParamTy.subst(contextMap);
     assert(contextTy);
 
     SmallString<64> ParamNameBuf;
@@ -1397,8 +1441,8 @@ void TypeChecker::completePropertyBehaviorParameter(VarDecl *VD,
 void TypeChecker::completePropertyBehaviorAccessors(VarDecl *VD,
                                        VarDecl *ValueImpl,
                                        Type valueTy,
-                                       ArrayRef<Substitution> SelfInterfaceSubs,
-                                       ArrayRef<Substitution> SelfContextSubs) {
+                                       SubstitutionList SelfInterfaceSubs,
+                                       SubstitutionList SelfContextSubs) {
   auto selfTy = SelfContextSubs[0].getReplacement();
   auto selfIfaceTy = SelfInterfaceSubs[0].getReplacement();
 
@@ -2026,7 +2070,7 @@ swift::createDesignatedInitOverride(TypeChecker &tc,
 
       // Apply the superclass substitutions to produce a contextual
       // type in terms of the derived class archetypes.
-      auto paramSubstTy = paramTy.subst(subsMap, SubstOptions());
+      auto paramSubstTy = paramTy.subst(subsMap);
       decl->setType(paramSubstTy);
 
       // Map it to an interface type in terms of the derived class

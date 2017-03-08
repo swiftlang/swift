@@ -11,16 +11,16 @@ import Swift
 
 sil @test_alignment : $@convention(thin) () -> () {
 entry:
-  // CHECK: alloca %V9alignment3Foo, align 16
+  // CHECK: alloca %T9alignment3FooV, align 16
   %a = alloc_stack $*Foo
-  // CHECK: alloca %O9alignment9Singleton, align 16
+  // CHECK: alloca %T9alignment9SingletonO, align 16
   %b = alloc_stack $*Singleton
   %c = alloc_stack $*Empty
-  // CHECK: alloca %O9alignment9NoPayload, align 16
+  // CHECK: alloca %T9alignment9NoPayloadO, align 16
   %d = alloc_stack $*NoPayload
-  // CHECK: alloca %O9alignment13SinglePayload, align 16
+  // CHECK: alloca %T9alignment13SinglePayloadO, align 16
   %e = alloc_stack $*SinglePayload
-  // CHECK: alloca %O9alignment12MultiPayload, align 16
+  // CHECK: alloca %T9alignment12MultiPayloadO, align 16
   %f = alloc_stack $*MultiPayload
 
   // CHECK: load float{{.*}}, align 16

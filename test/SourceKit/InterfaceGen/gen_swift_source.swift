@@ -6,7 +6,7 @@
 // The cursor points to 'FooOverlayClassBase' inside the list of base classes, see 'gen_swift_source.swift.response'
 
 // CHECK1: FooOverlayClassBase
-// CHECK1: s:C4Foo219FooOverlayClassBase
+// CHECK1: s:4Foo219FooOverlayClassBaseC
 // CHECK1: FooOverlayClassBase.Type
 
 // RUN: %sourcekitd-test -req=interface-gen %S/Inputs/UnresolvedExtension.swift -- %S/Inputs/UnresolvedExtension.swift | %FileCheck -check-prefix=CHECK2 %s

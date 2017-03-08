@@ -369,6 +369,20 @@ FUNCTION(NativeUnownedRelease, swift_unownedRelease, RegisterPreservingCC,
          ARGS(RefCountedPtrTy),
          ATTRS(NoUnwind))
 
+// void swift_nonatomic_unownedRetain(void *ptr);
+FUNCTION(NonAtomicNativeUnownedRetain, swift_nonatomic_unownedRetain,
+         RegisterPreservingCC,
+         RETURNS(VoidTy),
+         ARGS(RefCountedPtrTy),
+         ATTRS(NoUnwind))
+
+// void swift_nonatomic_unownedRelease(void *ptr);
+FUNCTION(NonAtomicNativeUnownedRelease, swift_nonatomic_unownedRelease,
+         RegisterPreservingCC,
+         RETURNS(VoidTy),
+         ARGS(RefCountedPtrTy),
+         ATTRS(NoUnwind))
+
 // void swift_unownedRetain_n(void *ptr, int32_t n);
 FUNCTION(UnownedRetainN, swift_unownedRetain_n,
          RegisterPreservingCC,
@@ -383,8 +397,29 @@ FUNCTION(UnownedReleaseN, swift_unownedRelease_n,
          ARGS(RefCountedPtrTy, Int32Ty),
          ATTRS(NoUnwind))
 
+// void swift_nonatomic_unownedRetain_n(void *ptr, int32_t n);
+FUNCTION(NonAtomicUnownedRetainN, swift_nonatomic_unownedRetain_n,
+         RegisterPreservingCC,
+         RETURNS(VoidTy),
+         ARGS(RefCountedPtrTy, Int32Ty),
+         ATTRS(NoUnwind))
+
+// void swift_nonatomic_unownedRelease_n(void *ptr, int32_t n);
+FUNCTION(NonAtomicUnownedReleaseN, swift_nonatomic_unownedRelease_n,
+         RegisterPreservingCC,
+         RETURNS(VoidTy),
+         ARGS(RefCountedPtrTy, Int32Ty),
+         ATTRS(NoUnwind))
+
 // void swift_unownedRetainStrong(void *ptr);
 FUNCTION(NativeStrongRetainUnowned, swift_unownedRetainStrong, RegisterPreservingCC,
+         RETURNS(VoidTy),
+         ARGS(RefCountedPtrTy),
+         ATTRS(NoUnwind))
+
+// void swift_nonatomic_unownedRetainStrong(void *ptr);
+FUNCTION(NonAtomicNativeStrongRetainUnowned, swift_nonatomic_unownedRetainStrong,
+         RegisterPreservingCC,
          RETURNS(VoidTy),
          ARGS(RefCountedPtrTy),
          ATTRS(NoUnwind))
@@ -392,6 +427,13 @@ FUNCTION(NativeStrongRetainUnowned, swift_unownedRetainStrong, RegisterPreservin
 // void swift_unownedRetainStrongAndRelease(void *ptr);
 FUNCTION(NativeStrongRetainAndUnownedRelease,
          swift_unownedRetainStrongAndRelease, RegisterPreservingCC,
+         RETURNS(VoidTy),
+         ARGS(RefCountedPtrTy),
+         ATTRS(NoUnwind))
+
+// void swift_nonatomic_unownedRetainStrongAndRelease(void *ptr);
+FUNCTION(NonAtomicNativeStrongRetainAndUnownedRelease,
+         swift_nonatomic_unownedRetainStrongAndRelease, RegisterPreservingCC,
          RETURNS(VoidTy),
          ARGS(RefCountedPtrTy),
          ATTRS(NoUnwind))
@@ -1135,6 +1177,13 @@ FUNCTION(DeallocError, swift_deallocError, C_CC,
 FUNCTION(GetErrorValue, swift_getErrorValue, C_CC,
          RETURNS(VoidTy),
          ARGS(ErrorPtrTy, Int8PtrPtrTy, OpenedErrorTriplePtrTy),
+         ATTRS(NoUnwind))
+
+// void __tsan_write1(void *addr);
+// This is a Thread Sanitizer instrumentation entry point in compiler-rt.
+FUNCTION(TSanInoutAccess, __tsan_write1, C_CC,
+         RETURNS(VoidTy),
+         ARGS(Int8PtrTy),
          ATTRS(NoUnwind))
 
 #if SWIFT_OBJC_INTEROP || !defined(SWIFT_RUNTIME_GENERATE_GLOBAL_SYMBOLS)

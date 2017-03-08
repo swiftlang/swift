@@ -30,7 +30,7 @@ bb0(%0 : $@thick X.Type):
   return %14 : $()
 }
 
-sil @_T014dynamic_lookup1XC9subscriptSiSicfgTo : $@convention(objc_method) (Int, X) -> Int {
+sil @_T014dynamic_lookup1XC9subscriptS2icfgTo : $@convention(objc_method) (Int, X) -> Int {
 bb0(%0 : $Int, %1 : $X):
   %4 = function_ref @_T0Si33_convertFromBuiltinIntegerLiteralSiBi64_3val_tcSimF : $@convention(thin) (Builtin.Int64, @thin Int.Type) -> Int // user: %7
   %5 = metatype $@thin Int.Type
@@ -51,7 +51,7 @@ bb0(%0 : $X):
   return %7 : $Int
 }
 
-// CHECK: define{{( protected)?}} void @dynamic_lookup_br(%objc_object*)
+// CHECK: define{{( protected)?}} swiftcc void @dynamic_lookup_br(%objc_object*)
 sil @dynamic_lookup_br : $@convention(thin) (AnyObject) -> () {
 bb0(%0 : $AnyObject):
   %1 = alloc_box $<τ_0_0> { var τ_0_0 } <AnyObject>
@@ -80,7 +80,7 @@ bb3:
   return %43 : $()
 }
 
-// CHECK: define{{( protected)?}} void @dynamic_lookup_static_br(%swift.type*)
+// CHECK: define{{( protected)?}} swiftcc void @dynamic_lookup_static_br(%swift.type*)
 sil @dynamic_lookup_static_br : $@convention(thin) (@thick AnyObject.Type) -> () {
 bb0(%0 : $@thick AnyObject.Type):
   // CHECK: [[SEL:%[0-9]+]] = load i8*, i8** @"\01L_selector(g)", align {{(4|8)}}
@@ -123,7 +123,7 @@ bb3:
   return %43 : $()
 }
 
-// CHECK-LABEL: define{{( protected)?}} void @_T1t16opt_to_subscriptFT3objPSo13AnyObject_1iSi_T_(%objc_object*, {{(i32|i64)}})
+// CHECK-LABEL: define{{( protected)?}} swiftcc void @_T1t16opt_to_subscriptFT3objPSo13AnyObject_1iSi_T_(%objc_object*, {{(i32|i64)}})
 sil @_T1t16opt_to_subscriptFT3objPSo13AnyObject_1iSi_T_ : $@convention(thin) (AnyObject, Int) -> () {
 bb0(%0 : $AnyObject, %1 : $Int):
   %2 = alloc_box $<τ_0_0> { var τ_0_0 } <AnyObject>

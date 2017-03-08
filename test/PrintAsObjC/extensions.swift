@@ -21,16 +21,18 @@ import objc_generics
 // CHECK-NEXT: @end
 @objc class A1 {}
 
-// CHECK-LABEL: @interface A1 (SWIFT_EXTENSION(extensions))
-// CHECK-NEXT: @end
+// NEGATIVE-NOT: @interface A1 (SWIFT_EXTENSION(extensions))
 extension A1 {}
 
 // CHECK-LABEL: @interface A2{{$}}
 // CHECK-NEXT: init
 // CHECK-NEXT: @end
 // CHECK-LABEL: @interface A2 (SWIFT_EXTENSION(extensions))
+// CHECK-DAG: @property (nonatomic, readonly) NSInteger some;
 // CHECK-NEXT: @end
-extension A2 {}
+extension A2 {
+  var some: Int { return 1 }
+}
 @objc class A2 {}
 
 // CHECK-LABEL: @interface A3{{$}}
@@ -65,6 +67,16 @@ extension A4 {
   @objc class Inner {}
 }
 
+// CHECK-LABEL: @interface A5{{$}}
+// CHECK-NEXT: init
+// CHECK-NEXT: @end
+@objc class A5 {}
+
+// NEGATIVE-NOT: @interface A5 (SWIFT_EXTENSION(extensions))
+extension A5 {
+  var notObjC: NotObjC { return NotObjC() }
+}
+
 // CHECK-LABEL: @interface CustomName{{$}}
 // CHECK-NEXT: init
 // CHECK-NEXT: @end
@@ -84,7 +96,7 @@ extension CGColor {
   func anyOldMethod() {}
 }
 
-// CHECK-LABEL: @interface GenericClass (SWIFT_EXTENSION(extensions))
+// CHECK-LABEL: @interface GenericClass<T> (SWIFT_EXTENSION(extensions))
 // CHECK-NEXT: - (void)bar;
 // CHECK-NEXT: @end
 extension GenericClass {
@@ -95,11 +107,14 @@ extension GenericClass {
 class NotObjC {}
 extension NotObjC {}
 
-// CHECK-LABEL: @interface NSObject (SWIFT_EXTENSION(extensions))
-// CHECK-NEXT: @end
 // NEGATIVE-NOT: @interface NSObject{{$}}
 // NEGATIVE-NOT: @class NSObject
-extension NSObject {}
+// CHECK-LABEL: @interface NSObject (SWIFT_EXTENSION(extensions))
+// CHECK-DAG: @property (nonatomic, readonly) NSInteger some;
+// CHECK-NEXT: @end
+extension NSObject {
+  var some: Int { return 1 }
+}
 
 // NEGATIVE-NOT: @class NSString;
 // CHECK: @class NSColor;
@@ -115,3 +130,17 @@ extension NSString {
   class func fromColor(_ color: NSColor) -> NSString? { return nil; }
 }
 
+// CHECK-LABEL: @interface PettableContainer<T> (SWIFT_EXTENSION(extensions))
+// CHECK-NEXT: - (PettableContainer<T> * _Nonnull)duplicate SWIFT_WARN_UNUSED_RESULT;
+// CHECK-NEXT: - (PettableContainer<T> * _Nonnull)duplicate2 SWIFT_WARN_UNUSED_RESULT;
+// CHECK-NEXT: - (PettableContainer<PettableOverextendedMetaphor *> * _Nonnull)duplicate3 SWIFT_WARN_UNUSED_RESULT;
+// CHECK-NEXT: - (T _Nonnull)extract SWIFT_WARN_UNUSED_RESULT;
+// CHECK-NEXT: - (T _Nullable)extract2 SWIFT_WARN_UNUSED_RESULT;
+// CHECK-NEXT: @end
+extension PettableContainer {
+  func duplicate() -> PettableContainer { fatalError() }
+  func duplicate2() -> PettableContainer<T> { fatalError() }
+  func duplicate3() -> PettableContainer<PettableOverextendedMetaphor> { fatalError() }
+  func extract() -> T { fatalError() }
+  func extract2() -> T? { fatalError() }
+}

@@ -12,6 +12,8 @@
 # values.
 #
 
+from __future__ import print_function
+
 import argparse
 import json
 import os
@@ -20,6 +22,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+
 import gyb
 
 
@@ -91,7 +94,7 @@ def run_once_with_primary(args, ast, rng, primary_idx):
                    "-o", ofile] + opts + focus + extra + inputs
 
         if args.trace:
-            print "running: " + " ".join(command)
+            print("running: " + " ".join(command))
 
         if args.dtrace:
             trace = "trace.txt"
@@ -140,15 +143,15 @@ def run_once(args, ast, rng):
 def run_many(args):
 
     if args.dtrace and has_debuginfo(args.swiftc_binary):
-        print ""
-        print "**************************************************"
-        print ""
-        print "dtrace is unreliable on binaries w/ debug symbols"
-        print "please run 'strip -S %s'" % args.swiftc_binary
-        print "or pass a different --swiftc-binary"
-        print ""
-        print "**************************************************"
-        print ""
+        print("")
+        print("**************************************************")
+        print("")
+        print("dtrace is unreliable on binaries w/ debug symbols")
+        print("please run 'strip -S %s'" % args.swiftc_binary)
+        print("or pass a different --swiftc-binary")
+        print("")
+        print("**************************************************")
+        print("")
         exit(1)
 
     ast = gyb.parse_template(args.file.name, args.file.read())
@@ -185,7 +188,7 @@ def report(args, rng, runs):
     bad = False
     keys = set.intersection(*[set(j.keys()) for j in runs])
     if len(keys) == 0:
-        print "No data found"
+        print("No data found")
         if len(args.select) != 0:
             "(perhaps try a different --select?)"
         return True
@@ -203,9 +206,9 @@ def report(args, rng, runs):
         if b >= args.threshold:
             bad = True
         if not args.quiet or b >= args.threshold:
-            print "O(n^%1.1f) : %s" % (b, k)
+            print("O(n^%1.1f) : %s" % (b, k))
             if args.values:
-                print "                = ", vals
+                print("                = ", vals)
     return bad
 
 

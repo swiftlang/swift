@@ -58,8 +58,8 @@ namespace swift {
   /// \param LinkAll when true, always link. For testing purposes.
   void performSILLinking(SILModule *M, bool LinkAll = false);
 
-  /// \brief Cleanup instructions/builtin calls not suitable for IRGen.
-  void performSILCleanup(SILModule *M);
+  /// \brief Convert SIL to a lowered form suitable for IRGen.
+  void runSILLoweringPasses(SILModule &M);
 
   /// \brief Perform SIL Inst Count on M.
   void performSILInstCount(SILModule *M);

@@ -71,21 +71,23 @@ namespace irgen {
                                              llvm::Value *wtable,
                                            AssociatedTypeDecl *associatedType);
 
-  /// Given a type T and an associated type X of a protocol PT to which
+  /// Given a type T and an associated type path X.Y of a protocol PT to which
   /// T conforms, where X is required to implement some protocol PX, return
-  /// the witness table witnessing the conformance of T.X to PX.
+  /// the witness table witnessing the conformance of T.X.Y to PX.
   ///
-  /// PX must be a direct requirement of X.
+  /// PX must be a direct requirement of PT.
   ///
   /// \param parentMetadata - the type metadata for T
   /// \param wtable - the witness table witnessing the conformance of T to PT
-  /// \param associatedType - the declaration of X; a member of PT
-  /// \param associatedTypeMetadata - the type metadata for T.X
+  /// \param parentProtocol - PT
+  /// \param associatedType - the path X.Y, a dependent type within PT
+  /// \param associatedTypeMetadata - the type metadata for T.X.Y
   /// \param associatedProtocol - the declaration of PX
   llvm::Value *emitAssociatedTypeWitnessTableRef(IRGenFunction &IGF,
                                                  llvm::Value *parentMetadata,
                                                  llvm::Value *wtable,
-                                          AssociatedTypeDecl *associatedType,
+                                          ProtocolDecl *parentProtocol,
+                                          CanType associatedType,
                                           llvm::Value *associatedTypeMetadata,
                                           ProtocolDecl *associatedProtocol);
 
@@ -136,7 +138,7 @@ namespace irgen {
   void emitPolymorphicArguments(IRGenFunction &IGF,
                                 CanSILFunctionType origType,
                                 CanSILFunctionType substType,
-                                ArrayRef<Substitution> subs,
+                                const SubstitutionMap &subs,
                                 WitnessMetadata *witnessMetadata,
                                 Explosion &args);
 

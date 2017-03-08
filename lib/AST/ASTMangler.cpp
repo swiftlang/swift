@@ -272,8 +272,41 @@ std::string ASTMangler::mangleTypeForDebugger(Type Ty, const DeclContext *DC) {
   return finalize();
 }
 
-std::string ASTMangler::mangleTypeAsUSR(Type type) {
-  appendType(type);
+static bool isPrivate(const NominalTypeDecl *Nominal) {
+  return Nominal->hasAccessibility() &&
+         Nominal->getFormalAccess() <= Accessibility::FilePrivate;
+}
+
+std::string ASTMangler::mangleObjCRuntimeName(const NominalTypeDecl *Nominal) {
+  DeclContext *Ctx = Nominal->getDeclContext();
+
+  if (Ctx->isModuleScopeContext() && !isPrivate(Nominal)) {
+    // Use the old mangling for non-private top-level classes and protocols.
+    // This is what the ObjC runtime needs to demangle.
+    // TODO: Use new mangling scheme as soon as the ObjC runtime
+    // can demangle it.
+    //
+    // Don't use word-substitutions and punycode encoding.
+    MaxNumWords = 0;
+    UsePunycode = false;
+    Buffer << "_Tt";
+    bool isProto = false;
+    if (isa<ClassDecl>(Nominal)) {
+      Buffer << 'C';
+    } else {
+      isProto = true;
+      assert(isa<ProtocolDecl>(Nominal));
+      Buffer << 'P';
+    }
+    appendModule(Ctx->getParentModule());
+    appendIdentifier(Nominal->getName().str());
+    if (isProto)
+      Buffer << '_';
+    return finalize();
+  }
+  // For all other cases, we can use the new mangling.
+  beginMangling();
+  appendNominalType(Nominal);
   return finalize();
 }
 
@@ -556,18 +589,24 @@ void ASTMangler::appendType(Type type) {
     case TypeKind::BoundGenericEnum:
     case TypeKind::BoundGenericStruct:
       if (type->isSpecialized()) {
+        // Try to mangle the entire name as a substitution.
+        if (tryMangleSubstitution(type.getPointer()))
+          return;
+
         NominalTypeDecl *NDecl = type->getAnyNominal();
         if (isStdlibType(NDecl) && NDecl->getName().str() == "Optional") {
           auto GenArgs = type->castTo<BoundGenericType>()->getGenericArgs();
           assert(GenArgs.size() == 1);
           appendType(GenArgs[0]);
-          return appendOperator("Sg");
+          appendOperator("Sg");
+        } else {
+          appendNominalType(NDecl);
+          bool isFirstArgList = true;
+          appendBoundGenericArgs(type, isFirstArgList);
+          appendOperator("G");
         }
-
-        appendNominalType(NDecl);
-        bool isFirstArgList = true;
-        appendBoundGenericArgs(type, isFirstArgList);
-        return appendOperator("G");
+        addSubstitution(type.getPointer());
+        return;
       }
       appendNominalType(tybase->getAnyNominal());
       return;
@@ -1362,11 +1401,6 @@ void ASTMangler::appendGenericSignatureParts(
   appendOperator("r", StringRef(OpStorage.data(), OpStorage.size()));
 }
 
-bool ASTMangler::
-checkGenericParamsOrder(ArrayRef<GenericTypeParamType *> params) {
-  return Mangle::Mangler::checkGenericParamsOrder(params);
-}
-
 void ASTMangler::appendAssociatedTypeName(DependentMemberType *dmt) {
   auto assocTy = dmt->getAssocType();
 
@@ -1430,8 +1464,7 @@ void ASTMangler::appendInitializerEntity(const VarDecl *var) {
 /// Self type out of its mangling.
 static bool isMethodDecl(const Decl *decl) {
   return isa<AbstractFunctionDecl>(decl)
-    && (isa<NominalTypeDecl>(decl->getDeclContext())
-        || isa<ExtensionDecl>(decl->getDeclContext()));
+    && decl->getDeclContext()->isTypeContext();
 }
 
 static bool genericParamIsBelowDepth(Type type, unsigned methodDepth) {
@@ -1446,54 +1479,59 @@ static bool genericParamIsBelowDepth(Type type, unsigned methodDepth) {
   return false;
 }
 
-Type ASTMangler::getDeclTypeForMangling(const ValueDecl *decl,
-                                ArrayRef<GenericTypeParamType *> &genericParams,
-                                unsigned &initialParamDepth,
-                                ArrayRef<Requirement> &requirements,
-                                SmallVectorImpl<Requirement> &requirementsBuf) {
+CanType ASTMangler::getDeclTypeForMangling(
+    const ValueDecl *decl,
+    ArrayRef<GenericTypeParamType *> &genericParams,
+    unsigned &initialParamDepth,
+    ArrayRef<Requirement> &requirements,
+    SmallVectorImpl<Requirement> &requirementsBuf) {
   auto &C = decl->getASTContext();
   if (!decl->hasInterfaceType())
     return ErrorType::get(C)->getCanonicalType();
 
-  Type type = decl->getInterfaceType();
+  auto type = decl->getInterfaceType()->getCanonicalType();
 
   initialParamDepth = 0;
   CanGenericSignature sig;
-  if (auto gft = type->getAs<GenericFunctionType>()) {
-    sig = gft->getGenericSignature()->getCanonicalSignature();
+  if (auto gft = dyn_cast<GenericFunctionType>(type)) {
+    sig = gft.getGenericSignature();
     CurGenericSignature = sig;
     genericParams = sig->getGenericParams();
     requirements = sig->getRequirements();
 
-    type = FunctionType::get(gft->getInput(), gft->getResult(),
-                             gft->getExtInfo());
+    type = CanFunctionType::get(gft.getInput(), gft.getResult(),
+                                gft->getExtInfo());
   } else {
     genericParams = {};
     requirements = {};
   }
 
-  // Shed the 'self' type and generic requirements from method manglings.
-  if (isMethodDecl(decl) && type && !type->hasError()) {
-    // Drop the Self argument clause from the type.
-    type = type->castTo<AnyFunctionType>()->getResult();
+  if (!type->hasError()) {
+    // Shed the 'self' type and generic requirements from method manglings.
+    if (isMethodDecl(decl)) {
+      // Drop the Self argument clause from the type.
+      type = cast<AnyFunctionType>(type).getResult();
+    }
 
-    // Drop generic parameters and requirements from the method's context.
-    if (auto parentGenericSig =
-          decl->getDeclContext()->getGenericSignatureOfContext()) {
-      // The method's depth starts below the depth of the context.
-      if (!parentGenericSig->getGenericParams().empty())
-        initialParamDepth =
-          parentGenericSig->getGenericParams().back()->getDepth()+1;
+    if (isMethodDecl(decl) || isa<SubscriptDecl>(decl)) {
+      // Drop generic parameters and requirements from the method's context.
+      auto parentGenericSig =
+        decl->getDeclContext()->getGenericSignatureOfContext();
+      if (parentGenericSig && sig) {
+        // The method's depth starts below the depth of the context.
+        if (!parentGenericSig->getGenericParams().empty())
+          initialParamDepth =
+            parentGenericSig->getGenericParams().back()->getDepth()+1;
 
-      while (!genericParams.empty()) {
-        if (genericParams.front()->getDepth() >= initialParamDepth)
-          break;
-        genericParams = genericParams.slice(1);
-      }
+        while (!genericParams.empty()) {
+          if (genericParams.front()->getDepth() >= initialParamDepth)
+            break;
+          genericParams = genericParams.slice(1);
+        }
 
-      requirementsBuf.clear();
-      for (auto &reqt : sig->getRequirements()) {
-        switch (reqt.getKind()) {
+        requirementsBuf.clear();
+        for (auto &reqt : sig->getRequirements()) {
+          switch (reqt.getKind()) {
         case RequirementKind::Conformance:
         case RequirementKind::Layout:
         case RequirementKind::Superclass:
@@ -1509,12 +1547,13 @@ Type ASTMangler::getDeclTypeForMangling(const ValueDecl *decl,
               !genericParamIsBelowDepth(reqt.getSecondType(),initialParamDepth))
             continue;
           break;
-        }
+          }
 
-        // If we fell through the switch, mangle the requirement.
-        requirementsBuf.push_back(reqt);
+          // If we fell through the switch, mangle the requirement.
+          requirementsBuf.push_back(reqt);
+        }
+        requirements = requirementsBuf;
       }
-      requirements = requirementsBuf;
     }
   }
   return type->getCanonicalType();
@@ -1526,18 +1565,16 @@ void ASTMangler::appendDeclType(const ValueDecl *decl) {
   ArrayRef<Requirement> requirements;
   SmallVector<Requirement, 4> requirementsBuf;
   Mod = decl->getModuleContext();
-  Type type = getDeclTypeForMangling(decl,
+  auto type = getDeclTypeForMangling(decl,
                                      genericParams, initialParamDepth,
                                      requirements, requirementsBuf);
   appendType(type);
 
   // Mangle the generic signature, if any.
   if (!genericParams.empty() || !requirements.empty()) {
-    if (checkGenericParamsOrder(genericParams)) {
-      appendGenericSignatureParts(genericParams, initialParamDepth,
-                                  requirements);
-      appendOperator("u");
-    }
+    appendGenericSignatureParts(genericParams, initialParamDepth,
+                                requirements);
+    appendOperator("u");
   }
 }
 
@@ -1546,54 +1583,10 @@ bool ASTMangler::tryAppendStandardSubstitution(const NominalTypeDecl *decl) {
   if (!isStdlibType(decl))
     return false;
 
-  StringRef name = decl->getName().str();
-  if (name == "Int") {
-    appendOperator("Si");
-    return true;
-  } else if (name == "UInt") {
-    appendOperator("Su");
-    return true;
-  } else if (name == "Bool") {
-    appendOperator("Sb");
-    return true;
-  } else if (name == "UnicodeScalar") {
-    appendOperator("Sc");
-    return true;
-  } else if (name == "Double") {
-    appendOperator("Sd");
-    return true;
-  } else if (name == "Float") {
-    appendOperator("Sf");
-    return true;
-  } else if (name == "UnsafeRawPointer") {
-    appendOperator("SV");
-    return true;
-  } else if (name == "UnsafeMutableRawPointer") {
-    appendOperator("Sv");
-    return true;
-  } else if (name == "UnsafePointer") {
-    appendOperator("SP");
-    return true;
-  } else if (name == "UnsafeMutablePointer") {
-    appendOperator("Sp");
-    return true;
-  } else if (name == "Optional") {
-    appendOperator("Sq");
-    return true;
-  } else if (name == "ImplicitlyUnwrappedOptional") {
-    appendOperator("SQ");
-    return true;
-  } else if (name == "UnsafeBufferPointer") {
-    appendOperator("SR");
-    return true;
-  } else if (name == "UnsafeMutableBufferPointer") {
-    appendOperator("Sr");
-    return true;
-  } else if (name == "Array") {
-    appendOperator("Sa");
-    return true;
-  } else if (name == "String") {
-    appendOperator("SS");
+  if (char Subst = getStandardTypeSubst(decl->getName().str())) {
+    if (!SubstMerging.tryMergeSubst(*this, Subst, /*isStandardSubst*/ true)) {
+      appendOperator("S", StringRef(&Subst, 1));
+    }
     return true;
   }
   return false;
@@ -1701,7 +1694,7 @@ void ASTMangler::appendEntity(const ValueDecl *decl) {
   ArrayRef<Requirement> requirements;
   SmallVector<Requirement, 4> requirementsBuf;
   Mod = decl->getModuleContext();
-  Type type = getDeclTypeForMangling(decl,
+  auto type = getDeclTypeForMangling(decl,
                                      genericParams, initialParamDepth,
                                      requirements, requirementsBuf);
 
@@ -1714,9 +1707,8 @@ void ASTMangler::appendEntity(const ValueDecl *decl) {
 
   // Mangle the generic signature, if any.
   if (!genericParams.empty() || !requirements.empty()) {
-    if (checkGenericParamsOrder(genericParams))
-      appendGenericSignatureParts(genericParams, initialParamDepth,
-                                  requirements);
+    appendGenericSignatureParts(genericParams, initialParamDepth,
+                                requirements);
   }
   appendOperator("F");
   if (decl->isStatic())

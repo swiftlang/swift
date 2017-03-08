@@ -19,7 +19,6 @@
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/ProtocolConformance.h"
-#include "swift/Basic/Fallthrough.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILUndef.h"
 #include "swift/SIL/TypeLowering.h"
@@ -36,7 +35,7 @@ emitBridgeNativeToObjectiveC(SILGenFunction &gen,
                              ManagedValue swiftValue,
                              ProtocolConformance *conformance) {
   // Dig out the nominal type we're bridging from.
-  Type swiftValueType = swiftValue.getSwiftType()->getRValueType();
+  Type swiftValueType = swiftValue.getType().getSwiftRValueType();
 
   // Find the _bridgeToObjectiveC requirement.
   auto requirement = gen.SGM.getBridgeToObjectiveCRequirement(loc);
@@ -62,13 +61,13 @@ emitBridgeNativeToObjectiveC(SILGenFunction &gen,
   auto witnessFnTy = witnessRef->getType();
 
   // Compute the substitutions.
-  ArrayRef<Substitution> witnessSubstitutions = witness.getSubstitutions();
-  ArrayRef<Substitution> typeSubstitutions =
+  SubstitutionList witnessSubstitutions = witness.getSubstitutions();
+  SubstitutionList typeSubstitutions =
       swiftValueType->gatherAllSubstitutions(gen.SGM.SwiftModule, nullptr);
 
   // FIXME: Witness substitutions get dropped via serialization, so we end up
   // trying to reconstitute them here.
-  ArrayRef<Substitution> substitutions;
+  SubstitutionList substitutions;
   SmallVector<Substitution, 4> substitutionsBuf;
   if (typeSubstitutions.empty()) {
     substitutions = witnessSubstitutions;
@@ -80,8 +79,7 @@ emitBridgeNativeToObjectiveC(SILGenFunction &gen,
     GenericEnvironment *witnessEnv = witness.getSyntheticEnvironment();
 
     SubstitutionMap typeSubMap = witnessEnv
-      ->getSubstitutionMap(gen.SGM.SwiftModule,
-                           typeSubstitutions);
+      ->getSubstitutionMap(typeSubstitutions);
     for (auto sub : witnessSubstitutions) {
       substitutionsBuf.push_back(sub.subst(gen.SGM.SwiftModule, typeSubMap));
     }
@@ -111,10 +109,9 @@ emitBridgeNativeToObjectiveC(SILGenFunction &gen,
 
   // Call the witness.
   SILType resultTy = gen.getLoweredType(objcType);
-  SILValue bridgedValue = gen.B.createApply(loc, witnessRef, witnessFnTy,
-                                            resultTy, substitutions,
-                                            swiftValue.borrow()
-                                              .getUnmanagedValue());
+  SILValue bridgedValue =
+      gen.B.createApply(loc, witnessRef, witnessFnTy, resultTy, substitutions,
+                        swiftValue.borrow(gen, loc).getValue());
   return gen.emitManagedRValueWithCleanup(bridgedValue);
 }
 
@@ -143,7 +140,7 @@ emitBridgeObjectiveCToNative(SILGenFunction &gen,
   auto witnessFnTy = witnessRef->getType().castTo<SILFunctionType>();
 
   Type swiftValueType = conformance->getType();
-  ArrayRef<Substitution> substitutions =
+  SubstitutionList substitutions =
       swiftValueType->gatherAllSubstitutions(
           gen.SGM.SwiftModule, nullptr);
 
@@ -374,7 +371,7 @@ ManagedValue SILGenFunction::emitFuncToBlock(SILLocation loc,
 
   CanGenericSignature genericSig;
   GenericEnvironment *genericEnv = nullptr;
-  ArrayRef<Substitution> subs;
+  SubstitutionList subs;
   if (fnTy->hasArchetype() || blockTy->hasArchetype()) {
     genericSig = F.getLoweredFunctionType()->getGenericSignature();
     genericEnv = F.getGenericEnvironment();
@@ -501,9 +498,10 @@ static ManagedValue emitNativeToCBridgedNonoptionalValue(SILGenFunction &gen,
   // some work by opening it.
   if (loweredNativeTy->isExistentialType()) {
     auto openedTy = ArchetypeType::getOpened(loweredNativeTy);
-    
-    auto openedExistential = gen.emitOpenExistential(loc, v, openedTy,
-                                                 gen.getLoweredType(openedTy));
+
+    auto openedExistential = gen.emitOpenExistential(
+        loc, v, openedTy, gen.getLoweredType(openedTy), AccessKind::Read);
+
     v = gen.manageOpaqueValue(openedExistential, loc, SGFContext());
     loweredNativeTy = openedTy;
   }
@@ -646,15 +644,20 @@ ManagedValue
 SILGenFunction::emitBlockToFunc(SILLocation loc,
                                 ManagedValue block,
                                 CanSILFunctionType funcTy) {
-  CanSILFunctionType substFnTy;
-
   // Declare the thunk.
   auto blockTy = block.getType().castTo<SILFunctionType>();
 
   SubstitutionMap contextSubs, interfaceSubs;
   GenericEnvironment *genericEnv = nullptr;
-  auto thunkTy = buildThunkType(block, funcTy, substFnTy, genericEnv,
-                                contextSubs, interfaceSubs);
+
+  // These two are not used here -- but really, bridging thunks
+  // should be emitted using the formal AST type, not the lowered
+  // type
+  CanType inputSubstType, outputSubstType;
+
+  auto thunkTy = buildThunkType(blockTy, funcTy,
+                                inputSubstType, outputSubstType,
+                                genericEnv, interfaceSubs);
 
   auto thunk = SGM.getOrCreateReabstractionThunk(genericEnv,
                                                  thunkTy,
@@ -670,9 +673,14 @@ SILGenFunction::emitBlockToFunc(SILLocation loc,
     buildBlockToFuncThunkBody(thunkSGF, loc, blockTy, funcTy);
   }
 
+  CanSILFunctionType substFnTy = thunkTy;
+
   SmallVector<Substitution, 4> subs;
-  if (auto genericSig = thunkTy->getGenericSignature())
+  if (auto genericSig = thunkTy->getGenericSignature()) {
     genericSig->getSubstitutions(interfaceSubs, subs);
+    substFnTy = thunkTy->substGenericArgs(F.getModule(),
+                                          interfaceSubs);
+  }
 
   // Create it in the current function.
   auto thunkValue = B.createFunctionRef(loc, thunk);
@@ -980,14 +988,17 @@ static SILFunctionType *emitObjCThunkArguments(SILGenFunction &gen,
       gen.emitBridgedToNativeValue(loc,
                                    bridgedArgs[i],
                                    SILFunctionTypeRepresentation::ObjCMethod,
-                                   argTy.getSwiftType());
+                                   argTy.getSwiftRValueType());
     SILValue argValue;
 
-    if (nativeInputs[i].isConsumed())
+    if (nativeInputs[i].isConsumed()) {
       argValue = native.forward(gen);
-    else
+    } else if (nativeInputs[i].isGuaranteed()) {
+      argValue = native.borrow(gen, loc).getUnmanagedValue();
+    } else {
       argValue = native.getValue();
-    
+    }
+
     args.push_back(argValue);
   }
 
@@ -1120,7 +1131,7 @@ getThunkedForeignFunctionRef(SILGenFunction &gen,
                              SILLocation loc,
                              SILDeclRef foreign,
                              ArrayRef<ManagedValue> args,
-                             ArrayRef<Substitution> subs,
+                             SubstitutionList subs,
                              const SILConstantInfo &foreignCI) {
   assert(!foreign.isCurried
          && "should not thunk calling convention when curried");

@@ -1,7 +1,13 @@
+
+if (SWIFT_FORCE_OPTIMIZED_TYPECHECKER)
+  set(EXTRA_TYPECHECKER_FLAGS "FORCE_BUILD_OPTIMIZED")
+endif()
+
 add_swift_library(swiftSema STATIC
   CSApply.cpp
   CSDiag.cpp
   CSGen.cpp
+  CSPropagate.cpp
   CSRanking.cpp
   CSSimplify.cpp
   CSSolver.cpp
@@ -24,6 +30,7 @@ add_swift_library(swiftSema STATIC
   PCMacro.cpp
   PlaygroundTransform.cpp
   ResilienceDiagnostics.cpp
+  Semantics.cpp
   SourceLoader.cpp
   TypeCheckAttr.cpp
   TypeCheckAvailability.cpp
@@ -44,5 +51,7 @@ add_swift_library(swiftSema STATIC
   TypeChecker.cpp
   LINK_LIBRARIES
     swiftParse
-    swiftAST)
+    swiftAST
+  ${EXTRA_TYPECHECKER_FLAGS}
+)
 

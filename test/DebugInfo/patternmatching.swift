@@ -13,7 +13,7 @@ func classifyPoint2(_ p: (Double, Double)) {
 
 switch p {
     case (let x, let y) where
-      // CHECK:   call double {{.*}}return_same{{.*}}, !dbg ![[LOC1:.*]]
+      // CHECK:   call {{.*}}double {{.*}}return_same{{.*}}, !dbg ![[LOC1:.*]]
       // CHECK: br {{.*}}, label {{.*}}, label {{.*}}, !dbg ![[LOC2:.*]]
       // CHECK: call{{.*}}markUsed{{.*}}, !dbg ![[LOC3:.*]]
       // CHECK: ![[LOC1]] = !DILocation(line: [[@LINE+2]],

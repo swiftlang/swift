@@ -1,8 +1,72 @@
-// RUN: %target-sil-opt -enable-sil-opaque-values -enable-sil-verify-all -emit-sorted-sil %s | %FileCheck %s
+// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-opaque-values -enable-sil-verify-all -emit-sorted-sil %s | %FileCheck %s
 
 import Builtin
+import Swift
 
 sil_stage canonical
+
+protocol Foo {
+  func foo()
+}
+
+struct S : Foo {
+  func foo()
+  init()
+}
+
+// CHECK-LABEL: sil @castOpaque : $@convention(thin) (Int) -> () {
+// CHECK: bb0([[ARG:%.*]] : $Int):
+// CHECK:  unconditional_checked_cast_opaque [[ARG]] : $Int to $Foo
+// CHECK-LABEL: } // end sil function 'castOpaque'
+sil @castOpaque : $@convention(thin) (Int) -> () {
+bb0(%0 : $Int):
+  %c = unconditional_checked_cast_opaque %0 : $Int to $Foo
+  %t = tuple ()
+  return %t : $()
+}
+
+// CHECK-LABEL: sil @condCastOpaque : $@convention(thin) (Int) -> () {
+// CHECK: bb0([[ARG:%.*]] : $Int):
+// CHECK:  checked_cast_value_br [[ARG]] : $Int to $Int
+// CHECK-LABEL: } // end sil function 'condCastOpaque'
+sil @condCastOpaque : $@convention(thin) (Int) -> () {
+bb0(%0 : $Int):
+  %c = checked_cast_value_br %0 : $Int to $Int, bb2, bb1
+
+bb1:
+  br bb3
+
+bb2(%i : $Int):
+  br bb3
+
+bb3:
+  %t = tuple ()
+  return %t : $()
+}
+
+// CHECK-LABEL: sil @initDeinitExistentialOpaque : $@convention(thin) <T> (@in T) -> () {
+// CHECK: bb0([[ARG:%.*]] : $T):
+// CHECK:  [[IE:%.*]] = init_existential_opaque [[ARG]] : $T, $T, $Any
+// CHECK:  deinit_existential_opaque [[IE]] : $Any
+// CHECK-LABEL: } // end sil function 'initDeinitExistentialOpaque'
+sil @initDeinitExistentialOpaque : $@convention(thin) <T> (@in T) -> () {
+bb0(%0 : $T):
+  %i = init_existential_opaque %0 : $T, $T, $Any
+  %d = deinit_existential_opaque %i : $Any
+  %t = tuple ()
+  return %t : $()
+}
+
+// CHECK-LABEL: sil @openExistentialOpaque : $@convention(thin) (@in Foo) -> () {
+// CHECK: bb0([[ARG:%.*]] : $Foo):
+// CHECK:  open_existential_opaque [[ARG]] : $Foo to $@opened("2E9EACA6-FD59-11E6-B016-685B3593C496") Foo
+// CHECK-LABEL: } // end sil function 'openExistentialOpaque'
+sil @openExistentialOpaque : $@convention(thin) (@in Foo) -> () {
+bb0(%0 : $Foo):
+  %o = open_existential_opaque %0 : $Foo to $@opened("2E9EACA6-FD59-11E6-B016-685B3593C496") Foo
+  %t = tuple ()
+  return %t : $()
+}
 
 // Test @callee_guaranteed parsing.
 // ----
@@ -37,15 +101,6 @@ bb0(%0 : $T):
 
 // Test @in_guaranteed parsing.
 // ----
-
-protocol Foo {
-  func foo()
-}
-
-struct S : Foo {
-  func foo()
-  init()
-}
 
 sil @doWithS : $@convention(method) (S) -> ()
 

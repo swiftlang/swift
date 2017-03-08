@@ -15,8 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Basic/LLVM.h"
-#include "swift/Basic/Demangle.h"
-#include "swift/Basic/Fallthrough.h"
+#include "swift/Basic/Demangler.h"
 #include "swift/Basic/Lazy.h"
 #include "swift/Runtime/Config.h"
 #include "swift/Runtime/Enum.h"
@@ -26,6 +25,7 @@
 #include "swift/Runtime/Unreachable.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/PointerIntPair.h"
+#include "llvm/Support/Compiler.h"
 #include "swift/Runtime/Debug.h"
 #include "ErrorObject.h"
 #include "ExistentialMetadataImpl.h"
@@ -89,7 +89,9 @@ static void _buildNameForMetadata(const Metadata *type,
 #endif
 
   // Use the remangler to generate a mangled name from the type metadata.
-  auto demangling = _swift_buildDemanglingForMetadata(type);
+  
+  Demangle::Demangler Dem;
+  auto demangling = _swift_buildDemanglingForMetadata(type, Dem);
   if (demangling == nullptr) {
     result = "<<< invalid type >>>";
     return;
@@ -108,7 +110,7 @@ std::string swift::nameForMetadata(const Metadata *type,
   return result;
 }
 
-SWIFT_CC(swift) SWIFT_RUNTIME_EXPORT
+SWIFT_CC(swift)
 TwoWordPair<const char *, uintptr_t>::Return
 swift::swift_getTypeName(const Metadata *type, bool qualified) {
   using Pair = TwoWordPair<const char *, uintptr_t>;
@@ -263,10 +265,8 @@ _dynamicCastClassMetatype(const ClassMetadata *sourceType,
 }
 
 /// Dynamically cast a class instance to a Swift class type.
-SWIFT_RT_ENTRY_VISIBILITY
-const void *
-swift::swift_dynamicCastClass(const void *object,
-                              const ClassMetadata *targetType)
+const void *swift::swift_dynamicCastClass(const void *object,
+                                          const ClassMetadata *targetType)
     SWIFT_CC(RegisterPreservingCC_IMPL) {
 #if SWIFT_OBJC_INTEROP
   assert(!targetType->isPureObjC());
@@ -910,7 +910,7 @@ static bool _dynamicCastToExistential(OpaqueValue *dest,
         maybeDeallocateSource(result);
         return result;
       }
-      SWIFT_FALLTHROUGH;
+      LLVM_FALLTHROUGH;
 
     case MetadataKind::Enum:
     case MetadataKind::Optional:
@@ -928,7 +928,7 @@ static bool _dynamicCastToExistential(OpaqueValue *dest,
         return success;
       }
 #endif
-      SWIFT_FALLTHROUGH;
+      LLVM_FALLTHROUGH;
 
     case MetadataKind::Function:
     case MetadataKind::HeapLocalVariable:
@@ -1177,7 +1177,7 @@ swift::swift_dynamicCastMetatype(const Metadata *sourceType,
     // Get the actual class object.
     targetType = static_cast<const ObjCClassWrapperMetadata*>(targetType)
       ->Class;
-    SWIFT_FALLTHROUGH;
+    LLVM_FALLTHROUGH;
   case MetadataKind::Class:
     // The source value must also be a class; otherwise the cast fails.
     switch (sourceType->getKind()) {
@@ -1185,7 +1185,7 @@ swift::swift_dynamicCastMetatype(const Metadata *sourceType,
       // Get the actual class object.
       sourceType = static_cast<const ObjCClassWrapperMetadata*>(sourceType)
         ->Class;
-      SWIFT_FALLTHROUGH;
+      LLVM_FALLTHROUGH;
     case MetadataKind::Class: {
       // Check if the source is a subclass of the target.
 #if SWIFT_OBJC_INTEROP
@@ -1232,7 +1232,7 @@ swift::swift_dynamicCastMetatype(const Metadata *sourceType,
       // Get the actual class object.
       sourceType = static_cast<const ObjCClassWrapperMetadata*>(sourceType)
         ->Class;
-      SWIFT_FALLTHROUGH;
+      LLVM_FALLTHROUGH;
     case MetadataKind::Class:
     case MetadataKind::ForeignClass:
       // Check if the source is a subclass of the target.
@@ -1289,7 +1289,7 @@ swift::swift_dynamicCastMetatypeUnconditional(const Metadata *sourceType,
     // Get the actual class object.
     targetType = static_cast<const ObjCClassWrapperMetadata*>(targetType)
       ->Class;
-    SWIFT_FALLTHROUGH;
+    LLVM_FALLTHROUGH;
   case MetadataKind::Class:
     // The source value must also be a class; otherwise the cast fails.
     switch (sourceType->getKind()) {
@@ -1297,7 +1297,7 @@ swift::swift_dynamicCastMetatypeUnconditional(const Metadata *sourceType,
       // Get the actual class object.
       sourceType = static_cast<const ObjCClassWrapperMetadata*>(sourceType)
         ->Class;
-      SWIFT_FALLTHROUGH;
+      LLVM_FALLTHROUGH;
     case MetadataKind::Class: {
       // Check if the source is a subclass of the target.
 #if SWIFT_OBJC_INTEROP
@@ -1345,7 +1345,7 @@ swift::swift_dynamicCastMetatypeUnconditional(const Metadata *sourceType,
       // Get the actual class object.
       sourceType = static_cast<const ObjCClassWrapperMetadata*>(sourceType)
         ->Class;
-      SWIFT_FALLTHROUGH;
+      LLVM_FALLTHROUGH;
     case MetadataKind::Class:
     case MetadataKind::ForeignClass:
       // Check if the source is a subclass of the target.
@@ -2421,9 +2421,8 @@ static bool _dynamicCastTupleToTuple(OpaqueValue *destination,
 /******************************************************************************/
 
 /// Perform a dynamic cast to an arbitrary type.
-SWIFT_RT_ENTRY_VISIBILITY
-bool swift::swift_dynamicCast(OpaqueValue *dest,
-                              OpaqueValue *src,
+
+bool swift::swift_dynamicCast(OpaqueValue *dest, OpaqueValue *src,
                               const Metadata *srcType,
                               const Metadata *targetType,
                               DynamicCastFlags flags)
@@ -2494,7 +2493,7 @@ bool swift::swift_dynamicCast(OpaqueValue *dest,
         return true;
       }
     }
-    SWIFT_FALLTHROUGH;
+    LLVM_FALLTHROUGH;
 #endif
 
   case MetadataKind::ForeignClass:
@@ -2521,7 +2520,7 @@ bool swift::swift_dynamicCast(OpaqueValue *dest,
         return _dynamicCastFromAnyHashable(dest, src, srcType,
                                            targetType, flags);
       }
-      SWIFT_FALLTHROUGH;
+      LLVM_FALLTHROUGH;
 
     case MetadataKind::Enum:
     case MetadataKind::Optional: {
@@ -2631,7 +2630,7 @@ bool swift::swift_dynamicCast(OpaqueValue *dest,
       break;
     }
 
-    SWIFT_FALLTHROUGH;
+    LLVM_FALLTHROUGH;
 
   // The non-polymorphic types.
   case MetadataKind::HeapLocalVariable:
@@ -2704,25 +2703,28 @@ struct _ObjectiveCBridgeableWitnessTable {
                      const _ObjectiveCBridgeableWitnessTable *witnessTable);
 
   // func _bridgeToObjectiveC() -> _ObjectiveCType
+  SWIFT_CC(swift)
   HeapObject *(*bridgeToObjectiveC)(
-                OpaqueValue *self, const Metadata *Self,
+                SWIFT_CONTEXT OpaqueValue *self, const Metadata *Self,
                 const _ObjectiveCBridgeableWitnessTable *witnessTable);
 
   // class func _forceBridgeFromObjectiveC(x: _ObjectiveCType,
   //                                       inout result: Self?)
+  SWIFT_CC(swift)
   void (*forceBridgeFromObjectiveC)(
          HeapObject *sourceValue,
          OpaqueValue *result,
-         const Metadata *self,
+         SWIFT_CONTEXT const Metadata *self,
          const Metadata *selfType,
          const _ObjectiveCBridgeableWitnessTable *witnessTable);
 
   // class func _conditionallyBridgeFromObjectiveC(x: _ObjectiveCType,
   //                                              inout result: Self?) -> Bool
+  SWIFT_CC(swift)
   bool (*conditionallyBridgeFromObjectiveC)(
          HeapObject *sourceValue,
          OpaqueValue *result,
-         const Metadata *self,
+         SWIFT_CONTEXT const Metadata *self,
          const Metadata *selfType,
          const _ObjectiveCBridgeableWitnessTable *witnessTable);
 };
@@ -3224,6 +3226,7 @@ bool _swift_isClassOrObjCExistentialType(const Metadata *value,
   return swift_isClassOrObjCExistentialTypeImpl(T);
 }
 
+SWIFT_CC(swift)
 const Metadata *swift::_swift_class_getSuperclass(const Metadata *theClass) {
   if (const ClassMetadata *classType = theClass->getClassObject())
     if (classHasSuperclass(classType))

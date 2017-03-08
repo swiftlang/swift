@@ -49,27 +49,77 @@ template <class T> class SILWitnessVisitor : public ASTVisitor<T> {
 
 public:
   void visitProtocolDecl(ProtocolDecl *protocol) {
-    // Visit inherited protocols.
-    // TODO: We need to figure out all the guarantees we want here.
-    // It would be abstractly good to allow conversion to a base
-    // protocol to be trivial, but it's not clear that there's
-    // really a structural guarantee we can rely on here.
-    for (auto baseProto : protocol->getInheritedProtocols(nullptr)) {
-      // ObjC protocols do not have witnesses.
-      if (!Lowering::TypeConverter::protocolRequiresWitnessTable(baseProto))
+    // Associated types get added after the inherited conformances, but
+    // before all the function requirements.
+    bool haveAddedAssociatedTypes = false;
+    auto addAssociatedTypes = [&] {
+      if (haveAddedAssociatedTypes) return;
+      haveAddedAssociatedTypes = true;
+
+      for (Decl *member : protocol->getMembers()) {
+        if (auto associatedType = dyn_cast<AssociatedTypeDecl>(member)) {
+          // TODO: only add associated types when they're new?
+          asDerived().addAssociatedType(associatedType);
+        }
+      }
+    };
+
+    for (auto &reqt : protocol->getRequirementSignature()
+                              ->getCanonicalSignature()->getRequirements()) {
+      switch (reqt.getKind()) {
+      // These requirements don't show up in the witness table.
+      case RequirementKind::Superclass:
+      case RequirementKind::SameType:
+      case RequirementKind::Layout:
         continue;
 
-      asDerived().addOutOfLineBaseProtocol(baseProto);
+      case RequirementKind::Conformance: {
+        auto type = CanType(reqt.getFirstType());
+        assert(type->isTypeParameter());
+        auto requirement =
+          cast<ProtocolType>(CanType(reqt.getSecondType()))->getDecl();
+
+        // ObjC protocols do not have witnesses.
+        if (!Lowering::TypeConverter::protocolRequiresWitnessTable(requirement))
+          continue;
+
+        // If the type parameter is 'self', consider this to be protocol
+        // inheritance.  In the canonical signature, these should all
+        // come before any protocol requirements on associated types.
+        if (auto parameter = dyn_cast<GenericTypeParamType>(type)) {
+          assert(type->isEqual(protocol->getSelfInterfaceType()));
+          assert(!haveAddedAssociatedTypes &&
+                 "unexpected ordering of conformances");
+          assert(parameter->getDepth() == 0 && parameter->getIndex() == 0 &&
+                 "non-self type parameter in protocol");
+          asDerived().addOutOfLineBaseProtocol(requirement);
+          continue;
+        }
+
+        // Add the associated types if we haven't yet.
+        addAssociatedTypes();
+
+        // Otherwise, add an associated requirement.
+        asDerived().addAssociatedConformance(type, requirement);
+        continue;
+      }
+      }
+      llvm_unreachable("bad requirement kind");
     }
 
-    /// Visit the witnesses for the direct members of a protocol.
+    // Add the associated types if we haven't yet.
+    addAssociatedTypes();
+
+    // Visit the witnesses for the direct members of a protocol.
     for (Decl *member : protocol->getMembers())
       ASTVisitor<T>::visit(member);
   }
 
   /// Fallback for unexpected protocol requirements.
   void visitDecl(Decl *d) {
+#ifndef NDEBUG
     d->print(llvm::errs());
+#endif
     llvm_unreachable("unhandled protocol requirement");
   }
 
@@ -94,11 +144,7 @@ public:
   }
 
   void visitAssociatedTypeDecl(AssociatedTypeDecl *td) {
-    SmallVector<ProtocolDecl *, 4> protos;
-    for (auto p : td->getConformingProtocols())
-      protos.push_back(p);
-    ProtocolType::canonicalizeProtocols(protos);
-    asDerived().addAssociatedType(td, protos);
+    // We already visited these in the first pass.
   }
     
   void visitTypeAliasDecl(TypeAliasDecl *tad) {

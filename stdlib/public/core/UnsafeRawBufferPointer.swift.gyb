@@ -86,7 +86,7 @@
 ///     byteArray += someBytes[n..<someBytes.count]
 % if mutable:
 ///
-/// Assigning into a ranged subscript of an `{$Self}` instance copies bytes
+/// Assigning into a ranged subscript of an `${Self}` instance copies bytes
 /// into the memory. The next `n` bytes of the memory that `someBytes`
 /// references are copied in this code:
 ///
@@ -131,7 +131,7 @@ public struct Unsafe${Mutable}RawBufferPointer
   /// initialized.
   ///
   /// - Parameter size: The number of bytes to allocate.
-  /// - Returns: A word-aligned buffer pointer covering a region of memory 
+  /// - Returns: A word-aligned buffer pointer covering a region of memory.
   public static func allocate(count size: Int
   ) -> UnsafeMutableRawBufferPointer {
     return UnsafeMutableRawBufferPointer(

@@ -10,7 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/Basic/Fallthrough.h"
 #include "swift/Runtime/Reflection.h"
 #include "swift/Runtime/Config.h"
 #include "swift/Runtime/HeapObject.h"
@@ -21,6 +20,8 @@
 #include "swift/Runtime/Debug.h"
 #include "swift/Runtime/Portability.h"
 #include "Private.h"
+#include "WeakReference.h"
+#include "llvm/Support/Compiler.h"
 #include <cassert>
 #include <cstdio>
 #include <cstring>
@@ -66,6 +67,7 @@ struct MagicMirrorData;
 
 struct String;
 
+SWIFT_CC(swift)
 extern "C" void swift_stringFromUTF8InRawMemory(String *out,
                                                 const char *start,
                                                 intptr_t len);
@@ -231,6 +233,8 @@ const char *swift_OpaqueSummary(const Metadata *T) {
     case MetadataKind::ErrorObject:
       return "(ErrorType Object)";
   }
+
+  swift_runtime_unreachable("Unhandled MetadataKind in switch.");
 }
 
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERFACE
@@ -1084,7 +1088,7 @@ getImplementationForType(const Metadata *T, const OpaqueValue *Value) {
       if (obj->metadata->getKind() == MetadataKind::Class)
         return getImplementationForClass(Value);
     }
-    SWIFT_FALLTHROUGH;
+    LLVM_FALLTHROUGH;
   }
 
   /// TODO: Implement specialized mirror witnesses for all kinds.
@@ -1140,6 +1144,7 @@ MagicMirror::MagicMirror(HeapObject *owner,
 ///
 /// This function consumes 'value', following Swift's +1 convention for "in"
 /// arguments.
+SWIFT_CC(swift)
 MirrorReturn swift::swift_reflectAny(OpaqueValue *value, const Metadata *T) {
   const Metadata *mirrorType;
   const OpaqueValue *cMirrorValue;

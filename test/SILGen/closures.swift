@@ -289,8 +289,10 @@ func generateWithConstant(_ x : SomeSpecificClass) {
 // CHECK-LABEL: sil shared @_TFF8closures20generateWithConstantFCS_17SomeSpecificClassT_U_FT_CS_9SomeClass : $@convention(thin) (@owned SomeSpecificClass) -> @owned SomeClass {
 // CHECK: bb0([[T0:%.*]] : $SomeSpecificClass):
 // CHECK:   debug_value [[T0]] : $SomeSpecificClass, let, name "x", argno 1
-// CHECK:   [[T0_COPY:%.*]] = copy_value [[T0]]
+// CHECK:   [[BORROWED_T0:%.*]] = begin_borrow [[T0]]
+// CHECK:   [[T0_COPY:%.*]] = copy_value [[BORROWED_T0]]
 // CHECK:   [[T0_COPY_CASTED:%.*]] = upcast [[T0_COPY]] : $SomeSpecificClass to $SomeClass
+// CHECK:   end_borrow [[BORROWED_T0]] from [[T0]]
 // CHECK:   destroy_value [[T0]]
 // CHECK:   return [[T0_COPY_CASTED]]
 // CHECK: } // end sil function '_TFF8closures20generateWithConstantFCS_17SomeSpecificClassT_U_FT_CS_9SomeClass'
@@ -306,10 +308,27 @@ class SelfCapturedInInit : Base {
   var foo : () -> SelfCapturedInInit
 
   // CHECK-LABEL: sil hidden @_TFC8closures18SelfCapturedInInitc{{.*}} : $@convention(method) (@owned SelfCapturedInInit) -> @owned SelfCapturedInInit {
-  // CHECK:         [[VAL:%.*]] = load_borrow {{%.*}} : $*SelfCapturedInInit
-  // CHECK:         [[VAL:%.*]] = load_borrow {{%.*}} : $*SelfCapturedInInit
-  // CHECK:         [[VAL:%.*]] = load [copy] {{%.*}} : $*SelfCapturedInInit
-  // CHECK:         partial_apply {{%.*}}([[VAL]]) : $@convention(thin) (@owned SelfCapturedInInit) -> @owned SelfCapturedInInit
+  // CHECK: bb0([[SELF:%.*]] : $SelfCapturedInInit):
+  //
+  // First create our initial value for self.
+  // CHECK:   [[SELF_BOX:%.*]] = alloc_box ${ var SelfCapturedInInit }, let, name "self"
+  // CHECK:   [[PB_SELF_BOX:%.*]] = project_box [[SELF_BOX]]
+  // CHECK:   [[UNINIT_SELF:%.*]] = mark_uninitialized [derivedself] [[PB_SELF_BOX]]
+  // CHECK:   store [[SELF]] to [init] [[UNINIT_SELF]]
+  //
+  // Then perform the super init sequence.
+  // CHECK:   [[TAKEN_SELF:%.*]] = load [take] [[UNINIT_SELF]]
+  // CHECK:   [[UPCAST_TAKEN_SELF:%.*]] = upcast [[TAKEN_SELF]]
+  // CHECK:   [[NEW_SELF:%.*]] = apply {{.*}}([[UPCAST_TAKEN_SELF]]) : $@convention(method) (@owned Base) -> @owned Base
+  // CHECK:   [[DOWNCAST_NEW_SELF:%.*]] = unchecked_ref_cast [[NEW_SELF]] : $Base to $SelfCapturedInInit
+  // CHECK:   store [[DOWNCAST_NEW_SELF]] to [init] [[UNINIT_SELF]]
+  //
+  // Finally put self in the closure.
+  // CHECK:   [[BORROWED_SELF:%.*]] = load_borrow [[UNINIT_SELF]]
+  // CHECK:   [[COPIED_SELF:%.*]] = load [copy] [[UNINIT_SELF]]
+  // CHECK:   [[FOO_VALUE:%.*]] = partial_apply {{%.*}}([[COPIED_SELF]]) : $@convention(thin) (@owned SelfCapturedInInit) -> @owned SelfCapturedInInit
+  // CHECK:   [[FOO_LOCATION:%.*]] = ref_element_addr [[BORROWED_SELF]]
+  // CHECK:   assign [[FOO_VALUE]] to [[FOO_LOCATION]]
   override init() {
     super.init()
     foo = { self }
@@ -357,8 +376,10 @@ func closeOverLetLValue() {
 // CHECK:   [[TMP_CLASS_ADDR:%.*]] = alloc_stack $ClassWithIntProperty, let, name "a", argno 1
 // CHECK:   store [[ARG]] to [init] [[TMP_CLASS_ADDR]] : $*ClassWithIntProperty
 // CHECK:   [[LOADED_CLASS:%.*]] = load [copy] [[TMP_CLASS_ADDR]] : $*ClassWithIntProperty
-// CHECK:   [[INT_IN_CLASS_ADDR:%.*]] = ref_element_addr [[LOADED_CLASS]] : $ClassWithIntProperty, #ClassWithIntProperty.x
+// CHECK:   [[BORROWED_LOADED_CLASS:%.*]] = begin_borrow [[LOADED_CLASS]]
+// CHECK:   [[INT_IN_CLASS_ADDR:%.*]] = ref_element_addr [[BORROWED_LOADED_CLASS]] : $ClassWithIntProperty, #ClassWithIntProperty.x
 // CHECK:   [[INT_IN_CLASS:%.*]] = load [trivial] [[INT_IN_CLASS_ADDR]] : $*Int
+// CHECK:   end_borrow [[BORROWED_LOADED_CLASS]] from [[LOADED_CLASS]]
 // CHECK:   destroy_value [[LOADED_CLASS]]
 // CHECK:   destroy_addr [[TMP_CLASS_ADDR]] : $*ClassWithIntProperty
 // CHECK:   dealloc_stack %1 : $*ClassWithIntProperty
@@ -406,13 +427,17 @@ class SuperSub : SuperBase {
   func a() {
     // CHECK: sil shared @[[INNER_FUNC_1]] : $@convention(thin) (@owned SuperSub) -> () {
     // CHECK: bb0([[ARG:%.*]] : $SuperSub):
-    // CHECK:   [[CLASS_METHOD:%.*]] = class_method [[ARG]] : $SuperSub, #SuperSub.boom!1
-    // CHECK:   = apply [[CLASS_METHOD]]([[ARG]])
-    // CHECK:   [[ARG_COPY:%.*]] = copy_value [[ARG]]
+    // CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
+    // CHECK:   [[CLASS_METHOD:%.*]] = class_method [[BORROWED_ARG]] : $SuperSub, #SuperSub.boom!1
+    // CHECK:   = apply [[CLASS_METHOD]]([[BORROWED_ARG]])
+    // CHECK:   end_borrow [[BORROWED_ARG]] from [[ARG]]
+    // CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
+    // CHECK:   [[ARG_COPY:%.*]] = copy_value [[BORROWED_ARG]]
     // CHECK:   [[ARG_COPY_SUPER:%.*]] = upcast [[ARG_COPY]] : $SuperSub to $SuperBase
     // CHECK:   [[SUPER_METHOD:%[0-9]+]] = function_ref @_TFC8closures9SuperBase4boomfT_T_ : $@convention(method) (@guaranteed SuperBase) -> ()
     // CHECK:   = apply [[SUPER_METHOD]]([[ARG_COPY_SUPER]])
     // CHECK:   destroy_value [[ARG_COPY_SUPER]]
+    // CHECK:   end_borrow [[BORROWED_ARG]] from [[ARG]]
     // CHECK:   destroy_value [[ARG]]
     // CHECK: } // end sil function '[[INNER_FUNC_1]]'
     func a1() {
@@ -439,13 +464,17 @@ class SuperSub : SuperBase {
     func b1() {
       // CHECK: sil shared @[[INNER_FUNC_2]] : $@convention(thin) (@owned SuperSub) -> () {
       // CHECK: bb0([[ARG:%.*]] : $SuperSub):
-      // CHECK:   [[CLASS_METHOD:%.*]] = class_method [[ARG]] : $SuperSub, #SuperSub.boom!1
-      // CHECK:   = apply [[CLASS_METHOD]]([[ARG]]) : $@convention(method) (@guaranteed SuperSub) -> ()
-      // CHECK:   [[ARG_COPY:%.*]] = copy_value [[ARG]]
+      // CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
+      // CHECK:   [[CLASS_METHOD:%.*]] = class_method [[BORROWED_ARG]] : $SuperSub, #SuperSub.boom!1
+      // CHECK:   = apply [[CLASS_METHOD]]([[BORROWED_ARG]]) : $@convention(method) (@guaranteed SuperSub) -> ()
+      // CHECK:   end_borrow [[BORROWED_ARG]] from [[ARG]]
+      // CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
+      // CHECK:   [[ARG_COPY:%.*]] = copy_value [[BORROWED_ARG]]
       // CHECK:   [[ARG_COPY_SUPER:%.*]] = upcast [[ARG_COPY]] : $SuperSub to $SuperBase
       // CHECK:   [[SUPER_METHOD:%.*]] = function_ref @_TFC8closures9SuperBase4boomfT_T_ : $@convention(method) (@guaranteed SuperBase) -> ()
       // CHECK:   = apply [[SUPER_METHOD]]([[ARG_COPY_SUPER]]) : $@convention(method) (@guaranteed SuperBase)
       // CHECK:   destroy_value [[ARG_COPY_SUPER]]
+      // CHECK:   end_borrow [[BORROWED_ARG]] from [[ARG]]
       // CHECK:   destroy_value [[ARG]]
       // CHECK: } // end sil function '[[INNER_FUNC_2]]'
       func b2() {
@@ -462,20 +491,26 @@ class SuperSub : SuperBase {
   // CHECK:   [[INNER:%.*]] = function_ref @[[INNER_FUNC_1:_TFFC8closures8SuperSub1c.*]] : $@convention(thin) (@owned SuperSub) -> ()
   // CHECK:   [[SELF_COPY:%.*]] = copy_value [[SELF]]
   // CHECK:   [[PA:%.*]] = partial_apply [[INNER]]([[SELF_COPY]])
-  // CHECK:   [[PA_COPY:%.*]] = copy_value [[PA]]
+  // CHECK:   [[BORROWED_PA:%.*]] = begin_borrow [[PA]]
+  // CHECK:   [[PA_COPY:%.*]] = copy_value [[BORROWED_PA]]
   // CHECK:   apply [[PA_COPY]]()
+  // CHECK:   end_borrow [[BORROWED_PA]] from [[PA]]
   // CHECK:   destroy_value [[PA]]
   // CHECK: } // end sil function '_TFC8closures8SuperSub1cfT_T_'
   func c() {
     // CHECK: sil shared @[[INNER_FUNC_1]] : $@convention(thin) (@owned SuperSub) -> ()
     // CHECK: bb0([[ARG:%.*]] : $SuperSub):
-    // CHECK:   [[CLASS_METHOD:%.*]] = class_method [[ARG]] : $SuperSub, #SuperSub.boom!1
-    // CHECK:   = apply [[CLASS_METHOD]]([[ARG]]) : $@convention(method) (@guaranteed SuperSub) -> ()
-    // CHECK:   [[ARG_COPY:%.*]] = copy_value [[ARG]]
+    // CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
+    // CHECK:   [[CLASS_METHOD:%.*]] = class_method [[BORROWED_ARG]] : $SuperSub, #SuperSub.boom!1
+    // CHECK:   = apply [[CLASS_METHOD]]([[BORROWED_ARG]]) : $@convention(method) (@guaranteed SuperSub) -> ()
+    // CHECK:   end_borrow [[BORROWED_ARG]] from [[ARG]]
+    // CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
+    // CHECK:   [[ARG_COPY:%.*]] = copy_value [[BORROWED_ARG]]
     // CHECK:   [[ARG_COPY_SUPER:%.*]] = upcast [[ARG_COPY]] : $SuperSub to $SuperBase
     // CHECK:   [[SUPER_METHOD:%[0-9]+]] = function_ref @_TFC8closures9SuperBase4boomfT_T_ : $@convention(method) (@guaranteed SuperBase) -> ()
     // CHECK:   = apply [[SUPER_METHOD]]([[ARG_COPY_SUPER]])
     // CHECK:   destroy_value [[ARG_COPY_SUPER]]
+    // CHECK:   end_borrow [[BORROWED_ARG]] from [[ARG]]
     // CHECK:   destroy_value [[ARG]]
     // CHECK: } // end sil function '[[INNER_FUNC_1]]'
     let c1 = { () -> Void in
@@ -490,8 +525,10 @@ class SuperSub : SuperBase {
   // CHECK:   [[INNER:%.*]] = function_ref @[[INNER_FUNC_1:_TFFC8closures8SuperSub1d.*]] : $@convention(thin) (@owned SuperSub) -> ()
   // CHECK:   [[SELF_COPY:%.*]] = copy_value [[SELF]]
   // CHECK:   [[PA:%.*]] = partial_apply [[INNER]]([[SELF_COPY]])
-  // CHECK:   [[PA_COPY:%.*]] = copy_value [[PA]]
+  // CHECK:   [[BORROWED_PA:%.*]] = begin_borrow [[PA]]
+  // CHECK:   [[PA_COPY:%.*]] = copy_value [[BORROWED_PA]]
   // CHECK:   apply [[PA_COPY]]()
+  // CHECK:   end_borrow [[BORROWED_PA]] from [[PA]]
   // CHECK:   destroy_value [[PA]]
   // CHECK: } // end sil function '_TFC8closures8SuperSub1dfT_T_'
   func d() {
@@ -505,11 +542,13 @@ class SuperSub : SuperBase {
     let d1 = { () -> Void in
       // CHECK: sil shared @[[INNER_FUNC_2]] : $@convention(thin) (@owned SuperSub) -> () {
       // CHECK: bb0([[ARG:%.*]] : $SuperSub):
-      // CHECK:   [[ARG_COPY:%.*]] = copy_value [[ARG]]
+      // CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
+      // CHECK:   [[ARG_COPY:%.*]] = copy_value [[BORROWED_ARG]]
       // CHECK:   [[ARG_COPY_SUPER:%.*]] = upcast [[ARG_COPY]] : $SuperSub to $SuperBase
       // CHECK:   [[SUPER_METHOD:%.*]] = function_ref @_TFC8closures9SuperBase4boomfT_T_ : $@convention(method) (@guaranteed SuperBase) -> ()
       // CHECK:   = apply [[SUPER_METHOD]]([[ARG_COPY_SUPER]])
       // CHECK:   destroy_value [[ARG_COPY_SUPER]]
+      // CHECK:   end_borrow [[BORROWED_ARG]] from [[ARG]]
       // CHECK:   destroy_value [[ARG]]
       // CHECK: } // end sil function '[[INNER_FUNC_2]]'
       func d2() {
@@ -532,19 +571,23 @@ class SuperSub : SuperBase {
     // CHECK:   [[INNER:%.*]] = function_ref @[[INNER_FUNC_NAME2:_TFFFC8closures8SuperSub1e.*]] : $@convention(thin)
     // CHECK:   [[ARG_COPY:%.*]] = copy_value [[ARG]]
     // CHECK:   [[PA:%.*]] = partial_apply [[INNER]]([[ARG_COPY]])
-    // CHECK:   [[PA_COPY:%.*]] = copy_value [[PA]]
+    // CHECK:   [[BORROWED_PA:%.*]] = begin_borrow [[PA]]
+    // CHECK:   [[PA_COPY:%.*]] = copy_value [[BORROWED_PA]]
     // CHECK:   apply [[PA_COPY]]() : $@callee_owned () -> ()
+    // CHECK:   end_borrow [[BORROWED_PA]] from [[PA]]
     // CHECK:   destroy_value [[PA]]
     // CHECK:   destroy_value [[ARG]]
     // CHECK: } // end sil function '[[INNER_FUNC_NAME1]]'
     func e1() {
       // CHECK: sil shared @[[INNER_FUNC_NAME2]] : $@convention(thin)
-      // ChECK: bb0([[ARG:%.*]] : $SuperSub):
-      // CHECK:   [[ARG_COPY:%.*]] = copy_value [[ARG]]
+      // CHECK: bb0([[ARG:%.*]] : $SuperSub):
+      // CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
+      // CHECK:   [[ARG_COPY:%.*]] = copy_value [[BORROWED_ARG]]
       // CHECK:   [[ARG_COPY_SUPERCAST:%.*]] = upcast [[ARG_COPY]] : $SuperSub to $SuperBase
       // CHECK:   [[SUPER_METHOD:%.*]] = function_ref @_TFC8closures9SuperBase4boomfT_T_ : $@convention(method) (@guaranteed SuperBase) -> ()
       // CHECK:   = apply [[SUPER_METHOD]]([[ARG_COPY_SUPERCAST]])
       // CHECK:   destroy_value [[ARG_COPY_SUPERCAST]]
+      // CHECK:   end_borrow [[BORROWED_ARG]] from [[ARG]]
       // CHECK:   destroy_value [[ARG]]
       // CHECK:   return
       // CHECK: } // end sil function '[[INNER_FUNC_NAME2]]'
@@ -578,11 +621,13 @@ class SuperSub : SuperBase {
     let f1 = {
       // CHECK: sil shared [transparent] @[[INNER_FUNC_2]]
       // CHECK: bb0([[ARG:%.*]] : $SuperSub):
-      // CHECK:   [[ARG_COPY:%.*]] = copy_value [[ARG]]
+      // CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
+      // CHECK:   [[ARG_COPY:%.*]] = copy_value [[BORROWED_ARG]]
       // CHECK:   [[ARG_COPY_SUPER:%.*]] = upcast [[ARG_COPY]] : $SuperSub to $SuperBase
       // CHECK:   [[SUPER_METHOD:%.*]] = function_ref @_TFC8closures9SuperBase4boomfT_T_ : $@convention(method) (@guaranteed SuperBase) -> ()
       // CHECK:   = apply [[SUPER_METHOD]]([[ARG_COPY_SUPER]]) : $@convention(method) (@guaranteed SuperBase) -> ()
       // CHECK:   destroy_value [[ARG_COPY_SUPER]]
+      // CHECK:   end_borrow [[BORROWED_ARG]] from [[ARG]]
       // CHECK:   destroy_value [[ARG]]
       // CHECK: } // end sil function '[[INNER_FUNC_2]]'
       nil ?? super.boom()
@@ -610,11 +655,13 @@ class SuperSub : SuperBase {
     func g1() {
       // CHECK: sil shared [transparent] @[[INNER_FUNC_2]] : $@convention(thin) (@owned SuperSub) -> @error Error {
       // CHECK: bb0([[ARG:%.*]] : $SuperSub):
-      // CHECK:   [[ARG_COPY:%.*]] = copy_value [[ARG]]
+      // CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
+      // CHECK:   [[ARG_COPY:%.*]] = copy_value [[BORROWED_ARG]]
       // CHECK:   [[ARG_COPY_SUPER:%.*]] = upcast [[ARG_COPY]] : $SuperSub to $SuperBase
       // CHECK:   [[SUPER_METHOD:%.*]] = function_ref @_TFC8closures9SuperBase4boomfT_T_ : $@convention(method) (@guaranteed SuperBase) -> ()
       // CHECK:   = apply [[SUPER_METHOD]]([[ARG_COPY_SUPER]])
       // CHECK:   destroy_value [[ARG_COPY_SUPER]]
+      // CHECK:   end_borrow [[BORROWED_ARG]] from [[ARG]]
       // CHECK:   destroy_value [[ARG]]
       // CHECK: } // end sil function '[[INNER_FUNC_2]]'
       nil ?? super.boom()
@@ -698,11 +745,13 @@ class ConcreteBase {
 
 // CHECK-LABEL: sil shared @_TFFC8closures14GenericDerived4swimFT_T_U_FT_T_ : $@convention(thin) <Ocean> (@owned GenericDerived<Ocean>) -> ()
 // CHECK: bb0([[ARG:%.*]] : $GenericDerived<Ocean>):
-// CHECK:   [[ARG_COPY:%.*]] = copy_value [[ARG]]
+// CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
+// CHECK:   [[ARG_COPY:%.*]] = copy_value [[BORROWED_ARG]]
 // CHECK:   [[ARG_COPY_SUPER:%.*]] = upcast [[ARG_COPY]] : $GenericDerived<Ocean> to $ConcreteBase
 // CHECK:   [[METHOD:%.*]] = function_ref @_TFC8closures12ConcreteBase4swimfT_T_
 // CHECK:   apply [[METHOD]]([[ARG_COPY_SUPER]]) : $@convention(method) (@guaranteed ConcreteBase) -> ()
 // CHECK:   destroy_value [[ARG_COPY_SUPER]]
+// CHECK:   end_borrow [[BORROWED_ARG]] from [[ARG]]
 // CHECK:   destroy_value [[ARG]]
 // CHECK: } // end sil function '_TFFC8closures14GenericDerived4swimFT_T_U_FT_T_'
 

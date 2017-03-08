@@ -23,7 +23,6 @@
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/ReferencedNameTracker.h"
-#include "swift/Basic/Fallthrough.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/STLExtras.h"
 #include "llvm/ADT/DenseMap.h"
@@ -712,6 +711,8 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
 
           // Look in the generic parameters after checking our local declaration.
           GenericParams = AFD->getGenericParams();
+        } else if (auto *SD = dyn_cast<SubscriptDecl>(DC)) {
+          GenericParams = SD->getGenericParams();
         } else if (auto *ACE = dyn_cast<AbstractClosureExpr>(DC)) {
           // Look for local variables; normally, the parser resolves these
           // for us, but it can't do the right thing inside local types.
@@ -848,6 +849,8 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
             dcGenericParams = nominal->getGenericParams();
           else if (auto ext = dyn_cast<ExtensionDecl>(DC))
             dcGenericParams = ext->getGenericParams();
+          else if (auto subscript = dyn_cast<SubscriptDecl>(DC))
+            dcGenericParams = subscript->getGenericParams();
 
           while (dcGenericParams) {
             namelookup::FindLocalVal localVal(SM, Loc, Consumer);
@@ -977,9 +980,6 @@ public:
   /// Create a new member lookup table.
   explicit MemberLookupTable(ASTContext &ctx);
 
-  /// Destroy the lookup table.
-  void destroy();
-
   /// Update a lookup table with members from newly-added extensions.
   void updateLookupTable(NominalTypeDecl *nominal);
 
@@ -1036,10 +1036,6 @@ class ClassDecl::ObjCMethodLookupTable
                                 StoredObjCMethods>
 {
 public:
-  void destroy() {
-    this->~ObjCMethodLookupTable();
-  }
-
   // Only allow allocation of member lookup tables using the allocator in
   // ASTContext or by doing a placement new.
   void *operator new(size_t Bytes, ASTContext &C,
@@ -1056,7 +1052,7 @@ MemberLookupTable::MemberLookupTable(ASTContext &ctx) {
   // Register a cleanup with the ASTContext to call the lookup table
   // destructor.
   ctx.addCleanup([this]() {
-    this->destroy();
+    this->~MemberLookupTable();
   });
 }
 
@@ -1124,10 +1120,6 @@ void MemberLookupTable::updateLookupTable(NominalTypeDecl *nominal) {
   }
 }
 
-void MemberLookupTable::destroy() {
-  this->~MemberLookupTable();
-}
-
 void NominalTypeDecl::addedMember(Decl *member) {
   // If we have a lookup table, add the new member to it.
   if (LookupTable.getPointer()) {
@@ -1184,8 +1176,9 @@ void NominalTypeDecl::makeMemberVisible(ValueDecl *member) {
   LookupTable.getPointer()->addMember(member);
 }
 
-ArrayRef<ValueDecl *> NominalTypeDecl::lookupDirect(DeclName name,
-                                                    bool ignoreNewExtensions) {
+TinyPtrVector<ValueDecl *> NominalTypeDecl::lookupDirect(
+                                                  DeclName name,
+                                                  bool ignoreNewExtensions) {
   // Make sure we have the complete list of members (in this nominal and in all
   // extensions).
   if (!ignoreNewExtensions) {
@@ -1203,7 +1196,7 @@ ArrayRef<ValueDecl *> NominalTypeDecl::lookupDirect(DeclName name,
     return { };
 
   // We found something; return it.
-  return { known->second.begin(), known->second.size() };
+  return known->second;
 }
 
 void ClassDecl::createObjCMethodLookup() {
@@ -1214,7 +1207,7 @@ void ClassDecl::createObjCMethodLookup() {
   // Register a cleanup with the ASTContext to call the lookup table
   // destructor.
   ctx.addCleanup([this]() {
-    this->ObjCMethodLookup->destroy();
+    this->ObjCMethodLookup->~ObjCMethodLookupTable();
   });
 }
 

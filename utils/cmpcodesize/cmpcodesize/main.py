@@ -201,5 +201,6 @@ How to specify files:
                                       parsed_arguments.all_sections,
                                       parsed_arguments.list_categories)
 
+
 if __name__ == '__main__':
     main()

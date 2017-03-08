@@ -4,7 +4,7 @@ protocol P {
   associatedtype A
   associatedtype B
 
-  func f<T: P>(_: T) where T.A == Self.A, T.A == Self.B // expected-error{{instance method requirement 'f' cannot add constraint 'Self.B == Self.A' on 'Self'}}
+  func f<T: P>(_: T) where T.A == Self.A, T.A == Self.B // expected-error{{instance method requirement 'f' cannot add constraint 'Self.A == Self.B' on 'Self'}}
 }
 
 extension P {

@@ -28,7 +28,6 @@
 #include "llvm/IR/Function.h"
 #include "llvm/IR/Module.h"
 
-#include "swift/Basic/Fallthrough.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/TypeLowering.h"
@@ -146,8 +145,14 @@ llvm::Value *irgen::emitClassDowncast(IRGenFunction &IGF, llvm::Value *from,
   llvm::Constant *castFn;
 
   // Get the best known type information about the destination type.
-  auto destClass = toType.getSwiftRValueType().getClassBound();
-  assert(destClass || toType.is<ArchetypeType>());
+  ClassDecl *destClass = nullptr;
+  if (auto archetypeTy = toType.getAs<ArchetypeType>()) {
+    if (auto superclassTy = archetypeTy->getSuperclass())
+      destClass = superclassTy->getClassOrBoundGenericClass();
+  } else {
+    destClass = toType.getClassOrBoundGenericClass();
+    assert(destClass != nullptr);
+  }
 
   // If the destination type is known to have a Swift-compatible
   // implementation, use the most specific entrypoint.

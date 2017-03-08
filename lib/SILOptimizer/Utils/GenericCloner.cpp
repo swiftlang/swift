@@ -40,12 +40,11 @@ SILFunction *GenericCloner::initCloned(SILFunction *Orig,
   // Create a new empty function.
   SILFunction *NewF = Orig->getModule().createFunction(
       getSpecializedLinkage(Orig, Orig->getLinkage()), NewName,
-      ReInfo.getSpecializedType(), nullptr,
+      ReInfo.getSpecializedType(), ReInfo.getSpecializedGenericEnvironment(),
       Orig->getLocation(), Orig->isBare(), Orig->isTransparent(),
       Fragile, Orig->isThunk(), Orig->getClassVisibility(),
       Orig->getInlineStrategy(), Orig->getEffectsKind(), Orig,
-      Orig->getDebugScope(), Orig->getDeclContext());
-  NewF->setDeclCtx(Orig->getDeclContext());
+      Orig->getDebugScope());
   for (auto &Attr : Orig->getSemanticsAttrs()) {
     NewF->addSemanticsAttr(Attr);
   }
@@ -83,6 +82,9 @@ void GenericCloner::populateCloned() {
       AllocStacks.push_back(ASI);
     };
     auto handleConversion = [&]() {
+      if (!origConv.useLoweredAddresses())
+        return false;
+
       if (ArgIdx < origConv.getSILArgIndexOfFirstParam()) {
         // Handle result arguments.
         unsigned formalIdx =
@@ -109,8 +111,10 @@ void GenericCloner::populateCloned() {
           // Try to create a new debug_value from an existing debug_value_addr.
           for (Operand *ArgUse : OrigArg->getUses()) {
             if (auto *DVAI = dyn_cast<DebugValueAddrInst>(ArgUse->getUser())) {
+              getBuilder().setCurrentDebugScope(remapScope(DVAI->getDebugScope()));
               getBuilder().createDebugValue(DVAI->getLoc(), NewArg,
                                             DVAI->getVarInfo());
+              getBuilder().setCurrentDebugScope(nullptr);
               break;
             }
           }

@@ -69,11 +69,12 @@ namespace clang {
   class Type;
   namespace CodeGen {
     class CGFunctionInfo;
+    class CodeGenModule;
   }
 }
 
 namespace swift {
-  class ArchetypeBuilder;
+  class GenericSignatureBuilder;
   class ASTContext;
   class BraceStmt;
   class CanType;
@@ -393,6 +394,9 @@ public:
   /// Should we add value names to local IR values?
   bool EnableValueNames = false;
 
+  // Is swifterror returned in a register by the target ABI.
+  bool IsSwiftErrorInRegister;
+
   llvm::Type *VoidTy;                  /// void (usually {})
   llvm::IntegerType *Int1Ty;           /// i1
   llvm::IntegerType *Int8Ty;           /// i8
@@ -427,7 +431,6 @@ public:
   llvm::PointerType *UnownedReferencePtrTy;/// %swift.unowned_reference*
   llvm::Constant *RefCountedNull;      /// %swift.refcounted* null
   llvm::StructType *FunctionPairTy;    /// { i8*, %swift.refcounted* }
-  llvm::StructType *WitnessFunctionPairTy;    /// { i8*, %witness.table* }
   llvm::FunctionType *DeallocatingDtorTy; /// void (%swift.refcounted*)
   llvm::StructType *TypeMetadataStructTy; /// %swift.type = type { ... }
   llvm::PointerType *TypeMetadataPtrTy;/// %swift.type*
@@ -473,6 +476,8 @@ public:
   llvm::CallingConv::ID C_CC;          /// standard C calling convention
   llvm::CallingConv::ID DefaultCC;     /// default calling convention
   llvm::CallingConv::ID RegisterPreservingCC; /// lightweight calling convention
+  llvm::CallingConv::ID SwiftCC;     /// swift calling convention
+  bool UseSwiftCC;
 
   llvm::FunctionType *getAssociatedTypeMetadataAccessFunctionTy();
   llvm::FunctionType *getAssociatedTypeWitnessTableAccessFunctionTy();
@@ -591,7 +596,6 @@ public:
   ExplosionSchema getSchema(SILType T);
   unsigned getExplosionSize(SILType T);
   llvm::PointerType *isSingleIndirectValue(SILType T);
-  llvm::PointerType *requiresIndirectResult(SILType T);
   bool isPOD(SILType type, ResilienceExpansion expansion);
   clang::CanQual<clang::Type> getClangType(CanType type);
   clang::CanQual<clang::Type> getClangType(SILType type);
@@ -602,6 +606,8 @@ public:
            "requesting clang AST context without clang importer!");
     return *ClangASTContext;
   }
+
+  clang::CodeGen::CodeGenModule &getClangCGM() const;
 
   bool isResilient(NominalTypeDecl *decl, ResilienceExpansion expansion);
   ResilienceExpansion getResilienceExpansionForAccess(NominalTypeDecl *decl);
@@ -770,7 +776,7 @@ public:
   llvm::Constant *getAddrOfCaptureDescriptor(SILFunction &caller,
                                              CanSILFunctionType origCalleeType,
                                              CanSILFunctionType substCalleeType,
-                                             ArrayRef<Substitution> subs,
+                                             SubstitutionList subs,
                                              const HeapLayout &layout);
   llvm::Constant *getAddrOfBoxDescriptor(CanType boxedType);
 
@@ -897,7 +903,7 @@ public:
                                         ValueWitness index,
                                         ForDefinition_t forDefinition);
   llvm::Constant *getAddrOfValueWitnessTable(CanType concreteType,
-                                         llvm::Type *definitionType = nullptr);
+                                             ConstantInit init = ConstantInit());
   Optional<llvm::Function*> getAddrOfIVarInitDestroy(ClassDecl *cd,
                                                      bool isDestroyer,
                                                      bool isForeign,
@@ -906,8 +912,7 @@ public:
                                   bool isIndirect,
                                   bool isPattern,
                                   bool isConstant,
-                                  llvm::Constant *init,
-                                  std::unique_ptr<llvm::GlobalVariable> replace,
+                                  ConstantInitFuture init,
                                   llvm::StringRef section = {});
 
   llvm::Constant *getAddrOfTypeMetadata(CanType concreteType, bool isPattern);
@@ -923,10 +928,10 @@ public:
                                                ForDefinition_t forDefinition);
   llvm::Constant *getAddrOfForeignTypeMetadataCandidate(CanType concreteType);
   llvm::Constant *getAddrOfNominalTypeDescriptor(NominalTypeDecl *D,
-                                        llvm::Type *definitionType);
+                                                 ConstantInitFuture definition);
   llvm::Constant *getAddrOfProtocolDescriptor(ProtocolDecl *D,
-                                              ForDefinition_t forDefinition,
-                                              llvm::Type *definitionType);
+                                              ConstantInit definition =
+                                                ConstantInit());
   llvm::Constant *getAddrOfObjCClass(ClassDecl *D,
                                      ForDefinition_t forDefinition);
   Address getAddrOfObjCClassRef(ClassDecl *D);
@@ -953,7 +958,7 @@ public:
                                                CanType conformingType,
                                                ForDefinition_t forDefinition);
   llvm::Constant *getAddrOfWitnessTable(const NormalProtocolConformance *C,
-                                        llvm::Type *definitionTy = nullptr);
+                                    ConstantInit definition = ConstantInit());
   llvm::Constant *
   getAddrOfGenericWitnessTableCache(const NormalProtocolConformance *C,
                                     ForDefinition_t forDefinition);
@@ -965,13 +970,11 @@ public:
                                            AssociatedTypeDecl *associatedType);
   llvm::Function *getAddrOfAssociatedTypeWitnessTableAccessFunction(
                                            const NormalProtocolConformance *C,
-                                           AssociatedTypeDecl *associatedType,
+                                           CanType depAssociatedType,
                                            ProtocolDecl *requiredProtocol);
 
   Address getAddrOfObjCISAMask();
 
-  StringRef mangleType(CanType type, SmallVectorImpl<char> &buffer);
- 
   /// Retrieve the generic environment for the current generic context.
   ///
   /// Fails if there is no generic context.
@@ -995,10 +998,16 @@ public:
   /// the binary.
   void setTrueConstGlobal(llvm::GlobalVariable *var);
 
+  /// Add the swiftself attribute.
+  void addSwiftSelfAttributes(llvm::AttributeSet &attrs, unsigned argIndex);
+
+  /// Add the swifterror attribute.
+  void addSwiftErrorAttributes(llvm::AttributeSet &attrs, unsigned argIndex);
+
 private:
   llvm::Constant *getAddrOfLLVMVariable(LinkEntity entity,
                                         Alignment alignment,
-                                        llvm::Type *definitionType,
+                                        ConstantInit definition,
                                         llvm::Type *defaultType,
                                         DebugTypeInfo debugType);
   llvm::Constant *getAddrOfLLVMVariable(LinkEntity entity,
@@ -1008,7 +1017,7 @@ private:
                                         DebugTypeInfo debugType);
   ConstantReference getAddrOfLLVMVariable(LinkEntity entity,
                                         Alignment alignment,
-                                        llvm::Type *definitionType,
+                                        ConstantInit definition,
                                         llvm::Type *defaultType,
                                         DebugTypeInfo debugType,
                                         SymbolReferenceKind refKind);

@@ -13,6 +13,8 @@
 // RUN: %line-directive %t/out.swift -- %target-build-swift -parse-stdlib %t/out.swift -o %t/a.out -Onone
 // RUN: %line-directive %t/out.swift -- %target-run %t/a.out
 
+// REQUIRES: executable_test
+
 import Swift
 import StdlibUnittest
 

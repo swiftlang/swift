@@ -413,6 +413,12 @@ module SwiftGlibc [system] {
         header "${GLIBC_ARCH_INCLUDE_PATH}/sys/un.h"
         export *
       }
+% if CMAKE_SDK in ["LINUX"]:
+      module user {
+        header "${GLIBC_ARCH_INCLUDE_PATH}/sys/user.h"
+        export *
+      }
+% end
       module utsname {
         header "${GLIBC_ARCH_INCLUDE_PATH}/sys/utsname.h"
         export *

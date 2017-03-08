@@ -30,11 +30,15 @@ struct S2 : struct { } // expected-error{{expected identifier for type name}}
 // Protocol composition in inheritance clauses
 struct S3 : P, P & Q { } // expected-error {{duplicate inheritance from 'P'}}
                          // expected-error @-1 {{protocol composition is neither allowed nor needed here}}
+                         // expected-error @-2 {{'Q' requires that 'S3' inherit from 'A'}}
+                         // expected-note @-3 {{requirement specified as 'Self' : 'A' [with Self = S3]}}
 struct S4 : P, P { }     // expected-error {{duplicate inheritance from 'P'}}
 struct S6 : P & { }      // expected-error {{expected identifier for type name}}
                          // expected-error @-1 {{protocol composition is neither allowed nor needed here}}
 struct S7 : protocol<P, Q> { }  // expected-warning {{'protocol<...>' composition syntax is deprecated; join the protocols using '&'}}
                                 // expected-error @-1 {{protocol composition is neither allowed nor needed here}}{{13-22=}} {{26-27=}}
+                                // expected-error @-2 {{'Q' requires that 'S7' inherit from 'A'}}
+                                // expected-note @-3 {{requirement specified as 'Self' : 'A' [with Self = S7]}}
 
 class GenericBase<T> {}
 

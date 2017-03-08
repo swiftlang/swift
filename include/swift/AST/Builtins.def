@@ -478,6 +478,17 @@ BUILTIN_MISC_OPERATION(GetObjCTypeEncoding, "getObjCTypeEncoding", "n", Special)
 
 #undef BUILTIN_MISC_OPERATION
 
+/// Builtins for instrumentation added by sanitizers during SILGen.
+#ifndef BUILTIN_SANITIZER_OPERATION
+#define BUILTIN_SANITIZER_OPERATION(Id, Name, Attrs) BUILTIN(Id, Name, Attrs)
+#endif
+
+/// Builtin representing a call to Thread Sanitizer instrumentation.
+/// TSanInoutAccess has type (T) -> ()
+BUILTIN_SANITIZER_OPERATION(TSanInoutAccess, "tsanInoutAccess", "")
+
+#undef BUILTIN_SANITIZER_OPERATION
+
 // BUILTIN_TYPE_TRAIT_OPERATION - Compile-time type trait operations.
 #ifndef BUILTIN_TYPE_TRAIT_OPERATION
 #define BUILTIN_TYPE_TRAIT_OPERATION(Id, Name) \

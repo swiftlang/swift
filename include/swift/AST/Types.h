@@ -22,7 +22,7 @@
 #include "swift/AST/Ownership.h"
 #include "swift/AST/Requirement.h"
 #include "swift/AST/SILLayout.h"
-#include "swift/AST/Substitution.h"
+#include "swift/AST/SubstitutionList.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/TypeAlignments.h"
 #include "swift/AST/Identifier.h"
@@ -601,17 +601,10 @@ public:
   /// from its unspecialized type.
   ///
   /// \returns ASTContext-allocated substitutions.
-  ArrayRef<Substitution> gatherAllSubstitutions(
+  SubstitutionList gatherAllSubstitutions(
                            ModuleDecl *module,
                            LazyResolver *resolver,
                            DeclContext *gpContext = nullptr);
-
-  /// \brief Determine whether the given type is "generic", meaning that
-  /// it involves generic types for which generic arguments have not been
-  /// provided.
-  /// For example, the type Vector and Vector<Int>.InnerGeneric are both
-  /// unspecialized generic, but the type Vector<Int> is not.
-  bool isUnspecializedGeneric();
 
   /// \brief Determine whether this type is a legal, lowered SIL type.
   ///
@@ -873,14 +866,24 @@ public:
   /// the context of the extension above will produce substitutions T
   /// -> Int and U -> String suitable for mapping the type of
   /// \c SomeArray.
+  SubstitutionMap getContextSubstitutionMap(ModuleDecl *module,
+                                            const DeclContext *dc);
+
+  /// Deprecated version of the above.
   TypeSubstitutionMap getContextSubstitutions(const DeclContext *dc);
 
   /// Get the substitutions to apply to the type of the given member as seen
   /// from this base type.
   ///
-  /// If the member has its own generic parameters, they will remain unchanged
-  /// by the substitution.
-  TypeSubstitutionMap getMemberSubstitutions(const ValueDecl *member);
+  /// \param genericEnv If non-null, generic parameters of the member are
+  /// mapped to context archetypes of this generic environment.
+  SubstitutionMap getMemberSubstitutionMap(ModuleDecl *module,
+                                           const ValueDecl *member,
+                                           GenericEnvironment *genericEnv=nullptr);
+
+  /// Deprecated version of the above.
+  TypeSubstitutionMap getMemberSubstitutions(const ValueDecl *member,
+                                             GenericEnvironment *genericEnv=nullptr);
 
   /// Retrieve the type of the given member as seen through the given base
   /// type, substituting generic arguments where necessary.
@@ -903,16 +906,13 @@ public:
   ///
   /// \param member The member whose type we are substituting.
   ///
-  /// \param resolver The resolver for lazy type checking, which may be null for
-  /// a fully-type-checked AST.
-  ///
   /// \param memberType The type of the member, in which archetypes will be
   /// replaced by the generic arguments provided by the base type. If null,
   /// the member's type will be used.
   ///
   /// \returns the resulting member type.
   Type getTypeOfMember(ModuleDecl *module, const ValueDecl *member,
-                       LazyResolver *resolver, Type memberType = Type());
+                       Type memberType = Type());
 
   /// Get the type of a superclass member as seen from the subclass,
   /// substituting generic parameters, dynamic Self return, and the
@@ -2620,10 +2620,12 @@ public:
                               
   /// Substitute the given generic arguments into this generic
   /// function type and return the resulting non-generic type.
-  ///
-  /// The order of Substitutions must match the order of generic parameters.
-  FunctionType *substGenericArgs(ArrayRef<Substitution> subs);
-  
+  FunctionType *substGenericArgs(SubstitutionList subs);
+
+  /// Substitute the given generic arguments into this generic
+  /// function type and return the resulting non-generic type.
+  FunctionType *substGenericArgs(const SubstitutionMap &subs);
+
   /// Substitute the given generic arguments into this generic
   /// function type using the given substitution and conformance lookup
   /// callbacks.
@@ -2821,7 +2823,7 @@ public:
   /// storage. Therefore they will be passed using an indirect formal
   /// convention, and this method will return an address type. However, in
   /// canonical SIL the opaque arguments might not have an address type.
-  SILType getSILStorageType() const; // in SILFunctioConventions.h
+  SILType getSILStorageType() const; // in SILFunctionConventions.h
 
   /// Return a version of this parameter info with the type replaced.
   SILParameterInfo getWithType(CanType type) const {
@@ -2918,7 +2920,7 @@ public:
   /// storage. Therefore they will be returned using an indirect formal
   /// convention, and this method will return an address type. However, in
   /// canonical SIL the opaque results might not have an address type.
-  SILType getSILStorageType() const; // in SILFunctioConventions.h
+  SILType getSILStorageType() const; // in SILFunctionConventions.h
 
   /// Return a version of this result info with the type replaced.
   SILResultInfo getWithType(CanType type) const {
@@ -2961,7 +2963,7 @@ public:
 
   ValueOwnershipKind
   getOwnershipKind(SILModule &,
-                   CanGenericSignature sig = nullptr) const; // in SILType.cpp
+                   CanGenericSignature sig) const; // in SILType.cpp
 
   bool operator==(SILResultInfo rhs) const {
     return TypeAndConvention == rhs.TypeAndConvention;
@@ -3232,7 +3234,7 @@ public:
   // substituted SIL types match, a formal direct argument may not be passed
   // to a formal indirect parameter and vice-versa. Hence, the formally
   // indirect property, not the SIL indirect property, should be consulted to
-  // determine whether function reabstraction is necesary.
+  // determine whether function reabstraction is necessary.
   unsigned getNumIndirectFormalResults() const {
     return NumIndirectFormalResults;
   }
@@ -3348,8 +3350,12 @@ public:
     return getExtInfo().isPseudogeneric();
   }
 
+  bool isNoReturnFunction(); // Defined in SILType.cpp
+
   CanSILFunctionType substGenericArgs(SILModule &silModule,
-                                      ArrayRef<Substitution> subs);
+                                      SubstitutionList subs);
+  CanSILFunctionType substGenericArgs(SILModule &silModule,
+                                      const SubstitutionMap &subs);
   CanSILFunctionType substGenericArgs(SILModule &silModule,
                                       TypeSubstitutionFn subs,
                                       LookupConformanceFn conformances);
@@ -3390,18 +3396,18 @@ class SILBoxType final : public TypeBase,
   unsigned NumGenericArgs;
 
   static RecursiveTypeProperties
-  getRecursivePropertiesFromSubstitutions(ArrayRef<Substitution> Args);
+  getRecursivePropertiesFromSubstitutions(SubstitutionList Args);
 
   SILBoxType(ASTContext &C,
-             SILLayout *Layout, ArrayRef<Substitution> Args);
+             SILLayout *Layout, SubstitutionList Args);
 
 public:
   static CanSILBoxType get(ASTContext &C,
                            SILLayout *Layout,
-                           ArrayRef<Substitution> Args);
+                           SubstitutionList Args);
 
   SILLayout *getLayout() const { return Layout; }
-  ArrayRef<Substitution> getGenericArgs() const {
+  SubstitutionList getGenericArgs() const {
     return llvm::makeArrayRef(getTrailingObjects<Substitution>(),
                               NumGenericArgs);
   }
@@ -3423,7 +3429,7 @@ public:
   /// Produce a profile of this box, for use in a folding set.
   static void Profile(llvm::FoldingSetNodeID &id,
                       SILLayout *Layout,
-                      ArrayRef<Substitution> Args);
+                      SubstitutionList Args);
   
   /// \brief Produce a profile of this box, for use in a folding set.
   void Profile(llvm::FoldingSetNodeID &id) {
@@ -3947,7 +3953,7 @@ public:
   /// \brief Retrieve the nested type with the given name, if it's already
   /// known.
   ///
-  /// This is an implementation detail used by the archetype builder.
+  /// This is an implementation detail used by the generic signature builder.
   Optional<Type> getNestedTypeIfKnown(Identifier Name) const;
 
   /// \brief Check if the archetype contains a nested type with the given name.
@@ -4460,6 +4466,8 @@ inline NominalTypeDecl *TypeBase::getAnyNominal() {
 inline Type TypeBase::getNominalParent() {
   if (auto classType = getAs<NominalType>()) {
     return classType->getParent();
+  } else if (auto unboundType = getAs<UnboundGenericType>()) {
+    return unboundType->getParent();
   } else {
     return castTo<BoundGenericType>()->getParent();
   }

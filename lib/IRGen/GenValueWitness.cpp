@@ -29,6 +29,7 @@
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/Function.h"
 
+#include "ConstantBuilder.h"
 #include "Explosion.h"
 #include "FixedTypeInfo.h"
 #include "GenEnum.h"
@@ -858,10 +859,6 @@ static void buildValueWitnessFunction(IRGenModule &IGM,
   llvm_unreachable("bad value witness kind!");
 }
 
-static llvm::Constant *asOpaquePtr(IRGenModule &IGM, llvm::Constant *in) {
-  return llvm::ConstantExpr::getBitCast(in, IGM.Int8PtrTy);
-}
-
 /// Return a function which takes two pointer arguments and returns
 /// void immediately.
 static llvm::Constant *getNoOpVoidFunction(IRGenModule &IGM) {
@@ -899,10 +896,10 @@ static llvm::Constant *getAssignWithCopyStrongFunction(IRGenModule &IGM) {
     Address src(&*(it++), IGM.getPointerAlignment());
 
     llvm::Value *newValue = IGF.Builder.CreateLoad(src, "new");
-    IGF.emitNativeStrongRetain(newValue);
+    IGF.emitNativeStrongRetain(newValue, IGF.getDefaultAtomicity());
     llvm::Value *oldValue = IGF.Builder.CreateLoad(dest, "old");
     IGF.Builder.CreateStore(newValue, dest);
-    IGF.emitNativeStrongRelease(oldValue);
+    IGF.emitNativeStrongRelease(oldValue, IGF.getDefaultAtomicity());
 
     IGF.Builder.CreateRet(dest.getAddress());
   });
@@ -925,7 +922,7 @@ static llvm::Constant *getAssignWithTakeStrongFunction(IRGenModule &IGM) {
     llvm::Value *newValue = IGF.Builder.CreateLoad(src, "new");
     llvm::Value *oldValue = IGF.Builder.CreateLoad(dest, "old");
     IGF.Builder.CreateStore(newValue, dest);
-    IGF.emitNativeStrongRelease(oldValue);
+    IGF.emitNativeStrongRelease(oldValue, IGF.getDefaultAtomicity());
 
     IGF.Builder.CreateRet(dest.getAddress());
   });
@@ -945,7 +942,7 @@ static llvm::Constant *getInitWithCopyStrongFunction(IRGenModule &IGM) {
     Address src(&*(it++), IGM.getPointerAlignment());
 
     llvm::Value *newValue = IGF.Builder.CreateLoad(src, "new");
-    IGF.emitNativeStrongRetain(newValue);
+    IGF.emitNativeStrongRetain(newValue, IGF.getDefaultAtomicity());
     IGF.Builder.CreateStore(newValue, dest);
 
     IGF.Builder.CreateRet(dest.getAddress());
@@ -960,7 +957,7 @@ static llvm::Constant *getDestroyStrongFunction(IRGenModule &IGM) {
                                        IGM.VoidTy, argTys,
                                        [&](IRGenFunction &IGF) {
     Address arg(&*IGF.CurFn->arg_begin(), IGM.getPointerAlignment());
-    IGF.emitNativeStrongRelease(IGF.Builder.CreateLoad(arg));
+    IGF.emitNativeStrongRelease(IGF.Builder.CreateLoad(arg), IGF.getDefaultAtomicity());
     IGF.Builder.CreateRetVoid();
   });
 }
@@ -1088,41 +1085,46 @@ static llvm::Constant *getMemCpyArrayFunction(IRGenModule &IGM,
 }
 
 /// Find a witness to the fact that a type is a value type.
-/// Always returns an i8*.
-static llvm::Constant *getValueWitness(IRGenModule &IGM,
-                                       ValueWitness index,
-                                       FixedPacking packing,
-                                       CanType abstractType,
-                                       SILType concreteType,
-                                       const TypeInfo &concreteTI) {
+/// Always adds an i8*.
+static void addValueWitness(IRGenModule &IGM,
+                            ConstantArrayBuilder &B,
+                            ValueWitness index,
+                            FixedPacking packing,
+                            CanType abstractType,
+                            SILType concreteType,
+                            const TypeInfo &concreteTI) {
+  auto addFunction = [&](llvm::Constant *fn) {
+    B.addBitCast(fn, IGM.Int8PtrTy);
+  };
+
   // Try to use a standard function.
   switch (index) {
   case ValueWitness::DeallocateBuffer:
     if (isNeverAllocated(packing))
-      return asOpaquePtr(IGM, getNoOpVoidFunction(IGM));
+      return addFunction(getNoOpVoidFunction(IGM));
     goto standard;
 
   case ValueWitness::DestroyBuffer:
     if (concreteTI.isPOD(ResilienceExpansion::Maximal)) {
       if (isNeverAllocated(packing))
-        return asOpaquePtr(IGM, getNoOpVoidFunction(IGM));
+        return addFunction(getNoOpVoidFunction(IGM));
     } else if (concreteTI.isSingleSwiftRetainablePointer(ResilienceExpansion::Maximal)) {
       assert(isNeverAllocated(packing));
-      return asOpaquePtr(IGM, getDestroyStrongFunction(IGM));
+      return addFunction(getDestroyStrongFunction(IGM));
     }
     goto standard;
 
   case ValueWitness::Destroy:
     if (concreteTI.isPOD(ResilienceExpansion::Maximal)) {
-      return asOpaquePtr(IGM, getNoOpVoidFunction(IGM));
+      return addFunction(getNoOpVoidFunction(IGM));
     } else if (concreteTI.isSingleSwiftRetainablePointer(ResilienceExpansion::Maximal)) {
-      return asOpaquePtr(IGM, getDestroyStrongFunction(IGM));
+      return addFunction(getDestroyStrongFunction(IGM));
     }
     goto standard;
 
   case ValueWitness::DestroyArray:
     if (concreteTI.isPOD(ResilienceExpansion::Maximal)) {
-      return asOpaquePtr(IGM, getNoOpVoidFunction(IGM));
+      return addFunction(getNoOpVoidFunction(IGM));
     }
     // TODO: A standard "destroy strong array" entrypoint for arrays of single
     // refcounted pointer types.
@@ -1132,73 +1134,73 @@ static llvm::Constant *getValueWitness(IRGenModule &IGM,
   case ValueWitness::InitializeBufferWithCopy:
     if (packing == FixedPacking::OffsetZero) {
       if (concreteTI.isPOD(ResilienceExpansion::Maximal)) {
-        return asOpaquePtr(IGM, getMemCpyFunction(IGM, concreteTI));
+        return addFunction(getMemCpyFunction(IGM, concreteTI));
       } else if (concreteTI.isSingleSwiftRetainablePointer(ResilienceExpansion::Maximal)) {
-        return asOpaquePtr(IGM, getInitWithCopyStrongFunction(IGM));
+        return addFunction(getInitWithCopyStrongFunction(IGM));
       }
     }
     goto standard;
 
   case ValueWitness::InitializeBufferWithTakeOfBuffer:
     if (packing == FixedPacking::Allocate) {
-      return asOpaquePtr(IGM, getCopyOutOfLinePointerFunction(IGM));
+      return addFunction(getCopyOutOfLinePointerFunction(IGM));
     } else if (packing == FixedPacking::OffsetZero &&
                concreteTI.isBitwiseTakable(ResilienceExpansion::Maximal)) {
-      return asOpaquePtr(IGM, getMemCpyFunction(IGM, concreteTI));
+      return addFunction(getMemCpyFunction(IGM, concreteTI));
     }
     goto standard;
 
   case ValueWitness::InitializeBufferWithTake:
     if (concreteTI.isBitwiseTakable(ResilienceExpansion::Maximal)
         && packing == FixedPacking::OffsetZero)
-      return asOpaquePtr(IGM, getMemCpyFunction(IGM, concreteTI));
+      return addFunction(getMemCpyFunction(IGM, concreteTI));
     goto standard;
 
   case ValueWitness::InitializeWithTake:
     if (concreteTI.isBitwiseTakable(ResilienceExpansion::Maximal)) {
-      return asOpaquePtr(IGM, getMemCpyFunction(IGM, concreteTI));
+      return addFunction(getMemCpyFunction(IGM, concreteTI));
     }
     goto standard;
 
   case ValueWitness::InitializeArrayWithTakeFrontToBack:
     if (concreteTI.isBitwiseTakable(ResilienceExpansion::Maximal)) {
-      return asOpaquePtr(IGM, getMemMoveArrayFunction(IGM, concreteTI));
+      return addFunction(getMemMoveArrayFunction(IGM, concreteTI));
     }
     goto standard;
 
   case ValueWitness::InitializeArrayWithTakeBackToFront:
     if (concreteTI.isBitwiseTakable(ResilienceExpansion::Maximal)) {
-      return asOpaquePtr(IGM, getMemMoveArrayFunction(IGM, concreteTI));
+      return addFunction(getMemMoveArrayFunction(IGM, concreteTI));
     }
     goto standard;
 
   case ValueWitness::AssignWithCopy:
     if (concreteTI.isPOD(ResilienceExpansion::Maximal)) {
-      return asOpaquePtr(IGM, getMemCpyFunction(IGM, concreteTI));
+      return addFunction(getMemCpyFunction(IGM, concreteTI));
     } else if (concreteTI.isSingleSwiftRetainablePointer(ResilienceExpansion::Maximal)) {
-      return asOpaquePtr(IGM, getAssignWithCopyStrongFunction(IGM));
+      return addFunction(getAssignWithCopyStrongFunction(IGM));
     }
     goto standard;
 
   case ValueWitness::AssignWithTake:
     if (concreteTI.isPOD(ResilienceExpansion::Maximal)) {
-      return asOpaquePtr(IGM, getMemCpyFunction(IGM, concreteTI));
+      return addFunction(getMemCpyFunction(IGM, concreteTI));
     } else if (concreteTI.isSingleSwiftRetainablePointer(ResilienceExpansion::Maximal)) {
-      return asOpaquePtr(IGM, getAssignWithTakeStrongFunction(IGM));
+      return addFunction(getAssignWithTakeStrongFunction(IGM));
     }
     goto standard;
 
   case ValueWitness::InitializeWithCopy:
     if (concreteTI.isPOD(ResilienceExpansion::Maximal)) {
-      return asOpaquePtr(IGM, getMemCpyFunction(IGM, concreteTI));
+      return addFunction(getMemCpyFunction(IGM, concreteTI));
     } else if (concreteTI.isSingleSwiftRetainablePointer(ResilienceExpansion::Maximal)) {
-      return asOpaquePtr(IGM, getInitWithCopyStrongFunction(IGM));
+      return addFunction(getInitWithCopyStrongFunction(IGM));
     }
     goto standard;
 
   case ValueWitness::InitializeArrayWithCopy:
     if (concreteTI.isPOD(ResilienceExpansion::Maximal)) {
-      return asOpaquePtr(IGM, getMemCpyArrayFunction(IGM, concreteTI));
+      return addFunction(getMemCpyArrayFunction(IGM, concreteTI));
     }
     // TODO: A standard "copy strong array" entrypoint for arrays of single
     // refcounted pointer types.
@@ -1207,15 +1209,15 @@ static llvm::Constant *getValueWitness(IRGenModule &IGM,
   case ValueWitness::AllocateBuffer:
   case ValueWitness::ProjectBuffer:
     if (packing == FixedPacking::OffsetZero)
-      return asOpaquePtr(IGM, getReturnSelfFunction(IGM));
+      return addFunction(getReturnSelfFunction(IGM));
     goto standard;
 
   case ValueWitness::Size: {
     if (auto value = concreteTI.getStaticSize(IGM))
-      return llvm::ConstantExpr::getIntToPtr(value, IGM.Int8PtrTy);
+      return B.add(llvm::ConstantExpr::getIntToPtr(value, IGM.Int8PtrTy));
 
     // Just fill in null here if the type can't be statically laid out.
-    return llvm::ConstantPointerNull::get(IGM.Int8PtrTy);
+    return B.add(llvm::ConstantPointerNull::get(IGM.Int8PtrTy));
   }
 
   case ValueWitness::Flags: {
@@ -1243,22 +1245,22 @@ static llvm::Constant *getValueWitness(IRGenModule &IGM,
       flags |= ValueWitnessFlags::HasEnumWitnesses;
 
     auto value = IGM.getSize(Size(flags));
-    return llvm::ConstantExpr::getIntToPtr(value, IGM.Int8PtrTy);
+    return B.add(llvm::ConstantExpr::getIntToPtr(value, IGM.Int8PtrTy));
   }
 
   case ValueWitness::Stride: {
     if (auto value = concreteTI.getStaticStride(IGM))
-      return llvm::ConstantExpr::getIntToPtr(value, IGM.Int8PtrTy);
+      return B.add(llvm::ConstantExpr::getIntToPtr(value, IGM.Int8PtrTy));
 
     // Just fill in null here if the type can't be statically laid out.
-    return llvm::ConstantPointerNull::get(IGM.Int8PtrTy);
+    return B.add(llvm::ConstantPointerNull::get(IGM.Int8PtrTy));
   }
 
   case ValueWitness::StoreExtraInhabitant:
   case ValueWitness::GetExtraInhabitantIndex: {
     if (!concreteTI.mayHaveExtraInhabitants(IGM)) {
       assert(concreteType.getEnumOrBoundGenericEnum());
-      return llvm::ConstantPointerNull::get(IGM.Int8PtrTy);
+      return B.addNullPointer(IGM.Int8PtrTy);
     }
 
     goto standard;
@@ -1267,7 +1269,7 @@ static llvm::Constant *getValueWitness(IRGenModule &IGM,
   case ValueWitness::ExtraInhabitantFlags: {
     if (!concreteTI.mayHaveExtraInhabitants(IGM)) {
       assert(concreteType.getEnumOrBoundGenericEnum());
-      return llvm::ConstantPointerNull::get(IGM.Int8PtrTy);
+      return B.add(llvm::ConstantPointerNull::get(IGM.Int8PtrTy));
     }
 
     // If we locally know that the type has fixed layout, we can emit
@@ -1276,12 +1278,12 @@ static llvm::Constant *getValueWitness(IRGenModule &IGM,
       uint64_t numExtraInhabitants = fixedTI->getFixedExtraInhabitantCount(IGM);
       assert(numExtraInhabitants <= ExtraInhabitantFlags::NumExtraInhabitantsMask);
       auto value = IGM.getSize(Size(numExtraInhabitants));
-      return llvm::ConstantExpr::getIntToPtr(value, IGM.Int8PtrTy);
+      return B.add(llvm::ConstantExpr::getIntToPtr(value, IGM.Int8PtrTy));
     }
 
     // Otherwise, just fill in null here if the type can't be statically
     // queried for extra inhabitants.
-    return llvm::ConstantPointerNull::get(IGM.Int8PtrTy);
+    return B.add(llvm::ConstantPointerNull::get(IGM.Int8PtrTy));
   }
 
   case ValueWitness::GetEnumTag:
@@ -1298,34 +1300,35 @@ static llvm::Constant *getValueWitness(IRGenModule &IGM,
   if (fn->empty())
     buildValueWitnessFunction(IGM, fn, index, packing, abstractType,
                               concreteType, concreteTI);
-  return asOpaquePtr(IGM, fn);
+  addFunction(fn);
 }
 
 /// Collect the value witnesses for a particular type.
-static void addValueWitnesses(IRGenModule &IGM, FixedPacking packing,
+static void addValueWitnesses(IRGenModule &IGM,
+                              ConstantArrayBuilder &B,
+                              FixedPacking packing,
                               CanType abstractType,
-                              SILType concreteType, const TypeInfo &concreteTI,
-                              SmallVectorImpl<llvm::Constant*> &table) {
+                              SILType concreteType,
+                              const TypeInfo &concreteTI) {
   for (unsigned i = 0; i != NumRequiredValueWitnesses; ++i) {
-    table.push_back(getValueWitness(IGM, ValueWitness(i),
-                                    packing, abstractType, concreteType,
-                                    concreteTI));
+    addValueWitness(IGM, B, ValueWitness(i), packing,
+                    abstractType, concreteType, concreteTI);
   }
   if (concreteType.getEnumOrBoundGenericEnum() ||
       concreteTI.mayHaveExtraInhabitants(IGM)) {
     for (auto i = unsigned(ValueWitness::First_ExtraInhabitantValueWitness);
          i <= unsigned(ValueWitness::Last_ExtraInhabitantValueWitness);
          ++i) {
-      table.push_back(getValueWitness(IGM, ValueWitness(i), packing,
-                                      abstractType, concreteType, concreteTI));
+      addValueWitness(IGM, B, ValueWitness(i), packing,
+                      abstractType, concreteType, concreteTI);
     }
   }
   if (concreteType.getEnumOrBoundGenericEnum()) {
     for (auto i = unsigned(ValueWitness::First_EnumValueWitness);
          i <= unsigned(ValueWitness::Last_EnumValueWitness);
          ++i) {
-      table.push_back(getValueWitness(IGM, ValueWitness(i), packing,
-                                      abstractType, concreteType, concreteTI));
+      addValueWitness(IGM, B, ValueWitness(i), packing,
+                      abstractType, concreteType, concreteTI);
     }
   }
 }
@@ -1338,9 +1341,9 @@ bool irgen::hasDependentValueWitnessTable(IRGenModule &IGM, CanType ty) {
 }
 
 static void addValueWitnessesForAbstractType(IRGenModule &IGM,
-                                 CanType abstractType,
-                                 SmallVectorImpl<llvm::Constant*> &witnesses,
-                                 bool &canBeConstant) {
+                                             ConstantArrayBuilder &B,
+                                             CanType abstractType,
+                                             bool &canBeConstant) {
   CanType concreteFormalType = getFormalTypeInContext(abstractType);
 
   auto concreteLoweredType = IGM.getLoweredType(concreteFormalType);
@@ -1351,8 +1354,8 @@ static void addValueWitnessesForAbstractType(IRGenModule &IGM,
   // changing the value witnesses for something that's fixed-layout.
   canBeConstant = concreteTI.isFixedSize();
 
-  addValueWitnesses(IGM, packing, abstractType,
-                    concreteLoweredType, concreteTI, witnesses);
+  addValueWitnesses(IGM, B, packing, abstractType,
+                    concreteLoweredType, concreteTI);
 }
 
 /// Emit a value-witness table for the given type, which is assumed to
@@ -1363,17 +1366,16 @@ llvm::Constant *irgen::emitValueWitnessTable(IRGenModule &IGM,
   assert(!isa<BoundGenericType>(abstractType) &&
          "emitting VWT for generic instance");
 
-  SmallVector<llvm::Constant*, MaxNumValueWitnesses> witnesses;
+  ConstantInitBuilder builder(IGM);
+  auto witnesses = builder.beginArray(IGM.Int8PtrTy);
+
   bool canBeConstant = false;
-  addValueWitnessesForAbstractType(IGM, abstractType, witnesses, canBeConstant);
+  addValueWitnessesForAbstractType(IGM, witnesses, abstractType, canBeConstant);
 
-  auto tableTy = llvm::ArrayType::get(IGM.Int8PtrTy, witnesses.size());
-  auto table = llvm::ConstantArray::get(tableTy, witnesses);
-
-  auto addr = IGM.getAddrOfValueWitnessTable(abstractType, table->getType());
+  auto addr = IGM.getAddrOfValueWitnessTable(abstractType,
+                                             witnesses.finishAndCreateFuture());
   auto global = cast<llvm::GlobalVariable>(addr);
   global->setConstant(canBeConstant);
-  global->setInitializer(table);
 
   return llvm::ConstantExpr::getBitCast(global, IGM.WitnessTablePtrTy);
 }
@@ -1424,48 +1426,46 @@ llvm::Constant *IRGenModule::emitFixedTypeLayout(CanType t,
     return found->second;
 
   // Emit the layout values.
-  SmallVector<llvm::Constant *, MaxNumTypeLayoutWitnesses> witnesses;
+  ConstantInitBuilder builder(*this);
+  auto witnesses = builder.beginArray(Int8PtrTy);
   FixedPacking packing = ti.getFixedPacking(*this);
   for (auto witness = ValueWitness::First_TypeLayoutWitness;
        witness <= ValueWitness::Last_RequiredTypeLayoutWitness;
        witness = ValueWitness(unsigned(witness) + 1)) {
-    witnesses.push_back(getValueWitness(*this, witness,
-                                        packing, t, silTy, ti));
+    addValueWitness(*this, witnesses, witness, packing, t, silTy, ti);
   }
 
   if (ti.mayHaveExtraInhabitants(*this))
     for (auto witness = ValueWitness::First_ExtraInhabitantValueWitness;
          witness <= ValueWitness::Last_TypeLayoutWitness;
          witness = ValueWitness(unsigned(witness) + 1))
-      witnesses.push_back(getValueWitness(*this, witness,
-                                          packing, t, silTy, ti));
+      addValueWitness(*this, witnesses, witness, packing, t, silTy, ti);
 
-  auto layoutTy = llvm::ArrayType::get(Int8PtrTy, witnesses.size());
-  auto layoutVal = llvm::ConstantArray::get(layoutTy, witnesses);
-
-  llvm::Constant *layoutVar
-    = new llvm::GlobalVariable(Module, layoutTy, /*constant*/ true,
-        llvm::GlobalValue::PrivateLinkage, layoutVal,
+  auto layoutVar
+    = witnesses.finishAndCreateGlobal(
         "type_layout_" + llvm::Twine(size)
                        + "_" + llvm::Twine(align)
                        + "_" + llvm::Twine::utohexstr(numExtraInhabitants)
                        + (pod ? "_pod" :
-                          bt  ? "_bt"  : ""));
+                          bt  ? "_bt"  : ""),
+                                      getPointerAlignment(),
+                                      /*constant*/ true,
+                                      llvm::GlobalValue::PrivateLinkage);
 
   auto zero = llvm::ConstantInt::get(Int32Ty, 0);
   llvm::Constant *indices[] = {zero, zero};
-  layoutVar = llvm::ConstantExpr::getGetElementPtr(layoutTy, layoutVar,
-                                                   indices);
+  auto layout = llvm::ConstantExpr::getGetElementPtr(layoutVar->getValueType(),
+                                                     layoutVar, indices);
 
-  PrivateFixedLayouts.insert({key, layoutVar});
-  return layoutVar;
+  PrivateFixedLayouts.insert({key, layout});
+  return layout;
 }
 
 /// Emit the elements of a dependent value witness table template into a
 /// vector.
 void irgen::emitDependentValueWitnessTablePattern(IRGenModule &IGM,
-                                    CanType abstractType,
-                                    SmallVectorImpl<llvm::Constant*> &fields) {
+                                                  ConstantStructBuilder &B,
+                                                  CanType abstractType) {
   // We shouldn't emit global value witness tables for generic type instances.
   assert(!isa<BoundGenericType>(abstractType) &&
          "emitting VWT for generic instance");
@@ -1475,7 +1475,9 @@ void irgen::emitDependentValueWitnessTablePattern(IRGenModule &IGM,
          "emitting VWT pattern for fixed-layout type");
 
   bool canBeConstant = false;
-  addValueWitnessesForAbstractType(IGM, abstractType, fields, canBeConstant);
+  auto witnesses = B.beginArray(IGM.Int8PtrTy);
+  addValueWitnessesForAbstractType(IGM, witnesses, abstractType, canBeConstant);
+  witnesses.finishAndAddTo(B);
 }
 
 FixedPacking TypeInfo::getFixedPacking(IRGenModule &IGM) const {

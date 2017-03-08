@@ -5,6 +5,7 @@ from pass_pipeline import Pass
 # how to dump the passes and the pipelines themselves.
 AADumper = Pass('AADumper')
 ABCOpt = Pass('ABCOpt')
+AddressLowering = Pass('AddressLowering')
 AllocBoxToStack = Pass('AllocBoxToStack')
 CFGPrinter = Pass('CFGPrinter')
 COWArrayOpts = Pass('COWArrayOpts')
@@ -53,6 +54,7 @@ SwiftArrayOpts = Pass('SwiftArrayOpts')
 PASSES = [
     AADumper,
     ABCOpt,
+    AddressLowering,
     AllocBoxToStack,
     CFGPrinter,
     COWArrayOpts,

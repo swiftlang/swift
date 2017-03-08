@@ -5,11 +5,11 @@
 import Builtin
 import Swift
 
-// CHECK: [[ROOTGENERIC:%C15generic_classes11RootGeneric]] = type <{ %swift.refcounted, %Vs5UInt8 }>
+// CHECK: [[ROOTGENERIC:%T15generic_classes11RootGenericC]] = type <{ %swift.refcounted, %Ts5UInt8V }>
 
 // -- offset of RootGeneric<T>.x
 //    FIXME: Strings should be unnamed_addr. rdar://problem/22674524
-// CHECK: [[ROOTGENERIC_NAME:@.*]] = private constant [32 x i8] c"C15generic_classes11RootGeneric\00"
+// CHECK: [[ROOTGENERIC_NAME:@.*]] = private constant [32 x i8] c"15generic_classes11RootGenericC\00"
 // CHECK: [[ROOTGENERIC_FIELDS:@.*]] = private constant [7 x i8] c"x\00y\00z\00\00"
 // CHECK: @_TMnC15generic_classes11RootGeneric = hidden constant <{ {{.*}} i32 }> <{
 // --       name
@@ -48,7 +48,7 @@ import Swift
 
 // -- fixed-layout nongeneric descriptor
 //    FIXME: Strings should be unnamed_addr. rdar://problem/22674524
-// CHECK: [[ROOTNONGENERIC_NAME:@.*]] = private constant [35 x i8] c"C15generic_classes14RootNonGeneric\00"
+// CHECK: [[ROOTNONGENERIC_NAME:@.*]] = private constant [35 x i8] c"15generic_classes14RootNonGenericC\00"
 // CHECK: @_TMnC15generic_classes14RootNonGeneric = hidden constant <{ {{.*}} i32 }> <{
 // --       name
 // CHECK:   [35 x i8]* [[ROOTNONGENERIC_NAME]]
@@ -67,7 +67,7 @@ import Swift
 // CHECK: }>
 
 // CHECK: @_TMfC15generic_classes14RootNonGeneric = internal global <{ {{.*}} }> <{
-// CHECK:   void (%C15generic_classes14RootNonGeneric*)* @_TFC15generic_classes14RootNonGenericD,
+// CHECK:   void (%T15generic_classes14RootNonGenericC*)* @_TFC15generic_classes14RootNonGenericD,
 // CHECK:   i8** @_TWVBo,
 // CHECK-native: i64 0,
 // CHECK-native: %swift.type* null,
@@ -203,7 +203,7 @@ sil_vtable RecursiveGenericInheritsGeneric {}
 sil @_TFC15generic_classes31RecursiveGenericInheritsGenericD : $@convention(method) <T, U> (RecursiveGenericInheritsGeneric<T, U>) -> ()
 
 
-// CHECK: define{{( protected)?}} [[ROOTGENERIC]]* @RootGeneric_fragile_dependent_alloc
+// CHECK: define{{( protected)?}} swiftcc [[ROOTGENERIC]]* @RootGeneric_fragile_dependent_alloc
 // CHECK:   [[METADATA:%.*]] = call %swift.type* @_TMaC15generic_classes11RootGeneric
 // CHECK:   [[METADATA_ARRAY:%.*]] = bitcast %swift.type* [[METADATA]] to i8*
 // CHECK:   [[T0:%.*]] = getelementptr inbounds i8, i8* [[METADATA_ARRAY]], i32 48
@@ -222,7 +222,7 @@ entry:
 }
 
 // RootGeneric.x has fixed layout
-// CHECK: define{{( protected)?}} i8 @RootGeneric_concrete_fragile_dependent_member_access_x
+// CHECK: define{{( protected)?}} swiftcc i8 @RootGeneric_concrete_fragile_dependent_member_access_x
 // CHECK:   getelementptr inbounds [[ROOTGENERIC]], [[ROOTGENERIC]]* %0, i32 0, i32 1
 sil @RootGeneric_concrete_fragile_dependent_member_access_x : $<F> RootGeneric<F> -> UInt8 {
 entry(%c : $RootGeneric<F>):
@@ -232,7 +232,7 @@ entry(%c : $RootGeneric<F>):
 }
 
 // RootGeneric.y has dependent layout; load the offset from the metadata
-// CHECK-LABEL: define{{( protected)?}} void @RootGeneric_concrete_fragile_dependent_member_access_y
+// CHECK-LABEL: define{{( protected)?}} swiftcc void @RootGeneric_concrete_fragile_dependent_member_access_y
 // CHECK:   [[TYPE_METADATA_ARRAY:%.*]] = bitcast %swift.type* {{%.*}} to i64*
 // CHECK:   [[Y_OFFSET_ADDR:%.*]] = getelementptr inbounds i64, i64* [[TYPE_METADATA_ARRAY]], i64 16
 // CHECK:   [[Y_OFFSET:%.*]] = load i64, i64* [[Y_OFFSET_ADDR]], align 8
@@ -247,9 +247,9 @@ entry(%z : $*F, %c : $RootGeneric<F>):
   return %t : $()
 }
 
-// CHECK-LABEL: define{{( protected)?}} void @RootGeneric_subst_concrete_fragile_dependent_member_access_y
+// CHECK-LABEL: define{{( protected)?}} swiftcc void @RootGeneric_subst_concrete_fragile_dependent_member_access_y
 // CHECK:   [[Y_ADDR:%.*]] = getelementptr inbounds {{.*}}, {{.*}}* %1, i32 0, i32 3
-// CHECK:   bitcast %Si* [[Y_ADDR]] to i8*
+// CHECK:   bitcast %TSi* [[Y_ADDR]] to i8*
 sil @RootGeneric_subst_concrete_fragile_dependent_member_access_y : $(RootGeneric<Int>) -> @out Int {
 entry(%z : $*Int, %c : $RootGeneric<Int>):
   %p = ref_element_addr %c : $RootGeneric<Int>, #RootGeneric.y
@@ -259,13 +259,13 @@ entry(%z : $*Int, %c : $RootGeneric<Int>):
 }
 
 // RootGeneric.z has dependent layout; load the offset from the metadata
-// CHECK-LABEL: define{{( protected)?}} i8 @RootGeneric_concrete_fragile_dependent_member_access_z
+// CHECK-LABEL: define{{( protected)?}} swiftcc i8 @RootGeneric_concrete_fragile_dependent_member_access_z
 // CHECK:   [[TYPE_METADATA_ARRAY:%.*]] = bitcast %swift.type* {{%.*}} to i64*
 // CHECK:   [[Z_OFFSET_ADDR:%.*]] = getelementptr inbounds i64, i64* [[TYPE_METADATA_ARRAY]], i64 17
 // CHECK:   [[Z_OFFSET:%.*]] = load i64, i64* [[Z_OFFSET_ADDR]], align 8
 // CHECK:   [[CLASS_BYTE_ARRAY:%.*]] = bitcast [[ROOTGENERIC]]* {{%.*}} to i8*
 // CHECK:   [[Z_ADDR:%.*]] = getelementptr inbounds i8, i8* [[CLASS_BYTE_ARRAY]], i64 [[Z_OFFSET]]
-// CHECK:   bitcast i8* [[Z_ADDR]] to %Vs5UInt8*
+// CHECK:   bitcast i8* [[Z_ADDR]] to %Ts5UInt8V*
 sil @RootGeneric_concrete_fragile_dependent_member_access_z : $<F> RootGeneric<F> -> UInt8 {
 entry(%c : $RootGeneric<F>):
   %p = ref_element_addr %c : $RootGeneric<F>, #RootGeneric.z
@@ -273,9 +273,9 @@ entry(%c : $RootGeneric<F>):
   return %z : $UInt8
 }
 
-// CHECK-LABEL: define{{( protected)?}} i8 @RootGeneric_subst_concrete_fragile_dependent_member_access_z
+// CHECK-LABEL: define{{( protected)?}} swiftcc i8 @RootGeneric_subst_concrete_fragile_dependent_member_access_z
 // CHECK:   [[Z_ADDR:%.*]] = getelementptr inbounds {{.*}}, {{.*}}* %0, i32 0, i32 4
-// CHECK:   [[T0:%.*]] = getelementptr inbounds %Vs5UInt8, %Vs5UInt8* [[Z_ADDR]], i32 0, i32 0
+// CHECK:   [[T0:%.*]] = getelementptr inbounds %Ts5UInt8V, %Ts5UInt8V* [[Z_ADDR]], i32 0, i32 0
 // CHECK:   load i8, i8* [[T0]], align
 sil @RootGeneric_subst_concrete_fragile_dependent_member_access_z : $RootGeneric<Int> -> UInt8 {
 entry(%c : $RootGeneric<Int>):

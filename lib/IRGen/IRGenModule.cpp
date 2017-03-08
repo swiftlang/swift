@@ -28,6 +28,7 @@
 #include "clang/Basic/TargetInfo.h"
 #include "clang/CodeGen/CodeGenABITypes.h"
 #include "clang/CodeGen/ModuleBuilder.h"
+#include "clang/CodeGen/SwiftCallingConv.h"
 #include "clang/Lex/Preprocessor.h"
 #include "clang/Lex/PreprocessorOptions.h"
 #include "clang/Lex/HeaderSearch.h"
@@ -60,11 +61,12 @@ const unsigned DefaultAS = 0;
 /// A helper for creating LLVM struct types.
 static llvm::StructType *createStructType(IRGenModule &IGM,
                                           StringRef name,
-                                  std::initializer_list<llvm::Type*> types) {
+                                  std::initializer_list<llvm::Type*> types,
+                                          bool packed = false) {
   return llvm::StructType::create(IGM.getLLVMContext(),
                                   ArrayRef<llvm::Type*>(types.begin(),
                                                         types.size()),
-                                  name);
+                                  name, packed);
 };
 
 /// A helper for creating pointer-to-struct types.
@@ -272,10 +274,6 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
     FunctionPtrTy,
     RefCountedPtrTy,
   });
-  WitnessFunctionPairTy = createStructType(*this, "swift.function", {
-    FunctionPtrTy,
-    WitnessTablePtrTy,
-  });
   
   OpaquePtrTy = llvm::StructType::create(LLVMContext, "swift.opaque")
                   ->getPointerTo(DefaultAS);
@@ -387,10 +385,17 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
   else
     RegisterPreservingCC = DefaultCC;
 
+  SwiftCC = SWIFT_LLVM_CC(SwiftCC);
+  UseSwiftCC = (SwiftCC == llvm::CallingConv::Swift);
+
   if (IRGen.Opts.DebugInfoKind > IRGenDebugInfoKind::None)
     DebugInfo = new IRGenDebugInfo(IRGen.Opts, *CI, *this, Module, SF);
 
   initClangTypeConverter();
+
+  IsSwiftErrorInRegister =
+    clang::CodeGen::swiftcall::isSwiftErrorLoweredInRegister(
+      ClangCodeGen->CGM());
 }
 
 IRGenModule::~IRGenModule() {
@@ -707,6 +712,10 @@ ModuleDecl *IRGenModule::getSwiftModule() const {
 
 Lowering::TypeConverter &IRGenModule::getSILTypes() const {
   return IRGen.SIL.Types;
+}
+
+clang::CodeGen::CodeGenModule &IRGenModule::getClangCGM() const {
+  return ClangCodeGen->CGM();
 }
 
 llvm::Module *IRGenModule::getModule() const {

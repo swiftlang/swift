@@ -6,9 +6,9 @@
 //   These types end up in a completely different order with interop disabled.
 // CHECK: [[TYPE:%swift.type]] = type
 // CHECK: [[OPAQUE:%swift.opaque]] = type opaque
-// CHECK: [[C:%C12unowned_objc1C]] = type <{ [[REF:%swift.refcounted]] }>
+// CHECK: [[C:%T12unowned_objc1CC]] = type <{ [[REF:%swift.refcounted]] }>
 // CHECK: [[UNKNOWN:%objc_object]] = type
-// CHECK: [[A:%V12unowned_objc1A]] = type <{ %swift.unowned }>
+// CHECK: [[A:%T12unowned_objc1AV]] = type <{ %swift.unowned }>
 
 class C {}
 sil_vtable C {}
@@ -33,12 +33,12 @@ bb0(%0 : $@sil_unowned C):
   %3 = tuple ()
   %4 = return %3 : $()
 }
-// CHECK:    define{{( protected)?}} void @test_weak_rr_class([[C]]*) {{.*}} {
+// CHECK:    define{{( protected)?}} swiftcc void @test_weak_rr_class([[C]]*) {{.*}} {
 // CHECK:      call void bitcast (void ([[REF]]*)* @swift_rt_swift_unownedRetain to void ([[C]]*)*)([[C]]* %0)
 // CHECK-NEXT: call void bitcast (void ([[REF]]*)* @swift_rt_swift_unownedRelease to void ([[C]]*)*)([[C]]* %0)
 // CHECK-NEXT: ret void
 
-// CHECK:    define{{( protected)?}} void @test_unknown_unowned_copies([[UNKNOWN]]*, i8**, [[UNKNOWN]]*, i8**)
+// CHECK:    define{{( protected)?}} swiftcc void @test_unknown_unowned_copies([[UNKNOWN]]*, i8**, [[UNKNOWN]]*, i8**)
 sil @test_unknown_unowned_copies : $@convention(thin) (@owned P, @owned P) -> () {
 bb0(%p : $P, %q : $P):
 

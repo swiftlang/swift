@@ -22,5 +22,5 @@ bb0(%0 : $T):
   %3 = tuple ()
   return %3 : $()
 }
-// CHECK: define {{.*}}void @foo(%C16class_constraint1A*, %swift.type* %T)
+// CHECK: define {{.*}}void @foo(%T16class_constraint1AC*, %swift.type* %T)
 // CHECK: store i8** @_T016class_constraint1ACAA1PAAWP,

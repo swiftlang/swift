@@ -88,7 +88,7 @@ public:
 
   SILSuccessorIterator operator++(int) {
     SILSuccessorIterator copy = *this;
-    ++copy;
+    ++*this;
     return copy;
   }
 

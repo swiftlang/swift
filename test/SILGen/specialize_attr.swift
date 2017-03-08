@@ -34,7 +34,7 @@ public class CC<T : PP> {
 
 // CHECK-LABEL: sil hidden [_specialize exported: false, kind: full, where T == Int, U == Float] @_T015specialize_attr0A4Thisyx_q_1utr0_lF : $@convention(thin) <T, U> (@in T, @in U) -> () {
 
-// CHECK-LABEL: sil [noinline] [_specialize exported: false, kind: full, where T == RR, U == SS] @_T015specialize_attr2CCC3fooqd___AA2GGVyxGtqd___AFyxG1gtAA2QQRd__lF : $@convention(method) <T where T : PP><U where U : QQ> (@in U, GG<T>, @guaranteed CC<T>) -> (@out U, GG<T>) {
+// CHECK-LABEL: sil [noinline] [_specialize exported: false, kind: full, where T == RR, U == SS] @_T015specialize_attr2CCC3fooqd___AA2GGVyxGtqd___AG1gtAA2QQRd__lF : $@convention(method) <T where T : PP><U where U : QQ> (@in U, GG<T>, @guaranteed CC<T>) -> (@out U, GG<T>) {
 
 // -----------------------------------------------------------------------------
 // Test user-specialized subscript accessors.
@@ -70,7 +70,7 @@ public class ASubscriptable<Element> : TestSubscriptable {
 // CHECK-LABEL: sil [_specialize exported: false, kind: full, where Element == Int] @_T015specialize_attr14ASubscriptableC9subscriptxSicfs : $@convention(method) <Element> (@in Element, Int, @guaranteed ASubscriptable<Element>) -> () {
 
 // ASubscriptable.subscript.materializeForSet with no attribute
-// CHECK-LABEL: sil @_T015specialize_attr14ASubscriptableC9subscriptxSicfm : $@convention(method) <Element> (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, Int, @guaranteed ASubscriptable<Element>) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>) {
+// CHECK-LABEL: sil [transparent] [fragile] @_T015specialize_attr14ASubscriptableC9subscriptxSicfm : $@convention(method) <Element> (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, Int, @guaranteed ASubscriptable<Element>) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>) {
 
 public class Addressable<Element> : TestSubscriptable {
   var storage: UnsafeMutablePointer<Element>
@@ -99,10 +99,10 @@ public class Addressable<Element> : TestSubscriptable {
 
 
 // Addressable.subscript.getter with no attribute
-// CHECK-LABEL: sil @_T015specialize_attr11AddressableC9subscriptxSicfg : $@convention(method) <Element> (Int, @guaranteed Addressable<Element>) -> @out Element {
+// CHECK-LABEL: sil [transparent] [fragile] @_T015specialize_attr11AddressableC9subscriptxSicfg : $@convention(method) <Element> (Int, @guaranteed Addressable<Element>) -> @out Element {
 
 // Addressable.subscript.setter with no attribute
-// CHECK-LABEL: sil @_T015specialize_attr11AddressableC9subscriptxSicfs : $@convention(method) <Element> (@in Element, Int, @guaranteed Addressable<Element>) -> () {
+// CHECK-LABEL: sil [transparent] [fragile] @_T015specialize_attr11AddressableC9subscriptxSicfs : $@convention(method) <Element> (@in Element, Int, @guaranteed Addressable<Element>) -> () {
 
 // Addressable.subscript.materializeForSet with no attribute
-// CHECK-LABEL: sil @_T015specialize_attr11AddressableC9subscriptxSicfm : $@convention(method) <Element> (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, Int, @guaranteed Addressable<Element>) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>) {
+// CHECK-LABEL: sil [transparent] [fragile] @_T015specialize_attr11AddressableC9subscriptxSicfm : $@convention(method) <Element> (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, Int, @guaranteed Addressable<Element>) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>) {

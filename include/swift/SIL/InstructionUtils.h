@@ -97,7 +97,7 @@ class ConformanceCollector {
   SILModule &M;
 
   void scanType(Type type);
-  void scanSubsts(ArrayRef<Substitution> substs);
+  void scanSubsts(SubstitutionList substs);
 
   template <typename T> void scanFuncParams(ArrayRef<T> OrigParams,
                                             ArrayRef<T> SubstParams) {
@@ -122,6 +122,13 @@ class ConformanceCollector {
 public:
 
   ConformanceCollector(SILModule &M) : M(M) { }
+
+#ifndef NDEBUG
+  static bool verifyInIRGen() {
+    // TODO: currently disabled because of several problems.
+    return false;
+  }
+#endif
 
   /// Collect all used conformances of an instruction.
   ///

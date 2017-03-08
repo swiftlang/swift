@@ -82,6 +82,29 @@ func foo7(a : Int) -> Int {
   }
 }
 
+func foo8(a : [Int]) {
+  for v in a {
+    if v > 3 {
+      break
+    }
+    if v < 3 {
+      continue
+    }
+  }
+  var i : Int
+  i = 0
+  repeat {
+    print(i)
+    i = i + 1
+    if i < 10 {
+      continue
+    }
+    if i > 80 {
+      break
+    }
+  } while i < 100
+}
+
 // RUN: %target-swift-ide-test -range -pos=8:1 -end-pos 8:32 -source-filename %s | %FileCheck %s -check-prefix=CHECK1
 // RUN: %target-swift-ide-test -range -pos=9:1 -end-pos 9:26 -source-filename %s | %FileCheck %s -check-prefix=CHECK2
 // RUN: %target-swift-ide-test -range -pos=10:1 -end-pos 10:27 -source-filename %s | %FileCheck %s -check-prefix=CHECK3
@@ -102,6 +125,12 @@ func foo7(a : Int) -> Int {
 // RUN: %target-swift-ide-test -range -pos=76:1 -end-pos=79:13 -source-filename %s | %FileCheck %s -check-prefix=CHECK18
 // RUN: %target-swift-ide-test -range -pos=76:1 -end-pos=77:13 -source-filename %s | %FileCheck %s -check-prefix=CHECK19
 // RUN: %target-swift-ide-test -range -pos=78:1 -end-pos=81:13 -source-filename %s | %FileCheck %s -check-prefix=CHECK20
+// RUN: %target-swift-ide-test -range -pos=87:1 -end-pos=89:6 -source-filename %s | %FileCheck %s -check-prefix=CHECK21
+// RUN: %target-swift-ide-test -range -pos=90:1 -end-pos=92:6 -source-filename %s | %FileCheck %s -check-prefix=CHECK22
+// RUN: %target-swift-ide-test -range -pos=99:1 -end-pos=101:6 -source-filename %s | %FileCheck %s -check-prefix=CHECK23
+// RUN: %target-swift-ide-test -range -pos=102:1 -end-pos=104:6 -source-filename %s | %FileCheck %s -check-prefix=CHECK24
+// RUN: %target-swift-ide-test -range -pos=87:1 -end-pos=92:6 -source-filename %s | %FileCheck %s -check-prefix=CHECK25
+// RUN: %target-swift-ide-test -range -pos=97:1 -end-pos=104:6 -source-filename %s | %FileCheck %s -check-prefix=CHECK26
 
 // CHECK1: <Kind>SingleDecl</Kind>
 // CHECK1-NEXT: <Content>func foo1() -> Int { return 0 }</Content>
@@ -130,7 +159,7 @@ func foo7(a : Int) -> Int {
 // CHECK4-NEXT: <Content>aaa = aaa + 3
 // CHECK4-NEXT: if aaa == 3 { aaa = 4 }</Content>
 // CHECK4-NEXT: <Type>Void</Type>
-// CHECK4-NEXT: <Context>swift_ide_test.(file).func decl</Context>
+// CHECK4-NEXT: <Context>swift_ide_test.(file).foo()</Context>
 // CHECK4-NEXT: <Referenced>aaa</Referenced><Type>@lvalue Int</Type>
 // CHECK4-NEXT: <ASTNodes>2</ASTNodes>
 // CHECK4-NEXT: <end>
@@ -140,7 +169,7 @@ func foo7(a : Int) -> Int {
 // CHECK5-NEXT: if aaa == 3 { aaa = 4 }
 // CHECK5-NEXT: return aaa</Content>
 // CHECK5-NEXT: <Type>Int</Type>
-// CHECK5-NEXT: <Context>swift_ide_test.(file).func decl</Context>
+// CHECK5-NEXT: <Context>swift_ide_test.(file).foo()</Context>
 // CHECK5-NEXT: <Referenced>aaa</Referenced><Type>@lvalue Int</Type>
 // CHECK5-NEXT: <ASTNodes>3</ASTNodes>
 // CHECK5-NEXT: <end>
@@ -149,7 +178,7 @@ func foo7(a : Int) -> Int {
 // CHECK6-NEXT: if aaa == 3 { aaa = 4 }
 // CHECK6-NEXT: return aaa</Content>
 // CHECK6-NEXT: <Type>Int</Type>
-// CHECK6-NEXT: <Context>swift_ide_test.(file).func decl</Context>
+// CHECK6-NEXT: <Context>swift_ide_test.(file).foo()</Context>
 // CHECK6-NEXT: <Referenced>aaa</Referenced><Type>@lvalue Int</Type>
 // CHECK6-NEXT: <ASTNodes>2</ASTNodes>
 // CHECK6-NEXT: <end>
@@ -160,7 +189,7 @@ func foo7(a : Int) -> Int {
 // CHECK7-NEXT:   b = b.bigEndian.bigEndian.byteSwapped
 // CHECK7-NEXT:   print(b + c)</Content>
 // CHECK7-NEXT: <Type>()</Type>
-// CHECK7-NEXT: <Context>swift_ide_test.(file).func decl</Context>
+// CHECK7-NEXT: <Context>swift_ide_test.(file).foo2()</Context>
 // CHECK7-NEXT: <Declared>b</Declared><OutscopeReference>false</OutscopeReference>
 // CHECK7-NEXT: <Declared>c</Declared><OutscopeReference>false</OutscopeReference>
 // CHECK7-NEXT: <Referenced>a</Referenced><Type>Int</Type>
@@ -174,7 +203,7 @@ func foo7(a : Int) -> Int {
 // CHECK8-NEXT:   s = s.increment()
 // CHECK8-NEXT:   return c + b</Content>
 // CHECK8-NEXT: <Type>Int</Type>
-// CHECK8-NEXT: <Context>swift_ide_test.(file).func decl</Context>
+// CHECK8-NEXT: <Context>swift_ide_test.(file).foo3(s:)</Context>
 // CHECK8-NEXT: <Declared>c</Declared><OutscopeReference>false</OutscopeReference>
 // CHECK8-NEXT: <Referenced>s</Referenced><Type>@lvalue S1</Type>
 // CHECK8-NEXT: <Referenced>b</Referenced><Type>Int</Type>
@@ -187,7 +216,7 @@ func foo7(a : Int) -> Int {
 // CHECK9-NEXT:   let c = s.foo() + b
 // CHECK9-NEXT:   return c + b</Content>
 // CHECK9-NEXT: <Type>Int</Type>
-// CHECK9-NEXT: <Context>swift_ide_test.(file).func decl</Context>
+// CHECK9-NEXT: <Context>swift_ide_test.(file).foo4(s:)</Context>
 // CHECK9-NEXT: <Declared>b</Declared><OutscopeReference>false</OutscopeReference>
 // CHECK9-NEXT: <Declared>c</Declared><OutscopeReference>false</OutscopeReference>
 // CHECK9-NEXT: <Referenced>s</Referenced><Type>S1</Type>
@@ -199,7 +228,7 @@ func foo7(a : Int) -> Int {
 // CHECK10: <Kind>MultiStatement</Kind>
 // CHECK10-NEXT: <Content>let a = c.c.getC().c.getC().getC().getC()
 // CHECK10-NEXT:   let b = a.c.c.c.c.getC().getC()</Content>
-// CHECK10-NEXT: <Context>swift_ide_test.(file).func decl</Context>
+// CHECK10-NEXT: <Context>swift_ide_test.(file).foo5(c:)</Context>
 // CHECK10-NEXT: <Declared>a</Declared><OutscopeReference>true</OutscopeReference>
 // CHECK10-NEXT: <Declared>b</Declared><OutscopeReference>true</OutscopeReference>
 // CHECK10-NEXT: <Referenced>c</Referenced><Type>C1</Type>
@@ -211,7 +240,7 @@ func foo7(a : Int) -> Int {
 // CHECK11-NEXT: <Content>let a = c.c.getC().c.getC().getC().getC()
 // CHECK11-NEXT:   let b = a.c.c.c.c.getC().getC()
 // CHECK11-NEXT:   let d = a.c.getC().getC().c.c</Content>
-// CHECK11-NEXT: <Context>swift_ide_test.(file).func decl</Context>
+// CHECK11-NEXT: <Context>swift_ide_test.(file).foo5(c:)</Context>
 // CHECK11-NEXT: <Declared>a</Declared><OutscopeReference>true</OutscopeReference>
 // CHECK11-NEXT: <Declared>b</Declared><OutscopeReference>true</OutscopeReference>
 // CHECK11-NEXT: <Declared>d</Declared><OutscopeReference>true</OutscopeReference>
@@ -226,7 +255,7 @@ func foo7(a : Int) -> Int {
 // CHECK12-NEXT:   let d = a.c.getC().getC().c.c
 // CHECK12-NEXT:   return a.take(another: b).take(another: d)</Content>
 // CHECK12-NEXT: <Type>C1</Type>
-// CHECK12-NEXT: <Context>swift_ide_test.(file).func decl</Context>
+// CHECK12-NEXT: <Context>swift_ide_test.(file).foo5(c:)</Context>
 // CHECK12-NEXT: <Declared>a</Declared><OutscopeReference>false</OutscopeReference>
 // CHECK12-NEXT: <Declared>b</Declared><OutscopeReference>false</OutscopeReference>
 // CHECK12-NEXT: <Declared>d</Declared><OutscopeReference>false</OutscopeReference>
@@ -244,7 +273,7 @@ func foo7(a : Int) -> Int {
 // CHECK13-NEXT:     b = b.bigEndian.bigEndian.byteSwapped
 // CHECK13-NEXT:     print(b + c)</Content>
 // CHECK13-NEXT: <Type>()</Type>
-// CHECK13-NEXT: <Context>swift_ide_test.(file).func decl.explicit closure discriminator=0</Context>
+// CHECK13-NEXT: <Context>swift_ide_test.(file).foo6().explicit closure discriminator=0</Context>
 // CHECK13-NEXT: <Declared>a</Declared><OutscopeReference>false</OutscopeReference>
 // CHECK13-NEXT: <Declared>b</Declared><OutscopeReference>false</OutscopeReference>
 // CHECK13-NEXT: <Declared>c</Declared><OutscopeReference>false</OutscopeReference>
@@ -269,7 +298,7 @@ func foo7(a : Int) -> Int {
 // CHECK14-NEXT:       return 1
 // CHECK14-NEXT:     }()</Content>
 // CHECK14-NEXT: <Type>Int</Type>
-// CHECK14-NEXT: <Context>swift_ide_test.(file).func decl.explicit closure discriminator=0</Context>
+// CHECK14-NEXT: <Context>swift_ide_test.(file).foo6().explicit closure discriminator=0</Context>
 // CHECK14-NEXT: <Declared>a</Declared><OutscopeReference>false</OutscopeReference>
 // CHECK14-NEXT: <Declared>b</Declared><OutscopeReference>false</OutscopeReference>
 // CHECK14-NEXT: <Declared>c</Declared><OutscopeReference>false</OutscopeReference>
@@ -291,7 +320,7 @@ func foo7(a : Int) -> Int {
 // CHECK15-NEXT:       let c = a.byteSwapped
 // CHECK15-NEXT:       b = b.bigEndian.bigEndian.byteSwapped</Content>
 // CHECK15-NEXT: <Type>()</Type>
-// CHECK15-NEXT: <Context>swift_ide_test.(file).func decl.explicit closure discriminator=0.explicit closure discriminator=0</Context>
+// CHECK15-NEXT: <Context>swift_ide_test.(file).foo6().explicit closure discriminator=0.explicit closure discriminator=0</Context>
 // CHECK15-NEXT: <Declared>a</Declared><OutscopeReference>false</OutscopeReference>
 // CHECK15-NEXT: <Declared>b</Declared><OutscopeReference>true</OutscopeReference>
 // CHECK15-NEXT: <Declared>c</Declared><OutscopeReference>true</OutscopeReference>
@@ -308,7 +337,7 @@ func foo7(a : Int) -> Int {
 // CHECK16-NEXT:       print(b + c)
 // CHECK16-NEXT:       return 1</Content>
 // CHECK16-NEXT: <Type>Int</Type>
-// CHECK16-NEXT: <Context>swift_ide_test.(file).func decl.explicit closure discriminator=0.explicit closure discriminator=0</Context>
+// CHECK16-NEXT: <Context>swift_ide_test.(file).foo6().explicit closure discriminator=0.explicit closure discriminator=0</Context>
 // CHECK16-NEXT: <Declared>a</Declared><OutscopeReference>false</OutscopeReference>
 // CHECK16-NEXT: <Declared>b</Declared><OutscopeReference>false</OutscopeReference>
 // CHECK16-NEXT: <Declared>c</Declared><OutscopeReference>false</OutscopeReference>
@@ -321,7 +350,7 @@ func foo7(a : Int) -> Int {
 // CHECK17: <Kind>SingleExpression</Kind>
 // CHECK17-NEXT: <Content>print(b + c)</Content>
 // CHECK17-NEXT: <Type>()</Type>
-// CHECK17-NEXT: <Context>swift_ide_test.(file).func decl.explicit closure discriminator=0.explicit closure discriminator=0</Context>
+// CHECK17-NEXT: <Context>swift_ide_test.(file).foo6().explicit closure discriminator=0.explicit closure discriminator=0</Context>
 // CHECK17-NEXT: <Referenced>b</Referenced><Type>@lvalue Int</Type>
 // CHECK17-NEXT: <Referenced>c</Referenced><Type>Int</Type>
 // CHECK17-NEXT: <ASTNodes>1</ASTNodes>
@@ -333,7 +362,7 @@ func foo7(a : Int) -> Int {
 // CHECK18-NEXT:   case 2:
 // CHECK18-NEXT:     return 1</Content>
 // CHECK18-NEXT: <Type>Void</Type>
-// CHECK18-NEXT: <Context>swift_ide_test.(file).func decl</Context>
+// CHECK18-NEXT: <Context>swift_ide_test.(file).foo7(a:)</Context>
 // CHECK18-NEXT: <Entry>Multi</Entry>
 // CHECK18-NEXT: <ASTNodes>2</ASTNodes>
 // CHECK18-NEXT: <end>
@@ -342,7 +371,7 @@ func foo7(a : Int) -> Int {
 // CHECK19-NEXT: <Content>case 1:
 // CHECK19-NEXT:     return 0</Content>
 // CHECK19-NEXT: <Type>Void</Type>
-// CHECK19-NEXT: <Context>swift_ide_test.(file).func decl</Context>
+// CHECK19-NEXT: <Context>swift_ide_test.(file).foo7(a:)</Context>
 // CHECK19-NEXT: <ASTNodes>1</ASTNodes>
 // CHECK19-NEXT: <end>
 
@@ -352,7 +381,14 @@ func foo7(a : Int) -> Int {
 // CHECK20-NEXT:   default:
 // CHECK20-NEXT:     return a</Content>
 // CHECK20-NEXT: <Type>Void</Type>
-// CHECK20-NEXT: <Context>swift_ide_test.(file).func decl</Context>
+// CHECK20-NEXT: <Context>swift_ide_test.(file).foo7(a:)</Context>
 // CHECK20-NEXT: <Entry>Multi</Entry>
 // CHECK20-NEXT: <ASTNodes>2</ASTNodes>
 // CHECK20-NEXT: <end>
+
+// CHECK21: <Orphan>Break</Orphan>
+// CHECK22: <Orphan>Continue</Orphan>
+// CHECK23: <Orphan>Continue</Orphan>
+// CHECK24: <Orphan>Break</Orphan>
+// CHECK25: <Orphan>Break</Orphan>
+// CHECK26: <Orphan>Continue</Orphan>

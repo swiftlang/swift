@@ -37,7 +37,10 @@ func test(internalSub: Sub, publicSub: PublicSub) {
 }
 
 // CHECK-LABEL: sil hidden @_T04main4testyAA3SubC08internalC0_AA06PublicC0C06publicC0tF
-// CHECK: = class_method %0 : $Sub, #Sub.foo!1
-// CHECK: = class_method %1 : $PublicSub, #PublicSub.foo!1
+// CHECK: bb0([[ARG0:%.*]] : $Sub, [[ARG1:%.*]] : $PublicSub):
+// CHECK: [[BORROWED_ARG0:%.*]] = begin_borrow [[ARG0]]
+// CHECK: = class_method [[BORROWED_ARG0]] : $Sub, #Sub.foo!1
+// CHECK: [[BORROWED_ARG1:%.*]] = begin_borrow [[ARG1]]
+// CHECK: = class_method [[BORROWED_ARG1]] : $PublicSub, #PublicSub.foo!1
 // CHECK: } // end sil function '_T04main4testyAA3SubC08internalC0_AA06PublicC0C06publicC0tF'
 

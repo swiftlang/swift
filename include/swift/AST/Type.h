@@ -71,6 +71,14 @@ struct QueryTypeSubstitutionMap {
   Type operator()(SubstitutableType *type) const;
 };
 
+/// A function object suitable for use as a \c TypeSubstitutionFn that
+/// queries an underlying \c SubstitutionMap.
+struct QuerySubstitutionMap {
+  const SubstitutionMap &subMap;
+
+  Type operator()(SubstitutableType *type) const;
+};
+
 /// Function used to resolve conformances.
 using GenericFunction = auto(CanType dependentType,
   Type conformingReplacementType,
@@ -117,6 +125,20 @@ public:
              ProtocolType *conformedProtocol) const;
 };
 
+/// Functor class suitable for use as a \c LookupConformanceFn that fetches
+/// conformances from a generic signature.
+class LookUpConformanceInSignature {
+  const GenericSignature &Sig;
+public:
+  LookUpConformanceInSignature(const GenericSignature &Sig)
+    : Sig(Sig) {}
+  
+  Optional<ProtocolConformanceRef>
+  operator()(CanType dependentType,
+             Type conformingReplacementType,
+             ProtocolType *conformedProtocol) const;
+};
+  
 /// Flags that can be passed when substituting into a type.
 enum class SubstFlags {
   /// If a type cannot be produced because some member type is
@@ -252,21 +274,6 @@ public:
   /// Replace references to substitutable types with new, concrete types and
   /// return the substituted result.
   ///
-  /// \param module The module to use for conformance lookups.
-  ///
-  /// \param substitutions The mapping from substitutable types to their
-  /// replacements.
-  ///
-  /// \param options Options that affect the substitutions.
-  ///
-  /// \returns the substituted type, or a null type if an error occurred.
-  Type subst(ModuleDecl *module,
-             const TypeSubstitutionMap &substitutions,
-             SubstOptions options = None) const;
-
-  /// Replace references to substitutable types with new, concrete types and
-  /// return the substituted result.
-  ///
   /// \param substitutions The mapping from substitutable types to their
   /// replacements and conformances.
   ///
@@ -354,7 +361,6 @@ class CanType : public Type {
                                               OptionalTypeKind &kind);
   static CanType getReferenceStorageReferentImpl(CanType type);
   static CanType getLValueOrInOutObjectTypeImpl(CanType type);
-  static ClassDecl *getClassBoundImpl(CanType type);
 
 public:
   explicit CanType(TypeBase *P = 0) : Type(P) {
@@ -430,15 +436,6 @@ public:
   /// this type. If this type does not represent a layout constraint,
   /// it returns an empty LayoutConstraint.
   LayoutConstraint getLayoutConstraint() const;
-
-  /// \brief Retrieve the most-specific class bound of this type,
-  /// which is either a class, a bound-generic class, or a class-bounded
-  /// archetype.
-  ///
-  /// Returns nil if this is an archetype with a non-specific class bound.
-  ClassDecl *getClassBound() const {
-    return getClassBoundImpl(*this);
-  }
 
   CanType getAnyOptionalObjectType() const {
     OptionalTypeKind kind;

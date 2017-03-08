@@ -14,7 +14,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/Basic/Fallthrough.h"
 #include "swift/Parse/Parser.h"
 #include "swift/AST/Attr.h"
 #include "swift/AST/TypeLoc.h"
@@ -23,7 +22,9 @@
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/Twine.h"
+#include "llvm/Support/Compiler.h"
 #include "llvm/Support/SaveAndRestore.h"
+
 using namespace swift;
 
 TypeRepr *Parser::applyAttributeToType(TypeRepr *ty,
@@ -59,20 +60,20 @@ TypeRepr *Parser::applyAttributeToType(TypeRepr *ty,
   return ty;
 }
 
-LayoutConstraintInfo
-Parser::parseLayoutConstraint(Identifier LayoutConstraintID) {
-  LayoutConstraintInfo layoutConstraint =
-      getLayoutConstraintInfo(LayoutConstraintID, Context);
-  assert(layoutConstraint.isKnownLayout() &&
+LayoutConstraint Parser::parseLayoutConstraint(Identifier LayoutConstraintID) {
+  LayoutConstraint layoutConstraint =
+      getLayoutConstraint(LayoutConstraintID, Context);
+  assert(layoutConstraint->isKnownLayout() &&
          "Expected layout constraint definition");
 
-  if (!layoutConstraint.isTrivial())
+  if (!layoutConstraint->isTrivial())
     return layoutConstraint;
 
   SourceLoc LParenLoc;
   if (!consumeIf(tok::l_paren, LParenLoc)) {
     // It is a trivial without any size constraints.
-    return LayoutConstraintInfo(LayoutConstraintKind::Trivial);
+    return LayoutConstraint::getLayoutConstraint(LayoutConstraintKind::Trivial,
+                                                 Context);
   }
 
   int size = 0;
@@ -110,29 +111,30 @@ Parser::parseLayoutConstraint(Identifier LayoutConstraintID) {
     // There was an error during parsing.
     skipUntil(tok::r_paren);
     consumeIf(tok::r_paren);
-    return LayoutConstraintInfo::getUnknownLayout();
+    return LayoutConstraint::getUnknownLayout(Context);
   }
 
   if (!consumeIf(tok::r_paren)) {
     // Expected a closing r_paren.
     diagnose(Tok.getLoc(), diag::expected_rparen_layout_constraint);
     consumeToken();
-    return LayoutConstraintInfo::getUnknownLayout();
+    return LayoutConstraint::getUnknownLayout(Context);
   }
 
   if (size < 0) {
     diagnose(Tok.getLoc(), diag::layout_size_should_be_positive);
-    return LayoutConstraintInfo::getUnknownLayout();
+    return LayoutConstraint::getUnknownLayout(Context);
   }
 
   if (alignment < 0) {
     diagnose(Tok.getLoc(), diag::layout_alignment_should_be_positive);
-    return LayoutConstraintInfo::getUnknownLayout();
+    return LayoutConstraint::getUnknownLayout(Context);
   }
 
   // Otherwise it is a trivial layout constraint with
   // provided size and alignment.
-  return LayoutConstraintInfo(layoutConstraint.getKind(), size, alignment);
+  return LayoutConstraint::getLayoutConstraint(layoutConstraint->getKind(), size,
+                                               alignment, Context);
 }
 
 ParserResult<TypeRepr> Parser::parseTypeSimple() {
@@ -192,7 +194,7 @@ ParserResult<TypeRepr> Parser::parseTypeSimple(Diag<> MessageID,
       ty = parseOldStyleProtocolComposition();
       break;
     }
-    SWIFT_FALLTHROUGH;
+    LLVM_FALLTHROUGH;
   default:
     diagnose(Tok, MessageID);
     if (Tok.isKeyword() && !Tok.isAtStartOfLine()) {
@@ -397,6 +399,25 @@ ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID,
     // Only function types may be generic.
     auto brackets = generics->getSourceRange();
     diagnose(brackets.Start, diag::generic_non_function);
+    GenericsScope.reset();
+
+    // Forget any generic parameters we saw in the type.
+    class EraseTypeParamWalker : public ASTWalker {
+    public:
+      bool walkToTypeReprPre(TypeRepr *T) override {
+        if (auto ident = dyn_cast<ComponentIdentTypeRepr>(T)) {
+          if (auto decl = ident->getBoundDecl()) {
+            if (isa<GenericTypeParamDecl>(decl))
+              ident->overwriteIdentifier(decl->getName());
+          }
+        }
+        return true;
+      }
+
+    } walker;
+
+    if (tyR)
+      tyR->walk(walker);
   }
 
   return makeParserResult(applyAttributeToType(tyR, inoutLoc, attrs));

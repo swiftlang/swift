@@ -24,11 +24,11 @@ var raw = getZero()
 var cooked : Int = raw
 
 
-// SIL:   [[GET_INPUT:%.+]] = function_ref @_T08def_func8getInputSiSi1x_tF : $@convention(thin) (Int) -> Int
+// SIL:   [[GET_INPUT:%.+]] = function_ref @_T08def_func8getInputS2i1x_tF : $@convention(thin) (Int) -> Int
 // SIL:   {{%.+}} = apply [[GET_INPUT]]({{%.+}}) : $@convention(thin) (Int) -> Int
 var raw2 = getInput(x: raw)
 
-// SIL:   [[GET_SECOND:%.+]] = function_ref @_T08def_func9getSecondSiSi_Si1ytF : $@convention(thin) (Int, Int) -> Int
+// SIL:   [[GET_SECOND:%.+]] = function_ref @_T08def_func9getSecondS2i_Si1ytF : $@convention(thin) (Int, Int) -> Int
 // SIL:   {{%.+}} = apply [[GET_SECOND]]({{%.+}}, {{%.+}}) : $@convention(thin) (Int, Int) -> Int
 var raw3 = getSecond(raw, y: raw2)
 
@@ -81,7 +81,7 @@ struct IntWrapper2 : Wrapped {
   func getValue() -> Int { return 2 }
 }
 
-// SIL:   [[DIFFERENT_WRAPPED:%.+]] = function_ref @_T08def_func16differentWrappedSbx1a_q_1btAA0D0RzAaER_5ValueQzAFRt_r0_lF : $@convention(thin) <τ_0_0, τ_0_1 where τ_0_0 : Wrapped, τ_0_1 : Wrapped, τ_0_1.Value == τ_0_0.Value> (@in τ_0_0, @in τ_0_1) -> Bool
+// SIL:   [[DIFFERENT_WRAPPED:%.+]] = function_ref @_T08def_func16differentWrappedSbx1a_q_1btAA0D0RzAaER_5ValueQy_AFRtzr0_lF : $@convention(thin) <τ_0_0, τ_0_1 where τ_0_0 : Wrapped, τ_0_1 : Wrapped, τ_0_0.Value == τ_0_1.Value> (@in τ_0_0, @in τ_0_1) -> Bool
 
 
 _ = differentWrapped(a: IntWrapper1(), b: IntWrapper2())

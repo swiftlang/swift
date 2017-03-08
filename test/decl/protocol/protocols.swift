@@ -36,7 +36,7 @@ func test1() {
   v1.creator = "Me"                   // expected-error {{cannot assign to property: 'creator' is a get-only property}}
 }
 
-protocol Bogus : Int {} // expected-error{{inheritance from non-protocol type 'Int'}}
+protocol Bogus : Int {} // expected-error{{inheritance from non-protocol, non-class type 'Int'}}
 
 // Explicit conformance checks (successful).
 
@@ -75,13 +75,15 @@ struct NotFormattedPrintable : FormattedPrintable { // expected-error{{type 'Not
 
 // Circular protocols
 
-protocol CircleMiddle : CircleStart { func circle_middle() } // expected-error {{circular protocol inheritance CircleMiddle}}
+protocol CircleMiddle : CircleStart { func circle_middle() } // expected-error 2 {{circular protocol inheritance CircleMiddle}}
+// expected-error@-1{{circular protocol inheritance 'CircleMiddle' -> 'CircleStart' -> 'CircleEnd' -> 'CircleMiddle'}}
 // expected-error @+1 {{circular protocol inheritance CircleStart}}
-protocol CircleStart : CircleEnd { func circle_start() }
-protocol CircleEnd : CircleMiddle { func circle_end()}
+protocol CircleStart : CircleEnd { func circle_start() } // expected-error 2{{circular protocol inheritance CircleStart}}
+// expected-note@-1{{protocol 'CircleStart' declared here}}
+protocol CircleEnd : CircleMiddle { func circle_end()} // expected-note{{protocol 'CircleEnd' declared here}}
 
 protocol CircleEntry : CircleTrivial { }
-protocol CircleTrivial : CircleTrivial { } // expected-error{{circular protocol inheritance CircleTrivial}}
+protocol CircleTrivial : CircleTrivial { } // expected-error 3{{circular protocol inheritance CircleTrivial}}
 
 struct Circle {
   func circle_start() {}
@@ -235,7 +237,8 @@ struct WrongIsEqual : IsEqualComparable { // expected-error{{type 'WrongIsEqual'
 //===----------------------------------------------------------------------===//
 
 func existentialSequence(_ e: Sequence) { // expected-error{{has Self or associated type requirements}}
-  var x = e.makeIterator() // expected-error{{'Sequence.Iterator' is not convertible to 'Sequence'}}
+	// FIXME: Weird diagnostic
+  var x = e.makeIterator() // expected-error{{'Sequence' is not convertible to 'Sequence.Iterator'}}
   x.next()
   x.nonexistent()
 }
@@ -419,7 +422,7 @@ protocol P2 {
 struct X3<T : P1> where T.Assoc : P2 {}
 
 struct X4 : P1 { // expected-error{{type 'X4' does not conform to protocol 'P1'}}
-  func getX1() -> X3<X4> { return X3() } // expected-error{{cannot convert return expression of type 'X3<_>' to return type 'X3<X4>'}}
+  func getX1() -> X3<X4> { return X3() }
 }
 
 protocol ShouldntCrash {

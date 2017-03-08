@@ -23,9 +23,10 @@
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/Stmt.h"
-#include "swift/Basic/Fallthrough.h"
 #include "swift/Basic/STLExtras.h"
+#include "llvm/Support/Compiler.h"
 #include <algorithm>
+
 using namespace swift;
 
 const ASTScope *ASTScope::getActiveContinuation() const {
@@ -206,7 +207,6 @@ static bool isRealTopLevelCodeDecl(Decl *decl) {
 void ASTScope::expand() const {
   assert(!isExpanded() && "Already expanded the children of this node");
   ASTContext &ctx = getASTContext();
-  SourceManager &sourceMgr = ctx.SourceMgr;
 
 #ifndef NDEBUG
   auto verificationError = [&]() -> llvm::raw_ostream& {
@@ -234,6 +234,7 @@ void ASTScope::expand() const {
 
 #ifndef NDEBUG
     // Check invariants in asserting builds.
+    SourceManager &sourceMgr = ctx.SourceMgr;
 
     // Check for containment of the child within the parent.
     if (!sourceMgr.rangeContains(getSourceRange(), child->getSourceRange())) {
@@ -951,7 +952,7 @@ ASTScope *ASTScope::createIfNeeded(const ASTScope *parent, Decl *decl) {
 
   case DeclKind::Protocol:
     cast<ProtocolDecl>(decl)->createGenericParamsIfMissing();
-    SWIFT_FALLTHROUGH;
+    LLVM_FALLTHROUGH;
 
   case DeclKind::Class:
   case DeclKind::Enum:

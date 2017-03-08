@@ -72,6 +72,11 @@ Lowering::TypeConverter &IRGenFunction::getSILTypes() const {
   return IGM.getSILTypes();
 }
 
+// Returns the default atomicity of the module.
+Atomicity IRGenFunction::getDefaultAtomicity() {
+  return getSILModule().isDefaultAtomic() ? Atomicity::Atomic : Atomicity::NonAtomic;
+}
+
 /// Call the llvm.memcpy intrinsic.  The arguments need not already
 /// be of i8* type.
 void IRGenFunction::emitMemCpy(llvm::Value *dest, llvm::Value *src,
@@ -208,6 +213,14 @@ void IRGenFunction::emitDeallocRawCall(llvm::Value *pointer,
   return emitDeallocatingCall(*this, IGM.getSlowDeallocFn(),
                               {pointer, size, alignMask});
 }
+
+void IRGenFunction::emitTSanInoutAccessCall(llvm::Value *address) {
+  llvm::Function *fn = cast<llvm::Function>(IGM.getTSanInoutAccessFn());
+
+  llvm::Value *castAddress = Builder.CreateBitCast(address, IGM.Int8PtrTy);
+  Builder.CreateCall(fn, {castAddress});
+}
+
 
 /// Initialize a relative indirectable pointer to the given value.
 /// This always leaves the value in the direct state; if it's not a

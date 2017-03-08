@@ -233,6 +233,8 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
     case ValueKind::FunctionRefInst:
     case ValueKind::AllocGlobalInst:
     case ValueKind::GlobalAddrInst:
+    case ValueKind::EndLifetimeInst:
+    case ValueKind::UncheckedOwnershipConversionInst:
       return InlineCost::Free;
 
     // Typed GEPs are free.
@@ -320,6 +322,7 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
     case ValueKind::AssignInst:
     case ValueKind::BranchInst:
     case ValueKind::CheckedCastBranchInst:
+    case ValueKind::CheckedCastValueBranchInst:
     case ValueKind::CheckedCastAddrBranchInst:
     case ValueKind::ClassMethodInst:
     case ValueKind::CondBranchInst:
@@ -337,6 +340,7 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
     case ValueKind::DeallocStackInst:
     case ValueKind::DeallocValueBufferInst:
     case ValueKind::DeinitExistentialAddrInst:
+    case ValueKind::DeinitExistentialOpaqueInst:
     case ValueKind::DestroyAddrInst:
     case ValueKind::ProjectValueBufferInst:
     case ValueKind::ProjectBoxInst:
@@ -345,6 +349,7 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
     case ValueKind::UnmanagedReleaseValueInst:
     case ValueKind::DestroyValueInst:
     case ValueKind::AutoreleaseValueInst:
+    case ValueKind::UnmanagedAutoreleaseValueInst:
     case ValueKind::DynamicMethodBranchInst:
     case ValueKind::DynamicMethodInst:
     case ValueKind::EnumInst:
@@ -353,6 +358,7 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
     case ValueKind::IndexRawPointerInst:
     case ValueKind::InitEnumDataAddrInst:
     case ValueKind::InitExistentialAddrInst:
+    case ValueKind::InitExistentialOpaqueInst:
     case ValueKind::InitExistentialMetatypeInst:
     case ValueKind::InitExistentialRefInst:
     case ValueKind::InjectEnumAddrInst:
@@ -365,6 +371,7 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
     case ValueKind::OpenExistentialBoxInst:
     case ValueKind::OpenExistentialMetatypeInst:
     case ValueKind::OpenExistentialRefInst:
+    case ValueKind::OpenExistentialOpaqueInst:
     case ValueKind::PartialApplyInst:
     case ValueKind::ExistentialMetatypeInst:
     case ValueKind::RefElementAddrInst:
@@ -389,6 +396,7 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
     case ValueKind::UncheckedTakeEnumDataAddrInst:
     case ValueKind::UnconditionalCheckedCastInst:
     case ValueKind::UnconditionalCheckedCastAddrInst:
+    case ValueKind::UnconditionalCheckedCastOpaqueInst:
     case ValueKind::UnmanagedToRefInst:
     case ValueKind::UnownedReleaseInst:
     case ValueKind::UnownedRetainInst:

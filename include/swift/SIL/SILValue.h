@@ -28,12 +28,15 @@
 namespace swift {
 
 class DominanceInfo;
+class PostOrderFunctionInfo;
+class ReversePostOrderInfo;
 class Operand;
 class SILBasicBlock;
 class SILFunction;
 class SILInstruction;
 class SILLocation;
 class SILModule;
+class TransitivelyUnreachableBlocksInfo;
 class ValueBaseUseIterator;
 class ValueUseIterator;
 
@@ -111,9 +114,18 @@ struct ValueOwnershipKind {
   ValueOwnershipKind(SILModule &M, SILType Type,
                      SILArgumentConvention Convention);
 
+  /// Parse Value into a ValueOwnershipKind.
+  ///
+  /// *NOTE* Emits an unreachable if an invalid value is passed in.
+  explicit ValueOwnershipKind(StringRef Value);
+
   operator innerty() const { return Value; }
 
   Optional<ValueOwnershipKind> merge(ValueOwnershipKind RHS) const;
+
+  bool isTrivialOr(ValueOwnershipKind Kind) const {
+    return Value == Trivial || Value == Kind;
+  }
 };
 
 llvm::raw_ostream &operator<<(llvm::raw_ostream &os, ValueOwnershipKind Kind);
@@ -278,7 +290,8 @@ public:
   ValueOwnershipKind getOwnershipKind() const;
 
   /// Verify that this SILValue and its uses respects ownership invariants.
-  void verifyOwnership(SILModule &Mod) const;
+  void verifyOwnership(SILModule &Mod,
+                       TransitivelyUnreachableBlocksInfo *TUB = nullptr) const;
 };
 
 /// A formal SIL reference to a value, suitable for use as a stored

@@ -17,8 +17,10 @@
 #include "TypeChecker.h"
 #include "MiscDiagnostics.h"
 #include "swift/Subsystems.h"
+#include "swift/AST/ASTPrinter.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/ASTVisitor.h"
+#include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/NameLookup.h"
@@ -29,11 +31,13 @@
 #include "swift/Basic/Statistic.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Parse/LocalContext.h"
+#include "swift/Syntax/TokenKinds.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/TinyPtrVector.h"
 #include "llvm/ADT/Twine.h"
+#include "llvm/Support/Compiler.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/Format.h"
 #include "llvm/Support/Timer.h"
@@ -191,6 +195,120 @@ namespace {
     }
   };
 } // end anonymous namespace
+
+/// If the pattern handles an enum element, remove the enum element from the
+/// given set. If seeing uncertain patterns, e.g. any pattern, return true;
+/// otherwise return false.
+static bool
+removedHandledEnumElements(Pattern *P,
+                           llvm::DenseSet<EnumElementDecl*> &UnhandledElements) {
+  if (auto *EEP = dyn_cast<EnumElementPattern>(P)) {
+    UnhandledElements.erase(EEP->getElementDecl());
+  } else if (auto *VP = dyn_cast<VarPattern>(P)) {
+    return removedHandledEnumElements(VP->getSubPattern(), UnhandledElements);
+  } else {
+    return true;
+  }
+  return false;
+};
+
+void swift::diagnoseMissingCases(ASTContext &Context, const SwitchStmt *SwitchS,
+                                 Diagnostic Id) {
+  SourceLoc EndLoc = SwitchS->getEndLoc();
+  StringRef Placeholder = "<#Code#>";
+  SmallString<32> Buffer;
+  llvm::raw_svector_ostream OS(Buffer);
+
+  auto DefaultDiag = [&]() {
+    OS << tok::kw_default << ": " << Placeholder << "\n";
+    Context.Diags.diagnose(EndLoc, Id).fixItInsert(EndLoc, Buffer.str());
+  };
+  // To find the subject enum decl for this switch statement.
+  EnumDecl *SubjectED = nullptr;
+  if (auto SubjectTy = SwitchS->getSubjectExpr()->getType()) {
+    if (auto *ND = SubjectTy->getAnyNominal()) {
+      SubjectED = ND->getAsEnumOrEnumExtensionContext();
+    }
+  }
+
+  // The switch is not about an enum decl, add "default:" instead.
+  if (!SubjectED) {
+    DefaultDiag();
+    return;
+  }
+
+  // Assume enum elements are not handled in the switch statement.
+  llvm::DenseSet<EnumElementDecl*> UnhandledElements;
+
+  SubjectED->getAllElements(UnhandledElements);
+  for (auto Current : SwitchS->getCases()) {
+    // For each handled enum element, remove it from the bucket.
+    for (auto Item : Current->getCaseLabelItems()) {
+      if (removedHandledEnumElements(Item.getPattern(), UnhandledElements)) {
+        DefaultDiag();
+        return;
+      }
+    }
+  }
+
+  // No unhandled cases, so we are not sure the exact case to add, fall back to
+  // default instead.
+  if (UnhandledElements.empty()) {
+    DefaultDiag();
+    return;
+  }
+
+  // Sort the missing elements to a vector because set does not guarantee orders.
+  SmallVector<EnumElementDecl*, 4> SortedElements;
+  SortedElements.insert(SortedElements.begin(), UnhandledElements.begin(),
+                        UnhandledElements.end());
+  std::sort(SortedElements.begin(),SortedElements.end(),
+            [](EnumElementDecl *LHS, EnumElementDecl *RHS) {
+              return LHS->getNameStr().compare(RHS->getNameStr()) < 0;
+            });
+
+  auto printPayloads = [](EnumElementDecl *EE, llvm::raw_ostream &OS) {
+    // If the enum element has no payloads, return.
+    auto TL = EE->getArgumentTypeLoc();
+    if (TL.isNull())
+      return;
+    TypeRepr* TR = EE->getArgumentTypeLoc().getTypeRepr();
+    if (auto *TTR = dyn_cast<TupleTypeRepr>(TR)) {
+      SmallVector<Identifier, 4> NameBuffer;
+      ArrayRef<Identifier> Names;
+      if (TTR->hasElementNames()) {
+        // Get the name from the tuple repr, if exist.
+        Names = TTR->getElementNames();
+      } else {
+        // Create same amount of empty names to the elements.
+        NameBuffer.resize(TTR->getNumElements());
+        Names = llvm::makeArrayRef(NameBuffer);
+      }
+      OS << "(";
+      // Print each element in the pattern match.
+      for (unsigned I = 0, N = Names.size(); I < N; I ++) {
+        auto Id = Names[I];
+        if (Id.empty())
+          OS << "_";
+        else
+          OS << tok::kw_let << " " << Id.str();
+        if (I + 1 != N) {
+          OS << ", ";
+        }
+      }
+      OS << ")";
+    }
+  };
+
+  // Print each enum element name.
+  std::for_each(SortedElements.begin(), SortedElements.end(),
+    [&](EnumElementDecl *EE) {
+      OS << tok::kw_case << " ." << EE->getNameStr();
+      printPayloads(EE, OS);
+      OS <<": " << Placeholder << "\n";
+  });
+  Context.Diags.diagnose(EndLoc, Id).fixItInsert(EndLoc, Buffer.str());
+}
 
 static void setAutoClosureDiscriminators(DeclContext *DC, Stmt *S) {
   S->walk(ContextualizeClosures(DC));
@@ -861,6 +979,9 @@ public:
     AddSwitchNest switchNest(*this);
     AddLabeledStmt labelNest(*this, S);
 
+    // Reject switch statements with empty blocks.
+    if (S->getCases().empty())
+      diagnoseMissingCases(TC.Context, S, diag::empty_switch_stmt);
     for (unsigned i = 0, e = S->getCases().size(); i < e; ++i) {
       auto *caseBlock = S->getCases()[i];
       // Fallthrough transfers control to the next case block. In the
@@ -1154,6 +1275,8 @@ void TypeChecker::checkIgnoredExpr(Expr *E) {
         fn = applyFn->getFn();
       } else if (auto FVE = dyn_cast<ForceValueExpr>(fn)) {
         fn = FVE->getSubExpr();
+      } else if (auto dotSyntaxRef = dyn_cast<DotSyntaxBaseIgnoredExpr>(fn)) {
+        fn = dotSyntaxRef->getRHS();
       } else {
         break;
       }
@@ -1246,8 +1369,21 @@ Stmt *StmtChecker::visitBraceStmt(BraceStmt *BS) {
 
       bool hadTypeError = TC.typeCheckExpression(SubExpr, DC, TypeLoc(),
                                                  CTP_Unused, options);
-      if (isDiscarded && !hadTypeError)
+
+      // If a closure expression is unused, the user might have intended
+      // to write "do { ... }".
+      auto *CE = dyn_cast<ClosureExpr>(SubExpr);
+      if (CE || isa<CaptureListExpr>(SubExpr)) {
+        TC.diagnose(SubExpr->getLoc(), diag::expression_unused_closure);
+        
+        if (CE && CE->hasAnonymousClosureVars() &&
+            CE->getParameters()->size() == 0) {
+          TC.diagnose(CE->getStartLoc(), diag::brace_stmt_suggest_do)
+            .fixItInsert(CE->getStartLoc(), "do ");
+        }
+      } else if (isDiscarded && !hadTypeError)
         TC.checkIgnoredExpr(SubExpr);
+
       elem = SubExpr;
       continue;
     }
@@ -1315,6 +1451,8 @@ static void checkDefaultArguments(TypeChecker &tc,
 
 bool TypeChecker::typeCheckAbstractFunctionBodyUntil(AbstractFunctionDecl *AFD,
                                                      SourceLoc EndTypeCheckLoc) {
+  validateDecl(AFD);
+
   if (!AFD->getBody())
     return false;
 
@@ -1513,7 +1651,7 @@ bool TypeChecker::typeCheckConstructorBodyUntil(ConstructorDecl *ctor,
                  ctor->getDeclContext()->getDeclaredInterfaceType());
       }
 
-      SWIFT_FALLTHROUGH;
+      LLVM_FALLTHROUGH;
 
     case ConstructorDecl::BodyInitKind::None:
       wantSuperInitCall = false;
@@ -1533,9 +1671,9 @@ bool TypeChecker::typeCheckConstructorBodyUntil(ConstructorDecl *ctor,
       diagnose(initExpr->getLoc(), diag::delegation_here);
       ctor->setInitKind(CtorInitializerKind::Convenience);
     }
-  } else {
-    diagnoseResilientValueConstructor(ctor);
   }
+
+  diagnoseResilientConstructor(ctor);
 
   // If we want a super.init call...
   if (wantSuperInitCall) {

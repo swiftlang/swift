@@ -19,6 +19,7 @@
 
 #include "swift/AST/Type.h"
 #include "llvm/ADT/PointerIntPair.h"
+#include "llvm/Support/ErrorHandling.h"
 
 namespace swift {
 
@@ -84,6 +85,33 @@ public:
   Type getSecondType() const {
     assert(getKind() != RequirementKind::Layout);
     return SecondType;
+  }
+
+  /// \brief Subst the types involved in this requirement.
+  ///
+  /// The \c args arguments are passed through to Type::subst. This doesn't
+  /// touch the superclasses, protocols or layout constraints.
+  template <typename... Args>
+  Optional<Requirement> subst(Args &&... args) const {
+    auto newFirst = getFirstType().subst(std::forward<Args>(args)...);
+    if (!newFirst)
+      return None;
+
+    switch (getKind()) {
+    case RequirementKind::SameType: {
+      auto newSecond = getSecondType().subst(std::forward<Args>(args)...);
+      if (!newSecond)
+        return None;
+      return Requirement(getKind(), newFirst, newSecond);
+    }
+    case RequirementKind::Conformance:
+    case RequirementKind::Superclass:
+      return Requirement(getKind(), newFirst, getSecondType());
+    case RequirementKind::Layout:
+      return Requirement(getKind(), newFirst, getLayoutConstraint());
+    }
+
+    llvm_unreachable("Unhandled RequirementKind in switch.");
   }
 
   /// \brief Retrieve the layout constraint.

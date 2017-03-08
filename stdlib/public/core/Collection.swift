@@ -483,6 +483,88 @@ public struct IndexingIterator<
 ///     print(text.characters.first)
 ///     // Prints "Optional("B")"
 ///
+/// Accessing Slices of a Collection
+/// ================================
+///
+/// You can access a slice of a collection through its ranged subscript or by
+/// calling methods like `prefix(_:)` or `suffix(from:)`. A slice of a
+/// collection can contain zero or more of the original collection's elements
+/// and shares the original collection's semantics.
+///
+/// The following example, creates a `firstWord` constant by using the
+/// `prefix(_:)` method to get a slice of the `text` string's `characters`
+/// view.
+///
+///     let firstWord = text.characters.prefix(7)
+///     print(String(firstWord))
+///     // Prints "Buffalo"
+///
+/// You can retrieve the same slice using other methods, such as finding the
+/// terminating index, and then using the `prefix(upTo:)` method, which takes
+/// an index as its parameter, or by using the view's ranged subscript.
+///
+///     if let firstSpace = text.characters.index(of: " ") {
+///         print(text.characters.prefix(upTo: firstSpace))
+///         // Prints "Buffalo"
+///
+///         let start = text.characters.startIndex
+///         print(text.characters[start..<firstSpace])
+///         // Prints "Buffalo"
+///     }
+///
+/// The retrieved slice of `text.characters` is equivalent in each of these
+/// cases.
+///
+/// Slices Share Indices
+/// --------------------
+///
+/// A collection and its slices share the same indices. An element of a
+/// collection is located under the same index in a slice as in the base
+/// collection, as long as neither the collection nor the slice has been
+/// mutated since the slice was created.
+///
+/// For example, suppose you have an array holding the number of absences from
+/// each class during a session.
+///
+///     var absences = [0, 2, 0, 4, 0, 3, 1, 0]
+///
+/// You're tasked with finding the day with the most absences in the second
+/// half of the session. To find the index of the day in question, follow
+/// these steps:
+///
+/// 1) Create a slice of the `absences` array that holds the second half of the
+///    days.
+/// 2) Use the `max(by:)` method to determine the index of the day with the
+///    most absences.
+/// 3) Print the result using the index found in step 2 on the original
+///    `absences` array.
+///
+/// Here's an implementation of those steps:
+///
+///     let secondHalf = absences.suffix(absences.count / 2)
+///     if let i = secondHalf.indices.max(by: { secondHalf[$0] < secondHalf[$1] }) {
+///         print("Highest second-half absences: \(absences[i])")
+///     }
+///     // Prints "Highest second-half absences: 3"
+///
+/// Slice Inherit Collection Semantics
+/// ----------------------------------
+///
+/// A slice inherits the value or reference semantics of its base collection.
+/// That is, when working with a slice of a mutable
+/// collection that has value semantics, such as an array, mutating the
+/// original collection triggers a copy of that collection, and does not
+/// affect the contents of the slice.
+///
+/// For example, if you update the last element of the `absences` array from
+/// `0` to `2`, the `secondHalf` slice is unchanged.
+///
+///     absences[7] = 2
+///     print(absences)
+///     // Prints "[0, 2, 0, 4, 0, 3, 1, 2]"
+///     print(secondHalf)
+///     // Prints "[0, 3, 1, 0]"
+///
 /// Traversing a Collection
 /// =======================
 ///
