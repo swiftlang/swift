@@ -1231,9 +1231,17 @@ auto GenericSignatureBuilder::PotentialArchetype::getNestedType(
   SmallVector<std::pair<ProtocolDecl *, const RequirementSource *>, 4>
     conformsTo(rep->ConformsTo.begin(), rep->ConformsTo.end());
   for (auto &conforms : conformsTo) {
-    auto proto = conforms.first;
-
-    for (auto member : proto->lookupDirect(nestedName)) {
+    // Make sure we don't trigger deserialization of extensions,
+    // since they can refer back to a protocol we're currently
+    // type checking.
+    //
+    // Note that typealiases in extensions won't matter here,
+    // because a typealias is never going to be a representative
+    // PA.
+    auto *proto = conforms.first;
+    auto members = proto->lookupDirect(nestedName,
+                                       /*ignoreNewExtensions=*/true);
+    for (auto member : members) {
       PotentialArchetype *pa;
       std::function<void(Type, Type)> diagnoseMismatch;
 
