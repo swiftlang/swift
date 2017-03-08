@@ -202,7 +202,7 @@ internal let _errorDomainUserInfoProviderQueue = DispatchQueue(
 
 /// Retrieve the default userInfo dictionary for a given error.
 @_silgen_name("swift_Foundation_getErrorDefaultUserInfo")
-public func _swift_Foundation_getErrorDefaultUserInfo(_ error: Error)
+public func _swift_Foundation_getErrorDefaultUserInfo<T: Error>(_ error: T)
   -> AnyObject? {
   let hasUserInfoValueProvider: Bool
 
