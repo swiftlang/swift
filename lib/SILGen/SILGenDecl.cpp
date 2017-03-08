@@ -76,34 +76,51 @@ namespace {
   };
 } // end anonymous namespace
 
-void TupleInitialization::copyOrInitValueInto(SILGenFunction &SGF,
-                                              SILLocation loc,
-                                              ManagedValue valueMV,
-                                              bool isInit) {
-  // A scalar value is being copied into the tuple, break it into elements
-  // and assign/init each element in turn.
-  SILValue value = valueMV.forward(SGF);
-  auto sourceType = valueMV.getType().castTo<TupleType>();
-  auto sourceSILType = value->getType();
+static void copyOrInitValueIntoHelper(
+    SILGenFunction &SGF, SILLocation loc, ManagedValue value, bool isInit,
+    ArrayRef<InitializationPtr> subInitializations,
+    llvm::function_ref<ManagedValue(ManagedValue, unsigned, SILType)> func) {
+  auto sourceType = value.getType().castTo<TupleType>();
+  auto sourceSILType = value.getType();
   for (unsigned i = 0, e = sourceType->getNumElements(); i != e; ++i) {
     SILType fieldTy = sourceSILType.getTupleElementType(i);
-    auto &fieldTL = SGF.getTypeLowering(fieldTy);
-        
-    SILValue member;
-    if (value->getType().isAddress()) {
-      member = SGF.B.createTupleElementAddr(loc, value, i, fieldTy);
-      if (!fieldTL.isAddressOnly())
-        member =
-            fieldTL.emitLoad(SGF.B, loc, member, LoadOwnershipQualifier::Take);
-    } else {
-      member = SGF.B.createTupleExtract(loc, value, i, fieldTy);
-    }
-        
-    auto elt = SGF.emitManagedRValueWithCleanup(member, fieldTL);
-        
-    SubInitializations[i]->copyOrInitValueInto(SGF, loc, elt, isInit);
-    SubInitializations[i]->finishInitialization(SGF);
+    ManagedValue elt = func(value, i, fieldTy);
+    subInitializations[i]->copyOrInitValueInto(SGF, loc, elt, isInit);
+    subInitializations[i]->finishInitialization(SGF);
   }
+}
+
+void TupleInitialization::copyOrInitValueInto(SILGenFunction &SGF,
+                                              SILLocation loc,
+                                              ManagedValue value, bool isInit) {
+  // In the object case, we perform a borrow + extract + copy sequence. This is
+  // because we do not have a destructure operation.
+  if (value.getType().isObject()) {
+    value = value.borrow(SGF, loc);
+    return copyOrInitValueIntoHelper(
+        SGF, loc, value, isInit, SubInitializations,
+        [&](ManagedValue aggregate, unsigned i,
+            SILType fieldType) -> ManagedValue {
+          auto elt = SGF.B.createTupleExtract(loc, aggregate, i, fieldType);
+          return SGF.B.createCopyValue(loc, elt);
+        });
+  }
+
+  // In the address case, we can support takes directly, so forward the cleanup
+  // of the aggregate and create takes of the underlying addresses.
+  value = ManagedValue::forUnmanaged(value.forward(SGF));
+  return copyOrInitValueIntoHelper(
+      SGF, loc, value, isInit, SubInitializations,
+      [&](ManagedValue aggregate, unsigned i,
+          SILType fieldType) -> ManagedValue {
+        ManagedValue elt =
+            SGF.B.createTupleElementAddr(loc, value, i, fieldType);
+        if (!fieldType.isAddressOnly(SGF.F.getModule())) {
+          return SGF.B.createLoadTake(loc, elt);
+        }
+
+        return SGF.emitManagedRValueWithCleanup(elt.getValue());
+      });
 }
 
 void TupleInitialization::finishUninitialized(SILGenFunction &gen) {
