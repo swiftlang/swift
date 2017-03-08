@@ -341,41 +341,57 @@ SubstitutionMap::getOverrideSubstitutions(const ClassDecl *baseClass,
   }
 
   return combineSubstitutionMaps(baseSubMap, origSubMap,
+                                 CombineSubstitutionMaps::AtDepth,
                                  baseDepth, origDepth,
                                  baseSig);
 }
 
 SubstitutionMap
-SubstitutionMap::combineSubstitutionMaps(const SubstitutionMap &baseSubMap,
-                                         const SubstitutionMap &origSubMap,
-                                         unsigned baseDepth,
-                                         unsigned origDepth,
-                                         GenericSignature *baseSig) {
+SubstitutionMap::combineSubstitutionMaps(const SubstitutionMap &firstSubMap,
+                                         const SubstitutionMap &secondSubMap,
+                                         CombineSubstitutionMaps how,
+                                         unsigned firstDepthOrIndex,
+                                         unsigned secondDepthOrIndex,
+                                         GenericSignature *genericSig) {
+  auto &ctx = genericSig->getASTContext();
+
   auto replaceGenericParameter = [&](Type type) -> Type {
     if (auto gp = type->getAs<GenericTypeParamType>()) {
-      if (gp->getDepth() < baseDepth) return Type();
-      return GenericTypeParamType::get(gp->getDepth() + origDepth - baseDepth,
-                                       gp->getIndex(),
-                                       baseSig->getASTContext());
+      if (how == CombineSubstitutionMaps::AtDepth) {
+        if (gp->getDepth() < firstDepthOrIndex)
+          return Type();
+        return GenericTypeParamType::get(
+          gp->getDepth() + secondDepthOrIndex - firstDepthOrIndex,
+          gp->getIndex(),
+          ctx);
+      }
+
+      assert(how == CombineSubstitutionMaps::AtIndex);
+      if (gp->getIndex() < firstDepthOrIndex)
+        return Type();
+      return GenericTypeParamType::get(
+        gp->getDepth(),
+        gp->getIndex() + secondDepthOrIndex - firstDepthOrIndex,
+        ctx);
     }
 
     return type;
   };
 
-  return baseSig->getSubstitutionMap(
+  return genericSig->getSubstitutionMap(
     [&](SubstitutableType *type) {
       auto replacement = replaceGenericParameter(type);
       if (replacement)
-        return Type(replacement).subst(origSubMap);
-      return Type(type).subst(baseSubMap);
+        return Type(replacement).subst(secondSubMap);
+      return Type(type).subst(firstSubMap);
     },
     [&](CanType type, Type substType, ProtocolType *conformedProtocol) {
       auto replacement = type.transform(replaceGenericParameter);
       if (replacement)
-        return origSubMap.lookupConformance(replacement->getCanonicalType(),
-                                            conformedProtocol->getDecl());
-      return baseSubMap.lookupConformance(type,
-                                          conformedProtocol->getDecl());
+        return secondSubMap.lookupConformance(replacement->getCanonicalType(),
+                                              conformedProtocol->getDecl());
+      return firstSubMap.lookupConformance(type,
+                                           conformedProtocol->getDecl());
     });
 }
 

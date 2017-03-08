@@ -469,11 +469,13 @@ getSubstitutionsForCallee(SILModule &M,
 
   auto baseCalleeSig = baseCalleeType->getGenericSignature();
 
-  auto subMap = SubstitutionMap::combineSubstitutionMaps(baseSubMap,
-                                                         origSubMap,
-                                                         baseDepth,
-                                                         origDepth,
-                                                         baseCalleeSig);
+  auto subMap =
+    SubstitutionMap::combineSubstitutionMaps(baseSubMap,
+                                             origSubMap,
+                                             CombineSubstitutionMaps::AtDepth,
+                                             baseDepth,
+                                             origDepth,
+                                             baseCalleeSig);
 
   // Build the new substitutions using the base method signature.
   baseCalleeSig->getSubstitutions(subMap, newSubs);
@@ -814,11 +816,13 @@ static void getWitnessMethodSubstitutions(
   auto origDepth = 1;
   auto origSubMap = requirementSig->getSubstitutionMap(origSubs);
 
-  auto subMap = SubstitutionMap::combineSubstitutionMaps(baseSubMap,
-                                                         origSubMap,
-                                                         baseDepth,
-                                                         origDepth,
-                                                         witnessThunkSig);
+  auto subMap =
+    SubstitutionMap::combineSubstitutionMaps(baseSubMap,
+                                             origSubMap, 
+                                             CombineSubstitutionMaps::AtDepth,
+                                             baseDepth,
+                                             origDepth,
+                                             witnessThunkSig);
 
   witnessThunkSig->getSubstitutions(subMap, newSubs);
 }
