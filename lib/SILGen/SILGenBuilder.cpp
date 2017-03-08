@@ -624,6 +624,24 @@ ManagedValue SILGenBuilder::createTupleElementAddr(SILLocation Loc,
   return createTupleElementAddr(Loc, Value, Index, Type);
 }
 
+ManagedValue SILGenBuilder::createUncheckedRefCast(SILLocation loc,
+                                                   ManagedValue value,
+                                                   SILType type) {
+  CleanupCloner cloner(*this, value);
+  SILValue cast =
+      SILBuilder::createUncheckedRefCast(loc, value.forward(gen), type);
+  return cloner.clone(cast);
+}
+
+ManagedValue SILGenBuilder::createOpenExistentialRef(SILLocation loc,
+                                                     ManagedValue original,
+                                                     SILType type) {
+  CleanupCloner cloner(*this, original);
+  SILValue openedExistential =
+      SILBuilder::createOpenExistentialRef(loc, original.forward(gen), type);
+  return cloner.clone(openedExistential);
+}
+
 //===----------------------------------------------------------------------===//
 //                            Switch Enum Builder
 //===----------------------------------------------------------------------===//
