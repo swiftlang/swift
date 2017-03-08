@@ -334,7 +334,7 @@ func testStringForEachStmt() {
   
   // CHECK-LABEL: sil hidden @_TF13sil_locations21testStringForEachStmtFT_T_
   // CHECK: br {{.*}} line:[[@LINE-8]]:3
-  // CHECK: cond_br {{.*}} line:[[@LINE-9]]:3
+  // CHECK: switch_enum {{.*}} line:[[@LINE-9]]:3
   // CHECK: cond_br {{.*}} line:[[@LINE-8]]:8
   // Break branch:
   // CHECK: br {{.*}} line:[[@LINE-9]]:7
