@@ -424,14 +424,22 @@ SWIFT_CC(swift)
 static id _swift_bridgeErrorToNSError_(SwiftError *errorObject) {
   auto ns = reinterpret_cast<NSError *>(errorObject);
 
-  // If we already have a domain and userInfo set, then we've already
-  // initialized.
-  // FIXME: This might be overly strict; can we look only at the domain?
-  if (errorObject->domain.load(std::memory_order_acquire) &&
-      errorObject->userInfo.load(std::memory_order_acquire))
+  // If we already have a domain set, then we've already initialized.
+  // If this is a real NSError, then Cocoa and Core Foundation's initializers
+  // guarantee that the domain is never nil, so if this test fails, we can
+  // assume we're working with a bridged error. (Note that Cocoa and CF
+  // **will** allow the userInfo storage to be initialized to nil.)
+  //
+  // If this is a bridged error, then the domain, code, and user info are
+  // lazily computed, and the domain will be nil if they haven't been computed
+  // yet. The initialization is ordered in such a way that all other lazy
+  // initialization of the object happens-before the domain initialization so
+  // that the domain can be used alone as a flag for the initialization of the
+  // object.
+  if (errorObject->domain.load(std::memory_order_acquire))
     return ns;
 
-  // Otherwise, calculate the domain and code (TODO: and user info), and
+  // Otherwise, calculate the domain, code, and user info, and
   // initialize the NSError.
   auto value = SwiftError::getIndirectValue(&errorObject);
   auto type = errorObject->getType();
@@ -463,8 +471,8 @@ static id _swift_bridgeErrorToNSError_(SwiftError *errorObject) {
   // We also need to cmpxchg in the domain; if somebody beat us to it,
   // we need to release.
   //
-  // Storing the domain must be the LAST THING we do, since it's
-  // the signal that the NSError has been initialized.
+  // Storing the domain must be the **LAST THING** we do, since it's
+  // also the flag that the NSError has been initialized.
   CFStringRef expectedDomain = nullptr;
   if (!errorObject->domain.compare_exchange_strong(expectedDomain,
                                                    (CFStringRef)domain,
