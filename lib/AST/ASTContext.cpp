@@ -262,10 +262,6 @@ struct ASTContext::Implementation {
     llvm::FoldingSet<ProtocolType> ProtocolTypes;
     llvm::FoldingSet<LayoutConstraintInfo> LayoutConstraints;
 
-    llvm::DenseMap<std::pair<TypeBase *, DeclContext *>,
-                   SubstitutionList>
-      BoundGenericSubstitutions;
-
     /// The set of normal protocol conformances.
     llvm::FoldingSet<NormalProtocolConformance> NormalConformances;
 
@@ -1101,52 +1097,6 @@ static AllocationArena getArena(RecursiveTypeProperties properties) {
                         : AllocationArena::Permanent;
 }
 
-Optional<SubstitutionList>
-ASTContext::createTrivialSubstitutions(BoundGenericType *BGT,
-                                       DeclContext *gpContext) const {
-  assert(gpContext && "No generic parameter context");
-  assert(gpContext->getGenericEnvironmentOfContext() != nullptr &&
-         "Not type-checked yet");
-  assert(BGT->getGenericArgs().size() == 1);
-  Substitution Subst(BGT->getGenericArgs()[0], {});
-  auto Substitutions = AllocateCopy(llvm::makeArrayRef(Subst));
-  auto arena = getArena(BGT->getRecursiveProperties());
-  Impl.getArena(arena).BoundGenericSubstitutions
-    .insert(std::make_pair(std::make_pair(BGT, gpContext), Substitutions));
-  return Substitutions;
-}
-
-Optional<SubstitutionList>
-ASTContext::getSubstitutions(TypeBase *type,
-                             DeclContext *gpContext) const {
-  assert(gpContext && "Missing generic parameter context");
-  auto arena = getArena(type->getRecursiveProperties());
-  auto &boundGenericSubstitutions
-    = Impl.getArena(arena).BoundGenericSubstitutions;
-  auto known = boundGenericSubstitutions.find({type, gpContext});
-  if (known != boundGenericSubstitutions.end())
-    return known->second;
-
-  // We can trivially create substitutions for Array and Optional.
-  if (auto bound = dyn_cast<BoundGenericType>(type))
-    if (bound->getDecl() == getArrayDecl() ||
-        bound->getDecl() == getOptionalDecl())
-      return createTrivialSubstitutions(bound, gpContext);
-
-  return None;
-}
-
-void ASTContext::setSubstitutions(TypeBase* type,
-                                  DeclContext *gpContext,
-                                  SubstitutionList Subs) const {
-  auto arena = getArena(type->getRecursiveProperties());
-  auto &boundGenericSubstitutions
-    = Impl.getArena(arena).BoundGenericSubstitutions;
-  assert(boundGenericSubstitutions.count({type, gpContext}) == 0 &&
-         "Already have substitutions?");
-  boundGenericSubstitutions[{type, gpContext}] = Subs;
-}
-
 void ASTContext::addSearchPath(StringRef searchPath, bool isFramework,
                                bool isSystem) {
   OptionSet<SearchPathKind> &loaded = Impl.SearchPathsSet[searchPath];
@@ -1609,13 +1559,12 @@ size_t ASTContext::Implementation::Arena::getTotalMemory() const {
     llvm::capacity_in_bytes(LValueTypes) +
     llvm::capacity_in_bytes(InOutTypes) +
     llvm::capacity_in_bytes(DependentMemberTypes) +
-    llvm::capacity_in_bytes(DynamicSelfTypes) +
+    llvm::capacity_in_bytes(DynamicSelfTypes);
     // EnumTypes ?
     // StructTypes ?
     // ClassTypes ?
     // UnboundGenericTypes ?
     // BoundGenericTypes ?
-    llvm::capacity_in_bytes(BoundGenericSubstitutions);
     // NormalConformances ?
     // SpecializedConformances ?
     // InheritedConformances ?

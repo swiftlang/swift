@@ -3177,12 +3177,17 @@ static CheckTypeWitnessResult checkTypeWitness(TypeChecker &tc, DeclContext *dc,
     // build unless we fail here while inferring an associated type
     // somewhere.
     if (type->isSpecialized()) {
-      auto substitutions = type->gatherAllSubstitutions(
-          dc->getParentModule(), &tc);
-      for (auto sub : substitutions) {
-        if (sub.getReplacement()->hasError())
-          return reqProto;
-      }
+      auto *decl = type->getAnyNominal();
+      auto subMap = type->getContextSubstitutionMap(
+          dc->getParentModule(),
+          decl,
+          decl->getGenericEnvironmentOfContext());
+      auto result = decl->getGenericSignature()->enumeratePairedRequirements(
+        [&](Type t, ArrayRef<Requirement> reqt) -> bool {
+          return t.subst(subMap, SubstFlags::UseErrorType)->hasError();
+        });
+      if (result)
+        return reqProto;
     }
   }
 

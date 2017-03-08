@@ -2914,10 +2914,7 @@ findProtocolSelfReferences(const ProtocolDecl *proto, Type type,
 
   // Special handling for associated types.
   if (!skipAssocTypes && type->is<DependentMemberType>()) {
-    while (auto depMemTy = type->getAs<DependentMemberType>()) {
-      type = depMemTy->getBase();
-    }
-
+    type = type->getRootGenericParam();
     if (proto->getProtocolSelfType()->isEqual(type))
       return SelfReferenceKind::Other();
   }

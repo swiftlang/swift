@@ -13,12 +13,12 @@
 #include "SILGen.h"
 #include "Condition.h"
 #include "Scope.h"
-#include "swift/AST/AST.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticsCommon.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/ForeignErrorConvention.h"
+#include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/type_traits.h"
@@ -1284,6 +1284,35 @@ RValue RValueEmitter::visitMetatypeConversionExpr(MetatypeConversionExpr *E,
   return RValue(SGF, E, ManagedValue::forUnmanaged(upcast));
 }
 
+RValue SILGenFunction::emitCollectionConversion(SILLocation loc,
+                                                FuncDecl *fn,
+                                                CanType fromCollection,
+                                                CanType toCollection,
+                                                ManagedValue mv,
+                                                SGFContext C) {
+  auto *fromDecl = fromCollection->getAnyNominal();
+  auto *toDecl = toCollection->getAnyNominal();
+
+  auto fromSubMap = fromCollection->getContextSubstitutionMap(
+    SGM.SwiftModule, fromDecl);
+  auto toSubMap = toCollection->getContextSubstitutionMap(
+    SGM.SwiftModule, toDecl);
+
+  // Form type parameter substitutions.
+  auto *genericSig = fn->getGenericSignature();
+  unsigned fromParamCount = fromDecl->getGenericSignature()
+    ->getGenericParams().size();
+
+  auto subMap =
+    SubstitutionMap::combineSubstitutionMaps(fromSubMap,
+                                             toSubMap,
+                                             CombineSubstitutionMaps::AtIndex,
+                                             fromParamCount,
+                                             0,
+                                             genericSig);
+  return emitApplyOfLibraryIntrinsic(loc, fn, subMap, {mv}, C);
+}
+
 RValue RValueEmitter::
 visitCollectionUpcastConversionExpr(CollectionUpcastConversionExpr *E,
                                     SGFContext C) {
@@ -1294,42 +1323,24 @@ visitCollectionUpcastConversionExpr(CollectionUpcastConversionExpr *E,
   auto mv = SGF.emitRValueAsSingleValue(E->getSubExpr());
   
   // Compute substitutions for the intrinsic call.
-  auto fromCollection = cast<BoundGenericStructType>(
-                          E->getSubExpr()->getType()->getCanonicalType());
-  auto toCollection = cast<BoundGenericStructType>(
-                        E->getType()->getCanonicalType());
+  auto fromCollection = E->getSubExpr()->getType()->getCanonicalType();
+  auto toCollection = E->getType()->getCanonicalType();
 
   // Get the intrinsic function.
   auto &ctx = SGF.getASTContext();
   FuncDecl *fn = nullptr;
-  if (fromCollection->getDecl() == ctx.getArrayDecl()) {
+  if (fromCollection->getAnyNominal() == ctx.getArrayDecl()) {
     fn = SGF.SGM.getArrayForceCast(loc);
-  } else if (fromCollection->getDecl() == ctx.getDictionaryDecl()) {
+  } else if (fromCollection->getAnyNominal() == ctx.getDictionaryDecl()) {
     fn = SGF.SGM.getDictionaryUpCast(loc);
-  } else if (fromCollection->getDecl() == ctx.getSetDecl()) {
+  } else if (fromCollection->getAnyNominal() == ctx.getSetDecl()) {
     fn = SGF.SGM.getSetUpCast(loc);
   } else {
     llvm_unreachable("unsupported collection upcast kind");
   }
 
-  // This will have been diagnosed by the accessors above.
-  if (!fn) return SGF.emitUndefRValue(E, E->getType());
-  
-  auto fnGenericParams = fn->getGenericParams()->getParams();
-  auto fromSubsts = fromCollection->gatherAllSubstitutions(
-      SGF.SGM.SwiftModule, nullptr);
-  auto toSubsts = toCollection->gatherAllSubstitutions(
-      SGF.SGM.SwiftModule, nullptr);
-  assert(fnGenericParams.size() == fromSubsts.size() + toSubsts.size() &&
-         "wrong number of generic collection parameters");
-  (void) fnGenericParams;
-  
-  // Form type parameter substitutions.
-  SmallVector<Substitution, 4> subs;
-  subs.append(fromSubsts.begin(), fromSubsts.end());
-  subs.append(toSubsts.begin(), toSubsts.end());
-
-  return SGF.emitApplyOfLibraryIntrinsic(loc, fn, subs, {mv}, C);
+  return SGF.emitCollectionConversion(loc, fn, fromCollection, toCollection,
+                                      mv, C);
 }
 
 RValue RValueEmitter::visitArchetypeToSuperExpr(ArchetypeToSuperExpr *E,
@@ -1654,10 +1665,10 @@ RValue SILGenFunction::emitAnyHashableErasure(SILLocation loc,
         loc, getASTContext().getAnyHashableDecl()->getDeclaredType());
 
   // Construct the substitution for T: Hashable.
-  ProtocolConformanceRef conformances[] = { conformance };
-  Substitution sub(type, getASTContext().AllocateCopy(conformances));
+  auto subMap = SubstitutionMap::getProtocolSubstitutions(
+      conformance.getRequirement(), type, conformance);
 
-  return emitApplyOfLibraryIntrinsic(loc, convertFn, sub, value, C);
+  return emitApplyOfLibraryIntrinsic(loc, convertFn, subMap, value, C);
 }
 
 RValue RValueEmitter::visitAnyHashableErasureExpr(AnyHashableErasureExpr *E,
@@ -1729,7 +1740,8 @@ RValue RValueEmitter::visitIsExpr(IsExpr *E, SGFContext C) {
   // Call the _getBool library intrinsic.
   ASTContext &ctx = SGF.getASTContext();
   auto result =
-    SGF.emitApplyOfLibraryIntrinsic(E, ctx.getGetBoolDecl(nullptr), {},
+    SGF.emitApplyOfLibraryIntrinsic(E, ctx.getGetBoolDecl(nullptr),
+                                    SubstitutionMap(),
                                     ManagedValue::forUnmanaged(isa),
                                     C);
   return result;
@@ -1757,7 +1769,8 @@ RValue RValueEmitter::visitEnumIsCaseExpr(EnumIsCaseExpr *E,
   
   // Call the _getBool library intrinsic.
   auto result =
-    SGF.emitApplyOfLibraryIntrinsic(E, ctx.getGetBoolDecl(nullptr), {},
+    SGF.emitApplyOfLibraryIntrinsic(E, ctx.getGetBoolDecl(nullptr),
+                                    SubstitutionMap(),
                                     ManagedValue::forUnmanaged(selected),
                                     C);
   return result;
@@ -3590,25 +3603,6 @@ ProtocolDecl *SILGenFunction::getPointerProtocol() {
   return cast<ProtocolDecl>(lookup[0]);
 }
 
-/// Produce a Substitution for a type that conforms to the standard library
-/// _Pointer protocol.
-Substitution SILGenFunction::getPointerSubstitution(Type pointerType) {
-  auto &Ctx = getASTContext();
-  ProtocolDecl *pointerProto = getPointerProtocol();
-  auto conformance
-    = Ctx.getStdlibModule()->lookupConformance(pointerType, pointerProto,
-                                               nullptr);
-  assert(conformance && "not a _Pointer type");
-
-  // FIXME: Cache this
-  ProtocolConformanceRef conformances[] = {
-    ProtocolConformanceRef(*conformance)
-  };
-  auto conformancesCopy = Ctx.AllocateCopy(conformances);
-  
-  return Substitution{pointerType, conformancesCopy};
-}
-
 namespace {
 class AutoreleasingWritebackComponent : public LogicalPathComponent {
 public:
@@ -3752,8 +3746,10 @@ ManagedValue SILGenFunction::emitLValueToPointer(SILLocation loc,
   // Invoke the conversion intrinsic.
   FuncDecl *converter =
     getASTContext().getConvertInOutToPointerArgument(nullptr);
-  Substitution sub = getPointerSubstitution(pointerType);
-  return emitApplyOfLibraryIntrinsic(loc, converter, sub,
+
+  auto subMap = pointerType->getContextSubstitutionMap(SGM.M.getSwiftModule(),
+                                                       getPointerProtocol());
+  return emitApplyOfLibraryIntrinsic(loc, converter, subMap,
                                      ManagedValue::forUnmanaged(address),
                                      SGFContext())
            .getAsSingleValue(*this, loc);
@@ -3779,17 +3775,24 @@ RValue RValueEmitter::visitArrayToPointerExpr(ArrayToPointerExpr *E,
   }
 
   // Invoke the conversion intrinsic, which will produce an owner-pointer pair.
-  Substitution subs[2] = {
-    Substitution{
-      subExpr->getType()->getInOutObjectType()
-        ->castTo<BoundGenericType>()
-        ->getGenericArgs()[0],
-      {}
-    },
-    SGF.getPointerSubstitution(E->getType()),
-  };
+  auto *M = SGF.SGM.M.getSwiftModule();
+  auto firstSubMap = subExpr->getType()->getInOutObjectType()
+    ->getContextSubstitutionMap(
+      M, Ctx.getArrayDecl());
+  auto secondSubMap = E->getType()
+    ->getContextSubstitutionMap(
+      M, SGF.getPointerProtocol());
+
+  auto *genericSig = converter->getGenericSignature();
+  auto subMap =
+    SubstitutionMap::combineSubstitutionMaps(firstSubMap,
+                                             secondSubMap,
+                                             CombineSubstitutionMaps::AtIndex,
+                                             1, 0,
+                                             genericSig);
+
   SmallVector<ManagedValue, 2> resultScalars;
-  SGF.emitApplyOfLibraryIntrinsic(E, converter, subs, orig, SGFContext())
+  SGF.emitApplyOfLibraryIntrinsic(E, converter, subMap, orig, SGFContext())
     .getAll(resultScalars);
   assert(resultScalars.size() == 2);
   
@@ -3805,9 +3808,11 @@ RValue RValueEmitter::visitStringToPointerExpr(StringToPointerExpr *E,
   ManagedValue orig = SGF.emitRValueAsSingleValue(E->getSubExpr());
   
   // Invoke the conversion intrinsic, which will produce an owner-pointer pair.
-  Substitution sub = SGF.getPointerSubstitution(E->getType());
+  auto subMap = E->getType()->getCanonicalType()
+    ->getContextSubstitutionMap(SGF.SGM.M.getSwiftModule(),
+                                SGF.getPointerProtocol());
   SmallVector<ManagedValue, 2> results;
-  SGF.emitApplyOfLibraryIntrinsic(E, converter, sub, orig, C).getAll(results);
+  SGF.emitApplyOfLibraryIntrinsic(E, converter, subMap, orig, C).getAll(results);
   assert(results.size() == 2);
   
   // Implicitly leave the owner managed and return the pointer.

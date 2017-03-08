@@ -116,7 +116,8 @@ Type Solution::computeSubstitutions(
                                   ConformanceCheckFlags::Used));
   };
 
-  sig->getSubstitutions(subs, lookupConformanceFn, result);
+  sig->getSubstitutions(QueryTypeSubstitutionMap{subs},
+                        lookupConformanceFn, result);
   return type;
 }
 

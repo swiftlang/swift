@@ -339,21 +339,16 @@ bool SILType::isAddressOnly(SILModule &M) const {
 
 SILType SILType::substGenericArgs(SILModule &M,
                                   SubstitutionList Subs) const {
-  SILFunctionType *fnTy = getSwiftRValueType()->castTo<SILFunctionType>();
-  if (Subs.empty()) {
-    assert(!fnTy->isPolymorphic() && "function type without subs must not "
-           "be polymorphic.");
-    return *this;
-  }
-  assert(fnTy->isPolymorphic() && "Can only subst interface generic args on "
-         "polymorphic function types.");
-  CanSILFunctionType canFnTy = fnTy->substGenericArgs(M, Subs);
+  auto fnTy = castTo<SILFunctionType>();
+  auto canFnTy = CanSILFunctionType(fnTy->substGenericArgs(M, Subs));
   return SILType::getPrimitiveObjectType(canFnTy);
 }
 
-SubstitutionList SILType::gatherAllSubstitutions(SILModule &M) {
-  return getSwiftRValueType()->gatherAllSubstitutions(M.getSwiftModule(),
-                                                      nullptr);
+SILType SILType::substGenericArgs(SILModule &M,
+                                  const SubstitutionMap &SubMap) const {
+  auto fnTy = castTo<SILFunctionType>();
+  auto canFnTy = CanSILFunctionType(fnTy->substGenericArgs(M, SubMap));
+  return SILType::getPrimitiveObjectType(canFnTy);
 }
 
 bool SILType::isHeapObjectReferenceType() const {

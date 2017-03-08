@@ -70,9 +70,6 @@ class LinkEntity {
   enum : unsigned {
     KindShift = 0, KindMask = 0xFF,
 
-    // These fields appear in decl kinds.
-    UncurryLevelShift = 8, UncurryLevelMask = 0xFF00,
-
     // This field appears in the ValueWitness kind.
     ValueWitnessShift = 8, ValueWitnessMask = 0xFF00,
 
@@ -243,12 +240,11 @@ class LinkEntity {
             k <= Kind::ProtocolWitnessTableLazyCacheVariable);
   }
 
-  void setForDecl(Kind kind, const ValueDecl *decl, unsigned uncurryLevel) {
+  void setForDecl(Kind kind, const ValueDecl *decl) {
     assert(isDeclKind(kind));
     Pointer = const_cast<void*>(static_cast<const void*>(decl));
     SecondaryPointer = nullptr;
-    Data = LINKENTITY_SET_FIELD(Kind, unsigned(kind))
-         | LINKENTITY_SET_FIELD(UncurryLevel, uncurryLevel);
+    Data = LINKENTITY_SET_FIELD(Kind, unsigned(kind));
   }
 
   void setForProtocolConformance(Kind kind, const ProtocolConformance *c) {
@@ -363,14 +359,13 @@ public:
     assert(!isFunction(decl));
 
     LinkEntity entity;
-    entity.setForDecl(Kind::Other, decl, 0);
+    entity.setForDecl(Kind::Other, decl);
     return entity;
   }
 
-  static LinkEntity forWitnessTableOffset(ValueDecl *decl,
-                                          unsigned uncurryLevel) {
+  static LinkEntity forWitnessTableOffset(ValueDecl *decl) {
     LinkEntity entity;
-    entity.setForDecl(Kind::WitnessTableOffset, decl, uncurryLevel);
+    entity.setForDecl(Kind::WitnessTableOffset, decl);
     return entity;
   }
 
@@ -385,25 +380,25 @@ public:
 
   static LinkEntity forObjCClassRef(ClassDecl *decl) {
     LinkEntity entity;
-    entity.setForDecl(Kind::ObjCClassRef, decl, 0);
+    entity.setForDecl(Kind::ObjCClassRef, decl);
     return entity;
   }
 
   static LinkEntity forObjCClass(ClassDecl *decl) {
     LinkEntity entity;
-    entity.setForDecl(Kind::ObjCClass, decl, 0);
+    entity.setForDecl(Kind::ObjCClass, decl);
     return entity;
   }
 
   static LinkEntity forObjCMetaclass(ClassDecl *decl) {
     LinkEntity entity;
-    entity.setForDecl(Kind::ObjCMetaclass, decl, 0);
+    entity.setForDecl(Kind::ObjCMetaclass, decl);
     return entity;
   }
 
   static LinkEntity forSwiftMetaclassStub(ClassDecl *decl) {
     LinkEntity entity;
-    entity.setForDecl(Kind::SwiftMetaclassStub, decl, 0);
+    entity.setForDecl(Kind::SwiftMetaclassStub, decl);
     return entity;
   }
 
@@ -439,13 +434,13 @@ public:
   
   static LinkEntity forNominalTypeDescriptor(NominalTypeDecl *decl) {
     LinkEntity entity;
-    entity.setForDecl(Kind::NominalTypeDescriptor, decl, 0);
+    entity.setForDecl(Kind::NominalTypeDescriptor, decl);
     return entity;
   }
   
   static LinkEntity forProtocolDescriptor(ProtocolDecl *decl) {
     LinkEntity entity;
-    entity.setForDecl(Kind::ProtocolDescriptor, decl, 0);
+    entity.setForDecl(Kind::ProtocolDescriptor, decl);
     return entity;
   }
 
@@ -572,7 +567,7 @@ public:
   static LinkEntity
   forReflectionSuperclassDescriptor(const ClassDecl *decl) {
     LinkEntity entity;
-    entity.setForDecl(Kind::ReflectionSuperclassDescriptor, decl, 0);
+    entity.setForDecl(Kind::ReflectionSuperclassDescriptor, decl);
     return entity;
   }
 
@@ -637,10 +632,6 @@ public:
   ProtocolDecl *getAssociatedProtocol() const {
     assert(getKind() == Kind::AssociatedTypeWitnessTableAccessFunction);
     return reinterpret_cast<ProtocolDecl*>(Pointer);
-  }
-
-  unsigned getUncurryLevel() const {
-    return LINKENTITY_GET_FIELD(Data, UncurryLevel);
   }
 
   bool isValueWitness() const { return getKind() == Kind::ValueWitness; }

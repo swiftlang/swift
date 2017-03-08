@@ -2885,8 +2885,7 @@ static Address getAddrOfSimpleVariable(IRGenModule &IGM,
 Address IRGenModule::getAddrOfWitnessTableOffset(SILDeclRef code,
                                                 ForDefinition_t forDefinition) {
   LinkEntity entity =
-    LinkEntity::forWitnessTableOffset(code.getDecl(),
-                                      code.uncurryLevel);
+    LinkEntity::forWitnessTableOffset(code.getDecl());
   return getAddrOfSimpleVariable(*this, GlobalVars, entity,
                                  SizeTy, getPointerAlignment(),
                                  forDefinition);
@@ -2898,7 +2897,7 @@ Address IRGenModule::getAddrOfWitnessTableOffset(SILDeclRef code,
 Address IRGenModule::getAddrOfWitnessTableOffset(VarDecl *field,
                                                 ForDefinition_t forDefinition) {
   LinkEntity entity =
-    LinkEntity::forWitnessTableOffset(field, 0);
+    LinkEntity::forWitnessTableOffset(field);
   return ::getAddrOfSimpleVariable(*this, GlobalVars, entity,
                                    SizeTy, getPointerAlignment(),
                                    forDefinition);

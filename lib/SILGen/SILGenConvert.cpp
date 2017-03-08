@@ -20,6 +20,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/ProtocolConformance.h"
+#include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/type_traits.h"
 #include "swift/SIL/SILArgument.h"
@@ -204,7 +205,7 @@ SILGenFunction::emitPreconditionOptionalHasValue(SILLocation loc,
     ManagedValue args[4];
     emitSourceLocationArgs(*this, loc, args);
     
-    emitApplyOfLibraryIntrinsic(loc, diagnoseFailure, {}, args,
+    emitApplyOfLibraryIntrinsic(loc, diagnoseFailure, SubstitutionMap(), args,
                                 SGFContext());
   }
 
@@ -388,12 +389,20 @@ SILGenFunction::emitPointerToPointer(SILLocation loc,
   auto origValue = emitManagedBufferWithCleanup(origBuf);
   
   // Invoke the conversion intrinsic to convert to the destination type.
-  Substitution subs[2] = {
-    getPointerSubstitution(inputType),
-    getPointerSubstitution(outputType),
-  };
+  auto *M = SGM.M.getSwiftModule();
+  auto *proto = getPointerProtocol();
+  auto firstSubMap = inputType->getContextSubstitutionMap(M, proto);
+  auto secondSubMap = outputType->getContextSubstitutionMap(M, proto);
+
+  auto *genericSig = converter->getGenericSignature();
+  auto subMap =
+    SubstitutionMap::combineSubstitutionMaps(firstSubMap,
+                                             secondSubMap,
+                                             CombineSubstitutionMaps::AtIndex,
+                                             1, 0,
+                                             genericSig);
   
-  return emitApplyOfLibraryIntrinsic(loc, converter, subs, origValue, C);
+  return emitApplyOfLibraryIntrinsic(loc, converter, subMap, origValue, C);
 }
 
 
@@ -509,9 +518,10 @@ ManagedValue SILGenFunction::emitExistentialErasure(
       if (!getEmbeddedNSErrorFn)
         return emitUndef(loc, existentialTL.getLoweredType());
 
-      Substitution getEmbeddedNSErrorSubstitutions[1] = {
-        Substitution(concreteFormalType, conformances)
-      };
+      auto getEmbeddedNSErrorSubstitutions =
+        SubstitutionMap::getProtocolSubstitutions(ctx.getErrorDecl(),
+                                                  concreteFormalType,
+                                                  conformances[0]);
 
       ManagedValue concreteValue = F(SGFContext());
       ManagedValue potentialNSError =

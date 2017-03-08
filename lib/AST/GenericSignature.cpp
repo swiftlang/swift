@@ -462,14 +462,6 @@ getSubstitutionMap(TypeSubstitutionFn subs,
 }
 
 void GenericSignature::
-getSubstitutions(const TypeSubstitutionMap &subs,
-                 GenericSignature::LookupConformanceFn lookupConformance,
-                 SmallVectorImpl<Substitution> &result) const {
-  getSubstitutions(QueryTypeSubstitutionMap{subs}, lookupConformance,
-                   result);
-}
-
-void GenericSignature::
 getSubstitutions(TypeSubstitutionFn subs,
                  GenericSignature::LookupConformanceFn lookupConformance,
                  SmallVectorImpl<Substitution> &result) const {
