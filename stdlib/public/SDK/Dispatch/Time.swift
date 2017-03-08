@@ -109,11 +109,12 @@ public func ==(a: DispatchWallTime, b: DispatchWallTime) -> Bool {
 	return a.rawValue == b.rawValue
 }
 
-public enum DispatchTimeInterval {
+public enum DispatchTimeInterval: Equatable {
 	case seconds(Int)
 	case milliseconds(Int)
 	case microseconds(Int)
 	case nanoseconds(Int)
+	case never
 
 	internal var rawValue: Int64 {
 		switch self {
@@ -121,6 +122,16 @@ public enum DispatchTimeInterval {
 		case .milliseconds(let ms): return Int64(ms) * Int64(NSEC_PER_MSEC)
 		case .microseconds(let us): return Int64(us) * Int64(NSEC_PER_USEC)
 		case .nanoseconds(let ns): return Int64(ns)
+		case .never: return Int64.max
+		}
+	}
+
+	public static func ==(lhs: DispatchTimeInterval, rhs: DispatchTimeInterval) -> Bool {
+		switch (lhs, rhs) {
+		case (.never, .never): return true
+		case (.never, _): return false
+		case (_, .never): return false
+		default: return lhs.rawValue == rhs.rawValue
 		}
 	}
 }
