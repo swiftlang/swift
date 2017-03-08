@@ -2630,15 +2630,16 @@ public:
   Action walkToTypePost(Type ty) override {
     auto boundGeneric = ty->getAs<BoundGenericType>();
     if (!boundGeneric)
-      return Action::Continue; 
+      return Action::Continue;
 
-    auto genericSig = boundGeneric->getDecl()->getGenericSignature();
+    auto *decl = boundGeneric->getDecl();
+    auto genericSig = decl->getGenericSignature();
     if (!genericSig)
       return Action::Stop;
 
     /// Retrieve the substitution.
-    auto allSubs = boundGeneric->gatherAllSubstitutions(&module, nullptr);
-    auto subMap = genericSig->getSubstitutionMap(allSubs);
+    auto subMap = boundGeneric->getContextSubstitutionMap(
+      &module, decl, decl->getGenericEnvironment());
 
     // Handle the requirements.
     // FIXME: Inaccurate TypeReprs.
