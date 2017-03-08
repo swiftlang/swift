@@ -43,7 +43,7 @@ func local_recursion(_ x: Int, y: Int) {
     return transitive_capture_1(y + b)
   }
 
-  // CHECK: [[TRANS_CAPTURE_REF:%.*]] = function_ref [[TRANS_CAPTURE:@_T015local_recursionAAySi_Si1ytF20transitive_capture_2L_SiSiF]]
+  // CHECK: [[TRANS_CAPTURE_REF:%.*]] = function_ref [[TRANS_CAPTURE:@_T015local_recursionAAySi_Si1ytF20transitive_capture_2L_S2iF]]
   // CHECK: apply [[TRANS_CAPTURE_REF]]([[X]], [[X]], [[Y]])
   transitive_capture_2(x)
 
@@ -91,7 +91,7 @@ func local_recursion(_ x: Int, y: Int) {
 // CHECK:   apply [[MUTUALLY_RECURSIVE_REF]]({{.*}}, [[Y]], [[X]])
 
 
-// CHECK: sil shared [[TRANS_CAPTURE_1:@_T015local_recursionAAySi_Si1ytF20transitive_capture_1L_SiSiF]]
+// CHECK: sil shared [[TRANS_CAPTURE_1:@_T015local_recursionAAySi_Si1ytF20transitive_capture_1L_S2iF]]
 // CHECK: bb0([[A:%0]] : $Int, [[X:%1]] : $Int):
 
 // CHECK: sil shared [[TRANS_CAPTURE]]

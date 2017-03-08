@@ -19,6 +19,7 @@
 
 #include "swift/AST/Type.h"
 #include "llvm/ADT/PointerIntPair.h"
+#include "llvm/Support/ErrorHandling.h"
 
 namespace swift {
 
@@ -109,6 +110,8 @@ public:
     case RequirementKind::Layout:
       return Requirement(getKind(), newFirst, getLayoutConstraint());
     }
+
+    llvm_unreachable("Unhandled RequirementKind in switch.");
   }
 
   /// \brief Retrieve the layout constraint.

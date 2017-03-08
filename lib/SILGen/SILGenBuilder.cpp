@@ -11,10 +11,48 @@
 //===----------------------------------------------------------------------===//
 
 #include "SILGenBuilder.h"
+#include "ArgumentSource.h"
+#include "RValue.h"
 #include "SILGenFunction.h"
+#include "Scope.h"
+#include "SwitchCaseFullExpr.h"
 
 using namespace swift;
 using namespace Lowering;
+
+//===----------------------------------------------------------------------===//
+//                             Cleanup Forwarder
+//===----------------------------------------------------------------------===//
+
+namespace {
+class CleanupCloner {
+  SILGenFunction &gen;
+  bool hasCleanup;
+  bool isLValue;
+  ValueOwnershipKind ownershipKind;
+
+public:
+  CleanupCloner(SILGenBuilder &Builder, ManagedValue M)
+      : gen(Builder.getSILGenFunction()), hasCleanup(M.hasCleanup()),
+        isLValue(M.isLValue()), ownershipKind(M.getOwnershipKind()) {}
+
+  ManagedValue clone(SILValue value) {
+    if (isLValue) {
+      return ManagedValue::forLValue(value);
+    }
+
+    if (!hasCleanup) {
+      return ManagedValue::forUnmanaged(value);
+    }
+
+    if (value->getType().isAddress()) {
+      return gen.emitManagedBufferWithCleanup(value);
+    }
+
+    return gen.emitManagedRValueWithCleanup(value);
+  }
+};
+} // end anonymous namespace
 
 //===----------------------------------------------------------------------===//
 //                              Utility Methods
@@ -512,25 +550,149 @@ void SILGenBuilder::createCheckedCastBranch(SILLocation loc, bool isExact,
                                       trueBlock, falseBlock);
 }
 
-ManagedValue SILGenBuilder::createUpcast(SILLocation Loc, ManagedValue Original,
-                                         SILType Type) {
-  bool hadCleanup = Original.hasCleanup();
-  bool isLValue = Original.isLValue();
+void SILGenBuilder::createCheckedCastValueBranch(SILLocation loc,
+                                                 ManagedValue operand,
+                                                 SILType type,
+                                                 SILBasicBlock *trueBlock,
+                                                 SILBasicBlock *falseBlock) {
+  SILBuilder::createCheckedCastValueBranch(loc, operand.forward(gen), type,
+                                           trueBlock, falseBlock);
+}
 
+ManagedValue SILGenBuilder::createUpcast(SILLocation loc, ManagedValue original,
+                                         SILType type) {
+  CleanupCloner cloner(*this, original);
   SILValue convertedValue =
-      SILBuilder::createUpcast(Loc, Original.forward(gen), Type);
+      SILBuilder::createUpcast(loc, original.forward(gen), type);
+  return cloner.clone(convertedValue);
+}
 
-  if (isLValue) {
-    return ManagedValue::forLValue(convertedValue);
+ManagedValue SILGenBuilder::createOptionalSome(SILLocation loc,
+                                               ManagedValue arg) {
+  CleanupCloner cloner(*this, arg);
+  auto &argTL = getFunction().getTypeLowering(arg.getType());
+  SILType optionalType = arg.getType().wrapAnyOptionalType(getFunction());
+  if (argTL.isLoadable()) {
+    SILValue someValue =
+        SILBuilder::createOptionalSome(loc, arg.forward(gen), optionalType);
+    return cloner.clone(someValue);
   }
 
-  if (!hadCleanup) {
-    return ManagedValue::forUnmanaged(convertedValue);
+  SILValue tempResult = gen.emitTemporaryAllocation(loc, optionalType);
+  RValue rvalue(gen, loc, arg.getType().getSwiftRValueType(), arg);
+  ArgumentSource argValue(loc, std::move(rvalue));
+  gen.emitInjectOptionalValueInto(
+      loc, std::move(argValue), tempResult,
+      getFunction().getTypeLowering(tempResult->getType()));
+  return ManagedValue::forUnmanaged(tempResult);
+}
+
+ManagedValue SILGenBuilder::createManagedOptionalNone(SILLocation loc,
+                                                      SILType type) {
+  if (!type.isAddressOnly(getModule())) {
+    SILValue noneValue = SILBuilder::createOptionalNone(loc, type);
+    return ManagedValue::forUnmanaged(noneValue);
   }
 
-  if (Type.isAddress()) {
-    return gen.emitManagedBufferWithCleanup(convertedValue);
+  SILValue tempResult = gen.emitTemporaryAllocation(loc, type);
+  gen.emitInjectOptionalNothingInto(loc, tempResult,
+                                    gen.F.getTypeLowering(type));
+  return ManagedValue::forUnmanaged(tempResult);
+}
+
+ManagedValue SILGenBuilder::createTupleElementAddr(SILLocation Loc,
+                                                   ManagedValue Base,
+                                                   unsigned Index,
+                                                   SILType Type) {
+  SILValue TupleEltAddr =
+      SILBuilder::createTupleElementAddr(Loc, Base.getValue(), Index, Type);
+  return ManagedValue::forUnmanaged(TupleEltAddr);
+}
+
+ManagedValue SILGenBuilder::createTupleElementAddr(SILLocation Loc,
+                                                   ManagedValue Value,
+                                                   unsigned Index) {
+  SILType Type = Value.getType().getTupleElementType(Index);
+  return createTupleElementAddr(Loc, Value, Index, Type);
+}
+
+//===----------------------------------------------------------------------===//
+//                            Switch Enum Builder
+//===----------------------------------------------------------------------===//
+
+void SwitchEnumBuilder::emit() && {
+  bool isAddressOnly = optional.getType().isAddressOnly(builder.getModule());
+  using DeclBlockPair = std::pair<EnumElementDecl *, SILBasicBlock *>;
+  {
+    // TODO: We could store the data in CaseBB form and not have to do this.
+    llvm::SmallVector<DeclBlockPair, 8> caseBlocks;
+    std::transform(caseDataArray.begin(), caseDataArray.end(),
+                   std::back_inserter(caseBlocks),
+                   [](NormalCaseData &caseData) -> DeclBlockPair {
+                     return {caseData.decl, caseData.block};
+                   });
+    SILBasicBlock *defaultBlock =
+        defaultBlockData ? defaultBlockData->block : nullptr;
+    if (isAddressOnly) {
+      builder.createSwitchEnumAddr(loc, optional.getValue(), defaultBlock,
+                                   caseBlocks);
+    } else {
+      if (optional.getType().isAddress()) {
+        // TODO: Refactor this into a maybe load.
+        if (optional.hasCleanup()) {
+          optional = builder.createLoadTake(loc, optional);
+        } else {
+          optional = builder.createLoadCopy(loc, optional);
+        }
+      }
+      builder.createSwitchEnum(loc, optional.forward(getSGF()), defaultBlock,
+                               caseBlocks);
+    }
   }
 
-  return gen.emitManagedRValueWithCleanup(convertedValue);
+  for (NormalCaseData &caseData : caseDataArray) {
+    EnumElementDecl *decl = caseData.decl;
+    SILBasicBlock *caseBlock = caseData.block;
+    NullablePtr<SILBasicBlock> contBlock = caseData.contBlock;
+    NormalCaseHandler handler = caseData.handler;
+
+    // Don't allow cleanups to escape the conditional block.
+    SwitchCaseFullExpr presentScope(builder.getSILGenFunction(),
+                                    CleanupLocation::get(loc),
+                                    contBlock.getPtrOrNull());
+    builder.emitBlock(caseBlock);
+
+    ManagedValue input;
+    if (decl->getArgumentInterfaceType()) {
+      // Pull the payload out if we have one.
+      SILType inputType =
+          optional.getType().getEnumElementType(decl, builder.getModule());
+      input = optional;
+      if (!isAddressOnly) {
+        input = builder.createOwnedPHIArgument(inputType);
+      }
+    }
+    handler(input, presentScope);
+    assert(!builder.hasValidInsertionPoint());
+  }
+
+  // If we have a default BB, create an argument for the original loaded value
+  // and destroy it there.
+  if (defaultBlockData) {
+    SILBasicBlock *defaultBlock = defaultBlockData->block;
+    NullablePtr<SILBasicBlock> contBB = defaultBlockData->contBlock;
+    DefaultCaseHandler handler = defaultBlockData->handler;
+
+    // Don't allow cleanups to escape the conditional block.
+    SwitchCaseFullExpr presentScope(builder.getSILGenFunction(),
+                                    CleanupLocation::get(loc),
+                                    contBB.getPtrOrNull());
+    builder.emitBlock(defaultBlock);
+    ManagedValue input = optional;
+    if (!isAddressOnly) {
+      input = builder.createOwnedPHIArgument(optional.getType());
+    }
+    handler(input, presentScope);
+    assert(!builder.hasValidInsertionPoint());
+  }
 }

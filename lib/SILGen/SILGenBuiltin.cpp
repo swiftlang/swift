@@ -978,6 +978,7 @@ SpecializedEmitter::forDecl(SILGenModule &SGM, SILDeclRef function) {
 #define BUILTIN(Id, Name, Attrs)                                            \
   case BuiltinValueKind::Id:
 #define BUILTIN_SIL_OPERATION(Id, Name, Overload)
+#define BUILTIN_SANITIZER_OPERATION(Id, Name, Attrs)
 #define BUILTIN_TYPE_TRAIT_OPERATION(Id, Name)
 #include "swift/AST/Builtins.def"
   case BuiltinValueKind::None:
@@ -991,7 +992,13 @@ SpecializedEmitter::forDecl(SILGenModule &SGM, SILDeclRef function) {
 #define BUILTIN_SIL_OPERATION(Id, Name, Overload)                           \
   case BuiltinValueKind::Id:                                                \
     return SpecializedEmitter(&emitBuiltin##Id);
-  
+
+  // Sanitizer builtins should never directly be called; they should only
+  // be inserted as instrumentation by SILGen.
+#define BUILTIN_SANITIZER_OPERATION(Id, Name, Attrs)                        \
+  case BuiltinValueKind::Id:                                                \
+    llvm_unreachable("Sanitizer builtin called directly?");
+
   // Lower away type trait builtins when they're trivially solvable.
 #define BUILTIN_TYPE_TRAIT_OPERATION(Id, Name)                              \
   case BuiltinValueKind::Id:                                                \

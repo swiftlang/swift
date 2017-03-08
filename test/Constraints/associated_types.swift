@@ -84,3 +84,28 @@ struct UsesSameTypedDefaultWithReqts: SameTypedDefaultWithReqts {
 struct UsesSameTypedDefaultWithoutSatisfyingReqts: SameTypedDefaultWithReqts {
     static var y: YType { return YType() }
 }
+
+protocol SameTypedDefaultBaseWithReqts {
+    associatedtype X: XReqt // expected-note{{}}
+    static var x: X { get }
+}
+protocol SameTypedDefaultDerivedWithReqts: SameTypedDefaultBaseWithReqts {
+    associatedtype Y: YReqt
+    static var y: Y { get }
+}
+
+extension SameTypedDefaultDerivedWithReqts where Y == X {
+    static var x: X {
+        return y
+    }
+}
+
+struct UsesSameTypedDefaultDerivedWithReqts: SameTypedDefaultDerivedWithReqts {
+    static var y: XYType { return XYType() }
+}
+
+// expected-error@+1{{does not conform}}
+struct UsesSameTypedDefaultDerivedWithoutSatisfyingReqts: SameTypedDefaultDerivedWithReqts {
+    static var y: YType { return YType() }
+}
+

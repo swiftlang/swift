@@ -6,12 +6,12 @@ indirect enum TreeA<T> {
   case Branch(left: TreeA<T>, right: TreeA<T>)
 }
 
-// CHECK-LABEL: sil hidden @_T013indirect_enum11TreeA_casesyx_AA0C1AOyxG1lADyxG1rtlF : $@convention(thin) <T> (@in T, @owned TreeA<T>, @owned TreeA<T>) -> () {
+// CHECK-LABEL: sil hidden @_T013indirect_enum11TreeA_casesyx_AA0C1AOyxG1lAE1rtlF : $@convention(thin) <T> (@in T, @owned TreeA<T>, @owned TreeA<T>) -> () {
 func TreeA_cases<T>(_ t: T, l: TreeA<T>, r: TreeA<T>) {
 // CHECK: bb0([[ARG1:%.*]] : $*T, [[ARG2:%.*]] : $TreeA<T>, [[ARG3:%.*]] : $TreeA<T>):
 // CHECK:         [[METATYPE:%.*]] = metatype $@thin TreeA<T>.Type
 // CHECK-NEXT:    [[NIL:%.*]] = enum $TreeA<T>, #TreeA.Nil!enumelt
-// CHECK-NEXT:    destroy_value [[NIL]]
+// CHECK-NOT:     destroy_value [[NIL]]
   let _ = TreeA<T>.Nil
 
 // CHECK-NEXT:    [[METATYPE:%.*]] = metatype $@thin TreeA<T>.Type
@@ -43,10 +43,10 @@ func TreeA_cases<T>(_ t: T, l: TreeA<T>, r: TreeA<T>) {
   let _ = TreeA<T>.Branch(left: l, right: r)
 
 }
-// CHECK: // end sil function '_T013indirect_enum11TreeA_casesyx_AA0C1AOyxG1lADyxG1rtlF'
+// CHECK: // end sil function '_T013indirect_enum11TreeA_casesyx_AA0C1AOyxG1lAE1rtlF'
 
 
-// CHECK-LABEL: sil hidden @_T013indirect_enum16TreeA_reabstractySiSicF : $@convention(thin) (@owned @callee_owned (Int) -> Int) -> () {
+// CHECK-LABEL: sil hidden @_T013indirect_enum16TreeA_reabstractyS2icF : $@convention(thin) (@owned @callee_owned (Int) -> Int) -> () {
 func TreeA_reabstract(_ f: @escaping (Int) -> Int) {
 // CHECK: bb0([[ARG:%.*]] : $@callee_owned (Int) -> Int):
 // CHECK:         [[METATYPE:%.*]] = metatype $@thin TreeA<(Int) -> Int>.Type
@@ -54,7 +54,7 @@ func TreeA_reabstract(_ f: @escaping (Int) -> Int) {
 // CHECK-NEXT:    [[PB:%.*]] = project_box [[BOX]]
 // CHECK-NEXT:    [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
 // CHECK-NEXT:    [[ARG_COPY:%.*]] = copy_value [[BORROWED_ARG]]
-// CHECK:         [[THUNK:%.*]] = function_ref @_T0SiSiIxyd_SiSiIxir_TR
+// CHECK:         [[THUNK:%.*]] = function_ref @_T0S2iIxyd_S2iIxir_TR
 // CHECK-NEXT:    [[FN:%.*]] = partial_apply [[THUNK]]([[ARG_COPY]])
 // CHECK-NEXT:    store [[FN]] to [init] [[PB]]
 // CHECK-NEXT:    [[LEAF:%.*]] = enum $TreeA<(Int) -> Int>, #TreeA.Leaf!enumelt.1, [[BOX]]
@@ -64,7 +64,7 @@ func TreeA_reabstract(_ f: @escaping (Int) -> Int) {
 // CHECK: return
   let _ = TreeA<(Int) -> Int>.Leaf(f)
 }
-// CHECK: } // end sil function '_T013indirect_enum16TreeA_reabstractySiSicF'
+// CHECK: } // end sil function '_T013indirect_enum16TreeA_reabstractyS2icF'
 
 enum TreeB<T> {
   case Nil
@@ -72,7 +72,7 @@ enum TreeB<T> {
   indirect case Branch(left: TreeB<T>, right: TreeB<T>)
 }
 
-// CHECK-LABEL: sil hidden @_T013indirect_enum11TreeB_casesyx_AA0C1BOyxG1lADyxG1rtlF
+// CHECK-LABEL: sil hidden @_T013indirect_enum11TreeB_casesyx_AA0C1BOyxG1lAE1rtlF
 func TreeB_cases<T>(_ t: T, l: TreeB<T>, r: TreeB<T>) {
 
 // CHECK:         [[METATYPE:%.*]] = metatype $@thin TreeB<T>.Type
@@ -118,12 +118,12 @@ func TreeInt_cases(_ t: Int, l: TreeInt, r: TreeInt) {
 // CHECK: bb0([[ARG1:%.*]] : $Int, [[ARG2:%.*]] : $TreeInt, [[ARG3:%.*]] : $TreeInt):
 // CHECK:         [[METATYPE:%.*]] = metatype $@thin TreeInt.Type
 // CHECK-NEXT:    [[NIL:%.*]] = enum $TreeInt, #TreeInt.Nil!enumelt
-// CHECK-NEXT:    destroy_value [[NIL]]
+// CHECK-NOT:     destroy_value [[NIL]]
   let _ = TreeInt.Nil
 
 // CHECK-NEXT:    [[METATYPE:%.*]] = metatype $@thin TreeInt.Type
 // CHECK-NEXT:    [[LEAF:%.*]] = enum $TreeInt, #TreeInt.Leaf!enumelt.1, [[ARG1]]
-// CHECK-NEXT:    destroy_value [[LEAF]]
+// CHECK-NOT:     destroy_value [[LEAF]]
   let _ = TreeInt.Leaf(t)
 
 // CHECK-NEXT:    [[METATYPE:%.*]] = metatype $@thin TreeInt.Type

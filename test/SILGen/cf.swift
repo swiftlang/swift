@@ -65,9 +65,9 @@ protocol Impedance {
 
 extension CCImpedance: Impedance {}
 
-// CHECK-LABEL: sil hidden [transparent] [fragile] [thunk] @_T0SC11CCImpedanceV2cf9ImpedanceAccDP4real9ComponentQzfgTW
+// CHECK-LABEL: sil hidden [transparent] [fragile] [thunk] @_T0SC11CCImpedanceV2cf9ImpedanceA2cDP4real9ComponentQzfgTW
 // CHECK-LABEL: sil shared [transparent] [fragile] @_T0SC11CCImpedanceV4realSdfg
-// CHECK-LABEL: sil hidden [transparent] [fragile] [thunk] @_T0SC11CCImpedanceV2cf9ImpedanceAccDP4imag9ComponentQzfgTW
+// CHECK-LABEL: sil hidden [transparent] [fragile] [thunk] @_T0SC11CCImpedanceV2cf9ImpedanceA2cDP4imag9ComponentQzfgTW
 // CHECK-LABEL: sil shared [transparent] [fragile] @_T0SC11CCImpedanceV4imagSdfg
 
 class MyMagnetism : CCMagnetismModel {

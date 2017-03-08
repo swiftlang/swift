@@ -81,7 +81,33 @@ public:
     values.push_back(v);
   }
 
-  void visitTupleType(CanTupleType tupleFormalType, ManagedValue tupleMV) {
+  void visitObjectTupleType(CanTupleType tupleFormalType, ManagedValue tuple) {
+    bool isPlusZero = tuple.isPlusZeroRValueOrTrivial();
+    // SEMANTIC ARC TODO: This needs to be a take.
+    tuple = tuple.borrow(gen, loc);
+
+    for (auto i : indices(tupleFormalType->getElements())) {
+      CanType eltFormalType = tupleFormalType.getElementType(i);
+      assert(eltFormalType->isMaterializable());
+
+      auto eltTy = tuple.getType().getTupleElementType(i);
+      assert(eltTy.isAddress() == tuple.getType().isAddress());
+      auto &eltTI = gen.getTypeLowering(eltTy);
+
+      // Project the element.
+      assert(eltTI.isLoadable() || !gen.silConv.useLoweredAddresses());
+      ManagedValue elt = gen.B.createTupleExtract(loc, tuple, i, eltTy);
+      // If we're returning a +1 value, emit a cleanup for the member
+      // to cover for the cleanup we disabled for the tuple aggregate.
+      if (!isPlusZero)
+        elt = gen.B.createCopyValue(loc, elt);
+
+      visit(eltFormalType, elt);
+    }
+  }
+
+  void visitAddressTupleType(CanTupleType tupleFormalType,
+                             ManagedValue tupleMV) {
     bool isPlusZero = tupleMV.isPlusZeroRValueOrTrivial();
     SILValue tuple = tupleMV.forward(gen);
 
@@ -94,19 +120,13 @@ public:
       auto &eltTI = gen.getTypeLowering(eltTy);
 
       // Project the element.
-      SILValue elt;
-      if (tuple->getType().isObject()) {
-        assert(eltTI.isLoadable() || !gen.silConv.useLoweredAddresses());
-        elt = gen.B.createTupleExtract(loc, tuple, i, eltTy);
-      } else {
-        elt = gen.B.createTupleElementAddr(loc, tuple, i, eltTy);
+      SILValue elt = gen.B.createTupleElementAddr(loc, tuple, i, eltTy);
 
-        // RValue has an invariant that loadable values have been
-        // loaded.  Except it's not really an invariant, because
-        // argument emission likes to lie sometimes.
-        if (eltTI.isLoadable()) {
-          elt = eltTI.emitLoad(gen.B, loc, elt, LoadOwnershipQualifier::Take);
-        }
+      // RValue has an invariant that loadable values have been
+      // loaded.  Except it's not really an invariant, because
+      // argument emission likes to lie sometimes.
+      if (eltTI.isLoadable()) {
+        elt = eltTI.emitLoad(gen.B, loc, elt, LoadOwnershipQualifier::Take);
       }
 
       // If we're returning a +1 value, emit a cleanup for the member
@@ -116,6 +136,14 @@ public:
 
       visit(eltFormalType, eltMV);
     }
+  }
+
+  void visitTupleType(CanTupleType tupleFormalType, ManagedValue tuple) {
+    if (tuple.getType().isObject()) {
+      return visitObjectTupleType(tupleFormalType, tuple);
+    }
+
+    visitAddressTupleType(tupleFormalType, tuple);
   }
 };
 

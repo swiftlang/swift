@@ -27,6 +27,7 @@
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/IRGenOptions.h"
 
+#include "ConstantBuilder.h"
 #include "Explosion.h"
 #include "GenProto.h"
 #include "GenType.h"
@@ -264,11 +265,17 @@ static llvm::Constant *buildPrivateMetadata(IRGenModule &IGM,
                                             llvm::Constant *captureDescriptor,
                                             MetadataKind kind) {
   // Build the fields of the private metadata.
-  SmallVector<llvm::Constant*, 5> fields;
-  fields.push_back(dtorFn);
-  fields.push_back(llvm::ConstantPointerNull::get(IGM.WitnessTablePtrTy));
-  fields.push_back(llvm::ConstantStruct::get(IGM.TypeMetadataStructTy,
-                                             getMetadataKind(IGM, kind)));
+  ConstantInitBuilder builder(IGM);
+  auto fields = builder.beginStruct(IGM.FullBoxMetadataStructTy);
+
+  fields.add(dtorFn);
+  fields.addNullPointer(IGM.WitnessTablePtrTy);
+  {
+    auto kindStruct = fields.beginStruct(IGM.TypeMetadataStructTy);
+    kindStruct.add(getMetadataKind(IGM, kind));
+    kindStruct.finishAndAddTo(fields);
+  }
+
   // Figure out the offset to the first element, which is necessary to be able
   // to polymorphically project as a generic box.
   auto elements = layout.getElements();
@@ -278,18 +285,15 @@ static llvm::Constant *buildPrivateMetadata(IRGenModule &IGM,
     offset = elements[0].getByteOffset();
   else
     offset = Size(0);
-  fields.push_back(llvm::ConstantInt::get(IGM.Int32Ty, offset.getValue()));
+  fields.addInt32(offset.getValue());
 
-  fields.push_back(captureDescriptor);
-
-  llvm::Constant *init =
-    llvm::ConstantStruct::get(IGM.FullBoxMetadataStructTy, fields);
+  fields.add(captureDescriptor);
 
   llvm::GlobalVariable *var =
-    new llvm::GlobalVariable(IGM.Module, IGM.FullBoxMetadataStructTy,
-                             /*constant*/ true,
-                             llvm::GlobalVariable::PrivateLinkage, init,
-                             "metadata");
+    fields.finishAndCreateGlobal("metadata",
+                                 IGM.getPointerAlignment(),
+                                 /*constant*/ true,
+                                 llvm::GlobalVariable::PrivateLinkage);
 
   llvm::Constant *indices[] = {
     llvm::ConstantInt::get(IGM.Int32Ty, 0),

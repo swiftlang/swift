@@ -582,7 +582,7 @@
   {
     key.kind: source.lang.swift.ref.enumelement,
     key.name: "EElem",
-    key.usr: "s:8__main__1EO5EElemAcCmF",
+    key.usr: "s:8__main__1EO5EElemA2CmF",
     key.offset: 568,
     key.length: 5
   },
@@ -1083,7 +1083,7 @@
   {
     key.kind: source.lang.swift.ref.function.operator.infix,
     key.name: "+(_:_:)",
-    key.usr: "s:s1poiSiSi_SitF",
+    key.usr: "s:s1poiS2i_SitF",
     key.offset: 1217,
     key.length: 1
   },
@@ -1242,7 +1242,7 @@
   {
     key.kind: source.lang.swift.ref.function.subscript,
     key.name: "subscript(_:)",
-    key.usr: "s:8__main__3CC2C9subscriptSiSici",
+    key.usr: "s:8__main__3CC2C9subscriptS2ici",
     key.offset: 1357,
     key.length: 1
   },
@@ -1254,7 +1254,7 @@
   {
     key.kind: source.lang.swift.ref.function.subscript,
     key.name: "subscript(_:)",
-    key.usr: "s:8__main__3CC2C9subscriptSiSici",
+    key.usr: "s:8__main__3CC2C9subscriptS2ici",
     key.offset: 1359,
     key.length: 1
   },
@@ -1267,7 +1267,7 @@
   {
     key.kind: source.lang.swift.ref.function.subscript,
     key.name: "subscript(_:)",
-    key.usr: "s:8__main__3CC2C9subscriptSiSici",
+    key.usr: "s:8__main__3CC2C9subscriptS2ici",
     key.offset: 1366,
     key.length: 1
   },
@@ -1279,7 +1279,7 @@
   {
     key.kind: source.lang.swift.ref.function.subscript,
     key.name: "subscript(_:)",
-    key.usr: "s:8__main__3CC2C9subscriptSiSici",
+    key.usr: "s:8__main__3CC2C9subscriptS2ici",
     key.offset: 1368,
     key.length: 1
   },
@@ -1298,7 +1298,7 @@
   {
     key.kind: source.lang.swift.ref.function.subscript,
     key.name: "subscript(_:)",
-    key.usr: "s:8__main__3CC2C9subscriptSiSici",
+    key.usr: "s:8__main__3CC2C9subscriptS2ici",
     key.offset: 1379,
     key.length: 1
   },
@@ -1310,7 +1310,7 @@
   {
     key.kind: source.lang.swift.ref.function.subscript,
     key.name: "subscript(_:)",
-    key.usr: "s:8__main__3CC2C9subscriptSiSici",
+    key.usr: "s:8__main__3CC2C9subscriptS2ici",
     key.offset: 1381,
     key.length: 1
   },
@@ -1908,7 +1908,7 @@
       {
         key.kind: source.lang.swift.decl.function.method.instance,
         key.name: "instanceFunc0(_:b:)",
-        key.usr: "s:8__main__2CCC13instanceFunc0SiSi_Sf1btF",
+        key.usr: "s:8__main__2CCC13instanceFunc0S2i_Sf1btF",
         key.offset: 94,
         key.length: 63,
         key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>instanceFunc0</decl.name>(<decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>a</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"s:Si\">Int</ref.struct></decl.var.parameter.type></decl.var.parameter>, <decl.var.parameter><decl.var.parameter.argument_label>b</decl.var.parameter.argument_label>: <decl.var.parameter.type><ref.struct usr=\"s:Sf\">Float</ref.struct></decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><ref.struct usr=\"s:Si\">Int</ref.struct></decl.function.returntype></decl.function.method.instance>",
@@ -1932,7 +1932,7 @@
       {
         key.kind: source.lang.swift.decl.function.method.instance,
         key.name: "instanceFunc1(a:b:)",
-        key.usr: "s:8__main__2CCC13instanceFunc1SiSi1a_Sf1btF",
+        key.usr: "s:8__main__2CCC13instanceFunc1S2i1a_Sf1btF",
         key.offset: 161,
         key.length: 65,
         key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>instanceFunc1</decl.name>(<decl.var.parameter><decl.var.parameter.argument_label>a</decl.var.parameter.argument_label> <decl.var.parameter.name>x</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"s:Si\">Int</ref.struct></decl.var.parameter.type></decl.var.parameter>, <decl.var.parameter><decl.var.parameter.argument_label>b</decl.var.parameter.argument_label> <decl.var.parameter.name>y</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"s:Sf\">Float</ref.struct></decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><ref.struct usr=\"s:Si\">Int</ref.struct></decl.function.returntype></decl.function.method.instance>",
@@ -2032,7 +2032,7 @@
       {
         key.kind: source.lang.swift.decl.enumelement,
         key.name: "EElem",
-        key.usr: "s:8__main__1EO5EElemAcCmF",
+        key.usr: "s:8__main__1EO5EElemA2CmF",
         key.fully_annotated_decl: "<decl.enumelement><syntaxtype.keyword>case</syntaxtype.keyword> <decl.name>EElem</decl.name></decl.enumelement>"
       }
     ]
@@ -2334,7 +2334,7 @@
       {
         key.kind: source.lang.swift.decl.function.subscript,
         key.name: "subscript(_:)",
-        key.usr: "s:8__main__3CC2C9subscriptSiSici",
+        key.usr: "s:8__main__3CC2C9subscriptS2ici",
         key.offset: 1129,
         key.length: 99,
         key.fully_annotated_decl: "<decl.function.subscript><syntaxtype.keyword>subscript</syntaxtype.keyword>(<decl.var.parameter><decl.var.parameter.name>i</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"s:Si\">Int</ref.struct></decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><ref.struct usr=\"s:Si\">Int</ref.struct></decl.function.returntype> { <syntaxtype.keyword>get</syntaxtype.keyword> <syntaxtype.keyword>set</syntaxtype.keyword> }</decl.function.subscript>",
@@ -2350,7 +2350,7 @@
       },
       {
         key.kind: source.lang.swift.decl.function.accessor.getter,
-        key.usr: "s:8__main__3CC2C9subscriptSiSicfg",
+        key.usr: "s:8__main__3CC2C9subscriptS2icfg",
         key.offset: 1162,
         key.length: 25,
         key.fully_annotated_decl: "<decl.function.accessor.getter><decl.name>get</decl.name> {}</decl.function.accessor.getter>",
@@ -2365,7 +2365,7 @@
       },
       {
         key.kind: source.lang.swift.decl.function.accessor.setter,
-        key.usr: "s:8__main__3CC2C9subscriptSiSicfs",
+        key.usr: "s:8__main__3CC2C9subscriptS2icfs",
         key.offset: 1193,
         key.length: 31,
         key.fully_annotated_decl: "<decl.function.accessor.setter><decl.name>set(vvv)</decl.name> {}</decl.function.accessor.setter>",

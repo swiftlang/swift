@@ -843,6 +843,12 @@ if (Builtin.ID == BuiltinValueKind::id) { \
     out.add(globalString);
     return;
   }
-  
+
+  if (Builtin.ID == BuiltinValueKind::TSanInoutAccess) {
+    auto address = args.claimNext();
+    IGF.emitTSanInoutAccessCall(address);
+    return;
+  }
+
   llvm_unreachable("IRGen unimplemented for this builtin!");
 }

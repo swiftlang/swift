@@ -47,7 +47,7 @@ postfix func +- <T>(_: (a: T, b: T)) {}
 
 infix operator «+» {}
 
-// CHECK-LABEL: sil hidden @_T08mangling007p_qcaDcoiSiSi_SitF
+// CHECK-LABEL: sil hidden @_T08mangling007p_qcaDcoiS2i_SitF
 func «+»(a: Int, b: Int) -> Int { return a + b }
 
 protocol Foo {}
@@ -90,7 +90,7 @@ func uses_clang_struct(r r: NSRect) {}
 func uses_optionals(x x: Int?) -> UnicodeScalar? { return nil }
 
 enum GenericUnion<T> {
-  // CHECK-LABEL: sil shared [transparent] @_T08mangling12GenericUnionO3FooACyxGSicACyxGmlF
+  // CHECK-LABEL: sil shared [transparent] @_T08mangling12GenericUnionO3FooACyxGSicAEmlF
   case Foo(Int)
 }
 

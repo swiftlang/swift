@@ -207,6 +207,9 @@ public:
 
   // Only to be used by the demangler parsers.
   void addChild(NodePointer Child, NodeFactory &Factory);
+
+  // Reverses the order of children.
+  void reverseChildren(size_t StartingAt = 0);
 };
 
 /// Returns true if the mangledName starts with the swift mangling prefix.
@@ -481,14 +484,15 @@ public:
 
   llvm::StringRef getStringRef() const { return Stream; }
 
-  /// Returns a mutable reference to the last character added to the printer.
-  char &lastChar() { return Stream.back(); }
-
+  /// Shrinks the buffer.
+  void resetSize(size_t toPos) {
+    assert(toPos <= Stream.size());
+    Stream.resize(toPos);
+  }
 private:
   std::string Stream;
 };
 
-bool mangleStandardSubstitution(Node *node, DemanglerPrinter &Out);
 bool isSpecialized(Node *node);
 NodePointer getUnspecialized(Node *node, NodeFactory &Factory);
 

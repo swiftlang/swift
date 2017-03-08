@@ -20,6 +20,7 @@
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Defer.h"
+#include "llvm/Support/ErrorHandling.h"
 
 using namespace swift;
 
@@ -322,7 +323,7 @@ void TypeChecker::checkGenericParamList(GenericSignatureBuilder *builder,
 
       // Infer requirements from the inherited types.
       for (const auto &inherited : param->getInherited()) {
-        builder->inferRequirements(inherited);
+        builder->inferRequirements(*lookupDC->getParentModule(), inherited);
       }
     }
   }
@@ -399,6 +400,8 @@ bool TypeChecker::validateRequirement(SourceLoc whereLoc, RequirementRepr &req,
     return false;
   }
   }
+
+  llvm_unreachable("Unhandled RequirementKind in switch.");
 }
 
 void
@@ -505,7 +508,8 @@ static bool checkGenericFuncSignature(TypeChecker &tc,
 
     // Infer requirements from the pattern.
     if (builder) {
-      builder->inferRequirements(params, genericParams);
+      builder->inferRequirements(*func->getParentModule(), params,
+                                 genericParams);
     }
   }
 
@@ -524,7 +528,8 @@ static bool checkGenericFuncSignature(TypeChecker &tc,
       // Infer requirements from it.
       if (builder && genericParams &&
           fn->getBodyResultTypeLoc().getTypeRepr()) {
-        builder->inferRequirements(fn->getBodyResultTypeLoc());
+        builder->inferRequirements(*func->getParentModule(),
+                                   fn->getBodyResultTypeLoc());
       }
     }
   }
@@ -860,7 +865,8 @@ static bool checkGenericSubscriptSignature(TypeChecker &tc,
   // Infer requirements from it.
   if (genericParams && builder &&
       subscript->getElementTypeLoc().getTypeRepr()) {
-    builder->inferRequirements(subscript->getElementTypeLoc());
+    builder->inferRequirements(*subscript->getParentModule(),
+                               subscript->getElementTypeLoc());
   }
 
   // Check the indices.
@@ -872,7 +878,8 @@ static bool checkGenericSubscriptSignature(TypeChecker &tc,
 
   // Infer requirements from the pattern.
   if (builder)
-    builder->inferRequirements(params, genericParams);
+    builder->inferRequirements(*subscript->getParentModule(), params,
+                               genericParams);
 
   return badType;
 }

@@ -86,6 +86,8 @@ static SILValue getIncomingValueForPred(const SILBasicBlock *BB,
     return cast<const CondBranchInst>(TI)->getArgForDestBB(BB, Index);
   case TermKind::CheckedCastBranchInst:
     return cast<const CheckedCastBranchInst>(TI)->getOperand();
+  case TermKind::CheckedCastValueBranchInst:
+    return cast<const CheckedCastValueBranchInst>(TI)->getOperand();
   case TermKind::SwitchEnumInst:
     return cast<const SwitchEnumInst>(TI)->getOperand();
   }

@@ -374,7 +374,7 @@ Runtime.test("Generic class ObjC runtime names") {
   expectEqual("_T01a12GenericClassCySo9NSCopying_AA9ProtocolAAA0D1BpGD",
               NSStringFromClass(GenericClass<ProtocolB & NSCopying & ProtocolA>.self))
 
-  expectEqual("_T01a17MultiGenericClassCyAA0B6StructVySiGAA0B4EnumOyAGySiGGGD",
+  expectEqual("_T01a17MultiGenericClassCyAA0B6StructVySiGAA0B4EnumOyAHySiGGGD",
               NSStringFromClass(MultiGenericClass<GenericStruct<Int>,
                                                   GenericEnum<GenericEnum<Int>>>.self))
 }

@@ -18,6 +18,7 @@
 #include "swift/SIL/PrettyStackTrace.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILModule.h"
+#include "llvm/Support/CommandLine.h"
 #include "llvm/Support/raw_ostream.h"
 
 using namespace swift;

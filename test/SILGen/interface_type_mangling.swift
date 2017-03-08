@@ -215,10 +215,10 @@ struct GenericTypeContext<T>: GenericWitnessTest {
 }
 
 // CHECK-LABEL: protocol witness for interface_type_mangling.GenericWitnessTest.closureInGenericContext <A> (A1) -> () in conformance <A> interface_type_mangling.GenericTypeContext<A> : interface_type_mangling.GenericWitnessTest in interface_type_mangling
-// CHECK-LABEL: @_T023interface_type_mangling18GenericTypeContextVyxGAA0D11WitnessTestAAlAaDP09closureIndF0yqd__lFTW
+// CHECK-LABEL: @_T023interface_type_mangling18GenericTypeContextVyxGAA0D11WitnessTestAAlAaEP09closureIndF0yqd__lFTW
 
 // CHECK-LABEL: protocol witness for interface_type_mangling.GenericWitnessTest.closureInGenericPropertyContext.getter : A.Tee in conformance <A> interface_type_mangling.GenericTypeContext<A> : interface_type_mangling.GenericWitnessTest in interface_type_mangling
-// CHECK-LABEL: @_T023interface_type_mangling18GenericTypeContextVyxGAA0D11WitnessTestAAlAaDP09closureInd8PropertyF03TeeQzfgTW
+// CHECK-LABEL: @_T023interface_type_mangling18GenericTypeContextVyxGAA0D11WitnessTestAAlAaEP09closureInd8PropertyF03TeeQzfgTW
 
 // CHECK-LABEL: protocol witness for interface_type_mangling.GenericWitnessTest.twoParamsAtDepth <A, B> (A1, y : B1) -> () in conformance <A> interface_type_mangling.GenericTypeContext<A> : interface_type_mangling.GenericWitnessTest in interface_type_mangling
-// CHECK-LABEL: @_T023interface_type_mangling18GenericTypeContextVyxGAA0D11WitnessTestAAlAaDP16twoParamsAtDepthyqd___qd_0_1ytr0_lFTW
+// CHECK-LABEL: @_T023interface_type_mangling18GenericTypeContextVyxGAA0D11WitnessTestAAlAaEP16twoParamsAtDepthyqd___qd_0_1ytr0_lFTW

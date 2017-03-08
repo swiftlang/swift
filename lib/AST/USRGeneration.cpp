@@ -59,7 +59,7 @@ static bool printObjCUSRFragment(const ValueDecl *D, StringRef ObjCName,
     clang::index::generateUSRForObjCProperty(ObjCName, D->isStatic(), OS);
   } else if (isa<ConstructorDecl>(D)) {
     // init() is a class member in Swift, but an instance method in ObjC.
-    clang::index::generateUSRForObjCMethod(ObjCName, /*isInstanceMember=*/true,
+    clang::index::generateUSRForObjCMethod(ObjCName, /*IsInstanceMethod=*/true,
                                            OS);
   } else if (isa<AbstractFunctionDecl>(D)) {
     clang::index::generateUSRForObjCMethod(ObjCName, D->isInstanceMember(), OS);

@@ -91,6 +91,7 @@ bool SemaAnnotator::walkToDeclPre(Decl *D) {
 
   SourceLoc Loc = D->getLoc();
   unsigned NameLen = 0;
+  bool IsExtension = false;
 
   if (ValueDecl *VD = dyn_cast<ValueDecl>(D)) {
     if (VD->hasName())
@@ -101,7 +102,7 @@ bool SemaAnnotator::walkToDeclPre(Decl *D) {
     Loc = SR.Start;
     if (Loc.isValid())
       NameLen = ED->getASTContext().SourceMgr.getByteDistance(SR.Start, SR.End);
-    ExtDecls.push_back(ED);
+    IsExtension = true;
   } else if (auto Import = dyn_cast<ImportDecl>(D)) {
     if (!handleImports(Import))
       return false;
@@ -122,7 +123,11 @@ bool SemaAnnotator::walkToDeclPre(Decl *D) {
 
   CharSourceRange Range = (Loc.isValid()) ? CharSourceRange(Loc, NameLen)
                                           : CharSourceRange();
-  return SEWalker.walkToDeclPre(D, Range);
+  ShouldVisitChildren = SEWalker.walkToDeclPre(D, Range);
+  if (ShouldVisitChildren && IsExtension) {
+    ExtDecls.push_back(static_cast<ExtensionDecl*>(D));
+  }
+  return ShouldVisitChildren;
 }
 
 bool SemaAnnotator::walkToDeclPost(Decl *D) {
@@ -335,6 +340,9 @@ bool SemaAnnotator::walkToTypeReprPost(TypeRepr *T) {
 }
 
 std::pair<bool, Pattern *> SemaAnnotator::walkToPatternPre(Pattern *P) {
+  if (P->isImplicit())
+    return { true, P };
+
   if (auto *EP = dyn_cast<EnumElementPattern>(P)) {
     auto *Element = EP->getElementDecl();
     if (!Element)

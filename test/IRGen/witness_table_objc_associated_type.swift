@@ -22,7 +22,7 @@ struct SB: B {
 // CHECK-LABEL: @_T034witness_table_objc_associated_type2SBVAA1BAAWP = hidden constant [3 x i8*] [
 // CHECK:         i8* bitcast (%swift.type* ()* @_T034witness_table_objc_associated_type2SAVMa to i8*)
 // CHECK:         i8* bitcast (i8** ()* @_T034witness_table_objc_associated_type2SAVAA1AAAWa to i8*)
-// CHECK:         i8* bitcast {{.*}} @_T034witness_table_objc_associated_type2SBVAA1BAaaDP3fooyyFTW
+// CHECK:         i8* bitcast {{.*}} @_T034witness_table_objc_associated_type2SBVAA1BA2aDP3fooyyFTW
 // CHECK:       ]
 
 class CO: O {}
@@ -32,7 +32,7 @@ struct SO: C {
 }
 // CHECK-LABEL: @_T034witness_table_objc_associated_type2SOVAA1CAAWP = hidden constant [2 x i8*] [
 // CHECK:         i8* bitcast (%swift.type* ()* @_T034witness_table_objc_associated_type2COCMa to i8*)
-// CHECK:         i8* bitcast {{.*}} @_T034witness_table_objc_associated_type2SOVAA1CAaaDP3fooyyFTW
+// CHECK:         i8* bitcast {{.*}} @_T034witness_table_objc_associated_type2SOVAA1CA2aDP3fooyyFTW
 // CHECK:       ]
 
 // CHECK-LABEL: define hidden swiftcc void @_T034witness_table_objc_associated_type0A25OffsetAfterAssociatedTypeyxAA1BRzlF(%swift.opaque* noalias nocapture, %swift.type* %T, i8** %T.B)

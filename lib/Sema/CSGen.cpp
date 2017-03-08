@@ -2507,8 +2507,13 @@ namespace {
       if (!selfDecl->hasType())
         return ErrorType::get(tc.Context);
 
-      Type declaredType = selfDecl->getType()->getRValueInstanceType();
-      Type superclassTy = declaredType->getSuperclass(&tc);
+      // If the method returns 'Self', the type of 'self' is a
+      // DynamicSelfType. Unwrap it before getting the superclass.
+      auto selfTy = selfDecl->getType()->getRValueInstanceType();
+      if (auto *dynamicSelfTy = selfTy->getAs<DynamicSelfType>())
+        selfTy = dynamicSelfTy->getSelfType();
+
+      auto superclassTy = selfTy->getSuperclass(&tc);
 
       if (selfDecl->getType()->is<MetatypeType>())
         superclassTy = MetatypeType::get(superclassTy);

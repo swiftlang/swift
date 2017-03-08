@@ -3491,14 +3491,18 @@ static int prepareForDump(const char *Main,
   options::ModuleCachePath;
 
   if (!options::SwiftVersion.empty()) {
-    if (auto Version = version::Version::
-        parseVersionString(options::SwiftVersion, SourceLoc(), nullptr)) {
-      if (Version.getValue().isValidEffectiveLanguageVersion())
-        InitInvok.getLangOptions().EffectiveLanguageVersion = Version.getValue();
-      else {
-        llvm::errs() << "Unsupported Swift Version.\n";
-        return 1;
+    using version::Version;
+    bool isValid = false;
+    if (auto Version = Version::parseVersionString(options::SwiftVersion,
+                                                   SourceLoc(), nullptr)) {
+      if (auto Effective = Version.getValue().getEffectiveLanguageVersion()) {
+        InitInvok.getLangOptions().EffectiveLanguageVersion = *Effective;
+        isValid = true;
       }
+    }
+    if (!isValid) {
+      llvm::errs() << "Unsupported Swift Version.\n";
+      return 1;
     }
   }
 

@@ -11,13 +11,9 @@ add_swift_library(swiftFoundation ${SWIFT_SDK_OVERLAY_LIBRARY_BUILD_TYPES} IS_SD
   Decimal.swift
   ExtraStringAPIs.swift
   FileManager.swift
-  FileManagerThunks.m
   Foundation.swift
-  Hashing.m
-  Hashing.swift
   IndexPath.swift
   IndexSet.swift
-  IndexSetThunks.m
   Locale.swift
   Measurement.swift
   Notification.swift
@@ -44,7 +40,6 @@ add_swift_library(swiftFoundation ${SWIFT_SDK_OVERLAY_LIBRARY_BUILD_TYPES} IS_SD
   PersonNameComponents.swift
   ReferenceConvertible.swift
   String.swift
-  Thunks.mm
   TimeZone.swift
   TypePreservingNSNumber.mm
   URL.swift

@@ -389,6 +389,11 @@ void ConformanceCollector::collect(swift::SILInstruction *I) {
       scanType(cast<CheckedCastBranchInst>(I)->getCastType().
                  getSwiftRValueType());
       break;
+    case ValueKind::CheckedCastValueBranchInst:
+      scanType(cast<CheckedCastValueBranchInst>(I)
+                   ->getCastType()
+                   .getSwiftRValueType());
+      break;
     case ValueKind::ValueMetatypeInst: {
       auto *VMTI = cast<ValueMetatypeInst>(I);
       scanType(VMTI->getOperand()->getType().getSwiftRValueType());
