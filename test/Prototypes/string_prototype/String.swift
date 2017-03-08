@@ -197,7 +197,6 @@ extension String : Hashable {
   }
 }
 
-
 extension String : BidirectionalCollection {
   typealias Index = Characters.Index
   var startIndex: Index {
@@ -220,7 +219,7 @@ extension String : BidirectionalCollection {
   }
 }
 
-extension String /* : RangeReplaceableCollection */ {
+extension String : RangeReplaceableCollection {
   mutating func replaceSubrange<C: Collection>(
     _ subrange: Range<Int>, with newValues: C
   )

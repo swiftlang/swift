@@ -292,8 +292,17 @@ testSuite.test("replaceSubrange") {
     expectEqual(testSubject, result)
   }
 
+
+
   // Make sure the initial value wasn't mutated
   expectEqual(initial, "hello world!")
+
+  // Check implicit RangeReplaceable stuff works
+  var hello: String = "Hello!"
+  hello.removeLast()
+  let newElements: String = ", 🌎!"
+  hello += newElements
+  expectEqual(hello, "Hello, 🌎!")
 }
 
 testSuite.test("cstring") {
