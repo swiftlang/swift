@@ -1223,8 +1223,8 @@ public:
           << getIDAndType(CI->getDest());
   }
 
-  void visitUnconditionalCheckedCastOpaqueInst(
-      UnconditionalCheckedCastOpaqueInst *CI) {
+  void visitUnconditionalCheckedCastValueInst(
+      UnconditionalCheckedCastValueInst *CI) {
     *this << getIDAndType(CI->getOperand()) << " to " << CI->getType();
   }
 

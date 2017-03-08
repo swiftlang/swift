@@ -218,10 +218,10 @@ public:
       SILLocation loc, SILType ty, const TypeLowering &lowering,
       SGFContext context, std::function<void(SILValue)> rvalueEmitter);
 
-  using SILBuilder::createUnconditionalCheckedCastOpaque;
-  ManagedValue createUnconditionalCheckedCastOpaque(SILLocation loc,
-                                                    ManagedValue operand,
-                                                    SILType type);
+  using SILBuilder::createUnconditionalCheckedCastValue;
+  ManagedValue createUnconditionalCheckedCastValue(SILLocation loc,
+                                                   ManagedValue operand,
+                                                   SILType type);
   using SILBuilder::createUnconditionalCheckedCast;
   ManagedValue createUnconditionalCheckedCast(SILLocation loc,
                                               ManagedValue operand,

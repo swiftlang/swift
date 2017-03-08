@@ -527,9 +527,9 @@ ManagedValue SILGenBuilder::createEnum(SILLocation loc, ManagedValue payload,
   return gen.emitManagedRValueWithCleanup(result);
 }
 
-ManagedValue SILGenBuilder::createUnconditionalCheckedCastOpaque(
+ManagedValue SILGenBuilder::createUnconditionalCheckedCastValue(
     SILLocation loc, ManagedValue operand, SILType type) {
-  SILValue result = SILBuilder::createUnconditionalCheckedCastOpaque(
+  SILValue result = SILBuilder::createUnconditionalCheckedCastValue(
       loc, operand.forward(gen), type);
   return gen.emitManagedRValueWithCleanup(result);
 }

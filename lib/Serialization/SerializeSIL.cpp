@@ -1307,8 +1307,8 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
              llvm::makeArrayRef(listOfValues));
     break;
   }
-  case ValueKind::UnconditionalCheckedCastOpaqueInst: {
-    auto CI = cast<UnconditionalCheckedCastOpaqueInst>(&SI);
+  case ValueKind::UnconditionalCheckedCastValueInst: {
+    auto CI = cast<UnconditionalCheckedCastValueInst>(&SI);
     SILInstCastLayout::emitRecord(
         Out, ScratchRecord, SILAbbrCodes[SILInstCastLayout::Code],
         (unsigned)SI.getKind(), /*attr*/ 0,
