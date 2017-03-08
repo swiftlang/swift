@@ -681,8 +681,7 @@ private:
 
 static Callee prepareArchetypeCallee(SILGenFunction &gen, SILLocation loc,
                                      SILDeclRef constant,
-                                     ArgumentSource &selfValue,
-                                     SubstitutionList &substitutions) {
+                                     ArgumentSource &selfValue) {
   // Construct an archetype call.
   ArchetypeCalleeBuilder Builder{gen, loc, constant, selfValue};
   return Builder.build();
@@ -893,8 +892,7 @@ public:
         SILDeclRef constant = SILDeclRef(afd, kind);
 
         // Prepare the callee.  This can modify both selfValue and subs.
-        Callee theCallee = prepareArchetypeCallee(SGF, e, constant, selfValue,
-                                                  subs);
+        Callee theCallee = prepareArchetypeCallee(SGF, e, constant, selfValue);
         AssumedPlusZeroSelf = selfValue.isRValue()
           && selfValue.forceAndPeekRValue(SGF).peekIsPlusZeroRValueOrTrivial();
 
@@ -4638,7 +4636,7 @@ static RValue emitApplyAllocatingInitializer(SILGenFunction &SGF,
                               RValue(SGF, loc,
                                      selfMetaVal.getType().getSwiftRValueType(),
                                      selfMetaVal));
-    callee.emplace(prepareArchetypeCallee(SGF, loc, initRef, selfSource, subs));
+    callee.emplace(prepareArchetypeCallee(SGF, loc, initRef, selfSource));
   } else {
     callee.emplace(Callee::forDirect(SGF, initRef, loc));
   }
@@ -4854,8 +4852,7 @@ static Callee getBaseAccessorFunctionRef(SILGenFunction &gen,
                                          SILDeclRef constant,
                                          ArgumentSource &selfValue,
                                          bool isSuper,
-                                         bool isDirectUse,
-                                         SubstitutionList &substitutions){
+                                         bool isDirectUse) {
   auto *decl = cast<AbstractFunctionDecl>(constant.getDecl());
 
   // If this is a method in a protocol, generate it as a protocol call.
@@ -4863,8 +4860,7 @@ static Callee getBaseAccessorFunctionRef(SILGenFunction &gen,
     assert(!isDirectUse && "direct use of protocol accessor?");
     assert(!isSuper && "super call to protocol method?");
 
-    return prepareArchetypeCallee(gen, loc, constant, selfValue,
-                                  substitutions);
+    return prepareArchetypeCallee(gen, loc, constant, selfValue);
   }
 
   bool isClassDispatch = false;
@@ -4909,8 +4905,7 @@ emitSpecializedAccessorFunctionRef(SILGenFunction &gen,
   // Get the accessor function. The type will be a polymorphic function if
   // the Self type is generic.
   Callee callee = getBaseAccessorFunctionRef(gen, loc, constant, selfValue,
-                                             isSuper, isDirectUse,
-                                             substitutions);
+                                             isSuper, isDirectUse);
   
   // Collect captures if the accessor has them.
   auto accessorFn = cast<AbstractFunctionDecl>(constant.getDecl());
