@@ -724,18 +724,9 @@ public:
   InheritedProtocolConformance *
   getInheritedConformance(Type type, ProtocolConformance *inherited);
 
-  /// \brief Create trivial substitutions for the given bound generic type.
-  Optional<SubstitutionList>
-  createTrivialSubstitutions(BoundGenericType *BGT,
-                             DeclContext *gpContext) const;
-
   /// Record compiler-known protocol information in the AST.
   void recordKnownProtocols(ModuleDecl *Stdlib);
   
-  /// \brief Retrieve the substitutions for a bound generic type, if known.
-  Optional<SubstitutionList>
-  getSubstitutions(TypeBase *type, DeclContext *gpContext) const;
-
   /// Get the lazy data for the given declaration.
   ///
   /// \param lazyLoader If non-null, the lazy loader to use when creating the
@@ -852,12 +843,6 @@ private:
   void setBriefComment(const Decl *D, StringRef Comment);
 
   friend TypeBase;
-
-  /// \brief Set the substitutions for the given bound generic type.
-  void setSubstitutions(TypeBase *type,
-                        DeclContext *gpContext,
-                        SubstitutionList Subs) const;
-
   friend ArchetypeType;
 
   /// Provide context-level uniquing for SIL lowered type layouts and boxes.

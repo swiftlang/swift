@@ -600,15 +600,6 @@ public:
   /// specialized, but the type Vector is not.
   bool isSpecialized();
 
-  /// Gather all of the substitutions used to produce the given specialized type
-  /// from its unspecialized type.
-  ///
-  /// \returns ASTContext-allocated substitutions.
-  SubstitutionList gatherAllSubstitutions(
-                           ModuleDecl *module,
-                           LazyResolver *resolver,
-                           DeclContext *gpContext = nullptr);
-
   /// \brief Determine whether this type is a legal, lowered SIL type.
   ///
   /// A type is SIL-illegal if it is:
