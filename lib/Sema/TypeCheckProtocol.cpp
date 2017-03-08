@@ -2666,10 +2666,12 @@ diagnoseMissingWitnesses(MissingWitnessDiagnosisKind Kind) {
   // If this conformance has nothing to complain, return.
   if (LocalMissing.empty())
     return;
-
+  SourceLoc ComplainLoc = Loc;
+  bool EditorMode = TC.getLangOpts().DiagnosticsEditorMode;
   llvm::SetVector<ValueDecl*> MissingWitnesses(GlobalMissingWitnesses.begin(),
                                                GlobalMissingWitnesses.end());
-  auto InsertFixitCallback = [MissingWitnesses](NormalProtocolConformance *Conf) {
+  auto InsertFixitCallback = [ComplainLoc, EditorMode, MissingWitnesses]
+      (NormalProtocolConformance *Conf) {
     DeclContext *DC = Conf->getDeclContext();
     // The location where to insert stubs.
     SourceLoc FixitLocation;
@@ -2693,6 +2695,15 @@ diagnoseMissingWitnesses(MissingWitnessDiagnosisKind Kind) {
                                  MissingWitnesses.getArrayRef(),
                                  FixIt, NoStubRequirements);
     auto &Diags = DC->getASTContext().Diags;
+
+    // If we are in editor mode, squash all notes into a single fixit.
+    if (EditorMode) {
+      if (!FixIt.empty()) {
+        Diags.diagnose(ComplainLoc, diag::missing_witnesses_general).
+          fixItInsertAfter(FixitLocation, FixIt);
+      }
+      return;
+    }
     for (auto VD : MissingWitnesses) {
       // Whether this VD has a stub printed.
       bool AddFixit = !NoStubRequirements.count(VD);
