@@ -80,9 +80,6 @@ public:
                 CanType type, ProtocolDecl *proto,
                 llvm::SmallPtrSetImpl<CanType> *visitedParents = nullptr) const;
 
-  /// Retrieve the conformances for the given type.
-  ArrayRef<ProtocolConformanceRef> getConformances(CanType type) const;
-
   bool empty() const {
     return subMap.empty();
   }
@@ -90,8 +87,21 @@ public:
   /// Query whether any replacement types in the map contain archetypes.
   bool hasArchetypes() const;
 
+  /// Query whether any replacement types in the map contain an opened
+  /// existential.
+  bool hasOpenedExistential() const;
+
   /// Query whether any replacement type sin the map contain dynamic Self.
   bool hasDynamicSelf() const;
+
+  /// Apply a substitution to all replacement types in the map. Does not
+  /// change keys.
+  SubstitutionMap subst(const SubstitutionMap &subMap) const;
+
+  /// Apply a substitution to all replacement types in the map. Does not
+  /// change keys.
+  SubstitutionMap subst(TypeSubstitutionFn subs,
+                        LookupConformanceFn conformances) const;
 
   /// Create a substitution map for a protocol conformance.
   static SubstitutionMap

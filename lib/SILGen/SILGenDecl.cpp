@@ -1885,11 +1885,13 @@ SILGenModule::emitProtocolWitness(ProtocolConformance *conformance,
     Type concreteTy = conformance->getInterfaceType();
 
     // FIXME: conformance substitutions should be in terms of interface types
-    auto concreteSubs = concreteTy->gatherAllSubstitutions(M.getSwiftModule(),
-                                                           nullptr, nullptr);
     auto specialized = conformance;
     if (conformance->getGenericSignature()) {
       ASTContext &ctx = getASTContext();
+
+      auto concreteSubs = concreteTy->getContextSubstitutionMap(
+          M.getSwiftModule(),
+          conformance->getDeclContext());
       specialized = ctx.getSpecializedConformance(concreteTy, conformance,
                                                   concreteSubs);
     }

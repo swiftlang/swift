@@ -1457,6 +1457,17 @@ ASTContext::getSpecializedConformance(Type type,
   return result;
 }
 
+SpecializedProtocolConformance *
+ASTContext::getSpecializedConformance(Type type,
+                                      ProtocolConformance *generic,
+                                      const SubstitutionMap &subMap) {
+  SmallVector<Substitution, 4> subs;
+  if (auto *genericSig = generic->getGenericSignature())
+    genericSig->getSubstitutions(subMap, subs);
+
+  return getSpecializedConformance(type, generic, subs);
+}
+
 InheritedProtocolConformance *
 ASTContext::getInheritedConformance(Type type, ProtocolConformance *inherited) {
   llvm::FoldingSetNodeID id;

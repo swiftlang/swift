@@ -2905,18 +2905,20 @@ static Type substType(Type derivedType,
       if (boxTy->getGenericArgs().empty())
         return Type(boxTy);
       
-      SmallVector<Substitution, 4> substArgs;
-      for (auto &arg : boxTy->getGenericArgs()) {
-        substArgs.push_back(arg.subst(nullptr, substitutions,
-                                      lookupConformances));
-      }
-      for (auto &arg : substArgs) {
+      auto subMap = boxTy->getLayout()->getGenericSignature()
+        ->getSubstitutionMap(boxTy->getGenericArgs());
+      subMap = subMap.subst(substitutions, lookupConformances);
+
+      SmallVector<Substitution, 4> newSubs;
+      boxTy->getLayout()->getGenericSignature()
+        ->getSubstitutions(subMap, newSubs);
+      for (auto &arg : newSubs) {
         arg = Substitution(arg.getReplacement()->getCanonicalType(),
                            arg.getConformances());
       }
       return SILBoxType::get(boxTy->getASTContext(),
                              boxTy->getLayout(),
-                             substArgs);
+                             newSubs);
     }
     
     // We only substitute for substitutable types and dependent member types.

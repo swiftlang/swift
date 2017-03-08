@@ -95,6 +95,67 @@ ProtocolConformanceRef::getInherited(ProtocolDecl *parent) const {
   llvm_unreachable("unhandled ProtocolConformanceRef");
 }
 
+ProtocolConformanceRef
+ProtocolConformanceRef::subst(Type origType,
+                              TypeSubstitutionFn subs,
+                              LookupConformanceFn conformances) const {
+  auto substType = origType.subst(subs, conformances,
+                                  SubstFlags::UseErrorType);
+
+  if (substType->isOpenedExistential())
+    return *this;
+
+  // If we have a concrete conformance, we need to substitute the
+  // conformance to apply to the new type.
+  if (isConcrete())
+    return ProtocolConformanceRef(
+      getConcrete()->subst(substType, subs, conformances));
+
+  auto *proto = getRequirement();
+
+  // If the original type was an archetype, check the conformance map.
+  if (origType->is<SubstitutableType>()
+      || origType->is<DependentMemberType>()) {
+    if (auto result = conformances(origType->getCanonicalType(),
+                                   substType,
+                                   proto->getDeclaredType())) {
+      return *result;
+    }
+  }
+
+  // If that didn't find anything, we can still synthesize AnyObject
+  // conformances from thin air.  FIXME: gross.
+  if (proto->isSpecificProtocol(KnownProtocolKind::AnyObject)) {
+    if (substType->isExistentialType())
+      return *this;
+
+    ClassDecl *classDecl = nullptr;
+    auto archetype = substType->getAs<ArchetypeType>();
+
+    if (archetype) {
+      if (archetype->getSuperclass())
+        classDecl = archetype->getSuperclass()->getClassOrBoundGenericClass();
+
+      // A class-constrained archetype without a superclass constraint
+      // conforms to AnyObject abstractly.
+      if (!classDecl && archetype->requiresClass())
+        return ProtocolConformanceRef(proto);
+    } else {
+      classDecl = substType->getClassOrBoundGenericClass();
+    }
+
+    assert(classDecl);
+
+    // Create a concrete conformance based on the conforming class.
+    SmallVector<ProtocolConformance *, 1> lookupResults;
+    classDecl->lookupConformance(classDecl->getParentModule(), proto,
+                                 lookupResults);
+    return ProtocolConformanceRef(lookupResults.front());
+  }
+
+  llvm_unreachable("Invalid conformance substitution");
+}
+
 Type
 ProtocolConformanceRef::getTypeWitnessByName(Type type,
                                              ProtocolConformanceRef conformance,
@@ -546,10 +607,10 @@ bool ProtocolConformance::isVisibleFrom(const DeclContext *dc) const {
   return true;
 }
 
-ProtocolConformance *ProtocolConformance::subst(ModuleDecl *module,
-                                       Type substType,
-                                       TypeSubstitutionFn subs,
-                                       LookupConformanceFn conformances) const {
+ProtocolConformance *
+ProtocolConformance::subst(Type substType,
+                           TypeSubstitutionFn subs,
+                           LookupConformanceFn conformances) const {
   if (getType()->isEqual(substType))
     return const_cast<ProtocolConformance *>(this);
   
@@ -561,10 +622,37 @@ ProtocolConformance *ProtocolConformance::subst(ModuleDecl *module,
       assert(getType()->getNominalOrBoundGenericNominal()
                == substType->getNominalOrBoundGenericNominal()
              && "substitution mapped to different nominal?!");
+
+      // Since this is a normal conformance, the substitution maps archetypes
+      // in the environment of the conformance to types containing archetypes
+      // of some other generic environment.
+      //
+      // ASTContext::getSpecializedConformance() wants a substitution map
+      // with interface types as keys, so do the mapping here.
+      //
+      // Once the type of a normal conformance becomes an interface type,
+      // we can remove this.
+      SubstitutionMap subMap;
+      if (auto *genericSig = getGenericSignature()) {
+        auto *genericEnv = getGenericEnvironment();
+        subMap = genericSig->getSubstitutionMap(
+          [&](SubstitutableType *t) -> Type {
+            return genericEnv->mapTypeIntoContext(
+              t).subst(subs, conformances, SubstFlags::UseErrorType);
+          },
+          [&](CanType origType, Type substType, ProtocolType *protoType)
+            -> Optional<ProtocolConformanceRef> {
+            origType = CanType(
+              genericEnv->mapTypeIntoContext(
+                origType)->castTo<ArchetypeType>());
+            return conformances(origType, substType, protoType);
+          });
+      }
+
       return substType->getASTContext()
         .getSpecializedConformance(substType,
-                           const_cast<ProtocolConformance *>(this),
-                           substType->gatherAllSubstitutions(module, nullptr));
+                                   const_cast<ProtocolConformance *>(this),
+                                   subMap);
     }
     assert(substType->isEqual(getType())
            && "substitution changed non-specialized type?!");
@@ -576,8 +664,7 @@ ProtocolConformance *ProtocolConformance::subst(ModuleDecl *module,
       = cast<InheritedProtocolConformance>(this)->getInheritedConformance();
     ProtocolConformance *newBase;
     if (inheritedConformance->getType()->isSpecialized()) {
-      newBase = inheritedConformance->subst(module, substType,
-                                            subs, conformances);
+      newBase = inheritedConformance->subst(substType, subs, conformances);
     } else {
       newBase = inheritedConformance;
     }
@@ -588,16 +675,15 @@ ProtocolConformance *ProtocolConformance::subst(ModuleDecl *module,
   case ProtocolConformanceKind::Specialized: {
     // Substitute the substitutions in the specialized conformance.
     auto spec = cast<SpecializedProtocolConformance>(this);
-    SmallVector<Substitution, 8> newSubs;
-    newSubs.reserve(spec->getGenericSubstitutions().size());
-    for (auto &sub : spec->getGenericSubstitutions())
-      newSubs.push_back(sub.subst(module, subs, conformances));
-    
-    auto ctxNewSubs = substType->getASTContext().AllocateCopy(newSubs);
-    
+    auto genericConformance
+      = cast<SpecializedProtocolConformance>(this)->getGenericConformance();
+    auto subMap =
+      genericConformance->getGenericSignature()
+        ->getSubstitutionMap(spec->getGenericSubstitutions());
+
     return substType->getASTContext()
-      .getSpecializedConformance(substType, spec->getGenericConformance(),
-                                 ctxNewSubs);
+      .getSpecializedConformance(substType, genericConformance,
+                                 subMap.subst(subs, conformances));
   }
   }
   llvm_unreachable("bad ProtocolConformanceKind");
@@ -617,22 +703,18 @@ ProtocolConformance::getInheritedConformance(ProtocolDecl *protocol) const {
            && "inherited conformance doesn't match type?!");
     
     auto subs = spec->getGenericSubstitutions();
-
     auto *conformingDC = spec->getDeclContext();
-    auto *conformingModule = conformingDC->getParentModule();
-
     auto *env = conformingDC->getGenericEnvironmentOfContext();
-
     auto subMap = env->getSubstitutionMap(subs);
 
-    auto r = inherited->subst(conformingModule, getType(),
+    auto r = inherited->subst(getType(),
                               QuerySubstitutionMap{subMap},
                               LookUpConformanceInSubstitutionMap(subMap));
     assert(getType()->isEqual(r->getType())
            && "substitution didn't produce conformance for same type?!");
     return r;
   }
-    
+
   case ProtocolConformanceKind::Inherited: {
     auto classInherited = cast<InheritedProtocolConformance>(this);
     auto protoInherited = classInherited->getInheritedConformance()

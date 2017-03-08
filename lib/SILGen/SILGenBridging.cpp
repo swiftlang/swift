@@ -77,11 +77,14 @@ emitBridgeNativeToObjectiveC(SILGenFunction &gen,
     // FIXME: Substitute the type substitutions into the witness, because
     // SpecializedProtocolConformance::getWitness() doesn't do it for us.
     GenericEnvironment *witnessEnv = witness.getSyntheticEnvironment();
-
     SubstitutionMap typeSubMap = witnessEnv
       ->getSubstitutionMap(typeSubstitutions);
-    for (auto sub : witnessSubstitutions) {
-      substitutionsBuf.push_back(sub.subst(gen.SGM.SwiftModule, typeSubMap));
+    SubstitutionMap witnessSubMap;
+    if (auto *genericSig = cast<FuncDecl>(witness.getDecl())
+          ->getGenericSignature()) {
+      witnessSubMap = genericSig->getSubstitutionMap(witnessSubstitutions);
+      witnessSubMap = witnessSubMap.subst(typeSubMap);
+      genericSig->getSubstitutions(witnessSubMap, substitutionsBuf);
     }
     substitutions = substitutionsBuf;
   }
