@@ -516,6 +516,9 @@ public:
     return getRecursiveProperties().hasTypeParameter();
   }
 
+  /// Return the root generic parameter of this type parameter type.
+  GenericTypeParamType *getRootGenericParam();
+
   /// Determines whether this type is an lvalue. This includes both straight
   /// lvalue types as well as tuples or optionals of lvalues.
   bool isLValueType() {
@@ -4368,6 +4371,15 @@ inline bool TypeBase::isTypeParameter() {
     return depMemTy->getBase()->isTypeParameter();
 
   return false;
+}
+
+inline GenericTypeParamType *TypeBase::getRootGenericParam() {
+  Type t(this);
+
+  while (auto *memberTy = t->getAs<DependentMemberType>())
+    t = memberTy->getBase();
+
+  return t->castTo<GenericTypeParamType>();
 }
 
 inline bool TypeBase::isExistentialType() {
