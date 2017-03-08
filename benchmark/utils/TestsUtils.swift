@@ -10,7 +10,11 @@
 //
 //===----------------------------------------------------------------------===//
 
+#if os(Linux)
+import Glibc
+#else
 import Darwin
+#endif
 
 // Linear function shift register.
 //
