@@ -26,6 +26,10 @@
 #define __has_attribute(x) 0
 #endif
 
+#if !defined(__has_builtin)
+#define __has_builtin(x) 0
+#endif
+
 #if __has_feature(nullability)
 // Provide macros to temporarily suppress warning about the use of
 // _Nullable and _Nonnull.
