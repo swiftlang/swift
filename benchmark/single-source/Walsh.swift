@@ -11,7 +11,11 @@
 //===----------------------------------------------------------------------===//
 
 import TestsUtils
+#if os(Linux)
+import Glibc
+#else
 import Darwin
+#endif
 
 func IsPowerOfTwo(_ x: Int) -> Bool { return (x & (x - 1)) == 0 }
 
