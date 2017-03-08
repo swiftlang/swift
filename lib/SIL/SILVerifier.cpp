@@ -2522,8 +2522,8 @@ public:
     verifyOpenedArchetype(CI, CI->getType().getSwiftRValueType());
   }
 
-  void checkUnconditionalCheckedCastOpaqueInst(
-      UnconditionalCheckedCastOpaqueInst *CI) {
+  void checkUnconditionalCheckedCastValueInst(
+      UnconditionalCheckedCastValueInst *CI) {
     verifyCheckedCast(/*exact*/ false, CI->getOperand()->getType(),
                       CI->getType(), true);
     verifyOpenedArchetype(CI, CI->getType().getSwiftRValueType());

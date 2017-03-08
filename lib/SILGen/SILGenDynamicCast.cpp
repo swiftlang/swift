@@ -102,7 +102,7 @@ namespace {
 
       ManagedValue result;
       if (Strategy == CastStrategy::Address) {
-        result = SGF.B.createUnconditionalCheckedCastOpaque(
+        result = SGF.B.createUnconditionalCheckedCastValue(
             Loc, operand, origTargetTL.getLoweredType());
       } else {
         result = SGF.B.createUnconditionalCheckedCast(
@@ -388,7 +388,7 @@ namespace {
 
       SILValue resultScalar;
       if (Strategy == CastStrategy::Address) {
-        resultScalar = SGF.B.createUnconditionalCheckedCastOpaque(
+        resultScalar = SGF.B.createUnconditionalCheckedCastValue(
             Loc, operand.forward(SGF), origTargetTL.getLoweredType());
       } else {
         resultScalar = SGF.B.createUnconditionalCheckedCast(

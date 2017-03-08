@@ -67,7 +67,7 @@ static bool isRCIdentityPreservingCast(ValueKind Kind) {
     case ValueKind::UncheckedRefCastInst:
     case ValueKind::UncheckedRefCastAddrInst:
     case ValueKind::UnconditionalCheckedCastInst:
-    case ValueKind::UnconditionalCheckedCastOpaqueInst:
+    case ValueKind::UnconditionalCheckedCastValueInst:
     case ValueKind::RefToBridgeObjectInst:
     case ValueKind::BridgeObjectToRefInst:
       return true;
@@ -364,7 +364,7 @@ void ConformanceCollector::collect(swift::SILInstruction *I) {
     case ValueKind::AllocRefDynamicInst:
     case ValueKind::MetatypeInst:
     case ValueKind::UnconditionalCheckedCastInst:
-    case ValueKind::UnconditionalCheckedCastOpaqueInst:
+    case ValueKind::UnconditionalCheckedCastValueInst:
       scanType(I->getType().getSwiftRValueType());
       break;
     case ValueKind::AllocStackInst: {
