@@ -433,10 +433,13 @@ class RefCountBitsT {
   }
 
   LLVM_ATTRIBUTE_ALWAYS_INLINE
-  RefCountBitsT(RefCountBitsT<RefCountIsInline> newbits) {
+  RefCountBitsT(const RefCountBitsT<RefCountIsInline> *newbitsPtr) {
     bits = 0;
+
+    assert(newbitsPtr && "expected non null newbits");
+    RefCountBitsT<RefCountIsInline> newbits = *newbitsPtr;
     
-    if (refcountIsInline  ||  sizeof(newbits) == sizeof(*this)) {
+    if (refcountIsInline || sizeof(newbits) == sizeof(*this)) {
       // this and newbits are both inline
       // OR this is out-of-line but the same layout as inline.
       // (FIXME: use something cleaner than sizeof for same-layout test)
@@ -672,7 +675,7 @@ class SideTableRefCountBits : public RefCountBitsT<RefCountNotInline>
 
   LLVM_ATTRIBUTE_ALWAYS_INLINE
   SideTableRefCountBits(InlineRefCountBits newbits)
-    : RefCountBitsT<RefCountNotInline>(newbits), weakBits(1)
+    : RefCountBitsT<RefCountNotInline>(&newbits), weakBits(1)
   { }
 
   
