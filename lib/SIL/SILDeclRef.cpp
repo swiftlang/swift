@@ -537,9 +537,21 @@ bool SILDeclRef::isFragile() const {
     if (isEnumElement())
       if (cast<EnumDecl>(dc)->getEffectiveAccess() >= Accessibility::Public)
         return true;
+
+    // The allocating entry point for designated initializers are serialized
+    // if the class is @_versioned or public.
+    if (kind == SILDeclRef::Kind::Allocator) {
+      auto *ctor = cast<ConstructorDecl>(getDecl());
+      if (ctor->isDesignatedInit() &&
+          ctor->getDeclContext()->getAsClassOrClassExtensionContext()) {
+        if (ctor->getEffectiveAccess() >= Accessibility::Public &&
+            !ctor->hasClangNode())
+          return true;
+      }
+    }
   }
 
-  // This is stupid
+  // Otherwise, ask the AST if we're inside an @_inlineable context.
   return (dc->getResilienceExpansion() == ResilienceExpansion::Minimal);
 }
 
