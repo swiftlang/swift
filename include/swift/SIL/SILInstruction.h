@@ -2416,17 +2416,22 @@ class PointerToAddressInst
 {
   friend SILBuilder;
 
-  bool IsStrict;
+  bool IsStrict, IsInvariant;
 
   PointerToAddressInst(SILDebugLocation DebugLoc, SILValue Operand, SILType Ty,
-                       bool IsStrict)
-    : UnaryInstructionBase(DebugLoc, Operand, Ty), IsStrict(IsStrict) {}
+                       bool IsStrict, bool IsInvariant)
+    : UnaryInstructionBase(DebugLoc, Operand, Ty),
+      IsStrict(IsStrict), IsInvariant(IsInvariant) {}
 
 public:
   /// Whether the returned address adheres to strict aliasing.
   /// If true, then the type of each memory access dependent on
   /// this address must be consistent with the memory's bound type.
   bool isStrict() const { return IsStrict; }
+  /// Whether the returned address is invariant.
+  /// If true, then loading from an address derived from this pointer always
+  /// produces the same value.
+  bool isInvariant() const { return IsInvariant; }
 };
 
 /// Convert a heap object reference to a different type without any runtime

@@ -5287,7 +5287,9 @@ emitMaterializeForSetAccessor(SILLocation loc, SILDeclRef materializeForSet,
   // materialize for set is strictly typed, whether it is the local buffer or
   // stored property.
   SILValue address = results[0].getUnmanagedValue();
-  address = B.createPointerToAddress(loc, address, buffer->getType(), /*isStrict*/ true);
+  address = B.createPointerToAddress(loc, address, buffer->getType(),
+                                     /*isStrict*/ true,
+                                     /*isInvariant*/ false);
 
   // Project out the optional callback.
   SILValue optionalCallback = results[1].getUnmanagedValue();
@@ -5389,7 +5391,9 @@ emitAddressorAccessor(SILLocation loc, SILDeclRef addressor,
                                   SILType::getRawPointerType(getASTContext()));
 
   // Convert to the appropriate address type and return.
-  SILValue address = B.createPointerToAddress(loc, pointer, addressType, /*isStrict*/ true);
+  SILValue address = B.createPointerToAddress(loc, pointer, addressType,
+                                              /*isStrict*/ true,
+                                              /*isInvariant*/ false);
 
   // Mark dependence as necessary.
   switch (cast<FuncDecl>(addressor.getDecl())->getAddressorKind()) {

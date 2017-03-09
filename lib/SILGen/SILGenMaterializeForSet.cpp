@@ -860,7 +860,8 @@ MaterializeForSetEmitter::emitUsingGetterSetter(SILGenFunction &gen,
   resultBuffer =
     gen.B.createPointerToAddress(loc, resultBuffer,
                                  RequirementStorageType.getAddressType(),
-                                 /*isStrict*/ true);
+                                 /*isStrict*/ true,
+                                 /*isInvariant*/ false);
   TemporaryInitialization init(resultBuffer, CleanupHandle::invalid());
 
   // Evaluate the getter into the result buffer.
@@ -943,7 +944,8 @@ MaterializeForSetEmitter::createSetterCallback(SILFunction &F,
     // The callback gets the value at +1.
     auto &valueTL = gen.getTypeLowering(lvalue.getTypeOfRValue());
     value = gen.B.createPointerToAddress(
-      loc, value, valueTL.getLoweredType().getAddressType(), /*isStrict*/ true);
+      loc, value, valueTL.getLoweredType().getAddressType(),
+      /*isStrict*/ true, /*isInvariant*/ false);
     if (valueTL.isLoadable() || !gen.silConv.useLoweredAddresses())
       value = valueTL.emitLoad(gen.B, loc, value, LoadOwnershipQualifier::Take);
     ManagedValue mValue = gen.emitManagedRValueWithCleanup(value, valueTL);

@@ -2377,21 +2377,27 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB, SILBuilder &B) {
     SILType Ty;
     Identifier ToToken;
     SourceLoc ToLoc;
-    bool isStrict = false;
+    StringRef attr;
     if (parseTypedValueRef(Val, B) ||
         parseSILIdentifier(ToToken, ToLoc,
-                           diag::expected_tok_in_sil_instr, "to") ||
-        parseSILOptional(isStrict, *this, "strict") ||
-        parseSILType(Ty) ||
+                           diag::expected_tok_in_sil_instr, "to"))
+      return true;
+    if (parseSILOptional(attr, *this) && attr.empty())
+      return true;
+    if (parseSILType(Ty) ||
         parseSILDebugLocation(InstLoc, B))
       return true;
+
+    bool isStrict = attr.equals("strict");
+    bool isInvariant = attr.equals("invariant");
 
     if (ToToken.str() != "to") {
       P.diagnose(ToLoc, diag::expected_tok_in_sil_instr, "to");
       return true;
     }
 
-    ResultVal = B.createPointerToAddress(InstLoc, Val, Ty, isStrict);
+    ResultVal = B.createPointerToAddress(InstLoc, Val, Ty,
+                                         isStrict, isInvariant);
     break;
   }
   case ValueKind::RefToBridgeObjectInst: {
