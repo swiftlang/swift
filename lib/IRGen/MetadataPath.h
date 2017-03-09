@@ -20,6 +20,7 @@
 
 #include "swift/Basic/EncodedSequence.h"
 #include "swift/Reflection/MetadataSource.h"
+#include "IRGen.h"
 
 namespace llvm {
   class Value;
@@ -33,6 +34,7 @@ namespace swift {
 namespace irgen {
   class IRGenFunction;
   class LocalTypeDataKey;
+
 
 /// A path from one source metadata --- either Swift type metadata or a Swift
 /// protocol conformance --- to another.
@@ -91,12 +93,18 @@ class MetadataPath {
     }
 
     /// Return an abstract measurement of the cost of this component.
-    unsigned cost() const {
-      // Right now, all components cost the same: they take one load.
-      // In the future, maybe some components will be cheaper (no loads,
-      // like loading from a superclass's metadata) or more expensive
-      // (multiple loads, or even a call).
-      return 1;
+    OperationCost cost() const {
+      switch (getKind()) {
+      case Kind::InheritedProtocol:
+      case Kind::NominalTypeArgumentConformance:
+      case Kind::NominalTypeArgument:
+      case Kind::NominalParent:
+        return OperationCost::Load;
+
+      case Kind::Impossible:
+        llvm_unreachable("cannot compute cost of an imposible path");
+      }
+      llvm_unreachable("bad path component");
     }
 
     static Component decode(const EncodedSequenceBase::Chunk *&ptr) {
@@ -156,8 +164,8 @@ public:
   }
 
   /// Return an abstract measurement of the cost of this path.
-  unsigned cost() const {
-    unsigned cost = 0;
+  OperationCost cost() const {
+    auto cost = OperationCost::Free;
     for (const Component &component : Path)
       cost += component.cost();
     return cost;

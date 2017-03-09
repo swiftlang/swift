@@ -79,7 +79,7 @@ private:
     void setNext(CacheEntry *next) { NextAndFlags.setPointer(next); }
 
     /// Return the abstract cost of evaluating this cache entry.
-    unsigned cost() const;
+    OperationCost cost() const;
 
     /// Destruct and deallocate this cache entry.
     void erase() const;
@@ -105,7 +105,7 @@ private:
                        llvm::Value *value)
       : CacheEntry(Kind::Concrete, point, isConditional), Value(value) {}
 
-    unsigned cost() const { return 0; }
+    OperationCost cost() const { return OperationCost::Free; }
   };
 
   /// A source of concrete data from which abstract cache entries can be
@@ -159,7 +159,7 @@ private:
 
     llvm::Value *follow(IRGenFunction &IGF, AbstractSource &source) const;
 
-    unsigned cost() const { return Path.cost(); }
+    OperationCost cost() const { return Path.cost(); }
   };
 
   /// The linked list of cache entries corresponding to a particular key.
