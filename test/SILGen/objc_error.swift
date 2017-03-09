@@ -111,11 +111,20 @@ class MyNSError : NSError {
   }
 }
 
-// CHECK-LABEL: sil hidden @_T010objc_error14eraseMyNSError{{[_0-9a-zA-Z]*}}F
-// CHECK-NOT: return
-// CHECK: init_existential_ref
+// CHECK-LABEL: sil hidden @_T010objc_error14eraseMyNSError{{[_0-9a-zA-Z]*}}F : $@convention(thin) () -> @owned Error {
+// CHECK: bb0:
+// CHECK:   [[NSERROR_SUBCLASS:%.*]] = apply {{.*}}({{.*}}) : $@convention(method) (@thick MyNSError.Type) -> @owned MyNSError
+// CHECK:   [[UPCAST:%.*]] = upcast [[NSERROR_SUBCLASS]] : $MyNSError to $NSError
+// CHECK:   [[EXISTENTIAL_REF:%.*]] = init_existential_ref [[UPCAST]]
+// CHECK:   [[BORROWED_EXISTENTIAL_REF:%.*]] = begin_borrow [[EXISTENTIAL_REF]]
+// CHECK:   [[COPY_BORROWED_EXISTENTIAL_REF:%.*]] = copy_value [[BORROWED_EXISTENTIAL_REF]]
+// CHECK:   end_borrow [[BORROWED_EXISTENTIAL_REF]] from [[EXISTENTIAL_REF]]
+// CHECK:   destroy_value [[EXISTENTIAL_REF]]
+// CHECK:   return [[COPY_BORROWED_EXISTENTIAL_REF]]
+// CHECK: } // end sil function '_T010objc_error14eraseMyNSError{{[_0-9a-zA-Z]*}}F'
 func eraseMyNSError() -> Error {
-  return MyNSError()
+  let x: Error = MyNSError()
+  return x
 }
 
 // CHECK-LABEL: sil hidden @_T010objc_error25eraseFictionalServerErrors0F0_pyF

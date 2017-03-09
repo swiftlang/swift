@@ -94,7 +94,7 @@ func testExistentialDispatch(p: P) {
 // CHECK:   [[CP_F:%[0-9]+]] = witness_method $@opened([[N]]) CP, #CP.f!1 : {{.*}}, [[CP_ADDR]]{{.*}} : $@convention(witness_method) <τ_0_0 where τ_0_0 : CP> (@guaranteed τ_0_0) -> @owned τ_0_0
 // CHECK:   [[CP_F_RESULT:%[0-9]+]] = apply [[CP_F]]<@opened([[N]]) CP>([[CP_ADDR]]) : $@convention(witness_method) <τ_0_0 where τ_0_0 : CP> (@guaranteed τ_0_0) -> @owned τ_0_0
 // CHECK:   [[RESULT_EXISTENTIAL:%[0-9]+]] = init_existential_ref [[CP_F_RESULT]] : $@opened([[N]]) CP : $@opened([[N]]) CP, $CP
-// CHECK:   destroy_value [[CP_F_RESULT]] : $@opened([[N]]) CP
+// CHECK:   destroy_value [[RESULT_EXISTENTIAL]]
 // CHECK:   end_borrow [[BORROWED_CP]] from [[CP]]
 // CHECK:   destroy_value [[CP]]
 func testExistentialDispatchClass(cp: CP) {
