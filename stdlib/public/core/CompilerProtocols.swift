@@ -667,7 +667,7 @@ public protocol ExpressibleByDictionaryLiteral {
 ///           String(stringInterpolationSegment: "."))
 @available(*, deprecated, message: "it will be replaced or redesigned in Swift 4.0.  Instead of conforming to 'ExpressibleByStringInterpolation', consider adding an 'init(_:String)'")
 public typealias ExpressibleByStringInterpolation = _ExpressibleByStringInterpolation
-public protocol _ExpressibleByStringInterpolation {
+public protocol _ExpressibleByStringInterpolation: ExpressibleByStringLiteral {
   /// Creates an instance by concatenating the given values.
   ///
   /// Do not call this initializer directly. It is used by the compiler when
