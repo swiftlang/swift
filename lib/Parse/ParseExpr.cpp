@@ -1689,6 +1689,8 @@ createStringLiteralExprFromSegment(ASTContext &Ctx,
            "Returned string is not from buffer?");
     EncodedStr = Ctx.AllocateCopy(EncodedStr);
   }
+  // If you change this line, make sure you also change 
+  // InterpolatedStringLiteralExpr::isInterpolatedSegment().
   return new (Ctx) StringLiteralExpr(EncodedStr, TokenLoc);
 }
 
@@ -1747,6 +1749,8 @@ ParserResult<Expr> Parser::parseExprStringLiteral() {
       consumeToken();
       assert(Tok.is(tok::l_paren));
       
+      // If you change this line, make sure you also change 
+      // InterpolatedStringLiteralExpr::isInterpolatedSegment().
       ParserResult<Expr> E = parseExprList(tok::l_paren, tok::r_paren);
       Status |= E;
       if (E.isNonNull()) {
@@ -2521,6 +2525,9 @@ ParserResult<Expr> Parser::parseExprList(tok leftTok, tok rightTok) {
                                       subExprNameLocs,
                                       rightLoc,
                                       trailingClosure);
+
+  // If you change this function, make sure you also change 
+  // InterpolatedStringLiteralExpr::isInterpolatedSegment().
 
   // A tuple with a single, unlabeled element is just parentheses.
   if (subExprs.size() == 1 &&

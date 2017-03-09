@@ -1020,24 +1020,21 @@ public:
   ArrayRef<Expr *> getSegments() const { return Segments; }
   
   bool isInterpolatedSegment(Expr * segmentExpr) const {
-    // FIXME: This is slow and depends on an implementation detail
-    // (something upstream inserts empty string literal segments at 
-    // the beginning and end of the interpolated string). It should be 
-    // done better.
-    bool isInterpolated = false;
-    
-    for(auto segment : Segments) {
-      if(segment == segmentExpr) {
-        return isInterpolated;
-      }
-      else {
-        isInterpolated = !isInterpolated;
-      }
+    // FIXME: This depends on an implementation detail of ParseExpr.cpp: 
+    // its createStringLiteralExprFromSegment() always creates a 
+    // StringLiteralExpr, and its parseExprList() always creates a 
+    // ParenExpr. We should probably fix this by modeling segments more 
+    // formally.
+    switch(segmentExpr->getKind()) {
+    case ExprKind::StringLiteral:
+      return false;
+      
+    case ExprKind::Paren:
+      return true;
+      
+    default:
+      llvm_unreachable("Interpolated string literal segment is not of a known kind!");
     }
-    
-    // We should never fall out of this loop.
-    assert(false && "segmentExpr is not one of the segments in the Segments list");
-    return false;
   }
   
   /// \brief Retrieve the expression that actually evaluates the resulting
