@@ -1944,12 +1944,15 @@ namespace {
   ProtocolConformance *MultiConformanceChecker::
   checkIndividualConformance(NormalProtocolConformance *conformance,
                              bool issueFixit) {
+    std::vector<ValueDecl*> revivedMissingWitnesses;
     switch (conformance->getState()) {
       case ProtocolConformanceState::Incomplete:
         if (conformance->isInvalid()) {
           // Emit any delayed diagnostics and return.
           ConformanceChecker(TC, conformance, MissingWitnesses, false).
-          emitDelayedDiags();
+            emitDelayedDiags();
+          revivedMissingWitnesses = TC.Context.
+            takeDelayedMissingWitnesses(conformance);
         }
 
         // Check the rest of the conformance below.
@@ -2050,6 +2053,8 @@ namespace {
 
     // The conformance checker we're using.
     AllUsedCheckers.emplace_back(TC, conformance, MissingWitnesses);
+    MissingWitnesses.insert(revivedMissingWitnesses.begin(),
+                            revivedMissingWitnesses.end());
     AllUsedCheckers.back().checkConformance(issueFixit ?
                                       MissingWitnessDiagnosisKind::ErrorFixIt :
                                       MissingWitnessDiagnosisKind::ErrorOnly);
@@ -2709,7 +2714,12 @@ diagnoseMissingWitnesses(MissingWitnessDiagnosisKind Kind) {
 
   switch (Kind) {
   case MissingWitnessDiagnosisKind::ErrorFixIt: {
-    diagnoseOrDefer(LocalMissing[0], true, InsertFixitCallback);
+    if (SuppressDiagnostics) {
+      TC.Context.addDelayedMissingWitnesses(Conformance,
+                                            MissingWitnesses.getArrayRef());
+    } else {
+      diagnoseOrDefer(LocalMissing[0], true, InsertFixitCallback);
+    }
     clearGlobalMissingWitnesses();
     return;
   }
