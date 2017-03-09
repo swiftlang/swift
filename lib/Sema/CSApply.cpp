@@ -2118,20 +2118,25 @@ namespace {
       };
 
       for (auto segment : expr->getSegments()) {
-        ApplyExpr *apply =
-          CallExpr::createImplicit(
-            tc.Context, typeRef,
-            { segment },
-            { tc.Context.Id_stringInterpolationSegment }, getType);
-        cs.cacheSubExprTypes(apply);
+        if(expr->isInterpolatedSegment(segment)) {
+          ApplyExpr *apply =
+            CallExpr::createImplicit(
+              tc.Context, typeRef,
+              { segment },
+              { tc.Context.Id_stringInterpolationSegment }, getType);
+          cs.cacheSubExprTypes(apply);
 
-        Expr *convertedSegment = apply;
-        cs.setSubExprTypes(convertedSegment);
-        if (tc.typeCheckExpressionShallow(convertedSegment, cs.DC))
-          continue;
-        cs.cacheExprTypes(convertedSegment);
+          Expr *convertedSegment = apply;
+          cs.setSubExprTypes(convertedSegment);
+          if (tc.typeCheckExpressionShallow(convertedSegment, cs.DC))
+            continue;
+          cs.cacheExprTypes(convertedSegment);
 
-        segments.push_back(convertedSegment);
+          segments.push_back(convertedSegment);
+        }
+        else {
+          segments.push_back(segment);
+        }
 
         if (names.empty()) {
           names.push_back(tc.Context.Id_stringInterpolation);
