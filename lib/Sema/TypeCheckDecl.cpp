@@ -953,6 +953,47 @@ static void checkRedeclaration(TypeChecker &tc, ValueDecl *current) {
           continue;
       }
 
+      // If the conflicting declarations are initializers with different
+      // failability, but they have non-overlapping availability, let them go.
+      if (auto *currentInit = dyn_cast<ConstructorDecl>(current)) {
+        auto *otherInit = cast<ConstructorDecl>(other);
+        if (((currentInit->getFailability() == OTK_None) ^
+             (otherInit->getFailability() == OTK_None)) ||
+            (currentInit->hasThrows() != otherInit->hasThrows())) {
+
+          struct AvailabilityRange {
+            Optional<clang::VersionTuple> introduced;
+            Optional<clang::VersionTuple> obsoleted;
+          };
+
+          auto findSwiftAvailability =
+              [](const ValueDecl *VD) -> AvailabilityRange {
+            AvailabilityRange result;
+            for (auto *attr : VD->getAttrs().getAttributes<AvailableAttr>()) {
+              if (attr->PlatformAgnostic ==
+                    PlatformAgnosticAvailabilityKind::SwiftVersionSpecific) {
+                if (attr->Introduced)
+                  result.introduced = attr->Introduced;
+                if (attr->Obsoleted)
+                  result.obsoleted = attr->Obsoleted;
+              }
+            }
+            return result;
+          };
+
+          AvailabilityRange currentAvail = findSwiftAvailability(current);
+          AvailabilityRange otherAvail = findSwiftAvailability(other);
+          if (currentAvail.introduced && otherAvail.obsoleted &&
+              *currentAvail.introduced >= *otherAvail.obsoleted) {
+            continue;
+          }
+          if (otherAvail.introduced && currentAvail.obsoleted &&
+              *otherAvail.introduced >= *currentAvail.obsoleted) {
+            continue;
+          }
+        }
+      }
+
       tc.diagnose(current, diag::invalid_redecl, current->getFullName());
       tc.diagnose(other, diag::invalid_redecl_prev, other->getFullName());
       markInvalid();
