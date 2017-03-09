@@ -46,6 +46,9 @@ class MetadataPath {
       // Some components carry indices.
       // P means the primary index.
 
+      /// Associated conformance of a protocol.  P is the WitnessIndex.
+      AssociatedConformance,
+
       /// Base protocol of a protocol.  P is the WitnessIndex.
       OutOfLineBaseProtocol,
 
@@ -101,6 +104,9 @@ class MetadataPath {
       case Kind::NominalTypeArgument:
       case Kind::NominalParent:
         return OperationCost::Load;
+
+      case Kind::AssociatedConformance:
+        return OperationCost::Call;
 
       case Kind::Impossible:
         llvm_unreachable("cannot compute cost of an imposible path");
@@ -161,6 +167,14 @@ public:
   void addInheritedProtocolComponent(WitnessIndex index) {
     assert(!index.isPrefix());
     Path.push_back(Component(Component::Kind::OutOfLineBaseProtocol,
+                             index.getValue()));
+  }
+
+  /// Add a step to this path which gets the associated conformance at
+  /// a particular witness index.
+  void addAssociatedConformanceComponent(WitnessIndex index) {
+    assert(!index.isPrefix());
+    Path.push_back(Component(Component::Kind::AssociatedConformance,
                              index.getValue()));
   }
 

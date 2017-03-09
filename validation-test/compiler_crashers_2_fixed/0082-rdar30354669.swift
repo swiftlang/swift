@@ -1,4 +1,4 @@
-// RUN: not --crash %target-swift-frontend -primary-file %s -emit-ir
+// RUN: %target-swift-frontend -primary-file %s -emit-ir
 
 public func ==<T: EquatableMetaType>(lhs: T, rhs: T) -> Bool {
     return type(of: lhs) == type(of: lhs)

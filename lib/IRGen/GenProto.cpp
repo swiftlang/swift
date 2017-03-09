@@ -1991,6 +1991,29 @@ llvm::Value *MetadataPath::follow(IRGenFunction &IGF,
   return source;
 }
 
+/// Call an associated-type witness table access function.  Does not do
+/// any caching or drill down to implied protocols.
+static llvm::Value *
+emitAssociatedTypeWitnessTableRef(IRGenFunction &IGF,
+                                  llvm::Value *parentMetadata,
+                                  llvm::Value *wtable,
+                                  WitnessIndex index,
+                                  llvm::Value *associatedTypeMetadata) {
+  llvm::Value *witness = emitInvariantLoadOfOpaqueWitness(IGF, wtable, index);
+
+  // Cast the witness to the appropriate function type.
+  auto witnessTy = IGF.IGM.getAssociatedTypeWitnessTableAccessFunctionTy();
+  witness = IGF.Builder.CreateBitCast(witness, witnessTy->getPointerTo());
+
+  // Call the accessor.
+  auto call = IGF.Builder.CreateCall(witness,
+                            { associatedTypeMetadata, parentMetadata, wtable });
+  call->setDoesNotThrow();
+  call->setCallingConv(IGF.IGM.DefaultCC);
+
+  return call;
+}
+
 /// Drill down on a single stage of component.
 ///
 /// sourceType and sourceDecl will be adjusted to refer to the new
@@ -2096,6 +2119,57 @@ llvm::Value *MetadataPath::followComponent(IRGenFunction &IGF,
     return source;
   }
 
+  case Component::Kind::AssociatedConformance: {
+    auto sourceType = sourceKey.Type;
+    auto sourceConformance = sourceKey.Kind.getProtocolConformance();
+    auto sourceProtocol = sourceConformance.getRequirement();
+    auto &pi = IGF.IGM.getProtocolInfo(sourceProtocol);
+
+    auto &entry = pi.getWitnessEntries()[component.getPrimaryIndex()];
+    assert(entry.isAssociatedConformance());
+    auto association = entry.getAssociatedConformancePath();
+    auto associatedRequirement = entry.getAssociatedConformanceRequirement();
+
+    CanType associatedType =
+      sourceConformance.getAssociatedType(sourceType, association)
+        ->getCanonicalType();
+    sourceKey.Type = associatedType;
+
+    auto associatedConformance =
+      sourceConformance.getAssociatedConformance(sourceType, association,
+                                                 associatedRequirement);
+
+    // FIXME: this should be taken care of automatically by
+    // getAssociatedConformance.
+    if (!associatedConformance.isConcrete() &&
+        !isa<ArchetypeType>(associatedType)) {
+      if (auto concreteConf =
+            IGF.IGM.getSwiftModule()->lookupConformance(associatedType,
+                                              associatedRequirement, nullptr)) {
+        associatedConformance = *concreteConf;
+      }
+    }
+
+    sourceKey.Kind =
+      LocalTypeDataKind::forProtocolWitnessTable(associatedConformance);
+
+    assert((associatedConformance.isConcrete() ||
+            isa<ArchetypeType>(sourceKey.Type)) &&
+           "couldn't find concrete conformance for concrete type");
+
+    if (source) {
+      WitnessIndex index(component.getPrimaryIndex(), /*prefix*/ false);
+      auto sourceMetadata = IGF.emitTypeMetadataRef(sourceType);
+      auto associatedMetadata = IGF.emitTypeMetadataRef(sourceKey.Type);
+      source = emitAssociatedTypeWitnessTableRef(IGF, sourceMetadata, source,
+                                                 index, associatedMetadata);
+
+      setProtocolWitnessTableName(IGF.IGM, source, sourceKey.Type,
+                                  associatedRequirement);
+    }
+    return source;
+  }
+
   case Component::Kind::Impossible:
     llvm_unreachable("following an impossible path!");
 
@@ -2115,6 +2189,9 @@ void MetadataPath::print(llvm::raw_ostream &out) const {
     switch (component.getKind()) {
     case Component::Kind::OutOfLineBaseProtocol:
       out << "out_of_line_base_protocol[" << component.getPrimaryIndex() << "]";
+      break;
+    case Component::Kind::AssociatedConformance:
+      out << "associated_conformance[" << component.getPrimaryIndex() << "]";
       break;
     case Component::Kind::NominalTypeArgument:
       out << "nominal_type_argument[" << component.getPrimaryIndex() << "]";
@@ -2828,32 +2905,4 @@ IRGenModule::getAssociatedTypeWitnessTableAccessFunctionTy() {
                                             /*varargs*/ false);
   AssociatedTypeWitnessTableAccessFunctionTy = accessorTy;
   return accessorTy;
-}
-
-/// Call an associated-type witness table access function.  Does not do
-/// any caching or drill down to implied protocols.
-llvm::Value *
-irgen::emitAssociatedTypeWitnessTableRef(IRGenFunction &IGF,
-                                         llvm::Value *parentMetadata,
-                                         llvm::Value *wtable,
-                                         ProtocolDecl *parentProtocol,
-                                         CanType associatedType,
-                                         llvm::Value *associatedTypeMetadata,
-                                         ProtocolDecl *associatedProtocol) {
-  auto &pi = IGF.IGM.getProtocolInfo(parentProtocol);
-  auto index =
-    pi.getAssociatedConformanceIndex(associatedType, associatedProtocol);
-  llvm::Value *witness = emitInvariantLoadOfOpaqueWitness(IGF, wtable, index);
-
-  // Cast the witness to the appropriate function type.
-  auto witnessTy = IGF.IGM.getAssociatedTypeWitnessTableAccessFunctionTy();
-  witness = IGF.Builder.CreateBitCast(witness, witnessTy->getPointerTo());
-
-  // Call the accessor.
-  auto call = IGF.Builder.CreateCall(witness,
-                            { associatedTypeMetadata, parentMetadata, wtable });
-  call->setDoesNotThrow();
-  call->setCallingConv(IGF.IGM.DefaultCC);
-
-  return call;
 }
