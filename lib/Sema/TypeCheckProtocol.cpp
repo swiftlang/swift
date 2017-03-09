@@ -2727,6 +2727,7 @@ diagnoseMissingWitnesses(MissingWitnessDiagnosisKind Kind) {
   switch (Kind) {
   case MissingWitnessDiagnosisKind::ErrorFixIt: {
     if (SuppressDiagnostics) {
+      Conformance->setInvalid();
       TC.Context.addDelayedMissingWitnesses(Conformance,
                                             MissingWitnesses.getArrayRef());
     } else {
