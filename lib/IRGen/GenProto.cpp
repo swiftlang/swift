@@ -2066,11 +2066,14 @@ llvm::Value *MetadataPath::followComponent(IRGenFunction &IGF,
     return source;
   }
 
-  case Component::Kind::InheritedProtocol: {
+  case Component::Kind::OutOfLineBaseProtocol: {
     auto conformance = sourceKey.Kind.getProtocolConformance();
     auto protocol = conformance.getRequirement();
-    auto inheritedProtocol =
-      protocol->getInheritedProtocols()[component.getPrimaryIndex()];
+    auto &pi = IGF.IGM.getProtocolInfo(protocol);
+
+    auto &entry = pi.getWitnessEntries()[component.getPrimaryIndex()];
+    assert(entry.isOutOfLineBase());
+    auto inheritedProtocol = entry.getBase();
 
     sourceKey.Kind =
       LocalTypeDataKind::forAbstractProtocolWitnessTable(inheritedProtocol);
@@ -2084,14 +2087,11 @@ llvm::Value *MetadataPath::followComponent(IRGenFunction &IGF,
     }
 
     if (source) {
-      auto &pi = IGF.IGM.getProtocolInfo(protocol);
-      auto index = pi.getBaseIndex(inheritedProtocol);
-      if (!index.isPrefix()) {
-        source = emitInvariantLoadOfOpaqueWitness(IGF, source, index);
-        source = IGF.Builder.CreateBitCast(source, IGF.IGM.WitnessTablePtrTy);
-        setProtocolWitnessTableName(IGF.IGM, source, sourceKey.Type,
-                                    inheritedProtocol);
-      }
+      WitnessIndex index(component.getPrimaryIndex(), /*prefix*/ false);
+      source = emitInvariantLoadOfOpaqueWitness(IGF, source, index);
+      source = IGF.Builder.CreateBitCast(source, IGF.IGM.WitnessTablePtrTy);
+      setProtocolWitnessTableName(IGF.IGM, source, sourceKey.Type,
+                                  inheritedProtocol);
     }
     return source;
   }
@@ -2113,8 +2113,8 @@ void MetadataPath::print(llvm::raw_ostream &out) const {
     if (i != Path.begin()) out << ".";
     auto component = *i;
     switch (component.getKind()) {
-    case Component::Kind::InheritedProtocol:
-      out << "inherited_protocol[" << component.getPrimaryIndex() << "]";
+    case Component::Kind::OutOfLineBaseProtocol:
+      out << "out_of_line_base_protocol[" << component.getPrimaryIndex() << "]";
       break;
     case Component::Kind::NominalTypeArgument:
       out << "nominal_type_argument[" << component.getPrimaryIndex() << "]";

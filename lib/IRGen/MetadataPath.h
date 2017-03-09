@@ -20,6 +20,7 @@
 
 #include "swift/Basic/EncodedSequence.h"
 #include "swift/Reflection/MetadataSource.h"
+#include "WitnessIndex.h"
 #include "IRGen.h"
 
 namespace llvm {
@@ -45,8 +46,8 @@ class MetadataPath {
       // Some components carry indices.
       // P means the primary index.
 
-      /// Base protocol P of a protocol.
-      InheritedProtocol,
+      /// Base protocol of a protocol.  P is the WitnessIndex.
+      OutOfLineBaseProtocol,
 
       /// Witness table at requirement index P of a generic nominal type.
       NominalTypeArgumentConformance,
@@ -95,7 +96,7 @@ class MetadataPath {
     /// Return an abstract measurement of the cost of this component.
     OperationCost cost() const {
       switch (getKind()) {
-      case Kind::InheritedProtocol:
+      case Kind::OutOfLineBaseProtocol:
       case Kind::NominalTypeArgumentConformance:
       case Kind::NominalTypeArgument:
       case Kind::NominalParent:
@@ -155,12 +156,12 @@ public:
                              index));
   }
 
-  /// Add a step to this path which gets the kth inherited protocol from a
-  /// witness table.
-  ///
-  /// k is computed including protocols which do not have witness tables.
-  void addInheritedProtocolComponent(unsigned index) {
-    Path.push_back(Component(Component::Kind::InheritedProtocol, index));
+  /// Add a step to this path which gets the inherited protocol at
+  /// a particular witness index.
+  void addInheritedProtocolComponent(WitnessIndex index) {
+    assert(!index.isPrefix());
+    Path.push_back(Component(Component::Kind::OutOfLineBaseProtocol,
+                             index.getValue()));
   }
 
   /// Return an abstract measurement of the cost of this path.
