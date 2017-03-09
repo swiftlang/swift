@@ -1250,6 +1250,19 @@ namespace {
       CS.addConstraint(ConstraintKind::LiteralConformsTo, tv,
                        interpolationProto->getDeclaredType(),
                        locator);
+      
+      for(auto segment : expr->getSegments()) {
+        if(expr->isInterpolatedSegment(segment)) {
+          // This branch intentionally left blank. Interpolated segments are 
+          // currently unconstrained, but we expect that to change.
+        }
+        else {
+          // Literal segments are of the same type as the interpolated string
+          // itself.
+          CS.addConstraint(ConstraintKind::Equal, tv,
+            segment->getType(), locator);
+        }
+      }
 
       return tv;
     }
