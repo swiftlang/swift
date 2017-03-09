@@ -34,27 +34,134 @@ llvm::cl::opt<bool> SpecializeGenericSubstitutions(
     llvm::cl::init(false),
     llvm::cl::desc("Enable partial specialization with generic substitutions"));
 
-// Max depth of a bound generic which can be processed by the generic
+// Max depth of a type which can be processed by the generic
 // specializer.
 // E.g. the depth of Array<Array<Array<T>>> is 3.
 // No specializations will be produced, if any of generic parameters contains
-// a bound generic type with the depth higher than this threshold 
-static const unsigned BoundGenericDepthThreshold = 50;
+// a bound generic type with the depth higher than this threshold
+static const unsigned TypeDepthThreshold = 50;
+// Set the width threshold rather high, because some projects uses very wide
+// tuples to model fixed size arrays.
+static const unsigned TypeWidthThreshold = 2000;
 
-static unsigned getBoundGenericDepth(Type t) {
+// Compute the width and the depth of a type.
+// We compute both, because some pathological test-cases result in very
+// wide types and some others result in very deep types. It is important
+// to bail as soon as we hit the threshold on any of both dimentions to
+// prevent compiler hangs and crashes.
+static std::pair<unsigned, unsigned> getTypeDepthAndWidth(Type t) {
   unsigned Depth = 0;
-  if (auto BGT = t->getAs<BoundGenericType>()) {
-    Depth++;
-    auto GenericArgs = BGT->getGenericArgs();
-    unsigned MaxGenericArgDepth = 0;
-    for (auto GenericArg : GenericArgs) {
-      auto ArgDepth = getBoundGenericDepth(GenericArg);
-      if (ArgDepth > MaxGenericArgDepth)
-        MaxGenericArgDepth = ArgDepth;
+  unsigned Width = 0;
+  if (auto *BGT = t->getAs<BoundGenericType>()) {
+    auto *NTD = BGT->getNominalOrBoundGenericNominal();
+    if (NTD) {
+      auto StoredProperties = NTD->getStoredProperties();
+      Width += std::distance(StoredProperties.begin(), StoredProperties.end());
     }
-    Depth += MaxGenericArgDepth;
+    Depth++;
+    unsigned MaxTypeDepth = 0;
+    auto GenericArgs = BGT->getGenericArgs();
+    for (auto Ty : GenericArgs) {
+      unsigned TypeWidth;
+      unsigned TypeDepth;
+      std::tie(TypeDepth, TypeWidth) = getTypeDepthAndWidth(Ty);
+      if (TypeDepth > MaxTypeDepth)
+        MaxTypeDepth = TypeDepth;
+      Width += TypeWidth;
+    }
+    Depth += MaxTypeDepth;
+    return std::make_pair(Depth, Width);
   }
-  return Depth;
+
+  if (auto *TupleTy = t->getAs<TupleType>()) {
+    Width += TupleTy->getNumElements();
+    Depth++;
+    unsigned MaxTypeDepth = 0;
+    auto ElementTypes = TupleTy->getElementTypes();
+    for (auto Ty : ElementTypes) {
+      unsigned TypeWidth;
+      unsigned TypeDepth;
+      std::tie(TypeDepth, TypeWidth) = getTypeDepthAndWidth(Ty);
+      if (TypeDepth > MaxTypeDepth)
+        MaxTypeDepth = TypeDepth;
+      Width += TypeWidth;
+    }
+    Depth += MaxTypeDepth;
+    return std::make_pair(Depth, Width);
+  }
+
+  if (auto *FnTy = t->getAs<SILFunctionType>()) {
+    Depth++;
+    unsigned MaxTypeDepth = 0;
+    auto Params = FnTy->getParameters();
+    Width += Params.size();
+    for (auto Param : Params) {
+      unsigned TypeWidth;
+      unsigned TypeDepth;
+      std::tie(TypeDepth, TypeWidth) = getTypeDepthAndWidth(Param.getType());
+      if (TypeDepth > MaxTypeDepth)
+        MaxTypeDepth = TypeDepth;
+      Width += TypeWidth;
+    }
+    auto Results = FnTy->getResults();
+    Width += Results.size();
+    for (auto Result : Results) {
+      unsigned TypeWidth;
+      unsigned TypeDepth;
+      std::tie(TypeDepth, TypeWidth) = getTypeDepthAndWidth(Result.getType());
+      if (TypeDepth > MaxTypeDepth)
+        MaxTypeDepth = TypeDepth;
+      Width += TypeWidth;
+    }
+    if (FnTy->hasErrorResult()) {
+      Width += 1;
+      unsigned TypeWidth;
+      unsigned TypeDepth;
+      std::tie(TypeDepth, TypeWidth) =
+          getTypeDepthAndWidth(FnTy->getErrorResult().getType());
+      if (TypeDepth > MaxTypeDepth)
+        MaxTypeDepth = TypeDepth;
+      Width += TypeWidth;
+    }
+    Depth += MaxTypeDepth;
+    return std::make_pair(Depth, Width);
+  }
+
+  if (auto *FnTy = t->getAs<FunctionType>()) {
+    Depth++;
+    unsigned MaxTypeDepth = 0;
+    unsigned TypeWidth;
+    unsigned TypeDepth;
+    std::tie(TypeDepth, TypeWidth) = getTypeDepthAndWidth(FnTy->getInput());
+    if (TypeDepth > MaxTypeDepth)
+      MaxTypeDepth = TypeDepth;
+    Width += TypeWidth;
+    std::tie(TypeDepth, TypeWidth) = getTypeDepthAndWidth(FnTy->getResult());
+    if (TypeDepth > MaxTypeDepth)
+      MaxTypeDepth = TypeDepth;
+    Width += TypeWidth;
+    Depth += MaxTypeDepth;
+    return std::make_pair(Depth, Width);
+  }
+
+  if (auto *MT = t->getAs<MetatypeType>()) {
+    Depth += 1;
+    unsigned TypeWidth;
+    unsigned TypeDepth;
+    std::tie(TypeDepth, TypeWidth) = getTypeDepthAndWidth(MT->getInstanceType());
+    Width += TypeWidth;
+    Depth += TypeDepth;
+    return std::make_pair(Depth, Width);
+  }
+
+  return std::make_pair(Depth, Width);
+}
+
+static bool isTypeTooComplex(Type t) {
+  unsigned TypeWidth;
+  unsigned TypeDepth;
+  std::tie(TypeDepth, TypeWidth) = getTypeDepthAndWidth(t);
+  return TypeWidth >= TypeWidthThreshold || TypeDepth >= TypeDepthThreshold;
 }
 
 // =============================================================================
@@ -116,9 +223,7 @@ bool ReabstractionInfo::prepareAndCheck(ApplySite Apply, SILFunction *Callee,
   // generated specializations.
   for (auto Sub : ParamSubs) {
     auto Replacement = Sub.getReplacement();
-    if (Replacement.findIf([](Type ty) -> bool {
-          return getBoundGenericDepth(ty) >= BoundGenericDepthThreshold;
-        })) {
+    if (isTypeTooComplex(Replacement)) {
       DEBUG(llvm::dbgs()
             << "    Cannot specialize because the generic type is too deep.\n");
       return false;
