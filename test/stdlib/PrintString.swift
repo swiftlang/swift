@@ -42,7 +42,7 @@ PrintTests.test("Printable") {
 
 PrintTests.test("CustomStringInterpolation") {
   let s = ("aaa\(1)bbb" as MyString).value
-  expectEqual("<segment aaa><segment 1><segment bbb>", s)
+  expectEqual("aaa<segment 1>bbb", s)
 }
 
 runAllTests()
