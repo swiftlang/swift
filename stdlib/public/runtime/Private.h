@@ -20,6 +20,7 @@
 #include "swift/Basic/Demangle.h"
 #include "swift/Runtime/Config.h"
 #include "swift/Runtime/Metadata.h"
+#include "swift/Runtime/OperatorNew.h"
 #include "llvm/Support/Compiler.h"
 
 // Opaque ISAs need to use object_getClass which is in runtime.h

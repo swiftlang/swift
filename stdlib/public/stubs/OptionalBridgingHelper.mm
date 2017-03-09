@@ -18,6 +18,7 @@
 #include "swift/Runtime/Metadata.h"
 #include "swift/Runtime/Mutex.h"
 #include "swift/Runtime/ObjCBridge.h"
+#include "swift/Runtime/OperatorNew.h"
 #include <vector>
 #import <Foundation/Foundation.h>
 #import <CoreFoundation/CoreFoundation.h>

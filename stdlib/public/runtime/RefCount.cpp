@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Runtime/HeapObject.h"
+#include "swift/Runtime/OperatorNew.h"
 
 namespace swift {
 

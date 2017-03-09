@@ -10,5 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/Runtime/OperatorNew.h"
 #include "../../../lib/Basic/Remangler.cpp"
 #include "../../../lib/Basic/PunycodeUTF8.cpp"
