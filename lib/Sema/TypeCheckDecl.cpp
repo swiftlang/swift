@@ -2536,7 +2536,7 @@ void swift::markAsObjC(TypeChecker &TC, ValueDecl *D,
 
   if (!isObjC) {
     // FIXME: For now, only @objc declarations can be dynamic.
-    if (auto attr = D->getAttrs().getAttribute<DynamicAttr>(D))
+    if (auto attr = D->getAttrs().getAttribute<DynamicAttr>())
       attr->setInvalid();
     return;
   }
