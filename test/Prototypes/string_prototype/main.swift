@@ -1,6 +1,5 @@
 // Run the tests for the whole String prototype
-// RUN: rm -rf %t_out && mkdir -p %t_out && %gyb %S/Substring.swift.gyb -o %t_out/Substring.swift
-// RUN: %target-build-swift %s %S/String.swift %S/StringStorage.swift %S/Unicode.swift %S/Latin1String.swift %S/CanonicalString.swift %S/StringComparison.swift %S/StringCompatibility.swift %t_out/Substring.swift -parse-stdlib -Xfrontend -disable-access-control -Onone -o %t
+// RUN: %target-build-swift %s %S/String.swift %S/StringStorage.swift %S/Unicode.swift %S/Latin1String.swift %S/CanonicalString.swift %S/StringComparison.swift %S/StringCompatibility.swift %S/Substring.swift -parse-stdlib -Xfrontend -disable-access-control -Onone -o %t
 // RUN: %target-run %t
 // REQUIRES: executable_test
 

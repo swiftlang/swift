@@ -98,15 +98,18 @@ public struct Substring : RangeReplaceableCollection, BidirectionalCollection {
     _slice.replaceSubrange(bounds, with: newElements)
   }
 
-% for Range in ['Range', 'ClosedRange']:
-
   public mutating func replaceSubrange(
-    _ bounds: ${Range}<Index>, with newElements: Substring
+    _ bounds: Range<Index>, with newElements: Substring
   ) {
     replaceSubrange(bounds, with: newElements._slice)
   }
 
-% end
+  public mutating func replaceSubrange(
+    _ bounds: ClosedRange<Index>, with newElements: Substring
+  ) {
+    replaceSubrange(bounds, with: newElements._slice)
+  }
+
 }
 
 extension Substring : Equatable {
@@ -149,17 +152,21 @@ extension Substring : Hashable {
 }
 
 extension Substring {
-% for (property, ViewPrefix) in [
-%   ('utf8', 'UTF8'),
-%   ('utf16', 'UTF16')]:
-  public typealias ${ViewPrefix}Index = String.Valid${ViewPrefix}View.Index
+  public typealias UTF8Index = String.ValidUTF8View.Index
 
-  public var ${property}: String.Valid${ViewPrefix}View {
+  public var utf8: String.ValidUTF8View {
     get {
-      return String(self).${property}
+      return String(self).utf8
     }
   }
-% end
+
+  public typealias UTF16Index = String.ValidUTF16View.Index
+
+  public var utf16: String.ValidUTF16View {
+    get {
+      return String(self).utf16
+    }
+  }
 
   // public typealias ${ViewPrefix}Index = String.Valid${ViewPrefix}View.Index
 
