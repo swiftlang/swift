@@ -104,6 +104,11 @@ public:
                            CanType formalConcreteType, SILValue concreteValue,
                            ArrayRef<ProtocolConformanceRef> conformances);
 
+  ManagedValue
+  createInitExistentialRef(SILLocation loc, SILType existentialType,
+                           CanType formalConcreteType, ManagedValue concrete,
+                           ArrayRef<ProtocolConformanceRef> conformances);
+
   AllocExistentialBoxInst *
   createAllocExistentialBox(SILLocation loc, SILType existentialType,
                             CanType concreteType,

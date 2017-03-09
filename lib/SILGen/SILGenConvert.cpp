@@ -463,9 +463,7 @@ ManagedValue SILGenFunction::emitExistentialErasure(
     if (nsErrorType->isExactSuperclassOf(concreteFormalType, nullptr)) {
       ManagedValue nsError =  F(SGFContext());
       if (nsErrorType != concreteFormalType) {
-        nsError = ManagedValue(B.createUpcast(loc, nsError.getValue(),
-                                              getLoweredType(nsErrorType)),
-                               nsError.getCleanup());
+        nsError = B.createUpcast(loc, nsError, getLoweredType(nsErrorType));
       }
       return emitBridgedToNativeError(loc, nsError);
     }
@@ -490,16 +488,15 @@ ManagedValue SILGenFunction::emitExistentialErasure(
         }
       }
 
-      auto nativeError = F(SGFContext());
+      ManagedValue nativeError = F(SGFContext());
 
       FormalEvaluationScope writebackScope(*this);
-      auto nsError =
-        emitRValueForPropertyLoad(loc, nativeError, concreteFormalType,
-                                  /*super*/ false, nsErrorVar,
-                                  nsErrorVarSubstitutions,
-                                  AccessSemantics::Ordinary, nsErrorType,
-                                  SGFContext())
-        .getAsSingleValue(*this, loc);
+      ManagedValue nsError =
+          emitRValueForPropertyLoad(
+              loc, nativeError, concreteFormalType,
+              /*super*/ false, nsErrorVar, nsErrorVarSubstitutions,
+              AccessSemantics::Ordinary, nsErrorType, SGFContext())
+              .getAsSingleValue(*this, loc);
 
       return emitBridgedToNativeError(loc, nsError);
     }
@@ -557,14 +554,11 @@ ManagedValue SILGenFunction::emitExistentialErasure(
         // layering reasons, so perform an unchecked cast down to NSError.
         SILType anyObjectTy =
           potentialNSError.getType().getAnyOptionalObjectType();
-        SILValue nsError = isPresentBB->createPHIArgument(
-            anyObjectTy, ValueOwnershipKind::Owned);
+        ManagedValue nsError = B.createOwnedPHIArgument(anyObjectTy);
         nsError = B.createUncheckedRefCast(loc, nsError, 
                                            getLoweredType(nsErrorType));
 
-        branchArg = emitBridgedToNativeError(loc,
-                                        emitManagedRValueWithCleanup(nsError))
-                      .forward(*this);
+        branchArg = emitBridgedToNativeError(loc, nsError).forward(*this);
       }
       B.createBranch(loc, contBB, branchArg);
 
@@ -616,12 +610,8 @@ ManagedValue SILGenFunction::emitExistentialErasure(
     assert(existentialTL.isLoadable());
 
     ManagedValue sub = F(SGFContext());
-    SILValue v = B.createInitExistentialRef(loc,
-                                            existentialTL.getLoweredType(),
-                                            concreteFormalType,
-                                            sub.getValue(),
-                                            conformances);
-    return ManagedValue(v, sub.getCleanup());
+    return B.createInitExistentialRef(loc, existentialTL.getLoweredType(),
+                                      concreteFormalType, sub, conformances);
   }
   case ExistentialRepresentation::Boxed: {
     // Allocate the existential.
@@ -660,13 +650,10 @@ ManagedValue SILGenFunction::emitExistentialErasure(
       ProtocolConformanceRef buf[] = {
         *anyObjectConformance,
       };
-      
-      auto asAnyObject = B.createInitExistentialRef(loc,
-                                  SILType::getPrimitiveObjectType(anyObjectTy),
-                                  concreteFormalType,
-                                  concreteValue.getValue(),
-                                  getASTContext().AllocateCopy(buf));
-      return ManagedValue(asAnyObject, concreteValue.getCleanup());
+
+      return B.createInitExistentialRef(
+          loc, SILType::getPrimitiveObjectType(anyObjectTy), concreteFormalType,
+          concreteValue, getASTContext().AllocateCopy(buf));
     };
     
     auto concreteTLPtr = &concreteTL;
