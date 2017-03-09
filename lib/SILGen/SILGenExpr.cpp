@@ -1264,9 +1264,8 @@ RValue RValueEmitter::visitDerivedToBaseExpr(DerivedToBaseExpr *E,
   if (original.getType() == loweredResultTy)
     return RValue(SGF, E, original);
 
-  SILValue converted = SGF.B.createUpcast(E, original.getValue(), 
-                                          loweredResultTy);
-  return RValue(SGF, E, ManagedValue(converted, original.getCleanup()));
+  ManagedValue converted = SGF.B.createUpcast(E, original, loweredResultTy);
+  return RValue(SGF, E, converted);
 }
 
 RValue RValueEmitter::visitMetatypeConversionExpr(MetatypeConversionExpr *E,
