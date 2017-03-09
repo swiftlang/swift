@@ -112,7 +112,7 @@ public struct Zip2Iterator<
 public struct Zip2Sequence<Sequence1 : Sequence, Sequence2 : Sequence>
   : Sequence {
 
-    
+
   @available(*, deprecated, renamed: "Sequence1.Iterator")
   public typealias Stream1 = Sequence1.Iterator
   @available(*, deprecated, renamed: "Sequence2.Iterator")

@@ -80,7 +80,7 @@ public struct UnicodeScalar :
   ///
   /// In case of an invalid input value, nil is returned.
   ///
-  ///     let codepoint: UInt32 = extValue // This might be an invalid value. 
+  ///     let codepoint: UInt32 = extValue // This might be an invalid value.
   ///     if let emoji = UnicodeScalar(codepoint) {
   ///       print(emoji)
   ///     } else {
@@ -121,7 +121,7 @@ public struct UnicodeScalar :
   ///
   /// In case an invalid input value, nil is returned.
   ///
-  ///     let codepoint: UInt32 = extValue // This might be an invalid value. 
+  ///     let codepoint: UInt32 = extValue // This might be an invalid value.
   ///     if let bap = UnicodeScalar(codepoint) {
   ///       print(bap)
   ///     } else {
@@ -320,7 +320,7 @@ extension UnicodeScalar {
   ///
   /// In case an invalid input value, nil is returned.
   ///
-  ///     let codepoint: UInt32 = extValue // This might be an invalid value. 
+  ///     let codepoint: UInt32 = extValue // This might be an invalid value.
   ///     if let emoji = UnicodeScalar(codepoint) {
   ///       print(emoji)
   ///     } else {

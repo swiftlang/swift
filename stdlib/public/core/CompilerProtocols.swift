@@ -265,7 +265,7 @@ public protocol ExpressibleByFloatLiteral {
   /// Valid types for `FloatLiteralType` are `Float`, `Double`, and `Float80`
   /// where available.
   associatedtype FloatLiteralType : _ExpressibleByBuiltinFloatLiteral
-  
+
   /// Creates an instance initialized to the specified floating-point value.
   ///
   /// Do not call this initializer directly. Instead, initialize a variable or
@@ -388,7 +388,7 @@ public protocol ExpressibleByExtendedGraphemeClusterLiteral
   /// `String`, and `StaticString`.
   associatedtype ExtendedGraphemeClusterLiteralType
     : _ExpressibleByBuiltinExtendedGraphemeClusterLiteral
-  
+
   /// Creates an instance initialized to the given value.
   ///
   /// - Parameter value: The value of the new instance.
@@ -429,12 +429,12 @@ public protocol ExpressibleByStringLiteral
   : ExpressibleByExtendedGraphemeClusterLiteral {
   // FIXME: when we have default function implementations in protocols, provide
   // an implementation of init(extendedGraphemeClusterLiteral:).
-  
+
   /// A type that represents a string literal.
   ///
   /// Valid types for `StringLiteralType` are `String` and `StaticString`.
   associatedtype StringLiteralType : _ExpressibleByBuiltinStringLiteral
-  
+
   /// Creates an instance initialized to the given string value.
   ///
   /// - Parameter value: The value of the new instance.
@@ -451,8 +451,8 @@ public protocol ExpressibleByStringLiteral
 /// initializer, or even as the subject of a nonmutating operation like
 /// `map(_:)` or `filter(_:)`.
 ///
-/// Arrays, sets, and option sets all conform to `ExpressibleByArrayLiteral`, 
-/// and your own custom types can as well. Here's an example of creating a set 
+/// Arrays, sets, and option sets all conform to `ExpressibleByArrayLiteral`,
+/// and your own custom types can as well. Here's an example of creating a set
 /// and an array using array literals:
 ///
 ///     let employeesSet: Set<String> = ["Amir", "Jihye", "Dave", "Alessia", "Dave"]
@@ -683,7 +683,7 @@ public protocol _ExpressibleByStringInterpolation {
   ///
   /// - Parameter strings: An array of instances of the conforming type.
   init(stringInterpolation strings: Self...)
-  
+
   /// Creates an instance containing the appropriate representation for the
   /// given value.
   ///

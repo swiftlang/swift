@@ -827,7 +827,7 @@ extension ${Self} {
   public init(_ v: ${That}) {
     _value = Builtin.${sign}itofp_${ThatBuiltinName}_FPIEEE${bits}(v._value)
   }
-  
+
 %   if srcBits < SignificandBitCount:
   @available(*, message: "Converting ${That} to ${Self} will always succeed.")
 %   end

@@ -59,7 +59,7 @@ public struct CollectionOfOne<Element>
   public var endIndex: Int {
     return 1
   }
-  
+
   /// Always returns `endIndex`.
   public func index(after i: Int) -> Int {
     _precondition(i == startIndex)

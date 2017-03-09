@@ -18,22 +18,22 @@ public enum _DebuggerSupport {
     case Element
     case Pair
     case ElementOfPair
-  
+
     internal var isCollection: Bool {
       return self != .NotACollection
     }
-  
+
     internal func getChildStatus(child: Mirror) -> CollectionStatus {
       let disposition = child.displayStyle ?? .struct
-    
+
       if disposition == .collection { return .CollectionOfElements }
       if disposition == .dictionary { return .CollectionOfPairs }
       if disposition == .set { return .CollectionOfElements }
-    
+
       if self == .CollectionOfElements { return .Element }
       if self == .CollectionOfPairs { return .Pair }
       if self == .Pair { return .ElementOfPair }
-    
+
       return .NotACollection
     }
   }
@@ -44,7 +44,7 @@ public enum _DebuggerSupport {
     }
     return false
   }
-  
+
   internal static func checkValue<T>(
     _ value: Any,
     ifClass: (AnyObject) -> T,
@@ -179,7 +179,7 @@ public enum _DebuggerSupport {
     }
 
     maxItemCounter -= 1
-  
+
     for _ in 0..<indent {
       print(" ", terminator: "", to: &targetStream)
     }
@@ -204,9 +204,9 @@ public enum _DebuggerSupport {
       : count == 0    ? "- "
       : maxDepth <= 0 ? "▹ " : "▿ "
     print("\(bullet)", terminator: "", to: &targetStream)
-  
+
     let collectionStatus = parentCollectionStatus.getChildStatus(child: mirror)
-  
+
     if let nam = name {
       print("\(nam) : ", terminator: "", to: &targetStream)
     }
@@ -214,7 +214,7 @@ public enum _DebuggerSupport {
     if let str = asStringRepresentation(value: value, mirror: mirror, count: count) {
       print("\(str)", terminator: "", to: &targetStream)
     }
-  
+
     if (maxDepth <= 0) || !willExpand {
       print("", to: &targetStream)
       return
@@ -232,9 +232,9 @@ public enum _DebuggerSupport {
     }
 
     print("", to: &targetStream)
-  
+
     var printedElements = 0
-  
+
     if let sc = mirror.superclassMirror {
       printForDebuggerImpl(
         value: nil,
@@ -248,7 +248,7 @@ public enum _DebuggerSupport {
         maxItemCounter: &maxItemCounter,
         targetStream: &targetStream)
     }
-  
+
     for (optionalName,child) in mirror.children {
       let childName = optionalName ?? "\(printedElements)"
       if maxItemCounter <= 0 {
@@ -267,7 +267,7 @@ public enum _DebuggerSupport {
         }
         return
       }
-    
+
       printForDebuggerImpl(
         value: child,
         mirror: Mirror(reflecting: child),

@@ -13,9 +13,9 @@
 import SwiftShims
 
 #if _runtime(_ObjC)
-@_silgen_name("swift_ObjCMirror_count") 
+@_silgen_name("swift_ObjCMirror_count")
 func _getObjCCount(_: _MagicMirrorData) -> Int
-@_silgen_name("swift_ObjCMirror_subscript") 
+@_silgen_name("swift_ObjCMirror_subscript")
 func _getObjCChild<T>(_: Int, _: _MagicMirrorData) -> (T, _Mirror)
 
 func _getObjCSummary(_ data: _MagicMirrorData) -> String {

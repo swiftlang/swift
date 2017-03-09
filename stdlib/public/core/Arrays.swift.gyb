@@ -1376,14 +1376,14 @@ extension ${Self} : RangeReplaceableCollection, _ArrayProtocol {
 
     let startNewElements = _buffer.firstElementAddress + oldCount
     let buf = UnsafeMutableBufferPointer(
-                start: startNewElements, 
+                start: startNewElements,
                 count: self.capacity - oldCount)
 
     let (remainder,writtenUpTo) = buf.initialize(from: newElements)
-    
+
     // trap on underflow from the sequence's underestimate:
     let writtenCount = buf.distance(from: buf.startIndex, to: writtenUpTo)
-    _precondition(newElementsCount <= writtenCount, 
+    _precondition(newElementsCount <= writtenCount,
       "newElements.underestimatedCount was an overestimate")
     // can't check for overflow as sequences can underestimate
 
@@ -1696,7 +1696,7 @@ extension ${Self} {
     // a precondition and Array never lies about its count.
     guard var p = buffer.baseAddress
       else { _preconditionFailure("Attempt to copy contents into nil buffer pointer") }
-    _precondition(self.count <= buffer.count, 
+    _precondition(self.count <= buffer.count,
       "Insufficient space allocated to copy array contents")
 
     if let s = _baseAddressIfContiguous {
@@ -2005,7 +2005,7 @@ extension _ArrayBufferProtocol {
   internal mutating func _arrayAppendSequence<S : Sequence>(
     _ newItems: S
   ) where S.Iterator.Element == Element {
-    
+
     // this function is only ever called from append(contentsOf:)
     // which should always have exhausted its capacity before calling
     _sanityCheck(count == capacity)
@@ -2020,7 +2020,7 @@ extension _ArrayBufferProtocol {
 
       // grow capacity, first time around and when filled
       var newBuffer = _forceCreateUniqueMutableBuffer(
-        countForNewBuffer: newCount, 
+        countForNewBuffer: newCount,
         // minNewCapacity handles the exponential growth, just
         // need to request 1 more than current count/capacity
         minNewCapacity: newCount + 1)

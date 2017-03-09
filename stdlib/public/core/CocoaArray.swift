@@ -27,7 +27,7 @@ import SwiftShims
 /// don't want to pay for the dynamic dispatch overhead.
 internal struct _CocoaArrayWrapper : RandomAccessCollection {
   typealias Indices = CountableRange<Int>
-  
+
   var startIndex: Int {
     return 0
   }
@@ -64,7 +64,7 @@ internal struct _CocoaArrayWrapper : RandomAccessCollection {
     let contiguousCount = withUnsafeMutablePointer(to: &enumerationState) {
       self.buffer.countByEnumerating(with: $0, objects: nil, count: 0)
     }
-    
+
     return contiguousCount >= subRange.upperBound
       ? UnsafeMutableRawPointer(enumerationState.itemsPtr!)
           .assumingMemoryBound(to: AnyObject.self)

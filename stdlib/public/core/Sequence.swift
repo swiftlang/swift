@@ -501,7 +501,7 @@ public protocol Sequence {
   /// - Returns: A subsequence starting at the beginning of this sequence
   ///   with at most `maxLength` elements.
   func prefix(_ maxLength: Int) -> SubSequence
-  
+
   /// Returns a subsequence containing the initial, consecutive elements that
   /// satisfy the given predicate.
   ///
@@ -580,7 +580,7 @@ public protocol Sequence {
   ///
   ///     print(
   ///         line.characters.split(
-  ///             omittingEmptySubsequences: false, 
+  ///             omittingEmptySubsequences: false,
   ///             whereSeparator: { $0 == " " })
   ///         ).map(String.init))
   ///     // Prints "["BLANCHE:", "", "", "I", "don\'t", "want", "realism.", "I", "want", "magic!"]"
@@ -619,7 +619,7 @@ public protocol Sequence {
   /// in the same order.
   func _copyToContiguousArray() -> ContiguousArray<Iterator.Element>
 
-  /// Copy `self` into an unsafe buffer, returning a partially-consumed 
+  /// Copy `self` into an unsafe buffer, returning a partially-consumed
   /// iterator with any elements that didn't fit remaining.
   func _copyContents(
     initializing ptr: UnsafeMutableBufferPointer<Iterator.Element>
@@ -725,7 +725,7 @@ internal class _PrefixSequence<Base : IteratorProtocol>
         maxLength: Swift.min(maxLength, self._maxLength),
         taken: _taken))
   }
-  
+
   internal func drop(
     while predicate: (Base.Element) throws -> Bool
   ) rethrows -> AnySequence<Base.Element> {
@@ -755,7 +755,7 @@ internal class _DropWhileSequence<Base : IteratorProtocol>
   ) rethrows {
     self._iterator = iterator
     self._nextElement = nextElement ?? _iterator.next()
-    
+
     while try _nextElement.flatMap(predicate) == true {
       _nextElement = _iterator.next()
     }
@@ -769,7 +769,7 @@ internal class _DropWhileSequence<Base : IteratorProtocol>
     guard _nextElement != nil else {
       return _iterator.next()
     }
-    
+
     let next = _nextElement
     _nextElement = nil
     return next
@@ -934,7 +934,7 @@ extension Sequence {
   ///
   ///     print(
   ///         line.characters.split(
-  ///             omittingEmptySubsequences: false, 
+  ///             omittingEmptySubsequences: false,
   ///             whereSeparator: { $0 == " " }
   ///         ).map(String.init))
   ///     // Prints "["BLANCHE:", "", "", "I", "don\'t", "want", "realism.", "I", "want", "magic!"]"
@@ -1227,7 +1227,7 @@ extension Sequence where
     }
     return AnySequence(result)
   }
-  
+
   /// Returns a subsequence by skipping the initial, consecutive elements that
   /// satisfy the given predicate.
   ///
@@ -1285,7 +1285,7 @@ extension Sequence where
     return AnySequence(
       _PrefixSequence(_iterator: makeIterator(), maxLength: maxLength))
   }
-  
+
   /// Returns a subsequence containing the initial, consecutive elements that
   /// satisfy the given predicate.
   ///
@@ -1349,7 +1349,7 @@ extension Sequence {
   /// Returns a subsequence containing all but the last element of the
   /// sequence.
   ///
-  /// The sequence must be finite. 
+  /// The sequence must be finite.
   ///
   ///     let numbers = [1, 2, 3, 4, 5]
   ///     print(numbers.dropLast())

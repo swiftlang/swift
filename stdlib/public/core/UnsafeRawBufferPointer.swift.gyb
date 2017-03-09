@@ -426,7 +426,7 @@ public struct Unsafe${Mutable}RawBufferPointer
   /// Initializes memory in the buffer with the elements of
   /// `source` and binds the initialized memory to type `T`.
   ///
-  /// Returns an iterator to any elements of `source` that didn't fit in the 
+  /// Returns an iterator to any elements of `source` that didn't fit in the
   /// buffer, and a typed buffer of the written elements.
   ///
   /// - Precondition: The memory in `startIndex..<(source.count *
@@ -437,7 +437,7 @@ public struct Unsafe${Mutable}RawBufferPointer
   ///   accommodate at least `source.underestimateCount` elements.
   ///
   /// - Postcondition: The memory at `self[startIndex..<source.count *
-  ///   MemoryLayout<T>.stride]                 
+  ///   MemoryLayout<T>.stride]
   ///   is bound to type `T`.
   ///
   /// - Postcondition: The `T` values at `self[startIndex..<source.count *
@@ -452,20 +452,20 @@ public struct Unsafe${Mutable}RawBufferPointer
     var it = source.makeIterator()
     var idx = startIndex
     let elementStride = MemoryLayout<S.Iterator.Element>.stride
-    
+
     // This has to be a debug precondition due to the cost of walking over some collections.
     _debugPrecondition(source.underestimatedCount <= (count / elementStride),
       "insufficient space to accommodate source.underestimatedCount elements")
     guard let base = baseAddress else {
       // this can be a precondition since only an invalid argument should be costly
-      _precondition(source.underestimatedCount == 0, 
+      _precondition(source.underestimatedCount == 0,
         "no memory available to initialize from source")
       return (it, UnsafeMutableBufferPointer(start: nil, count: 0))
-    }  
+    }
 
-    for p in stride(from: base, 
+    for p in stride(from: base,
       // only advance to as far as the last element that will fit
-      to: base + count - elementStride + 1, 
+      to: base + count - elementStride + 1,
       by: elementStride
     ) {
       // underflow is permitted -- e.g. a sequence into
@@ -476,7 +476,7 @@ public struct Unsafe${Mutable}RawBufferPointer
     }
 
     return (it, UnsafeMutableBufferPointer(
-                  start: base.assumingMemoryBound(to: S.Iterator.Element.self), 
+                  start: base.assumingMemoryBound(to: S.Iterator.Element.self),
                   count: idx / elementStride))
   }
   %  end # mutable

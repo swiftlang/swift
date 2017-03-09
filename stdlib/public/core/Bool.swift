@@ -77,7 +77,7 @@ public struct Bool {
   @_versioned
   @_transparent
   internal init(_ v: Builtin.Int1) { self._value = v }
-  
+
   /// Creates an instance equal to the given Boolean value.
   ///
   /// - Parameter value: The Boolean value to copy.

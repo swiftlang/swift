@@ -527,7 +527,7 @@ internal struct _Stdout : TextOutputStream {
 
 extension String : TextOutputStream {
   /// Appends the given string to this string.
-  /// 
+  ///
   /// - Parameter other: A string to append.
   public mutating func write(_ other: String) {
     self += other
@@ -540,7 +540,7 @@ extension String : TextOutputStream {
 
 extension String : TextOutputStreamable {
   /// Writes the string into the given output stream.
-  /// 
+  ///
   /// - Parameter target: An output stream.
   public func write<Target : TextOutputStream>(to target: inout Target) {
     target.write(self)
@@ -575,7 +575,7 @@ internal struct _TeeStream<
 > : TextOutputStream {
   var left: L
   var right: R
-  
+
   /// Append the given `string` to this stream.
   mutating func write(_ string: String)
   { left.write(string); right.write(string) }

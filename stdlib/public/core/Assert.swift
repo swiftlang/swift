@@ -235,7 +235,7 @@ public func _overflowChecked<T>(
   let (result, error) = args
   if _isDebugAssertConfiguration() {
     if _branchHint(error, expected: false) {
-      _fatalErrorMessage("fatal error", "Overflow/underflow", 
+      _fatalErrorMessage("fatal error", "Overflow/underflow",
         file: file, line: line, flags: _fatalErrorFlags())
     }
   } else {

@@ -49,7 +49,7 @@ internal class _SwiftNativeNSArrayWithContiguousStorage
   }
 }
 
-// Implement the APIs required by NSArray 
+// Implement the APIs required by NSArray
 extension _SwiftNativeNSArrayWithContiguousStorage : _NSArrayCore {
   @objc internal var count: Int {
     return withUnsafeBufferOfObjects { $0.count }
@@ -143,7 +143,7 @@ extension _SwiftNativeNSArrayWithContiguousStorage : _NSArrayCore {
   }
 
   internal typealias HeapBufferStorage = _HeapBufferStorage<Int, AnyObject>
-  
+
   internal var _heapBufferBridged: HeapBufferStorage? {
     if let ref =
       _stdlib_atomicLoadARCRef(object: _heapBufferBridgedPtr) {
@@ -173,7 +173,7 @@ extension _SwiftNativeNSArrayWithContiguousStorage : _NSArrayCore {
   ) rethrows -> R {
     while true {
       var buffer: UnsafeBufferPointer<AnyObject>
-      
+
       // If we've already got a buffer of bridged objects, just use it
       if let bridgedStorage = _heapBufferBridged {
         let heapBuffer = _HeapBuffer(bridgedStorage)
@@ -191,7 +191,7 @@ extension _SwiftNativeNSArrayWithContiguousStorage : _NSArrayCore {
       else {
         // Create buffer of bridged objects.
         let objects = _nativeStorage._getNonVerbatimBridgedHeapBuffer()
-        
+
         // Atomically store a reference to that buffer in self.
         if !_stdlib_atomicInitializeARCRef(
           object: _heapBufferBridgedPtr, desired: objects.storage!) {
@@ -202,7 +202,7 @@ extension _SwiftNativeNSArrayWithContiguousStorage : _NSArrayCore {
         }
         continue // Try again
       }
-      
+
       defer { _fixLifetime(self) }
       return try body(buffer)
     }
@@ -228,7 +228,7 @@ extension _SwiftNativeNSArrayWithContiguousStorage : _NSArrayCore {
 class _SwiftNativeNSArrayWithContiguousStorage {}
 #endif
 
-/// Base class of the heap buffer backing arrays.  
+/// Base class of the heap buffer backing arrays.
 internal class _ContiguousArrayStorageBase
   : _SwiftNativeNSArrayWithContiguousStorage {
 
@@ -237,7 +237,7 @@ internal class _ContiguousArrayStorageBase
   init(_doNotCallMeBase: ()) {
     _sanityCheckFailure("creating instance of _ContiguousArrayStorageBase")
   }
-  
+
 #if _runtime(_ObjC)
   internal override func withUnsafeBufferOfObjects<R>(
     _ body: (UnsafeBufferPointer<AnyObject>) throws -> R

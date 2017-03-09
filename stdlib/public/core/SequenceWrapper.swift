@@ -21,7 +21,7 @@ public // @testable
 protocol _SequenceWrapper {
   associatedtype Base : Sequence
   associatedtype Iterator : IteratorProtocol = Base.Iterator
-  
+
   var _base: Base { get }
 }
 
@@ -92,13 +92,13 @@ extension Sequence
   ) rethrows -> [Base.Iterator.Element] {
     return try _base.filter(isIncluded)
   }
-  
+
   public func _customContainsEquatableElement(
     _ element: Base.Iterator.Element
-  ) -> Bool? { 
+  ) -> Bool? {
     return _base._customContainsEquatableElement(element)
   }
-  
+
   /// If `self` is multi-pass (i.e., a `Collection`), invoke
   /// `preprocess` on `self` and return its result.  Otherwise, return
   /// `nil`.

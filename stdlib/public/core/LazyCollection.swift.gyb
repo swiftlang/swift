@@ -75,7 +75,7 @@ public struct ${Self}<Base : ${TraversalCollection}> : LazyCollectionProtocol {
 /// Forward implementations to the base collection, to pick up any
 /// optimizations it might implement.
 extension ${Self} : Sequence {
-  
+
   public typealias Iterator = Base.Iterator
 
   /// Returns an iterator over the elements of this sequence.

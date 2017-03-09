@@ -89,7 +89,7 @@ public protocol _MutableIndexable : _Indexable {
   /// A collection that represents a contiguous subrange of the collection's
   /// elements.
   associatedtype SubSequence
-  
+
   /// Accesses a contiguous subrange of the collection's elements.
   ///
   /// The accessed slice uses the same indices for the same elements as the
@@ -113,7 +113,7 @@ public protocol _MutableIndexable : _Indexable {
   /// - Parameter bounds: A range of the collection's indices. The bounds of
   ///   the range must be valid indices of the collection.
   subscript(bounds: Range<Index>) -> SubSequence { get set }
-  
+
   /// Performs a range check in O(1), or a no-op when a range check is not
   /// implementable in O(1).
   ///
@@ -205,7 +205,7 @@ public protocol _MutableIndexable : _Indexable {
 /// To add conformance to the `MutableCollection` protocol to your own
 /// custom collection, upgrade your type's subscript to support both read
 /// and write access.
-/// 
+///
 /// A value stored into a subscript of a `MutableCollection` instance must
 /// subsequently be accessible at that same position. That is, for a mutable
 /// collection instance `a`, index `i`, and value `x`, the two sets of
@@ -213,7 +213,7 @@ public protocol _MutableIndexable : _Indexable {
 ///
 ///     a[i] = x
 ///     let y = a[i]
-///     
+///
 ///     // Must be equivalent to:
 ///     a[i] = x
 ///     let y = x
@@ -309,7 +309,7 @@ public protocol MutableCollection : _MutableIndexable, Collection {
   mutating func partition(
     by belongsInSecondPartition: (Iterator.Element) throws -> Bool
   ) rethrows -> Index
-  
+
   /// Call `body(p)`, where `p` is a pointer to the collection's
   /// mutable contiguous storage.  If no such storage exists, it is
   /// first created.  If the collection does not support an internal

@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 //
-//  
+//
 //
 //===----------------------------------------------------------------------===//
 
@@ -50,14 +50,14 @@
 /// - `x.isStrictSuperset(of: y)` if and only if
 ///   `x.isSuperset(of: y) && x != y`
 /// - `x.isStrictSubset(of: y)` if and only if `x.isSubset(of: y) && x != y`
-/// 
+///
 /// - SeeAlso: `OptionSet`, `Set`
 public protocol SetAlgebra : Equatable, ExpressibleByArrayLiteral {
   // FIXME: write tests for SetAlgebra
-  
+
   /// A type for which the conforming type provides a containment test.
   associatedtype Element
-  
+
   /// Creates an empty set.
   ///
   /// This initializer is equivalent to initializing with an empty array
@@ -72,7 +72,7 @@ public protocol SetAlgebra : Equatable, ExpressibleByArrayLiteral {
   ///     print(emptySet.isEmpty)
   ///     // Prints "true"
   init()
-  
+
   /// Returns a Boolean value that indicates whether the given element exists
   /// in the set.
   ///
@@ -118,7 +118,7 @@ public protocol SetAlgebra : Equatable, ExpressibleByArrayLiteral {
   ///   distinguishable (e.g. via `===`), which of these elements is present
   ///   in the result is unspecified.
   func union(_ other: Self) -> Self
-  
+
   /// Returns a new set with the elements that are common to both this set and
   /// the given set.
   ///
@@ -193,7 +193,7 @@ public protocol SetAlgebra : Equatable, ExpressibleByArrayLiteral {
   mutating func insert(
     _ newMember: Element
   ) -> (inserted: Bool, memberAfterInsert: Element)
-  
+
   /// Removes the given element and any elements subsumed by the given element.
   ///
   /// - Parameter member: The element of the set to remove.
@@ -230,11 +230,11 @@ public protocol SetAlgebra : Equatable, ExpressibleByArrayLiteral {
   ///   comparison or some other means.
   ///
   ///   For sets where the set type and element type are the same, like
-  ///   `OptionSet` types, this method returns any intersection between the 
+  ///   `OptionSet` types, this method returns any intersection between the
   ///   set and `[newMember]`, or `nil` if the intersection is empty.
   @discardableResult
   mutating func update(with newMember: Element) -> Element?
-  
+
   /// Adds the elements of the given set to the set.
   ///
   /// In the following example, the elements of the `visitors` set are added to
@@ -357,7 +357,7 @@ public protocol SetAlgebra : Equatable, ExpressibleByArrayLiteral {
 
   /// A Boolean value that indicates whether the set has no elements.
   var isEmpty: Bool { get }
-  
+
   /// Creates a new set from a finite sequence of items.
   ///
   /// Use this initializer to create a new set from an existing sequence, like

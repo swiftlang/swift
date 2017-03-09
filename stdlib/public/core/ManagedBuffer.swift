@@ -43,7 +43,7 @@ open class ManagedBuffer<Header, Element> {
     // The _fixLifetime is not really needed, because p is used afterwards.
     // But let's be conservative and fix the lifetime after we use the
     // headerAddress.
-    _fixLifetime(p) 
+    _fixLifetime(p)
     return p
   }
 
@@ -183,7 +183,7 @@ public struct ManagedBufferPointer<Header, Element> : Equatable {
 
     // initialize the header field
     try withUnsafeMutablePointerToHeader {
-      $0.initialize(to: 
+      $0.initialize(to:
         try factory(
           self.buffer,
           {
@@ -440,7 +440,7 @@ public func == <Header, Element>(
 
 // FIXME: when our calling convention changes to pass self at +0,
 // inout should be dropped from the arguments to these functions.
-// FIXME(docs): isKnownUniquelyReferenced should check weak/unowned counts too, 
+// FIXME(docs): isKnownUniquelyReferenced should check weak/unowned counts too,
 // but currently does not. rdar://problem/29341361
 
 /// Returns a Boolean value indicating whether the given object is known to

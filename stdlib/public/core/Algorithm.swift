@@ -107,7 +107,7 @@ public struct EnumeratedIterator<
   public mutating func next() -> Element? {
     guard let b = _base.next() else { return nil }
     let result = (offset: _count, element: b)
-    _count += 1 
+    _count += 1
     return result
   }
 }
