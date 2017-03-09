@@ -1307,8 +1307,7 @@ auto GenericSignatureBuilder::PotentialArchetype::getNestedType(
 
       // If we have resolved this nested type to more than one associated
       // type, create same-type constraints between them.
-      llvm::TinyPtrVector<PotentialArchetype *> &nested =
-          NestedTypes[nestedName];
+      auto &nested = NestedTypes[nestedName];
       if (!nested.empty()) {
         nested.push_back(pa);
 
@@ -1339,7 +1338,7 @@ auto GenericSignatureBuilder::PotentialArchetype::getNestedType(
 
   // We couldn't resolve the nested type yet, so create an
   // unresolved associated type.
-  llvm::TinyPtrVector<PotentialArchetype *> &nested = NestedTypes[nestedName];
+  auto &nested = NestedTypes[nestedName];
   if (nested.empty()) {
     nested.push_back(new PotentialArchetype(this, nestedName));
     ++builder.Impl->NumUnresolvedNestedTypes;

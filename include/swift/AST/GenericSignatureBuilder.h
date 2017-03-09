@@ -1025,13 +1025,39 @@ class GenericSignatureBuilder::PotentialArchetype {
   /// The source of the layout constraint requirement.
   const RequirementSource *LayoutSource = nullptr;
 
+  /// A stored nested type.
+  struct StoredNestedType {
+    /// The potential archetypes describing this nested type, all of which
+    /// are equivalent.
+    llvm::TinyPtrVector<PotentialArchetype *> archetypes;
+
+    typedef llvm::TinyPtrVector<PotentialArchetype *>::iterator iterator;
+    iterator begin() { return archetypes.begin(); }
+    iterator end() { return archetypes.end(); }
+
+    typedef llvm::TinyPtrVector<PotentialArchetype *>::const_iterator
+      const_iterator;
+    const_iterator begin() const { return archetypes.begin(); }
+    const_iterator end() const { return archetypes.end(); }
+
+    PotentialArchetype *front() const { return archetypes.front(); }
+
+    bool empty() const { return archetypes.empty(); }
+
+    void push_back(PotentialArchetype *pa) {
+      archetypes.push_back(pa);
+    }
+  };
+
   /// \brief The set of nested types of this archetype.
   ///
   /// For a given nested type name, there may be multiple potential archetypes
   /// corresponding to different associated types (from different protocols)
   /// that share a name.
-  llvm::MapVector<Identifier, llvm::TinyPtrVector<PotentialArchetype *>>
-    NestedTypes;
+  llvm::MapVector<Identifier, StoredNestedType> NestedTypes;
+
+  /// Tracks the number of conformances that
+  unsigned numConformancesInNestedType = 0;
 
   /// Whether this is an unresolved nested type.
   unsigned isUnresolvedNestedType : 1;
@@ -1213,8 +1239,7 @@ public:
   }
 
   /// Retrieve the set of nested types.
-  const llvm::MapVector<Identifier, llvm::TinyPtrVector<PotentialArchetype *>> &
-  getNestedTypes() const{
+  const llvm::MapVector<Identifier, StoredNestedType> &getNestedTypes() const {
     return NestedTypes;
   }
 
