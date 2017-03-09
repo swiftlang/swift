@@ -53,8 +53,10 @@ void GenericSpecializationMangler::mangleSpecialization() {
   auto SubMap = Sig->getSubstitutionMap(Subs);
   Sig->enumeratePairedRequirements(
     [&](Type depTy, ArrayRef<Requirement> reqts) {
-      if (depTy->is<GenericTypeParamType>())
-        M.mangleType(depTy.subst(SubMap)->getCanonicalType(), 0);
+      if (!depTy->is<GenericTypeParamType>())
+        return false;
+
+      M.mangleType(depTy.subst(SubMap)->getCanonicalType(), 0);
 
       for (auto reqt : reqts) {
         auto conformance = SubMap.lookupConformance(
