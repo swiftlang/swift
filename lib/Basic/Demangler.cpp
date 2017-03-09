@@ -407,6 +407,11 @@ void Demangler::init(StringRef MangledName) {
 NodePointer Demangler::demangleSymbol(StringRef MangledName) {
   init(MangledName);
 
+  // Demangle old-style class and protocol names, which are still used in the
+  // ObjC metadata.
+  if (nextIf("_Tt"))
+    return demangleObjCTypeName();
+
   if (!nextIf(MANGLING_PREFIX_STR)
       // Also accept the future mangling prefix.
       // TODO: remove this line as soon as MANGLING_PREFIX_STR gets "_S".
@@ -2100,12 +2105,16 @@ NodePointer Demangler::demangleObjCTypeName() {
     return nullptr;
   }
 
-  NodePointer Ident = demangleIdentifier();
-  if (!Ident)
-    return nullptr;
-  Nominal->addChild(changeKind(Ident, Node::Kind::Module), *this);
+  if (nextIf('s')) {
+    Nominal->addChild(createNode(Node::Kind::Module, "Swift"), *this);
+  } else {
+    NodePointer Module = demangleIdentifier();
+    if (!Module)
+      return nullptr;
+    Nominal->addChild(changeKind(Module, Node::Kind::Module), *this);
+  }
 
-  Ident = demangleIdentifier();
+  NodePointer Ident = demangleIdentifier();
   if (!Ident)
     return nullptr;
   Nominal->addChild(Ident, *this);
