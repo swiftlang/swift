@@ -32,3 +32,35 @@ public func testComputeNat() -> Int32 {
  return computeNat(8, Zero())
 }
 
+// Check that compiler does not hang producing very wide tuples during
+// specialization.
+@inline(never)
+func computeTuple<T>(t: T) {
+  computeTuple(t: (t, t))
+}
+
+// CHECK-LABEL: sil @_T024specialize_deep_generics16testComputeTupleyyF
+public func testComputeTuple() {
+  computeTuple(t: 0)
+}
+
+// Check that compiler does not hang producing very deep metatypes.
+@inline(never)
+public func computeMetatype<T>(t: T) {
+  computeMetatype(t: T.self)
+}
+
+// CHECK-LABEL: sil @_T024specialize_deep_generics19testComputeMetatypeyyF
+public func testComputeMetatype() {
+  computeMetatype(t: 0)
+}
+
+// Check that compiler does not hang producing very deep function types.
+@inline(never)
+public func computeFunctionType<T>(t: [T]) {
+  computeFunctionType(t: [{ t[0] }])
+}
+
+public func testComputeFunctionType() {
+  computeFunctionType(t: [0])
+}
