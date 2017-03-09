@@ -1,12 +1,12 @@
 # Verify symbols from libswiftCore.dylib.
 
 # No C++ exports allowed.
-RUN: %target-nm-exports %platform-module-dir/libswiftCore.dylib | %FileCheck --check-prefix CHECK-CXX %s
+RUN: %target-nm-exports %platform-module-dir/libswiftCore.%target-dylib-extension | %FileCheck --check-prefix CHECK-CXX %s
 CHECK-CXX-NOT: __Z
 
 # No imports of operators new and delete allowed.
 # Use swift/Runtime/OperatorNew.h instead.
-RUN: %target-nm-imports %platform-module-dir/libswiftCore.dylib | %FileCheck --check-prefix CHECK-NEW %s
+RUN: %target-nm-imports %platform-module-dir/libswiftCore.%target-dylib-extension | %FileCheck --check-prefix CHECK-NEW %s
 CHECK-NEW-NOT: __Znwm
 CHECK-NEW-NOT: __ZnwmRKSt9nothrow_t
 CHECK-NEW-NOT: __Znam
