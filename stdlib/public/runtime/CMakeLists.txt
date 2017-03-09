@@ -27,8 +27,8 @@ set(swift_runtime_objc_sources
     ErrorObject.mm
     SwiftObject.mm
     SwiftValue.mm
-    Remangle.cpp
-    Reflection.mm)
+    Reflection.mm
+    "${SWIFT_SOURCE_DIR}/lib/Demangling/Remangler.cpp")
 
 set(swift_runtime_sources
     AnyHashableSupport.cpp
@@ -54,11 +54,16 @@ set(swift_runtime_sources
     Portability.cpp
     ProtocolConformance.cpp
     RefCount.cpp
-    RuntimeEntrySymbols.cpp)
+    RuntimeEntrySymbols.cpp
+    "${SWIFT_SOURCE_DIR}/lib/Demangling/OldDemangler.cpp"
+    "${SWIFT_SOURCE_DIR}/lib/Demangling/Demangler.cpp"
+    "${SWIFT_SOURCE_DIR}/lib/Demangling/NodePrinter.cpp"
+    "${SWIFT_SOURCE_DIR}/lib/Demangling/Context.cpp"
+    "${SWIFT_SOURCE_DIR}/lib/Demangling/ManglingUtils.cpp"
+    "${SWIFT_SOURCE_DIR}/lib/Demangling/Punycode.cpp")
 
 # Acknowledge that the following sources are known.
 set(LLVM_OPTIONAL_SOURCES
-    Remangle.cpp
     swift_sections.S
     MutexPThread.cpp
     MutexWin32.cpp
