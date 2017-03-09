@@ -49,9 +49,24 @@ func testPaths2<U: P2 & P4>(_ t: U) where U.AssocP3 == U.AssocP2.AssocP1 {
 }
 
 func testPaths3<V: P5>(_ v: V) {
-	// CHECK: Conformance access path for V.AssocP3: P0 is V: P5 -> τ_0_0.AssocP3: Q0 -> τ_0_0: P0
+	// CHECK: Conformance access path for V.AssocP3: P0 is V: P5 -> Self.AssocP3: Q0 -> τ_0_0: P0
 	acceptP0(v.getAssocP3())
 
-	// CHECK: Conformance access path for V.AssocP3: Q0 is V: P5 -> τ_0_0.AssocP3: Q0
+	// CHECK: Conformance access path for V.AssocP3: Q0 is V: P5 -> Self.AssocP3: Q0
 	acceptQ0(v.getAssocP3())
+}
+
+protocol P6Unordered: P5Unordered {
+	associatedtype A: P0
+}
+
+protocol P5Unordered {
+	associatedtype A: P0
+
+	func getA() -> A
+}
+
+func testUnorderedP5_P6<W: P6Unordered>(_ w: W) {
+	// CHECK: Conformance access path for W.A: P0 is W: P6Unordered -> Self: P5Unordered -> τ_0_0.A: P0
+	acceptP0(w.getA())
 }
