@@ -2227,7 +2227,12 @@ ExistentialTypeMetadata::mayTakeValue(const OpaqueValue *container) const {
     return true;
   // Opaque existential containers uniquely own their contained value.
   case ExistentialTypeRepresentation::Opaque:
+#ifdef SWIFT_RUNTIME_ENABLE_COW_EXISTENTIALS
+    // We can't take from a shared existential box without checking uniqueness.
+    return false;
+#else
     return true;
+#endif
     
   // References to boxed existential containers may be shared.
   case ExistentialTypeRepresentation::Error: {
@@ -2254,10 +2259,21 @@ const {
     break;
   
   case ExistentialTypeRepresentation::Opaque: {
+#ifdef SWIFT_RUNTIME_ENABLE_COW_EXISTENTIALS
+    auto *opaque = reinterpret_cast<OpaqueExistentialContainer *>(container);
+    auto *vwt = opaque->Type->getValueWitnesses();
+    if (!vwt->isValueInline()) {
+      unsigned alignMask = vwt->getAlignmentMask();
+      unsigned size = vwt->size;
+      swift_deallocObject(*reinterpret_cast<HeapObject **>(&opaque->Buffer),
+                          size, alignMask);
+    }
+#else
     // Containing the value may require a side allocation, which we need
     // to clean up.
     auto opaque = reinterpret_cast<OpaqueExistentialContainer *>(container);
     opaque->Type->vw_deallocateBuffer(&opaque->Buffer);
+#endif
     break;
   }
   
@@ -2277,10 +2293,25 @@ ExistentialTypeMetadata::projectValue(const OpaqueValue *container) const {
     return reinterpret_cast<const OpaqueValue *>(&classContainer->Value);
   }
   case ExistentialTypeRepresentation::Opaque: {
-    auto opaqueContainer =
+    auto *opaqueContainer =
       reinterpret_cast<const OpaqueExistentialContainer*>(container);
+#ifdef SWIFT_RUNTIME_ENABLE_COW_EXISTENTIALS
+    auto *type = opaqueContainer->Type;
+    auto *vwt = type->getValueWitnesses();
+
+    if (vwt->isValueInline())
+      return reinterpret_cast<const OpaqueValue *>(&opaqueContainer->Buffer);
+
+    unsigned alignMask = vwt->getAlignmentMask();
+    // Compute the byte offset of the object in the box.
+    unsigned byteOffset = (sizeof(HeapObject) + alignMask) & ~alignMask;
+    auto *bytePtr = reinterpret_cast<const char *>(
+        *reinterpret_cast<HeapObject *const *const>(&opaqueContainer->Buffer));
+    return reinterpret_cast<const OpaqueValue *>(bytePtr + byteOffset);
+#else
     return opaqueContainer->Type->vw_projectBuffer(
-                         const_cast<ValueBuffer*>(&opaqueContainer->Buffer));
+      const_cast<ValueBuffer *>(&opaqueContainer->Buffer));
+#endif
   }
   case ExistentialTypeRepresentation::Error: {
     const SwiftError *errorBox
@@ -2610,6 +2641,38 @@ Metadata::getClassObject() const {
   }
 
   swift_runtime_unreachable("Unhandled MetadataKind in switch.");
+}
+
+template <> OpaqueValue *Metadata::allocateBoxForExistentialIn(ValueBuffer *buffer) const {
+  auto *vwt = getValueWitnesses();
+  if (vwt->isValueInline())
+    return reinterpret_cast<OpaqueValue *>(buffer);
+
+  // Allocate the box.
+  BoxPair refAndValueAddr(swift_allocBox(this));
+  buffer->PrivateData[0] = refAndValueAddr.first;
+  return refAndValueAddr.second;
+}
+
+template <> OpaqueValue *Metadata::allocateBufferIn(ValueBuffer *buffer) const {
+  auto *vwt = getValueWitnesses();
+  if (vwt->isValueInline())
+    return reinterpret_cast<OpaqueValue *>(buffer);
+  // Allocate temporary outline buffer.
+  auto size = vwt->getSize();
+  auto alignMask = vwt->getAlignmentMask();
+  auto *ptr = swift_slowAlloc(size, alignMask);
+  buffer->PrivateData[0] = ptr;
+  return reinterpret_cast<OpaqueValue *>(ptr);
+}
+
+template <> void Metadata::deallocateBufferIn(ValueBuffer *buffer) const {
+  auto *vwt = getValueWitnesses();
+  if (vwt->isValueInline())
+    return;
+  auto size = vwt->getSize();
+  auto alignMask = vwt->getAlignmentMask();
+  swift_slowDealloc(buffer->PrivateData[0], size, alignMask);
 }
 
 #ifndef NDEBUG
