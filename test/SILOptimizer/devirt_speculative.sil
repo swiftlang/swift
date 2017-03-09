@@ -2,6 +2,8 @@
 
 sil_stage canonical
 
+import Builtin
+
 @objc class MyNSObject {}
 private class Base : MyNSObject {
    override init()
@@ -104,3 +106,21 @@ bb0(%0: $Base2):
 // CHECK:  checked_cast_br [exact] %0 : $Base2 to $Sub2, bb{{.*}}, bb[[GENCALL:[0-9]+]]
 // CHECK: bb[[GENCALL]]{{.*}}:
 // CHECK:  apply [[METH]]
+
+// Don't devirtualize 'unsafeGuaranteed' self calls.
+// CHECK-LABEL: sil @test_unsafeGuaranteed
+// CHECK-NOT: check_cast_br
+// CHECK: return
+sil @test_unsafeGuaranteed : $@convention(thin) (@guaranteed Base2) -> () {
+bb0(%0: $Base2):
+  strong_retain %0 : $Base2
+  %4 = builtin "unsafeGuaranteed"<Base2>(%0 : $Base2) : $(Base2, Builtin.Int8)
+  %5 = tuple_extract %4 : $(Base2, Builtin.Int8), 0
+  %6 = tuple_extract %4 : $(Base2, Builtin.Int8), 1
+  %1 = class_method %0 : $Base2, #Base2.foo!1 : (Base2) -> () -> (), $@convention(method) (@guaranteed Base2) -> ()
+  %2 = apply %1(%5) : $@convention(method) (@guaranteed Base2) -> ()
+  strong_release %5 : $Base2
+  %16 = builtin "unsafeGuaranteedEnd"(%6 : $Builtin.Int8) : $()
+  %3 = tuple()
+  return %3 : $()
+}
