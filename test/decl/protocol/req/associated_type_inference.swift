@@ -80,8 +80,8 @@ protocol P1 {
 }
 
 extension P1 {
-  final func f0(_ x: Int) { }
-  final func g0(_ x: Int) { }
+  func f0(_ x: Int) { }
+  func g0(_ x: Int) { }
 }
 
 struct X0j : P0, P1 { }
@@ -93,8 +93,8 @@ protocol P2 {
 }
 
 extension P2 where Self.P2Assoc : PSimple {
-  final func f0(_ x: P2Assoc) { } // expected-note{{inferred type 'Float' (by matching requirement 'f0') is invalid: does not conform to 'PSimple'}}
-  final func g0(_ x: P2Assoc) { } // expected-note{{inferred type 'Float' (by matching requirement 'g0') is invalid: does not conform to 'PSimple'}}
+  func f0(_ x: P2Assoc) { } // expected-note{{inferred type 'Float' (by matching requirement 'f0') is invalid: does not conform to 'PSimple'}}
+  func g0(_ x: P2Assoc) { } // expected-note{{inferred type 'Float' (by matching requirement 'g0') is invalid: does not conform to 'PSimple'}}
 }
 
 struct X0k : P0, P2 {

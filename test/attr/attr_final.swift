@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -swift-version 4
 
 class Super {
   final var i: Int { get { return 5 } } // expected-note{{overridden declaration is here}}
@@ -34,9 +34,26 @@ enum SomeEnum {
   final func f() {}  // expected-error {{only classes and class members may be marked with 'final'}}
 }
 
+protocol SomeProtocol {
+  final var i: Int { get } // expected-error {{only classes and class members may be marked with 'final'}}
+  final func protoFunc()  // expected-error {{only classes and class members may be marked with 'final'}} {{3-9=}}
+}
+
+extension SomeProtocol {
+  final var i: Int { return 1 } // expected-error {{only classes and class members may be marked with 'final'}}
+  final func protoExtensionFunc() {}  // expected-error {{only classes and class members may be marked with 'final'}} {{3-9=}}
+}
+
+extension SomeStruct {
+  final func structExtensionFunc() {}  // expected-error {{only classes and class members may be marked with 'final'}} {{3-9=}}
+}
+
+extension SomeEnum {
+  final func enumExtensionFunc() {}  // expected-error {{only classes and class members may be marked with 'final'}} {{3-9=}}
+}
+
 extension Super {
   final func someClassMethod() {} // ok
-  
 }
 
 final func global_function() {}  // expected-error {{only classes and class members may be marked with 'final'}}
@@ -63,20 +80,4 @@ class Sub2 : Super2 { //// expected-error{{inheritance from a final class 'Super
   }
 
   final override init() {} // expected-error {{'final' modifier cannot be applied to this declaration}} {{3-9=}}
-}
-
-protocol SomeProtocol {
-  final var i: Int { get } // expected-error {{only classes and class members may be marked with 'final'}}
-  final func f() // expected-error {{only classes and class members may be marked with 'final'}}
-}
-
-extension SomeProtocol {
-  final var i: Int { return 1 } // Ok, ignored.
-  final func f() {} // Ok, ignored.
-}
-
-// Just to make sure 'final' in protocol extension doesn't prevent concrete implementation.
-class TestC_SomeProtocol : SomeProtocol {
-  var i: Int { return 42 }
-  func f() {}
 }
