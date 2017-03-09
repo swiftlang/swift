@@ -289,7 +289,8 @@ static SILInstruction *createIndexAddrFrom(IndexRawPointerInst *I,
 
   // index_raw_pointer's address type is currently always strict.
   auto *NewPTAI = Builder.createPointerToAddress(
-    I->getLoc(), Ptr, InstanceType.getAddressType(), /*isStrict*/ true);
+    I->getLoc(), Ptr, InstanceType.getAddressType(),
+    /*isStrict*/ true, /*isInvariant*/ false);
 
   auto *DistanceAsWord =
       Builder.createBuiltin(I->getLoc(), TruncOrBitCast->getName(),

@@ -51,15 +51,24 @@ void GenericSpecializationMangler::mangleSpecialization() {
   SILFunctionType *FTy = Function->getLoweredFunctionType();
   CanGenericSignature Sig = FTy->getGenericSignature();
   auto SubMap = Sig->getSubstitutionMap(Subs);
-  for (Type DepType : Sig->getSubstitutableParams()) {
-    M.mangleType(DepType.subst(SubMap)->getCanonicalType(), 0);
-    for (auto C : SubMap.getConformances(DepType->getCanonicalType())) {
-      if (C.isAbstract())
-        return;
-      M.mangleProtocolConformance(C.getConcrete());
-    }
-    M.append('_');
-  }
+  Sig->enumeratePairedRequirements(
+    [&](Type depTy, ArrayRef<Requirement> reqts) {
+      if (!depTy->is<GenericTypeParamType>())
+        return false;
+
+      M.mangleType(depTy.subst(SubMap)->getCanonicalType(), 0);
+
+      for (auto reqt : reqts) {
+        auto conformance = SubMap.lookupConformance(
+            depTy->getCanonicalType(),
+            reqt.getSecondType()->castTo<ProtocolType>()->getDecl());
+        if (conformance && conformance->isConcrete())
+          M.mangleProtocolConformance(conformance->getConcrete());
+      }
+      M.append('_');
+
+      return false;
+    });
 }
 
 void PartialSpecializationMangler::mangleSpecialization() {

@@ -470,11 +470,9 @@ static bool isMethodDecl(const Decl *decl) {
 }
 
 static bool genericParamIsBelowDepth(Type type, unsigned methodDepth) {
-  if (auto gp = type->getAs<GenericTypeParamType>()) {
+  if (type->isTypeParameter()) {
+    auto gp = type->getRootGenericParam();
     return gp->getDepth() >= methodDepth;
-  }
-  if (auto dm = type->getAs<DependentMemberType>()) {
-    return genericParamIsBelowDepth(dm->getBase(), methodDepth);
   }
   // Non-dependent types in a same-type requirement don't affect whether we
   // mangle the requirement.

@@ -22,6 +22,7 @@
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/SubstitutionMap.h"
 #include "swift/Basic/Range.h"
 #include "swift/Basic/Unicode.h"
 #include "swift/SIL/PrettyStackTrace.h"
@@ -680,8 +681,7 @@ private:
 
 static Callee prepareArchetypeCallee(SILGenFunction &gen, SILLocation loc,
                                      SILDeclRef constant,
-                                     ArgumentSource &selfValue,
-                                     SubstitutionList &substitutions) {
+                                     ArgumentSource &selfValue) {
   // Construct an archetype call.
   ArchetypeCalleeBuilder Builder{gen, loc, constant, selfValue};
   return Builder.build();
@@ -892,8 +892,7 @@ public:
         SILDeclRef constant = SILDeclRef(afd, kind);
 
         // Prepare the callee.  This can modify both selfValue and subs.
-        Callee theCallee = prepareArchetypeCallee(SGF, e, constant, selfValue,
-                                                  subs);
+        Callee theCallee = prepareArchetypeCallee(SGF, e, constant, selfValue);
         AssumedPlusZeroSelf = selfValue.isRValue()
           && selfValue.forceAndPeekRValue(SGF).peekIsPlusZeroRValueOrTrivial();
 
@@ -4533,9 +4532,13 @@ RValue SILGenFunction::emitApplyExpr(Expr *e, SGFContext c) {
 RValue
 SILGenFunction::emitApplyOfLibraryIntrinsic(SILLocation loc,
                                             FuncDecl *fn,
-                                            SubstitutionList subs,
+                                            const SubstitutionMap &subMap,
                                             ArrayRef<ManagedValue> args,
                                             SGFContext ctx) {
+  SmallVector<Substitution, 4> subs;
+  if (auto *genericSig = fn->getGenericSignature())
+    genericSig->getSubstitutions(subMap, subs);
+
   auto callee = Callee::forDirect(*this, SILDeclRef(fn), loc);
   callee.setSubstitutions(subs);
 
@@ -4633,7 +4636,7 @@ static RValue emitApplyAllocatingInitializer(SILGenFunction &SGF,
                               RValue(SGF, loc,
                                      selfMetaVal.getType().getSwiftRValueType(),
                                      selfMetaVal));
-    callee.emplace(prepareArchetypeCallee(SGF, loc, initRef, selfSource, subs));
+    callee.emplace(prepareArchetypeCallee(SGF, loc, initRef, selfSource));
   } else {
     callee.emplace(Callee::forDirect(SGF, initRef, loc));
   }
@@ -4785,13 +4788,11 @@ SILGenFunction::emitUninitializedArrayAllocation(Type ArrayTy,
   auto &Ctx = getASTContext();
   auto allocate = Ctx.getAllocateUninitializedArray(nullptr);
 
-  auto arrayElementTy = ArrayTy->castTo<BoundGenericType>()
-    ->getGenericArgs()[0];
-
   // Invoke the intrinsic, which returns a tuple.
-  Substitution sub{arrayElementTy, {}};
+  auto subMap = ArrayTy->getContextSubstitutionMap(SGM.M.getSwiftModule(),
+                                                   Ctx.getArrayDecl());
   auto result = emitApplyOfLibraryIntrinsic(Loc, allocate,
-                                            sub,
+                                            subMap,
                                             ManagedValue::forUnmanaged(Length),
                                             SGFContext());
 
@@ -4808,12 +4809,12 @@ void SILGenFunction::emitUninitializedArrayDeallocation(SILLocation loc,
   auto &Ctx = getASTContext();
   auto deallocate = Ctx.getDeallocateUninitializedArray(nullptr);
 
-  CanType arrayElementTy =
-    array->getType().castTo<BoundGenericType>().getGenericArgs()[0];
+  CanType arrayTy = array->getType().getSwiftRValueType();
 
   // Invoke the intrinsic.
-  Substitution sub{arrayElementTy, {}};
-  emitApplyOfLibraryIntrinsic(loc, deallocate, sub,
+  auto subMap = arrayTy->getContextSubstitutionMap(SGM.M.getSwiftModule(),
+                                                   Ctx.getArrayDecl());
+  emitApplyOfLibraryIntrinsic(loc, deallocate, subMap,
                               ManagedValue::forUnmanaged(array),
                               SGFContext());
 }
@@ -4851,8 +4852,7 @@ static Callee getBaseAccessorFunctionRef(SILGenFunction &gen,
                                          SILDeclRef constant,
                                          ArgumentSource &selfValue,
                                          bool isSuper,
-                                         bool isDirectUse,
-                                         SubstitutionList &substitutions){
+                                         bool isDirectUse) {
   auto *decl = cast<AbstractFunctionDecl>(constant.getDecl());
 
   // If this is a method in a protocol, generate it as a protocol call.
@@ -4860,8 +4860,7 @@ static Callee getBaseAccessorFunctionRef(SILGenFunction &gen,
     assert(!isDirectUse && "direct use of protocol accessor?");
     assert(!isSuper && "super call to protocol method?");
 
-    return prepareArchetypeCallee(gen, loc, constant, selfValue,
-                                  substitutions);
+    return prepareArchetypeCallee(gen, loc, constant, selfValue);
   }
 
   bool isClassDispatch = false;
@@ -4906,8 +4905,7 @@ emitSpecializedAccessorFunctionRef(SILGenFunction &gen,
   // Get the accessor function. The type will be a polymorphic function if
   // the Self type is generic.
   Callee callee = getBaseAccessorFunctionRef(gen, loc, constant, selfValue,
-                                             isSuper, isDirectUse,
-                                             substitutions);
+                                             isSuper, isDirectUse);
   
   // Collect captures if the accessor has them.
   auto accessorFn = cast<AbstractFunctionDecl>(constant.getDecl());
@@ -5289,7 +5287,9 @@ emitMaterializeForSetAccessor(SILLocation loc, SILDeclRef materializeForSet,
   // materialize for set is strictly typed, whether it is the local buffer or
   // stored property.
   SILValue address = results[0].getUnmanagedValue();
-  address = B.createPointerToAddress(loc, address, buffer->getType(), /*isStrict*/ true);
+  address = B.createPointerToAddress(loc, address, buffer->getType(),
+                                     /*isStrict*/ true,
+                                     /*isInvariant*/ false);
 
   // Project out the optional callback.
   SILValue optionalCallback = results[1].getUnmanagedValue();
@@ -5391,7 +5391,9 @@ emitAddressorAccessor(SILLocation loc, SILDeclRef addressor,
                                   SILType::getRawPointerType(getASTContext()));
 
   // Convert to the appropriate address type and return.
-  SILValue address = B.createPointerToAddress(loc, pointer, addressType, /*isStrict*/ true);
+  SILValue address = B.createPointerToAddress(loc, pointer, addressType,
+                                              /*isStrict*/ true,
+                                              /*isInvariant*/ false);
 
   // Mark dependence as necessary.
   switch (cast<FuncDecl>(addressor.getDecl())->getAddressorKind()) {

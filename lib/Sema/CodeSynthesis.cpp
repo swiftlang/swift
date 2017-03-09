@@ -2061,16 +2061,17 @@ swift::createDesignatedInitOverride(TypeChecker &tc,
   // like 'class A : B<Int>'.
   if (auto *superclassSig = superclassDecl->getGenericSignatureOfContext()) {
     auto *moduleDecl = classDecl->getParentModule();
-    auto subs = superclassTyInContext->gatherAllSubstitutions(
-        moduleDecl, nullptr, nullptr);
-    auto subsMap = superclassSig->getSubstitutionMap(subs);
+    auto subMap = superclassTyInContext->getContextSubstitutionMap(
+        moduleDecl,
+        superclassDecl,
+        classDecl->getGenericEnvironment());
 
     for (auto *decl : *bodyParams) {
       auto paramTy = decl->getInterfaceType();
 
       // Apply the superclass substitutions to produce a contextual
       // type in terms of the derived class archetypes.
-      auto paramSubstTy = paramTy.subst(subsMap);
+      auto paramSubstTy = paramTy.subst(subMap);
       decl->setType(paramSubstTy);
 
       // Map it to an interface type in terms of the derived class

@@ -1773,7 +1773,7 @@ UnconditionalCheckedCastInst *UnconditionalCheckedCastInst::create(
                                                      TypeDependentOperands, DestTy);
 }
 
-UnconditionalCheckedCastOpaqueInst *UnconditionalCheckedCastOpaqueInst::create(
+UnconditionalCheckedCastValueInst *UnconditionalCheckedCastValueInst::create(
     SILDebugLocation DebugLoc, SILValue Operand, SILType DestTy, SILFunction &F,
     SILOpenedArchetypesState &OpenedArchetypes) {
   SILModule &Mod = F.getModule();
@@ -1783,8 +1783,8 @@ UnconditionalCheckedCastOpaqueInst *UnconditionalCheckedCastOpaqueInst::create(
   unsigned size =
       totalSizeToAlloc<swift::Operand>(1 + TypeDependentOperands.size());
   void *Buffer =
-      Mod.allocateInst(size, alignof(UnconditionalCheckedCastOpaqueInst));
-  return ::new (Buffer) UnconditionalCheckedCastOpaqueInst(
+      Mod.allocateInst(size, alignof(UnconditionalCheckedCastValueInst));
+  return ::new (Buffer) UnconditionalCheckedCastValueInst(
       DebugLoc, Operand, TypeDependentOperands, DestTy);
 }
 

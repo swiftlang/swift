@@ -219,12 +219,13 @@ func s130_____________wrap<T>(_ x: T) -> T? {
 // CHECK-NOT: alloc_stack $Optional<Int>
 // CHECK:   [[APPLY_ARG3:%.*]] = apply %{{.*}}<CountableRange<Int>>
 // CHECK-NOT: dealloc_stack
-// CHECK:   [[ENUM_ARG:%.*]] = select_enum [[APPLY_ARG3]] : $Optional<Int>
-// CHECK:   cond_br [[ENUM_ARG]], bb3, bb2
+// CHECK:   switch_enum [[APPLY_ARG3]]
 // CHECK: bb2:
-// CHECK:   return %{{.*}} : $()
+// CHECK:   br bb3
 // CHECK: bb3:
-// CHECK:   unchecked_enum_data [[APPLY_ARG3]]
+// CHECK:   return %{{.*}} : $()
+// CHECK: bb4([[ENUM_ARG:%.*]] : $Int):
+// CHECK-NOT:   unchecked_enum_data
 // CHECK:   br bb1
 // CHECK-LABEL: } // end sil function '_T020opaque_values_silgen21s140______forEachStmtyyF'
 func s140______forEachStmt() {
@@ -257,7 +258,7 @@ func s160_______callAnyArg() {
 // CHECK:   [[INT_TYPE:%.*]] = metatype $@thin Int.Type
 // CHECK:   [[INT_LIT:%.*]] = integer_literal $Builtin.Int2048, 42
 // CHECK:   [[INT_ARG:%.*]] = apply %{{.*}}([[INT_LIT]], [[INT_TYPE]]) : $@convention(method) (Builtin.Int2048, @thin Int.Type) -> Int
-// CHECK:   [[INT_CAST:%.*]] = unconditional_checked_cast_opaque [[INT_ARG]] : $Int to $T
+// CHECK:   [[INT_CAST:%.*]] = unconditional_checked_cast_value [[INT_ARG]] : $Int to $T
 // CHECK:   [[CAST_BORROW:%.*]] = begin_borrow [[INT_CAST]] : $T
 // CHECK:   [[RETURN_VAL:%.*]] = copy_value [[CAST_BORROW]] : $T
 // CHECK:   end_borrow [[CAST_BORROW]] from [[INT_CAST]] : $T, $T
@@ -275,7 +276,7 @@ func s170____force_convert<T>() -> T {
 // CHECK: bb0:
 // CHECK:   [[INT_LIT:%.*]] = integer_literal $Builtin.Int2048, 42
 // CHECK:   [[INT_ARG:%.*]] = apply %{{.*}}([[INT_LIT]], [[INT_TYPE]]) : $@convention(method) (Builtin.Int2048, @thin Int.Type) -> Int
-// CHECK:   [[INT_CAST:%.*]] = unconditional_checked_cast_opaque [[INT_ARG]] : $Int to $Foo
+// CHECK:   [[INT_CAST:%.*]] = unconditional_checked_cast_value [[INT_ARG]] : $Int to $Foo
 // CHECK:   return [[INT_CAST]] : $Foo
 // CHECK-LABEL: } // end sil function '_T020opaque_values_silgen21s180_______return_fooAA3Foo_pyF'
 func s180_______return_foo() -> Foo {

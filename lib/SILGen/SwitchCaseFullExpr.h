@@ -36,7 +36,7 @@ public:
   explicit SwitchCaseFullExpr(SILGenFunction &SGF, CleanupLocation loc,
                               SILBasicBlock *contBlock = nullptr);
 
-  ~SwitchCaseFullExpr();
+  ~SwitchCaseFullExpr() = default;
 
   SwitchCaseFullExpr(const SwitchCaseFullExpr &) = delete;
   SwitchCaseFullExpr &operator=(const SwitchCaseFullExpr &) = delete;

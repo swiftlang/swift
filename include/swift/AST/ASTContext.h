@@ -689,18 +689,37 @@ public:
   takeDelayedMissingWitnesses(NormalProtocolConformance *conformance);
 
   /// \brief Produce a specialized conformance, which takes a generic
-  /// conformance and substitutes
+  /// conformance and substitutions written in terms of the generic
+  /// conformance's signature.
   ///
   /// \param type The type for which we are retrieving the conformance.
   ///
   /// \param generic The generic conformance.
   ///
   /// \param substitutions The set of substitutions required to produce the
-  /// specialized conformance from the generic conformance.
+  /// specialized conformance from the generic conformance. This list is
+  /// copied so passing a temporary is permitted.
   SpecializedProtocolConformance *
   getSpecializedConformance(Type type,
                             ProtocolConformance *generic,
                             SubstitutionList substitutions);
+
+  /// \brief Produce a specialized conformance, which takes a generic
+  /// conformance and substitutions written in terms of the generic
+  /// conformance's signature.
+  ///
+  /// \param type The type for which we are retrieving the conformance.
+  ///
+  /// \param generic The generic conformance.
+  ///
+  /// \param substitutions The set of substitutions required to produce the
+  /// specialized conformance from the generic conformance. The keys must
+  /// be generic parameters, not archetypes, so for example passing in
+  /// TypeBase::getContextSubstitutionMap() is OK.
+  SpecializedProtocolConformance *
+  getSpecializedConformance(Type type,
+                            ProtocolConformance *generic,
+                            const SubstitutionMap &substitutions);
 
   /// \brief Produce an inherited conformance, for subclasses of a type
   /// that already conforms to a protocol.
@@ -711,18 +730,9 @@ public:
   InheritedProtocolConformance *
   getInheritedConformance(Type type, ProtocolConformance *inherited);
 
-  /// \brief Create trivial substitutions for the given bound generic type.
-  Optional<SubstitutionList>
-  createTrivialSubstitutions(BoundGenericType *BGT,
-                             DeclContext *gpContext) const;
-
   /// Record compiler-known protocol information in the AST.
   void recordKnownProtocols(ModuleDecl *Stdlib);
   
-  /// \brief Retrieve the substitutions for a bound generic type, if known.
-  Optional<SubstitutionList>
-  getSubstitutions(TypeBase *type, DeclContext *gpContext) const;
-
   /// Get the lazy data for the given declaration.
   ///
   /// \param lazyLoader If non-null, the lazy loader to use when creating the
@@ -839,12 +849,6 @@ private:
   void setBriefComment(const Decl *D, StringRef Comment);
 
   friend TypeBase;
-
-  /// \brief Set the substitutions for the given bound generic type.
-  void setSubstitutions(TypeBase *type,
-                        DeclContext *gpContext,
-                        SubstitutionList Subs) const;
-
   friend ArchetypeType;
 
   /// Provide context-level uniquing for SIL lowered type layouts and boxes.

@@ -13,15 +13,14 @@
 #ifndef SWIFT_RUNTIME_SWIFT_HASHABLE_SUPPORT_H
 #define SWIFT_RUNTIME_SWIFT_HASHABLE_SUPPORT_H
 
-#include "swift/Runtime/Config.h"
 #include "swift/Runtime/Metadata.h"
 #include <stdint.h>
 
 namespace swift {
 namespace hashable_support {
 
-extern "C" const ProtocolDescriptor HashableProtocolDescriptor
-  __asm__(SWIFT_QUOTED_SYMBOL_NAME(PROTOCOL_DESCR_SYM(s8Hashable)));
+extern "C" const ProtocolDescriptor PROTOCOL_DESCR_SYM(s8Hashable);
+static constexpr auto &HashableProtocolDescriptor = PROTOCOL_DESCR_SYM(s8Hashable);
 
 struct HashableWitnessTable;
 

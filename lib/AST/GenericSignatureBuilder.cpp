@@ -296,8 +296,8 @@ const RequirementSource *RequirementSource::forAbstract(
 }
 
 const RequirementSource *RequirementSource::forExplicit(
-                                             PotentialArchetype *root,
-                                             WrittenRequirementLoc writtenLoc) {
+    PotentialArchetype *root,
+    GenericSignatureBuilder::WrittenRequirementLoc writtenLoc) {
   auto &builder = *root->getBuilder();
   REQUIREMENT_SOURCE_FACTORY_BODY(
                         (nodeID, Explicit, nullptr, root,
@@ -363,10 +363,9 @@ static Type rerootOnProtocolSelf(Type depTy, ProtocolDecl *protocol) {
 }
 
 const RequirementSource *RequirementSource::viaProtocolRequirement(
-                                     GenericSignatureBuilder &builder,
-                                     Type dependentType,
-                                     ProtocolDecl *protocol,
-                                     WrittenRequirementLoc writtenLoc) const {
+    GenericSignatureBuilder &builder, Type dependentType,
+    ProtocolDecl *protocol,
+    GenericSignatureBuilder::WrittenRequirementLoc writtenLoc) const {
   // Re-root the dependent type on the protocol.
   // FIXME: we really want to canonicalize w.r.t. the requirement signature of
   // the protocol, but it might not have been computed yet.
@@ -1231,9 +1230,17 @@ auto GenericSignatureBuilder::PotentialArchetype::getNestedType(
   SmallVector<std::pair<ProtocolDecl *, const RequirementSource *>, 4>
     conformsTo(rep->ConformsTo.begin(), rep->ConformsTo.end());
   for (auto &conforms : conformsTo) {
-    auto proto = conforms.first;
-
-    for (auto member : proto->lookupDirect(nestedName)) {
+    // Make sure we don't trigger deserialization of extensions,
+    // since they can refer back to a protocol we're currently
+    // type checking.
+    //
+    // Note that typealiases in extensions won't matter here,
+    // because a typealias is never going to be a representative
+    // PA.
+    auto *proto = conforms.first;
+    auto members = proto->lookupDirect(nestedName,
+                                       /*ignoreNewExtensions=*/true);
+    for (auto member : members) {
       PotentialArchetype *pa;
       std::function<void(Type, Type)> diagnoseMismatch;
 
@@ -2623,15 +2630,16 @@ public:
   Action walkToTypePost(Type ty) override {
     auto boundGeneric = ty->getAs<BoundGenericType>();
     if (!boundGeneric)
-      return Action::Continue; 
+      return Action::Continue;
 
-    auto genericSig = boundGeneric->getDecl()->getGenericSignature();
+    auto *decl = boundGeneric->getDecl();
+    auto genericSig = decl->getGenericSignature();
     if (!genericSig)
       return Action::Stop;
 
     /// Retrieve the substitution.
-    auto allSubs = boundGeneric->gatherAllSubstitutions(&module, nullptr);
-    auto subMap = genericSig->getSubstitutionMap(allSubs);
+    auto subMap = boundGeneric->getContextSubstitutionMap(
+      &module, decl, decl->getGenericEnvironment());
 
     // Handle the requirements.
     // FIXME: Inaccurate TypeReprs.

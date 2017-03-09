@@ -16,6 +16,7 @@
 #include "SILGenFunction.h"
 #include "Scope.h"
 #include "SwitchCaseFullExpr.h"
+#include "swift/AST/SubstitutionMap.h"
 
 using namespace swift;
 using namespace Lowering;
@@ -93,11 +94,18 @@ MetatypeInst *SILGenBuilder::createMetatype(SILLocation loc, SILType metatype) {
   case MetatypeRepresentation::ObjC: {
     // Walk the type recursively to look for substitutions we may need.
     theMetatype.getInstanceType().findIf([&](Type t) -> bool {
-      if (!t->getAnyNominal())
+      auto *decl = t->getAnyNominal();
+      if (!decl)
         return false;
 
-      auto subs =
-          t->gatherAllSubstitutions(getSILGenModule().SwiftModule, nullptr);
+      auto *genericSig = decl->getGenericSignature();
+      if (!genericSig)
+        return false;
+
+      auto subMap = t->getContextSubstitutionMap(getSILGenModule().SwiftModule,
+                                                 decl);
+      SmallVector<Substitution, 4> subs;
+      genericSig->getSubstitutions(subMap, subs);
       getSILGenModule().useConformancesFromSubstitutions(subs);
       return false;
     });
@@ -527,9 +535,9 @@ ManagedValue SILGenBuilder::createEnum(SILLocation loc, ManagedValue payload,
   return gen.emitManagedRValueWithCleanup(result);
 }
 
-ManagedValue SILGenBuilder::createUnconditionalCheckedCastOpaque(
+ManagedValue SILGenBuilder::createUnconditionalCheckedCastValue(
     SILLocation loc, ManagedValue operand, SILType type) {
-  SILValue result = SILBuilder::createUnconditionalCheckedCastOpaque(
+  SILValue result = SILBuilder::createUnconditionalCheckedCastValue(
       loc, operand.forward(gen), type);
   return gen.emitManagedRValueWithCleanup(result);
 }
@@ -614,6 +622,24 @@ ManagedValue SILGenBuilder::createTupleElementAddr(SILLocation Loc,
                                                    unsigned Index) {
   SILType Type = Value.getType().getTupleElementType(Index);
   return createTupleElementAddr(Loc, Value, Index, Type);
+}
+
+ManagedValue SILGenBuilder::createUncheckedRefCast(SILLocation loc,
+                                                   ManagedValue value,
+                                                   SILType type) {
+  CleanupCloner cloner(*this, value);
+  SILValue cast =
+      SILBuilder::createUncheckedRefCast(loc, value.forward(gen), type);
+  return cloner.clone(cast);
+}
+
+ManagedValue SILGenBuilder::createOpenExistentialRef(SILLocation loc,
+                                                     ManagedValue original,
+                                                     SILType type) {
+  CleanupCloner cloner(*this, original);
+  SILValue openedExistential =
+      SILBuilder::createOpenExistentialRef(loc, original.forward(gen), type);
+  return cloner.clone(openedExistential);
 }
 
 //===----------------------------------------------------------------------===//

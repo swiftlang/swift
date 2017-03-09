@@ -215,7 +215,7 @@ CONSTANT_OWNERSHIP_INST(Owned, PartialApply)
 CONSTANT_OWNERSHIP_INST(Owned, StrongPin)
 CONSTANT_OWNERSHIP_INST(Owned, ThinToThickFunction)
 CONSTANT_OWNERSHIP_INST(Owned, InitExistentialOpaque)
-CONSTANT_OWNERSHIP_INST(Owned, UnconditionalCheckedCastOpaque)
+CONSTANT_OWNERSHIP_INST(Owned, UnconditionalCheckedCastValue)
 
 // One would think that these /should/ be unowned. In truth they are owned since
 // objc metatypes do not go through the retain/release fast path. In their
@@ -661,6 +661,7 @@ CONSTANT_OWNERSHIP_BUILTIN(Trivial, IntToPtr)
 CONSTANT_OWNERSHIP_BUILTIN(Trivial, LShr)
 CONSTANT_OWNERSHIP_BUILTIN(Trivial, Load)
 CONSTANT_OWNERSHIP_BUILTIN(Trivial, LoadRaw)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, LoadInvariant)
 CONSTANT_OWNERSHIP_BUILTIN(Trivial, Mul)
 CONSTANT_OWNERSHIP_BUILTIN(Trivial, Or)
 CONSTANT_OWNERSHIP_BUILTIN(Trivial, PtrToInt)

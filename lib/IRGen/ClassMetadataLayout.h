@@ -26,9 +26,6 @@ namespace irgen {
 
 class IRGenModule;
 
-/// The number of fields in a FullHeapMetadata object.
-const unsigned NumHeapMetadataFields = 3;
-
 /// A CRTP class for laying out class metadata.  Note that this does
 /// *not* handle the metadata template stuff.
 template <class Impl> class ClassMetadataLayout : public MetadataLayout<Impl> {
@@ -184,29 +181,20 @@ private:
     // If the method does not have a vtable entry, don't add any.
     if (!hasKnownVTableEntry(IGM, fn))
       return;
-    
-    // TODO: consider emitting at different explosion levels and
-    // uncurryings.
-    auto explosionLevel = ResilienceExpansion::Minimal;
-    unsigned uncurryLevel = SILDeclRef::ConstructAtNaturalUncurryLevel;
-    
+
     if (isa<FuncDecl>(fn))
-      maybeAddMethod(fn, SILDeclRef::Kind::Func, explosionLevel, uncurryLevel);
+      maybeAddMethod(fn, SILDeclRef::Kind::Func);
     else {
       auto ctor = cast<ConstructorDecl>(fn);
       if (ctor->isRequired())
-        maybeAddMethod(fn, SILDeclRef::Kind::Allocator, explosionLevel, 
-                       uncurryLevel);
-      maybeAddMethod(fn, SILDeclRef::Kind::Initializer, explosionLevel, 
-                     uncurryLevel);      
+        maybeAddMethod(fn, SILDeclRef::Kind::Allocator);
+      maybeAddMethod(fn, SILDeclRef::Kind::Initializer);
     }
   }
 
   void maybeAddMethod(AbstractFunctionDecl *fn,
-                      SILDeclRef::Kind kind,
-                      ResilienceExpansion explosionLevel,
-                      unsigned uncurryLevel) {
-    SILDeclRef declRef(fn, kind, explosionLevel, uncurryLevel);
+                      SILDeclRef::Kind kind) {
+    SILDeclRef declRef(fn, kind);
     // If the method overrides something, we don't need a new entry.
     if (declRef.getNextOverriddenVTableEntry())
       return;

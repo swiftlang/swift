@@ -2416,17 +2416,22 @@ class PointerToAddressInst
 {
   friend SILBuilder;
 
-  bool IsStrict;
+  bool IsStrict, IsInvariant;
 
   PointerToAddressInst(SILDebugLocation DebugLoc, SILValue Operand, SILType Ty,
-                       bool IsStrict)
-    : UnaryInstructionBase(DebugLoc, Operand, Ty), IsStrict(IsStrict) {}
+                       bool IsStrict, bool IsInvariant)
+    : UnaryInstructionBase(DebugLoc, Operand, Ty),
+      IsStrict(IsStrict), IsInvariant(IsInvariant) {}
 
 public:
   /// Whether the returned address adheres to strict aliasing.
   /// If true, then the type of each memory access dependent on
   /// this address must be consistent with the memory's bound type.
   bool isStrict() const { return IsStrict; }
+  /// Whether the returned address is invariant.
+  /// If true, then loading from an address derived from this pointer always
+  /// produces the same value.
+  bool isInvariant() const { return IsInvariant; }
 };
 
 /// Convert a heap object reference to a different type without any runtime
@@ -2838,20 +2843,19 @@ public:
 
 /// Perform an unconditional checked cast that aborts if the cast fails.
 /// The result of the checked cast is left in the destination.
-class UnconditionalCheckedCastOpaqueInst final
+class UnconditionalCheckedCastValueInst final
     : public UnaryInstructionWithTypeDependentOperandsBase<
-          ValueKind::UnconditionalCheckedCastOpaqueInst,
-          UnconditionalCheckedCastOpaqueInst, ConversionInst, true> {
+          ValueKind::UnconditionalCheckedCastValueInst,
+          UnconditionalCheckedCastValueInst, ConversionInst, true> {
   friend SILBuilder;
 
-  UnconditionalCheckedCastOpaqueInst(SILDebugLocation DebugLoc,
-                                     SILValue Operand,
-                                     ArrayRef<SILValue> TypeDependentOperands,
-                                     SILType DestTy)
+  UnconditionalCheckedCastValueInst(SILDebugLocation DebugLoc, SILValue Operand,
+                                    ArrayRef<SILValue> TypeDependentOperands,
+                                    SILType DestTy)
       : UnaryInstructionWithTypeDependentOperandsBase(
             DebugLoc, Operand, TypeDependentOperands, DestTy) {}
 
-  static UnconditionalCheckedCastOpaqueInst *
+  static UnconditionalCheckedCastValueInst *
   create(SILDebugLocation DebugLoc, SILValue Operand, SILType DestTy,
          SILFunction &F, SILOpenedArchetypesState &OpenedArchetypes);
 };
@@ -3876,12 +3880,6 @@ public:
   }
 
   ProtocolConformanceRef getConformance() const { return Conformance; }
-
-  /// Get a representation of the lookup type as a substitution of the
-  /// protocol's Self archetype.
-  Substitution getSelfSubstitution() const {
-    return Substitution{getLookupType(), Conformance};
-  }
 
   ArrayRef<Operand> getAllOperands() const {
     return { getTrailingObjects<Operand>(), NumOperands };

@@ -16,6 +16,7 @@
 import Foundation
 import TestsUtils
 
+#if _runtime(_ObjC)
 class Thing : NSObject {
 
   required override init() {
@@ -50,10 +51,13 @@ class Stuff {
 
   }
 }
+#endif
 
 @inline(never)
 public func run_DictionaryBridge(_ N: Int) {
+#if _runtime(_ObjC)
     for _ in 1...100*N {
         _ = Stuff()
     }
+#endif
 }

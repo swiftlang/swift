@@ -147,7 +147,7 @@ func test10(_ g: Gizmo) -> AnyClass {
   // CHECK-NEXT: [[THICK:%.*]] = objc_to_thick_metatype [[OBJC]]
   // CHECK:      [[T0:%.*]] = enum $Optional<@thick AnyObject.Type>, #Optional.some!enumelt.1, [[THICK]]
   // CHECK:   bb5([[RES:%.*]] : $@thick AnyObject.Type):
-  // CHECK:      destroy_value [[G_COPY]] : $Gizmo
+  // CHECK:      destroy_value [[NS_G_COPY]] : $NSObject
   // CHECK:      destroy_value [[G]] : $Gizmo
   // CHECK-NEXT: return [[RES]] : $@thick AnyObject.Type
   return g.classProp
@@ -169,7 +169,7 @@ func test11(_ g: Gizmo) -> AnyClass {
   // CHECK:   bb5([[RES:%.*]] : $@thick NSAnsing.Type):
   // CHECK:      [[OPENED:%.*]] = open_existential_metatype [[RES]]
   // CHECK:      [[RES_ANY:%.*]] = init_existential_metatype [[OPENED]]
-  // CHECK:      destroy_value [[G_COPY]] : $Gizmo
+  // CHECK:      destroy_value [[NS_G_COPY]] : $NSObject
   // CHECK:      destroy_value [[G]] : $Gizmo
   // CHECK-NEXT: return [[RES_ANY]] : $@thick AnyObject.Type
   return g.qualifiedClassProp

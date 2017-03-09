@@ -1223,8 +1223,8 @@ public:
           << getIDAndType(CI->getDest());
   }
 
-  void visitUnconditionalCheckedCastOpaqueInst(
-      UnconditionalCheckedCastOpaqueInst *CI) {
+  void visitUnconditionalCheckedCastValueInst(
+      UnconditionalCheckedCastValueInst *CI) {
     *this << getIDAndType(CI->getOperand()) << " to " << CI->getType();
   }
 
@@ -1266,6 +1266,8 @@ public:
     *this << getIDAndType(CI->getOperand()) << " to ";
     if (CI->isStrict())
       *this << "[strict] ";
+    if (CI->isInvariant())
+      *this << "[invariant] ";
     *this << CI->getType();
   }
   void visitUncheckedRefCastInst(UncheckedRefCastInst *CI) {
