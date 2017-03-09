@@ -1,6 +1,6 @@
 # Verify symbols from libswiftCore.dylib.
 
-UNSUPPORTED: OS=linux
+UNSUPPORTED: OS=linux-gnu
 
 # No C++ exports allowed.
 RUN: nm -m -g -U -arch %target-cpu %platform-module-dir/libswiftCore.dylib | %FileCheck --check-prefix CHECK-CXX %s
