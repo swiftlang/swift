@@ -10,15 +10,16 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_BASIC_MANGLINGUTILS_H
-#define SWIFT_BASIC_MANGLINGUTILS_H
+#ifndef SWIFT_DEMANGLING_MANGLINGUTILS_H
+#define SWIFT_DEMANGLING_MANGLINGUTILS_H
 
 #include "llvm/ADT/StringRef.h"
-#include "llvm/ADT/ArrayRef.h"
-#include "swift/Basic/Punycode.h"
+#include "swift/Demangling/Punycode.h"
 
 namespace swift {
 namespace NewMangling {
+
+using llvm::StringRef;
 
 inline bool isLowerLetter(char ch) {
   return ch >= 'a' && ch <= 'z';
@@ -313,5 +314,5 @@ public:
 } // end namespace Mangle
 } // end namespace swift
 
-#endif // SWIFT_BASIC_MANGLINGUTILS_H
+#endif // SWIFT_DEMANGLING_MANGLINGUTILS_H
 

@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Driver/DependencyGraph.h"
-#include "swift/Basic/Demangle.h"
+#include "swift/Demangling/Demangle.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringSwitch.h"

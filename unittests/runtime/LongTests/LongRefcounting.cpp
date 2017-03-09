@@ -12,7 +12,7 @@
 
 #include "swift/Runtime/HeapObject.h"
 #include "swift/Runtime/Metadata.h"
-#include "swift/Basic/ManglingMacros.h"
+#include "swift/Demangling/ManglingMacros.h"
 #include "gtest/gtest.h"
 
 #ifdef __APPLE__

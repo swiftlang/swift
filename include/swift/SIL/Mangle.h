@@ -13,7 +13,7 @@
 #ifndef SWIFT_SIL_MANGLE_H
 #define SWIFT_SIL_MANGLE_H
 
-#include "swift/Basic/Demangle.h"
+#include "swift/Demangling/Demangle.h"
 #include "swift/Basic/NullablePtr.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Mangle.h"

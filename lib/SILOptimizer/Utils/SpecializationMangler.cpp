@@ -13,8 +13,7 @@
 #include "swift/SILOptimizer/Utils/SpecializationMangler.h"
 #include "swift/SIL/SILGlobalVariable.h"
 #include "swift/AST/SubstitutionMap.h"
-#include "swift/Basic/Demangler.h"
-#include "swift/Basic/ManglingMacros.h"
+#include "swift/Demangling/ManglingMacros.h"
 
 using namespace swift;
 using namespace NewMangling;

@@ -10,10 +10,12 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "../../../lib/Basic/Demangle.cpp"
-#include "../../../lib/Basic/Demangler.cpp"
-#include "../../../lib/Basic/ManglingUtils.cpp"
-#include "../../../lib/Basic/Punycode.cpp"
+#include "../../../lib/Demangling/OldDemangler.cpp"
+#include "../../../lib/Demangling/Demangler.cpp"
+#include "../../../lib/Demangling/NodePrinter.cpp"
+#include "../../../lib/Demangling/Context.cpp"
+#include "../../../lib/Demangling/ManglingUtils.cpp"
+#include "../../../lib/Demangling/Punycode.cpp"
 #include "swift/Runtime/Metadata.h"
 #include "Private.h"
 

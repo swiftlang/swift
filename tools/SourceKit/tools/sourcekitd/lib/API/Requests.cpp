@@ -24,10 +24,9 @@
 #include "SourceKit/Support/UIdent.h"
 #include "SourceKit/SwiftLang/Factory.h"
 
-#include "swift/Basic/DemangleWrappers.h"
-#include "swift/Basic/ManglingMacros.h"
+#include "swift/Demangling/ManglingMacros.h"
+#include "swift/Demangling/Demangler.h"
 #include "swift/Basic/Mangler.h"
-#include "swift/Basic/Demangler.h"
 
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/SmallString.h"

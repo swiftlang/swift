@@ -16,16 +16,14 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_BASIC_DEMANGLE_H
-#define SWIFT_BASIC_DEMANGLE_H
+#ifndef SWIFT_DEMANGLING_DEMANGLE_H
+#define SWIFT_DEMANGLING_DEMANGLE_H
 
 #include <memory>
 #include <string>
-#include <vector>
 #include <cassert>
 #include <cstdint>
 #include "llvm/ADT/StringRef.h"
-#include "swift/Basic/Malloc.h"
 
 namespace llvm {
   class raw_ostream;
@@ -116,7 +114,7 @@ static inline char encodeSpecializationPass(SpecializationPass Pass) {
 enum class ValueWitnessKind {
 #define VALUE_WITNESS(MANGLING, NAME) \
   NAME,
-#include "swift/Basic/ValueWitnessMangling.def"
+#include "swift/Demangling/ValueWitnessMangling.def"
 };
 
 enum class Directness {
@@ -130,7 +128,7 @@ class Node {
 public:
   enum class Kind : uint16_t {
 #define NODE(ID) ID,
-#include "swift/Basic/DemangleNodes.def"
+#include "swift/Demangling/DemangleNodes.def"
   };
 
   typedef uint64_t IndexType;
@@ -203,13 +201,18 @@ public:
     return Children[index];
   }
 
-  void addChild(NodePointer Child, Context &Ctx);
+//  inline void addChild(NodePointer Child, Context &Ctx);
 
   // Only to be used by the demangler parsers.
   void addChild(NodePointer Child, NodeFactory &Factory);
 
   // Reverses the order of children.
   void reverseChildren(size_t StartingAt = 0);
+
+  /// Prints the whole node tree in readable form to stderr.
+  ///
+  /// Useful to be called from the debugger.
+  void dump();
 };
 
 /// Returns true if the mangledName starts with the swift mangling prefix.
@@ -311,24 +314,6 @@ public:
   /// The memory which is used for nodes is not freed but recycled for the next
   /// demangling operation.
   void clear();
-  
-  /// Creates a node of kind \p K.
-  ///
-  /// The lifetime of the returned node ends with the lifetime of the
-  /// context or with a call of clear().
-  NodePointer createNode(Node::Kind K);
-
-  /// Creates a node of kind \p K with an \p Index payload.
-  ///
-  /// The lifetime of the returned node ends with the lifetime of the
-  /// context or with a call of clear().
-  NodePointer createNode(Node::Kind K, Node::IndexType Index);
-
-  /// Creates a node of kind \p K with a \p Text payload.
-  ///
-  /// The lifetime of the returned node ends with the lifetime of the
-  /// context or with a call of clear().
-  NodePointer createNode(Node::Kind K, llvm::StringRef Text);
 };
 
 /// Standalong utility function to demangle the given symbol as string.
@@ -493,16 +478,17 @@ private:
   std::string Stream;
 };
 
+/// Returns a the node kind \p k as string.
+const char *getNodeKindString(swift::Demangle::Node::Kind k);
+
+/// Prints the whole node tree \p Root in readable form into a std::string.
+///
+/// Useful for debugging.
+std::string &&getNodeTreeAsString(NodePointer Root);
+
 bool isSpecialized(Node *node);
 NodePointer getUnspecialized(Node *node, NodeFactory &Factory);
-
-/// Is a character considered a digit by the demangling grammar?
-///
-/// Yes, this is equivalent to the standard C isdigit(3), but some platforms
-/// give isdigit suboptimal implementations.
-static inline bool isDigit(int c) {
-  return c >= '0' && c <= '9';
-}
+std::string archetypeName(Node::IndexType index, Node::IndexType depth);
 
 } // end namespace Demangle
 
@@ -515,4 +501,4 @@ bool useNewMangling(Demangle::NodePointer Node);
 
 } // end namespace swift
 
-#endif // SWIFT_BASIC_DEMANGLE_H
+#endif // SWIFT_DEMANGLING_DEMANGLE_H

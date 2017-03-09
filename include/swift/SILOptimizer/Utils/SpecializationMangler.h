@@ -13,7 +13,7 @@
 #ifndef SWIFT_SILOPTIMIZER_UTILS_SPECIALIZATIONMANGLER_H
 #define SWIFT_SILOPTIMIZER_UTILS_SPECIALIZATIONMANGLER_H
 
-#include "swift/Basic/Demangler.h"
+#include "swift/Demangling/Demangler.h"
 #include "swift/Basic/NullablePtr.h"
 #include "swift/AST/ASTMangler.h"
 #include "swift/SIL/SILLinkage.h"

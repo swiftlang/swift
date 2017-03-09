@@ -13,7 +13,7 @@
 #ifndef SWIFT_BASIC_MANGLER_H
 #define SWIFT_BASIC_MANGLER_H
 
-#include "swift/Basic/ManglingUtils.h"
+#include "swift/Demangling/ManglingUtils.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/StringMap.h"

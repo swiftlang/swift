@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/Basic/ManglingUtils.h"
+#include "swift/Demangling/ManglingUtils.h"
 
 using namespace swift;
 using namespace NewMangling;
@@ -72,7 +72,7 @@ char NewMangling::getStandardTypeSubst(StringRef TypeName) {
     return #MANGLING[0];                             \
   }
 
-#include "swift/Basic/StandardTypesMangling.def"
+#include "swift/Demangling/StandardTypesMangling.def"
 
   return 0;
 }
