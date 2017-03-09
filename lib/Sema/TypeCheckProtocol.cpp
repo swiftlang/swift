@@ -1957,16 +1957,8 @@ namespace {
 
       case ProtocolConformanceState::CheckingTypeWitnesses:
       case ProtocolConformanceState::Checking:
-        // Nothing to do.
-        return conformance;
-
       case ProtocolConformanceState::Complete:
-        if (conformance->isInvalid()) {
-          // Emit any delayed diagnostics and return.
-          // FIXME: Should we complete checking to emit more diagnostics?
-          ConformanceChecker(TC, conformance, MissingWitnesses, false).
-          emitDelayedDiags();
-        }
+        // Nothing to do.
         return conformance;
     }
 
@@ -4865,8 +4857,6 @@ void ConformanceChecker::checkConformance(MissingWitnessDiagnosisKind Kind) {
 
   // FIXME: Caller checks that this type conforms to all of the
   // inherited protocols.
-
-  emitDelayedDiags();
 
   // Resolve all of the type witnesses.
   resolveTypeWitnesses();
