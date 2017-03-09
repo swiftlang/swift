@@ -1019,6 +1019,27 @@ public:
   MutableArrayRef<Expr *> getSegments() { return Segments; }
   ArrayRef<Expr *> getSegments() const { return Segments; }
   
+  bool isInterpolatedSegment(Expr * segmentExpr) const {
+    // FIXME: This is slow and depends on an implementation detail
+    // (something upstream inserts empty string literal segments at 
+    // the beginning and end of the interpolated string). It should be 
+    // done better.
+    bool isInterpolated = false;
+    
+    for(auto segment : Segments) {
+      if(segment == segmentExpr) {
+        return isInterpolated;
+      }
+      else {
+        isInterpolated = !isInterpolated;
+      }
+    }
+    
+    // We should never fall out of this loop.
+    assert(false && "segmentExpr is not one of the segments in the Segments list");
+    return false;
+  }
+  
   /// \brief Retrieve the expression that actually evaluates the resulting
   /// string, typically with a series of '+' operations.
   Expr *getSemanticExpr() const { return SemanticExpr; }
