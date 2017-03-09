@@ -68,7 +68,7 @@ func test0(_ ref: A) {
 // CHECK-NEXT: [[CALLBACK:%.*]] = pointer_to_thin_function [[CALLBACK_ADDR]] : $Builtin.RawPointer to $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout A, @thick A.Type) -> ()
 // CHECK-NEXT: [[TEMP2:%.*]] = alloc_stack $A
 // SEMANTIC SIL TODO: This is an issue caused by the callback for materializeForSet in the class case taking the value as @inout when it should really take it as @guaranteed.
-// CHECK-NEXT: store [[BORROWED_ARG_LHS]] to [init] [[TEMP2]] : $*A
+// CHECK-NEXT: store_borrow [[BORROWED_ARG_LHS]] to [[TEMP2]] : $*A
 // CHECK-NEXT: [[T0:%.*]] = metatype $@thick A.Type
 // CHECK-NEXT: [[T1:%.*]] = address_to_pointer [[ADDR]] : $*OrdinarySub to $Builtin.RawPointer
 // CHECK-NEXT: apply [[CALLBACK]]([[T1]], [[STORAGE]], [[TEMP2]], [[T0]])
@@ -130,7 +130,7 @@ func test1(_ ref: B) {
 // CHECK:    [[WRITEBACK]]([[CALLBACK_ADDR:%.*]] : $Builtin.RawPointer):
 // CHECK-NEXT: [[CALLBACK:%.*]] = pointer_to_thin_function [[CALLBACK_ADDR]] : $Builtin.RawPointer to $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout B, @thick B.Type) -> ()
 // CHECK-NEXT: [[TEMP2:%.*]] = alloc_stack $B
-// CHECK-NEXT: store [[BORROWED_ARG_RHS]] to [init] [[TEMP2]] : $*B
+// CHECK-NEXT: store_borrow [[BORROWED_ARG_RHS]] to [[TEMP2]] : $*B
 // CHECK-NEXT: [[T0:%.*]] = metatype $@thick B.Type
 // CHECK-NEXT: [[T1:%.*]] = address_to_pointer [[ADDR]] : $*MutatingSub to $Builtin.RawPointer
 // CHECK-NEXT: apply [[CALLBACK]]([[T1]], [[STORAGE]], [[TEMP2]], [[T0]])
@@ -156,7 +156,7 @@ func test1(_ ref: B) {
 // CHECK:    [[WRITEBACK]]([[CALLBACK_ADDR:%.*]] : $Builtin.RawPointer):
 // CHECK-NEXT: [[CALLBACK:%.*]] = pointer_to_thin_function [[CALLBACK_ADDR]] : $Builtin.RawPointer to $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout B, @thick B.Type) -> ()
 // CHECK-NEXT: [[TEMP2:%.*]] = alloc_stack $B
-// CHECK-NEXT: store [[BORROWED_ARG_LHS]] to [init] [[TEMP2]] : $*B
+// CHECK-NEXT: store_borrow [[BORROWED_ARG_LHS]] to [[TEMP2]] : $*B
 // CHECK-NEXT: [[T0:%.*]] = metatype $@thick B.Type
 // CHECK-NEXT: [[T1:%.*]] = address_to_pointer [[ADDR]] : $*MutatingSub to $Builtin.RawPointer
 // CHECK-NEXT: apply [[CALLBACK]]([[T1]], [[STORAGE2]], [[TEMP2]], [[T0]])
