@@ -2255,6 +2255,9 @@ public:
               CastConsumptionKind::CopyOnSuccess)
             return true;
           break;
+        case ValueKind::DebugValueAddrInst:
+          // Harmless use.
+          break;
         default:
           assert(false && "Unhandled unexpected instruction");
           break;
