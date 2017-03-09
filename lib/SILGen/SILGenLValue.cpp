@@ -913,8 +913,12 @@ namespace {
                                             baseFormalType);
 
             baseAddress = gen.emitTemporaryAllocation(loc, base.getType());
-            gen.B.emitStoreValueOperation(loc, base.getValue(), baseAddress,
-                                          StoreOwnershipQualifier::Init);
+            if (base.getOwnershipKind() == ValueOwnershipKind::Guaranteed) {
+              gen.B.createStoreBorrow(loc, base.getValue(), baseAddress);
+            } else {
+              gen.B.emitStoreValueOperation(loc, base.getValue(), baseAddress,
+                                            StoreOwnershipQualifier::Init);
+            }
           }
           baseMetatype = gen.B.createMetatype(loc, metatypeType);
 
