@@ -22,38 +22,11 @@ struct SwiftCanonicalString {
   // Perform a copy, transcoding, and normalization of the supplied code units
   init<OtherCodeUnits, OtherEncoding>(
     _ other: UnicodeStorage<OtherCodeUnits, OtherEncoding>
-  ) {
-    // FIXME: do normalization on the fly, perhaps a normalized view?
-    let otherUTF16 = other.transcoded(to: Encoding.self)
-
-    // TODO: more effient to allocate too much space (guessed by encoding
-    // sizes), and copy in, rather than linear time count operation
-    let newCount = otherUTF16.count
-
-    let newStringStorage = _StringStorage<UInt16>(
-      count: newCount, minimumCapacity: newCount
-    )
-
-    self._storage = UnicodeStorage(
-      CodeUnits(newStringStorage),
-      Encoding.self
-    )
-    
-    // Start off as true, we will unset when we find a violation
-    self.isKnownASCII = true
-    self.isKnownLatin1 = true
-
-    // Copy in
-    // FIXME: why can't I use .indices below?
-    for (idx, elt) in zip(0..<newCount, otherUTF16) {
-      if (elt > 0xff) {
-        self.isKnownLatin1 = false
-        self.isKnownASCII = false
-      } else if (elt > 0x7f) {
-        isKnownASCII = false
-      }
-      newStringStorage[idx] = elt
-    }
+  )
+  // FIXME: when new integers land, we won't need this constraint anymore.
+  where OtherCodeUnits.Iterator.Element : UnsignedInteger
+  {
+    self._storage = UnicodeStorage(CodeUnits(_StringStorage<UInt16>(other)))
   }
 
   init() {
@@ -86,6 +59,8 @@ extension SwiftCanonicalString {
     OtherCodeUnits.SubSequence.Index == OtherCodeUnits.Index,
     OtherCodeUnits.SubSequence.SubSequence == OtherCodeUnits.SubSequence,
     OtherCodeUnits.SubSequence.Iterator.Element == OtherCodeUnits.Iterator.Element
+  // FIXME: when new integers land, we won't need this constraint anymore.
+  , OtherCodeUnits.Iterator.Element : UnsignedInteger
   {
     self.init(UnicodeStorage(codeUnits, otherEncoding))
   }

@@ -10,7 +10,10 @@ extension CopyConstructible {
   }
 }
 
-/// - Requires: Element is trivial (UInt8/UInt16)
+/// Buffer of contiguously-stored UTF-16-compatible code units, meaning it can
+/// hold ASCII, Latin1, or UTF-16.
+/// 
+/// - Requires: Element is trivial (UInt8/UInt16 in practice)
 @_versioned
 final class _StringStorage<Element: UnsignedInteger>
  : /*_SwiftNativeNSString,*/ _NSStringCore, CopyConstructible {
@@ -61,10 +64,17 @@ final class _StringStorage<Element: UnsignedInteger>
 
   /// Satisfies the compiler's need for a designated initializer.
   internal init(_NeverActuallyCalled: ()) {
-    _header = _SwiftStringBodyStorage(count: 0, capacity: 0, flags: 0)
+    fatalError("Unexpected call to StringStorage designated initializer")
   }
 
-  convenience init(count: Int, minimumCapacity: Int) {
+  convenience init(
+    count: Int,
+    minimumCapacity: Int = 0,
+    isKnownLatin1: Bool = false,
+    isKnownASCII: Bool = false,
+    isKnownValidEncoding: Bool = false,
+    isKnownFCCNormalized: Bool = false
+  ) {
     self.init(
       Builtin.allocWithTailElems_1(
       _StringStorage.self,
@@ -79,6 +89,9 @@ final class _StringStorage<Element: UnsignedInteger>
 
     // All stored properties are uninitialized, but we can use assignment
     // because they're trivial types.
+    //
+    // FIXME: we should abstract this pattern and make it use actual
+    // initialization, modifying ManagedBufferPointer to do it.
     self._header = _SwiftStringBodyStorage(
       count: numericCast(count), capacity: numericCast(realCapacity), flags: 0)
   }
@@ -90,7 +103,24 @@ final class _StringStorage<Element: UnsignedInteger>
       Builtin.addressof(&_swiftEmptyStringStorage))
   }
 
-/*
+  func withUnsafeMutableBufferPointer<R>(
+    _ body: (inout UnsafeMutableBufferPointer<Element>)->R
+  ) -> R {
+    defer { _fixLifetime(self) }
+    let base = UnsafeMutablePointer<Element>(
+      Builtin.projectTailElems(self, Element.self))
+    var buffer = UnsafeMutableBufferPointer(start: base, count: count)
+    return body(&buffer)
+  }
+
+  func withUnsafeBufferPointer<R>(
+    _ body: (UnsafeBufferPointer<Element>)->R
+  ) -> R {
+    return withUnsafeMutableBufferPointer {
+      body(UnsafeBufferPointer(start: $0.baseAddress, count: $0.count))
+    }
+  }
+  /*
 }
   https://bugs.swift.org/browse/SR-4173 @objc is not supported within extensions of generic classes
 extension _StringStorage : _NSStringCore {
@@ -134,6 +164,127 @@ extension _StringStorage : RandomAccessCollection, MutableCollection {
       _StringBuffer(self)[i] = newValue
     }
   }
+}
+
+extension Collection {
+  func _copyCompleteContents(
+    initializing memory: UnsafeMutableBufferPointer<Iterator.Element>
+  ) {
+    var (excessElements, endOfCopy) = self._copyContents(initializing: memory)
+    _precondition(
+      excessElements.next() == nil,
+      "Source of new string under-reported its count")
+    _precondition(
+      endOfCopy == memory.endIndex,
+      "Source of new string over-reported its count")
+  }
+}
+
+extension _StringStorage where Element == UInt16 {
+  internal func _setMaxStored(_ maxCodeUnit: UInt16) {
+    switch maxCodeUnit {
+    case 0..<0x80: self.isKnownASCII = true; fallthrough
+    case 0..<0x100: self.isKnownLatin1 = true; fallthrough
+    case 0..<0x300: self.isKnownFCCNormalized = true; fallthrough
+    case 0..<0xD800: self.isKnownValidEncoding = true
+    default: break
+    }
+  }
+  
+  /// Initialize from a sequence of valid UTF16 code unit values (possibly
+  /// represented with a different code unit type).
+  internal convenience init<OtherCodeUnits, OtherEncoding>(
+    utf16CodeUnitValues other: UnicodeStorage<OtherCodeUnits, OtherEncoding>,
+    isKnownLatin1 otherIsKnownLatin1: Bool = false,
+    isKnownASCII otherIsKnownASCII: Bool = false,
+    isKnownValidEncoding otherIsKnownValidEncoding: Bool = false,
+    isKnownFCCNormalized otherIsKnownFCCNormalized: Bool = false
+  )
+  // FIXME: when new integers land, we won't need this constraint anymore.
+  where OtherCodeUnits.Iterator.Element : UnsignedInteger
+  {
+    let otherIsLatin1 = OtherEncoding.self is Latin1.Type
+    
+    // No need for transcoding, since we're not trying to ensure our own
+    // encoding is valid UTF16.  We'll just copy the same code units (possibly
+    // zero-extended).
+    self.init(
+      count: numericCast(other.codeUnits.count),
+      minimumCapacity: 0,
+      isKnownLatin1: otherIsKnownLatin1 || otherIsLatin1,
+      isKnownASCII: otherIsKnownASCII,
+      isKnownValidEncoding: otherIsKnownValidEncoding
+      || otherIsLatin1 || OtherEncoding.self is ValidUTF16.Type,
+      isKnownFCCNormalized: otherIsKnownFCCNormalized || otherIsLatin1
+    )
+    
+    if _fastPath(otherIsKnownASCII) {
+      withUnsafeMutableBufferPointer {
+        other.codeUnits.lazy.map {
+          numericCast($0)
+        }._copyCompleteContents(initializing: $0)
+      }
+    }
+    else {
+      var maxCodeUnit: UInt16 = 0
+      withUnsafeMutableBufferPointer {
+        for (i, u) in other.codeUnits.enumerated() {
+          let u16 = numericCast(u) as UInt16
+          maxCodeUnit = Swift.max(u16, maxCodeUnit)
+          _precondition(i < count)
+          $0[i] = u16
+        }
+      }
+      _setMaxStored(maxCodeUnit)
+    }
+  }
+
+  
+  internal convenience init<OtherCodeUnits, OtherEncoding>(
+    _ other: UnicodeStorage<OtherCodeUnits, OtherEncoding>,
+    isKnownLatin1 otherIsKnownLatin1: Bool = false,
+    isKnownASCII otherIsKnownASCII: Bool = false,
+    isKnownValidEncoding otherIsKnownValidEncoding: Bool = false,
+    isKnownFCCNormalized otherIsKnownFCCNormalized: Bool = false,
+    box: () = ()
+  )
+  // FIXME: when new integers land, we won't need this constraint anymore.
+  where OtherCodeUnits.Iterator.Element : UnsignedInteger
+  {
+    let otherIsLatin1 = OtherEncoding.self is Latin1.Type
+    let otherIsUTF16Compatible = otherIsLatin1
+      || OtherEncoding.EncodedScalar.self is UTF16.EncodedScalar.Type
+
+    if _fastPath(otherIsUTF16Compatible) {
+      self.init(
+        utf16CodeUnitValues: other,
+        isKnownLatin1: otherIsKnownLatin1,
+        isKnownASCII: otherIsKnownASCII,
+        isKnownValidEncoding: otherIsKnownValidEncoding,
+        isKnownFCCNormalized: otherIsKnownFCCNormalized
+      )
+    }
+    else {
+
+      var count = 0
+      var maxCodeUnit: UInt16 = 0
+      OtherEncoding.parseForward(
+        other.codeUnits,
+        repairingIllFormedSequences: true
+      ) {
+        count += $0.utf16.count
+        maxCodeUnit = Swift.max(maxCodeUnit, $0.utf16.max()!)
+      }
+
+      self.init(count: count)
+      withUnsafeMutableBufferPointer {
+        other.transcoded(
+          to: UTF16.self
+        )._copyCompleteContents(initializing: $0)
+      }
+      _setMaxStored(maxCodeUnit)
+    }
+  }    
 }
 
 /// - Requires: Element is trivial (UInt8/UInt16)

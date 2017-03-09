@@ -258,6 +258,10 @@ where EncodedScalar.Iterator.Element : UnsignedInteger {
 
 /// Parsing multiple unicode scalar values
 extension UnicodeEncoding {
+
+
+  // FIXME: deprecate the following in Swift 4
+  
   /// Returns the number of code units required for the given code unit
   /// sequence when transcoded to UTF-16, and a Boolean value indicating
   /// whether the sequence was found to contain only ASCII characters.

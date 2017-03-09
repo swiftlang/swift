@@ -388,10 +388,14 @@ extension String {
   ///   should be interpreted.
   init<Encoding: UnicodeEncoding>(
     cString nulTerminatedCodeUnits: UnsafePointer<Encoding.CodeUnit>,
-    encoding: Encoding.Type) {
+    encoding: Encoding.Type
+  )
+  // FIXME: when new integers land, we won't need this constraint anymore.
+  where Encoding.EncodedScalar.Iterator.Element : UnsignedInteger {
       let len = Encoding._nullCodeUnitOffset(in: nulTerminatedCodeUnits)
       // TODO: use String.init that detects optimal storage
-      self = String(canonical: SwiftCanonicalString(
+    self = String(
+      canonical: SwiftCanonicalString(
         codeUnits: UnsafeBufferPointer(start: nulTerminatedCodeUnits, count: len),
         encodedWith: Encoding.self
       ))
