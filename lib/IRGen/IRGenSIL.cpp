@@ -3200,6 +3200,18 @@ void IRGenSILFunction::visitRefTailAddrInst(RefTailAddrInst *i) {
   setLoweredAddress(i, TailAddr);
 }
 
+static bool isInvariantAddress(SILValue v) {
+  auto root = getUnderlyingAddressRoot(v);
+  if (auto ptrRoot = dyn_cast<PointerToAddressInst>(root)) {
+    return ptrRoot->isInvariant();
+  }
+  // TODO: We could be more aggressive about considering addresses based on
+  // `let` variables as invariant when the type of the address is known not to
+  // have any sharably-mutable interior storage (in other words, no weak refs,
+  // atomics, etc.)
+  return false;
+}
+
 void IRGenSILFunction::visitLoadInst(swift::LoadInst *i) {
   Explosion lowered;
   Address source = getLoweredAddress(i->getOperand());
@@ -3216,7 +3228,13 @@ void IRGenSILFunction::visitLoadInst(swift::LoadInst *i) {
     typeInfo.loadAsCopy(*this, source, lowered);
     break;
   }
-
+  
+  if (isInvariantAddress(i->getOperand())) {
+    // It'd be better to push this down into `loadAs` methods, perhaps...
+    for (auto value : lowered.getAll())
+      if (auto load = dyn_cast<llvm::LoadInst>(value))
+        setInvariantLoad(load);
+  }
   setLoweredExplosion(i, lowered);
 }
 

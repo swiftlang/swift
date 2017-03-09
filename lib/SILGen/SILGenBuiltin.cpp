@@ -160,7 +160,8 @@ static ManagedValue emitBuiltinLoadOrTake(SILGenFunction &gen,
                                           CanFunctionType formalApplyType,
                                           SGFContext C,
                                           IsTake_t isTake,
-                                          bool isStrict) {
+                                          bool isStrict,
+                                          bool isInvariant) {
   assert(substitutions.size() == 1 && "load should have single substitution");
   assert(args.size() == 1 && "load should have a single argument");
   
@@ -173,7 +174,7 @@ static ManagedValue emitBuiltinLoadOrTake(SILGenFunction &gen,
   // Convert the pointer argument to a SIL address.
   SILValue addr = gen.B.createPointerToAddress(loc, args[0].getUnmanagedValue(),
                                                loadedType.getAddressType(),
-                                               isStrict);
+                                               isStrict, isInvariant);
   // Perform the load.
   return gen.emitLoad(loc, addr, rvalueTL, C, isTake);
 }
@@ -186,7 +187,7 @@ static ManagedValue emitBuiltinLoad(SILGenFunction &gen,
                                     SGFContext C) {
   return emitBuiltinLoadOrTake(gen, loc, substitutions, args,
                                formalApplyType, C, IsNotTake,
-                               /*isStrict*/ true);
+                               /*isStrict*/ true, /*isInvariant*/ false);
 }
 
 static ManagedValue emitBuiltinLoadRaw(SILGenFunction &gen,
@@ -197,7 +198,17 @@ static ManagedValue emitBuiltinLoadRaw(SILGenFunction &gen,
                                        SGFContext C) {
   return emitBuiltinLoadOrTake(gen, loc, substitutions, args,
                                formalApplyType, C, IsNotTake,
-                               /*isStrict*/ false);
+                               /*isStrict*/ false, /*isInvariant*/ false);
+}
+static ManagedValue emitBuiltinLoadInvariant(SILGenFunction &gen,
+                                             SILLocation loc,
+                                             SubstitutionList substitutions,
+                                             ArrayRef<ManagedValue> args,
+                                             CanFunctionType formalApplyType,
+                                             SGFContext C) {
+  return emitBuiltinLoadOrTake(gen, loc, substitutions, args,
+                               formalApplyType, C, IsNotTake,
+                               /*isStrict*/ false, /*isInvariant*/ true);
 }
 
 static ManagedValue emitBuiltinTake(SILGenFunction &gen,
@@ -207,7 +218,8 @@ static ManagedValue emitBuiltinTake(SILGenFunction &gen,
                                     CanFunctionType formalApplyType,
                                     SGFContext C) {
   return emitBuiltinLoadOrTake(gen, loc, substitutions, args,
-                               formalApplyType, C, IsTake, /*isStrict*/ true);
+                               formalApplyType, C, IsTake,
+                               /*isStrict*/ true, /*isInvariant*/ false);
 }
 
 /// Specialized emitter for Builtin.destroy.
@@ -233,7 +245,8 @@ static ManagedValue emitBuiltinDestroy(SILGenFunction &gen,
   SILValue addr =
     gen.B.createPointerToAddress(loc, args[1].getUnmanagedValue(),
                                  destroyType.getAddressType(),
-                                 /*isStrict*/ true);
+                                 /*isStrict*/ true,
+                                 /*isInvariant*/ false);
   
   // Destroy the value indirectly. Canonicalization will promote to loads
   // and releases if appropriate.
@@ -260,7 +273,8 @@ static ManagedValue emitBuiltinAssign(SILGenFunction &gen,
   SILValue addr = gen.B.createPointerToAddress(loc,
                                                args.back().getUnmanagedValue(),
                                                assignType.getAddressType(),
-                                               /*isStrict*/ true);
+                                               /*isStrict*/ true,
+                                               /*isInvariant*/ false);
   
   // Build the value to be assigned, reconstructing tuples if needed.
   auto src = RValue::withPreExplodedElements(args.slice(0, args.size() - 1),
@@ -287,7 +301,8 @@ static ManagedValue emitBuiltinInit(SILGenFunction &gen,
   SILValue addr = gen.emitRValueAsSingleValue(args[1]).getUnmanagedValue();
   addr = gen.B.createPointerToAddress(
     loc, addr, formalTL.getLoweredType().getAddressType(),
-    /*isStrict*/ true);
+    /*isStrict*/ true,
+    /*isInvariant*/ false);
 
   TemporaryInitialization init(addr, CleanupHandle::invalid());
   gen.emitExprInto(args[0], &init);
@@ -504,7 +519,9 @@ static ManagedValue emitBuiltinGep(SILGenFunction &gen,
   SILType ElemTy = gen.getLoweredType(substitutions[0].getReplacement());
   SILType RawPtrType = args[0].getUnmanagedValue()->getType();
   SILValue addr = gen.B.createPointerToAddress(loc, args[0].getUnmanagedValue(),
-                                               ElemTy.getAddressType(), true);
+                                               ElemTy.getAddressType(),
+                                               /*strict*/ true,
+                                               /*invariant*/ false);
   addr = gen.B.createIndexAddr(loc, addr, args[1].getUnmanagedValue());
   addr = gen.B.createAddressToPointer(loc, addr, RawPtrType);
 
@@ -525,7 +542,9 @@ static ManagedValue emitBuiltinGetTailAddr(SILGenFunction &gen,
   SILType TailTy = gen.getLoweredType(substitutions[1].getReplacement());
   SILType RawPtrType = args[0].getUnmanagedValue()->getType();
   SILValue addr = gen.B.createPointerToAddress(loc, args[0].getUnmanagedValue(),
-                                               ElemTy.getAddressType(), true);
+                                               ElemTy.getAddressType(),
+                                               /*strict*/ true,
+                                               /*invariant*/ false);
   addr = gen.B.createTailAddr(loc, addr, args[1].getUnmanagedValue(),
                               TailTy.getAddressType());
   addr = gen.B.createAddressToPointer(loc, addr, RawPtrType);

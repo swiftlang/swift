@@ -928,7 +928,8 @@ SILCloner<ImplClass>::visitPointerToAddressInst(PointerToAddressInst *Inst) {
     getBuilder().createPointerToAddress(getOpLocation(Inst->getLoc()),
                                         getOpValue(Inst->getOperand()),
                                         getOpType(Inst->getType()),
-                                        Inst->isStrict()));
+                                        Inst->isStrict(),
+                                        Inst->isInvariant()));
 }
 
 template<typename ImplClass>

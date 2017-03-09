@@ -1602,6 +1602,7 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
       
   case BuiltinValueKind::Load:
   case BuiltinValueKind::LoadRaw:
+  case BuiltinValueKind::LoadInvariant:
   case BuiltinValueKind::Take:
     if (!Types.empty()) return nullptr;
     return getLoadOperation(Context, Id);

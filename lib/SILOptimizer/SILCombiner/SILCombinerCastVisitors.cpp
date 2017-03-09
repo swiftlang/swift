@@ -140,7 +140,8 @@ visitPointerToAddressInst(PointerToAddressInst *PTAI) {
 
         auto *NewPTAI = Builder.createPointerToAddress(PTAI->getLoc(), Ptr,
                                                        PTAI->getType(),
-                                                       PTAI->isStrict());
+                                                       PTAI->isStrict(),
+                                                       PTAI->isInvariant());
         auto DistanceAsWord = Builder.createBuiltin(
             PTAI->getLoc(), Trunc->getName(), Trunc->getType(), {}, Distance);
 
@@ -181,7 +182,7 @@ visitPointerToAddressInst(PointerToAddressInst *PTAI) {
       SILValue Distance = Bytes->getArguments()[0];
       auto *NewPTAI =
         Builder.createPointerToAddress(PTAI->getLoc(), Ptr, PTAI->getType(),
-                                       PTAI->isStrict());
+                                       PTAI->isStrict(), PTAI->isInvariant());
       return Builder.createIndexAddr(PTAI->getLoc(), NewPTAI, Distance);
     }
   }
