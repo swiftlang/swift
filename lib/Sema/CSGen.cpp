@@ -2504,19 +2504,16 @@ namespace {
 
       // If the 'self' parameter is not configured, something went
       // wrong elsewhere and should have been diagnosed already.
-      if (!selfDecl->hasType())
+      if (!selfDecl->hasInterfaceType())
         return ErrorType::get(tc.Context);
 
-      // If the method returns 'Self', the type of 'self' is a
-      // DynamicSelfType. Unwrap it before getting the superclass.
-      auto selfTy = selfDecl->getType()->getRValueInstanceType();
-      if (auto *dynamicSelfTy = selfTy->getAs<DynamicSelfType>())
-        selfTy = dynamicSelfTy->getSelfType();
-
+      auto selfTy = CS.DC->mapTypeIntoContext(
+        typeContext->getDeclaredInterfaceType());
       auto superclassTy = selfTy->getSuperclass(&tc);
 
-      if (selfDecl->getType()->is<MetatypeType>())
+      if (selfDecl->getInterfaceType()->is<MetatypeType>())
         superclassTy = MetatypeType::get(superclassTy);
+
       return superclassTy;
     }
     
