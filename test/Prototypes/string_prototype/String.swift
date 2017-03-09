@@ -84,8 +84,9 @@ extension String : Unicode {
     }
   }
 
+  typealias UnicodeScalarView = LazyMapBidirectionalCollection<ValidUTF32View, UnicodeScalar>
   // TODO: this properly
-  var unicodeScalars: LazyMapBidirectionalCollection<ValidUTF32View, UnicodeScalar> {
+  var unicodeScalars: UnicodeScalarView {
     switch contents {
     case .canonical(let str):
       return str.utf32.lazy.map { UnicodeScalar($0)! }
@@ -210,6 +211,10 @@ extension String : BidirectionalCollection {
     return characters[idx]
   }
 
+  subscript(bounds: Range<Index>) -> Substring {
+    return Substring(_base: self, bounds)
+  }
+
   func index(before idx: Index) -> Index {
     return characters.index(before: idx)
   }
@@ -220,6 +225,8 @@ extension String : BidirectionalCollection {
 }
 
 extension String : RangeReplaceableCollection {
+  typealias SubSequence = Substring
+
   mutating func replaceSubrange<C: Collection>(
     _ subrange: Range<Int>, with newValues: C
   )

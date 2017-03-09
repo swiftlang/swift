@@ -1,5 +1,6 @@
 // Run the tests for the whole String prototype
-// RUN: %target-build-swift %s %S/String.swift %S/StringStorage.swift %S/Unicode.swift %S/Latin1String.swift %S/CanonicalString.swift %S/StringComparison.swift %S/StringCompatibility.swift -parse-stdlib -Xfrontend -disable-access-control -Onone -o %t
+// RUN: rm -rf %t_out && mkdir -p %t_out && %gyb %S/Substring.swift.gyb -o %t_out/Substring.swift
+// RUN: %target-build-swift %s %S/String.swift %S/StringStorage.swift %S/Unicode.swift %S/Latin1String.swift %S/CanonicalString.swift %S/StringComparison.swift %S/StringCompatibility.swift %t_out/Substring.swift -parse-stdlib -Xfrontend -disable-access-control -Onone -o %t
 // RUN: %target-run %t
 // REQUIRES: executable_test
 
@@ -322,6 +323,17 @@ testSuite.test("cstring") {
     String(cString: $0.baseAddress!, encoding: UTF16.self)
   }
   expectEqual(s4, "some string")
+}
+
+testSuite.test("substring") {
+  let s: String = "hello world"
+  let worldRange: Range = s.index(s.startIndex, offsetBy: 6)..<s.endIndex
+  expectEqualSequence("world" as String, s[worldRange] as Substring)
+  expectEqualSequence("world" as String, s[worldRange] as String)
+
+  var tail = s.dropFirst()
+  expectType(Substring.self, &tail)
+  expectEqualSequence("ello world", tail)
 }
 
 runAllTests()
