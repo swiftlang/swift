@@ -2160,7 +2160,7 @@ bool GenericSignatureBuilder::addSameTypeRequirementBetweenArchetypes(
     (void)updateSuperclass(T1, equivClass2->superclass, source2);
 
     equivClass->superclassConstraints.insert(
-                                   equivClass->concreteTypeConstraints.end(),
+                                   equivClass->superclassConstraints.end(),
                                    equivClass2->superclassConstraints.begin(),
                                    equivClass2->superclassConstraints.end());
   }
