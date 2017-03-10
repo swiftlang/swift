@@ -194,8 +194,7 @@ open class _SwiftNativeNSString {}
 
 
 @objc
-public protocol _NSStringCore :
-    _NSCopying {
+public protocol _NSStringCore : _NSCopying {
 
   // The following methods should be overridden when implementing an
   // NSString subclass.
@@ -206,6 +205,12 @@ public protocol _NSStringCore :
 
   // We also override the following methods for efficiency.
   func _fastCharacterContents() -> UnsafeMutablePointer<UInt16>?
+
+  // WARNING: Before you implement this as anything other than “return nil,”
+  // see https://github.com/apple/swift/pull/3151#issuecomment-285583557
+  func _fastCStringContents(
+    _ nullTerminationRequired: Int8
+  ) -> UnsafePointer<CChar>?
 }
 
 /// An `NSString` built around a slice of contiguous Swift `String` storage.
@@ -254,6 +259,13 @@ public final class _NSContiguousString : _SwiftNativeNSString {
   @objc
   func _fastCharacterContents() -> UnsafeMutablePointer<UInt16>? {
     return _core.elementWidth == 2 ? _core.startUTF16 : nil
+  }
+
+  @objc
+  func _fastCStringContents(
+    _ nullTerminationRequired: Int8
+  ) -> UnsafePointer<CChar>? {
+    return nil
   }
 
   //
