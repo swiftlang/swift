@@ -646,10 +646,10 @@ public protocol ExpressibleByDictionaryLiteral {
 /// conformance. String interpolation is a multiple-step initialization
 /// process. When you use string interpolation, the following steps occur:
 ///
-/// 1. The string literal is broken into pieces. Each segment of the string
-///    literal before, between, and after any included expressions, along with
-///    the individual expressions themselves, are passed to the
-///    `init(stringInterpolationSegment:)` initializer.
+/// 1. The string literal is broken into pieces. Each included expression is 
+///    passed to the `init(stringInterpolationSegment:)` initializer; the 
+///    literal portions before, between, and after the expressions are 
+///    passed to the `init(stringLiteral:)` initializer as normal.
 /// 2. The results of those calls are passed to the
 ///    `init(stringInterpolation:)` initializer in the order in which they
 ///    appear in the string literal.
@@ -658,13 +658,13 @@ public protocol ExpressibleByDictionaryLiteral {
 /// using string interpolation is equivalent to the following code:
 ///
 ///     let message = String(stringInterpolation:
-///           String(stringInterpolationSegment: "One cookie: $"),
+///           String(stringLiteral: "One cookie: $"),
 ///           String(stringInterpolationSegment: price),
-///           String(stringInterpolationSegment: ", "),
+///           String(stringLiteral: ", "),
 ///           String(stringInterpolationSegment: number),
-///           String(stringInterpolationSegment: " cookies: $"),
+///           String(stringLiteral: " cookies: $"),
 ///           String(stringInterpolationSegment: price * number),
-///           String(stringInterpolationSegment: "."))
+///           String(stringLiteral: "."))
 @available(*, deprecated, message: "it will be replaced or redesigned in Swift 4.0.  Instead of conforming to 'ExpressibleByStringInterpolation', consider adding an 'init(_:String)'")
 public typealias ExpressibleByStringInterpolation = _ExpressibleByStringInterpolation
 public protocol _ExpressibleByStringInterpolation: ExpressibleByStringLiteral {
@@ -677,9 +677,9 @@ public protocol _ExpressibleByStringInterpolation: ExpressibleByStringLiteral {
   ///     print(s)
   ///     // Prints "5 x 2 = 10"
   ///
-  /// After calling `init(stringInterpolationSegment:)` with each segment of
-  /// the string literal, this initializer is called with their string
-  /// representations.
+  /// After calling `init(stringLiteral:)` or `init(stringInterpolationSegment:)` 
+  /// with each segment of the string literal, this initializer is called with 
+  /// their string representations.
   ///
   /// - Parameter strings: An array of instances of the conforming type.
   init(stringInterpolation strings: Self...)
@@ -695,10 +695,9 @@ public protocol _ExpressibleByStringInterpolation: ExpressibleByStringLiteral {
   ///     print(s)
   ///     // Prints "5 x 2 = 10"
   ///
-  /// This initializer is called five times when processing the string literal
-  /// in the example above; once each for the following: the integer `5`, the
-  /// string `" x "`, the integer `2`, the string `" = "`, and the result of
-  /// the expression `5 * 2`.
+  /// This initializer is called three times when processing the string literal
+  /// in the example above; once each for the following: the integer `5`, the 
+  /// integer `2`, and the result of the expression `5 * 2`.
   ///
   /// - Parameter expr: The expression to represent.
   init<T>(stringInterpolationSegment expr: T)
