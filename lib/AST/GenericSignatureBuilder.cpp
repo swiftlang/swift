@@ -423,7 +423,7 @@ PotentialArchetype *RequirementSource::getRootPotentialArchetype() const {
   auto root = getRoot();
 
   // We're at the root, so it's in the inline storage.
-  assert(storageKind == StorageKind::RootArchetype);
+  assert(root->storageKind == StorageKind::RootArchetype);
   return root->storage.rootArchetype;
 }
 
@@ -2160,7 +2160,7 @@ bool GenericSignatureBuilder::addSameTypeRequirementBetweenArchetypes(
     (void)updateSuperclass(T1, equivClass2->superclass, source2);
 
     equivClass->superclassConstraints.insert(
-                                   equivClass->concreteTypeConstraints.end(),
+                                   equivClass->superclassConstraints.end(),
                                    equivClass2->superclassConstraints.begin(),
                                    equivClass2->superclassConstraints.end());
   }
@@ -3656,7 +3656,20 @@ void GenericSignatureBuilder::addGenericSignature(GenericSignature *sig) {
   for (auto param : sig->getGenericParams())
     addGenericParameter(param);
 
+  // Add the requirements, queuing up same-type requirements until the end.
+  // FIXME: Queuing up same-type requirements is a hack that works around
+  // problems when referencing associated types. These issues primarily
+  // occur when building canonical generic environments
+  SmallVector<Requirement, 4> sameTypeRequirements;
   for (auto &reqt : sig->getRequirements()) {
+    if (reqt.getKind() == RequirementKind::SameType)
+      sameTypeRequirements.push_back(reqt);
+    else
+      addRequirement(reqt, FloatingRequirementSource::forAbstract());
+  }
+
+  // Handle same-type requirements.
+  for (auto &reqt : sameTypeRequirements) {
     addRequirement(reqt, FloatingRequirementSource::forAbstract());
   }
 }

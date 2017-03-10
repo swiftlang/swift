@@ -782,15 +782,15 @@ ConformanceAccessPath GenericSignature::getConformanceAccessPath(
   // Local function to construct the conformance access path from the
   // requirement.
   std::function<void(GenericSignature *, const RequirementSource *,
-                     ProtocolDecl *)> buildPath;
+                     ProtocolDecl *, Type)> buildPath;
   buildPath = [&](GenericSignature *sig, const RequirementSource *source,
-                  ProtocolDecl *conformingProto) {
+                  ProtocolDecl *conformingProto, Type rootType) {
     // Each protocol requirement is a step along the path.
     if (source->kind == RequirementSource::ProtocolRequirement) {
       // Follow the rest of the path to derive the conformance into which
       // this particular protocol requirement step would look.
       auto inProtocol = source->getProtocolDecl();
-      buildPath(sig, source->parent, inProtocol);
+      buildPath(sig, source->parent, inProtocol, rootType);
       assert(path.path.back().second == inProtocol &&
              "path produces incorrect conformance");
 
@@ -801,12 +801,10 @@ ConformanceAccessPath GenericSignature::getConformanceAccessPath(
         // conformance we want (\c conformingProto) within the protocol
         // described by this source.
 
-        // Canonicalize the subject type within the protocol's requirement
+        // Canonicalize the subject type within the protocol's generic
         // signature.
-        // FIXME: We might be able to guarantee this when building from a
-        // requirement signature.
         Type subjectType = source->getStoredType();
-        subjectType = inProtocol->getRequirementSignature()
+        subjectType = inProtocol->getGenericSignature()
           ->getCanonicalTypeInContext(subjectType,
                                       *inProtocol->getParentModule());
 
@@ -846,8 +844,17 @@ ConformanceAccessPath GenericSignature::getConformanceAccessPath(
       auto knownConforms = rep->getConformsTo().find(conformingProto);
       assert(knownConforms != rep->getConformsTo().end());
 
+      // Compute the root type, canonicalizing it w.r.t. the protocol context.
+      auto inProtoSig = inProtocol->getGenericSignature();
+      Type localRootType = knownConforms->second->getRootPotentialArchetype()
+                             ->getDependentType(inProtoSig->getGenericParams(),
+                                                /*allowUnresolved*/true);
+      localRootType = inProtoSig->getCanonicalTypeInContext(
+                                               localRootType,
+                                               *inProtocol->getModuleContext());
+
       // Build the path according to the requirement signature.
-      buildPath(reqSig, knownConforms->second, conformingProto);
+      buildPath(reqSig, knownConforms->second, conformingProto, localRootType);
 
       // We're done.
       return;
@@ -855,7 +862,7 @@ ConformanceAccessPath GenericSignature::getConformanceAccessPath(
 
     // If we still have a parent, keep going.
     if (source->parent) {
-      buildPath(sig, source->parent, conformingProto);
+      buildPath(sig, source->parent, conformingProto, rootType);
       return;
     }
 
@@ -863,26 +870,28 @@ ConformanceAccessPath GenericSignature::getConformanceAccessPath(
     assert(source->kind == RequirementSource::Explicit ||
            source->kind == RequirementSource::Inferred);
 
-    // Retrieve the subject type, which is the archetype anchor for the root
-    // of this requirement.
-    auto subjectPA = source->getRootPotentialArchetype();
-    subjectPA = subjectPA->getArchetypeAnchor(*subjectPA->getBuilder());
-    Type subjectType = subjectPA->getDependentType(sig->getGenericParams(),
-                                                   false);
-
     // Skip trivial path elements. These occur when querying a requirement
     // signature.
     if (!path.path.empty() && conformingProto == path.path.back().second &&
-        subjectType->isEqual(conformingProto->getSelfInterfaceType()))
+        rootType->isEqual(conformingProto->getSelfInterfaceType()))
       return;
 
-    assert(hasConformanceInSignature(sig, subjectType, conformingProto) &&
+    assert(hasConformanceInSignature(sig, rootType, conformingProto) &&
            "missing explicit conformance in signature");
 
     // Add the root of the path, which starts at this explicit requirement.
-    path.path.push_back({subjectType, conformingProto});
+    path.path.push_back({rootType, conformingProto});
   };
-  buildPath(this, conforms->second, protocol);
+
+  // Canonicalize the root type.
+  auto source = conforms->second;
+  auto subjectPA = source->getRootPotentialArchetype();
+  subjectPA = subjectPA->getArchetypeAnchor(*subjectPA->getBuilder());
+  Type rootType = subjectPA->getDependentType(getGenericParams(),
+                                              /*allowUnresolved=*/false);
+
+  // Build the path.
+  buildPath(this, conforms->second, protocol, rootType);
 
   // Return the path; we're done!
   return path;
