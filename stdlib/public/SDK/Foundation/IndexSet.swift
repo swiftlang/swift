@@ -258,9 +258,9 @@ public struct IndexSet : ReferenceConvertible, Equatable, BidirectionalCollectio
     
     private func _indexOfRange(containing integer : Element) -> RangeView.Index? {
         let result = _handle.map { 
-            __NSIndexSetIndexOfRangeContainingIndex($0, UInt(integer))
+            __NSIndexSetIndexOfRangeContainingIndex($0, integer)
         }
-        if result == UInt(NSNotFound) {
+        if result == NSNotFound {
             return nil
         } else {
             return Int(result)
@@ -269,9 +269,9 @@ public struct IndexSet : ReferenceConvertible, Equatable, BidirectionalCollectio
     
     private func _range(at index: RangeView.Index) -> Range<Element> {
         return _handle.map {
-            var location: UInt = 0
-            var length: UInt = 0
-            __NSIndexSetRangeAtIndex($0, UInt(index), &location, &length)
+            var location: Int = 0
+            var length: Int = 0
+            __NSIndexSetRangeAtIndex($0, index, &location, &length)
             return Int(location)..<Int(location)+Int(length)
         }
     }
