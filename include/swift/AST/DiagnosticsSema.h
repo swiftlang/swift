@@ -38,7 +38,7 @@ namespace swift {
 #include "DiagnosticsSema.def"
   }
   void diagnoseMissingCases(ASTContext &Context, const SwitchStmt *SwitchS,
-                            Diagnostic Id);
+                            bool Empty);
 }
 
 #endif

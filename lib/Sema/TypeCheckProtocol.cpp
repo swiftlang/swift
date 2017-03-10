@@ -2632,7 +2632,7 @@ printRequirementStub(ValueDecl *Requirement, DeclContext *Adopter,
     Options.PrintDocumentationComments = false;
     Options.AccessibilityFilter = Accessibility::Private;
     Options.PrintAccessibility = false;
-    Options.FunctionBody = [](const ValueDecl *VD) { return "<#code#>"; };
+    Options.FunctionBody = [](const ValueDecl *VD) { return getCodePlaceholder(); };
     Options.setBaseType(AdopterTy);
     Options.CurrentModule = Adopter->getParentModule();
     if (!Adopter->isExtensionContext()) {

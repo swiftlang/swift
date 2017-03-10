@@ -1988,7 +1988,7 @@ void SwiftEditorDocument::expandPlaceholder(unsigned Offset, unsigned Length,
         }
         if (HasSignature)
           OS << "in";
-        OS << "\n<#code#>\n";
+        OS << "\n" << getCodePlaceholder() << "\n";
         OS << "}";
       }
       Consumer.handleSourceText(ExpansionStr);
