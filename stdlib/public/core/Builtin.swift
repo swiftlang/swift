@@ -829,3 +829,18 @@ public func withoutActuallyEscaping<ClosureType, ResultType>(
   Builtin.unreachable()
 }
 
+@_transparent
+@_semantics("typechecker._openExistential(_:do:)")
+public func _openExistential<ExistentialType, ContainedType, ResultType>(
+  _ existential: ExistentialType,
+  do body: (_ escapingClosure: ContainedType) throws -> ResultType
+) rethrows -> ResultType {
+  // This implementation is never used, since calls to
+  // `Swift._openExistential(_:do:)` are resolved as a special case by
+  // the type checker.
+  Builtin.staticReport(_trueAfterDiagnostics(), true._value,
+    ("internal consistency error: '_openExistential(_:do:)' operation failed to resolve"
+     as StaticString).utf8Start._rawValue)
+  Builtin.unreachable()
+}
+

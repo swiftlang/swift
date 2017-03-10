@@ -6376,6 +6376,57 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
         return replacement;
       }
       
+      case DeclTypeCheckingSemantics::OpenExistential: {
+        // Resolve into an OpenExistentialExpr.
+        auto arg = cast<TupleExpr>(apply->getArg());
+        assert(arg->getNumElements() == 2 && "should have two arguments");
+
+        auto existential = cs.coerceToRValue(arg->getElements()[0]);
+        auto body = cs.coerceToRValue(arg->getElements()[1]);
+
+        auto bodyFnTy = cs.getType(body)->castTo<FunctionType>();
+        auto openedTy = bodyFnTy->getInput();
+        auto resultTy = bodyFnTy->getResult();
+
+        // The body is immediately called, so is obviously noescape.
+        bodyFnTy = cast<FunctionType>(
+          bodyFnTy->withExtInfo(bodyFnTy->getExtInfo().withNoEscape()));
+        body = coerceToType(body, bodyFnTy, locator);
+        assert(body && "can't make nonescaping?!");
+
+        auto openedInstanceTy = openedTy;
+        auto existentialInstanceTy = cs.getType(existential);
+        if (auto metaTy = openedTy->getAs<MetatypeType>()) {
+          openedInstanceTy = metaTy->getInstanceType();
+          existentialInstanceTy = existentialInstanceTy
+            ->castTo<ExistentialMetatypeType>()
+            ->getInstanceType();
+        }
+        auto openedArchetype = openedInstanceTy->castTo<ArchetypeType>();
+        assert(openedArchetype->getOpenedExistentialType()
+                              ->isEqual(existentialInstanceTy));
+
+        auto opaqueValue = new (tc.Context)
+          OpaqueValueExpr(apply->getLoc(), openedTy);
+        cs.setType(opaqueValue, openedTy);
+        
+        auto getType = [&](const Expr *E) -> Type {
+          return cs.getType(E);
+        };
+
+        auto callSubExpr = CallExpr::create(tc.Context, body, opaqueValue, {},
+                                            {}, /*trailing closure*/ false,
+                                            /*implicit*/ true,
+                                            Type(), getType);
+        cs.setType(callSubExpr, resultTy);
+        
+        auto replacement = new (tc.Context)
+          OpenExistentialExpr(existential, opaqueValue, callSubExpr,
+                              resultTy);
+        cs.setType(replacement, resultTy);
+        return replacement;
+      }
+      
       case DeclTypeCheckingSemantics::Normal:
         return nullptr;
       }
