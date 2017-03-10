@@ -10,8 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_BASIC_MANGLING_MACROS_H
-#define SWIFT_BASIC_MANGLING_MACROS_H
+#ifndef SWIFT_DEMANGLING_MANGLING_MACROS_H
+#define SWIFT_DEMANGLING_MANGLING_MACROS_H
 
 // The following macro enables the "new" mangling, which has an _S prefix rather
 // then the original _T prefix.
@@ -107,5 +107,5 @@
 #define OBJC_PARTIAL_APPLY_THUNK_SYM \
           MANGLE_SYM(OBJC_PARTIAL_APPLY_THUNK_MANGLING)
 
-#endif // SWIFT_BASIC_MANGLING_MACROS_H
+#endif // SWIFT_DEMANGLING_MANGLING_MACROS_H
 

@@ -16,17 +16,13 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/Basic/Demangler.h"
-#include "swift/Basic/LLVM.h"
-#include "swift/Basic/Punycode.h"
-#include "swift/Basic/Range.h"
-#include "swift/Basic/UUID.h"
-#include "swift/Basic/ManglingUtils.h"
-#include "swift/Basic/ManglingMacros.h"
+#include "swift/Demangling/Demangler.h"
+#include "swift/Demangling/Punycode.h"
+#include "swift/Demangling/ManglingUtils.h"
+#include "swift/Demangling/ManglingMacros.h"
 #include "swift/Strings.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/StringSwitch.h"
-#include "llvm/Support/Compiler.h"
 #include <vector>
 #include <cstdio>
 #include <cstdlib>
@@ -284,7 +280,7 @@ class Remangler {
 #define CONTEXT_NODE(ID)                                                \
   void mangle##ID(Node *node);                                        \
 //    void mangle##ID(Node *node, EntityContext &ctx);
-#include "swift/Basic/DemangleNodes.def"
+#include "swift/Demangling/DemangleNodes.def"
 
 public:
   Remangler(DemanglerPrinter &Buffer) : Buffer(Buffer) {}
@@ -292,7 +288,7 @@ public:
   void mangle(Node *node) {
     switch (node->getKind()) {
 #define NODE(ID) case Node::Kind::ID: return mangle##ID(node);
-#include "swift/Basic/DemangleNodes.def"
+#include "swift/Demangling/DemangleNodes.def"
     }
     unreachable("bad demangling tree node");
   }
@@ -407,7 +403,8 @@ std::pair<int, Node *> Remangler::mangleConstrainedType(Node *node) {
   assert(node->getKind() == Node::Kind::DependentGenericParamType);
 
   const char *ListSeparator = (Chain.size() > 1 ? "_" : "");
-  for (Node *DepAssocTyRef : reversed(Chain)) {
+  for (unsigned i = 1, n = Chain.size(); i <= n; ++i) {
+    Node *DepAssocTyRef = Chain[n - i];
     mangle(DepAssocTyRef);
     Buffer << ListSeparator;
     ListSeparator = "";
@@ -1585,7 +1582,7 @@ void Remangler::mangleValueWitness(Node *node) {
   switch (ValueWitnessKind(node->getIndex())) {
 #define VALUE_WITNESS(MANGLING, NAME) \
     case ValueWitnessKind::NAME: Code = #MANGLING; break;
-#include "swift/Basic/ValueWitnessMangling.def"
+#include "swift/Demangling/ValueWitnessMangling.def"
   }
   Buffer << 'w' << Code;
 }

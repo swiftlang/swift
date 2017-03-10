@@ -12,7 +12,8 @@
 
 #import <XCTest/XCTest.h>
 #include "swift/Runtime/Metadata.h"
-#include "swift/Basic/Demangle.h"
+#include "swift/Demangling/Demangle.h"
+#include "swift/Demangling/ManglingUtils.h"
 #include "swift/Strings.h"
 
 // NOTE: This is a temporary workaround.
@@ -32,7 +33,7 @@ static char *scanIdentifier(const char *&mangled)
     if (*mangled == '0') goto fail;  // length may not be zero
 
     size_t length = 0;
-    while (swift::Demangle::isDigit(*mangled)) {
+    while (swift::NewMangling::isDigit(*mangled)) {
       size_t oldlength = length;
       length *= 10;
       length += *mangled++ - '0';

@@ -31,7 +31,7 @@
 #include "swift/SIL/SILModule.h"
 #include "clang/AST/Attr.h"
 #include "clang/AST/DeclObjC.h"
-#include "swift/Basic/ManglingMacros.h"
+#include "swift/Demangling/ManglingMacros.h"
 
 #include "CallEmission.h"
 #include "ConstantBuilder.h"

@@ -1,4 +1,4 @@
-//===--- Remangle.cpp - Swift re-mangling from a demangling tree ----------===//
+//===--- OldRemangler.cpp - Old Swift Re-mangler --------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -16,13 +16,9 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/Basic/Demangler.h"
-#include "swift/Basic/LLVM.h"
-#include "swift/Basic/Punycode.h"
-#include "swift/Basic/Range.h"
-#include "swift/Basic/UUID.h"
+#include "swift/Demangling/Demangler.h"
+#include "swift/Demangling/Punycode.h"
 #include "swift/Strings.h"
-#include "llvm/ADT/StringRef.h"
 #include <vector>
 #include <cstdio>
 #include <cstdlib>
@@ -244,7 +240,7 @@ namespace {
     void mangle(Node *node) {
       switch (node->getKind()) {
 #define NODE(ID) case Node::Kind::ID: return mangle##ID(node);
-#include "swift/Basic/DemangleNodes.def"
+#include "swift/Demangling/DemangleNodes.def"
       }
       unreachable("bad demangling tree node");
     }
@@ -257,7 +253,7 @@ namespace {
 #define CONTEXT_NODE(ID)                                                \
     void mangle##ID(Node *node);                                        \
     void mangle##ID(Node *node, EntityContext &ctx);
-#include "swift/Basic/DemangleNodes.def"
+#include "swift/Demangling/DemangleNodes.def"
 
     void mangleIndex(Node::IndexType index);
     void mangleIdentifier(StringRef name, OperatorKind operatorKind);
@@ -311,7 +307,7 @@ void Remangler::mangle##ID(Node *node) {        \
   EntityContext ctx;                            \
   mangle##ID(node, ctx);                        \
 }
-#include "swift/Basic/DemangleNodes.def"
+#include "swift/Demangling/DemangleNodes.def"
 
 /// Reset the currently-active set of substitutions.  This is useful
 /// when part of the mangling is done independently, e.g. when an
@@ -672,7 +668,7 @@ void Remangler::mangleValueWitness(Node *node) {
   switch (ValueWitnessKind(node->getIndex())) {
 #define VALUE_WITNESS(MANGLING, NAME) \
     case ValueWitnessKind::NAME: Code = #MANGLING; break;
-#include "swift/Basic/ValueWitnessMangling.def"
+#include "swift/Demangling/ValueWitnessMangling.def"
   }
   Out << 'w' << Code;
   mangleSingleChildNode(node); // type
@@ -922,14 +918,14 @@ void Remangler::mangleEntityContext(Node *node, EntityContext &ctx) {
 #define NODE(ID)                                \
   case Node::Kind::ID:
 #define CONTEXT_NODE(ID)
-#include "swift/Basic/DemangleNodes.def"
+#include "swift/Demangling/DemangleNodes.def"
     unreachable("not a context node");
 
 #define NODE(ID)
 #define CONTEXT_NODE(ID)                        \
   case Node::Kind::ID:                          \
     return mangle##ID(node, ctx);
-#include "swift/Basic/DemangleNodes.def"
+#include "swift/Demangling/DemangleNodes.def"
   }
   unreachable("bad node kind");
 }
@@ -1443,7 +1439,8 @@ void Remangler::mangleDependentMemberType(Node *node) {
     Out << 'W';
     mangleDependentGenericParamIndex(base);
 
-    for (auto *member : reversed(members)) {
+    for (unsigned i = 1, n = members.size(); i <= n; ++i) {
+      Node *member = members[n - i];
       mangle(member->getChild(1));
     }
     Out << '_';

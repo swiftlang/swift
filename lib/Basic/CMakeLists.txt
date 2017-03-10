@@ -67,9 +67,6 @@ set(version_inc_files
 add_swift_library(swiftBasic STATIC
   Cache.cpp
   ClusteredBitVector.cpp
-  Demangle.cpp
-  Demangler.cpp
-  DemangleWrappers.cpp
   DiagnosticConsumer.cpp
   DiverseStack.cpp
   Edit.cpp
@@ -79,17 +76,12 @@ add_swift_library(swiftBasic STATIC
   LangOptions.cpp
   LLVMContext.cpp
   Mangler.cpp
-  ManglingUtils.cpp
   Platform.cpp
   PrefixMap.cpp
   PrettyStackTrace.cpp
   PrimitiveParsing.cpp
   Program.cpp
-  Punycode.cpp
-  PunycodeUTF8.cpp
   QuotedString.cpp
-  Remangle.cpp
-  Remangler.cpp
   SourceLoc.cpp
   StringExtras.cpp
   TaskQueue.cpp
@@ -109,7 +101,9 @@ add_swift_library(swiftBasic STATIC
   UnicodeExtendedGraphemeClusters.cpp.gyb
 
   C_COMPILE_FLAGS ${UUID_INCLUDE}
-  LINK_LIBRARIES ${UUID_LIBRARIES}
+  LINK_LIBRARIES
+    swiftDemangling
+    ${UUID_LIBRARIES}
   LLVM_COMPONENT_DEPENDS support)
 
 message(STATUS "Swift version: ${SWIFT_VERSION}")

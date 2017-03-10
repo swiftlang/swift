@@ -13,14 +13,13 @@
 #define CHECK_MANGLING_AGAINST_OLD
 
 #include "swift/Basic/Mangler.h"
-#include "swift/Basic/Demangler.h"
-#include "swift/Basic/Punycode.h"
-#include "swift/Basic/ManglingMacros.h"
+#include "swift/Demangling/Demangler.h"
+#include "swift/Demangling/Punycode.h"
+#include "swift/Demangling/ManglingMacros.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/Support/CommandLine.h"
 #ifdef CHECK_MANGLING_AGAINST_OLD
-#include "swift/Basic/Demangle.h"
-#include "swift/Basic/DemangleWrappers.h"
+#include "swift/Demangling/Demangle.h"
 #endif
 #include <algorithm>
 
@@ -220,9 +219,9 @@ std::string NewMangling::selectMangling(const std::string &Old,
                       "old: " << Old << "\n"
                       "new: " << New << "\n\n"
                       "### old tree: ###\n";
-      demangle_wrappers::NodeDumper(OldNode).print(llvm::errs());
+      llvm::errs() << Demangle::getNodeTreeAsString(OldNode);
       llvm::errs() << "\n### new tree: ###\n";
-      demangle_wrappers::NodeDumper(NewNode).print(llvm::errs());
+      llvm::errs() << Demangle::getNodeTreeAsString(NewNode);
       llvm::errs() << '\n';
       assert(false);
     }

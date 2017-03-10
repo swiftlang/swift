@@ -37,7 +37,7 @@ static StringRef mangleValueWitness(ValueWitness witness) {
   switch (witness) {
 #define VALUE_WITNESS(MANGLING, NAME) \
     case ValueWitness::NAME: return #MANGLING;
-#include "swift/Basic/ValueWitnessMangling.def"
+#include "swift/Demangling/ValueWitnessMangling.def"
 
   case ValueWitness::Size:
   case ValueWitness::Flags:

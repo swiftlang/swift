@@ -14,8 +14,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/Basic/DemangleWrappers.h"
-#include "swift/Basic/ManglingMacros.h"
+#include "swift/Demangling/Demangle.h"
+#include "swift/Demangling/ManglingMacros.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/MemoryBuffer.h"
@@ -89,7 +89,7 @@ static void demangle(llvm::raw_ostream &os, llvm::StringRef name,
   swift::Demangle::NodePointer pointer = DCtx.demangleSymbolAsNode(name);
   if (ExpandMode || TreeOnly) {
     llvm::outs() << "Demangling for " << name << '\n';
-    swift::demangle_wrappers::NodeDumper(pointer).print(llvm::outs());
+    llvm::outs() << getNodeTreeAsString(pointer);
   }
   if (RemangleMode) {
     std::string remangled;
