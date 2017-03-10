@@ -3,7 +3,7 @@
 
 import resilient_struct
 
-protocol Runcible {
+public protocol Runcible {
   func runce()
 }
 
@@ -19,8 +19,8 @@ protocol Runcible {
 // -- flags 0x01: unique direct metadata
 // CHECK:           i32 1
 // CHECK:         },
-struct NativeValueType: Runcible {
-  func runce() {}
+public struct NativeValueType: Runcible {
+  public func runce() {}
 }
 
 // -- TODO class refs should be indirected through their ref variable
@@ -34,8 +34,8 @@ struct NativeValueType: Runcible {
 // -- flags 0x01: unique direct metadata (TODO should be 0x03 indirect class)
 // CHECK:           i32 1
 // CHECK:         },
-class NativeClassType: Runcible {
-  func runce() {}
+public class NativeClassType: Runcible {
+  public func runce() {}
 }
 
 // CHECK:         %swift.protocol_conformance {
@@ -48,8 +48,8 @@ class NativeClassType: Runcible {
 // -- flags 0x04: unique nominal type descriptor
 // CHECK:           i32 4
 // CHECK:         },
-struct NativeGenericType<T>: Runcible {
-  func runce() {}
+public struct NativeGenericType<T>: Runcible {
+  public func runce() {}
 }
 
 // CHECK:         %swift.protocol_conformance {
@@ -63,7 +63,7 @@ struct NativeGenericType<T>: Runcible {
 // CHECK:           i32 1
 // CHECK:         }
 extension Int: Runcible {
-  func runce() {}
+  public func runce() {}
 }
 
 // For a resilient struct, reference the NominalTypeDescriptor
@@ -81,7 +81,7 @@ extension Int: Runcible {
 // CHECK:       ]
 
 extension Size: Runcible {
-  func runce() {}
+  public func runce() {}
 }
 
 // TODO: conformances that need lazy initialization

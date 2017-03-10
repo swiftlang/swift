@@ -147,6 +147,14 @@ namespace irgen {
   /// the runtime?
   bool doesClassMetadataRequireDynamicInitialization(IRGenModule &IGM,
                                                      ClassDecl *theClass);
+    
+  /// Returns true if a conformance of the \p conformingType references the
+  /// nominal type descriptor of the type.
+  ///
+  /// Otherwise the conformance references the foreign metadata of the
+  /// \p conformingType.
+  bool doesConformanceReferenceNominalTypeDescriptor(IRGenModule &IGM,
+                                                     CanType conformingType);
 } // end namespace irgen
 } // end namespace swift
 

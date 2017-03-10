@@ -64,9 +64,10 @@ public func getUnmanagedCFNewType(useVar: Bool) -> Unmanaged<CFString> {
   // CHECK: ret
 }
 
-// Triggers instantiation of ClosedEnum : _ObjectiveCBridgeable
-// witness table.
 public func hasArrayOfClosedEnums(closed: [ClosedEnum]) {
+  // Triggers instantiation of ClosedEnum : _ObjectiveCBridgeable
+  // witness table.
+  print(closed[0])
 }
 
 // CHECK-LABEL: _T07newtype11compareABIsyyF

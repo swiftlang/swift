@@ -8,7 +8,7 @@
 
 import gizmo
 
-protocol Runcible {
+public protocol Runcible {
   func runce()
 }
 
@@ -24,7 +24,7 @@ protocol Runcible {
 // -- flags 0x02: nonunique direct metadata
 // CHECK:           i32 2 },
 extension NSRect: Runcible {
-  func runce() {}
+  public func runce() {}
 }
 
 // -- TODO class refs should be indirected through their ref variable
@@ -39,5 +39,5 @@ extension NSRect: Runcible {
 // CHECK:           i32 1
 // CHECK:         }
 extension Gizmo: Runcible {
-  func runce() {}
+  public func runce() {}
 }
