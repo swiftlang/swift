@@ -1949,9 +1949,6 @@ namespace {
     switch (conformance->getState()) {
       case ProtocolConformanceState::Incomplete:
         if (conformance->isInvalid()) {
-          // Emit any delayed diagnostics and return.
-          ConformanceChecker(TC, conformance, MissingWitnesses, false).
-            emitDelayedDiags();
           revivedMissingWitnesses = TC.Context.
             takeDelayedMissingWitnesses(conformance);
         }
@@ -4885,6 +4882,14 @@ void ConformanceChecker::checkConformance(MissingWitnessDiagnosisKind Kind) {
 
   // FIXME: Caller checks that this type conforms to all of the
   // inherited protocols.
+
+  emitDelayedDiags();
+
+  // If delayed diags have already complained, return.
+  if (AlreadyComplained) {
+    Conformance->setInvalid();
+    return;
+  }
 
   // Resolve all of the type witnesses.
   resolveTypeWitnesses();
