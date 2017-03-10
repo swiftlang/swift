@@ -726,6 +726,27 @@ llvm::Module *IRGenModule::releaseModule() {
   return ClangCodeGen->ReleaseModule();
 }
 
+bool IRGenerator::canEmitWitnessTableLazily(SILWitnessTable *wt) {
+  bool isWholeModule = PrimaryIGM->getSILModule().isWholeModule();
+  if (isPossiblyUsedExternally(wt->getLinkage(), isWholeModule))
+    return false;
+
+  if (Opts.UseJIT)
+    return false;
+
+  return true;
+}
+
+void IRGenerator::addLazyWitnessTable(const ProtocolConformance *Conf) {
+  if (SILWitnessTable *wt = SIL.lookUpWitnessTable(Conf)) {
+    // Add it to the queue if it hasn't already been put there.
+    if (canEmitWitnessTableLazily(wt) &&
+        LazilyEmittedWitnessTables.insert(wt).second) {
+      LazyWitnessTables.push_back(wt);
+    }
+  }
+}
+
 llvm::AttributeSet IRGenModule::getAllocAttrs() {
   if (AllocAttrs.isEmpty()) {
     AllocAttrs = llvm::AttributeSet::get(LLVMContext,

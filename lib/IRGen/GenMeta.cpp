@@ -5494,6 +5494,10 @@ IRGenModule::getAddrOfForeignTypeMetadataCandidate(CanType type) {
   // Only remember the offset.
   GlobalVars[entity] = result;
 
+  if (NominalTypeDecl *Nominal = type->getAnyNominal()) {
+    addLazyConformances(Nominal);
+  }
+
   return result;
 }
 

@@ -1741,7 +1741,20 @@ void IRGenModule::emitSILWitnessTable(SILWitnessTable *wt) {
   if (wt->getConformance()->isBehaviorConformance())
     return;
 
-  addProtocolConformanceRecord(wt->getConformance());
+  NormalProtocolConformance *Conf = wt->getConformance();
+  addProtocolConformanceRecord(Conf);
+
+  CanType conformingType = Conf->getType()->getCanonicalType();
+  if (!doesConformanceReferenceNominalTypeDescriptor(*this, conformingType)) {
+    // Trigger the lazy emission of the foreign type metadata.
+    NominalTypeDecl *Nominal = conformingType->getAnyNominal();
+    if (ClassDecl *clas = dyn_cast<ClassDecl>(Nominal)) {
+      if (clas->isForeign())
+        getAddrOfForeignTypeMetadataCandidate(conformingType);
+    } else if (Nominal->hasClangNode()) {
+      getAddrOfForeignTypeMetadataCandidate(conformingType);
+    }
+  }
 }
 
 

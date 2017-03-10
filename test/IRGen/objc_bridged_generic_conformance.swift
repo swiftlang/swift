@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-ir %s -import-objc-header %S/Inputs/objc_bridged_generic_conformance.h | %FileCheck %s
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-ir -primary-file %s -import-objc-header %S/Inputs/objc_bridged_generic_conformance.h | %FileCheck %s
 // REQUIRES: objc_interop
 
 // CHECK-NOT: _TMnCSo
