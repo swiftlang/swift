@@ -22,6 +22,7 @@
 #include "swift/SILOptimizer/Analysis/Analysis.h"
 #include "swift/SILOptimizer/Analysis/AliasAnalysis.h"
 #include "swift/SILOptimizer/Analysis/ARCAnalysis.h"
+#include "swift/SILOptimizer/Analysis/CallerAnalysis.h"
 #include "swift/SILOptimizer/Analysis/RCIdentityAnalysis.h"
 #include "swift/SILOptimizer/Utils/Local.h"
 #include "swift/SILOptimizer/PassManager/PassManager.h"
@@ -176,7 +177,9 @@ struct ResultDescriptor {
 
 /// Returns true if F is a function which the pass know show to specialize
 /// function signatures for.
-bool canSpecializeFunction(SILFunction *F);
+bool canSpecializeFunction(SILFunction *F,
+                           const CallerAnalysis::FunctionInfo *FuncInfo,
+                           bool OptForPartialApply);
 
 /// Return true if this argument is used in a non-trivial way.
 bool hasNonTrivialNonDebugUse(SILArgument *Arg);
