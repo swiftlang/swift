@@ -35,6 +35,7 @@
   ],
   "Collection": [
     "Collection.swift",
+    "FixedArray.swift",
     "BidirectionalCollection.swift",
     "RandomAccessCollection.swift",
     "MutableCollection.swift",
@@ -55,6 +56,8 @@
     "Existential.swift",
     "WriteBackMutableSlice.swift",
     "UnfoldSequence.swift",
+    "BoundedCapacity.swift",
+    "UnboundCapacity.swift",
     {
       "Type-erased": [
         "ExistentialCollection.swift"

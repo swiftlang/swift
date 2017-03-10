@@ -29,6 +29,7 @@ set(SWIFTLIB_ESSENTIAL
   AssertCommon.swift
   BidirectionalCollection.swift
   Bool.swift
+  BoundedCapacity.swift
   BridgeObjectiveC.swift
   BridgeStorage.swift
   Builtin.swift
@@ -51,6 +52,7 @@ set(SWIFTLIB_ESSENTIAL
   ErrorType.swift
   Existential.swift
   Filter.swift.gyb
+  FixedArray.swift
   FixedPoint.swift.gyb
   FlatMap.swift
   Flatten.swift.gyb
@@ -130,6 +132,7 @@ set(SWIFTLIB_ESSENTIAL
   SwiftNativeNSArray.swift
   TranscodedView.swift
   UnavailableStringAPIs.swift.gyb
+  UnboundCapacity.swift
   Unicode.swift
   Unicode2.swift
   UnicodeScalar.swift
