@@ -194,9 +194,9 @@ public:
         TC.diagnose(attr->getLocation(), diag::member_cannot_be_final)
           .fixItRemove(attr->getRange());
 
-      // Invalidate the attribute so child declarations are not flagged as final
+      // Remove the attribute so child declarations are not flagged as final
       // and duplicate the error message.
-      attr->setInvalid();
+      D->getAttrs().removeAttribute(attr);
       return;
     }
   }
