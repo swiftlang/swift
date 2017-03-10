@@ -1952,6 +1952,14 @@ namespace {
           // Revive registered missing witnesses to handle it below.
           revivedMissingWitnesses = TC.Context.
             takeDelayedMissingWitnesses(conformance);
+
+          // If we have no missing witnesses for this invalid conformance, the
+          // conformance is invalid for other reasons, so emit diagnosis now.
+          if (revivedMissingWitnesses.empty()) {
+            // Emit any delayed diagnostics.
+            ConformanceChecker(TC, conformance, MissingWitnesses, false).
+              emitDelayedDiags();
+          }
         }
 
         // Check the rest of the conformance below.
