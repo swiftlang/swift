@@ -285,7 +285,6 @@ DispatchAPI.test("DispatchData.copyBytesUnsafeRawBufferPointer") {
 	var dest: [UInt8] = [0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF]
 	let destPtr = UnsafeMutableRawBufferPointer(start: UnsafeMutablePointer(&dest),
 			count: dest.count)
-
 	var dispatchData = DispatchData(bytes: srcPtr1)
 
 	// Copy from offset 0

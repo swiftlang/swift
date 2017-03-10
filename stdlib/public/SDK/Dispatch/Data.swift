@@ -66,7 +66,7 @@ public struct DispatchData : RandomAccessCollection, _ObjectiveCBridgeable {
 	/// - parameter bytes: A pointer to the bytes.
 	/// - parameter count: The size of the bytes.
 	/// - parameter deallocator: Specifies the mechanism to free the indicated buffer.
-	@available(swift, deprecated: 4, message: "Use init(bytes: UnsafeRawBufferPointer, deallocater: Deallocator) instead")
+	@available(swift, deprecated: 4, message: "Use init(bytesNoCopy: UnsafeRawBufferPointer, deallocater: Deallocator) instead")
 	public init(bytesNoCopy bytes: UnsafeBufferPointer<UInt8>, deallocator: Deallocator = .free) {
 		let (q, b) = deallocator._deallocator
 		__wrapped = bytes.baseAddress == nil ? _swift_dispatch_data_empty()
@@ -181,10 +181,11 @@ public struct DispatchData : RandomAccessCollection, _ObjectiveCBridgeable {
 
 	/// Copy the contents of the data to a pointer.
 	///
-	/// - parameter pointer: A pointer to the buffer you wish to copy the bytes into.
+	/// - parameter pointer: A pointer to the buffer you wish to copy the bytes into. The buffer must be large
+	///	enough to hold `count` bytes.
 	/// - parameter count: The number of bytes to copy.
-	/// - warning: This method does not verify that the contents at pointer have enough space to hold `count` bytes.
 	public func copyBytes(to pointer: UnsafeMutableRawBufferPointer, count: Int) {
+		assert(count <= pointer.count, "Buffer too small to copy \(count) bytes")
 		guard pointer.baseAddress != nil else { return }
 		_copyBytesHelper(to: pointer.baseAddress!, from: 0..<count)
 	}
@@ -201,10 +202,11 @@ public struct DispatchData : RandomAccessCollection, _ObjectiveCBridgeable {
 
 	/// Copy a subset of the contents of the data to a pointer.
 	///
-	/// - parameter pointer: A pointer to the buffer you wish to copy the bytes into.
+	/// - parameter pointer: A pointer to the buffer you wish to copy the bytes into. The buffer must be large
+	///	enough to hold `count` bytes.
 	/// - parameter range: The range in the `Data` to copy.
-	/// - warning: This method does not verify that the contents at pointer have enough space to hold the required number of bytes.
 	public func copyBytes(to pointer: UnsafeMutableRawBufferPointer, from range: CountableRange<Index>) {
+		assert(range.count <= pointer.count, "Buffer too small to copy \(range.count) bytes")
 		guard pointer.baseAddress != nil else { return }
 		_copyBytesHelper(to: pointer.baseAddress!, from: range)
 	}
