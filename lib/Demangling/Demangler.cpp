@@ -626,6 +626,8 @@ NodePointer Demangler::demangleIdentifier() {
 
 NodePointer Demangler::demangleOperatorIdentifier() {
   NodePointer Ident = popNode(Node::Kind::Identifier);
+  if (!Ident)
+    return nullptr;
 
   static const char op_char_table[] = "& @/= >    <*!|+?%-~   ^ .";
 
