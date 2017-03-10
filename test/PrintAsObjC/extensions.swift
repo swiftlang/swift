@@ -28,7 +28,7 @@ extension A1 {}
 // CHECK-NEXT: init
 // CHECK-NEXT: @end
 // CHECK-LABEL: @interface A2 (SWIFT_EXTENSION(extensions))
-// CHECK-DAG: @property (nonatomic, readonly) NSInteger some;
+// CHECK-DAG: @property (nonatomic, readonly) NSInteger some SWIFT_GENERATED;
 // CHECK-NEXT: @end
 extension A2 {
   var some: Int { return 1 }
@@ -42,8 +42,8 @@ extension A2 {
 
 // CHECK-LABEL: @interface A3 (SWIFT_EXTENSION(extensions))
 // CHECK-DAG: @interface A3 (SWIFT_EXTENSION(extensions))
-// CHECK-DAG: @property (nonatomic, readonly) NSInteger more;
-// CHECK-DAG: @property (nonatomic, readonly) NSInteger some;
+// CHECK-DAG: @property (nonatomic, readonly) NSInteger more SWIFT_GENERATED;
+// CHECK-DAG: @property (nonatomic, readonly) NSInteger some SWIFT_GENERATED;
 // CHECK-DAG: @end
 // CHECK: @end
 extension A3 {
@@ -85,7 +85,7 @@ class ClassWithCustomName {
 }
 
 // CHECK-LABEL: @interface CustomName (SWIFT_EXTENSION(extensions))
-// CHECK-NEXT: - (void)foo;
+// CHECK-NEXT: - (void)foo SWIFT_GENERATED;
 // CHECK-NEXT: @end
 extension ClassWithCustomName {
   func foo() {}
@@ -97,7 +97,7 @@ extension CGColor {
 }
 
 // CHECK-LABEL: @interface GenericClass<T> (SWIFT_EXTENSION(extensions))
-// CHECK-NEXT: - (void)bar;
+// CHECK-NEXT: - (void)bar SWIFT_GENERATED;
 // CHECK-NEXT: @end
 extension GenericClass {
   func bar() {}
@@ -110,7 +110,7 @@ extension NotObjC {}
 // NEGATIVE-NOT: @interface NSObject{{$}}
 // NEGATIVE-NOT: @class NSObject
 // CHECK-LABEL: @interface NSObject (SWIFT_EXTENSION(extensions))
-// CHECK-DAG: @property (nonatomic, readonly) NSInteger some;
+// CHECK-DAG: @property (nonatomic, readonly) NSInteger some SWIFT_GENERATED;
 // CHECK-NEXT: @end
 extension NSObject {
   var some: Int { return 1 }
@@ -119,9 +119,9 @@ extension NSObject {
 // NEGATIVE-NOT: @class NSString;
 // CHECK: @class NSColor;
 // CHECK-LABEL: @interface NSString (SWIFT_EXTENSION(extensions))
-// CHECK-NEXT: - (void)test;
-// CHECK-NEXT: + (void)test2;
-// CHECK-NEXT: + (NSString * _Nullable)fromColor:(NSColor * _Nonnull)color SWIFT_WARN_UNUSED_RESULT;
+// CHECK-NEXT: - (void)test SWIFT_GENERATED;
+// CHECK-NEXT: + (void)test2 SWIFT_GENERATED;
+// CHECK-NEXT: + (NSString * _Nullable)fromColor:(NSColor * _Nonnull)color SWIFT_WARN_UNUSED_RESULT SWIFT_GENERATED;
 // CHECK-NEXT: @end
 extension NSString {
   func test() {}
@@ -131,11 +131,11 @@ extension NSString {
 }
 
 // CHECK-LABEL: @interface PettableContainer<T> (SWIFT_EXTENSION(extensions))
-// CHECK-NEXT: - (PettableContainer<T> * _Nonnull)duplicate SWIFT_WARN_UNUSED_RESULT;
-// CHECK-NEXT: - (PettableContainer<T> * _Nonnull)duplicate2 SWIFT_WARN_UNUSED_RESULT;
-// CHECK-NEXT: - (PettableContainer<PettableOverextendedMetaphor *> * _Nonnull)duplicate3 SWIFT_WARN_UNUSED_RESULT;
-// CHECK-NEXT: - (T _Nonnull)extract SWIFT_WARN_UNUSED_RESULT;
-// CHECK-NEXT: - (T _Nullable)extract2 SWIFT_WARN_UNUSED_RESULT;
+// CHECK-NEXT: - (PettableContainer<T> * _Nonnull)duplicate SWIFT_WARN_UNUSED_RESULT SWIFT_GENERATED;
+// CHECK-NEXT: - (PettableContainer<T> * _Nonnull)duplicate2 SWIFT_WARN_UNUSED_RESULT SWIFT_GENERATED;
+// CHECK-NEXT: - (PettableContainer<PettableOverextendedMetaphor *> * _Nonnull)duplicate3 SWIFT_WARN_UNUSED_RESULT SWIFT_GENERATED;
+// CHECK-NEXT: - (T _Nonnull)extract SWIFT_WARN_UNUSED_RESULT SWIFT_GENERATED;
+// CHECK-NEXT: - (T _Nullable)extract2 SWIFT_WARN_UNUSED_RESULT SWIFT_GENERATED;
 // CHECK-NEXT: @end
 extension PettableContainer {
   func duplicate() -> PettableContainer { fatalError() }

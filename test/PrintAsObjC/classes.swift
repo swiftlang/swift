@@ -63,7 +63,7 @@ import SingleGenericClass
 }
 
 // CHECK: @class CustomName2;
-// CHECK-LABEL: SWIFT_CLASS_NAMED("ClassWithCustomName")
+// CHECK-LABEL: SWIFT_CLASS_NAMED("ClassWithCustomName", "classes")
 // CHECK-NEXT: @interface CustomName{{$}}
 // CHECK-NEXT: - (void)forwardCustomName:(CustomName2 * _Nonnull)_;
 // CHECK-NEXT: init
@@ -73,14 +73,14 @@ class ClassWithCustomName {
   func forwardCustomName(_: ClassWithCustomName2) {}
 }
   
-// CHECK-LABEL: SWIFT_CLASS_NAMED("ClassWithCustomName2")
+// CHECK-LABEL: SWIFT_CLASS_NAMED("ClassWithCustomName2", "classes")
 // CHECK-NEXT: @interface CustomName2{{$}}
 // CHECK-NEXT: init
 // CHECK-NEXT: @end
 @objc(CustomName2)
 class ClassWithCustomName2 {}
   
-// CHECK-LABEL: SWIFT_CLASS_NAMED("ClassWithCustomNameSub")
+// CHECK-LABEL: SWIFT_CLASS_NAMED("ClassWithCustomNameSub", "classes")
 // CHECK-NEXT: @interface CustomNameSub : CustomName{{$}}
 // CHECK-NEXT: init
 // CHECK-NEXT: @end
@@ -634,7 +634,7 @@ public class NonObjCClass { }
 // CHECK-LABEL: @interface ReversedOrder2{{$}}
 // CHECK-NEXT: init
 // CHECK-NEXT: @end
-// CHECK: SWIFT_CLASS("_TtC7classes14ReversedOrder1")
+// CHECK: SWIFT_CLASS("_TtC7classes14ReversedOrder1", "classes")
 // CHECK-NEXT: @interface ReversedOrder1 : ReversedOrder2
 // CHECK-NEXT: init
 // CHECK-NEXT: @end

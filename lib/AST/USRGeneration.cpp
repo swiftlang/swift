@@ -51,9 +51,14 @@ static bool printObjCUSRFragment(const ValueDecl *D, StringRef ObjCName,
   if (!D)
     return true;
 
+  StringRef ModuleName = D->getModuleContext()->getName().str();
+
+  // FIXME: update the USRGenerations APIs in clang to handle the module name
   if (isa<ClassDecl>(D)) {
+    OS << "@M@" << ModuleName;
     clang::index::generateUSRForObjCClass(ObjCName, OS);
   } else if (isa<ProtocolDecl>(D)) {
+    OS << "@M@" << ModuleName;
     clang::index::generateUSRForObjCProtocol(ObjCName, OS);
   } else if (isa<VarDecl>(D)) {
     clang::index::generateUSRForObjCProperty(ObjCName, D->isStatic(), OS);
@@ -64,7 +69,9 @@ static bool printObjCUSRFragment(const ValueDecl *D, StringRef ObjCName,
   } else if (isa<AbstractFunctionDecl>(D)) {
     clang::index::generateUSRForObjCMethod(ObjCName, D->isInstanceMember(), OS);
   } else if (isa<EnumDecl>(D)) {
-    OS << "@E@" << ObjCName; // FIXME: expose clang API to handle enum names
+    // FIXME: expose clang API to handle enum names
+    OS << "@M@" << ModuleName;
+    OS << "@E@" << ObjCName;
   } else if (isa<EnumElementDecl>(D)) {
     OS << "@" << ObjCName;
   } else {
@@ -73,9 +80,23 @@ static bool printObjCUSRFragment(const ValueDecl *D, StringRef ObjCName,
   return false;
 }
 
+static bool printObjCUSRContext(const Decl *D, raw_ostream &OS) {
+  OS << clang::index::getUSRSpacePrefix();
+  if (auto *Parent = D->getDeclContext()->
+      getAsNominalTypeOrNominalTypeExtensionContext()) {
+    auto ObjCName = objc_translation::getObjCNameForSwiftDecl(Parent);
+    if (printObjCUSRFragment(Parent, ObjCName.first.str(), OS))
+      return true;
+  }
+  return false;
+}
+
 static bool printObjCUSRForAccessor(const AbstractStorageDecl *ASD,
                                     AccessorKind Kind,
                                     raw_ostream &OS) {
+  if (printObjCUSRContext(ASD, OS))
+    return true;
+
   ObjCSelector Selector;
   switch (Kind) {
     case swift::AccessorKind::IsGetter:
@@ -95,14 +116,8 @@ static bool printObjCUSRForAccessor(const AbstractStorageDecl *ASD,
 }
 
 static bool printObjCUSR(const ValueDecl *D, raw_ostream &OS) {
-  OS << clang::index::getUSRSpacePrefix();
-
-  if (auto *Parent = D->getDeclContext()->
-        getAsNominalTypeOrNominalTypeExtensionContext()) {
-    auto ObjCName = objc_translation::getObjCNameForSwiftDecl(Parent);
-    if (printObjCUSRFragment(Parent, ObjCName.first.str(), OS))
-      return true;
-  }
+  if (printObjCUSRContext(D, OS))
+    return true;
 
   auto ObjCName = objc_translation::getObjCNameForSwiftDecl(D);
 

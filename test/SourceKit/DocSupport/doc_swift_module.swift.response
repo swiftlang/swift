@@ -1540,7 +1540,7 @@ func genfoo<T1, T2>(x ix: T1, y iy: T2) where T1 : Prot, T2 : cake.C1, T1.Elemen
   {
     key.kind: source.lang.swift.decl.protocol,
     key.name: "P2",
-    key.usr: "c:objc(pl)P2",
+    key.usr: "c:@M@cakeobjc(pl)P2",
     key.offset: 711,
     key.length: 53,
     key.fully_annotated_decl: "<decl.protocol><syntaxtype.attribute.builtin><syntaxtype.attribute.name>@objc</syntaxtype.attribute.name></syntaxtype.attribute.builtin> <syntaxtype.keyword>protocol</syntaxtype.keyword> <decl.name>P2</decl.name></decl.protocol>",
@@ -1548,7 +1548,7 @@ func genfoo<T1, T2>(x ix: T1, y iy: T2) where T1 : Prot, T2 : cake.C1, T1.Elemen
       {
         key.kind: source.lang.swift.decl.function.method.instance,
         key.name: "foo1()",
-        key.usr: "c:objc(pl)P2(im)foo1",
+        key.usr: "c:@M@cakeobjc(pl)P2(im)foo1",
         key.offset: 736,
         key.length: 26,
         key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.attribute.builtin><syntaxtype.attribute.name>@objc</syntaxtype.attribute.name></syntaxtype.attribute.builtin> <syntaxtype.keyword>optional</syntaxtype.keyword> <syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>foo1</decl.name>()</decl.function.method.instance>",
