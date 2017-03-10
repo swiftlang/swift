@@ -810,8 +810,19 @@ void IRGenerator::emitGlobalTopLevel() {
   bool isWholeModule = PrimaryIGM->getSILModule().isWholeModule();
   for (SILFunction &f : PrimaryIGM->getSILModule()) {
     // Only eagerly emit functions that are externally visible.
-    if (!isPossiblyUsedExternally(f.getLinkage(), isWholeModule))
+    if (!isPossiblyUsedExternally(f.getLinkage(), isWholeModule)) {
+      // This function is not externally visible.
+      // It could be still useful to emit it for debug purposes if it is
+      // a debug build with disabled optimizations.
+      // Do not emit this function if it is coming from a binary SIL file
+      // or if debug info is not supposed to be emitted or if it is a JIT mode.
+      if (!PrimaryIGM->IRGen.Opts.Optimize && !PrimaryIGM->IRGen.Opts.UseJIT &&
+          f.hasLocation() && !f.getLocation().isSILFile() &&
+          PrimaryIGM->DebugInfo) {
+        addLazyFunction(&f);
+      }
       continue;
+    }
 
     CurrentIGMPtr IGM = getGenModule(&f);
     IGM->emitSILFunction(&f);
@@ -1797,6 +1808,16 @@ llvm::Function *IRGenModule::getAddrOfSILFunction(SILFunction *f,
                 llvm::AttributeSet::FunctionIndex, llvm::Attribute::ReadOnly);
   }
   fn = link.createFunction(*this, fnType, cc, attrs, insertBefore);
+  if (forDefinition && !link.isUsed()) {
+    if (IRGen.isLazyFunction(f) &&
+        f->hasLocation() && !f->getLocation().isSILFile() &&
+        link.getName() != SWIFT_ENTRY_POINT_FUNCTION) {
+      // This is a user-defined function and it is an -Onone
+      // compilation. Mark it as used so that LLVM backend
+      // does not remove it.
+      addUsedGlobal(fn);
+    }
+  }
 
   // If we have an order number for this function, set it up as appropriate.
   if (hasOrderNumber) {

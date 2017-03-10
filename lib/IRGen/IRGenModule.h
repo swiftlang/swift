@@ -295,6 +295,11 @@ public:
     }
   }
   
+
+  bool isLazyFunction(SILFunction *f) const {
+    return LazilyEmittedFunctions.count(f) != 0;
+  }
+
   void addLazyTypeMetadata(CanType type) {
     // Add it to the queue if it hasn't already been put there.
     if (LazilyEmittedTypeMetadata.insert(type).second)
