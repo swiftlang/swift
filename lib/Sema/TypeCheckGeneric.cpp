@@ -1124,7 +1124,7 @@ void TypeChecker::validateGenericTypeSignature(GenericTypeDecl *typeDecl) {
 /// Checking bound generic type arguments
 ///
 
-std::pair<bool, bool> TypeChecker::checkGenericArguments(
+RequirementCheckResult TypeChecker::checkGenericArguments(
     DeclContext *dc, SourceLoc loc, SourceLoc noteLoc, Type owner,
     GenericSignature *genericSig, TypeSubstitutionFn substitutions,
     LookupConformanceFn conformances,
@@ -1170,20 +1170,20 @@ std::pair<bool, bool> TypeChecker::checkGenericArguments(
                              conformanceOptions, loc, unsatisfiedDependency);
 
       // Unsatisfied dependency case.
-      if (result.first)
-        return std::make_pair(true, false);
-
-      // Conformance check failure case.
-      if (!result.second)
-        return std::make_pair(false, false);
-
-      // Report the conformance.
-      if (listener) {
-        listener->satisfiedConformance(rawReq.getFirstType(), firstType,
-                                       *result.second);
+      auto status = result.getStatus();
+      switch (status) {
+      case RequirementCheckResult::UnsatisfiedDependency:
+      case RequirementCheckResult::Failure:
+        // pass it on up.
+        return status;
+      case RequirementCheckResult::Success:
+        // Report the conformance.
+        if (listener) {
+          listener->satisfiedConformance(rawReq.getFirstType(), firstType,
+                                         result.getConformance());
+        }
+        continue;
       }
-      
-      continue;
     }
 
     case RequirementKind::Layout: {
@@ -1205,7 +1205,7 @@ std::pair<bool, bool> TypeChecker::checkGenericArguments(
                  genericSig->gatherGenericParamBindingsText(
                      {rawFirstType, rawSecondType}, substitutions));
 
-        return std::make_pair(false, false);
+        return RequirementCheckResult::Failure;
       }
       continue;
 
@@ -1219,11 +1219,13 @@ std::pair<bool, bool> TypeChecker::checkGenericArguments(
                  genericSig->gatherGenericParamBindingsText(
                      {rawFirstType, rawSecondType}, substitutions));
 
-        return std::make_pair(false, false);
+        return RequirementCheckResult::Failure;
       }
       continue;
     }
   }
 
-  return std::make_pair(false, valid);
+  if (valid)
+    return RequirementCheckResult::Success;
+  return RequirementCheckResult::Failure;
 }
