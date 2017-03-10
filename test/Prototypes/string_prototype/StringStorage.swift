@@ -16,20 +16,24 @@ extension CopyConstructible {
 /// - Requires: Element is trivial (UInt8/UInt16 in practice)
 @_versioned
 final class _StringStorage<Element: UnsignedInteger>
- : /*_SwiftNativeNSString,*/ _NSStringCore, CopyConstructible {
+ : _SwiftNativeNSString, _NSStringCore, CopyConstructible {
 
+  @nonobjc
   var _header: _SwiftStringBodyStorage
   
+  @nonobjc
   var count: Int {
     get { return numericCast(_header.count) }
     set { _header.count = numericCast(newValue) }
   }
   
+  @nonobjc
   var capacity: Int {
     get { return numericCast(_header.capacity) }
     set { _header.capacity = numericCast(newValue) }
   }
 
+  @nonobjc
   var isKnownLatin1: Bool {
     get { return _header.flags & 1<<0 as UInt8 != 0 }
     set {
@@ -38,6 +42,7 @@ final class _StringStorage<Element: UnsignedInteger>
     }
   }
   
+  @nonobjc
   var isKnownASCII: Bool {
     get { return _header.flags & 1<<1 as UInt8 != 0 }
     set {
@@ -46,6 +51,7 @@ final class _StringStorage<Element: UnsignedInteger>
     }
   }
 
+  @nonobjc
   var isKnownValidEncoding: Bool {
     get { return _header.flags & 1<<2 as UInt8 != 0 }
     set {
@@ -54,6 +60,7 @@ final class _StringStorage<Element: UnsignedInteger>
     }
   }
   
+  @nonobjc
   var isKnownFCCNormalized: Bool {
     get { return _header.flags & 1<<3 as UInt8 != 0 }
     set {
@@ -63,10 +70,12 @@ final class _StringStorage<Element: UnsignedInteger>
   }
 
   /// Satisfies the compiler's need for a designated initializer.
+  @nonobjc
   internal init(_NeverActuallyCalled: ()) {
     fatalError("Unexpected call to StringStorage designated initializer")
   }
 
+  @nonobjc
   convenience init(
     count: Int,
     minimumCapacity: Int = 0,
@@ -98,11 +107,13 @@ final class _StringStorage<Element: UnsignedInteger>
 
   /// The empty singleton that is used for every single empty String.
   /// The contents of the storage should never be mutated.
+  @nonobjc
   internal static var empty: _StringStorage {
     return Builtin.bridgeFromRawPointer(
       Builtin.addressof(&_swiftEmptyStringStorage))
   }
 
+  @nonobjc
   func withUnsafeMutableBufferPointer<R>(
     _ body: (inout UnsafeMutableBufferPointer<Element>)->R
   ) -> R {
@@ -113,6 +124,7 @@ final class _StringStorage<Element: UnsignedInteger>
     return body(&buffer)
   }
 
+  @nonobjc
   func withUnsafeBufferPointer<R>(
     _ body: (UnsafeBufferPointer<Element>)->R
   ) -> R {
@@ -152,9 +164,12 @@ extension _StringStorage : _NSStringCore {
 }
 
 extension _StringStorage : RandomAccessCollection, MutableCollection {
+  @nonobjc
   var startIndex : Int { return 0 }
+  @nonobjc
   var endIndex : Int { return count }
 
+  @nonobjc
   subscript(i: Int) -> Element {
     // FIXME: Add addressors
     get {
@@ -181,6 +196,7 @@ extension Collection {
 }
 
 extension _StringStorage where Element == UInt16 {
+  @nonobjc
   internal func _setMaxStored(_ maxCodeUnit: UInt16) {
     switch maxCodeUnit {
     case 0..<0x80: self.isKnownASCII = true; fallthrough
@@ -193,6 +209,7 @@ extension _StringStorage where Element == UInt16 {
   
   /// Initialize from a sequence of valid UTF16 code unit values (possibly
   /// represented with a different code unit type).
+  @nonobjc
   internal convenience init<OtherCodeUnits, OtherEncoding>(
     utf16CodeUnitValues other: UnicodeStorage<OtherCodeUnits, OtherEncoding>,
     isKnownLatin1 otherIsKnownLatin1: Bool = false,
@@ -240,6 +257,7 @@ extension _StringStorage where Element == UInt16 {
   }
 
   
+  @nonobjc
   internal convenience init<OtherCodeUnits, OtherEncoding>(
     _ other: UnicodeStorage<OtherCodeUnits, OtherEncoding>,
     isKnownLatin1 otherIsKnownLatin1: Bool = false,

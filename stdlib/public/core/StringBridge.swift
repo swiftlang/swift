@@ -188,7 +188,10 @@ extension String {
 // This allows us to subclass an Objective-C class and use the fast Swift
 // memory allocator.
 @objc @_swift_native_objc_runtime_base(_SwiftNativeNSStringBase)
-public class _SwiftNativeNSString {}
+// FIXME: change open back to final once the string prototype is incorporated
+// into the standard library.
+open class _SwiftNativeNSString {}
+
 
 @objc
 public protocol _NSStringCore :
