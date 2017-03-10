@@ -682,6 +682,15 @@ public:
   std::vector<DelayedConformanceDiag>
   takeDelayedConformanceDiags(NormalProtocolConformance *conformance);
 
+  /// Add delayed missing witnesses for the given normal protocol conformance.
+  void addDelayedMissingWitnesses(NormalProtocolConformance *conformance,
+                                  ArrayRef<ValueDecl*> witnesses);
+
+  /// Retrieve the delayed missing witnesses for the given normal protocol
+  /// conformance.
+  std::vector<ValueDecl*>
+  takeDelayedMissingWitnesses(NormalProtocolConformance *conformance);
+
   /// \brief Produce a specialized conformance, which takes a generic
   /// conformance and substitutions written in terms of the generic
   /// conformance's signature.
