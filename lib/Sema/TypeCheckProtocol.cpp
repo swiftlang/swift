@@ -5265,23 +5265,34 @@ Optional<ProtocolConformanceRef> TypeChecker::conformsToProtocol(
     }
   }
 
-  // Debugging aid: display the conformance access path for archetype
-  // conformances.
-  if (Context.LangOpts.DebugGenericSignatures && InExpression &&
-      T->is<ArchetypeType>() && lookupResult->isAbstract() &&
+  // When debugging, compute the conformance access path for each requirement.
+  // This acts as an assertion that the path itself makes sense.
+#ifndef NDEBUG
+  bool computeConformanceAccessPath = true;
+#else
+  bool computeConformanceAccessPath = Context.LangOpts.DebugGenericSignatures;
+#endif
+  if (computeConformanceAccessPath &&
+      InExpression && T->is<ArchetypeType>() && lookupResult->isAbstract() &&
+      !T->castTo<ArchetypeType>()->isOpenedExistential() &&
+      !T->castTo<ArchetypeType>()->requiresClass() &&
       T->castTo<ArchetypeType>()->getGenericEnvironment()
         == DC->getGenericEnvironmentOfContext()) {
     auto interfaceType = DC->mapTypeOutOfContext(T);
     if (interfaceType->isTypeParameter()) {
-      llvm::errs() << "Conformance access path for ";
-      T.print(llvm::errs());
-      llvm::errs() << ": " << Proto->getName() << " is ";
-
       auto genericSig = DC->getGenericSignatureOfContext();
-      genericSig->getConformanceAccessPath(interfaceType, Proto,
-                                           *DC->getParentModule())
-        .print(llvm::errs());
-      llvm::errs() << "\n";
+      auto path = genericSig->getConformanceAccessPath(interfaceType, Proto,
+                                                       *DC->getParentModule());
+
+      // Debugging aid: display the conformance access path for archetype
+      // conformances.
+      if (Context.LangOpts.DebugGenericSignatures) {
+        llvm::errs() << "Conformance access path for ";
+        T.print(llvm::errs());
+        llvm::errs() << ": " << Proto->getName() << " is ";
+        path.print(llvm::errs());
+        llvm::errs() << "\n";
+      }
     }
   }
 
