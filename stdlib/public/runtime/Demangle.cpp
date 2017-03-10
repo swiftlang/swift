@@ -10,10 +10,12 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "../../../lib/Basic/Demangle.cpp"
-#include "../../../lib/Basic/Demangler.cpp"
-#include "../../../lib/Basic/ManglingUtils.cpp"
-#include "../../../lib/Basic/Punycode.cpp"
+#include "../../../lib/Demangling/OldDemangler.cpp"
+#include "../../../lib/Demangling/Demangler.cpp"
+#include "../../../lib/Demangling/NodePrinter.cpp"
+#include "../../../lib/Demangling/Context.cpp"
+#include "../../../lib/Demangling/ManglingUtils.cpp"
+#include "../../../lib/Demangling/Punycode.cpp"
 #include "swift/Runtime/Metadata.h"
 #include "Private.h"
 
@@ -170,14 +172,9 @@ swift::_swift_buildDemanglingForMetadata(const Metadata *type,
     
     for (auto *protocol : protocols) {
       // The protocol name is mangled as a type symbol, with the _Tt prefix.
-      NodePointer protocolNode = nullptr;
       StringRef ProtoName(protocol->Name);
-      if (ProtoName.startswith("_Tt")) {
-        protocolNode = demangleOldSymbolAsNode(ProtoName, Dem);
-      } else {
-        protocolNode = Dem.demangleSymbol(ProtoName);
-      }
-      
+      NodePointer protocolNode = Dem.demangleSymbol(ProtoName);
+
       // ObjC protocol names aren't mangled.
       if (!protocolNode) {
         auto module = Dem.createNode(Node::Kind::Module,

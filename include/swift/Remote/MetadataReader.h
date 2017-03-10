@@ -19,8 +19,7 @@
 
 #include "swift/Runtime/Metadata.h"
 #include "swift/Remote/MemoryReader.h"
-#include "swift/Basic/Demangler.h"
-#include "swift/Basic/Demangle.h"
+#include "swift/Demangling/Demangler.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Runtime/Unreachable.h"
 

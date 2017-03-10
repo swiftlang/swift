@@ -22,7 +22,7 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SubstitutionMap.h"
-#include "swift/Basic/Punycode.h"
+#include "swift/Demangling/Punycode.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILType.h"
 #include "swift/SIL/SILGlobalVariable.h"

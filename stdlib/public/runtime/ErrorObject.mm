@@ -27,7 +27,7 @@
 #include "swift/Runtime/Debug.h"
 #include "swift/Runtime/ObjCBridge.h"
 #include "swift/Basic/Lazy.h"
-#include "swift/Basic/ManglingMacros.h"
+#include "swift/Demangling/ManglingMacros.h"
 #include "ErrorObject.h"
 #include "Private.h"
 #include <dlfcn.h>

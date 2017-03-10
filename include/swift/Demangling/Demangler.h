@@ -16,11 +16,10 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_BASIC_DEMANGLER_H
-#define SWIFT_BASIC_DEMANGLER_H
+#ifndef SWIFT_DEMANGLING_DEMANGLER_H
+#define SWIFT_DEMANGLING_DEMANGLER_H
 
-#include "swift/Basic/Demangle.h"
-#include <vector>
+#include "swift/Demangling/Demangle.h"
 
 //#define NODE_FACTORY_DEBUGGING
 
@@ -490,7 +489,7 @@ NodePointer demangleOldSymbolAsNode(StringRef MangledName,
 NodePointer demangleOldTypeAsNode(StringRef MangledName,
                                   NodeFactory &Factory);
 
-} // end namespace NewMangling
+} // end namespace Demangle
 } // end namespace swift
 
-#endif // SWIFT_BASIC_DEMANGLER_H
+#endif // SWIFT_DEMANGLING_DEMANGLER_H

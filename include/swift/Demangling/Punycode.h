@@ -24,17 +24,17 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_BASIC_PUNYCODE_H
-#define SWIFT_BASIC_PUNYCODE_H
+#ifndef SWIFT_DEMANGLING_PUNYCODE_H
+#define SWIFT_DEMANGLING_PUNYCODE_H
 
-#include "swift/Basic/LLVM.h"
 #include "llvm/ADT/StringRef.h"
-#include "llvm/ADT/SmallVector.h"
 #include <vector>
 #include <cstdint>
 
 namespace swift {
 namespace Punycode {
+
+using llvm::StringRef;
 
 /// Encodes a sequence of code points into Punycode.
 ///
@@ -61,5 +61,5 @@ bool decodePunycodeUTF8(StringRef InputPunycode, std::string &OutUTF8);
 } // end namespace Punycode
 } // end namespace swift
 
-#endif // SWIFT_BASIC_PUNYCODE_H
+#endif // SWIFT_DEMANGLING_PUNYCODE_H
 

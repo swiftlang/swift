@@ -17,7 +17,6 @@
 
 #define DEBUG_TYPE "sil-speculative-devirtualizer"
 
-#include "swift/Basic/DemangleWrappers.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILFunction.h"

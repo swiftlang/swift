@@ -16,7 +16,7 @@
 #include "swift/Runtime/Metadata.h"
 #include "swift/Runtime/Enum.h"
 #include "swift/Runtime/Unreachable.h"
-#include "swift/Basic/Demangle.h"
+#include "swift/Demangling/Demangle.h"
 #include "swift/Runtime/Debug.h"
 #include "swift/Runtime/Portability.h"
 #include "Private.h"
