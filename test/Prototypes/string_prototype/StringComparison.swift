@@ -626,8 +626,8 @@ where
         let rhsRest = _UnicodeStorage(
           rhs.codeUnits.suffix(from: rhsIdx).map { $0 }, OtherEncoding.self
         )
-        return lhsRest.nfcNormalizedUTF16.lexicographicCompare(
-          rhsRest.nfcNormalizedUTF16)
+        return lhsRest.fccNormalizedUTF16.lexicographicCompare(
+          rhsRest.fccNormalizedUTF16)
       }
     }
   }

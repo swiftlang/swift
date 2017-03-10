@@ -512,9 +512,19 @@ extension UnicodeStorage {
   }
 }
 
+internal func _makeFCCNormalizer() -> OpaquePointer {
+  var err = __swift_stdlib_U_ZERO_ERROR;
+  let ret = __swift_stdlib_unorm2_getInstance(
+    nil, "nfc", __swift_stdlib_UNORM2_COMPOSE_CONTIGUOUS, &err)
+  _precondition(err.isSuccess, "unexpected unorm2_getInstance failure")
+  return ret!
+}
+
+internal var _fccNormalizer = _makeFCCNormalizer()
+
 extension UnicodeStorage {
   
-  public typealias NFCNormalizedUTF16View = [UInt16]
+  public typealias FCCNormalizedUTF16View = [UInt16]
 
   /// Invokes `body` on a contiguous buffer of our UTF16.
   ///
@@ -533,18 +543,16 @@ extension UnicodeStorage {
     return Array(self.transcoded(to: UTF16.self)).withUnsafeBufferPointer(body)
   }
 
-  public var nfcNormalizedUTF16: NFCNormalizedUTF16View {
+  public var fccNormalizedUTF16: FCCNormalizedUTF16View {
     var error = __swift_stdlib_U_ZERO_ERROR
-    let nfc = __swift_stdlib_unorm2_getNFCInstance(&error)
-    _sanityCheck(__swift_stdlib_U_SUCCESS(error), "Couldn't get NFC normalizer")
     
     return _withContiguousUTF16 {
       // Start by assuming we need no more storage than we started with for the
       // result.
-      var result  = NFCNormalizedUTF16View(repeating: 0, count: $0.count)
+      var result  = FCCNormalizedUTF16View(repeating: 0, count: $0.count)
       while true {
         let usedCount = __swift_stdlib_unorm2_normalize(
-          nfc, $0.baseAddress!, numericCast($0.count),
+          _fccNormalizer, $0.baseAddress!, numericCast($0.count),
           &result, numericCast(result.count), &error)
         if __swift_stdlib_U_SUCCESS(error) {
           result.removeLast(result.count - numericCast(usedCount))

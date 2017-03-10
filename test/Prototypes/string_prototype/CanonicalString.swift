@@ -19,7 +19,7 @@ struct SwiftCanonicalString {
     set { _storage.codeUnits._storage.isKnownLatin1 = newValue }
   }
 
-  // Perform a copy, transcoding, and normalization of the supplied code units
+  // transcode and store the supplied code units
   init<OtherCodeUnits, OtherEncoding>(
     _ other: UnicodeStorage<OtherCodeUnits, OtherEncoding>
   )
@@ -137,7 +137,7 @@ extension SwiftCanonicalString : Comparable {
 extension SwiftCanonicalString : Hashable {
   var hashValue : Int {
     var hasher = _SipHash13Context(key: _Hashing.secretKey)
-    for x in _storage.nfcNormalizedUTF16 { hasher.append(x) }
+    for x in _storage.fccNormalizedUTF16 { hasher.append(x) }
     let resultBits = hasher.finalizeAndReturnHash()
 #if arch(i386) || arch(arm)
     return Int(truncatingBitPattern: resultBits)

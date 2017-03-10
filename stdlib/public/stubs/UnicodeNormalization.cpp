@@ -353,10 +353,20 @@ const swift::__swift_stdlib_UNormalizer2 *
 swift::__swift_stdlib_unorm2_getNFCInstance(
   __swift_stdlib_UErrorCode *pErrorCode
 ) {
-  static const swift::__swift_stdlib_UNormalizer2 * result
-  = ptr_cast<__swift_stdlib_UNormalizer2>(
+  return ptr_cast<__swift_stdlib_UNormalizer2>(
     unorm2_getNFCInstance(ptr_cast<UErrorCode>(pErrorCode)));
-  return result;
+}
+
+const swift::__swift_stdlib_UNormalizer2 *__null_unspecified
+swift::__swift_stdlib_unorm2_getInstance(
+  const char *__null_unspecified packageName,
+    const char *name,
+    __swift_stdlib_UNormalization2Mode mode,
+    __swift_stdlib_UErrorCode *pErrorCode) {
+  return ptr_cast<__swift_stdlib_UNormalizer2>(
+    unorm2_getInstance(
+      packageName, name, UNormalization2Mode(mode),
+        ptr_cast<UErrorCode>(pErrorCode)));
 }
 
 int32_t
