@@ -430,33 +430,33 @@ struct __swift_stdlib_UNormalizer2;
 typedef struct __swift_stdlib_UNormalizer2 __swift_stdlib_UNormalizer2;  
 
 SWIFT_RUNTIME_STDLIB_INTERFACE
-const __swift_stdlib_UNormalizer2 *
+const __swift_stdlib_UNormalizer2 *__null_unspecified
 __swift_stdlib_unorm2_getNFCInstance(__swift_stdlib_UErrorCode *pErrorCode);
 
 
 SWIFT_RUNTIME_STDLIB_INTERFACE
-const __swift_stdlib_UNormalizer2 *
+const __swift_stdlib_UNormalizer2 *__null_unspecified
 __swift_stdlib_unorm2_getNFDInstance(__swift_stdlib_UErrorCode *pErrorCode);
 
 
 SWIFT_RUNTIME_STDLIB_INTERFACE
-const __swift_stdlib_UNormalizer2 *
+const __swift_stdlib_UNormalizer2 *__null_unspecified
 __swift_stdlib_unorm2_getNFKCInstance(__swift_stdlib_UErrorCode *pErrorCode);
 
 
 SWIFT_RUNTIME_STDLIB_INTERFACE
-const __swift_stdlib_UNormalizer2 *
+const __swift_stdlib_UNormalizer2 *__null_unspecified
 __swift_stdlib_unorm2_getNFKDInstance(__swift_stdlib_UErrorCode *pErrorCode);
 
 
 SWIFT_RUNTIME_STDLIB_INTERFACE
-const __swift_stdlib_UNormalizer2 *
+const __swift_stdlib_UNormalizer2 *__null_unspecified
 __swift_stdlib_unorm2_getNFKCCasefoldInstance(__swift_stdlib_UErrorCode *pErrorCode);
 
 
 SWIFT_RUNTIME_STDLIB_INTERFACE
-const __swift_stdlib_UNormalizer2 *
-__swift_stdlib_unorm2_getInstance(const char *packageName,
+const __swift_stdlib_UNormalizer2 *__null_unspecified
+__swift_stdlib_unorm2_getInstance(const char *__null_unspecified packageName,
                    const char *name,
                    __swift_stdlib_UNormalization2Mode mode,
                    __swift_stdlib_UErrorCode *pErrorCode);
