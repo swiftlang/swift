@@ -423,7 +423,7 @@ PotentialArchetype *RequirementSource::getRootPotentialArchetype() const {
   auto root = getRoot();
 
   // We're at the root, so it's in the inline storage.
-  assert(storageKind == StorageKind::RootArchetype);
+  assert(root->storageKind == StorageKind::RootArchetype);
   return root->storage.rootArchetype;
 }
 
