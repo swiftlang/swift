@@ -1945,12 +1945,21 @@ namespace {
   ProtocolConformance *MultiConformanceChecker::
   checkIndividualConformance(NormalProtocolConformance *conformance,
                              bool issueFixit) {
+    std::vector<ValueDecl*> revivedMissingWitnesses;
     switch (conformance->getState()) {
       case ProtocolConformanceState::Incomplete:
         if (conformance->isInvalid()) {
-          // Emit any delayed diagnostics and return.
-          ConformanceChecker(TC, conformance, MissingWitnesses, false).
-          emitDelayedDiags();
+          // Revive registered missing witnesses to handle it below.
+          revivedMissingWitnesses = TC.Context.
+            takeDelayedMissingWitnesses(conformance);
+
+          // If we have no missing witnesses for this invalid conformance, the
+          // conformance is invalid for other reasons, so emit diagnosis now.
+          if (revivedMissingWitnesses.empty()) {
+            // Emit any delayed diagnostics.
+            ConformanceChecker(TC, conformance, MissingWitnesses, false).
+              emitDelayedDiags();
+          }
         }
 
         // Check the rest of the conformance below.
@@ -2051,6 +2060,8 @@ namespace {
 
     // The conformance checker we're using.
     AllUsedCheckers.emplace_back(TC, conformance, MissingWitnesses);
+    MissingWitnesses.insert(revivedMissingWitnesses.begin(),
+                            revivedMissingWitnesses.end());
     AllUsedCheckers.back().checkConformance(issueFixit ?
                                       MissingWitnessDiagnosisKind::ErrorFixIt :
                                       MissingWitnessDiagnosisKind::ErrorOnly);
@@ -2618,6 +2629,7 @@ printRequirementStub(ValueDecl *Requirement, DeclContext *Adopter,
     }
 
     PrintOptions Options = PrintOptions::printForDiagnostics();
+    Options.PrintDocumentationComments = false;
     Options.AccessibilityFilter = Accessibility::Private;
     Options.PrintAccessibility = false;
     Options.FunctionBody = [](const ValueDecl *VD) { return "<#code#>"; };
@@ -2721,7 +2733,15 @@ diagnoseMissingWitnesses(MissingWitnessDiagnosisKind Kind) {
 
   switch (Kind) {
   case MissingWitnessDiagnosisKind::ErrorFixIt: {
-    diagnoseOrDefer(LocalMissing[0], true, InsertFixitCallback);
+    if (SuppressDiagnostics) {
+      // If the diagnostics are suppressed, we register these missing witnesses
+      // for later revisiting.
+      Conformance->setInvalid();
+      TC.Context.addDelayedMissingWitnesses(Conformance,
+                                            MissingWitnesses.getArrayRef());
+    } else {
+      diagnoseOrDefer(LocalMissing[0], true, InsertFixitCallback);
+    }
     clearGlobalMissingWitnesses();
     return;
   }
@@ -4874,6 +4894,15 @@ void ConformanceChecker::checkConformance(MissingWitnessDiagnosisKind Kind) {
 
   // FIXME: Caller checks that this type conforms to all of the
   // inherited protocols.
+
+  // Emit known diags for this conformance.
+  emitDelayedDiags();
+
+  // If delayed diags have already complained, return.
+  if (AlreadyComplained) {
+    Conformance->setInvalid();
+    return;
+  }
 
   // Resolve all of the type witnesses.
   resolveTypeWitnesses();
