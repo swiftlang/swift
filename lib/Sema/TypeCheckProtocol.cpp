@@ -1328,7 +1328,7 @@ WitnessChecker::lookupValueWitnesses(ValueDecl *req, bool *ignoringNames) {
   assert(!isa<AssociatedTypeDecl>(req) && "Not for lookup for type witnesses*");
   
   SmallVector<ValueDecl *, 4> witnesses;
-  if (req->getName().isOperator()) {
+  if (req->isOperator()) {
     // Operator lookup is always global.
     auto lookupOptions = defaultUnqualifiedLookupOptions;
     if (!DC->isCascadingContextForLookup(false))

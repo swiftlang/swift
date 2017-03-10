@@ -191,7 +191,7 @@ DescriptiveDeclKind Decl::getDescriptiveKind() const {
        return DescriptiveDeclKind::MaterializeForSet;
      }
 
-     if (!func->getName().empty() && func->getName().isOperator())
+     if (func->isOperator())
        return DescriptiveDeclKind::OperatorFunction;
 
      if (func->getDeclContext()->isLocalContext())

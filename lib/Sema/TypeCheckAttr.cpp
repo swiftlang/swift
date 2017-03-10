@@ -1060,7 +1060,7 @@ void AttributeChecker::checkOperatorAttribute(DeclAttribute *attr) {
 
   // Only functions with an operator identifier can be declared with as an
   // operator.
-  if (!FD->getName().isOperator()) {
+  if (!FD->isOperator()) {
     TC.diagnose(D->getStartLoc(), diag::attribute_requires_operator_identifier,
                 attr->getAttrName());
     attr->setInvalid();
