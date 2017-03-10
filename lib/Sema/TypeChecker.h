@@ -66,6 +66,10 @@ enum class DeclTypeCheckingSemantics {
   /// The withoutActuallyEscaping(_:do:) declaration, which makes a nonescaping
   /// closure temporarily escapable.
   WithoutActuallyEscaping,
+
+  /// The _openExistential(_:do:) declaration, which extracts the value inside
+  /// an existential and passes it as a value of its own dynamic type.
+  OpenExistential,
 };
 
 /// The result of name lookup.

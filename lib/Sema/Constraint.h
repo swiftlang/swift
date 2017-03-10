@@ -129,6 +129,9 @@ enum class ConstraintKind : char {
   /// \brief The first type is the same function type as the second type, but
   /// made @escaping.
   EscapableFunctionOf,
+  /// \brief The first type is an opened type from the second type (which is
+  /// an existential).
+  OpenedExistentialOf,
 };
 
 /// \brief Classification of the different kinds of constraints.
@@ -508,6 +511,7 @@ public:
 
     case ConstraintKind::DynamicTypeOf:
     case ConstraintKind::EscapableFunctionOf:
+    case ConstraintKind::OpenedExistentialOf:
     case ConstraintKind::Defaultable:
       return ConstraintClassification::TypeProperty;
 
