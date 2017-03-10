@@ -682,9 +682,12 @@ public:
   std::vector<DelayedConformanceDiag>
   takeDelayedConformanceDiags(NormalProtocolConformance *conformance);
 
+  /// Add delayed missing witnesses for the given normal protocol conformance.
   void addDelayedMissingWitnesses(NormalProtocolConformance *conformance,
                                   ArrayRef<ValueDecl*> witnesses);
 
+  /// Retrieve the delayed missing witnesses for the given normal protocol
+  /// conformance.
   std::vector<ValueDecl*>
   takeDelayedMissingWitnesses(NormalProtocolConformance *conformance);
 

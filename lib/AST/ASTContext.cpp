@@ -206,6 +206,9 @@ struct ASTContext::Implementation {
                  std::vector<ASTContext::DelayedConformanceDiag>>
     DelayedConformanceDiags;
 
+  /// Map from normal protocol conformances to missing witnesses that have
+  /// been delayed until the conformance is fully checked, so that we can
+  /// issue a fixit that fills the entire protocol stub.
   llvm::DenseMap<NormalProtocolConformance *, std::vector<ValueDecl*>>
     DelayedMissingWitnesses;
 

@@ -1949,6 +1949,7 @@ namespace {
     switch (conformance->getState()) {
       case ProtocolConformanceState::Incomplete:
         if (conformance->isInvalid()) {
+          // Revive registered missing witnesses to handle it below.
           revivedMissingWitnesses = TC.Context.
             takeDelayedMissingWitnesses(conformance);
         }
@@ -2725,6 +2726,8 @@ diagnoseMissingWitnesses(MissingWitnessDiagnosisKind Kind) {
   switch (Kind) {
   case MissingWitnessDiagnosisKind::ErrorFixIt: {
     if (SuppressDiagnostics) {
+      // If the diagnostics are suppressed, we register these misssing witnesses
+      // for later revisiting.
       Conformance->setInvalid();
       TC.Context.addDelayedMissingWitnesses(Conformance,
                                             MissingWitnesses.getArrayRef());
