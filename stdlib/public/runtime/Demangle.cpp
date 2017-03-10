@@ -10,18 +10,17 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "../../../lib/Demangling/OldDemangler.cpp"
-#include "../../../lib/Demangling/Demangler.cpp"
-#include "../../../lib/Demangling/NodePrinter.cpp"
-#include "../../../lib/Demangling/Context.cpp"
-#include "../../../lib/Demangling/ManglingUtils.cpp"
-#include "../../../lib/Demangling/Punycode.cpp"
 #include "swift/Runtime/Metadata.h"
+#include "swift/Strings.h"
 #include "Private.h"
+
+#include <vector>
 
 #if SWIFT_OBJC_INTEROP
 #include <objc/runtime.h>
 #endif
+
+using namespace swift;
 
 // FIXME: This stuff should be merged with the existing logic in
 // include/swift/Reflection/TypeRefBuilder.h as part of the rewrite
