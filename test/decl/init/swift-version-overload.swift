@@ -10,59 +10,59 @@
 class NonOptToOpt {
   @available(swift, obsoleted: 4.0)
   @available(*, deprecated, message: "not 4.0")
-  public init() {} // NEGATIVE-NOT: [[@LINE]]:{{.+}}error
+  public init() {} // NEGATIVE-NOT: :[[@LINE]]:{{.+}}error
 
   @available(swift 4.0)
   @available(*, deprecated, message: "yes 4.0")
-  public init?() {} // NEGATIVE-NOT: [[@LINE]]:{{.+}}error
+  public init?() {} // NEGATIVE-NOT: :[[@LINE]]:{{.+}}error
 }
 
 _ = NonOptToOpt()
-// CHECK-3: [[@LINE-1]]:{{.+}} not 4.0
-// CHECK-4: [[@LINE-2]]:{{.+}} yes 4.0
+// CHECK-3: :[[@LINE-1]]:{{.+}} not 4.0
+// CHECK-4: :[[@LINE-2]]:{{.+}} yes 4.0
 
 class NonOptToOptReversed {
   @available(swift 4.0)
   @available(*, deprecated, message: "yes 4.0")
-  public init?() {} // NEGATIVE-NOT: [[@LINE]]:{{.+}}error
+  public init?() {} // NEGATIVE-NOT: :[[@LINE]]:{{.+}}error
 
   @available(swift, obsoleted: 4.0)
   @available(*, deprecated, message: "not 4.0")
-  public init() {} // NEGATIVE-NOT: [[@LINE]]:{{.+}}error
+  public init() {} // NEGATIVE-NOT: :[[@LINE]]:{{.+}}error
 }
 
 _ = NonOptToOptReversed()
-// CHECK-3: [[@LINE-1]]:{{.+}} not 4.0
-// CHECK-4: [[@LINE-2]]:{{.+}} yes 4.0
+// CHECK-3: :[[@LINE-1]]:{{.+}} not 4.0
+// CHECK-4: :[[@LINE-2]]:{{.+}} yes 4.0
 
 
 class OptToNonOpt {
   @available(swift, obsoleted: 4.0)
   @available(*, deprecated, message: "not 4.0")
-  public init!() {} // NEGATIVE-NOT: [[@LINE]]:{{.+}}error
+  public init!() {} // NEGATIVE-NOT: :[[@LINE]]:{{.+}}error
 
   @available(swift 4.0)
   @available(*, deprecated, message: "yes 4.0")
-  public init() {} // NEGATIVE-NOT: [[@LINE]]:{{.+}}error
+  public init() {} // NEGATIVE-NOT: :[[@LINE]]:{{.+}}error
 }
 
 _ = OptToNonOpt()
-// CHECK-3: [[@LINE-1]]:{{.+}} not 4.0
-// CHECK-4: [[@LINE-2]]:{{.+}} yes 4.0
+// CHECK-3: :[[@LINE-1]]:{{.+}} not 4.0
+// CHECK-4: :[[@LINE-2]]:{{.+}} yes 4.0
 
 class OptToNonOptReversed {
   @available(swift 4.0)
   @available(*, deprecated, message: "yes 4.0")
-  public init() {} // NEGATIVE-NOT: [[@LINE]]:{{.+}}error
+  public init() {} // NEGATIVE-NOT: :[[@LINE]]:{{.+}}error
 
   @available(swift, obsoleted: 4.0)
   @available(*, deprecated, message: "not 4.0")
-  public init!() {} // NEGATIVE-NOT: [[@LINE]]:{{.+}}error
+  public init!() {} // NEGATIVE-NOT: :[[@LINE]]:{{.+}}error
 }
 
 _ = OptToNonOptReversed()
-// CHECK-3: [[@LINE-1]]:{{.+}} not 4.0
-// CHECK-4: [[@LINE-2]]:{{.+}} yes 4.0
+// CHECK-3: :[[@LINE-1]]:{{.+}} not 4.0
+// CHECK-4: :[[@LINE-2]]:{{.+}} yes 4.0
 
 
 class NoChange {
@@ -72,7 +72,7 @@ class NoChange {
 
   @available(swift 4.0)
   @available(*, deprecated, message: "yes 4.0")
-  public init() {} // CHECK: [[@LINE]]:{{.+}} error: invalid redeclaration of 'init()'
+  public init() {} // CHECK: :[[@LINE]]:{{.+}} error: invalid redeclaration of 'init()'
 }
 
 class NoChangeReversed {
@@ -82,7 +82,7 @@ class NoChangeReversed {
 
   @available(swift, obsoleted: 4.0)
   @available(*, deprecated, message: "not 4.0")
-  public init() {} // CHECK: [[@LINE]]:{{.+}} error: invalid redeclaration of 'init()'
+  public init() {} // CHECK: :[[@LINE]]:{{.+}} error: invalid redeclaration of 'init()'
 }
 
 class OptToOpt {
@@ -92,7 +92,7 @@ class OptToOpt {
 
   @available(swift 4.0)
   @available(*, deprecated, message: "yes 4.0")
-  public init?() {} // CHECK: [[@LINE]]:{{.+}} error: invalid redeclaration of 'init()'
+  public init?() {} // CHECK: :[[@LINE]]:{{.+}} error: invalid redeclaration of 'init()'
 }
 
 class OptToOptReversed {
@@ -102,7 +102,7 @@ class OptToOptReversed {
 
   @available(swift, obsoleted: 4.0)
   @available(*, deprecated, message: "not 4.0")
-  public init!() {} // CHECK: [[@LINE]]:{{.+}} error: invalid redeclaration of 'init()'
+  public init!() {} // CHECK: :[[@LINE]]:{{.+}} error: invalid redeclaration of 'init()'
 }
 
 class ThreeWayA {
@@ -238,56 +238,100 @@ class OverlappingVersions {
 class NonThrowingToThrowing {
   @available(swift, obsoleted: 4.0)
   @available(*, deprecated, message: "not 4.0")
-  public init() {} // NEGATIVE-NOT: [[@LINE]]:{{.+}}error
+  public init() {} // NEGATIVE-NOT: :[[@LINE]]:{{.+}}error
 
   @available(swift 4.0)
   @available(*, deprecated, message: "yes 4.0")
-  public init() throws {} // NEGATIVE-NOT: [[@LINE]]:{{.+}}error
+  public init() throws {} // NEGATIVE-NOT: :[[@LINE]]:{{.+}}error
+
+  @available(swift, obsoleted: 4.0)
+  @available(*, deprecated, message: "not 4.0")
+  public static func foo() {} // NEGATIVE-NOT: :[[@LINE]]:{{.+}}error
+
+  @available(swift 4.0)
+  @available(*, deprecated, message: "yes 4.0")
+  public static func foo() throws {} // NEGATIVE-NOT: :[[@LINE]]:{{.+}}error
 }
 
 _ = NonThrowingToThrowing()
-// CHECK-3: [[@LINE-1]]:{{.+}} not 4.0
-// CHECK-4: [[@LINE-2]]:{{.+}} yes 4.0
+// CHECK-3: :[[@LINE-1]]:{{.+}} not 4.0
+// CHECK-4: :[[@LINE-2]]:{{.+}} yes 4.0
+_ = NonThrowingToThrowing.foo()
+// CHECK-3: :[[@LINE-1]]:{{.+}} not 4.0
+// CHECK-4: :[[@LINE-2]]:{{.+}} yes 4.0
 
 class NonThrowingToThrowingReversed {
   @available(swift 4.0)
   @available(*, deprecated, message: "yes 4.0")
-  public init() throws {} // NEGATIVE-NOT: [[@LINE]]:{{.+}}error
+  public init() throws {} // NEGATIVE-NOT: :[[@LINE]]:{{.+}}error
 
   @available(swift, obsoleted: 4.0)
   @available(*, deprecated, message: "not 4.0")
-  public init() {} // NEGATIVE-NOT: [[@LINE]]:{{.+}}error
+  public init() {} // NEGATIVE-NOT: :[[@LINE]]:{{.+}}error
+
+  @available(swift 4.0)
+  @available(*, deprecated, message: "yes 4.0")
+  public static func foo() throws {} // NEGATIVE-NOT: :[[@LINE]]:{{.+}}error
+
+  @available(swift, obsoleted: 4.0)
+  @available(*, deprecated, message: "not 4.0")
+  public static func foo() {} // NEGATIVE-NOT: :[[@LINE]]:{{.+}}error
 }
 
 _ = NonThrowingToThrowingReversed()
-// CHECK-3: [[@LINE-1]]:{{.+}} not 4.0
-// CHECK-4: [[@LINE-2]]:{{.+}} yes 4.0
+// CHECK-3: :[[@LINE-1]]:{{.+}} not 4.0
+// CHECK-4: :[[@LINE-2]]:{{.+}} yes 4.0
+_ = NonThrowingToThrowingReversed.foo()
+// CHECK-3: :[[@LINE-1]]:{{.+}} not 4.0
+// CHECK-4: :[[@LINE-2]]:{{.+}} yes 4.0
 
 
 class ThrowingToNonThrowing {
   @available(swift, obsoleted: 4.0)
   @available(*, deprecated, message: "not 4.0")
-  public init() throws {} // NEGATIVE-NOT: [[@LINE]]:{{.+}}error
+  public init() throws {} // NEGATIVE-NOT: :[[@LINE]]:{{.+}}error
 
   @available(swift 4.0)
   @available(*, deprecated, message: "yes 4.0")
-  public init() {} // NEGATIVE-NOT: [[@LINE]]:{{.+}}error
+  public init() {} // NEGATIVE-NOT: :[[@LINE]]:{{.+}}error
+
+  @available(swift, obsoleted: 4.0)
+  @available(*, deprecated, message: "not 4.0")
+  public static func foo() throws {} // NEGATIVE-NOT: :[[@LINE]]:{{.+}}error
+
+  @available(swift 4.0)
+  @available(*, deprecated, message: "yes 4.0")
+  public static func foo() {} // NEGATIVE-NOT: :[[@LINE]]:{{.+}}error
 }
 
 _ = ThrowingToNonThrowing()
-// CHECK-3: [[@LINE-1]]:{{.+}} not 4.0
-// CHECK-4: [[@LINE-2]]:{{.+}} yes 4.0
+// CHECK-3: :[[@LINE-1]]:{{.+}} not 4.0
+// CHECK-4: :[[@LINE-2]]:{{.+}} yes 4.0
+_ = ThrowingToNonThrowing.foo()
+// CHECK-3: :[[@LINE-1]]:{{.+}} not 4.0
+// CHECK-4: :[[@LINE-2]]:{{.+}} yes 4.0
 
 class ThrowingToNonThrowingReversed {
   @available(swift 4.0)
   @available(*, deprecated, message: "yes 4.0")
-  public init() {} // NEGATIVE-NOT: [[@LINE]]:{{.+}}error
+  public init() {} // NEGATIVE-NOT: :[[@LINE]]:{{.+}}error
 
   @available(swift, obsoleted: 4.0)
   @available(*, deprecated, message: "not 4.0")
-  public init() throws {} // NEGATIVE-NOT: [[@LINE]]:{{.+}}error
+  public init() throws {} // NEGATIVE-NOT: :[[@LINE]]:{{.+}}error
+
+  @available(swift 4.0)
+  @available(*, deprecated, message: "yes 4.0")
+  public static func foo() {} // NEGATIVE-NOT: :[[@LINE]]:{{.+}}error
+
+  @available(swift, obsoleted: 4.0)
+  @available(*, deprecated, message: "not 4.0")
+  public static func foo() throws {} // NEGATIVE-NOT: :[[@LINE]]:{{.+}}error
 }
 
 _ = ThrowingToNonThrowingReversed()
-// CHECK-3: [[@LINE-1]]:{{.+}} not 4.0
-// CHECK-4: [[@LINE-2]]:{{.+}} yes 4.0
+// CHECK-3: :[[@LINE-1]]:{{.+}} not 4.0
+// CHECK-4: :[[@LINE-2]]:{{.+}} yes 4.0
+_ = ThrowingToNonThrowingReversed.foo()
+// CHECK-3: :[[@LINE-1]]:{{.+}} not 4.0
+// CHECK-4: :[[@LINE-2]]:{{.+}} yes 4.0

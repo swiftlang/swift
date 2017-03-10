@@ -953,21 +953,35 @@ static void checkRedeclaration(TypeChecker &tc, ValueDecl *current) {
           continue;
       }
 
-      // If the conflicting declarations are initializers with different
-      // failability, but they have non-overlapping availability, let them go.
-      if (auto *currentInit = dyn_cast<ConstructorDecl>(current)) {
-        auto *otherInit = cast<ConstructorDecl>(other);
-        if (((currentInit->getFailability() == OTK_None) ^
-             (otherInit->getFailability() == OTK_None)) ||
-            (currentInit->hasThrows() != otherInit->hasThrows())) {
+      // If the conflicting declarations have non-overlapping availability and
+      // - one throws and the other does not,
+      // - or they are initializers with different failability
+      // let them go.
+      bool isAcceptableVersionBasedChange = false;
+      {
+        const auto *currentInit = dyn_cast<ConstructorDecl>(current);
+        const auto *otherInit = dyn_cast<ConstructorDecl>(other);
+        if (currentInit && otherInit &&
+            ((currentInit->getFailability() == OTK_None) !=
+             (otherInit->getFailability() == OTK_None))) {
+          isAcceptableVersionBasedChange = true;
+        }
+      }
+      {
+        const auto *currentAFD = dyn_cast<AbstractFunctionDecl>(current);
+        const auto *otherAFD = dyn_cast<AbstractFunctionDecl>(other);
+        if (currentAFD && otherAFD &&
+            currentAFD->hasThrows() != otherAFD->hasThrows()) {
+          isAcceptableVersionBasedChange = true;
+        }
+      }
+      if (isAcceptableVersionBasedChange) {
+        class AvailabilityRange {
+          Optional<clang::VersionTuple> introduced;
+          Optional<clang::VersionTuple> obsoleted;
 
-          struct AvailabilityRange {
-            Optional<clang::VersionTuple> introduced;
-            Optional<clang::VersionTuple> obsoleted;
-          };
-
-          auto findSwiftAvailability =
-              [](const ValueDecl *VD) -> AvailabilityRange {
+        public:
+          static AvailabilityRange from(const ValueDecl *VD) {
             AvailabilityRange result;
             for (auto *attr : VD->getAttrs().getAttributes<AvailableAttr>()) {
               if (attr->PlatformAgnostic ==
@@ -979,19 +993,25 @@ static void checkRedeclaration(TypeChecker &tc, ValueDecl *current) {
               }
             }
             return result;
-          };
+          }
 
-          AvailabilityRange currentAvail = findSwiftAvailability(current);
-          AvailabilityRange otherAvail = findSwiftAvailability(other);
-          if (currentAvail.introduced && otherAvail.obsoleted &&
-              *currentAvail.introduced >= *otherAvail.obsoleted) {
-            continue;
+          bool fullyPrecedes(const AvailabilityRange &other) const {
+            if (!obsoleted.hasValue())
+              return false;
+            if (!other.introduced.hasValue())
+              return false;
+            return *obsoleted <= *other.introduced;
           }
-          if (otherAvail.introduced && currentAvail.obsoleted &&
-              *otherAvail.introduced >= *currentAvail.obsoleted) {
-            continue;
+
+          bool overlaps(const AvailabilityRange &other) const {
+            return !fullyPrecedes(other) && !other.fullyPrecedes(*this);
           }
-        }
+        };
+
+        auto currentAvail = AvailabilityRange::from(current);
+        auto otherAvail = AvailabilityRange::from(other);
+        if (!currentAvail.overlaps(otherAvail))
+          continue;
       }
 
       tc.diagnose(current, diag::invalid_redecl, current->getFullName());
