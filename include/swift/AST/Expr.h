@@ -1031,9 +1031,14 @@ public:
       
     case ExprKind::Paren:
       return true;
+    
+    case ExprKind::Tuple:
+      // This can occur with certain kinds of invalid code. We'll just 
+      // treat it as a parenthesized expression.
+      return true;
       
     default:
-      llvm_unreachable("Interpolated string literal segment is not of a known kind!");
+      llvm_unreachable(("Interpolated string literal segment is of unexpected kind " + Expr::getKindName(segmentExpr->getKind()).str()).c_str());
     }
   }
   
