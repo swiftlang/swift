@@ -884,3 +884,64 @@ llvm::Value *irgen::emitLoadOfExtraInhabitantCount(IRGenFunction &IGF,
   return IGF.Builder.CreateAnd(xiFlags, mask,
                                xiFlags->getName() + ".extraInhabitantCount");
 }
+
+std::pair<llvm::Value *, llvm::Value *>
+irgen::emitLoadOfIsInline(IRGenFunction &IGF, llvm::Value *metadata) {
+  auto *flags =
+      emitLoadOfValueWitnessFromMetadata(IGF, metadata, ValueWitness::Flags);
+  auto mask = IGF.IGM.getSize(Size(ValueWitnessFlags::IsNonInline));
+  auto masked = IGF.Builder.CreateAnd(flags, mask);
+  return std::make_pair(
+      IGF.Builder.CreateICmpEQ(masked, IGF.IGM.getSize(Size(0)),
+                               flags->getName() + ".isInline"),
+      flags);
+}
+
+llvm::Value *irgen::emitLoadOfSize(IRGenFunction &IGF, llvm::Value *metadata) {
+  auto *size =
+      emitLoadOfValueWitnessFromMetadata(IGF, metadata, ValueWitness::Size);
+  return size;
+}
+
+llvm::Value *irgen::emitAlignMaskFromFlags(IRGenFunction &IGF,
+                                           llvm::Value *flags) {
+  auto *alignMask = IGF.IGM.getSize(Size(ValueWitnessFlags::AlignmentMask));
+  return IGF.Builder.CreateAnd(flags, alignMask,
+                               flags->getName() + ".alignmentMask");
+}
+
+llvm::Value *irgen::emitInitializeWithCopyCall(IRGenFunction &IGF,
+                                               llvm::Value *metadata,
+                                               Address dest, Address src) {
+  llvm::Value *copyFn = emitLoadOfValueWitnessFromMetadata(
+      IGF, metadata, ValueWitness::InitializeWithCopy);
+  llvm::CallInst *call = IGF.Builder.CreateCall(
+      copyFn, {dest.getAddress(), src.getAddress(), metadata});
+  call->setCallingConv(IGF.IGM.DefaultCC);
+  call->setDoesNotThrow();
+
+  return call;
+}
+
+llvm::Value *irgen::emitInitializeWithTakeCall(IRGenFunction &IGF,
+                                               llvm::Value *metadata,
+                                               Address dest, Address src) {
+  llvm::Value *copyFn = emitLoadOfValueWitnessFromMetadata(
+      IGF, metadata, ValueWitness::InitializeWithTake);
+  llvm::CallInst *call = IGF.Builder.CreateCall(
+      copyFn, {dest.getAddress(), src.getAddress(), metadata});
+  call->setCallingConv(IGF.IGM.DefaultCC);
+  call->setDoesNotThrow();
+
+  return call;
+}
+
+void irgen::emitDestroyCall(IRGenFunction &IGF, llvm::Value *metadata,
+                            Address object) {
+  llvm::Value *fn =
+      emitLoadOfValueWitnessFromMetadata(IGF, metadata, ValueWitness::Destroy);
+  llvm::CallInst *call =
+      IGF.Builder.CreateCall(fn, {object.getAddress(), metadata});
+  call->setCallingConv(IGF.IGM.DefaultCC);
+  setHelperAttributes(call);
+}
