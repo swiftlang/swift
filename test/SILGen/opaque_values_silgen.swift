@@ -359,6 +359,30 @@ func s220_____openExistBox(_ x: Error) -> String {
 // CHECK: bb6:
 // CHECK:   return %{{.*}} : $()
 // CHECK-LABEL: } // end sil function '_T020opaque_values_silgen21s230______condFromAnyyypF'
+func s230______condFromAny(_ x: Any) {
+  if let f = x as? (Int, (Int, (Int, Int)), Int) -> (Int, (Int, (Int, Int)), Int) {
+    _ = f(24, (4,(2, 42)), 42)
+  }
+}
+
+// Tests conditional value casts and correspondingly generated reabstraction thunk, with <T> types
+// ---
+// CHECK-LABEL: sil hidden @_T020opaque_values_silgen21s240_____condTFromAnyyyp_xtlF : $@convention(thin) <T> (@in Any, @in T) -> () {
+// CHECK: bb0([[ARG0:%.*]] : $Any, [[ARG1:%.*]] : $T):
+// CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG0]]
+// CHECK:   [[COPY__ARG:%.*]] = copy_value [[BORROWED_ARG]]
+// CHECK:   checked_cast_value_br [[COPY__ARG]] : $Any to $@callee_owned (@in (Int, T)) -> @out (Int, T), bb2, bb1
+// CHECK: bb2([[THUNK_PARAM:%.*]] : $@callee_owned (@in (Int, T)) -> @out (Int, T)):
+// CHECK:   [[THUNK_REF:%.*]] = function_ref @{{.*}} : $@convention(thin) <τ_0_0> (Int, @in τ_0_0, @owned @callee_owned (@in (Int, τ_0_0)) -> @out (Int, τ_0_0)) -> (Int, @out τ_0_0)
+// CHECK:   partial_apply [[THUNK_REF]]<T>([[THUNK_PARAM]])
+// CHECK: bb6:
+// CHECK:   return %{{.*}} : $()
+// CHECK-LABEL: } // end sil function '_T020opaque_values_silgen21s240_____condTFromAnyyyp_xtlF'
+func s240_____condTFromAny<T>(_ x: Any, _ y: T) {
+  if let f = x as? (Int, T) -> (Int, T) {
+    f(42, y)
+  }
+}
 // CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @{{.*}} : $@convention(thin) (Int, Int, Int, Int, Int, @owned @callee_owned (@in (Int, (Int, (Int, Int)), Int)) -> @out (Int, (Int, (Int, Int)), Int)) -> (Int, Int, Int, Int, Int)
 // CHECK: bb0([[ARG0:%.*]] : $Int, [[ARG1:%.*]] : $Int, [[ARG2:%.*]] : $Int, [[ARG3:%.*]] : $Int, [[ARG4:%.*]] : $Int, [[ARG5:%.*]] : $@callee_owned (@in (Int, (Int, (Int, Int)), Int)) -> @out (Int, (Int, (Int, Int)), Int)):
 // CHECK:   [[TUPLE_TO_APPLY0:%.*]] = tuple ([[ARG2]] : $Int, [[ARG3]] : $Int)
@@ -375,11 +399,21 @@ func s220_____openExistBox(_ x: Error) -> String {
 // CHECK:   [[RET_VAL_TUPLE:%.*]] = tuple ([[RET_VAL0]] : $Int, [[RET_VAL1]] : $Int, [[RET_VAL2]] : $Int, [[RET_VAL3]] : $Int, [[RET_VAL4]] : $Int)
 // CHECK:   return [[RET_VAL_TUPLE]] : $(Int, Int, Int, Int, Int)
 // CHECK-LABEL: } // end sil function '{{.*}}'
-func s230______condFromAny(_ x: Any) {
-  if let f = x as? (Int, (Int, (Int, Int)), Int) -> (Int, (Int, (Int, Int)), Int) {
-    _ = f(24, (4,(2, 42)), 42)
-  }
-}
+
+// CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @{{.*}} : $@convention(thin) <T> (Int, @in T, @owned @callee_owned (@in (Int, T)) -> @out (Int, T)) -> (Int, @out T) {
+// CHECK: bb0([[ARG0:%.*]] : $Int, [[ARG1:%.*]] : $T, [[ARG2:%.*]] : $@callee_owned (@in (Int, T)) -> @out (Int, T)):
+// CHECK:   [[TUPLE_TO_APPLY:%.*]] = tuple ([[ARG0]] : $Int, [[ARG1]] : $T)
+// CHECK:   [[TUPLE_APPLY:%.*]] = apply [[ARG2]]([[TUPLE_TO_APPLY]]) : $@callee_owned (@in (Int, T)) -> @out (Int, T)
+// CHECK:   [[TUPLE_BORROW:%.*]] = begin_borrow [[TUPLE_APPLY]] : $(Int, T)
+// CHECK:   [[RET_VAL0:%.*]] = tuple_extract [[TUPLE_BORROW]] : $(Int, T), 0
+// CHECK:   [[TUPLE_EXTRACT:%.*]] = tuple_extract [[TUPLE_BORROW]] : $(Int, T), 1
+// CHECK:   [[RET_VAL1:%.*]] = copy_value [[TUPLE_EXTRACT]] : $T
+// CHECK:   end_borrow [[TUPLE_BORROW]] from [[TUPLE_APPLY]] : $(Int, T), $(Int, T)
+// CHECK:   destroy_value [[TUPLE_APPLY]] : $(Int, T)
+// CHECK:   [[RET_VAL_TUPLE:%.*]] = tuple ([[RET_VAL0]] : $Int, [[RET_VAL1]] : $T)
+// CHECK:   return [[RET_VAL_TUPLE]] : $(Int, T)
+// CHECK-LABEL: } // end sil function '{{.*}}'
+
 
 // Tests LogicalPathComponent's writeback for opaque value types
 // ---

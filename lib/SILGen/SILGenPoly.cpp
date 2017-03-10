@@ -2213,7 +2213,7 @@ void ResultPlanner::planTupleFromDirectResult(AbstractionPattern innerOrigType,
     planScalarIntoDirectResult(
         newInnerOrigType, innerSubstType.getElementType(eltIndex),
         newOuterOrigType, outerSubstTupleType.getElementType(eltIndex),
-        planData, outerResult.first, eltResult);
+        planData, eltResult, outerResult.first);
   }
 }
 

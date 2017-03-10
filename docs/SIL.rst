@@ -4492,8 +4492,8 @@ unconditional_checked_cast_value
   sil-instruction ::= 'unconditional_checked_cast_value' sil-operand 'to' sil-type
 
   %1 = unconditional_checked_cast_value %0 : $A to $B
-  // $A must be not be an address
-  // $B must be an opaque value
+  // $A must not be an address
+  // $B must not be an address
   // %1 will be of type $B
 
 Performs a checked conversion, causing a runtime failure if the
