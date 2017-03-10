@@ -67,35 +67,26 @@ void ConcreteDeclRef::dump(raw_ostream &os) {
   // If specialized, dump the substitutions.
   if (isSpecialized()) {
     os << " [with ";
-    bool isFirst = true;
-    for (const auto &sub : getSubstitutions()) {
-      if (isFirst) {
-        isFirst = false;
-      } else {
-        os << ", ";
-      }
+    interleave(getSubstitutions(),
+               [&](const Substitution &sub) {
+                 os << sub.getReplacement().getString();
 
-      os << sub.getReplacement().getString();
-
-      if (sub.getConformances().size()) {
-        os << '[';
-        bool isFirst = true;
-        for (auto &c : sub.getConformances()) {
-          if (isFirst) {
-            isFirst = false;
-          } else {
-            os << ", ";
-          }
-
-          if (c.isConcrete()) {
-            c.getConcrete()->printName(os);
-          } else {
-            os << "abstract:" << c.getAbstract()->getName();
-          }
-        }
-        os << ']';
-      }
-    }
+                 if (sub.getConformances().size()) {
+                   os << '[';
+                   interleave(sub.getConformances(),
+                              [&](ProtocolConformanceRef c) {
+                                if (c.isConcrete()) {
+                                  c.getConcrete()->printName(os);
+                                } else {
+                                  os << "abstract:"
+                                     << c.getAbstract()->getName();
+                                }
+                              },
+                              [&] { os << ", "; });
+                   os << ']';
+                 }
+               },
+               [&] { os << ", "; });
     os << ']';
   }
 }

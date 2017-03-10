@@ -781,19 +781,15 @@ swift::decomposeParamType(Type type, const ValueDecl *paramOwner,
 std::string swift::getParamListAsString(ArrayRef<CallArgParam> params) {
   std::string result = "(";
 
-  bool isFirst = true;
-  for (auto &param : params) {
-    if (isFirst)
-      isFirst = false;
-    else
-      result += ", ";
-
-    if (param.hasLabel())
-      result += param.Label.str();
-    else
-      result += "_";
-    result += ":";
-  }
+  interleave(params,
+             [&](const CallArgParam &param) {
+               if (param.hasLabel())
+                 result += param.Label.str();
+               else
+                 result += "_";
+               result += ":";
+             },
+             [&] { result += ", "; });
 
   result += ')';
   return result;

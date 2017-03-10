@@ -1301,26 +1301,25 @@ void PrintAST::printSingleDepthOfGenericSignature(
   if (printParams) {
     // Print the generic parameters.
     Printer << "<";
-    bool isFirstParam = true;
-    for (auto param : genericParams) {
-      if (isFirstParam)
-        isFirstParam = false;
-      else
-        Printer << ", ";
-
-      if (!subMap.empty()) {
-        if (auto argTy = substParam(param))
-          printType(argTy);
-        else
-          printType(param);
-      } else if (auto *GP = param->getDecl()) {
-        Printer.callPrintStructurePre(PrintStructureKind::GenericParameter, GP);
-        Printer.printName(GP->getName(), PrintNameContext::GenericParameter);
-        Printer.printStructurePost(PrintStructureKind::GenericParameter, GP);
-      } else {
-        printType(param);
-      }
-    }
+    interleave(genericParams,
+               [&](GenericTypeParamType *param) {
+                 if (!subMap.empty()) {
+                   if (auto argTy = substParam(param))
+                     printType(argTy);
+                   else
+                     printType(param);
+                 } else if (auto *GP = param->getDecl()) {
+                   Printer.callPrintStructurePre(
+                       PrintStructureKind::GenericParameter, GP);
+                   Printer.printName(GP->getName(),
+                                     PrintNameContext::GenericParameter);
+                   Printer.printStructurePost(
+                       PrintStructureKind::GenericParameter, GP);
+                 } else {
+                   printType(param);
+                 }
+               },
+               [&] { Printer << ", "; });
   }
 
   if (printRequirements) {
@@ -3255,14 +3254,7 @@ class TypePrinter : public TypeVisitor<TypePrinter> {
       return;
 
     Printer << "<";
-    bool First = true;
-    for (Type Arg : Args) {
-      if (First)
-        First = false;
-      else
-        Printer << ", ";
-      visit(Arg);
-    }
+    interleave(Args, [&](Type Arg) { visit(Arg); }, [&] { Printer << ", "; });
     Printer << ">";
   }
 
@@ -3947,14 +3939,8 @@ public:
     if (T->getProtocols().empty()) {
       Printer << "Any";
     } else {
-      bool First = true;
-      for (auto Proto : T->getProtocols()) {
-        if (First)
-          First = false;
-        else
-          Printer << " & ";
-        visit(Proto);
-      }
+      interleave(T->getProtocols(), [&](Type Proto) { visit(Proto); },
+                 [&] { Printer << " & "; });
     }
   }
 
