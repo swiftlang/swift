@@ -4483,16 +4483,23 @@ void IRGenSILFunction::visitInitExistentialAddrInst(swift::InitExistentialAddrIn
                                                 i->getFormalConcreteType(),
                                                 i->getLoweredConcreteType(),
                                                 i->getConformances());
+  auto srcType = i->getLoweredConcreteType();
+  auto &srcTI = getTypeInfo(srcType);
 
-  auto &srcTI = getTypeInfo(i->getLoweredConcreteType());
+  // Allocate a COW box for the value if neceesary.
+  if (getSILModule().getOptions().UseCOWExistentials) {
+    auto *genericEnv = CurSILFn->getGenericEnvironment();
+    setLoweredAddress(i, emitAllocateBoxedOpaqueExistentialBuffer(
+                             *this, destType, srcType, container, genericEnv));
+    return;
+  }
 
   // See if we can defer initialization of the buffer to a copy_addr into it.
   if (tryDeferFixedSizeBufferInitialization(*this, i, srcTI, buffer, ""))
     return;
   
   // Allocate in the destination fixed-size buffer.
-  Address address =
-    srcTI.allocateBuffer(*this, buffer, i->getLoweredConcreteType());  
+  Address address = srcTI.allocateBuffer(*this, buffer, srcType);
   setLoweredAddress(i, address);
 }
 
@@ -4528,6 +4535,14 @@ void IRGenSILFunction::visitInitExistentialRefInst(InitExistentialRefInst *i) {
 void IRGenSILFunction::visitDeinitExistentialAddrInst(
                                               swift::DeinitExistentialAddrInst *i) {
   Address container = getLoweredAddress(i->getOperand());
+
+  // Deallocate the COW box for the value if neceesary.
+  if (getSILModule().getOptions().UseCOWExistentials) {
+    emitDeallocateBoxedOpaqueExistentialBuffer(
+        *this, i->getOperand()->getType(), container);
+    return;
+  }
+
   emitOpaqueExistentialContainerDeinit(*this, container,
                                        i->getOperand()->getType());
 }
@@ -4543,6 +4558,17 @@ void IRGenSILFunction::visitOpenExistentialAddrInst(OpenExistentialAddrInst *i) 
 
   auto openedArchetype = cast<ArchetypeType>(
                            i->getType().getSwiftRValueType());
+
+  // Insert a copy of the boxed value for COW semantics if necessary.
+  if (getSILModule().getOptions().UseCOWExistentials) {
+    auto accessKind = i->getAccessKind();
+    Address object = emitOpaqueBoxedExistentialProjection(
+        *this, accessKind, base, baseTy, openedArchetype);
+
+    setLoweredAddress(i, object);
+    return;
+  }
+
   Address object = emitOpaqueExistentialProjection(*this, base, baseTy,
                                                    openedArchetype);
 
@@ -4709,7 +4735,12 @@ void IRGenSILFunction::visitCopyAddrInst(swift::CopyAddrInst *i) {
   Address src = getLoweredAddress(i->getSrc());
   // See whether we have a deferred fixed-size buffer initialization.
   auto &loweredDest = getLoweredValue(i->getDest());
+
   if (loweredDest.isUnallocatedAddressInBuffer()) {
+    // We should never have a deferred initialization with COW existentials.
+    assert(!getSILModule().getOptions().UseCOWExistentials &&
+           "Should never have an unallocated buffer and COW existentials");
+
     assert(i->isInitializationOfDest()
            && "need to initialize an unallocated buffer");
     Address cont = loweredDest.getContainerOfAddress();

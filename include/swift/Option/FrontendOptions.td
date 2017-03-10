@@ -260,6 +260,9 @@ def enable_experimental_property_behaviors :
   Flag<["-"], "enable-experimental-property-behaviors">,
   HelpText<"Enable experimental property behaviors">;
 
+def enable_cow_existentials : Flag<["-"], "enable-cow-existentials">,
+  HelpText<"Enable the copy-on-write existential implementation">;
+
 def disable_availability_checking : Flag<["-"],
   "disable-availability-checking">,
   HelpText<"Disable checking for potentially unavailable APIs">;

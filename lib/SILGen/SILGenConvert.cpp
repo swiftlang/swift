@@ -784,11 +784,20 @@ SILGenFunction::emitOpenExistential(
     }
 
     if (existentialValue.hasCleanup()) {
-      canConsume = true;
-      // Leave a cleanup to deinit the existential container.
-      enterDeinitExistentialCleanup(existentialValue.getValue(), CanType(),
-                                    ExistentialRepresentation::Opaque);
-      archetypeMV = emitManagedBufferWithCleanup(archetypeValue);
+      if (this->SGM.M.getOptions().UseCOWExistentials) {
+        // With CoW existentials we can't consume the boxed value inside of
+        // the existential. (We could only do so after a uniqueness check on
+        // the box holding the value).
+        canConsume = false;
+        enterDestroyCleanup(existentialValue.getValue());
+        archetypeMV = ManagedValue::forUnmanaged(archetypeValue);
+      } else {
+        canConsume = true;
+        // Leave a cleanup to deinit the existential container.
+        enterDeinitExistentialCleanup(existentialValue.getValue(), CanType(),
+                                      ExistentialRepresentation::Opaque);
+        archetypeMV = emitManagedBufferWithCleanup(archetypeValue);
+      }
     } else {
       canConsume = false;
       archetypeMV = ManagedValue::forUnmanaged(archetypeValue);

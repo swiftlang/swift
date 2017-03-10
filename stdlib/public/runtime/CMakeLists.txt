@@ -18,6 +18,11 @@ if(SWIFT_RUNTIME_ENABLE_LEAK_CHECKER)
   set(swift_runtime_leaks_sources Leaks.mm)
 endif()
 
+if(SWIFT_RUNTIME_ENABLE_COW_EXISTENTIALS)
+  list(APPEND swift_runtime_compile_flags
+    "-DSWIFT_RUNTIME_ENABLE_COW_EXISTENTIALS=1")
+endif()
+
 set(section_magic_compile_flags ${swift_runtime_compile_flags})
 
 list(APPEND swift_runtime_compile_flags
