@@ -2620,6 +2620,7 @@ printRequirementStub(ValueDecl *Requirement, DeclContext *Adopter,
     }
 
     PrintOptions Options = PrintOptions::printForDiagnostics();
+    Options.PrintDocumentationComments = false;
     Options.AccessibilityFilter = Accessibility::Private;
     Options.PrintAccessibility = false;
     Options.FunctionBody = [](const ValueDecl *VD) { return "<#code#>"; };
