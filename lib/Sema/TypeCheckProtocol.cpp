@@ -2726,7 +2726,7 @@ diagnoseMissingWitnesses(MissingWitnessDiagnosisKind Kind) {
   switch (Kind) {
   case MissingWitnessDiagnosisKind::ErrorFixIt: {
     if (SuppressDiagnostics) {
-      // If the diagnostics are suppressed, we register these misssing witnesses
+      // If the diagnostics are suppressed, we register these missing witnesses
       // for later revisiting.
       Conformance->setInvalid();
       TC.Context.addDelayedMissingWitnesses(Conformance,
@@ -4887,6 +4887,7 @@ void ConformanceChecker::checkConformance(MissingWitnessDiagnosisKind Kind) {
   // FIXME: Caller checks that this type conforms to all of the
   // inherited protocols.
 
+  // Emit known diags for this conformance.
   emitDelayedDiags();
 
   // If delayed diags have already complained, return.
