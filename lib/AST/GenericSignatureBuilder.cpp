@@ -1906,6 +1906,15 @@ bool GenericSignatureBuilder::addConformanceRequirement(PotentialArchetype *PAT,
                                Source, Visited))
     return true;
 
+  // Add any requirements in the where clause on the protocol.
+  if (auto WhereClause = Proto->getTrailingWhereClause()) {
+    for (auto &req : WhereClause->getRequirements()) {
+      auto innerSource = FloatingRequirementSource::viaProtocolRequirement(
+          Source, Proto, &req);
+      addRequirement(&req, innerSource, &protocolSubMap);
+    }
+  }
+
   // Add requirements for each of the associated types.
   for (auto Member : getProtocolMembers(Proto)) {
     if (auto AssocType = dyn_cast<AssociatedTypeDecl>(Member)) {
