@@ -180,7 +180,7 @@ FixedPoint.test("${Dst}(bitPattern:) from ${Src}(${bit_pattern})") {
 %     input = prepare_bit_pattern(bit_pattern, src_ty.bits, src_ty.is_signed)
     let input = get${Src}(${input})
 %     input = prepare_bit_pattern(input, src_ty.bits, False)
-    let output = get${Dst}(${Dst}(bitPattern: input))
+    let output = get${Dst}(${Dst}(bitPattern: input as ${Src}))
     let expected = get${Dst}(${prepare_bit_pattern(input, dst_ty.bits, dst_ty.is_signed)})
     expectEqual(expected, output)
   }
@@ -190,7 +190,7 @@ FixedPoint.test("${Dst}(bitPattern:) from ${Src}(${bit_pattern})") {
     let input = get${Src}(${input})
 
     // Pass a literal directly.
-    let literalOutput = get${Dst}(${Dst}(bitPattern: ${input}))
+    let literalOutput = get${Dst}(${Dst}(bitPattern: ${input} as ${Src}))
     let output = get${Dst}(${Dst}(bitPattern: input))
 
 %     input = prepare_bit_pattern(input, src_ty.bits, False)

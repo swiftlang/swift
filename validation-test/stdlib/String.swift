@@ -1251,9 +1251,9 @@ internal func decodeCString<
   C : UnicodeCodec
 >(_ s: String, as codec: C.Type)
 -> (result: String, repairsMade: Bool)?
-where C.CodeUnit : UnsignedInteger {
+where C.CodeUnit : FixedWidthInteger {
   let units = s.unicodeScalars.map({ $0.value }) + [0]
-  return units.map({ C.CodeUnit(numericCast($0)) }).withUnsafeBufferPointer {
+  return units.map({ C.CodeUnit($0) }).withUnsafeBufferPointer {
     String.decodeCString($0.baseAddress, as: C.self)
   }
 }

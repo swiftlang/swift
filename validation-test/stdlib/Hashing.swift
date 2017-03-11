@@ -25,7 +25,7 @@ HashingTestSuite.test("_mixUInt32/GoldenValues") {
 }
 
 HashingTestSuite.test("_mixInt32/GoldenValues") {
-  expectEqual(Int32(bitPattern: 0x11b882c9), _mixInt32(0x0))
+  expectEqual(Int32(bitPattern: 0x11b882c9 as UInt32), _mixInt32(0x0))
 }
 
 HashingTestSuite.test("_mixUInt64/GoldenValues") {
@@ -47,7 +47,7 @@ HashingTestSuite.test("_mixUInt64/GoldenValues") {
 }
 
 HashingTestSuite.test("_mixUInt64/GoldenValues") {
-  expectEqual(Int64(bitPattern: 0xb2b2_4f68_8dc4_164d), _mixInt64(0x0))
+  expectEqual(Int64(bitPattern: 0xb2b2_4f68_8dc4_164d as UInt64), _mixInt64(0x0))
 }
 
 HashingTestSuite.test("_mixUInt/GoldenValues") {
@@ -62,9 +62,9 @@ HashingTestSuite.test("_mixUInt/GoldenValues") {
 
 HashingTestSuite.test("_mixInt/GoldenValues") {
 #if arch(i386) || arch(arm)
-  expectEqual(Int(bitPattern: 0x11b8_82c9), _mixInt(0x0))
+  expectEqual(Int(bitPattern: 0x11b8_82c9 as UInt), _mixInt(0x0))
 #elseif arch(x86_64) || arch(arm64) || arch(powerpc64) || arch(powerpc64le) || arch(s390x)
-  expectEqual(Int(bitPattern: 0xb2b2_4f68_8dc4_164d), _mixInt(0x0))
+  expectEqual(Int(bitPattern: 0xb2b2_4f68_8dc4_164d as UInt), _mixInt(0x0))
 #else
   fatalError("unimplemented")
 #endif
@@ -95,7 +95,7 @@ HashingTestSuite.test("String/hashValue/topBitsSet") {
   // of NSString.hash into an int in the runtime.
 
   // This is the bit pattern that we xor to NSString's hash value.
-  let hashOffset = UInt(bitPattern: 0x429b_1266_0000_0000)
+  let hashOffset = UInt(bitPattern: 0x429b_1266_0000_0000 as Int)
   let hash = "efghijkl".hashValue
   // When we are not equal to the top bit of the xor'ed hashOffset pattern
   // there where some bits set.

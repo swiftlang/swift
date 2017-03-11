@@ -8,6 +8,8 @@
 // RUN: %S/../../utils/line-directive %t/FixedPointConversion.swift -- %target-run %t/a.out_Release
 // REQUIRES: executable_test
 
+// FIXME(integers): add tests that perform the same checks in generic code
+
 %{
 import gyb
 }%

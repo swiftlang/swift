@@ -2,14 +2,14 @@
 // REQUIRES: OS=macosx
 // REQUIRES: asserts
 
-class C0<T:Integer> {
+class C0<T:FixedWidthInteger> {
     func foo() {
         return
     }
 }
 
 %for i in range(1, int(N)):
-class C${i}<T:Integer> {
+class C${i}<T:FixedWidthInteger> {
     func foo() {
         let c : C${i-1}<T> = C${i-1}()
         c.foo()
