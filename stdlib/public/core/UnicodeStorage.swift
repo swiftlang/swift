@@ -499,9 +499,6 @@ extension UnicodeStorage {
       defer { __swift_stdlib_ubrk_close(bi) }
 
       return storage._withUText { u in
-        // let access
-        _ = u[0].pFuncs[0].access(u, storage.codeUnits.offset(of: i)^, 1)
-        // _debugLog("access result:", access)
         // _debugLog("ubrk_setUText(breakIterator: \(bi), u: \(u)")
         // _debugLog("u: \(u.pointee)")
         __swift_stdlib_ubrk_setUText(bi, u, &err)
