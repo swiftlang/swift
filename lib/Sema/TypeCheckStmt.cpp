@@ -212,8 +212,9 @@ removedHandledEnumElements(Pattern *P,
   return false;
 };
 
-void swift::diagnoseMissingCases(ASTContext &Context, const SwitchStmt *SwitchS,
-                                 bool Empty) {
+void swift::
+diagnoseMissingCases(ASTContext &Context, const SwitchStmt *SwitchS) {
+  bool Empty = SwitchS->getCases().empty();
   SourceLoc StartLoc = SwitchS->getStartLoc();
   SourceLoc EndLoc = SwitchS->getEndLoc();
   StringRef Placeholder = getCodePlaceholder();
@@ -984,7 +985,7 @@ public:
 
     // Reject switch statements with empty blocks.
     if (S->getCases().empty())
-      diagnoseMissingCases(TC.Context, S, /*Empty*/true);
+      diagnoseMissingCases(TC.Context, S);
     for (unsigned i = 0, e = S->getCases().size(); i < e; ++i) {
       auto *caseBlock = S->getCases()[i];
       // Fallthrough transfers control to the next case block. In the

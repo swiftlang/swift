@@ -84,8 +84,7 @@ static void diagnoseUnreachable(const SILInstruction *I,
 
     // A non-exhaustive switch would also produce an unreachable instruction.
     if (L.isASTNode<SwitchStmt>()) {
-      diagnoseMissingCases(Context, L.getAsASTNode<SwitchStmt>(),
-                           /*Empty*/false);
+      diagnoseMissingCases(Context, L.getAsASTNode<SwitchStmt>());
       return;
     }
 
