@@ -4134,7 +4134,6 @@ namespace {
               uncurryLevel == 0);
     }
 
-    /// Emit the fully-formed call.
     RValue apply(SGFContext C = SGFContext()) {
       assert(!applied && "already applied!");
 
@@ -4427,61 +4426,28 @@ namespace {
       // End the initial writeback scope.
       InitialWritebackScope.pop();
 
-      // If there are remaining call sites, apply them to the result function.
-      // Each chained call gets its own writeback scope.
-      for (unsigned i = 0, size = extraSites.size(); i < size; ++i) {
-        FormalEvaluationScope writebackScope(gen);
-
-        SILLocation loc = extraSites[i].Loc;
-
-        auto functionMV = std::move(result).getAsSingleValue(gen, loc);
-
-        auto substFnType = functionMV.getType().castTo<SILFunctionType>();
-        ParamLowering paramLowering(substFnType, gen);
-
-        SmallVector<ManagedValue, 4> siteArgs;
-        SmallVector<InOutArgument, 2> inoutArgs;
-
-        // TODO: foreign errors for block or function pointer values?
-        assert(substFnType->hasErrorResult() ||
-               !cast<FunctionType>(formalType)->getExtInfo().throws());
-        foreignError = None;
-
-        // The result function has already been reabstracted to the substituted
-        // type, so use the substituted formal type as the abstraction pattern
-        // for argument passing now.
-        AbstractionPattern origResultType(formalType.getResult());
-        AbstractionPattern origParamType(claimNextParamClause(formalType));
-        std::move(extraSites[i]).emit(gen, origParamType, paramLowering,
-                                      siteArgs, inoutArgs, foreignError,
-                                      foreignSelf);
-        if (!inoutArgs.empty()) {
-          beginInOutFormalAccesses(gen, inoutArgs, siteArgs);
-        }
-
-        SGFContext context = i == size - 1 ? C : SGFContext();
-        ApplyOptions options = ApplyOptions::None;
-        result = gen.emitApply(loc, functionMV, {}, siteArgs,
-                               substFnType,
-                               origResultType,
-                               extraSites[i].getSubstResultType(),
-                               options, None, foreignError, context);
-      }
+      // Then handle the remaining call sites.
+      result =
+          handleRemainingCallSites(std::move(result), formalType, foreignSelf,
+                                   foreignError, substFnType, C);
 
       return result;
     }
+
+    RValue
+    handleRemainingCallSites(RValue &&result, CanFunctionType formalType,
+                             ImportAsMemberStatus foreignSelf,
+                             Optional<ForeignErrorConvention> foreignError,
+                             CanSILFunctionType substFnType, SGFContext C);
 
     ~CallEmission() { assert(applied && "never applied!"); }
 
     // Movable, but not copyable.
     CallEmission(CallEmission &&e)
-      : gen(e.gen),
-        uncurriedSites(std::move(e.uncurriedSites)),
-        extraSites(std::move(e.extraSites)),
-        callee(std::move(e.callee)),
-        InitialWritebackScope(std::move(e.InitialWritebackScope)),
-        uncurries(e.uncurries),
-        applied(e.applied) {
+        : gen(e.gen), uncurriedSites(std::move(e.uncurriedSites)),
+          extraSites(std::move(e.extraSites)), callee(std::move(e.callee)),
+          InitialWritebackScope(std::move(e.InitialWritebackScope)),
+          uncurries(e.uncurries), applied(e.applied) {
       e.applied = true;
     }
 
@@ -4490,6 +4456,53 @@ namespace {
     CallEmission &operator=(const CallEmission &) = delete;
   };
 } // end anonymous namespace
+
+RValue CallEmission::handleRemainingCallSites(
+    RValue &&result, CanFunctionType formalType,
+    ImportAsMemberStatus foreignSelf,
+    Optional<ForeignErrorConvention> foreignError,
+    CanSILFunctionType substFnType, SGFContext C) {
+  // If there are remaining call sites, apply them to the result function.
+  // Each chained call gets its own writeback scope.
+  for (unsigned i = 0, size = extraSites.size(); i < size; ++i) {
+    FormalEvaluationScope writebackScope(gen);
+
+    SILLocation loc = extraSites[i].Loc;
+
+    auto functionMV = std::move(result).getAsSingleValue(gen, loc);
+
+    auto substFnType = functionMV.getType().castTo<SILFunctionType>();
+    ParamLowering paramLowering(substFnType, gen);
+
+    SmallVector<ManagedValue, 4> siteArgs;
+    SmallVector<InOutArgument, 2> inoutArgs;
+
+    // TODO: foreign errors for block or function pointer values?
+    assert(substFnType->hasErrorResult() ||
+           !cast<FunctionType>(formalType)->getExtInfo().throws());
+    foreignError = None;
+
+    // The result function has already been reabstracted to the substituted
+    // type, so use the substituted formal type as the abstraction pattern
+    // for argument passing now.
+    AbstractionPattern origResultType(formalType.getResult());
+    AbstractionPattern origParamType(claimNextParamClause(formalType));
+    std::move(extraSites[i])
+        .emit(gen, origParamType, paramLowering, siteArgs, inoutArgs,
+              foreignError, foreignSelf);
+    if (!inoutArgs.empty()) {
+      beginInOutFormalAccesses(gen, inoutArgs, siteArgs);
+    }
+
+    SGFContext context = i == size - 1 ? C : SGFContext();
+    ApplyOptions options = ApplyOptions::None;
+    result = gen.emitApply(loc, functionMV, {}, siteArgs, substFnType,
+                           origResultType, extraSites[i].getSubstResultType(),
+                           options, None, foreignError, context);
+  }
+
+  return std::move(result);
+}
 
 static CallEmission prepareApplyExpr(SILGenFunction &gen, Expr *e) {
   // Set up writebacks for the call(s).
