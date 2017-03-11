@@ -9,7 +9,7 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
- %{
+%{
 #
 # Utility code for later in this template
 #
@@ -1766,19 +1766,25 @@ extension BinaryInteger {
 
     if lhs == (0 as Self) && rhs == (0 as Other) { return false }
 
-    // if we get here, lhs and rhs have the same sign.  If they're
-    // negative, then T and U are both signed types, and one of them can
-    // represent values of the other type.  Otherwise, lhs and rhs are
-    // positive, and one of T, U may be signed and the other unsigned.
-    // In this case, we can conceptually subtract 1 from the bitWidth of
-    // any signed type, and either the resulting bitWidths are the same
-    // or one can represent every value of the other.
+    // if we get here, lhs and rhs have the same sign. If they're negative,
+    // then Self and Other are both signed types, and one of them can represent
+    // values of the other type. Otherwise, lhs and rhs are positive, and one
+    // of Self, Other may be signed and the other unsigned.
 
-    let rT = Self(extendingOrTruncating: rhs)
+    let rhsAsSelf = Self(extendingOrTruncating: rhs)
+    let rhsAsSelfNegative = rhsAsSelf < (0 as Self)
 
-    // Can we round-trip rhs through T?
-    if Other(extendingOrTruncating: rT) == rhs {
-      return lhs < rT
+
+    // Can we round-trip rhs through Other?
+    if Other(extendingOrTruncating: rhsAsSelf) == rhs &&
+      // This additional check covers the `Int8.max < (128 as UInt8)` case.
+      // Since the types are of the same width, init(extendingOrTruncating:)
+      // will result in a simple bitcast, so that rhsAsSelf would be -128, and
+      // `lhs < rhsAsSelf` will return false.
+      // We basically guard agains that bitcast by requiring rhs and rhsAsSelf
+      // to be the same sign.
+      rhsNegative == rhsAsSelfNegative {
+      return lhs < rhsAsSelf
     }
 
     return Other(extendingOrTruncating: lhs) < rhs
@@ -2398,7 +2404,7 @@ extension UnsignedInteger where Self : FixedWidthInteger {
       _precondition(source >= 0, "Negative value is not representable")
     }
     // This check is potentially removable by the optimizer
-    if source.bitWidth > Self.bitWidth {
+    if source.bitWidth >= Self.bitWidth {
       _precondition(source <= Self.max,
         "Not enough bits to represent a signed value")
     }
@@ -2408,11 +2414,11 @@ extension UnsignedInteger where Self : FixedWidthInteger {
   @_transparent
   public init?<T : BinaryInteger>(exactly source: T) {
     // This check is potentially removable by the optimizer
-    if T.isSigned {
-      _precondition(source >= 0, "Negative value is not representable")
+    if T.isSigned && source < (0 as T) {
+      return nil
     }
     // The width check can be eliminated by the optimizer
-    if source.bitWidth > Self.bitWidth &&
+    if source.bitWidth >= Self.bitWidth &&
        source > Self.max {
       return nil
     }
@@ -2578,11 +2584,23 @@ public struct ${Self}
 #if !os(Windows) && (arch(i386) || arch(x86_64))
 %     end
 
+  @_transparent
   public init(_ source: ${FloatType}) {
-    _precondition(source.isFinite, "") // FIXME(integers): message
-    _precondition(source > ${str(lower)}.0, "") // FIXME(integers): message
-    _precondition(source < ${str(upper)}.0, "") // FIXME(integers): message
+    _precondition(source.isFinite,
+      "${FloatType} value cannot be converted to ${Self} because it is either infinite or NaN")
+    _precondition(source > ${str(lower)}.0,
+      "${FloatType} value cannot be converted to ${Self} because the result would be less than ${Self}.min")
+    _precondition(source < ${str(upper)}.0,
+      "${FloatType} value cannot be converted to ${Self} because the result would be greater than ${Self}.max")
     self._value = Builtin.fpto${u}i_FPIEEE${FloatBits}_${BuiltinName}(source._value)
+  }
+
+  @_transparent
+  public init?(exactly source: ${FloatType}) {
+    self._value = Builtin.fpto${u}i_FPIEEE${FloatBits}_${BuiltinName}(source._value)
+    if ${FloatType}(self) != source {
+      return nil
+    }
   }
 
 %     if FloatType == 'Float80':
@@ -3071,7 +3089,6 @@ extension ${Self} {
 %   end
     _preconditionFailure("Conversion is not supported")
   }
-
 }
 
 
