@@ -6,4 +6,8 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
 // RUN: not --crash %target-swift-frontend %s -emit-ir
+
+// Temporarily disabled
+// REQUIRES: https://bugs.swift.org/browse/SR-4219
+
 {{extension{init(UInt=_=1 + 1 as?Int?Int){var f=nil?Int
