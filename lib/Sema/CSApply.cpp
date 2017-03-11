@@ -3591,12 +3591,8 @@ namespace {
       Expr *argExpr = new (ctx) StringLiteralExpr(msg, E->getLoc(),
                                                   /*implicit*/true);
 
-      auto getType = [&](const Expr *E) -> Type {
-        return cs.getType(E);
-      };
-
       Expr *callExpr = CallExpr::createImplicit(ctx, fnRef, { argExpr },
-                                                { Identifier() }, getType);
+                                                { Identifier() });
 
       bool invalid = tc.typeCheckExpression(callExpr, cs.DC,
                                             TypeLoc::withoutLoc(valueType),
@@ -6036,11 +6032,12 @@ Expr *ExprRewriter::convertLiteral(Expr *literal,
     cs.cacheExprTypes(base);
     cs.setExprTypes(base);
     cs.setExprTypes(literal);
+    SmallVector<Expr *, 1> arguments = { literal };
 
     Expr *result = tc.callWitness(base, dc,
                                   builtinProtocol, *builtinConformance,
                                   builtinLiteralFuncName,
-                                  literal,
+                                  arguments,
                                   brokenBuiltinProtocolDiag);
     if (result)
       cs.cacheExprTypes(result);
@@ -7178,6 +7175,9 @@ Expr *TypeChecker::callWitness(Expr *base, DeclContext *dc,
   // Construct an empty constraint system and solution.
   ConstraintSystem cs(*this, dc, ConstraintSystemOptions());
 
+  for (auto *arg : arguments)
+    cs.cacheType(arg);
+
   // Find the witness we need to use.
   auto type = base->getType();
   assert(!type->hasTypeVariable() &&
@@ -7223,7 +7223,7 @@ Expr *TypeChecker::callWitness(Expr *base, DeclContext *dc,
   auto argLabels = witness->getFullName().getArgumentNames();
   if (arguments.size() == 1 &&
       (isVariadicWitness(witness) ||
-       argumentNamesMatch(arguments[0]->getType(), argLabels))) {
+       argumentNamesMatch(cs.getType(arguments[0]), argLabels))) {
     call = CallExpr::create(Context, unresolvedDot, arguments[0], {}, {},
                             /*hasTrailingClosure=*/false,
                             /*implicit=*/true, Type(), getType);

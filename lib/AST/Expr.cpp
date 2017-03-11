@@ -1749,7 +1749,8 @@ CallExpr *CallExpr::create(ASTContext &ctx, Expr *fn, SourceLoc lParenLoc,
   SmallVector<SourceLoc, 4> argLabelLocsScratch;
   Expr *arg = packSingleArgument(ctx, lParenLoc, args, argLabels, argLabelLocs,
                                  rParenLoc, trailingClosure, implicit,
-                                 argLabelsScratch, argLabelLocsScratch);
+                                 argLabelsScratch, argLabelLocsScratch,
+                                 getType);
 
   size_t size = totalSizeToAlloc(argLabels, argLabelLocs,
                                  trailingClosure != nullptr);
