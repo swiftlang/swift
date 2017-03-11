@@ -1242,7 +1242,17 @@ namespace {
         tc.diagnose(expr->getStartLoc(), diag::interpolation_missing_proto);
         return nullptr;
       }
-
+      
+      // FIXME: Protect against broken standard library.
+      auto interpolationAssociatedTypes = 
+                          interpolationProto->lookupDirect(
+                            CS.getASTContext().Id_StringInterpolationSegmentType);
+      if(interpolationAssociatedTypes.empty()) {
+        tc.diagnose(expr->getStartLoc(), diag::interpolation_broken_proto);
+        return nullptr;
+      }
+      auto interpolationAssociatedType = cast<AssociatedTypeDecl>(interpolationAssociatedTypes.front());
+      
       // The type of the expression must conform to the
       // ExpressibleByStringInterpolation protocol.
       auto locator = CS.getConstraintLocator(expr);
@@ -1251,10 +1261,13 @@ namespace {
                        interpolationProto->getDeclaredType(),
                        locator);
       
+      auto interpolationType = DependentMemberType::get(tv, interpolationAssociatedType);
+      
       for(auto segment : expr->getSegments()) {
         if(expr->isInterpolatedSegment(segment)) {
-          // This branch intentionally left blank. Interpolated segments are 
-          // currently unconstrained, but we expect that to change.
+          // Interpolated segments are of the StringInterpolationSegmentType 
+          // associated type.
+          CS.addConstraint(ConstraintKind::Equal, interpolationType, segment->getType(), locator);
         }
         else {
           // Literal segments are of the same type as the interpolated string
