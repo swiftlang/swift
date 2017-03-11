@@ -682,17 +682,17 @@ Type TypeChecker::applyUnboundGenericArguments(
                               LookUpConformanceInModule{dc->getParentModule()},
                               unsatisfiedDependency);
 
-    // Unsatisfied dependency case.
-    if (result.first)
+    switch (result) {
+    case RequirementCheckResult::UnsatisfiedDependency:
       return Type();
-
-    // Failure case.
-    if (!result.second)
+    case RequirementCheckResult::Failure:
       return ErrorType::get(Context);
 
-    if (useObjectiveCBridgeableConformancesOfArgs(dc, BGT,
-                                                  unsatisfiedDependency))
+    case RequirementCheckResult::Success:
+      if (useObjectiveCBridgeableConformancesOfArgs(dc, BGT,
+                                                    unsatisfiedDependency))
         return Type();
+    }
   }
 
   return BGT;

@@ -176,28 +176,24 @@ static std::string renderFixits(ArrayRef<llvm::SMFixIt> fixits,
                                 StringRef InputFile) {
   std::string Result;
   llvm::raw_string_ostream OS(Result);
-  bool isFirst = true;
-  for (auto &ActualFixIt : fixits) {
-    llvm::SMRange Range = ActualFixIt.getRange();
-    
-    if (isFirst)
-      isFirst = false;
-    else
-      OS << ' ';
-    OS << "{{"
-    << getColumnNumber(InputFile, Range.Start) << '-'
-    << getColumnNumber(InputFile, Range.End) << '=';
-    
-    for (auto C : ActualFixIt.getText()) {
-      if (C == '\n')
-        OS << "\\n";
-      else if (C == '}' || C == '\\')
-        OS << '\\' << C;
-      else
-        OS << C;
-    }
-    OS << "}}";
-  }
+  interleave(fixits,
+             [&](const llvm::SMFixIt &ActualFixIt) {
+               llvm::SMRange Range = ActualFixIt.getRange();
+
+               OS << "{{" << getColumnNumber(InputFile, Range.Start) << '-'
+                  << getColumnNumber(InputFile, Range.End) << '=';
+
+               for (auto C : ActualFixIt.getText()) {
+                 if (C == '\n')
+                   OS << "\\n";
+                 else if (C == '}' || C == '\\')
+                   OS << '\\' << C;
+                 else
+                   OS << C;
+               }
+               OS << "}}";
+             },
+             [&] { OS << ' '; });
   return OS.str();
 }
 

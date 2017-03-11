@@ -215,16 +215,9 @@ void Constraint::print(llvm::raw_ostream &Out, SourceManager *sm) const {
     }
     Out << ":";
 
-    bool first = true;
-    for (auto constraint : getNestedConstraints()) {
-      if (first)
-        first = false;
-      else
-        Out << " or ";
-
-      constraint->print(Out, sm);
-    }
-
+    interleave(getNestedConstraints(),
+               [&](Constraint *constraint) { constraint->print(Out, sm); },
+               [&] { Out << " or "; });
     return;
   }
 
