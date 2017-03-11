@@ -74,6 +74,7 @@ set(SWIFTLIB_ESSENTIAL
   IntegerParsing.swift.gyb
   Integers.swift.gyb
   Join.swift
+  KeyPath.swift
   LazyCollection.swift.gyb
   LazySequence.swift
   LifetimeManager.swift
