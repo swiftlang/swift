@@ -1,0 +1,16 @@
+// RUN: %target-sil-opt -enable-sil-opaque-values -enable-sil-ownership -enable-sil-verify-all=0 -module-name Swift -o /dev/null 2>&1  %s
+// REQUIRES: asserts
+
+// This file is meant to contain tests that previously the verifier treated
+// incorrectly. This is important to ensure that the verifier does not
+// regress. It should only deal with use matching of opaque types.
+
+sil_stage canonical
+
+import Builtin
+
+sil @unconditional_checked_cast_value_test : $@convention(thin) <T> (Builtin.Int32) -> @out T {
+bb0(%0 : @trivial $Builtin.Int32):
+  %1 = unconditional_checked_cast_value %0 : $Builtin.Int32 to $T
+  return %1 : $T
+}

@@ -214,6 +214,14 @@ void IRGenFunction::emitDeallocRawCall(llvm::Value *pointer,
                               {pointer, size, alignMask});
 }
 
+void IRGenFunction::emitTSanInoutAccessCall(llvm::Value *address) {
+  llvm::Function *fn = cast<llvm::Function>(IGM.getTSanInoutAccessFn());
+
+  llvm::Value *castAddress = Builder.CreateBitCast(address, IGM.Int8PtrTy);
+  Builder.CreateCall(fn, {castAddress});
+}
+
+
 /// Initialize a relative indirectable pointer to the given value.
 /// This always leaves the value in the direct state; if it's not a
 /// far reference, it's the caller's responsibility to ensure that the

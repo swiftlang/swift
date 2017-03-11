@@ -329,14 +329,8 @@ static void printGenericArgs(ASTPrinter &Printer, const PrintOptions &Opts,
     return;
 
   Printer << "<";
-  bool First = true;
-  for (auto Arg : Args) {
-    if (First)
-      First = false;
-    else
-      Printer << ", ";
-    printTypeRepr(Arg, Printer, Opts);
-  }
+  interleave(Args, [&](TypeRepr *Arg) { printTypeRepr(Arg, Printer, Opts); },
+             [&] { Printer << ", "; });
   Printer << ">";
 }
 
@@ -552,14 +546,8 @@ void CompositionTypeRepr::printImpl(ASTPrinter &Printer,
   if (Types.empty()) {
     Printer << "Any";
   } else {
-    bool First = true;
-    for (auto T : Types) {
-      if (First)
-        First = false;
-      else
-        Printer << " & ";
-      printTypeRepr(T, Printer, Opts);
-    }
+    interleave(Types, [&](TypeRepr *T) { printTypeRepr(T, Printer, Opts); },
+               [&] { Printer << " & "; });
   }
 }
 

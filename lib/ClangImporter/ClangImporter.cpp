@@ -323,11 +323,7 @@ void ClangImporter::clearTypeResolver() {
 
 #pragma mark Module loading
 
-#ifdef NDEBUG
 #define SHIMS_INCLUDE_FLAG "-isystem"
-#else
-#define SHIMS_INCLUDE_FLAG "-I"
-#endif
 
 static StringRef
 getMinVersionOptNameForDarwinTriple(const llvm::Triple &triple) {

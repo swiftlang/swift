@@ -236,30 +236,4 @@
 
 #endif
 
-#if !defined(__USER_LABEL_PREFIX__)
-// MSVC doesn't define __USER_LABEL_PREFIX.
-#if defined(_MSC_VER)
-#define __USER_LABEL_PREFIX__
-#else
-#error __USER_LABEL_PREFIX__ is undefined
-#endif
-#endif
-
-// Workaround the bug of clang in Cygwin 64bit
-// https://llvm.org/bugs/show_bug.cgi?id=26744
-#if defined(__CYGWIN__) && defined(__x86_64__)
-#undef __USER_LABEL_PREFIX__
-#define __USER_LABEL_PREFIX__
-#endif
-
-#define SWIFT_GLUE_EXPANDED(a, b) a##b
-#define SWIFT_GLUE(a, b) SWIFT_GLUE_EXPANDED(a, b)
-#define SWIFT_SYMBOL_NAME(name) SWIFT_GLUE(__USER_LABEL_PREFIX__, name)
-
-#define SWIFT_QUOTE_EXPANDED(literal) #literal
-#define SWIFT_QUOTE(literal) SWIFT_QUOTE_EXPANDED(literal)
-
-#define SWIFT_QUOTED_SYMBOL_NAME(name)                                   \
-  SWIFT_QUOTE(SWIFT_SYMBOL_NAME(name))
-
 #endif // SWIFT_RUNTIME_CONFIG_H

@@ -199,16 +199,14 @@ static bool calleeHasPartialApplyWithOpenedExistentials(FullApplySite AI) {
         auto PAISubs = PAI->getSubstitutions();
         if (PAISubs.empty())
           continue;
+
         // Check if any of substitutions would contain open existentials
         // after inlining.
-        for (auto PAISub : PAISubs) {
-          if (!PAISub.getReplacement()->hasArchetype())
-            continue;
-          auto NewPAISub =
-              PAISub.subst(AI.getModule().getSwiftModule(), SubsMap);
-          if (NewPAISub.getReplacement()->hasOpenedExistential())
-            return true;
-        }
+        auto PAISubMap = PAI->getOrigCalleeType()
+          ->getGenericSignature()->getSubstitutionMap(PAISubs);
+        PAISubMap = PAISubMap.subst(SubsMap);
+        if (PAISubMap.hasOpenedExistential())
+          return true;
       }
     }
   }
@@ -351,6 +349,11 @@ bool SILPerformanceInliner::isProfitableToInline(FullApplySite AI,
   int BaseBenefit = RemovedCallBenefit;
 
   SubstitutionMap CalleeSubstMap;
+  if (IsGeneric) {
+    CalleeSubstMap = Callee->getGenericEnvironment()
+      ->getSubstitutionMap(AI.getSubstitutions());
+  }
+
   const SILOptions &Opts = Callee->getModule().getOptions();
 
   // For some reason -Ounchecked can accept a higher base benefit without
@@ -395,30 +398,18 @@ bool SILPerformanceInliner::isProfitableToInline(FullApplySite AI,
             !isa<WitnessMethodInst>(def))
           continue;
 
-        SmallVector<Substitution, 32> NewSubs;
-        SubstitutionMap SubstMap;
-
         // It is a generic call inside the callee. Check if after inlining
         // it will be possible to perform a generic specialization or
         // devirtualization of this call.
 
         // Create the list of substitutions as they will be after
         // inlining.
-        for (auto Sub : Subs) {
-          if (!Sub.getReplacement()->hasArchetype()) {
-            // This substitution is a concrete type.
-            NewSubs.push_back(Sub);
-            continue;
-          }
-          // This substitution is not a concrete type.
-          if (IsGeneric && CalleeSubstMap.empty()) {
-            CalleeSubstMap =
-                Callee->getGenericEnvironment()->getSubstitutionMap(
-                    AI.getSubstitutions());
-          }
-          auto NewSub = Sub.subst(AI.getModule().getSwiftModule(), CalleeSubstMap);
-          NewSubs.push_back(NewSub);
-        }
+        auto Sig = FAI.getOrigCalleeType()->getGenericSignature();
+        auto SubMap = Sig->getSubstitutionMap(Subs);
+        SubMap = SubMap.subst(CalleeSubstMap);
+
+        SmallVector<Substitution, 4> NewSubs;
+        Sig->getSubstitutions(SubMap, NewSubs);
 
         // Check if the call can be devirtualized.
         if (isa<ClassMethodInst>(def) || isa<WitnessMethodInst>(def) ||

@@ -1133,7 +1133,26 @@ SILInstruction *swift::findReleaseToMatchUnsafeGuaranteedValue(
   auto UnsafeGuaranteedOpdRoot =
       RCFI.getRCIdentityRoot(UnsafeGuaranteedI->getOperand(0));
 
-  // Look before the "unsafeGuaranteedEnd".
+  // Try finding it after the "unsafeGuaranteedEnd".
+  for (auto ForwardIt = std::next(UnsafeGuaranteedEndI->getIterator()),
+            End = BB.end();
+       ForwardIt != End; ++ForwardIt) {
+    SILInstruction &CurInst = *ForwardIt;
+
+    // Is this a release?
+    if (isa<ReleaseValueInst>(CurInst) || isa<StrongReleaseInst>(CurInst)) {
+      if (hasUnsafeGuaranteedOperand(UnsafeGuaranteedRoot,
+                                     UnsafeGuaranteedOpdRoot, RCFI, CurInst))
+        return &CurInst;
+      continue;
+    }
+
+    if (CurInst.mayHaveSideEffects() && !isa<DebugValueInst>(CurInst) &&
+        !isa<DebugValueAddrInst>(CurInst))
+      break;
+  }
+
+  // Otherwise, Look before the "unsafeGuaranteedEnd".
   for (auto ReverseIt = ++UnsafeGuaranteedEndI->getIterator().getReverse(),
             End = BB.rend();
        ReverseIt != End; ++ReverseIt) {
@@ -1152,24 +1171,6 @@ SILInstruction *swift::findReleaseToMatchUnsafeGuaranteedValue(
       break;
   }
 
-  // Otherwise, try finding it after the "unsafeGuaranteedEnd".
-  for (auto ForwardIt = std::next(UnsafeGuaranteedEndI->getIterator()),
-            End = BB.end();
-       ForwardIt != End; ++ForwardIt) {
-    SILInstruction &CurInst = *ForwardIt;
-
-    // Is this a release?
-    if (isa<ReleaseValueInst>(CurInst) || isa<StrongReleaseInst>(CurInst)) {
-      if (hasUnsafeGuaranteedOperand(UnsafeGuaranteedRoot,
-                                     UnsafeGuaranteedOpdRoot, RCFI, CurInst))
-        return &CurInst;
-      continue;
-    }
-
-    if (CurInst.mayHaveSideEffects() && !isa<DebugValueInst>(CurInst) &&
-        !isa<DebugValueAddrInst>(CurInst))
-      break;
-  }
   return nullptr;
 }
 

@@ -65,6 +65,7 @@ Constraint::Constraint(ConstraintKind Kind, Type First, Type Second,
   case ConstraintKind::SelfObjectOfProtocol:
   case ConstraintKind::DynamicTypeOf:
   case ConstraintKind::EscapableFunctionOf:
+  case ConstraintKind::OpenedExistentialOf:
   case ConstraintKind::OptionalObject:
     assert(!First.isNull());
     assert(!Second.isNull());
@@ -178,6 +179,7 @@ Constraint *Constraint::clone(ConstraintSystem &cs) const {
   case ConstraintKind::CheckedCast:
   case ConstraintKind::DynamicTypeOf:
   case ConstraintKind::EscapableFunctionOf:
+  case ConstraintKind::OpenedExistentialOf:
   case ConstraintKind::SelfObjectOfProtocol:
   case ConstraintKind::ApplicableFunction:
   case ConstraintKind::OptionalObject:
@@ -213,16 +215,9 @@ void Constraint::print(llvm::raw_ostream &Out, SourceManager *sm) const {
     }
     Out << ":";
 
-    bool first = true;
-    for (auto constraint : getNestedConstraints()) {
-      if (first)
-        first = false;
-      else
-        Out << " or ";
-
-      constraint->print(Out, sm);
-    }
-
+    interleave(getNestedConstraints(),
+               [&](Constraint *constraint) { constraint->print(Out, sm); },
+               [&] { Out << " or "; });
     return;
   }
 
@@ -253,6 +248,7 @@ void Constraint::print(llvm::raw_ostream &Out, SourceManager *sm) const {
   case ConstraintKind::ApplicableFunction: Out << " applicable fn "; break;
   case ConstraintKind::DynamicTypeOf: Out << " dynamicType type of "; break;
   case ConstraintKind::EscapableFunctionOf: Out << " @escaping type of "; break;
+  case ConstraintKind::OpenedExistentialOf: Out << " opened archetype of "; break;
   case ConstraintKind::OptionalObject:
       Out << " optional with object type "; break;
   case ConstraintKind::BindOverload: {
@@ -477,6 +473,7 @@ gatherReferencedTypeVars(Constraint *constraint,
   case ConstraintKind::ValueMember:
   case ConstraintKind::DynamicTypeOf:
   case ConstraintKind::EscapableFunctionOf:
+  case ConstraintKind::OpenedExistentialOf:
   case ConstraintKind::OptionalObject:
   case ConstraintKind::Defaultable:
     constraint->getSecondType()->getTypeVariables(typeVars);

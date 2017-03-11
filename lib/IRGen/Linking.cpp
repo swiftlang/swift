@@ -37,7 +37,7 @@ static StringRef mangleValueWitness(ValueWitness witness) {
   switch (witness) {
 #define VALUE_WITNESS(MANGLING, NAME) \
     case ValueWitness::NAME: return #MANGLING;
-#include "swift/Basic/ValueWitnessMangling.def"
+#include "swift/Demangling/ValueWitnessMangling.def"
 
   case ValueWitness::Size:
   case ValueWitness::Flags:
@@ -164,10 +164,11 @@ std::string LinkEntity::mangleOld() const {
     // Witness table entries for constructors always refer to the allocating
     // constructor.
     if (auto ctor = dyn_cast<ConstructorDecl>(getDecl()))
-      mangler.mangleConstructorEntity(ctor, /*isAllocating=*/true,
-                                      getUncurryLevel());
+      mangler.mangleConstructorEntity(ctor,
+                                      /*isAllocating=*/true,
+                                      /*uncurryLevel=*/0);
     else
-      mangler.mangleEntity(getDecl(), getUncurryLevel());
+      mangler.mangleEntity(getDecl(), /*uncurryLevel=*/0);
     return mangler.finalize();
 
   //   global ::= 'Wv' directness entity
@@ -268,10 +269,11 @@ std::string LinkEntity::mangleOld() const {
     } else if (auto ctor = dyn_cast<ConstructorDecl>(getDecl())) {
       // FIXME: Hack. LinkInfo should be able to refer to the allocating
       // constructor rather than inferring it here.
-      mangler.mangleConstructorEntity(ctor, /*isAllocating=*/true,
-                                      getUncurryLevel());
+      mangler.mangleConstructorEntity(ctor,
+                                      /*isAllocating=*/true,
+                                      /*uncurryLevel=*/0);
     } else {
-      mangler.mangleEntity(getDecl(), getUncurryLevel());
+      mangler.mangleEntity(getDecl(), /*uncurryLevel=*/0);
     }
       return mangler.finalize();
 
@@ -312,11 +314,11 @@ std::string LinkEntity::mangleOld() const {
 
   case Kind::ReflectionBuiltinDescriptor:
     mangler.append("_TMRb");
-    mangler.mangleType(getType(), getUncurryLevel());
+    mangler.mangleType(getType(), /*uncurryLevel=*/0);
     return mangler.finalize();
   case Kind::ReflectionFieldDescriptor:
     mangler.append("_TMRf");
-    mangler.mangleType(getType(), getUncurryLevel());
+    mangler.mangleType(getType(), /*uncurryLevel=*/0);
     return mangler.finalize();
   case Kind::ReflectionAssociatedTypeDescriptor:
     mangler.append("_TMRa");

@@ -662,7 +662,7 @@ bool Expr::canAppendCallParentheses() const {
     return true;
 
   case ExprKind::DeclRef:
-    return !cast<DeclRefExpr>(this)->getDecl()->getName().isOperator();
+    return !cast<DeclRefExpr>(this)->getDecl()->isOperator();
 
   case ExprKind::SuperRef:
   case ExprKind::OtherConstructorDeclRef:
@@ -676,7 +676,7 @@ bool Expr::canAppendCallParentheses() const {
     auto *overloadedExpr = cast<OverloadedDeclRefExpr>(this);
     if (overloadedExpr->getDecls().empty())
       return false;
-    return !overloadedExpr->getDecls().front()->getName().isOperator();
+    return !overloadedExpr->getDecls().front()->isOperator();
   }
 
   case ExprKind::UnresolvedDeclRef:
@@ -1749,7 +1749,8 @@ CallExpr *CallExpr::create(ASTContext &ctx, Expr *fn, SourceLoc lParenLoc,
   SmallVector<SourceLoc, 4> argLabelLocsScratch;
   Expr *arg = packSingleArgument(ctx, lParenLoc, args, argLabels, argLabelLocs,
                                  rParenLoc, trailingClosure, implicit,
-                                 argLabelsScratch, argLabelLocsScratch);
+                                 argLabelsScratch, argLabelLocsScratch,
+                                 getType);
 
   size_t size = totalSizeToAlloc(argLabels, argLabelLocs,
                                  trailingClosure != nullptr);

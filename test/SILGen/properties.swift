@@ -305,7 +305,7 @@ func logical_local_get(_ x: Int) -> Int {
       return x
     }
   }
-  // CHECK: [[GET_REF:%[0-9]+]] = function_ref [[PROP_GET_CLOSURE:@_T010properties17logical_local_getSiSiF4propL_Sifg]]
+  // CHECK: [[GET_REF:%[0-9]+]] = function_ref [[PROP_GET_CLOSURE:@_T010properties17logical_local_getS2iF4propL_Sifg]]
   // CHECK: apply [[GET_REF]](%0)
   return prop
 }
@@ -324,7 +324,7 @@ func logical_local_captured_get(_ x: Int) -> Int {
   }
 
   return get_prop()
-  // CHECK: [[FUNC_REF:%[0-9]+]] = function_ref @_T010properties26logical_local_captured_getSiSiF0E5_propL_SiyF
+  // CHECK: [[FUNC_REF:%[0-9]+]] = function_ref @_T010properties26logical_local_captured_getS2iF0E5_propL_SiyF
   // CHECK: apply [[FUNC_REF]](%0)
 }
 // CHECK: sil shared @_T010properties26logical_local_captured_get{{.*}}fg

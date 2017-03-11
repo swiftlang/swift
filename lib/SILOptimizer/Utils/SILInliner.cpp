@@ -322,6 +322,7 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
     case ValueKind::AssignInst:
     case ValueKind::BranchInst:
     case ValueKind::CheckedCastBranchInst:
+    case ValueKind::CheckedCastValueBranchInst:
     case ValueKind::CheckedCastAddrBranchInst:
     case ValueKind::ClassMethodInst:
     case ValueKind::CondBranchInst:
@@ -395,7 +396,7 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
     case ValueKind::UncheckedTakeEnumDataAddrInst:
     case ValueKind::UnconditionalCheckedCastInst:
     case ValueKind::UnconditionalCheckedCastAddrInst:
-    case ValueKind::UnconditionalCheckedCastOpaqueInst:
+    case ValueKind::UnconditionalCheckedCastValueInst:
     case ValueKind::UnmanagedToRefInst:
     case ValueKind::UnownedReleaseInst:
     case ValueKind::UnownedRetainInst:

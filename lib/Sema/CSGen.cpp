@@ -2504,14 +2504,16 @@ namespace {
 
       // If the 'self' parameter is not configured, something went
       // wrong elsewhere and should have been diagnosed already.
-      if (!selfDecl->hasType())
+      if (!selfDecl->hasInterfaceType())
         return ErrorType::get(tc.Context);
 
-      Type declaredType = selfDecl->getType()->getRValueInstanceType();
-      Type superclassTy = declaredType->getSuperclass(&tc);
+      auto selfTy = CS.DC->mapTypeIntoContext(
+        typeContext->getDeclaredInterfaceType());
+      auto superclassTy = selfTy->getSuperclass(&tc);
 
-      if (selfDecl->getType()->is<MetatypeType>())
+      if (selfDecl->getInterfaceType()->is<MetatypeType>())
         superclassTy = MetatypeType::get(superclassTy);
+
       return superclassTy;
     }
     

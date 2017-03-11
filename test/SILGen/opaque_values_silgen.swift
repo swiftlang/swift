@@ -45,18 +45,22 @@ func s030______assigninout<T>(_ a: inout T, _ b: T) {
 
 // Test that we no longer use copy_addr or tuple_element_addr when copy by value is possible
 // ---
-// CHECK-LABEL: sil hidden @_T020opaque_values_silgen21s040___tupleReturnIntSiSi_xtlF : $@convention(thin) <T> (Int, @in T) -> Int {
+// CHECK-LABEL: sil hidden @_T020opaque_values_silgen21s040___tupleReturnIntS2i_xtlF : $@convention(thin) <T> (Int, @in T) -> Int {
 // CHECK: bb0([[ARG0:%.*]] : $Int, [[ARG1:%.*]] : $T):
 // CHECK:   [[TPL:%.*]] = tuple ([[ARG0]] : $Int, [[ARG1]] : $T)
 // CHECK:   [[BORROWED_ARG1:%.*]] = begin_borrow [[TPL]] : $(Int, T)
 // CHECK:   [[CPY:%.*]] = copy_value [[BORROWED_ARG1]] : $(Int, T)
-// CHECK:   [[INT:%.*]] = tuple_extract [[CPY]] : $(Int, T), 0
-// CHECK:   [[GEN:%.*]] = tuple_extract [[CPY]] : $(Int, T), 1
-// CHECK:   destroy_value [[GEN]] : $T
+// CHECK:   [[BORROWED_CPY:%.*]] = begin_borrow [[CPY]]
+// CHECK:   [[INT:%.*]] = tuple_extract [[BORROWED_CPY]] : $(Int, T), 0
+// CHECK:   [[GEN:%.*]] = tuple_extract [[BORROWED_CPY]] : $(Int, T), 1
+// CHECK:   [[COPY_GEN:%.*]] = copy_value [[GEN]]
+// CHECK:   destroy_value [[COPY_GEN]]
+// CHECK:   end_borrow [[BORROWED_CPY]] from [[CPY]]
+// CHECK:   destroy_value [[CPY]]
 // CHECK:   end_borrow [[BORROWED_ARG1]] from [[TPL]] : $(Int, T), $(Int, T)
 // CHECK:   destroy_value [[TPL]] : $(Int, T)
 // CHECK:   return [[INT]]
-// CHECK-LABEL: } // end sil function '_T020opaque_values_silgen21s040___tupleReturnIntSiSi_xtlF'
+// CHECK-LABEL: } // end sil function '_T020opaque_values_silgen21s040___tupleReturnIntS2i_xtlF'
 func s040___tupleReturnInt<T>(_ x: (Int, T)) -> Int {
   let y = x.0
   return y
@@ -156,12 +160,12 @@ func s100_________identity<T>(t: T) -> T {
 
 // Test a guaranteed opaque parameter.
 // ---
-// CHECK-LABEL: sil hidden [transparent] [thunk] @_T020opaque_values_silgen21s110___GuaranteedSelfVAA3FooAaaDP3fooyyFTW : $@convention(witness_method) (@in_guaranteed s110___GuaranteedSelf) -> () {
+// CHECK-LABEL: sil hidden [transparent] [thunk] @_T020opaque_values_silgen21s110___GuaranteedSelfVAA3FooA2aDP3fooyyFTW : $@convention(witness_method) (@in_guaranteed s110___GuaranteedSelf) -> () {
 // CHECK: bb0(%0 : $s110___GuaranteedSelf):
 // CHECK:   %[[F:.*]] = function_ref @_T020opaque_values_silgen21s110___GuaranteedSelfV3fooyyF : $@convention(method) (s110___GuaranteedSelf) -> ()
 // CHECK:   apply %[[F]](%0) : $@convention(method) (s110___GuaranteedSelf) -> ()
 // CHECK:   return
-// CHECK-LABEL: } // end sil function '_T020opaque_values_silgen21s110___GuaranteedSelfVAA3FooAaaDP3fooyyFTW'
+// CHECK-LABEL: } // end sil function '_T020opaque_values_silgen21s110___GuaranteedSelfVAA3FooA2aDP3fooyyFTW'
 struct s110___GuaranteedSelf : Foo {
   func foo() {}
 }
@@ -215,12 +219,13 @@ func s130_____________wrap<T>(_ x: T) -> T? {
 // CHECK-NOT: alloc_stack $Optional<Int>
 // CHECK:   [[APPLY_ARG3:%.*]] = apply %{{.*}}<CountableRange<Int>>
 // CHECK-NOT: dealloc_stack
-// CHECK:   [[ENUM_ARG:%.*]] = select_enum [[APPLY_ARG3]] : $Optional<Int>
-// CHECK:   cond_br [[ENUM_ARG]], bb3, bb2
+// CHECK:   switch_enum [[APPLY_ARG3]]
 // CHECK: bb2:
-// CHECK:   return %{{.*}} : $()
+// CHECK:   br bb3
 // CHECK: bb3:
-// CHECK:   unchecked_enum_data [[APPLY_ARG3]]
+// CHECK:   return %{{.*}} : $()
+// CHECK: bb4([[ENUM_ARG:%.*]] : $Int):
+// CHECK-NOT:   unchecked_enum_data
 // CHECK:   br bb1
 // CHECK-LABEL: } // end sil function '_T020opaque_values_silgen21s140______forEachStmtyyF'
 func s140______forEachStmt() {
@@ -253,7 +258,7 @@ func s160_______callAnyArg() {
 // CHECK:   [[INT_TYPE:%.*]] = metatype $@thin Int.Type
 // CHECK:   [[INT_LIT:%.*]] = integer_literal $Builtin.Int2048, 42
 // CHECK:   [[INT_ARG:%.*]] = apply %{{.*}}([[INT_LIT]], [[INT_TYPE]]) : $@convention(method) (Builtin.Int2048, @thin Int.Type) -> Int
-// CHECK:   [[INT_CAST:%.*]] = unconditional_checked_cast_opaque [[INT_ARG]] : $Int to $T
+// CHECK:   [[INT_CAST:%.*]] = unconditional_checked_cast_value [[INT_ARG]] : $Int to $T
 // CHECK:   [[CAST_BORROW:%.*]] = begin_borrow [[INT_CAST]] : $T
 // CHECK:   [[RETURN_VAL:%.*]] = copy_value [[CAST_BORROW]] : $T
 // CHECK:   end_borrow [[CAST_BORROW]] from [[INT_CAST]] : $T, $T
@@ -271,7 +276,7 @@ func s170____force_convert<T>() -> T {
 // CHECK: bb0:
 // CHECK:   [[INT_LIT:%.*]] = integer_literal $Builtin.Int2048, 42
 // CHECK:   [[INT_ARG:%.*]] = apply %{{.*}}([[INT_LIT]], [[INT_TYPE]]) : $@convention(method) (Builtin.Int2048, @thin Int.Type) -> Int
-// CHECK:   [[INT_CAST:%.*]] = unconditional_checked_cast_opaque [[INT_ARG]] : $Int to $Foo
+// CHECK:   [[INT_CAST:%.*]] = unconditional_checked_cast_value [[INT_ARG]] : $Int to $Foo
 // CHECK:   return [[INT_CAST]] : $Foo
 // CHECK-LABEL: } // end sil function '_T020opaque_values_silgen21s180_______return_fooAA3Foo_pyF'
 func s180_______return_foo() -> Foo {
@@ -340,6 +345,75 @@ func s210______compErasure(_ x: Foo & Error) -> Error {
 func s220_____openExistBox(_ x: Error) -> String {
   return x._domain
 }
+
+// Tests conditional value casts and correspondingly generated reabstraction thunk
+// ---
+// CHECK-LABEL: sil hidden @_T020opaque_values_silgen21s230______condFromAnyyypF : $@convention(thin) (@in Any) -> () {
+// CHECK: bb0([[ARG:%.*]] : $Any):
+// CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
+// CHECK:   [[COPY__ARG:%.*]] = copy_value [[BORROWED_ARG]]
+// CHECK:   checked_cast_value_br [[COPY__ARG]] : $Any to $@callee_owned (@in (Int, (Int, (Int, Int)), Int)) -> @out (Int, (Int, (Int, Int)), Int), bb2, bb1
+// CHECK: bb2([[THUNK_PARAM:%.*]] : $@callee_owned (@in (Int, (Int, (Int, Int)), Int)) -> @out (Int, (Int, (Int, Int)), Int)):
+// CHECK:   [[THUNK_REF:%.*]] = function_ref @{{.*}} : $@convention(thin) (Int, Int, Int, Int, Int, @owned @callee_owned (@in (Int, (Int, (Int, Int)), Int)) -> @out (Int, (Int, (Int, Int)), Int)) -> (Int, Int, Int, Int, Int)
+// CHECK:   partial_apply [[THUNK_REF]]([[THUNK_PARAM]])
+// CHECK: bb6:
+// CHECK:   return %{{.*}} : $()
+// CHECK-LABEL: } // end sil function '_T020opaque_values_silgen21s230______condFromAnyyypF'
+func s230______condFromAny(_ x: Any) {
+  if let f = x as? (Int, (Int, (Int, Int)), Int) -> (Int, (Int, (Int, Int)), Int) {
+    _ = f(24, (4,(2, 42)), 42)
+  }
+}
+
+// Tests conditional value casts and correspondingly generated reabstraction thunk, with <T> types
+// ---
+// CHECK-LABEL: sil hidden @_T020opaque_values_silgen21s240_____condTFromAnyyyp_xtlF : $@convention(thin) <T> (@in Any, @in T) -> () {
+// CHECK: bb0([[ARG0:%.*]] : $Any, [[ARG1:%.*]] : $T):
+// CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG0]]
+// CHECK:   [[COPY__ARG:%.*]] = copy_value [[BORROWED_ARG]]
+// CHECK:   checked_cast_value_br [[COPY__ARG]] : $Any to $@callee_owned (@in (Int, T)) -> @out (Int, T), bb2, bb1
+// CHECK: bb2([[THUNK_PARAM:%.*]] : $@callee_owned (@in (Int, T)) -> @out (Int, T)):
+// CHECK:   [[THUNK_REF:%.*]] = function_ref @{{.*}} : $@convention(thin) <τ_0_0> (Int, @in τ_0_0, @owned @callee_owned (@in (Int, τ_0_0)) -> @out (Int, τ_0_0)) -> (Int, @out τ_0_0)
+// CHECK:   partial_apply [[THUNK_REF]]<T>([[THUNK_PARAM]])
+// CHECK: bb6:
+// CHECK:   return %{{.*}} : $()
+// CHECK-LABEL: } // end sil function '_T020opaque_values_silgen21s240_____condTFromAnyyyp_xtlF'
+func s240_____condTFromAny<T>(_ x: Any, _ y: T) {
+  if let f = x as? (Int, T) -> (Int, T) {
+    f(42, y)
+  }
+}
+// CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @{{.*}} : $@convention(thin) (Int, Int, Int, Int, Int, @owned @callee_owned (@in (Int, (Int, (Int, Int)), Int)) -> @out (Int, (Int, (Int, Int)), Int)) -> (Int, Int, Int, Int, Int)
+// CHECK: bb0([[ARG0:%.*]] : $Int, [[ARG1:%.*]] : $Int, [[ARG2:%.*]] : $Int, [[ARG3:%.*]] : $Int, [[ARG4:%.*]] : $Int, [[ARG5:%.*]] : $@callee_owned (@in (Int, (Int, (Int, Int)), Int)) -> @out (Int, (Int, (Int, Int)), Int)):
+// CHECK:   [[TUPLE_TO_APPLY0:%.*]] = tuple ([[ARG2]] : $Int, [[ARG3]] : $Int)
+// CHECK:   [[TUPLE_TO_APPLY1:%.*]] = tuple ([[ARG1]] : $Int, [[TUPLE_TO_APPLY0]] : $(Int, Int))
+// CHECK:   [[TUPLE_TO_APPLY2:%.*]] = tuple ([[ARG0]] : $Int, [[TUPLE_TO_APPLY1]] : $(Int, (Int, Int)), [[ARG4]] : $Int)
+// CHECK:   [[TUPLE_APPLY:%.*]] = apply [[ARG5]]([[TUPLE_TO_APPLY2]]) : $@callee_owned (@in (Int, (Int, (Int, Int)), Int)) -> @out (Int, (Int, (Int, Int)), Int)
+// CHECK:   [[RET_VAL0:%.*]] = tuple_extract [[TUPLE_APPLY]] : $(Int, (Int, (Int, Int)), Int), 0
+// CHECK:   [[TUPLE_EXTRACT1:%.*]] = tuple_extract [[TUPLE_APPLY]] : $(Int, (Int, (Int, Int)), Int), 1
+// CHECK:   [[RET_VAL1:%.*]] = tuple_extract [[TUPLE_EXTRACT1]] : $(Int, (Int, Int)), 0
+// CHECK:   [[TUPLE_EXTRACT2:%.*]] = tuple_extract [[TUPLE_EXTRACT1]] : $(Int, (Int, Int)), 1
+// CHECK:   [[RET_VAL2:%.*]] = tuple_extract [[TUPLE_EXTRACT2]]  : $(Int, Int), 0
+// CHECK:   [[RET_VAL3:%.*]] = tuple_extract [[TUPLE_EXTRACT2]]  : $(Int, Int), 1
+// CHECK:   [[RET_VAL4:%.*]] = tuple_extract [[TUPLE_APPLY]] : $(Int, (Int, (Int, Int)), Int), 2
+// CHECK:   [[RET_VAL_TUPLE:%.*]] = tuple ([[RET_VAL0]] : $Int, [[RET_VAL1]] : $Int, [[RET_VAL2]] : $Int, [[RET_VAL3]] : $Int, [[RET_VAL4]] : $Int)
+// CHECK:   return [[RET_VAL_TUPLE]] : $(Int, Int, Int, Int, Int)
+// CHECK-LABEL: } // end sil function '{{.*}}'
+
+// CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @{{.*}} : $@convention(thin) <T> (Int, @in T, @owned @callee_owned (@in (Int, T)) -> @out (Int, T)) -> (Int, @out T) {
+// CHECK: bb0([[ARG0:%.*]] : $Int, [[ARG1:%.*]] : $T, [[ARG2:%.*]] : $@callee_owned (@in (Int, T)) -> @out (Int, T)):
+// CHECK:   [[TUPLE_TO_APPLY:%.*]] = tuple ([[ARG0]] : $Int, [[ARG1]] : $T)
+// CHECK:   [[TUPLE_APPLY:%.*]] = apply [[ARG2]]([[TUPLE_TO_APPLY]]) : $@callee_owned (@in (Int, T)) -> @out (Int, T)
+// CHECK:   [[TUPLE_BORROW:%.*]] = begin_borrow [[TUPLE_APPLY]] : $(Int, T)
+// CHECK:   [[RET_VAL0:%.*]] = tuple_extract [[TUPLE_BORROW]] : $(Int, T), 0
+// CHECK:   [[TUPLE_EXTRACT:%.*]] = tuple_extract [[TUPLE_BORROW]] : $(Int, T), 1
+// CHECK:   [[RET_VAL1:%.*]] = copy_value [[TUPLE_EXTRACT]] : $T
+// CHECK:   end_borrow [[TUPLE_BORROW]] from [[TUPLE_APPLY]] : $(Int, T), $(Int, T)
+// CHECK:   destroy_value [[TUPLE_APPLY]] : $(Int, T)
+// CHECK:   [[RET_VAL_TUPLE:%.*]] = tuple ([[RET_VAL0]] : $Int, [[RET_VAL1]] : $T)
+// CHECK:   return [[RET_VAL_TUPLE]] : $(Int, T)
+// CHECK-LABEL: } // end sil function '{{.*}}'
+
 
 // Tests LogicalPathComponent's writeback for opaque value types
 // ---

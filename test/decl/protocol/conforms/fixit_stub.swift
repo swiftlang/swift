@@ -85,10 +85,10 @@ class Adopter7: ProtocolWithSelfRequirement3 { //expected-error{{type 'Adopter7'
 
 
 public protocol ProtocolWithPublicAccess1 {
-  func foo() // expected-note{{protocol requires function 'foo()' with type '() -> ()'; do you want to add a stub?}} {{71-71=\n    func foo() {\n        <#code#>\n    \}\n}}
+  func foo() // expected-note{{protocol requires function 'foo()' with type '() -> ()'; do you want to add a stub?}} {{71-71=\n    func foo() {\n        <#code#>\n    \}\n\n    typealias AssocType = <#type#>\n}}
 }
 public protocol ProtocolWithPublicAccess2 {
-  associatedtype AssocType //expected-note{{protocol requires nested type 'AssocType'}} {71-71=\n    typealias AssocType = <#type#>\n}}
+  associatedtype AssocType //expected-note{{protocol requires nested type 'AssocType'}} {{71-71=\n    func foo() {\n        <#code#>\n    \}\n\n    typealias AssocType = <#type#>\n}}
 }
 class Adopter8: ProtocolWithPublicAccess1, ProtocolWithPublicAccess2 {
   // expected-error@-1{{type 'Adopter8' does not conform to protocol 'ProtocolWithPublicAccess1'}}
@@ -96,10 +96,10 @@ class Adopter8: ProtocolWithPublicAccess1, ProtocolWithPublicAccess2 {
 }
 
 public protocol ProtocolWithPublicAccess3 {
-  func foo() // expected-note{{protocol requires function 'foo()' with type '() -> ()'; do you want to add a stub?}} {{78-78=\n    public func foo() {\n        <#code#>\n    \}\n}}
+  func foo() // expected-note{{protocol requires function 'foo()' with type '() -> ()'; do you want to add a stub?}} {{78-78=\n    public func foo() {\n        <#code#>\n    \}\n\n    public typealias AssocType = <#type#>\n}}
 }
 public protocol ProtocolWithPublicAccess4 {
-  associatedtype AssocType //expected-note{{protocol requires nested type 'AssocType'}} {{78-78=\n    public typealias AssocType = <#type#>\n}}
+  associatedtype AssocType //expected-note{{protocol requires nested type 'AssocType'}} {{78-78=\n    public func foo() {\n        <#code#>\n    \}\n\n    public typealias AssocType = <#type#>\n}}
 }
 public class Adopter9: ProtocolWithPublicAccess3, ProtocolWithPublicAccess4 {
   // expected-error@-1{{type 'Adopter9' does not conform to protocol 'ProtocolWithPublicAccess3'}}
@@ -107,10 +107,10 @@ public class Adopter9: ProtocolWithPublicAccess3, ProtocolWithPublicAccess4 {
 }
 
 private protocol ProtocolWithPrivateAccess1 {
-  func foo() // expected-note{{protocol requires function 'foo()' with type '() -> ()'; do you want to add a stub?}} {{74-74=\n    func foo() {\n        <#code#>\n    \}\n}}
+  func foo() // expected-note{{protocol requires function 'foo()' with type '() -> ()'; do you want to add a stub?}} {{74-74=\n    func foo() {\n        <#code#>\n    \}\n\n    typealias AssocType = <#type#>\n}}
 }
 private protocol ProtocolWithPrivateAccess2 {
-  associatedtype AssocType //expected-note{{protocol requires nested type 'AssocType'}} {{74-74=\n    typealias AssocType = <#type#>\n}}
+  associatedtype AssocType //expected-note{{protocol requires nested type 'AssocType'}} {{74-74=\n    func foo() {\n        <#code#>\n    \}\n\n    typealias AssocType = <#type#>\n}}
 }
 class Adopter10: ProtocolWithPrivateAccess1, ProtocolWithPrivateAccess2 {
   // expected-error@-1{{type 'Adopter10' does not conform to protocol 'ProtocolWithPrivateAccess1'}}
@@ -118,10 +118,10 @@ class Adopter10: ProtocolWithPrivateAccess1, ProtocolWithPrivateAccess2 {
 }
 
 private protocol ProtocolWithPrivateAccess3 {
-  func foo() // expected-note{{protocol requires function 'foo()' with type '() -> ()'; do you want to add a stub?}} {{81-81=\n    func foo() {\n        <#code#>\n    \}\n}}
+  func foo() // expected-note{{protocol requires function 'foo()' with type '() -> ()'; do you want to add a stub?}} {{81-81=\n    func foo() {\n        <#code#>\n    \}\n\n    typealias AssocType = <#type#>\n}}
 }
 private protocol ProtocolWithPrivateAccess4 {
-  associatedtype AssocType //expected-note{{protocol requires nested type 'AssocType'}} {{81-81=\n    typealias AssocType = <#type#>\n}}
+  associatedtype AssocType //expected-note{{protocol requires nested type 'AssocType'}} {{81-81=\n    func foo() {\n        <#code#>\n    \}\n\n    typealias AssocType = <#type#>\n}}
 }
 public class Adopter11: ProtocolWithPrivateAccess3, ProtocolWithPrivateAccess4 {
   // expected-error@-1{{type 'Adopter11' does not conform to protocol 'ProtocolWithPrivateAccess3'}}
@@ -145,3 +145,50 @@ protocol ProtocolRequiresInit3 {
 
 struct Adopter14 {} // expected-note{{candidate}}
 extension Adopter14 : ProtocolRequiresInit3 {} //expected-error {{type 'Adopter14' does not conform to protocol 'ProtocolRequiresInit3'}}
+
+protocol ProtocolChain1 {
+  func foo1() // expected-note {{protocol requires function 'foo1()' with type '() -> ()'; do you want to add a stub?}}{{35-35=\n    func bar1() {\n        <#code#>\n    \}\n\n    func bar2() {\n        <#code#>\n    \}\n\n    func bar3() {\n        <#code#>\n    \}\n\n    var bar4: Int\n\n    func foo1() {\n        <#code#>\n    \}\n\n    func foo2() {\n        <#code#>\n    \}\n\n    func foo3() {\n        <#code#>\n    \}\n\n    var foo4: Int\n}}
+  func foo2() // expected-note {{protocol requires function 'foo2()' with type '() -> ()'; do you want to add a stub?}}{{35-35=\n    func bar1() {\n        <#code#>\n    \}\n\n    func bar2() {\n        <#code#>\n    \}\n\n    func bar3() {\n        <#code#>\n    \}\n\n    var bar4: Int\n\n    func foo1() {\n        <#code#>\n    \}\n\n    func foo2() {\n        <#code#>\n    \}\n\n    func foo3() {\n        <#code#>\n    \}\n\n    var foo4: Int\n}}
+  func foo3() // expected-note {{protocol requires function 'foo3()' with type '() -> ()'; do you want to add a stub?}}{{35-35=\n    func bar1() {\n        <#code#>\n    \}\n\n    func bar2() {\n        <#code#>\n    \}\n\n    func bar3() {\n        <#code#>\n    \}\n\n    var bar4: Int\n\n    func foo1() {\n        <#code#>\n    \}\n\n    func foo2() {\n        <#code#>\n    \}\n\n    func foo3() {\n        <#code#>\n    \}\n\n    var foo4: Int\n}}
+  var foo4 : Int {get set } // expected-note {{protocol requires property 'foo4' with type 'Int'; do you want to add a stub?}}{{35-35=\n    func bar1() {\n        <#code#>\n    \}\n\n    func bar2() {\n        <#code#>\n    \}\n\n    func bar3() {\n        <#code#>\n    \}\n\n    var bar4: Int\n\n    func foo1() {\n        <#code#>\n    \}\n\n    func foo2() {\n        <#code#>\n    \}\n\n    func foo3() {\n        <#code#>\n    \}\n\n    var foo4: Int\n}}
+}
+protocol ProtocolChain2 : ProtocolChain1 {
+  func bar1() // expected-note {{protocol requires function 'bar1()' with type '() -> ()'; do you want to add a stub?}}{{35-35=\n    func bar1() {\n        <#code#>\n    \}\n\n    func bar2() {\n        <#code#>\n    \}\n\n    func bar3() {\n        <#code#>\n    \}\n\n    var bar4: Int\n\n    func foo1() {\n        <#code#>\n    \}\n\n    func foo2() {\n        <#code#>\n    \}\n\n    func foo3() {\n        <#code#>\n    \}\n\n    var foo4: Int\n}}
+  func bar2() // expected-note {{protocol requires function 'bar2()' with type '() -> ()'; do you want to add a stub?}}{{35-35=\n    func bar1() {\n        <#code#>\n    \}\n\n    func bar2() {\n        <#code#>\n    \}\n\n    func bar3() {\n        <#code#>\n    \}\n\n    var bar4: Int\n\n    func foo1() {\n        <#code#>\n    \}\n\n    func foo2() {\n        <#code#>\n    \}\n\n    func foo3() {\n        <#code#>\n    \}\n\n    var foo4: Int\n}}
+  func bar3() // expected-note {{protocol requires function 'bar3()' with type '() -> ()'; do you want to add a stub?}}{{35-35=\n    func bar1() {\n        <#code#>\n    \}\n\n    func bar2() {\n        <#code#>\n    \}\n\n    func bar3() {\n        <#code#>\n    \}\n\n    var bar4: Int\n\n    func foo1() {\n        <#code#>\n    \}\n\n    func foo2() {\n        <#code#>\n    \}\n\n    func foo3() {\n        <#code#>\n    \}\n\n    var foo4: Int\n}}
+  var bar4 : Int {get set } // expected-note {{protocol requires property 'bar4' with type 'Int'; do you want to add a stub?}}{{35-35=\n    func bar1() {\n        <#code#>\n    \}\n\n    func bar2() {\n        <#code#>\n    \}\n\n    func bar3() {\n        <#code#>\n    \}\n\n    var bar4: Int\n\n    func foo1() {\n        <#code#>\n    \}\n\n    func foo2() {\n        <#code#>\n    \}\n\n    func foo3() {\n        <#code#>\n    \}\n\n    var foo4: Int\n}}
+}
+
+class Adopter15 : ProtocolChain2 {} //expected-error {{type 'Adopter15' does not conform to protocol 'ProtocolChain2'}} expected-error {{type 'Adopter15' does not conform to protocol 'ProtocolChain1'}}
+
+protocol ProtocolParallel1 {
+  associatedtype Foo1 // expected-note {{protocol requires nested type 'Foo1'; do you want to add it?}}{{57-57=\n    typealias Foo1 = <#type#>\n\n    typealias Foo2 = <#type#>\n\n    typealias Foo3 = <#type#>\n\n    typealias Bar1 = <#type#>\n\n    typealias Bar2 = <#type#>\n\n    typealias Bar3 = <#type#>\n}}
+  associatedtype Foo2 // expected-note {{protocol requires nested type 'Foo2'; do you want to add it?}}{{57-57=\n    typealias Foo1 = <#type#>\n\n    typealias Foo2 = <#type#>\n\n    typealias Foo3 = <#type#>\n\n    typealias Bar1 = <#type#>\n\n    typealias Bar2 = <#type#>\n\n    typealias Bar3 = <#type#>\n}}
+  associatedtype Foo3 // expected-note {{protocol requires nested type 'Foo3'; do you want to add it?}}{{57-57=\n    typealias Foo1 = <#type#>\n\n    typealias Foo2 = <#type#>\n\n    typealias Foo3 = <#type#>\n\n    typealias Bar1 = <#type#>\n\n    typealias Bar2 = <#type#>\n\n    typealias Bar3 = <#type#>\n}}
+  func Foo4()
+}
+
+protocol ProtocolParallel2 {
+  associatedtype Bar1 // expected-note {{protocol requires nested type 'Bar1'; do you want to add it?}}{{57-57=\n    typealias Foo1 = <#type#>\n\n    typealias Foo2 = <#type#>\n\n    typealias Foo3 = <#type#>\n\n    typealias Bar1 = <#type#>\n\n    typealias Bar2 = <#type#>\n\n    typealias Bar3 = <#type#>\n}}
+  associatedtype Bar2 // expected-note {{protocol requires nested type 'Bar2'; do you want to add it?}}{{57-57=\n    typealias Foo1 = <#type#>\n\n    typealias Foo2 = <#type#>\n\n    typealias Foo3 = <#type#>\n\n    typealias Bar1 = <#type#>\n\n    typealias Bar2 = <#type#>\n\n    typealias Bar3 = <#type#>\n}}
+  associatedtype Bar3 // expected-note {{protocol requires nested type 'Bar3'; do you want to add it?}}{{57-57=\n    typealias Foo1 = <#type#>\n\n    typealias Foo2 = <#type#>\n\n    typealias Foo3 = <#type#>\n\n    typealias Bar1 = <#type#>\n\n    typealias Bar2 = <#type#>\n\n    typealias Bar3 = <#type#>\n}}
+  func Bar4()
+}
+
+class Adopter16 : ProtocolParallel1, ProtocolParallel2 {} // expected-error {{type 'Adopter16' does not conform to protocol 'ProtocolParallel1'}} expected-error {{type 'Adopter16' does not conform to protocol 'ProtocolParallel2'}}
+
+protocol ProtocolParallel3 {
+  func foo1() // expected-note{{protocol requires function 'foo1()' with type '() -> ()'; do you want to add a stub?}}{{56-56=\n    func foo1() {\n        <#code#>\n    \}\n\n    func foo2() {\n        <#code#>\n    \}\n}}
+  func foo2() // expected-note{{protocol requires function 'foo2()' with type '() -> ()'; do you want to add a stub?}}{{56-56=\n    func foo1() {\n        <#code#>\n    \}\n\n    func foo2() {\n        <#code#>\n    \}\n}}
+}
+
+protocol ProtocolParallel4 {
+  func bar1()
+  func bar2()
+}
+
+class Adopter17: ProtocolParallel3, ProtocolParallel4 { // expected-error {{type 'Adopter17' does not conform to protocol 'ProtocolParallel3'}}
+  func bar1() {}
+  func bar2() {}
+}
+

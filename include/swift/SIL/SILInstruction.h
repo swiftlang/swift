@@ -461,8 +461,8 @@ public:
     }
   }
 
-  size_t
-      numTrailingObjects(SWIFT_TRAILING_OBJECTS_OVERLOAD_TOKEN(Operand)) const {
+  size_t numTrailingObjects(
+    typename TrailingObjects::template OverloadToken<Operand>) const {
     return NumOperands;
   }
 
@@ -2300,8 +2300,8 @@ public:
   SILType getBoundType() const { return BoundType ; }
 
   // Implement llvm::TrailingObjects.
-  size_t
-      numTrailingObjects(SWIFT_TRAILING_OBJECTS_OVERLOAD_TOKEN(Operand)) const {
+  size_t numTrailingObjects(
+    typename TrailingObjects::template OverloadToken<Operand>) const {
     return NumOperands;
   }
 
@@ -2416,17 +2416,22 @@ class PointerToAddressInst
 {
   friend SILBuilder;
 
-  bool IsStrict;
+  bool IsStrict, IsInvariant;
 
   PointerToAddressInst(SILDebugLocation DebugLoc, SILValue Operand, SILType Ty,
-                       bool IsStrict)
-    : UnaryInstructionBase(DebugLoc, Operand, Ty), IsStrict(IsStrict) {}
+                       bool IsStrict, bool IsInvariant)
+    : UnaryInstructionBase(DebugLoc, Operand, Ty),
+      IsStrict(IsStrict), IsInvariant(IsInvariant) {}
 
 public:
   /// Whether the returned address adheres to strict aliasing.
   /// If true, then the type of each memory access dependent on
   /// this address must be consistent with the memory's bound type.
   bool isStrict() const { return IsStrict; }
+  /// Whether the returned address is invariant.
+  /// If true, then loading from an address derived from this pointer always
+  /// produces the same value.
+  bool isInvariant() const { return IsInvariant; }
 };
 
 /// Convert a heap object reference to a different type without any runtime
@@ -2838,20 +2843,19 @@ public:
 
 /// Perform an unconditional checked cast that aborts if the cast fails.
 /// The result of the checked cast is left in the destination.
-class UnconditionalCheckedCastOpaqueInst final
+class UnconditionalCheckedCastValueInst final
     : public UnaryInstructionWithTypeDependentOperandsBase<
-          ValueKind::UnconditionalCheckedCastOpaqueInst,
-          UnconditionalCheckedCastOpaqueInst, ConversionInst, true> {
+          ValueKind::UnconditionalCheckedCastValueInst,
+          UnconditionalCheckedCastValueInst, ConversionInst, true> {
   friend SILBuilder;
 
-  UnconditionalCheckedCastOpaqueInst(SILDebugLocation DebugLoc,
-                                     SILValue Operand,
-                                     ArrayRef<SILValue> TypeDependentOperands,
-                                     SILType DestTy)
+  UnconditionalCheckedCastValueInst(SILDebugLocation DebugLoc, SILValue Operand,
+                                    ArrayRef<SILValue> TypeDependentOperands,
+                                    SILType DestTy)
       : UnaryInstructionWithTypeDependentOperandsBase(
             DebugLoc, Operand, TypeDependentOperands, DestTy) {}
 
-  static UnconditionalCheckedCastOpaqueInst *
+  static UnconditionalCheckedCastValueInst *
   create(SILDebugLocation DebugLoc, SILValue Operand, SILType DestTy,
          SILFunction &F, SILOpenedArchetypesState &OpenedArchetypes);
 };
@@ -3153,6 +3157,11 @@ public:
     return getElements()[i];
   }
 
+  unsigned getElementIndex(Operand *operand) {
+    assert(operand->getUser() == this);
+    return operand->getOperandNumber();
+  }
+
   ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
   MutableArrayRef<Operand> getAllOperands() { return Operands.asArray(); }
 
@@ -3217,6 +3226,8 @@ public:
 
   bool hasOperand() const { return OptionalOperand.hasValue(); }
   SILValue getOperand() const { return OptionalOperand->asValueArray()[0]; }
+
+  Operand &getOperandRef() { return OptionalOperand->asArray()[0]; }
 
   ArrayRef<Operand> getAllOperands() const {
     return OptionalOperand ? OptionalOperand->asArray() : ArrayRef<Operand>{};
@@ -3869,12 +3880,6 @@ public:
   }
 
   ProtocolConformanceRef getConformance() const { return Conformance; }
-
-  /// Get a representation of the lookup type as a substitution of the
-  /// protocol's Self archetype.
-  Substitution getSelfSubstitution() const {
-    return Substitution{getLookupType(), Conformance};
-  }
 
   ArrayRef<Operand> getAllOperands() const {
     return { getTrailingObjects<Operand>(), NumOperands };
@@ -5363,6 +5368,47 @@ public:
 };
 
 /// Perform a checked cast operation and branch on whether the cast succeeds.
+/// The success branch destination block receives the cast result as a BB
+/// argument.
+class CheckedCastValueBranchInst final
+    : public UnaryInstructionWithTypeDependentOperandsBase<
+          ValueKind::CheckedCastValueBranchInst, CheckedCastValueBranchInst,
+          TermInst, false> {
+  friend SILBuilder;
+
+  SILType DestTy;
+
+  SILSuccessor DestBBs[2];
+
+  CheckedCastValueBranchInst(SILDebugLocation DebugLoc, SILValue Operand,
+                             ArrayRef<SILValue> TypeDependentOperands,
+                             SILType DestTy, SILBasicBlock *SuccessBB,
+                             SILBasicBlock *FailureBB)
+      : UnaryInstructionWithTypeDependentOperandsBase(DebugLoc, Operand,
+                                                      TypeDependentOperands),
+        DestTy(DestTy), DestBBs{{this, SuccessBB}, {this, FailureBB}} {}
+
+  static CheckedCastValueBranchInst *
+  create(SILDebugLocation DebugLoc, SILValue Operand, SILType DestTy,
+         SILBasicBlock *SuccessBB, SILBasicBlock *FailureBB, SILFunction &F,
+         SILOpenedArchetypesState &OpenedArchetypes);
+
+public:
+  SuccessorListTy getSuccessors() { return DestBBs; }
+
+  SILType getCastType() const { return DestTy; }
+
+  SILBasicBlock *getSuccessBB() { return DestBBs[0]; }
+  const SILBasicBlock *getSuccessBB() const { return DestBBs[0]; }
+  SILBasicBlock *getFailureBB() { return DestBBs[1]; }
+  const SILBasicBlock *getFailureBB() const { return DestBBs[1]; }
+
+  static bool classof(const ValueBase *V) {
+    return V->getKind() == ValueKind::CheckedCastValueBranchInst;
+  }
+};
+
+/// Perform a checked cast operation and branch on whether the cast succeeds.
 /// The result of the checked cast is left in the destination address.
 class CheckedCastAddrBranchInst : public TermInst {
   friend SILBuilder;
@@ -5690,6 +5736,10 @@ public:
 
 #undef FOREACH_IMPL_RETURN
 
+  SILArgumentConvention getArgumentConvention(unsigned index) const {
+    return getSubstCalleeConv().getSILArgumentConvention(index);
+  }
+
   static ApplySite getFromOpaqueValue(void *p) {
     return ApplySite(p);
   }
@@ -5738,10 +5788,6 @@ public:
 
   OperandValueArrayRef getArgumentsWithoutIndirectResults() const {
     return getArguments().slice(getNumIndirectSILResults());
-  }
-
-  SILArgumentConvention getArgumentConvention(unsigned index) const {
-    return getSubstCalleeConv().getSILArgumentConvention(index);
   }
 
   static FullApplySite getFromOpaqueValue(void *p) {

@@ -77,3 +77,15 @@
 // CHECK-LIB: -embed-bitcode
 // CHECK-LIB: -disable-llvm-optzns
 // CHECK-LIB-NOT: swift -frontend
+
+// RUN: %target-swiftc_driver -embed-bitcode -emit-module %s 2>&1 -### | %FileCheck %s -check-prefix=WARN-EMBED-BITCODE
+// RUN: %target-swiftc_driver -embed-bitcode -emit-module-path a.swiftmodule %s 2>&1 -### | %FileCheck %s -check-prefix=WARN-EMBED-BITCODE
+// RUN: %target-swiftc_driver -embed-bitcode -emit-sib %s 2>&1 -### | %FileCheck %s -check-prefix=WARN-EMBED-BITCODE
+// RUN: %target-swiftc_driver -embed-bitcode -emit-sibgen %s 2>&1 -### | %FileCheck %s -check-prefix=WARN-EMBED-BITCODE
+// RUN: %target-swiftc_driver -embed-bitcode -emit-sil %s 2>&1 -### | %FileCheck %s -check-prefix=WARN-EMBED-BITCODE
+// RUN: %target-swiftc_driver -embed-bitcode -emit-silgen %s 2>&1 -### | %FileCheck %s -check-prefix=WARN-EMBED-BITCODE
+// RUN: %target-swiftc_driver -embed-bitcode -emit-ir %s 2>&1 -### | %FileCheck %s -check-prefix=WARN-EMBED-BITCODE
+// RUN: %target-swiftc_driver -embed-bitcode -emit-bc %s 2>&1 -### | %FileCheck %s -check-prefix=WARN-EMBED-BITCODE
+// RUN: %target-swiftc_driver -embed-bitcode -emit-assembly %s 2>&1 -### | %FileCheck %s -check-prefix=WARN-EMBED-BITCODE
+// WARN-EMBED-BITCODE: warning: ignoring -embed-bitcode since no object file is being generated
+// WARN-EMBED-BITCODE-NOT: -embed-bitcode

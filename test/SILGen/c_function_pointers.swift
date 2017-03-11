@@ -3,7 +3,7 @@
 func values(_ arg: @escaping @convention(c) (Int) -> Int) -> @convention(c) (Int) -> Int {
   return arg
 }
-// CHECK-LABEL: sil hidden @_T019c_function_pointers6valuesSiSiXCSiSiXCF
+// CHECK-LABEL: sil hidden @_T019c_function_pointers6valuesS2iXCS2iXCF
 // CHECK:       bb0(%0 : $@convention(c) (Int) -> Int):
 // CHECK:         return %0 : $@convention(c) (Int) -> Int
 
@@ -11,7 +11,7 @@ func values(_ arg: @escaping @convention(c) (Int) -> Int) -> @convention(c) (Int
 func calls(_ arg: @convention(c) (Int) -> Int, _ x: Int) -> Int {
   return arg(x)
 }
-// CHECK-LABEL: sil hidden @_T019c_function_pointers5callsSiSiSiXC_SitF
+// CHECK-LABEL: sil hidden @_T019c_function_pointers5callsS3iXC_SitF
 // CHECK:       bb0(%0 : $@convention(c) (Int) -> Int, %1 : $Int):
 // CHECK:         [[RESULT:%.*]] = apply %0(%1)
 // CHECK:         return [[RESULT]]
@@ -31,15 +31,15 @@ func pointers_to_swift_functions(_ x: Int) {
 
   func local(_ y: Int) -> Int { return y }
 
-  // CHECK:   [[GLOBAL_C:%.*]] = function_ref @_T019c_function_pointers6globalSiSiFTo
+  // CHECK:   [[GLOBAL_C:%.*]] = function_ref @_T019c_function_pointers6globalS2iFTo
   // CHECK:   apply {{.*}}([[GLOBAL_C]], [[X]])
   calls(global, x)
 
-  // CHECK:   [[LOCAL_C:%.*]] = function_ref @_T019c_function_pointers0B19_to_swift_functionsySiF5localL_SiSiFTo
+  // CHECK:   [[LOCAL_C:%.*]] = function_ref @_T019c_function_pointers0B19_to_swift_functionsySiF5localL_S2iFTo
   // CHECK:   apply {{.*}}([[LOCAL_C]], [[X]])
   calls(local, x)
 
-  // CHECK:   [[CLOSURE_C:%.*]] = function_ref @_T019c_function_pointers0B19_to_swift_functionsySiFSiSicfU_To
+  // CHECK:   [[CLOSURE_C:%.*]] = function_ref @_T019c_function_pointers0B19_to_swift_functionsySiFS2icfU_To
   // CHECK:   apply {{.*}}([[CLOSURE_C]], [[X]])
   calls({ $0 + 1 }, x)
 

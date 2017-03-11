@@ -203,12 +203,12 @@ func missingControllingExprInForEach() {
 func missingControllingExprInSwitch() {
   switch // expected-error {{expected expression in 'switch' statement}} expected-error {{expected '{' after 'switch' subject expression}}
 
-  switch { // expected-error {{expected expression in 'switch' statement}}
-  } // expected-error {{'switch' statement body must have at least one 'case' or 'default' block}}
+  switch { // expected-error {{expected expression in 'switch' statement}} expected-error {{'switch' statement body must have at least one 'case' or 'default' block}}
+  }
 
-  switch // expected-error {{expected expression in 'switch' statement}}
+  switch // expected-error {{expected expression in 'switch' statement}} expected-error {{'switch' statement body must have at least one 'case' or 'default' block}}
   {
-  } // expected-error {{'switch' statement body must have at least one 'case' or 'default' block}}
+  }
 
   switch { // expected-error {{expected expression in 'switch' statement}}
     case _: return

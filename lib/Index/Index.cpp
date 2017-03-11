@@ -355,7 +355,7 @@ private:
   bool startEntity(Decl *D, IndexSymbol &Info);
   bool startEntityDecl(ValueDecl *D);
 
-  bool reportRelatedRef(ValueDecl *D, SourceLoc Loc, SymbolRoleSet Relations, Decl *Related);
+  bool reportRelatedRef(ValueDecl *D, SourceLoc Loc, bool isImplicit, SymbolRoleSet Relations, Decl *Related);
   bool reportRelatedTypeRef(const TypeLoc &Ty, SymbolRoleSet Relations, Decl *Related);
   bool reportInheritedTypeRefs(ArrayRef<TypeLoc> Inherited, Decl *Inheritee);
   NominalTypeDecl *getTypeLocAsNominalTypeDecl(const TypeLoc &Ty);
@@ -624,13 +624,16 @@ bool IndexSwiftASTWalker::startEntityDecl(ValueDecl *D) {
   return startEntity(D, Info);
 }
 
-bool IndexSwiftASTWalker::reportRelatedRef(ValueDecl *D, SourceLoc Loc, SymbolRoleSet Relations, Decl *Related) {
+bool IndexSwiftASTWalker::reportRelatedRef(ValueDecl *D, SourceLoc Loc, bool isImplicit,
+                                           SymbolRoleSet Relations, Decl *Related) {
   if (!shouldIndex(D))
     return true;
 
   IndexSymbol Info;
   if (addRelation(Info, Relations, Related))
     return true;
+  if (isImplicit)
+    Info.roles |= (unsigned)SymbolRole::Implicit;
 
   // don't report this ref again when visitDeclReference reports it
   repressRefAtLoc(Loc);
@@ -655,9 +658,24 @@ bool IndexSwiftASTWalker::reportRelatedTypeRef(const TypeLoc &Ty, SymbolRoleSet 
 
   if (IdentTypeRepr *T = dyn_cast_or_null<IdentTypeRepr>(Ty.getTypeRepr())) {
     auto Comps = T->getComponentRange();
-    if (auto NTD =
-            dyn_cast_or_null<NominalTypeDecl>(Comps.back()->getBoundDecl())) {
-      if (!reportRelatedRef(NTD, Comps.back()->getIdLoc(), Relations, Related))
+    SourceLoc IdLoc = Comps.back()->getIdLoc();
+    NominalTypeDecl *NTD = nullptr;
+    bool isImplicit = false;
+    if (auto *VD = Comps.back()->getBoundDecl()) {
+      if (auto *TAD = dyn_cast<TypeAliasDecl>(VD)) {
+        IndexSymbol Info;
+        if (!reportRef(TAD, IdLoc, Info))
+          return false;
+        if (auto Ty = TAD->getUnderlyingTypeLoc().getType()) {
+          NTD = Ty->getAnyNominal();
+          isImplicit = true;
+        }
+      } else {
+        NTD = dyn_cast<NominalTypeDecl>(VD);
+      }
+    }
+    if (NTD) {
+      if (!reportRelatedRef(NTD, IdLoc, isImplicit, Relations, Related))
         return false;
     }
     return true;
@@ -665,7 +683,7 @@ bool IndexSwiftASTWalker::reportRelatedTypeRef(const TypeLoc &Ty, SymbolRoleSet 
 
   if (Ty.getType()) {
     if (auto nominal = Ty.getType()->getAnyNominal())
-      if (!reportRelatedRef(nominal, Ty.getLoc(), Relations, Related))
+      if (!reportRelatedRef(nominal, Ty.getLoc(), /*isImplicit=*/false, Relations, Related))
         return false;
   }
   return true;
@@ -752,8 +770,8 @@ bool IndexSwiftASTWalker::reportExtension(ExtensionDecl *D) {
   if (!startEntity(D, Info))
     return false;
 
-  if (!reportRelatedRef(NTD, Loc, (SymbolRoleSet)SymbolRole::RelationExtendedBy,
-                        D))
+  if (!reportRelatedRef(NTD, Loc, /*isImplicit=*/false,
+                        (SymbolRoleSet)SymbolRole::RelationExtendedBy, D))
       return false;
   if (!reportInheritedTypeRefs(D->getInherited(), D))
       return false;
@@ -921,71 +939,10 @@ static NominalTypeDecl *getNominalParent(ValueDecl *D) {
   return Ty->getAnyNominal();
 }
 
-/// \returns true if \c D is a subclass of 'XCTestCase'.
-static bool isUnitTestCase(const ClassDecl *D) {
-  if (!D)
-    return false;
-  while (auto *SuperD = D->getSuperclassDecl()) {
-    if (SuperD->getNameStr() == "XCTestCase")
-      return true;
-    D = SuperD;
-  }
-  return false;
-}
-
-static bool isUnitTest(ValueDecl *D) {
-  if (!D->hasName())
-    return false;
-
-  // A 'test candidate' is:
-  // 1. An instance method...
-  auto FD = dyn_cast<FuncDecl>(D);
-  if (!FD)
-    return false;
-  if (!D->isInstanceMember())
-    return false;
-
-  // 2. ...on a class or extension (not a struct) subclass of XCTestCase...
-  auto parentNTD = getNominalParent(D);
-  if (!parentNTD)
-    return false;
-  if (!isa<ClassDecl>(parentNTD))
-    return false;
-  if (!isUnitTestCase(cast<ClassDecl>(parentNTD)))
-    return false;
-
-  // 3. ...that returns void...
-  Type RetTy = FD->getResultInterfaceType();
-  if (RetTy && !RetTy->isVoid())
-    return false;
-
-  // 4. ...takes no parameters...
-  if (FD->getParameterLists().size() != 2)
-    return false;
-  if (FD->getParameterList(1)->size() != 0)
-    return false;
-
-  // 5. ...is of at least 'internal' accessibility (unless we can use
-  //    Objective-C reflection)...
-  if (!D->getASTContext().LangOpts.EnableObjCInterop &&
-      (D->getFormalAccess() < Accessibility::Internal ||
-      parentNTD->getFormalAccess() < Accessibility::Internal))
-    return false;
-
-  // 6. ...and starts with "test".
-  if (FD->getName().str().startswith("test"))
-    return true;
-
-  return false;
-}
-
 bool IndexSwiftASTWalker::initFuncDeclIndexSymbol(FuncDecl *D,
                                                   IndexSymbol &Info) {
   if (initIndexSymbol(D, D->getLoc(), /*IsRef=*/false, Info))
     return true;
-
-  if (isUnitTest(D))
-    Info.symInfo.Properties |= SymbolProperty::UnitTest;
 
   if (D->getAttrs().hasAttribute<IBActionAttr>()) {
     // Relate with type of the first parameter using RelationIBTypeOf.
@@ -1112,9 +1069,6 @@ bool IndexSwiftASTWalker::initVarRefIndexSymbols(Expr *CurrentE, ValueDecl *D, S
 
   if (!CurrentE)
     return false;
-
-  if (!(CurrentE->getReferencedDecl() == D))
-    return true;
 
   AccessKind Kind = CurrentE->hasLValueAccessKind() ? CurrentE->getLValueAccessKind() : AccessKind::Read;
   switch (Kind) {

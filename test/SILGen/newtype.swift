@@ -43,8 +43,8 @@ func getRawValue(ed: ErrorDomain) -> String {
 // CHECK-RAW: return [[STRING_RESULT]]
 
 class ObjCTest {
-  // CHECK-RAW-LABEL: sil hidden @_T07newtype8ObjCTestC19optionalPassThroughSC11ErrorDomainVSgAFSgF : $@convention(method) (@owned Optional<ErrorDomain>, @guaranteed ObjCTest) -> @owned Optional<ErrorDomain> {
-  // CHECK-RAW: sil hidden [thunk] @_T07newtype8ObjCTestC19optionalPassThroughSC11ErrorDomainVSgAFSgFTo : $@convention(objc_method) (Optional<ErrorDomain>, ObjCTest) -> Optional<ErrorDomain> {
+  // CHECK-RAW-LABEL: sil hidden @_T07newtype8ObjCTestC19optionalPassThroughSC11ErrorDomainVSgAGF : $@convention(method) (@owned Optional<ErrorDomain>, @guaranteed ObjCTest) -> @owned Optional<ErrorDomain> {
+  // CHECK-RAW: sil hidden [thunk] @_T07newtype8ObjCTestC19optionalPassThroughSC11ErrorDomainVSgAGFTo : $@convention(objc_method) (Optional<ErrorDomain>, ObjCTest) -> Optional<ErrorDomain> {
   @objc func optionalPassThrough(_ ed: ErrorDomain?) -> ErrorDomain? {
     return ed
   }  

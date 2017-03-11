@@ -45,6 +45,7 @@
 #include "llvm/IR/Module.h"
 
 #include "CallEmission.h"
+#include "ConstantBuilder.h"
 #include "EnumPayload.h"
 #include "Explosion.h"
 #include "FixedTypeInfo.h"
@@ -993,7 +994,8 @@ public:
   /// A class which lays out a specific conformance to a protocol.
   class WitnessTableBuilder : public SILWitnessVisitor<WitnessTableBuilder> {
     IRGenModule &IGM;
-    SmallVectorImpl<llvm::Constant*> &Table;
+    ConstantArrayBuilder &Table;
+    unsigned TableSize = ~0U; // will get overwritten unconditionally
     CanType ConcreteType;
     const NormalProtocolConformance &Conformance;
     ArrayRef<SILWitnessTable::Entry> SILEntries;
@@ -1007,7 +1009,7 @@ public:
 
   public:
     WitnessTableBuilder(IRGenModule &IGM,
-                        SmallVectorImpl<llvm::Constant*> &table,
+                        ConstantArrayBuilder &table,
                         SILWitnessTable *SILWT)
       : IGM(IGM), Table(table),
         ConcreteType(SILWT->getConformance()->getType()->getCanonicalType()),
@@ -1057,14 +1059,14 @@ public:
       // If we can emit the base witness table as a constant, do so.
       llvm::Constant *baseWitness = conf.tryGetConstantTable(IGM, ConcreteType);
       if (baseWitness) {
-        Table.push_back(baseWitness);
+        Table.addBitCast(baseWitness, IGM.Int8PtrTy);
         return;
       }
 
       // Otherwise, we'll need to derive it at instantiation time.
       RequiresSpecialization = true;
       SpecializedBaseConformances.push_back({Table.size(), &conf});
-      Table.push_back(llvm::ConstantPointerNull::get(IGM.WitnessTablePtrTy));
+      Table.addNullPointer(IGM.Int8PtrTy);
     }
 
     void addMethodFromSILWitnessTable(AbstractFunctionDecl *requirement) {
@@ -1073,7 +1075,7 @@ public:
 
       // Handle missing optional requirements.
       if (entry.getKind() == SILWitnessTable::MissingOptional) {
-        Table.push_back(llvm::ConstantPointerNull::get(IGM.Int8PtrTy));
+        Table.addNullPointer(IGM.Int8PtrTy);
         return;
       }
 
@@ -1096,7 +1098,7 @@ public:
         // It should be never called. We add a pointer to an error function.
         witness = IGM.getDeletedMethodErrorFn();
       }
-      Table.push_back(witness);
+      Table.addBitCast(witness, IGM.Int8PtrTy);
       return;
     }
 
@@ -1132,7 +1134,7 @@ public:
 
       llvm::Constant *metadataAccessFunction =
         getAssociatedTypeMetadataAccessFunction(requirement, associate);
-      Table.push_back(metadataAccessFunction);
+      Table.addBitCast(metadataAccessFunction, IGM.Int8PtrTy);
     }
 
     void addAssociatedConformance(Type associatedType, ProtocolDecl *protocol) {
@@ -1167,7 +1169,7 @@ public:
       llvm::Constant *wtableAccessFunction = 
         getAssociatedTypeWitnessTableAccessFunction(CanType(associatedType),
                                  associate, protocol, associatedConformance);
-      Table.push_back(wtableAccessFunction);
+      Table.addBitCast(wtableAccessFunction, IGM.Int8PtrTy);
     }
 
   private:
@@ -1236,12 +1238,7 @@ public:
 /// Build the witness table.
 void WitnessTableBuilder::build() {
   visitProtocolDecl(Conformance.getProtocol());
-
-  // Go through and convert all the entries to i8*.
-  // TODO: the IR would be more legible if we made a struct instead.
-  for (auto &entry : Table) {
-    entry = llvm::ConstantExpr::getBitCast(entry, IGM.Int8PtrTy);
-  }
+  TableSize = Table.size();
 }
 
 /// Return the address of a function which will return the type metadata
@@ -1577,7 +1574,7 @@ void WitnessTableBuilder::buildAccessFunction(llvm::Constant *wtable) {
   auto cacheTy = cast<llvm::StructType>(cache->getValueType());
   llvm::Constant *cacheData[] = {
     // WitnessTableSizeInWords
-    llvm::ConstantInt::get(IGM.Int16Ty, Table.size()),
+    llvm::ConstantInt::get(IGM.Int16Ty, TableSize),
     // WitnessTablePrivateSizeInWords
     llvm::ConstantInt::get(IGM.Int16Ty, NextCacheIndex),
     // RelativeIndirectablePointer<ProtocolDescriptor>
@@ -1720,7 +1717,8 @@ void IRGenModule::emitSILWitnessTable(SILWitnessTable *wt) {
     return;
 
   // Build the witnesses.
-  SmallVector<llvm::Constant*, 32> witnesses;
+  ConstantInitBuilder builder(*this);
+  auto witnesses = builder.beginArray(Int8PtrTy);
   WitnessTableBuilder wtableBuilder(*this, witnesses, wt);
   wtableBuilder.build();
   
@@ -1729,13 +1727,11 @@ void IRGenModule::emitSILWitnessTable(SILWitnessTable *wt) {
          && "witness table size doesn't match ProtocolInfo");
 
   // Produce the initializer value.
-  auto tableTy = llvm::ArrayType::get(FunctionPtrTy, witnesses.size());
-  auto initializer = llvm::ConstantArray::get(tableTy, witnesses);
+  auto initializer = witnesses.finishAndCreateFuture();
 
   auto global = cast<llvm::GlobalVariable>(
-                         getAddrOfWitnessTable(wt->getConformance(), tableTy));
+                    getAddrOfWitnessTable(wt->getConformance(), initializer));
   global->setConstant(true);
-  global->setInitializer(initializer);
   global->setAlignment(getWitnessTableAlignment().getValue());
 
   // FIXME: resilience; this should use the conformance's publishing scope.
@@ -1745,7 +1741,20 @@ void IRGenModule::emitSILWitnessTable(SILWitnessTable *wt) {
   if (wt->getConformance()->isBehaviorConformance())
     return;
 
-  addProtocolConformanceRecord(wt->getConformance());
+  NormalProtocolConformance *Conf = wt->getConformance();
+  addProtocolConformanceRecord(Conf);
+
+  CanType conformingType = Conf->getType()->getCanonicalType();
+  if (!doesConformanceReferenceNominalTypeDescriptor(*this, conformingType)) {
+    // Trigger the lazy emission of the foreign type metadata.
+    NominalTypeDecl *Nominal = conformingType->getAnyNominal();
+    if (ClassDecl *clas = dyn_cast<ClassDecl>(Nominal)) {
+      if (clas->isForeign())
+        getAddrOfForeignTypeMetadataCandidate(conformingType);
+    } else if (Nominal->hasClangNode()) {
+      getAddrOfForeignTypeMetadataCandidate(conformingType);
+    }
+  }
 }
 
 

@@ -13,12 +13,12 @@
 #include "SILGen.h"
 #include "Condition.h"
 #include "Scope.h"
-#include "swift/AST/AST.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticsCommon.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/ForeignErrorConvention.h"
+#include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/type_traits.h"
@@ -57,6 +57,9 @@ ManagedValue SILGenFunction::emitManagedRetain(SILLocation loc,
   assert(lowering.getLoweredType() == v->getType());
   if (lowering.isTrivial())
     return ManagedValue::forUnmanaged(v);
+  if (v->getType().isObject() &&
+      v.getOwnershipKind() == ValueOwnershipKind::Trivial)
+    return ManagedValue::forUnmanaged(v);
   assert(!lowering.isAddressOnly() && "cannot retain an unloadable type");
 
   v = lowering.emitCopyValue(B, loc, v);
@@ -73,6 +76,8 @@ ManagedValue SILGenFunction::emitManagedLoadCopy(SILLocation loc, SILValue v,
   assert(lowering.getLoweredType().getAddressType() == v->getType());
   v = lowering.emitLoadOfCopy(B, loc, v, IsNotTake);
   if (lowering.isTrivial())
+    return ManagedValue::forUnmanaged(v);
+  if (v.getOwnershipKind() == ValueOwnershipKind::Trivial)
     return ManagedValue::forUnmanaged(v);
   assert(!lowering.isAddressOnly() && "cannot retain an unloadable type");
   return emitManagedRValueWithCleanup(v, lowering);
@@ -107,7 +112,8 @@ ManagedValue SILGenFunction::emitManagedStoreBorrow(SILLocation loc, SILValue v,
 ManagedValue SILGenFunction::emitManagedStoreBorrow(
     SILLocation loc, SILValue v, SILValue addr, const TypeLowering &lowering) {
   assert(lowering.getLoweredType().getObjectType() == v->getType());
-  if (lowering.isTrivial()) {
+  if (lowering.isTrivial() ||
+      v.getOwnershipKind() == ValueOwnershipKind::Trivial) {
     lowering.emitStore(B, loc, v, addr, StoreOwnershipQualifier::Trivial);
     return ManagedValue::forUnmanaged(v);
   }
@@ -118,8 +124,6 @@ ManagedValue SILGenFunction::emitManagedStoreBorrow(
 
 ManagedValue SILGenFunction::emitManagedBeginBorrow(SILLocation loc,
                                                     SILValue v) {
-  if (v.getOwnershipKind() == ValueOwnershipKind::Guaranteed)
-    return ManagedValue::forUnmanaged(v);
   auto &lowering = F.getTypeLowering(v->getType());
   return emitManagedBeginBorrow(loc, v, lowering);
 }
@@ -131,8 +135,13 @@ SILGenFunction::emitManagedBeginBorrow(SILLocation loc, SILValue v,
          v->getType().getObjectType());
   if (lowering.isTrivial())
     return ManagedValue::forUnmanaged(v);
+
+  if (v.getOwnershipKind() == ValueOwnershipKind::Trivial)
+    return ManagedValue::forUnmanaged(v);
+
   if (v.getOwnershipKind() == ValueOwnershipKind::Guaranteed)
     return ManagedValue::forUnmanaged(v);
+
   auto *bbi = B.createBeginBorrow(loc, v);
   return emitManagedBorrowedRValueWithCleanup(v, bbi, lowering);
 }
@@ -263,9 +272,14 @@ ManagedValue SILGenFunction::emitManagedBorrowedRValueWithCleanup(
   if (lowering.isTrivial())
     return ManagedValue::forUnmanaged(borrowed);
 
+  if (original->getType().isObject() &&
+      original.getOwnershipKind() == ValueOwnershipKind::Trivial)
+    return ManagedValue::forUnmanaged(borrowed);
+
   if (borrowed->getType().isObject()) {
     Cleanups.pushCleanup<EndBorrowCleanup>(original, borrowed);
   }
+
   return ManagedValue(borrowed, CleanupHandle::invalid());
 }
 
@@ -276,10 +290,14 @@ ManagedValue SILGenFunction::emitManagedRValueWithCleanup(SILValue v) {
 
 ManagedValue SILGenFunction::emitManagedRValueWithCleanup(SILValue v,
                                                const TypeLowering &lowering) {
-  assert(lowering.getLoweredType() == v->getType());
+  assert(lowering.getLoweredType().getObjectType() ==
+         v->getType().getObjectType());
   if (lowering.isTrivial())
     return ManagedValue::forUnmanaged(v);
-  
+  if (v->getType().isObject() &&
+      v.getOwnershipKind() == ValueOwnershipKind::Trivial) {
+    return ManagedValue::forUnmanaged(v);
+  }
   return ManagedValue(v, enterDestroyCleanup(v));
 }
 
@@ -1246,9 +1264,8 @@ RValue RValueEmitter::visitDerivedToBaseExpr(DerivedToBaseExpr *E,
   if (original.getType() == loweredResultTy)
     return RValue(SGF, E, original);
 
-  SILValue converted = SGF.B.createUpcast(E, original.getValue(), 
-                                          loweredResultTy);
-  return RValue(SGF, E, ManagedValue(converted, original.getCleanup()));
+  ManagedValue converted = SGF.B.createUpcast(E, original, loweredResultTy);
+  return RValue(SGF, E, converted);
 }
 
 RValue RValueEmitter::visitMetatypeConversionExpr(MetatypeConversionExpr *E,
@@ -1267,6 +1284,35 @@ RValue RValueEmitter::visitMetatypeConversionExpr(MetatypeConversionExpr *E,
   return RValue(SGF, E, ManagedValue::forUnmanaged(upcast));
 }
 
+RValue SILGenFunction::emitCollectionConversion(SILLocation loc,
+                                                FuncDecl *fn,
+                                                CanType fromCollection,
+                                                CanType toCollection,
+                                                ManagedValue mv,
+                                                SGFContext C) {
+  auto *fromDecl = fromCollection->getAnyNominal();
+  auto *toDecl = toCollection->getAnyNominal();
+
+  auto fromSubMap = fromCollection->getContextSubstitutionMap(
+    SGM.SwiftModule, fromDecl);
+  auto toSubMap = toCollection->getContextSubstitutionMap(
+    SGM.SwiftModule, toDecl);
+
+  // Form type parameter substitutions.
+  auto *genericSig = fn->getGenericSignature();
+  unsigned fromParamCount = fromDecl->getGenericSignature()
+    ->getGenericParams().size();
+
+  auto subMap =
+    SubstitutionMap::combineSubstitutionMaps(fromSubMap,
+                                             toSubMap,
+                                             CombineSubstitutionMaps::AtIndex,
+                                             fromParamCount,
+                                             0,
+                                             genericSig);
+  return emitApplyOfLibraryIntrinsic(loc, fn, subMap, {mv}, C);
+}
+
 RValue RValueEmitter::
 visitCollectionUpcastConversionExpr(CollectionUpcastConversionExpr *E,
                                     SGFContext C) {
@@ -1277,42 +1323,24 @@ visitCollectionUpcastConversionExpr(CollectionUpcastConversionExpr *E,
   auto mv = SGF.emitRValueAsSingleValue(E->getSubExpr());
   
   // Compute substitutions for the intrinsic call.
-  auto fromCollection = cast<BoundGenericStructType>(
-                          E->getSubExpr()->getType()->getCanonicalType());
-  auto toCollection = cast<BoundGenericStructType>(
-                        E->getType()->getCanonicalType());
+  auto fromCollection = E->getSubExpr()->getType()->getCanonicalType();
+  auto toCollection = E->getType()->getCanonicalType();
 
   // Get the intrinsic function.
   auto &ctx = SGF.getASTContext();
   FuncDecl *fn = nullptr;
-  if (fromCollection->getDecl() == ctx.getArrayDecl()) {
+  if (fromCollection->getAnyNominal() == ctx.getArrayDecl()) {
     fn = SGF.SGM.getArrayForceCast(loc);
-  } else if (fromCollection->getDecl() == ctx.getDictionaryDecl()) {
+  } else if (fromCollection->getAnyNominal() == ctx.getDictionaryDecl()) {
     fn = SGF.SGM.getDictionaryUpCast(loc);
-  } else if (fromCollection->getDecl() == ctx.getSetDecl()) {
+  } else if (fromCollection->getAnyNominal() == ctx.getSetDecl()) {
     fn = SGF.SGM.getSetUpCast(loc);
   } else {
     llvm_unreachable("unsupported collection upcast kind");
   }
 
-  // This will have been diagnosed by the accessors above.
-  if (!fn) return SGF.emitUndefRValue(E, E->getType());
-  
-  auto fnGenericParams = fn->getGenericParams()->getParams();
-  auto fromSubsts = fromCollection->gatherAllSubstitutions(
-      SGF.SGM.SwiftModule, nullptr);
-  auto toSubsts = toCollection->gatherAllSubstitutions(
-      SGF.SGM.SwiftModule, nullptr);
-  assert(fnGenericParams.size() == fromSubsts.size() + toSubsts.size() &&
-         "wrong number of generic collection parameters");
-  (void) fnGenericParams;
-  
-  // Form type parameter substitutions.
-  SmallVector<Substitution, 4> subs;
-  subs.append(fromSubsts.begin(), fromSubsts.end());
-  subs.append(toSubsts.begin(), toSubsts.end());
-
-  return SGF.emitApplyOfLibraryIntrinsic(loc, fn, subs, {mv}, C);
+  return SGF.emitCollectionConversion(loc, fn, fromCollection, toCollection,
+                                      mv, C);
 }
 
 RValue RValueEmitter::visitArchetypeToSuperExpr(ArchetypeToSuperExpr *E,
@@ -1637,10 +1665,10 @@ RValue SILGenFunction::emitAnyHashableErasure(SILLocation loc,
         loc, getASTContext().getAnyHashableDecl()->getDeclaredType());
 
   // Construct the substitution for T: Hashable.
-  ProtocolConformanceRef conformances[] = { conformance };
-  Substitution sub(type, getASTContext().AllocateCopy(conformances));
+  auto subMap = SubstitutionMap::getProtocolSubstitutions(
+      conformance.getRequirement(), type, conformance);
 
-  return emitApplyOfLibraryIntrinsic(loc, convertFn, sub, value, C);
+  return emitApplyOfLibraryIntrinsic(loc, convertFn, subMap, value, C);
 }
 
 RValue RValueEmitter::visitAnyHashableErasureExpr(AnyHashableErasureExpr *E,
@@ -1670,8 +1698,14 @@ ManagedValue SILGenFunction::getManagedValue(SILLocation loc,
   if (valueTL.isTrivial())
     return ManagedValue::forUnmanaged(value.getValue());
 
-  // If it's an object, retain and enter a release cleanup.
+  // If it's an object...
   if (valueTy.isObject()) {
+    // See if we have more accurate information from the ownership kind. This
+    // detects trivial cases of enums.
+    if (value.getOwnershipKind() == ValueOwnershipKind::Trivial)
+      return ManagedValue::forUnmanaged(value.getValue());
+
+    // Otherwise, retain and enter a release cleanup.
     valueTL.emitCopyValue(B, loc, value.getValue());
     return emitManagedRValueWithCleanup(value.getValue(), valueTL);
   }
@@ -1706,7 +1740,8 @@ RValue RValueEmitter::visitIsExpr(IsExpr *E, SGFContext C) {
   // Call the _getBool library intrinsic.
   ASTContext &ctx = SGF.getASTContext();
   auto result =
-    SGF.emitApplyOfLibraryIntrinsic(E, ctx.getGetBoolDecl(nullptr), {},
+    SGF.emitApplyOfLibraryIntrinsic(E, ctx.getGetBoolDecl(nullptr),
+                                    SubstitutionMap(),
                                     ManagedValue::forUnmanaged(isa),
                                     C);
   return result;
@@ -1734,7 +1769,8 @@ RValue RValueEmitter::visitEnumIsCaseExpr(EnumIsCaseExpr *E,
   
   // Call the _getBool library intrinsic.
   auto result =
-    SGF.emitApplyOfLibraryIntrinsic(E, ctx.getGetBoolDecl(nullptr), {},
+    SGF.emitApplyOfLibraryIntrinsic(E, ctx.getGetBoolDecl(nullptr),
+                                    SubstitutionMap(),
                                     ManagedValue::forUnmanaged(selected),
                                     C);
   return result;
@@ -1773,7 +1809,9 @@ VarargsInfo Lowering::emitBeginVarargs(SILGenFunction &gen, SILLocation loc,
 
   // Turn the pointer into an address.
   basePtr = gen.B.createPointerToAddress(
-    loc, basePtr, baseTL.getLoweredType().getAddressType(), /*isStrict*/ true);
+    loc, basePtr, baseTL.getLoweredType().getAddressType(),
+    /*isStrict*/ true,
+    /*isInvariant*/ false);
 
   return VarargsInfo(array, abortCleanup, basePtr, baseTL, baseAbstraction);
 }
@@ -3567,25 +3605,6 @@ ProtocolDecl *SILGenFunction::getPointerProtocol() {
   return cast<ProtocolDecl>(lookup[0]);
 }
 
-/// Produce a Substitution for a type that conforms to the standard library
-/// _Pointer protocol.
-Substitution SILGenFunction::getPointerSubstitution(Type pointerType) {
-  auto &Ctx = getASTContext();
-  ProtocolDecl *pointerProto = getPointerProtocol();
-  auto conformance
-    = Ctx.getStdlibModule()->lookupConformance(pointerType, pointerProto,
-                                               nullptr);
-  assert(conformance && "not a _Pointer type");
-
-  // FIXME: Cache this
-  ProtocolConformanceRef conformances[] = {
-    ProtocolConformanceRef(*conformance)
-  };
-  auto conformancesCopy = Ctx.AllocateCopy(conformances);
-  
-  return Substitution{pointerType, conformancesCopy};
-}
-
 namespace {
 class AutoreleasingWritebackComponent : public LogicalPathComponent {
 public:
@@ -3729,8 +3748,10 @@ ManagedValue SILGenFunction::emitLValueToPointer(SILLocation loc,
   // Invoke the conversion intrinsic.
   FuncDecl *converter =
     getASTContext().getConvertInOutToPointerArgument(nullptr);
-  Substitution sub = getPointerSubstitution(pointerType);
-  return emitApplyOfLibraryIntrinsic(loc, converter, sub,
+
+  auto subMap = pointerType->getContextSubstitutionMap(SGM.M.getSwiftModule(),
+                                                       getPointerProtocol());
+  return emitApplyOfLibraryIntrinsic(loc, converter, subMap,
                                      ManagedValue::forUnmanaged(address),
                                      SGFContext())
            .getAsSingleValue(*this, loc);
@@ -3756,17 +3777,24 @@ RValue RValueEmitter::visitArrayToPointerExpr(ArrayToPointerExpr *E,
   }
 
   // Invoke the conversion intrinsic, which will produce an owner-pointer pair.
-  Substitution subs[2] = {
-    Substitution{
-      subExpr->getType()->getInOutObjectType()
-        ->castTo<BoundGenericType>()
-        ->getGenericArgs()[0],
-      {}
-    },
-    SGF.getPointerSubstitution(E->getType()),
-  };
+  auto *M = SGF.SGM.M.getSwiftModule();
+  auto firstSubMap = subExpr->getType()->getInOutObjectType()
+    ->getContextSubstitutionMap(
+      M, Ctx.getArrayDecl());
+  auto secondSubMap = E->getType()
+    ->getContextSubstitutionMap(
+      M, SGF.getPointerProtocol());
+
+  auto *genericSig = converter->getGenericSignature();
+  auto subMap =
+    SubstitutionMap::combineSubstitutionMaps(firstSubMap,
+                                             secondSubMap,
+                                             CombineSubstitutionMaps::AtIndex,
+                                             1, 0,
+                                             genericSig);
+
   SmallVector<ManagedValue, 2> resultScalars;
-  SGF.emitApplyOfLibraryIntrinsic(E, converter, subs, orig, SGFContext())
+  SGF.emitApplyOfLibraryIntrinsic(E, converter, subMap, orig, SGFContext())
     .getAll(resultScalars);
   assert(resultScalars.size() == 2);
   
@@ -3782,9 +3810,11 @@ RValue RValueEmitter::visitStringToPointerExpr(StringToPointerExpr *E,
   ManagedValue orig = SGF.emitRValueAsSingleValue(E->getSubExpr());
   
   // Invoke the conversion intrinsic, which will produce an owner-pointer pair.
-  Substitution sub = SGF.getPointerSubstitution(E->getType());
+  auto subMap = E->getType()->getCanonicalType()
+    ->getContextSubstitutionMap(SGF.SGM.M.getSwiftModule(),
+                                SGF.getPointerProtocol());
   SmallVector<ManagedValue, 2> results;
-  SGF.emitApplyOfLibraryIntrinsic(E, converter, sub, orig, C).getAll(results);
+  SGF.emitApplyOfLibraryIntrinsic(E, converter, subMap, orig, C).getAll(results);
   assert(results.size() == 2);
   
   // Implicitly leave the owner managed and return the pointer.

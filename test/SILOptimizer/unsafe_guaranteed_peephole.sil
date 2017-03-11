@@ -542,3 +542,85 @@ bb2(%9: $Error):
   strong_release %5 : $Foo
   throw  %9: $Error
 }
+
+// CHECK-LABEL: sil @testUnsafeGuaranteed_simple_retain_release_pair
+// CHECK: bb0([[P:%.*]] : $Foo):
+// CHECK-NOT: retain
+// CHECK-NOT: unsafeGuaranteed
+// CHECK:   [[M:%.*]] = class_method [[P]] : $Foo, #Foo.beep
+// CHECK:   apply [[M]]([[P]])
+// CHECK-NOT: release
+// CHECK-NOT: unsafeGuaranteedEnd
+// CHECK:   [[T:%.*]] = tuple ()
+// CHECK:   return [[T]]
+// CHECK: }
+sil @testUnsafeGuaranteed_simple_retain_release_pair : $@convention(method) (@guaranteed Foo) -> () {
+bb0(%0 : $Foo):
+  strong_retain %0 : $Foo
+  %4 = builtin "unsafeGuaranteed"<Foo>(%0 : $Foo) : $(Foo, Builtin.Int8)
+  %5 = tuple_extract %4 : $(Foo, Builtin.Int8), 0
+  %6 = tuple_extract %4 : $(Foo, Builtin.Int8), 1
+  %19 = class_method %5 : $Foo, #Foo.beep!1 : (Foo) -> () -> (), $@convention(method) (@guaranteed Foo) -> ()
+  retain_value %4 : $(Foo, Builtin.Int8)
+  %20 = apply %19(%5) : $@convention(method) (@guaranteed Foo) -> ()
+  strong_release %5 : $Foo
+  strong_release %5 : $Foo
+  %16 = builtin "unsafeGuaranteedEnd"(%6 : $Builtin.Int8) : $()
+  %17 = tuple ()
+  return %17 : $()
+}
+
+// CHECK-LABEL: sil @testUnsafeGuaranteed_simple_retain_release_pair2
+// CHECK: bb0([[P:%.*]] : $Foo):
+// CHECK-NOT: retain
+// CHECK-NOT: unsafeGuaranteed
+// CHECK:   [[M:%.*]] = class_method [[P]] : $Foo, #Foo.beep
+// CHECK:   apply [[M]]([[P]])
+// CHECK-NOT: release
+// CHECK-NOT: unsafeGuaranteedEnd
+// CHECK:   [[T:%.*]] = tuple ()
+// CHECK:   return [[T]]
+// CHECK: }
+sil @testUnsafeGuaranteed_simple_retain_release_pair2 : $@convention(method) (@guaranteed Foo) -> () {
+bb0(%0 : $Foo):
+  strong_retain %0 : $Foo
+  %4 = builtin "unsafeGuaranteed"<Foo>(%0 : $Foo) : $(Foo, Builtin.Int8)
+  %5 = tuple_extract %4 : $(Foo, Builtin.Int8), 0
+  %6 = tuple_extract %4 : $(Foo, Builtin.Int8), 1
+  %19 = class_method %5 : $Foo, #Foo.beep!1 : (Foo) -> () -> (), $@convention(method) (@guaranteed Foo) -> ()
+  retain_value %4 : $(Foo, Builtin.Int8)
+  %20 = apply %19(%5) : $@convention(method) (@guaranteed Foo) -> ()
+  strong_release %5 : $Foo
+  %16 = builtin "unsafeGuaranteedEnd"(%6 : $Builtin.Int8) : $()
+  strong_release %5 : $Foo
+  %17 = tuple ()
+  return %17 : $()
+}
+
+
+// CHECK-LABEL: sil @testUnsafeGuaranteed_simple_retain_release_pair_not_safe
+// CHECK: bb0([[P:%.*]] : $Foo):
+// CHECK:   [[M:%.*]] = class_method [[P]] : $Foo, #Foo.beep
+// CHECK: retain
+// CHECK: release
+// CHECK:   apply [[M]]([[P]])
+// CHECK: release
+// CHECK:   [[T:%.*]] = tuple ()
+// CHECK:   return [[T]]
+// CHECK: }
+sil @testUnsafeGuaranteed_simple_retain_release_pair_not_safe : $@convention(method) (@guaranteed Foo) -> () {
+bb0(%0 : $Foo):
+  strong_retain %0 : $Foo
+  %4 = builtin "unsafeGuaranteed"<Foo>(%0 : $Foo) : $(Foo, Builtin.Int8)
+  %5 = tuple_extract %4 : $(Foo, Builtin.Int8), 0
+  %6 = tuple_extract %4 : $(Foo, Builtin.Int8), 1
+  %19 = class_method %5 : $Foo, #Foo.beep!1 : (Foo) -> () -> (), $@convention(method) (@guaranteed Foo) -> ()
+  retain_value %4 : $(Foo, Builtin.Int8)
+  strong_release %0 : $Foo
+  %20 = apply %19(%5) : $@convention(method) (@guaranteed Foo) -> ()
+  strong_release %5 : $Foo
+  strong_release %5 : $Foo
+  %16 = builtin "unsafeGuaranteedEnd"(%6 : $Builtin.Int8) : $()
+  %17 = tuple ()
+  return %17 : $()
+}

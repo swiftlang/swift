@@ -160,6 +160,7 @@ namespace {
     bool simplifyBranchBlock(BranchInst *BI);
     bool simplifyCondBrBlock(CondBranchInst *BI);
     bool simplifyCheckedCastBranchBlock(CheckedCastBranchInst *CCBI);
+    bool simplifyCheckedCastValueBranchBlock(CheckedCastValueBranchInst *CCBI);
     bool simplifyCheckedCastAddrBranchBlock(CheckedCastAddrBranchInst *CCABI);
     bool simplifyTryApplyBlock(TryApplyInst *TAI);
     bool simplifySwitchValueBlock(SwitchValueInst *SVI);
@@ -1809,6 +1810,35 @@ bool SimplifyCFG::simplifyCheckedCastBranchBlock(CheckedCastBranchInst *CCBI) {
   return MadeChange;
 }
 
+bool SimplifyCFG::simplifyCheckedCastValueBranchBlock(
+    CheckedCastValueBranchInst *CCBI) {
+  auto SuccessBB = CCBI->getSuccessBB();
+  auto FailureBB = CCBI->getFailureBB();
+  auto ThisBB = CCBI->getParent();
+
+  bool MadeChange = false;
+  CastOptimizer CastOpt(
+      [&MadeChange](SILInstruction *I,
+                    ValueBase *V) { /* ReplaceInstUsesAction */
+                                    MadeChange = true;
+      },
+      [&MadeChange](SILInstruction *I) { /* EraseInstAction */
+                                         MadeChange = true;
+                                         I->eraseFromParent();
+      },
+      [&]() { /* WillSucceedAction */
+              MadeChange |= removeIfDead(FailureBB);
+              addToWorklist(ThisBB);
+      },
+      [&]() { /* WillFailAction */
+              MadeChange |= removeIfDead(SuccessBB);
+              addToWorklist(ThisBB);
+      });
+
+  MadeChange |= bool(CastOpt.simplifyCheckedCastValueBranchInst(CCBI));
+  return MadeChange;
+}
+
 bool
 SimplifyCFG::
 simplifyCheckedCastAddrBranchBlock(CheckedCastAddrBranchInst *CCABI) {
@@ -2157,6 +2187,10 @@ bool SimplifyCFG::simplifyBlocks() {
       break;
     case TermKind::CheckedCastBranchInst:
       Changed |= simplifyCheckedCastBranchBlock(cast<CheckedCastBranchInst>(TI));
+      break;
+    case TermKind::CheckedCastValueBranchInst:
+      Changed |= simplifyCheckedCastValueBranchBlock(
+          cast<CheckedCastValueBranchInst>(TI));
       break;
     case TermKind::CheckedCastAddrBranchInst:
       Changed |= simplifyCheckedCastAddrBranchBlock(cast<CheckedCastAddrBranchInst>(TI));

@@ -126,3 +126,12 @@ struct BadConcreteInherits: Inherits {
     typealias X = ConcreteConformsNonFoo2
 }
 */
+
+struct X { }
+
+protocol P {
+	associatedtype P1 where P1 == X
+	// expected-note@-1{{same-type constraint 'Self.P1' == 'X' written here}}
+	associatedtype P2 where P2 == P1, P2 == X
+	// expected-warning@-1{{redundant same-type constraint 'Self.P2' == 'X'}}
+}

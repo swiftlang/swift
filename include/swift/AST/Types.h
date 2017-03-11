@@ -516,6 +516,9 @@ public:
     return getRecursiveProperties().hasTypeParameter();
   }
 
+  /// Return the root generic parameter of this type parameter type.
+  GenericTypeParamType *getRootGenericParam();
+
   /// Determines whether this type is an lvalue. This includes both straight
   /// lvalue types as well as tuples or optionals of lvalues.
   bool isLValueType() {
@@ -596,15 +599,6 @@ public:
   /// For example, the types Vector<Int> and Vector<Int>.Element are both
   /// specialized, but the type Vector is not.
   bool isSpecialized();
-
-  /// Gather all of the substitutions used to produce the given specialized type
-  /// from its unspecialized type.
-  ///
-  /// \returns ASTContext-allocated substitutions.
-  SubstitutionList gatherAllSubstitutions(
-                           ModuleDecl *module,
-                           LazyResolver *resolver,
-                           DeclContext *gpContext = nullptr);
 
   /// \brief Determine whether this type is a legal, lowered SIL type.
   ///
@@ -866,11 +860,17 @@ public:
   /// the context of the extension above will produce substitutions T
   /// -> Int and U -> String suitable for mapping the type of
   /// \c SomeArray.
+  ///
+  /// \param genericEnv If non-null and the type is nested inside of a
+  /// generic function, generic parameters of the outer context are
+  /// mapped to context archetypes of this generic environment.
   SubstitutionMap getContextSubstitutionMap(ModuleDecl *module,
-                                            const DeclContext *dc);
+                                            const DeclContext *dc,
+                                            GenericEnvironment *genericEnv=nullptr);
 
   /// Deprecated version of the above.
-  TypeSubstitutionMap getContextSubstitutions(const DeclContext *dc);
+  TypeSubstitutionMap getContextSubstitutions(const DeclContext *dc,
+                                              GenericEnvironment *genericEnv=nullptr);
 
   /// Get the substitutions to apply to the type of the given member as seen
   /// from this base type.
@@ -990,8 +990,10 @@ public:
 class ErrorType : public TypeBase {
   friend class ASTContext;
   // The Error type is always canonical.
-  ErrorType(ASTContext &C, Type originalType)
-      : TypeBase(TypeKind::Error, &C, RecursiveTypeProperties::HasError) {
+  ErrorType(ASTContext &C, Type originalType,
+            RecursiveTypeProperties properties)
+      : TypeBase(TypeKind::Error, &C, properties) {
+    assert(properties.hasError());
     if (originalType) {
       ErrorTypeBits.HasOriginalType = true;
       *reinterpret_cast<Type *>(this + 1) = originalType;
@@ -4366,6 +4368,15 @@ inline bool TypeBase::isTypeParameter() {
     return depMemTy->getBase()->isTypeParameter();
 
   return false;
+}
+
+inline GenericTypeParamType *TypeBase::getRootGenericParam() {
+  Type t(this);
+
+  while (auto *memberTy = t->getAs<DependentMemberType>())
+    t = memberTy->getBase();
+
+  return t->castTo<GenericTypeParamType>();
 }
 
 inline bool TypeBase::isExistentialType() {

@@ -141,7 +141,7 @@ entry:
 // CHECK:         [[LAYOUT:%.*]] = bitcast %swift.refcounted* [[CONTEXT]] to <{ %swift.refcounted, i8* }>*
 // CHECK:         [[WTABLE:%.*]] = getelementptr inbounds <{ %swift.refcounted, i8* }>, <{ %swift.refcounted, i8* }>* [[LAYOUT]], i32 0, i32 1
 // CHECK:         store i8* null, i8** [[WTABLE]]
-// CHECK:         [[RESULT:%.*]] = insertvalue { i8*, %swift.refcounted* } { i8* bitcast (%swift.type* (%T19sil_witness_methods3BarCyAA3FooVAeEG**, %swift.refcounted*)* @_TPA_generic_type_concrete_method_witness to i8*), %swift.refcounted* undef }, %swift.refcounted* [[CONTEXT]], 1
+// CHECK:         [[RESULT:%.*]] = insertvalue { i8*, %swift.refcounted* } { i8* bitcast (%swift.type* (%T19sil_witness_methods3BarCyAA3FooVA2EG**, %swift.refcounted*)* @_TPA_generic_type_concrete_method_witness to i8*), %swift.refcounted* undef }, %swift.refcounted* [[CONTEXT]], 1
 // CHECK:         ret { i8*, %swift.refcounted* } [[RESULT]]
 
 sil @partial_apply_concrete_witness : $() -> @callee_owned (@in Bar<Foo, Foo, Foo>) -> @thick Bar<Foo, Foo, Foo>.Type {

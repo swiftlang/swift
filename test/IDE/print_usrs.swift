@@ -102,13 +102,13 @@ class GenCls<T> {
   // CHECK: [[@LINE+1]]:14 s:14swift_ide_test6GenClsC4cfooyyFZ{{$}}
   class func cfoo() {}
 
-  // CHECK: [[@LINE+1]]:3 s:14swift_ide_test6GenClsC9subscriptSiSi_Sitci{{$}}
+  // CHECK: [[@LINE+1]]:3 s:14swift_ide_test6GenClsC9subscriptS2i_Sitci{{$}}
   subscript (i : Int, j : Int) -> Int {
-    // CHECK: [[@LINE+1]]:5 s:14swift_ide_test6GenClsC9subscriptSiSi_Sitcfg{{$}}
+    // CHECK: [[@LINE+1]]:5 s:14swift_ide_test6GenClsC9subscriptS2i_Sitcfg{{$}}
     get {
       return i + j
     }
-    // CHECK: [[@LINE+1]]:5 s:14swift_ide_test6GenClsC9subscriptSiSi_Sitcfs{{$}}
+    // CHECK: [[@LINE+1]]:5 s:14swift_ide_test6GenClsC9subscriptS2i_Sitcfs{{$}}
     set(v) {
       _ = v + i - j
     }
@@ -183,14 +183,14 @@ class ObjCClass1 {
 
     // CHECK: [[@LINE+1]]:16 s:14swift_ide_test10ObjCClass1C13instanceFunc1ySiF9LocalEnumL_O
     @objc enum LocalEnum : Int {
-      // CHECK: [[@LINE+1]]:12 s:14swift_ide_test10ObjCClass1C13instanceFunc1ySiF9LocalEnumL_O8someCaseAfFmF
+      // CHECK: [[@LINE+1]]:12 s:14swift_ide_test10ObjCClass1C13instanceFunc1ySiF9LocalEnumL_O8someCaseA2FmF
       case someCase
     }
   }
   // CHECK: [[@LINE+1]]:14 c:objc(cs)ObjCClass1(cm)staticFunc1:{{$}}
   class func staticFunc1(_ a: Int) {}
 
-  // CHECK: [[@LINE+2]]:10 s:14swift_ide_test10ObjCClass1C9subscriptSiSici{{$}}
+  // CHECK: [[@LINE+2]]:10 s:14swift_ide_test10ObjCClass1C9subscriptS2ici{{$}}
   // CHECK: [[@LINE+1]]:20 s:14swift_ide_test10ObjCClass1C1xL_Siv{{$}}
   public subscript(x: Int) -> Int {
 
@@ -238,9 +238,9 @@ extension ObjCClass1 {
 
 // CHECK: [[@LINE+1]]:6 s:14swift_ide_test5SuitsO{{$}}
 enum Suits {
-  // CHECK: [[@LINE+1]]:8 s:14swift_ide_test5SuitsO5ClubsAcCmF{{$}}
+  // CHECK: [[@LINE+1]]:8 s:14swift_ide_test5SuitsO5ClubsA2CmF{{$}}
   case Clubs
-  // CHECK: [[@LINE+1]]:8 s:14swift_ide_test5SuitsO8DiamondsAcCmF{{$}}
+  // CHECK: [[@LINE+1]]:8 s:14swift_ide_test5SuitsO8DiamondsA2CmF{{$}}
   case Diamonds
 
   // CHECK: [[@LINE+1]]:8 s:14swift_ide_test5SuitsO5enfooyyF{{$}}

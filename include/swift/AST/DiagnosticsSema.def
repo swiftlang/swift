@@ -45,11 +45,6 @@ NOTE(decl_declared_here,none,
 NOTE(extended_type_declared_here,none,
      "extended type declared here", ())
 
-NOTE(while_converting_default_tuple_value,none,
-     "while converting default tuple value to element type %0", (Type))
-NOTE(while_converting_subscript_index,none,
-     "while converting subscript index to expected type %0", (Type))
-
 //------------------------------------------------------------------------------
 // Constraint solver diagnostics
 //------------------------------------------------------------------------------
@@ -915,8 +910,6 @@ ERROR(c_function_pointer_from_function_with_context,none,
       "%select{local function|closure}0 that captures "
       "%select{context|generic parameters|dynamic Self type}1",
       (bool, unsigned))
-NOTE(c_function_pointer_captures_here,none,
-     "%0 captured here", (Identifier))
 
 //------------------------------------------------------------------------------
 // Type Check Declarations
@@ -1400,6 +1393,8 @@ NOTE(no_witnesses,none,
      "%select{initializer %1|function %1|property %1|subscript}0 with type %2"
      "%select{|; do you want to add a stub?}3",
      (RequirementKind, DeclName, Type, bool))
+NOTE(missing_witnesses_general,none, "do you want to add protocol stubs?",
+     ())
 NOTE(ambiguous_witnesses,none,
      "multiple matching "
      "%select{initializers named %1|functions named %1|properties named %1|"
@@ -1508,8 +1503,6 @@ NOTE(declared_protocol_conformance_here,none,
 
 ERROR(redundant_conformance,none,
       "redundant conformance of %0 to protocol %1", (Type, DeclName))
-NOTE(protocol_conformance_implied_here,none,
-     "implied protocol conformance %0 here can be made explicit", (Identifier))
 
 // "Near matches"
 WARNING(optional_req_near_match,none,
@@ -1517,9 +1510,6 @@ WARNING(optional_req_near_match,none,
         (DescriptiveDeclKind, DeclName, DeclName, DeclName))
 NOTE(optional_req_nonobjc_near_match_add_objc,none,
      "add '@objc' to provide an Objective-C entrypoint", ())
-NOTE(optional_req_nonobjc_to_objc,none,
-     "rename to %0 to satisfy this requirement",
-     (DeclName))
 NOTE(optional_req_near_match_move,none,
      "move %0 to %select{an|another}1 extension to silence this warning",
      (DeclName, unsigned))
@@ -1775,8 +1765,6 @@ ERROR(decl_already_final,none,
       "static declarations are already final", ())
 ERROR(open_decl_cannot_be_final,none,
       "%0 cannot be declared both 'final' and 'open'", (DescriptiveDeclKind))
-NOTE(decl_init_here,none,
-     "initial value is here", ())
 
 
 // Inheritance
@@ -2069,9 +2057,6 @@ ERROR(nscopying_doesnt_conform,none,
 #define SELECT_APPLICATION_MAIN "select{'UIApplicationMain'|'NSApplicationMain'}"
 #define SELECT_APPLICATION_DELEGATE "select{'UIApplicationDelegate'|'NSApplicationDelegate'}"
 
-ERROR(attr_ApplicationMain_not_class,none,
-      "%" SELECT_APPLICATION_MAIN "0 attribute may only be used on classes",
-      (unsigned))
 ERROR(attr_ApplicationMain_not_ApplicationDelegate,none,
       "%" SELECT_APPLICATION_MAIN "0 class must conform to the %" SELECT_APPLICATION_DELEGATE "0 protocol",
       (unsigned))
@@ -2125,17 +2110,7 @@ NOTE(found_candidate,none,
      "found this candidate", ())
 NOTE(found_candidate_type,none,
      "found candidate with type %0", (Type))
-NOTE(first_declaration,none,
-     "first declaration", ())
-NOTE(second_declaration,none,
-     "second declaration", ())
 
-ERROR(no_IntegerLiteralType_found,none,
-      "standard library error: IntegerLiteralType not defined", ())
-ERROR(no_FloatLiteralType_found,none,
-      "standard library error: FloatLiteralType not defined", ())
-ERROR(no_StringLiteralType_found,none,
-      "standard library error: StringLiteralType not defined", ())
 ERROR(no_MaxBuiltinIntegerType_found,none,
    "standard library error: _MaxBuiltinIntegerType is not properly defined", ())
 ERROR(no_MaxBuiltinFloatType_found,none,
@@ -2240,9 +2215,6 @@ ERROR(try_if_rhs_noncovering,none,
 ERROR(try_assign_rhs_noncovering,none,
       "'" TRY_KIND_SELECT(0) "' following assignment operator does not cover "
       "everything to its right", (unsigned))
-
-NOTE(subscript_decl_here,none,
-     "subscript operator declared here", ())
 
 ERROR(broken_bool,none, "type 'Bool' is broken", ())
 
@@ -2698,7 +2670,12 @@ ERROR(trailing_closure_requires_parens,none,
       " context", ())
 
 ERROR(empty_switch_stmt,none,
-"'switch' statement body must have at least one 'case' or 'default' block",())
+      "'switch' statement body must have at least one 'case' or 'default' block;"
+      " do you want to add "
+      "%select{missing cases?|a default case?}0",(bool))
+ERROR(non_exhaustive_switch,none,
+      "switch must be exhaustive, consider adding "
+      "%select{missing cases|a default clause}0", (bool))
 //------------------------------------------------------------------------------
 // Type Check Patterns
 //------------------------------------------------------------------------------
@@ -3464,10 +3441,6 @@ WARNING(variable_never_mutated, none,
 WARNING(variable_never_read, none,
         "%select{variable|parameter}1 %0 was written to, but never read",
         (Identifier, unsigned))
-
-WARNING(extraneous_default_args_in_call, none,
-        "call to %0 has extraneous arguments that could use defaults",
-        (DeclName))
 
 //------------------------------------------------------------------------------
 // Circular reference diagnostics

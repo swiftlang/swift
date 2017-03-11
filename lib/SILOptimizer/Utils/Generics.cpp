@@ -34,27 +34,134 @@ llvm::cl::opt<bool> SpecializeGenericSubstitutions(
     llvm::cl::init(false),
     llvm::cl::desc("Enable partial specialization with generic substitutions"));
 
-// Max depth of a bound generic which can be processed by the generic
+// Max depth of a type which can be processed by the generic
 // specializer.
 // E.g. the depth of Array<Array<Array<T>>> is 3.
 // No specializations will be produced, if any of generic parameters contains
-// a bound generic type with the depth higher than this threshold 
-static const unsigned BoundGenericDepthThreshold = 50;
+// a bound generic type with the depth higher than this threshold
+static const unsigned TypeDepthThreshold = 50;
+// Set the width threshold rather high, because some projects uses very wide
+// tuples to model fixed size arrays.
+static const unsigned TypeWidthThreshold = 2000;
 
-static unsigned getBoundGenericDepth(Type t) {
+// Compute the width and the depth of a type.
+// We compute both, because some pathological test-cases result in very
+// wide types and some others result in very deep types. It is important
+// to bail as soon as we hit the threshold on any of both dimentions to
+// prevent compiler hangs and crashes.
+static std::pair<unsigned, unsigned> getTypeDepthAndWidth(Type t) {
   unsigned Depth = 0;
-  if (auto BGT = t->getAs<BoundGenericType>()) {
-    Depth++;
-    auto GenericArgs = BGT->getGenericArgs();
-    unsigned MaxGenericArgDepth = 0;
-    for (auto GenericArg : GenericArgs) {
-      auto ArgDepth = getBoundGenericDepth(GenericArg);
-      if (ArgDepth > MaxGenericArgDepth)
-        MaxGenericArgDepth = ArgDepth;
+  unsigned Width = 0;
+  if (auto *BGT = t->getAs<BoundGenericType>()) {
+    auto *NTD = BGT->getNominalOrBoundGenericNominal();
+    if (NTD) {
+      auto StoredProperties = NTD->getStoredProperties();
+      Width += std::distance(StoredProperties.begin(), StoredProperties.end());
     }
-    Depth += MaxGenericArgDepth;
+    Depth++;
+    unsigned MaxTypeDepth = 0;
+    auto GenericArgs = BGT->getGenericArgs();
+    for (auto Ty : GenericArgs) {
+      unsigned TypeWidth;
+      unsigned TypeDepth;
+      std::tie(TypeDepth, TypeWidth) = getTypeDepthAndWidth(Ty);
+      if (TypeDepth > MaxTypeDepth)
+        MaxTypeDepth = TypeDepth;
+      Width += TypeWidth;
+    }
+    Depth += MaxTypeDepth;
+    return std::make_pair(Depth, Width);
   }
-  return Depth;
+
+  if (auto *TupleTy = t->getAs<TupleType>()) {
+    Width += TupleTy->getNumElements();
+    Depth++;
+    unsigned MaxTypeDepth = 0;
+    auto ElementTypes = TupleTy->getElementTypes();
+    for (auto Ty : ElementTypes) {
+      unsigned TypeWidth;
+      unsigned TypeDepth;
+      std::tie(TypeDepth, TypeWidth) = getTypeDepthAndWidth(Ty);
+      if (TypeDepth > MaxTypeDepth)
+        MaxTypeDepth = TypeDepth;
+      Width += TypeWidth;
+    }
+    Depth += MaxTypeDepth;
+    return std::make_pair(Depth, Width);
+  }
+
+  if (auto *FnTy = t->getAs<SILFunctionType>()) {
+    Depth++;
+    unsigned MaxTypeDepth = 0;
+    auto Params = FnTy->getParameters();
+    Width += Params.size();
+    for (auto Param : Params) {
+      unsigned TypeWidth;
+      unsigned TypeDepth;
+      std::tie(TypeDepth, TypeWidth) = getTypeDepthAndWidth(Param.getType());
+      if (TypeDepth > MaxTypeDepth)
+        MaxTypeDepth = TypeDepth;
+      Width += TypeWidth;
+    }
+    auto Results = FnTy->getResults();
+    Width += Results.size();
+    for (auto Result : Results) {
+      unsigned TypeWidth;
+      unsigned TypeDepth;
+      std::tie(TypeDepth, TypeWidth) = getTypeDepthAndWidth(Result.getType());
+      if (TypeDepth > MaxTypeDepth)
+        MaxTypeDepth = TypeDepth;
+      Width += TypeWidth;
+    }
+    if (FnTy->hasErrorResult()) {
+      Width += 1;
+      unsigned TypeWidth;
+      unsigned TypeDepth;
+      std::tie(TypeDepth, TypeWidth) =
+          getTypeDepthAndWidth(FnTy->getErrorResult().getType());
+      if (TypeDepth > MaxTypeDepth)
+        MaxTypeDepth = TypeDepth;
+      Width += TypeWidth;
+    }
+    Depth += MaxTypeDepth;
+    return std::make_pair(Depth, Width);
+  }
+
+  if (auto *FnTy = t->getAs<FunctionType>()) {
+    Depth++;
+    unsigned MaxTypeDepth = 0;
+    unsigned TypeWidth;
+    unsigned TypeDepth;
+    std::tie(TypeDepth, TypeWidth) = getTypeDepthAndWidth(FnTy->getInput());
+    if (TypeDepth > MaxTypeDepth)
+      MaxTypeDepth = TypeDepth;
+    Width += TypeWidth;
+    std::tie(TypeDepth, TypeWidth) = getTypeDepthAndWidth(FnTy->getResult());
+    if (TypeDepth > MaxTypeDepth)
+      MaxTypeDepth = TypeDepth;
+    Width += TypeWidth;
+    Depth += MaxTypeDepth;
+    return std::make_pair(Depth, Width);
+  }
+
+  if (auto *MT = t->getAs<MetatypeType>()) {
+    Depth += 1;
+    unsigned TypeWidth;
+    unsigned TypeDepth;
+    std::tie(TypeDepth, TypeWidth) = getTypeDepthAndWidth(MT->getInstanceType());
+    Width += TypeWidth;
+    Depth += TypeDepth;
+    return std::make_pair(Depth, Width);
+  }
+
+  return std::make_pair(Depth, Width);
+}
+
+static bool isTypeTooComplex(Type t) {
+  unsigned TypeWidth;
+  unsigned TypeDepth;
+  std::tie(TypeDepth, TypeWidth) = getTypeDepthAndWidth(t);
+  return TypeWidth >= TypeWidthThreshold || TypeDepth >= TypeDepthThreshold;
 }
 
 // =============================================================================
@@ -116,9 +223,7 @@ bool ReabstractionInfo::prepareAndCheck(ApplySite Apply, SILFunction *Callee,
   // generated specializations.
   for (auto Sub : ParamSubs) {
     auto Replacement = Sub.getReplacement();
-    if (Replacement.findIf([](Type ty) -> bool {
-          return getBoundGenericDepth(ty) >= BoundGenericDepthThreshold;
-        })) {
+    if (isTypeTooComplex(Replacement)) {
       DEBUG(llvm::dbgs()
             << "    Cannot specialize because the generic type is too deep.\n");
       return false;
@@ -130,10 +235,10 @@ bool ReabstractionInfo::prepareAndCheck(ApplySite Apply, SILFunction *Callee,
   bool HasConcreteGenericParams = false;
   bool HasNonArchetypeGenericParams = false;
   HasUnboundGenericParams = false;
-  for (auto DT : CalleeGenericSig->getGenericParams()) {
+  for (auto GP : CalleeGenericSig->getSubstitutableParams()) {
     // Check only the substitutions for the generic parameters.
     // Ignore any dependent types, etc.
-    auto Replacement = Type(DT).subst(InterfaceSubs);
+    auto Replacement = Type(GP).subst(InterfaceSubs);
     if (!Replacement->is<ArchetypeType>())
       HasNonArchetypeGenericParams = true;
 
@@ -146,7 +251,7 @@ bool ReabstractionInfo::prepareAndCheck(ApplySite Apply, SILFunction *Callee,
       if (CalleeGenericEnv) {
         if (auto Archetype = Replacement->getAs<ArchetypeType>()) {
           auto OrigArchetype =
-              CalleeGenericEnv->mapTypeIntoContext(DT)->castTo<ArchetypeType>();
+              CalleeGenericEnv->mapTypeIntoContext(GP)->castTo<ArchetypeType>();
           if (Archetype->requiresClass() && !OrigArchetype->requiresClass())
             HasNonArchetypeGenericParams = true;
           if (Archetype->getLayoutConstraint() &&
@@ -261,6 +366,7 @@ ReabstractionInfo::ReabstractionInfo(ApplySite Apply, SILFunction *Callee,
     SpecializedType = CanSILFunctionType();
     SubstitutedType = CanSILFunctionType();
     SpecializedGenericSig = nullptr;
+    SpecializedGenericEnv = nullptr;
     return;
   }
 
@@ -382,6 +488,12 @@ ReabstractionInfo::createSubstitutedType(SILFunction *OrigF,
     Lowering::GenericContextScope GenericScope(M.Types,
                                                CanSpecializedGenericSig);
     FnTy = OrigF->getLoweredFunctionType()->substGenericArgs(M, SubstMap);
+    // FIXME: Some of the added new requirements may not have been taken into
+    // account by the substGenericArgs. So, canonicalize in the context of the
+    // specialized signature.
+    FnTy = cast<SILFunctionType>(
+        CanSpecializedGenericSig->getCanonicalTypeInContext(
+            FnTy, *M.getSwiftModule()));
   }
   assert(FnTy);
 
@@ -454,7 +566,8 @@ getGenericEnvironmentAndSignature(GenericSignatureBuilder &Builder,
   GenericSignatureBuilder TmpBuilder(
       M.getASTContext(), LookUpConformanceInModule(M.getSwiftModule()));
   TmpBuilder.addGenericSignature(GenericSig);
-  TmpBuilder.finalize(SourceLoc(), GenericSig->getGenericParams());
+  TmpBuilder.finalize(SourceLoc(), GenericSig->getGenericParams(),
+                      /*allowConcreteGenericParams=*/true);
   GenericSig =
       TmpBuilder.getGenericSignature()->getCanonicalSignature().getPointer();
   GenericEnv = GenericSig->createGenericEnvironment(*M.getSwiftModule());
@@ -482,7 +595,8 @@ getSignatureWithRequirements(GenericSignature *OrigGenSig,
     Builder.addRequirement(Req, Source);
   }
 
-  Builder.finalize(SourceLoc(), OrigGenSig->getGenericParams());
+  Builder.finalize(SourceLoc(), OrigGenSig->getGenericParams(),
+                   /*allowConcreteGenericParams=*/true);
   return getGenericEnvironmentAndSignature(Builder, M);
 }
 
@@ -861,17 +975,14 @@ static void prepareCallArguments(ApplySite AI, SILBuilder &Builder,
 
 /// Return a substituted callee function type.
 static CanSILFunctionType
-getCalleeSubstFunctionType(SILValue Callee, const ReabstractionInfo &ReInfo) {
+getCalleeSubstFunctionType(SILValue Callee, SubstitutionList Subs) {
   // Create a substituted callee type.
   auto CanFnTy =
       dyn_cast<SILFunctionType>(Callee->getType().getSwiftRValueType());
   auto CalleeSubstFnTy = CanFnTy;
 
-  if (ReInfo.getSpecializedType()->isPolymorphic() &&
-      !ReInfo.getCallerParamSubstitutions().empty()) {
-    CalleeSubstFnTy = CanFnTy->substGenericArgs(
-        ReInfo.getNonSpecializedFunction()->getModule(),
-        ReInfo.getCallerParamSubstitutions());
+  if (CanFnTy->isPolymorphic() && !Subs.empty()) {
+    CalleeSubstFnTy = CanFnTy->substGenericArgs(*Callee->getModule(), Subs);
     assert(!CalleeSubstFnTy->isPolymorphic() &&
            "Substituted callee type should not be polymorphic");
     assert(!CalleeSubstFnTy->hasTypeParameter() &&
@@ -899,7 +1010,7 @@ static ApplySite replaceWithSpecializedCallee(ApplySite AI,
     Subs = ReInfo.getCallerParamSubstitutions();
   }
 
-  auto CalleeSubstFnTy = getCalleeSubstFunctionType(Callee, ReInfo);
+  auto CalleeSubstFnTy = getCalleeSubstFunctionType(Callee, Subs);
   auto CalleeSILSubstFnTy = SILType::getPrimitiveObjectType(CalleeSubstFnTy);
   SILFunctionConventions substConv(CalleeSubstFnTy, Builder.getModule());
 
@@ -988,19 +1099,35 @@ public:
       Fragile = IsFragile;
 
     {
-      Mangle::Mangler M;
-      GenericSpecializationMangler OldMangler(
-          M, OrigF, ReInfo.getOriginalParamSubstitutions(), Fragile,
-          GenericSpecializationMangler::NotReabstracted);
-      OldMangler.mangle();
-      std::string Old = M.finalize();
+      if (!ReInfo.isPartialSpecialization()) {
+        Mangle::Mangler M;
+        GenericSpecializationMangler OldMangler(
+            M, OrigF, ReInfo.getOriginalParamSubstitutions(), Fragile,
+            GenericSpecializationMangler::NotReabstracted);
+        OldMangler.mangle();
+        std::string Old = M.finalize();
 
-      NewMangling::GenericSpecializationMangler NewMangler(
-        OrigF, ReInfo.getOriginalParamSubstitutions(), Fragile,
-          /*isReAbstracted*/ false);
+        NewMangling::GenericSpecializationMangler NewMangler(
+            OrigF, ReInfo.getOriginalParamSubstitutions(), Fragile,
+            /*isReAbstracted*/ false);
 
-      std::string New = NewMangler.mangle();
-      ThunkName = NewMangling::selectMangling(Old, New);
+        std::string New = NewMangler.mangle();
+        ThunkName = NewMangling::selectMangling(Old, New);
+      } else {
+        Mangle::Mangler M;
+        PartialSpecializationMangler OldMangler(
+            M, OrigF, ReInfo.getSpecializedType(), Fragile,
+            PartialSpecializationMangler::NotReabstracted);
+        OldMangler.mangle();
+        std::string Old = M.finalize();
+
+        NewMangling::PartialSpecializationMangler NewMangler(
+            OrigF, ReInfo.getSpecializedType(), Fragile,
+            /*isReAbstracted*/ false);
+
+        std::string New = NewMangler.mangle();
+        ThunkName = NewMangling::selectMangling(Old, New);
+      }
     }
   }
 
@@ -1019,6 +1146,8 @@ SILFunction *ReabstractionThunkGenerator::createThunk() {
   // Re-use an existing thunk.
   if (!Thunk->empty())
     return Thunk;
+
+  Thunk->setGenericEnvironment(ReInfo.getSpecializedGenericEnvironment());
 
   SILBasicBlock *EntryBB = Thunk->createBasicBlock();
   SILBuilder Builder(EntryBB);
@@ -1068,16 +1197,19 @@ SILValue ReabstractionThunkGenerator::createReabstractionThunkApply(
     SILBuilder &Builder) {
   SILFunction *Thunk = &Builder.getFunction();
   auto *FRI = Builder.createFunctionRef(Loc, SpecializedFunc);
+  auto Subs = Thunk->getForwardingSubstitutions();
+  auto CalleeSubstFnTy = getCalleeSubstFunctionType(FRI, Subs);
+  auto CalleeSILSubstFnTy = SILType::getPrimitiveObjectType(CalleeSubstFnTy);
   auto specConv = SpecializedFunc->getConventions();
   if (!SpecializedFunc->getLoweredFunctionType()->hasErrorResult()) {
-    return Builder.createApply(Loc, FRI, SpecializedFunc->getLoweredType(),
-                               specConv.getSILResultType(), {}, Arguments,
+    return Builder.createApply(Loc, FRI, CalleeSILSubstFnTy,
+                               specConv.getSILResultType(), Subs, Arguments,
                                false);
   }
   // Create the logic for calling a throwing function.
   SILBasicBlock *NormalBB = Thunk->createBasicBlock();
   SILBasicBlock *ErrorBB = Thunk->createBasicBlock();
-  Builder.createTryApply(Loc, FRI, SpecializedFunc->getLoweredType(), {},
+  Builder.createTryApply(Loc, FRI, CalleeSILSubstFnTy, Subs,
                          Arguments, NormalBB, ErrorBB);
   auto *ErrorVal = ErrorBB->createPHIArgument(specConv.getSILErrorType(),
                                               ValueOwnershipKind::Owned);
@@ -1208,11 +1340,6 @@ void swift::trySpecializeApplyOfGeneric(
   bool replacePartialApplyWithoutReabstraction = false;
   auto *PAI = dyn_cast<PartialApplyInst>(Apply);
 
-  // TODO: Partial specializations of partial applies are
-  // not supported yet.
-  if (PAI && ReInfo.getSpecializedType()->isPolymorphic())
-    return;
-
   if (PAI && ReInfo.hasConversions()) {
     // If we have a partial_apply and we converted some results/parameters from
     // indirect to direct there are 3 cases:
@@ -1289,11 +1416,12 @@ void swift::trySpecializeApplyOfGeneric(
     for (auto &Op : PAI->getArgumentOperands()) {
       Arguments.push_back(Op.get());
     }
+    auto Subs = ReInfo.getCallerParamSubstitutions();
+    auto CalleeSubstFnTy = getCalleeSubstFunctionType(FRI, Subs);
+    auto CalleeSILSubstFnTy = SILType::getPrimitiveObjectType(CalleeSubstFnTy);
     auto *NewPAI = Builder.createPartialApply(PAI->getLoc(), FRI,
-                                      PAI->getSubstCalleeSILType(),
-                                      {},
-                                      Arguments,
-                                      PAI->getType());
+                                              CalleeSILSubstFnTy, Subs,
+                                              Arguments, PAI->getType());
     PAI->replaceAllUsesWith(NewPAI);
     DeadApplies.insert(PAI);
     return;

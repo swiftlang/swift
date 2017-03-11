@@ -24,11 +24,11 @@ var raw = getZero()
 var cooked : Int = raw
 
 
-// SIL:   [[GET_INPUT:%.+]] = function_ref @_T08def_func8getInputSiSi1x_tF : $@convention(thin) (Int) -> Int
+// SIL:   [[GET_INPUT:%.+]] = function_ref @_T08def_func8getInputS2i1x_tF : $@convention(thin) (Int) -> Int
 // SIL:   {{%.+}} = apply [[GET_INPUT]]({{%.+}}) : $@convention(thin) (Int) -> Int
 var raw2 = getInput(x: raw)
 
-// SIL:   [[GET_SECOND:%.+]] = function_ref @_T08def_func9getSecondSiSi_Si1ytF : $@convention(thin) (Int, Int) -> Int
+// SIL:   [[GET_SECOND:%.+]] = function_ref @_T08def_func9getSecondS2i_Si1ytF : $@convention(thin) (Int, Int) -> Int
 // SIL:   {{%.+}} = apply [[GET_SECOND]]({{%.+}}, {{%.+}}) : $@convention(thin) (Int, Int) -> Int
 var raw3 = getSecond(raw, y: raw2)
 

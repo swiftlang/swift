@@ -23,6 +23,8 @@
 #include "ImageInspection.h"
 #include "Private.h"
 
+#include <vector>
+
 using namespace swift;
 
 #if !defined(NDEBUG) && SWIFT_OBJC_INTEROP

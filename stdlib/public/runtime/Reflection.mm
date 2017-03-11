@@ -16,7 +16,7 @@
 #include "swift/Runtime/Metadata.h"
 #include "swift/Runtime/Enum.h"
 #include "swift/Runtime/Unreachable.h"
-#include "swift/Basic/Demangle.h"
+#include "swift/Demangling/Demangle.h"
 #include "swift/Runtime/Debug.h"
 #include "swift/Runtime/Portability.h"
 #include "Private.h"
@@ -928,49 +928,60 @@ swift_ClassMirror_quickLookObject(HeapObject *owner, const OpaqueValue *value,
 // mirrors.
 typedef const Metadata *(*MetadataFn)();
 
-extern "C" Metadata *OpaqueMirrorMetadata()
-  __asm__(SWIFT_QUOTED_SYMBOL_NAME(STRUCT_MD_ACCESSOR_SYM(s13_OpaqueMirror)));
-extern "C" const MirrorWitnessTable OpaqueMirrorWitnessTable
-  __asm__(SWIFT_QUOTED_SYMBOL_NAME(MIRROR_CONFORMANCE_SYM(s13_OpaqueMirror, B)));
-extern "C" Metadata *TupleMirrorMetadata()
-  __asm__(SWIFT_QUOTED_SYMBOL_NAME(STRUCT_MD_ACCESSOR_SYM(s12_TupleMirror)));
-extern "C" const MirrorWitnessTable TupleMirrorWitnessTable
-  __asm__(SWIFT_QUOTED_SYMBOL_NAME(MIRROR_CONFORMANCE_SYM(s12_TupleMirror, B)));
+extern "C" Metadata *STRUCT_MD_ACCESSOR_SYM(s13_OpaqueMirror)();
+static constexpr auto &OpaqueMirrorMetadata = STRUCT_MD_ACCESSOR_SYM(s13_OpaqueMirror);
 
-extern "C" Metadata *StructMirrorMetadata()
-  __asm__(SWIFT_QUOTED_SYMBOL_NAME(STRUCT_MD_ACCESSOR_SYM(s13_StructMirror)));
-extern "C" const MirrorWitnessTable StructMirrorWitnessTable
-  __asm__(SWIFT_QUOTED_SYMBOL_NAME(MIRROR_CONFORMANCE_SYM(s13_StructMirror, B)));
+extern "C" const MirrorWitnessTable MIRROR_CONFORMANCE_SYM(s13_OpaqueMirror, B);
+static constexpr auto &OpaqueMirrorWitnessTable = MIRROR_CONFORMANCE_SYM(s13_OpaqueMirror, B);
 
-extern "C" Metadata *EnumMirrorMetadata()
-  __asm__(SWIFT_QUOTED_SYMBOL_NAME(STRUCT_MD_ACCESSOR_SYM(s11_EnumMirror)));
-extern "C" const MirrorWitnessTable EnumMirrorWitnessTable
-  __asm__(SWIFT_QUOTED_SYMBOL_NAME(MIRROR_CONFORMANCE_SYM(s11_EnumMirror, B)));
+extern "C" Metadata *STRUCT_MD_ACCESSOR_SYM(s12_TupleMirror)();
+static constexpr auto &TupleMirrorMetadata = STRUCT_MD_ACCESSOR_SYM(s12_TupleMirror);
 
-extern "C" Metadata *ClassMirrorMetadata()
-  __asm__(SWIFT_QUOTED_SYMBOL_NAME(STRUCT_MD_ACCESSOR_SYM(s12_ClassMirror)));
-extern "C" const MirrorWitnessTable ClassMirrorWitnessTable
-  __asm__(SWIFT_QUOTED_SYMBOL_NAME(MIRROR_CONFORMANCE_SYM(s12_ClassMirror, B)));
+extern "C" const MirrorWitnessTable MIRROR_CONFORMANCE_SYM(s12_TupleMirror, B);
+static constexpr auto &TupleMirrorWitnessTable = MIRROR_CONFORMANCE_SYM(s12_TupleMirror, B);
 
-extern "C" Metadata *ClassSuperMirrorMetadata()
-  __asm__(SWIFT_QUOTED_SYMBOL_NAME(STRUCT_MD_ACCESSOR_SYM(s17_ClassSuperMirror)));
-extern "C" const MirrorWitnessTable ClassSuperMirrorWitnessTable
-  __asm__(SWIFT_QUOTED_SYMBOL_NAME(MIRROR_CONFORMANCE_SYM(s17_ClassSuperMirror, C)));
+extern "C" Metadata *STRUCT_MD_ACCESSOR_SYM(s13_StructMirror)();
+static constexpr auto &StructMirrorMetadata = STRUCT_MD_ACCESSOR_SYM(s13_StructMirror);
 
-extern "C" Metadata *MetatypeMirrorMetadata()
-  __asm__(SWIFT_QUOTED_SYMBOL_NAME(STRUCT_MD_ACCESSOR_SYM(s15_MetatypeMirror)));
-extern "C" const MirrorWitnessTable MetatypeMirrorWitnessTable
-  __asm__(SWIFT_QUOTED_SYMBOL_NAME(MIRROR_CONFORMANCE_SYM(s15_MetatypeMirror, B)));
+extern "C" const MirrorWitnessTable MIRROR_CONFORMANCE_SYM(s13_StructMirror, B);
+static constexpr auto &StructMirrorWitnessTable = MIRROR_CONFORMANCE_SYM(s13_StructMirror, B);
+
+extern "C" Metadata *STRUCT_MD_ACCESSOR_SYM(s11_EnumMirror)();
+static constexpr auto &EnumMirrorMetadata = STRUCT_MD_ACCESSOR_SYM(s11_EnumMirror);
+
+extern "C" const MirrorWitnessTable MIRROR_CONFORMANCE_SYM(s11_EnumMirror, B);
+static constexpr auto &EnumMirrorWitnessTable = MIRROR_CONFORMANCE_SYM(s11_EnumMirror, B);
+
+extern "C" Metadata *STRUCT_MD_ACCESSOR_SYM(s12_ClassMirror)();
+static constexpr auto &ClassMirrorMetadata = STRUCT_MD_ACCESSOR_SYM(s12_ClassMirror);
+
+extern "C" const MirrorWitnessTable MIRROR_CONFORMANCE_SYM(s12_ClassMirror, B);
+static constexpr auto &ClassMirrorWitnessTable = MIRROR_CONFORMANCE_SYM(s12_ClassMirror, B);
+
+extern "C" Metadata *STRUCT_MD_ACCESSOR_SYM(s17_ClassSuperMirror)();
+static constexpr auto &ClassSuperMirrorMetadata = STRUCT_MD_ACCESSOR_SYM(s17_ClassSuperMirror);
+
+extern "C" const MirrorWitnessTable MIRROR_CONFORMANCE_SYM(s17_ClassSuperMirror, C);
+static constexpr auto &ClassSuperMirrorWitnessTable = MIRROR_CONFORMANCE_SYM(s17_ClassSuperMirror, C);
+
+extern "C" Metadata *STRUCT_MD_ACCESSOR_SYM(s15_MetatypeMirror)();
+static constexpr auto &MetatypeMirrorMetadata = STRUCT_MD_ACCESSOR_SYM(s15_MetatypeMirror);
+
+extern "C" const MirrorWitnessTable MIRROR_CONFORMANCE_SYM(s15_MetatypeMirror, B);
+static constexpr auto &MetatypeMirrorWitnessTable = MIRROR_CONFORMANCE_SYM(s15_MetatypeMirror, B);
 
 #if SWIFT_OBJC_INTEROP
-extern "C" Metadata *ObjCMirrorMetadata()
-  __asm__(SWIFT_QUOTED_SYMBOL_NAME(STRUCT_MD_ACCESSOR_SYM(s11_ObjCMirror)));
-extern "C" const MirrorWitnessTable ObjCMirrorWitnessTable
-  __asm__(SWIFT_QUOTED_SYMBOL_NAME(OBJC_MIRROR_CONFORMANCE_SYM()));
-extern "C" Metadata *ObjCSuperMirrorMetadata()
-  __asm__(SWIFT_QUOTED_SYMBOL_NAME(STRUCT_MD_ACCESSOR_SYM(s16_ObjCSuperMirror)));
-extern "C" const MirrorWitnessTable ObjCSuperMirrorWitnessTable
-  __asm__(SWIFT_QUOTED_SYMBOL_NAME(MIRROR_CONFORMANCE_SYM(s16_ObjCSuperMirror, C)));
+extern "C" Metadata *STRUCT_MD_ACCESSOR_SYM(s11_ObjCMirror)();
+static constexpr auto &ObjCMirrorMetadata = STRUCT_MD_ACCESSOR_SYM(s11_ObjCMirror);
+
+extern "C" const MirrorWitnessTable OBJC_MIRROR_CONFORMANCE_SYM();
+static constexpr auto &ObjCMirrorWitnessTable = OBJC_MIRROR_CONFORMANCE_SYM();
+
+extern "C" Metadata *STRUCT_MD_ACCESSOR_SYM(s16_ObjCSuperMirror)();
+static constexpr auto &ObjCSuperMirrorMetadata = STRUCT_MD_ACCESSOR_SYM(s16_ObjCSuperMirror);
+
+extern "C" const MirrorWitnessTable MIRROR_CONFORMANCE_SYM(s16_ObjCSuperMirror, C);
+static constexpr auto &ObjCSuperMirrorWitnessTable = MIRROR_CONFORMANCE_SYM(s16_ObjCSuperMirror, C);
 #endif
 
 /// \param owner passed at +1, consumed.

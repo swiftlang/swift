@@ -23,8 +23,7 @@
 #include "swift/AST/RawComment.h"
 #include "swift/AST/SourceEntityWalker.h"
 #include "swift/AST/USRGeneration.h"
-#include "swift/Basic/Demangle.h"
-#include "swift/Basic/DemangleWrappers.h"
+#include "swift/Demangling/Demangle.h"
 #include "swift/Basic/DiagnosticConsumer.h"
 #include "swift/Basic/LangOptions.h"
 #include "swift/Basic/PrimitiveParsing.h"
@@ -2714,6 +2713,8 @@ namespace {
       for (auto Relation : symbol.Relations) {
         OS << "  ";
         clang::index::printSymbolRoles(Relation.roles, OS);
+        OS << " | ";
+        printSymbolInfo(Relation.symInfo);
         OS << " | " << Relation.name << " | " << Relation.USR << "\n";
       }
       return Continue;

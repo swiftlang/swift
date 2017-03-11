@@ -720,6 +720,7 @@ static bool shouldBindToValueType(Constraint *constraint)
     return false;
   case ConstraintKind::DynamicTypeOf:
   case ConstraintKind::EscapableFunctionOf:
+  case ConstraintKind::OpenedExistentialOf:
   case ConstraintKind::ValueMember:
   case ConstraintKind::UnresolvedValueMember:
   case ConstraintKind::Defaultable:
@@ -843,6 +844,7 @@ static PotentialBindings getPotentialBindings(ConstraintSystem &cs,
     case ConstraintKind::CheckedCast:
     case ConstraintKind::DynamicTypeOf:
     case ConstraintKind::EscapableFunctionOf:
+    case ConstraintKind::OpenedExistentialOf:
       // Constraints from which we can't do anything.
       continue;
 
@@ -2317,12 +2319,11 @@ static bool shortCircuitDisjunctionAt(Constraint *constraint,
   // overloaded operators.
   if (constraint->getKind() == ConstraintKind::BindOverload &&
       constraint->getOverloadChoice().getKind() == OverloadChoiceKind::Decl &&
-      constraint->getOverloadChoice().getDecl()->getName().isOperator() &&
+      constraint->getOverloadChoice().getDecl()->isOperator() &&
       successfulConstraint->getKind() == ConstraintKind::BindOverload &&
       successfulConstraint->getOverloadChoice().getKind()
         == OverloadChoiceKind::Decl &&
-      successfulConstraint->getOverloadChoice().getDecl()->getName()
-        .isOperator() &&
+      successfulConstraint->getOverloadChoice().getDecl()->isOperator() &&
       constraint->getOverloadChoice().getDecl()->getInterfaceType()
         ->is<GenericFunctionType>() &&
       !successfulConstraint->getOverloadChoice().getDecl()->getInterfaceType()

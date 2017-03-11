@@ -90,7 +90,9 @@ namespace irgen {
                                   SILType T,
                                   Address destObject,
                                   Address srcObject);
-
+  llvm::Value *emitInitializeWithCopyCall(IRGenFunction &IGF,
+                                          llvm::Value *metadata, Address dest,
+                                          Address src);
 
   /// Emit a call to do an 'initializeBufferWithCopy' operation.
   llvm::Value *emitInitializeBufferWithCopyCall(IRGenFunction &IGF,
@@ -116,6 +118,9 @@ namespace irgen {
                                   SILType T,
                                   Address destObject,
                                   Address srcObject);
+  llvm::Value *emitInitializeWithTakeCall(IRGenFunction &IGF,
+                                          llvm::Value *metadata, Address dest,
+                                          Address src);
 
   /// Emit a call to do an 'initializeArrayWithTakeFrontToBack' operation.
   void emitInitializeArrayWithTakeFrontToBackCall(IRGenFunction &IGF,
@@ -150,6 +155,9 @@ namespace irgen {
   /// Emit a call to do a 'destroy' operation.
   void emitDestroyCall(IRGenFunction &IGF,
                        SILType T,
+                       Address object);
+
+  void emitDestroyCall(IRGenFunction &IGF, llvm::Value *metadata,
                        Address object);
 
   /// Emit a call to do a 'destroyArray' operation.
@@ -245,6 +253,14 @@ namespace irgen {
   /// point associated with it.
   void emitDeallocateDynamicAlloca(IRGenFunction &IGF, StackAddress address);
 
+  /// Returns the IsInline flag and the loaded flags value.
+  std::pair<llvm::Value *, llvm::Value *>
+  emitLoadOfIsInline(IRGenFunction &IGF, llvm::Value *metadata);
+
+  /// Emits the alignment mask value from a loaded flags value.
+  llvm::Value *emitAlignMaskFromFlags(IRGenFunction &IGF, llvm::Value *flags);
+
+  llvm::Value *emitLoadOfSize(IRGenFunction &IGF, llvm::Value *metadata);
 } // end namespace irgen
 } // end namespace swift
 

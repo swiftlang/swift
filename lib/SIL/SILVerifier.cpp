@@ -122,6 +122,10 @@ public:
     return F.getModule().getOptions().EnableSILOwnership;
   }
 
+  bool areCOWExistentialsEnabled() const {
+    return F.getModule().getOptions().UseCOWExistentials;
+  }
+
   void _require(bool condition, const Twine &complaint,
                 const std::function<void()> &extraContext = nullptr) {
     if (condition) return;
@@ -1260,13 +1264,17 @@ public:
               "store [init] or store [assign] can only be applied to "
               "non-trivial types");
       break;
-    case StoreOwnershipQualifier::Trivial:
+    case StoreOwnershipQualifier::Trivial: {
       require(
           F.hasQualifiedOwnership(),
           "Inst with qualified ownership in a function that is not qualified");
-      require(SI->getSrc()->getType().isTrivial(SI->getModule()),
-              "A store with trivial ownership must store a trivial type");
+      SILValue Src = SI->getSrc();
+      require(Src->getType().isTrivial(SI->getModule()) ||
+              Src.getOwnershipKind() == ValueOwnershipKind::Trivial,
+              "A store with trivial ownership must store a type with trivial "
+              "ownership");
       break;
+    }
     }
   }
 
@@ -1664,7 +1672,7 @@ public:
     }
 
     // Metatypes preserve their instance type through lowering.
-    if (auto loweredMT = loweredType.getAs<MetatypeType>()) {
+    if (loweredType.is<MetatypeType>()) {
       if (auto formalMT = dyn_cast<MetatypeType>(formalType)) {
         return isLoweringOf(loweredType.getMetatypeInstanceType(F.getModule()),
                             formalMT.getInstanceType());
@@ -2174,6 +2182,93 @@ public:
     require(OpenedArchetypes.getOpenedArchetypeDef(archetype) == OEI,
             "Archetype opened by open_existential_addr should be registered in "
             "SILFunction");
+
+    if (!areCOWExistentialsEnabled())
+      return;
+
+    // Check all the uses. Consuming or mutating uses must have mutable access
+    // to the opened value.
+    auto allowedAccessKind = OEI->getAccessKind();
+    if (allowedAccessKind == OpenedExistentialAccess::Mutable)
+      return;
+
+    auto isConsumingOrMutatingApplyUse = [](Operand *use) -> bool {
+      ApplySite apply(use->getUser());
+      assert(apply && "Not an apply instruction kind");
+      auto conv = apply.getArgumentConvention(use->getOperandNumber() - 1);
+      switch (conv) {
+      case SILArgumentConvention::Indirect_In_Guaranteed:
+        return false;
+
+      case SILArgumentConvention::Indirect_Out:
+      case SILArgumentConvention::Indirect_In:
+      case SILArgumentConvention::Indirect_Inout:
+      case SILArgumentConvention::Indirect_InoutAliasable:
+        return true;
+
+      case SILArgumentConvention::Direct_Unowned:
+      case SILArgumentConvention::Direct_Guaranteed:
+      case SILArgumentConvention::Direct_Owned:
+      case SILArgumentConvention::Direct_Deallocating:
+        assert(conv.isIndirectConvention() && "Expect an indirect convention");
+        return true; // return something "conservative".
+      }
+      llvm_unreachable("covered switch isn't covered?!");
+    };
+
+    // A "copy_addr %src [take] to *" is consuming on "%src".
+    // A "copy_addr * to * %dst" is mutating on "%dst".
+    auto isConsumingOrMutatingCopyAddrUse = [](Operand *use) -> bool {
+      auto *copyAddr = cast<CopyAddrInst>(use->getUser());
+      if (copyAddr->getDest() == use->get())
+        return true;
+      if (copyAddr->getSrc() == use->get() && copyAddr->isTakeOfSrc() == IsTake)
+        return true;
+      return false;
+    };
+
+    auto isMutatingOrConsuming = [=](OpenExistentialAddrInst *OEI) -> bool {
+      for (auto *use : OEI->getUses()) {
+        auto *inst = use->getUser();
+        if (inst->isTypeDependentOperand(*use))
+          continue;
+        switch (inst->getKind()) {
+        case ValueKind::ApplyInst:
+        case ValueKind::TryApplyInst:
+        case ValueKind::PartialApplyInst:
+          if (isConsumingOrMutatingApplyUse(use))
+            return true;
+          else
+            break;
+        case ValueKind::CopyAddrInst:
+          if (isConsumingOrMutatingCopyAddrUse(use))
+            return true;
+          else
+            break;
+        case ValueKind::DestroyAddrInst:
+          return true;
+        case ValueKind::UncheckedAddrCastInst:
+          // Escaping use lets be conservative here.
+          return true;
+        case ValueKind::CheckedCastAddrBranchInst:
+          if (cast<CheckedCastAddrBranchInst>(inst)->getConsumptionKind() !=
+              CastConsumptionKind::CopyOnSuccess)
+            return true;
+          break;
+        case ValueKind::DebugValueAddrInst:
+          // Harmless use.
+          break;
+        default:
+          assert(false && "Unhandled unexpected instruction");
+          break;
+        }
+      }
+      return false;
+    };
+    require(!isMutatingOrConsuming(OEI) ||
+                allowedAccessKind == OpenedExistentialAccess::Mutable,
+            "open_existential_addr uses that consumes or mutates but is not "
+            "opened for mutation");
   }
 
   void checkOpenExistentialRefInst(OpenExistentialRefInst *OEI) {
@@ -2462,7 +2557,8 @@ public:
     }
   }
 
-  void verifyCheckedCast(bool isExact, SILType fromTy, SILType toTy) {
+  void verifyCheckedCast(bool isExact, SILType fromTy, SILType toTy,
+                         bool isOpaque = false) {
     // Verify common invariants.
     require(fromTy.isObject() && toTy.isObject(),
             "value checked cast src and dest must be objects");
@@ -2470,8 +2566,8 @@ public:
     auto fromCanTy = fromTy.getSwiftRValueType();
     auto toCanTy = toTy.getSwiftRValueType();
 
-    require(canUseScalarCheckedCastInstructions(F.getModule(),
-                                                fromCanTy, toCanTy),
+    require(isOpaque || canUseScalarCheckedCastInstructions(F.getModule(),
+                                                            fromCanTy, toCanTy),
             "invalid value checked cast src or dest types");
 
     // Peel off metatypes. If two types are checked-cast-able, so are their
@@ -2517,8 +2613,10 @@ public:
     verifyOpenedArchetype(CI, CI->getType().getSwiftRValueType());
   }
 
-  void checkUnconditionalCheckedCastOpaqueInst(
-      UnconditionalCheckedCastOpaqueInst *CI) {
+  void checkUnconditionalCheckedCastValueInst(
+      UnconditionalCheckedCastValueInst *CI) {
+    verifyCheckedCast(/*exact*/ false, CI->getOperand()->getType(),
+                      CI->getType(), true);
     verifyOpenedArchetype(CI, CI->getType().getSwiftRValueType());
   }
 
@@ -2577,6 +2675,22 @@ public:
             "failure dest block argument must match type of original type in "
             "ownership qualified sil");
 #endif
+  }
+
+  void checkCheckedCastValueBranchInst(CheckedCastValueBranchInst *CBI) {
+    verifyCheckedCast(false, CBI->getOperand()->getType(), CBI->getCastType(),
+                      true);
+    verifyOpenedArchetype(CBI, CBI->getCastType().getSwiftRValueType());
+
+    require(CBI->getSuccessBB()->args_size() == 1,
+            "success dest of checked_cast_value_br must take one argument");
+    require(CBI->getSuccessBB()->args_begin()[0]->getType() ==
+                CBI->getCastType(),
+            "success dest block argument of checked_cast_value_br must match "
+            "type of cast");
+    require(F.hasQualifiedOwnership() || CBI->getFailureBB()->args_empty(),
+            "failure dest of checked_cast_value_br in unqualified ownership "
+            "sil must take no arguments");
   }
 
   void checkCheckedCastAddrBranchInst(CheckedCastAddrBranchInst *CCABI) {
@@ -3010,7 +3124,7 @@ public:
   void checkSwitchValueInst(SwitchValueInst *SVI) {
     // TODO: Type should be either integer or function
     auto Ty = SVI->getOperand()->getType();
-    require(Ty.getAs<BuiltinIntegerType>() || Ty.getAs<SILFunctionType>(),
+    require(Ty.is<BuiltinIntegerType>() || Ty.is<SILFunctionType>(),
             "switch_value operand should be either of an integer "
             "or function type");
 

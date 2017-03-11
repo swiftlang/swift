@@ -13,7 +13,7 @@
 #define DEBUG_TYPE "capture-prop"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/Utils/SpecializationMangler.h"
-#include "swift/Basic/Demangle.h"
+#include "swift/Demangling/Demangle.h"
 #include "swift/SIL/Mangle.h"
 #include "swift/SIL/SILCloner.h"
 #include "swift/SIL/SILInstruction.h"
@@ -248,7 +248,7 @@ SILFunction *CapturePropagation::specializeConstClosure(PartialApplyInst *PAI,
                                  SILFunctionType::Representation::Thin);
   SILFunction *NewF = OrigF->getModule().createFunction(
       SILLinkage::Shared, Name, NewFTy,
-      /*contextGenericParams*/ nullptr, OrigF->getLocation(), OrigF->isBare(),
+      OrigF->getGenericEnvironment(), OrigF->getLocation(), OrigF->isBare(),
       OrigF->isTransparent(), Fragile, OrigF->isThunk(),
       OrigF->getClassVisibility(), OrigF->getInlineStrategy(),
       OrigF->getEffectsKind(),

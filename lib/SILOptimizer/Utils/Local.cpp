@@ -14,6 +14,7 @@
 #include "swift/SILOptimizer/Analysis/Analysis.h"
 #include "swift/SILOptimizer/Analysis/ARCAnalysis.h"
 #include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
+#include "swift/AST/SubstitutionMap.h"
 #include "swift/SIL/DynamicCasts.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
@@ -1338,10 +1339,7 @@ optimizeBridgedObjCToSwiftCast(SILInstruction *Inst,
   auto BridgedProto =
       M.getASTContext().getProtocol(KnownProtocolKind::ObjectiveCBridgeable);
   auto Conf =
-      M.getSwiftModule()->lookupConformance(Target, BridgedProto, nullptr);
-  assert(Conf && "_ObjectiveCBridgeable conformance should exist");
-
-  auto *Conformance = Conf->getConcrete();
+      *M.getSwiftModule()->lookupConformance(Target, BridgedProto, nullptr);
 
   auto ParamTypes = BridgedFunc->getLoweredFunctionType()->getParameters();
 
@@ -1353,14 +1351,11 @@ optimizeBridgedObjCToSwiftCast(SILInstruction *Inst,
   SmallVector<SILValue, 1> Args;
 
   // Add substitutions
-  auto Conformances =
-    M.getASTContext().AllocateUninitialized<ProtocolConformanceRef>(1);
-  Conformances[0] = ProtocolConformanceRef(Conformance);
-  Substitution Subs[1] = {
-    Substitution(Target, Conformances)
-  };
+  auto SubMap = SubstitutionMap::getProtocolSubstitutions(
+      Conf.getRequirement(), Target, Conf);
+
   auto SILFnTy = FuncRef->getType();
-  SILType SubstFnTy = SILFnTy.substGenericArgs(M, Subs);
+  SILType SubstFnTy = SILFnTy.substGenericArgs(M, SubMap);
   SILFunctionConventions substConv(SubstFnTy.castTo<SILFunctionType>(), M);
   SILType ResultTy = substConv.getSILResultType();
 
@@ -1392,6 +1387,9 @@ optimizeBridgedObjCToSwiftCast(SILInstruction *Inst,
   Args.push_back(InOutOptionalParam);
   Args.push_back(SrcOp);
   Args.push_back(MetaTyVal);
+
+  SmallVector<Substitution, 4> Subs;
+  Conf.getRequirement()->getGenericSignature()->getSubstitutions(SubMap, Subs);
 
   auto *AI = Builder.createApply(Loc, FuncRef, SubstFnTy, ResultTy, Subs, Args,
                                  false);
@@ -1544,11 +1542,11 @@ optimizeBridgedSwiftToObjCCast(SILInstruction *Inst,
     return nullptr;
 
   // Get substitutions, if source is a bound generic type.
-  SubstitutionList Subs =
-      Source->gatherAllSubstitutions(
-          M.getSwiftModule(), nullptr);
+  auto SubMap =
+    Source->getContextSubstitutionMap(M.getSwiftModule(),
+                                      BridgeFuncDecl->getDeclContext());
 
-  SILType SubstFnTy = SILFnTy.substGenericArgs(M, Subs);
+  SILType SubstFnTy = SILFnTy.substGenericArgs(M, SubMap);
   SILFunctionConventions substConv(SubstFnTy.castTo<SILFunctionType>(), M);
   SILType ResultTy = substConv.getSILResultType();
 
@@ -1634,6 +1632,10 @@ optimizeBridgedSwiftToObjCCast(SILInstruction *Inst,
 
   if (needRetainBeforeCall)
     Builder.createRetainValue(Loc, Src, Builder.getDefaultAtomicity());
+
+  SmallVector<Substitution, 4> Subs;
+  if (auto *Sig = Source->getAnyNominal()->getGenericSignature())
+    Sig->getSubstitutions(SubMap, Subs);
 
   // Generate a code to invoke the bridging function.
   auto *NewAI = Builder.createApply(Loc, FnRef, SubstFnTy, ResultTy, Subs, Src,
@@ -1981,9 +1983,88 @@ CastOptimizer::simplifyCheckedCastBranchInst(CheckedCastBranchInst *Inst) {
   return NewI;
 }
 
-SILInstruction *
-CastOptimizer::
-optimizeCheckedCastAddrBranchInst(CheckedCastAddrBranchInst *Inst) {
+SILInstruction *CastOptimizer::simplifyCheckedCastValueBranchInst(
+    CheckedCastValueBranchInst *Inst) {
+  if (auto *I = optimizeCheckedCastValueBranchInst(Inst))
+    Inst = dyn_cast<CheckedCastValueBranchInst>(I);
+
+  if (!Inst)
+    return nullptr;
+
+  auto LoweredSourceType = Inst->getOperand()->getType();
+  auto LoweredTargetType = Inst->getCastType();
+  auto SourceType = LoweredSourceType.getSwiftRValueType();
+  auto TargetType = LoweredTargetType.getSwiftRValueType();
+  auto Loc = Inst->getLoc();
+  auto *SuccessBB = Inst->getSuccessBB();
+  auto *FailureBB = Inst->getFailureBB();
+  auto Op = Inst->getOperand();
+  auto &Mod = Inst->getModule();
+  bool isSourceTypeExact = isa<MetatypeInst>(Op);
+
+  // Check if we can statically predict the outcome of the cast.
+  auto Feasibility = classifyDynamicCast(Mod.getSwiftModule(), SourceType,
+                                         TargetType, isSourceTypeExact);
+
+  if (Feasibility == DynamicCastFeasibility::MaySucceed) {
+    return nullptr;
+  }
+
+  SILBuilderWithScope Builder(Inst);
+
+  if (Feasibility == DynamicCastFeasibility::WillFail) {
+    auto *NewI = Builder.createBranch(Loc, FailureBB);
+    EraseInstAction(Inst);
+    WillFailAction();
+    return NewI;
+  }
+
+  // Casting will succeed.
+
+  // Replace by unconditional_cast, followed by a branch.
+  // The unconditional_cast can be skipped, if the result of a cast
+  // is not used afterwards.
+  bool ResultNotUsed = SuccessBB->getArgument(0)->use_empty();
+  SILValue CastedValue;
+  if (Op->getType() != LoweredTargetType) {
+    if (!ResultNotUsed) {
+      auto Src = Inst->getOperand();
+      auto Dest = SILValue();
+      // To apply the bridged casts optimizations.
+      auto BridgedI = optimizeBridgedCasts(
+          Inst, CastConsumptionKind::CopyOnSuccess, false, Src, Dest,
+          SourceType, TargetType, nullptr, nullptr);
+
+      if (BridgedI) {
+        CastedValue = BridgedI;
+      } else {
+        if (!canUseScalarCheckedCastInstructions(Mod, SourceType, TargetType))
+          return nullptr;
+
+        CastedValue = emitSuccessfulScalarUnconditionalCast(
+            Builder, Mod.getSwiftModule(), Loc, Op, LoweredTargetType,
+            SourceType, TargetType, Inst);
+      }
+
+      if (!CastedValue)
+        CastedValue = Builder.createUnconditionalCheckedCastValue(
+            Loc, Op, LoweredTargetType);
+    } else {
+      CastedValue = SILUndef::get(LoweredTargetType, Mod);
+    }
+  } else {
+    // No need to cast.
+    CastedValue = Op;
+  }
+
+  auto *NewI = Builder.createBranch(Loc, SuccessBB, CastedValue);
+  EraseInstAction(Inst);
+  WillSucceedAction();
+  return NewI;
+}
+
+SILInstruction *CastOptimizer::optimizeCheckedCastAddrBranchInst(
+    CheckedCastAddrBranchInst *Inst) {
   auto Loc = Inst->getLoc();
   auto Src = Inst->getSrc();
   auto Dest = Inst->getDest();
@@ -2054,6 +2135,12 @@ optimizeCheckedCastAddrBranchInst(CheckedCastAddrBranchInst *Inst) {
       }
     }
   }
+  return nullptr;
+}
+
+SILInstruction *CastOptimizer::optimizeCheckedCastValueBranchInst(
+    CheckedCastValueBranchInst *Inst) {
+  // TODO
   return nullptr;
 }
 

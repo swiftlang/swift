@@ -940,14 +940,18 @@ namespace {
 
           auto outputTy = SGF.getSILType(claimNextOutputType());
           auto &outputTL = SGF.getTypeLowering(outputTy);
-          auto temp = SGF.emitTemporary(Loc, outputTL);
-          translateAndImplodeInto(inputOrigType,
-                                  inputTupleType,
-                                  outputOrigType,
-                                  outputTupleType,
-                                  *temp);
+          if (SGF.silConv.useLoweredAddresses()) {
+            auto temp = SGF.emitTemporary(Loc, outputTL);
+            translateAndImplodeInto(inputOrigType, inputTupleType,
+                                    outputOrigType, outputTupleType, *temp);
 
-          Outputs.push_back(temp->getManagedAddress());
+            Outputs.push_back(temp->getManagedAddress());
+          } else {
+            auto result = translateAndImplodeIntoValue(
+                inputOrigType, inputTupleType, outputOrigType, outputTupleType,
+                outputTL.getLoweredType());
+            Outputs.push_back(result);
+          }
           return;
         }
 
@@ -1518,9 +1522,9 @@ public:
     // information we needed.
     assert(data.OuterResults.empty());
     assert(data.InnerResults.empty());
-    assert(data.InnerIndirectResultAddrs.size()
-           == SILFunctionConventions(innerFnType, Gen.SGM.M)
-                  .getNumIndirectSILResults());
+    assert(data.InnerIndirectResultAddrs.size() ==
+           SILFunctionConventions(innerFnType, Gen.SGM.M)
+               .getNumIndirectSILResults());
     assert(data.NextOuterIndirectResultIndex
            == SILFunctionConventions(outerFnType, Gen.SGM.M)
                   .getNumIndirectSILResults());
@@ -1531,6 +1535,8 @@ public:
 private:
   void execute(ArrayRef<SILValue> innerDirectResults,
                SmallVectorImpl<SILValue> &outerDirectResults);
+  void executeInnerTuple(SILValue innerElement,
+                         SmallVector<SILValue, 4> &innerDirectResults);
 
   void plan(AbstractionPattern innerOrigType, CanType innerSubstType,
             AbstractionPattern outerOrigType, CanType outerSubstType,
@@ -1588,6 +1594,11 @@ private:
                                    CanTupleType outerSubstType,
                                    PlanData &planData,
                                    SILValue innerResultAddr);
+  void planTupleFromDirectResult(AbstractionPattern innerOrigType,
+                                 CanTupleType innerSubstType,
+                                 AbstractionPattern outerOrigType,
+                                 CanTupleType outerSubstType,
+                                 PlanData &planData, SILResultInfo innerResult);
   void planScalarFromIndirectResult(AbstractionPattern innerOrigType,
                                     CanType innerSubstType,
                                     AbstractionPattern outerOrigType,
@@ -1619,7 +1630,8 @@ private:
   /// indirect result and add it as an inner indirect result.
   SILValue addInnerIndirectResultTemporary(PlanData &data,
                                            SILResultInfo innerResult) {
-    assert(Gen.silConv.isSILIndirect(innerResult));
+    assert(Gen.silConv.isSILIndirect(innerResult) ||
+           !Gen.silConv.useLoweredAddresses());
     auto temporary =
         Gen.emitTemporaryAllocation(Loc, Gen.getSILType(innerResult));
     data.InnerIndirectResultAddrs.push_back(temporary);
@@ -1806,17 +1818,26 @@ void ResultPlanner::plan(AbstractionPattern innerOrigType,
   // Otherwise, the inner pattern is a scalar; claim the next inner result.
   SILResultInfo innerResult = claimNextInnerResult(planData);
 
-  assert((!outerOrigType.isTuple() || Gen.silConv.isSILIndirect(innerResult))
-         && "outer pattern is a tuple, inner pattern is not, but inner "
-            "result is not indirect?");
+  assert((!outerOrigType.isTuple() || innerResult.isFormalIndirect()) &&
+         "outer pattern is a tuple, inner pattern is not, but inner result is "
+         "not indirect?");
 
   // If the inner result is a tuple, we need to expand from a temporary.
-  if (Gen.silConv.isSILIndirect(innerResult) && outerOrigType.isTuple()) {
-    SILValue innerResultAddr =
-      addInnerIndirectResultTemporary(planData, innerResult);
-    planTupleFromIndirectResult(innerOrigType, cast<TupleType>(innerSubstType),
+  if (innerResult.isFormalIndirect() && outerOrigType.isTuple()) {
+    if (Gen.silConv.isSILIndirect(innerResult)) {
+      SILValue innerResultAddr =
+          addInnerIndirectResultTemporary(planData, innerResult);
+      planTupleFromIndirectResult(
+          innerOrigType, cast<TupleType>(innerSubstType), outerOrigType,
+          cast<TupleType>(outerSubstType), planData, innerResultAddr);
+    } else {
+      assert(!Gen.silConv.useLoweredAddresses() &&
+             "Formal Indirect Results that are not SIL Indirect are only "
+             "allowed in opaque values mode");
+      planTupleFromDirectResult(innerOrigType, cast<TupleType>(innerSubstType),
                                 outerOrigType, cast<TupleType>(outerSubstType),
-                                planData, innerResultAddr);
+                                planData, innerResult);
+    }
     return;
   }
 
@@ -2156,6 +2177,46 @@ ResultPlanner::planTupleFromIndirectResult(AbstractionPattern innerOrigType,
   }
 }
 
+void ResultPlanner::planTupleFromDirectResult(AbstractionPattern innerOrigType,
+                                              CanTupleType innerSubstType,
+                                              AbstractionPattern outerOrigType,
+                                              CanTupleType outerSubstType,
+                                              PlanData &planData,
+                                              SILResultInfo innerResult) {
+
+  assert(!innerOrigType.isTuple());
+  CanTupleType outerSubstTupleType = dyn_cast<TupleType>(outerSubstType);
+
+  assert(outerSubstTupleType && "Outer type must be a tuple");
+  assert(innerSubstType->getNumElements() ==
+         outerSubstTupleType->getNumElements());
+
+  // Create direct outer results for each of the elements.
+  for (auto eltIndex : indices(innerSubstType.getElementTypes())) {
+    AbstractionPattern newOuterOrigType =
+        outerOrigType.getTupleElementType(eltIndex);
+    AbstractionPattern newInnerOrigType =
+        innerOrigType.getTupleElementType(eltIndex);
+    if (newOuterOrigType.isTuple()) {
+      planTupleFromDirectResult(
+          newInnerOrigType,
+          cast<TupleType>(innerSubstType.getElementType(eltIndex)),
+          newOuterOrigType,
+          cast<TupleType>(outerSubstTupleType.getElementType(eltIndex)),
+          planData, innerResult);
+      continue;
+    }
+
+    auto outerResult = claimNextOuterResult(planData);
+    auto elemType = outerSubstTupleType.getElementType(eltIndex);
+    SILResultInfo eltResult(elemType, outerResult.first.getConvention());
+    planScalarIntoDirectResult(
+        newInnerOrigType, innerSubstType.getElementType(eltIndex),
+        newOuterOrigType, outerSubstTupleType.getElementType(eltIndex),
+        planData, eltResult, outerResult.first);
+  }
+}
+
 /// Plan the emission of a call result from an inner result address,
 /// given that the outer abstraction pattern is not a tuple.
 void
@@ -2197,6 +2258,25 @@ ResultPlanner::planScalarFromIndirectResult(AbstractionPattern innerOrigType,
   }
 }
 
+void ResultPlanner::executeInnerTuple(
+    SILValue innerElement, SmallVector<SILValue, 4> &innerDirectResults) {
+  auto innerTupleType = innerElement->getType().getAs<TupleType>();
+  assert(innerTupleType && "Only supports tuple inner types");
+  ManagedValue ownedInnerResult =
+      Gen.emitManagedRValueWithCleanup(innerElement);
+  // Then borrow the managed direct result.
+  ManagedValue borrowedInnerResult = ownedInnerResult.borrow(Gen, Loc);
+  for (unsigned i : indices(innerTupleType.getElementTypes())) {
+    ManagedValue elt = Gen.B.createTupleExtract(Loc, borrowedInnerResult, i);
+    auto eltType = elt.getType();
+    if (eltType.is<TupleType>()) {
+      executeInnerTuple(elt.getValue(), innerDirectResults);
+      continue;
+    }
+    innerDirectResults.push_back(elt.copyUnmanaged(Gen, Loc).forward(Gen));
+  }
+}
+
 SILValue ResultPlanner::execute(SILValue innerResult) {
   // The code emission here assumes that we don't need to have
   // active cleanups for all the result values we're not actively
@@ -2214,15 +2294,7 @@ SILValue ResultPlanner::execute(SILValue innerResult) {
       // First create an rvalue cleanup for our direct result.
       assert(innerResult.getOwnershipKind() == ValueOwnershipKind::Owned ||
              innerResult.getOwnershipKind() == ValueOwnershipKind::Trivial);
-      ManagedValue ownedInnerResult = Gen.emitManagedRValueWithCleanup(innerResult);
-      // Then borrow the managed direct result.
-      ManagedValue borrowedInnerResult = ownedInnerResult.borrow(Gen, Loc);
-      // Then create unmanaged copies of the direct result and forward the
-      // result as expected by addManageDirectResult.
-      for (unsigned i : indices(innerResultTupleType.getElementTypes())) {
-        ManagedValue elt = Gen.B.createTupleExtract(Loc, borrowedInnerResult, i);
-        innerDirectResults.push_back(elt.copyUnmanaged(Gen, Loc).forward(Gen));
-      }
+      executeInnerTuple(innerResult, innerDirectResults);
       // Then allow the cleanups to be emitted in the proper reverse order.
     }
   }

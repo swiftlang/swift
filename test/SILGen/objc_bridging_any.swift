@@ -417,11 +417,9 @@ func passingToNullableId<T: CP, U>(receiver: NSIdLover,
   // CHECK: [[METHOD:%.*]] = class_method [volatile] [[BORROWED_SELF]]
   // CHECK: [[BORROWED_OPT_STRING:%.*]] = begin_borrow [[OPT_STRING]]
   // CHECK: [[OPT_STRING_COPY:%.*]] = copy_value [[BORROWED_OPT_STRING]]
-  // CHECK: select_enum [[OPT_STRING_COPY]]
-  // CHECK: cond_br {{%.*}}, [[LHS:bb.*]], [[RHS:bb[0-9]+]]
+  // CHECK: switch_enum [[OPT_STRING_COPY]] : $Optional<String>, case #Optional.some!enumelt.1: [[SOME_BB:bb[0-9]+]], case #Optional.none!enumelt: [[NONE_BB:bb[0-9]+]]
   //
-  // CHECK: [[LHS]]:
-  // CHECK:   [[STRING_DATA:%.*]] = unchecked_enum_data [[OPT_STRING_COPY]]
+  // CHECK: [[SOME_BB]]([[STRING_DATA:%.*]] : $String):
   // CHECK:   [[BRIDGE_STRING:%.*]] = function_ref @_TFE10FoundationSS19_bridgeToObjectiveC
   // CHECK:   [[BORROWED_STRING_DATA:%.*]] = begin_borrow [[STRING_DATA]]
   // CHECK:   [[BRIDGED:%.*]] = apply [[BRIDGE_STRING]]([[BORROWED_STRING_DATA]])
@@ -431,7 +429,7 @@ func passingToNullableId<T: CP, U>(receiver: NSIdLover,
   // CHECK:   destroy_value [[STRING_DATA]]
   // CHECK:   br [[JOIN:bb.*]]([[OPT_ANYOBJECT]]
   //
-  // CHECK: [[RHS]]:
+  // CHECK: [[NONE_BB]]:
   // CHECK:   [[OPT_NONE:%.*]] = enum $Optional<AnyObject>, #Optional.none!enumelt
   // CHECK:   br [[JOIN]]([[OPT_NONE]]
   //

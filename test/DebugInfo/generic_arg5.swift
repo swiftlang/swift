@@ -6,7 +6,7 @@ public struct S<Type>
 
 public func foo<Type>(_ values : [S<Type>])
 {
-  // CHECK: define {{.*}}_T012generic_arg53fooySayAA1SVyxGGlFADyxGSgADyxGcfU_
+  // CHECK: define {{.*}}_T012generic_arg53fooySayAA1SVyxGGlFAESgAEcfU_
   // CHECK: store %[[TY:.*]]* %1, %[[TY]]** %[[ALLOCA:.*]], align
   // CHECK: call void @llvm.dbg.declare(metadata %[[TY]]** %[[ALLOCA]],
   // CHECK-SAME:       metadata ![[ARG:.*]], metadata ![[EXPR:.*]])
@@ -17,7 +17,7 @@ public func foo<Type>(_ values : [S<Type>])
   // CHECK: ![[TY]] = !DICompositeType({{.*}}identifier: "_T012generic_arg51SVyAA3fooySayACyxGGlFQq_GD")
   // CHECK: ![[EXPR]] = !DIExpression(DW_OP_deref)
   let _ = values.flatMap { arg in
-    return arg
+    return .some(arg)
   }
  
 }

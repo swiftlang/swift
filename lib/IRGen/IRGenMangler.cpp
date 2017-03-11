@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "IRGenMangler.h"
-#include "swift/Basic/ManglingMacros.h"
+#include "swift/Demangling/ManglingMacros.h"
 
 using namespace swift;
 using namespace irgen;
@@ -24,7 +24,7 @@ std::string IRGenMangler::mangleValueWitness(Type type, ValueWitness witness) {
   switch (witness) {
 #define VALUE_WITNESS(MANGLING, NAME) \
     case ValueWitness::NAME: Code = #MANGLING; break;
-#include "swift/Basic/ValueWitnessMangling.def"
+#include "swift/Demangling/ValueWitnessMangling.def"
     case ValueWitness::Size:
     case ValueWitness::Flags:
     case ValueWitness::Stride:
