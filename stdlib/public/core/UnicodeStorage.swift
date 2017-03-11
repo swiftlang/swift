@@ -342,7 +342,11 @@ extension UnicodeStorage : _UTextable {
       }
     }
     // _debugLog("_access filled buffer, u = \(u)")
-    return true
+    
+    // WORKAROUND? <rdar://30979421>: UBreakIterator attempts to index UText
+    // out-of-range if we don't treat requests for empty chunks as
+    // out-of-bounds.
+        return u.chunkLength > 0
   }
   
   internal func _extract(
