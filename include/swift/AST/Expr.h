@@ -1029,10 +1029,13 @@ public:
     case ExprKind::StringLiteral:
       return false;
       
-    case ExprKind::Paren:
+      // Interpolated segments are parsed as UnresolvedMember calls to `init`,
+      // and get transformed into plain Calls later on.
+    case ExprKind::UnresolvedMember:
+    case ExprKind::Call:
       return true;
     
-    case ExprKind::Tuple:
+    case ExprKind::Error:
       // This can occur with certain kinds of invalid code. We'll just 
       // treat it as a parenthesized expression.
       return true;

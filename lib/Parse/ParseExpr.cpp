@@ -1749,9 +1749,32 @@ ParserResult<Expr> Parser::parseExprStringLiteral() {
       consumeToken();
       assert(Tok.is(tok::l_paren));
       
+      SmallVector<Expr*, 8> args;
+      SmallVector<Identifier, 8> argLabels;
+      SmallVector<SourceLoc, 8> argLabelLocs;
+      Expr *trailingClosure = nullptr;
+
+      SourceLoc leftLoc, rightLoc;
+      ParserStatus status = parseExprList(tok::l_paren, tok::r_paren, /*isPostfix=*/false,
+                                          /*isExprBasic=*/true,
+                                          leftLoc,
+                                          args,
+                                          argLabels,
+                                          argLabelLocs,
+                                          rightLoc,
+                                          trailingClosure);
+      
+      
       // If you change this line, make sure you also change 
       // InterpolatedStringLiteralExpr::isInterpolatedSegment().
-      ParserResult<Expr> E = parseExprList(tok::l_paren, tok::r_paren);
+      ParserResult<Expr> E = makeParserResult(
+                 status,
+                 UnresolvedMemberExpr::create(Context, leftLoc, DeclNameLoc(leftLoc), 
+                                              Context.Id_init,
+                                              leftLoc, args, argLabels,
+                                              argLabelLocs, rightLoc,
+                                              trailingClosure,
+                                              /*implicit=*/false));
       Status |= E;
       if (E.isNonNull()) {
         Exprs.push_back(E.get());
