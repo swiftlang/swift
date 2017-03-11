@@ -335,4 +335,15 @@ testSuite.test("substring") {
   expectEqualSequence("ello world", tail)
 }
 
+import Foundation
+testSuite.test("bridging") {
+  defer { _debugLogging = false }
+  _debugLogging = false
+  let s : main.String
+    = "abc\n🇸🇸🇬🇱🇱🇸🇩🇯🇺🇸\nΣὲ 👥🥓γνωρίζω\nგთხოვთ\nงบู๊กู้ขึ้นม่\nᚹᛖᛥᚫ"
+  let n = s as NSString
+  let s2 = n as main.String
+  expectEqual(s, s2)
+}
+
 runAllTests()

@@ -157,6 +157,15 @@ extension _StringStorage : _NSStringCore {
     return UnsafeMutablePointer(Builtin.projectTailElems(self, Element.self))
   }
 
+  // WARNING: Before you implement this as anything other than “return nil,”
+  // see https://github.com/apple/swift/pull/3151#issuecomment-285583557
+  @objc
+  public func _fastCStringContents(
+    _ nullTerminationRequired: Int8
+  ) -> UnsafePointer<CChar>? {
+    return nil
+  }
+  
   @objc(copyWithZone:)
   internal func copy(with _: _SwiftNSZone?) -> AnyObject {
     return self

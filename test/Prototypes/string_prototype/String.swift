@@ -425,4 +425,51 @@ extension String {
     }
 }
 
+import Foundation // Just to get the definition of NSString.  We could bridge
+                  // this to something else such as AnyObject instead, just for
+                  // demonstration purposes, if we didn't want this dependency.
 
+struct _NSStringUTF16 : RandomAccessCollection {
+  var base: NSString
+  var startIndex: Int { return 0 }
+  var endIndex: Int { return base.length }
+  subscript(i: Int) -> UInt16 {
+    return base.character(at: i)
+  }
+}
+
+extension String : _ObjectiveCBridgeable {
+  @_semantics("convertToObjectiveC")
+  public func _bridgeToObjectiveC() -> NSString {
+    guard case .canonical(let c) = contents else { fatalError() }
+    return unsafeBitCast(c._storage.codeUnits._storage, to: NSString.self)
+  }
+
+  public static func _forceBridgeFromObjectiveC(
+    _ x: NSString,
+    result: inout String?
+  ) {
+    result = _unconditionallyBridgeFromObjectiveC(x)
+  }
+
+  public static func _conditionallyBridgeFromObjectiveC(
+    _ x: NSString,
+    result: inout String?
+  ) -> Bool {
+    self._forceBridgeFromObjectiveC(x, result: &result)
+    return result != nil
+  }
+
+  public static func _unconditionallyBridgeFromObjectiveC(
+    _ source: NSString?
+  ) -> String {
+    // `nil` has historically been used as a stand-in for an empty
+    // string; map it to an empty string.
+    if _slowPath(source == nil) { return String() }
+    // super inefficient; it transcodex
+    return String(
+      canonical: SwiftCanonicalString(
+        codeUnits: _NSStringUTF16(base: source!),
+        encodedWith: UTF16.self)) 
+  }
+}
