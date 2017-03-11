@@ -1520,18 +1520,20 @@ namespace {
       auto bridgeFnTy = FunctionType::get(valueParenTy, bridgeTy);
       // FIXME: Wrap in ParenExpr to prevent bogus "tuple passed as argument"
       // errors.
-      auto valueParen = new (tc.Context) ParenExpr(SourceLoc(),
-                                                   value,
-                                                   SourceLoc(),
-                                                   /*trailing closure*/ false,
-                                                   valueParenTy);
+      auto valueParen = cs.cacheType(
+          new (tc.Context) ParenExpr(SourceLoc(),
+                                     value,
+                                     SourceLoc(),
+                                     /*trailing closure*/ false,
+                                     valueParenTy));
 
       valueParen->setImplicit();
-      auto fnRef = new (tc.Context) DeclRefExpr(bridgeAnythingRef,
-                                                DeclNameLoc(),
-                                                /*implicit*/ true,
-                                                AccessSemantics::Ordinary,
-                                                bridgeFnTy);
+      auto fnRef = cs.cacheType(
+          new (tc.Context) DeclRefExpr(bridgeAnythingRef,
+                                       DeclNameLoc(),
+                                       /*implicit*/ true,
+                                       AccessSemantics::Ordinary,
+                                       bridgeFnTy));
 
       auto getType = [&](const Expr *E) -> Type {
         return cs.getType(E);
@@ -1630,13 +1632,14 @@ namespace {
 
       // Form the arguments.
       Expr *args[2] = {
-        object,
-        new (tc.Context) DotSelfExpr(
-                             TypeExpr::createImplicitHack(object->getLoc(),
-                                                          valueType,
-                                                          tc.Context),
-                             object->getLoc(), object->getLoc(),
-                             MetatypeType::get(valueType))
+        cs.cacheType(object),
+        cs.cacheType(
+            new (tc.Context) DotSelfExpr(
+                TypeExpr::createImplicitHack(object->getLoc(),
+                                             valueType,
+                                             tc.Context),
+                object->getLoc(), object->getLoc(),
+                MetatypeType::get(valueType)))
       };
       args[1]->setImplicit();
 
