@@ -836,9 +836,8 @@ SILGenFunction::emitOpenExistential(
     assert(existentialType.isObject());
     // NB: Don't forward the cleanup, because consuming a boxed value won't
     // consume the box reference.
-    archetypeMV = ManagedValue::forUnmanaged(
-        B.createOpenExistentialBox(loc, existentialValue.getValue(),
-                                   loweredOpenedType));
+    archetypeMV = ManagedValue::forUnmanaged(B.createOpenExistentialBox(
+        loc, existentialValue.getValue(), loweredOpenedType.getAddressType()));
     // The boxed value can't be assumed to be uniquely referenced. We can never
     // consume it.
     // TODO: We could use isUniquelyReferenced to shorten the duration of

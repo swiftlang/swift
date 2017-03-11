@@ -483,6 +483,9 @@ public:
   /// anywhere in the type, use \c hasOpenedExistential.
   bool isOpenedExistential();
 
+  /// Determine whether the type is an opened existential type with Error inside
+  bool isOpenedExistentialWithError();
+
   /// Retrieve the set of opened existential archetypes that occur
   /// within this type.
   void getOpenedExistentials(SmallVectorImpl<ArchetypeType *> &opened);
@@ -4411,6 +4414,19 @@ inline bool TypeBase::isOpenedExistential() {
   CanType T = getCanonicalType();
   if (auto archetype = dyn_cast<ArchetypeType>(T))
     return !archetype->getOpenedExistentialType().isNull();
+  return false;
+}
+
+inline bool TypeBase::isOpenedExistentialWithError() {
+  if (!hasOpenedExistential())
+    return false;
+
+  CanType T = getCanonicalType();
+  if (auto archetype = dyn_cast<ArchetypeType>(T)) {
+    auto openedExistentialType = archetype->getOpenedExistentialType();
+    return (!openedExistentialType.isNull() &&
+            openedExistentialType->isExistentialWithError());
+  }
   return false;
 }
 

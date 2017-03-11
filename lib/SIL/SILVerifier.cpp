@@ -2304,7 +2304,7 @@ public:
 
     CanType resultInstanceTy = OEI->getType().getSwiftRValueType();
 
-    require(OEI->getType().isAddress() || !fnConv.useLoweredAddresses(),
+    require(OEI->getType().isAddress(),
             "open_existential_box result must be an address");
 
     auto archetype = getOpenedArchetypeOf(resultInstanceTy);
