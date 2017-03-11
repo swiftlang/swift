@@ -212,16 +212,19 @@ removedHandledEnumElements(Pattern *P,
   return false;
 };
 
-void swift::diagnoseMissingCases(ASTContext &Context, const SwitchStmt *SwitchS,
-                                 Diagnostic Id) {
+void swift::
+diagnoseMissingCases(ASTContext &Context, const SwitchStmt *SwitchS) {
+  bool Empty = SwitchS->getCases().empty();
+  SourceLoc StartLoc = SwitchS->getStartLoc();
   SourceLoc EndLoc = SwitchS->getEndLoc();
-  StringRef Placeholder = "<#Code#>";
+  StringRef Placeholder = getCodePlaceholder();
   SmallString<32> Buffer;
   llvm::raw_svector_ostream OS(Buffer);
 
   auto DefaultDiag = [&]() {
     OS << tok::kw_default << ": " << Placeholder << "\n";
-    Context.Diags.diagnose(EndLoc, Id).fixItInsert(EndLoc, Buffer.str());
+    Context.Diags.diagnose(StartLoc, Empty ? diag::empty_switch_stmt :
+      diag::non_exhaustive_switch, true).fixItInsert(EndLoc, Buffer.str());
   };
   // To find the subject enum decl for this switch statement.
   EnumDecl *SubjectED = nullptr;
@@ -307,7 +310,8 @@ void swift::diagnoseMissingCases(ASTContext &Context, const SwitchStmt *SwitchS,
       printPayloads(EE, OS);
       OS <<": " << Placeholder << "\n";
   });
-  Context.Diags.diagnose(EndLoc, Id).fixItInsert(EndLoc, Buffer.str());
+  Context.Diags.diagnose(StartLoc, Empty ? diag::empty_switch_stmt :
+    diag::non_exhaustive_switch, false).fixItInsert(EndLoc, Buffer.str());
 }
 
 static void setAutoClosureDiscriminators(DeclContext *DC, Stmt *S) {
@@ -981,7 +985,7 @@ public:
 
     // Reject switch statements with empty blocks.
     if (S->getCases().empty())
-      diagnoseMissingCases(TC.Context, S, diag::empty_switch_stmt);
+      diagnoseMissingCases(TC.Context, S);
     for (unsigned i = 0, e = S->getCases().size(); i < e; ++i) {
       auto *caseBlock = S->getCases()[i];
       // Fallthrough transfers control to the next case block. In the

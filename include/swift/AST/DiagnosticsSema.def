@@ -2670,7 +2670,12 @@ ERROR(trailing_closure_requires_parens,none,
       " context", ())
 
 ERROR(empty_switch_stmt,none,
-"'switch' statement body must have at least one 'case' or 'default' block",())
+      "'switch' statement body must have at least one 'case' or 'default' block;"
+      " do you want to add "
+      "%select{missing cases?|a default case?}0",(bool))
+ERROR(non_exhaustive_switch,none,
+      "switch must be exhaustive, consider adding "
+      "%select{missing cases|a default clause}0", (bool))
 //------------------------------------------------------------------------------
 // Type Check Patterns
 //------------------------------------------------------------------------------

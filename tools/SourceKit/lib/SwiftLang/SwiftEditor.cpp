@@ -21,6 +21,7 @@
 #include "SourceKit/Support/UIdent.h"
 
 #include "swift/AST/AST.h"
+#include "swift/AST/ASTPrinter.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/SourceEntityWalker.h"
@@ -1988,7 +1989,7 @@ void SwiftEditorDocument::expandPlaceholder(unsigned Offset, unsigned Length,
         }
         if (HasSignature)
           OS << "in";
-        OS << "\n<#code#>\n";
+        OS << "\n" << getCodePlaceholder() << "\n";
         OS << "}";
       }
       Consumer.handleSourceText(ExpansionStr);

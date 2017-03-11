@@ -605,6 +605,8 @@ uint8_t swift::getKeywordLen(tok keyword) {
   }
 }
 
+StringRef swift::getCodePlaceholder() { return "<#code#>"; }
+
 ASTPrinter &operator<<(ASTPrinter &printer, tok keyword) {
   SmallString<16> Buffer;
   llvm::raw_svector_ostream OS(Buffer);
