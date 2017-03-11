@@ -15,50 +15,48 @@
 
 #include <new>
 #include <stdlib.h>
-
-#define SWIFT_PRIVATE_INLINE \
-  __private_extern__ inline __attribute__((always_inline))
+#include "llvm/Support/Compiler.h"
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Winline-new-delete"
 
-SWIFT_PRIVATE_INLINE void*
-operator new(std::size_t size) throw (std::bad_alloc) {
+LLVM_ATTRIBUTE_ALWAYS_INLINE inline
+void* operator new(std::size_t size) throw (std::bad_alloc) {
   return malloc(size);
 }
 
-SWIFT_PRIVATE_INLINE void*
-operator new[](std::size_t size) throw (std::bad_alloc) {
+LLVM_ATTRIBUTE_ALWAYS_INLINE inline
+void* operator new[](std::size_t size) throw (std::bad_alloc) {
   return malloc(size);
 }
 
-SWIFT_PRIVATE_INLINE void*
-operator new(std::size_t size, const std::nothrow_t&) throw() {
+LLVM_ATTRIBUTE_ALWAYS_INLINE inline
+void* operator new(std::size_t size, const std::nothrow_t&) throw() {
   return malloc(size);
 }
 
-SWIFT_PRIVATE_INLINE void*
-operator new[](std::size_t size, const std::nothrow_t&) throw() {
+LLVM_ATTRIBUTE_ALWAYS_INLINE inline
+void* operator new[](std::size_t size, const std::nothrow_t&) throw() {
   return malloc(size);
 }
 
-SWIFT_PRIVATE_INLINE void
-operator delete(void* p) throw() {
+LLVM_ATTRIBUTE_ALWAYS_INLINE inline
+void operator delete(void* p) throw() {
   free(p);
 }
 
-SWIFT_PRIVATE_INLINE void
-operator delete[](void* p) throw() {
+LLVM_ATTRIBUTE_ALWAYS_INLINE inline
+void operator delete[](void* p) throw() {
   free(p);
 }
 
-SWIFT_PRIVATE_INLINE void
-operator delete(void* p, const std::nothrow_t&) throw() {
+LLVM_ATTRIBUTE_ALWAYS_INLINE inline
+void operator delete(void* p, const std::nothrow_t&) throw() {
   free(p);
 }
 
-SWIFT_PRIVATE_INLINE void
-operator delete[](void* p, const std::nothrow_t&) throw() {
+LLVM_ATTRIBUTE_ALWAYS_INLINE inline
+void operator delete[](void* p, const std::nothrow_t&) throw() {
   free(p);
 }
 
