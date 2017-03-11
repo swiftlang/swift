@@ -953,6 +953,67 @@ static void checkRedeclaration(TypeChecker &tc, ValueDecl *current) {
           continue;
       }
 
+      // If the conflicting declarations have non-overlapping availability and
+      // - one throws and the other does not,
+      // - or they are initializers with different failability
+      // let them go.
+      bool isAcceptableVersionBasedChange = false;
+      {
+        const auto *currentInit = dyn_cast<ConstructorDecl>(current);
+        const auto *otherInit = dyn_cast<ConstructorDecl>(other);
+        if (currentInit && otherInit &&
+            ((currentInit->getFailability() == OTK_None) !=
+             (otherInit->getFailability() == OTK_None))) {
+          isAcceptableVersionBasedChange = true;
+        }
+      }
+      {
+        const auto *currentAFD = dyn_cast<AbstractFunctionDecl>(current);
+        const auto *otherAFD = dyn_cast<AbstractFunctionDecl>(other);
+        if (currentAFD && otherAFD &&
+            currentAFD->hasThrows() != otherAFD->hasThrows()) {
+          isAcceptableVersionBasedChange = true;
+        }
+      }
+      if (isAcceptableVersionBasedChange) {
+        class AvailabilityRange {
+          Optional<clang::VersionTuple> introduced;
+          Optional<clang::VersionTuple> obsoleted;
+
+        public:
+          static AvailabilityRange from(const ValueDecl *VD) {
+            AvailabilityRange result;
+            for (auto *attr : VD->getAttrs().getAttributes<AvailableAttr>()) {
+              if (attr->PlatformAgnostic ==
+                    PlatformAgnosticAvailabilityKind::SwiftVersionSpecific) {
+                if (attr->Introduced)
+                  result.introduced = attr->Introduced;
+                if (attr->Obsoleted)
+                  result.obsoleted = attr->Obsoleted;
+              }
+            }
+            return result;
+          }
+
+          bool fullyPrecedes(const AvailabilityRange &other) const {
+            if (!obsoleted.hasValue())
+              return false;
+            if (!other.introduced.hasValue())
+              return false;
+            return *obsoleted <= *other.introduced;
+          }
+
+          bool overlaps(const AvailabilityRange &other) const {
+            return !fullyPrecedes(other) && !other.fullyPrecedes(*this);
+          }
+        };
+
+        auto currentAvail = AvailabilityRange::from(current);
+        auto otherAvail = AvailabilityRange::from(other);
+        if (!currentAvail.overlaps(otherAvail))
+          continue;
+      }
+
       tc.diagnose(current, diag::invalid_redecl, current->getFullName());
       tc.diagnose(other, diag::invalid_redecl_prev, other->getFullName());
       markInvalid();
@@ -2536,7 +2597,7 @@ void swift::markAsObjC(TypeChecker &TC, ValueDecl *D,
 
   if (!isObjC) {
     // FIXME: For now, only @objc declarations can be dynamic.
-    if (auto attr = D->getAttrs().getAttribute<DynamicAttr>(D))
+    if (auto attr = D->getAttrs().getAttribute<DynamicAttr>())
       attr->setInvalid();
     return;
   }

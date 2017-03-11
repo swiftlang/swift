@@ -757,8 +757,8 @@ namespace {
       auto nominal = dyn_cast<NominalTypeDecl>(decl);
       if (!nominal) return nullptr;
 
-      for (auto attr : decl->getAttrs().getAttributes<SynthesizedProtocolAttr,
-                                                      false>()) {
+      const DeclAttributes &allAttrs = decl->getAttrs();
+      for (auto attr : allAttrs.getAttributes<SynthesizedProtocolAttr>()) {
         if (attr->getProtocolKind() ==
             KnownProtocolKind::BridgedStoredNSError) {
           auto &ctx = nominal->getASTContext();
