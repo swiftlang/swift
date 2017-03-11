@@ -336,11 +336,15 @@ func s210______compErasure(_ x: Foo & Error) -> Error {
 // CHECK-LABEL: sil hidden @_T020opaque_values_silgen21s220_____openExistBoxSSs5Error_pF : $@convention(thin) (@owned Error) -> @owned String {
 // CHECK: bb0([[ARG:%.*]] : $Error):
 // CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
-// CHECK:   [[OPAQUE_ARG:%.*]] = open_existential_box [[BORROWED_ARG]] : $Error to $@opened({{.*}}) Error
-// CHECK:   [[RET_STRING:%.*]] = apply{{.*}}<@opened({{.*}}) Error>([[OPAQUE_ARG]]) : $@convention(witness_method) <τ_0_0 where τ_0_0 : Error> (@in_guaranteed τ_0_0) -> @owned String
+// CHECK:   [[OPAQUE_ARG:%.*]] = open_existential_box [[BORROWED_ARG]] : $Error to $*@opened({{.*}}) Error
+// CHECK:   [[ALLOC_OPEN:%.*]] = alloc_stack $@opened({{.*}}) Error
+// CHECK:   copy_addr [[OPAQUE_ARG]] to [initialization] [[ALLOC_OPEN]] : $*@opened({{.*}}) Error
+// CHECK:   [[LOAD_ALLOC:%.*]] = load [take] [[ALLOC_OPEN]]
+// CHECK:   destroy_value [[LOAD_ALLOC]]
+// CHECK:   dealloc_stack [[ALLOC_OPEN]]
 // CHECK:   end_borrow [[BORROWED_ARG]] from [[ARG]]
 // CHECK:   destroy_value [[ARG]] : $Error
-// CHECK:   return [[RET_STRING]] : $String
+// CHECK:   return {{.*}} : $String
 // CHECK-LABEL: } // end sil function '_T020opaque_values_silgen21s220_____openExistBoxSSs5Error_pF'
 func s220_____openExistBox(_ x: Error) -> String {
   return x._domain
@@ -365,9 +369,32 @@ func s230______condFromAny(_ x: Any) {
   }
 }
 
+// Tests LValue of error types / existential boxes
+// ---
+// CHECK-LABEL: sil hidden @_T020opaque_values_silgen21s240_____propOfLValueSSs5Error_pF : $@convention(thin) (@owned Error) -> @owned String {
+// CHECK: bb0([[ARG:%.*]] : $Error):
+// CHECK:   [[ALLOC_OF_BOX:%.*]] = alloc_box ${ var Error }
+// CHECK:   [[PROJ_BOX:%.*]] = project_box [[ALLOC_OF_BOX]]
+// CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
+// CHECK:   [[COPY_ARG:%.*]] = copy_value [[BORROWED_ARG]]
+// CHECK:   store [[COPY_ARG]] to [init] [[PROJ_BOX]]
+// CHECK:   end_borrow [[BORROWED_ARG]] from [[ARG]]
+// CHECK:   [[LOAD_BOX:%.*]] = load [copy] [[PROJ_BOX]]
+// CHECK:   [[OPAQUE_ARG:%.*]] = open_existential_box [[LOAD_BOX]] : $Error to $*@opened({{.*}}) Error
+// CHECK:   [[LOAD_OPAQUE:%.*]] = load [copy] [[OPAQUE_ARG]]
+// CHECK:   [[ALLOC_OPEN:%.*]] = alloc_stack $@opened({{.*}}) Error
+// CHECK:   store [[LOAD_OPAQUE]] to [init] [[ALLOC_OPEN]]
+// CHECK:   [[RET_VAL:%.*]] = apply {{.*}}<@opened({{.*}}) Error>([[ALLOC_OPEN]])
+// CHECK:   return [[RET_VAL]] : $String
+// CHECK-LABEL: } // end sil function '_T020opaque_values_silgen21s240_____propOfLValueSSs5Error_pF'
+func s240_____propOfLValue(_ x: Error) -> String {
+  var x = x
+  return x._domain
+}
+
 // Tests conditional value casts and correspondingly generated reabstraction thunk, with <T> types
 // ---
-// CHECK-LABEL: sil hidden @_T020opaque_values_silgen21s240_____condTFromAnyyyp_xtlF : $@convention(thin) <T> (@in Any, @in T) -> () {
+// CHECK-LABEL: sil hidden @_T020opaque_values_silgen21s250_____condTFromAnyyyp_xtlF : $@convention(thin) <T> (@in Any, @in T) -> () {
 // CHECK: bb0([[ARG0:%.*]] : $Any, [[ARG1:%.*]] : $T):
 // CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG0]]
 // CHECK:   [[COPY__ARG:%.*]] = copy_value [[BORROWED_ARG]]
@@ -377,8 +404,8 @@ func s230______condFromAny(_ x: Any) {
 // CHECK:   partial_apply [[THUNK_REF]]<T>([[THUNK_PARAM]])
 // CHECK: bb6:
 // CHECK:   return %{{.*}} : $()
-// CHECK-LABEL: } // end sil function '_T020opaque_values_silgen21s240_____condTFromAnyyyp_xtlF'
-func s240_____condTFromAny<T>(_ x: Any, _ y: T) {
+// CHECK-LABEL: } // end sil function '_T020opaque_values_silgen21s250_____condTFromAnyyyp_xtlF'
+func s250_____condTFromAny<T>(_ x: Any, _ y: T) {
   if let f = x as? (Int, T) -> (Int, T) {
     f(42, y)
   }
