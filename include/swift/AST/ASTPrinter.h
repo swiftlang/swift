@@ -310,6 +310,9 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, tok keyword);
 /// Get the length of a keyword or punctuator by its kind.
 uint8_t getKeywordLen(tok keyword);
 
+/// Get <#code#>;
+StringRef getCodePlaceholder();
+
 } // namespace swift
 
 #endif // LLVM_SWIFT_AST_ASTPRINTER_H

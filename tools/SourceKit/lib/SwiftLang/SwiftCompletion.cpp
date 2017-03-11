@@ -16,6 +16,7 @@
 #include "SourceKit/Support/Logging.h"
 #include "SourceKit/Support/UIdent.h"
 
+#include "swift/AST/ASTPrinter.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
 #include "swift/IDE/CodeCompletionCache.h"
@@ -662,7 +663,7 @@ void SwiftToSourceKitCompletionAdapter::getResultSourceText(
   for (size_t i = 0; i < Chunks.size(); ++i) {
     auto &C = Chunks[i];
     if (C.is(ChunkKind::BraceStmtWithCursor)) {
-      OS << " {\n<#code#>\n}";
+      OS << " {\n" << getCodePlaceholder() << "\n}";
       continue;
     }
     if (C.is(ChunkKind::CallParameterBegin)) {
