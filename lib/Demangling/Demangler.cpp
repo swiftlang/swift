@@ -275,6 +275,9 @@ NodePointer Demangler::demangleSymbol(StringRef MangledName) {
         break;
     }
   }
+  if (topLevel->getNumChildren() == 0)
+    return nullptr;
+
   if (EndPos < Text.size()) {
     topLevel->addChild(createNode(Node::Kind::Suffix, Text.substr(EndPos)), *this);
   }
@@ -623,6 +626,8 @@ NodePointer Demangler::demangleIdentifier() {
 
 NodePointer Demangler::demangleOperatorIdentifier() {
   NodePointer Ident = popNode(Node::Kind::Identifier);
+  if (!Ident)
+    return nullptr;
 
   static const char op_char_table[] = "& @/= >    <*!|+?%-~   ^ .";
 

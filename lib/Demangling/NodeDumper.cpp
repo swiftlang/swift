@@ -55,5 +55,6 @@ std::string &&Demangle::getNodeTreeAsString(NodePointer Root) {
 }
 
 void swift::Demangle::Node::dump() {
-  fputs(getNodeTreeAsString(this).c_str(), stderr);
+  std::string TreeStr = getNodeTreeAsString(this);
+  fputs(TreeStr.c_str(), stderr);
 }
