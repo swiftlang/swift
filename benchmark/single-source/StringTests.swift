@@ -11,13 +11,6 @@
 //===----------------------------------------------------------------------===//
 import TestsUtils
 
-public func run_StringWithCString(_ N: Int) {
-  let str = String(repeating: "x", count: 100 * (1 << 16))
-  for _ in 0 ..< N {
-    str.withCString { _ in }
-  }
-}
-
 // FIXME(string)
 public func run_StringHasPrefix(_ N: Int) {
 #if _runtime(_ObjC)

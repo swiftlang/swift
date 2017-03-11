@@ -40,6 +40,7 @@ import CharacterLiteralsLarge
 import CharacterLiteralsSmall
 import Chars
 import ClassArrayGetter
+import CString
 import DeadArray
 import DictTest
 import DictTest2
@@ -98,7 +99,9 @@ import StaticArray
 import StrComplexWalk
 import StrToInt
 import StringBuilder
+import StringEdits
 import StringInterpolation
+import StringMatch
 import StringTests
 import StringWalk
 import SuperChars
@@ -149,6 +152,9 @@ precommitTests = [
   "CharacterLiteralsSmall": run_CharacterLiteralsSmall,
   "Chars": run_Chars,
   "ClassArrayGetter": run_ClassArrayGetter,
+  "CStringLongAscii": run_CStringLongAscii,
+  "CStringLongNonAscii": run_CStringLongNonAscii,
+  "CStringShortAscii": run_CStringShortAscii,
   "DeadArray": run_DeadArray,
   "Dictionary": run_Dictionary,
   "Dictionary2": run_Dictionary2,
@@ -268,12 +274,17 @@ precommitTests = [
   "StrComplexWalk": run_StrComplexWalk,
   "StrToInt": run_StrToInt,
   "StringBuilder": run_StringBuilder,
+  "StringAdder": run_StringAdder,
+  "StringUTF16Builder": run_StringUTF16Builder,
+  "StringBuilderLong": run_StringBuilderLong,
+  "StringEdits": run_StringEdits,
   "StringEqualPointerComparison": run_StringEqualPointerComparison,
   "StringHasPrefix": run_StringHasPrefix,
   "StringHasPrefixUnicode": run_StringHasPrefixUnicode,
   "StringHasSuffix": run_StringHasSuffix,
   "StringHasSuffixUnicode": run_StringHasSuffixUnicode,
   "StringInterpolation": run_StringInterpolation,
+  "StringMatch": run_StringMatch,
   "StringWalk": run_StringWalk,
   "StringWithCString": run_StringWithCString,
   "SuperChars": run_SuperChars,
