@@ -1,22 +1,30 @@
 // RUN: %target-typecheck-verify-swift
 
-struct CustomString<T> : ExpressibleByStringLiteral {
+struct CustomString<T: _ExpressibleByBuiltinStringLiteral>
+  : ExpressibleByStringLiteral {
   init(stringLiteral value: T) {}
 }
-struct CustomExtendedGraphemeCluster<T> : ExpressibleByExtendedGraphemeCluster {
+struct CustomExtendedGraphemeCluster
+  <T: _ExpressibleByBuiltinExtendedGraphemeClusterLiteral>
+  : ExpressibleByExtendedGraphemeClusterLiteral {
   init(extendedGraphemeClusterLiteral value: T) {}
 }
-struct CustomUnicodeScalar<T> : ExpressibleByUnicodeScalarLiteral {
-  init(unicodeScalarLiteral value: T) {}
+struct CustomUnicodeScalar<T: _ExpressibleByBuiltinUnicodeScalarLiteral>
+  : ExpressibleByUnicodeScalarLiteral {
+  init(unicodeScalarLiteral value: T) {
+  }
 }
 
-func verify<T>(stringLiteral value: CustomString<T>, with: T.Type) {}
-func verify<T>(
-  extendedGraphemeClusterLiteral value: CustomExtendedGraphemeCluster<T>, 
+func verify<T: _ExpressibleByBuiltinStringLiteral>(
+  stringLiteral value: CustomString<T>,
   with: T.Type) {
 }
-func verify<T>(
-  unicodeScalarLiteral value: CustomUnicodeScalar<T>, 
+func verify<T: _ExpressibleByBuiltinExtendedGraphemeClusterLiteral>(
+  extendedGraphemeClusterLiteral value: CustomExtendedGraphemeCluster<T>,
+  with: T.Type) {
+}
+func verify<T: _ExpressibleByBuiltinUnicodeScalarLiteral>(
+  unicodeScalarLiteral value: CustomUnicodeScalar<T>,
   with: T.Type) {
 }
 
