@@ -365,6 +365,39 @@ public:
                                     ProtocolConformanceRef conformance);
 };
 
+/// The result of `checkGenericRequirement`.
+enum class RequirementCheckResult { Success, Failure, UnsatisfiedDependency };
+
+class ConformsToProtocolResult {
+  Optional<ProtocolConformanceRef> Data;
+  RequirementCheckResult State;
+
+  ConformsToProtocolResult(Optional<ProtocolConformanceRef> data,
+                           RequirementCheckResult state)
+      : Data(data), State(state) {}
+
+public:
+  static ConformsToProtocolResult unsatisfiedDependency() {
+    return ConformsToProtocolResult(
+        None, RequirementCheckResult::UnsatisfiedDependency);
+  }
+  static ConformsToProtocolResult failure() {
+    return ConformsToProtocolResult(None, RequirementCheckResult::Failure);
+  }
+  static ConformsToProtocolResult success(ProtocolConformanceRef ref) {
+    return ConformsToProtocolResult(ref, RequirementCheckResult::Success);
+  }
+
+  RequirementCheckResult getStatus() const { return State; }
+  bool hasUnsatisfiedDependency() const {
+    return getStatus() == RequirementCheckResult::UnsatisfiedDependency;
+  }
+  ProtocolConformanceRef getConformance() const {
+    assert(getStatus() == RequirementCheckResult::Success);
+    return *Data;
+  }
+};
+
 /// Flags that describe the context of type checking a pattern or
 /// type.
 enum TypeResolutionFlags : unsigned {
@@ -1226,12 +1259,7 @@ public:
   /// requirement.
   /// \param listener The generic check listener used to pick requirements and
   /// notify callers about diagnosed errors.
-  ///
-  /// \returns One of the following:
-  /// - (true, false) if there was an unsatisfied dependency
-  /// - (false, true) on success
-  /// - (false, false) on failure
-  std::pair<bool, bool> checkGenericArguments(
+  RequirementCheckResult checkGenericArguments(
       DeclContext *dc, SourceLoc loc, SourceLoc noteLoc, Type owner,
       GenericSignature *genericSig, TypeSubstitutionFn substitutions,
       LookupConformanceFn conformances,
@@ -1703,17 +1731,9 @@ public:
                                      SourceLoc ComplainLoc = SourceLoc());
 
   /// A version of the above meant for use with the iterative type checker.
-  ///
-  /// \returns One of the following:
-  /// - (true, None) if there was an unsatisfied dependency
-  /// - (false, Some(ProtocolConformanceRef)) on success
-  /// - (false, None) on failure
-  std::pair<bool, Optional<ProtocolConformanceRef>>
-  conformsToProtocol(Type T,
-                     ProtocolDecl *Proto,
-                     DeclContext *DC,
-                     ConformanceCheckOptions options,
-                     SourceLoc ComplainLoc,
+  ConformsToProtocolResult
+  conformsToProtocol(Type T, ProtocolDecl *Proto, DeclContext *DC,
+                     ConformanceCheckOptions options, SourceLoc ComplainLoc,
                      UnsatisfiedDependency *unsatisfiedDependency);
 
   /// Completely check the given conformance.

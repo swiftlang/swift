@@ -1653,20 +1653,17 @@ void GenericSignatureBuilder::PotentialArchetype::dump(llvm::raw_ostream &Out,
   if (!ConformsTo.empty()) {
     Out << " : ";
 
-    bool First = true;
-    for (const auto &ProtoAndSource : ConformsTo) {
-      if (First)
-        First = false;
-      else
-        Out << " & ";
-
-      Out << ProtoAndSource.first->getName().str() << " ";
-      if (!ProtoAndSource.second->isDerivedRequirement())
-        Out << "*";
-      Out << "[";
-      ProtoAndSource.second->print(Out, SrcMgr);
-      Out << "]";
-    }
+    interleave(ConformsTo,
+               [&](std::pair<ProtocolDecl *, const RequirementSource *>
+                       ProtoAndSource) {
+                 Out << ProtoAndSource.first->getName().str() << " ";
+                 if (!ProtoAndSource.second->isDerivedRequirement())
+                   Out << "*";
+                 Out << "[";
+                 ProtoAndSource.second->print(Out, SrcMgr);
+                 Out << "]";
+               },
+               [&] { Out << " & "; });
   }
 
   if (getRepresentative() != this) {

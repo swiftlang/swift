@@ -5760,7 +5760,7 @@ bool FailureDiagnosis::diagnoseArgumentGenericRequirements(
       LookUpConformanceInModule{dc->getParentModule()}, nullptr,
       ConformanceCheckFlags::SuppressDependencyTracking, &genericReqListener);
 
-  return !result.second;
+  return result != RequirementCheckResult::Success;
 }
 
 /// When initializing Unsafe[Mutable]Pointer<T> from Unsafe[Mutable]RawPointer,

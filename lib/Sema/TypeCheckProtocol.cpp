@@ -4878,7 +4878,7 @@ void ConformanceChecker::ensureRequirementsAreSatisfied() {
       ConformanceCheckFlags::Used, &listener);
 
   // If there were no errors, record the conformances.
-  if (result.second) {
+  if (result == RequirementCheckResult::Success) {
     Conformance->setSignatureConformances(listener.conformances);
   } else {
     Conformance->setInvalid();
@@ -5328,9 +5328,8 @@ Optional<ProtocolConformanceRef> TypeChecker::conformsToProtocol(
   return lookupResult;
 }
 
-std::pair<bool, Optional<ProtocolConformanceRef>>
-TypeChecker::conformsToProtocol(Type T, ProtocolDecl *Proto,
-                                DeclContext *DC,
+ConformsToProtocolResult
+TypeChecker::conformsToProtocol(Type T, ProtocolDecl *Proto, DeclContext *DC,
                                 ConformanceCheckOptions options,
                                 SourceLoc ComplainLoc,
                                 UnsatisfiedDependency *unsatisfiedDependency) {
@@ -5339,7 +5338,7 @@ TypeChecker::conformsToProtocol(Type T, ProtocolDecl *Proto,
   if (unsatisfiedDependency) {
     if (auto *classDecl = dyn_cast_or_null<ClassDecl>(T->getAnyNominal())) {
       if ((*unsatisfiedDependency)(requestTypeCheckSuperclass(classDecl)))
-        return std::make_pair(true, None);
+        return ConformsToProtocolResult::unsatisfiedDependency();
     }
 
     SmallVector<ProtocolDecl *, 2> protos;
@@ -5350,14 +5349,15 @@ TypeChecker::conformsToProtocol(Type T, ProtocolDecl *Proto,
           anyUnsatisfied = true;
       }
       if (anyUnsatisfied)
-        return std::make_pair(true, None);
+        return ConformsToProtocolResult::unsatisfiedDependency();
     }
   }
 
   // Just punt to the older conformsToProtocol() and hope it doesn't
   // recurse.
   auto conformance = conformsToProtocol(T, Proto, DC, options, ComplainLoc);
-  return std::make_pair(false, conformance);
+  return conformance ? ConformsToProtocolResult::success(*conformance)
+                     : ConformsToProtocolResult::failure();
 }
 
 /// Mark any _ObjectiveCBridgeable conformances in the given type as "used".
@@ -5396,7 +5396,7 @@ bool TypeChecker::useObjectiveCBridgeableConformances(DeclContext *dc,
                                             /*ComplainLoc=*/SourceLoc(),
                                             Callback);
 
-        WasUnsatisfied |= result.first;
+        WasUnsatisfied |= result.hasUnsatisfiedDependency();
         if (WasUnsatisfied)
           return Action::Stop;
 
@@ -5415,7 +5415,7 @@ bool TypeChecker::useObjectiveCBridgeableConformances(DeclContext *dc,
                   keyType, hashableProto, DC, options,
                   /*ComplainLoc=*/SourceLoc(), Callback);
 
-              WasUnsatisfied |= result.first;
+              WasUnsatisfied |= result.hasUnsatisfiedDependency();
               if (WasUnsatisfied)
                 return Action::Stop;
             }
@@ -5454,23 +5454,23 @@ bool TypeChecker::useObjectiveCBridgeableConformancesOfArgs(
       options, /*ComplainLoc=*/SourceLoc(),
       unsatisfiedDependency);
 
-  // Unsatisfied dependency case.
-  if (result.first)
+  switch (result.getStatus()) {
+  case RequirementCheckResult::UnsatisfiedDependency:
     return true;
-
-  // Failure case.
-  if (!result.second)
+  case RequirementCheckResult::Failure:
     return false;
+  case RequirementCheckResult::Success: {
+    bool anyUnsatisfied = false;
 
-  bool anyUnsatisfied = false;
+    // Mark the conformances within the arguments.
+    for (auto arg : bound->getGenericArgs()) {
+      anyUnsatisfied |=
+          useObjectiveCBridgeableConformances(dc, arg, unsatisfiedDependency);
+    }
 
-  // Mark the conformances within the arguments.
-  for (auto arg : bound->getGenericArgs()) {
-    anyUnsatisfied |= useObjectiveCBridgeableConformances(
-        dc, arg, unsatisfiedDependency);
+    return anyUnsatisfied;
   }
-
-  return anyUnsatisfied;
+  }
 }
 
 void TypeChecker::useBridgedNSErrorConformances(DeclContext *dc, Type type) {
