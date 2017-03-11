@@ -4263,84 +4263,12 @@ namespace {
       // the call.
       } else {
         // Emit the arguments.
-        Optional<SILLocation> uncurriedLoc;
-        SmallVector<SmallVector<ManagedValue, 4>, 2> args;
-        SmallVector<InOutArgument, 2> inoutArgs;
-        CanFunctionType formalApplyType;
-        args.reserve(uncurriedSites.size());
-        {
-          ParamLowering paramLowering(substFnType, gen);
-
-          assert(!foreignError ||
-                 uncurriedSites.size() == 1 ||
-                 (uncurriedSites.size() == 2 &&
-                  substFnType->hasSelfParam()));
-
-          if (!uncurriedSites.back().throws()) {
-            initialOptions |= ApplyOptions::DoesNotThrow;
-          }
-          
-          // Collect the captures, if any.
-          if (callee.hasCaptures()) {
-            // The captures are represented as a placeholder curry level in the
-            // formal type.
-            // TODO: Remove this hack.
-            (void)paramLowering.claimCaptureParams(callee.getCaptures());
-            claimNextParamClause(origFormalType);
-            claimNextParamClause(formalType);
-            args.push_back({});
-            args.back().append(callee.getCaptures().begin(),
-                               callee.getCaptures().end());
-          }
-
-          // Collect the arguments to the uncurried call.
-          for (auto &site : uncurriedSites) {
-            AbstractionPattern origParamType =
-              claimNextParamClause(origFormalType);
-            formalApplyType = cast<FunctionType>(formalType);
-            claimNextParamClause(formalType);
-            uncurriedLoc = site.Loc;
-            args.push_back({});
-
-            bool isParamSite = &site == &uncurriedSites.back();
-
-            std::move(site).emit(gen, origParamType, paramLowering,
-                                 args.back(), inoutArgs,
-                                 // Claim the foreign error with the method
-                                 // formal params.
-                                 isParamSite
-                                   ? foreignError
-                                   : decltype(foreignError)(),
-                                 // Claim the foreign "self" with the self
-                                 // param.
-                                 isParamSite
-                                   ? decltype(foreignSelf)()
-                                   : foreignSelf);
-          }
-        }
-        assert(uncurriedLoc);
-        assert(formalApplyType);
-
-        // Begin the formal accesses to any inout arguments we have.
-        if (!inoutArgs.empty()) {
-          beginInOutFormalAccesses(gen, inoutArgs, args);
-        }
-
-        // Uncurry the arguments in calling convention order.
         SmallVector<ManagedValue, 4> uncurriedArgs;
-        for (auto &argSet : reversed(args))
-          uncurriedArgs.append(argSet.begin(), argSet.end());
-        args = {};
-        
-        // Move the foreign "self" argument into position.
-        if (foreignSelf.isInstance()) {
-          auto selfArg = uncurriedArgs.back();
-          std::move_backward(uncurriedArgs.begin() + foreignSelf.getSelfIndex(),
-                             uncurriedArgs.end() - 1,
-                             uncurriedArgs.end());
-          uncurriedArgs[foreignSelf.getSelfIndex()] = selfArg;
-        }
-
+        Optional<SILLocation> uncurriedLoc;
+        CanFunctionType formalApplyType;
+        emitArgumentsForNormalApply(
+            formalType, origFormalType, substFnType, foreignError, foreignSelf,
+            initialOptions, uncurriedArgs, uncurriedLoc, formalApplyType);
         // Emit the uncurried call.
         
         // Special case for superclass method calls.
@@ -4434,6 +4362,14 @@ namespace {
       return result;
     }
 
+    void emitArgumentsForNormalApply(
+        CanFunctionType &formalType, AbstractionPattern &origFormalType,
+        CanSILFunctionType &substFnType,
+        Optional<ForeignErrorConvention> &foreignError,
+        ImportAsMemberStatus &foreignSelf, ApplyOptions &initialOptions,
+        SmallVectorImpl<ManagedValue> &uncurriedArgs,
+        Optional<SILLocation> &uncurriedLoc, CanFunctionType &formalApplyType);
+
     RValue
     handleRemainingCallSites(RValue &&result, CanFunctionType formalType,
                              ImportAsMemberStatus foreignSelf,
@@ -4456,6 +4392,82 @@ namespace {
     CallEmission &operator=(const CallEmission &) = delete;
   };
 } // end anonymous namespace
+
+void CallEmission::emitArgumentsForNormalApply(
+    CanFunctionType &formalType, AbstractionPattern &origFormalType,
+    CanSILFunctionType &substFnType,
+    Optional<ForeignErrorConvention> &foreignError,
+    ImportAsMemberStatus &foreignSelf, ApplyOptions &initialOptions,
+    SmallVectorImpl<ManagedValue> &uncurriedArgs,
+    Optional<SILLocation> &uncurriedLoc, CanFunctionType &formalApplyType) {
+  SmallVector<SmallVector<ManagedValue, 4>, 2> args;
+  SmallVector<InOutArgument, 2> inoutArgs;
+
+  args.reserve(uncurriedSites.size());
+  {
+    ParamLowering paramLowering(substFnType, gen);
+
+    assert(!foreignError || uncurriedSites.size() == 1 ||
+           (uncurriedSites.size() == 2 && substFnType->hasSelfParam()));
+
+    if (!uncurriedSites.back().throws()) {
+      initialOptions |= ApplyOptions::DoesNotThrow;
+    }
+
+    // Collect the captures, if any.
+    if (callee.hasCaptures()) {
+      // The captures are represented as a placeholder curry level in the
+      // formal type.
+      // TODO: Remove this hack.
+      (void)paramLowering.claimCaptureParams(callee.getCaptures());
+      claimNextParamClause(origFormalType);
+      claimNextParamClause(formalType);
+      args.push_back({});
+      args.back().append(callee.getCaptures().begin(),
+                         callee.getCaptures().end());
+    }
+
+    // Collect the arguments to the uncurried call.
+    for (auto &site : uncurriedSites) {
+      AbstractionPattern origParamType = claimNextParamClause(origFormalType);
+      formalApplyType = cast<FunctionType>(formalType);
+      claimNextParamClause(formalType);
+      uncurriedLoc = site.Loc;
+      args.push_back({});
+
+      bool isParamSite = &site == &uncurriedSites.back();
+
+      std::move(site).emit(gen, origParamType, paramLowering, args.back(),
+                           inoutArgs,
+                           // Claim the foreign error with the method
+                           // formal params.
+                           isParamSite ? foreignError : None,
+                           // Claim the foreign "self" with the self
+                           // param.
+                           isParamSite ? ImportAsMemberStatus() : foreignSelf);
+    }
+  }
+  assert(uncurriedLoc);
+  assert(formalApplyType);
+
+  // Begin the formal accesses to any inout arguments we have.
+  if (!inoutArgs.empty()) {
+    beginInOutFormalAccesses(gen, inoutArgs, args);
+  }
+
+  // Uncurry the arguments in calling convention order.
+  for (auto &argSet : reversed(args))
+    uncurriedArgs.append(argSet.begin(), argSet.end());
+  args = {};
+
+  // Move the foreign "self" argument into position.
+  if (foreignSelf.isInstance()) {
+    auto selfArg = uncurriedArgs.back();
+    std::move_backward(uncurriedArgs.begin() + foreignSelf.getSelfIndex(),
+                       uncurriedArgs.end() - 1, uncurriedArgs.end());
+    uncurriedArgs[foreignSelf.getSelfIndex()] = selfArg;
+  }
+}
 
 RValue CallEmission::handleRemainingCallSites(
     RValue &&result, CanFunctionType formalType,
