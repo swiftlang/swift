@@ -668,6 +668,8 @@ public protocol ExpressibleByDictionaryLiteral {
 @available(*, deprecated, message: "it will be replaced or redesigned in Swift 4.0.  Instead of conforming to 'ExpressibleByStringInterpolation', consider adding an 'init(_:String)'")
 public typealias ExpressibleByStringInterpolation = _ExpressibleByStringInterpolation
 public protocol _ExpressibleByStringInterpolation: ExpressibleByStringLiteral {
+  associatedtype StringInterpolationSegmentType = String
+  
   /// Creates an instance by concatenating the given values.
   ///
   /// Do not call this initializer directly. It is used by the compiler when
@@ -700,7 +702,7 @@ public protocol _ExpressibleByStringInterpolation: ExpressibleByStringLiteral {
   /// integer `2`, and the result of the expression `5 * 2`.
   ///
   /// - Parameter expr: The expression to represent.
-  init<T>(stringInterpolationSegment expr: T)
+  init(stringInterpolationSegment segment: StringInterpolationSegmentType)
 }
 
 /// A type that can be initialized using a color literal (e.g.
