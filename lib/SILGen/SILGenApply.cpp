@@ -4145,34 +4145,14 @@ namespace {
       unsigned uncurryLevel = callee.getNaturalUncurryLevel() - uncurries;
 
       // Emit the first level of call.
-      RValue result;
-
       CanFunctionType formalType;
       Optional<AbstractionPattern> origFormalType;
       CanSILFunctionType substFnType;
       Optional<ForeignErrorConvention> foreignError;
       ImportAsMemberStatus foreignSelf;
-
-      // Check for a specialized emitter.
-      if (auto emitter = callee.getSpecializedEmitter(gen.SGM, uncurryLevel)) {
-        result = applyFirstLevelSpecializedEmitter(
-            formalType, origFormalType, substFnType, foreignError, foreignSelf,
-            emitter.getValue(), uncurryLevel, C);
-      } else if (isPartiallyAppliedSuperMethod(uncurryLevel)) {
-        result = applyPartiallyAppliedSuperMethod(formalType, origFormalType,
-                                                  substFnType, foreignError,
-                                                  foreignSelf, uncurryLevel, C);
-      } else if (isEnumElementConstructor()) {
-        result = applyEnumElementConstructor(formalType, origFormalType,
-                                             substFnType, foreignError,
-                                             foreignSelf, uncurryLevel, C);
-      } else {
-        result = applyNormalCall(formalType, origFormalType, substFnType,
-                                 foreignError, foreignSelf, uncurryLevel, C);
-      }
-
-      // End the initial writeback scope.
-      InitialWritebackScope.pop();
+      RValue result =
+          applyFirstLevelCallee(formalType, origFormalType, substFnType,
+                                foreignError, foreignSelf, uncurryLevel, C);
 
       // Then handle the remaining call sites.
       result = applyRemainingCallSites(std::move(result), formalType,
@@ -4189,14 +4169,14 @@ namespace {
         SmallVectorImpl<ManagedValue> &uncurriedArgs,
         Optional<SILLocation> &uncurriedLoc, CanFunctionType &formalApplyType);
 
-    RValue applyFirstLevelSpecializedEmitter(
-        CanFunctionType &formalType,
-        Optional<AbstractionPattern> &origFormalType,
-        CanSILFunctionType &substFnType,
-        Optional<ForeignErrorConvention> &foreignError,
-        ImportAsMemberStatus &foreignSelf,
-        SpecializedEmitter &specializedEmitter, unsigned uncurryLevel,
-        SGFContext C);
+    RValue
+    applySpecializedEmitter(CanFunctionType &formalType,
+                            Optional<AbstractionPattern> &origFormalType,
+                            CanSILFunctionType &substFnType,
+                            Optional<ForeignErrorConvention> &foreignError,
+                            ImportAsMemberStatus &foreignSelf,
+                            SpecializedEmitter &specializedEmitter,
+                            unsigned uncurryLevel, SGFContext C);
 
     RValue applyPartiallyAppliedSuperMethod(
         CanFunctionType &formalType,
@@ -4220,6 +4200,13 @@ namespace {
                            ImportAsMemberStatus &foreignSelf,
                            unsigned uncurryLevel, SGFContext C);
 
+    RValue applyFirstLevelCallee(CanFunctionType &formalType,
+                                 Optional<AbstractionPattern> &origFormalType,
+                                 CanSILFunctionType &substFnType,
+                                 Optional<ForeignErrorConvention> &foreignError,
+                                 ImportAsMemberStatus &foreignSelf,
+                                 unsigned uncurryLevel, SGFContext C);
+
     RValue
     applyRemainingCallSites(RValue &&result, CanFunctionType formalType,
                             ImportAsMemberStatus foreignSelf,
@@ -4242,6 +4229,35 @@ namespace {
     CallEmission &operator=(const CallEmission &) = delete;
   };
 } // end anonymous namespace
+
+RValue CallEmission::applyFirstLevelCallee(
+    CanFunctionType &formalType, Optional<AbstractionPattern> &origFormalType,
+    CanSILFunctionType &substFnType,
+    Optional<ForeignErrorConvention> &foreignError,
+    ImportAsMemberStatus &foreignSelf, unsigned uncurryLevel, SGFContext C) {
+
+  // Check for a specialized emitter.
+  if (auto emitter = callee.getSpecializedEmitter(gen.SGM, uncurryLevel)) {
+    return applySpecializedEmitter(formalType, origFormalType, substFnType,
+                                   foreignError, foreignSelf,
+                                   emitter.getValue(), uncurryLevel, C);
+  }
+
+  if (isPartiallyAppliedSuperMethod(uncurryLevel)) {
+    return applyPartiallyAppliedSuperMethod(formalType, origFormalType,
+                                            substFnType, foreignError,
+                                            foreignSelf, uncurryLevel, C);
+  }
+
+  if (isEnumElementConstructor()) {
+    return applyEnumElementConstructor(formalType, origFormalType, substFnType,
+                                       foreignError, foreignSelf, uncurryLevel,
+                                       C);
+  }
+
+  return applyNormalCall(formalType, origFormalType, substFnType, foreignError,
+                         foreignSelf, uncurryLevel, C);
+}
 
 RValue CallEmission::applyNormalCall(
     CanFunctionType &formalType, Optional<AbstractionPattern> &origFormalType,
@@ -4428,7 +4444,7 @@ RValue CallEmission::applyPartiallyAppliedSuperMethod(
                 ManagedValue::forUnmanaged(partialApply));
 }
 
-RValue CallEmission::applyFirstLevelSpecializedEmitter(
+RValue CallEmission::applySpecializedEmitter(
     CanFunctionType &formalType, Optional<AbstractionPattern> &origFormalType,
     CanSILFunctionType &substFnType,
     Optional<ForeignErrorConvention> &foreignError,
