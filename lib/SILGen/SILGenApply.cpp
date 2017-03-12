@@ -4162,8 +4162,11 @@ namespace {
         result = applyFirstLevelSpecializedEmitter(
             formalType, origFormalType, substFnType, foreignError, foreignSelf,
             emitter.getValue(), uncurryLevel, C);
+      } else if (isPartiallyAppliedSuperMethod(uncurryLevel)) {
+        result = applyPartiallyAppliedSuperMethod(formalType, origFormalType,
+                                                  substFnType, foreignError,
+                                                  foreignSelf, uncurryLevel, C);
       } else {
-
         ManagedValue mv;
         ApplyOptions initialOptions = ApplyOptions::None;
 
@@ -4171,13 +4174,7 @@ namespace {
         CanFunctionType formalType = callee.getSubstFormalType();
 
         // Get the callee type information.
-        if (isPartiallyAppliedSuperMethod(uncurryLevel)) {
-          // We want to emit the arguments as fully-substituted values
-          // because that's what the specialized emitters expect.
-          origFormalType = AbstractionPattern(formalType);
-          substFnType =
-              gen.getSILFunctionType(origFormalType, formalType, uncurryLevel);
-        } else if (isEnumElementConstructor()) {
+        if (isEnumElementConstructor()) {
           // Enum payloads are always stored at the abstraction level
           // of the unsubstituted payload type. This means that unlike
           // with specialized emitters above, enum constructors use
@@ -4251,48 +4248,11 @@ namespace {
                                       uncurriedArgs, uncurriedLoc,
                                       formalApplyType);
           // Emit the uncurried call.
-
-          // Special case for superclass method calls.
-          if (isPartiallyAppliedSuperMethod(uncurryLevel)) {
-            assert(uncurriedArgs.size() == 1 && "Can only partially apply the "
-                                                "self parameter of a super "
-                                                "method call");
-
-            auto constant = callee.getMethodName();
-            auto loc = uncurriedLoc.getValue();
-            auto subs = callee.getSubstitutions();
-            auto upcastedSelf = uncurriedArgs.back();
-            auto self = cast<UpcastInst>(upcastedSelf.getValue())->getOperand();
-            auto constantInfo = gen.getConstantInfo(callee.getMethodName());
-            auto functionTy = constantInfo.getSILType();
-            SILValue superMethodVal =
-                gen.B.createSuperMethod(loc, self, constant, functionTy,
-                                        /*volatile*/
-                                        constant.isForeign);
-
-            auto closureTy = SILGenBuilder::getPartialApplyResultType(
-                constantInfo.getSILType(), 1, gen.B.getModule(), subs,
-                ParameterConvention::Direct_Owned);
-
-            auto &module = gen.getFunction().getModule();
-
-            auto partialApplyTy = functionTy;
-            if (constantInfo.SILFnType->isPolymorphic() && !subs.empty())
-              partialApplyTy = partialApplyTy.substGenericArgs(module, subs);
-
-            SILValue partialApply = gen.B.createPartialApply(
-                loc, superMethodVal, partialApplyTy, subs,
-                {upcastedSelf.forward(gen)}, closureTy);
-            result = RValue(gen, loc, formalApplyType.getResult(),
-                            ManagedValue::forUnmanaged(partialApply));
-            // Handle a regular call.
-          } else {
-            result = gen.emitApply(
-                uncurriedLoc.getValue(), mv, callee.getSubstitutions(),
-                uncurriedArgs, substFnType, origFormalType,
-                uncurriedSites.back().getSubstResultType(), initialOptions,
-                None, foreignError, uncurriedContext);
-          }
+          result = gen.emitApply(
+              uncurriedLoc.getValue(), mv, callee.getSubstitutions(),
+              uncurriedArgs, substFnType, origFormalType,
+              uncurriedSites.back().getSubstResultType(), initialOptions, None,
+              foreignError, uncurriedContext);
         }
       }
 
@@ -4324,6 +4284,13 @@ namespace {
         SpecializedEmitter &specializedEmitter, unsigned uncurryLevel,
         SGFContext C);
 
+    RValue applyPartiallyAppliedSuperMethod(
+        CanFunctionType &formalType,
+        Optional<AbstractionPattern> &origFormalType,
+        CanSILFunctionType &substFnType,
+        Optional<ForeignErrorConvention> &foreignError,
+        ImportAsMemberStatus &foreignSelf, unsigned uncurryLevel, SGFContext C);
+
     RValue
     handleRemainingCallSites(RValue &&result, CanFunctionType formalType,
                              ImportAsMemberStatus foreignSelf,
@@ -4346,6 +4313,78 @@ namespace {
     CallEmission &operator=(const CallEmission &) = delete;
   };
 } // end anonymous namespace
+
+RValue CallEmission::applyPartiallyAppliedSuperMethod(
+    CanFunctionType &formalType, Optional<AbstractionPattern> &origFormalType,
+    CanSILFunctionType &substFnType,
+    Optional<ForeignErrorConvention> &foreignError,
+    ImportAsMemberStatus &foreignSelf, unsigned uncurryLevel, SGFContext C) {
+
+  ApplyOptions initialOptions = ApplyOptions::None;
+
+  // We want to emit the arguments as fully-substituted values
+  // because that's what the partially applied super method expects;
+  formalType = callee.getSubstFormalType();
+  origFormalType = AbstractionPattern(formalType);
+  substFnType = gen.getSILFunctionType(origFormalType.getValue(), formalType,
+                                       uncurryLevel);
+
+  // Now that we know the substFnType, check if we assumed that we were
+  // passing self at +0. If we did and self is not actually passed at +0,
+  // retain Self.
+  if (AssumedPlusZeroSelf) {
+    // If the final emitted function does not have a self param or it does
+    // have a self param that is consumed, convert what we think is self
+    // to
+    // be plus zero.
+    if (!substFnType->hasSelfParam() ||
+        substFnType->getSelfParameter().isConsumed()) {
+      convertSelfToPlusOneFromPlusZero();
+    }
+  }
+
+  // Emit the arguments.
+  SmallVector<ManagedValue, 4> uncurriedArgs;
+  Optional<SILLocation> uncurriedLoc;
+  CanFunctionType formalApplyType;
+  emitArgumentsForNormalApply(formalType, origFormalType.getValue(),
+                              substFnType, foreignError, foreignSelf,
+                              initialOptions, uncurriedArgs, uncurriedLoc,
+                              formalApplyType);
+
+  // Emit the uncurried call.
+  assert(uncurriedArgs.size() == 1 && "Can only partially apply the "
+                                      "self parameter of a super "
+                                      "method call");
+
+  auto constant = callee.getMethodName();
+  auto loc = uncurriedLoc.getValue();
+  auto subs = callee.getSubstitutions();
+  auto upcastedSelf = uncurriedArgs.back();
+  auto self = cast<UpcastInst>(upcastedSelf.getValue())->getOperand();
+  auto constantInfo = gen.getConstantInfo(callee.getMethodName());
+  auto functionTy = constantInfo.getSILType();
+  SILValue superMethodVal =
+      gen.B.createSuperMethod(loc, self, constant, functionTy,
+                              /*volatile*/
+                              constant.isForeign);
+
+  auto closureTy = SILGenBuilder::getPartialApplyResultType(
+      constantInfo.getSILType(), 1, gen.B.getModule(), subs,
+      ParameterConvention::Direct_Owned);
+
+  auto &module = gen.getFunction().getModule();
+
+  auto partialApplyTy = functionTy;
+  if (constantInfo.SILFnType->isPolymorphic() && !subs.empty())
+    partialApplyTy = partialApplyTy.substGenericArgs(module, subs);
+
+  SILValue partialApply =
+      gen.B.createPartialApply(loc, superMethodVal, partialApplyTy, subs,
+                               {upcastedSelf.forward(gen)}, closureTy);
+  return RValue(gen, loc, formalApplyType.getResult(),
+                ManagedValue::forUnmanaged(partialApply));
+}
 
 RValue CallEmission::applyFirstLevelSpecializedEmitter(
     CanFunctionType &formalType, Optional<AbstractionPattern> &origFormalType,
