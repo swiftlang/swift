@@ -4147,10 +4147,6 @@ namespace {
       // Emit the first level of call.
       RValue result;
 
-      // We use the context emit-into initialization only for the
-      // outermost call.
-      SGFContext uncurriedContext = (extraSites.empty() ? C : SGFContext());
-
       CanFunctionType formalType;
       Optional<AbstractionPattern> origFormalType;
       CanSILFunctionType substFnType;
@@ -4171,52 +4167,16 @@ namespace {
                                              substFnType, foreignError,
                                              foreignSelf, uncurryLevel, C);
       } else {
-        ManagedValue mv;
-        ApplyOptions initialOptions = ApplyOptions::None;
-
-        formalType = callee.getSubstFormalType();
-        origFormalType = AbstractionPattern(callee.getOrigFormalType());
-
-        // Get the callee type information.
-        std::tie(mv, substFnType, foreignError, foreignSelf, initialOptions) =
-            callee.getAtUncurryLevel(gen, uncurryLevel);
-
-        // Now that we know the substFnType, check if we assumed that we were
-        // passing self at +0. If we did and self is not actually passed at +0,
-        // retain Self.
-        if (AssumedPlusZeroSelf) {
-          // If the final emitted function does not have a self param or it does
-          // have a self param that is consumed, convert what we think is self
-          // to
-          // be plus zero.
-          if (!substFnType->hasSelfParam() ||
-              substFnType->getSelfParameter().isConsumed()) {
-            convertSelfToPlusOneFromPlusZero();
-          }
-        }
-
-        // Emit the arguments.
-        SmallVector<ManagedValue, 4> uncurriedArgs;
-        Optional<SILLocation> uncurriedLoc;
-        CanFunctionType formalApplyType;
-        emitArgumentsForNormalApply(formalType, origFormalType.getValue(),
-                                    substFnType, foreignError, foreignSelf,
-                                    initialOptions, uncurriedArgs, uncurriedLoc,
-                                    formalApplyType);
-        // Emit the uncurried call.
-        result = gen.emitApply(
-            uncurriedLoc.getValue(), mv, callee.getSubstitutions(),
-            uncurriedArgs, substFnType, origFormalType.getValue(),
-            uncurriedSites.back().getSubstResultType(), initialOptions, None,
-            foreignError, uncurriedContext);
+        result = applyNormalCall(formalType, origFormalType, substFnType,
+                                 foreignError, foreignSelf, uncurryLevel, C);
       }
 
       // End the initial writeback scope.
       InitialWritebackScope.pop();
 
       // Then handle the remaining call sites.
-      result = handleRemainingCallSites(std::move(result), formalType,
-                                        foreignSelf, foreignError, C);
+      result = applyRemainingCallSites(std::move(result), formalType,
+                                       foreignSelf, foreignError, C);
 
       return result;
     }
@@ -4253,11 +4213,18 @@ namespace {
                                 ImportAsMemberStatus &foreignSelf,
                                 unsigned uncurryLevel, SGFContext C);
 
+    RValue applyNormalCall(CanFunctionType &formalType,
+                           Optional<AbstractionPattern> &origFormalType,
+                           CanSILFunctionType &substFnType,
+                           Optional<ForeignErrorConvention> &foreignError,
+                           ImportAsMemberStatus &foreignSelf,
+                           unsigned uncurryLevel, SGFContext C);
+
     RValue
-    handleRemainingCallSites(RValue &&result, CanFunctionType formalType,
-                             ImportAsMemberStatus foreignSelf,
-                             Optional<ForeignErrorConvention> foreignError,
-                             SGFContext C);
+    applyRemainingCallSites(RValue &&result, CanFunctionType formalType,
+                            ImportAsMemberStatus foreignSelf,
+                            Optional<ForeignErrorConvention> foreignError,
+                            SGFContext C);
 
     ~CallEmission() { assert(applied && "never applied!"); }
 
@@ -4275,6 +4242,53 @@ namespace {
     CallEmission &operator=(const CallEmission &) = delete;
   };
 } // end anonymous namespace
+
+RValue CallEmission::applyNormalCall(
+    CanFunctionType &formalType, Optional<AbstractionPattern> &origFormalType,
+    CanSILFunctionType &substFnType,
+    Optional<ForeignErrorConvention> &foreignError,
+    ImportAsMemberStatus &foreignSelf, unsigned uncurryLevel, SGFContext C) {
+  // We use the context emit-into initialization only for the
+  // outermost call.
+  SGFContext uncurriedContext = (extraSites.empty() ? C : SGFContext());
+  ManagedValue mv;
+  ApplyOptions initialOptions = ApplyOptions::None;
+
+  formalType = callee.getSubstFormalType();
+  origFormalType = AbstractionPattern(callee.getOrigFormalType());
+
+  // Get the callee type information.
+  std::tie(mv, substFnType, foreignError, foreignSelf, initialOptions) =
+      callee.getAtUncurryLevel(gen, uncurryLevel);
+
+  // Now that we know the substFnType, check if we assumed that we were
+  // passing self at +0. If we did and self is not actually passed at +0,
+  // retain Self.
+  if (AssumedPlusZeroSelf) {
+    // If the final emitted function does not have a self param or it does
+    // have a self param that is consumed, convert what we think is self
+    // to
+    // be plus zero.
+    if (!substFnType->hasSelfParam() ||
+        substFnType->getSelfParameter().isConsumed()) {
+      convertSelfToPlusOneFromPlusZero();
+    }
+  }
+
+  // Emit the arguments.
+  SmallVector<ManagedValue, 4> uncurriedArgs;
+  Optional<SILLocation> uncurriedLoc;
+  CanFunctionType formalApplyType;
+  emitArgumentsForNormalApply(formalType, origFormalType.getValue(),
+                              substFnType, foreignError, foreignSelf,
+                              initialOptions, uncurriedArgs, uncurriedLoc,
+                              formalApplyType);
+  // Emit the uncurried call.
+  return gen.emitApply(uncurriedLoc.getValue(), mv, callee.getSubstitutions(),
+                       uncurriedArgs, substFnType, origFormalType.getValue(),
+                       uncurriedSites.back().getSubstResultType(),
+                       initialOptions, None, foreignError, uncurriedContext);
+}
 
 RValue CallEmission::applyEnumElementConstructor(
     CanFunctionType &formalType, Optional<AbstractionPattern> &origFormalType,
@@ -4580,7 +4594,7 @@ void CallEmission::emitArgumentsForNormalApply(
   }
 }
 
-RValue CallEmission::handleRemainingCallSites(
+RValue CallEmission::applyRemainingCallSites(
     RValue &&result, CanFunctionType formalType,
     ImportAsMemberStatus foreignSelf,
     Optional<ForeignErrorConvention> foreignError, SGFContext C) {
