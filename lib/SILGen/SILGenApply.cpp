@@ -4260,9 +4260,8 @@ namespace {
       InitialWritebackScope.pop();
 
       // Then handle the remaining call sites.
-      result =
-          handleRemainingCallSites(std::move(result), formalType, foreignSelf,
-                                   foreignError, substFnType, C);
+      result = handleRemainingCallSites(std::move(result), formalType,
+                                        foreignSelf, foreignError, C);
 
       return result;
     }
@@ -4295,7 +4294,7 @@ namespace {
     handleRemainingCallSites(RValue &&result, CanFunctionType formalType,
                              ImportAsMemberStatus foreignSelf,
                              Optional<ForeignErrorConvention> foreignError,
-                             CanSILFunctionType substFnType, SGFContext C);
+                             SGFContext C);
 
     ~CallEmission() { assert(applied && "never applied!"); }
 
@@ -4555,8 +4554,7 @@ void CallEmission::emitArgumentsForNormalApply(
 RValue CallEmission::handleRemainingCallSites(
     RValue &&result, CanFunctionType formalType,
     ImportAsMemberStatus foreignSelf,
-    Optional<ForeignErrorConvention> foreignError,
-    CanSILFunctionType substFnType, SGFContext C) {
+    Optional<ForeignErrorConvention> foreignError, SGFContext C) {
   // If there are remaining call sites, apply them to the result function.
   // Each chained call gets its own writeback scope.
   for (unsigned i = 0, size = extraSites.size(); i < size; ++i) {
