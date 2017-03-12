@@ -4170,8 +4170,8 @@ namespace {
         ManagedValue mv;
         ApplyOptions initialOptions = ApplyOptions::None;
 
-        AbstractionPattern origFormalType(callee.getOrigFormalType());
-        CanFunctionType formalType = callee.getSubstFormalType();
+        formalType = callee.getSubstFormalType();
+        origFormalType = AbstractionPattern(callee.getOrigFormalType());
 
         // Get the callee type information.
         if (isEnumElementConstructor()) {
@@ -4181,8 +4181,8 @@ namespace {
           // the AST-level abstraction pattern, to ensure that function
           // types in payloads are re-abstracted correctly.
           assert(!AssumedPlusZeroSelf);
-          substFnType =
-              gen.getSILFunctionType(origFormalType, formalType, uncurryLevel);
+          substFnType = gen.getSILFunctionType(origFormalType.getValue(),
+                                               formalType, uncurryLevel);
         } else {
           std::tie(mv, substFnType, foreignError, foreignSelf, initialOptions) =
               callee.getAtUncurryLevel(gen, uncurryLevel);
@@ -4214,7 +4214,7 @@ namespace {
           CanType formalResultType = formalType.getResult();
 
           // Ignore metatype argument
-          claimNextParamClause(origFormalType);
+          claimNextParamClause(origFormalType.getValue());
           claimNextParamClause(formalType);
           std::move(uncurriedSites[0]).forward().getAsSingleValue(gen);
 
@@ -4223,7 +4223,7 @@ namespace {
           if (element->getArgumentInterfaceType()) {
             assert(uncurriedSites.size() == 2);
             formalResultType = formalType.getResult();
-            claimNextParamClause(origFormalType);
+            claimNextParamClause(origFormalType.getValue());
             claimNextParamClause(formalType);
             payload = std::move(uncurriedSites[1]).forward();
           } else {
@@ -4243,14 +4243,14 @@ namespace {
           SmallVector<ManagedValue, 4> uncurriedArgs;
           Optional<SILLocation> uncurriedLoc;
           CanFunctionType formalApplyType;
-          emitArgumentsForNormalApply(formalType, origFormalType, substFnType,
-                                      foreignError, foreignSelf, initialOptions,
-                                      uncurriedArgs, uncurriedLoc,
-                                      formalApplyType);
+          emitArgumentsForNormalApply(formalType, origFormalType.getValue(),
+                                      substFnType, foreignError, foreignSelf,
+                                      initialOptions, uncurriedArgs,
+                                      uncurriedLoc, formalApplyType);
           // Emit the uncurried call.
           result = gen.emitApply(
               uncurriedLoc.getValue(), mv, callee.getSubstitutions(),
-              uncurriedArgs, substFnType, origFormalType,
+              uncurriedArgs, substFnType, origFormalType.getValue(),
               uncurriedSites.back().getSubstResultType(), initialOptions, None,
               foreignError, uncurriedContext);
         }
