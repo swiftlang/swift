@@ -5041,43 +5041,6 @@ public:
         makeFinal(TC.Context, FD);
       }
     }
-
-    // Check whether we have parameters with default arguments that follow a
-    // closure parameter; warn about such things, because the closure will not
-    // be treated as a trailing closure.
-    if (!FD->isImplicit()) {
-      auto paramList = FD->getParameterList(FD->getImplicitSelfDecl() ? 1 : 0);
-      bool anyDefaultArguments = false;
-      for (unsigned i = paramList->size(); i != 0; --i) {
-        // Determine whether the parameter is of (possibly lvalue, possibly
-        // optional), non-autoclosure function type, which could receive a
-        // closure. We look at the type sugar directly, so that one can
-        // suppress this warning by adding parentheses.
-        auto &param = paramList->get(i-1);
-        auto paramType = param->getType();
-
-        if (auto *funcTy = isUnparenthesizedTrailingClosure(paramType)) {
-          // If we saw any default arguments before this, complain.
-          // This doesn't apply to autoclosures.
-          if (anyDefaultArguments && !funcTy->getExtInfo().isAutoClosure()) {
-            TC.diagnose(param->getStartLoc(),
-                        diag::non_trailing_closure_before_default_args)
-              .highlight(param->getSourceRange());
-          }
-
-          break;
-        }
-
-        // If we have a default argument, keep going.
-        if (param->isDefaultArgument()) {
-          anyDefaultArguments = true;
-          continue;
-        }
-
-        // We're done.
-        break;
-      }
-    }
   }
 
   void visitModuleDecl(ModuleDecl *) { }

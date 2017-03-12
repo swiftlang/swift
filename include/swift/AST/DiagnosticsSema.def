@@ -1236,9 +1236,6 @@ WARNING(function_type_access_warn,none,
         "because its %select{parameter|result}5 uses "
         "%select{a private|a fileprivate|an internal|%error|%error}3 type",
         (bool, Accessibility, bool, Accessibility, unsigned, bool))
-WARNING(non_trailing_closure_before_default_args,none,
-        "closure parameter prior to parameters with default arguments will "
-        "not be treated as a trailing closure", ())
 ERROR(noreturn_not_supported,none,
       "'@noreturn' has been removed; functions that never return should have a "
       "return type of 'Never' instead", ())
