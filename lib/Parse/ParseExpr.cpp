@@ -1753,7 +1753,7 @@ ParserResult<Expr> Parser::parseExprStringLiteral() {
       SmallVector<Identifier, 8> argLabels;
       SmallVector<SourceLoc, 8> argLabelLocs;
       Expr *trailingClosure = nullptr;
-
+        
       SourceLoc leftLoc, rightLoc;
       ParserStatus status = parseExprList(tok::l_paren, tok::r_paren, /*isPostfix=*/false,
                                           /*isExprBasic=*/true,
@@ -1764,6 +1764,11 @@ ParserResult<Expr> Parser::parseExprStringLiteral() {
                                           rightLoc,
                                           trailingClosure);
       
+      // No leading label means a `forInterpolation:` label. (The constraint solver 
+      // will also consider no-leading-label candidates.)
+      if(!argLabels.empty() && argLabels[0].empty()) {
+        argLabels[0] = Context.Id_forInterpolation;
+      }
       
       // If you change this line, make sure you also change 
       // InterpolatedStringLiteralExpr::isInterpolatedSegment().
