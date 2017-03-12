@@ -87,8 +87,8 @@ public protocol AnyUnicodeEncoding {
   static func decodeForward<C: Collection>(
     _ input: C,
     repairingIllFormedSequences makeRepairs: Bool /* = true */,
-    into output: (UInt32)->Void
-  ) -> (remainder: C.SubSequence, errorCount: Int)
+    into output: (UInt32) throws ->Void
+  ) rethrows -> (remainder: C.SubSequence, errorCount: Int)
   where C.Iterator.Element == UInt32
   
   /// Decode a whole collection efficiently in reverse, writing results into
@@ -106,8 +106,8 @@ public protocol AnyUnicodeEncoding {
   static func decodeReverse<C: BidirectionalCollection>(
     _ input: C,
     repairingIllFormedSequences makeRepairs: Bool /* = true */,
-    into output: (UInt32)->Void
-  ) -> (remainder: C.SubSequence, errorCount: Int)
+    into output: (UInt32) throws->Void
+  ) rethrows -> (remainder: C.SubSequence, errorCount: Int)
   where C.Iterator.Element == UInt32
 }
 
@@ -225,13 +225,13 @@ where EncodedScalar.Iterator.Element : UnsignedInteger {
   public static func decodeForward<C: Collection>(
     _ input: C,
     repairingIllFormedSequences makeRepairs: Bool = true,
-    into output: (UInt32)->Void
-  ) -> (remainder: C.SubSequence, errorCount: Int)
+    into output: (UInt32) throws->Void
+  ) rethrows -> (remainder: C.SubSequence, errorCount: Int)
   where C.Iterator.Element == UInt32 {
-    let (remainder, errorCount) = parseForward(
+    let (remainder, errorCount) = try parseForward(
       input.lazy.map { numericCast($0) as CodeUnit },
       repairingIllFormedSequences: makeRepairs) {
-      output($0.utf32.first!)
+      try output($0.utf32.first!)
     }
     return (
       remainder: input[remainder.startIndex..<remainder.endIndex],
@@ -242,13 +242,13 @@ where EncodedScalar.Iterator.Element : UnsignedInteger {
   public static func decodeReverse<C: BidirectionalCollection>(
     _ input: C,
     repairingIllFormedSequences makeRepairs: Bool = true,
-    into output: (UInt32)->Void
-  ) -> (remainder: C.SubSequence, errorCount: Int)
+    into output: (UInt32) throws->Void
+  ) rethrows -> (remainder: C.SubSequence, errorCount: Int)
   where C.Iterator.Element == UInt32 {
-    let (remainder, errorCount) = parseReverse(
+    let (remainder, errorCount) = try parseReverse(
       input.lazy.map { numericCast($0) as CodeUnit },
       repairingIllFormedSequences: makeRepairs) {
-      output($0.utf32.first!)
+      try output($0.utf32.first!)
     }
     return (
       remainder: input[remainder.startIndex..<remainder.endIndex],
@@ -339,8 +339,8 @@ extension UnicodeEncoding {
   public static func parseForward<C: Collection>(
     _ input: C,
     repairingIllFormedSequences makeRepairs: Bool = true,
-    into output: (EncodedScalar)->Void
-  ) -> (remainder: C.SubSequence, errorCount: Int)
+    into output: (EncodedScalar) throws->Void
+  ) rethrows -> (remainder: C.SubSequence, errorCount: Int)
   where C.SubSequence : Collection, C.SubSequence.SubSequence == C.SubSequence,
     C.SubSequence.Iterator.Element == EncodedScalar.Iterator.Element {
     var remainder = input[input.startIndex..<input.endIndex]
@@ -372,7 +372,7 @@ extension UnicodeEncoding {
         ) else {
           return (remainder, errorCount)
         }
-        output(o)
+        try output(o)
       }
     }
 
@@ -381,7 +381,7 @@ extension UnicodeEncoding {
       guard let o = eat(parse1Forward(remainder)) else {
         return (remainder, errorCount)
       }
-      output(o)
+      try output(o)
     }
   }
 
@@ -400,8 +400,8 @@ extension UnicodeEncoding {
   public static func parseReverse<C: BidirectionalCollection>(
     _ input: C,
     repairingIllFormedSequences makeRepairs: Bool = true,
-    into output: (EncodedScalar)->Void
-  ) -> (remainder: C.SubSequence, errorCount: Int)
+    into output: (EncodedScalar) throws->Void
+  ) rethrows -> (remainder: C.SubSequence, errorCount: Int)
   where C.SubSequence : BidirectionalCollection,
         C.SubSequence.SubSequence == C.SubSequence,
         C.SubSequence.Iterator.Element == EncodedScalar.Iterator.Element {
@@ -434,7 +434,7 @@ extension UnicodeEncoding {
         ) else {
           return (remainder, errorCount)
         }
-        output(o)
+        try output(o)
       }
     }
 
@@ -443,7 +443,7 @@ extension UnicodeEncoding {
       guard let o = eat(parse1Reverse(remainder)) else {
         return (remainder, errorCount)
       }
-      output(o)
+      try output(o)
     }
   }
   // FIXME: without inducing a speed penalty, can we collapse the logic for
