@@ -117,6 +117,15 @@ static ConstraintSystem::TypeMatchOptions getDefaultDecompositionOptions(
   return flags | ConstraintSystem::TMF_GenerateConstraints;
 }
 
+static bool matchesOptionalLabel(Identifier expectedName, unsigned argNumber, ArrayRef<CallArgParam> args) {
+    // FIXME: This is a quick-and-dirty hack in several different ways.
+    bool isFirst = argNumber == 0;
+    bool isFullWidth = !args[argNumber].hasLabel();
+    bool matchingForInterpolation = expectedName.str() == "forInterpolation";
+    
+    return isFirst && isFullWidth && matchingForInterpolation;
+}
+
 bool constraints::
 matchCallArguments(ArrayRef<CallArgParam> args,
                    ArrayRef<CallArgParam> params,
@@ -152,7 +161,7 @@ matchCallArguments(ArrayRef<CallArgParam> args,
     if (!actualArgNames.empty()) {
       // We're recording argument names; record this one.
       actualArgNames[argNumber] = expectedName;
-    } else if (args[argNumber].Label != expectedName && !ignoreNameClash) {
+    } else if (args[argNumber].Label != expectedName && !matchesOptionalLabel(expectedName, argNumber, args) && !ignoreNameClash) {
       // We have an argument name mismatch. Start recording argument names.
       actualArgNames.resize(numArgs);
 
