@@ -54,7 +54,7 @@ class RValue {
   }
   
   /// Private constructor used by copy().
-  RValue(const RValue &copied, SILGenFunction &gen, SILLocation l);
+  RValue(const RValue &copied, SILGenFunction &SGF, SILLocation l);
   
   /// Construct an RValue from a pre-exploded set of
   /// ManagedValues. Used to implement the extractElement* methods.
@@ -90,11 +90,11 @@ public:
   ///
   /// \param expr - the expression which yielded this r-value; its type
   ///   will become the substituted formal type of this r-value
-  RValue(SILGenFunction &gen, Expr *expr, ManagedValue v);
+  RValue(SILGenFunction &SGF, Expr *expr, ManagedValue v);
 
   /// Create an RValue from a single value. If the value is of tuple type, it
   /// will be exploded.
-  RValue(SILGenFunction &gen, SILLocation l, CanType type, ManagedValue v);
+  RValue(SILGenFunction &SGF, SILLocation l, CanType type, ManagedValue v);
 
   /// Construct an RValue from a pre-exploded set of
   /// ManagedValues. Used to implement the extractElement* methods.
@@ -133,24 +133,24 @@ public:
   
   /// Add a ManagedValue element to the rvalue, exploding tuples if necessary.
   /// The rvalue must not yet be complete.
-  void addElement(SILGenFunction &gen, ManagedValue element,
+  void addElement(SILGenFunction &SGF, ManagedValue element,
                   CanType formalType, SILLocation l) &;
   
   /// Forward an rvalue into a single value, imploding tuples if necessary.
-  SILValue forwardAsSingleValue(SILGenFunction &gen, SILLocation l) &&;
+  SILValue forwardAsSingleValue(SILGenFunction &SGF, SILLocation l) &&;
 
   /// Forward an rvalue into a single value, imploding tuples if necessary, and
   /// introducing a potential conversion from semantic type to storage type.
-  SILValue forwardAsSingleStorageValue(SILGenFunction &gen,
+  SILValue forwardAsSingleStorageValue(SILGenFunction &SGF,
                                        SILType storageType,
                                        SILLocation l) &&;
 
   /// Get the rvalue as a single value, imploding tuples if necessary.
-  ManagedValue getAsSingleValue(SILGenFunction &gen, SILLocation l) &&;
+  ManagedValue getAsSingleValue(SILGenFunction &SGF, SILLocation l) &&;
   
   /// Get the rvalue as a single unmanaged value, imploding tuples if necessary.
   /// The values must not require any cleanups.
-  SILValue getUnmanagedSingleValue(SILGenFunction &gen, SILLocation l) const &;
+  SILValue getUnmanagedSingleValue(SILGenFunction &SGF, SILLocation l) const &;
   
   /// Peek at the single scalar value backing this rvalue without consuming it.
   /// The rvalue must not be of a tuple type.
@@ -177,20 +177,20 @@ public:
   }
 
   /// Use this rvalue to initialize an Initialization.
-  void forwardInto(SILGenFunction &gen, SILLocation loc, Initialization *I) &&;
+  void forwardInto(SILGenFunction &SGF, SILLocation loc, Initialization *I) &&;
 
   /// Copy this rvalue to initialize an Initialization without consuming the
   /// rvalue.
-  void copyInto(SILGenFunction &gen, SILLocation loc, Initialization *I) const&;
+  void copyInto(SILGenFunction &SGF, SILLocation loc, Initialization *I) const&;
 
   /// Assign this r-value into the destination.
-  void assignInto(SILGenFunction &gen, SILLocation loc, SILValue destAddr) &&;
+  void assignInto(SILGenFunction &SGF, SILLocation loc, SILValue destAddr) &&;
   
   /// Forward the exploded SILValues into a SmallVector.
-  void forwardAll(SILGenFunction &gen,
+  void forwardAll(SILGenFunction &SGF,
                   SmallVectorImpl<SILValue> &values) &&;
 
-  ManagedValue materialize(SILGenFunction &gen, SILLocation loc) &&;
+  ManagedValue materialize(SILGenFunction &SGF, SILLocation loc) &&;
   
   /// Take the ManagedValues from this RValue into a SmallVector.
   void getAll(SmallVectorImpl<ManagedValue> &values) &&;
@@ -218,8 +218,8 @@ public:
   }
   
   /// Emit an equivalent value with independent ownership.
-  RValue copy(SILGenFunction &gen, SILLocation l) const & {
-    return RValue(*this, gen, l);
+  RValue copy(SILGenFunction &SGF, SILLocation l) const & {
+    return RValue(*this, SGF, l);
   }
 
   bool isObviouslyEqual(const RValue &rhs) const {

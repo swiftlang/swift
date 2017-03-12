@@ -235,23 +235,23 @@ public:
   }
 
   /// Emit a copy of this value with independent ownership.
-  ManagedValue copy(SILGenFunction &gen, SILLocation loc);
+  ManagedValue copy(SILGenFunction &SGF, SILLocation loc);
 
   /// Emit a copy of this value with independent ownership into the current
   /// formal evaluation scope.
-  ManagedValue formalAccessCopy(SILGenFunction &gen, SILLocation loc);
+  ManagedValue formalAccessCopy(SILGenFunction &SGF, SILLocation loc);
 
   /// Store a copy of this value with independent ownership into the given
   /// uninitialized address.
-  void copyInto(SILGenFunction &gen, SILValue dest, SILLocation loc);
+  void copyInto(SILGenFunction &SGF, SILValue dest, SILLocation loc);
 
   /// This is the same operation as 'copy', but works on +0 values that don't
   /// have cleanups.  It returns a +1 value with one.
-  ManagedValue copyUnmanaged(SILGenFunction &gen, SILLocation loc);
+  ManagedValue copyUnmanaged(SILGenFunction &SGF, SILLocation loc);
 
   /// This is the same operation as 'formalAccessCopy', but works on +0 values
   /// that don't have cleanups.  It returns a +1 value with one.
-  ManagedValue formalAccessCopyUnmanaged(SILGenFunction &gen, SILLocation loc);
+  ManagedValue formalAccessCopyUnmanaged(SILGenFunction &SGF, SILLocation loc);
 
   bool hasCleanup() const { return cleanup.isValid(); }
   CleanupHandle getCleanup() const { return cleanup; }
@@ -261,36 +261,36 @@ public:
   /// An l-value is borrowed as itself.  A +1 r-value is borrowed as a
   /// +0 r-value, with the assumption that the original ManagedValue
   /// will not be forwarded until the borrowed value is fully used.
-  ManagedValue borrow(SILGenFunction &gen, SILLocation loc) const;
+  ManagedValue borrow(SILGenFunction &SGF, SILLocation loc) const;
 
   /// Return a formally evaluated "borrowed" version of this value.
-  ManagedValue formalAccessBorrow(SILGenFunction &gen, SILLocation loc) const;
+  ManagedValue formalAccessBorrow(SILGenFunction &SGF, SILLocation loc) const;
 
   ManagedValue unmanagedBorrow() const {
     return isLValue() ? *this : ManagedValue::forUnmanaged(getValue());
   }
 
   /// Disable the cleanup for this value.
-  void forwardCleanup(SILGenFunction &gen) const;
+  void forwardCleanup(SILGenFunction &SGF) const;
   
   /// Forward this value, deactivating the cleanup and returning the
   /// underlying value.
-  SILValue forward(SILGenFunction &gen) const;
+  SILValue forward(SILGenFunction &SGF) const;
   
   /// Forward this value into memory by storing it to the given address.
   ///
-  /// \param gen - The SILGenFunction.
+  /// \param SGF - The SILGenFunction.
   /// \param loc - the AST location to associate with emitted instructions.
   /// \param address - the address to assign to.
-  void forwardInto(SILGenFunction &gen, SILLocation loc, SILValue address);
+  void forwardInto(SILGenFunction &SGF, SILLocation loc, SILValue address);
   
   /// Assign this value into memory, destroying the existing
   /// value at the destination address.
   ///
-  /// \param gen - The SILGenFunction.
+  /// \param SGF - The SILGenFunction.
   /// \param loc - the AST location to associate with emitted instructions.
   /// \param address - the address to assign to.
-  void assignInto(SILGenFunction &gen, SILLocation loc, SILValue address);
+  void assignInto(SILGenFunction &SGF, SILLocation loc, SILValue address);
   
   explicit operator bool() const {
     // "InContext" is not considered false.
