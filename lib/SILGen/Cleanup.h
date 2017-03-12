@@ -71,14 +71,14 @@ public:
   size_t allocated_size() const { return allocatedSize; }
   
   CleanupState getState() const { return state; }
-  virtual void setState(SILGenFunction &gen, CleanupState newState) {
+  virtual void setState(SILGenFunction &SGF, CleanupState newState) {
     state = newState;
   }
   bool isActive() const { return state >= CleanupState::Active; }
   bool isDead() const { return state == CleanupState::Dead; }
 
-  virtual void emit(SILGenFunction &gen, CleanupLocation loc) = 0;
-  virtual void dump(SILGenFunction &gen) const = 0;
+  virtual void emit(SILGenFunction &SGF, CleanupLocation loc) = 0;
+  virtual void dump(SILGenFunction &SGF) const = 0;
 };
 
 /// A cleanup depth is generally used to denote the set of cleanups

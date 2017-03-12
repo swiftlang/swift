@@ -59,14 +59,14 @@ public:
 
   Kind getKind() const { return kind; }
 
-  void finish(SILGenFunction &gen) { finishImpl(gen); }
+  void finish(SILGenFunction &SGF) { finishImpl(SGF); }
 
   void setFinished() { finished = true; }
 
   bool isFinished() const { return finished; }
 
 protected:
-  virtual void finishImpl(SILGenFunction &gen) = 0;
+  virtual void finishImpl(SILGenFunction &SGF) = 0;
 };
 
 class SharedBorrowFormalAccess : public FormalAccess {
@@ -83,7 +83,7 @@ public:
   SILValue getOriginalValue() const { return originalValue; }
 
 private:
-  void finishImpl(SILGenFunction &gen) override;
+  void finishImpl(SILGenFunction &SGF) override;
 };
 
 class OwnedFormalAccess : public FormalAccess {
@@ -97,7 +97,7 @@ public:
   SILValue getValue() const { return value; }
 
 private:
-  void finishImpl(SILGenFunction &gen) override;
+  void finishImpl(SILGenFunction &SGF) override;
 };
 
 class FormalEvaluationContext {
@@ -139,16 +139,16 @@ public:
   /// is the top element of the stack.
   void pop(stable_iterator stable_iter) { stack.pop(stable_iter); }
 
-  void dump(SILGenFunction &gen);
+  void dump(SILGenFunction &SGF);
 };
 
 class FormalEvaluationScope {
-  SILGenFunction &gen;
+  SILGenFunction &SGF;
   llvm::Optional<FormalEvaluationContext::stable_iterator> savedDepth;
   bool wasInWritebackScope;
 
 public:
-  FormalEvaluationScope(SILGenFunction &gen);
+  FormalEvaluationScope(SILGenFunction &SGF);
   ~FormalEvaluationScope() {
     if (!savedDepth.hasValue())
       return;

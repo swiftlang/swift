@@ -189,12 +189,12 @@ public:
   /// Derive the address of this component given the address of the base.
   ///
   /// \param base - always an address, but possibly an r-value
-  virtual ManagedValue offset(SILGenFunction &gen,
+  virtual ManagedValue offset(SILGenFunction &SGF,
                               SILLocation loc,
                               ManagedValue base,
                               AccessKind accessKind) && = 0;
 
-  AccessKind getBaseAccessKind(SILGenFunction &gen,
+  AccessKind getBaseAccessKind(SILGenFunction &SGF,
                                AccessKind accessKind) const override {
     return accessKind;
   }
@@ -224,18 +224,18 @@ protected:
 public:
   /// Clone the path component onto the heap.
   virtual std::unique_ptr<LogicalPathComponent>
-  clone(SILGenFunction &gen, SILLocation l) const = 0;
+  clone(SILGenFunction &SGF, SILLocation l) const = 0;
   
   /// Set the property.
   ///
   /// \param base - always an address, but possibly an r-value
-  virtual void set(SILGenFunction &gen, SILLocation loc,
+  virtual void set(SILGenFunction &SGF, SILLocation loc,
                    RValue &&value, ManagedValue base) && = 0;
 
   /// Get the property.
   ///
   /// \param base - always an address, but possibly an r-value
-  virtual RValue get(SILGenFunction &gen, SILLocation loc,
+  virtual RValue get(SILGenFunction &SGF, SILLocation loc,
                      ManagedValue base, SGFContext c) && = 0;
 
   /// Compare 'this' lvalue and the 'rhs' lvalue (which is guaranteed to have
@@ -244,7 +244,7 @@ public:
   /// diagnostic.
   virtual void diagnoseWritebackConflict(LogicalPathComponent *rhs,
                                          SILLocation loc1, SILLocation loc2,
-                                         SILGenFunction &gen) = 0;
+                                         SILGenFunction &SGF) = 0;
 
 
   /// Materialize the storage into memory.  If the access is for
@@ -252,14 +252,14 @@ public:
   /// eventually be reflected in the original storage.
   ///
   /// \param base - always an address, but possibly an r-value
-  virtual ManagedValue getMaterialized(SILGenFunction &gen, SILLocation loc,
+  virtual ManagedValue getMaterialized(SILGenFunction &SGF, SILLocation loc,
                                        ManagedValue base,
                                        AccessKind accessKind) &&;
 
   /// Perform a writeback on the property.
   ///
   /// \param base - always an address, but possibly an r-value
-  virtual void writeback(SILGenFunction &gen, SILLocation loc,
+  virtual void writeback(SILGenFunction &SGF, SILLocation loc,
                          ManagedValue base,
                          MaterializedLValue materialized,
                          bool isFinal);
@@ -284,7 +284,7 @@ protected:
   }
 
 public:
-  AccessKind getBaseAccessKind(SILGenFunction &gen,
+  AccessKind getBaseAccessKind(SILGenFunction &SGF,
                                AccessKind kind) const override {
     // Always use the same access kind for the base.
     return kind;
@@ -292,23 +292,23 @@ public:
 
   void diagnoseWritebackConflict(LogicalPathComponent *RHS,
                                  SILLocation loc1, SILLocation loc2,
-                                 SILGenFunction &gen) override {
+                                 SILGenFunction &SGF) override {
     // no useful writeback diagnostics at this point
   }
 
-  RValue get(SILGenFunction &gen, SILLocation loc,
+  RValue get(SILGenFunction &SGF, SILLocation loc,
              ManagedValue base, SGFContext c) && override;
 
-  void set(SILGenFunction &gen, SILLocation loc,
+  void set(SILGenFunction &SGF, SILLocation loc,
            RValue &&value, ManagedValue base) && override;
 
   /// Transform from the original pattern.
-  virtual RValue translate(SILGenFunction &gen, SILLocation loc,
+  virtual RValue translate(SILGenFunction &SGF, SILLocation loc,
                            RValue &&value,
                            SGFContext ctx = SGFContext()) && = 0;
 
   /// Transform into the original pattern.
-  virtual RValue untranslate(SILGenFunction &gen, SILLocation loc,
+  virtual RValue untranslate(SILGenFunction &SGF, SILLocation loc,
                              RValue &&value,
                              SGFContext ctx = SGFContext()) && = 0;
   
@@ -388,7 +388,7 @@ public:
   }
 
   /// Add a member component to the access path of this lvalue.
-  void addMemberComponent(SILGenFunction &gen, SILLocation loc,
+  void addMemberComponent(SILGenFunction &SGF, SILLocation loc,
                           AbstractStorageDecl *storage,
                           SubstitutionList subs,
                           bool isSuper,
@@ -398,7 +398,7 @@ public:
                           CanType formalRValueType,
                           RValue &&indices);
 
-  void addMemberVarComponent(SILGenFunction &gen, SILLocation loc,
+  void addMemberVarComponent(SILGenFunction &SGF, SILLocation loc,
                              VarDecl *var,
                              SubstitutionList subs,
                              bool isSuper,
@@ -407,7 +407,7 @@ public:
                              AccessStrategy accessStrategy,
                              CanType formalRValueType);
 
-  void addMemberSubscriptComponent(SILGenFunction &gen, SILLocation loc,
+  void addMemberSubscriptComponent(SILGenFunction &SGF, SILLocation loc,
                                    SubscriptDecl *subscript,
                                    SubstitutionList subs,
                                    bool isSuper,
@@ -460,9 +460,9 @@ public:
 /// RAII object used to enter an inout conversion scope. Writeback scopes formed
 /// during the inout conversion scope will be no-ops.
 class InOutConversionScope {
-  SILGenFunction &gen;
+  SILGenFunction &SGF;
 public:
-  InOutConversionScope(SILGenFunction &gen);
+  InOutConversionScope(SILGenFunction &SGF);
   ~InOutConversionScope();
 };
 
@@ -503,13 +503,13 @@ struct LLVM_LIBRARY_VISIBILITY ExclusiveBorrowFormalAccess : FormalAccess {
                                          SGF);
   }
 
-  void performWriteback(SILGenFunction &gen, bool isFinal) {
-    Scope S(gen.Cleanups, CleanupLocation::get(loc));
-    component->writeback(gen, loc, base, materialized, isFinal);
+  void performWriteback(SILGenFunction &SGF, bool isFinal) {
+    Scope S(SGF.Cleanups, CleanupLocation::get(loc));
+    component->writeback(SGF, loc, base, materialized, isFinal);
   }
 
-  void finishImpl(SILGenFunction &gen) override {
-    performWriteback(gen, /*isFinal*/ true);
+  void finishImpl(SILGenFunction &SGF) override {
+    performWriteback(SGF, /*isFinal*/ true);
   }
 };
 
