@@ -4065,10 +4065,10 @@ namespace {
     std::vector<CallSite> uncurriedSites;
     std::vector<CallSite> extraSites;
     Callee callee;
-    FormalEvaluationScope InitialWritebackScope;
+    FormalEvaluationScope initialWritebackScope;
     unsigned uncurries;
     bool applied;
-    bool AssumedPlusZeroSelf;
+    bool assumedPlusZeroSelf;
 
   public:
     /// Create an emission for a call of the given callee.
@@ -4076,9 +4076,9 @@ namespace {
                  FormalEvaluationScope &&writebackScope,
                  bool assumedPlusZeroSelf = false)
         : gen(gen), callee(std::move(callee)),
-          InitialWritebackScope(std::move(writebackScope)),
+          initialWritebackScope(std::move(writebackScope)),
           uncurries(callee.getNaturalUncurryLevel() + 1), applied(false),
-          AssumedPlusZeroSelf(assumedPlusZeroSelf) {
+          assumedPlusZeroSelf(assumedPlusZeroSelf) {
       // Subtract an uncurry level for captures, if any.
       // TODO: Encapsulate this better in Callee.
       if (this->callee.hasCaptures()) {
@@ -4167,7 +4167,7 @@ namespace {
     CallEmission(CallEmission &&e)
         : gen(e.gen), uncurriedSites(std::move(e.uncurriedSites)),
           extraSites(std::move(e.extraSites)), callee(std::move(e.callee)),
-          InitialWritebackScope(std::move(e.InitialWritebackScope)),
+          initialWritebackScope(std::move(e.initialWritebackScope)),
           uncurries(e.uncurries), applied(e.applied) {
       e.applied = true;
     }
@@ -4280,7 +4280,7 @@ RValue CallEmission::applyNormalCall(
   // Now that we know the substFnType, check if we assumed that we were
   // passing self at +0. If we did and self is not actually passed at +0,
   // retain Self.
-  if (AssumedPlusZeroSelf) {
+  if (assumedPlusZeroSelf) {
     // If the final emitted function does not have a self param or it does
     // have a self param that is consumed, convert what we think is self
     // to
@@ -4311,7 +4311,7 @@ RValue CallEmission::applyEnumElementConstructor(
     CanSILFunctionType &substFnType,
     Optional<ForeignErrorConvention> &foreignError,
     ImportAsMemberStatus &foreignSelf, unsigned uncurryLevel, SGFContext C) {
-  assert(!AssumedPlusZeroSelf);
+  assert(!assumedPlusZeroSelf);
   SGFContext uncurriedContext = (extraSites.empty() ? C : SGFContext());
 
   // Get the callee type information.
@@ -4329,7 +4329,7 @@ RValue CallEmission::applyEnumElementConstructor(
   // Now that we know the substFnType, check if we assumed that we were
   // passing self at +0. If we did and self is not actually passed at +0,
   // retain Self.
-  if (AssumedPlusZeroSelf) {
+  if (assumedPlusZeroSelf) {
     // If the final emitted function does not have a self param or it does
     // have a self param that is consumed, convert what we think is self
     // to
@@ -4390,7 +4390,7 @@ RValue CallEmission::applyPartiallyAppliedSuperMethod(
   // Now that we know the substFnType, check if we assumed that we were
   // passing self at +0. If we did and self is not actually passed at +0,
   // retain Self.
-  if (AssumedPlusZeroSelf) {
+  if (assumedPlusZeroSelf) {
     // If the final emitted function does not have a self param or it does
     // have a self param that is consumed, convert what we think is self
     // to
@@ -4469,7 +4469,7 @@ RValue CallEmission::applySpecializedEmitter(
   // Now that we know the substFnType, check if we assumed that we were
   // passing self at +0. If we did and self is not actually passed at +0,
   // retain Self.
-  if (AssumedPlusZeroSelf) {
+  if (assumedPlusZeroSelf) {
     // If the final emitted function does not have a self param or it does
     // have a self param that is consumed, convert what we think is self to
     // be plus zero.
