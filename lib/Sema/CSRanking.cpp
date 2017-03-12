@@ -874,11 +874,11 @@ ConstraintSystem::compareSolutions(ConstraintSystem &cs,
       secondAsSpecializedAs = true;
     }
 
-    // If each is as specialized as the other, and both are constructors,
-    // check the constructor kind.
-    if (firstAsSpecializedAs && secondAsSpecializedAs) {
-      if (auto ctor1 = dyn_cast<ConstructorDecl>(decl1)) {
-        if (auto ctor2 = dyn_cast<ConstructorDecl>(decl2)) {
+    if (auto ctor1 = dyn_cast<ConstructorDecl>(decl1)) {
+      if (auto ctor2 = dyn_cast<ConstructorDecl>(decl2)) {
+        // If each is as specialized as the other, and both are constructors,
+        // check the constructor kind.
+        if (firstAsSpecializedAs && secondAsSpecializedAs) {
           if (ctor1->getInitKind() != ctor2->getInitKind()) {
             if (ctor1->getInitKind() < ctor2->getInitKind())
               ++score1;
@@ -902,6 +902,18 @@ ConstraintSystem::compareSolutions(ConstraintSystem &cs,
               }
             }
           }
+        }
+        
+        // Prefer `forInterpolation:` constructors over other constructors.
+        // FIXME: We ought to generalize this into some kind of "optional label" 
+        // feature.
+        if (ctor1->getParameters()->size() &&
+            ctor1->getParameters()->get(0)->getArgumentName() == cs.getASTContext().Id_forInterpolation) {
+          ++score1;
+        }
+        if (ctor2->getParameters()->size() &&
+            ctor2->getParameters()->get(0)->getArgumentName() == cs.getASTContext().Id_forInterpolation) {
+          ++score2;
         }
       }
     }
