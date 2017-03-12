@@ -4166,6 +4166,10 @@ namespace {
         result = applyPartiallyAppliedSuperMethod(formalType, origFormalType,
                                                   substFnType, foreignError,
                                                   foreignSelf, uncurryLevel, C);
+      } else if (isEnumElementConstructor()) {
+        result = applyEnumElementConstructor(formalType, origFormalType,
+                                             substFnType, foreignError,
+                                             foreignSelf, uncurryLevel, C);
       } else {
         ManagedValue mv;
         ApplyOptions initialOptions = ApplyOptions::None;
@@ -4174,19 +4178,8 @@ namespace {
         origFormalType = AbstractionPattern(callee.getOrigFormalType());
 
         // Get the callee type information.
-        if (isEnumElementConstructor()) {
-          // Enum payloads are always stored at the abstraction level
-          // of the unsubstituted payload type. This means that unlike
-          // with specialized emitters above, enum constructors use
-          // the AST-level abstraction pattern, to ensure that function
-          // types in payloads are re-abstracted correctly.
-          assert(!AssumedPlusZeroSelf);
-          substFnType = gen.getSILFunctionType(origFormalType.getValue(),
-                                               formalType, uncurryLevel);
-        } else {
-          std::tie(mv, substFnType, foreignError, foreignSelf, initialOptions) =
-              callee.getAtUncurryLevel(gen, uncurryLevel);
-        }
+        std::tie(mv, substFnType, foreignError, foreignSelf, initialOptions) =
+            callee.getAtUncurryLevel(gen, uncurryLevel);
 
         // Now that we know the substFnType, check if we assumed that we were
         // passing self at +0. If we did and self is not actually passed at +0,
@@ -4202,58 +4195,20 @@ namespace {
           }
         }
 
-        // If we have an early emitter, just let it take over for the
-        // uncurried call site.
-        if (isEnumElementConstructor()) {
-          // If we have a fully-applied enum element constructor, open-code
-          // the construction.
-          EnumElementDecl *element = callee.getEnumElementDecl();
-
-          SILLocation uncurriedLoc = uncurriedSites[0].Loc;
-
-          CanType formalResultType = formalType.getResult();
-
-          // Ignore metatype argument
-          claimNextParamClause(origFormalType.getValue());
-          claimNextParamClause(formalType);
-          std::move(uncurriedSites[0]).forward().getAsSingleValue(gen);
-
-          // Get the payload argument.
-          ArgumentSource payload;
-          if (element->getArgumentInterfaceType()) {
-            assert(uncurriedSites.size() == 2);
-            formalResultType = formalType.getResult();
-            claimNextParamClause(origFormalType.getValue());
-            claimNextParamClause(formalType);
-            payload = std::move(uncurriedSites[1]).forward();
-          } else {
-            assert(uncurriedSites.size() == 1);
-          }
-
-          assert(substFnType->getNumResults() == 1);
-          ManagedValue resultMV = gen.emitInjectEnum(
-              uncurriedLoc, std::move(payload),
-              gen.getLoweredType(formalResultType), element, uncurriedContext);
-          result = RValue(gen, uncurriedLoc, formalResultType, resultMV);
-
-          // Otherwise, emit the uncurried arguments now and perform
-          // the call.
-        } else {
-          // Emit the arguments.
-          SmallVector<ManagedValue, 4> uncurriedArgs;
-          Optional<SILLocation> uncurriedLoc;
-          CanFunctionType formalApplyType;
-          emitArgumentsForNormalApply(formalType, origFormalType.getValue(),
-                                      substFnType, foreignError, foreignSelf,
-                                      initialOptions, uncurriedArgs,
-                                      uncurriedLoc, formalApplyType);
-          // Emit the uncurried call.
-          result = gen.emitApply(
-              uncurriedLoc.getValue(), mv, callee.getSubstitutions(),
-              uncurriedArgs, substFnType, origFormalType.getValue(),
-              uncurriedSites.back().getSubstResultType(), initialOptions, None,
-              foreignError, uncurriedContext);
-        }
+        // Emit the arguments.
+        SmallVector<ManagedValue, 4> uncurriedArgs;
+        Optional<SILLocation> uncurriedLoc;
+        CanFunctionType formalApplyType;
+        emitArgumentsForNormalApply(formalType, origFormalType.getValue(),
+                                    substFnType, foreignError, foreignSelf,
+                                    initialOptions, uncurriedArgs, uncurriedLoc,
+                                    formalApplyType);
+        // Emit the uncurried call.
+        result = gen.emitApply(
+            uncurriedLoc.getValue(), mv, callee.getSubstitutions(),
+            uncurriedArgs, substFnType, origFormalType.getValue(),
+            uncurriedSites.back().getSubstResultType(), initialOptions, None,
+            foreignError, uncurriedContext);
       }
 
       // End the initial writeback scope.
@@ -4291,6 +4246,14 @@ namespace {
         ImportAsMemberStatus &foreignSelf, unsigned uncurryLevel, SGFContext C);
 
     RValue
+    applyEnumElementConstructor(CanFunctionType &formalType,
+                                Optional<AbstractionPattern> &origFormalType,
+                                CanSILFunctionType &substFnType,
+                                Optional<ForeignErrorConvention> &foreignError,
+                                ImportAsMemberStatus &foreignSelf,
+                                unsigned uncurryLevel, SGFContext C);
+
+    RValue
     handleRemainingCallSites(RValue &&result, CanFunctionType formalType,
                              ImportAsMemberStatus foreignSelf,
                              Optional<ForeignErrorConvention> foreignError,
@@ -4312,6 +4275,72 @@ namespace {
     CallEmission &operator=(const CallEmission &) = delete;
   };
 } // end anonymous namespace
+
+RValue CallEmission::applyEnumElementConstructor(
+    CanFunctionType &formalType, Optional<AbstractionPattern> &origFormalType,
+    CanSILFunctionType &substFnType,
+    Optional<ForeignErrorConvention> &foreignError,
+    ImportAsMemberStatus &foreignSelf, unsigned uncurryLevel, SGFContext C) {
+  assert(!AssumedPlusZeroSelf);
+  SGFContext uncurriedContext = (extraSites.empty() ? C : SGFContext());
+
+  // Get the callee type information.
+  //
+  // Enum payloads are always stored at the abstraction level of the
+  // unsubstituted payload type. This means that unlike with specialized
+  // emitters above, enum constructors use the AST-level abstraction
+  // pattern, to ensure that function types in payloads are re-abstracted
+  // correctly.
+  formalType = callee.getSubstFormalType();
+  origFormalType = AbstractionPattern(callee.getOrigFormalType());
+  substFnType = gen.getSILFunctionType(origFormalType.getValue(), formalType,
+                                       uncurryLevel);
+
+  // Now that we know the substFnType, check if we assumed that we were
+  // passing self at +0. If we did and self is not actually passed at +0,
+  // retain Self.
+  if (AssumedPlusZeroSelf) {
+    // If the final emitted function does not have a self param or it does
+    // have a self param that is consumed, convert what we think is self
+    // to
+    // be plus zero.
+    if (!substFnType->hasSelfParam() ||
+        substFnType->getSelfParameter().isConsumed()) {
+      convertSelfToPlusOneFromPlusZero();
+    }
+  }
+
+  // We have a fully-applied enum element constructor: open-code the
+  // construction.
+  EnumElementDecl *element = callee.getEnumElementDecl();
+
+  SILLocation uncurriedLoc = uncurriedSites[0].Loc;
+
+  CanType formalResultType = formalType.getResult();
+
+  // Ignore metatype argument
+  claimNextParamClause(origFormalType.getValue());
+  claimNextParamClause(formalType);
+  std::move(uncurriedSites[0]).forward().getAsSingleValue(gen);
+
+  // Get the payload argument.
+  ArgumentSource payload;
+  if (element->getArgumentInterfaceType()) {
+    assert(uncurriedSites.size() == 2);
+    formalResultType = formalType.getResult();
+    claimNextParamClause(origFormalType.getValue());
+    claimNextParamClause(formalType);
+    payload = std::move(uncurriedSites[1]).forward();
+  } else {
+    assert(uncurriedSites.size() == 1);
+  }
+
+  assert(substFnType->getNumResults() == 1);
+  ManagedValue resultMV = gen.emitInjectEnum(
+      uncurriedLoc, std::move(payload), gen.getLoweredType(formalResultType),
+      element, uncurriedContext);
+  return RValue(gen, uncurriedLoc, formalResultType, resultMV);
+}
 
 RValue CallEmission::applyPartiallyAppliedSuperMethod(
     CanFunctionType &formalType, Optional<AbstractionPattern> &origFormalType,
