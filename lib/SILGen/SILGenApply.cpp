@@ -4161,6 +4161,21 @@ namespace {
       return result;
     }
 
+    ~CallEmission() { assert(applied && "never applied!"); }
+
+    // Movable, but not copyable.
+    CallEmission(CallEmission &&e)
+        : gen(e.gen), uncurriedSites(std::move(e.uncurriedSites)),
+          extraSites(std::move(e.extraSites)), callee(std::move(e.callee)),
+          InitialWritebackScope(std::move(e.InitialWritebackScope)),
+          uncurries(e.uncurries), applied(e.applied) {
+      e.applied = true;
+    }
+
+  private:
+    CallEmission(const CallEmission &) = delete;
+    CallEmission &operator=(const CallEmission &) = delete;
+
     void emitArgumentsForNormalApply(
         CanFunctionType &formalType, AbstractionPattern &origFormalType,
         CanSILFunctionType &substFnType,
@@ -4212,21 +4227,6 @@ namespace {
                             ImportAsMemberStatus foreignSelf,
                             Optional<ForeignErrorConvention> foreignError,
                             SGFContext C);
-
-    ~CallEmission() { assert(applied && "never applied!"); }
-
-    // Movable, but not copyable.
-    CallEmission(CallEmission &&e)
-        : gen(e.gen), uncurriedSites(std::move(e.uncurriedSites)),
-          extraSites(std::move(e.extraSites)), callee(std::move(e.callee)),
-          InitialWritebackScope(std::move(e.InitialWritebackScope)),
-          uncurries(e.uncurries), applied(e.applied) {
-      e.applied = true;
-    }
-
-  private:
-    CallEmission(const CallEmission &) = delete;
-    CallEmission &operator=(const CallEmission &) = delete;
   };
 } // end anonymous namespace
 
