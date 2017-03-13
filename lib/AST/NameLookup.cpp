@@ -139,7 +139,7 @@ bool swift::removeShadowedDecls(SmallVectorImpl<ValueDecl*> &decls,
                                 const ModuleDecl *curModule,
                                 LazyResolver *typeResolver) {
   // Category declarations by their signatures.
-  llvm::SmallDenseMap<std::pair<CanType, Identifier>,
+  llvm::SmallDenseMap<std::pair<CanType, DeclBaseName>,
                       llvm::TinyPtrVector<ValueDecl *>>
     CollidingDeclGroups;
 
@@ -173,8 +173,8 @@ bool swift::removeShadowedDecls(SmallVectorImpl<ValueDecl*> &decls,
       signature = asd->getOverloadSignature().InterfaceType;
 
     // If we've seen a declaration with this signature before, note it.
-    auto &knownDecls =
-        CollidingDeclGroups[std::make_pair(signature, decl->getName())];
+    auto &knownDecls = CollidingDeclGroups[
+        std::make_pair(signature, decl->getBaseName())];
     if (!knownDecls.empty())
       anyCollisions = true;
 
@@ -943,7 +943,7 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
     return;
   }
 
-  ModuleDecl *desiredModule = Ctx.getLoadedModule(Name.getBaseName());
+  ModuleDecl *desiredModule = Ctx.getLoadedModule(Name.getBaseIdentifier());
   if (!desiredModule && Name == Ctx.TheBuiltinModule->getName())
     desiredModule = Ctx.TheBuiltinModule;
   if (desiredModule) {

@@ -4399,7 +4399,7 @@ DeclName AbstractFunctionDecl::getEffectiveFullName() const {
         case AccessorKind::IsMutableAddressor:
         case AccessorKind::IsGetter:
           return subscript ? subscript->getFullName()
-                           : DeclName(ctx, afd->getName(),
+                           : DeclName(ctx, afd->getBaseName(),
                                       ArrayRef<Identifier>());
 
         case AccessorKind::IsSetter:
@@ -4417,7 +4417,7 @@ DeclName AbstractFunctionDecl::getEffectiveFullName() const {
             argNames.append(subscript->getFullName().getArgumentNames().begin(),
                             subscript->getFullName().getArgumentNames().end());
           }
-          return DeclName(ctx, afd->getName(), argNames);
+          return DeclName(ctx, afd->getBaseName(), argNames);
         }
       }
     }
@@ -4546,7 +4546,7 @@ ObjCSelector AbstractFunctionDecl::getObjCSelector(
     if (argNames.size() != preferredName.getArgumentNames().size()) {
       return ObjCSelector();
     }
-    baseName = preferredName.getBaseName();
+    baseName = preferredName.getBaseIdentifier();
     argNames = preferredName.getArgumentNames();
   }
 
@@ -5135,7 +5135,7 @@ ConstructorDecl::getDelegatingOrChainedInitKind(DiagnosticEngine *diags,
       } else if (auto *CRE = dyn_cast<ConstructorRefCallExpr>(Callee)) {
         arg = CRE->getArg();
       } else if (auto *dotExpr = dyn_cast<UnresolvedDotExpr>(Callee)) {
-        if (dotExpr->getName().getBaseName().str() != "init")
+        if (dotExpr->getName().getBaseName() != "init")
           return { true, E };
 
         arg = dotExpr->getBase();

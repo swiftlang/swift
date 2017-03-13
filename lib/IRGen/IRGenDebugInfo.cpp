@@ -399,9 +399,12 @@ private:
           break;
         }
 
-        SmallVector<char, 64> Buf;
-        StringRef Name = (VD->getName().str() + Twine(Kind)).toStringRef(Buf);
-        return BumpAllocatedString(Name);
+        SmallString<64> Buf;
+        llvm::raw_svector_ostream Name{Buf};
+        // FIXME: Subscripts can be overloaded, and there could also be a
+        // variable named "subscript".
+        Name << VD->getBaseName() << Kind;
+        return BumpAllocatedString(Name.str());
       }
 
     if (FD.hasName())

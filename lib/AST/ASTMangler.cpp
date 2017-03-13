@@ -503,7 +503,8 @@ static unsigned getUnnamedParamIndex(const ParamDecl *D) {
 
 void ASTMangler::appendDeclName(const ValueDecl *decl) {
   if (decl->isOperator()) {
-    appendIdentifier(translateOperator(decl->getName().str()));
+    auto name = decl->getBaseName().getIdentifier().str();
+    appendIdentifier(translateOperator(name));
     switch (decl->getAttrs().getUnaryOperatorKind()) {
       case UnaryOperatorKind::Prefix:
         appendOperator("op");
@@ -516,7 +517,8 @@ void ASTMangler::appendDeclName(const ValueDecl *decl) {
         break;
     }
   } else if (decl->hasName()) {
-    appendIdentifier(decl->getName().str());
+    // TODO: Handle special names
+    appendIdentifier(decl->getBaseName().getIdentifier().str());
   } else {
     assert(AllowNamelessEntities && "attempt to mangle unnamed decl");
     // Fall back to an unlikely name, so that we still generate a valid
@@ -1908,7 +1910,7 @@ void ASTMangler::appendProtocolConformance(const ProtocolConformance *conformanc
     appendIdentifier(
               fileUnit->getDiscriminatorForPrivateValue(behaviorStorage).str());
     appendProtocolName(conformance->getProtocol());
-    appendIdentifier(behaviorStorage->getName().str());
+    appendIdentifier(behaviorStorage->getBaseName().getIdentifier().str());
   } else {
     auto conformanceDC = conformance->getDeclContext();
     auto conformingType =

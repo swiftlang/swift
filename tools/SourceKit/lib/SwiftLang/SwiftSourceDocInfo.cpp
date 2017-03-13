@@ -465,7 +465,8 @@ void walkRelatedDecls(const ValueDecl *VD, const FnTy &Fn) {
   // For now we use UnqualifiedLookup to fetch other declarations with the same
   // base name.
   auto TypeResolver = VD->getASTContext().getLazyResolver();
-  UnqualifiedLookup Lookup(VD->getName(), VD->getDeclContext(), TypeResolver);
+  UnqualifiedLookup Lookup(VD->getBaseName(), VD->getDeclContext(),
+                           TypeResolver);
   for (auto result : Lookup.Results) {
     ValueDecl *RelatedVD = result.getValueDecl();
     if (RelatedVD->getAttrs().isUnavailable(VD->getASTContext()))
@@ -934,9 +935,9 @@ static DeclName getSwiftDeclName(const ValueDecl *VD,
   auto &Ctx = VD->getDeclContext()->getASTContext();
   assert(SwiftLangSupport::getNameKindForUID(Info.NameKind) == NameKind::Swift);
   DeclName OrigName = VD->getFullName();
-  Identifier BaseName = Info.BaseName.empty()
-                            ? OrigName.getBaseName()
-                            : Ctx.getIdentifier(Info.BaseName);
+  DeclBaseName BaseName = Info.BaseName.empty()
+                              ? OrigName.getBaseName()
+                              : Ctx.getIdentifier(Info.BaseName);
   auto OrigArgs = OrigName.getArgumentNames();
   SmallVector<Identifier, 8> Args(OrigArgs.begin(), OrigArgs.end());
   if (Info.ArgNames.size() > OrigArgs.size())
@@ -996,6 +997,7 @@ static bool passNameInfoForDecl(const ValueDecl *VD, NameTranslatingInfo &Info,
       Named = dyn_cast_or_null<clang::NamedDecl>(BaseDecl->getClangDecl());
       BaseDecl = BaseDecl->getOverriddenDecl();
     }
+
     if (!Named)
       return true;
 
@@ -1006,7 +1008,7 @@ static bool passNameInfoForDecl(const ValueDecl *VD, NameTranslatingInfo &Info,
     DeclName Name = Importer->importName(Named, ObjCName);
     NameTranslatingInfo Result;
     Result.NameKind = SwiftLangSupport::getUIDForNameKind(NameKind::Swift);
-    Result.BaseName = Name.getBaseName().str();
+    Result.BaseName = Name.getBaseIdentifier().str();
     std::transform(Name.getArgumentNames().begin(),
                    Name.getArgumentNames().end(),
                    std::back_inserter(Result.ArgNames),

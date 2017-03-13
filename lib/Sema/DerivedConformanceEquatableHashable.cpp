@@ -322,7 +322,7 @@ ValueDecl *DerivedConformance::deriveEquatable(TypeChecker &tc,
     return nullptr;
 
   // Build the necessary decl.
-  if (requirement->getName().str() == "==") {
+  if (requirement->getBaseName() == "==") {
     if (auto theEnum = dyn_cast<EnumDecl>(type))
       return deriveEquatable_enum_eq(tc, parentDecl, theEnum);
     else
@@ -476,7 +476,7 @@ ValueDecl *DerivedConformance::deriveHashable(TypeChecker &tc,
     return nullptr;
   
   // Build the necessary decl.
-  if (requirement->getName().str() == "hashValue") {
+  if (requirement->getBaseName() == "hashValue") {
     if (auto theEnum = dyn_cast<EnumDecl>(type))
       return deriveHashable_enum_hashValue(tc, parentDecl, theEnum);
     else

@@ -2277,7 +2277,7 @@ public:
             dumpRef(decl);
             Out << " is missing witness for "
                 << conformance->getProtocol()->getName().str() 
-                << "." << req->getName().str()
+                << "." << req->getBaseName()
                 << "\n";
             abort();
           }

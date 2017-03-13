@@ -86,7 +86,7 @@ namespace {
         os << "While deserializing ";
 
         if (auto VD = dyn_cast<ValueDecl>(DeclOrOffset.get())) {
-          os << "'" << VD->getName() << "' (" << IDAndKind{VD, ID} << ")";
+          os << "'" << VD->getBaseName() << "' (" << IDAndKind{VD, ID} << ")";
         } else if (auto ED = dyn_cast<ExtensionDecl>(DeclOrOffset.get())) {
           os << "extension of '" << ED->getExtendedType() << "' ("
              << IDAndKind{ED, ID} << ")";
@@ -3793,7 +3793,7 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
     if (!nominal) {
       XRefTracePath tinyTrace{*nominalOrError.get()->getModuleContext()};
       DeclName fullName = cast<ValueDecl>(nominalOrError.get())->getFullName();
-      tinyTrace.addValue(fullName.getBaseName());
+      tinyTrace.addValue(fullName.getBaseIdentifier());
       return llvm::make_error<XRefError>("declaration is not a nominal type",
                                          tinyTrace, fullName);
     }
