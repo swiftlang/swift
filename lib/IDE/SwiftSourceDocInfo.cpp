@@ -19,6 +19,7 @@
 #include "swift/IDE/CommentConversion.h"
 #include "swift/IDE/Utils.h"
 #include "swift/Markup/XMLUtils.h"
+#include "swift/Subsystems.h"
 
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/DeclObjC.h"
@@ -225,9 +226,11 @@ void ResolvedRangeInfo::print(llvm::raw_ostream &OS) {
     OS << "</Type>\n";
   }
 
-  OS << "<Context>";
-  printContext(OS, RangeContext);
-  OS << "</Context>\n";
+  if (RangeContext) {
+    OS << "<Context>";
+    printContext(OS, RangeContext);
+    OS << "</Context>\n";
+  }
 
   if (!HasSingleEntry) {
     OS << "<Entry>Multi</Entry>\n";
@@ -341,6 +344,9 @@ private:
       ContainedInRange(ContainedInRange) {}
   };
 
+  std::vector<Token> AllTokens;
+  Token &StartTok;
+  Token &EndTok;
   SourceLoc Start;
   SourceLoc End;
   StringRef Content;
@@ -412,43 +418,6 @@ private:
     return true;
   }
 
-  static SourceLoc getNonwhitespaceLocBefore(SourceManager &SM,
-                                             unsigned BufferID,
-                                             unsigned Offset) {
-    CharSourceRange entireRange = SM.getRangeForBuffer(BufferID);
-    StringRef Buffer = SM.extractText(entireRange);
-
-    const char *BufStart = Buffer.data();
-    if (Offset >= Buffer.size())
-      return SourceLoc();
-
-    for (unsigned Off = Offset; Off != 0; Off --) {
-      if (!clang::isWhitespace(*(BufStart + Off))) {
-        return SM.getLocForOffset(BufferID, Off);
-      }
-    }
-    return clang::isWhitespace(*BufStart) ? SourceLoc() :
-    SM.getLocForOffset(BufferID, 0);
-  }
-
-  static SourceLoc getNonwhitespaceLocAfter(SourceManager &SM,
-                                            unsigned BufferID,
-                                            unsigned Offset) {
-    CharSourceRange entireRange = SM.getRangeForBuffer(BufferID);
-    StringRef Buffer = SM.extractText(entireRange);
-
-    const char *BufStart = Buffer.data();
-    if (Offset >= Buffer.size())
-      return SourceLoc();
-
-    for (unsigned Off = Offset; Off < Buffer.size(); Off ++) {
-      if (!clang::isWhitespace(*(BufStart + Off))) {
-        return SM.getLocForOffset(BufferID, Off);
-      }
-    }
-    return SourceLoc();
-  }
-
   DeclContext *getImmediateContext() {
     for (auto It = ContextStack.rbegin(); It != ContextStack.rend(); It ++) {
       if (auto *DC = It->Parent.getAsDeclContext())
@@ -457,9 +426,14 @@ private:
     return static_cast<DeclContext*>(&File);
   }
 
-  Implementation(SourceFile &File, SourceLoc Start, SourceLoc End) :
-    File(File), Ctx(File.getASTContext()), SM(Ctx.SourceMgr), Start(Start),
-    End(End), Content(getContent()) {}
+  Implementation(SourceFile &File, std::vector<Token> AllTokens,
+                 unsigned StartIdx, unsigned EndIdx) :
+    File(File), Ctx(File.getASTContext()), SM(Ctx.SourceMgr),
+    AllTokens(AllTokens), StartTok(AllTokens[StartIdx]), EndTok(AllTokens[EndIdx]),
+    Start(StartTok.getLoc()), End(EndTok.getLoc()),
+    Content(getContent()) {
+      assert(Start.isValid() && End.isValid());
+  }
 
 public:
   bool hasResult() { return Result.hasValue(); }
@@ -490,14 +464,33 @@ public:
                                         unsigned Length) {
     SourceManager &SM = File.getASTContext().SourceMgr;
     unsigned BufferId = File.getBufferID().getValue();
-    SourceLoc StartLoc = Implementation::getNonwhitespaceLocAfter(SM, BufferId,
-                                                                  StartOff);
-    SourceLoc EndLoc = Implementation::getNonwhitespaceLocBefore(SM, BufferId,
-                                                         StartOff + Length - 1);
-    StartLoc = Lexer::getLocForStartOfToken(SM, StartLoc);
-    EndLoc = Lexer::getLocForStartOfToken(SM, EndLoc);
-    return StartLoc.isInvalid() || EndLoc.isInvalid() ? nullptr :
-      new Implementation(File, StartLoc, EndLoc);
+
+    LangOptions Opts = File.getASTContext().LangOpts;
+    Opts.AttachCommentsToDecls = true;
+    std::vector<Token> AllTokens = tokenize(Opts, SM, BufferId, 0, 0, false);
+    auto TokenComp = [&](Token &LHS, SourceLoc Loc) {
+      return SM.isBeforeInBuffer(LHS.getLoc(), Loc);
+    };
+
+    SourceLoc StartRaw = SM.getLocForOffset(BufferId, StartOff);
+    SourceLoc EndRaw = SM.getLocForOffset(BufferId, StartOff + Length);
+
+    // This points to the first token after or on the start loc.
+    auto StartIt = std::lower_bound(AllTokens.begin(), AllTokens.end(), StartRaw,
+                                    TokenComp);
+    // This points to the first token after or on the end loc;
+    auto EndIt = std::lower_bound(AllTokens.begin(), AllTokens.end(), EndRaw,
+                                  TokenComp);
+    // Erroneous case.
+    if (StartIt == AllTokens.end() || EndIt == AllTokens.begin())
+      return nullptr;
+
+    // The start token is inclusive.
+    unsigned StartIdx = StartIt - AllTokens.begin();
+
+    // The end token is exclusive.
+    unsigned EndIdx = EndIt - 1 - AllTokens.begin();
+    return new Implementation(File, std::move(AllTokens), StartIdx, EndIdx);
   }
 
   static Implementation *createInstance(SourceFile &File, SourceLoc Start,
@@ -728,7 +721,9 @@ private:
 
   StringRef getContent() {
     SourceManager &SM = File.getASTContext().SourceMgr;
-    return CharSourceRange(SM, Start, Lexer::getLocForEndOfToken(SM, End)).str();
+    return CharSourceRange(SM, StartTok.hasComment() ?
+                            StartTok.getCommentStart() : StartTok.getLoc(),
+                           Lexer::getLocForEndOfToken(SM, End)).str();
   }
 };
 
