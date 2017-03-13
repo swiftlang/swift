@@ -11,7 +11,11 @@
 //===----------------------------------------------------------------------===//
 
 import TestsUtils
+#if os(Linux)
+import Glibc
+#else
 import Darwin
+#endif
 
 var editWords: [String] = [
   "woodshed",
