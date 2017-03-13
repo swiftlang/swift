@@ -3,7 +3,7 @@
 
 // Extend a protocol with a property.
 extension Sequence {
-  final var myCount: Int {
+  var myCount: Int {
     var result = 0
     for _ in self {
       result += 1
@@ -17,7 +17,7 @@ print(["a", "b", "c", "d"].myCount)
 
 // Extend a protocol with a function.
 extension Collection {
-  final var myIndices: Range<Index> {
+  var myIndices: Range<Index> {
     return startIndex..<endIndex
   }
 
@@ -30,7 +30,7 @@ extension Collection {
 print(["a", "b", "c", "d"].clone().myCount)
 
 extension Sequence {
-  final public func myEnumerated() -> EnumeratedSequence<Self> {
+  public func myEnumerated() -> EnumeratedSequence<Self> {
     return self.enumerated()
   }
 }
@@ -43,7 +43,7 @@ for (index, element) in ["a", "b", "c"].myEnumerated() {
 }
 
 extension Sequence {
-  final public func myReduce<T>(
+  public func myReduce<T>(
     _ initial: T, combine: (T, Self.Iterator.Element) -> T
   ) -> T { 
     var result = initial
@@ -59,7 +59,7 @@ print([1, 2, 3, 4, 5].myReduce(0, combine: +))
 
 
 extension Sequence {
-  final public func myZip<S : Sequence>(_ s: S) -> Zip2Sequence<Self, S> {
+  public func myZip<S : Sequence>(_ s: S) -> Zip2Sequence<Self, S> {
     return Zip2Sequence(_sequence1: self, _sequence2: s)
   }
 }
@@ -75,14 +75,14 @@ for (a, b) in [1, 2, 3].myZip(["a", "b", "c"]) {
 extension MutableCollection
   where Self: RandomAccessCollection, Self.Iterator.Element : Comparable {
 
-  public final mutating func myPartition() -> Index {
+  public mutating func myPartition() -> Index {
     let first = self.first
     return self.partition(by: { $0 >= first! })
   }
 }
 
 extension RangeReplaceableCollection {
-  public final func myJoin<S : Sequence where S.Iterator.Element == Self>(
+  public func myJoin<S : Sequence where S.Iterator.Element == Self>(
     _ elements: S
   ) -> Self {
     var result = Self()
@@ -107,7 +107,7 @@ print(
 
 // Constrained extensions for specific types.
 extension Collection where Self.Iterator.Element == String {
-  final var myCommaSeparatedList: String {
+  var myCommaSeparatedList: String {
     if startIndex == endIndex { return "" }
 
     var result = ""
@@ -133,7 +133,7 @@ protocol ExistP1 {
 }
 
 extension ExistP1 {
-  final func runExistP1() {
+  func runExistP1() {
     print("runExistP1")
     self.existP1()
   }
@@ -167,7 +167,7 @@ protocol P {
 }
 
 extension P {
-  final var extValue: Bool {
+  var extValue: Bool {
     get { return getValue() }
     set(newValue) { setValue(newValue) }
   }

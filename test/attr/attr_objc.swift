@@ -1934,22 +1934,22 @@ class Load1 {
 // Members of protocol extensions cannot be @objc
 
 extension PlainProtocol {
-  @objc final var property: Int { return 5 } // expected-error{{@objc can only be used with members of classes, @objc protocols, and concrete extensions of classes}}
-  @objc final subscript(x: Int) -> Class_ObjC1 { return Class_ObjC1() } // expected-error{{@objc can only be used with members of classes, @objc protocols, and concrete extensions of classes}}
-  @objc final func fun() { } // expected-error{{@objc can only be used with members of classes, @objc protocols, and concrete extensions of classes}}
+  @objc var property: Int { return 5 } // expected-error{{@objc can only be used with members of classes, @objc protocols, and concrete extensions of classes}}
+  @objc subscript(x: Int) -> Class_ObjC1 { return Class_ObjC1() } // expected-error{{@objc can only be used with members of classes, @objc protocols, and concrete extensions of classes}}
+  @objc func fun() { } // expected-error{{@objc can only be used with members of classes, @objc protocols, and concrete extensions of classes}}
 }
 
 extension Protocol_ObjC1 {
-  @objc final var property: Int { return 5 } // expected-error{{@objc can only be used with members of classes, @objc protocols, and concrete extensions of classes}}
-  @objc final subscript(x: Int) -> Class_ObjC1 { return Class_ObjC1() } // expected-error{{@objc can only be used with members of classes, @objc protocols, and concrete extensions of classes}}
-  @objc final func fun() { } // expected-error{{@objc can only be used with members of classes, @objc protocols, and concrete extensions of classes}}
+  @objc var property: Int { return 5 } // expected-error{{@objc can only be used with members of classes, @objc protocols, and concrete extensions of classes}}
+  @objc subscript(x: Int) -> Class_ObjC1 { return Class_ObjC1() } // expected-error{{@objc can only be used with members of classes, @objc protocols, and concrete extensions of classes}}
+  @objc func fun() { } // expected-error{{@objc can only be used with members of classes, @objc protocols, and concrete extensions of classes}}
 }
 
 extension Protocol_ObjC1 {
   // Don't infer @objc for extensions of @objc protocols.
 
   // CHECK: {{^}} var propertyOK: Int
-  final var propertyOK: Int { return 5 }
+  var propertyOK: Int { return 5 }
 }
 
 //===---

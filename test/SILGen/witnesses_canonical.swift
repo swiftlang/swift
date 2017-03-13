@@ -14,7 +14,7 @@ struct _S<T : _CDT> : CT {
 }
 
 extension _CDT {
-  final subscript(b: Int) -> _S<Self> {
+  subscript(b: Int) -> _S<Self> {
     return _S(a: self, b: b)
   }
 }

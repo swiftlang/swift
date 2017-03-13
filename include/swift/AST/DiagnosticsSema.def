@@ -1988,6 +1988,9 @@ ERROR(override_static,none,
 ERROR(member_cannot_be_final,none,
       "only classes and class members may be marked with 'final'",
       ())
+WARNING(protocol_extension_cannot_be_final,none,
+      "functions in a protocol extension do not need to be marked with 'final'",
+      ())
 
 ERROR(final_not_allowed_here,none,
       "'final' may only be applied to classes, properties, methods, and "
