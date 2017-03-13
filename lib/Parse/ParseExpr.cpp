@@ -1766,8 +1766,18 @@ ParserResult<Expr> Parser::parseExprStringLiteral() {
       
       // No leading label means a `forInterpolation:` label. (The constraint solver 
       // will also consider no-leading-label candidates.)
-      if(!argLabels.empty() && argLabels[0].empty()) {
-        argLabels[0] = Context.Id_forInterpolation;
+      if (!args.empty()) {
+        // If none of the arguments have labels, `argLabels` is empty. Why? 
+        // I don't know.
+        if (argLabels.empty()) {
+          argLabels.resize(args.size());
+          argLabelLocs.resize(args.size());
+        }
+        
+        if (argLabels[0].empty()) {
+          argLabels[0] = Context.Id_forInterpolation;
+          argLabelLocs[0] = args[0]->getStartLoc();
+        }
       }
       
       // If you change this line, make sure you also change 
