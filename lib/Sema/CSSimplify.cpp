@@ -117,13 +117,13 @@ static ConstraintSystem::TypeMatchOptions getDefaultDecompositionOptions(
   return flags | ConstraintSystem::TMF_GenerateConstraints;
 }
 
-static bool paramLabelMatchesArg(Identifier expectedName, CallArgParam arg) {
-    if (expectedName == arg.Label) {
+static bool paramLabelMatchesArg(Identifier paramLabel, CallArgParam arg) {
+    if (paramLabel == arg.Label) {
       return true;
     }
     
     // FIXME: This is a quick-and-dirty hack in several different ways.
-    bool isFullWidth = !expectedName.empty();
+    bool isFullWidth = !paramLabel.empty();
     bool matchingForInterpolation = arg.hasLabel() && arg.Label.str() == "forInterpolation";
     
     return isFullWidth && matchingForInterpolation;
@@ -219,7 +219,7 @@ matchCallArguments(ArrayRef<CallArgParam> args,
 
     // If the name matches, claim this argument.
     if (nextArgIdx != numArgs &&
-        (ignoreNameMismatch || args[nextArgIdx].Label == name)) {
+        (ignoreNameMismatch || paramLabelMatchesArg(name, args[nextArgIdx]))) {
       return claim(name, nextArgIdx);
     }
 
@@ -228,7 +228,7 @@ matchCallArguments(ArrayRef<CallArgParam> args,
     Optional<unsigned> claimedWithSameName;
     for (unsigned i = nextArgIdx; i != numArgs; ++i) {
       // Skip arguments where the name doesn't match.
-      if (args[i].Label != name)
+      if (!paramLabelMatchesArg(name, args[i]))
         continue;
 
       // Skip claimed arguments.
