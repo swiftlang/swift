@@ -13,7 +13,7 @@
 // LITERAL1-DAG:      Decl[InstanceVar]/CurrNominal:      bigEndian[#Int#]; name=bigEndian{{$}}
 // LITERAL1-DAG:      Decl[InstanceVar]/CurrNominal:      littleEndian[#Int#]; name=littleEndian{{$}}
 // LITERAL1-DAG:      Decl[InstanceVar]/CurrNominal:      byteSwapped[#Int#]; name=byteSwapped{{$}}
-// LITERAL1-DAG:      Decl[InstanceVar]/CurrNominal:      popcount[#Int#]; name=popcount{{$}}
+// LITERAL1-DAG:      Decl[InstanceVar]/CurrNominal:      nonzeroBitCount[#Int#]; name=nonzeroBitCount{{$}}
 
 {
   1.1.#^LITERAL2^#

@@ -10,7 +10,7 @@ var x: Int
 // CHECK-STDLIB-NOT: extension _SwiftNSOperatingSystemVersion
 // CHECK-STDLIB: struct Int : FixedWidthInteger, SignedInteger {
 // CHECK-STDLIB:   static var bitWidth: Int { get }
-// CHECK-STDLIB:   var popcount: Int { get }
+// CHECK-STDLIB:   var nonzeroBitCount: Int { get }
 // CHECK-STDLIB: }
 
 // Check that extensions of nested decls are showing up.

@@ -306,7 +306,7 @@ public struct _BigInt<Word: FixedWidthInteger & UnsignedInteger> :
     }
 
     // If `rhs` is a power of two, can just left shift `self`.
-    let rhsLSB = rhs.trailingZeroBits
+    let rhsLSB = rhs.trailingZeroBitCount
     if rhs >> rhsLSB == 1 {
       self <<= rhsLSB
       return
@@ -337,7 +337,7 @@ public struct _BigInt<Word: FixedWidthInteger & UnsignedInteger> :
     }
 
     // If `rhs` is a power of two, can just right shift `self`.
-    let rhsLSB = rhs.trailingZeroBits
+    let rhsLSB = rhs.trailingZeroBitCount
     if rhs >> rhsLSB == 1 {
       defer { self >>= rhsLSB }
       return _data[0] & ~(~0 << rhsLSB)
@@ -617,7 +617,7 @@ public struct _BigInt<Word: FixedWidthInteger & UnsignedInteger> :
     }
 
     // Is the highest bit set?
-    isNegative = _twosComplementData.last!.leadingZeroBits == 0
+    isNegative = _twosComplementData.last!.leadingZeroBitCount == 0
     if isNegative {
       _data = _twosComplementData.map(~)
       self._unsignedAdd(1 as Word)
@@ -633,7 +633,7 @@ public struct _BigInt<Word: FixedWidthInteger & UnsignedInteger> :
     // * Nonnegative values are already in 2's complement
     if !isNegative {
       // Positive values need to have a leading zero bit
-      if _data.last?.leadingZeroBits == 0 {
+      if _data.last?.leadingZeroBitCount == 0 {
         return _data + [0]
       } else {
         return _data
@@ -645,7 +645,7 @@ public struct _BigInt<Word: FixedWidthInteger & UnsignedInteger> :
     var x = self
     x._unsignedSubtract(1 as Word)
 
-    if x._data.last!.leadingZeroBits == 0 {
+    if x._data.last!.leadingZeroBitCount == 0 {
       // The highest bit is set to 1, which moves to 0 after negation.
       // We need to add another word at the high end so the highest bit is 1.
       return x._data.map(~) + [Word.max]
@@ -702,7 +702,7 @@ public struct _BigInt<Word: FixedWidthInteger & UnsignedInteger> :
 
       // If positive, need to make space for at least one zero on high end
       return twosComplementData.count * Word.bitWidth
-        - twosComplementData.last!.leadingZeroBits + 1
+        - twosComplementData.last!.leadingZeroBitCount + 1
     }
   }
 
@@ -710,14 +710,14 @@ public struct _BigInt<Word: FixedWidthInteger & UnsignedInteger> :
   /// value's binary representation.
   ///
   /// The numbers 1 and zero have zero trailing zeros.
-  public var trailingZeroBits: Int {
+  public var trailingZeroBitCount: Int {
     guard !isZero else {
       return 0
     }
 
     let i = _data.index(where: { $0 != 0 })!
     _sanityCheck(_data[i] != 0)
-    return i * Word.bitWidth + _data[i].trailingZeroBits
+    return i * Word.bitWidth + _data[i].trailingZeroBitCount
   }
 
   public static func %=(lhs: inout _BigInt, rhs: _BigInt) {
@@ -865,7 +865,7 @@ public struct _BigInt<Word: FixedWidthInteger & UnsignedInteger> :
     }
 
     var (x, y) = (self.magnitude, other.magnitude)
-    let (xLSB, yLSB) = (x.trailingZeroBits, y.trailingZeroBits)
+    let (xLSB, yLSB) = (x.trailingZeroBitCount, y.trailingZeroBitCount)
 
     // Remove any common factor of two
     let commonPower = Swift.min(xLSB, yLSB)
@@ -888,7 +888,7 @@ public struct _BigInt<Word: FixedWidthInteger & UnsignedInteger> :
 
       // Subtract smaller and remove any factors of two
       x._unsignedSubtract(y)
-      x >>= x.trailingZeroBits
+      x >>= x.trailingZeroBitCount
     }
 
     // Add original common factor of two back into result
@@ -1252,8 +1252,8 @@ struct Bit : FixedWidthInteger, UnsignedInteger {
     return 1
   }
 
-  var trailingZeroBits: Int {
-    return value.trailingZeroBits
+  var trailingZeroBitCount: Int {
+    return value.trailingZeroBitCount
   }
 
   static var max: Bit {
@@ -1268,12 +1268,12 @@ struct Bit : FixedWidthInteger, UnsignedInteger {
     return false
   }
 
-  var popcount: Int {
-    return value.popcount
+  var nonzeroBitCount: Int {
+    return value.nonzeroBitCount
   }
 
-  var leadingZeroBits: Int {
-    return value.popcount - 7
+  var leadingZeroBitCount: Int {
+    return value.nonzeroBitCount - 7
   }
 
   var bigEndian: Bit {

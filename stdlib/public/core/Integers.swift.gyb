@@ -1488,8 +1488,8 @@ public protocol BinaryInteger :
   ///
   ///     let x = Int8(bitPattern: 0b1111_1000)
   ///     // x == -8
-  ///     // x.trailingZeroBits == 3
-  var trailingZeroBits: Int { get }
+  ///     // x.trailingZeroBitCount == 3
+  var trailingZeroBitCount: Int { get }
 
 % for x in chain(*binaryArithmetic.values()):
   // defaulted using an in-place counterpart, but can be used as an
@@ -2102,8 +2102,8 @@ ${overflowOperationComment(x.operator)}
   ///
   ///     let x: Int8 = 0b0001_1111
   ///     // x == 31
-  ///     // x.popcount == 5
-  var popcount: Int { get }
+  ///     // x.nonzeroBitCount == 5
+  var nonzeroBitCount: Int { get }
 
   /// The number of leading zeros in this value's binary representation.
   ///
@@ -2112,8 +2112,8 @@ ${overflowOperationComment(x.operator)}
   ///
   ///     let x: Int8 = 0b0001_1111
   ///     // x == 31
-  ///     // x.leadingZeroBits == 3
-  var leadingZeroBits: Int { get }
+  ///     // x.leadingZeroBitCount == 3
+  var leadingZeroBitCount: Int { get }
 
   /// Creates an integer from its big-endian representation, changing the byte
   /// order if necessary.
@@ -2828,7 +2828,7 @@ ${operatorComment(x.operator, True)}
   public var bitWidth: Int { return ${bits} }
 
   @_transparent
-  public var leadingZeroBits: Int {
+  public var leadingZeroBitCount: Int {
     return Int(
       ${Self}(
         Builtin.int_ctlz_Int${bits}(self._value, false._value)
@@ -2836,7 +2836,7 @@ ${operatorComment(x.operator, True)}
   }
 
   @_transparent
-  public var trailingZeroBits: Int {
+  public var trailingZeroBitCount: Int {
     return Int(
       ${Self}(
         Builtin.int_cttz_Int${bits}(self._value, false._value)
@@ -2844,7 +2844,7 @@ ${operatorComment(x.operator, True)}
   }
 
   @_transparent
-  public var popcount: Int {
+  public var nonzeroBitCount: Int {
     return Int(
       ${Self}(
         Builtin.int_ctpop_Int${bits}(self._value)
@@ -3438,15 +3438,15 @@ public struct DoubleWidth<T : FixedWidthInteger>
     return "(\(_storage.high), \(_storage.low))"
   }
 
-  public var leadingZeroBits: Int {
+  public var leadingZeroBitCount: Int {
     fatalError()
   }
 
-  public var trailingZeroBits: Int {
+  public var trailingZeroBitCount: Int {
     fatalError()
   }
 
-  public var popcount: Int {
+  public var nonzeroBitCount: Int {
     fatalError()
   }
 

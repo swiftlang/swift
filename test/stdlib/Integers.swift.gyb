@@ -240,17 +240,17 @@ tests.test("MinMax") {
 }
 
 tests.test("CountLeadingZeros") {
-  expectEqual(0, UInt8.max.leadingZeroBits)
-  expectEqual(8, UInt8.min.leadingZeroBits)
-  expectEqual(1, Int8.max.leadingZeroBits)
-  expectEqual(0, Int8.min.leadingZeroBits)
+  expectEqual(0, UInt8.max.leadingZeroBitCount)
+  expectEqual(8, UInt8.min.leadingZeroBitCount)
+  expectEqual(1, Int8.max.leadingZeroBitCount)
+  expectEqual(0, Int8.min.leadingZeroBitCount)
 }
 
 tests.test("CountTrainlingZeros") {
-  expectEqual(0, UInt8.max.trailingZeroBits)
-  expectEqual(8, UInt8.min.trailingZeroBits)
-  expectEqual(0, Int8.max.trailingZeroBits)
-  expectEqual(7, Int8.min.trailingZeroBits)
+  expectEqual(0, UInt8.max.trailingZeroBitCount)
+  expectEqual(8, UInt8.min.trailingZeroBitCount)
+  expectEqual(0, Int8.max.trailingZeroBitCount)
+  expectEqual(7, Int8.min.trailingZeroBitCount)
 }
 
 tests.test("Conversion8to16") {

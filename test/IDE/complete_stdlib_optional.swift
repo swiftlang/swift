@@ -108,11 +108,11 @@ class ObjcClass {
 // UN_OPT_DOT_FOOSTRUCT: End completions
 
 // UN_OPT_NO_DOT_INT: Begin completions
-// UN_OPT_NO_DOT_INT-DAG: Decl[InstanceVar]/CurrNominal: .popcount[#Int#]{{; name=.+$}}
+// UN_OPT_NO_DOT_INT-DAG: Decl[InstanceVar]/CurrNominal: .nonzeroBitCount[#Int#]{{; name=.+$}}
 // UN_OPT_NO_DOT_INT: End completions
 
 // UN_OPT_DOT_INT: Begin completions
-// UN_OPT_DOT_INT-DAG: Decl[InstanceVar]/CurrNominal: popcount[#Int#]{{; name=.+$}}
+// UN_OPT_DOT_INT-DAG: Decl[InstanceVar]/CurrNominal: nonzeroBitCount[#Int#]{{; name=.+$}}
 // UN_OPT_DOT_INT: End completions
 
 // OPT_NO_DOT_OBJCCLASS: Begin completions
