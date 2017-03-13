@@ -166,3 +166,16 @@ SILInstruction *SILGlobalVariable::getValueOfStaticInitializer() {
     return SI;
   return nullptr;
 }
+
+/// Return whether this variable corresponds to a Clang node.
+bool SILGlobalVariable::hasClangNode() const {
+  return (VDecl ? VDecl->hasClangNode() : false);
+}
+
+/// Return the Clang node associated with this variable if it has one.
+ClangNode SILGlobalVariable::getClangNode() const {
+  return (VDecl ? VDecl->getClangNode() : ClangNode());
+}
+const clang::Decl *SILGlobalVariable::getClangDecl() const {
+  return (VDecl ? VDecl->getClangDecl() : nullptr);
+}

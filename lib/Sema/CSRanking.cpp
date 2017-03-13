@@ -16,6 +16,7 @@
 //===----------------------------------------------------------------------===//
 #include "ConstraintSystem.h"
 #include "swift/AST/ProtocolConformance.h"
+#include "swift/AST/ParameterList.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/Compiler.h"
 

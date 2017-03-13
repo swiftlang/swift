@@ -409,6 +409,12 @@ bool SILDeclRef::isClangGenerated(ClangNode node) {
   return false;
 }
 
+bool SILDeclRef::isImplicit() const {
+  if (hasDecl())
+    return getDecl()->isImplicit();
+  return getAbstractClosureExpr()->isImplicit();
+}
+
 SILLinkage SILDeclRef::getLinkage(ForDefinition_t forDefinition) const {
   // Anonymous functions have shared linkage.
   // FIXME: This should really be the linkage of the parent function.
@@ -465,6 +471,35 @@ SILDeclRef SILDeclRef::getDefaultArgGenerator(Loc loc,
   result.kind = Kind::DefaultArgGenerator;
   result.defaultArgIndex = defaultArgIndex;
   return result;
+}
+
+bool SILDeclRef::hasClosureExpr() const {
+  return loc.is<AbstractClosureExpr *>()
+    && isa<ClosureExpr>(getAbstractClosureExpr());
+}
+
+bool SILDeclRef::hasAutoClosureExpr() const {
+  return loc.is<AbstractClosureExpr *>()
+    && isa<AutoClosureExpr>(getAbstractClosureExpr());
+}
+
+bool SILDeclRef::hasFuncDecl() const {
+  return loc.is<ValueDecl *>() && isa<FuncDecl>(getDecl());
+}
+
+ClosureExpr *SILDeclRef::getClosureExpr() const {
+  return dyn_cast<ClosureExpr>(getAbstractClosureExpr());
+}
+AutoClosureExpr *SILDeclRef::getAutoClosureExpr() const {
+  return dyn_cast<AutoClosureExpr>(getAbstractClosureExpr());
+}
+
+FuncDecl *SILDeclRef::getFuncDecl() const {
+  return dyn_cast<FuncDecl>(getDecl());
+}
+
+AbstractFunctionDecl *SILDeclRef::getAbstractFunctionDecl() const {
+  return dyn_cast<AbstractFunctionDecl>(getDecl());
 }
 
 /// \brief True if the function should be treated as transparent.
@@ -873,6 +908,16 @@ std::string SILDeclRef::mangle(ManglingKind MKind) const {
   std::string New = mangleConstant(*this, MKind);
 
   return NewMangling::selectMangling(Old, New);
+}
+
+SILDeclRef SILDeclRef::getOverridden() const {
+  if (!hasDecl())
+    return SILDeclRef();
+  auto overridden = getDecl()->getOverriddenDecl();
+  if (!overridden)
+    return SILDeclRef();
+
+  return SILDeclRef(overridden, kind, getResilienceExpansion(), uncurryLevel);
 }
 
 SILDeclRef SILDeclRef::getNextOverriddenVTableEntry() const {

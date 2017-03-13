@@ -11,7 +11,10 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Index/IndexSymbol.h"
-#include "swift/AST/AST.h"
+#include "swift/AST/ASTContext.h"
+#include "swift/AST/Decl.h"
+#include "swift/AST/ParameterList.h"
+#include "swift/AST/Types.h"
 
 using namespace swift;
 using namespace swift::index;

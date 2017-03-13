@@ -145,17 +145,12 @@ public:
   SILInstruction *getValueOfStaticInitializer();
 
   /// Return whether this variable corresponds to a Clang node.
-  bool hasClangNode() const {
-    return (VDecl ? VDecl->hasClangNode() : false);
-  }
+  bool hasClangNode() const;
 
   /// Return the Clang node associated with this variable if it has one.
-  ClangNode getClangNode() const {
-    return (VDecl ? VDecl->getClangNode() : ClangNode());
-  }
-  const clang::Decl *getClangDecl() const {
-    return (VDecl ? VDecl->getClangDecl() : nullptr);
-  }
+  ClangNode getClangNode() const;
+
+  const clang::Decl *getClangDecl() const;
 
   //===--------------------------------------------------------------------===//
   // Miscellaneous
