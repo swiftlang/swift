@@ -1243,7 +1243,7 @@ namespace {
         return nullptr;
       }
       
-      // FIXME: Protect against broken standard library.
+      // Find the associated type it uses for interpolated segments.
       auto interpolationAssociatedTypes = 
                           interpolationProto->lookupDirect(
                             CS.getASTContext().Id_StringInterpolationSegmentType);
