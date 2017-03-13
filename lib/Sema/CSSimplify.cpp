@@ -120,8 +120,8 @@ static ConstraintSystem::TypeMatchOptions getDefaultDecompositionOptions(
 static bool matchesOptionalLabel(Identifier expectedName, unsigned argNumber, ArrayRef<CallArgParam> args) {
     // FIXME: This is a quick-and-dirty hack in several different ways.
     bool isFirst = argNumber == 0;
-    bool isFullWidth = !args[argNumber].hasLabel();
-    bool matchingForInterpolation = expectedName.str() == "forInterpolation";
+    bool isFullWidth = !expectedName.empty();
+    bool matchingForInterpolation = args[argNumber].hasLabel() && args[argNumber].Label.str() == "forInterpolation";
     
     return isFirst && isFullWidth && matchingForInterpolation;
 }
