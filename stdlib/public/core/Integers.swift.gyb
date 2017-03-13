@@ -2169,6 +2169,9 @@ extension FixedWidthInteger {
   /// [fixed point]:http://en.wikipedia.org/wiki/Fixed_point_(mathematics)
   @available(swift, deprecated: 3.1, obsoleted: 4.0, message: "Use 0")
   public static var allZeros: Self { return 0 }
+
+  public var bitWidth: Int { return Self.bitWidth }
+
 }
 
 //===----------------------------------------------------------------------===//
@@ -2823,8 +2826,6 @@ ${operatorComment(x.operator, True)}
   @_transparent
   public static var bitWidth : Int { return ${bits} }
 
-  public var bitWidth: Int { return ${bits} }
-
   @_transparent
   public var leadingZeroBitCount: Int {
     return Int(
@@ -3294,10 +3295,6 @@ public struct DoubleWidth<T : FixedWidthInteger>
 
   public static var isSigned: Bool {
     return T.isSigned
-  }
-
-  public var bitWidth : Int {
-    return 2 * T.bitWidth
   }
 
   // fixed width
