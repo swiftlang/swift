@@ -117,17 +117,16 @@ static ConstraintSystem::TypeMatchOptions getDefaultDecompositionOptions(
   return flags | ConstraintSystem::TMF_GenerateConstraints;
 }
 
-static bool paramLabelMatchesArg(Identifier expectedName, unsigned argNumber, ArrayRef<CallArgParam> args) {
-    if (expectedName == args[argNumber].Label) {
+static bool paramLabelMatchesArg(Identifier expectedName, CallArgParam arg) {
+    if (expectedName == arg.Label) {
       return true;
     }
     
     // FIXME: This is a quick-and-dirty hack in several different ways.
-    bool isFirst = argNumber == 0;
     bool isFullWidth = !expectedName.empty();
-    bool matchingForInterpolation = args[argNumber].hasLabel() && args[argNumber].Label.str() == "forInterpolation";
+    bool matchingForInterpolation = arg.hasLabel() && arg.Label.str() == "forInterpolation";
     
-    return isFirst && isFullWidth && matchingForInterpolation;
+    return isFullWidth && matchingForInterpolation;
 }
 
 bool constraints::
@@ -165,7 +164,7 @@ matchCallArguments(ArrayRef<CallArgParam> args,
     if (!actualArgNames.empty()) {
       // We're recording argument names; record this one.
       actualArgNames[argNumber] = expectedName;
-    } else if (!paramLabelMatchesArg(expectedName, args, argNumber) && !ignoreNameClash) {
+    } else if (!paramLabelMatchesArg(expectedName, args[argNumber]) && !ignoreNameClash) {
       // We have an argument name mismatch. Start recording argument names.
       actualArgNames.resize(numArgs);
 
