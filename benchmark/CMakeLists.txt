@@ -35,6 +35,7 @@ set(SWIFT_BENCH_MODULES
     single-source/CharacterLiteralsSmall
     single-source/Chars
     single-source/ClassArrayGetter
+    single-source/CString
     single-source/DeadArray
     single-source/DictTest
     single-source/DictTest2
@@ -93,7 +94,9 @@ set(SWIFT_BENCH_MODULES
     single-source/StrComplexWalk
     single-source/StrToInt
     single-source/StringBuilder
+    single-source/StringEdits
     single-source/StringInterpolation
+    single-source/StringMatch
     single-source/StringTests
     single-source/StringWalk
     single-source/SuperChars
