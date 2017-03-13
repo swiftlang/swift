@@ -40,11 +40,11 @@ extension String : _ExpressibleByStringInterpolation {
   /// interpreting string interpolations.
   ///
   /// - SeeAlso: `ExpressibleByStringInterpolation`
-  public init<T>(stringInterpolationSegment expr: T) {
-    self = String(describing: expr)
+  public init(stringInterpolationSegment segment: String) {
+    self = segment
   }
   
-  public init<T>(forInterpolation expr: T) {
+  public init<T> (forInterpolation expr: T) {
     self = String(describing: expr)
   }
 
