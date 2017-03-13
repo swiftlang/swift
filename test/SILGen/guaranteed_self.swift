@@ -445,7 +445,7 @@ public protocol SequenceDefaults {
 }
 
 extension SequenceDefaults {
-  public final func _constrainElement(_: FakeGenerator.Element) {}
+  public func _constrainElement(_: FakeGenerator.Element) {}
 }
 
 public protocol Sequence : SequenceDefaults {
