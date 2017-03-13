@@ -340,9 +340,12 @@ static ManagedValue emitCastToReferenceType(SILGenFunction &gen,
     SILValue undef = SILUndef::get(objPointerType, gen.SGM.M);
     return ManagedValue::forUnmanaged(undef);
   }
-
-  // Grab the argument.
-  ManagedValue arg = args[0];
+  
+  // Save the cleanup on the argument so we can forward it onto the cast
+  // result.
+  auto cleanup = args[0].getCleanup();
+  
+  SILValue arg = args[0].getValue();
 
   // If the argument is existential, open it.
   if (substitutions[0].getReplacement()->isClassExistentialType()) {
@@ -350,11 +353,12 @@ static ManagedValue emitCastToReferenceType(SILGenFunction &gen,
       = ArchetypeType::getOpened(substitutions[0].getReplacement());
     SILType loweredOpenedTy = gen.getLoweredLoadableType(openedTy);
     arg = gen.B.createOpenExistentialRef(loc, arg, loweredOpenedTy);
-    gen.setArchetypeOpeningSite(openedTy, arg.getValue());
+    gen.setArchetypeOpeningSite(openedTy, arg);
   }
 
-  // Return the cast result.
-  return gen.B.createUncheckedRefCast(loc, arg, objPointerType);
+  SILValue result = gen.B.createUncheckedRefCast(loc, arg, objPointerType);
+  // Return the cast result with the original cleanup.
+  return ManagedValue(result, cleanup);
 }
 
 /// Specialized emitter for Builtin.castToNativeObject.
