@@ -1059,10 +1059,6 @@ extension Sequence {
   }
 }
 
-internal enum _StopIteration : Error {
-  case stop
-}
-
 extension Sequence {
   /// Returns the first element of the sequence that satisfies the given
   /// predicate.
@@ -1084,16 +1080,12 @@ extension Sequence {
   public func first(
     where predicate: (Iterator.Element) throws -> Bool
   ) rethrows -> Iterator.Element? {
-    var foundElement: Iterator.Element?
-    do {
-      try self.forEach {
-        if try predicate($0) {
-          foundElement = $0
-          throw _StopIteration.stop
-        }
+    for element in self {
+      if try predicate(element) {
+        return element
       }
-    } catch is _StopIteration { }
-    return foundElement
+    }
+    return nil
   }
 }
 
