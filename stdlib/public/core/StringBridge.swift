@@ -193,12 +193,10 @@ extension String {
 open class _SwiftNativeNSString {}
 
 
+/// Core requirements that should be implemented by any performant NSString
+/// subclass.
 @objc
 public protocol _NSStringCore : _NSCopying {
-
-  // The following methods should be overridden when implementing an
-  // NSString subclass.
-
   func length() -> Int
 
   func characterAtIndex(_ index: Int) -> UInt16

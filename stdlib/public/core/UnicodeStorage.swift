@@ -322,8 +322,7 @@ extension UnicodeStorage : _UTextable {
         let chunkSource
           = _parsedSlice(nativeTargetIndex, codeUnits.prefix(upTo:))
 
-        // FIXME: must call reversed twice below because zip won't return a
-        // BidirectionalCollection... which might be hard!
+        // Transcode the source in reverse, filling the buffer forward
         for (i, scalar) in zip(
           chunkSource.indices.reversed(), chunkSource.reversed()) {
           
@@ -337,6 +336,7 @@ extension UnicodeStorage : _UTextable {
           u.chunkNativeStart = codeUnits.offset(of: i.base)^
           u.chunkOffset = u.chunkLength
         }
+        // Reverse the buffer contents to get everything in the right order.
         var b = buffer // copy due to https://bugs.swift.org/browse/SR-3782
         b[..<buffer.index(atOffset: u.chunkLength)].reverse()
       }
