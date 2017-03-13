@@ -342,6 +342,8 @@ LookupTypeResult TypeChecker::lookupMemberType(DeclContext *dc,
 
     // If we're looking up a member of a protocol, we must take special care.
     if (typeDecl->getDeclContext()->getAsProtocolOrProtocolExtensionContext()) {
+      auto memberType = typeDecl->getDeclaredInterfaceType();
+
       // We don't allow lookups of an associated type or typealias of an
       // existential type, because we have no way to represent such types.
       //
@@ -349,8 +351,6 @@ LookupTypeResult TypeChecker::lookupMemberType(DeclContext *dc,
       if (type->isExistentialType() &&
           (isa<TypeAliasDecl>(typeDecl) ||
            isa<AssociatedTypeDecl>(typeDecl))) {
-        auto memberType = typeDecl->getDeclaredInterfaceType();
-
         if (memberType->hasTypeParameter()) {
           // If we haven't seen this type result yet, add it to the result set.
           if (types.insert(memberType->getCanonicalType()).second)
@@ -366,7 +366,17 @@ LookupTypeResult TypeChecker::lookupMemberType(DeclContext *dc,
       if (auto assocType = dyn_cast<AssociatedTypeDecl>(typeDecl)) {
         if (!type->is<ArchetypeType>() &&
             !type->isTypeParameter()) {
-          inferredAssociatedTypes.push_back(assocType);
+          if (options.contains(NameLookupFlags::PerformConformanceCheck))
+            inferredAssociatedTypes.push_back(assocType);
+          continue;
+        }
+      }
+
+      if (auto aliasType = dyn_cast<TypeAliasDecl>(typeDecl)) {
+        if (!type->is<ArchetypeType>() &&
+            !type->isTypeParameter() &&
+            memberType->hasTypeParameter() &&
+            !options.contains(NameLookupFlags::PerformConformanceCheck)) {
           continue;
         }
       }
