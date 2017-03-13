@@ -4383,46 +4383,29 @@ inline GenericTypeParamType *TypeBase::getRootGenericParam() {
 }
 
 inline bool TypeBase::isExistentialType() {
-  return getCanonicalType().isExistentialType();
+  return is<ProtocolType>() || is<ProtocolCompositionType>();
 }
 
 inline bool TypeBase::isAnyExistentialType() {
-  return getCanonicalType().isAnyExistentialType();
-}
-
-inline bool CanType::isExistentialTypeImpl(CanType type) {
-  return isa<ProtocolType>(type) || isa<ProtocolCompositionType>(type);
-}
-
-inline bool CanType::isAnyExistentialTypeImpl(CanType type) {
-  return isExistentialTypeImpl(type) || isa<ExistentialMetatypeType>(type);
+  return isExistentialType() || is<ExistentialMetatypeType>();
 }
 
 inline bool TypeBase::isClassExistentialType() {
-  CanType T = getCanonicalType();
-  if (auto pt = dyn_cast<ProtocolType>(T))
+  if (auto pt = getAs<ProtocolType>())
     return pt->requiresClass();
-  if (auto pct = dyn_cast<ProtocolCompositionType>(T))
+  if (auto pct = getAs<ProtocolCompositionType>())
     return pct->requiresClass();
   return false;
 }
 
 inline bool TypeBase::isOpenedExistential() {
-  if (!hasOpenedExistential())
-    return false;
-
-  CanType T = getCanonicalType();
-  if (auto archetype = dyn_cast<ArchetypeType>(T))
+  if (auto archetype = getAs<ArchetypeType>())
     return !archetype->getOpenedExistentialType().isNull();
   return false;
 }
 
 inline bool TypeBase::isOpenedExistentialWithError() {
-  if (!hasOpenedExistential())
-    return false;
-
-  CanType T = getCanonicalType();
-  if (auto archetype = dyn_cast<ArchetypeType>(T)) {
+  if (auto archetype = getAs<ArchetypeType>()) {
     auto openedExistentialType = archetype->getOpenedExistentialType();
     return (!openedExistentialType.isNull() &&
             openedExistentialType->isExistentialWithError());
@@ -4431,42 +4414,30 @@ inline bool TypeBase::isOpenedExistentialWithError() {
 }
 
 inline ClassDecl *TypeBase::getClassOrBoundGenericClass() {
-  return getCanonicalType().getClassOrBoundGenericClass();
-}
-
-inline ClassDecl *CanType::getClassOrBoundGenericClass() const {
-  if (auto classTy = dyn_cast<ClassType>(*this))
+  if (auto classTy = getAs<ClassType>())
     return classTy->getDecl();
 
-  if (auto boundTy = dyn_cast<BoundGenericClassType>(*this))
+  if (auto boundTy = getAs<BoundGenericClassType>())
     return boundTy->getDecl();
 
   return nullptr;
 }
 
 inline StructDecl *TypeBase::getStructOrBoundGenericStruct() {
-  return getCanonicalType().getStructOrBoundGenericStruct();
-}
-
-inline StructDecl *CanType::getStructOrBoundGenericStruct() const {
-  if (auto structTy = dyn_cast<StructType>(*this))
+  if (auto structTy = getAs<StructType>())
     return structTy->getDecl();
 
-  if (auto boundTy = dyn_cast<BoundGenericStructType>(*this))
+  if (auto boundTy = getAs<BoundGenericStructType>())
     return boundTy->getDecl();
   
   return nullptr;
 }
 
 inline EnumDecl *TypeBase::getEnumOrBoundGenericEnum() {
-  return getCanonicalType().getEnumOrBoundGenericEnum();
-}
-
-inline EnumDecl *CanType::getEnumOrBoundGenericEnum() const {
-  if (auto enumTy = dyn_cast<EnumType>(*this))
+  if (auto enumTy = getAs<EnumType>())
     return enumTy->getDecl();
 
-  if (auto boundTy = dyn_cast<BoundGenericEnumType>(*this))
+  if (auto boundTy = getAs<BoundGenericEnumType>())
     return boundTy->getDecl();
   
   return nullptr;
@@ -4504,10 +4475,8 @@ inline GenericTypeDecl *TypeBase::getAnyGeneric() {
   return getCanonicalType().getAnyGeneric();
 }
 
-  
-  
 inline bool TypeBase::isBuiltinIntegerType(unsigned n) {
-  if (auto intTy = dyn_cast<BuiltinIntegerType>(getCanonicalType()))
+  if (auto intTy = getAs<BuiltinIntegerType>())
     return intTy->getWidth().isFixedWidth()
       && intTy->getWidth().getFixedWidth() == n;
   return false;
@@ -4564,20 +4533,12 @@ inline CanType CanType::getLValueOrInOutObjectTypeImpl(CanType type) {
   return type;
 }
 
-inline CanType CanType::getNominalParent() const {
-  if (auto classType = dyn_cast<NominalType>(*this)) {
-    return classType.getParent();
-  } else {
-    return cast<BoundGenericType>(*this).getParent();
-  }
-}
-
 inline bool TypeBase::mayHaveSuperclass() {
   if (getClassOrBoundGenericClass())
     return true;
 
   if (auto archetype = getAs<ArchetypeType>())
-    return (bool)archetype->requiresClass();
+    return archetype->requiresClass();
 
   return is<DynamicSelfType>();
 }

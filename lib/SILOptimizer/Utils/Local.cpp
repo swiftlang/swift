@@ -1709,12 +1709,12 @@ optimizeBridgedCasts(SILInstruction *Inst,
   // ensure that types are not existential,
   // and that one of the types is a class and another
   // one is a struct.
-  if (source.isAnyExistentialType() ||
-      target.isAnyExistentialType() ||
-      (source.getClassOrBoundGenericClass() &&
-       !target.getStructOrBoundGenericStruct()) ||
-      (target.getClassOrBoundGenericClass() &&
-       !source.getStructOrBoundGenericStruct()))
+  if (source->isAnyExistentialType() ||
+      target->isAnyExistentialType() ||
+      (source->getClassOrBoundGenericClass() &&
+       !target->getStructOrBoundGenericStruct()) ||
+      (target->getClassOrBoundGenericClass() &&
+       !source->getStructOrBoundGenericStruct()))
     return nullptr;
 
   // Casts involving non-bound generic types cannot be optimized.
@@ -2277,7 +2277,7 @@ CastOptimizer::optimizeCheckedCastBranchInst(CheckedCastBranchInst *Inst) {
           return nullptr;
         // Get the type used to initialize the existential.
         auto ConcreteTy = FoundIERI->getFormalConcreteType();
-        if (ConcreteTy.isAnyExistentialType())
+        if (ConcreteTy->isAnyExistentialType())
           return nullptr;
         // Get the SIL metatype of this type.
         auto EMT = dyn_cast<AnyMetatypeType>(EMI->getType().getSwiftRValueType());

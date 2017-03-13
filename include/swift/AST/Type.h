@@ -348,8 +348,6 @@ class CanType : public Type {
   bool isActuallyCanonicalOrNull() const;
 
   static bool isReferenceTypeImpl(CanType type, bool functionsCount);
-  static bool isExistentialTypeImpl(CanType type);
-  static bool isAnyExistentialTypeImpl(CanType type);
   static bool isExistentialTypeImpl(CanType type,
                                     SmallVectorImpl<ProtocolDecl*> &protocols);
   static bool isAnyExistentialTypeImpl(CanType type,
@@ -393,18 +391,8 @@ public:
   }
 
   /// Is this type existential?
-  bool isExistentialType() const {
-    return isExistentialTypeImpl(*this);
-  }
-
-  /// Is this type existential?
   bool isExistentialType(SmallVectorImpl<ProtocolDecl *> &protocols) {
     return isExistentialTypeImpl(*this, protocols);
-  }
-
-  /// Is this type an existential or an existential metatype?
-  bool isAnyExistentialType() const {
-    return isAnyExistentialTypeImpl(*this);
   }
 
   /// Is this type an existential or an existential metatype?
@@ -424,11 +412,7 @@ public:
     return isObjCExistentialTypeImpl(*this);
   }
 
-  ClassDecl *getClassOrBoundGenericClass() const; // in Types.h
-  StructDecl *getStructOrBoundGenericStruct() const; // in Types.h
-  EnumDecl *getEnumOrBoundGenericEnum() const; // in Types.h
   NominalTypeDecl *getNominalOrBoundGenericNominal() const; // in Types.h
-  CanType getNominalParent() const; // in Types.h
   NominalTypeDecl *getAnyNominal() const;
   GenericTypeDecl *getAnyGeneric() const;
 
