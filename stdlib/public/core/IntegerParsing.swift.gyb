@@ -53,8 +53,8 @@ internal func _parseUnsignedAsciiAsUInt64(
     default: return nil
     }
     if n >= uRadix { return nil }
-    let (result1, overflow1) = result.multipliedWithOverflow(by: uRadix)
-    let (result2, overflow2) = result1.addingWithOverflow(n)
+    let (result1, overflow1) = result.multipliedReportingOverflow(by: uRadix)
+    let (result2, overflow2) = result1.addingReportingOverflow(n)
     result = result2
     if overflow1 != .none || overflow2 != .none || result > maximum {
       return nil
