@@ -556,9 +556,7 @@ Address irgen::emitTailProjection(IRGenFunction &IGF, llvm::Value *Base,
   } else {
     llvm::Value *metadata = emitHeapMetadataRefForHeapObject(IGF, Base,
                                                              ClassType);
-    Offset = emitClassFragileInstanceSizeAndAlignMask(IGF,
-                                        ClassType.getClassOrBoundGenericClass(),
-                                        metadata).first;
+    Offset = emitClassInstanceSizeAndAlignMask(IGF, ClassType, metadata).first;
   }
   // Align up to the TailType.
   assert(TailType.isObject());
@@ -682,7 +680,8 @@ llvm::Value *irgen::emitClassAllocation(IRGenFunction &IGF, SILType selfType,
     assert(ti.getSchema().size() == 1);
     assert(!ti.getSchema().containsAggregate());
     auto destType = ti.getSchema()[0].getScalarType();
-    auto *val = emitObjCAllocObjectCall(IGF, metadata, selfType.getSwiftRValueType());
+    auto *val = emitObjCAllocObjectCall(IGF, metadata,
+                                        selfType.getSwiftRValueType());
     return IGF.Builder.CreateBitCast(val, destType);
   }
 
@@ -692,9 +691,7 @@ llvm::Value *irgen::emitClassAllocation(IRGenFunction &IGF, SILType selfType,
   // FIXME: Long-term, we clearly need a specialized runtime entry point.
   llvm::Value *size, *alignMask;
   std::tie(size, alignMask)
-    = emitClassFragileInstanceSizeAndAlignMask(IGF,
-                                   selfType.getClassOrBoundGenericClass(),
-                                   metadata);
+    = emitClassInstanceSizeAndAlignMask(IGF, selfType, metadata);
 
   const StructLayout &layout = classTI.getLayout(IGF.IGM, selfType);
   llvm::Type *destType = layout.getType()->getPointerTo();
@@ -726,9 +723,7 @@ llvm::Value *irgen::emitClassAllocationDynamic(IRGenFunction &IGF,
   // Otherwise, allocate using Swift's routines.
   llvm::Value *size, *alignMask;
   std::tie(size, alignMask)
-    = emitClassResilientInstanceSizeAndAlignMask(IGF,
-                                   selfType.getClassOrBoundGenericClass(),
-                                   metadata);
+    = emitClassResilientInstanceSizeAndAlignMask(IGF, metadata);
   size = appendSizeForTailAllocatedArrays(IGF, size, TailArrays);
 
   llvm::Value *val = IGF.emitAllocObjectCall(metadata, size, alignMask,
@@ -841,7 +836,7 @@ static void getInstanceSizeAndAlignMask(IRGenFunction &IGF,
   llvm::Value *metadata =
     emitHeapMetadataRefForHeapObject(IGF, selfValue, selfType);
   std::tie(size, alignMask)
-    = emitClassFragileInstanceSizeAndAlignMask(IGF, selfClass, metadata);
+    = emitClassInstanceSizeAndAlignMask(IGF, selfType, metadata);
 }
 
 void irgen::emitClassDeallocation(IRGenFunction &IGF, SILType selfType,

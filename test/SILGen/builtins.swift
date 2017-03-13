@@ -962,3 +962,9 @@ func retain(ptr: Builtin.NativeObject) {
 func release(ptr: Builtin.NativeObject) {
   Builtin.release(ptr)
 }
+
+// CHECK-LABEL: sil hidden @{{.*}}builtins{{.*}}allocGenericWithTailElems
+func allocGenericWithTailElems<T: AnyObject>(n: Builtin.Word) -> T {
+  // CHECK: alloc_ref [tail_elems $Int * %0 : $Builtin.Word] $T
+  return Builtin.allocWithTailElems_1(T.self, n, Int.self)
+}

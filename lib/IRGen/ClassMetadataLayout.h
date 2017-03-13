@@ -70,7 +70,8 @@ public:
     asImpl().addIVarDestroyer();
 
     // Class members.
-    addClassMembers(Target, Target->getDeclaredTypeInContext());
+    if (Target)
+      addClassMembers(Target, Target->getDeclaredTypeInContext());
   }
 
 private:

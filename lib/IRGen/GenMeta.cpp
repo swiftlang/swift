@@ -4323,33 +4323,35 @@ llvm::Value *irgen::emitClassFieldOffset(IRGenFunction &IGF,
 /// Given a reference to class metadata of the given type,
 /// load the fragile instance size and alignment of the class.
 std::pair<llvm::Value *, llvm::Value *>
-irgen::emitClassFragileInstanceSizeAndAlignMask(IRGenFunction &IGF,
-                                                ClassDecl *theClass,
-                                                llvm::Value *metadata) {  
-  // If the class has fragile fixed layout, return the constant size and
-  // alignment.
-  if (llvm::Constant *size
-        = tryEmitClassConstantFragileInstanceSize(IGF.IGM, theClass)) {
-    llvm::Constant *alignMask
-      = tryEmitClassConstantFragileInstanceAlignMask(IGF.IGM, theClass);
-    assert(alignMask && "static size without static align");
-    return {size, alignMask};
+irgen::emitClassInstanceSizeAndAlignMask(IRGenFunction &IGF,
+                                         SILType theClassTy,
+                                         llvm::Value *metadata) {
+  if (auto theClass = theClassTy.getClassOrBoundGenericClass()) {
+    // If the class has fragile fixed layout, return the constant size and
+    // alignment.
+    if (llvm::Constant *size
+          = tryEmitClassConstantFragileInstanceSize(IGF.IGM, theClass)) {
+      llvm::Constant *alignMask
+        = tryEmitClassConstantFragileInstanceAlignMask(IGF.IGM, theClass);
+      assert(alignMask && "static size without static align");
+      return {size, alignMask};
+    }
+    // If not, we'll need to load it from the metadata.
   }
- 
+  
   // Otherwise, load it from the metadata.
-  return emitClassResilientInstanceSizeAndAlignMask(IGF, theClass, metadata);
+  return emitClassResilientInstanceSizeAndAlignMask(IGF, metadata);
 }
 
 std::pair<llvm::Value *, llvm::Value *>
 irgen::emitClassResilientInstanceSizeAndAlignMask(IRGenFunction &IGF,
-                                                  ClassDecl *theClass,
                                                   llvm::Value *metadata) {
   class FindClassSize
          : public ClassMetadataScanner<FindClassSize> {
     using super = ClassMetadataScanner<FindClassSize>;
   public:
-    FindClassSize(IRGenModule &IGM, ClassDecl *theClass)
-      : ClassMetadataScanner(IGM, theClass) {}
+    FindClassSize(IRGenModule &IGM)
+      : ClassMetadataScanner(IGM, nullptr) {}
 
     Size InstanceSize = Size::invalid();
     Size InstanceAlignMask = Size::invalid();
@@ -4371,7 +4373,7 @@ irgen::emitClassResilientInstanceSizeAndAlignMask(IRGenFunction &IGF,
     }
   };
 
-  FindClassSize scanner(IGF.IGM, theClass);
+  FindClassSize scanner(IGF.IGM);
   scanner.layout();
   assert(!scanner.InstanceSize.isInvalid()
          && !scanner.InstanceAlignMask.isInvalid()

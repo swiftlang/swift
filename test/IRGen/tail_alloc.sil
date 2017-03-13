@@ -255,3 +255,8 @@ bb0(%0 : $EmptyClass, %1 : $Builtin.Word):
   return %l : $Int32
 }
 
+sil @test_generic : $@convention(thin) <T: AnyObject> (Builtin.Word) -> T {
+entry(%0 : $Builtin.Word):
+  %a = alloc_ref [tail_elems $Int * %0 : $Builtin.Word] $T
+  return %a : $T
+}

@@ -184,15 +184,14 @@ namespace irgen {
   /// Load the fragile instance size and alignment mask from a reference to
   /// class type metadata of the given type.
   std::pair<llvm::Value *, llvm::Value *>
-  emitClassFragileInstanceSizeAndAlignMask(IRGenFunction &IGF,
-                                           ClassDecl *theClass,
-                                           llvm::Value *metadata);
+  emitClassInstanceSizeAndAlignMask(IRGenFunction &IGF,
+                                    SILType theClass,
+                                    llvm::Value *metadata);
 
   /// Load the instance size and alignment mask from a reference to
   /// class type metadata of the given type.
   std::pair<llvm::Value *, llvm::Value *>
   emitClassResilientInstanceSizeAndAlignMask(IRGenFunction &IGF,
-                                             ClassDecl *theClass,
                                              llvm::Value *metadata);
   
   /// Given an opaque class instance pointer, produce the type

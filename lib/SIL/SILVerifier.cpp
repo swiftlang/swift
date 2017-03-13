@@ -772,7 +772,8 @@ public:
   }
 
   void checkAllocRefInst(AllocRefInst *AI) {
-    require(AI->isObjC() || AI->getType().getClassOrBoundGenericClass(),
+    require(AI->isObjC()
+            || AI->getType().getSwiftRValueType()->mayHaveSuperclass(),
             "alloc_ref must allocate class");
     checkAllocRefBase(AI);
   }
