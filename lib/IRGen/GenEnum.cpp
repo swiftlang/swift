@@ -105,6 +105,7 @@
 
 #include "swift/AST/Types.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/Expr.h"
 #include "swift/AST/IRGenOptions.h"
 #include "swift/SIL/SILModule.h"
 #include "llvm/IR/Function.h"

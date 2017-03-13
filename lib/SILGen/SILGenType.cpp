@@ -21,7 +21,6 @@
 #include "SILGenFunction.h"
 #include "Scope.h"
 #include "ManagedValue.h"
-#include "swift/AST/AST.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/TypeMemberVisitor.h"
 #include "swift/SIL/SILArgument.h"

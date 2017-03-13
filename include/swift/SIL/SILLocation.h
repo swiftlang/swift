@@ -14,10 +14,9 @@
 #define SWIFT_SIL_LOCATION_H
 
 #include "llvm/ADT/PointerUnion.h"
-#include "swift/AST/Decl.h"
-#include "swift/AST/Expr.h"
-#include "swift/AST/Pattern.h"
-#include "swift/AST/Stmt.h"
+#include "swift/Basic/SourceLoc.h"
+#include "swift/Basic/SourceManager.h"
+#include "swift/AST/TypeAlignments.h"
 
 #include <cstddef>
 #include <type_traits>
@@ -25,6 +24,10 @@
 namespace swift {
 
 class SourceLoc;
+class ReturnStmt;
+class BraceStmt;
+class AbstractClosureExpr;
+class AbstractFunctionDecl;
 
 /// This is a pointer to the AST node that a SIL instruction was
 /// derived from. This may be null if AST information is unavailable or
@@ -501,15 +504,13 @@ private:
 /// Allowed on an BranchInst, ReturnInst.
 class ReturnLocation : public SILLocation {
 public:
-  ReturnLocation(ReturnStmt *RS) : SILLocation(RS, ReturnKind) {}
+  ReturnLocation(ReturnStmt *RS);
 
   /// Construct the return location for a constructor or a destructor.
-  ReturnLocation(BraceStmt *BS)
-    : SILLocation(BS, ReturnKind) {}
+  ReturnLocation(BraceStmt *BS);
 
-  ReturnStmt *get() {
-    return castToASTNode<ReturnStmt>();
-  }
+  ReturnStmt *get();
+
 private:
   friend class SILLocation;
   static bool isKind(const SILLocation& L) {
@@ -524,31 +525,19 @@ private:
 class ImplicitReturnLocation : public SILLocation {
 public:
 
-  ImplicitReturnLocation(AbstractClosureExpr *E)
-    : SILLocation(E, ImplicitReturnKind) { }
+  ImplicitReturnLocation(AbstractClosureExpr *E);
 
-  ImplicitReturnLocation(ReturnStmt *S)
-  : SILLocation(S, ImplicitReturnKind) { }
+  ImplicitReturnLocation(ReturnStmt *S);
 
-  ImplicitReturnLocation(AbstractFunctionDecl *AFD)
-    : SILLocation(AFD, ImplicitReturnKind) { }
+  ImplicitReturnLocation(AbstractFunctionDecl *AFD);
 
   /// Construct from a RegularLocation; preserve all special bits.
   ///
   /// Note, this can construct an implicit return for an arbitrary expression
   /// (specifically, in case of auto-generated bodies).
-  static SILLocation getImplicitReturnLoc(SILLocation L) {
-    assert(L.isASTNode<Expr>() ||
-           L.isASTNode<ValueDecl>() ||
-           L.isASTNode<PatternBindingDecl>() ||
-           (L.isNull() && L.isInTopLevel()));
-    L.setLocationKind(ImplicitReturnKind);
-    return L;
-  }
+  static SILLocation getImplicitReturnLoc(SILLocation L);
 
-  AbstractClosureExpr *get() {
-    return castToASTNode<AbstractClosureExpr>();
-  }
+  AbstractClosureExpr *get();
 
 private:
   friend class SILLocation;

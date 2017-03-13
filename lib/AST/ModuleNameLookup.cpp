@@ -12,7 +12,7 @@
 
 #include "NameLookupImpl.h"
 #include "swift/AST/NameLookup.h"
-#include "swift/AST/AST.h"
+#include "swift/AST/ASTContext.h"
 #include "swift/AST/LazyResolver.h"
 #include "llvm/Support/raw_ostream.h"
 

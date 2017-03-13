@@ -10,7 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/AST/AST.h"
 #include "swift/Syntax/DeclSyntax.h"
 #include "swift/Syntax/ExprSyntax.h"
 #include "swift/Syntax/GenericSyntax.h"

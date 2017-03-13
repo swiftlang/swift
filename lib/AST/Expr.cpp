@@ -16,10 +16,11 @@
 
 #include "swift/AST/Expr.h"
 #include "swift/Basic/Unicode.h"
+#include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/Decl.h" // FIXME: Bad dependency
+#include "swift/AST/ParameterList.h"
 #include "swift/AST/Stmt.h"
-#include "swift/AST/AST.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/AvailabilitySpec.h"
 #include "swift/AST/PrettyStackTrace.h"

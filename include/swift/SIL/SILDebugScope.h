@@ -20,6 +20,8 @@
 #ifndef SWIFT_SIL_DEBUGSCOPE_H
 #define SWIFT_SIL_DEBUGSCOPE_H
 
+#include "llvm/ADT/DenseMap.h"
+#include "llvm/Support/raw_ostream.h"
 #include "swift/SIL/SILAllocated.h"
 #include "swift/SIL/SILLocation.h"
 

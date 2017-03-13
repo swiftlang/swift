@@ -245,3 +245,33 @@ CleanupLocation CleanupLocation::get(SILLocation L) {
   llvm_unreachable("Cannot construct Cleanup loc from the "
                    "given location.");
 }
+
+ReturnLocation::ReturnLocation(ReturnStmt *RS) : SILLocation(RS, ReturnKind) {}
+
+ReturnLocation::ReturnLocation(BraceStmt *BS) : SILLocation(BS, ReturnKind) {}
+
+ReturnStmt *ReturnLocation::get() {
+  return castToASTNode<ReturnStmt>();
+}
+
+ImplicitReturnLocation::ImplicitReturnLocation(AbstractClosureExpr *E)
+  : SILLocation(E, ImplicitReturnKind) { }
+
+ImplicitReturnLocation::ImplicitReturnLocation(ReturnStmt *S)
+  : SILLocation(S, ImplicitReturnKind) { }
+
+ImplicitReturnLocation::ImplicitReturnLocation(AbstractFunctionDecl *AFD)
+  : SILLocation(AFD, ImplicitReturnKind) { }
+
+SILLocation ImplicitReturnLocation::getImplicitReturnLoc(SILLocation L) {
+  assert(L.isASTNode<Expr>() ||
+         L.isASTNode<ValueDecl>() ||
+         L.isASTNode<PatternBindingDecl>() ||
+         (L.isNull() && L.isInTopLevel()));
+  L.setLocationKind(ImplicitReturnKind);
+  return L;
+}
+
+AbstractClosureExpr *ImplicitReturnLocation::get() {
+  return castToASTNode<AbstractClosureExpr>();
+}

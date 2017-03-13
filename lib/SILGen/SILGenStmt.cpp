@@ -17,7 +17,6 @@
 #include "RValue.h"
 #include "Scope.h"
 #include "SwitchCaseFullExpr.h"
-#include "swift/AST/AST.h"
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/SIL/SILArgument.h"
 #include "llvm/Support/SaveAndRestore.h"
