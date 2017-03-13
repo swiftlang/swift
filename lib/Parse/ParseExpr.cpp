@@ -1780,11 +1780,13 @@ ParserResult<Expr> Parser::parseExprStringLiteral() {
         }
       }
       
+      auto nameLoc = DeclNameLoc(Context, leftLoc, leftLoc, argLabelLocs, rightLoc);
+      
       // If you change this line, make sure you also change 
       // InterpolatedStringLiteralExpr::isInterpolatedSegment().
       ParserResult<Expr> E = makeParserResult(
                  status,
-                 UnresolvedMemberExpr::create(Context, leftLoc, DeclNameLoc(leftLoc), 
+                 UnresolvedMemberExpr::create(Context, leftLoc, nameLoc, 
                                               Context.Id_init,
                                               leftLoc, args, argLabels,
                                               argLabelLocs, rightLoc,
