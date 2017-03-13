@@ -48,9 +48,9 @@
 // PRINT-NEXT:    let rawValue: Float
 // PRINT-NEXT:  }
 // PRINT-NEXT:  extension MyFloat {
-// PRINT-NEXT:    static let globalFloat: MyFloat
-// PRINT-NEXT:    static let PI: MyFloat
-// PRINT-NEXT:    static let version: MyFloat
+// PRINT-NEXT:    static let globalFloat: MyFloat{{$}}
+// PRINT-NEXT:    static let PI: MyFloat{{$}}
+// PRINT-NEXT:    static let version: MyFloat{{$}}
 // PRINT-NEXT:  }
 //
 // PRINT-LABEL: struct MyInt : RawRepresentable, _SwiftNewtypeWrapper, Equatable, Hashable, Comparable {
@@ -59,11 +59,11 @@
 // PRINT-NEXT:    let rawValue: Int32
 // PRINT-NEXT:  }
 // PRINT-NEXT:  extension MyInt {
-// PRINT-NEXT:    static let zero: MyInt!
-// PRINT-NEXT:    static let one: MyInt!
+// PRINT-NEXT:    static let zero: MyInt{{$}}
+// PRINT-NEXT:    static let one: MyInt{{$}}
 // PRINT-NEXT:  }
 // PRINT-NEXT:  let kRawInt: Int32
-// PRINT-NEXT:  func takesMyInt(_: MyInt!)
+// PRINT-NEXT:  func takesMyInt(_: MyInt)
 //
 // PRINT-LABEL: extension NSURLResourceKey {
 // PRINT-NEXT:    static let isRegularFileKey: NSURLResourceKey
