@@ -689,6 +689,7 @@ swift::decomposeArgType(Type type, ArrayRef<Identifier> argumentLabels) {
       CallArgParam argParam;
       argParam.Ty = elt.getType();
       argParam.Label = argumentLabels[i];
+      argParam.CanMatchUnlabledParameter = (argumentLabels[0] == type->getASTContext().Id_forInterpolation);  // FIXME Do something better
       result.push_back(argParam);
     }
     return result;
@@ -712,6 +713,7 @@ swift::decomposeArgType(Type type, ArrayRef<Identifier> argumentLabels) {
   argParam.Ty = type;
   assert(argumentLabels.size() == 1);
   argParam.Label = argumentLabels[0];
+  argParam.CanMatchUnlabledParameter = (argumentLabels[0] == type->getASTContext().Id_forInterpolation);  // FIXME Do something better
   result.push_back(argParam);
   return result;
 }

@@ -1777,6 +1777,7 @@ ParserResult<Expr> Parser::parseExprStringLiteral() {
         if (argLabels[0].empty()) {
           argLabels[0] = Context.Id_forInterpolation;
           argLabelLocs[0] = args[0]->getStartLoc();
+          // FIXME Do something better somewhere around here
         }
       }
       

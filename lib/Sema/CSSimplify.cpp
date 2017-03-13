@@ -91,6 +91,7 @@ areConservativelyCompatibleArgumentLabels(ValueDecl *decl,
   for (auto argLabel : labels) {
     argInfos.push_back(CallArgParam());
     argInfos.back().Label = argLabel;
+    argInfos.back().CanMatchUnlabledParameter = (argLabel == decl->getASTContext().Id_forInterpolation);  // FIXME Do something better
   }
 
   SmallVector<CallArgParam, 8> paramInfos;
@@ -118,15 +119,11 @@ static ConstraintSystem::TypeMatchOptions getDefaultDecompositionOptions(
 }
 
 static bool paramLabelMatchesArg(Identifier paramLabel, CallArgParam arg) {
-    if (paramLabel == arg.Label) {
-      return true;
-    }
-    
-    // FIXME: This is a quick-and-dirty hack in several different ways.
-    bool isFullWidth = !paramLabel.empty();
-    bool matchingForInterpolation = arg.hasLabel() && arg.Label.str() == "forInterpolation";
-    
-    return isFullWidth && matchingForInterpolation;
+  if (paramLabel == arg.Label) {
+    return true;
+  }
+  
+  return arg.CanMatchUnlabledParameter && paramLabel.empty();
 }
 
 bool constraints::

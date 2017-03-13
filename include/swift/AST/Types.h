@@ -2546,9 +2546,15 @@ struct CallArgParam {
   // The label associated with the argument or parameter, if any.
   Identifier Label;
 
-  /// Whether the parameter has a default argument.  Not valid for arguments.
-  bool HasDefaultArgument = false;
-
+  union {
+    /// Whether the parameter has a default argument.  Not valid for arguments.
+    bool HasDefaultArgument = false;
+    
+    /// Whether the argument is permitted to match a parameter with an empty 
+    /// label. Not valid for parameters.
+    bool CanMatchUnlabledParameter /* = false */;
+  };
+  
   /// Parameter specific flags, not valid for arguments
   ParameterTypeFlags parameterFlags = {};
 
