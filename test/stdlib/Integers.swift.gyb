@@ -517,35 +517,35 @@ tests.test("word") {
   expectEqual(0, z.word(at: 1))
 }
 
-tests.test("DoubleWidthMultiply/UInt8") {
+tests.test("multipliedFullWidth/UInt8") {
   let a: UInt8 = 42
   let b: UInt8 = 42
-  let res = UInt8.doubleWidthMultiply(a, b)
+  let res = a.multipliedFullWidth(by: b)
   expectEqual(0x06, res.high)
   expectEqual(0xe4, res.low)
 }
 
-tests.test("DoubleWidthMultiply/Int8") {
+tests.test("multipliedFullWidth/Int8") {
   let a: Int8 = 42
   let b: Int8 = -42
-  let res = Int8.doubleWidthMultiply(a, b)
+  let res = a.multipliedFullWidth(by: b)
   expectEqual(Int8(bitPattern: 0xf9), res.high)
   expectEqual(0x1c, res.low)
 }
 
-tests.test("DoubleWidthMultiply/Int8/BothNegative") {
+tests.test("multipliedFullWidth/Int8/BothNegative") {
   let a: Int8 = -42
   let b: Int8 = -42
-  let res = Int8.doubleWidthMultiply(a, b)
+  let res = a.multipliedFullWidth(by: b)
   expectEqual(0x06, res.high)
   expectEqual(0xe4, res.low)
 }
 
-tests.test("DoubleWidthMultiplyAndDivide/Int8") {
+tests.test("MultiplyAndDivideFullWidth/Int8") {
   let a: Int8 = 42
   let b: Int8 = 43
-  let res = Int8.doubleWidthMultiply(a, b)
-  let (quotient, remainder) = Int8.doubleWidthDivide(res, b)
+  let res = a.multipliedFullWidth(by: b)
+  let (quotient, remainder) = b.dividingFullWidth(res)
   expectEqual(a, quotient)
   expectEqual(0, remainder)
 }

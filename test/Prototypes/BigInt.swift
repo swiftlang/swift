@@ -18,15 +18,15 @@ import Darwin
 
 extension FixedWidthInteger {
   /// Returns the high and low parts of a potentially overflowing addition.
-  static func doubleWidthAdd(_ lhs: Self, _ rhs: Self) ->
+  func addingFullWidth(_ other: Self) ->
     (high: Self, low: Self) {
-    let sum = lhs.addingReportingOverflow(rhs)
+    let sum = self.addingReportingOverflow(other)
     return (sum.overflow == .overflow ? 1 : 0, sum.partialValue)
   }
 
   /// Returns the high and low parts of two seqeuential potentially overflowing
   /// additions.
-  static func doubleWidthAdd(_ x: Self, _ y: Self, _ z: Self) ->
+  static func addingFullWidth(_ x: Self, _ y: Self, _ z: Self) ->
     (high: Self, low: Self) {
     let xy = x.addingReportingOverflow(y)
     let xyz = xy.partialValue.addingReportingOverflow(z)
@@ -223,13 +223,13 @@ public struct _BigInt<Word: FixedWidthInteger & UnsignedInteger> :
 
     // Add `rhs` to the first word, catching any carry.
     var carry: Word
-    (carry, _data[0]) = Word.doubleWidthAdd(_data[0], rhs)
+    (carry, _data[0]) = _data[0].addingFullWidth(rhs)
 
     // Handle any additional carries
     for i in 1..<_data.count {
       // No more action needed if there's nothing to carry
       if carry == 0 { break }
-      (carry, _data[i]) = Word.doubleWidthAdd(_data[i], carry)
+      (carry, _data[i]) = _data[i].addingFullWidth(carry)
     }
 
     // If there's any carry left, add it now
@@ -315,8 +315,8 @@ public struct _BigInt<Word: FixedWidthInteger & UnsignedInteger> :
 
     var carry: Word = 0
     for i in 0..<_data.count {
-      let product = Word.doubleWidthMultiply(_data[i], rhs)
-      (carry, _data[i]) = Word.doubleWidthAdd(product.low, carry)
+      let product = _data[i].multipliedFullWidth(by: rhs)
+      (carry, _data[i]) = product.low.addingFullWidth(carry)
       carry = carry &+ product.high
     }
 
@@ -347,7 +347,7 @@ public struct _BigInt<Word: FixedWidthInteger & UnsignedInteger> :
     var carry: Word = 0
     for i in (0..<_data.count).reversed() {
       let lhs = (high: carry, low: _data[i])
-      (_data[i], carry) = Word.doubleWidthDivide(lhs, rhs)
+      (_data[i], carry) = rhs.dividingFullWidth(lhs)
     }
 
     _standardize()
@@ -375,7 +375,7 @@ public struct _BigInt<Word: FixedWidthInteger & UnsignedInteger> :
     // Add the words up to the common count, carrying any overflows
     var carry: Word = 0
     for i in 0..<commonCount {
-      (carry, _data[i]) = Word.doubleWidthAdd(_data[i], rhs._data[i], carry)
+      (carry, _data[i]) = Word.addingFullWidth(_data[i], rhs._data[i], carry)
     }
 
     // If there are leftover words in `self`, just need to handle any carries
@@ -383,7 +383,7 @@ public struct _BigInt<Word: FixedWidthInteger & UnsignedInteger> :
       for i in commonCount..<maxCount {
         // No more action needed if there's nothing to carry
         if carry == 0 { break }
-        (carry, _data[i]) = Word.doubleWidthAdd(_data[i], carry)
+        (carry, _data[i]) = _data[i].addingFullWidth(carry)
       }
 
     // If there are leftover words in `rhs`, need to copy to `self` with carries
@@ -395,7 +395,7 @@ public struct _BigInt<Word: FixedWidthInteger & UnsignedInteger> :
           break
         }
         let sum: Word
-        (carry, sum) = Word.doubleWidthAdd(rhs._data[i], carry)
+        (carry, sum) = rhs._data[i].addingFullWidth(carry)
         _data.append(sum)
       }
     }
@@ -488,8 +488,8 @@ public struct _BigInt<Word: FixedWidthInteger & UnsignedInteger> :
         // additions can overflow to a higher word. The following two lines
         // capture the low word of the multiplication and additions in
         // `newData[ai + bi]` and any addition overflow in `carry`.
-        let product = Word.doubleWidthMultiply(a[ai], b[bi])
-        (carry, newData[ai + bi]) = Word.doubleWidthAdd(
+        let product = a[ai].multipliedFullWidth(by: b[bi])
+        (carry, newData[ai + bi]) = Word.addingFullWidth(
           newData[ai + bi], product.low, carry)
 
         // Now we combine the high word of the multiplication with any addition
@@ -1363,16 +1363,15 @@ struct Bit : FixedWidthInteger, UnsignedInteger {
     lhs.value = 0 // No remainders with bit division!
   }
 
-  static func doubleWidthMultiply(_ lhs: Bit, _ rhs: Bit) ->
-    (high: Bit, low: Bit) {
-      return (0, lhs * rhs)
+  func multipliedFullWidth(by other: Bit) -> (high: Bit, low: Bit) {
+      return (0, self * other)
   }
 
-  static func doubleWidthDivide(_ lhs: (high: Bit, low: Bit), _ rhs: Bit) ->
+  func dividingFullWidth(_ dividend: (high: Bit, low: Bit)) ->
     (quotient: Bit, remainder: Bit) {
-      assert(rhs != 0, "Division overflow")
-      assert(lhs.high == 0, "Quotient overflow")
-      return (lhs.low, 0)
+      assert(self != 0, "Division overflow")
+      assert(dividend.high == 0, "Quotient overflow")
+      return (dividend.low, 0)
   }
 
   // FIXME: Remove once default implementations are provided:

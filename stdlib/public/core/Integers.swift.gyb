@@ -868,7 +868,7 @@ def overflowOperationComment(operator):
   ///   occurred and the `partialValue` component contains the truncated
   ///   product of this value and `rhs`.
   ///
-  /// - SeeAlso: `doubleWidthMultiply(_:_:)`
+  /// - SeeAlso: `multipliedFullWidth(by:)`
 """,
         '/': """\
   /// Returns the quotient of dividing this value by the given value along with
@@ -2045,19 +2045,19 @@ ${overflowOperationComment(x.operator)}
   ///
   /// Use this method to calculate the full result of a product that would
   /// otherwise overflow. Unlike traditional truncating multiplication, the
-  /// `doubleWidthMultiply(_:_:)` method returns both the `high` and `low`
-  /// parts of the product of `lhs` and `rhs`. The following example uses this
-  /// method to multiply two `UInt8` values that normally overflow when
-  /// multiplied:
+  /// `multipliedFullWidth(by:)` method returns an instance of DoubleWith<Self>,
+  /// containing both the `high` and `low` parts of the product of `self` and
+  /// `other`. The following example uses this method to multiply two `UInt8`
+  /// values that normally overflow when multiplied:
   ///
   ///     let x: UInt8 = 100
   ///     let y: UInt8 = 20
-  ///     let result = UInt8.doubleWidthMultiply(100, 20)
+  ///     let result = x.multipliedFullWidth(by: y)
   ///     // result.high == 0b00000111
   ///     // result.low  == 0b11010000
   ///
   /// The product of `x` and `y` is 2000, which is too large to represent in a
-  /// `UInt8` instance. The `high` and `low` components of the `result` tuple
+  /// `UInt8` instance. The `high` and `low` properties of the `result` value
   /// represent 2000 when concatenated to form a double-width integer; that
   /// is, using `result.high` as the high byte and `result.low` as the low byte
   /// of a `UInt16` instance.
@@ -2066,31 +2066,29 @@ ${overflowOperationComment(x.operator)}
   ///     // z == 2000
   ///
   /// - Parameters:
-  ///   - lhs: A value to multiply.
-  ///   - rhs: Another value to multiply.
+  ///   - other: A value to multiply `self` by.
   /// - Returns: A tuple containing the high and low parts of the result of
-  ///   multiplying `lhs` and `rhs`.
+  ///   multiplying `self` and `other`.
   ///
   /// - SeeAlso: `multipliedReportingOverflow(by:)`
-  static func doubleWidthMultiply(_ lhs: Self, _ rhs: Self)
-    -> (high: Self, low: Magnitude)
+  // FIXME(integers): figure out how to return DoubleWidth<Self> or correct the
+  // doc comment
+  func multipliedFullWidth(by other: Self) -> (high: Self, low: Self.Magnitude)
 
   /// Returns a tuple containing the quotient and remainder of dividing the
-  /// first argument by the second.
+  /// first argument by `self`.
   ///
   /// The resulting quotient must be representable within the bounds of the
-  /// type. If the quotient of dividing `lhs` by `rhs` is too large to
+  /// type. If the quotient of dividing `dividend` by `self` is too large to
   /// represent in the type, a runtime error may occur.
   ///
   /// - Parameters:
-  ///   - lhs: A tuple containing the high and low parts of a double-width
-  ///     integer. The `high` component of the tuple carries the sign, if the
-  ///     type is signed.
-  ///   - rhs: The integer to divide into `lhs`.
-  /// - Returns: A tuple containing the quotient and remainder of `lhs` divided
-  ///   by `rhs`.
-  static func doubleWidthDivide(
-    _ lhs: (high: Self, low: Magnitude), _ rhs: Self)
+  ///   - dividend: A DoubleWidth<Self> value containing the high and low parts
+  ///     of a double-width integer. The `high` component of the value carries
+  ///     the sign, if the type is signed.
+  /// - Returns: A tuple containing the quotient and remainder of `dividend`
+  ///   divided by `self`.
+  func dividingFullWidth(_ dividend: (high: Self, low: Self.Magnitude))
     -> (quotient: Self, remainder: Self)
 
   init(_truncatingBits bits: UInt)
@@ -2897,8 +2895,11 @@ ${operatorComment(x.operator, True)}
 
 %   dbits = bits*2
   // FIXME(integers): tests
-  public static func doubleWidthMultiply(_ lhs: ${Self}, _ rhs: ${Self})
-    -> (high: ${Self}, low: ${Self}.Magnitude) {
+  public func multipliedFullWidth(by other: ${Self})
+  -> (high: ${Self}, low: ${Self}.Magnitude) {
+    // FIXME(integers): properly replace rhs and lhs with self and other
+    let lhs = self
+    let rhs = other
 %   # 128 bit types are not provided by the 32-bit LLVM
 %   if word_bits == 32 and bits == 64:
     // FIXME(integers): implement
@@ -2917,9 +2918,13 @@ ${operatorComment(x.operator, True)}
   }
 
   // FIXME(integers): tests
-  public static func doubleWidthDivide(
-    _ lhs: (high: ${Self}, low: Magnitude), _ rhs: ${Self})
-    -> (quotient: ${Self}, remainder: ${Self}) {
+  public func dividingFullWidth(
+    _ dividend: (high: ${Self}, low: ${Self}.Magnitude)
+  ) -> (quotient: ${Self}, remainder: ${Self}) {
+    // FIXME(integers): properly rename lhs to dividend and rhs to self.
+    let lhs = dividend
+    let rhs = self
+
 %   # 128 bit types are not provided by the 32-bit LLVM
 %   if word_bits == 32 and bits == 64:
     // FIXME(integers): implement
@@ -3208,13 +3213,21 @@ public struct DoubleWidth<T : FixedWidthInteger>
   T.Magnitude : FixedWidthInteger,
   T.Magnitude.Magnitude == T.Magnitude {
 
-  internal typealias High = T
-  internal typealias Low = T.Magnitude
+  public typealias High = T
+  public typealias Low = T.Magnitude
 
   internal var _storage: (high: T, low: T.Magnitude)
 
   internal init(_ _value: (High, Low)) {
     self._storage = (high: _value.0, low: _value.1)
+  }
+
+  public var high: High {
+    return _storage.high
+  }
+
+  public var low: Low {
+    return _storage.low
   }
 
   // Numeric
@@ -3326,7 +3339,7 @@ public struct DoubleWidth<T : FixedWidthInteger>
     let isNegative = (self < DoubleWidth<T>()) != (rhs < DoubleWidth<T>())
 
     func mul(_ x: Low, _ y: Low, _ carry: Low) -> (partial: Low, carry: Low) {
-      let pair = Low.doubleWidthMultiply(x, y)
+      let pair = x.multipliedFullWidth(by: y)
       let t = DoubleWidth<Low>(pair) + DoubleWidth<Low>((0, carry))
       return (partial: t._storage.low, carry: t._storage.high)
     }
@@ -3385,15 +3398,13 @@ public struct DoubleWidth<T : FixedWidthInteger>
     fatalError()
   }
 
-  public static func doubleWidthMultiply(
-    _ lhs: DoubleWidth<T>, _ rhs: DoubleWidth<T>
-  ) -> (high: DoubleWidth<T>, low: DoubleWidth<T>.Magnitude) {
+  public func multipliedFullWidth(by other: DoubleWidth<T>)
+    -> (high: DoubleWidth<T>, low: DoubleWidth<T>.Magnitude) {
     fatalError()
   }
 
-  public static func doubleWidthDivide(
-    _ lhs: (high: DoubleWidth<T>, low: DoubleWidth<T>.Magnitude),
-    _ rhs: DoubleWidth<T>
+  public func dividingFullWidth(
+    _ dividend: (high: DoubleWidth<T>, low: DoubleWidth<T>.Magnitude)
   ) -> (quotient: DoubleWidth<T>, remainder: DoubleWidth<T>) {
     fatalError()
   }
