@@ -7915,6 +7915,19 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
     return paramTy->getCanonicalType();
   };
 
+  // Bail out if we're validating one of our constructors already; we'll
+  // revisit the issue later.
+  bool alreadyValidatingCtor = false;
+  for (auto member : decl->getMembers()) {
+    if (auto ctor = dyn_cast<ConstructorDecl>(member)) {
+      validateDecl(ctor);
+      if (!ctor->hasValidSignature())
+        alreadyValidatingCtor = true;
+    }
+  }
+  if (alreadyValidatingCtor)
+    return;
+
   // Check whether there is a user-declared constructor or an instance
   // variable.
   bool FoundMemberwiseInitializedProperty = false;
@@ -7926,8 +7939,6 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
   llvm::SmallPtrSet<ConstructorDecl *, 4> overriddenInits;
   for (auto member : decl->getMembers()) {
     if (auto ctor = dyn_cast<ConstructorDecl>(member)) {
-      validateDecl(ctor);
-
       if (ctor->isDesignatedInit())
         FoundDesignatedInit = true;
 
