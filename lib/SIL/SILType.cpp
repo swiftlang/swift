@@ -630,3 +630,81 @@ SILType SILType::wrapAnyOptionalType(SILFunction &F) const {
                              BoundEnumDecl->getCanonicalType());
   return M.Types.getLoweredType(Pattern, BoundEnumDecl);
 }
+
+#ifndef NDEBUG
+static bool areOnlyAbstractionDifferent(CanType type1, CanType type2) {
+  assert(type1->isLegalSILType());
+  assert(type2->isLegalSILType());
+
+  // Exact equality is fine.
+  if (type1 == type2)
+    return true;
+
+  // Either both types should be optional or neither should be.
+  if (auto object1 = type1.getAnyOptionalObjectType()) {
+    auto object2 = type2.getAnyOptionalObjectType();
+    if (!object2)
+      return false;
+    return areOnlyAbstractionDifferent(object1, object2);
+  }
+  if (type2.getAnyOptionalObjectType())
+    return false;
+
+  // Either both types should be tuples or neither should be.
+  if (auto tuple1 = dyn_cast<TupleType>(type1)) {
+    auto tuple2 = dyn_cast<TupleType>(type2);
+    if (!tuple2)
+      return false;
+    if (tuple1->getNumElements() != tuple2->getNumElements())
+      return false;
+    for (auto i : indices(tuple2->getElementTypes()))
+      if (!areOnlyAbstractionDifferent(tuple1.getElementType(i),
+                                       tuple2.getElementType(i)))
+        return false;
+    return true;
+  }
+  if (isa<TupleType>(type2))
+    return false;
+
+  // Either both types should be metatypes or neither should be.
+  if (auto meta1 = dyn_cast<AnyMetatypeType>(type1)) {
+    auto meta2 = dyn_cast<AnyMetatypeType>(type2);
+    if (!meta2)
+      return false;
+    if (meta1.getInstanceType() != meta2.getInstanceType())
+      return false;
+    return true;
+  }
+
+  // Either both types should be functions or neither should be.
+  if (auto fn1 = dyn_cast<SILFunctionType>(type1)) {
+    auto fn2 = dyn_cast<SILFunctionType>(type2);
+    if (!fn2)
+      return false;
+    // TODO: maybe there are checks we can do here?
+    (void)fn1;
+    (void)fn2;
+    return true;
+  }
+  if (isa<SILFunctionType>(type2))
+    return false;
+
+  llvm_unreachable("no other types should differ by abstraction");
+}
+#endif
+
+/// Given two SIL types which are representations of the same type,
+/// check whether they have an abstraction difference.
+bool SILType::hasAbstractionDifference(SILFunctionTypeRepresentation rep,
+                                       SILType type2) {
+  CanType ct1 = getSwiftRValueType();
+  CanType ct2 = type2.getSwiftRValueType();
+  assert(getSILFunctionLanguage(rep) == SILFunctionLanguage::C ||
+         areOnlyAbstractionDifferent(ct1, ct2));
+  (void)ct1;
+  (void)ct2;
+
+  // Assuming that we've applied the same substitutions to both types,
+  // abstraction equality should equal type equality.
+  return (*this != type2);
+}
