@@ -328,6 +328,7 @@ Func ReversedRandomAccessCollection.index(_:offsetBy:) has return type change fr
 Func ReversedRandomAccessCollection.index(_:offsetBy:limitedBy:) has return type change from ReversedRandomAccessIndex<Base>? to ReversedRandomAccessCollection.Index?
 Func ReversedRandomAccessCollection.index(after:) has return type change from ReversedRandomAccessIndex<Base> to ReversedRandomAccessCollection.Index
 Func ReversedRandomAccessCollection.index(before:) has return type change from ReversedRandomAccessIndex<Base> to ReversedRandomAccessCollection.Index
+Func Sequence.elementsEqual(_:by:) has 2nd parameter type change from (Self.Iterator.Element, Self.Iterator.Element) throws -> Bool to (Self.Iterator.Element, OtherSequence.Iterator.Element) throws -> Bool
 Func Set.formSymmetricDifference(_:) has parameter 0 type change from Set<Element> to Set<Set.Element>
 Func Set.index(after:) has return type change from SetIndex<Element> to Set<Element>.Index
 Func Set.index(of:) has return type change from SetIndex<Element>? to Set<Element>.Index?
