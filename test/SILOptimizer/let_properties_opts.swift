@@ -16,7 +16,7 @@
 // initialization code could be removed.
 // Specifically, the initialization code for Prop1, Prop2 and Prop3 can be removed.
 
-// CHECK-WMO-LABEL: sil @_T019let_properties_opts3FooC{{[_0-9a-zA-Z]*}}fc : $@convention(method) (Int32, @owned Foo) -> @owned Foo
+// CHECK-WMO-LABEL: sil [thunk] [always_inline] @_T019let_properties_opts3FooC{{[_0-9a-zA-Z]*}}fc : $@convention(method) (Int32, @owned Foo) -> @owned Foo
 // CHECK-WMO-NOT: ref_element_addr %{{[0-9]+}} : $Foo, #Foo.Prop1
 // CHECK-WMO-NOT: ref_element_addr %{{[0-9]+}} : $Foo, #Foo.Prop2
 // CHECK-WMO-NOT: ref_element_addr %{{[0-9]+}} : $Foo, #Foo.Prop3
@@ -26,7 +26,7 @@
 // CHECK-WMO: ref_element_addr %{{[0-9]+}} : $Foo, #Foo.Prop3
 // CHECK-WMO: return
 
-// CHECK-WMO-LABEL: sil @_T019let_properties_opts3FooC{{[_0-9a-zA-Z]*}}fc : $@convention(method) (Int64, @owned Foo) -> @owned Foo 
+// CHECK-WMO-LABEL: sil [thunk] [always_inline] @_T019let_properties_opts3FooC{{[_0-9a-zA-Z]*}}fc : $@convention(method) (Int64, @owned Foo) -> @owned Foo
 // CHECK-WMO-NOT: ref_element_addr %{{[0-9]+}} : $Foo, #Foo.Prop1
 // CHECK-WMO-NOT: ref_element_addr %{{[0-9]+}} : $Foo, #Foo.Prop2
 // CHECK-WMO-NOT: ref_element_addr %{{[0-9]+}} : $Foo, #Foo.Prop3
@@ -41,14 +41,14 @@
 // from other modules. Therefore the initialization code could be removed.
 // Specifically, the initialization code for Prop2 can be removed.
 
-// CHECK-LABEL: sil @_T019let_properties_opts3FooC{{[_0-9a-zA-Z]*}}fc : $@convention(method) (Int32, @owned Foo) -> @owned Foo
+// CHECK-LABEL: sil [thunk] [always_inline] @_T019let_properties_opts3FooC{{[_0-9a-zA-Z]*}}fc : $@convention(method) (Int32, @owned Foo) -> @owned Foo
 // CHECK: ref_element_addr %{{[0-9]+}} : $Foo, #Foo.Prop0
 // CHECK: ref_element_addr %{{[0-9]+}} : $Foo, #Foo.Prop1
 // CHECK: ref_element_addr %{{[0-9]+}} : $Foo, #Foo.Prop2
 // CHECK: ref_element_addr %{{[0-9]+}} : $Foo, #Foo.Prop3
 // CHECK: return
 
-// CHECK-LABEL: sil @_T019let_properties_opts3FooC{{[_0-9a-zA-Z]*}}fc : $@convention(method) (Int64, @owned Foo) -> @owned Foo
+// CHECK-LABEL: sil [thunk] [always_inline] @_T019let_properties_opts3FooC{{[_0-9a-zA-Z]*}}fc : $@convention(method) (Int64, @owned Foo) -> @owned Foo
 // CHECK: ref_element_addr %{{[0-9]+}} : $Foo, #Foo.Prop0
 // CHECK: ref_element_addr %{{[0-9]+}} : $Foo, #Foo.Prop1
 // CHECK: ref_element_addr %{{[0-9]+}} : $Foo, #Foo.Prop2
