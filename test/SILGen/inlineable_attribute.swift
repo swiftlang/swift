@@ -23,6 +23,18 @@ public struct MySt {
 public class MyCls {
   // CHECK-LABEL: sil [fragile] @_T020inlineable_attribute5MyClsCfD : $@convention(method) (@owned MyCls) -> ()
   @_inlineable deinit {}
+
+  // Allocating entry point is [fragile]
+
+  // CHECK-LABEL: sil [fragile] @_T020inlineable_attribute5MyClsCACyt14designatedInit_tcfC : $@convention(method) (@thick MyCls.Type) -> @owned MyCls
+  public init(designatedInit: ()) {}
+
+  // Note -- convenience init is intentionally not [fragile]
+
+  // CHECK-LABEL: sil @_T020inlineable_attribute5MyClsCACyt15convenienceInit_tcfC : $@convention(method) (@thick MyCls.Type) -> @owned MyCls
+  public convenience init(convenienceInit: ()) {
+    self.init(designatedInit: ())
+  }
 }
 
 // Make sure enum case constructors for public and versioned enums are
