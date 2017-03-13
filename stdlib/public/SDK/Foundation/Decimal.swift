@@ -218,7 +218,7 @@ extension Decimal : ExpressibleByIntegerLiteral {
     }
 }
 
-extension Decimal : SignedArithmetic {
+extension Decimal : SignedNumeric {
   public var magnitude: Decimal {
     return Decimal(
       _exponent: self._exponent, _length: self._length,

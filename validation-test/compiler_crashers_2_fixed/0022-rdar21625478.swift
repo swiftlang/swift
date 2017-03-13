@@ -8,7 +8,7 @@ public struct MyRange<Bound : ForwardIndex> {
 }
 
 public protocol ForwardIndex : Equatable {
-  associatedtype Distance : SignedArithmetic
+  associatedtype Distance : SignedNumeric
   func successor() -> Self
 }
 

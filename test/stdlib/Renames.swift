@@ -261,8 +261,8 @@ func _InputStream() {
 }
 
 func _IntegerArithmetic() {
-  func fn1<T : IntegerArithmeticType>(_: T) {} // expected-error {{'IntegerArithmeticType' has been renamed to 'Arithmetic'}} {{16-37=Arithmetic}} {{none}}
-  func fn2<T : SignedNumberType>(_: T) {} // expected-error {{'SignedNumberType' has been renamed to 'SignedArithmetic'}} {{16-32=SignedArithmetic}} {{none}}
+  func fn1<T : IntegerArithmeticType>(_: T) {} // expected-error {{'IntegerArithmeticType' has been renamed to 'Numeric'}} {{16-37=Numeric}} {{none}}
+  func fn2<T : SignedNumberType>(_: T) {} // expected-error {{'SignedNumberType' has been renamed to 'SignedNumeric'}} {{16-32=SignedNumeric}} {{none}}
 }
 
 func _Join() {

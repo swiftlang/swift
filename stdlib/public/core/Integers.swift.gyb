@@ -34,7 +34,7 @@ class struct(object):
     return 'struct(%r)' % self.__dict__
 
 binaryArithmetic = {
-  'Arithmetic' : [
+  'Numeric' : [
     struct(operator='+', name='adding',      firstArg='_',  llvmName='add', kind='+'),
     struct(operator='-', name='subtracting', firstArg='_',  llvmName='sub', kind='-'),
     struct(operator='*', name='multiplied',  firstArg='by', llvmName='mul', kind='*'),
@@ -963,21 +963,21 @@ def unsafeOperationComment(operator):
 }%
 
 //===----------------------------------------------------------------------===//
-//===--- Arithmetic -------------------------------------------------------===//
+//===--- Numeric ----------------------------------------------------------===//
 //===----------------------------------------------------------------------===//
 
 /// Declares methods backing binary arithmetic operators--such as `+`, `-` and
 /// `*`--and their mutating counterparts.
 ///
-/// The `Arithmetic` protocol provides a suitable basis for arithmetic on
+/// The `Numeric` protocol provides a suitable basis for arithmetic on
 /// scalar values, such as integers and floating-point numbers. You can write
 /// generic methods that operate on any numeric type in the standard library
-/// by using the `Arithmetic` protocol as a generic constraint.
+/// by using the `Numeric` protocol as a generic constraint.
 ///
 /// The following example declares a method that calculates the total of any
-/// sequence with `Arithmetic` elements.
+/// sequence with `Numeric` elements.
 ///
-///     extension Sequence where Iterator.Element: Arithmetic {
+///     extension Sequence where Iterator.Element: Numeric {
 ///         func sum() -> Iterator.Element {
 ///             return reduce(0, +)
 ///         }
@@ -993,14 +993,14 @@ def unsafeOperationComment(operator):
 ///     let rangeSum = (1..<10).sum()
 ///     // rangeSum == 45
 ///
-/// Conforming to the Arithmetic Protocol
+/// Conforming to the Numeric Protocol
 /// =====================================
 ///
-/// To add `Arithmetic` protocol conformance to your own custom type, implement
-/// the required mutating methods. Extensions to `Arithmetic` provide default
+/// To add `Numeric` protocol conformance to your own custom type, implement
+/// the required mutating methods. Extensions to `Numeric` provide default
 /// implementations for the protocol's nonmutating methods based on the
 /// mutating variants.
-public protocol Arithmetic : Equatable, ExpressibleByIntegerLiteral {
+public protocol Numeric : Equatable, ExpressibleByIntegerLiteral {
   /// Creates a new instance from the given integer, if it can be represented
   /// exactly.
   ///
@@ -1018,10 +1018,11 @@ public protocol Arithmetic : Equatable, ExpressibleByIntegerLiteral {
   /// - Parameter source: A floating-point value to convert to an integer.
   init?<T : BinaryInteger>(exactly source: T)
 
-  // FIXME(ABI)#44 (Recursive Protocol Constraints): should be just Arithmetic
+  // FIXME(ABI)#44 (Recursive Protocol Constraints): should be just
+  // Numeric, Comparable
   /// A type that can represent the absolute value of any possible value of the
   /// conforming type.
-  associatedtype Magnitude : Equatable, ExpressibleByIntegerLiteral
+  associatedtype Magnitude : Comparable, ExpressibleByIntegerLiteral
 
   /// The magnitude of this value.
   ///
@@ -1042,7 +1043,7 @@ public protocol Arithmetic : Equatable, ExpressibleByIntegerLiteral {
   /// - SeeAlso: `abs(_:)`
   var magnitude: Magnitude { get }
 
-% for x in binaryArithmetic['Arithmetic']:
+% for x in binaryArithmetic['Numeric']:
   // defaulted using an in-place counterpart, but can be used as an
   // optimization hook
 ${operatorComment(x.operator, False)}
@@ -1057,15 +1058,15 @@ ${assignmentOperatorComment(x.operator, False)}
 % # FIXME(integers): uncomment once the compilation time improves.
 % # Don't forget to remove similar definitions from concrete integer types,
 % # floating point types, CGFloat, and Decimal in Foundation.
-% for Protocol in []: # !!! FIXME !!! ['Arithmetic', 'BinaryInteger', 'FloatingPoint']:
+% for Protocol in []: # !!! FIXME !!! ['Numeric', 'BinaryInteger', 'FloatingPoint']:
 % # Explicitly providing these operations for BinaryInteger and FloatingPoint
 % # protocols because Strideable conformance creates ambiguity if the
-% # operationsare only defined for Arithmetic
+% # operations are only defined for Numeric
 extension ${Protocol} {
-%   if Protocol in ['Arithmetic', 'FloatingPoint']:
-%       ops = binaryArithmetic['Arithmetic']
+%   if Protocol in ['Numeric', 'FloatingPoint']:
+%       ops = binaryArithmetic['Numeric']
 %   else:
-%       ops = binaryArithmetic['Arithmetic'] + binaryArithmetic['BinaryInteger']
+%       ops = binaryArithmetic['Numeric'] + binaryArithmetic['BinaryInteger']
 %   for x in ops:
 %     callLabel = x.firstArg + ': ' if not x.firstArg == '_' else ''
 ${operatorComment(x.operator, False)}
@@ -1081,18 +1082,18 @@ ${operatorComment(x.operator, False)}
 
 /// A type that can represent both positive and negative values.
 ///
-/// The `SignedArithmetic` protocol extends the operations defined by the
-/// `Arithmetic` protocol to include a value's additive inverse.
+/// The `SignedNumeric` protocol extends the operations defined by the
+/// `Numeric` protocol to include a value's additive inverse.
 ///
-/// Conforming to the SignedArithmetic Protocol
+/// Conforming to the SignedNumeric Protocol
 /// ===========================================
 ///
-/// Because the `SignedArithmetic` protocol provides default implementations of
+/// Because the `SignedNumeric` protocol provides default implementations of
 /// both of its required methods, you don't need to do anything beyond
 /// declaring conformance to the protocol and ensuring that the values of your
 /// type support negation. To customize your type's implementation, provide
 /// your own mutating `negate()` method.
-public protocol SignedArithmetic : Arithmetic {
+public protocol SignedNumeric : Numeric {
   /// Returns the additive inverse of the specified value.
   ///
   /// The negation operator (prefix `-`) returns the additive inverse of its
@@ -1127,7 +1128,7 @@ public protocol SignedArithmetic : Arithmetic {
   mutating func negate()
 }
 
-extension SignedArithmetic {
+extension SignedNumeric {
   @_transparent
   public static prefix func - (_ operand: Self) -> Self {
     var result = operand
@@ -1147,7 +1148,7 @@ extension SignedArithmetic {
 /// - Parameter x: A signed number.
 /// - Returns: The absolute value of `x`.
 @_transparent
-public func abs<T : SignedArithmetic>(_ x: T) -> T
+public func abs<T : SignedNumeric>(_ x: T) -> T
   where T.Magnitude == T {
   return x.magnitude
 }
@@ -1165,15 +1166,11 @@ public func abs<T : SignedArithmetic>(_ x: T) -> T
 ///
 /// - Parameter x: A signed number.
 /// - Returns: The absolute value of `x`.
-public func abs<T : SignedArithmetic & Comparable>(_ x: T) -> T {
+public func abs<T : SignedNumeric & Comparable>(_ x: T) -> T {
   return x < 0 ? -x : x
 }
 
-//===----------------------------------------------------------------------===//
-//===--- Arithmetic operators ---------------------------------------------===//
-//===----------------------------------------------------------------------===//
-
-extension Arithmetic {
+extension Numeric {
   @_transparent
   public static prefix func + (x: Self) -> Self {
     return x
@@ -1341,7 +1338,7 @@ extension Arithmetic {
 ///     }
 ///     // Prints "23 is greater than -23."
 public protocol BinaryInteger :
-  Comparable, Hashable, Arithmetic, CustomStringConvertible, Strideable {
+  Comparable, Hashable, Numeric, CustomStringConvertible, Strideable {
 
   /// A Boolean value indicating whether this type is a signed integer type.
   ///
@@ -2036,7 +2033,7 @@ public protocol FixedWidthInteger : BinaryInteger, BitwiseOperations {
   /// exponentiation.
   static var min: Self { get }
 
-% for x in binaryArithmetic['Arithmetic'] + binaryArithmetic['BinaryInteger'][:1]:
+% for x in binaryArithmetic['Numeric'] + binaryArithmetic['BinaryInteger'][:1]:
 ${overflowOperationComment(x.operator)}
   func ${x.name}WithOverflow(
     ${x.firstArg} rhs: Self
@@ -2259,7 +2256,7 @@ extension FixedWidthInteger {
     else { self = Self(extendingOrTruncating: source) }
   }
 
-% for x in binaryArithmetic['Arithmetic'] + binaryArithmetic["BinaryInteger"][:1]:
+% for x in binaryArithmetic['Numeric'] + binaryArithmetic["BinaryInteger"][:1]:
 %   callLabel = x.firstArg + ': ' if not x.firstArg == '_' else ''
 // FIXME(integers): pending optimizer work on handling the case where the
 // boolean value is wrapped into a two-case enum and then immediately
@@ -2449,7 +2446,7 @@ extension UnsignedInteger where Self : FixedWidthInteger {
 //===----------------------------------------------------------------------===//
 
 /// An integer type that can represent both positive and negative values.
-public protocol SignedInteger : BinaryInteger, SignedArithmetic {
+public protocol SignedInteger : BinaryInteger, SignedNumeric {
   /// A type that can represent the absolute value of any possible value of the
   /// conforming type.
   associatedtype Magnitude : BinaryInteger
@@ -2709,7 +2706,7 @@ public struct ${Self}
 // boolean value is wrapped into a two-case enum and then immediately
 // unwrapped. <rdar://problem/29004429>
 // See corresponding definitions in the FixedWidthInteger extension.
-%       for x in binaryArithmetic['Arithmetic'] + binaryArithmetic["BinaryInteger"][:1]:
+%       for x in binaryArithmetic['Numeric'] + binaryArithmetic["BinaryInteger"][:1]:
   @_transparent
   public static func ${x.operator}=(_ lhs: inout ${Self}, _ rhs: ${Self}) {
 %   if x.kind == '/':
@@ -3220,7 +3217,7 @@ public struct DoubleWidth<T : FixedWidthInteger>
     self._storage = (high: _value.0, low: _value.1)
   }
 
-  // arithmetic
+  // Numeric
   //
   public init() {
     self.init((High(), Low()))
@@ -3303,7 +3300,7 @@ public struct DoubleWidth<T : FixedWidthInteger>
   public static var bitWidth : Int { return 2 * T.bitWidth }
 
 % # This covers + and -
-% for x in binaryArithmetic['Arithmetic'][:2]:
+% for x in binaryArithmetic['Numeric'][:2]:
 %   highAffectedByLowOverflow = 'T.max' if x.operator == '+' else 'T.min'
   public func ${x.name}WithOverflow(_ rhs: DoubleWidth<T>)
     -> (partialValue: DoubleWidth<T>, overflow: ArithmeticOverflow) {
@@ -3411,7 +3408,7 @@ public struct DoubleWidth<T : FixedWidthInteger>
 
 % for x in chain(*binaryArithmetic.values()):
 
-  // FIXME(integers): remove this once the operators are back to Arithmetic
+  // FIXME(integers): remove this once the operators are back to Numeric
   public static func ${x.operator} (
     lhs: DoubleWidth<T>, rhs: DoubleWidth<T>
   ) -> DoubleWidth<T> {
@@ -3497,24 +3494,24 @@ internal func _unsafeMinus(_ lhs: Int, _ rhs: Int) -> Int {
 }
 
 // FIXME(integers): test more of these.
-// FIXME: should maybe be BinaryInteger & Arithmetic, but <rdar://27619386> prevents it
-@available(*, unavailable, renamed: "Arithmetic")
-public typealias _IntegerArithmeticType = Arithmetic
+// FIXME: should maybe be BinaryInteger & Numeric, but <rdar://27619386> prevents it
+@available(*, unavailable, renamed: "Numeric")
+public typealias _IntegerArithmeticType = Numeric
 
-@available(*, unavailable, renamed: "Arithmetic")
-public typealias IntegerArithmeticType = Arithmetic
+@available(*, unavailable, renamed: "Numeric")
+public typealias IntegerArithmeticType = Numeric
 
-@available(*, unavailable, renamed: "SignedArithmetic")
-public typealias SignedNumberType = SignedArithmetic
+@available(*, unavailable, renamed: "SignedNumeric")
+public typealias SignedNumberType = SignedNumeric
 
 @available(*, unavailable, renamed: "SignedInteger")
 public typealias SignedIntegerType = SignedInteger
 
 @available(*, unavailable, renamed: "UnsignedInteger")
-public typealias UnsignedIntegerType = SignedArithmetic
+public typealias UnsignedIntegerType = SignedNumeric
 
-@available(*, unavailable, renamed: "SignedArithmetic")
-public typealias AbsoluteValuable = SignedArithmetic
+@available(*, unavailable, renamed: "SignedNumeric")
+public typealias AbsoluteValuable = SignedNumeric
 
 @available(*, unavailable, renamed: "FixedWidthInteger")
 public typealias _IntegerType = FixedWidthInteger

@@ -25,7 +25,7 @@
 /// values that can be offset and measured.
 public protocol ${Self} : ${Conformance} {
   /// A type that represents the distance between two values of `Self`.
-  associatedtype Stride : SignedArithmetic, Comparable
+  associatedtype Stride : SignedNumeric, Comparable
 
   /// Returns a stride `x` such that `self.advanced(by: x)` approximates
   /// `other`.

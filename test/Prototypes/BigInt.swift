@@ -353,7 +353,7 @@ public struct _BigInt<Word: FixedWidthInteger & UnsignedInteger> :
     return carry
   }
 
-  //===--- Arithmetic -----------------------------------------------------===//
+  //===--- Numeric --------------------------------------------------------===//
 
   public typealias Magnitude = _BigInt
 
@@ -834,7 +834,7 @@ public struct _BigInt<Word: FixedWidthInteger & UnsignedInteger> :
     return -x - 1
   }
 
-  //===--- SignedArithmetic -----------------------------------------------===//
+  //===--- SignedNumeric --------------------------------------------------===//
 
   public static prefix func -(x: inout _BigInt) {
     defer { x._checkInvariants() }
@@ -1636,7 +1636,7 @@ BigIntTests.test("Huge") {
   expectGT(y, y - 1)
 }
 
-BigIntTests.test("Arithmetic").forEach(in: [
+BigIntTests.test("Numeric").forEach(in: [
   ("3GFWFN54YXNBS6K2ST8K9B89Q2AMRWCNYP4JAS5ZOPPZ1WU09MXXTIT27ZPVEG2Y",
    "9Y1QXS4XYYDSBMU4N3LW7R3R1WKK",
    "CIFJIVHV0K4MSX44QEX2US0MFFEAWJVQ8PJZ",
