@@ -979,7 +979,7 @@ class RequirementRepr {
     : SeparatorLoc(SeparatorLoc), Kind(Kind), Invalid(false),
       FirstType(FirstType), SecondLayout(SecondLayout) { }
 
-  void printImpl(raw_ostream &OS, bool AsWritten) const;
+  void printImpl(ASTPrinter &OS, bool AsWritten) const;
 
 public:
   /// \brief Construct a new type-constraint requirement.
@@ -1164,6 +1164,7 @@ public:
       void dump() const LLVM_ATTRIBUTE_USED,
       "only for use within the debugger");
   void print(raw_ostream &OS) const;
+  void print(ASTPrinter &Printer) const;
 };
   
 /// GenericParamList - A list of generic parameters that is part of a generic
