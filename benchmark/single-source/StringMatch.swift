@@ -11,7 +11,11 @@
 //===----------------------------------------------------------------------===//
 
 import TestsUtils
+#if os(Linux)
+import Glibc
+#else
 import Darwin
+#endif
 
 // FIXME: remove when String is a Collection
 extension String: Collection { }
