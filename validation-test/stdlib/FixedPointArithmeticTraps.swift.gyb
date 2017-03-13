@@ -41,6 +41,32 @@ func expectNoOverflow<T>(
     stackTrace: stackTrace.pushIf(showFrame, file: file, line: line))
 }
 
+func expectOverflow<T>(
+  _ res: (partialValue: T, overflow: ArithmeticOverflow),
+  //===--- TRACE boilerplate ----------------------------------------------===//
+  _ message: @autoclosure () -> String = "",
+    showFrame: Bool = true,
+    stackTrace: SourceLocStack = SourceLocStack(),
+    file: String = #file, line: UInt = #line
+) {
+  expectTrue(
+    res.overflow == .overflow, "expected overflow",
+    stackTrace: stackTrace.pushIf(showFrame, file: file, line: line))
+}
+
+func expectNoOverflow<T>(
+  _ res: (partialValue: T, overflow: ArithmeticOverflow),
+  //===--- TRACE boilerplate ----------------------------------------------===//
+  _ message: @autoclosure () -> String = "",
+    showFrame: Bool = true,
+    stackTrace: SourceLocStack = SourceLocStack(),
+    file: String = #file, line: UInt = #line
+) {
+  expectTrue(
+    res.overflow == .none, "expected no overflow",
+    stackTrace: stackTrace.pushIf(showFrame, file: file, line: line))
+}
+
 %{
 
 from SwiftIntTypes import all_integer_types
@@ -110,14 +136,14 @@ FixedPointArithmeticTraps.test("PostIncrement/${IntTy}") {
 FixedPointArithmeticTraps.test("Addition/${IntTy}") {
   var a = get${IntTy}(${IntTy}.max / 3)
 
-  expectNoOverflow(${IntTy}.addWithOverflow(a, get${IntTy}(${IntTy}.max / 3)))
+  expectNoOverflow(a.addingReportingOverflow(get${IntTy}(${IntTy}.max / 3)))
   a = a + get${IntTy}(${IntTy}.max / 3)
 
-  expectNoOverflow(${IntTy}.addWithOverflow(a, get${IntTy}(${IntTy}.max / 3)))
+  expectNoOverflow(a.addingReportingOverflow(get${IntTy}(${IntTy}.max / 3)))
   a = a + get${IntTy}(${IntTy}.max / 3)
 
   // Overflow in addition.
-  expectOverflow(${IntTy}.addWithOverflow(a, get${IntTy}(${IntTy}.max / 3)))
+  expectOverflow(a.addingReportingOverflow(get${IntTy}(${IntTy}.max / 3)))
   expectCrashLater()
   a = a + get${IntTy}(${IntTy}.max / 3)
   _blackHole(a)
@@ -130,11 +156,11 @@ FixedPointArithmeticTraps.test("Addition/${IntTy}") {
 FixedPointArithmeticTraps.test("Subtraction/${IntTy}") {
   var a = get${IntTy}(${IntTy}.min + get${IntTy}(${IntTy}.max / 3))
 
-  expectNoOverflow(${IntTy}.subtractWithOverflow(a, get${IntTy}(${IntTy}.max / 3)))
+  expectNoOverflow(a.subtractingReportingOverflow(get${IntTy}(${IntTy}.max / 3)))
   a = a - get${IntTy}(${IntTy}.max / 3)
 
   // Overflow in subtraction.
-  expectOverflow(${IntTy}.subtractWithOverflow(a, get${IntTy}(${IntTy}.max / 3)))
+  expectOverflow(a.subtractingReportingOverflow(get${IntTy}(${IntTy}.max / 3)))
   expectCrashLater()
   a = a - get${IntTy}(${IntTy}.max / 3)
   _blackHole(a)
@@ -147,11 +173,11 @@ FixedPointArithmeticTraps.test("Subtraction/${IntTy}") {
 FixedPointArithmeticTraps.test("Multiplication/${IntTy}") {
   var a = get${IntTy}(${IntTy}.max / 3)
 
-  expectNoOverflow(${IntTy}.multiplyWithOverflow(a, get${IntTy}(2)))
+  expectNoOverflow(a.multipliedReportingOverflow(by: get${IntTy}(2)))
   a = a * get${IntTy}(2)
 
   // Overflow in multiplication.
-  expectOverflow(${IntTy}.multiplyWithOverflow(a, get${IntTy}(2)))
+  expectOverflow(a.multipliedReportingOverflow(by: get${IntTy}(2)))
   expectCrashLater()
   a = a * get${IntTy}(2)
   _blackHole(a)
@@ -165,11 +191,11 @@ FixedPointArithmeticTraps.test("Division/${IntTy}") {
   var a = get${IntTy}(${IntTy}.max / 3)
 
   // x / 3
-  expectNoOverflow(${IntTy}.divideWithOverflow(a, get${IntTy}(3)))
+  expectNoOverflow(a.dividedReportingOverflow(by: get${IntTy}(3)))
   a = a / get${IntTy}(3)
 
   // x / 0
-  expectOverflow(${IntTy}.divideWithOverflow(a, get${IntTy}(0)))
+  expectOverflow(a.dividedReportingOverflow(by: get${IntTy}(3)))
   expectCrashLater()
   a = a / get${IntTy}(0)
 }
@@ -179,11 +205,11 @@ FixedPointArithmeticTraps.test("Division/${IntTy}") {
 FixedPointArithmeticTraps.test("Division/${IntTy}.min-over-minus-one") {
   var a = get${IntTy}(${IntTy}.min)
 
-  expectNoOverflow(${IntTy}.divideWithOverflow(a, get${IntTy}(3)))
+  expectNoOverflow(a.dividedReportingOverflow(by: get${IntTy}(3)))
   a = a / get${IntTy}(3)
 
   a = get${IntTy}(${IntTy}.min)
-  expectOverflow(${IntTy}.divideWithOverflow(a, get${IntTy}(-1)))
+  expectOverflow(a.dividedReportingOverflow(by: get${IntTy}(3)))
   expectCrashLater()
   a = a / get${IntTy}(-1)
   // IntTy.min / -1
@@ -200,11 +226,11 @@ FixedPointArithmeticTraps.test("Remainder/${IntTy}") {
   var a = get${IntTy}(${IntTy}.max / 3)
 
   // x % 3
-  expectNoOverflow(${IntTy}.remainderWithOverflow(a, get${IntTy}(3)))
+  expectNoOverflow(a.remainderReportingOverflow(dividingBy: get${IntTy}(3)))
   a = a % get${IntTy}(3)
 
   // x % 0
-  expectOverflow(${IntTy}.remainderWithOverflow(a, get${IntTy}(0)))
+  expectOverflow(a.remainderReportingOverflow(dividingBy: get${IntTy}(0)))
   expectCrashLater()
   a = a % get${IntTy}(0)
   _blackHole(a)
@@ -216,12 +242,12 @@ FixedPointArithmeticTraps.test("Remainder/${IntTy}.min-mod-minus-one") {
   var a = get${IntTy}(${IntTy}.min)
 
   // Int.min % 3
-  expectNoOverflow(${IntTy}.remainderWithOverflow(a, get${IntTy}(3)))
+  expectNoOverflow(a.remainderReportingOverflow(dividingBy: get${IntTy}(3)))
   a = a % get${IntTy}(3)
 
   // Int.min % -1
   a = get${IntTy}(${IntTy}.min)
-  expectOverflow(${IntTy}.remainderWithOverflow(a, get${IntTy}(-1)))
+  expectOverflow(a.remainderReportingOverflow(dividingBy: get${IntTy}(-1)))
   expectCrashLater()
   a = a % get${IntTy}(-1)
   _blackHole(a)

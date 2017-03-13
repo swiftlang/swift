@@ -4,12 +4,12 @@
 
 % from SwiftIntTypes import all_numeric_type_names, numeric_type_names_macintosh_only, \
 %   all_integer_type_names, all_integer_binary_operator_names, all_integer_or_real_binary_operator_names, \
-%   all_arithmetic_comparison_operator_names, all_integer_assignment_operator_names, \
+%   all_integer_assignment_operator_names, \
 %   all_integer_or_real_assignment_operator_names
 
 % int_ops = all_integer_binary_operator_names() + all_integer_assignment_operator_names()
 % arith_ops = all_integer_or_real_binary_operator_names() + \
-%   all_arithmetic_comparison_operator_names() + all_integer_or_real_assignment_operator_names()
+%   all_integer_or_real_assignment_operator_names()
 
 % count = 0
 // TODO: Verify the type of the result
@@ -17,7 +17,6 @@
 func testIteratedOperations() {
 % for typesToTest, operatorsToTest in zip([all_integer_type_names(), all_numeric_type_names()],
 %  [int_ops, arith_ops]):
-  % operatorsToTest = [x for x in operatorsToTest if not '+' in x and not '-' in x]
   %# TODO: rm when rdar://18695154 is fixed.
 // typesToTest: ${typesToTest}, operatorsToTest: ${operatorsToTest}
   % for T1 in typesToTest:
@@ -26,16 +25,31 @@ func testIteratedOperations() {
         or T2 in numeric_type_names_macintosh_only() else "" }
       % for op in operatorsToTest:
         % count += 1
-        % theDiagnostic = "// expected-error{{of type}} expected-note*{{expected an argument list of type}} expected-note*{{exist with these partially matching parameter lists}} " if (T1 != T2) else \
-        %   "// expected-note{{add an explicit type annotation}}  expected-warning{{inferred to have type}}"\
-        %   if (op in all_integer_assignment_operator_names() + all_integer_or_real_assignment_operator_names())\
-        %   else "" #FIXME Temporary workaround for rdar://15928178 gyb miscompiles nested if elif
+        % theDiagnostic = ""
+        % all_assignment_operators = (all_integer_assignment_operator_names() + all_integer_or_real_assignment_operator_names())
+        % if T1 != T2:
+        %   if op in [">>", "<<"]: # heterogeneous shifts are allowed
+        %     theDiagnostic = ""
+        %   elif op in [">>=", "<<="]:
+        %     theDiagnostic = "// expected-note{{add an explicit type annotation}}  expected-warning{{inferred to have type}}"
+        %   elif op not in ["&+", "&-", "&*"]:
+        %     theDiagnostic = "// expected-error{{of type}} expected-note*{{expected an argument list of type}} expected-note*{{exist with these partially matching parameter lists}}"
+        %   else:
+        %     theDiagnostic = "// expected-error {{'Self' could not be inferred}}"
+        %   end
+        % else:
+        %   if op in all_assignment_operators:
+        %     theDiagnostic = "// expected-note{{add an explicit type annotation}}  expected-warning{{inferred to have type}}"
+        %   else:
+        %     pass
+        %   end
+        % end
     do { // ${count}
       var x1_${T1}: ${T1} = 0
       var x2_${T2}: ${T2} = 0
       var result = x1_${T1} ${op} x2_${T2}  ${theDiagnostic}
     }
-      %end # op
+      % end # for op
       ${ "\n#endif //arch(i386) || arch(x86_64)\n\n" if T1 in numeric_type_names_macintosh_only()
         or T2 in numeric_type_names_macintosh_only() else "" }
     %end # T2

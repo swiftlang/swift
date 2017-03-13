@@ -828,7 +828,7 @@ def assignmentOperatorComment(operator, fixedWidth):
 #     +   addingReportingOverflow(_:)
 #     -   subtractingReportingOverflow(_:)
 #     *   multiplyingReportingOverflow(_:)
-#     /   dividingReportingOverflow(by:)
+#     /   dividedReportingOverflow(by:)
 #     %   remainderReportingOverflow(dividingBy:)
 def overflowOperationComment(operator):
     comments = {
@@ -875,7 +875,7 @@ def overflowOperationComment(operator):
   /// a flag indicating whether overflow occurred in the operation.
   ///
   /// Dividing by zero is not an error when using this method. For a value `x`,
-  /// the result of `x.dividingReportingOverflow(by: 0)` is `(x, .overflow)`.
+  /// the result of `x.dividedReportingOverflow(by: 0)` is `(x, .overflow)`.
   ///
   /// - Parameter rhs: The value to divide this value by.
   /// - Returns: A tuple containing the result of the division along with a
@@ -891,7 +891,7 @@ def overflowOperationComment(operator):
   /// a flag indicating whether overflow occurred in the operation.
   ///
   /// Dividing by zero is not an error when using this method. For a value `x`,
-  /// the result of `x.dividingReportingOverflow(by: 0)` is `(x, .overflow)`.
+  /// the result of `x.dividedReportingOverflow(by: 0)` is `(x, .overflow)`.
   ///
   /// - Parameter rhs: The value to divide this value by.
   /// - Returns: A tuple containing the result of the division along with a
