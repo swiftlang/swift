@@ -20,7 +20,6 @@
 #include "SourceKit/Support/Tracing.h"
 #include "SourceKit/Support/UIdent.h"
 
-#include "swift/AST/AST.h"
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"

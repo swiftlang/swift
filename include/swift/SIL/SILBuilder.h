@@ -26,6 +26,8 @@ namespace swift {
 using Atomicity = RefCountingInst::Atomicity;
 
 class SILDebugScope;
+class IntegerLiteralExpr;
+class FloatLiteralExpr;
 
 class SILBuilder {
   friend class SILBuilderWithScope;
@@ -425,9 +427,8 @@ public:
                       GlobalAddrInst(getSILDebugLocation(Loc), g));
   }
 
-  IntegerLiteralInst *createIntegerLiteral(IntegerLiteralExpr *E) {
-    return insert(IntegerLiteralInst::create(E, getSILDebugLocation(E), F));
-  }
+  IntegerLiteralInst *createIntegerLiteral(IntegerLiteralExpr *E);
+
   IntegerLiteralInst *createIntegerLiteral(SILLocation Loc, SILType Ty,
                                            intmax_t Value) {
     return insert(
@@ -439,9 +440,8 @@ public:
         IntegerLiteralInst::create(getSILDebugLocation(Loc), Ty, Value, F));
   }
 
-  FloatLiteralInst *createFloatLiteral(FloatLiteralExpr *E) {
-    return insert(FloatLiteralInst::create(E, getSILDebugLocation(E), F));
-  }
+  FloatLiteralInst *createFloatLiteral(FloatLiteralExpr *E);
+
   FloatLiteralInst *createFloatLiteral(SILLocation Loc, SILType Ty,
                                        const APFloat &Value) {
     return insert(

@@ -13,7 +13,6 @@
 #include "SILGenFunction.h"
 #include "ManagedValue.h"
 #include "Scope.h"
-#include "swift/AST/AST.h"
 #include "swift/AST/Mangle.h"
 #include "swift/AST/ASTMangler.h"
 #include "swift/SIL/FormalLinkage.h"

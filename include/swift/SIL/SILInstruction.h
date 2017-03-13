@@ -18,9 +18,10 @@
 #define SWIFT_SIL_INSTRUCTION_H
 
 #include "swift/AST/Builtins.h"
-#include "swift/AST/Expr.h"
+#include "swift/AST/Decl.h"
 #include "swift/AST/ProtocolConformanceRef.h"
 #include "swift/Basic/Compiler.h"
+#include "swift/Basic/NullablePtr.h"
 #include "swift/SIL/Consumption.h"
 #include "swift/SIL/SILAllocated.h"
 #include "swift/SIL/SILFunctionConventions.h"

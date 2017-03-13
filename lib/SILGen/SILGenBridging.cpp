@@ -13,7 +13,6 @@
 #include "SILGenFunction.h"
 #include "RValue.h"
 #include "Scope.h"
-#include "swift/AST/AST.h"
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/GenericEnvironment.h"

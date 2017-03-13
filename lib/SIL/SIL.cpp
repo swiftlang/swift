@@ -19,7 +19,6 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/AnyFunctionRef.h"
 #include "swift/AST/Decl.h"
-#include "swift/AST/Expr.h"
 #include "swift/AST/Mangle.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/ProtocolConformance.h"

@@ -10,12 +10,22 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/AST/Expr.h"
 #include "swift/SIL/SILBuilder.h"
+
 using namespace swift;
 
 //===----------------------------------------------------------------------===//
 // SILBuilder Implementation
 //===----------------------------------------------------------------------===//
+
+IntegerLiteralInst *SILBuilder::createIntegerLiteral(IntegerLiteralExpr *E) {
+  return insert(IntegerLiteralInst::create(E, getSILDebugLocation(E), F));
+}
+
+FloatLiteralInst *SILBuilder::createFloatLiteral(FloatLiteralExpr *E) {
+  return insert(FloatLiteralInst::create(E, getSILDebugLocation(E), F));
+}
 
 TupleInst *SILBuilder::createTuple(SILLocation loc, ArrayRef<SILValue> elts) {
   // Derive the tuple type from the elements.
