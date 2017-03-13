@@ -4,7 +4,7 @@ import Swift
 // In-memory UTF16 encoding in TODO-normal-form.
 struct SwiftCanonicalString {
   typealias Element = UInt16
-  typealias CodeUnits = _StringBuffer<Element>
+  typealias CodeUnits = _StringBuffer<_UTF16StringStorage>
   typealias Encoding = UTF16
   typealias Storage = UnicodeStorage<CodeUnits, Encoding>
   var _storage: Storage
@@ -26,7 +26,8 @@ struct SwiftCanonicalString {
   // FIXME: when new integers land, we won't need this constraint anymore.
   where OtherCodeUnits.Iterator.Element : UnsignedInteger
   {
-    self._storage = UnicodeStorage(CodeUnits(_StringStorage<UInt16>(other)))
+    self._storage = UnicodeStorage(
+      CodeUnits(_UTF16StringStorage(utf16CodeUnitValues: other.transcoded(to: UTF16.self))))
   }
 
   init() {

@@ -6,7 +6,7 @@ import Swift
 // and data stored in _StringBuffer
 struct Latin1String {
   typealias Element = UInt8
-  typealias CodeUnits = _StringBuffer<Element>
+  typealias CodeUnits = _StringBuffer<_Latin1StringStorage>
   typealias Encoding = Latin1
   typealias Storage = UnicodeStorage<CodeUnits, Encoding>
   var _storage: Storage
@@ -23,9 +23,8 @@ struct Latin1String {
   ) {
     let otherLatin1 = other.transcoded(to: Encoding.self)
     let newCount = otherLatin1.count
-    let newStringStorage = _StringStorage<UInt8>(
-      count: newCount, minimumCapacity: newCount
-    )
+    let newStringStorage = _Latin1StringStorage(
+      _uninitializedCount: numericCast(newCount))
 
     // Copy in
     // FIXME: why can't I use .indices below?
