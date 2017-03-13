@@ -9,11 +9,9 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
-// RUN: rm -rf %t && mkdir -p %t && %gyb -DWORD_BITS=%target-ptrsize %s -o %t/out.swift
-// RUN: %line-directive %t/out.swift -- %target-build-swift %t/out.swift -o %t/a.out -Onone
-// RUN: %line-directive %t/out.swift -- %target-run %t/a.out
-
+// RUN: %target-run-simple-swift
 // REQUIRES: executable_test
+
 import StdlibUnittest
 
 struct UnicodeIndex : Comparable {
@@ -237,6 +235,7 @@ protocol AnyUnicodeBidirectionalUInt32_ {
   var contiguousStorage : ContiguousStorage<Element>? { get }
 }
 
+// Adapts any bidirectional collection of UInt32 to AnyUnicodeBidirectionalUInt32_
 struct AnyUnicodeBidirectionalUInt32 : BidirectionalCollection, AnyUnicodeBidirectionalUInt32_ {
   let base: AnyUnicodeBidirectionalUInt32_
   typealias IndexDistance = Int64
@@ -315,7 +314,7 @@ where Base.Iterator.Element : UnsignedInteger {
 protocol AnyCharacters_ {
   typealias IndexDistance = Int64
   typealias Index = UnicodeIndex
-  typealias Element = UInt32
+  typealias Element = Character
   var startIndex: Index { get }
   var endIndex: Index { get }
   func index(after: Index) -> Index
@@ -333,7 +332,7 @@ struct AnyCharacters : BidirectionalCollection, AnyCharacters_ {
   let base: AnyCharacters_
   typealias IndexDistance = Int64
   typealias Index = UnicodeIndex
-  typealias Element = UInt32
+  typealias Element = Character
   var startIndex: Index { return base.startIndex }
   var endIndex: Index { return base.endIndex }
   func index(after i: Index) -> Index { return base.index(after: i) }
@@ -366,15 +365,15 @@ protocol AnyUnicode {
   func isInFastCOrDForm(scan: Bool/* = true*/) -> Bool
 }
 
-struct AnyUIntCollection<
-Base: RandomAccessCollection, Element_ : UnsignedInteger
+struct AnyRandomAccessUnsignedIntegers<
+  Base: RandomAccessCollection, Element_ : UnsignedInteger
 > : RandomAccessCollection
 where Base.Iterator.Element : UnsignedInteger {
   typealias IndexDistance = Int64
   typealias Index = Int64
   typealias Element = Element_
   // FIXME: associated type deduction seems to need a hint here.
-  typealias Indices = DefaultRandomAccessIndices<AnyUIntCollection>
+  typealias Indices = DefaultRandomAccessIndices<AnyRandomAccessUnsignedIntegers>
   
   let base: Base
 
@@ -425,9 +424,11 @@ extension AnyUnicodeEncoding
   where Self : UnicodeEncoding,
   Self.EncodedScalar.Iterator.Element : UnsignedInteger {
   
-  static func utf16View<CodeUnits: RandomAccessCollection>(codeUnits: CodeUnits) -> AnyUTF16
+  static func utf16View<
+    CodeUnits: RandomAccessCollection
+  >(codeUnits: CodeUnits) -> AnyUTF16
   where CodeUnits.Iterator.Element : UnsignedInteger {
-    typealias WidthAdjusted = AnyUIntCollection<CodeUnits, CodeUnit>
+    typealias WidthAdjusted = AnyRandomAccessUnsignedIntegers<CodeUnits, CodeUnit>
     typealias Storage = UnicodeStorage<WidthAdjusted, Self>
     
     let r = Storage.TranscodedView(
