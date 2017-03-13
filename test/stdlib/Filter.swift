@@ -60,4 +60,23 @@ FilterTests.test("filtering sequences") {
   expectEqualSequence([7, 14, 21, 28], f1)
 }
 
+FilterTests.test("single-count") {
+  // Check that we're only calling a lazy filter's predicate one time for
+  // each element in a sequence or collection.
+  var count = 0
+  let mod7AndCount: (Int) -> Bool = {
+    count += 1
+    return $0 % 7 == 0
+  }
+    
+  let f0 = (0..<30).makeIterator().lazy.filter(mod7AndCount)
+  let a0 = Array(f0)
+  expectEqual(30, count)
+
+  count = 0
+  let f1 = LazyFilterCollection(_base: 0..<30, mod7AndCount)
+  let a1 = Array(f1)
+  expectEqual(30, count)
+}
+
 runAllTests()

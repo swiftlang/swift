@@ -268,6 +268,22 @@ public struct ${Self}<
     return ${Slice}(base: self, bounds: bounds)
   }
 
+  // Any estimate of the number of elements that pass `_predicate` requires
+  // iterating the collection and evaluating each element, which can be costly,
+  // is unexpected, and usually doesn't pay for itself in saving time through
+  // preventing intermediate reallocations. (SR-4164)
+  public var underestimatedCount: Int { return 0 }
+
+  public func _copyToContiguousArray()
+    -> ContiguousArray<Base.Iterator.Element> {
+
+    // The default implementation of `_copyToContiguousArray` queries the
+    // `count` property, which evaluates `_predicate` for every element --
+    // see the note above `underestimatedCount`. Here we treat `self` as a
+    // sequence and only rely on underestimated count.
+    return _copySequenceToContiguousArray(self)
+  }
+
   // FIXME(ABI)#28 (Associated Types with where clauses): we actually want to add:
   //
   //   typealias SubSequence = ${Self}<Base.SubSequence>
