@@ -481,6 +481,11 @@ public:
   /// Type.
   SILType getReferentType(SILModule &M) const;
 
+  /// Given two SIL types which are representations of the same type,
+  /// check whether they have an abstraction difference.
+  bool hasAbstractionDifference(SILFunctionTypeRepresentation rep,
+                                SILType type2);
+
   /// Returns the hash code for the SILType.
   llvm::hash_code getHashCode() const {
     return llvm::hash_combine(*this);
