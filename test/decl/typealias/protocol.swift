@@ -93,6 +93,28 @@ struct OneIntSeq: MySeq, MyIterator {
   }
 }
 
+protocol MyIntIterator {
+  typealias Elem = Int
+}
+
+struct MyIntSeq : MyIterator, MyIntIterator {
+  func next() -> Elem? {
+    return 0
+  }
+}
+
+protocol MyIntIterator2 {}
+
+extension MyIntIterator2 {
+  typealias Elem = Int
+}
+
+struct MyIntSeq2 : MyIterator, MyIntIterator2 {
+  func next() -> Elem? {
+    return 0
+  }
+}
+
 // test for conformance correctness using typealias in extension
 extension MySeq {
   func first() -> Elem {
