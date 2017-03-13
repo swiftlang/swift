@@ -898,7 +898,8 @@ void swift::ide::getLocationInfo(const ValueDecl *VD,
       NameLen = getCharLength(SM, R);
     } else {
       if (VD->hasName()) {
-        NameLen = VD->getName().getLength();
+        // TODO: Handle special names
+        NameLen = VD->getBaseName().getIdentifier().getLength();
       } else {
         NameLen = getCharLength(SM, VD->getLoc());
       }

@@ -48,16 +48,16 @@ public:
   /// be consulted first.  Return true if results have been added
   /// to RV.
   /// FIXME: I don't think this ever does anything useful.
-  virtual bool lookupOverrides(Identifier Name, DeclContext *DC,
+  virtual bool lookupOverrides(DeclBaseName Name, DeclContext *DC,
                                SourceLoc Loc, bool IsTypeLookup,
                                ResultVector &RV) = 0;
- 
+
   /// This is the second time DebuggerClient is consulted:
   /// after all names in external Modules are checked, the client
   /// gets a chance to add names to the list of candidates that
-  /// have been found in the external module lookup.  
+  /// have been found in the external module lookup.
 
-  virtual bool lookupAdditions(Identifier Name, DeclContext *DC,
+  virtual bool lookupAdditions(DeclBaseName Name, DeclContext *DC,
                                SourceLoc Loc, bool IsTypeLookup,
                                ResultVector &RV) = 0;
 

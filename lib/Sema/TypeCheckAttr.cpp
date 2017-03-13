@@ -1816,7 +1816,7 @@ void AttributeChecker::visitFixedLayoutAttr(FixedLayoutAttr *attr) {
   if (VD->getEffectiveAccess() < Accessibility::Public) {
     TC.diagnose(attr->getLocation(),
                 diag::fixed_layout_attr_on_internal_type,
-                VD->getName(),
+                VD->getBaseName(),
                 getAccessForDiagnostics(VD))
         .fixItRemove(attr->getRangeWithAt());
     attr->setInvalid();
@@ -1840,7 +1840,7 @@ void AttributeChecker::visitVersionedAttr(VersionedAttr *attr) {
   if (VD->getFormalAccess() != Accessibility::Internal) {
     TC.diagnose(attr->getLocation(),
                 diag::versioned_attr_with_explicit_accessibility,
-                VD->getName(),
+                VD->getBaseName(),
                 VD->getFormalAccess())
         .fixItRemove(attr->getRangeWithAt());
     attr->setInvalid();
@@ -1872,7 +1872,7 @@ void AttributeChecker::visitInlineableAttr(InlineableAttr *attr) {
        VD->getFormalAccess() < Accessibility::Public)) {
     TC.diagnose(attr->getLocation(),
                 diag::inlineable_decl_not_public,
-                VD->getName(),
+                VD->getBaseName(),
                 getAccessForDiagnostics(VD))
         .fixItRemove(attr->getRangeWithAt());
     attr->setInvalid();

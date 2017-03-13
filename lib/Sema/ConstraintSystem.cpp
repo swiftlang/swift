@@ -1060,10 +1060,10 @@ ConstraintSystem::getTypeOfMemberReference(
 
   // Handle associated type lookup as a special case, horribly.
   // FIXME: This is an awful hack.
-  if (isa<AssociatedTypeDecl>(value)) {
+  if (auto atd = dyn_cast<AssociatedTypeDecl>(value)) {
     // Refer to a member of the archetype directly.
     auto archetype = baseObjTy->castTo<ArchetypeType>();
-    Type memberTy = archetype->getNestedType(value->getName());
+    Type memberTy = archetype->getNestedType(atd->getName());
     if (!isTypeReference)
       memberTy = MetatypeType::get(memberTy);
 
