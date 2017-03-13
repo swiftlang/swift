@@ -4158,7 +4158,7 @@ public:
       exType = exMetatype.getInstanceType();
       concreteType = cast<MetatypeType>(concreteType).getInstanceType();
     }
-    assert(exType.isExistentialType());
+    assert(exType->isExistentialType());
     return concreteType;
   }
 

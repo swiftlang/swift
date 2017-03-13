@@ -2262,7 +2262,7 @@ SILValue SILGenFunction::emitMetatypeOfValue(SILLocation loc, Expr *baseExpr) {
   CanType baseTy = formalBaseType->getCanonicalType();
 
   // For class, archetype, and protocol types, look up the dynamic metatype.
-  if (baseTy.isAnyExistentialType()) {
+  if (baseTy->isAnyExistentialType()) {
     SILType metaTy = getLoweredLoadableType(
                                       CanExistentialMetatypeType::get(baseTy));
     auto base = emitRValueAsSingleValue(baseExpr,
