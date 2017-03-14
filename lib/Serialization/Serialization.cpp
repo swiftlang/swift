@@ -2385,7 +2385,21 @@ void Serializer::writeDecl(const Decl *D) {
                          isa<ProtocolDecl>(baseNominal);
     }
 
-    writeGenericParams(extension->getGenericParams());
+    // Extensions of nested generic types have multiple generic parameter
+    // lists. Collect them all, from the innermost to outermost.
+    SmallVector<GenericParamList *, 2> allGenericParams;
+    for (auto *genericParams = extension->getGenericParams();
+         genericParams != nullptr;
+         genericParams = genericParams->getOuterParameters()) {
+      allGenericParams.push_back(genericParams);
+    }
+
+    // Reverse the list, and write the parameter lists, from outermost
+    // to innermost.
+    std::reverse(allGenericParams.begin(), allGenericParams.end());
+    for (auto *genericParams : allGenericParams)
+      writeGenericParams(genericParams);
+
     writeMembers(extension->getMembers(), isClassExtension);
     writeConformances(conformances, DeclTypeAbbrCodes);
     break;

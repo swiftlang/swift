@@ -3428,9 +3428,12 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     extension->setEarlyAttrValidation();
     declOrOffset = extension;
 
-    // Generic parameters.
-    GenericParamList *genericParams = maybeReadGenericParams(DC);
-    extension->setGenericParams(genericParams);
+    // Generic parameter lists are written from outermost to innermost.
+    // Keep reading until we run out of generic parameter lists.
+    GenericParamList *outerParams = nullptr;
+    while (auto *genericParams = maybeReadGenericParams(DC, outerParams))
+      outerParams = genericParams;
+    extension->setGenericParams(outerParams);
 
     configureGenericEnvironment(extension, genericEnvID);
 
@@ -3457,6 +3460,19 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
                                        DeclTypeCursor.GetCurrentBitNo()));
 
     nominal->addExtension(extension);
+
+#ifndef NDEBUG
+    if (outerParams) {
+      unsigned paramCount = 0;
+      for (auto *paramList = outerParams;
+           paramList != nullptr;
+           paramList = paramList->getOuterParameters()) {
+        paramCount += paramList->size();
+      }
+      assert(paramCount ==
+             extension->getGenericSignature()->getGenericParams().size());
+    }
+#endif
 
     break;
   }
