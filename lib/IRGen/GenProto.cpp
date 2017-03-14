@@ -2104,7 +2104,9 @@ llvm::Value *MetadataPath::followComponent(IRGenFunction &IGF,
 }
 
 void MetadataPath::dump() const {
-  print(llvm::errs());
+  auto &out = llvm::errs();
+  print(out);
+  out << '\n';
 }
 void MetadataPath::print(llvm::raw_ostream &out) const {
   for (auto i = Path.begin(), e = Path.end(); i != e; ++i) {
