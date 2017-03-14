@@ -189,13 +189,29 @@ private:
   };
   SILValue SelfValue;
   CanAnyFunctionType OrigFormalInterfaceType;
+  CanFunctionType SubstFormalInterfaceType;
   SubstitutionList Substitutions;
   Optional<SmallVector<ManagedValue, 2>> Captures;
 
   // The pointer back to the AST node that produced the callee.
   SILLocation Loc;
 
-private:
+  static CanFunctionType
+  getSubstFormalInterfaceType(CanAnyFunctionType substFormalType,
+                              SubstitutionList subs) {
+    if (auto *gft = substFormalType->getAs<GenericFunctionType>()) {
+      return cast<FunctionType>(
+        gft->substGenericArgs(subs)
+          ->getCanonicalType());
+    }
+
+    return cast<FunctionType>(substFormalType);
+  }
+
+  static CanAnyFunctionType getConstantFormalInterfaceType(SILGenFunction &SGF,
+                                                           SILDeclRef fn) {
+    return SGF.SGM.Types.getConstantInfo(fn).FormalInterfaceType;
+  }
 
   Callee(ManagedValue indirectValue,
          CanAnyFunctionType origFormalType,
@@ -203,19 +219,18 @@ private:
     : kind(Kind::IndirectValue),
       IndirectValue(indirectValue),
       OrigFormalInterfaceType(origFormalType),
+      SubstFormalInterfaceType(cast<FunctionType>(origFormalType)),
       Loc(l)
   {}
 
-  static CanAnyFunctionType getConstantFormalInterfaceType(SILGenFunction &SGF,
-                                                           SILDeclRef fn) {
-    return SGF.SGM.Types.getConstantInfo(fn).FormalInterfaceType;
-  }
-
   Callee(SILGenFunction &SGF, SILDeclRef standaloneFunction,
+         CanAnyFunctionType origFormalType,
+         CanAnyFunctionType substFormalType,
          SubstitutionList subs, SILLocation l)
     : kind(Kind::StandaloneFunction), Constant(standaloneFunction),
-      OrigFormalInterfaceType(getConstantFormalInterfaceType(SGF,
-                                                           standaloneFunction)),
+      OrigFormalInterfaceType(origFormalType),
+      SubstFormalInterfaceType(getSubstFormalInterfaceType(substFormalType,
+                                                           subs)),
       Substitutions(subs),
       Loc(l)
   {
@@ -226,10 +241,13 @@ private:
          SILValue selfValue,
          SILDeclRef methodName,
          CanAnyFunctionType origFormalType,
+         CanAnyFunctionType substFormalType,
          SubstitutionList subs,
          SILLocation l)
     : kind(methodKind), Constant(methodName), SelfValue(selfValue),
       OrigFormalInterfaceType(origFormalType),
+      SubstFormalInterfaceType(getSubstFormalInterfaceType(substFormalType,
+                                                           subs)),
       Substitutions(subs),
       Loc(l)
   {
@@ -245,53 +263,58 @@ public:
   static Callee forDirect(SILGenFunction &SGF, SILDeclRef c,
                           SubstitutionList subs,
                           SILLocation l) {
-    return Callee(SGF, c, subs, l);
+    auto formalType = getConstantFormalInterfaceType(SGF, c);
+    return Callee(SGF, c, formalType, formalType, subs, l);
   }
   static Callee forEnumElement(SILGenFunction &SGF, SILDeclRef c,
                                SubstitutionList subs,
                                SILLocation l) {
     assert(isa<EnumElementDecl>(c.getDecl()));
+    auto formalType = getConstantFormalInterfaceType(SGF, c);
     return Callee(Kind::EnumElement, SGF, SILValue(), c,
-                  getConstantFormalInterfaceType(SGF, c),
-                  subs, l);
+                  formalType, formalType, subs, l);
   }
   static Callee forClassMethod(SILGenFunction &SGF, SILValue selfValue,
-                               SILDeclRef name,
+                               SILDeclRef c,
                                SubstitutionList subs,
                                SILLocation l) {
-    return Callee(Kind::ClassMethod, SGF, selfValue, name,
-                  getConstantFormalInterfaceType(SGF, name),
-                  subs, l);
+    auto base = c.getBaseOverriddenVTableEntry();
+    auto formalType = getConstantFormalInterfaceType(SGF, base);
+    auto substType = getConstantFormalInterfaceType(SGF, c);
+    return Callee(Kind::ClassMethod, SGF, selfValue, c,
+                  formalType, substType, subs, l);
   }
   static Callee forSuperMethod(SILGenFunction &SGF, SILValue selfValue,
-                               SILDeclRef name,
+                               SILDeclRef c,
                                SubstitutionList subs,
                                SILLocation l) {
     while (auto *UI = dyn_cast<UpcastInst>(selfValue))
       selfValue = UI->getOperand();
 
-    return Callee(Kind::SuperMethod, SGF, selfValue, name,
-                  getConstantFormalInterfaceType(SGF, name),
-                  subs, l);
+    auto formalType = getConstantFormalInterfaceType(SGF, c);
+    return Callee(Kind::SuperMethod, SGF, selfValue, c,
+                  formalType, formalType, subs, l);
   }
   static Callee forArchetype(SILGenFunction &SGF,
                              SILValue optOpeningInstruction,
                              CanType protocolSelfType,
-                             SILDeclRef name,
+                             SILDeclRef c,
                              SubstitutionList subs,
                              SILLocation l) {
-    return Callee(Kind::WitnessMethod, SGF, optOpeningInstruction, name,
-                  getConstantFormalInterfaceType(SGF, name), subs, l);
+    auto formalType = getConstantFormalInterfaceType(SGF, c);
+    return Callee(Kind::WitnessMethod, SGF, optOpeningInstruction, c,
+                  formalType, formalType, subs, l);
   }
   static Callee forDynamic(SILGenFunction &SGF, SILValue proto,
-                           SILDeclRef name, Type substFormalType,
+                           SILDeclRef c,
+                           Type substFormalType,
                            SubstitutionList subs,
                            SILLocation l) {
-    return Callee(Kind::DynamicMethod, SGF, proto, name,
-                  getDynamicMethodFormalType(proto,
-                                             name.getDecl(),
-                                             substFormalType),
-                  subs, l);
+    auto formalType = getDynamicMethodFormalType(proto,
+                                                 c.getDecl(),
+                                                 substFormalType);
+    return Callee(Kind::DynamicMethod, SGF, proto, c,
+                  formalType, formalType, subs, l);
   }
   Callee(Callee &&) = default;
   Callee &operator=(Callee &&) = default;
@@ -315,13 +338,7 @@ public:
   }
 
   CanFunctionType getSubstFormalType() const {
-    if (auto *gft = OrigFormalInterfaceType->getAs<GenericFunctionType>()) {
-      return cast<FunctionType>(
-        gft->substGenericArgs(getSubstitutions())
-          ->getCanonicalType());
-    }
-
-    return cast<FunctionType>(OrigFormalInterfaceType);
+    return SubstFormalInterfaceType;
   }
 
   unsigned getNaturalUncurryLevel() const {
@@ -642,7 +659,7 @@ private:
     if (!fd->isInstanceMember() ||
         protocol->requiresClass() ||
         selfValue.hasLValueType() ||
-        !cast<ArchetypeType>(selfValue.getSubstRValueType())->requiresClass())
+        !cast<ArchetypeType>(getSelfType())->requiresClass())
       return false;
 
     assert(SGF.silConv.useLoweredAddresses() ==

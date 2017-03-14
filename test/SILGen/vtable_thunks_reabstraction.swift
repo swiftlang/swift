@@ -86,12 +86,10 @@ class ConcreteClassMetatype<X>: Opaque<C.Type> {
   override func variantOptionality(x: C.Type?) -> C.Type { return x! }
 }
 
-/*
 class ConcreteOptional<X>: Opaque<S?> {
   override func inAndOut(x: S?) -> S? { return x }
-  override func variantOptionality(x: S??) -> S? { return x! }
+  // override func variantOptionality(x: S??) -> S? { return x! }
 }
- */
 
 // Make sure we remap the method's innermost generic parameters
 // to the correct depth
