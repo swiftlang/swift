@@ -37,6 +37,9 @@ public:
   virtual RValue finish(SILGenFunction &SGF, SILLocation loc, CanType substType,
                         ArrayRef<ManagedValue> &directResults) = 0;
   virtual ~ResultPlan() = default;
+
+  virtual void
+  gatherIndirectResultAddrs(SmallVectorImpl<SILValue> &outList) const = 0;
 };
 
 using ResultPlanPtr = std::unique_ptr<ResultPlan>;
@@ -47,14 +50,11 @@ struct ResultPlanBuilder {
   SILLocation loc;
   ArrayRef<SILResultInfo> allResults;
   SILFunctionTypeRepresentation rep;
-  SmallVectorImpl<SILValue> &indirectResultAddrs;
 
   ResultPlanBuilder(SILGenFunction &SGF, SILLocation loc,
                     ArrayRef<SILResultInfo> allResults,
-                    SILFunctionTypeRepresentation rep,
-                    SmallVectorImpl<SILValue> &resultAddrs)
-      : SGF(SGF), loc(loc), allResults(allResults), rep(rep),
-        indirectResultAddrs(resultAddrs) {}
+                    SILFunctionTypeRepresentation rep)
+      : SGF(SGF), loc(loc), allResults(allResults), rep(rep) {}
 
   ResultPlanPtr build(Initialization *emitInto, AbstractionPattern origType,
                       CanType substType);

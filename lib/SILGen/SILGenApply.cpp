@@ -1740,10 +1740,10 @@ static bool hasUnownedInnerPointerResult(CanSILFunctionType fnType) {
   return false;
 }
 
-static ResultPlanPtr
-computeResultPlan(SILGenFunction *SGF, CalleeTypeInfo &calleeTypeInfo,
-                  SILLocation loc, SGFContext evalContext,
-                  SmallVectorImpl<SILValue> &indirectResultAddrs) {
+static ResultPlanPtr computeResultPlan(SILGenFunction *SGF,
+                                       CalleeTypeInfo &calleeTypeInfo,
+                                       SILLocation loc,
+                                       SGFContext evalContext) {
   auto origResultTypeForPlan = calleeTypeInfo.origResultType;
   auto substResultTypeForPlan = calleeTypeInfo.substResultType;
   ArrayRef<SILResultInfo> allResults = calleeTypeInfo.substFnType->getResults();
@@ -1778,8 +1778,7 @@ computeResultPlan(SILGenFunction *SGF, CalleeTypeInfo &calleeTypeInfo,
   }
 
   ResultPlanBuilder builder(*SGF, loc, allResults,
-                            calleeTypeInfo.getOverrideRep(),
-                            indirectResultAddrs);
+                            calleeTypeInfo.getOverrideRep());
   return builder.build(evalContext.getEmitInto(), origResultTypeForPlan,
                        substResultTypeForPlan);
 }
@@ -1797,9 +1796,10 @@ RValue SILGenFunction::emitApply(SILLocation loc, ManagedValue fn,
   auto substResultType = calleeTypeInfo.substResultType;
 
   // Create the result plan.
+  ResultPlanPtr resultPlan =
+      computeResultPlan(this, calleeTypeInfo, loc, evalContext);
   SmallVector<SILValue, 4> indirectResultAddrs;
-  ResultPlanPtr resultPlan = computeResultPlan(
-      this, calleeTypeInfo, loc, evalContext, indirectResultAddrs);
+  resultPlan->gatherIndirectResultAddrs(indirectResultAddrs);
 
   // If the function returns an inner pointer, we'll need to lifetime-extend
   // the 'self' parameter.

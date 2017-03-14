@@ -37,6 +37,10 @@ public:
     init->finishInitialization(SGF);
     return RValue();
   }
+  void
+  gatherIndirectResultAddrs(SmallVectorImpl<SILValue> &outList) const override {
+    outList.emplace_back(init->getAddressForInPlaceInitialization());
+  }
 };
 
 /// A result plan for working with a single value and potentially
@@ -114,6 +118,13 @@ public:
       return RValue(SGF, loc, substType, value);
     }
   }
+
+  void
+  gatherIndirectResultAddrs(SmallVectorImpl<SILValue> &outList) const override {
+    if (!temporary)
+      return;
+    outList.emplace_back(temporary->getAddress());
+  }
 };
 
 /// A result plan which calls copyOrInitValueInto on an Initialization
@@ -142,6 +153,11 @@ public:
 
     return RValue();
   }
+
+  void
+  gatherIndirectResultAddrs(SmallVectorImpl<SILValue> &outList) const override {
+    subPlan->gatherIndirectResultAddrs(outList);
+  }
 };
 
 /// A result plan which calls copyOrInitValueInto using the result of
@@ -163,6 +179,11 @@ public:
     init->finishInitialization(SGF);
 
     return RValue();
+  }
+
+  void
+  gatherIndirectResultAddrs(SmallVectorImpl<SILValue> &outList) const override {
+    subPlan->gatherIndirectResultAddrs(outList);
   }
 };
 
@@ -197,6 +218,13 @@ public:
     }
 
     return tupleRV;
+  }
+
+  void
+  gatherIndirectResultAddrs(SmallVectorImpl<SILValue> &outList) const override {
+    for (const auto &eltPlan : eltPlans) {
+      eltPlan->gatherIndirectResultAddrs(outList);
+    }
   }
 };
 
@@ -243,6 +271,13 @@ public:
 
     return RValue();
   }
+
+  void
+  gatherIndirectResultAddrs(SmallVectorImpl<SILValue> &outList) const override {
+    for (const auto &eltPlan : eltPlans) {
+      eltPlan->gatherIndirectResultAddrs(outList);
+    }
+  }
 };
 
 } // end anonymous namespace
@@ -275,7 +310,6 @@ ResultPlanPtr ResultPlanBuilder::build(Initialization *init,
     if (initAddr && SGF.silConv.isSILIndirect(result) &&
         !initAddr->getType().hasAbstractionDifference(
             rep, result.getSILStorageType())) {
-      indirectResultAddrs.push_back(initAddr);
       return ResultPlanPtr(new InPlaceInitializationResultPlan(init));
     }
   }
@@ -292,7 +326,6 @@ ResultPlanPtr ResultPlanBuilder::build(Initialization *init,
   if (SGF.silConv.isSILIndirect(result)) {
     auto &resultTL = SGF.getTypeLowering(result.getType());
     temporary = SGF.emitTemporary(loc, resultTL);
-    indirectResultAddrs.push_back(temporary->getAddress());
   }
 
   return ResultPlanPtr(
