@@ -236,6 +236,7 @@ bool CanType::isExistentialTypeImpl(CanType type,
     return true;
   }
 
+  assert(!type.isExistentialType());
   return false;
 }
 
@@ -262,7 +263,7 @@ bool TypeBase::isObjCExistentialType() {
 }
 
 bool CanType::isObjCExistentialTypeImpl(CanType type) {
-  if (!type->isExistentialType()) return false;
+  if (!type.isExistentialType()) return false;
 
   SmallVector<ProtocolDecl *, 4> protocols;
   type.getAnyExistentialTypeProtocols(protocols);

@@ -314,7 +314,7 @@ bool SILLinkerVisitor::visitAllocRefInst(AllocRefInst *ARI) {
 
 bool SILLinkerVisitor::visitMetatypeInst(MetatypeInst *MI) {
   CanType instTy = MI->getType().castTo<MetatypeType>().getInstanceType();
-  ClassDecl *C = instTy->getClassOrBoundGenericClass();
+  ClassDecl *C = instTy.getClassOrBoundGenericClass();
   if (!C)
     return false;
 

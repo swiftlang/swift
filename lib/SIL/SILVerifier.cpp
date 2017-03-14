@@ -2349,7 +2349,7 @@ public:
       resultInstTy = cast<MetatypeType>(resultInstTy).getInstanceType();
     }
 
-    require(operandInstTy->isExistentialType(),
+    require(operandInstTy.isExistentialType(),
             "ill-formed existential metatype in open_existential_metatype "
             "operand");
     auto archetype = getOpenedArchetypeOf(resultInstTy);
@@ -2596,9 +2596,9 @@ public:
     }
 
     if (isExact) {
-      require(fromCanTy->getClassOrBoundGenericClass(),
+      require(fromCanTy.getClassOrBoundGenericClass(),
               "downcast operand must be a class type");
-      require(toCanTy->getClassOrBoundGenericClass(),
+      require(toCanTy.getClassOrBoundGenericClass(),
               "downcast must convert to a class type");
       require(SILType::getPrimitiveObjectType(fromCanTy).
               isBindableToSuperclassOf(SILType::getPrimitiveObjectType(toCanTy)),
