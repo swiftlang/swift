@@ -474,6 +474,7 @@ static bool diagnoseAmbiguity(ConstraintSystem &cs,
     for (auto choice : overload.choices) {
       switch (choice.getKind()) {
       case OverloadChoiceKind::Decl:
+      case OverloadChoiceKind::DeclViaOmittedLabels:
       case OverloadChoiceKind::DeclViaDynamic:
       case OverloadChoiceKind::TypeDecl:
       case OverloadChoiceKind::DeclViaBridge:

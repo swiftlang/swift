@@ -60,6 +60,9 @@ enum class OverloadChoiceKind : int {
   /// \brief The overload choice selects a particular declaration that
   /// was found by unwrapping an optional context type.
   DeclViaUnwrappedOptional,
+  /// \brief The overload choice selects a particular declaration that  
+  /// was found by ignoring optional argument labels.
+  DeclViaOmittedLabels,
 };
 
 /// \brief Describes a particular choice within an overload set.
@@ -76,10 +79,9 @@ class OverloadChoice {
     /// optional context type, turning a "Decl" kind into
     /// "DeclViaUnwrappedOptional".
     IsUnwrappedOptionalBit = 0x04,
-    
-    // IsBridged and IsUnwrappedOptional are mutually exclusive, so there is
-    // room for another mutually exclusive OverloadChoiceKind to be packed into
-    // those two bits.
+    /// Indicates whether this declaration was resolved by ignoring 
+    /// optional argument labels.
+    OmitsLabelsBits = IsBridgedBit | IsUnwrappedOptionalBit,
   };
 
   /// \brief The base type to be used when referencing the declaration
@@ -181,6 +183,18 @@ public:
     result.TheFunctionRefKind = functionRefKind;
     return result;
   }
+  
+  /// Retrieve an overload choice for a declaration that was found via
+  /// dynamic lookup.
+  static OverloadChoice getDeclViaOmittedLabels(Type base, ValueDecl *value,
+                                          FunctionRefKind functionRefKind) {
+    OverloadChoice result;
+    result.BaseAndBits.setPointer(base);
+    result.BaseAndBits.setInt(OmitsLabelsBits);
+    result.DeclOrKind = reinterpret_cast<uintptr_t>(value);
+    result.TheFunctionRefKind = functionRefKind;
+    return result;
+  }
 
   /// \brief Retrieve the base type used to refer to the declaration.
   Type getBaseType() const { return BaseAndBits.getPointer(); }
@@ -197,6 +211,8 @@ public:
   OverloadChoiceKind getKind() const {
     switch (DeclOrKind & 0x03) {
     case 0x00: 
+      if ((BaseAndBits.getInt() & OmitsLabelsBits) == OmitsLabelsBits)
+        return OverloadChoiceKind::DeclViaOmittedLabels;
       if (BaseAndBits.getInt() & IsBridgedBit)
         return OverloadChoiceKind::DeclViaBridge;
       if (BaseAndBits.getInt() & IsUnwrappedOptionalBit)
@@ -226,6 +242,7 @@ public:
     case OverloadChoiceKind::TypeDecl:
     case OverloadChoiceKind::DeclViaBridge:
     case OverloadChoiceKind::DeclViaUnwrappedOptional:
+    case OverloadChoiceKind::DeclViaOmittedLabels:
       return true;
 
     case OverloadChoiceKind::BaseType:

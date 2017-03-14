@@ -1378,6 +1378,7 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
     
     LLVM_FALLTHROUGH;
 
+  case OverloadChoiceKind::DeclViaOmittedLabels:
   case OverloadChoiceKind::DeclViaBridge:
   case OverloadChoiceKind::DeclViaDynamic:
   case OverloadChoiceKind::DeclViaUnwrappedOptional:
