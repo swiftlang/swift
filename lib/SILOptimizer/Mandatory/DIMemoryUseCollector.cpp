@@ -348,12 +348,9 @@ onlyTouchesTrivialElements(const DIMemoryObjectInfo &MI) const {
 static void getScalarizedElementAddresses(SILValue Pointer, SILBuilder &B,
                                           SILLocation Loc,
                                       SmallVectorImpl<SILValue> &ElementAddrs) {
-  CanType AggType = Pointer->getType().getSwiftRValueType();
-  TupleType *TT = AggType->castTo<TupleType>();
-  for (auto &Field : TT->getElements()) {
-    (void)Field;
-    ElementAddrs.push_back(B.createTupleElementAddr(Loc, Pointer,
-                                                    ElementAddrs.size()));
+  TupleType *TT = Pointer->getType().castTo<TupleType>();
+  for (auto Index : indices(TT->getElements())) {
+    ElementAddrs.push_back(B.createTupleElementAddr(Loc, Pointer, Index));
   }
 }
 
@@ -362,10 +359,9 @@ static void getScalarizedElementAddresses(SILValue Pointer, SILBuilder &B,
 static void getScalarizedElements(SILValue V,
                                   SmallVectorImpl<SILValue> &ElementVals,
                                   SILLocation Loc, SILBuilder &B) {
-  TupleType *TT = V->getType().getSwiftRValueType()->castTo<TupleType>();
-  for (auto &Field : TT->getElements()) {
-    (void)Field;
-    ElementVals.push_back(B.emitTupleExtract(Loc, V, ElementVals.size()));
+  TupleType *TT = V->getType().castTo<TupleType>();
+  for (auto Index : indices(TT->getElements())) {
+    ElementVals.push_back(B.emitTupleExtract(Loc, V, Index));
   }
 }
 

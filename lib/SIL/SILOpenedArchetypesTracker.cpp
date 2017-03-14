@@ -14,7 +14,7 @@
 
 using namespace swift;
 
-void SILOpenedArchetypesTracker::addOpenedArchetypeDef(ArchetypeType *archetype,
+void SILOpenedArchetypesTracker::addOpenedArchetypeDef(CanArchetypeType archetype,
                                                        SILValue Def) {
   auto OldDef = getOpenedArchetypeDef(archetype);
   if (OldDef && isa<GlobalAddrInst>(OldDef)) {
@@ -39,18 +39,18 @@ bool SILOpenedArchetypesTracker::hasUnresolvedOpenedArchetypeDefinitions() {
   return false;
 }
 
-void SILOpenedArchetypesTracker::registerUsedOpenedArchetypes(Type Ty) {
+void SILOpenedArchetypesTracker::registerUsedOpenedArchetypes(CanType Ty) {
   // Nothing else to be done if the type does not contain an opened archetype.
   if (!Ty || !Ty->hasOpenedExistential())
     return;
 
   // Find all opened existentials used by this type and check if their
   // definitions are known.
-  Ty.visit([&](Type ty) {
+  Ty.visit([&](CanType ty) {
     if (!ty->isOpenedExistential())
       return;
 
-    auto *archetypeTy = ty->castTo<ArchetypeType>();
+    auto archetypeTy = cast<ArchetypeType>(ty);
     // Nothing to do if a definition was seen already.
     if (getOpenedArchetypeDef(archetypeTy))
       return;
@@ -113,16 +113,17 @@ void SILOpenedArchetypesTracker::handleDeleteNotification(
 
 /// Find an opened archetype defined by an instruction.
 /// \returns The found archetype or empty type otherwise.
-ArchetypeType *swift::getOpenedArchetypeOf(const SILInstruction *I) {
+CanArchetypeType swift::getOpenedArchetypeOf(const SILInstruction *I) {
   if (isa<OpenExistentialAddrInst>(I) || isa<OpenExistentialRefInst>(I) ||
       isa<OpenExistentialBoxInst>(I) || isa<OpenExistentialMetatypeInst>(I) ||
       isa<OpenExistentialOpaqueInst>(I)) {
     auto Ty = getOpenedArchetypeOf(I->getType().getSwiftRValueType());
-    assert(Ty->isOpenedExistential() && "Type should be an opened archetype");
-    return Ty->castTo<ArchetypeType>();
+    assert(Ty && Ty->isOpenedExistential() &&
+           "Type should be an opened archetype");
+    return Ty;
   }
 
-  return nullptr;
+  return CanArchetypeType();
 }
 
 
@@ -134,18 +135,18 @@ ArchetypeType *swift::getOpenedArchetypeOf(const SILInstruction *I) {
 /// recursively check any children of this type, because
 /// this is the task of the type visitor invoking it.
 /// \returns The found archetype or empty type otherwise.
-ArchetypeType *swift::getOpenedArchetypeOf(Type Ty) {
+CanArchetypeType swift::getOpenedArchetypeOf(CanType Ty) {
   if (!Ty)
-    return nullptr;
-  while (auto MetaTy = Ty->getAs<AnyMetatypeType>())
-    Ty = MetaTy->getInstanceType();
+    return CanArchetypeType();
+  while (auto MetaTy = dyn_cast<AnyMetatypeType>(Ty))
+    Ty = MetaTy.getInstanceType();
   if (Ty->isOpenedExistential())
-    return Ty->castTo<ArchetypeType>();
-  return nullptr;
+    return cast<ArchetypeType>(Ty);
+  return CanArchetypeType();
 }
 
 SILValue SILOpenedArchetypesState::getOpenedArchetypeDef(
-    ArchetypeType *archetypeTy) const {
+    CanArchetypeType archetypeTy) const {
   if (!archetypeTy)
     return SILValue();
   // First perform a quick check.

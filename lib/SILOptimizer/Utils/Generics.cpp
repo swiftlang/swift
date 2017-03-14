@@ -977,8 +977,7 @@ static void prepareCallArguments(ApplySite AI, SILBuilder &Builder,
 static CanSILFunctionType
 getCalleeSubstFunctionType(SILValue Callee, SubstitutionList Subs) {
   // Create a substituted callee type.
-  auto CanFnTy =
-      dyn_cast<SILFunctionType>(Callee->getType().getSwiftRValueType());
+  auto CanFnTy = Callee->getType().castTo<SILFunctionType>();
   auto CalleeSubstFnTy = CanFnTy;
 
   if (CanFnTy->isPolymorphic() && !Subs.empty()) {

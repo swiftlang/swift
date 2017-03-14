@@ -2413,7 +2413,7 @@ ConformanceChecker::getReferencedAssociatedTypes(ValueDecl *req) {
   // signature.
   auto &assocTypes = ReferencedAssociatedTypes[req];
   llvm::SmallPtrSet<AssociatedTypeDecl *, 4> knownAssocTypes;
-  req->getInterfaceType()->getCanonicalType().visit([&](Type type) {
+  req->getInterfaceType()->getCanonicalType().visit([&](CanType type) {
       if (auto assocType = getReferencedAssocTypeOfProtocol(type, Proto)) {
         if (knownAssocTypes.insert(assocType).second) {
           assocTypes.push_back(assocType);

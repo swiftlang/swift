@@ -763,8 +763,8 @@ public:
     auto runtimeTy = getRuntimeReifiedType(IGM,
                                            Ty.getType()->getCanonicalType());
     if (!IGM.IRGen.Opts.Optimize && runtimeTy->hasArchetype())
-      runtimeTy.visit([&](Type t) {
-        if (auto archetype = dyn_cast<ArchetypeType>(CanType(t)))
+      runtimeTy.visit([&](CanType t) {
+        if (auto archetype = dyn_cast<ArchetypeType>(t))
           emitTypeMetadataRef(archetype);
        });
 

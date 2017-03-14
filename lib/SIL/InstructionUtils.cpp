@@ -227,14 +227,14 @@ SILValue swift::stripExpectIntrinsic(SILValue V) {
   return BI->getArguments()[0];
 }
 
-void ConformanceCollector::scanType(Type type) {
-  type = type->getCanonicalType();
+void ConformanceCollector::scanType(Type ncType) {
+  CanType type = ncType->getCanonicalType();
   if (Visited.count(type.getPointer()) != 0)
     return;
 
   // Look for all possible metatypes and conformances which are used in type.
-  type.visit([this](Type SubType) {
-    if (NominalTypeDecl *NT = SubType->getNominalOrBoundGenericNominal()) {
+  type.visit([this](CanType SubType) {
+    if (NominalTypeDecl *NT = SubType.getNominalOrBoundGenericNominal()) {
       if (Visited.count(SubType.getPointer()) == 0) {
 
         if (Visited.count(NT) == 0) {
