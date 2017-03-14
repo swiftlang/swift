@@ -206,7 +206,14 @@ BUILTIN_SIL_OPERATION(CastToUnknownObject, "castToUnknownObject", Special)
 BUILTIN_SIL_OPERATION(CastFromUnknownObject, "castFromUnknownObject", Special)
 
 /// CastToNativeObject has type (T) -> Builtin.NativeObject.
+///
+/// This builtin asserts if the underlying type /could/ be objc.
 BUILTIN_SIL_OPERATION(CastToNativeObject, "castToNativeObject", Special)
+
+/// UnsafeCastToNativeObject has type (T) -> Builtin.NativeObject.
+///
+/// This builtin does not check if the underlying type /could/ be objc.
+BUILTIN_SIL_OPERATION(UnsafeCastToNativeObject, "unsafeCastToNativeObject", Special)
 
 /// CastFromNativeObject has type (Builtin.NativeObject) -> T
 BUILTIN_SIL_OPERATION(CastFromNativeObject, "castFromNativeObject", Special)
