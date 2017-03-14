@@ -329,9 +329,12 @@ function(_compile_swift_files
     endif()
   endif()
 
-  swift_install_in_component("${SWIFTFILE_INSTALL_IN_COMPONENT}"
-      FILES "${module_file}" "${module_doc_file}"
-      DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/swift/${library_subdir}")
+  # If we want to build a single overlay, don't install the swiftmodule and swiftdoc files.
+  if(NOT BUILD_STANDALONE)
+    swift_install_in_component("${SWIFTFILE_INSTALL_IN_COMPONENT}"
+        FILES "${module_file}" "${module_doc_file}"
+        DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/swift/${library_subdir}")
+  endif()
 
   set(line_directive_tool "${SWIFT_SOURCE_DIR}/utils/line-directive")
   set(swift_compiler_tool "${SWIFT_NATIVE_SWIFT_TOOLS_PATH}/swiftc")

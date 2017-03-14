@@ -224,9 +224,10 @@ public:
       SGFContext context, std::function<void(SILValue)> rvalueEmitter);
 
   using SILBuilder::createUnconditionalCheckedCastValue;
-  ManagedValue createUnconditionalCheckedCastValue(SILLocation loc,
-                                                   ManagedValue operand,
-                                                   SILType type);
+  ManagedValue
+  createUnconditionalCheckedCastValue(SILLocation loc,
+                                      CastConsumptionKind consumption,
+                                      ManagedValue operand, SILType type);
   using SILBuilder::createUnconditionalCheckedCast;
   ManagedValue createUnconditionalCheckedCast(SILLocation loc,
                                               ManagedValue operand,
