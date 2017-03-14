@@ -70,8 +70,8 @@ bool IRGenerator::tryEnableLazyTypeMetadata(NominalTypeDecl *Nominal) {
     case DeclKind::Struct:
       break;
     default:
-      // Keep all metadata for classes, because a class can be instanciated by
-      // using the library function _typeByName.
+      // Keep all metadata for classes, because a class can be instantiated by
+      // using the library function _typeByName or NSClassFromString.
       return false;
   }
 
