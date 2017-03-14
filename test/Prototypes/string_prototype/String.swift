@@ -394,7 +394,7 @@ extension String {
   /// - Parameter encoding: describes the encoding in which the code units
   ///   should be interpreted.
   init<Encoding: UnicodeEncoding>(
-    cString nulTerminatedCodeUnits: UnsafePointer<Encoding.CodeUnit>,
+    cString nulTerminatedCodeUnits: UnsafePointer<Encoding.EncodedScalar.Iterator.Element>,
     encoding: Encoding.Type
   )
   // FIXME: when new integers land, we won't need this constraint anymore.
@@ -420,7 +420,7 @@ extension String {
         }
         result.append(0)
         return try result.withUnsafeBufferPointer {
-          try body($0.baseAddress!)
+          try body($0.baseAddress)
         }
     }
 }

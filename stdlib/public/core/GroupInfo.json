@@ -35,6 +35,7 @@
   ],
   "Collection": [
     "Collection.swift",
+    "ContiguouslyStored.swift",
     "FixedArray.swift",
     "BidirectionalCollection.swift",
     "RandomAccessCollection.swift",

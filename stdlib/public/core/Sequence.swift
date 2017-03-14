@@ -636,6 +636,24 @@ extension Sequence
   }
 }
 
+extension Sequence {
+  /// Initializes `memory` with a copy of this `Sequence`'s elements.
+  ///
+  /// - Precondition: the elements of this sequence exactly fill the given
+  ///   memory.
+  public func _copyCompleteContents(
+    initializing memory: UnsafeMutableBufferPointer<Iterator.Element>
+  ) {
+    var (excessElements, endOfCopy) = self._copyContents(initializing: memory)
+    _precondition(
+      excessElements.next() == nil,
+      "_copyCompleteContents: source not completely copied (under-reported count?)")
+    _precondition(
+      endOfCopy == memory.endIndex,
+      "_copyCompleteContents: target not completely filled (over-reported count?)")
+  }
+}
+
 /// A sequence that lazily consumes and drops `n` elements from an underlying
 /// `Base` iterator before possibly returning the first available element.
 ///

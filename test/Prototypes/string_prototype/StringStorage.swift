@@ -11,36 +11,6 @@ extension FactoryInitializable {
   }
 }
 
-protocol ContiguouslyStored : RandomAccessCollection {
-  func withUnsafeBufferPointer<R>(
-    _: (UnsafeBufferPointer<Iterator.Element>) throws -> R
-  ) rethrows -> R
-}
-
-protocol MutableContiguouslyStored : ContiguouslyStored {
-  mutating func withUnsafeMutableBufferPointer<R>(
-    _: (UnsafeMutableBufferPointer<Iterator.Element>) throws -> R
-  ) rethrows -> R
-}
-
-extension Collection {
-  /// Initializes `memory` with a copy of this `Collection`'s elements.
-  ///
-  /// - Precondition: the elements of this collection exactly fill the given
-  ///   memory.
-  func _copyCompleteContents(
-    initializing memory: UnsafeMutableBufferPointer<Iterator.Element>
-  ) {
-    var (excessElements, endOfCopy) = self._copyContents(initializing: memory)
-    _precondition(
-      excessElements.next() == nil,
-      "Source collection under-reported its count")
-    _precondition(
-      endOfCopy == memory.endIndex,
-      "Source collection over-reported its count")
-  }
-}
-
 //===--- String Specifics -------------------------------------------------===//
 protocol _AnyUnicode {
   var encoding: AnyUnicodeEncoding.Type { get }
@@ -186,7 +156,8 @@ extension _SwiftLatin1StringHeader : _BoundedStorageHeader {
 }
 
 protocol _BoundedStorage
-  : class, RandomAccessCollection, MutableCollection {
+  : class, RandomAccessCollection, 
+    MutableCollection/*, RangeReplaceableCollection*/ {
   associatedtype Element
   associatedtype Header : _BoundedStorageHeader
   

@@ -40,6 +40,7 @@ set(SWIFTLIB_ESSENTIAL
   CollectionAlgorithms.swift.gyb
   Comparable.swift
   CompilerProtocols.swift
+  ContiguouslyStored.swift
   ClosedRange.swift
   ContiguousArrayBuffer.swift
   CString.swift

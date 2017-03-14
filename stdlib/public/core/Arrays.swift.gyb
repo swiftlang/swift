@@ -1605,19 +1605,6 @@ extension ${Self} {
     return try _buffer.withUnsafeBufferPointer(body)
   }
 
-  public func withUnsafeElementStorage<R>(
-    _ body: (UnsafeBufferPointer<Element>?) throws -> R
-  ) rethrows -> R {
-    return try _buffer.withUnsafeBufferPointer(body)
-  }
-  
-  public var contiguousStorage: ContiguousStorage<Iterator.Element>? {
-    return ContiguousStorage(accessor: {
-        (f: (UnsafeBufferPointer<Element>)->Void) in
-        self.withUnsafeBufferPointer(f)
-      })
-  }
-
   /// Calls the given closure with a pointer to the array's mutable contiguous
   /// storage.
   ///

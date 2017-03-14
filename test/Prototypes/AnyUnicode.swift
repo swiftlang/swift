@@ -36,11 +36,9 @@ protocol AnyCodeUnits_ {
   subscript(i: Index) -> Element { get }
   //  subscript(r: Range<Index>) -> AnyCodeUnits { get }
 
-  func withUnsafeElementStorage<R>(
-    _ body: (UnsafeBufferPointer<Element>?) throws -> R
-  ) rethrows -> R
-  
-  var contiguousStorage : ContiguousStorage<Element>? { get }
+  func withExistingUnsafeBuffer<R>(
+    _ body: (UnsafeBufferPointer<Element>) throws -> R
+  ) rethrows -> R?
 }
 
 struct AnyCodeUnits : RandomAccessCollection, AnyCodeUnits_ {
@@ -59,13 +57,9 @@ struct AnyCodeUnits : RandomAccessCollection, AnyCodeUnits_ {
   func index(_ i: Index, offsetBy: Int64) -> Index { return base.index(i, offsetBy: i) }
   subscript(i: Index) -> Element { return base[i] }
   
-  public func withUnsafeElementStorage<R>(
-    _ body: (UnsafeBufferPointer<Element>?) throws -> R
-  ) rethrows -> R { return try base.withUnsafeElementStorage(body) }
-  
-  public var contiguousStorage : ContiguousStorage<Element>? {
-    return base.contiguousStorage
-  }
+  public func withExistingUnsafeBuffer<R>(
+    _ body: (UnsafeBufferPointer<Element>) throws -> R
+  ) rethrows -> R? { return try base.withExistingUnsafeBuffer(body) }
 }
 
 /// Adapts any random access collection of unsigned integer to AnyCodeUnits_
@@ -105,24 +99,12 @@ where Base.Iterator.Element : UnsignedInteger {
     return numericCast(base[base.index(atOffset: i)])
   }
 
-  public func withUnsafeElementStorage<R>(
-    _ body: (UnsafeBufferPointer<Element>?) throws -> R
-  ) rethrows -> R {
-    return try base.withUnsafeElementStorage { b in
-      if let b1 = b {
-        if let b2 = b1 as Any as? UnsafeBufferPointer<Element> {
-          return try body(b2)
-        }
-      }
-      return try body(nil)
-    }
-  }
-  
-  public var contiguousStorage : ContiguousStorage<Element>? {
-    if let b = base.contiguousStorage {
-      return b as Any as? ContiguousStorage<Element>
-    }
-    return nil
+  public func withExistingUnsafeBuffer<R>(
+    _ body: (UnsafeBufferPointer<Element>) throws -> R
+  ) rethrows -> R? {
+    return try base.withExistingUnsafeBuffer {
+      try ($0 as Any as? UnsafeBufferPointer<Element>).map(body)
+    }.flatMap { $0 }
   }
 }
 
@@ -136,11 +118,9 @@ protocol AnyUTF16_ {
   func index(before: Index) -> Index
   subscript(i: Index) -> Element { get }
 
-  func withUnsafeElementStorage<R>(
-    _ body: (UnsafeBufferPointer<Element>?) throws -> R
-  ) rethrows -> R
-  
-  var contiguousStorage : ContiguousStorage<Element>? { get }
+  func withExistingUnsafeBuffer<R>(
+    _ body: (UnsafeBufferPointer<Element>) throws -> R
+  ) rethrows -> R?
 }
 
 struct AnyUTF16 : BidirectionalCollection, AnyUTF16_ {
@@ -153,12 +133,10 @@ struct AnyUTF16 : BidirectionalCollection, AnyUTF16_ {
   func index(after i: Index) -> Index { return base.index(after: i) }
   func index(before i: Index) -> Index { return base.index(before: i) }
   subscript(i: Index) -> Element { return base[i] }
-  public func withUnsafeElementStorage<R>(
-    _ body: (UnsafeBufferPointer<Element>?) throws -> R
-  ) rethrows -> R { return try base.withUnsafeElementStorage(body) }
-  
-  public var contiguousStorage : ContiguousStorage<Element>? {
-    return base.contiguousStorage
+  public func withExistingUnsafeBuffer<R>(
+    _ body: (UnsafeBufferPointer<Element>) throws -> R
+  ) rethrows -> R? {
+    return try base.withExistingUnsafeBuffer(body)
   }
 }
 
@@ -197,24 +175,12 @@ where Base.Iterator.Element : UnsignedInteger {
     return numericCast(base[base.index(atOffset: i.offset)])
   }
 
-  public func withUnsafeElementStorage<R>(
-    _ body: (UnsafeBufferPointer<Element>?) throws -> R
-  ) rethrows -> R {
-    return try base.withUnsafeElementStorage { b in
-      if let b1 = b {
-        if let b2 = b1 as Any as? UnsafeBufferPointer<Element> {
-          return try body(b2)
-        }
-      }
-      return try body(nil)
-    }
-  }
-  
-  public var contiguousStorage : ContiguousStorage<Element>? {
-    if let b = base.contiguousStorage {
-      return b as Any as? ContiguousStorage<Element>
-    }
-    return nil
+  public func withExistingUnsafeBuffer<R>(
+    _ body: (UnsafeBufferPointer<Element>) throws -> R
+  ) rethrows -> R? {
+    return try base.withExistingUnsafeBuffer {
+      try ($0 as Any as? UnsafeBufferPointer<Element>).map(body)
+    }.flatMap { $0 }
   }
 }
 
@@ -228,11 +194,9 @@ protocol AnyUnicodeBidirectionalUInt32_ {
   func index(before: Index) -> Index
   subscript(i: Index) -> Element { get }
 
-  func withUnsafeElementStorage<R>(
-    _ body: (UnsafeBufferPointer<Element>?) throws -> R
-  ) rethrows -> R
-  
-  var contiguousStorage : ContiguousStorage<Element>? { get }
+  func withExistingUnsafeBuffer<R>(
+    _ body: (UnsafeBufferPointer<Element>) throws -> R
+  ) rethrows -> R?
 }
 
 // Adapts any bidirectional collection of UInt32 to AnyUnicodeBidirectionalUInt32_
@@ -246,12 +210,12 @@ struct AnyUnicodeBidirectionalUInt32 : BidirectionalCollection, AnyUnicodeBidire
   func index(after i: Index) -> Index { return base.index(after: i) }
   func index(before i: Index) -> Index { return base.index(before: i) }
   subscript(i: Index) -> Element { return base[i] }
-  public func withUnsafeElementStorage<R>(
-    _ body: (UnsafeBufferPointer<Element>?) throws -> R
-  ) rethrows -> R { return try base.withUnsafeElementStorage(body) }
-  
-  public var contiguousStorage : ContiguousStorage<Element>? {
-    return base.contiguousStorage
+  public func withExistingUnsafeBuffer<R>(
+    _ body: (UnsafeBufferPointer<Element>) throws -> R
+  ) rethrows -> R? {
+    return try base.withExistingUnsafeBuffer {
+      try ($0 as Any as? UnsafeBufferPointer<Element>).map(body)
+    }.flatMap { $0 }
   }
 }
 
@@ -290,24 +254,12 @@ where Base.Iterator.Element : UnsignedInteger {
     return numericCast(base[base.index(atOffset: i.offset)])
   }
 
-  public func withUnsafeElementStorage<R>(
-    _ body: (UnsafeBufferPointer<Element>?) throws -> R
-  ) rethrows -> R {
-    return try base.withUnsafeElementStorage { b in
-      if let b1 = b {
-        if let b2 = b1 as Any as? UnsafeBufferPointer<Element> {
-          return try body(b2)
-        }
-      }
-      return try body(nil)
-    }
-  }
-  
-  public var contiguousStorage : ContiguousStorage<Element>? {
-    if let b = base.contiguousStorage {
-      return b as Any as? ContiguousStorage<Element>
-    }
-    return nil
+  public func withExistingUnsafeBuffer<R>(
+    _ body: (UnsafeBufferPointer<Element>) throws -> R
+  ) rethrows -> R? {
+    return try base.withExistingUnsafeBuffer {
+      try ($0 as Any as? UnsafeBufferPointer<Element>).map(body)
+    }.flatMap { $0 }
   }
 }
 
@@ -321,11 +273,9 @@ protocol AnyCharacters_ {
   func index(before: Index) -> Index
   subscript(i: Index) -> Element { get }
 
-  func withUnsafeElementStorage<R>(
-    _ body: (UnsafeBufferPointer<Element>?) throws -> R
-  ) rethrows -> R
-  
-  var contiguousStorage : ContiguousStorage<Element>? { get }
+  func withExistingUnsafeBuffer<R>(
+    _ body: (UnsafeBufferPointer<Element>) throws -> R
+  ) rethrows -> R?
 }
 
 struct AnyCharacters : BidirectionalCollection, AnyCharacters_ {
@@ -338,12 +288,12 @@ struct AnyCharacters : BidirectionalCollection, AnyCharacters_ {
   func index(after i: Index) -> Index { return base.index(after: i) }
   func index(before i: Index) -> Index { return base.index(before: i) }
   subscript(i: Index) -> Element { return base[i] }
-  public func withUnsafeElementStorage<R>(
-    _ body: (UnsafeBufferPointer<Element>?) throws -> R
-  ) rethrows -> R { return try base.withUnsafeElementStorage(body) }
-  
-  public var contiguousStorage : ContiguousStorage<Element>? {
-    return base.contiguousStorage
+  public func withExistingUnsafeBuffer<R>(
+    _ body: (UnsafeBufferPointer<Element>) throws -> R
+  ) rethrows -> R? {
+    return try base.withExistingUnsafeBuffer {
+      try ($0 as Any as? UnsafeBufferPointer<Element>).map(body)
+    }.flatMap { $0 }
   }
 }
 
@@ -401,17 +351,12 @@ where Base.Iterator.Element : UnsignedInteger {
     return numericCast(base[base.index(atOffset: i)])
   }
 
-  public func withUnsafeElementStorage<R>(
-    _ body: (UnsafeBufferPointer<Element>?) throws -> R
-  ) rethrows -> R {
-    return try base.withUnsafeElementStorage { b in
-      if let b1 = b {
-        if let b2 = b1 as Any as? UnsafeBufferPointer<Element> {
-          return try body(b2)
-        }
-      }
-      return try body(nil)
-    }
+  public func withExistingUnsafeBuffer<R>(
+    _ body: (UnsafeBufferPointer<Element>) throws -> R
+  ) rethrows -> R? {
+    return try base.withExistingUnsafeBuffer {
+      try ($0 as Any as? UnsafeBufferPointer<Element>).map(body)
+    }.flatMap { $0 }
   }
 }
 

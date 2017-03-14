@@ -535,9 +535,8 @@ extension UnicodeStorage {
   ) -> R {
     if Encoding.EncodedScalar.self is UTF16.EncodedScalar.Type {
       // It's a UTF16 encoding
-      let r: R? = codeUnits.withUnsafeElementStorage {
-        if $0 == nil { return nil }
-        return ($0! as Any as? UnsafeBufferPointer<UTF16.CodeUnit>).map (body)
+      let r: R? = codeUnits.withExistingUnsafeBuffer {
+        body($0 as Any as! UnsafeBufferPointer<UTF16.CodeUnit>)
       }
       if r != nil { return r! }
     }

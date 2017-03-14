@@ -319,7 +319,7 @@ testSuite.test("cstring") {
 
   let utf16 = Array(s3.utf16) + [0]
   let s4 = utf16.withUnsafeBufferPointer {
-    String(cString: $0.baseAddress!, encoding: UTF16.self)
+    String(cString: $0.baseAddress, encoding: UTF16.self)
   }
   expectEqual(s4, "some string")
 }

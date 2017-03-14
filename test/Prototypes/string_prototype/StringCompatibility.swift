@@ -52,14 +52,14 @@ extension String {
   @available(*, deprecated, message: "TODO")
   // TODO: should this continue to work for the repairing=false case?
   public static func decodeCString<Encoding : UnicodeCodec>(
-    _ cString: UnsafePointer<Encoding.CodeUnit>?,
+    _ cString: UnsafePointer<Encoding.EncodedScalar.Iterator.Element>?,
     as encoding: Encoding.Type,
     repairingInvalidCodeUnits isRepairing: Bool = true)
-      -> (result: String, repairsMade: Bool)? {
-
-      return OldString.decodeCString(cString, as: encoding, 
-                          repairingInvalidCodeUnits: isRepairing)
-        .map { s, r in (String(_old: s),r) }
+  -> (result: String, repairsMade: Bool)? {
+    return OldString.decodeCString(
+      cString, as: encoding, 
+      repairingInvalidCodeUnits: isRepairing
+    ).map { s, r in (String(_old: s),r) }
   }
   
   @available(*, deprecated, message: "TODO")
