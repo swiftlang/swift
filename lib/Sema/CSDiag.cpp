@@ -1031,8 +1031,8 @@ namespace {
                       ArrayRef<CallArgParam> actualArgs);
       
     void filterListArgs(ArrayRef<CallArgParam> actualArgs);
-    void filterList(Type actualArgsType, ArrayRef<Identifier> argLabels) {
-      return filterListArgs(decomposeArgType(actualArgsType, argLabels));
+    void filterList(Type actualArgsType, ArrayRef<Identifier> argLabels, ClusteredBitVector omittableArgLabels) {
+      return filterListArgs(decomposeArgType(actualArgsType, argLabels, omittableArgLabels));
     }
     void filterList(ClosenessPredicate predicate);
     void filterContextualMemberList(Expr *argExpr);
@@ -1752,7 +1752,7 @@ void CalleeCandidateInfo::filterContextualMemberList(Expr *argExpr) {
     CallArgParam param;
     param.Ty = argType;
     param.Label = argTuple->getElementName(i);
-    param.CanMatchUnlabledParameter = (argTuple->getElementName(i) == CS->getASTContext().Id_forInterpolation);  // FIXME Do something better
+    param.CanMatchUnlabledParameter = argTuple->getOmittableElementNames(&CS->getASTContext())[i]; 
     ArgElts.push_back(param);
   }
 
@@ -2048,7 +2048,8 @@ public:
   /// ApplyExpr or SubscriptExpr.
   bool diagnoseParameterErrors(CalleeCandidateInfo &CCI,
                                Expr *fnExpr, Expr *argExpr,
-                               ArrayRef<Identifier> argLabels);
+                               ArrayRef<Identifier> argLabels,
+                               ClusteredBitVector omittableArgLabels);
 
   /// Attempt to diagnose a specific failure from the info we've collected from
   /// the failed constraint system.
@@ -2136,6 +2137,7 @@ private:
   bool diagnoseMethodAttributeFailures(ApplyExpr *expr,
                                        ArrayRef<Identifier> argLabels,
                                        bool hasTrailingClosure,
+                                       ClusteredBitVector omittableArgLabels,
                                        CalleeCandidateInfo &candidates);
 
   /// Produce diagnostic for failures related to unfulfilled requirements
@@ -2143,7 +2145,8 @@ private:
   bool diagnoseArgumentGenericRequirements(TypeChecker &TC, Expr *fnExpr,
                                            Expr *argExpr,
                                            CalleeCandidateInfo &candidates,
-                                           ArrayRef<Identifier> argLabels);
+                                           ArrayRef<Identifier> argLabels,
+                                           ClusteredBitVector omittableArgLabels);
 
   bool visitExpr(Expr *E);
   bool visitIdentityExpr(IdentityExpr *E);
@@ -4590,7 +4593,7 @@ typeCheckArgumentChildIndependently(Expr *argExpr, Type argType,
       CallArgParam arg;
       arg.Ty = voidTy;
       arg.Label = TE->getElementName(i);
-      arg.CanMatchUnlabledParameter = (TE->getElementName(i) == CS->getASTContext().Id_forInterpolation);  // FIXME Do something better
+      arg.CanMatchUnlabledParameter = TE->getOmittableElementNames(&CS->getASTContext())[i]; 
       args.push_back(arg);
     }
 
@@ -4692,6 +4695,7 @@ typeCheckArgumentChildIndependently(Expr *argExpr, Type argType,
 static bool diagnoseImplicitSelfErrors(Expr *fnExpr, Expr *argExpr,
                                        CalleeCandidateInfo &CCI,
                                        ArrayRef<Identifier> argLabels,
+                                       ClusteredBitVector omittableArgLabels,
                                        ConstraintSystem *CS) {
   // If candidate list is empty it means that problem is somewhere else,
   // since we need to have candidates which might be shadowing other funcs.
@@ -4794,7 +4798,7 @@ static bool diagnoseImplicitSelfErrors(Expr *fnExpr, Expr *argExpr,
                                    candidates, CCI.hasTrailingClosure, CS,
                                    base);
 
-    calleeInfo.filterList(argType, argLabels);
+    calleeInfo.filterList(argType, argLabels, omittableArgLabels);
     if (calleeInfo.closeness != CC_ExactMatch)
       return false;
 
@@ -4884,7 +4888,8 @@ static bool diagnoseImplicitSelfErrors(Expr *fnExpr, Expr *argExpr,
 /// exactly one candidate we know about.  Return true if an error is emitted.
 static bool diagnoseSingleCandidateFailures(CalleeCandidateInfo &CCI,
                                             Expr *fnExpr, Expr *argExpr,
-                                            ArrayRef<Identifier> argLabels) {
+                                            ArrayRef<Identifier> argLabels,
+                                            ClusteredBitVector omittableArgLabels) {
   // We only handle the situation where there is exactly one candidate here.
   if (CCI.size() != 1)
     return false;
@@ -4896,7 +4901,7 @@ static bool diagnoseSingleCandidateFailures(CalleeCandidateInfo &CCI,
   if (!argTy) return false;
 
   auto params = decomposeParamType(argTy, candidate.getDecl(), candidate.level);
-  auto args = decomposeArgType(argExpr->getType(), argLabels);
+  auto args = decomposeArgType(argExpr->getType(), argLabels, omittableArgLabels);
 
   // It is a somewhat common error to try to access an instance method as a
   // curried member on the type, instead of using an instance, e.g. the user
@@ -5275,7 +5280,8 @@ static bool diagnoseSingleCandidateFailures(CalleeCandidateInfo &CCI,
 /// labels don't match up, diagnose that error and return true.
 bool FailureDiagnosis::diagnoseParameterErrors(CalleeCandidateInfo &CCI,
                                                Expr *fnExpr, Expr *argExpr,
-                                               ArrayRef<Identifier> argLabels) {
+                                               ArrayRef<Identifier> argLabels,
+                                               ClusteredBitVector omittableArgLabels) {
   // If we are invoking a constructor and there are absolutely no candidates,
   // then they must all be private.
   if (auto *MTT = fnExpr->getType()->getAs<MetatypeType>()) {
@@ -5290,12 +5296,12 @@ bool FailureDiagnosis::diagnoseParameterErrors(CalleeCandidateInfo &CCI,
   }
 
   // Try to diagnose errors related to the use of implicit self reference.
-  if (diagnoseImplicitSelfErrors(fnExpr, argExpr, CCI, argLabels, CS))
+  if (diagnoseImplicitSelfErrors(fnExpr, argExpr, CCI, argLabels, omittableArgLabels, CS))
     return true;
 
   // Do all the stuff that we only have implemented when there is a single
   // candidate.
-  if (diagnoseSingleCandidateFailures(CCI, fnExpr, argExpr, argLabels))
+  if (diagnoseSingleCandidateFailures(CCI, fnExpr, argExpr, argLabels, omittableArgLabels))
     return true;
 
   // If we have a failure where the candidate set differs on exactly one
@@ -5411,13 +5417,14 @@ bool FailureDiagnosis::visitSubscriptExpr(SubscriptExpr *SE) {
     --calleeInfo.candidates[i].level;
 
   ArrayRef<Identifier> argLabels = SE->getArgumentLabels();
-  if (diagnoseParameterErrors(calleeInfo, SE, indexExpr, argLabels))
+  ClusteredBitVector omittableArgLabels = SE->getOmittableArgumentLabels(&CS->getASTContext());
+  if (diagnoseParameterErrors(calleeInfo, SE, indexExpr, argLabels, omittableArgLabels))
     return true;
 
   auto indexType = indexExpr->getType();
 
-  auto decomposedBaseType = decomposeArgType(baseType, { Identifier() });
-  auto decomposedIndexType = decomposeArgType(indexType, argLabels);
+  auto decomposedBaseType = decomposeArgType(baseType, { Identifier() }, omittableArgLabels);
+  auto decomposedIndexType = decomposeArgType(indexType, argLabels, omittableArgLabels);
   calleeInfo.filterList([&](UncurriedCandidate cand) ->
                                  CalleeCandidateInfo::ClosenessResultTy
   {
@@ -5481,7 +5488,7 @@ bool FailureDiagnosis::visitSubscriptExpr(SubscriptExpr *SE) {
     return true;
   }
 
-  if (diagnoseParameterErrors(calleeInfo, SE, indexExpr, argLabels))
+  if (diagnoseParameterErrors(calleeInfo, SE, indexExpr, argLabels, omittableArgLabels))
     return true;
 
   // Diagnose some simple and common errors.
@@ -5606,7 +5613,8 @@ bool FailureDiagnosis::diagnoseNilLiteralComparison(
 
 bool FailureDiagnosis::diagnoseMethodAttributeFailures(
     swift::ApplyExpr *callExpr, ArrayRef<Identifier> argLabels,
-    bool hasTrailingClosure, CalleeCandidateInfo &candidates) {
+    bool hasTrailingClosure, ClusteredBitVector omittableArgLabels, 
+    CalleeCandidateInfo &candidates) {
   auto UDE = dyn_cast<UnresolvedDotExpr>(callExpr->getFn());
   if (!UDE)
     return false;
@@ -5619,7 +5627,7 @@ bool FailureDiagnosis::diagnoseMethodAttributeFailures(
     return false;
 
   // Let's filter our candidate list based on that type.
-  candidates.filterList(argType, argLabels);
+  candidates.filterList(argType, argLabels, omittableArgLabels);
 
   if (candidates.closeness == CC_ExactMatch)
     return false;
@@ -5672,7 +5680,7 @@ bool FailureDiagnosis::diagnoseMethodAttributeFailures(
 
   // Filter list of the unviable candidates based on the
   // already established type of the argument expression.
-  unviableCandidates.filterList(argType, argLabels);
+  unviableCandidates.filterList(argType, argLabels, omittableArgLabels);
 
   // If one of the unviable candidates matches arguments exactly,
   // that means that actual problem is related to function attributes.
@@ -5687,7 +5695,8 @@ bool FailureDiagnosis::diagnoseMethodAttributeFailures(
 
 bool FailureDiagnosis::diagnoseArgumentGenericRequirements(
     TypeChecker &TC, Expr *fnExpr, Expr *argExpr,
-    CalleeCandidateInfo &candidates, ArrayRef<Identifier> argLabels) {
+    CalleeCandidateInfo &candidates, ArrayRef<Identifier> argLabels, 
+    ClusteredBitVector omittableArgLabels) {
   if (candidates.closeness != CC_ExactMatch || candidates.size() != 1)
     return false;
 
@@ -5706,7 +5715,7 @@ bool FailureDiagnosis::diagnoseArgumentGenericRequirements(
   auto const &candidate = candidates.candidates[0];
   auto params = decomposeParamType(candidate.getArgumentType(),
                                    candidate.getDecl(), candidate.level);
-  auto args = decomposeArgType(argExpr->getType(), argLabels);
+  auto args = decomposeArgType(argExpr->getType(), argLabels, omittableArgLabels);
 
   SmallVector<ParamBinding, 4> bindings;
   MatchCallArgumentListener listener;
@@ -5943,16 +5952,17 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
   SmallVector<Identifier, 2> argLabelsScratch;
   ArrayRef<Identifier> argLabels =
     callExpr->getArgumentLabels(argLabelsScratch);
+  ClusteredBitVector omittableArgLabels = callExpr->getOmittableArgumentLabels(&CS->getASTContext());
   if (diagnoseParameterErrors(calleeInfo, callExpr->getFn(),
-                              callExpr->getArg(), argLabels))
+                              callExpr->getArg(), argLabels, omittableArgLabels))
     return true;
 
   // There might be a candidate with correct argument types but it's not
   // used by constraint solver because it doesn't have correct attributes,
   // let's try to diagnose such situation there right before type checking
   // argument expression, because that would overwrite original argument types.
-  if (diagnoseMethodAttributeFailures(callExpr, argLabels, hasTrailingClosure,
-                                      calleeInfo))
+  if (diagnoseMethodAttributeFailures(callExpr, argLabels, hasTrailingClosure, 
+                                      omittableArgLabels, calleeInfo))
     return true;
 
   Type argType;  // Type of the argument list, if knowable.
@@ -5976,10 +5986,10 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
   if (!argExpr)
     return true; // already diagnosed.
 
-  calleeInfo.filterList(argExpr->getType(), argLabels);
+  calleeInfo.filterList(argExpr->getType(), argLabels, omittableArgLabels);
 
   if (diagnoseParameterErrors(calleeInfo, callExpr->getFn(), argExpr,
-                              argLabels))
+                              argLabels, omittableArgLabels))
     return true;
 
   // Diagnose some simple and common errors.
@@ -6023,7 +6033,7 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
   
   // Handle argument label mismatches when we have multiple candidates.
   if (calleeInfo.closeness == CC_ArgumentLabelMismatch) {
-    auto args = decomposeArgType(argExpr->getType(), argLabels);
+    auto args = decomposeArgType(argExpr->getType(), argLabels, omittableArgLabels);
 
     // If we have multiple candidates that we fail to match, just say we have
     // the wrong labels and list the candidates out.
@@ -6147,7 +6157,7 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
   // to their protocol types (if any) but it doesn't check additional
   // requirements placed on e.g. nested types or between parameters.
   if (diagnoseArgumentGenericRequirements(CS->TC, fnExpr, argExpr, calleeInfo,
-                                          argLabels))
+                                          argLabels, omittableArgLabels))
     return true;
 
   if (isContextualConversionFailure(argExpr))
@@ -7011,15 +7021,23 @@ bool FailureDiagnosis::visitUnresolvedMemberExpr(UnresolvedMemberExpr *E) {
                                                        candidateArgTy,
                                                        candidateInfo);
     if (!argExpr) return true;
+    
+    SmallVector<Identifier, 2> argLabelsScratch;
+    auto candidateArgLabels = candidateInfo[0].getArgumentLabels(
+                                                                 argLabelsScratch);
+    
+    // We actually care about the omittability at the call site, not the candidate's. 
+    auto omittableArgLabels = E->getOmittableArgumentLabels(&CS->getASTContext());
+    if (candidateArgLabels.size() > omittableArgLabels.size()) {
+      omittableArgLabels.extendWithClearBits(candidateArgLabels.size());
+    }
 
     // Construct the actual expected argument labels that our candidate
     // expected.
     assert(candidateArgTy &&
            "Candidate must expect an argument to have a label mismatch");
-    SmallVector<Identifier, 2> argLabelsScratch;
     auto arguments = decomposeArgType(candidateArgTy,
-                                      candidateInfo[0].getArgumentLabels(
-                                        argLabelsScratch));
+                                      candidateArgLabels, omittableArgLabels);
     
     // TODO: This is probably wrong for varargs, e.g. calling "print" with the
     // wrong label.

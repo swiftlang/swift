@@ -3064,6 +3064,7 @@ namespace {
       if (auto call = dyn_cast<CallExpr>(expr)) {
         associateArgumentLabels(call->getFn(),
                                 { call->getArgumentLabels(),
+                                  call->getOmittableArgumentLabels(&CS.getASTContext()),
                                   call->hasTrailingClosure() },
                                 /*labelsArePermanent=*/true);
         return { true, expr };

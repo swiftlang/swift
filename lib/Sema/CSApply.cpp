@@ -1175,6 +1175,7 @@ namespace {
     /// the call. Otherwise, a specific level describing which parameter level
     /// we're applying.
     /// \param argLabels The argument labels provided for the call.
+    /// \param omittableArgLabels Which argument labels can be omitted.
     /// \param hasTrailingClosure Whether the last argument is a trailing
     /// closure.
     /// \param locator Locator used to describe where in this expression we are.
@@ -1184,6 +1185,7 @@ namespace {
     coerceCallArguments(Expr *arg, Type paramType,
                         llvm::PointerUnion<ApplyExpr *, LevelTy> applyOrLevel,
                         ArrayRef<Identifier> argLabels,
+                        ClusteredBitVector omittableArgLabels,
                         bool hasTrailingClosure,
                         ConstraintLocatorBuilder locator);
 
@@ -1213,6 +1215,7 @@ namespace {
     /// \param isImplicit Whether this is an implicit subscript.
     Expr *buildSubscript(Expr *base, Expr *index,
                          ArrayRef<Identifier> argLabels,
+                         ClusteredBitVector omittableArgLabels,
                          bool hasTrailingClosure,
                          ConstraintLocatorBuilder locator,
                          bool isImplicit, AccessSemantics semantics) {
@@ -1278,7 +1281,7 @@ namespace {
 
       // Coerce the index argument.
       index = coerceCallArguments(
-          index, indexTy, LevelTy(1), argLabels,
+          index, indexTy, LevelTy(1), argLabels, omittableArgLabels,
           hasTrailingClosure,
           locator.withPathElement(ConstraintLocator::SubscriptIndex));
       if (!index)
@@ -2644,6 +2647,7 @@ namespace {
     Expr *visitSubscriptExpr(SubscriptExpr *expr) {
       return buildSubscript(expr->getBase(), expr->getIndex(),
                             expr->getArgumentLabels(),
+                            expr->getOmittableArgumentLabels(&cs.getASTContext()),
                             expr->hasTrailingClosure(),
                             cs.getConstraintLocator(expr),
                             expr->isImplicit(),
@@ -2814,6 +2818,7 @@ namespace {
     Expr *visitDynamicSubscriptExpr(DynamicSubscriptExpr *expr) {
       return buildSubscript(expr->getBase(), expr->getIndex(),
                             expr->getArgumentLabels(),
+                            expr->getOmittableArgumentLabels(&cs.getASTContext()),
                             expr->hasTrailingClosure(),
                             cs.getConstraintLocator(expr),
                             expr->isImplicit(), AccessSemantics::Ordinary);
@@ -4808,6 +4813,7 @@ Expr *ExprRewriter::coerceCallArguments(
     Expr *arg, Type paramType,
     llvm::PointerUnion<ApplyExpr *, LevelTy> applyOrLevel,
     ArrayRef<Identifier> argLabels,
+    ClusteredBitVector omittableArgLabels,
     bool hasTrailingClosure,
     ConstraintLocatorBuilder locator) {
 
@@ -4877,7 +4883,7 @@ Expr *ExprRewriter::coerceCallArguments(
 
   // Determine the parameter bindings.
   auto params = decomposeParamType(paramType, callee.getDecl(), level);
-  auto args = decomposeArgType(cs.getType(arg), argLabels);
+  auto args = decomposeArgType(cs.getType(arg), argLabels, omittableArgLabels);
 
   // Quickly test if any further fix-ups for the argument types are necessary.
   // FIXME: This hack is only necessary to work around some problems we have
@@ -6439,6 +6445,7 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
     Expr *arg = coerceCallArguments(origArg, fnType->getInput(),
                                     apply,
                                     apply->getArgumentLabels(argLabelsScratch),
+                                    apply->getOmittableArgumentLabels(&cs.getASTContext()),
                                     hasTrailingClosure,
                                     locator.withPathElement(
                                       ConstraintLocator::ApplyArgument));

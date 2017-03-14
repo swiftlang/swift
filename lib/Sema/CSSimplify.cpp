@@ -518,25 +518,26 @@ matchCallArguments(ArrayRef<CallArgParam> args,
 
 /// Find the callee declaration and uncurry level for a given call
 /// locator.
-static std::tuple<ValueDecl *, unsigned, ArrayRef<Identifier>, bool>
+static std::tuple<ValueDecl *, unsigned, ArrayRef<Identifier>, bool, ClusteredBitVector>
 getCalleeDeclAndArgs(ConstraintSystem &cs,
                      ConstraintLocatorBuilder callLocator,
                      SmallVectorImpl<Identifier> &argLabelsScratch) {
   ArrayRef<Identifier> argLabels;
   bool hasTrailingClosure = false;
+  ClusteredBitVector omittableArgLabels;
 
   // Break down the call.
   SmallVector<LocatorPathElt, 2> path;
   auto callExpr = callLocator.getLocatorParts(path);
   if (!callExpr) 
-    return std::make_tuple(nullptr, 0, argLabels, hasTrailingClosure);
+    return std::make_tuple(nullptr, 0, argLabels, hasTrailingClosure, omittableArgLabels);
 
   // Our remaining path can only be 'ApplyArgument' or 'SubscriptIndex'.
   if (!path.empty() &&
       !(path.size() == 1 &&
         (path.back().getKind() == ConstraintLocator::ApplyArgument ||
          path.back().getKind() == ConstraintLocator::SubscriptIndex)))
-    return std::make_tuple(nullptr, 0, argLabels, hasTrailingClosure);
+    return std::make_tuple(nullptr, 0, argLabels, hasTrailingClosure, omittableArgLabels);
 
   // Dig out the callee.
   Expr *calleeExpr;
@@ -544,27 +545,33 @@ getCalleeDeclAndArgs(ConstraintSystem &cs,
     calleeExpr = call->getDirectCallee();
     argLabels = call->getArgumentLabels();
     hasTrailingClosure = call->hasTrailingClosure();
+    omittableArgLabels = call->getOmittableArgumentLabels(&cs.getASTContext());
   } else if (auto unresolved = dyn_cast<UnresolvedMemberExpr>(callExpr)) {
     calleeExpr = callExpr;
     argLabels = unresolved->getArgumentLabels();
     hasTrailingClosure = unresolved->hasTrailingClosure();
+    omittableArgLabels = unresolved->getOmittableArgumentLabels(&cs.getASTContext());
   } else if (auto subscript = dyn_cast<SubscriptExpr>(callExpr)) {
     calleeExpr = callExpr;
     argLabels = subscript->getArgumentLabels();
     hasTrailingClosure = subscript->hasTrailingClosure();
+    omittableArgLabels = subscript->getOmittableArgumentLabels(&cs.getASTContext());
   } else if (auto dynSubscript = dyn_cast<DynamicSubscriptExpr>(callExpr)) {
     calleeExpr = callExpr;
     argLabels = dynSubscript->getArgumentLabels();
     hasTrailingClosure = dynSubscript->hasTrailingClosure();
+    omittableArgLabels = dynSubscript->getOmittableArgumentLabels(&cs.getASTContext());
   } else {
     if (auto apply = dyn_cast<ApplyExpr>(callExpr)) {
       argLabels = apply->getArgumentLabels(argLabelsScratch);
       assert(!apply->hasTrailingClosure());
+      omittableArgLabels = apply->getOmittableArgumentLabels(&cs.getASTContext());
     } else if (auto objectLiteral = dyn_cast<ObjectLiteralExpr>(callExpr)) {
       argLabels = objectLiteral->getArgumentLabels();
       hasTrailingClosure = objectLiteral->hasTrailingClosure();
+      omittableArgLabels = objectLiteral->getOmittableArgumentLabels(&cs.getASTContext());
     }
-    return std::make_tuple(nullptr, 0, argLabels, hasTrailingClosure);
+    return std::make_tuple(nullptr, 0, argLabels, hasTrailingClosure, omittableArgLabels);
   }
 
   // Determine the target locator.
@@ -609,7 +616,7 @@ getCalleeDeclAndArgs(ConstraintSystem &cs,
 
   // If we didn't find any matching overloads, we're done.
   if (!choice)
-    return std::make_tuple(nullptr, 0, argLabels, hasTrailingClosure);
+    return std::make_tuple(nullptr, 0, argLabels, hasTrailingClosure, omittableArgLabels);
 
   // If there's a declaration, return it.
   if (choice->isDecl()) {
@@ -630,10 +637,10 @@ getCalleeDeclAndArgs(ConstraintSystem &cs,
       }
     }
 
-    return std::make_tuple(decl, level, argLabels, hasTrailingClosure);
+    return std::make_tuple(decl, level, argLabels, hasTrailingClosure, omittableArgLabels);
   }
 
-  return std::make_tuple(nullptr, 0, argLabels, hasTrailingClosure);
+  return std::make_tuple(nullptr, 0, argLabels, hasTrailingClosure, omittableArgLabels);
 }
 
 // Match the argument of a call to the parameter.
@@ -667,7 +674,8 @@ matchCallArguments(ConstraintSystem &cs, ConstraintKind kind,
   ArrayRef<Identifier> argLabels;
   SmallVector<Identifier, 2> argLabelsScratch;
   bool hasTrailingClosure = false;
-  std::tie(callee, calleeLevel, argLabels, hasTrailingClosure) =
+  ClusteredBitVector omittableArgLabels;
+  std::tie(callee, calleeLevel, argLabels, hasTrailingClosure, omittableArgLabels) =
     getCalleeDeclAndArgs(cs, locator, argLabelsScratch);
   auto params = decomposeParamType(paramType, callee, calleeLevel);
 
@@ -687,7 +695,7 @@ matchCallArguments(ConstraintSystem &cs, ConstraintKind kind,
   }
 
   // Extract the arguments.
-  auto args = decomposeArgType(argType, argLabels);
+  auto args = decomposeArgType(argType, argLabels, omittableArgLabels);
 
   // Match up the call arguments to the parameters.
   MatchCallArgumentListener listener;
@@ -2836,6 +2844,7 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
 
     return areConservativelyCompatibleArgumentLabels(decl, parameterDepth,
                                           argumentLabels->Labels,
+                                          argumentLabels->OmittableLabels,
                                           argumentLabels->HasTrailingClosure,
                                           allowLabelOmission);
   };

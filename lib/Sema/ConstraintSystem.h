@@ -1252,6 +1252,7 @@ public:
 
   struct ArgumentLabelState {
     ArrayRef<Identifier> Labels;
+    ClusteredBitVector OmittableLabels;
     bool HasTrailingClosure;
   };
 
