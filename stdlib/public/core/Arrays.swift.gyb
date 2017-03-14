@@ -109,7 +109,7 @@ if True:
 ///     } else {
 ///         print("More absences in the second half.")
 ///     }
-///     // Prints "More absences in the second half."
+///     // Prints "More absences in the first half."
 ///
 /// - Important: Long-term storage of `ArraySlice` instances is discouraged. A
 ///   slice holds a reference to the entire storage of a larger array, not
