@@ -112,7 +112,7 @@ bool GenericSpecializer::specializeAppliesInFunction(SILFunction &F) {
       // (as opposed to returning a previous specialization), we need to notify
       // the pass manager so that the new functions get optimized.
       for (SILFunction *NewF : reverse(NewFunctions)) {
-        notifyPassManagerOfFunction(NewF, Callee);
+        notifyAddFunction(NewF, Callee);
       }
     }
   }

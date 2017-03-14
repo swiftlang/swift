@@ -590,12 +590,15 @@ class DeadFunctionElimination : FunctionLivenessComputation {
   }
 
   /// Removes all dead methods from vtables and witness tables.
-  void removeDeadEntriesFromTables() {
+  bool removeDeadEntriesFromTables() {
+    bool changedTable = false;
     for (SILVTable &vTable : Module->getVTableList()) {
-      vTable.removeEntries_if([this](SILVTable::Entry &entry) -> bool {
+      vTable.removeEntries_if([this, &changedTable]
+                              (SILVTable::Entry &entry) -> bool {
         if (!isAlive(entry.Implementation)) {
           DEBUG(llvm::dbgs() << "  erase dead vtable method " <<
                 entry.Implementation->getName() << "\n");
+          changedTable = true;
           return true;
         }
         return false;
@@ -606,10 +609,12 @@ class DeadFunctionElimination : FunctionLivenessComputation {
     for (auto WI = WitnessTables.begin(), EI = WitnessTables.end(); WI != EI;) {
       SILWitnessTable *WT = &*WI;
       WI++;
-      WT->clearMethods_if([this](const SILWitnessTable::MethodWitness &MW) -> bool {
+      WT->clearMethods_if([this, &changedTable]
+                          (const SILWitnessTable::MethodWitness &MW) -> bool {
         if (!isAlive(MW.Witness)) {
           DEBUG(llvm::dbgs() << "  erase dead witness method " <<
                 MW.Witness->getName() << "\n");
+          changedTable = true;
           return true;
         }
         return false;
@@ -622,17 +627,19 @@ class DeadFunctionElimination : FunctionLivenessComputation {
          WI != EI;) {
       SILDefaultWitnessTable *WT = &*WI;
       WI++;
-      WT->clearMethods_if([this](SILFunction *MW) -> bool {
+      WT->clearMethods_if([this, &changedTable](SILFunction *MW) -> bool {
         if (!MW)
           return false;
         if (!isAlive(MW)) {
           DEBUG(llvm::dbgs() << "  erase dead default witness method "
                              << MW->getName() << "\n");
+          changedTable = true;
           return true;
         }
         return false;
       });
     }
+    return changedTable;
   }
 
 public:
@@ -645,7 +652,7 @@ public:
     DEBUG(llvm::dbgs() << "running dead function elimination\n");
     findAliveFunctions();
 
-    removeDeadEntriesFromTables();
+    bool changedTables = removeDeadEntriesFromTables();
 
     // First drop all references so that we don't get problems with non-zero
     // reference counts of dead functions.
@@ -670,16 +677,17 @@ public:
     }
 
     // Last step: delete all dead functions.
-    auto InvalidateEverything = SILAnalysis::InvalidationKind::Everything;
     while (!DeadFunctions.empty()) {
       SILFunction *F = DeadFunctions.back();
       DeadFunctions.pop_back();
 
       DEBUG(llvm::dbgs() << "  erase dead function " << F->getName() << "\n");
       NumDeadFunc++;
-      DFEPass->invalidateAnalysisForDeadFunction(F, InvalidateEverything);
+      DFEPass->notifyDeleteFunction(F);
       Module->eraseFunction(F);
     }
+    if (changedTables)
+      DFEPass->invalidateFunctionTables();
   }
 };
 
@@ -839,8 +847,7 @@ public:
       // Do not remove bodies of any functions that are alive.
       if (!isAlive(F)) {
         if (tryToConvertExternalDefinitionIntoDeclaration(F)) {
-          DFEPass->invalidateAnalysisForDeadFunction(F,
-                                    SILAnalysis::InvalidationKind::Everything);
+          DFEPass->notifyDeleteFunction(F);
           if (F->getRefCount() == 0)
             F->getModule().eraseFunction(F);
         }

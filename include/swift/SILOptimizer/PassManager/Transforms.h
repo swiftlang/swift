@@ -104,7 +104,7 @@ namespace swift {
     /// derived from a common base function, e.g. due to specialization.
     /// The number should be small anyway, but bugs in optimizations could cause
     /// an infinite loop in the passmanager.
-    void notifyPassManagerOfFunction(SILFunction *F, SILFunction *DerivedFrom) {
+    void notifyAddFunction(SILFunction *F, SILFunction *DerivedFrom) {
       PM->addFunctionToWorklist(F, DerivedFrom);
       PM->notifyAnalysisOfFunction(F);
     }
@@ -146,10 +146,9 @@ namespace swift {
 
     SILModule *getModule() { return M; }
 
-    /// Invalidate all of functions in the module, using invalidation
-    /// information \p K.
-    void invalidateAnalysis(SILAnalysis::InvalidationKind K) {
-      PM->invalidateAnalysis(K);
+    /// Invalidate all analsysis data for the whole module.
+    void invalidateAll() {
+      PM->invalidateAllAnalysis();
     }
 
     /// Invalidate only the function \p F, using invalidation information \p K.
@@ -157,11 +156,19 @@ namespace swift {
       PM->invalidateAnalysis(F, K);
     }
 
-    /// Invalidate only the function \p F, using invalidation information \p K.
-    /// But we also know this function is going to be dead.
-    void invalidateAnalysisForDeadFunction(SILFunction *F,
-                                           SILAnalysis::InvalidationKind K) {
-      PM->invalidateAnalysisForDeadFunction(F, K);
+    /// Invalidate the analysis data for witness- and vtables.
+    void invalidateFunctionTables() {
+      PM->invalidateFunctionTables();
+    }
+
+    /// Inform the pass manager of a deleted function.
+    void notifyDeleteFunction(SILFunction *F) {
+      PM->notifyDeleteFunction(F);
+    }
+
+    /// Inform the pass manager of an added function.
+    void notifyAddFunction(SILFunction *F) {
+      PM->notifyAnalysisOfFunction(F);
     }
   };
 } // end namespace swift

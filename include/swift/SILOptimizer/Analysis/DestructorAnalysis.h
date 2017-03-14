@@ -34,6 +34,22 @@ public:
   /// Returns true if destruction of T may store to memory.
   bool mayStoreToMemoryOnDestruction(SILType T);
 
+  /// No invalidation is needed.
+  virtual void invalidate() override { }
+
+  /// No invalidation is needed.
+  virtual void invalidate(SILFunction *F, InvalidationKind K)  override { }
+
+  /// Notify the analysis about a newly created function.
+  virtual void notifyAddFunction(SILFunction *F) override { }
+
+  /// Notify the analysis about a function which will be deleted from the
+  /// module.
+  virtual void notifyDeleteFunction(SILFunction *F) override { }
+
+  /// Notify the analysis about changed witness or vtables.
+  virtual void invalidateFunctionTables() override { }
+
 protected:
   bool cacheResult(CanType Type, bool Result);
   bool isSafeType(CanType Ty);

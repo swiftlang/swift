@@ -885,7 +885,7 @@ bool SILClosureSpecializerTransform::specialize(SILFunction *Caller,
       // directly.
       if (!NewF) {
         NewF = ClosureSpecCloner::cloneFunction(CSDesc, NewFName);
-        notifyPassManagerOfFunction(NewF, CSDesc.getApplyCallee());
+        notifyAddFunction(NewF, CSDesc.getApplyCallee());
       }
 
       // Rewrite the call

@@ -515,7 +515,7 @@ void SideEffectAnalysis::getEffects(FunctionEffects &ApplyEffects, FullApplySite
   }
 }
 
-void SideEffectAnalysis::invalidate(InvalidationKind K) {
+void SideEffectAnalysis::invalidate() {
   Function2Info.clear();
   Allocator.DestroyAll();
   DEBUG(llvm::dbgs() << "invalidate all\n");

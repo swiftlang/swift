@@ -981,11 +981,11 @@ public:
       // The old function must be a thunk now.
       assert(F->isThunk() && "Old function should have been turned into a thunk");
 
-      PM->invalidateAnalysis(F, SILAnalysis::InvalidationKind::Everything);
+      invalidateAnalysis(SILAnalysis::InvalidationKind::Everything);
 
       // Make sure the PM knows about this function. This will also help us
       // with self-recursion.
-      notifyPassManagerOfFunction(FST.getOptimizedFunction(), F);
+      notifyAddFunction(FST.getOptimizedFunction(), F);
 
       if (!OptForPartialApply) {
         // We have to restart the pipeline for this thunk in order to run the
