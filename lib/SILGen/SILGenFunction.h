@@ -38,7 +38,8 @@ class LValue;
 class ManagedValue;
 class RValue;
 class TemporaryInitialization;
-  
+class CalleeTypeInfo;
+
 /// Internal context information for the SILGenFunction visitor.
 ///
 /// In general, emission methods which take an SGFContext indicate
@@ -1270,17 +1271,9 @@ public:
   /// lowered appropriately for the abstraction level but that the
   /// result does need to be turned back into something matching a
   /// formal type.
-  RValue emitApply(SILLocation loc,
-                   ManagedValue fn,
-                   SubstitutionList subs,
-                   ArrayRef<ManagedValue> args,
-                   CanSILFunctionType substFnType,
-                   AbstractionPattern origResultType,
-                   CanType substResultType,
-                   ApplyOptions options,
-                   Optional<SILFunctionTypeRepresentation> overrideRep,
-                   const Optional<ForeignErrorConvention> &foreignError,
-                   SGFContext evalContext);
+  RValue emitApply(SILLocation loc, ManagedValue fn, SubstitutionList subs,
+                   ArrayRef<ManagedValue> args, CalleeTypeInfo &calleeTypeInfo,
+                   ApplyOptions options, SGFContext evalContext);
 
   RValue emitApplyOfDefaultArgGenerator(SILLocation loc,
                                         ConcreteDeclRef defaultArgsOwner,

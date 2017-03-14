@@ -10,8 +10,9 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "SILGenFunction.h"
+#include "Callee.h"
 #include "RValue.h"
+#include "SILGenFunction.h"
 #include "Scope.h"
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/ForeignErrorConvention.h"
@@ -164,16 +165,14 @@ emitBridgeObjectiveCToNative(SILGenFunction &SGF,
     canGenericSig = genericSig->getCanonicalSignature();
   GenericContextScope genericContextScope(SGF.SGM.Types,
                                           canGenericSig);
-  return SGF.emitApply(loc, ManagedValue::forUnmanaged(witnessRef),
-                       subs,
-                       { objcValue, ManagedValue::forUnmanaged(metatypeValue) },
-                       witnessFnTy,
-                       AbstractionPattern(canGenericSig,
-                                          formalResultTy),
-                       swiftValueType->getCanonicalType(),
-                       ApplyOptions::None, None, None,
-                       SGFContext())
-    .getAsSingleValue(SGF, loc);
+  CalleeTypeInfo calleeTypeInfo(
+      witnessFnTy, AbstractionPattern(canGenericSig, formalResultTy),
+      swiftValueType->getCanonicalType());
+  return SGF
+      .emitApply(loc, ManagedValue::forUnmanaged(witnessRef), subs,
+                 {objcValue, ManagedValue::forUnmanaged(metatypeValue)},
+                 calleeTypeInfo, ApplyOptions::None, SGFContext())
+      .getAsSingleValue(SGF, loc);
 }
 
 static ManagedValue emitBridgeBoolToObjCBool(SILGenFunction &SGF,
@@ -1335,15 +1334,13 @@ void SILGenFunction::emitForeignToNativeThunk(SILDeclRef thunk) {
     auto substResultTy =
         fd->mapTypeIntoContext(nativeFormalResultTy)
             ->getCanonicalType();
-
-    auto resultMV = emitApply(fd, ManagedValue::forUnmanaged(fn),
-                       subs, args, fnType,
-                       AbstractionPattern(nativeFnTy->getGenericSignature(),
-                                          nativeFormalResultTy),
-                       substResultTy,
-                       ApplyOptions::None, None, foreignError,
-                       SGFContext())
-      .getAsSingleValue(*this, fd);
+    CalleeTypeInfo calleeTypeInfo(
+        fnType, AbstractionPattern(nativeFnTy->getGenericSignature(),
+                                   nativeFormalResultTy),
+        substResultTy, foreignError);
+    auto resultMV = emitApply(fd, ManagedValue::forUnmanaged(fn), subs, args,
+                              calleeTypeInfo, ApplyOptions::None, SGFContext())
+                        .getAsSingleValue(*this, fd);
     // TODO: Emit directly into the indirect result.
     if (indirectResult) {
       resultMV.forwardInto(*this, fd, indirectResult);
