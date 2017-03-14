@@ -2815,7 +2815,7 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
 
   /// Determine whether the given declaration has compatible argument
   /// labels.
-  auto hasCompatibleArgumentLabels = [&](ValueDecl *decl) -> bool {
+  auto hasCompatibleArgumentLabels = [&](ValueDecl *decl, bool allowLabelOmission) -> bool {
     if (!argumentLabels)
       return true;
 
@@ -2834,7 +2834,8 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
 
     return areConservativelyCompatibleArgumentLabels(decl, parameterDepth,
                                           argumentLabels->Labels,
-                                          argumentLabels->HasTrailingClosure);
+                                          argumentLabels->HasTrailingClosure,
+                                          allowLabelOmission);
   };
 
   
@@ -2890,10 +2891,17 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
 
       // If the argument labels for this result are incompatible with
       // the call site, skip it.
-      if (!hasCompatibleArgumentLabels(ctor)) {
-        labelMismatch = true;
-        result.addUnviable(ctor, MemberLookupResult::UR_LabelMismatch);
-        continue;
+      bool omittedLabels = false;
+      
+      if (!hasCompatibleArgumentLabels(ctor, false)) {
+        if (hasCompatibleArgumentLabels(ctor, true)) {
+          omittedLabels = true;
+        }
+        else {
+          labelMismatch = true;
+          result.addUnviable(ctor, MemberLookupResult::UR_LabelMismatch);
+          continue;
+        }
       }
 
       // If our base is an existential type, we can't make use of any
@@ -2929,8 +2937,11 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
         }
       }
       
-      result.addViable(OverloadChoice(baseTy, ctor, /*isSpecialized=*/false,
-                                      functionRefKind));
+      auto choice = omittedLabels
+        ? OverloadChoice::getDeclViaOmittedLabels(baseTy, ctor, functionRefKind)
+        : OverloadChoice(baseTy, ctor, /*isSpecialized=*/false, functionRefKind);
+      
+      result.addViable(choice);
     }
 
 
@@ -2988,10 +2999,17 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
 
     // If the argument labels for this result are incompatible with
     // the call site, skip it.
-    if (!hasCompatibleArgumentLabels(cand)) {
-      labelMismatch = true;
-      result.addUnviable(cand, MemberLookupResult::UR_LabelMismatch);
-      return;
+    bool omittedLabels = false;
+    
+    if (!hasCompatibleArgumentLabels(cand, false)) {
+      if (!isBridged && !isUnwrappedOptional && hasCompatibleArgumentLabels(cand, true)) {
+        omittedLabels = true;
+      }
+      else {
+        labelMismatch = true;
+        result.addUnviable(cand, MemberLookupResult::UR_LabelMismatch);
+        return;
+      }
     }
 
     // If our base is an existential type, we can't make use of any
@@ -3069,6 +3087,12 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
       // We found this declaration via dynamic lookup, record it as such.
       result.addViable(OverloadChoice::getDeclViaDynamic(baseTy, cand,
                                                          functionRefKind));
+      return;
+    }
+    
+    if (omittedLabels) {
+      result.addViable(OverloadChoice::getDeclViaOmittedLabels(baseTy, cand, 
+                                                               functionRefKind));
       return;
     }
 
