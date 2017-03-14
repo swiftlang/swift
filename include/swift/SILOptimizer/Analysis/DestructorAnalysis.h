@@ -35,10 +35,16 @@ public:
   bool mayStoreToMemoryOnDestruction(SILType T);
 
   /// No invalidation is needed.
-  virtual void invalidate() override { }
+  virtual void invalidate() override {
+    // Nothing can invalidate, because types are static and cannot be changed
+    // during the SIL pass pipeline.
+  }
 
   /// No invalidation is needed.
-  virtual void invalidate(SILFunction *F, InvalidationKind K)  override { }
+  virtual void invalidate(SILFunction *F, InvalidationKind K)  override {
+    // Nothing can invalidate, because types are static and cannot be changed
+    // during the SIL pass pipeline.
+  }
 
   /// Notify the analysis about a newly created function.
   virtual void notifyAddFunction(SILFunction *F) override { }

@@ -138,14 +138,23 @@ public:
   }
 
   /// Invalidate all of the information for a specific function.
-  virtual void invalidate(SILFunction *F, InvalidationKind K) override { }
+  virtual void invalidate(SILFunction *F, InvalidationKind K) override {
+    // No invalidation needed because the analysis does not cache anything
+    // per call-site in functions.
+  }
 
   /// Notify the analysis about a newly created function.
-  virtual void notifyAddFunction(SILFunction *F) override { }
+  virtual void notifyAddFunction(SILFunction *F) override {
+    // Nothing to be done because the analysis does not cache anything
+    // per call-site in functions.
+  }
 
   /// Notify the analysis about a function which will be deleted from the
   /// module.
-  virtual void notifyDeleteFunction(SILFunction *F) override { };
+  virtual void notifyDeleteFunction(SILFunction *F) override {
+    // No invalidation needed because the analysis does not cache anything
+    // per call-site in functions.
+  };
 
   /// Notify the analysis about changed witness or vtables.
   virtual void invalidateFunctionTables() override {

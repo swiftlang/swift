@@ -970,9 +970,6 @@ class CapturePromotionPass : public SILModuleTransform {
     for (auto &F : *getModule())
       processFunction(&F, Worklist);
 
-      if (!Worklist.empty()) {
-      }
-
     while (!Worklist.empty())
       processFunction(Worklist.pop_back_val(), Worklist);
   }
