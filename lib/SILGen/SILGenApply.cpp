@@ -3690,6 +3690,9 @@ namespace {
           applyFirstLevelCallee(formalType, origFormalType, substFnType,
                                 foreignError, foreignSelf, uncurryLevel, C);
 
+      // End of the initial writeback scope.
+      initialWritebackScope.pop();
+
       // Then handle the remaining call sites.
       result = applyRemainingCallSites(std::move(result), formalType,
                                        foreignSelf, foreignError, C);
