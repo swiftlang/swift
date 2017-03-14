@@ -1752,7 +1752,7 @@ void CalleeCandidateInfo::filterContextualMemberList(Expr *argExpr) {
     CallArgParam param;
     param.Ty = argType;
     param.Label = argTuple->getElementName(i);
-    param.CanMatchUnlabledParameter = argTuple->getOmittableElementNames(&CS->getASTContext())[i]; 
+    param.CanMatchUnlabledParameter = argTuple->getOmittableElementNames(CS->getASTContext())[i]; 
     ArgElts.push_back(param);
   }
 
@@ -4593,7 +4593,7 @@ typeCheckArgumentChildIndependently(Expr *argExpr, Type argType,
       CallArgParam arg;
       arg.Ty = voidTy;
       arg.Label = TE->getElementName(i);
-      arg.CanMatchUnlabledParameter = TE->getOmittableElementNames(&CS->getASTContext())[i]; 
+      arg.CanMatchUnlabledParameter = TE->getOmittableElementNames(CS->getASTContext())[i]; 
       args.push_back(arg);
     }
 
@@ -5417,7 +5417,7 @@ bool FailureDiagnosis::visitSubscriptExpr(SubscriptExpr *SE) {
     --calleeInfo.candidates[i].level;
 
   ArrayRef<Identifier> argLabels = SE->getArgumentLabels();
-  ClusteredBitVector omittableArgLabels = SE->getOmittableArgumentLabels(&CS->getASTContext());
+  ClusteredBitVector omittableArgLabels = SE->getOmittableArgumentLabels(CS->getASTContext());
   if (diagnoseParameterErrors(calleeInfo, SE, indexExpr, argLabels, omittableArgLabels))
     return true;
 
@@ -5952,7 +5952,7 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
   SmallVector<Identifier, 2> argLabelsScratch;
   ArrayRef<Identifier> argLabels =
     callExpr->getArgumentLabels(argLabelsScratch);
-  ClusteredBitVector omittableArgLabels = callExpr->getOmittableArgumentLabels(&CS->getASTContext());
+  ClusteredBitVector omittableArgLabels = callExpr->getOmittableArgumentLabels(CS->getASTContext());
   if (diagnoseParameterErrors(calleeInfo, callExpr->getFn(),
                               callExpr->getArg(), argLabels, omittableArgLabels))
     return true;
@@ -7027,7 +7027,7 @@ bool FailureDiagnosis::visitUnresolvedMemberExpr(UnresolvedMemberExpr *E) {
                                                                  argLabelsScratch);
     
     // We actually care about the omittability at the call site, not the candidate's. 
-    auto omittableArgLabels = E->getOmittableArgumentLabels(&CS->getASTContext());
+    auto omittableArgLabels = E->getOmittableArgumentLabels(CS->getASTContext());
     if (candidateArgLabels.size() > omittableArgLabels.size()) {
       omittableArgLabels.extendWithClearBits(candidateArgLabels.size());
     }

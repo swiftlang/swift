@@ -545,31 +545,31 @@ getCalleeDeclAndArgs(ConstraintSystem &cs,
     calleeExpr = call->getDirectCallee();
     argLabels = call->getArgumentLabels();
     hasTrailingClosure = call->hasTrailingClosure();
-    omittableArgLabels = call->getOmittableArgumentLabels(&cs.getASTContext());
+    omittableArgLabels = call->getOmittableArgumentLabels(cs.getASTContext());
   } else if (auto unresolved = dyn_cast<UnresolvedMemberExpr>(callExpr)) {
     calleeExpr = callExpr;
     argLabels = unresolved->getArgumentLabels();
     hasTrailingClosure = unresolved->hasTrailingClosure();
-    omittableArgLabels = unresolved->getOmittableArgumentLabels(&cs.getASTContext());
+    omittableArgLabels = unresolved->getOmittableArgumentLabels(cs.getASTContext());
   } else if (auto subscript = dyn_cast<SubscriptExpr>(callExpr)) {
     calleeExpr = callExpr;
     argLabels = subscript->getArgumentLabels();
     hasTrailingClosure = subscript->hasTrailingClosure();
-    omittableArgLabels = subscript->getOmittableArgumentLabels(&cs.getASTContext());
+    omittableArgLabels = subscript->getOmittableArgumentLabels(cs.getASTContext());
   } else if (auto dynSubscript = dyn_cast<DynamicSubscriptExpr>(callExpr)) {
     calleeExpr = callExpr;
     argLabels = dynSubscript->getArgumentLabels();
     hasTrailingClosure = dynSubscript->hasTrailingClosure();
-    omittableArgLabels = dynSubscript->getOmittableArgumentLabels(&cs.getASTContext());
+    omittableArgLabels = dynSubscript->getOmittableArgumentLabels(cs.getASTContext());
   } else {
     if (auto apply = dyn_cast<ApplyExpr>(callExpr)) {
       argLabels = apply->getArgumentLabels(argLabelsScratch);
       assert(!apply->hasTrailingClosure());
-      omittableArgLabels = apply->getOmittableArgumentLabels(&cs.getASTContext());
+      omittableArgLabels = apply->getOmittableArgumentLabels(cs.getASTContext());
     } else if (auto objectLiteral = dyn_cast<ObjectLiteralExpr>(callExpr)) {
       argLabels = objectLiteral->getArgumentLabels();
       hasTrailingClosure = objectLiteral->hasTrailingClosure();
-      omittableArgLabels = objectLiteral->getOmittableArgumentLabels(&cs.getASTContext());
+      omittableArgLabels = objectLiteral->getOmittableArgumentLabels(cs.getASTContext());
     }
     return std::make_tuple(nullptr, 0, argLabels, hasTrailingClosure, omittableArgLabels);
   }

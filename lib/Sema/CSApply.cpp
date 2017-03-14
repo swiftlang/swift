@@ -2647,7 +2647,7 @@ namespace {
     Expr *visitSubscriptExpr(SubscriptExpr *expr) {
       return buildSubscript(expr->getBase(), expr->getIndex(),
                             expr->getArgumentLabels(),
-                            expr->getOmittableArgumentLabels(&cs.getASTContext()),
+                            expr->getOmittableArgumentLabels(cs.getASTContext()),
                             expr->hasTrailingClosure(),
                             cs.getConstraintLocator(expr),
                             expr->isImplicit(),
@@ -2818,7 +2818,7 @@ namespace {
     Expr *visitDynamicSubscriptExpr(DynamicSubscriptExpr *expr) {
       return buildSubscript(expr->getBase(), expr->getIndex(),
                             expr->getArgumentLabels(),
-                            expr->getOmittableArgumentLabels(&cs.getASTContext()),
+                            expr->getOmittableArgumentLabels(cs.getASTContext()),
                             expr->hasTrailingClosure(),
                             cs.getConstraintLocator(expr),
                             expr->isImplicit(), AccessSemantics::Ordinary);
@@ -6445,7 +6445,7 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
     Expr *arg = coerceCallArguments(origArg, fnType->getInput(),
                                     apply,
                                     apply->getArgumentLabels(argLabelsScratch),
-                                    apply->getOmittableArgumentLabels(&cs.getASTContext()),
+                                    apply->getOmittableArgumentLabels(cs.getASTContext()),
                                     hasTrailingClosure,
                                     locator.withPathElement(
                                       ConstraintLocator::ApplyArgument));

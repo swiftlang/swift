@@ -927,13 +927,13 @@ shallowCloneImpl(const ObjectLiteralExpr *E, ASTContext &Ctx,
   return res;
 }
 
-ClusteredBitVector swift::getOmittableArgumentLabelsOrElementNamesImpl(ArrayRef<Identifier> identifiers, const ASTContext * Context) {
+ClusteredBitVector swift::getOmittableArgumentLabelsOrElementNamesImpl(ArrayRef<Identifier> identifiers, const ASTContext &Context) {
   auto vec = ClusteredBitVector();
   if (!identifiers.empty()) {
     vec.appendClearBits(identifiers.size());
   
     // FIXME: This is a despicable little hack.
-    if (identifiers[0] == Context->Id_forInterpolation) {
+    if (identifiers[0] == Context.Id_forInterpolation) {
       vec.setBit(0);
     }
   }
@@ -1709,7 +1709,7 @@ ArrayRef<Identifier> ApplyExpr::getArgumentLabels(
   return call->getArgumentLabels();
 }
 
-ClusteredBitVector ApplyExpr::getOmittableArgumentLabels(const ASTContext * Context) const {
+ClusteredBitVector ApplyExpr::getOmittableArgumentLabels(const ASTContext &Context) const {
   if (auto call = dyn_cast<CallExpr>(this)) {
     return call->getOmittableArgumentLabels(Context);
   }

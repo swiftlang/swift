@@ -655,7 +655,7 @@ public:
 
 // This uses ASTContext, which we don't want to include here (I assume).
 // FIXME: Can this be hidden better?
-ClusteredBitVector getOmittableArgumentLabelsOrElementNamesImpl(ArrayRef<Identifier> identifiers, const ASTContext * Context);
+ClusteredBitVector getOmittableArgumentLabelsOrElementNamesImpl(ArrayRef<Identifier> identifiers, const ASTContext &Context);
 
 /// Helper class to capture trailing call argument labels and related
 /// information, for expression nodes that involve argument labels, trailing
@@ -755,7 +755,7 @@ public:
     return i < locs.size() ? locs[i] : SourceLoc();
   }
 
-  ClusteredBitVector getOmittableArgumentLabels(const ASTContext * Context) const {
+  ClusteredBitVector getOmittableArgumentLabels(const ASTContext &Context) const {
     return getOmittableArgumentLabelsOrElementNamesImpl(getArgumentLabels(), Context);
   }
 };
@@ -2187,7 +2187,7 @@ public:
     return SourceLoc();
   }
 
-  ClusteredBitVector getOmittableElementNames(const ASTContext * Context) const {
+  ClusteredBitVector getOmittableElementNames(const ASTContext &Context) const {
     return getOmittableArgumentLabelsOrElementNamesImpl(getElementNames(), Context);
   }
 
@@ -3785,7 +3785,7 @@ public:
 
   /// Whether this application was written using a trailing closure.
   bool hasTrailingClosure() const;
-  ClusteredBitVector getOmittableArgumentLabels(const ASTContext * Context) const;
+  ClusteredBitVector getOmittableArgumentLabels(const ASTContext &Context) const;
 
   static bool classof(const Expr *E) {
     return E->getKind() >= ExprKind::First_ApplyExpr &&
