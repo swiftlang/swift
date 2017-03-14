@@ -590,7 +590,7 @@ public:
     // an opened type.
     SILValue openingSite;
     auto archetype =
-        cast<ArchetypeType>(CanType(getSelfType()->getRValueInstanceType()));
+        getSelfType()->getRValueInstanceType()->castTo<ArchetypeType>();
     if (archetype->getOpenedExistentialType()) {
       openingSite = SGF.getArchetypeOpeningSite(archetype);
     }
