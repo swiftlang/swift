@@ -2589,7 +2589,21 @@ void ConformanceChecker::recordTypeWitness(AssociatedTypeDecl *assocType,
 bool swift::
 printRequirementStub(ValueDecl *Requirement, DeclContext *Adopter,
                      Type AdopterTy, SourceLoc TypeLoc, raw_ostream &OS) {
-
+  if (isa<ConstructorDecl>(Requirement)) {
+    if (auto CD = Adopter->getAsClassOrClassExtensionContext()) {
+      if (!CD->isFinal() && Adopter->isExtensionContext()) {
+          // In this case, user should mark class as 'final' or define
+          // 'required' initializer directly in the class definition.
+          return false;
+      }
+    }
+  }
+  if (auto MissingTypeWitness = dyn_cast<AssociatedTypeDecl>(Requirement)) {
+    if (!MissingTypeWitness->getDefaultDefinitionLoc().isNull()) {
+      // For type witnesses with default definitions, we don't print the stub.
+      return false;
+    }
+  }
   // FIXME: Infer body indentation from the source rather than hard-coding
   // 4 spaces.
   ASTContext &Ctx = Requirement->getASTContext();
@@ -2617,11 +2631,7 @@ printRequirementStub(ValueDecl *Requirement, DeclContext *Adopter,
   } else {
     if (isa<ConstructorDecl>(Requirement)) {
       if (auto CD = Adopter->getAsClassOrClassExtensionContext()) {
-        if (!CD->isFinal() && Adopter->isExtensionContext()) {
-          // In this case, user should mark class as 'final' or define
-          // 'required' initializer directly in the class definition.
-          return false;
-        } else if (!CD->isFinal()) {
+        if (!CD->isFinal()) {
           Printer << "required ";
         } else if (Adopter->isExtensionContext()) {
           Printer << "convenience ";
