@@ -31,7 +31,6 @@
 
 #define DEBUG_TYPE "sil-function-signature-opt"
 #include "swift/SILOptimizer/Analysis/ARCAnalysis.h"
-#include "swift/SILOptimizer/Analysis/BasicCalleeAnalysis.h"
 #include "swift/SILOptimizer/Analysis/CallerAnalysis.h"
 #include "swift/SILOptimizer/Analysis/EpilogueARCAnalysis.h"
 #include "swift/SILOptimizer/Analysis/RCIdentityAnalysis.h"
@@ -934,9 +933,6 @@ public:
 
     auto *RCIA = getAnalysis<RCIdentityAnalysis>();
     auto *EA = PM->getAnalysis<EpilogueARCAnalysis>();
-
-    // Lock BCA so it's not invalidated along with the rest of the call graph.
-    AnalysisPreserver BCAP(PM->getAnalysis<BasicCalleeAnalysis>());
 
     // As we optimize the function more and more, the name of the function is
     // going to change, make sure the mangler is aware of all the changes done
