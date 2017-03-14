@@ -4909,8 +4909,9 @@ Expr *ExprRewriter::coerceCallArguments(
   SmallVector<ParamBinding, 4> parameterBindings;
   bool failed = constraints::matchCallArguments(args, params,
                                                 hasTrailingClosure,
-                                                /*allowFixes=*/false, listener,
-                                                parameterBindings);
+                                                /*allowFixes=*/false, 
+                                                /*allowLabelOmission=*/false, 
+                                                listener, parameterBindings);
 
   assert((matchCanFail || !failed) && "Call arguments did not match up?");
   (void)failed;

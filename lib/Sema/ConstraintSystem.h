@@ -2597,6 +2597,7 @@ bool matchCallArguments(ArrayRef<CallArgParam> argTuple,
                         ArrayRef<CallArgParam> paramTuple,
                         bool hasTrailingClosure,
                         bool allowFixes,
+                        bool allowLabelOmission,
                         MatchCallArgumentListener &listener,
                         SmallVectorImpl<ParamBinding> &parameterBindings);
 
@@ -2606,7 +2607,8 @@ bool matchCallArguments(ArrayRef<CallArgParam> argTuple,
 bool areConservativelyCompatibleArgumentLabels(ValueDecl *decl,
                                                unsigned parameterDepth,
                                                ArrayRef<Identifier> labels,
-                                               bool hasTrailingClosure);
+                                               bool hasTrailingClosure,
+                                               bool allowLabelOmission = false);
 
 /// Simplify the given locator by zeroing in on the most specific
 /// subexpression described by the locator.

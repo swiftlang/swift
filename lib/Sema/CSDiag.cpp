@@ -1261,7 +1261,7 @@ CalleeCandidateInfo::evaluateCloseness(UncurriedCandidate candidate,
   // types of the arguments, looking only at the argument labels etc.
   SmallVector<ParamBinding, 4> paramBindings;
   if (matchCallArguments(actualArgs, candArgs, hasTrailingClosure,
-                         /*allowFixes:*/ true,
+                         /*allowFixes:*/ true, /*allowLabelOmission:*/ false,
                          listener, paramBindings))
     // On error, get our closeness from whatever problem the listener saw.
     return { listener.getResult(), {}};
@@ -4603,7 +4603,7 @@ typeCheckArgumentChildIndependently(Expr *argExpr, Type argType,
 
     SmallVector<ParamBinding, 4> paramBindings;
     if (!matchCallArguments(args, params, callArgHasTrailingClosure(argExpr),
-                            /*allowFixes=*/true,
+                            /*allowFixes=*/true, /*allowLabelOmission=*/false, 
                             listener, paramBindings)) {
       SmallVector<Expr*, 4> resultElts(TE->getNumElements(), nullptr);
       SmallVector<TupleTypeElt, 4> resultEltTys(TE->getNumElements(), voidTy);
@@ -5258,7 +5258,8 @@ static bool diagnoseSingleCandidateFailures(CalleeCandidateInfo &CCI,
       // concrete types of the arguments, looking only at the argument labels.
       matchCallArguments(Arguments, Parameters,
                          CandidateInfo.hasTrailingClosure,
-                         /*allowFixes:*/ true, *this, Bindings);
+                         /*allowFixes:*/ true, /*allowLabelOmission:*/ false,
+                         *this, Bindings);
 
       return Diagnosed;
     }
@@ -5710,7 +5711,8 @@ bool FailureDiagnosis::diagnoseArgumentGenericRequirements(
   SmallVector<ParamBinding, 4> bindings;
   MatchCallArgumentListener listener;
   if (matchCallArguments(args, params, candidates.hasTrailingClosure,
-                         /*allowFixes=*/false, listener, bindings))
+                         /*allowFixes=*/false, /*allowLabelOmission=*/false, 
+                         listener, bindings))
     return false;
 
   TypeSubstitutionMap substitutions;

@@ -79,7 +79,8 @@ bool constraints::
 areConservativelyCompatibleArgumentLabels(ValueDecl *decl,
                                           unsigned parameterDepth,
                                           ArrayRef<Identifier> labels,
-                                          bool hasTrailingClosure) {
+                                          bool hasTrailingClosure,
+                                          bool allowLabelOmission) {
   // Bail out conservatively if this isn't a function declaration.
   auto fn = dyn_cast<AbstractFunctionDecl>(decl);
   if (!fn) return true;
@@ -107,7 +108,7 @@ areConservativelyCompatibleArgumentLabels(ValueDecl *decl,
   SmallVector<ParamBinding, 8> unusedParamBindings;
 
   return !matchCallArguments(argInfos, paramInfos, hasTrailingClosure,
-                             /*allow fixes*/ false,
+                             /*allow fixes*/ false, allowLabelOmission,
                              listener, unusedParamBindings);
 }
 
@@ -118,12 +119,16 @@ static ConstraintSystem::TypeMatchOptions getDefaultDecompositionOptions(
   return flags | ConstraintSystem::TMF_GenerateConstraints;
 }
 
-static bool paramLabelMatchesArg(Identifier paramLabel, CallArgParam arg) {
+static bool paramLabelMatchesArg(Identifier paramLabel, CallArgParam arg, bool allowLabelOmission) {
   if (paramLabel == arg.Label) {
     return true;
   }
   
-  return arg.CanMatchUnlabledParameter && paramLabel.empty();
+  if (allowLabelOmission && arg.CanMatchUnlabledParameter && paramLabel.empty()) {
+    return true;
+  }
+  
+  return false;
 }
 
 bool constraints::
@@ -131,6 +136,7 @@ matchCallArguments(ArrayRef<CallArgParam> args,
                    ArrayRef<CallArgParam> params,
                    bool hasTrailingClosure,
                    bool allowFixes,
+                   bool allowLabelOmission,
                    MatchCallArgumentListener &listener,
                    SmallVectorImpl<ParamBinding> &parameterBindings) {
   // Keep track of the parameter we're matching and what argument indices
@@ -161,7 +167,7 @@ matchCallArguments(ArrayRef<CallArgParam> args,
     if (!actualArgNames.empty()) {
       // We're recording argument names; record this one.
       actualArgNames[argNumber] = expectedName;
-    } else if (!paramLabelMatchesArg(expectedName, args[argNumber]) && !ignoreNameClash) {
+    } else if (!paramLabelMatchesArg(expectedName, args[argNumber], allowLabelOmission) && !ignoreNameClash) {
       // We have an argument name mismatch. Start recording argument names.
       actualArgNames.resize(numArgs);
 
@@ -216,7 +222,7 @@ matchCallArguments(ArrayRef<CallArgParam> args,
 
     // If the name matches, claim this argument.
     if (nextArgIdx != numArgs &&
-        (ignoreNameMismatch || paramLabelMatchesArg(name, args[nextArgIdx]))) {
+        (ignoreNameMismatch || paramLabelMatchesArg(name, args[nextArgIdx], allowLabelOmission))) {
       return claim(name, nextArgIdx);
     }
 
@@ -225,7 +231,7 @@ matchCallArguments(ArrayRef<CallArgParam> args,
     Optional<unsigned> claimedWithSameName;
     for (unsigned i = nextArgIdx; i != numArgs; ++i) {
       // Skip arguments where the name doesn't match.
-      if (!paramLabelMatchesArg(name, args[i]))
+      if (!paramLabelMatchesArg(name, args[i], allowLabelOmission))
         continue;
 
       // Skip claimed arguments.
@@ -685,8 +691,9 @@ matchCallArguments(ConstraintSystem &cs, ConstraintKind kind,
   MatchCallArgumentListener listener;
   SmallVector<ParamBinding, 4> parameterBindings;
   if (constraints::matchCallArguments(args, params, hasTrailingClosure,
-                                      cs.shouldAttemptFixes(), listener,
-                                      parameterBindings))
+                                      cs.shouldAttemptFixes(), 
+                                      /*allowLabelOmission:*/ false,
+                                      listener, parameterBindings))
     return ConstraintSystem::SolutionKind::Error;
 
   // Check the argument types for each of the parameters.
