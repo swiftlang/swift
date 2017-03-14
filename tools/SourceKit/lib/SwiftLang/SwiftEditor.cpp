@@ -2128,6 +2128,16 @@ void SwiftLangSupport::editorExtractTextFromComment(StringRef Source,
   Consumer.handleSourceText(extractPlainTextFromComment(Source));
 }
 
+void SwiftLangSupport::editorConvertMarkupToXML(StringRef Source,
+                                                EditorConsumer &Consumer) {
+  std::string Result;
+  llvm::raw_string_ostream OS(Result);
+  if (convertMarkupToXML(Source, OS)) {
+    Consumer.handleRequestError("Conversion failed.");
+  }
+  Consumer.handleSourceText(Result);
+}
+
 //===----------------------------------------------------------------------===//
 // EditorExpandPlaceholder
 //===----------------------------------------------------------------------===//

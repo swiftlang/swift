@@ -463,6 +463,9 @@ public:
   virtual void editorExtractTextFromComment(StringRef Source,
                                             EditorConsumer &Consumer) = 0;
 
+  virtual void editorConvertMarkupToXML(StringRef Source,
+                                        EditorConsumer &Consumer) = 0;
+
   virtual void editorExpandPlaceholder(StringRef Name, unsigned Offset,
                                        unsigned Length,
                                        EditorConsumer &Consumer) = 0;
