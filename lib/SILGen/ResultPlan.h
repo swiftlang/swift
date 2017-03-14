@@ -44,17 +44,17 @@ using ResultPlanPtr = std::unique_ptr<ResultPlan>;
 /// The class for building result plans.
 struct ResultPlanBuilder {
   SILGenFunction &SGF;
-  SILLocation Loc;
-  ArrayRef<SILResultInfo> AllResults;
-  SILFunctionTypeRepresentation Rep;
-  SmallVectorImpl<SILValue> &IndirectResultAddrs;
+  SILLocation loc;
+  ArrayRef<SILResultInfo> allResults;
+  SILFunctionTypeRepresentation rep;
+  SmallVectorImpl<SILValue> &indirectResultAddrs;
 
   ResultPlanBuilder(SILGenFunction &SGF, SILLocation loc,
                     ArrayRef<SILResultInfo> allResults,
                     SILFunctionTypeRepresentation rep,
                     SmallVectorImpl<SILValue> &resultAddrs)
-      : SGF(SGF), Loc(loc), AllResults(allResults), Rep(rep),
-        IndirectResultAddrs(resultAddrs) {}
+      : SGF(SGF), loc(loc), allResults(allResults), rep(rep),
+        indirectResultAddrs(resultAddrs) {}
 
   ResultPlanPtr build(Initialization *emitInto, AbstractionPattern origType,
                       CanType substType);
@@ -63,7 +63,7 @@ struct ResultPlanBuilder {
                               CanTupleType substType);
 
   ~ResultPlanBuilder() {
-    assert(AllResults.empty() && "didn't consume all results!");
+    assert(allResults.empty() && "didn't consume all results!");
   }
 };
 
