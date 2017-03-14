@@ -490,9 +490,6 @@ private:
 
   ParameterList *readParameterList();
   
-  GenericParamList *maybeGetOrReadGenericParams(serialization::DeclID contextID,
-                                                DeclContext *DC);
-
   /// Reads a generic param list from \c DeclTypeCursor.
   ///
   /// If the record at the cursor is not a generic param list, returns null
