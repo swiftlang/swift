@@ -5,6 +5,6 @@
 // See https://swift.org/LICENSE.txt for license information
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
-// REQUIRES: deterministic-behavior
-// RUN: not --crash %target-swift-frontend %s -emit-ir
-func d(UInt=_=1 + 1 + 1 as?Int){guard let c=()a=1 1 guard let{p.a{f=1?It{{{[{{{{{{P{_.s{{{&({{b
+
+// RUN: not %target-swift-frontend %s -emit-ir
+func b(UInt=1 + 1 as?Int){$

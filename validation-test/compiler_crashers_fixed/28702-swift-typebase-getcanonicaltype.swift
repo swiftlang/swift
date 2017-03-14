@@ -5,12 +5,5 @@
 // See https://swift.org/LICENSE.txt for license information
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
-// REQUIRES: asserts
-// REQUIRES: deterministic-behavior
-// RUN: not --crash %target-swift-frontend %s -emit-ir
-{func a(UInt=1 + 1 + 1 as?Int){
-typealias e:A(t:_
-func a{
-a?a
-{{f{}struct A.init()a{
-a{func b
+// RUN: not %target-swift-frontend %s -emit-ir
+{extension{func 丏(UInt=1 + 1 + 1 as?Int){a

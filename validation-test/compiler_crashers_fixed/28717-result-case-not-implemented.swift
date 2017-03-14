@@ -5,6 +5,5 @@
 // See https://swift.org/LICENSE.txt for license information
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
-// RUN: not --crash %target-swift-frontend %s -emit-ir
-// REQUIRES: deterministic-behavior
-protocol A.init(UInt=_=1 + 1){{let c{extension{lazy var f={
+// RUN: not %target-swift-frontend %s -emit-ir
+A:{ struct A{func a(UInt=1 + 1 + 1 + 1 as?Int){
