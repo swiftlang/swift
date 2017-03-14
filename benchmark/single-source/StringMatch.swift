@@ -17,9 +17,6 @@ import Glibc
 import Darwin
 #endif
 
-// FIXME: remove when String is a Collection
-extension String: Collection { }
-
 /* match: search for regexp anywhere in text */
 func match(regexp: String, text: String) -> Bool {
   if regexp.first == "^" {
