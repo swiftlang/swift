@@ -666,7 +666,7 @@ Type TypeBase::replaceCovariantResultType(Type newResultType,
 }
 
 SmallVector<CallArgParam, 4>
-swift::decomposeArgType(Type type, ArrayRef<Identifier> argumentLabels) {
+swift::decomposeArgType(Type type, ArrayRef<Identifier> argumentLabels, ClusteredBitVector omittableArgumentLabels) {
   SmallVector<CallArgParam, 4> result;
   switch (type->getKind()) {
   case TypeKind::Tuple: {
@@ -689,7 +689,7 @@ swift::decomposeArgType(Type type, ArrayRef<Identifier> argumentLabels) {
       CallArgParam argParam;
       argParam.Ty = elt.getType();
       argParam.Label = argumentLabels[i];
-      argParam.CanMatchUnlabledParameter = (argumentLabels[0] == type->getASTContext().Id_forInterpolation);  // FIXME Do something better
+      argParam.CanMatchUnlabledParameter = omittableArgumentLabels[i]; 
       result.push_back(argParam);
     }
     return result;
@@ -713,7 +713,7 @@ swift::decomposeArgType(Type type, ArrayRef<Identifier> argumentLabels) {
   argParam.Ty = type;
   assert(argumentLabels.size() == 1);
   argParam.Label = argumentLabels[0];
-  argParam.CanMatchUnlabledParameter = (argumentLabels[0] == type->getASTContext().Id_forInterpolation);  // FIXME Do something better
+  argParam.CanMatchUnlabledParameter = omittableArgumentLabels[0];
   result.push_back(argParam);
   return result;
 }

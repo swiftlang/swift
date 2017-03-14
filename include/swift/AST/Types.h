@@ -28,6 +28,7 @@
 #include "swift/AST/Identifier.h"
 #include "swift/Basic/ArrayRefView.h"
 #include "swift/Basic/UUID.h"
+#include "swift/Basic/ClusteredBitVector.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseMapInfo.h"
 #include "llvm/ADT/FoldingSet.h"
@@ -2576,7 +2577,7 @@ struct CallArgParam {
 /// \param type The type to decompose.
 /// \param argumentLabels The argument labels to use.
 SmallVector<CallArgParam, 4>
-decomposeArgType(Type type, ArrayRef<Identifier> argumentLabels);
+decomposeArgType(Type type, ArrayRef<Identifier> argumentLabels, ClusteredBitVector omittableArgumentLabels);
 
 /// Break a parameter type into an array of \c CallArgParams.
 ///

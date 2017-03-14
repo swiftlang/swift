@@ -79,6 +79,7 @@ bool constraints::
 areConservativelyCompatibleArgumentLabels(ValueDecl *decl,
                                           unsigned parameterDepth,
                                           ArrayRef<Identifier> labels,
+                                          ClusteredBitVector omittableLabels,
                                           bool hasTrailingClosure,
                                           bool allowLabelOmission) {
   // Bail out conservatively if this isn't a function declaration.
@@ -89,10 +90,11 @@ areConservativelyCompatibleArgumentLabels(ValueDecl *decl,
   ParameterList &params = *fn->getParameterList(parameterDepth);
 
   SmallVector<CallArgParam, 8> argInfos;
-  for (auto argLabel : labels) {
+  
+  for (unsigned i = 0; i < labels.size(); ++i) {
     argInfos.push_back(CallArgParam());
-    argInfos.back().Label = argLabel;
-    argInfos.back().CanMatchUnlabledParameter = (argLabel == decl->getASTContext().Id_forInterpolation);  // FIXME Do something better
+    argInfos.back().Label = labels[i];
+    argInfos.back().CanMatchUnlabledParameter = omittableLabels[i];
   }
 
   SmallVector<CallArgParam, 8> paramInfos;

@@ -2607,6 +2607,7 @@ bool matchCallArguments(ArrayRef<CallArgParam> argTuple,
 bool areConservativelyCompatibleArgumentLabels(ValueDecl *decl,
                                                unsigned parameterDepth,
                                                ArrayRef<Identifier> labels,
+                                               ClusteredBitVector omittableLabels,
                                                bool hasTrailingClosure,
                                                bool allowLabelOmission = false);
 
