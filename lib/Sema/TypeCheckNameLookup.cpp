@@ -372,7 +372,7 @@ LookupTypeResult TypeChecker::lookupMemberType(DeclContext *dc,
         }
       }
 
-      if (auto aliasType = dyn_cast<TypeAliasDecl>(typeDecl)) {
+      if (isa<TypeAliasDecl>(typeDecl)) {
         if (!type->is<ArchetypeType>() &&
             !type->isTypeParameter() &&
             memberType->hasTypeParameter() &&
