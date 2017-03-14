@@ -155,10 +155,15 @@ extension _SwiftLatin1StringHeader : _BoundedStorageHeader {
   }
 }
 
+/// A class that presents its contiguous array of Elements as a
+/// random-access, range-replaceable collection
 protocol _BoundedStorage
-  : class, RandomAccessCollection, 
-    MutableCollection/*, RangeReplaceableCollection*/ {
-  associatedtype Element
+: class, MutableCollection, 
+    RandomAccessCollection,   
+    FactoryInitializable  // Allows us to code init in terms of Builtin.allocWithTailElems_1
+  , RangeReplaceableCollection {
+
+  associatedtype Element = Iterator.Element
   associatedtype Header : _BoundedStorageHeader
   
   @nonobjc var _header: Header { get set }
@@ -177,6 +182,10 @@ protocol _BoundedStorage
 }
 
 extension _BoundedStorage {
+  init() {
+    self.init(Self._emptyInstance())
+  }
+  
   init(
     minimumCapacity: Int = 0,
     makeInitialHeader: (_ allocatedCapacity: Int)->Header) {
@@ -222,7 +231,7 @@ extension _BoundedStorage {
   }
 }
 
-/// Fulfills the RandomAccessCollection requirements
+/// Fulfills the RandomAccessCollection and MutableCollection requirements
 extension _BoundedStorage {
   @nonobjc
   public var startIndex: Int { return 0 }
@@ -243,6 +252,98 @@ extension _BoundedStorage {
   public var count: Int {
     get { return numericCast(_header.count) }
     set { _header.count = numericCast(newValue) }
+  }
+}
+
+/// Fulfills the RangeReplaceableCollection requirements
+extension _BoundedStorage where Element == Iterator.Element {
+  internal func replaceSubrange<C>(
+    _ target: Range<Int>,
+    with newValues: C
+  ) where C : Collection, 
+  C.Iterator.Element == Iterator.Element {
+    self.replaceSubrange(
+      target,
+      with: numericCast(newValues.count),
+      elementsOf: newValues)
+  }
+  
+  internal func replaceSubrange<C>(
+    _ target: Range<Int>,
+    with newCount: Int,
+    elementsOf newValues: C
+  ) where C : Collection, 
+  C.Iterator.Element == Iterator.Element {
+    defer { _fixLifetime(self) }
+    let oldCount: Int = numericCast(self.count)
+    let eraseCount: Int = numericCast(target.count)
+
+    let growth = newCount - eraseCount
+    _sanityCheck(oldCount + growth <= capacity)
+    self._header.count = numericCast(oldCount + growth)
+
+    let elements = self._baseAddress
+    let oldTailIndex = target.upperBound
+    let oldTailStart = elements + oldTailIndex
+    let newTailIndex = oldTailIndex + growth
+    let newTailStart = oldTailStart + growth
+    let tailCount = oldCount - target.upperBound
+
+    if growth > 0 {
+      // Slide the tail part of the buffer forwards, in reverse order
+      // so as not to self-clobber.
+      newTailStart.moveInitialize(from: oldTailStart, count: tailCount)
+
+      // Assign over the original target
+      var i = newValues.startIndex
+      for j in CountableRange(target) {
+        elements[j] = newValues[i]
+        newValues.formIndex(after: &i)
+      }
+      // Initialize the hole left by sliding the tail forward
+      for j in oldTailIndex..<newTailIndex {
+        (elements + j).initialize(to: newValues[i])
+        newValues.formIndex(after: &i)
+      }
+      _expectEnd(of: newValues, is: i)
+    }
+    else { // We're not growing the buffer
+      // Assign all the new elements into the start of the target
+      var i = target.lowerBound
+      var j = newValues.startIndex
+      for _ in 0..<newCount {
+        elements[i] = newValues[j]
+        i += 1
+        newValues.formIndex(after: &j)
+      }
+      _expectEnd(of: newValues, is: j)
+
+      // If the size didn't change, we're done.
+      if growth == 0 {
+        return
+      }
+
+      // Move the tail backward to cover the shrinkage.
+      let shrinkage = -growth
+      if tailCount > shrinkage {   // If the tail length exceeds the shrinkage
+
+        // Assign over the rest of the replaced range with the first
+        // part of the tail.
+        newTailStart.moveAssign(from: oldTailStart, count: shrinkage)
+
+        // Slide the rest of the tail back
+        oldTailStart.moveInitialize(
+          from: oldTailStart + shrinkage, count: tailCount - shrinkage)
+      }
+      else {                      // Tail fits within erased elements
+        // Assign over the start of the replaced range with the tail
+        newTailStart.moveAssign(from: oldTailStart, count: tailCount)
+
+        // Destroy elements remaining after the tail in target
+        (newTailStart + tailCount).deinitialize(
+          count: shrinkage - tailCount)
+      }
+    }
   }
 }
 
