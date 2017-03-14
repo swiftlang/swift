@@ -45,7 +45,7 @@ extension _StringCore {
 
       _memcpy(
         dest: UnsafeMutableRawPointer(Builtin.addressof(&result)),
-        src: asciiBuffer.baseAddress! + i,
+        src: asciiBuffer.baseAddress + i,
         size: numericCast(utf16Count))
 
       // Convert the _UTF8Chunk into host endianness.

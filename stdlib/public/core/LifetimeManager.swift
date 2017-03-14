@@ -48,7 +48,7 @@ extension String {
     _ body: (UnsafePointer<Int8>) throws -> Result
   ) rethrows -> Result {
     return try self.utf8CString.withUnsafeBufferPointer {
-      try body($0.baseAddress!)
+      try body($0.baseAddress)
     }
   }
 }

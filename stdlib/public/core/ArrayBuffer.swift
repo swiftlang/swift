@@ -424,8 +424,10 @@ extension _ArrayBuffer {
       "Array is bridging an opaque NSArray; can't get a pointer to the elements"
     )
     defer { _fixLifetime(self) }
-    return try body(UnsafeMutableBufferPointer(
-      start: firstElementAddressIfContiguous, count: count))
+    return try body(
+      !_isNative ? UnsafeMutableBufferPointer()
+      : UnsafeMutableBufferPointer(
+        start: firstElementAddressIfContiguous!, count: count))
   }
   
   /// An object that keeps the elements stored in this buffer alive.

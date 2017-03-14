@@ -553,7 +553,7 @@ extension UnicodeStorage {
       var result  = FCCNormalizedUTF16View(repeating: 0, count: $0.count)
       while true {
         let usedCount = __swift_stdlib_unorm2_normalize(
-          _fccNormalizer, $0.baseAddress!, numericCast($0.count),
+          _fccNormalizer, $0.baseAddress, numericCast($0.count),
           &result, numericCast(result.count), &error)
         if __swift_stdlib_U_SUCCESS(error) {
           result.removeLast(result.count - numericCast(usedCount))

@@ -42,7 +42,7 @@ extension _Unicode {
     _ string: UnsafeBufferPointer<UInt16>
   ) -> Int {
     let collationIterator = _swift_stdlib_unicodeCollationIterator_create(
-      string.baseAddress!,
+      string.baseAddress,
       UInt32(string.count))
     defer { _swift_stdlib_unicodeCollationIterator_delete(collationIterator) }
 
@@ -94,7 +94,7 @@ extension String : Hashable {
 #else
     if let asciiBuffer = self._core.asciiBuffer {
       return _Unicode.hashASCII(UnsafeBufferPointer(
-        start: asciiBuffer.baseAddress!,
+        start: asciiBuffer.baseAddress,
         count: asciiBuffer.count))
     } else {
       return _Unicode.hashUTF16(
