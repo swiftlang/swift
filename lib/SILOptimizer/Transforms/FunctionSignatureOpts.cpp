@@ -31,7 +31,6 @@
 
 #define DEBUG_TYPE "sil-function-signature-opt"
 #include "swift/SILOptimizer/Analysis/ARCAnalysis.h"
-#include "swift/SILOptimizer/Analysis/BasicCalleeAnalysis.h"
 #include "swift/SILOptimizer/Analysis/CallerAnalysis.h"
 #include "swift/SILOptimizer/Analysis/EpilogueARCAnalysis.h"
 #include "swift/SILOptimizer/Analysis/RCIdentityAnalysis.h"
@@ -935,9 +934,6 @@ public:
     auto *RCIA = getAnalysis<RCIdentityAnalysis>();
     auto *EA = PM->getAnalysis<EpilogueARCAnalysis>();
 
-    // Lock BCA so it's not invalidated along with the rest of the call graph.
-    AnalysisPreserver BCAP(PM->getAnalysis<BasicCalleeAnalysis>());
-
     // As we optimize the function more and more, the name of the function is
     // going to change, make sure the mangler is aware of all the changes done
     // to the function.
@@ -981,11 +977,11 @@ public:
       // The old function must be a thunk now.
       assert(F->isThunk() && "Old function should have been turned into a thunk");
 
-      PM->invalidateAnalysis(F, SILAnalysis::InvalidationKind::Everything);
+      invalidateAnalysis(SILAnalysis::InvalidationKind::Everything);
 
       // Make sure the PM knows about this function. This will also help us
       // with self-recursion.
-      notifyPassManagerOfFunction(FST.getOptimizedFunction(), F);
+      notifyAddFunction(FST.getOptimizedFunction(), F);
 
       if (!OptForPartialApply) {
         // We have to restart the pipeline for this thunk in order to run the

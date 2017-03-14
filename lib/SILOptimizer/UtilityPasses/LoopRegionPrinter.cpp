@@ -27,7 +27,7 @@ namespace {
 
 class LoopRegionViewText : public SILModuleTransform {
   void run() override {
-    invalidateAnalysis(SILAnalysis::InvalidationKind::Everything);
+    invalidateAll();
     LoopRegionAnalysis *LRA = PM->getAnalysis<LoopRegionAnalysis>();
     for (auto &Fn : *getModule()) {
       if (Fn.isExternalDeclaration()) continue;

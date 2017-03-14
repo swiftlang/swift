@@ -103,6 +103,8 @@ class GlobalPropertyOpt {
   /// All found calls to get-property semantic functions.
   std::vector<ApplyInst *> propertyCalls;
 
+  llvm::SetVector<SILFunction *> ChangedFunctions;
+
   /// Contains entries with a false property value, which must be propagated
   /// to their dependencies.
   llvm::SmallVector<Entry *, 32> WorkList;
@@ -223,13 +225,13 @@ class GlobalPropertyOpt {
   
   void propagatePropertiesInGraph();
   
-  bool replacePropertyCalls();
+  void replacePropertyCalls();
   
 public:
   GlobalPropertyOpt(SILModule &Module) :
       M(Module), ArrayType(nullptr) {}
   
-  bool run();
+  void run(SILModuleTransform *T);
 };
 
 /// Checks if an address value does escape. If \p acceptStore is false, then
@@ -453,12 +455,14 @@ void GlobalPropertyOpt::propagatePropertiesInGraph() {
 
 /// Replaces all get-property calls, which we can prove to be true, with
 /// true-literals.
-bool GlobalPropertyOpt::replacePropertyCalls() {
-  bool Changed = false;
+void GlobalPropertyOpt::replacePropertyCalls() {
   for (ApplyInst *AI : propertyCalls) {
+    SILFunction *F = AI->getFunction();
     // Don't optimize functions that are marked with the opt.never attribute.
-    if (!AI->getFunction()->shouldOptimize())
+    if (!F->shouldOptimize())
       continue;
+
+    ChangedFunctions.insert(F);
 
     SILValue array = AI->getArgument(0);
     
@@ -481,14 +485,12 @@ bool GlobalPropertyOpt::replacePropertyCalls() {
       
       semCall.removeCall();
       NumPropertiesReplaced++;
-      Changed = true;
     }
   }
-  return Changed;
 }
  
 /// The main entry point to the optimization.
-bool GlobalPropertyOpt::run() {
+void GlobalPropertyOpt::run(SILModuleTransform *T) {
   
   assert(WorkList.empty());
   assert(FieldEntries.empty() && ValueEntries.empty());
@@ -502,7 +504,12 @@ bool GlobalPropertyOpt::run() {
   propagatePropertiesInGraph();
 
   // Step 3: replace get-property calls with literals.
-  return replacePropertyCalls();
+  replacePropertyCalls();
+
+  for (SILFunction *ChangedFn : ChangedFunctions) {
+    T->invalidateAnalysis(ChangedFn,
+                          SILAnalysis::InvalidationKind::CallsAndInstructions);
+  }
 }
 
 /// The module pass, which runs the optimization.
@@ -513,11 +520,7 @@ class GlobalPropertyOptPass : public SILModuleTransform {
     
     DEBUG(llvm::dbgs() << "** GlobalPropertyOpt **\n");
     
-    bool Changed = GlobalPropertyOpt(*M).run();
-    
-    if (Changed) {
-      invalidateAnalysis(SILAnalysis::InvalidationKind::CallsAndInstructions);
-    }
+    GlobalPropertyOpt(*M).run(this);
   }
   
   StringRef getName() override { return "GlobalPropertyOpt"; }

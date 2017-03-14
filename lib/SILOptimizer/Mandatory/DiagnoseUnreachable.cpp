@@ -727,7 +727,8 @@ static bool removeUnreachableBlocks(SILFunction &F, SILModule &M,
 /// diagnose any user code after it as being unreachable.  This pass happens
 /// before the definite initialization pass so that it doesn't see infeasible
 /// control flow edges.
-static void performNoReturnFunctionProcessing(SILModule *M) {
+static void performNoReturnFunctionProcessing(SILModule *M,
+                                              SILModuleTransform *T) {
   for (auto &Fn : *M) {
     DEBUG(llvm::errs() << "*** No return function processing: "
           << Fn.getName() << "\n");
@@ -737,10 +738,11 @@ static void performNoReturnFunctionProcessing(SILModule *M) {
       // function.
       simplifyBlocksWithCallsToNoReturn(BB, nullptr);
     }
+    T->invalidateAnalysis(&Fn, SILAnalysis::InvalidationKind::FunctionBody);
   }
 }
 
-void swift::performSILDiagnoseUnreachable(SILModule *M) {
+void swift::performSILDiagnoseUnreachable(SILModule *M, SILModuleTransform *T) {
   for (auto &Fn : *M) {
     DEBUG(llvm::errs() << "*** Diagnose Unreachable processing: "
           << Fn.getName() << "\n");
@@ -778,14 +780,16 @@ void swift::performSILDiagnoseUnreachable(SILModule *M) {
 
     // Remove unreachable blocks.
     removeUnreachableBlocks(Fn, *M, &State);
+
+    if (T)
+      T->invalidateAnalysis(&Fn, SILAnalysis::InvalidationKind::FunctionBody);
   }
 }
 
 namespace {
   class NoReturnFolding : public SILModuleTransform {
     void run() override {
-      performNoReturnFunctionProcessing(getModule());
-      invalidateAnalysis(SILAnalysis::InvalidationKind::FunctionBody);
+      performNoReturnFunctionProcessing(getModule(), this);
     }
     
     StringRef getName() override { return "NoReturnFolding"; }
@@ -800,8 +804,7 @@ SILTransform *swift::createNoReturnFolding() {
 namespace {
   class DiagnoseUnreachable : public SILModuleTransform {
     void run() override {
-      performSILDiagnoseUnreachable(getModule());
-      invalidateAnalysis(SILAnalysis::InvalidationKind::FunctionBody);
+      performSILDiagnoseUnreachable(getModule(), this);
     }
 
     StringRef getName() override { return "Diagnose Unreachable"; }

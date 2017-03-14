@@ -43,10 +43,11 @@ namespace {
 
 class LetPropertiesOpt {
   SILModule *Module;
-  bool HasChanged = false;
 
   typedef SmallVector<SILInstruction *, 8> Instructions;
   typedef SmallVector<VarDecl *, 4> Properties;
+
+  llvm::SetVector<SILFunction *> ChangedFunctions;
 
   // Map each let property to a set of instructions accessing it.
   llvm::MapVector<VarDecl *, Instructions> AccessMap;
@@ -69,7 +70,7 @@ class LetPropertiesOpt {
 public:
   LetPropertiesOpt(SILModule *M): Module(M) {}
 
-  bool run();
+  void run(SILModuleTransform *T);
 
 protected:
   bool isConstantLetProperty(VarDecl *Property);
@@ -188,12 +189,14 @@ void LetPropertiesOpt::optimizeLetPropertyAccess(VarDecl *Property,
   unsigned NumReplaced = 0;
 
   for (auto Load: Loads) {
+    SILFunction *F = Load->getFunction();
+
     // Look for any instructions accessing let properties.
     if (isa<RefElementAddrInst>(Load)) {
       // Copy the initializer into the function
       // Replace the access to a let property by the value
       // computed by this initializer.
-      InstructionsCloner Cloner(*Load->getFunction(), Init, Load);
+      InstructionsCloner Cloner(*F, Init, Load);
       Cloner.clone();
       SILInstruction *I = &*std::prev(Load->getIterator());
       SILBuilderWithScope B(Load);
@@ -208,12 +211,12 @@ void LetPropertiesOpt::optimizeLetPropertyAccess(VarDecl *Property,
         User->eraseFromParent();
         ++NumReplaced;
       }
-      HasChanged = true;
+      ChangedFunctions.insert(F);
     } else if (isa<StructExtractInst>(Load)) {
       // Copy the initializer into the function
       // Replace the access to a let property by the value
       // computed by this initializer.
-      InstructionsCloner Cloner(*Load->getFunction(), Init, Load);
+      InstructionsCloner Cloner(*F, Init, Load);
       Cloner.clone();
       SILInstruction *I = &*std::prev(Load->getIterator());
       Load->replaceAllUsesWith(I);
@@ -222,12 +225,12 @@ void LetPropertiesOpt::optimizeLetPropertyAccess(VarDecl *Property,
 
       Load->eraseFromParent();
       ++NumReplaced;
-      HasChanged = true;
+      ChangedFunctions.insert(F);
     }  else if (isa<StructElementAddrInst>(Load)) {
       // Copy the initializer into the function
       // Replace the access to a let property by the value
       // computed by this initializer.
-      InstructionsCloner Cloner(*Load->getFunction(), Init, Load);
+      InstructionsCloner Cloner(*F, Init, Load);
       Cloner.clone();
       SILInstruction *I = &*std::prev(Load->getIterator());
       SILBuilderWithScope B(Load);
@@ -241,7 +244,7 @@ void LetPropertiesOpt::optimizeLetPropertyAccess(VarDecl *Property,
         User->eraseFromParent();
         ++NumReplaced;
       }
-      HasChanged = true;
+      ChangedFunctions.insert(F);
     }
   }
 
@@ -563,7 +566,7 @@ void LetPropertiesOpt::collectPropertyAccess(SILInstruction *I,
     CannotRemove.insert(Property);
 }
 
-bool LetPropertiesOpt::run() {
+void LetPropertiesOpt::run(SILModuleTransform *T) {
   // Collect property access information for the whole module.
   for (auto &F : *Module) {
     // Take into account even those functions that should not be
@@ -593,17 +596,18 @@ bool LetPropertiesOpt::run() {
     optimizeLetPropertyAccess(Init.first, Init.second);
   }
 
-  return HasChanged;
+  for (SILFunction *ChangedFn : ChangedFunctions) {
+    // Program flow is not changed by this pass.
+    T->invalidateAnalysis(ChangedFn,
+                          SILAnalysis::InvalidationKind::Instructions);
+  }
 }
 
 namespace {
 class LetPropertiesOptPass : public SILModuleTransform
 {
   void run() override {
-    if (LetPropertiesOpt(getModule()).run()) {
-      // Program flow is not changed by this pass.
-      invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
-    }
+    LetPropertiesOpt(getModule()).run(this);
   }
 
   StringRef getName() override {
