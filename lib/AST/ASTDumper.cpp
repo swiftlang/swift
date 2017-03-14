@@ -2611,6 +2611,7 @@ void ProtocolConformanceRef::dump(llvm::raw_ostream &out,
     out.indent(indent) << "(abstract_conformance protocol="
                        << getAbstract()->getName();
     PrintWithColorRAII(out, ParenthesisColor) << ')';
+    out << '\n';
   }
 }
 

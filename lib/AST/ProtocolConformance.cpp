@@ -397,13 +397,22 @@ void NormalProtocolConformance::setTypeWitness(
   TypeWitnesses[assocType] = std::make_pair(substitution, typeDecl);
 }
 
-Type NormalProtocolConformance::getAssociatedType(Type assocType,
-                                                LazyResolver *resolver) const {
+Type ProtocolConformance::getAssociatedType(Type assocType,
+                                            LazyResolver *resolver) const {
   assert(assocType->isTypeParameter() &&
          "associated type must be a type parameter");
 
+  ProtocolConformanceRef ref(const_cast<ProtocolConformance*>(this));
+  return ref.getAssociatedType(getType(), assocType, resolver);
+}
+
+Type ProtocolConformanceRef::getAssociatedType(Type conformingType,
+                                               Type assocType,
+                                               LazyResolver *resolver) const {
+  assert(!isConcrete() || getConcrete()->getType()->isEqual(conformingType));
+
   auto type = assocType->getCanonicalType();
-  auto proto = getProtocol();
+  auto proto = getRequirement();
 
 #if false
   // Fast path for generic parameters.
@@ -421,11 +430,41 @@ Type NormalProtocolConformance::getAssociatedType(Type assocType,
 #endif
 
   // General case: consult the substitution map.
-  auto self = const_cast<NormalProtocolConformance *>(this);
   auto substMap =
-    SubstitutionMap::getProtocolSubstitutions(proto, getType(),
-                                              ProtocolConformanceRef(self));
+    SubstitutionMap::getProtocolSubstitutions(proto, conformingType, *this);
   return type.subst(substMap);
+}
+
+ProtocolConformanceRef
+ProtocolConformanceRef::getAssociatedConformance(Type conformingType,
+                                                 Type assocType,
+                                                 ProtocolDecl *protocol,
+                                                 LazyResolver *resolver) const {
+  // If this is a concrete conformance, look up the associated conformance.
+  if (isConcrete()) {
+    auto conformance = getConcrete();
+    assert(conformance->getType()->isEqual(conformingType));
+    return conformance->getAssociatedConformance(assocType, protocol, resolver);
+  }
+
+  // Otherwise, apply the substitution {self -> conformingType}
+  // to the abstract conformance requirement laid upon the dependent type
+  // by the protocol.
+  auto subMap =
+    SubstitutionMap::getProtocolSubstitutions(getRequirement(),
+                                              conformingType, *this);
+  auto abstractConf = ProtocolConformanceRef(protocol);
+  return abstractConf.subst(assocType,
+                            QuerySubstitutionMap{subMap},
+                            LookUpConformanceInSubstitutionMap(subMap));
+}
+
+ProtocolConformanceRef
+ProtocolConformance::getAssociatedConformance(Type assocType,
+                                               ProtocolDecl *protocol,
+                                               LazyResolver *resolver) const {
+  CONFORMANCE_SUBCLASS_DISPATCH(getAssociatedConformance,
+                                (assocType, protocol, resolver))
 }
 
 ProtocolConformanceRef
@@ -580,6 +619,35 @@ SpecializedProtocolConformance::getWitness(ValueDecl *requirement,
                                            LazyResolver *resolver) const {
   // FIXME: Apply substitutions here!
   return GenericConformance->getWitness(requirement, resolver);
+}
+
+ProtocolConformanceRef
+SpecializedProtocolConformance::getAssociatedConformance(Type assocType,
+                                                ProtocolDecl *protocol,
+                                                LazyResolver *resolver) const {
+  ProtocolConformanceRef conformance =
+    GenericConformance->getAssociatedConformance(assocType, protocol, resolver);
+
+  auto genericEnv = GenericConformance->getGenericEnvironment();
+  auto subMap = genericEnv->getSubstitutionMap(GenericSubstitutions);
+
+  Type origType =
+    (conformance.isConcrete()
+       ? conformance.getConcrete()->getType()
+       : GenericConformance->getAssociatedType(assocType, resolver));
+
+  return conformance.subst(origType,
+                           QuerySubstitutionMap{subMap},
+                           LookUpConformanceInSubstitutionMap(subMap));
+}
+
+ProtocolConformanceRef
+InheritedProtocolConformance::getAssociatedConformance(Type assocType,
+                         ProtocolDecl *protocol,
+                         LazyResolver *resolver) const {
+  // FIXME: Substitute!
+  return InheritedConformance->getAssociatedConformance(assocType, protocol,
+                                                        resolver);
 }
 
 const NormalProtocolConformance *
