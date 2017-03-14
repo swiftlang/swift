@@ -678,7 +678,7 @@ public:
 
   /// Get the empty tuple type as a SILType.
   SILType getEmptyTupleType() {
-    return getLoweredType(TupleType::getEmpty(Context));
+    return SILType::getPrimitiveObjectType(TupleType::getEmpty(Context));
   }
   
   /// Get a function type curried with its capture context.
