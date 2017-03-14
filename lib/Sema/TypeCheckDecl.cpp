@@ -7346,12 +7346,29 @@ void TypeChecker::validateDecl(ValueDecl *D) {
 }
 
 void TypeChecker::validateDeclForNameLookup(ValueDecl *D) {
+  // Validate the context.
+  auto dc = D->getDeclContext();
+  if (auto nominal = dyn_cast<NominalTypeDecl>(dc)) {
+    validateDeclForNameLookup(nominal);
+    if (!nominal->hasInterfaceType())
+      return;
+  } else if (auto ext = dyn_cast<ExtensionDecl>(dc)) {
+    validateExtension(ext);
+    if (!ext->hasValidSignature())
+      return;
+  }
+
   switch (D->getKind()) {
   case DeclKind::Protocol: {
     auto proto = cast<ProtocolDecl>(D);
     if (proto->hasInterfaceType())
       return;
     proto->computeType();
+
+    auto *gp = proto->getGenericParams();
+    unsigned depth = gp->getDepth();
+    for (auto paramDecl : *gp)
+      paramDecl->setDepth(depth);
 
     validateAccessibility(proto);
 
