@@ -499,6 +499,7 @@ func testCustomizedError(error: Error, nsError: NSError) {
     nsError.localizedRecoveryOptions)
 
   // Directly recover.
+  let ctx = UnsafeMutableRawPointer(bitPattern:0x1234567)
   let attempter: AnyObject
   if #available(OSX 10.11, iOS 9.0, tvOS 9.0, watchOS 2.0, *) {
     expectNil(nsError.userInfo[NSRecoveryAttempterErrorKey as NSObject])
@@ -514,14 +515,14 @@ func testCustomizedError(error: Error, nsError: NSError) {
     false)
 
   // Recover through delegate.
-  let rd1 = RecoveryDelegate(expectedSuccess: true, expectedContextInfo: nil)
+  let rd1 = RecoveryDelegate(expectedSuccess: true, expectedContextInfo: ctx)
   expectEqual(false, rd1.called)
   attempter.attemptRecovery(
     fromError: nsError,
     optionIndex: 0,
     delegate: rd1,
     didRecoverSelector: #selector(RecoveryDelegate.recover(success:contextInfo:)),
-    contextInfo: nil)
+    contextInfo: ctx)
   expectEqual(true, rd1.called)
 
   let rd2 = RecoveryDelegate(expectedSuccess: false, expectedContextInfo: nil)
