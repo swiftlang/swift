@@ -3062,20 +3062,20 @@ internal struct _Native${Self}Buffer<${TypeParameters}> {
   internal var startIndex: Index {
     // We start at "index after -1" instead of "0" because we need to find the
     // first occupied slot.
-    return index(after: Index(offset: -1))
+    return index(after: Index(offset: capacity))
   }
 
   @_versioned
   internal var endIndex: Index {
-    return Index(offset: capacity)
+    return Index(offset: -1)
   }
 
   @_versioned
   internal func index(after i: Index) -> Index {
     _precondition(i != endIndex)
-    var idx = i.offset + 1
-    while idx < capacity && !isInitializedEntry(at: idx) {
-      idx += 1
+    var idx = i.offset - 1
+    while idx >= 0 && !isInitializedEntry(at: idx) {
+      idx -= 1
     }
 
     return Index(offset: idx)
