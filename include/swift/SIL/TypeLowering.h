@@ -653,24 +653,29 @@ public:
   /// Returns the SILParameterInfo for the given declaration's `self` parameter.
   /// `constant` must refer to a method.
   SILParameterInfo getConstantSelfParameter(SILDeclRef constant);
-  
-  /// Returns the SILFunctionType the given declaration must use to override.
-  /// Will be the same as getConstantFunctionType if the declaration does
-  /// not override.
+
+  /// Returns the SILFunctionType that must be used to perform a vtable dispatch
+  /// to the given declaration.
+  ///
+  /// Will be the same as getConstantFunctionType() if the declaration does not
+  /// override anything.
   CanSILFunctionType getConstantOverrideType(SILDeclRef constant) {
-    // Fast path if the constant isn't overridden.
-    if (constant.getNextOverriddenVTableEntry().isNull())
-      return getConstantFunctionType(constant);
-    SILDeclRef base = constant;
-    while (SILDeclRef overridden = base.getOverridden())
-      base = overridden;
-    
-    return getConstantOverrideType(constant, base);
+    return getConstantOverrideInfo(constant).SILFnType;
   }
 
-  CanSILFunctionType getConstantOverrideType(SILDeclRef constant,
-                                             SILDeclRef base) {
-    return getConstantOverrideInfo(constant, base).SILFnType;
+  /// Returns the SILConstantInfo that must be used to perform a vtable dispatch
+  /// to the given declaration.
+  ///
+  /// Will be the same as getConstantInfo() if the declaration does not
+  /// override anything.
+  SILConstantInfo getConstantOverrideInfo(SILDeclRef constant) {
+    // Fast path if the constant does not override anything.
+    auto next = constant.getNextOverriddenVTableEntry();
+    if (next.isNull())
+      return getConstantInfo(constant);
+
+    auto base = constant.getBaseOverriddenVTableEntry();
+    return getConstantOverrideInfo(constant, base);
   }
 
   SILConstantInfo getConstantOverrideInfo(SILDeclRef constant,

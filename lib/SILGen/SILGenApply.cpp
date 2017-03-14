@@ -208,8 +208,7 @@ private:
 
   static CanAnyFunctionType getConstantFormalInterfaceType(SILGenFunction &SGF,
                                                            SILDeclRef fn) {
-    return SGF.SGM.Types.getConstantInfo(fn.atUncurryLevel(0))
-             .FormalInterfaceType;
+    return SGF.SGM.Types.getConstantInfo(fn).FormalInterfaceType;
   }
 
   Callee(SILGenFunction &SGF, SILDeclRef standaloneFunction,
@@ -225,34 +224,12 @@ private:
          SILGenFunction &SGF,
          SILValue selfValue,
          SILDeclRef methodName,
+         CanAnyFunctionType origFormalType,
          SILLocation l)
     : kind(methodKind), Constant(methodName), SelfValue(selfValue),
-      OrigFormalInterfaceType(getConstantFormalInterfaceType(SGF, methodName)),
+      OrigFormalInterfaceType(origFormalType),
       Loc(l)
   {
-  }
-
-  CanArchetypeType getWitnessMethodSelfType() const {
-    return cast<ArchetypeType>(getSubstFormalType().getInput()
-        ->getRValueInstanceType()
-        ->getCanonicalType());
-  }
-
-  CanSILFunctionType getSubstFunctionType(SILGenModule &SGM,
-                                          CanSILFunctionType origFnType) const {
-    return origFnType->substGenericArgs(SGM.M, Substitutions);
-  }
-
-  /// Add the 'self' type to the substituted function type of this
-  /// dynamic callee.
-  void addDynamicCalleeSelfToFormalType(Type substFormalType) {
-    assert(kind == Kind::DynamicMethod);
-
-    OrigFormalInterfaceType
-      = getDynamicMethodFormalType(SelfValue,
-                                   Constant.getDecl(),
-                                   substFormalType);
-    assert(!OrigFormalInterfaceType->hasTypeParameter());
   }
 
 public:
@@ -269,12 +246,14 @@ public:
   static Callee forEnumElement(SILGenFunction &SGF, SILDeclRef c,
                                SILLocation l) {
     assert(isa<EnumElementDecl>(c.getDecl()));
-    return Callee(Kind::EnumElement, SGF, SILValue(), c, l);
+    return Callee(Kind::EnumElement, SGF, SILValue(), c,
+                  getConstantFormalInterfaceType(SGF, c), l);
   }
   static Callee forClassMethod(SILGenFunction &SGF, SILValue selfValue,
                                SILDeclRef name,
                                SILLocation l) {
-    return Callee(Kind::ClassMethod, SGF, selfValue, name, l);
+    return Callee(Kind::ClassMethod, SGF, selfValue, name,
+                  getConstantFormalInterfaceType(SGF, name), l);
   }
   static Callee forSuperMethod(SILGenFunction &SGF, SILValue selfValue,
                                SILDeclRef name,
@@ -282,22 +261,24 @@ public:
     while (auto *UI = dyn_cast<UpcastInst>(selfValue))
       selfValue = UI->getOperand();
 
-    return Callee(Kind::SuperMethod, SGF, selfValue, name, l);
+    return Callee(Kind::SuperMethod, SGF, selfValue, name,
+                  getConstantFormalInterfaceType(SGF, name), l);
   }
   static Callee forArchetype(SILGenFunction &SGF,
                              SILValue optOpeningInstruction,
                              CanType protocolSelfType,
                              SILDeclRef name,
                              SILLocation l) {
-    Callee callee(Kind::WitnessMethod, SGF, optOpeningInstruction, name, l);
-    return callee;
+    return Callee(Kind::WitnessMethod, SGF, optOpeningInstruction, name,
+                  getConstantFormalInterfaceType(SGF, name), l);
   }
   static Callee forDynamic(SILGenFunction &SGF, SILValue proto,
                            SILDeclRef name, Type substFormalType,
                            SILLocation l) {
-    Callee callee(Kind::DynamicMethod, SGF, proto, name, l);
-    callee.addDynamicCalleeSelfToFormalType(substFormalType);
-    return callee;
+    return Callee(Kind::DynamicMethod, SGF, proto, name,
+                  getDynamicMethodFormalType(proto,
+                                             name.getDecl(),
+                                             substFormalType), l);
   }
   Callee(Callee &&) = default;
   Callee &operator=(Callee &&) = default;
@@ -459,13 +440,13 @@ public:
         break;
       }
 
-      // Look up the witness for the archetype.
       auto proto = Constant.getDecl()->getDeclContext()
-                                     ->getAsProtocolOrProtocolExtensionContext();
-      auto archetype = getWitnessMethodSelfType();
+        ->getAsProtocolOrProtocolExtensionContext();
+      auto lookupType = getSubstFormalType().getInput()
+        ->getRValueInstanceType()->getCanonicalType();
 
       SILValue fn = SGF.B.createWitnessMethod(Loc,
-                                  archetype,
+                                  lookupType,
                                   ProtocolConformanceRef(proto),
                                   *constant,
                                   constantInfo.getSILType(),
@@ -512,8 +493,9 @@ public:
       foreignSelf = func->getImportAsMemberStatus();
     }
 
-    CanSILFunctionType substFnType =
-      getSubstFunctionType(SGF.SGM, mv.getType().castTo<SILFunctionType>());
+    auto substFnType =
+      mv.getType().castTo<SILFunctionType>()->substGenericArgs(
+        SGF.SGM.M, Substitutions);
 
     return std::make_tuple(mv, substFnType, foreignError, foreignSelf, options);
   }
