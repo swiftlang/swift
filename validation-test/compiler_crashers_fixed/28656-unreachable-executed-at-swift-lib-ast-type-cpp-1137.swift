@@ -5,5 +5,6 @@
 // See https://swift.org/LICENSE.txt for license information
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
-// RUN: not --crash %target-swift-frontend %s -emit-ir
-==1 C:{func b(UInt=1 + 1 + 1 as?Int){a==A(
+// RUN: not %target-swift-frontend %s -emit-ir
+{ struct A{
+p.init(UInt=1 + 1 as?Int){

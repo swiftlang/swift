@@ -5,5 +5,8 @@
 // See https://swift.org/LICENSE.txt for license information
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
-// RUN: not --crash %target-swift-frontend %s -emit-ir
-let x[{{{{{{{{{{{{{{{{{{{{{{{{struct c{func b(UInt=1 + 1 + 1 + 1 + 1 as?Int){{{{{{{{{{{{struct P
+// RUN: not %target-swift-frontend %s -emit-ir
+{struct A{func a(UInt=1 + 1 + 1 + 1 as?Int){{
+protocol r
+protocol A
+func<

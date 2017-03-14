@@ -5,6 +5,5 @@
 // See https://swift.org/LICENSE.txt for license information
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
-// RUN: not --crash %target-swift-frontend %s -emit-ir
-n
-func{(struct A{func b(Int=1 + 1 + 1 as?Int?){a
+// RUN: not %target-swift-frontend %s -emit-ir
+nt){{func t(UInt=1 + 1 + 1 as?Int){{{{{[._{
