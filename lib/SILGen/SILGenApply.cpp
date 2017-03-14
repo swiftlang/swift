@@ -302,8 +302,8 @@ public:
     return Captures.hasValue();
   }
 
-  CanAnyFunctionType getOrigFormalType() const {
-    return OrigFormalInterfaceType;
+  AbstractionPattern getOrigFormalType() const {
+    return AbstractionPattern(OrigFormalInterfaceType);
   }
 
   CanFunctionType getSubstFormalType() const {
@@ -3805,7 +3805,7 @@ RValue CallEmission::applyNormalCall(
   ApplyOptions initialOptions = ApplyOptions::None;
 
   formalType = callee.getSubstFormalType();
-  origFormalType = AbstractionPattern(callee.getOrigFormalType());
+  origFormalType = callee.getOrigFormalType();
 
   // Get the callee type information.
   std::tie(mv, substFnType, foreignError, foreignSelf, initialOptions) =
@@ -3861,7 +3861,7 @@ RValue CallEmission::applyEnumElementConstructor(
   // pattern, to ensure that function types in payloads are re-abstracted
   // correctly.
   formalType = callee.getSubstFormalType();
-  origFormalType = AbstractionPattern(callee.getOrigFormalType());
+  origFormalType = callee.getOrigFormalType();
   substFnType = SGF.getSILFunctionType(origFormalType.getValue(), formalType,
                                        uncurryLevel);
 
@@ -4261,8 +4261,7 @@ SILGenFunction::emitApplyOfLibraryIntrinsic(SILLocation loc,
   auto callee = Callee::forDirect(*this, SILDeclRef(fn), loc);
   callee.setSubstitutions(subs);
 
-  auto origFormalType =
-    cast<AnyFunctionType>(fn->getInterfaceType()->getCanonicalType());
+  auto origFormalType = callee.getOrigFormalType();
   auto substFormalType = callee.getSubstFormalType();
 
   ManagedValue mv;
@@ -4279,7 +4278,7 @@ SILGenFunction::emitApplyOfLibraryIntrinsic(SILLocation loc,
            == SILFunctionLanguage::Swift);
 
   CalleeTypeInfo calleeTypeInfo(
-      substFnType, AbstractionPattern(origFormalType).getFunctionResultType(),
+      substFnType, origFormalType.getFunctionResultType(),
       substFormalType.getResult());
   ResultPlanPtr resultPlan =
       ResultPlanBuilder::computeResultPlan(*this, calleeTypeInfo, loc, ctx);
@@ -4970,8 +4969,7 @@ emitMaterializeForSetAccessor(SILLocation loc, SILDeclRef materializeForSet,
                                                      isSuper, isDirectUse);
   bool hasCaptures = callee.hasCaptures();
   bool hasSelf = (bool)selfValue;
-  CanAnyFunctionType accessType = callee.getSubstFormalType();
-  CanAnyFunctionType origAccessType = callee.getOrigFormalType();
+  auto accessType = callee.getSubstFormalType();
 
   CallEmission emission(*this, std::move(callee), std::move(writebackScope));
   // Self ->
@@ -4980,7 +4978,7 @@ emitMaterializeForSetAccessor(SILLocation loc, SILDeclRef materializeForSet,
   }
   // TODO: Have Callee encapsulate the captures better.
   if (hasSelf || hasCaptures) {
-    accessType = cast<AnyFunctionType>(accessType.getResult());
+    accessType = cast<FunctionType>(accessType.getResult());
   }
 
   // (buffer, callbackStorage)  or (buffer, callbackStorage, indices) ->
@@ -5016,9 +5014,13 @@ emitMaterializeForSetAccessor(SILLocation loc, SILDeclRef materializeForSet,
   // Project out the optional callback.
   SILValue optionalCallback = results[1].getUnmanagedValue();
 
-  CanType origSelfType = origAccessType->getInput()
+  auto origAccessType = SGM.Types.getConstantInfo(materializeForSet)
+      .FormalInterfaceType;
+
+  auto origSelfType = origAccessType->getInput()
       ->getInOutObjectType()
       ->getCanonicalType();
+
   CanGenericSignature genericSig;
   if (auto genericFnType = dyn_cast<GenericFunctionType>(origAccessType))
     genericSig = genericFnType.getGenericSignature();
