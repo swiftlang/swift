@@ -2188,7 +2188,15 @@ public:
   }
 
   ClusteredBitVector getOmittableElementNames(const ASTContext &Context) const {
-    return getOmittableArgumentLabelsOrElementNamesImpl(getElementNames(), Context);
+    if (hasElementNames()) {
+      return getOmittableArgumentLabelsOrElementNamesImpl(getElementNames(), Context);
+    }
+    else {
+      SmallVector<Identifier, 4> scratch;
+      scratch.append(getNumElements(), Identifier());
+      ArrayRef<Identifier> scratchArray(scratch);
+      return getOmittableArgumentLabelsOrElementNamesImpl(scratchArray, Context);
+    }
   }
 
   static bool classof(const Expr *E) { return E->getKind() == ExprKind::Tuple; }
