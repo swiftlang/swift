@@ -1710,6 +1710,10 @@ ArrayRef<Identifier> ApplyExpr::getArgumentLabels(
 }
 
 ClusteredBitVector ApplyExpr::getOmittableArgumentLabels(const ASTContext * Context) const {
+  if (auto call = dyn_cast<CallExpr>(this)) {
+    return call->getOmittableArgumentLabels(Context);
+  }
+  
   SmallVector<Identifier, 2> argLabelsScratch;
   auto labels = getArgumentLabels(argLabelsScratch);
   
