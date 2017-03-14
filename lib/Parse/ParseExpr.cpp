@@ -1781,7 +1781,11 @@ ParserResult<Expr> Parser::parseExprStringLiteral() {
         }
       }
       
-      auto nameLoc = DeclNameLoc(Context, leftLoc, leftLoc, argLabelLocs, rightLoc);
+      // You'd think there would always be at least one argument label, but there 
+      // isn't when we're doing code completion or when there's an error.
+      auto nameLoc = argLabels.size() > 0
+        ? DeclNameLoc(Context, leftLoc, leftLoc, argLabelLocs, rightLoc)
+        : DeclNameLoc(leftLoc);
       
       // If you change this line, make sure you also change 
       // InterpolatedStringLiteralExpr::isInterpolatedSegment().
