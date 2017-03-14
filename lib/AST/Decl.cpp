@@ -630,12 +630,7 @@ GenericSignature *GenericContext::getGenericSignature() const {
     auto self = PD->getSelfInterfaceType()->castTo<GenericTypeParamType>();
     auto req =
         Requirement(RequirementKind::Conformance, self, PD->getDeclaredType());
-    GenericTypeParamType *params[] = {self};
-    Requirement reqs[] = {req};
-
-    auto &ctx = getASTContext();
-    return GenericSignature::get(ctx.AllocateCopy(params),
-                                 ctx.AllocateCopy(reqs));
+    return GenericSignature::get({self}, {req});
   }
 
   return nullptr;
