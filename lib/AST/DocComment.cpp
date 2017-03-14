@@ -287,8 +287,8 @@ bool extractSimpleField(
   return NormalItems.size() == 0;
 }
 
-static swift::markup::CommentParts
-extractCommentParts(swift::markup::MarkupContext &MC,
+swift::markup::CommentParts
+swift::extractCommentParts(swift::markup::MarkupContext &MC,
                     swift::markup::MarkupASTNode *Node) {
 
   swift::markup::CommentParts Parts;
