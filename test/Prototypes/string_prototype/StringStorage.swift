@@ -163,14 +163,13 @@ protocol _BoundedStorage
     FactoryInitializable  // Allows us to code init in terms of Builtin.allocWithTailElems_1
   , RangeReplaceableCollection {
 
-  associatedtype Element = Iterator.Element
   associatedtype Header : _BoundedStorageHeader
   
   @nonobjc var _header: Header { get set }
   // WARNING: don't use this property without a fixLifetime call
   // protecting the use; ARC may end the lifetime of self before you
   // get a chance to use the result.
-  @nonobjc var _baseAddress: UnsafeMutablePointer<Element> { get }
+  @nonobjc var _baseAddress: UnsafeMutablePointer<Iterator.Element> { get }
 
   init(uninitializedWithMinimumCapacity: Int)
 
@@ -182,6 +181,8 @@ protocol _BoundedStorage
 }
 
 extension _BoundedStorage {
+  typealias Element = Iterator.Element
+  
   init() {
     self.init(Self._emptyInstance())
   }
@@ -256,7 +257,7 @@ extension _BoundedStorage {
 }
 
 /// Fulfills the RangeReplaceableCollection requirements
-extension _BoundedStorage where Element == Iterator.Element {
+extension _BoundedStorage {
   internal func replaceSubrange<C>(
     _ target: Range<Int>,
     with newValues: C
@@ -351,14 +352,13 @@ extension _BoundedStorage where Element == Iterator.Element {
 @_versioned
 class _StringStorageBase<
   Header: _BoundedStorageHeader,
-  Element_: UnsignedInteger
+  Element: UnsignedInteger
 > :
   // Dynamically provides inheritance from NSString
   _SwiftNativeNSString,
   // Allows us to code init in terms of Builtin.allocWithTailElems_1
   FactoryInitializable  
 {
-  typealias Element = Element_
   var _header: _SwiftUTF16StringHeader
   
   @objc
@@ -401,6 +401,10 @@ final class _UTF16StringStorage
   : _StringStorageBase<_SwiftUTF16StringHeader, UTF16.CodeUnit>
   , _NSStringCore // Ensures that we implement essential NSString methods.  
 {
+  // WORKAROUND: helping type inference along will be unnecessary someday
+  typealias _Element = UInt16
+  typealias Iterator = IndexingIterator<_UTF16StringStorage>
+  
   //===--- _NSStringCore conformance --------------------------------------===//
   // There doesn't seem to be a way to write these in an extension
 
@@ -433,7 +437,7 @@ final class _UTF16StringStorage
   // WORKAROUND: rdar://31047127 prevents us from hoisting this into
   // _StringStorageBase
   @nonobjc
-  override var _baseAddress: UnsafeMutablePointer<Element> {
+  override var _baseAddress: UnsafeMutablePointer<UTF16.CodeUnit> {
     return UnsafeMutablePointer(
       Builtin.projectTailElems(self, Element.self))
   }
@@ -629,6 +633,10 @@ final class _Latin1StringStorage
   : _StringStorageBase<_SwiftLatin1StringHeader, UInt8>
   , _NSStringCore // Ensures that we implement essential NSString methods.  
 {
+  // WORKAROUND: helping type inference along will be unnecessary someday
+  typealias _Element = UInt8
+  typealias Iterator = IndexingIterator<_Latin1StringStorage>
+  
   /// Returns a pointer to contiguously-stored UTF-16 code units
   /// comprising the whole string, or NULL if such storage isn't
   /// available.
@@ -658,7 +666,7 @@ final class _Latin1StringStorage
   // WORKAROUND: rdar://31047127 prevents us from hoisting this into
   // _StringStorageBase
   @nonobjc
-  override var _baseAddress: UnsafeMutablePointer<Element> {
+  override var _baseAddress: UnsafeMutablePointer<Latin1.CodeUnit> {
     return UnsafeMutablePointer(
       Builtin.projectTailElems(self, Element.self))
   }
@@ -672,9 +680,7 @@ extension _Latin1StringStorage : _BoundedStorage {
 }
 
 /// - Requires: Element is trivial (UInt8/UInt16)
-struct _StringBuffer<Storage: _BoundedStorage>
-where Storage.Element == Storage.Iterator.Element
-{
+struct _StringBuffer<Storage: _BoundedStorage> {
   internal var _storage: Storage
 
   init(_ storage: Storage) { self._storage = storage }
