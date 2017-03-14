@@ -4489,9 +4489,14 @@ unconditional_checked_cast_value
 ````````````````````````````````
 ::
 
-  sil-instruction ::= 'unconditional_checked_cast_value' sil-operand 'to' sil-type
+  sil-instruction ::= 'unconditional_checked_cast_value'
+                       sil-cast-consumption-kind
+                       sil-operand 'to' sil-type
+  sil-cast-consumption-kind ::= 'take_always'
+  sil-cast-consumption-kind ::= 'take_on_success'
+  sil-cast-consumption-kind ::= 'copy_on_success'
 
-  %1 = unconditional_checked_cast_value %0 : $A to $B
+  %1 = unconditional_checked_cast_value take_always %0 : $A to $B
   // $A must not be an address
   // $B must not be an address
   // %1 will be of type $B

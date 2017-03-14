@@ -2046,7 +2046,7 @@ SILInstruction *CastOptimizer::simplifyCheckedCastValueBranchInst(
 
       if (!CastedValue)
         CastedValue = Builder.createUnconditionalCheckedCastValue(
-            Loc, Op, LoweredTargetType);
+            Loc, CastConsumptionKind::TakeAlways, Op, LoweredTargetType);
     } else {
       CastedValue = SILUndef::get(LoweredTargetType, Mod);
     }
