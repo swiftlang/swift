@@ -1953,7 +1953,7 @@ bool EscapeAnalysis::canParameterEscape(FullApplySite FAS, int ParamIdx,
   return false;
 }
 
-void EscapeAnalysis::invalidate(InvalidationKind K) {
+void EscapeAnalysis::invalidate() {
   Function2Info.clear();
   Allocator.DestroyAll();
   DEBUG(llvm::dbgs() << "invalidate all\n");

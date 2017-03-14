@@ -22,6 +22,7 @@
 namespace swift {
   class SILOptions;
   class SILTransform;
+  class SILModuleTransform;
 
   namespace irgen {
     class IRGenModule;
@@ -46,7 +47,7 @@ namespace swift {
 
   /// \brief Detect and remove unreachable code. Diagnose provably unreachable
   /// user code.
-  void performSILDiagnoseUnreachable(SILModule *M);
+  void performSILDiagnoseUnreachable(SILModule *M, SILModuleTransform *T);
 
   /// \brief Remove dead functions from \p M.
   void performSILDeadFunctionElimination(SILModule *M);

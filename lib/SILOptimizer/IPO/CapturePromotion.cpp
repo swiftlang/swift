@@ -851,7 +851,7 @@ constructClonedFunction(PartialApplyInst *PAI, FunctionRefInst *FRI,
 /// with a partial_apply of the new closure, fixing up reference counting as
 /// necessary. Also, if the closure is cloned, the cloned function is added to
 /// the worklist.
-static void
+static SILFunction *
 processPartialApplyInst(PartialApplyInst *PAI, IndicesSet &PromotableIndices,
                         SmallVectorImpl<SILFunction*> &Worklist) {
   SILModule &M = PAI->getModule();
@@ -934,6 +934,7 @@ processPartialApplyInst(PartialApplyInst *PAI, IndicesSet &PromotableIndices,
     // TODO: If this is the last use of the closure, and if it has internal
     // linkage, we should remove it from the SILModule now.
   }
+  return ClonedFn;
 }
 
 static void
@@ -961,19 +962,6 @@ constructMapFromPartialApplyToPromotableIndices(SILFunction *F,
   }
 }
 
-static void
-processFunction(SILFunction *F, SmallVectorImpl<SILFunction*> &Worklist) {
-  // This is a map from each partial apply to a set of indices of promotable
-  // box variables.
-  PartialApplyIndicesMap IndicesMap;
-  constructMapFromPartialApplyToPromotableIndices(F, IndicesMap);
-
-  // Do the actual promotions; all promotions on a single partial_apply are
-  // handled together.
-  for (auto &IndicesPair : IndicesMap)
-    processPartialApplyInst(IndicesPair.first, IndicesPair.second, Worklist);
-}
-
 namespace {
 class CapturePromotionPass : public SILModuleTransform {
   /// The entry point to the transformation.
@@ -982,18 +970,33 @@ class CapturePromotionPass : public SILModuleTransform {
     for (auto &F : *getModule())
       processFunction(&F, Worklist);
 
-      if (!Worklist.empty()) {
-        invalidateAnalysis(SILAnalysis::InvalidationKind::Everything);
-      }
-
     while (!Worklist.empty())
       processFunction(Worklist.pop_back_val(), Worklist);
   }
+
+  void processFunction(SILFunction *F, SmallVectorImpl<SILFunction*> &Worklist);
 
   StringRef getName() override { return "Capture Promotion"; }
 };
 } // end anonymous namespace
 
+void CapturePromotionPass::processFunction(SILFunction *F,
+                                      SmallVectorImpl<SILFunction*> &Worklist) {
+  // This is a map from each partial apply to a set of indices of promotable
+  // box variables.
+  PartialApplyIndicesMap IndicesMap;
+  constructMapFromPartialApplyToPromotableIndices(F, IndicesMap);
+
+  // Do the actual promotions; all promotions on a single partial_apply are
+  // handled together.
+  for (auto &IndicesPair : IndicesMap) {
+    PartialApplyInst *PAI = IndicesPair.first;
+    SILFunction *ClonedFn = processPartialApplyInst(PAI, IndicesPair.second,
+                                                    Worklist);
+    notifyAddFunction(ClonedFn);
+  }
+  invalidateAnalysis(F, SILAnalysis::InvalidationKind::Everything);
+}
 
 SILTransform *swift::createCapturePromotion() {
   return new CapturePromotionPass();

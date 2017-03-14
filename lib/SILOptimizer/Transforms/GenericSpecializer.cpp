@@ -19,7 +19,6 @@
 
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILInstruction.h"
-#include "swift/SILOptimizer/Analysis/BasicCalleeAnalysis.h"
 #include "swift/SILOptimizer/Utils/Generics.h"
 #include "swift/SILOptimizer/Utils/Local.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
@@ -38,9 +37,6 @@ class GenericSpecializer : public SILFunctionTransform {
     SILFunction &F = *getFunction();
     DEBUG(llvm::dbgs() << "***** GenericSpecializer on function:" << F.getName()
                        << " *****\n");
-
-    // Lock BCA so it's not invalidated along with the rest of the call graph.
-    AnalysisPreserver BCAP(PM->getAnalysis<BasicCalleeAnalysis>());
 
     if (specializeAppliesInFunction(F))
       invalidateAnalysis(SILAnalysis::InvalidationKind::Everything);
@@ -112,7 +108,7 @@ bool GenericSpecializer::specializeAppliesInFunction(SILFunction &F) {
       // (as opposed to returning a previous specialization), we need to notify
       // the pass manager so that the new functions get optimized.
       for (SILFunction *NewF : reverse(NewFunctions)) {
-        notifyPassManagerOfFunction(NewF, Callee);
+        notifyAddFunction(NewF, Callee);
       }
     }
   }

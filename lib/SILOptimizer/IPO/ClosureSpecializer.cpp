@@ -674,34 +674,64 @@ void ClosureSpecCloner::populateCloned() {
 
 namespace {
 
-class ClosureSpecializer {
-
-  /// A vector consisting of closures that we propagated. After
-  std::vector<SILInstruction *> PropagatedClosures;
-  bool IsPropagatedClosuresUniqued = false;
-
-public:
-  ClosureSpecializer() = default;
-
+class SILClosureSpecializerTransform : public SILFunctionTransform {
   void gatherCallSites(SILFunction *Caller,
                        llvm::SmallVectorImpl<ClosureInfo*> &ClosureCandidates,
                        llvm::DenseSet<FullApplySite> &MultipleClosureAI);
-  bool specialize(SILFunction *Caller, SILFunctionTransform *SFT);
+  bool specialize(SILFunction *Caller,
+                  std::vector<SILInstruction *> &PropagatedClosures);
 
-  ArrayRef<SILInstruction *> getPropagatedClosures() {
-    if (IsPropagatedClosuresUniqued)
-      return PropagatedClosures;
+public:
+  SILClosureSpecializerTransform() {}
 
-    sortUnique(PropagatedClosures);
-    IsPropagatedClosuresUniqued = true;
+  void run() override;
 
-    return PropagatedClosures;
-  }
+  StringRef getName() override { return "Closure Specialization"; }
 };
 
-} // end anonymous namespace
+void SILClosureSpecializerTransform::run() {
+  SILFunction *F = getFunction();
 
-void ClosureSpecializer::gatherCallSites(
+  // Don't optimize functions that are marked with the opt.never
+  // attribute.
+  if (!F->shouldOptimize())
+    return;
+
+  // If F is an external declaration, there is nothing to specialize.
+  if (F->isExternalDeclaration())
+    return;
+
+  std::vector<SILInstruction *> PropagatedClosures;
+
+  if (!specialize(F, PropagatedClosures))
+    return;
+
+  // If for testing purposes we were asked to not eliminate dead closures,
+  // return.
+  if (EliminateDeadClosures) {
+    // Otherwise, remove any local dead closures that are now dead since we
+    // specialized all of their uses.
+    DEBUG(llvm::dbgs() << "Trying to remove dead closures!\n");
+    sortUnique(PropagatedClosures);
+    for (SILInstruction *Closure : PropagatedClosures) {
+      DEBUG(llvm::dbgs() << "    Visiting: " << *Closure);
+      if (!tryDeleteDeadClosure(Closure)) {
+        DEBUG(llvm::dbgs() << "        Failed to delete closure!\n");
+        NumPropagatedClosuresNotEliminated++;
+        continue;
+      }
+
+      DEBUG(llvm::dbgs() << "        Deleted closure!\n");
+      ++NumPropagatedClosuresEliminated;
+    }
+  }
+
+  // Invalidate everything since we delete calls as well as add new
+  // calls and branches.
+  invalidateAnalysis(SILAnalysis::InvalidationKind::Everything);
+}
+
+void SILClosureSpecializerTransform::gatherCallSites(
     SILFunction *Caller,
     llvm::SmallVectorImpl<ClosureInfo*> &ClosureCandidates,
     llvm::DenseSet<FullApplySite> &MultipleClosureAI) {
@@ -824,8 +854,8 @@ void ClosureSpecializer::gatherCallSites(
   }
 }
 
-bool ClosureSpecializer::specialize(SILFunction *Caller,
-                                    SILFunctionTransform *SFT) {
+bool SILClosureSpecializerTransform::specialize(SILFunction *Caller,
+                            std::vector<SILInstruction *> &PropagatedClosures) {
   DEBUG(llvm::dbgs() << "Optimizing callsites that take closure argument in "
                      << Caller->getName() << '\n');
 
@@ -855,7 +885,7 @@ bool ClosureSpecializer::specialize(SILFunction *Caller,
       // directly.
       if (!NewF) {
         NewF = ClosureSpecCloner::cloneFunction(CSDesc, NewFName);
-        SFT->notifyPassManagerOfFunction(NewF, CSDesc.getApplyCallee());
+        notifyAddFunction(NewF, CSDesc.getApplyCallee());
       }
 
       // Rewrite the call
@@ -869,61 +899,7 @@ bool ClosureSpecializer::specialize(SILFunction *Caller,
   return Changed;
 }
 
-//===----------------------------------------------------------------------===//
-//                               Top Level Code
-//===----------------------------------------------------------------------===//
-
-namespace {
-
-class SILClosureSpecializerTransform : public SILFunctionTransform {
-public:
-  SILClosureSpecializerTransform() {}
-
-  void run() override {
-    SILFunction *F = getFunction();
-
-    // Don't optimize functions that are marked with the opt.never
-    // attribute.
-    if (!F->shouldOptimize())
-      return;
-
-    // If F is an external declaration, there is nothing to specialize.
-    if (F->isExternalDeclaration())
-      return;
-
-    ClosureSpecializer C;
-    if (!C.specialize(F, this))
-      return;
-
-    // If for testing purposes we were asked to not eliminate dead closures,
-    // return.
-    if (EliminateDeadClosures) {
-      // Otherwise, remove any local dead closures that are now dead since we
-      // specialized all of their uses.
-      DEBUG(llvm::dbgs() << "Trying to remove dead closures!\n");
-      for (SILInstruction *Closure : C.getPropagatedClosures()) {
-        DEBUG(llvm::dbgs() << "    Visiting: " << *Closure);
-        if (!tryDeleteDeadClosure(Closure)) {
-          DEBUG(llvm::dbgs() << "        Failed to delete closure!\n");
-          NumPropagatedClosuresNotEliminated++;
-          continue;
-        }
-
-        DEBUG(llvm::dbgs() << "        Deleted closure!\n");
-        ++NumPropagatedClosuresEliminated;
-      }
-    }
-
-    // Invalidate everything since we delete calls as well as add new
-    // calls and branches.
-    invalidateAnalysis(SILAnalysis::InvalidationKind::Everything);
-  }
-
-  StringRef getName() override { return "Closure Specialization"; }
-};
-
 } // end anonymous namespace
-
 
 SILTransform *swift::createClosureSpecializer() {
   return new SILClosureSpecializerTransform();
