@@ -297,8 +297,8 @@ static SILFunction *getCalleeOfOnceCall(BuiltinInst *BI) {
   assert(BI->getNumOperands() == 2 && "once call should have 2 operands.");
 
   auto Callee = BI->getOperand(1);
-  assert(cast<SILFunctionType>(Callee->getType().getSwiftRValueType())
-                 ->getRepresentation() == SILFunctionTypeRepresentation::Thin &&
+  assert(Callee->getType().castTo<SILFunctionType>()->getRepresentation()
+           == SILFunctionTypeRepresentation::Thin &&
          "Expected thin function representation!");
 
   if (auto *FR = dyn_cast<FunctionRefInst>(Callee))

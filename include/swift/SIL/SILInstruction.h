@@ -2798,6 +2798,19 @@ class UnconditionalCheckedCastInst final
   static UnconditionalCheckedCastInst *
   create(SILDebugLocation DebugLoc, SILValue Operand, SILType DestTy,
          SILFunction &F, SILOpenedArchetypesState &OpenedArchetypes);
+
+public:
+  /// Returns the formal type of the source value.
+  CanType getSourceType() const {
+    // This instruction is only used with types that allow this.
+    return getOperand()->getType().getSwiftRValueType();
+  }
+
+  /// Returns the formal target type.
+  CanType getTargetType() const {
+    // This instruction is only used with types that allow this.
+    return getType().getSwiftRValueType();
+  }
 };
 
 /// Perform an unconditional checked cast that aborts if the cast fails.
@@ -5356,6 +5369,18 @@ public:
     return DestBBs;
   }
 
+  /// Returns the formal type of the source value.
+  CanType getSourceType() const {
+    // This instruction is only used with types that allow this.
+    return getOperand()->getType().getSwiftRValueType();
+  }
+
+  /// Returns the formal target type.
+  CanType getTargetType() const {
+    // This instruction is only used with types that allow this.
+    return getCastType().getSwiftRValueType();
+  }
+
   SILType getCastType() const { return DestTy; }
 
   SILBasicBlock *getSuccessBB() { return DestBBs[0]; }
@@ -5396,6 +5421,18 @@ class CheckedCastValueBranchInst final
 
 public:
   SuccessorListTy getSuccessors() { return DestBBs; }
+
+  /// Returns the formal type of the source value.
+  CanType getSourceType() const {
+    // This instruction is only used with types that allow this.
+    return getOperand()->getType().getSwiftRValueType();
+  }
+
+  /// Returns the formal target type.
+  CanType getTargetType() const {
+    // This instruction is only used with types that allow this.
+    return getCastType().getSwiftRValueType();
+  }
 
   SILType getCastType() const { return DestTy; }
 

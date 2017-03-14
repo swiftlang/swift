@@ -558,7 +558,11 @@ SILFunction *SILDeserializer::readSILFunction(DeclID FID,
   };
 
   MF->DeserializedTypeCallback = [&OpenedArchetypesTracker] (Type ty) {
-    OpenedArchetypesTracker.registerUsedOpenedArchetypes(ty);
+    // We can't call getCanonicalType() immediately on everything we
+    // deserialize, but fortunately we only need to register opened
+    // existentials.
+    if (ty->isOpenedExistential())
+      OpenedArchetypesTracker.registerUsedOpenedArchetypes(CanType(ty));
   };
 
   // Another SIL_FUNCTION record means the end of this SILFunction.
