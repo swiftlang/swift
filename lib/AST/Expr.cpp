@@ -927,6 +927,21 @@ shallowCloneImpl(const ObjectLiteralExpr *E, ASTContext &Ctx,
   return res;
 }
 
+ClusteredBitVector swift::getOmittableArgumentLabelsOrElementNamesImpl(ArrayRef<Identifier> identifiers, const ASTContext * Context) {
+  auto vec = ClusteredBitVector();
+  if (!identifiers.empty()) {
+    vec.appendClearBits(identifiers.size());
+  
+    // FIXME: This is a despicable little hack.
+    if (identifiers[0] == Context->Id_forInterpolation) {
+      vec.setBit(0);
+    }
+  }
+  
+  return vec;
+}
+
+
 // Make an exact copy of this AST node.
 LiteralExpr *LiteralExpr::shallowClone(
     ASTContext &Ctx, llvm::function_ref<Type(const Expr *)> getType) const {
@@ -1692,6 +1707,13 @@ ArrayRef<Identifier> ApplyExpr::getArgumentLabels(
   // For calls, get the argument labels directly.
   auto call = cast<CallExpr>(this);
   return call->getArgumentLabels();
+}
+
+ClusteredBitVector ApplyExpr::getOmittableArgumentLabels(const ASTContext * Context) const {
+  SmallVector<Identifier, 2> argLabelsScratch;
+  auto labels = getArgumentLabels(argLabelsScratch);
+  
+  return getOmittableArgumentLabelsOrElementNamesImpl(labels, Context);
 }
 
 bool ApplyExpr::hasTrailingClosure() const {

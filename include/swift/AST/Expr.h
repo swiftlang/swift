@@ -17,6 +17,7 @@
 #ifndef SWIFT_AST_EXPR_H
 #define SWIFT_AST_EXPR_H
 
+#include "swift/Basic/ClusteredBitVector.h"
 #include "swift/AST/CaptureInfo.h"
 #include "swift/AST/ConcreteDeclRef.h"
 #include "swift/AST/DeclNameLoc.h"
@@ -652,6 +653,10 @@ public:
   }
 };
 
+// This uses ASTContext, which we don't want to include here (I assume).
+// FIXME: Can this be hidden better?
+ClusteredBitVector getOmittableArgumentLabelsOrElementNamesImpl(ArrayRef<Identifier> identifiers, const ASTContext * Context);
+
 /// Helper class to capture trailing call argument labels and related
 /// information, for expression nodes that involve argument labels, trailing
 /// closures, etc.
@@ -748,6 +753,10 @@ public:
   SourceLoc getArgumentLabelLoc(unsigned i) const {
     auto locs = getArgumentLabelLocs();
     return i < locs.size() ? locs[i] : SourceLoc();
+  }
+
+  ClusteredBitVector getOmittableArgumentLabels(const ASTContext * Context) const {
+    return getOmittableArgumentLabelsOrElementNamesImpl(getArgumentLabels(), Context);
   }
 };
 
@@ -2176,6 +2185,10 @@ public:
       return getElementNameLocs()[i];
     
     return SourceLoc();
+  }
+
+  ClusteredBitVector getOmittableElementNames(const ASTContext * Context) const {
+    return getOmittableArgumentLabelsOrElementNamesImpl(getElementNames(), Context);
   }
 
   static bool classof(const Expr *E) { return E->getKind() == ExprKind::Tuple; }
@@ -3772,6 +3785,7 @@ public:
 
   /// Whether this application was written using a trailing closure.
   bool hasTrailingClosure() const;
+  ClusteredBitVector getOmittableArgumentLabels(const ASTContext * Context) const;
 
   static bool classof(const Expr *E) {
     return E->getKind() >= ExprKind::First_ApplyExpr &&
@@ -3856,6 +3870,7 @@ public:
   bool hasTrailingClosure() const { return CallExprBits.HasTrailingClosure; }
 
   using TrailingCallArguments::getArgumentLabels;
+  using TrailingCallArguments::getOmittableArgumentLabels;
 
   /// Retrieve the expression that direct represents the callee.
   ///
