@@ -30,6 +30,8 @@ class Initialization;
 class ManagedValue;
 class RValue;
 class SILGenFunction;
+class SGFContext;
+class CalleeTypeInfo;
 
 /// An abstract class for working with results.of applies.
 class ResultPlan {
@@ -37,6 +39,9 @@ public:
   virtual RValue finish(SILGenFunction &SGF, SILLocation loc, CanType substType,
                         ArrayRef<ManagedValue> &directResults) = 0;
   virtual ~ResultPlan() = default;
+
+  virtual void
+  gatherIndirectResultAddrs(SmallVectorImpl<SILValue> &outList) const = 0;
 };
 
 using ResultPlanPtr = std::unique_ptr<ResultPlan>;
@@ -47,20 +52,22 @@ struct ResultPlanBuilder {
   SILLocation loc;
   ArrayRef<SILResultInfo> allResults;
   SILFunctionTypeRepresentation rep;
-  SmallVectorImpl<SILValue> &indirectResultAddrs;
 
   ResultPlanBuilder(SILGenFunction &SGF, SILLocation loc,
                     ArrayRef<SILResultInfo> allResults,
-                    SILFunctionTypeRepresentation rep,
-                    SmallVectorImpl<SILValue> &resultAddrs)
-      : SGF(SGF), loc(loc), allResults(allResults), rep(rep),
-        indirectResultAddrs(resultAddrs) {}
+                    SILFunctionTypeRepresentation rep)
+      : SGF(SGF), loc(loc), allResults(allResults), rep(rep) {}
 
   ResultPlanPtr build(Initialization *emitInto, AbstractionPattern origType,
                       CanType substType);
   ResultPlanPtr buildForTuple(Initialization *emitInto,
                               AbstractionPattern origType,
                               CanTupleType substType);
+
+  static ResultPlanPtr computeResultPlan(SILGenFunction &SGF,
+                                         CalleeTypeInfo &calleeTypeInfo,
+                                         SILLocation loc,
+                                         SGFContext evalContext);
 
   ~ResultPlanBuilder() {
     assert(allResults.empty() && "didn't consume all results!");

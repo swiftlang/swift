@@ -210,8 +210,8 @@ struct FailableAddrOnlyStruct<T : Pachyderm> {
 // CHECK:       bb0(%0 : $*Optional<FailableAddrOnlyStruct<T>>, %1 : $@thin FailableAddrOnlyStruct<T>.Type):
 // CHECK:         [[SELF_BOX:%.*]] = alloc_stack $FailableAddrOnlyStruct<T>
 // CHECK:         [[T_INIT_FN:%.*]] = witness_method $T, #Pachyderm.init!allocator.1
-// CHECK-NEXT:    [[T_TYPE:%.*]] = metatype $@thick T.Type
 // CHECK-NEXT:    [[X_BOX:%.*]] = alloc_stack $T
+// CHECK-NEXT:    [[T_TYPE:%.*]] = metatype $@thick T.Type
 // CHECK-NEXT:    apply [[T_INIT_FN]]<T>([[X_BOX]], [[T_TYPE]])
 // CHECK-NEXT:    [[X_ADDR:%.*]] = struct_element_addr [[SELF_BOX]]
 // CHECK-NEXT:    copy_addr [take] [[X_BOX]] to [initialization] [[X_ADDR]]
@@ -234,15 +234,15 @@ struct FailableAddrOnlyStruct<T : Pachyderm> {
 // CHECK:       bb0(%0 : $*Optional<FailableAddrOnlyStruct<T>>, %1 : $@thin FailableAddrOnlyStruct<T>.Type):
 // CHECK:         [[SELF_BOX:%.*]] = alloc_stack $FailableAddrOnlyStruct<T>
 // CHECK:         [[T_INIT_FN:%.*]] = witness_method $T, #Pachyderm.init!allocator.1
-// CHECK-NEXT:    [[T_TYPE:%.*]] = metatype $@thick T.Type
 // CHECK-NEXT:    [[X_BOX:%.*]] = alloc_stack $T
+// CHECK-NEXT:    [[T_TYPE:%.*]] = metatype $@thick T.Type
 // CHECK-NEXT:    apply [[T_INIT_FN]]<T>([[X_BOX]], [[T_TYPE]])
 // CHECK-NEXT:    [[X_ADDR:%.*]] = struct_element_addr [[SELF_BOX]]
 // CHECK-NEXT:    copy_addr [take] [[X_BOX]] to [initialization] [[X_ADDR]]
 // CHECK-NEXT:    dealloc_stack [[X_BOX]]
 // CHECK-NEXT:    [[T_INIT_FN:%.*]] = witness_method $T, #Pachyderm.init!allocator.1
-// CHECK-NEXT:    [[T_TYPE:%.*]] = metatype $@thick T.Type
 // CHECK-NEXT:    [[Y_BOX:%.*]] = alloc_stack $T
+// CHECK-NEXT:    [[T_TYPE:%.*]] = metatype $@thick T.Type
 // CHECK-NEXT:    apply [[T_INIT_FN]]<T>([[Y_BOX]], [[T_TYPE]])
 // CHECK-NEXT:    [[Y_ADDR:%.*]] = struct_element_addr [[SELF_BOX]]
 // CHECK-NEXT:    copy_addr [take] [[Y_BOX]] to [initialization] [[Y_ADDR]]
