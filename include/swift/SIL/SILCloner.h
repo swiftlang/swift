@@ -1165,7 +1165,7 @@ void SILCloner<ImplClass>::visitUnconditionalCheckedCastValueInst(
   SILType OpType = getOpType(Inst->getType());
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
   doPostProcess(Inst, getBuilder().createUnconditionalCheckedCastValue(
-                          OpLoc, OpValue, OpType));
+                          OpLoc, Inst->getConsumptionKind(), OpValue, OpType));
 }
 
 template <typename ImplClass>

@@ -2849,16 +2849,24 @@ class UnconditionalCheckedCastValueInst final
           ValueKind::UnconditionalCheckedCastValueInst,
           UnconditionalCheckedCastValueInst, ConversionInst, true> {
   friend SILBuilder;
+  CastConsumptionKind ConsumptionKind;
 
-  UnconditionalCheckedCastValueInst(SILDebugLocation DebugLoc, SILValue Operand,
+  UnconditionalCheckedCastValueInst(SILDebugLocation DebugLoc,
+                                    CastConsumptionKind consumption,
+                                    SILValue Operand,
                                     ArrayRef<SILValue> TypeDependentOperands,
                                     SILType DestTy)
       : UnaryInstructionWithTypeDependentOperandsBase(
-            DebugLoc, Operand, TypeDependentOperands, DestTy) {}
+            DebugLoc, Operand, TypeDependentOperands, DestTy),
+        ConsumptionKind(consumption) {}
 
   static UnconditionalCheckedCastValueInst *
-  create(SILDebugLocation DebugLoc, SILValue Operand, SILType DestTy,
-         SILFunction &F, SILOpenedArchetypesState &OpenedArchetypes);
+  create(SILDebugLocation DebugLoc, CastConsumptionKind consumption,
+         SILValue Operand, SILType DestTy, SILFunction &F,
+         SILOpenedArchetypesState &OpenedArchetypes);
+
+public:
+  CastConsumptionKind getConsumptionKind() const { return ConsumptionKind; }
 };
 
 /// StructInst - Represents a constructed loadable struct.

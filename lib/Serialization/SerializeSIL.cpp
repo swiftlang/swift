@@ -1313,7 +1313,8 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     auto CI = cast<UnconditionalCheckedCastValueInst>(&SI);
     SILInstCastLayout::emitRecord(
         Out, ScratchRecord, SILAbbrCodes[SILInstCastLayout::Code],
-        (unsigned)SI.getKind(), /*attr*/ 0,
+        (unsigned)SI.getKind(),
+        toStableCastConsumptionKind(CI->getConsumptionKind()),
         S.addTypeRef(CI->getType().getSwiftRValueType()),
         (unsigned)CI->getType().getCategory(),
         S.addTypeRef(CI->getOperand()->getType().getSwiftRValueType()),

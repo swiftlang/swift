@@ -546,9 +546,10 @@ ManagedValue SILGenBuilder::createEnum(SILLocation loc, ManagedValue payload,
 }
 
 ManagedValue SILGenBuilder::createUnconditionalCheckedCastValue(
-    SILLocation loc, ManagedValue operand, SILType type) {
+    SILLocation loc, CastConsumptionKind consumption, ManagedValue operand,
+    SILType type) {
   SILValue result = SILBuilder::createUnconditionalCheckedCastValue(
-      loc, operand.forward(SGF), type);
+      loc, consumption, operand.forward(SGF), type);
   return SGF.emitManagedRValueWithCleanup(result);
 }
 
