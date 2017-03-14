@@ -1,7 +1,11 @@
+cmake_minimum_required(VERSION 3.4.3)
+include("../../../../cmake/modules/StandaloneOverlay.cmake")
+
 add_swift_library(swiftCoreGraphics ${SWIFT_SDK_OVERLAY_LIBRARY_BUILD_TYPES} IS_SDK_OVERLAY
   CoreGraphics.swift
   CGFloat.swift.gyb
   Private.swift
+
   # rdar://problem/20891746
   # SWIFT_COMPILE_FLAGS ${STDLIB_SIL_SERIALIZE_ALL}
   SWIFT_COMPILE_FLAGS "${SWIFT_RUNTIME_SWIFT_COMPILE_FLAGS}"
