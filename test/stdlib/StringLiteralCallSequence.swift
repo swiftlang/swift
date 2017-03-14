@@ -12,10 +12,17 @@ struct TracingString {
     case stringLiteral(String)
     case unicodeScalarLiteral(UnicodeScalar)
     case extendedGraphemeClusterLiteral(Character)
-    case stringInterpolationSegment(AnyHashable)
+    case stringInterpolationSegment(StringInterpolationSegmentType)
     case stringInterpolation([TracingString])
   }
   var initializer: Initializer
+  
+  struct StringInterpolationSegmentType {
+    enum Initializer {
+      case forInterpolation(AnyHashable)
+    }
+    var initializer: Initializer
+  }
 }
 
 extension TracingString: ExpressibleByStringInterpolation {
@@ -31,15 +38,18 @@ extension TracingString: ExpressibleByStringInterpolation {
     initializer = .extendedGraphemeClusterLiteral(value)
   }
 
-  init<T>(stringInterpolationSegment value: T) {
-    guard let hashable = value as? AnyHashable else {
-      preconditionFailure("Only supports Hashable interpolated values")
-    }
-    initializer = .stringInterpolationSegment(hashable)
+  init(stringInterpolationSegment segment: StringInterpolationSegmentType) {
+    initializer = .stringInterpolationSegment(segment)
   }
 
   init(stringInterpolation segments: TracingString...) {
     initializer = .stringInterpolation(segments)
+  }
+}
+
+extension TracingString.StringInterpolationSegmentType {
+  init<T: Hashable>(forInterpolation value: T) {
+    initializer = .forInterpolation(value)
   }
 }
 
@@ -81,20 +91,45 @@ extension TracingString: Hashable {
   }
 }
 
+extension TracingString.StringInterpolationSegmentType: Hashable {
+  static func == (lhs: TracingString.StringInterpolationSegmentType, rhs: TracingString.StringInterpolationSegmentType) -> Bool {
+    switch (lhs.initializer, rhs.initializer) {
+    case let (.forInterpolation(l), .forInterpolation(r)):
+      return l == r
+    }
+  }
+  
+  var hashValue: Int {
+    switch initializer {
+    case let .forInterpolation(value):
+      return value.hashValue
+    }
+  }
+}
+
 extension TracingString: CustomDebugStringConvertible {
   var debugDescription: String {
     switch initializer {
     case .stringLiteral(let value):
-      return "TracingString(stringLiteral: \(String(reflecting: value)))"
+      return "TracingString(stringLiteral: \(reflecting: value))"
     case .unicodeScalarLiteral(let value):
-      return "TracingString(unicodeScalarLiteral: \(String(reflecting: value)))"
+      return "TracingString(unicodeScalarLiteral: \(reflecting: value))"
     case .extendedGraphemeClusterLiteral(let value):
-      return "TracingString(extendedGraphemeClusterLiteral: \(String(reflecting: value)))"
+      return "TracingString(extendedGraphemeClusterLiteral: \(reflecting: value))"
     case .stringInterpolationSegment(let value):
-      return "TracingString(stringInterpolationSegment: \(String(reflecting: value)))"
+      return "TracingString(stringInterpolationSegment: \(reflecting: value))"
     case .stringInterpolation(let segments):
       let segmentsString = segments.map(String.init(reflecting:)).joined(separator: ", ")
       return "TracingString(stringInterpolation: \(segmentsString))"
+    }
+  }
+}
+
+extension TracingString.StringInterpolationSegmentType: CustomDebugStringConvertible {
+  var debugDescription: String {
+    switch initializer {
+    case .forInterpolation(let value):
+      return "StringInterpolationSegmentType(forInterpolation: \(reflecting: value))"
     }
   }
 }
@@ -120,7 +155,7 @@ StringLiteralCallSequenceTests.test("StringLiteralCallSequence/simple interpolat
     "Hello, \(1)!", 
     TracingString(stringInterpolation: 
       TracingString(stringLiteral: "Hello, "), 
-      TracingString(stringInterpolationSegment: 1), 
+      TracingString(stringInterpolationSegment: .init(forInterpolation: 1)), 
       TracingString(stringLiteral: "!")
     )
   )
@@ -131,9 +166,9 @@ StringLiteralCallSequenceTests.test("StringLiteralCallSequence/adjacent interpol
     "Hello, \(1)\(2)!", 
     TracingString(stringInterpolation:
       TracingString(stringLiteral: "Hello, "), 
-      TracingString(stringInterpolationSegment: 1), 
+      TracingString(stringInterpolationSegment: .init(forInterpolation: 1)), 
       TracingString(stringLiteral: ""),
-      TracingString(stringInterpolationSegment: 2),
+      TracingString(stringInterpolationSegment: .init(forInterpolation: 2)),
       TracingString(stringLiteral: "!")
     )
   )
@@ -144,7 +179,7 @@ StringLiteralCallSequenceTests.test("StringLiteralCallSequence/leading interpola
     "\(1)!", 
     TracingString(stringInterpolation:
       TracingString(stringLiteral: ""), 
-      TracingString(stringInterpolationSegment: 1), 
+      TracingString(stringInterpolationSegment: .init(forInterpolation: 1)), 
       TracingString(stringLiteral: "!")
     )
   )
@@ -156,7 +191,7 @@ StringLiteralCallSequenceTests.test("StringLiteralCallSequence/trailing interpol
     "Hello, \(1)", 
     TracingString(stringInterpolation:
       TracingString(stringLiteral: "Hello, "), 
-      TracingString(stringInterpolationSegment: 1), 
+      TracingString(stringInterpolationSegment: .init(forInterpolation: 1)), 
       TracingString(stringLiteral: "")
     )
   )

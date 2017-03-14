@@ -150,7 +150,7 @@ public struct MyString : ExpressibleByStringLiteral,
     self.init(str: result)
   }
 
-  public init<T>(stringInterpolationSegment expr: T) {
+  public init(stringInterpolationSegment expr: String) {
     self.init(str: "<segment " + String(describing: expr) + ">")
   }
 }
