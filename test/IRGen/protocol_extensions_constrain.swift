@@ -27,7 +27,7 @@ public struct C2 : P2 {
 }
 
 extension P2 where Self.Index : P3 {
-  final public var bar: Bool {
+  public var bar: Bool {
 	  let i = startIndex
     return i.foo(i)
   }

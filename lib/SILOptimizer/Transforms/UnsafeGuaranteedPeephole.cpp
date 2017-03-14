@@ -44,6 +44,56 @@
 
 using namespace swift;
 
+/// Pattern match and remove "retain(self), apply(self), release(self)" calls
+/// inbetween unsafeGuaranteed pairs and remove the retain/release pairs.
+static void tryRemoveRetainReleasePairsBetween(
+    RCIdentityFunctionInfo &RCFI, SILInstruction *UnsafeGuaranteedI,
+    SILInstruction *Retain, SILInstruction *Release,
+    SILInstruction *UnsafeGuaranteedEndI) {
+  auto *BB = UnsafeGuaranteedI->getParent();
+  if (BB != UnsafeGuaranteedEndI->getParent() || BB != Retain->getParent() ||
+      BB != Release->getParent())
+    return;
+
+  SILInstruction *CandidateRetain = nullptr;
+  SmallVector<SILInstruction *, 8> InstsToDelete;
+
+  SILBasicBlock::iterator It(UnsafeGuaranteedI);
+  while (It != BB->end() && It != SILBasicBlock::iterator(Release) &&
+         It != SILBasicBlock::iterator(UnsafeGuaranteedEndI)) {
+    auto *CurInst = &*It++;
+    if (CurInst != Retain &&
+        (isa<StrongRetainInst>(CurInst) || isa<RetainValueInst>(CurInst)) &&
+        RCFI.getRCIdentityRoot(CurInst->getOperand(0)) ==
+            SILValue(UnsafeGuaranteedI)) {
+      CandidateRetain = CurInst;
+      continue;
+    }
+    if (!CurInst->mayHaveSideEffects())
+      continue;
+
+    if (isa<DebugValueInst>(CurInst) || isa<DebugValueAddrInst>(CurInst))
+      continue;
+
+    if (isa<ApplyInst>(CurInst) || isa<PartialApplyInst>(CurInst))
+      continue;
+
+    if (CandidateRetain != nullptr && CurInst != Release &&
+        (isa<StrongReleaseInst>(CurInst) || isa<ReleaseValueInst>(CurInst)) &&
+        RCFI.getRCIdentityRoot(CurInst->getOperand(0)) ==
+            SILValue(UnsafeGuaranteedI)) {
+      // Delete the retain/release pair.
+      InstsToDelete.push_back(CandidateRetain);
+      InstsToDelete.push_back(CurInst);
+    }
+
+    // Otherwise, reset our scan.
+    CandidateRetain = nullptr;
+  }
+  for (auto *Inst: InstsToDelete)
+    Inst->eraseFromParent();
+}
+
 /// Remove retain/release pairs around builtin "unsafeGuaranteed" instruction
 /// sequences.
 static bool removeGuaranteedRetainReleasePairs(SILFunction &F,
@@ -154,6 +204,12 @@ static bool removeGuaranteedRetainReleasePairs(SILFunction &F,
       // Okay we found a post dominating release. Let's remove the
       // retain/unsafeGuaranteed/release combo.
       //
+      // Before we do this check whether there are any pairs of retain releases
+      // we can safely remove.
+      tryRemoveRetainReleasePairsBetween(RCIA, UnsafeGuaranteedI,
+                                         LastRetainInst, LastRelease,
+                                         UnsafeGuaranteedEndI);
+
       LastRetainInst->eraseFromParent();
       LastRelease->eraseFromParent();
       UnsafeGuaranteedEndI->eraseFromParent();

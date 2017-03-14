@@ -17,6 +17,11 @@
 #include "InstrumenterSupport.h"
 
 #include "swift/Subsystems.h"
+#include "swift/AST/ASTContext.h"
+#include "swift/AST/Decl.h"
+#include "swift/AST/DeclContext.h"
+#include "swift/AST/Module.h"
+#include "swift/AST/Pattern.h"
 
 #include <random>
 #include <forward_list>

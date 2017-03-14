@@ -12,6 +12,7 @@
 
 #define DEBUG_TYPE "sil-inst-utils"
 #include "swift/SIL/InstructionUtils.h"
+#include "swift/AST/SubstitutionMap.h"
 #include "swift/Basic/NullablePtr.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/SIL/Projection.h"
@@ -67,7 +68,7 @@ static bool isRCIdentityPreservingCast(ValueKind Kind) {
     case ValueKind::UncheckedRefCastInst:
     case ValueKind::UncheckedRefCastAddrInst:
     case ValueKind::UnconditionalCheckedCastInst:
-    case ValueKind::UnconditionalCheckedCastOpaqueInst:
+    case ValueKind::UnconditionalCheckedCastValueInst:
     case ValueKind::RefToBridgeObjectInst:
     case ValueKind::BridgeObjectToRefInst:
       return true;
@@ -241,11 +242,17 @@ void ConformanceCollector::scanType(Type type) {
           Visited.insert(NT);
         }
 
+        auto *Sig = NT->getGenericSignature();
+        if (!Sig)
+          return;
+
         // Also inserts the type passed to scanType().
         Visited.insert(SubType.getPointer());
-        auto substs = SubType->gatherAllSubstitutions(M.getSwiftModule(),
-                                                     nullptr);
-        scanSubsts(substs);
+        auto SubMap = SubType->getContextSubstitutionMap(M.getSwiftModule(),
+                                                         NT);
+        SmallVector<Substitution, 4> Subs;
+        Sig->getSubstitutions(SubMap, Subs);
+        scanSubsts(Subs);
       }
     }
   });
@@ -364,7 +371,7 @@ void ConformanceCollector::collect(swift::SILInstruction *I) {
     case ValueKind::AllocRefDynamicInst:
     case ValueKind::MetatypeInst:
     case ValueKind::UnconditionalCheckedCastInst:
-    case ValueKind::UnconditionalCheckedCastOpaqueInst:
+    case ValueKind::UnconditionalCheckedCastValueInst:
       scanType(I->getType().getSwiftRValueType());
       break;
     case ValueKind::AllocStackInst: {
@@ -388,6 +395,11 @@ void ConformanceCollector::collect(swift::SILInstruction *I) {
     case ValueKind::CheckedCastBranchInst:
       scanType(cast<CheckedCastBranchInst>(I)->getCastType().
                  getSwiftRValueType());
+      break;
+    case ValueKind::CheckedCastValueBranchInst:
+      scanType(cast<CheckedCastValueBranchInst>(I)
+                   ->getCastType()
+                   .getSwiftRValueType());
       break;
     case ValueKind::ValueMetatypeInst: {
       auto *VMTI = cast<ValueMetatypeInst>(I);

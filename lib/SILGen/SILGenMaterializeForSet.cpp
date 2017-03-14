@@ -161,7 +161,6 @@
 #include "RValue.h"
 #include "Scope.h"
 #include "Initialization.h"
-#include "swift/AST/AST.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Types.h"
 #include "swift/AST/GenericEnvironment.h"
@@ -692,9 +691,9 @@ SILFunction *MaterializeForSetEmitter::createCallback(SILFunction &F,
                          genericEnv, SILLocation(Witness),
                          IsBare, F.isTransparent(), F.isFragile(),
                          IsNotThunk,
-                         /*ClassVisibility=*/SILFunction::NotRelevant,
-                         /*InlineStrategy=*/InlineDefault,
-                         /*EffectsKind=*/EffectsKind::Unspecified,
+                         /*classVisibility=*/SILFunction::NotRelevant,
+                         /*inlineStrategy=*/InlineDefault,
+                         /*EK=*/EffectsKind::Unspecified,
                          /*InsertBefore=*/&F);
 
   callback->setDebugScope(new (SGM.M) SILDebugScope(Witness, callback));
@@ -860,7 +859,8 @@ MaterializeForSetEmitter::emitUsingGetterSetter(SILGenFunction &gen,
   resultBuffer =
     gen.B.createPointerToAddress(loc, resultBuffer,
                                  RequirementStorageType.getAddressType(),
-                                 /*isStrict*/ true);
+                                 /*isStrict*/ true,
+                                 /*isInvariant*/ false);
   TemporaryInitialization init(resultBuffer, CleanupHandle::invalid());
 
   // Evaluate the getter into the result buffer.
@@ -943,7 +943,8 @@ MaterializeForSetEmitter::createSetterCallback(SILFunction &F,
     // The callback gets the value at +1.
     auto &valueTL = gen.getTypeLowering(lvalue.getTypeOfRValue());
     value = gen.B.createPointerToAddress(
-      loc, value, valueTL.getLoweredType().getAddressType(), /*isStrict*/ true);
+      loc, value, valueTL.getLoweredType().getAddressType(),
+      /*isStrict*/ true, /*isInvariant*/ false);
     if (valueTL.isLoadable() || !gen.silConv.useLoweredAddresses())
       value = valueTL.emitLoad(gen.B, loc, value, LoadOwnershipQualifier::Take);
     ManagedValue mValue = gen.emitManagedRValueWithCleanup(value, valueTL);

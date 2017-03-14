@@ -11,16 +11,87 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Index/IndexSymbol.h"
-#include "swift/AST/AST.h"
+#include "swift/AST/ASTContext.h"
+#include "swift/AST/Decl.h"
+#include "swift/AST/ParameterList.h"
+#include "swift/AST/Types.h"
 
 using namespace swift;
 using namespace swift::index;
+
+static NominalTypeDecl *getNominalParent(const ValueDecl *D) {
+  Type Ty = D->getDeclContext()->getDeclaredTypeOfContext();
+  if (!Ty)
+    return nullptr;
+  return Ty->getAnyNominal();
+}
+
+/// \returns true if \c D is a subclass of 'XCTestCase'.
+static bool isUnitTestCase(const ClassDecl *D) {
+  if (!D)
+    return false;
+  while (auto *SuperD = D->getSuperclassDecl()) {
+    if (SuperD->getNameStr() == "XCTestCase")
+      return true;
+    D = SuperD;
+  }
+  return false;
+}
+
+static bool isUnitTest(const ValueDecl *D) {
+  if (!D->hasName())
+    return false;
+
+  // A 'test candidate' is:
+  // 1. An instance method...
+  auto FD = dyn_cast<FuncDecl>(D);
+  if (!FD)
+    return false;
+  if (!D->isInstanceMember())
+    return false;
+
+  // 2. ...on a class or extension (not a struct) subclass of XCTestCase...
+  auto parentNTD = getNominalParent(D);
+  if (!parentNTD)
+    return false;
+  if (!isa<ClassDecl>(parentNTD))
+    return false;
+  if (!isUnitTestCase(cast<ClassDecl>(parentNTD)))
+    return false;
+
+  // 3. ...that returns void...
+  Type RetTy = FD->getResultInterfaceType();
+  if (RetTy && !RetTy->isVoid())
+    return false;
+
+  // 4. ...takes no parameters...
+  if (FD->getParameterLists().size() != 2)
+    return false;
+  if (FD->getParameterList(1)->size() != 0)
+    return false;
+
+  // 5. ...is of at least 'internal' accessibility (unless we can use
+  //    Objective-C reflection)...
+  if (!D->getASTContext().LangOpts.EnableObjCInterop &&
+      (D->getFormalAccess() < Accessibility::Internal ||
+      parentNTD->getFormalAccess() < Accessibility::Internal))
+    return false;
+
+  // 6. ...and starts with "test".
+  if (FD->getName().str().startswith("test"))
+    return true;
+
+  return false;
+}
 
 static void setFuncSymbolInfo(const FuncDecl *FD, SymbolInfo &sym) {
   sym.Kind = SymbolKind::Function;
 
   if (FD->getAttrs().hasAttribute<IBActionAttr>())
     sym.Properties |= SymbolProperty::IBAnnotated;
+
+  if (isUnitTest(FD))
+    sym.Properties |= SymbolProperty::UnitTest;
 
   if (FD->getDeclContext()->isTypeContext()) {
     if (FD->isStatic()) {
@@ -76,8 +147,12 @@ SymbolInfo index::getSymbolInfoForDecl(const Decl *D) {
   switch (D->getKind()) {
     case DeclKind::Enum:             info.Kind = SymbolKind::Enum; break;
     case DeclKind::Struct:           info.Kind = SymbolKind::Struct; break;
-    case DeclKind::Class:            info.Kind = SymbolKind::Class; break;
     case DeclKind::Protocol:         info.Kind = SymbolKind::Protocol; break;
+    case DeclKind::Class:
+      info.Kind = SymbolKind::Class;
+      if (isUnitTestCase(cast<ClassDecl>(D)))
+        info.Properties |= SymbolProperty::UnitTest;
+      break;
     case DeclKind::Extension: {
       info.Kind = SymbolKind::Extension;
       auto *ED = cast<ExtensionDecl>(D);
@@ -88,9 +163,11 @@ SymbolInfo index::getSymbolInfoForDecl(const Decl *D) {
         break;
       if (isa<StructDecl>(NTD))
         info.SubKind = SymbolSubKind::SwiftExtensionOfStruct;
-      else if (isa<ClassDecl>(NTD))
+      else if (auto *CD = dyn_cast<ClassDecl>(NTD)) {
         info.SubKind = SymbolSubKind::SwiftExtensionOfClass;
-      else if (isa<EnumDecl>(NTD))
+        if (isUnitTestCase(CD))
+          info.Properties |= SymbolProperty::UnitTest;
+      } else if (isa<EnumDecl>(NTD))
         info.SubKind = SymbolSubKind::SwiftExtensionOfEnum;
       else if (isa<ProtocolDecl>(NTD))
         info.SubKind = SymbolSubKind::SwiftExtensionOfProtocol;

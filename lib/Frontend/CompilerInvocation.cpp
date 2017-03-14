@@ -837,6 +837,8 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
 
   Opts.UseMalloc |= Args.hasArg(OPT_use_malloc);
 
+  Opts.DiagnosticsEditorMode |= Args.hasArg(OPT_diagnostics_editor_mode);
+
   Opts.EnableExperimentalPropertyBehaviors |=
     Args.hasArg(OPT_enable_experimental_property_behaviors);
 
@@ -1234,6 +1236,10 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
     Opts.Sanitize = parseSanitizerArgValues(A, Triple, Diags);
     IRGenOpts.Sanitize = Opts.Sanitize;
   }
+
+  /// Should we use the copy-on-write implementation of opaque existentials.
+  /// FIXME: Use during bootstraping this feature. Remove later.
+  Opts.UseCOWExistentials = Args.hasArg(OPT_enable_cow_existentials);
 
   return false;
 }

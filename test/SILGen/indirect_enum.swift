@@ -375,14 +375,19 @@ func guardTreeA<T>(_ tree: TreeA<T>) {
     // CHECK:   [[VALUE_ADDR:%.*]] = project_box [[BOX]]
     // CHECK:   [[TUPLE:%.*]] = load [take] [[VALUE_ADDR]]
     // CHECK:   [[TUPLE_COPY:%.*]] = copy_value [[TUPLE]]
-    // CHECK:   [[L:%.*]] = tuple_extract [[TUPLE_COPY]]
-    // CHECK:   [[R:%.*]] = tuple_extract [[TUPLE_COPY]]
+    // CHECK:   [[BORROWED_TUPLE_COPY:%.*]] = begin_borrow [[TUPLE_COPY]]
+    // CHECK:   [[L:%.*]] = tuple_extract [[BORROWED_TUPLE_COPY]]
+    // CHECK:   [[COPY_L:%.*]] = copy_value [[L]]
+    // CHECK:   [[R:%.*]] = tuple_extract [[BORROWED_TUPLE_COPY]]
+    // CHECK:   [[COPY_R:%.*]] = copy_value [[R]]
+    // CHECK:   end_borrow [[BORROWED_TUPLE_COPY]] from [[TUPLE_COPY]]
+    // CHECK:   destroy_value [[TUPLE_COPY]]
     // CHECK:   destroy_value [[BOX]]
     // CHECK:   end_borrow [[BORROWED_ARG_3]] from [[ARG]]
     guard case .Branch(left: let l, right: let r) = tree else { return }
 
-    // CHECK:   destroy_value [[R]]
-    // CHECK:   destroy_value [[L]]
+    // CHECK:   destroy_value [[COPY_R]]
+    // CHECK:   destroy_value [[COPY_L]]
     // CHECK:   destroy_addr [[X]]
   }
 
@@ -426,12 +431,17 @@ func guardTreeA<T>(_ tree: TreeA<T>) {
     // CHECK:   [[VALUE_ADDR:%.*]] = project_box [[BOX]]
     // CHECK:   [[TUPLE:%.*]] = load [take] [[VALUE_ADDR]]
     // CHECK:   [[TUPLE_COPY:%.*]] = copy_value [[TUPLE]]
-    // CHECK:   [[L:%.*]] = tuple_extract [[TUPLE_COPY]]
-    // CHECK:   [[R:%.*]] = tuple_extract [[TUPLE_COPY]]
+    // CHECK:   [[BORROWED_TUPLE_COPY:%.*]] = begin_borrow [[TUPLE_COPY]]
+    // CHECK:   [[L:%.*]] = tuple_extract [[BORROWED_TUPLE_COPY]]
+    // CHECK:   [[COPY_L:%.*]] = copy_value [[L]]
+    // CHECK:   [[R:%.*]] = tuple_extract [[BORROWED_TUPLE_COPY]]
+    // CHECK:   [[COPY_R:%.*]] = copy_value [[R]]
+    // CHECK:   end_borrow [[BORROWED_TUPLE_COPY]] from [[TUPLE_COPY]]
+    // CHECK:   destroy_value [[TUPLE_COPY]]
     // CHECK:   destroy_value [[BOX]]
     // CHECK:   end_borrow [[BORROWED_ARG]] from [[ARG]]
-    // CHECK:   destroy_value [[R]]
-    // CHECK:   destroy_value [[L]]
+    // CHECK:   destroy_value [[COPY_R]]
+    // CHECK:   destroy_value [[COPY_L]]
     if case .Branch(left: let l, right: let r) = tree { }
   }
 }

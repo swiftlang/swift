@@ -17,11 +17,10 @@ func getDescription(_ o: NSObject) -> String {
 // CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
 // CHECK:   [[DESCRIPTION:%.*]] = class_method [volatile] [[BORROWED_ARG]] : $NSObject, #NSObject.description!getter.1.foreign
 // CHECK:   [[OPT_BRIDGED:%.*]] = apply [[DESCRIPTION]]([[BORROWED_ARG]])
-// CHECK:   [[SELECT_RESULT:%.*]] = select_enum [[OPT_BRIDGED]]
-// CHECK:   cond_br [[SELECT_RESULT]], [[SOME_BB:bb[0-9]+]], [[NONE_BB:bb[0-9]+]]
+// CHECK:   switch_enum [[OPT_BRIDGED]] : $Optional<NSString>, case #Optional.some!enumelt.1: [[SOME_BB:bb[0-9]+]], case #Optional.none!enumelt: [[NONE_BB:bb[0-9]+]]
 //
-// CHECK: [[SOME_BB]]:
-// CHECK:   [[BRIDGED:%.*]] = unchecked_enum_data [[OPT_BRIDGED]]
+// CHECK: [[SOME_BB]]([[BRIDGED:%.*]] : $NSString):
+// CHECK-NOT:   unchecked_enum_data
 // CHECK:   [[NSSTRING_TO_STRING:%.*]] = function_ref @_TZFE10FoundationSS36_unconditionallyBridgeFromObjectiveCfGSqCSo8NSString_SS
 // CHECK:   [[BRIDGED_BOX:%.*]] = enum $Optional<NSString>, #Optional.some!enumelt.1, [[BRIDGED]]
 // CHECK:   [[NATIVE:%.*]] = apply [[NSSTRING_TO_STRING]]([[BRIDGED_BOX]],
@@ -54,12 +53,12 @@ func getUppercaseString(_ s: NSString) -> String {
 // CHECK-NOT: function_ref @swift_StringToNSString
 // CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
 // CHECK:   [[UPPERCASE_STRING:%.*]] = class_method [volatile] [[BORROWED_ARG]] : $NSString, #NSString.uppercase!1.foreign
-// CHECK:   [[OPT_BRIDGED:%.*]] = apply [[UPPERCASE_STRING]]([[BORROWED_ARG]])
-// CHECK:   [[HAS_VALUE:%.*]] = select_enum [[OPT_BRIDGED]]
-// CHECK:   cond_br [[HAS_VALUE]], [[SOME_BB:bb[0-9]+]], [[NONE_BB:bb[0-9]+]]
+// CHECK:   [[OPT_BRIDGED:%.*]] = apply [[UPPERCASE_STRING]]([[BORROWED_ARG]]) : $@convention(objc_method) (NSString) -> @autoreleased Optional<NSString>
+// CHECK:   switch_enum [[OPT_BRIDGED]] : $Optional<NSString>, case #Optional.some!enumelt.1: [[SOME_BB:bb[0-9]+]], case #Optional.none!enumelt: [[NONE_BB:bb[0-9]+]]
 //
-// CHECK: [[SOME_BB]]:
-// CHECK:   [[BRIDGED:%.*]] = unchecked_enum_data [[OPT_BRIDGED]]
+//
+// CHECK: [[SOME_BB]]([[BRIDGED:%.*]] :
+// CHECK-NOT:  unchecked_enum_data
 // CHECK:   [[NSSTRING_TO_STRING:%.*]] = function_ref @_TZFE10FoundationSS36_unconditionallyBridgeFromObjectiveCfGSqCSo8NSString_SS
 // CHECK:   [[BRIDGED_BOX:%.*]] = enum $Optional<NSString>, #Optional.some!enumelt.1, [[BRIDGED]]
 // CHECK:   [[NATIVE:%.*]] = apply [[NSSTRING_TO_STRING]]([[BRIDGED_BOX]]
@@ -91,11 +90,10 @@ func setFoo(_ f: Foo, s: String) {
 // CHECK:   [[SET_FOO:%.*]] = class_method [volatile] [[BORROWED_ARG0]] : $Foo, #Foo.setFoo!1.foreign
 // CHECK:   [[NV:%.*]] = load
 // CHECK:   [[OPT_NATIVE:%.*]] = enum $Optional<String>, #Optional.some!enumelt.1, [[NV]]
-// CHECK:   [[HAS_VALUE:%.*]] = select_enum [[OPT_NATIVE]]
-// CHECK:   cond_br [[HAS_VALUE:%.*]], [[SOME_BB:bb[0-9]+]], [[NONE_BB:bb[0-9]+]]
+// CHECK:   switch_enum [[OPT_NATIVE]] : $Optional<String>, case #Optional.some!enumelt.1: [[SOME_BB:bb[0-9]+]], case #Optional.none!enumelt: [[NONE_BB:bb[0-9]+]]
 //
-// CHECK: [[SOME_BB]]:
-// CHECK:   [[NATIVE:%.*]] = unchecked_enum_data [[OPT_NATIVE]]
+// CHECK: [[SOME_BB]]([[NATIVE:%.*]] : $String):
+// CHECK-NOT: unchecked_enum_data
 // CHECK:   [[STRING_TO_NSSTRING:%.*]] = function_ref @_TFE10FoundationSS19_bridgeToObjectiveCfT_CSo8NSString
 // CHECK:   [[BORROWED_NATIVE:%.*]] = begin_borrow [[NATIVE]]
 // CHECK:   [[BRIDGED:%.*]] = apply [[STRING_TO_NSSTRING]]([[BORROWED_NATIVE]])
@@ -255,9 +253,10 @@ func callBar() -> String {
 // CHECK-LABEL: sil hidden @_TF13objc_bridging7callBar
 // CHECK: bb0:
 // CHECK:   [[BAR:%.*]] = function_ref @bar
-// CHECK:   [[OPT_BRIDGED:%.*]] = apply [[BAR]]()
-// CHECK:   select_enum [[OPT_BRIDGED]]
-// CHECK:   [[BRIDGED:%.*]] = unchecked_enum_data [[OPT_BRIDGED]]
+// CHECK:   [[OPT_BRIDGED:%.*]] = apply [[BAR]]() : $@convention(c) () -> @autoreleased Optional<NSString>
+// CHECK:   switch_enum [[OPT_BRIDGED]] : $Optional<NSString>, case #Optional.some!enumelt.1: [[SOME_BB:bb[0-9]+]], case #Optional.none!enumelt: [[NONE_BB:bb[0-9]+]]
+
+// CHECK: [[SOME_BB]]([[BRIDGED:%.*]] : $NSString):
 // CHECK:   [[NSSTRING_TO_STRING:%.*]] = function_ref @_TZFE10FoundationSS36_unconditionallyBridgeFromObjectiveCfGSqCSo8NSString_SS
 // CHECK:   [[BRIDGED_BOX:%.*]] = enum $Optional<NSString>, #Optional.some!enumelt.1, [[BRIDGED]]
 // CHECK:   [[NATIVE:%.*]] = apply [[NSSTRING_TO_STRING]]([[BRIDGED_BOX]]
@@ -276,8 +275,10 @@ func callSetBar(_ s: String) {
 // CHECK:   [[SET_BAR:%.*]] = function_ref @setBar
 // CHECK:   [[NV:%.*]] = load
 // CHECK:   [[OPT_NATIVE:%.*]] = enum $Optional<String>, #Optional.some!enumelt.1, [[NV]]
-// CHECK:   select_enum [[OPT_NATIVE]]
-// CHECK:   [[NATIVE:%.*]] = unchecked_enum_data [[OPT_NATIVE]]
+// CHECK:   switch_enum [[OPT_NATIVE]] : $Optional<String>, case #Optional.some!enumelt.1: [[SOME_BB:bb[0-9]+]], case #Optional.none!enumelt: [[NONE_BB:bb[0-9]+]]
+
+// CHECK: [[SOME_BB]]([[NATIVE:%.*]] : $String):
+// CHECK-NOT: unchecked_enum_data
 // CHECK:   [[STRING_TO_NSSTRING:%.*]] = function_ref @_TFE10FoundationSS19_bridgeToObjectiveCfT_CSo8NSString
 // CHECK:   [[BORROWED_NATIVE:%.*]] = begin_borrow [[NATIVE]]
 // CHECK:   [[BRIDGED:%.*]] = apply [[STRING_TO_NSSTRING]]([[BORROWED_NATIVE]])

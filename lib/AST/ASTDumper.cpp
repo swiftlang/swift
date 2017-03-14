@@ -15,7 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Basic/QuotedString.h"
-#include "swift/AST/AST.h"
+#include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ForeignErrorConvention.h"
@@ -158,19 +158,15 @@ void RequirementRepr::print(raw_ostream &out) const {
 
 void GenericParamList::print(llvm::raw_ostream &OS) {
   OS << '<';
-  bool First = true;
-  for (auto P : *this) {
-    if (First) {
-      First = false;
-    } else {
-      OS << ", ";
-    }
-    OS << P->getName();
-    if (!P->getInherited().empty()) {
-      OS << " : ";
-      P->getInherited()[0].getType().print(OS);
-    }
-  }
+  interleave(*this,
+             [&](const GenericTypeParamDecl *P) {
+               OS << P->getName();
+               if (!P->getInherited().empty()) {
+                 OS << " : ";
+                 P->getInherited()[0].getType().print(OS);
+               }
+             },
+             [&] { OS << ", "; });
 
   if (!getRequirements().empty()) {
     OS << " where ";
@@ -578,15 +574,8 @@ namespace {
       if (Inherited.empty())
         return;
       OS << " inherits: ";
-      bool First = true;
-      for (auto Super : Inherited) {
-        if (First)
-          First = false;
-        else
-          OS << ", ";
-
-        Super.getType().print(OS);
-      }
+      interleave(Inherited, [&](TypeLoc Super) { Super.getType().print(OS); },
+                 [&] { OS << ", "; });
     }
 
     void visitImportDecl(ImportDecl *ID) {

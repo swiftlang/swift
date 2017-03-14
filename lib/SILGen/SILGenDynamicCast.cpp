@@ -16,7 +16,6 @@
 #include "RValue.h"
 #include "Scope.h"
 #include "ExitableFullExpr.h"
-#include "swift/AST/AST.h"
 #include "swift/SIL/DynamicCasts.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/TypeLowering.h"
@@ -102,7 +101,7 @@ namespace {
 
       ManagedValue result;
       if (Strategy == CastStrategy::Address) {
-        result = SGF.B.createUnconditionalCheckedCastOpaque(
+        result = SGF.B.createUnconditionalCheckedCastValue(
             Loc, operand, origTargetTL.getLoweredType());
       } else {
         result = SGF.B.createUnconditionalCheckedCast(
@@ -133,23 +132,29 @@ namespace {
       SILBasicBlock *trueBB = SGF.B.splitBlockForFallthrough();
 
       // Emit the branch.
-      ManagedValue scalarOperandValue;
+      ManagedValue operandValue;
       SILValue resultBuffer;
-      if (Strategy == CastStrategy::Address) {
+      if (Strategy == CastStrategy::Address &&
+          SGF.silConv.useLoweredAddresses()) {
         assert(operand.getType().isAddress());
         resultBuffer =
             createAbstractResultBuffer(hasAbstraction, origTargetTL, ctx);
         SGF.B.createCheckedCastAddrBranch(
             Loc, consumption, operand.forward(SGF), SourceType, resultBuffer,
             TargetType, trueBB, falseBB);
+      } else if (Strategy == CastStrategy::Address) {
+        // Opaque value mode
+        operandValue = std::move(operand);
+        SGF.B.createCheckedCastValueBranch(
+            Loc, operandValue, origTargetTL.getLoweredType(), trueBB, falseBB);
       } else {
         // Tolerate being passed an address here.  It comes up during switch
         // emission.
-        scalarOperandValue = std::move(operand);
-        if (scalarOperandValue.getType().isAddress()) {
-          scalarOperandValue = SGF.B.createLoadTake(Loc, scalarOperandValue);
+        operandValue = std::move(operand);
+        if (operandValue.getType().isAddress()) {
+          operandValue = SGF.B.createLoadTake(Loc, operandValue);
         }
-        SGF.B.createCheckedCastBranch(Loc, /*exact*/ false, scalarOperandValue,
+        SGF.B.createCheckedCastBranch(Loc, /*exact*/ false, operandValue,
                                       origTargetTL.getLoweredType(), trueBB,
                                       falseBB);
       }
@@ -160,7 +165,8 @@ namespace {
         FullExpr scope(SGF.Cleanups, CleanupLocation::get(Loc));
 
         ManagedValue result;
-        if (Strategy == CastStrategy::Address) {
+        if (Strategy == CastStrategy::Address &&
+            SGF.silConv.useLoweredAddresses()) {
           result = finishFromResultBuffer(hasAbstraction, resultBuffer,
                                           abstraction, origTargetTL, ctx);
         } else {
@@ -200,7 +206,7 @@ namespace {
         if (shouldDestroyOnFailure(consumption)) {
           {
             FullExpr argScope(SGF.Cleanups, CleanupLocation::get(Loc));
-            SGF.B.createOwnedPHIArgument(scalarOperandValue.getType());
+            SGF.B.createOwnedPHIArgument(operandValue.getType());
           }
           handleFalse(None);
           assert(!SGF.B.hasValidInsertionPoint() &&
@@ -208,7 +214,7 @@ namespace {
           return;
         }
 
-        handleFalse(SGF.B.createOwnedPHIArgument(scalarOperandValue.getType()));
+        handleFalse(SGF.B.createOwnedPHIArgument(operandValue.getType()));
         assert(!SGF.B.hasValidInsertionPoint() && "handler did not end block");
       }
     }
@@ -381,7 +387,7 @@ namespace {
 
       SILValue resultScalar;
       if (Strategy == CastStrategy::Address) {
-        resultScalar = SGF.B.createUnconditionalCheckedCastOpaque(
+        resultScalar = SGF.B.createUnconditionalCheckedCastValue(
             Loc, operand.forward(SGF), origTargetTL.getLoweredType());
       } else {
         resultScalar = SGF.B.createUnconditionalCheckedCast(
@@ -576,21 +582,19 @@ static RValue emitCollectionDowncastExpr(SILGenFunction &SGF,
                                          SGFContext C,
                                          bool conditional) {
   // Compute substitutions for the intrinsic call.
-  auto fromCollection = cast<BoundGenericStructType>(
-                          sourceType->getCanonicalType());
-  auto toCollection = cast<BoundGenericStructType>(
-                        destType->getCanonicalType());
+  auto fromCollection = sourceType->getCanonicalType();
+  auto toCollection = destType->getCanonicalType();
   // Get the intrinsic function.
   auto &ctx = SGF.getASTContext();
   FuncDecl *fn = nullptr;
-  if (fromCollection->getDecl() == ctx.getArrayDecl()) {
+  if (fromCollection->getAnyNominal() == ctx.getArrayDecl()) {
     fn = conditional ? SGF.SGM.getArrayConditionalCast(loc)
                      : SGF.SGM.getArrayForceCast(loc);
-  } else if (fromCollection->getDecl() == ctx.getDictionaryDecl()) {
+  } else if (fromCollection->getAnyNominal() == ctx.getDictionaryDecl()) {
     fn = (conditional
            ? SGF.SGM.getDictionaryDownCastConditional(loc)
            : SGF.SGM.getDictionaryDownCast(loc));
-  } else if (fromCollection->getDecl() == ctx.getSetDecl()) {
+  } else if (fromCollection->getAnyNominal() == ctx.getSetDecl()) {
     fn = (conditional
            ? SGF.SGM.getSetDownCastConditional(loc)
            : SGF.SGM.getSetDownCast(loc));
@@ -598,24 +602,8 @@ static RValue emitCollectionDowncastExpr(SILGenFunction &SGF,
     llvm_unreachable("unsupported collection upcast kind");
   }
 
-  // This will have been diagnosed by the accessors above.
-  if (!fn) return SGF.emitUndefRValue(loc, destType);
-
-  auto fnGenericParams = fn->getGenericSignature()->getGenericParams();
-  auto fromSubsts = fromCollection->gatherAllSubstitutions(
-      SGF.SGM.SwiftModule, nullptr);
-  auto toSubsts = toCollection->gatherAllSubstitutions(
-      SGF.SGM.SwiftModule, nullptr);
-  assert(fnGenericParams.size() == fromSubsts.size() + toSubsts.size() &&
-         "wrong number of generic collection parameters");
-  (void) fnGenericParams;
-
-  // Form type parameter substitutions.
-  SmallVector<Substitution, 4> subs;
-  subs.append(fromSubsts.begin(), fromSubsts.end());
-  subs.append(toSubsts.begin(), toSubsts.end());
-
-  return SGF.emitApplyOfLibraryIntrinsic(loc, fn, subs, {source}, C);
+  return SGF.emitCollectionConversion(loc, fn, fromCollection, toCollection,
+                                      source, C);
 }
 
 static ManagedValue
@@ -635,7 +623,9 @@ adjustForConditionalCheckedCastOperand(SILLocation loc, ManagedValue src,
   bool hasAbstraction = (src.getType() != srcAbstractTL.getLoweredType());
   
   // Fast path: no re-abstraction required.
-  if (!hasAbstraction && (!requiresAddress || src.getType().isAddress())) {
+  if (!hasAbstraction &&
+      (!requiresAddress ||
+       (src.getType().isAddress() || !SGF.silConv.useLoweredAddresses()))) {
     return src;
   }
   

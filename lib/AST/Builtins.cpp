@@ -14,10 +14,12 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/AST/AST.h"
 #include "swift/AST/GenericSignatureBuilder.h"
 #include "swift/Basic/LLVMContext.h"
+#include "swift/AST/ASTContext.h"
 #include "swift/AST/Builtins.h"
+#include "swift/AST/Module.h"
+#include "swift/AST/ParameterList.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringSwitch.h"
@@ -914,6 +916,14 @@ static ValueDecl *getGetObjCTypeEncodingOperation(ASTContext &Context,
   return builder.build(Id);
 }
 
+static ValueDecl *getTSanInoutAccess(ASTContext &Context, Identifier Id) {
+  // <T> T -> ()
+  BuiltinGenericSignatureBuilder builder(Context);
+  builder.addParameter(makeGenericParam());
+  builder.setResult(makeConcrete(Context.TheEmptyTupleType));
+  return builder.build(Id);
+}
+
 static ValueDecl *getAddressOfOperation(ASTContext &Context, Identifier Id) {
   // <T> (@inout T) -> RawPointer
   BuiltinGenericSignatureBuilder builder(Context);
@@ -1088,6 +1098,8 @@ static const OverloadedBuiltinKind OverloadedBuiltinKinds[] = {
    OverloadedBuiltinKind::overload,
 #define BUILTIN_MISC_OPERATION(id, name, attrs, overload) \
    OverloadedBuiltinKind::overload,
+#define BUILTIN_SANITIZER_OPERATION(id, name, attrs) \
+  OverloadedBuiltinKind::None,
 #define BUILTIN_TYPE_TRAIT_OPERATION(id, name) \
    OverloadedBuiltinKind::Special,
 #define BUILTIN_RUNTIME_CALL(id, attrs, name) \
@@ -1592,6 +1604,7 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
       
   case BuiltinValueKind::Load:
   case BuiltinValueKind::LoadRaw:
+  case BuiltinValueKind::LoadInvariant:
   case BuiltinValueKind::Take:
     if (!Types.empty()) return nullptr;
     return getLoadOperation(Context, Id);
@@ -1744,6 +1757,9 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
 
   case BuiltinValueKind::GetObjCTypeEncoding:
     return getGetObjCTypeEncodingOperation(Context, Id);
+
+  case BuiltinValueKind::TSanInoutAccess:
+    return getTSanInoutAccess(Context, Id);
   }
 
   llvm_unreachable("bad builtin value!");

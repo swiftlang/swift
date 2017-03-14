@@ -17,8 +17,11 @@
 
 import TestsUtils
 import Foundation
+#if _runtime(_ObjC)
 import ObjectiveCTests
+#endif
 
+#if _runtime(_ObjC)
 @inline(never)
 func testObjectiveCBridgeStubFromNSStringRef() {
   let b = BridgeTester()
@@ -28,16 +31,20 @@ func testObjectiveCBridgeStubFromNSStringRef() {
   }
   CheckResults(nsString.isEqual(to: "Default string value no tagged pointer" as NSString), "Wrong value returned")
 }
+#endif
 
 @inline(never)
 public func run_ObjectiveCBridgeStubFromNSStringRef(N: Int) {
+#if _runtime(_ObjC)
   autoreleasepool {
     for _ in 0 ..< N {
       testObjectiveCBridgeStubFromNSStringRef()
     }
   }
+#endif
 }
 
+#if _runtime(_ObjC)
 @inline(never)
 func testObjectiveCBridgeStubToNSStringRef() {
    let b = BridgeTester()
@@ -46,15 +53,19 @@ func testObjectiveCBridgeStubToNSStringRef() {
      b.test(from: str)
    }
 }
+#endif
 
 @inline(never)
 public func run_ObjectiveCBridgeStubToNSStringRef(N: Int) {
+#if _runtime(_ObjC)
   autoreleasepool {
     for _ in 0 ..< N {
       testObjectiveCBridgeStubToNSStringRef()
     }
   }
+#endif
 }
+#if _runtime(_ObjC)
 @inline(never)
 func testObjectiveCBridgeStubFromNSDateRef() {
   let b = BridgeTester()
@@ -64,16 +75,20 @@ func testObjectiveCBridgeStubFromNSDateRef() {
     let _ = bridgedEnd.timeIntervalSince(bridgedBegin)
   }
 }
+#endif
 
 @inline(never)
 public func run_ObjectiveCBridgeStubFromNSDateRef(N: Int) {
+#if _runtime(_ObjC)
   autoreleasepool {
     for _ in 0 ..< N {
       testObjectiveCBridgeStubFromNSDateRef()
     }
   }
+#endif
 }
 
+#if _runtime(_ObjC)
 @inline(never)
 public func testObjectiveCBridgeStubToNSDateRef() {
   let b = BridgeTester()
@@ -82,17 +97,21 @@ public func testObjectiveCBridgeStubToNSDateRef() {
     b.use(d)
   }
 }
+#endif
 
 @inline(never)
 public func run_ObjectiveCBridgeStubToNSDateRef(N: Int) {
+#if _runtime(_ObjC)
   autoreleasepool {
     for _ in 0 ..< N {
       testObjectiveCBridgeStubToNSDateRef()
     }
   }
+#endif
 }
 
 
+#if _runtime(_ObjC)
 @inline(never)
 func testObjectiveCBridgeStubNSDateRefAccess() {
   var remainders = 0.0
@@ -101,16 +120,20 @@ func testObjectiveCBridgeStubNSDateRefAccess() {
     remainders += d.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: 10)
   }
 }
+#endif
 
 @inline(never)
 public func run_ObjectiveCBridgeStubNSDateRefAccess(N: Int) {
+#if _runtime(_ObjC)
   autoreleasepool {
     for _ in 0 ..< N {
       testObjectiveCBridgeStubNSDateRefAccess()
     }
   }
+#endif
 }
 
+#if _runtime(_ObjC)
 @inline(never)
 func testObjectiveCBridgeStubNSDateMutationRef() {
   var d = NSDate()
@@ -118,16 +141,20 @@ func testObjectiveCBridgeStubNSDateMutationRef() {
       d = d.addingTimeInterval(1)
   }
 }
+#endif
 
 @inline(never)
 public func run_ObjectiveCBridgeStubNSDateMutationRef(N: Int) {
+#if _runtime(_ObjC)
   autoreleasepool {
     for _ in 0 ..< N {
       testObjectiveCBridgeStubNSDateMutationRef()
     }
   }
+#endif
 }
 
+#if _runtime(_ObjC)
 @inline(never)
 func testObjectiveCBridgeStubURLAppendPathRef() {
   let startUrl = URL(string: "/")!
@@ -138,16 +165,20 @@ func testObjectiveCBridgeStubURLAppendPathRef() {
     }
   }
 }
+#endif
 
 @inline(never)
 public func run_ObjectiveCBridgeStubURLAppendPathRef(N: Int) {
+#if _runtime(_ObjC)
   autoreleasepool {
     for _ in 0 ..< N {
       testObjectiveCBridgeStubURLAppendPathRef()
     }
   }
+#endif
 }
 
+#if _runtime(_ObjC)
 @inline(never)
 func testObjectiveCBridgeStubNSDataAppend() {
   let proto = NSMutableData()
@@ -159,12 +190,15 @@ func testObjectiveCBridgeStubNSDataAppend() {
     }
   }
 }
+#endif
 
 @inline(never)
 public func run_ObjectiveCBridgeStubNSDataAppend(N: Int) {
+#if _runtime(_ObjC)
   autoreleasepool {
     for _ in 0 ..< N {
       testObjectiveCBridgeStubNSDataAppend()
     }
   }
+#endif
 }

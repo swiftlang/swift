@@ -16,7 +16,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "NameLookupImpl.h"
-#include "swift/AST/AST.h"
+#include "swift/AST/ASTContext.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/ProtocolConformance.h"

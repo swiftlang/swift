@@ -33,7 +33,7 @@
 #include "ImageInspection.h"
 #include "swift/Runtime/Debug.h"
 #include "swift/Runtime/Mutex.h"
-#include "swift/Basic/Demangle.h"
+#include "swift/Demangling/Demangle.h"
 #include "swift/Basic/LLVM.h"
 #include "llvm/ADT/StringRef.h"
 #if !defined(_MSC_VER)

@@ -997,6 +997,8 @@ TypeChecker::getDeclTypeCheckingSemantics(ValueDecl *decl) {
       return DeclTypeCheckingSemantics::TypeOf;
     if (semantics->Value.equals("typechecker.withoutActuallyEscaping(_:do:)"))
       return DeclTypeCheckingSemantics::WithoutActuallyEscaping;
+    if (semantics->Value.equals("typechecker._openExistential(_:do:)"))
+      return DeclTypeCheckingSemantics::OpenExistential;
   }
   return DeclTypeCheckingSemantics::Normal;
 }

@@ -21,7 +21,9 @@
 #include "swift/AST/SubstitutionList.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/FoldingSet.h"
+#include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/TrailingObjects.h"
+#include <utility>
 
 namespace swift {
 
@@ -30,6 +32,61 @@ class ProtocolConformanceRef;
 class ProtocolType;
 class Substitution;
 class SubstitutionMap;
+
+/// An access path used to find a particular protocol conformance within
+/// a generic signature.
+///
+/// One can follow a conformance path to extract any conformance that is
+/// derivable within the generic signature. For example, given:
+///
+/// \code
+///   func f<C: Collection>(_: C) where C.Iterator.Element: Hashable { }
+/// \endcode
+///
+/// One can extract conformances for various types and protocols, including
+/// those written directly (\c C: Collection, \c C.Iterator.Element: Hashable),
+/// and others that can be derived (\c C: Sequence,
+/// \c C.Iterator: IteratorProtocol, \c C.Iterator.Element: Equatable).
+///
+/// A conformance access path is a sequence of (dependent type, protocol decl)
+/// pairs that starts at an explicit requirement in the generic signature
+/// (e.g., \c C: Collection). Each subsequent step names a dependent
+/// type and protocol that refers to an explicit requirement in the requirement
+/// signature of the previous step's protocol. For example, consider the
+/// derived conformance \c C.Iterator: IteratorProtocol, which has the
+/// following path:
+///
+/// \code
+/// (C, Collection) -> (Self, Sequence) -> (Self.Iterator, IteratorProtocol)
+/// \endcode
+///
+/// Therefore, the path starts at \c C: Collection. It then retrieves the
+/// \c Sequence conformance of \c C (because \c Collection inherits
+/// \c Sequence). Finally, it extracts the conformance of the associated type
+/// \c Iterator to \c IteratorProtocol from the \c Sequence protocol.
+class ConformanceAccessPath {
+public:
+  /// An entry in the conformance access path, which is described by the
+  /// dependent type on which the conformance is stated as the protocol to
+  /// which.
+  typedef std::pair<Type, ProtocolDecl *> Entry;
+
+private:
+  llvm::SmallVector<Entry, 2> path;
+
+  friend class GenericSignature;
+
+public:
+  typedef llvm::SmallVector<Entry, 2>::const_iterator iterator;
+  typedef llvm::SmallVector<Entry, 2>::const_iterator const_iterator;
+
+  const_iterator begin() const { return path.begin(); }
+  const_iterator end() const { return path.end(); }
+
+  void print(raw_ostream &OS) const;
+
+  LLVM_ATTRIBUTE_DEPRECATED(void dump() const, "only for use in a debugger");
+};
 
 /// Describes the generic signature of a particular declaration, including
 /// both the generic type parameters and the requirements placed on those
@@ -90,8 +147,9 @@ public:
 
   /// Create a new generic signature with the given type parameters and
   /// requirements, first canonicalizing the types.
-  static CanGenericSignature getCanonical(ArrayRef<GenericTypeParamType *> params,
-                                          ArrayRef<Requirement> requirements);
+  static CanGenericSignature getCanonical(
+                                      ArrayRef<GenericTypeParamType *> params,
+                                      ArrayRef<Requirement> requirements);
 
   /// Retrieve the generic parameters.
   ArrayRef<GenericTypeParamType *> getGenericParams() const {
@@ -153,12 +211,6 @@ public:
   /// Build an array of substitutions from an interface type substitution map,
   /// using the given function to look up conformances.
   void getSubstitutions(TypeSubstitutionFn substitution,
-                        LookupConformanceFn lookupConformance,
-                        SmallVectorImpl<Substitution> &result) const;
-
-  /// Build an array of substitutions from an interface type substitution map,
-  /// using the given function to look up conformances.
-  void getSubstitutions(const TypeSubstitutionMap &subMap,
                         LookupConformanceFn lookupConformance,
                         SmallVectorImpl<Substitution> &result) const;
 
@@ -263,6 +315,22 @@ public:
   /// signature.
   CanType getCanonicalTypeInContext(Type type, GenericSignatureBuilder &builder);
   bool isCanonicalTypeInContext(Type type, GenericSignatureBuilder &builder);
+
+  /// Retrieve the conformance access path used to extract the conformance of
+  /// interface \c type to the given \c protocol.
+  ///
+  /// \param type The interface type whose conformance access path is to be
+  /// queried.
+  /// \param protocol A protocol to which \c type conforms.
+  ///
+  /// \returns the conformance access path that starts at a requirement of
+  /// this generic signature and ends at the conformance that makes \c type
+  /// conform to \c protocol.
+  ///
+  /// \seealso ConformanceAccessPath
+  ConformanceAccessPath getConformanceAccessPath(Type type,
+                                                 ProtocolDecl *protocol,
+                                                 ModuleDecl &mod);
 
   static void Profile(llvm::FoldingSetNodeID &ID,
                       ArrayRef<GenericTypeParamType *> genericParams,

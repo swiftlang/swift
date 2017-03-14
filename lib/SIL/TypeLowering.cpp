@@ -1099,12 +1099,6 @@ namespace {
     OpaqueValueTypeLowering(SILType type)
       : LeafLoadableTypeLowering(type, IsAddressOnly, IsReferenceCounted) {}
 
-    // --- Same as LoadableTypeLowering.
-    void emitDestroyAddress(SILBuilder &B, SILLocation loc,
-                            SILValue addr) const override {
-      llvm_unreachable("destroy address");
-    }
-
     void emitCopyInto(SILBuilder &B, SILLocation loc,
                       SILValue src, SILValue dest, IsTake_t isTake,
                       IsInitialization_t isInit) const override {

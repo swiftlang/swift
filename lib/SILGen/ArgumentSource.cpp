@@ -20,14 +20,14 @@
 using namespace swift;
 using namespace Lowering;
 
-RValue &ArgumentSource::forceAndPeekRValue(SILGenFunction &gen) & {
+RValue &ArgumentSource::forceAndPeekRValue(SILGenFunction &SGF) & {
   if (isRValue()) {
     return peekRValue();
   }
 
   auto expr = asKnownExpr();
   StoredKind = Kind::RValue;
-  new (&Storage.TheRV.Value) RValue(gen.emitRValue(expr));
+  new (&Storage.TheRV.Value) RValue(SGF.emitRValue(expr));
   Storage.TheRV.Loc = expr;
   return Storage.TheRV.Value;
 }
@@ -89,68 +89,68 @@ bool ArgumentSource::requiresCalleeToEvaluate() {
   llvm_unreachable("Unhandled Kind in switch.");
 }
 
-RValue ArgumentSource::getAsRValue(SILGenFunction &gen, SGFContext C) && {
+RValue ArgumentSource::getAsRValue(SILGenFunction &SGF, SGFContext C) && {
   assert(!isLValue());
   if (isRValue())
     return std::move(*this).asKnownRValue();
 
-  return gen.emitRValue(std::move(*this).asKnownExpr(), C);
+  return SGF.emitRValue(std::move(*this).asKnownExpr(), C);
 }
 
-ManagedValue ArgumentSource::getAsSingleValue(SILGenFunction &gen,
+ManagedValue ArgumentSource::getAsSingleValue(SILGenFunction &SGF,
                                               SGFContext C) && {
   if (isRValue()) {
     auto loc = getKnownRValueLocation();
-    return std::move(*this).asKnownRValue().getAsSingleValue(gen, loc);
+    return std::move(*this).asKnownRValue().getAsSingleValue(SGF, loc);
   }
   if (isLValue()) {
     auto loc = getKnownLValueLocation();
-    return gen.emitAddressOfLValue(loc, std::move(*this).asKnownLValue(),
+    return SGF.emitAddressOfLValue(loc, std::move(*this).asKnownLValue(),
                                    AccessKind::ReadWrite);
   }
 
   auto e = std::move(*this).asKnownExpr();
   if (e->getType()->is<InOutType>()) {
-    return gen.emitAddressOfLValue(e, gen.emitLValue(e, AccessKind::ReadWrite),
+    return SGF.emitAddressOfLValue(e, SGF.emitLValue(e, AccessKind::ReadWrite),
                                    AccessKind::ReadWrite);
   } else {
-    return gen.emitRValueAsSingleValue(e, C);
+    return SGF.emitRValueAsSingleValue(e, C);
   }
 }
 
 
-ManagedValue ArgumentSource::getAsSingleValue(SILGenFunction &gen,
+ManagedValue ArgumentSource::getAsSingleValue(SILGenFunction &SGF,
                                               AbstractionPattern origFormalType,
                                               SGFContext C) && {
   auto loc = getLocation();
   auto substFormalType = getSubstType();
-  ManagedValue outputValue = std::move(*this).getAsSingleValue(gen);
-  return gen.emitSubstToOrigValue(loc,
+  ManagedValue outputValue = std::move(*this).getAsSingleValue(SGF);
+  return SGF.emitSubstToOrigValue(loc,
                                   outputValue, origFormalType,
                                   substFormalType, C);
 }
 
-void ArgumentSource::forwardInto(SILGenFunction &gen, Initialization *dest) && {
+void ArgumentSource::forwardInto(SILGenFunction &SGF, Initialization *dest) && {
   assert(!isLValue());
   if (isRValue()) {
     auto loc = getKnownRValueLocation();
-    return std::move(*this).asKnownRValue().forwardInto(gen, loc, dest);
+    return std::move(*this).asKnownRValue().forwardInto(SGF, loc, dest);
   }
 
   auto e = std::move(*this).asKnownExpr();
-  return gen.emitExprInto(e, dest);
+  return SGF.emitExprInto(e, dest);
 }
 
-ManagedValue ArgumentSource::materialize(SILGenFunction &gen) && {
+ManagedValue ArgumentSource::materialize(SILGenFunction &SGF) && {
   assert(!isLValue());
   if (isRValue()) {
     auto loc = getKnownRValueLocation();
-    return std::move(*this).asKnownRValue().materialize(gen, loc);
+    return std::move(*this).asKnownRValue().materialize(SGF, loc);
   }
 
   auto expr = std::move(*this).asKnownExpr();
-  auto temp = gen.emitTemporary(expr, gen.getTypeLowering(expr->getType()));
-  gen.emitExprInto(expr, temp.get());
+  auto temp = SGF.emitTemporary(expr, SGF.getTypeLowering(expr->getType()));
+  SGF.emitExprInto(expr, temp.get());
   return temp->getManagedAddress();
 }
 

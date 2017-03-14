@@ -74,7 +74,7 @@
 
    ;; SIL Instructions - Borrowing
    `(,(regexp-opt '("load_borrow" "begin_borrow" "store_borrow" "end_borrow_argument") 'words) . font-lock-keyword-face)
-   '("\\(end_borrow\\) %[[:alnum:]] \\(from\\)" (1 font-lock-keyword-face) (2 font-lock-keyword-face))
+   '("\\(end_borrow\\) %[[:alnum:]]+ \\(from\\)" (1 font-lock-keyword-face) (2 font-lock-keyword-face))
 
    ;; SIL Instructions - ownership
    `(,(regexp-opt '("unchecked_ownership_conversion") 'words) . font-lock-keyword-face)
@@ -159,7 +159,7 @@
 
    ;; Checked Conversions
    `(,(regexp-opt '("unconditional_checked_cast" "unconditional_checked_cast_addr"
-                    "unconditional_checked_cast_opaque")
+                    "unconditional_checked_cast_value")
                   'words) . font-lock-keyword-face)
    ;; Runtime Failures
    `(,(regexp-opt '("cond_fail")
@@ -168,7 +168,7 @@
    `(,(regexp-opt '("unreachable" "return" "br"
                     "cond_br" "switch_value" "switch_enum"
                     "switch_enum_addr" "dynamic_method_br"
-                    "checked_cast_br" "throw" "checked_cast_addr_br" "case")
+                    "checked_cast_br" "checked_cast_value_br" "throw" "checked_cast_addr_br" "case")
                   'words) . font-lock-keyword-face)
    ;; Blocks
    `(,(regexp-opt '("project_block_storage" "init_block_storage_header"

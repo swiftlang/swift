@@ -20,8 +20,8 @@
 #include "swift/AST/Initializer.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ProtocolConformance.h"
-#include "swift/Basic/Demangle.h"
-#include "swift/Basic/Punycode.h"
+#include "swift/Demangling/Demangle.h"
+#include "swift/Demangling/Punycode.h"
 #include "clang/Basic/CharInfo.h"
 #include "clang/AST/Attr.h"
 #include "clang/AST/Decl.h"
@@ -368,7 +368,7 @@ void Mangler::bindGenericParameters(const DeclContext *DC) {
 }
 
 static OperatorFixity getDeclFixity(const ValueDecl *decl) {
-  if (!decl->getName().isOperator())
+  if (!decl->isOperator())
     return OperatorFixity::NotOperator;
 
   switch (decl->getAttrs().getUnaryOperatorKind()) {
@@ -470,11 +470,9 @@ static bool isMethodDecl(const Decl *decl) {
 }
 
 static bool genericParamIsBelowDepth(Type type, unsigned methodDepth) {
-  if (auto gp = type->getAs<GenericTypeParamType>()) {
+  if (type->isTypeParameter()) {
+    auto gp = type->getRootGenericParam();
     return gp->getDepth() >= methodDepth;
-  }
-  if (auto dm = type->getAs<DependentMemberType>()) {
-    return genericParamIsBelowDepth(dm->getBase(), methodDepth);
   }
   // Non-dependent types in a same-type requirement don't affect whether we
   // mangle the requirement.

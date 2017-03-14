@@ -16,7 +16,6 @@
 
 #include "swift/Subsystems.h"
 #include "swift/AST/NameLookup.h"
-#include "swift/AST/AST.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/ModuleLoader.h"

@@ -15,8 +15,8 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Basic/LLVM.h"
-#include "swift/Basic/Demangler.h"
 #include "swift/Basic/Lazy.h"
+#include "swift/Demangling/Demangler.h"
 #include "swift/Runtime/Config.h"
 #include "swift/Runtime/Enum.h"
 #include "swift/Runtime/HeapObject.h"
@@ -160,7 +160,7 @@ swift::swift_getTypeName(const Metadata *type, bool qualified) {
 }
 
 /// Report a dynamic cast failure.
-// This is noinline with asm("") to preserve this frame in stack traces.
+// This is noinline to preserve this frame in stack traces.
 // We want "dynamicCastFailure" to appear in crash logs even we crash 
 // during the diagnostic because some Metadata is invalid.
 LLVM_ATTRIBUTE_NORETURN
@@ -169,8 +169,6 @@ void
 swift::swift_dynamicCastFailure(const void *sourceType, const char *sourceName, 
                                 const void *targetType, const char *targetName, 
                                 const char *message) {
-  asm("");
-
   swift::fatalError(/* flags = */ 0,
                     "Could not cast value of type '%s' (%p) to '%s' (%p)%s%s\n",
                     sourceName, sourceType, 

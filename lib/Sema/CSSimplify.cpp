@@ -16,6 +16,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "ConstraintSystem.h"
+#include "swift/AST/ParameterList.h"
 #include "swift/Basic/StringExtras.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "llvm/Support/Compiler.h"
@@ -711,6 +712,7 @@ matchCallArguments(ConstraintSystem &cs, ConstraintKind kind,
   case ConstraintKind::Disjunction:
   case ConstraintKind::DynamicTypeOf:
   case ConstraintKind::EscapableFunctionOf:
+  case ConstraintKind::OpenedExistentialOf:
   case ConstraintKind::LiteralConformsTo:
   case ConstraintKind::OptionalObject:
   case ConstraintKind::SelfObjectOfProtocol:
@@ -838,6 +840,7 @@ ConstraintSystem::matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
   case ConstraintKind::Disjunction:
   case ConstraintKind::DynamicTypeOf:
   case ConstraintKind::EscapableFunctionOf:
+  case ConstraintKind::OpenedExistentialOf:
   case ConstraintKind::LiteralConformsTo:
   case ConstraintKind::OptionalObject:
   case ConstraintKind::SelfObjectOfProtocol:
@@ -953,6 +956,7 @@ static bool matchFunctionRepresentations(FunctionTypeRepresentation rep1,
   case ConstraintKind::Disjunction:
   case ConstraintKind::DynamicTypeOf:
   case ConstraintKind::EscapableFunctionOf:
+  case ConstraintKind::OpenedExistentialOf:
   case ConstraintKind::LiteralConformsTo:
   case ConstraintKind::OptionalObject:
   case ConstraintKind::SelfObjectOfProtocol:
@@ -1021,6 +1025,7 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
   case ConstraintKind::Disjunction:
   case ConstraintKind::DynamicTypeOf:
   case ConstraintKind::EscapableFunctionOf:
+  case ConstraintKind::OpenedExistentialOf:
   case ConstraintKind::LiteralConformsTo:
   case ConstraintKind::OptionalObject:
   case ConstraintKind::SelfObjectOfProtocol:
@@ -1547,6 +1552,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
     case ConstraintKind::Disjunction:
     case ConstraintKind::DynamicTypeOf:
     case ConstraintKind::EscapableFunctionOf:
+    case ConstraintKind::OpenedExistentialOf:
     case ConstraintKind::LiteralConformsTo:
     case ConstraintKind::OptionalObject:
     case ConstraintKind::SelfObjectOfProtocol:
@@ -3630,6 +3636,47 @@ ConstraintSystem::simplifyEscapableFunctionOfConstraint(
 }
 
 ConstraintSystem::SolutionKind
+ConstraintSystem::simplifyOpenedExistentialOfConstraint(
+                                        Type type1, Type type2,
+                                        TypeMatchOptions flags,
+                                        ConstraintLocatorBuilder locator) {
+  TypeMatchOptions subflags = getDefaultDecompositionOptions(flags);
+  type2 = getFixedTypeRecursive(type2, flags, /*wantRValue=*/true);
+  if (type2->isAnyExistentialType()) {
+    // We have the existential side. Produce an opened archetype and bind
+    // type1 to it.
+    bool isMetatype = false;
+    auto instanceTy = type2;
+    if (auto metaTy = type2->getAs<ExistentialMetatypeType>()) {
+      isMetatype = true;
+      instanceTy = metaTy->getInstanceType();
+    }
+    assert(instanceTy->isExistentialType());
+    Type openedTy = ArchetypeType::getOpened(instanceTy);
+    if (isMetatype)
+      openedTy = MetatypeType::get(openedTy, TC.Context);
+    return matchTypes(type1, openedTy, ConstraintKind::Bind, subflags, locator);
+  }
+  if (!type2->isTypeVariableOrMember())
+    // We definitely don't have an existential, so bail.
+    return SolutionKind::Error;
+  
+  // If type1 is constrained to anything concrete, the constraint fails.
+  // It can only be bound to a type we opened for it.
+  type1 = getFixedTypeRecursive(type1, flags, /*wantRValue=*/true);
+  if (!type1->isTypeVariableOrMember())
+    return SolutionKind::Error;
+  
+  if (flags.contains(TMF_GenerateConstraints)) {
+    addUnsolvedConstraint(
+      Constraint::create(*this, ConstraintKind::OpenedExistentialOf,
+                         type1, type2, getConstraintLocator(locator)));
+    return SolutionKind::Solved;
+  }
+  return SolutionKind::Unsolved;
+}
+
+ConstraintSystem::SolutionKind
 ConstraintSystem::simplifyApplicableFnConstraint(
                                            Type type1,
                                            Type type2,
@@ -4286,6 +4333,10 @@ ConstraintSystem::addConstraintImpl(ConstraintKind kind, Type first,
     return simplifyEscapableFunctionOfConstraint(first, second,
                                                  subflags, locator);
 
+  case ConstraintKind::OpenedExistentialOf:
+    return simplifyOpenedExistentialOfConstraint(first, second,
+                                                 subflags, locator);
+
   case ConstraintKind::ConformsTo:
   case ConstraintKind::Layout:
   case ConstraintKind::LiteralConformsTo:
@@ -4427,6 +4478,12 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
 
   case ConstraintKind::EscapableFunctionOf:
     return simplifyEscapableFunctionOfConstraint(constraint.getFirstType(),
+                                                 constraint.getSecondType(),
+                                                 None,
+                                                 constraint.getLocator());
+
+  case ConstraintKind::OpenedExistentialOf:
+    return simplifyOpenedExistentialOfConstraint(constraint.getFirstType(),
                                                  constraint.getSecondType(),
                                                  None,
                                                  constraint.getLocator());

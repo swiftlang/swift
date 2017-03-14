@@ -28,8 +28,10 @@
 #include "swift/SIL/SILDeclRef.h"
 
 namespace swift {
-  class ASTContext;
-  class VarDecl;
+
+class ASTContext;
+class VarDecl;
+class SILFunction;
 
 namespace Lowering {
   class AbstractionPattern;
@@ -191,22 +193,22 @@ public:
   /// Retrieve the ClassDecl for a type that maps to a Swift class or
   /// bound generic class type.
   ClassDecl *getClassOrBoundGenericClass() const {
-    return getSwiftRValueType().getClassOrBoundGenericClass();
+    return getSwiftRValueType()->getClassOrBoundGenericClass();
   }
   /// Retrieve the StructDecl for a type that maps to a Swift struct or
   /// bound generic struct type.
   StructDecl *getStructOrBoundGenericStruct() const {
-    return getSwiftRValueType().getStructOrBoundGenericStruct();
+    return getSwiftRValueType()->getStructOrBoundGenericStruct();
   }
   /// Retrieve the EnumDecl for a type that maps to a Swift enum or
   /// bound generic enum type.
   EnumDecl *getEnumOrBoundGenericEnum() const {
-    return getSwiftRValueType().getEnumOrBoundGenericEnum();
+    return getSwiftRValueType()->getEnumOrBoundGenericEnum();
   }
   /// Retrieve the NominalTypeDecl for a type that maps to a Swift
   /// nominal or bound generic nominal type.
   NominalTypeDecl *getNominalOrBoundGenericNominal() const {
-    return getSwiftRValueType().getNominalOrBoundGenericNominal();
+    return getSwiftRValueType()->getNominalOrBoundGenericNominal();
   }
   
   /// True if the type is an address type.
@@ -282,11 +284,11 @@ public:
   }
   /// Returns true if the referenced type is an existential type.
   bool isExistentialType() const {
-    return getSwiftRValueType().isExistentialType();
+    return getSwiftRValueType()->isExistentialType();
   }
   /// Returns true if the referenced type is any kind of existential type.
   bool isAnyExistentialType() const {
-    return getSwiftRValueType().isAnyExistentialType();
+    return getSwiftRValueType()->isAnyExistentialType();
   }
   /// Returns true if the referenced type is a class existential type.
   bool isClassExistentialType() const {
@@ -421,6 +423,13 @@ public:
   SILType substGenericArgs(SILModule &M,
                            SubstitutionList Subs) const;
 
+  /// Transform the function type SILType by replacing all of its interface
+  /// generic args with the appropriate item from the substitution.
+  ///
+  /// Only call this with function types!
+  SILType substGenericArgs(SILModule &M,
+                           const SubstitutionMap &SubMap) const;
+
   /// If the original type is generic, pass the signature as genericSig.
   ///
   /// If the replacement types are generic, you must push a generic context
@@ -431,10 +440,6 @@ public:
                 CanGenericSignature genericSig=CanGenericSignature()) const;
 
   SILType subst(SILModule &silModule, const SubstitutionMap &subs) const;
-
-  /// If this is a specialized generic type, return all substitutions used to
-  /// generate it.
-  SubstitutionList gatherAllSubstitutions(SILModule &M);
 
   /// Return true if this type references a "ref" type that has a single pointer
   /// representation. Class existentials do not always qualify.
@@ -462,12 +467,24 @@ public:
   /// Otherwise directly returns the given type.
   SILType unwrapAnyOptionalType() const;
 
+  /// Wraps one level of optional type.
+  ///
+  /// Returns the lowered Optional<T> if the given type is T.
+  ///
+  /// \arg F The SILFunction where the SILType is used.
+  SILType wrapAnyOptionalType(SILFunction &F) const;
+
   /// Returns true if this is the AnyObject SILType;
   bool isAnyObject() const { return getSwiftRValueType()->isAnyObject(); }
 
   /// Returns the underlying referent SILType of an @sil_unowned or @sil_weak
   /// Type.
   SILType getReferentType(SILModule &M) const;
+
+  /// Given two SIL types which are representations of the same type,
+  /// check whether they have an abstraction difference.
+  bool hasAbstractionDifference(SILFunctionTypeRepresentation rep,
+                                SILType type2);
 
   /// Returns the hash code for the SILType.
   llvm::hash_code getHashCode() const {

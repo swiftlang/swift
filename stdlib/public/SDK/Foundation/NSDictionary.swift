@@ -233,7 +233,7 @@ extension NSDictionary {
     let valueBuffer = buffer.bindMemory(to: AnyObject.self, capacity: numElems)
     let buffer2 = buffer + singleSize
 
-    __NSDictionaryGetObjects(otherDictionary, buffer, buffer2, UInt(numElems))
+    __NSDictionaryGetObjects(otherDictionary, buffer, buffer2, numElems)
 
     let keyBufferCopying = buffer2.assumingMemoryBound(to: NSCopying.self)
     self.init(objects: valueBuffer, forKeys: keyBufferCopying, count: numElems)

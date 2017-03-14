@@ -16,10 +16,11 @@
 
 #include "swift/AST/Expr.h"
 #include "swift/Basic/Unicode.h"
+#include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/Decl.h" // FIXME: Bad dependency
+#include "swift/AST/ParameterList.h"
 #include "swift/AST/Stmt.h"
-#include "swift/AST/AST.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/AvailabilitySpec.h"
 #include "swift/AST/PrettyStackTrace.h"
@@ -662,7 +663,7 @@ bool Expr::canAppendCallParentheses() const {
     return true;
 
   case ExprKind::DeclRef:
-    return !cast<DeclRefExpr>(this)->getDecl()->getName().isOperator();
+    return !cast<DeclRefExpr>(this)->getDecl()->isOperator();
 
   case ExprKind::SuperRef:
   case ExprKind::OtherConstructorDeclRef:
@@ -676,7 +677,7 @@ bool Expr::canAppendCallParentheses() const {
     auto *overloadedExpr = cast<OverloadedDeclRefExpr>(this);
     if (overloadedExpr->getDecls().empty())
       return false;
-    return !overloadedExpr->getDecls().front()->getName().isOperator();
+    return !overloadedExpr->getDecls().front()->isOperator();
   }
 
   case ExprKind::UnresolvedDeclRef:
@@ -1749,7 +1750,8 @@ CallExpr *CallExpr::create(ASTContext &ctx, Expr *fn, SourceLoc lParenLoc,
   SmallVector<SourceLoc, 4> argLabelLocsScratch;
   Expr *arg = packSingleArgument(ctx, lParenLoc, args, argLabels, argLabelLocs,
                                  rParenLoc, trailingClosure, implicit,
-                                 argLabelsScratch, argLabelLocsScratch);
+                                 argLabelsScratch, argLabelLocsScratch,
+                                 getType);
 
   size_t size = totalSizeToAlloc(argLabels, argLabelLocs,
                                  trailingClosure != nullptr);

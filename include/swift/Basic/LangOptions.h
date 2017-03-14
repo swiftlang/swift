@@ -186,6 +186,10 @@ namespace swift {
     /// TypeChecker uses it to set resolve the ParameterConvention.
     bool EnableSILOpaqueValues = false;
 
+    /// If set to true, the diagnosis engine can assume the emitted diagnostics
+    /// will be used in editor. This usually leads to more aggressive fixit.
+    bool DiagnosticsEditorMode = false;
+
     /// Sets the target we are building for and updates platform conditions
     /// to match.
     ///

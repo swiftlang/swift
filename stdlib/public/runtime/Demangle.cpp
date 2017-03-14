@@ -10,16 +10,17 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "../../../lib/Basic/Demangle.cpp"
-#include "../../../lib/Basic/Demangler.cpp"
-#include "../../../lib/Basic/ManglingUtils.cpp"
-#include "../../../lib/Basic/Punycode.cpp"
 #include "swift/Runtime/Metadata.h"
+#include "swift/Strings.h"
 #include "Private.h"
+
+#include <vector>
 
 #if SWIFT_OBJC_INTEROP
 #include <objc/runtime.h>
 #endif
+
+using namespace swift;
 
 // FIXME: This stuff should be merged with the existing logic in
 // include/swift/Reflection/TypeRefBuilder.h as part of the rewrite
@@ -170,14 +171,9 @@ swift::_swift_buildDemanglingForMetadata(const Metadata *type,
     
     for (auto *protocol : protocols) {
       // The protocol name is mangled as a type symbol, with the _Tt prefix.
-      NodePointer protocolNode = nullptr;
       StringRef ProtoName(protocol->Name);
-      if (ProtoName.startswith("_Tt")) {
-        protocolNode = demangleOldSymbolAsNode(ProtoName, Dem);
-      } else {
-        protocolNode = Dem.demangleSymbol(ProtoName);
-      }
-      
+      NodePointer protocolNode = Dem.demangleSymbol(ProtoName);
+
       // ObjC protocol names aren't mangled.
       if (!protocolNode) {
         auto module = Dem.createNode(Node::Kind::Module,

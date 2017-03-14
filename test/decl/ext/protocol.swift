@@ -9,13 +9,13 @@ protocol P1 {
 }
 
 extension P1 {
-  final func extP1a() -> Bool { return !reqP1a() }
+  func extP1a() -> Bool { return !reqP1a() }
 
-  final var extP1b: Bool {
+  var extP1b: Bool {
     return self.reqP1a()
   }
 
-  final var extP1c: Bool {
+  var extP1c: Bool {
     return extP1b && self.extP1a()
   }
 }
@@ -27,13 +27,13 @@ protocol P2 {
 }
 
 extension P2 {
-  final func extP2a() -> AssocP2? { return reqP2a() }
+  func extP2a() -> AssocP2? { return reqP2a() }
 
-  final func extP2b() {
+  func extP2b() {
     self.reqP2a().reqP1a()
   }
 
-  final func extP2c() -> Self.AssocP2 { return extP2a()! }
+  func extP2c() -> Self.AssocP2 { return extP2a()! }
 }
 
 protocol P3 {
@@ -43,7 +43,7 @@ protocol P3 {
 }
 
 extension P3 {
-  final func extP3a() -> AssocP3.AssocP2 {
+  func extP3a() -> AssocP3.AssocP2 {
     return reqP3a().reqP2a()
   }
 }
@@ -60,14 +60,14 @@ protocol P4 {
 func acceptsP1<T : P1>(_ t: T) { }
 
 extension P1 {
-  final func extP1d() { acceptsP1(self) }
+  func extP1d() { acceptsP1(self) }
 }
 
 func acceptsP2<T : P2>(_ t: T) { }
 
 extension P2 {
-  final func extP2acceptsP1() { acceptsP1(reqP2a()) }
-  final func extP2acceptsP2() { acceptsP2(self) }
+  func extP2acceptsP1() { acceptsP1(reqP2a()) }
+  func extP2acceptsP2() { acceptsP2(self) }
 }
 
 // Use of 'Self' as a return type within a protocol extension.
@@ -83,7 +83,7 @@ func acceptSelfP1<T, U : SelfP1>(_ t: T, _ u: U) -> T where U.AssocType == T {
 }
 
 extension SelfP1 {
-  final func tryAcceptSelfP1<Z : SelfP1>(_ z: Z)-> Self where Z.AssocType == Self  {
+  func tryAcceptSelfP1<Z : SelfP1>(_ z: Z)-> Self where Z.AssocType == Self  {
     return acceptSelfP1(self, z)
   }
 }
@@ -126,7 +126,7 @@ protocol SubscriptP1 {
 }
 
 extension SubscriptP1 {
-  final subscript(i: Int) -> String {
+  subscript(i: Int) -> String {
     get { return readAt(i) }
     set(newValue) { writeAt(i, string: newValue) }
   }
@@ -180,7 +180,7 @@ extension S1 {
 // Protocol extensions with additional requirements
 // ----------------------------------------------------------------------------
 extension P4 where Self.AssocP4 : P1 {
-  final func extP4a() {  // expected-note 2 {{found this candidate}}
+  func extP4a() {  // expected-note 2 {{found this candidate}}
     acceptsP1(reqP4a())
   }
 }
@@ -207,11 +207,11 @@ struct S4d : P4 {
 }
 
 extension P4 where Self.AssocP4 == Int {
-  final func extP4Int() { }
+  func extP4Int() { }
 }
 
 extension P4 where Self.AssocP4 == Bool {
-  final func extP4a() -> Bool { return reqP4a() } // expected-note 2 {{found this candidate}}
+  func extP4a() -> Bool { return reqP4a() } // expected-note 2 {{found this candidate}}
 }
 
 func testP4(_ s4a: S4a, s4b: S4b, s4c: S4c, s4d: S4d) {
@@ -234,7 +234,7 @@ protocol P5 {
 
 // extension of P5 provides a witness for P6
 extension P5 {
-  final func reqP6a() { reqP5a() }
+  func reqP6a() { reqP5a() }
 }
 
 protocol P6 {
@@ -285,7 +285,7 @@ protocol P8 {
 
 // extension of P8 provides conformance to P7Assoc
 extension P8 {
-  final func getP7Assoc() -> P7FromP8<P8Assoc> { return P7FromP8() }
+  func getP7Assoc() -> P7FromP8<P8Assoc> { return P7FromP8() }
 }
 
 // Okay, P7 requirements satisfied by P8
@@ -315,7 +315,7 @@ protocol PConforms1 {
 }
 
 extension PConforms1 {
-  final func pc2() { } // expected-note{{candidate exactly matches}}
+  func pc2() { } // expected-note{{candidate exactly matches}}
 }
 
 protocol PConforms2 : PConforms1, MakePC2Ambiguous {
@@ -326,7 +326,7 @@ protocol MakePC2Ambiguous {
 }
 
 extension MakePC2Ambiguous {
-  final func pc2() { } // expected-note{{candidate exactly matches}}
+  func pc2() { } // expected-note{{candidate exactly matches}}
 }
 
 struct SConforms2a : PConforms2 { } // expected-error{{type 'SConforms2a' does not conform to protocol 'PConforms2'}}
@@ -381,7 +381,7 @@ struct OtherIndexedIterator<C : _MyCollection> : IteratorProtocol {
 }
 
 extension _MyCollection {
-  final func myGenerate() -> MyIndexedIterator<Self> {
+  func myGenerate() -> MyIndexedIterator<Self> {
     return MyIndexedIterator(container: self, index: self.myEndIndex)
   }
 }
@@ -420,7 +420,7 @@ func testSomeCollections(_ sc1: SomeCollection1, sc2: SomeCollection2) {
 
 public protocol PConforms3 {}
 extension PConforms3 {
-  final public var z: Int {
+  public var z: Int {
     return 0
   }
 }
@@ -440,7 +440,7 @@ protocol PConforms5 {
 protocol PConforms6 : PConforms5 {}
 
 extension PConforms6 {
-  final func f() -> Int { return 42 }
+  func f() -> Int { return 42 }
 }
 
 func test<T: PConforms6>(_ x: T) -> Int { return x.f() }
@@ -458,9 +458,9 @@ protocol PConforms7 {
 }
 
 extension PConforms7 {
-  final func method() { }
-  final var property: Int { return 5 }
-  final subscript (i: Int) -> Int { return i }
+  func method() { }
+  var property: Int { return 5 }
+  subscript (i: Int) -> Int { return i }
 }
 
 struct SConforms7a : PConforms7 { }
@@ -474,9 +474,9 @@ protocol PConforms8 {
 }
 
 extension PConforms8 {
-  final func method() -> Int { return 5 }
-  final var property: Int { return 5 }
-  final subscript (i: Int) -> Int { return i }
+  func method() -> Int { return 5 }
+  var property: Int { return 5 }
+  subscript (i: Int) -> Int { return i }
 }
 
 struct SConforms8a : PConforms8 { }
@@ -519,9 +519,9 @@ protocol PConforms9 {
 }
 
 extension PConforms9 {
-  final func method() -> Self.Assoc { return Assoc() }
-  final var property: Self.Assoc { return Assoc() }
-  final subscript (i: Self.Assoc) -> Self.Assoc { return Assoc() }
+  func method() -> Self.Assoc { return Assoc() }
+  var property: Self.Assoc { return Assoc() }
+  subscript (i: Self.Assoc) -> Self.Assoc { return Assoc() }
 }
 
 struct SConforms9a : PConforms9 { // expected-error{{type 'SConforms9a' does not conform to protocol 'PConforms9'}}
@@ -559,7 +559,7 @@ func testSConforms9d(_ s9d: SConforms9d) {
 
 protocol PConforms10 {}
 extension PConforms10 {
- final func f() {}
+ func f() {}
 }
 protocol PConforms11 {
  func f()
@@ -602,7 +602,7 @@ protocol PTypeAliasSuper2 {
 }
 
 extension PTypeAliasSuper2 {
-  final func foo() -> TypeAliasHelper<Self> { return TypeAliasHelper() }
+  func foo() -> TypeAliasHelper<Self> { return TypeAliasHelper() }
 }
 
 protocol PTypeAliasSub2 : PTypeAliasSuper2 {
@@ -648,19 +648,19 @@ protocol PInherit3 : PInherit2 { }
 protocol PInherit4 : PInherit2 { }
 
 extension PInherit1 {
-  final func order1() -> Int { return 0 }
+  func order1() -> Int { return 0 }
 }
 
 extension PInherit2 {
-  final func order1() -> Bool { return true }
+  func order1() -> Bool { return true }
 }
 
 extension PInherit3 {
-  final func order1() -> Double { return 1.0 }
+  func order1() -> Double { return 1.0 }
 }
 
 extension PInherit4 {
-  final func order1() -> String { return "hello" }
+  func order1() -> String { return "hello" }
 }
 
 struct SInherit1 : PInherit1 { }
@@ -693,15 +693,15 @@ protocol PConstrained1 {
 }
 
 extension PConstrained1 {
-  final func pc1() -> Int { return 0 }
+  func pc1() -> Int { return 0 }
 }
 
 extension PConstrained1 where AssocTypePC1 : PInherit2 {
-  final func pc1() -> Bool { return true }
+  func pc1() -> Bool { return true }
 }
 
 extension PConstrained1 where Self.AssocTypePC1 : PInherit3 {
-  final func pc1() -> String { return "hello" }
+  func pc1() -> String { return "hello" }
 }
 
 struct SConstrained1 : PConstrained1 {
@@ -739,11 +739,11 @@ protocol PConstrained3 : PConstrained2 {
 }
 
 extension PConstrained2 where Self.AssocTypePC2 : PInherit1 {
-  final func pc2() -> Bool { return true }
+  func pc2() -> Bool { return true }
 }
 
 extension PConstrained3 {
-  final func pc2() -> String { return "hello" }
+  func pc2() -> String { return "hello" }
 }
 
 struct SConstrained3a : PConstrained3 {
@@ -777,14 +777,14 @@ class Superclass {
 protocol PConstrained4 { }
 
 extension PConstrained4 where Self : Superclass {
-  final func testFoo() -> Foo {
+  func testFoo() -> Foo {
     foo()
     self.foo()
 
     return Foo(5)
   }
 
-  final static func testBar() {
+  static func testBar() {
     bar()
     self.bar()
   }
@@ -800,49 +800,49 @@ protocol PConstrained6 {
 protocol PConstrained7 { }
 
 extension PConstrained6 {
-  final var prop1: Int { return 0 }
-  final var prop2: Int { return 0 } // expected-note{{'prop2' previously declared here}}
+  var prop1: Int { return 0 }
+  var prop2: Int { return 0 } // expected-note{{'prop2' previously declared here}}
 
-  final subscript (key: Int) -> Int { return key }
-  final subscript (key: Double) -> Double { return key } // expected-note{{'subscript' previously declared here}}
+  subscript (key: Int) -> Int { return key }
+  subscript (key: Double) -> Double { return key } // expected-note{{'subscript' previously declared here}}
 }
 
 extension PConstrained6 {
-  final var prop2: Int { return 0 } // expected-error{{invalid redeclaration of 'prop2'}}
-  final subscript (key: Double) -> Double { return key } // expected-error{{invalid redeclaration of 'subscript'}}
+  var prop2: Int { return 0 } // expected-error{{invalid redeclaration of 'prop2'}}
+  subscript (key: Double) -> Double { return key } // expected-error{{invalid redeclaration of 'subscript'}}
 }
 
 extension PConstrained6 where Assoc : PConstrained5 {
-  final var prop1: Int { return 0 } // okay
-  final var prop3: Int { return 0 } // expected-note{{'prop3' previously declared here}}
-  final subscript (key: Int) -> Int { return key } // ok
-  final subscript (key: String) -> String { return key } // expected-note{{'subscript' previously declared here}}
+  var prop1: Int { return 0 } // okay
+  var prop3: Int { return 0 } // expected-note{{'prop3' previously declared here}}
+  subscript (key: Int) -> Int { return key } // ok
+  subscript (key: String) -> String { return key } // expected-note{{'subscript' previously declared here}}
 
-  final func foo() { } // expected-note{{'foo()' previously declared here}}
+  func foo() { } // expected-note{{'foo()' previously declared here}}
 }
 
 extension PConstrained6 where Assoc : PConstrained5 {
-  final var prop3: Int { return 0 } // expected-error{{invalid redeclaration of 'prop3'}}
-  final subscript (key: String) -> String { return key } // expected-error{{invalid redeclaration of 'subscript'}}
-  final func foo() { } // expected-error{{invalid redeclaration of 'foo()'}}
+  var prop3: Int { return 0 } // expected-error{{invalid redeclaration of 'prop3'}}
+  subscript (key: String) -> String { return key } // expected-error{{invalid redeclaration of 'subscript'}}
+  func foo() { } // expected-error{{invalid redeclaration of 'foo()'}}
 }
 
 extension PConstrained6 where Assoc : PConstrained7 {
-  final var prop1: Int { return 0 } // okay
-  final subscript (key: Int) -> Int { return key } // okay
-  final func foo() { } // okay
+  var prop1: Int { return 0 } // okay
+  subscript (key: Int) -> Int { return key } // okay
+   func foo() { } // okay
 }
 
 extension PConstrained6 where Assoc == Int {
-  final var prop4: Int { return 0 }
-  final subscript (key: Character) -> Character { return key }
-  final func foo() { } // okay
+  var prop4: Int { return 0 }
+  subscript (key: Character) -> Character { return key }
+  func foo() { } // okay
 }
 
 extension PConstrained6 where Assoc == Double {
-  final var prop4: Int { return 0 } // okay
-  final subscript (key: Character) -> Character { return key } // okay
-  final func foo() { } // okay
+  var prop4: Int { return 0 } // okay
+  subscript (key: Character) -> Character { return key } // okay
+  func foo() { } // okay
 }
 
 // Interaction between RawRepresentable and protocol extensions.

@@ -279,18 +279,15 @@ public:
   
   /// Get the property declaration for a behavior conformance, if this is one.
   AbstractStorageDecl *getBehaviorDecl() const;
+
+  /// Substitute the conforming type and produce a ProtocolConformance that
+  /// applies to the substituted type.
+  ProtocolConformance *subst(Type substType,
+                             TypeSubstitutionFn subs,
+                             LookupConformanceFn conformances) const;
   
   void dump() const;
   void dump(llvm::raw_ostream &out, unsigned indent = 0) const;
-
-private:
-  friend class Substitution;
-  /// Substitute the conforming type and produce a ProtocolConformance that
-  /// applies to the substituted type.
-  ProtocolConformance *subst(ModuleDecl *module,
-                             Type substType,
-                             TypeSubstitutionFn subs,
-                             LookupConformanceFn conformances) const;
 };
 
 /// Normal protocol conformance, which involves mapping each of the protocol

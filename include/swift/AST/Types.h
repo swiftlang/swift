@@ -483,6 +483,9 @@ public:
   /// anywhere in the type, use \c hasOpenedExistential.
   bool isOpenedExistential();
 
+  /// Determine whether the type is an opened existential type with Error inside
+  bool isOpenedExistentialWithError();
+
   /// Retrieve the set of opened existential archetypes that occur
   /// within this type.
   void getOpenedExistentials(SmallVectorImpl<ArchetypeType *> &opened);
@@ -515,6 +518,9 @@ public:
   bool hasTypeParameter() {
     return getRecursiveProperties().hasTypeParameter();
   }
+
+  /// Return the root generic parameter of this type parameter type.
+  GenericTypeParamType *getRootGenericParam();
 
   /// Determines whether this type is an lvalue. This includes both straight
   /// lvalue types as well as tuples or optionals of lvalues.
@@ -596,15 +602,6 @@ public:
   /// For example, the types Vector<Int> and Vector<Int>.Element are both
   /// specialized, but the type Vector is not.
   bool isSpecialized();
-
-  /// Gather all of the substitutions used to produce the given specialized type
-  /// from its unspecialized type.
-  ///
-  /// \returns ASTContext-allocated substitutions.
-  SubstitutionList gatherAllSubstitutions(
-                           ModuleDecl *module,
-                           LazyResolver *resolver,
-                           DeclContext *gpContext = nullptr);
 
   /// \brief Determine whether this type is a legal, lowered SIL type.
   ///
@@ -866,11 +863,17 @@ public:
   /// the context of the extension above will produce substitutions T
   /// -> Int and U -> String suitable for mapping the type of
   /// \c SomeArray.
+  ///
+  /// \param genericEnv If non-null and the type is nested inside of a
+  /// generic function, generic parameters of the outer context are
+  /// mapped to context archetypes of this generic environment.
   SubstitutionMap getContextSubstitutionMap(ModuleDecl *module,
-                                            const DeclContext *dc);
+                                            const DeclContext *dc,
+                                            GenericEnvironment *genericEnv=nullptr);
 
   /// Deprecated version of the above.
-  TypeSubstitutionMap getContextSubstitutions(const DeclContext *dc);
+  TypeSubstitutionMap getContextSubstitutions(const DeclContext *dc,
+                                              GenericEnvironment *genericEnv=nullptr);
 
   /// Get the substitutions to apply to the type of the given member as seen
   /// from this base type.
@@ -990,8 +993,10 @@ public:
 class ErrorType : public TypeBase {
   friend class ASTContext;
   // The Error type is always canonical.
-  ErrorType(ASTContext &C, Type originalType)
-      : TypeBase(TypeKind::Error, &C, RecursiveTypeProperties::HasError) {
+  ErrorType(ASTContext &C, Type originalType,
+            RecursiveTypeProperties properties)
+      : TypeBase(TypeKind::Error, &C, properties) {
+    assert(properties.hasError());
     if (originalType) {
       ErrorTypeBits.HasOriginalType = true;
       *reinterpret_cast<Type *>(this + 1) = originalType;
@@ -4368,78 +4373,71 @@ inline bool TypeBase::isTypeParameter() {
   return false;
 }
 
+inline GenericTypeParamType *TypeBase::getRootGenericParam() {
+  Type t(this);
+
+  while (auto *memberTy = t->getAs<DependentMemberType>())
+    t = memberTy->getBase();
+
+  return t->castTo<GenericTypeParamType>();
+}
+
 inline bool TypeBase::isExistentialType() {
-  return getCanonicalType().isExistentialType();
+  return is<ProtocolType>() || is<ProtocolCompositionType>();
 }
 
 inline bool TypeBase::isAnyExistentialType() {
-  return getCanonicalType().isAnyExistentialType();
-}
-
-inline bool CanType::isExistentialTypeImpl(CanType type) {
-  return isa<ProtocolType>(type) || isa<ProtocolCompositionType>(type);
-}
-
-inline bool CanType::isAnyExistentialTypeImpl(CanType type) {
-  return isExistentialTypeImpl(type) || isa<ExistentialMetatypeType>(type);
+  return isExistentialType() || is<ExistentialMetatypeType>();
 }
 
 inline bool TypeBase::isClassExistentialType() {
-  CanType T = getCanonicalType();
-  if (auto pt = dyn_cast<ProtocolType>(T))
+  if (auto pt = getAs<ProtocolType>())
     return pt->requiresClass();
-  if (auto pct = dyn_cast<ProtocolCompositionType>(T))
+  if (auto pct = getAs<ProtocolCompositionType>())
     return pct->requiresClass();
   return false;
 }
 
 inline bool TypeBase::isOpenedExistential() {
-  if (!hasOpenedExistential())
-    return false;
-
-  CanType T = getCanonicalType();
-  if (auto archetype = dyn_cast<ArchetypeType>(T))
+  if (auto archetype = getAs<ArchetypeType>())
     return !archetype->getOpenedExistentialType().isNull();
   return false;
 }
 
-inline ClassDecl *TypeBase::getClassOrBoundGenericClass() {
-  return getCanonicalType().getClassOrBoundGenericClass();
+inline bool TypeBase::isOpenedExistentialWithError() {
+  if (auto archetype = getAs<ArchetypeType>()) {
+    auto openedExistentialType = archetype->getOpenedExistentialType();
+    return (!openedExistentialType.isNull() &&
+            openedExistentialType->isExistentialWithError());
+  }
+  return false;
 }
 
-inline ClassDecl *CanType::getClassOrBoundGenericClass() const {
-  if (auto classTy = dyn_cast<ClassType>(*this))
+inline ClassDecl *TypeBase::getClassOrBoundGenericClass() {
+  if (auto classTy = getAs<ClassType>())
     return classTy->getDecl();
 
-  if (auto boundTy = dyn_cast<BoundGenericClassType>(*this))
+  if (auto boundTy = getAs<BoundGenericClassType>())
     return boundTy->getDecl();
 
   return nullptr;
 }
 
 inline StructDecl *TypeBase::getStructOrBoundGenericStruct() {
-  return getCanonicalType().getStructOrBoundGenericStruct();
-}
-
-inline StructDecl *CanType::getStructOrBoundGenericStruct() const {
-  if (auto structTy = dyn_cast<StructType>(*this))
+  if (auto structTy = getAs<StructType>())
     return structTy->getDecl();
 
-  if (auto boundTy = dyn_cast<BoundGenericStructType>(*this))
+  if (auto boundTy = getAs<BoundGenericStructType>())
     return boundTy->getDecl();
   
   return nullptr;
 }
 
 inline EnumDecl *TypeBase::getEnumOrBoundGenericEnum() {
-  return getCanonicalType().getEnumOrBoundGenericEnum();
-}
-
-inline EnumDecl *CanType::getEnumOrBoundGenericEnum() const {
-  if (auto enumTy = dyn_cast<EnumType>(*this))
+  if (auto enumTy = getAs<EnumType>())
     return enumTy->getDecl();
 
-  if (auto boundTy = dyn_cast<BoundGenericEnumType>(*this))
+  if (auto boundTy = getAs<BoundGenericEnumType>())
     return boundTy->getDecl();
   
   return nullptr;
@@ -4477,10 +4475,8 @@ inline GenericTypeDecl *TypeBase::getAnyGeneric() {
   return getCanonicalType().getAnyGeneric();
 }
 
-  
-  
 inline bool TypeBase::isBuiltinIntegerType(unsigned n) {
-  if (auto intTy = dyn_cast<BuiltinIntegerType>(getCanonicalType()))
+  if (auto intTy = getAs<BuiltinIntegerType>())
     return intTy->getWidth().isFixedWidth()
       && intTy->getWidth().getFixedWidth() == n;
   return false;
@@ -4537,20 +4533,12 @@ inline CanType CanType::getLValueOrInOutObjectTypeImpl(CanType type) {
   return type;
 }
 
-inline CanType CanType::getNominalParent() const {
-  if (auto classType = dyn_cast<NominalType>(*this)) {
-    return classType.getParent();
-  } else {
-    return cast<BoundGenericType>(*this).getParent();
-  }
-}
-
 inline bool TypeBase::mayHaveSuperclass() {
   if (getClassOrBoundGenericClass())
     return true;
 
   if (auto archetype = getAs<ArchetypeType>())
-    return (bool)archetype->requiresClass();
+    return archetype->requiresClass();
 
   return is<DynamicSelfType>();
 }

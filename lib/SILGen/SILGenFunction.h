@@ -934,6 +934,13 @@ public:
                             llvm::function_ref<ManagedValue (SGFContext)> F,
                             bool allowEmbeddedNSError = true);
 
+  RValue emitCollectionConversion(SILLocation loc,
+                                  FuncDecl *fn,
+                                  CanType fromCollection,
+                                  CanType toCollection,
+                                  ManagedValue mv,
+                                  SGFContext C);
+
   //===--------------------------------------------------------------------===//
   // Recursive entry points
   //===--------------------------------------------------------------------===//
@@ -1232,14 +1239,12 @@ public:
   RValue emitLoadOfLValue(SILLocation loc, LValue &&src, SGFContext C,
                           bool isGuaranteedValid = false);
 
-  /// Emit a reference to a method from within another method of the type, and
-  /// gather all the substitutions necessary to invoke it, without
-  /// dynamic dispatch.
-  std::tuple<ManagedValue, SILType, SubstitutionList>
+  /// Emit a reference to a method from within another method of the type.
+  std::tuple<ManagedValue, SILType>
   emitSiblingMethodRef(SILLocation loc,
                        SILValue selfValue,
                        SILDeclRef methodConstant,
-                       SubstitutionList innerSubstitutions);
+                       const SubstitutionMap &subMap);
   
   SILValue emitMetatypeOfValue(SILLocation loc, Expr *baseExpr);
   
@@ -1305,7 +1310,7 @@ public:
 
   RValue emitApplyOfLibraryIntrinsic(SILLocation loc,
                                      FuncDecl *fn,
-                                     SubstitutionList subs,
+                                     const SubstitutionMap &subMap,
                                      ArrayRef<ManagedValue> args,
                                      SGFContext ctx);
 
@@ -1695,10 +1700,6 @@ public:
   
   /// Get the _Pointer protocol used for pointer argument operations.
   ProtocolDecl *getPointerProtocol();
-  
-  /// Produce a substitution for invoking a pointer argument conversion
-  /// intrinsic.
-  Substitution getPointerSubstitution(Type pointerType);
 };
 
 

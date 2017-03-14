@@ -16,10 +16,10 @@
 #include "LValue.h"
 #include "RValue.h"
 #include "Scope.h"
-#include "swift/AST/AST.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Mangle.h"
 #include "swift/AST/ASTMangler.h"
+#include "swift/AST/ParameterList.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILUndef.h"
 #include "swift/SIL/TypeLowering.h"
@@ -505,13 +505,22 @@ void SILGenFunction::emitClassConstructorAllocator(ConstructorDecl *ctor) {
   ManagedValue initVal;
   SILType initTy;
 
-  SubstitutionList subs;
   // Call the initializer.
-  SubstitutionList forwardingSubs;
-  if (auto *genericEnv = ctor->getGenericEnvironmentOfContext())
-    forwardingSubs = genericEnv->getForwardingSubstitutions();
-  std::tie(initVal, initTy, subs)
-    = emitSiblingMethodRef(Loc, selfValue, initConstant, forwardingSubs);
+  SubstitutionMap subMap;
+  SmallVector<Substitution, 4> subs;
+  if (auto *genericEnv = ctor->getGenericEnvironmentOfContext()) {
+    auto *genericSig = genericEnv->getGenericSignature();
+    subMap = genericSig->getSubstitutionMap(
+      [&](SubstitutableType *t) -> Type {
+        return genericEnv->mapTypeIntoContext(
+          t->castTo<GenericTypeParamType>());
+      },
+      MakeAbstractConformanceForGenericType());
+    genericSig->getSubstitutions(subMap, subs);
+  }
+
+  std::tie(initVal, initTy)
+    = emitSiblingMethodRef(Loc, selfValue, initConstant, subMap);
 
   SILValue initedSelfValue = emitApplyWithRethrow(Loc, initVal.forward(*this),
                                                   initTy, subs, args);

@@ -12,6 +12,7 @@
 
 #define DEBUG_TYPE "definite-init"
 #include "DIMemoryUseCollector.h"
+#include "swift/AST/Expr.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
 #include "llvm/Support/Debug.h"

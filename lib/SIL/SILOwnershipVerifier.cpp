@@ -193,7 +193,7 @@ static bool isOwnershipForwardingValueKind(ValueKind K) {
   case ValueKind::RefToBridgeObjectInst:
   case ValueKind::BridgeObjectToRefInst:
   case ValueKind::UnconditionalCheckedCastInst:
-  case ValueKind::UnconditionalCheckedCastOpaqueInst:
+  case ValueKind::UnconditionalCheckedCastValueInst:
   case ValueKind::TupleExtractInst:
   case ValueKind::StructExtractInst:
   case ValueKind::UncheckedEnumDataInst:
@@ -456,6 +456,7 @@ CONSTANT_OWNERSHIP_INST(Trivial, false, DeallocValueBuffer)
             SHOULD_CHECK_FOR_DATAFLOW_VIOLATIONS};                             \
   }
 CONSTANT_OR_TRIVIAL_OWNERSHIP_INST(Owned, true, CheckedCastBranch)
+CONSTANT_OR_TRIVIAL_OWNERSHIP_INST(Owned, true, CheckedCastValueBranch)
 CONSTANT_OR_TRIVIAL_OWNERSHIP_INST(Owned, true, SwitchEnum)
 CONSTANT_OR_TRIVIAL_OWNERSHIP_INST(Owned, true, InitExistentialOpaque)
 CONSTANT_OR_TRIVIAL_OWNERSHIP_INST(Owned, true, DeinitExistentialOpaque)
@@ -567,7 +568,7 @@ FORWARD_ANY_OWNERSHIP_INST(ConvertFunction)
 FORWARD_ANY_OWNERSHIP_INST(RefToBridgeObject)
 FORWARD_ANY_OWNERSHIP_INST(BridgeObjectToRef)
 FORWARD_ANY_OWNERSHIP_INST(UnconditionalCheckedCast)
-FORWARD_ANY_OWNERSHIP_INST(UnconditionalCheckedCastOpaque)
+FORWARD_ANY_OWNERSHIP_INST(UnconditionalCheckedCastValue)
 FORWARD_ANY_OWNERSHIP_INST(MarkUninitialized)
 FORWARD_ANY_OWNERSHIP_INST(UncheckedEnumData)
 #undef FORWARD_ANY_OWNERSHIP_INST
@@ -1076,6 +1077,7 @@ CONSTANT_OWNERSHIP_BUILTIN(Trivial, false, TakeArrayBackToFront)
 CONSTANT_OWNERSHIP_BUILTIN(Trivial, false, TakeArrayFrontToBack)
 CONSTANT_OWNERSHIP_BUILTIN(Trivial, false, Trunc)
 CONSTANT_OWNERSHIP_BUILTIN(Trivial, false, TruncOrBitCast)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, false, TSanInoutAccess)
 CONSTANT_OWNERSHIP_BUILTIN(Trivial, false, UAddOver)
 CONSTANT_OWNERSHIP_BUILTIN(Trivial, false, UDiv)
 CONSTANT_OWNERSHIP_BUILTIN(Trivial, false, UIToFP)
@@ -1108,6 +1110,7 @@ BUILTINS_THAT_SHOULD_HAVE_BEEN_LOWERED_TO_SILINSTS(TryPin)
 BUILTINS_THAT_SHOULD_HAVE_BEEN_LOWERED_TO_SILINSTS(Unpin)
 BUILTINS_THAT_SHOULD_HAVE_BEEN_LOWERED_TO_SILINSTS(Load)
 BUILTINS_THAT_SHOULD_HAVE_BEEN_LOWERED_TO_SILINSTS(LoadRaw)
+BUILTINS_THAT_SHOULD_HAVE_BEEN_LOWERED_TO_SILINSTS(LoadInvariant)
 BUILTINS_THAT_SHOULD_HAVE_BEEN_LOWERED_TO_SILINSTS(Take)
 BUILTINS_THAT_SHOULD_HAVE_BEEN_LOWERED_TO_SILINSTS(Destroy)
 BUILTINS_THAT_SHOULD_HAVE_BEEN_LOWERED_TO_SILINSTS(Assign)

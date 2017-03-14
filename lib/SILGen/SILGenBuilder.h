@@ -13,6 +13,7 @@
 #ifndef SWIFT_SILGEN_SILGENBUILDER_H
 #define SWIFT_SILGEN_SILGENBUILDER_H
 
+#include "JumpDest.h"
 #include "ManagedValue.h"
 #include "swift/SIL/SILBuilder.h"
 
@@ -28,29 +29,30 @@ class SGFContext;
 /// The goal is to make this eventually composed with SILBuilder so that all
 /// APIs only vend ManagedValues.
 class SILGenBuilder : public SILBuilder {
-  SILGenFunction &gen;
+  SILGenFunction &SGF;
 
 public:
-  SILGenBuilder(SILGenFunction &gen);
-  SILGenBuilder(SILGenFunction &gen, SILBasicBlock *insertBB);
-  SILGenBuilder(SILGenFunction &gen, SILBasicBlock *insertBB,
+  SILGenBuilder(SILGenFunction &SGF);
+  SILGenBuilder(SILGenFunction &SGF, SILBasicBlock *insertBB);
+  SILGenBuilder(SILGenFunction &SGF, SILBasicBlock *insertBB,
                 SmallVectorImpl<SILInstruction *> *insertedInsts);
-  SILGenBuilder(SILGenFunction &gen, SILBasicBlock *insertBB,
+  SILGenBuilder(SILGenFunction &SGF, SILBasicBlock *insertBB,
                 SILBasicBlock::iterator insertInst);
 
-  SILGenBuilder(SILGenFunction &gen, SILFunction::iterator insertBB)
-      : SILGenBuilder(gen, &*insertBB) {}
-  SILGenBuilder(SILGenFunction &gen, SILFunction::iterator insertBB,
+  SILGenBuilder(SILGenFunction &SGF, SILFunction::iterator insertBB)
+      : SILGenBuilder(SGF, &*insertBB) {}
+  SILGenBuilder(SILGenFunction &SGF, SILFunction::iterator insertBB,
                 SmallVectorImpl<SILInstruction *> *insertedInsts)
-      : SILGenBuilder(gen, &*insertBB, insertedInsts) {}
-  SILGenBuilder(SILGenFunction &gen, SILFunction::iterator insertBB,
+      : SILGenBuilder(SGF, &*insertBB, insertedInsts) {}
+  SILGenBuilder(SILGenFunction &SGF, SILFunction::iterator insertBB,
                 SILInstruction *insertInst)
-      : SILGenBuilder(gen, &*insertBB, insertInst->getIterator()) {}
-  SILGenBuilder(SILGenFunction &gen, SILFunction::iterator insertBB,
+      : SILGenBuilder(SGF, &*insertBB, insertInst->getIterator()) {}
+  SILGenBuilder(SILGenFunction &SGF, SILFunction::iterator insertBB,
                 SILBasicBlock::iterator insertInst)
-      : SILGenBuilder(gen, &*insertBB, insertInst) {}
+      : SILGenBuilder(SGF, &*insertBB, insertInst) {}
 
   SILGenModule &getSILGenModule() const;
+  SILGenFunction &getSILGenFunction() const { return SGF; }
 
   // Metatype instructions use the conformances necessary to instantiate the
   // type.
@@ -100,6 +102,11 @@ public:
   InitExistentialRefInst *
   createInitExistentialRef(SILLocation loc, SILType existentialType,
                            CanType formalConcreteType, SILValue concreteValue,
+                           ArrayRef<ProtocolConformanceRef> conformances);
+
+  ManagedValue
+  createInitExistentialRef(SILLocation loc, SILType existentialType,
+                           CanType formalConcreteType, ManagedValue concrete,
                            ArrayRef<ProtocolConformanceRef> conformances);
 
   AllocExistentialBoxInst *
@@ -216,10 +223,10 @@ public:
       SILLocation loc, SILType ty, const TypeLowering &lowering,
       SGFContext context, std::function<void(SILValue)> rvalueEmitter);
 
-  using SILBuilder::createUnconditionalCheckedCastOpaque;
-  ManagedValue createUnconditionalCheckedCastOpaque(SILLocation loc,
-                                                    ManagedValue operand,
-                                                    SILType type);
+  using SILBuilder::createUnconditionalCheckedCastValue;
+  ManagedValue createUnconditionalCheckedCastValue(SILLocation loc,
+                                                   ManagedValue operand,
+                                                   SILType type);
   using SILBuilder::createUnconditionalCheckedCast;
   ManagedValue createUnconditionalCheckedCast(SILLocation loc,
                                               ManagedValue operand,
@@ -231,9 +238,94 @@ public:
                                SILBasicBlock *trueBlock,
                                SILBasicBlock *falseBlock);
 
+  using SILBuilder::createCheckedCastValueBranch;
+  void createCheckedCastValueBranch(SILLocation loc, ManagedValue operand,
+                                    SILType type, SILBasicBlock *trueBlock,
+                                    SILBasicBlock *falseBlock);
+
   using SILBuilder::createUpcast;
-  ManagedValue createUpcast(SILLocation Loc, ManagedValue Original,
-                            SILType Type);
+  ManagedValue createUpcast(SILLocation loc, ManagedValue original,
+                            SILType type);
+
+  using SILBuilder::createUncheckedRefCast;
+  ManagedValue createUncheckedRefCast(SILLocation loc, ManagedValue original,
+                                      SILType type);
+
+  using SILBuilder::createOpenExistentialRef;
+  ManagedValue createOpenExistentialRef(SILLocation loc, ManagedValue arg,
+                                        SILType openedType);
+
+  using SILBuilder::createOptionalSome;
+  ManagedValue createOptionalSome(SILLocation Loc, ManagedValue Arg);
+  ManagedValue createManagedOptionalNone(SILLocation Loc, SILType Type);
+};
+
+class SwitchCaseFullExpr;
+
+/// A class for building switch enums that handles all of the ownership
+/// requirements for the user.
+///
+/// It assumes that the user passes in a block that takes in a ManagedValue and
+/// returns a ManagedValue for the blocks exit argument. Should return an empty
+/// ManagedValue to signal no result.
+class SwitchEnumBuilder {
+public:
+  using NormalCaseHandler =
+      std::function<void(ManagedValue, SwitchCaseFullExpr &)>;
+  using DefaultCaseHandler =
+      std::function<void(ManagedValue, SwitchCaseFullExpr &)>;
+
+private:
+  struct NormalCaseData {
+    EnumElementDecl *decl;
+    SILBasicBlock *block;
+    NullablePtr<SILBasicBlock> contBlock;
+    NormalCaseHandler handler;
+
+    NormalCaseData(EnumElementDecl *decl, SILBasicBlock *block,
+                   NullablePtr<SILBasicBlock> contBlock,
+                   NormalCaseHandler handler)
+        : decl(decl), block(block), contBlock(contBlock), handler(handler) {}
+    ~NormalCaseData() = default;
+  };
+
+  struct DefaultCaseData {
+    SILBasicBlock *block;
+    NullablePtr<SILBasicBlock> contBlock;
+    DefaultCaseHandler handler;
+
+    DefaultCaseData(SILBasicBlock *block, NullablePtr<SILBasicBlock> contBlock,
+                    DefaultCaseHandler handler)
+        : block(block), contBlock(contBlock), handler(handler) {}
+    ~DefaultCaseData() = default;
+  };
+
+  SILGenBuilder &builder;
+  SILLocation loc;
+  ManagedValue optional;
+  llvm::Optional<DefaultCaseData> defaultBlockData;
+  llvm::SmallVector<NormalCaseData, 8> caseDataArray;
+
+public:
+  SwitchEnumBuilder(SILGenBuilder &builder, SILLocation loc,
+                    ManagedValue optional)
+      : builder(builder), loc(loc), optional(optional) {}
+
+  void addDefaultCase(SILBasicBlock *defaultBlock,
+                      NullablePtr<SILBasicBlock> contBlock,
+                      DefaultCaseHandler handle) {
+    defaultBlockData.emplace(defaultBlock, contBlock, handle);
+  }
+
+  void addCase(EnumElementDecl *decl, SILBasicBlock *caseBlock,
+               NullablePtr<SILBasicBlock> contBlock, NormalCaseHandler handle) {
+    caseDataArray.emplace_back(decl, caseBlock, contBlock, handle);
+  }
+
+  void emit() &&;
+
+private:
+  SILGenFunction &getSGF() const { return builder.getSILGenFunction(); }
 };
 
 } // namespace Lowering

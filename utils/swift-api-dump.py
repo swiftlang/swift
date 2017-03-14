@@ -239,20 +239,27 @@ def collect_frameworks(sdk):
     return (sorted(list(frameworks)), sdk_path)
 
 
+def get_short_sdk_name(sdk):
+    matched = re.match("[a-zA-Z]+", sdk)
+    return matched.group(0)
+
 def create_dump_module_api_args(cmd_common, cmd_extra_args, sdk, module,
                                 target, output_dir, quiet, verbose):
 
     # Determine the SDK root and collect the set of frameworks.
     (frameworks, sdk_root) = collect_frameworks(sdk)
 
+    # Figure out the "short" name of the SDK
+    short_sdk_name = get_short_sdk_name(sdk)
+
     # Determine the default target.
     if target:
         sdk_target = target
     else:
-        sdk_target = DEFAULT_TARGET_BASED_ON_SDK[sdk]
+        sdk_target = DEFAULT_TARGET_BASED_ON_SDK[short_sdk_name]
 
     # Determine the output idirectory
-    pretty_sdk = pretty_sdk_name(sdk)
+    pretty_sdk = pretty_sdk_name(short_sdk_name)
     sdk_output_dir = '%s/%s' % (output_dir, pretty_sdk)
 
     # Create the sets of arguments to dump_module_api.

@@ -25,6 +25,7 @@
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/NameLookup.h"
+#include "swift/AST/ParameterList.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/TypeLoc.h"
@@ -682,17 +683,17 @@ Type TypeChecker::applyUnboundGenericArguments(
                               LookUpConformanceInModule{dc->getParentModule()},
                               unsatisfiedDependency);
 
-    // Unsatisfied dependency case.
-    if (result.first)
+    switch (result) {
+    case RequirementCheckResult::UnsatisfiedDependency:
       return Type();
-
-    // Failure case.
-    if (!result.second)
+    case RequirementCheckResult::Failure:
       return ErrorType::get(Context);
 
-    if (useObjectiveCBridgeableConformancesOfArgs(dc, BGT,
-                                                  unsatisfiedDependency))
+    case RequirementCheckResult::Success:
+      if (useObjectiveCBridgeableConformancesOfArgs(dc, BGT,
+                                                    unsatisfiedDependency))
         return Type();
+    }
   }
 
   return BGT;
@@ -2280,7 +2281,8 @@ Type TypeResolver::resolveSILBoxType(SILBoxTypeRepr *repr,
     }
     
     bool ok = true;
-    genericSig->getSubstitutions(genericArgMap,
+    genericSig->getSubstitutions(
+      QueryTypeSubstitutionMap{genericArgMap},
       [&](CanType depTy, Type replacement, ProtocolType *proto)
       -> ProtocolConformanceRef {
         auto result = TC.conformsToProtocol(replacement, proto->getDecl(), DC,

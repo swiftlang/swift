@@ -19,6 +19,7 @@
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Initializer.h"
+#include "swift/AST/ParameterList.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/TypeWalker.h"
 #include "swift/AST/TypeMatcher.h"
@@ -5760,7 +5761,7 @@ bool FailureDiagnosis::diagnoseArgumentGenericRequirements(
       LookUpConformanceInModule{dc->getParentModule()}, nullptr,
       ConformanceCheckFlags::SuppressDependencyTracking, &genericReqListener);
 
-  return !result.second;
+  return result != RequirementCheckResult::Success;
 }
 
 /// When initializing Unsafe[Mutable]Pointer<T> from Unsafe[Mutable]RawPointer,

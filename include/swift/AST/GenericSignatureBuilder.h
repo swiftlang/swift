@@ -82,12 +82,17 @@ public:
 
   class FloatingRequirementSource;
 
-  /// Describes a constraint that is bounded on one side by a concrete type.
-  struct ConcreteConstraint {
+  /// Describes a specific constraint on a potential archetype.
+  template<typename T>
+  struct Constraint {
     PotentialArchetype *archetype;
-    Type concreteType;
+    T value;
     const RequirementSource *source;
   };
+
+  /// Describes a concrete constraint on a potential archetype where, where the
+  /// other parameter is a concrete type.
+  typedef Constraint<Type> ConcreteConstraint;
 
   /// Describes an equivalence class of potential archetypes.
   struct EquivalenceClass {
@@ -254,7 +259,15 @@ private:
 
   /// Add the requirements placed on the given type parameter
   /// to the given potential archetype.
+  ///
+  /// \param dependentType A dependent type thar describes \c pa relative to
+  /// its protocol, for protocol requirements.
+  ///
+  /// FIXME: \c dependentType will be derivable from \c parentSource and \c pa
+  /// when we're no longer putting conformance requirements directly on the
+  /// representative.
   bool addInheritedRequirements(TypeDecl *decl, PotentialArchetype *pa,
+                                Type dependentType,
                                 const RequirementSource *parentSource,
                                 llvm::SmallPtrSetImpl<ProtocolDecl *> &visited);
 
@@ -331,9 +344,11 @@ public:
   ///
   /// \returns true if this requirement makes the set of requirements
   /// inconsistent, in which case a diagnostic will have been issued.
-  bool addRequirement(const Requirement &req, FloatingRequirementSource source);
+  bool addRequirement(const Requirement &req, FloatingRequirementSource source,
+                      const SubstitutionMap *subMap = nullptr);
 
   bool addRequirement(const Requirement &req, FloatingRequirementSource source,
+                      const SubstitutionMap *subMap,
                       llvm::SmallPtrSetImpl<ProtocolDecl *> &Visited);
 
   /// \brief Add a new requirement.
@@ -363,7 +378,7 @@ public:
   /// where \c Dictionary requires that its key type be \c Hashable,
   /// the requirement \c K : Hashable is inferred from the parameter type,
   /// because the type \c Dictionary<K,V> cannot be formed without it.
-  void inferRequirements(TypeLoc type);
+  void inferRequirements(ModuleDecl &module, TypeLoc type);
 
   /// Infer requirements from the given pattern, recursively.
   ///
@@ -377,7 +392,8 @@ public:
   /// where \c Dictionary requires that its key type be \c Hashable,
   /// the requirement \c K : Hashable is inferred from the parameter type,
   /// because the type \c Dictionary<K,V> cannot be formed without it.
-  void inferRequirements(ParameterList *params,GenericParamList *genericParams);
+  void inferRequirements(ModuleDecl &module, ParameterList *params,
+                         GenericParamList *genericParams);
 
   /// Finalize the set of requirements, performing any remaining checking
   /// required before generating archetypes.
@@ -410,7 +426,7 @@ private:
     Conflicting,
   };
 
-  /// Check a list of concrete constraints, removing self-derived constraints
+  /// Check a list of constraints, removing self-derived constraints
   /// and diagnosing redundant constraints.
   ///
   /// \param isSuitableRepresentative Determines whether the given constraint
@@ -421,17 +437,18 @@ private:
   /// emitted.
   ///
   /// \returns the representative constraint.
-  ConcreteConstraint checkConstraintList(
+  template<typename T>
+  Constraint<T> checkConstraintList(
                            ArrayRef<GenericTypeParamType *> genericParams,
-                           std::vector<ConcreteConstraint> &constraints,
-                           llvm::function_ref<bool(const ConcreteConstraint &)>
+                           std::vector<Constraint<T>> &constraints,
+                           llvm::function_ref<bool(const Constraint<T> &)>
                              isSuitableRepresentative,
-                           llvm::function_ref<ConstraintRelation(Type)>
+                           llvm::function_ref<ConstraintRelation(const T&)>
                              checkConstraint,
-                           Optional<Diag<unsigned, Type, Type, Type>>
+                           Optional<Diag<unsigned, Type, T, T>>
                              conflictingDiag,
-                           Diag<Type, Type> redundancyDiag,
-                           Diag<bool, Type, Type> otherNoteDiag);
+                           Diag<Type, T> redundancyDiag,
+                           Diag<bool, Type, T> otherNoteDiag);
 
   /// Check for redundant concrete type constraints within the equivalence
   /// class of the given potential archetype.
@@ -487,6 +504,7 @@ class GenericSignatureBuilder::RequirementSource final
                                   WrittenRequirementLoc> {
 
   friend class FloatingRequirementSource;
+  friend class GenericSignature;
 
 public:
   enum Kind : uint8_t {
@@ -526,7 +544,9 @@ public:
 
     /// The requirement is a protocol requirement.
     ///
-    /// This stores the protocol that introduced the requirement.
+    /// This stores the protocol that introduced the requirement as well as the
+    /// dependent type (relative to that protocol) to which the conformance
+    /// appertains.
     ProtocolRequirement,
 
     /// A requirement that was resolved via a superclass requirement.
@@ -554,7 +574,7 @@ private:
   /// The kind of storage we have.
   enum class StorageKind : uint8_t {
     RootArchetype,
-    ProtocolDecl,
+    StoredType,
     ProtocolConformance,
     AssociatedTypeDecl,
   };
@@ -565,13 +585,16 @@ private:
   /// Whether there is a trailing written requirement location.
   const bool hasTrailingWrittenRequirementLoc;
 
+  /// Whether a protocol requirement came from the requirement signature.
+  const bool usesRequirementSignature;
+
   /// The actual storage, described by \c storageKind.
   union {
     /// The root archetype.
     PotentialArchetype *rootArchetype;
 
-    /// The protocol being described.
-    ProtocolDecl *protocol;
+    /// The type to which a requirement applies.
+    TypeBase *type;
 
     /// A protocol conformance used to satisfy the requirement.
     ProtocolConformance *conformance;
@@ -586,12 +609,12 @@ private:
   size_t numTrailingObjects(OverloadToken<ProtocolDecl *>) const {
     switch (kind) {
     case RequirementSignatureSelf:
+    case ProtocolRequirement:
       return 1;
 
     case Explicit:
     case Inferred:
     case NestedTypeNameMatch:
-    case ProtocolRequirement:
     case Superclass:
     case Parent:
     case Concrete:
@@ -606,9 +629,11 @@ private:
     return hasTrailingWrittenRequirementLoc ? 1 : 0;
   }
 
+#ifndef NDEBUG
   /// Determines whether we have been provided with an acceptable storage kind
   /// for the given requirement source kind.
   static bool isAcceptableStorageKind(Kind kind, StorageKind storageKind);
+#endif
 
   /// Retrieve the opaque storage as a single pointer, for use in uniquing.
   const void *getOpaqueStorage1() const;
@@ -652,7 +677,7 @@ public:
                     WrittenRequirementLoc writtenReqLoc)
     : kind(kind), storageKind(StorageKind::RootArchetype),
       hasTrailingWrittenRequirementLoc(!writtenReqLoc.isNull()),
-      parent(nullptr) {
+      usesRequirementSignature(false), parent(nullptr) {
     assert(isAcceptableStorageKind(kind, storageKind) &&
            "RequirementSource kind/storageKind mismatch");
 
@@ -664,18 +689,20 @@ public:
   }
 
   RequirementSource(Kind kind, const RequirementSource *parent,
-                    ProtocolDecl *protocol,
+                    Type type, ProtocolDecl *protocol,
                     WrittenRequirementLoc writtenReqLoc)
-    : kind(kind), storageKind(StorageKind::ProtocolDecl),
+    : kind(kind), storageKind(StorageKind::StoredType),
       hasTrailingWrittenRequirementLoc(!writtenReqLoc.isNull()),
-
+      usesRequirementSignature(protocol->isRequirementSignatureComputed()),
       parent(parent) {
     assert((static_cast<bool>(parent) != isRootKind(kind)) &&
            "Root RequirementSource should not have parent (or vice versa)");
     assert(isAcceptableStorageKind(kind, storageKind) &&
            "RequirementSource kind/storageKind mismatch");
 
-    storage.protocol = protocol;
+    storage.type = type.getPointer();
+    if (kind == ProtocolRequirement)
+      getTrailingObjects<ProtocolDecl *>()[0] = protocol;
     if (hasTrailingWrittenRequirementLoc)
       getTrailingObjects<WrittenRequirementLoc>()[0] = writtenReqLoc;
   }
@@ -684,7 +711,7 @@ public:
                     ProtocolConformance *conformance)
     : kind(kind), storageKind(StorageKind::ProtocolConformance),
       hasTrailingWrittenRequirementLoc(false),
-      parent(parent) {
+      usesRequirementSignature(false), parent(parent) {
     assert((static_cast<bool>(parent) != isRootKind(kind)) &&
            "Root RequirementSource should not have parent (or vice versa)");
     assert(isAcceptableStorageKind(kind, storageKind) &&
@@ -697,7 +724,7 @@ public:
                     AssociatedTypeDecl *assocType)
     : kind(kind), storageKind(StorageKind::AssociatedTypeDecl),
       hasTrailingWrittenRequirementLoc(false),
-      parent(parent) {
+      usesRequirementSignature(false), parent(parent) {
     assert((static_cast<bool>(parent) != isRootKind(kind)) &&
            "Root RequirementSource should not have parent (or vice versa)");
     assert(isAcceptableStorageKind(kind, storageKind) &&
@@ -734,8 +761,9 @@ public:
 private:
   /// A requirement source that describes that a requirement comes from a
   /// requirement of the given protocol described by the parent.
-  const RequirementSource *viaAbstractProtocolRequirement(
+  const RequirementSource *viaProtocolRequirement(
                              GenericSignatureBuilder &builder,
+                             Type dependentType,
                              ProtocolDecl *protocol,
                              WrittenRequirementLoc writtenLoc =
                                WrittenRequirementLoc()) const;
@@ -759,8 +787,17 @@ public:
   const RequirementSource *viaParent(GenericSignatureBuilder &builder,
                                      AssociatedTypeDecl *assocType) const;
 
+  /// Retrieve the root requirement source.
+  const RequirementSource *getRoot() const;
+
   /// Retrieve the potential archetype at the root.
   PotentialArchetype *getRootPotentialArchetype() const;
+
+  /// Whether the requirement is inferred or derived from an inferred
+  /// requirment.
+  bool isInferredRequirement() const {
+    return getRoot()->kind == Inferred;
+  }
 
   /// Whether the requirement can be derived from something in its path.
   ///
@@ -805,6 +842,9 @@ public:
     return getTrailingObjects<WrittenRequirementLoc>()[0]
              .dyn_cast<const RequirementRepr *>();
   }
+
+  /// Retrieve the type stored in this requirement.
+  Type getStoredType() const;
 
   /// Retrieve the protocol for this requirement, if there is one.
   ProtocolDecl *getProtocolDecl() const;
@@ -880,7 +920,7 @@ class GenericSignatureBuilder::FloatingRequirementSource {
   struct {
     ProtocolDecl *protocol = nullptr;
     WrittenRequirementLoc written;
-  } abstractProtocolReq;
+  } protocolReq;
 
   FloatingRequirementSource(Kind kind, Storage storage)
     : kind(kind), storage(storage) { }
@@ -907,27 +947,28 @@ public:
     return { Inferred, typeRepr };
   }
 
-  static FloatingRequirementSource viaAbstractProtocolRequirement(
+  static FloatingRequirementSource viaProtocolRequirement(
                                      const RequirementSource *base,
                                      ProtocolDecl *inProtocol) {
     FloatingRequirementSource result{ AbstractProtocol, base };
-    result.abstractProtocolReq.protocol = inProtocol;
+    result.protocolReq.protocol = inProtocol;
     return result;
   }
 
-  static FloatingRequirementSource viaAbstractProtocolRequirement(
+  static FloatingRequirementSource viaProtocolRequirement(
                                      const RequirementSource *base,
                                      ProtocolDecl *inProtocol,
                                      WrittenRequirementLoc written) {
     FloatingRequirementSource result{ AbstractProtocol, base };
-    result.abstractProtocolReq.protocol = inProtocol;
-    result.abstractProtocolReq.written = written;
+    result.protocolReq.protocol = inProtocol;
+    result.protocolReq.written = written;
     return result;
   }
 
   /// Retrieve the complete requirement source rooted at the given potential
   /// archetype.
-  const RequirementSource *getSource(PotentialArchetype *pa) const;
+  const RequirementSource *getSource(PotentialArchetype *pa,
+                                     Type dependentType) const;
 
   /// Retrieve the source location for this requirement.
   SourceLoc getLoc() const;

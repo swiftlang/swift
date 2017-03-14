@@ -17,7 +17,6 @@
 
 #define DEBUG_TYPE "sil-speculative-devirtualizer"
 
-#include "swift/Basic/DemangleWrappers.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILFunction.h"
@@ -328,6 +327,17 @@ static bool tryToSpeculateTarget(FullApplySite AI,
   // semantically required.
   if (CMI->isVolatile())
     return false;
+
+  // Don't devirtualize withUnsafeGuaranteed 'self' as this would prevent
+  // retain/release removal.
+  //   unmanged._withUnsafeGuaranteedRef { $0.method() }
+  if (auto *TupleExtract = dyn_cast<TupleExtractInst>(CMI->getOperand()))
+    if (auto *UnsafeGuaranteedSelf =
+            dyn_cast<BuiltinInst>(TupleExtract->getOperand()))
+      if (UnsafeGuaranteedSelf->getBuiltinKind() ==
+              BuiltinValueKind::UnsafeGuaranteed &&
+          TupleExtract->getFieldNo() == 0)
+        return false;
 
   // Strip any upcasts off of our 'self' value, potentially leaving us
   // with a value whose type is closer (in the class hierarchy) to the

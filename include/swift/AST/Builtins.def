@@ -179,8 +179,13 @@ BUILTIN_SIL_OPERATION(Load, "load", Special)
 
 /// LoadRaw has type (Builtin.RawPointer) -> T
 /// This is a load of T from raw memory.
-/// It's address does not adhere to strict aliasing.
+/// Its address does not adhere to strict aliasing.
 BUILTIN_SIL_OPERATION(LoadRaw, "loadRaw", Special)
+
+/// LoadInvariant has type (Builtin.RawPointer) -> T
+/// This is a load of T from raw memory.
+/// The load is marked as invariant.
+BUILTIN_SIL_OPERATION(LoadInvariant, "loadInvariant", Special)
 
 /// Take has type (Builtin.RawPointer) -> T
 BUILTIN_SIL_OPERATION(Take, "take", Special)
@@ -477,6 +482,17 @@ BUILTIN_MISC_OPERATION(UnsafeGuaranteedEnd, "unsafeGuaranteedEnd", "", Special)
 BUILTIN_MISC_OPERATION(GetObjCTypeEncoding, "getObjCTypeEncoding", "n", Special)
 
 #undef BUILTIN_MISC_OPERATION
+
+/// Builtins for instrumentation added by sanitizers during SILGen.
+#ifndef BUILTIN_SANITIZER_OPERATION
+#define BUILTIN_SANITIZER_OPERATION(Id, Name, Attrs) BUILTIN(Id, Name, Attrs)
+#endif
+
+/// Builtin representing a call to Thread Sanitizer instrumentation.
+/// TSanInoutAccess has type (T) -> ()
+BUILTIN_SANITIZER_OPERATION(TSanInoutAccess, "tsanInoutAccess", "")
+
+#undef BUILTIN_SANITIZER_OPERATION
 
 // BUILTIN_TYPE_TRAIT_OPERATION - Compile-time type trait operations.
 #ifndef BUILTIN_TYPE_TRAIT_OPERATION

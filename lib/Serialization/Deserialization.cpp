@@ -12,7 +12,6 @@
 
 #include "swift/Serialization/ModuleFile.h"
 #include "swift/Serialization/ModuleFormat.h"
-#include "swift/AST/AST.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/GenericEnvironment.h"
@@ -590,7 +589,7 @@ ProtocolConformanceRef ModuleFile::readConformance(
     auto conformance =
            ctx.getSpecializedConformance(conformingType,
                                          genericConformance.getConcrete(),
-                                         ctx.AllocateCopy(substitutions));
+                                         substitutions);
     return ProtocolConformanceRef(conformance);
   }
 

@@ -24,7 +24,6 @@
 #include <objc/objc.h>
 #endif
 #include "llvm/ADT/StringRef.h"
-#include "swift/Basic/Demangle.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/Lazy.h"
 #include "swift/Runtime/Heap.h"

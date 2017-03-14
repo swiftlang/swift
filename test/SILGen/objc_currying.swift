@@ -59,9 +59,9 @@ func curry_bridged(_ x: CurryTest) -> (String!) -> String! {
 
 // CHECK: sil shared [thunk] @[[THUNK_BAR_2]] : $@convention(method) (@owned Optional<String>, @guaranteed CurryTest) -> @owned Optional<String>
 // CHECK: bb0([[OPT_STRING:%.*]] : $Optional<String>, [[SELF:%.*]] : $CurryTest):
-// CHECK:   cond_br {{%.*}}, bb1, bb2
-// CHECK: bb1:
-// CHECK:   [[STRING:%.*]] = unchecked_enum_data [[OPT_STRING]]
+// CHECK:   switch_enum [[OPT_STRING]] : $Optional<String>, case #Optional.some!enumelt.1: [[SOME_BB:bb[0-9]+]],
+//
+// CHECK: [[SOME_BB]]([[STRING:%.*]] : $String):
 // CHECK:   [[BRIDGING_FUNC:%.*]] = function_ref @_T0SS10FoundationE19_bridgeToObjectiveCSo8NSStringCyF
 // CHECK:   [[BORROWED_STRING:%.*]] = begin_borrow [[STRING]]
 // CHECK:   [[NSSTRING:%.*]] = apply [[BRIDGING_FUNC]]([[BORROWED_STRING]])
@@ -78,11 +78,9 @@ func curry_bridged(_ x: CurryTest) -> (String!) -> String! {
 // CHECK:   [[SELF_COPY:%.*]] = copy_value [[SELF]]
 // CHECK:   [[METHOD:%.*]] = class_method [volatile] [[SELF_COPY]] : $CurryTest, #CurryTest.bridged!1.foreign
 // CHECK:   [[RESULT_OPT_NSSTRING:%.*]] = apply [[METHOD]]([[OPT_NSSTRING]], [[SELF_COPY]]) : $@convention(objc_method) (Optional<NSString>, CurryTest) -> @autoreleased Optional<NSString>
-// CHECK:   [[IS_OPT:%.*]] = select_enum [[RESULT_OPT_NSSTRING]]
-// CHECK:   cond_br [[IS_OPT]], bb4, bb5
+// CHECK:   switch_enum [[RESULT_OPT_NSSTRING]] : $Optional<NSString>, case #Optional.some!enumelt.1: [[SOME_BB:bb[0-9]+]],
 
-// CHECK: bb4:
-// CHECK:   [[RESULT_NSSTRING:%.*]] = unchecked_enum_data [[RESULT_OPT_NSSTRING]]
+// CHECK: [[SOME_BB]]([[RESULT_NSSTRING:%.*]] : $NSString):
 // CHECK:   [[BRIDGE_FUNC:%.*]] = function_ref @_T0SS10FoundationE36_unconditionallyBridgeFromObjectiveCSSSo8NSStringCSgFZ
 // CHECK:   [[REWRAP_RESULT_NSSTRING:%.*]] = enum $Optional<NSString>, #Optional.some!enumelt.1, [[RESULT_NSSTRING]]
 // CHECK:   [[RESULT_STRING:%.*]] = apply [[BRIDGE_FUNC]]([[REWRAP_RESULT_NSSTRING]]

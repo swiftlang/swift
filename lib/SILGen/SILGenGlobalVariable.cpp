@@ -13,7 +13,6 @@
 #include "SILGenFunction.h"
 #include "ManagedValue.h"
 #include "Scope.h"
-#include "swift/AST/AST.h"
 #include "swift/AST/Mangle.h"
 #include "swift/AST/ASTMangler.h"
 #include "swift/SIL/FormalLinkage.h"
@@ -108,7 +107,7 @@ SILGenFunction::emitGlobalVariableRef(SILLocation loc, VarDecl *var) {
     // address.
     addr = B.createPointerToAddress(
       loc, addr, getLoweredType(var->getInterfaceType()).getAddressType(),
-      /*isStrict*/ true);
+      /*isStrict*/ true, /*isInvariant*/ false);
     return ManagedValue::forLValue(addr);
   }
 

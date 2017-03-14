@@ -215,7 +215,7 @@ CONSTANT_OWNERSHIP_INST(Owned, PartialApply)
 CONSTANT_OWNERSHIP_INST(Owned, StrongPin)
 CONSTANT_OWNERSHIP_INST(Owned, ThinToThickFunction)
 CONSTANT_OWNERSHIP_INST(Owned, InitExistentialOpaque)
-CONSTANT_OWNERSHIP_INST(Owned, UnconditionalCheckedCastOpaque)
+CONSTANT_OWNERSHIP_INST(Owned, UnconditionalCheckedCastValue)
 
 // One would think that these /should/ be unowned. In truth they are owned since
 // objc metatypes do not go through the retain/release fast path. In their
@@ -364,6 +364,7 @@ NO_RESULT_OWNERSHIP_INST(SwitchEnum)
 NO_RESULT_OWNERSHIP_INST(SwitchEnumAddr)
 NO_RESULT_OWNERSHIP_INST(DynamicMethodBranch)
 NO_RESULT_OWNERSHIP_INST(CheckedCastBranch)
+NO_RESULT_OWNERSHIP_INST(CheckedCastValueBranch)
 NO_RESULT_OWNERSHIP_INST(CheckedCastAddrBranch)
 #undef NO_RESULT_OWNERSHIP_INST
 
@@ -660,6 +661,7 @@ CONSTANT_OWNERSHIP_BUILTIN(Trivial, IntToPtr)
 CONSTANT_OWNERSHIP_BUILTIN(Trivial, LShr)
 CONSTANT_OWNERSHIP_BUILTIN(Trivial, Load)
 CONSTANT_OWNERSHIP_BUILTIN(Trivial, LoadRaw)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, LoadInvariant)
 CONSTANT_OWNERSHIP_BUILTIN(Trivial, Mul)
 CONSTANT_OWNERSHIP_BUILTIN(Trivial, Or)
 CONSTANT_OWNERSHIP_BUILTIN(Trivial, PtrToInt)
@@ -757,6 +759,8 @@ CONSTANT_OWNERSHIP_BUILTIN(Trivial, Assign)
 CONSTANT_OWNERSHIP_BUILTIN(Trivial, Init)
 CONSTANT_OWNERSHIP_BUILTIN(Trivial, AtomicStore)
 CONSTANT_OWNERSHIP_BUILTIN(Trivial, Once)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, TSanInoutAccess)
+
 #undef CONSTANT_OWNERSHIP_BUILTIN
 
 // Check all of these...

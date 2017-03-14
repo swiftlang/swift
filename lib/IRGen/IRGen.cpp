@@ -16,7 +16,6 @@
 
 #define DEBUG_TYPE "irgen"
 #include "swift/Subsystems.h"
-#include "swift/AST/AST.h"
 #include "swift/AST/DiagnosticsIRGen.h"
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/LinkLibrary.h"
@@ -701,6 +700,9 @@ static std::unique_ptr<llvm::Module> performIRGeneration(IRGenOptions &Opts,
       }
     }
 
+    // Okay, emit any definitions that we suddenly need.
+    irgen.emitLazyDefinitions();
+
     // Register our info with the runtime if needed.
     if (Opts.UseJIT) {
       IGM.emitRuntimeRegistration();
@@ -712,9 +714,6 @@ static std::unique_ptr<llvm::Module> performIRGeneration(IRGenOptions &Opts,
       IGM.emitBuiltinReflectionMetadata();
       IGM.emitReflectionMetadataVersion();
     }
-
-    // Okay, emit any definitions that we suddenly need.
-    irgen.emitLazyDefinitions();
 
     // Emit symbols for eliminated dead methods.
     IGM.emitVTableStubs();
@@ -885,7 +884,8 @@ static void performParallelIRGeneration(IRGenOptions &Opts,
     }
   }
   
-  IRGenModule *PrimaryGM = irgen.getPrimaryIGM();
+  // Okay, emit any definitions that we suddenly need.
+  irgen.emitLazyDefinitions();
 
   irgen.emitProtocolConformances();
 
@@ -894,10 +894,9 @@ static void performParallelIRGeneration(IRGenOptions &Opts,
   // Emit reflection metadata for builtin and imported types.
   irgen.emitBuiltinReflectionMetadata();
 
-  // Okay, emit any definitions that we suddenly need.
-  irgen.emitLazyDefinitions();
-  
- // Emit symbols for eliminated dead methods.
+  IRGenModule *PrimaryGM = irgen.getPrimaryIGM();
+
+  // Emit symbols for eliminated dead methods.
   PrimaryGM->emitVTableStubs();
     
   // Verify type layout if we were asked to.

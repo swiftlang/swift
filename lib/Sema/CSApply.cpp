@@ -19,6 +19,7 @@
 #include "ConstraintSystem.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
+#include "swift/AST/ParameterList.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/Basic/StringExtras.h"
@@ -116,7 +117,8 @@ Type Solution::computeSubstitutions(
                                   ConformanceCheckFlags::Used));
   };
 
-  sig->getSubstitutions(subs, lookupConformanceFn, result);
+  sig->getSubstitutions(QueryTypeSubstitutionMap{subs},
+                        lookupConformanceFn, result);
   return type;
 }
 
@@ -1519,18 +1521,20 @@ namespace {
       auto bridgeFnTy = FunctionType::get(valueParenTy, bridgeTy);
       // FIXME: Wrap in ParenExpr to prevent bogus "tuple passed as argument"
       // errors.
-      auto valueParen = new (tc.Context) ParenExpr(SourceLoc(),
-                                                   value,
-                                                   SourceLoc(),
-                                                   /*trailing closure*/ false,
-                                                   valueParenTy);
+      auto valueParen = cs.cacheType(
+          new (tc.Context) ParenExpr(SourceLoc(),
+                                     value,
+                                     SourceLoc(),
+                                     /*trailing closure*/ false,
+                                     valueParenTy));
 
       valueParen->setImplicit();
-      auto fnRef = new (tc.Context) DeclRefExpr(bridgeAnythingRef,
-                                                DeclNameLoc(),
-                                                /*implicit*/ true,
-                                                AccessSemantics::Ordinary,
-                                                bridgeFnTy);
+      auto fnRef = cs.cacheType(
+          new (tc.Context) DeclRefExpr(bridgeAnythingRef,
+                                       DeclNameLoc(),
+                                       /*implicit*/ true,
+                                       AccessSemantics::Ordinary,
+                                       bridgeFnTy));
 
       auto getType = [&](const Expr *E) -> Type {
         return cs.getType(E);
@@ -1629,13 +1633,14 @@ namespace {
 
       // Form the arguments.
       Expr *args[2] = {
-        object,
-        new (tc.Context) DotSelfExpr(
-                             TypeExpr::createImplicitHack(object->getLoc(),
-                                                          valueType,
-                                                          tc.Context),
-                             object->getLoc(), object->getLoc(),
-                             MetatypeType::get(valueType))
+        cs.cacheType(object),
+        cs.cacheType(
+            new (tc.Context) DotSelfExpr(
+                TypeExpr::createImplicitHack(object->getLoc(),
+                                             valueType,
+                                             tc.Context),
+                object->getLoc(), object->getLoc(),
+                MetatypeType::get(valueType)))
       };
       args[1]->setImplicit();
 
@@ -3588,12 +3593,8 @@ namespace {
       Expr *argExpr = new (ctx) StringLiteralExpr(msg, E->getLoc(),
                                                   /*implicit*/true);
 
-      auto getType = [&](const Expr *E) -> Type {
-        return cs.getType(E);
-      };
-
       Expr *callExpr = CallExpr::createImplicit(ctx, fnRef, { argExpr },
-                                                { Identifier() }, getType);
+                                                { Identifier() });
 
       bool invalid = tc.typeCheckExpression(callExpr, cs.DC,
                                             TypeLoc::withoutLoc(valueType),
@@ -6033,11 +6034,12 @@ Expr *ExprRewriter::convertLiteral(Expr *literal,
     cs.cacheExprTypes(base);
     cs.setExprTypes(base);
     cs.setExprTypes(literal);
+    SmallVector<Expr *, 1> arguments = { literal };
 
     Expr *result = tc.callWitness(base, dc,
                                   builtinProtocol, *builtinConformance,
                                   builtinLiteralFuncName,
-                                  literal,
+                                  arguments,
                                   brokenBuiltinProtocolDiag);
     if (result)
       cs.cacheExprTypes(result);
@@ -6372,6 +6374,57 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
                                        apply->getArg()->getEndLoc(),
                                        escapable);
         cs.setType(replacement, resultType);
+        return replacement;
+      }
+      
+      case DeclTypeCheckingSemantics::OpenExistential: {
+        // Resolve into an OpenExistentialExpr.
+        auto arg = cast<TupleExpr>(apply->getArg());
+        assert(arg->getNumElements() == 2 && "should have two arguments");
+
+        auto existential = cs.coerceToRValue(arg->getElements()[0]);
+        auto body = cs.coerceToRValue(arg->getElements()[1]);
+
+        auto bodyFnTy = cs.getType(body)->castTo<FunctionType>();
+        auto openedTy = bodyFnTy->getInput();
+        auto resultTy = bodyFnTy->getResult();
+
+        // The body is immediately called, so is obviously noescape.
+        bodyFnTy = cast<FunctionType>(
+          bodyFnTy->withExtInfo(bodyFnTy->getExtInfo().withNoEscape()));
+        body = coerceToType(body, bodyFnTy, locator);
+        assert(body && "can't make nonescaping?!");
+
+        auto openedInstanceTy = openedTy;
+        auto existentialInstanceTy = cs.getType(existential);
+        if (auto metaTy = openedTy->getAs<MetatypeType>()) {
+          openedInstanceTy = metaTy->getInstanceType();
+          existentialInstanceTy = existentialInstanceTy
+            ->castTo<ExistentialMetatypeType>()
+            ->getInstanceType();
+        }
+        auto openedArchetype = openedInstanceTy->castTo<ArchetypeType>();
+        assert(openedArchetype->getOpenedExistentialType()
+                              ->isEqual(existentialInstanceTy));
+
+        auto opaqueValue = new (tc.Context)
+          OpaqueValueExpr(apply->getLoc(), openedTy);
+        cs.setType(opaqueValue, openedTy);
+        
+        auto getType = [&](const Expr *E) -> Type {
+          return cs.getType(E);
+        };
+
+        auto callSubExpr = CallExpr::create(tc.Context, body, opaqueValue, {},
+                                            {}, /*trailing closure*/ false,
+                                            /*implicit*/ true,
+                                            Type(), getType);
+        cs.setType(callSubExpr, resultTy);
+        
+        auto replacement = new (tc.Context)
+          OpenExistentialExpr(existential, opaqueValue, callSubExpr,
+                              resultTy);
+        cs.setType(replacement, resultTy);
         return replacement;
       }
       
@@ -7175,6 +7228,9 @@ Expr *TypeChecker::callWitness(Expr *base, DeclContext *dc,
   // Construct an empty constraint system and solution.
   ConstraintSystem cs(*this, dc, ConstraintSystemOptions());
 
+  for (auto *arg : arguments)
+    cs.cacheType(arg);
+
   // Find the witness we need to use.
   auto type = base->getType();
   assert(!type->hasTypeVariable() &&
@@ -7220,7 +7276,7 @@ Expr *TypeChecker::callWitness(Expr *base, DeclContext *dc,
   auto argLabels = witness->getFullName().getArgumentNames();
   if (arguments.size() == 1 &&
       (isVariadicWitness(witness) ||
-       argumentNamesMatch(arguments[0]->getType(), argLabels))) {
+       argumentNamesMatch(cs.getType(arguments[0]), argLabels))) {
     call = CallExpr::create(Context, unresolvedDot, arguments[0], {}, {},
                             /*hasTrailingClosure=*/false,
                             /*implicit=*/true, Type(), getType);

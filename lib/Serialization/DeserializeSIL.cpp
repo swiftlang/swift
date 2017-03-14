@@ -913,12 +913,13 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     assert(RecordKind == SIL_ONE_TYPE_ONE_OPERAND &&
            "Layout should be OneTypeOneOperand.");
     bool isStrict = Attr & 0x01;
+    bool isInvariant = Attr & 0x02;
     ResultVal = Builder.createPointerToAddress(
       Loc,
       getLocalValue(ValID, getSILType(MF->getType(TyID2),
                                       (SILValueCategory)TyCategory2)),
       getSILType(MF->getType(TyID), (SILValueCategory)TyCategory),
-      isStrict);
+      isStrict, isInvariant);
     break;
   }
   case ValueKind::DeallocExistentialBoxInst: {
@@ -1907,11 +1908,28 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
                                                 successBB, failureBB);
     break;
   }
-  case ValueKind::UnconditionalCheckedCastOpaqueInst: {
+  case ValueKind::CheckedCastValueBranchInst: {
+    // Format: the cast kind, a typed value, a BasicBlock ID for success,
+    // a BasicBlock ID for failure. Uses SILOneTypeValuesLayout.
+    assert(ListOfValues.size() == 5 &&
+           "expect 6 numbers for CheckedCastValueBranchInst");
+    SILType opTy = getSILType(MF->getType(ListOfValues[1]),
+                              (SILValueCategory)ListOfValues[2]);
+    SILValue op = getLocalValue(ListOfValues[0], opTy);
+    SILType castTy =
+        getSILType(MF->getType(TyID), (SILValueCategory)TyCategory);
+    auto *successBB = getBBForReference(Fn, ListOfValues[3]);
+    auto *failureBB = getBBForReference(Fn, ListOfValues[4]);
+
+    ResultVal = Builder.createCheckedCastValueBranch(Loc, op, castTy, successBB,
+                                                     failureBB);
+    break;
+  }
+  case ValueKind::UnconditionalCheckedCastValueInst: {
     SILValue Val = getLocalValue(
         ValID, getSILType(MF->getType(TyID2), (SILValueCategory)TyCategory2));
     SILType Ty = getSILType(MF->getType(TyID), (SILValueCategory)TyCategory);
-    ResultVal = Builder.createUnconditionalCheckedCastOpaque(Loc, Val, Ty);
+    ResultVal = Builder.createUnconditionalCheckedCastValue(Loc, Val, Ty);
     break;
   }
   case ValueKind::UnconditionalCheckedCastAddrInst:

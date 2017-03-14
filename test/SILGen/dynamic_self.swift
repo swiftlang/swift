@@ -94,7 +94,7 @@ func testExistentialDispatch(p: P) {
 // CHECK:   [[CP_F:%[0-9]+]] = witness_method $@opened([[N]]) CP, #CP.f!1 : {{.*}}, [[CP_ADDR]]{{.*}} : $@convention(witness_method) <τ_0_0 where τ_0_0 : CP> (@guaranteed τ_0_0) -> @owned τ_0_0
 // CHECK:   [[CP_F_RESULT:%[0-9]+]] = apply [[CP_F]]<@opened([[N]]) CP>([[CP_ADDR]]) : $@convention(witness_method) <τ_0_0 where τ_0_0 : CP> (@guaranteed τ_0_0) -> @owned τ_0_0
 // CHECK:   [[RESULT_EXISTENTIAL:%[0-9]+]] = init_existential_ref [[CP_F_RESULT]] : $@opened([[N]]) CP : $@opened([[N]]) CP, $CP
-// CHECK:   destroy_value [[CP_F_RESULT]] : $@opened([[N]]) CP
+// CHECK:   destroy_value [[RESULT_EXISTENTIAL]]
 // CHECK:   end_borrow [[BORROWED_CP]] from [[CP]]
 // CHECK:   destroy_value [[CP]]
 func testExistentialDispatchClass(cp: CP) {
@@ -165,8 +165,8 @@ func testOptionalResult(v : OptionalResultInheritor) {
 // CHECK:      [[CAST_COPY_ARG:%.*]] = upcast [[COPY_ARG]]
 // CHECK:      [[T0:%.*]] = class_method [[CAST_COPY_ARG]] : $OptionalResult, #OptionalResult.foo!1 : (OptionalResult) -> () -> @dynamic_self OptionalResult?, $@convention(method) (@guaranteed OptionalResult) -> @owned Optional<OptionalResult>
 // CHECK-NEXT: [[RES:%.*]] = apply [[T0]]([[CAST_COPY_ARG]])
-// CHECK:      select_enum [[RES]]
-// CHECK:      [[T1:%.*]] = unchecked_enum_data [[RES]]
+// CHECK:      switch_enum [[RES]] : $Optional<OptionalResult>, case #Optional.some!enumelt.1: [[SOME_BB:bb[0-9]+]]
+// CHECK: [[SOME_BB]]([[T1:%.*]] : $OptionalResult):
 // CHECK-NEXT: [[T4:%.*]] = unchecked_ref_cast [[T1]] : $OptionalResult to $OptionalResultInheritor
 // CHECK-NEXT: enum $Optional<OptionalResultInheritor>, #Optional.some!enumelt.1, [[T4]]
 

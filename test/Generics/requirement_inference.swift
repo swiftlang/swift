@@ -77,15 +77,11 @@ struct V<T : Canidae> {}
 // CHECK-NEXT: Requirements:
 // CHECK-NEXT:   τ_0_0 : Canidae
 func inferSuperclassRequirement1<T : Carnivora>(_ v: V<T>) {}
-// expected-warning@-1{{redundant superclass constraint 'T' : 'Carnivora'}}
-// expected-note@-2{{superclass constraint 'T' : 'Canidae' written here}}
 
 // CHECK-LABEL: .inferSuperclassRequirement2@
 // CHECK-NEXT: Requirements:
 // CHECK-NEXT:   τ_0_0 : Canidae
 func inferSuperclassRequirement2<T : Canidae>(_ v: U<T>) {}
-// expected-warning@-1{{redundant superclass constraint 'T' : 'Carnivora'}}
-// expected-note@-2{{superclass constraint 'T' : 'Canidae' written here}}
 
 // ----------------------------------------------------------------------------
 // Same-type requirements
@@ -117,8 +113,8 @@ struct Model_P3_P4_Eq<T : P3, U : P4> where T.P3Assoc == U.P4Assoc {}
 // CHECK-NEXT: Requirements:
 // CHECK-NEXT:   τ_0_0 : P3 [τ_0_0: Inferred @ {{.*}}:32]
 // CHECK-NEXT:   τ_0_1 : P4 [τ_0_1: Inferred @ {{.*}}:32]
-// CHECK-NEXT:   τ_0_0[.P3].P3Assoc : P1 [τ_0_0: Inferred @ {{.*}}:32 -> Protocol requirement (P3) -> Protocol requirement (P2)]
-// CHECK-NEXT:   τ_0_0[.P3].P3Assoc : P2 [τ_0_0: Inferred @ {{.*}}:32 -> Protocol requirement (P3)]
+// CHECK-NEXT:   τ_0_0[.P3].P3Assoc : P1 [τ_0_1: Inferred @ {{.*}}:32 -> Protocol requirement (via Self.P4Assoc in P4)
+// CHECK-NEXT:   τ_0_0[.P3].P3Assoc : P2 [τ_0_0: Inferred @ {{.*}}:32 -> Protocol requirement (via Self.P3Assoc in P3)]
 // FIXME: τ_0_0[.P3].P3Assoc == τ_0_1[.P4].P4Assoc [τ_0_0: Inferred]
 func inferSameType1<T, U>(_ x: Model_P3_P4_Eq<T, U>) { }
 
@@ -126,8 +122,8 @@ func inferSameType1<T, U>(_ x: Model_P3_P4_Eq<T, U>) { }
 // CHECK-NEXT: Requirements:
 // CHECK-NEXT:   τ_0_0 : P3 [τ_0_0: Explicit @ {{.*}}:25]
 // CHECK-NEXT:   τ_0_1 : P4 [τ_0_1: Explicit @ {{.*}}:33]
-// CHECK-NEXT:   τ_0_0[.P3].P3Assoc : P1 [τ_0_0: Explicit @ {{.*}}:25 -> Protocol requirement (P3) -> Protocol requirement (P2)]
-// CHECK-NEXT:   τ_0_0[.P3].P3Assoc : P2 [τ_0_0: Explicit @ {{.*}}:25 -> Protocol requirement (P3)]
+// CHECK-NEXT:   τ_0_0[.P3].P3Assoc : P1 [τ_0_1: Explicit @ {{.*}}:33 -> Protocol requirement (via Self.P4Assoc in P4)
+// CHECK-NEXT:   τ_0_0[.P3].P3Assoc : P2 [τ_0_0: Explicit @ {{.*}}:25 -> Protocol requirement (via Self.P3Assoc in P3)]
 // CHECK-NEXT:   τ_0_0[.P3].P3Assoc == τ_0_1[.P4].P4Assoc [τ_0_0[.P3].P3Assoc: Explicit]
 func inferSameType2<T : P3, U : P4>(_: T, _: U) where U.P4Assoc : P2, T.P3Assoc == U.P4Assoc {}
 

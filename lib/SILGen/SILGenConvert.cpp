@@ -11,21 +11,23 @@
 //===----------------------------------------------------------------------===//
 
 #include "SILGen.h"
+#include "ArgumentSource.h"
+#include "Initialization.h"
+#include "LValue.h"
+#include "RValue.h"
 #include "Scope.h"
+#include "SwitchCaseFullExpr.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/ProtocolConformance.h"
+#include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/type_traits.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/TypeLowering.h"
-#include "Initialization.h"
-#include "LValue.h"
-#include "RValue.h"
-#include "ArgumentSource.h"
 #include "llvm/ADT/STLExtras.h"
-#include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/SaveAndRestore.h"
+#include "llvm/Support/raw_ostream.h"
 
 using namespace swift;
 using namespace Lowering;
@@ -203,7 +205,7 @@ SILGenFunction::emitPreconditionOptionalHasValue(SILLocation loc,
     ManagedValue args[4];
     emitSourceLocationArgs(*this, loc, args);
     
-    emitApplyOfLibraryIntrinsic(loc, diagnoseFailure, {}, args,
+    emitApplyOfLibraryIntrinsic(loc, diagnoseFailure, SubstitutionMap(), args,
                                 SGFContext());
   }
 
@@ -301,75 +303,68 @@ SILGenFunction::emitOptionalToOptional(SILLocation loc,
   auto isNotPresentBB = createBasicBlock();
   auto isPresentBB = createBasicBlock();
 
+  SwitchEnumBuilder SEBuilder(B, loc, input);
+  SILType noOptResultTy = resultTy.getAnyOptionalObjectType();
+  assert(noOptResultTy);
+
   // Create a temporary for the output optional.
-  auto &resultTL = getTypeLowering(resultTy);
+  auto &resultTL = F.getTypeLowering(resultTy);
 
   // If the result is address-only, we need to return something in memory,
   // otherwise the result is the BBArgument in the merge point.
-  SILValue result;
-  if (resultTL.isAddressOnly())
-    result = emitTemporaryAllocation(loc, resultTy);
-  else
-    result = contBB->createPHIArgument(resultTL.getLoweredType(),
-                                       ValueOwnershipKind::Owned);
-
-  // Branch on whether the input is optional, this doesn't consume the value.
-  auto isPresent = emitDoesOptionalHaveValue(loc, input.getValue());
-  B.createCondBranch(loc, isPresent, isPresentBB, isNotPresentBB);
-
-  // If it's present, apply the recursive transformation to the value.
-  B.emitBlock(isPresentBB);
-  SILValue branchArg;
-  {
-    // Don't allow cleanups to escape the conditional block.
-    FullExpr presentScope(Cleanups, CleanupLocation::get(loc));
-
-    CanType resultValueTy =
-      resultTy.getSwiftRValueType().getAnyOptionalObjectType();
-    assert(resultValueTy);
-    SILType loweredResultValueTy = getLoweredType(resultValueTy);
-
-    // Pull the value out.  This will load if the value is not address-only.
-    auto &inputTL = getTypeLowering(input.getType());
-    auto inputValue = emitUncheckedGetOptionalValueFrom(loc, input,
-                                                        inputTL, SGFContext());
-
-    // Transform it.
-    auto resultValue = transformValue(*this, loc, inputValue,
-                                      loweredResultValueTy);
-
-    // Inject that into the result type if the result is address-only.
-    if (resultTL.isAddressOnly()) {
-      ArgumentSource resultValueRV(loc, RValue(*this, loc,
-                                               resultValueTy, resultValue));
-      emitInjectOptionalValueInto(loc, std::move(resultValueRV),
-                                  result, resultTL);
-    } else {
-      resultValue = getOptionalSomeValue(loc, resultValue, resultTL);
-      branchArg = resultValue.forward(*this);
-    }
-  }
-  if (branchArg)
-    B.createBranch(loc, contBB, branchArg);
-  else
-    B.createBranch(loc, contBB);
-
-  // If it's not present, inject 'nothing' into the result.
-  B.emitBlock(isNotPresentBB);
+  ManagedValue finalResult;
   if (resultTL.isAddressOnly()) {
-    emitInjectOptionalNothingInto(loc, result, resultTL);
-    B.createBranch(loc, contBB);
+    finalResult = emitManagedBufferWithCleanup(
+        emitTemporaryAllocation(loc, resultTy), resultTL);
   } else {
-    branchArg = getOptionalNoneValue(loc, resultTL);
-    B.createBranch(loc, contBB, branchArg);
+    SavedInsertionPoint IP(*this, contBB);
+    finalResult = B.createOwnedPHIArgument(resultTL.getLoweredType());
   }
 
-  // Continue.
-  B.emitBlock(contBB);
-  if (resultTL.isAddressOnly())
-    return emitManagedBufferWithCleanup(result, resultTL);
+  SEBuilder.addCase(
+      getASTContext().getOptionalSomeDecl(), isPresentBB, contBB,
+      [&](ManagedValue input, SwitchCaseFullExpr &scope) {
+        // If we have an address only type, we want to match the old behavior of
+        // transforming the underlying type instead of the optional type. This
+        // ensures that we use the more efficient non-generic code paths when
+        // possible.
+        if (F.getTypeLowering(input.getType()).isAddressOnly()) {
+          auto *someDecl = B.getASTContext().getOptionalSomeDecl();
+          input = B.createUncheckedTakeEnumDataAddr(
+              loc, input, someDecl, input.getType().getAnyOptionalObjectType());
+        }
 
-  return emitManagedRValueWithCleanup(result, resultTL);
+        ManagedValue result = transformValue(*this, loc, input, noOptResultTy);
+
+        if (!resultTL.isAddressOnly()) {
+          SILValue some = B.createOptionalSome(loc, result).forward(*this);
+          return scope.exit(loc, some);
+        }
+
+        RValue R(*this, loc, noOptResultTy.getSwiftRValueType(), result);
+        ArgumentSource resultValueRV(loc, std::move(R));
+        emitInjectOptionalValueInto(loc, std::move(resultValueRV),
+                                    finalResult.getValue(), resultTL);
+        return scope.exit(loc);
+      });
+
+  SEBuilder.addCase(
+      getASTContext().getOptionalNoneDecl(), isNotPresentBB, contBB,
+      [&](ManagedValue input, SwitchCaseFullExpr &scope) {
+        if (!resultTL.isAddressOnly()) {
+          SILValue none =
+              B.createManagedOptionalNone(loc, resultTy).forward(*this);
+          return scope.exit(loc, none);
+        }
+
+        emitInjectOptionalNothingInto(loc, finalResult.getValue(), resultTL);
+        return scope.exit(loc);
+      });
+
+  std::move(SEBuilder).emit();
+
+  B.emitBlock(contBB);
+  return finalResult;
 }
 
 SILGenFunction::OpaqueValueRAII::~OpaqueValueRAII() {
@@ -394,12 +389,20 @@ SILGenFunction::emitPointerToPointer(SILLocation loc,
   auto origValue = emitManagedBufferWithCleanup(origBuf);
   
   // Invoke the conversion intrinsic to convert to the destination type.
-  Substitution subs[2] = {
-    getPointerSubstitution(inputType),
-    getPointerSubstitution(outputType),
-  };
+  auto *M = SGM.M.getSwiftModule();
+  auto *proto = getPointerProtocol();
+  auto firstSubMap = inputType->getContextSubstitutionMap(M, proto);
+  auto secondSubMap = outputType->getContextSubstitutionMap(M, proto);
+
+  auto *genericSig = converter->getGenericSignature();
+  auto subMap =
+    SubstitutionMap::combineSubstitutionMaps(firstSubMap,
+                                             secondSubMap,
+                                             CombineSubstitutionMaps::AtIndex,
+                                             1, 0,
+                                             genericSig);
   
-  return emitApplyOfLibraryIntrinsic(loc, converter, subs, origValue, C);
+  return emitApplyOfLibraryIntrinsic(loc, converter, subMap, origValue, C);
 }
 
 
@@ -460,9 +463,7 @@ ManagedValue SILGenFunction::emitExistentialErasure(
     if (nsErrorType->isExactSuperclassOf(concreteFormalType, nullptr)) {
       ManagedValue nsError =  F(SGFContext());
       if (nsErrorType != concreteFormalType) {
-        nsError = ManagedValue(B.createUpcast(loc, nsError.getValue(),
-                                              getLoweredType(nsErrorType)),
-                               nsError.getCleanup());
+        nsError = B.createUpcast(loc, nsError, getLoweredType(nsErrorType));
       }
       return emitBridgedToNativeError(loc, nsError);
     }
@@ -487,16 +488,15 @@ ManagedValue SILGenFunction::emitExistentialErasure(
         }
       }
 
-      auto nativeError = F(SGFContext());
+      ManagedValue nativeError = F(SGFContext());
 
       FormalEvaluationScope writebackScope(*this);
-      auto nsError =
-        emitRValueForPropertyLoad(loc, nativeError, concreteFormalType,
-                                  /*super*/ false, nsErrorVar,
-                                  nsErrorVarSubstitutions,
-                                  AccessSemantics::Ordinary, nsErrorType,
-                                  SGFContext())
-        .getAsSingleValue(*this, loc);
+      ManagedValue nsError =
+          emitRValueForPropertyLoad(
+              loc, nativeError, concreteFormalType,
+              /*super*/ false, nsErrorVar, nsErrorVarSubstitutions,
+              AccessSemantics::Ordinary, nsErrorType, SGFContext())
+              .getAsSingleValue(*this, loc);
 
       return emitBridgedToNativeError(loc, nsError);
     }
@@ -515,9 +515,10 @@ ManagedValue SILGenFunction::emitExistentialErasure(
       if (!getEmbeddedNSErrorFn)
         return emitUndef(loc, existentialTL.getLoweredType());
 
-      Substitution getEmbeddedNSErrorSubstitutions[1] = {
-        Substitution(concreteFormalType, conformances)
-      };
+      auto getEmbeddedNSErrorSubstitutions =
+        SubstitutionMap::getProtocolSubstitutions(ctx.getErrorDecl(),
+                                                  concreteFormalType,
+                                                  conformances[0]);
 
       ManagedValue concreteValue = F(SGFContext());
       ManagedValue potentialNSError =
@@ -553,14 +554,11 @@ ManagedValue SILGenFunction::emitExistentialErasure(
         // layering reasons, so perform an unchecked cast down to NSError.
         SILType anyObjectTy =
           potentialNSError.getType().getAnyOptionalObjectType();
-        SILValue nsError = isPresentBB->createPHIArgument(
-            anyObjectTy, ValueOwnershipKind::Owned);
+        ManagedValue nsError = B.createOwnedPHIArgument(anyObjectTy);
         nsError = B.createUncheckedRefCast(loc, nsError, 
                                            getLoweredType(nsErrorType));
 
-        branchArg = emitBridgedToNativeError(loc,
-                                        emitManagedRValueWithCleanup(nsError))
-                      .forward(*this);
+        branchArg = emitBridgedToNativeError(loc, nsError).forward(*this);
       }
       B.createBranch(loc, contBB, branchArg);
 
@@ -612,12 +610,8 @@ ManagedValue SILGenFunction::emitExistentialErasure(
     assert(existentialTL.isLoadable());
 
     ManagedValue sub = F(SGFContext());
-    SILValue v = B.createInitExistentialRef(loc,
-                                            existentialTL.getLoweredType(),
-                                            concreteFormalType,
-                                            sub.getValue(),
-                                            conformances);
-    return ManagedValue(v, sub.getCleanup());
+    return B.createInitExistentialRef(loc, existentialTL.getLoweredType(),
+                                      concreteFormalType, sub, conformances);
   }
   case ExistentialRepresentation::Boxed: {
     // Allocate the existential.
@@ -656,13 +650,10 @@ ManagedValue SILGenFunction::emitExistentialErasure(
       ProtocolConformanceRef buf[] = {
         *anyObjectConformance,
       };
-      
-      auto asAnyObject = B.createInitExistentialRef(loc,
-                                  SILType::getPrimitiveObjectType(anyObjectTy),
-                                  concreteFormalType,
-                                  concreteValue.getValue(),
-                                  getASTContext().AllocateCopy(buf));
-      return ManagedValue(asAnyObject, concreteValue.getCleanup());
+
+      return B.createInitExistentialRef(
+          loc, SILType::getPrimitiveObjectType(anyObjectTy), concreteFormalType,
+          concreteValue, getASTContext().AllocateCopy(buf));
     };
     
     auto concreteTLPtr = &concreteTL;
@@ -793,11 +784,20 @@ SILGenFunction::emitOpenExistential(
     }
 
     if (existentialValue.hasCleanup()) {
-      canConsume = true;
-      // Leave a cleanup to deinit the existential container.
-      enterDeinitExistentialCleanup(existentialValue.getValue(), CanType(),
-                                    ExistentialRepresentation::Opaque);
-      archetypeMV = emitManagedBufferWithCleanup(archetypeValue);
+      if (this->SGM.M.getOptions().UseCOWExistentials) {
+        // With CoW existentials we can't consume the boxed value inside of
+        // the existential. (We could only do so after a uniqueness check on
+        // the box holding the value).
+        canConsume = false;
+        enterDestroyCleanup(existentialValue.getValue());
+        archetypeMV = ManagedValue::forUnmanaged(archetypeValue);
+      } else {
+        canConsume = true;
+        // Leave a cleanup to deinit the existential container.
+        enterDeinitExistentialCleanup(existentialValue.getValue(), CanType(),
+                                      ExistentialRepresentation::Opaque);
+        archetypeMV = emitManagedBufferWithCleanup(archetypeValue);
+      }
     } else {
       canConsume = false;
       archetypeMV = ManagedValue::forUnmanaged(archetypeValue);
@@ -836,9 +836,8 @@ SILGenFunction::emitOpenExistential(
     assert(existentialType.isObject());
     // NB: Don't forward the cleanup, because consuming a boxed value won't
     // consume the box reference.
-    archetypeMV = ManagedValue::forUnmanaged(
-        B.createOpenExistentialBox(loc, existentialValue.getValue(),
-                                   loweredOpenedType));
+    archetypeMV = ManagedValue::forUnmanaged(B.createOpenExistentialBox(
+        loc, existentialValue.getValue(), loweredOpenedType.getAddressType()));
     // The boxed value can't be assumed to be uniquely referenced. We can never
     // consume it.
     // TODO: We could use isUniquelyReferenced to shorten the duration of

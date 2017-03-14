@@ -21,7 +21,7 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/Mangle.h"
-#include "swift/Basic/ManglingUtils.h"
+#include "swift/Demangling/ManglingUtils.h"
 #include "swift/Strings.h"
 #include "clang/Basic/CharInfo.h"
 #include "clang/AST/Attr.h"
@@ -376,7 +376,7 @@ static bool isInPrivateOrLocalContext(const ValueDecl *D) {
 }
 
 void ASTMangler::appendDeclName(const ValueDecl *decl) {
-  if (decl->getName().isOperator()) {
+  if (decl->isOperator()) {
     appendIdentifier(translateOperator(decl->getName().str()));
     switch (decl->getAttrs().getUnaryOperatorKind()) {
       case UnaryOperatorKind::Prefix:
@@ -1468,11 +1468,9 @@ static bool isMethodDecl(const Decl *decl) {
 }
 
 static bool genericParamIsBelowDepth(Type type, unsigned methodDepth) {
-  if (auto gp = type->getAs<GenericTypeParamType>()) {
+  if (type->isTypeParameter()) {
+    auto gp = type->getRootGenericParam();
     return gp->getDepth() >= methodDepth;
-  }
-  if (auto dm = type->getAs<DependentMemberType>()) {
-    return genericParamIsBelowDepth(dm->getBase(), methodDepth);
   }
   // Non-dependent types in a same-type requirement don't affect whether we
   // mangle the requirement.

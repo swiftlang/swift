@@ -105,6 +105,7 @@
 
 #include "swift/AST/Types.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/Expr.h"
 #include "swift/AST/IRGenOptions.h"
 #include "swift/SIL/SILModule.h"
 #include "llvm/IR/Function.h"
@@ -5862,7 +5863,9 @@ const TypeInfo *TypeConverter::convertEnumType(TypeBase *key, CanType type,
 }
 
 void IRGenModule::emitEnumDecl(EnumDecl *theEnum) {
-  emitEnumMetadata(*this, theEnum);
+  if (!IRGen.tryEnableLazyTypeMetadata(theEnum))
+    emitEnumMetadata(*this, theEnum);
+
   emitNestedTypeDecls(theEnum->getMembers());
 
   if (shouldEmitOpaqueTypeMetadataRecord(theEnum)) {

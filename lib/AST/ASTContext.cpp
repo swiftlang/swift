@@ -18,7 +18,6 @@
 #include "ForeignRepresentationInfo.h"
 #include "swift/Strings.h"
 #include "swift/AST/GenericSignatureBuilder.h"
-#include "swift/AST/AST.h"
 #include "swift/AST/ConcreteDeclRef.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsSema.h"
@@ -28,6 +27,7 @@
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/ModuleLoader.h"
 #include "swift/AST/NameLookup.h"
+#include "swift/AST/ParameterList.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/RawComment.h"
 #include "swift/AST/SILLayout.h"
@@ -206,6 +206,12 @@ struct ASTContext::Implementation {
                  std::vector<ASTContext::DelayedConformanceDiag>>
     DelayedConformanceDiags;
 
+  /// Map from normal protocol conformances to missing witnesses that have
+  /// been delayed until the conformance is fully checked, so that we can
+  /// issue a fixit that fills the entire protocol stub.
+  llvm::DenseMap<NormalProtocolConformance *, std::vector<ValueDecl*>>
+    DelayedMissingWitnesses;
+
   /// Stores information about lazy deserialization of various declarations.
   llvm::DenseMap<const DeclContext *, LazyContextData *> LazyContexts;
 
@@ -261,10 +267,6 @@ struct ASTContext::Implementation {
     llvm::FoldingSet<BoundGenericType> BoundGenericTypes;
     llvm::FoldingSet<ProtocolType> ProtocolTypes;
     llvm::FoldingSet<LayoutConstraintInfo> LayoutConstraints;
-
-    llvm::DenseMap<std::pair<TypeBase *, DeclContext *>,
-                   SubstitutionList>
-      BoundGenericSubstitutions;
 
     /// The set of normal protocol conformances.
     llvm::FoldingSet<NormalProtocolConformance> NormalConformances;
@@ -404,7 +406,8 @@ ASTContext::ASTContext(LangOptions &langOpts, SearchPathOptions &SearchPathOpts,
     SwiftShimsModuleName(getIdentifier(SWIFT_SHIMS_NAME)),
     TypeCheckerDebug(new StderrTypeCheckerDebugConsumer()),
     TheErrorType(
-      new (*this, AllocationArena::Permanent) ErrorType(*this, Type())),
+      new (*this, AllocationArena::Permanent)
+        ErrorType(*this, Type(), RecursiveTypeProperties::HasError)),
     TheUnresolvedType(new (*this, AllocationArena::Permanent)
                       UnresolvedType(*this)),
     TheEmptyTupleType(TupleType::get(ArrayRef<TupleTypeElt>(), *this)),
@@ -1100,52 +1103,6 @@ static AllocationArena getArena(RecursiveTypeProperties properties) {
                         : AllocationArena::Permanent;
 }
 
-Optional<SubstitutionList>
-ASTContext::createTrivialSubstitutions(BoundGenericType *BGT,
-                                       DeclContext *gpContext) const {
-  assert(gpContext && "No generic parameter context");
-  assert(gpContext->getGenericEnvironmentOfContext() != nullptr &&
-         "Not type-checked yet");
-  assert(BGT->getGenericArgs().size() == 1);
-  Substitution Subst(BGT->getGenericArgs()[0], {});
-  auto Substitutions = AllocateCopy(llvm::makeArrayRef(Subst));
-  auto arena = getArena(BGT->getRecursiveProperties());
-  Impl.getArena(arena).BoundGenericSubstitutions
-    .insert(std::make_pair(std::make_pair(BGT, gpContext), Substitutions));
-  return Substitutions;
-}
-
-Optional<SubstitutionList>
-ASTContext::getSubstitutions(TypeBase *type,
-                             DeclContext *gpContext) const {
-  assert(gpContext && "Missing generic parameter context");
-  auto arena = getArena(type->getRecursiveProperties());
-  auto &boundGenericSubstitutions
-    = Impl.getArena(arena).BoundGenericSubstitutions;
-  auto known = boundGenericSubstitutions.find({type, gpContext});
-  if (known != boundGenericSubstitutions.end())
-    return known->second;
-
-  // We can trivially create substitutions for Array and Optional.
-  if (auto bound = dyn_cast<BoundGenericType>(type))
-    if (bound->getDecl() == getArrayDecl() ||
-        bound->getDecl() == getOptionalDecl())
-      return createTrivialSubstitutions(bound, gpContext);
-
-  return None;
-}
-
-void ASTContext::setSubstitutions(TypeBase* type,
-                                  DeclContext *gpContext,
-                                  SubstitutionList Subs) const {
-  auto arena = getArena(type->getRecursiveProperties());
-  auto &boundGenericSubstitutions
-    = Impl.getArena(arena).BoundGenericSubstitutions;
-  assert(boundGenericSubstitutions.count({type, gpContext}) == 0 &&
-         "Already have substitutions?");
-  boundGenericSubstitutions[{type, gpContext}] = Subs;
-}
-
 void ASTContext::addSearchPath(StringRef searchPath, bool isFramework,
                                bool isSystem) {
   OptionSet<SearchPathKind> &loaded = Impl.SearchPathsSet[searchPath];
@@ -1456,6 +1413,17 @@ ASTContext::getSpecializedConformance(Type type,
   return result;
 }
 
+SpecializedProtocolConformance *
+ASTContext::getSpecializedConformance(Type type,
+                                      ProtocolConformance *generic,
+                                      const SubstitutionMap &subMap) {
+  SmallVector<Substitution, 4> subs;
+  if (auto *genericSig = generic->getGenericSignature())
+    genericSig->getSubstitutions(subMap, subs);
+
+  return getSpecializedConformance(type, generic, subs);
+}
+
 InheritedProtocolConformance *
 ASTContext::getInheritedConformance(Type type, ProtocolConformance *inherited) {
   llvm::FoldingSetNodeID id;
@@ -1529,6 +1497,24 @@ void ASTContext::addDelayedConformanceDiag(
   Impl.DelayedConformanceDiags[conformance].push_back(std::move(fn));
 }
 
+void ASTContext::
+addDelayedMissingWitnesses(NormalProtocolConformance *conformance,
+                           ArrayRef<ValueDecl*> witnesses) {
+  auto &bucket = Impl.DelayedMissingWitnesses[conformance];
+  bucket.insert(bucket.end(), witnesses.begin(), witnesses.end());
+}
+
+std::vector<ValueDecl*> ASTContext::
+takeDelayedMissingWitnesses(NormalProtocolConformance *conformance) {
+  std::vector<ValueDecl*> result;
+  auto known = Impl.DelayedMissingWitnesses.find(conformance);
+  if (known != Impl.DelayedMissingWitnesses.end()) {
+    result = std::move(known->second);
+    Impl.DelayedMissingWitnesses.erase(known);
+  }
+  return result;
+}
+
 std::vector<ASTContext::DelayedConformanceDiag>
 ASTContext::takeDelayedConformanceDiags(NormalProtocolConformance *conformance){
   std::vector<ASTContext::DelayedConformanceDiag> result;
@@ -1597,13 +1583,12 @@ size_t ASTContext::Implementation::Arena::getTotalMemory() const {
     llvm::capacity_in_bytes(LValueTypes) +
     llvm::capacity_in_bytes(InOutTypes) +
     llvm::capacity_in_bytes(DependentMemberTypes) +
-    llvm::capacity_in_bytes(DynamicSelfTypes) +
+    llvm::capacity_in_bytes(DynamicSelfTypes);
     // EnumTypes ?
     // StructTypes ?
     // ClassTypes ?
     // UnboundGenericTypes ?
     // BoundGenericTypes ?
-    llvm::capacity_in_bytes(BoundGenericSubstitutions);
     // NormalConformances ?
     // SpecializedConformances ?
     // InheritedConformances ?
@@ -2424,8 +2409,8 @@ Type ErrorType::get(const ASTContext &C) { return C.TheErrorType; }
 Type ErrorType::get(Type originalType) {
   assert(originalType);
 
-  auto properties = originalType->getRecursiveProperties();
-  auto arena = getArena(properties);
+  auto originalProperties = originalType->getRecursiveProperties();
+  auto arena = getArena(originalProperties);
 
   auto &ctx = originalType->getASTContext();
   auto &entry = ctx.Impl.getArena(arena).ErrorTypesWithOriginal[originalType];
@@ -2433,7 +2418,10 @@ Type ErrorType::get(Type originalType) {
 
   void *mem = ctx.Allocate(sizeof(ErrorType) + sizeof(Type),
                            alignof(ErrorType), arena);
-  return entry = new (mem) ErrorType(ctx, originalType);
+  RecursiveTypeProperties properties = RecursiveTypeProperties::HasError;
+  if (originalProperties.hasTypeVariable())
+    properties |= RecursiveTypeProperties::HasTypeVariable;
+  return entry = new (mem) ErrorType(ctx, originalType, properties);
 }
 
 BuiltinIntegerType *BuiltinIntegerType::get(BuiltinIntegerWidth BitWidth,
@@ -3539,18 +3527,18 @@ GenericEnvironment *GenericEnvironment::getIncomplete(
 }
 
 void DeclName::CompoundDeclName::Profile(llvm::FoldingSetNodeID &id,
-                                         Identifier baseName,
+                                         DeclBaseName baseName,
                                          ArrayRef<Identifier> argumentNames) {
-  id.AddPointer(baseName.get());
+  id.AddPointer(baseName.getAsOpaquePointer());
   id.AddInteger(argumentNames.size());
   for (auto arg : argumentNames)
     id.AddPointer(arg.get());
 }
 
-void DeclName::initialize(ASTContext &C, Identifier baseName,
+void DeclName::initialize(ASTContext &C, DeclBaseName baseName,
                           ArrayRef<Identifier> argumentNames) {
   if (argumentNames.size() == 0) {
-    SimpleOrCompound = IdentifierAndCompound(baseName, true);
+    SimpleOrCompound = BaseNameAndCompound(baseName, true);
     return;
   }
 
@@ -3576,7 +3564,7 @@ void DeclName::initialize(ASTContext &C, Identifier baseName,
 
 /// Build a compound value name given a base name and a set of argument names
 /// extracted from a parameter list.
-DeclName::DeclName(ASTContext &C, Identifier baseName,
+DeclName::DeclName(ASTContext &C, DeclBaseName baseName,
                    ParameterList *paramList) {
   SmallVector<Identifier, 4> names;
   

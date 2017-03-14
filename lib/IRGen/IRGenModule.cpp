@@ -19,7 +19,7 @@
 #include "swift/AST/DiagnosticsIRGen.h"
 #include "swift/AST/IRGenOptions.h"
 #include "swift/Basic/Dwarf.h"
-#include "swift/Basic/ManglingMacros.h"
+#include "swift/Demangling/ManglingMacros.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/Runtime/RuntimeFnWrappersGen.h"
 #include "swift/Runtime/Config.h"
@@ -274,9 +274,9 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
     FunctionPtrTy,
     RefCountedPtrTy,
   });
-  
-  OpaquePtrTy = llvm::StructType::create(LLVMContext, "swift.opaque")
-                  ->getPointerTo(DefaultAS);
+
+  OpaqueTy = llvm::StructType::create(LLVMContext, "swift.opaque");
+  OpaquePtrTy = OpaqueTy->getPointerTo(DefaultAS);
 
   ProtocolConformanceRecordTy
     = createStructType(*this, "swift.protocol_conformance", {
@@ -724,6 +724,27 @@ llvm::Module *IRGenModule::getModule() const {
 
 llvm::Module *IRGenModule::releaseModule() {
   return ClangCodeGen->ReleaseModule();
+}
+
+bool IRGenerator::canEmitWitnessTableLazily(SILWitnessTable *wt) {
+  bool isWholeModule = PrimaryIGM->getSILModule().isWholeModule();
+  if (isPossiblyUsedExternally(wt->getLinkage(), isWholeModule))
+    return false;
+
+  if (Opts.UseJIT)
+    return false;
+
+  return true;
+}
+
+void IRGenerator::addLazyWitnessTable(const ProtocolConformance *Conf) {
+  if (SILWitnessTable *wt = SIL.lookUpWitnessTable(Conf)) {
+    // Add it to the queue if it hasn't already been put there.
+    if (canEmitWitnessTableLazily(wt) &&
+        LazilyEmittedWitnessTables.insert(wt).second) {
+      LazyWitnessTables.push_back(wt);
+    }
+  }
 }
 
 llvm::AttributeSet IRGenModule::getAllocAttrs() {

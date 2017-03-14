@@ -17,7 +17,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Strings.h"
-#include "swift/Basic/Demangle.h"
+#include "swift/Demangling/Demangle.h"
 #include "swift/Basic/QuotedString.h"
 #include "swift/SIL/SILPrintContext.h"
 #include "swift/SIL/CFG.h"
@@ -29,7 +29,6 @@
 #include "swift/SIL/SILVisitor.h"
 #include "swift/SIL/SILVTable.h"
 #include "swift/AST/Decl.h"
-#include "swift/AST/Expr.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/PrintOptions.h"
@@ -1210,6 +1209,12 @@ public:
        << getID(CI->getSuccessBB()) << ", " << getID(CI->getFailureBB());
   }
 
+  void visitCheckedCastValueBranchInst(CheckedCastValueBranchInst *CI) {
+    *this << getIDAndType(CI->getOperand()) << " to " << CI->getCastType()
+          << ", " << getID(CI->getSuccessBB()) << ", "
+          << getID(CI->getFailureBB());
+  }
+
   void visitUnconditionalCheckedCastAddrInst(UnconditionalCheckedCastAddrInst *CI) {
     *this << getCastConsumptionKindName(CI->getConsumptionKind()) << ' '
           << CI->getSourceType() << " in " << getIDAndType(CI->getSrc())
@@ -1217,8 +1222,8 @@ public:
           << getIDAndType(CI->getDest());
   }
 
-  void visitUnconditionalCheckedCastOpaqueInst(
-      UnconditionalCheckedCastOpaqueInst *CI) {
+  void visitUnconditionalCheckedCastValueInst(
+      UnconditionalCheckedCastValueInst *CI) {
     *this << getIDAndType(CI->getOperand()) << " to " << CI->getType();
   }
 
@@ -1260,6 +1265,8 @@ public:
     *this << getIDAndType(CI->getOperand()) << " to ";
     if (CI->isStrict())
       *this << "[strict] ";
+    if (CI->isInvariant())
+      *this << "[invariant] ";
     *this << CI->getType();
   }
   void visitUncheckedRefCastInst(UncheckedRefCastInst *CI) {

@@ -20,6 +20,7 @@
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/NameLookup.h"
+#include "swift/AST/ParameterList.h"
 #include "swift/AST/Types.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/ClangImporter/ClangModule.h" // FIXME: SDK overlay semantics
@@ -182,15 +183,20 @@ public:
     if (isa<ClassDecl>(D))
       return;
 
-    // 'final' only makes sense in the context of a class
-    // declaration or a protocol extension.  Reject it on global functions,
-    // structs, enums, etc.
-    if (D->getDeclContext()->getAsProtocolExtensionContext()) {
-      // Accept and remove the 'final' attribute from members of protocol
-      // extensions.
+    // 'final' only makes sense in the context of a class declaration.
+    // Reject it on global functions, protocols, structs, enums, etc.
+    if (!D->getDeclContext()->getAsClassOrClassExtensionContext()) {
+      if (D->getDeclContext()->getAsProtocolExtensionContext())
+        TC.diagnose(attr->getLocation(), 
+          diag::protocol_extension_cannot_be_final)
+          .fixItRemove(attr->getRange());
+      else
+        TC.diagnose(attr->getLocation(), diag::member_cannot_be_final)
+          .fixItRemove(attr->getRange());
+
+      // Remove the attribute so child declarations are not flagged as final
+      // and duplicate the error message.
       D->getAttrs().removeAttribute(attr);
-    } else if (!D->getDeclContext()->getAsClassOrClassExtensionContext()) {
-      diagnoseAndRemoveAttr(attr, diag::member_cannot_be_final);
       return;
     }
   }
@@ -1008,7 +1014,8 @@ void AttributeChecker::visitFinalAttr(FinalAttr *attr) {
   // We currently only support final on var/let, func and subscript
   // declarations.
   if (!isa<VarDecl>(D) && !isa<FuncDecl>(D) && !isa<SubscriptDecl>(D)) {
-    TC.diagnose(attr->getLocation(), diag::final_not_allowed_here);
+    TC.diagnose(attr->getLocation(), diag::final_not_allowed_here)
+      .fixItRemove(attr->getRange());
     return;
   }
 
@@ -1017,7 +1024,8 @@ void AttributeChecker::visitFinalAttr(FinalAttr *attr) {
       unsigned Kind = 2;
       if (auto *VD = dyn_cast<VarDecl>(FD->getAccessorStorageDecl()))
         Kind = VD->isLet() ? 1 : 0;
-      TC.diagnose(attr->getLocation(), diag::final_not_on_accessors, Kind);
+      TC.diagnose(attr->getLocation(), diag::final_not_on_accessors, Kind)
+        .fixItRemove(attr->getRange());
       return;
     }
   }
@@ -1060,7 +1068,7 @@ void AttributeChecker::checkOperatorAttribute(DeclAttribute *attr) {
 
   // Only functions with an operator identifier can be declared with as an
   // operator.
-  if (!FD->getName().isOperator()) {
+  if (!FD->isOperator()) {
     TC.diagnose(D->getStartLoc(), diag::attribute_requires_operator_identifier,
                 attr->getAttrName());
     attr->setInvalid();

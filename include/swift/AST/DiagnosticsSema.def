@@ -1393,6 +1393,8 @@ NOTE(no_witnesses,none,
      "%select{initializer %1|function %1|property %1|subscript}0 with type %2"
      "%select{|; do you want to add a stub?}3",
      (RequirementKind, DeclName, Type, bool))
+NOTE(missing_witnesses_general,none, "do you want to add protocol stubs?",
+     ())
 NOTE(ambiguous_witnesses,none,
      "multiple matching "
      "%select{initializers named %1|functions named %1|properties named %1|"
@@ -1985,6 +1987,9 @@ ERROR(override_static,none,
 
 ERROR(member_cannot_be_final,none,
       "only classes and class members may be marked with 'final'",
+      ())
+WARNING(protocol_extension_cannot_be_final,none,
+      "functions in a protocol extension do not need to be marked with 'final'",
       ())
 
 ERROR(final_not_allowed_here,none,
@@ -2668,7 +2673,12 @@ ERROR(trailing_closure_requires_parens,none,
       " context", ())
 
 ERROR(empty_switch_stmt,none,
-"'switch' statement body must have at least one 'case' or 'default' block",())
+      "'switch' statement body must have at least one 'case' or 'default' block;"
+      " do you want to add "
+      "%select{missing cases?|a default case?}0",(bool))
+ERROR(non_exhaustive_switch,none,
+      "switch must be exhaustive, consider adding "
+      "%select{missing cases|a default clause}0", (bool))
 //------------------------------------------------------------------------------
 // Type Check Patterns
 //------------------------------------------------------------------------------

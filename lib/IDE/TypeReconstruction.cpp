@@ -13,9 +13,9 @@
 #include "swift/IDE/Utils.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/GenericSignature.h"
-#include "swift/Basic/ManglingMacros.h"
 #include "swift/AST/NameLookup.h"
-#include "swift/Basic/Demangle.h"
+#include "swift/Demangling/Demangle.h"
+#include "swift/Demangling/ManglingMacros.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/Strings.h"
@@ -629,19 +629,6 @@ FindNamedDecls(ASTContext *ast, const StringRef &name, VisitNodeResult &result,
   return false;
 }
 
-static const char *
-SwiftDemangleNodeKindToCString(const Demangle::Node::Kind node_kind) {
-#define NODE(e)                                                                \
-  case Demangle::Node::Kind::e:                                                \
-    return #e;
-
-  switch (node_kind) {
-#include "swift/Basic/DemangleNodes.def"
-  }
-  return "Demangle::Node::Kind::???";
-#undef NODE
-}
-
 static DeclKind GetKindAsDeclKind(Demangle::Node::Kind node_kind) {
   switch (node_kind) {
   case Demangle::Node::Kind::TypeAlias:
@@ -660,7 +647,7 @@ static DeclKind GetKindAsDeclKind(Demangle::Node::Kind node_kind) {
     return DeclKind::Protocol;
   default:
     llvm_unreachable("Missing alias");
-    // FIXME: can we 'log' SwiftDemangleNodeKindToCString(node_kind))
+    // FIXME: can we 'log' getNodeKindString(node_kind))
   }
 }
 
@@ -1024,7 +1011,7 @@ static void VisitNodeExplicitClosure(
     default:
       result._error =
           stringWithFormat("%s encountered in ExplicitClosure children",
-                           SwiftDemangleNodeKindToCString(child_node_kind));
+                      Demangle::getNodeKindString(child_node_kind));
       break;
     case Demangle::Node::Kind::Module:
       nodes.push_back((*pos));
@@ -1068,7 +1055,7 @@ static void VisitNodeExtension(
     default:
       result._error =
           stringWithFormat("%s encountered in extension children",
-                           SwiftDemangleNodeKindToCString(child_node_kind));
+                      Demangle::getNodeKindString(child_node_kind));
       break;
 
     case Demangle::Node::Kind::Module:
@@ -1161,7 +1148,7 @@ static void VisitNodeFunction(
     default:
       result._error =
           stringWithFormat("%s encountered in function children",
-                           SwiftDemangleNodeKindToCString(child_node_kind));
+                    Demangle::getNodeKindString(child_node_kind));
       break;
 
     // TODO: any other possible containers?
@@ -1436,7 +1423,7 @@ static void VisitNodeSetterGetter(
     default:
       result._error =
           stringWithFormat("%s encountered in generic type children",
-                           SwiftDemangleNodeKindToCString(child_node_kind));
+                      Demangle::getNodeKindString(child_node_kind));
       break;
     }
   }
@@ -1567,7 +1554,8 @@ static void VisitNodeSetterGetter(
       } else {
         result._error = stringWithFormat(
             "could not retrieve %s for variable %s",
-            SwiftDemangleNodeKindToCString(node_kind), identifier.c_str());
+            Demangle::getNodeKindString(node_kind),
+            identifier.c_str());
         return;
       }
     } else {

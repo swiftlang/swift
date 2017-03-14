@@ -9,8 +9,8 @@ sil_stage canonical
 
 import Builtin
 
-sil @unconditional_checked_cast_opaque_test : $@convention(thin) <T> (Builtin.Int32) -> @out T {
+sil @unconditional_checked_cast_value_test : $@convention(thin) <T> (Builtin.Int32) -> @out T {
 bb0(%0 : @trivial $Builtin.Int32):
-  %1 = unconditional_checked_cast_opaque %0 : $Builtin.Int32 to $T
+  %1 = unconditional_checked_cast_value %0 : $Builtin.Int32 to $T
   return %1 : $T
 }

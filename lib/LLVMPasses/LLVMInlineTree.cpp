@@ -27,7 +27,7 @@
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/Format.h"
 #include "llvm/ADT/SmallSet.h"
-#include "swift/Basic/DemangleWrappers.h"
+#include "swift/Demangling/Demangle.h"
 #include "swift/Basic/Range.h"
 
 using namespace llvm;
