@@ -5,6 +5,5 @@
 // See https://swift.org/LICENSE.txt for license information
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
-// REQUIRES: asserts
-// RUN: not --crash %target-swift-frontend %s -emit-ir
-s a){func a(UInt=1 + 1 + 1 as?Int){
+// RUN: not %target-swift-frontend %s -emit-ir
+{struct B{func o(UInt=_=1 + 1 + 1 + 1 as?Int){a f{{A

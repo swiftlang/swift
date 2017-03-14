@@ -1441,10 +1441,14 @@ static void checkDefaultArguments(TypeChecker &tc,
         ->changeResilienceExpansion(expansion);
 
     // Type-check the initializer, then flag that we did so.
-    if (!tc.typeCheckExpression(e, initContext,
-                                TypeLoc::withoutLoc(param->getType()),
-                                CTP_DefaultParameter))
+    bool hadError = tc.typeCheckExpression(e, initContext,
+                                           TypeLoc::withoutLoc(param->getType()),
+                                           CTP_DefaultParameter);
+    if (!hadError) {
       param->setDefaultValue(e);
+    } else {
+      param->setDefaultValue(nullptr);
+    }
 
     tc.checkInitializerErrorHandling(initContext, e);
 

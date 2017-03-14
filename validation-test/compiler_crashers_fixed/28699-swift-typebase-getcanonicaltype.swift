@@ -5,6 +5,5 @@
 // See https://swift.org/LICENSE.txt for license information
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
-// REQUIRES: asserts
-// RUN: not --crash %target-swift-frontend %s -emit-ir
-{{{func t(UInt=1 + 1 + 1 + 1 as?Int){{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{$0{{{{{{{{{{{{{{{{{{{{{{{{
+// RUN: not %target-swift-frontend %s -emit-ir
+==1 C:{func b(UInt=1 + 1 + 1 as?Int){a==A(
