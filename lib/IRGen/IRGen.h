@@ -268,6 +268,27 @@ public:
   }
 };
 
+/// An abstraction for computing the cost of an operation.
+enum class OperationCost : unsigned {
+  Free = 0,
+  Arithmetic = 1,
+  Load = 3, // TODO: split into static- and dynamic-offset cases?
+  Call = 10
+};
+inline OperationCost operator+(OperationCost l, OperationCost r) {
+  return OperationCost(unsigned(l) + unsigned(r));
+}
+inline OperationCost &operator+=(OperationCost &l, OperationCost r) {
+  l = l + r;
+  return l;
+}
+inline bool operator<(OperationCost l, OperationCost r) {
+  return unsigned(l) < unsigned(r);
+}
+inline bool operator<=(OperationCost l, OperationCost r) {
+  return unsigned(l) <= unsigned(r);
+}
+
 /// An alignment value, in eight-bit units.
 class Alignment {
 public:

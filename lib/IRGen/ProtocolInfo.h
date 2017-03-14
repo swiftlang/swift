@@ -21,6 +21,7 @@
 #include "swift/AST/Decl.h"
 
 #include "ValueWitness.h"
+#include "WitnessIndex.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/Support/TrailingObjects.h"
@@ -35,21 +36,6 @@ namespace irgen {
   class ConformanceInfo; // private to GenProto.cpp
   class IRGenModule;
   class TypeInfo;
-
-/// A class which encapsulates an index into a witness table.
-class WitnessIndex {
-  unsigned Value : 31;
-  unsigned IsPrefix : 1;
-public:
-  WitnessIndex() = default;
-  WitnessIndex(ValueWitness index) : Value(unsigned(index)) {}
-  explicit WitnessIndex(unsigned index, bool isPrefix)
-    : Value(index), IsPrefix(isPrefix) {}
-
-  unsigned getValue() const { return Value; }
-
-  bool isPrefix() const { return IsPrefix; }
-};
 
 /// A witness to a specific element of a protocol.  Every
 /// ProtocolTypeInfo stores one of these for each requirement
@@ -195,48 +181,74 @@ public:
     return NumTableEntries;
   }
 
+  /// Return all of the entries in this protocol witness table.
+  ///
+  /// The addresses of the entries in this array can be passed to
+  /// getBaseWitnessIndex/getNonBaseWitnessIndex, below.
   ArrayRef<WitnessTableEntry> getWitnessEntries() const {
     return {getTrailingObjects<WitnessTableEntry>(), NumTableEntries};
   }
 
-  WitnessIndex getBaseIndex(ProtocolDecl *protocol) const {
+  /// Given the address of a witness entry from this PI for a base protocol
+  /// conformance, return its witness index.
+  WitnessIndex getBaseWitnessIndex(const WitnessTableEntry *witness) const {
+    assert(witness && witness->isBase());
     auto entries = getWitnessEntries();
-    for (auto &witness : entries) {
-      if (witness.matchesBase(protocol)) {
-        if (witness.isOutOfLineBase()) {
-          return WitnessIndex(&witness - entries.begin(), false);
-        } else {
-          return WitnessIndex(0, true);
-        }
-      }
+    assert(entries.begin() <= witness && witness < entries.end() &&
+           "argument witness entry does not belong to this ProtocolInfo");
+    if (witness->isOutOfLineBase()) {
+      return WitnessIndex(witness - entries.begin(), false);
+    } else {
+      return WitnessIndex(0, true);
+    }
+  }
+
+  /// Given the address of a witness entry from this PI for a non-base
+  /// witness, return its witness index.
+  WitnessIndex getNonBaseWitnessIndex(const WitnessTableEntry *witness) const {
+    assert(witness && !witness->isBase());
+    auto entries = getWitnessEntries();
+    assert(entries.begin() <= witness && witness < entries.end());
+    return WitnessIndex(witness - entries.begin(), false);
+  }
+
+  /// Return the witness index for the protocol conformance pointer
+  /// for the given base protocol requirement.
+  WitnessIndex getBaseIndex(ProtocolDecl *protocol) const {
+    for (auto &witness : getWitnessEntries()) {
+      if (witness.matchesBase(protocol))
+        return getBaseWitnessIndex(&witness);
     }
     llvm_unreachable("didn't find entry for base");
   }
 
+  /// Return the witness index for the witness function for the given
+  /// function requirement.
   WitnessIndex getFunctionIndex(AbstractFunctionDecl *function) const {
-    auto entries = getWitnessEntries();
-    for (auto &witness : entries) {
+    for (auto &witness : getWitnessEntries()) {
       if (witness.matchesFunction(function))
-        return WitnessIndex(&witness - entries.begin(), false);
+        return getNonBaseWitnessIndex(&witness);
     }
     llvm_unreachable("didn't find entry for function");
   }
 
+  /// Return the witness index for the type metadata access function
+  /// for the given associated type.
   WitnessIndex getAssociatedTypeIndex(AssociatedTypeDecl *assocType) const {
-    auto entries = getWitnessEntries();
-    for (auto &witness : entries) {
+    for (auto &witness : getWitnessEntries()) {
       if (witness.matchesAssociatedType(assocType))
-        return WitnessIndex(&witness - entries.begin(), false);
+        return getNonBaseWitnessIndex(&witness);
     }
     llvm_unreachable("didn't find entry for associated type");
   }
 
+  /// Return the witness index for the protocol witness table access
+  /// function for the given associated protocol conformance.
   WitnessIndex getAssociatedConformanceIndex(CanType path,
                                              ProtocolDecl *requirement) const {
-    auto entries = getWitnessEntries();
-    for (auto &witness : entries) {
+    for (auto &witness : getWitnessEntries()) {
       if (witness.matchesAssociatedConformance(path, requirement))
-        return WitnessIndex(&witness - entries.begin(), false);
+        return getNonBaseWitnessIndex(&witness);
     }
     llvm_unreachable("didn't find entry for associated conformance");
   }
