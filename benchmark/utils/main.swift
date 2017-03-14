@@ -34,13 +34,13 @@ import ArrayOfRef
 import ArraySubscript
 import BitCount
 import ByteSwap
+import CString
 import Calculator
 import CaptureProp
 import CharacterLiteralsLarge
 import CharacterLiteralsSmall
 import Chars
 import ClassArrayGetter
-import CString
 import DeadArray
 import DictTest
 import DictTest2
@@ -59,6 +59,7 @@ import Histogram
 import Integrate
 import IterateData
 import Join
+import LazyFilter
 import LinkedList
 import MapReduce
 import Memset
@@ -146,15 +147,15 @@ precommitTests = [
   "ArrayValueProp4": run_ArrayValueProp4,
   "BitCount": run_BitCount,
   "ByteSwap": run_ByteSwap,
+  "CStringLongAscii": run_CStringLongAscii,
+  "CStringLongNonAscii": run_CStringLongNonAscii,
+  "CStringShortAscii": run_CStringShortAscii,
   "Calculator": run_Calculator,
   "CaptureProp": run_CaptureProp,
   "CharacterLiteralsLarge": run_CharacterLiteralsLarge,
   "CharacterLiteralsSmall": run_CharacterLiteralsSmall,
   "Chars": run_Chars,
   "ClassArrayGetter": run_ClassArrayGetter,
-  "CStringLongAscii": run_CStringLongAscii,
-  "CStringLongNonAscii": run_CStringLongNonAscii,
-  "CStringShortAscii": run_CStringShortAscii,
   "DeadArray": run_DeadArray,
   "Dictionary": run_Dictionary,
   "Dictionary2": run_Dictionary2,
@@ -177,6 +178,8 @@ precommitTests = [
   "Integrate": run_Integrate,
   "IterateData": run_IterateData,
   "Join": run_Join,
+  "LazilyFilteredArrays": run_LazilyFilteredArrays,
+  "LazilyFilteredRange": run_LazilyFilteredRange,
   "LinkedList": run_LinkedList,
   "MapReduce": run_MapReduce,
   "MapReduceAnyCollection": run_MapReduceAnyCollection,
@@ -273,9 +276,8 @@ precommitTests = [
   "StaticArray": run_StaticArray,
   "StrComplexWalk": run_StrComplexWalk,
   "StrToInt": run_StrToInt,
-  "StringBuilder": run_StringBuilder,
   "StringAdder": run_StringAdder,
-  "StringUTF16Builder": run_StringUTF16Builder,
+  "StringBuilder": run_StringBuilder,
   "StringBuilderLong": run_StringBuilderLong,
   "StringEdits": run_StringEdits,
   "StringEqualPointerComparison": run_StringEqualPointerComparison,
@@ -285,6 +287,7 @@ precommitTests = [
   "StringHasSuffixUnicode": run_StringHasSuffixUnicode,
   "StringInterpolation": run_StringInterpolation,
   "StringMatch": run_StringMatch,
+  "StringUTF16Builder": run_StringUTF16Builder,
   "StringWalk": run_StringWalk,
   "StringWithCString": run_StringWithCString,
   "SuperChars": run_SuperChars,
