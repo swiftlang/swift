@@ -3044,20 +3044,15 @@ StringRef ProtocolDecl::getObjCRuntimeName(
 }
 
 GenericParamList *ProtocolDecl::createGenericParams(DeclContext *dc) {
-  // Find the depth of the 'Self' parameter. This is zero in all valid
-  // code; however, we compute it nonetheless to maintain the AST
-  // invariants around generic parameter depths.
-  unsigned depth = 0;
-  GenericParamList *outerGenericParams
-    = dc->getParent()->getGenericParamsOfContext();
-  if (outerGenericParams)
-    depth = outerGenericParams->getDepth() + 1;
+  auto *outerGenericParams = dc->getParent()->getGenericParamsOfContext();
 
   // The generic parameter 'Self'.
   auto &ctx = getASTContext();
   auto selfId = ctx.Id_Self;
-  auto selfDecl = new (ctx) GenericTypeParamDecl(dc, selfId,
-                                                 SourceLoc(), depth, 0);
+  auto selfDecl = new (ctx) GenericTypeParamDecl(
+      dc, selfId,
+      SourceLoc(),
+      GenericTypeParamDecl::InvalidDepth, /*index=*/0);
   auto protoType = getDeclaredType();
   TypeLoc selfInherited[1] = { TypeLoc::withoutLoc(protoType) };
   selfDecl->setInherited(ctx.AllocateCopy(selfInherited));
