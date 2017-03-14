@@ -29,13 +29,13 @@ set(SWIFT_BENCH_MODULES
     single-source/ArraySubscript
     single-source/BitCount
     single-source/ByteSwap
+    single-source/CString
     single-source/Calculator
     single-source/CaptureProp
     single-source/CharacterLiteralsLarge
     single-source/CharacterLiteralsSmall
     single-source/Chars
     single-source/ClassArrayGetter
-    single-source/CString
     single-source/DeadArray
     single-source/DictTest
     single-source/DictTest2
@@ -54,6 +54,7 @@ set(SWIFT_BENCH_MODULES
     single-source/Integrate
     single-source/IterateData
     single-source/Join
+    single-source/LazyFilter
     single-source/LinkedList
     single-source/MapReduce
     single-source/Memset
