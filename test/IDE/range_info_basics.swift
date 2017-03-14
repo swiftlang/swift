@@ -105,6 +105,13 @@ func foo8(a : [Int]) {
   } while i < 100
 }
 
+func foo9(a: Int, b: Int) -> Int {
+  if a == b {
+    return 0
+  }
+  return 0
+}
+
 // RUN: %target-swift-ide-test -range -pos=8:1 -end-pos 8:32 -source-filename %s | %FileCheck %s -check-prefix=CHECK1
 // RUN: %target-swift-ide-test -range -pos=9:1 -end-pos 9:26 -source-filename %s | %FileCheck %s -check-prefix=CHECK2
 // RUN: %target-swift-ide-test -range -pos=10:1 -end-pos 10:27 -source-filename %s | %FileCheck %s -check-prefix=CHECK3
@@ -131,6 +138,9 @@ func foo8(a : [Int]) {
 // RUN: %target-swift-ide-test -range -pos=102:1 -end-pos=104:6 -source-filename %s | %FileCheck %s -check-prefix=CHECK24
 // RUN: %target-swift-ide-test -range -pos=87:1 -end-pos=92:6 -source-filename %s | %FileCheck %s -check-prefix=CHECK25
 // RUN: %target-swift-ide-test -range -pos=97:1 -end-pos=104:6 -source-filename %s | %FileCheck %s -check-prefix=CHECK26
+// RUN: %target-swift-ide-test -range -pos=109:6 -end-pos=111:4 -source-filename %s | %FileCheck %s -check-prefix=CHECK-INVALID
+
+// CHECK-INVALID: <Kind>Invalid</Kind>
 
 // CHECK1: <Kind>SingleDecl</Kind>
 // CHECK1-NEXT: <Content>func foo1() -> Int { return 0 }</Content>
