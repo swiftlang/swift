@@ -2645,11 +2645,11 @@ CanSILFunctionType SILGenFunction::buildThunkType(
   // Does the thunk type involve archetypes other than opened existentials?
   bool hasArchetypes = false;
   // Does the thunk type involve an open existential type?
-  ArchetypeType *openedExistential = nullptr;
-  auto archetypeVisitor = [&](Type t) {
-    if (auto *archetypeTy = t->getAs<ArchetypeType>()) {
+  CanArchetypeType openedExistential;
+  auto archetypeVisitor = [&](CanType t) {
+    if (auto archetypeTy = dyn_cast<ArchetypeType>(t)) {
       if (archetypeTy->getOpenedExistentialType()) {
-        assert((openedExistential == nullptr ||
+        assert((openedExistential == CanArchetypeType() ||
                 openedExistential == archetypeTy) &&
                "one too many open existentials");
         openedExistential = archetypeTy;
@@ -2682,7 +2682,7 @@ CanSILFunctionType SILGenFunction::buildThunkType(
   auto substIntoThunkContext = [&](CanType t) -> CanType {
     return t.subst(
       [&](SubstitutableType *type) -> Type {
-        if (type == openedExistential)
+        if (CanType(type) == openedExistential)
           return newArchetype;
         return Type(type).subst(contextSubs);
       },

@@ -92,8 +92,7 @@ SILInstruction *SILCombiner::optimizeBuiltinCanBeObjCClass(BuiltinInst *BI) {
 }
 
 static unsigned getTypeWidth(SILType Ty) {
-  if (auto BuiltinIntTy =
-          dyn_cast<BuiltinIntegerType>(Ty.getSwiftRValueType())) {
+  if (auto BuiltinIntTy = Ty.getAs<BuiltinIntegerType>()) {
     if (BuiltinIntTy->isFixedWidth()) {
       return BuiltinIntTy->getFixedWidth();
     }

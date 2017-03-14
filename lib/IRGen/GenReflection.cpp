@@ -189,9 +189,9 @@ protected:
 
   // Collect any builtin types referenced from this type.
   void addBuiltinTypeRefs(CanType type) {
-    type.visit([&](Type t) {
-      if (IGM.getSwiftModule()->isStdlibModule() && t->is<BuiltinType>())
-        IGM.BuiltinTypes.insert(CanType(t));
+    type.visit([&](CanType t) {
+      if (IGM.getSwiftModule()->isStdlibModule() && isa<BuiltinType>(t))
+        IGM.BuiltinTypes.insert(t);
 
       // We need size/alignment information for imported value types,
       // so emit builtin descriptors for them.

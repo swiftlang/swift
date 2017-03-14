@@ -372,6 +372,13 @@ public:
            "Forming a CanType out of a non-canonical type!");
   }
 
+  void visit(llvm::function_ref<void (CanType)> fn) const {
+    findIf([&fn](Type t) -> bool {
+        fn(CanType(t));
+        return false;
+      });
+  }
+
   // Provide a few optimized accessors that are really type-class queries.
 
   /// Do values of this type have reference semantics?

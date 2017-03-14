@@ -548,14 +548,8 @@ bool swift::ArraySemanticsCall::doesNotChangeArray() const {
 bool swift::ArraySemanticsCall::mayHaveBridgedObjectElementType() const {
   assert(hasSelf() && "Need self parameter");
 
-  auto Ty = getSelf()->getType().getSwiftRValueType();
-  auto *Struct = Ty->getStructOrBoundGenericStruct();
-  assert(Struct && "Array must be a struct !?");
-  if (Struct) {
-    auto BGT = dyn_cast<BoundGenericType>(Ty);
-    if (!BGT)
-      return true;
-
+  auto Ty = getSelf()->getType();
+  if (auto BGT = Ty.getAs<BoundGenericStructType>()) {
     // Check the array element type parameter.
     bool isClass = true;
     for (auto EltTy : BGT->getGenericArgs()) {

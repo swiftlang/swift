@@ -503,8 +503,8 @@ SILValue swift::castValueToABICompatibleType(SILBuilder *B, SILLocation Loc,
     return B->createUncheckedRefCast(Loc, Value, DestTy);
   }
 
-  if (auto mt1 = dyn_cast<AnyMetatypeType>(SrcTy.getSwiftRValueType())) {
-    if (auto mt2 = dyn_cast<AnyMetatypeType>(DestTy.getSwiftRValueType())) {
+  if (auto mt1 = SrcTy.getAs<AnyMetatypeType>()) {
+    if (auto mt2 = DestTy.getAs<AnyMetatypeType>()) {
       if (mt1->getRepresentation() == mt2->getRepresentation()) {
         // If B.Type needs to be casted to A.Type and
         // A is a superclass of B, then it can be done by means
@@ -1796,8 +1796,8 @@ simplifyCheckedCastAddrBranchInst(CheckedCastAddrBranchInst *Inst) {
 
   // Check if we can statically predict the outcome of the cast.
   auto Feasibility = classifyDynamicCast(Mod.getSwiftModule(),
-                          Src->getType().getSwiftRValueType(),
-                          Dest->getType().getSwiftRValueType(),
+                          SourceType,
+                          TargetType,
                           isSourceTypeExact,
                           Mod.isWholeModule());
 
@@ -1908,10 +1908,9 @@ CastOptimizer::simplifyCheckedCastBranchInst(CheckedCastBranchInst *Inst) {
   if (!Inst)
     return nullptr;
 
-  auto LoweredSourceType = Inst->getOperand()->getType();
   auto LoweredTargetType = Inst->getCastType();
-  auto SourceType = LoweredSourceType.getSwiftRValueType();
-  auto TargetType = LoweredTargetType.getSwiftRValueType();
+  auto SourceType = Inst->getSourceType();
+  auto TargetType = Inst->getTargetType();
   auto Loc = Inst->getLoc();
   auto *SuccessBB = Inst->getSuccessBB();
   auto *FailureBB = Inst->getFailureBB();
@@ -1991,10 +1990,9 @@ SILInstruction *CastOptimizer::simplifyCheckedCastValueBranchInst(
   if (!Inst)
     return nullptr;
 
-  auto LoweredSourceType = Inst->getOperand()->getType();
   auto LoweredTargetType = Inst->getCastType();
-  auto SourceType = LoweredSourceType.getSwiftRValueType();
-  auto TargetType = LoweredTargetType.getSwiftRValueType();
+  auto SourceType = Inst->getSourceType();
+  auto TargetType = Inst->getTargetType();
   auto Loc = Inst->getLoc();
   auto *SuccessBB = Inst->getSuccessBB();
   auto *FailureBB = Inst->getFailureBB();
@@ -2118,7 +2116,7 @@ SILInstruction *CastOptimizer::optimizeCheckedCastAddrBranchInst(
         if (SuccessBB->getSinglePredecessorBlock() &&
             canUseScalarCheckedCastInstructions(
                 Inst->getModule(), MI->getType().getSwiftRValueType(),
-                Dest->getType().getObjectType().getSwiftRValueType())) {
+                Inst->getTargetType())) {
           SILBuilderWithScope B(Inst);
           auto NewI = B.createCheckedCastBranch(
               Loc, false /*isExact*/, MI,
@@ -2224,7 +2222,7 @@ CastOptimizer::optimizeCheckedCastBranchInst(CheckedCastBranchInst *Inst) {
         if (LoweredConcreteTy.isAnyExistentialType())
           return nullptr;
         // Get the metatype of this type.
-        auto EMT = dyn_cast<AnyMetatypeType>(EmiTy.getSwiftRValueType());
+        auto EMT = EmiTy.castTo<AnyMetatypeType>();
         auto *MetaTy = MetatypeType::get(LoweredConcreteTy.getSwiftRValueType(),
                                          EMT->getRepresentation());
         auto CanMetaTy = CanMetatypeType::CanTypeWrapper(MetaTy);
@@ -2280,7 +2278,7 @@ CastOptimizer::optimizeCheckedCastBranchInst(CheckedCastBranchInst *Inst) {
         if (ConcreteTy.isAnyExistentialType())
           return nullptr;
         // Get the SIL metatype of this type.
-        auto EMT = dyn_cast<AnyMetatypeType>(EMI->getType().getSwiftRValueType());
+        auto EMT = EMI->getType().castTo<AnyMetatypeType>();
         auto *MetaTy = MetatypeType::get(ConcreteTy, EMT->getRepresentation());
         auto CanMetaTy = CanMetatypeType::CanTypeWrapper(MetaTy);
         auto SILMetaTy = SILType::getPrimitiveObjectType(CanMetaTy);
@@ -2313,8 +2311,8 @@ optimizeUnconditionalCheckedCastInst(UnconditionalCheckedCastInst *Inst) {
 
   // Check if we can statically predict the outcome of the cast.
   auto Feasibility = classifyDynamicCast(Mod.getSwiftModule(),
-                          LoweredSourceType.getSwiftRValueType(),
-                          LoweredTargetType.getSwiftRValueType(),
+                          Inst->getSourceType(),
+                          Inst->getTargetType(),
                           isSourceTypeExact);
 
   if (Feasibility == DynamicCastFeasibility::MaySucceed) {
