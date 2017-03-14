@@ -50,6 +50,7 @@ func dont_return<T>(_ argument: T) throws -> T {
 // CHECK:    sil hidden @_TF6errors16all_together_nowFSbCS_3Cat : $@convention(thin) (Bool) -> @owned Cat {
 // CHECK:    bb0(%0 : $Bool):
 // CHECK:      [[DR_FN:%.*]] = function_ref @_TF6errors11dont_returnur{{.*}} :
+// CHECK-NEXT: [[RET_TEMP:%.*]] = alloc_stack $Cat
 
 //   Branch on the flag.
 // CHECK:      cond_br {{%.*}}, [[FLAG_TRUE:bb[0-9]+]], [[FLAG_FALSE:bb[0-9]+]]
@@ -72,12 +73,11 @@ func dont_return<T>(_ argument: T) throws -> T {
 // CHECK:    [[TERNARY_CONT]]([[T0:%.*]] : $Cat):
 // CHECK-NEXT: [[ARG_TEMP:%.*]] = alloc_stack $Cat
 // CHECK-NEXT: store [[T0]] to [init] [[ARG_TEMP]]
-// CHECK-NEXT: [[RET_TEMP:%.*]] = alloc_stack $Cat
 // CHECK-NEXT: try_apply [[DR_FN]]<Cat>([[RET_TEMP]], [[ARG_TEMP]]) : $@convention(thin) <τ_0_0> (@in τ_0_0) -> (@out τ_0_0, @error Error), normal [[DR_NORMAL:bb[0-9]+]], error [[DR_ERROR:bb[0-9]+]]
 // CHECK:    [[DR_NORMAL]]({{%.*}} : $()):
 // CHECK-NEXT: [[T0:%.*]] = load [take] [[RET_TEMP]] : $*Cat
-// CHECK-NEXT: dealloc_stack [[RET_TEMP]]
 // CHECK-NEXT: dealloc_stack [[ARG_TEMP]]
+// CHECK-NEXT: dealloc_stack [[RET_TEMP]]
 // CHECK-NEXT: br [[RETURN:bb[0-9]+]]([[T0]] : $Cat)
 
 //   Return block.
@@ -130,8 +130,10 @@ func dont_return<T>(_ argument: T) throws -> T {
 
 //   Landing pad.
 // CHECK:    [[MAC_ERROR]]([[T0:%.*]] : $Error):
+// CHECK-NEXT: dealloc_stack [[RET_TEMP]]
 // CHECK-NEXT: br [[CATCH]]([[T0]] : $Error)
 // CHECK:    [[DMAC_ERROR]]([[T0:%.*]] : $Error):
+// CHECK-NEXT: dealloc_stack [[RET_TEMP]]
 // CHECK-NEXT: br [[CATCH]]([[T0]] : $Error)
 // CHECK:    [[DR_ERROR]]([[T0:%.*]] : $Error):
 // CHECK-NEXT: dealloc_stack

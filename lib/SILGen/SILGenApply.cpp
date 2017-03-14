@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "ArgumentSource.h"
+#include "Callee.h"
 #include "FormalEvaluation.h"
 #include "Initialization.h"
 #include "LValue.h"
@@ -1739,74 +1740,21 @@ static bool hasUnownedInnerPointerResult(CanSILFunctionType fnType) {
   return false;
 }
 
-static ResultPlanPtr
-computeResultPlan(SILGenFunction *SGF, CanSILFunctionType substFnType,
-                  AbstractionPattern origResultType, CanType substResultType,
-                  const Optional<ForeignErrorConvention> &foreignError,
-                  SILFunctionTypeRepresentation rep, SILLocation loc,
-                  SGFContext evalContext,
-                  SmallVectorImpl<SILValue> &indirectResultAddrs) {
-  auto origResultTypeForPlan = origResultType;
-  auto substResultTypeForPlan = substResultType;
-  ArrayRef<SILResultInfo> allResults = substFnType->getResults();
-  SILResultInfo optResult;
-
-  // The plan needs to be built using the formal result type
-  // after foreign-error adjustment.
-  if (foreignError) {
-    switch (foreignError->getKind()) {
-    // These conventions make the formal result type ().
-    case ForeignErrorConvention::ZeroResult:
-    case ForeignErrorConvention::NonZeroResult:
-      assert(substResultType->isVoid());
-      allResults = {};
-      break;
-
-    // These conventions leave the formal result alone.
-    case ForeignErrorConvention::ZeroPreservedResult:
-    case ForeignErrorConvention::NonNilError:
-      break;
-
-    // This convention changes the formal result to the optional object
-    // type; we need to make our own make SILResultInfo array.
-    case ForeignErrorConvention::NilResult: {
-      assert(allResults.size() == 1);
-      CanType objectType = allResults[0].getType().getAnyOptionalObjectType();
-      optResult = allResults[0].getWithType(objectType);
-      allResults = optResult;
-      break;
-    }
-    }
-  }
-
-  ResultPlanBuilder builder(*SGF, loc, allResults, rep, indirectResultAddrs);
-  return builder.build(evalContext.getEmitInto(), origResultTypeForPlan,
-                       substResultTypeForPlan);
-}
-
 /// Emit a function application, assuming that the arguments have been
 /// lowered appropriately for the abstraction level but that the
 /// result does need to be turned back into something matching a
 /// formal type.
-RValue SILGenFunction::emitApply(
-                            SILLocation loc,
-                            ManagedValue fn,
-                            SubstitutionList subs,
-                            ArrayRef<ManagedValue> args,
-                            CanSILFunctionType substFnType,
-                            AbstractionPattern origResultType,
-                            CanType substResultType,
-                            ApplyOptions options,
-                            Optional<SILFunctionTypeRepresentation> overrideRep,
-                      const Optional<ForeignErrorConvention> &foreignError,
-                            SGFContext evalContext) {
-  auto rep = overrideRep ? *overrideRep : substFnType->getRepresentation();
+RValue SILGenFunction::emitApply(ResultPlanPtr &&resultPlan, SILLocation loc,
+                                 ManagedValue fn, SubstitutionList subs,
+                                 ArrayRef<ManagedValue> args,
+                                 CalleeTypeInfo &calleeTypeInfo,
+                                 ApplyOptions options, SGFContext evalContext) {
+  auto substFnType = calleeTypeInfo.substFnType;
+  auto substResultType = calleeTypeInfo.substResultType;
 
   // Create the result plan.
   SmallVector<SILValue, 4> indirectResultAddrs;
-  ResultPlanPtr resultPlan = computeResultPlan(
-      this, substFnType, origResultType, substResultType, foreignError, rep,
-      loc, evalContext, indirectResultAddrs);
+  resultPlan->gatherIndirectResultAddrs(indirectResultAddrs);
 
   // If the function returns an inner pointer, we'll need to lifetime-extend
   // the 'self' parameter.
@@ -1847,7 +1795,7 @@ RValue SILGenFunction::emitApply(
   // If there's a foreign error parameter, fill it in.
   Optional<FormalEvaluationScope> errorTempWriteback;
   ManagedValue errorTemp;
-  if (foreignError) {
+  if (auto foreignError = calleeTypeInfo.foreignError) {
     // Error-temporary emission may need writeback.
     errorTempWriteback.emplace(*this);
 
@@ -1947,7 +1895,7 @@ RValue SILGenFunction::emitApply(
   // If there was a foreign error convention, consider it.
   // TODO: maybe this should happen after managing the result if it's
   // not a result-checking convention?
-  if (foreignError) {
+  if (auto foreignError = calleeTypeInfo.foreignError) {
     // Force immediate writeback to the error temporary.
     errorTempWriteback.reset();
 
@@ -1973,9 +1921,13 @@ RValue SILGenFunction::emitMonomorphicApply(SILLocation loc,
                      const Optional<ForeignErrorConvention> &foreignError){
   auto fnType = fn.getType().castTo<SILFunctionType>();
   assert(!fnType->isPolymorphic());
-  return emitApply(loc, fn, {}, args, fnType,
-                   AbstractionPattern(resultType), resultType,
-                   options, overrideRep, foreignError, SGFContext());
+  SGFContext evalContext;
+  CalleeTypeInfo calleeTypeInfo(fnType, AbstractionPattern(resultType),
+                                resultType, foreignError, overrideRep);
+  ResultPlanPtr resultPlan = ResultPlanBuilder::computeResultPlan(
+      *this, calleeTypeInfo, loc, evalContext);
+  return emitApply(std::move(resultPlan), loc, fn, {}, args, calleeTypeInfo,
+                   options, evalContext);
 }
 
 /// Count the number of SILParameterInfos that are needed in order to
@@ -3811,6 +3763,19 @@ namespace {
                             ImportAsMemberStatus foreignSelf,
                             Optional<ForeignErrorConvention> foreignError,
                             SGFContext C);
+
+    AbstractionPattern
+    getUncurriedOrigFormalType(AbstractionPattern origFormalType) {
+      if (callee.hasCaptures()) {
+        claimNextParamClause(origFormalType);
+      }
+
+      for (unsigned i = 0, e = uncurriedSites.size(); i < e; ++i) {
+        claimNextParamClause(origFormalType);
+      }
+
+      return origFormalType;
+    }
   };
 } // end anonymous namespace
 
@@ -3861,6 +3826,12 @@ RValue CallEmission::applyNormalCall(
   std::tie(mv, substFnType, foreignError, foreignSelf, initialOptions) =
       callee.getAtUncurryLevel(SGF, uncurryLevel);
 
+  CalleeTypeInfo calleeTypeInfo(
+      substFnType, getUncurriedOrigFormalType(*origFormalType),
+      uncurriedSites.back().getSubstResultType(), foreignError);
+  ResultPlanPtr resultPlan = ResultPlanBuilder::computeResultPlan(
+      SGF, calleeTypeInfo, uncurriedSites.back().Loc, uncurriedContext);
+
   // Now that we know the substFnType, check if we assumed that we were
   // passing self at +0. If we did and self is not actually passed at +0,
   // retain Self.
@@ -3884,10 +3855,9 @@ RValue CallEmission::applyNormalCall(
                               initialOptions, uncurriedArgs, uncurriedLoc,
                               formalApplyType);
   // Emit the uncurried call.
-  return SGF.emitApply(uncurriedLoc.getValue(), mv, callee.getSubstitutions(),
-                       uncurriedArgs, substFnType, origFormalType.getValue(),
-                       uncurriedSites.back().getSubstResultType(),
-                       initialOptions, None, foreignError, uncurriedContext);
+  return SGF.emitApply(std::move(resultPlan), uncurriedLoc.getValue(), mv,
+                       callee.getSubstitutions(), uncurriedArgs, calleeTypeInfo,
+                       initialOptions, uncurriedContext);
 }
 
 RValue CallEmission::applyEnumElementConstructor(
@@ -4127,6 +4097,9 @@ void CallEmission::emitArgumentsForNormalApply(
     Optional<SILLocation> &uncurriedLoc, CanFunctionType &formalApplyType) {
   SmallVector<SmallVector<ManagedValue, 4>, 2> args;
   SmallVector<InOutArgument, 2> inoutArgs;
+  auto expectedUncurriedOrigFormalType =
+      getUncurriedOrigFormalType(origFormalType);
+  (void)expectedUncurriedOrigFormalType;
 
   args.reserve(uncurriedSites.size());
   {
@@ -4174,7 +4147,10 @@ void CallEmission::emitArgumentsForNormalApply(
   }
   assert(uncurriedLoc);
   assert(formalApplyType);
-
+  assert(origFormalType.getType() ==
+             expectedUncurriedOrigFormalType.getType() &&
+         "getUncurriedOrigFormalType and emitArgumentsForNormalCall are out of "
+         "sync");
   // Begin the formal accesses to any inout arguments we have.
   if (!inoutArgs.empty()) {
     beginInOutFormalAccesses(SGF, inoutArgs, args);
@@ -4223,6 +4199,16 @@ RValue CallEmission::applyRemainingCallSites(
     // for argument passing now.
     AbstractionPattern origResultType(formalType.getResult());
     AbstractionPattern origParamType(claimNextParamClause(formalType));
+
+    SGFContext context = i == size - 1 ? C : SGFContext();
+
+    // Create the callee type info and initialize our indirect results.
+    CalleeTypeInfo calleeTypeInfo(substFnType, origResultType,
+                                  extraSites[i].getSubstResultType(),
+                                  foreignError);
+    ResultPlanPtr resultPtr =
+        ResultPlanBuilder::computeResultPlan(SGF, calleeTypeInfo, loc, context);
+
     std::move(extraSites[i])
         .emit(SGF, origParamType, paramLowering, siteArgs, inoutArgs,
               foreignError, foreignSelf);
@@ -4230,11 +4216,10 @@ RValue CallEmission::applyRemainingCallSites(
       beginInOutFormalAccesses(SGF, inoutArgs, siteArgs);
     }
 
-    SGFContext context = i == size - 1 ? C : SGFContext();
     ApplyOptions options = ApplyOptions::None;
-    result = SGF.emitApply(loc, functionMV, {}, siteArgs, substFnType,
-                           origResultType, extraSites[i].getSubstResultType(),
-                           options, None, foreignError, context);
+
+    result = SGF.emitApply(std::move(resultPtr), loc, functionMV, {}, siteArgs,
+                           calleeTypeInfo, options, context);
   }
 
   return std::move(result);
@@ -4308,10 +4293,13 @@ SILGenFunction::emitApplyOfLibraryIntrinsic(SILLocation loc,
   assert(substFnType->getExtInfo().getLanguage()
            == SILFunctionLanguage::Swift);
 
-  return emitApply(loc, mv, subs, args, substFnType,
-                   AbstractionPattern(origFormalType).getFunctionResultType(),
-                   substFormalType.getResult(),
-                   options, None, None, ctx);
+  CalleeTypeInfo calleeTypeInfo(
+      substFnType, AbstractionPattern(origFormalType).getFunctionResultType(),
+      substFormalType.getResult());
+  ResultPlanPtr resultPlan =
+      ResultPlanBuilder::computeResultPlan(*this, calleeTypeInfo, loc, ctx);
+  return emitApply(std::move(resultPlan), loc, mv, subs, args, calleeTypeInfo,
+                   options, ctx);
 }
 
 static StringRef
