@@ -48,15 +48,14 @@ static StringRef extractExprSource(SourceManager &SM, Expr *E) {
 
 /// Get the identifier string of the UnresolvedDeclRefExpr.
 /// Returns \c true if failed.
-static bool getNameStr(Expr *E, StringRef &Name, DeclRefKind Kind) {
+static llvm::Optional<StringRef> getDeclRefStr(Expr *E, DeclRefKind Kind) {
   auto UDRE = dyn_cast<UnresolvedDeclRefExpr>(E);
   if (!UDRE ||
       !UDRE->hasName() ||
       UDRE->getRefKind() != Kind ||
       UDRE->getName().isCompoundName())
-    return true;
-  Name = UDRE->getName().getBaseName().str();
-  return false;
+    return None;
+  return UDRE->getName().getBaseName().str();
 }
 
 /// The condition validator.
@@ -78,10 +77,13 @@ class ValidateIfConfigCondition :
   Expr *foldSequence(Expr *LHS, ArrayRef<Expr*> &S, bool isRecurse = false) {
     assert(!S.empty() && ((S.size() & 1) == 0));
 
-    auto getNextOperator = [&](StringRef &Name) -> bool {
-      assert(!S.empty() && ((S.size() & 1) == 0));
-      while (getNameStr(S[0], Name, DeclRefKind::BinaryOperator) ||
-            (Name != "||" && Name != "&&")) {
+    auto getNextOperator = [&]() -> llvm::Optional<StringRef> {
+      assert((S.size() & 1) == 0);
+      while (!S.empty()) {
+        auto Name = getDeclRefStr(S[0], DeclRefKind::BinaryOperator);
+        if (Name.hasValue() && (*Name == "||" || *Name == "&&"))
+          return Name;
+
         auto DiagID = isa<UnresolvedDeclRefExpr>(S[0])
           ? diag::unsupported_conditional_compilation_binary_expression
           : diag::unsupported_conditional_compilation_expression_type;
@@ -89,15 +91,13 @@ class ValidateIfConfigCondition :
         HasError |= true;
         // Consume invalid operator and the immediate RHS.
         S = S.slice(2);
-        if (S.empty())
-          return true;
       }
-      return false;
+      return None;
     };
 
     // Extract out the first operator name.
-    StringRef OpName;
-    if (getNextOperator(OpName))
+    auto OpName = getNextOperator();
+    if (!OpName.hasValue())
       // If failed, it's not a sequence anymore.
       return LHS;
     Expr *Op = S[0];
@@ -107,11 +107,11 @@ class ValidateIfConfigCondition :
     Expr *RHS = validate(S[1]);
     S = S.slice(2);
 
-    // Pull out the next binary operator.
     while (true) {
-      StringRef NextOpName;
-      bool IsEnd = S.empty() || getNextOperator(NextOpName);
-      if (!IsEnd && OpName == "||" && NextOpName == "&&") {
+      // Pull out the next binary operator.
+      auto NextOpName = getNextOperator();
+      bool IsEnd = !NextOpName.hasValue();
+      if (!IsEnd && *OpName == "||" && *NextOpName == "&&") {
         RHS = foldSequence(RHS, S, /*isRecurse*/true);
         continue;
       }
@@ -127,7 +127,7 @@ class ValidateIfConfigCondition :
       // If we don't have the next operator, we're done.
       if (IsEnd)
         break;
-      if (isRecurse && OpName == "&&" && NextOpName == "||")
+      if (isRecurse && *OpName == "&&" && *NextOpName == "||")
         break;
 
       OpName = NextOpName;
@@ -149,9 +149,8 @@ class ValidateIfConfigCondition :
     S = S.slice(1);
 
     while (!S.empty()) {
-      StringRef OpName;
-      if (getNameStr(S[0], OpName, DeclRefKind::BinaryOperator) ||
-            (OpName != "||" && OpName != "&&")) {
+      auto OpName = getDeclRefStr(S[0], DeclRefKind::BinaryOperator);
+      if (!OpName.hasValue() || (*OpName != "||" && *OpName != "&&")) {
         // Warning and ignore in Swift3 mode.
         D.diagnose(
             S[0]->getLoc(),
@@ -176,8 +175,7 @@ public:
 
   // Explicit configuration flag.
   Expr *visitUnresolvedDeclRefExpr(UnresolvedDeclRefExpr *E) {
-    StringRef FlagName;
-    if (getNameStr(E, FlagName, DeclRefKind::Ordinary))
+    if (!getDeclRefStr(E, DeclRefKind::Ordinary).hasValue())
       return diagnoseUnsupportedExpr(E);
     return E;
   }
@@ -204,8 +202,8 @@ public:
 
   // Platform conditions.
   Expr *visitCallExpr(CallExpr *E) {
-    StringRef KindName;
-    if (getNameStr(E->getFn(), KindName, DeclRefKind::Ordinary)) {
+    auto KindName = getDeclRefStr(E->getFn(), DeclRefKind::Ordinary);
+    if (!KindName.hasValue()) {
       D.diagnose(E->getLoc(), diag::unsupported_platform_condition_expression);
       return nullptr;
     }
@@ -218,7 +216,7 @@ public:
     Expr *Arg = ArgP->getSubExpr();
 
     // '_compiler_version' '(' string-literal ')'
-    if (KindName == "_compiler_version") {
+    if (*KindName == "_compiler_version") {
       auto SLE = dyn_cast<StringLiteralExpr>(Arg);
       if (!SLE) {
         D.diagnose(Arg->getLoc(),
@@ -241,12 +239,11 @@ public:
     }
 
     // 'swift' '(' '>=' float-literal ( '.' integer-literal )* ')'
-    if (KindName == "swift") {
+    if (*KindName == "swift") {
       auto PUE = dyn_cast<PrefixUnaryExpr>(Arg);
-      StringRef PrefixName;
-      if (!PUE ||
-          getNameStr(PUE->getFn(), PrefixName, DeclRefKind::PrefixOperator) ||
-          PrefixName != ">=") {
+      llvm::Optional<StringRef> PrefixName = PUE ?
+        getDeclRefStr(PUE->getFn(), DeclRefKind::PrefixOperator) : None;
+      if (!PrefixName || *PrefixName != ">=") {
         D.diagnose(Arg->getLoc(),
                    diag::unsupported_platform_condition_argument,
                    "a unary comparison, such as '>=2.2'");
@@ -261,30 +258,30 @@ public:
     }
 
     // ( 'os' | 'arch' | '_endian' | '_runtime' ) '(' identifier ')''
-    auto Kind = getPlatformConditionKind(KindName);
+    auto Kind = getPlatformConditionKind(*KindName);
     if (!Kind.hasValue()) {
       D.diagnose(E->getLoc(), diag::unsupported_platform_condition_expression);
       return nullptr;
     }
 
-    StringRef ArgStr;
-    if (getNameStr(Arg, ArgStr, DeclRefKind::Ordinary)) {
+    auto ArgStr = getDeclRefStr(Arg, DeclRefKind::Ordinary);
+    if (!ArgStr.hasValue()) {
       D.diagnose(E->getLoc(), diag::unsupported_platform_condition_argument,
                  "identifier");
       return nullptr;
     }
 
     // FIXME: Perform the replacement macOS -> OSX elsewhere.
-    if (Kind == PlatformConditionKind::OS && ArgStr == "macOS") {
-      ArgStr = "OSX";
+    if (Kind == PlatformConditionKind::OS && *ArgStr == "macOS") {
+      *ArgStr = "OSX";
       ArgP->setSubExpr(
-          new (Ctx) UnresolvedDeclRefExpr(Ctx.getIdentifier(ArgStr),
+          new (Ctx) UnresolvedDeclRefExpr(Ctx.getIdentifier(*ArgStr),
                                           DeclRefKind::Ordinary,
                                           DeclNameLoc(Arg->getLoc())));
     }
 
     std::vector<StringRef> suggestions;
-    if (!LangOptions::checkPlatformConditionSupported(*Kind, ArgStr,
+    if (!LangOptions::checkPlatformConditionSupported(*Kind, *ArgStr,
                                                       suggestions)) {
       if (Kind == PlatformConditionKind::Runtime) {
         // Error for _runtime()
@@ -305,7 +302,7 @@ public:
       }
       auto Loc = Arg->getLoc();
       D.diagnose(Loc, diag::unknown_platform_condition_argument,
-                 DiagName, KindName);
+                 DiagName, *KindName);
       for (auto suggestion : suggestions)
         D.diagnose(Loc, diag::note_typo_candidate, suggestion)
           .fixItReplace(Arg->getSourceRange(), suggestion);
@@ -323,9 +320,8 @@ public:
 
   // Prefix '!'. Other prefix operators are rejected.
   Expr *visitPrefixUnaryExpr(PrefixUnaryExpr *E) {
-    StringRef OpName;
-    if (getNameStr(E->getFn(), OpName, DeclRefKind::PrefixOperator) ||
-        OpName != "!") {
+    auto OpName = getDeclRefStr(E->getFn(), DeclRefKind::PrefixOperator);
+    if (!OpName.hasValue() || *OpName != "!") {
       D.diagnose(E->getLoc(),
                  diag::unsupported_conditional_compilation_unary_expression);
       return nullptr;
@@ -394,14 +390,12 @@ public:
   }
 
   bool visitUnresolvedDeclRefExpr(UnresolvedDeclRefExpr *E) {
-    StringRef Name;
-    getNameStr(E, Name, DeclRefKind::Ordinary);
+    auto Name = getDeclRefStr(E, DeclRefKind::Ordinary).getValue();
     return Ctx.LangOpts.isCustomConditionalCompilationFlagSet(Name);
   }
 
   bool visitCallExpr(CallExpr *E) {
-    StringRef KindName;
-    getNameStr(E->getFn(), KindName, DeclRefKind::Ordinary);
+    auto KindName = getDeclRefStr(E->getFn(), DeclRefKind::Ordinary).getValue();
     auto *Arg = cast<ParenExpr>(E->getArg())->getSubExpr();
 
     if (KindName == "_compiler_version") {
@@ -419,8 +413,7 @@ public:
       return thisVersion >= Val;
     }
 
-    StringRef Val;
-    getNameStr(Arg, Val, DeclRefKind::Ordinary);
+    auto Val = getDeclRefStr(Arg, DeclRefKind::Ordinary).getValue();
     auto Kind = getPlatformConditionKind(KindName).getValue();
     auto Target = Ctx.LangOpts.getPlatformConditionValue(Kind);
     return Target == Val;
@@ -436,8 +429,8 @@ public:
 
   bool visitBinaryExpr(BinaryExpr *E) {
     assert(!Ctx.isSwiftVersion3() && "BinaryExpr in Swift3 mode");
-    StringRef OpName;
-    getNameStr(E->getFn(), OpName, DeclRefKind::BinaryOperator);
+    auto OpName =
+      getDeclRefStr(E->getFn(), DeclRefKind::BinaryOperator).getValue();
     auto Args = E->getArg()->getElements();
     if (OpName == "||") return visit(Args[0]) || visit(Args[1]);
     if (OpName == "&&") return visit(Args[0]) && visit(Args[1]);
@@ -450,8 +443,8 @@ public:
     auto Result = visit(Elems[0]);
     Elems = Elems.slice(1);
     while (!Elems.empty()) {
-      StringRef OpName;
-      getNameStr(Elems[0], OpName, DeclRefKind::BinaryOperator);
+      auto OpName =
+        getDeclRefStr(Elems[0], DeclRefKind::BinaryOperator).getValue();
 
       if (OpName == "||") {
         Result = Result || visit(Elems[1]);
@@ -490,8 +483,8 @@ public:
   IsVersionIfConfigCondition() {}
 
   bool visitBinaryExpr(BinaryExpr *E) {
-    StringRef OpName;
-    getNameStr(E->getFn(), OpName, DeclRefKind::BinaryOperator);
+    auto OpName =
+      getDeclRefStr(E->getFn(), DeclRefKind::BinaryOperator).getValue();
     auto Args = E->getArg()->getElements();
     if (OpName == "||") return visit(Args[0]) && visit(Args[1]);
     if (OpName == "&&") return visit(Args[0]) || visit(Args[1]);
@@ -499,8 +492,7 @@ public:
   }
 
   bool visitCallExpr(CallExpr *E) {
-    StringRef KindName;
-    getNameStr(E->getFn(), KindName, DeclRefKind::Ordinary);
+    auto KindName = getDeclRefStr(E->getFn(), DeclRefKind::Ordinary).getValue();
     return KindName == "_compiler_version" || KindName == "swift";
   }
 
