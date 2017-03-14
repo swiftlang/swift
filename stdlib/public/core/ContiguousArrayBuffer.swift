@@ -29,7 +29,7 @@ internal final class _EmptyArrayStorage
   override func _withVerbatimBridgedUnsafeBuffer<R>(
     _ body: (UnsafeBufferPointer<AnyObject>) throws -> R
   ) rethrows -> R? {
-    return try body(UnsafeBufferPointer(start: nil, count: 0))
+    return try body(UnsafeBufferPointer())
   }
 
   override func _getNonVerbatimBridgedCount() -> Int {

@@ -27,8 +27,8 @@ public func _stdlib_mkstemps(_ template: inout String, _ suffixlen: CInt) -> CIn
   var utf8CStr = template.utf8CString
   let (fd, fileName) = utf8CStr.withUnsafeMutableBufferPointer {
     (utf8CStr) -> (CInt, String) in
-    let fd = mkstemps(utf8CStr.baseAddress!, suffixlen)
-    let fileName = String(cString: utf8CStr.baseAddress!)
+    let fd = mkstemps(utf8CStr.baseAddress, suffixlen)
+    let fileName = String(cString: utf8CStr.baseAddress)
     return (fd, fileName)
   }
   template = fileName
