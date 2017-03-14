@@ -1041,7 +1041,9 @@ class GenericSignatureBuilder::PotentialArchetype {
     const_iterator end() const { return archetypes.end(); }
 
     PotentialArchetype *front() const { return archetypes.front(); }
+    PotentialArchetype *back() const { return archetypes.back(); }
 
+    unsigned size() const { return archetypes.size(); }
     bool empty() const { return archetypes.empty(); }
 
     void push_back(PotentialArchetype *pa) {
@@ -1168,6 +1170,10 @@ public:
   void resolveAssociatedType(AssociatedTypeDecl *assocType,
                              GenericSignatureBuilder &builder);
 
+  /// Resolve the potential archetype to the given typealias.
+  void resolveTypeAlias(TypeAliasDecl *typealias,
+                        GenericSignatureBuilder &builder);
+
   /// Determine whether this is a generic parameter.
   bool isGenericParam() const {
     return parentOrBuilder.is<GenericSignatureBuilder *>();
@@ -1292,6 +1298,52 @@ public:
   /// \brief Retrieve (or create) a nested type with a known associated type.
   PotentialArchetype *getNestedType(AssociatedTypeDecl *assocType,
                                     GenericSignatureBuilder &builder);
+
+  /// \brief Retrieve (or create) a nested type with a known typealias.
+  PotentialArchetype *getNestedType(TypeAliasDecl *typealias,
+                                    GenericSignatureBuilder &builder);
+
+  /// \brief Retrieve (or create) a nested type that is the current best
+  /// nested archetype anchor (locally) with the given name.
+  ///
+  /// When called on the archetype anchor, this will produce the named
+  /// archetype anchor.
+  PotentialArchetype *getNestedArchetypeAnchor(
+                                           Identifier name,
+                                           GenericSignatureBuilder &builder);
+
+  /// Describes the kind of update that is performed.
+  enum class NestedTypeUpdate {
+    /// Resolve an existing potential archetype, but don't create a new
+    /// one if not present.
+    ResolveExisting,
+    /// If this potential archetype is missing, create it.
+    AddIfMissing,
+    /// If this potential archetype is missing and would be a better anchor,
+    /// create it.
+    AddIfBetterAnchor,
+  };
+
+  /// Update the named nested type when we know this type conforms to the given
+  /// protocol.
+  ///
+  /// \returns the potential archetype associated with the associated
+  /// type or typealias of the given protocol, unless the \c kind implies that
+  /// a potential archetype should not be created if it's missing.
+  PotentialArchetype *updateNestedTypeForConformance(
+                      PointerUnion<AssociatedTypeDecl *, TypeAliasDecl *> type,
+                      NestedTypeUpdate kind);
+
+  /// Update the named nested type when we know this type conforms to the given
+  /// protocol.
+  ///
+  /// \returns the potential archetype associated with either an associated
+  /// type or typealias of the given protocol, unless the \c kind implies that
+  /// a potential archetype should not be created if it's missing.
+  PotentialArchetype *updateNestedTypeForConformance(
+                        Identifier name,
+                        ProtocolDecl *protocol,
+                        NestedTypeUpdate kind);
 
   /// \brief Retrieve (or build) the type corresponding to the potential
   /// archetype within the given generic environment.
