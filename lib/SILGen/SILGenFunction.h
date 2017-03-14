@@ -39,6 +39,8 @@ class ManagedValue;
 class RValue;
 class TemporaryInitialization;
 class CalleeTypeInfo;
+class ResultPlan;
+using ResultPlanPtr = std::unique_ptr<ResultPlan>;
 
 /// Internal context information for the SILGenFunction visitor.
 ///
@@ -1271,9 +1273,10 @@ public:
   /// lowered appropriately for the abstraction level but that the
   /// result does need to be turned back into something matching a
   /// formal type.
-  RValue emitApply(SILLocation loc, ManagedValue fn, SubstitutionList subs,
-                   ArrayRef<ManagedValue> args, CalleeTypeInfo &calleeTypeInfo,
-                   ApplyOptions options, SGFContext evalContext);
+  RValue emitApply(ResultPlanPtr &&resultPlan, SILLocation loc, ManagedValue fn,
+                   SubstitutionList subs, ArrayRef<ManagedValue> args,
+                   CalleeTypeInfo &calleeTypeInfo, ApplyOptions options,
+                   SGFContext evalContext);
 
   RValue emitApplyOfDefaultArgGenerator(SILLocation loc,
                                         ConcreteDeclRef defaultArgsOwner,

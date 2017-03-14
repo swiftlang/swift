@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "ResultPlan.h"
+#include "Callee.h"
 #include "Initialization.h"
 #include "RValue.h"
 #include "SILGenFunction.h"
@@ -373,4 +374,47 @@ ResultPlanPtr ResultPlanBuilder::buildForTuple(Initialization *init,
   // Make a plan that calls copyOrInitValueInto.
   return ResultPlanPtr(
       new InitValueFromRValueResultPlan(init, std::move(subplan)));
+}
+
+ResultPlanPtr
+ResultPlanBuilder::computeResultPlan(SILGenFunction &SGF,
+                                     CalleeTypeInfo &calleeTypeInfo,
+                                     SILLocation loc, SGFContext evalContext) {
+  auto origResultTypeForPlan = calleeTypeInfo.origResultType;
+  auto substResultTypeForPlan = calleeTypeInfo.substResultType;
+  ArrayRef<SILResultInfo> allResults = calleeTypeInfo.substFnType->getResults();
+  SILResultInfo optResult;
+
+  // The plan needs to be built using the formal result type
+  // after foreign-error adjustment.
+  if (auto foreignError = calleeTypeInfo.foreignError) {
+    switch (foreignError->getKind()) {
+    // These conventions make the formal result type ().
+    case ForeignErrorConvention::ZeroResult:
+    case ForeignErrorConvention::NonZeroResult:
+      assert(calleeTypeInfo.substResultType->isVoid());
+      allResults = {};
+      break;
+
+    // These conventions leave the formal result alone.
+    case ForeignErrorConvention::ZeroPreservedResult:
+    case ForeignErrorConvention::NonNilError:
+      break;
+
+    // This convention changes the formal result to the optional object
+    // type; we need to make our own make SILResultInfo array.
+    case ForeignErrorConvention::NilResult: {
+      assert(allResults.size() == 1);
+      CanType objectType = allResults[0].getType().getAnyOptionalObjectType();
+      optResult = allResults[0].getWithType(objectType);
+      allResults = optResult;
+      break;
+    }
+    }
+  }
+
+  ResultPlanBuilder builder(SGF, loc, allResults,
+                            calleeTypeInfo.getOverrideRep());
+  return builder.build(evalContext.getEmitInto(), origResultTypeForPlan,
+                       substResultTypeForPlan);
 }

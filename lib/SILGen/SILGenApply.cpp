@@ -1740,55 +1740,12 @@ static bool hasUnownedInnerPointerResult(CanSILFunctionType fnType) {
   return false;
 }
 
-static ResultPlanPtr computeResultPlan(SILGenFunction *SGF,
-                                       CalleeTypeInfo &calleeTypeInfo,
-                                       SILLocation loc,
-                                       SGFContext evalContext) {
-  auto origResultTypeForPlan = calleeTypeInfo.origResultType;
-  auto substResultTypeForPlan = calleeTypeInfo.substResultType;
-  ArrayRef<SILResultInfo> allResults = calleeTypeInfo.substFnType->getResults();
-  SILResultInfo optResult;
-
-  // The plan needs to be built using the formal result type
-  // after foreign-error adjustment.
-  if (auto foreignError = calleeTypeInfo.foreignError) {
-    switch (foreignError->getKind()) {
-    // These conventions make the formal result type ().
-    case ForeignErrorConvention::ZeroResult:
-    case ForeignErrorConvention::NonZeroResult:
-      assert(calleeTypeInfo.substResultType->isVoid());
-      allResults = {};
-      break;
-
-    // These conventions leave the formal result alone.
-    case ForeignErrorConvention::ZeroPreservedResult:
-    case ForeignErrorConvention::NonNilError:
-      break;
-
-    // This convention changes the formal result to the optional object
-    // type; we need to make our own make SILResultInfo array.
-    case ForeignErrorConvention::NilResult: {
-      assert(allResults.size() == 1);
-      CanType objectType = allResults[0].getType().getAnyOptionalObjectType();
-      optResult = allResults[0].getWithType(objectType);
-      allResults = optResult;
-      break;
-    }
-    }
-  }
-
-  ResultPlanBuilder builder(*SGF, loc, allResults,
-                            calleeTypeInfo.getOverrideRep());
-  return builder.build(evalContext.getEmitInto(), origResultTypeForPlan,
-                       substResultTypeForPlan);
-}
-
 /// Emit a function application, assuming that the arguments have been
 /// lowered appropriately for the abstraction level but that the
 /// result does need to be turned back into something matching a
 /// formal type.
-RValue SILGenFunction::emitApply(SILLocation loc, ManagedValue fn,
-                                 SubstitutionList subs,
+RValue SILGenFunction::emitApply(ResultPlanPtr &&resultPlan, SILLocation loc,
+                                 ManagedValue fn, SubstitutionList subs,
                                  ArrayRef<ManagedValue> args,
                                  CalleeTypeInfo &calleeTypeInfo,
                                  ApplyOptions options, SGFContext evalContext) {
@@ -1796,8 +1753,6 @@ RValue SILGenFunction::emitApply(SILLocation loc, ManagedValue fn,
   auto substResultType = calleeTypeInfo.substResultType;
 
   // Create the result plan.
-  ResultPlanPtr resultPlan =
-      computeResultPlan(this, calleeTypeInfo, loc, evalContext);
   SmallVector<SILValue, 4> indirectResultAddrs;
   resultPlan->gatherIndirectResultAddrs(indirectResultAddrs);
 
@@ -1966,9 +1921,13 @@ RValue SILGenFunction::emitMonomorphicApply(SILLocation loc,
                      const Optional<ForeignErrorConvention> &foreignError){
   auto fnType = fn.getType().castTo<SILFunctionType>();
   assert(!fnType->isPolymorphic());
+  SGFContext evalContext;
   CalleeTypeInfo calleeTypeInfo(fnType, AbstractionPattern(resultType),
                                 resultType, foreignError, overrideRep);
-  return emitApply(loc, fn, {}, args, calleeTypeInfo, options, SGFContext());
+  ResultPlanPtr resultPlan = ResultPlanBuilder::computeResultPlan(
+      *this, calleeTypeInfo, loc, evalContext);
+  return emitApply(std::move(resultPlan), loc, fn, {}, args, calleeTypeInfo,
+                   options, evalContext);
 }
 
 /// Count the number of SILParameterInfos that are needed in order to
@@ -3870,6 +3829,8 @@ RValue CallEmission::applyNormalCall(
   CalleeTypeInfo calleeTypeInfo(
       substFnType, getUncurriedOrigFormalType(*origFormalType),
       uncurriedSites.back().getSubstResultType(), foreignError);
+  ResultPlanPtr resultPlan = ResultPlanBuilder::computeResultPlan(
+      SGF, calleeTypeInfo, uncurriedSites.back().Loc, uncurriedContext);
 
   // Now that we know the substFnType, check if we assumed that we were
   // passing self at +0. If we did and self is not actually passed at +0,
@@ -3894,9 +3855,9 @@ RValue CallEmission::applyNormalCall(
                               initialOptions, uncurriedArgs, uncurriedLoc,
                               formalApplyType);
   // Emit the uncurried call.
-  return SGF.emitApply(uncurriedLoc.getValue(), mv, callee.getSubstitutions(),
-                       uncurriedArgs, calleeTypeInfo, initialOptions,
-                       uncurriedContext);
+  return SGF.emitApply(std::move(resultPlan), uncurriedLoc.getValue(), mv,
+                       callee.getSubstitutions(), uncurriedArgs, calleeTypeInfo,
+                       initialOptions, uncurriedContext);
 }
 
 RValue CallEmission::applyEnumElementConstructor(
@@ -4239,10 +4200,14 @@ RValue CallEmission::applyRemainingCallSites(
     AbstractionPattern origResultType(formalType.getResult());
     AbstractionPattern origParamType(claimNextParamClause(formalType));
 
-    // Create the callee type info.
+    SGFContext context = i == size - 1 ? C : SGFContext();
+
+    // Create the callee type info and initialize our indirect results.
     CalleeTypeInfo calleeTypeInfo(substFnType, origResultType,
                                   extraSites[i].getSubstResultType(),
                                   foreignError);
+    ResultPlanPtr resultPtr =
+        ResultPlanBuilder::computeResultPlan(SGF, calleeTypeInfo, loc, context);
 
     std::move(extraSites[i])
         .emit(SGF, origParamType, paramLowering, siteArgs, inoutArgs,
@@ -4251,11 +4216,10 @@ RValue CallEmission::applyRemainingCallSites(
       beginInOutFormalAccesses(SGF, inoutArgs, siteArgs);
     }
 
-    SGFContext context = i == size - 1 ? C : SGFContext();
     ApplyOptions options = ApplyOptions::None;
 
-    result = SGF.emitApply(loc, functionMV, {}, siteArgs, calleeTypeInfo,
-                           options, context);
+    result = SGF.emitApply(std::move(resultPtr), loc, functionMV, {}, siteArgs,
+                           calleeTypeInfo, options, context);
   }
 
   return std::move(result);
@@ -4332,7 +4296,10 @@ SILGenFunction::emitApplyOfLibraryIntrinsic(SILLocation loc,
   CalleeTypeInfo calleeTypeInfo(
       substFnType, AbstractionPattern(origFormalType).getFunctionResultType(),
       substFormalType.getResult());
-  return emitApply(loc, mv, subs, args, calleeTypeInfo, options, ctx);
+  ResultPlanPtr resultPlan =
+      ResultPlanBuilder::computeResultPlan(*this, calleeTypeInfo, loc, ctx);
+  return emitApply(std::move(resultPlan), loc, mv, subs, args, calleeTypeInfo,
+                   options, ctx);
 }
 
 static StringRef

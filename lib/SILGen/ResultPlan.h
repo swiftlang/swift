@@ -30,6 +30,8 @@ class Initialization;
 class ManagedValue;
 class RValue;
 class SILGenFunction;
+class SGFContext;
+class CalleeTypeInfo;
 
 /// An abstract class for working with results.of applies.
 class ResultPlan {
@@ -61,6 +63,11 @@ struct ResultPlanBuilder {
   ResultPlanPtr buildForTuple(Initialization *emitInto,
                               AbstractionPattern origType,
                               CanTupleType substType);
+
+  static ResultPlanPtr computeResultPlan(SILGenFunction &SGF,
+                                         CalleeTypeInfo &calleeTypeInfo,
+                                         SILLocation loc,
+                                         SGFContext evalContext);
 
   ~ResultPlanBuilder() {
     assert(allResults.empty() && "didn't consume all results!");

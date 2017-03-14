@@ -12,6 +12,7 @@
 
 #include "Callee.h"
 #include "RValue.h"
+#include "ResultPlan.h"
 #include "SILGenFunction.h"
 #include "Scope.h"
 #include "swift/AST/DiagnosticsSIL.h"
@@ -168,11 +169,14 @@ emitBridgeObjectiveCToNative(SILGenFunction &SGF,
   CalleeTypeInfo calleeTypeInfo(
       witnessFnTy, AbstractionPattern(canGenericSig, formalResultTy),
       swiftValueType->getCanonicalType());
-  return SGF
-      .emitApply(loc, ManagedValue::forUnmanaged(witnessRef), subs,
-                 {objcValue, ManagedValue::forUnmanaged(metatypeValue)},
-                 calleeTypeInfo, ApplyOptions::None, SGFContext())
-      .getAsSingleValue(SGF, loc);
+  SGFContext context;
+  ResultPlanPtr resultPlan =
+      ResultPlanBuilder::computeResultPlan(SGF, calleeTypeInfo, loc, context);
+  RValue result = SGF.emitApply(
+      std::move(resultPlan), loc, ManagedValue::forUnmanaged(witnessRef), subs,
+      {objcValue, ManagedValue::forUnmanaged(metatypeValue)}, calleeTypeInfo,
+      ApplyOptions::None, context);
+  return std::move(result).getAsSingleValue(SGF, loc);
 }
 
 static ManagedValue emitBridgeBoolToObjCBool(SILGenFunction &SGF,
@@ -1338,9 +1342,13 @@ void SILGenFunction::emitForeignToNativeThunk(SILDeclRef thunk) {
         fnType, AbstractionPattern(nativeFnTy->getGenericSignature(),
                                    nativeFormalResultTy),
         substResultTy, foreignError);
-    auto resultMV = emitApply(fd, ManagedValue::forUnmanaged(fn), subs, args,
-                              calleeTypeInfo, ApplyOptions::None, SGFContext())
-                        .getAsSingleValue(*this, fd);
+    SGFContext context;
+    ResultPlanPtr resultPlan = ResultPlanBuilder::computeResultPlan(
+        *this, calleeTypeInfo, fd, context);
+    auto resultMV =
+        emitApply(std::move(resultPlan), fd, ManagedValue::forUnmanaged(fn),
+                  subs, args, calleeTypeInfo, ApplyOptions::None, context)
+            .getAsSingleValue(*this, fd);
     // TODO: Emit directly into the indirect result.
     if (indirectResult) {
       resultMV.forwardInto(*this, fd, indirectResult);

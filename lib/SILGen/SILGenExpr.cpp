@@ -18,6 +18,7 @@
 #include "Initialization.h"
 #include "LValue.h"
 #include "RValue.h"
+#include "ResultPlan.h"
 #include "SILGenDynamicCast.h"
 #include "Scope.h"
 #include "Varargs.h"
@@ -2085,8 +2086,11 @@ SILGenFunction::emitApplyOfDefaultArgGenerator(SILLocation loc,
   auto substFnType = fnType->substGenericArgs(SGM.M,
                                           defaultArgsOwner.getSubstitutions());
   CalleeTypeInfo calleeTypeInfo(substFnType, origResultType, resultType);
-  return emitApply(loc, fnRef, defaultArgsOwner.getSubstitutions(), {},
-                   calleeTypeInfo, ApplyOptions::None, C);
+  ResultPlanPtr resultPtr =
+      ResultPlanBuilder::computeResultPlan(*this, calleeTypeInfo, loc, C);
+  return emitApply(std::move(resultPtr), loc, fnRef,
+                   defaultArgsOwner.getSubstitutions(), {}, calleeTypeInfo,
+                   ApplyOptions::None, C);
 }
 
 RValue SILGenFunction::emitApplyOfStoredPropertyInitializer(
@@ -2105,7 +2109,10 @@ RValue SILGenFunction::emitApplyOfStoredPropertyInitializer(
   auto substFnType = fnType->substGenericArgs(SGM.M, subs);
 
   CalleeTypeInfo calleeTypeInfo(substFnType, origResultType, resultType);
-  return emitApply(loc, fnRef, subs, {}, calleeTypeInfo, ApplyOptions::None, C);
+  ResultPlanPtr resultPlan =
+      ResultPlanBuilder::computeResultPlan(*this, calleeTypeInfo, loc, C);
+  return emitApply(std::move(resultPlan), loc, fnRef, subs, {}, calleeTypeInfo,
+                   ApplyOptions::None, C);
 }
 
 static void emitTupleShuffleExprInto(RValueEmitter &emitter,
