@@ -2134,6 +2134,7 @@ void SwiftLangSupport::editorConvertMarkupToXML(StringRef Source,
   llvm::raw_string_ostream OS(Result);
   if (convertMarkupToXML(Source, OS)) {
     Consumer.handleRequestError("Conversion failed.");
+    return;
   }
   Consumer.handleSourceText(Result);
 }
