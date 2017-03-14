@@ -830,14 +830,16 @@ ConstraintSystem::compareSolutions(ConstraintSystem &cs,
       if (choice1.getKind() == OverloadChoiceKind::Decl &&
           (choice2.getKind() == OverloadChoiceKind::DeclViaDynamic || 
            choice2.getKind() == OverloadChoiceKind::DeclViaBridge ||
-           choice2.getKind() == OverloadChoiceKind::DeclViaUnwrappedOptional)) {
+           choice2.getKind() == OverloadChoiceKind::DeclViaUnwrappedOptional ||
+           choice2.getKind() == OverloadChoiceKind::DeclViaOmittedLabels)) {
         ++score1;
         continue;
       }
 
       if ((choice1.getKind() == OverloadChoiceKind::DeclViaDynamic ||
            choice1.getKind() == OverloadChoiceKind::DeclViaBridge ||
-           choice1.getKind() == OverloadChoiceKind::DeclViaUnwrappedOptional) &&
+           choice1.getKind() == OverloadChoiceKind::DeclViaUnwrappedOptional ||
+           choice1.getKind() == OverloadChoiceKind::DeclViaOmittedLabels) &&
           choice2.getKind() == OverloadChoiceKind::Decl) {
         ++score2;
         continue;
@@ -904,18 +906,6 @@ ConstraintSystem::compareSolutions(ConstraintSystem &cs,
               }
             }
           }
-        }
-        
-        // Prefer `forInterpolation:` constructors over other constructors.
-        // FIXME: We ought to generalize this into some kind of "optional label" 
-        // feature.
-        if (ctor1->getParameters()->size() &&
-            ctor1->getParameters()->get(0)->getArgumentName() == cs.getASTContext().Id_forInterpolation) {
-          ++score1;
-        }
-        if (ctor2->getParameters()->size() &&
-            ctor2->getParameters()->get(0)->getArgumentName() == cs.getASTContext().Id_forInterpolation) {
-          ++score2;
         }
       }
     }
