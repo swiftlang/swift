@@ -762,7 +762,7 @@ public struct ${Self}<Element>
   /// - Precondition: The array has a native buffer.
   @_semantics("array.owner")
   internal func _getOwnerWithSemanticLabel_native() -> Builtin.NativeObject {
-    return Builtin.castToNativeObject(_buffer.nativeOwner)
+    return Builtin.unsafeCastToNativeObject(_buffer.nativeOwner)
   }
 
   /// - Precondition: The array has a native buffer.
@@ -779,7 +779,7 @@ public struct ${Self}<Element>
 #endif
     // In the value typed case the extra call to
     // _getOwnerWithSemanticLabel_native hinders optimization.
-    return Builtin.castToNativeObject(_buffer.owner)
+    return Builtin.unsafeCastToNativeObject(_buffer.owner)
   }
 
   // FIXME(ABI)#12 : move to an initializer on _Buffer.
