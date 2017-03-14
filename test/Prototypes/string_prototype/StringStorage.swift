@@ -246,51 +246,62 @@ extension _BoundedStorage {
   }
 }
 
-//===--- UTF16 String Storage ---------------------------------------------===//
+/// Common base class of our string storage classes
 @_versioned
-final class _UTF16StringStorage
-: _SwiftNativeNSString // Dynamically provides inheritance from NSString
+class _StringStorageBase<
+  Header: _BoundedStorageHeader,
+  Element_: UnsignedInteger
+> :
+  // Dynamically provides inheritance from NSString
+  _SwiftNativeNSString,
+  // Allows us to code init in terms of Builtin.allocWithTailElems_1
+  FactoryInitializable  
 {
-  typealias Element = UTF16.CodeUnit
-  
+  typealias Element = Element_
   var _header: _SwiftUTF16StringHeader
+  
+  @objc
+  final public func length() -> Int {
+    return numericCast(_header.count)
+  }
 
+  @objc(copyWithZone:)
+  final public func copy(with: _SwiftNSZone?) -> AnyObject {
+    return self
+  }
+  
   // satisfies the compiler's demand for a designated initializer
   init(_doNotCallMe: ()) { fatalError("do not call me") }
-}
 
-// There doesn't appear to be a way to avoid writing this stuff once
-// for each buffer type: <rdar://31000776> SIL verification failed:
-// alloc_ref must allocate class
-extension _UTF16StringStorage
-  : _BoundedStorage, FactoryInitializable
-{
   @nonobjc
   convenience init(uninitializedWithMinimumCapacity n: Int) {
     self.init(
       Builtin.allocWithTailElems_1(
-        _UTF16StringStorage.self, n._builtinWordValue, Element.self))
+        type(of: self), n._builtinWordValue, Element.self))
   }
+
+  @objc
+  final public func characterAtIndex(_ index: Int) -> UInt16 {
+    defer { _fixLifetime(self) }
+    return numericCast(_baseAddress[index])
+  }
+
   @nonobjc
   var _baseAddress: UnsafeMutablePointer<Element> {
-    return UnsafeMutablePointer(
-      Builtin.projectTailElems(self, Element.self))
+    // WORKAROUND: rdar://31047127 prevents us from implementing _baseAddress as
+    // final here.
+    fatalError("Override me!")
   }
 }
 
-/// Supplies essential NSString methods.  
-// There doesn't appear to be a
-// way to avoid writing this stuff once for each buffer type.
-extension _UTF16StringStorage : _NSStringCore {
-  @objc
-  func length() -> Int {
-    return count
-  }
-
-  @objc
-  func characterAtIndex(_ index: Int) -> UInt16 {
-    return self[index]
-  }
+//===--- UTF16 String Storage ---------------------------------------------===//
+@_versioned
+final class _UTF16StringStorage
+  : _StringStorageBase<_SwiftUTF16StringHeader, UTF16.CodeUnit>
+  , _NSStringCore // Ensures that we implement essential NSString methods.  
+{
+  //===--- _NSStringCore conformance --------------------------------------===//
+  // There doesn't seem to be a way to write these in an extension
 
   /// Returns a pointer to contiguously-stored UTF-16 code units
   /// comprising the whole string, or NULL if such storage isn't
@@ -318,9 +329,22 @@ extension _UTF16StringStorage : _NSStringCore {
     return nil
   }
 
-  @objc
-  public func copy(with _: _SwiftNSZone?) -> AnyObject {
-    return self
+  // WORKAROUND: rdar://31047127 prevents us from hoisting this into
+  // _StringStorageBase
+  @nonobjc
+  override var _baseAddress: UnsafeMutablePointer<Element> {
+    return UnsafeMutablePointer(
+      Builtin.projectTailElems(self, Element.self))
+  }
+}
+
+extension _UTF16StringStorage : _BoundedStorage {
+  /// Returns empty singleton that is used for every single empty String.
+  /// The contents of the storage should never be mutated.
+  @nonobjc
+  internal static func _emptyInstance() -> _UTF16StringStorage {
+    return Builtin.bridgeFromRawPointer(
+      Builtin.addressof(&_swiftEmptyStringStorage))
   }
 }
 
@@ -496,67 +520,14 @@ extension _UTF16StringStorage : _FixedFormatUnicode {
       isKnownValidEncoding = true // repairs had to be made
     }
   }
-  
-  /// Returns empty singleton that is used for every single empty String.
-  /// The contents of the storage should never be mutated.
-  @nonobjc
-  internal static func _emptyInstance() -> _UTF16StringStorage {
-    return Builtin.bridgeFromRawPointer(
-      Builtin.addressof(&_swiftEmptyStringStorage))
-  }
 }
 
 //===--- Latin-1 String Storage -------------------------------------------===//
 @_versioned
 final class _Latin1StringStorage
-: _SwiftNativeNSString // Dynamically provides inheritance from NSString
+  : _StringStorageBase<_SwiftLatin1StringHeader, UInt8>
+  , _NSStringCore // Ensures that we implement essential NSString methods.  
 {
-  typealias Element = Latin1.CodeUnit
-  
-  var _header: _SwiftLatin1StringHeader
-
-  // satisfies the compiler's demand for a designated initializer
-  init(_doNotCallMe: ()) { fatalError("do not call me") }
-}
-
-// There doesn't appear to be a way to avoid writing this stuff once
-// for each buffer type: <rdar://31000776> SIL verification failed:
-// alloc_ref must allocate class
-extension _Latin1StringStorage : _BoundedStorage, FactoryInitializable
-{
-  @nonobjc
-  convenience init(uninitializedWithMinimumCapacity n: Int) {
-    self.init(
-      Builtin.allocWithTailElems_1(
-        _Latin1StringStorage.self, n._builtinWordValue, Element.self))
-  }
-  @nonobjc
-  var _baseAddress: UnsafeMutablePointer<Element> {
-    return UnsafeMutablePointer(
-      Builtin.projectTailElems(self, Element.self))
-  }
-
-  @nonobjc
-  internal static func _emptyInstance() -> _Latin1StringStorage {
-    return _Latin1StringStorage(uninitializedWithMinimumCapacity: 0)
-  }
-}
-
-/// Supplies essential NSString methods.
-  
-// There doesn't appear to be a
-// way to avoid writing this stuff once for each buffer type.
-extension _Latin1StringStorage : _NSStringCore {
-  @objc
-  func length() -> Int {
-    return count
-  }
-
-  @objc
-  func characterAtIndex(_ index: Int) -> UInt16 {
-    return UInt16(self[index])
-  }
-
   /// Returns a pointer to contiguously-stored UTF-16 code units
   /// comprising the whole string, or NULL if such storage isn't
   /// available.
@@ -582,10 +553,20 @@ extension _Latin1StringStorage : _NSStringCore {
   ) -> UnsafePointer<CChar>? {
     return nil
   }
+  
+  // WORKAROUND: rdar://31047127 prevents us from hoisting this into
+  // _StringStorageBase
+  @nonobjc
+  override var _baseAddress: UnsafeMutablePointer<Element> {
+    return UnsafeMutablePointer(
+      Builtin.projectTailElems(self, Element.self))
+  }
+}
 
-  @objc
-  public func copy(with _: _SwiftNSZone?) -> AnyObject {
-    return self
+extension _Latin1StringStorage : _BoundedStorage {
+  @nonobjc
+  internal static func _emptyInstance() -> _Latin1StringStorage {
+    return _Latin1StringStorage(uninitializedWithMinimumCapacity: 0)
   }
 }
 
