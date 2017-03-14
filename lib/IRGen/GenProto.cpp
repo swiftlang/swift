@@ -496,7 +496,7 @@ void EmitPolymorphicParameters::bindExtraSource(const MetadataSource &source,
       auto selfTy = FnType->getSelfInstanceType();
       CanType argTy = getTypeInContext(selfTy);
       setTypeMetadataName(IGF.IGM, metadata, argTy);
-      auto *CD = selfTy->getClassOrBoundGenericClass();
+      auto *CD = selfTy.getClassOrBoundGenericClass();
       // The self metadata here corresponds to the conforming type.
       // For an inheritable conformance, that may be a subclass of the static
       // type, and so the self metadata will be inexact. Currently, all

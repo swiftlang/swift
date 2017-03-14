@@ -407,7 +407,7 @@ static llvm::Value *emitNominalMetadataRef(IRGenFunction &IGF,
 
 
 bool irgen::hasKnownSwiftMetadata(IRGenModule &IGM, CanType type) {
-  if (ClassDecl *theClass = type->getClassOrBoundGenericClass()) {
+  if (ClassDecl *theClass = type.getClassOrBoundGenericClass()) {
     return hasKnownSwiftMetadata(IGM, theClass);
   }
 
@@ -3667,7 +3667,7 @@ namespace {
     }
 
     void addParentMetadataRef(ClassDecl *forClass, Type classType) {
-      CanType parentType = classType->getNominalParent()->getCanonicalType();
+      CanType parentType = classType->getCanonicalType().getNominalParent();
 
       if (auto metadata =
             tryEmitConstantTypeMetadataRef(IGM, parentType,
@@ -3781,7 +3781,7 @@ namespace {
     }
 
     void addParentMetadataRef(ClassDecl *forClass, Type classType) {
-      CanType parentType = classType->getNominalParent()->getCanonicalType();
+      CanType parentType = classType->getCanonicalType().getNominalParent();
       this->addFillOp(parentType, None, /*relative*/ false);
       B.addNullPointer(IGM.TypeMetadataPtrTy);
     }
@@ -4487,7 +4487,7 @@ llvm::Value *irgen::emitHeapMetadataRefForHeapObject(IRGenFunction &IGF,
                                                      llvm::Value *object,
                                                      CanType objectType,
                                                      bool suppressCast) {
-  ClassDecl *theClass = objectType->getClassOrBoundGenericClass();
+  ClassDecl *theClass = objectType.getClassOrBoundGenericClass();
   if (theClass && isKnownNotTaggedPointer(IGF.IGM, theClass))
     return emitLoadOfHeapMetadataRef(IGF, object,
                                      getIsaEncodingForType(IGF.IGM, objectType),
@@ -5226,8 +5226,8 @@ namespace {
     Size AddressPoint = Size::invalid();
 
     bool computeUnfilledParent() {
-      if (auto parentType = asImpl().getTargetType()->getNominalParent()) {
-        return !tryEmitConstantTypeMetadataRef(IGM, parentType->getCanonicalType(),
+      if (auto parentType = asImpl().getTargetType().getNominalParent()) {
+        return !tryEmitConstantTypeMetadataRef(IGM, parentType,
                                                SymbolReferenceKind::Absolute);
       }
       return false;
@@ -5364,7 +5364,7 @@ namespace {
     }
     void emitInitialization(IRGenFunction &IGF, llvm::Value *metadata) {
       if (HasUnfilledParent) {
-        auto parentType = getTargetType()->getNominalParent()->getCanonicalType();
+        auto parentType = getTargetType().getNominalParent();
         auto parentMetadata = IGF.emitTypeMetadataRef(parentType);
 
         int index = ValueTypeParentIndex;
@@ -5410,7 +5410,7 @@ namespace {
     }
     void emitInitialization(IRGenFunction &IGF, llvm::Value *metadata) {
       if (HasUnfilledParent) {
-        auto parentType = getTargetType()->getNominalParent()->getCanonicalType();
+        auto parentType = getTargetType().getNominalParent();
         auto parentMetadata = IGF.emitTypeMetadataRef(parentType);
 
         int index = ValueTypeParentIndex;
