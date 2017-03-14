@@ -5,9 +5,7 @@
 // See https://swift.org/LICENSE.txt for license information
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
-// RUN: not --crash %target-swift-frontend %s -emit-ir
-
-// Temporarily disabled
-// REQUIRES: SR-4219
-
-{{extension{init(UInt=_=1 + 1 as?Int?Int){var f=nil?Int
+// REQUIRES: asserts
+// RUN: not %target-swift-frontend %s -emit-ir
+:{func t(UInt=1 + 1 + 1 as?Int){[.s
+nil?Int

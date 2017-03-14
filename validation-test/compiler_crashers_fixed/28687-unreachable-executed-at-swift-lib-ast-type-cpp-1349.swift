@@ -5,6 +5,5 @@
 // See https://swift.org/LICENSE.txt for license information
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
-// REQUIRES: deterministic-behavior
-// RUN: not --crash %target-swift-frontend %s -emit-ir
-{extension{func 丏(UInt=1 + 1 + 1 as?Int){a
+// RUN: not %target-swift-frontend %s -emit-ir
+{{{{func a(UInt=1 + 1 as?Int){{{{{{A{{{{{{{{{{{{{{{{{{{{{{{{
