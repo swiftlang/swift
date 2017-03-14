@@ -43,34 +43,66 @@ def update_single_repository(args):
     try:
         print("Updating '" + repo_path + "'")
         with shell.pushd(repo_path, dry_run=False, echo=False):
-            shell.run(["git", "fetch", "--recurse-submodules=yes"], echo=True)
-
+            # The clean option should restore a repository to pristine condition.
             if should_clean:
                 shell.run(['git', 'clean', '-fdx'], echo=True)
                 shell.run(['git', 'submodule', 'foreach', '--recursive', 'git',
                             'clean', '-fdx'], echo=True)
                 shell.run(['git', 'submodule', 'foreach', '--recursive', 'git',
                             'reset', '--hard', 'HEAD'], echo=True)
-                shell.run(['git', 'reset', '--hard', 'HEAD'],
-                                    echo=True)
+                shell.run(['git', 'reset', '--hard', 'HEAD'], echo=True)
+                # It is possible to reset --hard and still be in the middle of a rebase.
+                try:
+                    shell.run(['git', 'rebase', '--abort'], echo=True)
+                except:
+                    pass
 
             if branch:
                 shell.run(['git', 'status', '--porcelain', '-uno'],
                                        echo=False)
                 shell.run(['git', 'checkout', branch], echo=True)
 
-                # If we were asked to reset to the specified branch, do the hard
-                # reset and return.
-                if reset_to_remote and not cross_repo:
-                    shell.run(['git', 'reset', '--hard', "origin/%s" % branch],
-                               echo=True)
-                    return
+            # It's important that we checkout, fetch, and rebase, in order.
+            # .git/FETCH_HEAD updates the not-for-merge attributes based on which
+            # branch was checked out during the fetch.
+            shell.run(["git", "fetch", "--recurse-submodules=yes"], echo=True)
+
+            # If we were asked to reset to the specified branch, do the hard
+            # reset and return.
+            if branch and reset_to_remote and not cross_repo:
+                shell.run(['git', 'reset', '--hard', "origin/%s" % branch],
+                           echo=True)
+                return
+
+            # Query whether we have a "detached HEAD", which will mean that
+            # we previously checked out a tag rather than a branch.
+            detached_head = False
+            try:
+                # This git command returns error code 1 if HEAD is detached.
+                # Otherwise there was some other error, and we need to handle
+                # it like other command errors.
+                shell.run(["git", "symbolic-ref", "-q", "HEAD"], echo=False)
+            except Exception as e:
+                if e.ret == 1:
+                    detached_head = True
+                else:
+                    raise  # Pass this error up the chain.
+
+            # If we have a detached HEAD in this repository, we don't want
+            # to rebase. With a detached HEAD, the fetch will have marked
+            # all the branches in FETCH_HEAD as not-for-merge, and the
+            # "git rebase FETCH_HEAD" will try to rebase the tree from the
+            # default branch's current head, making a mess.
 
             # Prior to Git 2.6, this is the way to do a "git pull
             # --rebase" that respects rebase.autostash.  See
             # http://stackoverflow.com/a/30209750/125349
-            if not cross_repo:
+            if not cross_repo and not detached_head:
                 shell.run(["git", "rebase", "FETCH_HEAD"], echo=True)
+            elif detached_head:
+                print(repo_path,
+                      "\nDetached HEAD; probably checked out a tag. No need to rebase.\n")
+
             shell.run(["git", "submodule", "update", "--recursive"], echo=True)
     except:
         (type, value, tb) = sys.exc_info()
@@ -83,13 +115,15 @@ def update_repository_to_tag(args, repo_name, repo_path, tag_name):
         tag_exists = shell.capture(['git', 'ls-remote', '--tags',
                                     'origin', tag_name], echo=False)
         if not tag_exists:
-            print("Skipping tagging of '" + repo_name + "', tag does not exist")
-            return
+            print("Tag '" + tag_name + "' does not exist for '"
+                    + repo_name + "', just updating regularly")
+            tag_name = None
+
         return [repo_path,
                 tag_name,
                 args.reset_to_remote,
                 args.clean,
-                True]
+                False]
 
 
 def update_repository_to_scheme(
@@ -97,7 +131,7 @@ def update_repository_to_scheme(
     cross_repo = False
     repo_branch = scheme_name
     # This loop is only correct, since we know that each alias set has
-    # unique contents. This is checked by verify config. Thus the first
+    # unique contents. This is checked by validate_config. Thus the first
     # branch scheme data that has scheme_name as one of its aliases is
     # the only possible correct answer.
     for v in config['branch-schemes'].values():
@@ -187,7 +221,7 @@ def obtain_all_additional_swift_sources(
                 continue
 
             if os.path.isdir(os.path.join(repo_name, ".git")):
-                print("Skipping clone of '" + repo_name + "', directory already eixsts")
+                print("Skipping clone of '" + repo_name + "', directory already exists")
                 continue
 
             # If we have a url override, use that url instead of
@@ -240,6 +274,14 @@ def validate_config(config):
     scheme_names = config['branch-schemes'].keys()
     if len(scheme_names) != len(set(scheme_names)):
         raise RuntimeError('Configuration file has duplicate schemes?!')
+
+    # Ensure the branch-scheme name is also an alias
+    # This guarantees sensible behavior of update_repository_to_scheme when
+    # the branch-scheme is passed as the scheme name
+    for scheme_name in config['branch-schemes'].keys():
+        if not scheme_name in config['branch-schemes'][scheme_name]['aliases']:
+            raise RuntimeError('branch-scheme name: "{0}" must be an alias too.'
+                .format(scheme_name))
 
     # Then make sure the alias names used by our branches are unique.
     #
@@ -323,7 +365,7 @@ By default, updates your checkouts of Swift, SourceKit, LLDB, and SwiftPM.""")
     args = parser.parse_args()
 
     if args.reset_to_remote and not args.scheme:
-        print("update-checkout usage error: --reset-to-remote must specify --branch=foo")
+        print("update-checkout usage error: --reset-to-remote must specify --scheme=foo")
         exit(1)
 
     clone = args.clone
@@ -338,7 +380,7 @@ By default, updates your checkouts of Swift, SourceKit, LLDB, and SwiftPM.""")
 
     if args.dump_hashes:
         dump_repo_hashes(config)
-        return 0
+        return (None, None)
 
     cross_repos_pr = {}
     if github_comment:
