@@ -447,18 +447,6 @@ DeclID Serializer::addDeclRef(const Decl *D, bool forceSerialization) {
           isa<PrecedenceGroupDecl>(D)) &&
          "cannot cross-reference this decl");
 
-  // Record any generic parameters that come from this decl, so that we can use
-  // the decl to refer to the parameters later.
-  const GenericParamList *paramList = nullptr;
-  if (auto fn = dyn_cast<AbstractFunctionDecl>(D))
-    paramList = fn->getGenericParams();
-  else if (auto nominal = dyn_cast<NominalTypeDecl>(D))
-    paramList = nominal->getGenericParams();
-  else if (auto ext = dyn_cast<ExtensionDecl>(D))
-    paramList = ext->getGenericParams();
-  if (paramList)
-    GenericContexts[paramList] = D;
-
   id = { ++LastDeclID, forceSerialization };
   DeclsAndTypesToWrite.push(D);
   return id.first;
@@ -533,11 +521,6 @@ NormalConformanceID Serializer::addConformanceRef(
   NormalConformancesToWrite.push(conformance);
 
   return conformanceID;
-}
-
-const Decl *Serializer::getGenericContext(const GenericParamList *paramList) {
-  auto contextDecl = GenericContexts.lookup(paramList);
-  return contextDecl;
 }
 
 /// Record the name of a block.

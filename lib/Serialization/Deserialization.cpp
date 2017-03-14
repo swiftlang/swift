@@ -783,25 +783,6 @@ ModuleFile::maybeReadSubstitution(llvm::BitstreamCursor &cursor,
                       getContext().AllocateCopy(conformanceBuf)};
 }
 
-GenericParamList *
-ModuleFile::maybeGetOrReadGenericParams(serialization::DeclID genericContextID,
-                                        DeclContext *DC) {
-  if (genericContextID) {
-    Decl *genericContext = getDecl(genericContextID);
-    assert(genericContext && "loading PolymorphicFunctionType before its decl");
-
-    if (auto fn = dyn_cast<AbstractFunctionDecl>(genericContext))
-      return fn->getGenericParams();
-    if (auto nominal = dyn_cast<NominalTypeDecl>(genericContext))
-      return nominal->getGenericParams();
-    if (auto ext = dyn_cast<ExtensionDecl>(genericContext))
-      return ext->getGenericParams();
-    llvm_unreachable("only functions and nominals can provide generic params");
-  } else {
-    return maybeReadGenericParams(DC);
-  }
-}
-
 GenericParamList *ModuleFile::maybeReadGenericParams(DeclContext *DC,
                                                GenericParamList *outerParams) {
   using namespace decls_block;
@@ -821,7 +802,6 @@ GenericParamList *ModuleFile::maybeReadGenericParams(DeclContext *DC,
     return nullptr;
 
   SmallVector<GenericTypeParamDecl *, 8> params;
-  SmallVector<RequirementRepr, 8> requirements;
 
   while (true) {
     lastRecordOffset.reset();
