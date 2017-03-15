@@ -884,16 +884,16 @@ public:
 
   /// OpenedArchetypes - Mappings of opened archetypes back to the
   /// instruction which opened them.
-  llvm::DenseMap<CanType, SILValue> ArchetypeOpenings;
+  llvm::DenseMap<ArchetypeType *, SILValue> ArchetypeOpenings;
 
-  SILValue getArchetypeOpeningSite(CanArchetypeType archetype) const {
+  SILValue getArchetypeOpeningSite(ArchetypeType *archetype) const {
     auto it = ArchetypeOpenings.find(archetype);
     assert(it != ArchetypeOpenings.end() &&
            "opened archetype was not registered with SILGenFunction");
     return it->second;
   }
 
-  void setArchetypeOpeningSite(CanArchetypeType archetype, SILValue site) {
+  void setArchetypeOpeningSite(ArchetypeType *archetype, SILValue site) {
     ArchetypeOpenings.insert({archetype, site});
   }
 
@@ -916,7 +916,7 @@ public:
   SILGenFunction::OpaqueValueState
   emitOpenExistential(SILLocation loc,
                       ManagedValue existentialValue,
-                      CanArchetypeType openedArchetype,
+                      ArchetypeType *openedArchetype,
                       SILType loweredOpenedType,
                       AccessKind accessKind);
 

@@ -3548,7 +3548,7 @@ void SILGenFunction::emitOpenExistentialExprImpl(
   
   Type opaqueValueType = E->getOpaqueValue()->getType()->getRValueType();
   SILGenFunction::OpaqueValueState state = emitOpenExistential(
-      E, existentialValue, CanArchetypeType(E->getOpenedArchetype()),
+      E, existentialValue, E->getOpenedArchetype(),
       getLoweredType(opaqueValueType), accessKind);
 
   // Register the opaque value for the projected existential.
