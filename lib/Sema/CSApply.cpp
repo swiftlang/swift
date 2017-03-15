@@ -5980,13 +5980,18 @@ Expr *ExprRewriter::convertLiteral(Expr *literal,
     return cs.getType(E);
   };
 
+  auto setType = [&](Expr *E, Type Ty) {
+    cs.setType(E, Ty);
+  };
+
   // If coercing a literal to an unresolved type, we don't try to look up the
   // witness members, just do it.
   if (type->is<UnresolvedType>()) {
     // Instead of updating the literal expr in place, allocate a new node.  This
     // avoids issues where Builtin types end up on expr nodes and pollute
     // diagnostics.
-    literal = cast<LiteralExpr>(literal)->shallowClone(tc.Context, getType);
+    literal = cast<LiteralExpr>(literal)->shallowClone(tc.Context, setType,
+                                                       getType);
 
     // The literal expression has this type.
     cs.setType(literal, type);
@@ -6021,7 +6026,8 @@ Expr *ExprRewriter::convertLiteral(Expr *literal,
     // Instead of updating the literal expr in place, allocate a new node.  This
     // avoids issues where Builtin types end up on expr nodes and pollute
     // diagnostics.
-    literal = cast<LiteralExpr>(literal)->shallowClone(tc.Context, getType);
+    literal = cast<LiteralExpr>(literal)->shallowClone(tc.Context, setType,
+                                                       getType);
 
     // The literal expression has this type.
     cs.setType(literal, argType);
@@ -6124,13 +6130,18 @@ Expr *ExprRewriter::convertLiteralInPlace(Expr *literal,
     return cs.getType(E);
   };
 
+  auto setType = [&](Expr *E, Type Ty) {
+    cs.setType(E, Ty);
+  };
+
   // If coercing a literal to an unresolved type, we don't try to look up the
   // witness members, just do it.
   if (type->is<UnresolvedType>()) {
     // Instead of updating the literal expr in place, allocate a new node.  This
     // avoids issues where Builtin types end up on expr nodes and pollute
     // diagnostics.
-    literal = cast<LiteralExpr>(literal)->shallowClone(tc.Context, getType);
+    literal = cast<LiteralExpr>(literal)->shallowClone(tc.Context, setType,
+                                                       getType);
 
     // The literal expression has this type.
     cs.setType(literal, type);
