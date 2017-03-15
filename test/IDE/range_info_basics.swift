@@ -122,6 +122,12 @@ func foo9(_ a: Int, _ b: Int) -> Int {
   return 0
 }
 
+func testInout(_ a : inout Int) {
+  var b = a + 1 + 1
+  b = b + 1
+  testInout(&b)
+}
+
 // RUN: %target-swift-ide-test -range -pos=8:1 -end-pos 8:32 -source-filename %s | %FileCheck %s -check-prefix=CHECK1
 // RUN: %target-swift-ide-test -range -pos=9:1 -end-pos 9:26 -source-filename %s | %FileCheck %s -check-prefix=CHECK2
 // RUN: %target-swift-ide-test -range -pos=10:1 -end-pos 10:27 -source-filename %s | %FileCheck %s -check-prefix=CHECK3
@@ -151,8 +157,17 @@ func foo9(_ a: Int, _ b: Int) -> Int {
 // RUN: %target-swift-ide-test -range -pos=109:6 -end-pos=111:4 -source-filename %s | %FileCheck %s -check-prefix=CHECK-INVALID
 // RUN: %target-swift-ide-test -range -pos=114:1 -end-pos=115:15 -source-filename %s | %FileCheck %s -check-prefix=CHECK27
 // RUN: %target-swift-ide-test -range -pos=118:1 -end-pos=119:15 -source-filename %s | %FileCheck %s -check-prefix=CHECK27
+// RUN: %target-swift-ide-test -range -pos=126:11 -end-pos=126:12 -source-filename %s | %FileCheck %s -check-prefix=CHECK-INT
+// RUN: %target-swift-ide-test -range -pos=126:11 -end-pos=126:20 -source-filename %s | %FileCheck %s -check-prefix=CHECK-INT
+// RUN: %target-swift-ide-test -range -pos=127:7 -end-pos=127:8 -source-filename %s | %FileCheck %s -check-prefix=CHECK-INT
+// RUN: %target-swift-ide-test -range -pos=127:3 -end-pos=127:4 -source-filename %s | %FileCheck %s -check-prefix=CHECK-INT-LVALUE
+// RUN: %target-swift-ide-test -range -pos=128:13 -end-pos=128:15 -source-filename %s | %FileCheck %s -check-prefix=CHECK-INT-INOUT
 
 // CHECK-INVALID: <Kind>Invalid</Kind>
+
+// CHECK-INT: <Type>Int</Type>
+// CHECK-INT-LVALUE: <Type>@lvalue Int</Type>
+// CHECK-INT-INOUT: <Type>inout Int</Type>
 
 // CHECK1: <Kind>SingleDecl</Kind>
 // CHECK1-NEXT: <Content>func foo1() -> Int { return 0 }</Content>
