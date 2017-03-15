@@ -667,6 +667,7 @@ extension UTF16CompatibleStringContents : _FixedFormatUnicode {
 enum AnyStringContents {
 case utf16(_UTF16StringStorage)
 case latin1(_Latin1StringStorage)
+case any(AnyUnicode)
 }
 
 extension AnyStringContents : AnyUnicode {
@@ -676,6 +677,8 @@ extension AnyStringContents : AnyUnicode {
       return storage.isKnownValidEncoding ? ValidUTF16.self : UTF16.self
     case .latin1(_):
       return Latin1.self
+    case .any(let base):
+      return base.encoding
     }
   }
   var rawUTF16: AnyUTF16 {
@@ -684,6 +687,8 @@ extension AnyStringContents : AnyUnicode {
       return AnyUTF16(storage)
     case .latin1(let storage):
       return AnyUTF16(storage)
+    case .any(let base):
+      return base.rawUTF16
     }
   }
 
@@ -695,6 +700,8 @@ extension AnyStringContents : AnyUnicode {
       )
     case .latin1(let storage):
       return AnyUnicodeBidirectionalUInt32(storage)
+    case .any(let base):
+      return base.utf32
     }
   }
 
@@ -704,6 +711,8 @@ extension AnyStringContents : AnyUnicode {
       return AnyUnicodeBidirectionalUInt32(storage)
     case .latin1(let storage):
       return AnyUnicodeBidirectionalUInt32(storage)
+    case .any(let base):
+      return base.extendedASCII
     }
   }
 
@@ -713,6 +722,8 @@ extension AnyStringContents : AnyUnicode {
       return AnyCharacters(storage.characters)
     case .latin1(let storage):
       return AnyCharacters(storage.characters)
+    case .any(let base):
+      return base.characters
     }
   }
 
@@ -722,6 +733,8 @@ extension AnyStringContents : AnyUnicode {
       return AnyUTF16(storage.fccNormalizedUTF16)
     case .latin1(let storage):
       return AnyUTF16(storage.fccNormalizedUTF16)
+    case .any(let base):
+      return base.fccNormalizedUTF16
     }
   }
 
@@ -731,6 +744,8 @@ extension AnyStringContents : AnyUnicode {
       return AnyCodeUnits(storage)
     case .latin1(let storage):
       return AnyCodeUnits(storage)
+    case .any(let base):
+      return base.codeUnits
     }
   }
 
@@ -740,6 +755,8 @@ extension AnyStringContents : AnyUnicode {
       return storage.isKnownASCII
     case .latin1(let storage):
       return storage.isKnownASCII
+    case .any(let base):
+      return base.isKnownASCII
     }
   }
 
@@ -749,6 +766,8 @@ extension AnyStringContents : AnyUnicode {
       return storage.isKnownLatin1
     case .latin1(let storage):
       return storage.isKnownLatin1
+    case .any(let base):
+      return base.isKnownLatin1
     }
   }
 
@@ -758,6 +777,8 @@ extension AnyStringContents : AnyUnicode {
       return storage.isKnownValidEncoding
     case .latin1(let storage):
       return storage.isKnownValidEncoding
+    case .any(let base):
+      return base.isKnownValidEncoding
     }
   }
 
@@ -767,6 +788,8 @@ extension AnyStringContents : AnyUnicode {
       return storage.isKnownFCCNormalized
     case .latin1(let storage):
       return storage.isKnownFCCNormalized
+    case .any(let base):
+      return base.isKnownFCCNormalized
     }
   }
 
@@ -776,6 +799,8 @@ extension AnyStringContents : AnyUnicode {
       return storage.isKnownFCDForm
     case .latin1(let storage):
       return storage.isKnownFCDForm
+    case .any(let base):
+      return base.isKnownFCDForm
     }
   }
 
@@ -785,6 +810,8 @@ extension AnyStringContents : AnyUnicode {
       return storage.isKnownNFDNormalized
     case .latin1(let storage):
       return storage.isKnownNFDNormalized
+    case .any(let base):
+      return base.isKnownNFDNormalized
     }
   }
 
@@ -794,9 +821,14 @@ extension AnyStringContents : AnyUnicode {
       return storage.isKnownNFCNormalized
     case .latin1(let storage):
       return storage.isKnownNFCNormalized
+    case .any(let base):
+      return base.isKnownNFCNormalized
     }
   }
 }
+
+print(MemoryLayout<UTF16CompatibleStringContents>.size)
+print(MemoryLayout<AnyStringContents>.size)
 
 var suite = TestSuite("AnyUnicode")
 suite.test("basics") {
