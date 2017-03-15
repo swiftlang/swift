@@ -12,6 +12,18 @@
 // RUN: %target-run-simple-swift
 // REQUIRES: executable_test
 
+extension _UTF16StringStorage {
+  var characters: UnicodeStorage<_UTF16StringStorage, UTF16>.CharacterView {
+    return UnicodeStorage(self, UTF16.self).characters
+  }
+}
+
+extension _Latin1StringStorage {
+  var characters: LazyMapBidirectionalCollection<_Latin1StringStorage, Character> {
+    return self.lazy.map { Character(UnicodeScalar(UInt32($0))!) }
+  }
+}
+
 import StdlibUnittest
 
 struct UnicodeIndex : Comparable {
@@ -344,6 +356,11 @@ struct AnyUnicodeBidirectionalUInt32 : BidirectionalCollection, AnyUnicodeBidire
   > where Base.Iterator.Element : UnsignedInteger {
     let base: Base
   }
+
+  init<C: BidirectionalCollection>(_ c: C)
+  where C.Iterator.Element : UnsignedInteger {
+    base = ZeroExtender(base: c)
+  }
 }
 
 /// Adapts any bidirectional collection of unsigned integer to AnyUnicodeBidirectionalUInt32_
@@ -419,17 +436,85 @@ struct AnyCharacters : BidirectionalCollection, AnyCharacters_ {
       try ($0 as Any as? UnsafeBufferPointer<Element>).map(body)
     }.flatMap { $0 }
   }
+
+  struct Adapter<Base: BidirectionalCollection>
+  where Base.Iterator.Element == Character,
+  // FIXME: we may not want to keep this constraint
+  Base.Index : SignedInteger { 
+    let base: Base
+  }
+
+  init<C: BidirectionalCollection>(_ c: C)
+  where C.Iterator.Element == Character,
+  // FIXME: we may not want to keep this constraint
+  C.Index : SignedInteger { 
+    base = Adapter(base: c)
+  }
 }
 
-protocol AnyUnicode_ : Swift._AnyUnicode {
+extension AnyCharacters.Adapter : AnyCharacters_, BidirectionalCollection {
+  typealias IndexDistance = Int64
+  typealias Index = UnicodeIndex
+  typealias Element = Character
+
+  var startIndex: Index { return Index(offset: numericCast(base.startIndex)) }
+  var endIndex: Index { return Index(offset: numericCast(base.endIndex)) }
+  
+  func index(after i: Index) -> Index {
+    return Index(offset: numericCast(base.index(after: numericCast(i.offset))))
+  }
+  
+  func index(before i: Index) -> Index {
+    return Index(offset: numericCast(base.index(before: numericCast(i.offset))))
+  }
+  
+  func index(_ i: Index, offsetBy n: Int64) -> Index {
+    return Index(
+      offset: numericCast(
+        base.index(numericCast(i.offset), offsetBy: numericCast(n))))
+  }
+  
+  subscript(i: Index) -> Element {
+    return base[numericCast(i.offset)]
+  }
+
+  func withExistingUnsafeBuffer<R>(
+    _ body: (UnsafeBufferPointer<Element>) throws -> R
+  ) rethrows -> R? {
+    return try base.withExistingUnsafeBuffer {
+      try ($0 as Any as? UnsafeBufferPointer<Element>).map(body)
+    }.flatMap { $0 }
+  }
+}
+
+protocol AnyUnicode : Swift._AnyUnicode {
   var codeUnits: AnyCodeUnits { get }
-  var utf16: AnyUTF16 { get }
+  var rawUTF16: AnyUTF16 { get }
   var utf32: AnyUnicodeBidirectionalUInt32 { get }
+  var fccNormalizedUTF16: AnyUTF16 { get }
   // FIXME: Can this be Random Access?  If all encodings use a single code unit
   // per ASCII character and can statelessly identify a code unit that
   // represents ASCII, then yes.  Look into, e.g. shift-JIS.
-  var extendedASCII : AnyUnicodeBidirectionalUInt32 { get }
-  var characters : AnyCharacters { get }
+  var extendedASCII: AnyUnicodeBidirectionalUInt32 { get }
+  var characters: AnyCharacters { get }
+}
+
+extension AnyUnicode {
+  func isLatin1() -> Bool {
+    return isKnownLatin1 || !rawUTF16.contains { $0 > 0xFF }
+  }
+  
+  func isASCII() -> Bool {
+    return isKnownASCII || !rawUTF16.contains { $0 > 0x7f }
+  }
+}
+
+extension AnyUnicode {
+  func isValidEncoding() -> Bool {
+    return encoding.decodeForward(
+      codeUnits, repairingIllFormedSequences: false
+    ) { _ in }.errorCount == 0
+  }
 }
 
 struct AnyRandomAccessUnsignedIntegers<
@@ -512,6 +597,149 @@ extension UTF16CompatibleStringContents : _FixedFormatUnicode {
       return CodeUnits(storage)
     case .latin1(let storage):
       return CodeUnits(storage)
+    }
+  }
+
+  var isKnownASCII: Bool {
+    switch self {
+    case .utf16(let storage):
+      return storage.isKnownASCII
+    case .latin1(let storage):
+      return storage.isKnownASCII
+    }
+  }
+
+  var isKnownLatin1: Bool {
+    switch self {
+    case .utf16(let storage):
+      return storage.isKnownLatin1
+    case .latin1(let storage):
+      return storage.isKnownLatin1
+    }
+  }
+
+  var isKnownValidEncoding: Bool {
+    switch self {
+    case .utf16(let storage):
+      return storage.isKnownValidEncoding
+    case .latin1(let storage):
+      return storage.isKnownValidEncoding
+    }
+  }
+
+  var isKnownFCCNormalized: Bool {
+    switch self {
+    case .utf16(let storage):
+      return storage.isKnownFCCNormalized
+    case .latin1(let storage):
+      return storage.isKnownFCCNormalized
+    }
+  }
+
+  var isKnownFCDForm: Bool {
+    switch self {
+    case .utf16(let storage):
+      return storage.isKnownFCDForm
+    case .latin1(let storage):
+      return storage.isKnownFCDForm
+    }
+  }
+
+  var isKnownNFDNormalized: Bool {
+    switch self {
+    case .utf16(let storage):
+      return storage.isKnownNFDNormalized
+    case .latin1(let storage):
+      return storage.isKnownNFDNormalized
+    }
+  }
+
+  var isKnownNFCNormalized: Bool {
+    switch self {
+    case .utf16(let storage):
+      return storage.isKnownNFCNormalized
+    case .latin1(let storage):
+      return storage.isKnownNFCNormalized
+    }
+  }
+}
+
+enum AnyStringContents {
+case utf16(_UTF16StringStorage)
+case latin1(_Latin1StringStorage)
+}
+
+extension AnyStringContents : AnyUnicode {
+  var encoding: AnyUnicodeEncoding.Type {
+    switch self {
+    case .utf16(let storage):
+      return storage.isKnownValidEncoding ? ValidUTF16.self : UTF16.self
+    case .latin1(_):
+      return Latin1.self
+    }
+  }
+  var rawUTF16: AnyUTF16 {
+    switch self {
+    case .utf16(let storage):
+      return AnyUTF16(storage)
+    case .latin1(let storage):
+      return AnyUTF16(storage)
+    }
+  }
+
+  var utf32: AnyUnicodeBidirectionalUInt32 {
+    switch self {
+    case .utf16(let storage):
+      return AnyUnicodeBidirectionalUInt32(
+        UnicodeStorage(storage, UTF16.self).transcoded(to: UTF32.self)
+      )
+    case .latin1(let storage):
+      return AnyUnicodeBidirectionalUInt32(storage)
+    }
+  }
+
+  var extendedASCII: AnyUnicodeBidirectionalUInt32 {
+    switch self {
+    case .utf16(let storage):
+      return AnyUnicodeBidirectionalUInt32(storage)
+    case .latin1(let storage):
+      return AnyUnicodeBidirectionalUInt32(storage)
+    }
+  }
+
+  var characters: AnyCharacters {
+    switch self {
+    case .utf16(let storage):
+      return AnyCharacters(storage.characters)
+    case .latin1(let storage):
+      return AnyCharacters(storage.characters)
+    }
+  }
+
+  var fccNormalizedUTF16: AnyUTF16 {
+    switch self {
+    case .utf16(let storage):
+      return AnyUTF16(storage.fccNormalizedUTF16)
+    case .latin1(let storage):
+      return AnyUTF16(storage.fccNormalizedUTF16)
+    }
+  }
+
+  var codeUnits: AnyCodeUnits {
+    switch self {
+    case .utf16(let storage):
+      return AnyCodeUnits(storage)
+    case .latin1(let storage):
+      return AnyCodeUnits(storage)
+    }
+  }
+
+  var isKnownASCII: Bool {
+    switch self {
+    case .utf16(let storage):
+      return storage.isKnownASCII
+    case .latin1(let storage):
+      return storage.isKnownASCII
     }
   }
 
