@@ -27,43 +27,44 @@ namespace Lowering {
 /// A Scope is a RAII object recording that a scope (e.g. a brace
 /// statement) has been entered.
 class LLVM_LIBRARY_VISIBILITY Scope {
-  CleanupManager &Cleanups;
-  CleanupsDepth Depth;
-  CleanupsDepth SavedInnermostScope;
-  CleanupLocation Loc;
-
-  void popImpl() {
-    Cleanups.Stack.checkIterator(Depth);
-    Cleanups.Stack.checkIterator(Cleanups.InnermostScope);
-    assert(Cleanups.InnermostScope == Depth && "popping scopes out of order");
-
-    Cleanups.InnermostScope = SavedInnermostScope;
-    Cleanups.endScope(Depth, Loc);
-    Cleanups.Stack.checkIterator(Cleanups.InnermostScope);
-    Cleanups.popTopDeadCleanups(Cleanups.InnermostScope);
-  }
+  CleanupManager &cleanups;
+  CleanupsDepth depth;
+  CleanupsDepth savedInnermostScope;
+  CleanupLocation loc;
 
 public:
-  explicit Scope(CleanupManager &Cleanups, CleanupLocation L)
-    : Cleanups(Cleanups), Depth(Cleanups.getCleanupsDepth()),
-      SavedInnermostScope(Cleanups.InnermostScope),
-      Loc(L) {
-    assert(Depth.isValid());
-    Cleanups.Stack.checkIterator(Cleanups.InnermostScope);
-    Cleanups.InnermostScope = Depth;
+  explicit Scope(CleanupManager &cleanups, CleanupLocation loc)
+      : cleanups(cleanups), depth(cleanups.getCleanupsDepth()),
+        savedInnermostScope(cleanups.innermostScope), loc(loc) {
+    assert(depth.isValid());
+    cleanups.stack.checkIterator(cleanups.innermostScope);
+    cleanups.innermostScope = depth;
   }
 
   void pop() {
-    assert(Depth.isValid() && "popping a scope twice!");
+    assert(depth.isValid() && "popping a scope twice!");
     popImpl();
-    Depth = CleanupsDepth::invalid();
+    depth = CleanupsDepth::invalid();
   }
   
   ~Scope() {
-    if (Depth.isValid()) popImpl();
+    if (depth.isValid())
+      popImpl();
   }
 
-  bool isValid() const { return Depth.isValid(); }
+  bool isValid() const { return depth.isValid(); }
+
+private:
+  void popImpl() {
+    cleanups.stack.checkIterator(depth);
+    cleanups.stack.checkIterator(cleanups.innermostScope);
+    assert(cleanups.innermostScope == depth && "popping scopes out of order");
+
+    cleanups.innermostScope = savedInnermostScope;
+    cleanups.endScope(depth, loc);
+    cleanups.stack.checkIterator(cleanups.innermostScope);
+    cleanups.popTopDeadCleanups(cleanups.innermostScope);
+  }
 };
 
 /// A FullExpr is a RAII object recording that a full-expression has
@@ -73,8 +74,8 @@ public:
 /// that are only conditionally evaluated.
 class LLVM_LIBRARY_VISIBILITY FullExpr : private Scope {
 public:
-  explicit FullExpr(CleanupManager &Cleanups, CleanupLocation Loc)
-    : Scope(Cleanups, Loc) {}
+  explicit FullExpr(CleanupManager &cleanups, CleanupLocation loc)
+      : Scope(cleanups, loc) {}
   using Scope::pop;
 };
 
@@ -82,11 +83,9 @@ public:
 class LLVM_LIBRARY_VISIBILITY LexicalScope : private Scope {
   SILGenFunction& SGF;
 public:
-  explicit LexicalScope(CleanupManager &Cleanups,
-                        SILGenFunction& SGF,
-                        CleanupLocation Loc)
-    : Scope(Cleanups, Loc), SGF(SGF) {
-    SGF.enterDebugScope(Loc);
+  explicit LexicalScope(SILGenFunction &SGF, CleanupLocation loc)
+      : Scope(SGF.Cleanups, loc), SGF(SGF) {
+    SGF.enterDebugScope(loc);
   }
   using Scope::pop;
 
@@ -100,8 +99,8 @@ class LLVM_LIBRARY_VISIBILITY DebugScope {
   SILGenFunction &SGF;
 
 public:
-  explicit DebugScope(SILGenFunction &SGF, CleanupLocation Loc) : SGF(SGF) {
-    SGF.enterDebugScope(Loc);
+  explicit DebugScope(SILGenFunction &SGF, CleanupLocation loc) : SGF(SGF) {
+    SGF.enterDebugScope(loc);
   }
 
   ~DebugScope() { SGF.leaveDebugScope(); }
