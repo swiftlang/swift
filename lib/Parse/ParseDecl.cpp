@@ -3945,7 +3945,10 @@ VarDecl *Parser::parseDeclVarGetSet(Pattern *pattern,
   if (!TyLoc.hasLocation()) {
     if (accessors.Get || accessors.Set || accessors.Addressor ||
         accessors.MutableAddressor) {
-      diagnose(pattern->getLoc(), diag::computed_property_missing_type);
+      SourceLoc locAfterPattern = pattern->getLoc().getAdvancedLoc(
+        pattern->getBoundName().getLength());
+      diagnose(pattern->getLoc(), diag::computed_property_missing_type)
+        .fixItInsert(locAfterPattern, ": <# Type #>");
       Invalid = true;
     }
   }
