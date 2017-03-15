@@ -225,6 +225,9 @@ ToolChain::constructInvocation(const CompileJobAction &job,
       // Since this is our primary output, we need to specify the option here.
       FrontendModeOption = "-emit-module";
       break;
+    case types::TY_ImportedModules:
+      FrontendModeOption = "-emit-imported-modules";
+      break;
     case types::TY_Nothing:
       // We were told to output nothing, so get the last mode option and use that.
       if (const Arg *A = context.Args.getLastArg(options::OPT_modes_Group))
@@ -492,6 +495,7 @@ ToolChain::constructInvocation(const BackendJobAction &job,
                          "but no mode option was passed to the driver.");
       break;
 
+    case types::TY_ImportedModules:
     case types::TY_SwiftModuleFile:
     case types::TY_RawSIL:
     case types::TY_RawSIB:

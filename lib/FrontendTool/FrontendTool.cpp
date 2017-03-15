@@ -21,6 +21,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/FrontendTool/FrontendTool.h"
+#include "ImportedModules.h"
 #include "ReferenceDependencies.h"
 
 #include "swift/Subsystems.h"
@@ -390,7 +391,8 @@ static bool performCompile(std::unique_ptr<CompilerInstance> &Instance,
 
   if (Action == FrontendOptions::Parse ||
       Action == FrontendOptions::DumpParse ||
-      Action == FrontendOptions::DumpInterfaceHash)
+      Action == FrontendOptions::DumpInterfaceHash ||
+      Action == FrontendOptions::EmitImportedModules)
     Instance->performParseOnly();
   else
     Instance->performSema();
@@ -484,6 +486,9 @@ static bool performCompile(std::unique_ptr<CompilerInstance> &Instance,
       SF->dumpInterfaceHash(llvm::errs());
     else
       SF->dump();
+    return Context.hadError();
+  } else if (Action == FrontendOptions::EmitImportedModules) {
+    emitImportedModules(Context.Diags, Instance->getMainModule(), opts);
     return Context.hadError();
   }
 
