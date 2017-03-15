@@ -704,8 +704,7 @@ sourcekitd_variant_array_apply(sourcekitd_variant_t array,
 }
 #endif
 
-SOURCEKITD_PUBLIC SOURCEKITD_NONNULL_ALL bool
-  sourcekitd_variant_array_apply_impl(
+bool sourcekitd_variant_array_apply_impl(
     sourcekitd_variant_t array,
     llvm::function_ref<bool(size_t, sourcekitd_variant_t)> applier) {
   if (auto fn = VAR_FN(array, array_apply))

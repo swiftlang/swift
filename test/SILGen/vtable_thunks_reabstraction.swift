@@ -122,3 +122,16 @@ class GenericSub<T> : ConcreteBase {
     super.doStuff(t: t, u: u)
   }
 }
+
+// Issue with generic parameter index
+class MoreGenericSub1<T, TT> : GenericBase<T> {
+  override func doStuff<U>(t: T, u: U) {
+    super.doStuff(t: t, u: u)
+  }
+}
+
+class MoreGenericSub2<TT, T> : GenericBase<T> {
+  override func doStuff<U>(t: T, u: U) {
+    super.doStuff(t: t, u: u)
+  }
+}
