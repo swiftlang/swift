@@ -578,7 +578,10 @@ static void deallocateDynamicValue(OpaqueValue *value, const Metadata *type) {
       
     case ExistentialTypeRepresentation::Opaque:
 #ifdef SWIFT_RUNTIME_ENABLE_COW_EXISTENTIALS
-      assert(false && "Can't move out of copy-on-write boxes");
+      swift::fatalError(
+          0 /* flags */,
+          "Attempting to move out of a copy-on-write existential");
+      break;
 #else
       auto existential =
         reinterpret_cast<OpaqueExistentialContainer*>(value);
@@ -3024,7 +3027,9 @@ static id bridgeAnythingNonVerbatimToObjectiveC(OpaqueValue *src,
 #ifdef SWIFT_RUNTIME_ENABLE_COW_EXISTENTIALS
           // Copy-on-write existentials share boxed and can't be 'take'n out of
           // without a uniqueness check (which we currently don't do).
-          assert(false && "Should never get here");
+          swift::fatalError(
+              0 /* flags */,
+              "Attempting to move out of a copy-on-write existential");
 #else
           // Should only be true of opaque existentials right now.
           assert(srcExistentialTy->getRepresentation()
