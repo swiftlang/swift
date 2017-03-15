@@ -4,7 +4,6 @@
 # and return.
 if(DEFINED SWIFT_MASTER_LOADED
   OR NOT ${CMAKE_CURRENT_SOURCE_DIR} STREQUAL ${CMAKE_SOURCE_DIR})
-  message(STATUS "returning from StandaloneOverlay.cmake")
   set(SWIFT_MASTER_LOADED TRUE)
   return()
 endif()
