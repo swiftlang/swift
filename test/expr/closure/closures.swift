@@ -3,7 +3,7 @@
 var func6 : (_ fn : (Int,Int) -> Int) -> ()
 var func6a : ((Int, Int) -> Int) -> ()
 var func6b : (Int, (Int, Int) -> Int) -> ()
-func func6c(_ f: (Int, Int) -> Int, _ n: Int = 0) {} // expected-warning{{prior to parameters}}
+func func6c(_ f: (Int, Int) -> Int, _ n: Int = 0) {}
 
 
 // Expressions can be auto-closurified, so that they can be evaluated separately
