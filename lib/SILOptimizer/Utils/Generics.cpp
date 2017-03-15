@@ -290,12 +290,9 @@ bool ReabstractionInfo::canBeSpecialized(ApplySite Apply, SILFunction *Callee,
 }
 
 ReabstractionInfo::ReabstractionInfo(ApplySite Apply, SILFunction *Callee,
-                                     ArrayRef<Substitution> ParamSubs,
-                                     bool ConvertIndirectToDirect) {
+                                     ArrayRef<Substitution> ParamSubs) {
   if (!prepareAndCheck(Apply, Callee, ParamSubs))
     return;
-
-  this->ConvertIndirectToDirect = ConvertIndirectToDirect;
 
   if (SpecializeGenericSubstitutions) {
     specializeConcreteAndGenericSubstitutions(Apply, Callee, ParamSubs);
