@@ -14,7 +14,28 @@ struct Box<T> {
   let t: T
 }
 
+protocol EmptyP {}
+
+struct AddressOnlyStruct : EmptyP {}
+
 func s010_hasVarArg(_ args: Any...) {}
+
+// Tests Address only enums's construction
+// CHECK-LABEL: sil shared [transparent] @_T020opaque_values_silgen15AddressOnlyEnumO4mereAcA6EmptyP_pcACmF : $@convention(method) (@in EmptyP, @thin AddressOnlyEnum.Type) -> @out AddressOnlyEnum {
+// CHECK: bb0([[ARG0:%.*]] : $EmptyP, [[ARG1:%.*]] : $@thin AddressOnlyEnum.Type):
+// CHECK:   [[RETVAL:%.*]] = enum $AddressOnlyEnum, #AddressOnlyEnum.mere!enumelt.1, [[ARG0]] : $EmptyP
+// CHECK:   return [[RETVAL]] : $AddressOnlyEnum
+// CHECK-LABEL: } // end sil function '_T020opaque_values_silgen15AddressOnlyEnumO4mereAcA6EmptyP_pcACmF'
+// CHECK-LABEL: sil shared [transparent] [thunk] @_T020opaque_values_silgen15AddressOnlyEnumO4mereAcA6EmptyP_pcACmFTc : $@convention(thin) (@thin AddressOnlyEnum.Type) -> @owned @callee_owned (@in EmptyP) -> @out AddressOnlyEnum {
+// CHECK: bb0([[ARG:%.*]] : $@thin AddressOnlyEnum.Type):
+// CHECK:   [[RETVAL:%.*]] = partial_apply {{.*}}([[ARG]]) : $@convention(method) (@in EmptyP, @thin AddressOnlyEnum.Type) -> @out AddressOnlyEnum
+// CHECK:   return [[RETVAL]] : $@callee_owned (@in EmptyP) -> @out AddressOnlyEnum
+// CHECK-LABEL: } // end sil function '_T020opaque_values_silgen15AddressOnlyEnumO4mereAcA6EmptyP_pcACmFTc'
+enum AddressOnlyEnum {
+  case nought
+  case mere(EmptyP)
+  case phantom(AddressOnlyStruct)
+}
 
 // Test that we still use addresses when dealing with array initialization
 // ---
@@ -410,6 +431,34 @@ func s240_____propOfLValue(_ x: Error) -> String {
 func s250_________testBoxT() {
   let _ = Box(t: 42)
 }
+
+// Tests Address only enums
+// ---
+// CHECK-LABEL: sil hidden @_T020opaque_values_silgen21s260_______AOnly_enumyAA17AddressOnlyStructVF : $@convention(thin) (AddressOnlyStruct) -> () {
+// CHECK: bb0([[ARG:%.*]] : $AddressOnlyStruct):
+// CHECK:   [[MTYPE1:%.*]] = metatype $@thin AddressOnlyEnum.Type
+// CHECK:   [[APPLY1:%.*]] =  apply {{.*}}([[MTYPE1]]) : $@convention(thin) (@thin AddressOnlyEnum.Type) -> @owned @callee_owned (@in EmptyP) -> @out AddressOnlyEnum
+// CHECK:   destroy_value [[APPLY1]]
+// CHECK:   [[MTYPE2:%.*]] = metatype $@thin AddressOnlyEnum.Type
+// CHECK:   [[ENUM1:%.*]] = enum $AddressOnlyEnum, #AddressOnlyEnum.nought!enumelt
+// CHECK:   [[MTYPE3:%.*]] = metatype $@thin AddressOnlyEnum.Type
+// CHECK:   [[INIT_OPAQUE:%.*]] = init_existential_opaque [[ARG]] : $AddressOnlyStruct, $AddressOnlyStruct, $EmptyP
+// CHECK:   [[ENUM2:%.*]] = enum $AddressOnlyEnum, #AddressOnlyEnum.mere!enumelt.1, [[INIT_OPAQUE]] : $EmptyP
+// CHECK:   destroy_value [[ENUM2]]
+// CHECK:   [[MTYPE4:%.*]] = metatype $@thin AddressOnlyEnum.Type
+// CHECK:   [[ENUM3:%.*]] = enum $AddressOnlyEnum, #AddressOnlyEnum.phantom!enumelt.1, [[ARG]] : $AddressOnlyStruct
+// CHECK:   return %{{.*}} : $()
+// CHECK-LABEL: } // end sil function '_T020opaque_values_silgen21s260_______AOnly_enumyAA17AddressOnlyStructVF'
+func s260_______AOnly_enum(_ s: AddressOnlyStruct) {
+  _ = AddressOnlyEnum.mere
+
+  _ = AddressOnlyEnum.nought
+
+  _ = AddressOnlyEnum.mere(s)
+
+  _ = AddressOnlyEnum.phantom(s)
+}
+
 
 // Tests conditional value casts and correspondingly generated reabstraction thunk, with <T> types
 // ---
