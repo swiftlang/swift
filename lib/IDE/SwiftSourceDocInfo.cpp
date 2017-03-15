@@ -342,37 +342,6 @@ private:
     std::vector<ASTNode> EndMatches;
     ContextInfo(ASTNode Parent, bool ContainedInRange) : Parent(Parent),
       ContainedInRange(ContainedInRange) {}
-private:
-    bool hasStmtlikeNode(ArrayRef<ASTNode> Nodes) {
-      for (auto N : Nodes) {
-        if (N.is<Stmt*>())
-          return true;
-        // Expression with void type is statement-like.
-        else if (N.is<Expr*>()) {
-          auto *E = N.get<Expr*>();
-          if (auto T = E->getType()) {
-            if (T->isVoid())
-              return true;
-          }
-        } else {
-          // Decls are statement like.
-          return true;
-        }
-      }
-      return false;
-    }
-public:
-    bool hasStmtMatch(RangeMatchKind Kind) {
-      switch(Kind) {
-      case RangeMatchKind::NoneMatch:
-      case RangeMatchKind::RangeMatch:
-        llvm_unreachable("cannot answer these.");
-      case RangeMatchKind::StartMatch:
-        return hasStmtlikeNode(StartMatches);
-      case RangeMatchKind::EndMatch:
-        return hasStmtlikeNode(EndMatches);
-      }
-    }
   };
 
   std::vector<Token> AllTokens;
@@ -685,11 +654,7 @@ public:
       }
     }
 
-    // Check if the start and end matches have statement-like entities; this
-    // can avoid picking expressions like "a == b" in a list of selected
-    // multi-statement at the start (or the end).
-    if (DCInfo.hasStmtMatch(RangeMatchKind::StartMatch) &&
-        DCInfo.hasStmtMatch(RangeMatchKind::EndMatch)) {
+    if (!DCInfo.StartMatches.empty() && !DCInfo.EndMatches.empty()) {
       postAnalysis(DCInfo.EndMatches.back());
       Result = {RangeKind::MultiStatement,
                 /* Last node has the type */
@@ -717,7 +682,7 @@ public:
   ResolvedRangeInfo getResult() {
     if (Result.hasValue())
       return Result.getValue();
-    return ResolvedRangeInfo(Content);
+    return ResolvedRangeInfo();
   }
 
   void analyzeDeclRef(ValueDecl *VD, CharSourceRange Range, Type Ty,
@@ -819,7 +784,7 @@ visitDeclReference(ValueDecl *D, CharSourceRange Range, TypeDecl *CtorTyRef,
 
 ResolvedRangeInfo RangeResolver::resolve() {
   if (!Impl)
-    return ResolvedRangeInfo(StringRef());
+    return ResolvedRangeInfo();
   Impl->enter(ASTNode());
   walk(Impl->File);
   return Impl->getResult();
