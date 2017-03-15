@@ -517,6 +517,55 @@ extension AnyUnicode {
   }
 }
 
+// Work around name collision ambiguity
+extension _FixedFormatUnicode {
+  internal var _codeUnits: CodeUnits { return codeUnits }
+  internal var _characters: CharacterView { return characters }
+  internal var _fccNormalizedUTF16: FCCNormalizedUTF16View {
+    return fccNormalizedUTF16
+  }
+}
+
+extension AnyUnicode
+where Self : _FixedFormatUnicode,
+Self.CodeUnits : RandomAccessCollection,
+Self.CodeUnits.Iterator.Element : UnsignedInteger,
+Self.RawUTF16View : BidirectionalCollection,
+Self.RawUTF16View.Iterator.Element == UTF16.CodeUnit,
+Self.FCCNormalizedUTF16View.Iterator.Element : UnsignedInteger,
+Self.CodeUnits.Index == Self.CodeUnits.SubSequence.Index, 
+Self.CodeUnits.SubSequence : RandomAccessCollection, 
+Self.CodeUnits.SubSequence == Self.CodeUnits.SubSequence.SubSequence, 
+Self.CodeUnits.Iterator.Element == Self.CodeUnits.SubSequence.Iterator.Element, 
+Self.CodeUnits.SubSequence.Iterator.Element == Self.Encoding.EncodedScalar.Iterator.Element,
+Self.CharacterView.Iterator.Element == Character,
+Self.CharacterView.Index : SignedInteger
+{
+  var codeUnits: AnyCodeUnits {
+    return AnyCodeUnits(self._codeUnits)
+  }
+  
+  var rawUTF16: AnyUTF16 { return AnyUTF16(self.rawUTF16 as RawUTF16View) }
+  // FIXME: this could be more efficient for encodings such as Latin1
+  var utf32: AnyUnicodeBidirectionalUInt32 {
+      return AnyUnicodeBidirectionalUInt32(
+      UnicodeStorage(
+        _codeUnits, Encoding.self
+      ).transcoded(to: UTF32.self)
+    )
+  }
+  var fccNormalizedUTF16: AnyUTF16 {
+    return AnyUTF16(fccNormalizedUTF16 as FCCNormalizedUTF16View)
+  }
+  // FIXME: Could be more efficient generally
+  var extendedASCII: AnyUnicodeBidirectionalUInt32 {
+    return utf32
+  }
+  var characters: AnyCharacters {
+    return AnyCharacters(_characters)
+  }
+}
+
 struct AnyRandomAccessUnsignedIntegers<
   Base: RandomAccessCollection, Element_ : UnsignedInteger
 > : RandomAccessCollection
@@ -585,9 +634,9 @@ extension UTF16CompatibleStringContents : _FixedFormatUnicode {
   var fccNormalizedUTF16: FCCNormalizedUTF16View {
     switch self {
     case .utf16(let storage):
-      return AnyUTF16(storage.fccNormalizedUTF16)
+      return storage.fccNormalizedUTF16
     case .latin1(let storage):
-      return AnyUTF16(storage.fccNormalizedUTF16)
+      return storage.fccNormalizedUTF16
     }
   }
 
@@ -728,6 +777,14 @@ case latin1(_Latin1StringStorage)
 case any(AnyUnicodeBox)
 }
 
+extension _UTF16StringStorage : AnyUnicode {
+  
+}
+
+extension _Latin1StringStorage : AnyUnicode {
+  
+}
+
 extension AnyStringContents : AnyUnicode {
   var encoding: AnyUnicodeEncoding.Type {
     switch self {
@@ -788,9 +845,9 @@ extension AnyStringContents : AnyUnicode {
   var fccNormalizedUTF16: AnyUTF16 {
     switch self {
     case .utf16(let storage):
-      return AnyUTF16(storage.fccNormalizedUTF16)
+      return storage.fccNormalizedUTF16
     case .latin1(let storage):
-      return AnyUTF16(storage.fccNormalizedUTF16)
+      return storage.fccNormalizedUTF16
     case .any(let base):
       return base.fccNormalizedUTF16
     }
@@ -883,6 +940,18 @@ extension AnyStringContents : AnyUnicode {
       return base.isKnownNFCNormalized
     }
   }
+
+  init<T: AnyUnicode>(_ x: T) {
+    if let s = x as? _Latin1StringStorage {
+      self = .latin1(s)
+    }
+    else if let s = x as? _UTF16StringStorage {
+      self = .utf16(s)
+    }
+    else {
+      self = .any(AnyUnicodeBox(wrapping: x))
+    }
+  }
 }
 
 print(MemoryLayout<UTF16CompatibleStringContents>.size)
@@ -895,4 +964,16 @@ suite.test("basics") {
   expectTrue(x.elementsEqual(y))
 }
 
+suite.test("AnyStringContents") {
+  let sample = "abcdefghijklmnopqrstuvwxyz\n"
+  + "🇸🇸🇬🇱🇱🇸🇩🇯🇺🇸\n"
+  + "Σὲ 👥🥓γνωρίζω ἀπὸ τὴν κόψη χαῖρε, ὦ χαῖρε, ᾿Ελευθεριά!\n"
+  + "Οὐχὶ ταὐτὰ παρίσταταί μοι γιγνώσκειν, ὦ ἄνδρες ᾿Αθηναῖοι,\n"
+  + "გთხოვთ ახლავე გაიაროთ რეგისტრაცია Unicode-ის მეათე საერთაშორისო\n"
+  + "Зарегистрируйтесь сейчас на Десятую Международную Конференцию по\n"
+  + "  ๏ แผ่นดินฮั่นเสื่อมโทรมแสนสังเวช  พระปกเกศกองบู๊กู้ขึ้นใหม่\n"
+  + "ᚻᛖ ᚳᚹᚫᚦ ᚦᚫᛏ ᚻᛖ ᛒᚢᛞᛖ ᚩᚾ ᚦᚫᛗ ᛚᚪᚾᛞᛖ ᚾᚩᚱᚦᚹᛖᚪᚱᛞᚢᛗ ᚹᛁᚦ ᚦᚪ ᚹᛖᛥᚫ"
+
+  var s = AnyStringContents(_UTF16StringStorage(sample.utf16))
+}
 runAllTests()

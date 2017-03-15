@@ -117,6 +117,19 @@ extension _BoundedBufferReference {
 
 /// Fulfills the RangeReplaceableCollection requirements
 extension _BoundedBufferReference {
+  public init<S : Sequence>(_ elements: S)
+    where S.Iterator.Element == Iterator.Element {
+    self.init(Array(elements))
+  }
+  
+  public init<C : Collection>(_ elements: C)
+    where C.Iterator.Element == Iterator.Element {
+    self.init(_uninitializedCount: numericCast(elements.count))
+    withUnsafeMutableBufferPointer {
+      elements._copyCompleteContents(initializing: $0)
+    }
+  }
+  
   public func replaceSubrange<C>(
     _ target: Range<Int>,
     with newValues: C

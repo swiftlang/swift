@@ -379,3 +379,101 @@ extension _Latin1StringStorage : _FixedFormatUnicode {
   }
 }
 
+//===--- UTF-8 String Storage ---------------------------------------------===//
+public struct UTF8StringHeader : _BoundedBufferHeader {
+  public var count: UInt32
+  public var capacity: UInt32
+  
+  public init(count: Int, capacity: Int) {
+    self.count = numericCast(count)
+    self.capacity = numericCast(capacity)
+  }
+}
+
+public final class _UTF8StringStorage
+// FIXME: we might want our own header type
+  : _StringStorageBase<UTF8StringHeader, UInt8>
+  , _NSStringCore // Ensures that we implement essential NSString methods.  
+{
+  // WORKAROUND: helping type inference along will be unnecessary someday
+  public typealias _Element = UInt8
+  public typealias Iterator = IndexingIterator<_UTF8StringStorage>
+  
+  /// Returns a pointer to contiguously-stored UTF-16 code units
+  /// comprising the whole string, or NULL if such storage isn't
+  /// available.
+  ///
+  /// WARNING: don't use this method from Swift code; ARC may end the
+  /// lifetime of self before you get a chance to use the result.
+  @objc
+  public func _fastCharacterContents() -> UnsafeMutablePointer<UInt16>? {
+    return nil
+  }
+
+  /// Returns a pointer to contiguously-stored code units in the
+  /// system encoding comprising the whole string, or NULL if such
+  /// storage isn't available.
+  ///
+  // WARNING: don't use this method from Swift code; ARC may end the lifetime of
+  // self before you get a chance to use the result.
+  // WARNING: Before you implement this as anything other than “return nil,”
+  // see https://github.com/apple/swift/pull/3151#issuecomment-285583557
+  @objc
+  public func _fastCStringContents(
+    _ nullTerminationRequired: Int8
+  ) -> UnsafePointer<CChar>? {
+    return nil
+  }
+  
+  // WORKAROUND: rdar://31047127 prevents us from hoisting this into
+  // _StringStorageBase
+  @nonobjc
+  public override var _baseAddress: UnsafeMutablePointer<UTF8.CodeUnit> {
+    return UnsafeMutablePointer(
+      Builtin.projectTailElems(self, Element.self))
+  }
+
+  @nonobjc
+  public var isKnownASCII = false
+  @nonobjc
+  public var isKnownLatin1 = false
+  @nonobjc
+  public var isKnownValidEncoding = false
+  @nonobjc
+  public var isKnownFCCNormalized = false
+  @nonobjc
+  public var isKnownFCDForm = false
+  @nonobjc
+  public var isKnownNFDNormalized = false
+  @nonobjc
+  public var isKnownNFCNormalized = false
+}
+
+extension _UTF8StringStorage : _BoundedBufferReference {
+  @nonobjc
+  public static func _emptyInstance() -> _UTF8StringStorage {
+    return _UTF8StringStorage(uninitializedWithMinimumCapacity: 0)
+  }
+}
+
+extension _UTF8StringStorage : _FixedFormatUnicode {
+  public typealias Encoding = UTF8
+  
+  // WORKAROUND: helping type inference along will be unnecessary someday
+  public typealias CodeUnits = _UTF8StringStorage
+  
+  public typealias RawUTF16View = UnicodeStorage<
+    CodeUnits, Encoding
+  >.TranscodedView<UTF16>
+
+  public typealias FCCNormalizedUTF16View = UnicodeStorage<
+    CodeUnits, Encoding
+  >.FCCNormalizedUTF16View
+  
+  public var codeUnits: CodeUnits { return self }
+  public var rawUTF16: RawUTF16View { return RawUTF16View(self) }
+  public var fccNormalizedUTF16: FCCNormalizedUTF16View {
+    return UnicodeStorage(self, UTF8.self).fccNormalizedUTF16
+  }
+}
+

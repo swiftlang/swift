@@ -50,7 +50,26 @@ public protocol _FixedFormatUnicode : _AnyUnicode {
   // where Iterator.Element == UInt16
 
   /// An FCC-normalized view of the string
-  var fccNormalizedUTF16 : FCCNormalizedUTF16View { get }
+  var fccNormalizedUTF16: FCCNormalizedUTF16View { get }
+
+  associatedtype CharacterView : BidirectionalCollection
+  // where Iterator.Element == Character
+
+  var characters: CharacterView { get }
+}
+
+/// Default views
+public extension _FixedFormatUnicode
+where
+  CodeUnits.Iterator.Element  == Encoding.EncodedScalar.Iterator.Element,
+  CodeUnits.Iterator.Element : UnsignedInteger,
+  CodeUnits.SubSequence : RandomAccessCollection,
+  CodeUnits.SubSequence.Index == CodeUnits.Index,
+  CodeUnits.SubSequence.SubSequence == CodeUnits.SubSequence,
+  CodeUnits.SubSequence.Iterator.Element == CodeUnits.Iterator.Element {
+  var characters: UnicodeStorage<CodeUnits,Encoding>.CharacterView {
+    return UnicodeStorage(codeUnits).characters
+  }
 }
 
 public extension _FixedFormatUnicode {
@@ -108,12 +127,12 @@ public extension _FixedFormatUnicode where Encoding == Latin1 {
   
 public extension _FixedFormatUnicode
 where Encoding == Latin1, CodeUnits.Iterator.Element : UnsignedInteger {
-  var rawUTF16 : LazyMapRandomAccessCollection<CodeUnits, UInt16> {
+  var rawUTF16: LazyMapRandomAccessCollection<CodeUnits, UInt16> {
     return fccNormalizedUTF16
   }
 
   /// An FCC-normalized view of the string
-  var fccNormalizedUTF16 : LazyMapRandomAccessCollection<CodeUnits, UInt16> {
+  var fccNormalizedUTF16: LazyMapRandomAccessCollection<CodeUnits, UInt16> {
     return codeUnits.lazy.map { numericCast($0) }
   }
 }
