@@ -397,10 +397,10 @@ static void replaceObjcDeclarationsWithSwiftOnes(const Decl *D,
     OS << Doc;
 }
 
-static LineList getLineListFromComment(swift::markup::MarkupContext &MC,
+static LineList getLineListFromComment(SourceManager &SourceMgr,
+                                       swift::markup::MarkupContext &MC,
                                        const StringRef Text) {
   LangOptions LangOpts;
-  SourceManager SourceMgr;
   auto Tokens = swift::tokenize(LangOpts, SourceMgr,
                                 SourceMgr.addMemBufferCopy(Text));
   std::vector<SingleRawComment> Comments;
@@ -418,8 +418,9 @@ static LineList getLineListFromComment(swift::markup::MarkupContext &MC,
 }
 
 std::string ide::extractPlainTextFromComment(const StringRef Text) {
+  SourceManager SourceMgr;
   swift::markup::MarkupContext MC;
-  return getLineListFromComment(MC, Text).str();
+  return getLineListFromComment(SourceMgr, MC, Text).str();
 }
 
 bool ide::getDocumentationCommentAsXML(const Decl *D, raw_ostream &OS) {
@@ -468,8 +469,9 @@ bool ide::convertMarkupToXML(StringRef Text, raw_ostream &OS) {
     llvm::raw_string_ostream OS(Comment);
     OS << "/**\n" << Text << "\n" << "*/";
   }
+  SourceManager SourceMgr;
   MarkupContext MC;
-  LineList LL = getLineListFromComment(MC, Comment);
+  LineList LL = getLineListFromComment(SourceMgr, MC, Comment);
   if (auto *Doc = swift::markup::parseDocument(MC, LL)) {
     CommentToXMLConverter Converter(OS);
     Converter.visitCommentParts(extractCommentParts(MC, Doc));
