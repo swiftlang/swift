@@ -1412,7 +1412,7 @@ namespace {
       // Wrap in covariant `Self` return if needed.
       if (selfTy->hasReferenceSemantics()) {
         auto covariantTy = resultTy
-          ->replaceCovariantResultType(base->getType()
+          ->replaceCovariantResultType(cs.getType(base)
                                            ->getLValueOrInOutObjectType(),
                                        ctor->getNumParameterLists());
         if (!covariantTy->isEqual(resultTy))
@@ -7300,9 +7300,11 @@ Expr *TypeChecker::callWitness(Expr *base, DeclContext *dc,
                             /*implicit=*/true, getType);
   }
 
+  cs.cacheSubExprTypes(call);
+
   // Add the conversion from the argument to the function parameter type.
   cs.addConstraint(ConstraintKind::ArgumentTupleConversion,
-                   call->getArg()->getType(),
+                   cs.getType(call->getArg()),
                    openedType->castTo<FunctionType>()->getInput(),
                    cs.getConstraintLocator(call,
                                            ConstraintLocator::ApplyArgument));
