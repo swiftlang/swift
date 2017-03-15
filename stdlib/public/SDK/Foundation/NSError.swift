@@ -836,12 +836,24 @@ extension CocoaError.Code {
 
   @available(OSX, introduced: 10.11) @available(iOS, introduced: 9.0)
   public static var coderReadCorrupt: CocoaError.Code {
+    return _coderReadCorrupt
+  }
+
+  internal static var _coderReadCorrupt: CocoaError.Code {
     return CocoaError.Code(rawValue: 4864)
   }
 
   @available(OSX, introduced: 10.11) @available(iOS, introduced: 9.0)
   public static var coderValueNotFound: CocoaError.Code {
+    return _coderValueNotFound
+  }
+
+  internal static var _coderValueNotFound: CocoaError.Code {
     return CocoaError.Code(rawValue: 4865)
+  }
+
+  public static var coderInvalidValue: CocoaError.Code {
+    return CocoaError.Code(rawValue: 4866)
   }
 }
 
@@ -1275,12 +1287,24 @@ extension CocoaError {
 
   @available(OSX, introduced: 10.11) @available(iOS, introduced: 9.0)
   public static var coderReadCorrupt: CocoaError.Code {
+    return _coderReadCorrupt
+  }
+
+  public static var _coderReadCorrupt: CocoaError.Code {
     return CocoaError.Code(rawValue: 4864)
   }
 
   @available(OSX, introduced: 10.11) @available(iOS, introduced: 9.0)
   public static var coderValueNotFound: CocoaError.Code {
+    return _coderValueNotFound
+  }
+
+  internal static var _coderValueNotFound: CocoaError.Code {
     return CocoaError.Code(rawValue: 4865)
+  }
+
+  public static var coderInvalidValue: CocoaError.Code {
+    return CocoaError.Code(rawValue: 4866)
   }
 }
 
