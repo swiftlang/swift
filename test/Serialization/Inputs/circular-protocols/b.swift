@@ -5,3 +5,7 @@ public protocol BB {
 public protocol B {
   associatedtype T : BB
 }
+
+public protocol BaseProto30984417 {
+  func toConcrete() -> SubProtoImpl30984417
+}
