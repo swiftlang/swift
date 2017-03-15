@@ -2029,7 +2029,9 @@ Job *Driver::buildJobsForAction(Compilation &C, const JobAction *JA,
       if (llvm::sys::fs::is_regular_file(OutputPath))
         llvm::sys::fs::remove(OutputPath);
     }
+  }
 
+  if (isa<CompileJobAction>(JA)) {
     // Choose the dependencies file output path.
     if (C.getArgs().hasArg(options::OPT_emit_dependencies)) {
       addAuxiliaryOutput(C, *Output, types::TY_Dependencies, OI, OutputMap);
