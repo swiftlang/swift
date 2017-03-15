@@ -1081,5 +1081,8 @@ suite.test("AnyStringContents") {
   + "ᚻᛖ ᚳᚹᚫᚦ ᚦᚫᛏ ᚻᛖ ᛒᚢᛞᛖ ᚩᚾ ᚦᚫᛗ ᛚᚪᚾᛞᛖ ᚾᚩᚱᚦᚹᛖᚪᚱᛞᚢᛗ ᚹᛁᚦ ᚦᚪ ᚹᛖᛥᚫ"
 
   var s = AnyStringContents(_UTF16StringStorage(sample.utf16))
+  for c in s.characters {
+    print("\(c)|", terminator: "")
+  }
 }
 runAllTests()
