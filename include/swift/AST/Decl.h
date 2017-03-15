@@ -2883,6 +2883,9 @@ public:
 private:
   /// Predicate used to filter StoredPropertyRange.
   struct ToStoredProperty {
+    ToStoredProperty(bool skipInaccessible = false) :
+        skipUserInaccessible(skipInaccessible) {}
+    bool skipUserInaccessible;
     Optional<VarDecl *> operator()(Decl *decl) const;
   };
   
@@ -2892,8 +2895,9 @@ public:
                                                      ToStoredProperty>;
 
   /// Return a collection of the stored member variables of this type.
-  StoredPropertyRange getStoredProperties() const {
-    return StoredPropertyRange(getMembers(), ToStoredProperty());
+  StoredPropertyRange getStoredProperties(bool skipInaccessible = false) const {
+    return StoredPropertyRange(getMembers(),
+                               ToStoredProperty(skipInaccessible));
   }
 
   // Implement isa/cast/dyncast/etc.
@@ -5985,7 +5989,8 @@ inline bool ValueDecl::isSettable(const DeclContext *UseDC,
 inline Optional<VarDecl *>
 NominalTypeDecl::ToStoredProperty::operator()(Decl *decl) const {
   if (auto var = dyn_cast<VarDecl>(decl)) {
-    if (!var->isStatic() && var->hasStorage())
+    if (!var->isStatic() && var->hasStorage() &&
+        (!skipUserInaccessible || var->isUserAccessible()))
       return var;
   }
 

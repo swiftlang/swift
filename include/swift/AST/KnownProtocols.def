@@ -60,6 +60,8 @@ PROTOCOL_(ErrorCodeProtocol)
 PROTOCOL(OptionSet)
 PROTOCOL_(BridgedNSError)
 PROTOCOL_(BridgedStoredNSError)
+PROTOCOL(CodingKey)
+PROTOCOL(Codable)
 
 PROTOCOL_(ObjectiveCBridgeable)
 PROTOCOL_(DestructorSafeContainer)

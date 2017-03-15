@@ -5548,6 +5548,8 @@ SpecialProtocol irgen::getSpecialProtocolID(ProtocolDecl *P) {
   case KnownProtocolKind::BridgedNSError:
   case KnownProtocolKind::BridgedStoredNSError:
   case KnownProtocolKind::ErrorCodeProtocol:
+  case KnownProtocolKind::CodingKey:
+  case KnownProtocolKind::Codable:
     return SpecialProtocol::None;
   }
 

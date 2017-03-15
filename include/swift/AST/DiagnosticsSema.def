@@ -1895,6 +1895,10 @@ ERROR(broken_equatable_eq_operator,none,
       "Equatable protocol is broken: no infix operator declaration for '=='", ())
 ERROR(no_equal_overload_for_int,none,
       "no overload of '==' for Int", ())
+ERROR(broken_coding_key_requirement,none,
+      "CodingKey protocol is broken: unexpected requirement", ())
+ERROR(broken_codable_requirement,none,
+      "Codable protocol is broken: unexpected requirement", ())
 
 // Dynamic Self
 ERROR(dynamic_self_non_method,none,

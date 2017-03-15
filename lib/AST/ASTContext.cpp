@@ -743,7 +743,9 @@ ProtocolDecl *ASTContext::getProtocol(KnownProtocolKind kind) const {
   // are in the Foundation module.
   if (kind == KnownProtocolKind::BridgedNSError ||
       kind == KnownProtocolKind::BridgedStoredNSError ||
-      kind == KnownProtocolKind::ErrorCodeProtocol) {
+      kind == KnownProtocolKind::ErrorCodeProtocol ||
+      kind == KnownProtocolKind::CodingKey ||
+      kind == KnownProtocolKind::Codable) {
     ModuleDecl *foundation =
         const_cast<ASTContext *>(this)->getLoadedModule(Id_Foundation);
     if (!foundation)

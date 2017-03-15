@@ -6234,6 +6234,12 @@ ValueDecl *TypeChecker::deriveProtocolRequirement(DeclContext *DC,
     return DerivedConformance::deriveBridgedNSError(*this, Decl, TypeDecl,
                                                     Requirement);
 
+  case KnownProtocolKind::CodingKey:
+    return DerivedConformance::deriveCodingKey(*this, Decl, TypeDecl, Requirement);
+
+  case KnownProtocolKind::Codable:
+    return DerivedConformance::deriveCodable(*this, Decl, TypeDecl, Requirement);
+
   default:
     return nullptr;
   }
