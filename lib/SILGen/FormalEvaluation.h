@@ -142,6 +142,35 @@ public:
   void dump(SILGenFunction &SGF);
 };
 
+/// A scope associated with the beginning of the formal evaluation of an lvalue.
+///
+/// A formal evaluation of an lvalue occurs when emitting:
+///
+///   1. accessors.
+///   2. getters.
+///   3. materializeForSets.
+///
+/// for lvalues. The general form of such an evaluation is:
+///
+///   formally evaluate the lvalue "x" into memory
+///   begin formal access to "x"
+///   end formal access to "x"
+///   ... *more formal access*
+///   begin formal access to "x"
+///   end formal access to "x"
+///   end formal evaluation of lvalue into memory
+///
+/// *NOTE* All formal access contain a pointer to a cleanup in the normal
+/// cleanup stack. This is to ensure that when SILGen calls
+/// Cleanups.emitBranchAndCleanups (and other special cleanup code along error
+/// edges), writebacks are properly created. What is key to notice is that all
+/// of these cleanup emission types are non-destructive. Contrast this with
+/// normal scope popping. In such a case, the scope pop is destructive. This
+/// means that any pointers from the formal access to the cleanup stack is now
+/// invalid.
+///
+/// In order to avoid this issue, it is important to /never/ create a formal
+/// access cleanup when the "top level" scope is not a formal evaluation scope.
 class FormalEvaluationScope {
   SILGenFunction &SGF;
   llvm::Optional<FormalEvaluationContext::stable_iterator> savedDepth;
