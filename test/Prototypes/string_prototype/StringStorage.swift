@@ -46,7 +46,7 @@ protocol _FixedFormatUnicode : _AnyUnicode {
 
   /// The string's UTF-16 code units, without necessarily correcting encoding
   /// errors.
-  var rawUTF16 : RawUTF16View { get }
+  var rawUTF16: RawUTF16View { get }
 
   /// A type that presents an FCC-normalized view of the string
   associatedtype FCCNormalizedUTF16View : BidirectionalCollection
@@ -63,13 +63,7 @@ extension _FixedFormatUnicode {
 }
 
 /// Default implementations
-extension _FixedFormatUnicode
-where RawUTF16View.Iterator.Element : UnsignedInteger,
-  CodeUnits.SubSequence : Collection, 
-  CodeUnits.SubSequence.SubSequence == CodeUnits.SubSequence,
-  CodeUnits.SubSequence.Iterator.Element == Encoding.EncodedScalar.Iterator.Element
-{
-  var encoding: Encoding.Type { return Encoding.self }
+extension _FixedFormatUnicode {
   
   var isKnownLatin1: Bool { return false }
   var isKnownASCII: Bool { return false }
@@ -78,7 +72,24 @@ where RawUTF16View.Iterator.Element : UnsignedInteger,
   var isKnownFCDForm: Bool {
     return isKnownFCCNormalized || isKnownNFDNormalized
   }
+}
 
+extension _FixedFormatUnicode
+where RawUTF16View.Iterator.Element : UnsignedInteger,
+  CodeUnits.SubSequence : Collection, 
+  CodeUnits.SubSequence.SubSequence == CodeUnits.SubSequence,
+  CodeUnits.SubSequence.Iterator.Element == Encoding.EncodedScalar.Iterator.Element
+{
+  // FIXME: we'd like to put this up in the unconditional extension, but we are
+  // forbidden.
+  var encoding: Encoding.Type { return Encoding.self }
+  
+  func isValidEncoding() -> Bool {
+    return Encoding.parseForward(
+      codeUnits, repairingIllFormedSequences: false
+    ) { _ in }.errorCount == 0
+  }
+  
   func isLatin1() -> Bool {
     return isKnownLatin1 || !rawUTF16.contains { $0 > 0xFF }
   }
@@ -86,24 +97,19 @@ where RawUTF16View.Iterator.Element : UnsignedInteger,
   func isASCII() -> Bool {
     return isKnownASCII || !rawUTF16.contains { $0 > 0x7f }
   }
-  
-  func isValidEncoding() -> Bool {
-    return Encoding.parseForward(
-      codeUnits, repairingIllFormedSequences: false
-    ) { _ in }.errorCount == 0
-  }
 }
 
 /// Latin-1
-extension _FixedFormatUnicode
-where Encoding == Latin1, CodeUnits.Iterator.Element : UnsignedInteger {
-
+extension _FixedFormatUnicode where Encoding == Latin1 {
   var isKnownLatin1: Bool { return true }
   var isKnownValidEncoding: Bool { return true }
   var isKnownFCCNormalized: Bool { return true }
-
+}
+  
+extension _FixedFormatUnicode
+where Encoding == Latin1, CodeUnits.Iterator.Element : UnsignedInteger {
   var rawUTF16 : LazyMapRandomAccessCollection<CodeUnits, UInt16> {
-    return codeUnits.lazy.map { numericCast($0) }
+    return fccNormalizedUTF16
   }
 
   /// An FCC-normalized view of the string
@@ -115,6 +121,7 @@ where Encoding == Latin1, CodeUnits.Iterator.Element : UnsignedInteger {
 /// UTF16 and ValidUTF16
 extension _FixedFormatUnicode
 where Encoding.EncodedScalar == UTF16.EncodedScalar,
+  CodeUnits.Iterator.Element : UnsignedInteger,
   CodeUnits.Iterator.Element == UTF16.CodeUnit,
   CodeUnits.SubSequence : RandomAccessCollection,
   CodeUnits.SubSequence.Index == CodeUnits.Index,
@@ -465,23 +472,23 @@ extension _UTF16StringStorage : _FixedFormatUnicode {
   var codeUnits: _UTF16StringStorage { return self }
   
   @nonobjc
-  var isKnownLatin1: Bool {
+  var isKnownASCII: Bool {
     get { return _header.flags & 1<<0 as UInt16 != 0 }
     set {
       if newValue { _header.flags |= 1<<0 as UInt16 }
-      else { _header.flags &= ~(1<<0) as UInt16 }
-    }
-  }
-  
-  @nonobjc
-  var isKnownASCII: Bool {
-    get { return _header.flags & 1<<1 as UInt16 != 0 }
-    set {
-      if newValue { _header.flags |= 1<<1 as UInt16 }
-      else { _header.flags &= ~(1<<1) }
+      else { _header.flags &= ~(1<<0) }
     }
   }
 
+  @nonobjc
+  var isKnownLatin1: Bool {
+    get { return _header.flags & 1<<1 as UInt16 != 0 }
+    set {
+      if newValue { _header.flags |= 1<<1 as UInt16 }
+      else { _header.flags &= ~(1<<1) as UInt16 }
+    }
+  }
+  
   @nonobjc
   var isKnownValidEncoding: Bool {
     get { return _header.flags & 1<<2 as UInt16 != 0 }
@@ -676,6 +683,29 @@ extension _Latin1StringStorage : _BoundedStorage {
   @nonobjc
   internal static func _emptyInstance() -> _Latin1StringStorage {
     return _Latin1StringStorage(uninitializedWithMinimumCapacity: 0)
+  }
+}
+
+extension _Latin1StringStorage : _FixedFormatUnicode {
+  typealias Encoding = Latin1
+  
+  // WORKAROUND: helping type inference along will be unnecessary someday
+  typealias CodeUnits = _Latin1StringStorage
+  typealias FCCNormalizedUTF16View = LazyMapRandomAccessCollection<CodeUnits, UTF16.CodeUnit>
+  typealias RawUTF16View = FCCNormalizedUTF16View
+  
+  var codeUnits: _Latin1StringStorage { return self }
+
+  var isKnownNFDNormalized: Bool { return true }
+  var isKnownNFCNormalized: Bool { return true }
+
+  @nonobjc
+  var isKnownASCII: Bool {
+    get { return _header.flags & 1<<0 as UInt16 != 0 }
+    set {
+      if newValue { _header.flags |= 1<<0 as UInt16 }
+      else { _header.flags &= ~(1<<0) }
+    }
   }
 }
 
