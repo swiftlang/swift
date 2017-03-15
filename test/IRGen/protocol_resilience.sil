@@ -11,13 +11,6 @@ import SwiftShims
 
 import resilient_protocol
 
-// Witness table for conformance with resilient associated type
-
-// CHECK: @_T019protocol_resilience26ConformsWithResilientAssocVAA03HaseF0AAWP = {{(protected )?}}constant [2 x i8*] [
-// CHECK-SAME:   i8* bitcast (%swift.type* ()* @_T019protocol_resilience23ResilientConformingTypeVMa to i8*),
-// CHECK-SAME:   i8* bitcast (i8** ()* @_T019protocol_resilience23ResilientConformingTypeV010resilient_A005OtherC8ProtocolAAWa to i8*)
-// CHECK-SAME: ]
-
 
 // Protocol is public -- needs resilient witness table
 
@@ -56,6 +49,13 @@ protocol InternalProtocol {
   func f()
 }
 
+
+// Witness table for conformance with resilient associated type
+
+// CHECK: @_T019protocol_resilience26ConformsWithResilientAssocVAA03HaseF0AAWP = {{(protected )?}}constant [2 x i8*] [
+// CHECK-SAME:   i8* bitcast (%swift.type* ()* @_T019protocol_resilience23ResilientConformingTypeVMa to i8*),
+// CHECK-SAME:   i8* bitcast (i8** ()* @_T019protocol_resilience23ResilientConformingTypeV010resilient_A005OtherC8ProtocolAAWa to i8*)
+// CHECK-SAME: ]
 
 // CHECK-LABEL: define{{( protected)?}} swiftcc void @defaultC(%swift.opaque* noalias nocapture swiftself, %swift.type* %Self, i8** %SelfWitnessTable)
 // CHECK-NEXT:  entry:
