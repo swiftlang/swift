@@ -88,7 +88,7 @@ static void emitImplicitValueConstructor(SILGenFunction &gen,
 
   // Emit the indirect return argument, if any.
   SILValue resultSlot;
-  if (selfTy.isAddressOnly(gen.SGM.M)) {
+  if (selfTy.isAddressOnly(gen.SGM.M) && gen.silConv.useLoweredAddresses()) {
     auto &AC = gen.getASTContext();
     auto VD = new (AC) ParamDecl(/*IsLet*/ false, SourceLoc(), SourceLoc(),
                                  AC.getIdentifier("$return_value"),

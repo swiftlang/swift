@@ -10,6 +10,10 @@ protocol P {
   var x : Int { get }
 }
 
+struct Box<T> {
+  let t: T
+}
+
 func s010_hasVarArg(_ args: Any...) {}
 
 // Test that we still use addresses when dealing with array initialization
@@ -392,9 +396,24 @@ func s240_____propOfLValue(_ x: Error) -> String {
   return x._domain
 }
 
+// Tests Implicit Value Construction under Opaque value mode
+// ---
+// CHECK-LABEL: sil hidden @_T020opaque_values_silgen21s250_________testBoxTyyF : $@convention(thin) () -> () {
+// CHECK: bb0:
+// CHECK:   [[BOX_MTYPE:%.*]] = metatype $@thin Box<Int>.Type
+// CHECK:   [[MTYPE:%.*]] = metatype $@thin Int.Type
+// CHECK:   [[INTLIT:%.*]] = integer_literal $Builtin.Int2048, 42
+// CHECK:   [[AINT:%.*]] = apply {{.*}}([[INTLIT]], [[MTYPE]]) : $@convention(method) (Builtin.Int2048, @thin Int.Type) -> Int
+// CHECK:   apply {{.*}}<Int>([[AINT]], [[BOX_MTYPE]]) : $@convention(method) <τ_0_0> (@in τ_0_0, @thin Box<τ_0_0>.Type) -> @out Box<τ_0_0>
+// CHECK:   return %{{.*}} : $()
+// CHECK-LABEL: } // end sil function '_T020opaque_values_silgen21s250_________testBoxTyyF'
+func s250_________testBoxT() {
+  let _ = Box(t: 42)
+}
+
 // Tests conditional value casts and correspondingly generated reabstraction thunk, with <T> types
 // ---
-// CHECK-LABEL: sil hidden @_T020opaque_values_silgen21s250_____condTFromAnyyyp_xtlF : $@convention(thin) <T> (@in Any, @in T) -> () {
+// CHECK-LABEL: sil hidden @_T020opaque_values_silgen21s999_____condTFromAnyyyp_xtlF : $@convention(thin) <T> (@in Any, @in T) -> () {
 // CHECK: bb0([[ARG0:%.*]] : $Any, [[ARG1:%.*]] : $T):
 // CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG0]]
 // CHECK:   [[COPY__ARG:%.*]] = copy_value [[BORROWED_ARG]]
@@ -404,12 +423,21 @@ func s240_____propOfLValue(_ x: Error) -> String {
 // CHECK:   partial_apply [[THUNK_REF]]<T>([[THUNK_PARAM]])
 // CHECK: bb6:
 // CHECK:   return %{{.*}} : $()
-// CHECK-LABEL: } // end sil function '_T020opaque_values_silgen21s250_____condTFromAnyyyp_xtlF'
-func s250_____condTFromAny<T>(_ x: Any, _ y: T) {
+// CHECK-LABEL: } // end sil function '_T020opaque_values_silgen21s999_____condTFromAnyyyp_xtlF'
+func s999_____condTFromAny<T>(_ x: Any, _ y: T) {
   if let f = x as? (Int, T) -> (Int, T) {
     f(42, y)
   }
 }
+
+// s250_________testBoxT continued Tests Implicit Value Construction under Opaque value mode
+// ---
+// CHECK-LABEL: sil hidden @_T020opaque_values_silgen3BoxVACyxGx1t_tcfC : $@convention(method) <T> (@in T, @thin Box<T>.Type) -> @out Box<T> {
+// CHECK: bb0([[ARG0:%.*]] : $T, [[ARG1:%.*]] : $@thin Box<T>.Type):
+// CHECK:   [[RETVAL:%.*]] = struct $Box<T> ([[ARG0]] : $T)
+// CHECK:   return [[RETVAL]] : $Box<T>
+// CHECK-LABEL: } // end sil function '_T020opaque_values_silgen3BoxVACyxGx1t_tcfC'
+
 // CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @{{.*}} : $@convention(thin) (Int, Int, Int, Int, Int, @owned @callee_owned (@in (Int, (Int, (Int, Int)), Int)) -> @out (Int, (Int, (Int, Int)), Int)) -> (Int, Int, Int, Int, Int)
 // CHECK: bb0([[ARG0:%.*]] : $Int, [[ARG1:%.*]] : $Int, [[ARG2:%.*]] : $Int, [[ARG3:%.*]] : $Int, [[ARG4:%.*]] : $Int, [[ARG5:%.*]] : $@callee_owned (@in (Int, (Int, (Int, Int)), Int)) -> @out (Int, (Int, (Int, Int)), Int)):
 // CHECK:   [[TUPLE_TO_APPLY0:%.*]] = tuple ([[ARG2]] : $Int, [[ARG3]] : $Int)
