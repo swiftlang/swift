@@ -19,6 +19,7 @@ set(SWIFTLIB_ESSENTIAL
   ### PLEASE KEEP THIS LIST IN ALPHABETICAL ORDER ###
   # Some files can't be sorted alphabetically, see notes in the list below.
   Algorithm.swift
+  AnyUnicode.swift
   ArrayBody.swift
   ArrayBuffer.swift
   ArrayBufferProtocol.swift
@@ -29,6 +30,7 @@ set(SWIFTLIB_ESSENTIAL
   AssertCommon.swift
   BidirectionalCollection.swift
   Bool.swift
+  BoundedBufferReference.swift
   BoundedCapacity.swift
   BridgeObjectiveC.swift
   BridgeStorage.swift
@@ -127,6 +129,7 @@ set(SWIFTLIB_ESSENTIAL
   StringLegacy.swift
   StringRangeReplaceableCollection.swift.gyb
   StringIndexConversions.swift
+  StringStorage.swift
   StringUnicodeScalarView.swift
   StringUTF16.swift
   StringUTF8.swift
