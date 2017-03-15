@@ -65,6 +65,12 @@ Swift 4.0
 Swift 3.1
 ---------
 
+* [SR-2402](https://bugs.swift.org/browse/SR-2402)
+
+  Swift now imports "function-like" macros from C and Objective-C. For now,
+  only function-like macros that take no arguments, such as
+  `#define MyMacro() 1`, are imported.
+
 * [SE-0080][]:
 
   Adds a new family of conversion initializers to all numeric types that

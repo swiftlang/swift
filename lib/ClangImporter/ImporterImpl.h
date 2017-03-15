@@ -742,10 +742,12 @@ public:
   /// \param value The value of the named constant.
   /// \param convertKind How to convert the constant to the given type.
   /// \param isStatic Whether the constant should be a static member of \p dc.
+  /// \param isFunction Whether the constant was originally defined as a
+  /// function-like macro.
   ValueDecl *createConstant(Identifier name, DeclContext *dc,
                             Type type, const clang::APValue &value,
                             ConstantConvertKind convertKind,
-                            bool isStatic,
+                            bool isStatic, bool isFunction,
                             ClangNode ClangN);
 
   /// \brief Create a new named constant with the given value.
@@ -756,8 +758,25 @@ public:
   /// \param value The value of the named constant.
   /// \param convertKind How to convert the constant to the given type.
   /// \param isStatic Whether the constant should be a static member of \p dc.
+  /// \param isFunction Whether the constant was originally defined as a
+  //  function-like macro.
   ValueDecl *createConstant(Identifier name, DeclContext *dc,
                             Type type, StringRef value,
+                            ConstantConvertKind convertKind,
+                            bool isStatic, bool isFunction,
+                            ClangNode ClangN);
+
+  /// \brief Create a new named function using the given expression.
+  ///
+  /// \param name The name of the function.
+  /// \param dc The declaration context into which the name will be introduced.
+  /// \param type The type of the named function.
+  /// \param valueExpr An expression to use as the return value of the function.
+  /// \param convertKind How to convert the function return type to the given
+  /// type.
+  /// \param isStatic Whether the constant should be a static member of \p dc.
+  ValueDecl *createFunction(Identifier name, DeclContext *dc,
+                            Type type, Expr *valueExpr,
                             ConstantConvertKind convertKind,
                             bool isStatic,
                             ClangNode ClangN);

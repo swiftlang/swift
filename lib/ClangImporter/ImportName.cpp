@@ -1666,11 +1666,11 @@ static bool shouldIgnoreMacro(StringRef name, const clang::MacroInfo *macro) {
   if (macro->tokens_empty())
     return true;
 
-  // Currently we only convert non-function-like macros.
-  if (macro->isFunctionLike())
+  // Currently we only convert function-like macros that take zero arguments.
+  if (macro->isFunctionLike() && macro->getNumArgs() != 0)
     return true;
 
-  // Consult the blacklist of macros to suppress.
+  // Consult the list of macros to suppress.
   auto suppressMacro = llvm::StringSwitch<bool>(name)
 #define SUPPRESS_MACRO(NAME) .Case(#NAME, true)
 #include "MacroTable.def"
@@ -1694,7 +1694,7 @@ NameImporter::importMacroName(const clang::IdentifierInfo *clangIdentifier,
   if (::shouldIgnoreMacro(clangIdentifier->getName(), macro))
     return Identifier();
 
-  // No transformation is applied to the name.
+  // Otherwise, no transformation is applied to the name.
   StringRef name = clangIdentifier->getName();
   return swiftCtx.getIdentifier(name);
 }

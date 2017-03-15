@@ -2933,7 +2933,8 @@ namespace {
         auto result = Impl.createConstant(name, dc, type,
                                           clang::APValue(decl->getInitVal()),
                                           ConstantConvertKind::Coerce,
-                                          /*static*/ false, decl);
+                                          /*isStatic*/false,
+                                          /*isFunctionLike*/false, decl);
         Impl.ImportedDecls[{decl->getCanonicalDecl(), getVersion()}] = result;
 
         // If this is a Swift 2 stub, mark it as such.
@@ -2972,7 +2973,8 @@ namespace {
         auto result = Impl.createConstant(name, dc, enumType,
                                           clang::APValue(decl->getInitVal()),
                                           ConstantConvertKind::Construction,
-                                          /*static*/ false, decl);
+                                          /*isStatic*/false,
+                                          /*isFunctionLike*/false, decl);
         Impl.ImportedDecls[{decl->getCanonicalDecl(), getVersion()}] = result;
 
         // If this is a Swift 2 stub, mark it as such.
@@ -4889,7 +4891,8 @@ SwiftDeclConverter::importOptionConstant(const clang::EnumConstantDecl *decl,
     convertKind = ConstantConvertKind::ConstructionWithUnwrap;
   Decl *CD = Impl.createConstant(
       name, theStruct, theStruct->getDeclaredTypeInContext(),
-      clang::APValue(decl->getInitVal()), convertKind, /*isStatic*/ true, decl);
+      clang::APValue(decl->getInitVal()), convertKind, /*isStatic*/true,
+      /*isFunctionLike*/false, decl);
   Impl.importAttributes(decl, CD);
 
   // NS_OPTIONS members that have a value of 0 (typically named "None") do
@@ -7252,6 +7255,7 @@ ClangImporter::Implementation::createConstant(Identifier name, DeclContext *dc,
                                               const clang::APValue &value,
                                               ConstantConvertKind convertKind,
                                               bool isStatic,
+                                              bool isFunctionLike,
                                               ClangNode ClangN) {
   auto &context = SwiftContext;
 
@@ -7311,73 +7315,62 @@ ClangImporter::Implementation::createConstant(Identifier name, DeclContext *dc,
   }
 
   assert(expr);
-  return createConstant(name, dc, type, expr, convertKind, isStatic, ClangN);
+  if (isFunctionLike)
+    return createFunction(name, dc, type, expr, convertKind, isStatic, ClangN);
+  else
+    return createConstant(name, dc, type, expr, convertKind, isStatic, ClangN);
 }
-
 
 ValueDecl *
 ClangImporter::Implementation::createConstant(Identifier name, DeclContext *dc,
                                               Type type, StringRef value,
                                               ConstantConvertKind convertKind,
                                               bool isStatic,
+                                              bool isFunctionLike,
                                               ClangNode ClangN) {
   auto expr = new (SwiftContext) StringLiteralExpr(value, SourceRange());
-  return createConstant(name, dc, type, expr, convertKind, isStatic, ClangN);
+  if (isFunctionLike)
+    return createFunction(name, dc, type, expr, convertKind, isStatic, ClangN);
+  else
+    return createConstant(name, dc, type, expr, convertKind, isStatic, ClangN);
 }
 
-
-ValueDecl *
-ClangImporter::Implementation::createConstant(Identifier name, DeclContext *dc,
-                                              Type type, Expr *valueExpr,
-                                              ConstantConvertKind convertKind,
-                                              bool isStatic,
-                                              ClangNode ClangN) {
-  auto &C = SwiftContext;
-
-  VarDecl *var = nullptr;
-  if (ClangN) {
-    var = createDeclWithClangNode<VarDecl>(ClangN, Accessibility::Public,
-                                           /*IsStatic*/isStatic, /*IsLet*/false,
-                                           /*IsCaptureList*/false, SourceLoc(),
-                                           name, type, dc);
-  } else {
-    var = new (SwiftContext)
-        VarDecl(/*IsStatic*/isStatic, /*IsLet*/false, /*IsCaptureList*/false,
-                SourceLoc(), name, type, dc);
-  }
-
-  var->setInterfaceType(type);
-
-  // Form the argument patterns.
-  SmallVector<ParameterList*, 3> getterArgs;
-  
-  // 'self'
+/// A helper function that creates a FuncDecl which simply returns the given
+/// constant value expression, and performs any additional conversion requested
+/// via the \c convertKind parameter. An unnamed FuncDecl (suitable for a getter
+/// function) may be created using the \c isNamed parameter.
+static FuncDecl *
+createValueGetterFuncDecl(ClangImporter::Implementation &Impl, Identifier name,
+                          ASTContext &C, DeclContext *dc,
+                          ConstantConvertKind convertKind, Type type,
+                          Expr *valueExpr, bool isStatic, bool isNamed) {
+  // Form the parameters.
+  SmallVector<ParameterList*, 3> parameters;
+  // The first parameter is 'self'.
   if (dc->isTypeContext()) {
     auto *selfDecl = ParamDecl::createSelf(SourceLoc(), dc, isStatic);
-    getterArgs.push_back(ParameterList::createWithoutLoc(selfDecl));
+    parameters.push_back(ParameterList::createWithoutLoc(selfDecl));
   }
-  
-  // empty tuple
-  getterArgs.push_back(ParameterList::createEmpty(C));
+  // The second is an empty tuple.
+  parameters.push_back(ParameterList::createEmpty(C));
 
-  // Form the type of the getter.
-  auto getterType = ParameterList::getFullInterfaceType(type, getterArgs, C);
+  // Form the type of the function.
+  auto funcType = ParameterList::getFullInterfaceType(type, parameters, C);
 
-  // Create the getter function declaration.
-  auto func =
-    FuncDecl::create(C, /*StaticLoc=*/SourceLoc(), StaticSpellingKind::None,
-                     /*FuncLoc=*/SourceLoc(),
-                     /*Name=*/Identifier(), /*NameLoc=*/SourceLoc(),
-                     /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
-                     /*AccessorKeywordLoc=*/SourceLoc(),
-                     /*GenericParams=*/nullptr, getterArgs,
-                     TypeLoc::withoutLoc(type), dc);
+  // Create the function declaration.
+  auto func = FuncDecl::create(
+      C, /*StaticLoc=*/SourceLoc(), StaticSpellingKind::None,
+      /*FuncLoc=*/SourceLoc(),
+      /*Name=*/isNamed ? DeclName(C, name, parameters[0]) : Identifier(),
+      /*NameLoc=*/SourceLoc(), /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
+      /*AccessorKeywordLoc=*/SourceLoc(), /*GenericParams=*/nullptr, parameters,
+      /*TypeLoc=*/TypeLoc::withoutLoc(type), dc);
   func->setStatic(isStatic);
-  func->setInterfaceType(getterType);
+  func->setInterfaceType(funcType);
   func->setAccessibility(getOverridableAccessibility(dc));
 
   // If we're not done type checking, build the getter body.
-  if (!hasFinishedTypeChecking()) {
+  if (!Impl.hasFinishedTypeChecking()) {
     auto expr = valueExpr;
 
     // If we need a conversion, add one now.
@@ -7388,7 +7381,7 @@ ClangImporter::Implementation::createConstant(Identifier name, DeclContext *dc,
     case ConstantConvertKind::Construction:
     case ConstantConvertKind::ConstructionWithUnwrap: {
       auto typeRef = TypeExpr::createImplicit(type, C);
-      
+
       expr = CallExpr::createImplicit(C, typeRef, { expr }, { C.Id_rawValue });
       if (convertKind == ConstantConvertKind::ConstructionWithUnwrap)
         expr = new (C) ForceValueExpr(expr, SourceLoc());
@@ -7410,19 +7403,52 @@ ClangImporter::Implementation::createConstant(Identifier name, DeclContext *dc,
     auto ret = new (C) ReturnStmt(SourceLoc(), expr);
 
     // Finally, set the body.
-    func->setBody(BraceStmt::create(C, SourceLoc(),
-                                    ASTNode(ret),
-                                    SourceLoc()));
+    func->setBody(BraceStmt::create(C, SourceLoc(), { ret }, SourceLoc()));
   }
 
+  // Register this thunk as an external definition.
+  Impl.registerExternalDecl(func);
+
+  return func;
+}
+
+ValueDecl *
+ClangImporter::Implementation::createFunction(Identifier name, DeclContext *dc,
+                                              Type type, Expr *valueExpr,
+                                              ConstantConvertKind convertKind,
+                                              bool isStatic,
+                                              ClangNode ClangN) {
+  return createValueGetterFuncDecl(*this, name, SwiftContext, dc, convertKind,
+                                   type, valueExpr, isStatic, /*isNamed*/true);
+}
+
+ValueDecl *
+ClangImporter::Implementation::createConstant(Identifier name, DeclContext *dc,
+                                              Type type, Expr *valueExpr,
+                                              ConstantConvertKind convertKind,
+                                              bool isStatic,
+                                              ClangNode ClangN) {
+  auto &C = SwiftContext;
+
+  VarDecl *var = nullptr;
+  if (ClangN) {
+    var = createDeclWithClangNode<VarDecl>(ClangN, Accessibility::Public,
+                                           /*IsStatic*/isStatic, /*IsLet*/false,
+                                           /*IsCaptureList*/false, SourceLoc(),
+                                           name, type, dc);
+  } else {
+    var = new (SwiftContext)
+        VarDecl(/*IsStatic*/isStatic, /*IsLet*/false, /*IsCaptureList*/false,
+                SourceLoc(), name, type, dc);
+  }
+  var->setInterfaceType(type);
+
+  auto func = createValueGetterFuncDecl(*this, name, C, dc, convertKind, type,
+                                        valueExpr, isStatic, /*isNamed*/false);
   // Mark the function transparent so that we inline it away completely.
   func->getAttrs().add(new (C) TransparentAttr(/*implicit*/ true));
-  
   // Set the function up as the getter.
   var->makeComputed(SourceLoc(), func, nullptr, nullptr, SourceLoc());
-
-  // Register this thunk as an external definition.
-  registerExternalDecl(func);
 
   return var;
 }

@@ -80,10 +80,11 @@ createMacroConstant(ClangImporter::Implementation &Impl,
                     const clang::APValue &value,
                     ConstantConvertKind convertKind,
                     bool isStatic,
+                    bool isFunctionLike,
                     ClangNode ClangN) {
   Impl.ImportedMacroConstants[macro] = {value, type};
   return Impl.createConstant(name, dc, type, value, convertKind, isStatic,
-                             ClangN);
+                             isFunctionLike, ClangN);
 }
 
 static ValueDecl *importNumericLiteral(ClangImporter::Implementation &Impl,
@@ -93,7 +94,8 @@ static ValueDecl *importNumericLiteral(ClangImporter::Implementation &Impl,
                                        const clang::Token *signTok,
                                        const clang::Token &tok,
                                        const clang::MacroInfo *ClangN,
-                                       const clang::QualType *castType) {
+                                       const clang::QualType *castType,
+                                       bool isFunctionLike) {
   assert(tok.getKind() == clang::tok::numeric_constant &&
          "not a numeric token");
   {
@@ -143,10 +145,10 @@ static ValueDecl *importNumericLiteral(ClangImporter::Implementation &Impl,
         }
       }
 
-      return createMacroConstant(Impl, MI, name, DC, constantType,
-                                 clang::APValue(value),
-                                 ConstantConvertKind::Coerce,
-                                 /*static*/ false, ClangN);
+      return createMacroConstant(
+          Impl, MI, name, DC, constantType, clang::APValue(value),
+          ConstantConvertKind::Coerce, /*isStatic*/false, isFunctionLike,
+          ClangN);
     }
 
     if (auto *floating = dyn_cast<clang::FloatingLiteral>(parsed)) {
@@ -161,10 +163,10 @@ static ValueDecl *importNumericLiteral(ClangImporter::Implementation &Impl,
         value.changeSign();
       }
 
-      return createMacroConstant(Impl, MI, name, DC, constantType,
-                                 clang::APValue(value),
-                                 ConstantConvertKind::Coerce,
-                                 /*static*/ false, ClangN);
+      return createMacroConstant(
+          Impl, MI, name, DC, constantType, clang::APValue(value),
+          ConstantConvertKind::Coerce, /*isStatic*/false, isFunctionLike,
+          ClangN);
     }
     // TODO: Other numeric literals (complex, imaginary, etc.)
   }
@@ -189,7 +191,8 @@ static ValueDecl *importStringLiteral(ClangImporter::Implementation &Impl,
                                       Identifier name,
                                       const clang::Token &tok,
                                       MappedStringLiteralKind kind,
-                                      const clang::MacroInfo *ClangN) {
+                                      const clang::MacroInfo *ClangN,
+                                      bool isFunctionLike) {
   DeclContext *dc = Impl.getClangModuleForMacro(MI);
   if (!dc)
     return nullptr;
@@ -209,9 +212,9 @@ static ValueDecl *importStringLiteral(ClangImporter::Implementation &Impl,
   if (!importTy)
     return nullptr;
 
-  return Impl.createConstant(name, dc, importTy, parsed->getString(),
-                             ConstantConvertKind::Coerce, /*static*/ false,
-                             ClangN);
+  return Impl.createConstant(
+      name, dc, importTy, parsed->getString(), ConstantConvertKind::Coerce,
+      /*isStatic*/false, isFunctionLike, ClangN);
 }
 
 static ValueDecl *importLiteral(ClangImporter::Implementation &Impl,
@@ -220,16 +223,19 @@ static ValueDecl *importLiteral(ClangImporter::Implementation &Impl,
                                 Identifier name,
                                 const clang::Token &tok,
                                 const clang::MacroInfo *ClangN,
-                                const clang::QualType *castType = nullptr) {
+                                const clang::QualType *castType,
+                                bool isFunctionLike) {
   switch (tok.getKind()) {
   case clang::tok::numeric_constant:
-    return importNumericLiteral(Impl, DC, MI, name, /*signTok*/nullptr, tok,
-                                ClangN, castType);
+    return importNumericLiteral(
+        Impl, DC, MI, name, /*signTok*/nullptr, tok, ClangN, castType,
+        isFunctionLike);
 
   case clang::tok::string_literal:
   case clang::tok::utf8_string_literal:
-    return importStringLiteral(Impl, DC, MI, name, tok,
-                               MappedStringLiteralKind::CString, ClangN);
+    return importStringLiteral(
+        Impl, DC, MI, name, tok, MappedStringLiteralKind::CString, ClangN,
+        isFunctionLike);
 
   // TODO: char literals.
   default:
@@ -337,7 +343,8 @@ static ValueDecl *importMacro(ClangImporter::Implementation &impl,
                               Identifier name,
                               const clang::MacroInfo *macro,
                               const clang::MacroInfo *ClangN,
-                              clang::QualType *castType = nullptr) {
+                              clang::QualType *castType = nullptr,
+                              bool isOriginalMacroFunctionLike = false) {
   if (name.empty()) return nullptr;
 
   auto numTokens = macro->getNumTokens();
@@ -414,7 +421,9 @@ static ValueDecl *importMacro(ClangImporter::Implementation &impl,
 
     // If it's a literal token, we might be able to translate the literal.
     if (tok.isLiteral()) {
-      return importLiteral(impl, DC, macro, name, tok, ClangN, castType);
+      return importLiteral(
+          impl, DC, macro, name, tok, ClangN, castType,
+          isOriginalMacroFunctionLike || macro->isFunctionLike());
     }
 
     if (tok.is(clang::tok::identifier)) {
@@ -431,8 +440,14 @@ static ValueDecl *importMacro(ClangImporter::Implementation &impl,
           return importNil(impl, DC, name, ClangN);
 
         auto macroID = impl.getClangPreprocessor().getMacroInfo(clangID);
-        if (macroID && macroID != macro)
-          return importMacro(impl, DC, name, macroID, ClangN);
+        if (macroID && macroID != macro) {
+          // When recursing, pass along information to keep track of whether the
+          // outer macro is function-like. If it is, it must be imported as a
+          // function, not a variable.
+          return importMacro(
+              impl, DC, name, macroID, ClangN, /*castType*/nullptr,
+              isOriginalMacroFunctionLike || macro->isFunctionLike());
+        }
       }
 
       // FIXME: If the identifier refers to a declaration, alias it?
@@ -450,13 +465,16 @@ static ValueDecl *importMacro(ClangImporter::Implementation &impl,
     clang::Token const &second = tokenI[1];
 
     if (isSignToken(first) && second.is(clang::tok::numeric_constant))
-      return importNumericLiteral(impl, DC, macro, name, &first, second, ClangN,
-                                  castType);
+      return importNumericLiteral(
+          impl, DC, macro, name, &first, second, ClangN, castType,
+          isOriginalMacroFunctionLike || macro->isFunctionLike());
 
     // We also allow @"string".
     if (first.is(clang::tok::at) && isStringToken(second))
-      return importStringLiteral(impl, DC, macro, name, second,
-                                 MappedStringLiteralKind::NSString, ClangN);
+      return importStringLiteral(
+          impl, DC, macro, name, second, MappedStringLiteralKind::NSString,
+          ClangN, isOriginalMacroFunctionLike || macro->isFunctionLike());
+
     break;
   }
   case 3: {
@@ -598,10 +616,10 @@ static ValueDecl *importMacro(ClangImporter::Implementation &impl,
       return nullptr;
     }
 
-    return createMacroConstant(impl, macro, name, DC, resultSwiftType,
-                               clang::APValue(resultValue),
-                               ConstantConvertKind::Coerce,
-                               /*isStatic=*/false, ClangN);
+    return createMacroConstant(
+        impl, macro, name, DC, resultSwiftType, clang::APValue(resultValue),
+        ConstantConvertKind::Coerce, /*isStatic=*/false,
+        isOriginalMacroFunctionLike || macro->isFunctionLike(), ClangN);
   }
   case 4: {
     // Check for a CFString literal of the form CFSTR("string").
@@ -610,8 +628,9 @@ static ValueDecl *importMacro(ClangImporter::Implementation &impl,
         tokenI[1].is(clang::tok::l_paren) &&
         isStringToken(tokenI[2]) &&
         tokenI[3].is(clang::tok::r_paren)) {
-      return importStringLiteral(impl, DC, macro, name, tokenI[2],
-                                 MappedStringLiteralKind::CFString, ClangN);
+      return importStringLiteral(
+          impl, DC, macro, name, tokenI[2], MappedStringLiteralKind::CFString,
+          ClangN, isOriginalMacroFunctionLike || macro->isFunctionLike());
     }
     // FIXME: Handle BIT_MASK(pos) helper macros which expand to a constant?
     break;
