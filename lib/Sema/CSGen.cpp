@@ -1820,7 +1820,7 @@ namespace {
         unsigned index = 0;
         for (auto element : expr->getElements()) {
           CS.addConstraint(ConstraintKind::Conversion,
-                           element->getType(),
+                           CS.getType(element),
                            contextualDictionaryElementType,
                            CS.getConstraintLocator(expr,
                                                    LocatorPathElt::
@@ -1862,8 +1862,8 @@ namespace {
             if (element1 == element2)
               continue;
 
-            auto tty1 = element1->getType()->getAs<TupleType>();
-            auto tty2 = element2->getType()->getAs<TupleType>();
+            auto tty1 = CS.getType(element1)->getAs<TupleType>();
+            auto tty2 = CS.getType(element2)->getAs<TupleType>();
 
             if (tty1 && tty2) {
               auto mergedKey = false;
@@ -1911,7 +1911,7 @@ namespace {
       for (auto element : expr->getElements()) {
         if (!mergedElements.count(element))
           CS.addConstraint(ConstraintKind::Conversion,
-                           element->getType(),
+                           CS.getType(element),
                            elementTy,
                            CS.getConstraintLocator(
                              expr,
