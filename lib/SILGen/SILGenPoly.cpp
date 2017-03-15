@@ -176,10 +176,10 @@ collectExistentialConformances(ModuleDecl *M, Type fromType, Type toType) {
   return M->getASTContext().AllocateCopy(conformances);
 }
 
-static CanArchetypeType getOpenedArchetype(Type openedType) {
-  while (auto metatypeTy = openedType->getAs<MetatypeType>())
-    openedType = metatypeTy->getInstanceType();
-  return cast<ArchetypeType>(openedType->getCanonicalType());
+static ArchetypeType *getOpenedArchetype(CanType openedType) {
+  while (auto metatypeTy = dyn_cast<MetatypeType>(openedType))
+    openedType = metatypeTy.getInstanceType();
+  return cast<ArchetypeType>(openedType);
 }
 
 static ManagedValue emitTransformExistential(SILGenFunction &SGF,
@@ -191,7 +191,7 @@ static ManagedValue emitTransformExistential(SILGenFunction &SGF,
   assert(inputType != outputType);
 
   SILGenFunction::OpaqueValueState state;
-  CanArchetypeType openedArchetype;
+  ArchetypeType *openedArchetype = nullptr;
 
   if (inputType->isAnyExistentialType()) {
     CanType openedType = ArchetypeType::getAnyOpened(inputType);

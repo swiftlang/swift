@@ -760,7 +760,7 @@ SILGenFunction::OpaqueValueState
 SILGenFunction::emitOpenExistential(
        SILLocation loc,
        ManagedValue existentialValue,
-       CanArchetypeType openedArchetype,
+       ArchetypeType *openedArchetype,
        SILType loweredOpenedType,
        AccessKind accessKind) {
   // Open the existential value into the opened archetype value.
