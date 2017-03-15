@@ -664,10 +664,68 @@ extension UTF16CompatibleStringContents : _FixedFormatUnicode {
   }
 }
 
+class AnyUnicodeBox : AnyUnicode, FactoryInitializable {
+  var encoding: AnyUnicodeEncoding.Type { fatalError("override me!") }
+  var codeUnits: AnyCodeUnits { fatalError("override me!") }
+  var rawUTF16: AnyUTF16 { fatalError("override me!") }
+  var utf32: AnyUnicodeBidirectionalUInt32 { fatalError("override me!") }
+  var fccNormalizedUTF16: AnyUTF16 { fatalError("override me!") }
+  // FIXME: Can this be Random Access?  If all encodings use a single code unit
+  // per ASCII character and can statelessly identify a code unit that
+  // represents ASCII, then yes.  Look into, e.g. shift-JIS.
+  var extendedASCII: AnyUnicodeBidirectionalUInt32 { fatalError("override me!") }
+  var characters: AnyCharacters { fatalError("override me!") }
+  var isKnownLatin1: Bool { fatalError("override me!") }
+  var isKnownASCII: Bool { fatalError("override me!") }
+  var isKnownValidEncoding: Bool { fatalError("override me!") }
+  var isKnownFCCNormalized: Bool { fatalError("override me!") }
+  var isKnownFCDForm: Bool { fatalError("override me!") }
+  var isKnownNFDNormalized: Bool { fatalError("override me!") }
+  var isKnownNFCNormalized: Bool { fatalError("override me!") }
+
+  func isLatin1() -> Bool  { fatalError("override me!") }
+  func isASCII() -> Bool { fatalError("override me!") }
+  func isValidEncoding() -> Bool { fatalError("override me!") }
+
+  class Instance<T: AnyUnicode> : AnyUnicodeBox {
+    var base: T
+    override var encoding: AnyUnicodeEncoding.Type { return base.encoding }
+    override var codeUnits: AnyCodeUnits { return base.codeUnits }
+    override var rawUTF16: AnyUTF16 { return base.rawUTF16 }
+    override var utf32: AnyUnicodeBidirectionalUInt32 { return base.utf32 }
+    override var fccNormalizedUTF16: AnyUTF16 { return base.fccNormalizedUTF16 }
+    override var extendedASCII: AnyUnicodeBidirectionalUInt32 {
+      return base.extendedASCII
+    }
+    override var characters: AnyCharacters { return base.characters }
+    override var isKnownLatin1: Bool { return base.isKnownLatin1 }
+    override var isKnownASCII: Bool { return base.isKnownASCII }
+    override var isKnownValidEncoding: Bool { return base.isKnownValidEncoding }
+    override var isKnownFCCNormalized: Bool { return base.isKnownFCCNormalized }
+    override var isKnownFCDForm: Bool { return base.isKnownFCDForm }
+    override var isKnownNFDNormalized: Bool { return base.isKnownNFDNormalized }
+    override var isKnownNFCNormalized: Bool { return base.isKnownNFCNormalized }
+    override func isLatin1() -> Bool  { return base.isLatin1() }
+    override func isASCII() -> Bool  { return base.isASCII() }
+    override func isValidEncoding() -> Bool  { return base.isValidEncoding() }
+    init(_ x: T) {
+      base = x
+      super.init(fromSubclass: ())
+    }
+  }
+
+  convenience init<T: AnyUnicode>(wrapping x: T) {
+    self.init(Instance(x))
+  }
+  
+  init(fromSubclass: ()) {}
+}
+
+  
 enum AnyStringContents {
 case utf16(_UTF16StringStorage)
 case latin1(_Latin1StringStorage)
-case any(AnyUnicode)
+case any(AnyUnicodeBox)
 }
 
 extension AnyStringContents : AnyUnicode {
