@@ -9,6 +9,10 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
+
+//===--- TODO -------------------------------------------------------------===//
+//
+//===----------------------------------------------------------------------===//
 public protocol _AnyUnicode {
   var encoding: AnyUnicodeEncoding.Type { get }
   
@@ -56,6 +60,19 @@ public protocol _FixedFormatUnicode : _AnyUnicode {
   // where Iterator.Element == Character
 
   var characters: CharacterView { get }
+
+  /// A type that presents the string's unicode scalar values
+  associatedtype UnicodeScalarView : BidirectionalCollection
+  // where Iterator.Element == UnicodeScalar
+
+  var unicodeScalars: UnicodeScalarView { get }
+  
+  /// A type presenting ASCII unicode scalar values verbatim, and otherwise
+  /// presenting values >= 128, which is outside the range of ASCII.
+  associatedtype ExtendedASCIIView : BidirectionalCollection = CodeUnits
+  // where Iterator.Element : UnsignedInteger
+  
+  var extendedASCII: ExtendedASCIIView { get }
 }
 
 /// Default views
@@ -72,15 +89,62 @@ where
   }
 }
 
+// UTF32 gets a default UnicodeScalarView that injects replacement characters
+// for illegal scalar values
+public extension _FixedFormatUnicode
+where
+  Encoding == UTF32,
+  CodeUnits.Iterator.Element  == Encoding.EncodedScalar.Iterator.Element,
+  CodeUnits.Iterator.Element : UnsignedInteger,
+  CodeUnits.SubSequence : RandomAccessCollection,
+  CodeUnits.SubSequence.Index == CodeUnits.Index,
+  CodeUnits.SubSequence.SubSequence == CodeUnits.SubSequence,
+  CodeUnits.SubSequence.Iterator.Element == CodeUnits.Iterator.Element {
+
+  var unicodeScalars: LazyMapCollection<CodeUnits, UnicodeScalar> {
+    return codeUnits.lazy.map {
+      UnicodeScalar($0)
+      ?? UnicodeScalar(_unchecked: 0xFFFD)
+    }
+  }
+}
+
+// Everybody else gets a UnicodeScalarView based on transcoding to UTF32, which
+// already makes any necessary corrections.
+public extension _FixedFormatUnicode
+where
+  CodeUnits.Iterator.Element  == Encoding.EncodedScalar.Iterator.Element,
+  CodeUnits.Iterator.Element : UnsignedInteger,
+  CodeUnits.SubSequence : RandomAccessCollection,
+  CodeUnits.SubSequence.Index == CodeUnits.Index,
+  CodeUnits.SubSequence.SubSequence == CodeUnits.SubSequence,
+  CodeUnits.SubSequence.Iterator.Element == CodeUnits.Iterator.Element {
+
+  var unicodeScalars: LazyMapBidirectionalCollection<
+    UnicodeStorage<CodeUnits,Encoding>.ScalarsTranscoded<UTF32>
+  , UnicodeScalar
+  > {
+    return UnicodeStorage(codeUnits, Encoding.self)
+      .scalarsTranscoded(to: UTF32.self)
+      .lazy.map { UnicodeScalar($0) }
+  }
+}
+
 public extension _FixedFormatUnicode {
   var encoding: AnyUnicodeEncoding.Type {
     return encoding as Encoding.Type
   }
 }
 
+public extension _FixedFormatUnicode where ExtendedASCIIView == CodeUnits {
+  var extendedASCII: CodeUnits {
+    return codeUnits
+  }
+}
+
 /// Default implementations
 public extension _FixedFormatUnicode {
-  
+
   var isKnownLatin1: Bool { return false }
   var isKnownASCII: Bool { return false }
   var isKnownValidEncoding: Bool { return false }
@@ -126,7 +190,14 @@ public extension _FixedFormatUnicode where Encoding == Latin1 {
 }
   
 public extension _FixedFormatUnicode
-where Encoding == Latin1, CodeUnits.Iterator.Element : UnsignedInteger {
+where Encoding == Latin1, 
+  CodeUnits.Iterator.Element == Encoding.EncodedScalar.Iterator.Element,
+  CodeUnits.Iterator.Element : UnsignedInteger,
+  CodeUnits.SubSequence : RandomAccessCollection,
+  CodeUnits.SubSequence.Index == CodeUnits.Index,
+  CodeUnits.SubSequence.SubSequence == CodeUnits.SubSequence,
+  CodeUnits.SubSequence.Iterator.Element == CodeUnits.Iterator.Element
+{
   var rawUTF16: LazyMapRandomAccessCollection<CodeUnits, UInt16> {
     return fccNormalizedUTF16
   }
@@ -135,8 +206,20 @@ where Encoding == Latin1, CodeUnits.Iterator.Element : UnsignedInteger {
   var fccNormalizedUTF16: LazyMapRandomAccessCollection<CodeUnits, UInt16> {
     return codeUnits.lazy.map { numericCast($0) }
   }
-}
+  
+  var characters: LazyMapRandomAccessCollection<CodeUnits, Character> {
+    return codeUnits.lazy.map {
+      Character(UnicodeScalar(_unchecked: numericCast($0)))
+    }
+  }
 
+  var unicodeScalars: LazyMapRandomAccessCollection<CodeUnits, UnicodeScalar> {
+    return codeUnits.lazy.map {
+      UnicodeScalar(_unchecked: numericCast($0))
+    }
+  }
+}
+  
 //===--- Defaults for UTF16 and ValidUTF16 --------------------------------===//
 public extension _FixedFormatUnicode
 where Encoding.EncodedScalar == UTF16.EncodedScalar,

@@ -209,6 +209,91 @@ extension AnyUTF16.ZeroExtender : BidirectionalCollection, AnyUTF16_ {
   }
 }
 
+protocol AnyUnicodeScalars_ {
+  typealias IndexDistance = Int64
+  typealias Index = UnicodeIndex
+  typealias Element = UnicodeScalar
+  var startIndex: Index { get }
+  var endIndex: Index { get }
+  func index(after: Index) -> Index
+  func index(before: Index) -> Index
+  subscript(i: Index) -> Element { get }
+
+  func withExistingUnsafeBuffer<R>(
+    _ body: (UnsafeBufferPointer<Element>) throws -> R
+  ) rethrows -> R?
+}
+
+struct AnyUnicodeScalars : BidirectionalCollection, AnyUnicodeScalars_ {
+  let base: AnyUnicodeScalars_
+  typealias IndexDistance = Int64
+  typealias Index = UnicodeIndex
+  typealias Element = AnyUnicodeScalars_.Element
+  var startIndex: Index { return base.startIndex }
+  var endIndex: Index { return base.endIndex }
+  func index(after i: Index) -> Index { return base.index(after: i) }
+  func index(before i: Index) -> Index { return base.index(before: i) }
+  subscript(i: Index) -> Element { return base[i] }
+  public func withExistingUnsafeBuffer<R>(
+    _ body: (UnsafeBufferPointer<Element>) throws -> R
+  ) rethrows -> R? {
+    return try base.withExistingUnsafeBuffer(body)
+  }
+
+  init<C: BidirectionalCollection>(_ c: C)
+  where C.Iterator.Element == UnicodeScalar {
+    base = Adapter(base: c)
+  }
+
+  struct Adapter<
+    Base: BidirectionalCollection
+  > where Base.Iterator.Element == UnicodeScalar {
+    let base: Base
+  }
+}
+
+/// Adapts any bidirectional collection of unicode scalar values to
+/// AnyUnicodeScalars_
+extension AnyUnicodeScalars.Adapter
+  : BidirectionalCollection, AnyUnicodeScalars_ 
+{
+  typealias IndexDistance = Int64
+  typealias Index = UnicodeIndex
+  typealias Element = AnyUnicodeScalars_.Element
+  
+  var startIndex: Index { return Index(offset: 0) }
+  var endIndex: Index { return Index(offset: numericCast(base.count)) }
+  
+  func index(after i: Index) -> Index {
+    return Index(offset: numericCast(
+        base.offset(of: base.index(after: base.index(atOffset: i.offset)))))
+  }
+  
+  func index(before i: Index) -> Index {
+    return Index(offset: numericCast(
+        base.offset(of: base.index(before: base.index(atOffset: i.offset)))))
+  }
+  
+  func index(_ i: Index, offsetBy n: Int64) -> Index {
+    return Index(offset: numericCast(
+      base.offset(
+        of: base.index(base.index(atOffset: i.offset),
+            offsetBy: numericCast(n)))))
+  }
+  
+  subscript(i: Index) -> Element {
+    return base[base.index(atOffset: i.offset)]
+  }
+
+  public func withExistingUnsafeBuffer<R>(
+    _ body: (UnsafeBufferPointer<Element>) throws -> R
+  ) rethrows -> R? {
+    return try base.withExistingUnsafeBuffer {
+      try ($0 as Any as? UnsafeBufferPointer<Element>).map(body)
+    }.flatMap { $0 }
+  }
+}
+
 protocol AnyRandomAccessUTF16_ : AnyUTF16_ {
   typealias IndexDistance = Int64
   typealias Index = UnicodeIndex
@@ -621,6 +706,27 @@ extension UTF16CompatibleStringContents : _FixedFormatUnicode {
   typealias RawUTF16View = AnyUTF16
   typealias CodeUnits = AnyRandomAccessUTF16
   typealias FCCNormalizedUTF16View = AnyUTF16
+  
+  var characters: AnyCharacters {
+    switch self {
+    case .utf16(let storage):
+      return storage.characters
+    case .latin1(let storage):
+      return storage.characters
+    }
+  }
+  
+  var unicodeScalars: AnyCharacters {
+    switch self {
+    case .utf16(let storage):
+      return storage.characters
+    case .latin1(let storage):
+      return storage.characters
+    }
+  }
+  
+  //typealias CharacterView = LazyMapRandomAccessCollection<AnyRandomAccessUTF16, Character>
+//  typealias UnicodeScalarView = LazyMapRandomAccessCollection<AnyRandomAccessUTF16, UnicodeScalar>
   
   var rawUTF16: AnyUTF16 {
     switch self {

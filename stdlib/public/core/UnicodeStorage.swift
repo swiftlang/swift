@@ -178,6 +178,18 @@ extension UnicodeStorage.EncodedScalars : BidirectionalCollection {
 }
 
 extension UnicodeStorage {
+  public typealias ScalarsTranscoded<ToEncoding : UnicodeEncoding>
+  = LazyMapBidirectionalCollection<EncodedScalars, ToEncoding.EncodedScalar>
+
+  public func scalarsTranscoded<ToEncoding : UnicodeEncoding>(
+    to dst: ToEncoding.Type
+  )
+  -> ScalarsTranscoded<ToEncoding> {
+    return UnicodeStorage.EncodedScalars(codeUnits, Encoding.self).lazy.map {
+      dst.encode($0)!
+    }
+  }
+  
   /// Given `CodeUnits` representing text that has been encoded with
   /// `FromEncoding`, provides a collection of `ToEncoding.CodeUnit`s
   /// representing the same text.
@@ -199,10 +211,7 @@ extension UnicodeStorage {
       from src: FromEncoding.Type = FromEncoding.self,
       to dst: ToEncoding.Type = ToEncoding.self
     ) {
-      base = Base(
-        UnicodeStorage.EncodedScalars(codeUnits, src).lazy.map {
-          dst.encode($0)!
-        })
+      base = Base(UnicodeStorage(codeUnits).scalarsTranscoded(to: dst))
     }
     
     // FIXME: this should go in the extension below but for <rdar://30320012>
