@@ -208,8 +208,8 @@ ERROR(decl_already_static,none,
 ERROR(enum_case_dot_prefix,none,
       "extraneous '.' in enum 'case' declaration", ())
 
-ERROR(associatedtype_where_swift_3,none,
-      "where clauses on associated types are fragile; use '-swift-version 4' to experiment.", ())
+ERROR(protocol_associatedtype_where_swift_3,none,
+      "where clauses on %0 are fragile; use '-swift-version 4' to experiment.", (StringRef))
 
 
 // Variable getters/setters

@@ -117,18 +117,18 @@ void RequirementRepr::dump() const {
   llvm::errs() << "\n";
 }
 
-void RequirementRepr::printImpl(raw_ostream &out, bool AsWritten) const {
+void RequirementRepr::printImpl(ASTPrinter &out, bool AsWritten) const {
   auto printTy = [&](const TypeLoc &TyLoc) {
     if (AsWritten && TyLoc.getTypeRepr()) {
-      TyLoc.getTypeRepr()->print(out);
+      TyLoc.getTypeRepr()->print(out, PrintOptions());
     } else {
-      TyLoc.getType().print(out);
+      TyLoc.getType().print(out, PrintOptions());
     }
   };
 
   auto printLayoutConstraint =
       [&](const LayoutConstraintLoc &LayoutConstraintLoc) {
-        LayoutConstraintLoc.getLayoutConstraint()->print(out);
+        LayoutConstraintLoc.getLayoutConstraint()->print(out, PrintOptions());
       };
 
   switch (getKind()) {
@@ -153,7 +153,11 @@ void RequirementRepr::printImpl(raw_ostream &out, bool AsWritten) const {
 }
 
 void RequirementRepr::print(raw_ostream &out) const {
-  printImpl(out, /*AsWritten=*/false);
+  StreamPrinter printer(out);
+  printImpl(printer, /*AsWritten=*/true);
+}
+void RequirementRepr::print(ASTPrinter &out) const {
+  printImpl(out, /*AsWritten=*/true);
 }
 
 void GenericParamList::print(llvm::raw_ostream &OS) {
@@ -651,13 +655,33 @@ namespace {
         OS << " default=";
         defaultDef.print(OS);
       }
-      
+      if (auto whereClause = decl->getTrailingWhereClause()) {
+        OS << " where requirements: ";
+        interleave(whereClause->getRequirements(),
+                   [&](const RequirementRepr &req) { req.print(OS); },
+                   [&] { OS << ", "; });
+      }
+
       OS << ")";
     }
 
     void visitProtocolDecl(ProtocolDecl *PD) {
       printCommon(PD, "protocol");
+
+      OS << " requirement signature=";
+      if (PD->isRequirementSignatureComputed()) {
+        OS << PD->getRequirementSignature()->getAsString();
+      } else {
+        OS << "<null>";
+      }
       printInherited(PD->getInherited());
+      if (auto whereClause = PD->getTrailingWhereClause()) {
+        OS << " where requirements: ";
+        interleave(whereClause->getRequirements(),
+                   [&](const RequirementRepr &req) { req.print(OS); },
+                   [&] { OS << ", "; });
+      }
+
       for (auto VD : PD->getMembers()) {
         OS << '\n';
         printRec(VD);

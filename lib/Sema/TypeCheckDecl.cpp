@@ -4406,13 +4406,22 @@ public:
     if (!IsSecondPass) {
       checkUnsupportedNestedType(PD);
 
+      ProtocolRequirementTypeResolver resolver(PD);
+      TypeResolutionOptions options;
+
+      if (auto whereClause = PD->getTrailingWhereClause()) {
+        DeclContext *lookupDC = PD;
+        for (auto &req : whereClause->getRequirements()) {
+          // FIXME: handle error?
+          (void)TC.validateRequirement(whereClause->getWhereLoc(), req,
+                                       lookupDC, options, &resolver);
+        }
+      }
+
       for (auto member : PD->getMembers()) {
         if (auto assocType = dyn_cast<AssociatedTypeDecl>(member)) {
           if (auto whereClause = assocType->getTrailingWhereClause()) {
             DeclContext *lookupDC = assocType->getDeclContext();
-
-            ProtocolRequirementTypeResolver resolver(PD);
-            TypeResolutionOptions options;
 
             for (auto &req : whereClause->getRequirements()) {
               if (!TC.validateRequirement(whereClause->getWhereLoc(), req,

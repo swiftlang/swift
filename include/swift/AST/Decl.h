@@ -979,7 +979,7 @@ class RequirementRepr {
     : SeparatorLoc(SeparatorLoc), Kind(Kind), Invalid(false),
       FirstType(FirstType), SecondLayout(SecondLayout) { }
 
-  void printImpl(raw_ostream &OS, bool AsWritten) const;
+  void printImpl(ASTPrinter &OS, bool AsWritten) const;
 
 public:
   /// \brief Construct a new type-constraint requirement.
@@ -1164,6 +1164,7 @@ public:
       void dump() const LLVM_ATTRIBUTE_USED,
       "only for use within the debugger");
   void print(raw_ostream &OS) const;
+  void print(ASTPrinter &Printer) const;
 };
   
 /// GenericParamList - A list of generic parameters that is part of a generic
@@ -3367,6 +3368,10 @@ private:
 class ProtocolDecl : public NominalTypeDecl {
   SourceLoc ProtocolLoc;
 
+  /// The syntactic representation of the where clause in a protocol like
+  /// `protocol ... where ... { ... }`.
+  TrailingWhereClause *TrailingWhere;
+
   llvm::DenseMap<ValueDecl *, Witness> DefaultWitnesses;
 
   /// The generic signature representing exactly the new requirements introduced
@@ -3389,8 +3394,9 @@ class ProtocolDecl : public NominalTypeDecl {
 
 public:
   ProtocolDecl(DeclContext *DC, SourceLoc ProtocolLoc, SourceLoc NameLoc,
-               Identifier Name, MutableArrayRef<TypeLoc> Inherited);
-  
+               Identifier Name, MutableArrayRef<TypeLoc> Inherited,
+               TrailingWhereClause *TrailingWhere);
+
   using Decl::getASTContext;
 
   /// Retrieve the set of protocols inherited from this protocol.
@@ -3552,6 +3558,11 @@ public:
   /// Create the generic parameters of this protocol if the haven't been
   /// created yet.
   void createGenericParamsIfMissing();
+
+  /// Retrieve the trailing where clause on this protocol, if it exists.
+  TrailingWhereClause *getTrailingWhereClause() const {
+    return TrailingWhere;
+  }
 
   /// Retrieve the generic signature representing the requirements introduced by
   /// this protocol.
