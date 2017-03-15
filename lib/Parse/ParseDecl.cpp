@@ -3154,28 +3154,10 @@ ParserResult<TypeDecl> Parser::parseDeclAssociatedType(Parser::ParseDeclOptions 
   TrailingWhereClause *TrailingWhere = nullptr;
   // Parse a 'where' clause if present.
   if (Tok.is(tok::kw_where)) {
-    SourceLoc whereLoc;
-    SmallVector<RequirementRepr, 4> requirements;
-    bool firstTypeInComplete;
-    auto whereStatus =
-        parseGenericWhereClause(whereLoc, requirements, firstTypeInComplete);
-    if (whereStatus.isSuccess()) {
-      TrailingWhere =
-          TrailingWhereClause::create(Context, whereLoc, requirements);
-    } else if (whereStatus.hasCodeCompletion()) {
-      // FIXME: this is completely (hah) cargo culted.
-      if (CodeCompletion && firstTypeInComplete) {
-        CodeCompletion->completeGenericParams(nullptr);
-      } else {
-        return makeParserCodeCompletionResult<AssociatedTypeDecl>();
-      }
-    }
-
-    if (Context.isSwiftVersion3()) {
-      diagnose(whereLoc, diag::associatedtype_where_swift_3);
-      // There's nothing to see here, move along.
-      TrailingWhere = nullptr;
-    }
+    auto whereStatus = parseProtocolOrAssociatedTypeWhereClause(
+        TrailingWhere, /*inProtocol=*/false);
+    if (whereStatus.shouldStopParsing())
+      return whereStatus;
   }
 
   if (!Flags.contains(PD_InProtocol)) {
@@ -5307,18 +5289,18 @@ parseDeclProtocol(ParseDeclOptions Flags, DeclAttributes &Attributes) {
 
   // Parse a 'where' clause if present. These are not supported, but we will
   // get better QoI this way.
+  TrailingWhereClause *TrailingWhere = nullptr;
+  // Parse a 'where' clause if present.
   if (Tok.is(tok::kw_where)) {
-    GenericParamList *unused = nullptr;
-    auto whereStatus = parseFreestandingGenericWhereClause(
-        unused, WhereClauseKind::Protocol);
+    auto whereStatus = parseProtocolOrAssociatedTypeWhereClause(
+        TrailingWhere, /*isProtocol=*/true);
     if (whereStatus.shouldStopParsing())
       return whereStatus;
   }
 
-  ProtocolDecl *Proto
-    = new (Context) ProtocolDecl(CurDeclContext, ProtocolLoc, NameLoc,
-                                 ProtocolName,
-                                 Context.AllocateCopy(InheritedProtocols));
+  ProtocolDecl *Proto = new (Context)
+      ProtocolDecl(CurDeclContext, ProtocolLoc, NameLoc, ProtocolName,
+                   Context.AllocateCopy(InheritedProtocols), TrailingWhere);
   // No need to setLocalDiscriminator: protocols can't appear in local contexts.
 
   // If there was a 'class' requirement, mark this as a class-bounded protocol.

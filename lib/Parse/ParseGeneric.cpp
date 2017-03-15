@@ -16,6 +16,7 @@
 
 #include "swift/Parse/Parser.h"
 #include "swift/AST/DiagnosticsParse.h"
+#include "swift/Parse/CodeCompletionCallbacks.h"
 #include "swift/Parse/Lexer.h"
 using namespace swift;
 
@@ -371,3 +372,32 @@ parseFreestandingGenericWhereClause(GenericParamList *&genericParams,
   return ParserStatus();
 }
 
+/// Parse a where clause after a protocol or associated type declaration.
+ParserStatus Parser::parseProtocolOrAssociatedTypeWhereClause(
+    TrailingWhereClause *&trailingWhere, bool isProtocol) {
+  assert(Tok.is(tok::kw_where) && "Shouldn't call this without a where");
+  SourceLoc whereLoc;
+  SmallVector<RequirementRepr, 4> requirements;
+  bool firstTypeInComplete;
+  auto whereStatus =
+      parseGenericWhereClause(whereLoc, requirements, firstTypeInComplete);
+  if (whereStatus.isSuccess()) {
+    trailingWhere =
+        TrailingWhereClause::create(Context, whereLoc, requirements);
+  } else if (whereStatus.hasCodeCompletion()) {
+    // FIXME: this is completely (hah) cargo culted.
+    if (CodeCompletion && firstTypeInComplete) {
+      CodeCompletion->completeGenericParams(nullptr);
+    } else {
+      return makeParserCodeCompletionStatus();
+    }
+  }
+
+  if (Context.isSwiftVersion3()) {
+    diagnose(whereLoc, diag::protocol_associatedtype_where_swift_3,
+             isProtocol ? "protocols" : "associated types");
+    // There's nothing to see here, move along.
+    trailingWhere = nullptr;
+  }
+  return ParserStatus();
+}
