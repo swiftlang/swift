@@ -59,27 +59,29 @@ struct AnyCodeUnits : RandomAccessCollection, AnyCodeUnits_ {
 
   init<C: RandomAccessCollection>(_ c: C)
   where C.Iterator.Element : UnsignedInteger {
-    base = AnyCodeUnitsZeroExtender(base: c)
+    base = ZeroExtender(base: c)
   }
   
   public func withExistingUnsafeBuffer<R>(
     _ body: (UnsafeBufferPointer<Element>) throws -> R
   ) rethrows -> R? { return try base.withExistingUnsafeBuffer(body) }
+
+  /// Adapts any random access collection of unsigned integer to AnyCodeUnits_
+  struct ZeroExtender<
+    Base: RandomAccessCollection
+  > where Base.Iterator.Element : UnsignedInteger {
+    let base: Base
+  }  
 }
 
-/// Adapts any random access collection of unsigned integer to AnyCodeUnits_
-struct AnyCodeUnitsZeroExtender<
-  Base: RandomAccessCollection
-> : RandomAccessCollection, AnyCodeUnits_
-where Base.Iterator.Element : UnsignedInteger {
+extension AnyCodeUnits.ZeroExtender : RandomAccessCollection, AnyCodeUnits_ {
   typealias IndexDistance = Int64
   typealias Index = Int64
   typealias Element = UInt32
   // FIXME: associated type deduction seems to need a hint here.
-  typealias Indices = DefaultRandomAccessIndices<AnyCodeUnitsZeroExtender>
+  typealias Indices = DefaultRandomAccessIndices<
+    AnyCodeUnits.ZeroExtender<Base>>
   
-  let base: Base
-
   var startIndex: Index { return 0 }
   var endIndex: Index { return numericCast(base.count) }
   
@@ -146,21 +148,22 @@ struct AnyUTF16 : BidirectionalCollection, AnyUTF16_ {
 
   init<C: BidirectionalCollection>(_ c: C)
   where C.Iterator.Element : UnsignedInteger {
-    base = AnyUTF16ZeroExtender(base: c)
+    base = ZeroExtender(base: c)
+  }
+
+  struct ZeroExtender<
+    Base: BidirectionalCollection
+  > where Base.Iterator.Element : UnsignedInteger {
+    let base: Base
   }
 }
 
 /// Adapts any bidirectional collection of unsigned integer to AnyUTF16_
-struct AnyUTF16ZeroExtender<
-  Base: BidirectionalCollection
-> : BidirectionalCollection, AnyUTF16_
-where Base.Iterator.Element : UnsignedInteger {
+extension AnyUTF16.ZeroExtender : BidirectionalCollection, AnyUTF16_ {
   typealias IndexDistance = Int64
   typealias Index = UnicodeIndex
   typealias Element = UInt16
   
-  let base: Base
-
   var startIndex: Index { return Index(offset: 0) }
   var endIndex: Index { return Index(offset: numericCast(base.count)) }
   
@@ -238,21 +241,24 @@ struct AnyRandomAccessUTF16 : RandomAccessCollection, AnyRandomAccessUTF16_ {
 
   init<C: RandomAccessCollection>(_ c: C)
   where C.Iterator.Element : UnsignedInteger {
-    base = AnyRandomAccessUTF16ZeroExtender(base: c)
+    base = ZeroExtender(base: c)
+  }
+
+  struct ZeroExtender<
+    Base: RandomAccessCollection
+  > where Base.Iterator.Element : UnsignedInteger {
+    let base: Base
   }
 }
 
 /// Adapts any random access collection of unsigned integer to
 /// AnyRandomAccessUTF16_, so it can be wrapped in AnyRandomAccessUTF16
-struct AnyRandomAccessUTF16ZeroExtender<
-  Base: RandomAccessCollection
-> : RandomAccessCollection, AnyRandomAccessUTF16_
-where Base.Iterator.Element : UnsignedInteger {
+extension AnyRandomAccessUTF16.ZeroExtender
+: RandomAccessCollection, AnyRandomAccessUTF16_ {
   typealias IndexDistance = Int64
   typealias Index = UnicodeIndex
   typealias Element = UInt16
   
-  let base: Base
 
   var startIndex: Index { return Index(offset: 0) }
   var endIndex: Index { return Index(offset: numericCast(base.count)) }
@@ -332,18 +338,21 @@ struct AnyUnicodeBidirectionalUInt32 : BidirectionalCollection, AnyUnicodeBidire
       try ($0 as Any as? UnsafeBufferPointer<Element>).map(body)
     }.flatMap { $0 }
   }
+
+  struct ZeroExtender<
+    Base: BidirectionalCollection
+  > where Base.Iterator.Element : UnsignedInteger {
+    let base: Base
+  }
 }
 
 /// Adapts any bidirectional collection of unsigned integer to AnyUnicodeBidirectionalUInt32_
-struct AnyUnicodeBidirectionalUInt32ZeroExtender<
-  Base: BidirectionalCollection
-> : BidirectionalCollection, AnyUnicodeBidirectionalUInt32_
-where Base.Iterator.Element : UnsignedInteger {
+extension AnyUnicodeBidirectionalUInt32.ZeroExtender
+  : BidirectionalCollection, AnyUnicodeBidirectionalUInt32_ {
   typealias IndexDistance = Int64
   typealias Index = UnicodeIndex
   typealias Element = UInt32
   
-  let base: Base
 
   var startIndex: Index { return Index(offset: 0) }
   var endIndex: Index { return Index(offset: numericCast(base.count)) }
@@ -369,7 +378,7 @@ where Base.Iterator.Element : UnsignedInteger {
     return numericCast(base[base.index(atOffset: i.offset)])
   }
 
-  public func withExistingUnsafeBuffer<R>(
+  func withExistingUnsafeBuffer<R>(
     _ body: (UnsafeBufferPointer<Element>) throws -> R
   ) rethrows -> R? {
     return try base.withExistingUnsafeBuffer {
@@ -563,8 +572,8 @@ extension UTF16CompatibleStringContents : _FixedFormatUnicode {
 
 var suite = TestSuite("AnyUnicode")
 suite.test("basics") {
-  let x = AnyUTF16ZeroExtender(base: Array(3...7) as [UInt16])
-  let y = AnyUTF16ZeroExtender(base: Array(3...7) as [UInt8])
+  let x = AnyUTF16.ZeroExtender(base: Array(3...7) as [UInt16])
+  let y = AnyUTF16.ZeroExtender(base: Array(3...7) as [UInt8])
   expectTrue(x.elementsEqual(y))
 }
 
