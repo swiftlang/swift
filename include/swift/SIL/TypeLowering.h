@@ -603,7 +603,9 @@ public:
 
   SILType getLoweredLoadableType(Type t) {
     const TypeLowering &ti = getTypeLowering(t);
-    assert(ti.isLoadable() && "unexpected address-only type");
+    assert(
+        (ti.isLoadable() || !SILModuleConventions(M).useLoweredAddresses()) &&
+        "unexpected address-only type");
     return ti.getLoweredType();
   }
 
