@@ -5153,9 +5153,9 @@ public:
     bool emittedError = false;
     Type plainParentTy = owningTy->adjustSuperclassMemberDeclType(
         parentMember, member, parentMember->getInterfaceType(), &TC);
-    const auto *parentTy = plainParentTy->castTo<AnyFunctionType>();
+    const auto *parentTy = plainParentTy->castTo<FunctionType>();
     if (isa<AbstractFunctionDecl>(parentMember))
-      parentTy = parentTy->getResult()->castTo<AnyFunctionType>();
+      parentTy = parentTy->getResult()->castTo<FunctionType>();
 
     // Check the parameter types.
     auto checkParam = [&](const ParamDecl *decl, Type parentParamTy) {
@@ -5600,14 +5600,8 @@ public:
         parentDeclTy = parentDeclTy->getUnlabeledType(TC.Context);
         if (method) {
           // For methods, strip off the 'Self' type.
-          parentDeclTy = parentDeclTy->castTo<AnyFunctionType>()->getResult();
+          parentDeclTy = parentDeclTy->castTo<FunctionType>()->getResult();
           adjustFunctionTypeForOverride(parentDeclTy);
-        } else if (subscript) {
-          // For subscripts, we don't have a 'Self' type, but turn it
-          // into a monomorphic function type.
-          auto parentFuncTy = parentDeclTy->castTo<AnyFunctionType>();
-          parentDeclTy = FunctionType::get(parentFuncTy->getInput(),
-                                           parentFuncTy->getResult());
         } else {
           // For properties, strip off ownership.
           parentDeclTy = parentDeclTy->getReferenceStorageReferent();
