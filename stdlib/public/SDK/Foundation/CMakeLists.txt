@@ -15,6 +15,7 @@ add_swift_library(swiftFoundation ${SWIFT_SDK_OVERLAY_LIBRARY_BUILD_TYPES} IS_SD
   Foundation.swift
   IndexPath.swift
   IndexSet.swift
+  JSONEncoder.swift
   Locale.swift
   Measurement.swift
   Notification.swift

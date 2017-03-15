@@ -1580,7 +1580,7 @@ extension CocoaError {
     }
 
     internal static func coderInvalidValue(`in` context: [CodingKey], reason: String) -> Error {
-        return CocoaError.error(._coderInvalidValue, debugDescription: reason, userInfo: [
+        return CocoaError.error(.coderInvalidValue, debugDescription: reason, userInfo: [
             NSCodingKeyContextErrorKey: context,
             // TODO: Set up localized string for this error in Foundation strings.
         ])
@@ -1588,7 +1588,7 @@ extension CocoaError {
 
     internal static func coderTypeMismatch(`in` context: [CodingKey], reason: String) -> Error {
         // This purposefully reuses the localized description from .coderReadCorrupt.
-        return CocoaError.error(._coderTypeMismatch, debugDescription: reason, userInfo: [
+        return CocoaError.error(.coderTypeMismatch, debugDescription: reason, userInfo: [
             NSCodingKeyContextErrorKey: context,
             NSLocalizedDescriptionKey: NSLocalizedString("Err4864",
                                                          tableName: "FoundationErrors",
