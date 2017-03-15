@@ -36,22 +36,32 @@ let errFile =
   open(sourcePath, O_RDONLY | O_CREAT | O_EXCL)
 if errFile != -1 { 
   print("O_CREAT|O_EXCL failed to return an error") 
-} else { 
-  print("O_CREAT|O_EXCL returned errno *\(errno)*") 
+} else {
+  let e = errno
+  print("O_CREAT|O_EXCL returned errno *\(e)*") 
 }
 
 // CHECK-NOT: error
 // CHECK: created mode *33216* *33216*
 let tempFile = 
   open(tempPath, O_RDWR | O_CREAT | O_EXCL, S_IRUSR | S_IWUSR | S_IXUSR)
+if tempFile == -1 {
+  let e = errno
+  print("error: open(tempPath \(tempPath)) returned -1, errno \(e)")
+  abort()
+}
 let written = write(tempFile, bytes, 11)
-assert(written == 11)
+if (written != 11) {
+  print("error: write(tempFile) returned \(written), errno \(errno)")
+  abort()
+}
 
 var err: Int32
 var statbuf1 = stat()
 err = fstat(tempFile, &statbuf1)
-if err != 0 { 
-  print("error: fstat returned \(err), errno \(errno)")
+if err != 0 {
+  let e = errno
+  print("error: fstat returned \(err), errno \(e)")
   abort()
 }
 
@@ -59,8 +69,9 @@ close(tempFile)
 
 var statbuf2 = stat()
 err = stat(tempPath, &statbuf2)
-if err != 0 { 
-  print("error: stat returned \(err), errno \(errno)")
+if err != 0 {
+  let e = errno
+  print("error: stat returned \(err), errno \(e)")
   abort()
 }
 
