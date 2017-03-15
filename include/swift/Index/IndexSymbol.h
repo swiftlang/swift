@@ -79,6 +79,7 @@ struct IndexSymbol : IndexRelation {
 
 SymbolInfo getSymbolInfoForDecl(const Decl *D);
 SymbolSubKind getSubKindForAccessor(AccessorKind AK);
+bool isLocalSymbol(const Decl *D);
 
 using clang::index::printSymbolProperties;
 

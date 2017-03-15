@@ -19,6 +19,7 @@
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/ParameterList.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/Mangle.h"
 #include "swift/Demangling/ManglingUtils.h"
@@ -375,6 +376,29 @@ static bool isInPrivateOrLocalContext(const ValueDecl *D) {
   return isInPrivateOrLocalContext(nominal);
 }
 
+static unsigned getUnnamedParamIndex(const Decl *D) {
+  unsigned UnnamedIndex = 0;
+  ArrayRef<ParameterList *> ParamLists;
+
+  if (auto AFD = dyn_cast<AbstractFunctionDecl>(D->getDeclContext())) {
+    ParamLists = AFD->getParameterLists();
+  } else if (auto ACE = dyn_cast<AbstractClosureExpr>(D->getDeclContext())) {
+    ParamLists = ACE->getParameterLists();
+  } else {
+    llvm_unreachable("unhandled param context");
+  }
+  for (auto ParamList : ParamLists) {
+    for (auto Param : *ParamList) {
+      if (!Param->hasName()) {
+        if (Param == D)
+          return UnnamedIndex;
+        ++UnnamedIndex;
+      }
+    }
+  }
+  llvm_unreachable("param not found");
+}
+
 void ASTMangler::appendDeclName(const ValueDecl *decl) {
   if (decl->isOperator()) {
     appendIdentifier(translateOperator(decl->getName().str()));
@@ -394,6 +418,10 @@ void ASTMangler::appendDeclName(const ValueDecl *decl) {
   }
 
   if (decl->getDeclContext()->isLocalContext()) {
+    if (isa<ParamDecl>(decl) && !decl->hasName()) {
+      // Mangle unnamed params with their ordering.
+      return appendOperator("L", Index(getUnnamedParamIndex(decl)));
+    }
     // Mangle local declarations with a numeric discriminator.
     return appendOperator("L", Index(decl->getLocalDiscriminator()));
   }
