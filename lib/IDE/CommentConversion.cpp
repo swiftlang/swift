@@ -206,7 +206,7 @@ struct CommentToXMLConverter {
         printInlinesUnder(N, S);
       S << "\"";
     }
-    S << "\\>";
+    S << "/>";
     printRawHTML(S.str());
   }
 
@@ -685,7 +685,7 @@ public:
         printInlinesUnder(Child, S);
       S << "\"";
     }
-    S << "\\>";
+    S << "/>";
     print(S.str());
   }
 
