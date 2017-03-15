@@ -7165,7 +7165,8 @@ void TypeChecker::validateDecl(ValueDecl *D) {
 
     validateAttributes(*this, D);
 
-    proto->computeRequirementSignature();
+    if (!proto->isRequirementSignatureComputed())
+      proto->computeRequirementSignature();
 
     // If the protocol is @objc, it may only refine other @objc protocols.
     // FIXME: Revisit this restriction.
