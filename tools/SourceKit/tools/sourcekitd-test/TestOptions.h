@@ -51,7 +51,6 @@ enum class SourceKitRequest {
   ExtractComment,
   ModuleGroups,
   NameTranslation,
-  MarkupToXML,
 };
 
 struct TestOptions {

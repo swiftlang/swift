@@ -110,7 +110,6 @@ static LazySKDUID RequestBuildSettingsRegister(
 static LazySKDUID RequestModuleGroups(
     "source.request.module.groups");
 static LazySKDUID RequestNameTranslation("source.request.name.translation");
-static LazySKDUID RequestMarkupToXML("source.request.convert.markup.xml");
 
 static LazySKDUID KindExpr("source.lang.swift.expr");
 static LazySKDUID KindStmt("source.lang.swift.stmt");
@@ -231,8 +230,6 @@ editorOpenSwiftTypeInterface(StringRef TypeUsr, ArrayRef<const char *> Args,
                              ResponseReceiver Rec);
 
 static sourcekitd_response_t editorExtractTextFromComment(StringRef Source);
-
-static sourcekitd_response_t editorConvertMarkupToXML(StringRef Source);
 
 static sourcekitd_response_t
 editorClose(StringRef Name, bool RemoveCache);
@@ -544,13 +541,6 @@ void handleRequestImpl(sourcekitd_object_t ReqObj, ResponseReceiver Rec) {
     if (!Source.hasValue())
       return Rec(createErrorRequestInvalid("missing 'key.sourcetext'"));
     return Rec(editorExtractTextFromComment(Source.getValue()));
-  }
-
-  if (ReqUID == RequestMarkupToXML) {
-    Optional<StringRef> Source = Req.getString(KeySourceText);
-    if (!Source.hasValue())
-      return Rec(createErrorRequestInvalid("missing 'key.sourcetext'"));
-    return Rec(editorConvertMarkupToXML(Source.getValue()));
   }
 
   if (ReqUID == RequestEditorFindUSR) {
@@ -1991,16 +1981,6 @@ static sourcekitd_response_t editorExtractTextFromComment(StringRef Source) {
                          /*SyntacticOnly=*/true);
   LangSupport &Lang = getGlobalContext().getSwiftLangSupport();
   Lang.editorExtractTextFromComment(Source, EditC);
-  return EditC.createResponse();
-}
-
-static sourcekitd_response_t editorConvertMarkupToXML(StringRef Source) {
-  SKEditorConsumer EditC(/*EnableSyntaxMap=*/false,
-                         /*EnableStructure=*/false,
-                         /*EnableDiagnostics=*/false,
-                         /*SyntacticOnly=*/true);
-  LangSupport &Lang = getGlobalContext().getSwiftLangSupport();
-  Lang.editorConvertMarkupToXML(Source, EditC);
   return EditC.createResponse();
 }
 
