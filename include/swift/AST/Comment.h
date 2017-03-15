@@ -95,10 +95,6 @@ Optional<DocComment *>getSingleDocComment(swift::markup::MarkupContext &Context,
 Optional<DocComment *> getCascadingDocComment(swift::markup::MarkupContext &MC,
                                              const Decl *D);
 
-/// Extract comments parts from the given Markup node.
-swift::markup::CommentParts
-extractCommentParts(swift::markup::MarkupContext &MC,
-                    swift::markup::MarkupASTNode *Node);
 } // namespace swift
 
 #endif // LLVM_SWIFT_AST_COMMENT_H

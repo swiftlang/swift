@@ -380,9 +380,6 @@ public:
   void editorExtractTextFromComment(StringRef Source,
                                     EditorConsumer &Consumer) override;
 
-  void editorConvertMarkupToXML(StringRef Source,
-                                EditorConsumer &Consumer) override;
-
   void editorExpandPlaceholder(StringRef Name, unsigned Offset, unsigned Length,
                                EditorConsumer &Consumer) override;
 
