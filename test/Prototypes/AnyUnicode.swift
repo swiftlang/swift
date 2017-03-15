@@ -56,6 +56,11 @@ struct AnyCodeUnits : RandomAccessCollection, AnyCodeUnits_ {
   func index(before i: Index) -> Index { return base.index(before: i) }
   func index(_ i: Index, offsetBy: Int64) -> Index { return base.index(i, offsetBy: i) }
   subscript(i: Index) -> Element { return base[i] }
+
+  init<C: RandomAccessCollection>(_ c: C)
+  where C.Iterator.Element : UnsignedInteger {
+    base = AnyCodeUnitsZeroExtender(base: c)
+  }
   
   public func withExistingUnsafeBuffer<R>(
     _ body: (UnsafeBufferPointer<Element>) throws -> R
@@ -138,6 +143,11 @@ struct AnyUTF16 : BidirectionalCollection, AnyUTF16_ {
   ) rethrows -> R? {
     return try base.withExistingUnsafeBuffer(body)
   }
+
+  init<C: BidirectionalCollection>(_ c: C)
+  where C.Iterator.Element : UnsignedInteger {
+    base = AnyUTF16ZeroExtender(base: c)
+  }
 }
 
 /// Adapts any bidirectional collection of unsigned integer to AnyUTF16_
@@ -169,6 +179,111 @@ where Base.Iterator.Element : UnsignedInteger {
       base.offset(
         of: base.index(base.index(atOffset: i.offset),
             offsetBy: numericCast(n)))))
+  }
+  
+  subscript(i: Index) -> Element {
+    return numericCast(base[base.index(atOffset: i.offset)])
+  }
+
+  public func withExistingUnsafeBuffer<R>(
+    _ body: (UnsafeBufferPointer<Element>) throws -> R
+  ) rethrows -> R? {
+    return try base.withExistingUnsafeBuffer {
+      try ($0 as Any as? UnsafeBufferPointer<Element>).map(body)
+    }.flatMap { $0 }
+  }
+}
+
+protocol AnyRandomAccessUTF16_ : AnyUTF16_ {
+  typealias IndexDistance = Int64
+  typealias Index = UnicodeIndex
+  typealias Element = UInt16
+  var startIndex: Index { get }
+  var endIndex: Index { get }
+  func index(after: Index) -> Index
+  func index(before: Index) -> Index
+  func index(_: Index, offsetBy: IndexDistance) -> Index
+  func distance(from: Index, to: Index) -> IndexDistance
+  
+  subscript(i: Index) -> Element { get }
+
+  func withExistingUnsafeBuffer<R>(
+    _ body: (UnsafeBufferPointer<Element>) throws -> R
+  ) rethrows -> R?
+}
+
+// A wrapper that holds any instance of AnyRandomAccessUTF16_ and makes it conform to
+// RandomAccessCollection
+struct AnyRandomAccessUTF16 : RandomAccessCollection, AnyRandomAccessUTF16_ {
+  let base: AnyRandomAccessUTF16_
+  typealias IndexDistance = Int64
+  typealias Index = UnicodeIndex
+  typealias Element = UInt16
+  var startIndex: Index { return base.startIndex }
+  var endIndex: Index { return base.endIndex }
+  func index(after i: Index) -> Index { return base.index(after: i) }
+  func index(before i: Index) -> Index { return base.index(before: i) }
+  func index(_ i: Index, offsetBy n: IndexDistance) -> Index {
+    return base.index(i, offsetBy: n)
+  }
+  func distance(from i: Index, to j: Index) -> IndexDistance {
+    return base.distance(from: i, to: j)
+  }
+  subscript(i: Index) -> Element { return base[i] }
+  public func withExistingUnsafeBuffer<R>(
+    _ body: (UnsafeBufferPointer<Element>) throws -> R
+  ) rethrows -> R? {
+    return try base.withExistingUnsafeBuffer(body)
+  }
+
+  init<C: RandomAccessCollection>(_ c: C)
+  where C.Iterator.Element : UnsignedInteger {
+    base = AnyRandomAccessUTF16ZeroExtender(base: c)
+  }
+}
+
+/// Adapts any random access collection of unsigned integer to
+/// AnyRandomAccessUTF16_, so it can be wrapped in AnyRandomAccessUTF16
+struct AnyRandomAccessUTF16ZeroExtender<
+  Base: RandomAccessCollection
+> : RandomAccessCollection, AnyRandomAccessUTF16_
+where Base.Iterator.Element : UnsignedInteger {
+  typealias IndexDistance = Int64
+  typealias Index = UnicodeIndex
+  typealias Element = UInt16
+  
+  let base: Base
+
+  var startIndex: Index { return Index(offset: 0) }
+  var endIndex: Index { return Index(offset: numericCast(base.count)) }
+  
+  func index(after i: Index) -> Index {
+    return Index(
+      offset: numericCast(
+        base.offset(of: base.index(after: base.index(atOffset: i.offset)))))
+  }
+  
+  func index(before i: Index) -> Index {
+    return Index(
+      offset: numericCast(
+        base.offset(
+          of: base.index(before: base.index(atOffset: i.offset)))))
+  }
+  
+  func index(_ i: Index, offsetBy n: Int64) -> Index {
+    return Index(
+      offset: numericCast(
+        base.offset(
+          of: base.index(
+            base.index(atOffset: i.offset),
+            offsetBy: numericCast(n)))))
+  }
+  
+  func distance(from i: Index, to j: Index) -> IndexDistance {
+    return numericCast(
+      base.distance(
+        from: base.index(atOffset: i.offset),
+        to: base.index(atOffset: j.offset)))
   }
   
   subscript(i: Index) -> Element {
@@ -297,8 +412,7 @@ struct AnyCharacters : BidirectionalCollection, AnyCharacters_ {
   }
 }
 
-protocol AnyUnicode {
-  var encoding: AnyUnicodeEncoding { get }
+protocol AnyUnicode_ : Swift._AnyUnicode {
   var codeUnits: AnyCodeUnits { get }
   var utf16: AnyUTF16 { get }
   var utf32: AnyUnicodeBidirectionalUInt32 { get }
@@ -307,12 +421,6 @@ protocol AnyUnicode {
   // represents ASCII, then yes.  Look into, e.g. shift-JIS.
   var extendedASCII : AnyUnicodeBidirectionalUInt32 { get }
   var characters : AnyCharacters { get }
-  
-  func isASCII(scan: Bool/* = true */) -> Bool 
-  func isLatin1(scan: Bool/* = true */) -> Bool 
-  func isNormalizedNFC(scan: Bool/* = true*/) -> Bool
-  func isNormalizedNFD(scan: Bool/* = true*/) -> Bool
-  func isInFastCOrDForm(scan: Bool/* = true*/) -> Bool
 }
 
 struct AnyRandomAccessUnsignedIntegers<
@@ -360,37 +468,98 @@ where Base.Iterator.Element : UnsignedInteger {
   }
 }
 
-protocol AnyUnicodeEncoding : Swift.AnyUnicodeEncoding {
-  static func utf16View<CodeUnits: RandomAccessCollection>(_: CodeUnits) -> AnyUTF16
-    where CodeUnits.Iterator.Element : UnsignedInteger
+enum UTF16CompatibleStringContents {
+case utf16(_UTF16StringStorage)
+case latin1(_Latin1StringStorage)
 }
 
-extension AnyUnicodeEncoding
-  where Self : UnicodeEncoding,
-  Self.EncodedScalar.Iterator.Element : UnsignedInteger {
+extension UTF16CompatibleStringContents : _FixedFormatUnicode {
+  typealias Encoding = UTF16
+  typealias RawUTF16View = AnyUTF16
+  typealias CodeUnits = AnyRandomAccessUTF16
+  typealias FCCNormalizedUTF16View = AnyUTF16
   
-  static func utf16View<
-    CodeUnits: RandomAccessCollection
-  >(codeUnits: CodeUnits) -> AnyUTF16
-  where CodeUnits.Iterator.Element : UnsignedInteger {
-    typealias WidthAdjusted = AnyRandomAccessUnsignedIntegers<CodeUnits, CodeUnit>
-    typealias Storage = UnicodeStorage<WidthAdjusted, Self>
-    
-    let r = Storage.TranscodedView(
-      WidthAdjusted(base: codeUnits),
-      from: self,
-      to: UTF16.self
-    )
-    fatalError()
+  var rawUTF16: AnyUTF16 {
+    switch self {
+    case .utf16(let storage):
+      return AnyUTF16(storage)
+    case .latin1(let storage):
+      return AnyUTF16(storage)
+    }
+  }
+
+  var fccNormalizedUTF16: FCCNormalizedUTF16View {
+    switch self {
+    case .utf16(let storage):
+      return AnyUTF16(storage.fccNormalizedUTF16)
+    case .latin1(let storage):
+      return AnyUTF16(storage.fccNormalizedUTF16)
+    }
+  }
+
+  var codeUnits: CodeUnits {
+    switch self {
+    case .utf16(let storage):
+      return CodeUnits(storage)
+    case .latin1(let storage):
+      return CodeUnits(storage)
+    }
+  }
+
+  var isKnownLatin1: Bool {
+    switch self {
+    case .utf16(let storage):
+      return storage.isKnownLatin1
+    case .latin1(let storage):
+      return storage.isKnownLatin1
+    }
+  }
+
+  var isKnownValidEncoding: Bool {
+    switch self {
+    case .utf16(let storage):
+      return storage.isKnownValidEncoding
+    case .latin1(let storage):
+      return storage.isKnownValidEncoding
+    }
+  }
+
+  var isKnownFCCNormalized: Bool {
+    switch self {
+    case .utf16(let storage):
+      return storage.isKnownFCCNormalized
+    case .latin1(let storage):
+      return storage.isKnownFCCNormalized
+    }
+  }
+
+  var isKnownFCDForm: Bool {
+    switch self {
+    case .utf16(let storage):
+      return storage.isKnownFCDForm
+    case .latin1(let storage):
+      return storage.isKnownFCDForm
+    }
+  }
+
+  var isKnownNFDNormalized: Bool {
+    switch self {
+    case .utf16(let storage):
+      return storage.isKnownNFDNormalized
+    case .latin1(let storage):
+      return storage.isKnownNFDNormalized
+    }
+  }
+
+  var isKnownNFCNormalized: Bool {
+    switch self {
+    case .utf16(let storage):
+      return storage.isKnownNFCNormalized
+    case .latin1(let storage):
+      return storage.isKnownNFCNormalized
+    }
   }
 }
-/*
-extension AnyUnicode {
-  var utf16: AnyUTF16 {
-    return 
-  }
-}
-*/
 
 var suite = TestSuite("AnyUnicode")
 suite.test("basics") {
