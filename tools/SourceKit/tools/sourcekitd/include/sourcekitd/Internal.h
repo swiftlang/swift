@@ -34,15 +34,13 @@ namespace SourceKit {
   class UIdent;
 }
 
-SOURCEKITD_PUBLIC SOURCEKITD_NONNULL_ALL bool
-sourcekitd_variant_dictionary_apply_impl(
-  sourcekitd_variant_t dict,
-  llvm::function_ref<bool(sourcekitd_uid_t, sourcekitd_variant_t)> applier);
+bool sourcekitd_variant_dictionary_apply_impl(
+    sourcekitd_variant_t dict,
+    llvm::function_ref<bool(sourcekitd_uid_t, sourcekitd_variant_t)> applier);
 
-SOURCEKITD_PUBLIC SOURCEKITD_NONNULL_ALL bool
-sourcekitd_variant_array_apply_impl(
-  sourcekitd_variant_t array,
-  llvm::function_ref<bool(size_t, sourcekitd_variant_t)> applier);
+bool sourcekitd_variant_array_apply_impl(
+    sourcekitd_variant_t array,
+    llvm::function_ref<bool(size_t, sourcekitd_variant_t)> applier);
 
 namespace sourcekitd {
 
