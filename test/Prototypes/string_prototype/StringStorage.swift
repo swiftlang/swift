@@ -75,20 +75,10 @@ extension _FixedFormatUnicode {
 }
 
 extension _FixedFormatUnicode
-where RawUTF16View.Iterator.Element : UnsignedInteger,
-  CodeUnits.SubSequence : Collection, 
-  CodeUnits.SubSequence.SubSequence == CodeUnits.SubSequence,
-  CodeUnits.SubSequence.Iterator.Element == Encoding.EncodedScalar.Iterator.Element
-{
+where RawUTF16View.Iterator.Element : UnsignedInteger {
   // FIXME: we'd like to put this up in the unconditional extension, but we are
   // forbidden.
   var encoding: Encoding.Type { return Encoding.self }
-  
-  func isValidEncoding() -> Bool {
-    return Encoding.parseForward(
-      codeUnits, repairingIllFormedSequences: false
-    ) { _ in }.errorCount == 0
-  }
   
   func isLatin1() -> Bool {
     return isKnownLatin1 || !rawUTF16.contains { $0 > 0xFF }
@@ -99,7 +89,20 @@ where RawUTF16View.Iterator.Element : UnsignedInteger,
   }
 }
 
-/// Latin-1
+extension _FixedFormatUnicode
+where RawUTF16View.Iterator.Element : UnsignedInteger,
+  CodeUnits.SubSequence : Collection, 
+  CodeUnits.SubSequence.SubSequence == CodeUnits.SubSequence,
+  CodeUnits.SubSequence.Iterator.Element == Encoding.EncodedScalar.Iterator.Element
+{
+  func isValidEncoding() -> Bool {
+    return Encoding.parseForward(
+      codeUnits, repairingIllFormedSequences: false
+    ) { _ in }.errorCount == 0
+  }
+}
+
+//===--- Defaults for Latin-1 ---------------------------------------------===//
 extension _FixedFormatUnicode where Encoding == Latin1 {
   var isKnownLatin1: Bool { return true }
   var isKnownValidEncoding: Bool { return true }
@@ -118,7 +121,7 @@ where Encoding == Latin1, CodeUnits.Iterator.Element : UnsignedInteger {
   }
 }
 
-/// UTF16 and ValidUTF16
+//===--- Defaults for UTF16 and ValidUTF16 --------------------------------===//
 extension _FixedFormatUnicode
 where Encoding.EncodedScalar == UTF16.EncodedScalar,
   CodeUnits.Iterator.Element : UnsignedInteger,
@@ -126,12 +129,8 @@ where Encoding.EncodedScalar == UTF16.EncodedScalar,
   CodeUnits.SubSequence : RandomAccessCollection,
   CodeUnits.SubSequence.Index == CodeUnits.Index,
   CodeUnits.SubSequence.SubSequence == CodeUnits.SubSequence,
-  CodeUnits.SubSequence.Iterator.Element == CodeUnits.Iterator.Element{
-
-  var rawUTF16 : CodeUnits {
-    return codeUnits
-  }
-
+  CodeUnits.SubSequence.Iterator.Element == CodeUnits.Iterator.Element {
+  
   // FIXME: we should have a way to represent the validity of the encoding of
   // this result—and maybe other nice properties—in the type system.  So maybe
   // this thing should conform to _FixedFormatUnicode
@@ -139,14 +138,24 @@ where Encoding.EncodedScalar == UTF16.EncodedScalar,
   : UnicodeStorage<CodeUnits,Encoding>.FCCNormalizedUTF16View {
     return UnicodeStorage(codeUnits, Encoding.self).fccNormalizedUTF16
   }
+  
+  var rawUTF16 : CodeUnits {
+    return codeUnits
+  }
 }
 
+//===----------------------------------------------------------------------===//
+//===--- Growable buffer classes with bounded capacity --------------------===//
+//===----------------------------------------------------------------------===//
+
+/// Stores (at least) the count and capacity of a growable buffer class
 protocol _BoundedStorageHeader {
   init(count: Int, capacity: Int)
   associatedtype Size : UnsignedInteger
   var count: Size { get set }
   var capacity: Size { get }
 }
+
 extension _SwiftUTF16StringHeader : _BoundedStorageHeader {
   init(count: Int, capacity: Int) {
     self.count = numericCast(count)
@@ -355,6 +364,10 @@ extension _BoundedStorage {
   }
 }
 
+//===----------------------------------------------------------------------===//
+//===--- Now we get String-specific ---------------------------------------===//
+//===----------------------------------------------------------------------===//
+
 /// Common base class of our string storage classes
 @_versioned
 class _StringStorageBase<
@@ -462,6 +475,8 @@ extension _UTF16StringStorage : _BoundedStorage {
 
 extension _UTF16StringStorage : _FixedFormatUnicode {
   typealias Encoding = UTF16
+
+  // WORKAROUND: helping type inference along will be unnecessary someday
   typealias RawUTF16View = _UTF16StringStorage
   typealias CodeUnits = _UTF16StringStorage
   typealias FCCNormalizedUTF16View = UnicodeStorage<
@@ -694,7 +709,7 @@ extension _Latin1StringStorage : _FixedFormatUnicode {
   typealias FCCNormalizedUTF16View = LazyMapRandomAccessCollection<CodeUnits, UTF16.CodeUnit>
   typealias RawUTF16View = FCCNormalizedUTF16View
   
-  var codeUnits: _Latin1StringStorage { return self }
+  var codeUnits: CodeUnits { return self }
 
   var isKnownNFDNormalized: Bool { return true }
   var isKnownNFCNormalized: Bool { return true }
