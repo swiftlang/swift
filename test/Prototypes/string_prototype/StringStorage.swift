@@ -3,10 +3,10 @@ import SwiftShims
 
 //===--- General Utilities ------------------------------------------------===//
 // This is a hack to work around the inability to assign to self in a class init
-protocol FactoryInitializable {}
+public protocol FactoryInitializable {}
 extension FactoryInitializable {
   @nonobjc
-  init(_ me: Self) {
+  public init(_ me: Self) {
     self = me
   }
 }
@@ -149,22 +149,23 @@ where Encoding.EncodedScalar == UTF16.EncodedScalar,
 //===----------------------------------------------------------------------===//
 
 /// Stores (at least) the count and capacity of a growable buffer class
-protocol _BoundedStorageHeader {
+public // @testable
+protocol _BoundedBufferHeader {
   init(count: Int, capacity: Int)
   associatedtype Size : UnsignedInteger
   var count: Size { get set }
   var capacity: Size { get }
 }
 
-extension _SwiftUTF16StringHeader : _BoundedStorageHeader {
-  init(count: Int, capacity: Int) {
+extension _SwiftUTF16StringHeader : _BoundedBufferHeader {
+  public init(count: Int, capacity: Int) {
     self.count = numericCast(count)
     self.capacity = numericCast(capacity)
     self.flags = 0
   }
 }
-extension _SwiftLatin1StringHeader : _BoundedStorageHeader {
-  init(count: Int, capacity: Int) {
+extension _SwiftLatin1StringHeader : _BoundedBufferHeader {
+  public init(count: Int, capacity: Int) {
     self.count = numericCast(count)
     self.capacity = numericCast(capacity)
     self.flags = 0
@@ -173,12 +174,13 @@ extension _SwiftLatin1StringHeader : _BoundedStorageHeader {
 
 /// A class that presents its contiguous array of Elements as a
 /// random-access, range-replaceable collection
-protocol _BoundedStorage
+public // @testable
+protocol _BoundedBufferReference
 : class, ContiguouslyStoredMutableCollection,
     FactoryInitializable,  // Allows us to code init in terms of Builtin.allocWithTailElems_1
     RangeReplaceableCollection {
 
-  associatedtype Header : _BoundedStorageHeader
+  associatedtype Header : _BoundedBufferHeader
   
   @nonobjc var _header: Header { get set }
   // WARNING: don't use this property without a fixLifetime call
@@ -195,14 +197,14 @@ protocol _BoundedStorage
   static func _emptyInstance() -> Self
 }
 
-extension _BoundedStorage {
-  typealias Element = Iterator.Element
+extension _BoundedBufferReference {
+  public typealias Element = Iterator.Element
   
-  init() {
+  public init() {
     self.init(Self._emptyInstance())
   }
   
-  init(
+  public init(
     minimumCapacity: Int = 0,
     makeInitialHeader: (_ allocatedCapacity: Int)->Header) {
     self.init(uninitializedWithMinimumCapacity: minimumCapacity)
@@ -211,7 +213,7 @@ extension _BoundedStorage {
     }
   }
 
-  init(_uninitializedCount: Int, minimumCapacity: Int = 0) {
+  public init(_uninitializedCount: Int, minimumCapacity: Int = 0) {
     self.init(minimumCapacity: Swift.max(_uninitializedCount, minimumCapacity)) {
       Header(count: _uninitializedCount, capacity: $0)
     }
@@ -231,7 +233,7 @@ extension _BoundedStorage {
 }
 
 /// Fulfills the RandomAccessCollection and MutableCollection requirements
-extension _BoundedStorage {
+extension _BoundedBufferReference {
   @nonobjc
   public var startIndex: Int { return 0 }
   @nonobjc
@@ -255,8 +257,8 @@ extension _BoundedStorage {
 }
 
 /// Fulfills the RangeReplaceableCollection requirements
-extension _BoundedStorage {
-  internal func replaceSubrange<C>(
+extension _BoundedBufferReference {
+  public func replaceSubrange<C>(
     _ target: Range<Int>,
     with newValues: C
   ) where C : Collection, 
@@ -267,7 +269,7 @@ extension _BoundedStorage {
       elementsOf: newValues)
   }
   
-  internal func replaceSubrange<C>(
+  public func replaceSubrange<C>(
     _ target: Range<Int>,
     with newCount: Int,
     elementsOf newValues: C
@@ -347,9 +349,9 @@ extension _BoundedStorage {
 }
 
 /// Fulfills the ContiguouslyStoredMutableCollection requirements
-extension _BoundedStorage {
+extension _BoundedBufferReference {
   @inline(__always)
-  func withUnsafeBufferPointer<R>(
+  public func withUnsafeBufferPointer<R>(
     _ body: (UnsafeBufferPointer<Iterator.Element>) throws -> R
   ) rethrows -> R {
     defer { _fixLifetime(self) }
@@ -357,7 +359,7 @@ extension _BoundedStorage {
   }
   
   @inline(__always)
-  func withUnsafeMutableBufferPointer<R>(
+  public func withUnsafeMutableBufferPointer<R>(
     _ body: (inout UnsafeMutableBufferPointer<Iterator.Element>) throws->R
   ) rethrows -> R {
     defer { _fixLifetime(self) }
@@ -373,7 +375,7 @@ extension _BoundedStorage {
 /// Common base class of our string storage classes
 @_versioned
 class _StringStorageBase<
-  Header: _BoundedStorageHeader,
+  Header: _BoundedBufferHeader,
   Element: UnsignedInteger
 > :
   // Dynamically provides inheritance from NSString
@@ -465,7 +467,7 @@ final class _UTF16StringStorage
   }
 }
 
-extension _UTF16StringStorage : _BoundedStorage {
+extension _UTF16StringStorage : _BoundedBufferReference {
   /// Returns empty singleton that is used for every single empty String.
   /// The contents of the storage should never be mutated.
   @nonobjc
@@ -696,7 +698,7 @@ final class _Latin1StringStorage
   }
 }
 
-extension _Latin1StringStorage : _BoundedStorage {
+extension _Latin1StringStorage : _BoundedBufferReference {
   @nonobjc
   internal static func _emptyInstance() -> _Latin1StringStorage {
     return _Latin1StringStorage(uninitializedWithMinimumCapacity: 0)
@@ -727,7 +729,7 @@ extension _Latin1StringStorage : _FixedFormatUnicode {
 }
 
 /// - Requires: Element is trivial (UInt8/UInt16)
-struct _StringBuffer<Storage: _BoundedStorage> {
+struct _StringBuffer<Storage: _BoundedBufferReference> {
   internal var _storage: Storage
 
   init(_ storage: Storage) { self._storage = storage }
