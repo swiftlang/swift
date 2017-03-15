@@ -35,10 +35,10 @@ class LLVM_LIBRARY_VISIBILITY Scope {
 public:
   explicit Scope(CleanupManager &cleanups, CleanupLocation loc)
       : cleanups(cleanups), depth(cleanups.getCleanupsDepth()),
-        savedInnermostScope(cleanups.InnermostScope), loc(loc) {
+        savedInnermostScope(cleanups.innermostScope), loc(loc) {
     assert(depth.isValid());
-    cleanups.Stack.checkIterator(cleanups.InnermostScope);
-    cleanups.InnermostScope = depth;
+    cleanups.stack.checkIterator(cleanups.innermostScope);
+    cleanups.innermostScope = depth;
   }
 
   void pop() {
@@ -56,14 +56,14 @@ public:
 
 private:
   void popImpl() {
-    cleanups.Stack.checkIterator(depth);
-    cleanups.Stack.checkIterator(cleanups.InnermostScope);
-    assert(cleanups.InnermostScope == depth && "popping scopes out of order");
+    cleanups.stack.checkIterator(depth);
+    cleanups.stack.checkIterator(cleanups.innermostScope);
+    assert(cleanups.innermostScope == depth && "popping scopes out of order");
 
-    cleanups.InnermostScope = savedInnermostScope;
+    cleanups.innermostScope = savedInnermostScope;
     cleanups.endScope(depth, loc);
-    cleanups.Stack.checkIterator(cleanups.InnermostScope);
-    cleanups.popTopDeadCleanups(cleanups.InnermostScope);
+    cleanups.stack.checkIterator(cleanups.innermostScope);
+    cleanups.popTopDeadCleanups(cleanups.innermostScope);
   }
 };
 
