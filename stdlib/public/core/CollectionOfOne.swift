@@ -122,7 +122,7 @@ public struct CollectionOfOne<Element>
 extension CollectionOfOne : CustomDebugStringConvertible {
   /// A textual representation of `self`, suitable for debugging.
   public var debugDescription: String {
-    return "CollectionOfOne(\(String(reflecting: _element)))"
+    return "CollectionOfOne(\(reflecting: _element))"
   }
 }
 
