@@ -50,10 +50,6 @@ class ReabstractionInfo {
   /// to direct.
   llvm::SmallBitVector Conversions;
 
-  /// If set, indirect to direct conversions should be performned by the generic
-  /// specializer.
-  bool ConvertIndirectToDirect;
-
   /// The first NumResults bits in Conversions refer to formal indirect
   /// out-parameters.
   unsigned NumFormalIndirectResults;
@@ -134,8 +130,7 @@ public:
   /// If specialization is not possible getSpecializedType() will return an
   /// invalid type.
   ReabstractionInfo(ApplySite Apply, SILFunction *Callee,
-                    SubstitutionList ParamSubs,
-                    bool ConvertIndirectToDirect = true);
+                    SubstitutionList ParamSubs);
 
   /// Constructs the ReabstractionInfo for generic function \p Orig with
   /// additional requirements. Requirements may contain new layout,
@@ -145,15 +140,14 @@ public:
   /// Returns true if the \p ParamIdx'th (non-result) formal parameter is
   /// converted from indirect to direct.
   bool isParamConverted(unsigned ParamIdx) const {
-    return ConvertIndirectToDirect &&
-           Conversions.test(ParamIdx + NumFormalIndirectResults);
+    return Conversions.test(ParamIdx + NumFormalIndirectResults);
   }
 
   /// Returns true if the \p ResultIdx'th formal result is converted from
   /// indirect to direct.
   bool isFormalResultConverted(unsigned ResultIdx) const {
     assert(ResultIdx < NumFormalIndirectResults);
-    return ConvertIndirectToDirect && Conversions.test(ResultIdx);
+    return Conversions.test(ResultIdx);
   }
 
   /// Gets the total number of original function arguments.
