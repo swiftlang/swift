@@ -205,9 +205,10 @@ public:
     maybePrintObjCGenericParameters(baseClass);
     os << " (SWIFT_EXTENSION(" << origDC->getParentModule()->getName()
        << "))\n";
-    insideCategory = true;
+
+    llvm::SaveAndRestore<bool> restore(insideCategory, true);
     printMembers</*allowDelayed*/true>(members);
-    insideCategory = false;
+
     os << "@end\n\n";
   }
   
@@ -365,9 +366,10 @@ private:
     os << " (SWIFT_EXTENSION(" << ED->getModuleContext()->getName() << "))";
     printProtocols(ED->getLocalProtocols(ConformanceLookupKind::OnlyExplicit));
     os << "\n";
-    insideCategory = true;
+
+    llvm::SaveAndRestore<bool> restore(insideCategory, true);
     printMembers(ED->getMembers());
-    insideCategory = false;
+
     os << "@end\n";
   }
 
