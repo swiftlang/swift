@@ -576,25 +576,7 @@ internal func _copyCollectionToContiguousArray<
   C : Collection
 >(_ source: C) -> ContiguousArray<C.Iterator.Element>
 {
-  let count: Int = numericCast(source.count)
-  if count == 0 {
-    return ContiguousArray()
-  }
-
-  let result = _ContiguousArrayBuffer<C.Iterator.Element>(
-    _uninitializedCount: count,
-    minimumCapacity: 0)
-
-  var p = result.firstElementAddress
-  var i = source.startIndex
-  for _ in 0..<count {
-    // FIXME(performance): use _copyContents(initializing:).
-    p.initialize(to: source[i])
-    source.formIndex(after: &i)
-    p += 1
-  }
-  _expectEnd(of: source, is: i)
-  return ContiguousArray(_buffer: result)
+  return _copySequenceToContiguousArray(source)
 }
 
 /// A "builder" interface for initializing array buffers.
