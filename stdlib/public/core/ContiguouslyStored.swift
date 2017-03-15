@@ -9,7 +9,7 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
-protocol ContiguouslyStoredCollection : RandomAccessCollection {
+public protocol ContiguouslyStoredCollection : RandomAccessCollection {
   func withUnsafeBufferPointer<R>(
     _: (UnsafeBufferPointer<Iterator.Element>) throws -> R
   ) rethrows -> R
@@ -17,24 +17,24 @@ protocol ContiguouslyStoredCollection : RandomAccessCollection {
 
 extension ContiguouslyStoredCollection {
   @inline(__always)
-  func withExistingUnsafeBuffer<R>(
+  public func withExistingUnsafeBuffer<R>(
     _ body: (UnsafeBufferPointer<Iterator.Element>) throws -> R
   ) rethrows -> R? {
     return try withUnsafeBufferPointer(body)
   }
 }
 
-protocol ContiguouslyStoredMutableCollection
+public protocol ContiguouslyStoredMutableCollection
   : ContiguouslyStoredCollection, MutableCollection {
   mutating func withUnsafeMutableBufferPointer<R>(
-    _: (UnsafeMutableBufferPointer<Iterator.Element>) throws -> R
+    _: (inout UnsafeMutableBufferPointer<Iterator.Element>) throws -> R
   ) rethrows -> R
 }
 
 extension ContiguouslyStoredMutableCollection {
   @inline(__always)
-  mutating func withExistingUnsafeMutableBuffer<R>(
-    _ body: (UnsafeMutableBufferPointer<Iterator.Element>) throws -> R
+  public mutating func withExistingUnsafeMutableBuffer<R>(
+    _ body: (inout UnsafeMutableBufferPointer<Iterator.Element>) throws -> R
   ) rethrows -> R? {
     return try withUnsafeMutableBufferPointer(body)
   }

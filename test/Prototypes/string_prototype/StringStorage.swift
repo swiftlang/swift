@@ -174,10 +174,9 @@ extension _SwiftLatin1StringHeader : _BoundedStorageHeader {
 /// A class that presents its contiguous array of Elements as a
 /// random-access, range-replaceable collection
 protocol _BoundedStorage
-: class, MutableCollection, 
-    RandomAccessCollection,   
-    FactoryInitializable  // Allows us to code init in terms of Builtin.allocWithTailElems_1
-  , RangeReplaceableCollection {
+: class, ContiguouslyStoredMutableCollection,
+    FactoryInitializable,  // Allows us to code init in terms of Builtin.allocWithTailElems_1
+    RangeReplaceableCollection {
 
   associatedtype Header : _BoundedStorageHeader
   
@@ -228,24 +227,7 @@ extension _BoundedStorage {
     let endAddr = startAddr + _swift_stdlib_malloc_size(selfAddr)
     return endAddr.assumingMemoryBound(to: Element.self)
          - startAddr.assumingMemoryBound(to: Element.self)
-  }
-  
-  func withUnsafeMutableBufferPointer<R>(
-    _ body: (inout UnsafeMutableBufferPointer<Element>) throws->R
-  ) rethrows -> R {
-    defer { _fixLifetime(self) }
-    var buffer = UnsafeMutableBufferPointer(
-      start: _baseAddress, count: count)
-    return try body(&buffer)
-  }
-
-  func withUnsafeBufferPointer<R>(
-    _ body: (UnsafeBufferPointer<Element>) throws->R
-  ) rethrows -> R {
-    return try withUnsafeMutableBufferPointer {
-      try body(UnsafeBufferPointer(start: $0.baseAddress, count: $0.count))
-    }
-  }
+  }  
 }
 
 /// Fulfills the RandomAccessCollection and MutableCollection requirements
@@ -361,6 +343,26 @@ extension _BoundedStorage {
           count: shrinkage - tailCount)
       }
     }
+  }
+}
+
+/// Fulfills the ContiguouslyStoredMutableCollection requirements
+extension _BoundedStorage {
+  @inline(__always)
+  func withUnsafeBufferPointer<R>(
+    _ body: (UnsafeBufferPointer<Iterator.Element>) throws -> R
+  ) rethrows -> R {
+    defer { _fixLifetime(self) }
+    return try body(UnsafeBufferPointer(start: _baseAddress, count: count))
+  }
+  
+  @inline(__always)
+  func withUnsafeMutableBufferPointer<R>(
+    _ body: (inout UnsafeMutableBufferPointer<Iterator.Element>) throws->R
+  ) rethrows -> R {
+    defer { _fixLifetime(self) }
+    var buffer = UnsafeMutableBufferPointer(start: _baseAddress, count: count)
+    return try body(&buffer)
   }
 }
 
