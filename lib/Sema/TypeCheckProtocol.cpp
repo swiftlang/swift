@@ -2708,7 +2708,7 @@ diagnoseMissingWitnesses(MissingWitnessDiagnosisKind Kind) {
     llvm::SetVector<ValueDecl*> NoStubRequirements;
 
     // Group missing witnesses by their context.
-    llvm::SmallDenseMap<DeclContext*, llvm::SmallVector<ValueDecl*, 4>>
+    llvm::MapVector<DeclContext*, llvm::SmallVector<ValueDecl*, 4>>
       GroupedWitness;
     for (auto W : MissingWitnesses) {
       GroupedWitness[W->getDeclContext()].push_back(W);
@@ -2718,8 +2718,8 @@ diagnoseMissingWitnesses(MissingWitnessDiagnosisKind Kind) {
     // adjacent to each other.
     llvm::SmallVector<ValueDecl*, 4> SortedWitnesses;
     for (auto KV : GroupedWitness) {
-      SortedWitnesses.insert(SortedWitnesses.begin(), KV.getSecond().begin(),
-                             KV.getSecond().end());
+      SortedWitnesses.insert(SortedWitnesses.begin(), KV.second.begin(),
+                             KV.second.end());
     }
 
     // Print stubs for all known missing witnesses.
