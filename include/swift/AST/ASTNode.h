@@ -29,7 +29,10 @@ namespace swift {
   class SourceLoc;
   class SourceRange;
   class ASTWalker;
-  
+  enum class ExprKind : uint8_t;
+  enum class DeclKind : uint8_t;
+  enum class StmtKind;
+
   struct ASTNode : public llvm::PointerUnion3<Expr*, Stmt*, Decl*> {
     // Inherit the constructors from PointerUnion.
     using PointerUnion3::PointerUnion3;
@@ -51,8 +54,14 @@ namespace swift {
     /// \brief get the underlying entity as a decl context if it is one,
     /// otherwise, return nullptr;
     DeclContext *getAsDeclContext() const;
+
+    /// Provides some utilities to decide detailed node kind.
+#define FUNC(T) bool is##T(T##Kind Kind) const;
+    FUNC(Stmt)
+    FUNC(Expr)
+    FUNC(Decl)
+#undef FUNC
   };
-  
 } // namespace swift
 
 namespace llvm {
