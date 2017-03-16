@@ -376,7 +376,7 @@ void SILGenFunction::emitEnumConstructor(EnumElementDecl *element) {
 
   // Emit the indirect return slot.
   std::unique_ptr<Initialization> dest;
-  if (enumTI.isAddressOnly()) {
+  if (enumTI.isAddressOnly() && silConv.useLoweredAddresses()) {
     auto &AC = getASTContext();
     auto VD = new (AC) ParamDecl(/*IsLet*/ false, SourceLoc(), SourceLoc(),
                                  AC.getIdentifier("$return_value"),
@@ -418,7 +418,7 @@ void SILGenFunction::emitEnumConstructor(EnumElementDecl *element) {
     scope.pop();
     B.createReturn(ReturnLoc, emitEmptyTuple(Loc));
   } else {
-    assert(enumTI.isLoadable());
+    assert(enumTI.isLoadable() || !silConv.useLoweredAddresses());
     SILValue result = mv.forward(*this);
     scope.pop();
     B.createReturn(ReturnLoc, result);
