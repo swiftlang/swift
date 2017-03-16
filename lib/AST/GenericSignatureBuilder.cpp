@@ -1909,10 +1909,6 @@ auto GenericSignatureBuilder::resolve(UnresolvedType paOrT,
                       }) &&
          "unexpected typealias representative with non-typealias equivalent");
 
-  // Recursively resolve the concrete type.
-  if (auto concrete = pa->getConcreteType())
-    return resolve(concrete);
-
   return ResolvedType::forPotentialArchetype(pa);
 }
 
