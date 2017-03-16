@@ -1681,7 +1681,11 @@ void IRGenSILFunction::visitAllocGlobalInst(AllocGlobalInst *i) {
   // buffer.
   Address addr = IGM.getAddrOfSILGlobalVariable(var, ti,
                                                 NotForDefinition);
-  (void) ti.allocateBuffer(*this, addr, loweredTy);
+  if (getSILModule().getOptions().UseCOWExistentials) {
+    emitAllocateValueInBuffer(*this, loweredTy, addr);
+  } else {
+    (void) ti.allocateBuffer(*this, addr, loweredTy);
+  }
 }
 
 void IRGenSILFunction::visitGlobalAddrInst(GlobalAddrInst *i) {
@@ -1711,7 +1715,11 @@ void IRGenSILFunction::visitGlobalAddrInst(GlobalAddrInst *i) {
 
   // Otherwise, the static storage for the global consists of a fixed-size
   // buffer; project it.
-  addr = ti.projectBuffer(*this, addr, loweredTy);
+  if (getSILModule().getOptions().UseCOWExistentials) {
+    addr = emitProjectValueInBuffer(*this, loweredTy, addr);
+  } else {
+    addr = ti.projectBuffer(*this, addr, loweredTy);
+  }
   
   setLoweredAddress(i, addr);
 }
@@ -4450,8 +4458,12 @@ void IRGenSILFunction::visitAllocValueBufferInst(
                                           swift::AllocValueBufferInst *i) {
   Address buffer = getLoweredAddress(i->getOperand());
   auto valueType = i->getValueType();
-  Address value =
-    getTypeInfo(valueType).allocateBuffer(*this, buffer, valueType);
+  Address value;
+  if (getSILModule().getOptions().UseCOWExistentials) {
+    value = emitAllocateValueInBuffer(*this, valueType, buffer);
+  } else {
+    value = getTypeInfo(valueType).allocateBuffer(*this, buffer, valueType);
+  }
   setLoweredAddress(i, value);
 }
 
@@ -4459,8 +4471,12 @@ void IRGenSILFunction::visitProjectValueBufferInst(
                                           swift::ProjectValueBufferInst *i) {
   Address buffer = getLoweredAddress(i->getOperand());
   auto valueType = i->getValueType();
-  Address value =
-    getTypeInfo(valueType).projectBuffer(*this, buffer, valueType);
+  Address value;
+  if (getSILModule().getOptions().UseCOWExistentials) {
+    value = emitProjectValueInBuffer(*this, valueType, buffer);
+  } else {
+    value = getTypeInfo(valueType).projectBuffer(*this, buffer, valueType);
+  }
   setLoweredAddress(i, value);
 }
 
@@ -4468,6 +4484,10 @@ void IRGenSILFunction::visitDeallocValueBufferInst(
                                           swift::DeallocValueBufferInst *i) {
   Address buffer = getLoweredAddress(i->getOperand());
   auto valueType = i->getValueType();
+  if (getSILModule().getOptions().UseCOWExistentials) {
+    emitDeallocateValueInBuffer(*this, valueType, buffer);
+    return;
+  }
   getTypeInfo(valueType).deallocateBuffer(*this, buffer, valueType);
 }
 

@@ -261,6 +261,18 @@ namespace irgen {
   llvm::Value *emitAlignMaskFromFlags(IRGenFunction &IGF, llvm::Value *flags);
 
   llvm::Value *emitLoadOfSize(IRGenFunction &IGF, llvm::Value *metadata);
+
+  /// Allocate/project/allocate memory for a value of the type in the fixed size
+  /// buffer.
+  Address emitAllocateValueInBuffer(IRGenFunction &IGF,
+                               SILType type,
+                               Address buffer);
+  Address emitProjectValueInBuffer(IRGenFunction &IGF,
+                              SILType type,
+                              Address buffer);
+  void emitDeallocateValueInBuffer(IRGenFunction &IGF,
+                                   SILType type,
+                                   Address buffer);
 } // end namespace irgen
 } // end namespace swift
 

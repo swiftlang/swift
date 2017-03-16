@@ -149,6 +149,11 @@ static llvm::Constant *getInitWithCopyBoxedOpaqueExistentialBufferFunction(
     IRGenModule &IGM, OpaqueExistentialLayout existLayout,
     llvm::Type *existContainerPointerTy);
 
+static llvm::Constant *
+getProjectBoxedOpaqueExistentialFunction(IRGenFunction &IGF,
+                                         OpenedExistentialAccess accessKind,
+                                         OpaqueExistentialLayout existLayout);
+
 namespace {
 
 /// A helper class for implementing existential type infos that
@@ -1945,8 +1950,19 @@ void irgen::emitMetatypeOfOpaqueExistential(IRGenFunction &IGF, Address addr,
 
   // Project the buffer and apply the 'typeof' value witness.
   Address buffer = existLayout.projectExistentialBuffer(IGF, addr);
-  llvm::Value *object =
-    emitProjectBufferCall(IGF, metadata, buffer);
+  llvm::Value *object;
+
+  if (IGF.getSILModule().getOptions().UseCOWExistentials) {
+    auto *projectFunc = getProjectBoxedOpaqueExistentialFunction(
+        IGF, OpenedExistentialAccess::Immutable, existLayout);
+    auto *addrOfValue =
+        IGF.Builder.CreateCall(projectFunc, {buffer.getAddress(), metadata});
+    addrOfValue->setCallingConv(IGF.IGM.DefaultCC);
+    addrOfValue->setDoesNotThrow();
+    object = addrOfValue;
+  } else
+    object = emitProjectBufferCall(IGF, metadata, buffer);
+
   llvm::Value *dynamicType =
     IGF.Builder.CreateCall(IGF.IGM.getGetDynamicTypeFn(),
                            {object, metadata,
