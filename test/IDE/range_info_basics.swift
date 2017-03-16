@@ -162,6 +162,7 @@ func testInout(_ a : inout Int) {
 // RUN: %target-swift-ide-test -range -pos=127:7 -end-pos=127:8 -source-filename %s | %FileCheck %s -check-prefix=CHECK-INT
 // RUN: %target-swift-ide-test -range -pos=127:3 -end-pos=127:4 -source-filename %s | %FileCheck %s -check-prefix=CHECK-INT-LVALUE
 // RUN: %target-swift-ide-test -range -pos=128:13 -end-pos=128:15 -source-filename %s | %FileCheck %s -check-prefix=CHECK-INT-INOUT
+// RUN: %target-swift-ide-test -range -pos=118:1 -end-pos=120:22 -source-filename %s | %FileCheck %s -check-prefix=CHECK-INT
 
 // CHECK-INVALID: <Kind>Invalid</Kind>
 
