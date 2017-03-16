@@ -36,7 +36,7 @@ protocol Q2 {
 // CHECK-NEXT: Requirements:
 // CHECK-NEXT:   τ_0_0 : Q2 [τ_0_0: Explicit @ 42:59]
 // CHECK-NEXT:   τ_0_0[.Q2].B : P2 [τ_0_0: Explicit @ 42:59 -> Protocol requirement (via Self.B in Q2)]
-// CHECK-NEXT:   τ_0_0[.Q2].C == S<T.B.A> [τ_0_0[.Q2].C: Explicit @ 42:69]
+// CHECK-NEXT:   τ_0_0[.Q2].C == S<T.B.A> [τ_0_0[.Q2].C: Explicit]
 // CHECK-NEXT:   τ_0_0[.Q2].B[.P2].X == S<T.B.A> [τ_0_0[.Q2].B[.P2].X: Nested type match]
 // CHECK: Canonical generic signature: <τ_0_0 where τ_0_0 : Q2, τ_0_0.C == S<τ_0_0.B.A>>
 func requirementOnConcreteNestedTypeAlias<T>(_: T) where T: Q2, T.C == T.B.X {}
@@ -53,14 +53,14 @@ func concreteRequirementOnConcreteNestedTypeAlias<T>(_: T) where T: Q2, S<T.C> =
 
 // Incompatible concrete typealias types are flagged as such
 protocol P3 {
-    typealias T = Int // expected-error{{typealias 'T' requires types 'Int' and 'Float' to be the same}}
+    typealias T = Int // expected-error{{typealias 'T' requires types 'Q3.T' (aka 'Float') and 'Int' to be the same}}
 }
 protocol Q3: P3 {
     typealias T = Float
 }
 
 protocol P3_1 {
-    typealias T = Float // expected-error{{typealias 'T' requires types 'Float' and 'Int' to be the same}}
+    typealias T = Float // expected-error{{typealias 'T' requires types 'P3.T' (aka 'Int') and 'Float' to be the same}}
 }
 protocol Q3_1: P3, P3_1 {}
 
