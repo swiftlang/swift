@@ -320,11 +320,6 @@ static bool hasUnhandledError(ArrayRef<ASTNode> Nodes) {
   });
 }
 
-static bool
-hasNodeThat(ArrayRef<ASTNode> Nodes, llvm::function_ref<bool(ASTNode)> Pred) {
-  return std::any_of(Nodes.begin(), Nodes.end(), Pred);
-}
-
 struct RangeResolver::Implementation {
   SourceFile &File;
   ASTContext &Ctx;
@@ -359,7 +354,7 @@ private:
 
       // Explicitly allow the selection of multiple case statments.
       auto IsCase = [](ASTNode N) { return N.isStmt(StmtKind::Case); };
-      if (hasNodeThat(StartMatches, IsCase) && hasNodeThat(EndMatches, IsCase))
+      if (llvm::any_of(StartMatches, IsCase) && llvm::any_of(EndMatches, IsCase))
         return true;
       return false;
     }
