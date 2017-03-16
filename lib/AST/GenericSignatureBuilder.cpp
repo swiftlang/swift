@@ -1156,6 +1156,35 @@ PotentialArchetype *PotentialArchetype::getArchetypeAnchor(
   return anchor;
 }
 
+namespace {
+  /// Function object to diagnose a conflict in same-type constraints for a
+  /// given potential archetype.
+  struct DiagnoseSameTypeConflict {
+    DiagnosticEngine &diags;
+    const RequirementSource *source;
+    PotentialArchetype *pa;
+
+    void operator()(Type type1, Type type2) const {
+      if (pa->getParent() && pa->getTypeAliasDecl() &&
+          source->getLoc().isInvalid()) {
+        diags.diagnose(pa->getTypeAliasDecl()->getLoc(),
+                       diag::protocol_typealias_conflict,
+                       pa->getTypeAliasDecl()->getName(),
+                       type1, type2);
+        return;
+      }
+
+      if (source->getLoc().isValid()) {
+        diags.diagnose(source->getLoc(),
+                       diag::requires_same_type_conflict,
+                       pa->isGenericParam(),
+                       pa->getDependentType(/*FIXME: */{ }, true),
+                       type1, type2);
+      }
+    }
+  };
+}
+
 // Give a nested type the appropriately resolved concrete type, based off a
 // parent PA that has a concrete type.
 static void concretizeNestedTypeFromConcreteParent(
@@ -1190,14 +1219,10 @@ static void concretizeNestedTypeFromConcreteParent(
   }
 
   builder.addSameTypeRequirement(nestedPA, witnessType, source,
-     [&](Type type1, Type type2) {
-       builder.getASTContext().Diags.diagnose(
-                              source->getLoc(),
-                              diag::requires_same_type_conflict,
-                              nestedPA->isGenericParam(),
-                              nestedPA->getDependentType(/*FIXME: */{ }, true),
-                              type1, type2);
-     });
+                                 DiagnoseSameTypeConflict{
+                                   builder.getASTContext().Diags,
+                                   source, nestedPA
+                                 });
 }
 
 PotentialArchetype *PotentialArchetype::getNestedType(
@@ -1439,24 +1464,6 @@ PotentialArchetype *PotentialArchetype::updateNestedTypeForConformance(
   if (shouldUpdatePA) {
     // For typealiases, introduce a same-type requirement to the aliased type.
     if (typealias) {
-      auto diagnoseMismatch = [&](Type first, Type second) {
-        if (auto NAT = dyn_cast<NameAliasType>(first.getPointer())) {
-          if (NAT->getDecl() == typealias) {
-            // If we have typealias T = Foo and Foo is completely concrete
-            // (e.g. Array<Int?>), then the subst will leave the NameAliasType
-            // intact. However, this means, if there's a
-            // concrete-type-mismatch at the top level, the default error
-            // message will be "ProtocolName.T (aka Foo)", but the "T" bit is
-            // already in the error message so it's better to print only
-            // "Foo".
-            first = NAT->getSinglyDesugaredType();
-          }
-        }
-        builder.Diags.diagnose(typealias->getLoc(),
-                               diag::protocol_typealias_conflict,
-                               typealias->getName(), first, second);
-      };
-
       // FIXME (recursive decl validation): if the alias doesn't have an
       // interface type when getNestedType is called while building a
       // protocol's generic signature (i.e. during validation), then it'll
@@ -1481,8 +1488,7 @@ PotentialArchetype *PotentialArchetype::updateNestedTypeForConformance(
         builder.addSameTypeRequirement(
                            ResolvedType::forNewTypeAlias(resultPA),
                            builder.resolve(type),
-                           RequirementSource::forNestedTypeNameMatch(resultPA),
-                           diagnoseMismatch);
+                           RequirementSource::forNestedTypeNameMatch(resultPA));
       }
     }
 
@@ -2229,14 +2235,9 @@ bool GenericSignatureBuilder::addSameTypeRequirementBetweenArchetypes(
 
   // FIXME: This seems early.
   if (concrete1 && concrete2) {
-    bool mismatch = addSameTypeRequirement(
-        concrete1, concrete2, Source, [&](Type type1, Type type2) {
-          Diags.diagnose(Source->getLoc(),
-                         diag::requires_same_type_conflict,
-                         T1->isGenericParam(),
-                         T1->getDependentType(/*FIXME: */{ }, true), type1,
-                         type2);
-        });
+    bool mismatch = addSameTypeRequirement(concrete1, concrete2, Source,
+                                           DiagnoseSameTypeConflict{
+                                             Diags, Source, T1});
 
     if (mismatch) return true;
   }
@@ -2315,13 +2316,7 @@ bool GenericSignatureBuilder::addSameTypeRequirementBetweenArchetypes(
       if (addSameTypeRequirement(
                            T1Nested, T2Nested.second.front(),
                            RequirementSource::forNestedTypeNameMatch(T1Nested),
-                           [&](Type type1, Type type2) {
-            Diags.diagnose(Source->getLoc(),
-                           diag::requires_same_type_conflict,
-                           T1Nested->isGenericParam(),
-                           T1Nested->getDependentType(/*FIXME: */{ }, true),
-                           type1, type2);
-            }))
+                           DiagnoseSameTypeConflict{Diags, Source, T1Nested}))
         return true;
     }
   }
@@ -2342,16 +2337,10 @@ bool GenericSignatureBuilder::addSameTypeRequirementToConcrete(
 
   // If we've already been bound to a type, match that type.
   if (equivClass->concreteType) {
-    bool mismatch = addSameTypeRequirement(
-            equivClass->concreteType, Concrete, Source,
-            [&](Type type1, Type type2) {
-            Diags.diagnose(Source->getLoc(),
-                           diag::requires_same_type_conflict,
-                           T->isGenericParam(),
-                           T->getDependentType(/*FIXME: */{ }, true), type1,
-                           type2);
-
-          });
+    bool mismatch = addSameTypeRequirement(equivClass->concreteType, Concrete,
+                                           Source,
+                                           DiagnoseSameTypeConflict{
+                                             Diags, Source, T});
 
     if (mismatch) return true;
 
