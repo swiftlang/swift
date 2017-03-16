@@ -196,6 +196,9 @@ extension _UnicodeViews {
   public struct TranscodedView<ToEncoding : UnicodeEncoding> : BidirectionalCollection {
     public typealias FromEncoding = Encoding
     
+    public typealias Segments = Base.Segments
+    public var segments: Segments? { return base.segments }
+
     // We could just be a generic typealias as this type, but it turns
     // out to be impossible, or nearly so, to write the init() below.
     // Instead, we wrap an instance of Base.
@@ -553,13 +556,12 @@ extension _UnicodeViews {
   }
 
   public var fccNormalizedUTF16: FCCNormalizedUTF16View {
-    var error = __swift_stdlib_U_ZERO_ERROR
-    
     return _withContiguousUTF16 {
       // Start by assuming we need no more storage than we started with for the
       // result.
       var result  = FCCNormalizedUTF16View(repeating: 0, count: $0.count)
       while true {
+        var error = __swift_stdlib_U_ZERO_ERROR
         let usedCount = __swift_stdlib_unorm2_normalize(
           _fccNormalizer, $0.baseAddress, numericCast($0.count),
           &result, numericCast(result.count), &error)
@@ -570,7 +572,7 @@ extension _UnicodeViews {
         _sanityCheck(
           error == __swift_stdlib_U_BUFFER_OVERFLOW_ERROR,
           "Unknown normalization error")
-        
+
         // extend result storage by 25%
         result.append(
           contentsOf: repeatElement(0, count: (result.count + 3) >> 2))
