@@ -335,6 +335,66 @@ testSuite.test("substring") {
   expectEqualSequence("ello world", tail)
 }
 
+typealias _String = Swift.String
+
+testSuite.test("fcc-normalized-view") {
+  let a: UInt16 = 0x0061
+  let aTic: UInt16 = 0x00e0
+  let aBackTic: UInt16 = 0x00e1
+  typealias UTF16String = _UnicodeViews<[UInt16], UTF16>
+
+  // Test canonical equivalence for:
+  //   1) a + ̀ + ́ == à + ́
+  //   2) a + ́ + ̀ == á + ̀
+  // BUT, the two are distinct, #1 != #2
+  do {
+  let str1form1 = [a, 0x0300, 0x0301]
+  let str1form2 = [aTic, 0x0301]
+  let str2form1 = [a, 0x0301, 0x0300]
+  let str2form2 = [aBackTic, 0x0300]
+
+  let str1_1 = UTF16String(str1form1)
+  let str1_2 = UTF16String(str1form2)
+  let str2_1 = UTF16String(str2form1)
+  let str2_2 = UTF16String(str2form2)
+
+  for (cu1, cu2) in zip(str1_1.fccNormalizedUTF16, str1_2.fccNormalizedUTF16) {
+    expectEqual(cu1, cu2)
+  }
+  for (cu1, cu2) in zip(str2_1.fccNormalizedUTF16, str2_2.fccNormalizedUTF16) {
+    expectEqual(cu1, cu2)
+  }
+  for (cu1, cu2) in zip(str1_1.fccNormalizedUTF16, str2_1.fccNormalizedUTF16) {
+    expectNotEqual(cu1, cu2)
+  }
+  }
+
+  // Test canonical equivalence, and non-combining-ness of FCC for:
+  //   1) a + ̖ + ̀ == à + ̖ == a + ̀ + ̖
+  //   All will normalize under FCC as a + ̖ + ̀
+  do {
+  let form1 = [a, 0x0316, 0x0300]
+  let form2 = [a, 0x0300, 0x0316]
+  let form3 = [aTic, 0x0316]
+
+  let str1 = UTF16String(form1)
+  let str2 = UTF16String(form2)
+  let str3 = UTF16String(form3)
+
+  for (cu1, (cu2, cu3)) in zip(
+    str1.fccNormalizedUTF16,
+    zip(str2.fccNormalizedUTF16, str3.fccNormalizedUTF16)
+  ) {
+    expectEqual(cu1, cu2)
+    expectEqual(cu2, cu3)
+  }
+
+  expectEqual(str3.fccNormalizedUTF16.map { $0 }, form1)
+  }
+
+
+}
+
 import Foundation
 testSuite.test("bridging") {
   defer { _debugLogging = false }
