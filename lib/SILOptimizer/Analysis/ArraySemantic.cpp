@@ -162,7 +162,10 @@ ArrayCallKind swift::ArraySemanticsCall::getKind() const {
             .Case("array.get_element_address",
                   ArrayCallKind::kGetElementAddress)
             .Case("array.mutate_unknown", ArrayCallKind::kMutateUnknown)
-            .Case("array.withUnsafeMutableBufferPointer", ArrayCallKind::kWithUnsafeMutableBufferPointer)
+            .Case("array.withUnsafeMutableBufferPointer",
+                  ArrayCallKind::kWithUnsafeMutableBufferPointer)
+            .Case("array.append_contentsOf", ArrayCallKind::kAppendContentsOf)
+            .Case("array.append_element", ArrayCallKind::kAppendElement)
             .Default(ArrayCallKind::kNone);
     if (Tmp != ArrayCallKind::kNone) {
       assert(Kind == ArrayCallKind::kNone && "Multiple array semantic "
@@ -673,5 +676,44 @@ bool swift::ArraySemanticsCall::replaceByValue(SILValue V) {
                                 IsInitialization_t::IsInitialization);
   }
   removeCall();
+  return true;
+}
+
+bool swift::ArraySemanticsCall::replaceByAppendingValues(
+    SILModule &M, SILFunction *AppendFn, SmallVectorImpl<SILValue> &Vals,
+    ArrayRef<Substitution> Subs) {
+  assert(getKind() == ArrayCallKind::kAppendContentsOf &&
+         "Must be an append_contentsOf call");
+  assert(AppendFn && "Must provide an append SILFunction");
+
+  // We only handle loadable types.
+  if (any_of(Vals, [&M](SILValue V) -> bool {
+        return !V->getType().isLoadable(M);
+      }))
+    return false;
+
+  auto ArrRef = SemanticsCall->getArgument(1);
+  SILBuilderWithScope Builder(SemanticsCall);
+  auto Loc = SemanticsCall->getLoc();
+  auto *FnRef = Builder.createFunctionRef(Loc, AppendFn);
+  auto FnTy = FnRef->getType();
+
+  for (auto &V : Vals) {
+    auto SubTy = V->getType();
+    auto &ValLowering = Builder.getModule().getTypeLowering(SubTy);
+    auto CopiedVal = ValLowering.emitCopyValue(Builder, Loc, V);
+    auto *AllocStackInst = Builder.createAllocStack(Loc, SubTy);
+    ValLowering.emitStoreOfCopy(Builder, Loc, CopiedVal, AllocStackInst,
+                                IsInitialization_t::IsInitialization);
+    SILValue Args[] = {AllocStackInst, ArrRef};
+    Builder.createApply(Loc, FnRef, FnTy.substGenericArgs(M, Subs),
+                        FnTy.castTo<SILFunctionType>()->getAllResultsType(), Subs,
+                        Args, false);
+    Builder.createDeallocStack(Loc, AllocStackInst);
+    ValLowering.emitDestroyValue(Builder, Loc, CopiedVal);
+  }
+
+  removeCall();
+
   return true;
 }
