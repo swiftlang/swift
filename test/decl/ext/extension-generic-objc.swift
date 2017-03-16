@@ -13,7 +13,7 @@ class A<T> : NSObject {
 }
 extension A {
     // This should throw an error
-    @objc func a1() {} // expected-error{{@objc is not supported within extensions of generic classes, or classes that inherit from generic classes}}
+    @objc func a1() {} // expected-error{{@objc is not supported within extensions of generic classes or classes that inherit from generic classes}}
     // This should *not* throw an error
     func a2() {}
 }
@@ -26,7 +26,7 @@ class B : A<Int> {
 }
 extension B {
     // This should throw an error
-    @objc func b1() {} // expected-error{{@objc is not supported within extensions of generic classes, or classes that inherit from generic classes}}
+    @objc func b1() {} // expected-error{{@objc is not supported within extensions of generic classes or classes that inherit from generic classes}}
     // This should *not* throw an error
     func b2() {}
 }
@@ -40,7 +40,7 @@ class D : C {
 }
 extension D {
     // This should throw an error
-    @objc func d1() {} // expected-error{{@objc is not supported within extensions of generic classes, or classes that inherit from generic classes}}
+    @objc func d1() {} // expected-error{{@objc is not supported within extensions of generic classes or classes that inherit from generic classes}}
     // This should *not* throw an error
     func d2() {}
 }
