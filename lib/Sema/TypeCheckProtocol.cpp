@@ -38,6 +38,7 @@
 #include "llvm/ADT/ScopedHashTable.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/Support/Compiler.h"
+#include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/SaveAndRestore.h"
 
 #define DEBUG_TYPE "protocol-conformance-checking"
@@ -5482,6 +5483,8 @@ bool TypeChecker::useObjectiveCBridgeableConformancesOfArgs(
     return anyUnsatisfied;
   }
   }
+
+  llvm_unreachable("Unhandled RequirementCheckResult in switch.");
 }
 
 void TypeChecker::useBridgedNSErrorConformances(DeclContext *dc, Type type) {
