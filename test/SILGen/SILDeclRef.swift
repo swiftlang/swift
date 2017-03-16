@@ -38,7 +38,7 @@ public class Derived2: Base {
   override public func foo(f: Float) -> Int32 { return 7 }
 }
 
-// CHECK-LABEL: sil @_TF10SILDeclRef5testPFT1pPS_1P__Vs5Int32
+// CHECK-LABEL: sil @_T010SILDeclRef5testPs5Int32VAA1P_p1p_tF
 // Check that witness_method contains SILDeclRefs with a signature.
 // CHECK: witness_method $@opened({{.*}}) P, #P.foo!1 : <Self where Self : P> (Self) -> () -> Int32, %{{.*}} : $*@opened({{.*}}) P : $@convention(witness_method) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> Int32
 public func testP(p: P) -> Int32 {
@@ -46,7 +46,7 @@ public func testP(p: P) -> Int32 {
 }
 
 // Check that class_method contains SILDeclRefs with a signature.
-// CHECK-LABEL:sil @_TF10SILDeclRef8testBaseFT1bCS_4Base_Vs5Int32
+// CHECK-LABEL:sil @_T010SILDeclRef8testBases5Int32VAA0D0C1b_tF
 // CHECK: class_method %{{.*}} : $Base, #Base.foo!1 : (Base) -> (Float) -> Int32, $@convention(method) (Float, @guaranteed Base) -> Int32
 public func testBase(b: Base) -> Int32 {
   return b.foo(f: 10)
@@ -55,16 +55,16 @@ public func testBase(b: Base) -> Int32 {
 // Check that vtables and witness tables contain SILDeclRefs with signatures.
 
 // CHECK: sil_vtable Base {
-// CHECK:  #Base.foo!1: (Base) -> () -> Int32 : _TFC10SILDeclRef4Base3foofT_Vs5Int32	// Base.foo() -> Int32
-// CHECK:  #Base.foo!1: (Base) -> (Int32) -> () : _TFC10SILDeclRef4Base3foofT1nVs5Int32_T_	// Base.foo(n : Int32) -> ()
-// CHECK:  #Base.foo!1: (Base) -> (Float) -> Int32 : _TFC10SILDeclRef4Base3foofT1fSf_Vs5Int32	// Base.foo(f : Float) -> Int32
-// CHECK:  #Base.deinit!deallocator: _TFC10SILDeclRef4BaseD	// Base.__deallocating_deinit
-// CHECK:  #Base.init!initializer.1: (Base.Type) -> () -> Base : _TFC10SILDeclRef4BasecfT_S0_	// Base.init() -> Base
+// CHECK:  #Base.foo!1: (Base) -> () -> Int32 : _T010SILDeclRef4BaseC3foos5Int32VyF	// Base.foo() -> Int32
+// CHECK:  #Base.foo!1: (Base) -> (Int32) -> () : _T010SILDeclRef4BaseC3fooys5Int32V1n_tF	// Base.foo(n : Int32) -> ()
+// CHECK:  #Base.foo!1: (Base) -> (Float) -> Int32 : _T010SILDeclRef4BaseC3foos5Int32VSf1f_tF	// Base.foo(f : Float) -> Int32
+// CHECK:  #Base.deinit!deallocator: _T010SILDeclRef4BaseCfD	// Base.__deallocating_deinit
+// CHECK:  #Base.init!initializer.1: (Base.Type) -> () -> Base : _T010SILDeclRef4BaseCACycfc	// Base.init() -> Base
 // CHECK: }
 
 // CHECK:sil_witness_table [fragile] Base: P module SILDeclRef {
-// CHECK: method #P.foo!1: <Self where Self : P> (Self) -> () -> Int32 : @_TTWC10SILDeclRef4BaseS_1PS_FS1_3foofT_Vs5Int32	// protocol witness for P.foo() -> Int32 in conformance Base
-// CHECK: method #P.foo!1: <Self where Self : P> (Self) -> (Int32) -> () : @_TTWC10SILDeclRef4BaseS_1PS_FS1_3foofT1nVs5Int32_T_	// protocol witness for P.foo(n : Int32) -> () in conformance Base
+// CHECK: method #P.foo!1: <Self where Self : P> (Self) -> () -> Int32 : @_T010SILDeclRef4BaseCAA1PA2aDP3foos5Int32VyFTW	// protocol witness for P.foo() -> Int32 in conformance Base
+// CHECK: method #P.foo!1: <Self where Self : P> (Self) -> (Int32) -> () : @_T010SILDeclRef4BaseCAA1PA2aDP3fooys5Int32V1n_tFTW	// protocol witness for P.foo(n : Int32) -> () in conformance Base
 // CHECK: }
 
 

@@ -12,30 +12,31 @@ protocol EmptyP {}
 
 struct String { var ptr: Builtin.NativeObject }
 
-// Init of Empty protocol + Builtin.NativeObject enum (including opaque tuples as a return value)
-// ---
-// CHECK-LABEL: sil shared [transparent] [thunk] @_TFOs9PAndSEnum1AFMS_FTPs6EmptyP_SS_S_ : $@convention(thin) (@thin PAndSEnum.Type) -> @owned @callee_owned (@in EmptyP, @owned String) -> @out PAndSEnum {
-// CHECK: bb0([[ARG:%.*]] : $@thin PAndSEnum.Type):
-// CHECK:   [[RETVAL:%.*]] = partial_apply {{.*}}([[ARG]]) : $@convention(method) (@in EmptyP, @owned String, @thin PAndSEnum.Type) -> @out PAndSEnum
-// CHECK:   return [[RETVAL]] : $@callee_owned (@in EmptyP, @owned String) -> @out PAndSEnum
-// CHECK-LABEL: } // end sil function '_TFOs9PAndSEnum1AFMS_FTPs6EmptyP_SS_S_'
-// CHECK-LABEL: sil shared [transparent] @_TFOs9PAndSEnum1AfMS_FTPs6EmptyP_SS_S_ : $@convention(method) (@in EmptyP, @owned String, @thin PAndSEnum.Type) -> @out PAndSEnum {
-// CHECK: bb0([[ARG0:%.*]] : $EmptyP, [[ARG1:%.*]]  : $String, [[ARG2:%.*]] : $@thin PAndSEnum.Type):
-// CHECK:   [[RTUPLE:%.*]] = tuple ([[ARG0]] : $EmptyP, [[ARG1]] : $String)
-// CHECK:   [[RETVAL:%.*]] = enum $PAndSEnum, #PAndSEnum.A!enumelt.1, [[RTUPLE]] : $(EmptyP, String)
-// CHECK:   return [[RETVAL]] : $PAndSEnum
-// CHECK-LABEL: } // end sil function '_TFOs9PAndSEnum1AfMS_FTPs6EmptyP_SS_S_'
-enum PAndSEnum { case A(EmptyP, String) }
-
 // Tests Empty protocol + Builtin.NativeObject enum (including opaque tuples as a return value)
 // ---
-// CHECK-LABEL: sil hidden @_TFs21s010______PAndS_casesFT_T_ : $@convention(thin) () -> () {
+// CHECK-LABEL: sil hidden @_T0s21s010______PAndS_casesyyF : $@convention(thin) () -> () {
 // CHECK: bb0:
 // CHECK:   [[MTYPE:%.*]] = metatype $@thin PAndSEnum.Type
 // CHECK:   [[EAPPLY:%.*]] = apply {{.*}}([[MTYPE]]) : $@convention(thin) (@thin PAndSEnum.Type) -> @owned @callee_owned (@in EmptyP, @owned String) -> @out PAndSEnum
 // CHECK:   destroy_value [[EAPPLY]]
 // CHECK:   return %{{.*}} : $()
-// CHECK-LABEL: } // end sil function '_TFs21s010______PAndS_casesFT_T_'
+// CHECK-LABEL: } // end sil function '_T0s21s010______PAndS_casesyyF'
 func s010______PAndS_cases() {
   _ = PAndSEnum.A
 }
+
+// Init of Empty protocol + Builtin.NativeObject enum (including opaque tuples as a return value)
+// ---
+// CHECK-LABEL: sil shared [transparent] @_T0s9PAndSEnumO1AABs6EmptyP_p_SStcABmF : $@convention(method) (@in EmptyP, @owned String, @thin PAndSEnum.Type) -> @out PAndSEnum {
+// CHECK: bb0([[ARG0:%.*]] : $EmptyP, [[ARG1:%.*]]  : $String, [[ARG2:%.*]] : $@thin PAndSEnum.Type):
+// CHECK:   [[RTUPLE:%.*]] = tuple ([[ARG0]] : $EmptyP, [[ARG1]] : $String)
+// CHECK:   [[RETVAL:%.*]] = enum $PAndSEnum, #PAndSEnum.A!enumelt.1, [[RTUPLE]] : $(EmptyP, String)
+// CHECK:   return [[RETVAL]] : $PAndSEnum
+// CHECK-LABEL: } // end sil function '_T0s9PAndSEnumO1AABs6EmptyP_p_SStcABmF'
+// CHECK-LABEL: sil shared [transparent] [thunk] @_T0s9PAndSEnumO1AABs6EmptyP_p_SStcABmFTc : $@convention(thin) (@thin PAndSEnum.Type) -> @owned @callee_owned (@in EmptyP, @owned String) -> @out PAndSEnum {
+// CHECK: bb0([[ARG:%.*]] : $@thin PAndSEnum.Type):
+// CHECK:   [[RETVAL:%.*]] = partial_apply {{.*}}([[ARG]]) : $@convention(method) (@in EmptyP, @owned String, @thin PAndSEnum.Type) -> @out PAndSEnum
+// CHECK:   return [[RETVAL]] : $@callee_owned (@in EmptyP, @owned String) -> @out PAndSEnum
+// CHECK-LABEL: } // end sil function '_T0s9PAndSEnumO1AABs6EmptyP_p_SStcABmFTc'
+enum PAndSEnum { case A(EmptyP, String) }
+

@@ -52,7 +52,7 @@ func main() {
   print(arr as Any)
   print(constArr as Any)
 
-  // CHECK: [[PRINT_FUN:%.*]] = function_ref @_TFs5printFTGSaP{{.*}} : $@convention(thin) (@owned Array<Any>, @owned String, @owned String) -> ()
+  // CHECK: [[PRINT_FUN:%.*]] = function_ref @_T0s5printySayypG_SS9separatorSS10terminatortF : $@convention(thin) (@owned Array<Any>, @owned String, @owned String) -> ()
   // CHECK: apply [[PRINT_FUN]]({{.*}})
   // CHECK: destroy_value [[load_4]]
   // CHECK: destroy_value [[load_3]]
@@ -62,7 +62,7 @@ func main() {
 
   // Make sure there's no more destroys
   // CHECK-NOT: destroy_value
-  // CHECK: } // end sil function '_TF17retaining_globals4mainFT_T_'
+  // CHECK: } // end sil function '_T017retaining_globals4mainyyF'
 }
 
 

@@ -14,7 +14,7 @@ import Builtin
 class C {}
 sil_vtable C {}
 
-sil @_TFC11enum_32_bit1CD : $@convention(thin) (@owned C) -> ()
+sil @_T011enum_32_bit1CCfD : $@convention(thin) (@owned C) -> ()
 
 // CHECK-LABEL: %T11enum_32_bit3FooO = type <{ [4 x i8] }>
 enum Foo {

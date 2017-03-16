@@ -98,7 +98,7 @@ class F: D {
 // CHECK:   switch_enum [[Y]] : $Optional<B>, case #Optional.some!enumelt.1: [[SOME_BB:bb[0-9]+]], case #Optional.none!enumelt: [[NONE_BB:bb[0-9]+]]
 
 // CHECK: [[NONE_BB]]:
-// CHECK:   [[DIAGNOSE_UNREACHABLE_FUNC:%.*]] = function_ref @_TFs30_diagnoseUnexpectedNilOptional{{.*}}
+// CHECK:   [[DIAGNOSE_UNREACHABLE_FUNC:%.*]] = function_ref @_T0s30_diagnoseUnexpectedNilOptional{{.*}}
 // CHECK:   apply [[DIAGNOSE_UNREACHABLE_FUNC]]
 // CHECK:   unreachable
 

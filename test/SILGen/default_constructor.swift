@@ -14,12 +14,12 @@ struct D {
   var (i, j) : (Int, Double) = (2, 3.5)
 }
 
-// CHECK-LABEL: sil hidden [transparent] @_TIvV19default_constructor1D1iSii : $@convention(thin) () -> (Int, Double)
-// CHECK:      [[FN:%.*]] = function_ref @_TFSiCfT22_builtinIntegerLiteralBi2048__Si : $@convention(method) (Builtin.Int2048, @thin Int.Type) -> Int
+// CHECK-LABEL: sil hidden [transparent] @_T019default_constructor1DV1iSivfi : $@convention(thin) () -> (Int, Double)
+// CHECK:      [[FN:%.*]] = function_ref @_T0S2iBi2048_22_builtinIntegerLiteral_tcfC : $@convention(method) (Builtin.Int2048, @thin Int.Type) -> Int
 // CHECK-NEXT: [[METATYPE:%.*]] = metatype $@thin Int.Type
 // CHECK-NEXT: [[VALUE:%.*]] = integer_literal $Builtin.Int2048, 2
 // CHECK-NEXT: [[LEFT:%.*]] = apply [[FN]]([[VALUE]], [[METATYPE]]) : $@convention(method) (Builtin.Int2048, @thin Int.Type) -> Int
-// CHECK:      [[FN:%.*]] = function_ref @_TFSdCfT20_builtinFloatLiteralBf{{64|80}}__Sd : $@convention(method) (Builtin.FPIEEE{{64|80}}, @thin Double.Type) -> Double
+// CHECK:      [[FN:%.*]] = function_ref @_T0S2dBf{{64|80}}_20_builtinFloatLiteral_tcfC : $@convention(method) (Builtin.FPIEEE{{64|80}}, @thin Double.Type) -> Double
 // CHECK-NEXT: [[METATYPE:%.*]] = metatype $@thin Double.Type
 // CHECK-NEXT: [[VALUE:%.*]] = float_literal $Builtin.FPIEEE{{64|80}}, {{0x400C000000000000|0x4000E000000000000000}}
 // CHECK-NEXT: [[RIGHT:%.*]] = apply [[FN]]([[VALUE]], [[METATYPE]]) : $@convention(method) (Builtin.FPIEEE{{64|80}}, @thin Double.Type) -> Double
@@ -27,10 +27,10 @@ struct D {
 // CHECK-NEXT: return [[RESULT]] : $(Int, Double)
 
 
-// CHECK-LABEL: sil hidden @_TFV19default_constructor1DC{{.*}} : $@convention(method) (@thin D.Type) -> D
+// CHECK-LABEL: sil hidden @_T019default_constructor1DV{{[_0-9a-zA-Z]*}}fC : $@convention(method) (@thin D.Type) -> D
 // CHECK: [[THISBOX:%[0-9]+]] = alloc_box ${ var D }
 // CHECK: [[THIS:%[0-9]+]] = mark_uninit
-// CHECK: [[INIT:%[0-9]+]] = function_ref @_TIvV19default_constructor1D1iSii
+// CHECK: [[INIT:%[0-9]+]] = function_ref @_T019default_constructor1DV1iSivfi
 // CHECK: [[RESULT:%[0-9]+]] = apply [[INIT]]()
 // CHECK: [[INTVAL:%[0-9]+]] = tuple_extract [[RESULT]] : $(Int, Double), 0
 // CHECK: [[FLOATVAL:%[0-9]+]] = tuple_extract [[RESULT]] : $(Int, Double), 1
@@ -43,16 +43,16 @@ class E {
   var i = Int64()
 }
 
-// CHECK-LABEL: sil hidden [transparent] @_TIvC19default_constructor1E1iVs5Int64i : $@convention(thin) () -> Int64
-// CHECK:      [[FN:%.*]] = function_ref @_TFVs5Int64CfT_S_ : $@convention(method) (@thin Int64.Type) -> Int64
+// CHECK-LABEL: sil hidden [transparent] @_T019default_constructor1EC1is5Int64Vvfi : $@convention(thin) () -> Int64
+// CHECK:      [[FN:%.*]] = function_ref @_T0s5Int64VABycfC : $@convention(method) (@thin Int64.Type) -> Int64
 // CHECK-NEXT: [[METATYPE:%.*]] = metatype $@thin Int64.Type
 // CHECK-NEXT: [[VALUE:%.*]] = apply [[FN]]([[METATYPE]]) : $@convention(method) (@thin Int64.Type) -> Int64
 // CHECK-NEXT: return [[VALUE]] : $Int64
 
-// CHECK-LABEL: sil hidden @_TFC19default_constructor1Ec{{.*}} : $@convention(method) (@owned E) -> @owned E
+// CHECK-LABEL: sil hidden @_T019default_constructor1EC{{[_0-9a-zA-Z]*}}fc : $@convention(method) (@owned E) -> @owned E
 // CHECK: bb0([[SELFIN:%[0-9]+]] : $E)
 // CHECK: [[SELF:%[0-9]+]] = mark_uninitialized
-// CHECK: [[INIT:%[0-9]+]] = function_ref @_TIvC19default_constructor1E1iVs5Int64i : $@convention(thin) () -> Int64
+// CHECK: [[INIT:%[0-9]+]] = function_ref @_T019default_constructor1EC1is5Int64Vvfi : $@convention(thin) () -> Int64
 // CHECK-NEXT: [[VALUE:%[0-9]+]] = apply [[INIT]]() : $@convention(thin) () -> Int64
 // CHECK-NEXT: [[BORROWED_SELF:%.*]] = begin_borrow [[SELF]]
 // CHECK-NEXT: [[IREF:%[0-9]+]] = ref_element_addr [[BORROWED_SELF]] : $E, #E.i
@@ -64,7 +64,7 @@ class E {
 
 class F : E { }
 
-// CHECK-LABEL: sil hidden @_TFC19default_constructor1Fc{{.*}} : $@convention(method) (@owned F) -> @owned F
+// CHECK-LABEL: sil hidden @_T019default_constructor1FCACycfc : $@convention(method) (@owned F) -> @owned F
 // CHECK: bb0([[ORIGSELF:%[0-9]+]] : $F)
 // CHECK-NEXT: [[SELF_BOX:%[0-9]+]] = alloc_box ${ var F }
 // CHECK-NEXT: project_box [[SELF_BOX]]
@@ -72,7 +72,7 @@ class F : E { }
 // CHECK-NEXT: store [[ORIGSELF]] to [init] [[SELF]] : $*F
 // CHECK-NEXT: [[SELFP:%[0-9]+]] = load [take] [[SELF]] : $*F
 // CHECK-NEXT: [[E:%[0-9]]] = upcast [[SELFP]] : $F to $E
-// CHECK: [[E_CTOR:%[0-9]+]] = function_ref @_TFC19default_constructor1EcfT_S0_ : $@convention(method) (@owned E) -> @owned E
+// CHECK: [[E_CTOR:%[0-9]+]] = function_ref @_T019default_constructor1ECACycfc : $@convention(method) (@owned E) -> @owned E
 // CHECK-NEXT: [[ESELF:%[0-9]]] = apply [[E_CTOR]]([[E]]) : $@convention(method) (@owned E) -> @owned E
 
 // CHECK-NEXT: [[ESELFW:%[0-9]+]] = unchecked_ref_cast [[ESELF]] : $E to $F
@@ -92,14 +92,14 @@ struct G {
 
 // CHECK-NOT: default_constructor.G.init ()
 // CHECK-LABEL: default_constructor.G.init (bar : Swift.Optional<Swift.Int32>)
-// CHECK-NEXT: sil hidden @_TFV19default_constructor1GC
+// CHECK-NEXT: sil hidden @_T019default_constructor1GV{{[_0-9a-zA-Z]*}}fC
 // CHECK-NOT: default_constructor.G.init ()
 
 struct H<T> {
   var opt: T?
 
-  // CHECK-LABEL: sil hidden @_TFV19default_constructor1HCurfqd__GS0_x_ : $@convention(method) <T><U> (@in U, @thin H<T>.Type) -> @out H<T> {
-  // CHECK: [[INIT_FN:%[0-9]+]] = function_ref @_TIvV19default_constructor1H3optGSqx_i : $@convention(thin) <τ_0_0> () -> @out Optional<τ_0_0>
+  // CHECK-LABEL: sil hidden @_T019default_constructor1HVACyxGqd__clufC : $@convention(method) <T><U> (@in U, @thin H<T>.Type) -> @out H<T> {
+  // CHECK: [[INIT_FN:%[0-9]+]] = function_ref @_T019default_constructor1HV3optxSgvfi : $@convention(thin) <τ_0_0> () -> @out Optional<τ_0_0>
   // CHECK-NEXT: [[OPT_T:%[0-9]+]] = alloc_stack $Optional<T>
   // CHECK-NEXT: apply [[INIT_FN]]<T>([[OPT_T]]) : $@convention(thin) <τ_0_0> () -> @out Optional<τ_0_0>
   init<U>(_: U) { }
@@ -110,8 +110,8 @@ struct H<T> {
 struct I {
   var x: Int = 0
 
-  // CHECK-LABEL: sil hidden @_TFV19default_constructor1ICurfxS0_ : $@convention(method) <T> (@in T, @thin I.Type) -> I {
-  // CHECK: [[INIT_FN:%[0-9]+]] = function_ref @_TIvV19default_constructor1I1xSii : $@convention(thin) () -> Int
+  // CHECK-LABEL: sil hidden @_T019default_constructor1IVACxclufC : $@convention(method) <T> (@in T, @thin I.Type) -> I {
+  // CHECK: [[INIT_FN:%[0-9]+]] = function_ref @_T019default_constructor1IV1xSivfi : $@convention(thin) () -> Int
   // CHECK: [[RESULT:%[0-9]+]] = apply [[INIT_FN]]() : $@convention(thin) () -> Int
   // CHECK: [[X_ADDR:%[0-9]+]] = struct_element_addr {{.*}} : $*I, #I.x
   // CHECK: assign [[RESULT]] to [[X_ADDR]] : $*Int
