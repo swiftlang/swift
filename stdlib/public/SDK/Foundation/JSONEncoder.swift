@@ -30,7 +30,7 @@ open class JSONEncoder {
     /// The strategy to use for encoding `Date` values.
     public enum DateEncodingStrategy {
         /// Defer to `Date` for choosing an encoding. This is the default strategy.
-        case deferToDate
+        case deferredToDate
 
         /// Encode the `Date` as a UNIX timestamp (as a JSON number).
         case secondsSince1970
@@ -74,8 +74,8 @@ open class JSONEncoder {
     /// The output format to produce. Defaults to `.compact`.
     open var outputFormatting: OutputFormatting = .compact
 
-    /// The strategy to use in encoding dates. Defaults to `.deferToDate`.
-    open var dateEncodingStrategy: DateEncodingStrategy = .deferToDate
+    /// The strategy to use in encoding dates. Defaults to `.deferredToDate`.
+    open var dateEncodingStrategy: DateEncodingStrategy = .deferredToDate
 
     /// The strategy to use in encoding binary data. Defaults to `.base64Encode`.
     open var dataEncodingStrategy: DataEncodingStrategy = .base64Encode
@@ -545,7 +545,7 @@ fileprivate class _JSONKeyedEncodingContainer<Key : CodingKey> : KeyedEncodingCo
                 return innerEncoder.storage.value
 
             // This case falls through to the default logic below.
-            case .deferToDate: break
+            case .deferredToDate: break
             }
         }
 
@@ -701,7 +701,7 @@ open class JSONDecoder {
     /// The strategy to use for decoding `Date` values.
     public enum DateDecodingStrategy {
         /// Defer to `Date` for decoding. This is the default strategy.
-        case deferToDate
+        case deferredToDate
 
         /// Decode the `Date` as a UNIX timestamp from a JSON number.
         case secondsSince1970
@@ -738,8 +738,8 @@ open class JSONDecoder {
         case convertFromString(positiveInfinity: String, negativeInfinity: String, nan: String)
     }
 
-    /// The strategy to use in decoding dates. Defaults to `.deferToDate`.
-    open var dateDecodingStrategy: DateDecodingStrategy = .deferToDate
+    /// The strategy to use in decoding dates. Defaults to `.deferredToDate`.
+    open var dateDecodingStrategy: DateDecodingStrategy = .deferredToDate
 
     /// The strategy to use in decoding binary data. Defaults to `.base64Decode`.
     open var dataDecodingStrategy: DataDecodingStrategy = .base64Decode
@@ -1202,7 +1202,7 @@ fileprivate class _JSONKeyedDecodingContainer<Key : CodingKey> : KeyedDecodingCo
                 return (try closure(nestedDecoder) as! Value)
 
             // This case falls through to the default logic below.
-            case .deferToDate:
+            case .deferredToDate:
                 break
             }
         }
