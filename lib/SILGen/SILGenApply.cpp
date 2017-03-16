@@ -3307,7 +3307,7 @@ ManagedValue SILGenFunction::emitInjectEnum(SILLocation loc,
 
   // Easy case -- no payload
   if (!payload) {
-    if (enumTy.isLoadable(SGM.M)) {
+    if (enumTy.isLoadable(SGM.M) || !silConv.useLoweredAddresses()) {
       return emitManagedRValueWithCleanup(
         B.createEnum(loc, SILValue(), element,
                      enumTy.getObjectType()));

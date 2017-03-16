@@ -257,7 +257,8 @@ static SILValue implodeTupleValues(ArrayRef<ManagedValue> values,
 
   // To implode an address-only tuple, we need to create a buffer to hold the
   // result tuple.
-  if (loweredType.isAddressOnly(SGF.F.getModule())) {
+  if (loweredType.isAddressOnly(SGF.F.getModule()) &&
+      SGF.silConv.useLoweredAddresses()) {
     assert(KIND != ImplodeKind::Unmanaged &&
            "address-only values are always managed!");
     SILValue buffer = SGF.emitTemporaryAllocation(l, loweredType);
