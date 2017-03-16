@@ -13,6 +13,7 @@
 #ifndef SWIFT_SILGEN_RESULTPLAN_H
 #define SWIFT_SILGEN_RESULTPLAN_H
 
+#include "Callee.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/SIL/SILLocation.h"
@@ -50,13 +51,13 @@ using ResultPlanPtr = std::unique_ptr<ResultPlan>;
 struct ResultPlanBuilder {
   SILGenFunction &SGF;
   SILLocation loc;
+  CalleeTypeInfo &calleeTypeInfo;
   ArrayRef<SILResultInfo> allResults;
-  SILFunctionTypeRepresentation rep;
 
   ResultPlanBuilder(SILGenFunction &SGF, SILLocation loc,
-                    ArrayRef<SILResultInfo> allResults,
-                    SILFunctionTypeRepresentation rep)
-      : SGF(SGF), loc(loc), allResults(allResults), rep(rep) {}
+                    CalleeTypeInfo &calleeTypeInfo)
+      : SGF(SGF), loc(loc), calleeTypeInfo(calleeTypeInfo),
+        allResults(calleeTypeInfo.substFnType->getResults()) {}
 
   ResultPlanPtr build(Initialization *emitInto, AbstractionPattern origType,
                       CanType substType);
@@ -72,6 +73,9 @@ struct ResultPlanBuilder {
   ~ResultPlanBuilder() {
     assert(allResults.empty() && "didn't consume all results!");
   }
+
+private:
+  ResultPlanPtr buildTopLevelResult(Initialization *init);
 };
 
 } // end namespace Lowering
