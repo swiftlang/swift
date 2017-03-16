@@ -13,8 +13,9 @@ using namespace DerivedConformance;
 
 // Returns whether the type represented by the given ClassDecl inherits from a
 // type which is Codable.
-static bool classInheritsCodable(TypeChecker &tc, ClassDecl *type) {
-  if (!type || !type->hasSuperclass())
+static bool superclassIsCodable(TypeChecker &tc, ClassDecl *type) {
+  assert(type && "Cannot get superclass of null type.");
+  if (!type->hasSuperclass())
     return false;
 
   ASTContext &C = tc.Context;
@@ -226,7 +227,7 @@ getOrSynthesizeCodingKeysDecl(TypeChecker &tc, Decl *parentDecl,
   // For classes which inherit from something Codable, we provide case `super`
   // as the first key (to be used in encoding super).
   auto classDecl = dyn_cast<ClassDecl>(type);
-  if (classInheritsCodable(tc, classDecl)) {
+  if (superclassIsCodable(tc, classDecl)) {
     // TODO: Ensure the class doesn't already have or inherit a variable named
     // "`super`"; otherwise we will generate an invalid enum. In that case,
     // diagnose and bail.
@@ -444,7 +445,7 @@ static void deriveBodyCodable_encode(AbstractFunctionDecl *encodeDecl) {
 
   // Classes which inherit from something Codable should encode super as well.
   auto classDecl = dyn_cast<ClassDecl>(typeDecl);
-  if (classInheritsCodable(tc, classDecl)) {
+  if (superclassIsCodable(tc, classDecl)) {
     // Need to generate `try super.encode(to: container.superEncoder())`
 
     // superEncoder()
@@ -540,7 +541,7 @@ static ValueDecl *deriveCodable_encode(TypeChecker &tc, Decl *parentDecl,
   // This method should be marked as 'override' for classes inheriting Codable
   // conformance from a parent class.
   if (auto classDecl = dyn_cast<ClassDecl>(type)) {
-    if (classInheritsCodable(tc, classDecl)) {
+    if (superclassIsCodable(tc, classDecl)) {
       auto attr = new (C) SimpleDeclAttr<DAK_Override>(/*IsImplicit=*/true);
       encodeDecl->getAttrs().add(attr);
     }
@@ -712,7 +713,7 @@ static void deriveBodyCodable_init(AbstractFunctionDecl *initDecl) {
 
   // Classes which inherit from something Codable should decode super as well.
   auto classDecl = dyn_cast<ClassDecl>(typeDecl);
-  if (classInheritsCodable(tc, classDecl)) {
+  if (superclassIsCodable(tc, classDecl)) {
     // Need to generate `try super.init(from: container.superDecoder())`
 
     // superDecoder()
