@@ -2718,7 +2718,7 @@ diagnoseMissingWitnesses(MissingWitnessDiagnosisKind Kind) {
     // adjacent to each other.
     llvm::SmallVector<ValueDecl*, 4> SortedWitnesses;
     for (auto KV : GroupedWitness) {
-      SortedWitnesses.insert(SortedWitnesses.begin(), KV.second.begin(),
+      SortedWitnesses.insert(SortedWitnesses.end(), KV.second.begin(),
                              KV.second.end());
     }
 
