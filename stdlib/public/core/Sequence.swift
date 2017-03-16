@@ -725,14 +725,6 @@ internal class _PrefixSequence<Base : IteratorProtocol>
         maxLength: Swift.min(maxLength, self._maxLength),
         taken: _taken))
   }
-  
-  internal func drop(
-    while predicate: (Base.Element) throws -> Bool
-  ) rethrows -> AnySequence<Base.Element> {
-    return try AnySequence(
-      _DropWhileSequence(
-        iterator: _iterator, nextElement: nil, predicate: predicate))
-  }
 }
 
 /// A sequence that lazily consumes and drops `n` elements from an underlying
