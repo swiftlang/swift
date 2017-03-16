@@ -2707,9 +2707,23 @@ diagnoseMissingWitnesses(MissingWitnessDiagnosisKind Kind) {
     std::string FixIt;
     llvm::SetVector<ValueDecl*> NoStubRequirements;
 
+    // Group missing witnesses by their context.
+    llvm::SmallDenseMap<DeclContext*, llvm::SmallVector<ValueDecl*, 4>>
+      GroupedWitness;
+    for (auto W : MissingWitnesses) {
+      GroupedWitness[W->getDeclContext()].push_back(W);
+    }
+
+    // Sort witnesses so that witnesses belong to the same protocol are
+    // adjacent to each other.
+    llvm::SmallVector<ValueDecl*, 4> SortedWitnesses;
+    for (auto KV : GroupedWitness) {
+      SortedWitnesses.insert(SortedWitnesses.begin(), KV.getSecond().begin(),
+                             KV.getSecond().end());
+    }
+
     // Print stubs for all known missing witnesses.
-    printProtocolStubFixitString(TypeLoc, Conf,
-                                 MissingWitnesses.getArrayRef(),
+    printProtocolStubFixitString(TypeLoc, Conf, SortedWitnesses,
                                  FixIt, NoStubRequirements);
     auto &Diags = DC->getASTContext().Diags;
 
@@ -2721,7 +2735,7 @@ diagnoseMissingWitnesses(MissingWitnessDiagnosisKind Kind) {
       }
       return;
     }
-    for (auto VD : MissingWitnesses) {
+    for (auto VD : SortedWitnesses) {
       // Whether this VD has a stub printed.
       bool AddFixit = !NoStubRequirements.count(VD);
 
