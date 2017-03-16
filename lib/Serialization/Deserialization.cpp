@@ -285,7 +285,24 @@ static bool skipRecord(llvm::BitstreamCursor &cursor, unsigned recordKind) {
 #endif
 }
 
+ModuleFile &ModuleFile::getModuleFileForDelayedActions() {
+  assert(FileContext && "cannot delay actions before associating with a file");
+  ModuleDecl *associatedModule = getAssociatedModule();
+
+  // Check for the common case.
+  if (associatedModule->getFiles().size() == 1)
+    return *this;
+
+  for (FileUnit *file : associatedModule->getFiles())
+    if (auto *serialized = dyn_cast<SerializedASTFile>(file))
+      return serialized->File;
+
+  llvm_unreachable("should always have FileContext in the list of files");
+}
+
 void ModuleFile::finishPendingActions() {
+  assert(&getModuleFileForDelayedActions() == this &&
+         "wrong module used for delayed actions");
   while (!DelayedGenericEnvironments.empty()) {
     // Force completion of the last generic environment.
     auto genericEnvDC = DelayedGenericEnvironments.back();
@@ -990,7 +1007,8 @@ void ModuleFile::configureGenericEnvironment(
   // creation.
   if (auto genericSig = sigOrEnv.dyn_cast<GenericSignature *>()) {
     genericDecl->setLazyGenericEnvironment(this, genericSig, envID);
-    DelayedGenericEnvironments.push_back(genericDecl);
+    ModuleFile &delayedActionFile = getModuleFileForDelayedActions();
+    delayedActionFile.DelayedGenericEnvironments.push_back(genericDecl);
     return;
   }
 
