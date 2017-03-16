@@ -1,5 +1,7 @@
 // RUN: %target-swift-frontend -typecheck -verify %s
 
+// REQUIRES: objc_interop
+
 import Foundation
 
 // Tests for correct detection of the "objc_in_generic_extension" error,
