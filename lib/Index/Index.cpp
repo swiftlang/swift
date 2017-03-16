@@ -24,6 +24,7 @@
 #include "swift/Basic/StringExtras.h"
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/SmallVector.h"
+#include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/FileSystem.h"
 
 using namespace swift;
@@ -570,6 +571,8 @@ bool IndexSwiftASTWalker::startEntity(Decl *D, IndexSymbol &Info) {
       EntitiesStack.push_back({D, Info.symInfo, Info.roles, {}});
       return true;
   }
+
+  llvm_unreachable("Unhandled IndexDataConsumer in switch.");
 }
 
 bool IndexSwiftASTWalker::startEntityDecl(ValueDecl *D) {
