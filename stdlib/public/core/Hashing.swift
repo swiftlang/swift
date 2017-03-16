@@ -63,10 +63,8 @@ struct _HashingDetail {
   @_versioned
   @_transparent
   static func getExecutionSeed() -> UInt64 {
-    // FIXME: This needs to be a per-execution seed. This is just a placeholder
-    // implementation.
-    let seed: UInt64 = 0xff51afd7ed558ccd
-    return _HashingDetail.fixedSeedOverride == 0 ? seed : fixedSeedOverride
+    return _HashingDetail.fixedSeedOverride == 0 ?
+              _swift_stdlib_HashingDetail_getRandomSeed() : fixedSeedOverride
   }
 
   @_versioned

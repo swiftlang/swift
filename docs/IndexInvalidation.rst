@@ -170,10 +170,6 @@ array or an array slice is guaranteed to perform a trap.
 Additional guarantees for ``Swift.Dictionary``
 ==============================================
 
-**Insertion into a Dictionary invalidates indexes only on a rehash.**  If a
-``Dictionary`` has enough free buckets (guaranteed by calling an initializer or
-reserving space), then inserting elements does not invalidate indexes.
-
-Note: unlike C++'s ``std::unordered_map``, removing elements from a
+Unlike C++'s ``std::unordered_map``, inserting or removing elements from a
 ``Dictionary`` invalidates indexes.
 

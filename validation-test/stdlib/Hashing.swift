@@ -9,6 +9,8 @@ import StdlibUnittest
 var HashingTestSuite = TestSuite("Hashing")
 
 HashingTestSuite.test("_mixUInt32/GoldenValues") {
+  _HashingDetail.fixedSeedOverride = 0xff51afd7ed558ccd
+  defer { _HashingDetail.fixedSeedOverride = 0 }
   expectEqual(0x11b882c9, _mixUInt32(0x0))
   expectEqual(0x60d0aafb, _mixUInt32(0x1))
   expectEqual(0x636847b5, _mixUInt32(0xffff))
@@ -25,10 +27,14 @@ HashingTestSuite.test("_mixUInt32/GoldenValues") {
 }
 
 HashingTestSuite.test("_mixInt32/GoldenValues") {
+  _HashingDetail.fixedSeedOverride = 0xff51afd7ed558ccd
+  defer { _HashingDetail.fixedSeedOverride = 0 }
   expectEqual(Int32(bitPattern: 0x11b882c9), _mixInt32(0x0))
 }
 
 HashingTestSuite.test("_mixUInt64/GoldenValues") {
+  _HashingDetail.fixedSeedOverride = 0xff51afd7ed558ccd
+  defer { _HashingDetail.fixedSeedOverride = 0 }
   expectEqual(0xb2b2_4f68_8dc4_164d, _mixUInt64(0x0))
   expectEqual(0x792e_33eb_0685_57de, _mixUInt64(0x1))
   expectEqual(0x9ec4_3423_1b42_3dab, _mixUInt64(0xffff))
@@ -47,10 +53,14 @@ HashingTestSuite.test("_mixUInt64/GoldenValues") {
 }
 
 HashingTestSuite.test("_mixUInt64/GoldenValues") {
+  _HashingDetail.fixedSeedOverride = 0xff51afd7ed558ccd
+  defer { _HashingDetail.fixedSeedOverride = 0 }
   expectEqual(Int64(bitPattern: 0xb2b2_4f68_8dc4_164d), _mixInt64(0x0))
 }
 
 HashingTestSuite.test("_mixUInt/GoldenValues") {
+  _HashingDetail.fixedSeedOverride = 0xff51afd7ed558ccd
+  defer { _HashingDetail.fixedSeedOverride = 0 }
 #if arch(i386) || arch(arm)
   expectEqual(0x11b8_82c9, _mixUInt(0x0))
 #elseif arch(x86_64) || arch(arm64) || arch(powerpc64) || arch(powerpc64le) || arch(s390x)
@@ -61,6 +71,8 @@ HashingTestSuite.test("_mixUInt/GoldenValues") {
 }
 
 HashingTestSuite.test("_mixInt/GoldenValues") {
+  _HashingDetail.fixedSeedOverride = 0xff51afd7ed558ccd
+  defer { _HashingDetail.fixedSeedOverride = 0 }
 #if arch(i386) || arch(arm)
   expectEqual(Int(bitPattern: 0x11b8_82c9), _mixInt(0x0))
 #elseif arch(x86_64) || arch(arm64) || arch(powerpc64) || arch(powerpc64le) || arch(s390x)

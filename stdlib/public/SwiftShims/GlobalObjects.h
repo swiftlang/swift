@@ -49,6 +49,7 @@ struct _SwiftDictionaryBodyStorage {
   __swift_intptr_t count;
   struct _SwiftUnsafeBitMap initializedEntries;
   void *keys;
+  __swift_intptr_t *hashes;
   void *values;
 };
 
@@ -57,6 +58,7 @@ struct _SwiftSetBodyStorage {
   __swift_intptr_t count;
   struct _SwiftUnsafeBitMap initializedEntries;
   void *keys;
+  __swift_intptr_t *hashes;
 };
 
 struct _SwiftEmptyDictionaryStorage {
@@ -84,6 +86,9 @@ struct _SwiftHashingSecretKey {
 
 SWIFT_RUNTIME_STDLIB_INTERFACE
 struct _SwiftHashingSecretKey _swift_stdlib_Hashing_secretKey;
+
+SWIFT_RUNTIME_STDLIB_INTERFACE
+__swift_uint64_t _swift_stdlib_HashingDetail_getRandomSeed();
 
 SWIFT_RUNTIME_STDLIB_INTERFACE
 __swift_uint64_t _swift_stdlib_HashingDetail_fixedSeedOverride;

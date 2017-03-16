@@ -13,6 +13,8 @@ func avalancheTest(
   _ hashUnderTest: @escaping (UInt64) -> UInt64,
   _ pValue: Double
 ) {
+  _HashingDetail.fixedSeedOverride = 0xff51afd7ed558ccd
+  defer { _HashingDetail.fixedSeedOverride = 0 }
   let testsInBatch = 100000
   let testData = randArray64(testsInBatch)
   let testDataHashed = Array(testData.lazy.map { hashUnderTest($0) })

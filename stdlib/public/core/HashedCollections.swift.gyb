@@ -20,9 +20,9 @@ import SwiftShims
 //
 // `Dictionary` uses two storage schemes: native storage and Cocoa storage.
 //
-// Native storage is a hash table with open addressing and linear probing. The
-// bucket array forms a logical ring (e.g., a chain can wrap around the end of
-// buckets array to the beginning of it).
+// Native storage is a hash table with open addressing and Robin Hood probing.
+// The bucket array forms a logical ring (e.g., a chain can wrap around the end
+// of buckets array to the beginning of it).
 //
 // The logical bucket array is implemented as three arrays: Key, Value, and a
 // bitmap that marks valid entries. An invalid entry marks the end of a chain.
@@ -135,28 +135,21 @@ import SwiftShims
 // Index Invalidation
 // ------------------
 //
-// FIXME: decide if this guarantee is worth making, as it restricts
-// collision resolution to first-come-first-serve. The most obvious alternative
-// would be robin hood hashing. The Rust code base is the best
-// resource on a *practical* implementation of robin hood hashing I know of: 
-// https://github.com/rust-lang/rust/blob/ac919fcd9d4a958baf99b2f2ed5c3d38a2ebf9d0/src/libstd/collections/hash/map.rs#L70-L178
-//
 // Indexing a container, `c[i]`, uses the integral offset stored in the index
 // to access the elements referenced by the container. Generally, an index into
-// one container has no meaning for another. However copy-on-write currently
-// preserves indices under insertion, as long as reallocation doesn't occur:
+// one container has no meaning for another. Indices are invalidated on
+// insertion and deletion. However, copy-on-write that only updates values for
+// existing keys preserves indices.
 //
 //   var (i, found) = d.find(k) // i is associated with d's storage
 //   if found {
-//      var e = d            // now d is sharing its data with e
-//      e[newKey] = newValue // e now has a unique copy of the data
-//      return e[i]          // use i to access e
+//      var e = d             // now d is sharing its data with e
+//      e[k] = newValue       // e now has a unique copy of the data
+//      return e[i]           // use i to access e
 //   }
 //
-// The result should be a set of iterator invalidation rules familiar to anyone
-// familiar with the C++ standard library.  Note that because all accesses to a
-// dictionary storage are bounds-checked, this scheme never compromises memory
-// safety.
+// Note that because all accesses to a dictionary storage are bounds-checked,
+// this scheme never compromises memory safety.
 //
 //
 // Bridging
@@ -255,7 +248,10 @@ internal protocol _HashBuffer {
 /// Should not be used outside `Dictionary` implementation.
 @_transparent
 internal var _hashContainerDefaultMaxLoadFactorInverse: Double {
-  return 1.0 / 0.75
+  // We can use a load factor as high as 90% because we use the Robin Hood
+  // algorithm for resolving duplicates, which allows us to have a worst
+  // case probe that approaches 6 for searches and grows very, very slowly.
+  return 1.0 / 0.9
 }
 
 #if _runtime(_ObjC)
@@ -1185,13 +1181,16 @@ extension Set {
       if lhsNative.count != rhsNative.count {
         return false
       }
-
-      for member in lhs {
-        let (_, found) =
-          rhsNative._find(member, startBucket: rhsNative._bucket(member))
-        if !found {
+      var index = lhsNative.startIndex
+      while index != lhsNative.endIndex {
+        let i = index.offset
+        let key = lhsNative.key(at: i)
+        let hash = lhsNative.hash(at: i)
+        let idealBucket = rhsNative._bucket(for: hash)
+        if !rhsNative._find(key, startBucket: idealBucket, hash: hash).found {
           return false
         }
+        index = lhsNative.index(after: index)
       }
       return true
 
@@ -2077,22 +2076,20 @@ extension Dictionary where Key : Equatable, Value : Equatable {
       if lhsNative.count != rhsNative.count {
         return false
       }
-
-      for (k, v) in lhs {
-        let (pos, found) = rhsNative._find(k, startBucket: rhsNative._bucket(k))
-        // FIXME: Can't write the simple code pending
-        // <rdar://problem/15484639> Refcounting bug
-        /*
-        if !found || rhs[pos].value != lhsElement.value {
-          return false
-        }
-        */
+      var index = lhsNative.startIndex
+      while index != lhsNative.endIndex {
+        let i = index.offset
+        let key = lhsNative.key(at: i)
+        let hash = lhsNative.hash(at: i)
+        let idealBucket = rhsNative._bucket(for: hash)
+        let (rhsIndex, found) = rhsNative._find(key, startBucket: idealBucket, hash: hash)
         if !found {
           return false
         }
-        if rhsNative.value(at: pos.offset) != v {
+        if lhsNative.value(at: i) != rhsNative.value(at: rhsIndex.offset) {
           return false
         }
+        index = lhsNative.index(after: index)
       }
       return true
 
@@ -2488,6 +2485,7 @@ internal class _RawNative${Self}Storage:
 
   internal final var initializedEntries: _UnsafeBitMap
   internal final var keys: UnsafeMutableRawPointer
+  internal final var hashes: UnsafeMutablePointer<Int>
 % if Self == 'Dictionary':
   internal final var values: UnsafeMutableRawPointer
 % end
@@ -2735,8 +2733,7 @@ final internal class _HashableTypedNative${Self}Storage<${TypeParametersDecl}> :
     guard let nativeKey = _conditionallyBridgeFromObjectiveC(aKey, Key.self)
     else { return nil }
 
-    let (i, found) = buffer._find(nativeKey, 
-        startBucket: buffer._bucket(nativeKey))
+    let (i, found) = buffer._find(nativeKey)
 
     if found {
       return buffer.bridgedValue(at: i)
@@ -2839,14 +2836,16 @@ internal struct _Native${Self}Buffer<${TypeParameters}> {
   internal init(capacity: Int, unhashable: ()) {
     let numWordsForBitmap = _UnsafeBitMap.sizeInWords(forSizeInBits: capacity)
 %if Self == 'Dictionary':
+    let storage = Builtin.allocWithTailElems_4(TypedStorage.self,
+        numWordsForBitmap._builtinWordValue, UInt.self,
+        capacity._builtinWordValue, Key.self,
+        capacity._builtinWordValue, Int.self,
+        capacity._builtinWordValue, Value.self)
+%else:
     let storage = Builtin.allocWithTailElems_3(TypedStorage.self,
         numWordsForBitmap._builtinWordValue, UInt.self,
         capacity._builtinWordValue, Key.self,
-        capacity._builtinWordValue, Value.self)
-%else:
-    let storage = Builtin.allocWithTailElems_2(TypedStorage.self,
-        numWordsForBitmap._builtinWordValue, UInt.self,
-        capacity._builtinWordValue, Key.self)
+        capacity._builtinWordValue, Int.self)
 %end
     self.init(capacity: capacity, storage: storage)
   }
@@ -2869,13 +2868,16 @@ internal struct _Native${Self}Buffer<${TypeParameters}> {
     let numWordsForBitmap = _UnsafeBitMap.sizeInWords(forSizeInBits: capacity)
     let keysAddr = Builtin.getTailAddr_Word(bitmapAddr,
            numWordsForBitmap._builtinWordValue, UInt.self, Key.self)
+    let hashesAddr = Builtin.getTailAddr_Word(keysAddr,
+           capacity._builtinWordValue, Key.self, Int.self)
 
     // Initialize header
     _storage.initializedEntries = initializedEntries
     _storage.keys = UnsafeMutableRawPointer(keysAddr)
+    _storage.hashes = UnsafeMutablePointer<Int>(hashesAddr)
 %if Self == 'Dictionary':
-    let valuesAddr = Builtin.getTailAddr_Word(keysAddr,
-        capacity._builtinWordValue, Key.self, Value.self)
+    let valuesAddr = Builtin.getTailAddr_Word(hashesAddr,
+        capacity._builtinWordValue, Int.self, Value.self)
     _storage.values = UnsafeMutableRawPointer(valuesAddr)
 %end
   }
@@ -2908,6 +2910,12 @@ internal struct _Native${Self}Buffer<${TypeParameters}> {
     return _storage.keys.assumingMemoryBound(to: Key.self)
   }
 
+  // This API is unsafe and needs a `_fixLifetime` in the caller.
+  @_versioned
+  internal var hashes: UnsafeMutablePointer<Int> {
+    return _storage.hashes
+  }
+
 %if Self == 'Dictionary':
   // This API is unsafe and needs a `_fixLifetime` in the caller.
   @_versioned
@@ -2938,8 +2946,16 @@ internal struct _Native${Self}Buffer<${TypeParameters}> {
     _sanityCheck(isInitializedEntry(at: i))
     defer { _fixLifetime(self) }
 
-    let res = (keys + i).pointee
-    return res
+    return (keys + i).pointee
+  }
+  
+  @_versioned
+  @inline(__always)
+  internal func hash(at i: Int) -> Int {
+    _sanityCheck(i >= 0 && i < capacity)
+    _sanityCheck(isInitializedEntry(at: i))
+    defer { _fixLifetime(self) }
+    return (hashes + i).pointee
   }
 
 #if _runtime(_ObjC)
@@ -2981,13 +2997,32 @@ internal struct _Native${Self}Buffer<${TypeParameters}> {
   }
 
 %if Self == 'Set':
-  @_transparent
-  internal func initializeKey(_ k: Key, at i: Int) {
-    _sanityCheck(!isInitializedEntry(at: i))
+  internal func initializeKey(_ k: Key, hash h: Int, at i: Int) {
     defer { _fixLifetime(self) }
-
+    initializeKeyHelper(k, hash: h, at: i)
+  }
+  
+  // Never call this function directly, it is called by initializeKey
+  // and performs recursion, we use indirection to guarantee tail call
+  // optimization
+  internal func initializeKeyHelper(_ k: Key, hash h: Int, at i: Int) {
+    guard isInitializedEntry(at: i)
+    else {
+      (keys + i).initialize(to: k)
+      (hashes + i).initialize(to: h)
+      _storage.initializedEntries[i] = true
+      return
+    }
+    let oldHash = (hashes + i).pointee
+    guard _displacement(for: h, at: i) > _displacement(for: oldHash, at: i)
+    else {
+      return initializeKeyHelper(k, hash: h, at: _index(after: i))
+    }
+    let oldKey = (keys + i).move()
+    
     (keys + i).initialize(to: k)
-    _storage.initializedEntries[i] = true
+    (hashes + i).initialize(to: h)
+    return initializeKeyHelper(oldKey, hash: oldHash, at: _index(after: i))
   }
 
   @_transparent
@@ -2997,6 +3032,7 @@ internal struct _Native${Self}Buffer<${TypeParameters}> {
     defer { _fixLifetime(self) }
 
     (keys + toEntryAt).initialize(to: (from.keys + at).move())
+    (hashes + toEntryAt).initialize(to: (from.hashes + at).move())
     from._storage.initializedEntries[at] = false
     _storage.initializedEntries[toEntryAt] = true
   }
@@ -3017,14 +3053,37 @@ internal struct _Native${Self}Buffer<${TypeParameters}> {
   }
 
 %elif Self == 'Dictionary':
-  @_transparent
-  internal func initializeKey(_ k: Key, value v: Value, at i: Int) {
-    _sanityCheck(!isInitializedEntry(at: i))
-    defer { _fixLifetime(self) }
 
+  internal func initializeKey(_ k: Key, value v: Value, hash h: Int, at i: Int) {
+    defer { _fixLifetime(self) }
+    initializeKeyHelper(k, value: v, hash: h, at: i)
+  }
+  
+  // Never call this function directly, it is called by initializeKey
+  // and performs recursion, we use indirection to guarantee tail call
+  // optimization
+  internal func initializeKeyHelper(_ k: Key, value v: Value, hash h: Int, at i: Int) {
+    guard isInitializedEntry(at: i)
+    else {
+      (keys + i).initialize(to: k)
+      (hashes + i).initialize(to: h)
+      (values + i).initialize(to: v)
+      _storage.initializedEntries[i] = true
+      return
+    }
+    let oldHash = (hashes + i).pointee
+    guard _displacement(for: h, at: i) > _displacement(for: oldHash, at: i)
+    else {
+      return initializeKeyHelper(k, value: v, hash: h, at: _index(after: i))
+    }
+    let oldKey = (keys + i).move()
+    let oldValue = (values + i).move()
+    
     (keys + i).initialize(to: k)
+    (hashes + i).initialize(to: h)
     (values + i).initialize(to: v)
-    _storage.initializedEntries[i] = true
+    
+    return initializeKeyHelper(oldKey, value: oldValue, hash: oldHash, at: _index(after: i))
   }
 
   @_transparent
@@ -3034,6 +3093,7 @@ internal struct _Native${Self}Buffer<${TypeParameters}> {
 
     (keys + toEntryAt).initialize(to: (from.keys + at).move())
     (values + toEntryAt).initialize(to: (from.values + at).move())
+    (hashes + toEntryAt).initialize(to: (from.hashes + at).move())
     from._storage.initializedEntries[at] = false
     _storage.initializedEntries[toEntryAt] = true
   }
@@ -3100,6 +3160,64 @@ internal struct _Native${Self}Buffer<${TypeParameters}> {
 %end
 
   }
+  
+  internal var _bucketMask: Int {
+    // The capacity is not negative, therefore subtracting 1 will not overflow.
+    return capacity &- 1
+  }
+  
+  @_versioned
+  @inline(__always) // For performance reasons.
+  internal func _bucket(for hashValue: Int) -> Int {
+    return _squeezeHashValue(hashValue, capacity)
+  }
+  
+  @_versioned
+  @inline(__always) // For performance reasons.
+  internal func _displacement(between idealBucket: Int, and bucket: Int) -> Int {
+    if idealBucket <= bucket {
+      return bucket - idealBucket
+    } else {
+      // displacement can wraparound the end, so if idealBucket > bucket
+      // our displacement is bucket + distance to the end.
+      return bucket + (capacity - idealBucket)
+    }
+  }
+  
+  @_versioned
+  @inline(__always) // For performance reasons.
+  internal func _displacement(for hash: Int, at bucket: Int) -> Int {
+    let idealBucket = _bucket(for: hash)
+    return _displacement(between: idealBucket, and: bucket)
+  }
+  
+  @_versioned
+  internal func _index(after bucket: Int) -> Int {
+    // Bucket is within 0 and capacity. Therefore adding 1 does not overflow.
+    return (bucket &+ 1) & _bucketMask
+  }
+  
+  internal func _prev(_ bucket: Int) -> Int {
+    // Bucket is not negative. Therefore subtracting 1 does not overflow.
+    return (bucket &- 1) & _bucketMask
+  }
+  
+  /// A textual representation of `self`.
+  var description: String {
+    var result = ""
+    #if INTERNAL_CHECKS_ENABLED
+    for i in 0..<capacity {
+      if isInitializedEntry(at: i) {
+        let key = self.key(at: i)
+        result += "bucket \(i), ideal bucket = \(_bucket(for: hash(at: i))), key = \(key)\n"
+      } else {
+        result += "bucket \(i), empty\n"
+      }
+    }
+    #endif
+    return result
+  }
+  
 }
 
 extension _Native${Self}Buffer 
@@ -3125,14 +3243,16 @@ extension _Native${Self}Buffer
   internal init(capacity: Int) {
     let numWordsForBitmap = _UnsafeBitMap.sizeInWords(forSizeInBits: capacity)
 %if Self == 'Dictionary':
+    let storage = Builtin.allocWithTailElems_4(HashTypedStorage.self,
+        numWordsForBitmap._builtinWordValue, UInt.self,
+        capacity._builtinWordValue, Key.self,
+        capacity._builtinWordValue, Int.self,
+        capacity._builtinWordValue, Value.self)
+%else:
     let storage = Builtin.allocWithTailElems_3(HashTypedStorage.self,
         numWordsForBitmap._builtinWordValue, UInt.self,
         capacity._builtinWordValue, Key.self,
-        capacity._builtinWordValue, Value.self)
-%else:
-    let storage = Builtin.allocWithTailElems_2(HashTypedStorage.self,
-        numWordsForBitmap._builtinWordValue, UInt.self,
-        capacity._builtinWordValue, Key.self)
+        capacity._builtinWordValue, Int.self)
 %end
     self.init(capacity: capacity, storage: storage)
   }
@@ -3160,51 +3280,32 @@ extension _Native${Self}Buffer
   }
 #endif
 
-  /// A textual representation of `self`.
-  var description: String {
-    var result = ""
-#if INTERNAL_CHECKS_ENABLED
-    for i in 0..<capacity {
-      if isInitializedEntry(at: i) {
-        let key = self.key(at: i)
-        result += "bucket \(i), ideal bucket = \(_bucket(key)), key = \(key)\n"
-      } else {
-        result += "bucket \(i), empty\n"
-      }
-    }
-#endif
-    return result
-  }
-
-  internal var _bucketMask: Int {
-    // The capacity is not negative, therefore subtracting 1 will not overflow.
-    return capacity &- 1
-  }
-
   @_versioned
   @inline(__always) // For performance reasons.
-  internal func _bucket(_ k: Key) -> Int {
-    return _squeezeHashValue(k.hashValue, capacity)
+  internal func _bucketAndHash(for k: Key) -> (bucket: Int, hash: Int) {
+    let hashValue = k.hashValue
+    return (bucket: _bucket(for: hashValue), hash: hashValue)
   }
 
-  @_versioned
-  internal func _index(after bucket: Int) -> Int {
-    // Bucket is within 0 and capacity. Therefore adding 1 does not overflow.
-    return (bucket &+ 1) & _bucketMask
-  }
 
-  internal func _prev(_ bucket: Int) -> Int {
-    // Bucket is not negative. Therefore subtracting 1 does not overflow.
-    return (bucket &- 1) & _bucketMask
-  }
-
-  /// Search for a given key starting from the specified bucket.
+  /// Search for a given key.
   ///
   /// If the key is not present, returns the position where it could be
   /// inserted.
   @_versioned
   @inline(__always)
-  internal func _find(_ key: Key, startBucket: Int)
+  internal func _find(_ key: Key)
+    -> (pos: Index, found: Bool) {
+    let (startBucket, hash) = _bucketAndHash(for: key)
+    return _find(key, startBucket: startBucket, hash: hash)
+  }
+  
+  /// Same as the other _find function except this takes the startingBucket
+  /// and hash of the key as parameters which can be used to speed up
+  /// the calculation.
+  @_versioned
+  @inline(__always)
+  internal func _find(_ key: Key, startBucket: Int, hash: Int)
     -> (pos: Index, found: Bool) {
 
     var bucket = startBucket
@@ -3216,9 +3317,22 @@ extension _Native${Self}Buffer
       if isHole {
         return (Index(offset: bucket), false)
       }
-      if self.key(at: bucket) == key {
+      let currentBucketHash = self.hash(at: bucket)
+      if currentBucketHash == hash && self.key(at: bucket) == key {
         return (Index(offset: bucket), true)
       }
+      
+      // We can end the search early if the key at the current bucket has a
+      // displacement smaller than the displacement of the key we are finding.
+      
+      // Based on research from http://citeseerx.ist.psu.edu/viewdoc/summary?doi=10.1.1.130.6339
+      // in the worst case we will have a displacement that approaches about 6
+      // and will grow very, very slowly.
+      if _displacement(for: currentBucketHash, at: bucket) <
+         _displacement(between: startBucket, and: bucket) {
+        return (Index(offset: bucket), false)
+      }
+      
       bucket = _index(after: bucket)
     }
   }
@@ -3239,20 +3353,40 @@ extension _Native${Self}Buffer
 
 %if Self == 'Set':
 
-  internal func unsafeAddNew(key newKey: Element) {
-    let (i, found) = _find(newKey, startBucket: _bucket(newKey))
+  internal func unsafeAddNew(key newKey: Element,
+                             hash precalculatedHash: Int? = nil) {
+    let startBucket: Int
+    let hash: Int
+    if let precalculatedHash = precalculatedHash {
+      hash = precalculatedHash
+      startBucket = _bucket(for: hash)
+    } else {
+      (startBucket, hash) = _bucketAndHash(for: newKey)
+    }
+    
+    let (i, found) = _find(newKey, startBucket: startBucket, hash: hash)
     _sanityCheck(
       !found, "unsafeAddNew was called, but the key is already present")
-    initializeKey(newKey, at: i.offset)
+    initializeKey(newKey, hash: hash, at: i.offset)
   }
 
 %elif Self == 'Dictionary':
 
-  internal func unsafeAddNew(key newKey: Key, value: Value) {
-    let (i, found) = _find(newKey, startBucket: _bucket(newKey))
+  internal func unsafeAddNew(key newKey: Key, value: Value,
+                             hash precalculatedHash: Int? = nil) {
+    let startBucket: Int
+    let hash: Int
+    if let precalculatedHash = precalculatedHash {
+      hash = precalculatedHash
+      startBucket = _bucket(for: hash)
+    } else {
+      (startBucket, hash) = _bucketAndHash(for: newKey)
+    }
+
+    let (i, found) = _find(newKey, startBucket: startBucket, hash: hash)
     _sanityCheck(
       !found, "unsafeAddNew was called, but the key is already present")
-    initializeKey(newKey, value: value, at: i.offset)
+    initializeKey(newKey, value: value, hash: hash, at: i.offset)
   }
 
 %end
@@ -3268,13 +3402,13 @@ extension _Native${Self}Buffer
       // Fast path that avoids computing the hash of the key.
       return nil
     }
-    let (i, found) = _find(key, startBucket: _bucket(key))
+    let (i, found) = _find(key)
     return found ? i : nil
   }
 
 
   internal func assertingGet(_ key: Key) -> Value {
-    let (i, found) = _find(key, startBucket: _bucket(key))
+    let (i, found) = _find(key)
     _precondition(found, "key not found")
 %if Self == 'Set':
     return self.key(at: i.offset)
@@ -3291,13 +3425,9 @@ extension _Native${Self}Buffer
       return nil
     }
 
-    let (i, found) = _find(key, startBucket: _bucket(key))
+    let (i, found) = _find(key)
     if found {
-%if Self == 'Set':
-      return self.key(at: i.offset)
-%elif Self == 'Dictionary':
       return self.value(at: i.offset)
-%end
     }
     return nil
   }
@@ -3350,12 +3480,13 @@ extension _Native${Self}Buffer
 
     var count = 0
     for key in elements {
+      let (startBucket, hash) = nativeBuffer._bucketAndHash(for: key)
       let (i, found) =
-        nativeBuffer._find(key, startBucket: nativeBuffer._bucket(key))
+        nativeBuffer._find(key, startBucket: startBucket, hash: hash)
       if found {
         continue
       }
-      nativeBuffer.initializeKey(key, at: i.offset)
+      nativeBuffer.initializeKey(key, hash: hash, at: i.offset)
       count += 1
     }
     nativeBuffer.count = count
@@ -3363,10 +3494,11 @@ extension _Native${Self}Buffer
 %elif Self == 'Dictionary':
 
     for (key, value) in elements {
+      let (startBucket, hash) = nativeBuffer._bucketAndHash(for: key)
       let (i, found) =
-        nativeBuffer._find(key, startBucket: nativeBuffer._bucket(key))
+        nativeBuffer._find(key, startBucket: startBucket, hash: hash)
       _precondition(!found, "${Self} literal contains duplicate keys")
-      nativeBuffer.initializeKey(key, value: value, at: i.offset)
+      nativeBuffer.initializeKey(key, value: value, hash: hash, at: i.offset)
     }
     nativeBuffer.count = elements.count
 
@@ -3597,11 +3729,12 @@ final internal class _SwiftDeferredNS${Self}<${TypeParametersDecl}>
     for i in 0..<nativeBuffer.capacity {
       if nativeBuffer.isInitializedEntry(at: i) {
         let key = _bridgeAnythingToObjectiveC(nativeBuffer.key(at: i))
+        let hash = nativeBuffer.hash(at: i)
 %if Self == 'Set':
-        bridged.initializeKey(key, at: i)
+        bridged.initializeKey(key, hash: hash, at: i)
 %elif Self == 'Dictionary':
         let val = _bridgeAnythingToObjectiveC(nativeBuffer.value(at: i))
-        bridged.initializeKey(key, value: val, at: i)
+        bridged.initializeKey(key, value: val, hash: hash, at: i)
 %end
       }
     }
@@ -3667,8 +3800,7 @@ final internal class _SwiftDeferredNS${Self}<${TypeParametersDecl}>
     guard let nativeKey = _conditionallyBridgeFromObjectiveC(aKey, Key.self)
     else { return nil }
 
-    let (i, found) = nativeBuffer._find(
-      nativeKey, startBucket: nativeBuffer._bucket(nativeKey))
+    let (i, found) = nativeBuffer._find(nativeKey)
     if found {
       bridgeEverything()
       return bridgedBuffer.value(at: i.offset)
@@ -3951,28 +4083,37 @@ internal enum _Variant${Self}Buffer<${TypeParametersDecl}> : _HashBuffer {
       let oldNativeBuffer = asNative
       var newNativeBuffer = NativeBuffer(minimumCapacity: minimumCapacity)
       let newCapacity = newNativeBuffer.capacity
-      for i in 0..<oldCapacity {
-        if oldNativeBuffer.isInitializedEntry(at: i) {
-          if oldCapacity == newCapacity {
-            let key = oldNativeBuffer.key(at: i)
+      if oldCapacity == newCapacity {
+        for i in 0..<oldCapacity {
+          guard oldNativeBuffer.isInitializedEntry(at: i)
+            else { continue }
+            
+          let key = oldNativeBuffer.key(at: i)
+          let hash = oldNativeBuffer.hash(at: i)
 %if Self == 'Set':
-            newNativeBuffer.initializeKey(key, at: i)
+          newNativeBuffer.initializeKey(key, hash: hash, at: i)
 %elif Self == 'Dictionary':
-            let value = oldNativeBuffer.value(at: i)
-            newNativeBuffer.initializeKey(key, value: value , at: i)
+          let value = oldNativeBuffer.value(at: i)
+          newNativeBuffer.initializeKey(key, value: value, hash: hash, at: i)
 %end
-          } else {
-            let key = oldNativeBuffer.key(at: i)
+        }
+      } else {
+        for i in 0..<oldCapacity {
+          guard oldNativeBuffer.isInitializedEntry(at: i)
+            else { continue }
+          
+          let key = oldNativeBuffer.key(at: i)
+          let hash = oldNativeBuffer.hash(at: i)
 %if Self == 'Set':
-            newNativeBuffer.unsafeAddNew(key: key)
+          newNativeBuffer.unsafeAddNew(key: key, hash: hash)
 %elif Self == 'Dictionary':
-            newNativeBuffer.unsafeAddNew(
-              key: key,
-              value: oldNativeBuffer.value(at: i))
+          newNativeBuffer.unsafeAddNew(key: key,
+                                       value: oldNativeBuffer.value(at: i),
+                                       hash: hash)
 %end
-          }
         }
       }
+    
       newNativeBuffer.count = oldNativeBuffer.count
 
       self = .native(newNativeBuffer)
@@ -4197,7 +4338,8 @@ internal enum _Variant${Self}Buffer<${TypeParametersDecl}> : _HashBuffer {
   internal mutating func nativeUpdateValue(
     _ value: Value, forKey key: Key
   ) -> Value? {
-    var (i, found) = asNative._find(key, startBucket: asNative._bucket(key))
+    var (startBucket, hash) = asNative._bucketAndHash(for: key)
+    var (i, found) = asNative._find(key, startBucket: startBucket, hash: hash)
 
     let minCapacity = found
       ? asNative.capacity
@@ -4207,7 +4349,8 @@ internal enum _Variant${Self}Buffer<${TypeParametersDecl}> : _HashBuffer {
 
     let (_, capacityChanged) = ensureUniqueNativeBuffer(minCapacity)
     if capacityChanged {
-      i = asNative._find(key, startBucket: asNative._bucket(key)).pos
+      startBucket = asNative._bucket(for: hash)
+      i = asNative._find(key, startBucket: startBucket, hash: hash).pos
     }
 
 %if Self == 'Set':
@@ -4215,7 +4358,7 @@ internal enum _Variant${Self}Buffer<${TypeParametersDecl}> : _HashBuffer {
     if found {
       asNative.setKey(key, at: i.offset)
     } else {
-      asNative.initializeKey(key, at: i.offset)
+      asNative.initializeKey(key, hash: hash, at: i.offset)
       asNative.count += 1
     }
 %elif Self == 'Dictionary':
@@ -4223,7 +4366,7 @@ internal enum _Variant${Self}Buffer<${TypeParametersDecl}> : _HashBuffer {
     if found {
       asNative.setKey(key, value: value, at: i.offset)
     } else {
-      asNative.initializeKey(key, value: value, at: i.offset)
+      asNative.initializeKey(key, value: value, hash: hash, at: i.offset)
       asNative.count += 1
     }
 %end
@@ -4256,8 +4399,9 @@ internal enum _Variant${Self}Buffer<${TypeParametersDecl}> : _HashBuffer {
   internal mutating func nativeInsert(
     _ value: Value, forKey key: Key
   ) -> (inserted: Bool, memberAfterInsert: Value) {
-
-    var (i, found) = asNative._find(key, startBucket: asNative._bucket(key))
+    
+    var (startBucket, hash) = asNative._bucketAndHash(for: key)
+    var (i, found) = asNative._find(key, startBucket: startBucket, hash: hash)
     if found {
 %if Self == 'Set':
       return (inserted: false, memberAfterInsert: asNative.key(at: i.offset))
@@ -4273,16 +4417,17 @@ internal enum _Variant${Self}Buffer<${TypeParametersDecl}> : _HashBuffer {
     let (_, capacityChanged) = ensureUniqueNativeBuffer(minCapacity)
 
     if capacityChanged {
-      i = asNative._find(key, startBucket: asNative._bucket(key)).pos
+      startBucket = asNative._bucket(for: hash)
+      i = asNative._find(key, startBucket: startBucket, hash: hash).pos
     }
 
 %if Self == 'Set':
-    asNative.initializeKey(key, at: i.offset)
-    asNative.count += 1
+    asNative.initializeKey(key, hash: hash, at: i.offset)
 %elif Self == 'Dictionary':
-    asNative.initializeKey(key, value: value, at: i.offset)
-    asNative.count += 1
+    asNative.initializeKey(key, value: value, hash: hash, at: i.offset)
 %end
+
+    asNative.count += 1
 
     return (inserted: true, memberAfterInsert: value)
   }
@@ -4313,71 +4458,52 @@ internal enum _Variant${Self}Buffer<${TypeParametersDecl}> : _HashBuffer {
   /// - parameter offset: The offset of the element that will be deleted.
   /// Precondition: there should be an initialized entry at offset.
   internal mutating func nativeDelete(
-    _ nativeBuffer: NativeBuffer, idealBucket: Int, offset: Int
-  ) {
-    _sanityCheck(
-        nativeBuffer.isInitializedEntry(at: offset), "expected initialized entry")
+    _ nativeBuffer: NativeBuffer, idealBucket: Int, offset: Int) {
+      
+    _sanityCheck(nativeBuffer.isInitializedEntry(at: offset), "expected initialized entry")
 
     var nativeBuffer = nativeBuffer
 
     // remove the element
     nativeBuffer.destroyEntry(at: offset)
     nativeBuffer.count -= 1
+    
+    // Run a backward shift until we reach a hole or an element that
+    // is exactly at it's ideal bucket. This keeps invariants of robin hood
+    // algorithm that allows us to do things efficiently.
 
-    // If we've put a hole in a chain of contiguous elements, some
-    // element after the hole may belong where the new hole is.
-    var hole = offset
-
-    // Find the first bucket in the contiguous chain
-    var start = idealBucket
-    while nativeBuffer.isInitializedEntry(at: nativeBuffer._prev(start)) {
-      start = nativeBuffer._prev(start)
-    }
-
-    // Find the last bucket in the contiguous chain
-    var lastInChain = hole
-    var b = nativeBuffer._index(after: lastInChain)
-    while nativeBuffer.isInitializedEntry(at: b) {
-      lastInChain = b
-      b = nativeBuffer._index(after: b)
-    }
-
-    // Relocate out-of-place elements in the chain, repeating until
-    // none are found.
-    while hole != lastInChain {
-      // Walk backwards from the end of the chain looking for
-      // something out-of-place.
-      var b = lastInChain
-      while b != hole {
-        let idealBucket = nativeBuffer._bucket(nativeBuffer.key(at: b))
-
-        // Does this element belong between start and hole?  We need
-        // two separate tests depending on whether [start, hole] wraps
-        // around the end of the storage
-        let c0 = idealBucket >= start
-        let c1 = idealBucket <= hole
-        if start <= hole ? (c0 && c1) : (c0 || c1) {
-          break // Found it
-        }
-        b = nativeBuffer._prev(b)
+    // We just made a hole at offset and are trying to fill it
+    var fillHoleAt = offset
+    // fillHoleUsing calculates which element to use to fill the hole
+    var fillHoleUsing = nativeBuffer._index(after: fillHoleAt)
+    
+    while nativeBuffer.isInitializedEntry(at: fillHoleUsing) {
+      let bucket = nativeBuffer._bucket(for: nativeBuffer.hash(at: fillHoleUsing))
+      if bucket == fillHoleUsing {
+          break
       }
-
-      if b == hole { // No out-of-place elements found; we're done adjusting
-        break
+      
+      // Find the furthest element that still has the same ideal bucket value
+      // and use that element to fill the hole (to help avoid unnecessary moves)
+      var afterFillHoleUsing = nativeBuffer._index(after: fillHoleUsing)
+      while nativeBuffer.isInitializedEntry(at: afterFillHoleUsing) &&
+            nativeBuffer._bucket(for: nativeBuffer.hash(at: afterFillHoleUsing)) == bucket {
+        
+        fillHoleUsing = afterFillHoleUsing
+        afterFillHoleUsing = nativeBuffer._index(after: fillHoleUsing)
       }
-
-      // Move the found element into the hole
-      nativeBuffer.moveInitializeEntry(
-        from: nativeBuffer,
-        at: b,
-        toEntryAt: hole)
-      hole = b
+      
+      nativeBuffer.moveInitializeEntry(from: nativeBuffer, at: fillHoleUsing, toEntryAt: fillHoleAt)
+      
+      // Now fill the hole we just created
+      fillHoleAt = fillHoleUsing
+      fillHoleUsing = nativeBuffer._index(after: fillHoleAt)
     }
   }
 
   internal mutating func nativeRemoveObject(forKey key: Key) -> Value? {
-    var idealBucket = asNative._bucket(key)
-    var (index, found) = asNative._find(key, startBucket: idealBucket)
+    var (startBucket, hash) = asNative._bucketAndHash(for: key)
+    var (i, found) = asNative._find(key, startBucket: startBucket, hash: hash)
 
     // Fast path: if the key is not present, we will not mutate the set,
     // so don't force unique buffer.
@@ -4389,17 +4515,16 @@ internal enum _Variant${Self}Buffer<${TypeParametersDecl}> : _HashBuffer {
       ensureUniqueNativeBuffer(asNative.capacity)
     let nativeBuffer = asNative
     if capacityChanged {
-      idealBucket = nativeBuffer._bucket(key)
-      (index, found) = nativeBuffer._find(key, startBucket: idealBucket)
+      startBucket = nativeBuffer._bucket(for: hash)
+      (i, found) = nativeBuffer._find(key, startBucket: startBucket, hash: hash)
       _sanityCheck(found, "key was lost during buffer migration")
     }
 %if Self == 'Set':
-    let oldValue = nativeBuffer.key(at: index.offset)
+    let oldValue = nativeBuffer.key(at: i.offset)
 %elif Self == 'Dictionary':
-    let oldValue = nativeBuffer.value(at: index.offset)
+    let oldValue = nativeBuffer.value(at: i.offset)
 %end
-    nativeDelete(nativeBuffer, idealBucket: idealBucket,
-      offset: index.offset)
+    nativeDelete(nativeBuffer, idealBucket: startBucket, offset: i.offset)
     return oldValue
   }
 
@@ -4413,13 +4538,9 @@ internal enum _Variant${Self}Buffer<${TypeParametersDecl}> : _HashBuffer {
     let nativeBuffer = asNative
 
     let result = nativeBuffer.assertingGet(nativeIndex)
-%if Self == 'Set':
-    let key = result
-%elif Self == 'Dictionary':
-    let key = result.0
-%end
-
-    nativeDelete(nativeBuffer, idealBucket: nativeBuffer._bucket(key),
+    let idealBucket = nativeBuffer._bucket(for: nativeBuffer.hash(at: nativeIndex.offset))
+    
+    nativeDelete(nativeBuffer, idealBucket: idealBucket,
         offset: nativeIndex.offset)
     return result
   }

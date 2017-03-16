@@ -110,6 +110,8 @@ do {
 // CHECK-NEXT:   1 = Hello;
 // CHECK-NEXT: }
 do {
+  _HashingDetail.fixedSeedOverride = 0xff51afd7ed558ccd
+  defer { _HashingDetail.fixedSeedOverride = 0 }
   var dict: Dictionary<NSNumber, NSString> = [1: "Hello", 2: "World"]
   let obj = _bridgeAnythingToObjectiveC(dict)
   print("dictionary bridges to \(obj.description!)")
@@ -120,6 +122,8 @@ do {
 // CHECK-NEXT:   1 = Hello;
 // CHECK-NEXT: }
 do {
+  _HashingDetail.fixedSeedOverride = 0xff51afd7ed558ccd
+  defer { _HashingDetail.fixedSeedOverride = 0 }
   var dict2 = [1: "Hello", 2: "World"]
   let obj = _bridgeAnythingToObjectiveC(dict2)
   print("dictionary bridges to \(obj.description!)")
@@ -130,6 +134,8 @@ do {
 // CHECK-NEXT:   1 = "(\"Hello\", 1)";
 // CHECK-NEXT: }
 do {
+  _HashingDetail.fixedSeedOverride = 0xff51afd7ed558ccd
+  defer { _HashingDetail.fixedSeedOverride = 0 }
   var dict3 = [1: ("Hello", 1), 2: ("World", 2)]
   let obj = _bridgeAnythingToObjectiveC(dict3)
   print("dictionary bridges to \(obj)")

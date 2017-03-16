@@ -72,8 +72,9 @@ swift::_SwiftEmptyDictionaryStorage swift::_swiftEmptyDictionaryStorage = {
       1 // int bitCount; (1 so there's something for iterators to read)
     },
     
-    (void*)1, // void* keys; (non-null garbage)
-    (void*)1  // void* values; (non-null garbage)
+    (void*)1,               // void* keys; (non-null garbage)
+    (__swift_intptr_t *)1,  // __swift_intptr_t *hashes; (non-null garbage)
+    (void*)1                // void* values; (non-null garbage)
   },
 
   0 // int entries; (zero'd bits)
@@ -100,7 +101,8 @@ swift::_SwiftEmptySetStorage swift::_swiftEmptySetStorage = {
       1 // int bitCount; (1 so there's something for iterators to read)
     },
     
-    (void*)1 // void* keys; (non-null garbage)
+    (void*)1,               // void* keys; (non-null garbage)
+    (__swift_intptr_t *)1   // __swift_intptr_t *hashes; (non-null garbage)
   },
 
   0 // int entries; (zero'd bits)
@@ -118,6 +120,11 @@ swift::_SwiftHashingSecretKey swift::_swift_stdlib_Hashing_secretKey = {
   randomUInt64(), randomUInt64()
 };
 SWIFT_ALLOWED_RUNTIME_GLOBAL_CTOR_END
+
+__swift_uint64_t swift::_swift_stdlib_HashingDetail_getRandomSeed() {
+  static __swift_uint64_t randomSeed = randomUInt64();
+  return randomSeed;
+}
 
 __swift_uint64_t swift::_swift_stdlib_HashingDetail_fixedSeedOverride = 0;
 

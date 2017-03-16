@@ -31,6 +31,8 @@ Reflection.test("Dictionary/Empty") {
 }
 
 Reflection.test("Dictionary") {
+  _HashingDetail.fixedSeedOverride = 0xff51afd7ed558ccd
+  defer { _HashingDetail.fixedSeedOverride = 0 }
   let dict = ["One": 1, "Two": 2, "Three": 3, "Four": 4, "Five": 5]
 
   var output = ""
@@ -80,6 +82,8 @@ Reflection.test("Dictionary") {
 }
 
 Reflection.test("Set") {
+  _HashingDetail.fixedSeedOverride = 0xff51afd7ed558ccd
+  defer { _HashingDetail.fixedSeedOverride = 0 }
   let s = Set(1...5)
 
   var output = ""
@@ -99,8 +103,8 @@ Reflection.test("Set") {
   expected += "  - 5\n"
   expected += "  - 2\n"
   expected += "  - 3\n"
-  expected += "  - 1\n"
   expected += "  - 4\n"
+  expected += "  - 1\n"
 #else
   fatalError("unimplemented")
 #endif
