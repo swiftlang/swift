@@ -29,7 +29,7 @@ public func f(s : S) -> (() -> ()) {
 // CHECK-DAG: @{{[0-9]+}} = private constant [3 x i8] c"Sq\00", section ".sw3tyrf"
 // CHECK-DAG: @{{[0-9]+}} = private constant [5 x i8] c"none\00", section ".sw3rfst"
 // CHECK-DAG: @{{[0-9]+}} = private constant [5 x i8] c"some\00", section ".sw3rfst"
-// CHECK-DAG: @_TMRfSq = internal constant {{.*}}, section ".sw3flmd"
-// CHECK-DAG: @_TMRaVs1Ss1Ps = internal constant {{.*}}, section ".sw3asty"
-// CHECK-DAG: @_TMRbBo = internal constant {{.*}}, section ".sw3bltn"
+// CHECK-DAG: @_T0SqMF = internal constant {{.*}}, section ".sw3flmd"
+// CHECK-DAG: @_T0s1SVs1PsMA = internal constant {{.*}}, section ".sw3asty"
+// CHECK-DAG: @_T0BoMB = internal constant {{.*}}, section ".sw3bltn"
 

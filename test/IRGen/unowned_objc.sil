@@ -16,7 +16,7 @@ protocol P : class {
   func explode()
 }
 
-sil @_TFC12unowned_objc1CD : $@convention(method) (C) -> ()
+sil @_T012unowned_objc1CCfD : $@convention(method) (C) -> ()
 
 struct A {
   unowned var x : C

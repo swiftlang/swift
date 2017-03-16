@@ -288,7 +288,7 @@ func hasLocalizationKey2() {}
 // CHECK8-NEXT: s:11cursor_info2CCCACSi1x_tcfc
 // CHECK8-NEXT: (CC.Type) -> (Int) -> CC
 // CHECK8-NEXT: _TtFT1xSi_C11cursor_info2CC
-// CHECK8-NEXT: <Container>_TtC11cursor_info2CC</Container>
+// CHECK8-NEXT: <Container>_T011cursor_info2CCCD</Container>
 // CHECK8-NEXT: <Declaration>convenience init(x: <Type usr="s:Si">Int</Type>)</Declaration>
 // CHECK8-NEXT: <decl.function.constructor><syntaxtype.keyword>convenience</syntaxtype.keyword> <syntaxtype.keyword>init</syntaxtype.keyword>(<decl.var.parameter><decl.var.parameter.argument_label>x</decl.var.parameter.argument_label>: <decl.var.parameter.type><ref.struct usr="s:Si">Int</ref.struct></decl.var.parameter.type></decl.var.parameter>)</decl.function.constructor>
 
