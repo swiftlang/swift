@@ -320,6 +320,11 @@ static bool hasUnhandledError(ArrayRef<ASTNode> Nodes) {
   });
 }
 
+static bool
+hasNodeThat(ArrayRef<ASTNode> Nodes, llvm::function_ref<bool(ASTNode)> Pred) {
+  return std::any_of(Nodes.begin(), Nodes.end(), Pred);
+}
+
 struct RangeResolver::Implementation {
   SourceFile &File;
   ASTContext &Ctx;
@@ -342,36 +347,21 @@ private:
     std::vector<ASTNode> EndMatches;
     ContextInfo(ASTNode Parent, bool ContainedInRange) : Parent(Parent),
       ContainedInRange(ContainedInRange) {}
-private:
-    bool hasStmtlikeNode(ArrayRef<ASTNode> Nodes) {
-      for (auto N : Nodes) {
-        if (N.is<Stmt*>())
-          return true;
-        // Expression with void type is statement-like.
-        else if (N.is<Expr*>()) {
-          auto *E = N.get<Expr*>();
-          if (auto T = E->getType()) {
-            if (T->isVoid())
-              return true;
-          }
-        } else {
-          // Decls are statement like.
-          return true;
-        }
-      }
+
+    bool isMultiStatment() {
+      if (StartMatches.empty() || EndMatches.empty())
+        return false;
+
+      // Multi-statement should have a common parent of brace statement, this
+      // can be implicit brace statement, e.g. in case statement.
+      if (Parent.isStmt(StmtKind::Brace))
+        return true;
+
+      // Explicitly allow the selection of multiple case statments.
+      auto IsCase = [](ASTNode N) { return N.isStmt(StmtKind::Case); };
+      if (hasNodeThat(StartMatches, IsCase) && hasNodeThat(EndMatches, IsCase))
+        return true;
       return false;
-    }
-public:
-    bool hasStmtMatch(RangeMatchKind Kind) {
-      switch(Kind) {
-      case RangeMatchKind::NoneMatch:
-      case RangeMatchKind::RangeMatch:
-        llvm_unreachable("cannot answer these.");
-      case RangeMatchKind::StartMatch:
-        return hasStmtlikeNode(StartMatches);
-      case RangeMatchKind::EndMatch:
-        return hasStmtlikeNode(EndMatches);
-      }
     }
   };
 
@@ -395,17 +385,28 @@ public:
   std::vector<ASTNode> ContainedASTNodes;
 
   /// Collect the type that an ASTNode should be evaluated to.
-  Type resolveNodeType(ASTNode N) {
-    if (N.is<Stmt*>()) {
-      if (auto RS = dyn_cast<ReturnStmt>(N.get<Stmt*>())) {
-        return resolveNodeType(RS->getResult());
+  Type resolveNodeType(ASTNode N, RangeKind Kind) {
+    switch(Kind) {
+    case RangeKind::Invalid:
+    case RangeKind::SingleDecl:
+      llvm_unreachable("cannot get type.");
+
+    // For a single expression, its type is apparent.
+    case RangeKind::SingleExpression:
+      return N.get<Expr*>()->getType();
+
+    // For statements, we either resolve to the returning type or Void.
+    case RangeKind::SingleStatement:
+    case RangeKind::MultiStatement: {
+      if (N.is<Stmt*>()) {
+        if (auto RS = dyn_cast<ReturnStmt>(N.get<Stmt*>())) {
+          return resolveNodeType(RS->getResult(), RangeKind::SingleExpression);
+        }
       }
       // For other statements, the type should be void.
       return Ctx.getVoidDecl()->getDeclaredInterfaceType();
-    } else if (N.is<Expr*>()) {
-      return N.get<Expr*>()->getType();
     }
-    return Type();
+    }
   }
 
   ResolvedRangeInfo getSingleNodeKind(ASTNode Node) {
@@ -417,14 +418,16 @@ public:
     OrphanKind Kind = getOrphanKind(ContainedASTNodes);
     if (Node.is<Expr*>())
       return ResolvedRangeInfo(RangeKind::SingleExpression,
-                               resolveNodeType(Node), Content,
+                               resolveNodeType(Node, RangeKind::SingleExpression),
+                               Content,
                                getImmediateContext(), SingleEntry,
                                UnhandledError, Kind,
                                llvm::makeArrayRef(ContainedASTNodes),
                                llvm::makeArrayRef(DeclaredDecls),
                                llvm::makeArrayRef(ReferencedDecls));
     else if (Node.is<Stmt*>())
-      return ResolvedRangeInfo(RangeKind::SingleStatement, resolveNodeType(Node),
+      return ResolvedRangeInfo(RangeKind::SingleStatement,
+                               resolveNodeType(Node, RangeKind::SingleStatement),
                                Content, getImmediateContext(), SingleEntry,
                                UnhandledError, Kind,
                                llvm::makeArrayRef(ContainedASTNodes),
@@ -685,15 +688,12 @@ public:
       }
     }
 
-    // Check if the start and end matches have statement-like entities; this
-    // can avoid picking expressions like "a == b" in a list of selected
-    // multi-statement at the start (or the end).
-    if (DCInfo.hasStmtMatch(RangeMatchKind::StartMatch) &&
-        DCInfo.hasStmtMatch(RangeMatchKind::EndMatch)) {
+    if (DCInfo.isMultiStatment()) {
       postAnalysis(DCInfo.EndMatches.back());
       Result = {RangeKind::MultiStatement,
                 /* Last node has the type */
-                resolveNodeType(DCInfo.EndMatches.back()), Content,
+                resolveNodeType(DCInfo.EndMatches.back(),
+                                RangeKind::MultiStatement), Content,
                 getImmediateContext(), hasSingleEntryPoint(ContainedASTNodes),
                 hasUnhandledError(ContainedASTNodes),
                 getOrphanKind(ContainedASTNodes),
