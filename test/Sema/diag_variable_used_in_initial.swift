@@ -28,3 +28,19 @@ class A4 {
     var foo1 = foo1 // expected-error {{variable used within its own initial value}}{{none}}
   }
 }
+
+func localContext() {
+  class A5 {
+    func foo1() {}
+    func foo2() {
+      var foo1 = foo1() // expected-error {{variable used within its own initial value; use 'self.' to refer to the instance method}}{{18-18=self.}}
+    }
+
+    class A6 {
+      func foo1() {}
+      func foo2() {
+        var foo1 = foo1() // expected-error {{variable used within its own initial value; use 'self.' to refer to the instance method}}{{20-20=self.}}
+      }
+    }
+  }
+}
