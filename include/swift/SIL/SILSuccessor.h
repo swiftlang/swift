@@ -94,6 +94,7 @@ public:
 
   SILSuccessor *getSuccessorRef() const { return Cur; }
   SILBasicBlock *operator*();
+  const SILBasicBlock *operator*() const;
 };
   
 
