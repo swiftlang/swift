@@ -3,7 +3,7 @@
 
 // CHECK: {{.+}}/non-modular/Foo.framework/Headers/Foo.h:1:9: error: include of non-modular header inside framework module 'Foo'
 // CHECK-macosx: error: could not build Objective-C module 'Foo'
-// CHECK-linux: error: could not build C module 'Foo'
+// CHECK-linux-gnu: error: could not build C module 'Foo'
 // CHECK-NOT: error
 
 import Foo
