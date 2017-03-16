@@ -1,4 +1,4 @@
-//===--- UnicodeStorage.swift ---------------------------------------------===//
+//===--- UnicodeViews.swift -----------------------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -32,12 +32,12 @@ internal func __swift_stdlib_U_FAILURE(_ x: __swift_stdlib_UErrorCode) -> Bool {
 
 /// A collection of `CodeUnit`s to be interpreted by some `Encoding`.
 ///
-/// View types nested in UnicodeStorage may be suitable *generic* implementation
+/// View types nested in _UnicodeViews may be suitable *generic* implementation
 /// guts for views for models of Unicode, but specific models may want to
 /// provide their own implementations.  For example, the UTF16 view of a
 /// Latin1String would might be a simple lazy zero-extended mapping, rather than
 /// something that goes through the transcoding machinery.
-public struct UnicodeStorage<
+public struct _UnicodeViews<
   CodeUnits : RandomAccessCollection,
   Encoding : UnicodeEncoding
 >
@@ -54,15 +54,15 @@ where Encoding.EncodedScalar.Iterator.Element == CodeUnits.Iterator.Element,
   public var codeUnits: CodeUnits
 }
 
-/// A straightforward typealias for _UnicodeStorage
+/// A straightforward typealias for _UnicodeViews
 ///
 /// Use this to escape the automatic deduction of the generic arguments given
-/// the name `UnicodeStorage` from within nested contexts
+/// the name `_UnicodeViews` from within nested contexts
 /// (https://bugs.swift.org/browse/SR-4155).
-internal typealias _UnicodeStorage<
+internal typealias _UnicodeViews_<
   CodeUnits : RandomAccessCollection,
   Encoding : UnicodeEncoding
->  = UnicodeStorage<CodeUnits, Encoding>
+>  = _UnicodeViews<CodeUnits, Encoding>
 where Encoding.EncodedScalar.Iterator.Element == CodeUnits.Iterator.Element,
   CodeUnits.SubSequence : RandomAccessCollection,
   CodeUnits.SubSequence.Index == CodeUnits.Index,
@@ -71,7 +71,7 @@ CodeUnits.SubSequence.Iterator.Element == CodeUnits.Iterator.Element
 
 /// A lazy collection of `Encoding.EncodedScalar` that results
 /// from parsing an instance of codeUnits using that `Encoding`.
-extension UnicodeStorage {
+extension _UnicodeViews {
   public struct EncodedScalars {
     let codeUnits: CodeUnits
     
@@ -81,7 +81,7 @@ extension UnicodeStorage {
   }
 }
 
-extension UnicodeStorage.EncodedScalars {
+extension _UnicodeViews.EncodedScalars {
   // Because parsing produces a buffer and a new index, to avoid
   // repeatedly decoding the same data, this index stores that buffer
   // and the next index.  This would obviously be more complicated if
@@ -108,7 +108,7 @@ extension UnicodeStorage.EncodedScalars {
 }
 
 /// Collection Conformance
-extension UnicodeStorage.EncodedScalars : BidirectionalCollection {
+extension _UnicodeViews.EncodedScalars : BidirectionalCollection {
   public var startIndex: Index {
     if _slowPath(codeUnits.isEmpty) { return endIndex }
     let s = codeUnits.startIndex
@@ -177,7 +177,7 @@ extension UnicodeStorage.EncodedScalars : BidirectionalCollection {
   }
 }
 
-extension UnicodeStorage {
+extension _UnicodeViews {
   public typealias ScalarsTranscoded<ToEncoding : UnicodeEncoding>
   = LazyMapBidirectionalCollection<EncodedScalars, ToEncoding.EncodedScalar>
 
@@ -185,7 +185,7 @@ extension UnicodeStorage {
     to dst: ToEncoding.Type
   )
   -> ScalarsTranscoded<ToEncoding> {
-    return UnicodeStorage.EncodedScalars(codeUnits, Encoding.self).lazy.map {
+    return _UnicodeViews.EncodedScalars(codeUnits, Encoding.self).lazy.map {
       dst.encode($0)!
     }
   }
@@ -201,7 +201,7 @@ extension UnicodeStorage {
     // Instead, we wrap an instance of Base.
     public typealias Base = FlattenBidirectionalCollection<
       LazyMapBidirectionalCollection<
-        UnicodeStorage<CodeUnits, FromEncoding>.EncodedScalars,
+        _UnicodeViews<CodeUnits, FromEncoding>.EncodedScalars,
         ToEncoding.EncodedScalar
       >
     >
@@ -211,7 +211,7 @@ extension UnicodeStorage {
       from src: FromEncoding.Type = FromEncoding.self,
       to dst: ToEncoding.Type = ToEncoding.self
     ) {
-      base = Base(UnicodeStorage(codeUnits).scalarsTranscoded(to: dst))
+      base = Base(_UnicodeViews(codeUnits).scalarsTranscoded(to: dst))
     }
     
     // FIXME: this should go in the extension below but for <rdar://30320012>
@@ -241,7 +241,7 @@ extension UnicodeStorage {
   }
 }
 
-extension UnicodeStorage : _UTextable {
+extension _UnicodeViews : _UTextable {
   internal func _nativeLength(_ uText: inout _UText) -> Int64 {
     uText.validate()
     return codeUnits.count^
@@ -250,15 +250,15 @@ extension UnicodeStorage : _UTextable {
   internal func _parsedSlice(
     _ offset: Int64,
     _ slice: (CodeUnits.Index) -> CodeUnits.SubSequence
-  ) -> UnicodeStorage<CodeUnits.SubSequence,Encoding>.EncodedScalars.SubSequence {
-    return _UnicodeStorage(
+  ) -> _UnicodeViews<CodeUnits.SubSequence,Encoding>.EncodedScalars.SubSequence {
+    return _UnicodeViews_(
       slice(codeUnits.index(atOffset: offset)), Encoding.self
     ).scalars.dropFirst(0)
   }
 
   internal func _parsedSuffix(
     fromOffset offset: Int64
-  ) -> UnicodeStorage<CodeUnits.SubSequence,Encoding>.EncodedScalars.SubSequence {
+  ) -> _UnicodeViews<CodeUnits.SubSequence,Encoding>.EncodedScalars.SubSequence {
     return _parsedSlice(offset, codeUnits.suffix(from:))
   }
 
@@ -381,7 +381,7 @@ extension UnicodeStorage : _UTextable {
       // the generic TranscodedView, which is likely to be less efficient in
       // some common cases.
       let source
-        = _UnicodeStorage(base, Encoding.self).transcoded(to: UTF16.self)
+        = _UnicodeViews_(base, Encoding.self).transcoded(to: UTF16.self)
       var d = destination // copy due to https://bugs.swift.org/browse/SR-3782
       let (limit, remainder) = d.copy(from: source)
       
@@ -426,26 +426,26 @@ extension UnicodeStorage : _UTextable {
       ..<
       codeUnits.index(atOffset: nativeIndex)]
     
-    return _UnicodeStorage(
+    return _UnicodeViews_(
       nativeChunk, Encoding.self).transcoded(to: UTF16.self).count^
   }
 }
 
-extension UnicodeStorage {
+extension _UnicodeViews {
   public var scalars: EncodedScalars {
     return EncodedScalars(codeUnits, Encoding.self)
   }
 }
 
-extension UnicodeStorage {
+extension _UnicodeViews {
   
   public struct CharacterView : BidirectionalCollection {
 
     public init(_ codeUnits: CodeUnits, _: Encoding.Type = Encoding.self) {
-      self.storage = UnicodeStorage(codeUnits)
+      self.storage = _UnicodeViews(codeUnits)
     }
 
-    internal let storage: UnicodeStorage
+    internal let storage: _UnicodeViews
 
     public typealias SubSequence = BidirectionalSlice<CharacterView>
 
@@ -455,7 +455,7 @@ extension UnicodeStorage {
 
     public subscript(i: Index) -> Character {
       let j = index(after: i)
-      let contents = UnicodeStorage<
+      let contents = _UnicodeViews<
                        // explicit generic parameters shouldn't be needed
                        // <rdar://problem/30882312>
                        CodeUnits.SubSequence,Encoding
@@ -532,7 +532,7 @@ internal func _makeFCCNormalizer() -> OpaquePointer {
 
 internal var _fccNormalizer = _makeFCCNormalizer()
 
-extension UnicodeStorage {
+extension _UnicodeViews {
   
   public typealias FCCNormalizedUTF16View = [UInt16]
 

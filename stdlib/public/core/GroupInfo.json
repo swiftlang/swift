@@ -28,7 +28,7 @@
     "Unicode.swift",
     "Unicode2.swift",
     "UnicodeScalar.swift",
-    "UnicodeStorage.swift",
+    "UnicodeViews.swift",
     "UnicodeTrie.swift",
     "UnavailableStringAPIs.swift"
   ],

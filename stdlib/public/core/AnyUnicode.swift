@@ -84,8 +84,8 @@ where
   CodeUnits.SubSequence.Index == CodeUnits.Index,
   CodeUnits.SubSequence.SubSequence == CodeUnits.SubSequence,
   CodeUnits.SubSequence.Iterator.Element == CodeUnits.Iterator.Element {
-  var characters: UnicodeStorage<CodeUnits,Encoding>.CharacterView {
-    return UnicodeStorage(codeUnits).characters
+  var characters: _UnicodeViews<CodeUnits,Encoding>.CharacterView {
+    return _UnicodeViews(codeUnits).characters
   }
 }
 
@@ -121,10 +121,10 @@ where
   CodeUnits.SubSequence.Iterator.Element == CodeUnits.Iterator.Element {
 
   var unicodeScalars: LazyMapBidirectionalCollection<
-    UnicodeStorage<CodeUnits,Encoding>.ScalarsTranscoded<UTF32>
+    _UnicodeViews<CodeUnits,Encoding>.ScalarsTranscoded<UTF32>
   , UnicodeScalar
   > {
-    return UnicodeStorage(codeUnits, Encoding.self)
+    return _UnicodeViews(codeUnits, Encoding.self)
       .scalarsTranscoded(to: UTF32.self)
       .lazy.map { UnicodeScalar($0) }
   }
@@ -234,8 +234,8 @@ where Encoding.EncodedScalar == UTF16.EncodedScalar,
   // this result—and maybe other nice properties—in the type system.  So maybe
   // this thing should conform to _FixedFormatUnicode
   var fccNormalizedUTF16
-  : UnicodeStorage<CodeUnits,Encoding>.FCCNormalizedUTF16View {
-    return UnicodeStorage(codeUnits, Encoding.self).fccNormalizedUTF16
+  : _UnicodeViews<CodeUnits,Encoding>.FCCNormalizedUTF16View {
+    return _UnicodeViews(codeUnits, Encoding.self).fccNormalizedUTF16
   }
   
   var rawUTF16 : CodeUnits {

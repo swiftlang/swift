@@ -13,8 +13,8 @@
 // REQUIRES: executable_test
 
 extension _UTF16StringStorage {
-  var characters: UnicodeStorage<_UTF16StringStorage, UTF16>.CharacterView {
-    return UnicodeStorage(self, UTF16.self).characters
+  var characters: _UnicodeViews<_UTF16StringStorage, UTF16>.CharacterView {
+    return _UnicodeViews(self, UTF16.self).characters
   }
 }
 
@@ -634,7 +634,7 @@ Self.CharacterView.Index : SignedInteger
   // FIXME: this could be more efficient for encodings such as Latin1
   var utf32: AnyUnicodeBidirectionalUInt32 {
       return AnyUnicodeBidirectionalUInt32(
-      UnicodeStorage(
+      _UnicodeViews(
         _codeUnits, Encoding.self
       ).transcoded(to: UTF32.self)
     )
@@ -917,7 +917,7 @@ extension AnyStringContents : AnyUnicode {
     switch self {
     case .utf16(let storage):
       return AnyUnicodeBidirectionalUInt32(
-        UnicodeStorage(storage, UTF16.self).transcoded(to: UTF32.self)
+        _UnicodeViews(storage, UTF16.self).transcoded(to: UTF32.self)
       )
     case .latin1(let storage):
       return AnyUnicodeBidirectionalUInt32(storage)

@@ -20,12 +20,12 @@ testSuite.test("CharacterView") {
   ] // + "👩‍❤️‍👩"
 
   // FIXME: the generic arguments should be deducible, but aren't; <rdar://30323161>
-  let v8 = UnicodeStorage<Array<UInt8>, UTF8>.CharacterView(Array(s.utf8), UTF8.self)
+  let v8 = _UnicodeViews<Array<UInt8>, UTF8>.CharacterView(Array(s.utf8), UTF8.self)
   expectEqual(a, Array(v8))
 
   // FIXME: We need to wrap s.utf16 in Array because of <rdar://30386193> Unaccountable link errors
   // FIXME: the generic arguments should be deducible; <rdar://30323161>
-  let v16 = UnicodeStorage<Array<UInt16>, UTF16>.CharacterView(Array(s.utf16), UTF16.self)
+  let v16 = _UnicodeViews<Array<UInt16>, UTF16>.CharacterView(Array(s.utf16), UTF16.self)
   expectEqual(a, Array(v16))
 
   expectEqual(v8.reversed(), a.reversed())
@@ -48,10 +48,10 @@ testSuite.test("basic") {
   let s32 = s.unicodeScalars.lazy.map { $0.value }
   let s16 = Array(s.utf16)
   let s8 = Array(s.utf8)
-  let s16to32 = UnicodeStorage.TranscodedView(s16, from: UTF16.self, to: UTF32.self)
-  let s16to8 = UnicodeStorage.TranscodedView(s16, from: UTF16.self, to: UTF8.self)
-  let s8to16 = UnicodeStorage.TranscodedView(s8, from: UTF8.self, to: UTF16.self)
-  let s8Vto16 = UnicodeStorage.TranscodedView(s8, from: ValidUTF8.self, to: UTF16.self)
+  let s16to32 = _UnicodeViews.TranscodedView(s16, from: UTF16.self, to: UTF32.self)
+  let s16to8 = _UnicodeViews.TranscodedView(s16, from: UTF16.self, to: UTF8.self)
+  let s8to16 = _UnicodeViews.TranscodedView(s8, from: UTF8.self, to: UTF16.self)
+  let s8Vto16 = _UnicodeViews.TranscodedView(s8, from: ValidUTF8.self, to: UTF16.self)
   print(Array(s32))
   print(Array(s16to32))
   expectTrue(s32.elementsEqual(s16to32))
@@ -92,10 +92,10 @@ testSuite.test("SwiftCanonicalString") {
   let s32 = s.unicodeScalars.lazy.map { $0.value }
   let s16 = Array(s.utf16)
   let s8 = Array(s.utf8)
-  let s16to32 = UnicodeStorage.TranscodedView(s16, from: UTF16.self, to: UTF32.self)
-  let s16to8 = UnicodeStorage.TranscodedView(s16, from: UTF16.self, to: UTF8.self)
-  let s8to16 = UnicodeStorage.TranscodedView(s8, from: UTF8.self, to: UTF16.self)
-  let _ = UnicodeStorage.TranscodedView(s8, from: ValidUTF8.self, to: UTF16.self)
+  let s16to32 = _UnicodeViews.TranscodedView(s16, from: UTF16.self, to: UTF32.self)
+  let s16to8 = _UnicodeViews.TranscodedView(s16, from: UTF16.self, to: UTF8.self)
+  let s8to16 = _UnicodeViews.TranscodedView(s8, from: UTF8.self, to: UTF16.self)
+  let _ = _UnicodeViews.TranscodedView(s8, from: ValidUTF8.self, to: UTF16.self)
 
   let sncFrom32 = String(canonical: SwiftCanonicalString(
     codeUnits: Array(s32), encodedWith: UTF32.self
@@ -208,7 +208,7 @@ testSuite.test("string-compare") {
   let s3 = "abcde\(UnicodeScalar(0x304)!)z"
   let s4 = "abcd\(UnicodeScalar(0x113)!)z"
 
-  typealias UTF16String = UnicodeStorage<[UInt16], UTF16>
+  typealias UTF16String = _UnicodeViews<[UInt16], UTF16>
   let s1u16 = UTF16String(Array(s1.utf16))
   let s2u16 = UTF16String(Array(s2.utf16))
   let s3u16 = UTF16String(Array(s3.utf16))
@@ -236,7 +236,7 @@ testSuite.test("string-compare-hash") {
   let s3 = "abcde\(UnicodeScalar(0x304)!)z"
   let s4 = "abcd\(UnicodeScalar(0x113)!)z"
 
-  typealias UTF16String = UnicodeStorage<[UInt16], UTF16>
+  typealias UTF16String = _UnicodeViews<[UInt16], UTF16>
   let s1u16 = UTF16String(Array(s1.utf16))
   let s2u16 = UTF16String(Array(s2.utf16))
   let s3u16 = UTF16String(Array(s3.utf16))

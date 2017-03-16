@@ -6,7 +6,7 @@ struct SwiftCanonicalString {
   typealias Element = UInt16
   typealias CodeUnits = _StringBuffer<_UTF16StringStorage>
   typealias Encoding = UTF16
-  typealias Storage = UnicodeStorage<CodeUnits, Encoding>
+  typealias Storage = _UnicodeViews<CodeUnits, Encoding>
   var _storage: Storage
 
   // Always set at construction time, conservatively updated at modification
@@ -21,24 +21,24 @@ struct SwiftCanonicalString {
 
   // transcode and store the supplied code units
   init<OtherCodeUnits, OtherEncoding>(
-    _ other: UnicodeStorage<OtherCodeUnits, OtherEncoding>
+    _ other: _UnicodeViews<OtherCodeUnits, OtherEncoding>
   )
   // FIXME: when new integers land, we won't need this constraint anymore.
   where OtherCodeUnits.Iterator.Element : UnsignedInteger
   {
-    self._storage = UnicodeStorage(
+    self._storage = _UnicodeViews(
       CodeUnits(_UTF16StringStorage(utf16CodeUnitValues: other.transcoded(to: UTF16.self))))
   }
 
   init() {
-    self._storage = UnicodeStorage(CodeUnits(), Encoding.self)
+    self._storage = _UnicodeViews(CodeUnits(), Encoding.self)
     // Empty strings have all the encodings!
     self.isKnownASCII = true
     self.isKnownLatin1 = true
   }
 
   init(uninitializedCount count: Int) {
-    self._storage = UnicodeStorage(
+    self._storage = _UnicodeViews(
       CodeUnits(_uninitializedCount: count, minimumCapacity: count), 
       Encoding.self)
     self.isKnownASCII = true
@@ -63,7 +63,7 @@ extension SwiftCanonicalString {
   // FIXME: when new integers land, we won't need this constraint anymore.
   , OtherCodeUnits.Iterator.Element : UnsignedInteger
   {
-    self.init(UnicodeStorage(codeUnits, otherEncoding))
+    self.init(_UnicodeViews(codeUnits, otherEncoding))
   }
 }
 

@@ -8,7 +8,7 @@ struct Latin1String {
   typealias Element = UInt8
   typealias CodeUnits = _StringBuffer<_Latin1StringStorage>
   typealias Encoding = Latin1
-  typealias Storage = UnicodeStorage<CodeUnits, Encoding>
+  typealias Storage = _UnicodeViews<CodeUnits, Encoding>
   var _storage: Storage
 
   // Store some bits TODO: should be packed into our storage ref?
@@ -19,7 +19,7 @@ struct Latin1String {
 
   // Perform a copy, transcoding, and normalization of the supplied code units
   init<OtherCodeUnits, OtherEncoding>(
-    _ other: UnicodeStorage<OtherCodeUnits, OtherEncoding>
+    _ other: _UnicodeViews<OtherCodeUnits, OtherEncoding>
   ) {
     let otherLatin1 = other.transcoded(to: Encoding.self)
     let newCount = otherLatin1.count
@@ -32,18 +32,18 @@ struct Latin1String {
       newStringStorage[idx] = elt
     }
 
-    _storage = UnicodeStorage(
+    _storage = _UnicodeViews(
       CodeUnits(newStringStorage),
       Encoding.self
     )
   }
 
   init() {
-    _storage = UnicodeStorage(CodeUnits(), Encoding.self)
+    _storage = _UnicodeViews(CodeUnits(), Encoding.self)
   }
 
   init(uninitializedCount count: Int) {
-    _storage = UnicodeStorage(
+    _storage = _UnicodeViews(
       CodeUnits(_uninitializedCount: count, minimumCapacity: count), 
       Encoding.self)
   }
@@ -64,7 +64,7 @@ extension Latin1String {
     OtherCodeUnits.SubSequence.SubSequence == OtherCodeUnits.SubSequence,
     OtherCodeUnits.SubSequence.Iterator.Element == OtherCodeUnits.Iterator.Element
   {
-    self.init(UnicodeStorage(codeUnits, otherEncoding))
+    self.init(_UnicodeViews(codeUnits, otherEncoding))
   }
 }
 

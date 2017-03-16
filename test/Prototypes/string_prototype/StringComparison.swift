@@ -125,7 +125,7 @@ where
 // string's normalized unicode scalar values.
 //
 
-// Mocked-up extra bits of info we might want from Unicode/UnicodeStorage
+// Mocked-up extra bits of info we might want from Unicode/_UnicodeViews
 extension Unicode {
   // Whether the string only contains unicode scalar values in the Basic
   // Multilingual Plane (BMP). This is useful as it ensures trivial-decodability
@@ -210,7 +210,7 @@ extension Unicode {
 //
 
 
-extension UnicodeStorage {
+extension _UnicodeViews {
   // TODO: a properties struct formed by a single pass instead of the below.
 
   func isASCII(scan: Bool = true) -> Bool {
@@ -255,8 +255,8 @@ func _determineComparisonStrategy<
   RHSCodeUnits: RandomAccessCollection,
   RHSEncoding: UnicodeEncoding
 >(
-  _ lhs: UnicodeStorage<LHSCodeUnits, LHSEncoding>,
-  _ rhs: UnicodeStorage<RHSCodeUnits, RHSEncoding>
+  _ lhs: _UnicodeViews<LHSCodeUnits, LHSEncoding>,
+  _ rhs: _UnicodeViews<RHSCodeUnits, RHSEncoding>
 ) -> StringComparisonStrategy
 where
   LHSEncoding.CodeUnit: UnsignedInteger,
@@ -350,8 +350,8 @@ func _partialFastCompare<
   RHSEncoding: UnicodeEncoding
 >
 (
-  _ lhs: UnicodeStorage<LHSCodeUnits, LHSEncoding>,
-  _ rhs: UnicodeStorage<RHSCodeUnits, RHSEncoding>,
+  _ lhs: _UnicodeViews<LHSCodeUnits, LHSEncoding>,
+  _ rhs: _UnicodeViews<RHSCodeUnits, RHSEncoding>,
   preNormalized: Bool
 ) -> PartialFastCompare<LHSCodeUnits.Index, RHSCodeUnits.Index>
 where
@@ -522,7 +522,7 @@ extension EncodedScalarProtocol {
   }
 }
 
-extension UnicodeStorage
+extension _UnicodeViews
 where
   // CodeUnits.Index : UnsignedInteger,
   // FIXME: something like: CodeUnits.SubSequence == CodeUnits,
@@ -531,7 +531,7 @@ where
 {
   func ordered<
     OtherCodeUnits: RandomAccessCollection, OtherEncoding: UnicodeEncoding
-  >(with other: UnicodeStorage<OtherCodeUnits, OtherEncoding>) -> SortOrder
+  >(with other: _UnicodeViews<OtherCodeUnits, OtherEncoding>) -> SortOrder
   where
     OtherCodeUnits.Index == CodeUnits.Index,
     // OtherCodeUnits.SubSequence == OtherCodeUnits,
@@ -597,10 +597,10 @@ where
         return res
       case .moreProcessingRequired(let lhsIdx, let rhsIdx):
         // FIXME: avoid the copy into array once I get constraints right...
-        let lhsRest = _UnicodeStorage(
+        let lhsRest = _UnicodeViews_(
           lhs.codeUnits.suffix(from: lhsIdx).map { $0 }, Encoding.self
         )
-        let rhsRest = _UnicodeStorage(
+        let rhsRest = _UnicodeViews_(
           rhs.codeUnits.suffix(from: rhsIdx).map { $0 }, OtherEncoding.self
         )
         // Fall back to decoding and comparing decoded scalars
@@ -620,10 +620,10 @@ where
         return res
       case .moreProcessingRequired(let lhsIdx, let rhsIdx):
         // FIXME: avoid the copy into array once I get constraints right...
-        let lhsRest = _UnicodeStorage(
+        let lhsRest = _UnicodeViews_(
           lhs.codeUnits.suffix(from: lhsIdx).map { $0 }, Encoding.self
         )
-        let rhsRest = _UnicodeStorage(
+        let rhsRest = _UnicodeViews_(
           rhs.codeUnits.suffix(from: rhsIdx).map { $0 }, OtherEncoding.self
         )
         return lhsRest.fccNormalizedUTF16.lexicographicCompare(

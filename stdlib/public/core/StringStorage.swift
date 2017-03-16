@@ -135,14 +135,14 @@ extension _UTF16StringStorage : _FixedFormatUnicode {
   // WORKAROUND: helping type inference along will be unnecessary someday
   public typealias RawUTF16View = _UTF16StringStorage
   public typealias CodeUnits = _UTF16StringStorage
-  public typealias FCCNormalizedUTF16View = UnicodeStorage<
+  public typealias FCCNormalizedUTF16View = _UnicodeViews<
     CodeUnits, Encoding
   >.FCCNormalizedUTF16View
   
-  public typealias CharacterView = UnicodeStorage<CodeUnits,Encoding>.CharacterView
+  public typealias CharacterView = _UnicodeViews<CodeUnits,Encoding>.CharacterView
 
   public typealias UnicodeScalarView = LazyMapBidirectionalCollection<
-    UnicodeStorage<CodeUnits,Encoding>.ScalarsTranscoded<UTF32>
+    _UnicodeViews<CodeUnits,Encoding>.ScalarsTranscoded<UTF32>
   , UnicodeScalar
   >
   
@@ -301,7 +301,7 @@ extension _UTF16StringStorage : _FixedFormatUnicode {
 
       self.init(count: count)
       withUnsafeMutableBufferPointer {
-        UnicodeStorage(
+        _UnicodeViews(
           other.codeUnits, Other.Encoding.self).transcoded(
           to: UTF16.self
         )._copyCompleteContents(initializing: $0)
@@ -469,25 +469,25 @@ extension _UTF8StringStorage : _FixedFormatUnicode {
   // WORKAROUND: helping type inference along will be unnecessary someday
   public typealias CodeUnits = _UTF8StringStorage
   
-  public typealias RawUTF16View = UnicodeStorage<
+  public typealias RawUTF16View = _UnicodeViews<
     CodeUnits, Encoding
   >.TranscodedView<UTF16>
 
-  public typealias FCCNormalizedUTF16View = UnicodeStorage<
+  public typealias FCCNormalizedUTF16View = _UnicodeViews<
     CodeUnits, Encoding
   >.FCCNormalizedUTF16View
 
-  public typealias CharacterView = UnicodeStorage<CodeUnits,Encoding>.CharacterView
+  public typealias CharacterView = _UnicodeViews<CodeUnits,Encoding>.CharacterView
 
   public typealias UnicodeScalarView = LazyMapBidirectionalCollection<
-    UnicodeStorage<CodeUnits,Encoding>.ScalarsTranscoded<UTF32>
+    _UnicodeViews<CodeUnits,Encoding>.ScalarsTranscoded<UTF32>
   , UnicodeScalar
   >
   
   public var codeUnits: CodeUnits { return self }
   public var rawUTF16: RawUTF16View { return RawUTF16View(self) }
   public var fccNormalizedUTF16: FCCNormalizedUTF16View {
-    return UnicodeStorage(self, UTF8.self).fccNormalizedUTF16
+    return _UnicodeViews(self, UTF8.self).fccNormalizedUTF16
   }
 }
 
