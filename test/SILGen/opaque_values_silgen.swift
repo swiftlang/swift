@@ -2,6 +2,10 @@
 
 // UNSUPPORTED: resilient_stdlib
 
+struct TrivialStruct {
+  var x: Int
+}
+
 protocol Foo {
   func foo()
 }
@@ -9,6 +13,10 @@ protocol Foo {
 protocol P {
   var x : Int { get }
 }
+
+protocol P2 : P {}
+
+extension TrivialStruct : P2 {}
 
 struct Box<T> {
   let t: T
@@ -40,6 +48,22 @@ enum AddressOnlyEnum {
   case mere(EmptyP)
   case phantom(AddressOnlyStruct)
 }
+
+// part of s280_convExistTrivial: conversion between existential types - reabstraction thunk
+// ---
+// CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_T020opaque_values_silgen1P_pAA13TrivialStructVIxid_AA2P2_pAaE_pIxir_TR : $@convention(thin) (@in P2, @owned @callee_owned (@in P) -> TrivialStruct) -> @out P2 {
+// CHECK: bb0([[ARG0:%.*]] : $P2, [[ARG1:%.*]] : $@callee_owned (@in P) -> TrivialStruct):
+// CHECK:   [[OPENED_ARG:%.*]] = open_existential_opaque [[ARG0]] : $P2 to $@opened({{.*}}) P2
+// CHECK:   [[INIT_P:%.*]] = init_existential_opaque [[OPENED_ARG]] : $@opened({{.*}}) P2, $@opened({{.*}}) P2, $P
+// CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[INIT_P]]
+// CHECK:   [[APPLY_P:%.*]] = apply [[ARG1]]([[BORROWED_ARG]]) : $@callee_owned (@in P) -> TrivialStruct
+// CHECK:   [[RETVAL:%.*]] = init_existential_opaque [[APPLY_P]] : $TrivialStruct, $TrivialStruct, $P2
+// CHECK:   end_borrow [[BORROWED_ARG]] from [[INIT_P]] : $P, $P
+// CHECK:   destroy_value [[OPENED_ARG]]
+// CHECK:   deinit_existential_opaque [[ARG0]]
+// CHECK:   return [[RETVAL]] : $P2
+// CHECK-LABEL: } // end sil function '_T020opaque_values_silgen1P_pAA13TrivialStructVIxid_AA2P2_pAaE_pIxir_TR'
+
 
 // Test that we still use addresses when dealing with array initialization
 // ---
@@ -483,6 +507,22 @@ func s260_______AOnly_enum(_ s: AddressOnlyStruct) {
 func s270_convOptAnyStruct(_ a1: @escaping (AnyStruct?) -> AnyStruct) {
   let _: (AnyStruct?) -> AnyStruct? = a1
   let _: (AnyStruct!) -> AnyStruct? = a1
+}
+
+// Tests conversion between existential types
+// ---
+// CHECK-LABEL: sil hidden @_T020opaque_values_silgen21s280_convExistTrivialyAA0G6StructVAA1P_pcF : $@convention(thin) (@owned @callee_owned (@in P) -> TrivialStruct) -> () {
+// CHECK: bb0([[ARG:%.*]] : $@callee_owned (@in P) -> TrivialStruct):
+// CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
+// CHECK:   [[COPY_ARG:%.*]] = copy_value [[BORROWED_ARG]]
+// CHECK:   [[PAPPLY:%.*]] = partial_apply %{{.*}}([[COPY_ARG]]) : $@convention(thin) (@in P2, @owned @callee_owned (@in P) -> TrivialStruct) -> @out P2
+// CHECK:   destroy_value [[PAPPLY]] : $@callee_owned (@in P2) -> @out P2
+// CHECK:   end_borrow [[BORROWED_ARG]] from [[ARG]] : $@callee_owned (@in P) -> TrivialStruct
+// CHECK:   destroy_value [[ARG]]
+// CHECK:   return %{{.*}} : $()
+// CHECK-LABEL: } // end sil function '_T020opaque_values_silgen21s280_convExistTrivialyAA0G6StructVAA1P_pcF'
+func s280_convExistTrivial(_ s: @escaping (P) -> TrivialStruct) {
+  let _: (P2) -> P2 = s
 }
 
 // Tests conditional value casts and correspondingly generated reabstraction thunk, with <T> types

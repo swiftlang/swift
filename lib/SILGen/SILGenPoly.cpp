@@ -1300,13 +1300,30 @@ namespace {
       }
       case ParameterConvention::Indirect_In:
       case ParameterConvention::Indirect_In_Guaranteed: {
-        // We need to translate into a temporary.
-        auto &outputTL = SGF.getTypeLowering(SGF.getSILType(result));
-        auto temp = SGF.emitTemporary(Loc, outputTL);
-        translateSingleInto(inputOrigType, inputSubstType,
-                            outputOrigType, outputSubstType,
-                            input, *temp);
-        Outputs.push_back(temp->getManagedAddress());
+        if (SGF.silConv.useLoweredAddresses()) {
+          // We need to translate into a temporary.
+          auto &outputTL = SGF.getTypeLowering(SGF.getSILType(result));
+          auto temp = SGF.emitTemporary(Loc, outputTL);
+          translateSingleInto(inputOrigType, inputSubstType, outputOrigType,
+                              outputSubstType, input, *temp);
+          Outputs.push_back(temp->getManagedAddress());
+        } else {
+          auto output =
+              translatePrimitive(inputOrigType, inputSubstType, outputOrigType,
+                                 outputSubstType, input);
+          assert(output.getType() == SGF.getSILType(result));
+
+          if (output.getOwnershipKind() == ValueOwnershipKind::Unowned) {
+            assert(!output.hasCleanup());
+            output = SGF.emitManagedRetain(Loc, output.getValue());
+          }
+
+          if (output.getOwnershipKind() == ValueOwnershipKind::Owned) {
+            output = SGF.emitManagedBeginBorrow(Loc, output.getValue());
+          }
+
+          Outputs.push_back(output);
+        }
         return;
       }
       case ParameterConvention::Indirect_InoutAliasable: {
