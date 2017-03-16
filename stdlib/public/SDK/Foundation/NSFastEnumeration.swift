@@ -16,63 +16,52 @@
 //===----------------------------------------------------------------------===//
 // Fast enumeration
 //===----------------------------------------------------------------------===//
-
-// NB: This is a class because fast enumeration passes around interior pointers
-// to the enumeration state, so the state cannot be moved in memory. We will
-// probably need to implement fast enumeration in the compiler as a primitive
-// to implement it both correctly and efficiently.
-final public class NSFastEnumerationIterator : IteratorProtocol {
-  var enumerable: NSFastEnumeration
-  var state: [NSFastEnumerationState]
-  var n: Int
-  var count: Int
-
-  /// Size of ObjectsBuffer, in ids.
-  static var STACK_BUF_SIZE: Int { return 4 }
-
-  var objects: [Unmanaged<AnyObject>?]
-
-  public func next() -> Any? {
-    if n == count {
-      // FIXME: Is this check necessary before refresh()?
-      if count == 0 { return nil }
-      refresh()
-      if count == 0 { return nil }
+public struct NSFastEnumerationIterator : IteratorProtocol {
+    var enumerable: NSFastEnumeration
+    var objects: (Unmanaged<AnyObject>?, Unmanaged<AnyObject>?, Unmanaged<AnyObject>?, Unmanaged<AnyObject>?, Unmanaged<AnyObject>?, Unmanaged<AnyObject>?, Unmanaged<AnyObject>?, Unmanaged<AnyObject>?, Unmanaged<AnyObject>?, Unmanaged<AnyObject>?, Unmanaged<AnyObject>?, Unmanaged<AnyObject>?, Unmanaged<AnyObject>?, Unmanaged<AnyObject>?, Unmanaged<AnyObject>?, Unmanaged<AnyObject>?) = (nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil)
+    var state = NSFastEnumerationState(state: 0, itemsPtr: nil, mutationsPtr: _fastEnumerationStorageMutationsPtr, extra: (0, 0, 0, 0, 0))
+    var index = 0
+    var count = 0
+    var useObjectsBuffer = false
+    
+    public init(_ enumerable: NSFastEnumeration) {
+        self.enumerable = enumerable
     }
-    let next: Any = state[0].itemsPtr![n]!
-    n += 1
-    return next
-  }
-
-  func refresh() {
-    _sanityCheck(objects.count > 0)
-    n = 0
-    objects.withUnsafeMutableBufferPointer {
-      count = enumerable.countByEnumerating(
-        with: &state,
-        objects: AutoreleasingUnsafeMutablePointer($0.baseAddress!),
-        count: $0.count)
+    
+    public mutating func next() -> Any? {
+        if index + 1 > count {
+            index = 0
+            count = withUnsafeMutablePointer(to: &objects) {
+                let buffer = AutoreleasingUnsafeMutablePointer<AnyObject?>($0)
+                let result = enumerable.countByEnumerating(with: &state, objects: buffer, count: 16)
+                if state.itemsPtr == buffer {
+                    // Most cocoa classes will emit their own inner pointer buffers instead of traversing this path.
+                    useObjectsBuffer = true
+                } else {
+                    // this is the common case
+                    useObjectsBuffer = false
+                }
+                return result
+            }
+            if count == 0 { return nil }
+        }
+        defer { index += 1 }
+        if !useObjectsBuffer {
+            return state.itemsPtr![index]
+        } else {
+            return withUnsafePointer(to: &objects) {
+                let ptr = UnsafeRawPointer($0).assumingMemoryBound(to: Optional<Unmanaged<AnyObject>>.self)
+                return ptr.advanced(by: index).pointee?.takeUnretainedValue()
+            }
+        }
     }
-  }
-
-  public init(_ enumerable: NSFastEnumeration) {
-    self.enumerable = enumerable
-    self.state = [ NSFastEnumerationState(
-      state: 0, itemsPtr: nil,
-      mutationsPtr: _fastEnumerationStorageMutationsPtr,
-      extra: (0, 0, 0, 0, 0)) ]
-    self.objects = Array(
-      repeating: nil, count: NSFastEnumerationIterator.STACK_BUF_SIZE)
-    self.n = -1
-    self.count = -1
-  }
 }
 
 extension NSEnumerator : Sequence {
-  /// Return an *iterator* over the *enumerator*.
-  ///
-  /// - Complexity: O(1).
-  public func makeIterator() -> NSFastEnumerationIterator {
-    return NSFastEnumerationIterator(self)
-  }
+    /// Return an *iterator* over the *enumerator*.
+    ///
+    /// - Complexity: O(1).
+    public func makeIterator() -> NSFastEnumerationIterator {
+        return NSFastEnumerationIterator(self)
+    }
 }
