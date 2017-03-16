@@ -322,7 +322,7 @@ static bool hasUnhandledError(ArrayRef<ASTNode> Nodes) {
 
 static bool
 hasNodeThat(ArrayRef<ASTNode> Nodes, llvm::function_ref<bool(ASTNode)> Pred) {
-  return std::find_if(Nodes.begin(), Nodes.end(), Pred) != Nodes.end();
+  return std::any_of(Nodes.begin(), Nodes.end(), Pred);
 }
 
 struct RangeResolver::Implementation {
