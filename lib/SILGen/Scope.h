@@ -14,8 +14,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SCOPE_H
-#define SCOPE_H
+#ifndef SWIFT_SILGEN_SCOPE_H
+#define SWIFT_SILGEN_SCOPE_H
 
 #include "SILGenFunction.h"
 #include "swift/SIL/SILDebugScope.h"
