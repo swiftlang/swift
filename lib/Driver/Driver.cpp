@@ -1279,7 +1279,7 @@ void Driver::buildActions(const ToolChain &TC,
     JobAction *PCH = nullptr;
     if (Args.hasFlag(options::OPT_enable_bridging_pch,
                      options::OPT_disable_bridging_pch,
-                     true)) {
+                     false)) {
       if (Arg *A = Args.getLastArg(options::OPT_import_objc_header)) {
         StringRef Value = A->getValue();
         auto Ty = TC.lookupTypeForExtension(llvm::sys::path::extension(Value));
