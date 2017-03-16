@@ -397,6 +397,14 @@ private:
         if (auto RS = dyn_cast<ReturnStmt>(N.get<Stmt*>())) {
           return resolveNodeType(RS->getResult(), RangeKind::SingleExpression);
         }
+
+        // Unbox the brace statement to find its type.
+        if (auto BS = dyn_cast<BraceStmt>(N.get<Stmt*>())) {
+          if (!BS->getElements().empty()) {
+            return resolveNodeType(BS->getElements().back(),
+                                   RangeKind::SingleStatement);
+          }
+        }
       }
       // For other statements, the type should be void.
       return Ctx.getVoidDecl()->getDeclaredInterfaceType();
