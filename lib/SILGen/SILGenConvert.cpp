@@ -47,7 +47,7 @@ SILGenFunction::emitInjectOptional(SILLocation loc,
 
   // If the value is loadable, just emit and wrap.
   // TODO: honor +0 contexts?
-  if (optTL.isLoadable()) {
+  if (optTL.isLoadable() || !silConv.useLoweredAddresses()) {
     ManagedValue objectResult = generator(SGFContext());
     auto some = B.createEnum(loc, objectResult.forward(*this), someDecl, optTy);
     return emitManagedRValueWithCleanup(some, optTL);
