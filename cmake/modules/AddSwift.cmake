@@ -634,6 +634,10 @@ function(_add_swift_library_single target name)
     endif()
   endif()
 
+  if(SWIFT_RUNTIME_ENABLE_COW_EXISTENTIALS)
+    list(APPEND SWIFTLIB_SINGLE_C_COMPILE_FLAGS "-DSWIFT_RUNTIME_ENABLE_COW_EXISTENTIALS=1")
+  endif()
+
   if (SWIFT_COMPILER_VERSION)
     is_darwin_based_sdk("${SWIFTLIB_SINGLE_SDK}" IS_DARWIN)
     if(IS_DARWIN)

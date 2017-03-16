@@ -945,3 +945,44 @@ void irgen::emitDestroyCall(IRGenFunction &IGF, llvm::Value *metadata,
   call->setCallingConv(IGF.IGM.DefaultCC);
   setHelperAttributes(call);
 }
+
+Address irgen::emitAllocateValueInBuffer(IRGenFunction &IGF, SILType type,
+                                         Address buffer) {
+  auto *size = emitLoadOfSize(IGF, type);
+  auto *alignMask = emitLoadOfAlignmentMask(IGF, type);
+  // TODO: check whether we fit in the inline value buffer.
+  auto valueAddr = IGF.emitAllocRawCall(size, alignMask, "outline.ValueBuffer");
+  IGF.Builder.CreateStore(
+      valueAddr,
+      Address(IGF.Builder.CreateBitCast(buffer.getAddress(),
+                                        valueAddr->getType()->getPointerTo()),
+              Alignment(1)));
+  valueAddr =
+      IGF.Builder.CreateBitCast(valueAddr, IGF.IGM.getStoragePointerType(type));
+  return Address(valueAddr, Alignment(1));
+
+}
+
+Address irgen::emitProjectValueInBuffer(IRGenFunction &IGF,
+                            SILType type,
+                            Address buffer) {
+  // TODO: check whether we fit in the inline value buffer.
+  auto ptr = IGF.Builder.CreateLoad(Address(
+      IGF.Builder.CreateBitCast(buffer.getAddress(), IGF.IGM.Int8PtrPtrTy),
+      Alignment(1)));
+  auto valueAddr =
+      IGF.Builder.CreateBitCast(ptr, IGF.IGM.getStoragePointerType(type));
+  return Address(valueAddr, Alignment(1));
+}
+
+void irgen::emitDeallocateValueInBuffer(IRGenFunction &IGF,
+                                 SILType type,
+                                 Address buffer) {
+  auto *size = emitLoadOfSize(IGF, type);
+  auto *alignMask = emitLoadOfAlignmentMask(IGF, type);
+  auto *ptr = IGF.Builder.CreateLoad(Address(
+      IGF.Builder.CreateBitCast(buffer.getAddress(), IGF.IGM.Int8PtrPtrTy),
+      Alignment(1)));
+  // TODO: check whether we fit in the inline value buffer.
+  IGF.emitDeallocRawCall(ptr, size, alignMask);
+}
