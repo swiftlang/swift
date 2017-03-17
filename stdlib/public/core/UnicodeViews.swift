@@ -30,6 +30,8 @@ internal func __swift_stdlib_U_FAILURE(_ x: __swift_stdlib_UErrorCode) -> Bool {
  return x.rawValue > __swift_stdlib_U_ZERO_ERROR.rawValue
 }
 
+/// Unicode views should conform to this protocol, which supports index
+/// interchange and String type erasure.
 public protocol UnicodeView : BidirectionalCollection {
   func index(atCodeUnitOffset: Int64) -> Index
   static func codeUnitOffset(of: Index) -> Int64
@@ -59,6 +61,7 @@ where Encoding.EncodedScalar.Iterator.Element == CodeUnits.Iterator.Element,
   public var codeUnits: CodeUnits
 }
 
+//===--- Helper typealias -------------------------------------------------===//
 /// A straightforward typealias for _UnicodeViews
 ///
 /// Use this to escape the automatic deduction of the generic arguments given
@@ -73,7 +76,11 @@ where Encoding.EncodedScalar.Iterator.Element == CodeUnits.Iterator.Element,
   CodeUnits.SubSequence.Index == CodeUnits.Index,
   CodeUnits.SubSequence.SubSequence == CodeUnits.SubSequence,
 CodeUnits.SubSequence.Iterator.Element == CodeUnits.Iterator.Element
+//===----------------------------------------------------------------------===//
 
+//===----------------------------------------------------------------------===//
+// _UnicodeViews.EncodedScalars
+//===----------------------------------------------------------------------===//
 /// A lazy collection of `Encoding.EncodedScalar` that results
 /// from parsing an instance of codeUnits using that `Encoding`.
 extension _UnicodeViews {
@@ -87,24 +94,30 @@ extension _UnicodeViews {
 }
 
 extension _UnicodeViews.EncodedScalars {
-  // Because parsing produces a buffer and a new index, to avoid
-  // repeatedly decoding the same data, this index stores that buffer
-  // and the next index.  This would obviously be more complicated if
-  // the buffer contained more than a single scalar (and it probably
-  // should).
   public struct Index : Comparable {
+    // In one call, parsing produces both:
+    // - the buffer of code units comprising the scalar and
+    // - the position of the next scalar
+    // In a typical subscript-and-advance loop, the same call would need to be
+    // repeated twice for each iteration if we didn't store all that information
+    // in this index.
+    //
+    // When parsing is updated to handle a larger chunk at a time (e.g. a SIMD
+    // vector's worth), this will become more complicated/fun.
+    let base: CodeUnits.IndexDistance
+    let scalar: Encoding.EncodedScalar?
+    let count: UInt8
+
+    // Having an init makes us impervious to member reordering.
     init(
       base: CodeUnits.IndexDistance,
       count: UInt8,
-      scalar: Encoding.EncodedScalar?
+      scalar: Encoding.EncodedScalar? // There can be no scalar at the end index
     ) {
       self.base = base
       self.count = count
       self.scalar = scalar
     }
-    let base: CodeUnits.IndexDistance
-    let scalar: Encoding.EncodedScalar?
-    let count: UInt8
 
     public static func < (lhs: Index, rhs: Index) -> Bool {
       return lhs.base < rhs.base
@@ -135,6 +148,7 @@ extension _UnicodeViews.EncodedScalars : BidirectionalCollection {
   }
 
   public func index(after i: Index) -> Index {
+    // Parse forward from the beginning of the next encoded unicode scalar
     let startOffset = i.base + i.count^
     let start = codeUnits.index(atOffset: startOffset)
     var remainder = codeUnits[start...]
@@ -151,9 +165,8 @@ extension _UnicodeViews.EncodedScalars : BidirectionalCollection {
           let count = codeUnits.distance(from: start, to: next)
           return Index(base: startOffset, count: count^, scalar: r)
         }
-          // the encoding couldn't represent a replacement character, so the
-          // best we can do is to drop that scalar on the floor and keep going.
-          remainder = codeUnits[next...]
+        // Replacement character not representable; drop the scalar and continue
+        remainder = codeUnits[next...]
         
       case .emptyInput:
         return endIndex
@@ -162,6 +175,7 @@ extension _UnicodeViews.EncodedScalars : BidirectionalCollection {
   }
 
   public func index(before i: Index) -> Index {
+    // Parse backward from the beginning of the current encoded unicode scalar
     let end = codeUnits.index(atOffset: i.base)
     var remainder = codeUnits[..<end]
     while true {
@@ -178,8 +192,7 @@ extension _UnicodeViews.EncodedScalars : BidirectionalCollection {
           return Index(
             base: codeUnits.offset(of: prior), count: count^, scalar: r)
         }
-        // the encoding couldn't represent a replacement character, so the
-        // best we can do is to drop that scalar on the floor and keep going.
+        // Replacement character not representable; drop the scalar and continue
         remainder = codeUnits[..<prior]
         
       case .emptyInput:
@@ -189,6 +202,19 @@ extension _UnicodeViews.EncodedScalars : BidirectionalCollection {
   }
 }
 
+extension _UnicodeViews.EncodedScalars : UnicodeView {
+  public func index(atCodeUnitOffset offset: Int64) -> Index {
+    return index(after: Index(base: offset^, count: 0, scalar: nil))
+  }
+  public static func codeUnitOffset(of i: Index) -> Int64 {
+    return numericCast(i.base)
+  }
+}
+
+
+//===----------------------------------------------------------------------===//
+// _UnicodeViews.ScalarsTranscoded<ToEncoding>
+//===----------------------------------------------------------------------===//
 extension _UnicodeViews {
   public typealias ScalarsTranscoded<ToEncoding : UnicodeEncoding>
   = LazyMapBidirectionalCollection<EncodedScalars, ToEncoding.EncodedScalar>
@@ -201,25 +227,30 @@ extension _UnicodeViews {
       dst.encode($0)!
     }
   }
-    
-  public func transcoded<OtherEncoding: UnicodeEncoding>(
-    to otherEncoding: OtherEncoding.Type
-  ) -> TranscodedView<OtherEncoding> {
-    return type(of: self).TranscodedView(self.codeUnits, to: otherEncoding)
-  }
-
-  public typealias TranscodedView<ToEncoding : UnicodeEncoding>
-    = _TranscodedView<CodeUnits, Encoding, ToEncoding>
 }
 
-/// Given `CodeUnits` representing text that has been encoded with
-/// `FromEncoding`, provides a collection of `ToEncoding.CodeUnit`s
-/// representing the same text.
+//===----------------------------------------------------------------------===//
+// _UnicodeViews.TranscodedView<ToEncoding>
+//===----------------------------------------------------------------------===//
+extension _UnicodeViews {
+  public typealias TranscodedView<ToEncoding : UnicodeEncoding>
+  = _TranscodedView<CodeUnits, Encoding, ToEncoding>
+  
+  public func transcoded<ToEncoding: UnicodeEncoding>(
+    to targetEncoding: ToEncoding.Type
+  ) -> TranscodedView<ToEncoding> {
+    return type(of: self).TranscodedView(self.codeUnits, to: targetEncoding)
+  }
+}
+  /// Given `CodeUnits` representing text that has been encoded with
+  /// `FromEncoding`, provides a collection of `ToEncoding.CodeUnit`s
+  /// representing the same text.
 public struct _TranscodedView<
-  CodeUnits : RandomAccessCollection,
-  FromEncoding_ : UnicodeEncoding,
-  ToEncoding : UnicodeEncoding
-> : BidirectionalCollection
+CodeUnits : RandomAccessCollection,
+FromEncoding_ : UnicodeEncoding,
+ToEncoding : UnicodeEncoding
+> 
+	: BidirectionalCollection 
 where FromEncoding_.EncodedScalar.Iterator.Element == CodeUnits.Iterator.Element,
   CodeUnits.SubSequence : RandomAccessCollection,
   CodeUnits.SubSequence.Index == CodeUnits.Index,
@@ -227,21 +258,27 @@ where FromEncoding_.EncodedScalar.Iterator.Element == CodeUnits.Iterator.Element
   CodeUnits.SubSequence.Iterator.Element == CodeUnits.Iterator.Element
 {
   public typealias FromEncoding = FromEncoding_
-  
-  public typealias Base = FlattenBidirectionalCollection<
-    _UnicodeViews<CodeUnits.SubSequence, FromEncoding>.ScalarsTranscoded<ToEncoding>
-  >
-  public typealias Index = Base.Index
-  
-  var base: Base { return _base(from: codeUnits.startIndex) }
-  
+    
   let codeUnits: CodeUnits
 
+  // This view is, in spirit, the result of flattening the ScalarsTranscoded
+  // view.  We flatten that view of the codeUnits' slice type just to make
+  // index translation more straightforward.
+  public typealias Base = FlattenBidirectionalCollection<
+    _UnicodeViews<CodeUnits.SubSequence, FromEncoding>
+    .ScalarsTranscoded<ToEncoding>
+  >
+  public typealias Index = Base.Index
+
+  var base: Base { return _base(from: codeUnits.startIndex) }
+
+  /// Returns an instance of Base that starts at the given position in the
+  /// underlying code units.
   internal func _base(from start: CodeUnits.Index) -> Base {
     return Base(
-      _UnicodeViews(codeUnits[start...]).scalarsTranscoded(to: ToEncoding.self))
+      _UnicodeViews_(codeUnits[start...]).scalarsTranscoded(to: ToEncoding.self))
   }
-  
+
   public init(_ codeUnits: CodeUnits,
     from src: FromEncoding.Type = FromEncoding.self,
     to dst: ToEncoding.Type = ToEncoding.self
@@ -249,6 +286,8 @@ where FromEncoding_.EncodedScalar.Iterator.Element == CodeUnits.Iterator.Element
     self.codeUnits = codeUnits
   }
 
+  // FIXME: create generalized [Bidi|Random]CollectionWrapper protocols
+  // instead of repeating this boilerplate.
   public var startIndex : Base.Index {
     return base.startIndex
   }
@@ -264,8 +303,13 @@ where FromEncoding_.EncodedScalar.Iterator.Element == CodeUnits.Iterator.Element
   public func index(before i: Base.Index) -> Base.Index {
     return base.index(before: i)
   }
+  public typealias Segments = Base.Segments
+  public var segments: Segments? { return base.segments }
+
+  // FIXME: use Base.SubSequence?
   public typealias SubSequence = BidirectionalSlice<_TranscodedView>
 }
+
 
 extension _TranscodedView : UnicodeView {
   public func index(atCodeUnitOffset offset: Int64) -> Base.Index {

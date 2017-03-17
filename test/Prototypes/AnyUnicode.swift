@@ -363,7 +363,7 @@ extension AnyUTF16 {
   CodeUnits.SubSequence.Index == CodeUnits.Index,
   CodeUnits.SubSequence.SubSequence == CodeUnits.SubSequence,
   CodeUnits.SubSequence.Iterator.Element == CodeUnits.Iterator.Element {
-    self.base = Eraser(
+    base = Eraser(
       _UnicodeViews(codeUnits[...], Encoding.self).transcoded(to: UTF16.self))
   }
 }
