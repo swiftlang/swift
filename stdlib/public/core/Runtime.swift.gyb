@@ -454,6 +454,8 @@ func _uint64ToString(
   }
 }
 
+@_inlineable
+@_versioned
 func _rawPointerToString(_ value: Builtin.RawPointer) -> String {
   var result = _uint64ToString(
     UInt64(

@@ -49,12 +49,14 @@ extension LazyCollectionProtocol where Elements == Self {
 /// implemented lazily.
 ///
 /// - See also: `LazySequenceProtocol`, `LazyCollection`
+@_fixed_layout
 public struct ${Self}<Base : ${TraversalCollection}> : LazyCollectionProtocol {
 
   /// The type of the underlying collection.
   public typealias Elements = Base
 
   /// The underlying collection.
+  @_inlineable
   public var elements: Elements { return _base }
 
   /// A type that represents a valid position in the collection.
@@ -65,10 +67,13 @@ public struct ${Self}<Base : ${TraversalCollection}> : LazyCollectionProtocol {
 
   /// Creates an instance with `base` as its underlying Collection
   /// instance.
+  @_inlineable
+  @_versioned
   internal init(_base: Base) {
     self._base = _base
   }
 
+  @_versioned
   internal var _base: Base
 }
 
@@ -81,6 +86,7 @@ extension ${Self} : Sequence {
   /// Returns an iterator over the elements of this sequence.
   ///
   /// - Complexity: O(1).
+  @_inlineable
   public func makeIterator() -> Iterator {
     return _base.makeIterator()
   }
@@ -89,19 +95,23 @@ extension ${Self} : Sequence {
   /// `self`, **nondestructively**.
   ///
   /// - Complexity: O(*n*)
+  @_inlineable
   public var underestimatedCount: Int { return _base.underestimatedCount }
 
+  @_inlineable
   public func _copyToContiguousArray()
      -> ContiguousArray<Base.Iterator.Element> {
     return _base._copyToContiguousArray()
   }
 
+  @_inlineable
   public func _copyContents(
     initializing buf: UnsafeMutableBufferPointer<Iterator.Element>
   ) -> (Iterator,UnsafeMutableBufferPointer<Iterator.Element>.Index) {
     return _base._copyContents(initializing: buf)
   }
 
+  @_inlineable
   public func _customContainsEquatableElement(
     _ element: Base.Iterator.Element
   ) -> Bool? {
@@ -113,6 +123,7 @@ extension ${Self} : ${TraversalCollection} {
   /// The position of the first element in a non-empty collection.
   ///
   /// In an empty collection, `startIndex == endIndex`.
+  @_inlineable
   public var startIndex: Base.Index {
     return _base.startIndex
   }
@@ -122,15 +133,18 @@ extension ${Self} : ${TraversalCollection} {
   ///
   /// `endIndex` is always reachable from `startIndex` by zero or more
   /// applications of `index(after:)`.
+  @_inlineable
   public var endIndex: Base.Index {
     return _base.endIndex
   }
 
+  @_inlineable
   public var indices: Base.Indices {
     return _base.indices
   }
 
   // TODO: swift-3-indexing-model - add docs
+  @_inlineable
   public func index(after i: Base.Index) -> Base.Index {
     return _base.index(after: i)
   }
@@ -139,6 +153,7 @@ extension ${Self} : ${TraversalCollection} {
   ///
   /// - Precondition: `position` is a valid position in `self` and
   ///   `position != endIndex`.
+  @_inlineable
   public subscript(position: Base.Index) -> Base.Iterator.Element {
     return _base[position]
   }
@@ -147,11 +162,13 @@ extension ${Self} : ${TraversalCollection} {
   /// `self`'s elements.
   ///
   /// - Complexity: O(1)
+  @_inlineable
   public subscript(bounds: Range<Index>) -> ${Self}<${Slice}<Base>> {
     return ${Slice}(base: _base, bounds: bounds).lazy
   }
 
   /// A Boolean value indicating whether the collection is empty.
+  @_inlineable
   public var isEmpty: Bool {
     return _base.isEmpty
   }
@@ -165,6 +182,7 @@ extension ${Self} : ${TraversalCollection} {
   ///
   /// - Complexity: O(1) if `Self` conforms to `RandomAccessCollection`;
   ///   O(*n*) otherwise.
+  @_inlineable
   public var count: Base.IndexDistance {
     return _base.count
   }
@@ -176,6 +194,7 @@ extension ${Self} : ${TraversalCollection} {
   /// `nil` otherwise.
   ///
   /// - Complexity: O(*n*)
+  @_inlineable
   public func _customIndexOfEquatableElement(
     _ element: Base.Iterator.Element
   ) -> Index?? {
@@ -183,16 +202,19 @@ extension ${Self} : ${TraversalCollection} {
   }
 
   /// Returns the first element of `self`, or `nil` if `self` is empty.
+  @_inlineable
   public var first: Base.Iterator.Element? {
     return _base.first
   }
 
   // TODO: swift-3-indexing-model - add docs
+  @_inlineable
   public func index(_ i: Index, offsetBy n: Base.IndexDistance) -> Index {
     return _base.index(i, offsetBy: n)
   }
 
   // TODO: swift-3-indexing-model - add docs
+  @_inlineable
   public func index(
     _ i: Index, offsetBy n: Base.IndexDistance, limitedBy limit: Index
   ) -> Index? {
@@ -200,16 +222,19 @@ extension ${Self} : ${TraversalCollection} {
   }
 
   // TODO: swift-3-indexing-model - add docs
+  @_inlineable
   public func distance(from start: Index, to end: Index) -> Base.IndexDistance {
     return _base.distance(from:start, to: end)
   }
 
 %   if Traversal != 'Forward':
 
+  @_inlineable
   public func index(before i: Base.Index) -> Base.Index {
     return _base.index(before: i)
   }
 
+  @_inlineable
   public var last: Base.Iterator.Element? {
     return _base.last
   }
@@ -226,6 +251,7 @@ extension ${TraversalCollection} {
   /// need a part of the final collection to avoid unnecessary computation.
   ///
   /// - SeeAlso: `LazySequenceProtocol`, `LazyCollectionProtocol`.
+  @_inlineable
   public var lazy: ${Self}<Self> {
     return ${Self}(_base: self)
   }
@@ -235,6 +261,7 @@ extension ${TraversalCollection} {
 // LazyCollectionProtocol (below) is not selected for some reason.
 extension ${TraversalCollection} where Self : LazyCollectionProtocol {
   /// Identical to `self`.
+  @_inlineable
   public var lazy: Self { // Don't re-wrap already-lazy collections
     return self
   }
