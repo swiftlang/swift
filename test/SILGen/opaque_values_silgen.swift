@@ -577,6 +577,22 @@ func s300__convETupleToAny(_ t: @escaping () -> ()) {
   let _: () -> Any = t
 }
 
+// Tests corner-case: reabstraction of an non-empty tuple to any
+// ---
+// CHECK-LABEL: sil hidden @_T020opaque_values_silgen21s310__convIntTupleAnyySi_SitycF : $@convention(thin) (@owned @callee_owned () -> (Int, Int)) -> () {
+// CHECK: bb0([[ARG:%.*]] : $@callee_owned () -> (Int, Int)):
+// CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
+// CHECK:   [[COPY_ARG:%.*]] = copy_value [[BORROWED_ARG]]
+// CHECK:   [[PAPPLY:%.*]] = partial_apply %{{.*}}([[COPY_ARG]]) : $@convention(thin) (@owned @callee_owned () -> (Int, Int)) -> @out Any
+// CHECK:   destroy_value [[PAPPLY]] : $@callee_owned () -> @out Any
+// CHECK:   end_borrow [[BORROWED_ARG]] from [[ARG]] : $@callee_owned () -> (Int, Int), $@callee_owned () -> (Int, Int)
+// CHECK:   destroy_value [[ARG]]
+// CHECK:   return %{{.*}} : $()
+// CHECK-LABEL: } // end sil function '_T020opaque_values_silgen21s310__convIntTupleAnyySi_SitycF'
+func s310__convIntTupleAny(_ t: @escaping () -> (Int, Int)) {
+  let _: () -> Any = t
+}
+
 // Tests conditional value casts and correspondingly generated reabstraction thunk, with <T> types
 // ---
 // CHECK-LABEL: sil hidden @_T020opaque_values_silgen21s999_____condTFromAnyyyp_xtlF : $@convention(thin) <T> (@in Any, @in T) -> () {
@@ -617,13 +633,33 @@ func s999_____condTFromAny<T>(_ x: Any, _ y: T) {
 // ---
 // CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_T0Ix_ypIxr_TR : $@convention(thin) (@owned @callee_owned () -> ()) -> @out Any {
 // CHECK: bb0([[ARG:%.*]] : $@callee_owned () -> ()):
-// CHECK:   [[ABOX:%.*]] = alloc_box ${ var Any }
-// CHECK:   [[PBOX:%.*]] = project_box [[ABOX]] : ${ var Any }
-// CHECK:   [[IADDR:%.*]] = init_existential_addr [[PBOX]] : $*Any, $Any
+// CHECK:   [[ASTACK:%.*]] = alloc_stack $Any
+// CHECK:   [[IADDR:%.*]] = init_existential_addr [[ASTACK]] : $*Any, $()
 // CHECK:   [[APPLYARG:%.*]] = apply [[ARG]]() : $@callee_owned () -> ()
-// CHECK:   [[RETVAL:%.*]] = load [take] [[IADDR]] : $*Any
+// CHECK:   [[LOAD_EXIST:%.*]] = load [trivial] [[IADDR]] : $*()
+// CHECK:   [[RETVAL:%.*]] = init_existential_opaque [[LOAD_EXIST]] : $(), $(), $Any
 // CHECK:   return [[RETVAL]] : $Any
 // CHECK-LABEL: } // end sil function '_T0Ix_ypIxr_TR'
+
+// s310_convIntTupleAny continued Test: reabstraction of non-empty tuple to Any
+// ---
+// CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_T0S2iIxdd_ypIxr_TR : $@convention(thin) (@owned @callee_owned () -> (Int, Int)) -> @out Any {
+// CHECK: bb0([[ARG:%.*]] : $@callee_owned () -> (Int, Int)):
+// CHECK:   [[ASTACK:%.*]] = alloc_stack $Any
+// CHECK:   [[IADDR:%.*]] = init_existential_addr [[ASTACK]] : $*Any, $(Int, Int)
+// CHECK:   [[TADDR0:%.*]] = tuple_element_addr [[IADDR]] : $*(Int, Int), 0
+// CHECK:   [[TADDR1:%.*]] = tuple_element_addr [[IADDR]] : $*(Int, Int), 1
+// CHECK:   [[APPLYARG:%.*]] = apply [[ARG]]() : $@callee_owned () -> (Int, Int)
+// CHECK:   [[TEXTRACT0:%.*]] = tuple_extract [[APPLYARG]] : $(Int, Int), 0
+// CHECK:   [[TEXTRACT1:%.*]] = tuple_extract [[APPLYARG]] : $(Int, Int), 1
+// CHECK:   store [[TEXTRACT0]] to [trivial] [[TADDR0]] : $*Int
+// CHECK:   store [[TEXTRACT1]] to [trivial] [[TADDR1]] : $*Int
+// CHECK:   [[LOAD_EXIST:%.*]] = load [trivial] [[IADDR]] : $*(Int, Int)
+// CHECK:   [[RETVAL:%.*]] = init_existential_opaque [[LOAD_EXIST]] : $(Int, Int), $(Int, Int), $Any
+// CHECK:   dealloc_stack [[ASTACK]] : $*Any
+// CHECK:   return [[RETVAL]] : $Any
+// CHECK-LABEL: } // end sil function '_T0S2iIxdd_ypIxr_TR'
+
 
 // CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @{{.*}} : $@convention(thin) (Int, Int, Int, Int, Int, @owned @callee_owned (@in (Int, (Int, (Int, Int)), Int)) -> @out (Int, (Int, (Int, Int)), Int)) -> (Int, Int, Int, Int, Int)
 // CHECK: bb0([[ARG0:%.*]] : $Int, [[ARG1:%.*]] : $Int, [[ARG2:%.*]] : $Int, [[ARG3:%.*]] : $Int, [[ARG4:%.*]] : $Int, [[ARG5:%.*]] : $@callee_owned (@in (Int, (Int, (Int, Int)), Int)) -> @out (Int, (Int, (Int, Int)), Int)):
