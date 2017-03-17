@@ -186,7 +186,7 @@ There are a number of minor extensions we can make to the generics system that d
 
 ### Arbitrary requirements in protocols (*)
 
-*This feature has been accepted in [SE-0142](https://github.com/apple/swift-evolution/blob/master/proposals/0142-associated-types-constraints.md) and is planned for release in SWIFT_VERSION_HERE.*
+*This feature has been accepted in [SE-0142](https://github.com/apple/swift-evolution/blob/master/proposals/0142-associated-types-constraints.md) and is under development.*
 
 Currently, a new protocol can inherit from other protocols, introduce new associated types, and add new conformance constraints to associated types (by redeclaring an associated type from an inherited protocol). However, one cannot express more general constraints. Building on the example from "Recursive protocol constraints", we really want the element type of a `Sequence`'s `SubSequence` to be the same as the element type of the `Sequence`, e.g.,
 
@@ -283,7 +283,7 @@ Unlike the minor extensions, major extensions to the generics model provide more
 
 ### Conditional conformances (*)
 
-*This feature has been accepted in [SE-0143](https://github.com/apple/swift-evolution/blob/master/proposals/0143-conditional-conformances.md) and is planned for release in SWIFT_VERSION_HERE.*
+*This feature has been accepted in [SE-0143](https://github.com/apple/swift-evolution/blob/master/proposals/0143-conditional-conformances.md) and is under development.*
 
 Conditional conformances express the notion that a generic type will conform to a particular protocol only under certain circumstances. For example, `Array` is `Equatable` only when its elements are `Equatable`:
 
