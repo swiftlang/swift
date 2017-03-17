@@ -23,7 +23,7 @@ overlay_source_path="${script_dir_name}/../stdlib/public/SDK/$OVERLAY"
 build_dir="${script_dir_name}/../../build/${OVERLAY}-${SDK}"
 swift_source_root="${script_dir_name}/../../../"
 
-mkdir -p "$build_dir" && cd "$build_dir"
+mkdir -p "$build_dir" && cd "$build_dir" || exit
 
 echo "OVERLAY: ${OVERLAY}"
 echo "SDK: ${SDK}"
@@ -35,7 +35,7 @@ echo "overlay_source_path: ${overlay_source_path}"
 echo "swift_source_root: ${swift_source_root}"
 echo "build_dir: ${build_dir}"
 
-toolchain=`xcode-select -p`
+toolchain=$(xcode-select -p)
 cmake -G Ninja -DSWIFT_SOURCE_ROOT="${swift_source_root}" -DSWIFT_DEST_ROOT="${build_dir}/root" -DSWIFT_HOST_VARIANT_SDK="${SDK}" -DTOOLCHAIN_DIR="${toolchain}/Toolchains/XcodeDefault.xctoolchain" "${overlay_source_path}"
 NINJA_TARGET="swift${OVERLAY}-${TARGET}"
 ninja "${NINJA_TARGET}"

@@ -229,7 +229,6 @@ CanSILFunctionType getPartialApplyInterfaceResultType(PartialApplyInst *PAI) {
   // expressed as literals. So its callee signature will be the same as its
   // return signature.
   auto FTy = PAI->getType().castTo<SILFunctionType>();
-  CanGenericSignature CanGenericSig;
   assert(!PAI->hasSubstitutions() || !hasArchetypes(PAI->getSubstitutions()));
   FTy = cast<SILFunctionType>(
     OrigF->mapTypeOutOfContext(FTy)->getCanonicalType());
