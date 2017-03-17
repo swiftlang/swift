@@ -4452,7 +4452,7 @@ RValue SILGenFunction::emitLiteral(LiteralExpr *literal, SGFContext C) {
     case MagicIdentifierLiteralExpr::File: {
       StringRef value = "";
       if (loc.isValid())
-        value = ctx.SourceMgr.getBufferIdentifierForLoc(loc);
+        value = ctx.SourceMgr.getPresumedFilenameForLoc(loc);
       builtinLiteralArgs = emitStringLiteral(*this, literal, value, C,
                                              magicLiteral->getStringEncoding());
       builtinInit = magicLiteral->getBuiltinInitializer();

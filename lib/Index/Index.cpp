@@ -399,7 +399,7 @@ private:
   std::pair<unsigned, unsigned> getLineCol(SourceLoc Loc) {
     if (Loc.isInvalid())
       return std::make_pair(0, 0);
-    return SrcMgr.getLineAndColumn(Loc, BufferID);
+    return SrcMgr.getPresumedLineAndColumnForLoc(Loc, BufferID);
   }
 
   bool shouldIndex(ValueDecl *D, bool IsRef) const {

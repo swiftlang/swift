@@ -131,11 +131,6 @@ public:
   /// buffer identifier, or None if there is no such buffer.
   Optional<unsigned> getIDForBufferIdentifier(StringRef BufIdentifier);
 
-  /// Returns the identifier for the buffer with the given ID.
-  ///
-  /// \p BufferID must be a valid buffer ID.
-  StringRef getIdentifierForBuffer(unsigned BufferID) const;
-
   /// \brief Returns a SourceRange covering the entire specified buffer.
   ///
   /// Note that the start location might not point at the first token: it
@@ -163,40 +158,71 @@ public:
     return getLocForBufferStart(BufferID).getAdvancedLoc(Offset);
   }
 
-  /// Returns the identifier string for the buffer containing the given source
+  /// Returns the identifier string for the buffer with the given ID.
+  ///
+  /// \p BufferID must be a valid buffer ID.
+  StringRef getIdentifierForBuffer(unsigned BufferID) const;
+
+  /// Returns the identifier string for the buffer containing the given valid 
+  /// source location.
+  ///
+  /// Note that this doesn't respect #sourceLocation directives.
+  StringRef getIdentifierForBuffer(SourceLoc Loc) const {
+    return getIdentifierForBuffer(findBufferContainingLoc(Loc));
+  }
+
+  /// Returns the physical line and column represented by the given valid
+  /// source location.
+  ///
+  /// Note that this doesn't respect #sourceLocation directives.
+  /// If \p BufferID is provided, \p Loc must come from that source buffer.
+  std::pair<unsigned, unsigned>
+  getLineAndColumnInBuffer(SourceLoc Loc, unsigned BufferID = 0) const {
+    return LLVMSourceMgr.getLineAndColumn(Loc.Value, BufferID);
+  }
+
+  /// Translate line and column pair to the offset.
+  llvm::Optional<unsigned>
+  getOffsetForLineAndColumnInBuffer(unsigned BufferId, unsigned Line,
+                                    unsigned Col) const;
+
+
+  /// Returns the source location from the given physical line and col in the
+  /// specified buffer.
+  SourceLoc getLocForLineAndColumnInBuffer(unsigned BufferId, unsigned Line,
+                                           unsigned Col) const {
+    auto Offset = getOffsetForLineAndColumnInBuffer(BufferId, Line, Col);
+    return Offset.hasValue() ? getLocForOffset(BufferId, Offset.getValue()) :
+                               SourceLoc();
+  }
+
+  /// Returns the presumed filename string containing the given valid source
   /// location.
   ///
-  /// This respects #line directives.
-  StringRef getBufferIdentifierForLoc(SourceLoc Loc) const {
+  /// This respects \c #sourceLocation direvtive.
+  StringRef getPresumedFilenameForLoc(SourceLoc Loc) const {
     if (auto VFile = getVirtualFile(Loc))
       return VFile->Name;
     else
-      return getIdentifierForBuffer(findBufferContainingLoc(Loc));
+      return getIdentifierForBuffer(Loc);
   }
 
-  /// Returns the line and column represented by the given source location.
+  /// Returns the line and column represented by the given valid source
+  /// location.
   ///
   /// If \p BufferID is provided, \p Loc must come from that source buffer.
-  ///
-  /// This respects #line directives.
+  /// This respects \c #sourceLocation direvtive.
   std::pair<unsigned, unsigned>
-  getLineAndColumn(SourceLoc Loc, unsigned BufferID = 0) const {
+  getPresumedLineAndColumnForLoc(SourceLoc Loc, unsigned BufferID = 0) const {
     assert(Loc.isValid());
-    int LineOffset = getLineOffset(Loc);
     int l, c;
     std::tie(l, c) = LLVMSourceMgr.getLineAndColumn(Loc.Value, BufferID);
-    assert(LineOffset+l > 0 && "bogus line offset");
-    return { LineOffset + l, c };
-  }
 
-  /// Returns the real line number for a source location.
-  ///
-  /// If \p BufferID is provided, \p Loc must come from that source buffer.
-  ///
-  /// This does not respect #line directives.
-  unsigned getLineNumber(SourceLoc Loc, unsigned BufferID = 0) const {
-    assert(Loc.isValid());
-    return LLVMSourceMgr.FindLineNumber(Loc.Value, BufferID);
+    if (auto VFile = getVirtualFile(Loc)) {
+      assert(l + VFile->LineOffset > 0 && "bogus line offset");
+      l += VFile->LineOffset;
+    }
+    return { l, c };
   }
 
   StringRef extractText(CharSourceRange Range,
@@ -210,25 +236,8 @@ public:
   /// Verifies that all buffers are still valid.
   void verifyAllBuffers() const;
 
-  /// Translate line and column pair to the offset.
-  llvm::Optional<unsigned> resolveFromLineCol(unsigned BufferId, unsigned Line,
-                                              unsigned Col) const;
-
-  SourceLoc getLocForLineCol(unsigned BufferId, unsigned Line, unsigned Col) const {
-    auto Offset = resolveFromLineCol(BufferId, Line, Col);
-    return Offset.hasValue() ? getLocForOffset(BufferId, Offset.getValue()) :
-                               SourceLoc();
-  }
-
 private:
   const VirtualFile *getVirtualFile(SourceLoc Loc) const;
-
-  int getLineOffset(SourceLoc Loc) const {
-    if (auto VFile = getVirtualFile(Loc))
-      return VFile->LineOffset;
-    else
-      return 0;
-  }
 };
 
 } // end namespace swift

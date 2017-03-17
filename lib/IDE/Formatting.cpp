@@ -118,7 +118,7 @@ public:
 
     if (Stmt *S = Cursor->getAsStmt()) {
       SourceLoc SL = S->getStartLoc();
-      return SM.getLineAndColumn(SL);
+      return SM.getPresumedLineAndColumnForLoc(SL);
     }
     if (Decl *D = Cursor->getAsDecl()) {
       SourceLoc SL = D->getStartLoc();
@@ -131,11 +131,11 @@ public:
             SL = AttrLoc;
       }
 
-      return SM.getLineAndColumn(SL);
+      return SM.getPresumedLineAndColumnForLoc(SL);
     }
     if (Expr *E = Cursor->getAsExpr()) {
       SourceLoc SL = E->getStartLoc();
-      return SM.getLineAndColumn(SL);
+      return SM.getPresumedLineAndColumnForLoc(SL);
     }
 
     return std::make_pair(0, 0);
@@ -204,13 +204,13 @@ public:
           SourceLoc ElseLoc = If->getElseLoc();
           // If we're at 'else', take the indent of 'if' and continue.
           if (ElseLoc.isValid() &&
-              LineAndColumn.first == SM.getLineAndColumn(ElseLoc).first) {
+              LineAndColumn.first == SM.getPresumedLineAndColumnForLoc(ElseLoc).first) {
             LineAndColumn = ParentLineAndColumn;
             continue;
           }
           // If we are at conditions, take the indent of 'if' and continue.
           for (auto Cond : If->getCond()) {
-            if (LineAndColumn.first == SM.getLineNumber(Cond.getEndLoc())) {
+            if (LineAndColumn.first == SM.getLineAndColumnInBuffer(Cond.getEndLoc()).first) {
               LineAndColumn = ParentLineAndColumn;
               continue;
             }
@@ -234,7 +234,7 @@ public:
 
         // Align with Func start instead of with param decls.
         if (auto *FD = dyn_cast_or_null<AbstractFunctionDecl>(Cursor->getAsDecl())) {
-          if (LineAndColumn.first <= SM.getLineNumber(FD->getSignatureSourceRange().End)) {
+          if (LineAndColumn.first <= SM.getLineAndColumnInBuffer(FD->getSignatureSourceRange().End).first) {
             LineAndColumn = ParentLineAndColumn;
             continue;
           }
@@ -252,7 +252,7 @@ public:
   }
 
   bool exprEndAtLine(Expr *E, unsigned Line) {
-    return E->getEndLoc().isValid() && SM.getLineNumber(E->getEndLoc()) == Line;
+    return E->getEndLoc().isValid() && SM.getLineAndColumnInBuffer(E->getEndLoc()).first == Line;
   };
 
   bool shouldAddIndentForLine(unsigned Line, TokenInfo TInfo,
@@ -274,7 +274,7 @@ public:
       if (!LabelItems.empty())
         Loc = LabelItems.back().getPattern()->getLoc();
       if (Loc.isValid())
-        return Line > SM.getLineAndColumn(Loc).first;
+        return Line > SM.getPresumedLineAndColumnForLoc(Loc).first;
       return true;
     }
     if (isSwitchContext()) {
@@ -291,7 +291,7 @@ public:
       // switch ...
       // { <-- No indent here, open brace should be at same level as switch.
       auto *S = cast<SwitchStmt>(Cursor->getAsStmt());
-      if (SM.getLineAndColumn(S->getLBraceLoc()).first == Line)
+      if (SM.getPresumedLineAndColumnForLoc(S->getLBraceLoc()).first == Line)
         return false;
       if (IsInCommentLine()) {
         for (auto Case : S->getCases()) {
@@ -299,7 +299,7 @@ public:
           // {
           // // case comment <-- No indent here.
           // case 0:
-          if (SM.getLineAndColumn(Case->swift::Stmt::getStartLoc()).first == Line + 1)
+          if (SM.getPresumedLineAndColumnForLoc(Case->swift::Stmt::getStartLoc()).first == Line + 1)
             return FmtOptions.IndentSwitchCase;
         }
       }
@@ -317,7 +317,7 @@ public:
     //  }
     if (auto FD = dyn_cast_or_null<FuncDecl>(Start.getAsDecl())) {
       if (FD->isGetter() && FD->getAccessorKeywordLoc().isInvalid()) {
-        if (SM.getLineNumber(FD->getBody()->getLBraceLoc()) == Line)
+        if (SM.getLineAndColumnInBuffer(FD->getBody()->getLBraceLoc()).first == Line)
           return false;
       }
     }
@@ -357,10 +357,10 @@ public:
     // class Foo
     // { <-- No indent here, open brace should be at same level as class.
     auto *NTD = dyn_cast_or_null<NominalTypeDecl>(Cursor->getAsDecl());
-    if (NTD && SM.getLineAndColumn(NTD->getBraces().Start).first == Line)
+    if (NTD && SM.getPresumedLineAndColumnForLoc(NTD->getBraces().Start).first == Line)
       return false;
     auto *ETD = dyn_cast_or_null<ExtensionDecl>(Cursor->getAsDecl());
-    if (ETD && SM.getLineAndColumn(ETD->getBraces().Start).first == Line)
+    if (ETD && SM.getPresumedLineAndColumnForLoc(ETD->getBraces().Start).first == Line)
       return false;
 
     // If we are at the start of a trailing closure, do not add indentation.
@@ -369,21 +369,21 @@ public:
     // { <-- No indent here.
     auto *TE = dyn_cast_or_null<TupleExpr>(Cursor->getAsExpr());
     if (TE && TE->hasTrailingClosure() &&
-        SM.getLineNumber(TE->getElements().back()->getStartLoc()) == Line) {
+        SM.getLineAndColumnInBuffer(TE->getElements().back()->getStartLoc()).first == Line) {
       return false;
     }
 
     // If we're in an IfStmt and at the 'else', don't add an indent.
     IfStmt *If = dyn_cast_or_null<IfStmt>(Cursor->getAsStmt());
     if (If && If->getElseLoc().isValid() &&
-        SM.getLineAndColumn(If->getElseLoc()).first == Line)
+        SM.getPresumedLineAndColumnForLoc(If->getElseLoc()).first == Line)
       return false;
 
     // If we're in a DoCatchStmt and at a 'catch', don't add an indent.
     if (auto *DoCatchS = dyn_cast_or_null<DoCatchStmt>(Cursor->getAsStmt())) {
       for (CatchStmt *CatchS : DoCatchS->getCatches()) {
         SourceLoc Loc = CatchS->getCatchLoc();
-        if (Loc.isValid() && SM.getLineAndColumn(Loc).first == Line)
+        if (Loc.isValid() && SM.getPresumedLineAndColumnForLoc(Loc).first == Line)
           return false;
       }
     }
@@ -403,24 +403,24 @@ public:
       if (auto *Paren = dyn_cast_or_null<ParenExpr>(Cursor->getAsExpr())) {
         auto *SubExpr = Paren->getSubExpr();
         if (SubExpr && SubExpr == AtExprEnd &&
-            SM.getLineAndColumn(Paren->getEndLoc()).first == Line)
+            SM.getPresumedLineAndColumnForLoc(Paren->getEndLoc()).first == Line)
           return false;
       } else if (auto *Tuple = dyn_cast_or_null<TupleExpr>(Cursor->getAsExpr())) {
         auto SubExprs = Tuple->getElements();
         if (!SubExprs.empty() && SubExprs.back() == AtExprEnd &&
-            SM.getLineAndColumn(Tuple->getEndLoc()).first == Line) {
+            SM.getPresumedLineAndColumnForLoc(Tuple->getEndLoc()).first == Line) {
           return false;
         }
       } else if (auto *VD = dyn_cast_or_null<VarDecl>(Cursor->getAsDecl())) {
         SourceLoc Loc = getVarDeclInitEnd(VD);
-        if (Loc.isValid() && SM.getLineNumber(Loc) == Line) {
+        if (Loc.isValid() && SM.getLineAndColumnInBuffer(Loc).first == Line) {
           return false;
         }
       } else if (auto *Seq = dyn_cast_or_null<SequenceExpr>(Cursor->getAsExpr())) {
         ArrayRef<Expr*> Elements = Seq->getElements();
         if (Elements.size() == 3 &&
             isa<AssignExpr>(Elements[1]) &&
-            SM.getLineAndColumn(Elements[2]->getEndLoc()).first == Line) {
+            SM.getPresumedLineAndColumnForLoc(Elements[2]->getEndLoc()).first == Line) {
               return false;
         }
       }
@@ -524,7 +524,8 @@ class FormatWalker : public SourceEntityWalker {
     }
 
     bool sameLineWithTarget(SourceLoc Loc) {
-      return SM.getLineNumber(Loc) == SM.getLineNumber(TargetLoc);
+      return SM.getLineAndColumnInBuffer(Loc).first ==
+        SM.getLineAndColumnInBuffer(TargetLoc).first;
     }
 
   public:
@@ -539,7 +540,7 @@ class FormatWalker : public SourceEntityWalker {
       SourceLoc PrevLoc;
       auto FindAlignLoc = [&](SourceLoc Loc) {
         if (PrevLoc.isValid() && Loc.isValid() &&
-            SM.getLineNumber(PrevLoc) == SM.getLineNumber(Loc))
+            SM.getLineAndColumnInBuffer(PrevLoc).first == SM.getLineAndColumnInBuffer(Loc).first)
           return PrevLoc;
         return PrevLoc = Loc;
       };
@@ -693,8 +694,8 @@ class FormatWalker : public SourceEntityWalker {
          (InValid || SM.isBeforeInBuffer(CurrentTokIt->getLoc(), Loc));
          CurrentTokIt++) {
       if (CurrentTokIt->getKind() == tok::comment) {
-        auto StartLine = SM.getLineNumber(CurrentTokIt->getRange().getStart());
-        auto EndLine = SM.getLineNumber(CurrentTokIt->getRange().getEnd());
+        auto StartLine = SM.getLineAndColumnInBuffer(CurrentTokIt->getRange().getStart()).first;
+        auto EndLine = SM.getLineAndColumnInBuffer(CurrentTokIt->getRange().getEnd()).first;
         auto TokenStr = CurrentTokIt->getRange().str();
         InDocCommentBlock |= TargetLine > StartLine && TargetLine <= EndLine &&
         TokenStr.startswith("/*");
@@ -721,7 +722,7 @@ public:
   FormatContext walkToLocation(SourceLoc Loc) {
     Stack.clear();
     TargetLocation = Loc;
-    TargetLine = SM.getLineNumber(TargetLocation);
+    TargetLine = SM.getLineAndColumnInBuffer(TargetLocation).first;
     AtStart = AtEnd = swift::ASTWalker::ParentTy();
     walk(SF);
     scanForComments(SourceLoc());
@@ -857,10 +858,10 @@ class TokenInfoCollector {
     SourceManager &SM;
     Comparator(SourceManager &SM) : SM(SM) {}
     bool operator()(const Token &T, unsigned Line) const {
-      return SM.getLineNumber(T.getLoc()) < Line;
+      return SM.getLineAndColumnInBuffer(T.getLoc()).first < Line;
     }
     bool operator()(unsigned Line, const Token &T) const {
-      return Line < SM.getLineNumber(T.getLoc());
+      return Line < SM.getLineAndColumnInBuffer(T.getLoc()).first;
     }
   };
 
@@ -873,7 +874,7 @@ public:
       return TokenInfo();
     Comparator Comp(SM);
     auto LineMatch = [this] (const Token* T, unsigned Line) {
-      return T != Tokens.end() && SM.getLineNumber(T->getLoc()) == Line;
+      return T != Tokens.end() && SM.getLineAndColumnInBuffer(T->getLoc()).first == Line;
     };
     auto TargetIt = std::lower_bound(Tokens.begin(), Tokens.end(), Line, Comp);
     auto LineBefore = std::lower_bound(Tokens.begin(), TargetIt, Line - 1, Comp);

@@ -2658,8 +2658,8 @@ ParserResult<Expr> Parser::parseTrailingClosure(SourceRange calleeRange) {
   // Warn if the trailing closure is separated from its callee by more than
   // one line. A single-line separation is acceptable for a trailing closure
   // call, and will be diagnosed later only if the call fails to typecheck.
-  auto origLine = SourceMgr.getLineNumber(calleeRange.End);
-  auto braceLine = SourceMgr.getLineNumber(braceLoc);
+  auto origLine = SourceMgr.getLineAndColumnInBuffer(calleeRange.End).first;
+  auto braceLine = SourceMgr.getLineAndColumnInBuffer(braceLoc).first;
   if (braceLine > origLine + 1) {
     diagnose(braceLoc, diag::trailing_closure_after_newlines);
     diagnose(calleeRange.Start, diag::trailing_closure_callee_here);

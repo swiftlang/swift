@@ -1973,8 +1973,8 @@ void ASTScope::print(llvm::raw_ostream &out, unsigned level,
       return;
     }
 
-    auto startLineAndCol = sourceMgr.getLineAndColumn(range.Start);
-    auto endLineAndCol = sourceMgr.getLineAndColumn(range.End);
+    auto startLineAndCol = sourceMgr.getPresumedLineAndColumnForLoc(range.Start);
+    auto endLineAndCol = sourceMgr.getPresumedLineAndColumnForLoc(range.End);
 
     out << " [" << startLineAndCol.first << ":" << startLineAndCol.second
         << " - " << endLineAndCol.first << ":" << endLineAndCol.second << "]";

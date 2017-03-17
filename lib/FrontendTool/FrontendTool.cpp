@@ -443,9 +443,8 @@ static bool performCompile(std::unique_ptr<CompilerInstance> &Instance,
         SourceManager &sourceMgr = Instance->getSourceMgr();
         // Probe each of the locations, and dump what we find.
         for (auto lineColumn : opts.DumpScopeMapLocations) {
-          SourceLoc loc = sourceMgr.getLocForLineCol(*bufferID,
-                                                     lineColumn.first,
-                                                     lineColumn.second);
+          SourceLoc loc = sourceMgr.getLocForLineAndColumnInBuffer(
+              *bufferID, lineColumn.first, lineColumn.second);
           if (loc.isInvalid()) continue;
 
           llvm::errs() << "***Scope at " << lineColumn.first << ":"

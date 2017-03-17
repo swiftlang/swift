@@ -2683,8 +2683,8 @@ static void checkSwitch(TypeChecker &TC, const SwitchStmt *stmt) {
         continue;
       
       auto &SM = TC.Context.SourceMgr;
-      auto prevLineCol = SM.getLineAndColumn(prevLoc);
-      if (SM.getLineNumber(thisLoc) != prevLineCol.first)
+      auto prevLineCol = SM.getPresumedLineAndColumnForLoc(prevLoc);
+      if (SM.getLineAndColumnInBuffer(thisLoc).first != prevLineCol.first)
         continue;
       
       TC.diagnose(items[i].getWhereLoc(), diag::where_on_one_item)

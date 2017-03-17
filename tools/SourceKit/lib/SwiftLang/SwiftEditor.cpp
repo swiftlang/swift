@@ -105,7 +105,7 @@ void EditorDiagConsumer::handleDiagnostic(SourceManager &SM, SourceLoc Loc,
   }
 
   SKInfo.Offset = SM.getLocOffsetInBuffer(Loc, BufferID);
-  std::tie(SKInfo.Line, SKInfo.Column) = SM.getLineAndColumn(Loc, BufferID);
+  std::tie(SKInfo.Line, SKInfo.Column) = SM.getPresumedLineAndColumnForLoc(Loc, BufferID);
   SKInfo.Filename = SM.getIdentifierForBuffer(BufferID);
 
   for (auto R : Info.Ranges) {
@@ -1250,8 +1250,8 @@ public:
 
     ++NestingLevel;
     SourceLoc StartLoc = Node.Range.getStart();
-    auto StartLineAndColumn = SrcManager.getLineAndColumn(StartLoc);
-    auto EndLineAndColumn = SrcManager.getLineAndColumn(Node.Range.getEnd());
+    auto StartLineAndColumn = SrcManager.getPresumedLineAndColumnForLoc(StartLoc);
+    auto EndLineAndColumn = SrcManager.getPresumedLineAndColumnForLoc(Node.Range.getEnd());
     unsigned StartLine = StartLineAndColumn.first;
     unsigned EndLine = EndLineAndColumn.second > 1 ? EndLineAndColumn.first
                                                    : EndLineAndColumn.first - 1;
@@ -1676,8 +1676,8 @@ ImmutableTextSnapshotRef SwiftEditorDocument::replaceText(
   unsigned BufID = Impl.SyntaxInfo->getBufferID();
   SourceLoc StartLoc = SrcManager.getLocForBufferStart(BufID).getAdvancedLoc(
                                                                         Offset);
-  unsigned StartLine = SrcManager.getLineAndColumn(StartLoc).first;
-  unsigned EndLine = SrcManager.getLineAndColumn(
+  unsigned StartLine = SrcManager.getPresumedLineAndColumnForLoc(StartLoc).first;
+  unsigned EndLine = SrcManager.getPresumedLineAndColumnForLoc(
                                          StartLoc.getAdvancedLoc(Length)).first;
 
   // Delete all syntax map data from start line through end line.

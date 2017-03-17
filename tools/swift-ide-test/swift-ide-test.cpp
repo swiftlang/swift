@@ -1207,7 +1207,7 @@ private:
   void printLoc(SourceLoc Loc, raw_ostream &OS) {
     OS << '@';
     if (Loc.isValid()) {
-      auto LineCol = SM.getLineAndColumn(Loc, BufferID);
+      auto LineCol = SM.getPresumedLineAndColumnForLoc(Loc, BufferID);
       OS  << LineCol.first << ':' << LineCol.second;
     }
   }
@@ -2004,7 +2004,7 @@ public:
       SourceCode = SM.extractText({ SR.Start,
                                     SM.getByteDistance(SR.Start, EndCharLoc) });
       unsigned Column;
-      std::tie(Line, Column) = SM.getLineAndColumn(SR.Start, BufferID);
+      std::tie(Line, Column) = SM.getPresumedLineAndColumnForLoc(SR.Start, BufferID);
     }
 
     OS.indent(IndentLevel * 2);
@@ -2220,7 +2220,7 @@ public:
     if (auto *VD = dyn_cast<ValueDecl>(D)) {
       SourceLoc Loc = D->getLoc();
       if (Loc.isValid()) {
-        auto LineAndColumn = SM.getLineAndColumn(Loc);
+        auto LineAndColumn = SM.getPresumedLineAndColumnForLoc(Loc);
         OS << getBufferIdentifier(VD->getLoc())
            << ":" << LineAndColumn.first << ":" << LineAndColumn.second << ": ";
       }
@@ -2237,7 +2237,7 @@ public:
     } else if (isa<ExtensionDecl>(D)) {
       SourceLoc Loc = D->getLoc();
       if (Loc.isValid()) {
-        auto LineAndColumn = SM.getLineAndColumn(Loc);
+        auto LineAndColumn = SM.getPresumedLineAndColumnForLoc(Loc);
         OS << getBufferIdentifier(D->getLoc())
         << ":" << LineAndColumn.first << ":" << LineAndColumn.second << ": ";
       }
@@ -2425,8 +2425,9 @@ static int doPrintTypeInterface(const CompilerInvocation &InitInvok,
   assert(SF && "no source file?");
   SemaLocResolver Resolver(*SF);
   SourceManager &SM = SF->getASTContext().SourceMgr;
-  auto Offset = SM.resolveFromLineCol(BufID, Pair.getValue().first,
-                                      Pair.getValue().second);
+  auto Offset = SM.getOffsetForLineAndColumnInBuffer(BufID,
+                                                     Pair.getValue().first,
+                                                     Pair.getValue().second);
   if (!Offset.hasValue()) {
     llvm::errs() << "Cannot resolve source location.\n";
     return 1;
@@ -2512,7 +2513,7 @@ private:
 
   void printLoc(SourceLoc Loc) {
     if (Loc.isValid()) {
-      auto LineCol = SM.getLineAndColumn(Loc, BufferID);
+      auto LineCol = SM.getPresumedLineAndColumnForLoc(Loc, BufferID);
       OS << LineCol.first << ':' << LineCol.second;
     }
   }
@@ -2655,10 +2656,10 @@ static int doPrintRangeInfo(const CompilerInvocation &InitInvok,
   assert(SF->getBufferID().hasValue() && "no buffer id?");
   SourceManager &SM = SF->getASTContext().SourceMgr;
   unsigned bufferID = SF->getBufferID().getValue();
-  SourceLoc StartLoc = SM.getLocForLineCol(bufferID, StartLineCol.first,
-                                           StartLineCol.second);
-  SourceLoc EndLoc = SM.getLocForLineCol(bufferID, EndLineCol.first,
-                                         EndLineCol.second);
+  SourceLoc StartLoc = SM.getLocForLineAndColumnInBuffer(
+      bufferID, StartLineCol.first, StartLineCol.second);
+  SourceLoc EndLoc = SM.getLocForLineAndColumnInBuffer(
+      bufferID, EndLineCol.first, EndLineCol.second);
   RangeResolver Resolver(*SF, StartLoc, EndLoc);
   ResolvedRangeInfo Result = Resolver.resolve();
   Result.print(llvm::outs());

@@ -144,7 +144,7 @@ static void emitSourceLocationArgs(SILGenFunction &gen,
   if (sourceLoc.isValid()) {
     unsigned bufferID = ctx.SourceMgr.findBufferContainingLoc(sourceLoc);
     filename = ctx.SourceMgr.getIdentifierForBuffer(bufferID);
-    line = ctx.SourceMgr.getLineAndColumn(sourceLoc).first;
+    line = ctx.SourceMgr.getPresumedLineAndColumnForLoc(sourceLoc).first;
   }
   
   bool isASCII = true;

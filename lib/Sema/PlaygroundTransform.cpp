@@ -806,9 +806,10 @@ public:
     }
 
     std::pair<unsigned, unsigned> StartLC =
-        Context.SourceMgr.getLineAndColumn(SR.Start);
+        Context.SourceMgr.getPresumedLineAndColumnForLoc(SR.Start);
 
-    std::pair<unsigned, unsigned> EndLC = Context.SourceMgr.getLineAndColumn(
+    std::pair<unsigned, unsigned> EndLC =
+      Context.SourceMgr.getPresumedLineAndColumnForLoc(
         Lexer::getLocForEndOfToken(Context.SourceMgr, SR.End));
 
     const size_t buf_size = 8;

@@ -58,10 +58,10 @@ SingleRawComment::SingleRawComment(CharSourceRange Range,
                                    const SourceManager &SourceMgr)
     : Range(Range), RawText(SourceMgr.extractText(Range)),
       Kind(static_cast<unsigned>(getCommentKind(RawText))),
-      EndLine(SourceMgr.getLineNumber(Range.getEnd())) {
-  auto StartLineAndColumn = SourceMgr.getLineAndColumn(Range.getStart());
-  StartLine = StartLineAndColumn.first;
-  StartColumn = StartLineAndColumn.second;
+      EndLine(SourceMgr.getLineAndColumnInBuffer(Range.getEnd()).first) {
+  auto Start = SourceMgr.getPresumedLineAndColumnForLoc(Range.getStart());
+  StartLine = Start.first;
+  StartColumn = Start.second;
 }
 
 SingleRawComment::SingleRawComment(StringRef RawText, unsigned StartColumn)

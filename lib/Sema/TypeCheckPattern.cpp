@@ -689,8 +689,8 @@ static void diagnoseAndMigrateVarParameterToBody(ParamDecl *decl,
   std::string start;
   std::string end;
   
-  auto lBraceLine = SM.getLineNumber(declBody->getLBraceLoc());
-  auto rBraceLine = SM.getLineNumber(declBody->getRBraceLoc());
+  auto lBraceLine = SM.getLineAndColumnInBuffer(declBody->getLBraceLoc()).first;
+  auto rBraceLine = SM.getLineAndColumnInBuffer(declBody->getRBraceLoc()).first;
 
   if (!declBody->getNumElements()) {
     
@@ -711,7 +711,7 @@ static void diagnoseAndMigrateVarParameterToBody(ParamDecl *decl,
   } else {
     auto firstLine = declBody->getElement(0);
     insertionStartLoc = firstLine.getStartLoc();
-    if (lBraceLine == SM.getLineNumber(firstLine.getStartLoc())) {
+    if (lBraceLine == SM.getLineAndColumnInBuffer(firstLine.getStartLoc()).first) {
       // Function on same line, insert with semi-colon. Not ideal but
       // better than weird space alignment.
       start = "";

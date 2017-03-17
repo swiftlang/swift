@@ -121,7 +121,7 @@ SourceManager::GetMessage(SourceLoc Loc, llvm::SourceMgr::DiagKind Kind,
   std::string LineStr;
 
   if (Loc.isValid()) {
-    BufferID = getBufferIdentifierForLoc(Loc);
+    BufferID = getPresumedFilenameForLoc(Loc);
     auto CurMB = LLVMSourceMgr.getMemoryBuffer(findBufferContainingLoc(Loc));
 
     // Scan backward to find the start of the line.
@@ -160,7 +160,7 @@ SourceManager::GetMessage(SourceLoc Loc, llvm::SourceMgr::DiagKind Kind,
                                          R.End.getPointer()-LineStart));
     }
 
-    LineAndCol = getLineAndColumn(Loc);
+    LineAndCol = getPresumedLineAndColumnForLoc(Loc);
   }
 
   return llvm::SMDiagnostic(LLVMSourceMgr, Loc.Value, BufferID,

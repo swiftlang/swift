@@ -323,7 +323,7 @@ bool DiagnosticVerifier::verifyFile(unsigned BufferID,
     if (PrevExpectedContinuationLine)
       Expected.LineNo = PrevExpectedContinuationLine;
     else
-      Expected.LineNo = SM.getLineAndColumn(
+      Expected.LineNo = SM.getPresumedLineAndColumnForLoc(
           BufferStartLoc.getAdvancedLoc(MatchStart.data() - InputFile.data()),
           BufferID).first;
     Expected.LineNo += LineOffset;

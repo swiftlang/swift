@@ -5896,8 +5896,8 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
         auto &SM = CS->getASTContext().SourceMgr;
         if (closure->hasAnonymousClosureVars() &&
             closure->getParameters()->size() == 0 &&
-            1 + SM.getLineNumber(callExpr->getFn()->getEndLoc()) ==
-            SM.getLineNumber(closure->getStartLoc())) {
+            1 + SM.getLineAndColumnInBuffer(callExpr->getFn()->getEndLoc()).first ==
+            SM.getLineAndColumnInBuffer(closure->getStartLoc()).first) {
           diagnose(closure->getStartLoc(), diag::brace_stmt_suggest_do)
             .fixItInsert(closure->getStartLoc(), "do ");
         }

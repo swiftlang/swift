@@ -2405,7 +2405,7 @@ visitMagicIdentifierLiteralExpr(MagicIdentifierLiteralExpr *E, SGFContext C) {
   case MagicIdentifierLiteralExpr::Line: {
     unsigned Value = 0;
     if (Loc.isValid())
-      Value = Ctx.SourceMgr.getLineAndColumn(Loc).first;
+      Value = Ctx.SourceMgr.getPresumedLineAndColumnForLoc(Loc).first;
 
     SILValue V = SGF.B.createIntegerLiteral(E, Ty, Value);
     return RValue(SGF, E, ManagedValue::forUnmanaged(V));
@@ -2413,7 +2413,7 @@ visitMagicIdentifierLiteralExpr(MagicIdentifierLiteralExpr *E, SGFContext C) {
   case MagicIdentifierLiteralExpr::Column: {
     unsigned Value = 0;
     if (Loc.isValid())
-      Value = Ctx.SourceMgr.getLineAndColumn(Loc).second;
+      Value = Ctx.SourceMgr.getPresumedLineAndColumnForLoc(Loc).second;
 
     SILValue V = SGF.B.createIntegerLiteral(E, Ty, Value);
     return RValue(SGF, E, ManagedValue::forUnmanaged(V));

@@ -148,8 +148,8 @@ SILLocation::DebugLoc SILLocation::decode(SourceLoc Loc,
                                           const SourceManager &SM) {
   DebugLoc DL;
   if (Loc.isValid()) {
-    DL.Filename = SM.getBufferIdentifierForLoc(Loc);
-    std::tie(DL.Line, DL.Column) = SM.getLineAndColumn(Loc);
+    DL.Filename = SM.getPresumedFilenameForLoc(Loc);
+    std::tie(DL.Line, DL.Column) = SM.getPresumedLineAndColumnForLoc(Loc);
   }
   return DL;
 }
