@@ -110,7 +110,9 @@ public:
                                              ModuleDecl *Module);
 
   std::string mangleTypeForDebugger(Type decl, const DeclContext *DC);
-
+  
+  std::string mangleDeclType(const ValueDecl *decl);
+  
   std::string mangleObjCRuntimeName(const NominalTypeDecl *Nominal);
 
   std::string mangleTypeAsUSR(Type type) {
