@@ -454,16 +454,24 @@ namespace {
   /// A physical path component which returns a literal address.
   class ValueComponent : public PhysicalPathComponent {
     ManagedValue Value;
+    bool IsRValue;
   public:
-    ValueComponent(ManagedValue value, LValueTypeData typeData) :
+    ValueComponent(ManagedValue value, LValueTypeData typeData,
+                   bool isRValue = false) :
       PhysicalPathComponent(typeData, ValueKind),
-      Value(value) {
+      Value(value),
+      IsRValue(isRValue) {
+        assert(IsRValue || value.getType().isAddress());
     }
 
     ManagedValue offset(SILGenFunction &SGF, SILLocation loc, ManagedValue base,
                         AccessKind accessKind) && override {
       assert(!base && "value component must be root of lvalue path");
       return Value;
+    }
+
+    bool isRValue() const override {
+      return IsRValue;
     }
 
     void print(raw_ostream &OS) const override {
@@ -1351,7 +1359,7 @@ LValue LValue::forValue(ManagedValue value,
                                              value.getValue());
 
   LValue lv;
-  lv.add<ValueComponent>(value, typeData);
+  lv.add<ValueComponent>(value, typeData, /*isRValue=*/true);
   return lv;
 }
 
@@ -1514,7 +1522,7 @@ LValue SILGenLValue::visitRec(Expr *e, AccessKind accessKind) {
     CanType formalType = getSubstFormalRValueType(e);
     auto typeData = getValueTypeData(formalType, rv.getValue());
     LValue lv;
-    lv.add<ValueComponent>(rv, typeData);
+    lv.add<ValueComponent>(rv, typeData, /*isRValue=*/true);
     return lv;
   }
 
@@ -1974,7 +1982,7 @@ LValue SILGenFunction::emitPropertyLValue(SILLocation loc, ManagedValue base,
                                                  base.getValue());
 
   // Refer to 'self' as the base of the lvalue.
-  lv.add<ValueComponent>(base, baseTypeData);
+  lv.add<ValueComponent>(base, baseTypeData, /*isRValue=*/!base.isLValue());
 
   auto substFormalType = ivar->getInterfaceType().subst(subMap)
     ->getCanonicalType();
@@ -2396,13 +2404,23 @@ SILValue SILGenFunction::emitConversionFromSemanticValue(SILLocation loc,
   llvm_unreachable("unexpected storage type that differs from type-of-rvalue");
 }
 
+static void emitTsanInoutAccess(SILGenFunction &SGF, SILLocation loc,
+                                ManagedValue address) {
+  assert(address.getType().isAddress());
+  SILValue accessFnArgs[] = {address.getValue()};
+
+  SGF.B.createBuiltin(loc, SGF.getASTContext().getIdentifier("tsanInoutAccess"),
+                      SGF.SGM.Types.getEmptyTupleType(), {}, accessFnArgs);
+}
+
 /// Produce a physical address that corresponds to the given l-value
 /// component.
 static ManagedValue drillIntoComponent(SILGenFunction &SGF,
                                        SILLocation loc,
                                        PathComponent &&component,
                                        ManagedValue base,
-                                       AccessKind accessKind) {
+                                       AccessKind accessKind,
+                                       TSanKind tsanKind) {
   ManagedValue addr;
   if (component.isPhysical()) {
     addr = std::move(component.asPhysical()).offset(SGF, loc, base, accessKind);
@@ -2411,16 +2429,23 @@ static ManagedValue drillIntoComponent(SILGenFunction &SGF,
     addr = std::move(lcomponent).getMaterialized(SGF, loc, base, accessKind);
   }
 
+  if (SGF.getASTContext().LangOpts.EnableTSANInoutInstrumentation &&
+      tsanKind == TSanKind::InoutAccess && !component.isRValue()) {
+    emitTsanInoutAccess(SGF, loc, addr);
+  }
+
   return addr;
 }
 
 /// Find the last component of the given lvalue and derive a base
 /// location for it.
-static PathComponent &&drillToLastComponent(SILGenFunction &SGF,
-                                            SILLocation loc,
-                                            LValue &&lv,
-                                            ManagedValue &addr,
-                                            AccessKind accessKind) {
+static PathComponent &&
+drillToLastComponent(SILGenFunction &SGF,
+                     SILLocation loc,
+                     LValue &&lv,
+                     ManagedValue &addr,
+                     AccessKind accessKind,
+                     TSanKind tsanKind = TSanKind::None) {
   assert(lv.begin() != lv.end() &&
          "lvalue must have at least one component");
 
@@ -2432,7 +2457,8 @@ static PathComponent &&drillToLastComponent(SILGenFunction &SGF,
   }
 
   for (auto i = lv.begin(), e = lv.end() - 1; i != e; ++i) {
-    addr = drillIntoComponent(SGF, loc, std::move(**i), addr, accessKind);
+    addr = drillIntoComponent(SGF, loc, std::move(**i), addr, accessKind,
+                              tsanKind);
     accessKind = pathAccessKinds.pop_back_val();
   }
 
@@ -2464,11 +2490,15 @@ RValue SILGenFunction::emitLoadOfLValue(SILLocation loc, LValue &&src,
 
 ManagedValue SILGenFunction::emitAddressOfLValue(SILLocation loc,
                                                  LValue &&src,
-                                                 AccessKind accessKind) {
+                                                 AccessKind accessKind,
+                                                 TSanKind tsanKind) {
   ManagedValue addr;
   PathComponent &&component =
-    drillToLastComponent(*this, loc, std::move(src), addr, accessKind);
-  addr = drillIntoComponent(*this, loc, std::move(component), addr, accessKind);
+    drillToLastComponent(*this, loc, std::move(src), addr, accessKind,
+                         tsanKind);
+
+  addr = drillIntoComponent(*this, loc, std::move(component), addr, accessKind,
+                            tsanKind);
   assert(addr.getType().isAddress() &&
          "resolving lvalue did not give an address");
   return ManagedValue::forLValue(addr.getValue());
