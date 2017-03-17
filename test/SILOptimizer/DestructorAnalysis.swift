@@ -3,9 +3,6 @@
 // This test depends on asserts because we look at debug output.
 // REQUIRES: asserts
 
-// FIXME: https://bugs.swift.org/browse/SR-2808
-// XFAIL: resilient_stdlib
-
 class Foo {}
 
 var a: [Int] = []
