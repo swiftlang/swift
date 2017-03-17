@@ -4096,6 +4096,11 @@ public:
       != ParsedKeywords.end();
   }
 
+  bool missingOverride(DeclVisibilityKind Reason) {
+    return !hasOverride && Reason == DeclVisibilityKind::MemberOfSuper &&
+           !CurrDeclContext->getAsProtocolOrProtocolExtensionContext();
+  }
+
   void addAccessControl(const ValueDecl *VD,
                         CodeCompletionResultBuilder &Builder) {
     assert(CurrDeclContext->getAsNominalTypeOrNominalTypeExtensionContext());
@@ -4146,10 +4151,7 @@ public:
 
     // FIXME: if we're missing 'override', but have the decl introducer we
     // should delete it and re-add both in the correct order.
-    bool missingOverride =
-      !hasOverride && Reason == DeclVisibilityKind::MemberOfSuper &&
-      !CurrDeclContext->getAsProtocolOrProtocolExtensionContext();
-    if (!hasDeclIntroducer && missingOverride)
+    if (!hasDeclIntroducer && missingOverride(Reason))
       Builder.addOverrideKeyword();
 
     if (!hasDeclIntroducer)
@@ -4168,6 +4170,14 @@ public:
   }
 
   void addVarOverride(const VarDecl *VD, DeclVisibilityKind Reason) {
+    // Overrides cannot use 'let', but if the 'override' keyword is specified
+    // then the intention is clear, so provide the results anyway.  The compiler
+    // can then provide an error telling you to use 'var' instead.
+    // If we don't need override then it's a protocol requirement, so show it.
+    if (missingOverride(Reason) && hasVarIntroducer &&
+        isKeywordSpecified("let"))
+      return;
+
     CodeCompletionResultBuilder Builder(
         Sink, CodeCompletionResult::ResultKind::Declaration,
         SemanticContextKind::Super, {});
@@ -4199,9 +4209,7 @@ public:
     if (!hasAccessModifier)
       addAccessControl(CD, Builder);
 
-    if (!hasOverride && Reason == DeclVisibilityKind::MemberOfSuper &&
-        !CurrDeclContext->getAsProtocolOrProtocolExtensionContext() &&
-        CD->isDesignatedInit() && !CD->isRequired())
+    if (missingOverride(Reason) && CD->isDesignatedInit() && !CD->isRequired())
       Builder.addOverrideKeyword();
 
     // Emit 'required' if we're in class context, 'required' is not specified,
