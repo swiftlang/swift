@@ -365,6 +365,7 @@ extension String : ExpressibleByUnicodeScalarLiteral {
 }
 
 extension String : _ExpressibleByBuiltinExtendedGraphemeClusterLiteral {
+  @_inlineable
   @effects(readonly)
   @_semantics("string.makeUTF8")
   public init(
@@ -392,6 +393,7 @@ extension String : ExpressibleByExtendedGraphemeClusterLiteral {
 }
 
 extension String : _ExpressibleByBuiltinUTF16StringLiteral {
+  @_inlineable
   @effects(readonly)
   @_semantics("string.makeUTF16")
   public init(
@@ -409,6 +411,7 @@ extension String : _ExpressibleByBuiltinUTF16StringLiteral {
 }
 
 extension String : _ExpressibleByBuiltinStringLiteral {
+  @_inlineable
   @effects(readonly)
   @_semantics("string.makeUTF8")
   public init(
@@ -554,6 +557,7 @@ extension String {
   ///
   /// Low-level construction interface used by introspection
   /// implementation in the runtime library.
+  @_inlineable
   @_silgen_name("swift_stringFromUTF8InRawMemory")
   public // COMPILER_INTRINSIC
   static func _fromUTF8InRawMemory(

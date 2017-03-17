@@ -1,6 +1,7 @@
 // RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -primary-file %s -O -emit-sil | grep -v 'builtin "onFastPath"' | %FileCheck %s
 
 // REQUIRES: swift_stdlib_no_asserts
+// XFAIL: resilient_stdlib
 
 //CHECK-LABEL: @_T017unused_containers16empty_array_testyyF
 //CHECK: bb0:
