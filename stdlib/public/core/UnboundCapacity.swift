@@ -82,8 +82,19 @@ extension UnboundCapacity {
 
   /// Converts our contents into an array with at least the given
   /// capacity, and presents it to `body` for mutation.
-  internal mutating func withMutableArray<R>(
-    minCapacity: Int = 0,
+  //
+  // Michael NOTE: temporarily public, should probably make private
+  //
+  // Michael NOTE: forwarding version added due to odd linker behavior. Linker
+  // couldn't find the version with a default argument.
+  //
+  public mutating func withMutableArray<R>(
+    body: (inout [Base.Iterator.Element]) throws->R
+  ) rethrows -> R {
+    return try withMutableArray(minCapacity: 0, body: body)
+  }
+  public mutating func withMutableArray<R>(
+    minCapacity: Int,
     body: (inout [Base.Iterator.Element]) throws->R
   ) rethrows -> R {
     var result: [Base.Iterator.Element]
@@ -110,7 +121,9 @@ extension UnboundCapacity {
 
   /// Returns the small (`Base`) representation iff we have it and it has at
   /// least the given capacity.
-  internal func _small(minCapacity: Int) -> Base? {
+  ///
+  /// Michael: I made this public to squash linker errors in prototypes
+  public func _small(minCapacity: Int) -> Base? {
     if case .small(let base) = self,
       minCapacity <= numericCast(base.maxCapacity) {
       return base

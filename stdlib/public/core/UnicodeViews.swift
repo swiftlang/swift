@@ -22,11 +22,11 @@ public func _debugLog(_ arg0: @autoclosure ()->Any, _ arg1: @autoclosure ()->Any
   print(arg0(), arg1())
 }
 
-internal func __swift_stdlib_U_SUCCESS(_ x: __swift_stdlib_UErrorCode) -> Bool {
+public func __swift_stdlib_U_SUCCESS(_ x: __swift_stdlib_UErrorCode) -> Bool {
  return x.rawValue <= __swift_stdlib_U_ZERO_ERROR.rawValue
 }
 
-internal func __swift_stdlib_U_FAILURE(_ x: __swift_stdlib_UErrorCode) -> Bool {
+public func __swift_stdlib_U_FAILURE(_ x: __swift_stdlib_UErrorCode) -> Bool {
  return x.rawValue > __swift_stdlib_U_ZERO_ERROR.rawValue
 }
 
@@ -533,7 +533,9 @@ internal func _makeFCCNormalizer() -> OpaquePointer {
   return ret!
 }
 
-internal var _fccNormalizer = _makeFCCNormalizer()
+// Michael NOTE: I don't think this is thread safe. It seems like the
+// Normalizer2Impl's trie pointer can be modified even by simple queries.
+public var _fccNormalizer = _makeFCCNormalizer()
 
 extension _UnicodeViews {
   

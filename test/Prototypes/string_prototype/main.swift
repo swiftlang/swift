@@ -1,5 +1,5 @@
 // Run the tests for the whole String prototype
-// RUN: %target-build-swift %s %S/String.swift %S/StringStorage.swift %S/Unicode.swift %S/Latin1String.swift %S/CanonicalString.swift %S/StringComparison.swift %S/StringCompatibility.swift %S/Substring.swift -parse-stdlib -Xfrontend -disable-access-control -Onone -o %t
+// RUN: %target-build-swift %s %S/String.swift %S/StringStorage.swift %S/Unicode.swift %S/Latin1String.swift %S/CanonicalString.swift %S/StringComparison.swift %S/StringCompatibility.swift %S/Substring.swift -parse-stdlib -Xfrontend -disable-access-control -Onone -g -o %t
 // RUN: %target-run %t
 // REQUIRES: executable_test
 
@@ -7,6 +7,21 @@ import Swift
 import Darwin
 import SwiftShims
 import StdlibUnittest
+
+//
+// WIP: for debugging use within the prototype, only
+//
+var _printDebugging = false
+func _debug(_ s: Swift.String) {
+  guard _printDebugging else { return }
+  print(s)
+}
+func _withDebugging(_ f: ()->()) {
+  let prior = _printDebugging
+  _printDebugging = true
+  f()
+  _printDebugging = prior
+}
 
 var testSuite = TestSuite("t")
 
@@ -342,57 +357,115 @@ testSuite.test("fcc-normalized-view") {
   let aTic: UInt16 = 0x00e0
   let aBackTic: UInt16 = 0x00e1
   typealias UTF16String = _UnicodeViews<[UInt16], UTF16>
+  typealias NormalizedView = FCCNormalizedUTF16View_2<[UInt16], UTF16>
+
+  // Helper old/new functions, eagerly forms arrays of the forwards and reverse
+  // FCC normalized UTF16 code units
+  func oldFCCNormView(_ codeUnits: [UInt16])
+    -> (forward: [UInt16], reversed: [UInt16]) {
+    let view = UTF16String(codeUnits).fccNormalizedUTF16
+    return (forward: Array(view),
+            reversed: Array(view.reversed()))
+  }
+  func newFCCNormView(_ codeUnits: [UInt16])
+    -> (forward: [UInt16], reversed: [UInt16]) {
+    let view = NormalizedView(FCCNormalizedLazySegments(UTF16String(codeUnits)))
+    return (forward: Array(view),
+            reversed: Array(view.reversed()))
+  }
 
   // Test canonical equivalence for:
   //   1) a + ̀ + ́ == à + ́
   //   2) a + ́ + ̀ == á + ̀
   // BUT, the two are distinct, #1 != #2
   do {
-  let str1form1 = [a, 0x0300, 0x0301]
-  let str1form2 = [aTic, 0x0301]
-  let str2form1 = [a, 0x0301, 0x0300]
-  let str2form2 = [aBackTic, 0x0300]
+    let str1form1 = [a, 0x0300, 0x0301]
+    let str1form2 = [aTic, 0x0301]
+    let str2form1 = [a, 0x0301, 0x0300]
+    let str2form2 = [aBackTic, 0x0300]
 
-  let str1_1 = UTF16String(str1form1)
-  let str1_2 = UTF16String(str1form2)
-  let str2_1 = UTF16String(str2form1)
-  let str2_2 = UTF16String(str2form2)
+    let (norm1_1, norm1_1rev) = oldFCCNormView(str1form1)
+    let (norm1_2, norm1_2rev) = oldFCCNormView(str1form2)
+    let (norm2_1, norm2_1rev) = oldFCCNormView(str2form1)
+    let (norm2_2, norm2_2rev) = oldFCCNormView(str2form2)
 
-  for (cu1, cu2) in zip(str1_1.fccNormalizedUTF16, str1_2.fccNormalizedUTF16) {
-    expectEqual(cu1, cu2)
-  }
-  for (cu1, cu2) in zip(str2_1.fccNormalizedUTF16, str2_2.fccNormalizedUTF16) {
-    expectEqual(cu1, cu2)
-  }
-  for (cu1, cu2) in zip(str1_1.fccNormalizedUTF16, str2_1.fccNormalizedUTF16) {
-    expectNotEqual(cu1, cu2)
-  }
+    expectEqualSequence(norm1_1, norm1_2)
+    expectEqualSequence(norm2_1, norm2_2)
+    for (cu1, cu2) in zip(norm1_1, norm2_1) {
+      expectNotEqual(cu1, cu2)
+    }
+
+    let (newNorm1_1, newNorm1_1rev) = newFCCNormView(str1form1)
+    let (newNorm1_2, newNorm1_2rev) = newFCCNormView(str1form2)
+    let (newNorm2_1, newNorm2_1rev) = newFCCNormView(str2form1)
+    let (newNorm2_2, newNorm2_2rev) = newFCCNormView(str2form2)
+
+    expectEqualSequence(newNorm1_1, newNorm1_2)
+    expectEqualSequence(newNorm1_1, norm1_1)
+    expectEqualSequence(newNorm2_1, newNorm2_2)
+    expectEqualSequence(newNorm2_1, norm2_1)
+
+    // Test other direction
+    expectEqualSequence(newNorm1_1rev, newNorm1_2rev)
+    expectEqualSequence(newNorm1_1rev, norm1_1rev)
+    expectEqualSequence(newNorm2_1rev, newNorm2_2rev)
+    expectEqualSequence(newNorm2_1rev, norm2_1rev)
   }
 
   // Test canonical equivalence, and non-combining-ness of FCC for:
   //   1) a + ̖ + ̀ == à + ̖ == a + ̀ + ̖
   //   All will normalize under FCC as a + ̖ + ̀
   do {
-  let form1 = [a, 0x0316, 0x0300]
-  let form2 = [a, 0x0300, 0x0316]
-  let form3 = [aTic, 0x0316]
+    let form1 = [a, 0x0316, 0x0300]
+    let form2 = [a, 0x0300, 0x0316]
+    let form3 = [aTic, 0x0316]
 
-  let str1 = UTF16String(form1)
-  let str2 = UTF16String(form2)
-  let str3 = UTF16String(form3)
+    let (norm1, norm1rev) = oldFCCNormView(form1)
+    let (norm2, norm2rev) = oldFCCNormView(form2)
+    let (norm3, norm3rev) = oldFCCNormView(form3)
 
-  for (cu1, (cu2, cu3)) in zip(
-    str1.fccNormalizedUTF16,
-    zip(str2.fccNormalizedUTF16, str3.fccNormalizedUTF16)
-  ) {
-    expectEqual(cu1, cu2)
-    expectEqual(cu2, cu3)
+    // Sanity check existing normal form yields same results
+    expectEqualSequence(norm1, norm2)
+    expectEqualSequence(norm2, norm3)
+
+    // Form 1 is already in FCC
+    expectEqualSequence(norm3, form1)
+
+    // Test the new one
+    let (newNorm1, newNorm1rev) = newFCCNormView(form1)
+    let (newNorm2, newNorm2rev) = newFCCNormView(form2)
+    let (newNorm3, newNorm3rev) = newFCCNormView(form3)
+
+    expectEqualSequence(newNorm1, newNorm2)
+    expectEqualSequence(newNorm2, newNorm3)
+    expectEqualSequence(newNorm3, norm3)
+
+    // And in reverse
+    expectEqualSequence(newNorm1rev, newNorm2rev)
+    expectEqualSequence(newNorm2rev, newNorm3rev)
+    expectEqualSequence(newNorm3rev, norm3rev)
   }
 
-  expectEqual(str3.fccNormalizedUTF16.map { $0 }, form1)
+  do {
+    // Test that the new normalizer is same result as old normalizer
+    let s = "abcdefghijklmnopqrstuvwxyz\n"
+    + "🇸🇸🇬🇱🇱🇸🇩🇯🇺🇸\n"
+    + "Σὲ 👥🥓γνωρίζω ἀπὸ τὴν κόψη χαῖρε, ὦ χαῖρε, ᾿Ελευθεριά!\n"
+    + "Οὐχὶ ταὐτὰ παρίσταταί μοι γιγνώσκειν, ὦ ἄνδρες ᾿Αθηναῖοι,\n"
+    + "გთხოვთ ახლავე გაიაროთ რეგისტრაცია Unicode-ის მეათე საერთაშორისო\n"
+    + "Зарегистрируйтесь сейчас на Десятую Международную Конференцию по\n"
+    + "  ๏ แผ่นดินฮั่นเสื่อมโทรมแสนสังเวช  พระปกเกศกองบู๊กู้ขึ้นใหม่\n"
+    + "ᚻᛖ ᚳᚹᚫᚦ ᚦᚫᛏ ᚻᛖ ᛒᚢᛞᛖ ᚩᚾ ᚦᚫᛗ ᛚᚪᚾᛞᛖ ᚾᚩᚱᚦᚹᛖᚪᚱᛞᚢᛗ ᚹᛁᚦ ᚦᚪ ᚹᛖᛥᚫ"
+    let s16 = Array(s.utf16)
+
+    let (norm1, norm1rev) = oldFCCNormView(s16)
+    let (newNorm1, newNorm1rev) = newFCCNormView(s16)
+
+    expectEqualSequence(norm1, newNorm1)
+    expectEqualSequence(norm1rev, newNorm1rev)
+
+    expectTrue(norm1 != newNorm1rev)
   }
-
-
 }
 
 import Foundation
