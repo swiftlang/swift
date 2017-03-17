@@ -1157,7 +1157,7 @@ extension Bool : Codable {
     }
 
     public func encode(to encoder: Encoder) throws {
-        try encoder.singleValueContainer().encode( self)
+        try encoder.singleValueContainer().encode(self)
     }
 }
 
@@ -1167,7 +1167,7 @@ extension Int : Codable {
     }
 
     public func encode(to encoder: Encoder) throws {
-        try encoder.singleValueContainer().encode( self)
+        try encoder.singleValueContainer().encode(self)
     }
 }
 
@@ -1177,7 +1177,7 @@ extension Int8 : Codable {
     }
 
     public func encode(to encoder: Encoder) throws {
-        try encoder.singleValueContainer().encode( self)
+        try encoder.singleValueContainer().encode(self)
     }
 }
 
@@ -1187,7 +1187,7 @@ extension Int16 : Codable {
     }
 
     public func encode(to encoder: Encoder) throws {
-        try encoder.singleValueContainer().encode( self)
+        try encoder.singleValueContainer().encode(self)
     }
 }
 
@@ -1197,7 +1197,7 @@ extension Int32 : Codable {
     }
 
     public func encode(to encoder: Encoder) throws {
-        try encoder.singleValueContainer().encode( self)
+        try encoder.singleValueContainer().encode(self)
     }
 }
 
@@ -1207,7 +1207,7 @@ extension Int64 : Codable {
     }
 
     public func encode(to encoder: Encoder) throws {
-        try encoder.singleValueContainer().encode( self)
+        try encoder.singleValueContainer().encode(self)
     }
 }
 
@@ -1217,7 +1217,7 @@ extension UInt : Codable {
     }
 
     public func encode(to encoder: Encoder) throws {
-        try encoder.singleValueContainer().encode( self)
+        try encoder.singleValueContainer().encode(self)
     }
 }
 
@@ -1227,7 +1227,7 @@ extension UInt8 : Codable {
     }
 
     public func encode(to encoder: Encoder) throws {
-        try encoder.singleValueContainer().encode( self)
+        try encoder.singleValueContainer().encode(self)
     }
 }
 
@@ -1237,7 +1237,7 @@ extension UInt16 : Codable {
     }
 
     public func encode(to encoder: Encoder) throws {
-        try encoder.singleValueContainer().encode( self)
+        try encoder.singleValueContainer().encode(self)
     }
 }
 
@@ -1247,7 +1247,7 @@ extension UInt32 : Codable {
     }
 
     public func encode(to encoder: Encoder) throws {
-        try encoder.singleValueContainer().encode( self)
+        try encoder.singleValueContainer().encode(self)
     }
 }
 
@@ -1257,7 +1257,7 @@ extension UInt64 : Codable {
     }
 
     public func encode(to encoder: Encoder) throws {
-        try encoder.singleValueContainer().encode( self)
+        try encoder.singleValueContainer().encode(self)
     }
 }
 
@@ -1267,7 +1267,7 @@ extension Float : Codable {
     }
 
     public func encode(to encoder: Encoder) throws {
-        try encoder.singleValueContainer().encode( self)
+        try encoder.singleValueContainer().encode(self)
     }
 }
 
@@ -1277,7 +1277,7 @@ extension Double : Codable {
     }
 
     public func encode(to encoder: Encoder) throws {
-        try encoder.singleValueContainer().encode( self)
+        try encoder.singleValueContainer().encode(self)
     }
 }
 
@@ -1287,7 +1287,7 @@ extension String : Codable {
     }
 
     public func encode(to encoder: Encoder) throws {
-        try encoder.singleValueContainer().encode( self)
+        try encoder.singleValueContainer().encode(self)
     }
 }
 
@@ -1297,7 +1297,7 @@ extension Data : Codable {
     }
 
     public func encode(to encoder: Encoder) throws {
-        try encoder.singleValueContainer().encode( self)
+        try encoder.singleValueContainer().encode(self)
     }
 }
 
