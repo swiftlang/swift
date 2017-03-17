@@ -491,14 +491,6 @@ NodePointer getUnspecialized(Node *node, NodeFactory &Factory);
 std::string archetypeName(Node::IndexType index, Node::IndexType depth);
 
 } // end namespace Demangle
-
-
-/// Returns true if the new mangling scheme should be used.
-///
-/// TODO: remove this function when the old mangling is removed.
-bool useNewMangling(Demangle::NodePointer Node);
-
-
 } // end namespace swift
 
 #endif // SWIFT_DEMANGLING_DEMANGLE_H

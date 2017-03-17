@@ -1588,7 +1588,7 @@ static int doPrintLocalTypes(const CompilerInvocation &InitInvok,
       while (node->getKind() != NodeKind::LocalDeclName)
         node = node->getChild(1); // local decl name
 
-      auto remangled = Demangle::mangleNode(typeNode, useNewMangling(typeNode));
+      auto remangled = Demangle::mangleNode(typeNode);
 
       auto LTD = M->lookupLocalType(remangled);
 

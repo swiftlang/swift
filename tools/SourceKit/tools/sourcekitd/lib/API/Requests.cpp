@@ -1164,7 +1164,7 @@ static std::string mangleSimpleClass(StringRef moduleName,
   typeNode->addChild(classNode, Dem);
   typeManglingNode->addChild(typeNode, Dem);
   globalNode->addChild(typeManglingNode, Dem);
-  return mangleNode(globalNode, swift::useNewMangling(globalNode));
+  return mangleNode(globalNode);
 }
 
 static sourcekitd_response_t

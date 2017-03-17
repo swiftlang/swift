@@ -25,10 +25,6 @@ llvm::cl::opt<bool> NewManglingForTests(
                        "new-mangling-for-tests", llvm::cl::init(false),
                        llvm::cl::desc("Use new mangling for compiler tests"));
 
-bool swift::useNewMangling(Demangle::NodePointer Node) {
-  return true;
-}
-
 #ifndef NDEBUG
 
 llvm::cl::opt<bool> PrintSwiftManglingStats(
