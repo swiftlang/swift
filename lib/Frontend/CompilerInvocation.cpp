@@ -1028,6 +1028,8 @@ static bool ParseClangImporterArgs(ClangImporterOptions &Opts,
 
   Opts.DisableModulesValidateSystemHeaders |= Args.hasArg(OPT_disable_modules_validate_system_headers);
 
+  Opts.DisableAdapterModules |= Args.hasArg(OPT_emit_imported_modules);
+
   return false;
 }
 

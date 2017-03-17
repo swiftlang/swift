@@ -15,12 +15,12 @@
 
 namespace swift {
 
-class DiagnosticEngine;
+class ASTContext;
 class FrontendOptions;
 class ModuleDecl;
 
-/// Emit the names of the modules imported by \c module.
-bool emitImportedModules(DiagnosticEngine &diags, ModuleDecl *module,
+/// Emit the names of the modules imported by \c mainModule.
+bool emitImportedModules(ASTContext &Context, ModuleDecl *mainModule,
                          const FrontendOptions &opts);
 } // end namespace swift
 

@@ -488,7 +488,7 @@ static bool performCompile(std::unique_ptr<CompilerInstance> &Instance,
       SF->dump();
     return Context.hadError();
   } else if (Action == FrontendOptions::EmitImportedModules) {
-    emitImportedModules(Context.Diags, Instance->getMainModule(), opts);
+    emitImportedModules(Context, Instance->getMainModule(), opts);
     return Context.hadError();
   }
 
