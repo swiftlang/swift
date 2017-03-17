@@ -842,35 +842,15 @@ GenericFuncSpecializer::GenericFuncSpecializer(SILFunction *GenericFunc,
   assert(GenericFunc->isDefinition() && "Expected definition to specialize!");
   auto FnTy = ReInfo.getSpecializedType();
 
-  std::string Old;
-
   if (ReInfo.isPartialSpecialization()) {
-    Mangle::Mangler Mangler;
-    PartialSpecializationMangler OldGenericMangler(Mangler, GenericFunc, FnTy,
-                                                   Fragile);
-    OldGenericMangler.mangle();
-    Old = Mangler.finalize();
-  } else {
-    Mangle::Mangler Mangler;
-    GenericSpecializationMangler OldGenericMangler(Mangler, GenericFunc,
-                                                   ParamSubs, Fragile);
-    OldGenericMangler.mangle();
-    Old = Mangler.finalize();
-  }
-
-  std::string New;
-  if (ReInfo.isPartialSpecialization()) {
-    NewMangling::PartialSpecializationMangler NewGenericMangler(
+    NewMangling::PartialSpecializationMangler Mangler(
         GenericFunc, FnTy, Fragile, /*isReAbstracted*/ true);
-    New = NewGenericMangler.mangle();
+    ClonedName = Mangler.mangle();
   } else {
-    NewMangling::GenericSpecializationMangler NewGenericMangler(
+    NewMangling::GenericSpecializationMangler Mangler(
         GenericFunc, ParamSubs, Fragile, /*isReAbstracted*/ true);
-    New = NewGenericMangler.mangle();
+    ClonedName = Mangler.mangle();
   }
-
-  ClonedName = NewMangling::selectMangling(Old, New);
-
   DEBUG(llvm::dbgs() << "    Specialized function " << ClonedName << '\n');
 }
 
@@ -1104,33 +1084,17 @@ public:
 
     {
       if (!ReInfo.isPartialSpecialization()) {
-        Mangle::Mangler M;
-        GenericSpecializationMangler OldMangler(
-            M, OrigF, ReInfo.getOriginalParamSubstitutions(), Fragile,
-            GenericSpecializationMangler::NotReabstracted);
-        OldMangler.mangle();
-        std::string Old = M.finalize();
-
-        NewMangling::GenericSpecializationMangler NewMangler(
+        NewMangling::GenericSpecializationMangler Mangler(
             OrigF, ReInfo.getOriginalParamSubstitutions(), Fragile,
             /*isReAbstracted*/ false);
 
-        std::string New = NewMangler.mangle();
-        ThunkName = NewMangling::selectMangling(Old, New);
+        ThunkName = Mangler.mangle();
       } else {
-        Mangle::Mangler M;
-        PartialSpecializationMangler OldMangler(
-            M, OrigF, ReInfo.getSpecializedType(), Fragile,
-            PartialSpecializationMangler::NotReabstracted);
-        OldMangler.mangle();
-        std::string Old = M.finalize();
-
-        NewMangling::PartialSpecializationMangler NewMangler(
+        NewMangling::PartialSpecializationMangler Mangler(
             OrigF, ReInfo.getSpecializedType(), Fragile,
             /*isReAbstracted*/ false);
 
-        std::string New = NewMangler.mangle();
-        ThunkName = NewMangling::selectMangling(Old, New);
+        ThunkName = Mangler.mangle();
       }
     }
   }

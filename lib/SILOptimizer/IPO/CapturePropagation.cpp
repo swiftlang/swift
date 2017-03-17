@@ -16,7 +16,6 @@
 #include "swift/SILOptimizer/Utils/Generics.h"
 #include "swift/SILOptimizer/Utils/SpecializationMangler.h"
 #include "swift/Demangling/Demangle.h"
-#include "swift/SIL/Mangle.h"
 #include "swift/SIL/SILCloner.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/TypeSubstCloner.h"
@@ -75,23 +74,16 @@ static bool isConstant(SILValue V) {
 
 static std::string getClonedName(PartialApplyInst *PAI, IsFragile_t Fragile,
                                  SILFunction *F) {
-
-  Mangle::Mangler M;
   auto P = Demangle::SpecializationPass::CapturePropagation;
-  FunctionSignatureSpecializationMangler OldMangler(P, M, Fragile, F);
-  NewMangling::FunctionSignatureSpecializationMangler NewMangler(P, Fragile, F);
+  NewMangling::FunctionSignatureSpecializationMangler Mangler(P, Fragile, F);
 
   // We know that all arguments are literal insts.
   unsigned argIdx = ApplySite(PAI).getCalleeArgIndexOfFirstAppliedArg();
   for (auto arg : PAI->getArguments()) {
-    OldMangler.setArgumentConstantProp(argIdx, getConstant(arg));
-    NewMangler.setArgumentConstantProp(argIdx, getConstant(arg));
+    Mangler.setArgumentConstantProp(argIdx, getConstant(arg));
     ++argIdx;
   }
-  OldMangler.mangle();
-  std::string Old = M.finalize();
-  std::string New = NewMangler.mangle();
-  return NewMangling::selectMangling(Old, New);
+  return Mangler.mangle();
 }
 
 namespace {

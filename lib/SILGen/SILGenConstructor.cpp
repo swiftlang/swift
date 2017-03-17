@@ -17,7 +17,6 @@
 #include "RValue.h"
 #include "Scope.h"
 #include "swift/AST/GenericEnvironment.h"
-#include "swift/AST/Mangle.h"
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/SIL/SILArgument.h"
@@ -27,7 +26,6 @@
 
 using namespace swift;
 using namespace Lowering;
-using namespace Mangle;
 
 static SILValue emitConstructorMetatypeArg(SILGenFunction &gen,
                                            ValueDecl *ctor) {
@@ -844,15 +842,8 @@ static void emitMemberInit(SILGenFunction &SGF, VarDecl *selfDecl,
 
 static SILValue getBehaviorInitStorageFn(SILGenFunction &gen,
                                          VarDecl *behaviorVar) {
-  std::string behaviorInitName;
-  {
-    Mangler m;
-    m.mangleBehaviorInitThunk(behaviorVar);
-    std::string Old = m.finalize();
-    NewMangling::ASTMangler NewMangler;
-    std::string New = NewMangler.mangleBehaviorInitThunk(behaviorVar);
-    behaviorInitName = NewMangling::selectMangling(Old, New);
-  }
+  NewMangling::ASTMangler NewMangler;
+  std::string behaviorInitName = NewMangler.mangleBehaviorInitThunk(behaviorVar);
   
   SILFunction *thunkFn;
   // Skip out early if we already emitted this thunk.
