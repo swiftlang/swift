@@ -162,10 +162,6 @@ namespace swift {
     /// \brief Enable experimental property behavior feature.
     bool EnableExperimentalPropertyBehaviors = false;
 
-    /// \brief Staging flag for treating inout parameters as Thread Sanitizer
-    /// accesses.
-    bool EnableTSANInoutInstrumentation = false;
-
     /// \brief Staging flag for class resilience, which we do not want to enable
     /// fully until more code is in place, to allow the standard library to be
     /// tested with value type resilience only.

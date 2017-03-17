@@ -594,21 +594,6 @@ void ElementUseCollector::collectContainerUses(AllocBoxInst *ABI) {
   }
 }
 
-/// Returns true when the instruction represents added instrumentation for
-/// run-time sanitizers.
-static bool isSanitizerInstrumentation(SILInstruction *Instruction,
-                                       ASTContext &Ctx) {
-  auto *BI = dyn_cast<BuiltinInst>(Instruction);
-  if (!BI)
-    return false;
-
-  Identifier Name = BI->getName();
-  if (Name == Ctx.getIdentifier("tsanInoutAccess"))
-    return true;
-
-  return false;
-}
-
 void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
   assert(Pointer->getType().isAddress() &&
          "Walked through the pointer to the value?");
@@ -846,11 +831,6 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
     if (isa<DeallocStackInst>(User)) {
       continue;
     }
-
-    // Sanitizer instrumentation is not user visible, so it should not
-    // count as a use and must not affect compile-time diagnostics.
-    if (isSanitizerInstrumentation(User, Module.getASTContext()))
-      continue;
 
     // Otherwise, the use is something complicated, it escapes.
     addElementUses(BaseEltNo, PointeeType, User, DIUseKind::Escape);
