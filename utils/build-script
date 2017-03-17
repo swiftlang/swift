@@ -57,11 +57,12 @@ build_script_impl = os.path.join(
     SWIFT_SOURCE_ROOT, "swift", "utils", "build-script-impl")
 
 
-def exit_rejecting_arguments(message, parser = None):
+def exit_rejecting_arguments(message, parser=None):
     print(message, file=sys.stderr)
     if parser:
         parser.print_usage(sys.stderr)
     sys.exit(2)  # 2 is the same as `argparse` error exit code.
+
 
 def call_without_sleeping(command, env=None, dry_run=False, echo=False):
     """
@@ -321,9 +322,9 @@ class BuildScriptInvocation(object):
                                      "skip tvOS device tests.")
 
         if args.watchos_all:
-            exit_rejecting_arguments("error: --watchos-all is unavailable in " +
-                                     "open-source Swift.\nUse --watchos to " +
-                                     "skip watchOS device tests.")
+            exit_rejecting_arguments("error: --watchos-all is unavailable " +
+                                     "in open-source Swift.\nUse --watchos " +
+                                     "to skip watchOS device tests.")
 
         ninja_required = (
             args.cmake_generator == 'Ninja' or args.build_foundation)
@@ -1826,7 +1827,8 @@ iterations with -O",
         help="also build for iOS, but disallow tests that require an iOS "
              "device",
         action="store_true")
-    parser.add_argument("-I", "--ios-all",
+    parser.add_argument(
+        "-I", "--ios-all",
         help="also build for iOS, and allow all iOS tests",
         action="store_true",
         dest="ios_all")
@@ -1841,7 +1843,8 @@ iterations with -O",
         help="also build for tvOS, but disallow tests that require a tvos "
              "device",
         action=arguments.action.optional_bool)
-    parser.add_argument("--tvos-all",
+    parser.add_argument(
+        "--tvos-all",
         help="also build for tvOS, and allow all tvOS tests",
         action=arguments.action.optional_bool,
         dest="tvos_all")
@@ -1856,7 +1859,8 @@ iterations with -O",
         help="also build for watchOS, but disallow tests that require an "
              "watchOS device",
         action=arguments.action.optional_bool)
-    parser.add_argument("--watchos-all",
+    parser.add_argument(
+        "--watchos-all",
         help="also build for Apple watchOS, and allow all Apple watchOS tests",
         action=arguments.action.optional_bool,
         dest="watchos_all")
