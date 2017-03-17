@@ -441,7 +441,7 @@ bb0(%0 : $Int):
 
 // Crash on partial apply of a generic enum.
 enum GenericEnum<T> {
-	case X(String)
+  case X(String)
   case Y(T, T, T, T, T)
 }
 sil public_external @generic_indirect_return : $@convention(thin) <T> (Int) -> @owned GenericEnum<T>
@@ -463,7 +463,7 @@ sil @partial_apply_generic_indirect_return : $@convention(thin) (Int) -> @callee
 
 // Crash on partial apply of a generic enum.
 enum GenericEnum2<T> {
-	case X(String)
+  case X(String)
   case Y(T)
 }
 sil public_external @generic_indirect_return2 : $@convention(thin) <T> (Int) -> @owned GenericEnum2<T>
