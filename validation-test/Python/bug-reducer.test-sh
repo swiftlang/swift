@@ -2,4 +2,4 @@
 // REQUIRES: OS=macosx
 // REQUIRES: asserts
 // REQUIRES: CMAKE_GENERATOR=Ninja
-// REQUIRES: rdar://problem/31044019
+// REQUIRES: rdar31044019
