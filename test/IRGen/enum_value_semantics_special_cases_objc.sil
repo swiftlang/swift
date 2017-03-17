@@ -22,7 +22,7 @@ enum NullableObjCRefcounted {
 class C {}
 sil_vtable C {}
 
-sil @_TFC39enum_value_semantics_special_cases_objc1CD : $@convention(method) (C) -> ()
+sil @_T039enum_value_semantics_special_cases_objc1CCfD : $@convention(method) (C) -> ()
 
 enum AllMixedRefcounted {
   case Ref(Builtin.NativeObject)

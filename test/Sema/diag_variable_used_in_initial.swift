@@ -42,5 +42,14 @@ func localContext() {
         var foo1 = foo1() // expected-error {{variable used within its own initial value; use 'self.' to refer to the instance method}}{{20-20=self.}}
       }
     }
+
+    extension E { // expected-error {{declaration is only valid at file scope}}
+      class A7 {
+        func foo1() {}
+        func foo2() {
+          var foo1 = foo1() // expected-error {{variable used within its own initial value; use 'self.' to refer to the instance method}}{{22-22=self.}}
+        }
+      }
+    }
   }
 }

@@ -228,7 +228,7 @@ func hasLocalizationKey2() {}
 // CHECK2-NEXT: +
 // CHECK2-NEXT: s:s1poiS2i_SitF
 // CHECK2-NEXT: (Int, Int) -> Int{{$}}
-// CHECK2-NEXT: _TtFTSiSi_Si
+// CHECK2-NEXT: _T0S2i_SitcD
 // CHECK2-NEXT: Swift{{$}}
 // CHECK2-NEXT: <Group>Math/Integers</Group>
 // CHECK2-NEXT: SYSTEM
@@ -240,7 +240,7 @@ func hasLocalizationKey2() {}
 // CHECK3-NEXT: x{{$}}
 // CHECK3-NEXT: s:11cursor_info3gooySiF1xL_Siv{{$}}
 // CHECK3-NEXT: Int{{$}}
-// CHECK3-NEXT: _TtSi
+// CHECK3-NEXT: _T0SiD
 // CHECK3-NEXT: <Declaration>let x: <Type usr="s:Si">Int</Type></Declaration>
 // CHECK3-NEXT: <decl.var.parameter><syntaxtype.keyword>let</syntaxtype.keyword> <decl.var.parameter.name>x</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr="s:Si">Int</ref.struct></decl.var.parameter.type></decl.var.parameter>
 
@@ -249,7 +249,7 @@ func hasLocalizationKey2() {}
 // CHECK4-NEXT: fooIntVar{{$}}
 // CHECK4-NEXT: c:@fooIntVar{{$}}
 // CHECK4-NEXT: Int32{{$}}
-// CHECK4-NEXT: _TtVs5Int32
+// CHECK4-NEXT: _T0s5Int32VD
 // CHECK4-NEXT: Foo{{$}}
 // CHECK4-NEXT: <Declaration>var fooIntVar: <Type usr="s:s5Int32V">Int32</Type></Declaration>
 // CHECK4-NEXT: <decl.var.global><syntaxtype.keyword>var</syntaxtype.keyword> <decl.name>fooIntVar</decl.name>: <decl.var.type><ref.struct usr="s:s5Int32V">Int32</ref.struct></decl.var.type></decl.var.global>
@@ -266,7 +266,7 @@ func hasLocalizationKey2() {}
 // CHECK6-NEXT: fooSwiftFunc
 // CHECK6-NEXT: s:14FooSwiftModule03fooB4FuncSiyF
 // CHECK6-NEXT: () -> Int
-// CHECK6-NEXT: _TtFT_Si
+// CHECK6-NEXT: _T0SiycD
 // CHECK6-NEXT: FooSwiftModule
 // CHECK6-NEXT: <Declaration>func fooSwiftFunc() -&gt; <Type usr="s:Si">Int</Type></Declaration>
 // CHECK6-NEXT: <decl.function.free><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>fooSwiftFunc</decl.name>() -&gt; <decl.function.returntype><ref.struct usr="s:Si">Int</ref.struct></decl.function.returntype></decl.function.free>
@@ -277,7 +277,7 @@ func hasLocalizationKey2() {}
 // CHECK7-NEXT: S1
 // CHECK7-NEXT: s:11cursor_info2S1V
 // CHECK7-NEXT: S1.Type
-// CHECK7-NEXT: _Tt
+// CHECK7-NEXT: _T0
 // CHECK7-NEXT: <Declaration>struct S1</Declaration>
 // CHECK7-NEXT: <decl.struct><syntaxtype.keyword>struct</syntaxtype.keyword> <decl.name>S1</decl.name></decl.struct>
 // CHECK7-NEXT: <Class file="{{[^"]+}}cursor_info.swift" line="13" column="8"><Name>S1</Name><USR>s:11cursor_info2S1V</USR><Declaration>struct S1</Declaration><Abstract><Para>Aaa.  S1.  Bbb.</Para></Abstract></Class>
@@ -287,8 +287,8 @@ func hasLocalizationKey2() {}
 // CHECK8-NEXT: init
 // CHECK8-NEXT: s:11cursor_info2CCCACSi1x_tcfc
 // CHECK8-NEXT: (CC.Type) -> (Int) -> CC
-// CHECK8-NEXT: _TtFT1xSi_C11cursor_info2CC
-// CHECK8-NEXT: <Container>_TtC11cursor_info2CC</Container>
+// CHECK8-NEXT: _T011cursor_info2CCCSi1x_tcD
+// CHECK8-NEXT: <Container>_T011cursor_info2CCCD</Container>
 // CHECK8-NEXT: <Declaration>convenience init(x: <Type usr="s:Si">Int</Type>)</Declaration>
 // CHECK8-NEXT: <decl.function.constructor><syntaxtype.keyword>convenience</syntaxtype.keyword> <syntaxtype.keyword>init</syntaxtype.keyword>(<decl.var.parameter><decl.var.parameter.argument_label>x</decl.var.parameter.argument_label>: <decl.var.parameter.type><ref.struct usr="s:Si">Int</ref.struct></decl.var.parameter.type></decl.var.parameter>)</decl.function.constructor>
 
@@ -393,7 +393,7 @@ func hasLocalizationKey2() {}
 // CHECK29-NEXT: deinit
 // CHECK29-NEXT: s:11cursor_info2C3Cfd
 // CHECK29-NEXT: (C3) -> ()
-// CHECK29-NEXT: _TtFT_T_
+// CHECK29-NEXT: _T0yycD
 // CHECK29-NEXT: <Declaration>deinit</Declaration>
 // CHECK29-NEXT: <decl.function.destructor><syntaxtype.keyword>deinit</syntaxtype.keyword></decl.function.destructor>
 
@@ -402,7 +402,7 @@ func hasLocalizationKey2() {}
 // CHECK30-NEXT: init(x:)
 // CHECK30-NEXT: s:11cursor_info2C3CSQyACGSi1x_tcfc
 // CHECK30-NEXT: (C3.Type) -> (Int) -> C3!
-// CHECK30-NEXT: _TtFT1xSi_GSQC11cursor_info2C3_
+// CHECK30-NEXT: _T0SQy11cursor_info2C3CGSi1x_tcD
 // CHECK30-NEXT: <Declaration>init!(x: <Type usr="s:Si">Int</Type>)</Declaration>
 // CHECK30-NEXT: <decl.function.constructor><syntaxtype.keyword>init</syntaxtype.keyword>!(<decl.var.parameter><decl.var.parameter.argument_label>x</decl.var.parameter.argument_label>: <decl.var.parameter.type><ref.struct usr="s:Si">Int</ref.struct></decl.var.parameter.type></decl.var.parameter>)</decl.function.constructor>
 
@@ -411,7 +411,7 @@ func hasLocalizationKey2() {}
 // CHECK31-NEXT: init(y:)
 // CHECK31-NEXT: s:11cursor_info2C3CACSgSi1y_tcfc
 // CHECK31-NEXT: (C3.Type) -> (Int) -> C3?
-// CHECK31-NEXT: _TtFT1ySi_GSqC11cursor_info2C3_
+// CHECK31-NEXT: _T011cursor_info2C3CSgSi1y_tcD
 // CHECK31-NEXT: <Declaration>init?(y: <Type usr="s:Si">Int</Type>)</Declaration>
 // CHECK31-NEXT: <decl.function.constructor><syntaxtype.keyword>init</syntaxtype.keyword>?(<decl.var.parameter><decl.var.parameter.argument_label>y</decl.var.parameter.argument_label>: <decl.var.parameter.type><ref.struct usr="s:Si">Int</ref.struct></decl.var.parameter.type></decl.var.parameter>)</decl.function.constructor>
 
@@ -420,7 +420,7 @@ func hasLocalizationKey2() {}
 // CHECK32-NEXT: init(z:)
 // CHECK32-NEXT: s:11cursor_info2C3CACSi1z_tKcfc
 // CHECK32-NEXT: (C3.Type) -> (Int) throws -> C3
-// CHECK32-NEXT: _TtFzT1zSi_C11cursor_info2C3
+// CHECK32-NEXT: _T011cursor_info2C3CSi1z_tKcD
 // CHECK32-NEXT: <Declaration>init(z: <Type usr="s:Si">Int</Type>) throws</Declaration>
 // CHECK32-NEXT: <decl.function.constructor><syntaxtype.keyword>init</syntaxtype.keyword>(<decl.var.parameter><decl.var.parameter.argument_label>z</decl.var.parameter.argument_label>: <decl.var.parameter.type><ref.struct usr="s:Si">Int</ref.struct></decl.var.parameter.type></decl.var.parameter>) <syntaxtype.keyword>throws</syntaxtype.keyword></decl.function.constructor>
 
@@ -716,7 +716,7 @@ func hasLocalizationKey2() {}
 // CHECK87-NEXT: HasLocalizationKey
 // CHECK87-NEXT: s:11cursor_info18HasLocalizationKeyV
 // CHECK87-NEXT: HasLocalizationKey.Type
-// CHECK87-NEXT: _Tt
+// CHECK87-NEXT: _T0
 // CHECK87-NEXT: <Declaration>struct HasLocalizationKey</Declaration>
 // CHECK87-NEXT: <decl.struct><syntaxtype.keyword>struct</syntaxtype.keyword> <decl.name>HasLocalizationKey</decl.name></decl.struct>
 // CHECK87-NEXT: <Class file="{{[^"]+}}cursor_info.swift" line="212" column="8"><Name>HasLocalizationKey</Name><USR>s:11cursor_info18HasLocalizationKeyV</USR><Declaration>struct HasLocalizationKey</Declaration><Abstract><Para>Brief.</Para></Abstract></Class>
@@ -727,7 +727,7 @@ func hasLocalizationKey2() {}
 // CHECK88-NEXT: hasLocalizationKey2
 // CHECK88-NEXT: s:11cursor_info19hasLocalizationKey2yyF
 // CHECK88-NEXT: () -> ()
-// CHECK88-NEXT: _Tt
+// CHECK88-NEXT: _T0
 // CHECK88-NEXT: <Declaration>func hasLocalizationKey2()</Declaration>
 // CHECK88-NEXT: <decl.function.free><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>hasLocalizationKey2</decl.name>()</decl.function.free>
 // CHECK88-NEXT: <Function file="{{[^"]+}}cursor_info.swift" line="215" column="6"><Name>hasLocalizationKey2()</Name><USR>s:11cursor_info19hasLocalizationKey2yyF</USR><Declaration>func hasLocalizationKey2()</Declaration></Function

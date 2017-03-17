@@ -47,7 +47,7 @@ SILGenFunction::emitInjectOptional(SILLocation loc,
 
   // If the value is loadable, just emit and wrap.
   // TODO: honor +0 contexts?
-  if (optTL.isLoadable()) {
+  if (optTL.isLoadable() || !silConv.useLoweredAddresses()) {
     ManagedValue objectResult = generator(SGFContext());
     auto some = B.createEnum(loc, objectResult.forward(*this), someDecl, optTy);
     return emitManagedRValueWithCleanup(some, optTL);
@@ -313,7 +313,7 @@ SILGenFunction::emitOptionalToOptional(SILLocation loc,
   // If the result is address-only, we need to return something in memory,
   // otherwise the result is the BBArgument in the merge point.
   ManagedValue finalResult;
-  if (resultTL.isAddressOnly()) {
+  if (resultTL.isAddressOnly() && silConv.useLoweredAddresses()) {
     finalResult = emitManagedBufferWithCleanup(
         emitTemporaryAllocation(loc, resultTy), resultTL);
   } else {
@@ -336,7 +336,7 @@ SILGenFunction::emitOptionalToOptional(SILLocation loc,
 
         ManagedValue result = transformValue(*this, loc, input, noOptResultTy);
 
-        if (!resultTL.isAddressOnly()) {
+        if (!(resultTL.isAddressOnly() && silConv.useLoweredAddresses())) {
           SILValue some = B.createOptionalSome(loc, result).forward(*this);
           return scope.exit(loc, some);
         }
@@ -351,7 +351,7 @@ SILGenFunction::emitOptionalToOptional(SILLocation loc,
   SEBuilder.addCase(
       getASTContext().getOptionalNoneDecl(), isNotPresentBB, contBB,
       [&](ManagedValue input, SwitchCaseFullExpr &scope) {
-        if (!resultTL.isAddressOnly()) {
+        if (!(resultTL.isAddressOnly() && silConv.useLoweredAddresses())) {
           SILValue none =
               B.createManagedOptionalNone(loc, resultTy).forward(*this);
           return scope.exit(loc, none);

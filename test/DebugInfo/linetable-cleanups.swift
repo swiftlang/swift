@@ -1,8 +1,5 @@
 // RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests %s -emit-ir -g -o - | %FileCheck %s
 
-// FIXME: https://bugs.swift.org/browse/SR-2808
-// XFAIL: resilient_stdlib
-
 func markUsed<T>(_ t: T) {}
 
 class Person {

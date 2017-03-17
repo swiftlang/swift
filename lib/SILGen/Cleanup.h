@@ -56,15 +56,16 @@ enum class CleanupState {
 llvm::raw_ostream &operator<<(raw_ostream &os, CleanupState state);
 
 class LLVM_LIBRARY_VISIBILITY Cleanup {
-  unsigned allocatedSize;
-  
   friend class CleanupManager;
+
+  unsigned allocatedSize;
+
 protected:
   CleanupState state;
 
   Cleanup() {}
   virtual ~Cleanup() {}
-  
+
 public:
   /// Return the allocated size of this object.  This is required by
   /// DiverseStack for iteration.
@@ -98,10 +99,10 @@ typedef DiverseStackImpl<Cleanup>::stable_iterator CleanupHandle;
 class LLVM_LIBRARY_VISIBILITY CleanupManager {
   friend class Scope;
 
-  SILGenFunction &Gen;
-  
+  SILGenFunction &SGF;
+
   /// Stack - Currently active cleanups in this scope tree.
-  DiverseStack<Cleanup, 128> Stack;
+  DiverseStack<Cleanup, 128> stack;
 
   /// The shallowest depth held by an active Scope object.
   ///
@@ -113,8 +114,8 @@ class LLVM_LIBRARY_VISIBILITY CleanupManager {
   /// only really care about those held by the Scope RAII objects.  So
   /// we can only reap the cleanup stack up to the innermost depth
   /// that we've handed out as a Scope.
-  CleanupsDepth InnermostScope;
-  
+  CleanupsDepth innermostScope;
+
   void popTopDeadCleanups(CleanupsDepth end);
   void emitCleanups(CleanupsDepth depth, CleanupLocation l,
                     bool popCleanups=true);
@@ -128,32 +129,28 @@ class LLVM_LIBRARY_VISIBILITY CleanupManager {
   friend class FormalEvaluationScope;
 
 public:
-  CleanupManager(SILGenFunction &Gen)
-    : Gen(Gen), InnermostScope(Stack.stable_end()) {
-  }
-  
+  CleanupManager(SILGenFunction &SGF)
+      : SGF(SGF), innermostScope(stack.stable_end()) {}
+
   /// Return a stable reference to the last cleanup pushed.
-  CleanupsDepth getCleanupsDepth() const {
-    return Stack.stable_begin();
-  }
+  CleanupsDepth getCleanupsDepth() const { return stack.stable_begin(); }
 
   /// Return a stable reference to the last cleanup pushed.
   CleanupHandle getTopCleanup() const {
-    assert(!Stack.empty());
-    return Stack.stable_begin();
+    assert(!stack.empty());
+    return stack.stable_begin();
   }
 
   /// \brief Emit a branch to the given jump destination,
   /// threading out through any cleanups we need to run. This does not pop the
   /// cleanup stack.
   ///
-  /// \param Dest       The destination scope and block.
-  /// \param BranchLoc  The location of the branch instruction.
-  /// \param Args       Arguments to pass to the destination block.
-  void emitBranchAndCleanups(JumpDest Dest,
-                             SILLocation BranchLoc,
-                             ArrayRef<SILValue> Args = {});
-  
+  /// \param dest       The destination scope and block.
+  /// \param branchLoc  The location of the branch instruction.
+  /// \param args       Arguments to pass to the destination block.
+  void emitBranchAndCleanups(JumpDest dest, SILLocation branchLoc,
+                             ArrayRef<SILValue> args = {});
+
   /// emitCleanupsForReturn - Emit the top-level cleanups needed prior to a
   /// return from the function.
   void emitCleanupsForReturn(CleanupLocation loc);
@@ -161,9 +158,8 @@ public:
   /// Emit a new block that jumps to the specified location and runs necessary
   /// cleanups based on its level.  If there are no cleanups to run, this just
   /// returns the dest block.
-  SILBasicBlock *emitBlockForCleanups(JumpDest Dest,
-                                      SILLocation BranchLoc,
-                                      ArrayRef<SILValue> Args = {});
+  SILBasicBlock *emitBlockForCleanups(JumpDest dest, SILLocation branchLoc,
+                                      ArrayRef<SILValue> args = {});
 
   /// pushCleanup - Push a new cleanup.
   template<class T, class... A>
@@ -172,15 +168,16 @@ public:
     assert(state != CleanupState::Dead);
 
 #ifndef NDEBUG
-    CleanupsDepth oldTop = Stack.stable_begin();
+    CleanupsDepth oldTop = stack.stable_begin();
 #endif
-    
-    T &cleanup = Stack.push<T, A...>(::std::forward<A>(args)...);
+
+    T &cleanup = stack.push<T, A...>(::std::forward<A>(args)...);
     T &result = static_cast<T&>(initCleanup(cleanup, sizeof(T), state));
     
 #ifndef NDEBUG
-    auto newTop = Stack.begin(); ++newTop;
-    assert(newTop == Stack.find(oldTop));
+    auto newTop = stack.begin();
+    ++newTop;
+    assert(newTop == stack.find(oldTop));
 #endif
     return result;
   }
@@ -217,14 +214,14 @@ public:
 /// An RAII object that allows the state of a cleanup to be
 /// temporarily modified.
 class CleanupStateRestorationScope {
-  CleanupManager &Cleanups;
-  SmallVector<std::pair<CleanupHandle, CleanupState>, 4> SavedStates;
+  CleanupManager &cleanups;
+  SmallVector<std::pair<CleanupHandle, CleanupState>, 4> savedStates;
 
   CleanupStateRestorationScope(const CleanupStateRestorationScope &) = delete;
   CleanupStateRestorationScope &
     operator=(const CleanupStateRestorationScope &) = delete;
 public:
-  CleanupStateRestorationScope(CleanupManager &cleanups) : Cleanups(cleanups) {}
+  CleanupStateRestorationScope(CleanupManager &cleanups) : cleanups(cleanups) {}
 
   /// Set the state of the given cleanup and remember what we set it to.
   void pushCleanupState(CleanupHandle handle, CleanupState newState);

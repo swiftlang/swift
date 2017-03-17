@@ -11,7 +11,7 @@ typealias Int = Builtin.Int32
 // apply the generic caller's substitutions to the nongeneric callee, violating
 // invariants.
 
-// CHECK-LABEL: sil @_TTSf2i__promotable_box : $@convention(thin) (Builtin.Int32) -> Builtin.Int32
+// CHECK-LABEL: sil @_T014promotable_boxTf2i_n : $@convention(thin) (Builtin.Int32) -> Builtin.Int32
 
 sil @promotable_box : $@convention(thin) (<τ_0_0> { var τ_0_0 } <Int>) -> Int {
 entry(%b : $<τ_0_0> { var τ_0_0 } <Int>):
@@ -21,7 +21,7 @@ entry(%b : $<τ_0_0> { var τ_0_0 } <Int>):
 }
 
 // CHECK-LABEL: sil @call_promotable_box_from_generic
-// CHECK:         [[F:%.*]] = function_ref @_TTSf2i__promotable_box
+// CHECK:         [[F:%.*]] = function_ref @_T014promotable_boxTf2i_n
 // CHECK:         partial_apply [[F]](
 
 sil @call_promotable_box_from_generic : $@convention(thin) <T> (@in T, Int) -> @owned @callee_owned () -> Int {
@@ -37,7 +37,7 @@ entry(%0 : $*T, %1 : $Int):
 
 protocol P {}
 
-// CHECK-LABEL: sil @_TTSf2n_i__generic_promotable_box : $@convention(thin) <T> (@in T, Builtin.Int32) -> Builtin.Int32
+// CHECK-LABEL: sil @_T022generic_promotable_boxTf2ni_n : $@convention(thin) <T> (@in T, Builtin.Int32) -> Builtin.Int32
 // CHECK:       bb0(%0 : $*T, %1 : $Builtin.Int32):
 // CHECK-NEXT:    return %1 : $Builtin.Int32
 
@@ -52,7 +52,7 @@ entry(%0 : $*T, %b : $<τ_0_0> { var τ_0_0 } <Int>):
 // CHECK:       bb0(%0 : $*T, %1 : $*U, %2 : $Builtin.Int32):
 // CHECK-NEXT:    destroy_addr %0 : $*T
 // CHECK-NEXT:    destroy_addr %1 : $*U
-// CHECK:         [[F:%.*]] = function_ref @_TTSf2n_i__generic_promotable_box : $@convention(thin) <τ_0_0> (@in τ_0_0, Builtin.Int32) -> Builtin.Int32
+// CHECK:         [[F:%.*]] = function_ref @_T022generic_promotable_boxTf2ni_n : $@convention(thin) <τ_0_0> (@in τ_0_0, Builtin.Int32) -> Builtin.Int32
 // CHECK-NEXT:    [[CLOSURE:%.*]] = partial_apply [[F]]<U>(%2)
 // CHECK-NEXT:    return [[CLOSURE]]
 

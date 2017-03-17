@@ -135,9 +135,6 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
       DataLayout(target->createDataLayout()), Triple(Context.LangOpts.Target),
       TargetMachine(std::move(target)), silConv(irgen.SIL),
       OutputFilename(OutputFilename),
-#ifndef NDEBUG
-      EligibleConfs(getSILModule()),
-#endif
       TargetInfo(SwiftTargetInfo::get(*this)), DebugInfo(nullptr),
       ModuleHash(nullptr), ObjCInterop(Context.LangOpts.EnableObjCInterop),
       Types(*new TypeConverter(*this)) {

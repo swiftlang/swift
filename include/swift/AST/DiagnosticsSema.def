@@ -2952,7 +2952,7 @@ ERROR(invalid_nonobjc_decl,none,
 ERROR(objc_in_extension_context,none,
       "members of constrained extensions cannot be declared @objc", ())
 ERROR(objc_in_generic_extension,none,
-      "@objc is not supported within extensions of generic classes", ())
+      "@objc is not supported within extensions of generic classes or classes that inherit from generic classes", ())
 ERROR(objc_operator, none,
       "operator methods cannot be declared @objc", ())
 ERROR(objc_operator_proto, none,

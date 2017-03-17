@@ -4783,22 +4783,6 @@ public:
     return false;
   }
 
-  /// Determine whether this is an unparenthesized closure type.
-  static AnyFunctionType *isUnparenthesizedTrailingClosure(Type type) {
-    if (isa<ParenType>(type.getPointer()))
-      return nullptr;
-
-    // Only consider the rvalue type.
-    type = type->getRValueType();
-
-    // Look through one level of optionality.
-    if (auto objectType = type->getAnyOptionalObjectType())
-      type = objectType;
-
-    // Is it a function type?
-    return type->getAs<AnyFunctionType>();
-  }
-
   void checkMemberOperator(FuncDecl *FD) {
     // Check that member operators reference the type of 'Self'.
     if (FD->getNumParameterLists() != 2 || FD->isInvalid()) return;

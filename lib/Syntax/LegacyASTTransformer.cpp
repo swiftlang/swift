@@ -69,7 +69,7 @@ namespace {
 
     return TokensInRange;
   }
-} // namespace
+} // anonymous namespace
 
 Optional<Syntax>
 syntax::transformAST(ASTNode Node,

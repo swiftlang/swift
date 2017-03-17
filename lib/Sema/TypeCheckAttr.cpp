@@ -1819,7 +1819,7 @@ void AttributeChecker::visitVersionedAttr(VersionedAttr *attr) {
     TC.diagnose(attr->getLocation(),
                 diag::versioned_attr_with_explicit_accessibility,
                 VD->getName(),
-                getAccessForDiagnostics(VD))
+                VD->getFormalAccess())
         .fixItRemove(attr->getRangeWithAt());
     attr->setInvalid();
     return;

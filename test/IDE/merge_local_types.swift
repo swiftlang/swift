@@ -8,18 +8,18 @@
 // RUN: %target-swift-ide-test -print-local-types -I %t -module-to-print LocalTypesMerged -source-filename %s | %FileCheck %s
 
 public func toMerge() {
-  // CHECK-DAG: VF16LocalTypesMerged7toMergeFT_T_L_16SingleFuncStruct
+  // CHECK-DAG: 16LocalTypesMerged7toMergeyyF16SingleFuncStructL_V
   struct SingleFuncStruct {
     let sfsi: Int
   }
-  // CHECK-DAG: CF16LocalTypesMerged7toMergeFT_T_L_15SingleFuncClass
+  // CHECK-DAG: 16LocalTypesMerged7toMergeyyF15SingleFuncClassL_C
   class SingleFuncClass {
     let sfcs: String
     init(s: String) {
       self.sfcs = s
     }
   }
-  // CHECK-DAG: OF16LocalTypesMerged7toMergeFT_T_L_14SingleFuncEnum
+  // CHECK-DAG: 16LocalTypesMerged7toMergeyyF14SingleFuncEnumL_O
   enum SingleFuncEnum {
     case SFEI(Int)
   }
@@ -27,24 +27,24 @@ public func toMerge() {
 
 // Merged from local_types.swift
 
-//CHECK-DAG: OF16LocalTypesMerged7toMergeFT_T_L_14SingleFuncEnum
-//CHECK-DAG: OF16LocalTypesMerged10singleFuncFT_T_L_14SingleFuncEnum
-//CHECK-DAG: CFIF16LocalTypesMerged21singleDefaultArgumentFT1iSi_T_A_U_FT_SiL_26SingleDefaultArgumentClass
-//CHECK-DAG: OF16LocalTypesMergedg13singlePatternSiL_17SinglePatternEnum
-//CHECK-DAG: CFIv16LocalTypesMerged13singleClosureFT_T_iU_FT_T_L_18SingleClosureClass
-//CHECK-DAG: CFF16LocalTypesMerged10doubleFuncFT_T_L_9innerFuncFT_T_L_15DoubleFuncClass
-//CHECK-DAG: VFIv16LocalTypesMerged13singleClosureFT_T_iU_FT_T_L_19SingleClosureStruct
-//CHECK-DAG: OFIF16LocalTypesMerged21singleDefaultArgumentFT1iSi_T_A_U_FT_SiL_25SingleDefaultArgumentEnum
-//CHECK-DAG: OFIv16LocalTypesMerged13singleClosureFT_T_iU_FT_T_L_17SingleClosureEnum
-//CHECK-DAG: CF16LocalTypesMerged10singleFuncFT_T_L_15SingleFuncClass
-//CHECK-DAG: CF16LocalTypesMergedg13singlePatternSiL_18SinglePatternClass
-//CHECK-DAG: CFFIv16LocalTypesMerged13doubleClosureFT_T_iU_FT_T_U_FT_T_L_18DoubleClosureClass
-//CHECK-DAG: VFFIv16LocalTypesMerged13doubleClosureFT_T_iU_FT_T_U_FT_T_L_19DoubleClosureStruct
-//CHECK-DAG: VFIF16LocalTypesMerged21singleDefaultArgumentFT1iSi_T_A_U_FT_SiL_27SingleDefaultArgumentStruct
-//CHECK-DAG: OFFIv16LocalTypesMerged13doubleClosureFT_T_iU_FT_T_U_FT_T_L_17DoubleClosureEnum
-//CHECK-DAG: VFF16LocalTypesMerged10doubleFuncFT_T_L_9innerFuncFT_T_L_16DoubleFuncStruct
-//CHECK-DAG: OFF16LocalTypesMerged10doubleFuncFT_T_L_9innerFuncFT_T_L_14DoubleFuncEnum
-//CHECK-DAG: CF16LocalTypesMerged7toMergeFT_T_L_15SingleFuncClass
-//CHECK-DAG: VF16LocalTypesMerged7toMergeFT_T_L_16SingleFuncStruct
-//CHECK-DAG: VF16LocalTypesMerged10singleFuncFT_T_L_16SingleFuncStruct
-//CHECK-DAG: VF16LocalTypesMergedg13singlePatternSiL_19SinglePatternStruct
+//CHECK-DAG: 16LocalTypesMerged7toMergeyyF14SingleFuncEnumL_O
+//CHECK-DAG: 16LocalTypesMerged10singleFuncyyF06SingleE4EnumL_O
+//CHECK-DAG: 16LocalTypesMerged21singleDefaultArgumentySi1i_tFfA_SiycfU_06SingleeF5ClassL_C
+//CHECK-DAG: 16LocalTypesMerged13singlePatternSifg06SingleE4EnumL_O
+//CHECK-DAG: 16LocalTypesMerged13singleClosureyycvfiyycfU_06SingleE5ClassL_C
+//CHECK-DAG: 16LocalTypesMerged10doubleFuncyyF05innerE0L_yyF06DoubleE5ClassL_C
+//CHECK-DAG: 16LocalTypesMerged13singleClosureyycvfiyycfU_06SingleE6StructL_V
+//CHECK-DAG: 16LocalTypesMerged21singleDefaultArgumentySi1i_tFfA_SiycfU_06SingleeF4EnumL_O
+//CHECK-DAG: 16LocalTypesMerged13singleClosureyycvfiyycfU_06SingleE4EnumL_O
+//CHECK-DAG: 16LocalTypesMerged10singleFuncyyF06SingleE5ClassL_C
+//CHECK-DAG: 16LocalTypesMerged13singlePatternSifg06SingleE5ClassL_C
+//CHECK-DAG: 16LocalTypesMerged13doubleClosureyycvfiyycfU_yycfU_06DoubleE5ClassL_C
+//CHECK-DAG: 16LocalTypesMerged13doubleClosureyycvfiyycfU_yycfU_06DoubleE6StructL_V
+//CHECK-DAG: 16LocalTypesMerged21singleDefaultArgumentySi1i_tFfA_SiycfU_06SingleeF6StructL_V
+//CHECK-DAG: 16LocalTypesMerged13doubleClosureyycvfiyycfU_yycfU_06DoubleE4EnumL_O
+//CHECK-DAG: 16LocalTypesMerged10doubleFuncyyF05innerE0L_yyF06DoubleE6StructL_V
+//CHECK-DAG: 16LocalTypesMerged10doubleFuncyyF05innerE0L_yyF06DoubleE4EnumL_O
+//CHECK-DAG: 16LocalTypesMerged7toMergeyyF15SingleFuncClassL_C
+//CHECK-DAG: 16LocalTypesMerged7toMergeyyF16SingleFuncStructL_V
+//CHECK-DAG: 16LocalTypesMerged10singleFuncyyF06SingleE6StructL_V
+//CHECK-DAG: 16LocalTypesMerged13singlePatternSifg06SingleE6StructL_V

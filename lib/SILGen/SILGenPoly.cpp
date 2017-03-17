@@ -1300,13 +1300,30 @@ namespace {
       }
       case ParameterConvention::Indirect_In:
       case ParameterConvention::Indirect_In_Guaranteed: {
-        // We need to translate into a temporary.
-        auto &outputTL = SGF.getTypeLowering(SGF.getSILType(result));
-        auto temp = SGF.emitTemporary(Loc, outputTL);
-        translateSingleInto(inputOrigType, inputSubstType,
-                            outputOrigType, outputSubstType,
-                            input, *temp);
-        Outputs.push_back(temp->getManagedAddress());
+        if (SGF.silConv.useLoweredAddresses()) {
+          // We need to translate into a temporary.
+          auto &outputTL = SGF.getTypeLowering(SGF.getSILType(result));
+          auto temp = SGF.emitTemporary(Loc, outputTL);
+          translateSingleInto(inputOrigType, inputSubstType, outputOrigType,
+                              outputSubstType, input, *temp);
+          Outputs.push_back(temp->getManagedAddress());
+        } else {
+          auto output =
+              translatePrimitive(inputOrigType, inputSubstType, outputOrigType,
+                                 outputSubstType, input);
+          assert(output.getType() == SGF.getSILType(result));
+
+          if (output.getOwnershipKind() == ValueOwnershipKind::Unowned) {
+            assert(!output.hasCleanup());
+            output = SGF.emitManagedRetain(Loc, output.getValue());
+          }
+
+          if (output.getOwnershipKind() == ValueOwnershipKind::Owned) {
+            output = SGF.emitManagedBeginBorrow(Loc, output.getValue());
+          }
+
+          Outputs.push_back(output);
+        }
         return;
       }
       case ParameterConvention::Indirect_InoutAliasable: {
@@ -1998,29 +2015,49 @@ ResultPlanner::planTupleIntoDirectResult(AbstractionPattern innerOrigType,
 
   CanTupleType outerSubstTupleType = dyn_cast<TupleType>(outerSubstType);
 
-  // If the outer type is not a tuple, it must be optional.
+  // If the outer type is not a tuple, it must be optional or we are under
+  // opaque value mode
   if (!outerSubstTupleType) {
     CanType outerSubstObjectType =
       outerSubstType.getAnyOptionalObjectType();
-    assert(outerSubstObjectType &&
-           "inner type was a tuple but outer type was neither a tuple nor "
-           "optional");
 
-    auto someDecl = Gen.getASTContext().getOptionalSomeDecl();
-    SILType outerObjectType =
-        Gen.getSILType(outerResult).getAnyOptionalObjectType();
-    SILResultInfo outerObjectResult(outerObjectType.getSwiftRValueType(),
-                                    outerResult.getConvention());
+    if (outerSubstObjectType) {
+      auto someDecl = Gen.getASTContext().getOptionalSomeDecl();
+      SILType outerObjectType =
+          Gen.getSILType(outerResult).getAnyOptionalObjectType();
+      SILResultInfo outerObjectResult(outerObjectType.getSwiftRValueType(),
+                                      outerResult.getConvention());
 
-    // Plan to leave the tuple elements as a single direct outer result.
-    planTupleIntoDirectResult(innerOrigType, innerSubstType,
-                              outerOrigType.getAnyOptionalObjectType(),
-                              outerSubstObjectType,
-                              planData, outerObjectResult);
+      // Plan to leave the tuple elements as a single direct outer result.
+      planTupleIntoDirectResult(innerOrigType, innerSubstType,
+                                outerOrigType.getAnyOptionalObjectType(),
+                                outerSubstObjectType, planData,
+                                outerObjectResult);
 
-    // Take that result and inject it into an optional.
-    addInjectOptionalDirect(someDecl, outerResult);
-    return;
+      // Take that result and inject it into an optional.
+      addInjectOptionalDirect(someDecl, outerResult);
+      return;
+    } else {
+      assert(!Gen.silConv.useLoweredAddresses() &&
+             "inner type was a tuple but outer type was neither a tuple nor "
+             "optional nor are we under opaque value mode");
+      assert(outerSubstType->isAny());
+      auto &C = Gen.SGM.getASTContext();
+      auto layout = SILLayout::get(C, nullptr, SILField(outerSubstType, true));
+      auto canSILBoxTy = SILBoxType::get(C, layout, {});
+
+      AllocBoxInst *allocBox = Gen.B.createAllocBox(Loc, canSILBoxTy);
+      ProjectBoxInst *projBox = Gen.B.createProjectBox(Loc, allocBox, 0);
+      ManagedValue managedVal = Gen.emitManagedRValueWithCleanup(projBox);
+
+      auto opaque = AbstractionPattern::getOpaque();
+      SILValue outerConcreteResultAddr = Gen.B.createInitExistentialAddr(
+          Loc, managedVal.getValue(), outerSubstType,
+          Gen.getLoweredType(opaque, outerSubstType), /*conformances=*/{});
+
+      addIndirectToDirect(outerConcreteResultAddr, outerResult);
+      return;
+    }
   }
 
   // Otherwise, the outer type is a tuple.

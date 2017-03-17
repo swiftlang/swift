@@ -719,7 +719,7 @@ SILFunction *MaterializeForSetEmitter::createCallback(SILFunction &F,
 
     // Call the generator function we were provided.
     {
-      LexicalScope scope(gen.Cleanups, gen, CleanupLocation::get(loc));
+      LexicalScope scope(gen, CleanupLocation::get(loc));
       generator(gen, loc, valueBuffer, storageBuffer, self);
     }
 

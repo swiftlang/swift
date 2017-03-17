@@ -2772,7 +2772,7 @@ for host in "${ALL_HOSTS[@]}"; do
                     continue
                 fi
                 echo "--- Running tests for ${product} ---"
-                call "${swiftpm_bootstrap_command[@]}" test
+                call "${swiftpm_bootstrap_command[@]}" test --test-parallel
                 # As swiftpm tests itself, we break early here.
                 continue
                 ;;

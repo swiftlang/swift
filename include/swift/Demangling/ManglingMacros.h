@@ -18,7 +18,7 @@
 // TODO: When we get rid of the old mangling, the term "new mangling" should
 // just be renamed to "mangling".
 
-//#define USE_NEW_MANGLING
+#define USE_NEW_MANGLING
 
 #define STRINGIFY_MANGLING(M) #M
 #define MANGLE_AS_STRING(M) STRINGIFY_MANGLING(M)
