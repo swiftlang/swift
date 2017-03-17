@@ -365,6 +365,7 @@ public struct AutoreleasingUnsafeMutablePointer<Pointee /* TODO : class */>
   ///
   /// - Precondition: the pointee has been initialized with an instance of type
   ///   `Pointee`.
+  @_inlineable
   public var pointee: Pointee {
     /// Retrieve the value the pointer points to.
     @_transparent get {
@@ -447,6 +448,7 @@ public struct AutoreleasingUnsafeMutablePointer<Pointee /* TODO : class */>
   ///
   /// - Warning: Accessing `pointee` as a type that is unrelated to
   ///   the underlying memory's bound type is undefined.
+  @_versioned
   @_transparent
   init<U>(_ from: UnsafePointer<U>) {
     self._rawValue = from._rawValue
@@ -461,6 +463,7 @@ public struct AutoreleasingUnsafeMutablePointer<Pointee /* TODO : class */>
   ///
   /// - Warning: Accessing `pointee` as a type that is unrelated to
   ///   the underlying memory's bound type is undefined.
+  @_versioned
   @_transparent
   init?<U>(_ from: UnsafePointer<U>?) {
     guard let unwrapped = from else { return nil }
@@ -514,6 +517,7 @@ extension UnsafeRawPointer {
 
 extension AutoreleasingUnsafeMutablePointer : CustomDebugStringConvertible {
   /// A textual representation of `self`, suitable for debugging.
+  @_inlineable
   public var debugDescription: String {
     return _rawPointerToString(_rawValue)
   }
@@ -527,6 +531,8 @@ public func == <Pointee>(
   return Bool(Builtin.cmp_eq_RawPointer(lhs._rawValue, rhs._rawValue))
 }
 
+@_fixed_layout
+@_versioned
 internal struct _CocoaFastEnumerationStackBuf {
   // Clang uses 16 pointers.  So do we.
   internal var _item0: UnsafeRawPointer?
@@ -551,6 +557,7 @@ internal struct _CocoaFastEnumerationStackBuf {
     return 16
   }
 
+  @_versioned
   internal init() {
     _item0 = nil
     _item1 = _item0

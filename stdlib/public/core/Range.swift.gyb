@@ -78,6 +78,7 @@ public enum _DisabledRangeIndex_ {}
 ///     // Prints "0"
 ///
 /// - SeeAlso: `CountableClosedRange`, `Range`, `ClosedRange`
+@_fixed_layout
 public struct CountableRange<Bound> : RandomAccessCollection
   where
   // FIXME(ABI)#176 (Type checker)
@@ -107,20 +108,24 @@ public struct CountableRange<Bound> : RandomAccessCollection
 
   public typealias IndexDistance = Bound.Stride
 
+  @_inlineable
   public var startIndex: Index {
     return lowerBound
   }
 
+  @_inlineable
   public var endIndex: Index {
     return upperBound
   }
 
+  @_inlineable
   public func index(after i: Index) -> Index {
     _failEarlyRangeCheck(i, bounds: startIndex..<endIndex)
 
     return i.advanced(by: 1)
   }
 
+  @_inlineable
   public func index(before i: Index) -> Index {
     _precondition(i > lowerBound)
     _precondition(i <= upperBound)
@@ -128,6 +133,7 @@ public struct CountableRange<Bound> : RandomAccessCollection
     return i.advanced(by: -1)
   }
 
+  @_inlineable
   public func index(_ i: Index, offsetBy n: IndexDistance) -> Index {
     let r = i.advanced(by: n)
     _precondition(r >= lowerBound)
@@ -135,6 +141,7 @@ public struct CountableRange<Bound> : RandomAccessCollection
     return r
   }
 
+  @_inlineable
   public func distance(from start: Index, to end: Index) -> IndexDistance {
     return start.distance(to: end)
   }
@@ -145,6 +152,7 @@ public struct CountableRange<Bound> : RandomAccessCollection
   ///
   /// - Parameter bounds: A range of the range's indices. The upper and lower
   ///   bounds of the `bounds` range must be valid indices of the collection.
+  @_inlineable
   public subscript(bounds: Range<Index>) -> CountableRange<Bound> {
     return CountableRange(bounds)
   }
@@ -153,6 +161,7 @@ public struct CountableRange<Bound> : RandomAccessCollection
   ///
   /// - Parameter bounds: A range of the range's indices. The upper and lower
   ///   bounds of the `bounds` range must be valid indices of the collection.
+  @_inlineable
   public subscript(bounds: CountableRange<Bound>) -> CountableRange<Bound> {
     return self[Range(bounds)]
   }
@@ -161,6 +170,7 @@ public struct CountableRange<Bound> : RandomAccessCollection
 
   /// The indices that are valid for subscripting the range, in ascending
   /// order.
+  @_inlineable
   public var indices: Indices {
     return self
   }
@@ -173,11 +183,13 @@ public struct CountableRange<Bound> : RandomAccessCollection
   /// (`..<`) to form `CountableRange` instances is preferred.
   ///
   /// - Parameter bounds: A tuple of the lower and upper bounds of the range.
+  @_inlineable
   public init(uncheckedBounds bounds: (lower: Bound, upper: Bound)) {
     self.lowerBound = bounds.lower
     self.upperBound = bounds.upper
   }
 
+  @_inlineable
   public func _customContainsEquatableElement(_ element: Element) -> Bool? {
     return lowerBound <= element && element < upperBound
   }
@@ -189,6 +201,7 @@ public struct CountableRange<Bound> : RandomAccessCollection
   ///     let empty = 10..<10
   ///     print(empty.isEmpty)
   ///     // Prints "true"
+  @_inlineable
   public var isEmpty: Bool {
     return lowerBound == upperBound
   }
@@ -214,6 +227,7 @@ extension CountableRange {
   /// - Parameter position: The position of the element to access. `position`
   ///   must be a valid index of the range, and must not equal the range's end
   ///   index.
+  @_inlineable
   public subscript(position: Index) -> Element {
     // FIXME: swift-3-indexing-model: tests for the range check.
     _debugPrecondition(self.contains(position), "Index out of range")
@@ -260,6 +274,7 @@ extension CountableRange
   ///   lower bounds of the `bounds` range must be valid indices of the
   ///   collection and `bounds.upperBound` must be less than the collection's
   ///   end index.
+  @_inlineable
   public subscript(bounds: ClosedRange<Bound>) -> CountableRange<Bound> {
     return self[bounds.lowerBound..<(bounds.upperBound.advanced(by: 1))]
   }
@@ -270,6 +285,7 @@ extension CountableRange
   ///   lower bounds of the `bounds` range must be valid indices of the
   ///   collection and `bounds.upperBound` must be less than the collection's
   ///   end index.
+  @_inlineable
   public subscript(
     bounds: CountableClosedRange<Bound>
   ) -> CountableRange<Bound> {
@@ -312,7 +328,7 @@ public struct Range<
   /// (`..<`) to form `Range` instances is preferred.
   ///
   /// - Parameter bounds: A tuple of the lower and upper bounds of the range.
-  @inline(__always)
+  @_inlineable
   public init(uncheckedBounds bounds: (lower: Bound, upper: Bound)) {
     self.lowerBound = bounds.lower
     self.upperBound = bounds.upper
@@ -339,6 +355,7 @@ public struct Range<
   /// - Parameter element: The element to check for containment.
   /// - Returns: `true` if `element` is contained in the range; otherwise,
   ///   `false`.
+  @_inlineable
   public func contains(_ element: Bound) -> Bool {
     return lowerBound <= element && element < upperBound
   }
@@ -350,6 +367,7 @@ public struct Range<
   ///     let empty: Range = 10..<10
   ///     print(empty.isEmpty)
   ///     // Prints "true"
+  @_inlineable
   public var isEmpty: Bool {
     return lowerBound == upperBound
   }
@@ -543,6 +561,7 @@ extension ${Self} : Equatable {
   /// - Parameters:
   ///   - lhs: A range to compare.
   ///   - rhs: Another range to compare.
+  @_inlineable
   public static func == (lhs: ${Self}<Bound>, rhs: ${Self}<Bound>) -> Bool {
     return
       lhs.lowerBound == rhs.lowerBound &&
@@ -587,6 +606,7 @@ extension ${Self} : Equatable {
   /// - Parameters:
   ///   - lhs: A range.
   ///   - rhs: A value to match against `lhs`.
+  @_inlineable
   public static func ~= (pattern: ${Self}<Bound>, value: Bound) -> Bool {
     return pattern.contains(value)
   }
@@ -611,6 +631,7 @@ extension ${Self} where Bound : _Strideable, Bound.Stride : SignedInteger {
   // WORKAROUND rdar://25214598 - should be Bound : Strideable
 
   /// The number of values contained in the range.
+  @_inlineable
   public var count: Bound.Stride {
     let distance = lowerBound.distance(to: upperBound)
 %   if 'Closed' in Self:
