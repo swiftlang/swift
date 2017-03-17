@@ -738,17 +738,37 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
   // Create a new explosion for potentially reabstracted parameters.
   Explosion args;
 
+  Address resultValueAddr;
+
   {
     // Lower the forwarded arguments in the original function's generic context.
     GenericContextScope scope(IGM, origType->getGenericSignature());
-    
-    // Forward the indirect return values.
-    auto &nativeSchema = IGM.getTypeInfo(outConv.getSILResultType())
-                             .nativeReturnValueSchema(IGM);
-    if (nativeSchema.requiresIndirect())
-      args.add(origParams.claimNext());
 
     SILFunctionConventions origConv(origType, IGM.getSILModule());
+    auto &outResultTI = IGM.getTypeInfo(outConv.getSILResultType());
+    auto &nativeResultSchema = outResultTI.nativeReturnValueSchema(IGM);
+    auto &origResultTI = IGM.getTypeInfo(origConv.getSILResultType());
+    auto &origNativeSchema = origResultTI.nativeReturnValueSchema(IGM);
+
+    // Forward the indirect return values. We might have to reabstract the
+    // return value.
+    if (nativeResultSchema.requiresIndirect()) {
+      assert(origNativeSchema.requiresIndirect());
+      auto resultAddr = origParams.claimNext();
+      resultAddr = subIGF.Builder.CreateBitCast(
+          resultAddr, IGM.getStoragePointerType(origConv.getSILResultType()));
+      args.add(resultAddr);
+    } else if (origNativeSchema.requiresIndirect()) {
+      assert(!nativeResultSchema.requiresIndirect());
+      auto stackAddr = outResultTI.allocateStack(
+          subIGF, outConv.getSILResultType(), false, "return.temp");
+      resultValueAddr = stackAddr.getAddress();
+      auto resultAddr = subIGF.Builder.CreateBitCast(
+          resultValueAddr,
+          IGM.getStoragePointerType(origConv.getSILResultType()));
+      args.add(resultAddr.getAddress());
+    }
+
     for (auto resultType : origConv.getIndirectSILResultTypes()) {
       auto addr = origParams.claimNext();
       addr = subIGF.Builder.CreateBitCast(
@@ -1151,23 +1171,48 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
   // If the parameters depended on the context, consume the context now.
   if (rawData && consumesContext && dependsOnContextLifetime)
     subIGF.emitNativeStrongRelease(rawData, subIGF.getDefaultAtomicity());
-  
-  // FIXME: Reabstract the result value as substituted.
 
-  if (call->getType()->isVoidTy())
-    subIGF.Builder.CreateRetVoid();
-  else {
+  // Reabstract the result value as substituted.
+  SILFunctionConventions origConv(origType, IGM.getSILModule());
+  auto &outResultTI = IGM.getTypeInfo(outConv.getSILResultType());
+  auto &nativeResultSchema = outResultTI.nativeReturnValueSchema(IGM);
+  if (call->getType()->isVoidTy()) {
+    if (!resultValueAddr.isValid())
+      subIGF.Builder.CreateRetVoid();
+    else {
+      // Okay, we have called a function that expects an indirect return type
+      // but the partially applied return type is direct.
+      assert(nativeResultSchema.requiresIndirect() == false);
+      Explosion loadedResult;
+      cast<LoadableTypeInfo>(outResultTI)
+          .loadAsTake(subIGF, resultValueAddr, loadedResult);
+      Explosion nativeResult = nativeResultSchema.mapIntoNative(
+          IGM, subIGF, loadedResult, outConv.getSILResultType());
+      outResultTI.deallocateStack(subIGF, resultValueAddr,
+                                  outConv.getSILResultType());
+      if (nativeResult.size() == 1)
+        subIGF.Builder.CreateRet(nativeResult.claimNext());
+      else {
+        llvm::Value *nativeAgg =
+            llvm::UndefValue::get(nativeResultSchema.getExpandedType(IGM));
+        for (unsigned i = 0, e = nativeResult.size(); i != e; ++i) {
+          auto *elt = nativeResult.claimNext();
+          nativeAgg = subIGF.Builder.CreateInsertValue(nativeAgg, elt, i);
+        }
+        subIGF.Builder.CreateRet(nativeAgg);
+      }
+    }
+  } else {
     llvm::Value *callResult = call;
-    // If the result type is dependent on a type parameter we might have to cast
-    // to the result type - it could be substituted.
-    SILFunctionConventions origConv(origType, IGM.getSILModule());
+    // If the result type is dependent on a type parameter we might have to
+    // cast to the result type - it could be substituted.
     if (origConv.getSILResultType().hasTypeParameter()) {
       auto ResType = fwd->getReturnType();
       callResult = subIGF.Builder.CreateBitCast(callResult, ResType);
     }
     subIGF.Builder.CreateRet(callResult);
   }
-  
+
   return fwd;
 }
 
