@@ -2282,7 +2282,7 @@ Address irgen::emitAllocateBoxedOpaqueExistentialBuffer(
   if (auto *fixedTI = dyn_cast<FixedTypeInfo>(&valueTI)) {
     // Don't allocate an out-of-line buffer if the fixed buffer size is
     // sufficient.
-    if (fixedTI->getFixedSize() <= getFixedBufferSize(IGF.IGM)) {
+    if (fixedTI->getFixedPacking(IGF.IGM) == FixedPacking::OffsetZero) {
       return valueTI.getAddressForPointer(IGF.Builder.CreateBitCast(
           existentialBuffer.getAddress(), valuePointerType));
     }
