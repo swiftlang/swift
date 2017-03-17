@@ -273,6 +273,15 @@ std::string ASTMangler::mangleTypeForDebugger(Type Ty, const DeclContext *DC) {
   return finalize();
 }
 
+std::string ASTMangler::mangleDeclType(const ValueDecl *decl) {
+  DWARFMangling = true;
+  beginMangling();
+  
+  appendDeclType(decl);
+  appendOperator("D");
+  return finalize();
+}
+
 static bool isPrivate(const NominalTypeDecl *Nominal) {
   return Nominal->hasAccessibility() &&
          Nominal->getFormalAccess() <= Accessibility::FilePrivate;

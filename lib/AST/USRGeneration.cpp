@@ -39,10 +39,9 @@ bool ide::printTypeUSR(Type Ty, raw_ostream &OS) {
 }
 
 bool ide::printDeclTypeUSR(const ValueDecl *D, raw_ostream &OS) {
-  using namespace Mangle;
-  Mangler Mangler(true);
-  Mangler.mangleDeclTypeForDebugger(D);
-  Mangler.finalize(OS);
+  NewMangling::ASTMangler Mangler;
+  std::string MangledName = Mangler.mangleDeclType(D);
+  OS << MangledName;
   return false;
 }
 
