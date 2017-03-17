@@ -1,4 +1,10 @@
-// RUN: %target-run-simple-swift
+// RUN: rm -rf %t
+// RUN: mkdir -p %t
+// RUN: %target-build-swift %s -o %t/a.out_swift3 -swift-version 3
+// RUN: %target-build-swift %s -o %t/a.out_swift4 -swift-version 4
+//
+// RUN: %target-run %t/a.out_swift3
+// RUN: %target-run %t/a.out_swift4
 // REQUIRES: executable_test
 
 // REQUIRES: objc_interop
@@ -451,3 +457,14 @@ DispatchAPI.test("DispatchData.bufferUnsafeRawBufferPointer") {
 	expectEqual(data.count, 0)
 }
 
+DispatchAPI.test("DispatchIO.initRelativePath") {
+	let q = DispatchQueue(label: "initRelativePath queue")
+#if swift(>=4.0)
+	let chan = DispatchIO(type: .random, path: "_REL_PATH_", oflag: O_RDONLY, mode: 0, queue: q, cleanupHandler: { (error) in })
+	expectEqual(chan, nil)
+#else
+	expectCrashLater()
+	let chan = DispatchIO(type: .random, path: "_REL_PATH_", oflag: O_RDONLY, mode: 0, queue: q, cleanupHandler: { (error) in })
+	chan.setInterval(interval: .seconds(1)) // Dereference of unexpected nil should crash
+#endif
+}
