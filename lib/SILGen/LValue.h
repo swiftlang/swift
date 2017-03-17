@@ -156,9 +156,7 @@ public:
   /// base value.
   virtual AccessKind getBaseAccessKind(SILGenFunction &SGF,
                                        AccessKind accessKind) const = 0;
-
-  virtual bool isRValue() const { return false; }
-
+  
   /// Returns the logical type-as-rvalue of the value addressed by the
   /// component.  This is always an object type, never an address.
   SILType getTypeOfRValue() const { return TypeData.TypeOfRValue; }
