@@ -475,15 +475,15 @@ ${SelfName}TestSuite.test("RandomAccessCollection") {
   defer { SubscriptGetTest.deallocateFor${'Raw' if IsRaw else ''}Buffer(
       memoryCopy, count: elementCount) }
 
-  var buffer = SubscriptGetTest.create${SelfName}(from: memory)
-  var expected = UnsafeMutable${'Raw' if IsRaw else ''}BufferPointer(
+  let buffer = SubscriptGetTest.create${SelfName}(from: memory)
+  let expected = UnsafeMutable${'Raw' if IsRaw else ''}BufferPointer(
     start: memoryCopy, count: buffer.count)
 
 %   if IsRaw:
   expected.copyBytes(from: buffer)
   checkRandomAccessCollection(expected, buffer) { $0 == $1 }
 %   else:
-  expected.baseAddress!.initialize(from: buffer)
+  _ = expected.initialize(from: buffer)
   checkRandomAccessCollection(expected, buffer) { $0.value == $1.value }
 %   end
 }
@@ -542,15 +542,15 @@ ${SelfName}TestSuite.test("subscript/${RangeName}/get").forEach(in: subscriptGet
     )
   }
 }
-%    end
-
-% end
+%   end # RangeName
+% end # SelfName, IsMutable, IsRaw, SelfType, PointerType
 
 % for (SelfName, IsRaw) in [
 %   ('UnsafeMutableBufferPointer', False),
 %   ('UnsafeMutableRawBufferPointer', True)
 % ]:
 %   for RangeName in ['range', 'countableRange', 'closedRange', 'countableClosedRange']:
+
 UnsafeMutable${'Raw' if IsRaw else ''}BufferPointerTestSuite.test("subscript/${RangeName}/set")
 %     if not IsRaw:
   // UnsafeRawBuffer (currently) invokes Collection._failEarlyRangeCheck
@@ -585,7 +585,7 @@ UnsafeMutable${'Raw' if IsRaw else ''}BufferPointerTestSuite.test("subscript/${R
       return false
     }
   }
-%      else:
+%      else: # !closed
   expectedValues = test.expectedValues
   replacementValues = test.replacementValues
   let isOutOfBounds: () -> Bool = {
@@ -596,7 +596,7 @@ UnsafeMutable${'Raw' if IsRaw else ''}BufferPointerTestSuite.test("subscript/${R
       return false
     }
   }
-%      end
+%      end # !closed
 
   var memory = SubscriptSetTest.allocateFor${'Raw' if IsRaw else ''}Buffer(
     count: elementCount)
@@ -640,7 +640,9 @@ UnsafeMutable${'Raw' if IsRaw else ''}BufferPointerTestSuite.test("subscript/${R
     )
   }
 }
+
 %   end # RangeName
+
 % end # SelfName
 
 UnsafeMutableRawBufferPointerTestSuite.test("changeElementViaBuffer") {
