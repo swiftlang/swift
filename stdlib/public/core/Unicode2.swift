@@ -18,7 +18,7 @@ public enum ParseResult<T, Index> { // FIXME: RENAME THIS!
 /// Indicates valid input was recognized.
 ///
 /// `resumptionPoint` is the end of the parsed region
-case valid(T, resumptionPoint: Index)
+case valid(T, resumptionPoint: Index)  // FIXME: should these be reordered?
 
 /// Indicates invalid input was recognized.
 ///
