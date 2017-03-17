@@ -5,7 +5,6 @@
 // See https://swift.org/LICENSE.txt for license information
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
-// REQUIRES: asserts
 // RUN: not %target-swift-frontend %s -emit-ir
 :{func t(UInt=1 + 1 + 1 as?Int){[.s
 nil?Int
