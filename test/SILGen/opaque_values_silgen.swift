@@ -2,6 +2,10 @@
 
 // UNSUPPORTED: resilient_stdlib
 
+struct TrivialStruct {
+  var x: Int
+}
+
 protocol Foo {
   func foo()
 }
@@ -9,6 +13,10 @@ protocol Foo {
 protocol P {
   var x : Int { get }
 }
+
+protocol P2 : P {}
+
+extension TrivialStruct : P2 {}
 
 struct Box<T> {
   let t: T
@@ -40,6 +48,42 @@ enum AddressOnlyEnum {
   case mere(EmptyP)
   case phantom(AddressOnlyStruct)
 }
+
+// part of s280_convExistTrivial: conversion between existential types - reabstraction thunk
+// ---
+// CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_T020opaque_values_silgen1P_pAA13TrivialStructVIxid_AA2P2_pAaE_pIxir_TR : $@convention(thin) (@in P2, @owned @callee_owned (@in P) -> TrivialStruct) -> @out P2 {
+// CHECK: bb0([[ARG0:%.*]] : $P2, [[ARG1:%.*]] : $@callee_owned (@in P) -> TrivialStruct):
+// CHECK:   [[OPENED_ARG:%.*]] = open_existential_opaque [[ARG0]] : $P2 to $@opened({{.*}}) P2
+// CHECK:   [[INIT_P:%.*]] = init_existential_opaque [[OPENED_ARG]] : $@opened({{.*}}) P2, $@opened({{.*}}) P2, $P
+// CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[INIT_P]]
+// CHECK:   [[APPLY_P:%.*]] = apply [[ARG1]]([[BORROWED_ARG]]) : $@callee_owned (@in P) -> TrivialStruct
+// CHECK:   [[RETVAL:%.*]] = init_existential_opaque [[APPLY_P]] : $TrivialStruct, $TrivialStruct, $P2
+// CHECK:   end_borrow [[BORROWED_ARG]] from [[INIT_P]] : $P, $P
+// CHECK:   destroy_value [[OPENED_ARG]]
+// CHECK:   deinit_existential_opaque [[ARG0]]
+// CHECK:   return [[RETVAL]] : $P2
+// CHECK-LABEL: } // end sil function '_T020opaque_values_silgen1P_pAA13TrivialStructVIxid_AA2P2_pAaE_pIxir_TR'
+
+// part of s290_convOptExistTriv: conversion between existential types - reabstraction thunk - optionals case
+// ---
+// CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_T020opaque_values_silgen1P_pSgAA13TrivialStructVIxid_AESgAA2P2_pIxyr_TR : $@convention(thin) (Optional<TrivialStruct>, @owned @callee_owned (@in Optional<P>) -> TrivialStruct) -> @out P2 {
+// CHECK: bb0([[ARG0:%.*]] : $Optional<TrivialStruct>, [[ARG1:%.*]] : $@callee_owned (@in Optional<P>) -> TrivialStruct):
+// CHECK:   switch_enum [[ARG0]] : $Optional<TrivialStruct>, case #Optional.some!enumelt.1: bb2, case #Optional.none!enumelt: bb1
+// CHECK: bb1:
+// CHECK:   [[ONONE:%.*]] = enum $Optional<P>, #Optional.none!enumelt
+// CHECK:   br bb3([[ONONE]] : $Optional<P>)
+// CHECK: bb2([[OSOME:%.*]] : $TrivialStruct):
+// CHECK:   [[INIT_S:%.*]] = init_existential_opaque [[OSOME]] : $TrivialStruct, $TrivialStruct, $P
+// CHECK:   [[ENUM_S:%.*]] = enum $Optional<P>, #Optional.some!enumelt.1, [[INIT_S]] : $P
+// CHECK:   br bb3([[ENUM_S]] : $Optional<P>)
+// CHECK: bb3([[OPT_S:%.*]] : $Optional<P>):
+// CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[OPT_S]]
+// CHECK:   [[APPLY_P:%.*]] = apply [[ARG1]]([[BORROWED_ARG]]) : $@callee_owned (@in Optional<P>) -> TrivialStruct
+// CHECK:   [[RETVAL:%.*]] = init_existential_opaque [[APPLY_P]] : $TrivialStruct, $TrivialStruct, $P2
+// CHECK:   end_borrow [[BORROWED_ARG]] from [[OPT_S]] : $Optional<P>, $Optional<P>
+// CHECK:   destroy_value [[OPT_S]]
+// CHECK:   return [[RETVAL]] : $P2
+// CHECK-LABEL: } // end sil function '_T020opaque_values_silgen1P_pSgAA13TrivialStructVIxid_AESgAA2P2_pIxyr_TR'
 
 // Test that we still use addresses when dealing with array initialization
 // ---
@@ -483,6 +527,38 @@ func s260_______AOnly_enum(_ s: AddressOnlyStruct) {
 func s270_convOptAnyStruct(_ a1: @escaping (AnyStruct?) -> AnyStruct) {
   let _: (AnyStruct?) -> AnyStruct? = a1
   let _: (AnyStruct!) -> AnyStruct? = a1
+}
+
+// Tests conversion between existential types
+// ---
+// CHECK-LABEL: sil hidden @_T020opaque_values_silgen21s280_convExistTrivialyAA0G6StructVAA1P_pcF : $@convention(thin) (@owned @callee_owned (@in P) -> TrivialStruct) -> () {
+// CHECK: bb0([[ARG:%.*]] : $@callee_owned (@in P) -> TrivialStruct):
+// CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
+// CHECK:   [[COPY_ARG:%.*]] = copy_value [[BORROWED_ARG]]
+// CHECK:   [[PAPPLY:%.*]] = partial_apply %{{.*}}([[COPY_ARG]]) : $@convention(thin) (@in P2, @owned @callee_owned (@in P) -> TrivialStruct) -> @out P2
+// CHECK:   destroy_value [[PAPPLY]] : $@callee_owned (@in P2) -> @out P2
+// CHECK:   end_borrow [[BORROWED_ARG]] from [[ARG]] : $@callee_owned (@in P) -> TrivialStruct
+// CHECK:   destroy_value [[ARG]]
+// CHECK:   return %{{.*}} : $()
+// CHECK-LABEL: } // end sil function '_T020opaque_values_silgen21s280_convExistTrivialyAA0G6StructVAA1P_pcF'
+func s280_convExistTrivial(_ s: @escaping (P) -> TrivialStruct) {
+  let _: (P2) -> P2 = s
+}
+
+// Tests conversion between existential types - optionals case
+// ---
+// CHECK-LABEL: sil hidden @_T020opaque_values_silgen21s290_convOptExistTrivyAA13TrivialStructVAA1P_pSgcF : $@convention(thin) (@owned @callee_owned (@in Optional<P>) -> TrivialStruct) -> () {
+// CHECK: bb0([[ARG:%.*]] : $@callee_owned (@in Optional<P>) -> TrivialStruct):
+// CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
+// CHECK:   [[COPY_ARG:%.*]] = copy_value [[BORROWED_ARG]]
+// CHECK:   [[PAPPLY:%.*]] = partial_apply %{{.*}}([[COPY_ARG]]) : $@convention(thin) (Optional<TrivialStruct>, @owned @callee_owned (@in Optional<P>) -> TrivialStruct) -> @out P2
+// CHECK:   destroy_value [[PAPPLY]] : $@callee_owned (Optional<TrivialStruct>) -> @out P2
+// CHECK:   end_borrow [[BORROWED_ARG]] from [[ARG]] : $@callee_owned (@in Optional<P>) -> TrivialStruct, $@callee_owned (@in Optional<P>) -> TrivialStruct
+// CHECK:   destroy_value [[ARG]]
+// CHECK:   return %{{.*}} : $()
+// CHECK-LABEL: } // end sil function '_T020opaque_values_silgen21s290_convOptExistTrivyAA13TrivialStructVAA1P_pSgcF'
+func s290_convOptExistTriv(_ s: @escaping (P?) -> TrivialStruct) {
+  let _: (TrivialStruct?) -> P2 = s
 }
 
 // Tests conditional value casts and correspondingly generated reabstraction thunk, with <T> types
