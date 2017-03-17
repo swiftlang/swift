@@ -2320,6 +2320,7 @@ Parser::parseDecl(ParseDeclOptions Flags,
         case tok::kw_func:
         case tok::kw_subscript:
         case tok::kw_var:
+        case tok::kw_let:
         case tok::kw_typealias:
           Keywords.push_back(OrigTok.getText());
           break;
