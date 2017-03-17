@@ -405,15 +405,7 @@ void mangleIdentifier(const char *data, size_t length,
 /// \brief Remangle a demangled parse tree.
 ///
 /// This should always round-trip perfectly with demangleSymbolAsNode.
-std::string mangleNodeOld(const NodePointer &root);
-
 std::string mangleNode(const NodePointer &root);
-
-inline std::string mangleNode(const NodePointer &root, bool NewMangling) {
-  if (NewMangling)
-    return mangleNode(root);
-  return mangleNodeOld(root);
-}
 
 /// \brief Transform the node structure to a string.
 ///
