@@ -140,11 +140,7 @@ extension _UTF16StringStorage : _FixedFormatUnicode {
   >.FCCNormalizedUTF16View
   
   public typealias CharacterView = _UnicodeViews<CodeUnits,Encoding>.CharacterView
-
-  public typealias UnicodeScalarView = LazyMapBidirectionalCollection<
-    _UnicodeViews<CodeUnits,Encoding>.ScalarsTranscoded<UTF32>
-  , UnicodeScalar
-  >
+  public typealias UnicodeScalarView = _UnicodeViews<CodeUnits,Encoding>.Scalars
   
   public var encoding: UTF16.Type { return UTF16.self }
   public var codeUnits: _UTF16StringStorage { return self }
@@ -478,11 +474,7 @@ extension _UTF8StringStorage : _FixedFormatUnicode {
   >.FCCNormalizedUTF16View
 
   public typealias CharacterView = _UnicodeViews<CodeUnits,Encoding>.CharacterView
-
-  public typealias UnicodeScalarView = LazyMapBidirectionalCollection<
-    _UnicodeViews<CodeUnits,Encoding>.ScalarsTranscoded<UTF32>
-  , UnicodeScalar
-  >
+  public typealias UnicodeScalarView = _UnicodeViews<CodeUnits,Encoding>.Scalars
   
   public var codeUnits: CodeUnits { return self }
   public var rawUTF16: RawUTF16View { return RawUTF16View(self) }

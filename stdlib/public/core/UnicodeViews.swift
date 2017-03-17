@@ -91,6 +91,9 @@ extension _UnicodeViews {
       self.codeUnits = codeUnits
     }
   }
+  public var encodedScalars: EncodedScalars {
+    return EncodedScalars(codeUnits, Encoding.self)
+  }
 }
 
 extension _UnicodeViews.EncodedScalars {
@@ -211,6 +214,62 @@ extension _UnicodeViews.EncodedScalars : UnicodeView {
   }
 }
 
+//===----------------------------------------------------------------------===//
+// _UnicodeViews.UnicodeScalars
+//===----------------------------------------------------------------------===//
+
+/// A lazy collection of `Encoding.EncodedScalar` that results
+/// from parsing an instance of codeUnits using that `Encoding`.
+extension _UnicodeViews {
+  public struct Scalars {
+    let codeUnits: CodeUnits
+    
+    public init(_ codeUnits: CodeUnits, _: Encoding.Type = Encoding.self) {
+      self.codeUnits = codeUnits
+    }
+  }
+  public var scalars: Scalars {
+    return Scalars(codeUnits, Encoding.self)
+  }
+}
+
+/// Collection Conformance
+extension _UnicodeViews.Scalars : BidirectionalCollection {
+  public typealias Base = _UnicodeViews<CodeUnits, Encoding>.EncodedScalars
+  public typealias Element = UnicodeScalar
+  public typealias Index = Base.Index
+
+  var base: Base { return Base(codeUnits) }
+  
+  public var startIndex: Index {
+    return base.startIndex
+  }
+  
+  public var endIndex: Index {
+    return base.endIndex
+  }
+  
+  public subscript(i: Index) -> Element {
+    return UnicodeScalar(base[i])
+  }
+
+  public func index(after i: Index) -> Index {
+    return base.index(after: i)
+  }
+
+  public func index(before i: Index) -> Index {
+    return base.index(before: i)
+  }
+}
+
+extension _UnicodeViews.Scalars : UnicodeView {
+  public func index(atCodeUnitOffset offset: Int64) -> Index {
+    return base.index(atCodeUnitOffset: offset)
+  }
+  public static func codeUnitOffset(of i: Index) -> Int64 {
+    return Base.codeUnitOffset(of: i)
+  }
+}
 
 //===----------------------------------------------------------------------===//
 // _UnicodeViews.ScalarsTranscoded<ToEncoding>
@@ -332,7 +391,7 @@ extension _UnicodeViews : _UTextable {
   ) -> _UnicodeViews<CodeUnits.SubSequence,Encoding>.EncodedScalars.SubSequence {
     return _UnicodeViews_(
       slice(codeUnits.index(atOffset: offset)), Encoding.self
-    ).scalars.dropFirst(0)
+    ).encodedScalars.dropFirst(0)
   }
 
   internal func _parsedSuffix(
@@ -511,12 +570,6 @@ extension _UnicodeViews : _UTextable {
 }
 
 extension _UnicodeViews {
-  public var scalars: EncodedScalars {
-    return EncodedScalars(codeUnits, Encoding.self)
-  }
-}
-
-extension _UnicodeViews {
   
   public struct CharacterView : BidirectionalCollection {
 
@@ -545,7 +598,7 @@ extension _UnicodeViews {
       }
       else {
         // FIXME: there is undoubtley a less ridiculous way to do this
-        let scalars = contents.scalars.lazy.map(UnicodeScalar.init)
+        let scalars = contents.encodedScalars.lazy.map(UnicodeScalar.init)
         let string = Swift.String(Swift.String.UnicodeScalarView(scalars))
         return Character(_largeRepresentationString: string)
       }

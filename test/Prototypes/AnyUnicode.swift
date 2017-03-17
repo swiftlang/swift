@@ -329,13 +329,13 @@ extension AnyUTF16 {
 
 extension AnyUTF16 {
   init<Base: UnicodeView>(_ base: Base)
-  where Base.Iterator.Element == UInt16 {
+  where Base.Iterator.Element == Element {
     self.base = Eraser(base)
   }
 
   /// Adapts any random access collection of unsigned integer to AnyUTF16_
   struct Eraser<Base: UnicodeView> : AnyUTF16_, UnicodeViewAdapter
-  where Base.Iterator.Element == UInt16 {
+  where Base.Iterator.Element == Element {
     let base: Base
 
     init(_ base: Base) { self.base = base }
@@ -368,7 +368,7 @@ extension AnyUTF16 {
   }
 }
 
-#if false
+
 protocol AnyUnicodeScalars_ : AnyUnicodeView_ {
   typealias Element = UnicodeScalar
   subscript(i: UnicodeIndex) -> Element { get }
@@ -378,312 +378,93 @@ protocol AnyUnicodeScalars_ : AnyUnicodeView_ {
   ) rethrows -> R?
 }
 
-struct AnyUnicodeScalars : UnicodeViewCollection, AnyUnicodeViewAdapter {
+struct AnyUnicodeScalars : UnicodeViewWithCommonIndex, AnyUnicodeViewAdapter {
   let base: AnyUnicodeScalars_
   internal var anyBase: AnyUnicodeView_ { return base }
   
   typealias Element = UnicodeScalar
   typealias Index = UnicodeIndex
-  typealias IndexDistance = Int64
-  
+
   subscript(i: Index) -> Element { return base[i] }
   public func withExistingUnsafeBuffer<R>(
     _ body: (UnsafeBufferPointer<Element>) throws -> R
   ) rethrows -> R? {
     return try base.withExistingUnsafeBuffer(body)
   }
+}
 
-  init<C: UnicodeViewCollection & AnyUnicodeScalars_>(_ c: C)
-  where C.Iterator.Element : UnsignedInteger {
-    base = Adapter(base: c)
+/// Construct from (possibly zero-extended) code units
+extension AnyUnicodeScalars {
+  init<Base: RandomAccessCollection>(_ base: Base)
+  where Base.Iterator.Element : UnsignedInteger {
+    self.base = ZeroExtender(base: base)
   }
 
-  struct Adapter<
-    Base: UnicodeViewCollection & AnyUnicodeScalars_
-  > where Base.Iterator.Element : UnsignedInteger {
+  /// Adapts any random access collection of unsigned integer to AnyUnicodeScalars_
+  struct ZeroExtender<Base: RandomAccessCollection> : AnyUnicodeScalars_, CodeUnitAdapter
+  where Base.Iterator.Element : UnsignedInteger {
     let base: Base
+
+    subscript(i: Index) -> Element {
+      return UnicodeScalar(
+        numericCast(base[base.index(atOffset: i.codeUnitOffset)]) as UInt32)!
+    }
+
+    public func withExistingUnsafeBuffer<R>(
+      _ body: (UnsafeBufferPointer<Element>) throws -> R
+    ) rethrows -> R? {
+      return try base.withExistingUnsafeBuffer {
+        try ($0 as Any as? UnsafeBufferPointer<Element>).map(body)
+      }.flatMap { $0 }
+    }
   }
 }
 
-/// Adapts any bidirectional collection of unsigned integer to AnyUnicodeScalars_
-extension AnyUnicodeScalars.Adapter : UnicodeViewAdapter, AnyUnicodeScalars_ {
-  typealias Index = UnicodeIndex
-
-  var endIndex: Index { return base.endIndex }
-  var startIndex: Index { return base.startIndex }
-  
-  subscript(i: Index) -> UnicodeScalar {
-    return base[i]
+extension AnyUnicodeScalars {
+  init<Base: UnicodeView>(_ base: Base)
+  where Base.Iterator.Element == Element {
+    self.base = Eraser(base)
   }
 
-  public func withExistingUnsafeBuffer<R>(
-    _ body: (UnsafeBufferPointer<Element>) throws -> R
-  ) rethrows -> R? {
-    return try base.withExistingUnsafeBuffer {
-      try ($0 as Any as? UnsafeBufferPointer<Element>).map(body)
-    }.flatMap { $0 }
-  }
-}
-
-protocol AnyUnicodeScalars_ : AnyUnicodeView_ {
-  typealias Element = UnicodeScalar
-  typealias IndexDistance = Int64
-  typealias Index = SimpleUnicodeIndex
-  var startIndex: Index { get }
-  var endIndex: Index { get }
-  func index(after: Index) -> Index
-  func index(before: Index) -> Index
-  subscript(i: Index) -> Element { get }
-
-  func withExistingUnsafeBuffer<R>(
-    _ body: (UnsafeBufferPointer<Element>) throws -> R
-  ) rethrows -> R?
-}
-
-struct AnyUnicodeScalars : UnicodeViewCollection, AnyUnicodeScalars_ {
-  let base: AnyUnicodeScalars_
-  typealias IndexDistance = Int64
-  typealias Index = UnicodeIndex
-  typealias Element = AnyUnicodeScalars_.Element
-  var startIndex: Index { return base.startIndex }
-  var endIndex: Index { return base.endIndex }
-  func index(after i: Index) -> Index { return base.index(after: i) }
-  func index(before i: Index) -> Index { return base.index(before: i) }
-  subscript(i: Index) -> Element { return base[i] }
-  public func withExistingUnsafeBuffer<R>(
-    _ body: (UnsafeBufferPointer<Element>) throws -> R
-  ) rethrows -> R? {
-    return try base.withExistingUnsafeBuffer(body)
-  }
-
-  init<C: BidirectionalCollection>(_ c: C)
-  where C.Iterator.Element == UnicodeScalar {
-    base = Adapter(base: c)
-  }
-
-  struct Adapter<
-    Base: BidirectionalCollection
-  > where Base.Iterator.Element == UnicodeScalar {
+  /// Adapts any random access collection of unsigned integer to AnyUnicodeScalars_
+  struct Eraser<Base: UnicodeView> : AnyUnicodeScalars_, UnicodeViewAdapter
+  where Base.Iterator.Element == Element {
     let base: Base
+
+    init(_ base: Base) { self.base = base }
+    
+    subscript(i: Index) -> Element {
+      return base[_unwrap(i)]
+    }
+
+    public func withExistingUnsafeBuffer<R>(
+      _ body: (UnsafeBufferPointer<Element>) throws -> R
+    ) rethrows -> R? {
+      return try base.withExistingUnsafeBuffer {
+        try ($0 as Any as? UnsafeBufferPointer<Element>).map(body)
+      }.flatMap { $0 }
+    }
   }
 }
 
-/// Adapts any bidirectional collection of unicode scalar values to
-/// AnyUnicodeScalars_
-extension AnyUnicodeScalars.Adapter
-  : BidirectionalCollection, AnyUnicodeScalars_ 
-{
-  typealias IndexDistance = Int64
-  typealias Index = SimpleUnicodeIndex
-  typealias Element = AnyUnicodeScalars_.Element
-  
-  var startIndex: Index { return Index(offset: 0) }
-  var endIndex: Index { return Index(offset: numericCast(base.count)^) }
-  
-  func index(after i: Index) -> Index {
-    return Index(offset: numericCast(
-        base.offset(of: base.index(after: base.index(atOffset: i.offset)))))
-  }
-  
-  func index(before i: Index) -> Index {
-    return Index(offset: numericCast(
-        base.offset(of: base.index(before: base.index(atOffset: i.offset)))))
-  }
-  
-  func index(_ i: Index, offsetBy n: Int64) -> Index {
-    return Index(offset: numericCast(
-      base.offset(
-        of: base.index(base.index(atOffset: i.offset),
-            offsetBy: n^))))
-  }
-  
-  subscript(i: Index) -> Element {
-    return base[base.index(atOffset: i.offset)]
-  }
-
-  public func withExistingUnsafeBuffer<R>(
-    _ body: (UnsafeBufferPointer<Element>) throws -> R
-  ) rethrows -> R? {
-    return try base.withExistingUnsafeBuffer {
-      try ($0 as Any as? UnsafeBufferPointer<Element>).map(body)
-    }.flatMap { $0 }
+extension AnyUnicodeScalars {
+  init<CodeUnits: RandomAccessCollection, Encoding: UnicodeEncoding>(
+    decoding codeUnits: CodeUnits, from e: Encoding.Type
+  )
+  where Encoding.EncodedScalar.Iterator.Element == CodeUnits.Iterator.Element,
+  CodeUnits.SubSequence : RandomAccessCollection,
+  CodeUnits.SubSequence.Index == CodeUnits.Index,
+  CodeUnits.SubSequence.SubSequence == CodeUnits.SubSequence,
+  CodeUnits.SubSequence.Iterator.Element == CodeUnits.Iterator.Element {
+    base = Eraser(
+      _UnicodeViews(codeUnits[...], Encoding.self).scalars)
   }
 }
-
-protocol AnyUnicodeBidirectionalUInt32_ {
-  typealias IndexDistance = Int64
-  typealias Index = SimpleUnicodeIndex
-  typealias Element = UInt32
-  var startIndex: Index { get }
-  var endIndex: Index { get }
-  func index(after: Index) -> Index
-  func index(before: Index) -> Index
-  subscript(i: Index) -> Element { get }
-
-  func withExistingUnsafeBuffer<R>(
-    _ body: (UnsafeBufferPointer<Element>) throws -> R
-  ) rethrows -> R?
-}
-
-// Adapts any bidirectional collection of UInt32 to AnyUnicodeBidirectionalUInt32_
-struct AnyUnicodeBidirectionalUInt32 : BidirectionalCollection, AnyUnicodeBidirectionalUInt32_ {
-  let base: AnyUnicodeBidirectionalUInt32_
-  typealias IndexDistance = Int64
-  typealias Index = SimpleUnicodeIndex
-  typealias Element = UInt32
-  var startIndex: Index { return base.startIndex }
-  var endIndex: Index { return base.endIndex }
-  func index(after i: Index) -> Index { return base.index(after: i) }
-  func index(before i: Index) -> Index { return base.index(before: i) }
-  subscript(i: Index) -> Element { return base[i] }
-  public func withExistingUnsafeBuffer<R>(
-    _ body: (UnsafeBufferPointer<Element>) throws -> R
-  ) rethrows -> R? {
-    return try base.withExistingUnsafeBuffer {
-      try ($0 as Any as? UnsafeBufferPointer<Element>).map(body)
-    }.flatMap { $0 }
-  }
-
-  struct ZeroExtender<
-    Base: BidirectionalCollection
-  > where Base.Iterator.Element : UnsignedInteger {
-    let base: Base
-  }
-
-  init<C: BidirectionalCollection>(_ c: C)
-  where C.Iterator.Element : UnsignedInteger {
-    base = ZeroExtender(base: c)
-  }
-}
-
-/// Adapts any bidirectional collection of unsigned integer to AnyUnicodeBidirectionalUInt32_
-extension AnyUnicodeBidirectionalUInt32.ZeroExtender
-  : BidirectionalCollection, AnyUnicodeBidirectionalUInt32_ {
-  typealias IndexDistance = Int64
-  typealias Index = SimpleUnicodeIndex
-  typealias Element = UInt32
-  
-
-  var startIndex: Index { return Index(offset: 0) }
-  var endIndex: Index { return Index(offset: base.count^) }
-  
-  func index(after i: Index) -> Index {
-    return Index(offset: numericCast(
-        base.offset(of: base.index(after: base.index(atOffset: i.offset)))))
-  }
-  
-  func index(before i: Index) -> Index {
-    return Index(offset: numericCast(
-        base.offset(of: base.index(before: base.index(atOffset: i.offset)))))
-  }
-  
-  func index(_ i: Index, offsetBy n: Int64) -> Index {
-    return Index(offset: numericCast(
-      base.offset(
-        of: base.index(base.index(atOffset: i.offset),
-            offsetBy: n^))))
-  }
-  
-  subscript(i: Index) -> Element {
-    return numericCast(base[base.index(atOffset: i.offset)])
-  }
-
-  func withExistingUnsafeBuffer<R>(
-    _ body: (UnsafeBufferPointer<Element>) throws -> R
-  ) rethrows -> R? {
-    return try base.withExistingUnsafeBuffer {
-      try ($0 as Any as? UnsafeBufferPointer<Element>).map(body)
-    }.flatMap { $0 }
-  }
-}
-
-protocol AnyCharacters_ {
-  typealias IndexDistance = Int64
-  typealias Index = SimpleUnicodeIndex
-  typealias Element = Character
-  var startIndex: Index { get }
-  var endIndex: Index { get }
-  func index(after: Index) -> Index
-  func index(before: Index) -> Index
-  subscript(i: Index) -> Element { get }
-
-  func withExistingUnsafeBuffer<R>(
-    _ body: (UnsafeBufferPointer<Element>) throws -> R
-  ) rethrows -> R?
-}
-
-struct AnyCharacters : BidirectionalCollection, AnyCharacters_ {
-  let base: AnyCharacters_
-  typealias IndexDistance = Int64
-  typealias Index = SimpleUnicodeIndex
-  typealias Element = Character
-  var startIndex: Index { return base.startIndex }
-  var endIndex: Index { return base.endIndex }
-  func index(after i: Index) -> Index { return base.index(after: i) }
-  func index(before i: Index) -> Index { return base.index(before: i) }
-  subscript(i: Index) -> Element { return base[i] }
-  public func withExistingUnsafeBuffer<R>(
-    _ body: (UnsafeBufferPointer<Element>) throws -> R
-  ) rethrows -> R? {
-    return try base.withExistingUnsafeBuffer {
-      try ($0 as Any as? UnsafeBufferPointer<Element>).map(body)
-    }.flatMap { $0 }
-  }
-
-  struct Adapter<Base: BidirectionalCollection>
-  where Base.Iterator.Element == Character,
-  // FIXME: we may not want to keep this constraint
-  Base.Index : SignedInteger { 
-    let base: Base
-  }
-
-  init<C: BidirectionalCollection>(_ c: C)
-  where C.Iterator.Element == Character,
-  // FIXME: we may not want to keep this constraint
-  C.Index : SignedInteger { 
-    base = Adapter(base: c)
-  }
-}
-
-extension AnyCharacters.Adapter : AnyCharacters_, BidirectionalCollection {
-  typealias IndexDistance = Int64
-  typealias Index = SimpleUnicodeIndex
-  typealias Element = Character
-
-  var startIndex: Index { return Index(offset: base.startIndex^) }
-  var endIndex: Index { return Index(offset: base.endIndex^) }
-  
-  func index(after i: Index) -> Index {
-    return Index(offset: numericCast(base.index(after: i.offset^)))
-  }
-  
-  func index(before i: Index) -> Index {
-    return Index(offset: numericCast(base.index(before: i.offset^)))
-  }
-  
-  func index(_ i: Index, offsetBy n: Int64) -> Index {
-    return Index(
-      offset: numericCast(
-        base.index(i.offset^, offsetBy: n^)))
-  }
-  
-  subscript(i: Index) -> Element {
-    return base[i.offset^]
-  }
-
-  func withExistingUnsafeBuffer<R>(
-    _ body: (UnsafeBufferPointer<Element>) throws -> R
-  ) rethrows -> R? {
-    return try base.withExistingUnsafeBuffer {
-      try ($0 as Any as? UnsafeBufferPointer<Element>).map(body)
-    }.flatMap { $0 }
-  }
-}
-#endif
 
 protocol AnyUnicode : Swift._AnyUnicode {
   var codeUnits: AnyCodeUnits { get }
   var rawUTF16: AnyUTF16 { get }
+  var unicodeScalars: AnyUnicodeScalars { get }
 #if false
   var utf32: AnyUnicodeBidirectionalUInt32 { get }
   var fccNormalizedUTF16: AnyUTF16 { get }
@@ -724,8 +505,8 @@ extension _FixedFormatUnicode {
 #endif
 }
 
-extension AnyUnicode
-where Self : _FixedFormatUnicode,
+extension _FixedFormatUnicode
+where Self : AnyUnicode,
 Self.CodeUnits : RandomAccessCollection,
 Self.CodeUnits.Iterator.Element : UnsignedInteger {
   var codeUnits: AnyCodeUnits {
@@ -734,24 +515,28 @@ Self.CodeUnits.Iterator.Element : UnsignedInteger {
 }
 
 
-extension AnyUnicode
-where Self : _FixedFormatUnicode,
+extension _FixedFormatUnicode
+where Self : AnyUnicode,
 Self.CodeUnits : RandomAccessCollection,
 Self.CodeUnits.Iterator.Element : UnsignedInteger,
 Self.Encoding == Latin1 {
   var rawUTF16: AnyUTF16 { return AnyUTF16(self.codeUnits) }
+  var unicodeScalars: AnyUnicodeScalars { return AnyUnicodeScalars(self.codeUnits) }
 }
 
-extension AnyUnicode
-where Self : _FixedFormatUnicode,
+extension _FixedFormatUnicode
+where Self : AnyUnicode,
 Self.CodeUnits : RandomAccessCollection,
 Self.CodeUnits.Iterator.Element : UnsignedInteger,
-Self.Encoding.EncodedScalar == UTF16.EncodedScalar {
+Self.Encoding.EncodedScalar == UTF16.EncodedScalar,
+Self.UnicodeScalarView : UnicodeView,
+Self.UnicodeScalarView.Iterator.Element == UnicodeScalar {
   var rawUTF16: AnyUTF16 { return AnyUTF16(self.codeUnits) }
+  var unicodeScalars: AnyUnicodeScalars { return AnyUnicodeScalars(self.unicodeScalars as UnicodeScalarView) }
 }
 
-extension AnyUnicode
-where Self : _FixedFormatUnicode,
+extension _FixedFormatUnicode
+where Self : AnyUnicode,
 Self.CodeUnits : RandomAccessCollection,
 Self.CodeUnits.Iterator.Element : UnsignedInteger,
 Self.RawUTF16View : BidirectionalCollection,
@@ -776,7 +561,11 @@ Self.CharacterView.Index : SignedInteger
   var rawUTF16: AnyUTF16 {
     return AnyUTF16(transcoding: self._codeUnits, from: Encoding.self)
   }
-  
+
+  var unicodeScalars: AnyUnicodeScalars {
+    return AnyUnicodeScalars(self.unicodeScalars)
+  }
+
 #if false
   // FIXME: this could be more efficient for encodings such as Latin1
   var utf32: AnyUnicodeBidirectionalUInt32 {
@@ -803,6 +592,7 @@ class AnyUnicodeBox : AnyUnicode, FactoryInitializable {
   var encoding: AnyUnicodeEncoding.Type { fatalError("override me!") }
   var codeUnits: AnyCodeUnits { fatalError("override me!") }
   var rawUTF16: AnyUTF16 { fatalError("override me!") }
+  var unicodeScalars: AnyUnicodeScalars { fatalError("override me!") }
 #if false
   var utf32: AnyUnicodeBidirectionalUInt32 { fatalError("override me!") }
   var fccNormalizedUTF16: AnyUTF16 { fatalError("override me!") }
@@ -832,6 +622,7 @@ class AnyUnicodeBox : AnyUnicode, FactoryInitializable {
     override var encoding: AnyUnicodeEncoding.Type { return base.encoding }
     override var codeUnits: AnyCodeUnits { return base.codeUnits }
     override var rawUTF16: AnyUTF16 { return base.rawUTF16 }
+    override var unicodeScalars: AnyUnicodeScalars { return base.unicodeScalars }
 #if false
     override var utf32: AnyUnicodeBidirectionalUInt32 { return base.utf32 }
     override var fccNormalizedUTF16: AnyUTF16 { return base.fccNormalizedUTF16 }
@@ -878,6 +669,10 @@ extension _Latin1StringStorage : AnyUnicode {
   
 }
 
+extension _UTF8StringStorage : AnyUnicode {
+  
+}
+
 extension AnyStringContents : AnyUnicode {
   var encoding: AnyUnicodeEncoding.Type {
     switch self {
@@ -897,6 +692,17 @@ extension AnyStringContents : AnyUnicode {
       return AnyUTF16(storage)
     case .any(let base):
       return base.rawUTF16
+    }
+  }
+
+  var unicodeScalars: AnyUnicodeScalars {
+    switch self {
+    case .utf16(let storage):
+      return AnyUnicodeScalars(storage.unicodeScalars)
+    case .latin1(let storage):
+      return AnyUnicodeScalars(storage.unicodeScalars)
+    case .any(let base):
+      return base.unicodeScalars
     }
   }
 
@@ -1058,6 +864,8 @@ suite.test("basics") {
   expectTrue(x.elementsEqual(y))
 }
 
+import Foundation // https://bugs.swift.org/browse/SR-4277
+
 suite.test("AnyStringContents") {
   let sample = "abcdefghijklmnopqrstuvwxyz\n"
   + "🇸🇸🇬🇱🇱🇸🇩🇯🇺🇸\n"
@@ -1068,7 +876,29 @@ suite.test("AnyStringContents") {
   + "  ๏ แผ่นดินฮั่นเสื่อมโทรมแสนสังเวช  พระปกเกศกองบู๊กู้ขึ้นใหม่\n"
   + "ᚻᛖ ᚳᚹᚫᚦ ᚦᚫᛏ ᚻᛖ ᛒᚢᛞᛖ ᚩᚾ ᚦᚫᛗ ᛚᚪᚾᛞᛖ ᚾᚩᚱᚦᚹᛖᚪᚱᛞᚢᛗ ᚹᛁᚦ ᚦᚪ ᚹᛖᛥᚫ"
 
-  var s = AnyStringContents(_UTF16StringStorage(sample.utf16))
+  let latins = sample.utf16.lazy.filter { $0 < 0x100 }.map {
+    Character(UnicodeScalar($0)!)
+  }
+  let latin1Sample = String(latins)
+  
+  let s16 = AnyStringContents(_UTF16StringStorage(sample.utf16))
+  expectEqualSequence(sample.utf16.lazy.map { numericCast($0) }, s16.codeUnits)
+  expectEqualSequence(sample.utf16, s16.rawUTF16)
+  expectEqualSequence(sample.unicodeScalars, s16.unicodeScalars)
+
+  let s8 = AnyStringContents(_UTF8StringStorage(sample.utf8))
+  expectEqualSequence(sample.utf8.lazy.map { numericCast($0) }, s8.codeUnits)
+  expectEqualSequence(sample.utf16, s8.rawUTF16)
+  expectEqualSequence(sample.unicodeScalars, s8.unicodeScalars)
+
+  let sl = AnyStringContents(_Latin1StringStorage(latin1Sample.unicodeScalars.map {
+        numericCast($0.value)
+      }))
+  
+  expectEqualSequence(latin1Sample.utf16.lazy.map { numericCast($0) }, sl.codeUnits)
+  expectEqualSequence(latin1Sample.utf16, sl.rawUTF16)
+  expectEqualSequence(latin1Sample.unicodeScalars, sl.unicodeScalars)
+
 #if false
   for c in s.characters {
     print("\(c)|", terminator: "")

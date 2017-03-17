@@ -101,7 +101,7 @@ where
   CodeUnits.SubSequence.SubSequence == CodeUnits.SubSequence,
   CodeUnits.SubSequence.Iterator.Element == CodeUnits.Iterator.Element {
 
-  var unicodeScalars: LazyMapCollection<CodeUnits, UnicodeScalar> {
+  var unicodeScalars: LazyMapRandomAccessCollection<CodeUnits, UnicodeScalar> {
     return codeUnits.lazy.map {
       UnicodeScalar($0)
       ?? UnicodeScalar(_unchecked: 0xFFFD)
@@ -120,13 +120,8 @@ where
   CodeUnits.SubSequence.SubSequence == CodeUnits.SubSequence,
   CodeUnits.SubSequence.Iterator.Element == CodeUnits.Iterator.Element {
 
-  var unicodeScalars: LazyMapBidirectionalCollection<
-    _UnicodeViews<CodeUnits,Encoding>.ScalarsTranscoded<UTF32>
-  , UnicodeScalar
-  > {
-    return _UnicodeViews(codeUnits, Encoding.self)
-      .scalarsTranscoded(to: UTF32.self)
-      .lazy.map { UnicodeScalar($0) }
+  var unicodeScalars: _UnicodeViews<CodeUnits,Encoding>.Scalars {
+    return _UnicodeViews(codeUnits, Encoding.self).scalars
   }
 }
 
