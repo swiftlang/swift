@@ -41,11 +41,14 @@ set(sources
   )
 set(output_dir "${SWIFTLIB_DIR}/shims")
 
-set(commands
+add_custom_command(
+    OUTPUT "${output_dir}"
     COMMAND ${CMAKE_COMMAND} "-E" "make_directory" "${output_dir}")
 set(outputs)
 foreach(input ${sources})
-  list(APPEND commands
+  add_custom_command(
+      OUTPUT "${output_dir}/${input}"
+      DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/${input}"
       COMMAND
         "${CMAKE_COMMAND}" "-E" "copy_if_different"
         "${CMAKE_CURRENT_SOURCE_DIR}/${input}"
@@ -55,11 +58,8 @@ endforeach()
 # Put the output dir itself last so that it isn't considered the primary output.
 list(APPEND outputs "${output_dir}")
 
-add_custom_command_target(unused_var
-    ${commands}
-    CUSTOM_TARGET_NAME "copy_shim_headers"
-    OUTPUT "${outputs}"
-    DEPENDS "${sources}"
+add_custom_target("copy_shim_headers"
+    DEPENDS "${outputs}"
     COMMENT "Copying SwiftShims module to ${output_dir}")
 
 if ("${LLVM_PACKAGE_VERSION}" STREQUAL "")
