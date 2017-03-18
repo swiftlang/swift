@@ -368,6 +368,97 @@ extension AnyUTF16 {
   }
 }
 
+protocol AnyUnicodeBidirectionalUInt32_ : AnyUnicodeView_ {
+  typealias Element = UInt32
+  subscript(i: UnicodeIndex) -> Element { get }
+
+  func withExistingUnsafeBuffer<R>(
+    _ body: (UnsafeBufferPointer<Element>) throws -> R
+  ) rethrows -> R?
+}
+
+struct AnyUnicodeBidirectionalUInt32 : UnicodeViewWithCommonIndex, AnyUnicodeViewAdapter {
+  let base: AnyUnicodeBidirectionalUInt32_
+  internal var anyBase: AnyUnicodeView_ { return base }
+  
+  typealias Element = UInt32
+  typealias Index = UnicodeIndex
+
+  subscript(i: Index) -> Element { return base[i] }
+  public func withExistingUnsafeBuffer<R>(
+    _ body: (UnsafeBufferPointer<Element>) throws -> R
+  ) rethrows -> R? {
+    return try base.withExistingUnsafeBuffer(body)
+  }
+}
+
+/// Construct from (possibly zero-extended) code units
+extension AnyUnicodeBidirectionalUInt32 {
+  init<Base: RandomAccessCollection>(_ base: Base)
+  where Base.Iterator.Element : UnsignedInteger {
+    self.base = ZeroExtender(base: base)
+  }
+
+  /// Adapts any random access collection of unsigned integer to AnyUnicodeBidirectionalUInt32_
+  struct ZeroExtender<Base: RandomAccessCollection> : AnyUnicodeBidirectionalUInt32_, CodeUnitAdapter
+  where Base.Iterator.Element : UnsignedInteger {
+    let base: Base
+
+    subscript(i: Index) -> Element {
+      return numericCast(base[base.index(atOffset: i.codeUnitOffset)])
+    }
+
+    public func withExistingUnsafeBuffer<R>(
+      _ body: (UnsafeBufferPointer<Element>) throws -> R
+    ) rethrows -> R? {
+      return try base.withExistingUnsafeBuffer {
+        try ($0 as Any as? UnsafeBufferPointer<Element>).map(body)
+      }.flatMap { $0 }
+    }
+  }
+}
+
+extension AnyUnicodeBidirectionalUInt32 {
+  init<Base: UnicodeView>(_ base: Base)
+  where Base.Iterator.Element == Element {
+    self.base = Eraser(base)
+  }
+
+  /// Adapts any random access collection of unsigned integer to AnyUnicodeBidirectionalUInt32_
+  struct Eraser<Base: UnicodeView> : AnyUnicodeBidirectionalUInt32_, UnicodeViewAdapter
+  where Base.Iterator.Element == Element {
+    let base: Base
+
+    init(_ base: Base) { self.base = base }
+    
+    subscript(i: Index) -> Element {
+      return base[_unwrap(i)]
+    }
+
+    public func withExistingUnsafeBuffer<R>(
+      _ body: (UnsafeBufferPointer<Element>) throws -> R
+    ) rethrows -> R? {
+      return try base.withExistingUnsafeBuffer {
+        try ($0 as Any as? UnsafeBufferPointer<Element>).map(body)
+      }.flatMap { $0 }
+    }
+  }
+}
+
+extension AnyUnicodeBidirectionalUInt32 {
+  init<CodeUnits: RandomAccessCollection, Encoding: UnicodeEncoding>(
+    transcoding codeUnits: CodeUnits, toUTF32From e: Encoding.Type
+  )
+  where Encoding.EncodedScalar.Iterator.Element == CodeUnits.Iterator.Element,
+  CodeUnits.SubSequence : RandomAccessCollection,
+  CodeUnits.SubSequence.Index == CodeUnits.Index,
+  CodeUnits.SubSequence.SubSequence == CodeUnits.SubSequence,
+  CodeUnits.SubSequence.Iterator.Element == CodeUnits.Iterator.Element {
+    base = Eraser(
+      _UnicodeViews(codeUnits[...], Encoding.self).transcoded(to: UTF32.self))
+  }
+}
+
 
 protocol AnyUnicodeScalars_ : AnyUnicodeView_ {
   typealias Element = UnicodeScalar
@@ -465,8 +556,8 @@ protocol AnyUnicode : Swift._AnyUnicode {
   var codeUnits: AnyCodeUnits { get }
   var rawUTF16: AnyUTF16 { get }
   var unicodeScalars: AnyUnicodeScalars { get }
-#if false
   var utf32: AnyUnicodeBidirectionalUInt32 { get }
+#if false
   var fccNormalizedUTF16: AnyUTF16 { get }
   // FIXME: Can this be Random Access?  If all encodings use a single code unit
   // per ASCII character and can statelessly identify a code unit that
@@ -532,8 +623,24 @@ Self.Encoding.EncodedScalar == UTF16.EncodedScalar,
 Self.UnicodeScalarView : UnicodeView,
 Self.UnicodeScalarView.Iterator.Element == UnicodeScalar {
   var rawUTF16: AnyUTF16 { return AnyUTF16(self.codeUnits) }
-  var unicodeScalars: AnyUnicodeScalars { return AnyUnicodeScalars(self.unicodeScalars as UnicodeScalarView) }
+  var unicodeScalars: AnyUnicodeScalars {
+    return AnyUnicodeScalars(self.unicodeScalars as UnicodeScalarView)
+  }
 }
+
+extension _FixedFormatUnicode
+where Self : AnyUnicode,
+  Encoding.EncodedScalar.Iterator.Element == CodeUnits.Iterator.Element,
+  CodeUnits.SubSequence : RandomAccessCollection,
+  CodeUnits.SubSequence.Index == CodeUnits.Index,
+  CodeUnits.SubSequence.SubSequence == CodeUnits.SubSequence,
+  CodeUnits.SubSequence.Iterator.Element == CodeUnits.Iterator.Element {
+  var utf32: AnyUnicodeBidirectionalUInt32 {
+    let cu: Self.CodeUnits = self.codeUnits
+    return AnyUnicodeBidirectionalUInt32(transcoding: cu, toUTF32From: Encoding.self)
+  }
+}
+
 
 extension _FixedFormatUnicode
 where Self : AnyUnicode,
@@ -567,14 +674,6 @@ Self.CharacterView.Index : SignedInteger
   }
 
 #if false
-  // FIXME: this could be more efficient for encodings such as Latin1
-  var utf32: AnyUnicodeBidirectionalUInt32 {
-      return AnyUnicodeBidirectionalUInt32(
-      _UnicodeViews(
-        _codeUnits, Encoding.self
-      ).transcoded(to: UTF32.self)
-    )
-  }
   var fccNormalizedUTF16: AnyUTF16 {
     return AnyUTF16(fccNormalizedUTF16 as FCCNormalizedUTF16View)
   }
@@ -593,8 +692,8 @@ class AnyUnicodeBox : AnyUnicode, FactoryInitializable {
   var codeUnits: AnyCodeUnits { fatalError("override me!") }
   var rawUTF16: AnyUTF16 { fatalError("override me!") }
   var unicodeScalars: AnyUnicodeScalars { fatalError("override me!") }
-#if false
   var utf32: AnyUnicodeBidirectionalUInt32 { fatalError("override me!") }
+#if false
   var fccNormalizedUTF16: AnyUTF16 { fatalError("override me!") }
 #endif
   
@@ -623,8 +722,8 @@ class AnyUnicodeBox : AnyUnicode, FactoryInitializable {
     override var codeUnits: AnyCodeUnits { return base.codeUnits }
     override var rawUTF16: AnyUTF16 { return base.rawUTF16 }
     override var unicodeScalars: AnyUnicodeScalars { return base.unicodeScalars }
-#if false
     override var utf32: AnyUnicodeBidirectionalUInt32 { return base.utf32 }
+#if false
     override var fccNormalizedUTF16: AnyUTF16 { return base.fccNormalizedUTF16 }
     override var extendedASCII: AnyUnicodeBidirectionalUInt32 {
       return base.extendedASCII
@@ -706,7 +805,6 @@ extension AnyStringContents : AnyUnicode {
     }
   }
 
-#if false
   var utf32: AnyUnicodeBidirectionalUInt32 {
     switch self {
     case .utf16(let storage):
@@ -720,6 +818,7 @@ extension AnyStringContents : AnyUnicode {
     }
   }
 
+#if false
   var extendedASCII: AnyUnicodeBidirectionalUInt32 {
     switch self {
     case .utf16(let storage):
@@ -866,6 +965,19 @@ suite.test("basics") {
 
 import Foundation // https://bugs.swift.org/browse/SR-4277
 
+func dissect(_ x: AnyStringContents) {
+  print("#### Contents")
+  dump(x)
+  print("# Code Units")
+  dump(x.codeUnits)
+  print("# UTF16")
+  dump(x.rawUTF16)
+  print("# Unicode Scalars")
+  dump(x.unicodeScalars)
+  print("# UTF32")
+  dump(x.utf32)
+  print("########")
+}
 suite.test("AnyStringContents") {
   let sample = "abcdefghijklmnopqrstuvwxyz\n"
   + "🇸🇸🇬🇱🇱🇸🇩🇯🇺🇸\n"
@@ -885,8 +997,10 @@ suite.test("AnyStringContents") {
   expectEqualSequence(sample.utf16.lazy.map { numericCast($0) }, s16.codeUnits)
   expectEqualSequence(sample.utf16, s16.rawUTF16)
   expectEqualSequence(sample.unicodeScalars, s16.unicodeScalars)
-
+  dissect(s16)
+  
   let s8 = AnyStringContents(_UTF8StringStorage(sample.utf8))
+  dissect(s8)
   expectEqualSequence(sample.utf8.lazy.map { numericCast($0) }, s8.codeUnits)
   expectEqualSequence(sample.utf16, s8.rawUTF16)
   expectEqualSequence(sample.unicodeScalars, s8.unicodeScalars)
@@ -894,7 +1008,7 @@ suite.test("AnyStringContents") {
   let sl = AnyStringContents(_Latin1StringStorage(latin1Sample.unicodeScalars.map {
         numericCast($0.value)
       }))
-  
+  dissect(sl)
   expectEqualSequence(latin1Sample.utf16.lazy.map { numericCast($0) }, sl.codeUnits)
   expectEqualSequence(latin1Sample.utf16, sl.rawUTF16)
   expectEqualSequence(latin1Sample.unicodeScalars, sl.unicodeScalars)
