@@ -13,10 +13,12 @@
 #include "swift/Driver/ParseableOutput.h"
 
 #include "swift/Basic/JSONSerialization.h"
+#include "swift/Basic/Statistic.h"
 #include "swift/Driver/Action.h"
 #include "swift/Driver/Job.h"
 #include "swift/Driver/Types.h"
 #include "llvm/Option/Arg.h"
+#include "llvm/Support/Chrono.h"
 #include "llvm/Support/raw_ostream.h"
 
 using namespace swift::driver::parseable_output;
@@ -73,6 +75,16 @@ namespace json {
       return seq[index];
     }
   };
+
+  template<>
+  struct ScalarTraits<llvm::sys::TimePoint<>> {
+    static void output(const llvm::sys::TimePoint<> &value, llvm::raw_ostream &os) {
+      using namespace std::chrono;
+      os << duration_cast<microseconds>(value.time_since_epoch()).count();
+    }
+    static bool mustQuote(StringRef) { return false; }
+  };
+
 } // namespace json
 } // namespace swift
 
@@ -81,20 +93,30 @@ namespace {
 class Message {
   std::string Kind;
   std::string Name;
+  llvm::sys::TimePoint<> Timestamp;
+  Optional<ResourceStats> Resources;
 public:
-  Message(StringRef Kind, StringRef Name) : Kind(Kind), Name(Name) {}
+  Message(StringRef Kind, StringRef Name,
+          Optional<ResourceStats> Resources = Optional<ResourceStats>()) :
+    Kind(Kind), Name(Name),
+    Timestamp(std::chrono::system_clock::now()),
+    Resources(Resources) {}
   virtual ~Message() = default;
 
   virtual void provideMapping(swift::json::Output &out) {
     out.mapRequired("kind", Kind);
     out.mapRequired("name", Name);
+    out.mapRequired("timestamp", Timestamp);
+    out.mapOptional("resources", Resources);
   }
 };
 
 class CommandBasedMessage : public Message {
 public:
-  CommandBasedMessage(StringRef Kind, const Job &Cmd) :
-      Message(Kind, Cmd.getSource().getClassName()) {}
+  CommandBasedMessage(StringRef Kind, const Job &Cmd,
+                      Optional<ResourceStats> Resources =
+                      Optional<ResourceStats>()) :
+    Message(Kind, Cmd.getSource().getClassName(), Resources) {}
 };
 
 class DetailedCommandBasedMessage : public CommandBasedMessage {
@@ -151,8 +173,9 @@ public:
 class TaskBasedMessage : public CommandBasedMessage {
   ProcessId Pid;
 public:
-  TaskBasedMessage(StringRef Kind, const Job &Cmd, ProcessId Pid) :
-      CommandBasedMessage(Kind, Cmd), Pid(Pid) {}
+  TaskBasedMessage(StringRef Kind, const Job &Cmd, ProcessId Pid,
+                   Optional<ResourceStats> Resources) :
+    CommandBasedMessage(Kind, Cmd, Resources), Pid(Pid) {}
 
   void provideMapping(swift::json::Output &out) override {
     CommandBasedMessage::provideMapping(out);
@@ -176,8 +199,9 @@ class TaskOutputMessage : public TaskBasedMessage {
   std::string Output;
 public:
   TaskOutputMessage(StringRef Kind, const Job &Cmd, ProcessId Pid,
-                    StringRef Output) : TaskBasedMessage(Kind, Cmd, Pid),
-                                        Output(Output) {}
+                    StringRef Output,
+                    Optional<ResourceStats> Resources)
+    : TaskBasedMessage(Kind, Cmd, Pid, Resources), Output(Output) {}
 
   void provideMapping(swift::json::Output &out) override {
     TaskBasedMessage::provideMapping(out);
@@ -189,9 +213,9 @@ class FinishedMessage : public TaskOutputMessage {
   int ExitStatus;
 public:
   FinishedMessage(const Job &Cmd, ProcessId Pid, StringRef Output,
-                  int ExitStatus) : TaskOutputMessage("finished", Cmd, Pid,
-                                                      Output),
-                                    ExitStatus(ExitStatus) {}
+                  int ExitStatus, Optional<ResourceStats> Resources) :
+    TaskOutputMessage("finished", Cmd, Pid, Output, Resources),
+    ExitStatus(ExitStatus) {}
 
   void provideMapping(swift::json::Output &out) override {
     TaskOutputMessage::provideMapping(out);
@@ -204,9 +228,10 @@ class SignalledMessage : public TaskOutputMessage {
   Optional<int> Signal;
 public:
   SignalledMessage(const Job &Cmd, ProcessId Pid, StringRef Output,
-                   StringRef ErrorMsg, Optional<int> Signal) :
-      TaskOutputMessage("signalled", Cmd, Pid, Output), ErrorMsg(ErrorMsg),
-      Signal(Signal) {}
+                   StringRef ErrorMsg, Optional<int> Signal,
+                   Optional<ResourceStats> Resources) :
+    TaskOutputMessage("signalled", Cmd, Pid, Output, Resources),
+    ErrorMsg(ErrorMsg), Signal(Signal) {}
 
   void provideMapping(swift::json::Output &out) override {
     TaskOutputMessage::provideMapping(out);
@@ -233,6 +258,15 @@ struct ObjectTraits<Message> {
   }
 };
 
+template<>
+struct ObjectTraits<ResourceStats> {
+  static void mapping(Output &out, ResourceStats &RS) {
+    out.mapRequired("user", RS.UserTimeUsec);
+    out.mapRequired("sys", RS.SystemTimeUsec);
+    out.mapRequired("rss", RS.MaxResidentBytes);
+  }
+};
+
 } // namespace json
 } // namespace swift
 
@@ -254,8 +288,9 @@ void parseable_output::emitBeganMessage(raw_ostream &os,
 
 void parseable_output::emitFinishedMessage(raw_ostream &os,
                                            const Job &Cmd, ProcessId Pid,
-                                           int ExitStatus, StringRef Output) {
-  FinishedMessage msg(Cmd, Pid, Output, ExitStatus);
+                                           int ExitStatus, StringRef Output,
+                                           Optional<ResourceStats> Resources) {
+  FinishedMessage msg(Cmd, Pid, Output, ExitStatus, Resources);
   emitMessage(os, msg);
 }
 
@@ -263,8 +298,9 @@ void parseable_output::emitSignalledMessage(raw_ostream &os,
                                             const Job &Cmd, ProcessId Pid,
                                             StringRef ErrorMsg,
                                             StringRef Output,
-                                            Optional<int> Signal) {
-  SignalledMessage msg(Cmd, Pid, Output, ErrorMsg, Signal);
+                                            Optional<int> Signal,
+                                            Optional<ResourceStats> Resources) {
+  SignalledMessage msg(Cmd, Pid, Output, ErrorMsg, Signal, Resources);
   emitMessage(os, msg);
 }
 

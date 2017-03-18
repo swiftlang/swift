@@ -376,7 +376,7 @@ namespace driver {
       if (Comp.Level == OutputLevel::Parseable) {
         // Parseable output was requested.
         parseable_output::emitFinishedMessage(llvm::errs(), *FinishedCmd, Pid,
-                                              ReturnCode, Output);
+                                              ReturnCode, Output, Resources);
       } else {
         // Otherwise, send the buffered output to stderr, though only if we
         // support getting buffered output.
@@ -439,7 +439,8 @@ namespace driver {
       if (Comp.Level == OutputLevel::Parseable) {
         // Parseable output was requested.
         parseable_output::emitSignalledMessage(llvm::errs(), *SignalledCmd,
-                                               Pid, ErrorMsg, Output, Signal);
+                                               Pid, ErrorMsg, Output, Signal,
+                                               Resources);
       } else {
         // Otherwise, send the buffered output to stderr, though only if we
         // support getting buffered output.

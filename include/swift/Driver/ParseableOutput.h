@@ -19,6 +19,7 @@
 #define SWIFT_DRIVER_PARSEABLEOUTPUT_H
 
 #include "swift/Basic/LLVM.h"
+#include "swift/Basic/Statistic.h"
 #include "swift/Basic/TaskQueue.h"
 
 namespace swift {
@@ -29,17 +30,20 @@ class Job;
 namespace parseable_output {
 
 using swift::sys::ProcessId;
+using swift::sys::ResourceStats;
 
 /// \brief Emits a "began" message to the given stream.
 void emitBeganMessage(raw_ostream &os, const Job &Cmd, ProcessId Pid);
 
 /// \brief Emits a "finished" message to the given stream.
 void emitFinishedMessage(raw_ostream &os, const Job &Cmd, ProcessId Pid,
-                         int ExitStatus, StringRef Output);
+                         int ExitStatus, StringRef Output,
+                         Optional<ResourceStats> Resources);
 
 /// \brief Emits a "signalled" message to the given stream.
 void emitSignalledMessage(raw_ostream &os, const Job &Cmd, ProcessId Pid,
-                          StringRef ErrorMsg, StringRef Output, Optional<int> Signal);
+                          StringRef ErrorMsg, StringRef Output, Optional<int> Signal,
+                          Optional<ResourceStats> Resources);
 
 /// \brief Emits a "skipped" message to the given stream.
 void emitSkippedMessage(raw_ostream &os, const Job &Cmd);
