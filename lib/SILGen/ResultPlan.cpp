@@ -13,6 +13,7 @@
 #include "ResultPlan.h"
 #include "Callee.h"
 #include "Initialization.h"
+#include "LValue.h"
 #include "RValue.h"
 #include "SILGenFunction.h"
 
@@ -282,11 +283,13 @@ public:
 };
 
 class ForeignErrorInitializationPlan : public ResultPlan {
+  const CalleeTypeInfo &calleeTypeInfo;
   ResultPlanPtr subPlan;
 
 public:
-  ForeignErrorInitializationPlan(ResultPlanPtr &&subPlan)
-      : subPlan(std::move(subPlan)) {}
+  ForeignErrorInitializationPlan(const CalleeTypeInfo &calleeTypeInfo,
+                                 ResultPlanPtr &&subPlan)
+      : calleeTypeInfo(calleeTypeInfo), subPlan(std::move(subPlan)) {}
 
   RValue finish(SILGenFunction &SGF, SILLocation loc, CanType substType,
                 ArrayRef<ManagedValue> &directResults) override {
@@ -300,7 +303,50 @@ public:
 
   Optional<std::pair<ManagedValue, ManagedValue>>
   emitForeignErrorArgument(SILGenFunction &SGF, SILLocation loc) override {
-    return None;
+    unsigned errorParamIndex =
+        calleeTypeInfo.foreignError->getErrorParameterIndex();
+    SILParameterInfo errorParameter =
+        calleeTypeInfo.substFnType->getParameters()[errorParamIndex];
+    // We assume that there's no interesting reabstraction here beyond a layer
+    // of
+    // optional.
+    OptionalTypeKind optKind;
+    CanType errorPtrType = errorParameter.getType();
+    CanType unwrappedPtrType = errorPtrType;
+    if (Type unwrapped = errorPtrType->getAnyOptionalObjectType(optKind))
+      unwrappedPtrType = unwrapped->getCanonicalType();
+
+    PointerTypeKind ptrKind;
+    auto errorType =
+        CanType(unwrappedPtrType->getAnyPointerElementType(ptrKind));
+    auto &errorTL = SGF.getTypeLowering(errorType);
+
+    // Allocate a temporary.
+    SILValue errorTemp =
+        SGF.emitTemporaryAllocation(loc, errorTL.getLoweredType());
+
+    // Nil-initialize it.
+    SGF.emitInjectOptionalNothingInto(loc, errorTemp, errorTL);
+
+    // Enter a cleanup to destroy the value there.
+    auto managedErrorTemp =
+        SGF.emitManagedBufferWithCleanup(errorTemp, errorTL);
+
+    // Create the appropriate pointer type.
+    LValue lvalue =
+        LValue::forAddress(ManagedValue::forLValue(errorTemp),
+                           AbstractionPattern(errorType), errorType);
+    auto pointerValue =
+        SGF.emitLValueToPointer(loc, std::move(lvalue), unwrappedPtrType,
+                                ptrKind, AccessKind::ReadWrite);
+
+    // Wrap up in an Optional if called for.
+    if (optKind != OTK_None) {
+      auto &optTL = SGF.getTypeLowering(errorPtrType);
+      pointerValue = SGF.getOptionalSomeValue(loc, pointerValue, optTL);
+    }
+
+    return std::make_pair(managedErrorTemp, pointerValue);
   }
 };
 
@@ -350,8 +396,9 @@ ResultPlanPtr ResultPlanBuilder::buildTopLevelResult(Initialization *init) {
   }
   }
 
-  return ResultPlanPtr(new ForeignErrorInitializationPlan(build(
-      init, calleeTypeInfo.origResultType, calleeTypeInfo.substResultType)));
+  return ResultPlanPtr(new ForeignErrorInitializationPlan(
+      calleeTypeInfo, build(init, calleeTypeInfo.origResultType,
+                            calleeTypeInfo.substResultType)));
 }
 
 /// Build a result plan for the results of an apply.
