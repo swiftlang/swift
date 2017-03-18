@@ -283,13 +283,49 @@ public:
 };
 
 class ForeignErrorInitializationPlan : public ResultPlan {
-  const CalleeTypeInfo &calleeTypeInfo;
+  SILLocation loc;
+  LValue lvalue;
   ResultPlanPtr subPlan;
+  ManagedValue managedErrorTemp;
+  CanType unwrappedPtrType;
+  PointerTypeKind ptrKind;
+  OptionalTypeKind optKind;
+  CanType errorPtrType;
 
 public:
-  ForeignErrorInitializationPlan(const CalleeTypeInfo &calleeTypeInfo,
+  ForeignErrorInitializationPlan(SILGenFunction &SGF, SILLocation loc,
+                                 const CalleeTypeInfo &calleeTypeInfo,
                                  ResultPlanPtr &&subPlan)
-      : calleeTypeInfo(calleeTypeInfo), subPlan(std::move(subPlan)) {}
+      : loc(loc), subPlan(std::move(subPlan)) {
+    unsigned errorParamIndex =
+        calleeTypeInfo.foreignError->getErrorParameterIndex();
+    SILParameterInfo errorParameter =
+        calleeTypeInfo.substFnType->getParameters()[errorParamIndex];
+    // We assume that there's no interesting reabstraction here beyond a layer
+    // of optional.
+    errorPtrType = errorParameter.getType();
+    unwrappedPtrType = errorPtrType;
+    if (Type unwrapped = errorPtrType->getAnyOptionalObjectType(optKind))
+      unwrappedPtrType = unwrapped->getCanonicalType();
+
+    auto errorType =
+        CanType(unwrappedPtrType->getAnyPointerElementType(ptrKind));
+    auto &errorTL = SGF.getTypeLowering(errorType);
+
+    // Allocate a temporary.
+    SILValue errorTemp =
+        SGF.emitTemporaryAllocation(loc, errorTL.getLoweredType());
+
+    // Nil-initialize it.
+    SGF.emitInjectOptionalNothingInto(loc, errorTemp, errorTL);
+
+    // Enter a cleanup to destroy the value there.
+    managedErrorTemp = SGF.emitManagedBufferWithCleanup(errorTemp, errorTL);
+
+    // Create the appropriate pointer type.
+    lvalue = LValue::forAddress(ManagedValue::forLValue(errorTemp),
+                                AbstractionPattern(errorType), errorType);
+  }
 
   RValue finish(SILGenFunction &SGF, SILLocation loc, CanType substType,
                 ArrayRef<ManagedValue> &directResults) override {
@@ -303,39 +339,6 @@ public:
 
   Optional<std::pair<ManagedValue, ManagedValue>>
   emitForeignErrorArgument(SILGenFunction &SGF, SILLocation loc) override {
-    unsigned errorParamIndex =
-        calleeTypeInfo.foreignError->getErrorParameterIndex();
-    SILParameterInfo errorParameter =
-        calleeTypeInfo.substFnType->getParameters()[errorParamIndex];
-    // We assume that there's no interesting reabstraction here beyond a layer
-    // of
-    // optional.
-    OptionalTypeKind optKind;
-    CanType errorPtrType = errorParameter.getType();
-    CanType unwrappedPtrType = errorPtrType;
-    if (Type unwrapped = errorPtrType->getAnyOptionalObjectType(optKind))
-      unwrappedPtrType = unwrapped->getCanonicalType();
-
-    PointerTypeKind ptrKind;
-    auto errorType =
-        CanType(unwrappedPtrType->getAnyPointerElementType(ptrKind));
-    auto &errorTL = SGF.getTypeLowering(errorType);
-
-    // Allocate a temporary.
-    SILValue errorTemp =
-        SGF.emitTemporaryAllocation(loc, errorTL.getLoweredType());
-
-    // Nil-initialize it.
-    SGF.emitInjectOptionalNothingInto(loc, errorTemp, errorTL);
-
-    // Enter a cleanup to destroy the value there.
-    auto managedErrorTemp =
-        SGF.emitManagedBufferWithCleanup(errorTemp, errorTL);
-
-    // Create the appropriate pointer type.
-    LValue lvalue =
-        LValue::forAddress(ManagedValue::forLValue(errorTemp),
-                           AbstractionPattern(errorType), errorType);
     auto pointerValue =
         SGF.emitLValueToPointer(loc, std::move(lvalue), unwrappedPtrType,
                                 ptrKind, AccessKind::ReadWrite);
@@ -359,7 +362,8 @@ public:
 /// Build a result plan for the results of an apply.
 ///
 /// If the initialization is non-null, the result plan will emit into it.
-ResultPlanPtr ResultPlanBuilder::buildTopLevelResult(Initialization *init) {
+ResultPlanPtr ResultPlanBuilder::buildTopLevelResult(Initialization *init,
+                                                     SILLocation loc) {
   // First check if we do not have a foreign error. If we don't, just call
   // build.
   auto foreignError = calleeTypeInfo.foreignError;
@@ -396,9 +400,10 @@ ResultPlanPtr ResultPlanBuilder::buildTopLevelResult(Initialization *init) {
   }
   }
 
+  ResultPlanPtr subPlan = build(init, calleeTypeInfo.origResultType,
+                                calleeTypeInfo.substResultType);
   return ResultPlanPtr(new ForeignErrorInitializationPlan(
-      calleeTypeInfo, build(init, calleeTypeInfo.origResultType,
-                            calleeTypeInfo.substResultType)));
+      SGF, loc, calleeTypeInfo, std::move(subPlan)));
 }
 
 /// Build a result plan for the results of an apply.
@@ -495,5 +500,5 @@ ResultPlanBuilder::computeResultPlan(SILGenFunction &SGF,
                                      const CalleeTypeInfo &calleeTypeInfo,
                                      SILLocation loc, SGFContext evalContext) {
   ResultPlanBuilder builder(SGF, loc, calleeTypeInfo);
-  return builder.buildTopLevelResult(evalContext.getEmitInto());
+  return builder.buildTopLevelResult(evalContext.getEmitInto(), loc);
 }

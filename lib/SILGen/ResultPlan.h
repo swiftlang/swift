@@ -80,7 +80,7 @@ struct ResultPlanBuilder {
   }
 
 private:
-  ResultPlanPtr buildTopLevelResult(Initialization *init);
+  ResultPlanPtr buildTopLevelResult(Initialization *init, SILLocation loc);
 };
 
 } // end namespace Lowering
