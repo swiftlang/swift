@@ -14,6 +14,7 @@
 #define SWIFT_SILGEN_RESULTPLAN_H
 
 #include "Callee.h"
+#include "ManagedValue.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/SIL/SILLocation.h"
@@ -28,7 +29,6 @@ namespace Lowering {
 
 class AbstractionPattern;
 class Initialization;
-class ManagedValue;
 class RValue;
 class SILGenFunction;
 class SGFContext;
@@ -43,6 +43,11 @@ public:
 
   virtual void
   gatherIndirectResultAddrs(SmallVectorImpl<SILValue> &outList) const = 0;
+
+  virtual Optional<std::pair<ManagedValue, ManagedValue>>
+  emitForeignErrorArgument(SILGenFunction &SGF, SILLocation loc) {
+    return None;
+  }
 };
 
 using ResultPlanPtr = std::unique_ptr<ResultPlan>;
@@ -51,11 +56,11 @@ using ResultPlanPtr = std::unique_ptr<ResultPlan>;
 struct ResultPlanBuilder {
   SILGenFunction &SGF;
   SILLocation loc;
-  CalleeTypeInfo &calleeTypeInfo;
+  const CalleeTypeInfo &calleeTypeInfo;
   ArrayRef<SILResultInfo> allResults;
 
   ResultPlanBuilder(SILGenFunction &SGF, SILLocation loc,
-                    CalleeTypeInfo &calleeTypeInfo)
+                    const CalleeTypeInfo &calleeTypeInfo)
       : SGF(SGF), loc(loc), calleeTypeInfo(calleeTypeInfo),
         allResults(calleeTypeInfo.substFnType->getResults()) {}
 
@@ -66,7 +71,7 @@ struct ResultPlanBuilder {
                               CanTupleType substType);
 
   static ResultPlanPtr computeResultPlan(SILGenFunction &SGF,
-                                         CalleeTypeInfo &calleeTypeInfo,
+                                         const CalleeTypeInfo &calleeTypeInfo,
                                          SILLocation loc,
                                          SGFContext evalContext);
 
@@ -75,7 +80,7 @@ struct ResultPlanBuilder {
   }
 
 private:
-  ResultPlanPtr buildTopLevelResult(Initialization *init);
+  ResultPlanPtr buildTopLevelResult(Initialization *init, SILLocation loc);
 };
 
 } // end namespace Lowering

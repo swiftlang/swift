@@ -1683,49 +1683,6 @@ static SILValue emitRawApply(SILGenFunction &SGF,
   return result;
 }
 
-static std::pair<ManagedValue, ManagedValue>
-emitForeignErrorArgument(SILGenFunction &SGF,
-                         SILLocation loc,
-                         SILParameterInfo errorParameter) {
-  // We assume that there's no interesting reabstraction here beyond a layer of
-  // optional.
-  OptionalTypeKind optKind;
-  CanType errorPtrType = errorParameter.getType();
-  CanType unwrappedPtrType = errorPtrType;
-  if (Type unwrapped = errorPtrType->getAnyOptionalObjectType(optKind))
-    unwrappedPtrType = unwrapped->getCanonicalType();
-
-  PointerTypeKind ptrKind;
-  auto errorType = CanType(unwrappedPtrType->getAnyPointerElementType(ptrKind));
-  auto &errorTL = SGF.getTypeLowering(errorType);
-
-  // Allocate a temporary.
-  SILValue errorTemp =
-    SGF.emitTemporaryAllocation(loc, errorTL.getLoweredType());
-
-  // Nil-initialize it.
-  SGF.emitInjectOptionalNothingInto(loc, errorTemp, errorTL);
-
-  // Enter a cleanup to destroy the value there.
-  auto managedErrorTemp = SGF.emitManagedBufferWithCleanup(errorTemp, errorTL);
-
-  // Create the appropriate pointer type.
-  LValue lvalue = LValue::forAddress(ManagedValue::forLValue(errorTemp),
-                                     AbstractionPattern(errorType),
-                                     errorType);
-  auto pointerValue = SGF.emitLValueToPointer(loc, std::move(lvalue),
-                                              unwrappedPtrType, ptrKind,
-                                              AccessKind::ReadWrite);
-
-  // Wrap up in an Optional if called for.
-  if (optKind != OTK_None) {
-    auto &optTL = SGF.getTypeLowering(errorPtrType);
-    pointerValue = SGF.getOptionalSomeValue(loc, pointerValue, optTL);
-  }
-
-  return {managedErrorTemp, pointerValue};
-}
-
 static bool hasUnownedInnerPointerResult(CanSILFunctionType fnType) {
   for (auto result : fnType->getResults()) {
     if (result.getConvention() == ResultConvention::UnownedInnerPointer)
@@ -1741,7 +1698,7 @@ static bool hasUnownedInnerPointerResult(CanSILFunctionType fnType) {
 RValue SILGenFunction::emitApply(ResultPlanPtr &&resultPlan, SILLocation loc,
                                  ManagedValue fn, SubstitutionList subs,
                                  ArrayRef<ManagedValue> args,
-                                 CalleeTypeInfo &calleeTypeInfo,
+                                 const CalleeTypeInfo &calleeTypeInfo,
                                  ApplyOptions options, SGFContext evalContext) {
   auto substFnType = calleeTypeInfo.substFnType;
   auto substResultType = calleeTypeInfo.substResultType;
@@ -1793,14 +1750,14 @@ RValue SILGenFunction::emitApply(ResultPlanPtr &&resultPlan, SILLocation loc,
     // Error-temporary emission may need writeback.
     errorTempWriteback.emplace(*this);
 
-    auto errorParamIndex = foreignError->getErrorParameterIndex();
-    auto errorParam = substFnType->getParameters()[errorParamIndex];
+    unsigned errorParamIndex =
+        calleeTypeInfo.foreignError->getErrorParameterIndex();
 
     // This is pretty evil.
-    auto &errorArgSlot = const_cast<ManagedValue&>(args[errorParamIndex]);
+    auto &errorArgSlot = const_cast<ManagedValue &>(args[errorParamIndex]);
 
-    std::tie(errorTemp, errorArgSlot)
-      = emitForeignErrorArgument(*this, loc, errorParam);
+    std::tie(errorTemp, errorArgSlot) =
+        resultPlan->emitForeignErrorArgument(*this, loc).getValue();
   }
 
   // Emit the raw application.
