@@ -29,19 +29,28 @@ extension _SequenceWrapper  {
   public var underestimatedCount: Int {
     return _base.underestimatedCount
   }
-  
-  public func _copyToContiguousArray()
-    -> ContiguousArray<Iterator.Element> {
-    return _base._copyToContiguousArray()
+
+  public func _preprocessingPass<R>(
+    _ preprocess: () throws -> R
+  ) rethrows -> R? {
+    return try _base._preprocessingPass(preprocess)
   }
 }
 
-extension _SequenceWrapper where Self.Iterator == Self.Base.Iterator {
-
+extension _SequenceWrapper where Iterator == Base.Iterator {
   public func makeIterator() -> Iterator {
     return self._base.makeIterator()
   }
+  
+  @discardableResult
+  public func _copyContents(
+    initializing buf: UnsafeMutableBufferPointer<Iterator.Element>
+  ) -> (Iterator, UnsafeMutableBufferPointer<Iterator.Element>.Index) {
+    return _base._copyContents(initializing: buf)
+  }
+}
 
+extension _SequenceWrapper where Iterator.Element == Base.Iterator.Element {
   public func map<T>(
     _ transform: (Iterator.Element) throws -> T
   ) rethrows -> [T] {
@@ -60,16 +69,8 @@ extension _SequenceWrapper where Self.Iterator == Self.Base.Iterator {
     return _base._customContainsEquatableElement(element)
   }
   
-  public func _preprocessingPass<R>(
-    _ preprocess: () throws -> R
-  ) rethrows -> R? {
-    return try _base._preprocessingPass(preprocess)
-  }
-
-  @discardableResult
-  public func _copyContents(
-    initializing buf: UnsafeMutableBufferPointer<Iterator.Element>
-  ) -> (Base.Iterator, UnsafeMutableBufferPointer<Iterator.Element>.Index) {
-    return _base._copyContents(initializing: buf)
+  public func _copyToContiguousArray()
+    -> ContiguousArray<Iterator.Element> {
+    return _base._copyToContiguousArray()
   }
 }
