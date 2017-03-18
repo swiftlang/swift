@@ -175,6 +175,7 @@ class FormalEvaluationScope {
   SILGenFunction &SGF;
   llvm::Optional<FormalEvaluationContext::stable_iterator> savedDepth;
   bool wasInWritebackScope;
+  bool wasInInOutConversionScope;
 
 public:
   FormalEvaluationScope(SILGenFunction &SGF);
@@ -187,6 +188,9 @@ public:
   bool isPopped() const { return !savedDepth.hasValue(); }
 
   void pop() {
+    if (wasInInOutConversionScope)
+      return;
+
     assert(!isPopped() && "popping an already-popped writeback scope!");
     popImpl();
     savedDepth.reset();

@@ -50,8 +50,9 @@ void OwnedFormalAccess::finishImpl(SILGenFunction &SGF) {
 
 FormalEvaluationScope::FormalEvaluationScope(SILGenFunction &SGF)
     : SGF(SGF), savedDepth(SGF.FormalEvalContext.stable_begin()),
-      wasInWritebackScope(SGF.InWritebackScope) {
-  if (SGF.InInOutConversionScope) {
+      wasInWritebackScope(SGF.InWritebackScope),
+      wasInInOutConversionScope(SGF.InInOutConversionScope) {
+  if (wasInInOutConversionScope) {
     savedDepth.reset();
     return;
   }
@@ -60,7 +61,8 @@ FormalEvaluationScope::FormalEvaluationScope(SILGenFunction &SGF)
 
 FormalEvaluationScope::FormalEvaluationScope(FormalEvaluationScope &&o)
     : SGF(o.SGF), savedDepth(o.savedDepth),
-      wasInWritebackScope(o.wasInWritebackScope) {
+      wasInWritebackScope(o.wasInWritebackScope),
+      wasInInOutConversionScope(o.wasInInOutConversionScope) {
   o.savedDepth.reset();
 }
 

@@ -290,6 +290,50 @@ public:
 /// Build a result plan for the results of an apply.
 ///
 /// If the initialization is non-null, the result plan will emit into it.
+ResultPlanPtr ResultPlanBuilder::buildTopLevelResult(Initialization *init) {
+  // First check if we do not have a foreign error. If we don't, just call
+  // build.
+  auto foreignError = calleeTypeInfo.foreignError;
+  if (!foreignError) {
+    return build(init, calleeTypeInfo.origResultType,
+                 calleeTypeInfo.substResultType);
+  }
+
+  // Otherwise, handle the foreign error first.
+  //
+  // The plan needs to be built using the formal result type after foreign-error
+  // adjustment.
+  switch (foreignError->getKind()) {
+  // These conventions make the formal result type ().
+  case ForeignErrorConvention::ZeroResult:
+  case ForeignErrorConvention::NonZeroResult:
+    assert(calleeTypeInfo.substResultType->isVoid());
+    allResults = {};
+    break;
+
+  // These conventions leave the formal result alone.
+  case ForeignErrorConvention::ZeroPreservedResult:
+  case ForeignErrorConvention::NonNilError:
+    break;
+
+  // This convention changes the formal result to the optional object type; we
+  // need to make our own make SILResultInfo array.
+  case ForeignErrorConvention::NilResult: {
+    assert(allResults.size() == 1);
+    CanType objectType = allResults[0].getType().getAnyOptionalObjectType();
+    SILResultInfo optResult = allResults[0].getWithType(objectType);
+    allResults = optResult;
+    break;
+  }
+  }
+
+  return build(init, calleeTypeInfo.origResultType,
+               calleeTypeInfo.substResultType);
+}
+
+/// Build a result plan for the results of an apply.
+///
+/// If the initialization is non-null, the result plan will emit into it.
 ResultPlanPtr ResultPlanBuilder::build(Initialization *init,
                                        AbstractionPattern origType,
                                        CanType substType) {
@@ -310,7 +354,7 @@ ResultPlanPtr ResultPlanBuilder::build(Initialization *init,
     // there are no abstraction differences, then just do it.
     if (initAddr && SGF.silConv.isSILIndirect(result) &&
         !initAddr->getType().hasAbstractionDifference(
-            rep, result.getSILStorageType())) {
+            calleeTypeInfo.getOverrideRep(), result.getSILStorageType())) {
       return ResultPlanPtr(new InPlaceInitializationResultPlan(init));
     }
   }
@@ -329,8 +373,8 @@ ResultPlanPtr ResultPlanBuilder::build(Initialization *init,
     temporary = SGF.emitTemporary(loc, resultTL);
   }
 
-  return ResultPlanPtr(
-      new ScalarResultPlan(std::move(temporary), origType, init, rep));
+  return ResultPlanPtr(new ScalarResultPlan(
+      std::move(temporary), origType, init, calleeTypeInfo.getOverrideRep()));
 }
 
 ResultPlanPtr ResultPlanBuilder::buildForTuple(Initialization *init,
@@ -380,41 +424,6 @@ ResultPlanPtr
 ResultPlanBuilder::computeResultPlan(SILGenFunction &SGF,
                                      CalleeTypeInfo &calleeTypeInfo,
                                      SILLocation loc, SGFContext evalContext) {
-  auto origResultTypeForPlan = calleeTypeInfo.origResultType;
-  auto substResultTypeForPlan = calleeTypeInfo.substResultType;
-  ArrayRef<SILResultInfo> allResults = calleeTypeInfo.substFnType->getResults();
-  SILResultInfo optResult;
-
-  // The plan needs to be built using the formal result type
-  // after foreign-error adjustment.
-  if (auto foreignError = calleeTypeInfo.foreignError) {
-    switch (foreignError->getKind()) {
-    // These conventions make the formal result type ().
-    case ForeignErrorConvention::ZeroResult:
-    case ForeignErrorConvention::NonZeroResult:
-      assert(calleeTypeInfo.substResultType->isVoid());
-      allResults = {};
-      break;
-
-    // These conventions leave the formal result alone.
-    case ForeignErrorConvention::ZeroPreservedResult:
-    case ForeignErrorConvention::NonNilError:
-      break;
-
-    // This convention changes the formal result to the optional object
-    // type; we need to make our own make SILResultInfo array.
-    case ForeignErrorConvention::NilResult: {
-      assert(allResults.size() == 1);
-      CanType objectType = allResults[0].getType().getAnyOptionalObjectType();
-      optResult = allResults[0].getWithType(objectType);
-      allResults = optResult;
-      break;
-    }
-    }
-  }
-
-  ResultPlanBuilder builder(SGF, loc, allResults,
-                            calleeTypeInfo.getOverrideRep());
-  return builder.build(evalContext.getEmitInto(), origResultTypeForPlan,
-                       substResultTypeForPlan);
+  ResultPlanBuilder builder(SGF, loc, calleeTypeInfo);
+  return builder.buildTopLevelResult(evalContext.getEmitInto());
 }
