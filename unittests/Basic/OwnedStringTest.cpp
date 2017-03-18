@@ -84,7 +84,7 @@ TEST(OwnedStringTest, char_pointer_length_nonzero) {
   // terminated.
   StringRef str = copy.str();
   EXPECT_EQ("s", str);
-  EXPECT_EQ(1, strlen(str.data()));
+  EXPECT_EQ(1UL, strlen(str.data()));
 }
 
 TEST(OwnedStringTest, char_pointer_length_zero) {
