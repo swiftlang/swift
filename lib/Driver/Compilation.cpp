@@ -365,7 +365,8 @@ namespace driver {
     /// any additional Jobs which we now know we need to run.
     TaskFinishedResponse
     taskFinished(ProcessId Pid, int ReturnCode, StringRef Output,
-                 StringRef Errors, void *Context) {
+                 StringRef Errors, void *Context,
+                 Optional<ResourceStats> Resources) {
       const Job *FinishedCmd = (const Job *)Context;
 
       if (Comp.ShowDriverTimeCompilation) {
@@ -427,7 +428,8 @@ namespace driver {
 
     TaskFinishedResponse
     taskSignalled(ProcessId Pid, StringRef ErrorMsg, StringRef Output,
-                  StringRef Errors, void *Context, Optional<int> Signal) {
+                  StringRef Errors, void *Context, Optional<int> Signal,
+                  Optional<ResourceStats> Resources) {
       const Job *SignalledCmd = (const Job *)Context;
 
       if (Comp.ShowDriverTimeCompilation) {
@@ -579,9 +581,9 @@ namespace driver {
         TQ->execute(std::bind(&PerformJobsState::taskBegan, this,
                               _1, _2),
                     std::bind(&PerformJobsState::taskFinished, this,
-                              _1, _2, _3, _4, _5),
+                              _1, _2, _3, _4, _5, _6),
                     std::bind(&PerformJobsState::taskSignalled, this,
-                              _1, _2, _3, _4, _5, _6));
+                              _1, _2, _3, _4, _5, _6, _7));
 
         // Mark all remaining deferred commands as skipped.
         for (const Job *Cmd : DeferredCommands) {

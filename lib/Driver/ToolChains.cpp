@@ -836,7 +836,9 @@ static bool findXcodeClangPath(llvm::SmallVectorImpl<char> &path) {
                   /*SeparateErrors=*/true);
     queue.execute(nullptr, [&path](sys::ProcessId PID, int returnCode,
                                    StringRef output, StringRef errors,
-                                   void *unused) -> sys::TaskFinishedResponse {
+                                   void *unused,
+                                   Optional<sys::ResourceStats> resources)
+                  -> sys::TaskFinishedResponse {
       if (returnCode == 0) {
         output = output.rtrim();
         path.append(output.begin(), output.end());

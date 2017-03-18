@@ -83,7 +83,8 @@ bool DummyTaskQueue::execute(TaskQueue::TaskBeganCallback Began,
       std::string Output = "Output placeholder\n";
       std::string Errors =
           P.second->SeparateErrors ? "Error placeholder\n" : "";
-      if (Finished(P.first, 0, Output, Errors, P.second->Context) ==
+      Optional<ResourceStats> Resources;
+      if (Finished(P.first, 0, Output, Errors, P.second->Context, Resources) ==
           TaskFinishedResponse::StopExecution)
         SubtaskFailed = true;
     }
