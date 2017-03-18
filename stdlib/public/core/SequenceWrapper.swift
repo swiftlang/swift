@@ -18,16 +18,14 @@
 /// A type that is just a wrapper over some base Sequence
 @_show_in_interface
 public // @testable
-protocol _SequenceWrapper {
+protocol _SequenceWrapper : Sequence {
   associatedtype Base : Sequence
-  associatedtype Iterator : IteratorProtocol = Base.Iterator
+//  associatedtype Iterator : IteratorProtocol = Base.Iterator
   
   var _base: Base { get }
 }
 
-extension _SequenceWrapper where
-  Self : Sequence,
-  Self.Iterator == Self.Base.Iterator {
+extension _SequenceWrapper {
 
   /// Returns a value less than or equal to the number of elements in
   /// the sequence, nondestructively.
@@ -37,12 +35,6 @@ extension _SequenceWrapper where
   public var underestimatedCount: Int {
     return _base.underestimatedCount
   }
-}
-
-extension Sequence
-  where
-  Self : _SequenceWrapper,
-  Self.Iterator == Self.Base.Iterator {
 
   /// Returns an iterator over the elements of this sequence.
   public func makeIterator() -> Base.Iterator {
