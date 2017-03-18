@@ -637,7 +637,7 @@ public struct IndexingIterator<
 public protocol Collection : _Indexable, Sequence {
   /// A type that represents the number of steps between a pair of
   /// indices.
-  associatedtype IndexDistance : SignedInteger = Int
+  associatedtype IndexDistance = Int
 
   /// A type that provides the collection's iteration interface and
   /// encapsulates its iteration state.
@@ -645,7 +645,7 @@ public protocol Collection : _Indexable, Sequence {
   /// By default, a collection conforms to the `Sequence` protocol by
   /// supplying `IndexingIterator` as its associated `Iterator`
   /// type.
-  associatedtype Iterator : IteratorProtocol = IndexingIterator<Self>
+  associatedtype Iterator = IndexingIterator<Self>
 
   // FIXME(ABI)#179 (Type checker): Needed here so that the `Iterator` is properly deduced from
   // a custom `makeIterator()` function.  Otherwise we get an

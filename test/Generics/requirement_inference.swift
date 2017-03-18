@@ -126,6 +126,8 @@ func inferSameType1<T, U>(_ x: Model_P3_P4_Eq<T, U>) { }
 // CHECK-NEXT:   τ_0_0[.P3].P3Assoc : P2 [τ_0_0: Explicit @ {{.*}}:25 -> Protocol requirement (via Self.P3Assoc in P3)]
 // CHECK-NEXT:   τ_0_0[.P3].P3Assoc == τ_0_1[.P4].P4Assoc [τ_0_0[.P3].P3Assoc: Explicit]
 func inferSameType2<T : P3, U : P4>(_: T, _: U) where U.P4Assoc : P2, T.P3Assoc == U.P4Assoc {}
+// expected-warning@-1{{redundant conformance constraint 'T.P3Assoc': 'P2'}}
+// expected-note@-2{{conformance constraint 'T.P3Assoc': 'P2' implied here}}
 
 // CHECK-LABEL: .inferSameType3@
 // CHECK-NEXT: Requirements:
@@ -149,8 +151,8 @@ protocol P7 : P6 {
 
 // CHECK-LABEL: P7.nestedSameType1()@
 // CHECK: Canonical generic signature: <τ_0_0 where τ_0_0 : P7, τ_0_0.AssocP6.Element : P6, τ_0_0.AssocP6.Element == τ_0_0.AssocP7.AssocP6.Element>
-extension P7 where AssocP6.Element : P6, 
-        AssocP7.AssocP6.Element : P6,
+extension P7 where AssocP6.Element : P6, // expected-note{{conformance constraint 'Self.AssocP6.Element': 'P6' written here}}
+        AssocP7.AssocP6.Element : P6, // expected-warning{{redundant conformance constraint 'Self.AssocP6.Element': 'P6'}}
         AssocP6.Element == AssocP7.AssocP6.Element {
   func nestedSameType1() { }
 }

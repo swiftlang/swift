@@ -1,6 +1,12 @@
 // RUN: %target-swift-frontend %s -emit-ir
 // RUN: %target-swift-frontend %s -emit-ir -O
 
+// XFAIL: *
+
+// Note: this was passing for the wrong reasons before. We need to
+// correctly model cases where a nested type of an abstract conformance is
+// in fact concrete and, therefore, has concrete conformances.
+
 protocol ControllerB {
     associatedtype T: Controller
 }

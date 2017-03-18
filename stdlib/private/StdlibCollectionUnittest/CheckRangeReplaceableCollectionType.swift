@@ -1199,7 +1199,6 @@ self.test("\(testNamePrefix).OperatorPlus") {
     C.Indices.Index == C.Index,
     C.Indices.SubSequence == C.Indices,
     CollectionWithEquatableElement.Iterator.Element : Equatable,
-    CollectionWithEquatableElement.SubSequence : Collection,
     CollectionWithEquatableElement.SubSequence.Iterator.Element
       == CollectionWithEquatableElement.Iterator.Element {
 
@@ -1331,7 +1330,6 @@ self.test("\(testNamePrefix).removeLast(n: Int)/whereIndexIsBidirectional/remove
     C.Indices.Index == C.Index,
     C.Indices.SubSequence == C.Indices,
     CollectionWithEquatableElement.Iterator.Element : Equatable,
-    CollectionWithEquatableElement.SubSequence : Collection,
     CollectionWithEquatableElement.SubSequence.Iterator.Element
       == CollectionWithEquatableElement.Iterator.Element {
 

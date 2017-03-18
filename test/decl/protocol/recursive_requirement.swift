@@ -52,7 +52,8 @@ protocol P3 {
 
 protocol P4 : P3 {}
 
-protocol DeclaredP : P3, P4 {}
+protocol DeclaredP : P3, // expected-warning{{redundant conformance constraint 'Self': 'P3'}}
+P4 {} // expected-note{{conformance constraint 'Self': 'P3' implied here}}
 
 struct Y3 : DeclaredP {
 }
@@ -75,7 +76,13 @@ protocol Gamma {
   associatedtype Delta: Alpha // expected-error{{type may not reference itself as a requirement}}
 }
 
-struct Epsilon<T: Alpha, U: Gamma> where T.Beta == U, U.Delta == T {}
+// FIXME: Redundancy diagnostics are odd here.
+struct Epsilon<T: Alpha, // expected-note{{conformance constraint 'U': 'Gamma' implied here}}
+// expected-warning@-1{{redundant conformance constraint 'T': 'Alpha'}}
+               U: Gamma> // expected-warning{{redundant conformance constraint 'U': 'Gamma'}}
+// expected-note@-1{{conformance constraint 'T': 'Alpha' implied here}}
+  where T.Beta == U,
+        U.Delta == T {}
 
 // -----
 
