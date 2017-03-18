@@ -471,10 +471,14 @@ internal enum _SubSequenceSubscriptOnRangeMode {
 %{
   from gyb_stdlib_support import collectionForTraversal
   def testConstraints(protocol):
+    if protocol == 'Collection':
+      subseq_as_collection = 'CollectionWithEquatableElement.SubSequence : Collection,'
+    else:
+      subseq_as_collection=''
     return '''
     C : %(protocol)s,
     CollectionWithEquatableElement : %(protocol)s,
-    CollectionWithEquatableElement.SubSequence : Collection,
+    %(subseq_as_collection)s
     CollectionWithEquatableElement.SubSequence.Iterator.Element
       == CollectionWithEquatableElement.Iterator.Element,
     C.SubSequence : %(protocol)s,

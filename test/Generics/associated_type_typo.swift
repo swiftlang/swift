@@ -30,8 +30,9 @@ func typoAssoc3<T : P2, U : P2>()
   where U.AssocP2.assoc : P3,  T.AssocP2.assoc : P4,
         T.AssocP2 == U.AssocP2 {}
 
+// expected-error@+3{{'T.AssocP2' does not have a member type named 'assoc'; did you mean 'Assoc'?}}{{47-52=Assoc}}
 // expected-error@+2{{'T' does not have a member type named 'Assocp2'; did you mean 'AssocP2'?}}{{39-46=AssocP2}}
-// expected-error@+1{{'T.AssocP2' does not have a member type named 'assoc'; did you mean 'Assoc'?}}{{47-52=Assoc}}
+// expected-error@+1{{'T.AssocP2' does not have a member type named 'assoc'; did you mean 'Assoc'?}}
 func typoAssoc4<T : P2>(_: T) where T.Assocp2.assoc : P3 {}
 
 
@@ -39,7 +40,7 @@ func typoAssoc4<T : P2>(_: T) where T.Assocp2.assoc : P3 {}
 // CHECK-GENERIC-NEXT: Requirements:
 // CHECK-GENERIC-NEXT:   τ_0_0 : P2 [τ_0_0: Explicit @ {{.*}}:21]
 // CHECK-GENERIC-NEXT:   τ_0_0[.P2].AssocP2 : P1 [τ_0_0: Explicit @ {{.*}}:21 -> Protocol requirement (via Self.AssocP2 in P2)]
-// CHECK-GENERIC-NEXT:   τ_0_0[.P2].AssocP2[.P1].Assoc : P3 [τ_0_0[.P2].AssocP2.assoc: Explicit @ {{.*}}:53]
+// CHECK-GENERIC-NEXT:   τ_0_0[.P2].AssocP2[.P1].Assoc : P3 [τ_0_0[.P2].AssocP2[.P1].Assoc: Explicit @ {{.*}}:53]
 // CHECK-GENERIC-NEXT: Potential archetypes
 
 // <rdar://problem/19620340>

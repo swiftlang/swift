@@ -1571,6 +1571,12 @@ ERROR(requires_same_concrete_type,none,
 ERROR(protocol_typealias_conflict, none,
       "typealias %0 requires types %1 and %2 to be the same",
       (Identifier, Type, Type))
+WARNING(redundant_conformance_constraint,none,
+        "redundant conformance constraint %0: %1", (Type, ProtocolDecl *))
+NOTE(redundant_conformance_here,none,
+     "conformance constraint %1: %2 %select{written here|implied here}0",
+     (bool, Type, ProtocolDecl *))
+
 WARNING(redundant_same_type_to_concrete,none,
         "redundant same-type constraint %0 == %1", (Type, Type))
 NOTE(same_type_redundancy_here,none,

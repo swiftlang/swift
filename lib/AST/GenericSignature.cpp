@@ -528,7 +528,7 @@ bool GenericSignature::requiresClass(Type type, ModuleDecl &mod) {
 
   // If any of the protocols are class-bound, then it must be a class.
   for (auto proto : pa->getConformsTo()) {
-    if (proto.first->requiresClass()) return true;
+    if (proto->requiresClass()) return true;
   }
 
   return false;
@@ -571,7 +571,7 @@ SmallVector<ProtocolDecl *, 2> GenericSignature::getConformsTo(Type type,
   // Retrieve the protocols to which this type conforms.
   SmallVector<ProtocolDecl *, 2> result;
   for (auto proto : pa->getConformsTo())
-    result.push_back(proto.first);
+    result.push_back(proto);
 
   // Canonicalize the resulting set of protocols.
   ProtocolType::canonicalizeProtocols(result);
@@ -738,6 +738,26 @@ static Type eraseAssociatedTypes(Type type) {
   return type;
 }
 
+namespace {
+  typedef GenericSignatureBuilder::RequirementSource RequirementSource;
+
+  template<typename T>
+  using GSBConstraint = GenericSignatureBuilder::Constraint<T>;
+}
+
+/// Retrieve the best requirement source from the list
+static const RequirementSource *
+getBestRequirementSource(ArrayRef<GSBConstraint<ProtocolDecl *>> constraints) {
+  const RequirementSource *bestSource = nullptr;
+  for (const auto &constraint : constraints) {
+    auto source = constraint.source;
+    if (!bestSource || source->compare(bestSource) < 0)
+      bestSource = source;
+  }
+
+  return bestSource;
+}
+
 ConformanceAccessPath GenericSignature::getConformanceAccessPath(
                                                        Type type,
                                                        ProtocolDecl *protocol,
@@ -747,12 +767,12 @@ ConformanceAccessPath GenericSignature::getConformanceAccessPath(
   // Resolve this type to a potential archetype.
   auto &builder = *getGenericSignatureBuilder(mod);
   auto pa = builder.resolveArchetype(type);
-  auto rep = pa->getRepresentative();
+  auto equivClass = pa->getOrCreateEquivalenceClass();
 
   // Dig out the conformance of this type to the given protocol, because we
   // want its requirement source.
-  auto conforms = rep->getConformsTo().find(protocol);
-  assert(conforms != rep->getConformsTo().end());
+  auto conforms = equivClass->conformsTo.find(protocol);
+  assert(conforms != equivClass->conformsTo.end());
 
   // Follow the requirement source to form the conformance access path.
   typedef GenericSignatureBuilder::RequirementSource RequirementSource;
@@ -837,16 +857,17 @@ ConformanceAccessPath GenericSignature::getConformanceAccessPath(
 
       // Dig out the potential archetype for this stored type.
       auto pa = reqSigBuilder.resolveArchetype(storedType);
-      auto rep = pa->getRepresentative();
+      auto equivClass = pa->getOrCreateEquivalenceClass();
 
       // Find the conformance of this potential archetype to the protocol in
       // question.
-      auto knownConforms = rep->getConformsTo().find(conformingProto);
-      assert(knownConforms != rep->getConformsTo().end());
+      auto conforms = equivClass->conformsTo.find(conformingProto);
+      assert(conforms != equivClass->conformsTo.end());
 
       // Compute the root type, canonicalizing it w.r.t. the protocol context.
       auto inProtoSig = inProtocol->getGenericSignature();
-      Type localRootType = knownConforms->second->getRootPotentialArchetype()
+      auto conformsSource = getBestRequirementSource(conforms->second);
+      Type localRootType = conformsSource->getRootPotentialArchetype()
                              ->getDependentType(inProtoSig->getGenericParams(),
                                                 /*allowUnresolved*/true);
       localRootType = inProtoSig->getCanonicalTypeInContext(
@@ -854,7 +875,7 @@ ConformanceAccessPath GenericSignature::getConformanceAccessPath(
                                                *inProtocol->getModuleContext());
 
       // Build the path according to the requirement signature.
-      buildPath(reqSig, knownConforms->second, conformingProto, localRootType);
+      buildPath(reqSig, conformsSource, conformingProto, localRootType);
 
       // We're done.
       return;
@@ -884,14 +905,14 @@ ConformanceAccessPath GenericSignature::getConformanceAccessPath(
   };
 
   // Canonicalize the root type.
-  auto source = conforms->second;
+  auto source = getBestRequirementSource(conforms->second);
   auto subjectPA = source->getRootPotentialArchetype();
   subjectPA = subjectPA->getArchetypeAnchor(*subjectPA->getBuilder());
   Type rootType = subjectPA->getDependentType(getGenericParams(),
                                               /*allowUnresolved=*/false);
 
   // Build the path.
-  buildPath(this, conforms->second, protocol, rootType);
+  buildPath(this, source, protocol, rootType);
 
   // Return the path; we're done!
   return path;

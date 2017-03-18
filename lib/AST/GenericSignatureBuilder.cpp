@@ -237,6 +237,11 @@ bool RequirementSource::isSelfDerivedSource(PotentialArchetype *pa) const {
     case RequirementSource::Inferred:
     case RequirementSource::RequirementSignatureSelf:
       currentPA = source->getRootPotentialArchetype();
+      while (auto parent = currentPA->getParent()) {
+        if (auto assocType = currentPA->getResolvedAssociatedType())
+          assocTypes.push_back(assocType);
+        currentPA = parent;
+      }
       break;
 
     case RequirementSource::Concrete:
@@ -262,7 +267,6 @@ bool RequirementSource::isSelfDerivedSource(PotentialArchetype *pa) const {
     currentPA = knownNested->second.front();
   }
 
-  // FIXME: currentPA == pa?
   return false;
 }
 
@@ -798,6 +802,18 @@ EquivalenceClass::findAnySuperclassConstraintAsWritten(
   return result;
 }
 
+bool EquivalenceClass::isConformanceSatisfiedBySuperclass(
+                                                    ProtocolDecl *proto) const {
+  auto known = conformsTo.find(proto);
+  assert(known != conformsTo.end() && "doesn't conform to this protocol");
+  for (const auto &constraint: known->second) {
+    if (constraint.source->kind == RequirementSource::Superclass)
+      return true;
+  }
+
+  return false;
+}
+
 bool GenericSignatureBuilder::updateRequirementSource(
                                       const RequirementSource *&existingSource,
                                       const RequirementSource *newSource) {
@@ -816,8 +832,7 @@ bool GenericSignatureBuilder::updateRequirementSource(
 
 const RequirementSource *GenericSignatureBuilder::resolveSuperConformance(
                       GenericSignatureBuilder::PotentialArchetype *pa,
-                      ProtocolDecl *proto,
-                      const RequirementSource *&protoSource) {
+                      ProtocolDecl *proto) {
   // Get the superclass constraint.
   Type superclass = pa->getSuperclass();
   if (!superclass) return nullptr;
@@ -843,8 +858,7 @@ const RequirementSource *GenericSignatureBuilder::resolveSuperConformance(
 
   superclassSource =
     superclassSource->viaSuperclass(*this, conformance->getConcrete());
-  if (protoSource)
-    updateRequirementSource(protoSource, superclassSource);
+  paEquivClass->conformsTo[proto].push_back({pa, proto, superclassSource});
   return superclassSource;
 }
 
@@ -926,29 +940,23 @@ static DeclRange getProtocolMembers(ProtocolDecl *proto) {
 }
 
 bool PotentialArchetype::addConformance(ProtocolDecl *proto,
-                                        bool updateExistingSource,
                                         const RequirementSource *source,
                                         GenericSignatureBuilder &builder) {
-  auto rep = getRepresentative();
-  if (rep != this)
-    return rep->addConformance(proto, updateExistingSource, source, builder);
-
-  // Check whether we already know about this conformance.
-  auto known = ConformsTo.find(proto);
-  if (known != ConformsTo.end()) {
-    // We already have this requirement. Update the requirement source
-    // appropriately.
-    if (updateExistingSource)
-      builder.updateRequirementSource(known->second, source);
+  // Check whether we already knew about this conformance.
+  auto equivClass = getOrCreateEquivalenceClass();
+  auto known = equivClass->conformsTo.find(proto);
+  if (known != equivClass->conformsTo.end()) {
+    // We already knew about this conformance; record this specific constraint.
+    known->second.push_back({this, proto, source});
     return false;
   }
 
-  // Add this conformance.
-  auto inserted = ConformsTo.insert(std::make_pair(proto, source)).first;
+  // Add the conformance along with this constraint.
+  equivClass->conformsTo[proto].push_back({this, proto, source});
 
-  // If there is a superclass, try to resolve the conformance immediately via
-  // the superclass.
-  getBuilder()->resolveSuperConformance(this, proto, inserted->second);
+  // Determine whether there is a superclass constraint where the
+  // superclass conforms to this protocol.
+  (void)getBuilder()->resolveSuperConformance(this, proto);
 
   // Resolve any existing nested types that need it.
   for (auto &nested : NestedTypes) {
@@ -1261,9 +1269,8 @@ PotentialArchetype *PotentialArchetype::getNestedArchetypeAnchor(
   TypeAliasDecl *bestTypeAlias = nullptr;
   SmallVector<TypeAliasDecl *, 4> typealiases;
   auto rep = getRepresentative();
-  for (const auto &conforms : rep->getConformsTo()) {
+  for (auto proto : rep->getConformsTo()) {
     // Look for an associated type and/or typealias with this name.
-    auto proto = conforms.first;
     AssociatedTypeDecl *assocType = nullptr;
     TypeAliasDecl *typealias = nullptr;
     for (auto member : proto->lookupDirect(name,
@@ -1494,21 +1501,8 @@ PotentialArchetype *PotentialArchetype::updateNestedTypeForConformance(
 
     // If there's a superclass constraint that conforms to the protocol,
     // add the appropriate same-type relationship.
-    auto rep = getRepresentative();
-    auto knownConformance = rep->getConformsTo().find(proto);
-    if (knownConformance != rep->getConformsTo().end()) {
-      auto superSource =
-        builder.resolveSuperConformance(this, proto, knownConformance->second);
-
+    if (auto superSource = builder.resolveSuperConformance(this, proto))
       maybeAddSameTypeRequirementForNestedType(resultPA, superSource, builder);
-    } else {
-      // FIXME: Dropping unknown conformance source on the floor.
-      const RequirementSource *nullSource = nullptr;
-      auto superSource = builder.resolveSuperConformance(this, proto,
-                                                         nullSource);
-
-      maybeAddSameTypeRequirementForNestedType(resultPA, superSource, builder);
-    }
 
     // We know something concrete about the parent PA, so we need to propagate
     // that information to this new archetype.
@@ -1551,6 +1545,7 @@ Type GenericSignatureBuilder::PotentialArchetype::getTypeInContext(
     return archetypeAnchor->getTypeInContext(builder, genericEnv);
 
   auto representative = getRepresentative();
+  auto equivClass = representative->getOrCreateEquivalenceClass();
   ASTContext &ctx = genericEnv->getGenericSignature()->getASTContext();
 
   // Return a concrete type or archetype we've already resolved.
@@ -1655,9 +1650,9 @@ Type GenericSignatureBuilder::PotentialArchetype::getTypeInContext(
 
   // Collect the protocol conformances for the archetype.
   SmallVector<ProtocolDecl *, 4> Protos;
-  for (const auto &conforms : representative->getConformsTo()) {
-    if (conforms.second->kind != RequirementSource::Superclass)
-      Protos.push_back(conforms.first);
+  for (auto proto : representative->getConformsTo()) {
+    if (!equivClass || !equivClass->isConformanceSatisfiedBySuperclass(proto))
+      Protos.push_back(proto);
   }
 
   // Create the archetype.
@@ -1791,20 +1786,27 @@ void GenericSignatureBuilder::PotentialArchetype::dump(llvm::raw_ostream &Out,
   }
 
   // Print requirements.
-  if (!ConformsTo.empty()) {
-    Out << " : ";
+  if (equivClass) {
+    bool First = true;
+    for (const auto &entry : equivClass->conformsTo) {
+      for (const auto &constraint : entry.second) {
+        if (constraint.archetype != this) continue;
 
-    interleave(ConformsTo,
-               [&](std::pair<ProtocolDecl *, const RequirementSource *>
-                       ProtoAndSource) {
-                 Out << ProtoAndSource.first->getName().str() << " ";
-                 if (!ProtoAndSource.second->isDerivedRequirement())
-                   Out << "*";
-                 Out << "[";
-                 ProtoAndSource.second->print(Out, SrcMgr);
-                 Out << "]";
-               },
-               [&] { Out << " & "; });
+        if (First) {
+          First = false;
+          Out << ": ";
+        } else {
+          Out << " & ";
+        }
+
+        Out << constraint.value->getName().str() << " ";
+        if (!constraint.source->isDerivedRequirement())
+          Out << "*";
+        Out << "[";
+        constraint.source->print(Out, SrcMgr);
+        Out << "]";
+      }
+    }
   }
 
   if (getRepresentative() != this) {
@@ -1998,12 +2000,12 @@ bool GenericSignatureBuilder::addConformanceRequirement(PotentialArchetype *PAT,
                                                  ProtocolDecl *Proto,
                                                  const RequirementSource *Source,
                                llvm::SmallPtrSetImpl<ProtocolDecl *> &Visited) {
+  // Add the requirement, if we haven't done so already.
+  if (!PAT->addConformance(Proto, Source, *this))
+    return false;
+
   // Add the requirement to the representative.
   auto T = PAT->getRepresentative();
-
-  // Add the requirement, if we haven't done so already.
-  if (!T->addConformance(Proto, /*updateExistingSource=*/true, Source, *this))
-    return false;
 
   bool inserted = Visited.insert(Proto).second;
   assert(inserted);
@@ -2120,10 +2122,9 @@ bool GenericSignatureBuilder::updateSuperclass(
   // Local function to handle the update of superclass conformances
   // when the superclass constraint changes.
   auto updateSuperclassConformances = [&] {
-    for (auto &conforms : T->ConformsTo) {
-      if (auto superSource = resolveSuperConformance(T, conforms.first,
-                                                     conforms.second)) {
-        for (auto req : getProtocolMembers(conforms.first)) {
+    for (auto proto : T->getConformsTo()) {
+      if (auto superSource = resolveSuperConformance(T, proto)) {
+        for (auto req : getProtocolMembers(proto)) {
           auto assocType = dyn_cast<AssociatedTypeDecl>(req);
           if (!assocType) continue;
 
@@ -2242,24 +2243,6 @@ bool GenericSignatureBuilder::addSameTypeRequirementBetweenArchetypes(
     if (mismatch) return true;
   }
 
-  // Don't mark requirements as redundant if they come from one of our
-  // child archetypes. This is a targeted fix -- more general cases
-  // continue to break. In general, we need to detect cycles in the
-  // archetype graph and not propagate requirement source information
-  // along back edges.
-  bool updateExistingSource = true;
-  auto T2Parent = T2;
-  while (T2Parent != nullptr) {
-    if (T2Parent->getRepresentative() == T1)
-      updateExistingSource = false;
-    T2Parent = T2Parent->getParent();
-  }
-
-  // Another targeted fix -- don't drop conformances from generic
-  // parameters.
-  if (T1->getParent() == nullptr)
-    updateExistingSource = false;
-
   // Merge the equivalence classes.
   auto equivClass = T1->getOrCreateEquivalenceClass();
   auto equivClass2Members = T2->getEquivalenceClassMembers();
@@ -2304,9 +2287,15 @@ bool GenericSignatureBuilder::addSameTypeRequirementBetweenArchetypes(
   }
 
   // Add all of the protocol conformance requirements of T2 to T1.
-  for (auto conforms : T2->ConformsTo) {
-    T1->addConformance(conforms.first, updateExistingSource,
-                       conforms.second, *this);
+  if (equivClass2) {
+    for (const auto &entry : equivClass2->conformsTo) {
+      T1->addConformance(entry.first, entry.second.front().source, *this);
+
+      auto &constraints1 = equivClass->conformsTo[entry.first];
+      constraints1.insert(constraints1.end(),
+                          entry.second.begin() + 1,
+                          entry.second.end());
+    }
   }
 
   // Recursively merge the associated types of T2 into T1.
@@ -2356,8 +2345,7 @@ bool GenericSignatureBuilder::addSameTypeRequirementToConcrete(
   DenseMap<ProtocolDecl *, ProtocolConformanceRef> conformances;
   CanType depTy = rep->getDependentType({ }, /*allowUnresolved=*/true)
                     ->getCanonicalType();
-  for (auto &conforms : rep->getConformsTo()) {
-    auto protocol = conforms.first;
+  for (auto protocol : rep->getConformsTo()) {
     auto conformance =
       getLookupConformanceFn()(depTy, Concrete,
                                protocol->getDeclaredInterfaceType()
@@ -2380,7 +2368,7 @@ bool GenericSignatureBuilder::addSameTypeRequirementToConcrete(
                                               conformance->isConcrete()
                                                 ? conformance->getConcrete()
                                                 : nullptr);
-    updateRequirementSource(conforms.second, concreteSource);
+    equivClass->conformsTo[protocol].push_back({T, protocol, concreteSource});
   }
 
   // Eagerly resolve any existing nested types to their concrete forms (others
@@ -2493,8 +2481,7 @@ void GenericSignatureBuilder::markPotentialArchetypeRecursive(
     return;
   pa->setIsRecursive();
 
-  // FIXME: Drop this protocol.
-  pa->addConformance(proto, /*updateExistingSource=*/true, source, *this);
+  pa->addConformance(proto, source, *this);
   if (!pa->getParent())
     return;
 
@@ -2809,8 +2796,7 @@ static Identifier typoCorrectNestedType(
   llvm::SmallVector<Identifier, 2> bestMatches;
   unsigned bestEditDistance = 0;
   unsigned maxScore = (name.size() + 1) / 3;
-  for (const auto &conforms : pa->getParent()->getConformsTo()) {
-    auto proto = conforms.first;
+  for (auto proto : pa->getParent()->getConformsTo()) {
     for (auto member : getProtocolMembers(proto)) {
       auto assocType = dyn_cast<AssociatedTypeDecl>(member);
       if (!assocType)
@@ -2984,6 +2970,8 @@ GenericSignatureBuilder::finalize(SourceLoc loc,
         checkRedundantSuperclassConstraints(genericParams, archetype);
       }
     }
+
+    checkConformanceConstraints(genericParams, archetype);
   });
 
   // Check for generic parameters which have been made concrete or equated
@@ -3139,6 +3127,7 @@ Constraint<T> GenericSignatureBuilder::checkConstraintList(
                            Diag<Type, T> redundancyDiag,
                            Diag<bool, Type, T> otherNoteDiag) {
   // Remove self-derived constraints.
+  assert(!constraints.empty() && "No constraints?");
   constraints.erase(
     std::remove_if(constraints.begin(), constraints.end(),
                    [&](const Constraint<T> &constraint) {
@@ -3146,6 +3135,7 @@ Constraint<T> GenericSignatureBuilder::checkConstraintList(
                               constraint.archetype);
                    }),
     constraints.end());
+  assert(!constraints.empty() && "All constraints were self-derived!");
 
   // Sort the constraints, so we get a deterministic ordering of diagnostics.
   llvm::array_pod_sort(constraints.begin(), constraints.end());
@@ -3298,6 +3288,29 @@ Constraint<T> GenericSignatureBuilder::checkConstraintList(
   }
 
   return *representativeConstraint;
+}
+
+void GenericSignatureBuilder::checkConformanceConstraints(
+                          ArrayRef<GenericTypeParamType *> genericParams,
+                          PotentialArchetype *pa) {
+  auto equivClass = pa->getEquivalenceClassIfPresent();
+  if (!equivClass || equivClass->conformsTo.empty())
+    return;
+
+  for (auto &entry : equivClass->conformsTo) {
+    checkConstraintList<ProtocolDecl *>(
+      genericParams, entry.second,
+      [](const Constraint<ProtocolDecl *> &constraint) {
+        return true;
+      },
+      [&](ProtocolDecl *proto) {
+        assert(proto == entry.first && "Mixed up protocol constraints");
+        return ConstraintRelation::Redundant;
+      },
+      None,
+      diag::redundant_conformance_constraint,
+      diag::redundant_conformance_here);
+  }
 }
 
 void GenericSignatureBuilder::checkRedundantConcreteTypeConstraints(
@@ -3720,11 +3733,23 @@ void GenericSignatureBuilder::enumerateRequirements(llvm::function_ref<
     // Enumerate conformance requirements.
     SmallVector<ProtocolDecl *, 4> protocols;
     DenseMap<ProtocolDecl *, const RequirementSource *> protocolSources;
-    for (const auto &conforms : rep->getConformsTo()) {
-      protocols.push_back(conforms.first);
-      assert(protocolSources.count(conforms.first) == 0 && 
-             "redundant protocol requirement?");
-      protocolSources.insert({conforms.first, conforms.second});
+    auto equivClass = rep->getEquivalenceClassIfPresent();
+    if (equivClass) {
+      for (const auto &conforms : equivClass->conformsTo) {
+        protocols.push_back(conforms.first);
+        assert(protocolSources.count(conforms.first) == 0 && 
+               "redundant protocol requirement?");
+
+        // Find the best source among the constraints that describe conformance
+        // to this protocol.
+        auto bestSource = conforms.second.front().source;
+        for (const auto &constraint : conforms.second) {
+          if (constraint.source->compare(bestSource) < 0)
+            bestSource = constraint.source;
+        }
+
+        protocolSources.insert({conforms.first, bestSource});
+      }
     }
 
     // Sort the protocols in canonical order.

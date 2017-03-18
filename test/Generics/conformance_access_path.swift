@@ -56,8 +56,8 @@ func testPaths3<V: P5>(_ v: V) {
 	acceptQ0(v.getAssocP3())
 }
 
-protocol P6Unordered: P5Unordered {
-	associatedtype A: P0
+protocol P6Unordered: P5Unordered { // expected-note{{conformance constraint 'Self.A': 'P0' implied here}}
+	associatedtype A: P0 // expected-warning{{redundant conformance constraint 'Self.A': 'P0'}}
 }
 
 protocol P5Unordered {
