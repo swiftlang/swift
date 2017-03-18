@@ -836,6 +836,13 @@ int Compilation::performJobsImpl() {
                            InputInfo);
   }
 
+  if (Level == OutputLevel::Parseable) {
+    CompilationCounters C = State.finalizeCounters();
+    Optional<ResourceStats> R = TaskQueue::ChildResourceStats();
+    parseable_output::emitCompilationMessage(llvm::errs(), "swiftc",
+                                             C, R);
+  }
+
   return State.getResult();
 }
 
