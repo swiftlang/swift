@@ -13,6 +13,7 @@
 #include "ResultPlan.h"
 #include "Callee.h"
 #include "Initialization.h"
+#include "LValue.h"
 #include "RValue.h"
 #include "SILGenFunction.h"
 
@@ -281,6 +282,77 @@ public:
   }
 };
 
+class ForeignErrorInitializationPlan : public ResultPlan {
+  SILLocation loc;
+  LValue lvalue;
+  ResultPlanPtr subPlan;
+  ManagedValue managedErrorTemp;
+  CanType unwrappedPtrType;
+  PointerTypeKind ptrKind;
+  OptionalTypeKind optKind;
+  CanType errorPtrType;
+
+public:
+  ForeignErrorInitializationPlan(SILGenFunction &SGF, SILLocation loc,
+                                 const CalleeTypeInfo &calleeTypeInfo,
+                                 ResultPlanPtr &&subPlan)
+      : loc(loc), subPlan(std::move(subPlan)) {
+    unsigned errorParamIndex =
+        calleeTypeInfo.foreignError->getErrorParameterIndex();
+    SILParameterInfo errorParameter =
+        calleeTypeInfo.substFnType->getParameters()[errorParamIndex];
+    // We assume that there's no interesting reabstraction here beyond a layer
+    // of optional.
+    errorPtrType = errorParameter.getType();
+    unwrappedPtrType = errorPtrType;
+    if (Type unwrapped = errorPtrType->getAnyOptionalObjectType(optKind))
+      unwrappedPtrType = unwrapped->getCanonicalType();
+
+    auto errorType =
+        CanType(unwrappedPtrType->getAnyPointerElementType(ptrKind));
+    auto &errorTL = SGF.getTypeLowering(errorType);
+
+    // Allocate a temporary.
+    SILValue errorTemp =
+        SGF.emitTemporaryAllocation(loc, errorTL.getLoweredType());
+
+    // Nil-initialize it.
+    SGF.emitInjectOptionalNothingInto(loc, errorTemp, errorTL);
+
+    // Enter a cleanup to destroy the value there.
+    managedErrorTemp = SGF.emitManagedBufferWithCleanup(errorTemp, errorTL);
+
+    // Create the appropriate pointer type.
+    lvalue = LValue::forAddress(ManagedValue::forLValue(errorTemp),
+                                AbstractionPattern(errorType), errorType);
+  }
+
+  RValue finish(SILGenFunction &SGF, SILLocation loc, CanType substType,
+                ArrayRef<ManagedValue> &directResults) override {
+    return subPlan->finish(SGF, loc, substType, directResults);
+  }
+
+  void
+  gatherIndirectResultAddrs(SmallVectorImpl<SILValue> &outList) const override {
+    subPlan->gatherIndirectResultAddrs(outList);
+  }
+
+  Optional<std::pair<ManagedValue, ManagedValue>>
+  emitForeignErrorArgument(SILGenFunction &SGF, SILLocation loc) override {
+    auto pointerValue =
+        SGF.emitLValueToPointer(loc, std::move(lvalue), unwrappedPtrType,
+                                ptrKind, AccessKind::ReadWrite);
+
+    // Wrap up in an Optional if called for.
+    if (optKind != OTK_None) {
+      auto &optTL = SGF.getTypeLowering(errorPtrType);
+      pointerValue = SGF.getOptionalSomeValue(loc, pointerValue, optTL);
+    }
+
+    return std::make_pair(managedErrorTemp, pointerValue);
+  }
+};
+
 } // end anonymous namespace
 
 //===----------------------------------------------------------------------===//
@@ -290,7 +362,8 @@ public:
 /// Build a result plan for the results of an apply.
 ///
 /// If the initialization is non-null, the result plan will emit into it.
-ResultPlanPtr ResultPlanBuilder::buildTopLevelResult(Initialization *init) {
+ResultPlanPtr ResultPlanBuilder::buildTopLevelResult(Initialization *init,
+                                                     SILLocation loc) {
   // First check if we do not have a foreign error. If we don't, just call
   // build.
   auto foreignError = calleeTypeInfo.foreignError;
@@ -327,8 +400,10 @@ ResultPlanPtr ResultPlanBuilder::buildTopLevelResult(Initialization *init) {
   }
   }
 
-  return build(init, calleeTypeInfo.origResultType,
-               calleeTypeInfo.substResultType);
+  ResultPlanPtr subPlan = build(init, calleeTypeInfo.origResultType,
+                                calleeTypeInfo.substResultType);
+  return ResultPlanPtr(new ForeignErrorInitializationPlan(
+      SGF, loc, calleeTypeInfo, std::move(subPlan)));
 }
 
 /// Build a result plan for the results of an apply.
@@ -422,8 +497,8 @@ ResultPlanPtr ResultPlanBuilder::buildForTuple(Initialization *init,
 
 ResultPlanPtr
 ResultPlanBuilder::computeResultPlan(SILGenFunction &SGF,
-                                     CalleeTypeInfo &calleeTypeInfo,
+                                     const CalleeTypeInfo &calleeTypeInfo,
                                      SILLocation loc, SGFContext evalContext) {
   ResultPlanBuilder builder(SGF, loc, calleeTypeInfo);
-  return builder.buildTopLevelResult(evalContext.getEmitInto());
+  return builder.buildTopLevelResult(evalContext.getEmitInto(), loc);
 }

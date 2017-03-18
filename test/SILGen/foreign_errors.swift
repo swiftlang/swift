@@ -11,11 +11,13 @@ import errors
 func test0() throws {
   // CHECK: [[SELF:%.*]] = metatype $@thick ErrorProne.Type
   // CHECK: [[METHOD:%.*]] = class_method [volatile] [[SELF]] : $@thick ErrorProne.Type, #ErrorProne.fail!1.foreign : (ErrorProne.Type) -> () throws -> (), $@convention(objc_method) (Optional<AutoreleasingUnsafeMutablePointer<Optional<NSError>>>, @objc_metatype ErrorProne.Type) -> ObjCBool
-  // CHECK: [[OBJC_SELF:%.*]] = thick_to_objc_metatype [[SELF]]
 
-  //   Create a strong temporary holding nil.
+  //   Create a strong temporary holding nil before we perform any further parts of function emission.
   // CHECK: [[ERR_TEMP0:%.*]] = alloc_stack $Optional<NSError>
   // CHECK: inject_enum_addr [[ERR_TEMP0]] : $*Optional<NSError>, #Optional.none!enumelt
+
+  // CHECK: [[OBJC_SELF:%.*]] = thick_to_objc_metatype [[SELF]]
+
   //   Create an unmanaged temporary, copy into it, and make a AutoreleasingUnsafeMutablePointer.
   // CHECK: [[ERR_TEMP1:%.*]] = alloc_stack $@sil_unmanaged Optional<NSError>
   // CHECK: [[T0:%.*]] = load_borrow [[ERR_TEMP0]]
