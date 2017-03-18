@@ -3434,6 +3434,10 @@ WARNING(variable_never_used, none,
         "%select{variable|immutable value}1 %0 was never used; "
         "consider replacing with '_' or removing it",
         (Identifier, unsigned))
+WARNING(immutable_value_never_used_but_assigned, none,
+        "immutable value %0 was never used; "
+        "consider removing it",
+        (Identifier))
 WARNING(variable_never_mutated, none,
         "%select{variable|parameter}1 %0 was never mutated; "
         "consider changing to 'let' constant",
