@@ -101,25 +101,6 @@ public protocol BidirectionalCollection
   // This is dependent on both recursive protocol constraints AND associated 
   // types with where clauses.
   // associatedtype Indices : BidirectionalCollection
-
-  /// The indices that are valid for subscripting the collection, in ascending
-  /// order.
-  ///
-  /// A collection's `indices` property can hold a strong reference to the
-  /// collection itself, causing the collection to be non-uniquely referenced.
-  /// If you mutate the collection while iterating over its indices, a strong
-  /// reference can cause an unexpected copy of the collection. To avoid the
-  /// unexpected copy, use the `index(after:)` method starting with
-  /// `startIndex` to produce indices instead.
-  ///
-  ///     var c = MyFancyCollection([10, 20, 30, 40, 50])
-  ///     var i = c.startIndex
-  ///     while i != c.endIndex {
-  ///         c[i] /= 5
-  ///         i = c.index(after: i)
-  ///     }
-  ///     // c == MyFancyCollection([2, 4, 6, 8, 10])
-  var indices: Indices { get }
   
   // TODO: swift-3-indexing-model: tests.
   /// The last element of the collection.
@@ -134,29 +115,6 @@ public protocol BidirectionalCollection
   ///     
   /// - Complexity: O(1)
   var last: Iterator.Element? { get }
-
-  /// Accesses a contiguous subrange of the collection's elements.
-  ///
-  /// The accessed slice uses the same indices for the same elements as the
-  /// original collection uses. Always use the slice's `startIndex` property
-  /// instead of assuming that its indices start at a particular value.
-  ///
-  /// This example demonstrates getting a slice of an array of strings, finding
-  /// the index of one of the strings in the slice, and then using that index
-  /// in the original array.
-  ///
-  ///     let streets = ["Adams", "Bryant", "Channing", "Douglas", "Evarts"]
-  ///     let streetsSlice = streets[2 ..< streets.endIndex]
-  ///     print(streetsSlice)
-  ///     // Prints "["Channing", "Douglas", "Evarts"]"
-  ///
-  ///     let index = streetsSlice.index(of: "Evarts")    // 4
-  ///     print(streets[index!])
-  ///     // Prints "Evarts"
-  ///
-  /// - Parameter bounds: A range of the collection's indices. The bounds of
-  ///   the range must be valid indices of the collection.
-  subscript(bounds: Range<Index>) -> SubSequence { get }
 }
 
 /// Default implementation for bidirectional collections.
