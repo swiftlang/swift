@@ -32,6 +32,11 @@ namespace llvm {
 }
 
 namespace swift {
+namespace driver {
+namespace parseable_output {
+struct CompilationCounters;
+}
+}
 
 /// The non-templated implementation of DependencyGraph.
 ///
@@ -74,6 +79,8 @@ public:
     void printPath(raw_ostream &out, const void *item,
                    llvm::function_ref<void(const void *)> printItem) const;
   };
+
+  using CompilationCounters = driver::parseable_output::CompilationCounters;
 
 private:
   enum class DependencyFlags : uint8_t;
@@ -168,13 +175,20 @@ protected:
     (void)newlyInserted;
   }
 
+  void
+  countMarking(CompilationCounters &counters,
+               DependencyMaskTy kinds, bool isCascading);
+
   void markTransitive(SmallVectorImpl<const void *> &visited,
-                      const void *node, MarkTracerImpl *tracer = nullptr);
+                      const void *node,
+                      CompilationCounters &counters,
+                      MarkTracerImpl *tracer = nullptr);
   bool markIntransitive(const void *node) {
     assert(Provides.count(node) && "node is not in the graph");
     return Marked.insert(node).second;
   }
   void markExternal(SmallVectorImpl<const void *> &visited,
+                    CompilationCounters &counters,
                     StringRef externalDependency);
 
   bool isMarked(const void *node) const {
@@ -281,19 +295,23 @@ public:
   /// MarkTracer instance to \p tracer.
   template <unsigned N>
   void markTransitive(SmallVector<T, N> &visited, T node,
+                      CompilationCounters &counters,
                       MarkTracer *tracer = nullptr) {
     SmallVector<const void *, N> rawMarked;
     DependencyGraphImpl::markTransitive(rawMarked,
                                         Traits::getAsVoidPointer(node),
+                                        counters,
                                         tracer);
     // FIXME: How can we avoid this copy?
     copyBack(visited, rawMarked);
   }
 
   template <unsigned N>
-  void markExternal(SmallVector<T, N> &visited, StringRef externalDependency) {
+  void markExternal(SmallVector<T, N> &visited,
+                    CompilationCounters &counters,
+                    StringRef externalDependency) {
     SmallVector<const void *, N> rawMarked;
-    DependencyGraphImpl::markExternal(rawMarked, externalDependency);
+    DependencyGraphImpl::markExternal(rawMarked, counters, externalDependency);
     // FIXME: How can we avoid this copy?
     copyBack(visited, rawMarked);
   }
