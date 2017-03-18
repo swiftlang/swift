@@ -21,6 +21,7 @@ public // @testable
 protocol _SequenceWrapper : Sequence {
   associatedtype Base : Sequence
   associatedtype Iterator : IteratorProtocol = Base.Iterator
+  associatedtype SubSequence = Base.SubSequence
   
   var _base: Base { get }
 }
@@ -53,7 +54,7 @@ extension _SequenceWrapper where Iterator == Base.Iterator {
 extension _SequenceWrapper where Iterator.Element == Base.Iterator.Element {
   public func map<T>(
     _ transform: (Iterator.Element) throws -> T
-  ) rethrows -> [T] {
+) rethrows -> [T] {
     return try _base.map(transform)
   }
   
@@ -61,6 +62,10 @@ extension _SequenceWrapper where Iterator.Element == Base.Iterator.Element {
     _ isIncluded: (Iterator.Element) throws -> Bool
   ) rethrows -> [Iterator.Element] {
     return try _base.filter(isIncluded)
+  }
+
+  public func forEach(_ body: (Iterator.Element) throws -> Void) rethrows {
+    return try _base.forEach(body)
   }
   
   public func _customContainsEquatableElement(
@@ -72,5 +77,51 @@ extension _SequenceWrapper where Iterator.Element == Base.Iterator.Element {
   public func _copyToContiguousArray()
     -> ContiguousArray<Iterator.Element> {
     return _base._copyToContiguousArray()
+  }
+}
+
+extension _SequenceWrapper where SubSequence == Base.SubSequence {
+  public func dropFirst(_ n: Int) -> SubSequence {
+    return _base.dropFirst(n)
+  }
+  public func dropLast(_ n: Int) -> SubSequence {
+    return _base.dropLast(n)
+  }
+  public func prefix(_ maxLength: Int) -> SubSequence {
+    return _base.prefix(maxLength)
+  }
+  public func suffix(_ maxLength: Int) -> SubSequence {
+    return _base.suffix(maxLength)
+  }
+}
+
+extension _SequenceWrapper
+  where SubSequence == Base.SubSequence, Iterator.Element == Base.Iterator.Element {
+
+  public func drop(
+    while predicate: (Iterator.Element) throws -> Bool
+  ) rethrows -> SubSequence {
+    return try _base.drop(while: predicate)
+  }
+
+  public func prefix(
+    while predicate: (Iterator.Element) throws -> Bool
+  ) rethrows -> SubSequence {
+    return try _base.prefix(while: predicate)
+  }
+  
+  public func suffix(_ maxLength: Int) -> SubSequence {
+    return _base.suffix(maxLength)
+  }
+
+  public func split(
+    maxSplits: Int, omittingEmptySubsequences: Bool,
+    whereSeparator isSeparator: (Iterator.Element) throws -> Bool
+  ) rethrows -> [SubSequence] {
+    return try _base.split(
+      maxSplits: maxSplits,
+      omittingEmptySubsequences: omittingEmptySubsequences,
+      whereSeparator: isSeparator
+    )
   }
 }
