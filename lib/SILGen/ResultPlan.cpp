@@ -281,6 +281,29 @@ public:
   }
 };
 
+class ForeignErrorInitializationPlan : public ResultPlan {
+  ResultPlanPtr subPlan;
+
+public:
+  ForeignErrorInitializationPlan(ResultPlanPtr &&subPlan)
+      : subPlan(std::move(subPlan)) {}
+
+  RValue finish(SILGenFunction &SGF, SILLocation loc, CanType substType,
+                ArrayRef<ManagedValue> &directResults) override {
+    return subPlan->finish(SGF, loc, substType, directResults);
+  }
+
+  void
+  gatherIndirectResultAddrs(SmallVectorImpl<SILValue> &outList) const override {
+    subPlan->gatherIndirectResultAddrs(outList);
+  }
+
+  Optional<std::pair<ManagedValue, ManagedValue>>
+  emitForeignErrorArgument(SILGenFunction &SGF, SILLocation loc) override {
+    return None;
+  }
+};
+
 } // end anonymous namespace
 
 //===----------------------------------------------------------------------===//
@@ -327,8 +350,8 @@ ResultPlanPtr ResultPlanBuilder::buildTopLevelResult(Initialization *init) {
   }
   }
 
-  return build(init, calleeTypeInfo.origResultType,
-               calleeTypeInfo.substResultType);
+  return ResultPlanPtr(new ForeignErrorInitializationPlan(build(
+      init, calleeTypeInfo.origResultType, calleeTypeInfo.substResultType)));
 }
 
 /// Build a result plan for the results of an apply.
