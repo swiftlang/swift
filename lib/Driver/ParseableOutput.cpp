@@ -246,6 +246,20 @@ public:
       DetailedCommandBasedMessage("skipped", Cmd) {}
 };
 
+class CompilationMessage : public Message {
+  CompilationCounters Counters;
+  public:
+  CompilationMessage(StringRef Name, const CompilationCounters &Counters,
+                     Optional<ResourceStats> Resources) :
+    Message("compilation", Name, Resources),
+    Counters(Counters) {}
+
+  void provideMapping(swift::json::Output &out) override {
+    Message::provideMapping(out);
+    out.mapRequired("counters", Counters);
+  }
+};
+
 } // end anonymous namespace
 
 namespace swift {
@@ -264,6 +278,24 @@ struct ObjectTraits<ResourceStats> {
     out.mapRequired("user", RS.UserTimeUsec);
     out.mapRequired("sys", RS.SystemTimeUsec);
     out.mapRequired("rss", RS.MaxResidentBytes);
+  }
+};
+
+template<>
+struct ObjectTraits<CompilationCounters> {
+  static void mapping(Output &out, CompilationCounters &C) {
+    out.mapRequired("jobs-total", C.JobsTotal);
+    out.mapRequired("jobs-skipped", C.JobsSkipped);
+    out.mapRequired("dep-cascading-top-level", C.DepCascadingTopLevel);
+    out.mapRequired("dep-cascading-dynamic", C.DepCascadingDynamic);
+    out.mapRequired("dep-cascading-nominal", C.DepCascadingNominal);
+    out.mapRequired("dep-cascading-member", C.DepCascadingMember);
+    out.mapRequired("dep-cascading-external", C.DepCascadingExternal);
+    out.mapRequired("dep-top-level", C.DepTopLevel);
+    out.mapRequired("dep-dynamic", C.DepDynamic);
+    out.mapRequired("dep-nominal", C.DepNominal);
+    out.mapRequired("dep-member", C.DepMember);
+    out.mapRequired("dep-external", C.DepExternal);
   }
 };
 
@@ -306,5 +338,12 @@ void parseable_output::emitSignalledMessage(raw_ostream &os,
 
 void parseable_output::emitSkippedMessage(raw_ostream &os, const Job &Cmd) {
   SkippedMessage msg(Cmd);
+  emitMessage(os, msg);
+}
+
+void parseable_output::emitCompilationMessage(raw_ostream &os, StringRef Name,
+                                              const CompilationCounters &Counters,
+                                              Optional<ResourceStats> Resources) {
+  CompilationMessage msg(Name, Counters, Resources);
   emitMessage(os, msg);
 }
