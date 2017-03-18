@@ -4700,9 +4700,9 @@ SourceLoc FuncDecl::getStartLoc() const {
   if (Result.isInvalid())
     return Result;
   for (auto Attr : getAttrs()) {
-    auto Loc = Attr->getLocation();
+    auto Loc = Attr->getRangeWithAt().Start;
     // If any attribute is before the current start, update the start location.
-    if (Loc.isValid() && Attr->AtLoc.isInvalid() &&
+    if (Loc.isValid() &&
         Loc.getOpaquePointerValue() < Result.getOpaquePointerValue()) {
       Result = Loc;
     }
