@@ -4695,6 +4695,21 @@ void DestructorDecl::setSelfDecl(ParamDecl *selfDecl) {
   }
 }
 
+SourceLoc FuncDecl::getStartLoc() const {
+  auto Result = StaticLoc.isValid() && !isAccessor() ? StaticLoc : FuncLoc;
+  if (Result.isInvalid())
+    return Result;
+  for (auto Attr : getAttrs()) {
+    auto Loc = Attr->getLocation();
+    // If any attribute is before the current start, update the start location.
+    if (Loc.isValid() &&
+        Loc.getOpaquePointerValue() < Result.getOpaquePointerValue()) {
+      Result = Loc;
+    }
+  }
+  return Result;
+}
+
 SourceRange FuncDecl::getSourceRange() const {
   SourceLoc StartLoc = getStartLoc();
   if (StartLoc.isInvalid() ||

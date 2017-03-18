@@ -5061,9 +5061,8 @@ public:
   SourceLoc getFuncLoc() const { return FuncLoc; }
   SourceLoc getAccessorKeywordLoc() const {return AccessorKeywordLoc; }
 
-  SourceLoc getStartLoc() const {
-    return StaticLoc.isValid() && !isAccessor() ? StaticLoc : FuncLoc;
-  }
+  SourceLoc getStartLoc() const;
+
   SourceRange getSourceRange() const;
 
   TypeLoc &getBodyResultTypeLoc() { return FnRetType; }
