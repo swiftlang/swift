@@ -72,8 +72,8 @@ struct S2 {
     // CHECK:   [[X_BOX:%[0-9]+]] = alloc_stack $X
     // CHECK:   store [[X]] to [trivial] [[X_BOX]] : $*X
     // CHECK:   [[SELF_BOX1:%[0-9]+]] = apply [[S2_DELEG_INIT]]<X>([[X_BOX]], [[S2_META]]) : $@convention(method) <τ_0_0> (@in τ_0_0, @thin S2.Type) -> S2
-    // CHECK:   assign [[SELF_BOX1]] to [[SELF]] : $*S2
     // CHECK:   dealloc_stack [[X_BOX]] : $*X
+    // CHECK:   assign [[SELF_BOX1]] to [[SELF]] : $*S2
     // CHECK:   [[SELF_BOX4:%[0-9]+]] = load [trivial] [[SELF]] : $*S2
     self.init(t: X())
     // CHECK:   destroy_value [[SELF_BOX]] : ${ var S2 }

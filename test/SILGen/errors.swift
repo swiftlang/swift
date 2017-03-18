@@ -75,8 +75,8 @@ func dont_return<T>(_ argument: T) throws -> T {
 // CHECK-NEXT: store [[T0]] to [init] [[ARG_TEMP]]
 // CHECK-NEXT: try_apply [[DR_FN]]<Cat>([[RET_TEMP]], [[ARG_TEMP]]) : $@convention(thin) <τ_0_0> (@in τ_0_0) -> (@out τ_0_0, @error Error), normal [[DR_NORMAL:bb[0-9]+]], error [[DR_ERROR:bb[0-9]+]]
 // CHECK:    [[DR_NORMAL]]({{%.*}} : $()):
-// CHECK-NEXT: [[T0:%.*]] = load [take] [[RET_TEMP]] : $*Cat
 // CHECK-NEXT: dealloc_stack [[ARG_TEMP]]
+// CHECK-NEXT: [[T0:%.*]] = load [take] [[RET_TEMP]] : $*Cat
 // CHECK-NEXT: dealloc_stack [[RET_TEMP]]
 // CHECK-NEXT: br [[RETURN:bb[0-9]+]]([[T0]] : $Cat)
 
@@ -799,8 +799,8 @@ func testOptionalTryVar() {
 // CHECK-NEXT: copy_addr %0 to [initialization] [[ARG_BOX]] : $*T
 // CHECK-NEXT: try_apply [[FN]]<T>([[BOX_DATA]], [[ARG_BOX]]) : $@convention(thin) <τ_0_0> (@in τ_0_0) -> (@out τ_0_0, @error Error), normal [[SUCCESS:[^ ]+]], error [[CLEANUPS:[^ ]+]],
 // CHECK: [[SUCCESS]]({{%.+}} : $()):
-// CHECK-NEXT: inject_enum_addr [[BOX]] : $*Optional<T>, #Optional.some!enumelt.1
 // CHECK-NEXT: dealloc_stack [[ARG_BOX]] : $*T
+// CHECK-NEXT: inject_enum_addr [[BOX]] : $*Optional<T>, #Optional.some!enumelt.1
 // CHECK-NEXT: br [[DONE:[^ ]+]],
 // CHECK: [[DONE]]:
 // CHECK-NEXT: destroy_addr [[BOX]] : $*Optional<T>
@@ -830,8 +830,8 @@ func testOptionalTryAddressOnly<T>(_ obj: T) {
 // CHECK-NEXT: copy_addr %0 to [initialization] [[ARG_BOX]] : $*T
 // CHECK-NEXT: try_apply [[FN]]<T>([[BOX_DATA]], [[ARG_BOX]]) : $@convention(thin) <τ_0_0> (@in τ_0_0) -> (@out τ_0_0, @error Error), normal [[SUCCESS:[^ ]+]], error [[CLEANUPS:[^ ]+]],
 // CHECK: [[SUCCESS]]({{%.+}} : $()):
-// CHECK-NEXT: inject_enum_addr [[PB]] : $*Optional<T>, #Optional.some!enumelt.1
 // CHECK-NEXT: dealloc_stack [[ARG_BOX]] : $*T
+// CHECK-NEXT: inject_enum_addr [[PB]] : $*Optional<T>, #Optional.some!enumelt.1
 // CHECK-NEXT: br [[DONE:[^ ]+]],
 // CHECK: [[DONE]]:
 // CHECK-NEXT: destroy_value [[BOX]] : $<τ_0_0> { var Optional<τ_0_0> } <T>
