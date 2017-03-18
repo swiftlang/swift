@@ -628,8 +628,7 @@ public protocol Sequence {
 
 /// A default makeIterator() function for `IteratorProtocol` instances that
 /// are declared to conform to `Sequence`
-extension Sequence
-  where Self.Iterator == Self, Self : IteratorProtocol {
+extension Sequence where Self.Iterator == Self {
   /// Returns an iterator over the elements of this sequence.
   public func makeIterator() -> Self {
     return self

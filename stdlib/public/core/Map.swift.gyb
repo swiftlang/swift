@@ -221,9 +221,11 @@ extension LazySequenceProtocol {
 % for Traversal in TRAVERSALS:
 
 extension LazyCollectionProtocol
+%   if Traversal != 'Forward':
   where
   Self : ${collectionForTraversal(Traversal)},
   Elements : ${collectionForTraversal(Traversal)}
+%   end
 {
   /// Returns a `LazyMapCollection` over this `Collection`.  The elements of
   /// the result are computed lazily, each time they are read, by

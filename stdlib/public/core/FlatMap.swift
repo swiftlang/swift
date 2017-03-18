@@ -102,12 +102,11 @@ extension LazyCollectionProtocol
   /// `c.map(transform).joined()`.
   ///
   /// - Complexity: O(1)
-  public func flatMap<SegmentOfResult : Collection>(
+  public func flatMap<SegmentOfResult : BidirectionalCollection>(
     _ transform: @escaping (Elements.Iterator.Element) -> SegmentOfResult
   ) -> LazyCollection<
     FlattenBidirectionalCollection<
-      LazyMapBidirectionalCollection<Elements, SegmentOfResult>>>
-    where SegmentOfResult : BidirectionalCollection {
+      LazyMapBidirectionalCollection<Elements, SegmentOfResult>>> {
     return self.map(transform).joined()
   }
   

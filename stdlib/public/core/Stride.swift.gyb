@@ -24,8 +24,13 @@
 /// Conforming types are notionally continuous, one-dimensional
 /// values that can be offset and measured.
 public protocol ${Self} : ${Conformance} {
+%   if Self == '_Strideable':
   /// A type that represents the distance between two values of `Self`.
   associatedtype Stride : SignedNumber
+%   else:
+  /// A type that represents the distance between two values of `Self`.
+  associatedtype Stride
+%   end
 
   /// Returns a stride `x` such that `self.advanced(by: x)` approximates
   /// `other`.
