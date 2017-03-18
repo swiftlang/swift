@@ -5,3 +5,5 @@ import A.B.C
 import X
 import Y
 import enum Foo.Member
+// The overlaying Swift module should not be loaded.
+import InvalidOverlay
