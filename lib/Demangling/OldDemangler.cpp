@@ -2228,8 +2228,3 @@ swift::Demangle::demangleOldSymbolAsNode(StringRef MangledName,
   return demangler.demangleTopLevel();
 }
 
-NodePointer swift::Demangle::demangleOldTypeAsNode(llvm::StringRef MangledName,
-                                                   NodeFactory &Factory) {
-  OldDemangler demangler(MangledName, Factory);
-  return demangler.demangleTypeName();
-}

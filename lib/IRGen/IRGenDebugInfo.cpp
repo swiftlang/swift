@@ -1035,9 +1035,10 @@ void IRGenDebugInfo::emitGlobalVariableDeclaration(
 StringRef IRGenDebugInfo::getMangledName(DebugTypeInfo DbgTy) {
   if (MetadataTypeDecl && DbgTy.getDecl() == MetadataTypeDecl)
     return BumpAllocatedString(DbgTy.getDecl()->getName().str());
-
-  std::string Name = NewMangling::mangleTypeForDebugger(DbgTy.getType(),
-                                                        DbgTy.getDeclContext());
+  
+  NewMangling::ASTMangler Mangler;
+  std::string Name = Mangler.mangleTypeForDebugger(DbgTy.getType(),
+                                                   DbgTy.getDeclContext());
   return BumpAllocatedString(Name);
 }
 

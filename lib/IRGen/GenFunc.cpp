@@ -700,21 +700,12 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
   llvm::FunctionType *fwdTy = IGM.getFunctionType(outType, outAttrs);
   SILFunctionConventions outConv(outType, IGM.getSILModule());
 
-  // Build a name for the thunk. If we're thunking a static function reference,
-  // include its symbol name in the thunk name.
-  llvm::SmallString<20> OldThunkName;
   StringRef FnName;
-  OldThunkName += "_TPA";
-  if (staticFnPtr) {
+  if (staticFnPtr)
     FnName = staticFnPtr->getName();
-    OldThunkName += '_';
-    OldThunkName += FnName;
-  }
-  IRGenMangler Mangler;
-  std::string NewThunkName = Mangler.manglePartialApplyForwarder(FnName);
 
-  std::string thunkName = NewMangling::selectMangling(OldThunkName.str(),
-                                                      NewThunkName);
+  IRGenMangler Mangler;
+  std::string thunkName = Mangler.manglePartialApplyForwarder(FnName);
 
   // FIXME: Maybe cache the thunk by function and closure types?.
   llvm::Function *fwd =

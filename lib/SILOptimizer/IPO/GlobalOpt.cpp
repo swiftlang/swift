@@ -24,7 +24,6 @@
 #include "llvm/ADT/SCCIterator.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
-#include "swift/AST/Mangle.h"
 #include "swift/AST/ASTMangler.h"
 using namespace swift;
 
@@ -192,15 +191,8 @@ static void removeToken(SILValue Op) {
 }
 
 static std::string mangleGetter(VarDecl *varDecl) {
-  Mangle::Mangler getterMangler;
-  getterMangler.append("_T");
-  getterMangler.mangleGlobalGetterEntity(varDecl);
-  std::string Old = getterMangler.finalize();
-
-  NewMangling::ASTMangler NewMangler;
-  std::string New = NewMangler.mangleGlobalGetterEntity(varDecl);
-
-  return NewMangling::selectMangling(Old, New);
+  NewMangling::ASTMangler Mangler;
+  return Mangler.mangleGlobalGetterEntity(varDecl);
 }
 
 /// Generate getter from the initialization code whose

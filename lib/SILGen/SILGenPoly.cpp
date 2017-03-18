@@ -2042,20 +2042,22 @@ ResultPlanner::planTupleIntoDirectResult(AbstractionPattern innerOrigType,
              "inner type was a tuple but outer type was neither a tuple nor "
              "optional nor are we under opaque value mode");
       assert(outerSubstType->isAny());
-      auto &C = Gen.SGM.getASTContext();
-      auto layout = SILLayout::get(C, nullptr, SILField(outerSubstType, true));
-      auto canSILBoxTy = SILBoxType::get(C, layout, {});
-
-      AllocBoxInst *allocBox = Gen.B.createAllocBox(Loc, canSILBoxTy);
-      ProjectBoxInst *projBox = Gen.B.createProjectBox(Loc, allocBox, 0);
-      ManagedValue managedVal = Gen.emitManagedRValueWithCleanup(projBox);
 
       auto opaque = AbstractionPattern::getOpaque();
-      SILValue outerConcreteResultAddr = Gen.B.createInitExistentialAddr(
-          Loc, managedVal.getValue(), outerSubstType,
-          Gen.getLoweredType(opaque, outerSubstType), /*conformances=*/{});
+      auto anyType = Gen.getLoweredType(opaque, outerSubstType);
+      auto outerResultAddr = Gen.emitTemporaryAllocation(Loc, anyType);
 
-      addIndirectToDirect(outerConcreteResultAddr, outerResult);
+      SILValue outerConcreteResultAddr = Gen.B.createInitExistentialAddr(
+          Loc, outerResultAddr, innerSubstType,
+          Gen.getLoweredType(opaque, innerSubstType), /*conformances=*/{});
+
+      planTupleIntoIndirectResult(innerOrigType, innerSubstType, innerOrigType,
+                                  innerSubstType, planData,
+                                  outerConcreteResultAddr);
+
+      addReabstractIndirectToDirect(innerOrigType, innerSubstType,
+                                    outerOrigType, outerSubstType,
+                                    outerConcreteResultAddr, outerResult);
       return;
     }
   }

@@ -4330,7 +4330,8 @@ void Serializer::writeAST(ModuleOrSourceFile DC,
 
     for (auto TD : localTypeDecls) {
       hasLocalTypes = true;
-      std::string MangledName = NewMangling::mangleTypeAsUSR(
+      NewMangling::ASTMangler Mangler;
+      std::string MangledName = Mangler.mangleTypeAsUSR(
                                               TD->getDeclaredInterfaceType());
       assert(!MangledName.empty() && "Mangled type came back empty!");
       localTypeGenerator.insert(MangledName, {

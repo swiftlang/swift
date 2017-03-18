@@ -41,7 +41,6 @@
 #include "swift/SILOptimizer/Utils/SILInliner.h"
 #include "swift/SILOptimizer/Utils/SpecializationMangler.h"
 #include "swift/SIL/DebugUtils.h"
-#include "swift/SIL/Mangle.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILCloner.h"
 #include "swift/SIL/SILValue.h"
@@ -87,16 +86,6 @@ static SILInstruction *findOnlyApply(SILFunction *F) {
   return OnlyApply;
 }
 
-/// Return a unique name in the current module. We should not be blocked
-/// from being able to FSO a function just because we have a name conflict.
-///
-/// TODO: we should teach the demangler to understand this suffix.
-static std::string getUniqueName(std::string Name, SILModule &M) {
-  if (!M.hasFunction(Name))
-    return Name;
-  return getUniqueName(Name + "_unique_suffix", M);
-}
-
 //===----------------------------------------------------------------------===//
 //                     Function Signature Transformation 
 //===----------------------------------------------------------------------===//
@@ -114,8 +103,7 @@ class FunctionSignatureTransform {
   EpilogueARCAnalysis *EA;
 
   // The function signature mangler we are using.
-  FunctionSignatureSpecializationMangler &OldFM;
-  NewMangling::FunctionSignatureSpecializationMangler &NewFM;
+  NewMangling::FunctionSignatureSpecializationMangler &Mangler;
 
   // Keep tracks to argument mapping.
   ArgumentIndexMap &AIM;
@@ -231,12 +219,11 @@ public:
   /// Constructor.
   FunctionSignatureTransform(SILFunction *F,
                              RCIdentityAnalysis *RCIA, EpilogueARCAnalysis *EA,
-                             FunctionSignatureSpecializationMangler &OldFM,
-                    NewMangling::FunctionSignatureSpecializationMangler &NewFM,
+                   NewMangling::FunctionSignatureSpecializationMangler &Mangler,
                              ArgumentIndexMap &AIM,
                              llvm::SmallVector<ArgumentDescriptor, 4> &ADL,
                              llvm::SmallVector<ResultDescriptor, 4> &RDL)
-    : F(F), NewF(nullptr), RCIA(RCIA), EA(EA), OldFM(OldFM), NewFM(NewFM),
+    : F(F), NewF(nullptr), RCIA(RCIA), EA(EA), Mangler(Mangler),
       AIM(AIM), shouldModifySelfArgument(false), ArgumentDescList(ADL),
       ResultDescList(RDL) {}
 
@@ -334,8 +321,7 @@ std::string FunctionSignatureTransform::createOptimizedSILFunctionName() {
   for (unsigned i : indices(ArgumentDescList)) {
     const ArgumentDescriptor &Arg = ArgumentDescList[i];
     if (Arg.IsEntirelyDead) {
-      OldFM.setArgumentDead(i);
-      NewFM.setArgumentDead(i);
+      Mangler.setArgumentDead(i);
       // No point setting other attribute if argument is dead.
       continue;
     }   
@@ -343,37 +329,31 @@ std::string FunctionSignatureTransform::createOptimizedSILFunctionName() {
     // If we have an @owned argument and found a callee release for it,
     // convert the argument to guaranteed.
     if (Arg.OwnedToGuaranteed) {
-      OldFM.setArgumentOwnedToGuaranteed(i);
-      NewFM.setArgumentOwnedToGuaranteed(i);
+      Mangler.setArgumentOwnedToGuaranteed(i);
     }
 
     // If this argument is not dead and we can explode it, add 's' to the
     // mangling.
     if (Arg.Explode) {
-      OldFM.setArgumentSROA(i);
-      NewFM.setArgumentSROA(i);
+      Mangler.setArgumentSROA(i);
     }
   }
 
   // Handle return value's change.
   // FIXME: handle multiple direct results here
   if (ResultDescList.size() == 1 && !ResultDescList[0].CalleeRetain.empty()) {
-    OldFM.setReturnValueOwnedToUnowned();
-    NewFM.setReturnValueOwnedToUnowned();
+    Mangler.setReturnValueOwnedToUnowned();
   }
 
-  OldFM.mangle();
   SILModule &M = F->getModule();
-  std::string Old = getUniqueName(OldFM.getMangler().finalize(), M);
-
   int UniqueID = 0;
-  std::string New;
+  std::string MangledName;
   do {
-    New = NewFM.mangle(UniqueID);
+    MangledName = Mangler.mangle(UniqueID);
     ++UniqueID;
-  } while (M.hasFunction(New));
-
-  return NewMangling::selectMangling(Old, New);
+  } while (M.hasFunction(MangledName));
+  
+  return MangledName;
 }
 
 /// Compute what the function interface will look like based on the
@@ -937,11 +917,9 @@ public:
     // As we optimize the function more and more, the name of the function is
     // going to change, make sure the mangler is aware of all the changes done
     // to the function.
-    Mangle::Mangler M;
     auto P = Demangle::SpecializationPass::FunctionSignatureOpts;
-    FunctionSignatureSpecializationMangler OldFM(P, M, F->isFragile(), F);
-    NewMangling::FunctionSignatureSpecializationMangler NewFM(P, F->isFragile(),
-                                                              F);
+    NewMangling::FunctionSignatureSpecializationMangler Mangler(P,
+                                                             F->isFragile(), F);
 
     /// Keep a map between the exploded argument index and the original argument
     /// index.
@@ -963,7 +941,7 @@ public:
     }
 
     // Owned to guaranteed optimization.
-    FunctionSignatureTransform FST(F, RCIA, EA, OldFM, NewFM, AIM,
+    FunctionSignatureTransform FST(F, RCIA, EA, Mangler, AIM,
                                    ArgumentDescList, ResultDescList);
 
     bool Changed = false;
