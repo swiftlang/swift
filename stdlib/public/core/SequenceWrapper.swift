@@ -18,109 +18,110 @@
 /// A type that is just a wrapper over some base Sequence
 @_show_in_interface
 public // @testable
-protocol _SequenceWrapper {
+protocol _SequenceWrapper : Sequence {
   associatedtype Base : Sequence
   associatedtype Iterator : IteratorProtocol = Base.Iterator
+  associatedtype SubSequence = Base.SubSequence
   
   var _base: Base { get }
 }
 
-extension _SequenceWrapper where
-  Self : Sequence,
-  Self.Iterator == Self.Base.Iterator {
-
-  /// Returns a value less than or equal to the number of elements in
-  /// the sequence, nondestructively.
-  ///
-  /// - Complexity: O(*n*), where *n* is the length of the sequence if the
-  ///   sequence is a collection or wraps a collection; otherwise, O(1).
+extension _SequenceWrapper  {
   public var underestimatedCount: Int {
     return _base.underestimatedCount
   }
-}
 
-extension Sequence
-  where
-  Self : _SequenceWrapper,
-  Self.Iterator == Self.Base.Iterator {
-
-  /// Returns an iterator over the elements of this sequence.
-  public func makeIterator() -> Base.Iterator {
-    return self._base.makeIterator()
-  }
-
-  /// Returns an array containing the results of mapping the given closure
-  /// over the sequence's elements.
-  ///
-  /// In this example, `map` is used first to convert the names in the array to
-  /// lowercase strings and then to count their characters.
-  ///
-  ///     let cast = ["Vivien", "Marlon", "Kim", "Karl"]
-  ///     let lowercaseNames = cast.map { $0.lowercaseString }
-  ///     // 'lowercaseNames' == ["vivien", "marlon", "kim", "karl"]
-  ///     let letterCounts = cast.map { $0.characters.count }
-  ///     // 'letterCounts' == [6, 6, 3, 4]
-  ///
-  /// - Parameter transform: A mapping closure. `transform` accepts an
-  ///   element of this sequence as its parameter and returns a transformed
-  ///   value of the same or of a different type.
-  /// - Returns: An array containing the transformed elements of this
-  ///   sequence.
-  public func map<T>(
-    _ transform: (Base.Iterator.Element) throws -> T
-  ) rethrows -> [T] {
-    return try _base.map(transform)
-  }
-
-  /// Returns an array containing, in order, the elements of the sequence
-  /// that satisfy the given predicate.
-  ///
-  /// In this example, `filter` is used to include only names shorter than five
-  /// characters.
-  ///
-  ///     let cast = ["Vivien", "Marlon", "Kim", "Karl"]
-  ///     let shortNames = cast.filter { $0.characters.count < 5 }
-  ///     print(shortNames)
-  ///     // Prints "["Kim", "Karl"]"
-  ///
-  /// - Parameter includeElement: A closure that takes an element of the
-  ///   sequence as its argument and returns a Boolean value indicating
-  ///   whether the element should be included in the returned array.
-  /// - Returns: An array of the elements that `includeElement` allowed.
-  public func filter(
-    _ isIncluded: (Base.Iterator.Element) throws -> Bool
-  ) rethrows -> [Base.Iterator.Element] {
-    return try _base.filter(isIncluded)
-  }
-  
-  public func _customContainsEquatableElement(
-    _ element: Base.Iterator.Element
-  ) -> Bool? { 
-    return _base._customContainsEquatableElement(element)
-  }
-  
-  /// If `self` is multi-pass (i.e., a `Collection`), invoke
-  /// `preprocess` on `self` and return its result.  Otherwise, return
-  /// `nil`.
   public func _preprocessingPass<R>(
     _ preprocess: () throws -> R
   ) rethrows -> R? {
     return try _base._preprocessingPass(preprocess)
   }
+}
 
-  /// Create a native array buffer containing the elements of `self`,
-  /// in the same order.
-  public func _copyToContiguousArray()
-    -> ContiguousArray<Base.Iterator.Element> {
-    return _base._copyToContiguousArray()
+extension _SequenceWrapper where Iterator == Base.Iterator {
+  public func makeIterator() -> Iterator {
+    return self._base.makeIterator()
   }
-
-  /// Copy a Sequence into an array, returning one past the last
-  /// element initialized.
+  
   @discardableResult
   public func _copyContents(
-    initializing buf: UnsafeMutableBufferPointer<Base.Iterator.Element>
-  ) -> (Base.Iterator,UnsafeMutableBufferPointer<Base.Iterator.Element>.Index) {
+    initializing buf: UnsafeMutableBufferPointer<Iterator.Element>
+  ) -> (Iterator, UnsafeMutableBufferPointer<Iterator.Element>.Index) {
     return _base._copyContents(initializing: buf)
+  }
+}
+
+extension _SequenceWrapper where Iterator.Element == Base.Iterator.Element {
+  public func map<T>(
+    _ transform: (Iterator.Element) throws -> T
+) rethrows -> [T] {
+    return try _base.map(transform)
+  }
+  
+  public func filter(
+    _ isIncluded: (Iterator.Element) throws -> Bool
+  ) rethrows -> [Iterator.Element] {
+    return try _base.filter(isIncluded)
+  }
+
+  public func forEach(_ body: (Iterator.Element) throws -> Void) rethrows {
+    return try _base.forEach(body)
+  }
+  
+  public func _customContainsEquatableElement(
+    _ element: Iterator.Element
+  ) -> Bool? { 
+    return _base._customContainsEquatableElement(element)
+  }
+  
+  public func _copyToContiguousArray()
+    -> ContiguousArray<Iterator.Element> {
+    return _base._copyToContiguousArray()
+  }
+}
+
+extension _SequenceWrapper where SubSequence == Base.SubSequence {
+  public func dropFirst(_ n: Int) -> SubSequence {
+    return _base.dropFirst(n)
+  }
+  public func dropLast(_ n: Int) -> SubSequence {
+    return _base.dropLast(n)
+  }
+  public func prefix(_ maxLength: Int) -> SubSequence {
+    return _base.prefix(maxLength)
+  }
+  public func suffix(_ maxLength: Int) -> SubSequence {
+    return _base.suffix(maxLength)
+  }
+}
+
+extension _SequenceWrapper
+  where SubSequence == Base.SubSequence, Iterator.Element == Base.Iterator.Element {
+
+  public func drop(
+    while predicate: (Iterator.Element) throws -> Bool
+  ) rethrows -> SubSequence {
+    return try _base.drop(while: predicate)
+  }
+
+  public func prefix(
+    while predicate: (Iterator.Element) throws -> Bool
+  ) rethrows -> SubSequence {
+    return try _base.prefix(while: predicate)
+  }
+  
+  public func suffix(_ maxLength: Int) -> SubSequence {
+    return _base.suffix(maxLength)
+  }
+
+  public func split(
+    maxSplits: Int, omittingEmptySubsequences: Bool,
+    whereSeparator isSeparator: (Iterator.Element) throws -> Bool
+  ) rethrows -> [SubSequence] {
+    return try _base.split(
+      maxSplits: maxSplits,
+      omittingEmptySubsequences: omittingEmptySubsequences,
+      whereSeparator: isSeparator
+    )
   }
 }
