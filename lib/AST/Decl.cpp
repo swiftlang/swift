@@ -2216,6 +2216,11 @@ Type NominalTypeDecl::getDeclaredInterfaceType() const {
 }
 
 void NominalTypeDecl::prepareExtensions() {
+  // Types in local contexts can't have extensions
+  if (getLocalContext() != nullptr) {
+    return;
+  }
+  
   auto &context = Decl::getASTContext();
 
   // If our list of extensions is out of date, update it now.

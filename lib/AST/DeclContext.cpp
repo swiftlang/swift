@@ -298,7 +298,7 @@ Type DeclContext::mapTypeOutOfContext(Type type) const {
 DeclContext *DeclContext::getLocalContext() {
   if (isLocalContext())
     return this;
-  if (isModuleContext() || isExtensionContext())
+  if (isModuleContext())
     return nullptr;
   return getParent()->getLocalContext();
 }
