@@ -2094,8 +2094,11 @@ VarDeclUsageChecker::~VarDeclUsageChecker() {
 
     // If this is a 'let' value, any stores to it are actually initializations,
     // not mutations.
-    if (var->isLet())
+    auto isWrittenLet = false;
+    if (var->isLet()) {
+      isWrittenLet = (access & RK_Written) != 0;
       access &= ~RK_Written;
+    }
     
     // If this variable has WeakStorageType, then it can be mutated in ways we
     // don't know.
@@ -2200,11 +2203,17 @@ VarDeclUsageChecker::~VarDeclUsageChecker() {
       
       // Otherwise, this is something more complex, perhaps
       //    let (a,b) = foo()
-      // Just rewrite the one variable with a _.
-      unsigned varKind = var->isLet();
-      Diags.diagnose(var->getLoc(), diag::variable_never_used,
-                     var->getName(), varKind)
-        .fixItReplace(var->getLoc(), "_");
+      if (isWrittenLet) {
+        Diags.diagnose(var->getLoc(),
+                       diag::immutable_value_never_used_but_assigned,
+                       var->getName());
+      } else {
+        unsigned varKind = var->isLet();
+        // Just rewrite the one variable with a _.
+        Diags.diagnose(var->getLoc(), diag::variable_never_used,
+                       var->getName(), varKind)
+          .fixItReplace(var->getLoc(), "_");
+      }
       continue;
     }
     
