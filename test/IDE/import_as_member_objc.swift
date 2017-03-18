@@ -1,4 +1,4 @@
-// RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -I %t -I %S/Inputs/custom-modules -print-module -source-filename %s -module-to-print=ImportAsMember.Class -always-argument-labels > %t.printed.Class.txt
+// RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -I %t -I %S/Inputs/custom-modules -print-module -source-filename %s -module-to-print=ImportAsMember.Class -always-argument-labels -skip-unavailable > %t.printed.Class.txt
 
 // RUN: %FileCheck %s -check-prefix=PRINT-CLASS -strict-whitespace < %t.printed.Class.txt
 

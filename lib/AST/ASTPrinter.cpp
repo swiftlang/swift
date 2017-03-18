@@ -1605,10 +1605,6 @@ bool swift::shouldPrint(const Decl *D, PrintOptions &Options) {
       D->getAttrs().isUnavailable(D->getASTContext()))
     return false;
 
-  // Skip stub declarations used for prior or later variants of Swift.
-  if (D->getAttrs().isUnavailableInSwiftVersion())
-    return false;
-
   if (Options.ExplodeEnumCaseDecls) {
     if (isa<EnumElementDecl>(D))
       return true;
