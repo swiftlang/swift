@@ -359,7 +359,9 @@ public func expect${Mutable}CollectionType<X : ${Mutable}Collection>(
 ) where
   // FIXME(ABI)#2 (Associated Types with where clauses): there should be no constraints in
   // the 'where' clause, all of these should be required by the protocol.
+%   if Mutable == '':
   X.SubSequence : Collection,
+%   end
   X.SubSequence.Iterator.Element == X.Iterator.Element,
   X.SubSequence.Index == X.Index,
   // X.SubSequence.Indices == X.Indices, // FIXME(ABI)#3 (Recursive Protocol Constraints): can't have this constraint now.
