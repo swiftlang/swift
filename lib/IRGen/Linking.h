@@ -351,9 +351,6 @@ class LinkEntity {
 
   LinkEntity() = default;
 
-  std::string mangleOld() const;
-  std::string mangleNew() const;
-
 public:
   static LinkEntity forNonFunction(ValueDecl *decl) {
     assert(!isFunction(decl));

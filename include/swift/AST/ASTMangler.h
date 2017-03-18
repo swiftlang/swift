@@ -24,13 +24,6 @@ class AbstractClosureExpr;
 
 namespace NewMangling {
 
-/// Utility function which selects either the old or new mangling for a type.
-std::string mangleTypeForDebugger(Type Ty, const DeclContext *DC);
-
-/// Utility function which selects either the old or new mangling for a type and
-/// mangles the type as USR.
-std::string mangleTypeAsUSR(Type Ty);
-
 /// The mangler for AST declarations.
 class ASTMangler : public Mangler {
 protected:

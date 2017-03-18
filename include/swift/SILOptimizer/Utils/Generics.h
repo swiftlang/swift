@@ -17,9 +17,7 @@
 #ifndef SWIFT_SIL_GENERICS_H
 #define SWIFT_SIL_GENERICS_H
 
-#include "swift/AST/Mangle.h"
 #include "swift/AST/SubstitutionMap.h"
-#include "swift/SIL/Mangle.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SILOptimizer/Utils/Local.h"

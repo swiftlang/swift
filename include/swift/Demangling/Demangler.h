@@ -485,10 +485,6 @@ public:
   
 NodePointer demangleOldSymbolAsNode(StringRef MangledName,
                                     NodeFactory &Factory);
-
-NodePointer demangleOldTypeAsNode(StringRef MangledName,
-                                  NodeFactory &Factory);
-
 } // end namespace Demangle
 } // end namespace swift
 

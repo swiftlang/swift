@@ -13,7 +13,6 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/USRGeneration.h"
-#include "swift/AST/Mangle.h"
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/SwiftNameTranslation.h"
 #include "llvm/ADT/SmallString.h"
@@ -34,7 +33,8 @@ static inline StringRef getUSRSpacePrefix() {
 
 bool ide::printTypeUSR(Type Ty, raw_ostream &OS) {
   assert(!Ty->hasArchetype() && "cannot have contextless archetypes mangled.");
-  OS << NewMangling::mangleTypeForDebugger(Ty->getRValueType(), nullptr);
+  NewMangling::ASTMangler Mangler;
+  OS << Mangler.mangleTypeForDebugger(Ty->getRValueType(), nullptr);
   return false;
 }
 
@@ -141,8 +141,6 @@ static bool ShouldUseObjCUSR(const Decl *D) {
 }
 
 bool ide::printDeclUSR(const ValueDecl *D, raw_ostream &OS) {
-  using namespace Mangle;
-
   if (!D->hasName() && !isa<ParamDecl>(D) &&
       (!isa<FuncDecl>(D) ||
        cast<FuncDecl>(D)->getAccessorKind() == AccessorKind::NotAccessor))
@@ -225,8 +223,6 @@ bool ide::printDeclUSR(const ValueDecl *D, raw_ostream &OS) {
 
 bool ide::printAccessorUSR(const AbstractStorageDecl *D, AccessorKind AccKind,
                            llvm::raw_ostream &OS) {
-  using namespace Mangle;
-
   // AccKind should always be either IsGetter or IsSetter here, based
   // on whether a reference is a mutating or non-mutating use.  USRs
   // aren't supposed to reflect implementation differences like stored

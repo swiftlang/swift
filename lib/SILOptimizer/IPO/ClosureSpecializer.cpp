@@ -57,7 +57,6 @@
 #define DEBUG_TYPE "closure-specialization"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/Utils/SpecializationMangler.h"
-#include "swift/SIL/Mangle.h"
 #include "swift/SIL/SILCloner.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILInstruction.h"
@@ -398,25 +397,17 @@ IsFragile_t CallSiteDescriptor::isFragile() const {
 }
 
 std::string CallSiteDescriptor::createName() const {
-  Mangle::Mangler M;
   auto P = Demangle::SpecializationPass::ClosureSpecializer;
-  FunctionSignatureSpecializationMangler OldFSSM(P, M, isFragile(),
-                                                 getApplyCallee());
-  NewMangling::FunctionSignatureSpecializationMangler NewFSSM(P, isFragile(),
+  NewMangling::FunctionSignatureSpecializationMangler Mangler(P, isFragile(),
                                                               getApplyCallee());
 
   if (auto *PAI = dyn_cast<PartialApplyInst>(getClosure())) {
-    OldFSSM.setArgumentClosureProp(getClosureIndex(), PAI);
-    NewFSSM.setArgumentClosureProp(getClosureIndex(), PAI);
+    Mangler.setArgumentClosureProp(getClosureIndex(), PAI);
   } else {
     auto *TTTFI = cast<ThinToThickFunctionInst>(getClosure());
-    OldFSSM.setArgumentClosureProp(getClosureIndex(), TTTFI);
-    NewFSSM.setArgumentClosureProp(getClosureIndex(), TTTFI);
+    Mangler.setArgumentClosureProp(getClosureIndex(), TTTFI);
   }
-  OldFSSM.mangle();
-  std::string Old = M.finalize();
-  std::string New = NewFSSM.mangle();
-  return NewMangling::selectMangling(Old, New);
+  return Mangler.mangle();
 }
 
 void CallSiteDescriptor::extendArgumentLifetime(SILValue Arg) const {

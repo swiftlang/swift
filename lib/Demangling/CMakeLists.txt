@@ -5,7 +5,6 @@ add_swift_library(swiftDemangling STATIC
   NodeDumper.cpp
   NodePrinter.cpp
   OldDemangler.cpp
-  OldRemangler.cpp
   Punycode.cpp
   Remangler.cpp
   )

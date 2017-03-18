@@ -13,12 +13,10 @@
 #include "SILGenFunction.h"
 #include "ManagedValue.h"
 #include "Scope.h"
-#include "swift/AST/Mangle.h"
 #include "swift/AST/ASTMangler.h"
 #include "swift/SIL/FormalLinkage.h"
 
 using namespace swift;
-using namespace Mangle;
 using namespace Lowering;
 
 /// Get or create SILGlobalVariable for a given global VarDecl.
@@ -30,14 +28,8 @@ SILGlobalVariable *SILGenModule::getSILGlobalVariable(VarDecl *gDecl,
   if (auto SILGenName = gDecl->getAttrs().getAttribute<SILGenNameAttr>()) {
     mangledName = SILGenName->Name;
   } else {
-    Mangler mangler;
-    mangler.mangleGlobalVariableFull(gDecl);
-    std::string Old = mangler.finalize();
-
     NewMangling::ASTMangler NewMangler;
-    std::string New = NewMangler.mangleGlobalVariableFull(gDecl);
-
-    mangledName = NewMangling::selectMangling(Old, New);
+    mangledName = NewMangler.mangleGlobalVariableFull(gDecl);
   }
 
   // Check if it is already created, and update linkage if necessary.
@@ -218,17 +210,10 @@ void SILGenModule::emitGlobalInitialization(PatternBindingDecl *pd,
   });
   assert(varDecl);
 
-  std::string onceTokenBuffer;
-  {
-    Mangler tokenMangler;
-    tokenMangler.mangleGlobalInit(varDecl, counter, false);
-    std::string Old = tokenMangler.finalize();
-
-    NewMangling::ASTMangler NewMangler;
-    std::string New = NewMangler.mangleGlobalInit(varDecl, counter, false);
-    onceTokenBuffer = NewMangling::selectMangling(Old, New);
-  }
-
+  NewMangling::ASTMangler TokenMangler;
+  std::string onceTokenBuffer = TokenMangler.mangleGlobalInit(varDecl, counter,
+                                                              false);
+  
   auto onceTy = BuiltinIntegerType::getWordType(M.getASTContext());
   auto onceSILTy
     = SILType::getPrimitiveObjectType(onceTy->getCanonicalType());
@@ -241,17 +226,10 @@ void SILGenModule::emitGlobalInitialization(PatternBindingDecl *pd,
   onceToken->setDeclaration(false);
 
   // Emit the initialization code into a function.
-  std::string onceFuncBuffer;
-  {
-    Mangler funcMangler;
-    funcMangler.mangleGlobalInit(varDecl, counter, true);
-    std::string Old = funcMangler.finalize();
-
-    NewMangling::ASTMangler NewMangler;
-    std::string New = NewMangler.mangleGlobalInit(varDecl, counter, true);
-    onceFuncBuffer = NewMangling::selectMangling(Old, New);
-  }
-
+  NewMangling::ASTMangler FuncMangler;
+  std::string onceFuncBuffer = FuncMangler.mangleGlobalInit(varDecl, counter,
+                                                            true);
+  
   SILFunction *onceFunc = emitLazyGlobalInitializer(onceFuncBuffer, pd,
                                                     pbdEntry);
 

@@ -27,7 +27,6 @@
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Initializer.h"
-#include "swift/AST/Mangle.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/Basic/SourceManager.h"
@@ -657,9 +656,6 @@ struct ASTNodeBase {};
     }
 
     void verifyCheckedAlways(ValueDecl *D) {
-      if (D->hasName())
-        checkMangling(D);
-
       if (D->hasInterfaceType())
         verifyChecked(D->getInterfaceType());
 
@@ -705,7 +701,6 @@ struct ASTNodeBase {};
     }
 
     void verifyCheckedAlways(NominalTypeDecl *D) {
-      checkMangling(D);
       verifyCheckedAlwaysBase(D);
     }
 
@@ -2645,15 +2640,6 @@ struct ASTNodeBase {};
 
       Out << "exception type does not exist in " << where << "\n";
       abort();
-    }
-
-    void checkMangling(ValueDecl *D) {
-      Mangle::Mangler Mangler;
-      Mangler.mangleDeclName(D);
-      if (Mangler.finalize().empty()) {
-        Out << "Mangler gave empty string for a ValueDecl";
-        abort();
-      }
     }
 
     bool isGoodSourceRange(SourceRange SR) {

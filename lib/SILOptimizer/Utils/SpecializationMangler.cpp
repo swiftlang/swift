@@ -35,8 +35,6 @@ std::string SpecializationMangler::finalize() {
   if (FuncName.startswith(MANGLING_PREFIX_STR)) {
     FuncTopLevel = D.demangleSymbol(FuncName);
     assert(FuncTopLevel);
-  } else if (FuncName.startswith("_T")) {
-    FuncTopLevel = Demangle::demangleOldSymbolAsNode(FuncName, D);
   }
   if (!FuncTopLevel) {
     FuncTopLevel = D.createNode(Node::Kind::Global);

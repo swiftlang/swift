@@ -18,7 +18,6 @@
 #include "swift/AST/CanTypeVisitor.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/IRGenOptions.h"
-#include "swift/AST/Mangle.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/Types.h"
 #include "swift/SIL/FormalLinkage.h"

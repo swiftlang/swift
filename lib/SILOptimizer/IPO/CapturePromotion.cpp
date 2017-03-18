@@ -45,7 +45,6 @@
 #define DEBUG_TYPE "sil-capture-promotion"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/Utils/SpecializationMangler.h"
-#include "swift/SIL/Mangle.h"
 #include "swift/SIL/SILCloner.h"
 #include "swift/SIL/TypeSubstCloner.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
@@ -369,24 +368,17 @@ computeNewArgInterfaceTypes(SILFunction *F,
 static std::string getSpecializedName(SILFunction *F,
                                       IsFragile_t Fragile,
                                       IndicesSet &PromotableIndices) {
-  Mangle::Mangler M;
   auto P = Demangle::SpecializationPass::CapturePromotion;
-  FunctionSignatureSpecializationMangler OldFSSM(P, M, Fragile, F);
-  NewMangling::FunctionSignatureSpecializationMangler NewFSSM(P, Fragile, F);
+  NewMangling::FunctionSignatureSpecializationMangler Mangler(P, Fragile, F);
   auto fnConv = F->getConventions();
 
   for (unsigned argIdx = 0, endIdx = fnConv.getNumSILArguments();
        argIdx < endIdx; ++argIdx) {
     if (!PromotableIndices.count(argIdx))
       continue;
-    OldFSSM.setArgumentBoxToValue(argIdx);
-    NewFSSM.setArgumentBoxToValue(argIdx);
+    Mangler.setArgumentBoxToValue(argIdx);
   }
-
-  OldFSSM.mangle();
-  std::string Old = M.finalize();
-  std::string New = NewFSSM.mangle();
-  return NewMangling::selectMangling(Old, New);
+  return Mangler.mangle();
 }
 
 /// \brief Create the function corresponding to the clone of the original
