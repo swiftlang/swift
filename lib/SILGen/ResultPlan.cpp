@@ -422,7 +422,7 @@ ResultPlanPtr ResultPlanBuilder::buildForTuple(Initialization *init,
 
 ResultPlanPtr
 ResultPlanBuilder::computeResultPlan(SILGenFunction &SGF,
-                                     CalleeTypeInfo &calleeTypeInfo,
+                                     const CalleeTypeInfo &calleeTypeInfo,
                                      SILLocation loc, SGFContext evalContext) {
   ResultPlanBuilder builder(SGF, loc, calleeTypeInfo);
   return builder.buildTopLevelResult(evalContext.getEmitInto());

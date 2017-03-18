@@ -1275,7 +1275,7 @@ public:
   /// formal type.
   RValue emitApply(ResultPlanPtr &&resultPlan, SILLocation loc, ManagedValue fn,
                    SubstitutionList subs, ArrayRef<ManagedValue> args,
-                   CalleeTypeInfo &calleeTypeInfo, ApplyOptions options,
+                   const CalleeTypeInfo &calleeTypeInfo, ApplyOptions options,
                    SGFContext evalContext);
 
   RValue emitApplyOfDefaultArgGenerator(SILLocation loc,

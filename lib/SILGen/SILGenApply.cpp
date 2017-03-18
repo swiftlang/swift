@@ -1741,7 +1741,7 @@ static bool hasUnownedInnerPointerResult(CanSILFunctionType fnType) {
 RValue SILGenFunction::emitApply(ResultPlanPtr &&resultPlan, SILLocation loc,
                                  ManagedValue fn, SubstitutionList subs,
                                  ArrayRef<ManagedValue> args,
-                                 CalleeTypeInfo &calleeTypeInfo,
+                                 const CalleeTypeInfo &calleeTypeInfo,
                                  ApplyOptions options, SGFContext evalContext) {
   auto substFnType = calleeTypeInfo.substFnType;
   auto substResultType = calleeTypeInfo.substResultType;
