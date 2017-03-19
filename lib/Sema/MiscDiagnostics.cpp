@@ -2880,6 +2880,19 @@ parseObjCSelector(ASTContext &ctx, StringRef string) {
 
 namespace {
 
+static bool classIsSubclass(ClassDecl *CD, ClassDecl *SuperCD) {
+  if (CD == SuperCD) {
+    return true;
+  }
+  
+  auto super = CD->getSuperclassDecl();
+  if (!super) {
+    return false;
+  }
+  
+  return classIsSubclass(super, SuperCD);
+}
+  
 class ObjCSelectorWalker : public ASTWalker {
   TypeChecker &TC;
   const DeclContext *DC;
@@ -3137,8 +3150,6 @@ public:
       SmallString<32> replacement;
       {
         llvm::raw_svector_ostream out(replacement);
-        auto nominal = bestMethod->getDeclContext()
-                         ->getAsNominalTypeOrNominalTypeExtensionContext();
         out << "#selector(";
 
         DeclName name;
@@ -3169,8 +3180,20 @@ public:
         } else {
           name = bestMethod->getFullName();
         }
-
-        out << nominal->getName().str() << "." << name.getBaseName().str();
+        
+        auto hasClassPrefix = false;
+        auto bestMethodClass = bestMethod->getDeclContext()
+          ->getAsClassOrClassExtensionContext();
+        auto ITC = DC->getInnermostTypeContext();
+        if (!bestFunc || bestFunc->isStatic() || !ITC ||
+            (ITC->getAsClassOrClassExtensionContext() &&
+             !classIsSubclass(ITC->getAsClassOrClassExtensionContext(),
+                             bestMethodClass))) {
+          hasClassPrefix = true;
+          out << bestMethodClass->getName().str() << ".";
+        }
+        
+        out << name.getBaseName().str();
         auto argNames = name.getArgumentNames();
 
         // Only print the parentheses if there are some argument
@@ -3191,7 +3214,7 @@ public:
           if (auto fnType =
                 bestMethod->getInterfaceType()->getAs<FunctionType>()) {
             // For static/class members, drop the metatype argument.
-            if (bestMethod->isStatic())
+            if (!hasClassPrefix || bestMethod->isStatic())
               fnType = fnType->getResult()->getAs<FunctionType>();
 
             // Drop the argument labels.

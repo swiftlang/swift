@@ -49,6 +49,8 @@ class Bar : Foo {
 }
 
 class Foo {
+  @objc init(value: String) {}
+
   @objc(methodWithValue:label:) func method(_ value: Int, label: String) { }
 
   @objc(method2WithValue:) func method2(_ value: Int) { }
@@ -108,4 +110,18 @@ func testSelectorConstruction() {
 
   // Note: from Foundation
   _ = Selector("initWithArray:") // expected-warning{{use '#selector' instead of explicitly constructing a 'Selector'}}{{7-33=#selector(NSSet.init(array:))}}
+}
+
+extension Bar {
+  func testDeprecatedStringLiteralSelector() {
+    // method and properties fixit omits type when in scope
+    _ = "methodWithValue:label:" as Selector // expected-warning{{use of string literal for Objective-C selectors is deprecated; use '#selector' instead}}{{9-45=#selector(method(_:label:))}}
+    _ = "property" as Selector // expected-warning{{use of string literal for Objective-C selectors is deprecated; use '#selector' instead}}{{9-31=#selector(getter: property)}}
+    _ = "setProperty:" as Selector // expected-warning{{use of string literal for Objective-C selectors is deprecated; use '#selector' instead}}{{9-35=#selector(setter: property)}}
+
+    // init and static fixit don't omit type when in scope
+    _ = "initWithValue:" as Selector // expected-warning{{use of string literal for Objective-C selectors is deprecated; use '#selector' instead}}{{9-37=#selector(Foo.init(value:))}}
+    _ = "staticOrNonStatic:" as Selector // expected-warning{{use of string literal for Objective-C selectors is deprecated; use '#selector' instead}}{{9-41=#selector(staticOrNonStatic(_:))}}
+    _ = "theInstanceOne:" as Selector // expected-warning{{use of string literal for Objective-C selectors is deprecated; use '#selector' instead}}{{9-38=#selector(staticOrNonStatic2(_:) as (Int) -> ())}}
+  }
 }
