@@ -23,6 +23,8 @@ func test1() {
   // CHECK: [[T0:%.*]] = metatype $@thick C.Type
   // CHECK: [[C:%.*]] = apply [[CTOR]]([[T0]])
   // CHECK: [[SETTER:%.*]] = class_method [[D]] : $D,  #D.child!setter.1
-  // CHECK: apply [[SETTER]]([[C]], [[D]])
+  // CHECK: [[BORROWED_D:%.*]] = begin_borrow [[D]]
+  // CHECK: apply [[SETTER]]([[C]], [[BORROWED_D]])
+  // CHECK: end_borrow [[BORROWED_D]] from [[D]]
   D().child = C()
 }
