@@ -793,6 +793,7 @@ public struct Set<Element : Hashable> :
   ///   must be finite.
   /// - Returns: `true` if the set is a subset of `possibleSuperset`;
   ///   otherwise, `false`.
+  @_inlineable
   public func isSubset<S : Sequence>(of possibleSuperset: S) -> Bool
     where S.Iterator.Element == Element {
     // FIXME(performance): isEmpty fast path, here and elsewhere.
@@ -820,6 +821,7 @@ public struct Set<Element : Hashable> :
   ///   `possibleStrictSuperset` must be finite.
   /// - Returns: `true` is the set is strict subset of
   ///   `possibleStrictSuperset`; otherwise, `false`.
+  @_inlineable
   public func isStrictSubset<S : Sequence>(of possibleStrictSuperset: S) -> Bool
     where S.Iterator.Element == Element {
     // FIXME: code duplication.
@@ -842,6 +844,7 @@ public struct Set<Element : Hashable> :
   ///   be finite.
   /// - Returns: `true` if the set is a superset of `possibleSubset`;
   ///   otherwise, `false`.
+  @_inlineable
   public func isSuperset<S : Sequence>(of possibleSubset: S) -> Bool
     where S.Iterator.Element == Element {
     // FIXME(performance): Don't build a set; just ask if every element is in
@@ -918,6 +921,7 @@ public struct Set<Element : Hashable> :
   ///
   /// - Parameter other: A sequence of elements. `other` must be finite.
   /// - Returns: A new set with the unique elements of this set and `other`.
+  @_inlineable
   public func union<S : Sequence>(_ other: S) -> Set<Element>
     where S.Iterator.Element == Element {
     var newSet = self
@@ -938,6 +942,7 @@ public struct Set<Element : Hashable> :
   ///     // Prints "["Diana", "Nathaniel", "Bethany", "Alicia", "Marcia"]"
   ///
   /// - Parameter other: A sequence of elements. `other` must be finite.
+  @_inlineable
   public mutating func formUnion<S : Sequence>(_ other: S)
     where S.Iterator.Element == Element {
     for item in other {
@@ -959,11 +964,13 @@ public struct Set<Element : Hashable> :
   ///
   /// - Parameter other: A sequence of elements. `other` must be finite.
   /// - Returns: A new set.
+  @_inlineable
   public func subtracting<S : Sequence>(_ other: S) -> Set<Element>
     where S.Iterator.Element == Element {
     return self._subtracting(other)
   }
 
+  @_versioned
   internal func _subtracting<S : Sequence>(_ other: S) -> Set<Element>
     where S.Iterator.Element == Element {
     var newSet = self
@@ -1012,6 +1019,7 @@ public struct Set<Element : Hashable> :
   ///
   /// - Parameter other: A sequence of elements. `other` must be finite.
   /// - Returns: A new set.
+  @_inlineable
   public func intersection<S : Sequence>(_ other: S) -> Set<Element>
     where S.Iterator.Element == Element {
     let otherSet = Set(other)
@@ -1031,6 +1039,7 @@ public struct Set<Element : Hashable> :
   ///     // Prints "["Bethany", "Eric"]"
   ///
   /// - Parameter other: A sequence of elements. `other` must be finite.
+  @_inlineable
   public mutating func formIntersection<S : Sequence>(_ other: S)
     where S.Iterator.Element == Element {
     // Because `intersect` needs to both modify and iterate over
@@ -1065,6 +1074,7 @@ public struct Set<Element : Hashable> :
   ///
   /// - Parameter other: A sequence of elements. `other` must be finite.
   /// - Returns: A new set.
+  @_inlineable
   public func symmetricDifference<S : Sequence>(_ other: S) -> Set<Element>
     where S.Iterator.Element == Element {
     var newSet = self
@@ -1089,6 +1099,7 @@ public struct Set<Element : Hashable> :
   ///     // Prints "["Diana", "Forlani", "Alicia"]"
   ///
   /// - Parameter other: A sequence of elements. `other` must be finite.
+  @_inlineable
   public mutating func formSymmetricDifference<S : Sequence>(_ other: S)
     where S.Iterator.Element == Element {
     let otherSet = Set(other)
@@ -1148,6 +1159,8 @@ public struct Set<Element : Hashable> :
 /// a set and some sequence (which may itself be a `Set`).
 ///
 /// (isSubset: lhs ⊂ rhs, isEqual: lhs ⊂ rhs and |lhs| = |rhs|)
+@_inlineable
+@_versioned
 internal func _compareSets<Element>(_ lhs: Set<Element>, _ rhs: Set<Element>)
   -> (isSubset: Bool, isEqual: Bool) {
   // FIXME(performance): performance could be better if we start by comparing
@@ -3333,6 +3346,7 @@ extension _Native${Self}Buffer
       "don't call mutating methods on _Native${Self}Buffer")
   }
 
+  @_versioned
   internal static func fromArray(_ elements: [SequenceElementWithoutLabels])
     -> Buffer 
   {
@@ -5107,6 +5121,7 @@ extension ${Self} {
   ///
   /// - Complexity: Averages to O(1) over many calls to `popFirst()`.
 %end
+  @_inlineable
   public mutating func popFirst() -> Element? {
     guard !isEmpty else { return nil }
     return remove(at: startIndex)
@@ -5186,6 +5201,7 @@ extension Set {
   ///
   /// - Parameter other: Another set.
   /// - Returns: `true` if the set is a subset of `other`; otherwise, `false`.
+  @_inlineable
   public func isSubset(of other: Set<Element>) -> Bool {
     let (isSubset, isEqual) = _compareSets(self, other)
     return isSubset || isEqual
@@ -5205,6 +5221,7 @@ extension Set {
   /// - Parameter other: Another set.
   /// - Returns: `true` if the set is a superset of `other`; otherwise,
   ///   `false`.
+  @_inlineable
   public func isSuperset(of other: Set<Element>) -> Bool {
     return other.isSubset(of: self)
   }
@@ -5223,6 +5240,7 @@ extension Set {
   /// - Parameter other: Another set.
   /// - Returns: `true` if the set has no elements in common with `other`;
   ///   otherwise, `false`.
+  @_inlineable
   public func isDisjoint(with other: Set<Element>) -> Bool {
     for member in self {
       if other.contains(member) {
@@ -5246,6 +5264,7 @@ extension Set {
   ///
   /// - Parameter other: Another set.
   /// - Returns: A new set.
+  @_inlineable
   public func subtracting(_ other: Set<Element>) -> Set<Element> {
     return self._subtracting(other)
   }
@@ -5267,6 +5286,7 @@ extension Set {
   /// - Parameter other: Another set.
   /// - Returns: `true` if the set is a strict superset of
   ///   `other`; otherwise, `false`.
+  @_inlineable
   public func isStrictSuperset(of other: Set<Element>) -> Bool {
     return self.isSuperset(of: other) && self != other
   }
@@ -5290,6 +5310,7 @@ extension Set {
   /// - Parameter other: Another set.
   /// - Returns: `true` if the set is a strict subset of
   ///   `other`; otherwise, `false`.
+  @_inlineable
   public func isStrictSubset(of other: Set<Element>) -> Bool {
     return other.isStrictSuperset(of: self)
   }
@@ -5310,6 +5331,7 @@ extension Set {
   ///
   /// - Parameter other: Another set.
   /// - Returns: A new set.
+  @_inlineable
   public func intersection(_ other: Set<Element>) -> Set<Element> {
     var newSet = Set<Element>()
     for member in self {
@@ -5337,6 +5359,7 @@ extension Set {
   ///     // Prints "["Diana", "Chris", "Forlani", "Alicia", "Greta"]"
   ///
   /// - Parameter other: Another set.
+  @_inlineable
   public mutating func formSymmetricDifference(_ other: Set<Element>) {
     for member in other {
       if contains(member) {

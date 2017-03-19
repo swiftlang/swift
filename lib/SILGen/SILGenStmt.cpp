@@ -189,7 +189,7 @@ Condition SILGenFunction::emitCondition(SILValue V, SILLocation Loc,
 
 void StmtEmitter::visitBraceStmt(BraceStmt *S) {
   // Enter a new scope.
-  LexicalScope BraceScope(SGF.Cleanups, SGF, CleanupLocation(S));
+  LexicalScope BraceScope(SGF, CleanupLocation(S));
   // Keep in sync with DiagnosticsSIL.def.
   const unsigned ReturnStmtType   = 0;
   const unsigned BreakStmtType    = 1;
@@ -476,7 +476,7 @@ void StmtEmitter::visitIfStmt(IfStmt *S) {
   // the CondFalseBB.
   {
     // Enter a scope for any bound pattern variables.
-    LexicalScope trueScope(SGF.Cleanups, SGF, S);
+    LexicalScope trueScope(SGF, S);
 
     SGF.emitStmtCondition(S->getCond(), falseDest, S);
     
@@ -549,8 +549,8 @@ void StmtEmitter::visitIfConfigStmt(IfConfigStmt *S) {
 }
 
 void StmtEmitter::visitWhileStmt(WhileStmt *S) {
-  LexicalScope condBufferScope(SGF.Cleanups, SGF, S);
-  
+  LexicalScope condBufferScope(SGF, S);
+
   // Create a new basic block and jump into it.
   JumpDest loopDest = createJumpDest(S->getBody());
   SGF.B.emitBlock(loopDest.getBlock(), S);
@@ -743,7 +743,7 @@ void StmtEmitter::visitForStmt(ForStmt *S) {
 
 void StmtEmitter::visitForEachStmt(ForEachStmt *S) {
   // Emit the 'iterator' variable that we'll be using for iteration.
-  LexicalScope OuterForScope(SGF.Cleanups, SGF, CleanupLocation(S));
+  LexicalScope OuterForScope(SGF, CleanupLocation(S));
   SGF.visitPatternBindingDecl(S->getIterator());
 
   // If we ever reach an unreachable point, stop emitting statements.

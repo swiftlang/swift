@@ -787,8 +787,8 @@ static sourcekitd_variant_type_t SKDVar_get_type(sourcekitd_variant_t var) {
 }
 
 static bool SKDVar_array_apply(
-                               sourcekitd_variant_t array,
-                               sourcekitd_variant_array_applier_t applier) {
+    sourcekitd_variant_t array,
+    llvm::function_ref<bool(size_t, sourcekitd_variant_t)> applier) {
   return dyn_cast<SKDArray>(SKD_OBJ(array))->apply([&](size_t Index, 
                                                        SKDObjectRef Object){
     return applier(Index, variantFromSKDObject(Object));
@@ -827,8 +827,8 @@ static bool SKDVar_bool_get_value(sourcekitd_variant_t obj) {
 }
 
 static bool SKDVar_dictionary_apply(
-                              sourcekitd_variant_t dict,
-                              sourcekitd_variant_dictionary_applier_t applier) {
+    sourcekitd_variant_t dict,
+    llvm::function_ref<bool(sourcekitd_uid_t, sourcekitd_variant_t)> applier) {
   return dyn_cast<SKDDictionary>(SKD_OBJ(dict))->apply([&](sourcekitd_uid_t Key, 
                                                            SKDObjectRef Object){
     return applier(Key, variantFromSKDObject(Object));

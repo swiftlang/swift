@@ -12,6 +12,7 @@
 
 /// Evaluate `f()` and return its result, ensuring that `x` is not
 /// destroyed before f returns.
+@_inlineable
 public func withExtendedLifetime<T, Result>(
   _ x: T, _ body: () throws -> Result
 ) rethrows -> Result {
@@ -21,6 +22,7 @@ public func withExtendedLifetime<T, Result>(
 
 /// Evaluate `f(x)` and return its result, ensuring that `x` is not
 /// destroyed before f returns.
+@_inlineable
 public func withExtendedLifetime<T, Result>(
   _ x: T, _ body: (T) throws -> Result
 ) rethrows -> Result {
@@ -44,6 +46,7 @@ extension String {
   ///   The pointer argument is valid only for the duration of the closure's
   ///   execution.
   /// - Returns: The return value of the `body` closure, if any.
+  @_inlineable
   public func withCString<Result>(
     _ body: (UnsafePointer<Int8>) throws -> Result
   ) rethrows -> Result {
@@ -78,6 +81,7 @@ public func _fixLifetime<T>(_ x: T) {
 /// - Returns: The return value of the `body` closure, if any.
 ///
 /// - SeeAlso: `withUnsafePointer(to:_:)`
+@_inlineable
 public func withUnsafeMutablePointer<T, Result>(
   to arg: inout T,
   _ body: (UnsafeMutablePointer<T>) throws -> Result
@@ -104,6 +108,7 @@ public func withUnsafeMutablePointer<T, Result>(
 /// - Returns: The return value of the `body` closure, if any.
 ///
 /// - SeeAlso: `withUnsafeMutablePointer(to:_:)`
+@_inlineable
 public func withUnsafePointer<T, Result>(
   to arg: inout T,
   _ body: (UnsafePointer<T>) throws -> Result

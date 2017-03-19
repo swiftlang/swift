@@ -27,6 +27,8 @@ There are a number of restrictions to the use of generics that fall out of the i
 
 ### Recursive protocol constraints (*)
 
+*The feature is being reviewed in [SE-0157](https://github.com/apple/swift-evolution/blob/master/proposals/0157-recursive-protocol-constraints.md).*
+
 Currently, an associated type cannot be required to conform to its enclosing protocol (or any protocol that inherits that protocol). For example, in the standard library `SubSequence` type of a `Sequence` should itself be a `Sequence`:
 
 ```Swift
@@ -41,6 +43,8 @@ The compiler currently rejects this protocol, which is unfortunate: it effective
 
 ### Nested generics
 
+*This feature is tracked by [SR-1446](https://bugs.swift.org/browse/SR-1446) and is planned for release with Swift 3.1.*
+
 Currently, a generic type cannot be nested within another generic type, e.g.
 
 ```Swift
@@ -52,6 +56,8 @@ struct X<T> {
 There isn't much to say about this: the compiler simply needs to be improved to handle nested generics throughout.
 
 ### Concrete same-type requirements
+
+*This feature is tracked by [SR-1009](https://bugs.swift.org/browse/SR-1009) and is planned for release with Swift 3.1.*
 
 Currently, a constrained extension cannot use a same-type constraint to make a type parameter equivalent to a concrete type. For example:
 
@@ -65,16 +71,13 @@ extension Array where Element == String {
 
 This is a highly-requested feature that fits into the existing syntax and semantics. Note that one could imagine introducing new syntax, e.g., extending `Array<String>`, which gets into new-feature territory: see the section on "Parameterized extensions".
 
-This feature is tracked by [SR-1009](https://bugs.swift.org/browse/SR-1009) and work has been completed. This feature is planned for release with Swift 3.1.
-
-
 ## Parameterizing other declarations
 
 There are a number of Swift declarations that currently cannot have generic parameters; some of those have fairly natural extensions to generic forms that maintain their current syntax and semantics, but become more powerful when made generic.
 
 ### Generic typealiases
 
-*Accepted in [SE-0048](https://github.com/apple/swift-evolution/blob/master/proposals/0048-generic-typealias.md), implemented in Swift 3*
+*This feature has been accepted in [SE-0048](https://github.com/apple/swift-evolution/blob/master/proposals/0048-generic-typealias.md) and was released with Swift 3.*
 
 Typealiases could be allowed to carry generic parameters. They would still be aliases (i.e., they would not introduce new types). For example:
 
@@ -86,6 +89,8 @@ var d2: Dictionary<String, Int> = d1 // okay: d1 and d2 have the same type, Dict
 ```
 
 ### Generic subscripts
+
+*This feature has been accepted in [SE-0148](https://github.com/apple/swift-evolution/blob/master/proposals/0148-generic-subscripts.md), is tracked by [SR-115](https://bugs.swift.org/browse/SR-115) and is planned for release in Swift 4.*
 
 Subscripts could be allowed to have generic parameters. For example, we could introduce a generic subscript on a `Collection` that allows us to pull out the values at an arbitrary set of indices:
 
@@ -181,6 +186,8 @@ There are a number of minor extensions we can make to the generics system that d
 
 ### Arbitrary requirements in protocols (*)
 
+*This feature has been accepted in [SE-0142](https://github.com/apple/swift-evolution/blob/master/proposals/0142-associated-types-constraints.md) and is under development.*
+
 Currently, a new protocol can inherit from other protocols, introduce new associated types, and add new conformance constraints to associated types (by redeclaring an associated type from an inherited protocol). However, one cannot express more general constraints. Building on the example from "Recursive protocol constraints", we really want the element type of a `Sequence`'s `SubSequence` to be the same as the element type of the `Sequence`, e.g.,
 
 ```Swift
@@ -194,6 +201,8 @@ protocol Sequence {
 Hanging the `where` clause off the associated type protocol is not ideal, but that's a discussion for another thread.
 
 ### Typealiases in protocols and protocol extensions (*)
+
+*The feature has been accepted in [SE-0092](https://github.com/apple/swift-evolution/blob/master/proposals/0092-typealiases-in-protocols.md) and was released with Swift 3.*
 
 Now that associated types have their own keyword (thanks!), it's reasonable to bring back `typealias`. Again with the `Sequence` protocol:
 
@@ -219,6 +228,8 @@ var p3: Promise = getRandomPromise() // p3 has type Promise<Int, Error> due to t
 ```
 
 ### Generalized `class` constraints
+
+*This feature will come as a consequence of proposal [SE-0156](https://github.com/apple/swift-evolution/blob/master/proposals/0156-subclass-existentials.md) which is in review.*
 
 The `class` constraint can currently only be used for defining protocols. We could generalize it to associated type and type parameter declarations, e.g.,
 
@@ -271,6 +282,8 @@ p.foo() // gotcha: prints "P" rather than "D"!
 Unlike the minor extensions, major extensions to the generics model provide more expressivity in the Swift generics system and, generally, have a much more significant design and implementation cost.
 
 ### Conditional conformances (*)
+
+*This feature has been accepted in [SE-0143](https://github.com/apple/swift-evolution/blob/master/proposals/0143-conditional-conformances.md) and is under development.*
 
 Conditional conformances express the notion that a generic type will conform to a particular protocol only under certain circumstances. For example, `Array` is `Equatable` only when its elements are `Equatable`:
 
@@ -444,7 +457,7 @@ extension Bag {
 
 ### Moving the `where` clause outside of the angle brackets (*)
 
-*Accepted in [SE-0081](https://github.com/apple/swift-evolution/blob/master/proposals/0081-move-where-expression.md), implemented in Swift 3*
+*Accepted in [SE-0081](https://github.com/apple/swift-evolution/blob/master/proposals/0081-move-where-expression.md) and  implemented in Swift 3.*
 
 The `where` clause of generic functions comes very early in the declaration, although it is generally of much less concern to the client than the function parameters and result type that follow it. This is one of the things that contributes to "angle bracket blindness". For example, consider the `containsAll` signature above:
 
@@ -461,7 +474,7 @@ func containsAll<S: Sequence>(elements: S) -> Bool
 
 ### Renaming `protocol<...>` to `Any<...>` (*)
 
-*Accepted in [SE-0095](https://github.com/apple/swift-evolution/blob/master/proposals/0095-any-as-existential.md) as "Replace `protocol<P1,P2>` syntax with `P1 & P2` syntax", implemented in Swift 3*
+*Accepted in [SE-0095](https://github.com/apple/swift-evolution/blob/master/proposals/0095-any-as-existential.md) as "Replace `protocol<P1,P2>` syntax with `P1 & P2` syntax" and implemented in Swift 3.*
 
 The `protocol<...>` syntax is a bit of an oddity in Swift. It is used to compose protocols together, mostly to create values of existential type, e.g.,
 
@@ -565,6 +578,8 @@ protocol Functor {
 ```
 
 ### Specifying type arguments for uses of generic functions
+
+*Not in scope for Swift 4.*
 
 The type arguments of a generic function are always determined via type inference. For example, given:
 
@@ -670,12 +685,13 @@ f(X()) // okay: X conforms to P through the conformance of Q to P
 
 This is an extremely powerful feature: is allows one to map the abstractions of one domain into another domain (e.g., every `Matrix` is a `Graph`). However, similar to private conformances, it puts a major burden on the dynamic-casting runtime to chase down arbitrarily long and potentially cyclic chains of conformances, which makes efficient implementation nearly impossible.
 
-
 ## Potential removals
 
 The generics system doesn't seem like a good candidate for a reduction in scope; most of its features do get used fairly pervasively in the standard library, and few feel overly anachronistic. However...
 
 ### Associated type inference
+
+*The feature has been rejected in [SE-0108](https://github.com/apple/swift-evolution/blob/master/proposals/0108-remove-assoctype-inference.md).*
 
 Associated type inference is the process by which we infer the type bindings for associated types from other requirements. For example:
 
@@ -691,7 +707,6 @@ struct IntIterator : IteratorProtocol {
 ```
 
 Associated type inference is a useful feature. It's used throughout the standard library, and it helps keep associated types less visible to types that simply want to conform to a protocol. On the other hand, associated type inference is the only place in Swift where we have a global type inference problem: it has historically been a major source of bugs, and implementing it fully and correctly requires a drastically different architecture to the type checker. Is the value of this feature worth keeping global type inference in the Swift language, when we have deliberatively avoided global type inference elsewhere in the language?
-
 
 ## Existentials
 

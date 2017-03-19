@@ -285,7 +285,24 @@ static bool skipRecord(llvm::BitstreamCursor &cursor, unsigned recordKind) {
 #endif
 }
 
+ModuleFile &ModuleFile::getModuleFileForDelayedActions() {
+  assert(FileContext && "cannot delay actions before associating with a file");
+  ModuleDecl *associatedModule = getAssociatedModule();
+
+  // Check for the common case.
+  if (associatedModule->getFiles().size() == 1)
+    return *this;
+
+  for (FileUnit *file : associatedModule->getFiles())
+    if (auto *serialized = dyn_cast<SerializedASTFile>(file))
+      return serialized->File;
+
+  llvm_unreachable("should always have FileContext in the list of files");
+}
+
 void ModuleFile::finishPendingActions() {
+  assert(&getModuleFileForDelayedActions() == this &&
+         "wrong module used for delayed actions");
   while (!DelayedGenericEnvironments.empty()) {
     // Force completion of the last generic environment.
     auto genericEnvDC = DelayedGenericEnvironments.back();
@@ -783,25 +800,6 @@ ModuleFile::maybeReadSubstitution(llvm::BitstreamCursor &cursor,
                       getContext().AllocateCopy(conformanceBuf)};
 }
 
-GenericParamList *
-ModuleFile::maybeGetOrReadGenericParams(serialization::DeclID genericContextID,
-                                        DeclContext *DC) {
-  if (genericContextID) {
-    Decl *genericContext = getDecl(genericContextID);
-    assert(genericContext && "loading PolymorphicFunctionType before its decl");
-
-    if (auto fn = dyn_cast<AbstractFunctionDecl>(genericContext))
-      return fn->getGenericParams();
-    if (auto nominal = dyn_cast<NominalTypeDecl>(genericContext))
-      return nominal->getGenericParams();
-    if (auto ext = dyn_cast<ExtensionDecl>(genericContext))
-      return ext->getGenericParams();
-    llvm_unreachable("only functions and nominals can provide generic params");
-  } else {
-    return maybeReadGenericParams(DC);
-  }
-}
-
 GenericParamList *ModuleFile::maybeReadGenericParams(DeclContext *DC,
                                                GenericParamList *outerParams) {
   using namespace decls_block;
@@ -821,7 +819,6 @@ GenericParamList *ModuleFile::maybeReadGenericParams(DeclContext *DC,
     return nullptr;
 
   SmallVector<GenericTypeParamDecl *, 8> params;
-  SmallVector<RequirementRepr, 8> requirements;
 
   while (true) {
     lastRecordOffset.reset();
@@ -1010,7 +1007,8 @@ void ModuleFile::configureGenericEnvironment(
   // creation.
   if (auto genericSig = sigOrEnv.dyn_cast<GenericSignature *>()) {
     genericDecl->setLazyGenericEnvironment(this, genericSig, envID);
-    DelayedGenericEnvironments.push_back(genericDecl);
+    ModuleFile &delayedActionFile = getModuleFileForDelayedActions();
+    delayedActionFile.DelayedGenericEnvironments.push_back(genericDecl);
     return;
   }
 
@@ -3022,7 +3020,8 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
       return declOrOffset;
 
     auto proto = createDecl<ProtocolDecl>(DC, SourceLoc(), SourceLoc(),
-                                          getIdentifier(nameID), None);
+                                          getIdentifier(nameID), None,
+                                          /*TrailingWhere=*/nullptr);
     declOrOffset = proto;
 
     proto->setRequiresClass(isClassBounded);
@@ -3448,9 +3447,12 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     extension->setEarlyAttrValidation();
     declOrOffset = extension;
 
-    // Generic parameters.
-    GenericParamList *genericParams = maybeReadGenericParams(DC);
-    extension->setGenericParams(genericParams);
+    // Generic parameter lists are written from outermost to innermost.
+    // Keep reading until we run out of generic parameter lists.
+    GenericParamList *outerParams = nullptr;
+    while (auto *genericParams = maybeReadGenericParams(DC, outerParams))
+      outerParams = genericParams;
+    extension->setGenericParams(outerParams);
 
     configureGenericEnvironment(extension, genericEnvID);
 
@@ -3477,6 +3479,19 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
                                        DeclTypeCursor.GetCurrentBitNo()));
 
     nominal->addExtension(extension);
+
+#ifndef NDEBUG
+    if (outerParams) {
+      unsigned paramCount = 0;
+      for (auto *paramList = outerParams;
+           paramList != nullptr;
+           paramList = paramList->getOuterParameters()) {
+        paramCount += paramList->size();
+      }
+      assert(paramCount ==
+             extension->getGenericSignature()->getGenericParams().size());
+    }
+#endif
 
     break;
   }

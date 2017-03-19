@@ -790,6 +790,7 @@ public:
   // Make an exact copy of this one AST node.
   LiteralExpr *
   shallowClone(ASTContext &Ctx,
+               llvm::function_ref<void(Expr *, Type)> setType,
                llvm::function_ref<Type(const Expr *)> getType) const;
 
   static bool classof(const Expr *E) {

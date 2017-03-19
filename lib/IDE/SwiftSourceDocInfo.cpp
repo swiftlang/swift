@@ -342,6 +342,22 @@ private:
     std::vector<ASTNode> EndMatches;
     ContextInfo(ASTNode Parent, bool ContainedInRange) : Parent(Parent),
       ContainedInRange(ContainedInRange) {}
+
+    bool isMultiStatment() {
+      if (StartMatches.empty() || EndMatches.empty())
+        return false;
+
+      // Multi-statement should have a common parent of brace statement, this
+      // can be implicit brace statement, e.g. in case statement.
+      if (Parent.isStmt(StmtKind::Brace))
+        return true;
+
+      // Explicitly allow the selection of multiple case statments.
+      auto IsCase = [](ASTNode N) { return N.isStmt(StmtKind::Case); };
+      if (llvm::any_of(StartMatches, IsCase) && llvm::any_of(EndMatches, IsCase))
+        return true;
+      return false;
+    }
   };
 
   std::vector<Token> AllTokens;
@@ -364,17 +380,36 @@ private:
   std::vector<ASTNode> ContainedASTNodes;
 
   /// Collect the type that an ASTNode should be evaluated to.
-  Type resolveNodeType(ASTNode N) {
-    if (N.is<Stmt*>()) {
-      if (auto RS = dyn_cast<ReturnStmt>(N.get<Stmt*>())) {
-        return resolveNodeType(RS->getResult());
+  Type resolveNodeType(ASTNode N, RangeKind Kind) {
+    switch(Kind) {
+    case RangeKind::Invalid:
+    case RangeKind::SingleDecl:
+      llvm_unreachable("cannot get type.");
+
+    // For a single expression, its type is apparent.
+    case RangeKind::SingleExpression:
+      return N.get<Expr*>()->getType();
+
+    // For statements, we either resolve to the returning type or Void.
+    case RangeKind::SingleStatement:
+    case RangeKind::MultiStatement: {
+      if (N.is<Stmt*>()) {
+        if (auto RS = dyn_cast<ReturnStmt>(N.get<Stmt*>())) {
+          return resolveNodeType(RS->getResult(), RangeKind::SingleExpression);
+        }
+
+        // Unbox the brace statement to find its type.
+        if (auto BS = dyn_cast<BraceStmt>(N.get<Stmt*>())) {
+          if (!BS->getElements().empty()) {
+            return resolveNodeType(BS->getElements().back(),
+                                   RangeKind::SingleStatement);
+          }
+        }
       }
       // For other statements, the type should be void.
       return Ctx.getVoidDecl()->getDeclaredInterfaceType();
-    } else if (N.is<Expr*>()) {
-      return N.get<Expr*>()->getType();
     }
-    return Type();
+    }
   }
 
   ResolvedRangeInfo getSingleNodeKind(ASTNode Node) {
@@ -386,14 +421,16 @@ private:
     OrphanKind Kind = getOrphanKind(ContainedASTNodes);
     if (Node.is<Expr*>())
       return ResolvedRangeInfo(RangeKind::SingleExpression,
-                               resolveNodeType(Node), Content,
+                               resolveNodeType(Node, RangeKind::SingleExpression),
+                               Content,
                                getImmediateContext(), SingleEntry,
                                UnhandledError, Kind,
                                llvm::makeArrayRef(ContainedASTNodes),
                                llvm::makeArrayRef(DeclaredDecls),
                                llvm::makeArrayRef(ReferencedDecls));
     else if (Node.is<Stmt*>())
-      return ResolvedRangeInfo(RangeKind::SingleStatement, resolveNodeType(Node),
+      return ResolvedRangeInfo(RangeKind::SingleStatement,
+                               resolveNodeType(Node, RangeKind::SingleStatement),
                                Content, getImmediateContext(), SingleEntry,
                                UnhandledError, Kind,
                                llvm::makeArrayRef(ContainedASTNodes),
@@ -654,11 +691,12 @@ public:
       }
     }
 
-    if (!DCInfo.StartMatches.empty() && !DCInfo.EndMatches.empty()) {
+    if (DCInfo.isMultiStatment()) {
       postAnalysis(DCInfo.EndMatches.back());
       Result = {RangeKind::MultiStatement,
                 /* Last node has the type */
-                resolveNodeType(DCInfo.EndMatches.back()), Content,
+                resolveNodeType(DCInfo.EndMatches.back(),
+                                RangeKind::MultiStatement), Content,
                 getImmediateContext(), hasSingleEntryPoint(ContainedASTNodes),
                 hasUnhandledError(ContainedASTNodes),
                 getOrphanKind(ContainedASTNodes),
@@ -682,7 +720,7 @@ public:
   ResolvedRangeInfo getResult() {
     if (Result.hasValue())
       return Result.getValue();
-    return ResolvedRangeInfo();
+    return ResolvedRangeInfo(Content);
   }
 
   void analyzeDeclRef(ValueDecl *VD, CharSourceRange Range, Type Ty,
@@ -784,7 +822,7 @@ visitDeclReference(ValueDecl *D, CharSourceRange Range, TypeDecl *CtorTyRef,
 
 ResolvedRangeInfo RangeResolver::resolve() {
   if (!Impl)
-    return ResolvedRangeInfo();
+    return ResolvedRangeInfo(StringRef());
   Impl->enter(ASTNode());
   walk(Impl->File);
   return Impl->getResult();

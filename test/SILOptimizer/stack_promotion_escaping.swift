@@ -1,8 +1,5 @@
 // RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -parse-as-library -O -module-name=test %s -emit-sil | %FileCheck %s
 
-// FIXME: https://bugs.swift.org/browse/SR-2808
-// XFAIL: resilient_stdlib
-
 final class Item {}
 
 final public class Escaper {

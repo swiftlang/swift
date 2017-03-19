@@ -13,6 +13,7 @@ Protocol MutableIndexable has been removed (deprecated)
 Protocol RandomAccessIndexable has been removed (deprecated)
 Protocol RangeReplaceableIndexable has been removed (deprecated)
 Constructor String.init(stringInterpolationSegment:) has been removed
+Constructor UnsafeBufferPointerIterator.init() has been removed
 Func Array.append(contentsOf:) has been removed
 Func ArraySlice.append(contentsOf:) has been removed
 Func ContiguousArray.append(contentsOf:) has been removed

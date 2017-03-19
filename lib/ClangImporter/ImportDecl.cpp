@@ -3992,14 +3992,16 @@ namespace {
         return nativeDecl;
 
       // Create the protocol declaration and record it.
-      auto result = Impl.createDeclWithClangNode<ProtocolDecl>(decl,
-                                   Accessibility::Public,
-                                   dc,
-                                   Impl.importSourceLoc(decl->getLocStart()),
-                                   Impl.importSourceLoc(decl->getLocation()),
-                                   name,
-                                   None);
+      auto result = Impl.createDeclWithClangNode<ProtocolDecl>(
+          decl, Accessibility::Public, dc,
+          Impl.importSourceLoc(decl->getLocStart()),
+          Impl.importSourceLoc(decl->getLocation()), name, None,
+          /*TrailingWhere=*/nullptr);
       result->computeType();
+
+      // FIXME: Kind of awkward that we have to do this here
+      result->getGenericParams()->getParams()[0]->setDepth(0);
+
       addObjCAttribute(result, Impl.importIdentifier(decl->getIdentifier()));
 
       if (declaredNative)

@@ -19,6 +19,10 @@ public protocol _PointerFunction {
 }
 
 public struct _IgnorePointer<T> : _PointerFunction {
+  @_versioned
+  @_inlineable
+  init() {}
+
   public func call(_: UnsafeMutablePointer<T>, count: Int) {
     _sanityCheck(count == 0)
   }
@@ -183,12 +187,12 @@ public protocol _ArrayBufferProtocol
 extension _ArrayBufferProtocol 
   where Buffer.Element == Element
 {
-
-  // @_versioned
+  @_inlineable
   public var subscriptBaseAddress: UnsafeMutablePointer<Element> {
     return firstElementAddress
   }
 
+  @_inlineable
   public mutating func replaceSubrange<C>(
     _ subrange: Range<Int>,
     with newValues: C
@@ -288,6 +292,7 @@ extension _ArrayBufferProtocol
   }
 
   @inline(never)
+  @_versioned
   internal mutating func _arrayOutOfPlaceReplace<C : Collection>(
     _ bounds: Range<Int>,
     with newValues: C,
@@ -316,6 +321,7 @@ extension _ArrayBufferProtocol
   /// As an optimization, may move elements out of source rather than
   /// copying when it isUniquelyReferenced.
   @inline(never)
+  @_versioned
   internal mutating func _arrayOutOfPlaceUpdate<Initializer>(
     _ dest: inout Buffer,
     _ headCount: Int, // Count of initial source elements to copy/move
@@ -405,6 +411,7 @@ extension _ArrayBufferProtocol
   ///   max(minNewCapacity, source.capacity) if minNewCapacity <= source.capacity
   ///   max(minNewCapacity, _growArrayCapacity(source.capacity)) otherwise
   @inline(never)
+  @_versioned
   internal func _forceCreateUniqueMutableBuffer(
     countForNewBuffer: Int, minNewCapacity: Int
   ) -> Buffer {
@@ -451,6 +458,7 @@ extension _ArrayBufferProtocol
   }
 
   /// Append items from `newItems` to a buffer.
+  @_versioned
   internal mutating func _arrayAppendSequence<S : Sequence>(
     _ newItems: S
   ) where S.Iterator.Element == Element {

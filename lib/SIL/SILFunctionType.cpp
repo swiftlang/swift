@@ -1818,7 +1818,7 @@ SILConstantInfo TypeConverter::getConstantOverrideInfo(SILDeclRef derived,
   // is concrete) but the derived member is generic (because the derived
   // class is generic).
   if (auto derivedInterfaceFnTy = derivedInterfaceTy->getAs<GenericFunctionType>()) {
-    auto overrideInterfaceFnTy = overrideInterfaceTy->castTo<AnyFunctionType>();
+    auto overrideInterfaceFnTy = overrideInterfaceTy->castTo<FunctionType>();
     overrideInterfaceTy =
         GenericFunctionType::get(derivedInterfaceFnTy->getGenericSignature(),
                                  overrideInterfaceFnTy->getInput(),

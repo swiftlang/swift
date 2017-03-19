@@ -132,6 +132,7 @@ bool TestOptions::parseArgs(llvm::ArrayRef<const char *> Args) {
         .Case("module-groups", SourceKitRequest::ModuleGroups)
         .Case("range", SourceKitRequest::RangeInfo)
         .Case("translate", SourceKitRequest::NameTranslation)
+        .Case("markup-xml", SourceKitRequest::MarkupToXML)
         .Default(SourceKitRequest::None);
       if (Request == SourceKitRequest::None) {
         llvm::errs() << "error: invalid request, expected one of "
@@ -139,7 +140,8 @@ bool TestOptions::parseArgs(llvm::ArrayRef<const char *> Args) {
                "complete.update/complete.cache.ondisk/complete.cache.setpopularapi/"
                "cursor/related-idents/syntax-map/structure/format/expand-placeholder/"
                "doc-info/sema/interface-gen/interface-gen-openfind-usr/find-interface/"
-               "open/edit/print-annotations/print-diags/extract-comment/module-groups/range\n";
+               "open/edit/print-annotations/print-diags/extract-comment/module-groups/"
+               "range/translate/markup-xml\n";
         return true;
       }
       break;

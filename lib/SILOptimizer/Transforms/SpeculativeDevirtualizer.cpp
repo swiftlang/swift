@@ -348,7 +348,7 @@ static bool tryToSpeculateTarget(FullApplySite AI,
   // Bail if any generic types parameters of the class instance type are
   // unbound.
   // We cannot devirtualize unbound generic calls yet.
-  if (SubType.getSwiftRValueType()->hasArchetype())
+  if (SubType.hasArchetype())
     return false;
 
   auto &M = CMI->getModule();
@@ -392,7 +392,7 @@ static bool tryToSpeculateTarget(FullApplySite AI,
   SmallVector<ClassDecl *, 8> Subs(DirectSubs);
   Subs.append(IndirectSubs.begin(), IndirectSubs.end());
 
-  if (isa<BoundGenericClassType>(ClassType.getSwiftRValueType())) {
+  if (ClassType.is<BoundGenericClassType>()) {
     // Filter out any subclasses that do not inherit from this
     // specific bound class.
     auto RemovedIt = std::remove_if(Subs.begin(),

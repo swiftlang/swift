@@ -930,7 +930,8 @@ shallowCloneImpl(const ObjectLiteralExpr *E, ASTContext &Ctx,
 
 // Make an exact copy of this AST node.
 LiteralExpr *LiteralExpr::shallowClone(
-    ASTContext &Ctx, llvm::function_ref<Type(const Expr *)> getType) const {
+    ASTContext &Ctx, llvm::function_ref<void(Expr *, Type)> setType,
+                     llvm::function_ref<Type(const Expr *)> getType) const {
   LiteralExpr *Result = nullptr;
   switch (getKind()) {
   default: llvm_unreachable("Unknown literal type!");
@@ -950,7 +951,7 @@ LiteralExpr *LiteralExpr::shallowClone(
 #undef DISPATCH_CLONE
   }
 
-  Result->setType(getType(this));
+  setType(Result, getType(this));
   Result->setImplicit(isImplicit());
   return Result;
 }

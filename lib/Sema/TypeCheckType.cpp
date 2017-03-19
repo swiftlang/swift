@@ -615,88 +615,79 @@ Type TypeChecker::applyUnboundGenericArguments(
   if (!resolver)
     resolver = &defaultResolver;
 
-  // Validate the generic arguments and capture just the types.
-  SmallVector<Type, 4> genericArgTypes;
-  for (auto &genericArg : genericArgs) {
-    // Validate the generic argument.
+  auto genericSig = decl->getGenericSignature();
+  assert(genericSig != nullptr);
+
+  TypeSubstitutionMap subs;
+
+  // Get the substitutions for outer generic parameters from the parent
+  // type.
+  auto *unboundType = type->castTo<UnboundGenericType>();
+  if (auto parentType = unboundType->getParent())
+    subs = parentType->getContextSubstitutions(decl->getDeclContext());
+
+  SourceLoc noteLoc = decl->getLoc();
+  if (noteLoc.isInvalid())
+    noteLoc = loc;
+
+  // Realize the types of the generic arguments and add them to the
+  // substitution map.
+  bool hasTypeParameterOrVariable = false;
+  for (unsigned i = 0, e = genericArgs.size(); i < e; i++) {
+    auto &genericArg = genericArgs[i];
+
+    // Propagate failure.
     if (validateType(genericArg, dc, options, resolver, unsatisfiedDependency))
       return ErrorType::get(Context);
 
-    if (!genericArg.getType())
+    auto origTy = genericSig->getInnermostGenericParams()[i];
+    auto substTy = genericArg.getType();
+
+    // Unsatisfied dependency case.
+    if (!substTy)
       return nullptr;
 
-    genericArgTypes.push_back(genericArg.getType());
+    // Enter a substitution.
+    subs[origTy->getCanonicalType()->castTo<GenericTypeParamType>()] =
+      substTy;
+
+    hasTypeParameterOrVariable |=
+      (substTy->hasTypeParameter() || substTy->hasTypeVariable());
   }
 
-  // If we're completing a generic TypeAlias, then we map the types provided
-  // onto the underlying type.
-  if (auto *TAD = dyn_cast<TypeAliasDecl>(decl)) {
-    TypeSubstitutionMap subs;
-
-    // The type should look like SomeNominal<T, U>.Alias<V, W>.
-
-    // Get the substitutions for outer generic parameters from the parent
-    // type.
-    auto *unboundType = type->castTo<UnboundGenericType>();
-    if (auto parentType = unboundType->getParent())
-      subs = parentType->getContextSubstitutions(TAD->getDeclContext());
-
-    // Get the substitutions for the inner parameters.
-    auto signature = TAD->getGenericSignature();
-    for (unsigned i = 0, e = genericArgs.size(); i < e; i++) {
-      auto t = signature->getInnermostGenericParams()[i];
-      subs[t->getCanonicalType()->castTo<GenericTypeParamType>()] =
-        genericArgs[i].getType();
-    }
-
-    // Apply substitutions to the interface type of the typealias.
-    type = TAD->getDeclaredInterfaceType();
-    return type.subst(QueryTypeSubstitutionMap{subs},
-                      LookUpConformanceInModule(dc->getParentModule()),
-                      SubstFlags::UseErrorType);
-  }
-  
-  // Form the bound generic type.
-  auto *UGT = type->castTo<UnboundGenericType>();
-  auto *BGT = BoundGenericType::get(cast<NominalTypeDecl>(decl),
-                                    UGT->getParent(), genericArgTypes);
-
-  // Check protocol conformance.
-  if (!BGT->hasTypeParameter() && !BGT->hasTypeVariable()) {
-    SourceLoc noteLoc = decl->getLoc();
-    if (noteLoc.isInvalid())
-      noteLoc = loc;
-
-    // FIXME: Record that we're checking substitutions, so we can't end up
-    // with infinite recursion.
-
-    // Check the generic arguments against the generic signature.
-    auto genericSig = decl->getGenericSignature();
-
-    // Collect the complete set of generic arguments.
-    assert(genericSig != nullptr);
-    auto substitutions = BGT->getContextSubstitutions(BGT->getDecl());
-
+  // Check the generic arguments against the requirements of the declaration's
+  // generic signature.
+  if (!hasTypeParameterOrVariable) {
     auto result =
-        checkGenericArguments(dc, loc, noteLoc, UGT, genericSig,
-                              QueryTypeSubstitutionMap{substitutions},
-                              LookUpConformanceInModule{dc->getParentModule()},
-                              unsatisfiedDependency);
+      checkGenericArguments(dc, loc, noteLoc, unboundType, genericSig,
+                            QueryTypeSubstitutionMap{subs},
+                            LookUpConformanceInModule{dc->getParentModule()},
+                            unsatisfiedDependency);
 
     switch (result) {
     case RequirementCheckResult::UnsatisfiedDependency:
       return Type();
     case RequirementCheckResult::Failure:
       return ErrorType::get(Context);
-
     case RequirementCheckResult::Success:
-      if (useObjectiveCBridgeableConformancesOfArgs(dc, BGT,
-                                                    unsatisfiedDependency))
-        return Type();
+      break;
     }
   }
 
-  return BGT;
+  // Apply the substitution map to the interface type of the declaration.
+  type = decl->getDeclaredInterfaceType();
+  type = type.subst(QueryTypeSubstitutionMap{subs},
+                    LookUpConformanceInModule(dc->getParentModule()),
+                    SubstFlags::UseErrorType);
+
+  if (isa<NominalTypeDecl>(decl)) {
+    if (useObjectiveCBridgeableConformancesOfArgs(
+          dc, type->castTo<BoundGenericType>(),
+          unsatisfiedDependency))
+      return Type();
+  }
+
+  return type;
 }
 
 /// \brief Diagnose a use of an unbound generic type.

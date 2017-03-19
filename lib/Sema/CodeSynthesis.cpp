@@ -2059,7 +2059,7 @@ swift::createDesignatedInitOverride(TypeChecker &tc,
   //
   // We might have to apply substitutions, if for example we have a declaration
   // like 'class A : B<Int>'.
-  if (auto *superclassSig = superclassDecl->getGenericSignatureOfContext()) {
+  if (superclassDecl->getGenericSignatureOfContext()) {
     auto *moduleDecl = classDecl->getParentModule();
     auto subMap = superclassTyInContext->getContextSubstitutionMap(
         moduleDecl,

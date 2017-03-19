@@ -1470,7 +1470,7 @@ void AddressLowering::runOnFunction(SILFunction *F) {
   // Rewrite instructions with address-only operands or results.
   rewriteFunction(pass);
 
-  invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
+  invalidateAnalysis(F, SILAnalysis::InvalidationKind::Instructions);
 
   // Instructions that were explicitly marked dead should already have no
   // users.

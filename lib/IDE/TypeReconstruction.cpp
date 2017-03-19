@@ -29,16 +29,16 @@ using namespace swift;
 // FIXME: replace with std::string and StringRef as appropriate to each case.
 typedef const std::string ConstString;
 
-static std::string stringWithFormat(const std::string fmt_str, ...) {
-  int final_n, n = ((int)fmt_str.size()) * 2;
+static std::string stringWithFormat(const char *fmt_str, ...) {
+  int final_n, n = ((int)strlen(fmt_str)) * 2;
   std::string str;
   std::unique_ptr<char[]> formatted;
   va_list ap;
   while (1) {
     formatted.reset(new char[n]);
-    strcpy(&formatted[0], fmt_str.c_str());
+    strcpy(&formatted[0], fmt_str);
     va_start(ap, fmt_str);
-    final_n = vsnprintf(&formatted[0], n, fmt_str.c_str(), ap);
+    final_n = vsnprintf(&formatted[0], n, fmt_str, ap);
     va_end(ap);
     if (final_n < 0 || final_n >= n)
       n += abs(final_n - n + 1);
@@ -1587,8 +1587,7 @@ static void VisitNodeLocalDeclName(
     Demangle::NodePointer &cur_node, VisitNodeResult &result,
     const VisitNodeResult &generic_context) { // set by GenericType case
   Demangle::NodePointer parent_node = nodes[nodes.size() - 2];
-  std::string remangledNode = Demangle::mangleNode(parent_node,
-                                                   useNewMangling(parent_node));
+  std::string remangledNode = Demangle::mangleNode(parent_node);
   TypeDecl *decl = result._module.lookupLocalType(remangledNode);
   if (!decl)
     result._error = stringWithFormat("unable to lookup local type %s",

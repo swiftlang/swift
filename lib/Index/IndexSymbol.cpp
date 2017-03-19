@@ -208,6 +208,10 @@ SymbolInfo index::getSymbolInfoForDecl(const Decl *D) {
       break;
   }
 
+  if (isLocalSymbol(D)) {
+    info.Properties |= SymbolProperty::Local;
+  }
+
   return info;
 }
 
@@ -226,4 +230,9 @@ SymbolSubKind index::getSubKindForAccessor(AccessorKind AK) {
   }
 
   llvm_unreachable("Unhandled AccessorKind in switch.");
+}
+
+bool index::isLocalSymbol(const swift::Decl *D) {
+  return D->getDeclContext()->getLocalContext() &&
+    (!isa<ParamDecl>(D) || cast<ParamDecl>(D)->getArgumentNameLoc().isValid());
 }

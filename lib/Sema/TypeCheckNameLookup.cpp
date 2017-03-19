@@ -138,22 +138,20 @@ namespace {
         if (!conformance)
           return;
 
-        // We have an abstract conformance of an archetype to a protocol.
-        // Just return the requirement.
         if (conformance->isAbstract()) {
           assert(foundInType->is<ArchetypeType>());
           addResult(found);
           return;
         }
 
+        // If we're validating the protocol recursively, bail out.
+        if (!foundProto->hasValidSignature())
+          return;
+
         // Dig out the witness.
         ValueDecl *witness = nullptr;
         auto concrete = conformance->getConcrete();
         if (auto assocType = dyn_cast<AssociatedTypeDecl>(found)) {
-          // If we're validating the protocol recursively, bail out.
-          if (!assocType->hasValidSignature())
-            return;
-
           witness = concrete->getTypeWitnessSubstAndDecl(assocType, &TC)
             .second;
         } else if (found->isProtocolRequirement()) {
@@ -372,7 +370,7 @@ LookupTypeResult TypeChecker::lookupMemberType(DeclContext *dc,
         }
       }
 
-      if (auto aliasType = dyn_cast<TypeAliasDecl>(typeDecl)) {
+      if (isa<TypeAliasDecl>(typeDecl)) {
         if (!type->is<ArchetypeType>() &&
             !type->isTypeParameter() &&
             memberType->hasTypeParameter() &&
@@ -402,6 +400,11 @@ LookupTypeResult TypeChecker::lookupMemberType(DeclContext *dc,
       // If the type does not actually conform to the protocol, skip this
       // member entirely.
       auto *protocol = cast<ProtocolDecl>(assocType->getDeclContext());
+
+      // If we're validating the protocol recursively, bail out.
+      if (!protocol->hasValidSignature())
+        continue;
+
       auto conformance = conformsToProtocol(type, protocol, dc,
                                             conformanceOptions);
       if (!conformance) {

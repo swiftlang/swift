@@ -17,6 +17,8 @@
 #if _runtime(_ObjC)
 import SwiftShims
 
+@_inlineable
+@_versioned
 internal func _makeSwiftNSFastEnumerationState()
    -> _SwiftNSFastEnumerationState {
   return _SwiftNSFastEnumerationState(

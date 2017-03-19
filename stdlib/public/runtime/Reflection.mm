@@ -172,8 +172,14 @@ AnyReturn swift_MagicMirrorData_value(HeapObject *owner,
   Any result;
 
   result.Type = type;
+#ifdef SWIFT_RUNTIME_ENABLE_COW_EXISTENTIALS
+  auto *opaqueValueAddr = type->allocateBoxForExistentialIn(&result.Buffer);
+  type->vw_initializeWithCopy(opaqueValueAddr,
+                              const_cast<OpaqueValue *>(value));
+#else
   type->vw_initializeBufferWithCopy(&result.Buffer,
                                     const_cast<OpaqueValue*>(value));
+#endif
 
   return AnyReturn(result);
 }
@@ -439,9 +445,14 @@ static bool loadSpecialReferenceStorage(HeapObject *owner,
   // allocated storage.
   ValueBuffer temporaryBuffer;
 
+#ifdef SWIFT_RUNTIME_ENABLE_COW_EXISTENTIALS
+  auto temporaryValue = reinterpret_cast<ClassExistentialContainer *>(
+      type->allocateBufferIn(&temporaryBuffer));
+#else
   auto temporaryValue =
     reinterpret_cast<ClassExistentialContainer *>(
       type->vw_allocateBuffer(&temporaryBuffer));
+#endif
 
   // Now copy the entire value out of the parent, which will include the
   // witness tables.
@@ -456,7 +467,11 @@ static bool loadSpecialReferenceStorage(HeapObject *owner,
   new (outMirror) MagicMirror(reinterpret_cast<OpaqueValue *>(temporaryValue),
                               type, /*take*/ true);
 
+#ifdef SWIFT_RUNTIME_ENABLE_COW_EXISTENTIALS
+  type->deallocateBufferIn(&temporaryBuffer);
+#else
   type->vw_deallocateBuffer(&temporaryBuffer);
+#endif
 
   // swift_StructMirror_subscript and swift_ClassMirror_subscript
   // requires that the owner be consumed. Since we have the new heap box as the
@@ -920,9 +935,9 @@ swift_ClassMirror_quickLookObject(HeapObject *owner, const OpaqueValue *value,
 // -- MagicMirror implementation.
 
 #define MIRROR_CONFORMANCE_SYM(Mirror, Subst) \
-  SELECT_MANGLING(WPV##Mirror##s7_Mirrors , Mirror##Vs01_##Subst##0sWP)
+  MANGLE_SYM(Mirror##Vs01_##Subst##0sWP)
 #define OBJC_MIRROR_CONFORMANCE_SYM() \
-  SELECT_MANGLING(WPVs11_ObjCMirrors7_Mirrors, s11_ObjCMirrorVs7_MirrorsWP)
+  MANGLE_SYM(s11_ObjCMirrorVs7_MirrorsWP)
 
 // Addresses of the type metadata and Mirror witness tables for the primitive
 // mirrors.

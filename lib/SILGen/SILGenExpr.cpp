@@ -11,8 +11,17 @@
 //===----------------------------------------------------------------------===//
 
 #include "SILGen.h"
+#include "ArgumentSource.h"
+#include "Callee.h"
 #include "Condition.h"
+#include "ExitableFullExpr.h"
+#include "Initialization.h"
+#include "LValue.h"
+#include "RValue.h"
+#include "ResultPlan.h"
+#include "SILGenDynamicCast.h"
 #include "Scope.h"
+#include "Varargs.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticsCommon.h"
@@ -22,23 +31,16 @@
 #include "swift/AST/Types.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/type_traits.h"
+#include "swift/SIL/DynamicCasts.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILUndef.h"
 #include "swift/SIL/TypeLowering.h"
-#include "swift/SIL/DynamicCasts.h"
-#include "ExitableFullExpr.h"
-#include "Initialization.h"
-#include "LValue.h"
-#include "RValue.h"
-#include "ArgumentSource.h"
-#include "SILGenDynamicCast.h"
-#include "Varargs.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/ConvertUTF.h"
 #include "llvm/Support/MemoryBuffer.h"
-#include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/SaveAndRestore.h"
+#include "llvm/Support/raw_ostream.h"
 
 #include "swift/AST/DiagnosticsSIL.h"
 
@@ -2083,10 +2085,12 @@ SILGenFunction::emitApplyOfDefaultArgGenerator(SILLocation loc,
   auto fnType = fnRef.getType().castTo<SILFunctionType>();
   auto substFnType = fnType->substGenericArgs(SGM.M,
                                           defaultArgsOwner.getSubstitutions());
-  return emitApply(loc, fnRef, defaultArgsOwner.getSubstitutions(),
-                   {}, substFnType,
-                   origResultType, resultType,
-                   ApplyOptions::None, None, None, C);
+  CalleeTypeInfo calleeTypeInfo(substFnType, origResultType, resultType);
+  ResultPlanPtr resultPtr =
+      ResultPlanBuilder::computeResultPlan(*this, calleeTypeInfo, loc, C);
+  return emitApply(std::move(resultPtr), loc, fnRef,
+                   defaultArgsOwner.getSubstitutions(), {}, calleeTypeInfo,
+                   ApplyOptions::None, C);
 }
 
 RValue SILGenFunction::emitApplyOfStoredPropertyInitializer(
@@ -2104,11 +2108,11 @@ RValue SILGenFunction::emitApplyOfStoredPropertyInitializer(
 
   auto substFnType = fnType->substGenericArgs(SGM.M, subs);
 
-  return emitApply(loc, fnRef, subs, {},
-                   substFnType,
-                   origResultType,
-                   resultType,
-                   ApplyOptions::None, None, None, C);
+  CalleeTypeInfo calleeTypeInfo(substFnType, origResultType, resultType);
+  ResultPlanPtr resultPlan =
+      ResultPlanBuilder::computeResultPlan(*this, calleeTypeInfo, loc, C);
+  return emitApply(std::move(resultPlan), loc, fnRef, subs, {}, calleeTypeInfo,
+                   ApplyOptions::None, C);
 }
 
 static void emitTupleShuffleExprInto(RValueEmitter &emitter,
@@ -2262,7 +2266,7 @@ SILValue SILGenFunction::emitMetatypeOfValue(SILLocation loc, Expr *baseExpr) {
   CanType baseTy = formalBaseType->getCanonicalType();
 
   // For class, archetype, and protocol types, look up the dynamic metatype.
-  if (baseTy->isAnyExistentialType()) {
+  if (baseTy.isAnyExistentialType()) {
     SILType metaTy = getLoweredLoadableType(
                                       CanExistentialMetatypeType::get(baseTy));
     auto base = emitRValueAsSingleValue(baseExpr,
@@ -3544,7 +3548,7 @@ void SILGenFunction::emitOpenExistentialExprImpl(
   
   Type opaqueValueType = E->getOpaqueValue()->getType()->getRValueType();
   SILGenFunction::OpaqueValueState state = emitOpenExistential(
-      E, existentialValue, CanArchetypeType(E->getOpenedArchetype()),
+      E, existentialValue, E->getOpenedArchetype(),
       getLoweredType(opaqueValueType), accessKind);
 
   // Register the opaque value for the projected existential.

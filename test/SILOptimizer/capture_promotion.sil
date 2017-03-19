@@ -55,7 +55,7 @@ bb0:
   store %15 to %11a : $*Int
 
 // CHECK-NOT: function_ref @closure0 :
-// CHECK: [[CLOSURE_PROMOTE:%.*]] = function_ref @_TTSf2i_i_i__closure0
+// CHECK: [[CLOSURE_PROMOTE:%.*]] = function_ref @_T08closure0Tf2iii_n
 // CHECK-NOT: function_ref @closure0 :
 
 // The three strong retains are removed
@@ -114,7 +114,7 @@ bb0:
   store %15 to %11a : $*Int
 
 // CHECK-NOT: function_ref @closure_indirect_result :
-// CHECK: [[CLOSURE_PROMOTE:%.*]] = function_ref @_TTSf2n_i_i_i__closure_indirect_result
+// CHECK: [[CLOSURE_PROMOTE:%.*]] = function_ref @_T023closure_indirect_resultTf2niii_n
 // CHECK-NOT: function_ref @closure_indirect_result :
 
 // The three strong retains are removed
@@ -149,7 +149,7 @@ bb0:
   return %21 : $@callee_owned () -> @out Int
 }
 
-// CHECK-LABEL: sil private @_TTSf2i_i_i__closure0 : $@convention(thin) (@owned Foo, @owned Baz, Int) -> Int
+// CHECK-LABEL: sil private @_T08closure0Tf2iii_n : $@convention(thin) (@owned Foo, @owned Baz, Int) -> Int
 // CHECK: [[DUMMY_FUNC:%.*]] = function_ref @dummy_func : $@convention(thin) (Int, Int, Int) -> Int
 
 // The load of %1 is removed, and its uses replaced with the Foo argument
@@ -247,7 +247,7 @@ bb0(%0 : $*Int, %1 : $*Int):
   %4a = project_box %4 : $<τ_0_0> { var τ_0_0 } <Int>, 0
   copy_addr %1 to [initialization] %4a : $*Int
   %6 = function_ref @apply : $@convention(thin) (@owned @callee_owned () -> ()) -> ()
-  // CHECK: [[PROMOTED:%[0-9a-zA-Z]+]] = function_ref @_TTSf2n_i__closureWithGenericSignature : $@convention(thin) <τ_0_0> (@owned <τ_0_0> { var τ_0_0 } <Int>, Int) -> ()
+  // CHECK: [[PROMOTED:%[0-9a-zA-Z]+]] = function_ref @_T027closureWithGenericSignatureTf2ni_n : $@convention(thin) <τ_0_0> (@owned <τ_0_0> { var τ_0_0 } <Int>, Int) -> ()
   %7 = function_ref @closureWithGenericSignature : $@convention(thin) <τ_0_0> (@owned <τ_0_0> { var τ_0_0 } <Int>, @owned <τ_0_0> { var τ_0_0 } <Int>) -> ()
   strong_retain %4 : $<τ_0_0> { var τ_0_0 } <Int>
   strong_retain %2 : $<τ_0_0> { var τ_0_0 } <Int>
@@ -262,12 +262,12 @@ bb0(%0 : $*Int, %1 : $*Int):
   return %16 : $()
 }
 
-// CHECK: sil @_TTSf2n_i__closureWithGenericSignature : $@convention(thin) <{{[^>]+}}> (@owned <τ_0_0> { var τ_0_0 } <Int>, Int) -> ()
+// CHECK: sil @_T027closureWithGenericSignatureTf2ni_n : $@convention(thin) <{{[^>]+}}> (@owned <τ_0_0> { var τ_0_0 } <Int>, Int) -> ()
 sil @closureWithGenericSignature : $@convention(thin) <T> (@owned <τ_0_0> { var τ_0_0 } <Int>, @owned <τ_0_0> { var τ_0_0 } <Int>) -> () {
 bb0(%0 : $<τ_0_0> { var τ_0_0 } <Int>, %2 : $<τ_0_0> { var τ_0_0 } <Int>):
   %1 = project_box %0 : $<τ_0_0> { var τ_0_0 } <Int>, 0
   %3 = project_box %2 : $<τ_0_0> { var τ_0_0 } <Int>, 0
-  %4 = function_ref @_TFsoi1pFTSiSi_Si : $@convention(thin) (Int, Int) -> Int
+  %4 = function_ref @_T0s1poiSiSi_SitF : $@convention(thin) (Int, Int) -> Int
   %5 = load %3 : $*Int
   %6 = load %3 : $*Int
   %7 = apply %4(%5, %6) : $@convention(thin) (Int, Int) -> Int
@@ -278,7 +278,7 @@ bb0(%0 : $<τ_0_0> { var τ_0_0 } <Int>, %2 : $<τ_0_0> { var τ_0_0 } <Int>):
   return %11 : $()
 }
 
-sil [transparent] [fragile] @_TFsoi1pFTSiSi_Si : $@convention(thin) (Int, Int) -> Int
+sil [transparent] [fragile] @_T0s1poiSiSi_SitF : $@convention(thin) (Int, Int) -> Int
 
 
 sil private @closure_indirect_result : $@convention(thin) (@owned <τ_0_0> { var τ_0_0 } <Foo>, @owned <τ_0_0> { var τ_0_0 } <Baz>, @owned <τ_0_0> { var τ_0_0 } <Int>) -> @out Int {

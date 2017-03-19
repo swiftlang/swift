@@ -166,7 +166,6 @@ where RawUTF16View.Iterator.Element : UnsignedInteger {
 
 public extension _FixedFormatUnicode
 where RawUTF16View.Iterator.Element : UnsignedInteger,
-  CodeUnits.SubSequence : Collection, 
   CodeUnits.SubSequence.SubSequence == CodeUnits.SubSequence,
   CodeUnits.SubSequence.Iterator.Element == Encoding.EncodedScalar.Iterator.Element
 {
@@ -218,7 +217,6 @@ where Encoding == Latin1,
 //===--- Defaults for UTF16 and ValidUTF16 --------------------------------===//
 public extension _FixedFormatUnicode
 where Encoding.EncodedScalar == UTF16.EncodedScalar,
-  CodeUnits.Iterator.Element : UnsignedInteger,
   CodeUnits.Iterator.Element == UTF16.CodeUnit,
   CodeUnits.SubSequence : RandomAccessCollection,
   CodeUnits.SubSequence.Index == CodeUnits.Index,

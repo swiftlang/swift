@@ -229,6 +229,18 @@ public:
   /// Retrieve the complete set of protocol conformances for directly inherited
   /// protocols.
   const InheritedConformanceMap &getInheritedConformances() const;
+
+  /// Given a dependent type expressed in terms of the self parameter,
+  /// map it into the context of this conformance.
+  Type getAssociatedType(Type assocType,
+                         LazyResolver *resolver = nullptr) const;
+
+  /// Given that the requirement signature of the protocol directly states
+  /// that the given dependent type must conform to the given protocol,
+  /// return its associated conformance.
+  ProtocolConformanceRef
+  getAssociatedConformance(Type assocType, ProtocolDecl *protocol,
+                           LazyResolver *resolver = nullptr) const;
  
   /// Get the generic parameters open on the conforming type.
   GenericEnvironment *getGenericEnvironment() const;
@@ -441,11 +453,6 @@ public:
                       const Substitution &substitution,
                       TypeDecl *typeDecl) const;
 
-  /// Given a dependent type expressed in terms of the self parameter,
-  /// map it into the context of this conformance.
-  Type getAssociatedType(Type assocType,
-                         LazyResolver *resolver = nullptr) const;
-
   /// Given that the requirement signature of the protocol directly states
   /// that the given dependent type must conform to the given protocol,
   /// return its associated conformance.
@@ -611,6 +618,13 @@ public:
     return GenericConformance->getInheritedConformances();
   }
 
+  /// Given that the requirement signature of the protocol directly states
+  /// that the given dependent type must conform to the given protocol,
+  /// return its associated conformance.
+  ProtocolConformanceRef
+  getAssociatedConformance(Type assocType, ProtocolDecl *protocol,
+                           LazyResolver *resolver = nullptr) const;
+
   /// Determine whether the witness for the given requirement
   /// is either the default definition or was otherwise deduced.
   bool usesDefaultDefinition(AssociatedTypeDecl *requirement) const {
@@ -708,6 +722,13 @@ public:
     // FIXME: Substitute!
     return InheritedConformance->getWitness(requirement, resolver);
   }
+
+  /// Given that the requirement signature of the protocol directly states
+  /// that the given dependent type must conform to the given protocol,
+  /// return its associated conformance.
+  ProtocolConformanceRef
+  getAssociatedConformance(Type assocType, ProtocolDecl *protocol,
+                           LazyResolver *resolver = nullptr) const;
 
   /// Retrieve the protocol conformances directly-inherited protocols.
   const InheritedConformanceMap &getInheritedConformances() const {

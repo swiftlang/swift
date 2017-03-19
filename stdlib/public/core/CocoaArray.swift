@@ -25,17 +25,24 @@ import SwiftShims
 /// `Collection` conformance.  Why not make
 /// `_NSArrayCore` conform directly?  It's a class, and I
 /// don't want to pay for the dynamic dispatch overhead.
+@_versioned
+@_fixed_layout
 internal struct _CocoaArrayWrapper : RandomAccessCollection {
   typealias Indices = CountableRange<Int>
-  
+  @_inlineable
+  @_versioned
   var startIndex: Int {
     return 0
   }
 
+  @_inlineable
+  @_versioned
   var endIndex: Int {
     return buffer.count
   }
 
+  @_inlineable
+  @_versioned
   subscript(i: Int) -> AnyObject {
     return buffer.objectAt(i)
   }
@@ -50,6 +57,8 @@ internal struct _CocoaArrayWrapper : RandomAccessCollection {
   ///   is sometimes conservative and may return `nil` even when
   ///   contiguous storage exists, e.g., if array doesn't have a smart
   /// implementation of countByEnumerating.
+  @_inlineable
+  @_versioned
   func contiguousStorage(
     _ subRange: Range<Int>
   ) -> UnsafeMutablePointer<AnyObject>?
@@ -72,11 +81,13 @@ internal struct _CocoaArrayWrapper : RandomAccessCollection {
       : nil
   }
 
+  @_versioned
   @_transparent
   init(_ buffer: _NSArrayCore) {
     self.buffer = buffer
   }
 
+  @_versioned
   var buffer: _NSArrayCore
 }
 #endif

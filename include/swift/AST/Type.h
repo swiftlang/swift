@@ -348,6 +348,8 @@ class CanType : public Type {
   bool isActuallyCanonicalOrNull() const;
 
   static bool isReferenceTypeImpl(CanType type, bool functionsCount);
+  static bool isExistentialTypeImpl(CanType type);
+  static bool isAnyExistentialTypeImpl(CanType type);
   static bool isExistentialTypeImpl(CanType type,
                                     SmallVectorImpl<ProtocolDecl*> &protocols);
   static bool isAnyExistentialTypeImpl(CanType type,
@@ -368,6 +370,13 @@ public:
   explicit CanType(Type T) : Type(T) {
     assert(isActuallyCanonicalOrNull() &&
            "Forming a CanType out of a non-canonical type!");
+  }
+
+  void visit(llvm::function_ref<void (CanType)> fn) const {
+    findIf([&fn](Type t) -> bool {
+        fn(CanType(t));
+        return false;
+      });
   }
 
   // Provide a few optimized accessors that are really type-class queries.
@@ -391,8 +400,18 @@ public:
   }
 
   /// Is this type existential?
+  bool isExistentialType() const {
+    return isExistentialTypeImpl(*this);
+  }
+
+  /// Is this type existential?
   bool isExistentialType(SmallVectorImpl<ProtocolDecl *> &protocols) {
     return isExistentialTypeImpl(*this, protocols);
+  }
+
+  /// Is this type an existential or an existential metatype?
+  bool isAnyExistentialType() const {
+    return isAnyExistentialTypeImpl(*this);
   }
 
   /// Is this type an existential or an existential metatype?
@@ -412,7 +431,11 @@ public:
     return isObjCExistentialTypeImpl(*this);
   }
 
+  ClassDecl *getClassOrBoundGenericClass() const; // in Types.h
+  StructDecl *getStructOrBoundGenericStruct() const; // in Types.h
+  EnumDecl *getEnumOrBoundGenericEnum() const; // in Types.h
   NominalTypeDecl *getNominalOrBoundGenericNominal() const; // in Types.h
+  CanType getNominalParent() const; // in Types.h
   NominalTypeDecl *getAnyNominal() const;
   GenericTypeDecl *getAnyGeneric() const;
 

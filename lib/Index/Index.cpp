@@ -24,6 +24,7 @@
 #include "swift/Basic/StringExtras.h"
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/SmallVector.h"
+#include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/FileSystem.h"
 
 using namespace swift;
@@ -56,7 +57,7 @@ printArtificialName(const swift::AbstractStorageDecl *ASD, AccessorKind AK, llvm
 }
 
 static bool printDisplayName(const swift::ValueDecl *D, llvm::raw_ostream &OS) {
-  if (!D->hasName()) {
+  if (!D->hasName() && !isa<ParamDecl>(D)) {
     auto *FD = dyn_cast<FuncDecl>(D);
     if (!FD || FD->getAccessorKind() == AccessorKind::NotAccessor)
       return true;
@@ -401,20 +402,15 @@ private:
     return SrcMgr.getLineAndColumn(Loc, BufferID);
   }
 
-  bool shouldIndex(ValueDecl *D) const {
+  bool shouldIndex(ValueDecl *D, bool IsRef) const {
     if (D->isImplicit())
       return false;
-    if (isLocal(D))
+    if (isLocalSymbol(D) && (!isa<ParamDecl>(D) || IsRef))
       return false;
     if (D->isPrivateStdlibDecl())
       return false;
 
     return true;
-  }
-
-  bool isLocal(ValueDecl *D) const {
-    return D->getDeclContext()->getLocalContext() &&
-      (!isa<ParamDecl>(D) || cast<ParamDecl>(D)->getArgumentNameLoc().isValid());
   }
 
   void getModuleHash(SourceFileOrModule SFOrMod, llvm::raw_ostream &OS);
@@ -575,10 +571,12 @@ bool IndexSwiftASTWalker::startEntity(Decl *D, IndexSymbol &Info) {
       EntitiesStack.push_back({D, Info.symInfo, Info.roles, {}});
       return true;
   }
+
+  llvm_unreachable("Unhandled IndexDataConsumer in switch.");
 }
 
 bool IndexSwiftASTWalker::startEntityDecl(ValueDecl *D) {
-  if (!shouldIndex(D))
+  if (!shouldIndex(D, /*IsRef=*/false))
     return false;
 
   SourceLoc Loc = D->getLoc();
@@ -631,7 +629,7 @@ bool IndexSwiftASTWalker::startEntityDecl(ValueDecl *D) {
 
 bool IndexSwiftASTWalker::reportRelatedRef(ValueDecl *D, SourceLoc Loc, bool isImplicit,
                                            SymbolRoleSet Relations, Decl *Related) {
-  if (!shouldIndex(D))
+  if (!shouldIndex(D, /*IsRef=*/true))
     return true;
 
   IndexSymbol Info;
@@ -697,7 +695,7 @@ bool IndexSwiftASTWalker::reportRelatedTypeRef(const TypeLoc &Ty, SymbolRoleSet 
 bool IndexSwiftASTWalker::reportPseudoAccessor(AbstractStorageDecl *D,
                                                AccessorKind AccKind, bool IsRef,
                                                SourceLoc Loc) {
-  if (!shouldIndex(D))
+  if (!shouldIndex(D, IsRef))
     return true; // continue walking.
 
   auto updateInfo = [this, D, AccKind](IndexSymbol &Info) {
@@ -765,7 +763,7 @@ bool IndexSwiftASTWalker::reportExtension(ExtensionDecl *D) {
   NominalTypeDecl *NTD = D->getExtendedType()->getAnyNominal();
   if (!NTD)
     return true;
-  if (!shouldIndex(NTD))
+  if (!shouldIndex(NTD, /*IsRef=*/false))
     return true;
 
   IndexSymbol Info;
@@ -850,7 +848,7 @@ static bool hasUsefulRoleInSystemModule(SymbolRoleSet roles) {
 
 bool IndexSwiftASTWalker::reportRef(ValueDecl *D, SourceLoc Loc,
                                     IndexSymbol &Info) {
-  if (!shouldIndex(D))
+  if (!shouldIndex(D, /*IsRef=*/true))
     return true; // keep walking
 
   if (isa<AbstractFunctionDecl>(D)) {

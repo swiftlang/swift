@@ -210,6 +210,8 @@ func _memcpy(
 ///
 /// The memory regions `source..<source + count` and
 /// `dest..<dest + count` may overlap.
+@_versioned
+@_inlineable
 func _memmove(
   dest destination: UnsafeMutableRawPointer,
   src: UnsafeRawPointer,

@@ -82,6 +82,8 @@ protocol CircleStart : CircleEnd { func circle_start() } // expected-error 2{{ci
 // expected-note@-1{{protocol 'CircleStart' declared here}}
 protocol CircleEnd : CircleMiddle { func circle_end()} // expected-note{{protocol 'CircleEnd' declared here}}
 
+// expected-warning@+2{{redundant conformance constraint 'Self': 'CircleTrivial'}}
+// expected-note@+1{{conformance constraint 'Self': 'CircleTrivial' implied here}}
 protocol CircleEntry : CircleTrivial { }
 protocol CircleTrivial : CircleTrivial { } // expected-error 3{{circular protocol inheritance CircleTrivial}}
 
@@ -433,7 +435,8 @@ protocol ShouldntCrash {
   let fullName2: String  // expected-error {{immutable property requirement must be declared as 'var' with a '{ get }' specifier}}
 
   // <rdar://problem/16789886> Assert on protocol property requirement without a type
-  var propertyWithoutType { get } // expected-error {{type annotation missing in pattern}} expected-error {{computed property must have an explicit type}}
+  var propertyWithoutType { get } // expected-error {{type annotation missing in pattern}}
+  // expected-error@-1 {{computed property must have an explicit type}} {{26-26=: <# Type #>}}
 }
 
 // rdar://problem/18168866

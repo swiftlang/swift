@@ -85,4 +85,7 @@ def compute_build_subdir(args):
         build_subdir += "+swift-" + swift_build_dir_label
         build_subdir += "+stdlib-" + swift_stdlib_build_dir_label
 
+    # IF we have asan enabled, mangle it into the build directory name.
+    if args.enable_asan:
+        build_subdir += "+asan"
     return build_subdir

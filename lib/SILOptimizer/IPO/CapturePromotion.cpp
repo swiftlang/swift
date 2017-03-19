@@ -45,7 +45,6 @@
 #define DEBUG_TYPE "sil-capture-promotion"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/Utils/SpecializationMangler.h"
-#include "swift/SIL/Mangle.h"
 #include "swift/SIL/SILCloner.h"
 #include "swift/SIL/TypeSubstCloner.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
@@ -369,24 +368,17 @@ computeNewArgInterfaceTypes(SILFunction *F,
 static std::string getSpecializedName(SILFunction *F,
                                       IsFragile_t Fragile,
                                       IndicesSet &PromotableIndices) {
-  Mangle::Mangler M;
   auto P = Demangle::SpecializationPass::CapturePromotion;
-  FunctionSignatureSpecializationMangler OldFSSM(P, M, Fragile, F);
-  NewMangling::FunctionSignatureSpecializationMangler NewFSSM(P, Fragile, F);
+  NewMangling::FunctionSignatureSpecializationMangler Mangler(P, Fragile, F);
   auto fnConv = F->getConventions();
 
   for (unsigned argIdx = 0, endIdx = fnConv.getNumSILArguments();
        argIdx < endIdx; ++argIdx) {
     if (!PromotableIndices.count(argIdx))
       continue;
-    OldFSSM.setArgumentBoxToValue(argIdx);
-    NewFSSM.setArgumentBoxToValue(argIdx);
+    Mangler.setArgumentBoxToValue(argIdx);
   }
-
-  OldFSSM.mangle();
-  std::string Old = M.finalize();
-  std::string New = NewFSSM.mangle();
-  return NewMangling::selectMangling(Old, New);
+  return Mangler.mangle();
 }
 
 /// \brief Create the function corresponding to the clone of the original
@@ -851,7 +843,7 @@ constructClonedFunction(PartialApplyInst *PAI, FunctionRefInst *FRI,
 /// with a partial_apply of the new closure, fixing up reference counting as
 /// necessary. Also, if the closure is cloned, the cloned function is added to
 /// the worklist.
-static void
+static SILFunction *
 processPartialApplyInst(PartialApplyInst *PAI, IndicesSet &PromotableIndices,
                         SmallVectorImpl<SILFunction*> &Worklist) {
   SILModule &M = PAI->getModule();
@@ -934,6 +926,7 @@ processPartialApplyInst(PartialApplyInst *PAI, IndicesSet &PromotableIndices,
     // TODO: If this is the last use of the closure, and if it has internal
     // linkage, we should remove it from the SILModule now.
   }
+  return ClonedFn;
 }
 
 static void
@@ -961,19 +954,6 @@ constructMapFromPartialApplyToPromotableIndices(SILFunction *F,
   }
 }
 
-static void
-processFunction(SILFunction *F, SmallVectorImpl<SILFunction*> &Worklist) {
-  // This is a map from each partial apply to a set of indices of promotable
-  // box variables.
-  PartialApplyIndicesMap IndicesMap;
-  constructMapFromPartialApplyToPromotableIndices(F, IndicesMap);
-
-  // Do the actual promotions; all promotions on a single partial_apply are
-  // handled together.
-  for (auto &IndicesPair : IndicesMap)
-    processPartialApplyInst(IndicesPair.first, IndicesPair.second, Worklist);
-}
-
 namespace {
 class CapturePromotionPass : public SILModuleTransform {
   /// The entry point to the transformation.
@@ -982,18 +962,33 @@ class CapturePromotionPass : public SILModuleTransform {
     for (auto &F : *getModule())
       processFunction(&F, Worklist);
 
-      if (!Worklist.empty()) {
-        invalidateAnalysis(SILAnalysis::InvalidationKind::Everything);
-      }
-
     while (!Worklist.empty())
       processFunction(Worklist.pop_back_val(), Worklist);
   }
+
+  void processFunction(SILFunction *F, SmallVectorImpl<SILFunction*> &Worklist);
 
   StringRef getName() override { return "Capture Promotion"; }
 };
 } // end anonymous namespace
 
+void CapturePromotionPass::processFunction(SILFunction *F,
+                                      SmallVectorImpl<SILFunction*> &Worklist) {
+  // This is a map from each partial apply to a set of indices of promotable
+  // box variables.
+  PartialApplyIndicesMap IndicesMap;
+  constructMapFromPartialApplyToPromotableIndices(F, IndicesMap);
+
+  // Do the actual promotions; all promotions on a single partial_apply are
+  // handled together.
+  for (auto &IndicesPair : IndicesMap) {
+    PartialApplyInst *PAI = IndicesPair.first;
+    SILFunction *ClonedFn = processPartialApplyInst(PAI, IndicesPair.second,
+                                                    Worklist);
+    notifyAddFunction(ClonedFn);
+  }
+  invalidateAnalysis(F, SILAnalysis::InvalidationKind::Everything);
+}
 
 SILTransform *swift::createCapturePromotion() {
   return new CapturePromotionPass();

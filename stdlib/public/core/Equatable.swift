@@ -236,8 +236,8 @@ public func === (lhs: AnyObject?, rhs: AnyObject?) -> Bool {
   switch (lhs, rhs) {
   case let (l?, r?):
     return Bool(Builtin.cmp_eq_RawPointer(
-        Builtin.bridgeToRawPointer(Builtin.castToNativeObject(l)),
-        Builtin.bridgeToRawPointer(Builtin.castToNativeObject(r))
+        Builtin.bridgeToRawPointer(Builtin.castToUnknownObject(l)),
+        Builtin.bridgeToRawPointer(Builtin.castToUnknownObject(r))
       ))
   case (nil, nil):
     return true

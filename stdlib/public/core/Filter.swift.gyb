@@ -310,9 +310,11 @@ extension LazySequenceProtocol {
 % for Traversal in ['Forward', 'Bidirectional']:
 
 extension LazyCollectionProtocol
+%   if Traversal != 'Forward':
   where
   Self : ${collectionForTraversal(Traversal)},
   Elements : ${collectionForTraversal(Traversal)}
+%   end
 {
   /// Returns the elements of `self` that satisfy `predicate`.
   ///

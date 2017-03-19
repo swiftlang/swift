@@ -195,5 +195,6 @@ def main():
     if opts.submit_url:
         submit_results_to_server(lnt_result_data, opts.submit_url)
 
+
 if __name__ == '__main__':
     main()

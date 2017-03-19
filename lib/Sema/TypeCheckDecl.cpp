@@ -4406,13 +4406,22 @@ public:
     if (!IsSecondPass) {
       checkUnsupportedNestedType(PD);
 
+      ProtocolRequirementTypeResolver resolver(PD);
+      TypeResolutionOptions options;
+
+      if (auto whereClause = PD->getTrailingWhereClause()) {
+        DeclContext *lookupDC = PD;
+        for (auto &req : whereClause->getRequirements()) {
+          // FIXME: handle error?
+          (void)TC.validateRequirement(whereClause->getWhereLoc(), req,
+                                       lookupDC, options, &resolver);
+        }
+      }
+
       for (auto member : PD->getMembers()) {
         if (auto assocType = dyn_cast<AssociatedTypeDecl>(member)) {
           if (auto whereClause = assocType->getTrailingWhereClause()) {
             DeclContext *lookupDC = assocType->getDeclContext();
-
-            ProtocolRequirementTypeResolver resolver(PD);
-            TypeResolutionOptions options;
 
             for (auto &req : whereClause->getRequirements()) {
               if (!TC.validateRequirement(whereClause->getWhereLoc(), req,
@@ -4774,22 +4783,6 @@ public:
     return false;
   }
 
-  /// Determine whether this is an unparenthesized closure type.
-  static AnyFunctionType *isUnparenthesizedTrailingClosure(Type type) {
-    if (isa<ParenType>(type.getPointer()))
-      return nullptr;
-
-    // Only consider the rvalue type.
-    type = type->getRValueType();
-
-    // Look through one level of optionality.
-    if (auto objectType = type->getAnyOptionalObjectType())
-      type = objectType;
-
-    // Is it a function type?
-    return type->getAs<AnyFunctionType>();
-  }
-
   void checkMemberOperator(FuncDecl *FD) {
     // Check that member operators reference the type of 'Self'.
     if (FD->getNumParameterLists() != 2 || FD->isInvalid()) return;
@@ -5041,43 +5034,6 @@ public:
         makeFinal(TC.Context, FD);
       }
     }
-
-    // Check whether we have parameters with default arguments that follow a
-    // closure parameter; warn about such things, because the closure will not
-    // be treated as a trailing closure.
-    if (!FD->isImplicit()) {
-      auto paramList = FD->getParameterList(FD->getImplicitSelfDecl() ? 1 : 0);
-      bool anyDefaultArguments = false;
-      for (unsigned i = paramList->size(); i != 0; --i) {
-        // Determine whether the parameter is of (possibly lvalue, possibly
-        // optional), non-autoclosure function type, which could receive a
-        // closure. We look at the type sugar directly, so that one can
-        // suppress this warning by adding parentheses.
-        auto &param = paramList->get(i-1);
-        auto paramType = param->getType();
-
-        if (auto *funcTy = isUnparenthesizedTrailingClosure(paramType)) {
-          // If we saw any default arguments before this, complain.
-          // This doesn't apply to autoclosures.
-          if (anyDefaultArguments && !funcTy->getExtInfo().isAutoClosure()) {
-            TC.diagnose(param->getStartLoc(),
-                        diag::non_trailing_closure_before_default_args)
-              .highlight(param->getSourceRange());
-          }
-
-          break;
-        }
-
-        // If we have a default argument, keep going.
-        if (param->isDefaultArgument()) {
-          anyDefaultArguments = true;
-          continue;
-        }
-
-        // We're done.
-        break;
-      }
-    }
   }
 
   void visitModuleDecl(ModuleDecl *) { }
@@ -5153,9 +5109,9 @@ public:
     bool emittedError = false;
     Type plainParentTy = owningTy->adjustSuperclassMemberDeclType(
         parentMember, member, parentMember->getInterfaceType(), &TC);
-    const auto *parentTy = plainParentTy->castTo<AnyFunctionType>();
+    const auto *parentTy = plainParentTy->castTo<FunctionType>();
     if (isa<AbstractFunctionDecl>(parentMember))
-      parentTy = parentTy->getResult()->castTo<AnyFunctionType>();
+      parentTy = parentTy->getResult()->castTo<FunctionType>();
 
     // Check the parameter types.
     auto checkParam = [&](const ParamDecl *decl, Type parentParamTy) {
@@ -5600,14 +5556,8 @@ public:
         parentDeclTy = parentDeclTy->getUnlabeledType(TC.Context);
         if (method) {
           // For methods, strip off the 'Self' type.
-          parentDeclTy = parentDeclTy->castTo<AnyFunctionType>()->getResult();
+          parentDeclTy = parentDeclTy->castTo<FunctionType>()->getResult();
           adjustFunctionTypeForOverride(parentDeclTy);
-        } else if (subscript) {
-          // For subscripts, we don't have a 'Self' type, but turn it
-          // into a monomorphic function type.
-          auto parentFuncTy = parentDeclTy->castTo<AnyFunctionType>();
-          parentDeclTy = FunctionType::get(parentFuncTy->getInput(),
-                                           parentFuncTy->getResult());
         } else {
           // For properties, strip off ownership.
           parentDeclTy = parentDeclTy->getReferenceStorageReferent();
@@ -7171,7 +7121,8 @@ void TypeChecker::validateDecl(ValueDecl *D) {
 
     validateAttributes(*this, D);
 
-    proto->computeRequirementSignature();
+    if (!proto->isRequirementSignatureComputed())
+      proto->computeRequirementSignature();
 
     // If the protocol is @objc, it may only refine other @objc protocols.
     // FIXME: Revisit this restriction.
@@ -7346,12 +7297,29 @@ void TypeChecker::validateDecl(ValueDecl *D) {
 }
 
 void TypeChecker::validateDeclForNameLookup(ValueDecl *D) {
+  // Validate the context.
+  auto dc = D->getDeclContext();
+  if (auto nominal = dyn_cast<NominalTypeDecl>(dc)) {
+    validateDeclForNameLookup(nominal);
+    if (!nominal->hasInterfaceType())
+      return;
+  } else if (auto ext = dyn_cast<ExtensionDecl>(dc)) {
+    validateExtension(ext);
+    if (!ext->hasValidSignature())
+      return;
+  }
+
   switch (D->getKind()) {
   case DeclKind::Protocol: {
     auto proto = cast<ProtocolDecl>(D);
     if (proto->hasInterfaceType())
       return;
     proto->computeType();
+
+    auto *gp = proto->getGenericParams();
+    unsigned depth = gp->getDepth();
+    for (auto paramDecl : *gp)
+      paramDecl->setDepth(depth);
 
     validateAccessibility(proto);
 

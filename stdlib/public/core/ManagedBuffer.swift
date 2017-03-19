@@ -202,7 +202,7 @@ public struct ManagedBufferPointer<Header, Element> : Equatable {
   public init(unsafeBufferObject buffer: AnyObject) {
     ManagedBufferPointer._checkValidBufferClass(type(of: buffer))
 
-    self._nativeBuffer = Builtin.castToNativeObject(buffer)
+    self._nativeBuffer = Builtin.unsafeCastToNativeObject(buffer)
   }
 
   /// Internal version for use by _ContiguousArrayBuffer where we know that we
@@ -216,7 +216,7 @@ public struct ManagedBufferPointer<Header, Element> : Equatable {
   @_versioned
   internal init(_uncheckedUnsafeBufferObject buffer: AnyObject) {
     ManagedBufferPointer._sanityCheckValidBufferClass(type(of: buffer))
-    self._nativeBuffer = Builtin.castToNativeObject(buffer)
+    self._nativeBuffer = Builtin.unsafeCastToNativeObject(buffer)
   }
 
   /// The stored `Header` instance.
@@ -330,7 +330,7 @@ public struct ManagedBufferPointer<Header, Element> : Equatable {
       size: totalSize,
       alignmentMask: _My._alignmentMask)
 
-    self._nativeBuffer = Builtin.castToNativeObject(newBuffer)
+    self._nativeBuffer = Builtin.unsafeCastToNativeObject(newBuffer)
   }
 
   /// Manage the given `buffer`.
@@ -338,7 +338,7 @@ public struct ManagedBufferPointer<Header, Element> : Equatable {
   /// - Note: It is an error to use the `header` property of the resulting
   ///   instance unless it has been initialized.
   internal init(_ buffer: ManagedBuffer<Header, Element>) {
-    _nativeBuffer = Builtin.castToNativeObject(buffer)
+    _nativeBuffer = Builtin.unsafeCastToNativeObject(buffer)
   }
 
   internal typealias _My = ManagedBufferPointer
@@ -473,11 +473,14 @@ public func == <Header, Element>(
 ///   `object`; the use of `inout` is an implementation artifact.
 /// - Returns: `true` if `object` is known to have a single strong reference;
 ///   otherwise, `false`.
+@_inlineable
 public func isKnownUniquelyReferenced<T : AnyObject>(_ object: inout T) -> Bool
 {
   return _isUnique(&object)
 }
 
+@_inlineable
+@_versioned
 internal func _isKnownUniquelyReferencedOrPinned<T : AnyObject>(_ object: inout T) -> Bool {
   return _isUniqueOrPinned(&object)
 }
@@ -512,6 +515,7 @@ internal func _isKnownUniquelyReferencedOrPinned<T : AnyObject>(_ object: inout 
 ///   `object`; the use of `inout` is an implementation artifact.
 /// - Returns: `true` if `object` is known to have a single strong reference;
 ///   otherwise, `false`. If `object` is `nil`, the return value is `false`.
+@_inlineable
 public func isKnownUniquelyReferenced<T : AnyObject>(
   _ object: inout T?
 ) -> Bool {

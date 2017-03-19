@@ -18,7 +18,6 @@
 #include "swift/AST/CanTypeVisitor.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/IRGenOptions.h"
-#include "swift/AST/Mangle.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/Types.h"
 #include "swift/SIL/FormalLinkage.h"
@@ -407,7 +406,7 @@ static llvm::Value *emitNominalMetadataRef(IRGenFunction &IGF,
 
 
 bool irgen::hasKnownSwiftMetadata(IRGenModule &IGM, CanType type) {
-  if (ClassDecl *theClass = type->getClassOrBoundGenericClass()) {
+  if (ClassDecl *theClass = type.getClassOrBoundGenericClass()) {
     return hasKnownSwiftMetadata(IGM, theClass);
   }
 
@@ -2789,18 +2788,6 @@ irgen::emitFieldTypeAccessor(IRGenModule &IGM,
   // use it to provide metadata for generic parameters in field types.
   IGF.bindLocalTypeDataFromTypeMetadata(formalType, IsExact, metadata);
   
-  // Bind archetype access paths if the type is generic.
-  if (type->isGenericContext()) {
-    auto declCtxt = type;
-    if (auto generics = declCtxt->getGenericSignatureOfContext()) {
-      auto getInContext = [&](CanType type) -> CanType {
-        return declCtxt->mapTypeIntoContext(type)
-            ->getCanonicalType();
-      };
-      bindArchetypeAccessPaths(IGF, generics, getInContext);
-    }
-  }
-
   // Allocate storage for the field vector.
   unsigned allocSize = fieldTypes.size() * IGM.getPointerSize().getValue();
   auto allocSizeVal = llvm::ConstantInt::get(IGM.IntPtrTy, allocSize);
@@ -3667,7 +3654,7 @@ namespace {
     }
 
     void addParentMetadataRef(ClassDecl *forClass, Type classType) {
-      CanType parentType = classType->getNominalParent()->getCanonicalType();
+      CanType parentType = classType->getCanonicalType().getNominalParent();
 
       if (auto metadata =
             tryEmitConstantTypeMetadataRef(IGM, parentType,
@@ -3781,7 +3768,7 @@ namespace {
     }
 
     void addParentMetadataRef(ClassDecl *forClass, Type classType) {
-      CanType parentType = classType->getNominalParent()->getCanonicalType();
+      CanType parentType = classType->getCanonicalType().getNominalParent();
       this->addFillOp(parentType, None, /*relative*/ false);
       B.addNullPointer(IGM.TypeMetadataPtrTy);
     }
@@ -4487,7 +4474,7 @@ llvm::Value *irgen::emitHeapMetadataRefForHeapObject(IRGenFunction &IGF,
                                                      llvm::Value *object,
                                                      CanType objectType,
                                                      bool suppressCast) {
-  ClassDecl *theClass = objectType->getClassOrBoundGenericClass();
+  ClassDecl *theClass = objectType.getClassOrBoundGenericClass();
   if (theClass && isKnownNotTaggedPointer(IGF.IGM, theClass))
     return emitLoadOfHeapMetadataRef(IGF, object,
                                      getIsaEncodingForType(IGF.IGM, objectType),
@@ -5226,8 +5213,8 @@ namespace {
     Size AddressPoint = Size::invalid();
 
     bool computeUnfilledParent() {
-      if (auto parentType = asImpl().getTargetType()->getNominalParent()) {
-        return !tryEmitConstantTypeMetadataRef(IGM, parentType->getCanonicalType(),
+      if (auto parentType = asImpl().getTargetType().getNominalParent()) {
+        return !tryEmitConstantTypeMetadataRef(IGM, parentType,
                                                SymbolReferenceKind::Absolute);
       }
       return false;
@@ -5364,7 +5351,7 @@ namespace {
     }
     void emitInitialization(IRGenFunction &IGF, llvm::Value *metadata) {
       if (HasUnfilledParent) {
-        auto parentType = getTargetType()->getNominalParent()->getCanonicalType();
+        auto parentType = getTargetType().getNominalParent();
         auto parentMetadata = IGF.emitTypeMetadataRef(parentType);
 
         int index = ValueTypeParentIndex;
@@ -5410,7 +5397,7 @@ namespace {
     }
     void emitInitialization(IRGenFunction &IGF, llvm::Value *metadata) {
       if (HasUnfilledParent) {
-        auto parentType = getTargetType()->getNominalParent()->getCanonicalType();
+        auto parentType = getTargetType().getNominalParent();
         auto parentMetadata = IGF.emitTypeMetadataRef(parentType);
 
         int index = ValueTypeParentIndex;
