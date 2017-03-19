@@ -259,17 +259,6 @@ NodePointer Demangler::demangleSymbol(StringRef MangledName) {
       case Node::Kind::Type:
         Parent->addChild(Nd->getFirstChild(), *this);
         break;
-      case Node::Kind::Identifier:
-        if (StringRef(Nd->getText()).startswith("_T")) {
-          NodePointer Global = demangleOldSymbolAsNode(Nd->getText(), *this);
-          if (Global && Global->getKind() == Node::Kind::Global) {
-            for (NodePointer Child : *Global) {
-              Parent->addChild(Child, *this);
-            }
-            break;
-          }
-        }
-        LLVM_FALLTHROUGH;
       default:
         Parent->addChild(Nd, *this);
         break;

@@ -602,7 +602,7 @@ static void emitSuperArgument(IRGenFunction &IGF, bool isInstanceMethod,
   } else {
     ClassDecl *searchClassDecl =
       searchClass.castTo<MetatypeType>().getInstanceType()
-        ->getClassOrBoundGenericClass();
+        .getClassOrBoundGenericClass();
     searchValue = IGF.IGM.getAddrOfMetaclassObject(searchClassDecl,
                                                    NotForDefinition);
   }

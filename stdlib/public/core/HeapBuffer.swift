@@ -132,7 +132,7 @@ struct _HeapBuffer<Value, Element> : Equatable {
 
   public // @testable
   init(_ storage: _HeapBufferStorage<Value, Element>) {
-    self._storage = Builtin.castToNativeObject(storage)
+    self._storage = Builtin.unsafeCastToNativeObject(storage)
   }
 
   internal init(_ storage: AnyObject) {
@@ -140,7 +140,7 @@ struct _HeapBuffer<Value, Element> : Equatable {
       _usesNativeSwiftReferenceCounting(type(of: storage)),
       "HeapBuffer manages only native objects"
     )
-    self._storage = Builtin.castToNativeObject(storage)
+    self._storage = Builtin.unsafeCastToNativeObject(storage)
   }
 
   internal init<T : AnyObject>(_ storage: T?) {
@@ -172,7 +172,7 @@ struct _HeapBuffer<Value, Element> : Equatable {
       bufferType: storageClass,
       size: totalSize,
       alignmentMask: alignMask)
-    self._storage = Builtin.castToNativeObject(object)
+    self._storage = Builtin.unsafeCastToNativeObject(object)
     self._value.initialize(to: initializer)
   }
 

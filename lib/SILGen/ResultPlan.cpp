@@ -11,7 +11,9 @@
 //===----------------------------------------------------------------------===//
 
 #include "ResultPlan.h"
+#include "Callee.h"
 #include "Initialization.h"
+#include "LValue.h"
 #include "RValue.h"
 #include "SILGenFunction.h"
 
@@ -27,15 +29,19 @@ namespace {
 /// A result plan for evaluating an indirect result into the address
 /// associated with an initialization.
 class InPlaceInitializationResultPlan : public ResultPlan {
-  Initialization *Init;
+  Initialization *init;
 
 public:
-  InPlaceInitializationResultPlan(Initialization *init) : Init(init) {}
+  InPlaceInitializationResultPlan(Initialization *init) : init(init) {}
 
   RValue finish(SILGenFunction &SGF, SILLocation loc, CanType substType,
                 ArrayRef<ManagedValue> &directResults) override {
-    Init->finishInitialization(SGF);
+    init->finishInitialization(SGF);
     return RValue();
+  }
+  void
+  gatherIndirectResultAddrs(SmallVectorImpl<SILValue> &outList) const override {
+    outList.emplace_back(init->getAddressForInPlaceInitialization());
   }
 };
 
@@ -43,17 +49,17 @@ public:
 /// reabstracting it.  The value can actually be a tuple if the
 /// abstraction is opaque.
 class ScalarResultPlan : public ResultPlan {
-  std::unique_ptr<TemporaryInitialization> Temporary;
-  AbstractionPattern OrigType;
-  Initialization *Init;
-  SILFunctionTypeRepresentation Rep;
+  std::unique_ptr<TemporaryInitialization> temporary;
+  AbstractionPattern origType;
+  Initialization *init;
+  SILFunctionTypeRepresentation rep;
 
 public:
   ScalarResultPlan(std::unique_ptr<TemporaryInitialization> &&temporary,
                    AbstractionPattern origType, Initialization *init,
                    SILFunctionTypeRepresentation rep)
-      : Temporary(std::move(temporary)), OrigType(origType), Init(init),
-        Rep(rep) {}
+      : temporary(std::move(temporary)), origType(origType), init(init),
+        rep(rep) {}
 
   RValue finish(SILGenFunction &SGF, SILLocation loc, CanType substType,
                 ArrayRef<ManagedValue> &directResults) override {
@@ -65,10 +71,10 @@ public:
 
     // If we were created with a temporary, that address was passed as
     // an indirect result.
-    if (Temporary) {
+    if (temporary) {
       // Establish the cleanup.
-      Temporary->finishInitialization(SGF);
-      value = Temporary->getManagedAddress();
+      temporary->finishInitialization(SGF);
+      value = temporary->getManagedAddress();
 
       // If the value isn't address-only, go ahead and load.
       if (!substTL.isAddressOnly()) {
@@ -85,17 +91,17 @@ public:
 
     // Reabstract the value if the types don't match.  This can happen
     // due to either substitution reabstractions or bridging.
-    if (value.getType().hasAbstractionDifference(Rep,
+    if (value.getType().hasAbstractionDifference(rep,
                                                  substTL.getLoweredType())) {
       // Assume that a C-language API doesn't have substitution
       // reabstractions.  This shouldn't be necessary, but
       // emitOrigToSubstValue can get upset.
-      if (getSILFunctionLanguage(Rep) == SILFunctionLanguage::C) {
-        value = SGF.emitBridgedToNativeValue(loc, value, Rep, substType);
+      if (getSILFunctionLanguage(rep) == SILFunctionLanguage::C) {
+        value = SGF.emitBridgedToNativeValue(loc, value, rep, substType);
 
       } else {
-        value = SGF.emitOrigToSubstValue(loc, value, OrigType, substType,
-                                         SGFContext(Init));
+        value = SGF.emitOrigToSubstValue(loc, value, origType, substType,
+                                         SGFContext(init));
 
         // If that successfully emitted into the initialization, we're done.
         if (value.isInContext())
@@ -104,9 +110,9 @@ public:
     }
 
     // Otherwise, forcibly emit into the initialization if it exists.
-    if (Init) {
-      Init->copyOrInitValueInto(SGF, loc, value, /*init*/ true);
-      Init->finishInitialization(SGF);
+    if (init) {
+      init->copyOrInitValueInto(SGF, loc, value, /*init*/ true);
+      init->finishInitialization(SGF);
       return RValue();
 
       // Otherwise, we've got the r-value we want.
@@ -114,72 +120,89 @@ public:
       return RValue(SGF, loc, substType, value);
     }
   }
+
+  void
+  gatherIndirectResultAddrs(SmallVectorImpl<SILValue> &outList) const override {
+    if (!temporary)
+      return;
+    outList.emplace_back(temporary->getAddress());
+  }
 };
 
 /// A result plan which calls copyOrInitValueInto on an Initialization
 /// using a temporary buffer initialized by a sub-plan.
 class InitValueFromTemporaryResultPlan : public ResultPlan {
-  Initialization *Init;
-  ResultPlanPtr SubPlan;
-  std::unique_ptr<TemporaryInitialization> Temporary;
+  Initialization *init;
+  ResultPlanPtr subPlan;
+  std::unique_ptr<TemporaryInitialization> temporary;
 
 public:
   InitValueFromTemporaryResultPlan(
       Initialization *init, ResultPlanPtr &&subPlan,
       std::unique_ptr<TemporaryInitialization> &&temporary)
-      : Init(init), SubPlan(std::move(subPlan)),
-        Temporary(std::move(temporary)) {}
+      : init(init), subPlan(std::move(subPlan)),
+        temporary(std::move(temporary)) {}
 
   RValue finish(SILGenFunction &SGF, SILLocation loc, CanType substType,
                 ArrayRef<ManagedValue> &directResults) override {
-    RValue subResult = SubPlan->finish(SGF, loc, substType, directResults);
+    RValue subResult = subPlan->finish(SGF, loc, substType, directResults);
     assert(subResult.isUsed() && "sub-plan didn't emit into context?");
     (void)subResult;
 
-    ManagedValue value = Temporary->getManagedAddress();
-    Init->copyOrInitValueInto(SGF, loc, value, /*init*/ true);
-    Init->finishInitialization(SGF);
+    ManagedValue value = temporary->getManagedAddress();
+    init->copyOrInitValueInto(SGF, loc, value, /*init*/ true);
+    init->finishInitialization(SGF);
 
     return RValue();
+  }
+
+  void
+  gatherIndirectResultAddrs(SmallVectorImpl<SILValue> &outList) const override {
+    subPlan->gatherIndirectResultAddrs(outList);
   }
 };
 
 /// A result plan which calls copyOrInitValueInto using the result of
 /// a sub-plan.
 class InitValueFromRValueResultPlan : public ResultPlan {
-  Initialization *Init;
-  ResultPlanPtr SubPlan;
+  Initialization *init;
+  ResultPlanPtr subPlan;
 
 public:
   InitValueFromRValueResultPlan(Initialization *init, ResultPlanPtr &&subPlan)
-      : Init(init), SubPlan(std::move(subPlan)) {}
+      : init(init), subPlan(std::move(subPlan)) {}
 
   RValue finish(SILGenFunction &SGF, SILLocation loc, CanType substType,
                 ArrayRef<ManagedValue> &directResults) override {
-    RValue subResult = SubPlan->finish(SGF, loc, substType, directResults);
+    RValue subResult = subPlan->finish(SGF, loc, substType, directResults);
     ManagedValue value = std::move(subResult).getAsSingleValue(SGF, loc);
 
-    Init->copyOrInitValueInto(SGF, loc, value, /*init*/ true);
-    Init->finishInitialization(SGF);
+    init->copyOrInitValueInto(SGF, loc, value, /*init*/ true);
+    init->finishInitialization(SGF);
 
     return RValue();
+  }
+
+  void
+  gatherIndirectResultAddrs(SmallVectorImpl<SILValue> &outList) const override {
+    subPlan->gatherIndirectResultAddrs(outList);
   }
 };
 
 /// A result plan which produces a larger RValue from a bunch of
 /// components.
 class TupleRValueResultPlan : public ResultPlan {
-  SmallVector<ResultPlanPtr, 4> EltPlans;
+  SmallVector<ResultPlanPtr, 4> eltPlans;
 
 public:
   TupleRValueResultPlan(ResultPlanBuilder &builder, AbstractionPattern origType,
                         CanTupleType substType) {
     // Create plans for all the elements.
-    EltPlans.reserve(substType->getNumElements());
+    eltPlans.reserve(substType->getNumElements());
     for (auto i : indices(substType->getElementTypes())) {
       AbstractionPattern origEltType = origType.getTupleElementType(i);
       CanType substEltType = substType.getElementType(i);
-      EltPlans.push_back(builder.build(nullptr, origEltType, substEltType));
+      eltPlans.push_back(builder.build(nullptr, origEltType, substEltType));
     }
   }
 
@@ -189,59 +212,144 @@ public:
 
     // Finish all the component tuples.
     auto substTupleType = cast<TupleType>(substType);
-    assert(substTupleType.getElementTypes().size() == EltPlans.size());
+    assert(substTupleType.getElementTypes().size() == eltPlans.size());
     for (auto i : indices(substTupleType.getElementTypes())) {
-      RValue eltRV = EltPlans[i]->finish(
+      RValue eltRV = eltPlans[i]->finish(
           SGF, loc, substTupleType.getElementType(i), directResults);
       tupleRV.addElement(std::move(eltRV));
     }
 
     return tupleRV;
   }
+
+  void
+  gatherIndirectResultAddrs(SmallVectorImpl<SILValue> &outList) const override {
+    for (const auto &eltPlan : eltPlans) {
+      eltPlan->gatherIndirectResultAddrs(outList);
+    }
+  }
 };
 
 /// A result plan which evaluates into the sub-components
 /// of a splittable tuple initialization.
 class TupleInitializationResultPlan : public ResultPlan {
-  Initialization *TupleInit;
-  SmallVector<InitializationPtr, 4> EltInitsBuffer;
-  MutableArrayRef<InitializationPtr> EltInits;
-  SmallVector<ResultPlanPtr, 4> EltPlans;
+  Initialization *tupleInit;
+  SmallVector<InitializationPtr, 4> eltInitsBuffer;
+  MutableArrayRef<InitializationPtr> eltInits;
+  SmallVector<ResultPlanPtr, 4> eltPlans;
 
 public:
   TupleInitializationResultPlan(ResultPlanBuilder &builder,
                                 Initialization *tupleInit,
                                 AbstractionPattern origType,
                                 CanTupleType substType)
-      : TupleInit(tupleInit) {
+      : tupleInit(tupleInit) {
 
     // Get the sub-initializations.
-    EltInits = tupleInit->splitIntoTupleElements(builder.SGF, builder.Loc,
-                                                 substType, EltInitsBuffer);
+    eltInits = tupleInit->splitIntoTupleElements(builder.SGF, builder.loc,
+                                                 substType, eltInitsBuffer);
 
     // Create plans for all the sub-initializations.
-    EltPlans.reserve(substType->getNumElements());
+    eltPlans.reserve(substType->getNumElements());
     for (auto i : indices(substType->getElementTypes())) {
       AbstractionPattern origEltType = origType.getTupleElementType(i);
       CanType substEltType = substType.getElementType(i);
-      Initialization *eltInit = EltInits[i].get();
-      EltPlans.push_back(builder.build(eltInit, origEltType, substEltType));
+      Initialization *eltInit = eltInits[i].get();
+      eltPlans.push_back(builder.build(eltInit, origEltType, substEltType));
     }
   }
 
   RValue finish(SILGenFunction &SGF, SILLocation loc, CanType substType,
                 ArrayRef<ManagedValue> &directResults) override {
     auto substTupleType = cast<TupleType>(substType);
-    assert(substTupleType.getElementTypes().size() == EltPlans.size());
+    assert(substTupleType.getElementTypes().size() == eltPlans.size());
     for (auto i : indices(substTupleType.getElementTypes())) {
       auto eltType = substTupleType.getElementType(i);
-      RValue eltRV = EltPlans[i]->finish(SGF, loc, eltType, directResults);
+      RValue eltRV = eltPlans[i]->finish(SGF, loc, eltType, directResults);
       assert(eltRV.isUsed());
       (void)eltRV;
     }
-    TupleInit->finishInitialization(SGF);
+    tupleInit->finishInitialization(SGF);
 
     return RValue();
+  }
+
+  void
+  gatherIndirectResultAddrs(SmallVectorImpl<SILValue> &outList) const override {
+    for (const auto &eltPlan : eltPlans) {
+      eltPlan->gatherIndirectResultAddrs(outList);
+    }
+  }
+};
+
+class ForeignErrorInitializationPlan : public ResultPlan {
+  SILLocation loc;
+  LValue lvalue;
+  ResultPlanPtr subPlan;
+  ManagedValue managedErrorTemp;
+  CanType unwrappedPtrType;
+  PointerTypeKind ptrKind;
+  OptionalTypeKind optKind;
+  CanType errorPtrType;
+
+public:
+  ForeignErrorInitializationPlan(SILGenFunction &SGF, SILLocation loc,
+                                 const CalleeTypeInfo &calleeTypeInfo,
+                                 ResultPlanPtr &&subPlan)
+      : loc(loc), subPlan(std::move(subPlan)) {
+    unsigned errorParamIndex =
+        calleeTypeInfo.foreignError->getErrorParameterIndex();
+    SILParameterInfo errorParameter =
+        calleeTypeInfo.substFnType->getParameters()[errorParamIndex];
+    // We assume that there's no interesting reabstraction here beyond a layer
+    // of optional.
+    errorPtrType = errorParameter.getType();
+    unwrappedPtrType = errorPtrType;
+    if (Type unwrapped = errorPtrType->getAnyOptionalObjectType(optKind))
+      unwrappedPtrType = unwrapped->getCanonicalType();
+
+    auto errorType =
+        CanType(unwrappedPtrType->getAnyPointerElementType(ptrKind));
+    auto &errorTL = SGF.getTypeLowering(errorType);
+
+    // Allocate a temporary.
+    SILValue errorTemp =
+        SGF.emitTemporaryAllocation(loc, errorTL.getLoweredType());
+
+    // Nil-initialize it.
+    SGF.emitInjectOptionalNothingInto(loc, errorTemp, errorTL);
+
+    // Enter a cleanup to destroy the value there.
+    managedErrorTemp = SGF.emitManagedBufferWithCleanup(errorTemp, errorTL);
+
+    // Create the appropriate pointer type.
+    lvalue = LValue::forAddress(ManagedValue::forLValue(errorTemp),
+                                AbstractionPattern(errorType), errorType);
+  }
+
+  RValue finish(SILGenFunction &SGF, SILLocation loc, CanType substType,
+                ArrayRef<ManagedValue> &directResults) override {
+    return subPlan->finish(SGF, loc, substType, directResults);
+  }
+
+  void
+  gatherIndirectResultAddrs(SmallVectorImpl<SILValue> &outList) const override {
+    subPlan->gatherIndirectResultAddrs(outList);
+  }
+
+  Optional<std::pair<ManagedValue, ManagedValue>>
+  emitForeignErrorArgument(SILGenFunction &SGF, SILLocation loc) override {
+    auto pointerValue =
+        SGF.emitLValueToPointer(loc, std::move(lvalue), unwrappedPtrType,
+                                ptrKind, AccessKind::ReadWrite);
+
+    // Wrap up in an Optional if called for.
+    if (optKind != OTK_None) {
+      auto &optTL = SGF.getTypeLowering(errorPtrType);
+      pointerValue = SGF.getOptionalSomeValue(loc, pointerValue, optTL);
+    }
+
+    return std::make_pair(managedErrorTemp, pointerValue);
   }
 };
 
@@ -250,6 +358,53 @@ public:
 //===----------------------------------------------------------------------===//
 //                            Result Plan Builder
 //===----------------------------------------------------------------------===//
+
+/// Build a result plan for the results of an apply.
+///
+/// If the initialization is non-null, the result plan will emit into it.
+ResultPlanPtr ResultPlanBuilder::buildTopLevelResult(Initialization *init,
+                                                     SILLocation loc) {
+  // First check if we do not have a foreign error. If we don't, just call
+  // build.
+  auto foreignError = calleeTypeInfo.foreignError;
+  if (!foreignError) {
+    return build(init, calleeTypeInfo.origResultType,
+                 calleeTypeInfo.substResultType);
+  }
+
+  // Otherwise, handle the foreign error first.
+  //
+  // The plan needs to be built using the formal result type after foreign-error
+  // adjustment.
+  switch (foreignError->getKind()) {
+  // These conventions make the formal result type ().
+  case ForeignErrorConvention::ZeroResult:
+  case ForeignErrorConvention::NonZeroResult:
+    assert(calleeTypeInfo.substResultType->isVoid());
+    allResults = {};
+    break;
+
+  // These conventions leave the formal result alone.
+  case ForeignErrorConvention::ZeroPreservedResult:
+  case ForeignErrorConvention::NonNilError:
+    break;
+
+  // This convention changes the formal result to the optional object type; we
+  // need to make our own make SILResultInfo array.
+  case ForeignErrorConvention::NilResult: {
+    assert(allResults.size() == 1);
+    CanType objectType = allResults[0].getType().getAnyOptionalObjectType();
+    SILResultInfo optResult = allResults[0].getWithType(objectType);
+    allResults = optResult;
+    break;
+  }
+  }
+
+  ResultPlanPtr subPlan = build(init, calleeTypeInfo.origResultType,
+                                calleeTypeInfo.substResultType);
+  return ResultPlanPtr(new ForeignErrorInitializationPlan(
+      SGF, loc, calleeTypeInfo, std::move(subPlan)));
+}
 
 /// Build a result plan for the results of an apply.
 ///
@@ -263,8 +418,8 @@ ResultPlanPtr ResultPlanBuilder::build(Initialization *init,
   }
 
   // Otherwise, grab the next result.
-  auto result = AllResults.front();
-  AllResults = AllResults.slice(1);
+  auto result = allResults.front();
+  allResults = allResults.slice(1);
 
   SILValue initAddr;
   if (init) {
@@ -274,8 +429,7 @@ ResultPlanPtr ResultPlanBuilder::build(Initialization *init,
     // there are no abstraction differences, then just do it.
     if (initAddr && SGF.silConv.isSILIndirect(result) &&
         !initAddr->getType().hasAbstractionDifference(
-            Rep, result.getSILStorageType())) {
-      IndirectResultAddrs.push_back(initAddr);
+            calleeTypeInfo.getOverrideRep(), result.getSILStorageType())) {
       return ResultPlanPtr(new InPlaceInitializationResultPlan(init));
     }
   }
@@ -291,12 +445,11 @@ ResultPlanPtr ResultPlanBuilder::build(Initialization *init,
   std::unique_ptr<TemporaryInitialization> temporary;
   if (SGF.silConv.isSILIndirect(result)) {
     auto &resultTL = SGF.getTypeLowering(result.getType());
-    temporary = SGF.emitTemporary(Loc, resultTL);
-    IndirectResultAddrs.push_back(temporary->getAddress());
+    temporary = SGF.emitTemporary(loc, resultTL);
   }
 
-  return ResultPlanPtr(
-      new ScalarResultPlan(std::move(temporary), origType, init, Rep));
+  return ResultPlanPtr(new ScalarResultPlan(
+      std::move(temporary), origType, init, calleeTypeInfo.getOverrideRep()));
 }
 
 ResultPlanPtr ResultPlanBuilder::buildForTuple(Initialization *init,
@@ -324,7 +477,7 @@ ResultPlanPtr ResultPlanBuilder::buildForTuple(Initialization *init,
   auto &substTL = SGF.getTypeLowering(substType);
   if (substTL.isAddressOnly()) {
     // Create a temporary.
-    auto temporary = SGF.emitTemporary(Loc, substTL);
+    auto temporary = SGF.emitTemporary(loc, substTL);
 
     // Build a sub-plan to emit into the temporary.
     auto subplan = buildForTuple(temporary.get(), origType, substType);
@@ -340,4 +493,12 @@ ResultPlanPtr ResultPlanBuilder::buildForTuple(Initialization *init,
   // Make a plan that calls copyOrInitValueInto.
   return ResultPlanPtr(
       new InitValueFromRValueResultPlan(init, std::move(subplan)));
+}
+
+ResultPlanPtr
+ResultPlanBuilder::computeResultPlan(SILGenFunction &SGF,
+                                     const CalleeTypeInfo &calleeTypeInfo,
+                                     SILLocation loc, SGFContext evalContext) {
+  ResultPlanBuilder builder(SGF, loc, calleeTypeInfo);
+  return builder.buildTopLevelResult(evalContext.getEmitInto(), loc);
 }

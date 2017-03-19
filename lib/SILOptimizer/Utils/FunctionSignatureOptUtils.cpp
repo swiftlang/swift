@@ -18,7 +18,6 @@
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SILOptimizer/Utils/FunctionSignatureOptUtils.h"
 #include "swift/SILOptimizer/Utils/Local.h"
-#include "swift/SIL/Mangle.h"
 
 using namespace swift;
 

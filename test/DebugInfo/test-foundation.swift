@@ -12,7 +12,7 @@ import Foundation
 
 class MyObject : NSObject {
   // Ensure we don't emit linetable entries for ObjC thunks.
-  // LOC-CHECK: define {{.*}} @_TToFC4main8MyObjectg5MyArrCSo7NSArray
+  // LOC-CHECK: define {{.*}} @_T04main8MyObjectC0B3ArrSo7NSArrayCfgTo
   // LOC-CHECK: ret {{.*}}, !dbg ![[DBG:.*]]
   // LOC-CHECK: ret
   var MyArr = NSArray()
@@ -33,7 +33,7 @@ extension MyObject {
   }
 }
 
-// SANITY-DAG: ![[NSOBJECT:.*]] = !DICompositeType(tag: DW_TAG_structure_type, name: "NSObject",{{.*}} identifier: "_TtCSo8NSObject"
+// SANITY-DAG: ![[NSOBJECT:.*]] = !DICompositeType(tag: DW_TAG_structure_type, name: "NSObject",{{.*}} identifier: "_T0So8NSObjectC"
 // SANITY-DAG: !DIGlobalVariable(name: "NsObj",{{.*}} line: [[@LINE+1]],{{.*}} type: ![[NSOBJECT]],{{.*}} isDefinition: true
 var NsObj: NSObject
 NsObj = MyObject()
@@ -43,7 +43,7 @@ MyObj.blah()
 
 public func err() {
   // DWARF-CHECK: DW_AT_name{{.*}}NSError
-  // DWARF-CHECK: DW_AT_linkage_name{{.*}}_TtCSo7NSError
+  // DWARF-CHECK: DW_AT_linkage_name{{.*}}_T0So7NSErrorC
   let _ = NSError(domain: "myDomain", code: 4, 
                   userInfo: [AnyHashable("a"):1,
                              AnyHashable("b"):2,
@@ -52,11 +52,11 @@ public func err() {
 
 // LOC-CHECK: define {{.*}}4date
 public func date() {
-  // LOC-CHECK: call {{.*}} @_TFSSCfT21_builtinStringLiteralBp17utf8CodeUnitCountBw7isASCIIBi1__SS{{.*}}, !dbg ![[L1:.*]]
+  // LOC-CHECK: call {{.*}} @_T0S2SBp21_builtinStringLiteral_Bw17utf8CodeUnitCountBi1_7isASCIItcfC{{.*}}, !dbg ![[L1:.*]]
   let d1 = DateFormatter()
   // LOC-CHECK: br{{.*}}, !dbg ![[L2:.*]]
   d1.dateFormat = "dd. mm. yyyy" // LOC-CHECK: call{{.*}}objc_msgSend{{.*}}, !dbg ![[L2]]
-  // LOC-CHECK: call {{.*}} @_TFSSCfT21_builtinStringLiteralBp17utf8CodeUnitCountBw7isASCIIBi1__SS{{.*}}, !dbg ![[L3:.*]]
+  // LOC-CHECK: call {{.*}} @_T0S2SBp21_builtinStringLiteral_Bw17utf8CodeUnitCountBi1_7isASCIItcfC{{.*}}, !dbg ![[L3:.*]]
   let d2 = DateFormatter()
   // LOC-CHECK: br{{.*}}, !dbg ![[L4:.*]]
   d2.dateFormat = "mm dd yyyy" // LOC-CHECK: call{{.*}}objc_msgSend{{.*}}, !dbg ![[L4]]
@@ -68,7 +68,7 @@ func useOptions(_ opt: URL.BookmarkCreationOptions)
   return [opt, opt]
 }
 
-// LOC-CHECK: ![[THUNK:.*]] = distinct !DISubprogram({{.*}}linkageName: "_TToFC4main8MyObjectg5MyArrCSo7NSArray"
+// LOC-CHECK: ![[THUNK:.*]] = distinct !DISubprogram({{.*}}linkageName: "_T04main8MyObjectC0B3ArrSo7NSArrayCfgTo"
 // LOC-CHECK-NOT:                           line:
 // LOC-CHECK-SAME:                          isDefinition: true
 // LOC-CHECK: ![[DBG]] = !DILocation(line: 0, scope: ![[THUNK]])

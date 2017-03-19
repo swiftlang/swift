@@ -86,12 +86,10 @@ class ConcreteClassMetatype<X>: Opaque<C.Type> {
   override func variantOptionality(x: C.Type?) -> C.Type { return x! }
 }
 
-/*
 class ConcreteOptional<X>: Opaque<S?> {
   override func inAndOut(x: S?) -> S? { return x }
-  override func variantOptionality(x: S??) -> S? { return x! }
+  // override func variantOptionality(x: S??) -> S? { return x! }
 }
- */
 
 // Make sure we remap the method's innermost generic parameters
 // to the correct depth
@@ -119,6 +117,19 @@ class GenericSub<T> : ConcreteBase {
     super.init(t: t, u: u)
   }
   override func doStuff<U>(t: Int, u: U) {
+    super.doStuff(t: t, u: u)
+  }
+}
+
+// Issue with generic parameter index
+class MoreGenericSub1<T, TT> : GenericBase<T> {
+  override func doStuff<U>(t: T, u: U) {
+    super.doStuff(t: t, u: u)
+  }
+}
+
+class MoreGenericSub2<TT, T> : GenericBase<T> {
+  override func doStuff<U>(t: T, u: U) {
     super.doStuff(t: t, u: u)
   }
 }

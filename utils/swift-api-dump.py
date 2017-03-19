@@ -243,6 +243,7 @@ def get_short_sdk_name(sdk):
     matched = re.match("[a-zA-Z]+", sdk)
     return matched.group(0)
 
+
 def create_dump_module_api_args(cmd_common, cmd_extra_args, sdk, module,
                                 target, output_dir, quiet, verbose):
 

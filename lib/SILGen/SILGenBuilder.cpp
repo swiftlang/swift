@@ -546,9 +546,10 @@ ManagedValue SILGenBuilder::createEnum(SILLocation loc, ManagedValue payload,
 }
 
 ManagedValue SILGenBuilder::createUnconditionalCheckedCastValue(
-    SILLocation loc, ManagedValue operand, SILType type) {
+    SILLocation loc, CastConsumptionKind consumption, ManagedValue operand,
+    SILType type) {
   SILValue result = SILBuilder::createUnconditionalCheckedCastValue(
-      loc, operand.forward(SGF), type);
+      loc, consumption, operand.forward(SGF), type);
   return SGF.emitManagedRValueWithCleanup(result);
 }
 
@@ -590,7 +591,7 @@ ManagedValue SILGenBuilder::createOptionalSome(SILLocation loc,
   CleanupCloner cloner(*this, arg);
   auto &argTL = getFunction().getTypeLowering(arg.getType());
   SILType optionalType = arg.getType().wrapAnyOptionalType(getFunction());
-  if (argTL.isLoadable()) {
+  if (argTL.isLoadable() || !SGF.silConv.useLoweredAddresses()) {
     SILValue someValue =
         SILBuilder::createOptionalSome(loc, arg.forward(SGF), optionalType);
     return cloner.clone(someValue);
@@ -607,7 +608,7 @@ ManagedValue SILGenBuilder::createOptionalSome(SILLocation loc,
 
 ManagedValue SILGenBuilder::createManagedOptionalNone(SILLocation loc,
                                                       SILType type) {
-  if (!type.isAddressOnly(getModule())) {
+  if (!type.isAddressOnly(getModule()) || !SGF.silConv.useLoweredAddresses()) {
     SILValue noneValue = SILBuilder::createOptionalNone(loc, type);
     return ManagedValue::forUnmanaged(noneValue);
   }

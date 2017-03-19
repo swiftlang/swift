@@ -213,9 +213,7 @@ func r19763676Caller(_ g: @noescape (Int) -> Int) { // expected-warning{{@noesca
 
 
 // <rdar://problem/19763732> False positive in @noescape analysis triggered by default arguments
-func calleeWithDefaultParameters(_ f: @noescape () -> (), x : Int = 1) {}  // expected-warning {{closure parameter prior to parameters with default arguments will not be treated as a trailing closure}}
-  // expected-warning@-1{{@noescape is the default and is deprecated}} {{39-49=}}
-
+func calleeWithDefaultParameters(_ f: @noescape () -> (), x : Int = 1) {} // expected-warning{{@noescape is the default and is deprecated}} {{39-49=}}
 func callerOfDefaultParams(_ g: @noescape () -> ()) { // expected-warning{{@noescape is the default and is deprecated}} {{33-43=}}
   calleeWithDefaultParameters(g)
 }

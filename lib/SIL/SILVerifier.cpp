@@ -685,14 +685,14 @@ public:
       // fallthrough for archetype check
     }
 
-    rvalueType.visit([&](Type t) {
-      auto *A = dyn_cast<ArchetypeType>(t.getPointer());
+    rvalueType.visit([&](CanType t) {
+      auto A = dyn_cast<ArchetypeType>(t);
       if (!A)
         return;
       require(isArchetypeValidInFunction(A, F),
               "Operand is of an ArchetypeType that does not exist in the "
               "Caller's generic param list.");
-      if (auto OpenedA = getOpenedArchetypeOf(CanType(A))) {
+      if (auto OpenedA = getOpenedArchetypeOf(A)) {
         auto Def = OpenedArchetypes.getOpenedArchetypeDef(OpenedA);
         require (Def, "Opened archetype should be registered in SILFunction");
         require(I == nullptr || Def == I ||
@@ -822,17 +822,16 @@ public:
 
     // Function to collect opened archetypes in FoundOpenedArchetypes and set
     // hasDynamicSelf.
-    auto HandleType = [&](Type Ty) {
+    auto HandleType = [&](CanType Ty) {
       if (Ty->isOpenedExistential()) {
-        auto *A = Ty->getAs<ArchetypeType>();
+        auto A = cast<ArchetypeType>(Ty);
         require(isArchetypeValidInFunction(A, AI->getFunction()),
                 "Archetype to be substituted must be valid in function.");
         // Collect all opened archetypes used in the substitutions list.
         FoundOpenedArchetypes.insert(A);
         // Also check that they are properly tracked inside the current
         // function.
-        auto Def =
-          OpenedArchetypes.getOpenedArchetypeDef(A);
+        auto Def = OpenedArchetypes.getOpenedArchetypeDef(A);
         require(Def, "Opened archetype should be registered in SILFunction");
         require(Def == AI ||
                 Dominance->properlyDominates(cast<SILInstruction>(Def), AI),
@@ -846,7 +845,7 @@ public:
 
     // Search for opened archetypes and dynamic self.
     for (auto &Sub : AS.getSubstitutions()) {
-      Sub.getReplacement().visit(HandleType);
+      Sub.getReplacement()->getCanonicalType().visit(HandleType);
     }
     AS.getSubstCalleeType().visit(HandleType);
 
@@ -2349,7 +2348,7 @@ public:
       resultInstTy = cast<MetatypeType>(resultInstTy).getInstanceType();
     }
 
-    require(operandInstTy->isExistentialType(),
+    require(operandInstTy.isExistentialType(),
             "ill-formed existential metatype in open_existential_metatype "
             "operand");
     auto archetype = getOpenedArchetypeOf(resultInstTy);
@@ -2596,9 +2595,9 @@ public:
     }
 
     if (isExact) {
-      require(fromCanTy->getClassOrBoundGenericClass(),
+      require(fromCanTy.getClassOrBoundGenericClass(),
               "downcast operand must be a class type");
-      require(toCanTy->getClassOrBoundGenericClass(),
+      require(toCanTy.getClassOrBoundGenericClass(),
               "downcast must convert to a class type");
       require(SILType::getPrimitiveObjectType(fromCanTy).
               isBindableToSuperclassOf(SILType::getPrimitiveObjectType(toCanTy)),
@@ -2627,10 +2626,10 @@ public:
     if (!Ty)
       return;
     // Check the type and all of its contained types.
-    Ty.visit([&](Type t) {
+    Ty.visit([&](CanType t) {
       SILValue Def;
       if (t->isOpenedExistential()) {
-        auto *archetypeTy = t->castTo<ArchetypeType>();
+        auto archetypeTy = cast<ArchetypeType>(t);
         Def = OpenedArchetypes.getOpenedArchetypeDef(archetypeTy);
         require(Def, "Opened archetype should be registered in SILFunction");
       } else if (t->hasDynamicSelfType()) {
@@ -3724,7 +3723,7 @@ public:
     // OpenedArchetypesDefs are existing instructions
     // belonging to the function F.
     for (auto KV: OpenedArchetypes.getOpenedArchetypeDefs()) {
-      require(getOpenedArchetypeOf(KV.first),
+      require(getOpenedArchetypeOf(CanType(KV.first)),
               "Only opened archetypes should be registered in SILFunction");
       auto Def = cast<SILInstruction>(KV.second);
       require(Def->getFunction() == F, 

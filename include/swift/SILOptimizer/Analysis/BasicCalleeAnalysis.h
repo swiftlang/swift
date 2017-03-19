@@ -132,12 +132,34 @@ public:
     return S->getKind() == AnalysisKind::BasicCallee;
   }
 
-  virtual void invalidate(SILAnalysis::InvalidationKind K) {
-    if (K & InvalidationKind::Functions)
-      Cache.reset();
+  /// Invalidate all information in this analysis.
+  virtual void invalidate() override {
+    Cache.reset();
   }
 
-  virtual void invalidate(SILFunction *F, InvalidationKind K) { invalidate(K); }
+  /// Invalidate all of the information for a specific function.
+  virtual void invalidate(SILFunction *F, InvalidationKind K) override {
+    // No invalidation needed because the analysis does not cache anything
+    // per call-site in functions.
+  }
+
+  /// Notify the analysis about a newly created function.
+  virtual void notifyAddFunction(SILFunction *F) override {
+    // Nothing to be done because the analysis does not cache anything
+    // per call-site in functions.
+  }
+
+  /// Notify the analysis about a function which will be deleted from the
+  /// module.
+  virtual void notifyDeleteFunction(SILFunction *F) override {
+    // No invalidation needed because the analysis does not cache anything
+    // per call-site in functions.
+  };
+
+  /// Notify the analysis about changed witness or vtables.
+  virtual void invalidateFunctionTables() override {
+    Cache.reset();
+  }
 
   CalleeList getCalleeList(FullApplySite FAS) {
     if (!Cache)

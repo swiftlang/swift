@@ -135,6 +135,14 @@ tests.test("${Self}/Basics") {
   expectEqual(-(.infinity), ${Self}("-Inf"))
   expectEqual(String(${Self}.nan), String(${Self}("nan")!))
   expectEqual(String(${Self}.nan), String(${Self}("NaN")!))
+
+// sNaN cannot be fully supported on i386.
+#if !arch(i386)
+  expectTrue(${Self}("sNaN")!.isSignalingNaN)
+  expectTrue(${Self}("SNAN")!.isSignalingNaN)
+  expectTrue(${Self}("+snan")!.isSignalingNaN)
+  expectTrue(${Self}("-SnAn")!.isSignalingNaN)
+#endif
 % end
 
   expectEqual(-0.0, ${Self}("-0"))

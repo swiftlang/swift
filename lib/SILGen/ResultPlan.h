@@ -13,6 +13,8 @@
 #ifndef SWIFT_SILGEN_RESULTPLAN_H
 #define SWIFT_SILGEN_RESULTPLAN_H
 
+#include "Callee.h"
+#include "ManagedValue.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/SIL/SILLocation.h"
@@ -27,9 +29,10 @@ namespace Lowering {
 
 class AbstractionPattern;
 class Initialization;
-class ManagedValue;
 class RValue;
 class SILGenFunction;
+class SGFContext;
+class CalleeTypeInfo;
 
 /// An abstract class for working with results.of applies.
 class ResultPlan {
@@ -37,6 +40,14 @@ public:
   virtual RValue finish(SILGenFunction &SGF, SILLocation loc, CanType substType,
                         ArrayRef<ManagedValue> &directResults) = 0;
   virtual ~ResultPlan() = default;
+
+  virtual void
+  gatherIndirectResultAddrs(SmallVectorImpl<SILValue> &outList) const = 0;
+
+  virtual Optional<std::pair<ManagedValue, ManagedValue>>
+  emitForeignErrorArgument(SILGenFunction &SGF, SILLocation loc) {
+    return None;
+  }
 };
 
 using ResultPlanPtr = std::unique_ptr<ResultPlan>;
@@ -44,17 +55,14 @@ using ResultPlanPtr = std::unique_ptr<ResultPlan>;
 /// The class for building result plans.
 struct ResultPlanBuilder {
   SILGenFunction &SGF;
-  SILLocation Loc;
-  ArrayRef<SILResultInfo> AllResults;
-  SILFunctionTypeRepresentation Rep;
-  SmallVectorImpl<SILValue> &IndirectResultAddrs;
+  SILLocation loc;
+  const CalleeTypeInfo &calleeTypeInfo;
+  ArrayRef<SILResultInfo> allResults;
 
   ResultPlanBuilder(SILGenFunction &SGF, SILLocation loc,
-                    ArrayRef<SILResultInfo> allResults,
-                    SILFunctionTypeRepresentation rep,
-                    SmallVectorImpl<SILValue> &resultAddrs)
-      : SGF(SGF), Loc(loc), AllResults(allResults), Rep(rep),
-        IndirectResultAddrs(resultAddrs) {}
+                    const CalleeTypeInfo &calleeTypeInfo)
+      : SGF(SGF), loc(loc), calleeTypeInfo(calleeTypeInfo),
+        allResults(calleeTypeInfo.substFnType->getResults()) {}
 
   ResultPlanPtr build(Initialization *emitInto, AbstractionPattern origType,
                       CanType substType);
@@ -62,9 +70,17 @@ struct ResultPlanBuilder {
                               AbstractionPattern origType,
                               CanTupleType substType);
 
+  static ResultPlanPtr computeResultPlan(SILGenFunction &SGF,
+                                         const CalleeTypeInfo &calleeTypeInfo,
+                                         SILLocation loc,
+                                         SGFContext evalContext);
+
   ~ResultPlanBuilder() {
-    assert(AllResults.empty() && "didn't consume all results!");
+    assert(allResults.empty() && "didn't consume all results!");
   }
+
+private:
+  ResultPlanPtr buildTopLevelResult(Initialization *init, SILLocation loc);
 };
 
 } // end namespace Lowering

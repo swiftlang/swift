@@ -801,10 +801,12 @@ public:
   }
 
   UnconditionalCheckedCastValueInst *
-  createUnconditionalCheckedCastValue(SILLocation Loc, SILValue op,
-                                      SILType destTy) {
+  createUnconditionalCheckedCastValue(SILLocation Loc,
+                                      CastConsumptionKind consumption,
+                                      SILValue op, SILType destTy) {
     return insert(UnconditionalCheckedCastValueInst::create(
-        getSILDebugLocation(Loc), op, destTy, F, OpenedArchetypes));
+        getSILDebugLocation(Loc), consumption, op, destTy, F,
+        OpenedArchetypes));
   }
 
   RetainValueInst *createRetainValue(SILLocation Loc, SILValue operand,

@@ -35,8 +35,7 @@ SILCombiner::visitRefToRawPointerInst(RefToRawPointerInst *RRPI) {
   if (auto *URCI = dyn_cast<UncheckedRefCastInst>(RRPI->getOperand())) {
     // (ref_to_raw_pointer (unchecked_ref_cast x))
     //    -> (ref_to_raw_pointer x)
-    if (URCI->getOperand()->getType().getSwiftRValueType()
-        ->isAnyClassReferenceType()) {
+    if (URCI->getOperand()->getType().isAnyClassReferenceType()) {
       RRPI->setOperand(URCI->getOperand());
       return URCI->use_empty() ? eraseInstFromFunction(*URCI) : nullptr;
     }

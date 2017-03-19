@@ -185,9 +185,11 @@ public struct ${Self}<
 }
 
 extension LazyCollectionProtocol
+%   if Collection != 'Collection':
   where
   Self : ${Collection},
-  Elements : ${Collection}
+Elements : ${Collection}
+%   end
 {
   /// Returns a lazy collection that skips any initial elements that satisfy
   /// `predicate`.

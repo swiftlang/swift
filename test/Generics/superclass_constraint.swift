@@ -75,17 +75,23 @@ extension P2 where Self.T : C {
 
 // CHECK: superclassConformance1
 // CHECK: Requirements:
-// CHECK-NEXT: τ_0_0 : C [τ_0_0: Explicit @ {{.*}}:46]
-// CHECK-NEXT: τ_0_0 : P3 [τ_0_0: Explicit @ {{.*}}:46 -> Superclass (C: P3)]
+// CHECK-NEXT: τ_0_0 : C [τ_0_0: Explicit @ {{.*}}:11]
+// CHECK-NEXT: τ_0_0 : P3 [τ_0_0: Explicit @ {{.*}}:11 -> Superclass (C: P3)]
 // CHECK: Canonical generic signature: <τ_0_0 where τ_0_0 : C>
-func superclassConformance1<T>(t: T) where T : C, T : P3 {}
+func superclassConformance1<T>(t: T)
+  where T : C, // expected-note{{conformance constraint 'T': 'P3' implied here}}
+        T : P3 {} // expected-warning{{redundant conformance constraint 'T': 'P3'}}
+
+
 
 // CHECK: superclassConformance2
 // CHECK: Requirements:
-// CHECK-NEXT: τ_0_0 : C [τ_0_0: Explicit @ {{.*}}:46]
-// CHECK-NEXT: τ_0_0 : P3 [τ_0_0: Explicit @ {{.*}}:46 -> Superclass (C: P3)]
+// CHECK-NEXT: τ_0_0 : C [τ_0_0: Explicit @ {{.*}}:11]
+// CHECK-NEXT: τ_0_0 : P3 [τ_0_0: Explicit @ {{.*}}:11 -> Superclass (C: P3)]
 // CHECK: Canonical generic signature: <τ_0_0 where τ_0_0 : C>
-func superclassConformance2<T>(t: T) where T : C, T : P3 {}
+func superclassConformance2<T>(t: T)
+  where T : C, // expected-note{{conformance constraint 'T': 'P3' implied here}}
+   T : P3 {} // expected-warning{{redundant conformance constraint 'T': 'P3'}}
 
 protocol P4 { }
 
@@ -99,6 +105,8 @@ class C2 : C, P4 { }
 func superclassConformance3<T>(t: T) where T : C, T : P4, T : C2 {}
 // expected-warning@-1{{redundant superclass constraint 'T' : 'C'}}
 // expected-note@-2{{superclass constraint 'T' : 'C2' written here}}
+// expected-warning@-3{{redundant conformance constraint 'T': 'P4'}}
+// expected-note@-4{{conformance constraint 'T': 'P4' implied here}}
 
 protocol P5: A { } // expected-error{{non-class type 'P5' cannot inherit from class 'A'}}
 

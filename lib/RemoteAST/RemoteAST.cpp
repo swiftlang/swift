@@ -483,7 +483,7 @@ RemoteASTTypeBuilder::createNominalTypeDecl(const Demangle::NodePointer &node) {
   auto DC = findDeclContext(node);
   if (!DC) {
     return fail<NominalTypeDecl*>(Failure::CouldNotResolveTypeDecl,
-                              Demangle::mangleNode(node, useNewMangling(node)));
+                                  Demangle::mangleNode(node));
   }
 
   auto decl = dyn_cast<NominalTypeDecl>(DC);
@@ -547,7 +547,7 @@ RemoteASTTypeBuilder::findDeclContext(const Demangle::NodePointer &node) {
       if (!module) return nullptr;
 
       // Look up the local type by its mangling.
-      auto mangledName = Demangle::mangleNode(node, useNewMangling(node));
+      auto mangledName = Demangle::mangleNode(node);
       auto decl = module->lookupLocalType(mangledName);
       if (!decl) return nullptr;
 

@@ -1224,7 +1224,8 @@ public:
 
   void visitUnconditionalCheckedCastValueInst(
       UnconditionalCheckedCastValueInst *CI) {
-    *this << getIDAndType(CI->getOperand()) << " to " << CI->getType();
+    *this << getCastConsumptionKindName(CI->getConsumptionKind()) << ' '
+          << getIDAndType(CI->getOperand()) << " to " << CI->getType();
   }
 
   void visitCheckedCastAddrBranchInst(CheckedCastAddrBranchInst *CI) {

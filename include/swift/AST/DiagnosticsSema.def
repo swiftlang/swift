@@ -1236,9 +1236,6 @@ WARNING(function_type_access_warn,none,
         "because its %select{parameter|result}5 uses "
         "%select{a private|a fileprivate|an internal|%error|%error}3 type",
         (bool, Accessibility, bool, Accessibility, unsigned, bool))
-WARNING(non_trailing_closure_before_default_args,none,
-        "closure parameter prior to parameters with default arguments will "
-        "not be treated as a trailing closure", ())
 ERROR(noreturn_not_supported,none,
       "'@noreturn' has been removed; functions that never return should have a "
       "return type of 'Never' instead", ())
@@ -1574,6 +1571,12 @@ ERROR(requires_same_concrete_type,none,
 ERROR(protocol_typealias_conflict, none,
       "typealias %0 requires types %1 and %2 to be the same",
       (Identifier, Type, Type))
+WARNING(redundant_conformance_constraint,none,
+        "redundant conformance constraint %0: %1", (Type, ProtocolDecl *))
+NOTE(redundant_conformance_here,none,
+     "conformance constraint %1: %2 %select{written here|implied here}0",
+     (bool, Type, ProtocolDecl *))
+
 WARNING(redundant_same_type_to_concrete,none,
         "redundant same-type constraint %0 == %1", (Type, Type))
 NOTE(same_type_redundancy_here,none,
@@ -2955,7 +2958,7 @@ ERROR(invalid_nonobjc_decl,none,
 ERROR(objc_in_extension_context,none,
       "members of constrained extensions cannot be declared @objc", ())
 ERROR(objc_in_generic_extension,none,
-      "@objc is not supported within extensions of generic classes", ())
+      "@objc is not supported within extensions of generic classes or classes that inherit from generic classes", ())
 ERROR(objc_operator, none,
       "operator methods cannot be declared @objc", ())
 ERROR(objc_operator_proto, none,
@@ -3437,6 +3440,10 @@ WARNING(variable_never_used, none,
         "%select{variable|immutable value}1 %0 was never used; "
         "consider replacing with '_' or removing it",
         (Identifier, unsigned))
+WARNING(immutable_value_never_used_but_assigned, none,
+        "immutable value %0 was never used; "
+        "consider removing it",
+        (Identifier))
 WARNING(variable_never_mutated, none,
         "%select{variable|parameter}1 %0 was never mutated; "
         "consider changing to 'let' constant",

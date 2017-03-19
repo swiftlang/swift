@@ -19,8 +19,8 @@
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/ParameterList.h"
 #include "swift/AST/ProtocolConformance.h"
-#include "swift/AST/Mangle.h"
 #include "swift/Demangling/ManglingUtils.h"
 #include "swift/Strings.h"
 #include "clang/Basic/CharInfo.h"
@@ -37,28 +37,6 @@
 
 using namespace swift;
 using namespace swift::NewMangling;
-
-std::string NewMangling::mangleTypeForDebugger(Type Ty, const DeclContext *DC) {
-  Mangle::Mangler OldMangler(/* DWARF */ true);
-  OldMangler.mangleTypeForDebugger(Ty, DC);
-  std::string Old = OldMangler.finalize();
-  ASTMangler NewMangler(/* DWARF */ true);
-  std::string New = NewMangler.mangleTypeForDebugger(Ty, DC);
-
-  // The old mangling is broken in some cases, so we don't check if the new
-  // mangling is equivalent to the old mangling.
-  return selectMangling(Old, New, /*compareTrees*/ false);
-}
-
-std::string NewMangling::mangleTypeAsUSR(Type Ty) {
-  Mangle::Mangler OldMangler;
-  OldMangler.mangleType(Ty, /*uncurry*/ 0);
-  std::string Old = OldMangler.finalize();
-  ASTMangler NewMangler;
-  std::string New = NewMangler.mangleTypeAsUSR(Ty);
-  return selectMangling(Old, New);
-}
-
 
 std::string ASTMangler::mangleClosureEntity(const AbstractClosureExpr *closure,
                                             SymbolKind SKind) {
@@ -260,14 +238,23 @@ std::string ASTMangler::mangleReabstractionThunkHelper(
 }
 
 std::string ASTMangler::mangleTypeForDebugger(Type Ty, const DeclContext *DC) {
-  assert(DWARFMangling && "DWARFMangling expected when mangling for debugger");
-
+  DWARFMangling = true;
   beginMangling();
+  
   if (DC)
     bindGenericParameters(DC);
   DeclCtx = DC;
 
   appendType(Ty);
+  appendOperator("D");
+  return finalize();
+}
+
+std::string ASTMangler::mangleDeclType(const ValueDecl *decl) {
+  DWARFMangling = true;
+  beginMangling();
+  
+  appendDeclType(decl);
   appendOperator("D");
   return finalize();
 }
@@ -375,6 +362,29 @@ static bool isInPrivateOrLocalContext(const ValueDecl *D) {
   return isInPrivateOrLocalContext(nominal);
 }
 
+static unsigned getUnnamedParamIndex(const Decl *D) {
+  unsigned UnnamedIndex = 0;
+  ArrayRef<ParameterList *> ParamLists;
+
+  if (auto AFD = dyn_cast<AbstractFunctionDecl>(D->getDeclContext())) {
+    ParamLists = AFD->getParameterLists();
+  } else if (auto ACE = dyn_cast<AbstractClosureExpr>(D->getDeclContext())) {
+    ParamLists = ACE->getParameterLists();
+  } else {
+    llvm_unreachable("unhandled param context");
+  }
+  for (auto ParamList : ParamLists) {
+    for (auto Param : *ParamList) {
+      if (!Param->hasName()) {
+        if (Param == D)
+          return UnnamedIndex;
+        ++UnnamedIndex;
+      }
+    }
+  }
+  llvm_unreachable("param not found");
+}
+
 void ASTMangler::appendDeclName(const ValueDecl *decl) {
   if (decl->isOperator()) {
     appendIdentifier(translateOperator(decl->getName().str()));
@@ -394,6 +404,10 @@ void ASTMangler::appendDeclName(const ValueDecl *decl) {
   }
 
   if (decl->getDeclContext()->isLocalContext()) {
+    if (isa<ParamDecl>(decl) && !decl->hasName()) {
+      // Mangle unnamed params with their ordering.
+      return appendOperator("L", Index(getUnnamedParamIndex(decl)));
+    }
     // Mangle local declarations with a numeric discriminator.
     return appendOperator("L", Index(decl->getLocalDiscriminator()));
   }

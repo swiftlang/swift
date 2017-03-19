@@ -17,9 +17,7 @@
 #ifndef SWIFT_SIL_GENERICS_H
 #define SWIFT_SIL_GENERICS_H
 
-#include "swift/AST/Mangle.h"
 #include "swift/AST/SubstitutionMap.h"
-#include "swift/SIL/Mangle.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SILOptimizer/Utils/Local.h"
@@ -49,6 +47,10 @@ class ReabstractionInfo {
   /// A 1-bit means that this parameter/return value is converted from indirect
   /// to direct.
   llvm::SmallBitVector Conversions;
+
+  /// If set, indirect to direct conversions should be performned by the generic
+  /// specializer.
+  bool ConvertIndirectToDirect;
 
   /// The first NumResults bits in Conversions refer to formal indirect
   /// out-parameters.
@@ -130,7 +132,8 @@ public:
   /// If specialization is not possible getSpecializedType() will return an
   /// invalid type.
   ReabstractionInfo(ApplySite Apply, SILFunction *Callee,
-                    SubstitutionList ParamSubs);
+                    SubstitutionList ParamSubs,
+                    bool ConvertIndirectToDirect = true);
 
   /// Constructs the ReabstractionInfo for generic function \p Orig with
   /// additional requirements. Requirements may contain new layout,
@@ -140,14 +143,15 @@ public:
   /// Returns true if the \p ParamIdx'th (non-result) formal parameter is
   /// converted from indirect to direct.
   bool isParamConverted(unsigned ParamIdx) const {
-    return Conversions.test(ParamIdx + NumFormalIndirectResults);
+    return ConvertIndirectToDirect &&
+           Conversions.test(ParamIdx + NumFormalIndirectResults);
   }
 
   /// Returns true if the \p ResultIdx'th formal result is converted from
   /// indirect to direct.
   bool isFormalResultConverted(unsigned ResultIdx) const {
     assert(ResultIdx < NumFormalIndirectResults);
-    return Conversions.test(ResultIdx);
+    return ConvertIndirectToDirect && Conversions.test(ResultIdx);
   }
 
   /// Gets the total number of original function arguments.

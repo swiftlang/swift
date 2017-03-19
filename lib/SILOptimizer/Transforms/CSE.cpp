@@ -376,7 +376,7 @@ public:
   }
 
   hash_code visitOpenExistentialRefInst(OpenExistentialRefInst *X) {
-    auto ArchetypeTy = cast<ArchetypeType>(X->getType().getSwiftRValueType());
+    auto ArchetypeTy = X->getType().castTo<ArchetypeType>();
     auto ConformsTo = ArchetypeTy->getConformsTo();
     return llvm::hash_combine(
         X->getKind(), X->getOperand(),
@@ -406,11 +406,9 @@ bool llvm::DenseMapInfo<SimpleValue>::isEqual(SimpleValue LHS,
 
     // Consider the types of two open_existential_ref instructions to be equal,
     // if the sets of protocols they conform to are equal.
-    auto LHSArchetypeTy =
-        cast<ArchetypeType>(LHSI->getType().getSwiftRValueType());
+    auto LHSArchetypeTy = LHSI->getType().castTo<ArchetypeType>();
     auto LHSConformsTo = LHSArchetypeTy->getConformsTo();
-    auto RHSArchetypeTy =
-        cast<ArchetypeType>(RHSI->getType().getSwiftRValueType());
+    auto RHSArchetypeTy = RHSI->getType().castTo<ArchetypeType>();
     auto RHSConformsTo = RHSArchetypeTy->getConformsTo();
     return LHSConformsTo == RHSConformsTo;
   }
@@ -603,7 +601,7 @@ static void updateBasicBlockArgTypes(SILBasicBlock *BB,
                                      ArchetypeType *NewOpenedArchetype) {
   // Check types of all BB arguments.
   for (auto *Arg : BB->getPHIArguments()) {
-    if (!Arg->getType().getSwiftRValueType()->hasOpenedExistential())
+    if (!Arg->getType().hasOpenedExistential())
       continue;
     // Type of this BB argument uses an opened existential.
     // Try to apply substitutions to it and if it produces a different type,
@@ -705,16 +703,13 @@ bool CSE::processOpenExistentialRef(SILInstruction *Inst, ValueBase *V,
     // True if a candidate depends on the old opened archetype.
     bool DependsOnOldOpenedArchetype = !Candidate->getTypeDependentOperands().empty();
     if (!Candidate->use_empty() &&
-        Candidate->getType().getSwiftRValueType()->hasOpenedExistential()) {
+        Candidate->getType().hasOpenedExistential()) {
       // Check if the result type of the candidate depends on the opened
       // existential in question.
       auto ResultDependsOnOldOpenedArchetype =
           Candidate->getType().getSwiftRValueType().findIf(
               [&OldOpenedArchetype](Type t) -> bool {
-                if (auto *archetypeTy = t->getAs<ArchetypeType>())
-                  if (archetypeTy == OldOpenedArchetype)
-                    return true;
-                return false;
+                return (CanType(t) == OldOpenedArchetype);
               });
       if (ResultDependsOnOldOpenedArchetype) {
         DependsOnOldOpenedArchetype |= ResultDependsOnOldOpenedArchetype;

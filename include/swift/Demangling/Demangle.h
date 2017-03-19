@@ -405,15 +405,7 @@ void mangleIdentifier(const char *data, size_t length,
 /// \brief Remangle a demangled parse tree.
 ///
 /// This should always round-trip perfectly with demangleSymbolAsNode.
-std::string mangleNodeOld(const NodePointer &root);
-
 std::string mangleNode(const NodePointer &root);
-
-inline std::string mangleNode(const NodePointer &root, bool NewMangling) {
-  if (NewMangling)
-    return mangleNode(root);
-  return mangleNodeOld(root);
-}
 
 /// \brief Transform the node structure to a string.
 ///
@@ -491,14 +483,6 @@ NodePointer getUnspecialized(Node *node, NodeFactory &Factory);
 std::string archetypeName(Node::IndexType index, Node::IndexType depth);
 
 } // end namespace Demangle
-
-
-/// Returns true if the new mangling scheme should be used.
-///
-/// TODO: remove this function when the old mangling is removed.
-bool useNewMangling(Demangle::NodePointer Node);
-
-
 } // end namespace swift
 
 #endif // SWIFT_DEMANGLING_DEMANGLE_H

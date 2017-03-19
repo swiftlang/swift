@@ -2,8 +2,8 @@
 
 import Swift
 
-// CHECK-64: @_TWVO13indirect_enum5TreeA = hidden constant {{.*}} i8* inttoptr ([[WORD:i64]] 8 to i8*), i8* inttoptr (i64 2162695 to i8*), i8* inttoptr (i64 8 to i8*)
-// CHECK-32: @_TWVO13indirect_enum5TreeA = hidden constant {{.*}} i8* inttoptr ([[WORD:i32]] 4 to i8*), i8* inttoptr (i32 2162691 to i8*), i8* inttoptr (i32 4 to i8*)
+// CHECK-64: @_T013indirect_enum5TreeAOWV = hidden constant {{.*}} i8* inttoptr ([[WORD:i64]] 8 to i8*), i8* inttoptr (i64 2162695 to i8*), i8* inttoptr (i64 8 to i8*)
+// CHECK-32: @_T013indirect_enum5TreeAOWV = hidden constant {{.*}} i8* inttoptr ([[WORD:i32]] 4 to i8*), i8* inttoptr (i32 2162691 to i8*), i8* inttoptr (i32 4 to i8*)
 
 // CHECK-LABEL: define{{( protected)?}} private %swift.type** @get_field_types_TreeA
 // -- Leaf(T)
@@ -34,8 +34,8 @@ enum TreeB<T> {
 
 // CHECK-LABEL: define{{( protected)?}} private %swift.type** @get_field_types_Foo
 // -- Foo(Int)
-// CHECK-64:         (i64 or (i64 ptrtoint (%swift.type* @_TMSi {{.*}}), [[WORD]] 1)
-// CHECK-32:         (i32 or (i32 ptrtoint (%swift.type* @_TMSi {{.*}}), [[WORD]] 1)
+// CHECK-64:         (i64 or (i64 ptrtoint (%swift.type* @_T0SiN {{.*}}), [[WORD]] 1)
+// CHECK-32:         (i32 or (i32 ptrtoint (%swift.type* @_T0SiN {{.*}}), [[WORD]] 1)
 // -- Bar(T)
 // CHECK-NOT:     ptrtoint %swift.type* %T
 enum Foo<T> {

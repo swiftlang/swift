@@ -183,12 +183,12 @@ public protocol _ArrayBufferProtocol
 extension _ArrayBufferProtocol 
   where Buffer.Element == Element
 {
-
-  // @_versioned
+  @_inlineable
   public var subscriptBaseAddress: UnsafeMutablePointer<Element> {
     return firstElementAddress
   }
 
+  @_inlineable
   public mutating func replaceSubrange<C>(
     _ subrange: Range<Int>,
     with newValues: C

@@ -392,7 +392,8 @@ struct ElementReader {
 
   static bool
   dictionary_apply(void *buffer, size_t index,
-                   sourcekitd_variant_dictionary_applier_t applier) {
+                   llvm::function_ref<bool(sourcekitd_uid_t,
+                                           sourcekitd_variant_t)> applier) {
 
     CompactArrayReaderTy reader(buffer);
     sourcekitd_uid_t kind;
@@ -411,7 +412,8 @@ struct InheritedTypeReader {
 
   static bool
   dictionary_apply(void *buffer, size_t index,
-                   sourcekitd_variant_dictionary_applier_t applier) {
+                   llvm::function_ref<bool(sourcekitd_uid_t,
+                                           sourcekitd_variant_t)> applier) {
 
     CompactArrayReaderTy reader(buffer);
     const char *value = nullptr;
@@ -427,7 +429,8 @@ struct AttributesReader {
 
   static bool
   dictionary_apply(void *buffer, size_t index,
-                   sourcekitd_variant_dictionary_applier_t applier) {
+                   llvm::function_ref<bool(sourcekitd_uid_t,
+                                           sourcekitd_variant_t)> applier) {
 
     CompactArrayReaderTy reader(buffer);
     sourcekitd_uid_t value;
@@ -440,7 +443,8 @@ struct AttributesReader {
 struct DocStructureReader {
   static bool
   dictionary_apply(void *buffer, size_t index,
-                   sourcekitd_variant_dictionary_applier_t applier) {
+                   llvm::function_ref<bool(sourcekitd_uid_t,
+                                           sourcekitd_variant_t)> applier) {
     auto reader = DocStructureArrayReader(buffer);
     auto node = reader.readStructure(index);
 

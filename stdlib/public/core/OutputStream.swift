@@ -344,6 +344,7 @@ internal func _adHocPrint_unlocked<T, TargetStream : TextOutputStream>(
   }
 }
 
+@_versioned
 @inline(never)
 @_semantics("optimize.sil.specialize.generic.never")
 @_semantics("stdlib_binary_only")
@@ -386,6 +387,8 @@ internal func _print_unlocked<T, TargetStream : TextOutputStream>(
 ///
 /// This function is forbidden from being inlined because when building the
 /// standard library inlining makes us drop the special semantics.
+@_inlineable
+@_versioned
 @inline(never) @effects(readonly)
 func _toStringReadOnlyStreamable<T : TextOutputStreamable>(_ x: T) -> String {
   var result = ""
@@ -393,6 +396,8 @@ func _toStringReadOnlyStreamable<T : TextOutputStreamable>(_ x: T) -> String {
   return result
 }
 
+@_inlineable
+@_versioned
 @inline(never) @effects(readonly)
 func _toStringReadOnlyPrintable<T : CustomStringConvertible>(_ x: T) -> String {
   return x.description

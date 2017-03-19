@@ -38,7 +38,10 @@ class LValue;
 class ManagedValue;
 class RValue;
 class TemporaryInitialization;
-  
+class CalleeTypeInfo;
+class ResultPlan;
+using ResultPlanPtr = std::unique_ptr<ResultPlan>;
+
 /// Internal context information for the SILGenFunction visitor.
 ///
 /// In general, emission methods which take an SGFContext indicate
@@ -881,16 +884,16 @@ public:
 
   /// OpenedArchetypes - Mappings of opened archetypes back to the
   /// instruction which opened them.
-  llvm::DenseMap<CanType, SILValue> ArchetypeOpenings;
+  llvm::DenseMap<ArchetypeType *, SILValue> ArchetypeOpenings;
 
-  SILValue getArchetypeOpeningSite(CanArchetypeType archetype) const {
+  SILValue getArchetypeOpeningSite(ArchetypeType *archetype) const {
     auto it = ArchetypeOpenings.find(archetype);
     assert(it != ArchetypeOpenings.end() &&
            "opened archetype was not registered with SILGenFunction");
     return it->second;
   }
 
-  void setArchetypeOpeningSite(CanArchetypeType archetype, SILValue site) {
+  void setArchetypeOpeningSite(ArchetypeType *archetype, SILValue site) {
     ArchetypeOpenings.insert({archetype, site});
   }
 
@@ -913,7 +916,7 @@ public:
   SILGenFunction::OpaqueValueState
   emitOpenExistential(SILLocation loc,
                       ManagedValue existentialValue,
-                      CanArchetypeType openedArchetype,
+                      ArchetypeType *openedArchetype,
                       SILType loweredOpenedType,
                       AccessKind accessKind);
 
@@ -1270,16 +1273,9 @@ public:
   /// lowered appropriately for the abstraction level but that the
   /// result does need to be turned back into something matching a
   /// formal type.
-  RValue emitApply(SILLocation loc,
-                   ManagedValue fn,
-                   SubstitutionList subs,
-                   ArrayRef<ManagedValue> args,
-                   CanSILFunctionType substFnType,
-                   AbstractionPattern origResultType,
-                   CanType substResultType,
-                   ApplyOptions options,
-                   Optional<SILFunctionTypeRepresentation> overrideRep,
-                   const Optional<ForeignErrorConvention> &foreignError,
+  RValue emitApply(ResultPlanPtr &&resultPlan, SILLocation loc, ManagedValue fn,
+                   SubstitutionList subs, ArrayRef<ManagedValue> args,
+                   const CalleeTypeInfo &calleeTypeInfo, ApplyOptions options,
                    SGFContext evalContext);
 
   RValue emitApplyOfDefaultArgGenerator(SILLocation loc,

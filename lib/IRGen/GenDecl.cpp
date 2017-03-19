@@ -70,8 +70,8 @@ bool IRGenerator::tryEnableLazyTypeMetadata(NominalTypeDecl *Nominal) {
     case DeclKind::Struct:
       break;
     default:
-      // Keep all metadata for classes, because a class can be instanciated by
-      // using the library function _typeByName.
+      // Keep all metadata for classes, because a class can be instantiated by
+      // using the library function _typeByName or NSClassFromString.
       return false;
   }
 
@@ -129,7 +129,7 @@ public:
     classMetadata = llvm::ConstantExpr::getBitCast(classMetadata,
                                                    IGM.ObjCClassPtrTy);
     metaclassMetadata = IGM.getAddrOfMetaclassObject(
-                                       origTy->getClassOrBoundGenericClass(),
+                                       origTy.getClassOrBoundGenericClass(),
                                                          NotForDefinition);
     metaclassMetadata = llvm::ConstantExpr::getBitCast(metaclassMetadata,
                                                    IGM.ObjCClassPtrTy);
@@ -849,19 +849,9 @@ void IRGenerator::emitGlobalTopLevel() {
   // Emit witness tables.
   for (SILWitnessTable &wt : PrimaryIGM->getSILModule().getWitnessTableList()) {
     CurrentIGMPtr IGM = getGenModule(wt.getConformance()->getDeclContext());
-#ifndef NDEBUG
-    IGM->EligibleConfs.collect(&wt);
-    IGM->CurrentWitnessTable = &wt;
-#endif
-
     if (!canEmitWitnessTableLazily(&wt)) {
       IGM->emitSILWitnessTable(&wt);
     }
-
-#ifndef NDEBUG
-    IGM->EligibleConfs.clear();
-    IGM->CurrentWitnessTable = nullptr;
-#endif
   }
   
   for (auto Iter : *this) {
@@ -1895,84 +1885,6 @@ IRGenModule::getAddrOfLLVMVariable(LinkEntity entity, Alignment alignment,
   llvm_unreachable("bad reference kind");
 }
 
-void IRGenModule::checkEligibleConf(const ProtocolConformance *Conf) {
-  return; // FIXME: Remove temporary workaround for <rdar://30247881>
-#ifndef NDEBUG
-  if (!ConformanceCollector::verifyInIRGen())
-    return;
-
-  if (EligibleConfs.isUsed(Conf))
-    return;
-
-  if (CurrentInst) {
-    llvm::errs() << "## Conformance: ";
-    Conf->dump();
-    llvm::errs() << "## Inst: ";
-    CurrentInst->dump();
-    llvm_unreachable(
-                "ConformanceCollector is missing a conformance in instruction");
-  }
-  if (CurrentWitnessTable) {
-    llvm_unreachable(
-              "ConformanceCollector is missing a conformance in witness table");
-  }
-#endif
-}
-
-void IRGenModule::checkEligibleMetaType(NominalTypeDecl *NT) {
-#ifndef NDEBUG
-  if (!ConformanceCollector::verifyInIRGen())
-    return;
-
-  if (!NT || EligibleConfs.isMetaTypeEscaping(NT))
-    return;
-
-  if (CurrentInst) {
-    // Ignore instructions which may use a metatype but do not let escape it.
-    switch (CurrentInst->getKind()) {
-      case ValueKind::DestroyAddrInst:
-      case ValueKind::StructElementAddrInst:
-      case ValueKind::TupleElementAddrInst:
-      case ValueKind::InjectEnumAddrInst:
-      case ValueKind::SwitchEnumAddrInst:
-      case ValueKind::SelectEnumAddrInst:
-      case ValueKind::IndexAddrInst:
-      case ValueKind::RefElementAddrInst:
-      case ValueKind::RefTailAddrInst:
-      case ValueKind::TailAddrInst:
-      case ValueKind::AllocValueBufferInst:
-      case ValueKind::ProjectValueBufferInst:
-      case ValueKind::ProjectBoxInst:
-      case ValueKind::CopyAddrInst:
-      case ValueKind::UncheckedRefCastAddrInst:
-      case ValueKind::AllocStackInst:
-      case ValueKind::SuperMethodInst:
-      case ValueKind::WitnessMethodInst:
-      case ValueKind::DeallocRefInst:
-      case ValueKind::AllocGlobalInst:
-        return;
-      case ValueKind::ApplyInst:
-      case ValueKind::TryApplyInst:
-      case ValueKind::PartialApplyInst:
-        // It's not trivial to find the non-escaping vs. escaping meta-
-        // types of an apply. Therefore we just trust the ConformanceCollector
-        // that it does the right job.
-        return;
-      default:
-        break;
-    }
-    llvm::errs() << "## NominalType: " << NT->getName() << "\n## Inst: ";
-    CurrentInst->dump();
-    llvm_unreachable(
-                  "ConformanceCollector is missing a metatype in instruction");
-  }
-  if (CurrentWitnessTable) {
-    llvm_unreachable(
-                "ConformanceCollector is missing a metatype in witness table");
-  }
-#endif
-}
-
 /// A convenient wrapper around getAddrOfLLVMVariable which uses the
 /// default type as the definition type.
 llvm::Constant *
@@ -2514,7 +2426,6 @@ IRGenModule::getAddrOfTypeMetadataAccessFunction(CanType type,
                                               ForDefinition_t forDefinition) {
   assert(!type->hasArchetype() && !type->hasTypeParameter());
   NominalTypeDecl *Nominal = type->getNominalOrBoundGenericNominal();
-  checkEligibleMetaType(Nominal);
   IRGen.addLazyTypeMetadata(Nominal);
 
   LinkEntity entity = LinkEntity::forTypeMetadataAccessFunction(type);
@@ -2538,7 +2449,6 @@ IRGenModule::getAddrOfGenericTypeMetadataAccessFunction(
                                            ForDefinition_t forDefinition) {
   assert(!genericArgs.empty());
   assert(nominal->isGenericContext());
-  checkEligibleMetaType(nominal);
   IRGen.addLazyTypeMetadata(nominal);
 
   auto type = nominal->getDeclaredType()->getCanonicalType();
@@ -2562,7 +2472,6 @@ llvm::Constant *
 IRGenModule::getAddrOfTypeMetadataLazyCacheVariable(CanType type,
                                               ForDefinition_t forDefinition) {
   assert(!type->hasArchetype() && !type->hasTypeParameter());
-  checkEligibleMetaType(type->getNominalOrBoundGenericNominal());
   LinkEntity entity = LinkEntity::forTypeMetadataLazyCacheVariable(type);
   return getAddrOfLLVMVariable(entity, getPointerAlignment(), forDefinition,
                                TypeMetadataPtrTy, DebugTypeInfo());
@@ -2713,7 +2622,6 @@ ConstantReference IRGenModule::getAddrOfTypeMetadata(CanType concreteType,
                                                SymbolReferenceKind refKind) {
   assert(isPattern || !isa<UnboundGenericType>(concreteType));
 
-  checkEligibleMetaType(concreteType->getNominalOrBoundGenericNominal());
   llvm::Type *defaultVarTy;
   unsigned adjustmentIndex;
   Alignment alignment = getPointerAlignment();
@@ -2808,7 +2716,6 @@ ConstantReference IRGenModule::getAddrOfTypeMetadata(CanType concreteType,
 llvm::Constant *IRGenModule::getAddrOfNominalTypeDescriptor(NominalTypeDecl *D,
                                                 ConstantInitFuture definition) {
   assert(definition && "not defining nominal type descriptor?");
-  checkEligibleMetaType(D);
   auto entity = LinkEntity::forNominalTypeDescriptor(D);
   return getAddrOfLLVMVariable(entity, getPointerAlignment(),
                                definition,
@@ -3182,7 +3089,6 @@ IRGenModule::getResilienceExpansionForLayout(SILGlobalVariable *global) {
 llvm::Constant *IRGenModule::
 getAddrOfGenericWitnessTableCache(const NormalProtocolConformance *conf,
                                   ForDefinition_t forDefinition) {
-  checkEligibleConf(conf);
   auto entity = LinkEntity::forGenericProtocolWitnessTableCache(conf);
   auto expectedTy = getGenericWitnessTableCacheTy();
   return getAddrOfLLVMVariable(entity, getPointerAlignment(), forDefinition,
@@ -3192,7 +3098,6 @@ getAddrOfGenericWitnessTableCache(const NormalProtocolConformance *conf,
 llvm::Function *
 IRGenModule::getAddrOfGenericWitnessTableInstantiationFunction(
                                       const NormalProtocolConformance *conf) {
-  checkEligibleConf(conf);
   auto forDefinition = ForDefinition;
 
   LinkEntity entity =
@@ -3239,8 +3144,6 @@ llvm::Function *
 IRGenModule::getAddrOfWitnessTableAccessFunction(
                                       const NormalProtocolConformance *conf,
                                               ForDefinition_t forDefinition) {
-  checkEligibleConf(conf);
-
   IRGen.addLazyWitnessTable(conf);
 
   LinkEntity entity = LinkEntity::forProtocolWitnessTableAccessFunction(conf);
@@ -3269,7 +3172,6 @@ IRGenModule::getAddrOfWitnessTableLazyAccessFunction(
                                       const NormalProtocolConformance *conf,
                                               CanType conformingType,
                                               ForDefinition_t forDefinition) {
-  checkEligibleConf(conf);
   LinkEntity entity =
     LinkEntity::forProtocolWitnessTableLazyAccessFunction(conf, conformingType);
   llvm::Function *&entry = GlobalFuncs[entity];
@@ -3294,7 +3196,6 @@ IRGenModule::getAddrOfWitnessTableLazyCacheVariable(
                                               CanType conformingType,
                                               ForDefinition_t forDefinition) {
   assert(!conformingType->hasArchetype());
-  checkEligibleConf(conf);
   LinkEntity entity =
     LinkEntity::forProtocolWitnessTableLazyCacheVariable(conf, conformingType);
   return getAddrOfLLVMVariable(entity, getPointerAlignment(),
@@ -3311,7 +3212,6 @@ IRGenModule::getAddrOfWitnessTableLazyCacheVariable(
 llvm::Constant*
 IRGenModule::getAddrOfWitnessTable(const NormalProtocolConformance *conf,
                                    ConstantInit definition) {
-  checkEligibleConf(conf);
   IRGen.addLazyWitnessTable(conf);
 
   auto entity = LinkEntity::forDirectProtocolWitnessTable(conf);
@@ -3323,7 +3223,6 @@ llvm::Function *
 IRGenModule::getAddrOfAssociatedTypeMetadataAccessFunction(
                                   const NormalProtocolConformance *conformance,
                                   AssociatedTypeDecl *associate) {
-  checkEligibleConf(conformance);
   auto forDefinition = ForDefinition;
 
   LinkEntity entity =
@@ -3345,7 +3244,6 @@ IRGenModule::getAddrOfAssociatedTypeWitnessTableAccessFunction(
                                   const NormalProtocolConformance *conformance,
                                   CanType associatedType,
                                   ProtocolDecl *associatedProtocol) {
-  checkEligibleConf(conformance);
   auto forDefinition = ForDefinition;
 
   LinkEntity entity =

@@ -370,6 +370,7 @@ public protocol _Indexable : _IndexableBase {
 ///     }
 ///     // Prints "15.0"
 ///     // Prints "20.0"
+@_fixed_layout
 public struct IndexingIterator<
   Elements : _IndexableBase
   // FIXME(ABI)#97 (Recursive Protocol Constraints):
@@ -377,6 +378,7 @@ public struct IndexingIterator<
   // Elements : Collection
 > : IteratorProtocol, Sequence {
 
+  @_inlineable
   /// Creates an iterator over the given collection.
   public /// @testable
   init(_elements: Elements) {
@@ -408,14 +410,16 @@ public struct IndexingIterator<
   ///
   /// - Returns: The next element in the underlying sequence if a next element
   ///   exists; otherwise, `nil`.
+  @_inlineable
   public mutating func next() -> Elements._Element? {
     if _position == _elements.endIndex { return nil }
     let element = _elements[_position]
     _elements.formIndex(after: &_position)
     return element
   }
-
+  @_versioned
   internal let _elements: Elements
+  @_versioned
   internal var _position: Elements.Index
 }
 
@@ -633,7 +637,7 @@ public struct IndexingIterator<
 public protocol Collection : _Indexable, Sequence {
   /// A type that represents the number of steps between a pair of
   /// indices.
-  associatedtype IndexDistance : SignedInteger = Int
+  associatedtype IndexDistance = Int
 
   /// A type that provides the collection's iteration interface and
   /// encapsulates its iteration state.
@@ -641,7 +645,7 @@ public protocol Collection : _Indexable, Sequence {
   /// By default, a collection conforms to the `Sequence` protocol by
   /// supplying `IndexingIterator` as its associated `Iterator`
   /// type.
-  associatedtype Iterator : IteratorProtocol = IndexingIterator<Self>
+  associatedtype Iterator = IndexingIterator<Self>
 
   /// A type that provides access to sub-structure of the collection
   associatedtype Segments : _Indexable = EmptyCollection<Self>
@@ -1004,6 +1008,7 @@ extension _Indexable {
     i = index(after: i)
   }
 
+  @_inlineable
   public func _failEarlyRangeCheck(_ index: Index, bounds: Range<Index>) {
     // FIXME: swift-3-indexing-model: tests.
     _precondition(
@@ -1014,6 +1019,7 @@ extension _Indexable {
       "out of bounds: index >= endIndex")
   }
 
+  @_inlineable
   public func _failEarlyRangeCheck(_ index: Index, bounds: ClosedRange<Index>) {
     // FIXME: swift-3-indexing-model: tests.
     _precondition(
@@ -1024,6 +1030,7 @@ extension _Indexable {
       "out of bounds: index > endIndex")
   }
 
+  @_inlineable
   public func _failEarlyRangeCheck(_ range: Range<Index>, bounds: Range<Index>) {
     // FIXME: swift-3-indexing-model: tests.
     _precondition(
@@ -1066,6 +1073,7 @@ extension _Indexable {
   /// - Complexity: O(1) if the collection conforms to
   ///   `RandomAccessCollection`; otherwise, O(*n*), where *n* is the absolute
   ///   value of `n`.
+  @_inlineable
   public func index(_ i: Index, offsetBy n: IndexDistance) -> Index {
     return self._advanceForward(i, by: n)
   }
@@ -1111,6 +1119,7 @@ extension _Indexable {
   /// - Complexity: O(1) if the collection conforms to
   ///   `RandomAccessCollection`; otherwise, O(*n*), where *n* is the absolute
   ///   value of `n`.
+  @_inlineable
   public func index(
     _ i: Index, offsetBy n: IndexDistance, limitedBy limit: Index
   ) -> Index? {
@@ -1131,6 +1140,7 @@ extension _Indexable {
   /// - Complexity: O(1) if the collection conforms to
   ///   `RandomAccessCollection`; otherwise, O(*n*), where *n* is the absolute
   ///   value of `n`.
+  @_inlineable
   public func formIndex(_ i: inout Index, offsetBy n: IndexDistance) {
     i = index(i, offsetBy: n)
   }
@@ -1157,6 +1167,7 @@ extension _Indexable {
   /// - Complexity: O(1) if the collection conforms to
   ///   `RandomAccessCollection`; otherwise, O(*n*), where *n* is the absolute
   ///   value of `n`.
+  @_inlineable
   public func formIndex(
     _ i: inout Index, offsetBy n: IndexDistance, limitedBy limit: Index
   ) -> Bool {
@@ -1184,6 +1195,7 @@ extension _Indexable {
   /// - Complexity: O(1) if the collection conforms to
   ///   `RandomAccessCollection`; otherwise, O(*n*), where *n* is the
   ///   resulting distance.
+  @_inlineable
   public func distance(from start: Index, to end: Index) -> IndexDistance {
     _precondition(start <= end,
       "Only BidirectionalCollections can have end come before start")
@@ -1198,6 +1210,8 @@ extension _Indexable {
   }
 
   /// Do not use this method directly; call advanced(by: n) instead.
+  @_inlineable
+  @_versioned
   @inline(__always)
   internal func _advanceForward(_ i: Index, by n: IndexDistance) -> Index {
     _precondition(n >= 0,
@@ -1211,6 +1225,8 @@ extension _Indexable {
   }
 
   /// Do not use this method directly; call advanced(by: n, limit) instead.
+  @_inlineable
+  @_versioned
   @inline(__always)
   internal
   func _advanceForward(
@@ -1235,6 +1251,7 @@ extension _Indexable {
 /// `IndexingIterator<Self>`.
 extension Collection where Iterator == IndexingIterator<Self> {
   /// Returns an iterator over the elements of the collection.
+  @inline(__always)
   public func makeIterator() -> IndexingIterator<Self> {
     return IndexingIterator(_elements: self)
   }
@@ -1266,6 +1283,7 @@ extension Collection where SubSequence == Slice<Self> {
   ///   the range must be valid indices of the collection.
   ///
   /// - Complexity: O(1)
+  @_inlineable
   public subscript(bounds: Range<Index>) -> Slice<Self> {
     _failEarlyRangeCheck(bounds, bounds: startIndex..<endIndex)
     return Slice(base: self, bounds: bounds)
@@ -1279,6 +1297,7 @@ extension Collection where SubSequence == Self {
   ///   not empty; otherwise, `nil`.
   ///
   /// - Complexity: O(1)
+  @_inlineable
   public mutating func popFirst() -> Iterator.Element? {
     // TODO: swift-3-indexing-model - review the following
     guard !isEmpty else { return nil }
@@ -1321,6 +1340,7 @@ extension Collection {
   ///     // Prints "Hi ho, Silver!")
   ///
   /// - Complexity: O(1)
+  @_inlineable
   public var isEmpty: Bool {
     return startIndex == endIndex
   }
@@ -1334,6 +1354,7 @@ extension Collection {
   ///         print(firstNumber)
   ///     }
   ///     // Prints "10"
+  @_inlineable
   public var first: Iterator.Element? {
     // NB: Accessing `startIndex` may not be O(1) for some lazy collections,
     // so instead of testing `isEmpty` and then returning the first element,
@@ -1356,6 +1377,7 @@ extension Collection {
   /// - Complexity: O(1) if the collection conforms to
   ///   `RandomAccessCollection`; otherwise, O(*n*), where *n* is the length
   ///   of the collection.
+  @_inlineable
   public var underestimatedCount: Int {
     // TODO: swift-3-indexing-model - review the following
     return numericCast(count)
@@ -1371,6 +1393,7 @@ extension Collection {
   /// - Complexity: O(1) if the collection conforms to
   ///   `RandomAccessCollection`; otherwise, O(*n*), where *n* is the length
   ///   of the collection.
+  @_inlineable
   public var count: IndexDistance {
     return distance(from: startIndex, to: endIndex)
   }
@@ -1386,6 +1409,7 @@ extension Collection {
   ///   `Optional(Optional(index))` if an element was found.
   ///
   /// - Complexity: O(`count`).
+  @_inlineable
   public // dispatching
   func _customIndexOfEquatableElement(_: Iterator.Element) -> Index?? {
     return nil
@@ -1414,6 +1438,7 @@ extension Collection {
   ///   value of the same or of a different type.
   /// - Returns: An array containing the transformed elements of this
   ///   sequence.
+  @_inlineable
   public func map<T>(
     _ transform: (Iterator.Element) throws -> T
   ) rethrows -> [T] {
@@ -1456,6 +1481,7 @@ extension Collection {
   ///
   /// - Complexity: O(*n*), where *n* is the number of elements to drop from
   ///   the beginning of the collection.
+  @_inlineable
   public func dropFirst(_ n: Int) -> SubSequence {
     _precondition(n >= 0, "Can't drop a negative number of elements from a collection")
     let start = index(startIndex,
@@ -1481,6 +1507,7 @@ extension Collection {
   ///   at the end.
   ///
   /// - Complexity: O(*n*), where *n* is the length of the collection.
+  @_inlineable
   public func dropLast(_ n: Int) -> SubSequence {
     _precondition(
       n >= 0, "Can't drop a negative number of elements from a collection")
@@ -1499,6 +1526,7 @@ extension Collection {
   ///   returns `false` it will not be called again.
   ///
   /// - Complexity: O(*n*), where *n* is the length of the collection.
+  @_inlineable
   public func drop(
     while predicate: (Iterator.Element) throws -> Bool
   ) rethrows -> SubSequence {
@@ -1525,6 +1553,7 @@ extension Collection {
   ///   `maxLength` must be greater than or equal to zero.
   /// - Returns: A subsequence starting at the beginning of this collection
   ///   with at most `maxLength` elements.
+  @_inlineable
   public func prefix(_ maxLength: Int) -> SubSequence {
     _precondition(
       maxLength >= 0,
@@ -1543,6 +1572,7 @@ extension Collection {
   ///   returns `false` it will not be called again.
   ///
   /// - Complexity: O(*n*), where *n* is the length of the collection.
+  @_inlineable
   public func prefix(
     while predicate: (Iterator.Element) throws -> Bool
   ) rethrows -> SubSequence {
@@ -1571,6 +1601,7 @@ extension Collection {
   ///   most `maxLength` elements.
   ///
   /// - Complexity: O(*n*), where *n* is the length of the collection.
+  @_inlineable
   public func suffix(_ maxLength: Int) -> SubSequence {
     _precondition(
       maxLength >= 0,
@@ -1607,6 +1638,7 @@ extension Collection {
   ///
   /// - Complexity: O(1)
   /// - SeeAlso: `prefix(through:)`
+  @_inlineable
   public func prefix(upTo end: Index) -> SubSequence {
     return self[startIndex..<end]
   }
@@ -1635,6 +1667,7 @@ extension Collection {
   /// - Returns: A subsequence starting at the `start` position.
   ///
   /// - Complexity: O(1)
+  @_inlineable
   public func suffix(from start: Index) -> SubSequence {
     return self[start..<endIndex]
   }
@@ -1660,6 +1693,7 @@ extension Collection {
   ///
   /// - Complexity: O(1)
   /// - SeeAlso: `prefix(upTo:)`
+  @_inlineable
   public func prefix(through position: Index) -> SubSequence {
     return prefix(upTo: index(after: position))
   }
@@ -1715,6 +1749,7 @@ extension Collection {
   ///     split at that element.
   /// - Returns: An array of subsequences, split from this collection's
   ///   elements.
+  @_inlineable
   public func split(
     maxSplits: Int = Int.max,
     omittingEmptySubsequences: Bool = true,
@@ -1810,6 +1845,7 @@ extension Collection where Iterator.Element : Equatable {
   ///     subsequences are returned. The default value is `true`.
   /// - Returns: An array of subsequences, split from this collection's
   ///   elements.
+  @_inlineable
   public func split(
     separator: Iterator.Element,
     maxSplits: Int = Int.max,
@@ -1832,6 +1868,7 @@ extension Collection where SubSequence == Self {
   ///
   /// - Complexity: O(1)
   /// - SeeAlso: `popFirst()`
+  @_inlineable
   @discardableResult
   public mutating func removeFirst() -> Iterator.Element {
     // TODO: swift-3-indexing-model - review the following
@@ -1850,6 +1887,7 @@ extension Collection where SubSequence == Self {
   ///
   /// - Complexity: O(1) if the collection conforms to
   ///   `RandomAccessCollection`; otherwise, O(*n*).
+  @_inlineable
   public mutating func removeFirst(_ n: Int) {
     if n == 0 { return }
     _precondition(n >= 0, "number of elements to remove should be non-negative")
@@ -1860,6 +1898,7 @@ extension Collection where SubSequence == Self {
 }
 
 extension Collection {
+  @_inlineable
   public func _preprocessingPass<R>(
     _ preprocess: () throws -> R
   ) rethrows -> R? {

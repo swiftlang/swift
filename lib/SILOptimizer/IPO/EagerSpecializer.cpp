@@ -719,7 +719,6 @@ void EagerSpecializerTransform::run() {
     return;
 
   // Process functions in any order.
-  bool Changed = false;
   for (auto &F : *getModule()) {
     if (!F.shouldOptimize()) {
       DEBUG(dbgs() << "  Cannot specialize function " << F.getName()
@@ -744,6 +743,7 @@ void EagerSpecializerTransform::run() {
       auto AttrRequirements = SA->getRequirements();
       ReInfoVec.emplace_back(&F, AttrRequirements);
       auto *NewFunc = eagerSpecialize(&F, *SA, ReInfoVec.back());
+      notifyAddFunction(NewFunc);
 
       SpecializedFuncs.push_back(NewFunc);
 
@@ -755,6 +755,7 @@ void EagerSpecializerTransform::run() {
 
     // TODO: Optimize the dispatch code to minimize the amount
     // of checks. Use decision trees for this purpose.
+    bool Changed = false;
     for_each3(F.getSpecializeAttrs(), SpecializedFuncs, ReInfoVec,
               [&](const SILSpecializeAttr *SA, SILFunction *NewFunc,
                   const ReabstractionInfo &ReInfo) {
@@ -763,13 +764,13 @@ void EagerSpecializerTransform::run() {
                   EagerDispatch(&F, ReInfo).emitDispatchTo(NewFunc);
                 }
               });
+    // Invalidate everything since we delete calls as well as add new
+    // calls and branches.
+    if (Changed) {
+      invalidateAnalysis(&F, SILAnalysis::InvalidationKind::Everything);
+    }
     // As specializations are created, the attributes should be removed.
     F.clearSpecializeAttrs();
-  }
-  // Invalidate everything since we delete calls as well as add new
-  // calls and branches.
-  if (Changed) {
-    invalidateAnalysis(SILAnalysis::InvalidationKind::Everything);
   }
 }
 

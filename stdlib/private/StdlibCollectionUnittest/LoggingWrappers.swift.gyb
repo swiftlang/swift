@@ -675,11 +675,10 @@ public struct ${Self}<
 // Custom assertions
 //===----------------------------------------------------------------------===//
 
-public func expectCustomizable<T : Wrapper>(
+public func expectCustomizable<T : LoggingType>(
   _: T, _ counters: TypeIndexed<Int>, ${TRACE}
 ) where
-  T : LoggingType,
-  T.Base : Wrapper, T.Base : LoggingType,
+  T.Base : LoggingType,
   T.Log == T.Base.Log {
   let newTrace = stackTrace.pushIf(showFrame, file: file, line: line)
   expectNotEqual(0, counters[T.self], message(), stackTrace: newTrace)
@@ -687,11 +686,10 @@ public func expectCustomizable<T : Wrapper>(
     counters[T.self], counters[T.Base.self], message(), stackTrace: newTrace)
 }
 
-public func expectNotCustomizable<T : Wrapper>(
+public func expectNotCustomizable<T : LoggingType>(
   _: T, _ counters: TypeIndexed<Int>, ${TRACE}
 ) where
-  T : LoggingType,
-  T.Base : Wrapper, T.Base : LoggingType,
+  T.Base : LoggingType,
   T.Log == T.Base.Log {
   let newTrace = stackTrace.pushIf(showFrame, file: file, line: line)
   expectNotEqual(0, counters[T.self], message(), stackTrace: newTrace)
