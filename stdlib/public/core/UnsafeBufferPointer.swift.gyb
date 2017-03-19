@@ -29,6 +29,12 @@ public struct UnsafeBufferPointerIterator<Element>
     return result
   }
 
+  @_inlineable
+  public init(_position: UnsafePointer<Element>, _end: UnsafePointer<Element>) {
+    self._position = _position
+    self._end = _end
+  }
+  
   @_versioned
   internal var _position, _end: UnsafePointer<Element>
 }
