@@ -1228,8 +1228,7 @@ extension _Indexable {
   @_inlineable
   @_versioned
   @inline(__always)
-  internal
-  func _advanceForward(
+  internal func _advanceForward(
     _ i: Index, by n: IndexDistance, limitedBy limit: Index
   ) -> Index? {
     _precondition(n >= 0,

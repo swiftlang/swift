@@ -1344,8 +1344,6 @@ extension ${Self} : RangeReplaceableCollection, _ArrayProtocol {
   /// The count of the new buffer is set to `oldCount`, the capacity of the
   /// new buffer is big enough to hold 'oldCount' + 1 elements.
   @_versioned
-  @_inlineable
-  @inline(never)
   internal mutating func _copyToNewBuffer(oldCount: Int) {
     let newCount = oldCount + 1
     var newBuffer = _buffer._forceCreateUniqueMutableBuffer(

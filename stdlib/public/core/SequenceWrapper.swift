@@ -54,7 +54,7 @@ extension _SequenceWrapper where Iterator == Base.Iterator {
 extension _SequenceWrapper where Iterator.Element == Base.Iterator.Element {
   public func map<T>(
     _ transform: (Iterator.Element) throws -> T
-) rethrows -> [T] {
+  ) rethrows -> [T] {
     return try _base.map(transform)
   }
   
@@ -110,10 +110,6 @@ extension _SequenceWrapper
     return try _base.prefix(while: predicate)
   }
   
-  public func suffix(_ maxLength: Int) -> SubSequence {
-    return _base.suffix(maxLength)
-  }
-
   public func split(
     maxSplits: Int, omittingEmptySubsequences: Bool,
     whereSeparator isSeparator: (Iterator.Element) throws -> Bool

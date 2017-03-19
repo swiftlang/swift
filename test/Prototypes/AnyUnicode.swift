@@ -12,6 +12,272 @@
 // RUN: %target-run-simple-swift
 // REQUIRES: executable_test
 
+public protocol _CollectionWrapper : _SequenceWrapper, Collection {
+  // Note: associated type requirements are stated here only where compiler
+  // limitations prevent Collection from stating them fully
+  associatedtype _Element = Base.Iterator.Element
+  associatedtype Base : Collection
+  associatedtype Index = Base.Index
+  associatedtype IndexDistance = Base.IndexDistance
+  //associatedtype Segments : Collection = Base.Segments
+  associatedtype SubSequence : Collection = Base.SubSequence
+  associatedtype Indices : Collection = Base.Indices
+  var _base : Base { get }
+}
+
+extension _CollectionWrapper {
+  var isEmpty: Bool { return _base.isEmpty }
+  // Because these are specialized by Collection, we need to explicitly forward
+  // here to avoid ambiguity with the one from _SequenceWrapper
+  public var underestimatedCount: Int { return _base.underestimatedCount }
+  public func _preprocessingPass<R>(
+    _ preprocess: () throws -> R
+  ) rethrows -> R? {
+    return try _base._preprocessingPass(preprocess)
+  }
+}
+
+/*
+extension _CollectionWrapper
+where Segments == Base.Segments {
+  var segments : Segments? { return _base.segments }
+}
+*/
+
+extension _CollectionWrapper
+where Iterator.Element == Base.Iterator.Element {
+  public func withExistingUnsafeBuffer<R>(
+    _ body: (UnsafeBufferPointer<Iterator.Element>) throws -> R
+  ) rethrows -> R? {
+    return try _base.withExistingUnsafeBuffer(body)
+  }
+  var first: Iterator.Element? { return _base.first }
+
+  // Because these asre specialized by Collection, we need to explicitly forward
+  // here to avoid ambiguity with the one from _SequenceWrapper
+  public func map<T>(
+    _ transform: (Iterator.Element) throws -> T
+  ) rethrows -> [T] {
+    return try _base.map(transform)
+  }
+  public func _copyToContiguousArray()
+    -> ContiguousArray<Iterator.Element> {
+    return _base._copyToContiguousArray()
+  }
+}
+
+extension _CollectionWrapper
+  where SubSequence == Base.SubSequence, Iterator.Element == Base.Iterator.Element {
+
+  public func drop(
+    while predicate: (Iterator.Element) throws -> Bool
+  ) rethrows -> SubSequence {
+    return try _base.drop(while: predicate)
+  }
+
+  public func prefix(
+    while predicate: (Iterator.Element) throws -> Bool
+  ) rethrows -> SubSequence {
+    return try _base.prefix(while: predicate)
+  }
+  
+  public func split(
+    maxSplits: Int, omittingEmptySubsequences: Bool,
+    whereSeparator isSeparator: (Iterator.Element) throws -> Bool
+  ) rethrows -> [SubSequence] {
+    return try _base.split(
+      maxSplits: maxSplits,
+      omittingEmptySubsequences: omittingEmptySubsequences,
+      whereSeparator: isSeparator
+    )
+  }
+}
+
+extension _CollectionWrapper
+where Iterator.Element == Base.Iterator.Element, Index == Base.Index {
+  subscript(position: Index) -> Iterator.Element { return _base[position] }
+  public func _customIndexOfEquatableElement(
+    _ element: Iterator.Element
+  ) -> Index?? {
+    return _base._customIndexOfEquatableElement(element)
+  }
+}
+
+extension _CollectionWrapper
+where _Element == Base._Element, 
+Index == Base.Index {
+  subscript(position: Index) -> _Element { return _base[position] }
+}
+
+extension _CollectionWrapper
+where SubSequence == Base.SubSequence {
+  // Because this is specialized by Collection, we need to explicitly forward
+  // here to avoid ambiguity with the one from _SequenceWrapper
+  public func dropFirst(_ n: Int) -> SubSequence {
+    return _base.dropFirst(n)
+  }
+  public func dropLast(_ n: Int) -> SubSequence {
+    return _base.dropLast(n)
+  }
+  public func prefix(_ maxLength: Int) -> SubSequence {
+    return _base.prefix(maxLength)
+  }
+  public func suffix(_ maxLength: Int) -> SubSequence {
+    return _base.suffix(maxLength)
+  }
+}
+
+extension _CollectionWrapper
+where SubSequence == Base.SubSequence, Index == Base.Index {
+  subscript(bounds: Range<Index>) -> SubSequence { return _base[bounds] }
+  public func prefix(upTo end: Index) -> SubSequence {
+    return _base.prefix(upTo: end)
+  }
+  public func suffix(from start: Index) -> SubSequence {
+    return _base.suffix(from: start)
+  }
+  public func prefix(through lastElementOfResult: Index) -> SubSequence {
+    return _base.prefix(through: lastElementOfResult)
+  }
+}
+
+extension _CollectionWrapper
+where Indices == Base.Indices {
+  var indices: Indices { return _base.indices }
+}
+
+extension _CollectionWrapper
+where IndexDistance == Base.IndexDistance {
+  var count: IndexDistance { return _base.count }
+}
+
+extension _CollectionWrapper
+where IndexDistance == Base.IndexDistance, Index == Base.Index {
+  public func index(_ i: Index, offsetBy n: IndexDistance) -> Index {
+    return _base.index(i, offsetBy: n)
+  }
+  public func formIndex(_ i: inout Index, offsetBy n: IndexDistance) {
+    _base.formIndex(&i, offsetBy: n)
+  }
+  public func index(
+    _ i: Index, offsetBy n: IndexDistance, limitedBy limit: Index
+  ) -> Index? {
+    return _base.index(i, offsetBy: n, limitedBy: limit)
+  }
+  public func formIndex(
+    _ i: inout Index, offsetBy n: IndexDistance, limitedBy limit: Index
+  ) -> Bool {
+    return _base.formIndex(&i, offsetBy: n, limitedBy: limit)
+  }
+  public func distance(from start: Index, to end: Index) -> IndexDistance {
+    return _base.distance(from: start, to: end)
+  }
+}
+
+extension _CollectionWrapper
+where Index == Base.Index {
+  public var startIndex : Index { return _base.startIndex }
+  public var endIndex : Index { return (_base as Base).endIndex }
+  
+  public func _failEarlyRangeCheck(_ index: Index, bounds: Range<Index>) {
+    _base._failEarlyRangeCheck(index, bounds: bounds)
+  }
+  public func _failEarlyRangeCheck(_ index: Index, bounds: ClosedRange<Index>) {
+    _base._failEarlyRangeCheck(index, bounds: bounds)
+  }
+  public func _failEarlyRangeCheck(
+    _ range: Range<Index>, bounds: Range<Index>
+  ) {
+    _base._failEarlyRangeCheck(range, bounds: bounds)
+  }
+  public func index(after i: Index) -> Index {
+    return _base.index(after: i)
+  }
+  public func formIndex(after i: inout Index) {
+    return _base.formIndex(after: &i)
+  }
+
+}
+
+public protocol _BidirectionalCollectionWrapper
+: BidirectionalCollection, _CollectionWrapper {
+  // Note: associated type requirements are stated here only where compiler
+  // limitations prevent BidirectionalCollection from stating them fully
+  associatedtype Base : BidirectionalCollection
+//  associatedtype Segments : BidirectionalCollection = Base.Segments
+  associatedtype SubSequence : BidirectionalCollection = Base.SubSequence
+  associatedtype Indices : BidirectionalCollection = Base.Indices
+  var _base : Base { get }
+}
+
+extension _BidirectionalCollectionWrapper where Index == Base.Index {
+  func index(before i: Index) -> Index { return _base.index(before: i) }
+  func formIndex(before i: inout Index) { _base.formIndex(before: &i) }
+}
+
+// Because these functions are specialized by BidirectionalCollection, they need
+// to be redeclared here to avoid ambiguity with the ones from _CollectionWrapper
+extension _BidirectionalCollectionWrapper
+where IndexDistance == Base.IndexDistance, 
+  Index == Base.Index {
+  public func index(_ i: Index, offsetBy n: IndexDistance) -> Index {
+    return _base.index(i, offsetBy: n)
+  }
+  public func index(
+    _ i: Index, offsetBy n: IndexDistance, limitedBy limit: Index
+  ) -> Index? {
+    return _base.index(i, offsetBy: n, limitedBy: limit)
+  }
+  public func distance(from start: Index, to end: Index) -> IndexDistance {
+    return _base.distance(from: start, to: end)
+  }
+}
+
+// Because these functions are specialized by BidirectionalCollection, they need
+// to be redeclared here to avoid ambiguity with the ones from _CollectionWrapper
+extension _BidirectionalCollectionWrapper
+where SubSequence == Base.SubSequence {
+  public func dropLast(_ n: Int) -> SubSequence {
+    return _base.dropLast(n)
+  }
+  public func suffix(_ maxLength: Int) -> SubSequence {
+    return _base.suffix(maxLength)
+  }
+}
+
+public protocol _RandomAccessCollectionWrapper
+: RandomAccessCollection, _BidirectionalCollectionWrapper {
+  // Note: associated type requirements are stated here only where compiler
+  // limitations prevent RandomAccessCollection from stating them fully
+  associatedtype Base : RandomAccessCollection
+//  associatedtype Segments : RandomAccessCollection = Base.Segments
+  associatedtype SubSequence : RandomAccessCollection = Base.SubSequence
+  associatedtype Indices : RandomAccessCollection = Base.Indices
+  var _base : Base { get }
+}
+
+// Because these functions are specialized by RandomAccessCollection, they need
+// to be redeclared here to avoid ambiguity with the ones from
+// _BidirectionalCollectionWrapper
+extension _RandomAccessCollectionWrapper
+where IndexDistance == Base.IndexDistance, 
+  Index == Base.Index {
+  public func index(_ i: Index, offsetBy n: IndexDistance) -> Index {
+    return _base.index(i, offsetBy: n)
+  }
+  public func index(
+    _ i: Index, offsetBy n: IndexDistance, limitedBy limit: Index
+  ) -> Index? {
+    return _base.index(i, offsetBy: n, limitedBy: limit)
+  }
+  public func distance(from start: Index, to end: Index) -> IndexDistance {
+    return _base.distance(from: start, to: end)
+  }
+}
+
+
+//===----------------------------------------------------------------------===//
+
 extension _UTF16StringStorage {
   var characters: _UnicodeViews<_UTF16StringStorage, UTF16>.CharacterView {
     return _UnicodeViews(self, UTF16.self).characters
@@ -277,6 +543,33 @@ extension CodeUnitAdapter {
   }
 }
 
+/// Adapts any `Base` random access collection to UnicodeView under the
+/// assumption that there must be one `Base` element per underlying code unit.
+struct OnePerCodeUnit<Base_: RandomAccessCollection>
+: _RandomAccessCollectionWrapper, UnicodeView
+where Base_.SubSequence : RandomAccessCollection,
+Base_.Index : SignedInteger,
+Base_.Indices : RandomAccessCollection {
+
+  // Deduction fails :(
+  typealias Base = Base_
+  typealias Index = Base.Index 
+  typealias _Element = Base._Element
+//  typealias Segments = Base.Segments
+  typealias SubSequence = Base.SubSequence
+  typealias Indices = Base.Indices
+  
+  init(_ base: Base) { self._base = base }
+  let _base: Base
+
+  static func codeUnitOffset(of i: Index) -> Int64 {
+    return numericCast(i)
+  }
+  func index(atCodeUnitOffset n: Int64) -> Index {
+    return numericCast(n)
+  }
+}
+
 protocol AnyUTF16_ : AnyUnicodeView_ {
   typealias Element = UInt16
   subscript(i: UnicodeIndex) -> Element { get }
@@ -487,27 +780,11 @@ struct AnyUnicodeScalars : UnicodeViewWithCommonIndex, AnyUnicodeViewAdapter {
 /// Construct from (possibly zero-extended) code units
 extension AnyUnicodeScalars {
   init<Base: RandomAccessCollection>(_ base: Base)
-  where Base.Iterator.Element : UnsignedInteger {
-    self.base = ZeroExtender(base: base)
-  }
-
-  /// Adapts any random access collection of unsigned integer to AnyUnicodeScalars_
-  struct ZeroExtender<Base: RandomAccessCollection> : AnyUnicodeScalars_, CodeUnitAdapter
-  where Base.Iterator.Element : UnsignedInteger {
-    let base: Base
-
-    subscript(i: Index) -> Element {
-      return UnicodeScalar(
-        numericCast(base[base.index(atOffset: i.codeUnitOffset)]) as UInt32)!
-    }
-
-    public func withExistingUnsafeBuffer<R>(
-      _ body: (UnsafeBufferPointer<Element>) throws -> R
-    ) rethrows -> R? {
-      return try base.withExistingUnsafeBuffer {
-        try ($0 as Any as? UnsafeBufferPointer<Element>).map(body)
-      }.flatMap { $0 }
-    }
+  where Base.Iterator.Element == UnicodeScalar,
+  Base.SubSequence : RandomAccessCollection,
+  Base.Index : SignedInteger,
+  Base.Indices : RandomAccessCollection {
+    self.base = Eraser(OnePerCodeUnit(base))
   }
 }
 
@@ -517,7 +794,7 @@ extension AnyUnicodeScalars {
     self.base = Eraser(base)
   }
 
-  /// Adapts any random access collection of unsigned integer to AnyUnicodeScalars_
+  /// Adapts any bidirectional collection of UnicodeScalars to AnyUnicodeScalars_
   struct Eraser<Base: UnicodeView> : AnyUnicodeScalars_, UnicodeViewAdapter
   where Base.Iterator.Element == Element {
     let base: Base
@@ -535,20 +812,6 @@ extension AnyUnicodeScalars {
         try ($0 as Any as? UnsafeBufferPointer<Element>).map(body)
       }.flatMap { $0 }
     }
-  }
-}
-
-extension AnyUnicodeScalars {
-  init<CodeUnits: RandomAccessCollection, Encoding: UnicodeEncoding>(
-    decoding codeUnits: CodeUnits, from e: Encoding.Type
-  )
-  where Encoding.EncodedScalar.Iterator.Element == CodeUnits.Iterator.Element,
-  CodeUnits.SubSequence : RandomAccessCollection,
-  CodeUnits.SubSequence.Index == CodeUnits.Index,
-  CodeUnits.SubSequence.SubSequence == CodeUnits.SubSequence,
-  CodeUnits.SubSequence.Iterator.Element == CodeUnits.Iterator.Element {
-    base = Eraser(
-      _UnicodeViews(codeUnits[...], Encoding.self).scalars)
   }
 }
 
@@ -598,34 +861,50 @@ extension _FixedFormatUnicode {
 
 extension _FixedFormatUnicode
 where Self : AnyUnicode,
-Self.CodeUnits : RandomAccessCollection,
 Self.CodeUnits.Iterator.Element : UnsignedInteger {
   var codeUnits: AnyCodeUnits {
     return AnyCodeUnits(self._codeUnits)
   }
 }
 
-
 extension _FixedFormatUnicode
 where Self : AnyUnicode,
-Self.CodeUnits : RandomAccessCollection,
-Self.CodeUnits.Iterator.Element : UnsignedInteger,
-Self.Encoding == Latin1 {
-  var rawUTF16: AnyUTF16 { return AnyUTF16(self.codeUnits) }
-  var unicodeScalars: AnyUnicodeScalars { return AnyUnicodeScalars(self.codeUnits) }
+UnicodeScalarView : RandomAccessCollection,
+UnicodeScalarView.Iterator.Element == UnicodeScalar,
+UnicodeScalarView.SubSequence : RandomAccessCollection,
+UnicodeScalarView.Index : SignedInteger,
+UnicodeScalarView.Indices : RandomAccessCollection {
+  var unicodeScalars: AnyUnicodeScalars {
+    return AnyUnicodeScalars(self.unicodeScalars as UnicodeScalarView)
+  }
 }
 
 extension _FixedFormatUnicode
 where Self : AnyUnicode,
-Self.CodeUnits : RandomAccessCollection,
+UnicodeScalarView : UnicodeView,
+Self.UnicodeScalarView.Iterator.Element == UnicodeScalar {
+  var unicodeScalars: AnyUnicodeScalars {
+    return AnyUnicodeScalars(self.unicodeScalars as UnicodeScalarView)
+  }
+}
+
+
+
+extension _FixedFormatUnicode
+where Self : AnyUnicode,
+Self.CodeUnits.Iterator.Element : UnsignedInteger,
+Self.CodeUnits.Index : SignedInteger,
+Self.Encoding == Latin1 {
+  var rawUTF16: AnyUTF16 { return AnyUTF16(self.codeUnits) }
+}
+
+extension _FixedFormatUnicode
+where Self : AnyUnicode,
 Self.CodeUnits.Iterator.Element : UnsignedInteger,
 Self.Encoding.EncodedScalar == UTF16.EncodedScalar,
 Self.UnicodeScalarView : UnicodeView,
 Self.UnicodeScalarView.Iterator.Element == UnicodeScalar {
   var rawUTF16: AnyUTF16 { return AnyUTF16(self.codeUnits) }
-  var unicodeScalars: AnyUnicodeScalars {
-    return AnyUnicodeScalars(self.unicodeScalars as UnicodeScalarView)
-  }
 }
 
 extension _FixedFormatUnicode
@@ -644,9 +923,7 @@ where Self : AnyUnicode,
 
 extension _FixedFormatUnicode
 where Self : AnyUnicode,
-Self.CodeUnits : RandomAccessCollection,
 Self.CodeUnits.Iterator.Element : UnsignedInteger,
-Self.RawUTF16View : BidirectionalCollection,
 Self.RawUTF16View.Iterator.Element == UTF16.CodeUnit,
 Self.RawUTF16View : UnicodeView,
 /*Self.FCCNormalizedUTF16View.Iterator.Element : UnsignedInteger,*/
@@ -667,10 +944,6 @@ Self.CharacterView.Index : SignedInteger
 
   var rawUTF16: AnyUTF16 {
     return AnyUTF16(transcoding: self._codeUnits, from: Encoding.self)
-  }
-
-  var unicodeScalars: AnyUnicodeScalars {
-    return AnyUnicodeScalars(self.unicodeScalars)
   }
 
 #if false
@@ -963,23 +1236,7 @@ suite.test("basics") {
   expectTrue(x.elementsEqual(y))
 }
 
-import Foundation // https://bugs.swift.org/browse/SR-4277
-
-func dissect(_ x: AnyStringContents) {
-  print("#### Contents")
-  dump(x)
-  print("# Code Units")
-  dump(x.codeUnits)
-  print("# UTF16")
-  dump(x.rawUTF16)
-  print("# Unicode Scalars")
-  dump(x.unicodeScalars)
-  print("# UTF32")
-  dump(x.utf32)
-  print("########")
-}
-suite.test("AnyStringContents") {
-  let sample = "abcdefghijklmnopqrstuvwxyz\n"
+let sample = "abcdefghijklmnopqrstuvwxyz\n"
   + "🇸🇸🇬🇱🇱🇸🇩🇯🇺🇸\n"
   + "Σὲ 👥🥓γνωρίζω ἀπὸ τὴν κόψη χαῖρε, ὦ χαῖρε, ᾿Ελευθεριά!\n"
   + "Οὐχὶ ταὐτὰ παρίσταταί μοι γιγνώσκειν, ὦ ἄνδρες ᾿Αθηναῖοι,\n"
@@ -988,35 +1245,74 @@ suite.test("AnyStringContents") {
   + "  ๏ แผ่นดินฮั่นเสื่อมโทรมแสนสังเวช  พระปกเกศกองบู๊กู้ขึ้นใหม่\n"
   + "ᚻᛖ ᚳᚹᚫᚦ ᚦᚫᛏ ᚻᛖ ᛒᚢᛞᛖ ᚩᚾ ᚦᚫᛗ ᛚᚪᚾᛞᛖ ᚾᚩᚱᚦᚹᛖᚪᚱᛞᚢᛗ ᚹᛁᚦ ᚦᚪ ᚹᛖᛥᚫ"
 
-  let latins = sample.utf16.lazy.filter { $0 < 0x100 }.map {
-    Character(UnicodeScalar($0)!)
-  }
-  let latin1Sample = String(latins)
-  
-  let s16 = AnyStringContents(_UTF16StringStorage(sample.utf16))
-  expectEqualSequence(sample.utf16.lazy.map { numericCast($0) }, s16.codeUnits)
-  expectEqualSequence(sample.utf16, s16.rawUTF16)
-  expectEqualSequence(sample.unicodeScalars, s16.unicodeScalars)
-  dissect(s16)
-  
-  let s8 = AnyStringContents(_UTF8StringStorage(sample.utf8))
-  dissect(s8)
-  expectEqualSequence(sample.utf8.lazy.map { numericCast($0) }, s8.codeUnits)
-  expectEqualSequence(sample.utf16, s8.rawUTF16)
-  expectEqualSequence(sample.unicodeScalars, s8.unicodeScalars)
+let latin1Sample = String(
+  sample.unicodeScalars.lazy.filter { $0.value < 0x100 }.map {
+    Character($0)
+  })
 
-  let sl = AnyStringContents(_Latin1StringStorage(latin1Sample.unicodeScalars.map {
+suite.test("AnyStringContents/_UTF16StringStorage") {
+
+  let s = AnyStringContents(_UTF16StringStorage(sample.utf16))
+  
+  expectEqual(
+    AnyCodeUnits.ZeroExtender<_UTF16StringStorage>.self,
+    type(of: s.codeUnits.base))
+  expectEqualSequence(sample.utf16.map { numericCast($0) }, s.codeUnits)
+  
+  expectEqual(
+    AnyUTF16.ZeroExtender<_UTF16StringStorage>.self,
+    type(of: s.rawUTF16.base))
+  expectEqualSequence(sample.utf16, s.rawUTF16)
+
+  expectEqual(
+    AnyUnicodeScalars.Eraser<_UTF16StringStorage.UnicodeScalarView>.self,
+    type(of: s.unicodeScalars.base))
+  expectEqualSequence(sample.unicodeScalars, s.unicodeScalars)
+}
+
+suite.test("AnyStringContents/_UTF8StringStorage") {
+
+  let s = AnyStringContents(_UTF8StringStorage(sample.utf8))
+  
+  expectEqual(
+    AnyCodeUnits.ZeroExtender<_UTF8StringStorage>.self,
+    type(of: s.codeUnits.base))
+  expectEqualSequence(sample.utf8.lazy.map { numericCast($0) }, s.codeUnits)
+  
+  expectEqual(
+    AnyUTF16.Eraser<
+      _UnicodeViews<_UTF8StringStorage.SubSequence, UTF8>.TranscodedView<UTF16>
+    >.self,
+    type(of: s.rawUTF16.base))  
+  expectEqualSequence(sample.utf16, s.rawUTF16)
+  
+  expectEqual(
+    AnyUnicodeScalars.Eraser<_UTF8StringStorage.UnicodeScalarView>.self,
+    type(of: s.unicodeScalars.base))
+  expectEqualSequence(sample.unicodeScalars, s.unicodeScalars)
+}
+
+suite.test("AnyStringContents/_Latin1StringStorage") {
+  let s = AnyStringContents(_Latin1StringStorage(latin1Sample.unicodeScalars.map {
         numericCast($0.value)
       }))
-  dissect(sl)
-  expectEqualSequence(latin1Sample.utf16.lazy.map { numericCast($0) }, sl.codeUnits)
-  expectEqualSequence(latin1Sample.utf16, sl.rawUTF16)
-  expectEqualSequence(latin1Sample.unicodeScalars, sl.unicodeScalars)
+  
+  expectEqual(
+    AnyCodeUnits.ZeroExtender<_Latin1StringStorage>.self,
+    type(of: s.codeUnits.base))  
+  expectEqualSequence(latin1Sample.utf16.map { numericCast($0) }, s.codeUnits)
 
-#if false
-  for c in s.characters {
-    print("\(c)|", terminator: "")
-  }
-#endif
+  expectEqual(
+    AnyUTF16.ZeroExtender<_Latin1StringStorage>.self,
+    type(of: s.rawUTF16.base))
+  expectEqualSequence(latin1Sample.utf16, s.rawUTF16)
+  
+  expectEqual(
+    AnyUnicodeScalars.Eraser<
+      OnePerCodeUnit<_Latin1StringStorage.UnicodeScalarView>
+    >.self,
+    type(of: s.unicodeScalars.base))
+  expectEqualSequence(latin1Sample.unicodeScalars, s.unicodeScalars)
 }
+
 runAllTests()

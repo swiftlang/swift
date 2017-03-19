@@ -578,3 +578,7 @@ public func withUnsafeBytes<T, Result>(
     try body(UnsafeRawBufferPointer(start: $0, count: MemoryLayout<T>.size))
   }
 }
+
+// ${'Local Variables'}:
+// eval: (read-only-mode 1)
+// End:
