@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "SILGen.h"
+#include "ArgumentScope.h"
 #include "ArgumentSource.h"
 #include "Callee.h"
 #include "Condition.h"
@@ -2088,7 +2089,8 @@ SILGenFunction::emitApplyOfDefaultArgGenerator(SILLocation loc,
   CalleeTypeInfo calleeTypeInfo(substFnType, origResultType, resultType);
   ResultPlanPtr resultPtr =
       ResultPlanBuilder::computeResultPlan(*this, calleeTypeInfo, loc, C);
-  return emitApply(std::move(resultPtr), loc, fnRef,
+  ArgumentScope argScope(*this, loc);
+  return emitApply(std::move(resultPtr), std::move(argScope), loc, fnRef,
                    defaultArgsOwner.getSubstitutions(), {}, calleeTypeInfo,
                    ApplyOptions::None, C);
 }
@@ -2111,8 +2113,9 @@ RValue SILGenFunction::emitApplyOfStoredPropertyInitializer(
   CalleeTypeInfo calleeTypeInfo(substFnType, origResultType, resultType);
   ResultPlanPtr resultPlan =
       ResultPlanBuilder::computeResultPlan(*this, calleeTypeInfo, loc, C);
-  return emitApply(std::move(resultPlan), loc, fnRef, subs, {}, calleeTypeInfo,
-                   ApplyOptions::None, C);
+  ArgumentScope argScope(*this, loc);
+  return emitApply(std::move(resultPlan), std::move(argScope), loc, fnRef, subs,
+                   {}, calleeTypeInfo, ApplyOptions::None, C);
 }
 
 static void emitTupleShuffleExprInto(RValueEmitter &emitter,

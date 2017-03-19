@@ -313,6 +313,7 @@ func improveWizard(_ wizard: inout Wizard) {
 // CHECK-NEXT:  [[WTEMP:%.*]] = alloc_stack $Wizard
 // CHECK-NEXT:  store [[T0]] to [trivial] [[WTEMP]]
 // CHECK-NEXT:  [[T0:%.*]] = apply [[GETTER]]<Wizard>([[WTEMP]])
+// CHECK-NEXT:  dealloc_stack [[WTEMP]]
 // CHECK-NEXT:  store [[T0]] to [trivial] [[TEMP]]
 //   Call improve.
 // CHECK-NEXT:  apply [[IMPROVE]]([[TEMP]])
@@ -320,7 +321,6 @@ func improveWizard(_ wizard: inout Wizard) {
 // CHECK-NEXT:  function_ref
 // CHECK-NEXT:  [[SETTER:%.*]] = function_ref @_T017materializeForSet5MagicPAAE5hocusSifs
 // CHECK-NEXT:  apply [[SETTER]]<Wizard>([[T0]], [[WIZARD]])
-// CHECK-NEXT:  dealloc_stack [[WTEMP]]
 // CHECK-NEXT:  dealloc_stack [[TEMP]]
 
 protocol Totalled {
