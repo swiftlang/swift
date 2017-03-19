@@ -41,6 +41,7 @@ class TemporaryInitialization;
 class CalleeTypeInfo;
 class ResultPlan;
 using ResultPlanPtr = std::unique_ptr<ResultPlan>;
+class ArgumentScope;
 
 /// Internal context information for the SILGenFunction visitor.
 ///
@@ -1273,8 +1274,9 @@ public:
   /// lowered appropriately for the abstraction level but that the
   /// result does need to be turned back into something matching a
   /// formal type.
-  RValue emitApply(ResultPlanPtr &&resultPlan, SILLocation loc, ManagedValue fn,
-                   SubstitutionList subs, ArrayRef<ManagedValue> args,
+  RValue emitApply(ResultPlanPtr &&resultPlan, ArgumentScope &&argScope,
+                   SILLocation loc, ManagedValue fn, SubstitutionList subs,
+                   ArrayRef<ManagedValue> args,
                    const CalleeTypeInfo &calleeTypeInfo, ApplyOptions options,
                    SGFContext evalContext);
 
