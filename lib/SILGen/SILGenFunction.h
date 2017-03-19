@@ -202,6 +202,16 @@ enum class CaptureEmission {
   PartialApplication,
 };
 
+/// Parameter to \c SILGenFunction::emitAddressOfLValue that indicates
+/// what kind of instrumentation should be emitted when compiling under
+/// Thread Sanitizer.
+enum class TSanKind : bool {
+  None = 0,
+
+  /// Instrument the LValue access as an inout access.
+  InoutAccess
+};
+
 /// Represents an LValue opened for mutating access.
 ///
 /// This is used by LogicalPathComponent::getMaterialized() and
@@ -1239,7 +1249,9 @@ public:
   void emitCopyLValueInto(SILLocation loc, LValue &&src,
                           Initialization *dest);
   ManagedValue emitAddressOfLValue(SILLocation loc, LValue &&src,
-                                   AccessKind accessKind);
+                                   AccessKind accessKind,
+                                   TSanKind tsanKind = TSanKind::None);
+
   RValue emitLoadOfLValue(SILLocation loc, LValue &&src, SGFContext C,
                           bool isGuaranteedValid = false);
 

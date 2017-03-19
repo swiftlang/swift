@@ -1950,7 +1950,8 @@ static void beginInOutFormalAccesses(SILGenFunction &SGF,
       LValue &inoutArg = inoutNext->first;
       SILLocation loc = inoutNext->second;
       ManagedValue address = SGF.emitAddressOfLValue(loc, std::move(inoutArg),
-                                                     AccessKind::ReadWrite);
+                                                     AccessKind::ReadWrite,
+                                                     TSanKind::InoutAccess);
       siteArg = address;
       emittedInoutArgs.push_back({address.getValue(), loc});
 
