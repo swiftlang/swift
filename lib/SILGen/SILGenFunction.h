@@ -41,6 +41,7 @@ class TemporaryInitialization;
 class CalleeTypeInfo;
 class ResultPlan;
 using ResultPlanPtr = std::unique_ptr<ResultPlan>;
+class ArgumentScope;
 
 /// Internal context information for the SILGenFunction visitor.
 ///
@@ -199,6 +200,16 @@ enum class CaptureEmission {
   /// Captures are being emitted for partial application to form a closure
   /// value.
   PartialApplication,
+};
+
+/// Parameter to \c SILGenFunction::emitAddressOfLValue that indicates
+/// what kind of instrumentation should be emitted when compiling under
+/// Thread Sanitizer.
+enum class TSanKind : bool {
+  None = 0,
+
+  /// Instrument the LValue access as an inout access.
+  InoutAccess
 };
 
 /// Represents an LValue opened for mutating access.
@@ -1238,7 +1249,9 @@ public:
   void emitCopyLValueInto(SILLocation loc, LValue &&src,
                           Initialization *dest);
   ManagedValue emitAddressOfLValue(SILLocation loc, LValue &&src,
-                                   AccessKind accessKind);
+                                   AccessKind accessKind,
+                                   TSanKind tsanKind = TSanKind::None);
+
   RValue emitLoadOfLValue(SILLocation loc, LValue &&src, SGFContext C,
                           bool isGuaranteedValid = false);
 
@@ -1273,8 +1286,9 @@ public:
   /// lowered appropriately for the abstraction level but that the
   /// result does need to be turned back into something matching a
   /// formal type.
-  RValue emitApply(ResultPlanPtr &&resultPlan, SILLocation loc, ManagedValue fn,
-                   SubstitutionList subs, ArrayRef<ManagedValue> args,
+  RValue emitApply(ResultPlanPtr &&resultPlan, ArgumentScope &&argScope,
+                   SILLocation loc, ManagedValue fn, SubstitutionList subs,
+                   ArrayRef<ManagedValue> args,
                    const CalleeTypeInfo &calleeTypeInfo, ApplyOptions options,
                    SGFContext evalContext);
 

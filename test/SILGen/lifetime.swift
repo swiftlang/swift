@@ -339,7 +339,9 @@ func struct_with_ref_materialized() {
   // CHECK: [[METHOD:%[0-9]+]] = function_ref @_T08lifetime4BethV5gimel{{[_0-9a-zA-Z]*}}F
   // CHECK: [[FUNC:%[0-9]+]] = function_ref @_T08lifetime32fragile_struct_with_ref_elementsAA4BethVyF
   // CHECK: [[STRUCT:%[0-9]+]] = apply [[FUNC]]
-  // CHECK: apply [[METHOD]]([[STRUCT]])
+  // CHECK: [[BORROWED_STRUCT:%.*]] = begin_borrow [[STRUCT]]
+  // CHECK: apply [[METHOD]]([[BORROWED_STRUCT]])
+  // CHECK: end_borrow [[BORROWED_STRUCT]] from [[STRUCT]]
 }
 
 class RefWithProp {
@@ -364,7 +366,9 @@ func logical_lvalue_lifetime(_ r: RefWithProp, _ i: Int, _ v: Val) {
   r.int_prop = i
   // CHECK: [[R1:%[0-9]+]] = load [copy] [[PR]]
   // CHECK: [[SETTER_METHOD:%[0-9]+]] = class_method {{.*}} : $RefWithProp, #RefWithProp.int_prop!setter.1 : (RefWithProp) -> (Int) -> (), $@convention(method) (Int, @guaranteed RefWithProp) -> ()
-  // CHECK: apply [[SETTER_METHOD]]({{.*}}, [[R1]])
+  // CHECK: [[BORROWED_R1:%.*]] = begin_borrow [[R1]]
+  // CHECK: apply [[SETTER_METHOD]]({{.*}}, [[BORROWED_R1]])
+  // CHECK: end_borrow [[BORROWED_R1]] from [[R1]]
   // CHECK: destroy_value [[R1]]
 
   r.aleph_prop.b = v
@@ -742,7 +746,9 @@ func downcast(_ b: B) {
   (b as! D).foo()
   // CHECK: [[B:%[0-9]+]] = load [copy] [[PB]]
   // CHECK: [[D:%[0-9]+]] = unconditional_checked_cast [[B]] : {{.*}} to $D
-  // CHECK: apply {{.*}}([[D]])
+  // CHECK: [[BORROWED_D:%.*]] = begin_borrow [[D]]
+  // CHECK: apply {{.*}}([[BORROWED_D]])
+  // CHECK: end_borrow [[BORROWED_D]] from [[D]]
   // CHECK-NOT: destroy_value [[B]]
   // CHECK: destroy_value [[D]]
   // CHECK: destroy_value [[BADDR]]

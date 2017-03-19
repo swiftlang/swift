@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "ArgumentScope.h"
 #include "Callee.h"
 #include "RValue.h"
 #include "ResultPlan.h"
@@ -172,10 +173,12 @@ emitBridgeObjectiveCToNative(SILGenFunction &SGF,
   SGFContext context;
   ResultPlanPtr resultPlan =
       ResultPlanBuilder::computeResultPlan(SGF, calleeTypeInfo, loc, context);
-  RValue result = SGF.emitApply(
-      std::move(resultPlan), loc, ManagedValue::forUnmanaged(witnessRef), subs,
-      {objcValue, ManagedValue::forUnmanaged(metatypeValue)}, calleeTypeInfo,
-      ApplyOptions::None, context);
+  ArgumentScope argScope(SGF, loc);
+  RValue result =
+      SGF.emitApply(std::move(resultPlan), std::move(argScope), loc,
+                    ManagedValue::forUnmanaged(witnessRef), subs,
+                    {objcValue, ManagedValue::forUnmanaged(metatypeValue)},
+                    calleeTypeInfo, ApplyOptions::None, context);
   return std::move(result).getAsSingleValue(SGF, loc);
 }
 
@@ -1345,9 +1348,11 @@ void SILGenFunction::emitForeignToNativeThunk(SILDeclRef thunk) {
     SGFContext context;
     ResultPlanPtr resultPlan = ResultPlanBuilder::computeResultPlan(
         *this, calleeTypeInfo, fd, context);
-    auto resultMV =
-        emitApply(std::move(resultPlan), fd, ManagedValue::forUnmanaged(fn),
-                  subs, args, calleeTypeInfo, ApplyOptions::None, context)
+    ArgumentScope argScope(*this, fd);
+    ManagedValue resultMV =
+        emitApply(std::move(resultPlan), std::move(argScope), fd,
+                  ManagedValue::forUnmanaged(fn), subs, args, calleeTypeInfo,
+                  ApplyOptions::None, context)
             .getAsSingleValue(*this, fd);
     // TODO: Emit directly into the indirect result.
     if (indirectResult) {

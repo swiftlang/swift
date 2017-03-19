@@ -28,17 +28,15 @@ protocol Ansible {
 // CHECK: bb0([[THIS:%.*]] : $T):
 // -- Result of runce is autoreleased according to default objc conv
 // CHECK: [[METHOD:%.*]] = witness_method [volatile] {{\$.*}},  #NSRuncing.runce!1.foreign
-// CHECK: [[BORROWED_THIS_1:%.*]] = begin_borrow [[THIS]]
-// CHECK: [[RESULT1:%.*]] = apply [[METHOD]]<T>([[BORROWED_THIS_1:%.*]]) : $@convention(objc_method) <τ_0_0 where τ_0_0 : NSRuncing> (τ_0_0) -> @autoreleased NSObject
+// CHECK: [[BORROWED_THIS:%.*]] = begin_borrow [[THIS]]
+// CHECK: [[RESULT1:%.*]] = apply [[METHOD]]<T>([[BORROWED_THIS:%.*]]) : $@convention(objc_method) <τ_0_0 where τ_0_0 : NSRuncing> (τ_0_0) -> @autoreleased NSObject
+// CHECK: end_borrow [[BORROWED_THIS]] from [[THIS]]
 
 // -- Result of copyRuncing is received copy_valued according to -copy family
 // CHECK: [[METHOD:%.*]] = witness_method [volatile] {{\$.*}},  #NSRuncing.copyRuncing!1.foreign
-// CHECK: [[BORROWED_THIS_2:%.*]] = begin_borrow [[THIS]]
-// CHECK: [[RESULT2:%.*]] = apply [[METHOD]]<T>([[BORROWED_THIS_2:%.*]]) : $@convention(objc_method) <τ_0_0 where τ_0_0 : NSRuncing> (τ_0_0) -> @owned NSObject
-
-// End borrows
-// CHECK: end_borrow [[BORROWED_THIS_2]] from [[THIS]]
-// CHECK: end_borrow [[BORROWED_THIS_1]] from [[THIS]]
+// CHECK: [[BORROWED_THIS:%.*]] = begin_borrow [[THIS]]
+// CHECK: [[RESULT2:%.*]] = apply [[METHOD]]<T>([[BORROWED_THIS:%.*]]) : $@convention(objc_method) <τ_0_0 where τ_0_0 : NSRuncing> (τ_0_0) -> @owned NSObject
+// CHECK: end_borrow [[BORROWED_THIS]] from [[THIS]]
 
 // -- Arguments are not consumed by objc calls
 // CHECK: destroy_value [[THIS]]
@@ -53,8 +51,8 @@ func objc_generic_partial_apply<T : NSRuncing>(_ x: T) {
   // CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
   // CHECK:   [[ARG_COPY:%.*]] = copy_value [[BORROWED_ARG]]
   // CHECK:   [[METHOD:%.*]] = apply [[FN]]<T>([[ARG_COPY]])
-  // CHECK:   destroy_value [[METHOD]]
   // CHECK:   end_borrow [[BORROWED_ARG]] from [[ARG]]
+  // CHECK:   destroy_value [[METHOD]]
   _ = x.runce
 
   // CHECK:   [[FN:%.*]] = function_ref @[[THUNK1]] :
