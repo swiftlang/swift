@@ -4916,7 +4916,7 @@ Expr *ExprRewriter::coerceCallArguments(
   bool failed = constraints::matchCallArguments(args, params,
                                                 hasTrailingClosure,
                                                 /*allowFixes=*/false, 
-                                                /*allowLabelOmission=*/false, 
+                                                /*allowLabelOmission=*/true, 
                                                 listener, parameterBindings);
 
   assert((matchCanFail || !failed) && "Call arguments did not match up?");
