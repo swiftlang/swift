@@ -3484,20 +3484,8 @@ static PotentialArchetype *sameTypeDFS(PotentialArchetype *pa,
 
   // Visit its adjacent potential archetypes.
   for (const auto &sameType : pa->getSameTypeConstraints()) {
-    switch (sameType.second->kind) {
-    case RequirementSource::Explicit:
-    case RequirementSource::Inferred:
-    case RequirementSource::RequirementSignatureSelf:
-      // Skip explicit constraints.
-      continue;
-
-    case RequirementSource::Concrete:
-    case RequirementSource::NestedTypeNameMatch:
-    case RequirementSource::Parent:
-    case RequirementSource::ProtocolRequirement:
-    case RequirementSource::Superclass:
-      break;
-    }
+    // Skip non-derived constraints.
+    if (!sameType.second->isDerivedRequirement()) continue;
 
     sameTypeDFS(sameType.first, component, paToComponent);
 
