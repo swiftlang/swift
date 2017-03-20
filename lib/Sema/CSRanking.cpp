@@ -79,6 +79,9 @@ void ConstraintSystem::increaseScore(ScoreKind kind, unsigned value) {
     case SK_EmptyExistentialConversion:
       log << "empty-existential conversion";
       break;
+    case SK_IgnoredOmittableLabel:
+      log << "overload selected by omitting label";
+      break;
     }
     log << ")\n";
   }

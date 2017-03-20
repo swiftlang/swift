@@ -703,8 +703,16 @@ matchCallArguments(ConstraintSystem &cs, ConstraintKind kind,
   if (constraints::matchCallArguments(args, params, hasTrailingClosure,
                                       cs.shouldAttemptFixes(), 
                                       /*allowLabelOmission:*/ false,
-                                      listener, parameterBindings))
-    return ConstraintSystem::SolutionKind::Error;
+                                      listener, parameterBindings)) {
+    // Try again, permitting arg label omission
+    if(constraints::matchCallArguments(args, params, hasTrailingClosure,
+                                       cs.shouldAttemptFixes(), 
+                                       /*allowLabelOmission:*/ true,
+                                       listener, parameterBindings))
+      return ConstraintSystem::SolutionKind::Error;
+    else
+      cs.increaseScore(SK_IgnoredOmittableLabel);
+  }
 
   // Check the argument types for each of the parameters.
   ConstraintSystem::TypeMatchOptions subflags =

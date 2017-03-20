@@ -408,8 +408,10 @@ enum ScoreKind {
   SK_ArrayPointerConversion,
   /// A conversion to an empty existential type ('Any' or '{}').
   SK_EmptyExistentialConversion,
+  /// An overload selected by ignoring an omittable label.
+  SK_IgnoredOmittableLabel,
   
-  SK_LastScoreKind = SK_EmptyExistentialConversion,
+  SK_LastScoreKind = SK_IgnoredOmittableLabel,
 };
 
 /// The number of score kinds.
