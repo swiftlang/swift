@@ -89,8 +89,8 @@ public class AnyKeyPath: Hashable {
           let (aComponent, aType) = aBuffer.next()
           let (bComponent, bType) = bBuffer.next()
         
-          if aComponent.header.lastComponentOfReferencePrefix
-              != bComponent.header.lastComponentOfReferencePrefix
+          if aComponent.header.endOfReferencePrefix
+              != bComponent.header.endOfReferencePrefix
             || aComponent.value != bComponent.value
             || aType != bType {
             return false
@@ -156,28 +156,115 @@ public class PartialKeyPath<Root>: AnyKeyPath {
 // MARK: Concrete implementations
 
 public class KeyPath<Root, Value>: PartialKeyPath<Root> {
+  public typealias _Root = Root
+  public typealias _Value = Value
+
   public func appending<AppendedValue>(
     path: KeyPath<Value, AppendedValue>
   ) -> KeyPath<Root, AppendedValue> {
-    let resultTy = KeyPath.appendedType(with: type(of: path))
-    return withBuffer { selfBuffer in
-      return path.withBuffer { pathBuffer in
-        // TODO: return resultTy.create....
-        _ = resultTy
-        fatalError()
+    let resultTy = type(of: self).appendedType(with: type(of: path))
+    return withBuffer {
+      var rootBuffer = $0
+      return path.withBuffer {
+        var leafBuffer = $0
+        // Result buffer has room for both key paths' components, plus the
+        // header, plus space for the middle type.
+        let resultSize = rootBuffer.data.count + leafBuffer.data.count
+          + MemoryLayout<KeyPathBuffer.Header>.size
+          + MemoryLayout<Int>.size
+        return resultTy._create(capacityInBytes: resultSize) {
+          var destBuffer = $0
+          
+          func pushRaw(_ count: Int) {
+            _sanityCheck(destBuffer.count >= count)
+            destBuffer = UnsafeMutableRawBufferPointer(
+              start: destBuffer.baseAddress.unsafelyUnwrapped + count,
+              count: destBuffer.count - count
+            )
+          }
+          func pushType(_ type: Any.Type) {
+            let intSize = MemoryLayout<Int>.size
+            _sanityCheck(destBuffer.count >= intSize)
+            if intSize == 8 {
+              let words = unsafeBitCast(type, to: (UInt32, UInt32).self)
+              destBuffer.storeBytes(of: words.0,
+                                    as: UInt32.self)
+              destBuffer.storeBytes(of: words.1, toByteOffset: 4,
+                                    as: UInt32.self)
+            } else if intSize == 4 {
+              destBuffer.storeBytes(of: type, as: Any.Type.self)
+            } else {
+              _sanityCheckFailure("unsupported architecture")
+            }
+            pushRaw(intSize)
+          }
+          
+          // Save space for the header.
+          let leafIsReferenceWritable = type(of: path).kind == .reference
+          let header = KeyPathBuffer.Header(
+            size: resultSize - MemoryLayout<KeyPathBuffer.Header>.size,
+            trivial: rootBuffer.trivial && leafBuffer.trivial,
+            hasReferencePrefix: rootBuffer.hasReferencePrefix
+                                || leafIsReferenceWritable
+          )
+          destBuffer.storeBytes(of: header, as: KeyPathBuffer.Header.self)
+          pushRaw(MemoryLayout<KeyPathBuffer.Header>.size)
+          
+          let leafHasReferencePrefix = leafBuffer.hasReferencePrefix
+          
+          // Clone the root components into the buffer.
+          
+          while true {
+            let (component, type) = rootBuffer.next()
+            let isLast = type == nil
+            // If the leaf appended path has a reference prefix, then the
+            // entire root is part of the reference prefix.
+            let endOfReferencePrefix: Bool
+            if leafHasReferencePrefix {
+              endOfReferencePrefix = false
+            } else if isLast && leafIsReferenceWritable {
+              endOfReferencePrefix = true
+            } else {
+              endOfReferencePrefix = component.header.endOfReferencePrefix
+            }
+            
+            component.clone(
+              into: &destBuffer,
+              endOfReferencePrefix: endOfReferencePrefix
+            )
+            if let type = type {
+              pushType(type)
+            } else {
+              // Insert our endpoint type between the root and leaf components.
+              pushType(Value.self)
+              break
+            }
+          }
+          
+          // Clone the leaf components into the buffer.
+          while true {
+            let (component, type) = leafBuffer.next()
+
+            component.clone(
+              into: &destBuffer,
+              endOfReferencePrefix: component.header.endOfReferencePrefix
+            )
+
+            if let type = type {
+              pushType(type)
+            } else {
+              break
+            }
+          }
+          
+          _sanityCheck(destBuffer.count == 0,
+                       "did not fill entire result buffer")
+        }
       }
     }
   }
 
-  public final func appending<AppendedValue>(
-    path: WritableKeyPath<Value, AppendedValue>
-  ) -> Self {
-    return unsafeDowncast(
-      appending(path: path as KeyPath<Value, AppendedValue>),
-      to: type(of: self)
-    )
-  }
-  
+  @_inlineable
   public final func appending<AppendedValue>(
     path: ReferenceWritableKeyPath<Value, AppendedValue>
   ) -> ReferenceWritableKeyPath<Root, AppendedValue> {
@@ -198,6 +285,7 @@ public class KeyPath<Root, Value>: PartialKeyPath<Root> {
     }
     return nil
   }
+  
   @_inlineable
   public final override func appending<Value2, AppendedValue>(
     path: ReferenceWritableKeyPath<Value2, AppendedValue>
@@ -282,6 +370,15 @@ public class KeyPath<Root, Value>: PartialKeyPath<Root> {
 }
 
 public class WritableKeyPath<Root, Value>: KeyPath<Root, Value> {
+  public final func appending<AppendedValue>(
+    path: WritableKeyPath<Value, AppendedValue>
+  ) -> WritableKeyPath<Root, AppendedValue> {
+    return unsafeDowncast(
+      appending(path: path as KeyPath<Value, AppendedValue>),
+      to: WritableKeyPath<Root, AppendedValue>.self
+    )
+  }
+
   // MARK: Implementation detail
   
   override class var kind: Kind { return .value }
@@ -331,6 +428,17 @@ public class WritableKeyPath<Root, Value>: KeyPath<Root, Value> {
 }
 
 public class ReferenceWritableKeyPath<Root, Value>: WritableKeyPath<Root, Value> {
+  /* TODO: need a "new" attribute */
+  @_inlineable
+  public final func appendingR<AppendedValue>(
+    path: WritableKeyPath<Value, AppendedValue>
+  ) -> ReferenceWritableKeyPath<Root, AppendedValue> {
+    return unsafeDowncast(
+      appending(path: path as KeyPath<Value, AppendedValue>),
+      to: ReferenceWritableKeyPath<Root, AppendedValue>.self
+    )
+  }
+
   // MARK: Implementation detail
 
   final override class var kind: Kind { return .reference }
@@ -489,9 +597,27 @@ struct RawKeyPathComponent {
     var _value: UInt32
     
     var discriminator: Int { return Int(_value) >> Header.payloadBits & 0x3 }
-    var payload: Int { return Int(_value) & Header.payloadMask }
-    var lastComponentOfReferencePrefix: Bool {
-      return Int(_value) >> Header.payloadBits & 0x4 != 0
+    var payload: Int {
+      get { return Int(_value) & Header.payloadMask }
+      set {
+        _sanityCheck(newValue & Header.payloadMask == newValue,
+                     "payload too big")
+        let shortMask = UInt32(Header.payloadMask)
+        _value = _value & ~shortMask | UInt32(newValue)
+      }
+    }
+    var endOfReferencePrefix: Bool {
+      get {
+        return Int(_value) >> Header.payloadBits & 0x4 != 0
+      }
+      set {
+        let bit = 0x4 << UInt32(Header.payloadBits)
+        if newValue {
+          _value = _value | bit
+        } else {
+          _value = _value & ~bit
+        }
+      }
     }
 
     var kind: KeyPathComponentKind {
@@ -570,8 +696,32 @@ struct RawKeyPathComponent {
     }
   }
   
-  func clone(into buffer: UnsafeMutableRawPointer) {
-    fatalError("todo")
+  func clone(into buffer: inout UnsafeMutableRawBufferPointer,
+             endOfReferencePrefix: Bool) {
+    var newHeader = header
+    newHeader.endOfReferencePrefix = endOfReferencePrefix
+
+    var componentSize = MemoryLayout<Header>.size
+    buffer.storeBytes(of: newHeader, as: Header.self)
+    switch header.kind {
+    case .struct,
+         .class:
+      if header.payload == Header.payloadMask {
+        let overflowOffset = body.load(as: UInt32.self)
+        buffer.storeBytes(of: overflowOffset, toByteOffset: 4,
+                          as: UInt32.self)
+        componentSize += 4
+      }
+    case .optionalChain,
+         .optionalForce,
+         .optionalWrap:
+      break
+    }
+    _sanityCheck(buffer.count >= componentSize)
+    buffer = UnsafeMutableRawBufferPointer(
+      start: buffer.baseAddress.unsafelyUnwrapped + componentSize,
+      count: buffer.count - componentSize
+    )
   }
   
   func projectReadOnly<CurValue, NewValue>(_ base: CurValue) -> NewValue {
@@ -643,15 +793,22 @@ internal struct KeyPathBuffer {
   var trivial: Bool
   var hasReferencePrefix: Bool
   
-  init(base: UnsafeRawPointer) {
-    struct Header {
-      var _value: UInt32
-      
-      var size: Int { return Int(_value & 0x3FFF_FFFF) }
-      var trivial: Bool { return _value & 0x8000_0000 != 0 }
-      var hasReferencePrefix: Bool { return _value & 0x4000_0000 != 0 }
+  struct Header {
+    var _value: UInt32
+    
+    init(size: Int, trivial: Bool, hasReferencePrefix: Bool) {
+      _sanityCheck(size <= 0x3FFF_FFFF, "key path too big")
+      _value = UInt32(size)
+        | (trivial ? 0x8000_0000 : 0)
+        | (hasReferencePrefix ? 0x4000_0000 : 0)
     }
+    
+    var size: Int { return Int(_value & 0x3FFF_FFFF) }
+    var trivial: Bool { return _value & 0x8000_0000 != 0 }
+    var hasReferencePrefix: Bool { return _value & 0x4000_0000 != 0 }
+  }
 
+  init(base: UnsafeRawPointer) {
     let header = base.load(as: Header.self)
     data = UnsafeRawBufferPointer(
       start: base + MemoryLayout<Header>.size,
@@ -669,7 +826,7 @@ internal struct KeyPathBuffer {
   mutating func next() -> (RawKeyPathComponent, Any.Type?) {
     let header = pop(RawKeyPathComponent.Header.self)
     // Track if this is the last component of the reference prefix.
-    if header.lastComponentOfReferencePrefix {
+    if header.endOfReferencePrefix {
       _sanityCheck(self.hasReferencePrefix,
                    "beginMutation marker in non-reference-writable key path?")
       self.hasReferencePrefix = false
