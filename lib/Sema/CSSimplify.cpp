@@ -705,6 +705,7 @@ matchCallArguments(ConstraintSystem &cs, ConstraintKind kind,
                                       /*allowLabelOmission:*/ false,
                                       listener, parameterBindings)) {
     // Try again, permitting arg label omission
+    // FIXME: It should be possible to do both of these in a single pass.
     if(constraints::matchCallArguments(args, params, hasTrailingClosure,
                                        cs.shouldAttemptFixes(), 
                                        /*allowLabelOmission:*/ true,
