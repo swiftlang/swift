@@ -877,11 +877,11 @@ ConstraintSystem::compareSolutions(ConstraintSystem &cs,
       secondAsSpecializedAs = true;
     }
 
-    if (auto ctor1 = dyn_cast<ConstructorDecl>(decl1)) {
-      if (auto ctor2 = dyn_cast<ConstructorDecl>(decl2)) {
-        // If each is as specialized as the other, and both are constructors,
-        // check the constructor kind.
-        if (firstAsSpecializedAs && secondAsSpecializedAs) {
+    // If each is as specialized as the other, and both are constructors,
+    // check the constructor kind.
+    if (firstAsSpecializedAs && secondAsSpecializedAs) {
+      if (auto ctor1 = dyn_cast<ConstructorDecl>(decl1)) {
+        if (auto ctor2 = dyn_cast<ConstructorDecl>(decl2)) {
           if (ctor1->getInitKind() != ctor2->getInitKind()) {
             if (ctor1->getInitKind() < ctor2->getInitKind())
               ++score1;

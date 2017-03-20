@@ -2571,9 +2571,6 @@ ParserResult<Expr> Parser::parseExprList(tok leftTok, tok rightTok) {
                                       rightLoc,
                                       trailingClosure);
 
-  // If you change this function, make sure you also change 
-  // InterpolatedStringLiteralExpr::isInterpolatedSegment().
-
   // A tuple with a single, unlabeled element is just parentheses.
   if (subExprs.size() == 1 &&
       (subExprNames.empty() || subExprNames[0].empty())) {
