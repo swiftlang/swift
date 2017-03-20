@@ -22,7 +22,7 @@ namespace swift {
 
 class AbstractClosureExpr;
 
-namespace NewMangling {
+namespace Mangle {
 
 /// The mangler for AST declarations.
 class ASTMangler : public Mangler {
@@ -226,7 +226,7 @@ protected:
   }
 };
 
-} // end namespace NewMangling
+} // end namespace Mangle
 } // end namespace swift
 
 #endif // __SWIFT_AST_ASTMANGLER_H__

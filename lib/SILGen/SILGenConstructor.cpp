@@ -842,7 +842,7 @@ static void emitMemberInit(SILGenFunction &SGF, VarDecl *selfDecl,
 
 static SILValue getBehaviorInitStorageFn(SILGenFunction &gen,
                                          VarDecl *behaviorVar) {
-  NewMangling::ASTMangler NewMangler;
+  Mangle::ASTMangler NewMangler;
   std::string behaviorInitName = NewMangler.mangleBehaviorInitThunk(behaviorVar);
   
   SILFunction *thunkFn;

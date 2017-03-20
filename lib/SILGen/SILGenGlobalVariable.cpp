@@ -28,7 +28,7 @@ SILGlobalVariable *SILGenModule::getSILGlobalVariable(VarDecl *gDecl,
   if (auto SILGenName = gDecl->getAttrs().getAttribute<SILGenNameAttr>()) {
     mangledName = SILGenName->Name;
   } else {
-    NewMangling::ASTMangler NewMangler;
+    Mangle::ASTMangler NewMangler;
     mangledName = NewMangler.mangleGlobalVariableFull(gDecl);
   }
 
@@ -210,7 +210,7 @@ void SILGenModule::emitGlobalInitialization(PatternBindingDecl *pd,
   });
   assert(varDecl);
 
-  NewMangling::ASTMangler TokenMangler;
+  Mangle::ASTMangler TokenMangler;
   std::string onceTokenBuffer = TokenMangler.mangleGlobalInit(varDecl, counter,
                                                               false);
   
@@ -226,7 +226,7 @@ void SILGenModule::emitGlobalInitialization(PatternBindingDecl *pd,
   onceToken->setDeclaration(false);
 
   // Emit the initialization code into a function.
-  NewMangling::ASTMangler FuncMangler;
+  Mangle::ASTMangler FuncMangler;
   std::string onceFuncBuffer = FuncMangler.mangleGlobalInit(varDecl, counter,
                                                             true);
   

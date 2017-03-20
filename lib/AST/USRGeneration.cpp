@@ -33,13 +33,13 @@ static inline StringRef getUSRSpacePrefix() {
 
 bool ide::printTypeUSR(Type Ty, raw_ostream &OS) {
   assert(!Ty->hasArchetype() && "cannot have contextless archetypes mangled.");
-  NewMangling::ASTMangler Mangler;
+  Mangle::ASTMangler Mangler;
   OS << Mangler.mangleTypeForDebugger(Ty->getRValueType(), nullptr);
   return false;
 }
 
 bool ide::printDeclTypeUSR(const ValueDecl *D, raw_ostream &OS) {
-  NewMangling::ASTMangler Mangler;
+  Mangle::ASTMangler Mangler;
   std::string MangledName = Mangler.mangleDeclType(D);
   OS << MangledName;
   return false;
@@ -213,7 +213,7 @@ bool ide::printDeclUSR(const ValueDecl *D, raw_ostream &OS) {
   if (isa<ParamDecl>(VD) && isa<DestructorDecl>(VD->getDeclContext()))
     return true;
 
-  NewMangling::ASTMangler NewMangler;
+  Mangle::ASTMangler NewMangler;
   std::string Mangled = NewMangler.mangleDeclAsUSR(VD, getUSRSpacePrefix());
 
   OS << Mangled;
@@ -240,7 +240,7 @@ bool ide::printAccessorUSR(const AbstractStorageDecl *D, AccessorKind AccKind,
     return printObjCUSRForAccessor(SD, AccKind, OS);
   }
 
-  NewMangling::ASTMangler NewMangler;
+  Mangle::ASTMangler NewMangler;
   std::string Mangled = NewMangler.mangleAccessorEntityAsUSR(AccKind,
                           AddressorKind::NotAddressor, SD, getUSRSpacePrefix());
 

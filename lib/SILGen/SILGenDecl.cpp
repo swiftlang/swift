@@ -1928,7 +1928,7 @@ SILGenModule::emitProtocolWitness(ProtocolConformance *conformance,
                                                    witnessRef);
 
   // Mangle the name of the witness thunk.
-  NewMangling::ASTMangler NewMangler;
+  Mangle::ASTMangler NewMangler;
   std::string nameBuffer = NewMangler.mangleWitnessThunk(conformance,
                                                          requirement.getDecl());
   
@@ -2105,7 +2105,7 @@ getOrCreateReabstractionThunk(GenericEnvironment *genericEnv,
       = GenericEnvironment::mapTypeOutOfContext(genericEnv, toType)
               ->getCanonicalType();
 
-  NewMangling::ASTMangler NewMangler;
+  Mangle::ASTMangler NewMangler;
   std::string name = NewMangler.mangleReabstractionThunkHelper(thunkType,
                        fromInterfaceType, toInterfaceType, M.getSwiftModule());
   

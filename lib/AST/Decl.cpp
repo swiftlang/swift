@@ -2573,7 +2573,7 @@ ObjCClassKind ClassDecl::checkObjCAncestry() const {
 static StringRef mangleObjCRuntimeName(const NominalTypeDecl *nominal,
                                        llvm::SmallVectorImpl<char> &buffer) {
   {
-    NewMangling::ASTMangler Mangler;
+    Mangle::ASTMangler Mangler;
     std::string MangledName = Mangler.mangleObjCRuntimeName(nominal);
 
     buffer.clear();

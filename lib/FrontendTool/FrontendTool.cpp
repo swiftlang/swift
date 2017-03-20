@@ -979,7 +979,7 @@ int swift::performFrontend(ArrayRef<const char *> Args,
     performCompile(Instance, Invocation, Args, ReturnValue, observer);
 
   if (!HadError) {
-    NewMangling::printManglingStats();
+    Mangle::printManglingStats();
   }
 
   if (!HadError && !Invocation.getFrontendOptions().DumpAPIPath.empty()) {

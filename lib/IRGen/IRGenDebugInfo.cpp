@@ -1036,7 +1036,7 @@ StringRef IRGenDebugInfo::getMangledName(DebugTypeInfo DbgTy) {
   if (MetadataTypeDecl && DbgTy.getDecl() == MetadataTypeDecl)
     return BumpAllocatedString(DbgTy.getDecl()->getName().str());
   
-  NewMangling::ASTMangler Mangler;
+  Mangle::ASTMangler Mangler;
   std::string Name = Mangler.mangleTypeForDebugger(DbgTy.getType(),
                                                    DbgTy.getDeclContext());
   return BumpAllocatedString(Name);

@@ -28,7 +28,7 @@
 using namespace swift;
 
 static std::string mangleConstant(NormalProtocolConformance *C) {
-  NewMangling::ASTMangler Mangler;
+  Mangle::ASTMangler Mangler;
   return Mangler.mangleWitnessTable(C);
 }
 
