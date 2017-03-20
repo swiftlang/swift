@@ -226,7 +226,7 @@ def run():
 
     Replace temporary filenames and check it.
 
-    >>> print output.replace(target1.name,'TARGET1-NAME').replace(target2.name,'TARGET2-NAME') + 'EOF'
+    >>> print output.replace(target1.name,'TARGET1-NAME').replace(target2.name,'TARGET2-NAME').replace('\\r', '') + 'EOF'
     A
     TARGET1-NAME:2:111: error one
     B
@@ -242,9 +242,9 @@ def run():
     glitch in [fox.box, line 11 assert five
     glitch in [fox.box:28 assert six
     EOF
-    >>> print subprocess.check_output([sys.executable, __file__, 'foo.bar', '21', target1.name]),
+    >>> print subprocess.check_output([sys.executable, __file__, 'foo.bar', '21', target1.name]).replace('\\r', ''),
     5
-    >>> print subprocess.check_output([sys.executable, __file__, 'foo.bar', '8', target2.name]),
+    >>> print subprocess.check_output([sys.executable, __file__, 'foo.bar', '8', target2.name]).replace('\\r', ''),
     3
 
     """
