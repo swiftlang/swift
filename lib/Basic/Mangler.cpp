@@ -128,6 +128,7 @@ std::string Mangler::finalize() {
   assert(Storage.size() && "Mangling an empty name");
   std::string result = std::string(Storage.data(), Storage.size());
   Storage.clear();
+  verify(result);
   return result;
 }
 
@@ -136,6 +137,52 @@ std::string Mangler::finalize() {
 void Mangler::finalize(llvm::raw_ostream &stream) {
   std::string result = finalize();
   stream.write(result.data(), result.size());
+}
+
+
+static bool treeContains(Demangle::NodePointer Nd, Demangle::Node::Kind Kind) {
+  if (Nd->getKind() == Kind)
+    return true;
+
+  for (auto Child : *Nd) {
+    if (treeContains(Child, Kind))
+      return true;
+  }
+  return false;
+}
+
+void Mangler::verify(const std::string &mangledName) {
+#ifndef NDEBUG
+  StringRef nameStr = mangledName;
+  if (!nameStr.startswith(MANGLING_PREFIX_STR))
+    return;
+
+  Demangler Dem;
+  NodePointer Root = Dem.demangleSymbol(nameStr);
+  if (!Root || treeContains(Root, Node::Kind::Suffix)) {
+    llvm::errs() << "Can't demangle: " << nameStr << '\n';
+    abort();
+  }
+  std::string Remangled = mangleNode(Root);
+  if (Remangled == mangledName)
+    return;
+
+  if (treeContains(Root,
+                   Demangle::Node::Kind::DependentAssociatedTypeRef)) {
+    // There are cases where dependent associated types results in different
+    // remangled names. See ASTMangler::appendAssociatedTypeName.
+    // This is no problem for the compiler, but we have to exclude this case
+    // for the check. Instead we try to re-de-mangle the remangled name.
+    nameStr = Remangled;
+    NodePointer RootOfRemangled = Dem.demangleSymbol(nameStr);
+    if (Remangled == mangleNode(RootOfRemangled))
+      return;
+  }
+  llvm::errs() << "Remangling failed:\n"
+                  "original  = " << nameStr << "\n"
+                  "remangled = " << Remangled << '\n';
+  abort();
+#endif
 }
 
 void Mangler::appendIdentifier(StringRef ident) {
