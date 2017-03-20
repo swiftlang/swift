@@ -667,9 +667,7 @@ func test_open_existential_semantics_class(_ guaranteed: CP1,
   // CHECK: [[IMMEDIATE:%.*]] = load [copy] [[PB]]
   // CHECK: [[VALUE:%.*]] = open_existential_ref [[IMMEDIATE]]
   // CHECK: [[METHOD:%.*]] = function_ref
-  // CHECK: [[BORROWED_VALUE:%.*]] = begin_borrow [[VALUE]]
-  // CHECK: apply [[METHOD]]<{{.*}}>([[BORROWED_VALUE]])
-  // CHECK: end_borrow [[BORROWED_VALUE]] from [[VALUE]]
+  // CHECK: apply [[METHOD]]<{{.*}}>([[VALUE]])
   // CHECK: destroy_value [[VALUE]]
   // CHECK-NOT: destroy_value [[IMMEDIATE]]
   immediate.f1()
@@ -678,9 +676,7 @@ func test_open_existential_semantics_class(_ guaranteed: CP1,
   // CHECK: [[PLUS_ONE:%.*]] = apply [[F]]()
   // CHECK: [[VALUE:%.*]] = open_existential_ref [[PLUS_ONE]]
   // CHECK: [[METHOD:%.*]] = function_ref
-  // CHECK: [[BORROWED_VALUE:%.*]] = begin_borrow [[VALUE]]
-  // CHECK: apply [[METHOD]]<{{.*}}>([[BORROWED_VALUE]])
-  // CHECK: end_borrow [[BORROWED_VALUE]] from [[VALUE]]
+  // CHECK: apply [[METHOD]]<{{.*}}>([[VALUE]])
   // CHECK: destroy_value [[VALUE]]
   // CHECK-NOT: destroy_value [[PLUS_ONE]]
   plusOneCP1().f1()
