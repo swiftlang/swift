@@ -288,10 +288,6 @@ void Constraint::print(llvm::raw_ostream &Out, SourceManager *sm) const {
       Out << "decl-via-unwrapped-optional ";
       printDecl();
       break;
-      case OverloadChoiceKind::DeclViaOmittedLabels:
-        Out << "decl-via-omitted-labels ";
-        printDecl();
-        break;
     case OverloadChoiceKind::BaseType:
       Out << "base type";
       break;

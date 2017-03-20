@@ -145,7 +145,6 @@ static bool sameOverloadChoice(const OverloadChoice &x,
   case OverloadChoiceKind::DeclViaDynamic:
   case OverloadChoiceKind::DeclViaBridge:
   case OverloadChoiceKind::DeclViaUnwrappedOptional:
-  case OverloadChoiceKind::DeclViaOmittedLabels:
     return sameDecl(x.getDecl(), y.getDecl());
 
   case OverloadChoiceKind::TypeDecl:
@@ -863,7 +862,6 @@ ConstraintSystem::compareSolutions(ConstraintSystem &cs,
     case OverloadChoiceKind::Decl:
     case OverloadChoiceKind::DeclViaBridge:
     case OverloadChoiceKind::DeclViaUnwrappedOptional:
-    case OverloadChoiceKind::DeclViaOmittedLabels:
       break;
     }
     

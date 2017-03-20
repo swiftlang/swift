@@ -2650,7 +2650,6 @@ void Solution::dump(raw_ostream &out) const {
     case OverloadChoiceKind::TypeDecl:
     case OverloadChoiceKind::DeclViaBridge:
     case OverloadChoiceKind::DeclViaUnwrappedOptional:
-    case OverloadChoiceKind::DeclViaOmittedLabels:
       choice.getDecl()->dumpRef(out);
       out << " as ";
       if (choice.getBaseType())
@@ -2816,7 +2815,6 @@ void ConstraintSystem::print(raw_ostream &out) {
       case OverloadChoiceKind::TypeDecl:
       case OverloadChoiceKind::DeclViaBridge:
       case OverloadChoiceKind::DeclViaUnwrappedOptional:
-      case OverloadChoiceKind::DeclViaOmittedLabels:
         if (choice.getBaseType())
           out << choice.getBaseType()->getString() << ".";
         out << choice.getDecl()->getName() << ": "

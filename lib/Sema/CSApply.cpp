@@ -2551,7 +2551,6 @@ namespace {
       }
 
       case OverloadChoiceKind::Decl:
-      case OverloadChoiceKind::DeclViaOmittedLabels:
       case OverloadChoiceKind::DeclViaUnwrappedOptional:
       case OverloadChoiceKind::DeclViaDynamic: {
         bool isDynamic
