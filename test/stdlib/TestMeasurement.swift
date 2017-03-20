@@ -39,13 +39,16 @@ class MyDimensionalUnit : Dimension {
 
 @available(OSX 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *)
 class BugUnit : Unit {
-    override init() {
-        super.init(symbol: "bug")
+    override init(symbol: String) {
+        precondition(symbol == "bug")
+        super.init(symbol: symbol)
     }
     
     required init?(coder aDecoder: NSCoder) {
         super.init(coder: aDecoder)
     }
+    
+    public static let bugs = BugUnit(symbol: "bug")
 }
 
 @available(OSX 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *)
@@ -60,9 +63,9 @@ class TestMeasurement : TestMeasurementSuper {
         expectEqual(6, m3.value)
         expectEqual(m1, m2)
         
-        let m10 = Measurement(value: 2, unit: BugUnit())
-        let m11 = Measurement(value: 2, unit: BugUnit())
-        let m12 = Measurement(value: 3, unit: BugUnit())
+        let m10 = Measurement(value: 2, unit: BugUnit.bugs)
+        let m11 = Measurement(value: 2, unit: BugUnit.bugs)
+        let m12 = Measurement(value: 3, unit: BugUnit.bugs)
         
         expectEqual(m10, m11)
         expectNotEqual(m10, m12)
@@ -83,7 +86,7 @@ class TestMeasurement : TestMeasurementSuper {
         
         // This correctly fails to build
         
-        // let m2 = Measurement(value: 1, unit: BugUnit())
+        // let m2 = Measurement(value: 1, unit: BugUnit.bugs)
         // m2.converted(to: MyDimensionalUnit.unitKiloA)
     }
     
@@ -107,9 +110,9 @@ class TestMeasurement : TestMeasurementSuper {
         // Dynamically different dimensions
         expectEqual(Measurement(value: 1_001_000, unit: MyDimensionalUnit.unitA), oneMegaA + oneKiloA)
         
-        var bugCount = Measurement(value: 1, unit: BugUnit())
+        var bugCount = Measurement(value: 1, unit: BugUnit.bugs)
         expectEqual(bugCount.value, 1)
-        bugCount = bugCount + Measurement(value: 4, unit: BugUnit())
+        bugCount = bugCount + Measurement(value: 4, unit: BugUnit.bugs)
         expectEqual(bugCount.value, 5)
     }
     
@@ -179,7 +182,7 @@ class TestMeasurement : TestMeasurementSuper {
 
 #if !FOUNDATION_XCTEST
 if #available(OSX 10.12, iOS 10.0, tvOS 10.0, watchOS 3.0, *) {
-    var MeasurementTests = TestSuite("TestMeasurement")
+    let MeasurementTests = TestSuite("TestMeasurement")
     MeasurementTests.test("testBasicConstruction") { TestMeasurement().testBasicConstruction() }
     MeasurementTests.test("testConversion") { TestMeasurement().testConversion() }
     MeasurementTests.test("testOperators") { TestMeasurement().testOperators() }
