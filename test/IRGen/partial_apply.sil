@@ -617,3 +617,54 @@ bb0:
   %result = tuple ()
   return %result : $()
 }
+
+// Crash on partial apply of a generic enum.
+enum GenericEnum<T> {
+  case X(String)
+  case Y(T, T, T, T, T)
+}
+sil public_external @generic_indirect_return : $@convention(thin) <T> (Int) -> @owned GenericEnum<T>
+
+// CHECK-LABEL: define{{.*}} @partial_apply_generic_indirect_return
+// CHECK: insertvalue {{.*}}_TPA_generic_indirect_return
+
+// CHECK-LABEL: define internal void @_TPA_generic_indirect_return(%GO13partial_apply11GenericEnumSi_* noalias nocapture sret, %swift.refcounted*
+// CHECK:  [[CASTEDRETURN:%.*]] = bitcast %GO13partial_apply11GenericEnumSi_* %0 to %O13partial_apply11GenericEnum*
+// CHECK:  call void @generic_indirect_return({{.*}}[[CASTEDRETURN]]
+// CHECK:  ret void
+sil @partial_apply_generic_indirect_return : $@convention(thin) (Int) -> @callee_owned () -> @owned GenericEnum<Int> {
+  bb0(%0 : $Int):
+  %fn = function_ref @generic_indirect_return :$@convention(thin) <T> (Int) -> @owned GenericEnum<T>
+  %pa = partial_apply %fn<Int> (%0) : $@convention(thin) <T> (Int) -> @owned GenericEnum<T>
+  return %pa : $@callee_owned () -> @owned GenericEnum<Int>
+
+}
+
+// Crash on partial apply of a generic enum.
+enum GenericEnum2<T> {
+  case X(SwiftClass)
+  case Y(T)
+}
+sil public_external @generic_indirect_return2 : $@convention(thin) <T> (Int) -> @owned GenericEnum2<T>
+
+// CHECK-LABEL: define{{.*}} @partial_apply_generic_indirect_return2
+// CHECK: insertvalue {{.*}}_TPA_generic_indirect_return2
+
+// CHECK-LABEL: define internal { i64, i1 } @_TPA_generic_indirect_return2(%swift.refcounted*)
+// CHECK:  [[TMP:%.*]] = alloca %GO13partial_apply12GenericEnum2Si_
+// CHECK:  [[CASTED_ADDR:%.*]] = bitcast %GO13partial_apply12GenericEnum2Si_* [[TMP]] to %O13partial_apply12GenericEnum2*
+// CHECK: call void @generic_indirect_return2(%O13partial_apply12GenericEnum2* noalias nocapture sret [[CASTED_ADDR]]
+// CHECK:  [[PAYLOAD_ADDR:%.*]] = bitcast %GO13partial_apply12GenericEnum2Si_* %return.temp to i64*
+// CHECK:  [[PAYLOAD:%.*]] = load i64, i64* [[PAYLOAD_ADDR]]
+// CHECK:  [[TAG_ADDR:%.*]] = getelementptr inbounds %GO13partial_apply12GenericEnum2Si_, %GO13partial_apply12GenericEnum2Si_* %return.temp, i32 0, i32 1
+// CHECK:  [[TAG_ADDR2:%.*]] = bitcast [1 x i8]* [[TAG_ADDR]] to i1*
+// CHECK:  [[TAG:%.*]] = load i1, i1* [[TAG_ADDR2]]
+// CHECK:  [[TMP:%.*]] = insertvalue { i64, i1 } undef, i64 [[PAYLOAD]], 0
+// CHECK:  [[RET:%.*]] = insertvalue { i64, i1 } [[TMP]], i1 [[TAG]], 1
+// CHECK:  ret { i64, i1 } [[RET]]
+sil @partial_apply_generic_indirect_return2 : $@convention(thin) (Int) -> @callee_owned () -> @owned GenericEnum2<Int> {
+  bb0(%0 : $Int):
+  %fn = function_ref @generic_indirect_return2 :$@convention(thin) <T> (Int) -> @owned GenericEnum2<T>
+  %pa = partial_apply %fn<Int> (%0) : $@convention(thin) <T> (Int) -> @owned GenericEnum2<T>
+  return %pa : $@callee_owned () -> @owned GenericEnum2<Int>
+}
