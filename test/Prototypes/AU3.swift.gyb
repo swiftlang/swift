@@ -433,9 +433,8 @@ extension Any${Element}UnicodeView {
 
 % end
 
-
-public extension Wrapper
-where Base : Comparable, Self : AnyUnicodeIndex_ {
+/// Comparable -> Comparable wrappers just forward to the base implementation
+public extension Wrapper where Self : Comparable, Base : Comparable {
   static func < (lhs: Self, rhs: Self) -> Bool {
     return lhs.base < rhs.base
   }
@@ -444,22 +443,34 @@ where Base : Comparable, Self : AnyUnicodeIndex_ {
   }
 }
 
-extension _UnicodeViews.Scalars : UnicodeView {
-  struct AnyIndex : AnyUnicodeIndex_, Wrapper, Comparable {
-    var base: Index
-    var codeUnitOffset: Int64 {
-      return _UnicodeViews.Scalars.codeUnitOffset(of: base)
-    }
+
+//===--- Adapt Swift.UnicodeView to this file's UnicodeView protocol ------===//
+struct AnyUnicodeIndexAdapter<BaseView: Swift.UnicodeView> : AnyUnicodeIndex_, Wrapper, Comparable {
+  var base: BaseView.Index
+  var codeUnitOffset: Int64 {
+    return BaseView.codeUnitOffset(of: base)
   }
+}
+
+extension Swift.UnicodeView where Self : UnicodeView {
+  typealias Self_ = Self
   
   public func wrap(_ i: Index) -> AnyUnicodeIndex_ {
-    return AnyIndex(base: i)
+    return AnyUnicodeIndexAdapter<Self>(base: i)
   }
   public func unwrap(_ i: AnyUnicodeIndex_) -> Index {
-    return (i as? AnyIndex).map { $0.base }
+    return (i as? AnyUnicodeIndexAdapter<Self>).map { $0.base }
     ?? index(atCodeUnitOffset: i.codeUnitOffset)
   }
 }
+//===--- Adapt specific views ---------------------------------------------===//
+extension _UnicodeViews.Scalars : UnicodeView {}
+extension _TranscodedView : UnicodeView {}
+//===----------------------------------------------------------------------===//
+
+//===----------------------------------------------------------------------===//
+//===--- Tests ------------------------------------------------------------===//
+//===----------------------------------------------------------------------===//
 
 let sample = "abcdefghijklmnopqrstuvwxyz\n"
   + "🇸🇸🇬🇱🇱🇸🇩🇯🇺🇸\n"
