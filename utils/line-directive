@@ -61,7 +61,7 @@ def fline_map(target_filename):
 def map_line_to_source_file(target_filename, target_line_num):
     """
     >>> from tempfile import *
-    >>> t = NamedTemporaryFile()
+    >>> t = NamedTemporaryFile(delete=False)
     >>> t.write('''line 1
     ... line 2
     ... // ###sourceLocation(file: "foo.bar", line: 20)
@@ -103,7 +103,7 @@ def map_line_to_source_file(target_filename, target_line_num):
 def map_line_from_source_file(source_filename, source_line_num, target_filename):
     """
     >>> from tempfile import *
-    >>> t = NamedTemporaryFile()
+    >>> t = NamedTemporaryFile(delete=False)
     >>> t.write('''line 1
     ... line 2
     ... // ###sourceLocation(file: "foo.bar", line: 20)
@@ -173,7 +173,7 @@ def run():
     """Simulate a couple of gyb-generated files
 
     >>> from tempfile import *
-    >>> target1 = NamedTemporaryFile()
+    >>> target1 = NamedTemporaryFile(delete=False)
     >>> target1.write('''line 1
     ... line 2
     ... // ###sourceLocation(file: "foo.bar", line: 20)
@@ -184,7 +184,7 @@ def run():
     ... line 8
     ... ''')
     >>> target1.flush()
-    >>> target2 = NamedTemporaryFile()
+    >>> target2 = NamedTemporaryFile(delete=False)
     >>> target2.write('''// ###sourceLocation(file: "foo.bar", line: 7)
     ... line 2
     ... line 3
@@ -196,7 +196,7 @@ def run():
 
     Simulate the raw output of compilation
 
-    >>> raw_output = NamedTemporaryFile()
+    >>> raw_output = NamedTemporaryFile(delete=False)
     >>> target1_name, target2_name = target1.name, target2.name
     >>> raw_output.write('''A
     ... %(target1_name)s:2:111: error one
