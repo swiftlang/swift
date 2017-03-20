@@ -45,6 +45,17 @@ StringLiteralCallSequenceTests.test("StringLiteralCallSequence/multi-parameter i
   )
 }
 
+StringLiteralCallSequenceTests.test("StringLiteralCallSequence/multi-parameter defaulted interpolation") {
+  expectEqual(
+    "Hello, \(1, uppercase: true)!", 
+    TracingString(stringInterpolation: 
+      TracingString(stringLiteral: "Hello, "), 
+      TracingString(stringInterpolationSegment: .init(1, uppercase: true)), 
+      TracingString(stringLiteral: "!")
+    )
+  )
+}
+
 StringLiteralCallSequenceTests.test("StringLiteralCallSequence/adjacent interpolations") {
   expectEqual(
     "Hello, \(1)\(2)!", 
