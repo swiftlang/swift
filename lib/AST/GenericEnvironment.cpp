@@ -420,6 +420,7 @@ getSubstitutionMap(SubstitutionList subs) const {
   assert(subs.empty() && "did not use all substitutions?!");
 
   populateParentMap(result);
+  result.verify();
   return result;
 }
 
@@ -459,5 +460,6 @@ getSubstitutionMap(TypeSubstitutionFn subs,
     });
 
   populateParentMap(subMap);
+  subMap.verify();
   return subMap;
 }
