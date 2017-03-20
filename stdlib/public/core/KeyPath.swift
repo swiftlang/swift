@@ -51,10 +51,56 @@ public class AnyKeyPath: Hashable {
   }
   
   final public var hashValue: Int {
-    fatalError("TODO")
+    var hash = 0
+    withBuffer {
+      var buffer = $0
+      while true {
+        let (component, type) = buffer.next()
+        hash ^= _mixInt(component.value.hashValue)
+        if let type = type {
+          hash ^= _mixInt(unsafeBitCast(type, to: Int.self))
+        } else {
+          break
+        }
+      }
+    }
+    return hash
   }
   public static func ==(a: AnyKeyPath, b: AnyKeyPath) -> Bool {
-    fatalError("TODO")
+    // Fast-path identical objects
+    if a === b {
+      return true
+    }
+    // Short-circuit differently-typed key paths
+    if type(of: a) != type(of: b) {
+      return false
+    }
+    return a.withBuffer {
+      var aBuffer = $0
+      return b.withBuffer {
+        var bBuffer = $0
+        
+        // Two equivalent key paths should have the same reference prefix
+        if aBuffer.hasReferencePrefix != bBuffer.hasReferencePrefix {
+          return false
+        }
+        
+        while true {
+          let (aComponent, aType) = aBuffer.next()
+          let (bComponent, bType) = bBuffer.next()
+        
+          if aComponent.header.lastComponentOfReferencePrefix
+              != bComponent.header.lastComponentOfReferencePrefix
+            || aComponent.value != bComponent.value
+            || aType != bType {
+            return false
+          }
+          if aType == nil {
+            return true
+          }
+        }
+      }
+    }
   }
   
   // MARK: Implementation details
@@ -126,15 +172,19 @@ public class KeyPath<Root, Value>: PartialKeyPath<Root> {
   public final func appending<AppendedValue>(
     path: WritableKeyPath<Value, AppendedValue>
   ) -> Self {
-    return unsafeDowncast(appending(path: path as KeyPath<Value, AppendedValue>),
-                          to: type(of: self))
+    return unsafeDowncast(
+      appending(path: path as KeyPath<Value, AppendedValue>),
+      to: type(of: self)
+    )
   }
   
   public final func appending<AppendedValue>(
     path: ReferenceWritableKeyPath<Value, AppendedValue>
   ) -> ReferenceWritableKeyPath<Root, AppendedValue> {
-    return unsafeDowncast(appending(path: path as KeyPath<Value, AppendedValue>),
-                          to: ReferenceWritableKeyPath<Root, AppendedValue>.self)
+    return unsafeDowncast(
+      appending(path: path as KeyPath<Value, AppendedValue>),
+      to: ReferenceWritableKeyPath<Root, AppendedValue>.self
+    )
   }
 
   // MARK: Override optional-returning abstract interfaces
@@ -155,7 +205,7 @@ public class KeyPath<Root, Value>: PartialKeyPath<Root> {
     if Value2.self == Value.self {
       return .some(appending(
         path: unsafeDowncast(path,
-                             to: ReferenceWritableKeyPath<Value, AppendedValue>.self)))
+                      to: ReferenceWritableKeyPath<Value, AppendedValue>.self)))
     }
     return nil
   }
@@ -366,13 +416,11 @@ enum KeyPathComponentKind {
   /// The keypath optional-forces, trapping if the input is
   /// nil, or else proceeding by projecting the value inside.
   case optionalForce
-  /// The keypath has a getter.
-  case get
-  /// The keypath has a getter and setter.
-  case getSet
+  /// The keypath wraps a value in an optional.
+  case optionalWrap
 }
 
-enum KeyPathComponent {
+enum KeyPathComponent: Hashable {
   struct RawAccessor {
     var rawCode: Builtin.RawPointer
     var rawContext: Builtin.NativeObject?
@@ -389,10 +437,45 @@ enum KeyPathComponent {
   /// The keypath optional-forces, trapping if the input is
   /// nil, or else proceeding by projecting the value inside.
   case optionalForce
-  /// The keypath is read-only using a getter function.
-  case get(RawAccessor)
-  /// The keypath is read-only using a getter/setter pair.
-  case getSet(getter: RawAccessor, setter: RawAccessor, isMutating: Bool)
+  /// The keypath wraps a value in an optional.
+  case optionalWrap
+
+  static func ==(a: KeyPathComponent, b: KeyPathComponent) -> Bool {
+    switch (a, b) {
+    case (.struct(offset: let a), .struct(offset: let b)),
+         (.class (offset: let a), .class (offset: let b)):
+      return a == b
+    case (.optionalChain, .optionalChain),
+         (.optionalForce, .optionalForce),
+         (.optionalWrap, .optionalWrap):
+      return true
+    case (.struct, _),
+         (.class,  _),
+         (.optionalChain, _),
+         (.optionalForce, _),
+         (.optionalWrap, _):
+      return false
+    }
+  }
+  
+  var hashValue: Int {
+    var hash: Int = 0
+    switch self {
+    case .struct(offset: let a):
+      hash ^= _mixInt(0)
+      hash ^= _mixInt(a)
+    case .class(offset: let b):
+      hash ^= _mixInt(1)
+      hash ^= _mixInt(b)
+    case .optionalChain:
+      hash ^= _mixInt(2)
+    case .optionalForce:
+      hash ^= _mixInt(3)
+    case .optionalWrap:
+      hash ^= _mixInt(4)
+    }
+    return hash
+  }
 }
 
 struct RawKeyPathComponent {
@@ -420,12 +503,9 @@ struct RawKeyPathComponent {
       case (3, 0):
         return .optionalChain
       case (3, 1):
-        return .optionalForce
+        return .optionalWrap
       case (3, 2):
-        return .get
-      case (3, 3), // nonmutating
-           (3, 4): // mutating
-        return .getSet
+        return .optionalForce
       default:
         _sanityCheckFailure("invalid header")
       }
@@ -436,23 +516,15 @@ struct RawKeyPathComponent {
       case .struct, .class:
         if payload == Header.payloadMask { return 4 } // overflowed
         return 0
-      case .optionalChain, .optionalForce:
+      case .optionalChain, .optionalForce, .optionalWrap:
         return 0
-      case .get:
-        return MemoryLayout<Int>.size * 2
-      case .getSet:
-        // 32 bits of context are packed in the header payload
-        return MemoryLayout<Int>.size * 4
       }
     }
     
     var isTrivial: Bool {
       switch kind {
-      case .struct, .class, .optionalChain, .optionalForce:
+      case .struct, .class, .optionalChain, .optionalForce, .optionalWrap:
         return true
-      case .get, .getSet:
-        // Need to release context pointers for the getter and setter
-        return false
       }
     }
   }
@@ -470,77 +542,20 @@ struct RawKeyPathComponent {
     }
     return header.payload
   }
-  
-  func _getSetWord(at i: Int) -> Builtin.RawPointer? {
-    let result: Builtin.RawPointer?
-    if MemoryLayout<UInt>.size == 8 {
-      // Components are only 4-byte-aligned so we need to load two words
-      // separately.
-      let firstWordOffset = MemoryLayout<UInt32>.size * 2*i
-      _sanityCheck(body.count >= firstWordOffset + MemoryLayout<UInt32>.size*2,
-                   "component not big enough")
-      let lowWord = body.load(fromByteOffset: firstWordOffset,
-                              as: UInt32.self)
-      let highWord = body.load(fromByteOffset: firstWordOffset+4,
-                               as: UInt32.self)
-      let rawAddr = UInt(lowWord) | UInt(highWord) << 32
-      result = rawAddr == 0
-        ? nil : Builtin.inttoptr_Word(rawAddr._builtinWordValue)
-    } else if MemoryLayout<UInt>.size == 4 {
-      // Context fits in header; code pointers use the entire body.
-      let firstWordOffset = MemoryLayout<UInt32>.size * i
-      _sanityCheck(body.count >= firstWordOffset + MemoryLayout<UInt32>.size,
-                   "component not big enough")
-      result = body.load(fromByteOffset: firstWordOffset,
-                         as: Optional<Builtin.RawPointer>.self)
-    } else {
-      _sanityCheckFailure("unimplemented architecture")
-    }
-    return result
-  }
-  
-  var _getterContext: Builtin.NativeObject? {
-    _sanityCheck(header.kind == .getSet,
-                 "no setter context for this kind")
-    return _getSetWord(at: 0).map { Builtin.bridgeFromRawPointer($0) }
-  }
-  var _getterRawCode: Builtin.RawPointer {
-    _sanityCheck(header.kind == .get || header.kind == .getSet,
-                 "no getter code for this kind")
-    return _getSetWord(at: 1).unsafelyUnwrapped
-  }
-  var _setterContext: Builtin.NativeObject? {
-    _sanityCheck(header.kind == .getSet,
-                 "no setter context for this kind")
-    return _getSetWord(at: 2).map { Builtin.bridgeFromRawPointer($0) }
-  }
-  var _setterRawCode: Builtin.RawPointer {
-    _sanityCheck(header.kind == .getSet,
-                 "no setter code for this kind")
-    return _getSetWord(at: 3).unsafelyUnwrapped
-  }
 
   var value: KeyPathComponent {
-    return dump({ switch header.kind {
+    switch header.kind {
     case .struct:
       return .struct(offset: _structOrClassOffset)
     case .class:
       return .class(offset: _structOrClassOffset)
     case .optionalChain:
       return .optionalChain
-    case .get:
-      return .get(.init(rawCode: _getterRawCode, rawContext: _getterContext))
-    case .getSet:
-      _sanityCheck(header.payload == 3 || header.payload == 4,
-                   "invalid header for getSet component")
-      return .getSet(
-        getter: .init(rawCode: _getterRawCode, rawContext: _getterContext),
-        setter: .init(rawCode: _setterRawCode, rawContext: _setterContext),
-        isMutating: header.payload == 4
-      )
     case .optionalForce:
       return .optionalForce
-    } }())
+    case .optionalWrap:
+      return .optionalWrap
+    }
   }
 
   func destroy() {
@@ -548,19 +563,10 @@ struct RawKeyPathComponent {
     case .struct,
          .class,
          .optionalChain,
-         .optionalForce:
+         .optionalForce,
+         .optionalWrap:
       // trivial
       return
-    case .getSet:
-      // need to release contexts
-      if let context = _setterContext {
-        Builtin.release(context)
-      }
-      fallthrough
-    case .get:
-      if let context = _getterContext {
-        Builtin.release(context)
-      }
     }
   }
   
@@ -594,8 +600,8 @@ struct RawKeyPathComponent {
     
     case .optionalForce:
       fatalError("TODO")
-    case .get(let getter),
-         .getSet(let getter, setter: _, isMutating: _):
+      
+    case .optionalWrap:
       fatalError("TODO")
     }
   }
@@ -622,13 +628,11 @@ struct RawKeyPathComponent {
       keepAlive.append(object)
       return UnsafeRawPointer(Builtin.bridgeToRawPointer(object))
             .advanced(by: offset)
-      
-    case .getSet:
-      fatalError("TODO")
+    
     case .optionalForce:
       fatalError("TODO")
-
-    case .optionalChain, .get:
+    
+    case .optionalChain, .optionalWrap:
       _sanityCheckFailure("not a mutable key path component")
     }
   }
