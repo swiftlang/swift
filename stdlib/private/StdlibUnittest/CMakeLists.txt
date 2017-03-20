@@ -30,6 +30,7 @@ add_swift_library(swiftStdlibUnittest ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STD
   TestHelpers.swift
   TypeIndexed.swift
   GetOSVersion.mm
+  TracingString.swift
 
   SWIFT_MODULE_DEPENDS SwiftPrivate SwiftPrivatePthreadExtras SwiftPrivateLibcExtras
   SWIFT_MODULE_DEPENDS_IOS Darwin Foundation
