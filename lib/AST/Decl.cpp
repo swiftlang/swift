@@ -2102,11 +2102,11 @@ bool NominalTypeDecl::derivesProtocolConformance(ProtocolDecl *protocol) const {
 
         auto nominal = rawType->getAnyNominal();
         return nominal == C.getStringDecl() || nominal == C.getIntDecl();
-      } else {
-        // Empty enums are allowed to conform as well.
-        return enumDecl->getAllElements().empty() ||
-               enumDecl->hasOnlyCasesWithoutAssociatedValues();
       }
+
+      // Empty enums are allowed to conform as well.
+      return enumDecl->getAllElements().empty() ||
+             enumDecl->hasOnlyCasesWithoutAssociatedValues();
     }
 
     default:
