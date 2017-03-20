@@ -250,7 +250,8 @@ def run():
     """
     if len(sys.argv) <= 1:
         import doctest
-        doctest.testmod()
+        failure_count, _ = doctest.testmod()
+        sys.exit(failure_count)
     elif '--' not in sys.argv:
         source_file = sys.argv[1]
         source_line = int(sys.argv[2])
