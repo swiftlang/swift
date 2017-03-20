@@ -3572,7 +3572,7 @@ public:
       for (auto T : ExpectedTypes) {
         if (!T)
           continue;
-        if (T->getAs<TupleType>()) {
+        if (T->is<TupleType>()) {
           addTypeAnnotation(builder, T);
           builder.setExpectedTypeRelation(CodeCompletionResult::Identical);
           break;

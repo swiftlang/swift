@@ -1618,7 +1618,7 @@ struct ASTNodeBase {};
     }
 
     void verifyChecked(TypeExpr *expr) {
-      if (!expr->getType()->getAs<AnyMetatypeType>()) {
+      if (!expr->getType()->is<AnyMetatypeType>()) {
         Out << "TypeExpr must have metatype type\n";
         abort();
       }

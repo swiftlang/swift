@@ -1032,7 +1032,7 @@ createAggregate(SILBuilder &B, SILLocation Loc, ArrayRef<SILValue> Args) const {
     return B.createStruct(Loc, Ty, Args);
   }
 
-  if (Ty.getAs<TupleType>()) {
+  if (Ty.is<TupleType>()) {
     return B.createTuple(Loc, Ty, Args);
   }
 
