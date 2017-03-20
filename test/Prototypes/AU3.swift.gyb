@@ -31,51 +31,86 @@ public protocol Wrapper {
   var base: Base { get }
 }
 
-// FIXME: can we DRY some of the BidirectionalCollection wrappers?
+/// Comparable -> Comparable wrappers just forward to the base implementation
+public extension Wrapper where Self : Comparable, Base : Comparable {
+  static func < (lhs: Self, rhs: Self) -> Bool {
+    return lhs.base < rhs.base
+  }
+  static func == (lhs: Self, rhs: Self) -> Bool {
+    return lhs.base == rhs.base
+  }
+}
 
-/// Wrappers that present a `BidirectionalCollection` instance as another
-/// `BidirectionalCollection` forward all implementation directly to base
-public extension Wrapper
-where Base : BidirectionalCollection,
-Self : BidirectionalCollection {
-  var startIndex: Base.Index { return base.startIndex }
-  var endIndex: Base.Index { return base.endIndex }
-  func formIndex(after i: inout Base.Index) {
-    base.formIndex(after: &i)
+/// A type that wraps a `BidirectionalCollection` and forwards most or all of
+/// its API.
+///
+/// Some models of `BidirectionalCollectionWrapper` are themselves models
+/// `BidirectionalCollection`, but some are not.
+public protocol BidirectionalCollectionWrapper {
+  var base: Base { get }
+  associatedtype Base : BidirectionalCollection
+  associatedtype Index
+  associatedtype IndexDistance : SignedInteger
+  func _wrap(_: Base.Index) -> Index
+  func _unwrap(_: Index) -> Base.Index
+}
+
+public extension BidirectionalCollectionWrapper {
+  var startIndex: Index { return _wrap(base.startIndex) }
+  var endIndex: Index { return _wrap(base.endIndex) }
+  func index(after i: Index) -> Index {
+    return _wrap(base.index(after: _unwrap(i)))
   }
-  func index(after i: Base.Index) -> Base.Index {
-    return base.index(after: i)
+  func index(before i: Index) -> Index {
+    return _wrap(base.index(before: _unwrap(i)))
   }
-  func formIndex(before i: inout Base.Index) {
-    base.formIndex(before: &i)
+  public subscript(i: Index) -> Base.Iterator.Element {
+    return base[_unwrap(i)]
   }
-  func index(before i: Base.Index) -> Base.Index {
-    return base.index(before: i)
+}
+
+// Many of these implementations become redundant with defaults supplied by
+// Indexable et. al if we don't redeclare them with stricter constraints.  I'm
+// not sure if all of them are needed, but it seems like most.
+% for whereClause in '', 'where Self : BidirectionalCollection':
+public extension BidirectionalCollectionWrapper ${whereClause} {
+  func formIndex(after i: inout Index) {
+    var i1 = _unwrap(i)
+    base.formIndex(after: &i1)
+    i = _wrap(i1)
   }
-  func formIndex(_ i: inout Base.Index, offsetBy n: Base.IndexDistance) {
-    base.formIndex(&i, offsetBy: n)
+  func formIndex(before i: inout Index) {
+    var i1 = _unwrap(i)
+    base.formIndex(before: &i1)
+    i = _wrap(i1)
   }
-  func index(_ i: Base.Index, offsetBy n: Base.IndexDistance) -> Base.Index {
-    return base.index(i, offsetBy: n)
+  func formIndex(_ i: inout Index, offsetBy n: IndexDistance) {
+    var i1 = _unwrap(i)
+    base.formIndex(&i1, offsetBy: numericCast(n))
+    i = _wrap(i1)
+  }
+  func index(_ i: Index, offsetBy n: IndexDistance) -> Index {
+    return _wrap(base.index(_unwrap(i), offsetBy: numericCast(n)))
   }
   func index(
-    _ i: Base.Index,
-    offsetBy n: Base.IndexDistance,
-    limitedBy limit: Base.Index
-  ) -> Base.Index? {
-    return base.index(i, offsetBy: n, limitedBy: limit)
+    _ i: Index,
+    offsetBy n: IndexDistance,
+    limitedBy limit: Index
+  ) -> Index? {
+    return base.index(
+      _unwrap(i),
+      offsetBy: numericCast(n) as Base.IndexDistance,
+      limitedBy: _unwrap(limit)
+    ).map(_wrap)
   }
-  func distance(from i: Base.Index, to j: Base.Index) -> Base.IndexDistance {
-    return base.distance(from: i, to: j)
+  func distance(from i: Index, to j: Index) -> IndexDistance {
+    return numericCast(base.distance(from: _unwrap(i), to: _unwrap(j)))
   }
-  var count: Base.IndexDistance {
-    return base.count
+  var count: IndexDistance {
+    return numericCast(base.count)
   }
   var underestimatedCount: Int {
     return base.underestimatedCount
-  }
-  public subscript(i: Base.Index) -> Base.Iterator.Element {
-    return base[i]
   }
   public func withExistingUnsafeBuffer<R>(
     _ body: (UnsafeBufferPointer<Base.Iterator.Element>) throws -> R
@@ -84,7 +119,6 @@ Self : BidirectionalCollection {
   }
   public var first: Base.Iterator.Element? { return base.first }
   public var last: Base.Iterator.Element? { return base.last }
-
   public func map<T>(_ transform: (Base.Iterator.Element) throws -> T) rethrows -> [T] {
     return try base.map(transform)
   }
@@ -100,7 +134,12 @@ Self : BidirectionalCollection {
     return base._copyToContiguousArray()
   }
 }
+% end
 
+public extension BidirectionalCollectionWrapper where Index == Base.Index {
+  func _wrap(_ i: Base.Index) -> Index { return i }
+  func _unwrap(_ i: Index) -> Base.Index { return i }
+}
 
 //===--- AnyUnicodeIndex --------------------------------------------------===//
 
@@ -214,78 +253,13 @@ Self : BidirectionalCollection {
 /// Wrappers that present some `UnicodeView` as an `AnyUnicodeView_` forward all
 /// implementations by using `base` to `wrap`/`unwrap` indices and `numericCast`
 /// to translate `IndexDistance`s.
-public extension Wrapper
+public extension BidirectionalCollectionWrapper
 where Base : UnicodeView, Self : AnyUnicodeView_ {
-  var startIndex: AnyUnicodeIndex_ { return base.wrap(base.startIndex) }
-  var endIndex: AnyUnicodeIndex_ { return base.wrap(base.endIndex) }
-
-  func formIndex(after i: inout AnyUnicodeIndex_) {
-    var i1 = base.unwrap(i)
-    base.formIndex(after: &i1)
-    i = base.wrap(i1)
+  func _wrap(_ i: Base.Index) -> AnyUnicodeIndex_ {
+    return base.wrap(i)
   }
-  func index(after i: AnyUnicodeIndex_) -> AnyUnicodeIndex_ {
-    return base.wrap(base.index(after: base.unwrap(i)))
-  }
-  func formIndex(before i: inout AnyUnicodeIndex_) {
-    var i1 = base.unwrap(i)
-    base.formIndex(before: &i1)
-    i = base.wrap(i1)
-  }
-  func index(before i: AnyUnicodeIndex_) -> AnyUnicodeIndex_ {
-    return base.wrap(base.index(before: base.unwrap(i)))
-  }
-  func formIndex(_ i: inout AnyUnicodeIndex_, offsetBy n: Int64) {
-    var i1 = base.unwrap(i)
-    base.formIndex(&i1, offsetBy: numericCast(n))
-    i = base.wrap(i1)
-  }
-  func index(_ i: AnyUnicodeIndex_, offsetBy n: Int64) -> AnyUnicodeIndex_ {
-    return base.wrap(base.index(base.unwrap(i), offsetBy: numericCast(n)))
-  }
-  func index(
-    _ i: AnyUnicodeIndex_,
-    offsetBy n: Int64,
-    limitedBy limit: AnyUnicodeIndex_
-  ) -> AnyUnicodeIndex_? {
-    return base.index(
-      base.unwrap(i), offsetBy: numericCast(n), limitedBy: base.unwrap(limit)
-    ).map(base.wrap)
-  }
-  func distance(from i: AnyUnicodeIndex_, to j: AnyUnicodeIndex_) -> Int64 {
-    return numericCast(base.distance(from: base.unwrap(i), to: base.unwrap(j)))
-  }
-  var count: Int64 {
-    return numericCast(base.count)
-  }
-  var underestimatedCount: Int {
-    return base.underestimatedCount
-  }
-
-  public subscript(i: AnyUnicodeIndex_) -> Base.Iterator.Element {
-    return base[base.unwrap(i)]
-  }
-  public func withExistingUnsafeBuffer<R>(
-    _ body: (UnsafeBufferPointer<Base.Iterator.Element>) throws -> R
-  ) rethrows -> R? {
-    return try base.withExistingUnsafeBuffer(body)
-  }
-  public var first: Base.Iterator.Element? { return base.first }
-  public var last: Base.Iterator.Element? { return base.last }
-
-  public func map<T>(_ transform: (Base.Iterator.Element) throws -> T) rethrows -> [T] {
-    return try base.map(transform)
-  }
-  public func filter(
-    _ includedInResult: (Base.Iterator.Element) throws -> Bool
-  ) rethrows -> [Base.Iterator.Element] {
-    return try base.filter(includedInResult)
-  }
-  public func forEach(_ body: (Base.Iterator.Element) throws -> Void) rethrows {
-    try base.forEach(body)
-  }
-  public func _copyToContiguousArray() -> ContiguousArray<Base.Iterator.Element> {
-    return base._copyToContiguousArray()
+  func _unwrap(_ i: AnyUnicodeIndex_) -> Base.Index {
+    return base.unwrap(i)
   }
 }
 
@@ -297,17 +271,17 @@ where Base : UnicodeView, Self : AnyUnicodeView_ {
 /// access, there must be one element per code unit.
 public struct
 MappedViewOfUnicodeCodeUnits<Base : RandomAccessCollection>
-: Wrapper, UnicodeView {
+: BidirectionalCollectionWrapper, UnicodeView {
   public var base: Base
 
   // FIXME: the compiler needs deduction help here, but shouldn't
   public typealias Index = Base.Index
   public typealias IndexDistance = Base.IndexDistance
   
-  struct AnyIndex : AnyUnicodeIndex_, Wrapper, Comparable {
-    var base: Base.Index
+  public struct AnyIndex : AnyUnicodeIndex_, Wrapper, Comparable {
+    public var base: Base.Index
     var codeUnitOffset_: Base.IndexDistance
-    var codeUnitOffset: Int64 {
+    public var codeUnitOffset: Int64 {
       return numericCast(codeUnitOffset_)
     }
   }
@@ -345,9 +319,8 @@ public struct Any${Element}Iterator : IteratorProtocol {
 
 /// Wrappers that present a base `Sequence` as an `AnyUnicodeView_` adapt and
 /// forward the base's `iterator`.
-public extension Wrapper
-where Self : AnyUnicodeView_,
-Base : Sequence, Base.Iterator.Element == ${Element} {
+public extension BidirectionalCollectionWrapper
+where Self : AnyUnicodeView_, Base.Iterator.Element == ${Element} {
   func makeIterator() -> Any${Element}Iterator_ {
     return Any${Element}Iterator.Adapter<Base.Iterator>(
       base: base.makeIterator())
@@ -413,9 +386,12 @@ public struct Any${Element}UnicodeView : BidirectionalCollection, Wrapper {
 /// Adapt any `UnicodeView` with elements of type `Element`
 extension Any${Element}UnicodeView {
   /// An adaptor used to wrap `Base`
-  public struct Adapter<Base: UnicodeView>
-  : Any${Element}UnicodeView_, Wrapper
-  where Base.Iterator.Element == ${Element} {
+  public struct Adapter<Base_: UnicodeView>
+  : Any${Element}UnicodeView_, BidirectionalCollectionWrapper  
+  where Base_.Iterator.Element == ${Element} {
+    public typealias IndexDistance = Int64
+    public typealias Index = AnyUnicodeIndex_
+    public typealias Base = Base_
     public var base: Base
   }
 
@@ -424,7 +400,7 @@ extension Any${Element}UnicodeView {
   where Base.Iterator.Element == ${Element} {
     self.base2 = Adapter<Base>(base: base)
   }
-
+  
   public init<Base : RandomAccessCollection>(_ base: Base)
   where Base.Iterator.Element == ${Element} {
     self.base2 = Adapter(base: MappedViewOfUnicodeCodeUnits(base: base))
@@ -434,16 +410,6 @@ extension Any${Element}UnicodeView {
 //===----------------------------------------------------------------------===//
 
 % end
-
-/// Comparable -> Comparable wrappers just forward to the base implementation
-public extension Wrapper where Self : Comparable, Base : Comparable {
-  static func < (lhs: Self, rhs: Self) -> Bool {
-    return lhs.base < rhs.base
-  }
-  static func == (lhs: Self, rhs: Self) -> Bool {
-    return lhs.base == rhs.base
-  }
-}
 
 
 //===--- Adapt Swift.UnicodeView to this file's UnicodeView protocol ------===//
