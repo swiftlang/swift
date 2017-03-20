@@ -147,7 +147,7 @@ if(NOT SWIFT_LIBRARY_PATH)
 endif()
 
 # If the CMAKE_C_COMPILER is already clang, don't find it again,
-# thus allowing the --host-cc build-script argument to work here.
+# thus allowing the --cmake-c-compiler build-script argument to work here.
 get_filename_component(c_compiler ${CMAKE_C_COMPILER} NAME)
 
 if(${c_compiler} STREQUAL "clang")
