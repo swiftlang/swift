@@ -19,9 +19,9 @@
 #include <algorithm>
 
 using namespace swift;
-using namespace NewMangling;
+using namespace Mangle;
 
-llvm::cl::opt<bool> NewManglingForTests(
+llvm::cl::opt<bool> MangleForTests(
                        "new-mangling-for-tests", llvm::cl::init(false),
                        llvm::cl::desc("Use new mangling for compiler tests"));
 
@@ -70,7 +70,7 @@ void Mangler::recordOpStatImpl(StringRef op, size_t OldPos) {
 
 #endif // NDEBUG
 
-void NewMangling::printManglingStats() {
+void Mangle::printManglingStats() {
 #ifndef NDEBUG
   if (!PrintSwiftManglingStats)
     return;

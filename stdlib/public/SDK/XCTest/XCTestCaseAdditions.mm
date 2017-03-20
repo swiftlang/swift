@@ -33,7 +33,7 @@ static char *scanIdentifier(const char *&mangled)
     if (*mangled == '0') goto fail;  // length may not be zero
 
     size_t length = 0;
-    while (swift::NewMangling::isDigit(*mangled)) {
+    while (swift::Mangle::isDigit(*mangled)) {
       size_t oldlength = length;
       length *= 10;
       length += *mangled++ - '0';

@@ -103,7 +103,7 @@ class FunctionSignatureTransform {
   EpilogueARCAnalysis *EA;
 
   // The function signature mangler we are using.
-  NewMangling::FunctionSignatureSpecializationMangler &Mangler;
+  Mangle::FunctionSignatureSpecializationMangler &Mangler;
 
   // Keep tracks to argument mapping.
   ArgumentIndexMap &AIM;
@@ -219,7 +219,7 @@ public:
   /// Constructor.
   FunctionSignatureTransform(SILFunction *F,
                              RCIdentityAnalysis *RCIA, EpilogueARCAnalysis *EA,
-                   NewMangling::FunctionSignatureSpecializationMangler &Mangler,
+                   Mangle::FunctionSignatureSpecializationMangler &Mangler,
                              ArgumentIndexMap &AIM,
                              llvm::SmallVector<ArgumentDescriptor, 4> &ADL,
                              llvm::SmallVector<ResultDescriptor, 4> &RDL)
@@ -918,7 +918,7 @@ public:
     // going to change, make sure the mangler is aware of all the changes done
     // to the function.
     auto P = Demangle::SpecializationPass::FunctionSignatureOpts;
-    NewMangling::FunctionSignatureSpecializationMangler Mangler(P,
+    Mangle::FunctionSignatureSpecializationMangler Mangler(P,
                                                              F->isFragile(), F);
 
     /// Keep a map between the exploded argument index and the original argument

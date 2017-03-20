@@ -13,10 +13,10 @@
 #include "swift/Demangling/ManglingUtils.h"
 
 using namespace swift;
-using namespace NewMangling;
+using namespace Mangle;
 
 
-bool NewMangling::isNonAscii(StringRef str) {
+bool Mangle::isNonAscii(StringRef str) {
   for (unsigned char c : str) {
     if (c >= 0x80)
       return true;
@@ -24,7 +24,7 @@ bool NewMangling::isNonAscii(StringRef str) {
   return false;
 }
 
-bool NewMangling::needsPunycodeEncoding(StringRef str) {
+bool Mangle::needsPunycodeEncoding(StringRef str) {
   for (unsigned char c : str) {
     if (!isValidSymbolChar(c))
       return true;
@@ -35,7 +35,7 @@ bool NewMangling::needsPunycodeEncoding(StringRef str) {
 /// Translate the given operator character into its mangled form.
 ///
 /// Current operator characters:   @/=-+*%<>!&|^~ and the special operator '..'
-char NewMangling::translateOperatorChar(char op) {
+char Mangle::translateOperatorChar(char op) {
   switch (op) {
     case '&': return 'a'; // 'and'
     case '@': return 'c'; // 'commercial at sign'
@@ -58,7 +58,7 @@ char NewMangling::translateOperatorChar(char op) {
   }
 }
 
-std::string NewMangling::translateOperator(StringRef Op) {
+std::string Mangle::translateOperator(StringRef Op) {
   std::string Encoded;
   for (char ch : Op) {
     Encoded.push_back(translateOperatorChar(ch));
@@ -66,7 +66,7 @@ std::string NewMangling::translateOperator(StringRef Op) {
   return Encoded;
 }
 
-char NewMangling::getStandardTypeSubst(StringRef TypeName) {
+char Mangle::getStandardTypeSubst(StringRef TypeName) {
 #define STANDARD_TYPE(KIND, MANGLING, TYPENAME)      \
   if (TypeName == #TYPENAME) {                       \
     return #MANGLING[0];                             \

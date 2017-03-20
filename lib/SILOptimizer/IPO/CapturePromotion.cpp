@@ -369,7 +369,7 @@ static std::string getSpecializedName(SILFunction *F,
                                       IsFragile_t Fragile,
                                       IndicesSet &PromotableIndices) {
   auto P = Demangle::SpecializationPass::CapturePromotion;
-  NewMangling::FunctionSignatureSpecializationMangler Mangler(P, Fragile, F);
+  Mangle::FunctionSignatureSpecializationMangler Mangler(P, Fragile, F);
   auto fnConv = F->getConventions();
 
   for (unsigned argIdx = 0, endIdx = fnConv.getNumSILArguments();

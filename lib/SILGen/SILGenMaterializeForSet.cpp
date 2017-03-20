@@ -193,7 +193,7 @@ getMaterializeForSetCallbackName(ProtocolConformance *conformance,
   closure.setType(TupleType::getEmpty(dc->getASTContext()));
   closure.getCaptureInfo().setGenericParamCaptures(true);
 
-  NewMangling::ASTMangler Mangler;
+  Mangle::ASTMangler Mangler;
   std::string New;
   if (conformance) {
     // Concrete witness thunk for a conformance:
@@ -206,7 +206,7 @@ getMaterializeForSetCallbackName(ProtocolConformance *conformance,
   //
   // Mangle this as if it were a closure within the requirement.
   return Mangler.mangleClosureEntity(&closure,
-                                 NewMangling::ASTMangler::SymbolKind::Default);
+                                 Mangle::ASTMangler::SymbolKind::Default);
 }
 
 /// A helper class for emitting materializeForSet.
