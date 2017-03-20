@@ -1300,7 +1300,9 @@ bestRequirementPrintLocation(ProtocolDecl *proto, const Requirement &req) {
     // Self.T.U == Self should go on T (third condition).
     auto rhsBetterDirect =
         !lhsResult.second && rhsResult.second && rhsResult.first != proto;
-    if (lhsDoesntExist || rhsBetterDirect)
+    auto rhsOfSelfToAssoc = lhsResult.first == proto && rhsResult.first;
+    // e.g. Self == Self.T.U
+    if (lhsDoesntExist || rhsBetterDirect || rhsOfSelfToAssoc)
       bestDecl = rhsResult.first;
 
     // Same-type requirements can only occur in where clauses
