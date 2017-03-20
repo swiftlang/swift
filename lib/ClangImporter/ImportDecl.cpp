@@ -3887,6 +3887,9 @@ namespace {
 
     template <typename T, typename U>
     T *resolveSwiftDeclImpl(const U *decl, Identifier name, ModuleDecl *adapter) {
+      const auto &languageVersion =
+          Impl.SwiftContext.LangOpts.EffectiveLanguageVersion;
+
       SmallVector<ValueDecl *, 4> results;
       adapter->lookupValue({}, name, NLKind::QualifiedLookup, results);
       T *found = nullptr;
@@ -3895,8 +3898,9 @@ namespace {
           if (auto typeResolver = Impl.getTypeResolver())
             typeResolver->resolveDeclSignature(singleResult);
 
-          // Skip Swift 2 variants.
-          if (singleResult->getAttrs().isUnavailableInSwiftVersion())
+          // Skip versioned variants.
+          const DeclAttributes &attrs = singleResult->getAttrs();
+          if (attrs.isUnavailableInSwiftVersion(languageVersion))
             continue;
 
           if (found)
@@ -6250,9 +6254,11 @@ void SwiftDeclConverter::importMirroredProtocolMembers(
       if (classImplementsProtocol(superInterface, clangProto, true))
         continue;
 
+    const auto &languageVersion =
+        Impl.SwiftContext.LangOpts.EffectiveLanguageVersion;
     for (auto member : proto->getMembers()) {
       // Skip Swift 2 stubs; there's no reason to mirror them.
-      if (member->getAttrs().isUnavailableInSwiftVersion())
+      if (member->getAttrs().isUnavailableInSwiftVersion(languageVersion))
         continue;
 
       if (auto prop = dyn_cast<VarDecl>(member)) {
@@ -6343,13 +6349,16 @@ void SwiftDeclConverter::importInheritedConstructors(
 
   auto inheritConstructors = [&](DeclRange members,
                                  Optional<CtorInitializerKind> kind) {
+    const auto &languageVersion =
+        Impl.SwiftContext.LangOpts.EffectiveLanguageVersion;
+
     for (auto member : members) {
       auto ctor = dyn_cast<ConstructorDecl>(member);
       if (!ctor)
         continue;
 
       // Don't inherit Swift 2 stubs.
-      if (ctor->getAttrs().isUnavailableInSwiftVersion())
+      if (ctor->getAttrs().isUnavailableInSwiftVersion(languageVersion))
         continue;
 
       // Don't inherit (non-convenience) factory initializers.
