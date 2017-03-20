@@ -329,22 +329,6 @@ private:
   SILGenFunction &getSGF() const { return builder.getSILGenFunction(); }
 };
 
-class CleanupCloner {
-  SILGenFunction &SGF;
-  bool hasCleanup;
-  bool isLValue;
-  ValueOwnershipKind ownershipKind;
-
-public:
-  CleanupCloner(SILGenFunction &SGF, ManagedValue mv)
-      : SGF(SGF), hasCleanup(mv.hasCleanup()), isLValue(mv.isLValue()),
-        ownershipKind(mv.getOwnershipKind()) {}
-  CleanupCloner(SILGenBuilder &builder, ManagedValue mv)
-      : CleanupCloner(builder.getSILGenFunction(), mv) {}
-
-  ManagedValue clone(SILValue value);
-};
-
 } // namespace Lowering
 } // namespace swift
 
