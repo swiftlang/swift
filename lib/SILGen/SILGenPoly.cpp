@@ -1109,7 +1109,16 @@ namespace {
                               *tupleTemp);
 
       auto payload = tupleTemp->getManagedAddress();
-      return ManagedValue(existentialBuf, payload.getCleanup());
+      if (SGF.silConv.useLoweredAddresses()) {
+        return ManagedValue(existentialBuf, payload.getCleanup());
+      }
+      // We are under opaque value(s) mode - load the any and init an opaque
+      auto loadedPayload = SGF.emitManagedLoadCopy(Loc, payload.getValue());
+      auto &anyTL = SGF.getTypeLowering(opaque, outputSubstType);
+      SILValue loadedOpaque = SGF.B.createInitExistentialOpaque(
+          Loc, anyTL.getLoweredType(), inputTupleType, loadedPayload.getValue(),
+          /*conformances=*/{});
+      return ManagedValue(loadedOpaque, loadedPayload.getCleanup());
     }
 
     /// Handle a tuple that has been exploded in both the input and
