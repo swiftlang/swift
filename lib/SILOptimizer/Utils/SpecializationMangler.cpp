@@ -16,7 +16,7 @@
 #include "swift/Demangling/ManglingMacros.h"
 
 using namespace swift;
-using namespace NewMangling;
+using namespace Mangle;
 
 void SpecializationMangler::beginMangling() {
   ASTMangler::beginMangling();

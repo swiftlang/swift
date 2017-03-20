@@ -36,7 +36,7 @@
 #include "llvm/Support/CommandLine.h"
 
 using namespace swift;
-using namespace swift::NewMangling;
+using namespace swift::Mangle;
 
 std::string ASTMangler::mangleClosureEntity(const AbstractClosureExpr *closure,
                                             SymbolKind SKind) {

@@ -519,7 +519,7 @@ PromotedParamCloner::PromotedParamCloner(SILFunction *Orig, IsFragile_t Fragile,
 static std::string getClonedName(SILFunction *F, IsFragile_t Fragile,
                                  ArgIndexList &PromotedArgIndices) {
   auto P = Demangle::SpecializationPass::AllocBoxToStack;
-  NewMangling::FunctionSignatureSpecializationMangler Mangler(P, Fragile, F);
+  Mangle::FunctionSignatureSpecializationMangler Mangler(P, Fragile, F);
   for (unsigned i : PromotedArgIndices) {
     Mangler.setArgumentBoxToStack(i);
   }

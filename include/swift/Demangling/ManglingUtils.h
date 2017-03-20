@@ -17,7 +17,7 @@
 #include "swift/Demangling/Punycode.h"
 
 namespace swift {
-namespace NewMangling {
+namespace Mangle {
 
 using llvm::StringRef;
 

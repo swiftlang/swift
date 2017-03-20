@@ -23,7 +23,7 @@ using llvm::StringRef;
 using llvm::ArrayRef;
 
 namespace swift {
-namespace NewMangling {
+namespace Mangle {
 
 void printManglingStats();
 

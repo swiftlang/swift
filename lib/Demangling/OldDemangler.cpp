@@ -1399,7 +1399,7 @@ private:
 
     // A dependent member type begins with a non-index, non-'d' character.
     auto c = Mangled.peek();
-    if (c != 'd' && c != '_' && !NewMangling::isDigit(c)) {
+    if (c != 'd' && c != '_' && !Mangle::isDigit(c)) {
       NodePointer baseType = demangleType();
       if (!baseType) return nullptr;
       return demangleDependentMemberTypeName(baseType);

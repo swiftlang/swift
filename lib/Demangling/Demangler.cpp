@@ -21,7 +21,7 @@
 #include "swift/Strings.h"
 
 using namespace swift;
-using namespace NewMangling;
+using namespace Mangle;
 using swift::Demangle::FunctionSigSpecializationParamKind;
 
 //////////////////////////////////
@@ -1941,6 +1941,6 @@ NodePointer Demangler::demangleObjCTypeName() {
   return Global;
 }
 
-} // end namespace NewMangling
+} // end namespace Mangle
 } // end namespace swift
 

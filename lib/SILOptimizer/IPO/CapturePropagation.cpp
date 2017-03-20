@@ -75,7 +75,7 @@ static bool isConstant(SILValue V) {
 static std::string getClonedName(PartialApplyInst *PAI, IsFragile_t Fragile,
                                  SILFunction *F) {
   auto P = Demangle::SpecializationPass::CapturePropagation;
-  NewMangling::FunctionSignatureSpecializationMangler Mangler(P, Fragile, F);
+  Mangle::FunctionSignatureSpecializationMangler Mangler(P, Fragile, F);
 
   // We know that all arguments are literal insts.
   unsigned argIdx = ApplySite(PAI).getCalleeArgIndexOfFirstAppliedArg();
