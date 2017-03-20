@@ -31,6 +31,8 @@ public protocol Wrapper {
   var base: Base { get }
 }
 
+// FIXME: can we DRY some of the BidirectionalCollection wrappers?
+
 /// Wrappers that present a `BidirectionalCollection` instance as another
 /// `BidirectionalCollection` forward all implementation directly to base
 public extension Wrapper
