@@ -22,24 +22,38 @@ using namespace swift;
 using namespace Lowering;
 
 //===----------------------------------------------------------------------===//
-//                               CleanupCloner
+//                             Cleanup Forwarder
 //===----------------------------------------------------------------------===//
 
-ManagedValue CleanupCloner::clone(SILValue value) {
-  if (isLValue) {
-    return ManagedValue::forLValue(value);
-  }
+namespace {
+class CleanupCloner {
+  SILGenFunction &SGF;
+  bool hasCleanup;
+  bool isLValue;
+  ValueOwnershipKind ownershipKind;
 
-  if (!hasCleanup) {
-    return ManagedValue::forUnmanaged(value);
-  }
+public:
+  CleanupCloner(SILGenBuilder &Builder, ManagedValue M)
+      : SGF(Builder.getSILGenFunction()), hasCleanup(M.hasCleanup()),
+        isLValue(M.isLValue()), ownershipKind(M.getOwnershipKind()) {}
 
-  if (value->getType().isAddress()) {
-    return SGF.emitManagedBufferWithCleanup(value);
-  }
+  ManagedValue clone(SILValue value) {
+    if (isLValue) {
+      return ManagedValue::forLValue(value);
+    }
 
-  return SGF.emitManagedRValueWithCleanup(value);
-}
+    if (!hasCleanup) {
+      return ManagedValue::forUnmanaged(value);
+    }
+
+    if (value->getType().isAddress()) {
+      return SGF.emitManagedBufferWithCleanup(value);
+    }
+
+    return SGF.emitManagedRValueWithCleanup(value);
+  }
+};
+} // end anonymous namespace
 
 //===----------------------------------------------------------------------===//
 //                              Utility Methods

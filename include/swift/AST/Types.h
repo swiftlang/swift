@@ -2798,10 +2798,6 @@ public:
     return isIndirectFormalParameter(getConvention());
   }
 
-  bool isDirectGuaranteed() const {
-    return getConvention() == ParameterConvention::Direct_Guaranteed;
-  }
-
   bool isIndirectInGuaranteed() const {
     return getConvention() == ParameterConvention::Indirect_In_Guaranteed;
   }
