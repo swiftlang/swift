@@ -381,7 +381,7 @@ ResultPlanPtr ResultPlanBuilder::buildTopLevelResult(Initialization *init,
   case ForeignErrorConvention::ZeroResult:
   case ForeignErrorConvention::NonZeroResult:
     assert(calleeTypeInfo.substResultType->isVoid());
-    allResults = {};
+    allResults.clear();
     break;
 
   // These conventions leave the formal result alone.
@@ -395,7 +395,8 @@ ResultPlanPtr ResultPlanBuilder::buildTopLevelResult(Initialization *init,
     assert(allResults.size() == 1);
     CanType objectType = allResults[0].getType().getAnyOptionalObjectType();
     SILResultInfo optResult = allResults[0].getWithType(objectType);
-    allResults = optResult;
+    allResults.clear();
+    allResults.push_back(optResult);
     break;
   }
   }
@@ -418,8 +419,7 @@ ResultPlanPtr ResultPlanBuilder::build(Initialization *init,
   }
 
   // Otherwise, grab the next result.
-  auto result = allResults.front();
-  allResults = allResults.slice(1);
+  auto result = allResults.pop_back_val();
 
   SILValue initAddr;
   if (init) {
