@@ -219,7 +219,7 @@ def run():
     dump the output file.
 
     >>> import subprocess
-    >>> output = subprocess.check_output([
+    >>> output = subprocess.check_output([sys.executable,
     ...    __file__, target1.name, target2.name, '--', 
     ...    sys.executable, '-c', 
     ...   'import sys;sys.stdout.write(open(sys.argv[1]).read())', raw_output.name])
@@ -242,9 +242,9 @@ def run():
     glitch in [fox.box, line 11 assert five
     glitch in [fox.box:28 assert six
     EOF
-    >>> print subprocess.check_output([__file__, 'foo.bar', '21', target1.name]),
+    >>> print subprocess.check_output([sys.executable, __file__, 'foo.bar', '21', target1.name]),
     5
-    >>> print subprocess.check_output([__file__, 'foo.bar', '8', target2.name]),
+    >>> print subprocess.check_output([sys.executable, __file__, 'foo.bar', '8', target2.name]),
     3
 
     """
