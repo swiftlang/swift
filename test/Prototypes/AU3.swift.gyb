@@ -185,6 +185,7 @@ public struct AnyUnicodeIndex : Comparable {
 
 
 //===--- AnyUnicodeView ---------------------------------------------------===//
+/// Type-eraser bidirectional collections with index<->code unit offsets
 public protocol AnyUnicodeView_ {
   var startIndex: AnyUnicodeIndex_ { get }
   var endIndex: AnyUnicodeIndex_ { get }
