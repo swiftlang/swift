@@ -476,7 +476,7 @@ const char *getNodeKindString(swift::Demangle::Node::Kind k);
 /// Prints the whole node tree \p Root in readable form into a std::string.
 ///
 /// Useful for debugging.
-std::string &&getNodeTreeAsString(NodePointer Root);
+std::string getNodeTreeAsString(NodePointer Root);
 
 bool isSpecialized(Node *node);
 NodePointer getUnspecialized(Node *node, NodeFactory &Factory);
