@@ -1339,12 +1339,11 @@ protocol ProtocolWithWhereClause : QuxProtocol where Qux == Int, Self : FooProto
 // PREFER_TYPE_REPR_PRINTING: protocol ProtocolWithWhereClause : QuxProtocol where Self : FooProtocol, Self.Qux == Int {
 
 protocol ProtocolWithWhereClauseAndAssoc : QuxProtocol where Qux == Int, Self : FooProtocol {
-// PREFER_TYPE_REPR_PRINTING-DAG: protocol ProtocolWithWhereClauseAndAssoc : QuxProtocol where Self : FooProtocol, Self.Qux == Int {
+// PREFER_TYPE_REPR_PRINTING-DAG: protocol ProtocolWithWhereClauseAndAssoc : QuxProtocol where Self : FooProtocol, Self == Self.A2.Qux, Self.Qux == Int {
   associatedtype A1 : QuxProtocol where A1 : FooProtocol, A1.Qux : QuxProtocol, Int == A1.Qux.Qux
 // PREFER_TYPE_REPR_PRINTING-DAG: {{^}}  associatedtype A1 : QuxProtocol where Self.A1 : FooProtocol, Self.A1.Qux : QuxProtocol, Self.A1.Qux.Qux == Int{{$}}
 
-  // FIXME: this same type requirements between archetypes is dropped from the
-  // requirement signature, but should be printed here
+  // FIXME: this same type requirement with Self should be printed here
   associatedtype A2 : QuxProtocol where A2.Qux == Self
 // PREFER_TYPE_REPR_PRINTING-DAG: {{^}}  associatedtype A2 : QuxProtocol{{$}}
 }
