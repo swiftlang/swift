@@ -689,7 +689,7 @@ swift::decomposeArgType(Type type, ArrayRef<Identifier> argumentLabels, Clustere
       CallArgParam argParam;
       argParam.Ty = elt.getType();
       argParam.Label = argumentLabels[i];
-      if (i < omittableArgumentLabels.size()) argParam.CanMatchUnlabledParameter = omittableArgumentLabels[i]; 
+      if (i < omittableArgumentLabels.size()) argParam.CanOmitLabelOnParameter = omittableArgumentLabels[i]; 
       result.push_back(argParam);
     }
     return result;
@@ -713,7 +713,7 @@ swift::decomposeArgType(Type type, ArrayRef<Identifier> argumentLabels, Clustere
   argParam.Ty = type;
   assert(argumentLabels.size() == 1);
   argParam.Label = argumentLabels[0];
-  if (0 < omittableArgumentLabels.size()) argParam.CanMatchUnlabledParameter = omittableArgumentLabels[0];
+  if (0 < omittableArgumentLabels.size()) argParam.CanOmitLabelOnParameter = omittableArgumentLabels[0];
   result.push_back(argParam);
   return result;
 }

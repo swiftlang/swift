@@ -1751,7 +1751,7 @@ void CalleeCandidateInfo::filterContextualMemberList(Expr *argExpr) {
     CallArgParam param;
     param.Ty = argType;
     param.Label = argTuple->getElementName(i);
-    param.CanMatchUnlabledParameter = argTuple->getOmittableElementNames(CS->getASTContext())[i]; 
+    param.CanOmitLabelOnParameter = argTuple->getOmittableElementNames(CS->getASTContext())[i]; 
     ArgElts.push_back(param);
   }
 
@@ -4592,7 +4592,7 @@ typeCheckArgumentChildIndependently(Expr *argExpr, Type argType,
       CallArgParam arg;
       arg.Ty = voidTy;
       arg.Label = TE->getElementName(i);
-      arg.CanMatchUnlabledParameter = TE->getOmittableElementNames(CS->getASTContext())[i]; 
+      arg.CanOmitLabelOnParameter = TE->getOmittableElementNames(CS->getASTContext())[i]; 
       args.push_back(arg);
     }
 

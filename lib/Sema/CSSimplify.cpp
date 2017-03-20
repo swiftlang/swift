@@ -94,7 +94,7 @@ areConservativelyCompatibleArgumentLabels(ValueDecl *decl,
   for (unsigned i = 0; i < labels.size(); ++i) {
     argInfos.push_back(CallArgParam());
     argInfos.back().Label = labels[i];
-    argInfos.back().CanMatchUnlabledParameter = omittableLabels[i];
+    argInfos.back().CanOmitLabelOnParameter = omittableLabels[i];
   }
 
   SmallVector<CallArgParam, 8> paramInfos;
@@ -126,7 +126,7 @@ static bool paramLabelMatchesArg(Identifier paramLabel, CallArgParam arg, bool a
     return true;
   }
   
-  if (allowLabelOmission && arg.CanMatchUnlabledParameter && paramLabel.empty()) {
+  if (allowLabelOmission && arg.CanOmitLabelOnParameter && paramLabel.empty()) {
     return true;
   }
   

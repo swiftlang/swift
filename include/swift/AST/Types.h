@@ -2551,9 +2551,9 @@ struct CallArgParam {
     /// Whether the parameter has a default argument.  Not valid for arguments.
     bool HasDefaultArgument = false;
     
-    /// Whether the argument is permitted to match a parameter with an empty 
-    /// label. Not valid for parameters.
-    bool CanMatchUnlabledParameter /* = false */;
+    /// Whether the argument label is omittable, i.e., the argument can also match 
+    /// overloads with no parameter label. Not valid for parameters.
+    bool CanOmitLabelOnParameter /* = false */;
   };
   
   /// Parameter specific flags, not valid for arguments
