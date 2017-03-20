@@ -74,3 +74,15 @@ A<B?>(x: 0) // parses as type // expected-warning{{unused}}
 _ = a < b ? c : d
 
 A<(B) throws -> D>(x: 0) // expected-warning{{unused}}
+
+struct G<T,U> {}
+_ = A<A<A<A<A<B>>>>>() // not enough closing brackets
+_ = A<A<A<A<A<B>> >>>() // space in closing brackets
+_ = G<A<A<A<A<A<A<B>>>>>>, B>() // closing brackets inside
+// expected-warning@-1 {{generic closing brackets may be mistaken for version control conflict markers; consider using a typealias}}
+_ = G<B, A<A<A<A<A<B>>>>>>() // closing brackets at the end
+// expected-warning@-1 {{generic closing brackets may be mistaken for version control conflict markers; consider using a typealias}}
+_ = A<A<A<A<A<A<A<B>>>>>>>() // more than 6 closing brackets
+// expected-warning@-1 {{generic closing brackets may be mistaken for version control conflict markers; consider using a typealias}}
+_ = A<A<A<A<A<A<A<B> >>>>>>() // 7 with hole
+// expected-warning@-1 {{generic closing brackets may be mistaken for version control conflict markers; consider using a typealias}}

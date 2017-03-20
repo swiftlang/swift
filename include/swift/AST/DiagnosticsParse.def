@@ -1379,6 +1379,9 @@ ERROR(where_without_generic_params,none,
 WARNING(where_inside_brackets,none,
         "'where' clause next to generic parameters is deprecated "
         "and will be removed in the future version of Swift", ())
+WARNING(excessive_right_angle_brackets,none,
+      "generic closing brackets may be mistaken for version control conflict "
+      "markers; consider using a typealias", ())
 
 //------------------------------------------------------------------------------
 // Conditional compilation parsing diagnostics

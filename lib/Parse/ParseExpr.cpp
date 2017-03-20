@@ -1003,6 +1003,48 @@ static bool canParseTypeOf(Parser &P) {
   return true;
 }
 
+static bool shouldWarnExcessiveRAngleInRange(SourceRange SR) {
+  if (SR.isInvalid()) {
+    return false;
+  }
+  
+  int maxRightBrackets = 0;
+  int rightBrackets = 0;
+  SourceLoc SL = SR.Start;
+  while (true) {
+    if (*(char *)SL.getOpaquePointerValue() == '>') {
+      rightBrackets++;
+      if (rightBrackets > maxRightBrackets) {
+        maxRightBrackets = rightBrackets;
+      }
+    } else {
+      rightBrackets = 0;
+    }
+    
+    if (SL == SR.End) {
+      break;
+    }
+    
+    SL = SL.getAdvancedLoc(1);
+  }
+  
+  return maxRightBrackets >= 6;
+}
+
+static bool shouldWarnExcessiveRAngleExpr(Expr *E) {
+  if (auto TE = dyn_cast<TypeExpr>(E)) {
+    auto TR = TE->getTypeLoc().getTypeRepr();
+    if (auto GITR = dyn_cast<GenericIdentTypeRepr>(TR)) {
+      return shouldWarnExcessiveRAngleInRange(GITR->getAngleBrackets());
+    }
+  } else if (auto USE = dyn_cast<UnresolvedSpecializeExpr>(E)) {
+    SourceRange SR = SourceRange(USE->getLAngleLoc(), USE->getRAngleLoc());
+    return shouldWarnExcessiveRAngleInRange(SR);
+  }
+
+  return false;
+}
+
 /// parseExprPostfix
 ///
 ///   expr-literal:
@@ -1175,9 +1217,14 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
 
     LLVM_FALLTHROUGH;
   case tok::kw_self:     // self
-  case tok::kw_Self:     // Self
-    Result = makeParserResult(parseExprIdentifier());
+  case tok::kw_Self: {   // Self
+    auto Expr = parseExprIdentifier();
+    Result = makeParserResult(Expr);
 
+    if (shouldWarnExcessiveRAngleExpr(Expr)) {
+      diagnose(Expr->getLoc(), diag::excessive_right_angle_brackets);
+    }
+      
     // If there is an expr-call-suffix, parse it and form a call.
     if (Tok.isFollowingLParen()) {
       Result = parseExprCallSuffix(Result, isExprBasic);
@@ -1185,7 +1232,8 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
     }
 
     break;
-
+  }
+      
   case tok::kw_Any: { // Any
     ParserResult<TypeRepr> repr = parseAnyType();
     auto expr = new (Context) TypeExpr(TypeLoc(repr.get()));
