@@ -833,16 +833,14 @@ ConstraintSystem::compareSolutions(ConstraintSystem &cs,
       if (choice1.getKind() == OverloadChoiceKind::Decl &&
           (choice2.getKind() == OverloadChoiceKind::DeclViaDynamic || 
            choice2.getKind() == OverloadChoiceKind::DeclViaBridge ||
-           choice2.getKind() == OverloadChoiceKind::DeclViaUnwrappedOptional ||
-           choice2.getKind() == OverloadChoiceKind::DeclViaOmittedLabels)) {
+           choice2.getKind() == OverloadChoiceKind::DeclViaUnwrappedOptional)) {
         ++score1;
         continue;
       }
 
       if ((choice1.getKind() == OverloadChoiceKind::DeclViaDynamic ||
            choice1.getKind() == OverloadChoiceKind::DeclViaBridge ||
-           choice1.getKind() == OverloadChoiceKind::DeclViaUnwrappedOptional ||
-           choice1.getKind() == OverloadChoiceKind::DeclViaOmittedLabels) &&
+           choice1.getKind() == OverloadChoiceKind::DeclViaUnwrappedOptional) &&
           choice2.getKind() == OverloadChoiceKind::Decl) {
         ++score2;
         continue;
