@@ -609,9 +609,10 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
           // Predicate that determines whether a lookup result should
           // be unavailable except as a last-ditch effort.
           auto unavailableLookupResult =
-            [&](const UnqualifiedLookupResult &result) {
+              [&](const UnqualifiedLookupResult &result) {
+            auto &effectiveVersion = Ctx.LangOpts.EffectiveLanguageVersion;
             return result.getValueDecl()->getAttrs()
-                     .isUnavailableInSwiftVersion();
+                .isUnavailableInSwiftVersion(effectiveVersion);
           };
 
           // If all of the results we found are unavailable, keep looking.
@@ -825,8 +826,9 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
             // be unavailable except as a last-ditch effort.
             auto unavailableLookupResult =
               [&](const UnqualifiedLookupResult &result) {
+              auto &effectiveVersion = Ctx.LangOpts.EffectiveLanguageVersion;
               return result.getValueDecl()->getAttrs()
-                       .isUnavailableInSwiftVersion();
+                  .isUnavailableInSwiftVersion(effectiveVersion);
             };
 
             // If all of the results we found are unavailable, keep looking.
