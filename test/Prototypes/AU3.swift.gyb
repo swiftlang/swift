@@ -1,4 +1,4 @@
-//===--- AU3.swift --------------------------------------------------------===//
+//===--- AU3.swift.gyb ----------------------------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -287,6 +287,38 @@ where Base : UnicodeView, Self : AnyUnicodeView_ {
   }
 }
 
+/// An adapter that presents any `RandomAccessCollection` as a `UnicodeView` by
+/// adding a standard model of AnyUnicodeIndex_ and a corresponding pair of
+/// wrap/unwrap functions.
+///
+/// This adapter assumes that if you have a view of unicode that is random
+/// access, there must be one element per code unit.
+public struct
+MappedViewOfUnicodeCodeUnits<Base : RandomAccessCollection>
+: Wrapper, UnicodeView {
+  public var base: Base
+
+  // FIXME: the compiler needs deduction help here, but shouldn't
+  public typealias Index = Base.Index
+  public typealias IndexDistance = Base.IndexDistance
+  
+  struct AnyIndex : AnyUnicodeIndex_, Wrapper, Comparable {
+    var base: Base.Index
+    var codeUnitOffset_: Base.IndexDistance
+    var codeUnitOffset: Int64 {
+      return numericCast(codeUnitOffset_)
+    }
+  }
+  
+  public func wrap(_ i: Index) -> AnyUnicodeIndex_ {
+    return AnyIndex(base: i, codeUnitOffset_: base.offset(of: i))
+  }
+  public func unwrap(_ i: AnyUnicodeIndex_) -> Index {
+    return (i as? AnyIndex).map { $0.base }
+    ?? base.index(atOffset: i.codeUnitOffset)
+  }
+}
+
 // Generate wrappers for specific element types.
 % for Element in 'UInt16', 'UInt32', 'UnicodeScalar', 'Character':
 
@@ -379,7 +411,7 @@ public struct Any${Element}UnicodeView : BidirectionalCollection, Wrapper {
 /// Adapt any `UnicodeView` with elements of type `Element`
 extension Any${Element}UnicodeView {
   /// An adaptor used to wrap `Base`
-  public struct AdaptBidirectional<Base: UnicodeView>
+  public struct Adapter<Base: UnicodeView>
   : Any${Element}UnicodeView_, Wrapper
   where Base.Iterator.Element == ${Element} {
     public var base: Base
@@ -388,7 +420,12 @@ extension Any${Element}UnicodeView {
   /// Creates an instance that wraps `base`.
   public init<Base: UnicodeView>(_ base: Base)
   where Base.Iterator.Element == ${Element} {
-    self.base2 = AdaptBidirectional<Base>(base: base)
+    self.base2 = Adapter<Base>(base: base)
+  }
+
+  public init<Base : RandomAccessCollection>(_ base: Base)
+  where Base.Iterator.Element == ${Element} {
+    self.base2 = Adapter(base: MappedViewOfUnicodeCodeUnits(base: base))
   }
 }
 
@@ -396,31 +433,6 @@ extension Any${Element}UnicodeView {
 
 % end
 
-public struct
-MappedViewOfUnicodeCodeUnits<Base : RandomAccessCollection>
-: Wrapper, UnicodeView {
-  public var base: Base
-
-  // FIXME: the compiler needs deduction help here, but shouldn't
-  public typealias Index = Base.Index
-  public typealias IndexDistance = Base.IndexDistance
-  
-  struct AnyIndex : AnyUnicodeIndex_, Wrapper, Comparable {
-    var base: Base.Index
-    var codeUnitOffset_: Base.IndexDistance
-    var codeUnitOffset: Int64 {
-      return numericCast(codeUnitOffset_)
-    }
-  }
-  
-  public func wrap(_ i: Index) -> AnyUnicodeIndex_ {
-    return AnyIndex(base: i, codeUnitOffset_: base.offset(of: i))
-  }
-  public func unwrap(_ i: AnyUnicodeIndex_) -> Index {
-    return (i as? AnyIndex).map { $0.base }
-    ?? base.index(atOffset: i.codeUnitOffset)
-  }
-}
 
 public extension Wrapper
 where Base : Comparable, Self : AnyUnicodeIndex_ {
@@ -476,8 +488,7 @@ suite.test("Bidirectional/UnicodeScalar") {
 }
 
 suite.test("RandomAccess/UnicodeScalar") {
-  let a = AnyUnicodeScalarUnicodeView(
-    MappedViewOfUnicodeCodeUnits(base: Array(sample.unicodeScalars)))
+  let a = AnyUnicodeScalarUnicodeView(Array(sample.unicodeScalars))
   expectEqualSequence(sample.unicodeScalars, a)
   var lastCodeUnitOffset = Int64.min
   // Make sure it works as a collection, too.
