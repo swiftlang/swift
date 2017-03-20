@@ -102,6 +102,9 @@ protected:
   /// \p stream.
   void finalize(llvm::raw_ostream &stream);
 
+  /// Verify that demangling and remangling works.
+  void verify(const std::string &mangledName);
+
   /// Appends a mangled identifier string.
   void appendIdentifier(StringRef ident);
 

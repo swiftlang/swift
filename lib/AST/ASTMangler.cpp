@@ -1421,6 +1421,10 @@ void ASTMangler::appendAssociatedTypeName(DependentMemberType *dmt) {
   // If the base type is known to have a single protocol conformance
   // in the current generic context, then we don't need to disambiguate the
   // associated type name by protocol.
+  // This can result in getting the same mangled string for different
+  // DependentMemberTypes. This is not a problem but re-mangling might do more
+  // aggressive substitutions, which means that the re-mangled name may differ
+  // from the the original mangled name.
   // FIXME: We ought to be able to get to the generic signature from a
   // dependent type, but can't yet. Shouldn't need this side channel.
 

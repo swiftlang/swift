@@ -26,7 +26,7 @@ void SpecializationMangler::beginMangling() {
 }
 
 std::string SpecializationMangler::finalize() {
-  std::string MangledSpecialization = ASTMangler::finalize();
+  StringRef MangledSpecialization(Storage.data(), Storage.size());
   Demangle::Demangler D;
   NodePointer TopLevel = D.demangleSymbol(MangledSpecialization);
 
@@ -45,7 +45,9 @@ std::string SpecializationMangler::finalize() {
            FuncChild->getText() == "merged");
     TopLevel->addChild(FuncChild, D);
   }
-  return Demangle::mangleNode(TopLevel);
+  std::string mangledName = Demangle::mangleNode(TopLevel);
+  verify(mangledName);
+  return mangledName;
 }
 
 //===----------------------------------------------------------------------===//
