@@ -126,3 +126,10 @@ protocol P7 {
 	// expected-note@-2{{superclass constraint 'Self.Assoc' : 'A' written here}}
 	// expected-error@-3{{'Self.Assoc' cannot be a subclass of both 'Other' and 'A'}}
 }
+
+// CHECK: superclassConformance4
+// CHECK: Generic signature: <T, U where T : P3, U : P3, T.T : C, T.T == U.T>
+func superclassConformance4<T: P3, U: P3>(_: T, _: U)
+  where T.T: C, // expected-note{{superclass constraint 'T.T' : 'C' written here}}
+        U.T: C, // expected-warning{{redundant superclass constraint 'U.T' : 'C'}}
+        T.T == U.T { }
