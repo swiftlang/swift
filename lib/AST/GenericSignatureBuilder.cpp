@@ -2069,30 +2069,19 @@ bool GenericSignatureBuilder::addConformanceRequirement(PotentialArchetype *PAT,
   return false;
 }
 
-bool GenericSignatureBuilder::addLayoutRequirement(PotentialArchetype *PAT,
-                                            LayoutConstraint Layout,
-                                            const RequirementSource *Source) {
-  // Add the requirement to the representative.
-  auto T = PAT->getRepresentative();
+bool GenericSignatureBuilder::addLayoutRequirement(
+                                             PotentialArchetype *PAT,
+                                             LayoutConstraint Layout,
+                                             const RequirementSource *Source) {
+  auto equivClass = PAT->getOrCreateEquivalenceClass();
 
-  if (T->Layout) {
-    if (T->Layout == Layout) {
-      // Update the source.
-      T->LayoutSource = Source;
-      return false;
-    }
-    // There is an existing layout constraint for this archetype.
-    Diags.diagnose(Source->getLoc(), diag::mutiple_layout_constraints,
-                   Layout, T->Layout);
-    Diags.diagnose(T->LayoutSource->getLoc(),
-                   diag::previous_layout_constraint, T->Layout);
-    T->setInvalid();
+  // Record this layout constraint.
+  equivClass->layoutConstraints.push_back({PAT, Layout, Source});
 
-    return true;
-  }
-
-  T->Layout = Layout;
-  T->LayoutSource = Source;
+  // Update the layout in the equivalence class, if we didn't have one already.
+  // FIXME: Layouts can probably be merged sensibly.
+  if (!equivClass->layout)
+    equivClass->layout = Layout;
 
   return false;
 }
@@ -3052,6 +3041,7 @@ GenericSignatureBuilder::finalize(SourceLoc loc,
     }
 
     checkConformanceConstraints(genericParams, archetype);
+    checkLayoutConstraints(genericParams, archetype);
     checkSameTypeConstraints(genericParams, archetype);
   });
 
@@ -3457,6 +3447,28 @@ void GenericSignatureBuilder::checkSuperclassConstraints(
   }
 }
 
+void GenericSignatureBuilder::checkLayoutConstraints(
+                                ArrayRef<GenericTypeParamType *> genericParams,
+                                PotentialArchetype *pa) {
+  auto equivClass = pa->getEquivalenceClassIfPresent();
+  if (!equivClass || !equivClass->layout) return;
+
+  checkConstraintList<LayoutConstraint>(
+    genericParams, equivClass->layoutConstraints,
+    [&](const Constraint<LayoutConstraint> &constraint) {
+      return constraint.value == equivClass->layout;
+    },
+    [&](LayoutConstraint layout) {
+      if (layout == equivClass->layout)
+        return ConstraintRelation::Redundant;
+
+      return ConstraintRelation::Conflicting;
+    },
+    diag::conflicting_layout_constraints,
+    diag::redundant_layout_constraint,
+    diag::previous_layout_constraint);
+}
+
 template<typename F>
 void GenericSignatureBuilder::visitPotentialArchetypes(F f) {
   // Stack containing all of the potential archetypes to visit.
@@ -3543,10 +3555,6 @@ namespace {
     /// potential archetypes in this component equivalent to the concrete type.
     const RequirementSource *concreteTypeSource;
 
-    /// The (best) requirement source within the component that introduces
-    /// the superclass constraint.
-    const RequirementSource *superclassSource;
-
     friend bool operator<(const SameTypeComponent &lhs,
                           const SameTypeComponent &rhs) {
       return compareDependentTypes(&lhs.anchor, &rhs.anchor) < 0;
@@ -3603,7 +3611,7 @@ static SmallVector<SameTypeComponent, 2> getSameTypeComponents(
     auto anchor = sameTypeDFS(pa, components.size(), paToComponent);
 
     // Record the anchor.
-    components.push_back({anchor, nullptr, nullptr});
+    components.push_back({anchor, nullptr});
   }
 
   // If there is a concrete type, figure out the best concrete type anchor
@@ -3622,27 +3630,24 @@ static SmallVector<SameTypeComponent, 2> getSameTypeComponents(
       bestConcreteTypeSource = concrete.source;
   }
 
-  // If there is a superclass and no concrete type, figure out the best
-  // superclass source per component.
-  if (equivClass->superclass && !equivClass->concreteType) {
-    for (const auto &superclass : equivClass->superclassConstraints) {
-    // Dig out the component associated with constraint.
-    assert(paToComponent.count(superclass.archetype) > 0);
-    auto &component = components[paToComponent[superclass.archetype]];
-
-    // If it has a better source than we'd seen before for this component,
-    // keep it.
-    auto &bestSuperclassSource = component.superclassSource;
-    if (!bestSuperclassSource ||
-        superclass.source->compare(bestSuperclassSource) < 0)
-      bestSuperclassSource = superclass.source;
-    }
-  }
-
   // Sort the components.
   llvm::array_pod_sort(components.begin(), components.end());
 
   return components;
+}
+
+namespace {
+  /// Retrieve the best requirement source from a set of constraints.
+  template<typename T>
+  const RequirementSource *getBestConstraintSource(
+                                        ArrayRef<Constraint<T>> constraints) {
+    auto bestSource = constraints.front().source;
+    for (const auto &constraint : constraints) {
+      if (constraint.source->compare(bestSource) < 0)
+        bestSource = constraint.source;
+    }
+    return bestSource;
+  }
 }
 
 void GenericSignatureBuilder::enumerateRequirements(llvm::function_ref<
@@ -3718,14 +3723,6 @@ void GenericSignatureBuilder::enumerateRequirements(llvm::function_ref<
         continue;
       }
 
-      // If we have a superclass, produce a superclass requirement
-      if (Type superclass = rep->getSuperclass()) {
-        f(RequirementKind::Superclass, archetype, superclass,
-          knownAnchor->superclassSource
-            ? knownAnchor->superclassSource
-            : RequirementSource::forAbstract(archetype));
-      }
-
       // If we're at the last anchor in the component, do nothing;
       auto nextAnchor = knownAnchor;
       ++nextAnchor;
@@ -3748,16 +3745,32 @@ void GenericSignatureBuilder::enumerateRequirements(llvm::function_ref<
     if (archetype != archetype->getArchetypeAnchor(*this))
       continue;
 
+    auto equivClass = rep->getEquivalenceClassIfPresent();
+
+    // If we have a superclass, produce a superclass requirement
+    if (equivClass && equivClass->superclass) {
+      f(RequirementKind::Superclass, archetype, equivClass->superclass,
+        getBestConstraintSource<Type>(equivClass->superclassConstraints));
+    }
+
     // If we have a layout constraint, produce a layout requirement.
-    if (LayoutConstraint Layout = archetype->getLayout()) {
-      f(RequirementKind::Layout, archetype, Layout,
-        archetype->getLayoutSource());
+    if (equivClass && equivClass->layout) {
+      // Find the best source among the constraints that describe the layout
+      // of this type.
+      auto bestSource = equivClass->layoutConstraints.front().source;
+      for (const auto &constraint : equivClass->layoutConstraints) {
+        if (constraint.source->compare(bestSource) < 0)
+          bestSource = constraint.source;
+      }
+
+      f(RequirementKind::Layout, archetype, equivClass->layout,
+        getBestConstraintSource<LayoutConstraint>(
+                                              equivClass->layoutConstraints));
     }
 
     // Enumerate conformance requirements.
     SmallVector<ProtocolDecl *, 4> protocols;
     DenseMap<ProtocolDecl *, const RequirementSource *> protocolSources;
-    auto equivClass = rep->getEquivalenceClassIfPresent();
     if (equivClass) {
       for (const auto &conforms : equivClass->conformsTo) {
         protocols.push_back(conforms.first);
@@ -3772,7 +3785,9 @@ void GenericSignatureBuilder::enumerateRequirements(llvm::function_ref<
             bestSource = constraint.source;
         }
 
-        protocolSources.insert({conforms.first, bestSource});
+        protocolSources.insert(
+          {conforms.first,
+           getBestConstraintSource<ProtocolDecl *>(conforms.second)});
       }
     }
 
