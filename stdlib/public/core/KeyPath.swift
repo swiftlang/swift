@@ -37,17 +37,15 @@ internal func _abstract(
 
 // MARK: Type-erased abstract base classes
 
-public class AnyKeyPath: Hashable {
-  public func appending<Value, AppendedValue>(
-    path: KeyPath<Value, AppendedValue>
-  ) -> AnyKeyPath? {
-    _abstract()
+public class AnyKeyPath: Hashable, _AppendKeyPath {
+  @_inlineable
+  public static var rootType: Any.Type {
+    return _rootAndValueType.root
   }
-  public class var rootType: Any.Type {
-    _abstract()
-  }
-  public class var valueType: Any.Type {
-    _abstract()
+
+  @_inlineable
+  public static var valueType: Any.Type {
+    return _rootAndValueType.value
   }
   
   final public var hashValue: Int {
@@ -111,6 +109,11 @@ public class AnyKeyPath: Hashable {
     _sanityCheckFailure("use _create(...)")
   }
   
+  // internal-with-availability
+  public class var _rootAndValueType: (root: Any.Type, value: Any.Type) {
+    _abstract()
+  }
+  
   public // @testable
   static func _create(
     capacityInBytes bytes: Int,
@@ -134,24 +137,7 @@ public class AnyKeyPath: Hashable {
   }
 }
 
-public class PartialKeyPath<Root>: AnyKeyPath {
-  public override func appending<Value, AppendedValue>(
-    path: KeyPath<Value, AppendedValue>
-  ) -> KeyPath<Root, AppendedValue>? {
-    _abstract()
-  }
-  public func appending<Value, AppendedValue>(
-    path: ReferenceWritableKeyPath<Value, AppendedValue>
-  ) -> ReferenceWritableKeyPath<Root, AppendedValue>? {
-    _abstract()
-  }
-
-  // MARK: Override abstract interfaces
-  @_inlineable
-  public final override class var rootType: Any.Type {
-    return Root.self
-  }
-}
+public class PartialKeyPath<Root>: AnyKeyPath { }
 
 // MARK: Concrete implementations
 
@@ -159,148 +145,11 @@ public class KeyPath<Root, Value>: PartialKeyPath<Root> {
   public typealias _Root = Root
   public typealias _Value = Value
 
-  public func appending<AppendedValue>(
-    path: KeyPath<Value, AppendedValue>
-  ) -> KeyPath<Root, AppendedValue> {
-    let resultTy = type(of: self).appendedType(with: type(of: path))
-    return withBuffer {
-      var rootBuffer = $0
-      return path.withBuffer {
-        var leafBuffer = $0
-        // Result buffer has room for both key paths' components, plus the
-        // header, plus space for the middle type.
-        let resultSize = rootBuffer.data.count + leafBuffer.data.count
-          + MemoryLayout<KeyPathBuffer.Header>.size
-          + MemoryLayout<Int>.size
-        return resultTy._create(capacityInBytes: resultSize) {
-          var destBuffer = $0
-          
-          func pushRaw(_ count: Int) {
-            _sanityCheck(destBuffer.count >= count)
-            destBuffer = UnsafeMutableRawBufferPointer(
-              start: destBuffer.baseAddress.unsafelyUnwrapped + count,
-              count: destBuffer.count - count
-            )
-          }
-          func pushType(_ type: Any.Type) {
-            let intSize = MemoryLayout<Int>.size
-            _sanityCheck(destBuffer.count >= intSize)
-            if intSize == 8 {
-              let words = unsafeBitCast(type, to: (UInt32, UInt32).self)
-              destBuffer.storeBytes(of: words.0,
-                                    as: UInt32.self)
-              destBuffer.storeBytes(of: words.1, toByteOffset: 4,
-                                    as: UInt32.self)
-            } else if intSize == 4 {
-              destBuffer.storeBytes(of: type, as: Any.Type.self)
-            } else {
-              _sanityCheckFailure("unsupported architecture")
-            }
-            pushRaw(intSize)
-          }
-          
-          // Save space for the header.
-          let leafIsReferenceWritable = type(of: path).kind == .reference
-          let header = KeyPathBuffer.Header(
-            size: resultSize - MemoryLayout<KeyPathBuffer.Header>.size,
-            trivial: rootBuffer.trivial && leafBuffer.trivial,
-            hasReferencePrefix: rootBuffer.hasReferencePrefix
-                                || leafIsReferenceWritable
-          )
-          destBuffer.storeBytes(of: header, as: KeyPathBuffer.Header.self)
-          pushRaw(MemoryLayout<KeyPathBuffer.Header>.size)
-          
-          let leafHasReferencePrefix = leafBuffer.hasReferencePrefix
-          
-          // Clone the root components into the buffer.
-          
-          while true {
-            let (component, type) = rootBuffer.next()
-            let isLast = type == nil
-            // If the leaf appended path has a reference prefix, then the
-            // entire root is part of the reference prefix.
-            let endOfReferencePrefix: Bool
-            if leafHasReferencePrefix {
-              endOfReferencePrefix = false
-            } else if isLast && leafIsReferenceWritable {
-              endOfReferencePrefix = true
-            } else {
-              endOfReferencePrefix = component.header.endOfReferencePrefix
-            }
-            
-            component.clone(
-              into: &destBuffer,
-              endOfReferencePrefix: endOfReferencePrefix
-            )
-            if let type = type {
-              pushType(type)
-            } else {
-              // Insert our endpoint type between the root and leaf components.
-              pushType(Value.self)
-              break
-            }
-          }
-          
-          // Clone the leaf components into the buffer.
-          while true {
-            let (component, type) = leafBuffer.next()
-
-            component.clone(
-              into: &destBuffer,
-              endOfReferencePrefix: component.header.endOfReferencePrefix
-            )
-
-            if let type = type {
-              pushType(type)
-            } else {
-              break
-            }
-          }
-          
-          _sanityCheck(destBuffer.count == 0,
-                       "did not fill entire result buffer")
-        }
-      }
-    }
-  }
-
-  @_inlineable
-  public final func appending<AppendedValue>(
-    path: ReferenceWritableKeyPath<Value, AppendedValue>
-  ) -> ReferenceWritableKeyPath<Root, AppendedValue> {
-    return unsafeDowncast(
-      appending(path: path as KeyPath<Value, AppendedValue>),
-      to: ReferenceWritableKeyPath<Root, AppendedValue>.self
-    )
-  }
-
-  // MARK: Override optional-returning abstract interfaces
-  @_inlineable
-  public final override func appending<Value2, AppendedValue>(
-    path: KeyPath<Value2, AppendedValue>
-  ) -> KeyPath<Root, AppendedValue>? {
-    if Value2.self == Value.self {
-      return .some(appending(
-        path: unsafeDowncast(path, to: KeyPath<Value, AppendedValue>.self)))
-    }
-    return nil
-  }
-  
-  @_inlineable
-  public final override func appending<Value2, AppendedValue>(
-    path: ReferenceWritableKeyPath<Value2, AppendedValue>
-  ) -> ReferenceWritableKeyPath<Root, AppendedValue>? {
-    if Value2.self == Value.self {
-      return .some(appending(
-        path: unsafeDowncast(path,
-                      to: ReferenceWritableKeyPath<Value, AppendedValue>.self)))
-    }
-    return nil
-  }
-
-  @_inlineable
-  public final override class var valueType: Any.Type {
-    return Value.self
+  public final override class var _rootAndValueType: (
+    root: Any.Type,
+    value: Any.Type
+  ) {
+    return (Root.self, Value.self)
   }
   
   // MARK: Implementation
@@ -370,15 +219,6 @@ public class KeyPath<Root, Value>: PartialKeyPath<Root> {
 }
 
 public class WritableKeyPath<Root, Value>: KeyPath<Root, Value> {
-  public final func appending<AppendedValue>(
-    path: WritableKeyPath<Value, AppendedValue>
-  ) -> WritableKeyPath<Root, AppendedValue> {
-    return unsafeDowncast(
-      appending(path: path as KeyPath<Value, AppendedValue>),
-      to: WritableKeyPath<Root, AppendedValue>.self
-    )
-  }
-
   // MARK: Implementation detail
   
   override class var kind: Kind { return .value }
@@ -428,17 +268,6 @@ public class WritableKeyPath<Root, Value>: KeyPath<Root, Value> {
 }
 
 public class ReferenceWritableKeyPath<Root, Value>: WritableKeyPath<Root, Value> {
-  /* TODO: need a "new" attribute */
-  @_inlineable
-  public final func appendingR<AppendedValue>(
-    path: WritableKeyPath<Value, AppendedValue>
-  ) -> ReferenceWritableKeyPath<Root, AppendedValue> {
-    return unsafeDowncast(
-      appending(path: path as KeyPath<Value, AppendedValue>),
-      to: ReferenceWritableKeyPath<Root, AppendedValue>.self
-    )
-  }
-
   // MARK: Implementation detail
 
   final override class var kind: Kind { return .reference }
@@ -904,6 +733,234 @@ public struct _KeyPathBase<T> {
     }
     nonmutating mutableAddressWithNativeOwner {
       return keyPath.projectMutableAddress(from: base)
+    }
+  }
+}
+
+// MARK: Appending type system
+
+// FIXME(ABI): The type relationships between KeyPath append operands are tricky
+// and don't interact well with our overriding rules. Hack things by injecting
+// a bunch of `appending` overloads as protocol extensions so they aren't
+// constrained by being overrides, and so that we can use exact-type constraints
+// on `Self` to prevent dynamically-typed methods from being inherited by
+// statically-typed key paths.
+public protocol _AppendKeyPath {}
+
+extension _AppendKeyPath where Self == AnyKeyPath {
+  public func appending(path: AnyKeyPath) -> AnyKeyPath? {
+    return _tryToAppendKeyPaths(root: self, leaf: path)
+  }
+}
+
+extension _AppendKeyPath /* where Self == PartialKeyPath<T> */ {
+  public func appending<Root>(path: AnyKeyPath) -> PartialKeyPath<Root>?
+  where Self == PartialKeyPath<Root> {
+    return _tryToAppendKeyPaths(root: self, leaf: path)
+  }
+  
+  public func appending<Root, AppendedRoot, AppendedValue>(
+    path: KeyPath<AppendedRoot, AppendedValue>
+  ) -> KeyPath<Root, AppendedValue>?
+  where Self == PartialKeyPath<Root> {
+    return _tryToAppendKeyPaths(root: self, leaf: path)
+  }
+  
+  public func appending<Root, AppendedRoot, AppendedValue>(
+    path: ReferenceWritableKeyPath<AppendedRoot, AppendedValue>
+  ) -> ReferenceWritableKeyPath<Root, AppendedValue>?
+  where Self == PartialKeyPath<Root> {
+    return _tryToAppendKeyPaths(root: self, leaf: path)
+  }
+}
+
+extension _AppendKeyPath /* where Self == KeyPath<T,U> */ {
+  public func appending<Root, Value, AppendedValue>(
+    path: KeyPath<Value, AppendedValue>
+  ) -> KeyPath<Root, AppendedValue>
+  where Self: KeyPath<Root, Value> {
+    return _appendingKeyPaths(root: self, leaf: path)
+  }
+
+  /* TODO
+  public func appending<Root, Value, Leaf>(
+    path: Leaf,
+    // FIXME: Satisfy "Value generic param not used in signature" constraint
+    _: Value.Type = Value.self
+  ) -> PartialKeyPath<Root>?
+  where Self: KeyPath<Root, Value>, Leaf == AnyKeyPath {
+    return _tryToAppendKeyPaths(root: self, leaf: path)
+  }
+   */
+
+  public func appending<Root, Value, AppendedValue>(
+    path: ReferenceWritableKeyPath<Value, AppendedValue>
+  ) -> ReferenceWritableKeyPath<Root, AppendedValue>
+  where Self == KeyPath<Root, Value> {
+    return _appendingKeyPaths(root: self, leaf: path)
+  }
+}
+
+extension _AppendKeyPath /* where Self == WritableKeyPath<T,U> */ {
+  public func appending<Root, Value, AppendedValue>(
+    path: WritableKeyPath<Value, AppendedValue>
+  ) -> WritableKeyPath<Root, AppendedValue>
+  where Self == WritableKeyPath<Root, Value> {
+    return _appendingKeyPaths(root: self, leaf: path)
+  }
+
+  public func appending<Root, Value, AppendedValue>(
+    path: ReferenceWritableKeyPath<Value, AppendedValue>
+  ) -> ReferenceWritableKeyPath<Root, AppendedValue>
+  where Self == WritableKeyPath<Root, Value> {
+    return _appendingKeyPaths(root: self, leaf: path)
+  }
+}
+
+extension _AppendKeyPath /* where Self == ReferenceWritableKeyPath<T,U> */ {
+  public func appending<Root, Value, AppendedValue>(
+    path: WritableKeyPath<Value, AppendedValue>
+  ) -> ReferenceWritableKeyPath<Root, AppendedValue>
+  where Self == ReferenceWritableKeyPath<Root, Value> {
+    return _appendingKeyPaths(root: self, leaf: path)
+  }
+}
+
+// internal-with-availability
+public func _tryToAppendKeyPaths<Result: AnyKeyPath>(
+  root: AnyKeyPath,
+  leaf: AnyKeyPath
+) -> Result? {
+  let (rootRoot, rootValue) = type(of: root)._rootAndValueType
+  let (leafRoot, leafValue) = type(of: leaf)._rootAndValueType
+  
+  if rootValue != leafRoot {
+    return nil
+  }
+  
+  func open<Root>(_: Root.Type) -> Result {
+    func open2<Value>(_: Value.Type) -> Result {
+      func open3<AppendedValue>(_: AppendedValue.Type) -> Result {
+        let typedRoot = unsafeDowncast(root, to: KeyPath<Root, Value>.self)
+        let typedLeaf = unsafeDowncast(leaf,
+                                       to: KeyPath<Value, AppendedValue>.self)
+        let result = _appendingKeyPaths(root: typedRoot, leaf: typedLeaf)
+        return unsafeDowncast(result, to: Result.self)
+      }
+      return _openExistential(leafValue, do: open3)
+    }
+    return _openExistential(rootValue, do: open2)
+  }
+  return _openExistential(rootRoot, do: open)
+}
+
+// internal-with-availability
+public func _appendingKeyPaths<
+  Root, Value, AppendedValue,
+  Result: KeyPath<Root, AppendedValue>
+>(
+  root: KeyPath<Root, Value>,
+  leaf: KeyPath<Value, AppendedValue>
+) -> Result {
+  let resultTy = type(of: root).appendedType(with: type(of: leaf))
+  return root.withBuffer {
+    var rootBuffer = $0
+    return leaf.withBuffer {
+      var leafBuffer = $0
+      // Result buffer has room for both key paths' components, plus the
+      // header, plus space for the middle type.
+      let resultSize = rootBuffer.data.count + leafBuffer.data.count
+        + MemoryLayout<KeyPathBuffer.Header>.size
+        + MemoryLayout<Int>.size
+      let result = resultTy._create(capacityInBytes: resultSize) {
+        var destBuffer = $0
+        
+        func pushRaw(_ count: Int) {
+          _sanityCheck(destBuffer.count >= count)
+          destBuffer = UnsafeMutableRawBufferPointer(
+            start: destBuffer.baseAddress.unsafelyUnwrapped + count,
+            count: destBuffer.count - count
+          )
+        }
+        func pushType(_ type: Any.Type) {
+          let intSize = MemoryLayout<Int>.size
+          _sanityCheck(destBuffer.count >= intSize)
+          if intSize == 8 {
+            let words = unsafeBitCast(type, to: (UInt32, UInt32).self)
+            destBuffer.storeBytes(of: words.0,
+                                  as: UInt32.self)
+            destBuffer.storeBytes(of: words.1, toByteOffset: 4,
+                                  as: UInt32.self)
+          } else if intSize == 4 {
+            destBuffer.storeBytes(of: type, as: Any.Type.self)
+          } else {
+            _sanityCheckFailure("unsupported architecture")
+          }
+          pushRaw(intSize)
+        }
+        
+        // Save space for the header.
+        let leafIsReferenceWritable = type(of: leaf).kind == .reference
+        let header = KeyPathBuffer.Header(
+          size: resultSize - MemoryLayout<KeyPathBuffer.Header>.size,
+          trivial: rootBuffer.trivial && leafBuffer.trivial,
+          hasReferencePrefix: rootBuffer.hasReferencePrefix
+                              || leafIsReferenceWritable
+        )
+        destBuffer.storeBytes(of: header, as: KeyPathBuffer.Header.self)
+        pushRaw(MemoryLayout<KeyPathBuffer.Header>.size)
+        
+        let leafHasReferencePrefix = leafBuffer.hasReferencePrefix
+        
+        // Clone the root components into the buffer.
+        
+        while true {
+          let (component, type) = rootBuffer.next()
+          let isLast = type == nil
+          // If the leaf appended path has a reference prefix, then the
+          // entire root is part of the reference prefix.
+          let endOfReferencePrefix: Bool
+          if leafHasReferencePrefix {
+            endOfReferencePrefix = false
+          } else if isLast && leafIsReferenceWritable {
+            endOfReferencePrefix = true
+          } else {
+            endOfReferencePrefix = component.header.endOfReferencePrefix
+          }
+          
+          component.clone(
+            into: &destBuffer,
+            endOfReferencePrefix: endOfReferencePrefix
+          )
+          if let type = type {
+            pushType(type)
+          } else {
+            // Insert our endpoint type between the root and leaf components.
+            pushType(Value.self)
+            break
+          }
+        }
+        
+        // Clone the leaf components into the buffer.
+        while true {
+          let (component, type) = leafBuffer.next()
+
+          component.clone(
+            into: &destBuffer,
+            endOfReferencePrefix: component.header.endOfReferencePrefix
+          )
+
+          if let type = type {
+            pushType(type)
+          } else {
+            break
+          }
+        }
+        
+        _sanityCheck(destBuffer.count == 0,
+                     "did not fill entire result buffer")
+      }
+      return unsafeDowncast(result, to: Result.self)
     }
   }
 }

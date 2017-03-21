@@ -768,7 +768,7 @@ keyPathImpl.test("appending") {
     base: C(x: 17, y: LifetimeTracked(38), z: value.base)
   )
   
-  let c_z_p_y = c_z.appendingR(path: s_p_y)
+  let c_z_p_y = c_z.appending(path: s_p_y)
   
   expectEqual(value2[c_z_p_y], 4.0)
   value2[c_z_p_y] = 5.0
@@ -867,7 +867,6 @@ keyPathImpl.test("appending") {
               cratePair_left_value_c_z_p_y)
   expectEqual(cratePair_left_value_c_z_p_y_manual.hashValue,
               cratePair_left_value_c_z_p_y.hashValue)
-  
 }
 
 runAllTests()
