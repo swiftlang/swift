@@ -3368,6 +3368,9 @@ private:
 class ProtocolDecl : public NominalTypeDecl {
   SourceLoc ProtocolLoc;
 
+  /// The location of the 'class' keyword for class-bound protocols.
+  SourceLoc ClassRequirementLoc;
+
   /// The syntactic representation of the where clause in a protocol like
   /// `protocol ... where ... { ... }`.
   TrailingWhereClause *TrailingWhere;
@@ -3443,6 +3446,17 @@ public:
     ProtocolDeclBits.RequiresClassValid = true;
     ProtocolDeclBits.RequiresClass = requiresClass;
   }
+
+  /// Specify that this protocol is class-bounded, recording the location of
+  /// the 'class' keyword.
+  void setClassBounded(SourceLoc loc) {
+    ClassRequirementLoc = loc;
+    ProtocolDeclBits.RequiresClassValid = true;
+    ProtocolDeclBits.RequiresClass = true;
+  }
+
+  /// Retrieve the source location of the 'class' keyword.
+  SourceLoc getClassBoundedLoc() const { return ClassRequirementLoc; }
 
   /// Determine whether an existential conforming to this protocol can be
   /// matched with a generic type parameter constrained to this protocol.
