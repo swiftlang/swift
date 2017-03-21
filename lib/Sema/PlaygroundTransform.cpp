@@ -668,7 +668,7 @@ public:
           useJustFirst = true;
         } else {
           for (Expr *Arg : TE->getElements()) {
-            if (Arg->getType()->getAs<InOutType>()) {
+            if (Arg->getType()->is<InOutType>()) {
               useJustFirst = true;
               break;
             }

@@ -602,8 +602,8 @@ SILValue swift::castValueToABICompatibleType(SILBuilder *B, SILLocation Loc,
   }
 
   // Function types are interchangeable if they're also ABI-compatible.
-  if (SrcTy.getAs<SILFunctionType>()) {
-    if (DestTy.getAs<SILFunctionType>()) {
+  if (SrcTy.is<SILFunctionType>()) {
+    if (DestTy.is<SILFunctionType>()) {
       // Insert convert_function.
       return B->createConvertFunction(Loc, Value, DestTy);
     }
