@@ -169,14 +169,6 @@ private:
   GenericSignatureBuilder(const GenericSignatureBuilder &) = delete;
   GenericSignatureBuilder &operator=(const GenericSignatureBuilder &) = delete;
 
-  /// Update an existing constraint source reference when another constraint
-  /// source was found to produce the same constraint. Only the better
-  /// constraint source will be kept.
-  ///
-  /// \returns true if the new constraint source was better, false otherwise.
-  bool updateRequirementSource(const RequirementSource *&existingSource,
-                               const RequirementSource *newSource);
-
   /// Retrieve the constraint source conformance for the superclass constraint
   /// of the given potential archetype (if present) to the given protocol.
   ///

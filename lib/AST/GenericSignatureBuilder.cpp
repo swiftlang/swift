@@ -814,22 +814,6 @@ bool EquivalenceClass::isConformanceSatisfiedBySuperclass(
   return false;
 }
 
-bool GenericSignatureBuilder::updateRequirementSource(
-                                      const RequirementSource *&existingSource,
-                                      const RequirementSource *newSource) {
-  if (int result = newSource->compare(existingSource)) {
-    if (result < 0) {
-      existingSource = newSource;
-      return true;
-    }
-
-    return false;
-  }
-
-  assert(existingSource == newSource && "incomparable requirement sources");
-  return false;
-}
-
 const RequirementSource *GenericSignatureBuilder::resolveSuperConformance(
                       GenericSignatureBuilder::PotentialArchetype *pa,
                       ProtocolDecl *proto) {
