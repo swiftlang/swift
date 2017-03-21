@@ -24,16 +24,14 @@ def main():
     if flake8_result != 0:
         print("Missing modules flake8 or flake8-import-order. Please be sure "
               "to install these python packages before linting.")
-        sys.exit(0)
 
     utils_directory = os.path.dirname(os.path.abspath(__file__))
     parent_directory = os.path.dirname(utils_directory)
-    linting_result = subprocess.call(
+    subprocess.call(
       [sys.executable, "-m", "flake8"] + sys.argv[1:],
       cwd=parent_directory,
       universal_newlines=True
     )
-    sys.exit(linting_result)
 
 
 if __name__ == '__main__':
