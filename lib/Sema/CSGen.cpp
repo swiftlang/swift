@@ -1230,6 +1230,21 @@ namespace {
                        CS.getConstraintLocator(expr));
       return tv;
     }
+    
+    /// \brief Get a type dependent on the type var `protoTypeVar` for the 
+    /// associated type `name` of protocol `proto`.
+    DependentMemberType * 
+    getInterpolationDependentType(ProtocolDecl * proto, 
+                                  TypeVariableType * protoTypeVar, 
+                                  Identifier name) {
+      auto associatedTypes = proto->lookupDirect(name);
+      if (associatedTypes.empty()) {
+        return nullptr;
+      }
+      auto associatedType = cast<AssociatedTypeDecl>(associatedTypes.front());
+      
+      return DependentMemberType::get(protoTypeVar, associatedType);
+    }
 
     Type
     visitInterpolatedStringLiteralExpr(InterpolatedStringLiteralExpr *expr) {
@@ -1243,38 +1258,38 @@ namespace {
         return nullptr;
       }
       
-      // Find the associated type it uses for interpolated segments.
-      auto interpolationAssociatedTypes = 
-                          interpolationProto->lookupDirect(
-                            CS.getASTContext().Id_StringInterpolationSegmentType);
-      if(interpolationAssociatedTypes.empty()) {
-        tc.diagnose(expr->getStartLoc(), diag::interpolation_broken_proto);
+      // Dig out ExpressibleByStringLiteral too. We need it to get the 
+      // associated StringLiteralType.
+      auto literalProto
+        = tc.getProtocol(expr->getLoc(), 
+                         KnownProtocolKind::ExpressibleByStringLiteral);
+      if (!literalProto) {
+        tc.diagnose(expr->getStartLoc(), diag::missing_protocol, tc.Context.getIdentifier(getProtocolName(KnownProtocolKind::ExpressibleByStringLiteral)));
         return nullptr;
       }
-      auto interpolationAssociatedType = cast<AssociatedTypeDecl>(interpolationAssociatedTypes.front());
       
-      // The type of the expression must conform to the
-      // ExpressibleByStringInterpolation protocol.
+      // Create a type variable for the expression as a whole. The type of the 
+      // expression must conform to the ExpressibleByStringInterpolation protocol.
       auto locator = CS.getConstraintLocator(expr);
       auto tv = CS.createTypeVariable(locator, TVO_PrefersSubtypeBinding);
       CS.addConstraint(ConstraintKind::LiteralConformsTo, tv,
                        interpolationProto->getDeclaredType(),
                        locator);
       
-      auto interpolationType = DependentMemberType::get(tv, interpolationAssociatedType);
+      // Get types for the StringInterpolationType and StringLiteralType which are  
+      // dependent on the type var.
+      auto interpolationType = getInterpolationDependentType(interpolationProto, tv, 
+                                                             CS.getASTContext().Id_StringInterpolationType);
+      auto literalType = getInterpolationDependentType(literalProto, tv, 
+                                                       CS.getASTContext().Id_StringLiteralType);
+      if(!interpolationType || !literalType) {
+        CS.getTypeChecker().diagnose(expr->getStartLoc(), diag::interpolation_broken_proto);
+        return nullptr;
+      }
       
       for(auto segment : expr->getSegments()) {
-        if(expr->isInterpolatedSegment(segment)) {
-          // Interpolated segments are of the StringInterpolationSegmentType 
-          // associated type.
-          CS.addConstraint(ConstraintKind::Equal, interpolationType, segment->getType(), locator);
-        }
-        else {
-          // Literal segments are of the same type as the interpolated string
-          // itself.
-          CS.addConstraint(ConstraintKind::Equal, tv,
-            segment->getType(), locator);
-        }
+        auto segmentType = expr->isInterpolatedSegment(segment) ? interpolationType : literalType;
+        CS.addConstraint(ConstraintKind::Equal, segmentType, segment->getType(), locator);
       }
 
       return tv;
