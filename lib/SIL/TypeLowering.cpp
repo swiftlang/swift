@@ -503,6 +503,9 @@ namespace {
 static LoweredTypeKind classifyType(CanType type, SILModule &M,
                                     CanGenericSignature sig,
                                     ResilienceExpansion expansion) {
+  assert(!type->hasError() &&
+         "Error types should not appear in type-checked AST");
+
   return TypeClassifier(M, sig, expansion).visit(type);
 }
 
@@ -1561,6 +1564,9 @@ CanSILFunctionType TypeConverter::getSILFunctionType(
 
 CanType TypeConverter::getLoweredRValueType(AbstractionPattern origType,
                                             CanType substType) {
+  assert(!substType->hasError() &&
+         "Error types should not appear in type-checked AST");
+
   // AST function types are turned into SIL function types:
   //   - the type is uncurried as desired
   //   - types are turned into their unbridged equivalents, depending
