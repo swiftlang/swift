@@ -296,8 +296,12 @@ MappedViewOfUnicodeCodeUnits<Base : RandomAccessCollection>
   }
 }
 
+/// Use a typealias because we want random access for these collections
+public typealias ExtendedCodeUnit = UInt32
+
 // Generate wrappers for specific element types.
-% for Element in 'UInt16', 'UInt32', 'UnicodeScalar', 'Character':
+% for Element in (
+%   'UInt16', 'UInt32', 'UnicodeScalar', 'Character', 'ExtendedCodeUnit'):
 
 //===--- Any${Element}Iterator --------------------------------------------===//
 /// Type-eraser for Iterators over ${Element}s
@@ -396,11 +400,15 @@ extension Any${Element}UnicodeView {
     public var base: Base
   }
 
+  % if Element == 'ExtendedCodeUnit':
+  // CodeUnit views are always random-acess, so no construction from UnicodeView
+  % else:
   /// Creates an instance that wraps `base`.
   public init<Base: UnicodeView>(_ base: Base)
   where Base.Iterator.Element == ${Element} {
-    self.base2 = Adapter<Base>(base: base)
+    self.base2 = Adapter(base: base)
   }
+  % end
   
   public init<Base : RandomAccessCollection>(_ base: Base)
   where Base.Iterator.Element == ${Element} {
@@ -412,6 +420,7 @@ extension Any${Element}UnicodeView {
 
 % end
 
+extension AnyExtendedCodeUnitUnicodeView : RandomAccessCollection {  }
 
 //===--- Adapt Swift.UnicodeView to this file's UnicodeView protocol ------===//
 struct AnyUnicodeIndexAdapter<BaseView: Swift.UnicodeView> : AnyUnicodeIndex_, Wrapper, Comparable {
