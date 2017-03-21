@@ -5306,7 +5306,7 @@ parseDeclProtocol(ParseDeclOptions Flags, DeclAttributes &Attributes) {
 
   // If there was a 'class' requirement, mark this as a class-bounded protocol.
   if (classRequirementLoc.isValid())
-    Proto->setRequiresClass();
+    Proto->setClassBounded(classRequirementLoc);
 
   Proto->getAttrs() = Attributes;
 
