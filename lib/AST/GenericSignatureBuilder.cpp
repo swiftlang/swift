@@ -3698,7 +3698,7 @@ void GenericSignatureBuilder::enumerateRequirements(llvm::function_ref<
         // to the next.
         // FIXME: Distinguish between explicit and inferred here?
         auto otherPA = nextAnchor->anchor;
-        deferredSameTypeRequirement = [&f, archetype, otherPA, this] {
+        deferredSameTypeRequirement = [&f, archetype, otherPA] {
           f(RequirementKind::SameType, archetype, otherPA,
             RequirementSource::forAbstract(archetype));
         };
