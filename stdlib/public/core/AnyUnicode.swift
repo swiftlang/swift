@@ -42,12 +42,12 @@ public protocol _FixedFormatUnicode : _AnyUnicode {
   
   /// A type that presents the string's UTF-16 code units without necessarily
   /// correcting encoding errors
-  associatedtype RawUTF16View : BidirectionalCollection
+  associatedtype UTF16View : BidirectionalCollection
   // where Iterator.Element == UInt16
 
   /// The string's UTF-16 code units, without necessarily correcting encoding
   /// errors.
-  var rawUTF16: RawUTF16View { get }
+  var utf16: UTF16View { get }
 
   /// A type that presents an FCC-normalized view of the string
   associatedtype FCCNormalizedUTF16View : BidirectionalCollection
@@ -150,22 +150,22 @@ public extension _FixedFormatUnicode {
 }
 
 public extension _FixedFormatUnicode
-where RawUTF16View.Iterator.Element : UnsignedInteger {
+where UTF16View.Iterator.Element : UnsignedInteger {
   // FIXME: we'd like to put this up in the unconditional extension, but we are
   // forbidden.
   var encoding: Encoding.Type { return Encoding.self }
   
   func isLatin1() -> Bool {
-    return isKnownLatin1 || !rawUTF16.contains { $0 > 0xFF }
+    return isKnownLatin1 || !utf16.contains { $0 > 0xFF }
   }
   
   func isASCII() -> Bool {
-    return isKnownASCII || !rawUTF16.contains { $0 > 0x7f }
+    return isKnownASCII || !utf16.contains { $0 > 0x7f }
   }
 }
 
 public extension _FixedFormatUnicode
-where RawUTF16View.Iterator.Element : UnsignedInteger,
+where UTF16View.Iterator.Element : UnsignedInteger,
   CodeUnits.SubSequence.SubSequence == CodeUnits.SubSequence,
   CodeUnits.SubSequence.Iterator.Element == Encoding.EncodedScalar.Iterator.Element
 {
@@ -192,7 +192,7 @@ where Encoding == Latin1,
   CodeUnits.SubSequence.SubSequence == CodeUnits.SubSequence,
   CodeUnits.SubSequence.Iterator.Element == CodeUnits.Iterator.Element
 {
-  var rawUTF16: LazyMapRandomAccessCollection<CodeUnits, UInt16> {
+  var utf16: LazyMapRandomAccessCollection<CodeUnits, UInt16> {
     return fccNormalizedUTF16
   }
 
@@ -231,7 +231,7 @@ where Encoding.EncodedScalar == UTF16.EncodedScalar,
     return _UnicodeViews(codeUnits, Encoding.self).fccNormalizedUTF16
   }
   
-  var rawUTF16 : CodeUnits {
+  var utf16 : CodeUnits {
     return codeUnits
   }
 }

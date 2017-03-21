@@ -133,7 +133,7 @@ extension _UTF16StringStorage : _FixedFormatUnicode {
   public typealias Encoding = UTF16
 
   // WORKAROUND: helping type inference along will be unnecessary someday
-  public typealias RawUTF16View = _UTF16StringStorage
+  public typealias UTF16View = _UTF16StringStorage
   public typealias CodeUnits = _UTF16StringStorage
   public typealias FCCNormalizedUTF16View = _UnicodeViews<
     CodeUnits, Encoding
@@ -365,7 +365,7 @@ extension _Latin1StringStorage : _FixedFormatUnicode {
   // WORKAROUND: helping type inference along will be unnecessary someday
   public typealias CodeUnits = _Latin1StringStorage
   public typealias FCCNormalizedUTF16View = LazyMapRandomAccessCollection<CodeUnits, UTF16.CodeUnit>
-  public typealias RawUTF16View = FCCNormalizedUTF16View
+  public typealias UTF16View = FCCNormalizedUTF16View
   
   public var codeUnits: CodeUnits { return self }
 
@@ -465,7 +465,7 @@ extension _UTF8StringStorage : _FixedFormatUnicode {
   // WORKAROUND: helping type inference along will be unnecessary someday
   public typealias CodeUnits = _UTF8StringStorage
   
-  public typealias RawUTF16View = _UnicodeViews<
+  public typealias UTF16View = _UnicodeViews<
     CodeUnits, Encoding
   >.TranscodedView<UTF16>
 
@@ -477,7 +477,7 @@ extension _UTF8StringStorage : _FixedFormatUnicode {
   public typealias UnicodeScalarView = _UnicodeViews<CodeUnits,Encoding>.Scalars
   
   public var codeUnits: CodeUnits { return self }
-  public var rawUTF16: RawUTF16View { return RawUTF16View(self) }
+  public var utf16: UTF16View { return UTF16View(self) }
   public var fccNormalizedUTF16: FCCNormalizedUTF16View {
     return _UnicodeViews(self, UTF8.self).fccNormalizedUTF16
   }

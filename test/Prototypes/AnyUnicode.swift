@@ -551,7 +551,7 @@ extension AnyUnicodeScalars {
 
 protocol AnyUnicode : Swift._AnyUnicode {
   var codeUnits: AnyCodeUnits { get }
-  var rawUTF16: AnyUTF16 { get }
+  var utf16: AnyUTF16 { get }
   var unicodeScalars: AnyUnicodeScalars { get }
   var utf32: AnyUnicodeBidirectionalUInt32 { get }
 #if false
@@ -566,11 +566,11 @@ protocol AnyUnicode : Swift._AnyUnicode {
 
 extension AnyUnicode {
   func isLatin1() -> Bool {
-    return isKnownLatin1 || !rawUTF16.contains { $0 > 0xFF }
+    return isKnownLatin1 || !utf16.contains { $0 > 0xFF }
   }
   
   func isASCII() -> Bool {
-    return isKnownASCII || !rawUTF16.contains { $0 > 0x7f }
+    return isKnownASCII || !utf16.contains { $0 > 0x7f }
   }
 }
 
@@ -629,7 +629,7 @@ where Self : AnyUnicode,
 Self.CodeUnits.Iterator.Element : UnsignedInteger,
 Self.CodeUnits.Index : SignedInteger,
 Self.Encoding == Latin1 {
-  var rawUTF16: AnyUTF16 { return AnyUTF16(self.codeUnits) }
+  var utf16: AnyUTF16 { return AnyUTF16(self.codeUnits) }
 }
 
 extension _FixedFormatUnicode
@@ -638,7 +638,7 @@ Self.CodeUnits.Iterator.Element : UnsignedInteger,
 Self.Encoding.EncodedScalar == UTF16.EncodedScalar,
 Self.UnicodeScalarView : UnicodeView,
 Self.UnicodeScalarView.Iterator.Element == UnicodeScalar {
-  var rawUTF16: AnyUTF16 { return AnyUTF16(self.codeUnits) }
+  var utf16: AnyUTF16 { return AnyUTF16(self.codeUnits) }
 }
 
 extension _FixedFormatUnicode
@@ -658,8 +658,8 @@ where Self : AnyUnicode,
 extension _FixedFormatUnicode
 where Self : AnyUnicode,
 Self.CodeUnits.Iterator.Element : UnsignedInteger,
-Self.RawUTF16View.Iterator.Element == UTF16.CodeUnit,
-Self.RawUTF16View : UnicodeView,
+Self.UTF16View.Iterator.Element == UTF16.CodeUnit,
+Self.UTF16View : UnicodeView,
 /*Self.FCCNormalizedUTF16View.Iterator.Element : UnsignedInteger,*/
 Self.CodeUnits.Index == Self.CodeUnits.SubSequence.Index, 
 Self.CodeUnits.SubSequence : RandomAccessCollection, 
@@ -676,7 +676,7 @@ Self.CharacterView.Index : SignedInteger
     return AnyCodeUnits(self._codeUnits)
   }
 
-  var rawUTF16: AnyUTF16 {
+  var utf16: AnyUTF16 {
     return AnyUTF16(transcoding: self._codeUnits, from: Encoding.self)
   }
 
@@ -697,7 +697,7 @@ Self.CharacterView.Index : SignedInteger
 class AnyUnicodeBox : AnyUnicode, FactoryInitializable {
   var encoding: AnyUnicodeEncoding.Type { fatalError("override me!") }
   var codeUnits: AnyCodeUnits { fatalError("override me!") }
-  var rawUTF16: AnyUTF16 { fatalError("override me!") }
+  var utf16: AnyUTF16 { fatalError("override me!") }
   var unicodeScalars: AnyUnicodeScalars { fatalError("override me!") }
   var utf32: AnyUnicodeBidirectionalUInt32 { fatalError("override me!") }
 #if false
@@ -727,7 +727,7 @@ class AnyUnicodeBox : AnyUnicode, FactoryInitializable {
     var base: T
     override var encoding: AnyUnicodeEncoding.Type { return base.encoding }
     override var codeUnits: AnyCodeUnits { return base.codeUnits }
-    override var rawUTF16: AnyUTF16 { return base.rawUTF16 }
+    override var utf16: AnyUTF16 { return base.utf16 }
     override var unicodeScalars: AnyUnicodeScalars { return base.unicodeScalars }
     override var utf32: AnyUnicodeBidirectionalUInt32 { return base.utf32 }
 #if false
@@ -790,14 +790,14 @@ extension AnyStringContents : AnyUnicode {
       return base.encoding
     }
   }
-  var rawUTF16: AnyUTF16 {
+  var utf16: AnyUTF16 {
     switch self {
     case .utf16(let storage):
       return AnyUTF16(storage)
     case .latin1(let storage):
       return AnyUTF16(storage)
     case .any(let base):
-      return base.rawUTF16
+      return base.utf16
     }
   }
 
@@ -995,8 +995,8 @@ suite.test("AnyStringContents/_UTF16StringStorage") {
   
   expectEqual(
     AnyUTF16.ZeroExtender<_UTF16StringStorage>.self,
-    type(of: s.rawUTF16.base))
-  expectEqualSequence(sample.utf16, s.rawUTF16)
+    type(of: s.utf16.base))
+  expectEqualSequence(sample.utf16, s.utf16)
 
   expectEqual(
     AnyUnicodeScalars.Eraser<_UTF16StringStorage.UnicodeScalarView>.self,
@@ -1017,8 +1017,8 @@ suite.test("AnyStringContents/_UTF8StringStorage") {
     AnyUTF16.Eraser<
       _UnicodeViews<_UTF8StringStorage.SubSequence, UTF8>.TranscodedView<UTF16>
     >.self,
-    type(of: s.rawUTF16.base))  
-  expectEqualSequence(sample.utf16, s.rawUTF16)
+    type(of: s.utf16.base))  
+  expectEqualSequence(sample.utf16, s.utf16)
   
   expectEqual(
     AnyUnicodeScalars.Eraser<_UTF8StringStorage.UnicodeScalarView>.self,
@@ -1038,8 +1038,8 @@ suite.test("AnyStringContents/_Latin1StringStorage") {
 
   expectEqual(
     AnyUTF16.ZeroExtender<_Latin1StringStorage>.self,
-    type(of: s.rawUTF16.base))
-  expectEqualSequence(latin1Sample.utf16, s.rawUTF16)
+    type(of: s.utf16.base))
+  expectEqualSequence(latin1Sample.utf16, s.utf16)
   
   expectEqual(
     AnyUnicodeScalars.Eraser<
