@@ -1,0 +1,34 @@
+#!/bin/bash
+set -o pipefail
+set -e
+function check_usage { if [[ $# -ne 2 ]]; then echo "usage: $0 directory script"; exit 1; fi; }
+function dir_name { echo "${1%/*}"; }
+function file_name { echo "${1##*/}"; }
+function absolute_path { if [[ "$1" == /* ]]; then echo "$1"; else local name; name=$(file_name "$1"); echo "$PWD/${name}"; fi } # force to start with /
+function canonical_path { (pushd "$(dirname "$1")" > /dev/null 2>&1; absolute_path "$1") }
+function write_shim {
+    local dir="$1"
+    local shim_path="$dir/shim"
+    local script_path="$dir/script"
+    cat <<EOF > "$shim_path"
+#!/bin/bash -e
+echo "\$0" "\$@" >> "${dir}/log"
+${script_path} "\$0" "\$@"; exit 0
+#-- Commands are copy/paste runnable.
+EOF
+    chmod a+x "$shim_path"
+}
+function make_links {
+    local cmds=(ar clang clang++ codesign dsymutil gyb install_name_tool libtool ld lipo nm objdump python ranlib strip)
+    for cmd in "${cmds[@]}"
+        do ln -sf "shim" "$cmd"
+    done
+}
+check_usage "$@"
+swiftenv_path=$(canonical_path "$1")
+script_path=$(canonical_path "$2")
+mkdir -p "$swiftenv_path"
+cp "$script_path" "$swiftenv_path/script"
+cd "$swiftenv_path"
+write_shim "$swiftenv_path"
+make_links

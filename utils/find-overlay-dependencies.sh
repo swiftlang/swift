@@ -66,6 +66,7 @@ echo $1
 for sdk in ${(k)SDKS}; do
   arch=$SDKS[$sdk]
   printf "%s:\n\t" "$sdk"
+  echo "\"@import $1;\" | xcrun -sdk $sdk clang -arch $arch -x objective-c - -M -fmodules 2>/dev/null"
   deps=$(echo "@import $1;" | xcrun -sdk $sdk clang -arch $arch -x objective-c - -M -fmodules 2>/dev/null)
   if [[ $? != 0 ]]; then
     # Clear the cmake file of this unsupported platform and loop
