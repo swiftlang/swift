@@ -248,7 +248,10 @@ TEST(TypeSyntaxTests, TupleMakeAPIs) {
     TypeElements.push_back(SyntaxFactory::makeTupleTypeElement(Int, Comma));
     TypeElements.push_back(SyntaxFactory::makeTupleTypeElement(Bool, Comma));
     TypeElements.push_back(SyntaxFactory::makeTupleTypeElement(Int, None));
-    auto TupleType = SyntaxFactory::makeTupleType(TypeElements);
+    auto TupleType = SyntaxFactory::makeTupleType(
+                        SyntaxFactory::makeLeftParenToken({}, {}),
+                        TypeElements,
+                        SyntaxFactory::makeRightParenToken({}, {}));
     TupleType.print(OS);
     ASSERT_EQ(OS.str().str(),
               "(Int, Bool, Int, Bool, Int)");

@@ -1024,7 +1024,9 @@ TupleTypeSyntax SyntaxFactory::makeVoidTupleType() {
 }
 
 TupleTypeSyntax
-SyntaxFactory::makeTupleType(llvm::ArrayRef<TupleTypeElementSyntax> Types) {
+SyntaxFactory::makeTupleType(RC<TokenSyntax> LParen,
+                             llvm::ArrayRef<TupleTypeElementSyntax> Types,
+                             RC<TokenSyntax> RParen) {
   RawSyntax::LayoutList RawTypes;
   for (auto &Type : Types) {
     RawTypes.push_back(Type.getRaw());
@@ -1033,12 +1035,8 @@ SyntaxFactory::makeTupleType(llvm::ArrayRef<TupleTypeElementSyntax> Types) {
                                     RawTypes,
                                     SourcePresence::Present);
   auto Raw = RawSyntax::make(SyntaxKind::TupleType,
-    {
-      SyntaxFactory::makeLeftParenToken({}, {}),
-      ArgListRaw,
-      SyntaxFactory::makeRightParenToken({}, {})
-    },
-    SourcePresence::Present);
+                             { LParen, ArgListRaw, RParen },
+                             SourcePresence::Present);
   auto Data = TupleTypeSyntaxData::make(std::move(Raw));
   return TupleTypeSyntax {
     Data, Data.get()
