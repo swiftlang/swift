@@ -474,7 +474,7 @@ struct SyntaxFactory {
   /// Make a bare "()" void tuple type
   static TupleTypeSyntax makeVoidTupleType();
 
-  /// Make a tuple type from an array of types and the provided left/right
+  /// Make a tuple type from a type element list and the provided left/right
   /// paren tokens.
   static TupleTypeSyntax
   makeTupleType(RC<TokenSyntax> LParen,
