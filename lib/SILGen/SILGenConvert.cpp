@@ -142,8 +142,7 @@ static void emitSourceLocationArgs(SILGenFunction &gen,
   StringRef filename = "";
   unsigned line = 0;
   if (sourceLoc.isValid()) {
-    unsigned bufferID = ctx.SourceMgr.findBufferContainingLoc(sourceLoc);
-    filename = ctx.SourceMgr.getIdentifierForBuffer(bufferID);
+    filename = ctx.SourceMgr.getPresumedFilenameForLoc(sourceLoc);
     line = ctx.SourceMgr.getPresumedLineAndColumnForLoc(sourceLoc).first;
   }
   
