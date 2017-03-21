@@ -493,7 +493,7 @@ static void lookupVisibleMemberDeclsImpl(
     VisitedSet &Visited) {
   // Just look through l-valueness.  It doesn't affect name lookup.
   assert(BaseTy && "lookup into null type");
-  BaseTy = BaseTy->getRValueType();
+  assert(!BaseTy->isLValueType());
 
   // Handle metatype references, as in "some_type.some_member".  These are
   // special and can't have extensions.
@@ -674,7 +674,10 @@ public:
 
   OverrideFilteringConsumer(Type BaseTy, const DeclContext *DC,
                             LazyResolver *resolver)
-      : BaseTy(BaseTy->getRValueType()), DC(DC), TypeResolver(resolver) {
+      : BaseTy(BaseTy), DC(DC), TypeResolver(resolver) {
+    assert(!BaseTy->isLValueType());
+    if (auto *MetaTy = BaseTy->getAs<AnyMetatypeType>())
+      BaseTy = MetaTy->getInstanceType();
     assert(DC && BaseTy);
   }
 
@@ -724,11 +727,24 @@ public:
     }
 
     // Does it make sense to substitute types?
-    bool shouldSubst = !BaseTy->hasUnboundGenericType() &&
-                       !BaseTy->is<AnyMetatypeType>() &&
-                       !BaseTy->isExistentialType() &&
-                       !BaseTy->hasTypeVariable() &&
-                       VD->getDeclContext()->isTypeContext();
+
+    // Don't pass UnboundGenericType here. If you see this assertion
+    // being hit, fix the caller, don't remove it.
+    assert(!BaseTy->hasUnboundGenericType());
+
+    // If the base type is AnyObject, we might be doing a dynamic
+    // lookup, so the base type won't match the type of the member's
+    // context type.
+    //
+    // If the base type is not a nominal type, we can't substitute
+    // the member type.
+    //
+    // If the member is a free function and not a member of a type,
+    // don't substitute either.
+    bool shouldSubst = (!BaseTy->isAnyObject() &&
+                        !BaseTy->hasTypeVariable() &&
+                        BaseTy->getNominalOrBoundGenericNominal() &&
+                        VD->getDeclContext()->isTypeContext());
     ModuleDecl *M = DC->getParentModule();
 
     auto FoundSignature = VD->getOverloadSignature();
@@ -860,7 +876,7 @@ void swift::lookupVisibleDecls(VisibleDeclConsumer &Consumer,
       if (ExtendedType)
         BaseDecl = ExtendedType->getNominalOrBoundGenericNominal();
     } else if (auto ND = dyn_cast<NominalTypeDecl>(DC)) {
-      ExtendedType = ND->getDeclaredType();
+      ExtendedType = ND->getDeclaredTypeInContext();
       BaseDecl = ND;
     }
 

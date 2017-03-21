@@ -1168,6 +1168,22 @@ CanType TypeBase::getCanonicalType() {
   return CanType(Result);
 }
 
+TypeBase *TypeBase::reconstituteSugar() {
+  if (auto boundGeneric = dyn_cast<BoundGenericType>(this)) {
+    auto &ctx = getASTContext();
+    if (boundGeneric->getDecl() == ctx.getArrayDecl())
+      return ArraySliceType::get(boundGeneric->getGenericArgs()[0]);
+    if (boundGeneric->getDecl() == ctx.getDictionaryDecl())
+      return DictionaryType::get(boundGeneric->getGenericArgs()[0],
+                                 boundGeneric->getGenericArgs()[1]);
+    if (boundGeneric->getDecl() == ctx.getOptionalDecl())
+      return OptionalType::get(boundGeneric->getGenericArgs()[0]);
+    if (boundGeneric->getDecl() == ctx.getImplicitlyUnwrappedOptionalDecl())
+      return ImplicitlyUnwrappedOptionalType::
+        get(boundGeneric->getGenericArgs()[0]);
+  }
+  return this;
+}
 
 TypeBase *TypeBase::getDesugaredType() {
   switch (getKind()) {
