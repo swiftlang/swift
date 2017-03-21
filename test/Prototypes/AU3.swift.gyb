@@ -436,6 +436,13 @@ extension _UnicodeViews.Scalars : UnicodeView {}
 extension _TranscodedView : UnicodeView {}
 //===----------------------------------------------------------------------===//
 
+public protocol Unicode : _UnicodeContent, RandomAccessCollection
+// where Iterator.Element == Character
+{
+  // poor man's constraint on Iterator.Element
+  subscript(i: Index) -> Character { get } 
+}
+
 //===----------------------------------------------------------------------===//
 //===--- Tests ------------------------------------------------------------===//
 //===----------------------------------------------------------------------===//
