@@ -16,6 +16,8 @@
 #
 # ----------------------------------------------------------------------------
 
+from __future__ import print_function
+
 import bisect
 import re
 import subprocess
@@ -230,7 +232,7 @@ def run():
 
     Replace temporary filenames and check it.
 
-    >>> print output.replace(target1.name,'TARGET1-NAME').replace(target2.name,'TARGET2-NAME').replace('\\r', '') + 'EOF'
+    >>> print(output.replace(target1.name,'TARGET1-NAME').replace(target2.name,'TARGET2-NAME').replace('\\r', '') + 'EOF')
     A
     TARGET1-NAME:2:111: error one
     B
@@ -246,9 +248,9 @@ def run():
     glitch in [fox.box, line 11 assert five
     glitch in [fox.box:28 assert six
     EOF
-    >>> print subprocess.check_output([sys.executable, __file__, 'foo.bar', '21', target1.name]).replace('\\r', ''),
+    >>> print(subprocess.check_output([sys.executable, __file__, 'foo.bar', '21', target1.name]).rstrip())
     5
-    >>> print subprocess.check_output([sys.executable, __file__, 'foo.bar', '8', target2.name]).replace('\\r', ''),
+    >>> print(subprocess.check_output([sys.executable, __file__, 'foo.bar', '8', target2.name]).rstrip())
     3
 
     Simulate errors on different line numbers
@@ -573,7 +575,7 @@ def run():
     ...    __file__ + ' ' + long_output.name + ' -- ' + "echo '" +
     ...    long_output.name + ":112:27: error:'",
     ...    shell=True).rstrip()
-    >>> print long_output_result
+    >>> print(long_output_result)
     /public/core/Map.swift.gyb:118:27: error:
     >>> target1.close()
     >>> os.remove(target1.name)
