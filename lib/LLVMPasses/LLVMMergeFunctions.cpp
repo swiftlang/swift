@@ -1039,7 +1039,7 @@ bool SwiftMergeFunctions::replaceDirectCallers(Function *Old, Function *New,
     auto CallSiteAttrs = CI->getAttributes();
 
     CallSiteAttrs = CallSiteAttrs.addAttributes(
-        Context, AttributeSet::ReturnIndex, NewFuncAttrs.getRetAttributes());
+        Context, AttributeList::ReturnIndex, NewFuncAttrs.getRetAttributes());
 
     SmallVector<Type *, 8> OldParamTypes;
     SmallVector<Value *, 16> NewArgs;
@@ -1051,7 +1051,7 @@ bool SwiftMergeFunctions::replaceDirectCallers(Function *Old, Function *New,
     
     // Add the existing parameters.
     for (Value *OldArg : CI->arg_operands()) {
-      AttributeSet Attrs = NewFuncAttrs.getParamAttributes(ParamIdx);
+      AttributeList Attrs = NewFuncAttrs.getParamAttributes(ParamIdx);
       if (Attrs.getNumSlots())
         CallSiteAttrs = CallSiteAttrs.addAttributes(Context, ParamIdx, Attrs);
 

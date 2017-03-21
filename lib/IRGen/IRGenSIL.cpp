@@ -2021,7 +2021,7 @@ static CallEmission getCallEmissionForLoweredValue(IRGenSILFunction &IGF,
     }
 
     // Cast the callee pointer to the right function type.
-    llvm::AttributeSet attrs;
+    llvm::AttributeList attrs;
     llvm::FunctionType *fnTy =
       IGF.IGM.getFunctionType(origCalleeType, attrs, &foreignInfo);
     calleeFn = IGF.Builder.CreateBitCast(calleeFn, fnTy->getPointerTo());
@@ -2040,8 +2040,9 @@ static CallEmission getCallEmissionForLoweredValue(IRGenSILFunction &IGF,
                                            foreignInfo);
   CallEmission callEmission(IGF, callee);
   if (IGF.CurSILFn->isThunk())
-    callEmission.addAttribute(llvm::AttributeSet::FunctionIndex, llvm::Attribute::NoInline);
-  
+    callEmission.addAttribute(llvm::AttributeList::FunctionIndex,
+                              llvm::Attribute::NoInline);
+
   return callEmission;
 }
 

@@ -57,7 +57,7 @@ namespace llvm {
   class StructType;
   class StringRef;
   class Type;
-  class AttributeSet;
+  class AttributeList;
 }
 namespace clang {
   class ASTContext;
@@ -837,7 +837,7 @@ public:
   ClassDecl *getObjCRuntimeBaseClass(Identifier name, Identifier objcName);
   llvm::Module *getModule() const;
   llvm::Module *releaseModule();
-  llvm::AttributeSet getAllocAttrs();
+  llvm::AttributeList getAllocAttrs();
 
 private:
   llvm::Constant *EmptyTupleMetadata = nullptr;
@@ -846,7 +846,7 @@ private:
   llvm::Constant *ObjCISAMaskPtr = nullptr;
   Optional<llvm::Value*> ObjCRetainAutoreleasedReturnValueMarker;
   llvm::DenseMap<Identifier, ClassDecl*> SwiftRootClasses;
-  llvm::AttributeSet AllocAttrs;
+  llvm::AttributeList AllocAttrs;
 
 #define FUNCTION_ID(Id)             \
 public:                             \
@@ -885,7 +885,7 @@ public:
   /// invalid.
   bool finalize();
 
-  llvm::AttributeSet constructInitialAttributes();
+  llvm::AttributeList constructInitialAttributes();
 
   void emitProtocolDecl(ProtocolDecl *D);
   void emitEnumDecl(EnumDecl *D);
@@ -905,7 +905,7 @@ public:
   void finishEmitAfterTopLevel();
 
   llvm::FunctionType *getFunctionType(CanSILFunctionType type,
-                                      llvm::AttributeSet &attrs,
+                                      llvm::AttributeList &attrs,
                                       ForeignFunctionInfo *foreignInfo=nullptr);
   ForeignFunctionInfo getForeignFunctionInfo(CanSILFunctionType type);
 
@@ -1017,10 +1017,10 @@ public:
   void setTrueConstGlobal(llvm::GlobalVariable *var);
 
   /// Add the swiftself attribute.
-  void addSwiftSelfAttributes(llvm::AttributeSet &attrs, unsigned argIndex);
+  void addSwiftSelfAttributes(llvm::AttributeList &attrs, unsigned argIndex);
 
   /// Add the swifterror attribute.
-  void addSwiftErrorAttributes(llvm::AttributeSet &attrs, unsigned argIndex);
+  void addSwiftErrorAttributes(llvm::AttributeList &attrs, unsigned argIndex);
 
 private:
   llvm::Constant *getAddrOfLLVMVariable(LinkEntity entity,

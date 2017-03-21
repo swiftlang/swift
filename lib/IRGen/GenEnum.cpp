@@ -3239,9 +3239,9 @@ namespace {
       auto call = IGF.Builder.CreateCall(IGF.IGM.getGetEnumCaseMultiPayloadFn(),
                                          {addr.getAddress(), metadata});
       call->setDoesNotThrow();
-      call->addAttribute(llvm::AttributeSet::FunctionIndex,
+      call->addAttribute(llvm::AttributeList::FunctionIndex,
                          llvm::Attribute::ReadOnly);
-      
+
       return call;
     }
 
