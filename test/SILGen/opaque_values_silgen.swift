@@ -609,6 +609,20 @@ func s320__transImplodeAny(_ t: @escaping (Any) -> ()) {
   let _: ((Int, Int)) -> () = t
 }
 
+// Tests support for address only let closures under opaque value mode - they are not by-address anymore
+// ---
+// CHECK-LABEL: sil shared @_T020opaque_values_silgen21s330___addrLetClosurexxlFxycfU_xycfU_ : $@convention(thin) <T> (@in T) -> @out T {
+// CHECK: bb0([[ARG:%.*]] : $T):
+// CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]] : $T
+// CHECK:   [[COPY_ARG:%.*]] = copy_value [[BORROWED_ARG]] : $T
+// CHECK:   end_borrow [[BORROWED_ARG]] from [[ARG]] : $T
+// CHECK:   destroy_value [[ARG]]
+// CHECK:   return [[COPY_ARG]] : $T
+// CHECK-LABEL: } // end sil function '_T020opaque_values_silgen21s330___addrLetClosurexxlFxycfU_xycfU_'
+func s330___addrLetClosure<T>(_ x:T) -> T {
+  return { { x }() }()
+}
+
 // Tests conditional value casts and correspondingly generated reabstraction thunk, with <T> types
 // ---
 // CHECK-LABEL: sil hidden @_T020opaque_values_silgen21s999_____condTFromAnyyyp_xtlF : $@convention(thin) <T> (@in Any, @in T) -> () {
