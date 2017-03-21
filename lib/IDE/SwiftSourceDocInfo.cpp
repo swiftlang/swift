@@ -661,7 +661,8 @@ public:
     case RangeMatchKind::NoneMatch:
       // PatternBindingDecl is not visited; we need to explicitly analyze here.
       if (auto *VA = dyn_cast_or_null<VarDecl>(D))
-        analyze(VA->getParentPatternBinding());
+        if (auto PBD = VA->getParentPatternBinding())
+          analyze(PBD);
       break;
     case RangeMatchKind::RangeMatch: {
       postAnalysis(Node);
