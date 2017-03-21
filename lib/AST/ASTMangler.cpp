@@ -1486,13 +1486,14 @@ static bool isMethodDecl(const Decl *decl) {
 }
 
 static bool genericParamIsBelowDepth(Type type, unsigned methodDepth) {
-  if (type->isTypeParameter()) {
-    auto gp = type->getRootGenericParam();
-    return gp->getDepth() >= methodDepth;
-  }
-  // Non-dependent types in a same-type requirement don't affect whether we
-  // mangle the requirement.
-  return false;
+  if (!type->hasTypeParameter())
+    return true;
+
+  return !type.findIf([methodDepth](Type t) -> bool {
+    if (auto *gp = t->getAs<GenericTypeParamType>())
+      return gp->getDepth() >= methodDepth;
+    return false;
+  });
 }
 
 CanType ASTMangler::getDeclTypeForMangling(
@@ -1534,10 +1535,10 @@ CanType ASTMangler::getDeclTypeForMangling(
       auto parentGenericSig =
         decl->getDeclContext()->getGenericSignatureOfContext();
       if (parentGenericSig && sig) {
-        // The method's depth starts below the depth of the context.
+        // The method's depth starts above the depth of the context.
         if (!parentGenericSig->getGenericParams().empty())
           initialParamDepth =
-            parentGenericSig->getGenericParams().back()->getDepth()+1;
+            parentGenericSig->getGenericParams().back()->getDepth() + 1;
 
         while (!genericParams.empty()) {
           if (genericParams.front()->getDepth() >= initialParamDepth)
@@ -1551,16 +1552,16 @@ CanType ASTMangler::getDeclTypeForMangling(
         case RequirementKind::Conformance:
         case RequirementKind::Layout:
         case RequirementKind::Superclass:
-          // We don't need the requirement if the constrained type is above the
+          // We don't need the requirement if the constrained type is below the
           // method depth.
-          if (!genericParamIsBelowDepth(reqt.getFirstType(), initialParamDepth))
+          if (genericParamIsBelowDepth(reqt.getFirstType(), initialParamDepth))
             continue;
           break;
         case RequirementKind::SameType:
-          // We don't need the requirement if both types are above the method
+          // We don't need the requirement if both types are below the method
           // depth, or non-dependent.
-          if (!genericParamIsBelowDepth(reqt.getFirstType(),initialParamDepth)&&
-              !genericParamIsBelowDepth(reqt.getSecondType(),initialParamDepth))
+          if (genericParamIsBelowDepth(reqt.getFirstType(), initialParamDepth) &&
+              genericParamIsBelowDepth(reqt.getSecondType(), initialParamDepth))
             continue;
           break;
           }

@@ -928,11 +928,11 @@ namespace {
           secondFavoredTy = favoredExprTy;
         }
         
-        if (firstFavoredTy && firstArgTy->getAs<TypeVariableType>()) {
+        if (firstFavoredTy && firstArgTy->is<TypeVariableType>()) {
           firstArgTy = firstFavoredTy;
         }
         
-        if (secondFavoredTy && secondArgTy->getAs<TypeVariableType>()) {
+        if (secondFavoredTy && secondArgTy->is<TypeVariableType>()) {
           secondArgTy = secondFavoredTy;
         }
       }
@@ -1098,7 +1098,7 @@ namespace {
         auto isLValueBase = false;
         Type baseTy = CS.getType(subscriptExpr->getBase());
 
-        if (baseTy->getAs<LValueType>()) {
+        if (baseTy->is<LValueType>()) {
           isLValueBase = true;
           baseTy = baseTy->getLValueOrInOutObjectType();
         }
