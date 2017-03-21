@@ -3747,9 +3747,21 @@ public:
     printGenericArgs(T->getGenericArgs());
   }
 
+  void visitParentType(Type T) {
+    PrintOptions innerOptions = Options;
+    innerOptions.SynthesizeSugarOnTypes = false;
+
+    if (auto sugarType = dyn_cast<SyntaxSugarType>(T.getPointer()))
+      T = sugarType->getImplementationType();
+    else if (auto dictType = dyn_cast<DictionaryType>(T.getPointer()))
+      T = dictType->getImplementationType();
+
+    TypePrinter(Printer, innerOptions).visit(T);
+  }
+
   void visitEnumType(EnumType *T) {
     if (auto ParentType = T->getParent()) {
-      visit(ParentType);
+      visitParentType(ParentType);
       Printer << ".";
     } else if (shouldPrintFullyQualified(T)) {
       printModuleContext(T);
@@ -3760,7 +3772,7 @@ public:
 
   void visitStructType(StructType *T) {
     if (auto ParentType = T->getParent()) {
-      visit(ParentType);
+      visitParentType(ParentType);
       Printer << ".";
     } else if (shouldPrintFullyQualified(T)) {
       printModuleContext(T);
@@ -3771,7 +3783,7 @@ public:
 
   void visitClassType(ClassType *T) {
     if (auto ParentType = T->getParent()) {
-      visit(ParentType);
+      visitParentType(ParentType);
       Printer << ".";
     } else if (shouldPrintFullyQualified(T)) {
       printModuleContext(T);
@@ -4212,7 +4224,7 @@ public:
   }
 
   void visitDependentMemberType(DependentMemberType *T) {
-    visit(T->getBase());
+    visitParentType(T->getBase());
     Printer << ".";
     Printer.printName(T->getName());
   }
