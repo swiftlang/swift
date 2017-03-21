@@ -1983,6 +1983,17 @@ bool ConstraintSystem::solve(SmallVectorImpl<Solution> &solutions,
   // Set up solver state.
   SolverState state(*this);
 
+  // Simplify any constraints left active after constraint generation
+  // and optimization. Return if the resulting system has no
+  // solutions.
+  if (simplify())
+    return true;
+
+  // If the experimental constraint propagation pass is enabled, run it.
+  if (TC.Context.LangOpts.EnableConstraintPropagation)
+    if (propagateConstraints())
+      return true;
+
   // Solve the system.
   solveRec(solutions, allowFreeTypeVariables);
 
