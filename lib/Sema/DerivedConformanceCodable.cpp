@@ -733,12 +733,15 @@ static void deriveBodyCodable_init(AbstractFunctionDecl *initDecl) {
     // Now need to generate `x = try container.encode(Type.self, forKey: .x)`
     // for all existing properties.
     for (auto *elt : enumElements) {
-      // TODO: Don't decode a let var that has a default value.
       // Only ill-formed code would produce multiple results for this lookup.
       // This would get diagnosed later anyway, so we're free to only look at
       // the first result here.
       auto matchingVars = typeDecl->lookupDirect(DeclName(elt->getName()));
       auto *varDecl = cast<VarDecl>(matchingVars[0]);
+
+      // Don't output a decode statement for a var let with a default value.
+      if (varDecl->isLet() && varDecl->getParentInitializer() != nullptr)
+        continue;
 
       // Type.self (where Type === type(of: x)
       auto varType = varDecl->getType();
