@@ -3029,7 +3029,7 @@ GenericSignatureBuilder::finalize(SourceLoc loc,
 
         archetype->RecursiveConcreteType = true;
       } else {
-        checkRedundantConcreteTypeConstraints(genericParams, archetype);
+        checkConcreteTypeConstraints(genericParams, archetype);
       }
     }
 
@@ -3349,7 +3349,7 @@ void GenericSignatureBuilder::checkSameTypeConstraints(
   // FIXME: Diagnose redundant same-type constraints.
 }
 
-void GenericSignatureBuilder::checkRedundantConcreteTypeConstraints(
+void GenericSignatureBuilder::checkConcreteTypeConstraints(
                                  ArrayRef<GenericTypeParamType *> genericParams,
                                  PotentialArchetype *representative) {
   auto equivClass = representative->getOrCreateEquivalenceClass();

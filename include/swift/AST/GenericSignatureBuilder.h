@@ -456,9 +456,9 @@ private:
                            Diag<Type, T> redundancyDiag,
                            Diag<bool, Type, T> otherNoteDiag);
 
-  /// Check for redundant concrete type constraints within the equivalence
+  /// Check the concrete type constraints within the equivalence
   /// class of the given potential archetype.
-  void checkRedundantConcreteTypeConstraints(
+  void checkConcreteTypeConstraints(
                             ArrayRef<GenericTypeParamType *> genericParams,
                             PotentialArchetype *pa);
 
