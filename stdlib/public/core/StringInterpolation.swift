@@ -26,10 +26,13 @@ extension String : _ExpressibleByStringInterpolation {
   ///     print(message)
   ///     // Prints "If one cookie costs 2 dollars, 3 cookies cost 6 dollars."
   @effects(readonly)
-  public init(stringInterpolation strings: String...) {
+  public init(stringLiteral segments: StringInterpolationSegment<String, String>...) {
     self.init()
-    for str in strings {
-      self += str
+    for segment in segments {
+      switch segment {
+      case .stringLiteral(let str), .stringInterpolation(let str):
+        self += str
+      }
     }
   }
 

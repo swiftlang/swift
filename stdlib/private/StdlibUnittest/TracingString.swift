@@ -2,11 +2,10 @@
 /// compares equal if the calls were identical.
 public struct TracingString {
   enum Initializer {
+    case stringLiteralVariadic([StringInterpolationSegment<String, TracingString.Interpolation>])
     case stringLiteral(String)
     case unicodeScalarLiteral(UnicodeScalar)
     case extendedGraphemeClusterLiteral(Character)
-    case stringInterpolationSegment(StringInterpolationSegmentType)
-    case stringInterpolation([TracingString])
   }
   var initializer: Initializer
   
@@ -20,7 +19,9 @@ public struct TracingString {
 }
 
 extension TracingString: ExpressibleByStringInterpolation {
-  public typealias StringInterpolationSegmentType = Interpolation
+  public init(stringLiteral segments: StringInterpolationSegment<String, Interpolation>...) {
+    initializer = .stringLiteralVariadic(segments)
+  }
   
   public init(stringLiteral value: String) {
     initializer = .stringLiteral(value)
@@ -33,23 +34,24 @@ extension TracingString: ExpressibleByStringInterpolation {
   public init(extendedGraphemeClusterLiteral value: Character) {
     initializer = .extendedGraphemeClusterLiteral(value)
   }
-
-  public init(stringInterpolationSegment segment: Interpolation) {
-    initializer = .stringInterpolationSegment(segment)
-  }
-
-  public init(stringInterpolation segments: TracingString...) {
-    initializer = .stringInterpolation(segments)
-  }
 }
 
-extension TracingString.StringInterpolationSegmentType {
+extension TracingString.Interpolation {
   public init<T: Hashable>(forInterpolation value: T) {
     initializer = .forInterpolation(value)
   }
   
   public init(_ value: Int, radix: Int = 10, uppercase: Bool = false) {
     initializer = ._WithInteger(value, radix: radix, uppercase: uppercase)
+  }
+}
+
+fileprivate func hashable(for segment: StringInterpolationSegment<String, TracingString.Interpolation>) -> AnyHashable {
+  switch segment {
+  case .stringLiteral(let string):
+    return string
+  case .stringInterpolation(let interpolation):
+    return interpolation
   }
 }
 
@@ -62,15 +64,12 @@ extension TracingString: Hashable {
       return l == r
     case let (.extendedGraphemeClusterLiteral(l), .extendedGraphemeClusterLiteral(r)):
       return l == r
-    case let (.stringInterpolationSegment(l), .stringInterpolationSegment(r)):
-      return l == r
-    case let (.stringInterpolation(l), .stringInterpolation(r)):
-      return l == r
+    case let (.stringLiteralVariadic(l), .stringLiteralVariadic(r)):
+      return l.map(hashable(for:)) == r.map(hashable(for:))
     case (.stringLiteral, _),
         (.unicodeScalarLiteral, _),
         (.extendedGraphemeClusterLiteral, _),
-        (.stringInterpolationSegment, _),
-        (.stringInterpolation, _):
+        (.stringLiteralVariadic, _):
         return false
     }
   }
@@ -83,16 +82,14 @@ extension TracingString: Hashable {
       return value.hashValue
     case .extendedGraphemeClusterLiteral(let value):
       return value.hashValue
-    case .stringInterpolationSegment(let value):
-      return value.hashValue
-    case .stringInterpolation(let segments):
-      return segments.reduce(segments.count) { $0 ^ $1.hashValue }
+    case .stringLiteralVariadic(let segments):
+      return segments.reduce(segments.count) { $0 ^ hashable(for: $1).hashValue }
     }
   }
 }
 
-extension TracingString.StringInterpolationSegmentType: Hashable {
-  public static func == (lhs: TracingString.StringInterpolationSegmentType, rhs: TracingString.StringInterpolationSegmentType) -> Bool {
+extension TracingString.Interpolation: Hashable {
+  public static func == (lhs: TracingString.Interpolation, rhs: TracingString.Interpolation) -> Bool {
     switch (lhs.initializer, rhs.initializer) {
     case let (.forInterpolation(l), .forInterpolation(r)):
       return l == r
@@ -123,22 +120,20 @@ extension TracingString: CustomDebugStringConvertible {
       return "TracingString(unicodeScalarLiteral: \(reflecting: value))"
     case .extendedGraphemeClusterLiteral(let value):
       return "TracingString(extendedGraphemeClusterLiteral: \(reflecting: value))"
-    case .stringInterpolationSegment(let value):
-      return "TracingString(stringInterpolationSegment: \(reflecting: value))"
-    case .stringInterpolation(let segments):
+    case .stringLiteralVariadic(let segments):
       let segmentsString = segments.map(String.init(reflecting:)).joined(separator: ", ")
-      return "TracingString(stringInterpolation: \(segmentsString))"
+      return "TracingString(stringLiteral: \(segmentsString))"
     }
   }
 }
 
-extension TracingString.StringInterpolationSegmentType: CustomDebugStringConvertible {
+extension TracingString.Interpolation: CustomDebugStringConvertible {
   public var debugDescription: String {
     switch initializer {
     case .forInterpolation(let value):
-      return "StringInterpolationSegmentType(forInterpolation: \(reflecting: value))"
+      return "Interpolation(forInterpolation: \(reflecting: value))"
     case let ._WithInteger(value, radix: radix, uppercase: uppercase):
-      return "StringInterpolationSegmentType(\(reflecting: value), radix: \(reflecting: radix), uppercase: \(reflecting: uppercase))"
+      return "Interpolation(\(reflecting: value), radix: \(reflecting: radix), uppercase: \(reflecting: uppercase))"
     }
   }
 }

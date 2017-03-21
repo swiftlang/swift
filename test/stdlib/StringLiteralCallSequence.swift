@@ -26,10 +26,10 @@ StringLiteralCallSequenceTests.test("StringLiteralCallSequence/empty literal") {
 StringLiteralCallSequenceTests.test("StringLiteralCallSequence/simple interpolation") {
   expectEqual(
     "Hello, \(1)!", 
-    TracingString(stringInterpolation: 
-      TracingString(stringLiteral: "Hello, "), 
-      TracingString(stringInterpolationSegment: .init(forInterpolation: 1)), 
-      TracingString(stringLiteral: "!")
+    TracingString(stringLiteral: 
+      .stringLiteral("Hello, "), 
+      .stringInterpolation(.init(forInterpolation: 1)), 
+      .stringLiteral("!")
     )
   )
 }
@@ -37,10 +37,10 @@ StringLiteralCallSequenceTests.test("StringLiteralCallSequence/simple interpolat
 StringLiteralCallSequenceTests.test("StringLiteralCallSequence/multi-parameter interpolation") {
   expectEqual(
     "Hello, \(1, radix: 16, uppercase: true)!", 
-    TracingString(stringInterpolation: 
-      TracingString(stringLiteral: "Hello, "), 
-      TracingString(stringInterpolationSegment: .init(1, radix: 16, uppercase: true)), 
-      TracingString(stringLiteral: "!")
+    TracingString(stringLiteral: 
+      .stringLiteral("Hello, "), 
+      .stringInterpolation(.init(1, radix: 16, uppercase: true)), 
+      .stringLiteral("!")
     )
   )
 }
@@ -48,10 +48,10 @@ StringLiteralCallSequenceTests.test("StringLiteralCallSequence/multi-parameter i
 StringLiteralCallSequenceTests.test("StringLiteralCallSequence/multi-parameter defaulted interpolation") {
   expectEqual(
     "Hello, \(1, uppercase: true)!", 
-    TracingString(stringInterpolation: 
-      TracingString(stringLiteral: "Hello, "), 
-      TracingString(stringInterpolationSegment: .init(1, uppercase: true)), 
-      TracingString(stringLiteral: "!")
+    TracingString(stringLiteral: 
+      .stringLiteral("Hello, "), 
+      .stringInterpolation(.init(1, uppercase: true)), 
+      .stringLiteral("!")
     )
   )
 }
@@ -59,12 +59,12 @@ StringLiteralCallSequenceTests.test("StringLiteralCallSequence/multi-parameter d
 StringLiteralCallSequenceTests.test("StringLiteralCallSequence/adjacent interpolations") {
   expectEqual(
     "Hello, \(1)\(2)!", 
-    TracingString(stringInterpolation:
-      TracingString(stringLiteral: "Hello, "), 
-      TracingString(stringInterpolationSegment: .init(forInterpolation: 1)), 
-      TracingString(stringLiteral: ""),
-      TracingString(stringInterpolationSegment: .init(forInterpolation: 2)),
-      TracingString(stringLiteral: "!")
+    TracingString(stringLiteral:
+      .stringLiteral("Hello, "), 
+      .stringInterpolation(.init(forInterpolation: 1)), 
+      .stringLiteral(""),
+      .stringInterpolation(.init(forInterpolation: 2)),
+      .stringLiteral("!")
     )
   )
 }
@@ -72,22 +72,21 @@ StringLiteralCallSequenceTests.test("StringLiteralCallSequence/adjacent interpol
 StringLiteralCallSequenceTests.test("StringLiteralCallSequence/leading interpolation") {
   expectEqual(
     "\(1)!", 
-    TracingString(stringInterpolation:
-      TracingString(stringLiteral: ""), 
-      TracingString(stringInterpolationSegment: .init(forInterpolation: 1)), 
-      TracingString(stringLiteral: "!")
+    TracingString(stringLiteral:
+      .stringLiteral(""), 
+      .stringInterpolation(.init(forInterpolation: 1)), 
+      .stringLiteral("!")
     )
   )
 }
 
-
 StringLiteralCallSequenceTests.test("StringLiteralCallSequence/trailing interpolation") {
   expectEqual(
     "Hello, \(1)", 
-    TracingString(stringInterpolation:
-      TracingString(stringLiteral: "Hello, "), 
-      TracingString(stringInterpolationSegment: .init(forInterpolation: 1)), 
-      TracingString(stringLiteral: "")
+    TracingString(stringLiteral:
+      .stringLiteral("Hello, "), 
+      .stringInterpolation(.init(forInterpolation: 1)), 
+      .stringLiteral("")
     )
   )
 }
