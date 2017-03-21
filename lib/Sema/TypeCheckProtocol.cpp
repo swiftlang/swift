@@ -1037,7 +1037,7 @@ RequirementEnvironment::RequirementEnvironment(
         GenericTypeParamType::get(depth, genericParam->getIndex(), ctx);
       return substGenericParam;
     },
-    [selfType, concreteType, conformance, conformanceDC, &ctx, &tc](
+    [selfType, concreteType, conformance, conformanceDC, &ctx](
         CanType type, Type replacement, ProtocolType *protoType)
           -> Optional<ProtocolConformanceRef> {
       auto proto = protoType->getDecl();
@@ -2496,7 +2496,7 @@ void ConformanceChecker::recordTypeWitness(AssociatedTypeDecl *assocType,
       // Avoid relying on the lifetime of 'this'.
       const DeclContext *DC = this->DC;
       diagnoseOrDefer(assocType, false,
-        [DC, typeDecl, requiredAccessScope, assocType](
+        [DC, typeDecl, requiredAccessScope](
           NormalProtocolConformance *conformance) {
         Accessibility requiredAccess =
           requiredAccessScope.requiredAccessibilityForDiagnostics();

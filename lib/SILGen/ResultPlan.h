@@ -57,12 +57,17 @@ struct ResultPlanBuilder {
   SILGenFunction &SGF;
   SILLocation loc;
   const CalleeTypeInfo &calleeTypeInfo;
-  ArrayRef<SILResultInfo> allResults;
+
+  /// A list of all of the results that we are tracking in reverse order. The
+  /// reason that it is in reverse order is to allow us to simply traverse the
+  /// list by popping values off the back.
+  SmallVector<SILResultInfo, 8> allResults;
 
   ResultPlanBuilder(SILGenFunction &SGF, SILLocation loc,
                     const CalleeTypeInfo &calleeTypeInfo)
       : SGF(SGF), loc(loc), calleeTypeInfo(calleeTypeInfo),
-        allResults(calleeTypeInfo.substFnType->getResults()) {}
+        // We reverse the order so we can pop values off the back.
+        allResults(reversed(calleeTypeInfo.substFnType->getResults())) {}
 
   ResultPlanPtr build(Initialization *emitInto, AbstractionPattern origType,
                       CanType substType);

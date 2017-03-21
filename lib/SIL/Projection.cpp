@@ -905,7 +905,7 @@ processUsersOfValue(ProjectionTree &Tree,
     DEBUG(llvm::dbgs() << "        " << *User);
 
     // First try to create a Projection for User.
-    auto P = Projection::Projection(User);
+    auto P = Projection(User);
 
     // If we fail to create a projection, add User as a user to this node and
     // continue.
@@ -1032,7 +1032,7 @@ createAggregate(SILBuilder &B, SILLocation Loc, ArrayRef<SILValue> Args) const {
     return B.createStruct(Loc, Ty, Args);
   }
 
-  if (Ty.getAs<TupleType>()) {
+  if (Ty.is<TupleType>()) {
     return B.createTuple(Loc, Ty, Args);
   }
 

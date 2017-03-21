@@ -1376,6 +1376,7 @@ ClangImporter::Implementation::Implementation(ASTContext &ctx,
       InferImportAsMember(opts.InferImportAsMember),
       DisableSwiftBridgeAttr(opts.DisableSwiftBridgeAttr),
       BridgingHeaderExplicitlyRequested(!opts.BridgingHeader.empty()),
+      DisableAdapterModules(opts.DisableAdapterModules),
       IsReadingBridgingPCH(false),
       CurrentVersion(nameVersionFromOptions(ctx.LangOpts)),
       BridgingHeaderLookupTable(new SwiftLookupTable(nullptr)),
@@ -2472,6 +2473,9 @@ ModuleDecl *ClangModuleUnit::getAdapterModule() const {
   if (!clangModule)
     return nullptr;
 
+  if (owner.DisableAdapterModules)
+    return nullptr;
+
   if (!isTopLevel()) {
     // FIXME: Is this correct for submodules?
     auto topLevel = clangModule->getTopLevelModule();
@@ -2505,8 +2509,7 @@ void ClangModuleUnit::getImportedModules(
     SmallVectorImpl<ModuleDecl::ImportedModule> &imports,
     ModuleDecl::ImportFilter filter) const {
   if (filter != ModuleDecl::ImportFilter::Public)
-    imports.push_back({ModuleDecl::AccessPathTy(),
-                       getASTContext().getStdlibModule()});
+    imports.push_back({ModuleDecl::AccessPathTy(), owner.getStdlibModule()});
 
   if (!clangModule) {
     // This is the special "imported headers" module.

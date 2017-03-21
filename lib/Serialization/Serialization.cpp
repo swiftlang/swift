@@ -142,7 +142,7 @@ namespace {
 
       auto &mangledName = MangledNameCache[nominal];
       if (mangledName.empty())
-        mangledName = NewMangling::ASTMangler().mangleNominalType(nominal);
+        mangledName = Mangle::ASTMangler().mangleNominalType(nominal);
 
       assert(llvm::isUInt<31>(mangledName.size()));
       if (dataToWrite)
@@ -4330,7 +4330,7 @@ void Serializer::writeAST(ModuleOrSourceFile DC,
 
     for (auto TD : localTypeDecls) {
       hasLocalTypes = true;
-      NewMangling::ASTMangler Mangler;
+      Mangle::ASTMangler Mangler;
       std::string MangledName = Mangler.mangleTypeAsUSR(
                                               TD->getDeclaredInterfaceType());
       assert(!MangledName.empty() && "Mangled type came back empty!");

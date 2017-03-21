@@ -39,6 +39,8 @@ class Test : NSObject {
   class func zz() -> Self
   class func yy(aa x: Any) -> Self
   class func xx(_ x: Any, bb xx: Any) -> Self
+  @available(swift, obsoleted: 3, renamed: "zz()")
+  class func testZ() -> Self
   
   init()
 }
@@ -73,6 +75,14 @@ class TestError : NSObject {
   class func w2(_ x: Any?, error: ()) throws -> Self
   class func vv() throws -> Self
   class func v2(error: ()) throws -> Self
+  @available(swift, obsoleted: 3, renamed: "ww(_:)")
+  class func testW(_ x: Any?) throws -> Self
+  @available(swift, obsoleted: 3, renamed: "w2(_:error:)")
+  class func testW2(_ x: Any?) throws -> Self
+  @available(swift, obsoleted: 3, renamed: "vv()")
+  class func testV() throws -> Self
+  @available(swift, obsoleted: 3, renamed: "v2(error:)")
+  class func testV2() throws -> Self
   init()
 }
 

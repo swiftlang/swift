@@ -932,6 +932,7 @@ public:
     PrintRequirements = 2,
     InnermostOnly = 4,
     SkipSelfRequirement = 8,
+    SwapSelfAndDependentMemberType = 16,
   };
 
   void printWhereClauseFromRequirementSignature(ProtocolDecl *proto,
@@ -1300,7 +1301,9 @@ bestRequirementPrintLocation(ProtocolDecl *proto, const Requirement &req) {
     // Self.T.U == Self should go on T (third condition).
     auto rhsBetterDirect =
         !lhsResult.second && rhsResult.second && rhsResult.first != proto;
-    if (lhsDoesntExist || rhsBetterDirect)
+    auto rhsOfSelfToAssoc = lhsResult.first == proto && rhsResult.first;
+    // e.g. Self == Self.T.U
+    if (lhsDoesntExist || rhsBetterDirect || rhsOfSelfToAssoc)
       bestDecl = rhsResult.first;
 
     // Same-type requirements can only occur in where clauses
@@ -1321,8 +1324,11 @@ bestRequirementPrintLocation(ProtocolDecl *proto, const Requirement &req) {
 void PrintAST::printWhereClauseFromRequirementSignature(ProtocolDecl *proto,
                                                         Decl *attachingTo) {
   assert(proto->isRequirementSignatureComputed());
+  unsigned flags = PrintRequirements;
+  if (isa<AssociatedTypeDecl>(attachingTo))
+    flags |= SwapSelfAndDependentMemberType;
   printGenericSignature(
-      proto->getRequirementSignature(), PrintRequirements,
+      proto->getRequirementSignature(), flags,
       [&](const Requirement &req) {
         auto location = bestRequirementPrintLocation(proto, req);
         return location.AttachedTo == attachingTo && location.InWhereClause;
@@ -1439,6 +1445,8 @@ void PrintAST::printSingleDepthOfGenericSignature(
     llvm::function_ref<bool(const Requirement &)> filter) {
   bool printParams = (flags & PrintParams);
   bool printRequirements = (flags & PrintRequirements);
+  bool swapSelfAndDependentMemberType =
+    (flags & SwapSelfAndDependentMemberType);
 
   SubstitutionMap subMap;
   if (CurrentType) {
@@ -1514,6 +1522,13 @@ void PrintAST::printSingleDepthOfGenericSignature(
       } else {
         Printer << ", ";
       }
+
+      // Swap the order of Self == Self.A requirements if requested.
+      if (swapSelfAndDependentMemberType &&
+          req.getKind() == RequirementKind::SameType &&
+          first->is<GenericTypeParamType>() &&
+          second->is<DependentMemberType>())
+        std::swap(first, second);
 
       Printer.callPrintStructurePre(PrintStructureKind::GenericRequirement);
       if (second) {
@@ -1603,10 +1618,6 @@ bool swift::shouldPrint(const Decl *D, PrintOptions &Options) {
 
   if (Options.SkipUnavailable &&
       D->getAttrs().isUnavailable(D->getASTContext()))
-    return false;
-
-  // Skip stub declarations used for prior or later variants of Swift.
-  if (D->getAttrs().isUnavailableInSwiftVersion())
     return false;
 
   if (Options.ExplodeEnumCaseDecls) {

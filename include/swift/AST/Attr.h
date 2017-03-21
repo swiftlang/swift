@@ -1144,10 +1144,9 @@ public:
   }
 
   /// Determine whether there is a swiftVersionSpecific attribute that's
-  /// unavailable relative to the provided language version (defaulting to
-  /// current language version).
-  bool isUnavailableInSwiftVersion(const version::Version &effectiveVersion =
-           version::Version::getCurrentLanguageVersion()) const;
+  /// unavailable relative to the provided language version.
+  bool
+  isUnavailableInSwiftVersion(const version::Version &effectiveVersion) const;
 
   /// Returns the first @available attribute that indicates
   /// a declaration is unavailable, or null otherwise.

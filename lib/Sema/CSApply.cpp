@@ -5177,7 +5177,7 @@ ClosureExpr *ExprRewriter::coerceClosureExprToVoid(ClosureExpr *closureExpr) {
 
     // For l-value types, reset to the object type. This might not be strictly
     // necessary any more, but it's probably still a good idea.
-    if (cs.getType(singleExpr)->getAs<LValueType>())
+    if (cs.getType(singleExpr)->is<LValueType>())
       cs.setType(singleExpr,
                  cs.getType(singleExpr)->getLValueOrInOutObjectType());
 

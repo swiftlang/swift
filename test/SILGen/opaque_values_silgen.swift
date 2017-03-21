@@ -593,6 +593,36 @@ func s310__convIntTupleAny(_ t: @escaping () -> (Int, Int)) {
   let _: () -> Any = t
 }
 
+// Tests translating and imploding into Any under opaque value mode
+// ---
+// CHECK-LABEL: sil hidden @_T020opaque_values_silgen21s320__transImplodeAnyyyypcF : $@convention(thin) (@owned @callee_owned (@in Any) -> ()) -> () {
+// CHECK: bb0([[ARG:%.*]] : $@callee_owned (@in Any) -> ()):
+// CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
+// CHECK:   [[COPY_ARG:%.*]] = copy_value [[BORROWED_ARG]]
+// CHECK:   [[PAPPLY:%.*]] = partial_apply %{{.*}}([[COPY_ARG]]) : $@convention(thin) (Int, Int, @owned @callee_owned (@in Any) -> ()) -> ()
+// CHECK:   destroy_value [[PAPPLY]] : $@callee_owned (Int, Int) -> ()
+// CHECK:   end_borrow [[BORROWED_ARG]] from [[ARG]] : $@callee_owned (@in Any) -> (), $@callee_owned (@in Any) -> ()
+// CHECK:   destroy_value [[ARG]]
+// CHECK:   return %{{.*}} : $()
+// CHECK-LABEL: } // end sil function '_T020opaque_values_silgen21s320__transImplodeAnyyyypcF'
+func s320__transImplodeAny(_ t: @escaping (Any) -> ()) {
+  let _: ((Int, Int)) -> () = t
+}
+
+// Tests support for address only let closures under opaque value mode - they are not by-address anymore
+// ---
+// CHECK-LABEL: sil shared @_T020opaque_values_silgen21s330___addrLetClosurexxlFxycfU_xycfU_ : $@convention(thin) <T> (@in T) -> @out T {
+// CHECK: bb0([[ARG:%.*]] : $T):
+// CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]] : $T
+// CHECK:   [[COPY_ARG:%.*]] = copy_value [[BORROWED_ARG]] : $T
+// CHECK:   end_borrow [[BORROWED_ARG]] from [[ARG]] : $T
+// CHECK:   destroy_value [[ARG]]
+// CHECK:   return [[COPY_ARG]] : $T
+// CHECK-LABEL: } // end sil function '_T020opaque_values_silgen21s330___addrLetClosurexxlFxycfU_xycfU_'
+func s330___addrLetClosure<T>(_ x:T) -> T {
+  return { { x }() }()
+}
+
 // Tests conditional value casts and correspondingly generated reabstraction thunk, with <T> types
 // ---
 // CHECK-LABEL: sil hidden @_T020opaque_values_silgen21s999_____condTFromAnyyyp_xtlF : $@convention(thin) <T> (@in Any, @in T) -> () {
@@ -732,3 +762,20 @@ extension Dictionary {
     increment(x: &self[key]!)
   }
 }
+
+// s320__transImplodeAny continued Test: reabstraction thunk
+// ---
+// CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_T0ypIxi_S2iIxyy_TR : $@convention(thin) (Int, Int, @owned @callee_owned (@in Any) -> ()) -> () {
+// CHECK: bb0([[ARG0:%.*]] : $Int, [[ARG1:%.*]] : $Int, [[ARG2:%.*]] : $@callee_owned (@in Any) -> ()):
+// CHECK:   [[ASTACK:%.*]] = alloc_stack $Any
+// CHECK:   [[IADDR:%.*]] = init_existential_addr [[ASTACK]] : $*Any, $(Int, Int)
+// CHECK:   [[TADDR0:%.*]] = tuple_element_addr [[IADDR]] : $*(Int, Int), 0
+// CHECK:   store [[ARG0]] to [trivial] [[TADDR0]] : $*Int
+// CHECK:   [[TADDR1:%.*]] = tuple_element_addr [[IADDR]] : $*(Int, Int), 1
+// CHECK:   store [[ARG1]] to [trivial] [[TADDR1]] : $*Int
+// CHECK:   [[LOAD_EXIST:%.*]] = load [trivial] [[IADDR]] : $*(Int, Int)
+// CHECK:   [[INIT_OPAQUE:%.*]] = init_existential_opaque [[LOAD_EXIST]] : $(Int, Int), $(Int, Int), $Any
+// CHECK:   [[APPLYARG:%.*]] = apply [[ARG2]]([[INIT_OPAQUE]]) : $@callee_owned (@in Any) -> ()
+// CHECK:   dealloc_stack [[ASTACK]] : $*Any
+// CHECK:   return %{{.*}} : $()
+// CHECK-LABEL: } // end sil function '_T0ypIxi_S2iIxyy_TR'

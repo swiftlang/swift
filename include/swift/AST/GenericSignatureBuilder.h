@@ -104,6 +104,12 @@ public:
     llvm::MapVector<ProtocolDecl *, std::vector<Constraint<ProtocolDecl *>>>
       conformsTo;
 
+    /// Same-type constraints between each potential archetype and any other
+    /// archetype in its equivalence class.
+    llvm::MapVector<PotentialArchetype *,
+                    std::vector<Constraint<PotentialArchetype *>>>
+      sameTypeConstraints;
+
     /// Concrete type to which this equivalence class is equal.
     ///
     /// This is the semantic concrete type; the constraints as written
@@ -121,6 +127,12 @@ public:
 
     /// Superclass constraints written within this equivalence class.
     std::vector<ConcreteConstraint> superclassConstraints;
+
+    /// \The layout constraint for this equivalence class.
+    LayoutConstraint layout;
+
+    /// Layout constraints written within this equivalence class.
+    std::vector<Constraint<LayoutConstraint>> layoutConstraints;
 
     /// The members of the equivalence class.
     TinyPtrVector<PotentialArchetype *> members;
@@ -162,14 +174,6 @@ private:
 
   GenericSignatureBuilder(const GenericSignatureBuilder &) = delete;
   GenericSignatureBuilder &operator=(const GenericSignatureBuilder &) = delete;
-
-  /// Update an existing constraint source reference when another constraint
-  /// source was found to produce the same constraint. Only the better
-  /// constraint source will be kept.
-  ///
-  /// \returns true if the new constraint source was better, false otherwise.
-  bool updateRequirementSource(const RequirementSource *&existingSource,
-                               const RequirementSource *newSource);
 
   /// Retrieve the constraint source conformance for the superclass constraint
   /// of the given potential archetype (if present) to the given protocol.
@@ -458,21 +462,32 @@ private:
                            Diag<Type, T> redundancyDiag,
                            Diag<bool, Type, T> otherNoteDiag);
 
-  /// Check for redundant concrete type constraints within the equivalence
+  /// Check the concrete type constraints within the equivalence
   /// class of the given potential archetype.
-  void checkRedundantConcreteTypeConstraints(
+  void checkConcreteTypeConstraints(
                             ArrayRef<GenericTypeParamType *> genericParams,
                             PotentialArchetype *pa);
 
-  /// Check for redundant superclass constraints within the equivalence
+  /// Check the superclass constraints within the equivalence
   /// class of the given potential archetype.
-  void checkRedundantSuperclassConstraints(
+  void checkSuperclassConstraints(
                             ArrayRef<GenericTypeParamType *> genericParams,
                             PotentialArchetype *pa);
 
   /// Check conformance constraints within the equivalence class of the
   /// given potential archetype.
   void checkConformanceConstraints(
+                            ArrayRef<GenericTypeParamType *> genericParams,
+                            PotentialArchetype *pa);
+
+  /// Check layout constraints within the equivalence class of the given
+  /// potential archetype.
+  void checkLayoutConstraints(ArrayRef<GenericTypeParamType *> genericParams,
+                              PotentialArchetype *pa);
+
+  /// Check same-type constraints within the equivalence class of the
+  /// given potential archetype.
+  void checkSameTypeConstraints(
                             ArrayRef<GenericTypeParamType *> genericParams,
                             PotentialArchetype *pa);
 
@@ -1025,17 +1040,6 @@ class GenericSignatureBuilder::PotentialArchetype {
   mutable llvm::PointerUnion<PotentialArchetype *, EquivalenceClass *>
     representativeOrEquivClass;
 
-  /// Same-type constraints between this potential archetype and any other
-  /// archetype in its equivalence class.
-  llvm::MapVector<PotentialArchetype *, const RequirementSource *>
-    SameTypeConstraints;
-
-  /// \brief The layout constraint of this archetype, if specified.
-  LayoutConstraint Layout;
-
-  /// The source of the layout constraint requirement.
-  const RequirementSource *LayoutSource = nullptr;
-
   /// A stored nested type.
   struct StoredNestedType {
     /// The potential archetypes describing this nested type, all of which
@@ -1255,11 +1259,11 @@ public:
   }
 
   /// Retrieve the layout constraint of this archetype.
-  LayoutConstraint getLayout() const { return Layout; }
+  LayoutConstraint getLayout() const {
+    if (auto equivClass = getEquivalenceClassIfPresent())
+      return equivClass->layout;
 
-  /// Retrieve the requirement source for the layout constraint requirement.
-  const RequirementSource *getLayoutSource() const {
-    return LayoutSource;
+    return LayoutConstraint();
   }
 
   /// Retrieve the set of nested types.
@@ -1301,12 +1305,15 @@ public:
                              const RequirementSource *source);
 
   /// Retrieve the same-type constraints.
-  llvm::iterator_range<
-    std::vector<std::pair<PotentialArchetype *, const RequirementSource *>>
-       ::const_iterator>
-  getSameTypeConstraints() const {
-    return llvm::make_range(SameTypeConstraints.begin(),
-                            SameTypeConstraints.end());
+  ArrayRef<Constraint<PotentialArchetype *>> getSameTypeConstraints() const {
+    if (auto equivClass = getEquivalenceClassIfPresent()) {
+      auto known = equivClass->sameTypeConstraints.find(
+                                       const_cast<PotentialArchetype *>(this));
+      if (known == equivClass->sameTypeConstraints.end()) return { };
+      return known->second;
+    }
+
+    return { };
   }
 
   /// \brief Retrieve (or create) a nested type with the given name.

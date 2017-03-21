@@ -20,7 +20,7 @@ namespace swift {
 namespace irgen {
 
 /// The mangler for all kind of symbols produced in IRGen.
-class IRGenMangler : public NewMangling::ASTMangler {
+class IRGenMangler : public Mangle::ASTMangler {
 public:
   IRGenMangler() { }
 

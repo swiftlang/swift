@@ -47,7 +47,8 @@ struct ConcreteSameType: SameType {
     typealias T = Int
     typealias U = Int
 }
-struct BadConcreteSameType: SameType {
+struct BadConcreteSameType: SameType { // expected-error{{'SameType' requires the types 'BadConcreteSameType.T' (aka 'Int') and 'BadConcreteSameType.U' (aka 'Float') be equivalent}}
+	// expected-note@-1{{requirement specified as 'Self.T' == 'Self.U' [with Self = BadConcreteSameType]}}
     typealias T = Int
     typealias U = Float
 }

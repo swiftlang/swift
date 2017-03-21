@@ -96,7 +96,7 @@ convertToDefinition(ArrayRef<Entry> entries) {
 }
 
 Identifier SILDefaultWitnessTable::getIdentifier() const {
-  NewMangling::ASTMangler Mangler;
+  Mangle::ASTMangler Mangler;
   std::string name = Mangler.mangleTypeAsUSR(getProtocol()->getDeclaredType());
   return Mod.getASTContext().getIdentifier(name);
 }

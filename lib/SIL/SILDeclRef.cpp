@@ -626,7 +626,7 @@ static void mangleClangDecl(raw_ostream &buffer,
 }
 
 std::string SILDeclRef::mangle(ManglingKind MKind) const {
-  using namespace NewMangling;
+  using namespace Mangle;
   ASTMangler mangler;
 
   // As a special case, Clang functions and globals don't get mangled at all.

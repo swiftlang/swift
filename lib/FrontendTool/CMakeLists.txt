@@ -1,5 +1,6 @@
 add_swift_library(swiftFrontendTool STATIC
   FrontendTool.cpp
+  ImportedModules.cpp
   ReferenceDependencies.cpp
   DEPENDS SwiftOptions
   LINK_LIBRARIES

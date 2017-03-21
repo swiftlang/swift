@@ -365,6 +365,10 @@ public:
   /// sugar from all levels stripped off.
   CanType getCanonicalType();
 
+  /// Reconstitute type sugar, e.g., for array types, dictionary
+  /// types, optionals, etc.
+  TypeBase *reconstituteSugar();
+
   /// getASTContext - Return the ASTContext that this type belongs to.
   ASTContext &getASTContext() {
     // If this type is canonical, it has the ASTContext in it.
@@ -2796,10 +2800,6 @@ public:
   // transient SIL conventions that dictate SILValue types.
   bool isFormalIndirect() const {
     return isIndirectFormalParameter(getConvention());
-  }
-
-  bool isDirectGuaranteed() const {
-    return getConvention() == ParameterConvention::Direct_Guaranteed;
   }
 
   bool isIndirectInGuaranteed() const {

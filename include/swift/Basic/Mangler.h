@@ -23,7 +23,7 @@ using llvm::StringRef;
 using llvm::ArrayRef;
 
 namespace swift {
-namespace NewMangling {
+namespace Mangle {
 
 void printManglingStats();
 
@@ -101,6 +101,9 @@ protected:
   /// Finish the mangling of the symbol and write the mangled name into
   /// \p stream.
   void finalize(llvm::raw_ostream &stream);
+
+  /// Verify that demangling and remangling works.
+  void verify(const std::string &mangledName);
 
   /// Appends a mangled identifier string.
   void appendIdentifier(StringRef ident);

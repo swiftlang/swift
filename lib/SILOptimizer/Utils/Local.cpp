@@ -602,8 +602,8 @@ SILValue swift::castValueToABICompatibleType(SILBuilder *B, SILLocation Loc,
   }
 
   // Function types are interchangeable if they're also ABI-compatible.
-  if (SrcTy.getAs<SILFunctionType>()) {
-    if (DestTy.getAs<SILFunctionType>()) {
+  if (SrcTy.is<SILFunctionType>()) {
+    if (DestTy.is<SILFunctionType>()) {
       // Insert convert_function.
       return B->createConvertFunction(Loc, Value, DestTy);
     }
@@ -2225,7 +2225,7 @@ CastOptimizer::optimizeCheckedCastBranchInst(CheckedCastBranchInst *Inst) {
         auto EMT = EmiTy.castTo<AnyMetatypeType>();
         auto *MetaTy = MetatypeType::get(LoweredConcreteTy.getSwiftRValueType(),
                                          EMT->getRepresentation());
-        auto CanMetaTy = CanMetatypeType::CanTypeWrapper(MetaTy);
+        auto CanMetaTy = CanTypeWrapper<MetatypeType>(MetaTy);
         auto SILMetaTy = SILType::getPrimitiveObjectType(CanMetaTy);
         SILBuilderWithScope B(Inst);
         auto *MI = B.createMetatype(FoundIEI->getLoc(), SILMetaTy);
@@ -2280,7 +2280,7 @@ CastOptimizer::optimizeCheckedCastBranchInst(CheckedCastBranchInst *Inst) {
         // Get the SIL metatype of this type.
         auto EMT = EMI->getType().castTo<AnyMetatypeType>();
         auto *MetaTy = MetatypeType::get(ConcreteTy, EMT->getRepresentation());
-        auto CanMetaTy = CanMetatypeType::CanTypeWrapper(MetaTy);
+        auto CanMetaTy = CanTypeWrapper<MetatypeType>(MetaTy);
         auto SILMetaTy = SILType::getPrimitiveObjectType(CanMetaTy);
         SILBuilderWithScope B(Inst);
         auto *MI = B.createMetatype(FoundIERI->getLoc(), SILMetaTy);

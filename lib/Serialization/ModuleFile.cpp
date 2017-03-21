@@ -1530,7 +1530,7 @@ void ModuleFile::loadExtensions(NominalTypeDecl *nominal) {
     }
   } else {
     std::string mangledName =
-        NewMangling::ASTMangler().mangleNominalType(nominal);
+        Mangle::ASTMangler().mangleNominalType(nominal);
     for (auto item : *iter) {
       if (item.first == mangledName)
         (void)getDecl(item.second);

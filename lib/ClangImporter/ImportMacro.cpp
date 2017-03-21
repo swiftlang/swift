@@ -93,7 +93,7 @@ static ValueDecl *importNumericLiteral(ClangImporter::Implementation &Impl,
                                        const clang::Token *signTok,
                                        const clang::Token &tok,
                                        const clang::MacroInfo *ClangN,
-                                       const clang::QualType *castType) {
+                                       clang::QualType castType) {
   assert(tok.getKind() == clang::tok::numeric_constant &&
          "not a numeric token");
   {
@@ -120,12 +120,14 @@ static ValueDecl *importNumericLiteral(ClangImporter::Implementation &Impl,
       return nullptr;
 
     Type constantType;
-    if (castType) {
-      constantType = Impl.importType(*castType, ImportTypeKind::Value,
+    if (castType.isNull()) {
+      constantType = literalType;
+    } else {
+      constantType = Impl.importType(castType, ImportTypeKind::Value,
                                      isInSystemModule(DC),
                                      /*isFullyBridgeable*/false);
-    } else {
-      constantType = literalType;
+      if (!constantType)
+        return nullptr;
     }
 
     if (auto *integer = dyn_cast<clang::IntegerLiteral>(parsed)) {
@@ -220,7 +222,7 @@ static ValueDecl *importLiteral(ClangImporter::Implementation &Impl,
                                 Identifier name,
                                 const clang::Token &tok,
                                 const clang::MacroInfo *ClangN,
-                                const clang::QualType *castType = nullptr) {
+                                clang::QualType castType) {
   switch (tok.getKind()) {
   case clang::tok::numeric_constant:
     return importNumericLiteral(Impl, DC, MI, name, /*signTok*/nullptr, tok,
@@ -337,7 +339,7 @@ static ValueDecl *importMacro(ClangImporter::Implementation &impl,
                               Identifier name,
                               const clang::MacroInfo *macro,
                               const clang::MacroInfo *ClangN,
-                              clang::QualType *castType = nullptr) {
+                              clang::QualType castType) {
   if (name.empty()) return nullptr;
 
   auto numTokens = macro->getNumTokens();
@@ -354,13 +356,12 @@ static ValueDecl *importMacro(ClangImporter::Implementation &impl,
 
   // Handle tokens starting with a type cast
   bool castTypeIsId = false;
-  clang::QualType castClangType;
   if (numTokens > 3 &&
       tokenI[0].is(clang::tok::l_paren) &&
       (tokenI[1].is(clang::tok::identifier) ||
         impl.getClangSema().isSimpleTypeSpecifier(tokenI[1].getKind())) &&
       tokenI[2].is(clang::tok::r_paren)) {
-    if (castType) {
+    if (!castType.isNull()) {
       // this is a nested cast
       return nullptr;
     }
@@ -376,19 +377,18 @@ static ValueDecl *importMacro(ClangImporter::Implementation &impl,
                                                         clang::SourceLocation(),
                                                         /*scope*/nullptr);
       if (parsedType) {
-        castClangType = parsedType.get();
-        castType = &castClangType;
+        castType = parsedType.get();
       } else {
         return nullptr;
       }
-      if (!castClangType->isBuiltinType() && !castTypeIsId) {
+      if (!castType->isBuiltinType() && !castTypeIsId) {
         return nullptr;
       }
     } else {
       auto builtinType = builtinTypeForToken(tokenI[1],
                                              impl.getClangASTContext());
       if (builtinType) {
-        castType = &builtinType.getValue();
+        castType = builtinType.getValue();
       } else {
         return nullptr;
       }
@@ -431,8 +431,11 @@ static ValueDecl *importMacro(ClangImporter::Implementation &impl,
           return importNil(impl, DC, name, ClangN);
 
         auto macroID = impl.getClangPreprocessor().getMacroInfo(clangID);
-        if (macroID && macroID != macro)
-          return importMacro(impl, DC, name, macroID, ClangN);
+        if (macroID && macroID != macro) {
+          // FIXME: This was clearly intended to pass the cast type down, but
+          // doing so would be a behavior change.
+          return importMacro(impl, DC, name, macroID, ClangN, /*castType*/{});
+        }
       }
 
       // FIXME: If the identifier refers to a declaration, alias it?
@@ -672,7 +675,7 @@ ValueDecl *ClangImporter::Implementation::importMacro(Identifier name,
   if (!DC)
     return nullptr;
 
-  auto valueDecl = ::importMacro(*this, DC, name, macro, macro);
+  auto valueDecl = ::importMacro(*this, DC, name, macro, macro, /*castType*/{});
   ImportedMacros[name].push_back({macro, valueDecl});
   return valueDecl;
 }

@@ -19,7 +19,7 @@
 #define SWIFT_COMPILER_IS_MSVC 0
 #endif
 
-#if SWIFT_COMPILER_IS_MSVC
+#if SWIFT_COMPILER_IS_MSVC && _MSC_VER < 1910
 // Work around MSVC bug: attempting to reference a deleted function
 // https://connect.microsoft.com/VisualStudio/feedback/details/3116505
 #define SWIFT_DELETE_OPERATOR_DELETED                                          \

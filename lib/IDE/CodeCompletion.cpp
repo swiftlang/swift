@@ -3113,14 +3113,14 @@ public:
     NeedLeadingDot = !HaveDot;
 
     // This is horrible
+    ExprType = ExprType->getRValueType();
     this->ExprType = ExprType;
     if (ExprType->hasTypeParameter()) {
       DeclContext *DC;
       if (VD) {
         DC = VD->getInnermostDeclContext();
         this->ExprType = DC->mapTypeIntoContext(ExprType);
-      } else if (auto NTD = ExprType->getRValueType()->getRValueInstanceType()
-          ->getAnyNominal()) {
+      } else if (auto NTD = ExprType->getRValueInstanceType()->getAnyNominal()) {
         DC = NTD;
         this->ExprType = DC->mapTypeIntoContext(ExprType);
       }
@@ -3138,7 +3138,7 @@ public:
         Done = true;
       }
     }
-    if (auto *TT = ExprType->getRValueType()->getAs<TupleType>()) {
+    if (auto *TT = ExprType->getAs<TupleType>()) {
       getTupleExprCompletions(TT);
       Done = true;
     }
@@ -3572,7 +3572,7 @@ public:
       for (auto T : ExpectedTypes) {
         if (!T)
           continue;
-        if (T->getAs<TupleType>()) {
+        if (T->is<TupleType>()) {
           addTypeAnnotation(builder, T);
           builder.setExpectedTypeRelation(CodeCompletionResult::Identical);
           break;

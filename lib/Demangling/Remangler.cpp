@@ -30,7 +30,7 @@
 
 using namespace swift;
 using namespace Demangle;
-using namespace NewMangling;
+using namespace Mangle;
 
 [[noreturn]]
 static void unreachable(const char *Message) {
@@ -131,8 +131,8 @@ bool SubstitutionEntry::deepEquals(Node *lhs, Node *rhs) const {
 
 class Remangler {
   template <typename Mangler>
-  friend void NewMangling::mangleIdentifier(Mangler &M, StringRef ident);
-  friend class NewMangling::SubstitutionMerging;
+  friend void Mangle::mangleIdentifier(Mangler &M, StringRef ident);
+  friend class Mangle::SubstitutionMerging;
 
   const bool UsePunycode = true;
 
@@ -339,10 +339,10 @@ void Remangler::mangleIdentifierImpl(Node *node, bool isOperator) {
   SubstitutionEntry entry;
   if (trySubstitution(node, entry, /*treatAsIdentifier*/ true)) return;
   if (isOperator) {
-    NewMangling::mangleIdentifier(*this,
-                              NewMangling::translateOperator(node->getText()));
+    Mangle::mangleIdentifier(*this,
+                              Mangle::translateOperator(node->getText()));
   } else {
-    NewMangling::mangleIdentifier(*this, node->getText());
+    Mangle::mangleIdentifier(*this, node->getText());
   }
   addSubstitution(entry);
 }

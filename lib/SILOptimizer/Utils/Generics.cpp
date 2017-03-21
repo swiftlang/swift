@@ -843,11 +843,11 @@ GenericFuncSpecializer::GenericFuncSpecializer(SILFunction *GenericFunc,
   auto FnTy = ReInfo.getSpecializedType();
 
   if (ReInfo.isPartialSpecialization()) {
-    NewMangling::PartialSpecializationMangler Mangler(
+    Mangle::PartialSpecializationMangler Mangler(
         GenericFunc, FnTy, Fragile, /*isReAbstracted*/ true);
     ClonedName = Mangler.mangle();
   } else {
-    NewMangling::GenericSpecializationMangler Mangler(
+    Mangle::GenericSpecializationMangler Mangler(
         GenericFunc, ParamSubs, Fragile, /*isReAbstracted*/ true);
     ClonedName = Mangler.mangle();
   }
@@ -1084,13 +1084,13 @@ public:
 
     {
       if (!ReInfo.isPartialSpecialization()) {
-        NewMangling::GenericSpecializationMangler Mangler(
+        Mangle::GenericSpecializationMangler Mangler(
             OrigF, ReInfo.getOriginalParamSubstitutions(), Fragile,
             /*isReAbstracted*/ false);
 
         ThunkName = Mangler.mangle();
       } else {
-        NewMangling::PartialSpecializationMangler Mangler(
+        Mangle::PartialSpecializationMangler Mangler(
             OrigF, ReInfo.getSpecializedType(), Fragile,
             /*isReAbstracted*/ false);
 

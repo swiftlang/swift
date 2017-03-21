@@ -118,7 +118,8 @@ CaptureKind TypeConverter::getDeclCaptureKind(CapturedValue capture) {
       // If this is a non-address-only stored 'let' constant, we can capture it
       // by value.  If it is address-only, then we can't load it, so capture it
       // by its address (like a var) instead.
-      if (var->isLet() && !getTypeLowering(var->getType()).isAddressOnly())
+      if (var->isLet() && (!SILModuleConventions(M).useLoweredAddresses() ||
+                           !getTypeLowering(var->getType()).isAddressOnly()))
         return CaptureKind::Constant;
 
       if (var->getType()->is<InOutType>()) {
@@ -502,6 +503,9 @@ namespace {
 static LoweredTypeKind classifyType(CanType type, SILModule &M,
                                     CanGenericSignature sig,
                                     ResilienceExpansion expansion) {
+  assert(!type->hasError() &&
+         "Error types should not appear in type-checked AST");
+
   return TypeClassifier(M, sig, expansion).visit(type);
 }
 
@@ -1560,6 +1564,9 @@ CanSILFunctionType TypeConverter::getSILFunctionType(
 
 CanType TypeConverter::getLoweredRValueType(AbstractionPattern origType,
                                             CanType substType) {
+  assert(!substType->hasError() &&
+         "Error types should not appear in type-checked AST");
+
   // AST function types are turned into SIL function types:
   //   - the type is uncurried as desired
   //   - types are turned into their unbridged equivalents, depending

@@ -191,7 +191,7 @@ static void removeToken(SILValue Op) {
 }
 
 static std::string mangleGetter(VarDecl *varDecl) {
-  NewMangling::ASTMangler Mangler;
+  Mangle::ASTMangler Mangler;
   return Mangler.mangleGlobalGetterEntity(varDecl);
 }
 

@@ -37,12 +37,11 @@ class GY<T> : GX<[T]> { }
 // CHECK:   [[Y_COPY:%.*]] = copy_value [[BORROWED_Y]]
 // CHECK:   [[Y_AS_X_COPY:%[0-9]+]] = upcast [[Y_COPY]] : $Y to $X  
 // CHECK:   [[X_F:%[0-9]+]] = class_method [[Y_AS_X_COPY]] : $X, #X.f!1 : (X) -> () -> @dynamic_self X, $@convention(method) (@guaranteed X) -> @owned X
-// CHECK:   [[BORROWED_Y_AS_X_COPY:%.*]] = begin_borrow [[Y_AS_X_COPY]]
-// CHECK:   [[X_RESULT:%[0-9]+]] = apply [[X_F]]([[BORROWED_Y_AS_X_COPY]]) : $@convention(method) (@guaranteed X) -> @owned X
-// CHECK:   end_borrow [[BORROWED_Y_AS_X_COPY]] from [[Y_AS_X_COPY]]
+// => SEMANTIC SIL TODO: This argument here needs to be borrowed.
+// CHECK:   [[X_RESULT:%[0-9]+]] = apply [[X_F]]([[Y_AS_X_COPY]]) : $@convention(method) (@guaranteed X) -> @owned X
+// CHECK:   destroy_value [[Y_AS_X_COPY]]
 // CHECK:   [[Y_RESULT:%[0-9]+]] = unchecked_ref_cast [[X_RESULT]] : $X to $Y
 // CHECK:   destroy_value [[Y_RESULT]] : $Y
-// CHECK:   destroy_value [[Y_AS_X_COPY]]
 // CHECK:   end_borrow [[BORROWED_Y]] from [[Y]]
 // CHECK:   destroy_value [[Y]] : $Y
 func testDynamicSelfDispatch(y: Y) {
@@ -56,12 +55,10 @@ func testDynamicSelfDispatchGeneric(gy: GY<Int>) {
   // CHECK:   [[GY_COPY:%.*]] = copy_value [[BORROWED_GY]]
   // CHECK:   [[GY_AS_GX_COPY:%[0-9]+]] = upcast [[GY_COPY]] : $GY<Int> to $GX<Array<Int>>
   // CHECK:   [[GX_F:%[0-9]+]] = class_method [[GY_AS_GX_COPY]] : $GX<Array<Int>>, #GX.f!1 : <T> (GX<T>) -> () -> @dynamic_self GX<T>, $@convention(method) <τ_0_0> (@guaranteed GX<τ_0_0>) -> @owned GX<τ_0_0>
-  // CHECK:   [[BORROWED_GY_AS_GX_COPY:%.*]] = begin_borrow [[GY_AS_GX_COPY]]
-  // CHECK:   [[GX_RESULT:%[0-9]+]] = apply [[GX_F]]<[Int]>([[BORROWED_GY_AS_GX_COPY]]) : $@convention(method) <τ_0_0> (@guaranteed GX<τ_0_0>) -> @owned GX<τ_0_0>
-  // CHECK:   end_borrow [[BORROWED_GY_AS_GX_COPY]] from [[GY_AS_GX_COPY]]
+  // CHECK:   [[GX_RESULT:%[0-9]+]] = apply [[GX_F]]<[Int]>([[GY_AS_GX_COPY]]) : $@convention(method) <τ_0_0> (@guaranteed GX<τ_0_0>) -> @owned GX<τ_0_0>
+  // CHECK:   destroy_value [[GY_AS_GX_COPY]]
   // CHECK:   [[GY_RESULT:%[0-9]+]] = unchecked_ref_cast [[GX_RESULT]] : $GX<Array<Int>> to $GY<Int>
   // CHECK:   destroy_value [[GY_RESULT]] : $GY<Int>
-  // CHECK:   destroy_value [[GY_AS_GX_COPY]]
   // CHECK:   end_borrow [[BORROWED_GY]] from [[GY]]
   // CHECK:   destroy_value [[GY]]
   gy.f()
@@ -167,9 +164,7 @@ func testOptionalResult(v : OptionalResultInheritor) {
 // CHECK:      [[COPY_ARG:%.*]] = copy_value [[BORROWED_ARG]]
 // CHECK:      [[CAST_COPY_ARG:%.*]] = upcast [[COPY_ARG]]
 // CHECK:      [[T0:%.*]] = class_method [[CAST_COPY_ARG]] : $OptionalResult, #OptionalResult.foo!1 : (OptionalResult) -> () -> @dynamic_self OptionalResult?, $@convention(method) (@guaranteed OptionalResult) -> @owned Optional<OptionalResult>
-// CHECK:      [[BORROWED_CAST_COPY_ARG:%.*]] = begin_borrow [[CAST_COPY_ARG]]
-// CHECK-NEXT: [[RES:%.*]] = apply [[T0]]([[BORROWED_CAST_COPY_ARG]])
-// CHECK:      end_borrow [[BORROWED_CAST_COPY_ARG]] from [[CAST_COPY_ARG]]
+// CHECK-NEXT: [[RES:%.*]] = apply [[T0]]([[CAST_COPY_ARG]])
 // CHECK:      switch_enum [[RES]] : $Optional<OptionalResult>, case #Optional.some!enumelt.1: [[SOME_BB:bb[0-9]+]]
 // CHECK: [[SOME_BB]]([[T1:%.*]] : $OptionalResult):
 // CHECK-NEXT: [[T4:%.*]] = unchecked_ref_cast [[T1]] : $OptionalResult to $OptionalResultInheritor
@@ -286,12 +281,7 @@ class Derived : Base {
   // CHECK: [[SELF:%.*]] = copy_value %0
   // CHECK: [[SUPER:%.*]] = upcast [[SELF]] : $Derived to $Base
   // CHECK: [[METHOD:%.*]] = function_ref @_T012dynamic_self4BaseC11returnsSelfACXDyF
-  // CHECK: [[BORROWED_SUPER:%.*]] = begin_borrow [[SUPER]]
-  // CHECK: [[RESULT:%.*]] = apply [[METHOD]]([[BORROWED_SUPER]])
-  // CHECK: end_borrow [[BORROWED_SUPER]] from [[SUPER]]
-  // CHECK: destroy_value [[RESULT]]
-  // ==> SEMANTIC SIL TODO: This should be on SUPER
-  // CHECK: destroy_value [[SELF]]
+  // CHECK: apply [[METHOD]]([[SUPER]])
   // CHECK: return
   func superCall() {
     super.returnsSelf()
@@ -310,12 +300,7 @@ class Derived : Base {
   // CHECK: [[SELF:%.*]] = copy_value %0
   // CHECK: [[SUPER:%.*]] = upcast [[SELF]] : $Derived to $Base
   // CHECK: [[METHOD:%.*]] = function_ref @_T012dynamic_self4BaseC11returnsSelfACXDyF
-  // CHECK: [[BORROWED_SUPER:%.*]] = begin_borrow [[SUPER]]
-  // CHECK: [[RESULT:%.*]] = apply [[METHOD]]([[BORROWED_SUPER]])
-  // CHECK: end_borrow [[BORROWED_SUPER]] from [[SUPER]]
-  // CHECK: destroy_value [[RESULT]]
-  // ==> SEMANTIC SIL TODO: This should be on SUPER.
-  // CHECK: destroy_value [[SELF]]
+  // CHECK: apply [[METHOD]]([[SUPER]])
   // CHECK: return
   func superCallFromMethodReturningSelf() -> Self {
     super.returnsSelf()

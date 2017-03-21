@@ -67,9 +67,7 @@ func getObjectUID<T: ObjectUID>(x: T) -> (Int, Int, Int, Int) {
   // CHECK: destroy_value [[X2]]
   // -- call secondNextCLSID from class-constrained protocol ext
   // CHECK: [[SET_SECONDNEXT:%.*]] = function_ref @_T025protocol_class_refinement9ObjectUIDPAAE15secondNextCLSIDSifs
-  // CHECK: [[BORROWED_X1:%.*]] = begin_borrow [[X1]]
-  // CHECK: apply [[SET_SECONDNEXT]]<T>([[UID]], [[BORROWED_X1]])
-  // CHECK: end_borrow [[BORROWED_X1]] from [[X1]]
+  // CHECK: apply [[SET_SECONDNEXT]]<T>([[UID]], [[X1]])
   // CHECK: destroy_value [[X1]]
   x.secondNextCLSID = x.uid()
   return (x.iid, x.clsid, x.nextCLSID, x.secondNextCLSID)

@@ -36,7 +36,7 @@
 #include "llvm/Support/CommandLine.h"
 
 using namespace swift;
-using namespace swift::NewMangling;
+using namespace swift::Mangle;
 
 std::string ASTMangler::mangleClosureEntity(const AbstractClosureExpr *closure,
                                             SymbolKind SKind) {
@@ -1421,6 +1421,10 @@ void ASTMangler::appendAssociatedTypeName(DependentMemberType *dmt) {
   // If the base type is known to have a single protocol conformance
   // in the current generic context, then we don't need to disambiguate the
   // associated type name by protocol.
+  // This can result in getting the same mangled string for different
+  // DependentMemberTypes. This is not a problem but re-mangling might do more
+  // aggressive substitutions, which means that the re-mangled name may differ
+  // from the the original mangled name.
   // FIXME: We ought to be able to get to the generic signature from a
   // dependent type, but can't yet. Shouldn't need this side channel.
 
@@ -1482,13 +1486,14 @@ static bool isMethodDecl(const Decl *decl) {
 }
 
 static bool genericParamIsBelowDepth(Type type, unsigned methodDepth) {
-  if (type->isTypeParameter()) {
-    auto gp = type->getRootGenericParam();
-    return gp->getDepth() >= methodDepth;
-  }
-  // Non-dependent types in a same-type requirement don't affect whether we
-  // mangle the requirement.
-  return false;
+  if (!type->hasTypeParameter())
+    return true;
+
+  return !type.findIf([methodDepth](Type t) -> bool {
+    if (auto *gp = t->getAs<GenericTypeParamType>())
+      return gp->getDepth() >= methodDepth;
+    return false;
+  });
 }
 
 CanType ASTMangler::getDeclTypeForMangling(
@@ -1530,10 +1535,10 @@ CanType ASTMangler::getDeclTypeForMangling(
       auto parentGenericSig =
         decl->getDeclContext()->getGenericSignatureOfContext();
       if (parentGenericSig && sig) {
-        // The method's depth starts below the depth of the context.
+        // The method's depth starts above the depth of the context.
         if (!parentGenericSig->getGenericParams().empty())
           initialParamDepth =
-            parentGenericSig->getGenericParams().back()->getDepth()+1;
+            parentGenericSig->getGenericParams().back()->getDepth() + 1;
 
         while (!genericParams.empty()) {
           if (genericParams.front()->getDepth() >= initialParamDepth)
@@ -1547,16 +1552,16 @@ CanType ASTMangler::getDeclTypeForMangling(
         case RequirementKind::Conformance:
         case RequirementKind::Layout:
         case RequirementKind::Superclass:
-          // We don't need the requirement if the constrained type is above the
+          // We don't need the requirement if the constrained type is below the
           // method depth.
-          if (!genericParamIsBelowDepth(reqt.getFirstType(), initialParamDepth))
+          if (genericParamIsBelowDepth(reqt.getFirstType(), initialParamDepth))
             continue;
           break;
         case RequirementKind::SameType:
-          // We don't need the requirement if both types are above the method
+          // We don't need the requirement if both types are below the method
           // depth, or non-dependent.
-          if (!genericParamIsBelowDepth(reqt.getFirstType(),initialParamDepth)&&
-              !genericParamIsBelowDepth(reqt.getSecondType(),initialParamDepth))
+          if (genericParamIsBelowDepth(reqt.getFirstType(), initialParamDepth) &&
+              genericParamIsBelowDepth(reqt.getSecondType(), initialParamDepth))
             continue;
           break;
           }

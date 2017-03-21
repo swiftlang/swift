@@ -398,7 +398,7 @@ IsFragile_t CallSiteDescriptor::isFragile() const {
 
 std::string CallSiteDescriptor::createName() const {
   auto P = Demangle::SpecializationPass::ClosureSpecializer;
-  NewMangling::FunctionSignatureSpecializationMangler Mangler(P, isFragile(),
+  Mangle::FunctionSignatureSpecializationMangler Mangler(P, isFragile(),
                                                               getApplyCallee());
 
   if (auto *PAI = dyn_cast<PartialApplyInst>(getClosure())) {
