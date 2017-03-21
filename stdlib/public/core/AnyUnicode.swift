@@ -13,9 +13,11 @@
 //===--- TODO -------------------------------------------------------------===//
 //
 //===----------------------------------------------------------------------===//
-public protocol _AnyUnicode {
-  var encoding: AnyUnicodeEncoding.Type { get }
-  
+
+/// Types that present useful views and information about Unicode content.
+///
+/// Unicode and _UnicodeStorage refine this protocol.
+public protocol _UnicodeContent {
   var isKnownLatin1: Bool { get }
   var isKnownASCII: Bool { get }
   var isKnownValidEncoding: Bool { get }
@@ -27,19 +29,7 @@ public protocol _AnyUnicode {
   func isLatin1() -> Bool
   func isASCII() -> Bool
   func isValidEncoding() -> Bool
-}
 
-public protocol _FixedFormatUnicode : _AnyUnicode {
-  associatedtype Encoding: UnicodeEncoding
-  var encoding: Encoding.Type { get }
-  
-  // func isFCCNormalized() -> Bool
-  
-  associatedtype CodeUnits : RandomAccessCollection
-  // where Iterator.Element == Encoding.CodeUnit
-  
-  var codeUnits : CodeUnits { get }
-  
   /// A type that presents the string's UTF-16 code units without necessarily
   /// correcting encoding errors
   associatedtype UTF16View : BidirectionalCollection
@@ -67,16 +57,40 @@ public protocol _FixedFormatUnicode : _AnyUnicode {
 
   var unicodeScalars: UnicodeScalarView { get }
   
-  /// A type presenting ASCII unicode scalar values verbatim, and otherwise
-  /// presenting values >= 128, which is outside the range of ASCII.
-  associatedtype ExtendedASCIIView : BidirectionalCollection = CodeUnits
-  // where Iterator.Element : UnsignedInteger
+#if false
+  /// A type presenting ASCII-only extended grapheme clusters (`Character`s) as
+  /// their (single) unicode scalar values, and presenting all other
+  /// `Character`s as `nil`.
+  associatedtype ASCIIOnlyView : BidirectionalCollection
+  // where Iterator.Element : UInt8?
   
-  var extendedASCII: ExtendedASCIIView { get }
+  var asciiOnlyView: ASCIIOnlyView { get }
+#endif
+}
+
+/// Types that present Unicode content in a given encoding.
+///
+/// Typical models are the buffers that provide storage for String
+public protocol _UnicodeStorage : _UnicodeContent {
+  associatedtype Encoding: UnicodeEncoding
+  var encoding: Encoding.Type { get }
+  
+  associatedtype CodeUnits : RandomAccessCollection
+  // where Iterator.Element == Encoding.CodeUnit
+  
+  var codeUnits : CodeUnits { get }
+  // func isFCCNormalized() -> Bool
+}
+
+/// String types.
+public protocol Unicode : _UnicodeContent, RandomAccessCollection
+// where Iterator.Element == Character
+{
+  subscript(i: Index) -> Character { get }  // faux constraint
 }
 
 /// Default views
-public extension _FixedFormatUnicode
+public extension _UnicodeStorage
 where
   CodeUnits.Iterator.Element  == Encoding.EncodedScalar.Iterator.Element,
   CodeUnits.Iterator.Element : UnsignedInteger,
@@ -91,7 +105,7 @@ where
 
 // UTF32 gets a default UnicodeScalarView that injects replacement characters
 // for illegal scalar values
-public extension _FixedFormatUnicode
+public extension _UnicodeStorage
 where
   Encoding == UTF32,
   CodeUnits.Iterator.Element  == Encoding.EncodedScalar.Iterator.Element,
@@ -111,7 +125,7 @@ where
 
 // Everybody else gets a UnicodeScalarView based on transcoding to UTF32, which
 // already makes any necessary corrections.
-public extension _FixedFormatUnicode
+public extension _UnicodeStorage
 where
   CodeUnits.Iterator.Element  == Encoding.EncodedScalar.Iterator.Element,
   CodeUnits.Iterator.Element : UnsignedInteger,
@@ -125,20 +139,14 @@ where
   }
 }
 
-public extension _FixedFormatUnicode {
+public extension _UnicodeStorage {
   var encoding: AnyUnicodeEncoding.Type {
     return encoding as Encoding.Type
   }
 }
 
-public extension _FixedFormatUnicode where ExtendedASCIIView == CodeUnits {
-  var extendedASCII: CodeUnits {
-    return codeUnits
-  }
-}
-
 /// Default implementations
-public extension _FixedFormatUnicode {
+public extension _UnicodeStorage {
 
   var isKnownLatin1: Bool { return false }
   var isKnownASCII: Bool { return false }
@@ -149,7 +157,7 @@ public extension _FixedFormatUnicode {
   }
 }
 
-public extension _FixedFormatUnicode
+public extension _UnicodeStorage
 where UTF16View.Iterator.Element : UnsignedInteger {
   // FIXME: we'd like to put this up in the unconditional extension, but we are
   // forbidden.
@@ -164,7 +172,7 @@ where UTF16View.Iterator.Element : UnsignedInteger {
   }
 }
 
-public extension _FixedFormatUnicode
+public extension _UnicodeStorage
 where UTF16View.Iterator.Element : UnsignedInteger,
   CodeUnits.SubSequence.SubSequence == CodeUnits.SubSequence,
   CodeUnits.SubSequence.Iterator.Element == Encoding.EncodedScalar.Iterator.Element
@@ -177,13 +185,13 @@ where UTF16View.Iterator.Element : UnsignedInteger,
 }
 
 //===--- Defaults for Latin-1 ---------------------------------------------===//
-public extension _FixedFormatUnicode where Encoding == Latin1 {
+public extension _UnicodeStorage where Encoding == Latin1 {
   var isKnownLatin1: Bool { return true }
   var isKnownValidEncoding: Bool { return true }
   var isKnownFCCNormalized: Bool { return true }
 }
   
-public extension _FixedFormatUnicode
+public extension _UnicodeStorage
 where Encoding == Latin1, 
   CodeUnits.Iterator.Element == Encoding.EncodedScalar.Iterator.Element,
   CodeUnits.Iterator.Element : UnsignedInteger,
@@ -215,7 +223,7 @@ where Encoding == Latin1,
 }
   
 //===--- Defaults for UTF16 and ValidUTF16 --------------------------------===//
-public extension _FixedFormatUnicode
+public extension _UnicodeStorage
 where Encoding.EncodedScalar == UTF16.EncodedScalar,
   CodeUnits.Iterator.Element == UTF16.CodeUnit,
   CodeUnits.SubSequence : RandomAccessCollection,
@@ -225,7 +233,7 @@ where Encoding.EncodedScalar == UTF16.EncodedScalar,
   
   // FIXME: we should have a way to represent the validity of the encoding of
   // this result—and maybe other nice properties—in the type system.  So maybe
-  // this thing should conform to _FixedFormatUnicode
+  // this thing should conform to _UnicodeStorage
   var fccNormalizedUTF16
   : _UnicodeViews<CodeUnits,Encoding>.FCCNormalizedUTF16View {
     return _UnicodeViews(codeUnits, Encoding.self).fccNormalizedUTF16

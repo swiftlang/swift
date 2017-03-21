@@ -129,7 +129,7 @@ extension _UTF16StringStorage : _BoundedBufferReference {
   }
 }
 
-extension _UTF16StringStorage : _FixedFormatUnicode {
+extension _UTF16StringStorage : _UnicodeStorage {
   public typealias Encoding = UTF16
 
   // WORKAROUND: helping type inference along will be unnecessary someday
@@ -258,7 +258,7 @@ extension _UTF16StringStorage : _FixedFormatUnicode {
 
   // Eventually this should work for _AnyUnicode existentials too.
   @nonobjc
-  public convenience init<Other: _FixedFormatUnicode>(
+  public convenience init<Other: _UnicodeStorage>(
     _ other: Other
   )
   where Other.CodeUnits.Iterator.Element : UnsignedInteger,
@@ -359,7 +359,7 @@ extension _Latin1StringStorage : _BoundedBufferReference {
   }
 }
 
-extension _Latin1StringStorage : _FixedFormatUnicode {
+extension _Latin1StringStorage : _UnicodeStorage {
   public typealias Encoding = Latin1
   
   // WORKAROUND: helping type inference along will be unnecessary someday
@@ -459,7 +459,7 @@ extension _UTF8StringStorage : _BoundedBufferReference {
   }
 }
 
-extension _UTF8StringStorage : _FixedFormatUnicode {
+extension _UTF8StringStorage : _UnicodeStorage {
   public typealias Encoding = UTF8
   
   // WORKAROUND: helping type inference along will be unnecessary someday

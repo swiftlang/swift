@@ -583,7 +583,7 @@ extension AnyUnicode {
 }
 
 // Work around name collision ambiguity
-extension _FixedFormatUnicode {
+extension _UnicodeStorage {
   internal var _codeUnits: CodeUnits { return codeUnits }
 #if false
   internal var _characters: CharacterView { return characters }
@@ -593,7 +593,7 @@ extension _FixedFormatUnicode {
 #endif
 }
 
-extension _FixedFormatUnicode
+extension _UnicodeStorage
 where Self : AnyUnicode,
 Self.CodeUnits.Iterator.Element : UnsignedInteger {
   var codeUnits: AnyCodeUnits {
@@ -601,7 +601,7 @@ Self.CodeUnits.Iterator.Element : UnsignedInteger {
   }
 }
 
-extension _FixedFormatUnicode
+extension _UnicodeStorage
 where Self : AnyUnicode,
 UnicodeScalarView : RandomAccessCollection,
 UnicodeScalarView.Iterator.Element == UnicodeScalar,
@@ -613,7 +613,7 @@ UnicodeScalarView.Indices : RandomAccessCollection {
   }
 }
 
-extension _FixedFormatUnicode
+extension _UnicodeStorage
 where Self : AnyUnicode,
 UnicodeScalarView : UnicodeView,
 Self.UnicodeScalarView.Iterator.Element == UnicodeScalar {
@@ -624,7 +624,7 @@ Self.UnicodeScalarView.Iterator.Element == UnicodeScalar {
 
 
 
-extension _FixedFormatUnicode
+extension _UnicodeStorage
 where Self : AnyUnicode,
 Self.CodeUnits.Iterator.Element : UnsignedInteger,
 Self.CodeUnits.Index : SignedInteger,
@@ -632,7 +632,7 @@ Self.Encoding == Latin1 {
   var utf16: AnyUTF16 { return AnyUTF16(self.codeUnits) }
 }
 
-extension _FixedFormatUnicode
+extension _UnicodeStorage
 where Self : AnyUnicode,
 Self.CodeUnits.Iterator.Element : UnsignedInteger,
 Self.Encoding.EncodedScalar == UTF16.EncodedScalar,
@@ -641,7 +641,7 @@ Self.UnicodeScalarView.Iterator.Element == UnicodeScalar {
   var utf16: AnyUTF16 { return AnyUTF16(self.codeUnits) }
 }
 
-extension _FixedFormatUnicode
+extension _UnicodeStorage
 where Self : AnyUnicode,
   Encoding.EncodedScalar.Iterator.Element == CodeUnits.Iterator.Element,
   CodeUnits.SubSequence : RandomAccessCollection,
@@ -655,7 +655,7 @@ where Self : AnyUnicode,
 }
 
 
-extension _FixedFormatUnicode
+extension _UnicodeStorage
 where Self : AnyUnicode,
 Self.CodeUnits.Iterator.Element : UnsignedInteger,
 Self.UTF16View.Iterator.Element == UTF16.CodeUnit,
