@@ -36,7 +36,9 @@
 /// Does the current Swift platform use LLVM's intrinsic "swiftcall"
 /// calling convention for Swift functions?
 #ifndef SWIFT_USE_SWIFTCALL
-#if __has_attribute(swiftcall) || defined(__linux__)
+// Clang doesn't support mangling functions with the swiftcall attribute
+// on Windows and crashes during compilation: http://bugs.llvm.org/show_bug.cgi?id=32000
+#if (__has_attribute(swiftcall) || defined(__linux__)) && !defined(_WIN32)
 #define SWIFT_USE_SWIFTCALL 1
 #else
 #define SWIFT_USE_SWIFTCALL 0
