@@ -36,17 +36,6 @@ extension String : _ExpressibleByStringInterpolation {
     }
   }
 
-  /// Creates a string containing the given expression's textual
-  /// representation.
-  ///
-  /// Do not call this initializer directly. It is used by the compiler when
-  /// interpreting string interpolations.
-  ///
-  /// - SeeAlso: `ExpressibleByStringInterpolation`
-  public init(stringInterpolationSegment segment: String) {
-    self = segment
-  }
-  
   public init<T> (forInterpolation expr: T) {
     self = String(describing: expr)
   }
