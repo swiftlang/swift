@@ -20,7 +20,6 @@
 public protocol _UnicodeContent {
   var isKnownLatin1: Bool { get }
   var isKnownASCII: Bool { get }
-  var isKnownValidEncoding: Bool { get }
   var isKnownFCCNormalized: Bool { get }
   var isKnownFCDForm: Bool { get }
   var isKnownNFDNormalized: Bool { get }
@@ -28,7 +27,6 @@ public protocol _UnicodeContent {
 
   func isLatin1() -> Bool
   func isASCII() -> Bool
-  func isValidEncoding() -> Bool
 
   /// A type that presents the string's UTF-16 code units without necessarily
   /// correcting encoding errors
@@ -77,6 +75,9 @@ public protocol _UnicodeStorage : _UnicodeContent {
   
   associatedtype CodeUnits : RandomAccessCollection
   // where Iterator.Element == Encoding.CodeUnit
+
+  var isKnownValidEncoding: Bool { get }
+  func isValidEncoding() -> Bool
   
   var codeUnits : CodeUnits { get }
   // func isFCCNormalized() -> Bool
