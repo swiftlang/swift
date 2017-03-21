@@ -2683,7 +2683,7 @@ static void checkSwitch(TypeChecker &TC, const SwitchStmt *stmt) {
         continue;
       
       auto &SM = TC.Context.SourceMgr;
-      auto prevLineCol = SM.getPresumedLineAndColumnForLoc(prevLoc);
+      auto prevLineCol = SM.getLineAndColumnInBuffer(prevLoc);
       if (SM.getLineAndColumnInBuffer(thisLoc).first != prevLineCol.first)
         continue;
       
