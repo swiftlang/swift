@@ -197,6 +197,10 @@ public:
     return SpecializedGenericEnv;
   }
 
+  GenericSignature *getSpecializedGenericSignature() const {
+    return SpecializedGenericSig;
+  }
+
   SubstitutionList getCallerParamSubstitutions() const {
     return CallerParamSubs;
   }
@@ -236,6 +240,8 @@ public:
   /// Returns true if a given apply can be specialized.
   static bool canBeSpecialized(ApplySite Apply, SILFunction *Callee,
                                SubstitutionList ParamSubs);
+
+  void verify() const;
 };
 
 /// Helper class for specializing a generic function given a list of
