@@ -3832,7 +3832,7 @@ public:
 
   using TrailingCallArguments::getArgumentLabels;
 
-  /// Retrieve the expression that direct represents the callee.
+  /// Retrieve the expression that directly represents the callee.
   ///
   /// The "direct" callee is the expression representing the callee
   /// after looking through top-level constructs that don't affect the
