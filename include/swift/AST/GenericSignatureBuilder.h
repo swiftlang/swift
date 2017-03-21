@@ -128,6 +128,12 @@ public:
     /// Superclass constraints written within this equivalence class.
     std::vector<ConcreteConstraint> superclassConstraints;
 
+    /// \The layout constraint for this equivalence class.
+    LayoutConstraint layout;
+
+    /// Layout constraints written within this equivalence class.
+    std::vector<Constraint<LayoutConstraint>> layoutConstraints;
+
     /// The members of the equivalence class.
     TinyPtrVector<PotentialArchetype *> members;
 
@@ -473,6 +479,11 @@ private:
   void checkConformanceConstraints(
                             ArrayRef<GenericTypeParamType *> genericParams,
                             PotentialArchetype *pa);
+
+  /// Check layout constraints within the equivalence class of the given
+  /// potential archetype.
+  void checkLayoutConstraints(ArrayRef<GenericTypeParamType *> genericParams,
+                              PotentialArchetype *pa);
 
   /// Check same-type constraints within the equivalence class of the
   /// given potential archetype.
@@ -1029,12 +1040,6 @@ class GenericSignatureBuilder::PotentialArchetype {
   mutable llvm::PointerUnion<PotentialArchetype *, EquivalenceClass *>
     representativeOrEquivClass;
 
-  /// \brief The layout constraint of this archetype, if specified.
-  LayoutConstraint Layout;
-
-  /// The source of the layout constraint requirement.
-  const RequirementSource *LayoutSource = nullptr;
-
   /// A stored nested type.
   struct StoredNestedType {
     /// The potential archetypes describing this nested type, all of which
@@ -1254,11 +1259,11 @@ public:
   }
 
   /// Retrieve the layout constraint of this archetype.
-  LayoutConstraint getLayout() const { return Layout; }
+  LayoutConstraint getLayout() const {
+    if (auto equivClass = getEquivalenceClassIfPresent())
+      return equivClass->layout;
 
-  /// Retrieve the requirement source for the layout constraint requirement.
-  const RequirementSource *getLayoutSource() const {
-    return LayoutSource;
+    return LayoutConstraint();
   }
 
   /// Retrieve the set of nested types.
