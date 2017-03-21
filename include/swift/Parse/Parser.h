@@ -1145,9 +1145,12 @@ public:
   ParserResult<Expr> parseExprStringLiteral();
   ParserResult<Expr> parseExprTypeOf();
 
-  /// If the token is an escaped identifier being used as an argument
-  /// label, but doesn't need to be, diagnose it.
-  void diagnoseEscapedArgumentLabel(const Token &tok);
+  /// Parse an argument label `identifier ':'`, if it exists.
+  ///
+  /// \param name The parsed name of the label (empty if it doesn't exist, or is
+  /// _)
+  /// \param loc The location of the label (empty if it doesn't exist)
+  void parseOptionalArgumentLabel(Identifier &name, SourceLoc &loc);
 
   /// Parse an unqualified-decl-name.
   ///
