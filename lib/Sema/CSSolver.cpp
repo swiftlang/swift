@@ -141,7 +141,7 @@ Solution ConstraintSystem::finalize(
 
   // For each of the type variables, get its fixed type.
   for (auto tv : TypeVariables) {
-    solution.typeBindings[tv] = simplifyType(tv)->reconstituteSugar();
+    solution.typeBindings[tv] = simplifyType(tv)->reconstituteSugar(false);
   }
 
   // For each of the overload sets, get its overload choice.
