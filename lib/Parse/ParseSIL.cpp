@@ -4396,8 +4396,7 @@ bool Parser::parseDeclSIL() {
         FunctionState.ParsedTypeCallback = OldParsedTypeCallback;
       };
 
-      FunctionState.ParsedTypeCallback = [&OpenedArchetypesTracker,
-                                          &FunctionState](Type ty) {
+      FunctionState.ParsedTypeCallback = [&OpenedArchetypesTracker](Type ty) {
         OpenedArchetypesTracker.registerUsedOpenedArchetypes(
           ty->getCanonicalType());
       };
