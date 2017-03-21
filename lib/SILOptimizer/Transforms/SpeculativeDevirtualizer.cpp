@@ -499,7 +499,7 @@ static bool tryToSpeculateTarget(FullApplySite AI,
     if (auto EMT = SubType.getAs<AnyMetatypeType>()) {
       auto InstTy = ClassType.getSwiftRValueType();
       auto *MetaTy = MetatypeType::get(InstTy, EMT->getRepresentation());
-      auto CanMetaTy = CanMetatypeType::CanTypeWrapper(MetaTy);
+      auto CanMetaTy = CanMetatypeType(MetaTy);
       ClassOrMetatypeType = SILType::getPrimitiveObjectType(CanMetaTy);
     }
 
