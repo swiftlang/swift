@@ -93,6 +93,8 @@ def map_line_to_source_file(target_filename, target_line_num):
     ('baz.txt', 6)
     >>> map_line_to_source_file(t.name, 42)
     ('baz.txt', 40)
+    >>> t.close()
+    >>> os.remove(t.name)
     """
     assert(target_line_num > 0)
     map = fline_map(target_filename)
@@ -142,6 +144,8 @@ def map_line_from_source_file(source_filename, source_line_num, target_filename)
     ... except RuntimeError: pass
     >>> try: map_line_from_source_file('foo.bar', 2, t.name)
     ... except RuntimeError: pass
+    >>> t.close()
+    >>> os.remove(t.name)
     """
     assert(source_line_num > 0)
     map = fline_map(target_filename)
@@ -247,6 +251,12 @@ def run():
     >>> print subprocess.check_output([sys.executable, __file__, 'foo.bar', '8', target2.name]).replace('\\r', ''),
     3
 
+    >>> target1.close()
+    >>> os.remove(target1.name)
+    >>> target2.close()
+    >>> os.remove(target2.name)
+    >>> raw_output.close()
+    >>> os.remove(raw_output.name)
     """
     if len(sys.argv) <= 1:
         import doctest
