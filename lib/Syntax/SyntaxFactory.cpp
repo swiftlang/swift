@@ -910,7 +910,7 @@ GenericRequirementListSyntax SyntaxFactory::makeBlankGenericRequirementList() {
 
 /// Make a prefix operator with the given text.
 RC<TokenSyntax>
-SyntaxFactory::makePrefixOpereator(OwnedString Name,
+SyntaxFactory::makePrefixOperator(OwnedString Name,
                                    const Trivia &LeadingTrivia) {
   return TokenSyntax::make(tok::oper_prefix, Name,
                            SourcePresence::Present, LeadingTrivia, {});
