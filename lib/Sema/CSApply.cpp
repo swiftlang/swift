@@ -2062,6 +2062,35 @@ namespace {
     Expr *visitStringLiteralExpr(StringLiteralExpr *expr) {
       return handleStringLiteralExpr(expr);
     }
+    
+    /// \brief Creates a call to `$typeRef.$member(argLabels[0]: args[0], ...)` 
+    /// whose source locations indicate it's at the same place as `nearbyExpr`. 
+    /// The `MemberRefExpr` embedded within it is fully type-checked, but the 
+    /// top-level `ApplyExpr` is not.
+    ApplyExpr *
+    buildTypeMemberCallUnchecked(TypeExpr * typeRef, ValueDecl * member, 
+                        ArrayRef<Expr *> args, ArrayRef<Identifier> argLabels,
+                        Expr * nearbyExpr) {
+      auto &tc = cs.getTypeChecker();
+      auto getType = [&](const Expr *E) -> Type {
+        return cs.getType(E);
+      };
+      
+      // FIXME: This location info is bogus.
+      Expr *memberRef = new (tc.Context) MemberRefExpr(typeRef,
+                                                       nearbyExpr->getStartLoc(),
+                                                       member,
+                                                       DeclNameLoc(nearbyExpr->getStartLoc()),
+                                                       /*Implicit=*/true);
+      cs.cacheSubExprTypes(memberRef);
+      cs.setSubExprTypes(memberRef);
+      if(tc.typeCheckExpressionShallow(memberRef, cs.DC))
+        return nullptr;
+      cs.cacheExprTypes(memberRef);
+      
+      return CallExpr::createImplicit(tc.Context, memberRef,
+                                      args, argLabels, getType);
+    }
 
     Expr *
     visitInterpolatedStringLiteralExpr(InterpolatedStringLiteralExpr *expr) {
@@ -2086,10 +2115,12 @@ namespace {
             interpolationProto, name,
             diag::interpolation_broken_proto);
       
-      // Get the concrete StringInterpolationSegment parameter type we need.
+      // Get the concrete StringInterpolationSegment type the initializer uses.
+      // This is way easier than parameterizing StringInterpolationSegment with the
+      // associated types by hand.
       auto paramType = member->getParameters()->get(0)->getVarargBaseTy();
-      auto *paramTypeRef = TypeExpr::createImplicitHack(expr->getStartLoc(), paramType,
-                                                       tc.Context);
+      auto *paramTypeRef = TypeExpr::createImplicitHack(expr->getStartLoc(), 
+                                                        paramType, tc.Context);
       
       // Get declarations to construct the .stringInterpolation and .stringLiteral 
       // cases from StringInterpolationSegment.
@@ -2103,62 +2134,30 @@ namespace {
         return nullptr;
       }
       
-      // Build a reference to the init(stringLiteral:) initializer.
-      // FIXME: This location info is bogus.
-      auto *typeRef = TypeExpr::createImplicitHack(expr->getStartLoc(), type,
-                                                   tc.Context);
-      
-      Expr *memberRef =
-        new (tc.Context) MemberRefExpr(typeRef,
-                                       expr->getStartLoc(),
-                                       member,
-                                       DeclNameLoc(expr->getStartLoc()),
-                                       /*Implicit=*/true);
-      cs.cacheSubExprTypes(memberRef);
-      cs.setSubExprTypes(memberRef);
-      bool failed = tc.typeCheckExpressionShallow(memberRef, cs.DC);
-      cs.cacheExprTypes(memberRef);
-      assert(!failed && "Could not reference string interpolation witness");
-      (void)failed;
-
-      // Collect all the arguments and their labels into these lists.
+      // We will build lists of segments and argument labels.
       SmallVector<Expr *, 4> segments;
       SmallVector<Identifier, 4> names;
       ConstraintLocatorBuilder locatorBuilder(cs.getConstraintLocator(expr));
-      auto getType = [&](const Expr *E) -> Type {
-        return cs.getType(E);
-      };
 
-      // Wrap each segment in a StringLiteralSegment initializer, then add them 
-      // to the argument lists.
+      // Wrap each segment in a StringInterpolationSegment initializer, then add  
+      // them to the argument lists.
       for (auto segment : expr->getSegments()) {
         auto segmentCase = expr->isInterpolatedSegment(segment)
                             ? stringInterpolationCase
                             : stringLiteralCase;
         
-        // Create an expression referencing `StringLiteralSegment<...>.stringLiteral` 
-        // or `StringLiteralSegment<...>.stringLiteral`, then type check it.
-        Expr *caseRef = new (tc.Context) MemberRefExpr(paramTypeRef,
-                                                       segment->getStartLoc(),
-                                                       segmentCase,
-                                                       DeclNameLoc(segment->getStartLoc()),
-                                                       /*Implicit=*/true);
-        cs.cacheSubExprTypes(caseRef);
-        cs.setSubExprTypes(caseRef);
-        if (tc.typeCheckExpressionShallow(caseRef, cs.DC))
+        // Call to `StringInterpolationSegment<…>.$segmentCase($segment)`
+        Expr *apply = buildTypeMemberCallUnchecked(paramTypeRef, segmentCase, 
+                                          { segment }, { Identifier() }, 
+                                          segment);
+        if (!apply)
           continue;
-        cs.cacheExprTypes(caseRef);
         
-        // Create a call passing the segment's value to the caseRef, then type 
-        // check it.
-        Expr *apply = CallExpr::createImplicit(
-                                               tc.Context, caseRef,
-                                               { segment }, { Identifier() }, 
-                                               getType);
         cs.cacheSubExprTypes(apply);
         cs.setSubExprTypes(apply);
         if (tc.typeCheckExpressionShallow(apply, cs.DC))
           continue;
+        
         cs.cacheExprTypes(apply);
 
         // Add the segment and its label to the list of arguments.
@@ -2174,10 +2173,14 @@ namespace {
       // If all of the segments had errors, bail out.
       if (segments.empty())
         return nullptr;
-
-      // Call the init(stringLiteral:) initializer with the arguments.
-      ApplyExpr *apply = CallExpr::createImplicit(tc.Context, memberRef,
-                                                  segments, names, getType);
+      
+      auto *typeRef = TypeExpr::createImplicitHack(expr->getStartLoc(), type,
+                                                   tc.Context);
+      
+      // Call to $type(stringLiteral: $segments)
+      auto apply = buildTypeMemberCallUnchecked(typeRef, member, 
+                                                segments, names, expr);
+      assert(apply && "Could not reference string interpolation witness");
       cs.cacheExprTypes(apply);
       expr->setSemanticExpr(finishApply(apply, openedType, locatorBuilder));
       return expr;
