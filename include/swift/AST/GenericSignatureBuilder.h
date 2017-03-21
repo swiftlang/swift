@@ -137,6 +137,22 @@ public:
     /// The members of the equivalence class.
     TinyPtrVector<PotentialArchetype *> members;
 
+    /// Describes a component within the graph of same-type constraints within
+    /// the equivalence class that is held together by derived constraints.
+    struct DerivedSameTypeComponent {
+      /// The potential archetype that acts as the anchor for this component.
+      PotentialArchetype *anchor;
+
+      /// The (best) requirement source within the component that makes the
+      /// potential archetypes in this component equivalent to the concrete
+      /// type.
+      const RequirementSource *concreteTypeSource;
+    };
+
+    /// The set of connected components within this equivalence class, using
+    /// only the derived same-type constraints in the graph.
+    std::vector<DerivedSameTypeComponent> derivedSameTypeComponents;
+
     /// Construct a new equivalence class containing only the given
     /// potential archetype (which represents itself).
     EquivalenceClass(PotentialArchetype *representative);
