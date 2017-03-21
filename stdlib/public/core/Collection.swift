@@ -551,8 +551,8 @@ public struct IndexingIterator<
 ///     }
 ///     // Prints "Highest second-half absences: 3"
 ///
-/// Slice Inherit Collection Semantics
-/// ----------------------------------
+/// Slices Inherit Collection Semantics
+/// -----------------------------------
 ///
 /// A slice inherits the value or reference semantics of its base collection.
 /// That is, when working with a slice of a mutable
