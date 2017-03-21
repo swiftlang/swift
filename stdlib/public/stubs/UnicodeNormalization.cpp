@@ -379,3 +379,10 @@ swift::__swift_stdlib_unorm2_normalize(const __swift_stdlib_UNormalizer2 *norm2,
                           ptr_cast<UChar>(dest), capacity,
                           ptr_cast<UErrorCode>(pErrorCode));
 }
+
+swift::__swift_stdlib_UBool
+swift::__swift_stdlib_unorm2_hasBoundaryBefore(
+  const __swift_stdlib_UNormalizer2 *norm2,
+  __swift_stdlib_UChar32 c) {
+  return unorm2_hasBoundaryBefore(ptr_cast<const UNormalizer2>(norm2), c);
+}
