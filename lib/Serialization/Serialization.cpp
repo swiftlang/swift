@@ -738,8 +738,24 @@ void Serializer::writeHeader(const SerializationOptions &options) {
         options_block::XCCLayout XCC(Out);
 
         SDKPath.emit(ScratchRecord, M->getASTContext().SearchPathOpts.SDKPath);
-        for (const std::string &arg : options.ExtraClangOptions) {
-          XCC.emit(ScratchRecord, arg);
+        auto &Opts = options.ExtraClangOptions;
+        for (auto Arg = Opts.begin(), E = Opts.end(); Arg != E; ++Arg) { 
+          // FIXME: This is a hack and calls for a better design.
+          //
+          // Filter out any -ivfsoverlay options that include an
+          // unextended-module-overlay.yaml overlay. By convention the Xcode
+          // buildsystem uses these while *building* mixed Objective-C and Swift
+          // frameworks; but they should never be used to *import* the module
+          // defined in the framework.
+          if (StringRef(*Arg).startswith("-ivfsoverlay")) {
+            auto Next = std::next(Arg);
+            if (Next != E &&
+                StringRef(*Next).endswith("unextended-module-overlay.yaml")) {
+              ++Arg;
+              continue;
+            }
+          }
+          XCC.emit(ScratchRecord, *Arg);
         }
       }
     }
