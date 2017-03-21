@@ -1,0 +1,162 @@
+#!/bin/bash
+UNAME=$(uname)
+function dir_name { echo "${1%/*}"; }
+function file_name { echo "${1##*/}"; }
+function first { echo "${@:1:1}"; }
+function second { echo "${@:2:1}"; }
+function last { echo "${@: -1}"; }
+function absolute_path { if [[ "$1" == /* ]]; then echo "$1"; else local name; name=$(file_name "$1"); echo "$PWD/${name}"; fi } # force to start with /
+function canonical_path { (pushd "$(dirname "$1")" > /dev/null 2>&1; absolute_path "$1") }
+function split_paths { IFS=':' read -ra PATHS <<<"$PATH"; }
+function find_path_for {
+    local name=$1
+    split_paths
+    for path in "${PATHS[@]}"; do
+        local full_path="${path}/${name}"
+        if [ -f "${full_path}" ]; then echo "${full_path}"; fi
+    done
+}
+function xcrun_find { local cmd; cmd="$1"; xcrun -find "$cmd"; }
+function find_real_command {
+    local command_name; command_name=$(file_name "$1")
+    local find_util=
+    if [[ "${UNAME}" == "Linux" ]]; then
+        find_util="find_path_for"
+    else
+        find_util="xcrun_find"
+    fi
+    case "$command_name" in
+        clang|clang++|ld|swift|swiftc|lipo|ar|codesign|dsymutil|libtool|ranlib|strip|llvm-tblgen|python) "${find_util}" "${command_name}";;
+        *) echo "${command_name}";;
+    esac
+}
+function find_o_target { # last -o wins, can short circuit for faster compiles
+    local o_target=""
+    while test $# -gt 0; do
+        case "$1" in
+            -o|--output|-output) o_target="$2"; shift;;
+            -output*) o_target="${1:7}"; shift;;
+            -o*) o_target="${1:2}"; shift;;
+            *) shift;;
+        esac; done
+    echo "${o_target}"
+}
+function find_module_target {
+    while test $# -gt 0; do
+        case "$1" in
+            -emit-module-path) echo "$2"; break;;
+            *) shift;;
+        esac; done
+}
+function emit_module_p { #emit -o's arg + swiftmodule
+    while test $# -gt 0; do
+        case "$1" in
+            -emit-module) return 0;;
+            *) shift;;
+        esac; done; return 1
+}
+function find_command_targets { # sets: outfiles
+    local name="$1"
+    local args=("${@:2}")
+    case "$name" in
+        clang|clang++|ld|libtool|clang-tblgen|llvm-tblgen|lipo|gyb)
+            outfiles=("${outfiles[@]}" $(find_o_target "${args[@]}"));;
+        swift|swiftc)
+            outfiles=("${outfiles[@]}" $(find_o_target "${args[@]}"));
+            if emit_module_p "${args[@]}" ; then
+                local last_outfile; last_outfile=("${outfiles[@]: -1}")
+                outfiles=("${outfiles[@]}" "${last_outfile:0:${#last_outfile}-12}.swiftdoc"); fi
+            find_module_target "${args[@]}";;
+        ranlib) outfiles=("${outfiles[@]}" $(first "${args[@]}"));;
+        ar) outfiles=("${outfiles[@]}" $(second "${args[@]}"));;
+        codesign|dsymutil|install_name_tool|strip) outfiles=("${outfiles[@]}" $(last "${args[@]}"));;
+        line-directive|llvm-build|python);;
+        *) >&2 echo "find_command_targets: unknown command: $1";; # not fatal error
+    esac
+}
+
+function write_outfile {
+    local outfile="$1"
+    local cmd="$2"
+    local args=("${@:3}")
+    if [[ ! -f "${outfile}" ]]; then
+        cp "$shim_path" "$outfile"
+    fi
+    local full_cmd; full_cmd=$(canonical_path "${cmd}")
+    # Write command as a runnable comment
+    echo -en "# (pushd ${PWD}; { \"${full_cmd//\"/\\\"}\""  >> "$outfile"
+    for arg in "${args[@]}"; do
+        case $arg in
+            *\"*) echo -n " \"${arg//\"/\\\"}\"" >> "$outfile";;
+            *) echo -n " \"${arg}\"" >> "$outfile";; esac; done;
+    echo "; })" >> "$outfile"
+    # Write command as exploded array
+    echo -e "{\n  \"${full_cmd//\"/\\\"}\"" >> "$outfile"
+    for arg in "${args[@]}"; do
+        case $arg in
+            *\"*) echo "  \"${arg//\"/\\\"}\"" >> "$outfile";;
+            *) echo "  \"${arg}\"" >> "$outfile";; esac; done;
+    echo -e "}" >> "$outfile"
+}
+
+function main {
+    local script_args=("${@:2}")
+
+    local original_command_absolute_path; original_command_absolute_path=$(canonical_path "${original_command}")
+    local script_dir; script_dir=$(dir_name "${original_command_absolute_path}")
+    local shim_path; shim_path="${script_dir}/shim"
+
+    # see if configuring or not
+    cmake_step_path="${script_dir}/cmake-step"
+    cmake_step=""
+    if [ -f "${cmake_step_path}" ]; then cmake_step=$(<"${cmake_step_path}"); fi
+
+    local command; command="${script_args[@]:0:1}"
+    local command_args; command_args=("${script_args[@]:1}")
+    local subcommand=""
+    local subcommand_args=()
+    local command_name; command_name=$(file_name "${command}")
+
+    case "$command_name" in
+        python)
+            case "${command_args[@]:0:1}" in
+                -c|--version);; # flags aren't subcommands
+                *) subcommand="${command_args[@]:0:1}"; subcommand_args=("${command_args[@]:1}");;
+            esac
+    esac
+
+    local computed_command=""
+    local computed_args=""
+
+    if [[ "${subcommand}" != "" ]]; then
+        computed_command="${subcommand}"
+        computed_args=("${subcommand_args[@]}")
+        command_name=$(file_name "${subcommand}")
+    else
+        computed_command="${command}"
+        computed_args=("${command_args[@]}")
+    fi
+
+    local real_command=""
+    local real_args; real_args=("${computed_args[@]}")
+    case $cmake_step in
+        configure) real_command=$(find_real_command "${computed_command}");;
+        *) real_command="${computed_command}"
+    esac
+
+    # which object files to write
+    outfiles=()
+    find_command_targets "$command_name" "${real_args[@]}"
+
+    # Always run the real line-directive command
+    if [[ "${cmake_step}" == "configure" ]] || [[ "$real_command" == *line-directive ]]; then
+        exec "${real_command}" "${real_args[@]}"
+    else
+        for outfile in "${outfiles[@]}"; do
+            write_outfile "${outfile}" "${real_command}" "${real_args[@]}"
+        done
+    fi
+}
+
+original_command=$(first "${BASH_SOURCE[@]}")
+main "$0" "${@}"
