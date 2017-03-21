@@ -1168,8 +1168,8 @@ CanType TypeBase::getCanonicalType() {
   return CanType(Result);
 }
 
-TypeBase *TypeBase::reconstituteSugar() {
-  return Type(this).transform([](Type Ty) -> Type {
+TypeBase *TypeBase::reconstituteSugar(bool Recursive) {
+  auto Func = [](Type Ty) -> Type {
     if (auto boundGeneric = dyn_cast<BoundGenericType>(Ty.getPointer())) {
       auto &ctx = boundGeneric->getASTContext();
       if (boundGeneric->getDecl() == ctx.getArrayDecl())
@@ -1184,7 +1184,11 @@ TypeBase *TypeBase::reconstituteSugar() {
         get(boundGeneric->getGenericArgs()[0]);
     }
     return Ty;
-  }).getPointer();
+  };
+  if (Recursive)
+    return Type(this).transform(Func).getPointer();
+  else
+    return Func(this).getPointer();
 }
 
 TypeBase *TypeBase::getDesugaredType() {

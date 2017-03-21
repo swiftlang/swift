@@ -367,7 +367,7 @@ public:
 
   /// Reconstitute type sugar, e.g., for array types, dictionary
   /// types, optionals, etc.
-  TypeBase *reconstituteSugar();
+  TypeBase *reconstituteSugar(bool Recursive);
 
   /// getASTContext - Return the ASTContext that this type belongs to.
   ASTContext &getASTContext() {

@@ -1418,19 +1418,14 @@ SourceFile::getDiscriminatorForPrivateValue(const ValueDecl *D) const {
   llvm::MD5::MD5Result result;
   hash.final(result);
 
-  // Make sure the whole thing is a valid identifier.
+  // Use the hash as a hex string, prefixed with an underscore to make sure
+  // it is a valid identifier.
+  // FIXME: There are more compact ways to encode a 16-byte value.
   SmallString<33> buffer{"_"};
-
-  // Write the hash as a hex string.
-  // FIXME: This should go into llvm/ADT/StringExtras.h.
-  // FIXME: And there are more compact ways to encode a 16-byte value.
-  buffer.reserve(buffer.size() + 2*llvm::array_lengthof(result));
-  for (uint8_t byte : result) {
-    buffer.push_back(llvm::hexdigit(byte >> 4, /*LowerCase=*/false));
-    buffer.push_back(llvm::hexdigit(byte & 0xF, /*LowerCase=*/false));
-  }
-
-  PrivateDiscriminator = getASTContext().getIdentifier(buffer);
+  SmallString<32> hashString;
+  llvm::MD5::stringifyResult(result, hashString);
+  buffer += hashString;
+  PrivateDiscriminator = getASTContext().getIdentifier(buffer.str().upper());
   return PrivateDiscriminator;
 }
 
