@@ -13,7 +13,7 @@ struct String {
     #if false
     // Unknown: we are a buffer of bytes representing code units and an
     // associated encoding
-    case mystery(UnsafeRawPointer, AnyUnicodeEncoding.Type) // TODO: AnyCodeUnits?
+    case mystery(UnsafeRawPointer) // TODO: AnyCodeUnits?
 
     case nsstring(UnsafeRawPointer) // TODO: what is payload?
 

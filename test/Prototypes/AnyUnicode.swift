@@ -695,7 +695,6 @@ Self.CharacterView.Index : SignedInteger
 }
 
 class AnyUnicodeBox : AnyUnicode, FactoryInitializable {
-  var encoding: AnyUnicodeEncoding.Type { fatalError("override me!") }
   var codeUnits: AnyCodeUnits { fatalError("override me!") }
   var utf16: AnyUTF16 { fatalError("override me!") }
   var unicodeScalars: AnyUnicodeScalars { fatalError("override me!") }
@@ -725,7 +724,6 @@ class AnyUnicodeBox : AnyUnicode, FactoryInitializable {
 
   class Instance<T: AnyUnicode> : AnyUnicodeBox {
     var base: T
-    override var encoding: AnyUnicodeEncoding.Type { return base.encoding }
     override var codeUnits: AnyCodeUnits { return base.codeUnits }
     override var utf16: AnyUTF16 { return base.utf16 }
     override var unicodeScalars: AnyUnicodeScalars { return base.unicodeScalars }
@@ -780,16 +778,6 @@ extension _UTF8StringStorage : AnyUnicode {
 }
 
 extension AnyStringContents : AnyUnicode {
-  var encoding: AnyUnicodeEncoding.Type {
-    switch self {
-    case .utf16(let storage):
-      return storage.isKnownValidEncoding ? ValidUTF16.self : UTF16.self
-    case .latin1(_):
-      return Latin1.self
-    case .any(let base):
-      return base.encoding
-    }
-  }
   var utf16: AnyUTF16 {
     switch self {
     case .utf16(let storage):

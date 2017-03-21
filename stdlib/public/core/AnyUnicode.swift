@@ -82,13 +82,6 @@ public protocol _UnicodeStorage : _UnicodeContent {
   // func isFCCNormalized() -> Bool
 }
 
-/// String types.
-public protocol Unicode : _UnicodeContent, RandomAccessCollection
-// where Iterator.Element == Character
-{
-  subscript(i: Index) -> Character { get }  // faux constraint
-}
-
 /// Default views
 public extension _UnicodeStorage
 where
@@ -136,12 +129,6 @@ where
 
   var unicodeScalars: _UnicodeViews<CodeUnits,Encoding>.Scalars {
     return _UnicodeViews(codeUnits, Encoding.self).scalars
-  }
-}
-
-public extension _UnicodeStorage {
-  var encoding: AnyUnicodeEncoding.Type {
-    return encoding as Encoding.Type
   }
 }
 

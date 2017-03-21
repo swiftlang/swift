@@ -39,80 +39,8 @@ case emptyInput
   }
 }
 
-// FIXME: closure-taking methods should rethrow.
-
-public protocol AnyUnicodeEncoding {
-  // FIXME: a single scalar might not be the most efficient buffer to use here.
-  // SIMD instructions can be used to decode UTF-8 much more efficiently, which
-  // could result in processing up to 16 code units at a time.
-  /// The maximum number of code units in an encoded unicoded scalar value
-  static var maxLengthOfEncodedScalar: UInt { get }
-  
-  // FIXME: do we even want these single-scalar parse methods on the thing
-  // that's going to be used with type erasure?  You pretty much want to be
-  // doing bulk-stuff behind the type erasure boundary, so things like
-  // decodeForward/decodeBackward may make ore sense.
-  
-  /// Parse a single unicode scalar forward from `input`.
-  ///
-  /// - Parameter knownCount: a number of code units known to exist in `input`.
-  ///   **Note:** passing a known compile-time constant is strongly advised,
-  ///   even if it's zero.
-  static func _parse1Forward<C: Collection>(
-    _ input: C, knownCount: Int /* = 0 */
-  ) -> ParseResult<UInt32, C.Index>
-  where C.Iterator.Element == UInt32
-
-  /// Parse a single unicode scalar in reverse from `input`.
-  ///
-  /// - Parameter knownCount: a number of code units known to exist in `input`.
-  ///   **Note:** passing a known compile-time constant is strongly advised,
-  ///   even if it's zero.
-  static func _parse1Reverse<C: BidirectionalCollection>(
-    _ input: C, knownCount: Int/* = 0 */
-  ) -> ParseResult<UInt32, C.Index>
-  where C.Iterator.Element == UInt32
-
-  /// Decode a whole collection efficiently, writing results into `output`.
-  ///
-  /// - Returns: a pair consisting of:
-  ///   0. the suffix of input starting with the first decoding error if
-  ///      `stopOnError` is true, and the empty suffix otherwise.
-  ///   1. The number of errors that were detected.  If `stopOnError` is true
-  ///      this value will never exceed 1.
-  ///
-  /// - Note: using this function may be faster than repeatedly using `parse`
-  ///   directly, because it avoids intra-scalar checks for end of sequence.
-  @discardableResult
-  static func decodeForward<C: Collection>(
-    _ input: C,
-    repairingIllFormedSequences makeRepairs: Bool /* = true */,
-    into output: (UInt32) throws ->Void
-  ) rethrows -> (remainder: C.SubSequence, errorCount: Int)
-  where C.Iterator.Element == UInt32
-  
-  /// Decode a whole collection efficiently in reverse, writing results into
-  /// `output`.
-  ///
-  /// - Returns: a pair consisting of:
-  ///   0. the suffix of input starting with the first decoding error if
-  ///      `stopOnError` is true, and the empty suffix otherwise.
-  ///   1. The number of errors that were detected.  If `stopOnError` is true
-  ///      this value will never exceed 1.
-  ///
-  /// - Note: using this function may be faster than repeatedly using `parse`
-  ///   directly, because it avoids intra-scalar checks for end of sequence.
-  @discardableResult
-  static func decodeReverse<C: BidirectionalCollection>(
-    _ input: C,
-    repairingIllFormedSequences makeRepairs: Bool /* = true */,
-    into output: (UInt32) throws->Void
-  ) rethrows -> (remainder: C.SubSequence, errorCount: Int)
-  where C.Iterator.Element == UInt32
-}
-
 /// An encoding for text with UnicodeScalar as a common currency type
-public protocol UnicodeEncoding : AnyUnicodeEncoding {
+public protocol UnicodeEncoding {
   // FIXME: a single scalar might not be the most efficient buffer to use here.
   // SIMD instructions can be used to decode UTF-8 much more efficiently, which
   // could result in processing up to 16 code units at a time.
@@ -182,77 +110,6 @@ extension UnicodeEncoding {
   C.SubSequence.Index == C.Index,
   C.SubSequence.Iterator.Element == C.Iterator.Element {
     return parse1Reverse(input, knownCount: 0)
-  }
-}
-
-/// AnyUnicodeEncoding conformance in terms of more strictly-typed
-/// stuff.
-extension UnicodeEncoding
-where EncodedScalar.Iterator.Element : UnsignedInteger {
-  
-  public static func _parse1Forward<C: Collection>(
-    _ input: C, knownCount: Int = 0
-  ) -> ParseResult<UInt32, C.Index>
-  where C.Iterator.Element == UInt32 {
-    switch parse1Forward(
-      input.lazy.map { numericCast($0) as CodeUnit }, knownCount: knownCount) {
-    case .valid(let s,let r):
-      return .valid(s.utf32.first!, resumptionPoint: r)
-    case .error(let r):
-      return .error(resumptionPoint: r)
-    case .emptyInput:
-      return .emptyInput
-    }
-  }
-
-  public static func _parse1Reverse<C: BidirectionalCollection>(
-    _ input: C, knownCount: Int = 0
-  ) -> ParseResult<UInt32, C.Index>
-  where C.Iterator.Element == UInt32 {
-    switch parse1Reverse(
-      input.lazy.map { numericCast($0) as CodeUnit },
-      knownCount: knownCount) {
-    case .valid(let s,let r):
-      return .valid(s.utf32.last!, resumptionPoint: r)
-    case .error(let r):
-      return .error(resumptionPoint: r)
-    case .emptyInput:
-      return .emptyInput
-    }
-  }
-
-  @discardableResult
-  public static func decodeForward<C: Collection>(
-    _ input: C,
-    repairingIllFormedSequences makeRepairs: Bool = true,
-    into output: (UInt32) throws->Void
-  ) rethrows -> (remainder: C.SubSequence, errorCount: Int)
-  where C.Iterator.Element == UInt32 {
-    let (remainder, errorCount) = try parseForward(
-      input.lazy.map { numericCast($0) as CodeUnit },
-      repairingIllFormedSequences: makeRepairs) {
-      try output($0.utf32.first!)
-    }
-    return (
-      remainder: input[remainder.startIndex..<remainder.endIndex],
-      errorCount: errorCount)
-  }
-  
-  @discardableResult
-  public static func decodeReverse<C: BidirectionalCollection>(
-    _ input: C,
-    repairingIllFormedSequences makeRepairs: Bool = true,
-    into output: (UInt32) throws->Void
-  ) rethrows -> (remainder: C.SubSequence, errorCount: Int)
-  where C.Iterator.Element == UInt32 {
-    let (remainder, errorCount) = try parseReverse(
-      input.lazy.map { numericCast($0) as CodeUnit },
-      repairingIllFormedSequences: makeRepairs) {
-      try output($0.utf32.first!)
-    }
-    return (
-      remainder: input[remainder.startIndex..<remainder.endIndex],
-      errorCount: errorCount)
   }
 }
 
