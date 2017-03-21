@@ -953,7 +953,7 @@ public:
   /// number of generic arguments given, whereas applyGenericArguments emits
   /// diagnostics in those cases.
   ///
-  /// \param type The unbound generic type to which to apply arguments.
+  /// \param unboundType The unbound generic type to which to apply arguments.
   /// \param decl The declaration of the type.
   /// \param loc The source location for diagnostic reporting.
   /// \param dc The context where the arguments are applied.
@@ -965,7 +965,8 @@ public:
   /// error.
   ///
   /// \see applyGenericArguments
-  Type applyUnboundGenericArguments(Type type, GenericTypeDecl *decl,
+  Type applyUnboundGenericArguments(UnboundGenericType *unboundType,
+                                    GenericTypeDecl *decl,
                                     SourceLoc loc, DeclContext *dc,
                                     MutableArrayRef<TypeLoc> genericArgs,
                                     TypeResolutionOptions options,
