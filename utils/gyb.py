@@ -1009,14 +1009,15 @@ def execute_template(ast, line_directive='', **local_bindings):
     ... THIS SHOULD NOT APPEAR IN THE OUTPUT
     ... ''')
     >>> out = execute_template(ast, line_directive='//#sourceLocation', x=1)
+    >>> out = out.replace(os.path.abspath(os.sep) + 'dummy.file', "DUMMY-FILE")
     >>> print(out, end="")
-    //#sourceLocation(file: "/dummy.file", line: 1)
+    //#sourceLocation(file: "DUMMY-FILE", line: 1)
     Nothing
-    //#sourceLocation(file: "/dummy.file", line: 4)
+    //#sourceLocation(file: "DUMMY-FILE", line: 4)
     0
-    //#sourceLocation(file: "/dummy.file", line: 4)
+    //#sourceLocation(file: "DUMMY-FILE", line: 4)
     1
-    //#sourceLocation(file: "/dummy.file", line: 4)
+    //#sourceLocation(file: "DUMMY-FILE", line: 4)
     2
 
     >>> ast = parse_template('/dummy.file', text=
@@ -1028,10 +1029,11 @@ def execute_template(ast, line_directive='', **local_bindings):
     ... ${a}
     ... ''')
     >>> out = execute_template(ast, line_directive='//#sourceLocation', x=1)
+    >>> out = out.replace(os.path.abspath(os.sep) + 'dummy.file', "DUMMY-FILE")
     >>> print(out, end="")
-    //#sourceLocation(file: "/dummy.file", line: 1)
+    //#sourceLocation(file: "DUMMY-FILE", line: 1)
     Nothing
-    //#sourceLocation(file: "/dummy.file", line: 6)
+    //#sourceLocation(file: "DUMMY-FILE", line: 6)
     [0, 1, 2]
     """
     execution_context = ExecutionContext(
