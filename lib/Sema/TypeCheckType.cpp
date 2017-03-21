@@ -512,6 +512,8 @@ Type TypeChecker::applyGenericArguments(Type type, TypeDecl *decl,
     return type;
   }
 
+  auto *unboundType = type->castTo<UnboundGenericType>();
+
   // If we have a non-generic type alias, we have an unbound generic type.
   // Grab the decl from the unbound generic type.
   //
@@ -527,7 +529,7 @@ Type TypeChecker::applyGenericArguments(Type type, TypeDecl *decl,
   //
   if (isa<TypeAliasDecl>(decl) &&
       !cast<TypeAliasDecl>(decl)->getGenericParams()) {
-    decl = type->castTo<UnboundGenericType>()->getDecl();
+    decl = unboundType->getDecl();
   }
 
   // Make sure we have the right number of generic arguments.
@@ -577,9 +579,9 @@ Type TypeChecker::applyGenericArguments(Type type, TypeDecl *decl,
     args.push_back(tyR);
 
   auto argumentOptions = options - TR_NonEnumInheritanceClauseOuterLayer;
-  auto result = applyUnboundGenericArguments(type, genericDecl, loc, dc, args,
-                                             argumentOptions, resolver,
-                                             unsatisfiedDependency);
+  auto result = applyUnboundGenericArguments(unboundType, genericDecl, loc,
+                                             dc, args, argumentOptions,
+                                             resolver, unsatisfiedDependency);
   if (!result)
     return result;
   bool isMutablePointer;
@@ -596,7 +598,8 @@ Type TypeChecker::applyGenericArguments(Type type, TypeDecl *decl,
 
 /// Apply generic arguments to the given type.
 Type TypeChecker::applyUnboundGenericArguments(
-    Type type, GenericTypeDecl *decl, SourceLoc loc, DeclContext *dc,
+    UnboundGenericType *unboundType, GenericTypeDecl *decl,
+    SourceLoc loc, DeclContext *dc,
     MutableArrayRef<TypeLoc> genericArgs,
     TypeResolutionOptions options,
     GenericTypeResolver *resolver,
@@ -620,11 +623,17 @@ Type TypeChecker::applyUnboundGenericArguments(
 
   TypeSubstitutionMap subs;
 
+  // Get the interface type for the declaration. We will be substituting
+  // type parameters that appear inside this type with the provided
+  // generic arguments.
+  auto resultType = decl->getDeclaredInterfaceType();
+
   // Get the substitutions for outer generic parameters from the parent
-  // type.
-  auto *unboundType = type->castTo<UnboundGenericType>();
-  if (auto parentType = unboundType->getParent())
-    subs = parentType->getContextSubstitutions(decl->getDeclContext());
+  // type, but skip the step if the result type does not contain any
+  // substitutable type parameters.
+  if (resultType->hasTypeParameter())
+    if (auto parentType = unboundType->getParent())
+      subs = parentType->getContextSubstitutions(decl->getDeclContext());
 
   SourceLoc noteLoc = decl->getLoc();
   if (noteLoc.isInvalid())
@@ -675,19 +684,18 @@ Type TypeChecker::applyUnboundGenericArguments(
   }
 
   // Apply the substitution map to the interface type of the declaration.
-  type = decl->getDeclaredInterfaceType();
-  type = type.subst(QueryTypeSubstitutionMap{subs},
-                    LookUpConformanceInModule(dc->getParentModule()),
-                    SubstFlags::UseErrorType);
+  resultType = resultType.subst(QueryTypeSubstitutionMap{subs},
+                                LookUpConformanceInModule(dc->getParentModule()),
+                                SubstFlags::UseErrorType);
 
   if (isa<NominalTypeDecl>(decl)) {
     if (useObjectiveCBridgeableConformancesOfArgs(
-          dc, type->castTo<BoundGenericType>(),
+          dc, resultType->castTo<BoundGenericType>(),
           unsatisfiedDependency))
       return Type();
   }
 
-  return type;
+  return resultType;
 }
 
 /// \brief Diagnose a use of an unbound generic type.
@@ -2610,7 +2618,7 @@ Type TypeResolver::resolveDictionaryType(DictionaryTypeRepr *repr,
   if (auto dictTy = TC.getDictionaryType(repr->getBrackets().Start, keyTy, 
                                          valueTy)) {
     // Check the requirements on the generic arguments.
-    auto unboundTy = dictDecl->getDeclaredType();
+    auto unboundTy = dictDecl->getDeclaredType()->castTo<UnboundGenericType>();
     TypeLoc args[2] = { TypeLoc(repr->getKey()), TypeLoc(repr->getValue()) };
     args[0].setType(keyTy, true);
     args[1].setType(valueTy, true);

@@ -164,6 +164,11 @@ class GenericClass<T> {
       return TA(a: x, b: y)
     }
   }
+
+  // Stupid corner case -- underlying type is not dependent
+  typealias NotDependent<T> = Int
+
+  func misleadingCode(_: NotDependent<String>) {}
 }
 
 let gc = GenericClass<Double>()
