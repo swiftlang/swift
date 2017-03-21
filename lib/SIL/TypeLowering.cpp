@@ -118,7 +118,8 @@ CaptureKind TypeConverter::getDeclCaptureKind(CapturedValue capture) {
       // If this is a non-address-only stored 'let' constant, we can capture it
       // by value.  If it is address-only, then we can't load it, so capture it
       // by its address (like a var) instead.
-      if (var->isLet() && !getTypeLowering(var->getType()).isAddressOnly())
+      if (var->isLet() && (!SILModuleConventions(M).useLoweredAddresses() ||
+                           !getTypeLowering(var->getType()).isAddressOnly()))
         return CaptureKind::Constant;
 
       if (var->getType()->is<InOutType>()) {
