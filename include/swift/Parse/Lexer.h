@@ -338,8 +338,6 @@ public:
   static SourceLoc getLocForStartOfToken(SourceManager &SM, unsigned BufferID,
                                          unsigned Offset);
 
-  static SourceLoc getLocForStartOfToken(SourceManager &SM, SourceLoc Loc);
-
   /// Retrieve the start location of the line containing the given location.
   /// the given location.
   static SourceLoc getLocForStartOfLine(SourceManager &SM, SourceLoc Loc);

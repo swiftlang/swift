@@ -2129,15 +2129,6 @@ static const char *findStartOfLine(const char *bufStart, const char *current) {
   return current;
 }
 
-SourceLoc Lexer::getLocForStartOfToken(SourceManager &SM, SourceLoc Loc) {
-  Optional<unsigned> BufferIdOp = SM.getIDForBufferIdentifier(SM.
-    getPresumedFilenameForLoc(Loc));
-  if (!BufferIdOp.hasValue())
-    return SourceLoc();
-  return getLocForStartOfToken(SM, BufferIdOp.getValue(),
-    SM.getLocOffsetInBuffer(Loc, BufferIdOp.getValue()));
-}
-
 SourceLoc Lexer::getLocForStartOfToken(SourceManager &SM, unsigned BufferID,
                                        unsigned Offset) {
   CharSourceRange entireRange = SM.getRangeForBuffer(BufferID);
