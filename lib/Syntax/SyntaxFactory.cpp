@@ -1025,17 +1025,10 @@ TupleTypeSyntax SyntaxFactory::makeVoidTupleType() {
 
 TupleTypeSyntax
 SyntaxFactory::makeTupleType(RC<TokenSyntax> LParen,
-                             llvm::ArrayRef<TupleTypeElementSyntax> Types,
+                             TupleTypeElementListSyntax Elements,
                              RC<TokenSyntax> RParen) {
-  RawSyntax::LayoutList RawTypes;
-  for (auto &Type : Types) {
-    RawTypes.push_back(Type.getRaw());
-  }
-  auto ArgListRaw = RawSyntax::make(SyntaxKind::TupleTypeElementList,
-                                    RawTypes,
-                                    SourcePresence::Present);
   auto Raw = RawSyntax::make(SyntaxKind::TupleType,
-                             { LParen, ArgListRaw, RParen },
+                             { LParen, Elements.getRaw(), RParen },
                              SourcePresence::Present);
   auto Data = TupleTypeSyntaxData::make(std::move(Raw));
   return TupleTypeSyntax {

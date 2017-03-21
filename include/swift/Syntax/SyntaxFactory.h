@@ -474,11 +474,11 @@ struct SyntaxFactory {
   /// Make a bare "()" void tuple type
   static TupleTypeSyntax makeVoidTupleType();
 
-  /// Make a tuple type from an array of types, with one space between each
-  /// type.
+  /// Make a tuple type from an array of types and the provided left/right
+  /// paren tokens.
   static TupleTypeSyntax
   makeTupleType(RC<TokenSyntax> LParen,
-                llvm::ArrayRef<TupleTypeElementSyntax> Types,
+                TupleTypeElementListSyntax Elements,
                 RC<TokenSyntax> RParen);
 
   /// Make a tuple type element of the form 'Name: ElementType'

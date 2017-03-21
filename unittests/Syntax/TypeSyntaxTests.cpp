@@ -239,18 +239,18 @@ TEST(TypeSyntaxTests, TupleMakeAPIs) {
   {
     SmallString<10> Scratch;
     llvm::raw_svector_ostream OS(Scratch);
-    llvm::SmallVector<TupleTypeElementSyntax, 10> TypeElements;
     auto Int = SyntaxFactory::makeTypeIdentifier("Int", {}, {});
     auto Bool = SyntaxFactory::makeTypeIdentifier("Bool", {}, {});
     auto Comma = SyntaxFactory::makeCommaToken({}, { Trivia::spaces(1) });
-    TypeElements.push_back(SyntaxFactory::makeTupleTypeElement(Int, Comma));
-    TypeElements.push_back(SyntaxFactory::makeTupleTypeElement(Bool, Comma));
-    TypeElements.push_back(SyntaxFactory::makeTupleTypeElement(Int, Comma));
-    TypeElements.push_back(SyntaxFactory::makeTupleTypeElement(Bool, Comma));
-    TypeElements.push_back(SyntaxFactory::makeTupleTypeElement(Int, None));
+    auto Elements = SyntaxFactory::makeBlankTupleTypeElementList()
+      .appending(SyntaxFactory::makeTupleTypeElement(Int, Comma))
+      .appending(SyntaxFactory::makeTupleTypeElement(Bool, Comma))
+      .appending(SyntaxFactory::makeTupleTypeElement(Int, Comma))
+      .appending(SyntaxFactory::makeTupleTypeElement(Bool, Comma))
+      .appending(SyntaxFactory::makeTupleTypeElement(Int, None));
     auto TupleType = SyntaxFactory::makeTupleType(
                         SyntaxFactory::makeLeftParenToken({}, {}),
-                        TypeElements,
+                        Elements,
                         SyntaxFactory::makeRightParenToken({}, {}));
     TupleType.print(OS);
     ASSERT_EQ(OS.str().str(),
