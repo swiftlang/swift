@@ -1,0 +1,6 @@
+module imported_modules_underlying {
+    header "outer.h"
+    explicit module inner {
+        header "inner.h"
+    }
+}
