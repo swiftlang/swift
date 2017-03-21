@@ -265,6 +265,8 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
       Action = FrontendOptions::EmitSIBGen;
     } else if (Opt.matches(OPT_emit_pch)) {
       Action = FrontendOptions::EmitPCH;
+    } else if (Opt.matches(OPT_emit_imported_modules)) {
+      Action = FrontendOptions::EmitImportedModules;
     } else if (Opt.matches(OPT_parse)) {
       Action = FrontendOptions::Parse;
     } else if (Opt.matches(OPT_typecheck)) {
@@ -543,6 +545,13 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
     case FrontendOptions::EmitObject:
       Suffix = "o";
       break;
+
+    case FrontendOptions::EmitImportedModules:
+      if (Opts.OutputFilenames.empty())
+        Opts.setSingleOutputFilename("-");
+      else
+        Suffix = "importedmodules";
+      break;
     }
 
     if (!Suffix.empty()) {
@@ -697,6 +706,7 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
     case FrontendOptions::EmitBC:
     case FrontendOptions::EmitAssembly:
     case FrontendOptions::EmitObject:
+    case FrontendOptions::EmitImportedModules:
       break;
     }
   }
@@ -726,6 +736,7 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
     case FrontendOptions::EmitBC:
     case FrontendOptions::EmitAssembly:
     case FrontendOptions::EmitObject:
+    case FrontendOptions::EmitImportedModules:
       break;
     }
   }
@@ -759,6 +770,7 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
     case FrontendOptions::EmitBC:
     case FrontendOptions::EmitAssembly:
     case FrontendOptions::EmitObject:
+    case FrontendOptions::EmitImportedModules:
       break;
     }
   }
@@ -1019,6 +1031,8 @@ static bool ParseClangImporterArgs(ClangImporterOptions &Opts,
   Opts.DisableSwiftBridgeAttr |= Args.hasArg(OPT_disable_swift_bridge_attr);
 
   Opts.DisableModulesValidateSystemHeaders |= Args.hasArg(OPT_disable_modules_validate_system_headers);
+
+  Opts.DisableAdapterModules |= Args.hasArg(OPT_emit_imported_modules);
 
   return false;
 }
