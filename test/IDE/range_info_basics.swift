@@ -128,6 +128,13 @@ func testInout(_ a : inout Int) {
   testInout(&b)
 }
 
+func test_no_pattern_binding(_ parameters: [String: Any]) -> String {
+  var components: [(String, String)] = []
+  for key in parameters.keys.sorted(by: <) {
+  }
+  return components.map { "\($0)=\($1)" }.joined(separator: "&")
+}
+
 // RUN: %target-swift-ide-test -range -pos=8:1 -end-pos 8:32 -source-filename %s | %FileCheck %s -check-prefix=CHECK1
 // RUN: %target-swift-ide-test -range -pos=9:1 -end-pos 9:26 -source-filename %s | %FileCheck %s -check-prefix=CHECK2
 // RUN: %target-swift-ide-test -range -pos=10:1 -end-pos 10:27 -source-filename %s | %FileCheck %s -check-prefix=CHECK3
@@ -163,6 +170,21 @@ func testInout(_ a : inout Int) {
 // RUN: %target-swift-ide-test -range -pos=127:3 -end-pos=127:4 -source-filename %s | %FileCheck %s -check-prefix=CHECK-INT-LVALUE
 // RUN: %target-swift-ide-test -range -pos=128:13 -end-pos=128:15 -source-filename %s | %FileCheck %s -check-prefix=CHECK-INT-INOUT
 // RUN: %target-swift-ide-test -range -pos=118:1 -end-pos=120:22 -source-filename %s | %FileCheck %s -check-prefix=CHECK-INT
+// RUN: %target-swift-ide-test -range -pos=133:1 -end-pos=135:65 -source-filename %s | %FileCheck %s -check-prefix=CHECK-NO-PATTERN
+
+// CHECK-NO-PATTERN: <Kind>MultiStatement</Kind>
+// CHECK-NO-PATTERN-NEXT: <Content>for key in parameters.keys.sorted(by: <) {
+// CHECK-NO-PATTERN-NEXT:   }
+// CHECK-NO-PATTERN-NEXT:   return components.map { "\($0)=\($1)" }.joined(separator: "&")</Content>
+// CHECK-NO-PATTERN-NEXT: <Type>String</Type>
+// CHECK-NO-PATTERN-NEXT: <Context>swift_ide_test.(file).test_no_pattern_binding(_:)</Context>
+// CHECK-NO-PATTERN-NEXT: <Declared>key</Declared><OutscopeReference>false</OutscopeReference>
+// CHECK-NO-PATTERN-NEXT: <Referenced>parameters</Referenced><Type>[String : Any]</Type>
+// CHECK-NO-PATTERN-NEXT: <Referenced>components</Referenced><Type>@lvalue [(String, String)]</Type>
+// CHECK-NO-PATTERN-NEXT: <Referenced>$0</Referenced><Type>String</Type>
+// CHECK-NO-PATTERN-NEXT: <Referenced>$1</Referenced><Type>String</Type>
+// CHECK-NO-PATTERN-NEXT: <ASTNodes>2</ASTNodes>
+// CHECK-NO-PATTERN-NEXT: <end>
 
 // CHECK-INVALID: <Kind>Invalid</Kind>
 
