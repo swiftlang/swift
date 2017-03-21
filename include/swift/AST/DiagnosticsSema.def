@@ -1591,11 +1591,15 @@ NOTE(superclass_redundancy_here,none,
      "superclass constraint %1 : %2 %select{written here|implied here}0",
      (bool, Type, Type))
 
-ERROR(mutiple_layout_constraints,none,
-      "multiple layout constraints cannot be used at the same time: %0 and %1",
-      (LayoutConstraint, LayoutConstraint))
+ERROR(conflicting_layout_constraints,none,
+      "%select{generic parameter |protocol |}0%1 has conflicting layout "
+      "constraints %2 and %3",
+      (unsigned, Type, LayoutConstraint, LayoutConstraint))
+WARNING(redundant_layout_constraint,none,
+        "redundant layout constraint %0 : %1", (Type, LayoutConstraint))
 NOTE(previous_layout_constraint, none,
-    "previous layout constraint declaration %0 was here", (LayoutConstraint))
+     "layout constraint constraint %1 : %2 %select{written here|implied here}0",
+     (bool, Type, LayoutConstraint))
 
 ERROR(generic_param_access,none,
       "%0 %select{must be declared %select{"

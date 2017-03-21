@@ -2069,30 +2069,19 @@ bool GenericSignatureBuilder::addConformanceRequirement(PotentialArchetype *PAT,
   return false;
 }
 
-bool GenericSignatureBuilder::addLayoutRequirement(PotentialArchetype *PAT,
-                                            LayoutConstraint Layout,
-                                            const RequirementSource *Source) {
-  // Add the requirement to the representative.
-  auto T = PAT->getRepresentative();
+bool GenericSignatureBuilder::addLayoutRequirement(
+                                             PotentialArchetype *PAT,
+                                             LayoutConstraint Layout,
+                                             const RequirementSource *Source) {
+  auto equivClass = PAT->getOrCreateEquivalenceClass();
 
-  if (T->Layout) {
-    if (T->Layout == Layout) {
-      // Update the source.
-      T->LayoutSource = Source;
-      return false;
-    }
-    // There is an existing layout constraint for this archetype.
-    Diags.diagnose(Source->getLoc(), diag::mutiple_layout_constraints,
-                   Layout, T->Layout);
-    Diags.diagnose(T->LayoutSource->getLoc(),
-                   diag::previous_layout_constraint, T->Layout);
-    T->setInvalid();
+  // Record this layout constraint.
+  equivClass->layoutConstraints.push_back({PAT, Layout, Source});
 
-    return true;
-  }
-
-  T->Layout = Layout;
-  T->LayoutSource = Source;
+  // Update the layout in the equivalence class, if we didn't have one already.
+  // FIXME: Layouts can probably be merged sensibly.
+  if (!equivClass->layout)
+    equivClass->layout = Layout;
 
   return false;
 }
@@ -3052,6 +3041,7 @@ GenericSignatureBuilder::finalize(SourceLoc loc,
     }
 
     checkConformanceConstraints(genericParams, archetype);
+    checkLayoutConstraints(genericParams, archetype);
     checkSameTypeConstraints(genericParams, archetype);
   });
 
@@ -3457,6 +3447,28 @@ void GenericSignatureBuilder::checkSuperclassConstraints(
   }
 }
 
+void GenericSignatureBuilder::checkLayoutConstraints(
+                                ArrayRef<GenericTypeParamType *> genericParams,
+                                PotentialArchetype *pa) {
+  auto equivClass = pa->getEquivalenceClassIfPresent();
+  if (!equivClass || !equivClass->layout) return;
+
+  checkConstraintList<LayoutConstraint>(
+    genericParams, equivClass->layoutConstraints,
+    [&](const Constraint<LayoutConstraint> &constraint) {
+      return constraint.value == equivClass->layout;
+    },
+    [&](LayoutConstraint layout) {
+      if (layout == equivClass->layout)
+        return ConstraintRelation::Redundant;
+
+      return ConstraintRelation::Conflicting;
+    },
+    diag::conflicting_layout_constraints,
+    diag::redundant_layout_constraint,
+    diag::previous_layout_constraint);
+}
+
 template<typename F>
 void GenericSignatureBuilder::visitPotentialArchetypes(F f) {
   // Stack containing all of the potential archetypes to visit.
@@ -3748,16 +3760,24 @@ void GenericSignatureBuilder::enumerateRequirements(llvm::function_ref<
     if (archetype != archetype->getArchetypeAnchor(*this))
       continue;
 
+    auto equivClass = rep->getEquivalenceClassIfPresent();
+
     // If we have a layout constraint, produce a layout requirement.
-    if (LayoutConstraint Layout = archetype->getLayout()) {
-      f(RequirementKind::Layout, archetype, Layout,
-        archetype->getLayoutSource());
+    if (equivClass && equivClass->layout) {
+      // Find the best source among the constraints that describe the layout
+      // of this type.
+      auto bestSource = equivClass->layoutConstraints.front().source;
+      for (const auto &constraint : equivClass->layoutConstraints) {
+        if (constraint.source->compare(bestSource) < 0)
+          bestSource = constraint.source;
+      }
+
+      f(RequirementKind::Layout, archetype, equivClass->layout, bestSource);
     }
 
     // Enumerate conformance requirements.
     SmallVector<ProtocolDecl *, 4> protocols;
     DenseMap<ProtocolDecl *, const RequirementSource *> protocolSources;
-    auto equivClass = rep->getEquivalenceClassIfPresent();
     if (equivClass) {
       for (const auto &conforms : equivClass->conformsTo) {
         protocols.push_back(conforms.first);
