@@ -40,10 +40,16 @@ enum class LayoutConstraintKind : unsigned char {
   TrivialOfAtMostSize,
   // It is a layout constraint representing a trivial type of an unknown size.
   Trivial,
+  // It is a layout constraint representing a reference counted class instance.
+  Class,
+  // It is a layout constraint representing a reference counted native class
+  // instance.
+  NativeClass,
   // It is a layout constraint representing a reference counted object.
   RefCountedObject,
   // It is a layout constraint representing a native reference counted object.
   NativeRefCountedObject,
+  LastLayout = NativeRefCountedObject,
 };
 
 /// This is a class representing the layout constraint.
@@ -108,6 +114,22 @@ class LayoutConstraintInfo : public llvm::FoldingSetNode {
     return isNativeRefCountedObject(Kind);
   }
 
+  bool isClass() const {
+    return isClass(Kind);
+  }
+
+  bool isNativeClass() const {
+    return isNativeClass(Kind);
+  }
+
+  bool isRefCounted() const {
+    return isRefCounted(Kind);
+  }
+
+  bool isNativeRefCounted() const {
+    return isNativeRefCounted(Kind);
+  }
+
   unsigned getTrivialSizeInBytes() const {
     assert(isKnownSizeTrivial());
     return (SizeInBits + 7) / 8;
@@ -170,6 +192,16 @@ class LayoutConstraintInfo : public llvm::FoldingSetNode {
 
   static bool isNativeRefCountedObject(LayoutConstraintKind Kind);
 
+  static bool isAnyRefCountedObject(LayoutConstraintKind Kind);
+
+  static bool isClass(LayoutConstraintKind Kind);
+
+  static bool isNativeClass(LayoutConstraintKind Kind);
+
+  static bool isRefCounted(LayoutConstraintKind Kind);
+
+  static bool isNativeRefCounted(LayoutConstraintKind Kind);
+
   /// Uniquing for the LayoutConstraintInfo.
   void Profile(llvm::FoldingSetNodeID &ID) {
     Profile(ID, Kind, SizeInBits, Alignment);
@@ -189,6 +221,14 @@ class LayoutConstraintInfo : public llvm::FoldingSetNode {
   void *operator new(size_t bytes, const ASTContext &ctx,
                      AllocationArena arena, unsigned alignment = 8);
   void *operator new(size_t Bytes, void *Mem) throw() { return Mem; }
+
+  // Representation of the non-parametrized layouts.
+  static LayoutConstraintInfo UnknownLayoutConstraintInfo;
+  static LayoutConstraintInfo RefCountedObjectConstraintInfo;
+  static LayoutConstraintInfo NativeRefCountedObjectConstraintInfo;
+  static LayoutConstraintInfo ClassConstraintInfo;
+  static LayoutConstraintInfo NativeClassConstraintInfo;
+  static LayoutConstraintInfo TrivialConstraintInfo;
 };
 
 /// A wrapper class containing a reference to the actual LayoutConstraintInfo
@@ -204,12 +244,14 @@ class LayoutConstraint {
   static LayoutConstraint getLayoutConstraint(LayoutConstraintKind Kind,
                                               ASTContext &C);
 
+  static LayoutConstraint getLayoutConstraint(LayoutConstraintKind Kind);
+
   static LayoutConstraint getLayoutConstraint(LayoutConstraintKind Kind,
                                               unsigned SizeInBits,
                                               unsigned Alignment,
                                               ASTContext &C);
 
-  static LayoutConstraint getUnknownLayout(ASTContext &C);
+  static LayoutConstraint getUnknownLayout();
 
   LayoutConstraintInfo *getPointer() const { return Ptr; }
 

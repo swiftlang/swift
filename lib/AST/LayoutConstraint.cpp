@@ -51,6 +51,10 @@ StringRef LayoutConstraintInfo::getName(LayoutConstraintKind Kind) {
   switch (Kind) {
   case LayoutConstraintKind::UnknownLayout:
     return "_UnknownLayout";
+  case LayoutConstraintKind::Class:
+    return "_Class";
+  case LayoutConstraintKind::NativeClass:
+    return "_NativeClass";
   case LayoutConstraintKind::RefCountedObject:
     return "_RefCountedObject";
   case LayoutConstraintKind::NativeRefCountedObject:
@@ -106,6 +110,28 @@ bool LayoutConstraintInfo::isNativeRefCountedObject(LayoutConstraintKind Kind) {
   return Kind == LayoutConstraintKind::NativeRefCountedObject;
 }
 
+bool LayoutConstraintInfo::isAnyRefCountedObject(LayoutConstraintKind Kind) {
+  return isRefCountedObject(Kind) || isNativeRefCountedObject(Kind);
+}
+
+bool LayoutConstraintInfo::isClass(LayoutConstraintKind Kind) {
+  return Kind == LayoutConstraintKind::Class ||
+         Kind == LayoutConstraintKind::NativeClass;
+}
+
+bool LayoutConstraintInfo::isNativeClass(LayoutConstraintKind Kind) {
+  return Kind == LayoutConstraintKind::NativeClass;
+}
+
+bool LayoutConstraintInfo::isRefCounted(LayoutConstraintKind Kind) {
+  return isAnyRefCountedObject(Kind) || isClass(Kind);
+}
+
+bool LayoutConstraintInfo::isNativeRefCounted(LayoutConstraintKind Kind) {
+  return Kind == LayoutConstraintKind::NativeRefCountedObject ||
+         Kind == LayoutConstraintKind::NativeClass;
+}
+
 void *LayoutConstraintInfo::operator new(size_t bytes, const ASTContext &ctx,
                                          AllocationArena arena,
                                          unsigned alignment) {
@@ -113,5 +139,51 @@ void *LayoutConstraintInfo::operator new(size_t bytes, const ASTContext &ctx,
 }
 
 SourceRange LayoutConstraintLoc::getSourceRange() const { return getLoc(); }
+
+
+LayoutConstraint
+LayoutConstraint::getLayoutConstraint(LayoutConstraintKind Kind) {
+  assert(!LayoutConstraintInfo::isKnownSizeTrivial(Kind));
+  switch(Kind) {
+  case LayoutConstraintKind::Trivial:
+    return LayoutConstraint(&LayoutConstraintInfo::TrivialConstraintInfo);
+  case LayoutConstraintKind::NativeClass:
+    return LayoutConstraint(&LayoutConstraintInfo::NativeClassConstraintInfo);
+  case LayoutConstraintKind::Class:
+    return LayoutConstraint(&LayoutConstraintInfo::ClassConstraintInfo);
+  case LayoutConstraintKind::NativeRefCountedObject:
+    return LayoutConstraint(
+        &LayoutConstraintInfo::NativeRefCountedObjectConstraintInfo);
+  case LayoutConstraintKind::RefCountedObject:
+    return LayoutConstraint(
+        &LayoutConstraintInfo::RefCountedObjectConstraintInfo);
+  case LayoutConstraintKind::UnknownLayout:
+    return LayoutConstraint(&LayoutConstraintInfo::UnknownLayoutConstraintInfo);
+  case LayoutConstraintKind::TrivialOfAtMostSize:
+  case LayoutConstraintKind::TrivialOfExactSize:
+    llvm_unreachable("Wrong layout constraint kind");
+  }
+}
+
+LayoutConstraint LayoutConstraint::getUnknownLayout() {
+  return LayoutConstraint(&LayoutConstraintInfo::UnknownLayoutConstraintInfo);
+}
+
+LayoutConstraintInfo LayoutConstraintInfo::UnknownLayoutConstraintInfo;
+
+LayoutConstraintInfo LayoutConstraintInfo::RefCountedObjectConstraintInfo(
+    LayoutConstraintKind::RefCountedObject);
+
+LayoutConstraintInfo LayoutConstraintInfo::NativeRefCountedObjectConstraintInfo(
+    LayoutConstraintKind::NativeRefCountedObject);
+
+LayoutConstraintInfo LayoutConstraintInfo::ClassConstraintInfo(
+    LayoutConstraintKind::Class);
+
+LayoutConstraintInfo LayoutConstraintInfo::NativeClassConstraintInfo(
+    LayoutConstraintKind::NativeClass);
+
+LayoutConstraintInfo LayoutConstraintInfo::TrivialConstraintInfo(
+    LayoutConstraintKind::Trivial);
 
 } // end namespace swift

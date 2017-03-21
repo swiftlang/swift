@@ -4074,6 +4074,12 @@ LayoutConstraint LayoutConstraint::getLayoutConstraint(LayoutConstraintKind Kind
                                                       unsigned SizeInBits,
                                                       unsigned Alignment,
                                                       ASTContext &C) {
+  if (!LayoutConstraintInfo::isKnownSizeTrivial(Kind)) {
+    assert(SizeInBits == 0);
+    assert(Alignment == 0);
+    return getLayoutConstraint(Kind);
+  }
+
   // Check to see if we've already seen this tuple before.
   llvm::FoldingSetNodeID ID;
   LayoutConstraintInfo::Profile(ID, Kind, SizeInBits, Alignment);
@@ -4094,7 +4100,4 @@ LayoutConstraint LayoutConstraint::getLayoutConstraint(LayoutConstraintKind Kind
   return LayoutConstraint(New);
 }
 
-LayoutConstraint LayoutConstraint::getUnknownLayout(ASTContext &C) {
-  return getLayoutConstraint(LayoutConstraintKind::UnknownLayout, 0, 0, C);
-}
 
