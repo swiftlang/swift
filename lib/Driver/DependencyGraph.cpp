@@ -251,7 +251,7 @@ LoadResult DependencyGraphImpl::loadFromBuffer(const void *node,
   };
 
   auto providesCallback =
-      [this, node, &provides](StringRef name, DependencyKind kind,
+      [&provides](StringRef name, DependencyKind kind,
                               bool isCascading) -> LoadResult {
     assert(isCascading);
     auto iter = std::find_if(provides.begin(), provides.end(),
