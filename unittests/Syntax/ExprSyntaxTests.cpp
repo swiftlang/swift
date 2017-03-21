@@ -43,15 +43,16 @@ TEST(ExprSyntaxTests, IntegerLiteralExprMakeAPIs) {
     ASSERT_EQ(OS.str().str(), "0    ");
   }
   {
-    auto LiteralToken = SyntaxFactory::makeIntegerLiteralToken("1_000", {}, {});
-    auto NoSign = TokenSyntax::missingToken(tok::oper_prefix, "");
-    auto OneThousand = SyntaxFactory::makeIntegerLiteralExpr(NoSign,
+    auto LiteralToken =
+      SyntaxFactory::makeIntegerLiteralToken("1_000_000_000_000", {}, {});
+    auto PlusSign = SyntaxFactory::makePrefixOperator("+", {});
+    auto OneThousand = SyntaxFactory::makeIntegerLiteralExpr(PlusSign,
                                                              LiteralToken);
 
     llvm::SmallString<10> Scratch;
     llvm::raw_svector_ostream OS(Scratch);
     OneThousand.print(OS);
-    ASSERT_EQ(OS.str().str(), "1_000");
+    ASSERT_EQ(OS.str().str(), "+1_000_000_000_000");
   }
 }
 
