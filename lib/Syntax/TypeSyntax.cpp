@@ -304,7 +304,7 @@ TupleTypeSyntaxData::TupleTypeSyntaxData(RC<RawSyntax> Raw,
                                  tok::l_paren,
                                  "(");
   syntax_assert_child_kind(Raw, TupleTypeSyntax::Cursor::TypeArgumentList,
-                           SyntaxKind::TypeArgumentList);
+                           SyntaxKind::TupleTypeElementList);
   syntax_assert_child_token_text(Raw, TupleTypeSyntax::Cursor::RightParenToken,
                                  tok::r_paren,
                                  ")");
@@ -325,7 +325,7 @@ TupleTypeSyntaxData::makeBlank() {
       RawSyntax::make(SyntaxKind::TupleType,
                       {
                         TokenSyntax::missingToken(tok::l_paren, "("),
-                        RawSyntax::missing(SyntaxKind::TypeArgumentList),
+                        RawSyntax::missing(SyntaxKind::TupleTypeElementList),
                         TokenSyntax::missingToken(tok::r_paren, ")"),
                       },
                       SourcePresence::Present));
@@ -345,7 +345,7 @@ TupleTypeSyntax::withLeftParen(RC<TokenSyntax> NewLeftParen) const {
 }
 
 TupleTypeSyntax TupleTypeSyntax::
-withTypeArgumentList(TypeArgumentListSyntax NewTypeArgumentList) const {
+withTypeArgumentList(TupleTypeElementListSyntax NewTypeArgumentList) const {
   auto NewRaw = getRaw()->replaceChild(Cursor::TypeArgumentList,
                                        NewTypeArgumentList.getRaw());
   return Data->replaceSelf<TupleTypeSyntax>(NewRaw);
@@ -383,7 +383,7 @@ TupleTypeSyntaxBuilder::useRightParen(RC<TokenSyntax> RightParen) {
 }
 
 TupleTypeSyntax TupleTypeSyntaxBuilder::build() const {
-  auto ElementsRaw = RawSyntax::make(SyntaxKind::TypeArgumentList,
+  auto ElementsRaw = RawSyntax::make(SyntaxKind::TupleTypeElementList,
                                      { ElementTypeLayout },
                                      SourcePresence::Present);
   auto Raw = RawSyntax::make(SyntaxKind::TupleType,
@@ -878,8 +878,11 @@ FunctionTypeSyntaxData::FunctionTypeSyntaxData(RC<RawSyntax> Raw,
                            SyntaxKind::TypeAttributes);
   syntax_assert_child_token_text(Raw, FunctionTypeSyntax::Cursor::LeftParen,
                                  tok::l_paren, "(");
+
+  // FIXME: This needs its own element and element list.
   syntax_assert_child_kind(Raw, FunctionTypeSyntax::Cursor::ArgumentList,
-                           SyntaxKind::TypeArgumentList);
+                           SyntaxKind::TupleTypeElementList);
+
   syntax_assert_child_token_text(Raw, FunctionTypeSyntax::Cursor::RightParen,
                                  tok::r_paren, ")");
 #ifndef NDEBUG
@@ -908,7 +911,8 @@ RC<FunctionTypeSyntaxData> FunctionTypeSyntaxData::makeBlank() {
     {
       RawSyntax::missing(SyntaxKind::TypeAttributes),
       TokenSyntax::missingToken(tok::l_paren, "("),
-      RawSyntax::missing(SyntaxKind::TypeArgumentList),
+      // FIXME: This needs its own element and element list.
+      RawSyntax::missing(SyntaxKind::TupleTypeElementList),
       TokenSyntax::missingToken(tok::r_paren, ")"),
       TokenSyntax::missingToken(tok::kw_throws, "throws"),
       TokenSyntax::missingToken(tok::arrow, "->"),
@@ -1038,7 +1042,7 @@ addArgumentTypeSyntax(Optional<RC<TokenSyntax>> MaybeComma,
 
   TypeArgumentsLayout.push_back(NewTypeArgument.getRaw());
 
-  FunctionTypeLayout[Index] = RawSyntax::make(SyntaxKind::TypeArgumentList,
+  FunctionTypeLayout[Index] = RawSyntax::make(SyntaxKind::TupleTypeElementList,
                                               TypeArgumentsLayout,
                                               SourcePresence::Present);
   return *this;

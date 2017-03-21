@@ -481,7 +481,8 @@ struct SyntaxFactory {
 
   /// Make a tuple type element of the form 'Name: ElementType'
   static TupleTypeElementSyntax
-  makeTupleTypeElement(RC<TokenSyntax> Name, TypeSyntax ElementType,
+  makeTupleTypeElement(RC<TokenSyntax> Name, RC<TokenSyntax> Colon,
+                       TypeSyntax ElementType,
                        llvm::Optional<RC<TokenSyntax>> MaybeComma = llvm::None);
 
   /// Make a tuple type element without a label.
@@ -572,7 +573,7 @@ struct SyntaxFactory {
   static FunctionTypeSyntax
   makeFunctionType(TypeAttributesSyntax TypeAttributes,
                    RC<TokenSyntax> LeftParen,
-                   TypeArgumentListSyntax ArgumentList,
+                   TupleTypeElementListSyntax ArgumentList,
                    RC<TokenSyntax> RightParen, RC<TokenSyntax> ThrowsOrRethrows,
                    RC<TokenSyntax> Arrow, TypeSyntax ReturnType);
 
@@ -582,7 +583,7 @@ struct SyntaxFactory {
 #pragma mark - type-argument-list
 
   /// Make a list of type arguments with all elements marked as missing.
-  static TypeArgumentListSyntax makeBlankTypeArgumentList();
+  static TupleTypeElementListSyntax makeBlankTypeArgumentList();
 
 #pragma mark - Generics
 

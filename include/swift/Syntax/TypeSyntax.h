@@ -450,11 +450,11 @@ public:
   TupleTypeSyntax withLeftParen(RC<TokenSyntax> NewLeftParen) const;
 
   /// Get the type argument list inside the tuple type syntax.
-  TypeArgumentListSyntax getTypeArgumentList() const;
+  TupleTypeElementListSyntax getTypeArgumentList() const;
 
   /// Return a new tuple type syntax with the given type argument list.
   TupleTypeSyntax
-  withTypeArgumentList(TypeArgumentListSyntax NewTypeArgumentList) const;
+  withTypeArgumentList(TupleTypeElementListSyntax NewTypeArgumentList) const;
 
   /// Return the right paren ')' token surrounding the tuple type syntax.
   RC<TokenSyntax> getRightParen() const;
@@ -934,13 +934,13 @@ public:
                   FunctionTypeArgumentSyntax NewArgument) const;
 
   /// Return the type arguments list for this function type syntax.
-  TypeArgumentListSyntax getTypeArgumentList() const;
+  TupleTypeElementListSyntax getTypeArgumentList() const;
 
   /// Return a new function type with the given type argument list.
   ///
   /// This replaces all of the argument types.
   FunctionTypeSyntax
-  withTypeArgumentList(TypeArgumentListSyntax NewArgumentList) const;
+  withTypeArgumentList(TupleTypeElementListSyntax NewArgumentList) const;
 
   /// Return the right parenthesis ')' token surrounding the argument type.
   RC<TokenSyntax> getRightArgumentsParen() const;

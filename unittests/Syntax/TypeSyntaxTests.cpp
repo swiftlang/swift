@@ -207,11 +207,13 @@ TEST(TypeSyntaxTests, TupleBuilderAPIs) {
     TupleTypeSyntaxBuilder Builder;
     Builder.useLeftParen(SyntaxFactory::makeLeftParenToken({}, {}));
     auto Comma = SyntaxFactory::makeCommaToken({}, { Trivia::spaces(1) });
+    auto Colon = SyntaxFactory::makeColonToken({}, { Trivia::spaces(1) });
     auto Int = SyntaxFactory::makeTypeIdentifier("Int", {}, {});
     auto xLabel = SyntaxFactory::makeIdentifier("x", {} , {});
-    auto xTypeElt = SyntaxFactory::makeTupleTypeElement(xLabel, Int, Comma);
+    auto xTypeElt = SyntaxFactory::makeTupleTypeElement(xLabel, Colon,
+                                                        Int, Comma);
     auto yLabel = SyntaxFactory::makeIdentifier("y", {} , {});
-    auto yTypeElt = SyntaxFactory::makeTupleTypeElement(yLabel, Int)
+    auto yTypeElt = SyntaxFactory::makeTupleTypeElement(yLabel, Colon, Int)
       .withInoutToken(
         SyntaxFactory::makeInoutKeyword({}, { Trivia::spaces(1) }));
     Builder.addElementTypeSyntax(xTypeElt);
@@ -444,6 +446,7 @@ TEST(TypeSyntaxTests, DictionaryTypeMakeAPIs) {
 
 TEST(TypeSyntaxTests, FunctionTypeMakeAPIs) {
   auto Comma = SyntaxFactory::makeCommaToken({}, { Trivia::spaces(1) });
+  auto Colon = SyntaxFactory::makeColonToken({}, { Trivia::spaces(1) });
   auto LeftParen = SyntaxFactory::makeLeftParenToken({}, {});
   auto RightParen = SyntaxFactory::makeRightParenToken({},
                                                          {Trivia::spaces(1)});
@@ -460,8 +463,8 @@ TEST(TypeSyntaxTests, FunctionTypeMakeAPIs) {
 
     auto x = SyntaxFactory::makeIdentifier("x", {}, {});
     auto y = SyntaxFactory::makeIdentifier("y", {}, {});
-    auto xArg = SyntaxFactory::makeTupleTypeElement(x, Int, Comma);
-    auto yArg = SyntaxFactory::makeTupleTypeElement(y, Int);
+    auto xArg = SyntaxFactory::makeTupleTypeElement(x, Colon, Int, Comma);
+    auto yArg = SyntaxFactory::makeTupleTypeElement(y, Colon, Int);
 
     auto Attrs = SyntaxFactory::makeBlankTypeAttributes();
     auto ArgList = SyntaxFactory::makeBlankTypeArgumentList()
@@ -497,8 +500,8 @@ TEST(TypeSyntaxTests, FunctionTypeMakeAPIs) {
     llvm::raw_svector_ostream OS(Scratch);
     auto x = SyntaxFactory::makeIdentifier("x", {}, {});
     auto y = SyntaxFactory::makeIdentifier("y", {}, {});
-    auto xArg = SyntaxFactory::makeTupleTypeElement(x, Int);
-    auto yArg = SyntaxFactory::makeTupleTypeElement(y, Int);
+    auto xArg = SyntaxFactory::makeTupleTypeElement(x, Colon, Int);
+    auto yArg = SyntaxFactory::makeTupleTypeElement(y, Colon, Int);
 
     auto Attrs = SyntaxFactory::makeBlankTypeAttributes();
     auto ArgList = SyntaxFactory::makeBlankTypeArgumentList();

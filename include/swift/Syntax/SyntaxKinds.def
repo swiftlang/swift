@@ -109,7 +109,7 @@ SYNTAX(FunctionParameter, Syntax)
 SYNTAX(DeclModifier, Syntax)
 SYNTAX(DeclModifierList, Syntax)
 
-SYNTAX_COLLECTION(TypeArgumentList, TupleTypeElementSyntax)
+SYNTAX_COLLECTION(TupleTypeElementList, TupleTypeElementSyntax)
 
 #undef SYNTAX_COLLECTION
 #undef ABSTRACT_SYNTAX

@@ -1013,7 +1013,7 @@ TupleTypeSyntax SyntaxFactory::makeVoidTupleType() {
   auto Raw = RawSyntax::make(SyntaxKind::TupleType,
     {
       SyntaxFactory::makeLeftParenToken({}, {}),
-      RawSyntax::missing(SyntaxKind::TypeArgumentList),
+      RawSyntax::missing(SyntaxKind::TupleTypeElementList),
       SyntaxFactory::makeRightParenToken({}, {}),
     },
     SourcePresence::Present);
@@ -1029,7 +1029,7 @@ SyntaxFactory::makeTupleType(llvm::ArrayRef<TupleTypeElementSyntax> Types) {
   for (auto &Type : Types) {
     RawTypes.push_back(Type.getRaw());
   }
-  auto ArgListRaw = RawSyntax::make(SyntaxKind::TypeArgumentList,
+  auto ArgListRaw = RawSyntax::make(SyntaxKind::TupleTypeElementList,
                                     RawTypes,
                                     SourcePresence::Present);
   auto Raw = RawSyntax::make(SyntaxKind::TupleType,
@@ -1047,6 +1047,7 @@ SyntaxFactory::makeTupleType(llvm::ArrayRef<TupleTypeElementSyntax> Types) {
 
 TupleTypeElementSyntax
 SyntaxFactory::makeTupleTypeElement(RC<TokenSyntax> Name,
+                                    RC<TokenSyntax> Colon,
                                     TypeSyntax ElementTypeSyntax,
                                     Optional<RC<TokenSyntax>> MaybeComma) {
   auto Data = TupleTypeElementSyntaxData::makeBlank();
@@ -1058,7 +1059,7 @@ SyntaxFactory::makeTupleTypeElement(RC<TokenSyntax> Name,
   }
   return TupleTypeElementSyntax { Data, Data.get() }
     .withLabel(Name)
-    .withColonToken(SyntaxFactory::makeColonToken({}, Trivia::spaces(1)))
+    .withColonToken(Colon)
     .withTypeSyntax(ElementTypeSyntax)
     .withCommaToken(Comma);
 }
@@ -1146,7 +1147,7 @@ MetatypeTypeSyntax SyntaxFactory::makeBlankMetatypeType() {
 
 FunctionTypeSyntax SyntaxFactory::makeFunctionType(
     TypeAttributesSyntax TypeAttributes, RC<TokenSyntax> LeftParen,
-    TypeArgumentListSyntax ArgumentList, RC<TokenSyntax> RightParen,
+    TupleTypeElementListSyntax ArgumentList, RC<TokenSyntax> RightParen,
     RC<TokenSyntax> ThrowsOrRethrows, RC<TokenSyntax> Arrow,
     TypeSyntax ReturnType) {
   auto Raw =
@@ -1232,9 +1233,9 @@ TypeAttributesSyntax SyntaxFactory::makeBlankTypeAttributes() {
   return TypeAttributesSyntax { Data, Data.get() };
 }
 
-TypeArgumentListSyntax SyntaxFactory::makeBlankTypeArgumentList() {
-  auto Data = TypeArgumentListSyntaxData::makeBlank();
-  return TypeArgumentListSyntax { Data, Data.get() };
+TupleTypeElementListSyntax SyntaxFactory::makeBlankTypeArgumentList() {
+  auto Data = TupleTypeElementListSyntaxData::makeBlank();
+  return TupleTypeElementListSyntax { Data, Data.get() };
 }
 
 #pragma mark - array-type
