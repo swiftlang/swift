@@ -1593,7 +1593,10 @@ static void unwrapExistential(OpaqueValue *src,
       auto opaqueContainer = reinterpret_cast<OpaqueExistentialContainer*>(src);
       srcCapturedType = opaqueContainer->Type;
       srcValue = srcType->projectValue(src);
-      canTake = false;
+      // Can't take out of possibly shared existential boxes.
+      canTake = (src == srcValue);
+      assert(canTake == srcCapturedType->getValueWitnesses()->isValueInline() &&
+             "Only inline storage is take-able");
 #else
       auto opaqueContainer = reinterpret_cast<OpaqueExistentialContainer*>(src);
       srcCapturedType = opaqueContainer->Type;
@@ -1653,9 +1656,7 @@ static bool _dynamicCastFromExistential(OpaqueValue *dest,
   } else {
 #ifdef SWIFT_RUNTIME_ENABLE_COW_EXISTENTIALS
     assert(!isOutOfLine &&
-           srcType->getRepresentation() !=
-               ExistentialTypeRepresentation::Opaque &&
-           "Should only see inline represenations and no opaque existential");
+           "Should only see inline represenations of existentials");
 #else
     // swift_dynamicCast took or destroyed the value as per the original request
     // We may still have an opaque existential container to deallocate.
