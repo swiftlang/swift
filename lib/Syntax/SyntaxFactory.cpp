@@ -1233,7 +1233,7 @@ TypeAttributesSyntax SyntaxFactory::makeBlankTypeAttributes() {
   return TypeAttributesSyntax { Data, Data.get() };
 }
 
-TupleTypeElementListSyntax SyntaxFactory::makeBlankTypeArgumentList() {
+TupleTypeElementListSyntax SyntaxFactory::makeBlankTupleTypeElementList() {
   auto Data = TupleTypeElementListSyntaxData::makeBlank();
   return TupleTypeElementListSyntax { Data, Data.get() };
 }

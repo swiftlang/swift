@@ -467,11 +467,11 @@ TEST(TypeSyntaxTests, FunctionTypeMakeAPIs) {
     auto yArg = SyntaxFactory::makeTupleTypeElement(y, Colon, Int);
 
     auto Attrs = SyntaxFactory::makeBlankTypeAttributes();
-    auto ArgList = SyntaxFactory::makeBlankTypeArgumentList()
+    auto TypeList = SyntaxFactory::makeBlankTupleTypeElementList()
       .appending(xArg)
       .appending(yArg);
     SyntaxFactory::makeFunctionType(Attrs,
-                                    LeftParen, ArgList, RightParen,
+                                    LeftParen, TypeList, RightParen,
                                     Throws,
                                     Arrow,
                                     Int)
@@ -484,14 +484,14 @@ TEST(TypeSyntaxTests, FunctionTypeMakeAPIs) {
     llvm::raw_svector_ostream OS(Scratch);
     auto IntArgComma = IntArg.withCommaToken(Comma);
     auto Attrs = SyntaxFactory::makeBlankTypeAttributes();
-    auto ArgList = SyntaxFactory::makeBlankTypeArgumentList()
+    auto TypeList = SyntaxFactory::makeBlankTupleTypeElementList()
       .appending(IntArg.withCommaToken(Comma))
       .appending(IntArg);
     SyntaxFactory::makeFunctionType(Attrs,
-                                      LeftParen, ArgList, RightParen,
-                                      Rethrows,
-                                      Arrow,
-                                      Int).print(OS);
+                                    LeftParen, TypeList, RightParen,
+                                    Rethrows,
+                                    Arrow,
+                                    Int).print(OS);
     ASSERT_EQ(OS.str().str(), "(Int, Int) rethrows -> Int");
   }
 
@@ -504,14 +504,14 @@ TEST(TypeSyntaxTests, FunctionTypeMakeAPIs) {
     auto yArg = SyntaxFactory::makeTupleTypeElement(y, Colon, Int);
 
     auto Attrs = SyntaxFactory::makeBlankTypeAttributes();
-    auto ArgList = SyntaxFactory::makeBlankTypeArgumentList();
+    auto TypeList = SyntaxFactory::makeBlankTupleTypeElementList();
     auto Void = SyntaxFactory::makeVoidTupleType();
     SyntaxFactory::makeFunctionType(Attrs,
-                                      LeftParen, ArgList, RightParen,
-                                      TokenSyntax::missingToken(tok::kw_throws,
-                                                                "throws"),
-                                      Arrow,
-                                      Void).print(OS);
+                                    LeftParen, TypeList, RightParen,
+                                    TokenSyntax::missingToken(tok::kw_throws,
+                                                              "throws"),
+                                    Arrow,
+                                    Void).print(OS);
     ASSERT_EQ(OS.str().str(), "() -> ()");
   }
 

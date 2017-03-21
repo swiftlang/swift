@@ -580,10 +580,10 @@ struct SyntaxFactory {
   /// Make a function type with all elements marked as missing.
   static FunctionTypeSyntax makeBlankFunctionType();
 
-#pragma mark - type-argument-list
+#pragma mark - tuple-type-element-list
 
   /// Make a list of type arguments with all elements marked as missing.
-  static TupleTypeElementListSyntax makeBlankTypeArgumentList();
+  static TupleTypeElementListSyntax makeBlankTupleTypeElementList();
 
 #pragma mark - Generics
 

@@ -362,7 +362,7 @@ withRightParen(RC<TokenSyntax> NewRightParen) const {
 
 TupleTypeSyntaxBuilder::TupleTypeSyntaxBuilder()
   : ElementTypeLayout(
-      SyntaxFactory::makeBlankTypeArgumentList().getRaw()->Layout) {}
+      SyntaxFactory::makeBlankTupleTypeElementList().getRaw()->Layout) {}
 
 TupleTypeSyntaxBuilder &TupleTypeSyntaxBuilder::
 addElementTypeSyntax(TupleTypeElementSyntax ElementTypeSyntax) {
