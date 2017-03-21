@@ -82,7 +82,7 @@ public:
 // - Both threads get the exact same child (by identity)
 TEST(ThreadSafeCachingTests, ReturnGetExpression) {
   auto ReturnKW = SyntaxFactory::makeReturnKeyword({}, Trivia::spaces(1));
-  auto Minus = SyntaxFactory::makePrefixOpereator("-", {});
+  auto Minus = SyntaxFactory::makePrefixOperator("-", {});
   auto One = SyntaxFactory::makeIntegerLiteralToken("1", {}, {});
   auto MinusOne = SyntaxFactory::makeIntegerLiteralExpr(Minus, One);
 

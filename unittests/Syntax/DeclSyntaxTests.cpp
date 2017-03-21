@@ -208,7 +208,7 @@ FunctionParameterSyntax getCannedFunctionParameter() {
   auto NoEllipsis = TokenSyntax::missingToken(tok::identifier, "...");
   auto Equal = SyntaxFactory::makeEqualToken({}, Trivia::spaces(1));
 
-  auto Sign = SyntaxFactory::makePrefixOpereator("-", {});
+  auto Sign = SyntaxFactory::makePrefixOperator("-", {});
   auto OneDigits = SyntaxFactory::makeIntegerLiteralToken("1", {}, {});
   auto One = SyntaxFactory::makeIntegerLiteralExpr(Sign, OneDigits);
   auto Comma = SyntaxFactory::makeCommaToken({}, Trivia::spaces(1));
@@ -243,7 +243,7 @@ TEST(DeclSyntaxTests, FunctionParameterGetAPIs) {
   auto NoEllipsis = TokenSyntax::missingToken(tok::identifier, "...");
   auto Equal = SyntaxFactory::makeEqualToken({}, Trivia::spaces(1));
 
-  auto Sign = SyntaxFactory::makePrefixOpereator("-", {});
+  auto Sign = SyntaxFactory::makePrefixOperator("-", {});
   auto OneDigits = SyntaxFactory::makeIntegerLiteralToken("1", {}, {});
   auto One = SyntaxFactory::makeIntegerLiteralExpr(Sign, OneDigits);
   auto Comma = SyntaxFactory::makeCommaToken({}, {});

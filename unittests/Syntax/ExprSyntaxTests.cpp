@@ -8,7 +8,52 @@ using namespace swift::syntax;
 
 #pragma mark - integer-literal-expression
 
-// TODO
+TEST(ExprSyntaxTests, IntegerLiteralExprMakeAPIs) {
+  {
+    auto LiteralToken = SyntaxFactory::makeIntegerLiteralToken("100", {}, {});
+    auto Sign = SyntaxFactory::makePrefixOperator("-", {});
+    auto Literal = SyntaxFactory::makeIntegerLiteralExpr(Sign, LiteralToken);
+
+    llvm::SmallString<10> Scratch;
+    llvm::raw_svector_ostream OS(Scratch);
+    Literal.print(OS);
+    ASSERT_EQ(OS.str().str(), "-100");
+    ASSERT_EQ(Literal.getKind(), SyntaxKind::IntegerLiteralExpr);
+  }
+  {
+    auto LiteralToken = SyntaxFactory::makeIntegerLiteralToken("1_000", {}, {});
+    auto NoSign = TokenSyntax::missingToken(tok::oper_prefix, "");
+    auto Literal = SyntaxFactory::makeIntegerLiteralExpr(NoSign, LiteralToken);
+
+    llvm::SmallString<10> Scratch;
+    llvm::raw_svector_ostream OS(Scratch);
+    Literal.print(OS);
+    ASSERT_EQ(OS.str().str(), "1_000");
+  }
+  {
+    auto Literal = SyntaxFactory::makeBlankIntegerLiteralExpr()
+    .withSign(TokenSyntax::missingToken(tok::oper_prefix, ""))
+    .withDigits(SyntaxFactory::makeIntegerLiteralToken("0", {}, {
+      Trivia::spaces(4)
+    }));
+
+    llvm::SmallString<10> Scratch;
+    llvm::raw_svector_ostream OS(Scratch);
+    Literal.print(OS);
+    ASSERT_EQ(OS.str().str(), "0    ");
+  }
+  {
+    auto LiteralToken = SyntaxFactory::makeIntegerLiteralToken("1_000", {}, {});
+    auto NoSign = TokenSyntax::missingToken(tok::oper_prefix, "");
+    auto OneThousand = SyntaxFactory::makeIntegerLiteralExpr(NoSign,
+                                                             LiteralToken);
+
+    llvm::SmallString<10> Scratch;
+    llvm::raw_svector_ostream OS(Scratch);
+    OneThousand.print(OS);
+    ASSERT_EQ(OS.str().str(), "1_000");
+  }
+}
 
 #pragma mark - symbolic-reference
 

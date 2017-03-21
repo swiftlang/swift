@@ -419,7 +419,7 @@ struct SyntaxFactory {
 #pragma mark - Operators
 
   /// Make a prefix operator with the given text.
-  static RC<TokenSyntax> makePrefixOpereator(OwnedString Name,
+  static RC<TokenSyntax> makePrefixOperator(OwnedString Name,
                                              const Trivia &LeadingTrivia);
 
 #pragma mark - Types
