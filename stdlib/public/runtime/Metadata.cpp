@@ -2228,8 +2228,13 @@ ExistentialTypeMetadata::mayTakeValue(const OpaqueValue *container) const {
   // Opaque existential containers uniquely own their contained value.
   case ExistentialTypeRepresentation::Opaque:
 #ifdef SWIFT_RUNTIME_ENABLE_COW_EXISTENTIALS
+  {
     // We can't take from a shared existential box without checking uniqueness.
-    return false;
+    auto *opaque =
+        reinterpret_cast<const OpaqueExistentialContainer *>(container);
+    auto *vwt = opaque->Type->getValueWitnesses();
+    return vwt->isValueInline();
+  }
 #else
     return true;
 #endif
