@@ -474,12 +474,20 @@ struct SyntaxFactory {
   /// Make a bare "()" void tuple type
   static TupleTypeSyntax makeVoidTupleType();
 
+  /// Make a tuple type from an array of types, with one space between each
+  /// type.
+  static TupleTypeSyntax
+  makeTupleType(llvm::ArrayRef<TupleTypeElementSyntax> Types);
+
   /// Make a tuple type element of the form 'Name: ElementType'
   static TupleTypeElementSyntax
-  makeTupleTypeElement(RC<TokenSyntax> Name, TypeSyntax ElementType);
+  makeTupleTypeElement(RC<TokenSyntax> Name, TypeSyntax ElementType,
+                       llvm::Optional<RC<TokenSyntax>> MaybeComma = llvm::None);
 
   /// Make a tuple type element without a label.
-  static TupleTypeElementSyntax makeTupleTypeElement(TypeSyntax ElementType);
+  static TupleTypeElementSyntax
+  makeTupleTypeElement(TypeSyntax ElementType,
+                       llvm::Optional<RC<TokenSyntax>> MaybeComma = llvm::None);
 
 #pragma mark - optional-type
 

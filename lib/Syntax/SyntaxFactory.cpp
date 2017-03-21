@@ -1023,22 +1023,60 @@ TupleTypeSyntax SyntaxFactory::makeVoidTupleType() {
   };
 }
 
+TupleTypeSyntax
+SyntaxFactory::makeTupleType(llvm::ArrayRef<TupleTypeElementSyntax> Types) {
+  RawSyntax::LayoutList RawTypes;
+  for (auto &Type : Types) {
+    RawTypes.push_back(Type.getRaw());
+  }
+  auto ArgListRaw = RawSyntax::make(SyntaxKind::TypeArgumentList,
+                                    RawTypes,
+                                    SourcePresence::Present);
+  auto Raw = RawSyntax::make(SyntaxKind::TupleType,
+    {
+      SyntaxFactory::makeLeftParenToken({}, {}),
+      ArgListRaw,
+      SyntaxFactory::makeRightParenToken({}, {})
+    },
+    SourcePresence::Present);
+  auto Data = TupleTypeSyntaxData::make(std::move(Raw));
+  return TupleTypeSyntax {
+    Data, Data.get()
+  };
+}
+
 TupleTypeElementSyntax
 SyntaxFactory::makeTupleTypeElement(RC<TokenSyntax> Name,
-                                    TypeSyntax ElementTypeSyntax) {
+                                    TypeSyntax ElementTypeSyntax,
+                                    Optional<RC<TokenSyntax>> MaybeComma) {
   auto Data = TupleTypeElementSyntaxData::makeBlank();
+  RC<TokenSyntax> Comma;
+  if (MaybeComma.hasValue()) {
+    Comma = MaybeComma.getValue();
+  } else {
+    Comma = TokenSyntax::missingToken(tok::comma, ",");
+  }
   return TupleTypeElementSyntax { Data, Data.get() }
     .withLabel(Name)
     .withColonToken(SyntaxFactory::makeColonToken({}, Trivia::spaces(1)))
-    .withTypeSyntax(ElementTypeSyntax);
+    .withTypeSyntax(ElementTypeSyntax)
+    .withCommaToken(Comma);
 }
 
 
 TupleTypeElementSyntax
-SyntaxFactory::makeTupleTypeElement(TypeSyntax ElementType) {
+SyntaxFactory::makeTupleTypeElement(TypeSyntax ElementType,
+                                    Optional<RC<TokenSyntax>> MaybeComma) {
   auto Data = TupleTypeElementSyntaxData::makeBlank();
+  RC<TokenSyntax> Comma;
+  if (MaybeComma.hasValue()) {
+    Comma = MaybeComma.getValue();
+  } else {
+    Comma = TokenSyntax::missingToken(tok::comma, ",");
+  }
   return TupleTypeElementSyntax { Data, Data.get() }
-  .withTypeSyntax(ElementType);
+    .withTypeSyntax(ElementType)
+    .withCommaToken(Comma);
 }
 
 #pragma mark - optional-type
@@ -1195,7 +1233,7 @@ TypeAttributesSyntax SyntaxFactory::makeBlankTypeAttributes() {
 }
 
 TypeArgumentListSyntax SyntaxFactory::makeBlankTypeArgumentList() {
-  auto Data =  TypeArgumentListSyntaxData::makeBlank();
+  auto Data = TypeArgumentListSyntaxData::makeBlank();
   return TypeArgumentListSyntax { Data, Data.get() };
 }
 

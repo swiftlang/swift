@@ -187,11 +187,12 @@ TEST(TypeSyntaxTests, TupleBuilderAPIs) {
     auto Comma = SyntaxFactory::makeCommaToken({}, { Trivia::spaces(1) });
     auto IntId = SyntaxFactory::makeTypeIdentifier("Int", {}, {});
     auto Int = SyntaxFactory::makeTupleTypeElement(IntId);
+    auto IntWithComma = SyntaxFactory::makeTupleTypeElement(IntId, Comma);
     auto StringId = SyntaxFactory::makeTypeIdentifier("String", {}, {});
-    auto String = SyntaxFactory::makeTupleTypeElement(StringId);
-    Builder.addElementTypeSyntax(None, Int);
-    Builder.addElementTypeSyntax(Comma, String);
-    Builder.addElementTypeSyntax(Comma, Int);
+    auto String = SyntaxFactory::makeTupleTypeElement(StringId, Comma);
+    Builder.addElementTypeSyntax(IntWithComma);
+    Builder.addElementTypeSyntax(String);
+    Builder.addElementTypeSyntax(Int);
     Builder.useRightParen(SyntaxFactory::makeRightParenToken({}, {}));
 
     auto TupleType = Builder.build();
@@ -208,17 +209,18 @@ TEST(TypeSyntaxTests, TupleBuilderAPIs) {
     auto Comma = SyntaxFactory::makeCommaToken({}, { Trivia::spaces(1) });
     auto Int = SyntaxFactory::makeTypeIdentifier("Int", {}, {});
     auto xLabel = SyntaxFactory::makeIdentifier("x", {} , {});
-    auto xTypeElt = SyntaxFactory::makeTupleTypeElement(xLabel, Int);
+    auto xTypeElt = SyntaxFactory::makeTupleTypeElement(xLabel, Int, Comma);
     auto yLabel = SyntaxFactory::makeIdentifier("y", {} , {});
     auto yTypeElt = SyntaxFactory::makeTupleTypeElement(yLabel, Int)
       .withInoutToken(
         SyntaxFactory::makeInoutKeyword({}, { Trivia::spaces(1) }));
-    Builder.addElementTypeSyntax(None, xTypeElt);
-    Builder.addElementTypeSyntax(Comma, yTypeElt);
+    Builder.addElementTypeSyntax(xTypeElt);
+    Builder.addElementTypeSyntax(yTypeElt);
     Builder.useRightParen(SyntaxFactory::makeRightParenToken({}, {}));
 
     auto TupleType = Builder.build();
     TupleType.print(OS);
+
     ASSERT_EQ(OS.str(), "(x: Int, y: inout Int)");
   }
 }
@@ -232,7 +234,23 @@ TEST(TypeSyntaxTests, TupleMakeAPIs) {
     ASSERT_EQ(OS.str(), "()");
   }
 
-  // TODO: SyntaxFactory::makeTupleType
+  {
+    SmallString<10> Scratch;
+    llvm::raw_svector_ostream OS(Scratch);
+    llvm::SmallVector<TupleTypeElementSyntax, 10> TypeElements;
+    auto Int = SyntaxFactory::makeTypeIdentifier("Int", {}, {});
+    auto Bool = SyntaxFactory::makeTypeIdentifier("Bool", {}, {});
+    auto Comma = SyntaxFactory::makeCommaToken({}, { Trivia::spaces(1) });
+    TypeElements.push_back(SyntaxFactory::makeTupleTypeElement(Int, Comma));
+    TypeElements.push_back(SyntaxFactory::makeTupleTypeElement(Bool, Comma));
+    TypeElements.push_back(SyntaxFactory::makeTupleTypeElement(Int, Comma));
+    TypeElements.push_back(SyntaxFactory::makeTupleTypeElement(Bool, Comma));
+    TypeElements.push_back(SyntaxFactory::makeTupleTypeElement(Int, None));
+    auto TupleType = SyntaxFactory::makeTupleType(TypeElements);
+    TupleType.print(OS);
+    ASSERT_EQ(OS.str().str(),
+              "(Int, Bool, Int, Bool, Int)");
+  }
 }
 
 TEST(TypeSyntaxTests, CreateCannedTypes) {
@@ -442,13 +460,13 @@ TEST(TypeSyntaxTests, FunctionTypeMakeAPIs) {
 
     auto x = SyntaxFactory::makeIdentifier("x", {}, {});
     auto y = SyntaxFactory::makeIdentifier("y", {}, {});
-    auto xArg = SyntaxFactory::makeTupleTypeElement(x, Int);
+    auto xArg = SyntaxFactory::makeTupleTypeElement(x, Int, Comma);
     auto yArg = SyntaxFactory::makeTupleTypeElement(y, Int);
 
     auto Attrs = SyntaxFactory::makeBlankTypeAttributes();
     auto ArgList = SyntaxFactory::makeBlankTypeArgumentList()
-      .addType(None, xArg)
-      .addType(Comma, yArg);
+      .appending(xArg)
+      .appending(yArg);
     SyntaxFactory::makeFunctionType(Attrs,
                                     LeftParen, ArgList, RightParen,
                                     Throws,
@@ -461,15 +479,11 @@ TEST(TypeSyntaxTests, FunctionTypeMakeAPIs) {
   {
     SmallString<48> Scratch;
     llvm::raw_svector_ostream OS(Scratch);
-    auto x = SyntaxFactory::makeIdentifier("x", {}, {});
-    auto y = SyntaxFactory::makeIdentifier("y", {}, {});
-    auto xArg = SyntaxFactory::makeTupleTypeElement(x, Int);
-    auto yArg = SyntaxFactory::makeTupleTypeElement(y, Int);
-
+    auto IntArgComma = IntArg.withCommaToken(Comma);
     auto Attrs = SyntaxFactory::makeBlankTypeAttributes();
     auto ArgList = SyntaxFactory::makeBlankTypeArgumentList()
-      .addType(None, IntArg)
-      .addType(Comma, IntArg);
+      .appending(IntArg.withCommaToken(Comma))
+      .appending(IntArg);
     SyntaxFactory::makeFunctionType(Attrs,
                                       LeftParen, ArgList, RightParen,
                                       Rethrows,
