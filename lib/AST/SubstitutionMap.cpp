@@ -423,9 +423,9 @@ void SubstitutionMap::verify() const {
       // All of the conformances should be concrete.
       if (!citer->isConcrete()) {
         llvm::dbgs() << "Concrete replacement type:\n";
-        replacement->dump();
+        replacement->dump(llvm::dbgs());
         llvm::dbgs() << "SubstitutionMap:\n";
-        dump();
+        dump(llvm::dbgs());
       }
       assert(citer->isConcrete() && "Conformance should be concrete");
     }
