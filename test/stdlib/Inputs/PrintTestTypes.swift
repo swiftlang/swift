@@ -149,9 +149,10 @@ public struct MyString : ExpressibleByStringLiteral,
       case .stringLiteral(let str):
         result += str
       case .stringInterpolation(let str):
-        result += "<segment " + String(describing: expr) + ">"
+        result += "<segment " + String(describing: str) + ">"
       }
     }
+    self.init(str: result)
   }
 }
 
