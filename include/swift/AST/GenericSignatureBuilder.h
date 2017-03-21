@@ -462,9 +462,9 @@ private:
                             ArrayRef<GenericTypeParamType *> genericParams,
                             PotentialArchetype *pa);
 
-  /// Check for redundant superclass constraints within the equivalence
+  /// Check the superclass constraints within the equivalence
   /// class of the given potential archetype.
-  void checkRedundantSuperclassConstraints(
+  void checkSuperclassConstraints(
                             ArrayRef<GenericTypeParamType *> genericParams,
                             PotentialArchetype *pa);
 

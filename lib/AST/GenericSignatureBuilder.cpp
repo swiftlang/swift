@@ -3047,7 +3047,7 @@ GenericSignatureBuilder::finalize(SourceLoc loc,
 
         archetype->RecursiveSuperclassType = true;
       } else {
-        checkRedundantSuperclassConstraints(genericParams, archetype);
+        checkSuperclassConstraints(genericParams, archetype);
       }
     }
 
@@ -3375,7 +3375,7 @@ void GenericSignatureBuilder::checkConcreteTypeConstraints(
     diag::same_type_redundancy_here);
 }
 
-void GenericSignatureBuilder::checkRedundantSuperclassConstraints(
+void GenericSignatureBuilder::checkSuperclassConstraints(
                                  ArrayRef<GenericTypeParamType *> genericParams,
                                  PotentialArchetype *representative) {
   auto equivClass = representative->getOrCreateEquivalenceClass();
