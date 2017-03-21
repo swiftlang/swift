@@ -2192,18 +2192,12 @@ void GenericSignatureBuilder::PotentialArchetype::addSameTypeConstraint(
   if (this == otherPA) return;
 
   // Update the same-type constraints of this PA to reference the other PA.
-  auto insertedIntoThis = SameTypeConstraints.insert({otherPA, source});
-  if (!insertedIntoThis.second) {
-    getBuilder()->updateRequirementSource(insertedIntoThis.first->second,
-                                          source);
-  }
+  getOrCreateEquivalenceClass()->sameTypeConstraints[this]
+    .push_back({this, otherPA, source});
 
   // Update the same-type constraints of the other PA to reference this PA.
-  auto insertedIntoOther = otherPA->SameTypeConstraints.insert({this, source});
-  if (!insertedIntoOther.second) {
-    getBuilder()->updateRequirementSource(insertedIntoOther.first->second,
-                                          source);
-  }
+  otherPA->getOrCreateEquivalenceClass()->sameTypeConstraints[otherPA]
+    .push_back({otherPA, this, source});
 }
 
 bool GenericSignatureBuilder::addSameTypeRequirementBetweenArchetypes(
@@ -2254,6 +2248,16 @@ bool GenericSignatureBuilder::addSameTypeRequirementBetweenArchetypes(
   SWIFT_DEFER {
     delete equivClass2;
   };
+
+  // Same-type requirements.
+  if (equivClass2) {
+    for (auto &paSameTypes : equivClass2->sameTypeConstraints) {
+      auto inserted =
+        equivClass->sameTypeConstraints.insert(std::move(paSameTypes));
+      (void)inserted;
+      assert(inserted.second && "equivalence class already has entry for PA?");
+    }
+  }
 
   // Same-type-to-concrete requirements.
   if (equivClass2 && equivClass2->concreteType) {
@@ -2835,6 +2839,98 @@ static Identifier typoCorrectNestedType(
   return bestMatches.front();
 }
 
+namespace swift {
+  template<typename T>
+  bool operator<(const Constraint<T> &lhs, const Constraint<T> &rhs) {
+    auto lhsPA = lhs.archetype;
+    auto rhsPA = rhs.archetype;
+    if (int result = compareDependentTypes(&lhsPA, &rhsPA))
+      return result < 0;
+
+    if (int result = lhs.source->compare(rhs.source))
+      return result < 0;
+
+    return false;
+  }
+
+  template<typename T>
+  bool operator==(const Constraint<T> &lhs, const Constraint<T> &rhs){
+    return lhs.archetype == rhs.archetype &&
+           lhs.value == rhs.value &&
+           lhs.source == rhs.source;
+  }
+
+  template<>
+  bool operator==(const Constraint<Type> &lhs, const Constraint<Type> &rhs){
+    return lhs.archetype == rhs.archetype &&
+           lhs.value->isEqual(rhs.value) &&
+           lhs.source == rhs.source;
+  }
+}
+
+namespace {
+  /// Retrieve the representative constraint that will be used for diagnostics.
+  template<typename T>
+  Optional<Constraint<T>> findRepresentativeConstraint(
+                            ArrayRef<Constraint<T>> constraints,
+                            llvm::function_ref<bool(const Constraint<T> &)>
+                                                   isSuitableRepresentative) {
+    // Find a representative constraint.
+    Optional<Constraint<T>> representativeConstraint;
+    for (const auto &constraint : constraints) {
+      // If this isn't a suitable representative constraint, ignore it.
+      if (!isSuitableRepresentative(constraint))
+        continue;
+
+      // Check whether this constraint is better than the best we've seen so far
+      // at being the representative constraint against which others will be
+      // compared.
+      if (!representativeConstraint) {
+        representativeConstraint = constraint;
+        continue;
+      }
+
+      // We prefer constraints rooted at explicit requirements to ones rooted
+      // on inferred requirements.
+      bool thisIsInferred = constraint.source->isInferredRequirement();
+      bool representativeIsInferred = representativeConstraint->source->isInferredRequirement();
+      if (thisIsInferred != representativeIsInferred) {
+        if (representativeIsInferred)
+          representativeConstraint = constraint;
+        continue;
+      }
+
+      // We prefer derived constraints to non-derived constraints.
+      bool thisIsDerived = constraint.source->isDerivedRequirement();
+      bool representativeIsDerived =
+        representativeConstraint->source->isDerivedRequirement();
+      if (thisIsDerived != representativeIsDerived) {
+        if (thisIsDerived)
+          representativeConstraint = constraint;
+
+        continue;
+      }
+
+      // We prefer constraints with locations to constraints without locations.
+      bool thisHasValidSourceLoc = constraint.source->getLoc().isValid();
+      bool representativeHasValidSourceLoc =
+        representativeConstraint->source->getLoc().isValid();
+      if (thisHasValidSourceLoc != representativeHasValidSourceLoc) {
+        if (thisHasValidSourceLoc)
+          representativeConstraint = constraint;
+
+        continue;
+      }
+
+      // Otherwise, order via the constraint itself.
+      if (constraint < *representativeConstraint)
+        representativeConstraint = constraint;
+    }
+
+    return representativeConstraint;
+  }
+}
+
 void
 GenericSignatureBuilder::finalize(SourceLoc loc,
                            ArrayRef<GenericTypeParamType *> genericParams,
@@ -2972,6 +3068,7 @@ GenericSignatureBuilder::finalize(SourceLoc loc,
     }
 
     checkConformanceConstraints(genericParams, archetype);
+    checkSameTypeConstraints(genericParams, archetype);
   });
 
   // Check for generic parameters which have been made concrete or equated
@@ -3008,29 +3105,33 @@ GenericSignatureBuilder::finalize(SourceLoc loc,
       // don't actually have two parameters.
       for (auto other : rep->getEquivalenceClassMembers()) {
         // If it isn't a generic parameter, skip it.
-        if (other == pa || other->getParent() != nullptr) continue;
+        if (other == pa || !other->isGenericParam()) continue;
 
-        SourceLoc constraintLoc;
-        for (const auto &sameType : pa->getSameTypeConstraints()) {
-          SourceLoc sameTypeLoc = sameType.second->getLoc();
-          if (sameTypeLoc.isInvalid()) continue;
+        // Try to find an exact constraint that matches 'other'.
+        auto repConstraint =
+          findRepresentativeConstraint<PotentialArchetype *>(
+            pa->getSameTypeConstraints(),
+            [other](const Constraint<PotentialArchetype *> &constraint) {
+              return constraint.value == other;
+            });
 
-          if (sameType.first == other) {
-            constraintLoc = sameTypeLoc;
-            break;
-          }
 
-          if (constraintLoc.isInvalid())
-            constraintLoc = sameTypeLoc;
+         // Otherwise, just take any old constraint.
+        if (!repConstraint) {
+          repConstraint =
+            findRepresentativeConstraint<PotentialArchetype *>(
+              pa->getSameTypeConstraints(),
+              [other](const Constraint<PotentialArchetype *> &constraint) {
+                return true;
+              });
         }
 
-        if (constraintLoc.isInvalid())
-          constraintLoc = loc;
-
-        Diags.diagnose(constraintLoc,
-                       diag::requires_generic_params_made_equal,
-                       pa->getDependentType(genericParams, true),
-                       other->getDependentType(genericParams, true));
+        if (repConstraint && repConstraint->source->getLoc().isValid()) {
+          Diags.diagnose(repConstraint->source->getLoc(),
+                         diag::requires_generic_params_made_equal,
+                         pa->getDependentType(genericParams, true),
+                         other->getDependentType(genericParams, true));
+        }
         break;
       }
     }
@@ -3085,35 +3186,6 @@ bool GenericSignatureBuilder::diagnoseRemainingRenames(
   return invalid;
 }
 
-namespace swift {
-  template<typename T>
-  bool operator<(const Constraint<T> &lhs, const Constraint<T> &rhs) {
-    auto lhsPA = lhs.archetype;
-    auto rhsPA = rhs.archetype;
-    if (int result = compareDependentTypes(&lhsPA, &rhsPA))
-      return result < 0;
-
-    if (int result = lhs.source->compare(rhs.source))
-      return result < 0;
-
-    return false;
-  }
-
-  template<typename T>
-  bool operator==(const Constraint<T> &lhs, const Constraint<T> &rhs){
-    return lhs.archetype == rhs.archetype &&
-           lhs.value == rhs.value &&
-           lhs.source == rhs.source;
-  }
-
-  template<>
-  bool operator==(const Constraint<Type> &lhs, const Constraint<Type> &rhs){
-    return lhs.archetype == rhs.archetype &&
-           lhs.value->isEqual(rhs.value) &&
-           lhs.source == rhs.source;
-  }
-}
-
 template<typename T>
 Constraint<T> GenericSignatureBuilder::checkConstraintList(
                            ArrayRef<GenericTypeParamType *> genericParams,
@@ -3141,56 +3213,8 @@ Constraint<T> GenericSignatureBuilder::checkConstraintList(
   llvm::array_pod_sort(constraints.begin(), constraints.end());
 
   // Find a representative constraint.
-  Optional<Constraint<T>> representativeConstraint;
-  for (const auto &constraint : constraints) {
-    // If this isn't a suitable representative constraint, ignore it.
-    if (!isSuitableRepresentative(constraint))
-      continue;
-
-    // Check whether this constraint is better than the best we've seen so far
-    // at being the representative constraint against which others will be
-    // compared.
-    if (!representativeConstraint) {
-      representativeConstraint = constraint;
-      continue;
-    }
-
-    // We prefer constraints rooted at explicit requirements to ones rooted
-    // on inferred requirements.
-    bool thisIsInferred = constraint.source->isInferredRequirement();
-    bool representativeIsInferred = representativeConstraint->source->isInferredRequirement();
-    if (thisIsInferred != representativeIsInferred) {
-      if (representativeIsInferred)
-        representativeConstraint = constraint;
-      continue;
-    }
-
-    // We prefer derived constraints to non-derived constraints.
-    bool thisIsDerived = constraint.source->isDerivedRequirement();
-    bool representativeIsDerived =
-      representativeConstraint->source->isDerivedRequirement();
-    if (thisIsDerived != representativeIsDerived) {
-      if (thisIsDerived)
-        representativeConstraint = constraint;
-
-      continue;
-    }
-
-    // We prefer constraints with locations to constraints without locations.
-    bool thisHasValidSourceLoc = constraint.source->getLoc().isValid();
-    bool representativeHasValidSourceLoc =
-      representativeConstraint->source->getLoc().isValid();
-    if (thisHasValidSourceLoc != representativeHasValidSourceLoc) {
-      if (thisHasValidSourceLoc)
-        representativeConstraint = constraint;
-
-      continue;
-    }
-
-    // Otherwise, order via the constraint itself.
-    if (constraint < *representativeConstraint)
-      representativeConstraint = constraint;
-  }
+	auto representativeConstraint =
+    findRepresentativeConstraint<T>(constraints, isSuitableRepresentative);
 
   // Local function to provide a note describing the representative constraint.
   auto noteRepresentativeConstraint = [&] {
@@ -3311,6 +3335,34 @@ void GenericSignatureBuilder::checkConformanceConstraints(
       diag::redundant_conformance_constraint,
       diag::redundant_conformance_here);
   }
+}
+
+void GenericSignatureBuilder::checkSameTypeConstraints(
+                          ArrayRef<GenericTypeParamType *> genericParams,
+                          PotentialArchetype *pa) {
+  auto equivClass = pa->getEquivalenceClassIfPresent();
+  if (!equivClass || equivClass->sameTypeConstraints.empty())
+    return;
+
+  for (auto &entry : equivClass->sameTypeConstraints) {
+    auto &constraints = entry.second;
+
+    // Remove self-derived constraints.
+    assert(!constraints.empty() && "No constraints?");
+    constraints.erase(
+      std::remove_if(constraints.begin(), constraints.end(),
+                     [&](const Constraint<PotentialArchetype *> &constraint) {
+                       return constraint.source->isSelfDerivedSource(
+                                constraint.archetype);
+                     }),
+      constraints.end());
+    assert(!constraints.empty() && "All constraints were self-derived!");
+
+    // Sort the constraints, so we get a deterministic ordering of diagnostics.
+    llvm::array_pod_sort(constraints.begin(), constraints.end());
+  }
+
+  // FIXME: Diagnose redundant same-type constraints.
 }
 
 void GenericSignatureBuilder::checkRedundantConcreteTypeConstraints(
@@ -3483,15 +3535,15 @@ static PotentialArchetype *sameTypeDFS(PotentialArchetype *pa,
   if (!paToComponent.insert({pa, component}).second) return anchor;
 
   // Visit its adjacent potential archetypes.
-  for (const auto &sameType : pa->getSameTypeConstraints()) {
+  for (const auto &constraint : pa->getSameTypeConstraints()) {
     // Skip non-derived constraints.
-    if (!sameType.second->isDerivedRequirement()) continue;
+    if (!constraint.source->isDerivedRequirement()) continue;
 
-    sameTypeDFS(sameType.first, component, paToComponent);
+    sameTypeDFS(constraint.value, component, paToComponent);
 
     // If this type is better than the anchor, use it for the anchor.
-    if (compareDependentTypes(&sameType.first, &anchor) < 0)
-      anchor = sameType.first;
+    if (compareDependentTypes(&constraint.value, &anchor) < 0)
+      anchor = constraint.value;
   }
 
   return anchor;

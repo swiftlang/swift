@@ -104,6 +104,12 @@ public:
     llvm::MapVector<ProtocolDecl *, std::vector<Constraint<ProtocolDecl *>>>
       conformsTo;
 
+    /// Same-type constraints between each potential archetype and any other
+    /// archetype in its equivalence class.
+    llvm::MapVector<PotentialArchetype *,
+                    std::vector<Constraint<PotentialArchetype *>>>
+      sameTypeConstraints;
+
     /// Concrete type to which this equivalence class is equal.
     ///
     /// This is the semantic concrete type; the constraints as written
@@ -473,6 +479,12 @@ private:
   /// Check conformance constraints within the equivalence class of the
   /// given potential archetype.
   void checkConformanceConstraints(
+                            ArrayRef<GenericTypeParamType *> genericParams,
+                            PotentialArchetype *pa);
+
+  /// Check same-type constraints within the equivalence class of the
+  /// given potential archetype.
+  void checkSameTypeConstraints(
                             ArrayRef<GenericTypeParamType *> genericParams,
                             PotentialArchetype *pa);
 
@@ -1025,11 +1037,6 @@ class GenericSignatureBuilder::PotentialArchetype {
   mutable llvm::PointerUnion<PotentialArchetype *, EquivalenceClass *>
     representativeOrEquivClass;
 
-  /// Same-type constraints between this potential archetype and any other
-  /// archetype in its equivalence class.
-  llvm::MapVector<PotentialArchetype *, const RequirementSource *>
-    SameTypeConstraints;
-
   /// \brief The layout constraint of this archetype, if specified.
   LayoutConstraint Layout;
 
@@ -1301,12 +1308,15 @@ public:
                              const RequirementSource *source);
 
   /// Retrieve the same-type constraints.
-  llvm::iterator_range<
-    std::vector<std::pair<PotentialArchetype *, const RequirementSource *>>
-       ::const_iterator>
-  getSameTypeConstraints() const {
-    return llvm::make_range(SameTypeConstraints.begin(),
-                            SameTypeConstraints.end());
+  ArrayRef<Constraint<PotentialArchetype *>> getSameTypeConstraints() const {
+    if (auto equivClass = getEquivalenceClassIfPresent()) {
+      auto known = equivClass->sameTypeConstraints.find(
+                                       const_cast<PotentialArchetype *>(this));
+      if (known == equivClass->sameTypeConstraints.end()) return { };
+      return known->second;
+    }
+
+    return { };
   }
 
   /// \brief Retrieve (or create) a nested type with the given name.
