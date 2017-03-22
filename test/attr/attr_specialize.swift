@@ -49,6 +49,7 @@ class G<T> {
   // CHECK: @_specialize(exported: false, kind: full, where T == Int)
   @_specialize(where T == Int)
   @_specialize(where T == T) // expected-error{{Only concrete type same-type requirements are supported by '_specialize' attribute}}
+	// expected-warning@-1{{redundant same-type constraint 'T' == 'T'}}
   @_specialize(where T == S<T>) // expected-error{{Only concrete type same-type requirements are supported by '_specialize' attribute}}
 	// expected-error@-1{{same-type constraint 'T' == 'S<T>' is recursive}}
   @_specialize(where T == Int, U == Int) // expected-error{{use of undeclared type 'U'}}
