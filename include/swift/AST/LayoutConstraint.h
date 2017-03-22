@@ -259,6 +259,10 @@ class LayoutConstraint {
 
   LayoutConstraintInfo *operator->() const { return Ptr; }
 
+  /// Merge these two constraints and return a more specific one
+  /// or fail if they’re incompatible and return an unknown constraint.
+  LayoutConstraint merge(LayoutConstraint Other);
+
   explicit operator bool() const { return Ptr != 0; }
 
   void dump() const;

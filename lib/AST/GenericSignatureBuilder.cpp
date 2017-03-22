@@ -2079,9 +2079,14 @@ bool GenericSignatureBuilder::addLayoutRequirement(
   equivClass->layoutConstraints.push_back({PAT, Layout, Source});
 
   // Update the layout in the equivalence class, if we didn't have one already.
-  // FIXME: Layouts can probably be merged sensibly.
   if (!equivClass->layout)
     equivClass->layout = Layout;
+  else {
+    // Try to merge layout constraints.
+    auto mergedLayout = equivClass->layout.merge(Layout);
+    if (mergedLayout->isKnownLayout() && mergedLayout != equivClass->layout)
+      equivClass->layout = mergedLayout;
+  }
 
   return false;
 }
@@ -2120,6 +2125,16 @@ bool GenericSignatureBuilder::updateSuperclass(
   if (!equivClass->superclass) {
     equivClass->superclass = superclass;
     updateSuperclassConformances();
+    // Presence of a superclass constraint implies a _Class layout
+    // constraint.
+    auto layoutReqSource = source->viaSuperclass(*this, nullptr);
+    addLayoutRequirement(T,
+                         LayoutConstraint::getLayoutConstraint(
+                             superclass->getClassOrBoundGenericClass()->isObjC()
+                                 ? LayoutConstraintKind::Class
+                                 : LayoutConstraintKind::NativeClass,
+                             getASTContext()),
+                         layoutReqSource);
     return false;
   }
 
@@ -3459,7 +3474,9 @@ void GenericSignatureBuilder::checkLayoutConstraints(
       return constraint.value == equivClass->layout;
     },
     [&](LayoutConstraint layout) {
-      if (layout == equivClass->layout)
+      // If the layout constraints are mergable, i.e. compatible,
+      // it is a redundancy.
+      if (layout.merge(equivClass->layout)->isKnownLayout())
         return ConstraintRelation::Redundant;
 
       return ConstraintRelation::Conflicting;
