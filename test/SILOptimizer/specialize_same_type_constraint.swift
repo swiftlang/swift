@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests  -O -emit-sil -primary-file %s | %FileCheck %s
+// RUN: %target-swift-frontend  -O -emit-sil -primary-file %s | %FileCheck %s
 
 protocol FirstChild {}
 

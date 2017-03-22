@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -diagnostics -enable-sil-opaque-values -emit-sorted-sil -new-mangling-for-tests %s | %FileCheck %s
+// RUN: %target-sil-opt -diagnostics -enable-sil-opaque-values -emit-sorted-sil %s | %FileCheck %s
 
 import Builtin
 

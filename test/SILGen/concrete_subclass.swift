@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -Xllvm -sil-full-demangle -emit-silgen %s
+// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -emit-silgen %s
 
 class BaseClass<T> {
   func inAndOut(_ t: T) -> T { return t }

@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -parse-as-library -module-name=test -primary-file %s -O -emit-sil | %FileCheck %s
+// RUN: %target-swift-frontend -parse-as-library -module-name=test -primary-file %s -O -emit-sil | %FileCheck %s
 
 
 // Check if the compiler can convert a partial_apply of a dead argument (an

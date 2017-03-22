@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -emit-silgen -disable-objc-attr-requires-foundation-module %s -module-name failable_initializers | %FileCheck %s
+// RUN: %target-swift-frontend -emit-silgen -disable-objc-attr-requires-foundation-module %s -module-name failable_initializers | %FileCheck %s
 
 // High-level tests that silgen properly emits code for failable and thorwing
 // initializers.

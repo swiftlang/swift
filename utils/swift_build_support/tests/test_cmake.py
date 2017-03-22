@@ -28,9 +28,7 @@ class CMakeTestCase(unittest.TestCase):
     def default_args(self):
         """Return new args object with default values
         """
-        return Namespace(cmake_c_compiler="/path/to/clang",
-                         cmake_cxx_compiler="/path/to/clang++",
-                         enable_asan=False,
+        return Namespace(enable_asan=False,
                          enable_ubsan=False,
                          enable_tsan=False,
                          export_compile_commands=False,
@@ -54,8 +52,6 @@ class CMakeTestCase(unittest.TestCase):
         """Return new CMake object initialized with given args
         """
         toolchain = host_toolchain()
-        toolchain.cc = args.cmake_c_compiler
-        toolchain.cxx = args.cmake_cxx_compiler
         if args.distcc:
             toolchain.distcc = self.mock_distcc_path()
         toolchain.ninja = self.which_ninja(args)
@@ -67,8 +63,6 @@ class CMakeTestCase(unittest.TestCase):
         self.assertEqual(
             list(cmake.common_options()),
             ["-G", "Ninja",
-             "-DCMAKE_C_COMPILER:PATH=/path/to/clang",
-             "-DCMAKE_CXX_COMPILER:PATH=/path/to/clang++",
              "-DCMAKE_MAKE_PROGRAM=" + self.which_ninja(args)])
 
     def test_common_options_asan(self):
@@ -79,8 +73,6 @@ class CMakeTestCase(unittest.TestCase):
             list(cmake.common_options()),
             ["-G", "Ninja",
              "-DLLVM_USE_SANITIZER=Address",
-             "-DCMAKE_C_COMPILER:PATH=/path/to/clang",
-             "-DCMAKE_CXX_COMPILER:PATH=/path/to/clang++",
              "-DCMAKE_MAKE_PROGRAM=" + self.which_ninja(args)])
 
     def test_common_options_ubsan(self):
@@ -91,8 +83,6 @@ class CMakeTestCase(unittest.TestCase):
             list(cmake.common_options()),
             ["-G", "Ninja",
              "-DLLVM_USE_SANITIZER=Undefined",
-             "-DCMAKE_C_COMPILER:PATH=/path/to/clang",
-             "-DCMAKE_CXX_COMPILER:PATH=/path/to/clang++",
              "-DCMAKE_MAKE_PROGRAM=" + self.which_ninja(args)])
 
     def test_common_options_tsan(self):
@@ -103,8 +93,6 @@ class CMakeTestCase(unittest.TestCase):
             list(cmake.common_options()),
             ["-G", "Ninja",
              "-DLLVM_USE_SANITIZER=Thread",
-             "-DCMAKE_C_COMPILER:PATH=/path/to/clang",
-             "-DCMAKE_CXX_COMPILER:PATH=/path/to/clang++",
              "-DCMAKE_MAKE_PROGRAM=" + self.which_ninja(args)])
 
     def test_common_options_asan_ubsan(self):
@@ -116,8 +104,6 @@ class CMakeTestCase(unittest.TestCase):
             list(cmake.common_options()),
             ["-G", "Ninja",
              "-DLLVM_USE_SANITIZER=Address;Undefined",
-             "-DCMAKE_C_COMPILER:PATH=/path/to/clang",
-             "-DCMAKE_CXX_COMPILER:PATH=/path/to/clang++",
              "-DCMAKE_MAKE_PROGRAM=" + self.which_ninja(args)])
 
     def test_common_options_ubsan_tsan(self):
@@ -129,8 +115,6 @@ class CMakeTestCase(unittest.TestCase):
             list(cmake.common_options()),
             ["-G", "Ninja",
              "-DLLVM_USE_SANITIZER=Undefined;Thread",
-             "-DCMAKE_C_COMPILER:PATH=/path/to/clang",
-             "-DCMAKE_CXX_COMPILER:PATH=/path/to/clang++",
              "-DCMAKE_MAKE_PROGRAM=" + self.which_ninja(args)])
 
     def test_common_options_asan_ubsan_tsan(self):
@@ -143,8 +127,6 @@ class CMakeTestCase(unittest.TestCase):
             list(cmake.common_options()),
             ["-G", "Ninja",
              "-DLLVM_USE_SANITIZER=Address;Undefined;Thread",
-             "-DCMAKE_C_COMPILER:PATH=/path/to/clang",
-             "-DCMAKE_CXX_COMPILER:PATH=/path/to/clang++",
              "-DCMAKE_MAKE_PROGRAM=" + self.which_ninja(args)])
 
     def test_common_options_export_compile_commands(self):
@@ -155,8 +137,6 @@ class CMakeTestCase(unittest.TestCase):
             list(cmake.common_options()),
             ["-G", "Ninja",
              "-DCMAKE_EXPORT_COMPILE_COMMANDS=ON",
-             "-DCMAKE_C_COMPILER:PATH=/path/to/clang",
-             "-DCMAKE_CXX_COMPILER:PATH=/path/to/clang++",
              "-DCMAKE_MAKE_PROGRAM=" + self.which_ninja(args)])
 
     def test_common_options_distcc(self):
@@ -166,10 +146,6 @@ class CMakeTestCase(unittest.TestCase):
         self.assertEqual(
             list(cmake.common_options()),
             ["-G", "Ninja",
-             "-DCMAKE_C_COMPILER:PATH=" + self.mock_distcc_path(),
-             "-DCMAKE_C_COMPILER_ARG1=/path/to/clang",
-             "-DCMAKE_CXX_COMPILER:PATH=" + self.mock_distcc_path(),
-             "-DCMAKE_CXX_COMPILER_ARG1=/path/to/clang++",
              "-DCMAKE_MAKE_PROGRAM=" + self.which_ninja(args)])
 
     def test_common_options_xcode(self):
@@ -179,8 +155,6 @@ class CMakeTestCase(unittest.TestCase):
         self.assertEqual(
             list(cmake.common_options()),
             ["-G", "Xcode",
-             "-DCMAKE_C_COMPILER:PATH=/path/to/clang",
-             "-DCMAKE_CXX_COMPILER:PATH=/path/to/clang++",
              "-DCMAKE_CONFIGURATION_TYPES=" +
              "Debug;Release;MinSizeRel;RelWithDebInfo"])
 
@@ -193,8 +167,6 @@ class CMakeTestCase(unittest.TestCase):
         self.assertEqual(
             list(cmake.common_options()),
             ["-G", "Ninja",
-             "-DCMAKE_C_COMPILER:PATH=/path/to/clang",
-             "-DCMAKE_CXX_COMPILER:PATH=/path/to/clang++",
              "-DLLVM_VERSION_MAJOR:STRING=3",
              "-DLLVM_VERSION_MINOR:STRING=8",
              "-DLLVM_VERSION_PATCH:STRING=0",
@@ -207,8 +179,6 @@ class CMakeTestCase(unittest.TestCase):
         self.assertEqual(
             list(cmake.common_options()),
             ["-G", "Ninja",
-             "-DCMAKE_C_COMPILER:PATH=/path/to/clang",
-             "-DCMAKE_CXX_COMPILER:PATH=/path/to/clang++",
              "-DCMAKE_MAKE_PROGRAM=" + self.which_ninja(args)])
 
     def test_common_options_full(self):
@@ -228,10 +198,6 @@ class CMakeTestCase(unittest.TestCase):
             ["-G", "Xcode",
              "-DLLVM_USE_SANITIZER=Address;Undefined",
              "-DCMAKE_EXPORT_COMPILE_COMMANDS=ON",
-             "-DCMAKE_C_COMPILER:PATH=" + self.mock_distcc_path(),
-             "-DCMAKE_C_COMPILER_ARG1=/path/to/clang",
-             "-DCMAKE_CXX_COMPILER:PATH=" + self.mock_distcc_path(),
-             "-DCMAKE_CXX_COMPILER_ARG1=/path/to/clang++",
              "-DCMAKE_CONFIGURATION_TYPES=" +
              "Debug;Release;MinSizeRel;RelWithDebInfo",
              "-DLLVM_VERSION_MAJOR:STRING=3",

@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -primary-file %s -parse-as-library -emit-ir -O | %FileCheck %s
+// RUN: %target-swift-frontend -primary-file %s -parse-as-library -emit-ir -O | %FileCheck %s
 
 // Two thunks are generated:
 // 1. from function signature opts

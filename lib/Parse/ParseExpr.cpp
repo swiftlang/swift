@@ -1771,15 +1771,31 @@ ParserResult<Expr> Parser::parseExprStringLiteral() {
                                       Loc, Context.AllocateCopy(Exprs)));
 }
 
-void Parser::diagnoseEscapedArgumentLabel(const Token &tok) {
-  assert(tok.isEscapedIdentifier() && "Only for escaped identifiers");
-  if (!canBeArgumentLabel(tok.getText())) return;
+void Parser::parseOptionalArgumentLabel(Identifier &name, SourceLoc &loc) {
+  // Check to see if there is an argument label.
+  if (Tok.canBeArgumentLabel() && peekToken().is(tok::colon)) {
+    auto text = Tok.getText();
 
-  SourceLoc start = tok.getLoc();
-  SourceLoc end = start.getAdvancedLoc(tok.getLength());
-  diagnose(tok, diag::escaped_parameter_name, tok.getText())
-    .fixItRemoveChars(start, start.getAdvancedLoc(1))
-    .fixItRemoveChars(end.getAdvancedLoc(-1), end);
+    // If this was an escaped identifier that need not have been escaped, say
+    // so. Only _ needs escaping, because we take foo(_: 3) to be equivalent
+    // to foo(3), to be more uniform with _ in function declaration as well as
+    // the syntax for referring to the function pointer (foo(_:)),
+    auto escaped = Tok.isEscapedIdentifier();
+    auto underscore = Tok.is(tok::kw__) || (escaped && text == "_");
+    if (escaped && !underscore && canBeArgumentLabel(text)) {
+      SourceLoc start = Tok.getLoc();
+      SourceLoc end = start.getAdvancedLoc(Tok.getLength());
+      diagnose(Tok, diag::escaped_parameter_name, text)
+          .fixItRemoveChars(start, start.getAdvancedLoc(1))
+          .fixItRemoveChars(end.getAdvancedLoc(-1), end);
+    }
+
+    auto unescapedUnderscore = underscore && !escaped;
+    if (!unescapedUnderscore)
+      name = Context.getIdentifier(text);
+    loc = consumeToken();
+    consumeToken(tok::colon);
+  }
 }
 
 DeclName Parser::parseUnqualifiedDeclName(bool afterDot,
@@ -1834,20 +1850,12 @@ DeclName Parser::parseUnqualifiedDeclName(bool afterDot,
       argumentLabelLocs.push_back(consumeToken(tok::colon));
     }
 
-    // If we see a potential argument label followed by a ':', consume
-    // it.
-    if (Tok.canBeArgumentLabel() && peekToken().is(tok::colon)) {
-      // If this was an escaped identifier that need not have been escaped,
-      // say so.
-      if (Tok.isEscapedIdentifier())
-        diagnoseEscapedArgumentLabel(Tok);
-
-      if (Tok.is(tok::kw__))
-        argumentLabels.push_back(Identifier());
-      else
-        argumentLabels.push_back(Context.getIdentifier(Tok.getText()));
-      argumentLabelLocs.push_back(consumeToken());
-      (void)consumeToken(tok::colon);
+    Identifier argName;
+    SourceLoc argLoc;
+    parseOptionalArgumentLabel(argName, argLoc);
+    if (argLoc.isValid()) {
+      argumentLabels.push_back(argName);
+      argumentLabelLocs.push_back(argLoc);
       continue;
     }
 
@@ -2569,19 +2577,7 @@ ParserStatus Parser::parseExprList(tok leftTok, tok rightTok,
                                   [&] () -> ParserStatus {
     Identifier FieldName;
     SourceLoc FieldNameLoc;
-
-    // Check to see if there is an argument label.
-    if (Tok.canBeArgumentLabel() && peekToken().is(tok::colon)) {
-      // If this was an escaped identifier that need not have been escaped,
-      // say so.
-      if (Tok.isEscapedIdentifier())
-        diagnoseEscapedArgumentLabel(Tok);
-
-      if (!Tok.is(tok::kw__))
-        FieldName = Context.getIdentifier(Tok.getText());
-      FieldNameLoc = consumeToken();
-      consumeToken(tok::colon);
-    }
+    parseOptionalArgumentLabel(FieldName, FieldNameLoc);
 
     // See if we have an operator decl ref '(<op>)'. The operator token in
     // this case lexes as a binary operator because it neither leads nor

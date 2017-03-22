@@ -27,7 +27,7 @@ function find_real_command {
     fi
     case "$command_name" in
         clang|clang++|ld|swift|swiftc|lipo|ar|codesign|dsymutil|libtool|ranlib|strip|llvm-tblgen|python) "${find_util}" "${command_name}";;
-        *) echo "${command_name}";;
+        *) echo "$1";;
     esac
 }
 function find_o_target { # last -o wins, can short circuit for faster compiles
@@ -41,19 +41,27 @@ function find_o_target { # last -o wins, can short circuit for faster compiles
         esac; done
     echo "${o_target}"
 }
-function find_module_target {
+function find_swift_targets {
     while test $# -gt 0; do
         case "$1" in
-            -emit-module-path) echo "$2"; break;;
+            -o)
+                local out="$2";
+                outfiles=("${outfiles[@]}" "${out}")
+                if [[ "$2" == *.swiftmodule ]]; then
+                    outfiles=("${outfiles[@]}" "${out:0:${#out}-12}.swiftdoc")
+                fi
+                shift; shift;;
+            -output-file-map)
+                outfiles=("${outfiles[@]}" "$2"); shift; shift;;
+            -emit-module-path)
+                local module_path="$2";
+                outfiles=("${outfiles[@]}" "${module_path}")
+                outfiles=("${outfiles[@]}" "${module_path:0:${#module_path}-12}.swiftdoc")
+                shift; shift;;
+            -emit-objc-header-path)
+                outfiles=("${outfiles[@]}" "$2"); shift; shift;;
             *) shift;;
         esac; done
-}
-function emit_module_p { #emit -o's arg + swiftmodule
-    while test $# -gt 0; do
-        case "$1" in
-            -emit-module) return 0;;
-            *) shift;;
-        esac; done; return 1
 }
 function find_command_targets { # sets: outfiles
     local name="$1"
@@ -61,12 +69,7 @@ function find_command_targets { # sets: outfiles
     case "$name" in
         clang|clang++|ld|libtool|clang-tblgen|llvm-tblgen|lipo|gyb)
             outfiles=("${outfiles[@]}" $(find_o_target "${args[@]}"));;
-        swift|swiftc)
-            outfiles=("${outfiles[@]}" $(find_o_target "${args[@]}"));
-            if emit_module_p "${args[@]}" ; then
-                local last_outfile; last_outfile=("${outfiles[@]: -1}")
-                outfiles=("${outfiles[@]}" "${last_outfile:0:${#last_outfile}-12}.swiftdoc"); fi
-            find_module_target "${args[@]}";;
+        swift|swiftc) find_swift_targets "${args[@]}";;
         ranlib) outfiles=("${outfiles[@]}" $(first "${args[@]}"));;
         ar) outfiles=("${outfiles[@]}" $(second "${args[@]}"));;
         codesign|dsymutil|install_name_tool|strip) outfiles=("${outfiles[@]}" $(last "${args[@]}"));;

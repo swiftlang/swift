@@ -1,5 +1,5 @@
 // RUN: rm -rf %t && mkdir -p %t
-// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests %s -O -gsil -emit-ir -o %t/out.ir
+// RUN: %target-swift-frontend %s -O -gsil -emit-ir -o %t/out.ir
 // RUN: %FileCheck %s < %t/out.ir
 // RUN: %FileCheck %s --check-prefix=CHECK_OUT_SIL < %t/out.ir.gsil_0.sil
 

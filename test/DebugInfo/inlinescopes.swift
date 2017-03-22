@@ -1,8 +1,8 @@
 // RUN: rm -rf %t
 // RUN: mkdir -p %t
 // RUN: echo "public var x = Int64()" \
-// RUN:   | %target-swift-frontend -Xllvm -new-mangling-for-tests -module-name FooBar -emit-module -o %t -
-// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests %s -O -I %t -emit-ir -g -o %t.ll
+// RUN:   | %target-swift-frontend -module-name FooBar -emit-module -o %t -
+// RUN: %target-swift-frontend %s -O -I %t -emit-ir -g -o %t.ll
 // RUN: %FileCheck %s < %t.ll
 // RUN: %FileCheck %s -check-prefix=TRANSPARENT-CHECK < %t.ll
 

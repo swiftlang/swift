@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests %s -emit-sil -O -o - -verify | %FileCheck %s
+// RUN: %target-swift-frontend %s -emit-sil -O -o - -verify | %FileCheck %s
 
 // Make sure we do not specialize resilientCallee.
 

@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -enable-experimental-property-behaviors -emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-frontend -enable-experimental-property-behaviors -emit-silgen %s | %FileCheck %s
 protocol diBehavior {
   associatedtype Value
   var storage: Value { get set }

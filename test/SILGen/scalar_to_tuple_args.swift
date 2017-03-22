@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-frontend -emit-silgen %s | %FileCheck %s
 
 func inoutWithDefaults(_ x: inout Int, y: Int = 0, z: Int = 0) {}
 func inoutWithCallerSideDefaults(_ x: inout Int, y: Int = #line) {}

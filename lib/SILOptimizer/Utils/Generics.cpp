@@ -1078,7 +1078,7 @@ void FunctionSignaturePartialSpecializer::
           LookUpConformanceInSignature(*CallerGenericSig));
 
   DEBUG(llvm::dbgs() << "\n\nCallerInterfaceToSpecializedInterfaceMap map:\n";
-        CallerInterfaceToSpecializedInterfaceMap.dump());
+        CallerInterfaceToSpecializedInterfaceMap.dump(llvm::dbgs()));
 }
 
 void FunctionSignaturePartialSpecializer::
@@ -1092,7 +1092,7 @@ void FunctionSignaturePartialSpecializer::
           LookUpConformanceInSignature(*CalleeGenericSig));
 
   DEBUG(llvm::dbgs() << "\n\nCalleeInterfaceToSpecializedInterfaceMap:\n";
-        CalleeInterfaceToSpecializedInterfaceMap.dump());
+        CalleeInterfaceToSpecializedInterfaceMap.dump(llvm::dbgs()));
 }
 
 /// Generate a new generic type parameter for each used archetype from
@@ -1299,7 +1299,7 @@ void FunctionSignaturePartialSpecializer::computeCallerParamSubs(
           LookUpConformanceInSignature(*SpecializedGenericSig));
 
   DEBUG(llvm::dbgs() << "\n\nSpecializedInterfaceToCallerArchetypeMap map:\n";
-        SpecializedInterfaceToCallerArchetypeMap.dump());
+        SpecializedInterfaceToCallerArchetypeMap.dump(llvm::dbgs()));
 
   SpecializedGenericSig->getSubstitutions(
       SpecializedInterfaceToCallerArchetypeMap, List);
@@ -1325,7 +1325,7 @@ void FunctionSignaturePartialSpecializer::computeCallerInterfaceSubs(
       LookUpConformanceInSignature(*CalleeGenericSig));
 
   DEBUG(llvm::dbgs() << "\n\nCallerInterfaceSubs map:\n";
-        CallerInterfaceSubs.dump());
+        CallerInterfaceSubs.dump(llvm::dbgs()));
 }
 
 CanSILFunctionType
