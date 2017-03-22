@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -assume-parsing-unqualified-ownership-sil -module-name foo -emit-ir %s | %FileCheck %s
+// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -module-name foo -emit-ir %s | %FileCheck %s
 
 // CHECK: %swift.type = type { [[INT:i32|i64]] }
 

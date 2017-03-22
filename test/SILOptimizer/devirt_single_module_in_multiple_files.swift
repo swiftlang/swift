@@ -1,4 +1,4 @@
-// RUN: %target-swiftc_driver -Xllvm -new-mangling-for-tests -module-name devirt_single_module_in_multiple_files -O  %s %S/Inputs/BaseProblem.swift %S/Inputs/Problems.swift -parse-as-library -Xllvm -sil-disable-pass="Performance Inliner" -emit-sil 2>&1 | %FileCheck %s
+// RUN: %target-swiftc_driver -module-name devirt_single_module_in_multiple_files -O  %s %S/Inputs/BaseProblem.swift %S/Inputs/Problems.swift -parse-as-library -Xllvm -sil-disable-pass="Performance Inliner" -emit-sil 2>&1 | %FileCheck %s
 
 public func test() {
   let e = Evaluator()

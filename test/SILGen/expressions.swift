@@ -1,7 +1,7 @@
 // RUN: rm -rf %t
 // RUN: mkdir -p %t
 // RUN: echo "public var x = Int()" | %target-swift-frontend -module-name FooBar -emit-module -o %t -
-// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -parse-stdlib -emit-silgen %s -I%t -disable-access-control | %FileCheck %s
+// RUN: %target-swift-frontend -parse-stdlib -emit-silgen %s -I%t -disable-access-control | %FileCheck %s
 
 import Swift
 import FooBar

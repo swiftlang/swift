@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -assume-parsing-unqualified-ownership-sil -primary-file %s -O -emit-ir | %FileCheck %s
+// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -primary-file %s -O -emit-ir | %FileCheck %s
 
 // rdar://24121475
 //   Ideally, these wouldn't be in the v-table at all; but as long as they

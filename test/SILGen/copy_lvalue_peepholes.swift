@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -parse-stdlib -parse-as-library -emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-frontend -parse-stdlib -parse-as-library -emit-silgen %s | %FileCheck %s
 
 precedencegroup AssignmentPrecedence { assignment: true }
 

@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -emit-silgen -emit-verbose-sil %s | %FileCheck %s
+// RUN: %target-swift-frontend -emit-silgen -emit-verbose-sil %s | %FileCheck %s
 
 // CHECK-LABEL: @_specialize(exported: false, kind: full, where T == Int, U == Float)
 // CHECK-NEXT: func specializeThis<T, U>(_ t: T, u: U)

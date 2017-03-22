@@ -1,7 +1,7 @@
 // RUN: rm -rf %t
 // RUN: mkdir -p %t
 // RUN: %target-swift-frontend -emit-module -o %t %S/Inputs/def_structA.swift
-// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -emit-silgen -module-name ext_structA -I %t %s | %FileCheck %s
+// RUN: %target-swift-frontend -emit-silgen -module-name ext_structA -I %t %s | %FileCheck %s
 
 // Ensure that members of extensions of types from another module are mangled
 // correctly.

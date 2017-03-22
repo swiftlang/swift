@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -sil-verify-all -O %s -emit-sil | %FileCheck %s
+// RUN: %target-swift-frontend -sil-verify-all -O %s -emit-sil | %FileCheck %s
 
 // This file consists of tests for making sure that protocol conformances and
 // inherited conformances work well together when applied to each other. The

@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests  -parse-as-library -emit-silgen %s | %FileCheck %s
-// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -enable-astscope-lookup  -parse-as-library -emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-frontend  -parse-as-library -emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-frontend -enable-astscope-lookup  -parse-as-library -emit-silgen %s | %FileCheck %s
 
 // CHECK-LABEL: sil hidden @_T015local_recursionAAySi_Si1ytF : $@convention(thin) (Int, Int) -> () {
 // CHECK:       bb0([[X:%0]] : $Int, [[Y:%1]] : $Int):

@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -sanitize=thread -enable-experimental-tsan-inout-instrumentation -emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-frontend -sanitize=thread -enable-experimental-tsan-inout-instrumentation -emit-silgen %s | %FileCheck %s
 // REQUIRES: tsan_runtime
 // XFAIL: linux
 

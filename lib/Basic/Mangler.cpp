@@ -21,10 +21,6 @@
 using namespace swift;
 using namespace Mangle;
 
-llvm::cl::opt<bool> MangleForTests(
-                       "new-mangling-for-tests", llvm::cl::init(false),
-                       llvm::cl::desc("Use new mangling for compiler tests"));
-
 #ifndef NDEBUG
 
 llvm::cl::opt<bool> PrintSwiftManglingStats(

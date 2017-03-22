@@ -1,4 +1,4 @@
-// RUN: %target-swift-ide-test -new-mangling-for-tests -print-comments -source-filename %S/Inputs/comment_extensions.swift -comments-xml-schema %S/../../bindings/xml/comment-xml-schema.rng | %FileCheck %s
+// RUN: %target-swift-ide-test -print-comments -source-filename %S/Inputs/comment_extensions.swift -comments-xml-schema %S/../../bindings/xml/comment-xml-schema.rng | %FileCheck %s
 
 // Content is in separate file in ./Inputs due to the "requires" keyword getting
 // recognized by lit.

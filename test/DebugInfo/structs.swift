@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -primary-file %s -emit-ir -g -o - | %FileCheck %s
+// RUN: %target-swift-frontend -primary-file %s -emit-ir -g -o - | %FileCheck %s
 
 // Capture the pointer size from type Int
 // CHECK: %TSi = type <{ i[[PTRSIZE:[0-9]+]] }>
