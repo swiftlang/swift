@@ -1,5 +1,9 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TOP -import-objc-header %S/Inputs/header.h | %FileCheck %s -check-prefix=CHECK-TOP
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TYPE -import-objc-header %S/Inputs/header.h | %FileCheck %s -check-prefix=CHECK-TYPE
+// RUN: rm -rf %t && mkdir -p %t
+// RUN: %target-swift-ide-test -code-completion -pch-output-dir %t -source-filename %s -code-completion-token=TOP -import-objc-header %S/Inputs/header.h | %FileCheck %s -check-prefix=CHECK-TOP
+// RUN: %target-swift-ide-test -code-completion -pch-output-dir %t -source-filename %s -code-completion-token=TYPE -import-objc-header %S/Inputs/header.h | %FileCheck %s -check-prefix=CHECK-TYPE
+// RUN: stat %t/*.pch
 
 // REQUIRES: objc_interop
 
