@@ -49,3 +49,9 @@ func testCalls(_ range: SomeRange) {
   // Fix-Its
   paramName(0, `in`: range) // expected-warning{{keyword 'in' does not need to be escaped in argument list}}{{16-17=}}{{19-20=}}
 }
+
+// rdar://problem/31077797
+func foo(`_`: Int) {}
+foo(`_`: 3)
+let f = foo(`_`:)
+f(3)
