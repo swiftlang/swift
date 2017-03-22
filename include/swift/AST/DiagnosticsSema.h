@@ -22,7 +22,6 @@
 
 namespace swift {
   class SwitchStmt;
-  class EnumElementDecl;
   namespace diag {
 
     /// Describes the kind of requirement in a protocol.
@@ -38,7 +37,6 @@ namespace swift {
     extern detail::DiagWithArguments<void Signature>::type ID;
 #include "DiagnosticsSema.def"
   }
-
   void diagnoseMissingCases(ASTContext &Context, const SwitchStmt *SwitchS);
 }
 
