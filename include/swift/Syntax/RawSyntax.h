@@ -150,6 +150,7 @@ public:
 enum class SyntaxKind {
   Token,
 #define SYNTAX(Id, Parent) Id,
+#define SYNTAX_COLLECTION(Id, Element) Id,
 #define MISSING_SYNTAX(Id, Parent) Id,
 #define SYNTAX_RANGE(Id, First, Last) First_##Id = First, Last_##Id = Last,
 #include "swift/Syntax/SyntaxKinds.def"

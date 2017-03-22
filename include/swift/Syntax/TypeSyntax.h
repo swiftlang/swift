@@ -315,27 +315,6 @@ public:
   }
 };
 
-#pragma mark - type-argument-list Data
-
-class TypeArgumentListSyntaxData final : public SyntaxData {
-  friend class SyntaxData;
-  friend struct SyntaxFactory;
-
-  TypeArgumentListSyntaxData(RC<RawSyntax> Raw,
-                             const SyntaxData *Parent = nullptr,
-                             CursorIndex IndexInParent = 0);
-
-  static RC<TypeArgumentListSyntaxData> make(RC<RawSyntax> Raw,
-                                             const SyntaxData *Parent = nullptr,
-                                             CursorIndex IndexInParent = 0);
-  static RC<TypeArgumentListSyntaxData> makeBlank();
-
-public:
-  static bool classof(const SyntaxData *S) {
-    return S->getKind() == SyntaxKind::TypeArgumentList;
-  }
-};
-
 #pragma mark - tuple-type-element Data
 
 class TupleTypeElementSyntaxData final : public SyntaxData {
@@ -366,19 +345,20 @@ class TupleTypeElementSyntax final : public Syntax {
   friend class TupleTypeElementSyntaxData;
   friend class SyntaxData;
 
-  using DataType = TupleTypeElementSyntaxData;
-
   enum class Cursor : CursorIndex {
     Label,
     ColonToken,
     Attributes,
     InoutToken,
     Type,
+    CommaToken,
   };
 
   TupleTypeElementSyntax(RC<SyntaxData> Root,
                          const TupleTypeElementSyntaxData *Data);
 public:
+  using DataType = TupleTypeElementSyntaxData;
+  
   /// Return the label of the tuple type element.
   RC<TokenSyntax> getLabel() const;
 
@@ -392,6 +372,14 @@ public:
   /// using the specified leading and trailing trivia.
   TupleTypeElementSyntax
   withColonToken(RC<TokenSyntax> NewColonToken) const;
+
+  /// Return the comma token of the tuple type element.
+  RC<TokenSyntax> getCommaToken() const;
+
+  /// Return a new named tuple type element with a comma token replacement
+  /// using the specified leading and trailing trivia.
+  TupleTypeElementSyntax
+  withCommaToken(RC<TokenSyntax> NewCommaToken) const;
 
   /// Return the type attributes for the tuple type element.
   TypeAttributesSyntax getTypeAttributes() const;
@@ -415,33 +403,7 @@ public:
     return S->getKind() == SyntaxKind::TupleTypeElement;
   }
 };
-
-
-#pragma mark - type-argument-list API
-
-/// type-argument-list
-///   -> function-type-argument
-///    | function-type-argument ',' function-type-argument-list
-class TypeArgumentListSyntax final : public Syntax {
-  friend struct SyntaxFactory;
-  friend class SyntaxData;
-
-  using DataType = TypeArgumentListSyntaxData;
-
-  TypeArgumentListSyntax(RC<SyntaxData> Root,
-                         const TypeArgumentListSyntaxData *Data);
-
-public:
-  // TODO: TODO: getType
-  TypeArgumentListSyntax
-  addType(llvm::Optional<RC<TokenSyntax>> MaybeComma,
-          TupleTypeElementSyntax NewTypeArgument) const;
-
-  static bool classof(const Syntax *S) {
-    return S->getKind() == SyntaxKind::TypeArgumentList;
-  }
-};
-
+  
 #pragma mark - tuple-type Data
 
 class TupleTypeSyntaxData final : public TypeSyntaxData {
@@ -476,7 +438,7 @@ class TupleTypeSyntax final : public TypeSyntax {
 
   enum class Cursor : CursorIndex {
     LeftParenToken,
-    TypeArgumentList,
+    TypeElementList,
     RightParenToken,
   };
 
@@ -488,11 +450,11 @@ public:
   TupleTypeSyntax withLeftParen(RC<TokenSyntax> NewLeftParen) const;
 
   /// Get the type argument list inside the tuple type syntax.
-  TypeArgumentListSyntax getTypeArgumentList() const;
+  TupleTypeElementListSyntax getTypeElementList() const;
 
   /// Return a new tuple type syntax with the given type argument list.
   TupleTypeSyntax
-  withTypeArgumentList(TypeArgumentListSyntax NewTypeArgumentList) const;
+  withTypeElementList(TupleTypeElementListSyntax NewTypeElementList) const;
 
   /// Return the right paren ')' token surrounding the tuple type syntax.
   RC<TokenSyntax> getRightParen() const;
@@ -519,8 +481,7 @@ public:
 
   /// Add an element type to the eventual tuple type syntax.
   TupleTypeSyntaxBuilder &
-  addElementTypeSyntax(llvm::Optional<RC<TokenSyntax>> MaybeComma,
-                       TupleTypeElementSyntax ElementTypeSyntax);
+  addElementTypeSyntax(TupleTypeElementSyntax ElementTypeSyntax);
 
   /// Use the given left paren '(' token when building the tuple type syntax.
   TupleTypeSyntaxBuilder &useRightParen(RC<TokenSyntax> RightParen);
@@ -973,13 +934,13 @@ public:
                   FunctionTypeArgumentSyntax NewArgument) const;
 
   /// Return the type arguments list for this function type syntax.
-  TypeArgumentListSyntax getTypeArgumentList() const;
+  TupleTypeElementListSyntax getTypeElementList() const;
 
   /// Return a new function type with the given type argument list.
   ///
   /// This replaces all of the argument types.
   FunctionTypeSyntax
-  withTypeArgumentList(TypeArgumentListSyntax NewArgumentList) const;
+  withTypeElementList(TupleTypeElementListSyntax NewArgumentList) const;
 
   /// Return the right parenthesis ')' token surrounding the argument type.
   RC<TokenSyntax> getRightArgumentsParen() const;
