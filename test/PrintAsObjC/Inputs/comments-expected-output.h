@@ -1,11 +1,11 @@
-SWIFT_CLASS("_TtC8comments4A000")
+SWIFT_CLASS("_TtC8comments4A000", "comments")
 @interface A000
 - (nonnull instancetype)init OBJC_DESIGNATED_INITIALIZER;
 @end
 
 
 /// Aaa.  A010.  Bbb.
-SWIFT_CLASS("_TtC8comments21A010_AttachToEntities")
+SWIFT_CLASS("_TtC8comments21A010_AttachToEntities", "comments")
 @interface A010_AttachToEntities
 /// Aaa.  init().
 - (nonnull instancetype)init OBJC_DESIGNATED_INITIALIZER;
@@ -20,12 +20,12 @@ SWIFT_CLASS_PROPERTY(@property (nonatomic, class, readonly) NSInteger v2;)
 
 
 /// Aaa.  A013.
-SWIFT_PROTOCOL("_TtP8comments21A013_AttachToEntities_")
+SWIFT_PROTOCOL("_TtP8comments21A013_AttachToEntities_", "comments")
 @protocol A013_AttachToEntities
 @end
 
 
-SWIFT_CLASS("_TtC8comments10ATXHeaders")
+SWIFT_CLASS("_TtC8comments10ATXHeaders", "comments")
 @interface ATXHeaders
 /// <h1>LEVEL ONE</h1>
 /// <h2>LEVEL TWO</h2>
@@ -34,7 +34,7 @@ SWIFT_CLASS("_TtC8comments10ATXHeaders")
 @end
 
 
-SWIFT_CLASS("_TtC8comments13AutomaticLink")
+SWIFT_CLASS("_TtC8comments13AutomaticLink", "comments")
 @interface AutomaticLink
 /// And now for a URL.
 /// <a href="http://developer.apple.com/swift/">http://developer.apple.com/swift/</a>
@@ -43,7 +43,7 @@ SWIFT_CLASS("_TtC8comments13AutomaticLink")
 @end
 
 
-SWIFT_CLASS("_TtC8comments10BlockQuote")
+SWIFT_CLASS("_TtC8comments10BlockQuote", "comments")
 @interface BlockQuote
 /// Aaa.
 /// <blockquote>
@@ -59,7 +59,7 @@ SWIFT_CLASS("_TtC8comments10BlockQuote")
 @end
 
 
-SWIFT_CLASS("_TtC8comments5Brief")
+SWIFT_CLASS("_TtC8comments5Brief", "comments")
 @interface Brief
 /// Aaa.
 - (void)f0;
@@ -79,7 +79,7 @@ SWIFT_CLASS("_TtC8comments5Brief")
 @end
 
 
-SWIFT_CLASS("_TtC8comments15ClosingComments")
+SWIFT_CLASS("_TtC8comments15ClosingComments", "comments")
 @interface ClosingComments
 /// Some comment. */
 - (void)closingComment;
@@ -87,7 +87,7 @@ SWIFT_CLASS("_TtC8comments15ClosingComments")
 @end
 
 
-SWIFT_CLASS("_TtC8comments16ClosureContainer")
+SWIFT_CLASS("_TtC8comments16ClosureContainer", "comments")
 @interface ClosureContainer
 /// Partially applies a binary operator.
 /// \param a The left-hand side to partially apply.
@@ -156,7 +156,7 @@ SWIFT_CLASS("_TtC8comments16ClosureContainer")
 @end
 
 
-SWIFT_CLASS("_TtC8comments9CodeBlock")
+SWIFT_CLASS("_TtC8comments9CodeBlock", "comments")
 @interface CodeBlock
 /// This is how you use this code.
 /// \code
@@ -170,7 +170,7 @@ SWIFT_CLASS("_TtC8comments9CodeBlock")
 @end
 
 
-SWIFT_CLASS("_TtC8comments8Emphasis")
+SWIFT_CLASS("_TtC8comments8Emphasis", "comments")
 @interface Emphasis
 /// Aaa <em>bbb</em> ccc.
 /// Aaa <em>bbb</em> ccc.
@@ -179,7 +179,7 @@ SWIFT_CLASS("_TtC8comments8Emphasis")
 @end
 
 
-SWIFT_CLASS("_TtC8comments13EmptyComments")
+SWIFT_CLASS("_TtC8comments13EmptyComments", "comments")
 @interface EmptyComments
 ///
 - (void)f0;
@@ -195,7 +195,7 @@ SWIFT_CLASS("_TtC8comments13EmptyComments")
 @end
 
 
-SWIFT_CLASS("_TtC8comments19HasThrowingFunction")
+SWIFT_CLASS("_TtC8comments19HasThrowingFunction", "comments")
 @interface HasThrowingFunction
 /// Might throw something.
 /// \param x A number
@@ -208,7 +208,7 @@ SWIFT_CLASS("_TtC8comments19HasThrowingFunction")
 @end
 
 
-SWIFT_CLASS("_TtC8comments15HorizontalRules")
+SWIFT_CLASS("_TtC8comments15HorizontalRules", "comments")
 @interface HorizontalRules
 /// Briefly.
 /// <hr/>
@@ -218,7 +218,7 @@ SWIFT_CLASS("_TtC8comments15HorizontalRules")
 @end
 
 
-SWIFT_CLASS("_TtC8comments16ImplicitNameLink")
+SWIFT_CLASS("_TtC8comments16ImplicitNameLink", "comments")
 @interface ImplicitNameLink
 /// <a href="https://www.apple.com/">Apple</a>
 - (void)f0;
@@ -226,7 +226,7 @@ SWIFT_CLASS("_TtC8comments16ImplicitNameLink")
 @end
 
 
-SWIFT_CLASS("_TtC8comments20IndentedBlockComment")
+SWIFT_CLASS("_TtC8comments20IndentedBlockComment", "comments")
 @interface IndentedBlockComment
 /// Brief.
 /// First paragraph line.
@@ -254,7 +254,7 @@ SWIFT_CLASS("_TtC8comments20IndentedBlockComment")
 @end
 
 
-SWIFT_CLASS("_TtC8comments10InlineCode")
+SWIFT_CLASS("_TtC8comments10InlineCode", "comments")
 @interface InlineCode
 /// Aaa <code>bbb</code> ccc.
 - (void)f0;
@@ -262,7 +262,7 @@ SWIFT_CLASS("_TtC8comments10InlineCode")
 @end
 
 
-SWIFT_CLASS("_TtC8comments10InlineLink")
+SWIFT_CLASS("_TtC8comments10InlineLink", "comments")
 @interface InlineLink
 /// Aaa <a href="/path/to/something">bbb</a> ccc.
 - (void)f0;
@@ -270,7 +270,7 @@ SWIFT_CLASS("_TtC8comments10InlineLink")
 @end
 
 
-SWIFT_CLASS("_TtC8comments14MultiLineBrief")
+SWIFT_CLASS("_TtC8comments14MultiLineBrief", "comments")
 @interface MultiLineBrief
 /// Brief first line.
 /// Brief after softbreak.
@@ -280,7 +280,7 @@ SWIFT_CLASS("_TtC8comments14MultiLineBrief")
 @end
 
 
-SWIFT_CLASS("_TtC8comments11OrderedList")
+SWIFT_CLASS("_TtC8comments11OrderedList", "comments")
 @interface OrderedList
 /// <ol>
 ///   <li>
@@ -298,7 +298,7 @@ SWIFT_CLASS("_TtC8comments11OrderedList")
 
 /// \param x A number
 ///
-SWIFT_CLASS("_TtC8comments15ParamAndReturns")
+SWIFT_CLASS("_TtC8comments15ParamAndReturns", "comments")
 @interface ParamAndReturns
 /// Aaa.  f0.
 /// \param first Bbb.
@@ -342,7 +342,7 @@ SWIFT_CLASS("_TtC8comments15ParamAndReturns")
 @end
 
 
-SWIFT_CLASS("_TtC8comments16ParameterOutline")
+SWIFT_CLASS("_TtC8comments16ParameterOutline", "comments")
 @interface ParameterOutline
 /// \param x A number
 ///
@@ -355,7 +355,7 @@ SWIFT_CLASS("_TtC8comments16ParameterOutline")
 @end
 
 
-SWIFT_CLASS("_TtC8comments22ParameterOutlineMiddle")
+SWIFT_CLASS("_TtC8comments22ParameterOutlineMiddle", "comments")
 @interface ParameterOutlineMiddle
 /// <ul>
 ///   <li>
@@ -376,13 +376,13 @@ SWIFT_CLASS("_TtC8comments22ParameterOutlineMiddle")
 @end
 
 
-SWIFT_CLASS("_TtC8comments13ReferenceLink")
+SWIFT_CLASS("_TtC8comments13ReferenceLink", "comments")
 @interface ReferenceLink
 - (nonnull instancetype)init OBJC_DESIGNATED_INITIALIZER;
 @end
 
 
-SWIFT_CLASS("_TtC8comments7Returns")
+SWIFT_CLASS("_TtC8comments7Returns", "comments")
 @interface Returns
 ///
 /// returns:
@@ -392,7 +392,7 @@ SWIFT_CLASS("_TtC8comments7Returns")
 @end
 
 
-SWIFT_CLASS("_TtC8comments18SeparateParameters")
+SWIFT_CLASS("_TtC8comments18SeparateParameters", "comments")
 @interface SeparateParameters
 /// \param x A number
 ///
@@ -401,7 +401,7 @@ SWIFT_CLASS("_TtC8comments18SeparateParameters")
 @end
 
 
-SWIFT_CLASS("_TtC8comments13SetextHeaders")
+SWIFT_CLASS("_TtC8comments13SetextHeaders", "comments")
 @interface SetextHeaders
 /// <h1>LEVEL ONE</h1>
 /// <h2>LEVEL TWO</h2>
@@ -414,7 +414,7 @@ SWIFT_CLASS("_TtC8comments13SetextHeaders")
 @end
 
 
-SWIFT_CLASS("_TtC8comments14StrongEmphasis")
+SWIFT_CLASS("_TtC8comments14StrongEmphasis", "comments")
 @interface StrongEmphasis
 /// Aaa <em>bbb</em> ccc.
 /// Aaa <em>bbb</em> ccc.
@@ -423,7 +423,7 @@ SWIFT_CLASS("_TtC8comments14StrongEmphasis")
 @end
 
 
-SWIFT_CLASS("_TtC8comments13UnorderedList")
+SWIFT_CLASS("_TtC8comments13UnorderedList", "comments")
 @interface UnorderedList
 /// <ul>
 ///   <li>

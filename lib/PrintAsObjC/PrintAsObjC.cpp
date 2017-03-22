@@ -156,6 +156,7 @@ class ObjCPrinter : private DeclVisitor<ObjCPrinter>,
 
   Accessibility minRequiredAccess;
   bool protocolMembersOptional = false;
+  bool insideCategory = false;
 
   Optional<Type> NSCopyingType;
   
@@ -203,7 +204,10 @@ public:
     maybePrintObjCGenericParameters(baseClass);
     os << " (SWIFT_EXTENSION(" << origDC->getParentModule()->getName()
        << "))\n";
+
+    llvm::SaveAndRestore<bool> restore(insideCategory, true);
     printMembers</*allowDelayed*/true>(members);
+
     os << "@end\n\n";
   }
   
@@ -311,12 +315,15 @@ private:
     printDocumentationComment(CD);
 
     StringRef customName = getNameForObjC(CD, CustomNamesOnly);
+    StringRef moduleName = CD->getModuleContext()->getName().str();
     if (customName.empty()) {
       llvm::SmallString<32> scratch;
-      os << "SWIFT_CLASS(\"" << CD->getObjCRuntimeName(scratch) << "\")\n"
+      os << "SWIFT_CLASS(\"" << CD->getObjCRuntimeName(scratch) << "\", \""
+         << moduleName << "\")\n"
          << "@interface " << CD->getName();
     } else {
-      os << "SWIFT_CLASS_NAMED(\"" << CD->getName() << "\")\n"
+      os << "SWIFT_CLASS_NAMED(\"" << CD->getName() << "\", \""
+         << moduleName << "\")\n"
          << "@interface " << customName;
     }
 
@@ -358,7 +365,10 @@ private:
     os << " (SWIFT_EXTENSION(" << ED->getModuleContext()->getName() << "))";
     printProtocols(ED->getLocalProtocols(ConformanceLookupKind::OnlyExplicit));
     os << "\n";
+
+    llvm::SaveAndRestore<bool> restore(insideCategory, true);
     printMembers(ED->getMembers());
+
     os << "@end\n";
   }
 
@@ -366,12 +376,15 @@ private:
     printDocumentationComment(PD);
 
     StringRef customName = getNameForObjC(PD, CustomNamesOnly);
+    StringRef moduleName = PD->getModuleContext()->getName().str();
     if (customName.empty()) {
       llvm::SmallString<32> scratch;
-      os << "SWIFT_PROTOCOL(\"" << PD->getObjCRuntimeName(scratch) << "\")\n"
+      os << "SWIFT_PROTOCOL(\"" << PD->getObjCRuntimeName(scratch) << "\", \""
+         << moduleName << "\")\n"
          << "@protocol " << PD->getName();
     } else {
-      os << "SWIFT_PROTOCOL_NAMED(\"" << PD->getName() << "\")\n"
+      os << "SWIFT_PROTOCOL_NAMED(\"" << PD->getName() << "\", \""
+         << moduleName << "\")\n"
          << "@protocol " << customName;
     }
 
@@ -387,6 +400,7 @@ private:
     printDocumentationComment(ED);
     os << "typedef ";
     StringRef customName = getNameForObjC(ED, CustomNamesOnly);
+    StringRef moduleName = ED->getModuleContext()->getName().str();
     if (customName.empty()) {
       os << "SWIFT_ENUM(";
     } else {
@@ -399,7 +413,7 @@ private:
       os << ", " << customName
          << ", \"" << ED->getName() << "\"";
     }
-    os << ") {\n";
+    os << ", \"" << moduleName << "\") {\n";
     for (auto Elt : ED->getAllElements()) {
       printDocumentationComment(Elt);
 
@@ -631,7 +645,9 @@ private:
     if (!skipAvailability) {
       appendAvailabilityAttribute(AFD);
     }
-
+    if (insideCategory) {
+      os << " SWIFT_GENERATED";
+    }
     os << ";\n";
   }
 
@@ -680,7 +696,8 @@ private:
     }
 
     appendAvailabilityAttribute(FD);
-    
+    os << " SWIFT_MODULE(\"" << FD->getModuleContext()->getName().str() << "\")";
+
     os << ';';
   }
 
@@ -964,6 +981,10 @@ private:
         os << "_";
     } else {
       print(ty, OTK_None, objCName);
+    }
+
+    if (insideCategory) {
+      os << " SWIFT_GENERATED";
     }
 
     os << ";";
@@ -2368,6 +2389,15 @@ public:
            "#else\n"
            "# define SWIFT_NORETURN\n"
            "#endif\n"
+           "#if defined(__has_attribute) && __has_attribute(external_source_symbol)\n"
+           "# define SWIFT_MODULE(_module) __attribute__((external_source_symbol("
+             "language=\"Swift\", defined_in=_module, generated_declaration)))\n"
+           "# define SWIFT_GENERATED __attribute__((external_source_symbol("
+             "language=\"Swift\", generated_declaration)))\n"
+           "#else\n"
+           "# define SWIFT_MODULE(_module)\n"
+           "# define SWIFT_GENERATED\n"
+           "#endif\n"
            "#if !defined(SWIFT_CLASS_EXTRA)\n"
            "# define SWIFT_CLASS_EXTRA\n"
            "#endif\n"
@@ -2380,26 +2410,35 @@ public:
            "#if !defined(SWIFT_CLASS)\n"
            "# if defined(__has_attribute) && "
              "__has_attribute(objc_subclassing_restricted)\n"
-           "#  define SWIFT_CLASS(SWIFT_NAME) SWIFT_RUNTIME_NAME(SWIFT_NAME) "
+           "#  define SWIFT_CLASS(SWIFT_NAME, MODULE) "
+             "SWIFT_MODULE(MODULE) "
+             "SWIFT_RUNTIME_NAME(SWIFT_NAME) "
              "__attribute__((objc_subclassing_restricted)) "
              "SWIFT_CLASS_EXTRA\n"
-           "#  define SWIFT_CLASS_NAMED(SWIFT_NAME) "
-             "__attribute__((objc_subclassing_restricted)) "
+           "#  define SWIFT_CLASS_NAMED(SWIFT_NAME, MODULE) "
+             "SWIFT_MODULE(MODULE) "
              "SWIFT_COMPILE_NAME(SWIFT_NAME) "
+             "__attribute__((objc_subclassing_restricted)) "
              "SWIFT_CLASS_EXTRA\n"
            "# else\n"
-           "#  define SWIFT_CLASS(SWIFT_NAME) SWIFT_RUNTIME_NAME(SWIFT_NAME) "
+           "#  define SWIFT_CLASS(SWIFT_NAME,MODULE) "
+             "SWIFT_MODULE(MODULE) "
+             "SWIFT_RUNTIME_NAME(SWIFT_NAME) "
              "SWIFT_CLASS_EXTRA\n"
-           "#  define SWIFT_CLASS_NAMED(SWIFT_NAME) "
+           "#  define SWIFT_CLASS_NAMED(SWIFT_NAME,MODULE) "
+             "SWIFT_MODULE(MODULE) "
              "SWIFT_COMPILE_NAME(SWIFT_NAME) "
              "SWIFT_CLASS_EXTRA\n"
            "# endif\n"
            "#endif\n"
            "\n"
            "#if !defined(SWIFT_PROTOCOL)\n"
-           "# define SWIFT_PROTOCOL(SWIFT_NAME) SWIFT_RUNTIME_NAME(SWIFT_NAME) "
+           "# define SWIFT_PROTOCOL(SWIFT_NAME, MODULE) "
+             "SWIFT_MODULE(MODULE) "
+             "SWIFT_RUNTIME_NAME(SWIFT_NAME) "
              "SWIFT_PROTOCOL_EXTRA\n"
-           "# define SWIFT_PROTOCOL_NAMED(SWIFT_NAME) "
+           "# define SWIFT_PROTOCOL_NAMED(SWIFT_NAME, MODULE) "
+             "SWIFT_MODULE(MODULE) "
              "SWIFT_COMPILE_NAME(SWIFT_NAME) "
              "SWIFT_PROTOCOL_EXTRA\n"
            "#endif\n"
@@ -2418,17 +2457,17 @@ public:
            "# endif\n"
            "#endif\n"
            "#if !defined(SWIFT_ENUM)\n"
-           "# define SWIFT_ENUM(_type, _name) "
-             "enum _name : _type _name; "
-             "enum SWIFT_ENUM_EXTRA _name : _type\n"
+           "# define SWIFT_ENUM(_type, _name, MODULE) "
+             "enum _name : _type _name SWIFT_MODULE(MODULE); "
+             "enum SWIFT_MODULE(MODULE) SWIFT_ENUM_EXTRA _name : _type\n"
            "# if defined(__has_feature) && "
              "__has_feature(generalized_swift_name)\n"
-           "#  define SWIFT_ENUM_NAMED(_type, _name, SWIFT_NAME) "
-             "enum _name : _type _name SWIFT_COMPILE_NAME(SWIFT_NAME); "
-             "enum SWIFT_COMPILE_NAME(SWIFT_NAME) SWIFT_ENUM_EXTRA _name : _type\n"
+           "#  define SWIFT_ENUM_NAMED(_type, _name, SWIFT_NAME, MODULE) "
+             "enum _name : _type _name SWIFT_MODULE(MODULE) SWIFT_COMPILE_NAME(SWIFT_NAME); "
+             "enum SWIFT_MODULE(MODULE) SWIFT_COMPILE_NAME(SWIFT_NAME) SWIFT_ENUM_EXTRA _name : _type\n"
            "# else\n"
-           "#  define SWIFT_ENUM_NAMED(_type, _name, SWIFT_NAME) "
-             "SWIFT_ENUM(_type, _name)\n"
+           "#  define SWIFT_ENUM_NAMED(_type, _name, SWIFT_NAME, MODULE) "
+             "SWIFT_ENUM(_type, _name, MODULE)\n"
            "# endif\n"
            "#endif\n"
            "#if !defined(SWIFT_UNAVAILABLE)\n"

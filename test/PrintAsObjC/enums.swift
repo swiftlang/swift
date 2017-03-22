@@ -37,7 +37,7 @@ import Foundation
   @objc func acceptMemberImported(a: Wrapper.Raw, b: Wrapper.Enum, c: Wrapper.Options, d: Wrapper.Typedef, e: Wrapper.Anon, ee: Wrapper.Anon2) {}
 }
 
-// CHECK-LABEL: typedef SWIFT_ENUM_NAMED(NSInteger, ObjcEnumNamed, "EnumNamed") {
+// CHECK-LABEL: typedef SWIFT_ENUM_NAMED(NSInteger, ObjcEnumNamed, "EnumNamed", "enums") {
 // CHECK-NEXT:   ObjcEnumNamedA = 0,
 // CHECK-NEXT:   ObjcEnumNamedB = 1,
 // CHECK-NEXT:   ObjcEnumNamedC = 2,
@@ -49,7 +49,7 @@ import Foundation
   case A, B, C, d, helloDolly
 }
 
-// CHECK-LABEL: typedef SWIFT_ENUM(NSInteger, EnumWithNamedConstants) {
+// CHECK-LABEL: typedef SWIFT_ENUM(NSInteger, EnumWithNamedConstants, "enums") {
 // CHECK-NEXT:   kEnumA SWIFT_COMPILE_NAME("A") = 0,
 // CHECK-NEXT:   kEnumB SWIFT_COMPILE_NAME("B") = 1,
 // CHECK-NEXT:   kEnumC SWIFT_COMPILE_NAME("C") = 2,
@@ -61,7 +61,7 @@ import Foundation
   @objc(kEnumC) case C
 }
 
-// CHECK-LABEL: typedef SWIFT_ENUM(unsigned int, ExplicitValues) {
+// CHECK-LABEL: typedef SWIFT_ENUM(unsigned int, ExplicitValues, "enums") {
 // CHECK-NEXT:   ExplicitValuesZim = 0,
 // CHECK-NEXT:   ExplicitValuesZang = 219,
 // CHECK-NEXT:   ExplicitValuesZung = 220,
@@ -75,7 +75,7 @@ import Foundation
 }
 
 // CHECK: /// Foo: A feer, a female feer.
-// CHECK-NEXT: typedef SWIFT_ENUM(NSInteger, FooComments) {
+// CHECK-NEXT: typedef SWIFT_ENUM(NSInteger, FooComments, "enums") {
 // CHECK: /// Zim: A zeer, a female zeer.
 // CHECK-NEXT:   FooCommentsZim = 0,
 // CHECK-NEXT:   FooCommentsZang = 1,
@@ -89,7 +89,7 @@ import Foundation
   case Zang, Zung
 }
 
-// CHECK-LABEL: typedef SWIFT_ENUM(int16_t, NegativeValues) {
+// CHECK-LABEL: typedef SWIFT_ENUM(int16_t, NegativeValues, "enums") {
 // CHECK-NEXT:   Zang = -219,
 // CHECK-NEXT:   Zung = -218,
 // CHECK-NEXT: };
@@ -99,7 +99,7 @@ import Foundation
   func methodNotExportedToObjC() {}
 }
 
-// CHECK-LABEL: typedef SWIFT_ENUM(NSInteger, SomeError) {
+// CHECK-LABEL: typedef SWIFT_ENUM(NSInteger, SomeError, "enums") {
 // CHECK-NEXT:   SomeErrorBadness = 9001,
 // CHECK-NEXT:   SomeErrorWorseness = 9002,
 // CHECK-NEXT: };
@@ -109,7 +109,7 @@ import Foundation
   case Worseness
 }
 
-// CHECK-LABEL: typedef SWIFT_ENUM(NSInteger, SomeOtherError) {
+// CHECK-LABEL: typedef SWIFT_ENUM(NSInteger, SomeOtherError, "enums") {
 // CHECK-NEXT:   SomeOtherErrorDomain = 0,
 // CHECK-NEXT: };
 // NEGATIVE-NOT: NSString * _Nonnull const SomeOtherErrorDomain
@@ -117,7 +117,7 @@ import Foundation
   case Domain // collision!
 }
 
-// CHECK-LABEL: typedef SWIFT_ENUM_NAMED(NSInteger, ObjcErrorType, "SomeRenamedErrorType") {
+// CHECK-LABEL: typedef SWIFT_ENUM_NAMED(NSInteger, ObjcErrorType, "SomeRenamedErrorType", "enums") {
 // CHECK-NEXT:   ObjcErrorTypeBadStuff = 0,
 // CHECK-NEXT: };
 // CHECK-NEXT: static NSString * _Nonnull const ObjcErrorTypeDomain = @"enums.SomeRenamedErrorType";

@@ -20,7 +20,7 @@
 import Foundation
 
 
-// CHECK-LABEL: SWIFT_CLASS("_TtC9any_as_id11AnyAsIdTest")
+// CHECK-LABEL: SWIFT_CLASS("_TtC9any_as_id11AnyAsIdTest", "any_as_id")
 // CHECK-NEXT:  @interface AnyAsIdTest : NSObject
 class AnyAsIdTest : NSObject {
 
