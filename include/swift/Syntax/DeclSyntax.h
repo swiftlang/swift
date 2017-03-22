@@ -635,12 +635,6 @@ public:
   }
 };
 
-#pragma mark - function-parameter-list Data
-
-using FunctionParameterListSyntaxData =
-  SyntaxCollectionData<SyntaxKind::FunctionParameterList,
-  FunctionParameterSyntax>;
-
 #pragma mark - function-parameter-list API
 
 /// parameter-list -> parameteter | parameter ',' parameter-list
