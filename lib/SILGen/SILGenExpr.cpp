@@ -3334,8 +3334,9 @@ RValue RValueEmitter::visitOptionalEvaluationExpr(OptionalEvaluationExpr *E,
 
   // Form the optional using address operations if the type is address-only or
   // if we already have an address to use.
-  bool isByAddress = usingProvidedContext || optTL.isAddressOnly();
-  
+  bool isByAddress = ((usingProvidedContext || optTL.isAddressOnly()) &&
+                      SGF.silConv.useLoweredAddresses());
+
   std::unique_ptr<TemporaryInitialization> optTemp;
   if (!usingProvidedContext && isByAddress) {
     // Allocate the temporary for the Optional<T> if we didn't get one from the
