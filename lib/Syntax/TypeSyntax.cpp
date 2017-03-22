@@ -303,7 +303,7 @@ TupleTypeSyntaxData::TupleTypeSyntaxData(RC<RawSyntax> Raw,
   syntax_assert_child_token_text(Raw, TupleTypeSyntax::Cursor::LeftParenToken,
                                  tok::l_paren,
                                  "(");
-  syntax_assert_child_kind(Raw, TupleTypeSyntax::Cursor::TypeArgumentList,
+  syntax_assert_child_kind(Raw, TupleTypeSyntax::Cursor::TypeElementList,
                            SyntaxKind::TupleTypeElementList);
   syntax_assert_child_token_text(Raw, TupleTypeSyntax::Cursor::RightParenToken,
                                  tok::r_paren,
@@ -345,9 +345,9 @@ TupleTypeSyntax::withLeftParen(RC<TokenSyntax> NewLeftParen) const {
 }
 
 TupleTypeSyntax TupleTypeSyntax::
-withTypeArgumentList(TupleTypeElementListSyntax NewTypeArgumentList) const {
-  auto NewRaw = getRaw()->replaceChild(Cursor::TypeArgumentList,
-                                       NewTypeArgumentList.getRaw());
+withTypeElementList(TupleTypeElementListSyntax NewTypeElementList) const {
+  auto NewRaw = getRaw()->replaceChild(Cursor::TypeElementList,
+                                       NewTypeElementList.getRaw());
   return Data->replaceSelf<TupleTypeSyntax>(NewRaw);
 }
 

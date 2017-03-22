@@ -182,7 +182,7 @@ TEST(TypeSyntaxTests, TupleWithAPIs) {
     auto Foo = SyntaxFactory::makeTypeIdentifier("Foo", {},
                                                  { Trivia::spaces(2) });
     auto Void = SyntaxFactory::makeVoidTupleType()
-      .withTypeArgumentList(SyntaxFactory::makeTupleTypeElementList({
+      .withTypeElementList(SyntaxFactory::makeTupleTypeElementList({
         SyntaxFactory::makeTupleTypeElement(Foo, Comma),
         SyntaxFactory::makeTupleTypeElement(Foo)
       }));
