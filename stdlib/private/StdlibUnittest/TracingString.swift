@@ -111,6 +111,17 @@ extension TracingString.Interpolation: Hashable {
   }
 }
 
+extension StringInterpolationSegment {
+  fileprivate var dumped: String {
+    switch self {
+    case .stringLiteral(let str):
+      return "    .stringLiteral(\(reflecting: str))"
+    case .stringInterpolation(let expr):
+      return "    .stringInterpolation(\(reflecting: expr))"
+    }
+  }
+}
+
 extension TracingString: CustomDebugStringConvertible {
   public var debugDescription: String {
     switch initializer {
@@ -121,8 +132,8 @@ extension TracingString: CustomDebugStringConvertible {
     case .extendedGraphemeClusterLiteral(let value):
       return "TracingString(extendedGraphemeClusterLiteral: \(reflecting: value))"
     case .stringLiteralVariadic(let segments):
-      let segmentsString = segments.map(String.init(reflecting:)).joined(separator: ", ")
-      return "TracingString(stringLiteral: \(segmentsString))"
+      let segmentsString = segments.map { $0.dumped }.joined(separator: ",\n")
+      return "TracingString(stringLiteral: \n\(segmentsString)\n)"
     }
   }
 }
@@ -131,9 +142,11 @@ extension TracingString.Interpolation: CustomDebugStringConvertible {
   public var debugDescription: String {
     switch initializer {
     case .forInterpolation(let value):
-      return "Interpolation(forInterpolation: \(reflecting: value))"
+      return ".init(forInterpolation: \(reflecting: value))"
     case let ._WithInteger(value, radix: radix, uppercase: uppercase):
-      return "Interpolation(\(reflecting: value), radix: \(reflecting: radix), uppercase: \(reflecting: uppercase))"
+      // Strip off the AnyHashable() wrapper
+      let valueDesc = String(String(reflecting: value).characters.dropFirst(12).dropLast())
+      return ".init(\(valueDesc), radix: \(reflecting: radix), uppercase: \(reflecting: uppercase))"
     }
   }
 }
