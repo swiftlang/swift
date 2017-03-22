@@ -515,10 +515,10 @@ func applyStringBlock(_ f: @convention(block) (String) -> String, x: String) -> 
   // CHECK:   [[STRING_TO_NSSTRING:%.*]] = function_ref @_T0SS10FoundationE19_bridgeToObjectiveCSo8NSStringCyF
   // CHECK:   [[BORROWED_STRING_COPY:%.*]] = begin_borrow [[STRING_COPY]]
   // CHECK:   [[NSSTR:%.*]] = apply [[STRING_TO_NSSTRING]]([[BORROWED_STRING_COPY]]) : $@convention(method) (@guaranteed String)
-  // CHECK:   [[RESULT_NSSTR:%.*]] = apply [[BLOCK_COPY_COPY]]([[NSSTR]]) : $@convention(block) (NSString) -> @autoreleased NSString
-  // CHECK:   destroy_value [[NSSTR]]
   // CHECK:   end_borrow [[BORROWED_STRING_COPY]] from [[STRING_COPY]]
   // CHECK:   destroy_value [[STRING_COPY]]
+  // CHECK:   [[RESULT_NSSTR:%.*]] = apply [[BLOCK_COPY_COPY]]([[NSSTR]]) : $@convention(block) (NSString) -> @autoreleased NSString
+  // CHECK:   destroy_value [[NSSTR]]
   // CHECK:   [[FINAL_BRIDGE:%.*]] = function_ref @_T0SS10FoundationE36_unconditionallyBridgeFromObjectiveCSSSo8NSStringCSgFZ
   // CHECK:   [[OPTIONAL_NSSTR:%.*]] = enum $Optional<NSString>, #Optional.some!enumelt.1, [[RESULT_NSSTR]]
   // CHECK:   [[RESULT:%.*]] = apply [[FINAL_BRIDGE]]([[OPTIONAL_NSSTR]], {{.*}}) : $@convention(method) (@owned Optional<NSString>, @thin String.Type) -> @owned String
