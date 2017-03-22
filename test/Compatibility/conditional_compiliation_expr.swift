@@ -23,27 +23,38 @@ undefinedFunc() // expected-error {{use of unresolved identifier 'undefinedFunc'
 // SR-3663: The precedence and associativity of '||' and '&&'.
 // See test/Parse/ConditionalCompilation/sequence.swift for Swift 4 behavior.
 
+// expected-warning @+1 {{future version of Swift have different rule for evaluating condition; add parentheses to make the condition compatible with Swift4}} {{14-14=(}} {{27-27=)}}
 #if false || true && false
 undefinedIf() // expected-error {{use of unresolved identifier 'undefinedIf'}}
 #else
 undefinedElse()
 #endif
 
+// expected-warning @+1 {{future version of Swift have different rule for evaluating condition; add parentheses to make the condition compatible with Swift4}} {{5-5=(}} {{18-18=)}}
 #if false && true || true
 undefinedIf()
 #else
 undefinedElse() // expected-error {{use of unresolved identifier 'undefinedElse'}}
 #endif
 
+// expected-warning @+1 {{future version of Swift have different rule for evaluating condition; add parentheses to make the condition compatible with Swift4}} {{14-14=(}} {{27-27=)}}
 #if false || true && false || false
 undefinedIf() // expected-error {{use of unresolved identifier 'undefinedIf'}}
 #else
 undefinedElse()
 #endif
 
+// expected-warning @+1 {{future version of Swift have different rule for evaluating condition; add parentheses to make the condition compatible with Swift4}} {{5-5=(}} {{18-18=)}} {{22-22=(}} {{42-42=)}}
+#if true && false || true && true && true
+undefinedIf()
+#else
+undefinedElse() // expected-error {{use of unresolved identifier 'undefinedElse'}}
+#endif
+
 // Accepted in Swift3. *source breaking*
 #if false || true && try! Swift
 // expected-error @-1 {{invalid conditional compilation expression}}
+// expected-warning @-2 {{future version of Swift have different rule for evaluating condition; add parentheses to make the condition compatible with Swift4}} {{14-14=(}} {{32-32=)}}
 undefinedIf()
 #endif
 

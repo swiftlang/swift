@@ -145,6 +145,7 @@ class ValidateIfConfigCondition :
     assert(Ctx.isSwiftVersion3());
 
     SmallVector<Expr *, 3> Filtered;
+    SmallVector<unsigned, 2> AndIdxs;
     Filtered.push_back(validate(S[0]));
     S = S.slice(1);
 
@@ -157,13 +158,35 @@ class ValidateIfConfigCondition :
             diag::swift3_unsupported_conditional_compilation_expression_type)
           .highlight({ S[0]->getLoc(), S[1]->getEndLoc() });
       } else {
+        // Remember the start and end of '&&' sequence.
+        bool InAnd = (AndIdxs.size() & 1) == 1;
+        if ((*OpName == "&&" && !InAnd) || (*OpName == "||" && InAnd))
+          AndIdxs.push_back(Filtered.size() - 1);
+
         Filtered.push_back(S[0]);
         Filtered.push_back(validate(S[1]));
       }
       S = S.slice(2);
     }
-
     assert((Filtered.size() & 1) == 1);
+
+    // If the last OpName is '&&', close it with a parenthesis, except if the
+    // operators are '&&' only.
+    if ((1 == (AndIdxs.size() & 1)) && AndIdxs.back() > 0)
+      AndIdxs.push_back(Filtered.size() - 1);
+    // Emit fix-its to make this sequence compatilble with Swift >=4 even in
+    // Swift3 mode.
+    if (AndIdxs.size() >= 2) {
+      assert((AndIdxs.size() & 1) == 0);
+      auto diag = D.diagnose(
+          Filtered[AndIdxs[0]]->getStartLoc(),
+          diag::swift3_conditional_compilation_expression_precedence);
+      for (unsigned i = 0, e = AndIdxs.size(); i < e; i += 2) {
+        diag.fixItInsert(Filtered[AndIdxs[i]]->getStartLoc(), "(");
+        diag.fixItInsertAfter(Filtered[AndIdxs[i + 1]]->getEndLoc(), ")");
+      }
+    }
+
     if (Filtered.size() == 1)
       return Filtered[0];
     return SequenceExpr::create(Ctx, Filtered);
