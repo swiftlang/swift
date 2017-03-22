@@ -1601,6 +1601,13 @@ NOTE(previous_layout_constraint, none,
      "layout constraint constraint %1 : %2 %select{written here|implied here}0",
      (bool, Type, LayoutConstraint))
 
+WARNING(redundant_same_type_constraint,none,
+        "redundant same-type constraint %0 == %1", (Type, Type))
+NOTE(previous_same_type_constraint, none,
+     "previous same-type constraint %1 == %2 "
+     "%select{written here|implied here}0",
+     (bool, Type, Type))
+
 ERROR(generic_param_access,none,
       "%0 %select{must be declared %select{"
       "%select{private|fileprivate|internal|%error|%error}3|private or fileprivate}4"

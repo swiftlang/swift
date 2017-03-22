@@ -137,6 +137,22 @@ public:
     /// The members of the equivalence class.
     TinyPtrVector<PotentialArchetype *> members;
 
+    /// Describes a component within the graph of same-type constraints within
+    /// the equivalence class that is held together by derived constraints.
+    struct DerivedSameTypeComponent {
+      /// The potential archetype that acts as the anchor for this component.
+      PotentialArchetype *anchor;
+
+      /// The (best) requirement source within the component that makes the
+      /// potential archetypes in this component equivalent to the concrete
+      /// type.
+      const RequirementSource *concreteTypeSource;
+    };
+
+    /// The set of connected components within this equivalence class, using
+    /// only the derived same-type constraints in the graph.
+    std::vector<DerivedSameTypeComponent> derivedSameTypeComponents;
+
     /// Construct a new equivalence class containing only the given
     /// potential archetype (which represents itself).
     EquivalenceClass(PotentialArchetype *representative);
@@ -461,6 +477,32 @@ private:
                              conflictingDiag,
                            Diag<Type, T> redundancyDiag,
                            Diag<bool, Type, T> otherNoteDiag);
+
+  /// Check a list of constraints, removing self-derived constraints
+  /// and diagnosing redundant constraints.
+  ///
+  /// \param isSuitableRepresentative Determines whether the given constraint
+  /// is a suitable representative.
+  ///
+  /// \param checkConstraint Checks the given constraint against the
+  /// canonical constraint to determine which diagnostics (if any) should be
+  /// emitted.
+  ///
+  /// \returns the representative constraint.
+  template<typename T, typename DiagT>
+  Constraint<T> checkConstraintList(
+                           ArrayRef<GenericTypeParamType *> genericParams,
+                           std::vector<Constraint<T>> &constraints,
+                           llvm::function_ref<bool(const Constraint<T> &)>
+                             isSuitableRepresentative,
+                           llvm::function_ref<ConstraintRelation(const T&)>
+                             checkConstraint,
+                           Optional<Diag<unsigned, Type, DiagT, DiagT>>
+                             conflictingDiag,
+                           Diag<Type, DiagT> redundancyDiag,
+                           Diag<bool, Type, DiagT> otherNoteDiag,
+                           llvm::function_ref<DiagT(const T&)> diagValue,
+                           bool removeSelfDerived);
 
   /// Check the concrete type constraints within the equivalence
   /// class of the given potential archetype.

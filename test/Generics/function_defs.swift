@@ -289,6 +289,7 @@ func badProtocolReq<T>(_: T) where T : Int {} // expected-error{{type 'T' constr
 func nonTypeSameType<T>(_: T) where T == Wibble {} // expected-error{{use of undeclared type 'Wibble'}}
 func nonTypeSameType2<T>(_: T) where Wibble == T {} // expected-error{{use of undeclared type 'Wibble'}}
 func sameTypeEq<T>(_: T) where T = T {} // expected-error{{use '==' for same-type requirements rather than '='}} {{34-35===}}
+// expected-warning@-1{{redundant same-type constraint 'T' == 'T'}}
 
 func badTypeConformance1<T>(_: T) where Int : EqualComparable {} // expected-error{{type 'Int' in conformance requirement does not refer to a generic parameter or associated type}}
 
