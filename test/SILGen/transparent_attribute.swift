@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -emit-silgen -emit-verbose-sil %s | %FileCheck %s
+// RUN: %target-swift-frontend -emit-silgen -emit-verbose-sil %s | %FileCheck %s
 
 // Test that the attribute gets set on default argument generators.
 @_transparent func transparentFuncWithDefaultArgument (x: Int = 1) -> Int {

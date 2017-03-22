@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -assume-parsing-unqualified-ownership-sil -parse-as-library -emit-ir -primary-file %s | %FileCheck %s
+// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -parse-as-library -emit-ir -primary-file %s | %FileCheck %s
 
 // REQUIRES: CPU=x86_64
 

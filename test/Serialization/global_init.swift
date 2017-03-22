@@ -1,8 +1,8 @@
 // RUN: rm -rf %t
 // RUN: mkdir -p %t
-// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -emit-module -parse-as-library -sil-serialize-all -o %t %s
+// RUN: %target-swift-frontend -emit-module -parse-as-library -sil-serialize-all -o %t %s
 // RUN: llvm-bcanalyzer %t/global_init.swiftmodule | %FileCheck %s -check-prefix=BCANALYZER
-// RUN: %target-sil-opt -new-mangling-for-tests -enable-sil-verify-all %t/global_init.swiftmodule | %FileCheck %s
+// RUN: %target-sil-opt -enable-sil-verify-all %t/global_init.swiftmodule | %FileCheck %s
 
 // BCANALYZER-NOT: UnknownCode
 

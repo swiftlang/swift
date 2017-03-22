@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -O -emit-sil %s | %FileCheck %s
+// RUN: %target-swift-frontend -O -emit-sil %s | %FileCheck %s
 
 public class Base1 { @inline(never) func f() -> Int { return 0 } }
 

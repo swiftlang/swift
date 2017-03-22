@@ -1,6 +1,6 @@
 // Same test as clang_inline.swift, but with the order swapped.
 
-// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -assume-parsing-unqualified-ownership-sil -sdk %S/Inputs -primary-file %s -emit-ir -module-name clang_inline | %FileCheck %s
+// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -sdk %S/Inputs -primary-file %s -emit-ir -module-name clang_inline | %FileCheck %s
 
 // REQUIRES: CPU=i386_or_x86_64
 // XFAIL: linux

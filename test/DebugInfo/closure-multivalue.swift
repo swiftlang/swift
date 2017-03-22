@@ -31,7 +31,7 @@ public func demo() {
 demo()
 
 // At -O0, we should have a single aggregate argument.
-// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests %s -emit-ir -g -o - | %FileCheck %s --check-prefix=CHECK-O0
+// RUN: %target-swift-frontend %s -emit-ir -g -o - | %FileCheck %s --check-prefix=CHECK-O0
 // Verify that a reabstraction thunk does not have a line number.
 // CHECK-O0-NOT: DW_OP_bit_piece
 // CHECK-O0-NOT: DW_OP_bit_piece

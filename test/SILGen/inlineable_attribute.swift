@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -emit-silgen -emit-verbose-sil %s | %FileCheck %s
+// RUN: %target-swift-frontend -emit-silgen -emit-verbose-sil %s | %FileCheck %s
 
 // CHECK-LABEL: sil [fragile] @_T020inlineable_attribute15fragileFunctionyyF : $@convention(thin) () -> ()
 @_inlineable public func fragileFunction() {
