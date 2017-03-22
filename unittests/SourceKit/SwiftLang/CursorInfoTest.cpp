@@ -17,6 +17,7 @@
 #include "SourceKit/SwiftLang/Factory.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Path.h"
+#include "llvm/Support/TargetSelect.h"
 #include "gtest/gtest.h"
 
 using namespace SourceKit;
@@ -102,6 +103,10 @@ public:
   LangSupport &getLang() { return Ctx.getSwiftLangSupport(); }
 
   void SetUp() {
+    llvm::InitializeAllTargets();
+    llvm::InitializeAllTargetMCs();
+    llvm::InitializeAllAsmPrinters();
+    llvm::InitializeAllAsmParsers();
     NumTasks = 0;
   }
 

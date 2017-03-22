@@ -1525,7 +1525,6 @@ bool CompilerInvocation::parseArgs(ArrayRef<const char *> Args,
   return false;
 }
 
-
 serialization::Status
 CompilerInvocation::loadFromSerializedAST(StringRef data) {
   serialization::ExtendedValidationInfo extendedInfo;

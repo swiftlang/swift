@@ -22,9 +22,12 @@
 #include "swift/Basic/Version.h"
 #include "clang/Basic/VersionTuple.h"
 #include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
+#include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/Triple.h"
+#include "llvm/Support/raw_ostream.h"
 #include <string>
 #include <vector>
 
@@ -269,6 +272,17 @@ namespace swift {
     static bool checkPlatformConditionSupported(
       PlatformConditionKind Kind, StringRef Value,
       std::vector<StringRef> &suggestions);
+
+    /// Return a hash code of any components from these options that should
+    /// contribute to a Swift Bridging PCH hash.
+    llvm::hash_code getPCHHashComponents() const {
+      auto code = llvm::hash_value(Target.str());
+      SmallString<16> Scratch;
+      llvm::raw_svector_ostream OS(Scratch);
+      OS << EffectiveLanguageVersion;
+      code = llvm::hash_combine(code, OS.str());
+      return code;
+    }
 
   private:
     llvm::SmallVector<std::pair<PlatformConditionKind, std::string>,
