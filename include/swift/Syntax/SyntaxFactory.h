@@ -492,6 +492,10 @@ struct SyntaxFactory {
   makeTupleTypeElement(TypeSyntax ElementType,
                        llvm::Optional<RC<TokenSyntax>> MaybeComma = llvm::None);
 
+  /// Make a tuple type element list.
+  static TupleTypeElementListSyntax
+  makeTupleTypeElementList(std::vector<TupleTypeElementSyntax> ElementTypes);
+
 #pragma mark - optional-type
 
   /// Make an optional type, such as `Int?`

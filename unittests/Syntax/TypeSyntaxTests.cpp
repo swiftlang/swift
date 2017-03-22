@@ -175,6 +175,20 @@ TEST(TypeSyntaxTests, TupleWithAPIs) {
     Void.print(OS);
     ASSERT_EQ(OS.str(), "()");
   }
+  {
+    SmallString<2> Scratch;
+    llvm::raw_svector_ostream OS { Scratch };
+    auto Comma = SyntaxFactory::makeCommaToken({}, {});
+    auto Foo = SyntaxFactory::makeTypeIdentifier("Foo", {},
+                                                 { Trivia::spaces(2) });
+    auto Void = SyntaxFactory::makeVoidTupleType()
+      .withTypeArgumentList(SyntaxFactory::makeTupleTypeElementList({
+        SyntaxFactory::makeTupleTypeElement(Foo, Comma),
+        SyntaxFactory::makeTupleTypeElement(Foo)
+      }));
+    Void.print(OS);
+    ASSERT_EQ(OS.str().str(), "(Foo  ,Foo  )");
+  }
 }
 
 TEST(TypeSyntaxTests, TupleBuilderAPIs) {
@@ -242,15 +256,15 @@ TEST(TypeSyntaxTests, TupleMakeAPIs) {
     auto Int = SyntaxFactory::makeTypeIdentifier("Int", {}, {});
     auto Bool = SyntaxFactory::makeTypeIdentifier("Bool", {}, {});
     auto Comma = SyntaxFactory::makeCommaToken({}, { Trivia::spaces(1) });
-    auto Elements = SyntaxFactory::makeBlankTupleTypeElementList()
-      .appending(SyntaxFactory::makeTupleTypeElement(Int, Comma))
-      .appending(SyntaxFactory::makeTupleTypeElement(Bool, Comma))
-      .appending(SyntaxFactory::makeTupleTypeElement(Int, Comma))
-      .appending(SyntaxFactory::makeTupleTypeElement(Bool, Comma))
-      .appending(SyntaxFactory::makeTupleTypeElement(Int, None));
     auto TupleType = SyntaxFactory::makeTupleType(
                         SyntaxFactory::makeLeftParenToken({}, {}),
-                        Elements,
+                        SyntaxFactory::makeTupleTypeElementList({
+                          SyntaxFactory::makeTupleTypeElement(Int, Comma),
+                          SyntaxFactory::makeTupleTypeElement(Bool, Comma),
+                          SyntaxFactory::makeTupleTypeElement(Int, Comma),
+                          SyntaxFactory::makeTupleTypeElement(Bool, Comma),
+                          SyntaxFactory::makeTupleTypeElement(Int, None)
+                        }),
                         SyntaxFactory::makeRightParenToken({}, {}));
     TupleType.print(OS);
     ASSERT_EQ(OS.str().str(),

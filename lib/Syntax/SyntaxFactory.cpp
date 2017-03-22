@@ -1071,6 +1071,13 @@ SyntaxFactory::makeTupleTypeElement(TypeSyntax ElementType,
     .withCommaToken(Comma);
 }
 
+TupleTypeElementListSyntax
+SyntaxFactory::makeTupleTypeElementList(
+  std::vector<TupleTypeElementSyntax> ElementTypes) {
+  auto Data = TupleTypeElementListSyntax::makeData(ElementTypes);
+  return TupleTypeElementListSyntax { Data, Data.get() };
+}
+
 #pragma mark - optional-type
 
 OptionalTypeSyntax
