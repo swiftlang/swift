@@ -33,8 +33,8 @@ internal func __swift_stdlib_U_FAILURE(_ x: __swift_stdlib_UErrorCode) -> Bool {
 /// Unicode views should conform to this protocol, which supports index
 /// interchange and String type erasure.
 public protocol UnicodeView : BidirectionalCollection {
-  func index(atCodeUnitOffset: Int64) -> Index
-  static func codeUnitOffset(of: Index) -> Int64
+  func index(atEncodedPosition: Int64) -> Index
+  static func encodedPosition(of: Index) -> Int64
 }
 
 /// A collection of `CodeUnit`s to be interpreted by some `Encoding`.
@@ -206,10 +206,10 @@ extension _UnicodeViews.EncodedScalars : BidirectionalCollection {
 }
 
 extension _UnicodeViews.EncodedScalars : UnicodeView {
-  public func index(atCodeUnitOffset offset: Int64) -> Index {
+  public func index(atEncodedPosition offset: Int64) -> Index {
     return index(after: Index(base: offset^, count: 0, scalar: nil))
   }
-  public static func codeUnitOffset(of i: Index) -> Int64 {
+  public static func encodedPosition(of i: Index) -> Int64 {
     return numericCast(i.base)
   }
 }
@@ -263,11 +263,11 @@ extension _UnicodeViews.Scalars : BidirectionalCollection {
 }
 
 extension _UnicodeViews.Scalars : UnicodeView {
-  public func index(atCodeUnitOffset offset: Int64) -> Index {
-    return base.index(atCodeUnitOffset: offset)
+  public func index(atEncodedPosition offset: Int64) -> Index {
+    return base.index(atEncodedPosition: offset)
   }
-  public static func codeUnitOffset(of i: Index) -> Int64 {
-    return Base.codeUnitOffset(of: i)
+  public static func encodedPosition(of i: Index) -> Int64 {
+    return Base.encodedPosition(of: i)
   }
 }
 
@@ -371,10 +371,10 @@ where FromEncoding_.EncodedScalar.Iterator.Element == CodeUnits.Iterator.Element
 
 
 extension _TranscodedView : UnicodeView {
-  public func index(atCodeUnitOffset offset: Int64) -> Base.Index {
+  public func index(atEncodedPosition offset: Int64) -> Base.Index {
     return _base(from: codeUnits.index(atOffset: offset)).startIndex
   }
-  public static func codeUnitOffset(of i: Index) -> Int64 {
+  public static func encodedPosition(of i: Index) -> Int64 {
     return numericCast(i._outer.base)
   }
 }
