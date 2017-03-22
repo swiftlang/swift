@@ -41,6 +41,8 @@ RC<SyntaxData> SyntaxData::makeDataFromRaw(RC<RawSyntax> Raw,
   case SyntaxKind::Id: \
     return ParentType##Data::make(Raw, Parent, IndexInParent);
 
+#define SYNTAX_COLLECTION(Id, Element) SYNTAX(Id, {})
+
 #include "swift/Syntax/SyntaxKinds.def"
   case SyntaxKind::Token:
     llvm_unreachable("Can't make a SyntaxData from a Token!");

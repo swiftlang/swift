@@ -474,12 +474,27 @@ struct SyntaxFactory {
   /// Make a bare "()" void tuple type
   static TupleTypeSyntax makeVoidTupleType();
 
+  /// Make a tuple type from a type element list and the provided left/right
+  /// paren tokens.
+  static TupleTypeSyntax
+  makeTupleType(RC<TokenSyntax> LParen,
+                TupleTypeElementListSyntax Elements,
+                RC<TokenSyntax> RParen);
+
   /// Make a tuple type element of the form 'Name: ElementType'
   static TupleTypeElementSyntax
-  makeTupleTypeElement(RC<TokenSyntax> Name, TypeSyntax ElementType);
+  makeTupleTypeElement(RC<TokenSyntax> Name, RC<TokenSyntax> Colon,
+                       TypeSyntax ElementType,
+                       llvm::Optional<RC<TokenSyntax>> MaybeComma = llvm::None);
 
   /// Make a tuple type element without a label.
-  static TupleTypeElementSyntax makeTupleTypeElement(TypeSyntax ElementType);
+  static TupleTypeElementSyntax
+  makeTupleTypeElement(TypeSyntax ElementType,
+                       llvm::Optional<RC<TokenSyntax>> MaybeComma = llvm::None);
+
+  /// Make a tuple type element list.
+  static TupleTypeElementListSyntax
+  makeTupleTypeElementList(std::vector<TupleTypeElementSyntax> ElementTypes);
 
 #pragma mark - optional-type
 
@@ -564,17 +579,17 @@ struct SyntaxFactory {
   static FunctionTypeSyntax
   makeFunctionType(TypeAttributesSyntax TypeAttributes,
                    RC<TokenSyntax> LeftParen,
-                   TypeArgumentListSyntax ArgumentList,
+                   TupleTypeElementListSyntax ArgumentList,
                    RC<TokenSyntax> RightParen, RC<TokenSyntax> ThrowsOrRethrows,
                    RC<TokenSyntax> Arrow, TypeSyntax ReturnType);
 
   /// Make a function type with all elements marked as missing.
   static FunctionTypeSyntax makeBlankFunctionType();
 
-#pragma mark - type-argument-list
+#pragma mark - tuple-type-element-list
 
   /// Make a list of type arguments with all elements marked as missing.
-  static TypeArgumentListSyntax makeBlankTypeArgumentList();
+  static TupleTypeElementListSyntax makeBlankTupleTypeElementList();
 
 #pragma mark - Generics
 

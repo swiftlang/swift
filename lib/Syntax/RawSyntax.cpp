@@ -28,6 +28,7 @@ void dumpSyntaxKind(llvm::raw_ostream &OS, const SyntaxKind Kind) {
     OS << #Id;                                                                 \
     break;
 #define MISSING_SYNTAX(Id, Parent) SYNTAX(Id, Parent)
+#define SYNTAX_COLLECTION(Id, Element) SYNTAX(Id, {})
 #include "swift/Syntax/SyntaxKinds.def"
   case SyntaxKind::Token: OS << "Token"; break;
   }
