@@ -85,7 +85,7 @@ enum AddressOnlyEnum {
 // CHECK:   return [[RETVAL]] : $P2
 // CHECK-LABEL: } // end sil function '_T020opaque_values_silgen1P_pSgAA13TrivialStructVIxid_AESgAA2P2_pIxyr_TR'
 
-// Test that we still use addresses when dealing with array initialization
+// Test array initialization - we are still (somewhat) using addresses
 // ---
 // CHECK-LABEL: sil @_T020opaque_values_silgen21s020_______callVarArgyyF : $@convention(thin) () -> () {
 // CHECK: %[[APY:.*]] = apply %{{.*}}<Any>(%{{.*}}) : $@convention(thin) <τ_0_0> (Builtin.Word) -> (@owned Array<τ_0_0>, Builtin.RawPointer)
@@ -94,7 +94,8 @@ enum AddressOnlyEnum {
 // CHECK: end_borrow %[[BRW]] from %[[APY]] : $(Array<Any>, Builtin.RawPointer), $(Array<Any>, Builtin.RawPointer)
 // CHECK: destroy_value %[[APY]]
 // CHECK: %[[PTR:.*]] = pointer_to_address %[[TPL]] : $Builtin.RawPointer to [strict] $*Any
-// CHECK: init_existential_addr %[[PTR]] : $*Any, $Int
+// CHECK: [[IOPAQUE:%.*]] = init_existential_opaque %{{.*}} : $Int, $Int, $Any
+// CHECK: store [[IOPAQUE]] to [init] %[[PTR]] : $*Any
 // CHECK: return %{{.*}} : $()
 // CHECK-LABEL: } // end sil function '_T020opaque_values_silgen21s020_______callVarArgyyF'
 public func s020_______callVarArg() {
@@ -219,15 +220,15 @@ func s090___________caller<T>(_ t: T) -> T {
 
 // Test a simple opaque parameter and return value.
 // ---
-// CHECK-LABEL: sil hidden @_T020opaque_values_silgen21s100_________identityxx1t_tlF : $@convention(thin) <T> (@in T) -> @out T {
+// CHECK-LABEL: sil hidden @_T020opaque_values_silgen21s100_________identityxxlF : $@convention(thin) <T> (@in T) -> @out T {
 // CHECK: bb0([[ARG:%.*]] : $T):
 // CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
 // CHECK:   [[COPY_ARG:%.*]] = copy_value [[BORROWED_ARG]] : $T
 // CHECK:   end_borrow [[BORROWED_ARG]] from [[ARG]]
 // CHECK:   destroy_value [[ARG]] : $T
 // CHECK:   return [[COPY_ARG]] : $T
-// CHECK-LABEL: } // end sil function '_T020opaque_values_silgen21s100_________identityxx1t_tlF'
-func s100_________identity<T>(t: T) -> T {
+// CHECK-LABEL: } // end sil function '_T020opaque_values_silgen21s100_________identityxxlF'
+func s100_________identity<T>(_ t: T) -> T {
   return t
 }
 
@@ -621,6 +622,30 @@ func s320__transImplodeAny(_ t: @escaping (Any) -> ()) {
 // CHECK-LABEL: } // end sil function '_T020opaque_values_silgen21s330___addrLetClosurexxlFxycfU_xycfU_'
 func s330___addrLetClosure<T>(_ x:T) -> T {
   return { { x }() }()
+}
+
+// Tests support for capture of a mutable opaque value type
+// ---
+// CHECK-LABEL: sil hidden @_T020opaque_values_silgen21s340_______captureBoxyyF : $@convention(thin) () -> () {
+// CHECK: bb0:
+// CHECK:   [[ALLOC_OF_BOX:%.*]] = alloc_box ${ var EmptyP }, var, name "mutableAddressOnly"
+// CHECK:   [[PROJ_BOX:%.*]] = project_box [[ALLOC_OF_BOX]]
+// CHECK:   [[APPLY_FOR_BOX:%.*]] = apply %{{.*}}(%{{.*}}) : $@convention(method) (@thin AddressOnlyStruct.Type) -> AddressOnlyStruct
+// CHECK:   [[INIT_OPAQUE:%.*]] = init_existential_opaque [[APPLY_FOR_BOX]] : $AddressOnlyStruct, $AddressOnlyStruct, $EmptyP
+// CHECK:   store [[INIT_OPAQUE]] to [init] [[PROJ_BOX]] : $*EmptyP
+// CHECK:   [[COPY_BOX:%.*]] = copy_value [[ALLOC_OF_BOX]] : ${ var EmptyP }
+// CHECK:   mark_function_escape [[PROJ_BOX]] : $*EmptyP
+// CHECK:   apply %{{.*}}([[COPY_BOX]]) : $@convention(thin) (@owned { var EmptyP }) -> ()
+// CHECK:   return %{{.*}} : $()
+// CHECK-LABEL: } // end sil function '_T020opaque_values_silgen21s340_______captureBoxyyF'
+func s340_______captureBox() {
+  var mutableAddressOnly: EmptyP = AddressOnlyStruct()
+
+  func captureEverything() {
+    s100_________identity((mutableAddressOnly))
+  }
+
+  captureEverything()
 }
 
 // Tests conditional value casts and correspondingly generated reabstraction thunk, with <T> types
