@@ -1264,6 +1264,11 @@ bool LinkEntity::isFragile(IRGenModule &IGM) const {
       
     case Kind::ReflectionAssociatedTypeDescriptor:
     case Kind::ReflectionSuperclassDescriptor:
+    case Kind::AssociatedTypeMetadataAccessFunction:
+    case Kind::AssociatedTypeWitnessTableAccessFunction:
+    case Kind::GenericProtocolWitnessTableCache:
+    case Kind::GenericProtocolWitnessTableInstantiationFunction:
+    case Kind::ObjCClassRef:
       return false;
 
     default:

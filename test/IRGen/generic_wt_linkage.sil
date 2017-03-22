@@ -1,0 +1,50 @@
+// RUN: %target-swift-frontend %s -module-name=test -emit-ir | %FileCheck %s
+
+sil_stage canonical
+
+import Builtin
+import Swift
+import SwiftShims
+
+protocol P {
+}
+
+struct PBox<T> where T : P {
+  init()
+}
+
+protocol HasSimpleAssoc {
+  associatedtype Assoc
+}
+
+protocol DerivedFromSimpleAssoc : HasSimpleAssoc {
+}
+
+struct GenericComputed<T> : DerivedFromSimpleAssoc where T : P {
+  typealias Assoc = PBox<T>
+  init()
+}
+
+sil_witness_table shared [fragile] <T where T : P> GenericComputed<T>: DerivedFromSimpleAssoc module nix {
+  base_protocol HasSimpleAssoc: <T where T : P> GenericComputed<T>: HasSimpleAssoc module nix
+}
+
+sil_witness_table shared [fragile] <T where T : P> GenericComputed<T>: HasSimpleAssoc module nix {
+  associated_type Assoc: PBox<T>
+}
+
+sil_default_witness_table hidden P {
+}
+
+sil_default_witness_table hidden HasSimpleAssoc {
+  no_default
+}
+
+sil_default_witness_table hidden DerivedFromSimpleAssoc {
+  no_default
+}
+
+// CHECK: @_T04test15GenericComputedVyxGAA22DerivedFromSimpleAssocA2A1PRzlWG = internal global
+// CHECK: define internal void @_T04test15GenericComputedVyxGAA22DerivedFromSimpleAssocA2A1PRzlWI
+
+
