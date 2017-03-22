@@ -476,7 +476,7 @@ private:
                            Optional<Diag<unsigned, Type, T, T>>
                              conflictingDiag,
                            Diag<Type, T> redundancyDiag,
-                           Diag<bool, Type, T> otherNoteDiag);
+                           Diag<unsigned, Type, T> otherNoteDiag);
 
   /// Check a list of constraints, removing self-derived constraints
   /// and diagnosing redundant constraints.
@@ -500,7 +500,7 @@ private:
                            Optional<Diag<unsigned, Type, DiagT, DiagT>>
                              conflictingDiag,
                            Diag<Type, DiagT> redundancyDiag,
-                           Diag<bool, Type, DiagT> otherNoteDiag,
+                           Diag<unsigned, Type, DiagT> otherNoteDiag,
                            llvm::function_ref<DiagT(const T&)> diagValue,
                            bool removeSelfDerived);
 
@@ -869,6 +869,9 @@ public:
   bool isInferredRequirement() const {
     return getRoot()->kind == Inferred;
   }
+
+  /// Classify the kind of this source for diagnostic purposes.
+  unsigned classifyDiagKind() const;
 
   /// Whether the requirement can be derived from something in its path.
   ///

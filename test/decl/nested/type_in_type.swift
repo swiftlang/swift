@@ -137,7 +137,7 @@ struct AnyStream<T : Sequence> {
   }
 }
 
-func enumerate<T : Sequence>(_ arg: T) -> AnyStream<T> {
+func enumerate<T>(_ arg: T) -> AnyStream<T> {
   return AnyStream<T>(input: arg)
 }
 

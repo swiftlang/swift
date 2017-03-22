@@ -173,6 +173,12 @@ const void *RequirementSource::getOpaqueStorage3() const {
   return nullptr;
 }
 
+unsigned RequirementSource::classifyDiagKind() const {
+  if (isInferredRequirement()) return 2;
+  if (isDerivedRequirement()) return 1;
+  return 0;
+}
+
 bool RequirementSource::isDerivedRequirement() const {
   switch (kind) {
   case Explicit:
@@ -2855,12 +2861,13 @@ namespace {
         continue;
       }
 
-      // We prefer constraints rooted at explicit requirements to ones rooted
-      // on inferred requirements.
+      // We prefer constraints rooted at inferred requirements to ones rooted
+      // on explicit requirements, because the former won't be diagnosed
+      // directly.
       bool thisIsInferred = constraint.source->isInferredRequirement();
       bool representativeIsInferred = representativeConstraint->source->isInferredRequirement();
       if (thisIsInferred != representativeIsInferred) {
-        if (representativeIsInferred)
+        if (thisIsInferred)
           representativeConstraint = constraint;
         continue;
       }
@@ -3163,7 +3170,7 @@ Constraint<T> GenericSignatureBuilder::checkConstraintList(
                            Optional<Diag<unsigned, Type, T, T>>
                              conflictingDiag,
                            Diag<Type, T> redundancyDiag,
-                           Diag<bool, Type, T> otherNoteDiag) {
+                           Diag<unsigned, Type, T> otherNoteDiag) {
   return checkConstraintList<T, T>(genericParams, constraints,
                                    isSuitableRepresentative, checkConstraint,
                                    conflictingDiag, redundancyDiag,
@@ -3183,7 +3190,7 @@ Constraint<T> GenericSignatureBuilder::checkConstraintList(
                            Optional<Diag<unsigned, Type, DiagT, DiagT>>
                              conflictingDiag,
                            Diag<Type, DiagT> redundancyDiag,
-                           Diag<bool, Type, DiagT> otherNoteDiag,
+                           Diag<unsigned, Type, DiagT> otherNoteDiag,
                            llvm::function_ref<DiagT(const T&)> diagValue,
                            bool removeSelfDerived) {
   assert(!constraints.empty() && "No constraints?");
@@ -3212,7 +3219,7 @@ Constraint<T> GenericSignatureBuilder::checkConstraintList(
 
     Diags.diagnose(representativeConstraint->source->getLoc(),
                    otherNoteDiag,
-                   representativeConstraint->source->isDerivedRequirement(),
+                   representativeConstraint->source->classifyDiagKind(),
                    representativeConstraint->archetype->
                      getDependentType(genericParams, /*allowUnresolved=*/true),
                    diagValue(representativeConstraint->value));
@@ -3287,7 +3294,6 @@ Constraint<T> GenericSignatureBuilder::checkConstraintList(
       // location) complain that it is redundant.
       if (!constraint.source->isDerivedRequirement() &&
           !constraint.source->isInferredRequirement() &&
-          !representativeConstraint->source->isInferredRequirement() &&
           constraint.source->getLoc().isValid()) {
         Diags.diagnose(constraint.source->getLoc(),
                        redundancyDiag,
@@ -3457,8 +3463,18 @@ namespace {
 
     friend bool operator<(const IntercomponentEdge &lhs,
                           const IntercomponentEdge &rhs) {
-      return std::make_tuple(lhs.source, lhs.target, lhs.constraint)
-        < std::make_tuple(rhs.source, rhs.target, rhs.constraint);
+      if (lhs.source != rhs.source)
+        return lhs.source < rhs.source;
+      if (lhs.target != rhs.target)
+        return lhs.target < rhs.target;
+
+      // Prefer non-inferred requirement sources.
+      bool lhsIsInferred = lhs.constraint.source->isInferredRequirement();
+      bool rhsIsInferred = rhs.constraint.source->isInferredRequirement();
+      if (lhsIsInferred != rhsIsInferred)
+        return rhsIsInferred;;
+
+      return lhs.constraint < rhs.constraint;
     }
   };
 }
@@ -3555,10 +3571,8 @@ void GenericSignatureBuilder::checkSameTypeConstraints(
              "Must not be derived");
 
       // Ignore inferred requirements; we don't want to diagnose them.
-      if (!constraint.source->isInferredRequirement()) {
-        intercomponentEdges.push_back(
-          IntercomponentEdge(firstComponent, secondComponent, constraint));
-      }
+      intercomponentEdges.push_back(
+        IntercomponentEdge(firstComponent, secondComponent, constraint));
     }
   }
 
@@ -3605,6 +3619,10 @@ void GenericSignatureBuilder::checkSameTypeConstraints(
             rhs.constraint.source->getLoc().isInvalid())
           return true;
 
+        // If the constraint source is inferred, don't diagnose it.
+        if (lhs.constraint.source->isInferredRequirement())
+          return true;
+
         Diags.diagnose(lhs.constraint.source->getLoc(),
                        diag::redundant_same_type_constraint,
                        lhs.constraint.archetype->getDependentType(
@@ -3613,7 +3631,7 @@ void GenericSignatureBuilder::checkSameTypeConstraints(
                                                           genericParams, true));
         Diags.diagnose(rhs.constraint.source->getLoc(),
                        diag::previous_same_type_constraint,
-                       false,
+                       rhs.constraint.source->classifyDiagKind(),
                        rhs.constraint.archetype->getDependentType(
                                                           genericParams, true),
                        rhs.constraint.value->getDependentType(
@@ -3634,6 +3652,7 @@ void GenericSignatureBuilder::checkSameTypeConstraints(
       // not part of the spanning tree.
       if (connected[edge.source] && connected[edge.target]) {
         if (edge.constraint.source->getLoc().isValid() &&
+            !edge.constraint.source->isInferredRequirement() &&
             firstEdge.constraint.source->getLoc().isValid()) {
           Diags.diagnose(edge.constraint.source->getLoc(),
                          diag::redundant_same_type_constraint,
@@ -3644,7 +3663,7 @@ void GenericSignatureBuilder::checkSameTypeConstraints(
 
           Diags.diagnose(firstEdge.constraint.source->getLoc(),
                          diag::previous_same_type_constraint,
-                         false,
+                         firstEdge.constraint.source->classifyDiagKind(),
                          firstEdge.constraint.archetype->getDependentType(
                                                           genericParams, true),
                          firstEdge.constraint.value->getDependentType(
@@ -3759,7 +3778,7 @@ void GenericSignatureBuilder::checkSuperclassConstraints(
                             representativeConstraint.archetype)) {
         Diags.diagnose(existing->source->getLoc(),
                        diag::same_type_redundancy_here,
-                       existing->source->isDerivedRequirement(),
+                       existing->source->classifyDiagKind(),
                        existing->archetype->getDependentType(
                                                    genericParams,
                                                    /*allowUnresolved=*/true),
