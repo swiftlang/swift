@@ -55,4 +55,13 @@ func testRenamedTopLevel() {
   _ = VeryImportantCStruct()
   // CHECK-DIAGS-3: versioned.swift:[[@LINE-1]]:7: error: 'VeryImportantCStruct' has been renamed to 'ImportantCStruct'
   // CHECK-DIAGS-3: note: 'VeryImportantCStruct' was introduced in Swift 4
+
+  // CHECK-DIAGS-3-NOT: versioned.swift:[[@LINE+1]]:
+  _ = InnerInSwift4()
+  // CHECK-DIAGS-4: versioned.swift:[[@LINE-1]]:7: error: 'InnerInSwift4' has been renamed to 'Outer.Inner'
+  // CHECK-DIAGS-4: note: 'InnerInSwift4' was obsoleted in Swift 4
+
+  // CHECK-DIAGS-4-NOT: versioned.swift:[[@LINE+1]]:
+  _ = Outer.Inner()
+  // CHECK-DIAGS-3: versioned.swift:[[@LINE-1]]:7: error: type 'Outer' has no member 'Inner'
 }

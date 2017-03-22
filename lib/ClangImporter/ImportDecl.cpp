@@ -7506,13 +7506,14 @@ ClangImporter::Implementation::loadAllMembers(Decl *D, uint64_t extra) {
 
       // Import the member.
       auto member = importDecl(decl, CurrentVersion);
-      if (!member) continue;
+      if (!member || member->getDeclContext() != ext) continue;
 
       // Add the member.
       ext->addMember(member);
 
       for (auto alternate : getAlternateDecls(member)) {
-        ext->addMember(alternate);
+        if (alternate->getDeclContext() == ext)
+          ext->addMember(alternate);
       }
 
       // Import the Swift 2 stub declaration.
