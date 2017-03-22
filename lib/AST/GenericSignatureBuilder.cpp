@@ -3502,7 +3502,8 @@ void GenericSignatureBuilder::checkSameTypeConstraints(
   // diagnostics within each component.
   unsigned numComponents = equivClass->derivedSameTypeComponents.size();
   std::vector<std::vector<Constraint<PotentialArchetype *>>>
-    intracomponentEdges(numComponents, {});
+    intracomponentEdges(numComponents,
+                        std::vector<Constraint<PotentialArchetype *>>());
 
   // Intercomponent edges are stored as one big list, which tracks the
   // source/target components.
