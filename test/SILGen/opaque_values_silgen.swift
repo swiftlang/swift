@@ -648,6 +648,33 @@ func s340_______captureBox() {
   captureEverything()
 }
 
+// Tests support for if statements for opaque value(s) under new mode
+// ---
+// CHECK-LABEL: sil hidden @_T020opaque_values_silgen21s350_______addrOnlyIfAA6EmptyP_pSb1x_tF : $@convention(thin) (Bool) -> @out EmptyP {
+// CHECK: bb0([[ARG:%.*]] : $Bool):
+// CHECK:   [[ALLOC_OF_BOX:%.*]] = alloc_box ${ var EmptyP }, var
+// CHECK:   [[PROJ_BOX:%.*]] = project_box [[ALLOC_OF_BOX]]
+// CHECK:   [[APPLY_FOR_BOX:%.*]] = apply %{{.*}}(%{{.*}}) : $@convention(method) (@thin AddressOnlyStruct.Type) -> AddressOnlyStruct
+// CHECK:   [[INIT_OPAQUE:%.*]] = init_existential_opaque [[APPLY_FOR_BOX]] : $AddressOnlyStruct, $AddressOnlyStruct, $EmptyP
+// CHECK:   store [[INIT_OPAQUE]] to [init] [[PROJ_BOX]] : $*EmptyP
+// CHECK:   [[APPLY_FOR_BRANCH:%.*]] = apply %{{.*}}([[ARG]]) : $@convention(method) (Bool) -> Builtin.Int1
+// CHECK:   cond_br [[APPLY_FOR_BRANCH]], bb2, bb1
+// CHECK: bb1:
+// CHECK:   [[RETVAL1:%.*]] = load [copy] [[PROJ_BOX]] : $*EmptyP
+// CHECK:   br bb3([[RETVAL1]] : $EmptyP)
+// CHECK: bb2:
+// CHECK:   [[RETVAL2:%.*]] = load [copy] [[PROJ_BOX]] : $*EmptyP
+// CHECK:   br bb3([[RETVAL2]] : $EmptyP)
+// CHECK: bb3([[RETVAL:%.*]] : $EmptyP):
+// CHECK:   destroy_value [[ALLOC_OF_BOX]]
+// CHECK:   return [[RETVAL]] : $EmptyP
+// CHECK-LABEL: } // end sil function '_T020opaque_values_silgen21s350_______addrOnlyIfAA6EmptyP_pSb1x_tF'
+func s350_______addrOnlyIf(x: Bool) -> EmptyP {
+  var a : EmptyP = AddressOnlyStruct()
+
+  return x ? a : a
+}
+
 // Tests conditional value casts and correspondingly generated reabstraction thunk, with <T> types
 // ---
 // CHECK-LABEL: sil hidden @_T020opaque_values_silgen21s999_____condTFromAnyyyp_xtlF : $@convention(thin) <T> (@in Any, @in T) -> () {
