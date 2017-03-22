@@ -88,13 +88,13 @@ func testMixedSignArithmetic() {
     typealias Stride = ${T}.Stride
     _ = ${T}(1) + 0     // OK
     _ = 0 + ${T}(1)     // OK
-    ${T}(1) + Stride(0) // expected-error {{}} // ambiguous use of operator '+'
-    Stride(1) + ${T}(0) // expected-error {{}} // ambiguous use of operator '+'
-    ${T}(1) - Stride(0) // expected-error {{}} // ambiguous use of operator '-'
+    ${T}(1) + Stride(0) // expected-error {{}} expected-note {{}} // mixed-type arithmetics
+    Stride(1) + ${T}(0) // expected-error {{}} expected-note {{}} // mixed-type arithmetics
+    ${T}(1) - Stride(0) // expected-error {{}} expected-note {{}} // mixed-type arithmetics
     var x: ${T} = 0
     x += 1              // OK
-    x += Stride(1)      // expected-error {{}} // ambiguous use of operator '+='
-    x -= Stride(1)      // expected-error {{}} // ambiguous use of operator '-='
+    x += Stride(1)      // expected-error {{}} expected-note {{}} // mixed-type arithmetics
+    x -= Stride(1)      // expected-error {{}} expected-note {{}} // mixed-type arithmetics
 
     (x - x) as Stride   // expected-error {{}} // ambiguous use of operator '-'
 
@@ -114,7 +114,7 @@ func testMixedSignArithmetic() {
 % end
 }
 
-func testOps<T : IntegerArithmetic>(_ x: T, _ y: T) -> T {
+func testOps<T : FixedWidthInteger>(_ x: T, _ y: T) -> T {
   let a = x + y
   let s = x - y
   let m = x * y

@@ -195,7 +195,7 @@ FixedPointArithmeticTraps.test("Division/${IntTy}") {
   a = a / get${IntTy}(3)
 
   // x / 0
-  expectOverflow(a.dividedReportingOverflow(by: get${IntTy}(3)))
+  expectOverflow(a.dividedReportingOverflow(by: get${IntTy}(0)))
   expectCrashLater()
   a = a / get${IntTy}(0)
 }
@@ -209,7 +209,7 @@ FixedPointArithmeticTraps.test("Division/${IntTy}.min-over-minus-one") {
   a = a / get${IntTy}(3)
 
   a = get${IntTy}(${IntTy}.min)
-  expectOverflow(a.dividedReportingOverflow(by: get${IntTy}(3)))
+  expectOverflow(a.dividedReportingOverflow(by: get${IntTy}(-1)))
   expectCrashLater()
   a = a / get${IntTy}(-1)
   // IntTy.min / -1
@@ -250,71 +250,6 @@ FixedPointArithmeticTraps.test("Remainder/${IntTy}.min-mod-minus-one") {
   expectOverflow(a.remainderReportingOverflow(dividingBy: get${IntTy}(-1)))
   expectCrashLater()
   a = a % get${IntTy}(-1)
-  _blackHole(a)
-}
-
-%   end
-
-%   for (description, operation) in [("RightShift", ">>"), ("LeftShift", "<<")]:
-
-//
-// Test ${description} for ${IntTy}
-//
-
-%     if self_ty.is_signed:
-
-FixedPointArithmeticTraps.test("${description}/${IntTy}/Negative") {
-  var a = get${IntTy}(${IntTy}.max / 3)
-
-  a = get${IntTy}(a ${operation} get${IntTy}(1))
-
-  let shiftAmount: ${IntTy} = -1
-
-  // Overflow in ${description}.
-  expectCrashLater()
-  a = a ${operation} get${IntTy}(shiftAmount)
-  _blackHole(a)
-}
-
-%     end
-
-FixedPointArithmeticTraps.test("${description}/${IntTy}/TypeSize") {
-  var a = get${IntTy}(${IntTy}.max / 3)
-
-  a = get${IntTy}(a ${operation} get${IntTy}(0))
-  a = get${IntTy}(a ${operation} get${IntTy}(1))
-
-  let shiftAmount = ${IntTy}(MemoryLayout<${IntTy}>.size * 8)
-
-  // Overflow in ${description}.
-  expectCrashLater()
-  a = a ${operation} get${IntTy}(shiftAmount)
-  _blackHole(a)
-}
-
-FixedPointArithmeticTraps.test("${description}/${IntTy}/TypeSizePlusOne") {
-  var a = get${IntTy}(${IntTy}.max / 3)
-
-  a = get${IntTy}(a ${operation} get${IntTy}(0))
-
-  let shiftAmount = ${IntTy}(MemoryLayout<${IntTy}>.size * 8 + 1)
-
-  // Overflow in ${description}.
-  expectCrashLater()
-  a = a ${operation} get${IntTy}(shiftAmount)
-  _blackHole(a)
-}
-
-FixedPointArithmeticTraps.test("${description}/${IntTy}/Max") {
-  var a = get${IntTy}(${IntTy}.max / 3)
-
-  a = get${IntTy}(a ${operation} get${IntTy}(0))
-
-  let shiftAmount: ${IntTy} = ${IntTy}.max
-
-  // Overflow in ${description}.
-  expectCrashLater()
-  a = a ${operation} get${IntTy}(shiftAmount)
   _blackHole(a)
 }
 

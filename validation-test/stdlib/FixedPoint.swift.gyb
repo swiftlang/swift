@@ -328,11 +328,11 @@ FixedPoint.test("BitwiseOperations/UInt64") {
 
 FixedPoint.test("OverflowCheck") {
   expectEqual((partialValue: 9, overflow: .none),
-    (4 as Int8).addingWithOverflow(5))
+    (4 as Int8).addingReportingOverflow(5))
   expectEqual((partialValue: -128, overflow: .overflow),
-    (1 as Int8).addingWithOverflow(127))
+    (1 as Int8).addingReportingOverflow(127))
   expectEqual((partialValue: 0, overflow: .overflow),
-    (2 as UInt8).multipliedWithOverflow(by: 128))
+    (2 as UInt8).multipliedReportingOverflow(by: 128))
 }
 
 FixedPoint.test("String.init") {
