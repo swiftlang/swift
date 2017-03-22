@@ -1034,6 +1034,10 @@ static bool ParseClangImporterArgs(ClangImporterOptions &Opts,
 
   Opts.DisableAdapterModules |= Args.hasArg(OPT_emit_imported_modules);
 
+  if (const Arg *A = Args.getLastArg(OPT_pch_output_dir)) {
+    Opts.PrecompiledHeaderOutputDir = A->getValue();
+  }
+
   return false;
 }
 
