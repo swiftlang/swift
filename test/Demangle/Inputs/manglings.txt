@@ -245,4 +245,4 @@ _T03foo4_123ABTf3psbpsb_n ---> function signature specialization <Arg[0] = [Cons
 _T04main5innerys5Int32Vz_yADctF25closure_with_box_argumentxz_Bi32__lXXTf1nc_n ---> function signature specialization <Arg[1] = [Closure Propagated : closure_with_box_argument, Argument Types : [<A> { var A } <Builtin.Int32>]> of main.inner (inout Swift.Int32, (Swift.Int32) -> ()) -> ()
 _T03foo6testityyyc_yyctF1a1bTf3pfpf_n ---> function signature specialization <Arg[0] = [Constant Propagated Function : a], Arg[1] = [Constant Propagated Function : b]> of foo.testit (() -> (), () -> ()) -> ()
 _SocketJoinOrLeaveMulticast ---> _SocketJoinOrLeaveMulticast
-
+_T0s10DictionaryV3t17E6Index2V1loiSbAEyxq__G_AGtFZ ---> static (extension in t17):Swift.Dictionary.Index2.< infix ((extension in t17):[A : B].Index2, (extension in t17):[A : B].Index2) -> Swift.Bool
