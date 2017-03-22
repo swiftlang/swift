@@ -2,7 +2,7 @@
 // RUN: mkdir -p %t
 // RUN: %target-swift-frontend -emit-module -o %t %S/Inputs/def_objc.swift -disable-objc-attr-requires-foundation-module
 // RUN: llvm-bcanalyzer %t/def_objc.swiftmodule | %FileCheck %s
-// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -emit-silgen -I %t %s -o - | %FileCheck %s -check-prefix=SIL
+// RUN: %target-swift-frontend -emit-silgen -I %t %s -o - | %FileCheck %s -check-prefix=SIL
 
 // CHECK-NOT: UnknownCode
 

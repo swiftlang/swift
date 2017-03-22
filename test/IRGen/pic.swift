@@ -1,7 +1,7 @@
 // <rdar://problem/15358345> Check that we always use PIC relocations on all
 // platforms.
 
-// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -assume-parsing-unqualified-ownership-sil %s -module-name main -S -o - | %FileCheck -check-prefix=%target-cpu %s
+// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil %s -module-name main -S -o - | %FileCheck -check-prefix=%target-cpu %s
 
 // XFAIL: linux
 

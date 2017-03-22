@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -emit-silgen -parse-as-library %s | %FileCheck %s
+// RUN: %target-swift-frontend -emit-silgen -parse-as-library %s | %FileCheck %s
 
 
 func dup<T>(_ x: T) -> (T, T) { return (x,x) }

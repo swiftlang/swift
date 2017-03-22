@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -sdk %S/Inputs %s -emit-silgen | %FileCheck %s
+// RUN: %target-swift-frontend -sdk %S/Inputs %s -emit-silgen | %FileCheck %s
 
 // REQUIRES: objc_interop
 

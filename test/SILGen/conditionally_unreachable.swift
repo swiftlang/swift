@@ -1,8 +1,8 @@
-// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -emit-silgen -parse-stdlib -primary-file %s | %FileCheck %s -check-prefix=RAW
-// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -emit-sil -assert-config Debug -parse-stdlib -primary-file %s | %FileCheck -check-prefix=DEBUG %s
-// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -emit-sil -O -assert-config Debug -parse-stdlib -primary-file %s | %FileCheck -check-prefix=DEBUG %s
-// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -emit-sil -assert-config Release -parse-stdlib -primary-file %s | %FileCheck -check-prefix=RELEASE %s
-// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -emit-sil -O -assert-config Release -parse-stdlib -primary-file %s | %FileCheck -check-prefix=RELEASE %s
+// RUN: %target-swift-frontend -emit-silgen -parse-stdlib -primary-file %s | %FileCheck %s -check-prefix=RAW
+// RUN: %target-swift-frontend -emit-sil -assert-config Debug -parse-stdlib -primary-file %s | %FileCheck -check-prefix=DEBUG %s
+// RUN: %target-swift-frontend -emit-sil -O -assert-config Debug -parse-stdlib -primary-file %s | %FileCheck -check-prefix=DEBUG %s
+// RUN: %target-swift-frontend -emit-sil -assert-config Release -parse-stdlib -primary-file %s | %FileCheck -check-prefix=RELEASE %s
+// RUN: %target-swift-frontend -emit-sil -O -assert-config Release -parse-stdlib -primary-file %s | %FileCheck -check-prefix=RELEASE %s
 
 import Swift
 

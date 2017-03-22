@@ -1,4 +1,4 @@
-// RUN: %target-swift-ide-test -new-mangling-for-tests -print-indexed-symbols -source-filename %s | %FileCheck %s
+// RUN: %target-swift-ide-test -print-indexed-symbols -source-filename %s | %FileCheck %s
 
 // Enum
 enum AnEnumeration {

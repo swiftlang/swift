@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests %s -emit-ir -g -o - | %FileCheck %s
-// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests %s -S -g -o - | %FileCheck %s --check-prefix ASM-CHECK
+// RUN: %target-swift-frontend %s -emit-ir -g -o - | %FileCheck %s
+// RUN: %target-swift-frontend %s -S -g -o - | %FileCheck %s --check-prefix ASM-CHECK
 
 // REQUIRES: CPU=i386_or_x86_64
 

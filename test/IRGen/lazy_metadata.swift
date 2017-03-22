@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -parse-as-library -Xllvm -new-mangling-for-tests -module-name=test -O %s -emit-ir > %t.ll
+// RUN: %target-swift-frontend -parse-as-library -module-name=test -O %s -emit-ir > %t.ll
 // RUN: %FileCheck %s < %t.ll
 // RUN: %FileCheck -check-prefix=CHECK-DEAD %s < %t.ll
 
