@@ -30,6 +30,11 @@ struct AnyStruct {
   let a: Any
 }
 
+indirect enum IndirectEnum<T> {
+  case Nil
+  case Node(T)
+}
+
 func s010_hasVarArg(_ args: Any...) {}
 
 // Tests Address only enums's construction
@@ -673,6 +678,36 @@ func s350_______addrOnlyIf(x: Bool) -> EmptyP {
   var a : EmptyP = AddressOnlyStruct()
 
   return x ? a : a
+}
+
+// Tests support for guards and indirect enums for opaque values
+// ---
+// CHECK-LABEL: sil hidden @_T020opaque_values_silgen21s360________guardEnumyAA08IndirectF0OyxGlF : $@convention(thin) <T> (@owned IndirectEnum<T>) -> () {
+// CHECK: bb0([[ARG:%.*]] : $IndirectEnum<T>):
+// CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
+// CHECK:   [[COPY__ARG:%.*]] = copy_value [[BORROWED_ARG]]
+// CHECK:   switch_enum [[COPY__ARG]] : $IndirectEnum<T>, case #IndirectEnum.Node!enumelt.1: bb3, default bb1
+// CHECK: bb1:
+// CHECK:   end_borrow [[BORROWED_ARG]] from [[ARG]] : $IndirectEnum<T>, $IndirectEnum<T>
+// CHECK:   br bb2
+// CHECK: bb2:
+// CHECK:   br bb4
+// CHECK: bb3([[EARG:%.*]] : $<τ_0_0> { var τ_0_0 } <T>):
+// CHECK:   [[PROJ_BOX:%.*]] = project_box [[EARG]]
+// CHECK:   [[LOAD_BOX:%.*]] = load [take] [[PROJ_BOX]] : $*T
+// CHECK:   [[COPY_BOX:%.*]] = copy_value [[LOAD_BOX]] : $T
+// CHECK:   destroy_value [[EARG]]
+// CHECK:   end_borrow [[BORROWED_ARG]] from [[ARG]] : $IndirectEnum<T>, $IndirectEnum<T>
+// CHECK:   destroy_value [[COPY_BOX]]
+// CHECK:   br bb4
+// CHECK: bb4:
+// CHECK:   destroy_value [[ARG]]
+// CHECK:   return %{{.*}} : $()
+// CHECK-LABEL: } // end sil function '_T020opaque_values_silgen21s360________guardEnumyAA08IndirectF0OyxGlF'
+func s360________guardEnum<T>(_ e: IndirectEnum<T>) {
+  do {
+    guard case .Node(let x) = e else { return }
+  }
 }
 
 // Tests conditional value casts and correspondingly generated reabstraction thunk, with <T> types

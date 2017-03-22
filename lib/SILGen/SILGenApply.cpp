@@ -2566,16 +2566,18 @@ namespace {
                                          SILType loweredSubstArgType,
                                          AbstractionPattern origParamType,
                                          SILParameterInfo param) {
+      Scope scope(SGF, arg.getLocation());
+
       // TODO: We should take the opportunity to peephole certain abstraction
       // changes here, for instance, directly emitting a closure literal at the
       // callee's expected abstraction level instead of emitting it maximally
       // substituted and thunking.
       auto emitted = emitArgumentFromSource(std::move(arg), loweredSubstArgType,
                                             origParamType, param);
-      return SGF.emitSubstToOrigValue(emitted.loc,
-                                      std::move(emitted.value).getScalarValue(),
-                                      origParamType, emitted.value.getType(),
-                                      emitted.contextForReabstraction);
+      ManagedValue result = SGF.emitSubstToOrigValue(
+          emitted.loc, std::move(emitted.value).getScalarValue(), origParamType,
+          emitted.value.getType(), emitted.contextForReabstraction);
+      return scope.popPreservingValue(result);
     }
     
     CanType getAnyObjectType() {
@@ -2592,6 +2594,8 @@ namespace {
                                              SILType loweredSubstArgType,
                                              AbstractionPattern origParamType,
                                              SILParameterInfo param) {
+      Scope scope(SGF, arg.getLocation());
+
       // If we're bridging a concrete type to `id` via Any, skip the Any
       // boxing.
       
@@ -2601,17 +2605,18 @@ namespace {
       if (auto objTy = paramObjTy.getAnyOptionalObjectType())
         paramObjTy = objTy;
       if (isAnyObjectType(paramObjTy) && !arg.isRValue()) {
-        return emitNativeToBridgedObjectArgument(std::move(arg).asKnownExpr(),
-                                                 loweredSubstArgType,
-                                                 origParamType, param);
+        return scope.popPreservingValue(emitNativeToBridgedObjectArgument(
+            std::move(arg).asKnownExpr(), loweredSubstArgType, origParamType,
+            param));
       }
       
       auto emitted = emitArgumentFromSource(std::move(arg), loweredSubstArgType,
                                             origParamType, param);
-      
-      return SGF.emitNativeToBridgedValue(emitted.loc,
-                    std::move(emitted.value).getAsSingleValue(SGF, emitted.loc),
-                    Rep, param.getType());
+
+      return scope.popPreservingValue(SGF.emitNativeToBridgedValue(
+          emitted.loc,
+          std::move(emitted.value).getAsSingleValue(SGF, emitted.loc), Rep,
+          param.getType()));
     }
     
     enum class ExistentialPeepholeOptionality {
