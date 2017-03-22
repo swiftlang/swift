@@ -35,8 +35,12 @@ public:
   /// Equivalent to Clang's -mcpu=.
   std::string TargetCPU;
 
-  // The bridging header or PCH that will be imported.
+  /// The bridging header or PCH that will be imported.
   std::string BridgingHeader;
+
+  /// When automatically generating a precompiled header from the bridging
+  /// header, place it in this directory.
+  std::string PrecompiledHeaderOutputDir;
 
   /// \see Mode
   enum class Modes {
