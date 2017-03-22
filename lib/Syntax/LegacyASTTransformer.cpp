@@ -10,7 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/AST/AST.h"
 #include "swift/Syntax/DeclSyntax.h"
 #include "swift/Syntax/ExprSyntax.h"
 #include "swift/Syntax/GenericSyntax.h"
@@ -70,7 +69,7 @@ namespace {
 
     return TokensInRange;
   }
-} // namespace
+} // anonymous namespace
 
 Optional<Syntax>
 syntax::transformAST(ASTNode Node,

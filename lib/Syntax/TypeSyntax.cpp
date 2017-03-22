@@ -292,65 +292,6 @@ TypeIdentifierSyntax::withDotToken(RC<TokenSyntax> NewDotToken) const {
   return Data->replaceSelf<TypeIdentifierSyntax>(NewRaw);
 }
 
-#pragma mark - type-argument-list Data
-
-TypeArgumentListSyntaxData::
-TypeArgumentListSyntaxData(RC<RawSyntax> Raw,
-                           const SyntaxData *Parent,
-                           CursorIndex IndexInParent)
-    : SyntaxData(Raw, Parent, IndexInParent) {
-  assert(Raw->Kind == SyntaxKind::TypeArgumentList);
-#ifndef NDEBUG
-  for (size_t i = 0; i < Raw->Layout.size(); ++i) {
-    if (i % 2 == 0) {
-      assert(Raw->getChild(i)->Kind == SyntaxKind::TupleTypeElement);
-    } else {
-      syntax_assert_token_is(cast<TokenSyntax>(Raw->getChild(i)), tok::comma,
-                             ",");
-    }
-  }
-#endif
-}
-
-RC<TypeArgumentListSyntaxData>
-TypeArgumentListSyntaxData::make(RC<RawSyntax> Raw,
-                                 const SyntaxData *Parent,
-                                 CursorIndex IndexInParent) {
-  return RC<TypeArgumentListSyntaxData> {
-    new TypeArgumentListSyntaxData { Raw, Parent, IndexInParent }
-  };
-}
-
-RC<TypeArgumentListSyntaxData>
-TypeArgumentListSyntaxData::makeBlank() {
-  return make(RawSyntax::make(SyntaxKind::TypeArgumentList, {},
-                              SourcePresence::Present));
-}
-
-#pragma mark - type-argument-list API
-
-TypeArgumentListSyntax::
-TypeArgumentListSyntax(RC<SyntaxData> Root,
-                       const TypeArgumentListSyntaxData *Data)
-  : Syntax(Root, Data) {}
-
-TypeArgumentListSyntax TypeArgumentListSyntax::addType(
-    Optional<RC<TokenSyntax>> MaybeComma,
-    TupleTypeElementSyntax NewTypeArgument) const {
-  auto Layout = getRaw()->Layout;
-
-  if (MaybeComma.hasValue()) {
-    syntax_assert_token_is(MaybeComma.getValue(), tok::comma, ",");
-    Layout.push_back(MaybeComma.getValue());
-  }
-
-  Layout.push_back(NewTypeArgument.getRaw());
-
-  auto NewRaw = RawSyntax::make(SyntaxKind::TypeArgumentList, Layout,
-                                SourcePresence::Present);
-  return Data->replaceSelf<TypeArgumentListSyntax>(NewRaw);
-}
-
 #pragma mark - tuple-type Data
 
 TupleTypeSyntaxData::TupleTypeSyntaxData(RC<RawSyntax> Raw,
@@ -362,8 +303,8 @@ TupleTypeSyntaxData::TupleTypeSyntaxData(RC<RawSyntax> Raw,
   syntax_assert_child_token_text(Raw, TupleTypeSyntax::Cursor::LeftParenToken,
                                  tok::l_paren,
                                  "(");
-  syntax_assert_child_kind(Raw, TupleTypeSyntax::Cursor::TypeArgumentList,
-                           SyntaxKind::TypeArgumentList);
+  syntax_assert_child_kind(Raw, TupleTypeSyntax::Cursor::TypeElementList,
+                           SyntaxKind::TupleTypeElementList);
   syntax_assert_child_token_text(Raw, TupleTypeSyntax::Cursor::RightParenToken,
                                  tok::r_paren,
                                  ")");
@@ -384,7 +325,7 @@ TupleTypeSyntaxData::makeBlank() {
       RawSyntax::make(SyntaxKind::TupleType,
                       {
                         TokenSyntax::missingToken(tok::l_paren, "("),
-                        RawSyntax::missing(SyntaxKind::TypeArgumentList),
+                        RawSyntax::missing(SyntaxKind::TupleTypeElementList),
                         TokenSyntax::missingToken(tok::r_paren, ")"),
                       },
                       SourcePresence::Present));
@@ -404,9 +345,9 @@ TupleTypeSyntax::withLeftParen(RC<TokenSyntax> NewLeftParen) const {
 }
 
 TupleTypeSyntax TupleTypeSyntax::
-withTypeArgumentList(TypeArgumentListSyntax NewTypeArgumentList) const {
-  auto NewRaw = getRaw()->replaceChild(Cursor::TypeArgumentList,
-                                       NewTypeArgumentList.getRaw());
+withTypeElementList(TupleTypeElementListSyntax NewTypeElementList) const {
+  auto NewRaw = getRaw()->replaceChild(Cursor::TypeElementList,
+                                       NewTypeElementList.getRaw());
   return Data->replaceSelf<TupleTypeSyntax>(NewRaw);
 }
 
@@ -421,17 +362,10 @@ withRightParen(RC<TokenSyntax> NewRightParen) const {
 
 TupleTypeSyntaxBuilder::TupleTypeSyntaxBuilder()
   : ElementTypeLayout(
-      SyntaxFactory::makeBlankTypeArgumentList().getRaw()->Layout) {}
+      SyntaxFactory::makeBlankTupleTypeElementList().getRaw()->Layout) {}
 
 TupleTypeSyntaxBuilder &TupleTypeSyntaxBuilder::
-addElementTypeSyntax(llvm::Optional<RC<TokenSyntax>> MaybeComma,
-                     TupleTypeElementSyntax ElementTypeSyntax) {
-  if (MaybeComma.hasValue()) {
-    syntax_assert_token_is(MaybeComma.getValue(), tok::comma, ",");
-    ElementTypeLayout.push_back(MaybeComma.getValue());
-  } else {
-    ElementTypeLayout.push_back(TokenSyntax::missingToken(tok::comma, ","));
-  }
+addElementTypeSyntax(TupleTypeElementSyntax ElementTypeSyntax) {
   ElementTypeLayout.push_back(ElementTypeSyntax.getRaw());
   return *this;
 }
@@ -449,7 +383,7 @@ TupleTypeSyntaxBuilder::useRightParen(RC<TokenSyntax> RightParen) {
 }
 
 TupleTypeSyntax TupleTypeSyntaxBuilder::build() const {
-  auto ElementsRaw = RawSyntax::make(SyntaxKind::TypeArgumentList,
+  auto ElementsRaw = RawSyntax::make(SyntaxKind::TupleTypeElementList,
                                      { ElementTypeLayout },
                                      SourcePresence::Present);
   auto Raw = RawSyntax::make(SyntaxKind::TupleType,
@@ -471,7 +405,7 @@ TupleTypeElementSyntaxData(RC<RawSyntax> Raw,
                            CursorIndex IndexInParent)
   : SyntaxData(Raw, Parent, IndexInParent) {
   assert(Raw->Kind == SyntaxKind::TupleTypeElement);
-  assert(Raw->Layout.size() == 5);
+  assert(Raw->Layout.size() == 6);
   syntax_assert_child_token(Raw, TupleTypeElementSyntax::Cursor::Label,
                             tok::identifier);
   syntax_assert_child_token_text(Raw,
@@ -483,6 +417,9 @@ TupleTypeElementSyntaxData(RC<RawSyntax> Raw,
                                  TupleTypeElementSyntax::Cursor::InoutToken,
                                  tok::kw_inout,
                                  "inout");
+  syntax_assert_child_token_text(Raw,
+                                 TupleTypeElementSyntax::Cursor::CommaToken,
+                                 tok::comma, ",");
   assert(Raw->getChild(TupleTypeElementSyntax::Cursor::Type)->isType());
 }
 
@@ -505,6 +442,7 @@ TupleTypeElementSyntaxData::makeBlank() {
                         RawSyntax::missing(SyntaxKind::TypeAttributes),
                         TokenSyntax::missingToken(tok::kw_inout, "inout"),
                         RawSyntax::missing(SyntaxKind::MissingType),
+                        TokenSyntax::missingToken(tok::comma, ","),
                       },
                       SourcePresence::Present));
 }
@@ -516,6 +454,13 @@ TupleTypeElementSyntax(RC<SyntaxData> Root,
                        const TupleTypeElementSyntaxData *Data)
   : Syntax(Root, Data) {}
 
+RC<TokenSyntax>
+TupleTypeElementSyntax::getLabel() const {
+  auto Label = cast<TokenSyntax>(getRaw()->getChild(Cursor::Label));
+  assert(Label->getTokenKind() == tok::identifier);
+  return Label;
+}
+
 TupleTypeElementSyntax
 TupleTypeElementSyntax::withLabel(RC<TokenSyntax> NewLabel) const {
   assert(NewLabel->getTokenKind() == tok::identifier);
@@ -523,10 +468,31 @@ TupleTypeElementSyntax::withLabel(RC<TokenSyntax> NewLabel) const {
   return Data->replaceSelf<TupleTypeElementSyntax>(NewRaw);
 }
 
+RC<TokenSyntax>
+TupleTypeElementSyntax::getColonToken() const {
+  auto ColonToken = cast<TokenSyntax>(getRaw()->getChild(Cursor::ColonToken));
+  syntax_assert_token_is(ColonToken, tok::colon, ":");
+  return ColonToken;
+}
+
 TupleTypeElementSyntax
 TupleTypeElementSyntax::withColonToken(RC<TokenSyntax> NewColonToken) const {
   syntax_assert_token_is(NewColonToken, tok::colon, ":")
   auto NewRaw = getRaw()->replaceChild(Cursor::ColonToken, NewColonToken);
+  return Data->replaceSelf<TupleTypeElementSyntax>(NewRaw);
+}
+
+RC<TokenSyntax>
+TupleTypeElementSyntax::getCommaToken() const {
+  auto CommaToken = cast<TokenSyntax>(getRaw()->getChild(Cursor::CommaToken));
+  syntax_assert_token_is(CommaToken, tok::comma, ",");
+  return CommaToken;
+}
+
+TupleTypeElementSyntax
+TupleTypeElementSyntax::withCommaToken(RC<TokenSyntax> NewCommaToken) const {
+  syntax_assert_token_is(NewCommaToken, tok::comma, ",")
+  auto NewRaw = getRaw()->replaceChild(Cursor::CommaToken, NewCommaToken);
   return Data->replaceSelf<TupleTypeElementSyntax>(NewRaw);
 }
 
@@ -912,8 +878,11 @@ FunctionTypeSyntaxData::FunctionTypeSyntaxData(RC<RawSyntax> Raw,
                            SyntaxKind::TypeAttributes);
   syntax_assert_child_token_text(Raw, FunctionTypeSyntax::Cursor::LeftParen,
                                  tok::l_paren, "(");
+
+  // FIXME: This needs its own element and element list.
   syntax_assert_child_kind(Raw, FunctionTypeSyntax::Cursor::ArgumentList,
-                           SyntaxKind::TypeArgumentList);
+                           SyntaxKind::TupleTypeElementList);
+
   syntax_assert_child_token_text(Raw, FunctionTypeSyntax::Cursor::RightParen,
                                  tok::r_paren, ")");
 #ifndef NDEBUG
@@ -942,7 +911,8 @@ RC<FunctionTypeSyntaxData> FunctionTypeSyntaxData::makeBlank() {
     {
       RawSyntax::missing(SyntaxKind::TypeAttributes),
       TokenSyntax::missingToken(tok::l_paren, "("),
-      RawSyntax::missing(SyntaxKind::TypeArgumentList),
+      // FIXME: This needs its own element and element list.
+      RawSyntax::missing(SyntaxKind::TupleTypeElementList),
       TokenSyntax::missingToken(tok::r_paren, ")"),
       TokenSyntax::missingToken(tok::kw_throws, "throws"),
       TokenSyntax::missingToken(tok::arrow, "->"),
@@ -1072,7 +1042,7 @@ addArgumentTypeSyntax(Optional<RC<TokenSyntax>> MaybeComma,
 
   TypeArgumentsLayout.push_back(NewTypeArgument.getRaw());
 
-  FunctionTypeLayout[Index] = RawSyntax::make(SyntaxKind::TypeArgumentList,
+  FunctionTypeLayout[Index] = RawSyntax::make(SyntaxKind::TupleTypeElementList,
                                               TypeArgumentsLayout,
                                               SourcePresence::Present);
   return *this;

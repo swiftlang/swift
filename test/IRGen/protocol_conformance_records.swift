@@ -3,7 +3,7 @@
 
 import resilient_struct
 
-protocol Runcible {
+public protocol Runcible {
   func runce()
 }
 
@@ -11,16 +11,16 @@ protocol Runcible {
 
 // CHECK:         %swift.protocol_conformance {
 // -- protocol descriptor
-// CHECK:           [[RUNCIBLE:%swift.protocol\* @_TMp28protocol_conformance_records8Runcible]]
+// CHECK:           [[RUNCIBLE:%swift.protocol\* @_T028protocol_conformance_records8RuncibleMp]]
 // -- type metadata
-// CHECK:           @_TMfV28protocol_conformance_records15NativeValueType
+// CHECK:           @_T028protocol_conformance_records15NativeValueTypeVMf
 // -- witness table
-// CHECK:           @_TWPV28protocol_conformance_records15NativeValueTypeS_8Runcible
+// CHECK:           @_T028protocol_conformance_records15NativeValueTypeVAA8RuncibleAAWP
 // -- flags 0x01: unique direct metadata
 // CHECK:           i32 1
 // CHECK:         },
-struct NativeValueType: Runcible {
-  func runce() {}
+public struct NativeValueType: Runcible {
+  public func runce() {}
 }
 
 // -- TODO class refs should be indirected through their ref variable
@@ -28,42 +28,42 @@ struct NativeValueType: Runcible {
 // -- protocol descriptor
 // CHECK:           [[RUNCIBLE]]
 // -- class object (TODO should be class ref variable)
-// CHECK:           @_TMfC28protocol_conformance_records15NativeClassType
+// CHECK:           @_T028protocol_conformance_records15NativeClassTypeCMf
 // -- witness table
-// CHECK:           @_TWPC28protocol_conformance_records15NativeClassTypeS_8Runcible
+// CHECK:           @_T028protocol_conformance_records15NativeClassTypeCAA8RuncibleAAWP
 // -- flags 0x01: unique direct metadata (TODO should be 0x03 indirect class)
 // CHECK:           i32 1
 // CHECK:         },
-class NativeClassType: Runcible {
-  func runce() {}
+public class NativeClassType: Runcible {
+  public func runce() {}
 }
 
 // CHECK:         %swift.protocol_conformance {
 // -- protocol descriptor
 // CHECK:           [[RUNCIBLE]]
 // -- nominal type descriptor
-// CHECK:           @_TMnV28protocol_conformance_records17NativeGenericType
+// CHECK:           @_T028protocol_conformance_records17NativeGenericTypeVMn
 // -- witness table
-// CHECK:           @_TWPurGV28protocol_conformance_records17NativeGenericTypex_S_8RuncibleS_
+// CHECK:           @_T028protocol_conformance_records17NativeGenericTypeVyxGAA8RuncibleAAlWP
 // -- flags 0x04: unique nominal type descriptor
 // CHECK:           i32 4
 // CHECK:         },
-struct NativeGenericType<T>: Runcible {
-  func runce() {}
+public struct NativeGenericType<T>: Runcible {
+  public func runce() {}
 }
 
 // CHECK:         %swift.protocol_conformance {
 // -- protocol descriptor
 // CHECK:           [[RUNCIBLE]]
 // -- type metadata
-// CHECK:           @got._TMSi
+// CHECK:           @got._T0SiN
 // -- witness table
-// CHECK:           @_TWPSi28protocol_conformance_records8Runcible
+// CHECK:           @_T0Si28protocol_conformance_records8RuncibleAAWP
 // -- flags 0x01: unique direct metadata
 // CHECK:           i32 1
 // CHECK:         }
 extension Int: Runcible {
-  func runce() {}
+  public func runce() {}
 }
 
 // For a resilient struct, reference the NominalTypeDescriptor
@@ -72,16 +72,16 @@ extension Int: Runcible {
 // -- protocol descriptor
 // CHECK:           [[RUNCIBLE]]
 // -- nominal type descriptor
-// CHECK:           @got._TMV16resilient_struct4Size
+// CHECK:           @got._T016resilient_struct4SizeVN
 // -- witness table
-// CHECK:           @_TWPurGV28protocol_conformance_records17NativeGenericTypex_S_8RuncibleS_
+// CHECK:           @_T028protocol_conformance_records17NativeGenericTypeVyxGAA8RuncibleAAlWP
 // -- flags 0x04: unique direct metadata
 // CHECK:           i32 1
 // CHECK:         }
 // CHECK:       ]
 
 extension Size: Runcible {
-  func runce() {}
+  public func runce() {}
 }
 
 // TODO: conformances that need lazy initialization

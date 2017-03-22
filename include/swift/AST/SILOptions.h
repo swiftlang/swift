@@ -124,6 +124,13 @@ public:
   /// Assume that code will be executed in a single-threaded environment.
   bool AssumeSingleThreaded = false;
 
+  /// Use the copy-on-write implementation for opaque existentials.
+#ifdef SWIFT_RUNTIME_ENABLE_COW_EXISTENTIALS
+  bool UseCOWExistentials = true;
+#else
+  bool UseCOWExistentials = false;
+#endif
+
   /// Indicates which sanitizer is turned on.
   SanitizerKind Sanitize : 2;
 

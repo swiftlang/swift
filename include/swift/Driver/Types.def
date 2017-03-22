@@ -57,6 +57,7 @@ TYPE("diagnostics",     SerializedDiagnostics, "dia",          "")
 TYPE("objc-header",     ObjCHeader,         "h",               "")
 TYPE("swift-dependencies", SwiftDeps,       "swiftdeps",       "")
 TYPE("remap",           Remapping,          "remap",           "")
+TYPE("imported-modules", ImportedModules,   "importedmodules", "")
 
 // Misc types
 TYPE("pcm",             ClangModuleFile,    "pcm",             "")

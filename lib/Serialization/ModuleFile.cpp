@@ -13,7 +13,7 @@
 #include "swift/Serialization/ModuleFile.h"
 #include "swift/Serialization/ModuleFormat.h"
 #include "swift/Subsystems.h"
-#include "swift/AST/AST.h"
+#include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/ModuleLoader.h"
 #include "swift/AST/NameLookup.h"
@@ -1279,7 +1279,11 @@ Status ModuleFile::associateWithFileContext(FileUnit *file,
   return getStatus();
 }
 
-ModuleFile::~ModuleFile() = default;
+ModuleFile::~ModuleFile() {
+  assert(DelayedGenericEnvironments.empty() &&
+         "either finishPendingActions() was never called, or someone forgot "
+         "to use getModuleFileForDelayedActions()");
+}
 
 void ModuleFile::lookupValue(DeclName name,
                              SmallVectorImpl<ValueDecl*> &results) {
@@ -1526,7 +1530,7 @@ void ModuleFile::loadExtensions(NominalTypeDecl *nominal) {
     }
   } else {
     std::string mangledName =
-        NewMangling::ASTMangler().mangleNominalType(nominal);
+        Mangle::ASTMangler().mangleNominalType(nominal);
     for (auto item : *iter) {
       if (item.first == mangledName)
         (void)getDecl(item.second);

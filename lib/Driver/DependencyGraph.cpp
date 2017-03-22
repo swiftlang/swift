@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Driver/DependencyGraph.h"
-#include "swift/Basic/Demangle.h"
+#include "swift/Demangling/Demangle.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringSwitch.h"
@@ -251,7 +251,7 @@ LoadResult DependencyGraphImpl::loadFromBuffer(const void *node,
   };
 
   auto providesCallback =
-      [this, node, &provides](StringRef name, DependencyKind kind,
+      [&provides](StringRef name, DependencyKind kind,
                               bool isCascading) -> LoadResult {
     assert(isCascading);
     auto iter = std::find_if(provides.begin(), provides.end(),

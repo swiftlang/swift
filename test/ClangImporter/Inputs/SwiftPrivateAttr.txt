@@ -22,6 +22,8 @@ class Foo : NSObject, __PrivProto {
   func __setObject(_ object: Any!, forKeyedSubscript index: Any!)
   func __objectAtIndexedSubscript(_ index: Int32) -> Any!
   func setObject(_ object: Any!, atIndexedSubscript index: Int32)
+  @available(swift, obsoleted: 3, renamed: "__withNoArgs()")
+  class func __fooWithNoArgs() -> Self!
   init()
 }
 class Bar : NSObject {
@@ -81,6 +83,8 @@ enum NSEnum : Int {
   init?(rawValue: Int)
   var rawValue: Int { get }
   case __privA
+  @available(swift, obsoleted: 3, renamed: "__privA")
+  static var __PrivA: NSEnum { get }
   case B
 }
 struct __PrivNSOptions : OptionSet {
@@ -92,9 +96,15 @@ struct NSOptions : OptionSet {
   init(rawValue: Int)
   let rawValue: Int
   static var __privA: NSOptions { get }
+  @available(swift, obsoleted: 3, renamed: "__privA")
+  static var __PrivA: NSOptions { get }
   static var B: NSOptions { get }
 }
+@available(swift, obsoleted: 3, renamed: "__PrivCFType")
+typealias __PrivCFTypeRef = __PrivCFType
 class __PrivCFType {
 }
+@available(swift, obsoleted: 3, renamed: "__PrivCFSub")
+typealias __PrivCFSubRef = __PrivCFSub
 typealias __PrivCFSub = __PrivCFType
 typealias __PrivInt = Int32

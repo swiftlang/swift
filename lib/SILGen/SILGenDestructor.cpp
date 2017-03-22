@@ -13,7 +13,7 @@
 #include "SILGenFunction.h"
 #include "RValue.h"
 #include "Scope.h"
-#include "swift/AST/AST.h"
+#include "swift/AST/SubstitutionMap.h"
 #include "swift/SIL/TypeLowering.h"
 
 using namespace swift;
@@ -61,10 +61,15 @@ void SILGenFunction::emitDestroyingDestructor(DestructorDecl *dd) {
     SILValue baseSelf = B.createUpcast(cleanupLoc, selfValue, baseSILTy);
     ManagedValue dtorValue;
     SILType dtorTy;
-    SubstitutionList subs
-      = superclassTy->gatherAllSubstitutions(SGM.M.getSwiftModule(), nullptr);
-    std::tie(dtorValue, dtorTy, subs)
-      = emitSiblingMethodRef(cleanupLoc, baseSelf, dtorConstant, subs);
+    auto subMap
+      = superclassTy->getContextSubstitutionMap(SGM.M.getSwiftModule(),
+                                                superclass);
+    std::tie(dtorValue, dtorTy)
+      = emitSiblingMethodRef(cleanupLoc, baseSelf, dtorConstant, subMap);
+
+    SmallVector<Substitution, 4> subs;
+    if (auto *genericSig = superclass->getGenericSignature())
+      genericSig->getSubstitutions(subMap, subs);
     resultSelfValue = B.createApply(cleanupLoc, dtorValue.forward(*this),
                                     dtorTy, objectPtrTy, subs, baseSelf);
   } else {
@@ -111,11 +116,18 @@ void SILGenFunction::emitDeallocatingDestructor(DestructorDecl *dd) {
   // Form a reference to the destroying destructor.
   SILDeclRef dtorConstant(dd, SILDeclRef::Kind::Destroyer);
   auto classTy = initialSelfValue->getType();
+  auto classDecl = classTy.getSwiftRValueType()->getAnyNominal();
   ManagedValue dtorValue;
   SILType dtorTy;
-  SubstitutionList subs = classTy.gatherAllSubstitutions(SGM.M);
-  std::tie(dtorValue, dtorTy, subs)
-    = emitSiblingMethodRef(loc, initialSelfValue, dtorConstant, subs);
+  auto subMap = classTy.getSwiftRValueType()
+    ->getContextSubstitutionMap(SGM.M.getSwiftModule(),
+                                classDecl);
+  std::tie(dtorValue, dtorTy)
+    = emitSiblingMethodRef(loc, initialSelfValue, dtorConstant, subMap);
+
+  SmallVector<Substitution, 4> subs;
+  if (auto *genericSig = classDecl->getGenericSignature())
+    genericSig->getSubstitutions(subMap, subs);
 
   // Call the destroying destructor.
   SILValue selfForDealloc;
@@ -124,7 +136,8 @@ void SILGenFunction::emitDeallocatingDestructor(DestructorDecl *dd) {
     ManagedValue borrowedSelf = emitManagedBeginBorrow(loc, initialSelfValue);
     SILType objectPtrTy = SILType::getNativeObjectType(F.getASTContext());
     selfForDealloc = B.createApply(loc, dtorValue.forward(*this),
-                                   dtorTy, objectPtrTy, subs, borrowedSelf.getUnmanagedValue());
+                                   dtorTy, objectPtrTy, subs,
+                                   borrowedSelf.getUnmanagedValue());
   }
 
   // Balance out the +1 from the self argument using end_lifetime.
@@ -227,13 +240,19 @@ void SILGenFunction::emitObjCDestructor(SILDeclRef dtor) {
   // Call the superclass's -dealloc.
   SILType superclassSILTy = getLoweredLoadableType(superclassTy);
   SILValue superSelf = B.createUpcast(cleanupLoc, selfValue, superclassSILTy);
-  SubstitutionList subs
-    = superclassTy->gatherAllSubstitutions(SGM.M.getSwiftModule(), nullptr);
-  auto substDtorType = superclassDtorType.castTo<SILFunctionType>()
-    ->substGenericArgs(SGM.M, subs);
-  SILFunctionConventions dtorConv(substDtorType, SGM.M);
-  B.createApply(cleanupLoc, superclassDtorValue,
-                SILType::getPrimitiveObjectType(substDtorType),
+  auto subMap
+    = superclassTy->getContextSubstitutionMap(SGM.M.getSwiftModule(),
+                                              superclass);
+
+  auto substDtorType = superclassDtorType.substGenericArgs(SGM.M, subMap);
+  SILFunctionConventions dtorConv(substDtorType.castTo<SILFunctionType>(),
+                                  SGM.M);
+
+  SmallVector<Substitution, 4> subs;
+    if (auto *genericSig = superclass->getGenericSignature())
+      genericSig->getSubstitutions(subMap, subs);
+
+  B.createApply(cleanupLoc, superclassDtorValue, substDtorType,
                 dtorConv.getSILResultType(), subs, superSelf);
 
   // Return.

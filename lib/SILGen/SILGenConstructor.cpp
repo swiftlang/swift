@@ -16,10 +16,9 @@
 #include "LValue.h"
 #include "RValue.h"
 #include "Scope.h"
-#include "swift/AST/AST.h"
 #include "swift/AST/GenericEnvironment.h"
-#include "swift/AST/Mangle.h"
 #include "swift/AST/ASTMangler.h"
+#include "swift/AST/ParameterList.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILUndef.h"
 #include "swift/SIL/TypeLowering.h"
@@ -27,7 +26,6 @@
 
 using namespace swift;
 using namespace Lowering;
-using namespace Mangle;
 
 static SILValue emitConstructorMetatypeArg(SILGenFunction &gen,
                                            ValueDecl *ctor) {
@@ -88,7 +86,7 @@ static void emitImplicitValueConstructor(SILGenFunction &gen,
 
   // Emit the indirect return argument, if any.
   SILValue resultSlot;
-  if (selfTy.isAddressOnly(gen.SGM.M)) {
+  if (selfTy.isAddressOnly(gen.SGM.M) && gen.silConv.useLoweredAddresses()) {
     auto &AC = gen.getASTContext();
     auto VD = new (AC) ParamDecl(/*IsLet*/ false, SourceLoc(), SourceLoc(),
                                  AC.getIdentifier("$return_value"),
@@ -376,7 +374,7 @@ void SILGenFunction::emitEnumConstructor(EnumElementDecl *element) {
 
   // Emit the indirect return slot.
   std::unique_ptr<Initialization> dest;
-  if (enumTI.isAddressOnly()) {
+  if (enumTI.isAddressOnly() && silConv.useLoweredAddresses()) {
     auto &AC = getASTContext();
     auto VD = new (AC) ParamDecl(/*IsLet*/ false, SourceLoc(), SourceLoc(),
                                  AC.getIdentifier("$return_value"),
@@ -418,7 +416,7 @@ void SILGenFunction::emitEnumConstructor(EnumElementDecl *element) {
     scope.pop();
     B.createReturn(ReturnLoc, emitEmptyTuple(Loc));
   } else {
-    assert(enumTI.isLoadable());
+    assert(enumTI.isLoadable() || !silConv.useLoweredAddresses());
     SILValue result = mv.forward(*this);
     scope.pop();
     B.createReturn(ReturnLoc, result);
@@ -505,13 +503,22 @@ void SILGenFunction::emitClassConstructorAllocator(ConstructorDecl *ctor) {
   ManagedValue initVal;
   SILType initTy;
 
-  SubstitutionList subs;
   // Call the initializer.
-  SubstitutionList forwardingSubs;
-  if (auto *genericEnv = ctor->getGenericEnvironmentOfContext())
-    forwardingSubs = genericEnv->getForwardingSubstitutions();
-  std::tie(initVal, initTy, subs)
-    = emitSiblingMethodRef(Loc, selfValue, initConstant, forwardingSubs);
+  SubstitutionMap subMap;
+  SmallVector<Substitution, 4> subs;
+  if (auto *genericEnv = ctor->getGenericEnvironmentOfContext()) {
+    auto *genericSig = genericEnv->getGenericSignature();
+    subMap = genericSig->getSubstitutionMap(
+      [&](SubstitutableType *t) -> Type {
+        return genericEnv->mapTypeIntoContext(
+          t->castTo<GenericTypeParamType>());
+      },
+      MakeAbstractConformanceForGenericType());
+    genericSig->getSubstitutions(subMap, subs);
+  }
+
+  std::tie(initVal, initTy)
+    = emitSiblingMethodRef(Loc, selfValue, initConstant, subMap);
 
   SILValue initedSelfValue = emitApplyWithRethrow(Loc, initVal.forward(*this),
                                                   initTy, subs, args);
@@ -835,15 +842,8 @@ static void emitMemberInit(SILGenFunction &SGF, VarDecl *selfDecl,
 
 static SILValue getBehaviorInitStorageFn(SILGenFunction &gen,
                                          VarDecl *behaviorVar) {
-  std::string behaviorInitName;
-  {
-    Mangler m;
-    m.mangleBehaviorInitThunk(behaviorVar);
-    std::string Old = m.finalize();
-    NewMangling::ASTMangler NewMangler;
-    std::string New = NewMangler.mangleBehaviorInitThunk(behaviorVar);
-    behaviorInitName = NewMangling::selectMangling(Old, New);
-  }
+  Mangle::ASTMangler NewMangler;
+  std::string behaviorInitName = NewMangler.mangleBehaviorInitThunk(behaviorVar);
   
   SILFunction *thunkFn;
   // Skip out early if we already emitted this thunk.

@@ -22,11 +22,11 @@ struct S : Foo {
 
 // CHECK-LABEL: sil @castOpaque : $@convention(thin) (Int) -> () {
 // CHECK: bb0([[ARG:%.*]] : $Int):
-// CHECK:  unconditional_checked_cast_opaque [[ARG]] : $Int to $Foo
+// CHECK:  unconditional_checked_cast_value take_always [[ARG]] : $Int to $Foo
 // CHECK-LABEL: } // end sil function 'castOpaque'
 sil @castOpaque : $@convention(thin) (Int) -> () {
 bb0(%0 : $Int):
-  %c = unconditional_checked_cast_opaque %0 : $Int to $Foo
+  %c = unconditional_checked_cast_value take_always %0 : $Int to $Foo
   %t = tuple ()
   return %t : $()
 }

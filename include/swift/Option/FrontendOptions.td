@@ -260,9 +260,16 @@ def enable_experimental_property_behaviors :
   Flag<["-"], "enable-experimental-property-behaviors">,
   HelpText<"Enable experimental property behaviors">;
 
+def enable_cow_existentials : Flag<["-"], "enable-cow-existentials">,
+  HelpText<"Enable the copy-on-write existential implementation">;
+
 def disable_availability_checking : Flag<["-"],
   "disable-availability-checking">,
   HelpText<"Disable checking for potentially unavailable APIs">;
+
+def enable_experimental_tsan_inout_instrumentation : Flag<["-"],
+  "enable-experimental-tsan-inout-instrumentation">,
+  HelpText<"Enable treatment of inout parameters as Thread Sanitizer accesses">;
 
 def enable_infer_import_as_member :
   Flag<["-"], "enable-infer-import-as-member">,
@@ -368,5 +375,8 @@ def enable_class_resilience : Flag<["-"], "enable-class-resilience">,
 
 def group_info_path : Separate<["-"], "group-info-path">,
   HelpText<"The path to collect the group information of the compiled module">;
+
+def diagnostics_editor_mode : Flag<["-"], "diagnostics-editor-mode">,
+HelpText<"Diagnostics will be used in editor">;
 
 } // end let Flags = [FrontendOption, NoDriverOption, HelpHidden]

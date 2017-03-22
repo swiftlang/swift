@@ -122,7 +122,7 @@ public:
   /// \param loc The location for any instructions required to split the
   ///   initialization.
   virtual MutableArrayRef<InitializationPtr>
-  splitIntoTupleElements(SILGenFunction &gen, SILLocation loc, CanType type,
+  splitIntoTupleElements(SILGenFunction &SGF, SILLocation loc, CanType type,
                          SmallVectorImpl<InitializationPtr> &buf) {
     llvm_unreachable("Must implement if canSplitIntoTupleElements "
                      "returns true");
@@ -135,16 +135,16 @@ public:
   /// If this is an *copy* of the rvalue into this initialization then isInit is
   /// false.  If it is an *initialization* of the memory in the initialization,
   /// then isInit is true.
-  virtual void copyOrInitValueInto(SILGenFunction &gen, SILLocation loc,
+  virtual void copyOrInitValueInto(SILGenFunction &SGF, SILLocation loc,
                                    ManagedValue explodedElement,
                                    bool isInit) = 0;
 
   /// Perform post-initialization bookkeeping for this initialization.
-  virtual void finishInitialization(SILGenFunction &gen) {}
+  virtual void finishInitialization(SILGenFunction &SGF) {}
 
   /// Perform post-initialization bookkeeping for this initialization,
   /// given that it wasn't actually initialized.
-  virtual void finishUninitialized(SILGenFunction &gen) {
+  virtual void finishUninitialized(SILGenFunction &SGF) {
     llvm_unreachable("Initialization subclass does not support being left "
                      "uninitialized");
   }
@@ -177,26 +177,26 @@ public:
   }
   
   MutableArrayRef<InitializationPtr>
-  splitIntoTupleElements(SILGenFunction &gen, SILLocation loc, CanType type,
+  splitIntoTupleElements(SILGenFunction &SGF, SILLocation loc, CanType type,
                          SmallVectorImpl<InitializationPtr> &buf) override;
 
-  void copyOrInitValueInto(SILGenFunction &gen, SILLocation loc,
+  void copyOrInitValueInto(SILGenFunction &SGF, SILLocation loc,
                            ManagedValue value, bool isInit) override {
-    copyOrInitValueIntoSingleBuffer(gen, loc, value, isInit, getAddress());
+    copyOrInitValueIntoSingleBuffer(SGF, loc, value, isInit, getAddress());
   }
 
   /// Overriders must call this.
-  void finishInitialization(SILGenFunction &gen) override;
+  void finishInitialization(SILGenFunction &SGF) override;
   
   /// Emit the exploded element into a buffer at the specified address.
-  static void copyOrInitValueIntoSingleBuffer(SILGenFunction &gen,
+  static void copyOrInitValueIntoSingleBuffer(SILGenFunction &SGF,
                                               SILLocation loc,
                                               ManagedValue value,
                                               bool isInit,
                                               SILValue bufferAddress);
 
   static MutableArrayRef<InitializationPtr>
-  splitSingleBufferIntoTupleElements(SILGenFunction &gen, SILLocation loc,
+  splitSingleBufferIntoTupleElements(SILGenFunction &SGF, SILLocation loc,
                                      CanType type, SILValue bufferAddress,
                                      SmallVectorImpl<InitializationPtr> &buf,
                        TinyPtrVector<CleanupHandle::AsPointer> &splitCleanups);
@@ -215,7 +215,7 @@ public:
     return address;
   }
 
-  void finishUninitialized(SILGenFunction &gen) override {}
+  void finishUninitialized(SILGenFunction &SGF) override {}
 };
 
 /// Abstract base class for single-buffer initializations.
@@ -226,10 +226,10 @@ public:
   TemporaryInitialization(SILValue addr, CleanupHandle cleanup)
     : Addr(addr), Cleanup(cleanup) {}
 
-  void finishInitialization(SILGenFunction &gen) override;
+  void finishInitialization(SILGenFunction &SGF) override;
 
-  void finishUninitialized(SILGenFunction &gen) override {
-    TemporaryInitialization::finishInitialization(gen);
+  void finishUninitialized(SILGenFunction &SGF) override {
+    TemporaryInitialization::finishInitialization(SGF);
   }
 
   SILValue getAddressOrNull() const override {
@@ -271,12 +271,12 @@ public:
   }
     
   MutableArrayRef<InitializationPtr>
-  splitIntoTupleElements(SILGenFunction &gen, SILLocation loc, CanType type,
+  splitIntoTupleElements(SILGenFunction &SGF, SILLocation loc, CanType type,
                          SmallVectorImpl<InitializationPtr> &buf) override {
     return SubInitializations;
   }
 
-  void copyOrInitValueInto(SILGenFunction &gen, SILLocation loc,
+  void copyOrInitValueInto(SILGenFunction &SGF, SILLocation loc,
                            ManagedValue valueMV, bool isInit) override;
 
   // We don't need to do anything in finishInitialization.  There are two
@@ -286,7 +286,7 @@ public:
   //   - calling copyOrInitValueInto, which immediately finishes all
   //     of the sub-initializations.
 
-  void finishUninitialized(SILGenFunction &gen) override;
+  void finishUninitialized(SILGenFunction &SGF) override;
 };
 
 } // end namespace Lowering

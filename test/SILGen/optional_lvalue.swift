@@ -1,7 +1,7 @@
 // RUN: %target-swift-frontend -emit-silgen %s | %FileCheck %s
 
-// CHECK-LABEL: sil hidden @_TF15optional_lvalue22assign_optional_lvalueFTRGSqSi_Si_T_
-// CHECK:         [[PRECOND:%.*]] = function_ref @_TFs30_diagnoseUnexpectedNilOptional
+// CHECK-LABEL: sil hidden @_T015optional_lvalue07assign_a1_B0ySiSgz_SitF
+// CHECK:         [[PRECOND:%.*]] = function_ref @_T0s30_diagnoseUnexpectedNilOptional{{[_0-9a-zA-Z]*}}F
 // CHECK:         apply [[PRECOND]](
 // CHECK:         [[PAYLOAD:%.*]] = unchecked_take_enum_data_addr %0 : $*Optional<Int>, #Optional.some!enumelt.1
 // CHECK:         assign {{%.*}} to [[PAYLOAD]]
@@ -9,8 +9,8 @@ func assign_optional_lvalue(_ x: inout Int?, _ y: Int) {
   x! = y
 }
 
-// CHECK-LABEL: sil hidden @_TF15optional_lvalue17assign_iuo_lvalueFTRGSQSi_Si_T_
-// CHECK:         [[PRECOND:%.*]] = function_ref @_TFs30_diagnoseUnexpectedNilOptional
+// CHECK-LABEL: sil hidden @_T015optional_lvalue011assign_iuo_B0ySQySiGz_SitF
+// CHECK:         [[PRECOND:%.*]] = function_ref @_T0s30_diagnoseUnexpectedNilOptional{{[_0-9a-zA-Z]*}}F
 // CHECK:         apply [[PRECOND]](
 // CHECK:         [[PAYLOAD:%.*]] = unchecked_take_enum_data_addr %0 : $*Optional<Int>, #Optional.some!enumelt.1
 // CHECK:         assign {{%.*}} to [[PAYLOAD]]
@@ -27,7 +27,7 @@ struct S {
   }
 }
 
-// CHECK-LABEL: sil hidden @_TF15optional_lvalue26assign_iuo_lvalue_implicitFTRGSQVS_1S_Si_T_
+// CHECK-LABEL: sil hidden @_T015optional_lvalue011assign_iuo_B9_implicitySQyAA1SVGz_SitF
 // CHECK:         [[SOME:%.*]] = unchecked_take_enum_data_addr %0
 // CHECK:         [[X:%.*]] = struct_element_addr [[SOME]]
 func assign_iuo_lvalue_implicit(_ s: inout S!, _ y: Int) {
@@ -38,8 +38,8 @@ struct Struct<T> {
   var value: T?
 }
 
-// CHECK-LABEL: sil hidden @_TF15optional_lvalue35assign_optional_lvalue_reabstractedFTRGVS_6StructFSiSi_FSiSi_T_
-// CHECK:         [[REABSTRACT:%.*]] = function_ref @_TTRXFo_dSi_dSi_XFo_iSi_iSi_
+// CHECK-LABEL: sil hidden @_T015optional_lvalue07assign_a1_B13_reabstractedyAA6StructVyS2icGz_S2ictF
+// CHECK:         [[REABSTRACT:%.*]] = function_ref @_T0S2iIxyd_S2iIxir_TR
 // CHECK:         [[REABSTRACTED:%.*]] = partial_apply [[REABSTRACT]]
 // CHECK:         assign [[REABSTRACTED]] to {{%.*}} : $*@callee_owned (@in Int) -> @out Int
 func assign_optional_lvalue_reabstracted(_ x: inout Struct<(Int) -> Int>,
@@ -47,9 +47,9 @@ func assign_optional_lvalue_reabstracted(_ x: inout Struct<(Int) -> Int>,
   x.value! = y
 }
 
-// CHECK-LABEL: sil hidden @_TF15optional_lvalue31assign_optional_lvalue_computedFTRGSqVS_1S_Si_Si
-// CHECK:         function_ref @_TFV15optional_lvalue1Ss8computedSi
-// CHECK:         function_ref @_TFV15optional_lvalue1Sg8computedSi
+// CHECK-LABEL: sil hidden @_T015optional_lvalue07assign_a1_B9_computedSiAA1SVSgz_SitF
+// CHECK:         function_ref @_T015optional_lvalue1SV8computedSifs
+// CHECK:         function_ref @_T015optional_lvalue1SV8computedSifg
 func assign_optional_lvalue_computed(_ x: inout S?, _ y: Int) -> Int {
   x!.computed = y
   return x!.computed
@@ -57,7 +57,7 @@ func assign_optional_lvalue_computed(_ x: inout S?, _ y: Int) -> Int {
 
 func generate_int() -> Int { return 0 }
 
-// CHECK-LABEL: sil hidden @_TF15optional_lvalue28assign_bound_optional_lvalueFRGSqSi_T_
+// CHECK-LABEL: sil hidden @_T015optional_lvalue013assign_bound_a1_B0ySiSgzF
 // CHECK:         select_enum_addr
 // CHECK:         cond_br {{%.*}}, [[SOME:bb[0-9]+]], [[NONE:bb[0-9]+]]
 // CHECK:       [[SOME]]:

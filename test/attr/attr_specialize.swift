@@ -49,6 +49,7 @@ class G<T> {
   // CHECK: @_specialize(exported: false, kind: full, where T == Int)
   @_specialize(where T == Int)
   @_specialize(where T == T) // expected-error{{Only concrete type same-type requirements are supported by '_specialize' attribute}}
+	// expected-warning@-1{{redundant same-type constraint 'T' == 'T'}}
   @_specialize(where T == S<T>) // expected-error{{Only concrete type same-type requirements are supported by '_specialize' attribute}}
 	// expected-error@-1{{same-type constraint 'T' == 'S<T>' is recursive}}
   @_specialize(where T == Int, U == Int) // expected-error{{use of undeclared type 'U'}}
@@ -157,7 +158,11 @@ public func anotherFuncWithTwoGenericParameters<X: P, Y>(x: X, y: Y) {
 func funcWithForbiddenSpecializeRequirement<T>(_ t: T) {
 }
 
-@_specialize(where T: _Trivial(32), T: _Trivial(64), T: _Trivial, T: _RefCountedObject) // expected-error{{multiple layout constraints cannot be used at the same time: '_Trivial(64)' and '_Trivial(32)'}} expected-note{{previous layout constraint declaration '_Trivial(32)' was here}} expected-error{{multiple layout constraints cannot be used at the same time: '_Trivial' and '_Trivial(32)'}} expected-note{{previous layout constraint declaration '_Trivial(32)' was here}} expected-error{{multiple layout constraints cannot be used at the same time: '_RefCountedObject' and '_Trivial(32)'}} expected-note{{previous layout constraint declaration '_Trivial(32)' was here}}
+@_specialize(where T: _Trivial(32), T: _Trivial(64), T: _Trivial, T: _RefCountedObject)
+// expected-error@-1{{generic parameter 'T' has conflicting layout constraints '_Trivial(64)' and '_Trivial(32)'}}
+// expected-error@-2{{generic parameter 'T' has conflicting layout constraints '_RefCountedObject' and '_Trivial(32)'}}
+// expected-error@-3{{generic parameter 'T' has conflicting layout constraints '_Trivial' and '_Trivial(32)'}}
+// expected-note@-4 3{{layout constraint constraint 'T' : '_Trivial(32)' written here}}
 @_specialize(where Array<T> == Int) // expected-error{{Only requirements on generic parameters are supported by '_specialize' attribute}}
 // expected-error@-1{{generic signature requires types 'Array<T>' and 'Int' to be the same}}
 @_specialize(where T.Element == Int) // expected-error{{Only requirements on generic parameters are supported by '_specialize' attribute}}

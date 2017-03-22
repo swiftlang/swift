@@ -42,6 +42,7 @@ bool FrontendOptions::actionHasOutput() const {
   case EmitIR:
   case EmitBC:
   case EmitObject:
+  case EmitImportedModules:
     return true;
   }
   llvm_unreachable("Unknown ActionType");
@@ -72,6 +73,7 @@ bool FrontendOptions::actionIsImmediate() const {
   case EmitIR:
   case EmitBC:
   case EmitObject:
+  case EmitImportedModules:
     return false;
   }
   llvm_unreachable("Unknown ActionType");

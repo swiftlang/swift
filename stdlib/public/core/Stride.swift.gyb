@@ -24,8 +24,13 @@
 /// Conforming types are notionally continuous, one-dimensional
 /// values that can be offset and measured.
 public protocol ${Self} : ${Conformance} {
+%   if Self == '_Strideable':
   /// A type that represents the distance between two values of `Self`.
   associatedtype Stride : SignedNumeric, Comparable
+%   else:
+  /// A type that represents the distance between two values of `Self`.
+  associatedtype Stride
+%   end
 
   /// Returns a stride `x` such that `self.advanced(by: x)` approximates
   /// `other`.
@@ -54,10 +59,12 @@ public protocol ${Self} : ${Conformance} {
 % end
 
 /// Compare two `Strideable`s.
+@_inlineable
 public func < <T : Strideable>(x: T, y: T) -> Bool {
   return x.distance(to: y) > 0
 }
 
+@_inlineable
 public func == <T : Strideable>(x: T, y: T) -> Bool {
   return x.distance(to: y) == 0
 }
@@ -99,6 +106,7 @@ extension Strideable where Self : _Pointer {
 //===----------------------------------------------------------------------===//
 
 extension Strideable {
+  @_inlineable
   public static func _step(
     after current: (index: Int?, value: Self),
     from start: Self, by distance: Self.Stride
@@ -108,6 +116,7 @@ extension Strideable {
 }
 
 extension Strideable where Stride : FloatingPoint {
+  @_inlineable
   public static func _step(
     after current: (index: Int?, value: Self),
     from start: Self, by distance: Self.Stride
@@ -124,12 +133,22 @@ extension Strideable where Stride : FloatingPoint {
 }
 
 /// An iterator for `StrideTo<Element>`.
+@_fixed_layout
 public struct StrideToIterator<Element : Strideable> : IteratorProtocol {
+  @_versioned
   internal let _start: Element
+
+  @_versioned
   internal let _end: Element
+
+  @_versioned
   internal let _stride: Element.Stride
+
+  @_versioned
   internal var _current: (index: Int?, value: Element)
 
+  @_inlineable
+  @_versioned
   internal init(_start: Element, end: Element, stride: Element.Stride) {
     self._start = _start
     _end = end
@@ -141,6 +160,8 @@ public struct StrideToIterator<Element : Strideable> : IteratorProtocol {
   /// exists.
   ///
   /// Once `nil` has been returned, all subsequent calls return `nil`.
+
+  @_inlineable
   public mutating func next() -> Element? {
     let result = _current.value
     if _stride > 0 ? result >= _end : result <= _end {
@@ -152,16 +173,20 @@ public struct StrideToIterator<Element : Strideable> : IteratorProtocol {
 }
 
 /// A `Sequence` of values formed by striding over a half-open interval.
+@_fixed_layout
 public struct StrideTo<Element : Strideable> : Sequence, CustomReflectable {
   // FIXME: should really be a Collection, as it is multipass
 
   /// Returns an iterator over the elements of this sequence.
   ///
   /// - Complexity: O(1).
+  @_inlineable
   public func makeIterator() -> StrideToIterator<Element> {
     return StrideToIterator(_start: _start, end: _end, stride: _stride)
   }
 
+  @_inlineable
+  @_versioned
   internal init(_start: Element, end: Element, stride: Element.Stride) {
     _precondition(stride != 0, "stride size must not be zero")
     // At start, striding away from end is allowed; it just makes for an
@@ -171,8 +196,13 @@ public struct StrideTo<Element : Strideable> : Sequence, CustomReflectable {
     self._stride = stride
   }
 
+  @_versioned
   internal let _start: Element
+
+  @_versioned
   internal let _end: Element
+
+  @_versioned
   internal let _stride: Element.Stride
 
   public var customMirror: Mirror {
@@ -183,6 +213,7 @@ public struct StrideTo<Element : Strideable> : Sequence, CustomReflectable {
 /// Returns the sequence of values (`self`, `self + stride`, `self +
 /// 2 * stride`, ... *last*) where *last* is the last value in the
 /// progression that is less than `end`.
+@_inlineable
 public func stride<T : Strideable>(
   from start: T, to end: T, by stride: T.Stride
 ) -> StrideTo<T> {
@@ -190,13 +221,25 @@ public func stride<T : Strideable>(
 }
 
 /// An iterator for `StrideThrough<Element>`.
+@_fixed_layout
 public struct StrideThroughIterator<Element : Strideable> : IteratorProtocol {
+  @_versioned
   internal let _start: Element
+
+  @_versioned
   internal let _end: Element
+
+  @_versioned
   internal let _stride: Element.Stride
+
+  @_versioned
   internal var _current: (index: Int?, value: Element)
+
+  @_versioned
   internal var _didReturnEnd: Bool = false
 
+  @_inlineable
+  @_versioned
   internal init(_start: Element, end: Element, stride: Element.Stride) {
     self._start = _start
     _end = end
@@ -208,6 +251,7 @@ public struct StrideThroughIterator<Element : Strideable> : IteratorProtocol {
   /// exists.
   ///
   /// Once `nil` has been returned, all subsequent calls return `nil`.
+  @_inlineable
   public mutating func next() -> Element? {
     let result = _current.value
     if _stride > 0 ? result >= _end : result <= _end {
@@ -226,6 +270,7 @@ public struct StrideThroughIterator<Element : Strideable> : IteratorProtocol {
 }
 
 /// A `Sequence` of values formed by striding over a closed interval.
+@_fixed_layout
 public struct StrideThrough<
   Element : Strideable
 > : Sequence, CustomReflectable {
@@ -234,10 +279,13 @@ public struct StrideThrough<
   /// Returns an iterator over the elements of this sequence.
   ///
   /// - Complexity: O(1).
+  @_inlineable
   public func makeIterator() -> StrideThroughIterator<Element> {
     return StrideThroughIterator(_start: _start, end: _end, stride: _stride)
   }
 
+  @_inlineable
+  @_versioned
   internal init(_start: Element, end: Element, stride: Element.Stride) {
     _precondition(stride != 0, "stride size must not be zero")
     self._start = _start
@@ -245,8 +293,11 @@ public struct StrideThrough<
     self._stride = stride
   }
 
+  @_versioned
   internal let _start: Element
+  @_versioned
   internal let _end: Element
+  @_versioned
   internal let _stride: Element.Stride
 
   public var customMirror: Mirror {
@@ -260,6 +311,7 @@ public struct StrideThrough<
 /// progression less than or equal to `end`.
 ///
 /// - Note: There is no guarantee that `end` is an element of the sequence.
+@_inlineable
 public func stride<T : Strideable>(
   from start: T, through end: T, by stride: T.Stride
 ) -> StrideThrough<T> {

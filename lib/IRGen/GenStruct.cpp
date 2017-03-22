@@ -838,7 +838,9 @@ unsigned irgen::getPhysicalStructFieldIndex(IRGenModule &IGM, SILType baseType,
 }
 
 void IRGenModule::emitStructDecl(StructDecl *st) {
-  emitStructMetadata(*this, st);
+  if (!IRGen.tryEnableLazyTypeMetadata(st))
+    emitStructMetadata(*this, st);
+
   emitNestedTypeDecls(st->getMembers());
 
   if (shouldEmitOpaqueTypeMetadataRecord(st)) {

@@ -202,7 +202,7 @@ internal let _errorDomainUserInfoProviderQueue = DispatchQueue(
 
 /// Retrieve the default userInfo dictionary for a given error.
 @_silgen_name("swift_Foundation_getErrorDefaultUserInfo")
-public func _swift_Foundation_getErrorDefaultUserInfo(_ error: Error)
+public func _swift_Foundation_getErrorDefaultUserInfo<T: Error>(_ error: T)
   -> AnyObject? {
   let hasUserInfoValueProvider: Bool
 
@@ -380,8 +380,8 @@ extension __BridgedNSError
 
 public extension __BridgedNSError 
     where Self: RawRepresentable, Self.RawValue: SignedInteger {
-  public final var _domain: String { return Self._nsErrorDomain }
-  public final var _code: Int { return Int(rawValue) }
+  public var _domain: String { return Self._nsErrorDomain }
+  public var _code: Int { return Int(rawValue) }
 
   public init?(rawValue: RawValue) {
     self = unsafeBitCast(rawValue, to: Self.self)
@@ -395,7 +395,7 @@ public extension __BridgedNSError
     self.init(rawValue: RawValue(IntMax(_bridgedNSError.code)))
   }
 
-  public final var hashValue: Int { return _code }
+  public var hashValue: Int { return _code }
 }
 
 // Allow two bridged NSError types to be compared.
@@ -408,8 +408,8 @@ extension __BridgedNSError
 
 public extension __BridgedNSError
     where Self: RawRepresentable, Self.RawValue: UnsignedInteger {
-  public final var _domain: String { return Self._nsErrorDomain }
-  public final var _code: Int {
+  public var _domain: String { return Self._nsErrorDomain }
+  public var _code: Int {
     return Int(bitPattern: UInt(rawValue))
   }
 
@@ -425,7 +425,7 @@ public extension __BridgedNSError
     self.init(rawValue: RawValue(UIntMax(UInt(_bridgedNSError.code))))
   }
 
-  public final var hashValue: Int { return _code }
+  public var hashValue: Int { return _code }
 }
 
 /// Describes a raw representable type that is bridged to a particular

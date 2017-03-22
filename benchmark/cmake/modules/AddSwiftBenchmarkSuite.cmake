@@ -321,6 +321,7 @@ function (swift_benchmark_compile_archopts)
         "-c"
         "-o" "${objcfile}")
 
+  precondition(CMAKE_CODESIGN MESSAGE "CMAKE_CODESIGN is required, please set it")
   add_custom_command(
       OUTPUT "${OUTPUT_EXEC}"
       DEPENDS
@@ -349,7 +350,7 @@ function (swift_benchmark_compile_archopts)
         ${objcfile}
         "-o" "${OUTPUT_EXEC}"
       COMMAND
-        "codesign" "-f" "-s" "-" "${OUTPUT_EXEC}")
+        ${CMAKE_CODESIGN} "-f" "-s" "-" "${OUTPUT_EXEC}")
   set(new_output_exec "${OUTPUT_EXEC}" PARENT_SCOPE)
 endfunction()
 

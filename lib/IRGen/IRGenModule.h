@@ -21,7 +21,6 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/Module.h"
 #include "swift/SIL/SILFunction.h"
-#include "swift/SIL/InstructionUtils.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/ClusteredBitVector.h"
 #include "swift/Basic/SuccessorMap.h"
@@ -189,11 +188,17 @@ private:
   // The current IGM for which IR is generated.
   IRGenModule *CurrentIGM = nullptr;
 
+  /// The set of type metadata that is not emitted eagerly.
+  llvm::SmallPtrSet<NominalTypeDecl*, 4> eligibleLazyMetadata;
+
   /// The set of type metadata that have been enqueue for lazy emission.
-  llvm::SmallPtrSet<CanType, 4> LazilyEmittedTypeMetadata;
-  
+  ///
+  /// It can also contain some eagerly emitted metadata. Those are ignored in
+  /// lazy emission.
+  llvm::SmallPtrSet<NominalTypeDecl*, 4> scheduledLazyMetadata;
+
   /// The queue of lazy type metadata to emit.
-  llvm::SmallVector<CanType, 4> LazyTypeMetadata;
+  llvm::SmallVector<NominalTypeDecl*, 4> LazyMetadata;
   
   llvm::SmallPtrSet<SILFunction*, 4> LazilyEmittedFunctions;
 
@@ -209,6 +214,12 @@ private:
 
   /// SIL functions that we need to emit lazily.
   llvm::SmallVector<SILFunction*, 4> LazyFunctionDefinitions;
+
+  /// The set of witness tables that have been enqueue for lazy emission.
+  llvm::SmallPtrSet<SILWitnessTable *, 4> LazilyEmittedWitnessTables;
+
+  /// The queue of lazy witness tables to emit.
+  llvm::SmallVector<SILWitnessTable *, 4> LazyWitnessTables;
 
   /// The order in which all the SIL function definitions should
   /// appear in the translation unit.
@@ -284,6 +295,11 @@ public:
   /// Emit a symbol identifying the reflection metadata version.
   void emitReflectionMetadataVersion();
 
+  /// Checks if the metadata of \p Nominal can be emitted lazyly.
+  ///
+  /// If yes, \p Nominal is added to eligibleLazyMetadata and true is returned.
+  bool tryEnableLazyTypeMetadata(NominalTypeDecl *Nominal);
+
   /// Emit everything which is reachable from already emitted IR.
   void emitLazyDefinitions();
   
@@ -295,12 +311,19 @@ public:
     }
   }
   
-  void addLazyTypeMetadata(CanType type) {
+  void addLazyTypeMetadata(NominalTypeDecl *Nominal) {
     // Add it to the queue if it hasn't already been put there.
-    if (LazilyEmittedTypeMetadata.insert(type).second)
-      LazyTypeMetadata.push_back(type);
+    if (scheduledLazyMetadata.insert(Nominal).second) {
+      LazyMetadata.push_back(Nominal);
+    }
   }
-  
+
+  /// Return true if \p wt can be emitted lazyly.
+  bool canEmitWitnessTableLazily(SILWitnessTable *wt);
+
+  /// Adds \p Conf to LazyWitnessTables if it has not been added yet.
+  void addLazyWitnessTable(const ProtocolConformance *Conf);
+
   void addLazyFieldTypeAccessor(NominalTypeDecl *type,
                                 ArrayRef<FieldTypeInfo> fieldTypes,
                                 llvm::Function *fn,
@@ -371,14 +394,7 @@ public:
   SILModuleConventions silConv;
 
   llvm::SmallString<128> OutputFilename;
-
-#ifndef NDEBUG
-  // Used for testing ConformanceCollector.
-  ConformanceCollector EligibleConfs;
-  SILInstruction *CurrentInst = nullptr;
-  SILWitnessTable *CurrentWitnessTable = nullptr;
-#endif
-
+  
   /// Order dependency -- TargetInfo must be initialized after Opts.
   const SwiftTargetInfo TargetInfo;
   /// Holds lexical scope info, etc. Is a nullptr if we compile without -g.
@@ -450,6 +466,7 @@ public:
     llvm::PointerType *UnknownRefCountedPtrTy;
   };
   llvm::PointerType *BridgeObjectPtrTy; /// %swift.bridge*
+  llvm::StructType *OpaqueTy;           /// %swift.opaque
   llvm::PointerType *OpaquePtrTy;      /// %swift.opaque*
   llvm::StructType *ObjCClassStructTy; /// %objc_class
   llvm::PointerType *ObjCClassPtrTy;   /// %objc_class*
@@ -655,7 +672,8 @@ public:
   llvm::Constant *getOrCreateHelperFunction(StringRef name,
                                             llvm::Type *resultType,
                                             ArrayRef<llvm::Type*> paramTypes,
-                        llvm::function_ref<void(IRGenFunction &IGF)> generate);
+                        llvm::function_ref<void(IRGenFunction &IGF)> generate,
+                        bool setIsNoInline = false);
 
 private:
   llvm::Constant *getAddrOfClangGlobalDecl(clang::GlobalDecl global,
@@ -1022,11 +1040,11 @@ private:
                                         DebugTypeInfo debugType,
                                         SymbolReferenceKind refKind);
 
-  void checkEligibleConf(const ProtocolConformance *Conf);
-  void checkEligibleMetaType(NominalTypeDecl *NT);
-
   void emitLazyPrivateDefinitions();
   void addRuntimeResolvableType(CanType type);
+
+  /// Add all conformances of \p Nominal to LazyWitnessTables.
+  void addLazyConformances(NominalTypeDecl *Nominal);
 
 //--- Global context emission --------------------------------------------------
 public:

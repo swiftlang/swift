@@ -28,12 +28,20 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/Types.h"
+#include "llvm/Support/Debug.h"
 
 using namespace swift;
 
 bool SubstitutionMap::hasArchetypes() const {
   for (auto &entry : subMap)
     if (entry.second->hasArchetype())
+      return true;
+  return false;
+}
+
+bool SubstitutionMap::hasOpenedExistential() const {
+  for (auto &entry : subMap)
+    if (entry.second->hasOpenedExistential())
       return true;
   return false;
 }
@@ -209,17 +217,44 @@ addConformance(CanType type, ProtocolConformanceRef conformance) {
   conformanceMap[type.getPointer()].push_back(conformance);
 }
 
-ArrayRef<ProtocolConformanceRef> SubstitutionMap::
-getConformances(CanType type) const {
-  auto known = conformanceMap.find(type.getPointer());
-  if (known == conformanceMap.end()) return { };
-  return known->second;
-}
-
 void SubstitutionMap::
 addParent(CanType type, CanType parent, AssociatedTypeDecl *assocType) {
   assert(type && parent && assocType);
   parentMap[type.getPointer()].push_back(std::make_pair(parent, assocType));
+}
+
+
+SubstitutionMap SubstitutionMap::subst(const SubstitutionMap &subMap) const {
+  return subst(QuerySubstitutionMap{subMap},
+               LookUpConformanceInSubstitutionMap(subMap));
+}
+
+SubstitutionMap SubstitutionMap::subst(TypeSubstitutionFn subs,
+                                       LookupConformanceFn conformances) const {
+  SubstitutionMap result(*this);
+
+  for (auto iter = result.subMap.begin(),
+            end = result.subMap.end();
+       iter != end; ++iter) {
+    iter->second = iter->second.subst(subs, conformances,
+                                      SubstFlags::UseErrorType);
+  }
+
+  for (auto iter = result.conformanceMap.begin(),
+            end = result.conformanceMap.end();
+       iter != end; ++iter) {
+    auto origType = Type(iter->first).subst(
+        *this, SubstFlags::UseErrorType);
+    for (auto citer = iter->second.begin(),
+              cend = iter->second.end();
+         citer != cend; ++citer) {
+      *citer = citer->subst(origType, subs, conformances);
+    }
+  }
+
+  result.verify();
+
+  return result;
 }
 
 SubstitutionMap
@@ -309,42 +344,93 @@ SubstitutionMap::getOverrideSubstitutions(const ClassDecl *baseClass,
   }
 
   return combineSubstitutionMaps(baseSubMap, origSubMap,
+                                 CombineSubstitutionMaps::AtDepth,
                                  baseDepth, origDepth,
                                  baseSig);
 }
 
 SubstitutionMap
-SubstitutionMap::combineSubstitutionMaps(const SubstitutionMap &baseSubMap,
-                                         const SubstitutionMap &origSubMap,
-                                         unsigned baseDepth,
-                                         unsigned origDepth,
-                                         GenericSignature *baseSig) {
+SubstitutionMap::combineSubstitutionMaps(const SubstitutionMap &firstSubMap,
+                                         const SubstitutionMap &secondSubMap,
+                                         CombineSubstitutionMaps how,
+                                         unsigned firstDepthOrIndex,
+                                         unsigned secondDepthOrIndex,
+                                         GenericSignature *genericSig) {
+  auto &ctx = genericSig->getASTContext();
+
   auto replaceGenericParameter = [&](Type type) -> Type {
     if (auto gp = type->getAs<GenericTypeParamType>()) {
-      if (gp->getDepth() < baseDepth) return Type();
-      return GenericTypeParamType::get(gp->getDepth() + origDepth - baseDepth,
-                                       gp->getIndex(),
-                                       baseSig->getASTContext());
+      if (how == CombineSubstitutionMaps::AtDepth) {
+        if (gp->getDepth() < firstDepthOrIndex)
+          return Type();
+        return GenericTypeParamType::get(
+          gp->getDepth() + secondDepthOrIndex - firstDepthOrIndex,
+          gp->getIndex(),
+          ctx);
+      }
+
+      assert(how == CombineSubstitutionMaps::AtIndex);
+      if (gp->getIndex() < firstDepthOrIndex)
+        return Type();
+      return GenericTypeParamType::get(
+        gp->getDepth(),
+        gp->getIndex() + secondDepthOrIndex - firstDepthOrIndex,
+        ctx);
     }
 
     return type;
   };
 
-  return baseSig->getSubstitutionMap(
+  return genericSig->getSubstitutionMap(
     [&](SubstitutableType *type) {
       auto replacement = replaceGenericParameter(type);
       if (replacement)
-        return Type(replacement).subst(origSubMap);
-      return Type(type).subst(baseSubMap);
+        return Type(replacement).subst(secondSubMap);
+      return Type(type).subst(firstSubMap);
     },
     [&](CanType type, Type substType, ProtocolType *conformedProtocol) {
       auto replacement = type.transform(replaceGenericParameter);
       if (replacement)
-        return origSubMap.lookupConformance(replacement->getCanonicalType(),
-                                            conformedProtocol->getDecl());
-      return baseSubMap.lookupConformance(type,
-                                          conformedProtocol->getDecl());
+        return secondSubMap.lookupConformance(replacement->getCanonicalType(),
+                                              conformedProtocol->getDecl());
+      return firstSubMap.lookupConformance(type,
+                                           conformedProtocol->getDecl());
     });
+}
+
+void SubstitutionMap::verify() const {
+#ifndef NDEBUG
+  for (auto iter = conformanceMap.begin(), end = conformanceMap.end();
+       iter != end; ++iter) {
+    auto replacement = Type(iter->first).subst(*this, SubstFlags::UseErrorType);
+    if (replacement->isTypeParameter() || replacement->is<ArchetypeType>() ||
+        replacement->isTypeVariableOrMember() ||
+        replacement->is<UnresolvedType>() || replacement->hasError())
+      continue;
+    // Check conformances of a concrete replacement type.
+    for (auto citer = iter->second.begin(), cend = iter->second.end();
+         citer != cend; ++citer) {
+      // An existential type can have an abstract conformance to
+      // AnyObject or an @objc protocol.
+      if (citer->isAbstract() && replacement->isExistentialType()) {
+        auto *proto = citer->getRequirement();
+        assert((proto->isSpecificProtocol(KnownProtocolKind::AnyObject) ||
+                proto->isObjC()) &&
+               "an existential type can conform only to AnyObject or an "
+               "@objc-protocol");
+        continue;
+      }
+      // All of the conformances should be concrete.
+      if (!citer->isConcrete()) {
+        llvm::dbgs() << "Concrete replacement type:\n";
+        replacement->dump(llvm::dbgs());
+        llvm::dbgs() << "SubstitutionMap:\n";
+        dump(llvm::dbgs());
+      }
+      assert(citer->isConcrete() && "Conformance should be concrete");
+    }
+  }
+#endif
 }
 
 void SubstitutionMap::dump(llvm::raw_ostream &out) const {

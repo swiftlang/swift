@@ -94,12 +94,16 @@ struct AddressOnlyStruct<T> {
 func produceAddressOnlyStruct<T>(_ x : T) -> AddressOnlyStruct<T> {}
 
 // CHECK-LABEL: sil hidden @{{.*}}testAddressOnlyStructString
+// CHECK: bb0([[FUNC_ARG:%.*]] : $*T):
 func testAddressOnlyStructString<T>(_ a : T) -> String {
   return produceAddressOnlyStruct(a).str
   
   // CHECK: [[PRODFN:%[0-9]+]] = function_ref @{{.*}}produceAddressOnlyStruct
   // CHECK: [[TMPSTRUCT:%[0-9]+]] = alloc_stack $AddressOnlyStruct<T>
-  // CHECK: apply [[PRODFN]]<T>([[TMPSTRUCT]],
+  // CHECK: [[ARG:%.*]] = alloc_stack $T
+  // CHECK: copy_addr [[FUNC_ARG]] to [initialization] [[ARG]]
+  // CHECK: apply [[PRODFN]]<T>([[TMPSTRUCT]], [[ARG]])
+  // CHECK-NEXT: dealloc_stack [[ARG]]
   // CHECK-NEXT: [[STRADDR:%[0-9]+]] = struct_element_addr [[TMPSTRUCT]] : $*AddressOnlyStruct<T>, #AddressOnlyStruct.str
   // CHECK-NEXT: [[STRVAL:%[0-9]+]] = load [copy] [[STRADDR]]
   // CHECK-NEXT: destroy_addr [[TMPSTRUCT]]
@@ -113,7 +117,9 @@ func testAddressOnlyStructElt<T>(_ a : T) -> T {
   
   // CHECK: [[PRODFN:%[0-9]+]] = function_ref @{{.*}}produceAddressOnlyStruct
   // CHECK: [[TMPSTRUCT:%[0-9]+]] = alloc_stack $AddressOnlyStruct<T>
-  // CHECK: apply [[PRODFN]]<T>([[TMPSTRUCT]],
+  // CHECK: [[ARG:%.*]] = alloc_stack $T
+  // CHECK: apply [[PRODFN]]<T>([[TMPSTRUCT]], [[ARG]])
+  // CHECK-NEXT: dealloc_stack [[ARG]]
   // CHECK-NEXT: [[ELTADDR:%[0-9]+]] = struct_element_addr [[TMPSTRUCT]] : $*AddressOnlyStruct<T>, #AddressOnlyStruct.elt
   // CHECK-NEXT: copy_addr [[ELTADDR]] to [initialization] %0 : $*T
   // CHECK-NEXT: destroy_addr [[TMPSTRUCT]]

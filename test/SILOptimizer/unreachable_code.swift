@@ -134,17 +134,17 @@ func testSwitchEnum(_ xi: Int) -> Int {
     x += 1
   }
 
-  switch cond {
+  switch cond { // expected-error{{switch must be exhaustive}}
   case .One:
     x += 1
-  } // expected-error{{switch must be exhaustive}}
+  }
 
-  switch cond {
+  switch cond { // expected-error{{switch must be exhaustive}}
   case .One:
     x += 1
   case .Three:
     x += 1
-  } // expected-error{{switch must be exhaustive}}
+  }
 
   switch cond { // expected-warning{{switch condition evaluates to a constant}}
   case .Two: 
@@ -186,15 +186,15 @@ func testSwitchEnumBool(_ b: Bool, xi: Int) -> Int {
     x += 1
   }
 
-  switch Cond {
+  switch Cond { // expected-error{{switch must be exhaustive}}
   case true:
     x += 1
-  } // expected-error{{switch must be exhaustive}}
+  }
 
-  switch Cond {
+  switch Cond { // expected-error{{switch must be exhaustive}}
   case false:
     x += 1
-  } // expected-error{{switch must be exhaustive}}
+  }
 
   switch Cond { // no warning
   case true:
@@ -217,12 +217,12 @@ func testSwitchOptionalBool(_ b: Bool?, xi: Int) -> Int {
     x -= 1
   }
 
-  switch b {
+  switch b { // expected-error{{switch must be exhaustive}}
   case .some(true):
     x += 1
   case .none:
     x -= 1
-  } // expected-error{{switch must be exhaustive}}
+  }
 
   return xi
 }
@@ -238,19 +238,19 @@ func testSwitchEnumBoolTuple(_ b1: Bool, b2: Bool, xi: Int) -> Int {
     x += 1
   }
 
-  switch Cond {
+  switch Cond { // expected-error{{switch must be exhaustive}} expected-error{{switch must be exhaustive}}
   case (true, true):
     x += 1
     // FIXME: Two expect statements are written, because unreachable diagnostics produces N errors
     // for non-exhaustive switches on tuples of N elements
-  } // expected-error{{switch must be exhaustive}} expected-error{{switch must be exhaustive}}
+  }
 
-  switch Cond {
+  switch Cond { // expected-error{{switch must be exhaustive}} expected-error{{switch must be exhaustive}}
   case (false, true):
     x += 1
     // FIXME: Two expect statements are written, because unreachable diagnostics produces N errors
     // for non-exhaustive switches on tuples of N elements
-  } // expected-error{{switch must be exhaustive}} expected-error{{switch must be exhaustive}}
+  }
 
   switch Cond { // no warning
   case (true, true):

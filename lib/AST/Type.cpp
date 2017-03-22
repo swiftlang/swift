@@ -16,13 +16,14 @@
 
 #include "swift/AST/Types.h"
 #include "ForeignRepresentationInfo.h"
+#include "swift/AST/ASTContext.h"
 #include "swift/AST/TypeVisitor.h"
 #include "swift/AST/TypeWalker.h"
 #include "swift/AST/Decl.h"
-#include "swift/AST/AST.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/ParameterList.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/TypeLoc.h"
@@ -384,7 +385,8 @@ TypeBase::getTypeVariables(SmallVectorImpl<TypeVariableType *> &typeVariables) {
 
       return false;
     });
-    assert(!typeVariables.empty() && "Did not find type variables!");
+    assert((!typeVariables.empty() || hasError()) &&
+           "Did not find type variables!");
   }
 }
 
@@ -780,19 +782,15 @@ swift::decomposeParamType(Type type, const ValueDecl *paramOwner,
 std::string swift::getParamListAsString(ArrayRef<CallArgParam> params) {
   std::string result = "(";
 
-  bool isFirst = true;
-  for (auto &param : params) {
-    if (isFirst)
-      isFirst = false;
-    else
-      result += ", ";
-
-    if (param.hasLabel())
-      result += param.Label.str();
-    else
-      result += "_";
-    result += ":";
-  }
+  interleave(params,
+             [&](const CallArgParam &param) {
+               if (param.hasLabel())
+                 result += param.Label.str();
+               else
+                 result += "_";
+               result += ":";
+             },
+             [&] { result += ", "; });
 
   result += ')';
   return result;
@@ -1170,6 +1168,28 @@ CanType TypeBase::getCanonicalType() {
   return CanType(Result);
 }
 
+TypeBase *TypeBase::reconstituteSugar(bool Recursive) {
+  auto Func = [](Type Ty) -> Type {
+    if (auto boundGeneric = dyn_cast<BoundGenericType>(Ty.getPointer())) {
+      auto &ctx = boundGeneric->getASTContext();
+      if (boundGeneric->getDecl() == ctx.getArrayDecl())
+        return ArraySliceType::get(boundGeneric->getGenericArgs()[0]);
+      if (boundGeneric->getDecl() == ctx.getDictionaryDecl())
+        return DictionaryType::get(boundGeneric->getGenericArgs()[0],
+                                   boundGeneric->getGenericArgs()[1]);
+      if (boundGeneric->getDecl() == ctx.getOptionalDecl())
+        return OptionalType::get(boundGeneric->getGenericArgs()[0]);
+      if (boundGeneric->getDecl() == ctx.getImplicitlyUnwrappedOptionalDecl())
+        return ImplicitlyUnwrappedOptionalType::
+        get(boundGeneric->getGenericArgs()[0]);
+    }
+    return Ty;
+  };
+  if (Recursive)
+    return Type(this).transform(Func).getPointer();
+  else
+    return Func(this).getPointer();
+}
 
 TypeBase *TypeBase::getDesugaredType() {
   switch (getKind()) {
@@ -1504,10 +1524,10 @@ Type TypeBase::getSuperclass(LazyResolver *resolver) {
   // Gather substitutions from the self type, and apply them to the original
   // superclass type to form the substituted superclass type.
   ModuleDecl *module = classDecl->getModuleContext();
-  auto *sig = classDecl->getGenericSignatureOfContext();
-  auto subs = sig->getSubstitutionMap(gatherAllSubstitutions(module, resolver));
-
-  return superclassTy.subst(subs, None);
+  auto subMap = getContextSubstitutionMap(module,
+                                          classDecl,
+                                          classDecl->getGenericEnvironment());
+  return superclassTy.subst(subMap);
 }
 
 bool TypeBase::isExactSuperclassOf(Type ty, LazyResolver *resolver) {
@@ -1530,10 +1550,9 @@ bool TypeBase::isBindableTo(Type b, LazyResolver *resolver) {
   class IsBindableVisitor : public TypeVisitor<IsBindableVisitor, bool, CanType>
   {
     llvm::DenseMap<ArchetypeType *, CanType> Bindings;
-    LazyResolver *Resolver;
+
   public:
-    IsBindableVisitor(LazyResolver *Resolver)
-      : Resolver(Resolver) {}
+    IsBindableVisitor() {}
   
     bool visitArchetypeType(ArchetypeType *orig, CanType subst) {
       // If we already bound this archetype, make sure the new binding candidate
@@ -1697,38 +1716,46 @@ bool TypeBase::isBindableTo(Type b, LazyResolver *resolver) {
       if (auto substBGT = dyn_cast<BoundGenericType>(subst)) {
         if (bgt->getDecl() != substBGT->getDecl())
           return false;
-        
-        if (bgt->getDecl()->isInvalid())
+
+        auto *decl = bgt->getDecl();
+        if (decl->isInvalid())
           return false;
-        
-        auto origSubs = bgt->gatherAllSubstitutions(
-            bgt->getDecl()->getParentModule(), Resolver);
-        auto substSubs = substBGT->gatherAllSubstitutions(
-            bgt->getDecl()->getParentModule(), Resolver);
-        assert(origSubs.size() == substSubs.size());
-        for (unsigned subi : indices(origSubs)) {
-          if (!visit(origSubs[subi].getReplacement()->getCanonicalType(),
-                     substSubs[subi].getReplacement()->getCanonicalType()))
-            return false;
-          assert(origSubs[subi].getConformances().size()
-                 == substSubs[subi].getConformances().size());
-          for (unsigned conformancei :
-                 indices(origSubs[subi].getConformances())) {
-            // An abstract conformance can be bound to a concrete one.
-            // A concrete conformance may be bindable to a different
-            // specialization of the same root conformance.
-            auto origConf = origSubs[subi].getConformances()[conformancei],
-                 substConf = substSubs[subi].getConformances()[conformancei];
-            if (origConf.isConcrete()) {
-              if (!substConf.isConcrete())
-                return false;
-              if (origConf.getConcrete()->getRootNormalConformance()
-                   != substConf.getConcrete()->getRootNormalConformance())
-                return false;
+
+        auto *moduleDecl = decl->getParentModule();
+        auto origSubMap = bgt->getContextSubstitutionMap(
+            moduleDecl, decl, decl->getGenericEnvironment());
+        auto substSubMap = substBGT->getContextSubstitutionMap(
+            moduleDecl, decl, decl->getGenericEnvironment());
+
+        auto *genericSig = decl->getGenericSignature();
+        auto result = genericSig->enumeratePairedRequirements(
+          [&](Type t, ArrayRef<Requirement> reqts) -> bool {
+            auto orig = t.subst(origSubMap)->getCanonicalType();
+            auto subst = t.subst(substSubMap)->getCanonicalType();
+            if (!visit(orig, subst))
+              return true;
+
+            auto canTy = t->getCanonicalType();
+            for (auto reqt : reqts) {
+              auto *proto = reqt.getSecondType()->castTo<ProtocolType>()
+                ->getDecl();
+              auto origConf = *origSubMap.lookupConformance(canTy, proto);
+              auto substConf = *substSubMap.lookupConformance(canTy, proto);
+
+              if (origConf.isConcrete()) {
+                if (!substConf.isConcrete())
+                  return true;
+                if (origConf.getConcrete()->getRootNormalConformance()
+                    != substConf.getConcrete()->getRootNormalConformance())
+                  return true;
+              }
             }
-          }
-        }
-        
+            return false;
+          });
+
+        if (result)
+          return false;
+
         // Same decl should always either have or not have a parent.
         assert((bool)bgt->getParent() == (bool)substBGT->getParent());
         if (bgt->getParent())
@@ -1740,8 +1767,8 @@ bool TypeBase::isBindableTo(Type b, LazyResolver *resolver) {
     }
   };
   
-  return IsBindableVisitor(resolver).visit(getCanonicalType(),
-                                           b->getCanonicalType());
+  return IsBindableVisitor().visit(getCanonicalType(),
+                                   b->getCanonicalType());
 }
 
 bool TypeBase::isBindableToSuperclassOf(Type ty, LazyResolver *resolver) {
@@ -2904,18 +2931,20 @@ static Type substType(Type derivedType,
       if (boxTy->getGenericArgs().empty())
         return Type(boxTy);
       
-      SmallVector<Substitution, 4> substArgs;
-      for (auto &arg : boxTy->getGenericArgs()) {
-        substArgs.push_back(arg.subst(nullptr, substitutions,
-                                      lookupConformances));
-      }
-      for (auto &arg : substArgs) {
+      auto subMap = boxTy->getLayout()->getGenericSignature()
+        ->getSubstitutionMap(boxTy->getGenericArgs());
+      subMap = subMap.subst(substitutions, lookupConformances);
+
+      SmallVector<Substitution, 4> newSubs;
+      boxTy->getLayout()->getGenericSignature()
+        ->getSubstitutions(subMap, newSubs);
+      for (auto &arg : newSubs) {
         arg = Substitution(arg.getReplacement()->getCanonicalType(),
                            arg.getConformances());
       }
       return SILBoxType::get(boxTy->getASTContext(),
                              boxTy->getLayout(),
-                             substArgs);
+                             newSubs);
     }
     
     // We only substitute for substitutable types and dependent member types.
@@ -3019,7 +3048,9 @@ Type TypeBase::getSuperclassForDecl(const ClassDecl *baseClass,
   llvm_unreachable("no inheritance relationship between given classes");
 }
 
-TypeSubstitutionMap TypeBase::getContextSubstitutions(const DeclContext *dc) {
+TypeSubstitutionMap
+TypeBase::getContextSubstitutions(const DeclContext *dc,
+                                  GenericEnvironment *genericEnv) {
   assert(dc->isTypeContext());
   Type baseTy(this);
 
@@ -3059,12 +3090,11 @@ TypeSubstitutionMap TypeBase::getContextSubstitutions(const DeclContext *dc) {
 
   assert(ownerNominal == baseTy->getAnyNominal());
 
-  // If the base type isn't specialized, there's nothing to substitute.
-  if (!baseTy->isSpecialized())
-    return substitutions;
-
   // Gather all of the substitutions for all levels of generic arguments.
   GenericParamList *curGenericParams = dc->getGenericParamsOfContext();
+  if (!curGenericParams)
+    return substitutions;
+
   while (baseTy) {
     // For a bound generic type, gather the generic parameter -> generic
     // argument substitutions.
@@ -3098,16 +3128,32 @@ TypeSubstitutionMap TypeBase::getContextSubstitutions(const DeclContext *dc) {
     llvm_unreachable("Bad base type");
   }
 
+  if (genericEnv) {
+    auto *parentDC = dc;
+    while (parentDC->isTypeContext())
+      parentDC = parentDC->getParent();
+    if (auto *outerSig = parentDC->getGenericSignatureOfContext()) {
+      for (auto gp : outerSig->getGenericParams()) {
+        auto result = substitutions.insert(
+          {gp->getCanonicalType()->castTo<GenericTypeParamType>(),
+           genericEnv->mapTypeIntoContext(gp)});
+        assert(result.second);
+        (void) result;
+      }
+    }
+  }
+
   return substitutions;
 }
 
 SubstitutionMap TypeBase::getContextSubstitutionMap(
-    ModuleDecl *module, const DeclContext *dc) {
+    ModuleDecl *module, const DeclContext *dc,
+    GenericEnvironment *genericEnv) {
   auto *genericSig = dc->getGenericSignatureOfContext();
   if (genericSig == nullptr)
     return SubstitutionMap();
   return genericSig->getSubstitutionMap(
-      QueryTypeSubstitutionMap{getContextSubstitutions(dc)},
+      QueryTypeSubstitutionMap{getContextSubstitutions(dc, genericEnv)},
       LookUpConformanceInModule(module));
 }
 
@@ -3120,7 +3166,7 @@ TypeSubstitutionMap TypeBase::getMemberSubstitutions(
 
   // Compute the set of member substitutions to apply.
   if (memberDC->isTypeContext())
-    substitutions = getContextSubstitutions(memberDC);
+    substitutions = getContextSubstitutions(memberDC, genericEnv);
 
   // If the member itself is generic, preserve its generic parameters.
   // We need this since code completion and diagnostics want to be able
@@ -3176,6 +3222,13 @@ Type TypeBase::adjustSuperclassMemberDeclType(const ValueDecl *baseDecl,
                                               LazyResolver *resolver) {
   auto subs = SubstitutionMap::getOverrideSubstitutions(
       baseDecl, derivedDecl, /*derivedSubs=*/None, resolver);
+
+  if (auto *genericMemberType = memberType->getAs<GenericFunctionType>()) {
+    memberType = FunctionType::get(genericMemberType->getInput(),
+                                   genericMemberType->getResult(),
+                                   genericMemberType->getExtInfo());
+  }
+
   auto type = memberType.subst(subs);
 
   if (isa<AbstractFunctionDecl>(baseDecl)) {

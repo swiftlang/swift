@@ -11,14 +11,14 @@
 //===----------------------------------------------------------------------===//
 
 #include "SILGen.h"
-#include "Scope.h"
 #include "Condition.h"
 #include "Initialization.h"
 #include "LValue.h"
 #include "RValue.h"
-#include "swift/AST/AST.h"
-#include "swift/SIL/SILArgument.h"
+#include "Scope.h"
+#include "SwitchCaseFullExpr.h"
 #include "swift/AST/DiagnosticsSIL.h"
+#include "swift/SIL/SILArgument.h"
 #include "llvm/Support/SaveAndRestore.h"
 
 using namespace swift;
@@ -189,7 +189,7 @@ Condition SILGenFunction::emitCondition(SILValue V, SILLocation Loc,
 
 void StmtEmitter::visitBraceStmt(BraceStmt *S) {
   // Enter a new scope.
-  LexicalScope BraceScope(SGF.Cleanups, SGF, CleanupLocation(S));
+  LexicalScope BraceScope(SGF, CleanupLocation(S));
   // Keep in sync with DiagnosticsSIL.def.
   const unsigned ReturnStmtType   = 0;
   const unsigned BreakStmtType    = 1;
@@ -476,7 +476,7 @@ void StmtEmitter::visitIfStmt(IfStmt *S) {
   // the CondFalseBB.
   {
     // Enter a scope for any bound pattern variables.
-    LexicalScope trueScope(SGF.Cleanups, SGF, S);
+    LexicalScope trueScope(SGF, S);
 
     SGF.emitStmtCondition(S->getCond(), falseDest, S);
     
@@ -549,8 +549,8 @@ void StmtEmitter::visitIfConfigStmt(IfConfigStmt *S) {
 }
 
 void StmtEmitter::visitWhileStmt(WhileStmt *S) {
-  LexicalScope condBufferScope(SGF.Cleanups, SGF, S);
-  
+  LexicalScope condBufferScope(SGF, S);
+
   // Create a new basic block and jump into it.
   JumpDest loopDest = createJumpDest(S->getBody());
   SGF.B.emitBlock(loopDest.getBlock(), S);
@@ -743,9 +743,9 @@ void StmtEmitter::visitForStmt(ForStmt *S) {
 
 void StmtEmitter::visitForEachStmt(ForEachStmt *S) {
   // Emit the 'iterator' variable that we'll be using for iteration.
-  LexicalScope OuterForScope(SGF.Cleanups, SGF, CleanupLocation(S));
+  LexicalScope OuterForScope(SGF, CleanupLocation(S));
   SGF.visitPatternBindingDecl(S->getIterator());
-  
+
   // If we ever reach an unreachable point, stop emitting statements.
   // This will need revision if we ever add goto.
   if (!SGF.B.hasValidInsertionPoint()) return;
@@ -756,100 +756,130 @@ void StmtEmitter::visitForEachStmt(ForEachStmt *S) {
   // will be in the buffer.
   auto optTy = S->getIteratorNext()->getType()->getCanonicalType();
   auto &optTL = SGF.getTypeLowering(optTy);
-  SILValue nextBufOrValue;
+  SILValue addrOnlyBuf;
+  ManagedValue nextBufOrValue;
 
   if (optTL.isAddressOnly())
-    nextBufOrValue = SGF.emitTemporaryAllocation(S, optTL.getLoweredType());
-  
+    addrOnlyBuf = SGF.emitTemporaryAllocation(S, optTL.getLoweredType());
+
   // Create a new basic block and jump into it.
   JumpDest loopDest = createJumpDest(S->getBody());
   SGF.B.emitBlock(loopDest.getBlock(), S);
-  
+
   // Set the destinations for 'break' and 'continue'.
   JumpDest endDest = createJumpDest(S->getBody());
   SGF.BreakContinueDestStack.push_back({ S, endDest, loopDest });
 
+  // Then emit the loop destination block.
+  //
   // Advance the generator.  Use a scope to ensure that any temporary stack
   // allocations in the subexpression are immediately released.
   if (optTL.isAddressOnly()) {
     Scope InnerForScope(SGF.Cleanups, CleanupLocation(S->getIteratorNext()));
-    auto nextInit = SGF.useBufferAsTemporary(nextBufOrValue, optTL);
+    auto nextInit = SGF.useBufferAsTemporary(addrOnlyBuf, optTL);
     SGF.emitExprInto(S->getIteratorNext(), nextInit.get());
-    nextInit->getManagedAddress().forward(SGF);
-  } else {
-    Scope InnerForScope(SGF.Cleanups, CleanupLocation(S->getIteratorNext()));
     nextBufOrValue =
-      SGF.emitRValueAsSingleValue(S->getIteratorNext()).forward(SGF);
-  }
-  
-  // Continue if the value is present.
-  Condition Cond = SGF.emitCondition(
-         SGF.emitDoesOptionalHaveValue(S, nextBufOrValue), S,
-         /*hasFalseCode=*/false, /*invertValue=*/false);
-
-  if (Cond.hasTrue()) {
-    Cond.enterTrue(SGF);
-    SGF.emitProfilerIncrement(S->getBody());
-    
-    // Emit the loop body.
-    // The declared variable(s) for the current element are destroyed
-    // at the end of each loop iteration.
+        ManagedValue::forUnmanaged(nextInit->getManagedAddress().forward(SGF));
+  } else {
+    // SEMANTIC SIL TODO: I am doing this to match previous behavior. We need to
+    // forward tmp below to ensure that we do not prematurely destroy the
+    // induction variable at the end of scope. I tried to use the
+    // CleanupRestorationScope and dormant, but it seemingly did not work and I
+    // do not have time to look into this now = (.
+    SILValue tmpValue;
+    bool hasCleanup;
     {
-      Scope InnerForScope(SGF.Cleanups, CleanupLocation(S->getBody()));
-      // Emit the initialization for the pattern.  If any of the bound patterns
-      // fail (because this is a 'for case' pattern with a refutable pattern,
-      // the code should jump to the continue block.
-      InitializationPtr initLoopVars
-        = SGF.emitPatternBindingInitialization(S->getPattern(), loopDest);
-      ManagedValue val;
-
-      // If we had a loadable "next" generator value, we know it is present.
-      // Get the value out of the optional, and wrap it up with a cleanup so
-      // that any exits out of this scope properly clean it up.
-      if (optTL.isLoadable()) {
-        val = SGF.emitManagedRValueWithCleanup(nextBufOrValue);
-      } else {
-        val = SGF.emitManagedBufferWithCleanup(nextBufOrValue);
-      }
-      val = SGF.emitUncheckedGetOptionalValueFrom(S, val, optTL,
-                                            SGFContext(initLoopVars.get()));
-      if (!val.isInContext())
-        RValue(SGF, S, optTy.getAnyOptionalObjectType(), val)
-          .forwardInto(SGF, S, initLoopVars.get());
-
-      // Now that the pattern has been initialized, check any where condition.
-      // If it fails, loop around as if 'continue' happened.
-      if (auto *Where = S->getWhere()) {
-        auto cond = SGF.emitCondition(Where, /*hasFalse*/false, /*invert*/true);
-        // If self is null, branch to the epilog.
-        cond.enterTrue(SGF);
-        SGF.Cleanups.emitBranchAndCleanups(loopDest, Where, { });
-        cond.exitTrue(SGF);
-        cond.complete(SGF);
-      }
-
-      visit(S->getBody());
+      Scope InnerForScope(SGF.Cleanups, CleanupLocation(S->getIteratorNext()));
+      ManagedValue tmp = SGF.emitRValueAsSingleValue(S->getIteratorNext());
+      hasCleanup = tmp.hasCleanup();
+      tmpValue = tmp.forward(SGF);
     }
-    
-    // Loop back to the header.
-    if (SGF.B.hasValidInsertionPoint()) {
-      // Associate the loop body's closing brace with this branch.
-      RegularLocation L(S->getBody());
-      L.pointToEnd();
-      SGF.B.createBranch(L, loopDest.getBlock());
-    }
-    Cond.exitTrue(SGF);
+    nextBufOrValue = hasCleanup ? SGF.emitManagedRValueWithCleanup(tmpValue)
+                                : ManagedValue::forUnmanaged(tmpValue);
   }
-  
-  // Complete the conditional execution.
-  Cond.complete(SGF);
-  
+
+  SILBasicBlock *failExitingBlock = createBasicBlock();
+  SwitchEnumBuilder switchEnumBuilder(SGF.B, S, nextBufOrValue);
+
+  switchEnumBuilder.addCase(
+      SGF.getASTContext().getOptionalSomeDecl(), createBasicBlock(),
+      loopDest.getBlock(),
+      [&](ManagedValue inputValue, SwitchCaseFullExpr &scope) {
+        SGF.emitProfilerIncrement(S->getBody());
+
+        // Emit the loop body.
+        // The declared variable(s) for the current element are destroyed
+        // at the end of each loop iteration.
+        {
+          Scope innerForScope(SGF.Cleanups, CleanupLocation(S->getBody()));
+          // Emit the initialization for the pattern.  If any of the bound
+          // patterns
+          // fail (because this is a 'for case' pattern with a refutable
+          // pattern,
+          // the code should jump to the continue block.
+          InitializationPtr initLoopVars =
+              SGF.emitPatternBindingInitialization(S->getPattern(), loopDest);
+
+          // If we had a loadable "next" generator value, we know it is present.
+          // Get the value out of the optional, and wrap it up with a cleanup so
+          // that any exits out of this scope properly clean it up.
+          //
+          // *NOTE* If we do not have an address only value, then inputValue is
+          // *already properly unwrapped.
+          if (optTL.isAddressOnly()) {
+            inputValue =
+                SGF.emitManagedBufferWithCleanup(nextBufOrValue.getValue());
+            inputValue = SGF.emitUncheckedGetOptionalValueFrom(
+                S, inputValue, optTL, SGFContext(initLoopVars.get()));
+          }
+
+          if (!inputValue.isInContext())
+            RValue(SGF, S, optTy.getAnyOptionalObjectType(), inputValue)
+                .forwardInto(SGF, S, initLoopVars.get());
+
+          // Now that the pattern has been initialized, check any where
+          // condition.
+          // If it fails, loop around as if 'continue' happened.
+          if (auto *Where = S->getWhere()) {
+            auto cond =
+                SGF.emitCondition(Where, /*hasFalse*/ false, /*invert*/ true);
+            // If self is null, branch to the epilog.
+            cond.enterTrue(SGF);
+            SGF.Cleanups.emitBranchAndCleanups(loopDest, Where, {});
+            cond.exitTrue(SGF);
+            cond.complete(SGF);
+          }
+
+          visit(S->getBody());
+        }
+
+        // If we emitted an unreachable in the body, we will not have a valid
+        // insertion point. Just return early.
+        if (!SGF.B.hasValidInsertionPoint())
+          return;
+
+        // Otherwise, associate the loop body's closing brace with this branch.
+        RegularLocation L(S->getBody());
+        L.pointToEnd();
+        scope.exit(L);
+      });
+
+  // We add loop fail block, just to be defensive about intermediate
+  // transformations performing cleanups at scope.exit(). We still jump to the
+  // contBlock.
+  switchEnumBuilder.addCase(
+      SGF.getASTContext().getOptionalNoneDecl(), createBasicBlock(),
+      failExitingBlock,
+      [&](ManagedValue inputValue, SwitchCaseFullExpr &scope) {
+        assert(!inputValue && "None should not be passed an argument!");
+        scope.exit(S);
+      });
+
+  std::move(switchEnumBuilder).emit();
+
+  SGF.B.emitBlock(failExitingBlock);
   emitOrDeleteBlock(SGF, endDest, S);
   SGF.BreakContinueDestStack.pop_back();
-  
-  // We do not need to destroy the value in the 'nextBuf' slot here, because
-  // either the 'for' loop finished naturally and the buffer contains '.None',
-  // or we exited by 'break' and the value in the buffer was consumed.
 }
 
 void StmtEmitter::visitBreakStmt(BreakStmt *S) {

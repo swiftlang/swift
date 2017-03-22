@@ -82,7 +82,7 @@ func testError() {
   switch (terr) { case .TENone, .TEOne, .TETwo: break } // ok
 
   switch (terr) { case .TENone, .TEOne: break }
-    // expected-error@-1 {{switch must be exhaustive, consider adding a default clause}}
+    // expected-error@-1 {{switch must be exhaustive, consider adding missing cases}}
 
   let _ = TestError.Code(rawValue: 2)!
 

@@ -15,7 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/SIL/SILInstruction.h"
-#include "swift/AST/AST.h"
+#include "swift/AST/Expr.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/Basic/type_traits.h"
 #include "swift/Basic/Unicode.h"
@@ -36,8 +36,8 @@ using namespace Lowering;
 // \p openedArchetypes is being used as a set. We don't use a real set type here
 // for performance reasons.
 static void
-collectDependentTypeInfo(Type Ty,
-                         SmallVectorImpl<ArchetypeType *> &openedArchetypes,
+collectDependentTypeInfo(CanType Ty,
+                         SmallVectorImpl<CanArchetypeType> &openedArchetypes,
                          bool &hasDynamicSelf) {
   if (!Ty)
     return;
@@ -45,13 +45,13 @@ collectDependentTypeInfo(Type Ty,
     hasDynamicSelf = true;
   if (!Ty->hasOpenedExistential())
     return;
-  Ty.visit([&](Type t) {
+  Ty.visit([&](CanType t) {
     if (t->isOpenedExistential()) {
       // Add this opened archetype if it was not seen yet.
       // We don't use a set here, because the number of open archetypes
       // is usually very small and using a real set may introduce too
       // much overhead.
-      auto *archetypeTy = t->castTo<ArchetypeType>();
+      auto archetypeTy = cast<ArchetypeType>(t);
       if (std::find(openedArchetypes.begin(), openedArchetypes.end(),
                     archetypeTy) == openedArchetypes.end())
         openedArchetypes.push_back(archetypeTy);
@@ -62,7 +62,7 @@ collectDependentTypeInfo(Type Ty,
 // Takes a set of open archetypes as input and produces a set of
 // references to open archetype definitions.
 static void buildTypeDependentOperands(
-    SmallVectorImpl<ArchetypeType *> &OpenedArchetypes,
+    SmallVectorImpl<CanArchetypeType> &OpenedArchetypes,
     bool hasDynamicSelf,
     SmallVectorImpl<SILValue> &TypeDependentOperands,
     SILOpenedArchetypesState &OpenedArchetypesState, SILFunction &F) {
@@ -88,13 +88,14 @@ static void collectTypeDependentOperands(
                       SmallVectorImpl<SILValue> &TypeDependentOperands,
                       SILOpenedArchetypesState &OpenedArchetypesState,
                       SILFunction &F,
-                      Type Ty,
+                      CanType Ty,
                       SubstitutionList subs = SubstitutionList()) {
-  SmallVector<ArchetypeType *, 4> openedArchetypes;
+  SmallVector<CanArchetypeType, 4> openedArchetypes;
   bool hasDynamicSelf = false;
   collectDependentTypeInfo(Ty, openedArchetypes, hasDynamicSelf);
   for (auto sub : subs) {
-    auto ReplTy = sub.getReplacement();
+    // Substitutions in SIL should really be canonical.
+    auto ReplTy = sub.getReplacement()->getCanonicalType();
     collectDependentTypeInfo(ReplTy, openedArchetypes, hasDynamicSelf);
   }
   buildTypeDependentOperands(openedArchetypes, hasDynamicSelf,
@@ -1773,8 +1774,9 @@ UnconditionalCheckedCastInst *UnconditionalCheckedCastInst::create(
                                                      TypeDependentOperands, DestTy);
 }
 
-UnconditionalCheckedCastOpaqueInst *UnconditionalCheckedCastOpaqueInst::create(
-    SILDebugLocation DebugLoc, SILValue Operand, SILType DestTy, SILFunction &F,
+UnconditionalCheckedCastValueInst *UnconditionalCheckedCastValueInst::create(
+    SILDebugLocation DebugLoc, CastConsumptionKind consumption,
+    SILValue Operand, SILType DestTy, SILFunction &F,
     SILOpenedArchetypesState &OpenedArchetypes) {
   SILModule &Mod = F.getModule();
   SmallVector<SILValue, 8> TypeDependentOperands;
@@ -1783,9 +1785,9 @@ UnconditionalCheckedCastOpaqueInst *UnconditionalCheckedCastOpaqueInst::create(
   unsigned size =
       totalSizeToAlloc<swift::Operand>(1 + TypeDependentOperands.size());
   void *Buffer =
-      Mod.allocateInst(size, alignof(UnconditionalCheckedCastOpaqueInst));
-  return ::new (Buffer) UnconditionalCheckedCastOpaqueInst(
-      DebugLoc, Operand, TypeDependentOperands, DestTy);
+      Mod.allocateInst(size, alignof(UnconditionalCheckedCastValueInst));
+  return ::new (Buffer) UnconditionalCheckedCastValueInst(
+      DebugLoc, consumption, Operand, TypeDependentOperands, DestTy);
 }
 
 CheckedCastBranchInst *CheckedCastBranchInst::create(

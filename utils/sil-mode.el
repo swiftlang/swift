@@ -159,7 +159,7 @@
 
    ;; Checked Conversions
    `(,(regexp-opt '("unconditional_checked_cast" "unconditional_checked_cast_addr"
-                    "unconditional_checked_cast_opaque")
+                    "unconditional_checked_cast_value")
                   'words) . font-lock-keyword-face)
    ;; Runtime Failures
    `(,(regexp-opt '("cond_fail")

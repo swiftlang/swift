@@ -4,7 +4,7 @@
 struct GS<T> {
 // CHECK: decl: struct GS<T> for 'GS'
 // FIXME: why do we get this?
-// CHECK: decl: struct GS<T> for 'T' usr=s:14swift_ide_test2GSVD1TMx
+// CHECK: decl: struct GS<T> for 'T' usr=s:14swift_ide_test2GSV1Txmfp
 
   let a: T.Nope
 // CHECK: decl: let a: <<error type>>

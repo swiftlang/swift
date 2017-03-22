@@ -18,6 +18,11 @@ if(SWIFT_RUNTIME_ENABLE_LEAK_CHECKER)
   set(swift_runtime_leaks_sources Leaks.mm)
 endif()
 
+if(SWIFT_RUNTIME_ENABLE_COW_EXISTENTIALS)
+  list(APPEND swift_runtime_compile_flags
+    "-DSWIFT_RUNTIME_ENABLE_COW_EXISTENTIALS=1")
+endif()
+
 set(section_magic_compile_flags ${swift_runtime_compile_flags})
 
 list(APPEND swift_runtime_compile_flags
@@ -27,8 +32,8 @@ set(swift_runtime_objc_sources
     ErrorObject.mm
     SwiftObject.mm
     SwiftValue.mm
-    Remangle.cpp
-    Reflection.mm)
+    Reflection.mm
+    "${SWIFT_SOURCE_DIR}/lib/Demangling/Remangler.cpp")
 
 set(swift_runtime_sources
     AnyHashableSupport.cpp
@@ -54,11 +59,16 @@ set(swift_runtime_sources
     Portability.cpp
     ProtocolConformance.cpp
     RefCount.cpp
-    RuntimeEntrySymbols.cpp)
+    RuntimeEntrySymbols.cpp
+    "${SWIFT_SOURCE_DIR}/lib/Demangling/OldDemangler.cpp"
+    "${SWIFT_SOURCE_DIR}/lib/Demangling/Demangler.cpp"
+    "${SWIFT_SOURCE_DIR}/lib/Demangling/NodePrinter.cpp"
+    "${SWIFT_SOURCE_DIR}/lib/Demangling/Context.cpp"
+    "${SWIFT_SOURCE_DIR}/lib/Demangling/ManglingUtils.cpp"
+    "${SWIFT_SOURCE_DIR}/lib/Demangling/Punycode.cpp")
 
 # Acknowledge that the following sources are known.
 set(LLVM_OPTIONAL_SOURCES
-    Remangle.cpp
     swift_sections.S
     MutexPThread.cpp
     MutexWin32.cpp
@@ -165,8 +175,8 @@ foreach(sdk ${ELFISH_SDKS})
     set(section_magic_end_obj "${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/section_magic_end-${arch_suffix}.dir/swift_sections.S${CMAKE_C_OUTPUT_EXTENSION}")
 
     set(ld_EXECUTABLE ${CMAKE_LINKER})
-    if(${SWIFT_SDK_${prefix}_ARCH_${arch}_LINKER})
-      set(ld_EXECUTABLE ${SWIFT_SDK_${prefix}_ARCH_${arch}_LINKER})
+    if(SWIFT_SDK_${sdk}_ARCH_${arch}_LINKER)
+      set(ld_EXECUTABLE ${SWIFT_SDK_${sdk}_ARCH_${arch}_LINKER})
     endif()
 
     add_custom_command_target(section_magic_${arch_suffix}_begin_object

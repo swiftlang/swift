@@ -1653,6 +1653,25 @@ Address irgen::emitProjectBox(IRGenFunction &IGF,
                        boxType->getFieldType(IGF.IGM.getSILModule(), 0));
 }
 
+Address irgen::emitAllocateExistentialBoxInBuffer(IRGenFunction &IGF,
+                                                  SILType boxedType,
+                                                  Address destBuffer,
+                                                  GenericEnvironment *env,
+                                                  const llvm::Twine &name) {
+  // Get a box for the boxed value.
+  auto boxType = SILBoxType::get(boxedType.getSwiftRValueType());
+  auto &boxTI = IGF.getTypeInfoForLowered(boxType).as<BoxTypeInfo>();
+  OwnedAddress owned = boxTI.allocate(IGF, boxedType, env, name);
+  Explosion box;
+  box.add(owned.getOwner());
+  boxTI.initialize(IGF, box,
+                   Address(IGF.Builder.CreateBitCast(
+                               destBuffer.getAddress(),
+                               owned.getOwner()->getType()->getPointerTo()),
+                           destBuffer.getAlignment()));
+  return owned.getAddress();
+}
+
 #define DEFINE_VALUE_OP(ID)                                           \
 void IRGenFunction::emit##ID(llvm::Value *value, Atomicity atomicity) { \
   if (doesNotRequireRefCounting(value)) return;                       \

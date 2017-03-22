@@ -7,12 +7,12 @@ import user_objc
 
 let aliasOriginal = NSAliasesEnum.byName
 
-switch aliasOriginal {
+switch aliasOriginal { // expected-error {{switch must be exhaustive, consider adding missing cases}}
 case .original:
   break
-} // expected-error {{switch must be exhaustive, consider adding a default clause}}
+}
 
-switch aliasOriginal {
+switch aliasOriginal { // expected-error {{switch must be exhaustive, consider adding missing cases}}
 case .bySameValue:
   break
-} // expected-error {{switch must be exhaustive, consider adding a default clause}}
+}

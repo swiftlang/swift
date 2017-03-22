@@ -20,7 +20,7 @@
 #include "SourceKit/Support/Tracing.h"
 #include "SourceKit/Support/UIdent.h"
 
-#include "swift/AST/AST.h"
+#include "swift/AST/ASTPrinter.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/SourceEntityWalker.h"
@@ -1988,7 +1988,7 @@ void SwiftEditorDocument::expandPlaceholder(unsigned Offset, unsigned Length,
         }
         if (HasSignature)
           OS << "in";
-        OS << "\n<#code#>\n";
+        OS << "\n" << getCodePlaceholder() << "\n";
         OS << "}";
       }
       Consumer.handleSourceText(ExpansionStr);
@@ -2126,6 +2126,17 @@ void SwiftLangSupport::editorFormatText(StringRef Name, unsigned Line,
 void SwiftLangSupport::editorExtractTextFromComment(StringRef Source,
                                                     EditorConsumer &Consumer) {
   Consumer.handleSourceText(extractPlainTextFromComment(Source));
+}
+
+void SwiftLangSupport::editorConvertMarkupToXML(StringRef Source,
+                                                EditorConsumer &Consumer) {
+  std::string Result;
+  llvm::raw_string_ostream OS(Result);
+  if (convertMarkupToXML(Source, OS)) {
+    Consumer.handleRequestError("Conversion failed.");
+    return;
+  }
+  Consumer.handleSourceText(Result);
 }
 
 //===----------------------------------------------------------------------===//

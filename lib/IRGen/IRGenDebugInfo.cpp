@@ -26,10 +26,9 @@
 #include "swift/AST/ModuleLoader.h"
 #include "swift/AST/Pattern.h"
 #include "swift/Basic/Dwarf.h"
-#include "swift/Basic/Punycode.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Version.h"
-#include "swift/Basic/ManglingMacros.h"
+#include "swift/Demangling/ManglingMacros.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBasicBlock.h"
@@ -1036,9 +1035,10 @@ void IRGenDebugInfo::emitGlobalVariableDeclaration(
 StringRef IRGenDebugInfo::getMangledName(DebugTypeInfo DbgTy) {
   if (MetadataTypeDecl && DbgTy.getDecl() == MetadataTypeDecl)
     return BumpAllocatedString(DbgTy.getDecl()->getName().str());
-
-  std::string Name = NewMangling::mangleTypeForDebugger(DbgTy.getType(),
-                                                        DbgTy.getDeclContext());
+  
+  Mangle::ASTMangler Mangler;
+  std::string Name = Mangler.mangleTypeForDebugger(DbgTy.getType(),
+                                                   DbgTy.getDeclContext());
   return BumpAllocatedString(Name);
 }
 

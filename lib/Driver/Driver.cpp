@@ -448,6 +448,16 @@ static bool populateOutOfDateMap(InputInfoMap &map, StringRef argsHashStr,
   }
 }
 
+// warn if -embed-bitcode is set and the output type is not an object
+static void validateEmbedBitcode(DerivedArgList &Args, OutputInfo &OI,
+                                 DiagnosticEngine &Diags) {
+  if (Args.hasArg(options::OPT_embed_bitcode) &&
+      OI.CompilerOutputType != types::TY_Object) {
+    Diags.diagnose(SourceLoc(), diag::warn_ignore_embed_bitcode);
+    Args.eraseArg(options::OPT_embed_bitcode);
+  }
+}
+
 std::unique_ptr<Compilation> Driver::buildCompilation(
     ArrayRef<const char *> Args) {
   llvm::PrettyStackTraceString CrashInfo("Compilation construction");
@@ -535,6 +545,8 @@ std::unique_ptr<Compilation> Driver::buildCompilation(
 
   assert(OI.CompilerOutputType != types::ID::TY_INVALID &&
          "buildOutputInfo() must set a valid output type!");
+  
+  validateEmbedBitcode(*TranslatedArgList, OI, Diags);
 
   if (OI.CompilerMode == OutputInfo::Mode::REPL)
     // REPL mode expects no input files, so suppress the error.
@@ -1082,6 +1094,14 @@ void Driver::buildOutputInfo(const ToolChain &TC, const DerivedArgList &Args,
       OI.CompilerOutputType = types::TY_PCH;
       break;
 
+    case options::OPT_emit_imported_modules:
+      OI.CompilerOutputType = types::TY_ImportedModules;
+      // We want the imported modules from the module as a whole, not individual
+      // files, so let's do it in one invocation rather than having to collate
+      // later.
+      OI.CompilerMode = OutputInfo::Mode::SingleCompile;
+      break;
+
     case options::OPT_parse:
     case options::OPT_typecheck:
     case options::OPT_dump_parse:
@@ -1374,6 +1394,7 @@ void Driver::buildActions(const ToolChain &TC,
       case types::TY_SwiftDeps:
       case types::TY_Remapping:
       case types::TY_PCH:
+      case types::TY_ImportedModules:
         // We could in theory handle assembly or LLVM input, but let's not.
         // FIXME: What about LTO?
         Diags.diagnose(SourceLoc(), diag::error_unexpected_input_file,
@@ -2033,7 +2054,9 @@ Job *Driver::buildJobsForAction(Compilation &C, const JobAction *JA,
       if (llvm::sys::fs::is_regular_file(OutputPath))
         llvm::sys::fs::remove(OutputPath);
     }
+  }
 
+  if (isa<CompileJobAction>(JA)) {
     // Choose the dependencies file output path.
     if (C.getArgs().hasArg(options::OPT_emit_dependencies)) {
       addAuxiliaryOutput(C, *Output, types::TY_Dependencies, OI, OutputMap);

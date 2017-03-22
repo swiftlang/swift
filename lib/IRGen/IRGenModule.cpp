@@ -19,7 +19,7 @@
 #include "swift/AST/DiagnosticsIRGen.h"
 #include "swift/AST/IRGenOptions.h"
 #include "swift/Basic/Dwarf.h"
-#include "swift/Basic/ManglingMacros.h"
+#include "swift/Demangling/ManglingMacros.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/Runtime/RuntimeFnWrappersGen.h"
 #include "swift/Runtime/Config.h"
@@ -135,9 +135,6 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
       DataLayout(target->createDataLayout()), Triple(Context.LangOpts.Target),
       TargetMachine(std::move(target)), silConv(irgen.SIL),
       OutputFilename(OutputFilename),
-#ifndef NDEBUG
-      EligibleConfs(getSILModule()),
-#endif
       TargetInfo(SwiftTargetInfo::get(*this)), DebugInfo(nullptr),
       ModuleHash(nullptr), ObjCInterop(Context.LangOpts.EnableObjCInterop),
       Types(*new TypeConverter(*this)) {
@@ -274,9 +271,9 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
     FunctionPtrTy,
     RefCountedPtrTy,
   });
-  
-  OpaquePtrTy = llvm::StructType::create(LLVMContext, "swift.opaque")
-                  ->getPointerTo(DefaultAS);
+
+  OpaqueTy = llvm::StructType::create(LLVMContext, "swift.opaque");
+  OpaquePtrTy = OpaqueTy->getPointerTo(DefaultAS);
 
   ProtocolConformanceRecordTy
     = createStructType(*this, "swift.protocol_conformance", {
@@ -726,6 +723,37 @@ llvm::Module *IRGenModule::releaseModule() {
   return ClangCodeGen->ReleaseModule();
 }
 
+bool IRGenerator::canEmitWitnessTableLazily(SILWitnessTable *wt) {
+  if (Opts.UseJIT)
+    return false;
+
+  NominalTypeDecl *ConformingTy =
+    wt->getConformance()->getType()->getNominalOrBoundGenericNominal();
+
+  switch (ConformingTy->getEffectiveAccess()) {
+    case Accessibility::Private:
+    case Accessibility::FilePrivate:
+      return true;
+
+    case Accessibility::Internal:
+      return PrimaryIGM->getSILModule().isWholeModule();
+
+    default:
+      return false;
+  }
+  llvm_unreachable("switch does not handle all cases");
+}
+
+void IRGenerator::addLazyWitnessTable(const ProtocolConformance *Conf) {
+  if (SILWitnessTable *wt = SIL.lookUpWitnessTable(Conf)) {
+    // Add it to the queue if it hasn't already been put there.
+    if (canEmitWitnessTableLazily(wt) &&
+        LazilyEmittedWitnessTables.insert(wt).second) {
+      LazyWitnessTables.push_back(wt);
+    }
+  }
+}
+
 llvm::AttributeSet IRGenModule::getAllocAttrs() {
   if (AllocAttrs.isEmpty()) {
     AllocAttrs = llvm::AttributeSet::get(LLVMContext,
@@ -1030,8 +1058,8 @@ bool IRGenModule::finalize() {
     // We have to create the variable now (before we emit the global lists).
     // But we want to calculate the hash later because later we can do it
     // multi-threaded.
-    llvm::MD5::MD5Result zero = { 0 };
-    ArrayRef<uint8_t> ZeroArr(zero, sizeof(llvm::MD5::MD5Result));
+    llvm::MD5::MD5Result zero{};
+    ArrayRef<uint8_t> ZeroArr(reinterpret_cast<uint8_t *>(&zero), sizeof(zero));
     auto *ZeroConst = llvm::ConstantDataArray::get(Module.getContext(), ZeroArr);
     ModuleHash = new llvm::GlobalVariable(Module, ZeroConst->getType(), true,
                                           llvm::GlobalValue::PrivateLinkage,

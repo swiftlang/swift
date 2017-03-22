@@ -23,8 +23,7 @@
 #include "swift/AST/RawComment.h"
 #include "swift/AST/SourceEntityWalker.h"
 #include "swift/AST/USRGeneration.h"
-#include "swift/Basic/Demangle.h"
-#include "swift/Basic/DemangleWrappers.h"
+#include "swift/Demangling/Demangle.h"
 #include "swift/Basic/DiagnosticConsumer.h"
 #include "swift/Basic/LangOptions.h"
 #include "swift/Basic/PrimitiveParsing.h"
@@ -1550,9 +1549,10 @@ static int doPrintLocalTypes(const CompilerInvocation &InitInvok,
 
     // Simulate already having mangled names
     for (auto LTD : LocalTypeDecls) {
+      Mangle::ASTMangler Mangler;
       std::string MangledName =
-          NewMangling::mangleTypeForDebugger(LTD->getDeclaredInterfaceType(),
-                                             LTD->getDeclContext());
+        Mangler.mangleTypeForDebugger(LTD->getDeclaredInterfaceType(),
+                                      LTD->getDeclContext());
       MangledNames.push_back(MangledName);
     }
 
@@ -1588,7 +1588,7 @@ static int doPrintLocalTypes(const CompilerInvocation &InitInvok,
       while (node->getKind() != NodeKind::LocalDeclName)
         node = node->getChild(1); // local decl name
 
-      auto remangled = Demangle::mangleNode(typeNode, useNewMangling(typeNode));
+      auto remangled = Demangle::mangleNode(typeNode);
 
       auto LTD = M->lookupLocalType(remangled);
 
@@ -2560,7 +2560,8 @@ public:
 
 private:
   void tryDemangleType(Type T, const DeclContext *DC, CharSourceRange range) {
-    std::string mangledName(NewMangling::mangleTypeForDebugger(T, DC));
+    Mangle::ASTMangler Mangler;
+    std::string mangledName(Mangler.mangleTypeForDebugger(T, DC));
     std::string Error;
     Type ReconstructedType =
         getTypeFromMangledSymbolname(Ctx, mangledName, Error);

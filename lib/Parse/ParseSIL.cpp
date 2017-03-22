@@ -2377,21 +2377,27 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB, SILBuilder &B) {
     SILType Ty;
     Identifier ToToken;
     SourceLoc ToLoc;
-    bool isStrict = false;
+    StringRef attr;
     if (parseTypedValueRef(Val, B) ||
         parseSILIdentifier(ToToken, ToLoc,
-                           diag::expected_tok_in_sil_instr, "to") ||
-        parseSILOptional(isStrict, *this, "strict") ||
-        parseSILType(Ty) ||
+                           diag::expected_tok_in_sil_instr, "to"))
+      return true;
+    if (parseSILOptional(attr, *this) && attr.empty())
+      return true;
+    if (parseSILType(Ty) ||
         parseSILDebugLocation(InstLoc, B))
       return true;
+
+    bool isStrict = attr.equals("strict");
+    bool isInvariant = attr.equals("invariant");
 
     if (ToToken.str() != "to") {
       P.diagnose(ToLoc, diag::expected_tok_in_sil_instr, "to");
       return true;
     }
 
-    ResultVal = B.createPointerToAddress(InstLoc, Val, Ty, isStrict);
+    ResultVal = B.createPointerToAddress(InstLoc, Val, Ty,
+                                         isStrict, isInvariant);
     break;
   }
   case ValueKind::RefToBridgeObjectInst: {
@@ -2475,9 +2481,34 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB, SILBuilder &B) {
     break;
   }
 
+  case ValueKind::UnconditionalCheckedCastValueInst: {
+    CastConsumptionKind consumptionKind;
+    Identifier consumptionKindToken;
+    SourceLoc consumptionKindLoc;
+    SILType ty;
+    SILValue destVal;
+    Identifier toToken;
+    SourceLoc toLoc;
+    if (parseSILIdentifier(consumptionKindToken, consumptionKindLoc,
+                           diag::expected_tok_in_sil_instr,
+                           "cast consumption kind") ||
+        parseCastConsumptionKind(consumptionKindToken, consumptionKindLoc,
+                                 consumptionKind))
+      return true;
+
+    if (parseTypedValueRef(Val, B) || parseVerbatim("to") || parseSILType(ty))
+      return true;
+
+    if (parseSILDebugLocation(InstLoc, B))
+      return true;
+
+    ResultVal = B.createUnconditionalCheckedCastValue(InstLoc, consumptionKind,
+                                                      Val, ty);
+    break;
+  }
+
   // Checked Conversion instructions.
   case ValueKind::UnconditionalCheckedCastInst:
-  case ValueKind::UnconditionalCheckedCastOpaqueInst:
   case ValueKind::CheckedCastValueBranchInst:
   case ValueKind::CheckedCastBranchInst: {
     SILType ty;
@@ -2500,11 +2531,6 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB, SILBuilder &B) {
       if (parseSILDebugLocation(InstLoc, B))
         return true;
       ResultVal = B.createUnconditionalCheckedCast(InstLoc, Val, ty);
-      break;
-    } else if (Opcode == ValueKind::UnconditionalCheckedCastOpaqueInst) {
-      if (parseSILDebugLocation(InstLoc, B))
-        return true;
-      ResultVal = B.createUnconditionalCheckedCastOpaque(InstLoc, Val, ty);
       break;
     }
     // The conditional cast still needs its branch destinations.
@@ -4370,9 +4396,9 @@ bool Parser::parseDeclSIL() {
         FunctionState.ParsedTypeCallback = OldParsedTypeCallback;
       };
 
-      FunctionState.ParsedTypeCallback = [&OpenedArchetypesTracker,
-                                          &FunctionState](Type ty) {
-        OpenedArchetypesTracker.registerUsedOpenedArchetypes(ty);
+      FunctionState.ParsedTypeCallback = [&OpenedArchetypesTracker](Type ty) {
+        OpenedArchetypesTracker.registerUsedOpenedArchetypes(
+          ty->getCanonicalType());
       };
 
       do {

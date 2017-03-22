@@ -77,6 +77,9 @@ public:
   /// When set, don't validate module system headers. If a header is modified
   /// and this is not set, clang will rebuild the module.
   bool DisableModulesValidateSystemHeaders = false;
+
+  /// When set, don't look for or load adapter modules.
+  bool DisableAdapterModules = false;
 };
 
 } // end namespace swift

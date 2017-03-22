@@ -605,6 +605,8 @@ uint8_t swift::getKeywordLen(tok keyword) {
   }
 }
 
+StringRef swift::getCodePlaceholder() { return "<#code#>"; }
+
 ASTPrinter &operator<<(ASTPrinter &printer, tok keyword) {
   SmallString<16> Buffer;
   llvm::raw_svector_ostream OS(Buffer);
@@ -930,14 +932,22 @@ public:
     PrintRequirements = 2,
     InnermostOnly = 4,
     SkipSelfRequirement = 8,
+    SwapSelfAndDependentMemberType = 16,
   };
+
+  void printWhereClauseFromRequirementSignature(ProtocolDecl *proto,
+                                                Decl *attachingTo);
+  void printTrailingWhereClause(TrailingWhereClause *whereClause);
 
   void printGenericSignature(const GenericSignature *genericSig,
                              unsigned flags);
+  void
+  printGenericSignature(const GenericSignature *genericSig, unsigned flags,
+                        llvm::function_ref<bool(const Requirement &)> filter);
   void printSingleDepthOfGenericSignature(
-           ArrayRef<GenericTypeParamType *> genericParams,
-           ArrayRef<Requirement> requirements,
-           unsigned flags);
+      ArrayRef<GenericTypeParamType *> genericParams,
+      ArrayRef<Requirement> requirements, unsigned flags,
+      llvm::function_ref<bool(const Requirement &)> filter);
   void printRequirement(const Requirement &req);
 
 private:
@@ -1194,6 +1204,149 @@ static unsigned getDepthOfType(Type ty) {
   return ErrorDepth;
 }
 
+namespace {
+struct RequirementPrintLocation {
+  /// The Decl where the requirement should be attached (whether inherited or in
+  /// a where clause)
+  Decl *AttachedTo;
+  /// Whether the requirement needs to be in a where clause.
+  bool InWhereClause;
+};
+};
+
+/// Heuristically work out a good place for \c req to be printed inside \c
+/// proto.
+///
+/// This depends only on the protocol so that we make the same decisions for all
+/// requirements in all associated types, guaranteeing that all of them will be
+/// printed somewhere. That is, taking an AssociatedTypeDecl as an argument and
+/// asking "should this requirement be printed on this ATD?" seems more likely
+/// to result in inconsistencies in what is printed where, versus what this
+/// function does: asking "where should this requirement be printed?" and then
+/// callers check if the location is the ATD.
+static RequirementPrintLocation
+bestRequirementPrintLocation(ProtocolDecl *proto, const Requirement &req) {
+  auto protoSelf = proto->getProtocolSelfType();
+  // Returns the most relevant decl within proto connected to outerType (or null
+  // if one doesn't exist), and whether the type is an "direct use",
+  // i.e. outerType itself is Self or Self.T, but not, say, Self.T.U, or
+  // Array<Self.T>. (The first's decl will be proto, while the other three will
+  // be Self.T.)
+  auto findRelevantDeclAndDirectUse = [&](Type outerType) {
+    TypeDecl *relevantDecl = nullptr;
+    Type foundType;
+    (void)outerType.findIf([&](Type t) {
+      if (t->isEqual(protoSelf)) {
+        relevantDecl = proto;
+        foundType = t;
+        return true;
+      } else if (auto DMT = t->getAs<DependentMemberType>()) {
+        auto assocType = DMT->getAssocType();
+        if (assocType && assocType->getProtocol() == proto) {
+          relevantDecl = assocType;
+          foundType = t;
+          return true;
+        }
+      }
+
+      // not here, so let's keep looking.
+      return false;
+    });
+
+    // If we didn't find anything, relevantDecl and foundType will be null, as
+    // desired.
+    auto directUse = foundType && outerType->isEqual(foundType);
+    return std::make_pair(relevantDecl, directUse);
+  };
+
+  Decl *bestDecl;
+  bool inWhereClause;
+
+  switch (req.getKind()) {
+  case RequirementKind::Conformance:
+  case RequirementKind::Superclass:
+  case RequirementKind::Layout: {
+    auto subject = req.getFirstType();
+    auto result = findRelevantDeclAndDirectUse(subject);
+
+    bestDecl = result.first;
+
+    // A requirement like Self : Protocol or Self.T : Class might be from an
+    // inheritance, or might be a where clause.
+    if (req.getKind() != RequirementKind::Layout && result.second) {
+      auto inherited = req.getSecondType();
+      inWhereClause =
+          none_of(result.first->getInherited(), [&](const TypeLoc &loc) {
+            return loc.getType()->isEqual(inherited);
+          });
+    } else {
+      inWhereClause = true;
+    }
+    break;
+  }
+  case RequirementKind::SameType: {
+    auto lhs = req.getFirstType();
+    auto rhs = req.getSecondType();
+
+    auto lhsResult = findRelevantDeclAndDirectUse(lhs);
+    auto rhsResult = findRelevantDeclAndDirectUse(rhs);
+
+    // Default to using the left type's decl.
+    bestDecl = lhsResult.first;
+
+    // But maybe the right type's one is "obviously" better!
+    // e.g. Int == Self.T
+    auto lhsDoesntExist = !lhsResult.first;
+    // e.g. Self.T.U == Self.V should go on V (first two conditions), but
+    // Self.T.U == Self should go on T (third condition).
+    auto rhsBetterDirect =
+        !lhsResult.second && rhsResult.second && rhsResult.first != proto;
+    auto rhsOfSelfToAssoc = lhsResult.first == proto && rhsResult.first;
+    // e.g. Self == Self.T.U
+    if (lhsDoesntExist || rhsBetterDirect || rhsOfSelfToAssoc)
+      bestDecl = rhsResult.first;
+
+    // Same-type requirements can only occur in where clauses
+    inWhereClause = true;
+    break;
+  }
+  }
+  // Didn't find anything that we think is relevant, so let's default to a where
+  // clause on the protocol.
+  if (!bestDecl) {
+    bestDecl = proto;
+    inWhereClause = true;
+  }
+
+  return {/*AttachedTo=*/bestDecl, inWhereClause};
+}
+
+void PrintAST::printWhereClauseFromRequirementSignature(ProtocolDecl *proto,
+                                                        Decl *attachingTo) {
+  assert(proto->isRequirementSignatureComputed());
+  unsigned flags = PrintRequirements;
+  if (isa<AssociatedTypeDecl>(attachingTo))
+    flags |= SwapSelfAndDependentMemberType;
+  printGenericSignature(
+      proto->getRequirementSignature(), flags,
+      [&](const Requirement &req) {
+        auto location = bestRequirementPrintLocation(proto, req);
+        return location.AttachedTo == attachingTo && location.InWhereClause;
+      });
+}
+
+void PrintAST::printTrailingWhereClause(TrailingWhereClause *whereClause) {
+  Printer << " " << tok::kw_where << " ";
+  interleave(
+      whereClause->getRequirements(),
+      [&](const RequirementRepr &req) {
+        Printer.callPrintStructurePre(PrintStructureKind::GenericRequirement);
+        req.print(Printer);
+        Printer.printStructurePost(PrintStructureKind::GenericRequirement);
+      },
+      [&] { Printer << ", "; });
+}
+
 /// A helper function to return the depth of a requirement.
 static unsigned getDepthOfRequirement(const Requirement &req) {
   switch (req.getKind()) {
@@ -1234,14 +1387,21 @@ static void getRequirementsAtDepth(const GenericSignature *genericSig,
 
 void PrintAST::printGenericSignature(const GenericSignature *genericSig,
                                      unsigned flags) {
+  printGenericSignature(genericSig, flags,
+                        // print everything
+                        [&](const Requirement &) { return true; });
+}
+void PrintAST::printGenericSignature(
+    const GenericSignature *genericSig, unsigned flags,
+    llvm::function_ref<bool(const Requirement &)> filter) {
   if (flags & InnermostOnly) {
     auto genericParams = genericSig->getInnermostGenericParams();
     unsigned depth = genericParams[0]->getDepth();
     SmallVector<Requirement, 2> requirementsAtDepth;
     getRequirementsAtDepth(genericSig, depth, requirementsAtDepth);
 
-    printSingleDepthOfGenericSignature(genericParams,
-                                       requirementsAtDepth, flags);
+    printSingleDepthOfGenericSignature(genericParams, requirementsAtDepth,
+                                       flags, filter);
     return;
   }
 
@@ -1249,7 +1409,8 @@ void PrintAST::printGenericSignature(const GenericSignature *genericSig,
   auto requirements = genericSig->getRequirements();
 
   if (!Options.PrintInSILBody) {
-    printSingleDepthOfGenericSignature(genericParams, requirements, flags);
+    printSingleDepthOfGenericSignature(genericParams, requirements, flags,
+                                       filter);
     return;
   }
 
@@ -1271,19 +1432,21 @@ void PrintAST::printGenericSignature(const GenericSignature *genericSig,
     getRequirementsAtDepth(genericSig, depth, requirementsAtDepth);
 
     printSingleDepthOfGenericSignature(
-      genericParams.slice(paramIdx, lastParamIdx - paramIdx),
-      requirementsAtDepth, flags);
+        genericParams.slice(paramIdx, lastParamIdx - paramIdx),
+        requirementsAtDepth, flags, filter);
 
     paramIdx = lastParamIdx;
   }
 }
 
 void PrintAST::printSingleDepthOfGenericSignature(
-         ArrayRef<GenericTypeParamType *> genericParams,
-         ArrayRef<Requirement> requirements,
-         unsigned flags) {
+    ArrayRef<GenericTypeParamType *> genericParams,
+    ArrayRef<Requirement> requirements, unsigned flags,
+    llvm::function_ref<bool(const Requirement &)> filter) {
   bool printParams = (flags & PrintParams);
   bool printRequirements = (flags & PrintRequirements);
+  bool swapSelfAndDependentMemberType =
+    (flags & SwapSelfAndDependentMemberType);
 
   SubstitutionMap subMap;
   if (CurrentType) {
@@ -1301,31 +1464,33 @@ void PrintAST::printSingleDepthOfGenericSignature(
   if (printParams) {
     // Print the generic parameters.
     Printer << "<";
-    bool isFirstParam = true;
-    for (auto param : genericParams) {
-      if (isFirstParam)
-        isFirstParam = false;
-      else
-        Printer << ", ";
-
-      if (!subMap.empty()) {
-        if (auto argTy = substParam(param))
-          printType(argTy);
-        else
-          printType(param);
-      } else if (auto *GP = param->getDecl()) {
-        Printer.callPrintStructurePre(PrintStructureKind::GenericParameter, GP);
-        Printer.printName(GP->getName(), PrintNameContext::GenericParameter);
-        Printer.printStructurePost(PrintStructureKind::GenericParameter, GP);
-      } else {
-        printType(param);
-      }
-    }
+    interleave(genericParams,
+               [&](GenericTypeParamType *param) {
+                 if (!subMap.empty()) {
+                   if (auto argTy = substParam(param))
+                     printType(argTy);
+                   else
+                     printType(param);
+                 } else if (auto *GP = param->getDecl()) {
+                   Printer.callPrintStructurePre(
+                       PrintStructureKind::GenericParameter, GP);
+                   Printer.printName(GP->getName(),
+                                     PrintNameContext::GenericParameter);
+                   Printer.printStructurePost(
+                       PrintStructureKind::GenericParameter, GP);
+                 } else {
+                   printType(param);
+                 }
+               },
+               [&] { Printer << ", "; });
   }
 
   if (printRequirements) {
     bool isFirstReq = true;
     for (const auto &req : requirements) {
+      if (!filter(req))
+        continue;
+
       auto first = req.getFirstType();
       Type second;
 
@@ -1357,6 +1522,13 @@ void PrintAST::printSingleDepthOfGenericSignature(
       } else {
         Printer << ", ";
       }
+
+      // Swap the order of Self == Self.A requirements if requested.
+      if (swapSelfAndDependentMemberType &&
+          req.getKind() == RequirementKind::SameType &&
+          first->is<GenericTypeParamType>() &&
+          second->is<DependentMemberType>())
+        std::swap(first, second);
 
       Printer.callPrintStructurePre(PrintStructureKind::GenericRequirement);
       if (second) {
@@ -1446,10 +1618,6 @@ bool swift::shouldPrint(const Decl *D, PrintOptions &Options) {
 
   if (Options.SkipUnavailable &&
       D->getAttrs().isUnavailable(D->getASTContext()))
-    return false;
-
-  // Skip stub declarations used for prior or later variants of Swift.
-  if (D->getAttrs().isUnavailableInSwiftVersion())
     return false;
 
   if (Options.ExplodeEnumCaseDecls) {
@@ -2219,6 +2387,17 @@ void PrintAST::visitAssociatedTypeDecl(AssociatedTypeDecl *decl) {
     Printer << " = ";
     decl->getDefaultDefinitionLoc().getType().print(Printer, Options);
   }
+
+  auto proto = decl->getProtocol();
+  // As with protocol's trailing where clauses, use the requirement signature
+  // when available.
+  if (proto->isRequirementSignatureComputed()) {
+    printWhereClauseFromRequirementSignature(proto, decl);
+  } else {
+    if (auto trailingWhere = decl->getTrailingWhereClause()) {
+      printTrailingWhereClause(trailingWhere);
+    }
+  }
 }
 
 void PrintAST::visitEnumDecl(EnumDecl *decl) {
@@ -2338,6 +2517,18 @@ void PrintAST::visitProtocolDecl(ProtocolDecl *decl) {
     }
 
     printInherited(decl, explicitClass);
+
+    // The trailing where clause is a syntactic thing, which isn't serialized
+    // (etc.) and thus isn't available for printing things out of
+    // already-compiled SIL modules. The requirement signature is available in
+    // such cases, so let's go with that when we can.
+    if (decl->isRequirementSignatureComputed()) {
+      printWhereClauseFromRequirementSignature(decl, decl);
+    } else {
+      if (auto trailingWhere = decl->getTrailingWhereClause()) {
+        printTrailingWhereClause(trailingWhere);
+      }
+    }
   }
   if (Options.TypeDefinitions) {
     printMembersOfDecl(decl, false, true,
@@ -3255,14 +3446,7 @@ class TypePrinter : public TypeVisitor<TypePrinter> {
       return;
 
     Printer << "<";
-    bool First = true;
-    for (Type Arg : Args) {
-      if (First)
-        First = false;
-      else
-        Printer << ", ";
-      visit(Arg);
-    }
+    interleave(Args, [&](Type Arg) { visit(Arg); }, [&] { Printer << ", "; });
     Printer << ">";
   }
 
@@ -3563,9 +3747,21 @@ public:
     printGenericArgs(T->getGenericArgs());
   }
 
+  void visitParentType(Type T) {
+    PrintOptions innerOptions = Options;
+    innerOptions.SynthesizeSugarOnTypes = false;
+
+    if (auto sugarType = dyn_cast<SyntaxSugarType>(T.getPointer()))
+      T = sugarType->getImplementationType();
+    else if (auto dictType = dyn_cast<DictionaryType>(T.getPointer()))
+      T = dictType->getImplementationType();
+
+    TypePrinter(Printer, innerOptions).visit(T);
+  }
+
   void visitEnumType(EnumType *T) {
     if (auto ParentType = T->getParent()) {
-      visit(ParentType);
+      visitParentType(ParentType);
       Printer << ".";
     } else if (shouldPrintFullyQualified(T)) {
       printModuleContext(T);
@@ -3576,7 +3772,7 @@ public:
 
   void visitStructType(StructType *T) {
     if (auto ParentType = T->getParent()) {
-      visit(ParentType);
+      visitParentType(ParentType);
       Printer << ".";
     } else if (shouldPrintFullyQualified(T)) {
       printModuleContext(T);
@@ -3587,7 +3783,7 @@ public:
 
   void visitClassType(ClassType *T) {
     if (auto ParentType = T->getParent()) {
-      visit(ParentType);
+      visitParentType(ParentType);
       Printer << ".";
     } else if (shouldPrintFullyQualified(T)) {
       printModuleContext(T);
@@ -3947,14 +4143,8 @@ public:
     if (T->getProtocols().empty()) {
       Printer << "Any";
     } else {
-      bool First = true;
-      for (auto Proto : T->getProtocols()) {
-        if (First)
-          First = false;
-        else
-          Printer << " & ";
-        visit(Proto);
-      }
+      interleave(T->getProtocols(), [&](Type Proto) { visit(Proto); },
+                 [&] { Printer << " & "; });
     }
   }
 
@@ -4034,7 +4224,7 @@ public:
   }
 
   void visitDependentMemberType(DependentMemberType *T) {
-    visit(T->getBase());
+    visitParentType(T->getBase());
     Printer << ".";
     Printer.printName(T->getName());
   }

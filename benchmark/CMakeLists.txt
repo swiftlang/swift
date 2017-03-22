@@ -29,6 +29,7 @@ set(SWIFT_BENCH_MODULES
     single-source/ArraySubscript
     single-source/BitCount
     single-source/ByteSwap
+    single-source/CString
     single-source/Calculator
     single-source/CaptureProp
     single-source/CharacterLiteralsLarge
@@ -36,13 +37,14 @@ set(SWIFT_BENCH_MODULES
     single-source/Chars
     single-source/ClassArrayGetter
     single-source/DeadArray
-    single-source/DictTest
-    single-source/DictTest2
-    single-source/DictTest3
     single-source/DictionaryBridge
     single-source/DictionaryLiteral
     single-source/DictionaryRemove
     single-source/DictionarySwap
+    single-source/DictTest
+    single-source/DictTest2
+    single-source/DictTest3
+    single-source/DropLast
     single-source/ErrorHandling
     single-source/Fibonacci
     single-source/GlobalClass
@@ -53,15 +55,16 @@ set(SWIFT_BENCH_MODULES
     single-source/Integrate
     single-source/IterateData
     single-source/Join
+    single-source/LazyFilter
     single-source/LinkedList
     single-source/MapReduce
     single-source/Memset
     single-source/MonteCarloE
     single-source/MonteCarloPi
+    single-source/NopDeinit
     single-source/NSDictionaryCastToSwift
     single-source/NSError
     single-source/NSStringConversion
-    single-source/NopDeinit
     single-source/ObjectAllocation
     single-source/ObjectiveCBridging
     single-source/ObjectiveCBridgingStubs
@@ -78,11 +81,11 @@ set(SWIFT_BENCH_MODULES
     single-source/Prims
     single-source/ProtocolDispatch
     single-source/ProtocolDispatch2
-    single-source/RC4
-    single-source/RGBHistogram
     single-source/RangeAssignment
+    single-source/RC4
     single-source/RecursiveOwnedParameter
     single-source/ReversedCollections
+    single-source/RGBHistogram
     single-source/SetTests
     single-source/SevenBoom
     single-source/Sim2DArray
@@ -91,11 +94,14 @@ set(SWIFT_BENCH_MODULES
     single-source/StackPromo
     single-source/StaticArray
     single-source/StrComplexWalk
-    single-source/StrToInt
     single-source/StringBuilder
+    single-source/StringEdits
     single-source/StringInterpolation
+    single-source/StringMatch
     single-source/StringTests
     single-source/StringWalk
+    single-source/StrToInt
+    single-source/Suffix
     single-source/SuperChars
     single-source/TwoSum
     single-source/TypeFlood
@@ -141,7 +147,7 @@ if(NOT SWIFT_LIBRARY_PATH)
 endif()
 
 # If the CMAKE_C_COMPILER is already clang, don't find it again,
-# thus allowing the --host-cc build-script argument to work here.
+# thus allowing the --cmake-c-compiler build-script argument to work here.
 get_filename_component(c_compiler ${CMAKE_C_COMPILER} NAME)
 
 if(${c_compiler} STREQUAL "clang")

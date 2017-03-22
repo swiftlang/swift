@@ -17,10 +17,13 @@
 
 import SwiftShims
 
+@_fixed_layout
 @_versioned
 internal struct _ArrayBody {
+  @_versioned
   var _storage: _SwiftArrayBodyStorage
 
+  @_inlineable
   @_versioned
   init(count: Int, capacity: Int, elementTypeIsBridgedVerbatim: Bool = false) {
     _sanityCheck(count >= 0)
@@ -37,11 +40,15 @@ internal struct _ArrayBody {
   /// constructed, but since we want to claim all the allocated
   /// capacity after a new buffer is allocated, it's typical to want
   /// to update it immediately after construction.
+  @_inlineable
+  @_versioned
   init() {
     _storage = _SwiftArrayBodyStorage(count: 0, _capacityAndFlags: 0)
   }
   
   /// The number of elements stored in this Array.
+  @_inlineable
+  @_versioned
   var count: Int {
     get {
       return _assumeNonNegative(_storage.count)
@@ -53,6 +60,8 @@ internal struct _ArrayBody {
 
   /// The number of elements that can be stored in this Array without
   /// reallocation.
+  @_inlineable
+  @_versioned
   var capacity: Int {
     return Int(_capacityAndFlags &>> 1)
   }
@@ -63,6 +72,8 @@ internal struct _ArrayBody {
   /// optimizer before 1.0 ships, so we store it in a bit here to
   /// avoid the cost of calls into the runtime that compute the
   /// answer.
+  @_inlineable
+  @_versioned
   var elementTypeIsBridgedVerbatim: Bool {
     get {
       return (_capacityAndFlags & 0x1) != 0
@@ -75,6 +86,8 @@ internal struct _ArrayBody {
 
   /// Storage optimization: compresses capacity and
   /// elementTypeIsBridgedVerbatim together.
+  @_inlineable
+  @_versioned
   var _capacityAndFlags: UInt {
     get {
       return _storage._capacityAndFlags

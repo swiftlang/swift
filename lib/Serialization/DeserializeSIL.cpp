@@ -558,7 +558,11 @@ SILFunction *SILDeserializer::readSILFunction(DeclID FID,
   };
 
   MF->DeserializedTypeCallback = [&OpenedArchetypesTracker] (Type ty) {
-    OpenedArchetypesTracker.registerUsedOpenedArchetypes(ty);
+    // We can't call getCanonicalType() immediately on everything we
+    // deserialize, but fortunately we only need to register opened
+    // existentials.
+    if (ty->isOpenedExistential())
+      OpenedArchetypesTracker.registerUsedOpenedArchetypes(CanType(ty));
   };
 
   // Another SIL_FUNCTION record means the end of this SILFunction.
@@ -913,12 +917,13 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     assert(RecordKind == SIL_ONE_TYPE_ONE_OPERAND &&
            "Layout should be OneTypeOneOperand.");
     bool isStrict = Attr & 0x01;
+    bool isInvariant = Attr & 0x02;
     ResultVal = Builder.createPointerToAddress(
       Loc,
       getLocalValue(ValID, getSILType(MF->getType(TyID2),
                                       (SILValueCategory)TyCategory2)),
       getSILType(MF->getType(TyID), (SILValueCategory)TyCategory),
-      isStrict);
+      isStrict, isInvariant);
     break;
   }
   case ValueKind::DeallocExistentialBoxInst: {
@@ -1924,11 +1929,13 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
                                                      failureBB);
     break;
   }
-  case ValueKind::UnconditionalCheckedCastOpaqueInst: {
+  case ValueKind::UnconditionalCheckedCastValueInst: {
+    CastConsumptionKind consumption = getCastConsumptionKind(Attr);
     SILValue Val = getLocalValue(
         ValID, getSILType(MF->getType(TyID2), (SILValueCategory)TyCategory2));
     SILType Ty = getSILType(MF->getType(TyID), (SILValueCategory)TyCategory);
-    ResultVal = Builder.createUnconditionalCheckedCastOpaque(Loc, Val, Ty);
+    ResultVal =
+        Builder.createUnconditionalCheckedCastValue(Loc, consumption, Val, Ty);
     break;
   }
   case ValueKind::UnconditionalCheckedCastAddrInst:

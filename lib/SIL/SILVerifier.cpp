@@ -122,6 +122,10 @@ public:
     return F.getModule().getOptions().EnableSILOwnership;
   }
 
+  bool areCOWExistentialsEnabled() const {
+    return F.getModule().getOptions().UseCOWExistentials;
+  }
+
   void _require(bool condition, const Twine &complaint,
                 const std::function<void()> &extraContext = nullptr) {
     if (condition) return;
@@ -681,14 +685,14 @@ public:
       // fallthrough for archetype check
     }
 
-    rvalueType.visit([&](Type t) {
-      auto *A = dyn_cast<ArchetypeType>(t.getPointer());
+    rvalueType.visit([&](CanType t) {
+      auto A = dyn_cast<ArchetypeType>(t);
       if (!A)
         return;
       require(isArchetypeValidInFunction(A, F),
               "Operand is of an ArchetypeType that does not exist in the "
               "Caller's generic param list.");
-      if (auto OpenedA = getOpenedArchetypeOf(CanType(A))) {
+      if (auto OpenedA = getOpenedArchetypeOf(A)) {
         auto Def = OpenedArchetypes.getOpenedArchetypeDef(OpenedA);
         require (Def, "Opened archetype should be registered in SILFunction");
         require(I == nullptr || Def == I ||
@@ -818,17 +822,16 @@ public:
 
     // Function to collect opened archetypes in FoundOpenedArchetypes and set
     // hasDynamicSelf.
-    auto HandleType = [&](Type Ty) {
+    auto HandleType = [&](CanType Ty) {
       if (Ty->isOpenedExistential()) {
-        auto *A = Ty->getAs<ArchetypeType>();
+        auto A = cast<ArchetypeType>(Ty);
         require(isArchetypeValidInFunction(A, AI->getFunction()),
                 "Archetype to be substituted must be valid in function.");
         // Collect all opened archetypes used in the substitutions list.
         FoundOpenedArchetypes.insert(A);
         // Also check that they are properly tracked inside the current
         // function.
-        auto Def =
-          OpenedArchetypes.getOpenedArchetypeDef(A);
+        auto Def = OpenedArchetypes.getOpenedArchetypeDef(A);
         require(Def, "Opened archetype should be registered in SILFunction");
         require(Def == AI ||
                 Dominance->properlyDominates(cast<SILInstruction>(Def), AI),
@@ -842,7 +845,7 @@ public:
 
     // Search for opened archetypes and dynamic self.
     for (auto &Sub : AS.getSubstitutions()) {
-      Sub.getReplacement().visit(HandleType);
+      Sub.getReplacement()->getCanonicalType().visit(HandleType);
     }
     AS.getSubstCalleeType().visit(HandleType);
 
@@ -2178,6 +2181,93 @@ public:
     require(OpenedArchetypes.getOpenedArchetypeDef(archetype) == OEI,
             "Archetype opened by open_existential_addr should be registered in "
             "SILFunction");
+
+    if (!areCOWExistentialsEnabled())
+      return;
+
+    // Check all the uses. Consuming or mutating uses must have mutable access
+    // to the opened value.
+    auto allowedAccessKind = OEI->getAccessKind();
+    if (allowedAccessKind == OpenedExistentialAccess::Mutable)
+      return;
+
+    auto isConsumingOrMutatingApplyUse = [](Operand *use) -> bool {
+      ApplySite apply(use->getUser());
+      assert(apply && "Not an apply instruction kind");
+      auto conv = apply.getArgumentConvention(use->getOperandNumber() - 1);
+      switch (conv) {
+      case SILArgumentConvention::Indirect_In_Guaranteed:
+        return false;
+
+      case SILArgumentConvention::Indirect_Out:
+      case SILArgumentConvention::Indirect_In:
+      case SILArgumentConvention::Indirect_Inout:
+      case SILArgumentConvention::Indirect_InoutAliasable:
+        return true;
+
+      case SILArgumentConvention::Direct_Unowned:
+      case SILArgumentConvention::Direct_Guaranteed:
+      case SILArgumentConvention::Direct_Owned:
+      case SILArgumentConvention::Direct_Deallocating:
+        assert(conv.isIndirectConvention() && "Expect an indirect convention");
+        return true; // return something "conservative".
+      }
+      llvm_unreachable("covered switch isn't covered?!");
+    };
+
+    // A "copy_addr %src [take] to *" is consuming on "%src".
+    // A "copy_addr * to * %dst" is mutating on "%dst".
+    auto isConsumingOrMutatingCopyAddrUse = [](Operand *use) -> bool {
+      auto *copyAddr = cast<CopyAddrInst>(use->getUser());
+      if (copyAddr->getDest() == use->get())
+        return true;
+      if (copyAddr->getSrc() == use->get() && copyAddr->isTakeOfSrc() == IsTake)
+        return true;
+      return false;
+    };
+
+    auto isMutatingOrConsuming = [=](OpenExistentialAddrInst *OEI) -> bool {
+      for (auto *use : OEI->getUses()) {
+        auto *inst = use->getUser();
+        if (inst->isTypeDependentOperand(*use))
+          continue;
+        switch (inst->getKind()) {
+        case ValueKind::ApplyInst:
+        case ValueKind::TryApplyInst:
+        case ValueKind::PartialApplyInst:
+          if (isConsumingOrMutatingApplyUse(use))
+            return true;
+          else
+            break;
+        case ValueKind::CopyAddrInst:
+          if (isConsumingOrMutatingCopyAddrUse(use))
+            return true;
+          else
+            break;
+        case ValueKind::DestroyAddrInst:
+          return true;
+        case ValueKind::UncheckedAddrCastInst:
+          // Escaping use lets be conservative here.
+          return true;
+        case ValueKind::CheckedCastAddrBranchInst:
+          if (cast<CheckedCastAddrBranchInst>(inst)->getConsumptionKind() !=
+              CastConsumptionKind::CopyOnSuccess)
+            return true;
+          break;
+        case ValueKind::DebugValueAddrInst:
+          // Harmless use.
+          break;
+        default:
+          assert(false && "Unhandled unexpected instruction");
+          break;
+        }
+      }
+      return false;
+    };
+    require(!isMutatingOrConsuming(OEI) ||
+                allowedAccessKind == OpenedExistentialAccess::Mutable,
+            "open_existential_addr uses that consumes or mutates but is not "
+            "opened for mutation");
   }
 
   void checkOpenExistentialRefInst(OpenExistentialRefInst *OEI) {
@@ -2213,7 +2303,7 @@ public:
 
     CanType resultInstanceTy = OEI->getType().getSwiftRValueType();
 
-    require(OEI->getType().isAddress() || !fnConv.useLoweredAddresses(),
+    require(OEI->getType().isAddress(),
             "open_existential_box result must be an address");
 
     auto archetype = getOpenedArchetypeOf(resultInstanceTy);
@@ -2522,8 +2612,8 @@ public:
     verifyOpenedArchetype(CI, CI->getType().getSwiftRValueType());
   }
 
-  void checkUnconditionalCheckedCastOpaqueInst(
-      UnconditionalCheckedCastOpaqueInst *CI) {
+  void checkUnconditionalCheckedCastValueInst(
+      UnconditionalCheckedCastValueInst *CI) {
     verifyCheckedCast(/*exact*/ false, CI->getOperand()->getType(),
                       CI->getType(), true);
     verifyOpenedArchetype(CI, CI->getType().getSwiftRValueType());
@@ -2536,10 +2626,10 @@ public:
     if (!Ty)
       return;
     // Check the type and all of its contained types.
-    Ty.visit([&](Type t) {
+    Ty.visit([&](CanType t) {
       SILValue Def;
       if (t->isOpenedExistential()) {
-        auto *archetypeTy = t->castTo<ArchetypeType>();
+        auto archetypeTy = cast<ArchetypeType>(t);
         Def = OpenedArchetypes.getOpenedArchetypeDef(archetypeTy);
         require(Def, "Opened archetype should be registered in SILFunction");
       } else if (t->hasDynamicSelfType()) {
@@ -3633,7 +3723,7 @@ public:
     // OpenedArchetypesDefs are existing instructions
     // belonging to the function F.
     for (auto KV: OpenedArchetypes.getOpenedArchetypeDefs()) {
-      require(getOpenedArchetypeOf(KV.first),
+      require(getOpenedArchetypeOf(CanType(KV.first)),
               "Only opened archetypes should be registered in SILFunction");
       auto Def = cast<SILInstruction>(KV.second);
       require(Def->getFunction() == F, 

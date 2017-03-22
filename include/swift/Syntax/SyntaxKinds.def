@@ -32,6 +32,10 @@
 #define MISSING_SYNTAX(Id, Parent)
 #endif
 
+#ifndef SYNTAX_COLLECTION
+#define SYNTAX_COLLECTION(Id, Element)
+#endif
+
 SYNTAX(Unknown, Syntax)
 
 // Decls
@@ -56,7 +60,6 @@ SYNTAX(GenericArgumentList, Syntax)
 ABSTRACT_SYNTAX(GenericRequirementSyntax, Syntax)
   SYNTAX(ConformanceRequirement, GenericRequirementSyntax)
   SYNTAX(SameTypeRequirement, GenericRequirementSyntax)
-SYNTAX(TypeArgumentList, Syntax)
 
 // Types
 ABSTRACT_SYNTAX(TypeSyntax, Syntax)
@@ -106,6 +109,9 @@ SYNTAX(FunctionParameter, Syntax)
 SYNTAX(DeclModifier, Syntax)
 SYNTAX(DeclModifierList, Syntax)
 
+SYNTAX_COLLECTION(TupleTypeElementList, TupleTypeElementSyntax)
+
+#undef SYNTAX_COLLECTION
 #undef ABSTRACT_SYNTAX
 #undef DECL
 #undef STMT

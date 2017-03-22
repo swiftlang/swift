@@ -29,30 +29,30 @@ class SGFContext;
 /// The goal is to make this eventually composed with SILBuilder so that all
 /// APIs only vend ManagedValues.
 class SILGenBuilder : public SILBuilder {
-  SILGenFunction &gen;
+  SILGenFunction &SGF;
 
 public:
-  SILGenBuilder(SILGenFunction &gen);
-  SILGenBuilder(SILGenFunction &gen, SILBasicBlock *insertBB);
-  SILGenBuilder(SILGenFunction &gen, SILBasicBlock *insertBB,
+  SILGenBuilder(SILGenFunction &SGF);
+  SILGenBuilder(SILGenFunction &SGF, SILBasicBlock *insertBB);
+  SILGenBuilder(SILGenFunction &SGF, SILBasicBlock *insertBB,
                 SmallVectorImpl<SILInstruction *> *insertedInsts);
-  SILGenBuilder(SILGenFunction &gen, SILBasicBlock *insertBB,
+  SILGenBuilder(SILGenFunction &SGF, SILBasicBlock *insertBB,
                 SILBasicBlock::iterator insertInst);
 
-  SILGenBuilder(SILGenFunction &gen, SILFunction::iterator insertBB)
-      : SILGenBuilder(gen, &*insertBB) {}
-  SILGenBuilder(SILGenFunction &gen, SILFunction::iterator insertBB,
+  SILGenBuilder(SILGenFunction &SGF, SILFunction::iterator insertBB)
+      : SILGenBuilder(SGF, &*insertBB) {}
+  SILGenBuilder(SILGenFunction &SGF, SILFunction::iterator insertBB,
                 SmallVectorImpl<SILInstruction *> *insertedInsts)
-      : SILGenBuilder(gen, &*insertBB, insertedInsts) {}
-  SILGenBuilder(SILGenFunction &gen, SILFunction::iterator insertBB,
+      : SILGenBuilder(SGF, &*insertBB, insertedInsts) {}
+  SILGenBuilder(SILGenFunction &SGF, SILFunction::iterator insertBB,
                 SILInstruction *insertInst)
-      : SILGenBuilder(gen, &*insertBB, insertInst->getIterator()) {}
-  SILGenBuilder(SILGenFunction &gen, SILFunction::iterator insertBB,
+      : SILGenBuilder(SGF, &*insertBB, insertInst->getIterator()) {}
+  SILGenBuilder(SILGenFunction &SGF, SILFunction::iterator insertBB,
                 SILBasicBlock::iterator insertInst)
-      : SILGenBuilder(gen, &*insertBB, insertInst) {}
+      : SILGenBuilder(SGF, &*insertBB, insertInst) {}
 
   SILGenModule &getSILGenModule() const;
-  SILGenFunction &getSILGenFunction() const { return gen; }
+  SILGenFunction &getSILGenFunction() const { return SGF; }
 
   // Metatype instructions use the conformances necessary to instantiate the
   // type.
@@ -102,6 +102,11 @@ public:
   InitExistentialRefInst *
   createInitExistentialRef(SILLocation loc, SILType existentialType,
                            CanType formalConcreteType, SILValue concreteValue,
+                           ArrayRef<ProtocolConformanceRef> conformances);
+
+  ManagedValue
+  createInitExistentialRef(SILLocation loc, SILType existentialType,
+                           CanType formalConcreteType, ManagedValue concrete,
                            ArrayRef<ProtocolConformanceRef> conformances);
 
   AllocExistentialBoxInst *
@@ -218,10 +223,11 @@ public:
       SILLocation loc, SILType ty, const TypeLowering &lowering,
       SGFContext context, std::function<void(SILValue)> rvalueEmitter);
 
-  using SILBuilder::createUnconditionalCheckedCastOpaque;
-  ManagedValue createUnconditionalCheckedCastOpaque(SILLocation loc,
-                                                    ManagedValue operand,
-                                                    SILType type);
+  using SILBuilder::createUnconditionalCheckedCastValue;
+  ManagedValue
+  createUnconditionalCheckedCastValue(SILLocation loc,
+                                      CastConsumptionKind consumption,
+                                      ManagedValue operand, SILType type);
   using SILBuilder::createUnconditionalCheckedCast;
   ManagedValue createUnconditionalCheckedCast(SILLocation loc,
                                               ManagedValue operand,

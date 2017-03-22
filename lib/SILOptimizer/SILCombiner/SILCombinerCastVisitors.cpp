@@ -35,8 +35,7 @@ SILCombiner::visitRefToRawPointerInst(RefToRawPointerInst *RRPI) {
   if (auto *URCI = dyn_cast<UncheckedRefCastInst>(RRPI->getOperand())) {
     // (ref_to_raw_pointer (unchecked_ref_cast x))
     //    -> (ref_to_raw_pointer x)
-    if (URCI->getOperand()->getType().getSwiftRValueType()
-        ->isAnyClassReferenceType()) {
+    if (URCI->getOperand()->getType().isAnyClassReferenceType()) {
       RRPI->setOperand(URCI->getOperand());
       return URCI->use_empty() ? eraseInstFromFunction(*URCI) : nullptr;
     }
@@ -140,7 +139,8 @@ visitPointerToAddressInst(PointerToAddressInst *PTAI) {
 
         auto *NewPTAI = Builder.createPointerToAddress(PTAI->getLoc(), Ptr,
                                                        PTAI->getType(),
-                                                       PTAI->isStrict());
+                                                       PTAI->isStrict(),
+                                                       PTAI->isInvariant());
         auto DistanceAsWord = Builder.createBuiltin(
             PTAI->getLoc(), Trunc->getName(), Trunc->getType(), {}, Distance);
 
@@ -181,7 +181,7 @@ visitPointerToAddressInst(PointerToAddressInst *PTAI) {
       SILValue Distance = Bytes->getArguments()[0];
       auto *NewPTAI =
         Builder.createPointerToAddress(PTAI->getLoc(), Ptr, PTAI->getType(),
-                                       PTAI->isStrict());
+                                       PTAI->isStrict(), PTAI->isInvariant());
       return Builder.createIndexAddr(PTAI->getLoc(), NewPTAI, Distance);
     }
   }

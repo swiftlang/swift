@@ -20,7 +20,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/SIL/SILWitnessTable.h"
-#include "swift/AST/Mangle.h"
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/SIL/SILModule.h"
@@ -29,19 +28,8 @@
 using namespace swift;
 
 static std::string mangleConstant(NormalProtocolConformance *C) {
-  using namespace Mangle;
-  Mangler mangler;
-
-  //   mangled-name ::= '_T' global
-  //   global ::= 'WP' protocol-conformance
-  mangler.append("_TWP");
-  mangler.mangleProtocolConformance(C);
-  std::string Old = mangler.finalize();
-
-  NewMangling::ASTMangler NewMangler;
-  std::string New = NewMangler.mangleWitnessTable(C);
-
-  return NewMangling::selectMangling(Old, New);
+  Mangle::ASTMangler Mangler;
+  return Mangler.mangleWitnessTable(C);
 }
 
 void SILWitnessTable::addWitnessTable() {

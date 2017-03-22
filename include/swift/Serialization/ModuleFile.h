@@ -83,6 +83,9 @@ class ModuleFile : public LazyMemberLoader {
   /// Declaration contexts with delayed generic environments, which will be
   /// completed as a pending action.
   ///
+  /// This should only be used on the module returned by
+  /// getModuleFileForDelayedActions().
+  ///
   /// FIXME: This is needed because completing a generic environment can
   /// require the type checker, which might be gone if we delay generic
   /// environments too far. It is a hack.
@@ -93,7 +96,8 @@ class ModuleFile : public LazyMemberLoader {
     ModuleFile &MF;
 
   public:
-    DeserializingEntityRAII(ModuleFile &MF) : MF(MF) {
+    DeserializingEntityRAII(ModuleFile &mf)
+        : MF(mf.getModuleFileForDelayedActions()) {
       ++MF.NumCurrentDeserializingEntities;
     }
     ~DeserializingEntityRAII() {
@@ -107,6 +111,13 @@ class ModuleFile : public LazyMemberLoader {
     }
   };
   friend class DeserializingEntityRAII;
+
+  /// Picks a specific ModuleFile instance to serve as the "delayer" for the
+  /// entire module.
+  ///
+  /// This is usually \c this, but when there are partial swiftmodules all
+  /// loaded for the same module it may be different.
+  ModuleFile &getModuleFileForDelayedActions();
 
   /// Finish any pending actions that were waiting for the topmost entity to
   /// be deserialized.
@@ -490,9 +501,6 @@ private:
 
   ParameterList *readParameterList();
   
-  GenericParamList *maybeGetOrReadGenericParams(serialization::DeclID contextID,
-                                                DeclContext *DC);
-
   /// Reads a generic param list from \c DeclTypeCursor.
   ///
   /// If the record at the cursor is not a generic param list, returns null

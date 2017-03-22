@@ -15,7 +15,7 @@
 #include "TestOptions.h"
 #include "SourceKit/Support/Concurrency.h"
 #include "clang/Rewrite/Core/RewriteBuffer.h"
-#include "swift/Basic/ManglingMacros.h"
+#include "swift/Demangling/ManglingMacros.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/Optional.h"
 #include "llvm/ADT/StringSwitch.h"
@@ -166,6 +166,7 @@ static sourcekitd_uid_t RequestEditorFindInterfaceDoc;
 static sourcekitd_uid_t RequestDocInfo;
 static sourcekitd_uid_t RequestModuleGroups;
 static sourcekitd_uid_t RequestNameTranslation;
+static sourcekitd_uid_t RequestMarkupToXML;
 
 static sourcekitd_uid_t SemaDiagnosticStage;
 
@@ -297,6 +298,7 @@ static int skt_main(int argc, const char **argv) {
   RequestDocInfo = sourcekitd_uid_get_from_cstr("source.request.docinfo");
   RequestModuleGroups = sourcekitd_uid_get_from_cstr("source.request.module.groups");
   RequestNameTranslation = sourcekitd_uid_get_from_cstr("source.request.name.translation");
+  RequestMarkupToXML = sourcekitd_uid_get_from_cstr("source.request.convert.markup.xml");
   KindNameObjc = sourcekitd_uid_get_from_cstr("source.lang.name.kind.objc");
   KindNameSwift = sourcekitd_uid_get_from_cstr("source.lang.name.kind.swift");
 
@@ -578,7 +580,10 @@ static int handleTestInvocation(ArrayRef<const char *> Args,
     sourcekitd_request_dictionary_set_int64(Req, KeyLength, Length);
     break;
   }
-
+  case SourceKitRequest::MarkupToXML: {
+    sourcekitd_request_dictionary_set_uid(Req, KeyRequest, RequestMarkupToXML);
+    break;
+  }
   case SourceKitRequest::NameTranslation: {
     sourcekitd_request_dictionary_set_uid(Req, KeyRequest, RequestNameTranslation);
     sourcekitd_request_dictionary_set_int64(Req, KeyOffset, ByteOffset);
@@ -932,6 +937,7 @@ static bool handleResponse(sourcekitd_response_t Resp, const TestOptions &Opts,
       break;
 
     case SourceKitRequest::ExtractComment:
+    case SourceKitRequest::MarkupToXML:
       printNormalizedDocComment(Info);
       break;
 

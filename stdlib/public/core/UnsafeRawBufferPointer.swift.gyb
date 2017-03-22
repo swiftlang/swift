@@ -94,6 +94,7 @@
 % end
 ///
 /// - SeeAlso: `Unsafe${Mutable}RawPointer`, `Unsafe${Mutable}BufferPointer`
+@_fixed_layout
 public struct Unsafe${Mutable}RawBufferPointer
   : ${Mutable}Collection, RandomAccessCollection {
   // TODO: Specialize `index` and `formIndex` and
@@ -104,6 +105,7 @@ public struct Unsafe${Mutable}RawBufferPointer
   public typealias SubSequence = ${Self}
 
   /// An iterator over the bytes viewed by a raw buffer pointer.
+  @_fixed_layout
   public struct Iterator : IteratorProtocol, Sequence {
 
     /// Advances to the next byte and returns it, or `nil` if no next byte
@@ -113,6 +115,7 @@ public struct Unsafe${Mutable}RawBufferPointer
     ///
     /// - Returns: The next sequential byte in the raw buffer if another byte
     ///   exists; otherwise, `nil`.
+    @_inlineable
     public mutating func next() -> UInt8? {
       if _position == _end { return nil }
 
@@ -121,7 +124,15 @@ public struct Unsafe${Mutable}RawBufferPointer
       return result
     }
 
+    @_versioned
     internal var _position, _end: UnsafeRawPointer?
+
+    @_versioned
+    @_inlineable
+    init(_position: UnsafeRawPointer?, _end: UnsafeRawPointer?) {
+      self._position = _position
+      self._end = _end
+    }
   }
 
 %  if mutable:
@@ -132,6 +143,7 @@ public struct Unsafe${Mutable}RawBufferPointer
   ///
   /// - Parameter size: The number of bytes to allocate.
   /// - Returns: A word-aligned buffer pointer covering a region of memory.
+  @_inlineable
   public static func allocate(count size: Int
   ) -> UnsafeMutableRawBufferPointer {
     return UnsafeMutableRawBufferPointer(
@@ -146,6 +158,7 @@ public struct Unsafe${Mutable}RawBufferPointer
   /// The memory to be deallocated must not be initialized or must be
   /// initialized to a trivial type. For a buffer pointer `p`, all `p.count`
   /// bytes referenced by `p` are deallocated.
+  @_inlineable
   public func deallocate() {
     _position?.deallocate(
       bytes: count, alignedTo: MemoryLayout<UInt>.alignment)
@@ -177,6 +190,7 @@ public struct Unsafe${Mutable}RawBufferPointer
   ///     with `type`.
   /// - Returns: A new instance of type `T`, copied from the buffer pointer's
   ///   memory.
+  @_inlineable
   public func load<T>(fromByteOffset offset: Int = 0, as type: T.Type) -> T {
     _debugPrecondition(offset >= 0, "${Self}.load with negative offset")
     _debugPrecondition(offset + MemoryLayout<T>.size <= self.count,
@@ -210,6 +224,7 @@ public struct Unsafe${Mutable}RawBufferPointer
   ///   - type: The type to use for the newly constructed instance. The memory
   ///     must be initialized to a value of a type that is layout compatible
   ///     with `type`.
+  @_inlineable
   public func storeBytes<T>(
     of value: T, toByteOffset offset: Int = 0, as: T.Type
   ) {
@@ -236,6 +251,7 @@ public struct Unsafe${Mutable}RawBufferPointer
   ///   - source: A pointer to the memory to copy bytes from. The memory at
   ///     `source..<(source + count)` must be initialized to a trivial type.
   ///   - count: The number of bytes to copy. `count` must not be negative.
+  @_inlineable
   public func copyBytes(from source: UnsafeRawBufferPointer) {
     _debugPrecondition(source.count <= self.count,
       "${Self}.copyBytes source has too many elements")
@@ -255,6 +271,7 @@ public struct Unsafe${Mutable}RawBufferPointer
   ///
   /// - Parameter source: A collection of `UInt8` elements. `source.count` must
   ///   be less than or equal to this buffer's `count`.
+  @_inlineable
   public func copyBytes<C : Collection>(from source: C
   ) where C.Iterator.Element == UInt8 {
     _debugPrecondition(source.count <= self.count,
@@ -278,6 +295,7 @@ public struct Unsafe${Mutable}RawBufferPointer
   ///     non-`nil` `start`.
   ///   - count: The number of bytes to include in the buffer. `count` must not
   ///     be negative.
+  @_inlineable
   public init(start: Unsafe${Mutable}RawPointer?, count: Int) {
     _precondition(count >= 0, "${Self} with negative count")
     _precondition(count == 0 || start != nil,
@@ -289,6 +307,7 @@ public struct Unsafe${Mutable}RawBufferPointer
   /// Creates a new buffer over the same memory as the given buffer.
   ///
   /// - Parameter bytes: The buffer to convert.
+  @_inlineable
   public init(_ bytes: UnsafeMutableRawBufferPointer) {
     self.init(start: bytes.baseAddress, count: bytes.count)
   }
@@ -297,6 +316,7 @@ public struct Unsafe${Mutable}RawBufferPointer
   /// Creates a new mutable buffer over the same memory as the given buffer.
   ///
   /// - Parameter bytes: The buffer to convert.
+  @_inlineable
   public init(mutating bytes: UnsafeRawBufferPointer) {
     self.init(start: UnsafeMutableRawPointer(mutating: bytes.baseAddress),
       count: bytes.count)
@@ -305,6 +325,7 @@ public struct Unsafe${Mutable}RawBufferPointer
   /// Creates a new buffer over the same memory as the given buffer.
   ///
   /// - Parameter bytes: The buffer to convert.
+  @_inlineable
   public init(_ bytes: UnsafeRawBufferPointer) {
     self.init(start: bytes.baseAddress, count: bytes.count)
   }
@@ -314,6 +335,7 @@ public struct Unsafe${Mutable}RawBufferPointer
   ///
   /// - Parameter buffer: The typed buffer to convert to a raw buffer. The
   ///   buffer's type `T` must be a trivial type.
+  @_inlineable
   public init<T>(_ buffer: UnsafeMutableBufferPointer<T>) {
     self.init(start: buffer.baseAddress!,
       count: buffer.count * MemoryLayout<T>.stride)
@@ -324,6 +346,7 @@ public struct Unsafe${Mutable}RawBufferPointer
   ///
   /// - Parameter buffer: The typed buffer to convert to a raw buffer. The
   ///   buffer's type `T` must be a trivial type.
+  @_inlineable
   public init<T>(_ buffer: UnsafeBufferPointer<T>) {
     self.init(start: buffer.baseAddress!,
       count: buffer.count * MemoryLayout<T>.stride)
@@ -332,6 +355,7 @@ public struct Unsafe${Mutable}RawBufferPointer
 
   /// Always zero, which is the index of the first byte in a
   /// nonempty buffer.
+  @_inlineable
   public var startIndex: Int {
     return 0
   }
@@ -341,12 +365,14 @@ public struct Unsafe${Mutable}RawBufferPointer
   ///
   /// The `endIndex` property of an `Unsafe${Mutable}RawBufferPointer`
   /// instance is always identical to `count`.
+  @_inlineable
   public var endIndex: Int {
     return count
   }
 
   public typealias Indices = CountableRange<Int>
 
+  @_inlineable
   public var indices: Indices {
     return startIndex..<endIndex
   }
@@ -356,6 +382,7 @@ public struct Unsafe${Mutable}RawBufferPointer
   ///
   /// - Parameter i: The offset of the byte to access. `i` must be in the range
   ///   `0..<count`.
+  @_inlineable
   public subscript(i: Int) -> UInt8 {
     get {
       _debugPrecondition(i >= 0)
@@ -375,6 +402,7 @@ public struct Unsafe${Mutable}RawBufferPointer
   ///
   /// - Parameter bounds: The range of byte offsets to access. The upper and
   ///   lower bounds of the range must be in the range `0...count`.
+  @_inlineable
   public subscript(bounds: Range<Int>) -> Unsafe${Mutable}RawBufferPointer {
     get {
       _debugPrecondition(bounds.lowerBound >= startIndex)
@@ -399,6 +427,7 @@ public struct Unsafe${Mutable}RawBufferPointer
   }
 
   /// Returns an iterator over the bytes of this sequence.
+  @_inlineable
   public func makeIterator() -> Iterator {
     return Iterator(_position: _position, _end: _end)
   }
@@ -407,6 +436,7 @@ public struct Unsafe${Mutable}RawBufferPointer
   ///
   /// If the `baseAddress` of this buffer is `nil`, the count is zero. However,
   /// a buffer can have a `count` of zero even with a non-`nil` base address.
+  @_inlineable
   public var baseAddress: Unsafe${Mutable}RawPointer? {
     return _position
   }
@@ -415,6 +445,7 @@ public struct Unsafe${Mutable}RawBufferPointer
   ///
   /// If the `baseAddress` of this buffer is `nil`, the count is zero. However,
   /// a buffer can have a `count` of zero even with a non-`nil` base address.
+  @_inlineable
   public var count: Int {
     if let pos = _position {
       return _end! - pos
@@ -445,6 +476,7 @@ public struct Unsafe${Mutable}RawBufferPointer
   ///   are initialized.
   ///
   // TODO: Optimize where `C` is a `ContiguousArrayBuffer`.
+  @_inlineable
   public func initializeMemory<S: Sequence>(
     as: S.Iterator.Element.Type, from source: S
   ) -> (unwritten: S.Iterator, initialized: UnsafeMutableBufferPointer<S.Iterator.Element>) {
@@ -481,6 +513,7 @@ public struct Unsafe${Mutable}RawBufferPointer
   }
   %  end # mutable
 
+  @_versioned
   let _position, _end: Unsafe${Mutable}RawPointer?
 }
 
@@ -512,6 +545,7 @@ extension Unsafe${Mutable}RawBufferPointer : CustomDebugStringConvertible {
 /// - Returns: The return value of the `body` closure, if any.
 ///
 /// - SeeAlso: `withUnsafeMutablePointer(to:_:)`, `withUnsafeBytes(of:_:)`
+@_inlineable
 public func withUnsafeMutableBytes<T, Result>(
   of arg: inout T,
   _ body: (UnsafeMutableRawBufferPointer) throws -> Result
@@ -540,6 +574,7 @@ public func withUnsafeMutableBytes<T, Result>(
 /// - Returns: The return value of the `body` closure, if any.
 ///
 /// - SeeAlso: `withUnsafePointer(to:_:)`, `withUnsafeMutableBytes(of:_:)`
+@_inlineable
 public func withUnsafeBytes<T, Result>(
   of arg: inout T,
   _ body: (UnsafeRawBufferPointer) throws -> Result

@@ -294,6 +294,18 @@ public:
   bool isClassExistentialType() const {
     return getSwiftRValueType()->isClassExistentialType();
   }
+
+  /// Returns true if the referenced type is an opened existential type
+  /// (which is actually a kind of archetype).
+  bool isOpenedExistential() const {
+    return getSwiftRValueType()->isOpenedExistential();
+  }
+
+  /// Returns true if the referenced type is expressed in terms of one
+  /// or more opened existential types.
+  bool hasOpenedExistential() const {
+    return getSwiftRValueType()->hasOpenedExistential();
+  }
   
   /// Returns the representation used by an existential type. If the concrete
   /// type is provided, this may return a specialized representation kind that
@@ -423,6 +435,13 @@ public:
   SILType substGenericArgs(SILModule &M,
                            SubstitutionList Subs) const;
 
+  /// Transform the function type SILType by replacing all of its interface
+  /// generic args with the appropriate item from the substitution.
+  ///
+  /// Only call this with function types!
+  SILType substGenericArgs(SILModule &M,
+                           const SubstitutionMap &SubMap) const;
+
   /// If the original type is generic, pass the signature as genericSig.
   ///
   /// If the replacement types are generic, you must push a generic context
@@ -433,10 +452,6 @@ public:
                 CanGenericSignature genericSig=CanGenericSignature()) const;
 
   SILType subst(SILModule &silModule, const SubstitutionMap &subs) const;
-
-  /// If this is a specialized generic type, return all substitutions used to
-  /// generate it.
-  SubstitutionList gatherAllSubstitutions(SILModule &M);
 
   /// Return true if this type references a "ref" type that has a single pointer
   /// representation. Class existentials do not always qualify.
@@ -477,6 +492,11 @@ public:
   /// Returns the underlying referent SILType of an @sil_unowned or @sil_weak
   /// Type.
   SILType getReferentType(SILModule &M) const;
+
+  /// Given two SIL types which are representations of the same type,
+  /// check whether they have an abstraction difference.
+  bool hasAbstractionDifference(SILFunctionTypeRepresentation rep,
+                                SILType type2);
 
   /// Returns the hash code for the SILType.
   llvm::hash_code getHashCode() const {

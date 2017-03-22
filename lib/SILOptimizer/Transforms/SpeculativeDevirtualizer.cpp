@@ -17,7 +17,6 @@
 
 #define DEBUG_TYPE "sil-speculative-devirtualizer"
 
-#include "swift/Basic/DemangleWrappers.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILFunction.h"
@@ -329,6 +328,17 @@ static bool tryToSpeculateTarget(FullApplySite AI,
   if (CMI->isVolatile())
     return false;
 
+  // Don't devirtualize withUnsafeGuaranteed 'self' as this would prevent
+  // retain/release removal.
+  //   unmanged._withUnsafeGuaranteedRef { $0.method() }
+  if (auto *TupleExtract = dyn_cast<TupleExtractInst>(CMI->getOperand()))
+    if (auto *UnsafeGuaranteedSelf =
+            dyn_cast<BuiltinInst>(TupleExtract->getOperand()))
+      if (UnsafeGuaranteedSelf->getBuiltinKind() ==
+              BuiltinValueKind::UnsafeGuaranteed &&
+          TupleExtract->getFieldNo() == 0)
+        return false;
+
   // Strip any upcasts off of our 'self' value, potentially leaving us
   // with a value whose type is closer (in the class hierarchy) to the
   // actual dynamic type.
@@ -338,7 +348,7 @@ static bool tryToSpeculateTarget(FullApplySite AI,
   // Bail if any generic types parameters of the class instance type are
   // unbound.
   // We cannot devirtualize unbound generic calls yet.
-  if (SubType.getSwiftRValueType()->hasArchetype())
+  if (SubType.hasArchetype())
     return false;
 
   auto &M = CMI->getModule();
@@ -382,12 +392,12 @@ static bool tryToSpeculateTarget(FullApplySite AI,
   SmallVector<ClassDecl *, 8> Subs(DirectSubs);
   Subs.append(IndirectSubs.begin(), IndirectSubs.end());
 
-  if (isa<BoundGenericClassType>(ClassType.getSwiftRValueType())) {
+  if (ClassType.is<BoundGenericClassType>()) {
     // Filter out any subclasses that do not inherit from this
     // specific bound class.
     auto RemovedIt = std::remove_if(Subs.begin(),
         Subs.end(),
-        [&ClassType, &M](ClassDecl *Sub){
+        [&ClassType](ClassDecl *Sub){
           auto SubCanTy = Sub->getDeclaredType()->getCanonicalType();
           // Unbound generic type can override a method from
           // a bound generic class, but this unbound generic
@@ -489,7 +499,7 @@ static bool tryToSpeculateTarget(FullApplySite AI,
     if (auto EMT = SubType.getAs<AnyMetatypeType>()) {
       auto InstTy = ClassType.getSwiftRValueType();
       auto *MetaTy = MetatypeType::get(InstTy, EMT->getRepresentation());
-      auto CanMetaTy = CanMetatypeType::CanTypeWrapper(MetaTy);
+      auto CanMetaTy = CanMetatypeType(MetaTy);
       ClassOrMetatypeType = SILType::getPrimitiveObjectType(CanMetaTy);
     }
 

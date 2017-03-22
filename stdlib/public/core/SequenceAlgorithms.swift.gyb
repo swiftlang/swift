@@ -95,6 +95,7 @@ extension Sequence {
   ///     // Prints "Mateo"
   ///
   /// - Returns: A sequence of pairs enumerating the sequence.
+  @_inlineable
   public func enumerated() -> EnumeratedSequence<Self> {
     return EnumeratedSequence(_base: self)
   }
@@ -147,6 +148,7 @@ ${orderingExplanation}
   ///
   /// - SeeAlso: `min(by:)`
 %   end
+  @_inlineable
   @warn_unqualified_access
   public func min(
 %   if preds:
@@ -200,6 +202,7 @@ ${orderingExplanation}
   ///
   /// - SeeAlso: `max(by:)`
 %   end
+  @_inlineable
   @warn_unqualified_access
   public func max(
 %   if preds:
@@ -273,6 +276,7 @@ ${equivalenceExplanation}
   ///
   /// - SeeAlso: `starts(with:by:)`
 %   end
+  @_inlineable
   public func starts<PossiblePrefix>(
     with possiblePrefix: PossiblePrefix${"," if preds else ""}
 %   if preds:
@@ -350,6 +354,7 @@ ${equivalenceExplanation}
   ///
   /// - SeeAlso: `elementsEqual(_:by:)`
 %   end
+  @_inlineable
   public func elementsEqual<OtherSequence>(
     _ other: OtherSequence${"," if preds else ""}
 %   if preds:
@@ -436,6 +441,7 @@ ${orderingExplanation}
   ///   perform localized comparison.
   /// - SeeAlso: `lexicographicallyPrecedes(_:by:)`
 %   end
+  @_inlineable
   public func lexicographicallyPrecedes<OtherSequence>(
     _ other: OtherSequence${"," if preds else ""}
 %   if preds:
@@ -490,6 +496,7 @@ extension Sequence where Iterator.Element : Equatable {
   /// - Parameter element: The element to find in the sequence.
   /// - Returns: `true` if the element was found in the sequence; otherwise,
   ///   `false`.
+  @_inlineable
   public func contains(_ element: ${GElement}) -> Bool {
     if let result = _customContainsEquatableElement(element) {
       return result
@@ -540,6 +547,7 @@ extension Sequence {
   ///   the passed element represents a match.
   /// - Returns: `true` if the sequence contains an element that satisfies
   ///   `predicate`; otherwise, `false`.
+  @_inlineable
   public func contains(
     where predicate: (${GElement}) throws -> Bool
   ) rethrows -> Bool {
@@ -598,6 +606,7 @@ extension Sequence {
   ///     the caller.
   /// - Returns: The final accumulated value. If the sequence has no elements,
   ///   the result is `initialResult`.
+  @_inlineable
   public func reduce<Result>(
     _ initialResult: Result,
     _ nextPartialResult:
@@ -625,6 +634,7 @@ extension Sequence {
   ///
   /// - Returns: An array containing the elements of this sequence in
   ///   reverse order.
+  @_inlineable
   public func reversed() -> [${GElement}] {
     // FIXME(performance): optimize to 1 pass?  But Array(self) can be
     // optimized to a memcpy() sometimes.  Those cases are usually collections,
@@ -670,6 +680,7 @@ extension Sequence {
   /// - Complexity: O(*m* + *n*), where *m* is the length of this sequence
   ///   and *n* is the length of the result.
   /// - SeeAlso: `joined()`, `map(_:)`
+  @_inlineable
   public func flatMap<SegmentOfResult : Sequence>(
     _ transform: (${GElement}) throws -> SegmentOfResult
   ) rethrows -> [SegmentOfResult.${GElement}] {
@@ -706,6 +717,7 @@ extension Sequence {
   ///
   /// - Complexity: O(*m* + *n*), where *m* is the length of this sequence
   ///   and *n* is the length of the result.
+  @_inlineable
   public func flatMap<ElementOfResult>(
     _ transform: (${GElement}) throws -> ElementOfResult?
   ) rethrows -> [ElementOfResult] {

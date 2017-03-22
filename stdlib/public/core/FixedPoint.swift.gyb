@@ -146,6 +146,7 @@ extension UnsignedInteger {
 ///
 ///     func f(_ x: Int32) {}
 ///     func g(_ x: Int64) { f(numericCast(x)) }
+@_inlineable
 public func numericCast<
   T : _SignedInteger, U : _SignedInteger
 >(_ x: T) -> U {
@@ -160,6 +161,7 @@ public func numericCast<
 ///
 ///     func f(_ x: UInt32) {}
 ///     func g(_ x: UInt64) { f(numericCast(x)) }
+@_inlineable
 public func numericCast<
   T : UnsignedInteger, U : UnsignedInteger
 >(_ x: T) -> U {
@@ -174,6 +176,7 @@ public func numericCast<
 ///
 ///     func f(_ x: UInt32) {}
 ///     func g(_ x: Int64) { f(numericCast(x)) }
+@_inlineable
 public func numericCast<
   T : _SignedInteger, U : UnsignedInteger
 >(_ x: T) -> U {
@@ -188,6 +191,7 @@ public func numericCast<
 ///
 ///     func f(_ x: Int32) {}
 ///     func g(_ x: UInt64) { f(numericCast(x)) }
+@_inlineable
 public func numericCast<
 T : UnsignedInteger, U : _SignedInteger
 >(_ x: T) -> U {

@@ -1144,10 +1144,9 @@ public:
   }
 
   /// Determine whether there is a swiftVersionSpecific attribute that's
-  /// unavailable relative to the provided language version (defaulting to
-  /// current language version).
-  bool isUnavailableInSwiftVersion(const version::Version &effectiveVersion =
-           version::Version::getCurrentLanguageVersion()) const;
+  /// unavailable relative to the provided language version.
+  bool
+  isUnavailableInSwiftVersion(const version::Version &effectiveVersion) const;
 
   /// Returns the first @available attribute that indicates
   /// a declaration is unavailable, or null otherwise.
@@ -1249,7 +1248,7 @@ public:
 
   /// Return a range with all attributes in DeclAttributes with AttrKind
   /// ATTR.
-  template <typename ATTR, bool AllowInvalid>
+  template <typename ATTR, bool AllowInvalid = false>
   AttributeKindRange<ATTR, AllowInvalid> getAttributes() const {
     return AttributeKindRange<ATTR, AllowInvalid>(
         make_range(begin(), end()), ToAttributeKind<ATTR, AllowInvalid>());

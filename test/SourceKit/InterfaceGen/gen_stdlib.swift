@@ -33,7 +33,7 @@ var x: Int
 // CHECK1-NEXT: Int
 // CHECK1-NEXT: s:Si
 // CHECK1-NEXT: Int.Type
-// CHECK1-NEXT: _Tt
+// CHECK1-NEXT: _T0
 // CHECK1-NEXT: Swift{{$}}
 // CHECK1-NEXT: <Group>Math/Integers</Group>
 // CHECK1-NEXT: /<interface-gen>{{$}}

@@ -179,8 +179,13 @@ BUILTIN_SIL_OPERATION(Load, "load", Special)
 
 /// LoadRaw has type (Builtin.RawPointer) -> T
 /// This is a load of T from raw memory.
-/// It's address does not adhere to strict aliasing.
+/// Its address does not adhere to strict aliasing.
 BUILTIN_SIL_OPERATION(LoadRaw, "loadRaw", Special)
+
+/// LoadInvariant has type (Builtin.RawPointer) -> T
+/// This is a load of T from raw memory.
+/// The load is marked as invariant.
+BUILTIN_SIL_OPERATION(LoadInvariant, "loadInvariant", Special)
 
 /// Take has type (Builtin.RawPointer) -> T
 BUILTIN_SIL_OPERATION(Take, "take", Special)
@@ -201,7 +206,14 @@ BUILTIN_SIL_OPERATION(CastToUnknownObject, "castToUnknownObject", Special)
 BUILTIN_SIL_OPERATION(CastFromUnknownObject, "castFromUnknownObject", Special)
 
 /// CastToNativeObject has type (T) -> Builtin.NativeObject.
+///
+/// This builtin asserts if the underlying type /could/ be objc.
 BUILTIN_SIL_OPERATION(CastToNativeObject, "castToNativeObject", Special)
+
+/// UnsafeCastToNativeObject has type (T) -> Builtin.NativeObject.
+///
+/// This builtin does not check if the underlying type /could/ be objc.
+BUILTIN_SIL_OPERATION(UnsafeCastToNativeObject, "unsafeCastToNativeObject", Special)
 
 /// CastFromNativeObject has type (Builtin.NativeObject) -> T
 BUILTIN_SIL_OPERATION(CastFromNativeObject, "castFromNativeObject", Special)

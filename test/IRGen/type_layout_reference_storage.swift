@@ -4,19 +4,19 @@ class C {}
 protocol P: class {}
 protocol Q: class {}
 
-// CHECK: @_TMPV29type_layout_reference_storage26ReferenceStorageTypeLayout = hidden global {{.*}} @create_generic_metadata_ReferenceStorageTypeLayout
+// CHECK: @_T029type_layout_reference_storage26ReferenceStorageTypeLayoutVMP = hidden global {{.*}} @create_generic_metadata_ReferenceStorageTypeLayout
 // CHECK: define private %swift.type* @create_generic_metadata_ReferenceStorageTypeLayout
 struct ReferenceStorageTypeLayout<T> {
   var z: T
 
   // -- Known-Swift-refcounted type
-  // CHECK: store i8** getelementptr inbounds (i8*, i8** @_TWVXoBo, i32 17)
+  // CHECK: store i8** getelementptr inbounds (i8*, i8** @_T0BoXoWV, i32 17)
   unowned(safe)   var cs:  C
-  // CHECK: store i8** getelementptr inbounds (i8*, i8** @_TWVMBo, i32 17)
+  // CHECK: store i8** getelementptr inbounds (i8*, i8** @_T0BomWV, i32 17)
   unowned(unsafe) var cu:  C
-  // CHECK: store i8** getelementptr inbounds (i8*, i8** @_TWVXwGSqBo_, i32 17)
+  // CHECK: store i8** getelementptr inbounds (i8*, i8** @_T0BoSgXwWV, i32 17)
   weak            var cwo: C?
-  // CHECK: store i8** getelementptr inbounds (i8*, i8** @_TWVXwGSqBo_, i32 17)
+  // CHECK: store i8** getelementptr inbounds (i8*, i8** @_T0BoSgXwWV, i32 17)
   weak            var cwi: C!
 
   // -- Open-code layout for protocol types with witness tables.
@@ -49,12 +49,12 @@ struct ReferenceStorageTypeLayout<T> {
   weak            var pqwi: (P & Q)!
 
   // -- Unknown-refcounted existential without witness tables.
-  // CHECK: store i8** getelementptr inbounds (i8*, i8** @_TWVXo[[UNKNOWN:B[Oo]]], i32 17)
+  // CHECK: store i8** getelementptr inbounds (i8*, i8** @_T0[[UNKNOWN:B[Oo]]]XoWV, i32 17)
   unowned(safe)   var aos:  AnyObject
-  // CHECK: store i8** getelementptr inbounds (i8*, i8** @_TWVMBo, i32 17)
+  // CHECK: store i8** getelementptr inbounds (i8*, i8** @_T0BomWV, i32 17)
   unowned(unsafe) var aou:  AnyObject
-  // CHECK: store i8** getelementptr inbounds (i8*, i8** @_TWVXwGSq[[UNKNOWN]]_, i32 17)
+  // CHECK: store i8** getelementptr inbounds (i8*, i8** @_T0[[UNKNOWN]]SgXwWV, i32 17)
   weak            var aowo: AnyObject?
-  // CHECK: store i8** getelementptr inbounds (i8*, i8** @_TWVXwGSq[[UNKNOWN]]_, i32 17)
+  // CHECK: store i8** getelementptr inbounds (i8*, i8** @_T0[[UNKNOWN]]SgXwWV, i32 17)
   weak            var aowi: AnyObject!
 }

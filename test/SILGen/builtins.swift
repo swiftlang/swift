@@ -47,6 +47,22 @@ func load_raw_obj(_ x: Builtin.RawPointer) -> Builtin.NativeObject {
   return Builtin.loadRaw(x)
 }
 
+// CHECK-LABEL: sil hidden @_T08builtins18load_invariant_pod{{[_0-9a-zA-Z]*}}F
+func load_invariant_pod(_ x: Builtin.RawPointer) -> Builtin.Int64 {
+  // CHECK: [[ADDR:%.*]] = pointer_to_address {{%.*}} to [invariant] $*Builtin.Int64
+  // CHECK: [[VAL:%.*]] = load [trivial] [[ADDR]]
+  // CHECK: return [[VAL]]
+  return Builtin.loadInvariant(x)
+}
+
+// CHECK-LABEL: sil hidden @_T08builtins18load_invariant_obj{{[_0-9a-zA-Z]*}}F
+func load_invariant_obj(_ x: Builtin.RawPointer) -> Builtin.NativeObject {
+  // CHECK: [[ADDR:%.*]] = pointer_to_address {{%.*}} to [invariant] $*Builtin.NativeObject
+  // CHECK: [[VAL:%.*]] = load [copy] [[ADDR]]
+  // CHECK: return [[VAL]]
+  return Builtin.loadInvariant(x)
+}
+
 // CHECK-LABEL: sil hidden @_T08builtins8load_gen{{[_0-9a-zA-Z]*}}F
 func load_gen<T>(_ x: Builtin.RawPointer) -> T {
   // CHECK: [[ADDR:%.*]] = pointer_to_address {{%.*}} to [strict] $*T
@@ -220,7 +236,7 @@ func class_archetype_to_unknown_object<T : C>(_ t: T) -> Builtin.UnknownObject {
 func class_existential_to_native_object(_ t:ClassProto) -> Builtin.NativeObject {
   // CHECK: [[REF:%[0-9]+]] = open_existential_ref [[T:%[0-9]+]] : $ClassProto
   // CHECK: [[PTR:%[0-9]+]] = unchecked_ref_cast [[REF]] : $@opened({{.*}}) ClassProto to $Builtin.NativeObject
-  return Builtin.castToNativeObject(t)
+  return Builtin.unsafeCastToNativeObject(t)
 }
 
 // CHECK-LABEL: sil hidden @_T08builtins35class_existential_to_unknown_object{{[_0-9a-zA-Z]*}}F

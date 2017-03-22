@@ -18,7 +18,6 @@
 #include "SILGenFunction.h"
 #include "RValue.h"
 #include "Scope.h"
-#include "swift/AST/AST.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Initializer.h"
 #include "swift/SIL/SILArgument.h"
@@ -180,11 +179,11 @@ SILValue SILGenFunction::emitGlobalFunctionRef(SILLocation loc,
   return B.createFunctionRef(loc, f);
 }
 
-std::tuple<ManagedValue, SILType, SubstitutionList>
+std::tuple<ManagedValue, SILType>
 SILGenFunction::emitSiblingMethodRef(SILLocation loc,
                                      SILValue selfValue,
                                      SILDeclRef methodConstant,
-                                     SubstitutionList subs) {
+                                     const SubstitutionMap &subMap) {
   SILValue methodValue;
 
   // If the method is dynamic, access it through runtime-hookable virtual
@@ -198,14 +197,11 @@ SILGenFunction::emitSiblingMethodRef(SILLocation loc,
 
   SILType methodTy = methodValue->getType();
 
-  if (!subs.empty()) {
-    // Specialize the generic method.
-    methodTy = getLoweredLoadableType(
-            methodTy.castTo<SILFunctionType>()->substGenericArgs(SGM.M, subs));
-  }
+  // Specialize the generic method.
+  methodTy = methodTy.substGenericArgs(SGM.M, subMap);
 
   return std::make_tuple(ManagedValue::forUnmanaged(methodValue),
-                         methodTy, subs);
+                         methodTy);
 }
 
 void SILGenFunction::emitCaptures(SILLocation loc,

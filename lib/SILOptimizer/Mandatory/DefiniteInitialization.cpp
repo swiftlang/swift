@@ -15,6 +15,7 @@
 #include "DIMemoryUseCollector.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsSIL.h"
+#include "swift/AST/Expr.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
@@ -1216,7 +1217,7 @@ void LifetimeChecker::handleEscapeUse(const DIMemoryUse &Use) {
 ///
 static bool isFailableInitReturnUseOfEnum(EnumInst *EI) {
   // Only allow enums forming an optional.
-  if (!EI->getType().getSwiftRValueType()->getOptionalObjectType())
+  if (!EI->getType().getAnyOptionalObjectType())
     return false;
 
   if (!EI->hasOneUse()) return false;
@@ -1888,9 +1889,8 @@ void LifetimeChecker::processNonTrivialRelease(unsigned ReleaseID) {
 
 static Identifier getBinaryFunction(StringRef Name, SILType IntSILTy,
                                     ASTContext &C) {
-  CanType IntTy = IntSILTy.getSwiftRValueType();
-  unsigned NumBits =
-    cast<BuiltinIntegerType>(IntTy)->getWidth().getFixedWidth();
+  auto IntTy = IntSILTy.castTo<BuiltinIntegerType>();
+  unsigned NumBits = IntTy->getWidth().getFixedWidth();
   // Name is something like: add_Int64
   std::string NameStr = Name;
   NameStr += "_Int" + llvm::utostr(NumBits);
@@ -1898,9 +1898,8 @@ static Identifier getBinaryFunction(StringRef Name, SILType IntSILTy,
   return C.getIdentifier(NameStr);
 }
 static Identifier getTruncateToI1Function(SILType IntSILTy, ASTContext &C) {
-  CanType IntTy = IntSILTy.getSwiftRValueType();
-  unsigned NumBits =
-    cast<BuiltinIntegerType>(IntTy)->getWidth().getFixedWidth();
+  auto IntTy = IntSILTy.castTo<BuiltinIntegerType>();
+  unsigned NumBits = IntTy->getWidth().getFixedWidth();
 
   // Name is something like: trunc_Int64_Int8
   std::string NameStr = "trunc_Int" + llvm::utostr(NumBits) + "_Int1";

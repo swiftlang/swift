@@ -376,11 +376,10 @@ SILFunction *SILModule::getOrCreateFunction(SILLocation loc,
       F->setClangNodeOwner(decl);
 
     auto Attrs = decl->getAttrs();
-    for (auto *A : Attrs.getAttributes<SemanticsAttr, false /*AllowInvalid*/>())
+    for (auto *A : Attrs.getAttributes<SemanticsAttr>())
       F->addSemanticsAttr(cast<SemanticsAttr>(A)->Value);
 
-    for (auto *A :
-           Attrs.getAttributes<SpecializeAttr, false /*AllowInvalid*/>()) {
+    for (auto *A : Attrs.getAttributes<SpecializeAttr>()) {
       auto *SA = cast<SpecializeAttr>(A);
       auto kind = SA->getSpecializationKind() ==
                           SpecializeAttr::SpecializationKind::Full

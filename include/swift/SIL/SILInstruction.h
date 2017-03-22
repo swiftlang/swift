@@ -18,9 +18,10 @@
 #define SWIFT_SIL_INSTRUCTION_H
 
 #include "swift/AST/Builtins.h"
-#include "swift/AST/Expr.h"
+#include "swift/AST/Decl.h"
 #include "swift/AST/ProtocolConformanceRef.h"
 #include "swift/Basic/Compiler.h"
+#include "swift/Basic/NullablePtr.h"
 #include "swift/SIL/Consumption.h"
 #include "swift/SIL/SILAllocated.h"
 #include "swift/SIL/SILFunctionConventions.h"
@@ -2416,17 +2417,22 @@ class PointerToAddressInst
 {
   friend SILBuilder;
 
-  bool IsStrict;
+  bool IsStrict, IsInvariant;
 
   PointerToAddressInst(SILDebugLocation DebugLoc, SILValue Operand, SILType Ty,
-                       bool IsStrict)
-    : UnaryInstructionBase(DebugLoc, Operand, Ty), IsStrict(IsStrict) {}
+                       bool IsStrict, bool IsInvariant)
+    : UnaryInstructionBase(DebugLoc, Operand, Ty),
+      IsStrict(IsStrict), IsInvariant(IsInvariant) {}
 
 public:
   /// Whether the returned address adheres to strict aliasing.
   /// If true, then the type of each memory access dependent on
   /// this address must be consistent with the memory's bound type.
   bool isStrict() const { return IsStrict; }
+  /// Whether the returned address is invariant.
+  /// If true, then loading from an address derived from this pointer always
+  /// produces the same value.
+  bool isInvariant() const { return IsInvariant; }
 };
 
 /// Convert a heap object reference to a different type without any runtime
@@ -2792,6 +2798,19 @@ class UnconditionalCheckedCastInst final
   static UnconditionalCheckedCastInst *
   create(SILDebugLocation DebugLoc, SILValue Operand, SILType DestTy,
          SILFunction &F, SILOpenedArchetypesState &OpenedArchetypes);
+
+public:
+  /// Returns the formal type of the source value.
+  CanType getSourceType() const {
+    // This instruction is only used with types that allow this.
+    return getOperand()->getType().getSwiftRValueType();
+  }
+
+  /// Returns the formal target type.
+  CanType getTargetType() const {
+    // This instruction is only used with types that allow this.
+    return getType().getSwiftRValueType();
+  }
 };
 
 /// Perform an unconditional checked cast that aborts if the cast fails.
@@ -2838,22 +2857,29 @@ public:
 
 /// Perform an unconditional checked cast that aborts if the cast fails.
 /// The result of the checked cast is left in the destination.
-class UnconditionalCheckedCastOpaqueInst final
+class UnconditionalCheckedCastValueInst final
     : public UnaryInstructionWithTypeDependentOperandsBase<
-          ValueKind::UnconditionalCheckedCastOpaqueInst,
-          UnconditionalCheckedCastOpaqueInst, ConversionInst, true> {
+          ValueKind::UnconditionalCheckedCastValueInst,
+          UnconditionalCheckedCastValueInst, ConversionInst, true> {
   friend SILBuilder;
+  CastConsumptionKind ConsumptionKind;
 
-  UnconditionalCheckedCastOpaqueInst(SILDebugLocation DebugLoc,
-                                     SILValue Operand,
-                                     ArrayRef<SILValue> TypeDependentOperands,
-                                     SILType DestTy)
+  UnconditionalCheckedCastValueInst(SILDebugLocation DebugLoc,
+                                    CastConsumptionKind consumption,
+                                    SILValue Operand,
+                                    ArrayRef<SILValue> TypeDependentOperands,
+                                    SILType DestTy)
       : UnaryInstructionWithTypeDependentOperandsBase(
-            DebugLoc, Operand, TypeDependentOperands, DestTy) {}
+            DebugLoc, Operand, TypeDependentOperands, DestTy),
+        ConsumptionKind(consumption) {}
 
-  static UnconditionalCheckedCastOpaqueInst *
-  create(SILDebugLocation DebugLoc, SILValue Operand, SILType DestTy,
-         SILFunction &F, SILOpenedArchetypesState &OpenedArchetypes);
+  static UnconditionalCheckedCastValueInst *
+  create(SILDebugLocation DebugLoc, CastConsumptionKind consumption,
+         SILValue Operand, SILType DestTy, SILFunction &F,
+         SILOpenedArchetypesState &OpenedArchetypes);
+
+public:
+  CastConsumptionKind getConsumptionKind() const { return ConsumptionKind; }
 };
 
 /// StructInst - Represents a constructed loadable struct.
@@ -3153,6 +3179,11 @@ public:
     return getElements()[i];
   }
 
+  unsigned getElementIndex(Operand *operand) {
+    assert(operand->getUser() == this);
+    return operand->getOperandNumber();
+  }
+
   ArrayRef<Operand> getAllOperands() const { return Operands.asArray(); }
   MutableArrayRef<Operand> getAllOperands() { return Operands.asArray(); }
 
@@ -3217,6 +3248,8 @@ public:
 
   bool hasOperand() const { return OptionalOperand.hasValue(); }
   SILValue getOperand() const { return OptionalOperand->asValueArray()[0]; }
+
+  Operand &getOperandRef() { return OptionalOperand->asArray()[0]; }
 
   ArrayRef<Operand> getAllOperands() const {
     return OptionalOperand ? OptionalOperand->asArray() : ArrayRef<Operand>{};
@@ -3869,12 +3902,6 @@ public:
   }
 
   ProtocolConformanceRef getConformance() const { return Conformance; }
-
-  /// Get a representation of the lookup type as a substitution of the
-  /// protocol's Self archetype.
-  Substitution getSelfSubstitution() const {
-    return Substitution{getLookupType(), Conformance};
-  }
 
   ArrayRef<Operand> getAllOperands() const {
     return { getTrailingObjects<Operand>(), NumOperands };
@@ -5350,6 +5377,18 @@ public:
     return DestBBs;
   }
 
+  /// Returns the formal type of the source value.
+  CanType getSourceType() const {
+    // This instruction is only used with types that allow this.
+    return getOperand()->getType().getSwiftRValueType();
+  }
+
+  /// Returns the formal target type.
+  CanType getTargetType() const {
+    // This instruction is only used with types that allow this.
+    return getCastType().getSwiftRValueType();
+  }
+
   SILType getCastType() const { return DestTy; }
 
   SILBasicBlock *getSuccessBB() { return DestBBs[0]; }
@@ -5390,6 +5429,18 @@ class CheckedCastValueBranchInst final
 
 public:
   SuccessorListTy getSuccessors() { return DestBBs; }
+
+  /// Returns the formal type of the source value.
+  CanType getSourceType() const {
+    // This instruction is only used with types that allow this.
+    return getOperand()->getType().getSwiftRValueType();
+  }
+
+  /// Returns the formal target type.
+  CanType getTargetType() const {
+    // This instruction is only used with types that allow this.
+    return getCastType().getSwiftRValueType();
+  }
 
   SILType getCastType() const { return DestTy; }
 
@@ -5731,6 +5782,10 @@ public:
 
 #undef FOREACH_IMPL_RETURN
 
+  SILArgumentConvention getArgumentConvention(unsigned index) const {
+    return getSubstCalleeConv().getSILArgumentConvention(index);
+  }
+
   static ApplySite getFromOpaqueValue(void *p) {
     return ApplySite(p);
   }
@@ -5779,10 +5834,6 @@ public:
 
   OperandValueArrayRef getArgumentsWithoutIndirectResults() const {
     return getArguments().slice(getNumIndirectSILResults());
-  }
-
-  SILArgumentConvention getArgumentConvention(unsigned index) const {
-    return getSubstCalleeConv().getSILArgumentConvention(index);
   }
 
   static FullApplySite getFromOpaqueValue(void *p) {

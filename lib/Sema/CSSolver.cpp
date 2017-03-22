@@ -103,26 +103,6 @@ static Optional<Type> checkTypeOfBinding(ConstraintSystem &cs,
   return type;
 }
 
-/// Reconstitute type sugar, e.g., for array types, dictionary
-/// types, optionals, etc.
-static Type reconstituteSugar(Type type) {
-  if (auto boundGeneric = dyn_cast<BoundGenericType>(type.getPointer())) {
-    auto &ctx = type->getASTContext();
-    if (boundGeneric->getDecl() == ctx.getArrayDecl())
-      return ArraySliceType::get(boundGeneric->getGenericArgs()[0]);
-    if (boundGeneric->getDecl() == ctx.getDictionaryDecl())
-      return DictionaryType::get(boundGeneric->getGenericArgs()[0],
-                                 boundGeneric->getGenericArgs()[1]);
-    if (boundGeneric->getDecl() == ctx.getOptionalDecl())
-      return OptionalType::get(boundGeneric->getGenericArgs()[0]);
-    if (boundGeneric->getDecl() == ctx.getImplicitlyUnwrappedOptionalDecl())
-      return ImplicitlyUnwrappedOptionalType::get(
-               boundGeneric->getGenericArgs()[0]);
-  }
-
-  return type;
-}
-
 Solution ConstraintSystem::finalize(
            FreeTypeVariableBinding allowFreeTypeVariables) {
   // Create the solution.
@@ -161,7 +141,7 @@ Solution ConstraintSystem::finalize(
 
   // For each of the type variables, get its fixed type.
   for (auto tv : TypeVariables) {
-    solution.typeBindings[tv] = reconstituteSugar(simplifyType(tv));
+    solution.typeBindings[tv] = simplifyType(tv)->reconstituteSugar(false);
   }
 
   // For each of the overload sets, get its overload choice.
@@ -720,6 +700,7 @@ static bool shouldBindToValueType(Constraint *constraint)
     return false;
   case ConstraintKind::DynamicTypeOf:
   case ConstraintKind::EscapableFunctionOf:
+  case ConstraintKind::OpenedExistentialOf:
   case ConstraintKind::ValueMember:
   case ConstraintKind::UnresolvedValueMember:
   case ConstraintKind::Defaultable:
@@ -843,6 +824,7 @@ static PotentialBindings getPotentialBindings(ConstraintSystem &cs,
     case ConstraintKind::CheckedCast:
     case ConstraintKind::DynamicTypeOf:
     case ConstraintKind::EscapableFunctionOf:
+    case ConstraintKind::OpenedExistentialOf:
       // Constraints from which we can't do anything.
       continue;
 
@@ -1597,6 +1579,12 @@ void ConstraintSystem::Candidate::applySolutions(
 }
 
 void ConstraintSystem::shrink(Expr *expr) {
+  // Disable the shrink pass when constraint propagation is
+  // enabled. They achieve similar effects, and the shrink pass is
+  // known to have bad behavior in some cases.
+  if (TC.Context.LangOpts.EnableConstraintPropagation)
+    return;
+
   typedef llvm::SmallDenseMap<Expr *, ArrayRef<ValueDecl *>> DomainMap;
 
   // A collection of original domains of all of the expressions,
@@ -1995,6 +1983,17 @@ bool ConstraintSystem::solve(SmallVectorImpl<Solution> &solutions,
   // Set up solver state.
   SolverState state(*this);
 
+  // Simplify any constraints left active after constraint generation
+  // and optimization. Return if the resulting system has no
+  // solutions.
+  if (simplify())
+    return true;
+
+  // If the experimental constraint propagation pass is enabled, run it.
+  if (TC.Context.LangOpts.EnableConstraintPropagation)
+    if (propagateConstraints())
+      return true;
+
   // Solve the system.
   solveRec(solutions, allowFreeTypeVariables);
 
@@ -2317,12 +2316,11 @@ static bool shortCircuitDisjunctionAt(Constraint *constraint,
   // overloaded operators.
   if (constraint->getKind() == ConstraintKind::BindOverload &&
       constraint->getOverloadChoice().getKind() == OverloadChoiceKind::Decl &&
-      constraint->getOverloadChoice().getDecl()->getName().isOperator() &&
+      constraint->getOverloadChoice().getDecl()->isOperator() &&
       successfulConstraint->getKind() == ConstraintKind::BindOverload &&
       successfulConstraint->getOverloadChoice().getKind()
         == OverloadChoiceKind::Decl &&
-      successfulConstraint->getOverloadChoice().getDecl()->getName()
-        .isOperator() &&
+      successfulConstraint->getOverloadChoice().getDecl()->isOperator() &&
       constraint->getOverloadChoice().getDecl()->getInterfaceType()
         ->is<GenericFunctionType>() &&
       !successfulConstraint->getOverloadChoice().getDecl()->getInterfaceType()
@@ -2341,7 +2339,7 @@ void ConstraintSystem::collectDisjunctions(
   }
 }
 
-std::pair<PotentialBindings, TypeVariableType *>
+static std::pair<PotentialBindings, TypeVariableType *>
 determineBestBindings(ConstraintSystem &CS) {
   // Look for potential type variable bindings.
   TypeVariableType *bestTypeVar = nullptr;

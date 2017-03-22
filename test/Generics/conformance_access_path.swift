@@ -55,3 +55,18 @@ func testPaths3<V: P5>(_ v: V) {
 	// CHECK: Conformance access path for V.AssocP3: Q0 is V: P5 -> τ_0_0.AssocP3: Q0
 	acceptQ0(v.getAssocP3())
 }
+
+protocol P6Unordered: P5Unordered { // expected-note{{conformance constraint 'Self.A': 'P0' implied here}}
+	associatedtype A: P0 // expected-warning{{redundant conformance constraint 'Self.A': 'P0'}}
+}
+
+protocol P5Unordered {
+	associatedtype A: P0
+
+	func getA() -> A
+}
+
+func testUnorderedP5_P6<W: P6Unordered>(_ w: W) {
+	// CHECK: Conformance access path for W.A: P0 is W: P6Unordered -> τ_0_0: P5Unordered -> τ_0_0.A: P0
+	acceptP0(w.getA())
+}

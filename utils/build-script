@@ -57,6 +57,13 @@ build_script_impl = os.path.join(
     SWIFT_SOURCE_ROOT, "swift", "utils", "build-script-impl")
 
 
+def exit_rejecting_arguments(message, parser=None):
+    print(message, file=sys.stderr)
+    if parser:
+        parser.print_usage(sys.stderr)
+    sys.exit(2)  # 2 is the same as `argparse` error exit code.
+
+
 def call_without_sleeping(command, env=None, dry_run=False, echo=False):
     """
     Execute a command during which system sleep is disabled.
@@ -303,6 +310,22 @@ class BuildScriptInvocation(object):
         if args.cmake_generator is None:
             args.cmake_generator = "Ninja"
 
+        # --ios-all etc are not supported by open-source Swift.
+        if args.ios_all:
+            exit_rejecting_arguments("error: --ios-all is unavailable in " +
+                                     "open-source Swift.\nUse --ios to " +
+                                     "skip iOS device tests.")
+
+        if args.tvos_all:
+            exit_rejecting_arguments("error: --tvos-all is unavailable in " +
+                                     "open-source Swift.\nUse --tvos to " +
+                                     "skip tvOS device tests.")
+
+        if args.watchos_all:
+            exit_rejecting_arguments("error: --watchos-all is unavailable " +
+                                     "in open-source Swift.\nUse --watchos " +
+                                     "to skip watchOS device tests.")
+
         ninja_required = (
             args.cmake_generator == 'Ninja' or args.build_foundation)
         if ninja_required and toolchain.ninja is None:
@@ -489,18 +512,27 @@ class BuildScriptInvocation(object):
             self.platforms_to_skip_test.add(StdlibDeploymentTarget.Cygwin)
         if args.skip_test_osx:
             self.platforms_to_skip_test.add(StdlibDeploymentTarget.OSX)
-        # iOS device tests are not supported.
-        self.platforms_to_skip_test.add(StdlibDeploymentTarget.iOS)
+        if args.skip_test_ios_host:
+            self.platforms_to_skip_test.add(StdlibDeploymentTarget.iOS)
+        else:
+            exit_rejecting_arguments("error: iOS device tests are not " +
+                                     "supported in open-source Swift.")
         if args.skip_test_ios_simulator:
             self.platforms_to_skip_test.add(
                 StdlibDeploymentTarget.iOSSimulator)
-        # tvOS device tests are not supported.
-        self.platforms_to_skip_test.add(StdlibDeploymentTarget.AppleTV)
+        if args.skip_test_tvos_host:
+            self.platforms_to_skip_test.add(StdlibDeploymentTarget.AppleTV)
+        else:
+            exit_rejecting_arguments("error: tvOS device tests are not " +
+                                     "supported in open-source Swift.")
         if args.skip_test_tvos_simulator:
             self.platforms_to_skip_test.add(
                 StdlibDeploymentTarget.AppleTVSimulator)
-        # watchOS device tests are not supported.
-        self.platforms_to_skip_test.add(StdlibDeploymentTarget.AppleWatch)
+        if args.skip_test_watchos_host:
+            self.platforms_to_skip_test.add(StdlibDeploymentTarget.AppleWatch)
+        else:
+            exit_rejecting_arguments("error: watchOS device tests are not " +
+                                     "supported in open-source Swift.")
         if args.skip_test_watchos_simulator:
             self.platforms_to_skip_test.add(
                 StdlibDeploymentTarget.AppleWatchSimulator)
@@ -569,8 +601,6 @@ class BuildScriptInvocation(object):
             "--host-target", args.host_target,
             "--stdlib-deployment-targets",
             " ".join(args.stdlib_deployment_targets),
-            "--host-cc", toolchain.cc,
-            "--host-cxx", toolchain.cxx,
             "--darwin-xcrun-toolchain", args.darwin_xcrun_toolchain,
             "--darwin-deployment-version-osx=%s" % (
                 args.darwin_deployment_version_osx),
@@ -581,6 +611,8 @@ class BuildScriptInvocation(object):
             "--darwin-deployment-version-watchos=%s" % (
                 args.darwin_deployment_version_watchos),
             "--cmake", toolchain.cmake,
+            "--cmake-c-compiler", toolchain.cc,
+            "--cmake-cxx-compiler", toolchain.cxx,
             "--cmark-build-type", args.cmark_build_variant,
             "--llvm-build-type", args.llvm_build_variant,
             "--swift-build-type", args.swift_build_variant,
@@ -650,6 +682,14 @@ class BuildScriptInvocation(object):
                 "--distcc",
                 "--distcc-pump=%s" % toolchain.distcc_pump
             ]
+        if args.swiftenv_path:
+            impl_args += [ "--swiftenv-path=%s" % args.swiftenv_path]
+        if args.swiftenv_recreate:
+            impl_args += [ "--swiftenv-recreate"]
+        if args.swiftenv_script:
+            impl_args += [ "--swiftenv-script=%s" % args.swiftenv_script]
+        if args.swiftenv_make:
+            impl_args += [ "--swiftenv-make=%s" % args.swiftenv_make]
         if args.enable_asan:
             impl_args += ["--enable-asan"]
         if args.enable_ubsan:
@@ -787,12 +827,6 @@ class BuildScriptInvocation(object):
                 "--toolchain-prefix",
                 swift_build_support.targets.darwin_toolchain_prefix(
                     args.install_prefix),
-                "--host-lipo", toolchain.lipo,
-            ]
-
-        if toolchain.libtool is not None:
-            impl_args += [
-                "--host-libtool", toolchain.libtool,
             ]
 
         # If we have extra_swift_args, combine all of them together and then
@@ -1012,6 +1046,47 @@ def clean_delay():
     print('\b\b\b\bnow.')
 
 
+def handle_swiftenv_args(args):
+    # Find clang in swiftenv if present
+    if args.swiftenv_path is None:
+        if args.swiftenv_recreate:
+            print(sys.argv[0], "error: using a swiftenv_recreate to make a swiftenv requires a destination in --swiftenv-path=", file=sys.stderr)
+            sys.exit(2) # 2 is the same as `argparse` error exit code.
+
+        if args.swiftenv_script is not None:
+            print(sys.argv[0], "error: using a swiftenv_script to make a swiftenv requires a destination in --swiftenv-path=", file=sys.stderr)
+            sys.exit(2) # 2 is the same as `argparse` error exit code.
+
+        if args.swiftenv_make is not None:
+            print(sys.argv[0], "error: using a swiftenv_make to make a swiftenv requires a destination in --swiftenv-path=", file=sys.stderr)
+            sys.exit(2) # 2 is the same as `argparse` error exit code.
+
+    if args.swiftenv_path is not None:
+        # mkdir the swiftenv_path
+        if not os.path.exists(args.swiftenv_path):
+            os.makedirs(args.swiftenv_path)
+
+        # Only use swiftenv_make/swiftenv_script if one is provided
+        # utils/swiftenv-make is default
+        if args.swiftenv_make is None:
+            args.swiftenv_make = os.path.join(
+                SWIFT_SOURCE_ROOT, "swift", "utils", "swiftenv-make")
+        else:
+            args.swiftenv_make = os.path.abspath(args.swiftenv_make)
+
+        # utils/swiftenv-script is default
+        if args.swiftenv_script is None:
+            args.swiftenv_script = os.path.join(
+                SWIFT_SOURCE_ROOT, "swift", "utils", "swiftenv-script")
+        else:
+            args.swiftenv_script = os.path.abspath(args.swiftenv_script)
+
+        print("args.swiftenv_path", args.swiftenv_path)
+        print("args.swiftenv_recreate", args.swiftenv_recreate)
+        print("args.swiftenv_make", args.swiftenv_make)
+        print("args.swiftenv_script", args.swiftenv_script)
+
+
 # Main entry point for the preset mode.
 def main_preset():
     parser = argparse.ArgumentParser(
@@ -1038,6 +1113,19 @@ def main_preset():
         "--show-presets",
         help="list all presets and exit",
         action=arguments.action.optional_bool)
+    parser.add_argument(
+        "--swiftenv-path",
+        help="the absolute path to a directory containing replacement compiler commands")
+    parser.add_argument(
+        "--swiftenv-recreate",
+        help="a flag that, when present, will recreate the swiftenv",
+        action=arguments.action.optional_bool)
+    parser.add_argument(
+        "--swiftenv-script",
+        help="the absolute path to a script that takes the place of toolchain commands, default uses utils/swiftenv-script")
+    parser.add_argument(
+        "--swiftenv-make",
+        help="the absolute path to a script that will set up a swiftenv, default uses utils/swiftenv-make")
     parser.add_argument(
         "--distcc",
         help="use distcc",
@@ -1092,6 +1180,17 @@ def main_preset():
         build_script_args += ["--distcc"]
     if args.build_jobs:
         build_script_args += ["--jobs", str(args.build_jobs)]
+
+    handle_swiftenv_args(args)
+
+    if args.swiftenv_path is not None:
+        build_script_args += ["--swiftenv-path", str(args.swiftenv_path)]
+    if args.swiftenv_recreate:
+        build_script_args += ["--swiftenv-recreate"]
+    if args.swiftenv_make is not None:
+        build_script_args += ["--swiftenv-make", str(args.swiftenv_make)]
+    if args.swiftenv_script is not None:
+        build_script_args += ["--swiftenv-script", str(args.swiftenv_script)]
 
     diagnostics.note(
         "using preset '" + args.preset + "', which expands to \n\n" +
@@ -1796,6 +1895,11 @@ iterations with -O",
              "device",
         action="store_true")
     parser.add_argument(
+        "-I", "--ios-all",
+        help="also build for iOS, and allow all iOS tests",
+        action="store_true",
+        dest="ios_all")
+    parser.add_argument(
         "--skip-ios",
         help="set to skip everything iOS-related",
         dest="ios",
@@ -1807,6 +1911,11 @@ iterations with -O",
              "device",
         action=arguments.action.optional_bool)
     parser.add_argument(
+        "--tvos-all",
+        help="also build for tvOS, and allow all tvOS tests",
+        action=arguments.action.optional_bool,
+        dest="tvos_all")
+    parser.add_argument(
         "--skip-tvos",
         help="set to skip everything tvOS-related",
         dest="tvos",
@@ -1817,6 +1926,11 @@ iterations with -O",
         help="also build for watchOS, but disallow tests that require an "
              "watchOS device",
         action=arguments.action.optional_bool)
+    parser.add_argument(
+        "--watchos-all",
+        help="also build for Apple watchOS, and allow all Apple watchOS tests",
+        action=arguments.action.optional_bool,
+        dest="watchos_all")
     parser.add_argument(
         "--skip-watchos",
         help="set to skip everything watchOS-related",
@@ -1934,27 +2048,31 @@ iterations with -O",
         metavar="PATH")
 
     parser.add_argument(
-        "--host-cc",
+        "--cmake-c-compiler",
         help="the absolute path to CC, the 'clang' compiler for the host "
              "platform. Default is auto detected.",
         type=arguments.type.executable,
         metavar="PATH")
     parser.add_argument(
-        "--host-cxx",
+        "--cmake-cxx-compiler",
         help="the absolute path to CXX, the 'clang++' compiler for the host "
              "platform. Default is auto detected.",
         type=arguments.type.executable,
         metavar="PATH")
     parser.add_argument(
-        "--host-lipo",
-        help="the absolute path to lipo. Default is auto detected.",
-        type=arguments.type.executable,
-        metavar="PATH")
+        "--swiftenv-path",
+        help="the absolute path to a directory containing replacement compiler commands")
     parser.add_argument(
-        "--host-libtool",
-        help="the absolute path to libtool. Default is auto detected.",
-        type=arguments.type.executable,
-        metavar="PATH")
+        "--swiftenv-recreate",
+        help="a flag that, when present, will recreate the swiftenv",
+        default="false",
+        action=arguments.action.optional_bool)
+    parser.add_argument(
+        "--swiftenv-script",
+        help="the absolute path to a script that takes the place of toolchain commands")
+    parser.add_argument(
+        "--swiftenv-make",
+        help="the absolute path to a script that will set up a swiftenv, default uses utils/swiftenv-make")
     parser.add_argument(
         "--distcc",
         help="use distcc in pump mode",
@@ -2116,9 +2234,7 @@ iterations with -O",
             migration.check_impl_args(build_script_impl,
                                       args.build_script_impl_args)
         except ValueError as e:
-            parser.print_usage(sys.stderr)
-            print(e, file=sys.stderr)
-            sys.exit(2)  # 2 is the same as `argparse` error exit code.
+            exit_rejecting_arguments(e, parser)
 
         if '--check-args-only' in args.build_script_impl_args:
             return 0
@@ -2128,14 +2244,22 @@ iterations with -O",
     # Prepare and validate toolchain
     toolchain = host_toolchain(xcrun_toolchain=args.darwin_xcrun_toolchain)
 
-    if args.host_cc is not None:
-        toolchain.cc = args.host_cc
-    if args.host_cxx is not None:
-        toolchain.cxx = args.host_cxx
-    if args.host_lipo is not None:
-        toolchain.lipo = args.host_lipo
-    if args.host_libtool is not None:
-        toolchain.libtool = args.host_libtool
+    # Abstracted swiftenv_args for --preset and not
+    handle_swiftenv_args(args)
+
+    # Let args.cmake_c_compiler win over swiftenv's cc/cxx
+    if args.cmake_c_compiler is None and args.swiftenv_path is not None:
+        if os.path.exists(args.swiftenv_path + "/clang"):
+            args.cmake_c_compiler = args.swiftenv_path + "/clang"
+    if args.cmake_cxx_compiler is None and args.swiftenv_path is not None:
+        if os.path.exists(args.swiftenv_path + "/clang++"):
+            args.cmake_cxx_compiler = args.swiftenv_path + "/clang++"
+
+    if args.cmake_c_compiler is not None:
+        toolchain.cc = args.cmake_c_compiler
+    if args.cmake_cxx_compiler is not None:
+        toolchain.cxx = args.cmake_cxx_compiler
+
     if args.cmake is not None:
         toolchain.cmake = args.cmake
 

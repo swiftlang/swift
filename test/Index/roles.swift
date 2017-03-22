@@ -161,13 +161,28 @@ let _ = AClass(x: 1)[1] = 2
 
 // RelationBaseOf, RelationOverrideOf
 
-protocol X {}
+protocol X {
 // CHECK: [[@LINE-1]]:10 | protocol/Swift | X | [[X_USR:.*]] | Def | rel: 0
 
-class ImplementsX : X {}
+  var reqProp: Int { get }
+  // CHECK: [[@LINE-1]]:7 | instance-property/Swift | reqProp | [[reqProp_USR:.*]] | Def,RelChild | rel: 1
+}
+
+class ImplementsX : X {
 // CHECK: [[@LINE-1]]:7 | class/Swift | ImplementsX | [[ImplementsX_USR:.*]] | Def | rel: 0
 // CHECK: [[@LINE-2]]:21 | protocol/Swift | X | [[X_USR]] | Ref,RelBase | rel: 1
 // CHECK-NEXT: RelBase | class/Swift | ImplementsX | [[ImplementsX_USR]]
+
+  var reqProp: Int { return 1 }
+  // CHECK: [[@LINE-1]]:7 | instance-property/Swift | reqProp | [[reqPropImpl_USR:.*]] | Def,RelChild,RelOver | rel: 2
+  // CHECK-NEXT: RelOver | instance-property/Swift | reqProp | [[reqProp_USR]]
+  // CHECK-NEXT: RelChild | class/Swift | ImplementsX | [[ImplementsX_USR]]
+}
+
+func TestX(x: X) {
+  _ = x.reqProp
+  // CHECK: [[@LINE-1]]:9 | instance-property/Swift | reqProp | [[reqProp_USR]] | Ref,Read,RelCont | rel: 1
+}
 
 protocol AProtocol {
   // CHECK: [[@LINE-1]]:10 | protocol/Swift | AProtocol | [[AProtocol_USR:.*]] | Def | rel: 0

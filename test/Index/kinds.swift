@@ -44,15 +44,23 @@ class AClass {
   // CHECK: [[@LINE-1]]:7 | class/Swift | AClass | s:14swift_ide_test6AClassC | Def | rel: 0
 
   // InstanceMethod + Parameters
-  func instanceMethod(a: Int, b b: Int, _ c: Int, d _: Int, _: Int) {}
+  func instanceMethod(a: Int, b b: Int, _ c: Int, d _: Int, _: Int) {
   // CHECK: [[@LINE-1]]:8 | instance-method/Swift | instanceMethod(a:b:_:d:_:) | s:14swift_ide_test6AClassC14instanceMethodySi1a_Si1bS2i1dSitF | Def,RelChild | rel: 1
   // CHECK-NEXT: RelChild | class/Swift | AClass | s:14swift_ide_test6AClassC
   // CHECK: [[@LINE-3]]:23 | param/Swift | a | s:14swift_ide_test6AClassC14instanceMethodySi1a_Si1bS2i1dSitFAEL_Siv | Def,RelChild | rel: 1
   // CHECK-NEXT: RelChild | instance-method/Swift | instanceMethod(a:b:_:d:_:) | s:14swift_ide_test6AClassC14instanceMethodySi1a_Si1bS2i1dSitF
-  // CHECK-NOT: [[@LINE-5]]:33 | param/Swift | b | s:{{.*}} | Def,RelChild | rel: 1
-  // CHECK-NOT: [[@LINE-6]]:43 | param/Swift | c | s:{{.*}} | Def,RelChild | rel: 1
-  // CHECK-NOT: [[@LINE-7]]:53 | param/Swift | d | s:{{.*}} | Def,RelChild | rel: 1
-  // CHECK-NOT: [[@LINE-8]]:61 | param/Swift | _ | s:{{.*}} | Def,RelChild | rel: 1
+  // CHECK: [[@LINE-5]]:33 | param(local)/Swift | b | s:{{.*}} | Def,RelChild | rel: 1
+  // CHECK: [[@LINE-6]]:43 | param(local)/Swift | c | s:{{.*}} | Def,RelChild | rel: 1
+  // CHECK: [[@LINE-7]]:53 | param(local)/Swift | _ | s:{{.*}} | Def,RelChild | rel: 1
+  // CHECK: [[@LINE-8]]:61 | param/Swift | _ | s:{{.*}} | Def,RelChild | rel: 1
+
+    _ = a
+    // CHECK: [[@LINE-1]]:9 | param/Swift | a | s:{{.*}} | Ref,Read,RelCont | rel: 1
+    _ = b
+    // CHECK-NOT: [[@LINE-1]]:9 | param(local)/Swift | b | s:{{.*}} | Ref,Read,RelCont | rel: 1
+    _ = c
+    // CHECK-NOT: [[@LINE-1]]:9 | param(local)/Swift | c | s:{{.*}} | Ref,Read,RelCont | rel: 1
+  }
 
   // ClassMethod
   class func classMethod() {}

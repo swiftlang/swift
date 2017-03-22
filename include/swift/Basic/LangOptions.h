@@ -162,6 +162,10 @@ namespace swift {
     /// \brief Enable experimental property behavior feature.
     bool EnableExperimentalPropertyBehaviors = false;
 
+    /// \brief Staging flag for treating inout parameters as Thread Sanitizer
+    /// accesses.
+    bool EnableTSANInoutInstrumentation = false;
+
     /// \brief Staging flag for class resilience, which we do not want to enable
     /// fully until more code is in place, to allow the standard library to be
     /// tested with value type resilience only.
@@ -185,6 +189,10 @@ namespace swift {
     /// This is for bootstrapping. It can't be in SILOptions because the
     /// TypeChecker uses it to set resolve the ParameterConvention.
     bool EnableSILOpaqueValues = false;
+
+    /// If set to true, the diagnosis engine can assume the emitted diagnostics
+    /// will be used in editor. This usually leads to more aggressive fixit.
+    bool DiagnosticsEditorMode = false;
 
     /// Sets the target we are building for and updates platform conditions
     /// to match.

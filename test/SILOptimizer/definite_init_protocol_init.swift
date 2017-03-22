@@ -64,8 +64,8 @@ struct TrivialStruct : TriviallyConstructible {
 // CHECK:     bb0(%0 : $Int, %1 : $@thin TrivialStruct.Type):
 // CHECK-NEXT: [[SELF:%.*]] = alloc_stack $TrivialStruct
 // CHECK:      [[FN:%.*]] = function_ref @_T0023definite_init_protocol_B022TriviallyConstructiblePAAExSi6middle_tcfC
-// CHECK-NEXT: [[METATYPE:%.*]] = metatype $@thick TrivialStruct.Type
 // CHECK-NEXT: [[SELF_BOX:%.*]] = alloc_stack $TrivialStruct
+// CHECK-NEXT: [[METATYPE:%.*]] = metatype $@thick TrivialStruct.Type
 // CHECK-NEXT: apply [[FN]]<TrivialStruct>([[SELF_BOX]], %0, [[METATYPE]])
 // CHECK-NEXT: [[NEW_SELF:%.*]] = load [[SELF_BOX]]
 // CHECK-NEXT: store [[NEW_SELF]] to [[SELF]]
@@ -94,8 +94,8 @@ struct AddressOnlyStruct : TriviallyConstructible {
 // CHECK:     bb0(%0 : $*AddressOnlyStruct, %1 : $Int, %2 : $@thin AddressOnlyStruct.Type):
 // CHECK-NEXT: [[SELF:%.*]] = alloc_stack $AddressOnlyStruct
 // CHECK:      [[FN:%.*]] = function_ref @_T0023definite_init_protocol_B022TriviallyConstructiblePAAExSi6middle_tcfC
-// CHECK-NEXT: [[METATYPE:%.*]] = metatype $@thick AddressOnlyStruct.Type
 // CHECK-NEXT: [[SELF_BOX:%.*]] = alloc_stack $AddressOnlyStruct
+// CHECK-NEXT: [[METATYPE:%.*]] = metatype $@thick AddressOnlyStruct.Type
 // CHECK-NEXT: apply [[FN]]<AddressOnlyStruct>([[SELF_BOX]], %1, [[METATYPE]])
 // CHECK-NEXT: copy_addr [take] [[SELF_BOX]] to [initialization] [[SELF]]
 // CHECK-NEXT: dealloc_stack [[SELF_BOX]]
@@ -127,8 +127,8 @@ enum TrivialEnum : TriviallyConstructible {
 // CHECK:     bb0(%0 : $Int, %1 : $@thin TrivialEnum.Type):
 // CHECK-NEXT: [[SELF:%.*]] = alloc_stack $TrivialEnum
 // CHECK:      [[FN:%.*]] = function_ref @_T0023definite_init_protocol_B022TriviallyConstructiblePAAExSi6middle_tcfC
-// CHECK-NEXT: [[METATYPE:%.*]] = metatype $@thick TrivialEnum.Type
 // CHECK-NEXT: [[SELF_BOX:%.*]] = alloc_stack $TrivialEnum
+// CHECK-NEXT: [[METATYPE:%.*]] = metatype $@thick TrivialEnum.Type
 // CHECK-NEXT: apply [[FN]]<TrivialEnum>([[SELF_BOX]], %0, [[METATYPE]])
 // CHECK-NEXT: [[NEW_SELF:%.*]] = load [[SELF_BOX]]
 // CHECK-NEXT: store [[NEW_SELF]] to [[SELF]]

@@ -242,9 +242,11 @@ public struct ${Self}<
 }
 
 extension LazyCollectionProtocol
+%   if Collection != 'Collection':
   where
   Self : ${Collection},
   Elements : ${Collection}
+%   end
 {
   /// Returns a lazy collection of the initial consecutive elements that
   /// satisfy `predicate`.

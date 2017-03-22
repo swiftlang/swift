@@ -32,7 +32,7 @@
 #include "swift/Basic/Malloc.h"
 #include "swift/Basic/FlaggedPointer.h"
 #include "swift/Basic/RelativePointer.h"
-#include "swift/Basic/ManglingMacros.h"
+#include "swift/Demangling/ManglingMacros.h"
 #include "swift/Runtime/Unreachable.h"
 #include "../../../stdlib/public/SwiftShims/HeapObject.h"
 
@@ -1241,7 +1241,21 @@ public:
   void vw_destructiveInjectEnumTag(OpaqueValue *value, unsigned tag) const {
     getValueWitnesses()->_asEVWT()->destructiveInjectEnumTag(value, tag, this);
   }
-  
+
+  /// Allocate an out-of-line buffer if values of this type don't fit in the
+  /// ValueBuffer.
+  /// NOTE: This is not a box for copy-on-write existentials.
+  OpaqueValue *allocateBufferIn(ValueBuffer *buffer) const;
+
+  /// Deallocate an out-of-line buffer stored in 'buffer' if values of this type
+  /// are not stored inline in the ValueBuffer.
+  void deallocateBufferIn(ValueBuffer *buffer) const;
+
+  // Allocate an out-of-line buffer box (reference counted) if values of this
+  // type don't fit in the ValueBuffer.
+  // NOTE: This *is* a box for copy-on-write existentials.
+  OpaqueValue *allocateBoxForExistentialIn(ValueBuffer *Buffer) const;
+
   /// Get the nominal type descriptor if this metadata describes a nominal type,
   /// or return null if it does not.
   const ConstTargetFarRelativeDirectPointer<Runtime,

@@ -1161,10 +1161,9 @@ bool EscapeAnalysis::buildConnectionGraphForDestructor(
   // of its payload.
   // TODO: Generalize it. Destructor of an aggregate type is equivalent to calling
   // destructors for its components.
-  while (Ty.getSwiftRValueType()->getAnyOptionalObjectType())
-    Ty = M.Types.getLoweredType(Ty.getSwiftRValueType()
-                                  .getAnyOptionalObjectType());
-  auto Class = Ty.getSwiftRValueType().getClassOrBoundGenericClass();
+  while (auto payloadTy = Ty.getAnyOptionalObjectType())
+    Ty = payloadTy;
+  auto Class = Ty.getClassOrBoundGenericClass();
   if (!Class || !Class->hasDestructor())
     return false;
   auto Destructor = Class->getDestructor();
@@ -1954,7 +1953,7 @@ bool EscapeAnalysis::canParameterEscape(FullApplySite FAS, int ParamIdx,
   return false;
 }
 
-void EscapeAnalysis::invalidate(InvalidationKind K) {
+void EscapeAnalysis::invalidate() {
   Function2Info.clear();
   Allocator.DestroyAll();
   DEBUG(llvm::dbgs() << "invalidate all\n");

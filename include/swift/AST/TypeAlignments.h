@@ -25,6 +25,7 @@
 #include <cstddef>
 
 namespace swift {
+  class AbstractClosureExpr;
   class AbstractStorageDecl;
   class ArchetypeType;
   class AssociatedTypeDecl;
@@ -38,6 +39,7 @@ namespace swift {
   class GenericTypeParamDecl;
   class NormalProtocolConformance;
   class OperatorDecl;
+  class Pattern;
   class ProtocolDecl;
   class ProtocolConformance;
   class Stmt;
@@ -52,6 +54,7 @@ namespace swift {
   constexpr size_t ExprAlignInBits = 3;
   constexpr size_t StmtAlignInBits = 3;
   constexpr size_t TypeAlignInBits = 3;
+  constexpr size_t PatternAlignInBits = 3;
 }
 
 namespace llvm {
@@ -95,11 +98,14 @@ LLVM_DECLARE_TYPE_ALIGNMENT(swift::BraceStmt, swift::StmtAlignInBits)
 LLVM_DECLARE_TYPE_ALIGNMENT(swift::ASTContext, 2);
 LLVM_DECLARE_TYPE_ALIGNMENT(swift::DeclContext, swift::DeclContextAlignInBits)
 LLVM_DECLARE_TYPE_ALIGNMENT(swift::Expr, swift::ExprAlignInBits)
+LLVM_DECLARE_TYPE_ALIGNMENT(swift::AbstractClosureExpr, swift::ExprAlignInBits)
 LLVM_DECLARE_TYPE_ALIGNMENT(swift::ProtocolConformance, swift::DeclAlignInBits)
 LLVM_DECLARE_TYPE_ALIGNMENT(swift::NormalProtocolConformance,
                             swift::DeclAlignInBits)
 LLVM_DECLARE_TYPE_ALIGNMENT(swift::GenericEnvironment,
                             swift::DeclAlignInBits)
+LLVM_DECLARE_TYPE_ALIGNMENT(swift::Pattern,
+                            swift::PatternAlignInBits)
 
 static_assert(alignof(void*) >= 2, "pointer alignment is too small");
 

@@ -13,7 +13,6 @@
 #define DEBUG_TYPE "allocbox-to-stack"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SIL/Dominance.h"
-#include "swift/SIL/Mangle.h"
 #include "swift/SILOptimizer/Utils/SpecializationMangler.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
@@ -519,18 +518,12 @@ PromotedParamCloner::PromotedParamCloner(SILFunction *Orig, IsFragile_t Fragile,
 
 static std::string getClonedName(SILFunction *F, IsFragile_t Fragile,
                                  ArgIndexList &PromotedArgIndices) {
-  Mangle::Mangler M;
   auto P = Demangle::SpecializationPass::AllocBoxToStack;
-  FunctionSignatureSpecializationMangler OldFSSM(P, M, Fragile, F);
-  NewMangling::FunctionSignatureSpecializationMangler NewFSSM(P, Fragile, F);
+  Mangle::FunctionSignatureSpecializationMangler Mangler(P, Fragile, F);
   for (unsigned i : PromotedArgIndices) {
-    OldFSSM.setArgumentBoxToStack(i);
-    NewFSSM.setArgumentBoxToStack(i);
+    Mangler.setArgumentBoxToStack(i);
   }
-  OldFSSM.mangle();
-  std::string Old = M.finalize();
-  std::string New = NewFSSM.mangle();
-  return NewMangling::selectMangling(Old, New);
+  return Mangler.mangle();
 }
 
 /// \brief Create the function corresponding to the clone of the

@@ -29,10 +29,6 @@ using namespace swift;
 STATISTIC(NumDeadFunc, "Number of dead functions eliminated");
 STATISTIC(NumEliminatedExternalDefs, "Number of external function definitions eliminated");
 
-llvm::cl::opt<bool> RemoveDeadConformances(
-    "remove-dead-conformances", llvm::cl::init(false),
-    llvm::cl::desc("Remove dead conformances"));
-
 namespace {
 
 /// This is a base class for passes that are based on function liveness
@@ -98,8 +94,6 @@ protected:
   llvm::SmallSetVector<SILFunction *, 16> Worklist;
 
   llvm::SmallPtrSet<void *, 32> AliveFunctionsAndTables;
-
-  ConformanceCollector FoundConformances;
 
   /// Checks is a function is alive, e.g. because it is visible externally.
   bool isAnchorFunction(SILFunction *F) {
@@ -300,9 +294,6 @@ protected:
 
     DEBUG(llvm::dbgs() << "    scan function " << F->getName() << '\n');
 
-    size_t ExistingNumConfs = FoundConformances.getUsedConformances().size();
-    size_t ExistingMetaTypes = FoundConformances.getEscapingMetaTypes().size();
-
     // First scan all instructions of the function.
     for (SILBasicBlock &BB : *F) {
       for (SILInstruction &I : BB) {
@@ -323,23 +314,6 @@ protected:
         } else if (auto *FRI = dyn_cast<FunctionRefInst>(&I)) {
           ensureAlive(FRI->getReferencedFunction());
         }
-        if (RemoveDeadConformances)
-          FoundConformances.collect(&I);
-      }
-    }
-    // Now we scan all _new_ conformances we found in the function.
-    auto UsedConfs = FoundConformances.getUsedConformances();
-    for (size_t Idx = ExistingNumConfs; Idx < UsedConfs.size(); ++Idx) {
-      ensureAliveConformance(UsedConfs[Idx]);
-    }
-    // All conformances of a type for which the meta-type escapes, must stay
-    // alive.
-    auto UsedMTs = FoundConformances.getEscapingMetaTypes();
-    for (size_t Idx = ExistingMetaTypes; Idx < UsedMTs.size(); ++Idx) {
-      const NominalTypeDecl *NT = UsedMTs[Idx];
-      auto Confs = NT->getAllConformances();
-      for (ProtocolConformance *C : Confs) {
-        ensureAliveConformance(C);
       }
     }
   }
@@ -403,7 +377,7 @@ protected:
 
 public:
   FunctionLivenessComputation(SILModule *module) :
-    Module(module), FoundConformances(*module) {}
+    Module(module) {}
 
   /// The main entry point of the optimization.
   bool findAliveFunctions() {
@@ -421,7 +395,6 @@ public:
       Worklist.pop_back();
       scanFunction(F);
     }
-    FoundConformances.clear();
 
     return false;
   }
@@ -550,19 +523,10 @@ class DeadFunctionElimination : FunctionLivenessComputation {
         }
       }
 
-      ProtocolConformance *C = WT.getConformance();
-      CanType ConformingTy = C->getType()->getCanonicalType();
-      if (!RemoveDeadConformances || ConformingTy.isAnyClassReferenceType()) {
-        // We are very conservative with class conformances. Even if a private/
-        // internal class is never instantiated, it might be created via
-        // reflection by using the stdlib's _getTypeByMangledName function.
-        makeAlive(&WT);
-      } else {
-        NominalTypeDecl *decl = ConformingTy.getNominalOrBoundGenericNominal();
-        assert(decl);
-        if (isVisibleExternally(decl))
-          makeAlive(&WT);
-      }
+      // We don't do dead witness table elimination right now. So we assume
+      // that all witness tables are alive. Dead witness table elimination is
+      // done in IRGen by lazily emitting witness tables.
+      makeAlive(&WT);
     }
 
     // Check default witness methods.
@@ -590,12 +554,15 @@ class DeadFunctionElimination : FunctionLivenessComputation {
   }
 
   /// Removes all dead methods from vtables and witness tables.
-  void removeDeadEntriesFromTables() {
+  bool removeDeadEntriesFromTables() {
+    bool changedTable = false;
     for (SILVTable &vTable : Module->getVTableList()) {
-      vTable.removeEntries_if([this](SILVTable::Entry &entry) -> bool {
+      vTable.removeEntries_if([this, &changedTable]
+                              (SILVTable::Entry &entry) -> bool {
         if (!isAlive(entry.Implementation)) {
           DEBUG(llvm::dbgs() << "  erase dead vtable method " <<
                 entry.Implementation->getName() << "\n");
+          changedTable = true;
           return true;
         }
         return false;
@@ -606,10 +573,12 @@ class DeadFunctionElimination : FunctionLivenessComputation {
     for (auto WI = WitnessTables.begin(), EI = WitnessTables.end(); WI != EI;) {
       SILWitnessTable *WT = &*WI;
       WI++;
-      WT->clearMethods_if([this](const SILWitnessTable::MethodWitness &MW) -> bool {
+      WT->clearMethods_if([this, &changedTable]
+                          (const SILWitnessTable::MethodWitness &MW) -> bool {
         if (!isAlive(MW.Witness)) {
           DEBUG(llvm::dbgs() << "  erase dead witness method " <<
                 MW.Witness->getName() << "\n");
+          changedTable = true;
           return true;
         }
         return false;
@@ -622,17 +591,19 @@ class DeadFunctionElimination : FunctionLivenessComputation {
          WI != EI;) {
       SILDefaultWitnessTable *WT = &*WI;
       WI++;
-      WT->clearMethods_if([this](SILFunction *MW) -> bool {
+      WT->clearMethods_if([this, &changedTable](SILFunction *MW) -> bool {
         if (!MW)
           return false;
         if (!isAlive(MW)) {
           DEBUG(llvm::dbgs() << "  erase dead default witness method "
                              << MW->getName() << "\n");
+          changedTable = true;
           return true;
         }
         return false;
       });
     }
+    return changedTable;
   }
 
 public:
@@ -645,7 +616,7 @@ public:
     DEBUG(llvm::dbgs() << "running dead function elimination\n");
     findAliveFunctions();
 
-    removeDeadEntriesFromTables();
+    bool changedTables = removeDeadEntriesFromTables();
 
     // First drop all references so that we don't get problems with non-zero
     // reference counts of dead functions.
@@ -670,16 +641,17 @@ public:
     }
 
     // Last step: delete all dead functions.
-    auto InvalidateEverything = SILAnalysis::InvalidationKind::Everything;
     while (!DeadFunctions.empty()) {
       SILFunction *F = DeadFunctions.back();
       DeadFunctions.pop_back();
 
       DEBUG(llvm::dbgs() << "  erase dead function " << F->getName() << "\n");
       NumDeadFunc++;
-      DFEPass->invalidateAnalysisForDeadFunction(F, InvalidateEverything);
+      DFEPass->notifyDeleteFunction(F);
       Module->eraseFunction(F);
     }
+    if (changedTables)
+      DFEPass->invalidateFunctionTables();
   }
 };
 
@@ -839,8 +811,7 @@ public:
       // Do not remove bodies of any functions that are alive.
       if (!isAlive(F)) {
         if (tryToConvertExternalDefinitionIntoDeclaration(F)) {
-          DFEPass->invalidateAnalysisForDeadFunction(F,
-                                    SILAnalysis::InvalidationKind::Everything);
+          DFEPass->notifyDeleteFunction(F);
           if (F->getRefCount() == 0)
             F->getModule().eraseFunction(F);
         }

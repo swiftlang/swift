@@ -18,6 +18,7 @@
 #include "swift/AST/Initializer.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/NameLookup.h"
+#include "swift/AST/ParameterList.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/USRGeneration.h"
@@ -3112,14 +3113,14 @@ public:
     NeedLeadingDot = !HaveDot;
 
     // This is horrible
+    ExprType = ExprType->getRValueType();
     this->ExprType = ExprType;
     if (ExprType->hasTypeParameter()) {
       DeclContext *DC;
       if (VD) {
         DC = VD->getInnermostDeclContext();
         this->ExprType = DC->mapTypeIntoContext(ExprType);
-      } else if (auto NTD = ExprType->getRValueType()->getRValueInstanceType()
-          ->getAnyNominal()) {
+      } else if (auto NTD = ExprType->getRValueInstanceType()->getAnyNominal()) {
         DC = NTD;
         this->ExprType = DC->mapTypeIntoContext(ExprType);
       }
@@ -3137,7 +3138,7 @@ public:
         Done = true;
       }
     }
-    if (auto *TT = ExprType->getRValueType()->getAs<TupleType>()) {
+    if (auto *TT = ExprType->getAs<TupleType>()) {
       getTupleExprCompletions(TT);
       Done = true;
     }
@@ -3571,7 +3572,7 @@ public:
       for (auto T : ExpectedTypes) {
         if (!T)
           continue;
-        if (T->getAs<TupleType>()) {
+        if (T->is<TupleType>()) {
           addTypeAnnotation(builder, T);
           builder.setExpectedTypeRelation(CodeCompletionResult::Identical);
           break;
@@ -4095,6 +4096,11 @@ public:
       != ParsedKeywords.end();
   }
 
+  bool missingOverride(DeclVisibilityKind Reason) {
+    return !hasOverride && Reason == DeclVisibilityKind::MemberOfSuper &&
+           !CurrDeclContext->getAsProtocolOrProtocolExtensionContext();
+  }
+
   void addAccessControl(const ValueDecl *VD,
                         CodeCompletionResultBuilder &Builder) {
     assert(CurrDeclContext->getAsNominalTypeOrNominalTypeExtensionContext());
@@ -4145,10 +4151,7 @@ public:
 
     // FIXME: if we're missing 'override', but have the decl introducer we
     // should delete it and re-add both in the correct order.
-    bool missingOverride =
-      !hasOverride && Reason == DeclVisibilityKind::MemberOfSuper &&
-      !CurrDeclContext->getAsProtocolOrProtocolExtensionContext();
-    if (!hasDeclIntroducer && missingOverride)
+    if (!hasDeclIntroducer && missingOverride(Reason))
       Builder.addOverrideKeyword();
 
     if (!hasDeclIntroducer)
@@ -4167,6 +4170,14 @@ public:
   }
 
   void addVarOverride(const VarDecl *VD, DeclVisibilityKind Reason) {
+    // Overrides cannot use 'let', but if the 'override' keyword is specified
+    // then the intention is clear, so provide the results anyway.  The compiler
+    // can then provide an error telling you to use 'var' instead.
+    // If we don't need override then it's a protocol requirement, so show it.
+    if (missingOverride(Reason) && hasVarIntroducer &&
+        isKeywordSpecified("let"))
+      return;
+
     CodeCompletionResultBuilder Builder(
         Sink, CodeCompletionResult::ResultKind::Declaration,
         SemanticContextKind::Super, {});
@@ -4198,9 +4209,7 @@ public:
     if (!hasAccessModifier)
       addAccessControl(CD, Builder);
 
-    if (!hasOverride && Reason == DeclVisibilityKind::MemberOfSuper &&
-        !CurrDeclContext->getAsProtocolOrProtocolExtensionContext() &&
-        CD->isDesignatedInit() && !CD->isRequired())
+    if (missingOverride(Reason) && CD->isDesignatedInit() && !CD->isRequired())
       Builder.addOverrideKeyword();
 
     // Emit 'required' if we're in class context, 'required' is not specified,

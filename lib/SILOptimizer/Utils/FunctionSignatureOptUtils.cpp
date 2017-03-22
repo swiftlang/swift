@@ -18,7 +18,6 @@
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SILOptimizer/Utils/FunctionSignatureOptUtils.h"
 #include "swift/SILOptimizer/Utils/Local.h"
-#include "swift/SIL/Mangle.h"
 
 using namespace swift;
 
@@ -49,7 +48,8 @@ bool swift::hasNonTrivialNonDebugUse(SILArgument *Arg) {
   return false;
 }
 
-static bool isSpecializableRepresentation(SILFunctionTypeRepresentation Rep) {
+static bool isSpecializableRepresentation(SILFunctionTypeRepresentation Rep,
+                                          bool OptForPartialApply) {
   switch (Rep) {
   case SILFunctionTypeRepresentation::Method:
   case SILFunctionTypeRepresentation::Closure:
@@ -58,6 +58,7 @@ static bool isSpecializableRepresentation(SILFunctionTypeRepresentation Rep) {
   case SILFunctionTypeRepresentation::CFunctionPointer:
     return true;
   case SILFunctionTypeRepresentation::WitnessMethod:
+    return OptForPartialApply;
   case SILFunctionTypeRepresentation::ObjCMethod:
   case SILFunctionTypeRepresentation::Block:
     return false;
@@ -68,7 +69,9 @@ static bool isSpecializableRepresentation(SILFunctionTypeRepresentation Rep) {
 
 /// Returns true if F is a function which the pass know show to specialize
 /// function signatures for.
-bool swift::canSpecializeFunction(SILFunction *F) {
+bool swift::canSpecializeFunction(SILFunction *F,
+                                  const CallerAnalysis::FunctionInfo *FuncInfo,
+                                  bool OptForPartialApply) {
   // Do not specialize the signature of SILFunctions that are external
   // declarations since there is no body to optimize.
   if (F->isExternalDeclaration())
@@ -81,7 +84,11 @@ bool swift::canSpecializeFunction(SILFunction *F) {
   // Do not specialize the signature of always inline functions. We
   // will just inline them and specialize each one of the individual
   // functions that these sorts of functions are inlined into.
-  if (F->getInlineStrategy() == Inline_t::AlwaysInline)
+  // It is OK to specialize always inline functions if they are
+  // used by partial_apply instructions.
+  assert(!OptForPartialApply || FuncInfo);
+  if (F->getInlineStrategy() == Inline_t::AlwaysInline &&
+      (!OptForPartialApply || !FuncInfo->getMinPartialAppliedArgs()))
     return false;
 
   // For now ignore generic functions to keep things simple...
@@ -89,7 +96,8 @@ bool swift::canSpecializeFunction(SILFunction *F) {
     return false;
 
   // Make sure F has a linkage that we can optimize.
-  if (!isSpecializableRepresentation(F->getRepresentation()))
+  if (!isSpecializableRepresentation(F->getRepresentation(),
+                                     OptForPartialApply))
     return false;
 
   return true;

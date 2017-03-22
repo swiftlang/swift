@@ -13,11 +13,10 @@
 #include "swift/SILOptimizer/Utils/SpecializationMangler.h"
 #include "swift/SIL/SILGlobalVariable.h"
 #include "swift/AST/SubstitutionMap.h"
-#include "swift/Basic/Demangler.h"
-#include "swift/Basic/ManglingMacros.h"
+#include "swift/Demangling/ManglingMacros.h"
 
 using namespace swift;
-using namespace NewMangling;
+using namespace Mangle;
 
 void SpecializationMangler::beginMangling() {
   ASTMangler::beginMangling();
@@ -27,7 +26,7 @@ void SpecializationMangler::beginMangling() {
 }
 
 std::string SpecializationMangler::finalize() {
-  std::string MangledSpecialization = ASTMangler::finalize();
+  StringRef MangledSpecialization(Storage.data(), Storage.size());
   Demangle::Demangler D;
   NodePointer TopLevel = D.demangleSymbol(MangledSpecialization);
 
@@ -36,8 +35,6 @@ std::string SpecializationMangler::finalize() {
   if (FuncName.startswith(MANGLING_PREFIX_STR)) {
     FuncTopLevel = D.demangleSymbol(FuncName);
     assert(FuncTopLevel);
-  } else if (FuncName.startswith("_T")) {
-    FuncTopLevel = Demangle::demangleOldSymbolAsNode(FuncName, D);
   }
   if (!FuncTopLevel) {
     FuncTopLevel = D.createNode(Node::Kind::Global);
@@ -48,7 +45,9 @@ std::string SpecializationMangler::finalize() {
            FuncChild->getText() == "merged");
     TopLevel->addChild(FuncChild, D);
   }
-  return Demangle::mangleNode(TopLevel);
+  std::string mangledName = Demangle::mangleNode(TopLevel);
+  verify(mangledName);
+  return mangledName;
 }
 
 //===----------------------------------------------------------------------===//

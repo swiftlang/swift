@@ -12,7 +12,6 @@ import objc_extension_base
 
 // Check that metadata for nested enums added in extensions to imported classes
 // gets emitted concretely.
-// CHECK: @_T0So8NSObjectC15objc_extensionsE8SomeEnum33_1F05E59585E0BB585FCA206FBFF1A92DLLOs9EquatableACWP =
 
 // CHECK: [[CATEGORY_NAME:@.*]] = private unnamed_addr constant [16 x i8] c"objc_extensions\00"
 // CHECK: [[METHOD_TYPE:@.*]] = private unnamed_addr constant [8 x i8] c"v16@0:8\00"
@@ -146,7 +145,12 @@ extension Wotsit {
 
 extension NSObject {
   private enum SomeEnum { case X }
+
+  public func needMetadataOfSomeEnum() {
+    print(NSObject.SomeEnum.X)
+  }
 }
+
 
 /*
  * Make sure that @NSManaged causes a category to be generated.
@@ -160,6 +164,8 @@ extension NSDogcow {
   @NSManaged var woof: Int
 }
 
+// CHECK: @_T0So8NSObjectC15objc_extensionsE8SomeEnum33_1F05E59585E0BB585FCA206FBFF1A92DLLOs9EquatableACWP =
+
 class SwiftSubGizmo : SwiftBaseGizmo {
 
   // Don't crash on this call. Emit an objC method call to super.
@@ -172,3 +178,4 @@ class SwiftSubGizmo : SwiftBaseGizmo {
     super.frob()
   }
 }
+

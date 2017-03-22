@@ -587,7 +587,7 @@ AbstractionPattern AbstractionPattern::dropLastTupleElement() const {
   llvm_unreachable("bad kind");  
 }
 
-AbstractionPattern AbstractionPattern::getLValueObjectType() const {
+AbstractionPattern AbstractionPattern::getLValueOrInOutObjectType() const {
   switch (getKind()) {
   case Kind::Invalid:
     llvm_unreachable("querying invalid abstraction pattern!");

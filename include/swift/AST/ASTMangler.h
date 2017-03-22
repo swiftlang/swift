@@ -22,14 +22,7 @@ namespace swift {
 
 class AbstractClosureExpr;
 
-namespace NewMangling {
-
-/// Utility function which selects either the old or new mangling for a type.
-std::string mangleTypeForDebugger(Type Ty, const DeclContext *DC);
-
-/// Utility function which selects either the old or new mangling for a type and
-/// mangles the type as USR.
-std::string mangleTypeAsUSR(Type Ty);
+namespace Mangle {
 
 /// The mangler for AST declarations.
 class ASTMangler : public Mangler {
@@ -110,7 +103,9 @@ public:
                                              ModuleDecl *Module);
 
   std::string mangleTypeForDebugger(Type decl, const DeclContext *DC);
-
+  
+  std::string mangleDeclType(const ValueDecl *decl);
+  
   std::string mangleObjCRuntimeName(const NominalTypeDecl *Nominal);
 
   std::string mangleTypeAsUSR(Type type) {
@@ -231,7 +226,7 @@ protected:
   }
 };
 
-} // end namespace NewMangling
+} // end namespace Mangle
 } // end namespace swift
 
 #endif // __SWIFT_AST_ASTMANGLER_H__

@@ -164,6 +164,11 @@ class GenericClass<T> {
       return TA(a: x, b: y)
     }
   }
+
+  // Stupid corner case -- underlying type is not dependent
+  typealias NotDependent<T> = Int
+
+  func misleadingCode(_: NotDependent<String>) {}
 }
 
 let gc = GenericClass<Double>()
@@ -340,3 +345,16 @@ func f(x: S.G1<Int>, y: S.G2<Int>) {
   takesMyType(x: x)
   takesMyType(y: y)
 }
+
+//
+// Generic typealiases with requirements
+//
+
+typealias Element<S> = S.Iterator.Element where S : Sequence
+
+func takesInt(_: Element<[Int]>) {}
+
+takesInt(10)
+
+func failsRequirementCheck(_: Element<Int>) {}
+// expected-error@-1 {{type 'Int' does not conform to protocol 'Sequence'}}

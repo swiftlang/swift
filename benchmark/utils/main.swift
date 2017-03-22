@@ -34,6 +34,7 @@ import ArrayOfRef
 import ArraySubscript
 import BitCount
 import ByteSwap
+import CString
 import Calculator
 import CaptureProp
 import CharacterLiteralsLarge
@@ -41,13 +42,14 @@ import CharacterLiteralsSmall
 import Chars
 import ClassArrayGetter
 import DeadArray
-import DictTest
-import DictTest2
-import DictTest3
 import DictionaryBridge
 import DictionaryLiteral
 import DictionaryRemove
 import DictionarySwap
+import DictTest
+import DictTest2
+import DictTest3
+import DropLast
 import ErrorHandling
 import Fibonacci
 import GlobalClass
@@ -58,15 +60,16 @@ import Histogram
 import Integrate
 import IterateData
 import Join
+import LazyFilter
 import LinkedList
 import MapReduce
 import Memset
 import MonteCarloE
 import MonteCarloPi
+import NopDeinit
 import NSDictionaryCastToSwift
 import NSError
 import NSStringConversion
-import NopDeinit
 import ObjectAllocation
 import ObjectiveCBridging
 import ObjectiveCBridgingStubs
@@ -83,11 +86,11 @@ import PopFrontGeneric
 import Prims
 import ProtocolDispatch
 import ProtocolDispatch2
-import RC4
-import RGBHistogram
 import RangeAssignment
+import RC4
 import RecursiveOwnedParameter
 import ReversedCollections
+import RGBHistogram
 import SetTests
 import SevenBoom
 import Sim2DArray
@@ -96,11 +99,14 @@ import SortStrings
 import StackPromo
 import StaticArray
 import StrComplexWalk
-import StrToInt
 import StringBuilder
+import StringEdits
 import StringInterpolation
+import StringMatch
 import StringTests
 import StringWalk
+import StrToInt
+import Suffix
 import SuperChars
 import TwoSum
 import TypeFlood
@@ -143,6 +149,9 @@ precommitTests = [
   "ArrayValueProp4": run_ArrayValueProp4,
   "BitCount": run_BitCount,
   "ByteSwap": run_ByteSwap,
+  "CStringLongAscii": run_CStringLongAscii,
+  "CStringLongNonAscii": run_CStringLongNonAscii,
+  "CStringShortAscii": run_CStringShortAscii,
   "Calculator": run_Calculator,
   "CaptureProp": run_CaptureProp,
   "CharacterLiteralsLarge": run_CharacterLiteralsLarge,
@@ -162,6 +171,10 @@ precommitTests = [
   "DictionaryRemoveOfObjects": run_DictionaryRemoveOfObjects,
   "DictionarySwap": run_DictionarySwap,
   "DictionarySwapOfObjects": run_DictionarySwapOfObjects,
+  "DropLastAnySequence": run_DropLastAnySequence,
+  "DropLastArray": run_DropLastArray,
+  "DropLastCountableRange": run_DropLastCountableRange,
+  "DropLastSequence": run_DropLastSequence,
   "ErrorHandling": run_ErrorHandling,
   "GlobalClass": run_GlobalClass,
   "Hanoi": run_Hanoi,
@@ -171,6 +184,8 @@ precommitTests = [
   "Integrate": run_Integrate,
   "IterateData": run_IterateData,
   "Join": run_Join,
+  "LazilyFilteredArrays": run_LazilyFilteredArrays,
+  "LazilyFilteredRange": run_LazilyFilteredRange,
   "LinkedList": run_LinkedList,
   "MapReduce": run_MapReduce,
   "MapReduceAnyCollection": run_MapReduceAnyCollection,
@@ -267,15 +282,24 @@ precommitTests = [
   "StaticArray": run_StaticArray,
   "StrComplexWalk": run_StrComplexWalk,
   "StrToInt": run_StrToInt,
+  "StringAdder": run_StringAdder,
   "StringBuilder": run_StringBuilder,
+  "StringBuilderLong": run_StringBuilderLong,
+  "StringEdits": run_StringEdits,
   "StringEqualPointerComparison": run_StringEqualPointerComparison,
   "StringHasPrefix": run_StringHasPrefix,
   "StringHasPrefixUnicode": run_StringHasPrefixUnicode,
   "StringHasSuffix": run_StringHasSuffix,
   "StringHasSuffixUnicode": run_StringHasSuffixUnicode,
   "StringInterpolation": run_StringInterpolation,
+  "StringMatch": run_StringMatch,
+  "StringUTF16Builder": run_StringUTF16Builder,
   "StringWalk": run_StringWalk,
   "StringWithCString": run_StringWithCString,
+  "SuffixAnySequence": run_SuffixAnySequence,
+  "SuffixArray": run_SuffixArray,
+  "SuffixCountableRange": run_SuffixCountableRange,
+  "SuffixSequence": run_SuffixSequence,
   "SuperChars": run_SuperChars,
   "TwoSum": run_TwoSum,
   "TypeFlood": run_TypeFlood,

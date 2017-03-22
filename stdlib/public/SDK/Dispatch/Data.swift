@@ -44,7 +44,18 @@ public struct DispatchData : RandomAccessCollection, _ObjectiveCBridgeable {
 	///
 	/// - parameter bytes: A pointer to the memory. It will be copied.
 	/// - parameter count: The number of bytes to copy.
+	@available(swift, deprecated: 4, message: "Use init(bytes: UnsafeRawBufferPointer) instead")
 	public init(bytes buffer: UnsafeBufferPointer<UInt8>) {
+		__wrapped = buffer.baseAddress == nil ? _swift_dispatch_data_empty()
+				: _swift_dispatch_data_create(buffer.baseAddress!, buffer.count, nil,
+					_swift_dispatch_data_destructor_default()) as! __DispatchData
+	}
+
+	/// Initialize a `Data` with copied memory content.
+	///
+	/// - parameter bytes: A pointer to the memory. It will be copied.
+	/// - parameter count: The number of bytes to copy.
+	public init(bytes buffer: UnsafeRawBufferPointer) {
 		__wrapped = buffer.baseAddress == nil ? _swift_dispatch_data_empty()
 				: _swift_dispatch_data_create(buffer.baseAddress!, buffer.count, nil,
 					_swift_dispatch_data_destructor_default()) as! __DispatchData
@@ -55,7 +66,19 @@ public struct DispatchData : RandomAccessCollection, _ObjectiveCBridgeable {
 	/// - parameter bytes: A pointer to the bytes.
 	/// - parameter count: The size of the bytes.
 	/// - parameter deallocator: Specifies the mechanism to free the indicated buffer.
+	@available(swift, deprecated: 4, message: "Use init(bytesNoCopy: UnsafeRawBufferPointer, deallocater: Deallocator) instead")
 	public init(bytesNoCopy bytes: UnsafeBufferPointer<UInt8>, deallocator: Deallocator = .free) {
+		let (q, b) = deallocator._deallocator
+		__wrapped = bytes.baseAddress == nil ? _swift_dispatch_data_empty()
+				: _swift_dispatch_data_create(bytes.baseAddress!, bytes.count, q, b) as! __DispatchData
+	}
+
+	/// Initialize a `Data` without copying the bytes.
+	///
+	/// - parameter bytes: A pointer to the bytes.
+	/// - parameter count: The size of the bytes.
+	/// - parameter deallocator: Specifies the mechanism to free the indicated buffer.
+	public init(bytesNoCopy bytes: UnsafeRawBufferPointer, deallocator: Deallocator = .free) {
 		let (q, b) = deallocator._deallocator
 		__wrapped = bytes.baseAddress == nil ? _swift_dispatch_data_empty()
 				: _swift_dispatch_data_create(bytes.baseAddress!, bytes.count, q, b) as! __DispatchData
@@ -97,8 +120,20 @@ public struct DispatchData : RandomAccessCollection, _ObjectiveCBridgeable {
 	///
 	/// - parameter bytes: A pointer to the bytes to copy in to the data.
 	/// - parameter count: The number of bytes to copy.
+	@available(swift, deprecated: 4, message: "Use append(_: UnsafeRawBufferPointer) instead")
 	public mutating func append(_ bytes: UnsafePointer<UInt8>, count: Int) {
 		let data = _swift_dispatch_data_create(bytes, count, nil, _swift_dispatch_data_destructor_default()) as! __DispatchData
+		self.append(DispatchData(data: data))
+	}
+
+	/// Append bytes to the data.
+	///
+	/// - parameter bytes: A pointer to the bytes to copy in to the data.
+	/// - parameter count: The number of bytes to copy.
+	public mutating func append(_ bytes: UnsafeRawBufferPointer) {
+		// Nil base address does nothing.
+		guard bytes.baseAddress != nil else { return }
+		let data = _swift_dispatch_data_create(bytes.baseAddress!, bytes.count, nil, _swift_dispatch_data_destructor_default()) as! __DispatchData
 		self.append(DispatchData(data: data))
 	}
 
@@ -139,8 +174,20 @@ public struct DispatchData : RandomAccessCollection, _ObjectiveCBridgeable {
 	/// - parameter pointer: A pointer to the buffer you wish to copy the bytes into.
 	/// - parameter count: The number of bytes to copy.
 	/// - warning: This method does not verify that the contents at pointer have enough space to hold `count` bytes.
+	@available(swift, deprecated: 4, message: "Use copyBytes(to: UnsafeMutableRawBufferPointer, count: Int) instead")
 	public func copyBytes(to pointer: UnsafeMutablePointer<UInt8>, count: Int) {
 		_copyBytesHelper(to: pointer, from: 0..<count)
+	}
+
+	/// Copy the contents of the data to a pointer.
+	///
+	/// - parameter pointer: A pointer to the buffer you wish to copy the bytes into. The buffer must be large
+	///	enough to hold `count` bytes.
+	/// - parameter count: The number of bytes to copy.
+	public func copyBytes(to pointer: UnsafeMutableRawBufferPointer, count: Int) {
+		assert(count <= pointer.count, "Buffer too small to copy \(count) bytes")
+		guard pointer.baseAddress != nil else { return }
+		_copyBytesHelper(to: pointer.baseAddress!, from: 0..<count)
 	}
 
 	/// Copy a subset of the contents of the data to a pointer.
@@ -148,8 +195,20 @@ public struct DispatchData : RandomAccessCollection, _ObjectiveCBridgeable {
 	/// - parameter pointer: A pointer to the buffer you wish to copy the bytes into.
 	/// - parameter range: The range in the `Data` to copy.
 	/// - warning: This method does not verify that the contents at pointer have enough space to hold the required number of bytes.
+	@available(swift, deprecated: 4, message: "Use copyBytes(to: UnsafeMutableRawBufferPointer, from: CountableRange<Index>) instead")
 	public func copyBytes(to pointer: UnsafeMutablePointer<UInt8>, from range: CountableRange<Index>) {
 		_copyBytesHelper(to: pointer, from: range)
+	}
+
+	/// Copy a subset of the contents of the data to a pointer.
+	///
+	/// - parameter pointer: A pointer to the buffer you wish to copy the bytes into. The buffer must be large
+	///	enough to hold `count` bytes.
+	/// - parameter range: The range in the `Data` to copy.
+	public func copyBytes(to pointer: UnsafeMutableRawBufferPointer, from range: CountableRange<Index>) {
+		assert(range.count <= pointer.count, "Buffer too small to copy \(range.count) bytes")
+		guard pointer.baseAddress != nil else { return }
+		_copyBytesHelper(to: pointer.baseAddress!, from: range)
 	}
 
 	/// Copy the contents of the data into a buffer.

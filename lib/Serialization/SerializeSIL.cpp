@@ -1258,7 +1258,9 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   }
   case ValueKind::PointerToAddressInst: {
     assert(SI.getNumOperands() - SI.getTypeDependentOperands().size() == 1);
-    unsigned attrs = cast<PointerToAddressInst>(SI).isStrict() ? 1 : 0;
+    auto &PAI = cast<PointerToAddressInst>(SI);
+    unsigned attrs = (PAI.isStrict() ? 1 : 0)
+                   | (PAI.isInvariant() ? 2 : 0);
     writeOneTypeOneOperandLayout(SI.getKind(), attrs, SI.getType(),
                                  SI.getOperand(0));
     break;
@@ -1307,11 +1309,12 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
              llvm::makeArrayRef(listOfValues));
     break;
   }
-  case ValueKind::UnconditionalCheckedCastOpaqueInst: {
-    auto CI = cast<UnconditionalCheckedCastOpaqueInst>(&SI);
+  case ValueKind::UnconditionalCheckedCastValueInst: {
+    auto CI = cast<UnconditionalCheckedCastValueInst>(&SI);
     SILInstCastLayout::emitRecord(
         Out, ScratchRecord, SILAbbrCodes[SILInstCastLayout::Code],
-        (unsigned)SI.getKind(), /*attr*/ 0,
+        (unsigned)SI.getKind(),
+        toStableCastConsumptionKind(CI->getConsumptionKind()),
         S.addTypeRef(CI->getType().getSwiftRValueType()),
         (unsigned)CI->getType().getCategory(),
         S.addTypeRef(CI->getOperand()->getType().getSwiftRValueType()),

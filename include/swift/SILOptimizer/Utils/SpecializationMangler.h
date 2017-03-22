@@ -13,14 +13,14 @@
 #ifndef SWIFT_SILOPTIMIZER_UTILS_SPECIALIZATIONMANGLER_H
 #define SWIFT_SILOPTIMIZER_UTILS_SPECIALIZATIONMANGLER_H
 
-#include "swift/Basic/Demangler.h"
+#include "swift/Demangling/Demangler.h"
 #include "swift/Basic/NullablePtr.h"
 #include "swift/AST/ASTMangler.h"
 #include "swift/SIL/SILLinkage.h"
 #include "swift/SIL/SILFunction.h"
 
 namespace swift {
-namespace NewMangling {
+namespace Mangle {
 
 enum class SpecializationKind : uint8_t {
   Generic,
@@ -32,7 +32,7 @@ enum class SpecializationKind : uint8_t {
 using SpecializationPass = Demangle::SpecializationPass;
 
 /// The base class for specialization mangles.
-class SpecializationMangler : public NewMangling::ASTMangler {
+class SpecializationMangler : public Mangle::ASTMangler {
 protected:
   /// The specialization pass.
   SpecializationPass Pass;
@@ -164,7 +164,7 @@ private:
   void mangleReturnValue(ReturnValueModifierIntBase RetMod);
 };
 
-} // end namespace NewMangling
+} // end namespace Mangle
 } // end namespace swift
 
 #endif

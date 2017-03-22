@@ -1,7 +1,7 @@
 // RUN: rm -rf %t
 // RUN: mkdir -p %t
 // RUN: %build-clang-importer-objc-overlays
-// RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk-nosource) -I %t -I %S/Inputs/custom-modules -print-module -source-filename %s -module-to-print=Newtype > %t.printed.A.txt
+// RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk-nosource) -I %t -I %S/Inputs/custom-modules -print-module -source-filename %s -module-to-print=Newtype -skip-unavailable > %t.printed.A.txt
 // RUN: %FileCheck %s -check-prefix=PRINT -strict-whitespace < %t.printed.A.txt
 // RUN: %target-typecheck-verify-swift -sdk %clang-importer-sdk -I %S/Inputs/custom-modules -I %t -verify-ignore-unknown
 // REQUIRES: objc_interop
@@ -48,9 +48,9 @@
 // PRINT-NEXT:    let rawValue: Float
 // PRINT-NEXT:  }
 // PRINT-NEXT:  extension MyFloat {
-// PRINT-NEXT:    static let globalFloat: MyFloat
-// PRINT-NEXT:    static let PI: MyFloat
-// PRINT-NEXT:    static let version: MyFloat
+// PRINT-NEXT:    static let globalFloat: MyFloat{{$}}
+// PRINT-NEXT:    static let PI: MyFloat{{$}}
+// PRINT-NEXT:    static let version: MyFloat{{$}}
 // PRINT-NEXT:  }
 //
 // PRINT-LABEL: struct MyInt : RawRepresentable, _SwiftNewtypeWrapper, Equatable, Hashable, Comparable {
@@ -59,11 +59,11 @@
 // PRINT-NEXT:    let rawValue: Int32
 // PRINT-NEXT:  }
 // PRINT-NEXT:  extension MyInt {
-// PRINT-NEXT:    static let zero: MyInt!
-// PRINT-NEXT:    static let one: MyInt!
+// PRINT-NEXT:    static let zero: MyInt{{$}}
+// PRINT-NEXT:    static let one: MyInt{{$}}
 // PRINT-NEXT:  }
 // PRINT-NEXT:  let kRawInt: Int32
-// PRINT-NEXT:  func takesMyInt(_: MyInt!)
+// PRINT-NEXT:  func takesMyInt(_: MyInt)
 //
 // PRINT-LABEL: extension NSURLResourceKey {
 // PRINT-NEXT:    static let isRegularFileKey: NSURLResourceKey

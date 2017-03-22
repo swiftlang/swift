@@ -120,21 +120,29 @@ internal func _reinterpretCastToAnyObject<T>(_ x: T) -> AnyObject {
   return unsafeBitCast(x, to: AnyObject.self)
 }
 
+@_inlineable
+@_versioned
 @_transparent
 func == (lhs: Builtin.NativeObject, rhs: Builtin.NativeObject) -> Bool {
   return unsafeBitCast(lhs, to: Int.self) == unsafeBitCast(rhs, to: Int.self)
 }
 
+@_inlineable
+@_versioned
 @_transparent
 func != (lhs: Builtin.NativeObject, rhs: Builtin.NativeObject) -> Bool {
   return !(lhs == rhs)
 }
 
+@_inlineable
+@_versioned
 @_transparent
 func == (lhs: Builtin.RawPointer, rhs: Builtin.RawPointer) -> Bool {
   return unsafeBitCast(lhs, to: Int.self) == unsafeBitCast(rhs, to: Int.self)
 }
 
+@_inlineable
+@_versioned
 @_transparent
 func != (lhs: Builtin.RawPointer, rhs: Builtin.RawPointer) -> Bool {
   return !(lhs == rhs)
@@ -142,12 +150,14 @@ func != (lhs: Builtin.RawPointer, rhs: Builtin.RawPointer) -> Bool {
 
 /// Returns `true` iff `t0` is identical to `t1`; i.e. if they are both
 /// `nil` or they both represent the same type.
+@_inlineable
 public func == (t0: Any.Type?, t1: Any.Type?) -> Bool {
   return unsafeBitCast(t0, to: Int.self) == unsafeBitCast(t1, to: Int.self)
 }
 
 /// Returns `false` iff `t0` is identical to `t1`; i.e. if they are both
 /// `nil` or they both represent the same type.
+@_inlineable
 public func != (t0: Any.Type?, t1: Any.Type?) -> Bool {
   return !(t0 == t1)
 }
@@ -825,6 +835,21 @@ public func withoutActuallyEscaping<ClosureType, ResultType>(
   // the type checker.
   Builtin.staticReport(_trueAfterDiagnostics(), true._value,
     ("internal consistency error: 'withoutActuallyEscaping(_:do:)' operation failed to resolve"
+     as StaticString).utf8Start._rawValue)
+  Builtin.unreachable()
+}
+
+@_transparent
+@_semantics("typechecker._openExistential(_:do:)")
+public func _openExistential<ExistentialType, ContainedType, ResultType>(
+  _ existential: ExistentialType,
+  do body: (_ escapingClosure: ContainedType) throws -> ResultType
+) rethrows -> ResultType {
+  // This implementation is never used, since calls to
+  // `Swift._openExistential(_:do:)` are resolved as a special case by
+  // the type checker.
+  Builtin.staticReport(_trueAfterDiagnostics(), true._value,
+    ("internal consistency error: '_openExistential(_:do:)' operation failed to resolve"
      as StaticString).utf8Start._rawValue)
   Builtin.unreachable()
 }

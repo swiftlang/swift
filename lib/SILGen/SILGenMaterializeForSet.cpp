@@ -161,11 +161,9 @@
 #include "RValue.h"
 #include "Scope.h"
 #include "Initialization.h"
-#include "swift/AST/AST.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Types.h"
 #include "swift/AST/GenericEnvironment.h"
-#include "swift/AST/Mangle.h"
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SubstitutionMap.h"
@@ -195,29 +193,20 @@ getMaterializeForSetCallbackName(ProtocolConformance *conformance,
   closure.setType(TupleType::getEmpty(dc->getASTContext()));
   closure.getCaptureInfo().setGenericParamCaptures(true);
 
-  Mangle::Mangler mangler;
-  NewMangling::ASTMangler NewMangler;
+  Mangle::ASTMangler Mangler;
   std::string New;
   if (conformance) {
     // Concrete witness thunk for a conformance:
     //
     // Mangle this as if it were a conformance thunk for a closure
     // within the requirement.
-    mangler.append("_TTW");
-    mangler.mangleProtocolConformance(conformance);
-    New = NewMangler.mangleClosureWitnessThunk(conformance, &closure);
-  } else {
-    // Default witness thunk or concrete implementation:
-    //
-    // Mangle this as if it were a closure within the requirement.
-    mangler.append("_T");
-    New = NewMangler.mangleClosureEntity(&closure,
-                                NewMangling::ASTMangler::SymbolKind::Default);
+    return Mangler.mangleClosureWitnessThunk(conformance, &closure);
   }
-  mangler.mangleClosureEntity(&closure, /*uncurryingLevel=*/1);
-  std::string Old = mangler.finalize();
-
-  return NewMangling::selectMangling(Old, New);
+  // Default witness thunk or concrete implementation:
+  //
+  // Mangle this as if it were a closure within the requirement.
+  return Mangler.mangleClosureEntity(&closure,
+                                 Mangle::ASTMangler::SymbolKind::Default);
 }
 
 /// A helper class for emitting materializeForSet.
@@ -720,7 +709,7 @@ SILFunction *MaterializeForSetEmitter::createCallback(SILFunction &F,
 
     // Call the generator function we were provided.
     {
-      LexicalScope scope(gen.Cleanups, gen, CleanupLocation::get(loc));
+      LexicalScope scope(gen, CleanupLocation::get(loc));
       generator(gen, loc, valueBuffer, storageBuffer, self);
     }
 
@@ -860,7 +849,8 @@ MaterializeForSetEmitter::emitUsingGetterSetter(SILGenFunction &gen,
   resultBuffer =
     gen.B.createPointerToAddress(loc, resultBuffer,
                                  RequirementStorageType.getAddressType(),
-                                 /*isStrict*/ true);
+                                 /*isStrict*/ true,
+                                 /*isInvariant*/ false);
   TemporaryInitialization init(resultBuffer, CleanupHandle::invalid());
 
   // Evaluate the getter into the result buffer.
@@ -943,7 +933,8 @@ MaterializeForSetEmitter::createSetterCallback(SILFunction &F,
     // The callback gets the value at +1.
     auto &valueTL = gen.getTypeLowering(lvalue.getTypeOfRValue());
     value = gen.B.createPointerToAddress(
-      loc, value, valueTL.getLoweredType().getAddressType(), /*isStrict*/ true);
+      loc, value, valueTL.getLoweredType().getAddressType(),
+      /*isStrict*/ true, /*isInvariant*/ false);
     if (valueTL.isLoadable() || !gen.silConv.useLoweredAddresses())
       value = valueTL.emitLoad(gen.B, loc, value, LoadOwnershipQualifier::Take);
     ManagedValue mValue = gen.emitManagedRValueWithCleanup(value, valueTL);

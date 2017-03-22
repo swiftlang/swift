@@ -19,9 +19,9 @@
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/ParameterList.h"
 #include "swift/AST/ProtocolConformance.h"
-#include "swift/AST/Mangle.h"
-#include "swift/Basic/ManglingUtils.h"
+#include "swift/Demangling/ManglingUtils.h"
 #include "swift/Strings.h"
 #include "clang/Basic/CharInfo.h"
 #include "clang/AST/Attr.h"
@@ -36,29 +36,7 @@
 #include "llvm/Support/CommandLine.h"
 
 using namespace swift;
-using namespace swift::NewMangling;
-
-std::string NewMangling::mangleTypeForDebugger(Type Ty, const DeclContext *DC) {
-  Mangle::Mangler OldMangler(/* DWARF */ true);
-  OldMangler.mangleTypeForDebugger(Ty, DC);
-  std::string Old = OldMangler.finalize();
-  ASTMangler NewMangler(/* DWARF */ true);
-  std::string New = NewMangler.mangleTypeForDebugger(Ty, DC);
-
-  // The old mangling is broken in some cases, so we don't check if the new
-  // mangling is equivalent to the old mangling.
-  return selectMangling(Old, New, /*compareTrees*/ false);
-}
-
-std::string NewMangling::mangleTypeAsUSR(Type Ty) {
-  Mangle::Mangler OldMangler;
-  OldMangler.mangleType(Ty, /*uncurry*/ 0);
-  std::string Old = OldMangler.finalize();
-  ASTMangler NewMangler;
-  std::string New = NewMangler.mangleTypeAsUSR(Ty);
-  return selectMangling(Old, New);
-}
-
+using namespace swift::Mangle;
 
 std::string ASTMangler::mangleClosureEntity(const AbstractClosureExpr *closure,
                                             SymbolKind SKind) {
@@ -260,14 +238,23 @@ std::string ASTMangler::mangleReabstractionThunkHelper(
 }
 
 std::string ASTMangler::mangleTypeForDebugger(Type Ty, const DeclContext *DC) {
-  assert(DWARFMangling && "DWARFMangling expected when mangling for debugger");
-
+  DWARFMangling = true;
   beginMangling();
+  
   if (DC)
     bindGenericParameters(DC);
   DeclCtx = DC;
 
   appendType(Ty);
+  appendOperator("D");
+  return finalize();
+}
+
+std::string ASTMangler::mangleDeclType(const ValueDecl *decl) {
+  DWARFMangling = true;
+  beginMangling();
+  
+  appendDeclType(decl);
   appendOperator("D");
   return finalize();
 }
@@ -375,8 +362,31 @@ static bool isInPrivateOrLocalContext(const ValueDecl *D) {
   return isInPrivateOrLocalContext(nominal);
 }
 
+static unsigned getUnnamedParamIndex(const Decl *D) {
+  unsigned UnnamedIndex = 0;
+  ArrayRef<ParameterList *> ParamLists;
+
+  if (auto AFD = dyn_cast<AbstractFunctionDecl>(D->getDeclContext())) {
+    ParamLists = AFD->getParameterLists();
+  } else if (auto ACE = dyn_cast<AbstractClosureExpr>(D->getDeclContext())) {
+    ParamLists = ACE->getParameterLists();
+  } else {
+    llvm_unreachable("unhandled param context");
+  }
+  for (auto ParamList : ParamLists) {
+    for (auto Param : *ParamList) {
+      if (!Param->hasName()) {
+        if (Param == D)
+          return UnnamedIndex;
+        ++UnnamedIndex;
+      }
+    }
+  }
+  llvm_unreachable("param not found");
+}
+
 void ASTMangler::appendDeclName(const ValueDecl *decl) {
-  if (decl->getName().isOperator()) {
+  if (decl->isOperator()) {
     appendIdentifier(translateOperator(decl->getName().str()));
     switch (decl->getAttrs().getUnaryOperatorKind()) {
       case UnaryOperatorKind::Prefix:
@@ -394,6 +404,10 @@ void ASTMangler::appendDeclName(const ValueDecl *decl) {
   }
 
   if (decl->getDeclContext()->isLocalContext()) {
+    if (isa<ParamDecl>(decl) && !decl->hasName()) {
+      // Mangle unnamed params with their ordering.
+      return appendOperator("L", Index(getUnnamedParamIndex(decl)));
+    }
     // Mangle local declarations with a numeric discriminator.
     return appendOperator("L", Index(decl->getLocalDiscriminator()));
   }
@@ -1407,6 +1421,10 @@ void ASTMangler::appendAssociatedTypeName(DependentMemberType *dmt) {
   // If the base type is known to have a single protocol conformance
   // in the current generic context, then we don't need to disambiguate the
   // associated type name by protocol.
+  // This can result in getting the same mangled string for different
+  // DependentMemberTypes. This is not a problem but re-mangling might do more
+  // aggressive substitutions, which means that the re-mangled name may differ
+  // from the the original mangled name.
   // FIXME: We ought to be able to get to the generic signature from a
   // dependent type, but can't yet. Shouldn't need this side channel.
 
@@ -1468,15 +1486,14 @@ static bool isMethodDecl(const Decl *decl) {
 }
 
 static bool genericParamIsBelowDepth(Type type, unsigned methodDepth) {
-  if (auto gp = type->getAs<GenericTypeParamType>()) {
-    return gp->getDepth() >= methodDepth;
-  }
-  if (auto dm = type->getAs<DependentMemberType>()) {
-    return genericParamIsBelowDepth(dm->getBase(), methodDepth);
-  }
-  // Non-dependent types in a same-type requirement don't affect whether we
-  // mangle the requirement.
-  return false;
+  if (!type->hasTypeParameter())
+    return true;
+
+  return !type.findIf([methodDepth](Type t) -> bool {
+    if (auto *gp = t->getAs<GenericTypeParamType>())
+      return gp->getDepth() >= methodDepth;
+    return false;
+  });
 }
 
 CanType ASTMangler::getDeclTypeForMangling(
@@ -1518,10 +1535,10 @@ CanType ASTMangler::getDeclTypeForMangling(
       auto parentGenericSig =
         decl->getDeclContext()->getGenericSignatureOfContext();
       if (parentGenericSig && sig) {
-        // The method's depth starts below the depth of the context.
+        // The method's depth starts above the depth of the context.
         if (!parentGenericSig->getGenericParams().empty())
           initialParamDepth =
-            parentGenericSig->getGenericParams().back()->getDepth()+1;
+            parentGenericSig->getGenericParams().back()->getDepth() + 1;
 
         while (!genericParams.empty()) {
           if (genericParams.front()->getDepth() >= initialParamDepth)
@@ -1535,16 +1552,16 @@ CanType ASTMangler::getDeclTypeForMangling(
         case RequirementKind::Conformance:
         case RequirementKind::Layout:
         case RequirementKind::Superclass:
-          // We don't need the requirement if the constrained type is above the
+          // We don't need the requirement if the constrained type is below the
           // method depth.
-          if (!genericParamIsBelowDepth(reqt.getFirstType(), initialParamDepth))
+          if (genericParamIsBelowDepth(reqt.getFirstType(), initialParamDepth))
             continue;
           break;
         case RequirementKind::SameType:
-          // We don't need the requirement if both types are above the method
+          // We don't need the requirement if both types are below the method
           // depth, or non-dependent.
-          if (!genericParamIsBelowDepth(reqt.getFirstType(),initialParamDepth)&&
-              !genericParamIsBelowDepth(reqt.getSecondType(),initialParamDepth))
+          if (genericParamIsBelowDepth(reqt.getFirstType(), initialParamDepth) &&
+              genericParamIsBelowDepth(reqt.getSecondType(), initialParamDepth))
             continue;
           break;
           }

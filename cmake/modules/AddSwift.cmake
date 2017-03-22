@@ -101,7 +101,7 @@ function(_add_variant_c_compile_link_flags)
 
   # MSVC and clang-cl dont't understand -target.
   if (NOT SWIFT_COMPILER_IS_MSVC_LIKE)
-     list(APPEND result "-target" "${SWIFT_SDK_${CFLAGS_SDK}_ARCH_${CFLAGS_ARCH}_TRIPLE}")
+    list(APPEND result "-target" "${SWIFT_SDK_${CFLAGS_SDK}_ARCH_${CFLAGS_ARCH}_TRIPLE}")
   endif()
 
   is_darwin_based_sdk("${CFLAGS_SDK}" IS_DARWIN)
@@ -277,9 +277,14 @@ function(_add_variant_swift_compile_flags
     list(APPEND result "-sdk" "${SWIFT_SDK_${sdk}_PATH}")
   endif()
 
-  list(APPEND result
-      "-target" "${SWIFT_SDK_${sdk}_ARCH_${arch}_TRIPLE}"
-      "-resource-dir" "${SWIFTLIB_DIR}")
+  if(BUILD_STANDALONE)
+    list(APPEND result
+        "-target" "${SWIFT_SDK_${sdk}_ARCH_${arch}_TRIPLE}")
+  else()
+    list(APPEND result
+        "-target" "${SWIFT_SDK_${sdk}_ARCH_${arch}_TRIPLE}"
+        "-resource-dir" "${SWIFTLIB_DIR}")
+  endif()
 
   is_darwin_based_sdk("${sdk}" IS_DARWIN)
   if(IS_DARWIN)
@@ -460,22 +465,23 @@ function(_add_swift_lipo_target)
   is_darwin_based_sdk("${LIPO_SDK}" IS_DARWIN)
   if(IS_DARWIN)
     if(LIPO_CODESIGN)
-      set(codesign_command COMMAND "codesign" "-f" "-s" "-" "${LIPO_OUTPUT}")
+      precondition(CMAKE_CODESIGN MESSAGE "CMAKE_CODESIGN is required, please set it")
+      set(codesign_command COMMAND "${CMAKE_CODESIGN}" "-f" "-s" "-" "${LIPO_OUTPUT}")
     endif()
     # Use lipo to create the final binary.
     add_custom_command_target(unused_var
-        COMMAND "${LIPO}" "-create" "-output" "${LIPO_OUTPUT}" ${source_binaries}
-        ${codesign_command}
-        CUSTOM_TARGET_NAME "${LIPO_TARGET}"
-        OUTPUT "${LIPO_OUTPUT}"
-        DEPENDS ${source_targets})
+      COMMAND "${CMAKE_LIPO}" "-create" "-output" "${LIPO_OUTPUT}" ${source_binaries}
+      ${codesign_command}
+      CUSTOM_TARGET_NAME "${LIPO_TARGET}"
+      OUTPUT "${LIPO_OUTPUT}"
+      DEPENDS ${source_targets})
   else()
     # We don't know how to create fat binaries for other platforms.
     add_custom_command_target(unused_var
-        COMMAND "${CMAKE_COMMAND}" "-E" "copy" "${source_binaries}" "${LIPO_OUTPUT}"
-        CUSTOM_TARGET_NAME "${LIPO_TARGET}"
-        OUTPUT "${LIPO_OUTPUT}"
-        DEPENDS ${source_targets})
+      COMMAND "${CMAKE_COMMAND}" "-E" "copy" "${source_binaries}" "${LIPO_OUTPUT}"
+      CUSTOM_TARGET_NAME "${LIPO_TARGET}"
+      OUTPUT "${LIPO_OUTPUT}"
+      DEPENDS ${source_targets})
   endif()
 endfunction()
 
@@ -629,6 +635,10 @@ function(_add_swift_library_single target name)
     endif()
   endif()
 
+  if(SWIFT_RUNTIME_ENABLE_COW_EXISTENTIALS)
+    list(APPEND SWIFTLIB_SINGLE_C_COMPILE_FLAGS "-DSWIFT_RUNTIME_ENABLE_COW_EXISTENTIALS=1")
+  endif()
+
   if (SWIFT_COMPILER_VERSION)
     is_darwin_based_sdk("${SWIFTLIB_SINGLE_SDK}" IS_DARWIN)
     if(IS_DARWIN)
@@ -759,19 +769,19 @@ function(_add_swift_library_single target name)
       DEPENDS ${swift_module_dependency_target})
   endif()
 
-  if (swift_sib_dependency_target)
-    add_dependencies(swift-stdlib${VARIANT_SUFFIX}-sib
-      ${swift_sib_dependency_target})
-  endif()
+  # For standalone overlay builds to work
+  if(NOT BUILD_STANDALONE)
+    if (EXISTS swift_sib_dependency_target AND NOT "${swift_sib_dependency_target}" STREQUAL "")
+      add_dependencies(swift-stdlib${VARIANT_SUFFIX}-sib ${swift_sib_dependency_target})
+    endif()
 
-  if (swift_sibopt_dependency_target)
-    add_dependencies(swift-stdlib${VARIANT_SUFFIX}-sibopt
-      ${swift_sibopt_dependency_target})
-  endif()
+    if (EXISTS swift_sibopt_dependency_target AND NOT "${swift_sibopt_dependency_target}" STREQUAL "")
+      add_dependencies(swift-stdlib${VARIANT_SUFFIX}-sibopt ${swift_sibopt_dependency_target})
+    endif()
 
-  if (swift_sibgen_dependency_target)
-    add_dependencies(swift-stdlib${VARIANT_SUFFIX}-sibgen
-      ${swift_sibgen_dependency_target})
+    if (EXISTS swift_sibgen_dependency_target AND NOT "${swift_sibgen_dependency_target}" STREQUAL "")
+      add_dependencies(swift-stdlib${VARIANT_SUFFIX}-sibgen ${swift_sibgen_dependency_target})
+    endif()
   endif()
 
   set(SWIFTLIB_INCORPORATED_OBJECT_LIBRARIES_EXPRESSIONS)
@@ -1408,7 +1418,7 @@ function(add_swift_library name)
   endif()
 
   if(SWIFTLIB_TARGET_LIBRARY)
-    if(NOT SWIFT_BUILD_RUNTIME_WITH_HOST_COMPILER)
+    if(NOT SWIFT_BUILD_RUNTIME_WITH_HOST_COMPILER AND NOT BUILD_STANDALONE)
       list(APPEND SWIFTLIB_DEPENDS clang)
     endif()
 
@@ -1421,6 +1431,7 @@ function(add_swift_library name)
           "${SWIFTLIB_TARGET_SDKS}" "${SWIFT_HOST_VARIANT_SDK}"
           SWIFTLIB_TARGET_SDKS)
     endif()
+
     foreach(sdk ${SWIFTLIB_TARGET_SDKS})
       set(THIN_INPUT_TARGETS)
 
@@ -1470,12 +1481,16 @@ function(add_swift_library name)
         # linked libraries.  Find targets for both of these here.
         set(swiftlib_module_dependency_targets)
         set(swiftlib_private_link_libraries_targets)
-        foreach(mod ${swiftlib_module_depends_flattened})
-          list(APPEND swiftlib_module_dependency_targets
-              "swift${mod}${MODULE_VARIANT_SUFFIX}")
-          list(APPEND swiftlib_private_link_libraries_targets
-              "swift${mod}${VARIANT_SUFFIX}")
-        endforeach()
+
+        if(NOT BUILD_STANDALONE)
+          foreach(mod ${swiftlib_module_depends_flattened})
+            list(APPEND swiftlib_module_dependency_targets
+                "swift${mod}${MODULE_VARIANT_SUFFIX}")
+
+            list(APPEND swiftlib_private_link_libraries_targets
+                "swift${mod}${VARIANT_SUFFIX}")
+          endforeach()
+        endif()
 
         foreach(lib ${SWIFTLIB_PRIVATE_LINK_LIBRARIES})
           if("${lib}" STREQUAL "ICU_UC")
@@ -2082,7 +2097,7 @@ function(add_swift_host_tool executable)
       TARGETS ${executable}
       RUNTIME DESTINATION bin)
 
-     swift_is_installing_component(${ADDSWIFTHOSTTOOL_SWIFT_COMPONENT}
+    swift_is_installing_component(${ADDSWIFTHOSTTOOL_SWIFT_COMPONENT}
       is_installing)
   
     if(NOT is_installing)

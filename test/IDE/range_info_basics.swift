@@ -105,6 +105,36 @@ func foo8(a : [Int]) {
   } while i < 100
 }
 
+func foo9(_ a: Int, _ b: Int) -> Int {
+  if a == b {
+    return 0
+  }
+  switch a {
+  case 1:
+    foo9(1, 2)
+    foo9(1, 2)
+    return foo9(2, 4)
+  default:
+    foo9(1, 2)
+    foo9(1, 2)
+    return foo9(2, 4)
+  }
+  return 0
+}
+
+func testInout(_ a : inout Int) {
+  var b = a + 1 + 1
+  b = b + 1
+  testInout(&b)
+}
+
+func test_no_pattern_binding(_ parameters: [String: Any]) -> String {
+  var components: [(String, String)] = []
+  for key in parameters.keys.sorted(by: <) {
+  }
+  return components.map { "\($0)=\($1)" }.joined(separator: "&")
+}
+
 // RUN: %target-swift-ide-test -range -pos=8:1 -end-pos 8:32 -source-filename %s | %FileCheck %s -check-prefix=CHECK1
 // RUN: %target-swift-ide-test -range -pos=9:1 -end-pos 9:26 -source-filename %s | %FileCheck %s -check-prefix=CHECK2
 // RUN: %target-swift-ide-test -range -pos=10:1 -end-pos 10:27 -source-filename %s | %FileCheck %s -check-prefix=CHECK3
@@ -131,6 +161,36 @@ func foo8(a : [Int]) {
 // RUN: %target-swift-ide-test -range -pos=102:1 -end-pos=104:6 -source-filename %s | %FileCheck %s -check-prefix=CHECK24
 // RUN: %target-swift-ide-test -range -pos=87:1 -end-pos=92:6 -source-filename %s | %FileCheck %s -check-prefix=CHECK25
 // RUN: %target-swift-ide-test -range -pos=97:1 -end-pos=104:6 -source-filename %s | %FileCheck %s -check-prefix=CHECK26
+// RUN: %target-swift-ide-test -range -pos=109:6 -end-pos=111:4 -source-filename %s | %FileCheck %s -check-prefix=CHECK-INVALID
+// RUN: %target-swift-ide-test -range -pos=114:1 -end-pos=115:15 -source-filename %s | %FileCheck %s -check-prefix=CHECK27
+// RUN: %target-swift-ide-test -range -pos=118:1 -end-pos=119:15 -source-filename %s | %FileCheck %s -check-prefix=CHECK27
+// RUN: %target-swift-ide-test -range -pos=126:11 -end-pos=126:12 -source-filename %s | %FileCheck %s -check-prefix=CHECK-INT
+// RUN: %target-swift-ide-test -range -pos=126:11 -end-pos=126:20 -source-filename %s | %FileCheck %s -check-prefix=CHECK-INT
+// RUN: %target-swift-ide-test -range -pos=127:7 -end-pos=127:8 -source-filename %s | %FileCheck %s -check-prefix=CHECK-INT
+// RUN: %target-swift-ide-test -range -pos=127:3 -end-pos=127:4 -source-filename %s | %FileCheck %s -check-prefix=CHECK-INT-LVALUE
+// RUN: %target-swift-ide-test -range -pos=128:13 -end-pos=128:15 -source-filename %s | %FileCheck %s -check-prefix=CHECK-INT-INOUT
+// RUN: %target-swift-ide-test -range -pos=118:1 -end-pos=120:22 -source-filename %s | %FileCheck %s -check-prefix=CHECK-INT
+// RUN: %target-swift-ide-test -range -pos=133:1 -end-pos=135:65 -source-filename %s | %FileCheck %s -check-prefix=CHECK-NO-PATTERN
+
+// CHECK-NO-PATTERN: <Kind>MultiStatement</Kind>
+// CHECK-NO-PATTERN-NEXT: <Content>for key in parameters.keys.sorted(by: <) {
+// CHECK-NO-PATTERN-NEXT:   }
+// CHECK-NO-PATTERN-NEXT:   return components.map { "\($0)=\($1)" }.joined(separator: "&")</Content>
+// CHECK-NO-PATTERN-NEXT: <Type>String</Type>
+// CHECK-NO-PATTERN-NEXT: <Context>swift_ide_test.(file).test_no_pattern_binding(_:)</Context>
+// CHECK-NO-PATTERN-NEXT: <Declared>key</Declared><OutscopeReference>false</OutscopeReference>
+// CHECK-NO-PATTERN-NEXT: <Referenced>parameters</Referenced><Type>[String : Any]</Type>
+// CHECK-NO-PATTERN-NEXT: <Referenced>components</Referenced><Type>@lvalue [(String, String)]</Type>
+// CHECK-NO-PATTERN-NEXT: <Referenced>$0</Referenced><Type>String</Type>
+// CHECK-NO-PATTERN-NEXT: <Referenced>$1</Referenced><Type>String</Type>
+// CHECK-NO-PATTERN-NEXT: <ASTNodes>2</ASTNodes>
+// CHECK-NO-PATTERN-NEXT: <end>
+
+// CHECK-INVALID: <Kind>Invalid</Kind>
+
+// CHECK-INT: <Type>Int</Type>
+// CHECK-INT-LVALUE: <Type>@lvalue Int</Type>
+// CHECK-INT-INOUT: <Type>inout Int</Type>
 
 // CHECK1: <Kind>SingleDecl</Kind>
 // CHECK1-NEXT: <Content>func foo1() -> Int { return 0 }</Content>
@@ -188,7 +248,7 @@ func foo8(a : [Int]) {
 // CHECK7-NEXT:   let c = a.byteSwapped
 // CHECK7-NEXT:   b = b.bigEndian.bigEndian.byteSwapped
 // CHECK7-NEXT:   print(b + c)</Content>
-// CHECK7-NEXT: <Type>()</Type>
+// CHECK7-NEXT: <Type>Void</Type>
 // CHECK7-NEXT: <Context>swift_ide_test.(file).foo2()</Context>
 // CHECK7-NEXT: <Declared>b</Declared><OutscopeReference>false</OutscopeReference>
 // CHECK7-NEXT: <Declared>c</Declared><OutscopeReference>false</OutscopeReference>
@@ -228,6 +288,7 @@ func foo8(a : [Int]) {
 // CHECK10: <Kind>MultiStatement</Kind>
 // CHECK10-NEXT: <Content>let a = c.c.getC().c.getC().getC().getC()
 // CHECK10-NEXT:   let b = a.c.c.c.c.getC().getC()</Content>
+// CHECK10-NEXT: <Type>Void</Type>
 // CHECK10-NEXT: <Context>swift_ide_test.(file).foo5(c:)</Context>
 // CHECK10-NEXT: <Declared>a</Declared><OutscopeReference>true</OutscopeReference>
 // CHECK10-NEXT: <Declared>b</Declared><OutscopeReference>true</OutscopeReference>
@@ -240,6 +301,7 @@ func foo8(a : [Int]) {
 // CHECK11-NEXT: <Content>let a = c.c.getC().c.getC().getC().getC()
 // CHECK11-NEXT:   let b = a.c.c.c.c.getC().getC()
 // CHECK11-NEXT:   let d = a.c.getC().getC().c.c</Content>
+// CHECK11-NEXT: <Type>Void</Type>
 // CHECK11-NEXT: <Context>swift_ide_test.(file).foo5(c:)</Context>
 // CHECK11-NEXT: <Declared>a</Declared><OutscopeReference>true</OutscopeReference>
 // CHECK11-NEXT: <Declared>b</Declared><OutscopeReference>true</OutscopeReference>
@@ -272,7 +334,7 @@ func foo8(a : [Int]) {
 // CHECK13-NEXT:     let c = a.byteSwapped
 // CHECK13-NEXT:     b = b.bigEndian.bigEndian.byteSwapped
 // CHECK13-NEXT:     print(b + c)</Content>
-// CHECK13-NEXT: <Type>()</Type>
+// CHECK13-NEXT: <Type>Void</Type>
 // CHECK13-NEXT: <Context>swift_ide_test.(file).foo6().explicit closure discriminator=0</Context>
 // CHECK13-NEXT: <Declared>a</Declared><OutscopeReference>false</OutscopeReference>
 // CHECK13-NEXT: <Declared>b</Declared><OutscopeReference>false</OutscopeReference>
@@ -319,7 +381,7 @@ func foo8(a : [Int]) {
 // CHECK15-NEXT:       var b = a.bigEndian
 // CHECK15-NEXT:       let c = a.byteSwapped
 // CHECK15-NEXT:       b = b.bigEndian.bigEndian.byteSwapped</Content>
-// CHECK15-NEXT: <Type>()</Type>
+// CHECK15-NEXT: <Type>Void</Type>
 // CHECK15-NEXT: <Context>swift_ide_test.(file).foo6().explicit closure discriminator=0.explicit closure discriminator=0</Context>
 // CHECK15-NEXT: <Declared>a</Declared><OutscopeReference>false</OutscopeReference>
 // CHECK15-NEXT: <Declared>b</Declared><OutscopeReference>true</OutscopeReference>
@@ -392,3 +454,12 @@ func foo8(a : [Int]) {
 // CHECK24: <Orphan>Break</Orphan>
 // CHECK25: <Orphan>Break</Orphan>
 // CHECK26: <Orphan>Continue</Orphan>
+
+// CHECK27: <Kind>MultiStatement</Kind>
+// CHECK27-NEXT: <Content>foo9(1, 2)
+// CHECK27-NEXT:     foo9(1, 2)</Content>
+// CHECK27-NEXT: <Type>Void</Type>
+// CHECK27-NEXT: <Context>swift_ide_test.(file).foo9(_:_:)</Context>
+// CHECK27-NEXT: <Referenced>foo9</Referenced><Type>(Int, Int) -> Int</Type>
+// CHECK27-NEXT: <ASTNodes>2</ASTNodes>
+// CHECK27-NEXT: <end>

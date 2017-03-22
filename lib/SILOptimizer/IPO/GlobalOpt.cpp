@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "globalopt"
-#include "swift/Basic/Demangle.h"
+#include "swift/Demangling/Demangle.h"
 #include "swift/SIL/CFG.h"
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/SILInstruction.h"
@@ -24,7 +24,6 @@
 #include "llvm/ADT/SCCIterator.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
-#include "swift/AST/Mangle.h"
 #include "swift/AST/ASTMangler.h"
 using namespace swift;
 
@@ -192,15 +191,8 @@ static void removeToken(SILValue Op) {
 }
 
 static std::string mangleGetter(VarDecl *varDecl) {
-  Mangle::Mangler getterMangler;
-  getterMangler.append("_T");
-  getterMangler.mangleGlobalGetterEntity(varDecl);
-  std::string Old = getterMangler.finalize();
-
-  NewMangling::ASTMangler NewMangler;
-  std::string New = NewMangler.mangleGlobalGetterEntity(varDecl);
-
-  return NewMangling::selectMangling(Old, New);
+  Mangle::ASTMangler Mangler;
+  return Mangler.mangleGlobalGetterEntity(varDecl);
 }
 
 /// Generate getter from the initialization code whose
@@ -297,8 +289,8 @@ static SILFunction *getCalleeOfOnceCall(BuiltinInst *BI) {
   assert(BI->getNumOperands() == 2 && "once call should have 2 operands.");
 
   auto Callee = BI->getOperand(1);
-  assert(cast<SILFunctionType>(Callee->getType().getSwiftRValueType())
-                 ->getRepresentation() == SILFunctionTypeRepresentation::Thin &&
+  assert(Callee->getType().castTo<SILFunctionType>()->getRepresentation()
+           == SILFunctionTypeRepresentation::Thin &&
          "Expected thin function representation!");
 
   if (auto *FR = dyn_cast<FunctionRefInst>(Callee))
@@ -934,7 +926,7 @@ class SILGlobalOptPass : public SILModuleTransform
   void run() override {
     DominanceAnalysis *DA = PM->getAnalysis<DominanceAnalysis>();
     if (SILGlobalOpt(getModule(), DA).run()) {
-      invalidateAnalysis(SILAnalysis::InvalidationKind::FunctionBody);
+      invalidateAll();
     }
   }
 

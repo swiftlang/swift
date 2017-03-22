@@ -13,7 +13,6 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/USRGeneration.h"
-#include "swift/AST/Mangle.h"
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/SwiftNameTranslation.h"
 #include "llvm/ADT/SmallString.h"
@@ -34,15 +33,15 @@ static inline StringRef getUSRSpacePrefix() {
 
 bool ide::printTypeUSR(Type Ty, raw_ostream &OS) {
   assert(!Ty->hasArchetype() && "cannot have contextless archetypes mangled.");
-  OS << NewMangling::mangleTypeForDebugger(Ty->getRValueType(), nullptr);
+  Mangle::ASTMangler Mangler;
+  OS << Mangler.mangleTypeForDebugger(Ty->getRValueType(), nullptr);
   return false;
 }
 
 bool ide::printDeclTypeUSR(const ValueDecl *D, raw_ostream &OS) {
-  using namespace Mangle;
-  Mangler Mangler(true);
-  Mangler.mangleDeclTypeForDebugger(D);
-  Mangler.finalize(OS);
+  Mangle::ASTMangler Mangler;
+  std::string MangledName = Mangler.mangleDeclType(D);
+  OS << MangledName;
   return false;
 }
 
@@ -142,9 +141,9 @@ static bool ShouldUseObjCUSR(const Decl *D) {
 }
 
 bool ide::printDeclUSR(const ValueDecl *D, raw_ostream &OS) {
-  using namespace Mangle;
-
-  if (!D->hasName() && (!isa<FuncDecl>(D) || cast<FuncDecl>(D)->getAccessorKind() == AccessorKind::NotAccessor))
+  if (!D->hasName() && !isa<ParamDecl>(D) &&
+      (!isa<FuncDecl>(D) ||
+       cast<FuncDecl>(D)->getAccessorKind() == AccessorKind::NotAccessor))
     return true; // Ignore.
   if (D->getModuleContext()->isBuiltinModule())
     return true; // Ignore.
@@ -214,7 +213,7 @@ bool ide::printDeclUSR(const ValueDecl *D, raw_ostream &OS) {
   if (isa<ParamDecl>(VD) && isa<DestructorDecl>(VD->getDeclContext()))
     return true;
 
-  NewMangling::ASTMangler NewMangler;
+  Mangle::ASTMangler NewMangler;
   std::string Mangled = NewMangler.mangleDeclAsUSR(VD, getUSRSpacePrefix());
 
   OS << Mangled;
@@ -224,8 +223,6 @@ bool ide::printDeclUSR(const ValueDecl *D, raw_ostream &OS) {
 
 bool ide::printAccessorUSR(const AbstractStorageDecl *D, AccessorKind AccKind,
                            llvm::raw_ostream &OS) {
-  using namespace Mangle;
-
   // AccKind should always be either IsGetter or IsSetter here, based
   // on whether a reference is a mutating or non-mutating use.  USRs
   // aren't supposed to reflect implementation differences like stored
@@ -243,7 +240,7 @@ bool ide::printAccessorUSR(const AbstractStorageDecl *D, AccessorKind AccKind,
     return printObjCUSRForAccessor(SD, AccKind, OS);
   }
 
-  NewMangling::ASTMangler NewMangler;
+  Mangle::ASTMangler NewMangler;
   std::string Mangled = NewMangler.mangleAccessorEntityAsUSR(AccKind,
                           AddressorKind::NotAddressor, SD, getUSRSpacePrefix());
 

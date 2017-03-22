@@ -11,7 +11,10 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Index/IndexSymbol.h"
-#include "swift/AST/AST.h"
+#include "swift/AST/ASTContext.h"
+#include "swift/AST/Decl.h"
+#include "swift/AST/ParameterList.h"
+#include "swift/AST/Types.h"
 
 using namespace swift;
 using namespace swift::index;
@@ -205,6 +208,10 @@ SymbolInfo index::getSymbolInfoForDecl(const Decl *D) {
       break;
   }
 
+  if (isLocalSymbol(D)) {
+    info.Properties |= SymbolProperty::Local;
+  }
+
   return info;
 }
 
@@ -223,4 +230,9 @@ SymbolSubKind index::getSubKindForAccessor(AccessorKind AK) {
   }
 
   llvm_unreachable("Unhandled AccessorKind in switch.");
+}
+
+bool index::isLocalSymbol(const swift::Decl *D) {
+  return D->getDeclContext()->getLocalContext() &&
+    (!isa<ParamDecl>(D) || cast<ParamDecl>(D)->getArgumentNameLoc().isValid());
 }

@@ -65,7 +65,7 @@ def fline_map(target_filename):
 def map_line_to_source_file(target_filename, target_line_num):
     """
     >>> from tempfile import *
-    >>> t = NamedTemporaryFile()
+    >>> t = NamedTemporaryFile(delete=False)
     >>> t.write('''line 1
     ... line 2
     ... // ###sourceLocation(file: "foo.bar", line: 20)
@@ -97,6 +97,8 @@ def map_line_to_source_file(target_filename, target_line_num):
     ('baz.txt', 6)
     >>> map_line_to_source_file(t.name, 42)
     ('baz.txt', 40)
+    >>> t.close()
+    >>> os.remove(t.name)
     """
     assert(target_line_num > 0)
     map = fline_map(target_filename)
@@ -105,12 +107,11 @@ def map_line_to_source_file(target_filename, target_line_num):
     return base[1], base[2] + (target_line_num - base[0] - 1)
 
 
-def map_line_from_source_file(source_filename,
-                              source_line_num,
+def map_line_from_source_file(source_filename, source_line_num,
                               target_filename):
     """
     >>> from tempfile import *
-    >>> t = NamedTemporaryFile()
+    >>> t = NamedTemporaryFile(delete=False)
     >>> t.write('''line 1
     ... line 2
     ... // ###sourceLocation(file: "foo.bar", line: 20)
@@ -149,6 +150,8 @@ def map_line_from_source_file(source_filename,
     ... except RuntimeError: pass
     >>> try: map_line_from_source_file('foo.bar', 2, t.name)
     ... except RuntimeError: pass
+    >>> t.close()
+    >>> os.remove(t.name)
     """
     assert(source_line_num > 0)
     map = fline_map(target_filename)
@@ -186,7 +189,7 @@ def run():
     """Simulate a couple of gyb-generated files
 
     >>> from tempfile import *
-    >>> target1 = NamedTemporaryFile()
+    >>> target1 = NamedTemporaryFile(delete=False)
     >>> target1.write('''line 1
     ... line 2
     ... // ###sourceLocation(file: "foo.bar", line: 20)
@@ -197,7 +200,7 @@ def run():
     ... line 8
     ... ''')
     >>> target1.flush()
-    >>> target2 = NamedTemporaryFile()
+    >>> target2 = NamedTemporaryFile(delete=False)
     >>> target2.write('''// ###sourceLocation(file: "foo.bar", line: 7)
     ... line 2
     ... line 3
@@ -209,7 +212,7 @@ def run():
 
     Simulate the raw output of compilation
 
-    >>> raw_output = NamedTemporaryFile()
+    >>> raw_output = NamedTemporaryFile(delete=False)
     >>> target1_name, target2_name = target1.name, target2.name
     >>> raw_output.write('''A
     ... %(target1_name)s:2:111: error one
@@ -232,7 +235,7 @@ def run():
     dump the output file.
 
     >>> import subprocess
-    >>> output = subprocess.check_output([
+    >>> output = subprocess.check_output([sys.executable,
     ...    __file__, target1.name, target2.name, '--',
     ...    sys.executable, '-c',
     ...   'import sys;sys.stdout.write(open(sys.argv[1]).read())',
@@ -240,8 +243,9 @@ def run():
 
     Replace temporary filenames and check it.
 
-    >>> print output.replace(target1.name,'TARGET1-NAME')
-    ...             .replace(target2.name,'TARGET2-NAME') + 'EOF'
+    >>> print(output.replace(target1.name,'TARGET1-NAME')
+    ...             .replace(target2.name,'TARGET2-NAME')
+    ...             .replace('\\r', '') + 'EOF')
     A
     TARGET1-NAME:2:111: error one
     B
@@ -257,17 +261,349 @@ def run():
     glitch in [fox.box, line 11 assert five
     glitch in [fox.box:28 assert six
     EOF
-    >>> print subprocess.check_output([__file__, 'foo.bar', '21',
-    ...                                target1.name]),
+    >>> print(subprocess.check_output([sys.executable, __file__, 'foo.bar',
+    ...                                '21', target1.name]).rstrip())
     5
-    >>> print subprocess.check_output([__file__, 'foo.bar', '8',
-    ...                                target2.name]),
+    >>> print(subprocess.check_output([sys.executable, __file__, 'foo.bar',
+    ...                                '8', target2.name]).rstrip())
     3
 
+    Simulate errors on different line numbers
+    >>> long_output = NamedTemporaryFile(delete=False)
+    >>> long_output.write('''
+    ... // ###sourceLocation(file: "/public/core/Map.swift.gyb", line: 1)
+    ... // ###sourceLocation(file: "/public/core/Map.swift.gyb", line: 1)
+    ... //===--- Map.swift.gyb - Lazily map over a Sequence -----------*- swif
+    ... //
+    ... // This source file is part of the Swift.org open source project
+    ... //
+    ... // Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+    ... // Licensed under Apache License v2.0 with Runtime Library Exception
+    ... //
+    ... // See https://swift.org/LICENSE.txt for license information
+    ... // See https://swift.org/CONTRIBUTORS.txt for the list of Swift projec
+    ... //
+    ... //===-----------------------------------------------------------------
+    ...
+    ... // ###sourceLocation(file: "/public/core/Map.swift.gyb", line: 20)
+    ...
+    ... /// The `IteratorProtocol` used by `MapSequence` and `MapCollection`.
+    ... /// Produces each element by passing the output of the `Base`
+    ... /// `IteratorProtocol` through a transform function returning
+    ... @_fixed_layout
+    ... public struct LazyMapIterator<
+    ...   Base : IteratorProtocol, Element
+    ... > : IteratorProtocol, Sequence {
+    ...   /// Advances to the next element and returns it, or `nil` if no
+    ...   /// exists.
+    ...   ///
+    ...   /// Once `nil` has been returned, all subsequent calls return `nil`.
+    ...   ///
+    ...   /// - Precondition: `next()` has not been applied to a copy.
+    ...   ///   since the copy was made.
+    ...   @_inlineable
+    ...   public mutating func next() -> Element? {
+    ...     return _base.next().map(_transform)
+    ...   }
+    ...
+    ...   @_inlineable
+    ...   public var base: Base { return _base }
+    ...
+    ...   @_versioned
+    ...   internal var _base: Base
+    ...   @_versioned
+    ...   internal let _transform: (Base.Element) -> Element
+    ...
+    ...   @_inlineable
+    ...   @_versioned
+    ...   internal init(_base: Base, _transform: @escaping (Base.Element)
+    ...     self._base = _base
+    ...     self._transform = _transform
+    ...   }
+    ... }
+    ...
+    ... /// A `Sequence` whose elements consist of those in a `Base`
+    ... /// `Sequence` passed through a transform function returning.
+    ... /// These elements are computed lazily, each time they're read, by
+    ... /// calling the transform function on a base element.
+    ... @_fixed_layout
+    ... public struct LazyMapSequence<Base : Sequence, Element>
+    ...   : LazySequenceProtocol {
+    ...
+    ...   public typealias Elements = LazyMapSequence
+    ...
+    ...   /// Returns an iterator over the elements of this sequence.
+    ...   ///
+    ...   /// - Complexity: O(1).
+    ...   @_inlineable
+    ...   public func makeIterator() -> LazyMapIterator<Base.Iterator, Element
+    ...     return LazyMapIterator(_base: _base.makeIterator(), _transform: _t
+    ...   }
+    ...
+    ...   /// Returns a value less than or equal to the number of elements in
+    ...   /// `self`, **nondestructively**.
+    ...   ///
+    ...   /// - Complexity: O(*n*)
+    ...   @_inlineable
+    ...   public var underestimatedCount: Int {
+    ...     return _base.underestimatedCount
+    ...   }
+    ...
+    ...   /// Creates an instance with elements `transform(x)` for each elemen
+    ...   /// `x` of base.
+    ...   @_inlineable
+    ...   @_versioned
+    ...   internal init(_base: Base, transform: @escaping (Base.Iterator.Eleme
+    ...     self._base = _base
+    ...     self._transform = transform
+    ...   }
+    ...
+    ...   @_versioned
+    ...   internal var _base: Base
+    ...   @_versioned
+    ...   internal let _transform: (Base.Iterator.Element) -> Element
+    ... }
+    ...
+    ... //===--- Collections -------------------------------------------------
+    ...
+    ... // FIXME(ABI)#45 (Conditional Conformance): `LazyMap*Collection` types
+    ... // collapsed into one `LazyMapCollection` using conditional conformanc
+    ... // Maybe even combined with `LazyMapSequence`.
+    ... // rdar://problem/17144340
+    ...
+    ... // ###sourceLocation(file: "/public/core/Map.swift.gyb", line: 108)
+    ...
+    ... /// A `Collection` whose elements consist of those in a `Base`
+    ... /// `Collection` passed through a transform function returning `Elemen
+    ... /// These elements are computed lazily, each time they're read, by
+    ... /// calling the transform function on a base element.
+    ... @_fixed_layout
+    ... public struct LazyMapCollection<
+    ...   Base : Collection, Element
+    ... > : LazyCollectionProtocol,
+    ...     _CollectionWrapper
+    ... {
+    ...   public typealias Base = Base_
+    ...   public typealias Index = Base.Index
+    ...   public typealias _Element = Base._Element
+    ...   public typealias SubSequence = Base.SubSequence
+    ...   typealias Indices = Base.Indices
+    ...
+    ...   @_inlineable
+    ...   public subscript(position: Base.Index) -> Element {
+    ...     return _transform(_base[position])
+    ...   }
+    ...
+    ...   /// Create an instance with elements `transform(x)` for each element
+    ...   /// `x` of base.
+    ...   @_inlineable
+    ...   @_versioned
+    ...   internal init(_base: Base, transform: @escaping (Base.Iterator.Eleme
+    ...     self._base = _base
+    ...     self._transform = transform
+    ...   }
+    ...
+    ...   @_versioned
+    ...   internal var _base: Base
+    ...   @_versioned
+    ...   internal let _transform: (Base.Iterator.Element) -> Element
+    ... }
+    ...
+    ... // ###sourceLocation(file: "/public/core/Map.swift.gyb", line: 108)
+    ...
+    ... /// A `Collection` whose elements consist of those in a `Base`
+    ... /// `Collection` passed through a transform function returning `Elemen
+    ... /// These elements are computed lazily, each time they're read, by
+    ... /// calling the transform function on a base element.
+    ... @_fixed_layout
+    ... public struct LazyMapBidirectionalCollection<
+    ...   Base : BidirectionalCollection, Element
+    ... > : LazyCollectionProtocol,
+    ...     _BidirectionalCollectionWrapper
+    ... {
+    ...   public typealias Base = Base_
+    ...   public typealias Index = Base.Index
+    ...   public typealias _Element = Base._Element
+    ...   public typealias SubSequence = Base.SubSequence
+    ...   typealias Indices = Base.Indices
+    ...
+    ...   @_inlineable
+    ...   public subscript(position: Base.Index) -> Element {
+    ...     return _transform(_base[position])
+    ...   }
+    ...
+    ...   /// Create an instance with elements `transform(x)` for each element
+    ...   /// `x` of base.
+    ...   @_inlineable
+    ...   @_versioned
+    ...   internal init(_base: Base, transform: @escaping (Base.Iterator.Eleme
+    ...     self._base = _base
+    ...     self._transform = transform
+    ...   }
+    ...
+    ...   @_versioned
+    ...   internal var _base: Base
+    ...   @_versioned
+    ...   internal let _transform: (Base.Iterator.Element) -> Element
+    ... }
+    ...
+    ... // ###sourceLocation(file: "/public/core/Map.swift.gyb", line: 108)
+    ...
+    ... /// A `Collection` whose elements consist of those in a `Base`
+    ... /// `Collection` passed through a transform function returning `Elemen
+    ... /// These elements are computed lazily, each time they're read, by
+    ... /// calling the transform function on a base element.
+    ... @_fixed_layout
+    ... public struct LazyMapRandomAccessCollection<
+    ...   Base : RandomAccessCollection, Element
+    ... > : LazyCollectionProtocol,
+    ...     _RandomAccessCollectionWrapper
+    ... {
+    ...   public typealias Base = Base_
+    ...   public typealias Index = Base.Index
+    ...   public typealias _Element = Base._Element
+    ...   public typealias SubSequence = Base.SubSequence
+    ...   typealias Indices = Base.Indices
+    ...
+    ...   @_inlineable
+    ...   public subscript(position: Base.Index) -> Element {
+    ...     return _transform(_base[position])
+    ...   }
+    ...
+    ...   /// Create an instance with elements `transform(x)` for each element
+    ...   /// `x` of base.
+    ...   @_inlineable
+    ...   @_versioned
+    ...   internal init(_base: Base, transform: @escaping (Base.Iterator.Eleme
+    ...     self._base = _base
+    ...     self._transform = transform
+    ...   }
+    ...
+    ...   @_versioned
+    ...   internal var _base: Base
+    ...   @_versioned
+    ...   internal let _transform: (Base.Iterator.Element) -> Element
+    ... }
+    ...
+    ... // ###sourceLocation(file: "/public/core/Map.swift.gyb", line: 146)
+    ...
+    ... //===--- Support for s.lazy ------------------------------------------
+    ...
+    ... extension LazySequenceProtocol {
+    ...   /// Returns a `LazyMapSequence` over this `Sequence`.  The elements
+    ...   /// the result are computed lazily, each time they are read, by
+    ...   /// calling `transform` function on a base element.
+    ...   @_inlineable
+    ...   public func map<U>(
+    ...     _ transform: @escaping (Elements.Iterator.Element) -> U
+    ...   ) -> LazyMapSequence<Self.Elements, U> {
+    ...     return LazyMapSequence(_base: self.elements, transform: transform)
+    ...   }
+    ... }
+    ...
+    ... // ###sourceLocation(file: "/public/core/Map.swift.gyb", line: 162)
+    ...
+    ... extension LazyCollectionProtocol
+    ... // ###sourceLocation(file: "/public/core/Map.swift.gyb", line: 169)
+    ... {
+    ...   /// Returns a `LazyMapCollection` over this `Collection`.  The eleme
+    ...   /// the result are computed lazily, each time they are read, by
+    ...   /// calling `transform` function on a base element.
+    ...   @_inlineable
+    ...   public func map<U>(
+    ...     _ transform: @escaping (Elements.Iterator.Element) -> U
+    ...   ) -> LazyMapCollection<Self.Elements, U> {
+    ...     return LazyMapCollection(
+    ...       _base: self.elements,
+    ...       transform: transform)
+    ...   }
+    ... }
+    ...
+    ... // ###sourceLocation(file: "/public/core/Map.swift.gyb", line: 162)
+    ...
+    ... extension LazyCollectionProtocol
+    ... // ###sourceLocation(file: "/public/core/Map.swift.gyb", line: 165)
+    ...   where
+    ...   Self : BidirectionalCollection,
+    ...   Elements : BidirectionalCollection
+    ... // ###sourceLocation(file: "/public/core/Map.swift.gyb", line: 169)
+    ... {
+    ...   /// Returns a `LazyMapCollection` over this `Collection`.  The eleme
+    ...   /// the result are computed lazily, each time they are read, by
+    ...   /// calling `transform` function on a base element.
+    ...   @_inlineable
+    ...   public func map<U>(
+    ...     _ transform: @escaping (Elements.Iterator.Element) -> U
+    ...   ) -> LazyMapBidirectionalCollection<Self.Elements, U> {
+    ...     return LazyMapBidirectionalCollection(
+    ...       _base: self.elements,
+    ...       transform: transform)
+    ...   }
+    ... }
+    ...
+    ... // ###sourceLocation(file: "/public/core/Map.swift.gyb", line: 162)
+    ...
+    ... extension LazyCollectionProtocol
+    ... // ###sourceLocation(file: "/public/core/Map.swift.gyb", line: 165)
+    ...   where
+    ...   Self : RandomAccessCollection,
+    ...   Elements : RandomAccessCollection
+    ... // ###sourceLocation(file: "/public/core/Map.swift.gyb", line: 169)
+    ... {
+    ...   /// Returns a `LazyMapCollection` over this `Collection`.  The eleme
+    ...   /// the result are computed lazily, each time they are read, by
+    ...   /// calling `transform` function on a base element.
+    ...   @_inlineable
+    ...   public func map<U>(
+    ...     _ transform: @escaping (Elements.Iterator.Element) -> U
+    ...   ) -> LazyMapRandomAccessCollection<Self.Elements, U> {
+    ...     return LazyMapRandomAccessCollection(
+    ...       _base: self.elements,
+    ...       transform: transform)
+    ...   }
+    ... }
+    ...
+    ... // ###sourceLocation(file: "/public/core/Map.swift.gyb", line: 184)
+    ...
+    ... @available(*, unavailable, renamed: "LazyMapIterator")
+    ... public struct LazyMapGenerator<Base : IteratorProtocol, Element> {}
+    ...
+    ... extension LazyMapSequence {
+    ...   @available(*, unavailable, message: "use '.lazy.map' on the sequence
+    ...   public init(_ base: Base, transform: (Base.Iterator.Element) -> Elem
+    ...     Builtin.unreachable()
+    ...   }
+    ... }
+    ...
+    ... extension LazyMapCollection {
+    ...   @available(*, unavailable, message: "use '.lazy.map' on the collecti
+    ...   public init(_ base: Base, transform: (Base.Iterator.Element) -> Elem
+    ...     Builtin.unreachable()
+    ...   }
+    ... }
+    ...
+    ... // Local Variables:
+    ... // eval: (read-only-mode 1)
+    ... // End:
+    ... ''')
+    >>> long_output.flush()
+    >>> long_output_result = subprocess.check_output(sys.executable + ' ' +
+    ...    __file__ + ' ' + long_output.name + ' -- ' + "echo '" +
+    ...    long_output.name + ":112:27: error:'",
+    ...    shell=True).rstrip()
+    >>> print(long_output_result)
+    /public/core/Map.swift.gyb:117:27: error:
+    >>> target1.close()
+    >>> os.remove(target1.name)
+    >>> target2.close()
+    >>> os.remove(target2.name)
+    >>> raw_output.close()
+    >>> os.remove(raw_output.name)
     """
     if len(sys.argv) <= 1:
         import doctest
-        doctest.testmod()
+        failure_count, _ = doctest.testmod()
+        sys.exit(failure_count)
     elif '--' not in sys.argv:
         source_file = sys.argv[1]
         source_line = int(sys.argv[2])
@@ -298,7 +634,7 @@ def run():
 
         error_pattern = re.compile(
             '^' + sources +
-            ':(?P<line>[0-9]+):(?P<column>[0-9]+):;(?P<tail>.*?)\n?$')
+            ':(?P<line>[0-9]+):(?P<column>[0-9]+):(?P<tail>.*?)\n?$')
 
         assertion_pattern = re.compile(
             '^(?P<head>.*( file | at |#[0-9]+: |[[]))' +

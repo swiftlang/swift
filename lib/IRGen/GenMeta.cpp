@@ -18,7 +18,6 @@
 #include "swift/AST/CanTypeVisitor.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/IRGenOptions.h"
-#include "swift/AST/Mangle.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/Types.h"
 #include "swift/SIL/FormalLinkage.h"
@@ -2789,18 +2788,6 @@ irgen::emitFieldTypeAccessor(IRGenModule &IGM,
   // use it to provide metadata for generic parameters in field types.
   IGF.bindLocalTypeDataFromTypeMetadata(formalType, IsExact, metadata);
   
-  // Bind archetype access paths if the type is generic.
-  if (type->isGenericContext()) {
-    auto declCtxt = type;
-    if (auto generics = declCtxt->getGenericSignatureOfContext()) {
-      auto getInContext = [&](CanType type) -> CanType {
-        return declCtxt->mapTypeIntoContext(type)
-            ->getCanonicalType();
-      };
-      bindArchetypeAccessPaths(IGF, generics, getInContext);
-    }
-  }
-
   // Allocate storage for the field vector.
   unsigned allocSize = fieldTypes.size() * IGM.getPointerSize().getValue();
   auto allocSizeVal = llvm::ConstantInt::get(IGM.IntPtrTy, allocSize);
@@ -5493,6 +5480,10 @@ IRGenModule::getAddrOfForeignTypeMetadataCandidate(CanType type) {
 
   // Only remember the offset.
   GlobalVars[entity] = result;
+
+  if (NominalTypeDecl *Nominal = type->getAnyNominal()) {
+    addLazyConformances(Nominal);
+  }
 
   return result;
 }

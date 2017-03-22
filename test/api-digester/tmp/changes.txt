@@ -1,0 +1,418 @@
+
+/* Removed Decls */
+TypeAlias Dictionary.Index has been removed
+TypeAlias Set.Index has been removed
+Struct DictionaryIndex has been removed
+Struct SetIndex has been removed
+Protocol AbsoluteValuable has been removed
+Protocol BidirectionalIndexable has been removed (deprecated)
+Protocol ExpressibleByStringInterpolation has been removed (deprecated)
+Protocol Indexable has been removed (deprecated)
+Protocol IndexableBase has been removed (deprecated)
+Protocol IntegerArithmetic has been removed
+Protocol MutableIndexable has been removed (deprecated)
+Protocol RandomAccessIndexable has been removed (deprecated)
+Protocol RangeReplaceableIndexable has been removed (deprecated)
+Protocol SignedNumber has been removed
+Protocol _DisallowMixedSignArithmetic has been removed
+Protocol _Integer has been removed
+Protocol _IntegerArithmetic has been removed
+Protocol _SignedInteger has been removed
+Var Int.allZeros has been removed
+Var Int16.allZeros has been removed
+Var Int32.allZeros has been removed
+Var Int64.allZeros has been removed
+Var Int8.allZeros has been removed
+Var UInt.allZeros has been removed
+Var UInt16.allZeros has been removed
+Var UInt32.allZeros has been removed
+Var UInt64.allZeros has been removed
+Var UInt8.allZeros has been removed
+Constructor String.init(stringInterpolationSegment:) has been removed
+Func Array.append(contentsOf:) has been removed
+Func ArraySlice.append(contentsOf:) has been removed
+Func ContiguousArray.append(contentsOf:) has been removed
+Func Dictionary.removeValue(forKey:) has been removed
+Func Dictionary.updateValue(_:forKey:) has been removed
+Func Double.add(_:) has been removed
+Func Double.divide(by:) has been removed
+Func Double.multiply(by:) has been removed
+Func Double.subtract(_:) has been removed
+Func Float.add(_:) has been removed
+Func Float.divide(by:) has been removed
+Func Float.multiply(by:) has been removed
+Func Float.subtract(_:) has been removed
+Func Float80.add(_:) has been removed
+Func Float80.divide(by:) has been removed
+Func Float80.multiply(by:) has been removed
+Func Float80.subtract(_:) has been removed
+Func FloatingPoint.add(_:) has been removed
+Func FloatingPoint.adding(_:) has been removed
+Func FloatingPoint.divide(by:) has been removed
+Func FloatingPoint.divided(by:) has been removed
+Func FloatingPoint.multiplied(by:) has been removed
+Func FloatingPoint.multiply(by:) has been removed
+Func FloatingPoint.negated() has been removed
+Func FloatingPoint.subtract(_:) has been removed
+Func FloatingPoint.subtracting(_:) has been removed
+Func Int.addWithOverflow(_:_:) has been removed
+Func Int.divideWithOverflow(_:_:) has been removed
+Func Int.multiplyWithOverflow(_:_:) has been removed
+Func Int.remainderWithOverflow(_:_:) has been removed
+Func Int.subtractWithOverflow(_:_:) has been removed
+Func Int.toIntMax() has been removed
+Func Int16.addWithOverflow(_:_:) has been removed
+Func Int16.divideWithOverflow(_:_:) has been removed
+Func Int16.multiplyWithOverflow(_:_:) has been removed
+Func Int16.remainderWithOverflow(_:_:) has been removed
+Func Int16.subtractWithOverflow(_:_:) has been removed
+Func Int16.toIntMax() has been removed
+Func Int32.addWithOverflow(_:_:) has been removed
+Func Int32.divideWithOverflow(_:_:) has been removed
+Func Int32.multiplyWithOverflow(_:_:) has been removed
+Func Int32.remainderWithOverflow(_:_:) has been removed
+Func Int32.subtractWithOverflow(_:_:) has been removed
+Func Int32.toIntMax() has been removed
+Func Int64.addWithOverflow(_:_:) has been removed
+Func Int64.divideWithOverflow(_:_:) has been removed
+Func Int64.multiplyWithOverflow(_:_:) has been removed
+Func Int64.remainderWithOverflow(_:_:) has been removed
+Func Int64.subtractWithOverflow(_:_:) has been removed
+Func Int64.toIntMax() has been removed
+Func Int8.addWithOverflow(_:_:) has been removed
+Func Int8.divideWithOverflow(_:_:) has been removed
+Func Int8.multiplyWithOverflow(_:_:) has been removed
+Func Int8.remainderWithOverflow(_:_:) has been removed
+Func Int8.subtractWithOverflow(_:_:) has been removed
+Func Int8.toIntMax() has been removed
+Func SignedInteger.toIntMax() has been removed
+Func UInt.addWithOverflow(_:_:) has been removed
+Func UInt.divideWithOverflow(_:_:) has been removed
+Func UInt.multiplyWithOverflow(_:_:) has been removed
+Func UInt.remainderWithOverflow(_:_:) has been removed
+Func UInt.subtractWithOverflow(_:_:) has been removed
+Func UInt16.addWithOverflow(_:_:) has been removed
+Func UInt16.divideWithOverflow(_:_:) has been removed
+Func UInt16.multiplyWithOverflow(_:_:) has been removed
+Func UInt16.remainderWithOverflow(_:_:) has been removed
+Func UInt16.subtractWithOverflow(_:_:) has been removed
+Func UInt32.addWithOverflow(_:_:) has been removed
+Func UInt32.divideWithOverflow(_:_:) has been removed
+Func UInt32.multiplyWithOverflow(_:_:) has been removed
+Func UInt32.remainderWithOverflow(_:_:) has been removed
+Func UInt32.subtractWithOverflow(_:_:) has been removed
+Func UInt64.addWithOverflow(_:_:) has been removed
+Func UInt64.divideWithOverflow(_:_:) has been removed
+Func UInt64.multiplyWithOverflow(_:_:) has been removed
+Func UInt64.remainderWithOverflow(_:_:) has been removed
+Func UInt64.subtractWithOverflow(_:_:) has been removed
+Func UInt8.addWithOverflow(_:_:) has been removed
+Func UInt8.divideWithOverflow(_:_:) has been removed
+Func UInt8.multiplyWithOverflow(_:_:) has been removed
+Func UInt8.remainderWithOverflow(_:_:) has been removed
+Func UInt8.subtractWithOverflow(_:_:) has been removed
+
+/* Moved Decls */
+Var Int.description has been moved to Var SignedInteger.description
+Var Int.max has been moved to Var SignedInteger.max
+Var Int.min has been moved to Var SignedInteger.min
+Var Int16.description has been moved to Var SignedInteger.description
+Var Int16.max has been moved to Var SignedInteger.max
+Var Int16.min has been moved to Var SignedInteger.min
+Var Int32.description has been moved to Var SignedInteger.description
+Var Int32.max has been moved to Var SignedInteger.max
+Var Int32.min has been moved to Var SignedInteger.min
+Var Int64.description has been moved to Var SignedInteger.description
+Var Int64.max has been moved to Var SignedInteger.max
+Var Int64.min has been moved to Var SignedInteger.min
+Var Int8.description has been moved to Var SignedInteger.description
+Var Int8.max has been moved to Var SignedInteger.max
+Var Int8.min has been moved to Var SignedInteger.min
+Var UInt.description has been moved to Var SignedInteger.description
+Var UInt.max has been moved to Var SignedInteger.max
+Var UInt.min has been moved to Var SignedInteger.min
+Var UInt16.description has been moved to Var SignedInteger.description
+Var UInt16.max has been moved to Var SignedInteger.max
+Var UInt16.min has been moved to Var SignedInteger.min
+Var UInt32.description has been moved to Var SignedInteger.description
+Var UInt32.max has been moved to Var SignedInteger.max
+Var UInt32.min has been moved to Var SignedInteger.min
+Var UInt64.description has been moved to Var SignedInteger.description
+Var UInt64.max has been moved to Var SignedInteger.max
+Var UInt64.min has been moved to Var SignedInteger.min
+Var UInt8.description has been moved to Var SignedInteger.description
+Var UInt8.max has been moved to Var SignedInteger.max
+Var UInt8.min has been moved to Var SignedInteger.min
+Constructor Int.init() has been moved to Constructor BinaryInteger.init()
+Constructor Int.init(_:) has been moved to Constructor BinaryInteger.init(_:)
+Constructor Int.init(exactly:) has been moved to Constructor SignedInteger.init(exactly:)
+Constructor Int.init(integerLiteral:) has been moved to Constructor ExpressibleByIntegerLiteral.init(integerLiteral:)
+Constructor Int16.init() has been moved to Constructor BinaryInteger.init()
+Constructor Int16.init(_:) has been moved to Constructor BinaryInteger.init(_:)
+Constructor Int16.init(exactly:) has been moved to Constructor SignedInteger.init(exactly:)
+Constructor Int16.init(integerLiteral:) has been moved to Constructor ExpressibleByIntegerLiteral.init(integerLiteral:)
+Constructor Int32.init() has been moved to Constructor BinaryInteger.init()
+Constructor Int32.init(_:) has been moved to Constructor BinaryInteger.init(_:)
+Constructor Int32.init(exactly:) has been moved to Constructor SignedInteger.init(exactly:)
+Constructor Int32.init(integerLiteral:) has been moved to Constructor ExpressibleByIntegerLiteral.init(integerLiteral:)
+Constructor Int64.init() has been moved to Constructor BinaryInteger.init()
+Constructor Int64.init(_:) has been moved to Constructor BinaryInteger.init(_:)
+Constructor Int64.init(exactly:) has been moved to Constructor SignedInteger.init(exactly:)
+Constructor Int64.init(integerLiteral:) has been moved to Constructor ExpressibleByIntegerLiteral.init(integerLiteral:)
+Constructor Int8.init() has been moved to Constructor BinaryInteger.init()
+Constructor Int8.init(_:) has been moved to Constructor BinaryInteger.init(_:)
+Constructor Int8.init(exactly:) has been moved to Constructor SignedInteger.init(exactly:)
+Constructor Int8.init(integerLiteral:) has been moved to Constructor ExpressibleByIntegerLiteral.init(integerLiteral:)
+Constructor UInt.init() has been moved to Constructor BinaryInteger.init()
+Constructor UInt.init(_:) has been moved to Constructor BinaryInteger.init(_:)
+Constructor UInt.init(exactly:) has been moved to Constructor SignedInteger.init(exactly:)
+Constructor UInt.init(integerLiteral:) has been moved to Constructor ExpressibleByIntegerLiteral.init(integerLiteral:)
+Constructor UInt16.init() has been moved to Constructor BinaryInteger.init()
+Constructor UInt16.init(_:) has been moved to Constructor BinaryInteger.init(_:)
+Constructor UInt16.init(exactly:) has been moved to Constructor SignedInteger.init(exactly:)
+Constructor UInt16.init(integerLiteral:) has been moved to Constructor ExpressibleByIntegerLiteral.init(integerLiteral:)
+Constructor UInt32.init() has been moved to Constructor BinaryInteger.init()
+Constructor UInt32.init(_:) has been moved to Constructor BinaryInteger.init(_:)
+Constructor UInt32.init(exactly:) has been moved to Constructor SignedInteger.init(exactly:)
+Constructor UInt32.init(integerLiteral:) has been moved to Constructor ExpressibleByIntegerLiteral.init(integerLiteral:)
+Constructor UInt64.init() has been moved to Constructor BinaryInteger.init()
+Constructor UInt64.init(_:) has been moved to Constructor BinaryInteger.init(_:)
+Constructor UInt64.init(exactly:) has been moved to Constructor SignedInteger.init(exactly:)
+Constructor UInt64.init(integerLiteral:) has been moved to Constructor ExpressibleByIntegerLiteral.init(integerLiteral:)
+Constructor UInt8.init() has been moved to Constructor BinaryInteger.init()
+Constructor UInt8.init(_:) has been moved to Constructor BinaryInteger.init(_:)
+Constructor UInt8.init(exactly:) has been moved to Constructor SignedInteger.init(exactly:)
+Constructor UInt8.init(integerLiteral:) has been moved to Constructor ExpressibleByIntegerLiteral.init(integerLiteral:)
+Constructor UnsafeBufferPointerIterator.init() has been moved to Constructor BinaryInteger.init()
+Func SignedInteger.advanced(by:) has been moved to Func BinaryInteger.advanced(by:)
+Func SignedInteger.distance(to:) has been moved to Func BinaryInteger.distance(to:)
+Func UInt.toUIntMax() has been moved to Func Int8.toUIntMax()
+Func UInt16.toUIntMax() has been moved to Func Int8.toUIntMax()
+Func UInt32.toUIntMax() has been moved to Func Int8.toUIntMax()
+Func UInt64.toUIntMax() has been moved to Func Int8.toUIntMax()
+Func UInt8.toUIntMax() has been moved to Func Int8.toUIntMax()
+Func UnsignedInteger.advanced(by:) has been moved to Func BinaryInteger.advanced(by:)
+Func UnsignedInteger.distance(to:) has been moved to Func BinaryInteger.distance(to:)
+Func UnsignedInteger.toUIntMax() has been moved to Func Int8.toUIntMax()
+
+/* Renamed Decls */
+Protocol Integer has been renamed to Protocol BinaryInteger
+Func FloatingPoint.adding(_:) has been renamed to Func FloatingPoint.addingProduct(_:_:)
+
+/* Type Changes */
+Var Dictionary.endIndex has declared type change from DictionaryIndex<Key, Value> to Dictionary<Key, Value>.Index
+Var Dictionary.startIndex has declared type change from DictionaryIndex<Key, Value> to Dictionary<Key, Value>.Index
+Var Set.endIndex has declared type change from SetIndex<Element> to Set<Element>.Index
+Var Set.startIndex has declared type change from SetIndex<Element> to Set<Element>.Index
+Constructor AnyIterator.init(_:) has parameter 0 type change from () -> Element? to () -> AnyIterator.Element?
+Constructor BidirectionalSlice.init(base:bounds:) has parameter 1 type change from Range<Base.Index> to Range<BidirectionalSlice.Index>
+Constructor Int.init(_:) has parameter 0 type change from UInt8 to T
+Constructor Int.init(exactly:) has parameter 0 type change from UInt8 to Float
+Constructor Int16.init(_:) has parameter 0 type change from UInt8 to T
+Constructor Int16.init(exactly:) has parameter 0 type change from UInt8 to Float
+Constructor Int32.init(_:) has parameter 0 type change from UInt8 to T
+Constructor Int32.init(exactly:) has parameter 0 type change from UInt8 to Float
+Constructor Int64.init(_:) has parameter 0 type change from UInt8 to T
+Constructor Int64.init(exactly:) has parameter 0 type change from UInt8 to Float
+Constructor Int8.init(_:) has parameter 0 type change from UInt8 to T
+Constructor Int8.init(exactly:) has parameter 0 type change from UInt8 to Float
+Constructor MutableBidirectionalSlice.init(base:bounds:) has parameter 1 type change from Range<Base.Index> to Range<MutableBidirectionalSlice.Index>
+Constructor MutableRandomAccessSlice.init(base:bounds:) has parameter 1 type change from Range<Base.Index> to Range<MutableRandomAccessSlice.Index>
+Constructor MutableRangeReplaceableBidirectionalSlice.init(base:bounds:) has parameter 1 type change from Range<Base.Index> to Range<MutableRangeReplaceableBidirectionalSlice.Index>
+Constructor MutableRangeReplaceableRandomAccessSlice.init(base:bounds:) has parameter 1 type change from Range<Base.Index> to Range<MutableRangeReplaceableRandomAccessSlice.Index>
+Constructor MutableRangeReplaceableSlice.init(base:bounds:) has parameter 1 type change from Range<Base.Index> to Range<MutableRangeReplaceableSlice.Index>
+Constructor MutableSlice.init(base:bounds:) has parameter 1 type change from Range<Base.Index> to Range<MutableSlice.Index>
+Constructor RandomAccessSlice.init(base:bounds:) has parameter 1 type change from Range<Base.Index> to Range<RandomAccessSlice.Index>
+Constructor RangeReplaceableBidirectionalSlice.init(base:bounds:) has parameter 1 type change from Range<Base.Index> to Range<RangeReplaceableBidirectionalSlice.Index>
+Constructor RangeReplaceableRandomAccessSlice.init(base:bounds:) has parameter 1 type change from Range<Base.Index> to Range<RangeReplaceableRandomAccessSlice.Index>
+Constructor RangeReplaceableSlice.init(base:bounds:) has parameter 1 type change from Range<Base.Index> to Range<RangeReplaceableSlice.Index>
+Constructor SignedInteger.init(_:) has parameter 0 type change from IntMax to T
+Constructor Slice.init(base:bounds:) has parameter 1 type change from Range<Base.Index> to Range<Slice.Index>
+Constructor String.init(stringInterpolationSegment:) has parameter 0 type change from String to T
+Constructor UInt.init(_:) has parameter 0 type change from UInt8 to T
+Constructor UInt.init(exactly:) has parameter 0 type change from UInt8 to Float
+Constructor UInt16.init(_:) has parameter 0 type change from UInt8 to T
+Constructor UInt16.init(exactly:) has parameter 0 type change from UInt8 to Float
+Constructor UInt32.init(_:) has parameter 0 type change from UInt8 to T
+Constructor UInt32.init(exactly:) has parameter 0 type change from UInt8 to Float
+Constructor UInt64.init(_:) has parameter 0 type change from UInt8 to T
+Constructor UInt64.init(exactly:) has parameter 0 type change from UInt8 to Float
+Constructor UInt8.init(_:) has parameter 0 type change from UInt8 to T
+Constructor UInt8.init(exactly:) has parameter 0 type change from UInt8 to Float
+Constructor UnsignedInteger.init(_:) has parameter 0 type change from UIntMax to T
+Func AnyBidirectionalCollection.makeIterator() has return type change from AnyIterator<Element> to AnyBidirectionalCollection.Iterator
+Func AnyCollection.makeIterator() has return type change from AnyIterator<Element> to AnyCollection.Iterator
+Func AnyRandomAccessCollection.makeIterator() has return type change from AnyIterator<Element> to AnyRandomAccessCollection.Iterator
+Func AnySequence.makeIterator() has return type change from AnyIterator<Element> to AnySequence.Iterator
+Func BidirectionalSlice.distance(from:to:) has return type change from Base.IndexDistance to BidirectionalSlice.IndexDistance
+Func BidirectionalSlice.index(_:offsetBy:) has return type change from Base.Index to BidirectionalSlice.Index
+Func BidirectionalSlice.index(_:offsetBy:limitedBy:) has return type change from Base.Index? to BidirectionalSlice.Index?
+Func BidirectionalSlice.index(after:) has return type change from Base.Index to BidirectionalSlice.Index
+Func BidirectionalSlice.index(before:) has return type change from Base.Index to BidirectionalSlice.Index
+Func CountableClosedRange.distance(from:to:) has return type change from Bound.Stride to CountableClosedRange.IndexDistance
+Func CountableClosedRange.index(_:offsetBy:) has return type change from ClosedRangeIndex<Bound> to CountableClosedRange.Index
+Func CountableClosedRange.index(after:) has return type change from ClosedRangeIndex<Bound> to CountableClosedRange.Index
+Func CountableClosedRange.index(before:) has return type change from ClosedRangeIndex<Bound> to CountableClosedRange.Index
+Func CountableRange.distance(from:to:) has return type change from Bound.Stride to CountableRange.IndexDistance
+Func CountableRange.index(_:offsetBy:) has return type change from Bound to CountableRange.Index
+Func CountableRange.index(after:) has return type change from Bound to CountableRange.Index
+Func CountableRange.index(before:) has return type change from Bound to CountableRange.Index
+Func DefaultBidirectionalIndices.index(after:) has return type change from Elements.Index to DefaultBidirectionalIndices.Index
+Func DefaultBidirectionalIndices.index(before:) has return type change from Elements.Index to DefaultBidirectionalIndices.Index
+Func DefaultIndices.index(after:) has return type change from Elements.Index to DefaultIndices.Index
+Func DefaultRandomAccessIndices.index(after:) has return type change from Elements.Index to DefaultRandomAccessIndices.Index
+Func DefaultRandomAccessIndices.index(before:) has return type change from Elements.Index to DefaultRandomAccessIndices.Index
+Func Dictionary.index(after:) has return type change from DictionaryIndex<Key, Value> to Dictionary<Key, Value>.Index
+Func Dictionary.index(forKey:) has return type change from DictionaryIndex<Key, Value>? to Dictionary<Key, Value>.Index?
+Func Dictionary.makeIterator() has return type change from DictionaryIterator<Key, Value> to DictionaryIterator<Dictionary.Key, Dictionary.Value>
+Func Dictionary.popFirst() has return type change from (key: Key, value: Value)? to Dictionary.Element?
+Func Dictionary.remove(at:) has return type change from (key: Key, value: Value) to Dictionary.Element
+Func Dictionary.removeValue(forKey:) has return type change from Value? to Dictionary.Value?
+Func Dictionary.updateValue(_:forKey:) has return type change from Value? to Dictionary.Value?
+Func EnumeratedIterator.next() has return type change from (offset: Int, element: Base.Element)? to EnumeratedIterator.Element?
+Func FlattenBidirectionalCollection.index(after:) has return type change from FlattenBidirectionalCollectionIndex<Base> to FlattenBidirectionalCollection.Index
+Func FlattenBidirectionalCollection.index(before:) has return type change from FlattenBidirectionalCollectionIndex<Base> to FlattenBidirectionalCollection.Index
+Func FlattenCollection.index(after:) has return type change from FlattenCollectionIndex<Base> to FlattenCollection.Index
+Func LazyBidirectionalCollection.distance(from:to:) has parameter 0 type change from Base.Index to LazyBidirectionalCollection.Index
+Func LazyBidirectionalCollection.index(_:offsetBy:) has return type change from Base.Index to LazyBidirectionalCollection.Index
+Func LazyBidirectionalCollection.index(_:offsetBy:limitedBy:) has return type change from Base.Index? to LazyBidirectionalCollection.Index?
+Func LazyCollection.distance(from:to:) has parameter 0 type change from Base.Index to LazyCollection.Index
+Func LazyCollection.index(_:offsetBy:) has return type change from Base.Index to LazyCollection.Index
+Func LazyCollection.index(_:offsetBy:limitedBy:) has return type change from Base.Index? to LazyCollection.Index?
+Func LazyFilterBidirectionalCollection.index(after:) has return type change from LazyFilterIndex<Base> to LazyFilterBidirectionalCollection.Index
+Func LazyFilterBidirectionalCollection.index(before:) has return type change from LazyFilterIndex<Base> to LazyFilterBidirectionalCollection.Index
+Func LazyFilterCollection.index(after:) has return type change from LazyFilterIndex<Base> to LazyFilterCollection.Index
+Func LazyMapBidirectionalCollection.distance(from:to:) has parameter 0 type change from Base.Index to LazyMapBidirectionalCollection.Index
+Func LazyMapBidirectionalCollection.index(_:offsetBy:) has return type change from Base.Index to LazyMapBidirectionalCollection.Index
+Func LazyMapBidirectionalCollection.index(_:offsetBy:limitedBy:) has return type change from Base.Index? to LazyMapBidirectionalCollection.Index?
+Func LazyMapBidirectionalCollection.index(after:) has return type change from Base.Index to LazyMapBidirectionalCollection.Index
+Func LazyMapBidirectionalCollection.index(before:) has return type change from Base.Index to LazyMapBidirectionalCollection.Index
+Func LazyMapCollection.distance(from:to:) has parameter 0 type change from Base.Index to LazyMapCollection.Index
+Func LazyMapCollection.index(_:offsetBy:) has return type change from Base.Index to LazyMapCollection.Index
+Func LazyMapCollection.index(_:offsetBy:limitedBy:) has return type change from Base.Index? to LazyMapCollection.Index?
+Func LazyMapCollection.index(after:) has return type change from Base.Index to LazyMapCollection.Index
+Func LazyMapRandomAccessCollection.distance(from:to:) has parameter 0 type change from Base.Index to LazyMapRandomAccessCollection.Index
+Func LazyMapRandomAccessCollection.index(_:offsetBy:) has return type change from Base.Index to LazyMapRandomAccessCollection.Index
+Func LazyMapRandomAccessCollection.index(_:offsetBy:limitedBy:) has return type change from Base.Index? to LazyMapRandomAccessCollection.Index?
+Func LazyMapRandomAccessCollection.index(after:) has return type change from Base.Index to LazyMapRandomAccessCollection.Index
+Func LazyMapRandomAccessCollection.index(before:) has return type change from Base.Index to LazyMapRandomAccessCollection.Index
+Func LazyRandomAccessCollection.distance(from:to:) has parameter 0 type change from Base.Index to LazyRandomAccessCollection.Index
+Func LazyRandomAccessCollection.index(_:offsetBy:) has return type change from Base.Index to LazyRandomAccessCollection.Index
+Func LazyRandomAccessCollection.index(_:offsetBy:limitedBy:) has return type change from Base.Index? to LazyRandomAccessCollection.Index?
+Func MutableBidirectionalSlice.distance(from:to:) has return type change from Base.IndexDistance to MutableBidirectionalSlice.IndexDistance
+Func MutableBidirectionalSlice.index(_:offsetBy:) has return type change from Base.Index to MutableBidirectionalSlice.Index
+Func MutableBidirectionalSlice.index(_:offsetBy:limitedBy:) has return type change from Base.Index? to MutableBidirectionalSlice.Index?
+Func MutableBidirectionalSlice.index(after:) has return type change from Base.Index to MutableBidirectionalSlice.Index
+Func MutableBidirectionalSlice.index(before:) has return type change from Base.Index to MutableBidirectionalSlice.Index
+Func MutableRandomAccessSlice.distance(from:to:) has return type change from Base.IndexDistance to MutableRandomAccessSlice.IndexDistance
+Func MutableRandomAccessSlice.index(_:offsetBy:) has return type change from Base.Index to MutableRandomAccessSlice.Index
+Func MutableRandomAccessSlice.index(_:offsetBy:limitedBy:) has return type change from Base.Index? to MutableRandomAccessSlice.Index?
+Func MutableRandomAccessSlice.index(after:) has return type change from Base.Index to MutableRandomAccessSlice.Index
+Func MutableRandomAccessSlice.index(before:) has return type change from Base.Index to MutableRandomAccessSlice.Index
+Func MutableRangeReplaceableBidirectionalSlice.distance(from:to:) has return type change from Base.IndexDistance to MutableRangeReplaceableBidirectionalSlice.IndexDistance
+Func MutableRangeReplaceableBidirectionalSlice.index(_:offsetBy:) has return type change from Base.Index to MutableRangeReplaceableBidirectionalSlice.Index
+Func MutableRangeReplaceableBidirectionalSlice.index(_:offsetBy:limitedBy:) has return type change from Base.Index? to MutableRangeReplaceableBidirectionalSlice.Index?
+Func MutableRangeReplaceableBidirectionalSlice.index(after:) has return type change from Base.Index to MutableRangeReplaceableBidirectionalSlice.Index
+Func MutableRangeReplaceableBidirectionalSlice.index(before:) has return type change from Base.Index to MutableRangeReplaceableBidirectionalSlice.Index
+Func MutableRangeReplaceableBidirectionalSlice.insert(_:at:) has parameter 1 type change from Base.Index to MutableRangeReplaceableBidirectionalSlice.Index
+Func MutableRangeReplaceableBidirectionalSlice.insert(contentsOf:at:) has parameter 1 type change from Base.Index to MutableRangeReplaceableBidirectionalSlice.Index
+Func MutableRangeReplaceableBidirectionalSlice.remove(at:) has parameter 0 type change from Base.Index to MutableRangeReplaceableBidirectionalSlice.Index
+Func MutableRangeReplaceableBidirectionalSlice.removeSubrange(_:) has parameter 0 type change from Range<Base.Index> to Range<MutableRangeReplaceableBidirectionalSlice.Index>
+Func MutableRangeReplaceableBidirectionalSlice.replaceSubrange(_:with:) has parameter 0 type change from Range<Base.Index> to Range<MutableRangeReplaceableBidirectionalSlice.Index>
+Func MutableRangeReplaceableRandomAccessSlice.distance(from:to:) has return type change from Base.IndexDistance to MutableRangeReplaceableRandomAccessSlice.IndexDistance
+Func MutableRangeReplaceableRandomAccessSlice.index(_:offsetBy:) has return type change from Base.Index to MutableRangeReplaceableRandomAccessSlice.Index
+Func MutableRangeReplaceableRandomAccessSlice.index(_:offsetBy:limitedBy:) has return type change from Base.Index? to MutableRangeReplaceableRandomAccessSlice.Index?
+Func MutableRangeReplaceableRandomAccessSlice.index(after:) has return type change from Base.Index to MutableRangeReplaceableRandomAccessSlice.Index
+Func MutableRangeReplaceableRandomAccessSlice.index(before:) has return type change from Base.Index to MutableRangeReplaceableRandomAccessSlice.Index
+Func MutableRangeReplaceableRandomAccessSlice.insert(_:at:) has parameter 1 type change from Base.Index to MutableRangeReplaceableRandomAccessSlice.Index
+Func MutableRangeReplaceableRandomAccessSlice.insert(contentsOf:at:) has parameter 1 type change from Base.Index to MutableRangeReplaceableRandomAccessSlice.Index
+Func MutableRangeReplaceableRandomAccessSlice.remove(at:) has parameter 0 type change from Base.Index to MutableRangeReplaceableRandomAccessSlice.Index
+Func MutableRangeReplaceableRandomAccessSlice.removeSubrange(_:) has parameter 0 type change from Range<Base.Index> to Range<MutableRangeReplaceableRandomAccessSlice.Index>
+Func MutableRangeReplaceableRandomAccessSlice.replaceSubrange(_:with:) has parameter 0 type change from Range<Base.Index> to Range<MutableRangeReplaceableRandomAccessSlice.Index>
+Func MutableRangeReplaceableSlice.distance(from:to:) has return type change from Base.IndexDistance to MutableRangeReplaceableSlice.IndexDistance
+Func MutableRangeReplaceableSlice.index(_:offsetBy:) has return type change from Base.Index to MutableRangeReplaceableSlice.Index
+Func MutableRangeReplaceableSlice.index(_:offsetBy:limitedBy:) has return type change from Base.Index? to MutableRangeReplaceableSlice.Index?
+Func MutableRangeReplaceableSlice.index(after:) has return type change from Base.Index to MutableRangeReplaceableSlice.Index
+Func MutableRangeReplaceableSlice.insert(_:at:) has parameter 1 type change from Base.Index to MutableRangeReplaceableSlice.Index
+Func MutableRangeReplaceableSlice.insert(contentsOf:at:) has parameter 1 type change from Base.Index to MutableRangeReplaceableSlice.Index
+Func MutableRangeReplaceableSlice.remove(at:) has parameter 0 type change from Base.Index to MutableRangeReplaceableSlice.Index
+Func MutableRangeReplaceableSlice.removeSubrange(_:) has parameter 0 type change from Range<Base.Index> to Range<MutableRangeReplaceableSlice.Index>
+Func MutableRangeReplaceableSlice.replaceSubrange(_:with:) has parameter 0 type change from Range<Base.Index> to Range<MutableRangeReplaceableSlice.Index>
+Func MutableSlice.distance(from:to:) has return type change from Base.IndexDistance to MutableSlice.IndexDistance
+Func MutableSlice.index(_:offsetBy:) has return type change from Base.Index to MutableSlice.Index
+Func MutableSlice.index(_:offsetBy:limitedBy:) has return type change from Base.Index? to MutableSlice.Index?
+Func MutableSlice.index(after:) has return type change from Base.Index to MutableSlice.Index
+Func OptionSet.insert(_:) has return type change from (inserted: Bool, memberAfterInsert: Self) to (inserted: Bool, memberAfterInsert: Self.Element)
+Func OptionSet.remove(_:) has return type change from Self? to Self.Element?
+Func OptionSet.update(with:) has return type change from Self? to Self.Element?
+Func RandomAccessCollection.distance(from:to:) has return type change from Self.IndexDistance to Self.Index.Stride
+Func RandomAccessCollection.index(_:offsetBy:) has parameter 1 type change from Self.IndexDistance to Self.Index.Stride
+Func RandomAccessSlice.distance(from:to:) has return type change from Base.IndexDistance to RandomAccessSlice.IndexDistance
+Func RandomAccessSlice.index(_:offsetBy:) has return type change from Base.Index to RandomAccessSlice.Index
+Func RandomAccessSlice.index(_:offsetBy:limitedBy:) has return type change from Base.Index? to RandomAccessSlice.Index?
+Func RandomAccessSlice.index(after:) has return type change from Base.Index to RandomAccessSlice.Index
+Func RandomAccessSlice.index(before:) has return type change from Base.Index to RandomAccessSlice.Index
+Func RangeReplaceableBidirectionalSlice.distance(from:to:) has return type change from Base.IndexDistance to RangeReplaceableBidirectionalSlice.IndexDistance
+Func RangeReplaceableBidirectionalSlice.index(_:offsetBy:) has return type change from Base.Index to RangeReplaceableBidirectionalSlice.Index
+Func RangeReplaceableBidirectionalSlice.index(_:offsetBy:limitedBy:) has return type change from Base.Index? to RangeReplaceableBidirectionalSlice.Index?
+Func RangeReplaceableBidirectionalSlice.index(after:) has return type change from Base.Index to RangeReplaceableBidirectionalSlice.Index
+Func RangeReplaceableBidirectionalSlice.index(before:) has return type change from Base.Index to RangeReplaceableBidirectionalSlice.Index
+Func RangeReplaceableBidirectionalSlice.insert(_:at:) has parameter 1 type change from Base.Index to RangeReplaceableBidirectionalSlice.Index
+Func RangeReplaceableBidirectionalSlice.insert(contentsOf:at:) has parameter 1 type change from Base.Index to RangeReplaceableBidirectionalSlice.Index
+Func RangeReplaceableBidirectionalSlice.remove(at:) has parameter 0 type change from Base.Index to RangeReplaceableBidirectionalSlice.Index
+Func RangeReplaceableBidirectionalSlice.removeSubrange(_:) has parameter 0 type change from Range<Base.Index> to Range<RangeReplaceableBidirectionalSlice.Index>
+Func RangeReplaceableBidirectionalSlice.replaceSubrange(_:with:) has parameter 0 type change from Range<Base.Index> to Range<RangeReplaceableBidirectionalSlice.Index>
+Func RangeReplaceableRandomAccessSlice.distance(from:to:) has return type change from Base.IndexDistance to RangeReplaceableRandomAccessSlice.IndexDistance
+Func RangeReplaceableRandomAccessSlice.index(_:offsetBy:) has return type change from Base.Index to RangeReplaceableRandomAccessSlice.Index
+Func RangeReplaceableRandomAccessSlice.index(_:offsetBy:limitedBy:) has return type change from Base.Index? to RangeReplaceableRandomAccessSlice.Index?
+Func RangeReplaceableRandomAccessSlice.index(after:) has return type change from Base.Index to RangeReplaceableRandomAccessSlice.Index
+Func RangeReplaceableRandomAccessSlice.index(before:) has return type change from Base.Index to RangeReplaceableRandomAccessSlice.Index
+Func RangeReplaceableRandomAccessSlice.insert(_:at:) has parameter 1 type change from Base.Index to RangeReplaceableRandomAccessSlice.Index
+Func RangeReplaceableRandomAccessSlice.insert(contentsOf:at:) has parameter 1 type change from Base.Index to RangeReplaceableRandomAccessSlice.Index
+Func RangeReplaceableRandomAccessSlice.remove(at:) has parameter 0 type change from Base.Index to RangeReplaceableRandomAccessSlice.Index
+Func RangeReplaceableRandomAccessSlice.removeSubrange(_:) has parameter 0 type change from Range<Base.Index> to Range<RangeReplaceableRandomAccessSlice.Index>
+Func RangeReplaceableRandomAccessSlice.replaceSubrange(_:with:) has parameter 0 type change from Range<Base.Index> to Range<RangeReplaceableRandomAccessSlice.Index>
+Func RangeReplaceableSlice.distance(from:to:) has return type change from Base.IndexDistance to RangeReplaceableSlice.IndexDistance
+Func RangeReplaceableSlice.index(_:offsetBy:) has return type change from Base.Index to RangeReplaceableSlice.Index
+Func RangeReplaceableSlice.index(_:offsetBy:limitedBy:) has return type change from Base.Index? to RangeReplaceableSlice.Index?
+Func RangeReplaceableSlice.index(after:) has return type change from Base.Index to RangeReplaceableSlice.Index
+Func RangeReplaceableSlice.insert(_:at:) has parameter 1 type change from Base.Index to RangeReplaceableSlice.Index
+Func RangeReplaceableSlice.insert(contentsOf:at:) has parameter 1 type change from Base.Index to RangeReplaceableSlice.Index
+Func RangeReplaceableSlice.remove(at:) has parameter 0 type change from Base.Index to RangeReplaceableSlice.Index
+Func RangeReplaceableSlice.removeSubrange(_:) has parameter 0 type change from Range<Base.Index> to Range<RangeReplaceableSlice.Index>
+Func RangeReplaceableSlice.replaceSubrange(_:with:) has parameter 0 type change from Range<Base.Index> to Range<RangeReplaceableSlice.Index>
+Func ReversedCollection.distance(from:to:) has return type change from Base.IndexDistance to ReversedCollection.IndexDistance
+Func ReversedCollection.index(_:offsetBy:) has return type change from ReversedIndex<Base> to ReversedCollection.Index
+Func ReversedCollection.index(_:offsetBy:limitedBy:) has return type change from ReversedIndex<Base>? to ReversedCollection.Index?
+Func ReversedCollection.index(after:) has return type change from ReversedIndex<Base> to ReversedCollection.Index
+Func ReversedCollection.index(before:) has return type change from ReversedIndex<Base> to ReversedCollection.Index
+Func ReversedRandomAccessCollection.distance(from:to:) has return type change from Base.IndexDistance to ReversedRandomAccessCollection.IndexDistance
+Func ReversedRandomAccessCollection.index(_:offsetBy:) has return type change from ReversedRandomAccessIndex<Base> to ReversedRandomAccessCollection.Index
+Func ReversedRandomAccessCollection.index(_:offsetBy:limitedBy:) has return type change from ReversedRandomAccessIndex<Base>? to ReversedRandomAccessCollection.Index?
+Func ReversedRandomAccessCollection.index(after:) has return type change from ReversedRandomAccessIndex<Base> to ReversedRandomAccessCollection.Index
+Func ReversedRandomAccessCollection.index(before:) has return type change from ReversedRandomAccessIndex<Base> to ReversedRandomAccessCollection.Index
+Func Set.formSymmetricDifference(_:) has parameter 0 type change from Set<Element> to Set<Set.Element>
+Func Set.index(after:) has return type change from SetIndex<Element> to Set<Element>.Index
+Func Set.index(of:) has return type change from SetIndex<Element>? to Set<Element>.Index?
+Func Set.intersection(_:) has return type change from Set<Element> to Set<Set.Element>
+Func Set.isDisjoint(with:) has parameter 0 type change from Set<Element> to Set<Set.Element>
+Func Set.isStrictSubset(of:) has parameter 0 type change from Set<Element> to Set<Set.Element>
+Func Set.isStrictSuperset(of:) has parameter 0 type change from Set<Element> to Set<Set.Element>
+Func Set.isSubset(of:) has parameter 0 type change from Set<Element> to Set<Set.Element>
+Func Set.isSuperset(of:) has parameter 0 type change from Set<Element> to Set<Set.Element>
+Func Set.popFirst() has return type change from Element? to Set.Element?
+Func Set.remove(at:) has parameter 0 type change from SetIndex<Element> to Set<Element>.Index
+Func Set.removeFirst() has return type change from Element to Set.Element
+Func Set.subtract(_:) has parameter 0 type change from Set<Element> to Set<Set.Element>
+Func Set.subtracting(_:) has return type change from Set<Element> to Set<Set.Element>
+Func Set.symmetricDifference(_:) has return type change from Set<Element> to Set<Set.Element>
+Func Set.union(_:) has return type change from Set<Element> to Set<Set.Element>
+Func Slice.distance(from:to:) has return type change from Base.IndexDistance to Slice.IndexDistance
+Func Slice.index(_:offsetBy:) has return type change from Base.Index to Slice.Index
+Func Slice.index(_:offsetBy:limitedBy:) has return type change from Base.Index? to Slice.Index?
+Func Slice.index(after:) has return type change from Base.Index to Slice.Index
+Func UnsafePointer.withMemoryRebound(to:capacity:_:) has parameter 2 type change from (UnsafeMutablePointer<T>) throws -> Result to (UnsafePointer<T>) throws -> Result
+Func Zip2Iterator.next() has return type change from (Iterator1.Element, Iterator2.Element)? to Zip2Iterator.Element?
+Func Zip2Sequence.makeIterator() has return type change from Zip2Iterator<Sequence1.Iterator, Sequence2.Iterator> to Zip2Sequence.Iterator
+
+/* Decl Attribute changes */

@@ -16,10 +16,11 @@
 
 #include "swift/AST/Module.h"
 #include "swift/AST/AccessScope.h"
-#include "swift/AST/AST.h"
+#include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/ASTScope.h"
 #include "swift/AST/ASTWalker.h"
+#include "swift/AST/Builtins.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/LazyResolver.h"
@@ -180,7 +181,7 @@ void SourceLookupCache::doPopulateCache(Range decls,
                                         bool onlyOperators) {
   for (Decl *D : decls) {
     if (ValueDecl *VD = dyn_cast<ValueDecl>(D))
-      if (onlyOperators ? VD->getName().isOperator() : VD->hasName()) {
+      if (onlyOperators ? VD->isOperator() : VD->hasName()) {
         // Cache the value under both its compound name and its full name.
         TopLevelValues.add(VD);
       }
@@ -555,106 +556,6 @@ void ModuleDecl::getDisplayDecls(SmallVectorImpl<Decl*> &Results) const {
   FORWARD(getDisplayDecls, (Results));
 }
 
-SubstitutionList
-TypeBase::gatherAllSubstitutions(ModuleDecl *module,
-                                 LazyResolver *resolver,
-                                 DeclContext *gpContext) {
-  // FIXME: If there is no module, infer one. This is a hack for callers that
-  // don't have access to the module. It will have to go away once we're
-  // properly differentiating bound generic types based on the protocol
-  // conformances visible from a given module.
-  if (!module)
-    module = getAnyNominal()->getParentModule();
-
-  // Check the context, introducing the default if needed.
-  if (!gpContext)
-    gpContext = getAnyNominal();
-
-  assert(gpContext->getAsNominalTypeOrNominalTypeExtensionContext()
-         == getAnyNominal() && "not a valid context");
-
-  auto *genericSig = gpContext->getGenericSignatureOfContext();
-  if (genericSig == nullptr)
-    return { };
-
-  // If we already have a cached copy of the substitutions, return them.
-  const ASTContext &ctx = getASTContext();
-  if (auto known = ctx.getSubstitutions(this, gpContext))
-    return *known;
-
-  // Compute the set of substitutions.
-  TypeSubstitutionMap substitutions;
-
-  // The type itself contains substitutions up to the innermost
-  // non-type context.
-  Type parent = this;
-  ArrayRef<GenericTypeParamType *> genericParams =
-    genericSig->getGenericParams();
-  unsigned lastGenericIndex = genericParams.size();
-  while (parent) {
-    if (auto boundGeneric = parent->getAs<BoundGenericType>()) {
-      unsigned index = lastGenericIndex - boundGeneric->getGenericArgs().size();
-      for (Type arg : boundGeneric->getGenericArgs()) {
-        auto paramTy = genericParams[index++];
-        substitutions[
-          paramTy->getCanonicalType()->castTo<GenericTypeParamType>()] = arg;
-      }
-      lastGenericIndex -= boundGeneric->getGenericArgs().size();
-
-      parent = boundGeneric->getParent();
-      continue;
-    }
-
-    if (auto protocol = parent->getAs<ProtocolType>()) {
-      parent = protocol->getParent();
-      lastGenericIndex--;
-      continue;
-    }
-
-    if (auto nominal = parent->getAs<NominalType>()) {
-      parent = nominal->getParent();
-      continue;
-    }
-
-    llvm_unreachable("Not a nominal or bound generic type");
-  }
-
-  auto *genericEnv = gpContext->getGenericEnvironmentOfContext();
-
-  // Add forwarding substitutions from the outer context if we have
-  // a type nested inside a generic function.
-  auto *parentDC = gpContext;
-  while (parentDC->isTypeContext())
-    parentDC = parentDC->getParent();
-  if (auto *outerSig = parentDC->getGenericSignatureOfContext()) {
-    for (auto gp : outerSig->getGenericParams()) {
-      auto result = substitutions.insert(
-                      {gp->getCanonicalType()->castTo<GenericTypeParamType>(),
-                       genericEnv->mapTypeIntoContext(gp)});
-      assert(result.second);
-      (void) result;
-    }
-  }
-
-  SmallVector<Substitution, 4> result;
-  genericSig->getSubstitutions(substitutions,
-                               LookUpConformanceInModule(module),
-                               result);
-
-  // Before recording substitutions, make sure we didn't end up doing it
-  // recursively.
-  if (auto known = ctx.getSubstitutions(this, gpContext))
-    return *known;
-
-  // Copy and record the substitutions.
-  auto permanentSubs = ctx.AllocateCopy(result,
-                                        hasTypeVariable()
-                                          ? AllocationArena::ConstraintSolver
-                                          : AllocationArena::Permanent);
-  ctx.setSubstitutions(this, gpContext, permanentSubs);
-  return permanentSubs;
-}
-
 Optional<ProtocolConformanceRef>
 ModuleDecl::lookupConformance(Type type, ProtocolDecl *protocol,
                               LazyResolver *resolver) {
@@ -802,12 +703,10 @@ ModuleDecl::lookupConformance(Type type, ProtocolDecl *protocol,
     if (!explicitConformanceType->isEqual(type)) {
       // Gather the substitutions we need to map the generic conformance to
       // the specialized conformance.
-      auto substitutions = type->gatherAllSubstitutions(this, resolver,
-                                                        explicitConformanceDC);
+      auto subMap = type->getContextSubstitutionMap(this, explicitConformanceDC);
 
       // Create the specialized conformance entry.
-      auto result = ctx.getSpecializedConformance(type, conformance,
-                                                  substitutions);
+      auto result = ctx.getSpecializedConformance(type, conformance, subMap);
       return ProtocolConformanceRef(result);
     }
   }
@@ -1519,19 +1418,14 @@ SourceFile::getDiscriminatorForPrivateValue(const ValueDecl *D) const {
   llvm::MD5::MD5Result result;
   hash.final(result);
 
-  // Make sure the whole thing is a valid identifier.
+  // Use the hash as a hex string, prefixed with an underscore to make sure
+  // it is a valid identifier.
+  // FIXME: There are more compact ways to encode a 16-byte value.
   SmallString<33> buffer{"_"};
-
-  // Write the hash as a hex string.
-  // FIXME: This should go into llvm/ADT/StringExtras.h.
-  // FIXME: And there are more compact ways to encode a 16-byte value.
-  buffer.reserve(buffer.size() + 2*llvm::array_lengthof(result));
-  for (uint8_t byte : result) {
-    buffer.push_back(llvm::hexdigit(byte >> 4, /*LowerCase=*/false));
-    buffer.push_back(llvm::hexdigit(byte & 0xF, /*LowerCase=*/false));
-  }
-
-  PrivateDiscriminator = getASTContext().getIdentifier(buffer);
+  SmallString<32> hashString;
+  llvm::MD5::stringifyResult(result, hashString);
+  buffer += hashString;
+  PrivateDiscriminator = getASTContext().getIdentifier(buffer.str().upper());
   return PrivateDiscriminator;
 }
 

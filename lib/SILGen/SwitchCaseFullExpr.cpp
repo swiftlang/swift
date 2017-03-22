@@ -23,10 +23,6 @@ SwitchCaseFullExpr::SwitchCaseFullExpr(SILGenFunction &SGF, CleanupLocation loc,
     : SGF(SGF), scope(SGF.Cleanups, loc), loc(loc),
       contBlock(contBlock ? *contBlock : *SGF.B.splitBlockForFallthrough()) {}
 
-SwitchCaseFullExpr::~SwitchCaseFullExpr() {
-  assert(!scope.isValid() && "Switch Case Full Expr was not popped?!");
-}
-
 void SwitchCaseFullExpr::exit(SILLocation loc, ArrayRef<SILValue> branchArgs) {
   assert(SGF.B.hasValidInsertionPoint());
   scope.pop();

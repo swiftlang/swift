@@ -14,8 +14,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/Basic/DemangleWrappers.h"
-#include "swift/Basic/ManglingMacros.h"
+#include "swift/Demangling/Demangle.h"
+#include "swift/Demangling/ManglingMacros.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/MemoryBuffer.h"
@@ -89,21 +89,22 @@ static void demangle(llvm::raw_ostream &os, llvm::StringRef name,
   swift::Demangle::NodePointer pointer = DCtx.demangleSymbolAsNode(name);
   if (ExpandMode || TreeOnly) {
     llvm::outs() << "Demangling for " << name << '\n';
-    swift::demangle_wrappers::NodeDumper(pointer).print(llvm::outs());
+    llvm::outs() << getNodeTreeAsString(pointer);
   }
   if (RemangleMode) {
     std::string remangled;
-    if (!pointer) {
-      // Just reprint the original mangled name if it didn't demangle.
+    if (!pointer || !(name.startswith(MANGLING_PREFIX_STR) ||
+                      name.startswith("_S"))) {
+      // Just reprint the original mangled name if it didn't demangle or is in
+      // the old mangling scheme.
       // This makes it easier to share the same database between the
       // mangling and demangling tests.
       remangled = name;
     } else {
+      remangled = swift::Demangle::mangleNode(pointer);
       // Also accept the future mangling prefix.
-      // TODO: remove the "_S" as soon as MANGLING_PREFIX_STR gets "_S".
-      remangled = swift::Demangle::mangleNode(pointer,
-                          /*NewMangling*/ name.startswith(MANGLING_PREFIX_STR)
-                                          || name.startswith("_S"));
+      // TODO: remove the special "_S" handling as soon as MANGLING_PREFIX_STR
+      // gets "_S".
       if (name.startswith("_S")) {
         assert(remangled.find(MANGLING_PREFIX_STR) == 0);
         remangled = "_S" + remangled.substr(3);

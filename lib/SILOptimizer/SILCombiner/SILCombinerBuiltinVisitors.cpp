@@ -92,8 +92,7 @@ SILInstruction *SILCombiner::optimizeBuiltinCanBeObjCClass(BuiltinInst *BI) {
 }
 
 static unsigned getTypeWidth(SILType Ty) {
-  if (auto BuiltinIntTy =
-          dyn_cast<BuiltinIntegerType>(Ty.getSwiftRValueType())) {
+  if (auto BuiltinIntTy = Ty.getAs<BuiltinIntegerType>()) {
     if (BuiltinIntTy->isFixedWidth()) {
       return BuiltinIntTy->getFixedWidth();
     }
@@ -289,7 +288,8 @@ static SILInstruction *createIndexAddrFrom(IndexRawPointerInst *I,
 
   // index_raw_pointer's address type is currently always strict.
   auto *NewPTAI = Builder.createPointerToAddress(
-    I->getLoc(), Ptr, InstanceType.getAddressType(), /*isStrict*/ true);
+    I->getLoc(), Ptr, InstanceType.getAddressType(),
+    /*isStrict*/ true, /*isInvariant*/ false);
 
   auto *DistanceAsWord =
       Builder.createBuiltin(I->getLoc(), TruncOrBitCast->getName(),

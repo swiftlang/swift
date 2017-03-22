@@ -38,7 +38,11 @@ class LValue;
 class ManagedValue;
 class RValue;
 class TemporaryInitialization;
-  
+class CalleeTypeInfo;
+class ResultPlan;
+using ResultPlanPtr = std::unique_ptr<ResultPlan>;
+class ArgumentScope;
+
 /// Internal context information for the SILGenFunction visitor.
 ///
 /// In general, emission methods which take an SGFContext indicate
@@ -196,6 +200,16 @@ enum class CaptureEmission {
   /// Captures are being emitted for partial application to form a closure
   /// value.
   PartialApplication,
+};
+
+/// Parameter to \c SILGenFunction::emitAddressOfLValue that indicates
+/// what kind of instrumentation should be emitted when compiling under
+/// Thread Sanitizer.
+enum class TSanKind : bool {
+  None = 0,
+
+  /// Instrument the LValue access as an inout access.
+  InoutAccess
 };
 
 /// Represents an LValue opened for mutating access.
@@ -881,16 +895,16 @@ public:
 
   /// OpenedArchetypes - Mappings of opened archetypes back to the
   /// instruction which opened them.
-  llvm::DenseMap<CanType, SILValue> ArchetypeOpenings;
+  llvm::DenseMap<ArchetypeType *, SILValue> ArchetypeOpenings;
 
-  SILValue getArchetypeOpeningSite(CanArchetypeType archetype) const {
+  SILValue getArchetypeOpeningSite(ArchetypeType *archetype) const {
     auto it = ArchetypeOpenings.find(archetype);
     assert(it != ArchetypeOpenings.end() &&
            "opened archetype was not registered with SILGenFunction");
     return it->second;
   }
 
-  void setArchetypeOpeningSite(CanArchetypeType archetype, SILValue site) {
+  void setArchetypeOpeningSite(ArchetypeType *archetype, SILValue site) {
     ArchetypeOpenings.insert({archetype, site});
   }
 
@@ -913,7 +927,7 @@ public:
   SILGenFunction::OpaqueValueState
   emitOpenExistential(SILLocation loc,
                       ManagedValue existentialValue,
-                      CanArchetypeType openedArchetype,
+                      ArchetypeType *openedArchetype,
                       SILType loweredOpenedType,
                       AccessKind accessKind);
 
@@ -933,6 +947,13 @@ public:
                             SGFContext C,
                             llvm::function_ref<ManagedValue (SGFContext)> F,
                             bool allowEmbeddedNSError = true);
+
+  RValue emitCollectionConversion(SILLocation loc,
+                                  FuncDecl *fn,
+                                  CanType fromCollection,
+                                  CanType toCollection,
+                                  ManagedValue mv,
+                                  SGFContext C);
 
   //===--------------------------------------------------------------------===//
   // Recursive entry points
@@ -1228,18 +1249,18 @@ public:
   void emitCopyLValueInto(SILLocation loc, LValue &&src,
                           Initialization *dest);
   ManagedValue emitAddressOfLValue(SILLocation loc, LValue &&src,
-                                   AccessKind accessKind);
+                                   AccessKind accessKind,
+                                   TSanKind tsanKind = TSanKind::None);
+
   RValue emitLoadOfLValue(SILLocation loc, LValue &&src, SGFContext C,
                           bool isGuaranteedValid = false);
 
-  /// Emit a reference to a method from within another method of the type, and
-  /// gather all the substitutions necessary to invoke it, without
-  /// dynamic dispatch.
-  std::tuple<ManagedValue, SILType, SubstitutionList>
+  /// Emit a reference to a method from within another method of the type.
+  std::tuple<ManagedValue, SILType>
   emitSiblingMethodRef(SILLocation loc,
                        SILValue selfValue,
                        SILDeclRef methodConstant,
-                       SubstitutionList innerSubstitutions);
+                       const SubstitutionMap &subMap);
   
   SILValue emitMetatypeOfValue(SILLocation loc, Expr *baseExpr);
   
@@ -1265,16 +1286,10 @@ public:
   /// lowered appropriately for the abstraction level but that the
   /// result does need to be turned back into something matching a
   /// formal type.
-  RValue emitApply(SILLocation loc,
-                   ManagedValue fn,
-                   SubstitutionList subs,
+  RValue emitApply(ResultPlanPtr &&resultPlan, ArgumentScope &&argScope,
+                   SILLocation loc, ManagedValue fn, SubstitutionList subs,
                    ArrayRef<ManagedValue> args,
-                   CanSILFunctionType substFnType,
-                   AbstractionPattern origResultType,
-                   CanType substResultType,
-                   ApplyOptions options,
-                   Optional<SILFunctionTypeRepresentation> overrideRep,
-                   const Optional<ForeignErrorConvention> &foreignError,
+                   const CalleeTypeInfo &calleeTypeInfo, ApplyOptions options,
                    SGFContext evalContext);
 
   RValue emitApplyOfDefaultArgGenerator(SILLocation loc,
@@ -1305,7 +1320,7 @@ public:
 
   RValue emitApplyOfLibraryIntrinsic(SILLocation loc,
                                      FuncDecl *fn,
-                                     SubstitutionList subs,
+                                     const SubstitutionMap &subMap,
                                      ArrayRef<ManagedValue> args,
                                      SGFContext ctx);
 
@@ -1695,10 +1710,6 @@ public:
   
   /// Get the _Pointer protocol used for pointer argument operations.
   ProtocolDecl *getPointerProtocol();
-  
-  /// Produce a substitution for invoking a pointer argument conversion
-  /// intrinsic.
-  Substitution getPointerSubstitution(Type pointerType);
 };
 
 

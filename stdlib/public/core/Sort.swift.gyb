@@ -25,6 +25,8 @@ def cmp(a, b, p):
 % preds = [True, False]
 % for p in preds:
 
+@_inlineable
+@_versioned
 func _insertionSort<C>(
   _ elements: inout C,
   subRange range: Range<C.Index>
@@ -80,6 +82,7 @@ func _insertionSort<C>(
 ///
 /// - Precondition: `a < b && b < c`
 /// - Postcondition: `elements[a] <= elements[b] && elements[b] <= elements[c]`
+@_inlineable
 public // @testable
 func _sort3<C>(
   _ elements: inout C,
@@ -151,6 +154,8 @@ func _sort3<C>(
 ///
 /// - Precondition: The count of `range` must be >= 3:
 ///   `elements.distance(from: range.lowerBound, to: range.upperBound) >= 3`
+@_inlineable
+@_versioned
 func _partition<C>(
   _ elements: inout C,
   subRange range: Range<C.Index>
@@ -200,6 +205,7 @@ func _partition<C>(
   return lo
 }
 
+@_inlineable
 public // @testable
 func _introSort<C>(
   _ elements: inout C,
@@ -224,6 +230,8 @@ func _introSort<C>(
     depthLimit: depthLimit)
 }
 
+@_inlineable
+@_versioned
 func _introSortImpl<C>(
   _ elements: inout C,
   subRange range: Range<C.Index>
@@ -268,6 +276,8 @@ func _introSortImpl<C>(
     depthLimit: depthLimit &- 1)
 }
 
+@_inlineable
+@_versioned
 func _siftDown<C>(
   _ elements: inout C,
   index: C.Index,
@@ -308,6 +318,8 @@ func _siftDown<C>(
   }
 }
 
+@_inlineable
+@_versioned
 func _heapify<C>(
   _ elements: inout C,
   subRange range: Range<C.Index>
@@ -337,6 +349,8 @@ func _heapify<C>(
   }
 }
 
+@_inlineable
+@_versioned
 func _heapSort<C>(
   _ elements: inout C,
   subRange range: Range<C.Index>
@@ -368,6 +382,7 @@ func _heapSort<C>(
 /// Exchange the values of `a` and `b`.
 ///
 /// - Precondition: `a` and `b` do not alias each other.
+@_inlineable
 public func swap<T>(_ a: inout T, _ b: inout T) {
   // Semantically equivalent to (a, b) = (b, a).
   // Microoptimized to avoid retain/release traffic.
@@ -384,3 +399,4 @@ public func swap<T>(_ a: inout T, _ b: inout T) {
   // Initialize P2.
   Builtin.initialize(tmp, p2)
 }
+

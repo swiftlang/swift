@@ -928,11 +928,11 @@ namespace {
           secondFavoredTy = favoredExprTy;
         }
         
-        if (firstFavoredTy && firstArgTy->getAs<TypeVariableType>()) {
+        if (firstFavoredTy && firstArgTy->is<TypeVariableType>()) {
           firstArgTy = firstFavoredTy;
         }
         
-        if (secondFavoredTy && secondArgTy->getAs<TypeVariableType>()) {
+        if (secondFavoredTy && secondArgTy->is<TypeVariableType>()) {
           secondArgTy = secondFavoredTy;
         }
       }
@@ -1098,7 +1098,7 @@ namespace {
         auto isLValueBase = false;
         Type baseTy = CS.getType(subscriptExpr->getBase());
 
-        if (baseTy->getAs<LValueType>()) {
+        if (baseTy->is<LValueType>()) {
           isLValueBase = true;
           baseTy = baseTy->getLValueOrInOutObjectType();
         }
@@ -1820,7 +1820,7 @@ namespace {
         unsigned index = 0;
         for (auto element : expr->getElements()) {
           CS.addConstraint(ConstraintKind::Conversion,
-                           element->getType(),
+                           CS.getType(element),
                            contextualDictionaryElementType,
                            CS.getConstraintLocator(expr,
                                                    LocatorPathElt::
@@ -1862,8 +1862,8 @@ namespace {
             if (element1 == element2)
               continue;
 
-            auto tty1 = element1->getType()->getAs<TupleType>();
-            auto tty2 = element2->getType()->getAs<TupleType>();
+            auto tty1 = CS.getType(element1)->getAs<TupleType>();
+            auto tty2 = CS.getType(element2)->getAs<TupleType>();
 
             if (tty1 && tty2) {
               auto mergedKey = false;
@@ -1911,7 +1911,7 @@ namespace {
       for (auto element : expr->getElements()) {
         if (!mergedElements.count(element))
           CS.addConstraint(ConstraintKind::Conversion,
-                           element->getType(),
+                           CS.getType(element),
                            elementTy,
                            CS.getConstraintLocator(
                              expr,
@@ -2504,19 +2504,16 @@ namespace {
 
       // If the 'self' parameter is not configured, something went
       // wrong elsewhere and should have been diagnosed already.
-      if (!selfDecl->hasType())
+      if (!selfDecl->hasInterfaceType())
         return ErrorType::get(tc.Context);
 
-      // If the method returns 'Self', the type of 'self' is a
-      // DynamicSelfType. Unwrap it before getting the superclass.
-      auto selfTy = selfDecl->getType()->getRValueInstanceType();
-      if (auto *dynamicSelfTy = selfTy->getAs<DynamicSelfType>())
-        selfTy = dynamicSelfTy->getSelfType();
-
+      auto selfTy = CS.DC->mapTypeIntoContext(
+        typeContext->getDeclaredInterfaceType());
       auto superclassTy = selfTy->getSuperclass(&tc);
 
-      if (selfDecl->getType()->is<MetatypeType>())
+      if (selfDecl->getInterfaceType()->is<MetatypeType>())
         superclassTy = MetatypeType::get(superclassTy);
+
       return superclassTy;
     }
     
@@ -3066,10 +3063,6 @@ Expr *ConstraintSystem::generateConstraints(Expr *expr) {
   
   if (result)
     this->optimizeConstraints(result);
-
-  // If the experimental constraint propagation pass is enabled, run it.
-  if (TC.Context.LangOpts.EnableConstraintPropagation)
-    propagateConstraints();
 
   return result;
 }

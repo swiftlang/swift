@@ -27,8 +27,8 @@ void FormalAccess::_anchor() {}
 //                      Shared Borrow Formal Evaluation
 //===----------------------------------------------------------------------===//
 
-void SharedBorrowFormalAccess::finishImpl(SILGenFunction &gen) {
-  gen.B.createEndBorrow(CleanupLocation::get(loc), borrowedValue,
+void SharedBorrowFormalAccess::finishImpl(SILGenFunction &SGF) {
+  SGF.B.createEndBorrow(CleanupLocation::get(loc), borrowedValue,
                         originalValue);
 }
 
@@ -36,41 +36,43 @@ void SharedBorrowFormalAccess::finishImpl(SILGenFunction &gen) {
 //                             OwnedFormalAccess
 //===----------------------------------------------------------------------===//
 
-void OwnedFormalAccess::finishImpl(SILGenFunction &gen) {
+void OwnedFormalAccess::finishImpl(SILGenFunction &SGF) {
   auto cleanupLoc = CleanupLocation::get(loc);
   if (value->getType().isAddress())
-    gen.B.createDestroyAddr(cleanupLoc, value);
+    SGF.B.createDestroyAddr(cleanupLoc, value);
   else
-    gen.B.emitDestroyValueOperation(cleanupLoc, value);
+    SGF.B.emitDestroyValueOperation(cleanupLoc, value);
 }
 
 //===----------------------------------------------------------------------===//
 //                          Formal Evaluation Scope
 //===----------------------------------------------------------------------===//
 
-FormalEvaluationScope::FormalEvaluationScope(SILGenFunction &gen)
-    : gen(gen), savedDepth(gen.FormalEvalContext.stable_begin()),
-      wasInWritebackScope(gen.InWritebackScope) {
-  if (gen.InInOutConversionScope) {
+FormalEvaluationScope::FormalEvaluationScope(SILGenFunction &SGF)
+    : SGF(SGF), savedDepth(SGF.FormalEvalContext.stable_begin()),
+      wasInWritebackScope(SGF.InWritebackScope),
+      wasInInOutConversionScope(SGF.InInOutConversionScope) {
+  if (wasInInOutConversionScope) {
     savedDepth.reset();
     return;
   }
-  gen.InWritebackScope = true;
+  SGF.InWritebackScope = true;
 }
 
 FormalEvaluationScope::FormalEvaluationScope(FormalEvaluationScope &&o)
-    : gen(o.gen), savedDepth(o.savedDepth),
-      wasInWritebackScope(o.wasInWritebackScope) {
+    : SGF(o.SGF), savedDepth(o.savedDepth),
+      wasInWritebackScope(o.wasInWritebackScope),
+      wasInInOutConversionScope(o.wasInInOutConversionScope) {
   o.savedDepth.reset();
 }
 
 void FormalEvaluationScope::popImpl() {
   // Pop the InWritebackScope bit.
-  gen.InWritebackScope = wasInWritebackScope;
+  SGF.InWritebackScope = wasInWritebackScope;
 
   // Check to see if there is anything going on here.
 
-  auto &context = gen.FormalEvalContext;
+  auto &context = SGF.FormalEvalContext;
   using iterator = FormalEvaluationContext::iterator;
   using stable_iterator = FormalEvaluationContext::stable_iterator;
 
@@ -103,7 +105,7 @@ void FormalEvaluationScope::popImpl() {
 
     // and deactivate the cleanup. This will set the isFinished bit for owned
     // FormalAccess.
-    gen.Cleanups.setCleanupState(access.getCleanup(), CleanupState::Dead);
+    SGF.Cleanups.setCleanupState(access.getCleanup(), CleanupState::Dead);
 
     // Attempt to diagnose problems where obvious aliasing introduces illegal
     // code. We do a simple N^2 comparison here to detect this because it is
@@ -118,7 +120,7 @@ void FormalEvaluationScope::popImpl() {
           continue;
         auto &lhs = static_cast<ExclusiveBorrowFormalAccess &>(access);
         auto &rhs = static_cast<ExclusiveBorrowFormalAccess &>(other);
-        lhs.diagnoseConflict(rhs, gen);
+        lhs.diagnoseConflict(rhs, SGF);
       }
     }
 
@@ -127,7 +129,7 @@ void FormalEvaluationScope::popImpl() {
     //
     // This evaluates arbitrary code, so it's best to be paranoid
     // about iterators on the context.
-    access.finish(gen);
+    access.finish(SGF);
   }
 
   // Then check that we did not add any additional cleanups to the beginning of
@@ -143,9 +145,9 @@ void FormalEvaluationScope::popImpl() {
 //                         Formal Evaluation Context
 //===----------------------------------------------------------------------===//
 
-void FormalEvaluationContext::dump(SILGenFunction &gen) {
+void FormalEvaluationContext::dump(SILGenFunction &SGF) {
   for (auto II = begin(), IE = end(); II != IE; ++II) {
     FormalAccess &access = *II;
-    gen.Cleanups.dump(access.getCleanup());
+    SGF.Cleanups.dump(access.getCleanup());
   }
 }

@@ -12,7 +12,7 @@ struct Box {
 extension P1 {
   // CHECK-LABEL: sil hidden @_T019protocol_extensions2P1PAAE6extP1a{{[_0-9a-zA-Z]*}}F : $@convention(method) <Self where Self : P1> (@in_guaranteed Self) -> () {
   // CHECK: bb0([[SELF:%[0-9]+]] : $*Self):
-  final func extP1a() {
+  func extP1a() {
     // CHECK: [[WITNESS:%[0-9]+]] = witness_method $Self, #P1.reqP1a!1 : {{.*}} : $@convention(witness_method) <τ_0_0 where τ_0_0 : P1> (@in_guaranteed τ_0_0) -> ()
     // CHECK-NEXT: apply [[WITNESS]]<Self>([[SELF]]) : $@convention(witness_method) <τ_0_0 where τ_0_0 : P1> (@in_guaranteed τ_0_0) -> ()
     reqP1a()
@@ -21,7 +21,7 @@ extension P1 {
 
   // CHECK-LABEL: sil @_T019protocol_extensions2P1PAAE6extP1b{{[_0-9a-zA-Z]*}}F : $@convention(method) <Self where Self : P1> (@in_guaranteed Self) -> () {
   // CHECK: bb0([[SELF:%[0-9]+]] : $*Self):
-  public final func extP1b() {
+  public func extP1b() {
     // CHECK: [[FN:%[0-9]+]] = function_ref @_T019protocol_extensions2P1PAAE6extP1a{{[_0-9a-zA-Z]*}}F : $@convention(method) <τ_0_0 where τ_0_0 : P1> (@in_guaranteed τ_0_0) -> ()
     // CHECK-NEXT: apply [[FN]]<Self>([[SELF]]) : $@convention(method) <τ_0_0 where τ_0_0 : P1> (@in_guaranteed τ_0_0) -> ()
     extP1a()
@@ -36,7 +36,7 @@ extension P1 {
     set {}
   }
 
-  final func callSubscript() -> Int {
+  func callSubscript() -> Int {
     // But here we have to do a witness method call:
 
     // CHECK-LABEL: sil hidden @_T019protocol_extensions2P1PAAE13callSubscript{{[_0-9a-zA-Z]*}}F
@@ -474,24 +474,24 @@ func testG<T>(_ m: GenericMetaHolder<T>, gg: G<T>.Type) {
 // Using protocol extension members with existentials
 // ----------------------------------------------------------------------------
 extension P1 {
-  final func f1() { }
+  func f1() { }
 
-  final subscript (i: Int64) -> Bool {
+  subscript (i: Int64) -> Bool {
     get { return true }
   }
 
-  final var prop: Bool {
+  var prop: Bool {
     get { return true }
   }
 
-  final func returnsSelf() -> Self { return self }
+  func returnsSelf() -> Self { return self }
 
-  final var prop2: Bool {
+  var prop2: Bool {
     get { return true }
     set { }
   }
 
-  final subscript (b: Bool) -> Bool {
+  subscript (b: Bool) -> Bool {
     get { return b }
     set { }
   }
@@ -641,7 +641,7 @@ func test_open_existential_semantics_opaque(_ guaranteed: P1,
 protocol CP1: class {}
 
 extension CP1 {
-  final func f1() { }
+  func f1() { }
 }
 
 func plusOneCP1() -> CP1 {}

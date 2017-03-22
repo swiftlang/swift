@@ -553,20 +553,17 @@ void SILPassPipelinePlan::print(llvm::raw_ostream &os) {
   // rather than use the yaml writer interface. We want to use the yaml reader
   // interface to be resilient against slightly different forms of yaml.
   os << "[\n";
-  bool First = true;
-  for (const SILPassPipeline &Pipeline : getPipelines()) {
-    if (!First) {
-      os << "\n    ],\n";
-    }
-    First = false;
-    os << "    [\n";
+  interleave(getPipelines(),
+             [&](const SILPassPipeline &Pipeline) {
+               os << "    [\n";
 
-    os << "        \"" << Pipeline.Name << "\"";
-    for (PassKind Kind : getPipelinePasses(Pipeline)) {
-      os << ",\n        [\"" << PassKindID(Kind) << "\"," << PassKindName(Kind)
-         << ']';
-    }
-  }
+               os << "        \"" << Pipeline.Name << "\"";
+               for (PassKind Kind : getPipelinePasses(Pipeline)) {
+                 os << ",\n        [\"" << PassKindID(Kind) << "\","
+                    << PassKindName(Kind) << ']';
+               }
+             },
+             [&] { os << "\n    ],\n"; });
   os << "\n    ]\n";
   os << ']';
 }

@@ -90,8 +90,10 @@ public:
                              sourcekitd_uid_t,
                              uint8_t> CompactArrayReaderTy;
 
-  static bool dictionary_apply(void *Buf, size_t Index,
-                              sourcekitd_variant_dictionary_applier_t applier) {
+  static bool
+  dictionary_apply(void *Buf, size_t Index,
+                   llvm::function_ref<bool(sourcekitd_uid_t,
+                                           sourcekitd_variant_t)> applier) {
     CompactArrayReaderTy Reader(Buf);
 
     sourcekitd_uid_t Kind;
