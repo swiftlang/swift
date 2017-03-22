@@ -54,13 +54,17 @@ public protocol BidirectionalCollectionWrapper {
   associatedtype Base : BidirectionalCollection
   associatedtype Index
   associatedtype IndexDistance : SignedInteger
+  associatedtype Iterator : Iterator = Base.Iterator
   func _wrap(_: Base.Index) -> Index
   func _unwrap(_: Index) -> Base.Index
 }
 
+extension BidirectionalCollectionWrapper where Iterator == Base.Iterator {
+  public func makeIterator() -> Iterator { return base.makeIterator() }
+}
+
 extension BidirectionalCollectionWrapper {
-  // TODO: Forward Iterators
-${gyb.expand(
+  ${gyb.expand(
     '../../stdlib/public/core/ForwardCollectionAPIs.swift.gyb',
     base='base',
     Element='Base.Iterator.Element')}
@@ -70,7 +74,6 @@ ${gyb.expand(
 // Indexable et. al if we don't redeclare them with stricter constraints.  
 extension BidirectionalCollectionWrapper
 where Self : BidirectionalCollection {
-  // TODO: Forward Iterators
   ${gyb.expand(
     '../../stdlib/public/core/ForwardCollectionAPIs.swift.gyb',
     base='base',
