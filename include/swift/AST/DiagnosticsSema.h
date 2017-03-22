@@ -37,6 +37,10 @@ namespace swift {
     extern detail::DiagWithArguments<void Signature>::type ID;
 #include "DiagnosticsSema.def"
   }
+  /// Given an array of enum element decls, print them as case statements with
+  /// placeholders as contents.
+  void printEnumElmentsAsCases(llvm::DenseSet<EnumElementDecl*> &UnhandledElements,
+                               llvm::raw_ostream &OS);
   void diagnoseMissingCases(ASTContext &Context, const SwitchStmt *SwitchS);
 }
 
