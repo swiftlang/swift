@@ -893,17 +893,22 @@ NodePointer Demangler::demangleBoundGenericArgs(NodePointer Nominal,
 
   if (TypeListIdx >= TypeLists.size())
     return nullptr;
-  NodePointer args = TypeLists[TypeListIdx];
+  NodePointer args = TypeLists[TypeListIdx++];
 
   // Generic arguments for the outermost type come first.
   NodePointer Context = Nominal->getFirstChild();
 
-  if (Context->getKind() != Node::Kind::Module &&
-      Context->getKind() != Node::Kind::Function &&
-      Context->getKind() != Node::Kind::Extension) {
-    NodePointer BoundParent = demangleBoundGenericArgs(Context, TypeLists,
-                                                       TypeListIdx + 1);
-
+  if (TypeListIdx < TypeLists.size()) {
+    NodePointer BoundParent = nullptr;
+    if (Context->getKind() == Node::Kind::Extension) {
+      BoundParent = demangleBoundGenericArgs(Context->getChild(1), TypeLists,
+                                             TypeListIdx);
+      BoundParent = createWithChildren(Node::Kind::Extension,
+                                       Context->getFirstChild(),
+                                       BoundParent);
+    } else {
+      BoundParent = demangleBoundGenericArgs(Context, TypeLists, TypeListIdx);
+    }
     // Rebuild this type with the new parent type, which may have
     // had its generic arguments applied.
     Nominal = createWithChildren(Nominal->getKind(), BoundParent,
