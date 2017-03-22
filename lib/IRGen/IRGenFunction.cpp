@@ -151,10 +151,10 @@ llvm::Value *IRGenFunction::emitVerifyEndOfLifetimeCall(llvm::Value *object,
 void IRGenFunction::emitAllocBoxCall(llvm::Value *typeMetadata,
                                       llvm::Value *&box,
                                       llvm::Value *&valueAddress) {
-  auto attrs = llvm::AttributeSet::get(IGM.LLVMContext,
-                                       llvm::AttributeSet::FunctionIndex,
-                                       llvm::Attribute::NoUnwind);
-  
+  auto attrs = llvm::AttributeList::get(IGM.LLVMContext,
+                                        llvm::AttributeList::FunctionIndex,
+                                        llvm::Attribute::NoUnwind);
+
   llvm::CallInst *call =
     Builder.CreateCall(IGM.getAllocBoxFn(), typeMetadata);
   call->setAttributes(attrs);
@@ -165,9 +165,9 @@ void IRGenFunction::emitAllocBoxCall(llvm::Value *typeMetadata,
 
 void IRGenFunction::emitDeallocBoxCall(llvm::Value *box,
                                         llvm::Value *typeMetadata) {
-  auto attrs = llvm::AttributeSet::get(IGM.LLVMContext,
-                                       llvm::AttributeSet::FunctionIndex,
-                                       llvm::Attribute::NoUnwind);
+  auto attrs = llvm::AttributeList::get(IGM.LLVMContext,
+                                        llvm::AttributeList::FunctionIndex,
+                                        llvm::Attribute::NoUnwind);
 
   llvm::CallInst *call =
     Builder.CreateCall(IGM.getDeallocBoxFn(), box);
@@ -181,9 +181,8 @@ llvm::Value *IRGenFunction::emitProjectBoxCall(llvm::Value *box,
     llvm::Attribute::NoUnwind,
     llvm::Attribute::ReadNone,
   };
-  auto attrs = llvm::AttributeSet::get(IGM.LLVMContext,
-                                       llvm::AttributeSet::FunctionIndex,
-                                       attrKinds);
+  auto attrs = llvm::AttributeList::get(
+      IGM.LLVMContext, llvm::AttributeList::FunctionIndex, attrKinds);
   llvm::CallInst *call =
     Builder.CreateCall(IGM.getProjectBoxFn(), box);
   call->setCallingConv(IGM.DefaultCC);
