@@ -41,6 +41,9 @@ public:
     cleanups.innermostScope = depth;
   }
 
+  explicit Scope(SILGenFunction &SGF, SILLocation loc)
+      : Scope(SGF.Cleanups, CleanupLocation::get(loc)) {}
+
   void pop() {
     assert(depth.isValid() && "popping a scope twice!");
     popImpl();
