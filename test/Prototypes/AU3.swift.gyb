@@ -16,8 +16,8 @@
 import StdlibUnittest
 
 public protocol UnicodeView : BidirectionalCollection {
-  func wrap(_: Index) -> AnyUnicodeIndex_
-  func unwrap(_: AnyUnicodeIndex_) -> Index
+  func _wrap(_: Index) -> AnyUnicodeIndex_
+  func _unwrap(_: AnyUnicodeIndex_) -> Index
 }
 
 //===--- Wrapper ----------------------------------------------------------===//
@@ -257,10 +257,10 @@ Self : BidirectionalCollection {
 public extension BidirectionalCollectionWrapper
 where Base : UnicodeView, Self : AnyUnicodeView_ {
   func _wrap(_ i: Base.Index) -> AnyUnicodeIndex_ {
-    return base.wrap(i)
+    return base._wrap(i)
   }
   func _unwrap(_ i: AnyUnicodeIndex_) -> Base.Index {
-    return base.unwrap(i)
+    return base._unwrap(i)
   }
 }
 
@@ -287,10 +287,10 @@ MappedViewOfUnicodeCodeUnits<Base : RandomAccessCollection>
     }
   }
   
-  public func wrap(_ i: Index) -> AnyUnicodeIndex_ {
+  public func _wrap(_ i: Index) -> AnyUnicodeIndex_ {
     return AnyIndex(base: i, encodedPosition_: base.offset(of: i))
   }
-  public func unwrap(_ i: AnyUnicodeIndex_) -> Index {
+  public func _unwrap(_ i: AnyUnicodeIndex_) -> Index {
     return (i as? AnyIndex).map { $0.base }
     ?? base.index(atOffset: i.encodedPosition)
   }
@@ -423,10 +423,10 @@ struct AnyUnicodeIndexAdapter<BaseView: Swift.UnicodeView> : AnyUnicodeIndex_, W
 extension Swift.UnicodeView where Self : UnicodeView {
   typealias Self_ = Self
   
-  public func wrap(_ i: Index) -> AnyUnicodeIndex_ {
+  public func _wrap(_ i: Index) -> AnyUnicodeIndex_ {
     return AnyUnicodeIndexAdapter<Self>(base: i)
   }
-  public func unwrap(_ i: AnyUnicodeIndex_) -> Index {
+  public func _unwrap(_ i: AnyUnicodeIndex_) -> Index {
     return (i as? AnyUnicodeIndexAdapter<Self>).map { $0.base }
     ?? index(atEncodedPosition: i.encodedPosition)
   }
