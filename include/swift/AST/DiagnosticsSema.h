@@ -22,6 +22,7 @@
 
 namespace swift {
   class SwitchStmt;
+  class EnumElementDecl;
   namespace diag {
 
     /// Describes the kind of requirement in a protocol.
