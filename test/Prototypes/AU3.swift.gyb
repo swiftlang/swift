@@ -23,68 +23,6 @@ public protocol UnicodeView : BidirectionalCollection {
   func _unwrap(_: AnyUnicodeIndex_) -> Index
 }
 
-//===--- ForwardingWrapper ----------------------------------------------------------===//
-
-/// A type that forwards its implementation to an instance of `Base`.
-///
-/// Typical usage is to create protocol extensions of ForwardingWrapper constrained on
-/// other conformances of `Self` and `Base`.
-public protocol ForwardingWrapper {
-  associatedtype Base
-  var base: Base { get }
-}
-
-/// Comparable -> Comparable wrappers just forward to the base implementation
-public extension ForwardingWrapper where Self : Comparable, Base : Comparable {
-  static func < (lhs: Self, rhs: Self) -> Bool {
-    return lhs.base < rhs.base
-  }
-  static func == (lhs: Self, rhs: Self) -> Bool {
-    return lhs.base == rhs.base
-  }
-}
-
-/// A type that wraps a `BidirectionalCollection` and forwards most or all of
-/// its API.
-///
-/// Some models of `BidirectionalCollectionWrapper` are themselves models
-/// `BidirectionalCollection`, but some are not.
-public protocol BidirectionalCollectionWrapper : ForwardingWrapper {
-  var base: Base { get }
-  associatedtype Base : BidirectionalCollection
-  associatedtype Index
-  associatedtype IndexDistance : SignedInteger
-  associatedtype Iterator : Iterator = Base.Iterator
-  func _wrap(_: Base.Index) -> Index
-  func _unwrap(_: Index) -> Base.Index
-}
-
-extension BidirectionalCollectionWrapper where Iterator == Base.Iterator {
-  public func makeIterator() -> Iterator { return base.makeIterator() }
-}
-
-extension BidirectionalCollectionWrapper {
-  ${gyb.expand(
-    '../../stdlib/public/core/ForwardCollectionAPIs.swift.gyb',
-    base='base',
-    Element='Base.Iterator.Element')}
-}
-
-// Many of these implementations become redundant with defaults supplied by
-// Indexable et. al if we don't redeclare them with stricter constraints.  
-extension BidirectionalCollectionWrapper
-where Self : BidirectionalCollection {
-  ${gyb.expand(
-    '../../stdlib/public/core/ForwardCollectionAPIs.swift.gyb',
-    base='base',
-    Element='Base.Iterator.Element')}
-}
-
-public extension BidirectionalCollectionWrapper where Index == Base.Index {
-  func _wrap(_ i: Base.Index) -> Index { return i }
-  func _unwrap(_ i: Index) -> Base.Index { return i }
-}
-
 //===--- AnyUnicodeIndex --------------------------------------------------===//
 
 /// Type eraser for indices into type-erased unicode views.
@@ -112,8 +50,8 @@ public extension AnyUnicodeIndex_ where Self : Comparable {
   }
 }
 
-/// ForwardingWrapper for instances of AnyUnicodeIndex_ that makes it a suitable Index
-/// type (Comparable has self-requirements).
+/// ForwardingWrapper for instances of AnyUnicodeIndex_ that makes it a suitable
+/// Index type (Comparable has self-requirements).
 public struct AnyUnicodeIndex : Comparable {
   public var encodedPosition: Int64 { return base.encodedPosition }
   public var base: AnyUnicodeIndex_

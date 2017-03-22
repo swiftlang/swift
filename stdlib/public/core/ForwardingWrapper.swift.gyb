@@ -1,0 +1,92 @@
+//===--- ForwardingWrapper.swift.gyb --------------------------------------===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+%{import gyb}%
+
+//===--- ForwardingWrapper ------------------------------------------------===//
+
+/// A type that forwards its implementation to an instance of `Base`.
+///
+/// Typical usage is to create protocol extensions of ForwardingWrapper
+/// constrained on other conformances of `Self` and `Base`.
+public protocol ForwardingWrapper {
+  associatedtype Base
+  var base: Base { get }
+}
+
+//===--- Comparable forwarding --------------------------------------------===//
+
+/// Comparable -> Comparable wrappers just forward to the base implementation
+public extension ForwardingWrapper where Self : Comparable, Base : Comparable {
+  static func < (lhs: Self, rhs: Self) -> Bool {
+    return lhs.base < rhs.base
+  }
+  static func == (lhs: Self, rhs: Self) -> Bool {
+    return lhs.base == rhs.base
+  }
+}
+
+//===--- BidirectionalCollection forwarding -------------------------------===//
+
+/// A type that wraps a `BidirectionalCollection` and forwards most or all of
+/// its API.
+///
+/// - Note: Some models of `BidirectionalCollectionWrapper` are themselves
+///   models `BidirectionalCollection`, but some are not.
+///
+/// - Note: works great for random access collections as well.
+///
+/// - Warning: A wrapper that presents a different abstraction from the `Base`
+///   collection (as opposed to merely having different `Index` types, for
+///   example) must explicitly implement defaults supplied by its other
+///   conformances to prevent them from having semantics that simply forward to
+///   the `Base`.
+public protocol BidirectionalCollectionWrapper : ForwardingWrapper {
+  associatedtype Base : BidirectionalCollection
+  var base: Base { get }
+  associatedtype Index
+  associatedtype IndexDistance : SignedInteger
+  associatedtype Iterator = Base.Iterator
+  func _wrap(_: Base.Index) -> Index
+  func _unwrap(_: Index) -> Base.Index
+}
+
+/// When the `Iterator` type matches, just forward it.
+extension BidirectionalCollectionWrapper where Iterator == Base.Iterator {
+  public func makeIterator() -> Iterator { return base.makeIterator() }
+}
+
+/// When the `Index` type matches, wrapping/unwrapping is trivial
+public extension BidirectionalCollectionWrapper where Index == Base.Index {
+  func _wrap(_ i: Base.Index) -> Index { return i }
+  func _unwrap(_ i: Index) -> Base.Index { return i }
+}
+
+/// Forwards all the `BidirectionalCollection` APIs from `Base`, verbatim, but
+/// with whatever Index wrapping we have chosen.
+extension BidirectionalCollectionWrapper {
+  ${gyb.expand(
+    'ForwardCollectionAPIs.swift.gyb',
+    base='base',
+    Element='Base.Iterator.Element')}
+}
+
+/// When the model of BidirectionalCollectionWrapper is itself a collection,
+/// many of the defaults become redundant with defaults supplied by Indexable
+/// et. al., so repeat them with stricter constraints to resolve the ambiguity.
+extension BidirectionalCollectionWrapper
+where Self : BidirectionalCollection {
+  ${gyb.expand(
+    'ForwardCollectionAPIs.swift.gyb',
+    base='base',
+    Element='Base.Iterator.Element')}
+}
+

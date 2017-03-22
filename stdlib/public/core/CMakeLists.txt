@@ -62,6 +62,7 @@ set(SWIFTLIB_ESSENTIAL
   FloatingPoint.swift.gyb
   FloatingPointParsing.swift.gyb
   FloatingPointTypes.swift.gyb
+  ForwardingWrapper.swift.gyb
   Hashable.swift
   HashedCollections.swift.gyb
   # WORKAROUND: This file name is not sorted alphabetically in the list because
