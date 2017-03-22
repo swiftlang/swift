@@ -1,0 +1,105 @@
+//===--- ForwardCollectionAPIs.swift.gyb ----------------------------------===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+%{
+# Not meant as a standalone gyb file, but to be expanded inline in others.
+# Usage as follows:
+#   % import gyb
+#   ...
+#   extension SomeBidirectionalCollectionWrapper {
+#    ${gyb.expand(
+#       'CollectionForwarding.swift.gyb', Element='Base.Iterator.Element')}
+#    func _wrap(_ i: BaseIndex)->Index { ... }
+#    func _unwrap(_ i: Index)->BaseIndex { ... }
+#   }
+#
+#
+# Compute defaults for optional arguments
+bidirectional = locals().get('bidirectional', True)
+element_only = locals().get('element_only', False)
+}%
+% if not element_only:
+public var startIndex: Index { return _wrap(${base}.startIndex) }
+public var endIndex: Index { return _wrap(${base}.endIndex) }
+public func index(after i: Index) -> Index {
+  return _wrap(${base}.index(after: _unwrap(i)))
+}
+
+public func formIndex(after i: inout Index) {
+  var i1 = _unwrap(i)
+  ${base}.formIndex(after: &i1)
+  i = _wrap(i1)
+}
+% if bidirectional:
+public func index(before i: Index) -> Index {
+  return _wrap(${base}.index(before: _unwrap(i)))
+}
+public func formIndex(before i: inout Index) {
+  var i1 = _unwrap(i)
+  ${base}.formIndex(before: &i1)
+  i = _wrap(i1)
+}
+% end
+public func formIndex(_ i: inout Index, offsetBy n: IndexDistance) {
+  var i1 = _unwrap(i)
+  ${base}.formIndex(&i1, offsetBy: numericCast(n))
+  i = _wrap(i1)
+}
+public func index(_ i: Index, offsetBy n: IndexDistance) -> Index {
+  return _wrap(${base}.index(_unwrap(i), offsetBy: numericCast(n)))
+}
+public func index(
+  _ i: Index,
+  offsetBy n: IndexDistance,
+  limitedBy limit: Index
+) -> Index? {
+  return ${base}.index(
+    _unwrap(i),
+    offsetBy: numericCast(n),
+    limitedBy: _unwrap(limit)
+  ).map(_wrap)
+}
+public func distance(from i: Index, to j: Index) -> IndexDistance {
+  return numericCast(${base}.distance(from: _unwrap(i), to: _unwrap(j)))
+}
+public var count: IndexDistance {
+  return numericCast(${base}.count)
+}
+public var underestimatedCount: Int {
+  return ${base}.underestimatedCount
+}
+% end
+% if Element is not None:
+public subscript(i: Index) -> ${Element} {
+  return ${base}[_unwrap(i)]
+}
+public func withExistingUnsafeBuffer<R>(
+  _ body: (UnsafeBufferPointer<${Element}>) throws -> R
+) rethrows -> R? {
+  return try ${base}.withExistingUnsafeBuffer(body)
+}
+public var first: ${Element}? { return ${base}.first }
+public var last: ${Element}? { return ${base}.last }
+public func map<T>(_ transform: (${Element}) throws -> T) rethrows -> [T] {
+  return try ${base}.map(transform)
+}
+public func filter(
+  _ includedInResult: (${Element}) throws -> Bool
+) rethrows -> [${Element}] {
+  return try ${base}.filter(includedInResult)
+}
+public func forEach(_ body: (${Element}) throws -> Void) rethrows {
+  try ${base}.forEach(body)
+}
+public func _copyToContiguousArray() -> ContiguousArray<${Element}> {
+  return ${base}._copyToContiguousArray()
+}
+% end

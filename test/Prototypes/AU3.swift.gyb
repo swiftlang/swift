@@ -12,6 +12,9 @@
 // RUN: rm -rf %t && mkdir -p %t && %gyb -DWORD_BITS=%target-ptrsize %s -o %t/out.swift
 // RUN: %line-directive %t/out.swift -- %target-build-swift %t/out.swift -o %t/a.out -Onone
 // RUN: %line-directive %t/out.swift -- %target-run %t/a.out
+%{
+  import gyb
+}%
 
 import StdlibUnittest
 
@@ -55,86 +58,24 @@ public protocol BidirectionalCollectionWrapper {
   func _unwrap(_: Index) -> Base.Index
 }
 
-public extension BidirectionalCollectionWrapper {
-  var startIndex: Index { return _wrap(base.startIndex) }
-  var endIndex: Index { return _wrap(base.endIndex) }
-  func index(after i: Index) -> Index {
-    return _wrap(base.index(after: _unwrap(i)))
-  }
-  func index(before i: Index) -> Index {
-    return _wrap(base.index(before: _unwrap(i)))
-  }
-  public subscript(i: Index) -> Base.Iterator.Element {
-    return base[_unwrap(i)]
-  }
+extension BidirectionalCollectionWrapper {
+  // TODO: Forward Iterators
+${gyb.expand(
+    '../../stdlib/public/core/ForwardCollectionAPIs.swift.gyb',
+    base='base',
+    Element='Base.Iterator.Element')}
 }
 
 // Many of these implementations become redundant with defaults supplied by
-// Indexable et. al if we don't redeclare them with stricter constraints.  I'm
-// not sure if all of them are needed, but it seems like most.
-% for whereClause in '', 'where Self : BidirectionalCollection':
-public extension BidirectionalCollectionWrapper ${whereClause} {
-  func formIndex(after i: inout Index) {
-    var i1 = _unwrap(i)
-    base.formIndex(after: &i1)
-    i = _wrap(i1)
-  }
-  func formIndex(before i: inout Index) {
-    var i1 = _unwrap(i)
-    base.formIndex(before: &i1)
-    i = _wrap(i1)
-  }
-  func formIndex(_ i: inout Index, offsetBy n: IndexDistance) {
-    var i1 = _unwrap(i)
-    base.formIndex(&i1, offsetBy: numericCast(n))
-    i = _wrap(i1)
-  }
-  func index(_ i: Index, offsetBy n: IndexDistance) -> Index {
-    return _wrap(base.index(_unwrap(i), offsetBy: numericCast(n)))
-  }
-  func index(
-    _ i: Index,
-    offsetBy n: IndexDistance,
-    limitedBy limit: Index
-  ) -> Index? {
-    return base.index(
-      _unwrap(i),
-      offsetBy: numericCast(n) as Base.IndexDistance,
-      limitedBy: _unwrap(limit)
-    ).map(_wrap)
-  }
-  func distance(from i: Index, to j: Index) -> IndexDistance {
-    return numericCast(base.distance(from: _unwrap(i), to: _unwrap(j)))
-  }
-  var count: IndexDistance {
-    return numericCast(base.count)
-  }
-  var underestimatedCount: Int {
-    return base.underestimatedCount
-  }
-  public func withExistingUnsafeBuffer<R>(
-    _ body: (UnsafeBufferPointer<Base.Iterator.Element>) throws -> R
-  ) rethrows -> R? {
-    return try base.withExistingUnsafeBuffer(body)
-  }
-  public var first: Base.Iterator.Element? { return base.first }
-  public var last: Base.Iterator.Element? { return base.last }
-  public func map<T>(_ transform: (Base.Iterator.Element) throws -> T) rethrows -> [T] {
-    return try base.map(transform)
-  }
-  public func filter(
-    _ includedInResult: (Base.Iterator.Element) throws -> Bool
-  ) rethrows -> [Base.Iterator.Element] {
-    return try base.filter(includedInResult)
-  }
-  public func forEach(_ body: (Base.Iterator.Element) throws -> Void) rethrows {
-    try base.forEach(body)
-  }
-  public func _copyToContiguousArray() -> ContiguousArray<Base.Iterator.Element> {
-    return base._copyToContiguousArray()
-  }
+// Indexable et. al if we don't redeclare them with stricter constraints.  
+extension BidirectionalCollectionWrapper
+where Self : BidirectionalCollection {
+  // TODO: Forward Iterators
+  ${gyb.expand(
+    '../../stdlib/public/core/ForwardCollectionAPIs.swift.gyb',
+    base='base',
+    Element='Base.Iterator.Element')}
 }
-% end
 
 public extension BidirectionalCollectionWrapper where Index == Base.Index {
   func _wrap(_ i: Base.Index) -> Index { return i }
@@ -187,6 +128,7 @@ public struct AnyUnicodeIndex : Comparable {
 //===--- AnyUnicodeView ---------------------------------------------------===//
 /// Type-eraser bidirectional collections with index<->code unit offsets
 public protocol AnyUnicodeView_ {
+  typealias IndexDistance = Int64
   var startIndex: AnyUnicodeIndex_ { get }
   var endIndex: AnyUnicodeIndex_ { get }
   func formIndex(after: inout AnyUnicodeIndex_)
@@ -210,43 +152,17 @@ public protocol AnyUnicodeView_ {
 /// base
 public extension Wrapper
 where Base == AnyUnicodeView_,
-Self : BidirectionalCollection {
-  var startIndex: AnyUnicodeIndex { return AnyUnicodeIndex(base.startIndex) }
-  var endIndex: AnyUnicodeIndex { return AnyUnicodeIndex(base.endIndex) }
-  func formIndex(after i: inout AnyUnicodeIndex) {
-    base.formIndex(after: &i.base)
+Self : BidirectionalCollection, Self.Index == AnyUnicodeIndex {
+  // TODO: Forward Iterators
+  ${gyb.expand(
+    '../../stdlib/public/core/ForwardCollectionAPIs.swift.gyb',
+      base='base', Element=None)}
+  
+  func _wrap(_ x: AnyUnicodeIndex_) -> AnyUnicodeIndex {
+    return AnyUnicodeIndex(x)
   }
-  func index(after i: AnyUnicodeIndex) -> AnyUnicodeIndex {
-    return AnyUnicodeIndex(base.index(after: i.base))
-  }
-  func formIndex(before i: inout AnyUnicodeIndex) {
-    base.formIndex(before: &i.base)
-  }
-  func index(before i: AnyUnicodeIndex) -> AnyUnicodeIndex {
-    return AnyUnicodeIndex(base.index(before: i.base))
-  }
-  func formIndex(_ i: inout AnyUnicodeIndex, offsetBy n: Int64) {
-    base.formIndex(&i.base, offsetBy: n)
-  }
-  func index(_ i: AnyUnicodeIndex, offsetBy n: Int64) -> AnyUnicodeIndex {
-    return AnyUnicodeIndex(base.index(i.base, offsetBy: n))
-  }
-  func index(
-    _ i: AnyUnicodeIndex,
-    offsetBy n: Int64,
-    limitedBy limit: AnyUnicodeIndex
-  ) -> AnyUnicodeIndex? {
-    return base.index(i.base, offsetBy: n, limitedBy: limit.base)
-      .map(AnyUnicodeIndex.init)
-  }
-  func distance(from i: AnyUnicodeIndex, to j: AnyUnicodeIndex) -> Int64 {
-    return base.distance(from: i.base, to: j.base)
-  }
-  var count: Int64 {
-    return base.count
-  }
-  var underestimatedCount: Int {
-    return base.underestimatedCount
+  func _unwrap(_ x: AnyUnicodeIndex) -> AnyUnicodeIndex_ {
+    return x.base
   }
 }
 
@@ -346,37 +262,21 @@ public protocol Any${Element}UnicodeView_ : AnyUnicodeView_ {
   func _copyToContiguousArray() -> ContiguousArray<${Element}>
 }
 
-public struct Any${Element}UnicodeView : BidirectionalCollection, Wrapper {
+public struct Any${Element}UnicodeView
+   : BidirectionalCollection, Wrapper {
+  public typealias Index = AnyUnicodeIndex
+  public typealias IndexDistance = Int64
   public typealias Iterator = Any${Element}Iterator
   public func makeIterator() -> Any${Element}Iterator {
     return Any${Element}Iterator(base2.makeIterator())
   }
-  public subscript(i: AnyUnicodeIndex) -> ${Element} {
-    return base2[i.base]
-  }
   
-  public func withExistingUnsafeBuffer<R>(
-    _ body: (UnsafeBufferPointer<${Element}>) throws -> R
-  ) rethrows -> R? {
-    return try base2.withExistingUnsafeBuffer(body)
-  }
+  % # using element_only here because all the non-element stuff is handled in
+  % # one place above (where you see Element=None)
+  ${gyb.expand(
+    '../../stdlib/public/core/ForwardCollectionAPIs.swift.gyb',
+      base='base2', element_only=True, Element=Element)}
   
-  public var first: ${Element}? { return base2.first }
-  public var last: ${Element}? { return base2.last }
-  public func map<T>(_ transform: (${Element}) throws -> T) rethrows -> [T] {
-    return try base2.map(transform)
-  }
-  public func filter(
-    _ includedInResult: (${Element}) throws -> Bool
-  ) rethrows -> [${Element}] {
-    return try base2.filter(includedInResult)
-  }
-  public func forEach(_ body: (${Element}) throws -> Void) rethrows {
-    try base2.forEach(body)
-  }
-  public func _copyToContiguousArray() -> ContiguousArray<${Element}> {
-    return base2._copyToContiguousArray()
-  }
   // `base` must have exactly this signature to match the needed constrained
   // `Wrapper` extension, so we compute it and store the more refined
   // existential in `base2`.
@@ -413,7 +313,8 @@ extension Any${Element}UnicodeView {
 % end
 
 //===--- Adapt Swift.UnicodeView to this file's UnicodeView protocol ------===//
-struct AnyUnicodeIndexAdapter<BaseView: Swift.UnicodeView> : AnyUnicodeIndex_, Wrapper, Comparable {
+struct AnyUnicodeIndexAdapter<BaseView: Swift.UnicodeView>
+: AnyUnicodeIndex_, Wrapper, Comparable {
   var base: BaseView.Index
   var encodedPosition: Int64 {
     return BaseView.encodedPosition(of: base)
