@@ -2944,8 +2944,8 @@ RValue RValueEmitter::visitProtocolMetatypeToObjectExpr(
 
 RValue RValueEmitter::visitIfExpr(IfExpr *E, SGFContext C) {
   auto &lowering = SGF.getTypeLowering(E->getType());
-  
-  if (lowering.isLoadable()) {
+
+  if (lowering.isLoadable() || !SGF.silConv.useLoweredAddresses()) {
     // If the result is loadable, emit each branch and forward its result
     // into the destination block argument.
     
