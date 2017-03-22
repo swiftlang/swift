@@ -18,6 +18,7 @@
 #include "swift/Basic/LangOptions.h"
 #include "swift/Basic/Range.h"
 #include "swift/Config.h"
+#include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/Support/raw_ostream.h"
 #include <limits.h>
