@@ -495,12 +495,6 @@ open class _SwiftNativeNSData {
   public init() {}
 }
 
-// FIXME(ABI)#61 : move into the Foundation overlay and remove 'open'
-@objc @_swift_native_objc_runtime_base(_SwiftNativeNSCharacterSetBase)
-open class _SwiftNativeNSCharacterSet {
-  public init() {}
-}
-
 //===----------------------------------------------------------------------===//
 // Support for reliable testing of the return-autoreleased optimization
 //===----------------------------------------------------------------------===//
