@@ -814,7 +814,7 @@ emitEnumMatch(ManagedValue value, EnumElementDecl *ElementDecl,
     SILValue boxedValue = SGF.B.createProjectBox(loc, eltMV.getValue(), 0);
     auto &boxedTL = SGF.getTypeLowering(boxedValue->getType());
     // SEMANTIC ARC TODO: Revisit this when the verifier is enabled.
-    if (boxedTL.isLoadable())
+    if (boxedTL.isLoadable() || !SGF.silConv.useLoweredAddresses())
       boxedValue = boxedTL.emitLoad(SGF.B, loc, boxedValue,
                                     LoadOwnershipQualifier::Take);
 
