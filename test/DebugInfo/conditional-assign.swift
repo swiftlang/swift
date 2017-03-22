@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests %s -emit-sil -g -o - | %FileCheck  %s
+// RUN: %target-swift-frontend %s -emit-sil -g -o - | %FileCheck  %s
 public protocol DelegateA {}
 public protocol DelegateB {}
 public protocol WithDelegate

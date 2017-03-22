@@ -1,6 +1,6 @@
-// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests %s -O -I %t -emit-sil -emit-verbose-sil -o - \
+// RUN: %target-swift-frontend %s -O -I %t -emit-sil -emit-verbose-sil -o - \
 // RUN:    | %FileCheck %s --check-prefix=CHECK-SIL
-// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests %s -O -I %t -emit-ir -g -o - | %FileCheck %s
+// RUN: %target-swift-frontend %s -O -I %t -emit-ir -g -o - | %FileCheck %s
 
 public var glob : Int = 0
 @inline(never) public func hold(_ n : Int) { glob = n }

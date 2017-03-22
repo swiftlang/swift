@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests %s -module-name test -emit-sil -o - -verify | %FileCheck %s
+// RUN: %target-swift-frontend %s -module-name test -emit-sil -o - -verify | %FileCheck %s
 
 
 // Constructor calls are dispatched dynamically for open classes, even if

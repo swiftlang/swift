@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -Xllvm -sil-full-demangle %s -emit-silgen | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -sil-full-demangle %s -emit-silgen | %FileCheck %s
 
 protocol P {
   associatedtype Assoc1

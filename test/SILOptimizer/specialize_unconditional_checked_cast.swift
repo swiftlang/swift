@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests  -Xllvm -sil-disable-pass="Function Signature Optimization" -emit-sil -o - -O %s | %FileCheck %s
+// RUN: %target-swift-frontend  -Xllvm -sil-disable-pass="Function Signature Optimization" -emit-sil -o - -O %s | %FileCheck %s
 
 //////////////////
 // Declarations //

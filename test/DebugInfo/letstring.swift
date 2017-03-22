@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests %s -emit-ir -g -o %t.ll
+// RUN: %target-swift-frontend %s -emit-ir -g -o %t.ll
 // RUN: %FileCheck %s < %t.ll
 
 class UIWindow {}

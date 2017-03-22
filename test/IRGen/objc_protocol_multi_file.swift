@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -assume-parsing-unqualified-ownership-sil -primary-file %s %S/Inputs/objc_protocol_multi_file_helper.swift -g -emit-ir | %FileCheck %s
+// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -primary-file %s %S/Inputs/objc_protocol_multi_file_helper.swift -g -emit-ir | %FileCheck %s
 
 // REQUIRES: objc_interop
 

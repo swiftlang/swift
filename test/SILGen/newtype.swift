@@ -1,6 +1,6 @@
-// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -emit-silgen -sdk %S/Inputs -I %S/Inputs -enable-source-import  %s | %FileCheck %s -check-prefix=CHECK-RAW
+// RUN: %target-swift-frontend -emit-silgen -sdk %S/Inputs -I %S/Inputs -enable-source-import  %s | %FileCheck %s -check-prefix=CHECK-RAW
 
-// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -emit-sil -sdk %S/Inputs -I %S/Inputs -enable-source-import  %s | %FileCheck %s -check-prefix=CHECK-CANONICAL
+// RUN: %target-swift-frontend -emit-sil -sdk %S/Inputs -I %S/Inputs -enable-source-import  %s | %FileCheck %s -check-prefix=CHECK-CANONICAL
 
 // REQUIRES: objc_interop
 

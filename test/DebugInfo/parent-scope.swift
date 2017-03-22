@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -g -emit-ir %s | %FileCheck %s
+// RUN: %target-swift-frontend -g -emit-ir %s | %FileCheck %s
 
 public protocol P {
   associatedtype AT;

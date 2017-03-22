@@ -1,9 +1,9 @@
 // FIXME(integers): This test verifies the existense of old protocols that are
 // no longer there.
 // XFAIL: *
-// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all -eager-specializer -new-mangling-for-tests  %s | %FileCheck %s
-// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all -eager-specializer -sil-deadfuncelim -new-mangling-for-tests  %s | %FileCheck --check-prefix=CHECK-DEADFUNCELIM %s
-// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all -eager-specializer -new-mangling-for-tests  %s -o %t.sil && %target-swift-frontend -assume-parsing-unqualified-ownership-sil -module-name=eager_specialize -emit-ir %t.sil | %FileCheck --check-prefix=CHECK-IRGEN %s
+// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all -eager-specializer  %s | %FileCheck %s
+// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all -eager-specializer -sil-deadfuncelim  %s | %FileCheck --check-prefix=CHECK-DEADFUNCELIM %s
+// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all -eager-specializer  %s -o %t.sil && %target-swift-frontend -assume-parsing-unqualified-ownership-sil -module-name=eager_specialize -emit-ir %t.sil | %FileCheck --check-prefix=CHECK-IRGEN %s
 
 sil_stage canonical
 

@@ -1,7 +1,7 @@
 // RUN: rm -rf %t && mkdir %t
 // RUN: %target-swift-frontend -emit-module -enable-resilience -emit-module-path=%t/resilient_global.swiftmodule -module-name=resilient_global %S/../Inputs/resilient_global.swift
-// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -I %t -emit-silgen -enable-resilience -parse-as-library %s | %FileCheck %s
-// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -I %t -emit-sil -O -enable-resilience -parse-as-library %s | %FileCheck --check-prefix=CHECK-OPT %s
+// RUN: %target-swift-frontend -I %t -emit-silgen -enable-resilience -parse-as-library %s | %FileCheck %s
+// RUN: %target-swift-frontend -I %t -emit-sil -O -enable-resilience -parse-as-library %s | %FileCheck --check-prefix=CHECK-OPT %s
 
 import resilient_global
 
