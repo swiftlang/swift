@@ -1164,6 +1164,10 @@ function find_host_tools() {
   find_tool CMAKE_LINKER ld
   find_tool CMAKE_NM nm
   find_tool CMAKE_OBJDUMP objdump
+  if [[ "${DISTCC}" == 1 ]]; then
+    find_tool CMAKE_DISTCC distcc
+    find_tool CMAKE_DISTCC_PUMP pump
+  fi
 
   if [[ "${UNAME}" == "Darwin" ]]; then
     find_tool CMAKE_LIPO lipo
@@ -1651,6 +1655,10 @@ if [[ -n "${DISTCC}" ]]; then
         # distcc which is installed elsewhere, we need to set them explicitly.
         COMMON_CMAKE_OPTIONS=(
             "${COMMON_CMAKE_OPTIONS[@]}"
+            "-DCMAKE_C_COMPILER:PATH=${CMAKE_DISTCC}"
+            "-DCMAKE_C_COMPILER_ARGS=${CMAKE_C_COMPILER}"
+            "-DCMAKE_CXX_COMPILER:PATH=${CMAKE_DISTCC}"
+            "-DCMAKE_CXX_COMPILER_ARGS=${CMAKE_CXX_COMPILER}"
             "-DCMAKE_AR=${CMAKE_AR}"
             "-DCMAKE_LINKER=${CMAKE_LD}"
             "-DCMAKE_NM=${CMAKE_NM}"
