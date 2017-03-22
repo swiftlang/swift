@@ -527,11 +527,6 @@ TEST(TypeSyntaxTests, FunctionTypeMakeAPIs) {
   {
     SmallString<48> Scratch;
     llvm::raw_svector_ostream OS(Scratch);
-    auto x = SyntaxFactory::makeIdentifier("x", {}, {});
-    auto y = SyntaxFactory::makeIdentifier("y", {}, {});
-    auto xArg = SyntaxFactory::makeTupleTypeElement(x, Colon, Int);
-    auto yArg = SyntaxFactory::makeTupleTypeElement(y, Colon, Int);
-
     auto Attrs = SyntaxFactory::makeBlankTypeAttributes();
     auto TypeList = SyntaxFactory::makeBlankFunctionParameterList();
     auto Void = SyntaxFactory::makeVoidTupleType();
