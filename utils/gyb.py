@@ -559,7 +559,7 @@ class ExecutionContext(object):
     def __init__(self, line_directive=_default_line_directive,
                  **local_bindings):
         self.local_bindings = local_bindings
-        self.line_directive = line_directive
+        self.line_directive = '// ###sourceLocation' if line_directive is None else line_directive
         self.local_bindings['__context__'] = self
         self.result_text = []
         self.last_file_line = None
