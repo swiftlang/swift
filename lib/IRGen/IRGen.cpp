@@ -377,7 +377,8 @@ bool swift::performLLVM(IRGenOptions &Opts, DiagnosticEngine *Diags,
       if (DiagMutex) DiagMutex->unlock();
     );
 
-    ArrayRef<uint8_t> HashData(Result, sizeof(MD5::MD5Result));
+    ArrayRef<uint8_t> HashData(reinterpret_cast<uint8_t *>(&Result),
+                               sizeof(Result));
     if (Opts.OutputKind == IRGenOutputKind::ObjectFile &&
         !Opts.PrintInlineTree &&
         !needsRecompile(OutputFilename, HashData, HashGlobal, DiagMutex)) {

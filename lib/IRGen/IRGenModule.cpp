@@ -1058,8 +1058,8 @@ bool IRGenModule::finalize() {
     // We have to create the variable now (before we emit the global lists).
     // But we want to calculate the hash later because later we can do it
     // multi-threaded.
-    llvm::MD5::MD5Result zero = { 0 };
-    ArrayRef<uint8_t> ZeroArr(zero, sizeof(llvm::MD5::MD5Result));
+    llvm::MD5::MD5Result zero{};
+    ArrayRef<uint8_t> ZeroArr(reinterpret_cast<uint8_t *>(&zero), sizeof(zero));
     auto *ZeroConst = llvm::ConstantDataArray::get(Module.getContext(), ZeroArr);
     ModuleHash = new llvm::GlobalVariable(Module, ZeroConst->getType(), true,
                                           llvm::GlobalValue::PrivateLinkage,
