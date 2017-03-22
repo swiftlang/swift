@@ -16,10 +16,12 @@
 #include "ConstraintGraph.h"
 #include "ConstraintSystem.h"
 #include "llvm/ADT/DenseSet.h"
-#include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 using namespace swift;
 using namespace constraints;
 
-void ConstraintSystem::propagateConstraints() {
+bool ConstraintSystem::propagateConstraints() {
+  assert(getActiveConstraints().empty() && "Expected no active constraints!");
+
+  return false;
 }

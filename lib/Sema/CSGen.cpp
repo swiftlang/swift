@@ -3064,10 +3064,6 @@ Expr *ConstraintSystem::generateConstraints(Expr *expr) {
   if (result)
     this->optimizeConstraints(result);
 
-  // If the experimental constraint propagation pass is enabled, run it.
-  if (TC.Context.LangOpts.EnableConstraintPropagation)
-    propagateConstraints();
-
   return result;
 }
 
