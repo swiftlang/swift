@@ -75,8 +75,8 @@ internal func makeBufferAccessLoggingMutableCollection<
 
 internal func makeBufferAccessLoggingMutableCollection<
   C : MutableCollection & RandomAccessCollection
->(wrapping c: C) -> BufferAccessLoggingMutableBidirectionalCollection<C> {
-  return BufferAccessLoggingMutableBidirectionalCollection(wrapping: c)
+>(wrapping c: C) -> BufferAccessLoggingMutableRandomAccessCollection<C> {
+  return BufferAccessLoggingMutableRandomAccessCollection(wrapping: c)
 }
 
 extension TestSuite {
