@@ -984,7 +984,7 @@ SequenceTypeTests.test("prefix/dispatch") {
 
 SequenceTypeTests.test("prefix/drop/dispatch") {
   let xs = sequence(first: 1, next: {$0 < 10 ? $0 + 1 : nil})
-  expectTrue(Array(xs.prefix(3).drop(while: {$0 < 7})).isEmpty)
+  expectEqualSequence([], Array(xs.prefix(3).drop(while: {$0 < 7})))
 }
 
 //===----------------------------------------------------------------------===//
