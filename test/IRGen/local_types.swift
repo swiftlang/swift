@@ -1,6 +1,6 @@
 // RUN: rm -rf %t && mkdir -p %t
-// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -assume-parsing-unqualified-ownership-sil -emit-module %S/Inputs/local_types_helper.swift -o %t
-// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -assume-parsing-unqualified-ownership-sil -emit-ir -parse-as-library %s -I %t > %t.ll
+// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -emit-module %S/Inputs/local_types_helper.swift -o %t
+// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -emit-ir -parse-as-library %s -I %t > %t.ll
 // RUN: %FileCheck %s < %t.ll
 // RUN: %FileCheck -check-prefix=NEGATIVE %s < %t.ll
 

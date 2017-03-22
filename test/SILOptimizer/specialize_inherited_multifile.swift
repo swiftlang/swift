@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -primary-file %s %S/Inputs/specialize_inherited_multifile.swift -O -emit-sil -sil-verify-all | %FileCheck %s
+// RUN: %target-swift-frontend -primary-file %s %S/Inputs/specialize_inherited_multifile.swift -O -emit-sil -sil-verify-all | %FileCheck %s
 
 @_semantics("optimize.sil.never") func takesBase<T : Base>(t: T) {}
 

@@ -1,9 +1,9 @@
-// RUN: %sil-llvm-gen -output-kind=llvm-as -new-mangling-for-tests -target x86_64-apple-macosx10.9 -module-name main %s -o - | %FileCheck %s
-// RUN: %sil-llvm-gen -output-kind=llvm-as -new-mangling-for-tests -target i386-apple-ios7.0 %s -module-name main -o - | %FileCheck %s
-// RUN: %sil-llvm-gen -output-kind=llvm-as -new-mangling-for-tests -target x86_64-apple-ios7.0 %s -module-name main -o - | %FileCheck %s
-// RUN: %sil-llvm-gen -output-kind=llvm-as -new-mangling-for-tests -target armv7-apple-ios7.0 %s -module-name main -o - | %FileCheck %s
-// RUN: %sil-llvm-gen -output-kind=llvm-as -new-mangling-for-tests -target arm64-apple-ios7.0 %s -module-name main -o - | %FileCheck %s
-// RUN: %sil-llvm-gen -output-kind=llvm-as -new-mangling-for-tests -target x86_64-unknown-linux-gnu %s -module-name main -o - | %FileCheck %s
+// RUN: %sil-llvm-gen -output-kind=llvm-as -target x86_64-apple-macosx10.9 -module-name main %s -o - | %FileCheck %s
+// RUN: %sil-llvm-gen -output-kind=llvm-as -target i386-apple-ios7.0 %s -module-name main -o - | %FileCheck %s
+// RUN: %sil-llvm-gen -output-kind=llvm-as -target x86_64-apple-ios7.0 %s -module-name main -o - | %FileCheck %s
+// RUN: %sil-llvm-gen -output-kind=llvm-as -target armv7-apple-ios7.0 %s -module-name main -o - | %FileCheck %s
+// RUN: %sil-llvm-gen -output-kind=llvm-as -target arm64-apple-ios7.0 %s -module-name main -o - | %FileCheck %s
+// RUN: %sil-llvm-gen -output-kind=llvm-as -target x86_64-unknown-linux-gnu %s -module-name main -o - | %FileCheck %s
 
 // REQUIRES: CODEGENERATOR=X86
 // REQUIRES: CODEGENERATOR=ARM

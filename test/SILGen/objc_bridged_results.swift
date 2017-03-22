@@ -1,7 +1,7 @@
 // RUN: rm -rf %t && mkdir -p %t
 // RUN: %build-silgen-test-overlays
 
-// RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) -Xllvm -new-mangling-for-tests -emit-silgen %s -import-objc-header %S/Inputs/objc_bridged_results.h | %FileCheck %s
+// RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) -emit-silgen %s -import-objc-header %S/Inputs/objc_bridged_results.h | %FileCheck %s
 
 // REQUIRES: objc_interop
 

@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -disable-objc-attr-requires-foundation-module -emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-frontend -disable-objc-attr-requires-foundation-module -emit-silgen %s | %FileCheck %s
 
 public protocol P1 {
   func reqP1a()

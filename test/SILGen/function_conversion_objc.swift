@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -sdk %S/Inputs %s -I %S/Inputs -enable-source-import -emit-silgen -verify | %FileCheck %s
+// RUN: %target-swift-frontend -sdk %S/Inputs %s -I %S/Inputs -enable-source-import -emit-silgen -verify | %FileCheck %s
 
 import Foundation
 

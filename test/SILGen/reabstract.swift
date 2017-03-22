@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -Xllvm -sil-full-demangle -emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -emit-silgen %s | %FileCheck %s
 
 func takeFn<T>(_ f : (T) -> T?) {}
 func liftOptional(_ x : Int) -> Int? { return x }

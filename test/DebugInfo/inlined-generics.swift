@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -Xllvm -sil-inline-generics=true %s -O -g -o - -emit-ir | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -sil-inline-generics=true %s -O -g -o - -emit-ir | %FileCheck %s
 public protocol P {
   associatedtype DT1
   func getDT() -> DT1

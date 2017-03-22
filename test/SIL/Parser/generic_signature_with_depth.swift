@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests %s -emit-silgen | %target-sil-opt | %FileCheck %s
+// RUN: %target-swift-frontend %s -emit-silgen | %target-sil-opt | %FileCheck %s
 
 protocol mmGeneratorType {
   associatedtype Element

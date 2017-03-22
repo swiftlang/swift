@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -O %s -emit-sil | %FileCheck %s
+// RUN: %target-swift-frontend -O %s -emit-sil | %FileCheck %s
 
 // Make sure that we can dig all the way through the class hierarchy and
 // protocol conformances.

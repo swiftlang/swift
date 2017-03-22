@@ -1,7 +1,7 @@
 // RUN: rm -rf %t
 // RUN: mkdir -p %t
-// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -emit-module -sil-serialize-all -o %t %S/Inputs/def_generic_marker.swift
-// RUN: %target-sil-opt -new-mangling-for-tests -assume-parsing-unqualified-ownership-sil -linker -I %t %s | %FileCheck %s
+// RUN: %target-swift-frontend -emit-module -sil-serialize-all -o %t %S/Inputs/def_generic_marker.swift
+// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -linker -I %t %s | %FileCheck %s
 
 // Make sure that SILFunctionType with GenericSignature can match up with
 // SILFunctionType deserialized from module.

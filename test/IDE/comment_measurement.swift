@@ -1,4 +1,4 @@
-// RUN: %target-swift-ide-test -new-mangling-for-tests -print-comments -source-filename %s -comments-xml-schema %S/../../bindings/xml/comment-xml-schema.rng | %FileCheck %s
+// RUN: %target-swift-ide-test -print-comments -source-filename %s -comments-xml-schema %S/../../bindings/xml/comment-xml-schema.rng | %FileCheck %s
 
 /// Brief.
 ///

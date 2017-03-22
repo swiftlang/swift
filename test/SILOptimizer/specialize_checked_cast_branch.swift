@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests  -emit-sil -O -sil-inline-threshold 0 %s -o - | %FileCheck %s
+// RUN: %target-swift-frontend  -emit-sil -O -sil-inline-threshold 0 %s -o - | %FileCheck %s
 
 class C {}
 class D : C {}

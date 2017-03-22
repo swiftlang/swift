@@ -1,5 +1,5 @@
 // First check the SIL.
-// RUN: %target-swift-frontend -Xllvm -new-mangling-for-tests -O -Xllvm -sil-disable-pass="Function Signature Optimization" -module-name=test -emit-sil -primary-file %s | %FileCheck %s
+// RUN: %target-swift-frontend -O -Xllvm -sil-disable-pass="Function Signature Optimization" -module-name=test -emit-sil -primary-file %s | %FileCheck %s
 
 // Also do an end-to-end test to check all components, including IRGen.
 // RUN: rm -rf %t && mkdir -p %t 
