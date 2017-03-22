@@ -1003,6 +1003,10 @@ static bool ParseClangImporterArgs(ClangImporterOptions &Opts,
 
   Opts.DisableModulesValidateSystemHeaders |= Args.hasArg(OPT_disable_modules_validate_system_headers);
 
+  if (const Arg *A = Args.getLastArg(OPT_pch_output_dir)) {
+    Opts.PrecompiledHeaderOutputDir = A->getValue();
+  }
+
   return false;
 }
 
