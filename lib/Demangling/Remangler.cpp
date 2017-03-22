@@ -449,13 +449,11 @@ void Remangler::mangleGenericArgs(Node *node, char &Separator) {
   switch (node->getKind()) {
     case Node::Kind::Structure:
     case Node::Kind::Enum:
-    case Node::Kind::Class: {
-      NodePointer parentOrModule = node->getChild(0);
-      mangleGenericArgs(parentOrModule, Separator);
+    case Node::Kind::Class:
+      mangleGenericArgs(node->getChild(0), Separator);
       Buffer << Separator;
       Separator = '_';
       break;
-    }
 
     case Node::Kind::BoundGenericStructure:
     case Node::Kind::BoundGenericEnum:
@@ -471,6 +469,10 @@ void Remangler::mangleGenericArgs(Node *node, char &Separator) {
       break;
     }
       
+    case Node::Kind::Extension:
+      mangleGenericArgs(node->getChild(1), Separator);
+      break;
+
     default:
       break;
   }
@@ -1741,13 +1743,11 @@ bool Demangle::isSpecialized(Node *node) {
 
     case Node::Kind::Structure:
     case Node::Kind::Enum:
-    case Node::Kind::Class: {
-      Node *parentOrModule = node->getChild(0);
-      if (isSpecialized(parentOrModule))
-        return true;
+    case Node::Kind::Class:
+      return isSpecialized(node->getChild(0));
 
-      return false;
-    }
+    case Node::Kind::Extension:
+      return isSpecialized(node->getChild(1));
 
     default:
       return false;
@@ -1781,6 +1781,15 @@ NodePointer Demangle::getUnspecialized(Node *node, NodeFactory &Factory) {
         return nominalType;
     }
       
+    case Node::Kind::Extension: {
+      NodePointer parent = node->getChild(1);
+      if (!isSpecialized(parent))
+        return node;
+      NodePointer result = Factory.createNode(Node::Kind::Extension);
+      result->addChild(node->getFirstChild(), Factory);
+      result->addChild(getUnspecialized(parent, Factory), Factory);
+      return result;
+    }
     default:
       unreachable("bad nominal type kind");
   }
