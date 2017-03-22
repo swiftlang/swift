@@ -2328,7 +2328,7 @@ void ConstraintSystem::collectDisjunctions(
   }
 }
 
-std::pair<PotentialBindings, TypeVariableType *>
+static std::pair<PotentialBindings, TypeVariableType *>
 determineBestBindings(ConstraintSystem &CS) {
   // Look for potential type variable bindings.
   TypeVariableType *bestTypeVar = nullptr;
