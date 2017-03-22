@@ -2162,16 +2162,15 @@ bool GenericSignatureBuilder::addSuperclassRequirement(
 void GenericSignatureBuilder::PotentialArchetype::addSameTypeConstraint(
                                              PotentialArchetype *otherPA,
                                              const RequirementSource *source) {
-  // If the types are the same, there's nothing to do.
-  if (this == otherPA) return;
-
   // Update the same-type constraints of this PA to reference the other PA.
   getOrCreateEquivalenceClass()->sameTypeConstraints[this]
     .push_back({this, otherPA, source});
 
-  // Update the same-type constraints of the other PA to reference this PA.
-  otherPA->getOrCreateEquivalenceClass()->sameTypeConstraints[otherPA]
-    .push_back({otherPA, this, source});
+  if (this != otherPA) {
+    // Update the same-type constraints of the other PA to reference this PA.
+    otherPA->getOrCreateEquivalenceClass()->sameTypeConstraints[otherPA]
+      .push_back({otherPA, this, source});
+  }
 }
 
 bool GenericSignatureBuilder::addSameTypeRequirementBetweenArchetypes(
@@ -2198,19 +2197,6 @@ bool GenericSignatureBuilder::addSameTypeRequirementBetweenArchetypes(
     std::swap(OrigT1, OrigT2);
   }
 
-  // Merge any concrete constraints.
-  Type concrete1 = T1->getConcreteType();
-  Type concrete2 = T2->getConcreteType();
-
-  // FIXME: This seems early.
-  if (concrete1 && concrete2) {
-    bool mismatch = addSameTypeRequirement(concrete1, concrete2, Source,
-                                           DiagnoseSameTypeConflict{
-                                             Diags, Source, T1});
-
-    if (mismatch) return true;
-  }
-
   // Merge the equivalence classes.
   auto equivClass = T1->getOrCreateEquivalenceClass();
   auto equivClass2Members = T2->getEquivalenceClassMembers();
@@ -2235,8 +2221,13 @@ bool GenericSignatureBuilder::addSameTypeRequirementBetweenArchetypes(
 
   // Same-type-to-concrete requirements.
   if (equivClass2 && equivClass2->concreteType) {
-    if (!equivClass->concreteType)
+    if (equivClass->concreteType) {
+      (void)addSameTypeRequirement(equivClass->concreteType,
+                                   equivClass2->concreteType, Source,
+                                   DiagnoseSameTypeConflict{Diags, Source, T1});
+    } else {
       equivClass->concreteType = equivClass2->concreteType;
+    }
 
     equivClass->concreteTypeConstraints.insert(
                                  equivClass->concreteTypeConstraints.end(),
@@ -3173,16 +3164,40 @@ Constraint<T> GenericSignatureBuilder::checkConstraintList(
                              conflictingDiag,
                            Diag<Type, T> redundancyDiag,
                            Diag<bool, Type, T> otherNoteDiag) {
-  // Remove self-derived constraints.
+  return checkConstraintList<T, T>(genericParams, constraints,
+                                   isSuitableRepresentative, checkConstraint,
+                                   conflictingDiag, redundancyDiag,
+                                   otherNoteDiag,
+                                   [](const T& value) { return value; },
+                                   /*removeSelfDerived=*/true);
+}
+
+template<typename T, typename DiagT>
+Constraint<T> GenericSignatureBuilder::checkConstraintList(
+                           ArrayRef<GenericTypeParamType *> genericParams,
+                           std::vector<Constraint<T>> &constraints,
+                           llvm::function_ref<bool(const Constraint<T> &)>
+                             isSuitableRepresentative,
+                           llvm::function_ref<ConstraintRelation(const T&)>
+                             checkConstraint,
+                           Optional<Diag<unsigned, Type, DiagT, DiagT>>
+                             conflictingDiag,
+                           Diag<Type, DiagT> redundancyDiag,
+                           Diag<bool, Type, DiagT> otherNoteDiag,
+                           llvm::function_ref<DiagT(const T&)> diagValue,
+                           bool removeSelfDerived) {
   assert(!constraints.empty() && "No constraints?");
-  constraints.erase(
-    std::remove_if(constraints.begin(), constraints.end(),
-                   [&](const Constraint<T> &constraint) {
-                     return constraint.source->isSelfDerivedSource(
-                              constraint.archetype);
-                   }),
-    constraints.end());
-  assert(!constraints.empty() && "All constraints were self-derived!");
+  if (removeSelfDerived) {
+    // Remove self-derived constraints.
+    constraints.erase(
+      std::remove_if(constraints.begin(), constraints.end(),
+                     [&](const Constraint<T> &constraint) {
+                       return constraint.source->isSelfDerivedSource(
+                                constraint.archetype);
+                     }),
+      constraints.end());
+    assert(!constraints.empty() && "All constraints were self-derived!");
+  }
 
   // Sort the constraints, so we get a deterministic ordering of diagnostics.
   llvm::array_pod_sort(constraints.begin(), constraints.end());
@@ -3200,7 +3215,7 @@ Constraint<T> GenericSignatureBuilder::checkConstraintList(
                    representativeConstraint->source->isDerivedRequirement(),
                    representativeConstraint->archetype->
                      getDependentType(genericParams, /*allowUnresolved=*/true),
-                   representativeConstraint->value);
+                   diagValue(representativeConstraint->value));
   };
 
   // Go through the concrete constraints looking for redundancies.
@@ -3243,8 +3258,8 @@ Constraint<T> GenericSignatureBuilder::checkConstraintList(
         auto subject = getSubjectType(constraint.archetype);
         Diags.diagnose(constraint.source->getLoc(), *conflictingDiag,
                        subject.first, subject.second,
-                       constraint.value,
-                       representativeConstraint->value);
+                       diagValue(constraint.value),
+                       diagValue(representativeConstraint->value));
 
         noteRepresentativeConstraint();
         break;
@@ -3258,8 +3273,8 @@ Constraint<T> GenericSignatureBuilder::checkConstraintList(
         Diags.diagnose(representativeConstraint->source->getLoc(),
                        *conflictingDiag,
                        subject.first, subject.second,
-                       representativeConstraint->value,
-                       constraint.value);
+                       diagValue(representativeConstraint->value),
+                       diagValue(constraint.value));
 
         diagnosedConflictingRepresentative = true;
         break;
@@ -3278,7 +3293,7 @@ Constraint<T> GenericSignatureBuilder::checkConstraintList(
                        redundancyDiag,
                        constraint.archetype->getDependentType(
                          genericParams, /*allowUnresolved=*/true),
-                       constraint.value);
+                       diagValue(constraint.value));
 
         noteRepresentativeConstraint();
       }
@@ -3390,9 +3405,8 @@ namespace swift {
 /// canonical edges connects vertex i to vertex i+1 for i in 0..<size-1.
 static void computeDerivedSameTypeComponents(
               PotentialArchetype *rep,
-              std::vector<DerivedSameTypeComponent> &components) {
-  llvm::SmallDenseMap<PotentialArchetype *, unsigned> componentOf;
-
+              std::vector<DerivedSameTypeComponent> &components,
+              llvm::SmallDenseMap<PotentialArchetype *, unsigned> &componentOf){
   for (auto pa : rep->getEquivalenceClassMembers()) {
     // If we've already seen this potential archetype, there's nothing else to
     // do.
@@ -3425,6 +3439,30 @@ static void computeDerivedSameTypeComponents(
   llvm::array_pod_sort(components.begin(), components.end());
 }
 
+namespace {
+  /// An edge in the same-type constraint graph that spans two different
+  /// components.
+  struct IntercomponentEdge {
+    unsigned source;
+    unsigned target;
+    Constraint<PotentialArchetype *> constraint;
+
+    IntercomponentEdge(unsigned source, unsigned target,
+                       const Constraint<PotentialArchetype *> &constraint)
+      : source(source), target(target), constraint(constraint)
+    {
+      assert(source != target && "Not an intercomponent edge");
+      if (this->source > this->target) std::swap(this->source, this->target);
+    }
+
+    friend bool operator<(const IntercomponentEdge &lhs,
+                          const IntercomponentEdge &rhs) {
+      return std::make_tuple(lhs.source, lhs.target, lhs.constraint)
+        < std::make_tuple(rhs.source, rhs.target, rhs.constraint);
+    }
+  };
+}
+
 void GenericSignatureBuilder::checkSameTypeConstraints(
                           ArrayRef<GenericTypeParamType *> genericParams,
                           PotentialArchetype *pa) {
@@ -3453,9 +3491,173 @@ void GenericSignatureBuilder::checkSameTypeConstraints(
   // Compute the components in the subgraph of the same-type constraint graph
   // that includes only derived constraints.
   llvm::SmallDenseMap<PotentialArchetype *, unsigned> componentOf;
-  computeDerivedSameTypeComponents(pa, equivClass->derivedSameTypeComponents);
+  computeDerivedSameTypeComponents(pa, equivClass->derivedSameTypeComponents,
+                                   componentOf);
 
-  // FIXME: Diagnose redundant same-type constraints.
+  // Go through all of the same-type constraints, collecting all of the
+  // non-derived constraints to put them into bins: intra-component and
+  // inter-component.
+
+  // Intra-component edges are stored per-component, so we can perform
+  // diagnostics within each component.
+  unsigned numComponents = equivClass->derivedSameTypeComponents.size();
+  std::vector<std::vector<Constraint<PotentialArchetype *>>>
+    intracomponentEdges(numComponents, {});
+
+  // Intercomponent edges are stored as one big list, which tracks the
+  // source/target components.
+  std::vector<IntercomponentEdge> intercomponentEdges;
+  for (auto &entry : equivClass->sameTypeConstraints) {
+    auto &constraints = entry.second;
+    for (const auto &constraint : constraints) {
+      // If the source/destination are identical, complain.
+      if (constraint.archetype == constraint.value) {
+        if (!constraint.source->isDerivedRequirement() &&
+            !constraint.source->isInferredRequirement() &&
+            constraint.source->getLoc().isValid()) {
+          Diags.diagnose(constraint.source->getLoc(),
+                         diag::redundant_same_type_constraint,
+                         constraint.archetype->getDependentType(
+                                                          genericParams, true),
+                         constraint.value->getDependentType(
+                                                          genericParams, true));
+        }
+
+        continue;
+      }
+
+      // Only keep constraints where the source is "first" in the ordering;
+      // this lets us eliminate the duplication coming from us adding back
+      // edges.
+      // FIXME: Alternatively, we could track back edges differently in the
+      // constraint.
+      if (compareDependentTypes(&constraint.archetype, &constraint.value) > 0)
+        continue;
+
+      // Determine which component each of the source/destination fall into.
+      assert(componentOf.count(constraint.archetype) > 0 &&
+             "unknown potential archetype?");
+      unsigned firstComponent = componentOf[constraint.archetype];
+      assert(componentOf.count(constraint.value) > 0 &&
+             "unknown potential archetype?");
+      unsigned secondComponent = componentOf[constraint.value];
+
+      // If both vertices are within the same component, this is an
+      // intra-component edge. Record it as such.
+      if (firstComponent == secondComponent) {
+        intracomponentEdges[firstComponent].push_back(constraint);
+        continue;
+      }
+
+      // Otherwise, it's an intercomponent edge, which is never derived.
+      assert(!constraint.source->isDerivedRequirement() &&
+             "Must not be derived");
+
+      // Ignore inferred requirements; we don't want to diagnose them.
+      if (!constraint.source->isInferredRequirement()) {
+        intercomponentEdges.push_back(
+          IntercomponentEdge(firstComponent, secondComponent, constraint));
+      }
+    }
+  }
+
+  // Walk through each of the components, checking the intracomponent edges.
+  // This will diagnose any explicitly-specified requirements within a
+  // component, all of which are redundant.
+  for (auto &constraints : intracomponentEdges) {
+    if (constraints.empty()) continue;
+
+    checkConstraintList<PotentialArchetype *, Type>(
+      genericParams, constraints,
+      [](const Constraint<PotentialArchetype *> &) { return true; },
+      [](PotentialArchetype *) {
+        return ConstraintRelation::Redundant;
+      },
+      None,
+      diag::redundant_same_type_constraint,
+      diag::previous_same_type_constraint,
+      [&](PotentialArchetype *pa) {
+        return pa->getDependentType(genericParams, true);
+      },
+      /*removeSelfDerived=*/false);
+  }
+
+  // Diagnose redundant same-type constraints across components. First,
+  // sort the edges so that edges that between the same component pairs
+  // occur next to each other.
+  llvm::array_pod_sort(intercomponentEdges.begin(), intercomponentEdges.end());
+
+  // Diagnose and erase any redundant edges between the same two components.
+  intercomponentEdges.erase(
+    std::unique(
+      intercomponentEdges.begin(), intercomponentEdges.end(),
+      [&](const IntercomponentEdge &lhs,
+          const IntercomponentEdge &rhs) {
+        // If either the source or target is different, we have
+        // different elements.
+        if (lhs.source != rhs.source || lhs.target != rhs.target)
+          return false;
+
+        // We have two edges connected the same components. If both
+        // have locations, diagnose them.
+        if (lhs.constraint.source->getLoc().isInvalid() ||
+            rhs.constraint.source->getLoc().isInvalid())
+          return true;
+
+        Diags.diagnose(lhs.constraint.source->getLoc(),
+                       diag::redundant_same_type_constraint,
+                       lhs.constraint.archetype->getDependentType(
+                                                          genericParams, true),
+                       lhs.constraint.value->getDependentType(
+                                                          genericParams, true));
+        Diags.diagnose(rhs.constraint.source->getLoc(),
+                       diag::previous_same_type_constraint,
+                       false,
+                       rhs.constraint.archetype->getDependentType(
+                                                          genericParams, true),
+                       rhs.constraint.value->getDependentType(
+                                                          genericParams, true));
+        return true;
+      }),
+    intercomponentEdges.end());
+
+  // If we have more intercomponent edges than are needed to form a spanning
+  // tree, complain about redundancies. Note that the edges we have must
+  // connect all of the components, or else we wouldn't have an equivalence
+  // class.
+  if (intercomponentEdges.size() > numComponents - 1) {
+    std::vector<bool> connected(numComponents, false);
+    const auto &firstEdge = intercomponentEdges.front();
+    for (const auto &edge : intercomponentEdges) {
+      // If both the source and target are already connected, this edge is
+      // not part of the spanning tree.
+      if (connected[edge.source] && connected[edge.target]) {
+        if (edge.constraint.source->getLoc().isValid() &&
+            firstEdge.constraint.source->getLoc().isValid()) {
+          Diags.diagnose(edge.constraint.source->getLoc(),
+                         diag::redundant_same_type_constraint,
+                         edge.constraint.archetype->getDependentType(
+                                                          genericParams, true),
+                         edge.constraint.value->getDependentType(
+                                                          genericParams, true));
+
+          Diags.diagnose(firstEdge.constraint.source->getLoc(),
+                         diag::previous_same_type_constraint,
+                         false,
+                         firstEdge.constraint.archetype->getDependentType(
+                                                          genericParams, true),
+                         firstEdge.constraint.value->getDependentType(
+                                                          genericParams, true));
+        }
+
+        continue;
+      }
+
+      // Put the source and target into the spanning tree.
+      connected[edge.source] = true;
+      connected[edge.target] = true;
+    }
+  }
 }
 
 void GenericSignatureBuilder::checkConcreteTypeConstraints(

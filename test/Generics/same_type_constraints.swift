@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -swift-version 4
 
 protocol Fooable {
   associatedtype Foo
@@ -332,3 +332,31 @@ extension X7 where T.A == Int { } // expected-error {{'T.A' requires that 'Int' 
 struct X8<T: C> { }
 
 extension X8 where T == Int { } // expected-error {{'T' requires that 'Int' inherit from 'C'}}
+
+protocol P10 {
+	associatedtype A
+	associatedtype B
+	associatedtype C
+	associatedtype D
+	associatedtype E
+}
+
+protocol P11: P10 where A == B { }
+
+func intracomponent<T: P11>(_: T) // expected-note{{previous same-type constraint 'T.A' == 'T.B' implied here}}
+  where T.A == T.B { } // expected-warning{{redundant same-type constraint 'T.A' == 'T.B'}}
+
+func intercomponentSameComponents<T: P10>(_: T)
+  where T.A == T.B, // expected-warning{{redundant same-type constraint 'T.A' == 'T.B'}}
+        T.B == T.A { } // expected-note{{previous same-type constraint 'T.A' == 'T.B' written here}}
+                       // FIXME: directionality of constraint above is weird
+
+func intercomponentMoreThanSpanningTree<T: P10>(_: T)
+  where T.A == T.B, // expected-note{{previous same-type constraint 'T.A' == 'T.B' written here}}
+        T.B == T.C,
+        T.D == T.E, // expected-warning{{redundant same-type constraint 'T.D' == 'T.E'}}
+        T.D == T.B,
+        T.E == T.B
+        { }
+
+func trivialRedundancy<T: P10>(_: T) where T.A == T.A { } // expected-warning{{redundant same-type constraint 'T.A' == 'T.A'}}
