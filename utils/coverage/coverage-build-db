@@ -83,6 +83,7 @@ def worker(args):
     """Parse coverage log at path `args[0]` and place in queue `args[1]`"""
     args[1].put(parse_coverage_log(args[0]))
 
+
 manager = multiprocessing.Manager()
 result_queue = manager.Queue()
 worker_queue = []
@@ -199,6 +200,7 @@ def main():
         pool.terminate()
 
     return 0
+
 
 if __name__ == '__main__':
     sys.exit(main())

@@ -37,6 +37,7 @@ def get_arguments():
                                                 in our line length count"""))
     return parser.parse_args()
 
+
 args = get_arguments()
 
 found_violation = False
