@@ -110,7 +110,6 @@ public class MyResilientChild : MyResilientParent {
   public let field: Int32 = 0
 }
 
-
 // ClassWithResilientProperty metadata accessor
 
 // CHECK-LABEL: define{{( protected)?}} %swift.type* @_TMaC16class_resilience26ClassWithResilientProperty()
@@ -126,18 +125,6 @@ public class MyResilientChild : MyResilientParent {
 // CHECK:    cont:
 // CHECK-NEXT: [[RESULT:%.*]] = phi %swift.type* [ [[CACHE]], %entry ], [ [[METADATA]], %cacheIsNull ]
 // CHECK-NEXT: ret %swift.type* [[RESULT]]
-
-// ClassWithResilientProperty.color getter
-
-// CHECK-LABEL: define{{( protected)?}} i32 @_TFC16class_resilience26ClassWithResilientPropertyg5colorVs5Int32(%C16class_resilience26ClassWithResilientProperty*)
-// CHECK:      [[OFFSET:%.*]] = load [[INT]], [[INT]]* @_TWvdvC16class_resilience26ClassWithResilientProperty5colorVs5Int32
-// CHECK-NEXT: [[PTR:%.*]] = bitcast %C16class_resilience26ClassWithResilientProperty* %0 to i8*
-// CHECK-NEXT: [[FIELD_ADDR:%.*]] = getelementptr inbounds i8, i8* [[PTR]], [[INT]] [[OFFSET]]
-// CHECK-NEXT: [[FIELD_PTR:%.*]] = bitcast i8* [[FIELD_ADDR]] to %Vs5Int32*
-// CHECK-NEXT: [[FIELD_PAYLOAD:%.*]] = getelementptr inbounds %Vs5Int32, %Vs5Int32* [[FIELD_PTR]], i32 0, i32 0
-// CHECK-NEXT: [[FIELD_VALUE:%.*]] = load i32, i32* [[FIELD_PAYLOAD]]
-// CHECK-NEXT: ret i32 [[FIELD_VALUE]]
-
 
 // ClassWithResilientlySizedProperty metadata accessor
 
@@ -155,17 +142,6 @@ public class MyResilientChild : MyResilientParent {
 // CHECK-NEXT: [[RESULT:%.*]] = phi %swift.type* [ [[CACHE]], %entry ], [ [[METADATA]], %cacheIsNull ]
 // CHECK-NEXT: ret %swift.type* [[RESULT]]
 
-
-// ClassWithResilientlySizedProperty.color getter
-
-// CHECK-LABEL: define{{( protected)?}} i32 @_TFC16class_resilience33ClassWithResilientlySizedPropertyg5colorVs5Int32(%C16class_resilience33ClassWithResilientlySizedProperty*)
-// CHECK:      [[OFFSET:%.*]] = load [[INT]], [[INT]]* @_TWvdvC16class_resilience33ClassWithResilientlySizedProperty5colorVs5Int32
-// CHECK-NEXT: [[PTR:%.*]] = bitcast %C16class_resilience33ClassWithResilientlySizedProperty* %0 to i8*
-// CHECK-NEXT: [[FIELD_ADDR:%.*]] = getelementptr inbounds i8, i8* [[PTR]], [[INT]] [[OFFSET]]
-// CHECK-NEXT: [[FIELD_PTR:%.*]] = bitcast i8* [[FIELD_ADDR]] to %Vs5Int32*
-// CHECK-NEXT: [[FIELD_PAYLOAD:%.*]] = getelementptr inbounds %Vs5Int32, %Vs5Int32* [[FIELD_PTR]], i32 0, i32 0
-// CHECK-NEXT: [[FIELD_VALUE:%.*]] = load i32, i32* [[FIELD_PAYLOAD]]
-// CHECK-NEXT: ret i32 [[FIELD_VALUE]]
 
 
 // ClassWithIndirectResilientEnum.color getter

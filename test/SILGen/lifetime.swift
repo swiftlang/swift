@@ -694,6 +694,7 @@ func tuple_explosion() {
   // CHECK-NOT: destroy_value [[T1]]
   // CHECK-NOT: tuple_extract [[TUPLE]] : {{.*}}, 1
   // CHECK-NOT: destroy_value
+  // CHECK: ret
 }
 
 class C {

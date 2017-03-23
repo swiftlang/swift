@@ -389,7 +389,7 @@ static void convertStoredVarInProtocolToComputed(VarDecl *VD, TypeChecker &TC) {
   
   // We've added some members to our containing class, add them to the members
   // list.
-  addMemberToContextIfNeeded(Get, VD->getDeclContext());
+  addMemberToContextIfNeeded(Get, VD->getDeclContext(), VD);
 }
 
 
@@ -786,14 +786,14 @@ static void addTrivialAccessorsToStorage(AbstractStorageDecl *storage,
 
   bool isDynamic = (storage->isDynamic() && storage->isObjC());
   if (isDynamic)
-    getter->getAttrs().add(new (TC.Context) DynamicAttr(IsImplicit));
+    makeDynamic(TC.Context, getter);
 
   // Synthesize the body of the getter.
   synthesizeTrivialGetter(getter, storage, TC);
 
   if (setter) {
     if (isDynamic)
-      setter->getAttrs().add(new (TC.Context) DynamicAttr(IsImplicit));
+      makeDynamic(TC.Context, setter);
 
     // Synthesize the body of the setter.
     synthesizeTrivialSetter(setter, storage, setterValueParam, TC);
@@ -801,11 +801,11 @@ static void addTrivialAccessorsToStorage(AbstractStorageDecl *storage,
 
   // We've added some members to our containing context, add them to
   // the right list.
-  addMemberToContextIfNeeded(getter, DC);
+  addMemberToContextIfNeeded(getter, DC, storage);
   if (setter)
-    addMemberToContextIfNeeded(setter, DC);
+    addMemberToContextIfNeeded(setter, DC, getter);
   if (materializeForSet)
-    addMemberToContextIfNeeded(materializeForSet, DC);
+    addMemberToContextIfNeeded(materializeForSet, DC, setter);
 }
 
 /// Add a trivial setter and materializeForSet to a
@@ -865,8 +865,8 @@ static void convertNSManagedStoredVarToComputed(VarDecl *VD, TypeChecker &TC) {
 
   // We've added some members to our containing class/extension, add them to
   // the members list.
-  addMemberToContextIfNeeded(Get, VD->getDeclContext());
-  addMemberToContextIfNeeded(Set, VD->getDeclContext());
+  addMemberToContextIfNeeded(Get, VD->getDeclContext(), VD);
+  addMemberToContextIfNeeded(Set, VD->getDeclContext(), Get);
 }
 
 /// The specified AbstractStorageDecl was just found to satisfy a
@@ -1590,7 +1590,7 @@ void TypeChecker::completeLazyVarImplementation(VarDecl *VD) {
                                          PBDPattern, /*init*/nullptr,
                                          VD->getDeclContext());
   PBD->setImplicit();
-  addMemberToContextIfNeeded(PBD, VD->getDeclContext());
+  addMemberToContextIfNeeded(PBD, VD->getDeclContext(), VD);
 
   // Now that we've got the storage squared away, synthesize the getter.
   completeLazyPropertyGetter(VD, Storage, *this);
@@ -1714,9 +1714,9 @@ void swift::maybeAddAccessorsToVariable(VarDecl *var, TypeChecker &TC) {
       behavior->Conformance = conformance;
       behavior->ValueDecl = valueProp;
 
-      addMemberToContextIfNeeded(getter, dc);
+      addMemberToContextIfNeeded(getter, dc, var);
       if (setter)
-        addMemberToContextIfNeeded(setter, dc);
+        addMemberToContextIfNeeded(setter, dc, getter);
     };
 
     // Try to resolve the behavior to a protocol.
@@ -1817,10 +1817,10 @@ void swift::maybeAddAccessorsToVariable(VarDecl *var, TypeChecker &TC) {
 
     var->makeComputed(SourceLoc(), getter, setter, materializeForSet, SourceLoc());
 
-    addMemberToContextIfNeeded(getter, dc);
-    addMemberToContextIfNeeded(setter, dc);
+    addMemberToContextIfNeeded(getter, dc, var);
+    addMemberToContextIfNeeded(setter, dc, getter);
     if (materializeForSet)
-      addMemberToContextIfNeeded(materializeForSet, dc);
+      addMemberToContextIfNeeded(materializeForSet, dc, setter);
     return;
   }
 

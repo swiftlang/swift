@@ -443,26 +443,25 @@ public class Sub : Base {
   override var x: Bool { return false || super.x }
 }
 
-
-// Vtable contains entries for native and @objc methods, but not dynamic ones
 // CHECK-LABEL: sil_vtable Foo {
 // CHECK-LABEL:   #Foo.init!initializer.1:   _TFC7dynamic3Fooc
 // CHECK-LABEL:   #Foo.nativeMethod!1:       _TFC7dynamic3Foo12nativeMethod
+// CHECK-NEXT:   #Foo.nativeProp!getter.1:  _TFC7dynamic3Foog10nativePropSi     // dynamic.Foo.nativeProp.getter : Swift.Int
+// CHECK-NEXT:   #Foo.nativeProp!setter.1:  _TFC7dynamic3Foos10nativePropSi     // dynamic.Foo.nativeProp.setter : Swift.Int
+// CHECK-NEXT:   #Foo.nativeProp!materializeForSet.1: _TFC7dynamic3Foom10nativePropSi  // dynamic.Foo.nativeProp.materializeForSet : Swift.Int
 // CHECK-LABEL:   #Foo.subscript!getter.1:   _TFC7dynamic3Foog9subscriptFT6nativeSi_Si    // dynamic.Foo.subscript.getter : (native : Swift.Int) -> Swift.Int
-// CHECK-LABEL:   #Foo.subscript!setter.1:   _TFC7dynamic3Foos9subscriptFT6nativeSi_Si    // dynamic.Foo.subscript.setter : (native : Swift.Int) -> Swift.Int
+// CHECK-NEXT:   #Foo.subscript!setter.1:   _TFC7dynamic3Foos9subscriptFT6nativeSi_Si    // dynamic.Foo.subscript.setter : (native : Swift.Int) -> Swift.Int
 // CHECK-LABEL:   #Foo.init!initializer.1:   _TFC7dynamic3Fooc
 // CHECK-LABEL:   #Foo.objcMethod!1:         _TFC7dynamic3Foo10objcMethod
+// CHECK-LABEL:   #Foo.objcProp!getter.1:    _TFC7dynamic3Foog8objcPropSi  // dynamic.Foo.objcProp.getter : Swift.Int
+// CHECK-NEXT:   #Foo.objcProp!setter.1:    _TFC7dynamic3Foos8objcPropSi  // dynamic.Foo.objcProp.setter : Swift.Int
 // CHECK-LABEL:   #Foo.subscript!getter.1: _TFC7dynamic3Foog9subscriptFT4objcPs9AnyObject__Si // dynamic.Foo.subscript.getter : (objc : Swift.AnyObject) -> Swift.Int
-// CHECK-LABEL:   #Foo.subscript!setter.1: _TFC7dynamic3Foos9subscriptFT4objcPs9AnyObject__Si // dynamic.Foo.subscript.setter : (objc : Swift.AnyObject) -> Swift.Int
+// CHECK-NEXT:   #Foo.subscript!setter.1: _TFC7dynamic3Foos9subscriptFT4objcPs9AnyObject__Si // dynamic.Foo.subscript.setter : (objc : Swift.AnyObject) -> Swift.Int
 // CHECK-NOT:     dynamic.Foo.init (dynamic.Foo.Type)(dynamic : Swift.Int) -> dynamic.Foo
 // CHECK-NOT:     dynamic.Foo.dynamicMethod
 // CHECK-NOT:     dynamic.Foo.subscript.getter (dynamic : Swift.Int) -> Swift.Int
 // CHECK-NOT:     dynamic.Foo.subscript.setter (dynamic : Swift.Int) -> Swift.Int
 // CHECK-LABEL:   #Foo.overriddenByDynamic!1: _TFC7dynamic3Foo19overriddenByDynamic
-// CHECK-LABEL:   #Foo.nativeProp!getter.1:  _TFC7dynamic3Foog10nativePropSi     // dynamic.Foo.nativeProp.getter : Swift.Int
-// CHECK-LABEL:   #Foo.nativeProp!setter.1:  _TFC7dynamic3Foos10nativePropSi     // dynamic.Foo.nativeProp.setter : Swift.Int
-// CHECK-LABEL:   #Foo.objcProp!getter.1:    _TFC7dynamic3Foog8objcPropSi  // dynamic.Foo.objcProp.getter : Swift.Int
-// CHECK-LABEL:   #Foo.objcProp!setter.1:    _TFC7dynamic3Foos8objcPropSi  // dynamic.Foo.objcProp.setter : Swift.Int
 // CHECK-NOT:     dynamic.Foo.dynamicProp.getter
 // CHECK-NOT:     dynamic.Foo.dynamicProp.setter
 

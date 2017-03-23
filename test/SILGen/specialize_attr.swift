@@ -91,18 +91,17 @@ public class Addressable<Element> : TestSubscriptable {
   }
 }
 
-// Addressable.subscript.unsafeAddressor with _specialize
-// CHECK-LABEL: sil [_specialize <Int>] @_TFC15specialize_attr11Addressablelu9subscriptFSix : $@convention(method) <Element> (Int, @guaranteed Addressable<Element>) -> UnsafePointer<Element> {
-
-// Addressable.subscript.unsafeMutableAddressor with _specialize
-// CHECK-LABEL: sil [_specialize <Int>] @_TFC15specialize_attr11Addressableau9subscriptFSix : $@convention(method) <Element> (Int, @guaranteed Addressable<Element>) -> UnsafeMutablePointer<Element> {
-
-
 // Addressable.subscript.getter with no attribute
 // CHECK-LABEL: sil [transparent] [fragile] @_TFC15specialize_attr11Addressableg9subscriptFSix : $@convention(method) <Element> (Int, @guaranteed Addressable<Element>) -> @out Element {
 
+// Addressable.subscript.unsafeAddressor with _specialize
+// CHECK-LABEL: sil [_specialize <Int>] @_TFC15specialize_attr11Addressablelu9subscriptFSix : $@convention(method) <Element> (Int, @guaranteed Addressable<Element>) -> UnsafePointer<Element> {
+
 // Addressable.subscript.setter with no attribute
 // CHECK-LABEL: sil [transparent] [fragile] @_TFC15specialize_attr11Addressables9subscriptFSix : $@convention(method) <Element> (@in Element, Int, @guaranteed Addressable<Element>) -> () {
+
+// Addressable.subscript.unsafeMutableAddressor with _specialize
+// CHECK-LABEL: sil [_specialize <Int>] @_TFC15specialize_attr11Addressableau9subscriptFSix : $@convention(method) <Element> (Int, @guaranteed Addressable<Element>) -> UnsafeMutablePointer<Element> {
 
 // Addressable.subscript.materializeForSet with no attribute
 // CHECK-LABEL: sil [transparent] [fragile] @_TFC15specialize_attr11Addressablem9subscriptFSix : $@convention(method) <Element> (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, Int, @guaranteed Addressable<Element>) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>) {
