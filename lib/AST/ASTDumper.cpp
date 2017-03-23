@@ -2635,7 +2635,7 @@ public:
 
     for (auto elem : T->getElements()) {
       OS << '\n';
-      printRec(elem);
+      printRec(elem.Type);
     }
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }

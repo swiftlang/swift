@@ -182,15 +182,16 @@ TypeRepr * CloneVisitor::visitImplicitlyUnwrappedOptionalTypeRepr(
 }
 
 TypeRepr *CloneVisitor::visitTupleTypeRepr(TupleTypeRepr *T) {
-  // FIXME: Avoid this stash vector.
-  SmallVector<TypeRepr *, 8> elements;
+  SmallVector<TupleTypeReprElement, 8> elements;
   elements.reserve(T->getNumElements());
-  for (auto *arg : T->getElements())
-    elements.push_back(visit(arg));
-  return TupleTypeRepr::create(Ctx, elements, T->getParens(),
-                               T->getElementNames(), T->getElementNameLocs(),
-                               T->getUnderscoreLocs(),
-                               T->getEllipsisLoc(), T->getEllipsisIndex());
+  for (auto arg : T->getElements()) {
+    arg.Type = visit(arg.Type);
+    elements.push_back(arg);
+  }
+  return TupleTypeRepr::create(Ctx, elements,
+                               T->getParens(),
+                               T->getEllipsisLoc(),
+                               T->getEllipsisIndex());
 }
 
 TypeRepr *CloneVisitor::visitCompositionTypeRepr(CompositionTypeRepr *T) {
@@ -401,34 +402,27 @@ void ImplicitlyUnwrappedOptionalTypeRepr::printImpl(ASTPrinter &Printer,
   Printer << "!";
 }
 
-TupleTypeRepr::TupleTypeRepr(ArrayRef<TypeRepr *> Elements, SourceRange Parens,
-                             ArrayRef<Identifier> ElementNames,
-                             ArrayRef<SourceLoc> ElementNameLocs,
-                             ArrayRef<SourceLoc> underscoreLocs,
+TupleTypeRepr::TupleTypeRepr(ArrayRef<TupleTypeReprElement> Elements,
+                             SourceRange Parens,
                              SourceLoc Ellipsis, unsigned EllipsisIdx)
     : TypeRepr(TypeReprKind::Tuple), NumElements(Elements.size()),
       Parens(Parens) {
 
-  TupleTypeReprBits.NameStatus = ElementNames.empty() ? NotNamed
-                               : underscoreLocs.empty() ? HasNames : HasLabels;
+  TupleTypeReprBits.NameStatus = NotNamed;
+  for (auto &Element : Elements) {
+    if (Element.NameLoc.isValid() && TupleTypeReprBits.NameStatus < HasNames) {
+      TupleTypeReprBits.NameStatus = HasNames;
+    }
+    if (Element.UnderscoreLoc.isValid()) {
+      TupleTypeReprBits.NameStatus = HasLabels;
+      break;
+    }
+  }
   TupleTypeReprBits.HasEllipsis = Ellipsis.isValid();
 
   // Copy elements.
   std::uninitialized_copy(Elements.begin(), Elements.end(),
-                          getTrailingObjects<TypeRepr *>());
-
-  // Copy elements names.
-  std::uninitialized_copy(ElementNames.begin(), ElementNames.end(),
-                          getTrailingObjects<Identifier>());
-
-  // Copy elements names locations.
-  std::uninitialized_copy(ElementNameLocs.begin(), ElementNameLocs.end(),
-                          getTrailingObjects<SourceLoc>());
-
-  // Copy elements underscore locations.
-  std::uninitialized_copy(underscoreLocs.begin(), underscoreLocs.end(),
-                          getTrailingObjects<SourceLoc>() +
-                              ElementNameLocs.size());
+                          getTrailingObjects<TupleTypeReprElement>());
 
   // Set ellipsis location and index.
   if (Ellipsis.isValid())
@@ -436,29 +430,18 @@ TupleTypeRepr::TupleTypeRepr(ArrayRef<TypeRepr *> Elements, SourceRange Parens,
 }
 
 TupleTypeRepr *TupleTypeRepr::create(const ASTContext &C,
-                                     ArrayRef<TypeRepr *> Elements,
+                                     ArrayRef<TupleTypeReprElement> Elements,
                                      SourceRange Parens,
-                                     ArrayRef<Identifier> ElementNames,
-                                     ArrayRef<SourceLoc> ElementNameLocs,
-                                     ArrayRef<SourceLoc> underscoreLocs,
                                      SourceLoc Ellipsis, unsigned EllipsisIdx) {
-  assert(ElementNames.size() == 0 ||
-         ElementNames.size() == Elements.size());
-  assert(ElementNameLocs.size() == ElementNames.size());
-  assert(underscoreLocs.size() == 0 ||
-         underscoreLocs.size() == Elements.size());
   assert(Ellipsis.isValid() ? EllipsisIdx < Elements.size()
                             : EllipsisIdx == Elements.size());
 
   size_t size =
-    totalSizeToAlloc<TypeRepr *, Identifier, SourceLoc, SourceLocAndIdx>(
+    totalSizeToAlloc<TupleTypeReprElement, SourceLocAndIdx>(
       Elements.size(),
-      ElementNames.size(),
-      ElementNameLocs.size() + underscoreLocs.size(),
       Ellipsis.isValid() ? 1 : 0);
   void *mem = C.Allocate(size, alignof(TupleTypeRepr));
-  return new (mem) TupleTypeRepr(Elements, Parens, ElementNames,
-                                 ElementNameLocs, underscoreLocs,
+  return new (mem) TupleTypeRepr(Elements, Parens,
                                  Ellipsis, EllipsisIdx);
 }
 
@@ -466,7 +449,6 @@ TupleTypeRepr *TupleTypeRepr::create(const ASTContext &C,
 TupleTypeRepr *TupleTypeRepr::createEmpty(const ASTContext &C,
                                           SourceRange Parens) {
   return create(C, {}, Parens,
-      /*ElementNames=*/{}, /*ElementNameLocs=*/{}, /*underscoreLocs=*/{},
       /*Ellipsis=*/SourceLoc(), /*EllipsisIdx=*/0);
 }
 
@@ -522,7 +504,7 @@ void TupleTypeRepr::printImpl(ASTPrinter &Printer,
         Printer << ": ";
       }
     }
-    printTypeRepr(getElement(i), Printer, Opts);
+    printTypeRepr(getType(i), Printer, Opts);
     Printer.printStructurePost(PrintStructureKind::TupleElement);
 
     if (hasEllipsis() && getEllipsisIndex() == i)
