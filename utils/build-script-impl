@@ -1081,7 +1081,7 @@ check_swiftenv_args
 # If we are using a swiftenv, do this next block
 if [ "${SWIFTENV_PATH}" ]; then
 
-  if [ ! -d "${SWIFTENV_PATH}" ]; then
+  if [[ ! -d "${SWIFTENV_PATH}" ]]; then
       echo "${COMMAND_NAME}: SWIFTENV_PATH does not exist, it will be created"
   fi
   if [[ "${SWIFTENV_RECREATE}" ]]; then
@@ -1089,7 +1089,7 @@ if [ "${SWIFTENV_PATH}" ]; then
   fi
 
   # redo the swiftenv by deleting, mkdir, and running the SWIFTENV_MAKE script
-  if [ ! -d "${SWIFTENV_PATH}" ] || [[ "${SWIFTENV_RECREATE}" ]]; then
+  if [[ ! -d "${SWIFTENV_PATH}" ]] || [[ "${SWIFTENV_RECREATE}" ]]; then
     if [ ! -f "${SWIFTENV_MAKE}" ]; then
       echo "${COMMAND_NAME} error: SWIFTENV_MAKE is not set."
       exit 2
@@ -1099,10 +1099,17 @@ if [ "${SWIFTENV_PATH}" ]; then
       exit 2
     fi
 
-    call rm -rf "${SWIFTENV_PATH}"
-    call mkdir -p "${SWIFTENV_PATH}"
-    echo "${COMMAND_NAME}: Calling \"${SWIFTENV_MAKE}\" \"${SWIFTENV_PATH}\" \"${SWIFTENV_SCRIPT}\""
-    call "${SWIFTENV_MAKE}" "${SWIFTENV_PATH}" "${SWIFTENV_SCRIPT}"
+    if [[ -d "${SWIFTENV_PATH}" ]] && [[ "${SWIFTENV_RECREATE}" ]]; then
+      echo "${COMMAND_NAME}: SWIFTENV_PATH does exists, it will be deleted and recreated"
+      call rm -rf "${SWIFTENV_PATH}"
+      echo "${COMMAND_NAME}: Calling mkdir on SWIFTENV_PATH: ${SWIFTENV_PATH}"
+      call mkdir -p "${SWIFTENV_PATH}"
+      echo "${COMMAND_NAME}: Calling \"${SWIFTENV_MAKE}\" \"${SWIFTENV_PATH}\" \"${SWIFTENV_SCRIPT}\""
+      call "${SWIFTENV_MAKE}" "${SWIFTENV_PATH}" "${SWIFTENV_SCRIPT}"
+    fi
+
+  else
+    echo "${COMMAND_NAME}: SWIFTENV_PATH exists, not recreating the SWIFTENV"
   fi
 fi
 
@@ -1179,10 +1186,8 @@ function set_cmake_tools {
   if [ "${CMAKE_C_COMPILER}" ]; then cmake_options=( "${cmake_options[@]}" -DCMAKE_C_COMPILER:PATH="${CMAKE_C_COMPILER}"); fi
   if [ "${CMAKE_CXX_COMPILER}" ]; then cmake_options=( "${cmake_options[@]}" -DCMAKE_CXX_COMPILER:PATH="${CMAKE_CXX_COMPILER}"); fi
   if [ "${CMAKE_AR}" ]; then cmake_options=( "${cmake_options[@]}" -DCMAKE_AR:PATH="${CMAKE_AR}"); fi
-  if [ "${CMAKE_LD}" ]; then cmake_options=( "${cmake_options[@]}" -DCMAKE_LD:PATH="${CMAKE_LD}"); fi
   if [ "${CMAKE_RANLIB}" ]; then cmake_options=( "${cmake_options[@]}" -DCMAKE_RANLIB:PATH="${CMAKE_RANLIB}"); fi
   if [ "${CMAKE_LIPO}" ]; then cmake_options=( "${cmake_options[@]}" -DCMAKE_LIPO:PATH="${CMAKE_LIPO}"); fi
-  if [ "${CMAKE_LIBTOOL}" ]; then cmake_options=( "${cmake_options[@]}" -DCMAKE_LIBTOOL:PATH="${CMAKE_LIBTOOL}"); fi
   if [ "${CMAKE_INSTALL_NAME_TOOL}" ]; then cmake_options=( "${cmake_options[@]}" -DCMAKE_INSTALL_NAME_TOOL:PATH="${CMAKE_INSTALL_NAME_TOOL}"); fi
   if [ "${CMAKE_CODESIGN}" ]; then cmake_options=( "${cmake_options[@]}" -DCMAKE_CODESIGN:PATH="${CMAKE_CODESIGN}"); fi
   if [ "${CMAKE_PYTHON}" ]; then cmake_options=( "${cmake_options[@]}" -DPYTHON_EXECUTABLE:PATH="${CMAKE_PYTHON}"); fi
@@ -2107,7 +2112,12 @@ for host in "${ALL_HOSTS[@]}"; do
                     build_targets=(llvm-tblgen clang-headers)
                 fi
 
-                set_cmake_tools
+                if [ "${CMAKE_LIBTOOL}" ] ; then
+                    cmake_options=(
+                        "${cmake_options[@]}"
+                        -DCMAKE_LIBTOOL:PATH="${CMAKE_LIBTOOL}"
+                    )
+                fi
 
                 # Note: we set the variable:
                 #
