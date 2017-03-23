@@ -30,6 +30,10 @@ struct AnyStruct {
   let a: Any
 }
 
+protocol Clonable {
+  func maybeClone() -> Self?
+}
+
 indirect enum IndirectEnum<T> {
   case Nil
   case Node(T)
@@ -761,6 +765,23 @@ func s390___addrCallResult<T>(_ f: (() -> T)?) {
   var x = f?()
 }
 
+// Tests reabstraction / partial apply of protocols under opaque value mode
+// ---
+// CHECK-LABEL: sil hidden @_T020opaque_values_silgen21s400______maybeClonePyAA8Clonable_p1c_tF : $@convention(thin) (@in Clonable) -> () {
+// CHECK: bb0([[ARG:%.*]] : $Clonable):
+// CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
+// CHECK:   [[OPEN_ARG:%.*]] = open_existential_opaque [[BORROWED_ARG]] : $Clonable
+// CHECK:   [[COPY_OPAQUE:%.*]] = copy_value [[OPEN_ARG]]
+// CHECK:   [[APPLY_OPAQUE:%.*]] = apply %{{.*}}<@opened({{.*}}) Clonable>([[COPY_OPAQUE]]) : $@convention(thin) <τ_0_0 where τ_0_0 : Clonable> (@in τ_0_0) -> @owned @callee_owned () -> @out Optional<τ_0_0>
+// CHECK:   [[PAPPLY:%.*]] = partial_apply %{{.*}}<@opened({{.*}}) Clonable>([[APPLY_OPAQUE]]) : $@convention(thin) <τ_0_0 where τ_0_0 : Clonable> (@owned @callee_owned () -> @out Optional<τ_0_0>) -> @out Optional<Clonable>
+// CHECK:   end_borrow [[BORROWED_ARG]]
+// CHECK:   destroy_value [[ARG]]
+// CHECK:   return %{{.*}} : $()
+// CHECK-LABEL: } // end sil function '_T020opaque_values_silgen21s400______maybeClonePyAA8Clonable_p1c_tF'
+func s400______maybeCloneP(c: Clonable) {
+  let _: () -> Clonable? = c.maybeClone
+}
+
 // Tests conditional value casts and correspondingly generated reabstraction thunk, with <T> types
 // ---
 // CHECK-LABEL: sil hidden @_T020opaque_values_silgen21s999_____condTFromAnyyyp_xtlF : $@convention(thin) <T> (@in Any, @in T) -> () {
@@ -900,6 +921,23 @@ extension Dictionary {
     increment(x: &self[key]!)
   }
 }
+
+// s400______maybeCloneP continued Test: reabstraction thunk
+// ---
+// CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_T0xSgIxr_20opaque_values_silgen8Clonable_pSgIxr_AbCRzlTR : $@convention(thin) <τ_0_0 where τ_0_0 : Clonable> (@owned @callee_owned () -> @out Optional<τ_0_0>) -> @out Optional<Clonable> {
+// CHECK: bb0([[ARG:%.*]] : $@callee_owned () -> @out Optional<τ_0_0>):
+// CHECK:   [[APPLY_ARG:%.*]] = apply [[ARG]]() : $@callee_owned () -> @out Optional<τ_0_0>
+// CHECK:   switch_enum [[APPLY_ARG]] : $Optional<τ_0_0>, case #Optional.some!enumelt.1: bb2, case #Optional.none!enumelt: bb1
+// CHECK: bb1:
+// CHECK:   [[ONONE:%.*]] = enum $Optional<Clonable>, #Optional.none!enumelt
+// CHECK:   br bb3([[ONONE]] : $Optional<Clonable>)
+// CHECK: bb2([[ENUM_SOME:%.*]] : $τ_0_0):
+// CHECK:   [[INIT_OPAQUE:%.*]] = init_existential_opaque [[ENUM_SOME]] : $τ_0_0, $τ_0_0, $Clonable
+// CHECK:   [[OSOME:%.*]] = enum $Optional<Clonable>, #Optional.some!enumelt.1, [[INIT_OPAQUE]] : $Clonable
+// CHECK:   br bb3([[OSOME]] : $Optional<Clonable>)
+// CHECK: bb3([[RETVAL:%.*]] : $Optional<Clonable>):
+// CHECK:   return [[RETVAL]] : $Optional<Clonable>
+// CHECK-LABEL: } // end sil function '_T0xSgIxr_20opaque_values_silgen8Clonable_pSgIxr_AbCRzlTR'
 
 // s320__transImplodeAny continued Test: reabstraction thunk
 // ---
