@@ -1035,7 +1035,9 @@ def execute_template(
 
     Keyword arguments become local variable bindings in the execution context
 
-    >>> ast = parse_template('/dummy.file', text=
+    >>> root_directory = os.path.abspath('/')
+    >>> file_name = root_directory + 'dummy.file'
+    >>> ast = parse_template(file_name, text=
     ... '''Nothing
     ... % if x:
     ... %    for i in range(3):
@@ -1045,7 +1047,7 @@ def execute_template(
     ... THIS SHOULD NOT APPEAR IN THE OUTPUT
     ... ''')
     >>> out = execute_template(ast, line_directive='//#sourceLocation', x=1)
-    >>> out = out.replace(os.path.abspath(os.sep) + 'dummy.file', "DUMMY-FILE")
+    >>> out = out.replace(file_name, "DUMMY-FILE")
     >>> print(out, end="")
     //#sourceLocation(file: "DUMMY-FILE", line: 1)
     Nothing
@@ -1056,7 +1058,7 @@ def execute_template(
     //#sourceLocation(file: "DUMMY-FILE", line: 4)
     2
 
-    >>> ast = parse_template('/dummy.file', text=
+    >>> ast = parse_template(file_name, text=
     ... '''Nothing
     ... % a = []
     ... % for x in range(3):
@@ -1065,7 +1067,7 @@ def execute_template(
     ... ${a}
     ... ''')
     >>> out = execute_template(ast, line_directive='//#sourceLocation', x=1)
-    >>> out = out.replace(os.path.abspath(os.sep) + 'dummy.file', "DUMMY-FILE")
+    >>> out = out.replace(file_name, "DUMMY-FILE")
     >>> print(out, end="")
     //#sourceLocation(file: "DUMMY-FILE", line: 1)
     Nothing
