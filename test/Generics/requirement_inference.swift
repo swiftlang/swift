@@ -76,7 +76,10 @@ struct V<T : Canidae> {}
 // CHECK-LABEL: .inferSuperclassRequirement1@
 // CHECK-NEXT: Requirements:
 // CHECK-NEXT:   τ_0_0 : Canidae
-func inferSuperclassRequirement1<T : Carnivora>(_ v: V<T>) {}
+func inferSuperclassRequirement1<T : Carnivora>(
+	_ v: V<T>) {}
+// expected-warning@-2{{redundant superclass constraint 'T' : 'Carnivora'}}
+// expected-note@-2{{superclass constraint 'T' : 'Canidae' inferred from type here}}
 
 // CHECK-LABEL: .inferSuperclassRequirement2@
 // CHECK-NEXT: Requirements:

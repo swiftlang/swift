@@ -42,7 +42,7 @@ extension LoggingType {
 //===----------------------------------------------------------------------===//
 
 public class IteratorLog {
-  public static func dispatchTester<I : IteratorProtocol>(
+  public static func dispatchTester<I>(
     _ iterator: I
   ) -> LoggingIterator<LoggingIterator<I>> {
     return LoggingIterator(wrapping: LoggingIterator(wrapping: iterator))
@@ -72,7 +72,7 @@ public struct LoggingIterator<Base : IteratorProtocol>
 //===----------------------------------------------------------------------===//
 
 public class SequenceLog {
-  public static func dispatchTester<S : Sequence>(
+  public static func dispatchTester<S>(
     _ s: S
   ) -> LoggingSequence<LoggingSequence<S>> {
     return LoggingSequence(wrapping: LoggingSequence(wrapping: s))
@@ -96,7 +96,7 @@ public class SequenceLog {
 }
 
 public class CollectionLog : SequenceLog {
-  public class func dispatchTester<C : Collection>(
+  public class func dispatchTester<C>(
     _ c: C
   ) -> LoggingCollection<LoggingCollection<C>> {
     return LoggingCollection(wrapping: LoggingCollection(wrapping: c))
@@ -123,7 +123,7 @@ public class CollectionLog : SequenceLog {
 }
 
 public class BidirectionalCollectionLog : SequenceLog {
-  public class func dispatchTester<C : BidirectionalCollection>(
+  public class func dispatchTester<C>(
     _ c: C
   ) -> LoggingBidirectionalCollection<LoggingBidirectionalCollection<C>> {
     return LoggingBidirectionalCollection(
@@ -135,7 +135,7 @@ public class BidirectionalCollectionLog : SequenceLog {
 }
 
 public class MutableCollectionLog : CollectionLog {
-  public class func dispatchTester<C : MutableCollection>(
+  public class func dispatchTester<C>(
     _ c: C
   ) -> LoggingMutableCollection<LoggingMutableCollection<C>> {
     return LoggingMutableCollection(
@@ -172,7 +172,7 @@ public class RangeReplaceableCollectionLog : CollectionLog {
   public static var replaceSubrange = TypeIndexed(0)
   public static var reserveCapacity = TypeIndexed(0)
 
-  public class func dispatchTester<C : RangeReplaceableCollection>(
+  public class func dispatchTester<C>(
     _ rrc: C
   ) -> LoggingRangeReplaceableCollection<LoggingRangeReplaceableCollection<C>> {
     return LoggingRangeReplaceableCollection(

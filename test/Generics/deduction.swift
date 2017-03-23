@@ -292,7 +292,7 @@ protocol Bool_ {}
 struct False : Bool_ {}
 struct True : Bool_ {}
 
-postfix func <*> <B:Bool_>(_: Test<B>) -> Int? { return .none }
+postfix func <*> <B>(_: Test<B>) -> Int? { return .none }
 postfix func <*> (_: Test<True>) -> String? { return .none }
 
 class Test<C: Bool_> : MetaFunction {
