@@ -408,25 +408,26 @@ TupleTypeRepr::TupleTypeRepr(ArrayRef<TupleTypeReprElement> Elements,
     : TypeRepr(TypeReprKind::Tuple), NumElements(Elements.size()),
       Parens(Parens) {
 
-  TupleTypeReprBits.NameStatus = NotNamed;
+  NameStatus = NotNamed;
   for (auto &Element : Elements) {
-    if (Element.NameLoc.isValid() && TupleTypeReprBits.NameStatus < HasNames) {
-      TupleTypeReprBits.NameStatus = HasNames;
+    if (Element.NameLoc.isValid() && NameStatus < HasNames) {
+      NameStatus = HasNames;
     }
     if (Element.UnderscoreLoc.isValid()) {
-      TupleTypeReprBits.NameStatus = HasLabels;
+      NameStatus = HasLabels;
       break;
     }
   }
-  TupleTypeReprBits.HasEllipsis = Ellipsis.isValid();
 
   // Copy elements.
   std::uninitialized_copy(Elements.begin(), Elements.end(),
                           getTrailingObjects<TupleTypeReprElement>());
 
   // Set ellipsis location and index.
-  if (Ellipsis.isValid())
-    getTrailingObjects<SourceLocAndIdx>()[0] = {Ellipsis, EllipsisIdx};
+  if (Ellipsis.isValid()) {
+    EllipsisLoc = Ellipsis;
+    this->EllipsisIdx = EllipsisIdx;
+  }
 }
 
 TupleTypeRepr *TupleTypeRepr::create(const ASTContext &C,
@@ -437,9 +438,7 @@ TupleTypeRepr *TupleTypeRepr::create(const ASTContext &C,
                             : EllipsisIdx == Elements.size());
 
   size_t size =
-    totalSizeToAlloc<TupleTypeReprElement, SourceLocAndIdx>(
-      Elements.size(),
-      Ellipsis.isValid() ? 1 : 0);
+    totalSizeToAlloc<TupleTypeReprElement>(Elements.size());
   void *mem = C.Allocate(size, alignof(TupleTypeRepr));
   return new (mem) TupleTypeRepr(Elements, Parens,
                                  Ellipsis, EllipsisIdx);
