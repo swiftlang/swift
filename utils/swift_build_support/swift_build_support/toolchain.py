@@ -58,6 +58,8 @@ _register("distcc", "distcc")
 _register("distcc_pump", "distcc-pump", "pump")
 _register("llvm_profdata", "llvm-profdata")
 _register("llvm_cov", "llvm-cov")
+_register("lipo", "lipo")
+_register("libtool", "libtool")
 
 
 class Darwin(Toolchain):

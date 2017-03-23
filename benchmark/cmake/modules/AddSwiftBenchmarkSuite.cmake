@@ -349,7 +349,7 @@ function (swift_benchmark_compile_archopts)
         ${objcfile}
         "-o" "${OUTPUT_EXEC}"
       COMMAND
-        ${CMAKE_CODESIGN} "-f" "-s" "-" "${OUTPUT_EXEC}")
+        "codesign" "-f" "-s" "-" "${OUTPUT_EXEC}")
   set(new_output_exec "${OUTPUT_EXEC}" PARENT_SCOPE)
 endfunction()
 
