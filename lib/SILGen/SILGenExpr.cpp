@@ -3334,8 +3334,9 @@ RValue RValueEmitter::visitOptionalEvaluationExpr(OptionalEvaluationExpr *E,
 
   // Form the optional using address operations if the type is address-only or
   // if we already have an address to use.
-  bool isByAddress = usingProvidedContext || optTL.isAddressOnly();
-  
+  bool isByAddress = ((usingProvidedContext || optTL.isAddressOnly()) &&
+                      SGF.silConv.useLoweredAddresses());
+
   std::unique_ptr<TemporaryInitialization> optTemp;
   if (!usingProvidedContext && isByAddress) {
     // Allocate the temporary for the Optional<T> if we didn't get one from the
@@ -3357,7 +3358,7 @@ RValue RValueEmitter::visitOptionalEvaluationExpr(OptionalEvaluationExpr *E,
   RestoreOptionalFailureDest restoreFailureDest(SGF,
                     JumpDest(failureBB, SGF.Cleanups.getCleanupsDepth(), E));
 
-  SILValue NormalArgument;
+  SILValue NormalArgument = nullptr;
   if (emitOptimizedOptionalEvaluation(E, NormalArgument, optInit, *this)) {
     // Already emitted code for this.
   } else if (isByAddress) {
@@ -3383,7 +3384,7 @@ RValue RValueEmitter::visitOptionalEvaluationExpr(OptionalEvaluationExpr *E,
     failureBB->eraseFromParent();
     
     // The value we provide is the one we've already got.
-    if (!isByAddress)
+    if (!isByAddress && NormalArgument)
       return RValue(SGF, E,
                     SGF.emitManagedRValueWithCleanup(NormalArgument, optTL));
 
