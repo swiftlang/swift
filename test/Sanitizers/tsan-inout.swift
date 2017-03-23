@@ -1,6 +1,6 @@
 // RUN: %target-build-swift %S/Inputs/tsan-uninstrumented.swift -module-name TSanUninstrumented -emit-module -emit-module-path %T/TSanUninstrumented.swiftmodule -parse-as-library
 // RUN: %target-build-swift %S/Inputs/tsan-uninstrumented.swift -c -module-name TSanUninstrumented -parse-as-library -o %T/TSanUninstrumented.o
-// RUN: %target-swiftc_driver -Xfrontend -enable-experimental-tsan-inout-instrumentation %s %T/TSanUninstrumented.o -I%T -L%T -g -sanitize=thread -o %t_tsan-binary
+// RUN: %target-swiftc_driver %s %T/TSanUninstrumented.o -I%T -L%T -g -sanitize=thread -o %t_tsan-binary
 // RUN: not env TSAN_OPTIONS=abort_on_error=0 %target-run %t_tsan-binary 2>&1 | %FileCheck %s
 // RUN: not env TSAN_OPTIONS=abort_on_error=0:ignore_interceptors_accesses=0 %target-run %t_tsan-binary 2>&1 | %FileCheck %s --check-prefix CHECK-INTERCEPTORS-ACCESSES
 // REQUIRES: executable_test

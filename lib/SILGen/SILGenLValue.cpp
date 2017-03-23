@@ -2428,7 +2428,8 @@ static ManagedValue drillIntoComponent(SILGenFunction &SGF,
     addr = std::move(lcomponent).getMaterialized(SGF, loc, base, accessKind);
   }
 
-  if (SGF.getASTContext().LangOpts.EnableTSANInoutInstrumentation &&
+  if (!SGF.getASTContext().LangOpts.DisableTsanInoutInstrumentation &&
+      SGF.getModule().getOptions().Sanitize == SanitizerKind::Thread &&
       tsanKind == TSanKind::InoutAccess && !component.isRValue()) {
     emitTsanInoutAccess(SGF, loc, addr);
   }
