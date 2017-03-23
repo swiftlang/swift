@@ -738,6 +738,29 @@ func s380___contextualInit(_ a : Int?) {
   var x: Int! = a
 }
 
+// Tests opaque call result types
+// ---
+// CHECK-LABEL: sil hidden @_T020opaque_values_silgen21s390___addrCallResultyxycSglF : $@convention(thin) <T> (@owned Optional<@callee_owned () -> @out T>) -> () {
+// CHECK: bb0([[ARG:%.*]] : $Optional<@callee_owned () -> @out T>):
+// CHECK:   [[ALLOC_OF_BOX:%.*]] = alloc_box $<τ_0_0> { var Optional<τ_0_0> } <T>
+// CHECK:   [[PROJ_BOX:%.*]] = project_box [[ALLOC_OF_BOX]]
+// CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
+// CHECK:   [[COPY__ARG:%.*]] = copy_value [[BORROWED_ARG]]
+// CHECK:   [[SENUM:%.*]] = select_enum [[COPY__ARG]]
+// CHECK:   cond_br [[SENUM]], bb3, bb1
+// CHECK: bb1:
+// CHECK:   end_borrow [[BORROWED_ARG]] from [[ARG]]
+// CHECK:   br bb2
+// CHECK: bb2:
+// CHECK:   [[ONONE:%.*]] = enum $Optional<T>, #Optional.none!enumelt
+// CHECK:   br bb4([[ONONE]] : $Optional<T>)
+// CHECK: bb4(%{{.*}} : $Optional<T>):
+// CHECK:   return %{{.*}} : $()
+// CHECK-LABEL: } // end sil function '_T020opaque_values_silgen21s390___addrCallResultyxycSglF'
+func s390___addrCallResult<T>(_ f: (() -> T)?) {
+  var x = f?()
+}
+
 // Tests conditional value casts and correspondingly generated reabstraction thunk, with <T> types
 // ---
 // CHECK-LABEL: sil hidden @_T020opaque_values_silgen21s999_____condTFromAnyyyp_xtlF : $@convention(thin) <T> (@in Any, @in T) -> () {
