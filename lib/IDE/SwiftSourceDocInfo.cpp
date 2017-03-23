@@ -112,7 +112,7 @@ bool SemaLocResolver::visitSubscriptReference(ValueDecl *D, CharSourceRange Rang
                                               bool IsOpenBracket) {
   // We should treat both open and close brackets equally
   return visitDeclReference(D, Range, nullptr, nullptr, Type(),
-                            SemaReferenceKind::SubscriptRef);
+                    ReferenceMetaData(SemaReferenceKind::SubscriptRef, None));
 }
 
 SemaToken SemaLocResolver::resolve(SourceLoc Loc) {
@@ -167,7 +167,7 @@ bool SemaLocResolver::walkToStmtPost(Stmt *S) {
 bool SemaLocResolver::visitDeclReference(ValueDecl *D, CharSourceRange Range,
                                          TypeDecl *CtorTyRef,
                                          ExtensionDecl *ExtTyRef, Type T,
-                                         SemaReferenceKind Kind) {
+                                         ReferenceMetaData Data) {
   if (isDone())
     return false;
   return !tryResolve(D, CtorTyRef, ExtTyRef, Range.getStart(), /*IsRef=*/true, T);
@@ -277,10 +277,6 @@ void ResolvedRangeInfo::print(llvm::raw_ostream &OS) {
 
 bool DeclaredDecl::operator==(const DeclaredDecl& Other) {
   return VD == Other.VD;
-}
-
-bool ReferencedDecl::operator==(const ReferencedDecl& Other) {
-  return VD == Other.VD && Ty.getPointer() == Other.Ty.getPointer();
 }
 
 static bool hasUnhandledError(ArrayRef<ASTNode> Nodes) {
@@ -560,8 +556,8 @@ public:
     }
     bool visitDeclReference(ValueDecl *D, CharSourceRange Range,
                             TypeDecl *CtorTyRef, ExtensionDecl *ExtTyRef, Type T,
-                            SemaReferenceKind Kind) override {
-      Impl->analyzeDeclRef(D, Range, T, Kind);
+                            ReferenceMetaData Data) override {
+      Impl->analyzeDeclRef(D, Range, T, Data);
       return true;
     }
   public:
@@ -574,7 +570,7 @@ public:
     Implementation *Impl;
     bool visitDeclReference(ValueDecl *D, CharSourceRange Range,
                             TypeDecl *CtorTyRef, ExtensionDecl *ExtTyRef, Type T,
-                            SemaReferenceKind Kind) override {
+                            ReferenceMetaData Data) override {
       // If the reference is after the given range, continue logic.
       if (!Impl->SM.isBeforeInBuffer(Impl->End, Range.getStart()))
         return true;
@@ -725,9 +721,9 @@ public:
   }
 
   void analyzeDeclRef(ValueDecl *VD, CharSourceRange Range, Type Ty,
-                      SemaReferenceKind Kind) {
+                      ReferenceMetaData Data) {
     // Only collect decl ref.
-    if (Kind != SemaReferenceKind::DeclRef)
+    if (Data.Kind != SemaReferenceKind::DeclRef)
       return;
 
     if (!isContainedInSelection(Range))
@@ -737,11 +733,28 @@ public:
     if (VD->getDeclContext()->getParentSourceFile() != &File)
       return;
 
-    // Collect referenced decls in the range.
-    ReferencedDecl RD(VD, Ty);
-    if (std::find(ReferencedDecls.begin(), ReferencedDecls.end(), RD) ==
-          ReferencedDecls.end())
-      ReferencedDecls.push_back(RD);
+    // Down-grade LValue type to RValue type if it's read-only.
+    if (auto Access = Data.AccKind) {
+      switch (Access.getValue()) {
+      case AccessKind::Read:
+        Ty = Ty->getRValueType();
+        break;
+      case AccessKind::Write:
+      case AccessKind::ReadWrite:
+        break;
+      }
+    }
+
+    auto It = llvm::find_if(ReferencedDecls,
+                            [&](ReferencedDecl D) { return D.VD == VD; });
+    if (It == ReferencedDecls.end()) {
+      ReferencedDecls.emplace_back(VD, Ty);
+    } else {
+      // LValue type should take precedence.
+      if (!It->Ty->isLValueType() && Ty->isLValueType()) {
+        It->Ty = Ty;
+      }
+    }
   }
 
 private:
@@ -816,8 +829,8 @@ bool RangeResolver::walkToDeclPost(Decl *D) {
 
 bool RangeResolver::
 visitDeclReference(ValueDecl *D, CharSourceRange Range, TypeDecl *CtorTyRef,
-                   ExtensionDecl *ExtTyRef, Type T, SemaReferenceKind Kind) {
-  Impl->analyzeDeclRef(D, Range, T, Kind);
+                   ExtensionDecl *ExtTyRef, Type T, ReferenceMetaData Data) {
+  Impl->analyzeDeclRef(D, Range, T, Data);
   return true;
 }
 
