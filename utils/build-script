@@ -611,6 +611,8 @@ class BuildScriptInvocation(object):
             "--darwin-deployment-version-watchos=%s" % (
                 args.darwin_deployment_version_watchos),
             "--cmake", toolchain.cmake,
+            "--cmake-c-compiler", toolchain.cc,
+            "--cmake-cxx-compiler", toolchain.cxx,
             "--cmark-build-type", args.cmark_build_variant,
             "--llvm-build-type", args.llvm_build_variant,
             "--swift-build-type", args.swift_build_variant,
@@ -1060,6 +1062,10 @@ def handle_swiftenv_args(args):
             sys.exit(2) # 2 is the same as `argparse` error exit code.
 
     if args.swiftenv_path is not None:
+        # mkdir the swiftenv_path
+        if not os.path.exists(args.swiftenv_path):
+            os.makedirs(args.swiftenv_path)
+
         # Only use swiftenv_make/swiftenv_script if one is provided
         # utils/swiftenv-make is default
         if args.swiftenv_make is None:
@@ -2040,6 +2046,19 @@ iterations with -O",
              "directory.".format(android.adb.commands.DEVICE_TEMP_DIR),
         default=android.adb.commands.DEVICE_TEMP_DIR,
         metavar="PATH")
+
+    parser.add_argument(
+        "--cmake-c-compiler",
+        help="the absolute path to CC, the 'clang' compiler for the host "
+             "platform. Default is auto detected.",
+        type=arguments.type.executable,
+        metavar="PATH")
+    parser.add_argument(
+        "--cmake-cxx-compiler",
+        help="the absolute path to CXX, the 'clang++' compiler for the host "
+             "platform. Default is auto detected.",
+        type=arguments.type.executable,
+        metavar="PATH")
     parser.add_argument(
         "--swiftenv-path",
         help="the absolute path to a directory containing replacement compiler commands")
@@ -2227,6 +2246,19 @@ iterations with -O",
 
     # Abstracted swiftenv_args for --preset and not
     handle_swiftenv_args(args)
+
+    # Let args.cmake_c_compiler win over swiftenv's cc/cxx
+    if args.cmake_c_compiler is None and args.swiftenv_path is not None:
+        if os.path.exists(args.swiftenv_path + "/clang"):
+            args.cmake_c_compiler = args.swiftenv_path + "/clang"
+    if args.cmake_cxx_compiler is None and args.swiftenv_path is not None:
+        if os.path.exists(args.swiftenv_path + "/clang++"):
+            args.cmake_cxx_compiler = args.swiftenv_path + "/clang++"
+
+    if args.cmake_c_compiler is not None:
+        toolchain.cc = args.cmake_c_compiler
+    if args.cmake_cxx_compiler is not None:
+        toolchain.cxx = args.cmake_cxx_compiler
 
     if args.cmake is not None:
         toolchain.cmake = args.cmake
