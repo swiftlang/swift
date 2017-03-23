@@ -45,28 +45,16 @@ KNOWN_SETTINGS=(
     dry-run                     ""               "print the commands that would be executed, but do not execute them"
     build-args                  ""               "arguments to the build tool; defaults to -j8 when CMake generator is \"Unix Makefiles\""
     build-dir                   ""               "out-of-tree build directory; default is in-tree. **This argument is required**"
-    cmake-c-compiler            ""               "the path to CC, the 'clang' compiler for the host platform. **This argument is required**"
-    cmake-cxx-compiler          ""               "the path to CXX, the 'clang++' compiler for the host platform. **This argument is required**"
-    cmake-lipo                  ""               "the path to lipo for creating universal binaries on Darwin"
-    cmake-libtool               ""               "the path to libtool, auto-detected but can be overridden"
-    cmake-linker                ""               "the path to ld, auto-detected but can be overridden"
-    cmake-ar                    ""               "the path to ar, auto-detected but can be overridden"
-    cmake-nm                    ""               "the path to nm, auto-detected but can be overridden"
-    cmake-objdump               ""               "the path to objdump, auto-detected but can be overridden"
-    cmake-ranlib                ""               "the path to ranlib, auto-detected but can be overridden"
-    cmake-strip                 ""               "the path to strip, auto-detected but can be overridden"
-    cmake-dsymutil              ""               "the path to dsymutil, auto-detected but can be overridden"
-    cmake-codesign              ""               "the path to codesign, auto-detected but can be overridden"
-    swiftenv-path               ""               "a path containing the above host tools which is searched unless the specific tool path is set"
-    swiftenv-recreate           ""               "a flag that, when present, will recreate the swiftenv"
-    swiftenv-make               ""               "a path to a script that will make a swiftenv in swiftenv-path"
-    swiftenv-script             ""               "a path to a script that intercepts host tools"
+    host-cc                     ""               "the path to CC, the 'clang' compiler for the host platform. **This argument is required**"
+    host-cxx                    ""               "the path to CXX, the 'clang++' compiler for the host platform. **This argument is required**"
+    host-lipo                   ""               "the path to lipo for creating universal binaries on Darwin"
+    host-libtool                ""               "the path to libtool"
     darwin-xcrun-toolchain      "default"        "the name of the toolchain to use on Darwin"
     ninja-bin                   ""               "the path to Ninja tool"
     cmark-build-type            "Debug"          "the CMake build variant for CommonMark (Debug, RelWithDebInfo, Release, MinSizeRel).  Defaults to Debug."
     lldb-extra-cmake-args       ""               "extra command line args to pass to lldb cmake"
     lldb-extra-xcodebuild-args  ""               "extra command line args to pass to lldb xcodebuild"
-    lldb-test-cc                ""               "CC to use for building LLDB testsuite test inferiors.  Defaults to just-built, in-tree clang.  If set to 'host-toolchain', sets it to same as cmake-cc."
+    lldb-test-cc                ""               "CC to use for building LLDB testsuite test inferiors.  Defaults to just-built, in-tree clang.  If set to 'host-toolchain', sets it to same as host-cc."
     lldb-test-with-curses       ""               "run test lldb test runner using curses terminal control"
     lldb-test-swift-only        ""               "when running lldb tests, only include Swift-specific tests"
     lldb-no-debugserver         ""               "delete debugserver after building it, and don't try to codesign it"
@@ -990,218 +978,22 @@ if [ ! -e "${WORKSPACE}" ] ; then
     exit 1
 fi
 
+# FIXME: HOST_CC and CMAKE are set, and their presence is validated by,
+#        utils/build-script. These checks are redundant, but must remain until
+#        build-script-impl is merged completely with utils/build-script.
+#        For additional information, see: https://bugs.swift.org/browse/SR-237
+if [ -z "${HOST_CC}" ] ; then
+    echo "Can't find clang.  Please install clang-3.5 or a later version."
+    exit 1
+fi
 if [ -z "${CMAKE}" ] ; then
     echo "Environment variable CMAKE must be specified."
     exit 1
 fi
 
-#
-# Calculate source directories for each product.
-#
-NINJA_SOURCE_DIR="${WORKSPACE}/ninja"
-SWIFT_SOURCE_DIR="${WORKSPACE}/swift"
-LLVM_SOURCE_DIR="${WORKSPACE}/llvm"
-CMARK_SOURCE_DIR="${WORKSPACE}/cmark"
-LLDB_SOURCE_DIR="${WORKSPACE}/lldb"
-LLBUILD_SOURCE_DIR="${WORKSPACE}/llbuild"
-SWIFTPM_SOURCE_DIR="${WORKSPACE}/swiftpm"
-XCTEST_SOURCE_DIR="${WORKSPACE}/swift-corelibs-xctest"
-FOUNDATION_SOURCE_DIR="${WORKSPACE}/swift-corelibs-foundation"
-LIBDISPATCH_SOURCE_DIR="${WORKSPACE}/swift-corelibs-libdispatch"
-LIBICU_SOURCE_DIR="${WORKSPACE}/icu"
-PLAYGROUNDLOGGER_SOURCE_DIR="${WORKSPACE}/swift-xcode-playground-support/PlaygroundLogger"
-PLAYGROUNDSUPPORT_SOURCE_DIR="${WORKSPACE}/swift-xcode-playground-support/PlaygroundSupport"
-
-if [[ ! "${SKIP_BUILD_PLAYGROUNDLOGGER}" && ! -d ${PLAYGROUNDLOGGER_SOURCE_DIR} ]]; then
-    echo "Couldn't find PlaygroundLogger source directory."
-    exit 1
-fi
-
-if [[ ! "${SKIP_BUILD_PLAYGROUNDSUPPORT}" && ! -d ${PLAYGROUNDSUPPORT_SOURCE_DIR} ]]; then
-    echo "Couldn't find PlaygroundSupport source directory."
-    exit 1
-fi
-
-function make_relative_symlink() {
-    local SOURCE=$1
-    local TARGET=$2
-    local TARGET_DIR=$(dirname $2)
-    local RELATIVE_SOURCE=$(python -c "import os.path; print(os.path.relpath(\"${SOURCE}\", \"${TARGET_DIR}\"))")
-    call ln -sf "${RELATIVE_SOURCE}" "${TARGET}"
-}
-
-# Symlink clang into the llvm tree.
-CLANG_SOURCE_DIR="${LLVM_SOURCE_DIR}/tools/clang"
-
-if [ ! -e "${WORKSPACE}/clang" ] ; then
-    # If llvm/tools/clang is already a directory, use that and skip the symlink.
-    if [ ! -d "${CLANG_SOURCE_DIR}" ] ; then
-        echo "Can't find source directory for clang (tried ${WORKSPACE}/clang and ${CLANG_SOURCE_DIR})"
-        exit 1
-    fi
-fi
-if [ ! -d "${CLANG_SOURCE_DIR}" ] ; then
-    make_relative_symlink "${WORKSPACE}/clang" "${CLANG_SOURCE_DIR}"
-fi
-
-# Symlink compiler-rt into the llvm tree, if it exists.
-COMPILER_RT_SOURCE_DIR="${LLVM_SOURCE_DIR}/projects/compiler-rt"
-if [ -e "${WORKSPACE}/compiler-rt" ] ; then
-    if [ ! -d "${COMPILER_RT_SOURCE_DIR}" ] ; then
-        make_relative_symlink "${WORKSPACE}/compiler-rt" "${COMPILER_RT_SOURCE_DIR}"
-    fi
-fi
-
-function check_swiftenv_args() {
-    if [ "${SWIFTENV_PATH}" ]; then
-        echo "SWIFTENV_PATH: ${SWIFTENV_PATH}"
-        echo "SWIFTENV_MAKE: ${SWIFTENV_MAKE}"
-        echo "SWIFTENV_SCRIPT: ${SWIFTENV_SCRIPT}"
-        echo "SWIFTENV_RECREATE: ${SWIFTENV_RECREATE}"
-    fi
-
-    if [ ! "${SWIFTENV_PATH}" ]; then
-        if [ "${SWIFTENV_RECREATE}" ]; then
-            echo "${COMMAND_NAME} error: SWIFTENV_RECREATE requires a SWIFTENV_PATH" && exit 2; fi
-        if [ "${SWIFTENV_MAKE}" ]; then
-            echo "${COMMAND_NAME} error: SWIFTENV_MAKE requires a SWIFTENV_PATH" && exit 2; fi
-        if [ "${SWIFTENV_SCRIPT}" ]; then
-            echo "${COMMAND_NAME} error: SWIFTENV_SCRIPT requires a SWIFTENV_PATH" && exit 2; fi
-    fi
-    if [ "${SWIFTENV_PATH}" ]; then
-        if [ "${SWIFTENV_SCRIPT}" ] && [ ! -f "${SWIFTENV_SCRIPT}" ]; then
-            echo "${COMMAND_NAME} error: SWIFTENV_SCRIPT not found at ${SWIFTENV_SCRIPT}" && exit 2; fi
-        if [ "${SWIFTENV_MAKE}" ] && [ ! -f "${SWIFTENV_MAKE}" ]; then
-            echo "${COMMAND_NAME} error: SWIFTENV_MAKE not found at ${SWIFTENV_MAKE}" && exit 2; fi
-    fi
-}
-
-check_swiftenv_args
-
-# If we are using a swiftenv, do this next block
-if [ "${SWIFTENV_PATH}" ]; then
-
-  if [[ ! -d "${SWIFTENV_PATH}" ]]; then
-      echo "${COMMAND_NAME}: SWIFTENV_PATH does not exist, it will be created"
-  fi
-  if [[ "${SWIFTENV_RECREATE}" ]]; then
-      echo "${COMMAND_NAME}: SWIFTENV_PATH will be recreated because SWIFTENV_RECREATE is true"
-  fi
-
-  # redo the swiftenv by deleting, mkdir, and running the SWIFTENV_MAKE script
-  if [[ ! -d "${SWIFTENV_PATH}" ]] || [[ "${SWIFTENV_RECREATE}" ]]; then
-    if [ ! -f "${SWIFTENV_MAKE}" ]; then
-      echo "${COMMAND_NAME} error: SWIFTENV_MAKE is not set."
-      exit 2
-    fi
-    if [ ! -f "${SWIFTENV_SCRIPT}" ]; then
-      echo "${COMMAND_NAME} error: SWIFTENV_SCRIPT is not set."
-      exit 2
-    fi
-
-    if [[ -d "${SWIFTENV_PATH}" ]] && [[ "${SWIFTENV_RECREATE}" ]]; then
-      echo "${COMMAND_NAME}: SWIFTENV_PATH does exists, it will be deleted and recreated"
-      call rm -rf "${SWIFTENV_PATH}"
-      echo "${COMMAND_NAME}: Calling mkdir on SWIFTENV_PATH: ${SWIFTENV_PATH}"
-      call mkdir -p "${SWIFTENV_PATH}"
-      echo "${COMMAND_NAME}: Calling \"${SWIFTENV_MAKE}\" \"${SWIFTENV_PATH}\" \"${SWIFTENV_SCRIPT}\""
-      call "${SWIFTENV_MAKE}" "${SWIFTENV_PATH}" "${SWIFTENV_SCRIPT}"
-    fi
-
-  else
-    echo "${COMMAND_NAME}: SWIFTENV_PATH exists, not recreating the SWIFTENV"
-  fi
-fi
-
 function xcrun_find_tool() {
-  if [[ ! -z "${SWIFTENV_PATH}" ]] && [[ -f "${SWIFTENV_PATH}/$1" ]]; then
-    echo "${SWIFTENV_PATH}/$1"
-  else
-    xcrun --sdk macosx --toolchain "${DARWIN_XCRUN_TOOLCHAIN}" --find "$1" 2>/dev/null
-  fi
-
-  if [[ "$?" -ne 0 ]]; then
-    >&2 echo "xcrun_find_tool: \`\`xcrun -find\`\` failed for $1"
-    exit 1
-  fi
+  xcrun --sdk macosx --toolchain "${DARWIN_XCRUN_TOOLCHAIN}" --find "$@"
 }
-
-UNAME=$(uname -s)
-
-# if HOST_$TOOLNAME is not set, set it with xcrun or which
-# args: uname CMAKE_VAR command-name
-function find_tool() {
-  if [[ "${SWIFTENV_PATH}" ]]; then
-    SWIFT_PATH="${SWIFTENV_PATH}:$PATH"
-  fi
-
-  if [[ -z "${!1}" ]]; then
-    if [[ "${UNAME}" == "Darwin" ]]; then
-      eval "$1=$(xcrun_find_tool "$2")"
-    elif [[ "${UNAME}" == "Linux" ]]; then
-      eval "$1=$(env PATH="${SWIFT_PATH}" which "$2")"
-    fi
-  fi
-
-  if [[ -z "${!1}" ]]; then
-    if [[ "$2" ]]; then
-      eval "$1=$2"
-    else
-      echo "Could not find ${2}"
-      exit 3
-    fi
-  fi
-  if [[ "${1}" ]]; then
-    echo "Found ${2}: ${!1}"
-  fi
-}
-
-function find_host_tools() {
-  find_tool CMAKE_C_COMPILER clang
-  find_tool CMAKE_CXX_COMPILER clang++
-
-  find_tool CMAKE_AR ar
-  find_tool CMAKE_RANLIB ranlib
-  find_tool CMAKE_DSYMUTIL dsymutil
-  find_tool CMAKE_STRIP strip
-  find_tool CMAKE_LIBTOOL libtool
-  find_tool CMAKE_PYTHON python
-  CMAKE_GYB="${SWIFT_SOURCE_DIR}/utils/gyb"
-  echo "Found gyb: ${CMAKE_GYB}"
-  find_tool CMAKE_LINKER ld
-  find_tool CMAKE_NM nm
-  find_tool CMAKE_OBJDUMP objdump
-
-  if [[ "${UNAME}" == "Darwin" ]]; then
-    find_tool CMAKE_LIPO lipo
-    find_tool CMAKE_CODESIGN codesign
-    find_tool CMAKE_INSTALL_NAME_TOOL install_name_tool
-  fi
-}
-
-find_host_tools
-
-# Sets the cmake_options for a particular project, e.g. LLVM or Swift.
-function set_cmake_tools {
-  if [ "${CMAKE_C_COMPILER}" ]; then cmake_options=( "${cmake_options[@]}" -DCMAKE_C_COMPILER:PATH="${CMAKE_C_COMPILER}"); fi
-  if [ "${CMAKE_CXX_COMPILER}" ]; then cmake_options=( "${cmake_options[@]}" -DCMAKE_CXX_COMPILER:PATH="${CMAKE_CXX_COMPILER}"); fi
-  if [ "${CMAKE_AR}" ]; then cmake_options=( "${cmake_options[@]}" -DCMAKE_AR:PATH="${CMAKE_AR}"); fi
-  if [ "${CMAKE_RANLIB}" ]; then cmake_options=( "${cmake_options[@]}" -DCMAKE_RANLIB:PATH="${CMAKE_RANLIB}"); fi
-  if [ "${CMAKE_LIPO}" ]; then cmake_options=( "${cmake_options[@]}" -DCMAKE_LIPO:PATH="${CMAKE_LIPO}"); fi
-  if [ "${CMAKE_INSTALL_NAME_TOOL}" ]; then cmake_options=( "${cmake_options[@]}" -DCMAKE_INSTALL_NAME_TOOL:PATH="${CMAKE_INSTALL_NAME_TOOL}"); fi
-  if [ "${CMAKE_CODESIGN}" ]; then cmake_options=( "${cmake_options[@]}" -DCMAKE_CODESIGN:PATH="${CMAKE_CODESIGN}"); fi
-  if [ "${CMAKE_PYTHON}" ]; then cmake_options=( "${cmake_options[@]}" -DPYTHON_EXECUTABLE:PATH="${CMAKE_PYTHON}"); fi
-  if [ "${CMAKE_GYB}" ]; then cmake_options=( "${cmake_options[@]}" -DCMAKE_GYB:PATH="${CMAKE_GYB}"); fi
-}
-
-# FIXME: CMAKE_C_COMPILER and CMAKE are set, and their presence is validated by,
-#        utils/build-script. These checks are redundant, but must remain until
-#        build-script-impl is merged completely with utils/build-script.
-#        For additional information, see: https://bugs.swift.org/browse/SR-237
-if [ -z "${CMAKE_C_COMPILER}" ]; then
-    echo "Can't find clang.  Please install clang-3.5 or a later version."
-    exit 1
-fi
 
 function not() {
     if [[ ! "$1" ]] ; then
@@ -1238,6 +1030,14 @@ function copy_swift_stdlib_tool_substitute() {
         echo "--- Copy swift-stdlib-tool ---"
         call cp "${SWIFT_SOURCE_DIR}/utils/swift-stdlib-tool-substitute" "$1"
     fi
+}
+
+function make_relative_symlink() {
+    local SOURCE=$1
+    local TARGET=$2
+    local TARGET_DIR=$(dirname $2)
+    local RELATIVE_SOURCE=$(python -c "import os.path; print(os.path.relpath(\"${SOURCE}\", \"${TARGET_DIR}\"))")
+    call ln -sf "${RELATIVE_SOURCE}" "${TARGET}"
 }
 
 # Sanitize the list of cross-compilation targets.
@@ -1393,6 +1193,54 @@ function should_build_stdlib_target() {
         fi
     fi
 }
+
+#
+# Calculate source directories for each product.
+#
+NINJA_SOURCE_DIR="${WORKSPACE}/ninja"
+SWIFT_SOURCE_DIR="${WORKSPACE}/swift"
+LLVM_SOURCE_DIR="${WORKSPACE}/llvm"
+CMARK_SOURCE_DIR="${WORKSPACE}/cmark"
+LLDB_SOURCE_DIR="${WORKSPACE}/lldb"
+LLBUILD_SOURCE_DIR="${WORKSPACE}/llbuild"
+SWIFTPM_SOURCE_DIR="${WORKSPACE}/swiftpm"
+XCTEST_SOURCE_DIR="${WORKSPACE}/swift-corelibs-xctest"
+FOUNDATION_SOURCE_DIR="${WORKSPACE}/swift-corelibs-foundation"
+LIBDISPATCH_SOURCE_DIR="${WORKSPACE}/swift-corelibs-libdispatch"
+LIBICU_SOURCE_DIR="${WORKSPACE}/icu"
+PLAYGROUNDLOGGER_SOURCE_DIR="${WORKSPACE}/swift-xcode-playground-support/PlaygroundLogger"
+PLAYGROUNDSUPPORT_SOURCE_DIR="${WORKSPACE}/swift-xcode-playground-support/PlaygroundSupport"
+
+if [[ ! "${SKIP_BUILD_PLAYGROUNDLOGGER}" && ! -d ${PLAYGROUNDLOGGER_SOURCE_DIR} ]]; then
+    echo "Couldn't find PlaygroundLogger source directory."
+    exit 1
+fi
+
+if [[ ! "${SKIP_BUILD_PLAYGROUNDSUPPORT}" && ! -d ${PLAYGROUNDSUPPORT_SOURCE_DIR} ]]; then
+    echo "Couldn't find PlaygroundSupport source directory."
+    exit 1
+fi
+
+# Symlink clang into the llvm tree.
+CLANG_SOURCE_DIR="${LLVM_SOURCE_DIR}/tools/clang"
+if [ ! -e "${WORKSPACE}/clang" ] ; then
+    # If llvm/tools/clang is already a directory, use that and skip the symlink.
+    if [ ! -d "${CLANG_SOURCE_DIR}" ] ; then
+        echo "Can't find source directory for clang (tried ${WORKSPACE}/clang and ${CLANG_SOURCE_DIR})"
+        exit 1
+    fi
+fi
+if [ ! -d "${CLANG_SOURCE_DIR}" ] ; then
+    make_relative_symlink "${WORKSPACE}/clang" "${CLANG_SOURCE_DIR}"
+fi
+
+# Symlink compiler-rt into the llvm tree, if it exists.
+COMPILER_RT_SOURCE_DIR="${LLVM_SOURCE_DIR}/projects/compiler-rt"
+if [ -e "${WORKSPACE}/compiler-rt" ] ; then
+    if [ ! -d "${COMPILER_RT_SOURCE_DIR}" ] ; then
+        make_relative_symlink "${WORKSPACE}/compiler-rt" "${COMPILER_RT_SOURCE_DIR}"
+    fi
+fi
 
 PRODUCTS=(cmark llvm)
 if [[ ! "${SKIP_BUILD_LIBICU}" ]] ; then
@@ -1651,17 +1499,16 @@ eval EXTRA_CMAKE_OPTIONS=(${EXTRA_CMAKE_OPTIONS})
 eval BUILD_ARGS=(${BUILD_ARGS})
 
 if [[ -n "${DISTCC}" ]]; then
-    if [[ "${UNAME}" == "Darwin" ]] ; then
+    if [[ "$(uname -s)" == "Darwin" ]] ; then
         # These are normally deduced by CMake, but when the compiler is set to
         # distcc which is installed elsewhere, we need to set them explicitly.
         COMMON_CMAKE_OPTIONS=(
-            "${COMMON_CMAKE_OPTIONS[@]}"
-            "-DCMAKE_AR=${CMAKE_AR}"
-            "-DCMAKE_LINKER=${CMAKE_LD}"
-            "-DCMAKE_NM=${CMAKE_NM}"
-            "-DCMAKE_OBJDUMP=${CMAKE_OBJDUMP}"
-            "-DCMAKE_RANLIB=${CMAKE_RANLIB}"
-            "-DCMAKE_STRIP=${CMAKE_STRIP}"
+            "${COMMON_CMAKE_OPTIONS[@]}" "-DCMAKE_AR=$(xcrun_find_tool ar)"
+            "-DCMAKE_LINKER=$(xcrun_find_tool ld)"
+            "-DCMAKE_NM=$(xcrun_find_tool nm)"
+            "-DCMAKE_OBJDUMP=$(xcrun_find_tool objdump)"
+            "-DCMAKE_RANLIB=$(xcrun_find_tool ranlib)"
+            "-DCMAKE_STRIP=$(xcrun_find_tool strip)"
         )
     fi
 fi
@@ -1983,10 +1830,9 @@ for host in "${ALL_HOSTS[@]}"; do
         if [[ "${CROSS_COMPILE_WITH_HOST_TOOLS}" ]]; then
             # Optionally use the freshly-built host copy of clang to build
             # for foreign hosts.
-            LLVM_NATIVE_BUILD=$(build_directory "${LOCAL_HOST}" llvm)
             common_cmake_options_host+=(
-                -DCMAKE_C_COMPILER="$LLVM_NATIVE_BUILD/bin/clang"
-                -DCMAKE_CXX_COMPILER="$LLVM_NATIVE_BUILD/bin/clang++"
+                -DCMAKE_C_COMPILER="$(build_directory ${LOCAL_HOST} llvm)/bin/clang"
+                -DCMAKE_CXX_COMPILER="$(build_directory ${LOCAL_HOST} llvm)/bin/clang++"
             )
         fi
 
@@ -2012,7 +1858,7 @@ for host in "${ALL_HOSTS[@]}"; do
         )
     fi
 
-    if [[ "${ENABLE_ASAN}" || "${UNAME}" == "Linux" ]] ; then
+    if [[ "${ENABLE_ASAN}" || "$(uname -s)" == "Linux" ]] ; then
         swift_cmake_options=(
             "${swift_cmake_options[@]}"
             -DSWIFT_SOURCEKIT_USE_INPROC_LIBRARY:BOOL=TRUE
@@ -2092,7 +1938,6 @@ for host in "${ALL_HOSTS[@]}"; do
 
         case ${product} in
             cmark)
-                set_cmake_tools
                 cmake_options=(
                   "${cmake_options[@]}"
                   -DCMAKE_BUILD_TYPE:STRING="${CMARK_BUILD_TYPE}"
@@ -2112,10 +1957,10 @@ for host in "${ALL_HOSTS[@]}"; do
                     build_targets=(llvm-tblgen clang-headers)
                 fi
 
-                if [ "${CMAKE_LIBTOOL}" ] ; then
+                if [ "${HOST_LIBTOOL}" ] ; then
                     cmake_options=(
                         "${cmake_options[@]}"
-                        -DCMAKE_LIBTOOL:PATH="${CMAKE_LIBTOOL}"
+                        -DCMAKE_LIBTOOL:PATH="${HOST_LIBTOOL}"
                     )
                 fi
 
@@ -2168,26 +2013,12 @@ for host in "${ALL_HOSTS[@]}"; do
                 fi
 
                 if [[ $(is_cross_tools_host ${host}) ]] ; then
-                    # Find these tools from the LLVM_NATIVE_BUILD directory
-                    LLVM_NATIVE_BUILD=$(build_directory "${LOCAL_HOST}" llvm)
-                    CMAKE_C_COMPILER="${LLVM_NATIVE_BUILD}/bin/clang"
-                    CMAKE_CXX_COMPILER="${LLVM_NATIVE_BUILD}/bin/clang++"
-                    CMAKE_LLVM_TABLEGEN="${LLVM_NATIVE_BUILD}/bin/llvm-tblgen"
-                    CMAKE_CLANG_TABLEGEN="${LLVM_NATIVE_BUILD}/bin/clang-tblgen"
-                    echo "Cross compiling with CMAKE_C_COMPILER: ${CMAKE_C_COMPILER}"
-                    echo "Cross compiling with CMAKE_CXX_COMPILER: ${CMAKE_CXX_COMPILER}"
-                    echo "Cross compiling with CMAKE_LLVM_TABLEGEN: ${CMAKE_LLVM_TABLEGEN}"
-                    echo "Cross compiling with CMAKE_CLANG_TABLEGEN: ${CMAKE_CLANG_TABLEGEN}"
-
                     cmake_options=(
                         "${cmake_options[@]}"
-                        -DLLVM_TABLEGEN="${CMAKE_LLVM_TABLEGEN}"
-                        -DCLANG_TABLEGEN="${CMAKE_CLANG_TABLEGEN}"
-                        -DLLVM_NATIVE_BUILD="${LLVM_NATIVE_BUILD}"
+                        -DLLVM_TABLEGEN=$(build_directory "${LOCAL_HOST}" llvm)/bin/llvm-tblgen
+                        -DCLANG_TABLEGEN=$(build_directory "${LOCAL_HOST}" llvm)/bin/clang-tblgen
+                        -DLLVM_NATIVE_BUILD=$(build_directory "${LOCAL_HOST}" llvm)
                     )
-
-                    # LLVM, sets CMAKE_C_COMPILER, CMAKE_CXX_COMPILER
-                    set_cmake_tools
                 fi
 
                 ;;
@@ -2267,19 +2098,12 @@ for host in "${ALL_HOSTS[@]}"; do
                     )
                 fi
 
-                echo "CMAKE_C_COMPILER: ${CMAKE_C_COMPILER}"
-                echo "CMAKE_CXX_COMPILER: ${CMAKE_CXX_COMPILER}"
-                echo "CMAKE_RANLIB: ${CMAKE_RANLIB}"
-                echo "CMAKE_PYTHON: ${CMAKE_PYTHON}"
-                echo "CMAKE_GYB: ${CMAKE_GYB}"
-                if [[ "${UNAME}" == "Darwin" ]] ; then
-                    echo "CMAKE_LIPO: ${CMAKE_LIPO}"
-                    echo "CMAKE_INSTALL_NAME_TOOL: ${CMAKE_INSTALL_NAME_TOOL}"
-                    echo "CMAKE_CODESIGN: ${CMAKE_CODESIGN}"
+                if [ "${HOST_LIPO}" ] ; then
+                    cmake_options=(
+                        "${cmake_options[@]}"
+                        -DSWIFT_LIPO:PATH="${HOST_LIPO}"
+                    )
                 fi
-
-                # Swift
-                set_cmake_tools
 
                 cmake_options=(
                     "${cmake_options[@]}"
@@ -2538,7 +2362,7 @@ for host in "${ALL_HOSTS[@]}"; do
                     LIBDISPATCH_BUILD_ARGS="--libdispatch-src-dir=${LIBDISPATCH_SOURCE_DIR} --libdispatch-build-dir=${LIBDISPATCH_BUILD_DIR}"
                 fi
                 
-                if [[ "${UNAME}" == "Darwin" ]] ; then
+                if [[ "$(uname -s)" == "Darwin" ]] ; then
                     # xcodebuild requires swift-stdlib-tool to build a Swift
                     # framework. This is normally present when building XCTest
                     # via a packaged .xctoolchain, but here we are using the
@@ -2746,14 +2570,8 @@ for host in "${ALL_HOSTS[@]}"; do
             if [[ -n "${DISTCC}" ]]; then
                 EXTRA_DISTCC_OPTIONS=("DISTCC_HOSTS=localhost,lzo,cpp")
             fi
-            if [[ "${SWIFTENV_PATH}" ]]; then
-                call echo "configure" > "${SWIFTENV_PATH}/cmake-step"
-            fi
             with_pushd "${build_dir}" \
                 call env "${EXTRA_DISTCC_OPTIONS[@]}" "${CMAKE}" "${cmake_options[@]}" "${EXTRA_CMAKE_OPTIONS[@]}" "${source_dir}"
-            if [[ "${SWIFTENV_PATH}" ]]; then
-                call rm "${SWIFTENV_PATH}/cmake-step"
-            fi
         fi
 
         # When we are building LLVM create symlinks to the c++ headers. We need
@@ -2764,8 +2582,8 @@ for host in "${ALL_HOSTS[@]}"; do
         # swift. So we need to do configure's work here.
         if [[ "${product}" == "llvm" ]]; then
             # Find the location of the c++ header dir.
-            if [[ "${UNAME}" == "Darwin" ]] ; then
-              HOST_CXX_DIR=$(dirname ${CMAKE_CXX_COMPILER})
+            if [[ "$(uname -s)" == "Darwin" ]] ; then
+              HOST_CXX_DIR=$(dirname ${HOST_CXX})
               HOST_CXX_HEADERS_DIR="$HOST_CXX_DIR/../../usr/include/c++"
             else # Linux
               HOST_CXX_HEADERS_DIR="/usr/include/c++"
@@ -2866,7 +2684,7 @@ for host in "${ALL_HOSTS[@]}"; do
                 lldb_build_dir=$(build_directory ${host} lldb)
 
                 # Run the gtests.
-                if [[ "${UNAME}" == "Darwin" ]] ; then
+                if [[ "$(uname -s)" == "Darwin" ]] ; then
                     set_lldb_xcodebuild_options
                     # Run the LLDB unittests (gtests).
                     with_pushd ${LLDB_SOURCE_DIR} \
@@ -2884,7 +2702,7 @@ for host in "${ALL_HOSTS[@]}"; do
 
                 swift_build_dir=$(build_directory ${host} swift)
                 # Setup lldb executable path
-                if [[ "${UNAME}" == "Darwin" ]] ; then
+                if [[ "$(uname -s)" == "Darwin" ]] ; then
                     lldb_executable="${lldb_build_dir}"/${LLDB_BUILD_MODE}/lldb
                 else
                     lldb_executable="${lldb_build_dir}"/bin/lldb
@@ -2905,7 +2723,7 @@ for host in "${ALL_HOSTS[@]}"; do
                                        -O--xpass=success \
                                        -O--xfail=success"
                     # Setup the xUnit results formatter.
-                    if [[ "${UNAME}" != "Darwin" ]] ; then
+                    if [[ "$(uname -s)" != "Darwin" ]] ; then
                         # On non-Darwin, we ignore skipped tests entirely
                         # so that they don't pollute our xUnit results with
                         # non-actionable content.
@@ -2922,8 +2740,8 @@ for host in "${ALL_HOSTS[@]}"; do
 
                 # figure out which C/C++ compiler we should use for building test inferiors.
                 if [[ "${LLDB_TEST_CC}" == "host-toolchain" ]]; then
-                    # Use the host toolchain: i.e. the toolchain specified by CMAKE_C_COMPILER
-                    LLDB_DOTEST_CC_OPTS="-C ${CMAKE_C_COMPILER}"
+                    # Use the host toolchain: i.e. the toolchain specified by HOST_CC
+                    LLDB_DOTEST_CC_OPTS="-C ${HOST_CC}"
                 elif [[ -n "${LLDB_TEST_CC}" ]]; then
                     # Use exactly the compiler path specified by the user.
                     LLDB_DOTEST_CC_OPTS="-C ${LLDB_TEST_CC}"
@@ -3317,7 +3135,7 @@ for host in "${ALL_HOSTS[@]}"; do
                 # Note that installing directly to /usr/lib/swift usually
                 # requires root permissions.
                 set -x
-                case "${UNAME}" in
+                case "$(uname -s)" in
                     Linux)
                         PLAYGROUNDLOGGER_INSTALL_DIR="$(get_host_install_destdir ${host})/$(get_host_install_prefix ${host})/lib/swift/linux"
                         mkdir -p "${PLAYGROUNDLOGGER_INSTALL_DIR}"
@@ -3344,7 +3162,7 @@ for host in "${ALL_HOSTS[@]}"; do
                 if [[ -z "${INSTALL_PLAYGROUNDSUPPORT}" ]] ; then
                     continue
                 fi
-                case "${UNAME}" in
+                case "$(uname -s)" in
                     Linux)
                         ;;
                     FreeBSD)
@@ -3400,13 +3218,13 @@ for host in "${ALL_HOSTS[@]}"; do
                grep -v swift-stdlib-tool | \
                grep -v crashlog.py | \
                grep -v symbolication.py | \
-               xargs -n 1 -P ${BUILD_JOBS} ${CMAKE_DSYMUTIL})
+               xargs -n 1 -P ${BUILD_JOBS} $(xcrun_find_tool dsymutil))
 
             # Strip executables, shared libraries and static libraries in
             # `host_install_destdir`.
             find "${host_install_destdir}${TOOLCHAIN_PREFIX}/" \
               '(' -perm -0111 -or -name "*.a" ')' -type f -print | \
-              xargs -n 1 -P ${BUILD_JOBS} ${CMAKE_STRIP} -S
+              xargs -n 1 -P ${BUILD_JOBS} $(xcrun_find_tool strip) -S
 
             { set +x; } 2>/dev/null
         fi
@@ -3492,7 +3310,7 @@ function build_and_test_installable_package() {
               call tar -c -z -f "${package_for_host}" "${TOOLCHAIN_PREFIX/#\/}"
         else
             # tar on OS X doesn't support --owner/--group.
-            if [[ "${UNAME}" == "Darwin" ]] ; then
+            if [[ "$(uname -s)" == "Darwin" ]] ; then
                 with_pushd "${host_install_destdir}" \
                     tar -c -z -f "${package_for_host}" "${host_install_prefix/#\/}"
             else
@@ -3553,7 +3371,13 @@ if [[ ${#LIPO_SRC_DIRS[@]} -gt 0 ]]; then
     
     echo "--- Merging and running lipo ---"
     
-    call "${SWIFT_SOURCE_DIR}"/utils/recursive-lipo --lipo=${CMAKE_LIPO} --copy-subdirs="$(get_host_install_prefix ${host})lib/swift $(get_host_install_prefix ${host})lib/swift_static" --destination="$(get_host_install_destdir ${mergedHost})" ${LIPO_SRC_DIRS[@]}
+    # Allow passing lipo with --host-lipo
+    if [[ -z "${HOST_LIPO}" ]] ; then
+        LIPO_PATH=$(xcrun_find_tool lipo)
+    else
+        LIPO_PATH="${HOST_LIPO}"
+    fi
+    call "${SWIFT_SOURCE_DIR}"/utils/recursive-lipo --lipo=${LIPO_PATH} --copy-subdirs="$(get_host_install_prefix ${host})lib/swift $(get_host_install_prefix ${host})lib/swift_static" --destination="$(get_host_install_destdir ${mergedHost})" ${LIPO_SRC_DIRS[@]}
 
     # Build and test the lipo-ed package.
     build_and_test_installable_package ${mergedHost}
