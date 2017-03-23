@@ -33,8 +33,8 @@ internal func __swift_stdlib_U_FAILURE(_ x: __swift_stdlib_UErrorCode) -> Bool {
 /// Unicode views should conform to this protocol, which supports index
 /// interchange and String type erasure.
 public protocol UnicodeView : BidirectionalCollection {
-  func index(atEncodedPosition: Int64) -> Index
-  static func encodedPosition(of: Index) -> Int64
+  func index(atEncodedOffset: Int64) -> Index
+  static func encodedOffset(of: Index) -> Int64
 }
 
 //===--- RandomAccessUnicodeView ------------------------------------------===//
@@ -66,10 +66,10 @@ extension RandomAccessUnicodeView : BidirectionalCollectionWrapper {
 extension RandomAccessUnicodeView : RandomAccessCollection {}
 
 extension RandomAccessUnicodeView : UnicodeView {
-  public func index(atEncodedPosition position: Int64) -> Index {
+  public func index(atEncodedOffset position: Int64) -> Index {
     return Index(base: position^)
   }
-  public static func encodedPosition(of i: Index) -> Int64 {
+  public static func encodedOffset(of i: Index) -> Int64 {
     return i.base^
   }
 }
@@ -244,10 +244,10 @@ extension _UnicodeViews.EncodedScalars : BidirectionalCollection {
 }
 
 extension _UnicodeViews.EncodedScalars : UnicodeView {
-  public func index(atEncodedPosition offset: Int64) -> Index {
+  public func index(atEncodedOffset offset: Int64) -> Index {
     return index(after: Index(base: offset^, count: 0, scalar: nil))
   }
-  public static func encodedPosition(of i: Index) -> Int64 {
+  public static func encodedOffset(of i: Index) -> Int64 {
     return numericCast(i.base)
   }
 }
@@ -301,11 +301,11 @@ extension _UnicodeViews.Scalars : BidirectionalCollection {
 }
 
 extension _UnicodeViews.Scalars : UnicodeView {
-  public func index(atEncodedPosition offset: Int64) -> Index {
-    return base.index(atEncodedPosition: offset)
+  public func index(atEncodedOffset offset: Int64) -> Index {
+    return base.index(atEncodedOffset: offset)
   }
-  public static func encodedPosition(of i: Index) -> Int64 {
-    return Base.encodedPosition(of: i)
+  public static func encodedOffset(of i: Index) -> Int64 {
+    return Base.encodedOffset(of: i)
   }
 }
 
@@ -409,10 +409,10 @@ where FromEncoding_.EncodedScalar.Iterator.Element == CodeUnits.Iterator.Element
 
 
 extension _TranscodedView : UnicodeView {
-  public func index(atEncodedPosition offset: Int64) -> Base.Index {
+  public func index(atEncodedOffset offset: Int64) -> Base.Index {
     return _base(from: codeUnits.index(atOffset: offset)).startIndex
   }
-  public static func encodedPosition(of i: Index) -> Int64 {
+  public static func encodedOffset(of i: Index) -> Int64 {
     return numericCast(i._outer.base)
   }
 }
@@ -623,10 +623,10 @@ extension _UnicodeViews {
       public var base: CodeUnits.IndexDistance
     }
     
-    public func index(atEncodedPosition position: Int64) -> Index {
+    public func index(atEncodedOffset position: Int64) -> Index {
       return Index(base: position^)
     }
-    public static func encodedPosition(of i: Index) -> Int64 {
+    public static func encodedOffset(of i: Index) -> Int64 {
       return i.base^
     }
     

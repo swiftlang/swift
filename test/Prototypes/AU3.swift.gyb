@@ -24,7 +24,7 @@ import StdlibUnittest
 ///
 /// Not the underlying index, but a wrapper that UnicodeViews can create for it.
 public protocol AnyUnicodeIndex_ {
-  var encodedPosition: Int64 { get }
+  var encodedOffset: Int64 { get }
   func isLess(than other: AnyUnicodeIndex_) -> Bool
   func isEqual(to other: AnyUnicodeIndex_) -> Bool
 }
@@ -35,20 +35,20 @@ public extension AnyUnicodeIndex_ where Self : Comparable {
     if let o = other as? Self {
       return self < o
     }
-    return self.encodedPosition < other.encodedPosition
+    return self.encodedOffset < other.encodedOffset
   }
   func isEqual(to other: AnyUnicodeIndex_) -> Bool {
     if let o = other as? Self {
       return self == o
     }
-    return self.encodedPosition == other.encodedPosition
+    return self.encodedOffset == other.encodedOffset
   }
 }
 
 /// ForwardingWrapper for instances of AnyUnicodeIndex_ that makes it a suitable
 /// Index type (Comparable has self-requirements).
 public struct AnyUnicodeIndex : Comparable {
-  public var encodedPosition: Int64 { return base.encodedPosition }
+  public var encodedOffset: Int64 { return base.encodedOffset }
   public var base: AnyUnicodeIndex_
   public init(_ base: AnyUnicodeIndex_) { self.base = base }
   public static func < (lhs: AnyUnicodeIndex, rhs: AnyUnicodeIndex) -> Bool {
@@ -61,21 +61,21 @@ public struct AnyUnicodeIndex : Comparable {
   internal struct _OffsetAdapter
     : AnyUnicodeIndex_, ForwardingWrapper, Comparable {
     init(base: Int64) { self.base = base }
-    var encodedPosition: Int64 { return base }
+    var encodedOffset: Int64 { return base }
     var base: Int64
   }
 
-  public init(encodedPosition: Int64) {
-    self.base = _OffsetAdapter(base: encodedPosition)
+  public init(encodedOffset: Int64) {
+    self.base = _OffsetAdapter(base: encodedOffset)
   }
 }
 
 extension UnicodeView where Index == AnyUnicodeIndex {
-  public func index(atEncodedPosition x: Int64) -> Index {
-    return Index(encodedPosition: x)
+  public func index(atEncodedOffset x: Int64) -> Index {
+    return Index(encodedOffset: x)
   }
-  public static func encodedPosition(of i: Index) -> Int64 {
-    return i.encodedPosition
+  public static func encodedOffset(of i: Index) -> Int64 {
+    return i.encodedOffset
   }
 }
 
@@ -238,8 +238,8 @@ extension Any${Element}UnicodeView : UnicodeView {}
 struct AnyUnicodeIndexAdapter<BaseView: UnicodeView>
 : AnyUnicodeIndex_, ForwardingWrapper, Comparable {
   var base: BaseView.Index
-  var encodedPosition: Int64 {
-    return BaseView.encodedPosition(of: base)
+  var encodedOffset: Int64 {
+    return BaseView.encodedOffset(of: base)
   }
 }
 
@@ -249,7 +249,7 @@ extension UnicodeView {
   }
   public func _unwrap(_ i: AnyUnicodeIndex_) -> Index {
     return (i as? AnyUnicodeIndexAdapter<Self>).map { $0.base }
-    ?? index(atEncodedPosition: i.encodedPosition)
+    ?? index(atEncodedOffset: i.encodedOffset)
   }
 }
 //===----------------------------------------------------------------------===//
@@ -629,8 +629,8 @@ extension String : RangeReplaceableCollection {
   ) -> Bool 
   where C.Iterator.Element == UTF16.CodeUnit {
     guard _isUnique(&_content) else { return false }
-    let t: Range<Int> = numericCast(target.upperBound.encodedPosition)
-      ..< numericCast(target.lowerBound.encodedPosition)
+    let t: Range<Int> = numericCast(target.upperBound.encodedOffset)
+      ..< numericCast(target.lowerBound.encodedOffset)
 
     switch _content {
     case .utf16(let storage):
@@ -743,13 +743,13 @@ suite.test("Bidirectional/UnicodeScalar") {
   let a = AnyUnicodeScalarUnicodeView(
     _UnicodeViews(Array(sample.utf16), ValidUTF16.self).scalars)
   expectEqualSequence(sample.unicodeScalars, a)
-  var lastEncodedPosition = Int64.min
+  var lastEncodedOffset = Int64.min
   // Make sure it works as a collection, too.
   for (s, i) in zip(sample.unicodeScalars, a.indices) {
     expectEqual(s, a[i])
-    let o = i.encodedPosition
-    expectLT(lastEncodedPosition, o)
-    lastEncodedPosition = o
+    let o = i.encodedOffset
+    expectLT(lastEncodedOffset, o)
+    lastEncodedOffset = o
   }
 }
 
@@ -757,13 +757,13 @@ suite.test("RandomAccess/UnicodeScalar") {
   let a = AnyUnicodeScalarUnicodeView(
     RandomAccessUnicodeView(Array(sample.unicodeScalars)))
   expectEqualSequence(sample.unicodeScalars, a)
-  var lastEncodedPosition = Int64.min
+  var lastEncodedOffset = Int64.min
   // Make sure it works as a collection, too.
   for (s, i) in zip(sample.unicodeScalars, a.indices) {
     expectEqual(s, a[i])
-    let o = i.encodedPosition
-    expectLT(lastEncodedPosition, o)
-    lastEncodedPosition = o
+    let o = i.encodedOffset
+    expectLT(lastEncodedOffset, o)
+    lastEncodedOffset = o
   }
 }
 runAllTests()
