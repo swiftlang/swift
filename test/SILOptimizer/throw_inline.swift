@@ -10,8 +10,8 @@ public func foo() throws -> Int32 {
 // CHECK-LABEL: _T012throw_inline3foos5Int32VyKF
 // CHECK: debug_value undef : $Error, var, name "$error", argno 1
 // CHECK: %1 = integer_literal $Builtin.Int32, 999
-// CHECK: %3 = struct $Int32 (%1 : $Builtin.Int32)
-// CHECK: return %3 : $Int32
+// CHECK: %[[POS:.*]] = struct $Int32 (%1 : $Builtin.Int32)
+// CHECK: return %[[POS]] : $Int32
 func bar() throws  -> Int32 {
   return try foo()
 }
