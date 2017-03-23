@@ -39,6 +39,12 @@ indirect enum IndirectEnum<T> {
   case Node(T)
 }
 
+protocol SubscriptableGet {
+  subscript(a : Int) -> Int { get }
+}
+
+var subscriptableGet : SubscriptableGet
+
 func s010_hasVarArg(_ args: Any...) {}
 
 // Tests Address only enums's construction
@@ -780,6 +786,21 @@ func s390___addrCallResult<T>(_ f: (() -> T)?) {
 // CHECK-LABEL: } // end sil function '_T020opaque_values_silgen21s400______maybeClonePyAA8Clonable_p1c_tF'
 func s400______maybeCloneP(c: Clonable) {
   let _: () -> Clonable? = c.maybeClone
+}
+
+// Tests global opaque values / subscript rvalues
+// ---
+// CHECK-LABEL: sil hidden @_T020opaque_values_silgen21s410__globalRvalueGetS2iF : $@convention(thin) (Int) -> Int {
+// CHECK: bb0([[ARG:%.*]] : $Int):
+// CHECK:   [[GLOBAL_ADDR:%.*]] = global_addr @_T020opaque_values_silgen16subscriptableGetAA013SubscriptableE0_pv : $*SubscriptableGet
+// CHECK:   [[OPEN_ARG:%.*]] = open_existential_addr immutable_access [[GLOBAL_ADDR]] : $*SubscriptableGet to $*@opened
+// CHECK:   [[GET_OPAQUE:%.*]] = load [copy] [[OPEN_ARG]] : $*@opened
+// CHECK:   [[RETVAL:%.*]] = apply %{{.*}}<@opened({{.*}}) SubscriptableGet>([[ARG]], [[GET_OPAQUE]]) : $@convention(witness_method) <τ_0_0 where τ_0_0 : SubscriptableGet> (Int, @in_guaranteed τ_0_0) -> Int
+// CHECK:   destroy_value [[GET_OPAQUE]]
+// CHECK:   return [[RETVAL]] : $Int
+// CHECK-LABEL: } // end sil function '_T020opaque_values_silgen21s410__globalRvalueGetS2iF'
+func s410__globalRvalueGet(_ i : Int) -> Int {
+  return subscriptableGet[i]
 }
 
 // Tests conditional value casts and correspondingly generated reabstraction thunk, with <T> types
