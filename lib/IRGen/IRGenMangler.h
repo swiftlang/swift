@@ -14,7 +14,7 @@
 #define SWIFT_IRGEN_IRGENMANGLER_H
 
 #include "swift/AST/ASTMangler.h"
-#include "ValueWitness.h"
+#include "swift/IRGen/ValueWitness.h"
 
 namespace swift {
 namespace irgen {
