@@ -988,7 +988,7 @@ public:
 
   bool visitDeclReference(ValueDecl *D, CharSourceRange Range,
                           TypeDecl *CtorTyRef, ExtensionDecl *ExtTyRef, Type Ty,
-                          SemaReferenceKind Kind) override {
+                          ReferenceMetaData Data) override {
     unsigned StartOffset = getOffset(Range.getStart());
     References.emplace_back(D, StartOffset, Range.getByteLength(), Ty);
     return true;
@@ -998,7 +998,7 @@ public:
                                bool IsOpenBracket) override {
     // Treat both open and close brackets equally
     return visitDeclReference(D, Range, nullptr, nullptr, Type(),
-                              SemaReferenceKind::SubscriptRef);
+                      ReferenceMetaData(SemaReferenceKind::SubscriptRef, None));
   }
 
   bool isLocal(Decl *D) const {
