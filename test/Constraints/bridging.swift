@@ -215,8 +215,8 @@ func rdar19551164b(_ s: NSString, _ a: NSArray) {
 }
 
 // rdar://problem/19695671
-func takesSet<T: Hashable>(_ p: Set<T>) {}  // expected-note {{in call to function 'takesSet'}}
-func takesDictionary<K: Hashable, V>(_ p: Dictionary<K, V>) {} // expected-note {{in call to function 'takesDictionary'}}
+func takesSet<T>(_ p: Set<T>) {}  // expected-note {{in call to function 'takesSet'}}
+func takesDictionary<K, V>(_ p: Dictionary<K, V>) {} // expected-note {{in call to function 'takesDictionary'}}
 func takesArray<T>(_ t: Array<T>) {} // expected-note {{in call to function 'takesArray'}}
 func rdar19695671() {
   takesSet(NSSet() as! Set) // expected-error{{generic parameter 'T' could not be inferred}}

@@ -462,6 +462,8 @@ ConstraintSystem::SolverScope::SolverScope(ConstraintSystem &cs)
   PreviousScore = cs.CurrentScore;
 
   cs.solverState->registerScope(this);
+  assert(!cs.failedConstraint && "Unexpected failed constraint!");
+
   ++cs.solverState->NumStatesExplored;
 }
 
@@ -1986,7 +1988,7 @@ bool ConstraintSystem::solve(SmallVectorImpl<Solution> &solutions,
   // Simplify any constraints left active after constraint generation
   // and optimization. Return if the resulting system has no
   // solutions.
-  if (simplify())
+  if (failedConstraint || simplify())
     return true;
 
   // If the experimental constraint propagation pass is enabled, run it.

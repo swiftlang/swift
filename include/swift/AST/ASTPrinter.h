@@ -17,6 +17,7 @@
 #include "swift/Basic/UUID.h"
 #include "swift/AST/Identifier.h"
 #include "llvm/ADT/StringRef.h"
+#include "llvm/ADT/DenseSet.h"
 #include "llvm/Support/raw_ostream.h"
 #include "swift/AST/PrintOptions.h"
 
@@ -26,6 +27,7 @@ namespace swift {
   class DynamicSelfType;
   class ModuleEntity;
   class TypeDecl;
+  class EnumElementDecl;
   class Type;
   struct TypeLoc;
   class Pattern;
@@ -312,6 +314,11 @@ uint8_t getKeywordLen(tok keyword);
 
 /// Get <#code#>;
 StringRef getCodePlaceholder();
+
+/// Given an array of enum element decls, print them as case statements with
+/// placeholders as contents.
+void printEnumElmentsAsCases(llvm::DenseSet<EnumElementDecl*> &UnhandledElements,
+                             llvm::raw_ostream &OS);
 
 } // namespace swift
 

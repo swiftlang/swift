@@ -30,6 +30,15 @@ struct AnyStruct {
   let a: Any
 }
 
+protocol Clonable {
+  func maybeClone() -> Self?
+}
+
+indirect enum IndirectEnum<T> {
+  case Nil
+  case Node(T)
+}
+
 func s010_hasVarArg(_ args: Any...) {}
 
 // Tests Address only enums's construction
@@ -648,6 +657,131 @@ func s340_______captureBox() {
   captureEverything()
 }
 
+// Tests support for if statements for opaque value(s) under new mode
+// ---
+// CHECK-LABEL: sil hidden @_T020opaque_values_silgen21s350_______addrOnlyIfAA6EmptyP_pSb1x_tF : $@convention(thin) (Bool) -> @out EmptyP {
+// CHECK: bb0([[ARG:%.*]] : $Bool):
+// CHECK:   [[ALLOC_OF_BOX:%.*]] = alloc_box ${ var EmptyP }, var
+// CHECK:   [[PROJ_BOX:%.*]] = project_box [[ALLOC_OF_BOX]]
+// CHECK:   [[APPLY_FOR_BOX:%.*]] = apply %{{.*}}(%{{.*}}) : $@convention(method) (@thin AddressOnlyStruct.Type) -> AddressOnlyStruct
+// CHECK:   [[INIT_OPAQUE:%.*]] = init_existential_opaque [[APPLY_FOR_BOX]] : $AddressOnlyStruct, $AddressOnlyStruct, $EmptyP
+// CHECK:   store [[INIT_OPAQUE]] to [init] [[PROJ_BOX]] : $*EmptyP
+// CHECK:   [[APPLY_FOR_BRANCH:%.*]] = apply %{{.*}}([[ARG]]) : $@convention(method) (Bool) -> Builtin.Int1
+// CHECK:   cond_br [[APPLY_FOR_BRANCH]], bb2, bb1
+// CHECK: bb1:
+// CHECK:   [[RETVAL1:%.*]] = load [copy] [[PROJ_BOX]] : $*EmptyP
+// CHECK:   br bb3([[RETVAL1]] : $EmptyP)
+// CHECK: bb2:
+// CHECK:   [[RETVAL2:%.*]] = load [copy] [[PROJ_BOX]] : $*EmptyP
+// CHECK:   br bb3([[RETVAL2]] : $EmptyP)
+// CHECK: bb3([[RETVAL:%.*]] : $EmptyP):
+// CHECK:   destroy_value [[ALLOC_OF_BOX]]
+// CHECK:   return [[RETVAL]] : $EmptyP
+// CHECK-LABEL: } // end sil function '_T020opaque_values_silgen21s350_______addrOnlyIfAA6EmptyP_pSb1x_tF'
+func s350_______addrOnlyIf(x: Bool) -> EmptyP {
+  var a : EmptyP = AddressOnlyStruct()
+
+  return x ? a : a
+}
+
+// Tests support for guards and indirect enums for opaque values
+// ---
+// CHECK-LABEL: sil hidden @_T020opaque_values_silgen21s360________guardEnumyAA08IndirectF0OyxGlF : $@convention(thin) <T> (@owned IndirectEnum<T>) -> () {
+// CHECK: bb0([[ARG:%.*]] : $IndirectEnum<T>):
+// CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
+// CHECK:   [[COPY__ARG:%.*]] = copy_value [[BORROWED_ARG]]
+// CHECK:   switch_enum [[COPY__ARG]] : $IndirectEnum<T>, case #IndirectEnum.Node!enumelt.1: bb3, default bb1
+// CHECK: bb1:
+// CHECK:   end_borrow [[BORROWED_ARG]] from [[ARG]] : $IndirectEnum<T>, $IndirectEnum<T>
+// CHECK:   br bb2
+// CHECK: bb2:
+// CHECK:   br bb4
+// CHECK: bb3([[EARG:%.*]] : $<τ_0_0> { var τ_0_0 } <T>):
+// CHECK:   [[PROJ_BOX:%.*]] = project_box [[EARG]]
+// CHECK:   [[LOAD_BOX:%.*]] = load [take] [[PROJ_BOX]] : $*T
+// CHECK:   [[COPY_BOX:%.*]] = copy_value [[LOAD_BOX]] : $T
+// CHECK:   destroy_value [[EARG]]
+// CHECK:   end_borrow [[BORROWED_ARG]] from [[ARG]] : $IndirectEnum<T>, $IndirectEnum<T>
+// CHECK:   destroy_value [[COPY_BOX]]
+// CHECK:   br bb4
+// CHECK: bb4:
+// CHECK:   destroy_value [[ARG]]
+// CHECK:   return %{{.*}} : $()
+// CHECK-LABEL: } // end sil function '_T020opaque_values_silgen21s360________guardEnumyAA08IndirectF0OyxGlF'
+func s360________guardEnum<T>(_ e: IndirectEnum<T>) {
+  do {
+    guard case .Node(let x) = e else { return }
+  }
+}
+
+// Tests contextual init() of opaque value types
+// ---
+// CHECK-LABEL: sil hidden @_T020opaque_values_silgen21s370_____optToOptCastxSgSQyxGlF : $@convention(thin) <T> (@in Optional<T>) -> @out Optional<T> {
+// CHECK: bb0([[ARG:%.*]] : $Optional<T>):
+// CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
+// CHECK:   [[COPY__ARG:%.*]] = copy_value [[BORROWED_ARG]]
+// CHECK:   end_borrow [[BORROWED_ARG]] from [[ARG]] : $Optional<T>, $Optional<T>
+// CHECK:   destroy_value [[ARG]]
+// CHECK:   return [[COPY__ARG]] : $Optional<T>
+// CHECK-LABEL: } // end sil function '_T020opaque_values_silgen21s370_____optToOptCastxSgSQyxGlF'
+func s370_____optToOptCast<T>(_ x : T!) -> T? {
+  return x
+}
+
+// Tests casting optional opaques to optional opaques
+// ---
+// CHECK-LABEL: sil hidden @_T020opaque_values_silgen21s380___contextualInitySiSgF : $@convention(thin) (Optional<Int>) -> () {
+// CHECK: bb0([[ARG:%.*]] : $Optional<Int>):
+// CHECK:   [[ALLOC_OF_BOX:%.*]] = alloc_box ${ var Optional<Int> }, var
+// CHECK:   [[PROJ_BOX:%.*]] = project_box [[ALLOC_OF_BOX]]
+// CHECK:   store [[ARG]] to [trivial] [[PROJ_BOX]] : $*Optional<Int>
+// CHECK:   destroy_value [[ALLOC_OF_BOX]]
+// CHECK:   return %{{.*}} : $()
+// CHECK-LABEL: } // end sil function '_T020opaque_values_silgen21s380___contextualInitySiSgF'
+func s380___contextualInit(_ a : Int?) {
+  var x: Int! = a
+}
+
+// Tests opaque call result types
+// ---
+// CHECK-LABEL: sil hidden @_T020opaque_values_silgen21s390___addrCallResultyxycSglF : $@convention(thin) <T> (@owned Optional<@callee_owned () -> @out T>) -> () {
+// CHECK: bb0([[ARG:%.*]] : $Optional<@callee_owned () -> @out T>):
+// CHECK:   [[ALLOC_OF_BOX:%.*]] = alloc_box $<τ_0_0> { var Optional<τ_0_0> } <T>
+// CHECK:   [[PROJ_BOX:%.*]] = project_box [[ALLOC_OF_BOX]]
+// CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
+// CHECK:   [[COPY__ARG:%.*]] = copy_value [[BORROWED_ARG]]
+// CHECK:   [[SENUM:%.*]] = select_enum [[COPY__ARG]]
+// CHECK:   cond_br [[SENUM]], bb3, bb1
+// CHECK: bb1:
+// CHECK:   end_borrow [[BORROWED_ARG]] from [[ARG]]
+// CHECK:   br bb2
+// CHECK: bb2:
+// CHECK:   [[ONONE:%.*]] = enum $Optional<T>, #Optional.none!enumelt
+// CHECK:   br bb4([[ONONE]] : $Optional<T>)
+// CHECK: bb4(%{{.*}} : $Optional<T>):
+// CHECK:   return %{{.*}} : $()
+// CHECK-LABEL: } // end sil function '_T020opaque_values_silgen21s390___addrCallResultyxycSglF'
+func s390___addrCallResult<T>(_ f: (() -> T)?) {
+  var x = f?()
+}
+
+// Tests reabstraction / partial apply of protocols under opaque value mode
+// ---
+// CHECK-LABEL: sil hidden @_T020opaque_values_silgen21s400______maybeClonePyAA8Clonable_p1c_tF : $@convention(thin) (@in Clonable) -> () {
+// CHECK: bb0([[ARG:%.*]] : $Clonable):
+// CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
+// CHECK:   [[OPEN_ARG:%.*]] = open_existential_opaque [[BORROWED_ARG]] : $Clonable
+// CHECK:   [[COPY_OPAQUE:%.*]] = copy_value [[OPEN_ARG]]
+// CHECK:   [[APPLY_OPAQUE:%.*]] = apply %{{.*}}<@opened({{.*}}) Clonable>([[COPY_OPAQUE]]) : $@convention(thin) <τ_0_0 where τ_0_0 : Clonable> (@in τ_0_0) -> @owned @callee_owned () -> @out Optional<τ_0_0>
+// CHECK:   [[PAPPLY:%.*]] = partial_apply %{{.*}}<@opened({{.*}}) Clonable>([[APPLY_OPAQUE]]) : $@convention(thin) <τ_0_0 where τ_0_0 : Clonable> (@owned @callee_owned () -> @out Optional<τ_0_0>) -> @out Optional<Clonable>
+// CHECK:   end_borrow [[BORROWED_ARG]]
+// CHECK:   destroy_value [[ARG]]
+// CHECK:   return %{{.*}} : $()
+// CHECK-LABEL: } // end sil function '_T020opaque_values_silgen21s400______maybeClonePyAA8Clonable_p1c_tF'
+func s400______maybeCloneP(c: Clonable) {
+  let _: () -> Clonable? = c.maybeClone
+}
+
 // Tests conditional value casts and correspondingly generated reabstraction thunk, with <T> types
 // ---
 // CHECK-LABEL: sil hidden @_T020opaque_values_silgen21s999_____condTFromAnyyyp_xtlF : $@convention(thin) <T> (@in Any, @in T) -> () {
@@ -787,6 +921,23 @@ extension Dictionary {
     increment(x: &self[key]!)
   }
 }
+
+// s400______maybeCloneP continued Test: reabstraction thunk
+// ---
+// CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_T0xSgIxr_20opaque_values_silgen8Clonable_pSgIxr_AbCRzlTR : $@convention(thin) <τ_0_0 where τ_0_0 : Clonable> (@owned @callee_owned () -> @out Optional<τ_0_0>) -> @out Optional<Clonable> {
+// CHECK: bb0([[ARG:%.*]] : $@callee_owned () -> @out Optional<τ_0_0>):
+// CHECK:   [[APPLY_ARG:%.*]] = apply [[ARG]]() : $@callee_owned () -> @out Optional<τ_0_0>
+// CHECK:   switch_enum [[APPLY_ARG]] : $Optional<τ_0_0>, case #Optional.some!enumelt.1: bb2, case #Optional.none!enumelt: bb1
+// CHECK: bb1:
+// CHECK:   [[ONONE:%.*]] = enum $Optional<Clonable>, #Optional.none!enumelt
+// CHECK:   br bb3([[ONONE]] : $Optional<Clonable>)
+// CHECK: bb2([[ENUM_SOME:%.*]] : $τ_0_0):
+// CHECK:   [[INIT_OPAQUE:%.*]] = init_existential_opaque [[ENUM_SOME]] : $τ_0_0, $τ_0_0, $Clonable
+// CHECK:   [[OSOME:%.*]] = enum $Optional<Clonable>, #Optional.some!enumelt.1, [[INIT_OPAQUE]] : $Clonable
+// CHECK:   br bb3([[OSOME]] : $Optional<Clonable>)
+// CHECK: bb3([[RETVAL:%.*]] : $Optional<Clonable>):
+// CHECK:   return [[RETVAL]] : $Optional<Clonable>
+// CHECK-LABEL: } // end sil function '_T0xSgIxr_20opaque_values_silgen8Clonable_pSgIxr_AbCRzlTR'
 
 // s320__transImplodeAny continued Test: reabstraction thunk
 // ---

@@ -214,7 +214,7 @@ public struct StrideTo<Element : Strideable> : Sequence, CustomReflectable {
 /// 2 * stride`, ... *last*) where *last* is the last value in the
 /// progression that is less than `end`.
 @_inlineable
-public func stride<T : Strideable>(
+public func stride<T>(
   from start: T, to end: T, by stride: T.Stride
 ) -> StrideTo<T> {
   return StrideTo(_start: start, end: end, stride: stride)
@@ -312,7 +312,7 @@ public struct StrideThrough<
 ///
 /// - Note: There is no guarantee that `end` is an element of the sequence.
 @_inlineable
-public func stride<T : Strideable>(
+public func stride<T>(
   from start: T, through end: T, by stride: T.Stride
 ) -> StrideThrough<T> {
   return StrideThrough(_start: start, end: end, stride: stride)

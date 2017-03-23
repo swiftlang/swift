@@ -1574,22 +1574,25 @@ ERROR(protocol_typealias_conflict, none,
 WARNING(redundant_conformance_constraint,none,
         "redundant conformance constraint %0: %1", (Type, ProtocolDecl *))
 NOTE(redundant_conformance_here,none,
-     "conformance constraint %1: %2 %select{written here|implied here}0",
-     (bool, Type, ProtocolDecl *))
+     "conformance constraint %1: %2 %select{written here|implied here|"
+     "inferred from type here}0",
+     (unsigned, Type, ProtocolDecl *))
 
 WARNING(redundant_same_type_to_concrete,none,
         "redundant same-type constraint %0 == %1", (Type, Type))
 NOTE(same_type_redundancy_here,none,
-     "same-type constraint %1 == %2 %select{written here|implied here}0",
-     (bool, Type, Type))
+     "same-type constraint %1 == %2 %select{written here|implied here|"
+     "inferred from type here}0",
+     (unsigned, Type, Type))
 ERROR(requires_superclass_conflict,none,
       "%select{generic parameter |protocol |}0%1 cannot be a subclass of both "
       "%2 and %3", (unsigned, Type, Type, Type))
 WARNING(redundant_superclass_constraint,none,
         "redundant superclass constraint %0 : %1", (Type, Type))
 NOTE(superclass_redundancy_here,none,
-     "superclass constraint %1 : %2 %select{written here|implied here}0",
-     (bool, Type, Type))
+     "superclass constraint %1 : %2 %select{written here|implied here|"
+     "inferred from type here}0",
+     (unsigned, Type, Type))
 
 ERROR(conflicting_layout_constraints,none,
       "%select{generic parameter |protocol |}0%1 has conflicting layout "
@@ -1598,15 +1601,16 @@ ERROR(conflicting_layout_constraints,none,
 WARNING(redundant_layout_constraint,none,
         "redundant layout constraint %0 : %1", (Type, LayoutConstraint))
 NOTE(previous_layout_constraint, none,
-     "layout constraint constraint %1 : %2 %select{written here|implied here}0",
-     (bool, Type, LayoutConstraint))
+     "layout constraint constraint %1 : %2 %select{written here|implied here|"
+     "inferred from type here}0",
+     (unsigned, Type, LayoutConstraint))
 
 WARNING(redundant_same_type_constraint,none,
         "redundant same-type constraint %0 == %1", (Type, Type))
 NOTE(previous_same_type_constraint, none,
      "previous same-type constraint %1 == %2 "
-     "%select{written here|implied here}0",
-     (bool, Type, Type))
+     "%select{written here|implied here|inferred from type here}0",
+     (unsigned, Type, Type))
 
 ERROR(generic_param_access,none,
       "%0 %select{must be declared %select{"

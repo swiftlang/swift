@@ -236,6 +236,7 @@ def main():
     pool.map_async(demangle_coverage_data, coverage_log_files).get(9999999)
     return 0
 
+
 if __name__ == '__main__':
     try:
         sys.exit(main())

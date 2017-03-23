@@ -5,7 +5,7 @@
 import CoreCooling
 import CFAndObjC
 
-func assertUnmanaged<T: AnyObject>(_ t: Unmanaged<T>) {}
+func assertUnmanaged<T>(_ t: Unmanaged<T>) {}
 func assertManaged<T: AnyObject>(_ t: T) {}
 
 func test0(_ fridge: CCRefrigerator) {

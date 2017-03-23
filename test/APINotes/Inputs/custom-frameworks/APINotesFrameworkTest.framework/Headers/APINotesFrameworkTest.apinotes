@@ -35,6 +35,9 @@ Classes:
 Functions:
   - Name: jumpToLocation
     SwiftName: 'jumpTo(x:y:z:)'
+Tags:
+  - Name: InnerInSwift4
+    SwiftName: Outer.Inner
 SwiftVersions:
   - Version: 3.0
     Classes:
@@ -92,3 +95,5 @@ SwiftVersions:
     Tags:
       - Name: SomeCStruct
         SwiftName: ImportantCStruct
+      - Name: InnerInSwift4
+        SwiftName: InnerInSwift4

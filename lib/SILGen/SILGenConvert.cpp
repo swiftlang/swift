@@ -109,7 +109,8 @@ void SILGenFunction::emitInjectOptionalNothingInto(SILLocation loc,
 /// works for loadable enum types.
 SILValue SILGenFunction::getOptionalNoneValue(SILLocation loc,
                                               const TypeLowering &optTL) {
-  assert(optTL.isLoadable() && "Address-only optionals cannot use this");
+  assert((optTL.isLoadable() || !silConv.useLoweredAddresses()) &&
+         "Address-only optionals cannot use this");
   assert(optTL.getLoweredType().getAnyOptionalObjectType());
 
   return B.createEnum(loc, SILValue(), getASTContext().getOptionalNoneDecl(),
@@ -328,7 +329,8 @@ SILGenFunction::emitOptionalToOptional(SILLocation loc,
         // transforming the underlying type instead of the optional type. This
         // ensures that we use the more efficient non-generic code paths when
         // possible.
-        if (F.getTypeLowering(input.getType()).isAddressOnly()) {
+        if (F.getTypeLowering(input.getType()).isAddressOnly() &&
+            silConv.useLoweredAddresses()) {
           auto *someDecl = B.getASTContext().getOptionalSomeDecl();
           input = B.createUncheckedTakeEnumDataAddr(
               loc, input, someDecl, input.getType().getAnyOptionalObjectType());

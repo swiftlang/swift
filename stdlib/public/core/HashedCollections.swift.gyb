@@ -2078,7 +2078,7 @@ public struct Dictionary<Key : Hashable, Value> :
 
 }
 
-extension Dictionary where Key : Equatable, Value : Equatable {
+extension Dictionary where Value : Equatable {
   public static func == (lhs: [Key : Value], rhs: [Key : Value]) -> Bool {
     switch (lhs._variantBuffer, rhs._variantBuffer) {
     case (.native(let lhsNative), .native(let rhsNative)):

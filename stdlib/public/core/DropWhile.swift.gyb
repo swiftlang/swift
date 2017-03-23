@@ -105,14 +105,14 @@ public struct LazyDropWhileIndex<Base : Collection> : Comparable {
   public let base: Base.Index
 }
 
-public func == <Base : Collection>(
+public func == <Base>(
   lhs: LazyDropWhileIndex<Base>,
   rhs: LazyDropWhileIndex<Base>
 ) -> Bool {
   return lhs.base == rhs.base
 }
 
-public func < <Base : Collection>(
+public func < <Base>(
   lhs: LazyDropWhileIndex<Base>,
   rhs: LazyDropWhileIndex<Base>
 ) -> Bool {

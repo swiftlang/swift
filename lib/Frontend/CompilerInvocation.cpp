@@ -860,8 +860,8 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   Opts.DisableAvailabilityChecking |=
       Args.hasArg(OPT_disable_availability_checking);
 
-  Opts.EnableTSANInoutInstrumentation |=
-      Args.hasArg(OPT_enable_experimental_tsan_inout_instrumentation);
+  Opts.DisableTsanInoutInstrumentation |=
+      Args.hasArg(OPT_disable_tsan_inout_instrumentation);
 
   if (FrontendOpts.InputKind == InputFileKind::IFK_SIL)
     Opts.DisableAvailabilityChecking = true;
@@ -1033,6 +1033,10 @@ static bool ParseClangImporterArgs(ClangImporterOptions &Opts,
   Opts.DisableModulesValidateSystemHeaders |= Args.hasArg(OPT_disable_modules_validate_system_headers);
 
   Opts.DisableAdapterModules |= Args.hasArg(OPT_emit_imported_modules);
+
+  if (const Arg *A = Args.getLastArg(OPT_pch_output_dir)) {
+    Opts.PrecompiledHeaderOutputDir = A->getValue();
+  }
 
   return false;
 }

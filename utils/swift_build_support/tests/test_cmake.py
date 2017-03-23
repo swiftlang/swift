@@ -28,8 +28,8 @@ class CMakeTestCase(unittest.TestCase):
     def default_args(self):
         """Return new args object with default values
         """
-        return Namespace(cmake_c_compiler="/path/to/clang",
-                         cmake_cxx_compiler="/path/to/clang++",
+        return Namespace(host_cc="/path/to/clang",
+                         host_cxx="/path/to/clang++",
                          enable_asan=False,
                          enable_ubsan=False,
                          enable_tsan=False,
@@ -54,8 +54,8 @@ class CMakeTestCase(unittest.TestCase):
         """Return new CMake object initialized with given args
         """
         toolchain = host_toolchain()
-        toolchain.cc = args.cmake_c_compiler
-        toolchain.cxx = args.cmake_cxx_compiler
+        toolchain.cc = args.host_cc
+        toolchain.cxx = args.host_cxx
         if args.distcc:
             toolchain.distcc = self.mock_distcc_path()
         toolchain.ninja = self.which_ninja(args)

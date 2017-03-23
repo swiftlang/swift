@@ -196,7 +196,7 @@ private:
   bool walkToStmtPost(Stmt *S) override;
   bool visitDeclReference(ValueDecl *D, CharSourceRange Range,
                           TypeDecl *CtorTyRef, ExtensionDecl *ExtTyRef, Type T,
-                          SemaReferenceKind Kind) override;
+                          ReferenceMetaData Data) override;
   bool visitCallArgName(Identifier Name, CharSourceRange Range,
                         ValueDecl *D) override;
   bool visitModuleReference(ModuleEntity Mod, CharSourceRange Range) override;
@@ -234,7 +234,6 @@ struct ReferencedDecl {
   Type Ty;
   ReferencedDecl(ValueDecl* VD, Type Ty) : VD(VD), Ty(Ty) {}
   ReferencedDecl() : ReferencedDecl(nullptr, Type()) {}
-  bool operator==(const ReferencedDecl& other);
 };
 
 enum class OrphanKind : int8_t {
@@ -285,7 +284,7 @@ class RangeResolver : public SourceEntityWalker {
   bool walkToDeclPost(Decl *D) override;
   bool visitDeclReference(ValueDecl *D, CharSourceRange Range,
                           TypeDecl *CtorTyRef, ExtensionDecl *ExtTyRef, Type T,
-                          SemaReferenceKind Kind) override;
+                          ReferenceMetaData Data) override;
 public:
   RangeResolver(SourceFile &File, SourceLoc Start, SourceLoc End);
   RangeResolver(SourceFile &File, unsigned Offset, unsigned Length);

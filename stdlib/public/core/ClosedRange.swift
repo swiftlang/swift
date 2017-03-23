@@ -439,7 +439,7 @@ public struct ClosedRange<
 ///   - minimum: The lower bound for the range.
 ///   - maximum: The upper bound for the range.
 @_transparent
-public func ... <Bound : Comparable>(minimum: Bound, maximum: Bound)
+public func ... <Bound>(minimum: Bound, maximum: Bound)
   -> ClosedRange<Bound> {
   _precondition(
     minimum <= maximum, "Can't form Range with upperBound < lowerBound")
@@ -471,12 +471,7 @@ public func ... <Bound : Comparable>(minimum: Bound, maximum: Bound)
 @_transparent
 public func ... <Bound>(
   minimum: Bound, maximum: Bound
-) -> CountableClosedRange<Bound>
-  where
-  // FIXME(ABI)#176 (Type checker)
-  // WORKAROUND rdar://25214598 - should be just Bound : Strideable
-  Bound : _Strideable & Comparable,
-  Bound.Stride : SignedInteger {
+) -> CountableClosedRange<Bound> {
   // FIXME: swift-3-indexing-model: tests for traps.
   _precondition(
     minimum <= maximum, "Can't form Range with upperBound < lowerBound")

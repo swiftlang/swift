@@ -166,6 +166,10 @@ def import_objc_header : Separate<["-"], "import-objc-header">,
   Flags<[FrontendOption, HelpHidden]>,
   HelpText<"Implicitly imports an Objective-C header file">;
 
+def pch_output_dir: Separate<["-"], "pch-output-dir">,
+  Flags<[FrontendOption, HelpHidden]>,
+  HelpText<"Directory to persist automatically created precompiled bridging headers">;
+
 // FIXME: Unhide this once it doesn't depend on an output file map.
 def incremental : Flag<["-"], "incremental">,
   Flags<[NoInteractiveOption, HelpHidden, DoesNotAffectIncrementalBuild]>,

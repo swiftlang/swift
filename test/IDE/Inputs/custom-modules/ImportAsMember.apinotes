@@ -1,0 +1,13 @@
+Name: ImportAsMember
+Globals:
+- Name: IAMStruct1APINoteVar
+  SwiftName: Struct1.newApiNoteVar
+- Name: IAMStruct1APINoteVarInSwift4
+  SwiftName: Struct1.apiNoteVarInSwift4
+SwiftVersions:
+- Version: 3
+  Globals:
+  - Name: IAMStruct1APINoteVar
+    SwiftName: Struct1.oldApiNoteVar
+  - Name: IAMStruct1APINoteVarInSwift4
+    SwiftName: IAMStruct1APINoteVarInSwift4

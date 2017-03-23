@@ -20,7 +20,7 @@ extension LazySequenceProtocol {
   /// `s.map(transform).joined()`.
   ///
   /// - Complexity: O(1)
-  public func flatMap<SegmentOfResult : Sequence>(
+  public func flatMap<SegmentOfResult>(
     _ transform: @escaping (Elements.Iterator.Element) -> SegmentOfResult
   ) -> LazySequence<
     FlattenSequence<LazyMapSequence<Elements, SegmentOfResult>>> {
@@ -58,7 +58,7 @@ extension LazyCollectionProtocol {
   /// `c.map(transform).joined()`.
   ///
   /// - Complexity: O(1)
-  public func flatMap<SegmentOfResult : Collection>(
+  public func flatMap<SegmentOfResult>(
     _ transform: @escaping (Elements.Iterator.Element) -> SegmentOfResult
   ) -> LazyCollection<
     FlattenCollection<
@@ -102,7 +102,7 @@ extension LazyCollectionProtocol
   /// `c.map(transform).joined()`.
   ///
   /// - Complexity: O(1)
-  public func flatMap<SegmentOfResult : BidirectionalCollection>(
+  public func flatMap<SegmentOfResult>(
     _ transform: @escaping (Elements.Iterator.Element) -> SegmentOfResult
   ) -> LazyCollection<
     FlattenBidirectionalCollection<

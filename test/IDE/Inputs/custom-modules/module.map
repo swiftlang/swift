@@ -37,6 +37,10 @@ module ImportAsMember {
     header "ImportAsMemberC.h"
   }
 
+  module APINotes {
+    header "ImportAsMemberAPINotes.h"
+  }
+
   module Class {
     requires objc
     header "ImportAsMemberClass.h"
