@@ -1025,13 +1025,6 @@ function cmake_needs_to_specify_standard_computed_defaults() {
     fi
 }
 
-function copy_swift_stdlib_tool_substitute() {
-    if [ ! -f "$1" ] ; then
-        echo "--- Copy swift-stdlib-tool ---"
-        call cp "${SWIFT_SOURCE_DIR}/utils/swift-stdlib-tool-substitute" "$1"
-    fi
-}
-
 function make_relative_symlink() {
     local SOURCE=$1
     local TARGET=$2
@@ -2362,15 +2355,6 @@ for host in "${ALL_HOSTS[@]}"; do
                     LIBDISPATCH_BUILD_ARGS="--libdispatch-src-dir=${LIBDISPATCH_SOURCE_DIR} --libdispatch-build-dir=${LIBDISPATCH_BUILD_DIR}"
                 fi
                 
-                if [[ "$(uname -s)" == "Darwin" ]] ; then
-                    # xcodebuild requires swift-stdlib-tool to build a Swift
-                    # framework. This is normally present when building XCTest
-                    # via a packaged .xctoolchain, but here we are using the
-                    # swiftc that was just built--no toolchain exists yet. As a
-                    # result, we must copy swift-stdlib-tool ourselves.
-                    copy_swift_stdlib_tool_substitute "$(build_directory_bin ${host} swift)/swift-stdlib-tool"
-                fi
-
                 # Use XCTEST_BUILD_TYPE to build either --debug or --release.
                 if [[ "${XCTEST_BUILD_TYPE}" ==  "Debug" ]] ; then
                     XCTEST_BUILD_ARGS="--debug"
@@ -3260,8 +3244,6 @@ function build_and_test_installable_package() {
 
         # Assume the lipo builds are (or include) an OS X host and build an xctoolchain
         if [[ "${host}" == "macosx-"* ]] || [[ "${host}" == "merged-hosts" ]]; then
-          copy_swift_stdlib_tool_substitute "${host_install_destdir}${host_install_prefix}/bin/swift-stdlib-tool"
-          
           # Create plist for xctoolchain.
           echo "-- Create Info.plist --"
           PLISTBUDDY_BIN="/usr/libexec/PlistBuddy"
