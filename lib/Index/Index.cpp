@@ -303,7 +303,7 @@ private:
 
   bool visitDeclReference(ValueDecl *D, CharSourceRange Range,
                           TypeDecl *CtorTyRef, ExtensionDecl *ExtTyRef, Type T,
-                          SemaReferenceKind Kind) override {
+                          ReferenceMetaData Data) override {
     SourceLoc Loc = Range.getStart();
 
     if (isRepressed(Loc) || Loc.isInvalid())

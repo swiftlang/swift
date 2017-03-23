@@ -777,7 +777,7 @@ public:
 
   bool visitDeclReference(ValueDecl *D, CharSourceRange Range,
                           TypeDecl *CtorTyRef, ExtensionDecl *ExtTyRef, Type T,
-                          SemaReferenceKind Kind) override {
+                          ReferenceMetaData Data) override {
     if (isa<VarDecl>(D) && D->hasName() && D->getName().str() == "self")
       return true;
 
