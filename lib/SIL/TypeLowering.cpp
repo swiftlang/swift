@@ -337,7 +337,7 @@ namespace {
           return asImpl().handleTrivialAddressOnly(type);
         }
 
-        if (LayoutInfo->isRefCountedObject())
+        if (LayoutInfo->isRefCounted())
           return asImpl().handleReference(type);
       }
       return asImpl().handleAddressOnly(type);

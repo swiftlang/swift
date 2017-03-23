@@ -282,7 +282,7 @@ const TypeInfo *TypeConverter::convertArchetypeType(ArchetypeType *archetype) {
   // If the archetype is class-constrained, use a class pointer
   // representation.
   if (archetype->requiresClass() ||
-      (LayoutInfo && LayoutInfo->isRefCountedObject())) {
+      (LayoutInfo && LayoutInfo->isRefCounted())) {
     ReferenceCounting refcount;
     llvm::PointerType *reprTy;
 
