@@ -644,7 +644,8 @@ ManagedValue SILGenBuilder::createOpenExistentialRef(SILLocation loc,
 //===----------------------------------------------------------------------===//
 
 void SwitchEnumBuilder::emit() && {
-  bool isAddressOnly = optional.getType().isAddressOnly(builder.getModule());
+  bool isAddressOnly = optional.getType().isAddressOnly(builder.getModule()) &&
+                       getSGF().silConv.useLoweredAddresses();
   using DeclBlockPair = std::pair<EnumElementDecl *, SILBasicBlock *>;
   {
     // TODO: We could store the data in CaseBB form and not have to do this.
