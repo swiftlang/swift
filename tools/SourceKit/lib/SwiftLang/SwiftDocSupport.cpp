@@ -998,7 +998,7 @@ public:
                                bool IsOpenBracket) override {
     // Treat both open and close brackets equally
     return visitDeclReference(D, Range, nullptr, nullptr, Type(),
-                              SemaReferenceKind::SubscriptRef);
+                      ReferenceMetaData(SemaReferenceKind::SubscriptRef, None));
   }
 
   bool isLocal(Decl *D) const {

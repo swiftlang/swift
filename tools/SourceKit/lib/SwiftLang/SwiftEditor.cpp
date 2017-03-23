@@ -795,7 +795,7 @@ public:
                                bool IsOpenBracket) override {
     // We should treat both open and close brackets equally
     return visitDeclReference(D, Range, nullptr, nullptr, Type(),
-                              SemaReferenceKind::SubscriptRef);
+                      ReferenceMetaData(SemaReferenceKind::SubscriptRef, None));
   }
 
   void annotate(const Decl *D, bool IsRef, CharSourceRange Range) {
