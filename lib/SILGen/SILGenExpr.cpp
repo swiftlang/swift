@@ -3358,7 +3358,7 @@ RValue RValueEmitter::visitOptionalEvaluationExpr(OptionalEvaluationExpr *E,
   RestoreOptionalFailureDest restoreFailureDest(SGF,
                     JumpDest(failureBB, SGF.Cleanups.getCleanupsDepth(), E));
 
-  SILValue NormalArgument;
+  SILValue NormalArgument = nullptr;
   if (emitOptimizedOptionalEvaluation(E, NormalArgument, optInit, *this)) {
     // Already emitted code for this.
   } else if (isByAddress) {
@@ -3384,7 +3384,7 @@ RValue RValueEmitter::visitOptionalEvaluationExpr(OptionalEvaluationExpr *E,
     failureBB->eraseFromParent();
     
     // The value we provide is the one we've already got.
-    if (!isByAddress)
+    if (!isByAddress && NormalArgument)
       return RValue(SGF, E,
                     SGF.emitManagedRValueWithCleanup(NormalArgument, optTL));
 

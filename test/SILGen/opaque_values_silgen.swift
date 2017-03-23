@@ -710,7 +710,7 @@ func s360________guardEnum<T>(_ e: IndirectEnum<T>) {
   }
 }
 
-// Tests casting optional opaques to optional opaques
+// Tests contextual init() of opaque value types
 // ---
 // CHECK-LABEL: sil hidden @_T020opaque_values_silgen21s370_____optToOptCastxSgSQyxGlF : $@convention(thin) <T> (@in Optional<T>) -> @out Optional<T> {
 // CHECK: bb0([[ARG:%.*]] : $Optional<T>):
@@ -722,6 +722,20 @@ func s360________guardEnum<T>(_ e: IndirectEnum<T>) {
 // CHECK-LABEL: } // end sil function '_T020opaque_values_silgen21s370_____optToOptCastxSgSQyxGlF'
 func s370_____optToOptCast<T>(_ x : T!) -> T? {
   return x
+}
+
+// Tests casting optional opaques to optional opaques
+// ---
+// CHECK-LABEL: sil hidden @_T020opaque_values_silgen21s380___contextualInitySiSgF : $@convention(thin) (Optional<Int>) -> () {
+// CHECK: bb0([[ARG:%.*]] : $Optional<Int>):
+// CHECK:   [[ALLOC_OF_BOX:%.*]] = alloc_box ${ var Optional<Int> }, var
+// CHECK:   [[PROJ_BOX:%.*]] = project_box [[ALLOC_OF_BOX]]
+// CHECK:   store [[ARG]] to [trivial] [[PROJ_BOX]] : $*Optional<Int>
+// CHECK:   destroy_value [[ALLOC_OF_BOX]]
+// CHECK:   return %{{.*}} : $()
+// CHECK-LABEL: } // end sil function '_T020opaque_values_silgen21s380___contextualInitySiSgF'
+func s380___contextualInit(_ a : Int?) {
+  var x: Int! = a
 }
 
 // Tests conditional value casts and correspondingly generated reabstraction thunk, with <T> types
