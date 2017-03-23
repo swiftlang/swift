@@ -424,5 +424,6 @@ def main():
         args.optimization = sorted(list(set(args.optimization)))
     return args.func(args)
 
+
 if __name__ == '__main__':
     exit(main())

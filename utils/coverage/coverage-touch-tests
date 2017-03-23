@@ -81,8 +81,8 @@ def main():
     args = parser.parse_args()
 
     for path in [args.swift_dir, args.coverage_db]:
-        assert(os.path.exists(path), "Unable to find %s. Try absolute paths." %
-               path)
+        assert os.path.exists(path), "Unable to find %s. Try absolute" \
+                                     " paths." % path
 
     console.setLevel(level=args.log.upper())
     logging.debug(args)
@@ -159,6 +159,7 @@ def diff():
     sys.stdout.flush()
     subprocess.call(['diff', '-U0', args.old_file, args.new_file])
     return 0
+
 
 if __name__ == '__main__':
     if 'GIT_EXTERNAL_DIFF' in os.environ:
