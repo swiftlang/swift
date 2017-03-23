@@ -349,7 +349,7 @@ void Expr::propagateLValueAccessKind(AccessKind accessKind,
     NON_LVALUE_EXPR(Assign)
     NON_LVALUE_EXPR(CodeCompletion)
     NON_LVALUE_EXPR(ObjCSelector)
-    NON_LVALUE_EXPR(ObjCKeyPath)
+    NON_LVALUE_EXPR(KeyPath)
     NON_LVALUE_EXPR(EnumIsCase)
 
 #define UNCHECKED_EXPR(KIND, BASE) \
@@ -493,7 +493,7 @@ ConcreteDeclRef Expr::getReferencedDecl() const {
   NO_REFERENCE(UnresolvedPattern);
   NO_REFERENCE(EditorPlaceholder);
   NO_REFERENCE(ObjCSelector);
-  NO_REFERENCE(ObjCKeyPath);
+  NO_REFERENCE(KeyPath);
 
 #undef SIMPLE_REFERENCE
 #undef NO_REFERENCE
@@ -652,7 +652,7 @@ bool Expr::canAppendCallParentheses() const {
   case ExprKind::InterpolatedStringLiteral:
   case ExprKind::MagicIdentifierLiteral:
   case ExprKind::ObjCSelector:
-  case ExprKind::ObjCKeyPath:
+  case ExprKind::KeyPath:
     return true;
 
   case ExprKind::ObjectLiteral:
@@ -1986,42 +1986,42 @@ ArchetypeType *OpenExistentialExpr::getOpenedArchetype() const {
   return type->castTo<ArchetypeType>();
 }
 
-ObjCKeyPathExpr::ObjCKeyPathExpr(SourceLoc keywordLoc, SourceLoc lParenLoc,
+KeyPathExpr::KeyPathExpr(SourceLoc keywordLoc, SourceLoc lParenLoc,
                          ArrayRef<Identifier> names,
                          ArrayRef<SourceLoc> nameLocs,
                          SourceLoc rParenLoc)
-  : Expr(ExprKind::ObjCKeyPath, /*Implicit=*/nameLocs.empty()),
+  : Expr(ExprKind::KeyPath, /*Implicit=*/nameLocs.empty()),
     KeywordLoc(keywordLoc), LParenLoc(lParenLoc), RParenLoc(rParenLoc)
 {
   // Copy components (which are all names).
-  ObjCKeyPathExprBits.NumComponents = names.size();
+  KeyPathExprBits.NumComponents = names.size();
   for (auto idx : indices(names))
     getComponentsMutable()[idx] = names[idx];
 
   assert(nameLocs.empty() || nameLocs.size() == names.size());
-  ObjCKeyPathExprBits.HaveSourceLocations = !nameLocs.empty();
-  if (ObjCKeyPathExprBits.HaveSourceLocations) {
+  KeyPathExprBits.HaveSourceLocations = !nameLocs.empty();
+  if (KeyPathExprBits.HaveSourceLocations) {
     memcpy(getNameLocsMutable().data(), nameLocs.data(),
            nameLocs.size() * sizeof(SourceLoc));
   }
 }
 
-Identifier ObjCKeyPathExpr::getComponentName(unsigned i) const {
+Identifier KeyPathExpr::getComponentName(unsigned i) const {
   if (auto decl = getComponentDecl(i))
     return decl->getFullName().getBaseName();
 
   return getComponents()[i].get<Identifier>();
 }
 
-ObjCKeyPathExpr *ObjCKeyPathExpr::create(ASTContext &ctx,
+KeyPathExpr *KeyPathExpr::create(ASTContext &ctx,
                                  SourceLoc keywordLoc, SourceLoc lParenLoc,
                                  ArrayRef<Identifier> names,
                                  ArrayRef<SourceLoc> nameLocs,
                                  SourceLoc rParenLoc) {
-  unsigned size = sizeof(ObjCKeyPathExpr)
+  unsigned size = sizeof(KeyPathExpr)
     + names.size() * sizeof(Identifier)
     + nameLocs.size() * sizeof(SourceLoc);
-  void *mem = ctx.Allocate(size, alignof(ObjCKeyPathExpr));
-  return new (mem) ObjCKeyPathExpr(keywordLoc, lParenLoc, names, nameLocs,
+  void *mem = ctx.Allocate(size, alignof(KeyPathExpr));
+  return new (mem) KeyPathExpr(keywordLoc, lParenLoc, names, nameLocs,
                                    rParenLoc);
 }

@@ -1258,7 +1258,7 @@ LegacyASTTransformer::visitObjCSelectorExpr(ObjCSelectorExpr *E,
 }
 
 RC<SyntaxData>
-LegacyASTTransformer::visitObjCKeyPathExpr(ObjCKeyPathExpr *E,
+LegacyASTTransformer::visitKeyPathExpr(KeyPathExpr *E,
                                            const SyntaxData *Parent,
                                            const CursorIndex IndexInParent) {
   return getUnknownExpr(E);

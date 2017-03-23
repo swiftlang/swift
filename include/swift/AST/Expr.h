@@ -405,8 +405,8 @@ class alignas(8) Expr {
   enum { NumObjCSelectorExprBits = NumExprBits + 2 };
   static_assert(NumObjCSelectorExprBits <= 32, "fits in an unsigned");
 
-  class ObjCKeyPathExprBitfields {
-    friend class ObjCKeyPathExpr;
+  class KeyPathExprBitfields {
+    friend class KeyPathExpr;
     unsigned : NumExprBits;
 
     /// The number of components in the selector path.
@@ -415,8 +415,8 @@ class alignas(8) Expr {
     /// Whether the names have corresponding source locations.
     unsigned HaveSourceLocations : 1;
   };
-  enum { NumObjCKeyPathExprBits = NumExprBits + 9 };
-  static_assert(NumObjCKeyPathExprBits <= 32, "fits in an unsigned");
+  enum { NumKeyPathExprBits = NumExprBits + 9 };
+  static_assert(NumKeyPathExprBits <= 32, "fits in an unsigned");
 
 protected:
   union {
@@ -446,7 +446,7 @@ protected:
     CollectionUpcastConversionExprBitfields CollectionUpcastConversionExprBits;
     TupleShuffleExprBitfields TupleShuffleExprBits;
     ObjCSelectorExprBitfields ObjCSelectorExprBits;
-    ObjCKeyPathExprBitfields ObjCKeyPathExprBits;
+    KeyPathExprBitfields KeyPathExprBits;
   };
 
 private:
@@ -4542,7 +4542,7 @@ public:
 /// \code
 /// #keyPath(Person.friends.firstName)
 /// \endcode
-class ObjCKeyPathExpr : public Expr {
+class KeyPathExpr : public Expr {
   SourceLoc KeywordLoc;
   SourceLoc LParenLoc;
   SourceLoc RParenLoc;
@@ -4552,7 +4552,7 @@ class ObjCKeyPathExpr : public Expr {
   /// a resolved declaration.
   typedef llvm::PointerUnion<Identifier, ValueDecl *> StoredComponent;
 
-  ObjCKeyPathExpr(SourceLoc keywordLoc, SourceLoc lParenLoc,
+  KeyPathExpr(SourceLoc keywordLoc, SourceLoc lParenLoc,
               ArrayRef<Identifier> names,
               ArrayRef<SourceLoc> nameLocs,
               SourceLoc rParenLoc);
@@ -4572,7 +4572,7 @@ class ObjCKeyPathExpr : public Expr {
   /// Retrieve a mutable version of the name locations array, for
   /// initialization purposes.
   MutableArrayRef<SourceLoc> getNameLocsMutable() {
-    if (!ObjCKeyPathExprBits.HaveSourceLocations) return { };
+    if (!KeyPathExprBits.HaveSourceLocations) return { };
 
     auto mutableComponents = getComponentsMutable();
     return { reinterpret_cast<SourceLoc *>(mutableComponents.end()),
@@ -4585,7 +4585,7 @@ public:
   /// \param nameLocs The locations of the names in the key-path,
   /// which must either have the same number of entries as \p names or
   /// must be empty.
-  static ObjCKeyPathExpr *create(ASTContext &ctx,
+  static KeyPathExpr *create(ASTContext &ctx,
                              SourceLoc keywordLoc, SourceLoc lParenLoc,
                              ArrayRef<Identifier> names,
                              ArrayRef<SourceLoc> nameLocs,
@@ -4598,7 +4598,7 @@ public:
 
   /// Retrieve the number of components in the key-path.
   unsigned getNumComponents() const {
-    return ObjCKeyPathExprBits.NumComponents;
+    return KeyPathExprBits.NumComponents;
   }
 
   /// Retrieve's the name for the (i)th component;
@@ -4615,7 +4615,7 @@ public:
   /// If no location information is available, returns an empty
   /// \c DeclNameLoc.
   SourceLoc getComponentNameLoc(unsigned i) const {
-    if (!ObjCKeyPathExprBits.HaveSourceLocations) return { };
+    if (!KeyPathExprBits.HaveSourceLocations) return { };
 
     auto components = getComponents();
     ArrayRef<SourceLoc> nameLocs(
@@ -4638,7 +4638,7 @@ public:
   }
 
   static bool classof(const Expr *E) {
-    return E->getKind() == ExprKind::ObjCKeyPath;
+    return E->getKind() == ExprKind::KeyPath;
   }
 };
 

@@ -2805,7 +2805,7 @@ namespace {
       return type;
     }
 
-    Type visitObjCKeyPathExpr(ObjCKeyPathExpr *E) {
+    Type visitKeyPathExpr(KeyPathExpr *E) {
       return E->getSemanticExpr()->getType();
     }
   };
@@ -2908,9 +2908,9 @@ namespace {
 
       // Check a key-path expression, which fills in its semantic
       // expression as a string literal.
-      if (auto keyPath = dyn_cast<ObjCKeyPathExpr>(expr)) {
+      if (auto keyPath = dyn_cast<KeyPathExpr>(expr)) {
         auto &cs = CG.getConstraintSystem();
-        (void)cs.getTypeChecker().checkObjCKeyPathExpr(cs.DC, keyPath);
+        (void)cs.getTypeChecker().checkKeyPathExpr(cs.DC, keyPath);
       }
 
       // For closures containing only a single expression, the body participates

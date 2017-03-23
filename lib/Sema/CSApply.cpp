@@ -3903,7 +3903,7 @@ namespace {
       return E;
     }
 
-    Expr *visitObjCKeyPathExpr(ObjCKeyPathExpr *E) {
+    Expr *visitKeyPathExpr(KeyPathExpr *E) {
       if (auto semanticE = E->getSemanticExpr())
         cs.setType(E, cs.getType(semanticE));
 

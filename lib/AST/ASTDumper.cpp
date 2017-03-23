@@ -2404,7 +2404,7 @@ public:
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
 
-  void visitObjCKeyPathExpr(ObjCKeyPathExpr *E) {
+  void visitKeyPathExpr(KeyPathExpr *E) {
     printCommon(E, "keypath_expr");
     for (unsigned i = 0, n = E->getNumComponents(); i != n; ++i) {
       OS << "\n";

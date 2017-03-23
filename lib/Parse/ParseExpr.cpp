@@ -518,9 +518,9 @@ ParserResult<Expr> Parser::parseExprKeyPath() {
   SmallVector<Identifier, 4> names;
   SmallVector<SourceLoc, 4> nameLocs;
   auto handleCodeCompletion = [&](bool hasDot) -> ParserResult<Expr> {
-    ObjCKeyPathExpr *expr = nullptr;
+    KeyPathExpr *expr = nullptr;
     if (!names.empty()) {
-      expr = ObjCKeyPathExpr::create(Context, keywordLoc, lParenLoc, names,
+      expr = KeyPathExpr::create(Context, keywordLoc, lParenLoc, names,
                                      nameLocs, Tok.getLoc());
     }
 
@@ -594,7 +594,7 @@ ParserResult<Expr> Parser::parseExprKeyPath() {
 
   // We're done: create the key-path expression.
   return makeParserResult<Expr>(
-           ObjCKeyPathExpr::create(Context, keywordLoc, lParenLoc, names,
+           KeyPathExpr::create(Context, keywordLoc, lParenLoc, names,
                                    nameLocs, rParenLoc));
 }
 

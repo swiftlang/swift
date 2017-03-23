@@ -18,8 +18,8 @@
 #include "swift/Basic/Range.h"
 using namespace swift;
 
-Optional<Type> TypeChecker::checkObjCKeyPathExpr(DeclContext *dc,
-                                                 ObjCKeyPathExpr *expr,
+Optional<Type> TypeChecker::checkKeyPathExpr(DeclContext *dc,
+                                                 KeyPathExpr *expr,
                                                  bool requireResultType) {
   // If there is already a semantic expression, do nothing.
   if (expr->getSemanticExpr() && !requireResultType) return None;
