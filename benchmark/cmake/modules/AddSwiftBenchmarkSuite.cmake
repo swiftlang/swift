@@ -321,7 +321,6 @@ function (swift_benchmark_compile_archopts)
         "-c"
         "-o" "${objcfile}")
 
-  precondition(CMAKE_CODESIGN MESSAGE "CMAKE_CODESIGN is required, please set it")
   add_custom_command(
       OUTPUT "${OUTPUT_EXEC}"
       DEPENDS

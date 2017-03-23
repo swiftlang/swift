@@ -465,7 +465,6 @@ function(_add_swift_lipo_target)
   is_darwin_based_sdk("${LIPO_SDK}" IS_DARWIN)
   if(IS_DARWIN)
     if(LIPO_CODESIGN)
-      precondition(CMAKE_CODESIGN MESSAGE "CMAKE_CODESIGN is required, please set it")
       set(codesign_command COMMAND "${CMAKE_CODESIGN}" "-f" "-s" "-" "${LIPO_OUTPUT}")
     endif()
     # Use lipo to create the final binary.
