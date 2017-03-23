@@ -1173,6 +1173,8 @@ Property behaviors are implemented using private protocol conformances.
   LAYOUT-CONSTRAINT ::= 'N'  // NativeRefCountedObject 
   LAYOUT-CONSTRAINT ::= 'R'  // RefCountedObject 
   LAYOUT-CONSTRAINT ::= 'T'  // Trivial 
+  LAYOUT-CONSTRAINT ::= 'C'  // Class
+  LAYOUT-CONSTRAINT ::= 'D'  // NativeClass 
   LAYOUT-CONSTRAINT ::= 'E' LAYOUT-SIZE-AND-ALIGNMENT  // Trivial of exact size 
   LAYOUT-CONSTRAINT ::= 'e' LAYOUT-SIZE  // Trivial of exact size 
   LAYOUT-CONSTRAINT ::= 'M' LAYOUT-SIZE-AND-ALIGNMENT  // Trivial of size at most N bits 

@@ -4342,6 +4342,8 @@ void LayoutConstraintInfo::print(ASTPrinter &Printer,
   case LayoutConstraintKind::UnknownLayout:
   case LayoutConstraintKind::RefCountedObject:
   case LayoutConstraintKind::NativeRefCountedObject:
+  case LayoutConstraintKind::Class:
+  case LayoutConstraintKind::NativeClass:
   case LayoutConstraintKind::Trivial:
     return;
   case LayoutConstraintKind::TrivialOfAtMostSize:
