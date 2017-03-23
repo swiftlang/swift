@@ -2260,11 +2260,12 @@ void GenericTypeDecl::setLazyGenericEnvironment(LazyMemberLoader *lazyLoader,
   ++NumLazyGenericEnvironments;
 }
 
-TypeAliasDecl::TypeAliasDecl(SourceLoc TypeAliasLoc, Identifier Name,
-                             SourceLoc NameLoc, GenericParamList *GenericParams,
-                             DeclContext *DC)
+TypeAliasDecl::TypeAliasDecl(SourceLoc TypeAliasLoc, SourceLoc EqualLoc,
+                             Identifier Name, SourceLoc NameLoc,
+                             GenericParamList *GenericParams, DeclContext *DC)
   : GenericTypeDecl(DeclKind::TypeAlias, DC, Name, NameLoc, {}, GenericParams),
-    TypeAliasLoc(TypeAliasLoc) {
+    TypeAliasLoc(TypeAliasLoc),
+    EqualLoc(EqualLoc) {
   TypeAliasDeclBits.HasCompletedValidation = false;
 }
 

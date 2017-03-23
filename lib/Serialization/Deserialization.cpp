@@ -2457,7 +2457,8 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     if (declOrOffset.isComplete())
       return declOrOffset;
 
-    auto alias = createDecl<TypeAliasDecl>(SourceLoc(), getIdentifier(nameID),
+    auto alias = createDecl<TypeAliasDecl>(SourceLoc(), SourceLoc(),
+                                           getIdentifier(nameID),
                                            SourceLoc(), genericParams, DC);
     declOrOffset = alias;
 

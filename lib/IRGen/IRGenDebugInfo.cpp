@@ -813,7 +813,8 @@ void IRGenDebugInfo::emitArtificialFunction(IRBuilder &Builder,
 TypeAliasDecl *IRGenDebugInfo::getMetadataType() {
   if (!MetadataTypeDecl) {
     MetadataTypeDecl = new (IGM.Context) TypeAliasDecl(
-        SourceLoc(), IGM.Context.getIdentifier("$swift.type"), SourceLoc(),
+        SourceLoc(), SourceLoc(),
+        IGM.Context.getIdentifier("$swift.type"), SourceLoc(),
         /*genericparams*/nullptr, IGM.Context.TheBuiltinModule);
     MetadataTypeDecl->setUnderlyingType(IGM.Context.TheRawPointerType);
   }
