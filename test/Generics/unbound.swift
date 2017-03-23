@@ -67,3 +67,8 @@ func callfoor20792596<T>(x: T) -> T {
   return foor20792596(x) // expected-error {{generic parameter 'T' could not be inferred}}
 }
 
+// <rdar://problem/31181895> parameter "not used in function signature" when part of a superclass constraint
+struct X1<T> {
+  func bar<U>() where T: X2<U> {}
+}
+class X2<T> {}
