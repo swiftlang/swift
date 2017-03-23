@@ -1561,6 +1561,10 @@ void NodePrinter::print(NodePointer pointer, bool asContext, bool suppressType) 
       name = "_RefCountedObject";
     } else if (c == 'N') {
       name = "_NativeRefCountedObject";
+    } else if (c == 'C') {
+      name = "_Class";
+    } else if (c == 'D') {
+      name = "_NativeClass";
     } else if (c == 'T') {
       name = "_Trivial";
     } else if (c == 'E' || c == 'e') {
