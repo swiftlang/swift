@@ -113,7 +113,7 @@ public struct LazyPrefixWhileIndex<Base : Collection> : Comparable {
   }
 }
 
-public func == <Base : Collection>(
+public func == <Base>(
   lhs: LazyPrefixWhileIndex<Base>,
   rhs: LazyPrefixWhileIndex<Base>
 ) -> Bool {
@@ -127,7 +127,7 @@ public func == <Base : Collection>(
   }
 }
 
-public func < <Base : Collection>(
+public func < <Base>(
   lhs: LazyPrefixWhileIndex<Base>,
   rhs: LazyPrefixWhileIndex<Base>
 ) -> Bool {

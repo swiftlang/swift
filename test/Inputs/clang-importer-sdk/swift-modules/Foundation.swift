@@ -37,11 +37,11 @@ internal func _convertNSDictionaryToDictionary<K: NSObject, V: AnyObject>(
 }
 
 // NSSet bridging entry points
-internal func _convertSetToNSSet<T : Hashable>(_ s: Set<T>) -> NSSet {
+internal func _convertSetToNSSet<T>(_ s: Set<T>) -> NSSet {
   return NSSet()
 }
 
-internal func _convertNSSetToSet<T : Hashable>(_ s: NSSet?) -> Set<T> {
+internal func _convertNSSetToSet<T>(_ s: NSSet?) -> Set<T> {
   return Set<T>()
 }
 

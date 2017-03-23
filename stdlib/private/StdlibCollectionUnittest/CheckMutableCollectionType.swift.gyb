@@ -68,15 +68,15 @@ internal func _mapInPlace<C : MutableCollection>(
 }
 
 internal func makeBufferAccessLoggingMutableCollection<
-  C : MutableCollection & BidirectionalCollection
+  C
 >(wrapping c: C) -> BufferAccessLoggingMutableBidirectionalCollection<C> {
   return BufferAccessLoggingMutableBidirectionalCollection(wrapping: c)
 }
 
 internal func makeBufferAccessLoggingMutableCollection<
-  C : MutableCollection & RandomAccessCollection
->(wrapping c: C) -> BufferAccessLoggingMutableBidirectionalCollection<C> {
-  return BufferAccessLoggingMutableBidirectionalCollection(wrapping: c)
+  C
+>(wrapping c: C) -> BufferAccessLoggingMutableRandomAccessCollection<C> {
+  return BufferAccessLoggingMutableRandomAccessCollection(wrapping: c)
 }
 
 extension TestSuite {

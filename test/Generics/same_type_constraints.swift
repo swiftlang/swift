@@ -123,7 +123,7 @@ struct Composed<Left: Bindable, Right: Observable> where Left.Input == Right.Out
 infix operator <- : AssignmentPrecedence
 
 func <- <
-    Right : Observable
+    Right
     >(lhs: @escaping (Right.Output) -> Void, rhs: Right) -> Composed<SideEffect<Right>, Right>?
 {
   return nil
@@ -360,3 +360,8 @@ func intercomponentMoreThanSpanningTree<T: P10>(_: T)
         { }
 
 func trivialRedundancy<T: P10>(_: T) where T.A == T.A { } // expected-warning{{redundant same-type constraint 'T.A' == 'T.A'}}
+
+struct X11<T: P10> where T.A == T.B { }
+
+func intracomponentInferred<T>(_: X11<T>) // expected-note{{previous same-type constraint 'T.A' == 'T.B' inferred from type here}}
+  where T.A == T.B { } // expected-warning{{redundant same-type constraint 'T.A' == 'T.B'}}
