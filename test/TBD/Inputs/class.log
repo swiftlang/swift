@@ -97,23 +97,15 @@
 <unknown>:0: error: symbol '_T04test7NothingCACycfc' (test.Nothing.init () -> test.Nothing) is in generated IR file, but not in TBD file
 <unknown>:0: error: symbol '_T04test7NothingCMm' (metaclass for test.Nothing) is in generated IR file, but not in TBD file
 <unknown>:0: error: symbol '_T04test7NothingCfd' (test.Nothing.deinit) is in generated IR file, but not in TBD file
-<unknown>:0: error: symbol '_T04test7StaticsC10privateVarSivZ' (static test.Statics.privateVar : Swift.Int) is in generated IR file, but not in TBD file
-<unknown>:0: error: symbol '_T04test7StaticsC9publicVarSifau' (test.Statics.publicVar.unsafeMutableAddressor : Swift.Int) is in generated IR file, but not in TBD file
-<unknown>:0: error: symbol '_T04test7StaticsC9publicVarSivZ' (static test.Statics.publicVar : Swift.Int) is in generated IR file, but not in TBD file
 <unknown>:0: error: symbol '_T04test7StaticsCACycfCWo' (witness table offset for test.Statics.__allocating_init () -> test.Statics) is in generated IR file, but not in TBD file
 <unknown>:0: error: symbol '_T04test7StaticsCACycfc' (test.Statics.init () -> test.Statics) is in generated IR file, but not in TBD file
 <unknown>:0: error: symbol '_T04test7StaticsCMm' (metaclass for test.Statics) is in generated IR file, but not in TBD file
 <unknown>:0: error: symbol '_T04test7StaticsCfd' (test.Statics.deinit) is in generated IR file, but not in TBD file
-<unknown>:0: error: symbol '_T04test10PropertiesC10privateLetSifau' (test.Properties.privateLet.unsafeMutableAddressor : Swift.Int) is in TBD file, but not in generated IR
-<unknown>:0: error: symbol '_T04test10PropertiesC10privateLetSiv' (test.Properties.privateLet : Swift.Int) is in TBD file, but not in generated IR
 <unknown>:0: error: symbol '_T04test10PropertiesC15publicVarGetSetSifm' (test.Properties.publicVarGetSet.materializeForSet : Swift.Int) is in TBD file, but not in generated IR
-<unknown>:0: error: symbol '_T04test10PropertiesC9publicLetSifau' (test.Properties.publicLet.unsafeMutableAddressor : Swift.Int) is in TBD file, but not in generated IR
 <unknown>:0: error: symbol '_T04test10PropertiesC9publicLetSifg' (test.Properties.publicLet.getter : Swift.Int) is in TBD file, but not in generated IR
-<unknown>:0: error: symbol '_T04test10PropertiesC9publicLetSiv' (test.Properties.publicLet : Swift.Int) is in TBD file, but not in generated IR
 <unknown>:0: error: symbol '_T04test10PropertiesC9publicVarSifg' (test.Properties.publicVar.getter : Swift.Int) is in TBD file, but not in generated IR
 <unknown>:0: error: symbol '_T04test10PropertiesC9publicVarSifm' (test.Properties.publicVar.materializeForSet : Swift.Int) is in TBD file, but not in generated IR
 <unknown>:0: error: symbol '_T04test10PropertiesC9publicVarSifs' (test.Properties.publicVar.setter : Swift.Int) is in TBD file, but not in generated IR
-<unknown>:0: error: symbol '_T04test7StaticsC10privateLetSifau' (test.Statics.privateLet.unsafeMutableAddressor : Swift.Int) is in TBD file, but not in generated IR
 <unknown>:0: error: symbol '_T04test7StaticsC15publicVarGetSetSifmZ' (static test.Statics.publicVarGetSet.materializeForSet : Swift.Int) is in TBD file, but not in generated IR
 <unknown>:0: error: symbol '_T04test7StaticsC9publicLetSifgZ' (static test.Statics.publicLet.getter : Swift.Int) is in TBD file, but not in generated IR
 <unknown>:0: error: symbol '_T04test7StaticsC9publicVarSifgZ' (static test.Statics.publicVar.getter : Swift.Int) is in TBD file, but not in generated IR

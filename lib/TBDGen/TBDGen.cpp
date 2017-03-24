@@ -124,20 +124,28 @@ public:
     // protocols, each conforming type has to handle them individually.
   }
 
-  void visitVarDecl(VarDecl *VD) {
-    if (VD->isLet()) {
-      auto accessor = SILDeclRef(VD, SILDeclRef::Kind::GlobalAccessor);
-      addSymbol(accessor.mangle());
+  void visitVarDecl(VarDecl *VD);
 
-      // The actual let variable has a symbol.
-      Mangle::ASTMangler mangler;
-      addSymbol(mangler.mangleEntity(VD, false));
-    }
-
-    visitMembers(VD);
-  }
   void visitDecl(Decl *D) { visitMembers(D); }
 };
+}
+
+void TBDGenVisitor::visitVarDecl(VarDecl *VD) {
+  // statically/globally stored variables have some special handling.
+  if (VD->hasStorage() &&
+      (VD->isStatic() || VD->getDeclContext()->isModuleScopeContext())) {
+    // The actual variable has a symbol, even when private.
+    Mangle::ASTMangler mangler;
+    addSymbol(mangler.mangleEntity(VD, false));
+
+    if (isPrivateDecl(VD))
+      return;
+
+    auto accessor = SILDeclRef(VD, SILDeclRef::Kind::GlobalAccessor);
+    addSymbol(accessor.mangle());
+  }
+
+  visitMembers(VD);
 }
 
 void swift::enumeratePublicSymbols(FileUnit *file, StringSet &symbols) {
