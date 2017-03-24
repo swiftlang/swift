@@ -56,15 +56,25 @@ SILFunction *SILGenModule::getDynamicThunk(SILDeclRef constant,
   return F;
 }
 
-SILFunction *
-SILGenModule::emitVTableMethod(SILDeclRef derived, SILDeclRef base,
-                               SILLinkage &implLinkage) {
-  SILFunction *implFn = getFunction(derived, NotForDefinition);
-  implLinkage = implFn->getLinkage();
+SILVTable::Entry
+SILGenModule::emitVTableMethod(SILDeclRef derived, SILDeclRef base) {
+  SILFunction *implFn;
+  SILLinkage implLinkage;
+
+  // If the member is dynamic, reference its dynamic dispatch thunk so that
+  // it will be redispatched, funneling the method call through the runtime
+  // hook point.
+  if (derived.getDecl()->isDynamic()) {
+    implFn = getDynamicThunk(derived, Types.getConstantInfo(derived));
+    implLinkage = SILLinkage::Public;
+  } else {
+    implFn = getFunction(derived, NotForDefinition);
+    implLinkage = stripExternalFromLinkage(implFn->getLinkage());
+  }
 
   // As a fast path, if there is no override, definitely no thunk is necessary.
   if (derived == base)
-    return implFn;
+    return {base, implFn, implLinkage};
 
   // Determine the derived thunk type by lowering the derived type against the
   // abstraction pattern of the base.
@@ -78,7 +88,7 @@ SILGenModule::emitVTableMethod(SILDeclRef derived, SILDeclRef base,
   // member type. If the override is ABI compatible, we do not need
   // a thunk.
   if (overrideInfo == derivedInfo)
-    return implFn;
+    return {base, implFn, implLinkage};
 
   // Generate the thunk name.
   // TODO: If we allocated a new vtable slot for the derived method, then
@@ -90,7 +100,7 @@ SILGenModule::emitVTableMethod(SILDeclRef derived, SILDeclRef base,
   // TODO: Allocating new vtable slots for derived methods with different ABIs
   // would invalidate the assumption that the same thunk is correct, as above.
   if (auto existingThunk = M.lookUpFunction(name))
-    return existingThunk;
+    return {base, existingThunk, implLinkage};
 
   auto *derivedDecl = cast<AbstractFunctionDecl>(derived.getDecl());
   SILLocation loc(derivedDecl);
@@ -106,7 +116,7 @@ SILGenModule::emitVTableMethod(SILDeclRef derived, SILDeclRef base,
                      overrideInfo.LoweredInterfaceType,
                      derivedInfo.LoweredInterfaceType);
 
-  return thunk;
+  return {base, thunk, implLinkage};
 }
 
 SILValue SILGenFunction::emitDynamicMethodRef(SILLocation loc,
@@ -186,24 +196,6 @@ public:
     addVTableEntries(ancestor);
   }
 
-  SILVTable::Entry getVTableEntry(SILDeclRef baseRef, SILDeclRef declRef) {
-    // If the member is dynamic, reference its dynamic dispatch thunk so that
-    // it will be redispatched, funneling the method call through the runtime
-    // hook point.
-    // TODO: Dynamic thunks could conceivably require reabstraction too.
-    if (declRef.getDecl()->isDynamic()) {
-      return { baseRef,
-          SGM.getDynamicThunk(declRef, SGM.Types.getConstantInfo(declRef)),
-          SILLinkage::Public };
-    }
-
-    // The derived method may require thunking to match up to the ABI of the
-    // base method.
-    SILLinkage implLinkage;
-    SILFunction *implFn = SGM.emitVTableMethod(declRef, baseRef, implLinkage);
-    return { baseRef, implFn, stripExternalFromLinkage(implLinkage) };
-  }
-
   // Try to find an overridden entry.
   void addMethodOverride(SILDeclRef baseRef, SILDeclRef declRef) {
     // NB: Mutates vtableEntries in-place
@@ -212,7 +204,7 @@ public:
       // Replace the overridden member.
       if (entry.Method == baseRef) {
         // The entry is keyed by the least derived method.
-        entry = getVTableEntry(baseRef, declRef);
+        entry = SGM.emitVTableMethod(declRef, baseRef);
         return;
       }
     }
@@ -223,7 +215,7 @@ public:
 
   // Add an entry to the vtable.
   void addMethod(SILDeclRef member) {
-    vtableEntries.push_back(getVTableEntry(member, member));
+    vtableEntries.push_back(SGM.emitVTableMethod(member, member));
   }
 };
 

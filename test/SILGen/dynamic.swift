@@ -462,6 +462,25 @@ public class SubExt : BaseExt {
   }
 }
 
+public class GenericBase<T> {
+  public func method(_: T) {}
+}
+
+public class ConcreteDerived : GenericBase<Int> {
+  public override dynamic func method(_: Int) {}
+}
+
+// The dynamic override has a different calling convention than the base,
+// so after re-abstracting the signature we must dispatch to the dynamic
+// thunk.
+
+// CHECK-LABEL: sil private @_T07dynamic15ConcreteDerivedC6methodySiFTV : $@convention(method) (@in Int, @guaranteed ConcreteDerived) -> ()
+// CHECK: bb0(%0 : $*Int, %1 : $ConcreteDerived):
+// CHECK-NEXT:  [[VALUE:%.*]] = load [trivial] %0 : $*Int
+// CHECK:       [[DYNAMIC_THUNK:%.*]] = function_ref @_T07dynamic15ConcreteDerivedC6methodySiFTD : $@convention(method) (Int, @guaranteed ConcreteDerived) -> ()
+// CHECK-NEXT:  apply [[DYNAMIC_THUNK]]([[VALUE]], %1) : $@convention(method) (Int, @guaranteed ConcreteDerived) -> ()
+// CHECK:       return
+
 // Vtable contains entries for native and @objc methods, but not dynamic ones
 // CHECK-LABEL: sil_vtable Foo {
 // CHECK-NEXT:   #Foo.init!initializer.1: {{.*}} :   _T07dynamic3FooCACSi6native_tcfc
@@ -493,4 +512,11 @@ public class SubExt : BaseExt {
 // CHECK-LABEL: sil_vtable SubExt {
 // CHECK-NEXT: #BaseExt.init!initializer.1: (BaseExt.Type) -> () -> BaseExt : _T07dynamic6SubExtCACycfc // dynamic.SubExt.init () -> dynamic.SubExt
 // CHECK-NEXT: #SubExt.deinit!deallocator: _T07dynamic6SubExtCfD // dynamic.SubExt.__deallocating_deinit
+// CHECK-NEXT: }
+
+// Dynamic thunk + vtable re-abstraction
+// CHECK-LABEL: sil_vtable ConcreteDerived {
+// CHECK-NEXT: #GenericBase.method!1: <T> (GenericBase<T>) -> (T) -> () : public _T07dynamic15ConcreteDerivedC6methodySiFTV  // override dynamic.ConcreteDerived.method (Swift.Int) -> ()
+// CHECK-NEXT: #GenericBase.init!initializer.1: <T> (GenericBase<T>.Type) -> () -> GenericBase<T> : _T07dynamic15ConcreteDerivedCACycfc      // dynamic.ConcreteDerived.init () -> dynamic.ConcreteDerived
+// CHECK-NEXT: #ConcreteDerived.deinit!deallocator: _T07dynamic15ConcreteDerivedCfD  // dynamic.ConcreteDerived.__deallocating_deinit
 // CHECK-NEXT: }
