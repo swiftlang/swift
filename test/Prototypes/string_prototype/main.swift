@@ -446,6 +446,27 @@ testSuite.test("fcc-normalized-view") {
     expectEqualSequence(newNorm3rev, norm3rev)
   }
 
+  // Test non-start first scalars
+  do {
+    let form1 = [0x0300, a, 0x0300]
+    let form2 = [0x0300, aTic] // In FCC normal form
+    let (norm1, norm1rev) = oldFCCNormView(form1)
+    let (norm2, norm2rev) = oldFCCNormView(form2)
+
+    // Sanity check existing impl
+    expectEqualSequence(norm1, norm2)
+    expectEqualSequence(norm1rev, norm2rev)
+    expectEqualSequence(norm1, form2)
+
+    // Test the new one
+    let (newNorm1, newNorm1rev) = newFCCNormView(form1)
+    let (newNorm2, newNorm2rev) = newFCCNormView(form2)
+    expectEqualSequence(newNorm1, newNorm2)
+    expectEqualSequence(newNorm2, norm2)
+    expectEqualSequence(newNorm1rev, newNorm2rev)
+    expectEqualSequence(newNorm2rev, norm2rev)
+  }
+
   do {
     // Test that the new normalizer is same result as old normalizer
     let s = "abcdefghijklmnopqrstuvwxyz\n"

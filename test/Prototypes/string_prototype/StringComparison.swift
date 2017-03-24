@@ -646,12 +646,6 @@ where
 //
 //
 
-// Michael TODO: Why doesn't the following work?
-//
-// extension UnsignedInteger : _DefaultConstructible {
-//   init() { self = 0 }
-// }
-
 extension UInt16 : _DefaultConstructible {}
 
 typealias UTF16CodeUnitBuffer =
@@ -699,18 +693,6 @@ struct FCCNormalizedSegment : BidirectionalCollection {
   public typealias SubSequence = BidirectionalSlice<FCCNormalizedSegment>
 }
 
-// Initialize an UnboundCapacity from any sequence
-extension UnboundCapacity {
-  public init<S : Sequence>(_ elements: S)
-  where S.Iterator.Element == Base.Iterator.Element {
-    self.init()
-    self.reserveCapacity(elements.underestimatedCount)
-    for elt in elements {
-      self.append(elt)
-    }
-  }
-}
-
 // Ask ICU if the given unicode scalar value has a normalization boundary before
 // it, that is it begins a new normalization segment.
 public func _hasBoundary(before value: UInt32) -> Bool {
@@ -754,7 +736,7 @@ where
       // Include this scalar
       let (scalarValue: value, startIndex: scalarStart, e)
         = decodeOne(priorTo: start)
-      assert(e == start, "Internal inconsistency in decodeOne")
+      _sanityCheck(e == start, "Internal inconsistency in decodeOne")
 
       // Include this scalar
       start = scalarStart
@@ -784,14 +766,15 @@ where
     // Parse the first scalar, it will always be in the segment
     var (scalarValue: value, startIndex: s, endIndex: end)
       = decodeOne(from: start)
-    assert(_hasBoundary(before: value), "Not on segment boundary")
-    assert(s == start, "Internal inconsistency in decodeOne")
+    _sanityCheck(start == codeUnits.startIndex || 
+                 _hasBoundary(before: value), "Not on segment boundary")
+    _sanityCheck(s == start, "Internal inconsistency in decodeOne")
 
     // Include any subsequent scalars that don't have boundaries before them
     while end != codeUnits.endIndex {
       let (scalarValue: value, startIndex: s, endIndex: scalarEnd)
         = decodeOne(from: end)
-      assert(s == end, "Internal inconsistency in decodeOne")
+      _sanityCheck(s == end, "Internal inconsistency in decodeOne")
 
       if _hasBoundary(before: value) {
         // Exclude this scalar
@@ -835,7 +818,7 @@ where
       return FCCNormalizedSegment(buffer)
     }
 
-    assert(buffer.count > 0, "How did this happen? Failed precondition?")
+    _sanityCheck(buffer.count > 0, "How did this happen? Failed precondition?")
 
     // Ask ICU to normalize
     //
@@ -866,13 +849,11 @@ where
           let maxDecompSize = 8
 
           // Very loose canary to check that we haven't grown exceedingly large
-          // (indicative of error). Loose by assuming that every original
+          // (indicative of logic error). Loose by assuming that every original
           // character could be decomposed the maximum number of times. Without
           // this, an error would loop until we run out of memory or the array
           // is larger than 2^32 on 64bit platforms.
-          //
-          // FIXME: should go away by construction, or else be sanity check.
-          assert(buffer.count < originalCount*maxDecompSize)
+          _sanityCheck(buffer.count < originalCount*maxDecompSize)
 
           // extend array storage by 25%
           array.append(
@@ -938,7 +919,7 @@ where
       if lhs.nativeStartIndex < rhs.nativeStartIndex {
         // Our ends should be ordered similarly, unless lhs is the last index
         // before endIndex and rhs is the endIndex.
-        assert(
+        _sanityCheck(
           lhs.nativeEndIndex < rhs.nativeEndIndex ||
           rhs.nativeStartIndex == rhs.nativeEndIndex,
           "overlapping segments?")
@@ -953,16 +934,13 @@ where
       _debug("\(lhs.nativeStartIndex, lhs.nativeEndIndex) == \(rhs.nativeStartIndex, rhs.nativeEndIndex)")
 
       if lhs.nativeStartIndex == rhs.nativeStartIndex {
-        assert(
+        _sanityCheck(
           lhs.nativeEndIndex == rhs.nativeEndIndex,
           "overlapping segments?")
 
         return true
       }
 
-      // assert(
-      //   lhs.nativeEndIndex != rhs.nativeEndIndex
-      //   "overlapping segments?")
       return false
     }
   }

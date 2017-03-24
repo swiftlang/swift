@@ -533,8 +533,7 @@ internal func _makeFCCNormalizer() -> OpaquePointer {
   return ret!
 }
 
-// Michael NOTE: I don't think this is thread safe. It seems like the
-// Normalizer2Impl's trie pointer can be modified even by simple queries.
+// Michael NOTE: made public for prototype, should be internal
 public var _fccNormalizer = _makeFCCNormalizer()
 
 extension _UnicodeViews {
