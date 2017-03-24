@@ -448,6 +448,21 @@ public class Sub : Base {
   override var x: Bool { return false || super.x }
 }
 
+public class BaseExt : NSObject {}
+
+extension BaseExt {
+  public var count: Int {
+    return 0
+  }
+}
+
+public class SubExt : BaseExt {
+  public override var count: Int {
+    return 1
+  }
+}
+
+// Vtable contains entries for native and @objc methods, but not dynamic ones
 // CHECK-LABEL: sil_vtable Foo {
 // CHECK-NEXT:   #Foo.init!initializer.1: {{.*}} :   _T07dynamic3FooCACSi6native_tcfc
 // CHECK-NEXT:   #Foo.nativeMethod!1: {{.*}} :       _T07dynamic3FooC12nativeMethodyyF
@@ -465,13 +480,17 @@ public class Sub : Base {
 // CHECK-NEXT:   #Foo.subscript!getter.1: {{.*}} : _T07dynamic3FooC9subscriptSis9AnyObject_p4objc_tcfg // dynamic.Foo.subscript.getter : (objc : Swift.AnyObject) -> Swift.Int
 // CHECK-NEXT:   #Foo.subscript!setter.1: {{.*}} : _T07dynamic3FooC9subscriptSis9AnyObject_p4objc_tcfs // dynamic.Foo.subscript.setter : (objc : Swift.AnyObject) -> Swift.Int
 // CHECK-NEXT:   #Foo.subscript!materializeForSet
-// CHECK-NEXT:   #Foo.dynamicProp!materializeForSet.1: (Foo) -> (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer) -> (Builtin.RawPointer, Builtin.RawPointer?) : _T07dynamic3FooC0A4PropSifm	// dynamic.Foo.dynamicProp.materializeForSet : Swift.Int
-// CHECK-NEXT:   #Foo.subscript!materializeForSet.1: (Foo) -> (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, Int) -> (Builtin.RawPointer, Builtin.RawPointer?) : _T07dynamic3FooC9subscriptS2iAA_tcfm	// dynamic.Foo.subscript.materializeForSet : (dynamic : Swift.Int) -> Swift.Int
 // CHECK-NEXT:   #Foo.overriddenByDynamic!1: {{.*}} : _T07dynamic3FooC19overriddenByDynamic{{[_0-9a-zA-Z]*}}
 // CHECK-NEXT:   #Foo.deinit!deallocator: {{.*}}
 // CHECK-NEXT: }
 
 // Vtable uses a dynamic thunk for dynamic overrides
 // CHECK-LABEL: sil_vtable Subclass {
-// CHECK-LABEL:   #Foo.overriddenByDynamic!1: {{.*}} : public _T07dynamic8SubclassC19overriddenByDynamic{{[_0-9a-zA-Z]*}}FTD
+// CHECK:   #Foo.overriddenByDynamic!1: {{.*}} : public _T07dynamic8SubclassC19overriddenByDynamic{{[_0-9a-zA-Z]*}}FTD
+// CHECK: }
 
+// No vtable entry for override of @objc extension property
+// CHECK-LABEL: sil_vtable SubExt {
+// CHECK-NEXT: #BaseExt.init!initializer.1: (BaseExt.Type) -> () -> BaseExt : _T07dynamic6SubExtCACycfc // dynamic.SubExt.init () -> dynamic.SubExt
+// CHECK-NEXT: #SubExt.deinit!deallocator: _T07dynamic6SubExtCfD // dynamic.SubExt.__deallocating_deinit
+// CHECK-NEXT: }

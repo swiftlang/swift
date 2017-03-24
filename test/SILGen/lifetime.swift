@@ -270,6 +270,17 @@ struct Daleth {
 }
 
 class He {
+  
+  // -- default allocator:
+  // CHECK-LABEL: sil hidden @_T08lifetime2HeC{{[_0-9a-zA-Z]*}}fC : $@convention(method) (@thick He.Type) -> @owned He {
+  // CHECK: bb0({{%.*}} : $@thick He.Type):
+  // CHECK-NEXT:   [[THIS:%.*]] = alloc_ref $He
+  // CHECK-NEXT:   // function_ref lifetime.He.init
+  // CHECK-NEXT:   [[INIT:%.*]] = function_ref @_T08lifetime2HeC{{[_0-9a-zA-Z]*}}fc : $@convention(method) (@owned He) -> @owned He
+  // CHECK-NEXT:   [[THIS1:%.*]] = apply [[INIT]]([[THIS]])
+  // CHECK-NEXT:   return [[THIS1]]
+  // CHECK-NEXT: }
+
   // -- default initializer:
   // CHECK-LABEL: sil hidden @_T08lifetime2HeC{{[_0-9a-zA-Z]*}}fc : $@convention(method) (@owned He) -> @owned He {
   // CHECK: bb0([[SELF:%.*]] : $He):
@@ -280,15 +291,6 @@ class He {
   // CHECK-NEXT: return [[UNINITIALIZED_SELF_COPY]]
   // CHECK: } // end sil function '_T08lifetime2HeC{{[_0-9a-zA-Z]*}}fc'
 
-  // -- default allocator:
-  // CHECK-LABEL: sil hidden @_T08lifetime2HeC{{[_0-9a-zA-Z]*}}fC : $@convention(method) (@thick He.Type) -> @owned He {
-  // CHECK: bb0({{%.*}} : $@thick He.Type):
-  // CHECK-NEXT:   [[THIS:%.*]] = alloc_ref $He
-  // CHECK-NEXT:   // function_ref lifetime.He.init
-  // CHECK-NEXT:   [[INIT:%.*]] = function_ref @_T08lifetime2HeC{{[_0-9a-zA-Z]*}}fc : $@convention(method) (@owned He) -> @owned He
-  // CHECK-NEXT:   [[THIS1:%.*]] = apply [[INIT]]([[THIS]])
-  // CHECK-NEXT:   return [[THIS1]]
-  // CHECK-NEXT: }
   init() { }
 }
 
@@ -398,6 +400,14 @@ class Foo<T> {
 
   // Class initializer
   init() {
+  // -- allocating entry point
+  // CHECK-LABEL: sil hidden @_T08lifetime3FooC{{[_0-9a-zA-Z]*}}fC :
+    // CHECK: bb0([[METATYPE:%[0-9]+]] : $@thick Foo<T>.Type):
+    // CHECK: [[THIS:%[0-9]+]] = alloc_ref $Foo<T>
+    // CHECK: [[INIT_METHOD:%[0-9]+]] = function_ref @_T08lifetime3FooC{{[_0-9a-zA-Z]*}}fc
+    // CHECK: [[INIT_THIS:%[0-9]+]] = apply [[INIT_METHOD]]<{{.*}}>([[THIS]])
+    // CHECK: return [[INIT_THIS]]
+
   // -- initializing entry point
   // CHECK-LABEL: sil hidden @_T08lifetime3FooC{{[_0-9a-zA-Z]*}}fc :
     // CHECK: bb0([[THISIN:%[0-9]+]] : $Foo<T>):
@@ -447,19 +457,19 @@ class Foo<T> {
     // CHECK: destroy_value [[THIS]]
     // CHECK: return [[THIS_RESULT]]
 
-  // -- allocating entry point
-  // CHECK-LABEL: sil hidden @_T08lifetime3FooC{{[_0-9a-zA-Z]*}}fC :
-    // CHECK: bb0([[METATYPE:%[0-9]+]] : $@thick Foo<T>.Type):
-    // CHECK: [[THIS:%[0-9]+]] = alloc_ref $Foo<T>
-    // CHECK: [[INIT_METHOD:%[0-9]+]] = function_ref @_T08lifetime3FooC{{[_0-9a-zA-Z]*}}fc
-    // CHECK: [[INIT_THIS:%[0-9]+]] = apply [[INIT_METHOD]]<{{.*}}>([[THIS]])
-    // CHECK: return [[INIT_THIS]]
-
   }
 
   init(chi:Int) {
     var chi = chi
     z = Foo<T>.makeT()
+
+  // -- allocating entry point
+  // CHECK-LABEL: sil hidden @_T08lifetime3FooC{{[_0-9a-zA-Z]*}}fC :
+    // CHECK: bb0([[CHI:%[0-9]+]] : $Int, [[METATYPE:%[0-9]+]] : $@thick Foo<T>.Type):
+    // CHECK: [[THIS:%[0-9]+]] = alloc_ref $Foo<T>
+    // CHECK: [[INIT_METHOD:%[0-9]+]] = function_ref @_T08lifetime3FooC{{[_0-9a-zA-Z]*}}fc
+    // CHECK: [[INIT_THIS:%[0-9]+]] = apply [[INIT_METHOD]]<{{.*}}>([[CHI]], [[THIS]])
+    // CHECK: return [[INIT_THIS]]
 
   // -- initializing entry point
   // CHECK-LABEL: sil hidden @_T08lifetime3FooCACyxGSi3chi_tcfc : $@convention(method) <T> (Int, @owned Foo<T>) -> @owned Foo<T> {
@@ -501,42 +511,20 @@ class Foo<T> {
     // CHECK: destroy_value [[THIS]]
     // CHECK: return [[THIS_RETURN]]
   // CHECK: } // end sil function '_T08lifetime3FooCACyxGSi3chi_tcfc'
+  }
 
   // -- allocating entry point
   // CHECK-LABEL: sil hidden @_T08lifetime3FooC{{[_0-9a-zA-Z]*}}fC :
-    // CHECK: bb0([[CHI:%[0-9]+]] : $Int, [[METATYPE:%[0-9]+]] : $@thick Foo<T>.Type):
-    // CHECK: [[THIS:%[0-9]+]] = alloc_ref $Foo<T>
     // CHECK: [[INIT_METHOD:%[0-9]+]] = function_ref @_T08lifetime3FooC{{[_0-9a-zA-Z]*}}fc
-    // CHECK: [[INIT_THIS:%[0-9]+]] = apply [[INIT_METHOD]]<{{.*}}>([[CHI]], [[THIS]])
-    // CHECK: return [[INIT_THIS]]
-  }
 
   // -- initializing entry point
   // CHECK-LABEL: sil hidden @_T08lifetime3FooC{{[_0-9a-zA-Z]*}}fc :
 
-  // -- allocating entry point
-  // CHECK-LABEL: sil hidden @_T08lifetime3FooC{{[_0-9a-zA-Z]*}}fC :
-    // CHECK: [[INIT_METHOD:%[0-9]+]] = function_ref @_T08lifetime3FooC{{[_0-9a-zA-Z]*}}fc
   init<U:Intifiable>(chi:U) {
     z = Foo<T>.makeT()
 
     x = chi.intify()
   }
-
-  // Deallocating destructor for Foo.
-  // CHECK-LABEL: sil hidden @_T08lifetime3FooCfD : $@convention(method) <T> (@owned Foo<T>) -> ()
-  // CHECK: bb0([[SELF:%[0-9]+]] : $Foo<T>):
-  // CHECK:   [[DESTROYING_REF:%[0-9]+]] = function_ref @_T08lifetime3FooCfd : $@convention(method) <τ_0_0> (@guaranteed Foo<τ_0_0>) -> @owned Builtin.NativeObject
-  // CHECK-NEXT:   [[BORROWED_SELF:%.*]] = begin_borrow [[SELF]]
-  // CHECK-NEXT:   [[RESULT_SELF:%[0-9]+]] = apply [[DESTROYING_REF]]<T>([[BORROWED_SELF]]) : $@convention(method) <τ_0_0> (@guaranteed Foo<τ_0_0>) -> @owned Builtin.NativeObject
-  // CHECK-NEXT:   end_borrow [[BORROWED_SELF]] from [[SELF]]
-  // CHECK-NEXT:   end_lifetime [[SELF]]
-  // CHECK-NEXT:   [[SELF:%[0-9]+]] = unchecked_ref_cast [[RESULT_SELF]] : $Builtin.NativeObject to $Foo<T>
-  // CHECK-NEXT:   dealloc_ref [[SELF]] : $Foo<T>
-  // CHECK-NEXT:   [[RESULT:%[0-9]+]] = tuple ()
-  // CHECK-NEXT:   return [[RESULT]] : $()
-  // CHECK-NEXT: } // end sil function '_T08lifetime3FooCfD'
-
   
   // CHECK-LABEL: sil hidden @_T08lifetime3FooCfd : $@convention(method) <T> (@guaranteed Foo<T>) -> @owned Builtin.NativeObject
 
@@ -563,6 +551,20 @@ class Foo<T> {
     // CHECK: return [[PTR_OWNED]]
     // CHECK: } // end sil function '_T08lifetime3FooCfd'
   }
+
+  // Deallocating destructor for Foo.
+  // CHECK-LABEL: sil hidden @_T08lifetime3FooCfD : $@convention(method) <T> (@owned Foo<T>) -> ()
+  // CHECK: bb0([[SELF:%[0-9]+]] : $Foo<T>):
+  // CHECK:   [[DESTROYING_REF:%[0-9]+]] = function_ref @_T08lifetime3FooCfd : $@convention(method) <τ_0_0> (@guaranteed Foo<τ_0_0>) -> @owned Builtin.NativeObject
+  // CHECK-NEXT:   [[BORROWED_SELF:%.*]] = begin_borrow [[SELF]]
+  // CHECK-NEXT:   [[RESULT_SELF:%[0-9]+]] = apply [[DESTROYING_REF]]<T>([[BORROWED_SELF]]) : $@convention(method) <τ_0_0> (@guaranteed Foo<τ_0_0>) -> @owned Builtin.NativeObject
+  // CHECK-NEXT:   end_borrow [[BORROWED_SELF]] from [[SELF]]
+  // CHECK-NEXT:   end_lifetime [[SELF]]
+  // CHECK-NEXT:   [[SELF:%[0-9]+]] = unchecked_ref_cast [[RESULT_SELF]] : $Builtin.NativeObject to $Foo<T>
+  // CHECK-NEXT:   dealloc_ref [[SELF]] : $Foo<T>
+  // CHECK-NEXT:   [[RESULT:%[0-9]+]] = tuple ()
+  // CHECK-NEXT:   return [[RESULT]] : $()
+  // CHECK-NEXT: } // end sil function '_T08lifetime3FooCfD'
 
 }
 
