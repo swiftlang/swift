@@ -50,6 +50,21 @@ protocol SubscriptableGetSet {
 var subscriptableGet : SubscriptableGet
 var subscriptableGetSet : SubscriptableGetSet
 
+class OpaqueClass<T> {
+  typealias ObnoxiousTuple = (T, (T.Type, (T) -> T))
+
+  func inAndOut(x: T) -> T { return x }
+  func variantOptionalityTuples(x: ObnoxiousTuple) -> ObnoxiousTuple? { return x }
+}
+
+class StillOpaqueClass<T>: OpaqueClass<T> {
+  override func variantOptionalityTuples(x: ObnoxiousTuple?) -> ObnoxiousTuple { return x! }
+}
+
+class OpaqueTupleClass<U>: OpaqueClass<(U, U)> {
+  override func inAndOut(x: (U, U)) -> (U, U) { return x }
+}
+
 func unreachableF<T>() -> (Int, T)? { }
 
 func s010_hasVarArg(_ args: Any...) {}
@@ -70,6 +85,45 @@ enum AddressOnlyEnum {
   case mere(EmptyP)
   case phantom(AddressOnlyStruct)
 }
+
+// Test vtables - OpaqueTupleClass
+// ---
+// CHECK-LABEL: sil private @_T020opaque_values_silgen16OpaqueTupleClassC8inAndOutx_xtx_xt1x_tFAA0dF0CADxxAE_tFTV : $@convention(method) <U> (@in (U, U), @guaranteed OpaqueTupleClass<U>) -> @out (U, U) {
+// CHECK: bb0([[ARG0:%.*]] : $(U, U), [[ARG1:%.*]] : $OpaqueTupleClass<U>):
+// CHECK:   [[TELEM0:%.*]] = tuple_extract [[ARG0]] : $(U, U), 0
+// CHECK:   [[TELEM1:%.*]] = tuple_extract [[ARG0]] : $(U, U), 1
+// CHECK:   [[APPLY:%.*]] = apply {{.*}}<U>([[TELEM0]], [[TELEM1]], [[ARG1]]) : $@convention(method) <τ_0_0> (@in τ_0_0, @in τ_0_0, @guaranteed OpaqueTupleClass<τ_0_0>) -> (@out τ_0_0, @out τ_0_0)
+// CHECK:   [[BORROWED_T:%.*]] = begin_borrow [[APPLY]]
+// CHECK:   [[BORROWED_T_EXT0:%.*]] = tuple_extract [[BORROWED_T]] : $(U, U), 0
+// CHECK:   [[RETVAL0:%.*]] = copy_value [[BORROWED_T_EXT0]] : $U
+// CHECK:   [[BORROWED_T_EXT1:%.*]] = tuple_extract [[BORROWED_T]] : $(U, U), 1
+// CHECK:   [[RETVAL1:%.*]] = copy_value [[BORROWED_T_EXT1]] : $U
+// CHECK:   end_borrow [[BORROWED_T]]
+// CHECK:   [[RETVAL:%.*]] = tuple ([[RETVAL0]] : $U, [[RETVAL1]] : $U)
+// CHECK:   return [[RETVAL]]
+// CHECK-LABEL: } // end sil function '_T020opaque_values_silgen16OpaqueTupleClassC8inAndOutx_xtx_xt1x_tFAA0dF0CADxxAE_tFTV'
+
+// Test vtables - StillOpaqueClass
+// ---
+// CHECK-LABEL: sil private @_T020opaque_values_silgen16StillOpaqueClassC24variantOptionalityTuplesx_xm_xxcttx_xm_xxcttSg1x_tFAA0eF0CAdEx_xm_xxcttAF_tFTV : $@convention(method) <T> (@in T, @thick T.Type, @owned @callee_owned (@in T) -> @out T, @guaranteed StillOpaqueClass<T>) -> @out Optional<(T, (@thick T.Type, @callee_owned (@in T) -> @out T))> {
+// CHECK: bb0([[ARG0:%.*]] : $T, [[ARG1:%.*]] : $@thick T.Type, [[ARG2:%.*]] : $@callee_owned (@in T) -> @out T, [[ARG3:%.*]] : $StillOpaqueClass<T>):
+// CHECK:   [[TELEM0:%.*]] = tuple ([[ARG1]] : $@thick T.Type, [[ARG2]] : $@callee_owned (@in T) -> @out T)
+// CHECK:   [[TELEM1:%.*]] = tuple ([[ARG0]] : $T, [[TELEM0]] : $(@thick T.Type, @callee_owned (@in T) -> @out T))
+// CHECK:   [[ENUMOPT0:%.*]] = enum $Optional<(T, (@thick T.Type, @callee_owned (@in T) -> @out T))>, #Optional.some!enumelt.1, [[TELEM1]] : $(T, (@thick T.Type, @callee_owned (@in T) -> @out T))
+// CHECK:   [[APPLY:%.*]] = apply {{.*}}<T>([[ENUMOPT0]], [[ARG3]]) : $@convention(method) <τ_0_0> (@in Optional<(τ_0_0, (@thick τ_0_0.Type, @callee_owned (@in τ_0_0) -> @out τ_0_0))>, @guaranteed StillOpaqueClass<τ_0_0>) -> (@out τ_0_0, @thick τ_0_0.Type, @owned @callee_owned (@in τ_0_0) -> @out τ_0_0)
+// CHECK:   [[BORROWED_T:%.*]] = begin_borrow [[APPLY]]
+// CHECK:   [[BORROWED_T_EXT0:%.*]] = tuple_extract [[BORROWED_T]] : $(T, @thick T.Type, @callee_owned (@in T) -> @out T), 0
+// CHECK:   [[RETVAL0:%.*]] = copy_value [[BORROWED_T_EXT0]]
+// CHECK:   [[BORROWED_T_EXT1:%.*]] = tuple_extract [[BORROWED_T]] : $(T, @thick T.Type, @callee_owned (@in T) -> @out T), 1
+// CHECK:   [[BORROWED_T_EXT2:%.*]] = tuple_extract [[BORROWED_T]] : $(T, @thick T.Type, @callee_owned (@in T) -> @out T), 2
+// CHECK:   [[RETVAL1:%.*]] = copy_value [[BORROWED_T_EXT2]]
+// CHECK:   end_borrow [[BORROWED_T]]
+// CHECK:   [[RETTUPLE0:%.*]] = tuple ([[BORROWED_T_EXT1]] : $@thick T.Type, [[RETVAL1]] : $@callee_owned (@in T) -> @out T)
+// CHECK:   [[RETTUPLE1:%.*]] = tuple ([[RETVAL0]] : $T, [[RETTUPLE0]] : $(@thick T.Type, @callee_owned (@in T) -> @out T))
+// CHECK:   [[RETVAL:%.*]] = enum $Optional<(T, (@thick T.Type, @callee_owned (@in T) -> @out T))>, #Optional.some!enumelt.1, [[RETTUPLE1]] : $(T, (@thick T.Type, @callee_owned (@in T) -> @out T))
+// CHECK:   return [[RETVAL]]
+// CHECK-LABEL: } // end sil function '_T020opaque_values_silgen16StillOpaqueClassC24variantOptionalityTuplesx_xm_xxcttx_xm_xxcttSg1x_tFAA0eF0CAdEx_xm_xxcttAF_tFTV'
+
 
 // part of s280_convExistTrivial: conversion between existential types - reabstraction thunk
 // ---
