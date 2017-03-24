@@ -379,4 +379,7 @@ def group_info_path : Separate<["-"], "group-info-path">,
 def diagnostics_editor_mode : Flag<["-"], "diagnostics-editor-mode">,
 HelpText<"Diagnostics will be used in editor">;
 
+def validate_tbd_against_ir: Flag<["-"], "validate-tbd-against-ir">,
+    HelpText<"Compare the symbols in the IR against the TBD file that would be generated.">;
+
 } // end let Flags = [FrontendOption, NoDriverOption, HelpHidden]

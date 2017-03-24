@@ -149,6 +149,7 @@ public:
     /// Parse, type-check, and dump type refinement context hierarchy
     DumpTypeRefinementContexts,
 
+    EmitTBD, ///< Emit a TBD file for this module
     EmitImportedModules, ///< Emit the modules that this one imports
     EmitPCH, ///< Emit PCH of imported bridging header
 
@@ -262,6 +263,9 @@ public:
   /// Should we sort SIL functions, vtables, witness tables, and global
   /// variables by name when we print it out. This eases diffing of SIL files.
   bool EmitSortedSIL = false;
+
+  /// Compare the symbols in the IR against the TBD file we would generate.
+  bool ValidateTBDAgainstIR = false;
 
   /// An enum with different modes for automatically crashing at defined times.
   enum class DebugCrashMode {
