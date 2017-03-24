@@ -42,7 +42,7 @@ protected:
   ClassDecl *const Target;
 
   ClassMetadataLayout(IRGenModule &IGM, ClassDecl *target)
-    : super(IGM), Target(target) {}
+    : super(IGM), SILVTableVisitor<Impl>(IGM.getSILTypes()), Target(target) {}
 
 public:
   void layout() {

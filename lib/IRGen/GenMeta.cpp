@@ -4604,8 +4604,8 @@ llvm::Value *irgen::emitVirtualMethodValue(IRGenFunction &IGF,
   AbstractFunctionDecl *methodDecl
     = cast<AbstractFunctionDecl>(method.getDecl());
 
-  // Find the function that's actually got an entry in the metadata.
-  SILDeclRef overridden = method.getBaseOverriddenVTableEntry();
+  // Find the vtable entry for this method.
+  SILDeclRef overridden = IGF.IGM.getSILTypes().getOverriddenVTableEntry(method);
 
   // Find the metadata.
   llvm::Value *metadata;
