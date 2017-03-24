@@ -1757,6 +1757,36 @@ struct ASTNodeBase {};
           abort();
         }
       }
+
+      // Make sure we consistently set accessor overrides.
+      if (auto *baseASD = ASD->getOverriddenDecl()) {
+        if (ASD->getGetter() && baseASD->getGetter())
+          assert(ASD->getGetter()->getOverriddenDecl() ==
+                 baseASD->getGetter() &&
+                 "Storage overrides but getter does not");
+        if (ASD->getSetter() && baseASD->getSetter() &&
+            baseASD->isSetterAccessibleFrom(ASD->getDeclContext()))
+          assert(ASD->getSetter()->getOverriddenDecl() ==
+                 baseASD->getSetter() &&
+                 "Storage overrides but setter does not");
+        if (ASD->getMaterializeForSetFunc() &&
+            baseASD->getMaterializeForSetFunc() &&
+            baseASD->isSetterAccessibleFrom(ASD->getDeclContext()))
+          assert(ASD->getMaterializeForSetFunc()->getOverriddenDecl() ==
+                 baseASD->getMaterializeForSetFunc() &&
+                 "Storage override but materializeForSet does not");
+      } else {
+        if (ASD->getGetter())
+          assert(!ASD->getGetter()->getOverriddenDecl() &&
+                 "Storage does not override but getter does");
+        if (ASD->getSetter())
+          assert(!ASD->getSetter()->getOverriddenDecl() &&
+                 "Storage does not override but setter does");
+        if (ASD->getMaterializeForSetFunc())
+          assert(!ASD->getMaterializeForSetFunc()->getOverriddenDecl() &&
+                 "Storage does not override but materializeForSet does");
+      }
+
       verifyCheckedBase(ASD);
     }
 
