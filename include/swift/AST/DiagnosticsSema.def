@@ -2691,12 +2691,13 @@ ERROR(trailing_closure_requires_parens,none,
       " context", ())
 
 ERROR(empty_switch_stmt,none,
-      "'switch' statement body must have at least one 'case' or 'default' block;"
-      " do you want to add "
-      "%select{missing cases?|a default case?}0",(bool))
+      "%select{'switch' statement body must have at least one 'case' or 'default' block; |}0"
+      "do you want to add "
+      "%select{missing cases?|a default case?}1",(bool, bool))
 ERROR(non_exhaustive_switch,none,
-      "switch must be exhaustive, consider adding "
-      "%select{missing cases|a default clause}0", (bool))
+      "%select{switch must be exhaustive, consider adding |do you want to add }0"
+      "%select{missing cases|a default clause}1"
+      "%select{|?}0", (bool, bool))
 //------------------------------------------------------------------------------
 // Type Check Patterns
 //------------------------------------------------------------------------------
