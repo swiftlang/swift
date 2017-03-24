@@ -82,10 +82,8 @@ protocol CircleStart : CircleEnd { func circle_start() } // expected-error 2{{ci
 // expected-note@-1{{protocol 'CircleStart' declared here}}
 protocol CircleEnd : CircleMiddle { func circle_end()} // expected-note{{protocol 'CircleEnd' declared here}}
 
-// expected-warning@+2{{redundant conformance constraint 'Self': 'CircleTrivial'}}
-// expected-note@+1{{conformance constraint 'Self': 'CircleTrivial' implied here}}
 protocol CircleEntry : CircleTrivial { }
-protocol CircleTrivial : CircleTrivial { } // expected-error 3{{circular protocol inheritance CircleTrivial}}
+protocol CircleTrivial : CircleTrivial { } // expected-error 2{{circular protocol inheritance CircleTrivial}}
 
 struct Circle {
   func circle_start() {}
