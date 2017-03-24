@@ -712,7 +712,7 @@ RValue Lowering::emitConditionalCheckedCast(SILGenFunction &SGF,
   SILValue resultObjectBuffer;
   Optional<TemporaryInitialization> resultObjectTemp;
   SGFContext resultObjectCtx;
-  if (resultTL.isAddressOnly() ||
+  if ((resultTL.isAddressOnly() && SGF.silConv.useLoweredAddresses()) ||
       (C.getEmitInto() && C.getEmitInto()->getAddressOrNull())) {
     SILType resultTy = resultTL.getLoweredType();
     resultBuffer = SGF.getBufferForExprResult(loc, resultTy, C);

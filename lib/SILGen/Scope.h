@@ -41,6 +41,9 @@ public:
     cleanups.innermostScope = depth;
   }
 
+  explicit Scope(SILGenFunction &SGF, SILLocation loc)
+      : Scope(SGF.Cleanups, CleanupLocation::get(loc)) {}
+
   void pop() {
     assert(depth.isValid() && "popping a scope twice!");
     popImpl();
@@ -53,6 +56,17 @@ public:
   }
 
   bool isValid() const { return depth.isValid(); }
+
+  ManagedValue popPreservingValue(ManagedValue mv) {
+    // If we have a value, make sure that it is an object. The reason why is
+    // that we want to make sure that we are not forwarding a cleanup for a
+    // stack location that will be destroyed by this scope.
+    assert(!mv.getValue() || mv.getType().isObject());
+    CleanupCloner cloner(cleanups.SGF, mv);
+    SILValue value = mv.forward(cleanups.SGF);
+    pop();
+    return cloner.clone(value);
+  }
 
 private:
   void popImpl() {

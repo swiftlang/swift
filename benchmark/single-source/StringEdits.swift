@@ -23,6 +23,9 @@ var editWords: [String] = [
   "gastroperiodynia",
 ]
 
+// FIXME: remove when String is a Collection
+extension String: RangeReplaceableCollection { }
+
 let alphabet = "abcdefghijklmnopqrstuvwxyz"
 /// All edits that are one edit away from `word`
 func edits(_ word: String) -> Set<String> {

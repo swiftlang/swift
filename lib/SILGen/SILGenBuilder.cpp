@@ -22,38 +22,24 @@ using namespace swift;
 using namespace Lowering;
 
 //===----------------------------------------------------------------------===//
-//                             Cleanup Forwarder
+//                               CleanupCloner
 //===----------------------------------------------------------------------===//
 
-namespace {
-class CleanupCloner {
-  SILGenFunction &SGF;
-  bool hasCleanup;
-  bool isLValue;
-  ValueOwnershipKind ownershipKind;
-
-public:
-  CleanupCloner(SILGenBuilder &Builder, ManagedValue M)
-      : SGF(Builder.getSILGenFunction()), hasCleanup(M.hasCleanup()),
-        isLValue(M.isLValue()), ownershipKind(M.getOwnershipKind()) {}
-
-  ManagedValue clone(SILValue value) {
-    if (isLValue) {
-      return ManagedValue::forLValue(value);
-    }
-
-    if (!hasCleanup) {
-      return ManagedValue::forUnmanaged(value);
-    }
-
-    if (value->getType().isAddress()) {
-      return SGF.emitManagedBufferWithCleanup(value);
-    }
-
-    return SGF.emitManagedRValueWithCleanup(value);
+ManagedValue CleanupCloner::clone(SILValue value) const {
+  if (isLValue) {
+    return ManagedValue::forLValue(value);
   }
-};
-} // end anonymous namespace
+
+  if (!hasCleanup) {
+    return ManagedValue::forUnmanaged(value);
+  }
+
+  if (value->getType().isAddress()) {
+    return SGF.emitManagedBufferWithCleanup(value);
+  }
+
+  return SGF.emitManagedRValueWithCleanup(value);
+}
 
 //===----------------------------------------------------------------------===//
 //                              Utility Methods
@@ -658,7 +644,8 @@ ManagedValue SILGenBuilder::createOpenExistentialRef(SILLocation loc,
 //===----------------------------------------------------------------------===//
 
 void SwitchEnumBuilder::emit() && {
-  bool isAddressOnly = optional.getType().isAddressOnly(builder.getModule());
+  bool isAddressOnly = optional.getType().isAddressOnly(builder.getModule()) &&
+                       getSGF().silConv.useLoweredAddresses();
   using DeclBlockPair = std::pair<EnumElementDecl *, SILBasicBlock *>;
   {
     // TODO: We could store the data in CaseBB form and not have to do this.

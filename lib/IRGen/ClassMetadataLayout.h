@@ -18,6 +18,7 @@
 #define SWIFT_IRGEN_CLASSMETADATALAYOUT_H
 
 #include "swift/SIL/SILDeclRef.h"
+#include "swift/SIL/SILVTableVisitor.h"
 #include "IRGen.h"
 #include "MetadataLayout.h"
 
@@ -28,7 +29,9 @@ class IRGenModule;
 
 /// A CRTP class for laying out class metadata.  Note that this does
 /// *not* handle the metadata template stuff.
-template <class Impl> class ClassMetadataLayout : public MetadataLayout<Impl> {
+template <class Impl> class ClassMetadataLayout
+    : public MetadataLayout<Impl>,
+      public SILVTableVisitor<Impl> {
   typedef MetadataLayout<Impl> super;
 
 protected:
@@ -39,7 +42,7 @@ protected:
   ClassDecl *const Target;
 
   ClassMetadataLayout(IRGenModule &IGM, ClassDecl *target)
-    : super(IGM), Target(target) {}
+    : super(IGM), SILVTableVisitor<Impl>(IGM.getSILTypes()), Target(target) {}
 
 public:
   void layout() {
@@ -101,48 +104,8 @@ private:
     // parameters for the parent context are handled by the parent.
     asImpl().addGenericFields(theClass, type, theClass);
 
-    // Add entries for the methods.
-    for (auto member : theClass->getMembers()) {
-      // If this is a non-overriding final member, we don't need table entries.
-      // FIXME: do we really need entries for final overrides?  The
-      // superclass should provide the entries it needs, and
-      // reabstracting overrides shouldn't be required: if we know
-      // enough to call the override, we know enough to call it
-      // directly.
-      if (auto *VD = dyn_cast<ValueDecl>(member))
-        if (VD->isFinal() && VD->getOverriddenDecl() == nullptr)
-          continue;
-
-      // @NSManaged properties and methods don't have vtable entries.
-      if (member->getAttrs().hasAttribute<NSManagedAttr>())
-        continue;
-
-      // Add entries for methods.
-      if (auto fn = dyn_cast<FuncDecl>(member)) {
-        // Ignore accessors.  These get added when their AbstractStorageDecl is
-        // visited.
-        if (fn->isAccessor())
-          continue;
-
-        addMethodEntries(fn);
-      } else if (auto ctor = dyn_cast<ConstructorDecl>(member)) {
-        // Stub constructors don't get an entry.
-        if (ctor->hasStubImplementation())
-          continue;
-
-        // Add entries for constructors.
-        addMethodEntries(ctor);
-      } else if (auto *asd = dyn_cast<AbstractStorageDecl>(member)) {
-        // FIXME: Stored properties should either be final or have accessors.
-        if (!asd->hasAccessorFunctions()) continue;
-
-        addMethodEntries(asd->getGetter());
-        if (auto *setter = asd->getSetter())
-          addMethodEntries(setter);
-        if (auto *materializeForSet = asd->getMaterializeForSetFunc())
-          addMethodEntries(materializeForSet);
-      }
-    }
+    // Add vtable entries.
+    asImpl().addVTableEntries(theClass);
 
     // A class only really *needs* a field-offset vector in the
     // metadata if:
@@ -176,32 +139,6 @@ private:
   void addFieldEntries(VarDecl *field) {
     asImpl().addFieldOffset(field);
   }
-
-  void addMethodEntries(AbstractFunctionDecl *fn) {
-    // If the method does not have a vtable entry, don't add any.
-    if (!hasKnownVTableEntry(IGM, fn))
-      return;
-
-    if (isa<FuncDecl>(fn))
-      maybeAddMethod(fn, SILDeclRef::Kind::Func);
-    else {
-      auto ctor = cast<ConstructorDecl>(fn);
-      if (ctor->isRequired())
-        maybeAddMethod(fn, SILDeclRef::Kind::Allocator);
-      maybeAddMethod(fn, SILDeclRef::Kind::Initializer);
-    }
-  }
-
-  void maybeAddMethod(AbstractFunctionDecl *fn,
-                      SILDeclRef::Kind kind) {
-    SILDeclRef declRef(fn, kind);
-    // If the method overrides something, we don't need a new entry.
-    if (declRef.getNextOverriddenVTableEntry())
-      return;
-
-    // Both static and non-static functions go in the metadata.
-    asImpl().addMethod(declRef);
-  }
 };
 
 /// An "implementation" of ClassMetadataLayout that just scans through
@@ -232,9 +169,10 @@ public:
   void addClassAddressPoint() { addInt32(); }
   void addClassCacheData() { addPointer(); addPointer(); }
   void addClassDataPointer() { addPointer(); }
-  void addMethod(SILDeclRef fn) {
+  void addMethod(SILDeclRef declRef) {
     addPointer();
   }
+  void addMethodOverride(SILDeclRef baseRef, SILDeclRef declRef) {}
   void addFieldOffset(VarDecl *var) { addPointer(); }
   void addGenericArgument(CanType argument, ClassDecl *forClass) {
     addPointer();

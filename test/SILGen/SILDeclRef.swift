@@ -55,16 +55,16 @@ public func testBase(b: Base) -> Int32 {
 // Check that vtables and witness tables contain SILDeclRefs with signatures.
 
 // CHECK: sil_vtable Base {
-// CHECK:  #Base.foo!1: (Base) -> () -> Int32 : _T010SILDeclRef4BaseC3foos5Int32VyF	// Base.foo() -> Int32
-// CHECK:  #Base.foo!1: (Base) -> (Int32) -> () : _T010SILDeclRef4BaseC3fooys5Int32V1n_tF	// Base.foo(n : Int32) -> ()
-// CHECK:  #Base.foo!1: (Base) -> (Float) -> Int32 : _T010SILDeclRef4BaseC3foos5Int32VSf1f_tF	// Base.foo(f : Float) -> Int32
-// CHECK:  #Base.deinit!deallocator: _T010SILDeclRef4BaseCfD	// Base.__deallocating_deinit
-// CHECK:  #Base.init!initializer.1: (Base.Type) -> () -> Base : _T010SILDeclRef4BaseCACycfc	// Base.init() -> Base
-// CHECK: }
+// CHECK-NEXT:  #Base.foo!1: (Base) -> () -> Int32 : _T010SILDeclRef4BaseC3foos5Int32VyF	// Base.foo() -> Int32
+// CHECK-NEXT:  #Base.foo!1: (Base) -> (Int32) -> () : _T010SILDeclRef4BaseC3fooys5Int32V1n_tF	// Base.foo(n : Int32) -> ()
+// CHECK-NEXT:  #Base.foo!1: (Base) -> (Float) -> Int32 : _T010SILDeclRef4BaseC3foos5Int32VSf1f_tF	// Base.foo(f : Float) -> Int32
+// CHECK-NEXT:  #Base.init!initializer.1: (Base.Type) -> () -> Base : _T010SILDeclRef4BaseCACycfc	// Base.init() -> Base
+// CHECK-NEXT:  #Base.deinit!deallocator: _T010SILDeclRef4BaseCfD	// Base.__deallocating_deinit
+// CHECK-NEXT: }
 
 // CHECK:sil_witness_table [fragile] Base: P module SILDeclRef {
-// CHECK: method #P.foo!1: <Self where Self : P> (Self) -> () -> Int32 : @_T010SILDeclRef4BaseCAA1PA2aDP3foos5Int32VyFTW	// protocol witness for P.foo() -> Int32 in conformance Base
-// CHECK: method #P.foo!1: <Self where Self : P> (Self) -> (Int32) -> () : @_T010SILDeclRef4BaseCAA1PA2aDP3fooys5Int32V1n_tFTW	// protocol witness for P.foo(n : Int32) -> () in conformance Base
-// CHECK: }
+// CHECK-NEXT: method #P.foo!1: <Self where Self : P> (Self) -> () -> Int32 : @_T010SILDeclRef4BaseCAA1PA2aDP3foos5Int32VyFTW	// protocol witness for P.foo() -> Int32 in conformance Base
+// CHECK-NEXT: method #P.foo!1: <Self where Self : P> (Self) -> (Int32) -> () : @_T010SILDeclRef4BaseCAA1PA2aDP3fooys5Int32V1n_tFTW	// protocol witness for P.foo(n : Int32) -> () in conformance Base
+// CHECK-NEXT: }
 
 

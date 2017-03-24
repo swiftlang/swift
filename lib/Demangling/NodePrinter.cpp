@@ -378,6 +378,7 @@ private:
     case Node::Kind::ValueWitnessTable:
     case Node::Kind::Variable:
     case Node::Kind::VTableAttribute:
+    case Node::Kind::VTableThunk:
     case Node::Kind::Weak:
     case Node::Kind::WillSet:
     case Node::Kind::WitnessTableOffset:
@@ -1172,6 +1173,13 @@ void NodePrinter::print(NodePointer pointer, bool asContext, bool suppressType) 
     Printer << "instantiation function for generic protocol witness table for ";
     print(pointer->getFirstChild());
     return;
+  case Node::Kind::VTableThunk: {
+    Printer << "vtable thunk for ";
+    print(pointer->getChild(1));
+    Printer << " dispatching to ";
+    print(pointer->getChild(0));
+    return;
+  }
   case Node::Kind::ProtocolWitness: {
     Printer << "protocol witness for ";
     print(pointer->getChild(1));
@@ -1561,6 +1569,10 @@ void NodePrinter::print(NodePointer pointer, bool asContext, bool suppressType) 
       name = "_RefCountedObject";
     } else if (c == 'N') {
       name = "_NativeRefCountedObject";
+    } else if (c == 'C') {
+      name = "_Class";
+    } else if (c == 'D') {
+      name = "_NativeClass";
     } else if (c == 'T') {
       name = "_Trivial";
     } else if (c == 'E' || c == 'e') {

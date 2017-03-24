@@ -139,10 +139,6 @@ extension _SwiftNativeNSArrayWithContiguousStorage : _NSArrayCore {
 ///
 /// Ideally instances of this class would be allocated in-line in the
 /// buffers used for Array storage.
-///
-/// FIXME: If this class is not marked as @_fixed_layout and init
-/// not marked as @_inlineable, many executable tests are crashing
-/// in resilient stdlib builds.
 @_versioned
 @objc internal final class _SwiftDeferredNSArray
   : _SwiftNativeNSArrayWithContiguousStorage {

@@ -476,7 +476,7 @@ private:
                            Optional<Diag<unsigned, Type, T, T>>
                              conflictingDiag,
                            Diag<Type, T> redundancyDiag,
-                           Diag<bool, Type, T> otherNoteDiag);
+                           Diag<unsigned, Type, T> otherNoteDiag);
 
   /// Check a list of constraints, removing self-derived constraints
   /// and diagnosing redundant constraints.
@@ -500,7 +500,7 @@ private:
                            Optional<Diag<unsigned, Type, DiagT, DiagT>>
                              conflictingDiag,
                            Diag<Type, DiagT> redundancyDiag,
-                           Diag<bool, Type, DiagT> otherNoteDiag,
+                           Diag<unsigned, Type, DiagT> otherNoteDiag,
                            llvm::function_ref<DiagT(const T&)> diagValue,
                            bool removeSelfDerived);
 
@@ -870,6 +870,9 @@ public:
     return getRoot()->kind == Inferred;
   }
 
+  /// Classify the kind of this source for diagnostic purposes.
+  unsigned classifyDiagKind() const;
+
   /// Whether the requirement can be derived from something in its path.
   ///
   /// Derived requirements will not be recorded in a minimized generic
@@ -888,6 +891,11 @@ public:
   /// requirement redundant, because without said original requirement, the
   /// derived requirement ceases to hold.
   bool isSelfDerivedSource(PotentialArchetype *pa) const;
+
+  /// Determine whether a requirement \c pa: proto, when formed from this
+  /// requirement source, is dependent on itself.
+  bool isSelfDerivedConformance(PotentialArchetype *pa,
+                                ProtocolDecl *proto) const;
 
   /// Retrieve a source location that corresponds to the requirement.
   SourceLoc getLoc() const;

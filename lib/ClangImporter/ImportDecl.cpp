@@ -2034,7 +2034,7 @@ namespace {
             /*Deprecated*/clang::VersionTuple(), SourceRange(),
             /*Obsoleted*/clang::VersionTuple(), SourceRange(),
             PlatformAgnosticAvailabilityKind::SwiftVersionSpecific,
-            /*Implicit*/true);
+            /*Implicit*/false);
       }
 
       decl->getAttrs().add(attr);
@@ -4409,8 +4409,13 @@ namespace {
                                       OptionalAttr(/*implicit*/false));
       // FIXME: Handle IBOutletCollection.
 
-      if (overridden)
+      if (overridden) {
         result->setOverriddenDecl(overridden);
+        getter->setOverriddenDecl(overridden->getGetter());
+        if (auto parentSetter = overridden->getSetter())
+          if (setter)
+            setter->setOverriddenDecl(parentSetter);
+      }
 
       // If this is a Swift 2 stub, mark it as such.
       if (correctSwiftName)
@@ -7504,22 +7509,31 @@ ClangImporter::Implementation::loadAllMembers(Decl *D, uint64_t extra) {
       // Only continue members in the same submodule as this extension.
       if (decl->getImportedOwningModule() != submodule) continue;
 
-      // Import the member.
-      auto member = importDecl(decl, CurrentVersion);
-      if (!member || member->getDeclContext() != ext) continue;
+      SmallPtrSet<DeclName, 8> seenNames;
+      forEachImportNameVersionFromCurrent(CurrentVersion,
+                                          [&](ImportNameVersion nameVersion) {
+        // Check to see if the name is different.
+        ImportedName newName = importFullName(decl, nameVersion);
+        if (!seenNames.insert(newName).second)
+          return;
 
-      // Add the member.
-      ext->addMember(member);
+        // Quickly check the context and bail out if it obviously doesn't
+        // belong here.
+        if (auto *importDC = newName.getEffectiveContext().getAsDeclContext())
+          if (importDC->isTranslationUnit())
+            return;
 
-      for (auto alternate : getAlternateDecls(member)) {
-        if (alternate->getDeclContext() == ext)
-          ext->addMember(alternate);
-      }
-
-      // Import the Swift 2 stub declaration.
-      if (auto swift2Member = importDecl(decl, ImportNameVersion::Swift2))
-        if (swift2Member->getDeclContext() == ext)
-          ext->addMember(swift2Member);
+        // Then try to import the decl under the specified name.
+        auto *member = importDecl(decl, nameVersion);
+        if (!member || member->getDeclContext() != ext)
+          return;
+        ext->addMember(member);
+        
+        for (auto alternate : getAlternateDecls(member)) {
+          if (alternate->getDeclContext() == ext)
+            ext->addMember(alternate);
+        }
+      });
     }
 
     return;

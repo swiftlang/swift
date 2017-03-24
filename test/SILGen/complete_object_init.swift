@@ -3,7 +3,14 @@
 struct X { }
 
 class A {
-  // CHECK-LABEL: sil hidden @_T020complete_object_init1AC{{[_0-9a-zA-Z]*}}fc : $@convention(method) (@owned A) -> @owned A
+// CHECK-LABEL: sil hidden @_T020complete_object_init1AC{{[_0-9a-zA-Z]*}}fC : $@convention(method) (@thick A.Type) -> @owned A
+// CHECK: bb0([[SELF_META:%[0-9]+]] : $@thick A.Type):
+// CHECK:   [[SELF:%[0-9]+]] = alloc_ref_dynamic [[SELF_META]] : $@thick A.Type, $A
+// CHECK:   [[OTHER_INIT:%[0-9]+]] = function_ref @_T020complete_object_init1AC{{[_0-9a-zA-Z]*}}fc : $@convention(method) (@owned A) -> @owned A
+// CHECK:   [[RESULT:%[0-9]+]] = apply [[OTHER_INIT]]([[SELF]]) : $@convention(method) (@owned A) -> @owned A
+// CHECK:   return [[RESULT]] : $A
+
+// CHECK-LABEL: sil hidden @_T020complete_object_init1AC{{[_0-9a-zA-Z]*}}fc : $@convention(method) (@owned A) -> @owned A
 // CHECK: bb0([[SELF_PARAM:%[0-9]+]] : $A):
 // CHECK:   [[SELF_BOX:%[0-9]+]] = alloc_box ${ var A }
 // CHECK:   [[PB:%.*]] = project_box [[SELF_BOX]]
@@ -20,13 +27,7 @@ class A {
 // CHECK:   destroy_value [[SELF_BOX]] : ${ var A }
 // CHECK:   return [[RESULT]] : $A
 
-  // CHECK-LABEL: sil hidden @_T020complete_object_init1AC{{[_0-9a-zA-Z]*}}fC : $@convention(method) (@thick A.Type) -> @owned A
   convenience init() {
-    // CHECK: bb0([[SELF_META:%[0-9]+]] : $@thick A.Type):
-    // CHECK:   [[SELF:%[0-9]+]] = alloc_ref_dynamic [[SELF_META]] : $@thick A.Type, $A
-    // CHECK:   [[OTHER_INIT:%[0-9]+]] = function_ref @_T020complete_object_init1AC{{[_0-9a-zA-Z]*}}fc : $@convention(method) (@owned A) -> @owned A
-    // CHECK:   [[RESULT:%[0-9]+]] = apply [[OTHER_INIT]]([[SELF]]) : $@convention(method) (@owned A) -> @owned A
-    // CHECK:   return [[RESULT]] : $A
     self.init(x: X())
   }
 

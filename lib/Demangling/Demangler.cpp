@@ -1217,9 +1217,13 @@ NodePointer Demangler::demangleThunkOrSpecialization() {
     case 'O': return createNode(Node::Kind::NonObjCAttribute);
     case 'D': return createNode(Node::Kind::DynamicAttribute);
     case 'd': return createNode(Node::Kind::DirectMethodReferenceAttribute);
-    case 'V': return createNode(Node::Kind::VTableAttribute);
     case 'a': return createNode(Node::Kind::PartialApplyObjCForwarder);
     case 'A': return createNode(Node::Kind::PartialApplyForwarder);
+    case 'V': {
+      NodePointer Base = popNode(isEntity);
+      NodePointer Derived = popNode(isEntity);
+      return createWithChildren(Node::Kind::VTableThunk, Derived, Base);
+    }
     case 'W': {
       NodePointer Entity = popNode(isEntity);
       NodePointer Conf = popProtocolConformance();
@@ -1837,6 +1841,10 @@ NodePointer Demangler::demangleGenericRequirement() {
       name = "R";
     } else if (c == 'N') {
       name = "N";
+    } else if (c == 'C') {
+      name = "C";
+    } else if (c == 'D') {
+      name = "D";
     } else if (c == 'T') {
       name = "T";
     } else if (c == 'E') {

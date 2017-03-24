@@ -104,11 +104,11 @@ SYNTAX(FunctionTypeArgument, Syntax)
 SYNTAX(FunctionCallArgumentList, Syntax)
 SYNTAX(FunctionCallArgument, Syntax)
 SYNTAX(FunctionSignature, Syntax)
-SYNTAX(FunctionParameterList, Syntax)
 SYNTAX(FunctionParameter, Syntax)
 SYNTAX(DeclModifier, Syntax)
 SYNTAX(DeclModifierList, Syntax)
 
+SYNTAX_COLLECTION(FunctionParameterList, FunctionParameterSyntax)
 SYNTAX_COLLECTION(TupleTypeElementList, TupleTypeElementSyntax)
 
 #undef SYNTAX_COLLECTION

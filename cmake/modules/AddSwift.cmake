@@ -465,23 +465,22 @@ function(_add_swift_lipo_target)
   is_darwin_based_sdk("${LIPO_SDK}" IS_DARWIN)
   if(IS_DARWIN)
     if(LIPO_CODESIGN)
-      precondition(CMAKE_CODESIGN MESSAGE "CMAKE_CODESIGN is required, please set it")
-      set(codesign_command COMMAND "${CMAKE_CODESIGN}" "-f" "-s" "-" "${LIPO_OUTPUT}")
+      set(codesign_command COMMAND "codesign" "-f" "-s" "-" "${LIPO_OUTPUT}")
     endif()
     # Use lipo to create the final binary.
     add_custom_command_target(unused_var
-      COMMAND "${CMAKE_LIPO}" "-create" "-output" "${LIPO_OUTPUT}" ${source_binaries}
-      ${codesign_command}
-      CUSTOM_TARGET_NAME "${LIPO_TARGET}"
-      OUTPUT "${LIPO_OUTPUT}"
-      DEPENDS ${source_targets})
+        COMMAND "${LIPO}" "-create" "-output" "${LIPO_OUTPUT}" ${source_binaries}
+        ${codesign_command}
+        CUSTOM_TARGET_NAME "${LIPO_TARGET}"
+        OUTPUT "${LIPO_OUTPUT}"
+        DEPENDS ${source_targets})
   else()
     # We don't know how to create fat binaries for other platforms.
     add_custom_command_target(unused_var
-      COMMAND "${CMAKE_COMMAND}" "-E" "copy" "${source_binaries}" "${LIPO_OUTPUT}"
-      CUSTOM_TARGET_NAME "${LIPO_TARGET}"
-      OUTPUT "${LIPO_OUTPUT}"
-      DEPENDS ${source_targets})
+        COMMAND "${CMAKE_COMMAND}" "-E" "copy" "${source_binaries}" "${LIPO_OUTPUT}"
+        CUSTOM_TARGET_NAME "${LIPO_TARGET}"
+        OUTPUT "${LIPO_OUTPUT}"
+        DEPENDS ${source_targets})
   endif()
 endfunction()
 

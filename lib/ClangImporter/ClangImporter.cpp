@@ -2753,46 +2753,38 @@ void ClangImporter::Implementation::lookupValue(
       if (auto clangDecl = entry.dyn_cast<clang::NamedDecl *>()) {
         const clang::NamedDecl *recentClangDecl =
             clangDecl->getMostRecentDecl();
-        auto tryImport = [&](ImportNameVersion nameVersion) -> bool {
+
+        forEachImportNameVersionFromCurrent(CurrentVersion,
+                                            [&](ImportNameVersion nameVersion) {
+          if (nameVersion == CurrentVersion)
+            return;
+          if (anyMatching)
+            return;
+
           // Check to see if the name and context match what we expect.
           ImportedName newName = importFullName(recentClangDecl, nameVersion);
           if (!newName.getDeclName().matchesRef(name))
-            return false;
+            return;
 
           const clang::DeclContext *clangDC =
               newName.getEffectiveContext().getAsDeclContext();
           if (!clangDC || !clangDC->isFileContext())
-            return false;
+            return;
 
           // Then try to import the decl under the alternate name.
           auto alternateNamedDecl =
               cast_or_null<ValueDecl>(importDeclReal(recentClangDecl,
                                                      nameVersion));
           if (!alternateNamedDecl)
-            return false;
+            return;
           assert(alternateNamedDecl->getFullName().matchesRef(name) &&
                  "importFullName behaved differently from importDecl");
           if (alternateNamedDecl->getDeclContext()->isModuleScopeContext()) {
             consumer.foundDecl(alternateNamedDecl,
                                DeclVisibilityKind::VisibleAtTopLevel);
-            return true;
+            anyMatching = true;
           }
-          return false;
-        };
-
-        // Try importing previous versions of the decl first...
-        ImportNameVersion nameVersion = CurrentVersion;
-        while (!anyMatching && nameVersion != ImportNameVersion::Raw) {
-          --nameVersion;
-          anyMatching = tryImport(nameVersion);
-        }
-        // ...then move on to newer versions if none of the old versions
-        // matched.
-        nameVersion = CurrentVersion;
-        while (!anyMatching && nameVersion != ImportNameVersion::LAST_VERSION) {
-          ++nameVersion;
-          anyMatching = tryImport(nameVersion);
-        }
+        });
       }
     }
   }

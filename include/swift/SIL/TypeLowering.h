@@ -500,7 +500,9 @@ class TypeConverter {
   llvm::DenseMap<SILDeclRef, SILConstantInfo> ConstantTypes;
   
   llvm::DenseMap<OverrideKey, SILConstantInfo> ConstantOverrideTypes;
-  
+
+  llvm::DenseMap<SILDeclRef, bool> RequiresVTableEntry;
+
   llvm::DenseMap<AnyFunctionRef, CaptureInfo> LoweredCaptures;
   
   /// The current generic context signature.
@@ -656,6 +658,16 @@ public:
   /// `constant` must refer to a method.
   SILParameterInfo getConstantSelfParameter(SILDeclRef constant);
 
+  /// Return if this method introduces a new vtable entry. This will be true
+  /// if the method does not override any method of its base class, or if it
+  /// overrides a method but has a more general AST type.
+  bool requiresNewVTableEntry(SILDeclRef method);
+
+  /// Return the most derived override which requires a new vtable entry.
+  /// If the method does not override anything or no override is vtable
+  /// dispatched, will return the least derived method.
+  SILDeclRef getOverriddenVTableEntry(SILDeclRef method);
+
   /// Returns the SILFunctionType that must be used to perform a vtable dispatch
   /// to the given declaration.
   ///
@@ -676,7 +688,7 @@ public:
     if (next.isNull())
       return getConstantInfo(constant);
 
-    auto base = constant.getBaseOverriddenVTableEntry();
+    auto base = getOverriddenVTableEntry(constant);
     return getConstantOverrideInfo(constant, base);
   }
 
@@ -831,6 +843,8 @@ private:
   CanAnyFunctionType getBridgedFunctionType(AbstractionPattern fnPattern,
                                             CanAnyFunctionType fnType,
                                             AnyFunctionType::ExtInfo extInfo);
+
+  bool requiresNewVTableEntryUncached(SILDeclRef method);
 };
 
 inline const TypeLowering &

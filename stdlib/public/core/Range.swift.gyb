@@ -405,7 +405,7 @@ def get_init_warning(Self, OtherSelf):
 % for (Self, op) in all_range_types:
 %   for (OtherSelf, other_op) in all_range_types:
 extension ${Self}
-%   if 'Countable' in Self or 'Countable' in OtherSelf or 'Closed' in Self or 'Closed' in OtherSelf:
+%   if ('Countable' in OtherSelf or 'Closed' in OtherSelf or 'Closed' in Self) and not 'Countable' in Self:
   where
   Bound : _Strideable, Bound.Stride : SignedInteger
 %   end
@@ -431,7 +431,7 @@ ${get_init_warning(Self, OtherSelf)}
 }
 
 extension ${Self}
-%   if 'Countable' in Self or 'Countable' in OtherSelf:
+%   if 'Countable' in OtherSelf and not 'Countable' in Self:
   where
   Bound : _Strideable, Bound.Stride : SignedInteger
 %   end
@@ -658,7 +658,7 @@ extension ${Self} where Bound : _Strideable, Bound.Stride : SignedInteger {
 ///   - minimum: The lower bound for the range.
 ///   - maximum: The upper bound for the range.
 @_transparent
-public func ..< <Bound : Comparable>(minimum: Bound, maximum: Bound)
+public func ..< <Bound>(minimum: Bound, maximum: Bound)
   -> Range<Bound> {
   _precondition(minimum <= maximum,
     "Can't form Range with upperBound < lowerBound")
@@ -689,11 +689,7 @@ public func ..< <Bound : Comparable>(minimum: Bound, maximum: Bound)
 @_transparent
 public func ..< <Bound>(
   minimum: Bound, maximum: Bound
-) -> CountableRange<Bound>
-  where
-  // WORKAROUND rdar://25214598 - should be just Bound : Strideable
-  Bound : _Strideable & Comparable,
-  Bound.Stride : Integer {
+) -> CountableRange<Bound> {
 
   // FIXME: swift-3-indexing-model: tests for traps.
   _precondition(minimum <= maximum,

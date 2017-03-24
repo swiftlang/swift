@@ -173,6 +173,12 @@ const void *RequirementSource::getOpaqueStorage3() const {
   return nullptr;
 }
 
+unsigned RequirementSource::classifyDiagKind() const {
+  if (isInferredRequirement()) return 2;
+  if (isDerivedRequirement()) return 1;
+  return 0;
+}
+
 bool RequirementSource::isDerivedRequirement() const {
   switch (kind) {
   case Explicit:
@@ -269,6 +275,144 @@ bool RequirementSource::isSelfDerivedSource(PotentialArchetype *pa) const {
   }
 
   return false;
+}
+
+/// Replace 'Self' in the given dependent type (\c depTy) with the given
+/// potential archetype, producing a new potential archetype that refers to
+/// the nested type. This limited operation makes sure that it does not
+/// create any new potential archetypes along the way, so it should only be
+/// used in cases where we're reconstructing something that we know exists.
+static PotentialArchetype *replaceSelfWithPotentialArchetype(
+                             PotentialArchetype *selfPA, Type depTy) {
+  if (auto depMemTy = depTy->getAs<DependentMemberType>()) {
+    // Recurse to produce the potential archetype for the base.
+    auto basePA = replaceSelfWithPotentialArchetype(selfPA,
+                                                    depMemTy->getBase());
+
+    PotentialArchetype *nestedPAByName = nullptr;
+
+    auto assocType = depMemTy->getAssocType();
+    auto name = depMemTy->getName();
+    auto findNested = [&](PotentialArchetype *pa) -> PotentialArchetype * {
+      const auto &nested = pa->getNestedTypes();
+      auto found = nested.find(name);
+
+      if (found == nested.end()) return nullptr;
+      if (found->second.empty()) return nullptr;
+
+      // Note that we've found a nested PA by name.
+      if (!nestedPAByName) {
+        nestedPAByName = found->second.front();
+      }
+
+      // If we don't have an associated type to look for, we're done.
+      if (!assocType) return nestedPAByName;
+
+      // Look for a nested PA matching the associated type.
+      for (auto nestedPA : found->second) {
+        if (nestedPA->getResolvedAssociatedType() == assocType)
+          return nestedPA;
+      }
+
+      return nullptr;
+    };
+
+    // First, look in the base potential archetype for the member we want.
+    if (auto result = findNested(basePA))
+      return result;
+
+    // Otherwise, look elsewhere in the equivalence class of the base potential
+    // archetype.
+    for (auto otherBasePA : basePA->getEquivalenceClassMembers()) {
+      if (otherBasePA == basePA) continue;
+
+      if (auto result = findNested(otherBasePA))
+        return result;
+    }
+
+    assert(nestedPAByName && "Didn't find the associated type we wanted");
+    return nestedPAByName;
+  }
+
+  assert(depTy->is<GenericTypeParamType>() && "missing Self?");
+  return selfPA;
+}
+
+bool RequirementSource::isSelfDerivedConformance(PotentialArchetype *currentPA,
+                                                 ProtocolDecl *proto) const {
+  /// Keep track of all of the requirements we've seen along the way. If
+  /// we see the same requirement twice, it's a self-derived conformance.
+  llvm::DenseSet<std::pair<PotentialArchetype *, ProtocolDecl *>>
+    constraintsSeen;
+
+  // Note that we've now seen a new constraint, returning true if we've seen
+  // it before.
+  auto addConstraint = [&](PotentialArchetype *pa, ProtocolDecl *proto) {
+    return !constraintsSeen.insert({pa->getRepresentative(), proto}).second;
+  };
+
+  // Insert our end state.
+  constraintsSeen.insert({currentPA->getRepresentative(), proto});
+
+  // Follow from the root of the
+  std::function<PotentialArchetype *(const RequirementSource *source)>
+    followFromRoot;
+
+  bool sawProtocolRequirement = false;
+  followFromRoot = [&](const RequirementSource *source) -> PotentialArchetype *{
+    // Handle protocol requirements.
+    if (source->kind == ProtocolRequirement) {
+      sawProtocolRequirement = true;
+
+      // Compute the base potential archetype.
+      auto basePA = followFromRoot(source->parent);
+      if (!basePA) return nullptr;
+
+      // The base potential archetype must conform to the protocol in which
+      // this requirement results.
+      if (addConstraint(basePA, source->getProtocolDecl()))
+        return nullptr;
+
+      // If there's no stored type, return the base.
+      if (!source->getStoredType()) return basePA;
+
+      // Follow the dependent type in the protocol requirement.
+      return replaceSelfWithPotentialArchetype(basePA, source->getStoredType());
+    }
+
+    if (source->kind == Parent) {
+      // Compute the base potential archetype.
+      auto basePA = followFromRoot(source->parent);
+      if (!basePA) return nullptr;
+
+      // Add on this associated type.
+      return replaceSelfWithPotentialArchetype(
+               basePA,
+               source->getAssociatedType()->getDeclaredInterfaceType());
+    }
+
+    if (source->parent)
+      return followFromRoot(source->parent);
+
+    // We are at a root, so the root potential archetype is our result.
+    auto rootPA = source->getRootPotentialArchetype();
+
+    // If we haven't seen a protocol requirement, we're done.
+    if (!sawProtocolRequirement) return rootPA;
+
+    // The root archetype might be a nested type, which implies constraints
+    // for each of the protocols of the associated types referenced (if any).
+    for (auto pa = rootPA; pa->getParent(); pa = pa->getParent()) {
+      if (auto assocType = pa->getResolvedAssociatedType()) {
+        if (addConstraint(pa->getParent(), assocType->getProtocol()))
+          return nullptr;
+      }
+    }
+
+    return rootPA;
+  };
+
+  return followFromRoot(this) == nullptr;
 }
 
 #define REQUIREMENT_SOURCE_FACTORY_BODY(ProfileArgs, ConstructorArgs,      \
@@ -2080,9 +2224,14 @@ bool GenericSignatureBuilder::addLayoutRequirement(
   equivClass->layoutConstraints.push_back({PAT, Layout, Source});
 
   // Update the layout in the equivalence class, if we didn't have one already.
-  // FIXME: Layouts can probably be merged sensibly.
   if (!equivClass->layout)
     equivClass->layout = Layout;
+  else {
+    // Try to merge layout constraints.
+    auto mergedLayout = equivClass->layout.merge(Layout);
+    if (mergedLayout->isKnownLayout() && mergedLayout != equivClass->layout)
+      equivClass->layout = mergedLayout;
+  }
 
   return false;
 }
@@ -2121,6 +2270,16 @@ bool GenericSignatureBuilder::updateSuperclass(
   if (!equivClass->superclass) {
     equivClass->superclass = superclass;
     updateSuperclassConformances();
+    // Presence of a superclass constraint implies a _Class layout
+    // constraint.
+    auto layoutReqSource = source->viaSuperclass(*this, nullptr);
+    addLayoutRequirement(T,
+                         LayoutConstraint::getLayoutConstraint(
+                             superclass->getClassOrBoundGenericClass()->isObjC()
+                                 ? LayoutConstraintKind::Class
+                                 : LayoutConstraintKind::NativeClass,
+                             getASTContext()),
+                         layoutReqSource);
     return false;
   }
 
@@ -2855,12 +3014,13 @@ namespace {
         continue;
       }
 
-      // We prefer constraints rooted at explicit requirements to ones rooted
-      // on inferred requirements.
+      // We prefer constraints rooted at inferred requirements to ones rooted
+      // on explicit requirements, because the former won't be diagnosed
+      // directly.
       bool thisIsInferred = constraint.source->isInferredRequirement();
       bool representativeIsInferred = representativeConstraint->source->isInferredRequirement();
       if (thisIsInferred != representativeIsInferred) {
-        if (representativeIsInferred)
+        if (thisIsInferred)
           representativeConstraint = constraint;
         continue;
       }
@@ -3163,7 +3323,7 @@ Constraint<T> GenericSignatureBuilder::checkConstraintList(
                            Optional<Diag<unsigned, Type, T, T>>
                              conflictingDiag,
                            Diag<Type, T> redundancyDiag,
-                           Diag<bool, Type, T> otherNoteDiag) {
+                           Diag<unsigned, Type, T> otherNoteDiag) {
   return checkConstraintList<T, T>(genericParams, constraints,
                                    isSuitableRepresentative, checkConstraint,
                                    conflictingDiag, redundancyDiag,
@@ -3183,7 +3343,7 @@ Constraint<T> GenericSignatureBuilder::checkConstraintList(
                            Optional<Diag<unsigned, Type, DiagT, DiagT>>
                              conflictingDiag,
                            Diag<Type, DiagT> redundancyDiag,
-                           Diag<bool, Type, DiagT> otherNoteDiag,
+                           Diag<unsigned, Type, DiagT> otherNoteDiag,
                            llvm::function_ref<DiagT(const T&)> diagValue,
                            bool removeSelfDerived) {
   assert(!constraints.empty() && "No constraints?");
@@ -3212,7 +3372,7 @@ Constraint<T> GenericSignatureBuilder::checkConstraintList(
 
     Diags.diagnose(representativeConstraint->source->getLoc(),
                    otherNoteDiag,
-                   representativeConstraint->source->isDerivedRequirement(),
+                   representativeConstraint->source->classifyDiagKind(),
                    representativeConstraint->archetype->
                      getDependentType(genericParams, /*allowUnresolved=*/true),
                    diagValue(representativeConstraint->value));
@@ -3287,7 +3447,6 @@ Constraint<T> GenericSignatureBuilder::checkConstraintList(
       // location) complain that it is redundant.
       if (!constraint.source->isDerivedRequirement() &&
           !constraint.source->isInferredRequirement() &&
-          !representativeConstraint->source->isInferredRequirement() &&
           constraint.source->getLoc().isValid()) {
         Diags.diagnose(constraint.source->getLoc(),
                        redundancyDiag,
@@ -3312,7 +3471,18 @@ void GenericSignatureBuilder::checkConformanceConstraints(
     return;
 
   for (auto &entry : equivClass->conformsTo) {
-    checkConstraintList<ProtocolDecl *>(
+    // Remove self-derived constraints.
+    assert(!entry.second.empty() && "No constraints to work with?");
+    entry.second.erase(
+      std::remove_if(entry.second.begin(), entry.second.end(),
+                     [&](const Constraint<ProtocolDecl *> &constraint) {
+                       return constraint.source->isSelfDerivedConformance(
+                                constraint.archetype, entry.first);
+                     }),
+      entry.second.end());
+    assert(!entry.second.empty() && "All constraints were self-derived!");
+
+    checkConstraintList<ProtocolDecl *, ProtocolDecl *>(
       genericParams, entry.second,
       [](const Constraint<ProtocolDecl *> &constraint) {
         return true;
@@ -3323,7 +3493,9 @@ void GenericSignatureBuilder::checkConformanceConstraints(
       },
       None,
       diag::redundant_conformance_constraint,
-      diag::redundant_conformance_here);
+      diag::redundant_conformance_here,
+      [](ProtocolDecl *proto) { return proto; },
+      /*removeSelfDerived=*/false);
   }
 }
 
@@ -3457,8 +3629,18 @@ namespace {
 
     friend bool operator<(const IntercomponentEdge &lhs,
                           const IntercomponentEdge &rhs) {
-      return std::make_tuple(lhs.source, lhs.target, lhs.constraint)
-        < std::make_tuple(rhs.source, rhs.target, rhs.constraint);
+      if (lhs.source != rhs.source)
+        return lhs.source < rhs.source;
+      if (lhs.target != rhs.target)
+        return lhs.target < rhs.target;
+
+      // Prefer non-inferred requirement sources.
+      bool lhsIsInferred = lhs.constraint.source->isInferredRequirement();
+      bool rhsIsInferred = rhs.constraint.source->isInferredRequirement();
+      if (lhsIsInferred != rhsIsInferred)
+        return rhsIsInferred;;
+
+      return lhs.constraint < rhs.constraint;
     }
   };
 }
@@ -3555,10 +3737,8 @@ void GenericSignatureBuilder::checkSameTypeConstraints(
              "Must not be derived");
 
       // Ignore inferred requirements; we don't want to diagnose them.
-      if (!constraint.source->isInferredRequirement()) {
-        intercomponentEdges.push_back(
-          IntercomponentEdge(firstComponent, secondComponent, constraint));
-      }
+      intercomponentEdges.push_back(
+        IntercomponentEdge(firstComponent, secondComponent, constraint));
     }
   }
 
@@ -3605,6 +3785,10 @@ void GenericSignatureBuilder::checkSameTypeConstraints(
             rhs.constraint.source->getLoc().isInvalid())
           return true;
 
+        // If the constraint source is inferred, don't diagnose it.
+        if (lhs.constraint.source->isInferredRequirement())
+          return true;
+
         Diags.diagnose(lhs.constraint.source->getLoc(),
                        diag::redundant_same_type_constraint,
                        lhs.constraint.archetype->getDependentType(
@@ -3613,7 +3797,7 @@ void GenericSignatureBuilder::checkSameTypeConstraints(
                                                           genericParams, true));
         Diags.diagnose(rhs.constraint.source->getLoc(),
                        diag::previous_same_type_constraint,
-                       false,
+                       rhs.constraint.source->classifyDiagKind(),
                        rhs.constraint.archetype->getDependentType(
                                                           genericParams, true),
                        rhs.constraint.value->getDependentType(
@@ -3634,6 +3818,7 @@ void GenericSignatureBuilder::checkSameTypeConstraints(
       // not part of the spanning tree.
       if (connected[edge.source] && connected[edge.target]) {
         if (edge.constraint.source->getLoc().isValid() &&
+            !edge.constraint.source->isInferredRequirement() &&
             firstEdge.constraint.source->getLoc().isValid()) {
           Diags.diagnose(edge.constraint.source->getLoc(),
                          diag::redundant_same_type_constraint,
@@ -3644,7 +3829,7 @@ void GenericSignatureBuilder::checkSameTypeConstraints(
 
           Diags.diagnose(firstEdge.constraint.source->getLoc(),
                          diag::previous_same_type_constraint,
-                         false,
+                         firstEdge.constraint.source->classifyDiagKind(),
                          firstEdge.constraint.archetype->getDependentType(
                                                           genericParams, true),
                          firstEdge.constraint.value->getDependentType(
@@ -3759,7 +3944,7 @@ void GenericSignatureBuilder::checkSuperclassConstraints(
                             representativeConstraint.archetype)) {
         Diags.diagnose(existing->source->getLoc(),
                        diag::same_type_redundancy_here,
-                       existing->source->isDerivedRequirement(),
+                       existing->source->classifyDiagKind(),
                        existing->archetype->getDependentType(
                                                    genericParams,
                                                    /*allowUnresolved=*/true),
@@ -3781,7 +3966,9 @@ void GenericSignatureBuilder::checkLayoutConstraints(
       return constraint.value == equivClass->layout;
     },
     [&](LayoutConstraint layout) {
-      if (layout == equivClass->layout)
+      // If the layout constraints are mergable, i.e. compatible,
+      // it is a redundancy.
+      if (layout.merge(equivClass->layout)->isKnownLayout())
         return ConstraintRelation::Redundant;
 
       return ConstraintRelation::Conflicting;
@@ -4076,8 +4263,15 @@ static void collectRequirements(GenericSignatureBuilder &builder,
           GenericSignatureBuilder::PotentialArchetype *archetype,
           GenericSignatureBuilder::RequirementRHS type,
           const RequirementSource *source) {
-    // Filter out derived requirements.
-    if (source->isDerivedRequirement()) return;
+    // Filter out derived requirements... except for concrete-type requirements
+    // on generic parameters. The exception is due to the canonicalization of
+    // generic signatures, which never eliminates generic parameters even when
+    // they have been mapped to a concrete type.
+    if (source->isDerivedRequirement() &&
+        !(kind == RequirementKind::SameType &&
+          archetype->isGenericParam() &&
+          type.is<Type>()))
+      return;
 
     auto depTy = archetype->getDependentType(params,
                                              /*allowUnresolved=*/false);

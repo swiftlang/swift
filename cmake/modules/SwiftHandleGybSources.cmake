@@ -41,13 +41,8 @@ function(handle_gyb_source_single dependency_out_var_name)
       ${SWIFT_GYB_FLAGS}
       ${GYB_SINGLE_FLAGS})
 
-  if(NOT "${CMAKE_GYB}" STREQUAL "")
-    set(gyb_tool "${CMAKE_GYB}")
-    set(gyb_tool_source "${gyb_tool}" "${gyb_tool}")
-  else()
-    set(gyb_tool "${SWIFT_SOURCE_DIR}/utils/gyb")
-    set(gyb_tool_source "${gyb_tool}" "${gyb_tool}.py")
-  endif()
+  set(gyb_tool "${SWIFT_SOURCE_DIR}/utils/gyb")
+  set(gyb_tool_source "${gyb_tool}" "${gyb_tool}.py")
 
   get_filename_component(dir "${GYB_SINGLE_OUTPUT}" DIRECTORY)
   get_filename_component(basename "${GYB_SINGLE_OUTPUT}" NAME)

@@ -354,7 +354,7 @@ void EagerDispatch::emitDispatchTo(SILFunction *NewFunc) {
         // Emit a check that it is a trivial type of a certain size.
         emitTrivialAndSizeCheck(FailedTypeCheckBB, ParamTy,
                                 Replacement, LayoutInfo);
-      } else if (LayoutInfo && LayoutInfo->isRefCountedObject()) {
+      } else if (LayoutInfo && LayoutInfo->isRefCounted()) {
         // Emit a check that it is an object of a reference counted type.
         emitRefCountedObjectCheck(FailedTypeCheckBB, ParamTy,
                                   Replacement, LayoutInfo);
