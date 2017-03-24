@@ -528,7 +528,6 @@ extension String : Unicode {
       return base.isKnownNFCNormalized
     }
   }
-  
 }
 
 extension _BoundedBufferReference {
@@ -545,18 +544,20 @@ extension _BoundedBufferReference {
       + numericCast(tail.count) as IndexDistance
 
     self.init(_uninitializedCount: numericCast(newCount))
-    self.withUnsafeMutableBufferPointer {
-      let (_, i1) = head._copyContents(initializing: $0)
+    
+    self.withUnsafeMutableBufferPointer { b0 in
+
+      let (_, i0) = head._copyContents(initializing: b0)
       
       let b1 = UnsafeMutableBufferPointer(
-        start: $0.baseAddress + i1, count: $0.count - i1)
-      let (_, i2) = middle._copyContents(initializing: b1)
+        start: b0.baseAddress + i0, count: b0.count - b0[..<i0].count)
+      let (_, i1) = middle._copyContents(initializing: b1)
 
       let b2 = UnsafeMutableBufferPointer(
-        start: b1.baseAddress + i2, count: b1.count - i2)
-      let (_, i3) = tail._copyContents(initializing: b2)
+        start: b1.baseAddress + i1, count: b1.count - b1[..<i1].count)
+      let (_, i2) = tail._copyContents(initializing: b2)
       
-      assert(i3 == $0.endIndex, "Failed to consume input")
+      assert(i2 == b2.endIndex, "Failed to consume input")
     }
   }
 }
@@ -605,7 +606,7 @@ extension String : RangeReplaceableCollection {
     // Try to do in-place replacement
     let done = replaceUTF16InPlace(target, with: fasterReplacement)
     if done { return }
-    
+
     // TODO: Minimize repeated counting and maxing.  The work is being done
     // multiple times in some cases.
     let head = self.utf16[..<target.lowerBound]
@@ -624,13 +625,32 @@ extension String : RangeReplaceableCollection {
     }
   }
   
-  mutating func replaceUTF16InPlace<C>(
+  internal var _storageID: ObjectIdentifier? {
+    switch _content {
+    case .utf16(let storage):
+      return ObjectIdentifier(storage)
+    case .latin1(let storage):
+      return ObjectIdentifier(storage)
+    case .any(let storage):
+      return ObjectIdentifier(storage)
+    }
+  }
+
+  internal var isMutable: Bool {
+    mutating get {
+      defer { _fixLifetime(self) }
+      return _storageID?._liveObjectIsUniquelyReferenced() ?? true
+    }
+  }
+  
+  internal mutating func replaceUTF16InPlace<C>(
     _ target: Range<Index>, with replacement: Counted<C>
   ) -> Bool 
   where C.Iterator.Element == UTF16.CodeUnit {
-    guard _isUnique(&_content) else { return false }
-    let t: Range<Int> = numericCast(target.upperBound.encodedOffset)
-      ..< numericCast(target.lowerBound.encodedOffset)
+    if !isMutable { return false }
+
+    let t: Range<Int> = numericCast(target.lowerBound.encodedOffset)
+      ..< numericCast(target.upperBound.encodedOffset)
 
     switch _content {
     case .utf16(let storage):
@@ -643,6 +663,21 @@ extension String : RangeReplaceableCollection {
     }
   }
 }
+
+extension ObjectIdentifier {
+  /// Returns true if the object identified by `self` is uniquely referenced.
+  ///
+  /// Requires: the object identified by `self` exists.
+  internal func _liveObjectIsUniquelyReferenced() -> Bool {
+    var me = self
+    return withUnsafeMutablePointer(to: &me) {
+      $0.withMemoryRebound(to: AnyObject.self, capacity: 1) {
+        _isUnique(&$0.pointee)
+      }
+    }    
+  }
+}
+
 //===----------------------------------------------------------------------===//
 //===--- Tests ------------------------------------------------------------===//
 //===----------------------------------------------------------------------===//
@@ -659,11 +694,6 @@ let sample = "abcdefghijklmnopqrstuvwxyz\n"
   + "Зарегистрируйтесь сейчас на Десятую Международную Конференцию по\n"
   + "  ๏ แผ่นดินฮั่นเสื่อมโทรมแสนสังเวช  พระปกเกศกองบู๊กู้ขึ้นใหม่\n"
   + "ᚻᛖ ᚳᚹᚫᚦ ᚦᚫᛏ ᚻᛖ ᛒᚢᛞᛖ ᚩᚾ ᚦᚫᛗ ᛚᚪᚾᛞᛖ ᚾᚩᚱᚦᚹᛖᚪᚱᛞᚢᛗ ᚹᛁᚦ ᚦᚪ ᚹᛖᛥᚫ"
-
-let latin1Sample = String(
-  sample.unicodeScalars.lazy.filter { $0.value < 0x100 }.map {
-    Character($0)
-  })
 
 /*
 suite.test("basics") {
@@ -738,6 +768,32 @@ suite.test("AnyStringContents/_Latin1StringStorage") {
   expectEqualSequence(latin1Sample.unicodeScalars, s.unicodeScalars)
 }
 */
+
+
+suite.test("Latin1.smoke") {
+  var latin1Sample = String(
+    sample.unicodeScalars.lazy.filter { $0.value < 0x100 }.map {
+      Character($0)
+    })
+  
+  latin1Sample.replaceSubrange(
+    latin1Sample.index(atOffset: 3)..<latin1Sample.index(atOffset: 10),
+    with: "BRAK"
+  )
+  
+  let s1 = latin1Sample
+  
+  latin1Sample.replaceSubrange(
+    latin1Sample.index(atOffset: 5)..<latin1Sample.index(atOffset: 6),
+    with: "---bloog---"
+  )
+  expectEqualSequence(
+    "abcBRAKklmnopqrstuvw", Swift.String(s1[..<s1.index(atOffset: 20)]))
+
+  expectEqualSequence(
+    "abcBR---bloog---Kklmnopqr",
+    Swift.String(latin1Sample[..<latin1Sample.index(atOffset: 25)]))
+}
 
 suite.test("Bidirectional/UnicodeScalar") {
   let a = AnyUnicodeScalarUnicodeView(
