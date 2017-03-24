@@ -1,5 +1,6 @@
 // RUN: %target-swift-frontend -parse-stdlib -emit-sil %s | %FileCheck %s
 // RUN: %target-swift-frontend -parse-stdlib -emit-silgen %s | %FileCheck %s -check-prefix=SILGEN
+// RUN: %target-swift-frontend -parse-stdlib -emit-ir %s
 
 import Swift
 
@@ -509,3 +510,50 @@ func test_rec(_ outer: RecOuter) -> Int32 {
 // CHECK:   function_ref @_T010addressors8RecOuterC6middleAA0B6MiddleVfaP
 // CHECK:   struct_element_addr {{.*}} : $*RecMiddle, #RecMiddle.inner
 // CHECK:   function_ref @_T010addressors8RecInnerV9subscripts5Int32VAFcfg 
+
+class Base {
+  var data: UnsafeMutablePointer<Int32> = UnsafeMutablePointer.allocate(capacity: 100)
+
+  var value: Int32 {
+    addressWithNativeOwner {
+      return (UnsafePointer(data), Builtin.castToNativeObject(self))
+    }
+    mutableAddressWithNativeOwner {
+      return (data, Builtin.castToNativeObject(self))
+    }
+  }
+}
+
+class Sub : Base {
+  override var value: Int32 {
+    addressWithNativeOwner {
+      return (UnsafePointer(data), Builtin.castToNativeObject(self))
+    }
+    mutableAddressWithNativeOwner {
+      return (data, Builtin.castToNativeObject(self))
+    }
+  }
+}
+
+// Make sure addressors don't get vtable entries.
+// CHECK-LABEL: sil_vtable Base {
+// CHECK-NEXT: #Base.data!getter.1: (Base) -> () -> UnsafeMutablePointer<Int32> : _T010addressors4BaseC4dataSpys5Int32VGfg
+// CHECK-NEXT: #Base.data!setter.1: (Base) -> (UnsafeMutablePointer<Int32>) -> () : _T010addressors4BaseC4dataSpys5Int32VGfs
+// CHECK-NEXT: #Base.data!materializeForSet.1: (Base) -> (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer) -> (Builtin.RawPointer, Builtin.RawPointer?) : _T010addressors4BaseC4dataSpys5Int32VGfm
+// CHECK-NEXT: #Base.value!getter.1: (Base) -> () -> Int32 : _T010addressors4BaseC5values5Int32Vfg
+// CHECK-NEXT: #Base.value!setter.1: (Base) -> (Int32) -> () : _T010addressors4BaseC5values5Int32Vfs
+// CHECK-NEXT: #Base.value!materializeForSet.1: (Base) -> (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer) -> (Builtin.RawPointer, Builtin.RawPointer?) : _T010addressors4BaseC5values5Int32Vfm
+// CHECK-NEXT: #Base.init!initializer.1: (Base.Type) -> () -> Base : _T010addressors4BaseCACycfc
+// CHECK-NEXT: #Base.deinit!deallocator: _T010addressors4BaseCfD
+// CHECK-NEXT: }
+
+// CHECK-LABEL: sil_vtable Sub {
+// CHECK-NEXT: #Base.data!getter.1: (Base) -> () -> UnsafeMutablePointer<Int32> : _T010addressors4BaseC4dataSpys5Int32VGfg
+// CHECK-NEXT: #Base.data!setter.1: (Base) -> (UnsafeMutablePointer<Int32>) -> () : _T010addressors4BaseC4dataSpys5Int32VGfs
+// CHECK-NEXT: #Base.data!materializeForSet.1: (Base) -> (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer) -> (Builtin.RawPointer, Builtin.RawPointer?) : _T010addressors4BaseC4dataSpys5Int32VGfm
+// CHECK-NEXT: #Base.value!getter.1: (Base) -> () -> Int32 : _T010addressors3SubC5values5Int32Vfg
+// CHECK-NEXT: #Base.value!setter.1: (Base) -> (Int32) -> () : _T010addressors3SubC5values5Int32Vfs
+// CHECK-NEXT: #Base.value!materializeForSet.1: (Base) -> (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer) -> (Builtin.RawPointer, Builtin.RawPointer?) : _T010addressors3SubC5values5Int32Vfm
+// CHECK-NEXT: #Base.init!initializer.1: (Base.Type) -> () -> Base : _T010addressors3SubCACycfc
+// CHECK-NEXT: #Sub.deinit!deallocator: _T010addressors3SubCfD
+// CHECK-NEXT: }

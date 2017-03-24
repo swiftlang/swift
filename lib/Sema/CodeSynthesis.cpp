@@ -718,7 +718,12 @@ static void synthesizeTrivialGetter(FuncDecl *getter,
   getter->setBody(BraceStmt::create(ctx, loc, returnStmt, loc, true));
 
   maybeMarkTransparent(getter, storage, TC);
- 
+
+  // Record the getter as an override, which can happen with addressors.
+  if (auto *baseASD = storage->getOverriddenDecl())
+    if (baseASD->isAccessibleFrom(storage->getDeclContext()))
+      getter->setOverriddenDecl(baseASD->getGetter());
+
   // Register the accessor as an external decl if the storage was imported.
   if (needsToBeRegisteredAsExternalDecl(storage))
     TC.Context.addExternalDecl(getter);
@@ -739,6 +744,15 @@ static void synthesizeTrivialSetter(FuncDecl *setter,
   setter->setBody(BraceStmt::create(ctx, loc, setterBody, loc, true));
 
   maybeMarkTransparent(setter, storage, TC);
+
+  // Record the setter as an override, which can happen with addressors.
+  if (auto *baseASD = storage->getOverriddenDecl()) {
+    auto *baseSetter = baseASD->getSetter();
+    if (baseSetter != nullptr &&
+        baseASD->isSetterAccessibleFrom(storage->getDeclContext())) {
+      setter->setOverriddenDecl(baseSetter);
+    }
+  }
 
   // Register the accessor as an external decl if the storage was imported.
   if (needsToBeRegisteredAsExternalDecl(storage))
@@ -788,12 +802,8 @@ static void addTrivialAccessorsToStorage(AbstractStorageDecl *storage,
   if (doesStorageNeedSetter(storage))
     setter = createSetterPrototype(storage, setterValueParam, TC);
 
-  FuncDecl *materializeForSet = nullptr;
-  if (setter && DC->getAsNominalTypeOrNominalTypeExtensionContext())
-    materializeForSet = createMaterializeForSetPrototype(storage, setter, TC);
-
   // Okay, we have both the getter and setter.  Set them in VD.
-  storage->addTrivialAccessors(getter, setter, materializeForSet);
+  storage->addTrivialAccessors(getter, setter, nullptr);
 
   bool isDynamic = (storage->isDynamic() && storage->isObjC());
   if (isDynamic)
@@ -815,8 +825,8 @@ static void addTrivialAccessorsToStorage(AbstractStorageDecl *storage,
   addMemberToContextIfNeeded(getter, DC, storage);
   if (setter)
     addMemberToContextIfNeeded(setter, DC, getter);
-  if (materializeForSet)
-    addMemberToContextIfNeeded(materializeForSet, DC, setter);
+
+  maybeAddMaterializeForSet(storage, TC);
 }
 
 /// Add a trivial setter and materializeForSet to a

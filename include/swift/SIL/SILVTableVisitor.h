@@ -33,8 +33,9 @@ template <class T> class SILVTableVisitor {
   void maybeAddMethod(FuncDecl *fd) {
     assert(!fd->hasClangNode());
 
-    // Observing accessors don't get a vtable entry.
-    if (fd->isObservingAccessor())
+    // Observing accessors and addressors don't get vtable entries.
+    if (fd->isObservingAccessor() ||
+        fd->getAddressorKind() != AddressorKind::NotAddressor)
       return;
 
     maybeAddEntry(SILDeclRef(fd, SILDeclRef::Kind::Func));
