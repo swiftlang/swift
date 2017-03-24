@@ -1,12 +1,6 @@
-// RUN: not %target-swift-frontend -c -parse-as-library -module-name test -validate-tbd-against-ir %s 2>&1 | %FileCheck %s
-
 // FIXME: TBDGen is incorrect:
-// CHECK: symbol '_T04test10PropertiesV9publicVarSivfi' (test.Properties.(publicVar : Swift.Int).(variable initialization expression)) is in generated IR file, but not in TBD file
-// CHECK: symbol '_T04test7StaticsV9publicVarSivZ' (static test.Statics.publicVar : Swift.Int) is in generated IR file, but not in TBD file
-// CHECK: symbol '_T04test10PropertiesV9publicLetSivfi' (test.Properties.(publicLet : Swift.Int).(variable initialization expression)) is in generated IR file, but not in TBD file
-// CHECK: symbol '_T04test7StaticsV10privateVarSivZ' (static test.Statics.privateVar : Swift.Int) is in generated IR file, but not in TBD file
-// CHECK: symbol '_T04test7StaticsV9publicVarSifau' (test.Statics.publicVar.unsafeMutableAddressor : Swift.Int) is in generated IR file, but not in TBD file
-// CHECK: symbol '_T04test10PropertiesV15publicVarGetSetSifm' (test.Properties.publicVarGetSet.materializeForSet : Swift.Int) is in TBD file, but not in generated IR
+// RUN: not %target-swift-frontend -c -parse-as-library -module-name test -validate-tbd-against-ir %s > %t.log 2>&1
+// RUN: diff %t.log %S/Inputs/struct.log
 
 public struct Nothing {}
 

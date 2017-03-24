@@ -26,6 +26,17 @@
 #include "llvm/IR/Module.h"
 #include "llvm/IR/ValueSymbolTable.h"
 #include "llvm/Support/FileSystem.h"
+#include <vector>
+
+using namespace swift;
+
+static std::vector<StringRef> sortSymbols(llvm::StringSet<> &symbols) {
+  std::vector<StringRef> sorted;
+  for (auto &symbol : symbols)
+    sorted.push_back(symbol.getKey());
+  std::sort(sorted.begin(), sorted.end());
+  return sorted;
+}
 
 bool swift::writeTBD(ModuleDecl *M, StringRef OutputFilename) {
   std::error_code EC;
@@ -39,37 +50,34 @@ bool swift::writeTBD(ModuleDecl *M, StringRef OutputFilename) {
   for (auto file : M->getFiles())
     enumeratePublicSymbols(file, symbols);
 
-  for (auto &symbol : symbols) {
-    OS << symbol.getKey() << "\n";
+  // Ensure the order is stable.
+  for (auto &symbol : sortSymbols(symbols)) {
+    OS << symbol << "\n";
   }
 
   return false;
 }
 
-bool swift::validateTBD(ModuleDecl *M, llvm::Module &IRModule) {
+static bool validateSymbolSet(DiagnosticEngine &diags,
+                              llvm::StringSet<> symbols,
+                              llvm::Module &IRModule) {
   auto error = false;
-  for (auto file : M->getFiles())
-    error |= validateTBD(file, IRModule);
-  return error;
-}
-
-bool swift::validateTBD(FileUnit *file, llvm::Module &IRModule) {
-  llvm::StringSet<> symbols;
-  enumeratePublicSymbols(file, symbols);
-  auto error = false;
-  auto &diags = file->getParentModule()->getASTContext().Diags;
 
   // Diff the two sets of symbols, flagging anything outside their intersection.
+
+  // Delay the emission of errors for things in the IR but not TBD, so we can
+  // sort them to get a stable order.
+  std::vector<StringRef> irNotTBD;
+
   for (auto &nameValue : IRModule.getValueSymbolTable()) {
     auto name = nameValue.getKey();
     auto value = nameValue.getValue();
     if (auto GV = dyn_cast<llvm::GlobalValue>(value)) {
+      // Is this a symbol that should be listed?
       if (!GV->isDeclaration() && GV->hasExternalLinkage()) {
-        if (!symbols.erase(name)) {
-          diags.diagnose(SourceLoc(), diag::symbol_in_ir_not_in_tbd, name,
-                         Demangle::demangleSymbolAsString(name));
-          error = true;
-        }
+        // Is it listed?
+        if (!symbols.erase(name))
+          irNotTBD.push_back(name);
       }
     } else {
       assert(symbols.find(name) == symbols.end() &&
@@ -77,11 +85,34 @@ bool swift::validateTBD(FileUnit *file, llvm::Module &IRModule) {
     }
   }
 
-  for (auto &nameEntry : symbols) {
-    auto name = nameEntry.getKey();
+  std::sort(irNotTBD.begin(), irNotTBD.end());
+  for (auto &name : irNotTBD) {
+    diags.diagnose(SourceLoc(), diag::symbol_in_ir_not_in_tbd, name,
+                   Demangle::demangleSymbolAsString(name));
+    error = true;
+  }
+
+  for (auto &name : sortSymbols(symbols)) {
     diags.diagnose(SourceLoc(), diag::symbol_in_tbd_not_in_ir, name,
                    Demangle::demangleSymbolAsString(name));
     error = true;
   }
+
   return error;
+}
+
+bool swift::validateTBD(ModuleDecl *M, llvm::Module &IRModule) {
+  llvm::StringSet<> symbols;
+  for (auto file : M->getFiles())
+    enumeratePublicSymbols(file, symbols);
+
+  return validateSymbolSet(M->getASTContext().Diags, symbols, IRModule);
+}
+
+bool swift::validateTBD(FileUnit *file, llvm::Module &IRModule) {
+  llvm::StringSet<> symbols;
+  enumeratePublicSymbols(file, symbols);
+
+  return validateSymbolSet(file->getParentModule()->getASTContext().Diags,
+                           symbols, IRModule);
 }
