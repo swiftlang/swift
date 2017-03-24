@@ -28,7 +28,6 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/Types.h"
-#include "llvm/Support/Debug.h"
 
 using namespace swift;
 
@@ -252,8 +251,6 @@ SubstitutionMap SubstitutionMap::subst(TypeSubstitutionFn subs,
     }
   }
 
-  result.verify();
-
   return result;
 }
 
@@ -396,41 +393,6 @@ SubstitutionMap::combineSubstitutionMaps(const SubstitutionMap &firstSubMap,
       return firstSubMap.lookupConformance(type,
                                            conformedProtocol->getDecl());
     });
-}
-
-void SubstitutionMap::verify() const {
-#ifndef NDEBUG
-  for (auto iter = conformanceMap.begin(), end = conformanceMap.end();
-       iter != end; ++iter) {
-    auto replacement = Type(iter->first).subst(*this, SubstFlags::UseErrorType);
-    if (replacement->isTypeParameter() || replacement->is<ArchetypeType>() ||
-        replacement->isTypeVariableOrMember() ||
-        replacement->is<UnresolvedType>() || replacement->hasError())
-      continue;
-    // Check conformances of a concrete replacement type.
-    for (auto citer = iter->second.begin(), cend = iter->second.end();
-         citer != cend; ++citer) {
-      // An existential type can have an abstract conformance to
-      // AnyObject or an @objc protocol.
-      if (citer->isAbstract() && replacement->isExistentialType()) {
-        auto *proto = citer->getRequirement();
-        assert((proto->isSpecificProtocol(KnownProtocolKind::AnyObject) ||
-                proto->isObjC()) &&
-               "an existential type can conform only to AnyObject or an "
-               "@objc-protocol");
-        continue;
-      }
-      // All of the conformances should be concrete.
-      if (!citer->isConcrete()) {
-        llvm::dbgs() << "Concrete replacement type:\n";
-        replacement->dump(llvm::dbgs());
-        llvm::dbgs() << "SubstitutionMap:\n";
-        dump(llvm::dbgs());
-      }
-      assert(citer->isConcrete() && "Conformance should be concrete");
-    }
-  }
-#endif
 }
 
 void SubstitutionMap::dump(llvm::raw_ostream &out) const {
