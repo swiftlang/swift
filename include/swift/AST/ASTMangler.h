@@ -169,11 +169,11 @@ protected:
 
   void appendNominalType(const NominalTypeDecl *decl);
 
-  void appendFunctionType(AnyFunctionType *fn);
+  void appendFunctionType(AnyFunctionType *fn, bool forceSingleParam);
 
-  void appendFunctionSignature(AnyFunctionType *fn);
+  void appendFunctionSignature(AnyFunctionType *fn, bool forceSingleParam);
 
-  void appendParams(Type ParamsTy);
+  void appendParams(Type ParamsTy, bool forceSingleParam);
 
   void appendTypeList(Type listTy);
 
@@ -205,7 +205,7 @@ protected:
                                  ArrayRef<Requirement> &requirements,
                                  SmallVectorImpl<Requirement> &requirementsBuf);
 
-  void appendDeclType(const ValueDecl *decl);
+  void appendDeclType(const ValueDecl *decl, bool isFunctionMangling = false);
 
   bool tryAppendStandardSubstitution(const NominalTypeDecl *type);
 

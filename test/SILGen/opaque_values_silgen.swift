@@ -195,7 +195,7 @@ func s030______assigninout<T>(_ a: inout T, _ b: T) {
 
 // Test that we no longer use copy_addr or tuple_element_addr when copy by value is possible
 // ---
-// CHECK-LABEL: sil hidden @_T020opaque_values_silgen21s040___tupleReturnIntS2i_xtlF : $@convention(thin) <T> (Int, @in T) -> Int {
+// CHECK-LABEL: sil hidden @_T020opaque_values_silgen21s040___tupleReturnIntS2i_xt_tlF : $@convention(thin) <T> (Int, @in T) -> Int {
 // CHECK: bb0([[ARG0:%.*]] : $Int, [[ARG1:%.*]] : $T):
 // CHECK:   [[TPL:%.*]] = tuple ([[ARG0]] : $Int, [[ARG1]] : $T)
 // CHECK:   [[BORROWED_ARG1:%.*]] = begin_borrow [[TPL]] : $(Int, T)
@@ -210,7 +210,7 @@ func s030______assigninout<T>(_ a: inout T, _ b: T) {
 // CHECK:   end_borrow [[BORROWED_ARG1]] from [[TPL]] : $(Int, T), $(Int, T)
 // CHECK:   destroy_value [[TPL]] : $(Int, T)
 // CHECK:   return [[INT]]
-// CHECK-LABEL: } // end sil function '_T020opaque_values_silgen21s040___tupleReturnIntS2i_xtlF'
+// CHECK-LABEL: } // end sil function '_T020opaque_values_silgen21s040___tupleReturnIntS2i_xt_tlF'
 func s040___tupleReturnInt<T>(_ x: (Int, T)) -> Int {
   let y = x.0
   return y
