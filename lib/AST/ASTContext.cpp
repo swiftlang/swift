@@ -1217,7 +1217,18 @@ GenericSignatureBuilder *ASTContext::getOrCreateGenericSignatureBuilder(
   builder->finalize(SourceLoc(), sig->getGenericParams(),
                     /*allowConcreteGenericParams=*/true);
 
-  assert(builder->getGenericSignature()->getCanonicalSignature() == sig);
+#ifndef NDEBUG
+  if (builder->getGenericSignature()->getCanonicalSignature() != sig) {
+    llvm::errs() << "ERROR: generic signature builder is not idempotent.\n";
+    llvm::errs() << "Original generic signature   : ";
+    sig->print(llvm::errs());
+    llvm::errs() << "\nReprocessed generic signature: ";
+    builder->getGenericSignature()->getCanonicalSignature()
+    ->print(llvm::errs());
+    llvm::errs() << "\n";
+    llvm_unreachable("idempotency problem with a generic signature");
+  }
+#endif
 
   // Store this generic signature builder (no generic environment yet).
   Impl.GenericSignatureBuilders[{sig, mod}] =
