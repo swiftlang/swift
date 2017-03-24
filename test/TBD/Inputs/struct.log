@@ -1,34 +1,34 @@
-<unknown>:0: error: symbol '_T04test10PropertiesV9publicLetSivfi' (test.Properties.(publicLet : Swift.Int).(variable initialization expression)) is in generated IR file, but not in TBD file
-<unknown>:0: error: symbol '_T04test10PropertiesV9publicVarSivfi' (test.Properties.(publicVar : Swift.Int).(variable initialization expression)) is in generated IR file, but not in TBD file
-<unknown>:0: error: symbol '_T04test11PrivateInitVMa' (type metadata accessor for test.PrivateInit) is in generated IR file, but not in TBD file
-<unknown>:0: error: symbol '_T04test11PrivateInitVMn' (nominal type descriptor for test.PrivateInit) is in generated IR file, but not in TBD file
-<unknown>:0: error: symbol '_T04test11PrivateInitVN' (type metadata for test.PrivateInit) is in generated IR file, but not in TBD file
-<unknown>:0: error: symbol '_T04test11PrivateInitVWV' (value witness table for test.PrivateInit) is in generated IR file, but not in TBD file
-<unknown>:0: error: symbol '_T04test14PrivateMethodsVMa' (type metadata accessor for test.PrivateMethods) is in generated IR file, but not in TBD file
-<unknown>:0: error: symbol '_T04test14PrivateMethodsVMn' (nominal type descriptor for test.PrivateMethods) is in generated IR file, but not in TBD file
-<unknown>:0: error: symbol '_T04test14PrivateMethodsVN' (type metadata for test.PrivateMethods) is in generated IR file, but not in TBD file
-<unknown>:0: error: symbol '_T04test14PrivateMethodsVWV' (value witness table for test.PrivateMethods) is in generated IR file, but not in TBD file
-<unknown>:0: error: symbol '_T04test14PrivateNothingVMa' (type metadata accessor for test.PrivateNothing) is in generated IR file, but not in TBD file
-<unknown>:0: error: symbol '_T04test14PrivateNothingVMn' (nominal type descriptor for test.PrivateNothing) is in generated IR file, but not in TBD file
-<unknown>:0: error: symbol '_T04test14PrivateNothingVN' (type metadata for test.PrivateNothing) is in generated IR file, but not in TBD file
-<unknown>:0: error: symbol '_T04test14PrivateNothingVWV' (value witness table for test.PrivateNothing) is in generated IR file, but not in TBD file
-<unknown>:0: error: symbol '_T04test14PrivateStaticsV10privateLetSivZ' (static test.PrivateStatics.privateLet : Swift.Int) is in generated IR file, but not in TBD file
-<unknown>:0: error: symbol '_T04test14PrivateStaticsV10privateVarSivZ' (static test.PrivateStatics.privateVar : Swift.Int) is in generated IR file, but not in TBD file
-<unknown>:0: error: symbol '_T04test14PrivateStaticsVMa' (type metadata accessor for test.PrivateStatics) is in generated IR file, but not in TBD file
-<unknown>:0: error: symbol '_T04test14PrivateStaticsVMn' (nominal type descriptor for test.PrivateStatics) is in generated IR file, but not in TBD file
-<unknown>:0: error: symbol '_T04test14PrivateStaticsVN' (type metadata for test.PrivateStatics) is in generated IR file, but not in TBD file
-<unknown>:0: error: symbol '_T04test14PrivateStaticsVWV' (value witness table for test.PrivateStatics) is in generated IR file, but not in TBD file
-<unknown>:0: error: symbol '_T04test17PrivatePropertiesVMa' (type metadata accessor for test.PrivateProperties) is in generated IR file, but not in TBD file
-<unknown>:0: error: symbol '_T04test17PrivatePropertiesVMn' (nominal type descriptor for test.PrivateProperties) is in generated IR file, but not in TBD file
-<unknown>:0: error: symbol '_T04test17PrivatePropertiesVN' (type metadata for test.PrivateProperties) is in generated IR file, but not in TBD file
-<unknown>:0: error: symbol '_T04test17PrivatePropertiesVWV' (value witness table for test.PrivateProperties) is in generated IR file, but not in TBD file
-<unknown>:0: error: symbol '_T04test10PropertiesV15publicVarGetSetSifm' (test.Properties.publicVarGetSet.materializeForSet : Swift.Int) is in TBD file, but not in generated IR
-<unknown>:0: error: symbol '_T04test10PropertiesV9publicLetSifg' (test.Properties.publicLet.getter : Swift.Int) is in TBD file, but not in generated IR
-<unknown>:0: error: symbol '_T04test10PropertiesV9publicVarSifg' (test.Properties.publicVar.getter : Swift.Int) is in TBD file, but not in generated IR
-<unknown>:0: error: symbol '_T04test10PropertiesV9publicVarSifm' (test.Properties.publicVar.materializeForSet : Swift.Int) is in TBD file, but not in generated IR
-<unknown>:0: error: symbol '_T04test10PropertiesV9publicVarSifs' (test.Properties.publicVar.setter : Swift.Int) is in TBD file, but not in generated IR
-<unknown>:0: error: symbol '_T04test7StaticsV15publicVarGetSetSifmZ' (static test.Statics.publicVarGetSet.materializeForSet : Swift.Int) is in TBD file, but not in generated IR
-<unknown>:0: error: symbol '_T04test7StaticsV9publicLetSifgZ' (static test.Statics.publicLet.getter : Swift.Int) is in TBD file, but not in generated IR
-<unknown>:0: error: symbol '_T04test7StaticsV9publicVarSifgZ' (static test.Statics.publicVar.getter : Swift.Int) is in TBD file, but not in generated IR
-<unknown>:0: error: symbol '_T04test7StaticsV9publicVarSifmZ' (static test.Statics.publicVar.materializeForSet : Swift.Int) is in TBD file, but not in generated IR
-<unknown>:0: error: symbol '_T04test7StaticsV9publicVarSifsZ' (static test.Statics.publicVar.setter : Swift.Int) is in TBD file, but not in generated IR
+<unknown>:0: error: symbol '_T04test12InternalInitVMa' (type metadata accessor for test.InternalInit) is in generated IR file, but not in TBD file
+<unknown>:0: error: symbol '_T04test12InternalInitVMn' (nominal type descriptor for test.InternalInit) is in generated IR file, but not in TBD file
+<unknown>:0: error: symbol '_T04test12InternalInitVN' (type metadata for test.InternalInit) is in generated IR file, but not in TBD file
+<unknown>:0: error: symbol '_T04test12InternalInitVWV' (value witness table for test.InternalInit) is in generated IR file, but not in TBD file
+<unknown>:0: error: symbol '_T04test15InternalMethodsVMa' (type metadata accessor for test.InternalMethods) is in generated IR file, but not in TBD file
+<unknown>:0: error: symbol '_T04test15InternalMethodsVMn' (nominal type descriptor for test.InternalMethods) is in generated IR file, but not in TBD file
+<unknown>:0: error: symbol '_T04test15InternalMethodsVN' (type metadata for test.InternalMethods) is in generated IR file, but not in TBD file
+<unknown>:0: error: symbol '_T04test15InternalMethodsVWV' (value witness table for test.InternalMethods) is in generated IR file, but not in TBD file
+<unknown>:0: error: symbol '_T04test15InternalNothingVMa' (type metadata accessor for test.InternalNothing) is in generated IR file, but not in TBD file
+<unknown>:0: error: symbol '_T04test15InternalNothingVMn' (nominal type descriptor for test.InternalNothing) is in generated IR file, but not in TBD file
+<unknown>:0: error: symbol '_T04test15InternalNothingVN' (type metadata for test.InternalNothing) is in generated IR file, but not in TBD file
+<unknown>:0: error: symbol '_T04test15InternalNothingVWV' (value witness table for test.InternalNothing) is in generated IR file, but not in TBD file
+<unknown>:0: error: symbol '_T04test15InternalStaticsV11internalLetSivZ' (static test.InternalStatics.internalLet : Swift.Int) is in generated IR file, but not in TBD file
+<unknown>:0: error: symbol '_T04test15InternalStaticsV11internalVarSivZ' (static test.InternalStatics.internalVar : Swift.Int) is in generated IR file, but not in TBD file
+<unknown>:0: error: symbol '_T04test15InternalStaticsVMa' (type metadata accessor for test.InternalStatics) is in generated IR file, but not in TBD file
+<unknown>:0: error: symbol '_T04test15InternalStaticsVMn' (nominal type descriptor for test.InternalStatics) is in generated IR file, but not in TBD file
+<unknown>:0: error: symbol '_T04test15InternalStaticsVN' (type metadata for test.InternalStatics) is in generated IR file, but not in TBD file
+<unknown>:0: error: symbol '_T04test15InternalStaticsVWV' (value witness table for test.InternalStatics) is in generated IR file, but not in TBD file
+<unknown>:0: error: symbol '_T04test16PublicPropertiesV9publicLetSivfi' (test.PublicProperties.(publicLet : Swift.Int).(variable initialization expression)) is in generated IR file, but not in TBD file
+<unknown>:0: error: symbol '_T04test16PublicPropertiesV9publicVarSivfi' (test.PublicProperties.(publicVar : Swift.Int).(variable initialization expression)) is in generated IR file, but not in TBD file
+<unknown>:0: error: symbol '_T04test18InternalPropertiesVMa' (type metadata accessor for test.InternalProperties) is in generated IR file, but not in TBD file
+<unknown>:0: error: symbol '_T04test18InternalPropertiesVMn' (nominal type descriptor for test.InternalProperties) is in generated IR file, but not in TBD file
+<unknown>:0: error: symbol '_T04test18InternalPropertiesVN' (type metadata for test.InternalProperties) is in generated IR file, but not in TBD file
+<unknown>:0: error: symbol '_T04test18InternalPropertiesVWV' (value witness table for test.InternalProperties) is in generated IR file, but not in TBD file
+<unknown>:0: error: symbol '_T04test13PublicStaticsV15publicVarGetSetSifmZ' (static test.PublicStatics.publicVarGetSet.materializeForSet : Swift.Int) is in TBD file, but not in generated IR
+<unknown>:0: error: symbol '_T04test13PublicStaticsV9publicLetSifgZ' (static test.PublicStatics.publicLet.getter : Swift.Int) is in TBD file, but not in generated IR
+<unknown>:0: error: symbol '_T04test13PublicStaticsV9publicVarSifgZ' (static test.PublicStatics.publicVar.getter : Swift.Int) is in TBD file, but not in generated IR
+<unknown>:0: error: symbol '_T04test13PublicStaticsV9publicVarSifmZ' (static test.PublicStatics.publicVar.materializeForSet : Swift.Int) is in TBD file, but not in generated IR
+<unknown>:0: error: symbol '_T04test13PublicStaticsV9publicVarSifsZ' (static test.PublicStatics.publicVar.setter : Swift.Int) is in TBD file, but not in generated IR
+<unknown>:0: error: symbol '_T04test16PublicPropertiesV15publicVarGetSetSifm' (test.PublicProperties.publicVarGetSet.materializeForSet : Swift.Int) is in TBD file, but not in generated IR
+<unknown>:0: error: symbol '_T04test16PublicPropertiesV9publicLetSifg' (test.PublicProperties.publicLet.getter : Swift.Int) is in TBD file, but not in generated IR
+<unknown>:0: error: symbol '_T04test16PublicPropertiesV9publicVarSifg' (test.PublicProperties.publicVar.getter : Swift.Int) is in TBD file, but not in generated IR
+<unknown>:0: error: symbol '_T04test16PublicPropertiesV9publicVarSifm' (test.PublicProperties.publicVar.materializeForSet : Swift.Int) is in TBD file, but not in generated IR
+<unknown>:0: error: symbol '_T04test16PublicPropertiesV9publicVarSifs' (test.PublicProperties.publicVar.setter : Swift.Int) is in TBD file, but not in generated IR

@@ -3,5 +3,5 @@
 public func publicNoArgs() {}
 public func publicSomeArgs(_: Int, x: Int) {}
 
-func privateNoArgs() {}
-func privateSomeArgs(_: Int, x: Int) {}
+func internalNoArgs() {}
+func internalSomeArgs(_: Int, x: Int) {}

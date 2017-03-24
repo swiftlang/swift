@@ -1,113 +1,113 @@
-<unknown>:0: error: symbol '_T04test10PropertiesC10privateLetSivWvd' (direct field offset for test.Properties.privateLet : Swift.Int) is in generated IR file, but not in TBD file
-<unknown>:0: error: symbol '_T04test10PropertiesC10privateVarSifg' (test.Properties.privateVar.getter : Swift.Int) is in generated IR file, but not in TBD file
-<unknown>:0: error: symbol '_T04test10PropertiesC10privateVarSifgWo' (witness table offset for test.Properties.privateVar.getter : Swift.Int) is in generated IR file, but not in TBD file
-<unknown>:0: error: symbol '_T04test10PropertiesC10privateVarSifm' (test.Properties.privateVar.materializeForSet : Swift.Int) is in generated IR file, but not in TBD file
-<unknown>:0: error: symbol '_T04test10PropertiesC10privateVarSifmWo' (witness table offset for test.Properties.privateVar.materializeForSet : Swift.Int) is in generated IR file, but not in TBD file
-<unknown>:0: error: symbol '_T04test10PropertiesC10privateVarSifs' (test.Properties.privateVar.setter : Swift.Int) is in generated IR file, but not in TBD file
-<unknown>:0: error: symbol '_T04test10PropertiesC10privateVarSifsWo' (witness table offset for test.Properties.privateVar.setter : Swift.Int) is in generated IR file, but not in TBD file
-<unknown>:0: error: symbol '_T04test10PropertiesC10privateVarSivWvd' (direct field offset for test.Properties.privateVar : Swift.Int) is in generated IR file, but not in TBD file
-<unknown>:0: error: symbol '_T04test10PropertiesC12publicVarGetSifgWo' (witness table offset for test.Properties.publicVarGet.getter : Swift.Int) is in generated IR file, but not in TBD file
-<unknown>:0: error: symbol '_T04test10PropertiesC13privateVarGetSifg' (test.Properties.privateVarGet.getter : Swift.Int) is in generated IR file, but not in TBD file
-<unknown>:0: error: symbol '_T04test10PropertiesC13privateVarGetSifgWo' (witness table offset for test.Properties.privateVarGet.getter : Swift.Int) is in generated IR file, but not in TBD file
-<unknown>:0: error: symbol '_T04test10PropertiesC15publicVarGetSetSifgWo' (witness table offset for test.Properties.publicVarGetSet.getter : Swift.Int) is in generated IR file, but not in TBD file
-<unknown>:0: error: symbol '_T04test10PropertiesC15publicVarGetSetSifmWo' (witness table offset for test.Properties.publicVarGetSet.materializeForSet : Swift.Int) is in generated IR file, but not in TBD file
-<unknown>:0: error: symbol '_T04test10PropertiesC15publicVarGetSetSifsWo' (witness table offset for test.Properties.publicVarGetSet.setter : Swift.Int) is in generated IR file, but not in TBD file
-<unknown>:0: error: symbol '_T04test10PropertiesC16privateVarGetSetSifg' (test.Properties.privateVarGetSet.getter : Swift.Int) is in generated IR file, but not in TBD file
-<unknown>:0: error: symbol '_T04test10PropertiesC16privateVarGetSetSifgWo' (witness table offset for test.Properties.privateVarGetSet.getter : Swift.Int) is in generated IR file, but not in TBD file
-<unknown>:0: error: symbol '_T04test10PropertiesC16privateVarGetSetSifm' (test.Properties.privateVarGetSet.materializeForSet : Swift.Int) is in generated IR file, but not in TBD file
-<unknown>:0: error: symbol '_T04test10PropertiesC16privateVarGetSetSifmWo' (witness table offset for test.Properties.privateVarGetSet.materializeForSet : Swift.Int) is in generated IR file, but not in TBD file
-<unknown>:0: error: symbol '_T04test10PropertiesC16privateVarGetSetSifmytfU_' (test.Properties.(privateVarGetSet.materializeForSet : Swift.Int).(closure #1)) is in generated IR file, but not in TBD file
-<unknown>:0: error: symbol '_T04test10PropertiesC16privateVarGetSetSifs' (test.Properties.privateVarGetSet.setter : Swift.Int) is in generated IR file, but not in TBD file
-<unknown>:0: error: symbol '_T04test10PropertiesC16privateVarGetSetSifsWo' (witness table offset for test.Properties.privateVarGetSet.setter : Swift.Int) is in generated IR file, but not in TBD file
-<unknown>:0: error: symbol '_T04test10PropertiesC9publicLetSivWvd' (direct field offset for test.Properties.publicLet : Swift.Int) is in generated IR file, but not in TBD file
-<unknown>:0: error: symbol '_T04test10PropertiesC9publicLetSivfi' (test.Properties.(publicLet : Swift.Int).(variable initialization expression)) is in generated IR file, but not in TBD file
-<unknown>:0: error: symbol '_T04test10PropertiesC9publicVarSifgWo' (witness table offset for test.Properties.publicVar.getter : Swift.Int) is in generated IR file, but not in TBD file
-<unknown>:0: error: symbol '_T04test10PropertiesC9publicVarSifmWo' (witness table offset for test.Properties.publicVar.materializeForSet : Swift.Int) is in generated IR file, but not in TBD file
-<unknown>:0: error: symbol '_T04test10PropertiesC9publicVarSifsWo' (witness table offset for test.Properties.publicVar.setter : Swift.Int) is in generated IR file, but not in TBD file
-<unknown>:0: error: symbol '_T04test10PropertiesC9publicVarSivWvd' (direct field offset for test.Properties.publicVar : Swift.Int) is in generated IR file, but not in TBD file
-<unknown>:0: error: symbol '_T04test10PropertiesC9publicVarSivfi' (test.Properties.(publicVar : Swift.Int).(variable initialization expression)) is in generated IR file, but not in TBD file
-<unknown>:0: error: symbol '_T04test10PropertiesCACycfCWo' (witness table offset for test.Properties.__allocating_init () -> test.Properties) is in generated IR file, but not in TBD file
-<unknown>:0: error: symbol '_T04test10PropertiesCACycfc' (test.Properties.init () -> test.Properties) is in generated IR file, but not in TBD file
-<unknown>:0: error: symbol '_T04test10PropertiesCMm' (metaclass for test.Properties) is in generated IR file, but not in TBD file
-<unknown>:0: error: symbol '_T04test10PropertiesCfd' (test.Properties.deinit) is in generated IR file, but not in TBD file
-<unknown>:0: error: symbol '_T04test11PrivateInitCACSi8private__tcfCWo' (witness table offset for test.PrivateInit.__allocating_init (private_ : Swift.Int) -> test.PrivateInit) is in generated IR file, but not in TBD file
-<unknown>:0: error: symbol '_T04test11PrivateInitCACSi8private__tcfc' (test.PrivateInit.init (private_ : Swift.Int) -> test.PrivateInit) is in generated IR file, but not in TBD file
-<unknown>:0: error: symbol '_T04test11PrivateInitCACycfCWo' (witness table offset for test.PrivateInit.__allocating_init () -> test.PrivateInit) is in generated IR file, but not in TBD file
-<unknown>:0: error: symbol '_T04test11PrivateInitCACycfc' (test.PrivateInit.init () -> test.PrivateInit) is in generated IR file, but not in TBD file
-<unknown>:0: error: symbol '_T04test11PrivateInitCMm' (metaclass for test.PrivateInit) is in generated IR file, but not in TBD file
-<unknown>:0: error: symbol '_T04test11PrivateInitCfD' (test.PrivateInit.__deallocating_deinit) is in generated IR file, but not in TBD file
-<unknown>:0: error: symbol '_T04test11PrivateInitCfd' (test.PrivateInit.deinit) is in generated IR file, but not in TBD file
-<unknown>:0: error: symbol '_T04test14PrivateMethodsC13privateMethodyyF' (test.PrivateMethods.privateMethod () -> ()) is in generated IR file, but not in TBD file
-<unknown>:0: error: symbol '_T04test14PrivateMethodsC13privateMethodyyFWo' (witness table offset for test.PrivateMethods.privateMethod () -> ()) is in generated IR file, but not in TBD file
-<unknown>:0: error: symbol '_T04test14PrivateMethodsCACycfCWo' (witness table offset for test.PrivateMethods.__allocating_init () -> test.PrivateMethods) is in generated IR file, but not in TBD file
-<unknown>:0: error: symbol '_T04test14PrivateMethodsCACycfc' (test.PrivateMethods.init () -> test.PrivateMethods) is in generated IR file, but not in TBD file
-<unknown>:0: error: symbol '_T04test14PrivateMethodsCMm' (metaclass for test.PrivateMethods) is in generated IR file, but not in TBD file
-<unknown>:0: error: symbol '_T04test14PrivateMethodsCfD' (test.PrivateMethods.__deallocating_deinit) is in generated IR file, but not in TBD file
-<unknown>:0: error: symbol '_T04test14PrivateMethodsCfd' (test.PrivateMethods.deinit) is in generated IR file, but not in TBD file
-<unknown>:0: error: symbol '_T04test14PrivateNothingCACycfCWo' (witness table offset for test.PrivateNothing.__allocating_init () -> test.PrivateNothing) is in generated IR file, but not in TBD file
-<unknown>:0: error: symbol '_T04test14PrivateNothingCACycfc' (test.PrivateNothing.init () -> test.PrivateNothing) is in generated IR file, but not in TBD file
-<unknown>:0: error: symbol '_T04test14PrivateNothingCMm' (metaclass for test.PrivateNothing) is in generated IR file, but not in TBD file
-<unknown>:0: error: symbol '_T04test14PrivateNothingCfD' (test.PrivateNothing.__deallocating_deinit) is in generated IR file, but not in TBD file
-<unknown>:0: error: symbol '_T04test14PrivateNothingCfd' (test.PrivateNothing.deinit) is in generated IR file, but not in TBD file
-<unknown>:0: error: symbol '_T04test14PrivateStaticsC10privateLetSivZ' (static test.PrivateStatics.privateLet : Swift.Int) is in generated IR file, but not in TBD file
-<unknown>:0: error: symbol '_T04test14PrivateStaticsC10privateVarSivZ' (static test.PrivateStatics.privateVar : Swift.Int) is in generated IR file, but not in TBD file
-<unknown>:0: error: symbol '_T04test14PrivateStaticsCACycfCWo' (witness table offset for test.PrivateStatics.__allocating_init () -> test.PrivateStatics) is in generated IR file, but not in TBD file
-<unknown>:0: error: symbol '_T04test14PrivateStaticsCACycfc' (test.PrivateStatics.init () -> test.PrivateStatics) is in generated IR file, but not in TBD file
-<unknown>:0: error: symbol '_T04test14PrivateStaticsCMm' (metaclass for test.PrivateStatics) is in generated IR file, but not in TBD file
-<unknown>:0: error: symbol '_T04test14PrivateStaticsCfD' (test.PrivateStatics.__deallocating_deinit) is in generated IR file, but not in TBD file
-<unknown>:0: error: symbol '_T04test14PrivateStaticsCfd' (test.PrivateStatics.deinit) is in generated IR file, but not in TBD file
-<unknown>:0: error: symbol '_T04test17PrivatePropertiesC10privateLetSivWvd' (direct field offset for test.PrivateProperties.privateLet : Swift.Int) is in generated IR file, but not in TBD file
-<unknown>:0: error: symbol '_T04test17PrivatePropertiesC10privateVarSifg' (test.PrivateProperties.privateVar.getter : Swift.Int) is in generated IR file, but not in TBD file
-<unknown>:0: error: symbol '_T04test17PrivatePropertiesC10privateVarSifgWo' (witness table offset for test.PrivateProperties.privateVar.getter : Swift.Int) is in generated IR file, but not in TBD file
-<unknown>:0: error: symbol '_T04test17PrivatePropertiesC10privateVarSifm' (test.PrivateProperties.privateVar.materializeForSet : Swift.Int) is in generated IR file, but not in TBD file
-<unknown>:0: error: symbol '_T04test17PrivatePropertiesC10privateVarSifmWo' (witness table offset for test.PrivateProperties.privateVar.materializeForSet : Swift.Int) is in generated IR file, but not in TBD file
-<unknown>:0: error: symbol '_T04test17PrivatePropertiesC10privateVarSifs' (test.PrivateProperties.privateVar.setter : Swift.Int) is in generated IR file, but not in TBD file
-<unknown>:0: error: symbol '_T04test17PrivatePropertiesC10privateVarSifsWo' (witness table offset for test.PrivateProperties.privateVar.setter : Swift.Int) is in generated IR file, but not in TBD file
-<unknown>:0: error: symbol '_T04test17PrivatePropertiesC10privateVarSivWvd' (direct field offset for test.PrivateProperties.privateVar : Swift.Int) is in generated IR file, but not in TBD file
-<unknown>:0: error: symbol '_T04test17PrivatePropertiesC13privateVarGetSifg' (test.PrivateProperties.privateVarGet.getter : Swift.Int) is in generated IR file, but not in TBD file
-<unknown>:0: error: symbol '_T04test17PrivatePropertiesC13privateVarGetSifgWo' (witness table offset for test.PrivateProperties.privateVarGet.getter : Swift.Int) is in generated IR file, but not in TBD file
-<unknown>:0: error: symbol '_T04test17PrivatePropertiesC16privateVarGetSetSifg' (test.PrivateProperties.privateVarGetSet.getter : Swift.Int) is in generated IR file, but not in TBD file
-<unknown>:0: error: symbol '_T04test17PrivatePropertiesC16privateVarGetSetSifgWo' (witness table offset for test.PrivateProperties.privateVarGetSet.getter : Swift.Int) is in generated IR file, but not in TBD file
-<unknown>:0: error: symbol '_T04test17PrivatePropertiesC16privateVarGetSetSifm' (test.PrivateProperties.privateVarGetSet.materializeForSet : Swift.Int) is in generated IR file, but not in TBD file
-<unknown>:0: error: symbol '_T04test17PrivatePropertiesC16privateVarGetSetSifmWo' (witness table offset for test.PrivateProperties.privateVarGetSet.materializeForSet : Swift.Int) is in generated IR file, but not in TBD file
-<unknown>:0: error: symbol '_T04test17PrivatePropertiesC16privateVarGetSetSifmytfU_' (test.PrivateProperties.(privateVarGetSet.materializeForSet : Swift.Int).(closure #1)) is in generated IR file, but not in TBD file
-<unknown>:0: error: symbol '_T04test17PrivatePropertiesC16privateVarGetSetSifs' (test.PrivateProperties.privateVarGetSet.setter : Swift.Int) is in generated IR file, but not in TBD file
-<unknown>:0: error: symbol '_T04test17PrivatePropertiesC16privateVarGetSetSifsWo' (witness table offset for test.PrivateProperties.privateVarGetSet.setter : Swift.Int) is in generated IR file, but not in TBD file
-<unknown>:0: error: symbol '_T04test17PrivatePropertiesCACycfCWo' (witness table offset for test.PrivateProperties.__allocating_init () -> test.PrivateProperties) is in generated IR file, but not in TBD file
-<unknown>:0: error: symbol '_T04test17PrivatePropertiesCACycfc' (test.PrivateProperties.init () -> test.PrivateProperties) is in generated IR file, but not in TBD file
-<unknown>:0: error: symbol '_T04test17PrivatePropertiesCMm' (metaclass for test.PrivateProperties) is in generated IR file, but not in TBD file
-<unknown>:0: error: symbol '_T04test17PrivatePropertiesCfD' (test.PrivateProperties.__deallocating_deinit) is in generated IR file, but not in TBD file
-<unknown>:0: error: symbol '_T04test17PrivatePropertiesCfd' (test.PrivateProperties.deinit) is in generated IR file, but not in TBD file
-<unknown>:0: error: symbol '_T04test4InitCACSi7public__tcfCWo' (witness table offset for test.Init.__allocating_init (public_ : Swift.Int) -> test.Init) is in generated IR file, but not in TBD file
-<unknown>:0: error: symbol '_T04test4InitCACSi7public__tcfc' (test.Init.init (public_ : Swift.Int) -> test.Init) is in generated IR file, but not in TBD file
-<unknown>:0: error: symbol '_T04test4InitCACSi8private__tcfCWo' (witness table offset for test.Init.__allocating_init (private_ : Swift.Int) -> test.Init) is in generated IR file, but not in TBD file
-<unknown>:0: error: symbol '_T04test4InitCACSi8private__tcfc' (test.Init.init (private_ : Swift.Int) -> test.Init) is in generated IR file, but not in TBD file
-<unknown>:0: error: symbol '_T04test4InitCACycfCWo' (witness table offset for test.Init.__allocating_init () -> test.Init) is in generated IR file, but not in TBD file
-<unknown>:0: error: symbol '_T04test4InitCACycfc' (test.Init.init () -> test.Init) is in generated IR file, but not in TBD file
-<unknown>:0: error: symbol '_T04test4InitCMm' (metaclass for test.Init) is in generated IR file, but not in TBD file
-<unknown>:0: error: symbol '_T04test4InitCfd' (test.Init.deinit) is in generated IR file, but not in TBD file
-<unknown>:0: error: symbol '_T04test7MethodsC12publicMethodyyFWo' (witness table offset for test.Methods.publicMethod () -> ()) is in generated IR file, but not in TBD file
-<unknown>:0: error: symbol '_T04test7MethodsC13privateMethodyyF' (test.Methods.privateMethod () -> ()) is in generated IR file, but not in TBD file
-<unknown>:0: error: symbol '_T04test7MethodsC13privateMethodyyFWo' (witness table offset for test.Methods.privateMethod () -> ()) is in generated IR file, but not in TBD file
-<unknown>:0: error: symbol '_T04test7MethodsCACycfCWo' (witness table offset for test.Methods.__allocating_init () -> test.Methods) is in generated IR file, but not in TBD file
-<unknown>:0: error: symbol '_T04test7MethodsCACycfc' (test.Methods.init () -> test.Methods) is in generated IR file, but not in TBD file
-<unknown>:0: error: symbol '_T04test7MethodsCMm' (metaclass for test.Methods) is in generated IR file, but not in TBD file
-<unknown>:0: error: symbol '_T04test7MethodsCfd' (test.Methods.deinit) is in generated IR file, but not in TBD file
-<unknown>:0: error: symbol '_T04test7NothingCACycfCWo' (witness table offset for test.Nothing.__allocating_init () -> test.Nothing) is in generated IR file, but not in TBD file
-<unknown>:0: error: symbol '_T04test7NothingCACycfc' (test.Nothing.init () -> test.Nothing) is in generated IR file, but not in TBD file
-<unknown>:0: error: symbol '_T04test7NothingCMm' (metaclass for test.Nothing) is in generated IR file, but not in TBD file
-<unknown>:0: error: symbol '_T04test7NothingCfd' (test.Nothing.deinit) is in generated IR file, but not in TBD file
-<unknown>:0: error: symbol '_T04test7StaticsCACycfCWo' (witness table offset for test.Statics.__allocating_init () -> test.Statics) is in generated IR file, but not in TBD file
-<unknown>:0: error: symbol '_T04test7StaticsCACycfc' (test.Statics.init () -> test.Statics) is in generated IR file, but not in TBD file
-<unknown>:0: error: symbol '_T04test7StaticsCMm' (metaclass for test.Statics) is in generated IR file, but not in TBD file
-<unknown>:0: error: symbol '_T04test7StaticsCfd' (test.Statics.deinit) is in generated IR file, but not in TBD file
-<unknown>:0: error: symbol '_T04test10PropertiesC15publicVarGetSetSifm' (test.Properties.publicVarGetSet.materializeForSet : Swift.Int) is in TBD file, but not in generated IR
-<unknown>:0: error: symbol '_T04test10PropertiesC9publicLetSifg' (test.Properties.publicLet.getter : Swift.Int) is in TBD file, but not in generated IR
-<unknown>:0: error: symbol '_T04test10PropertiesC9publicVarSifg' (test.Properties.publicVar.getter : Swift.Int) is in TBD file, but not in generated IR
-<unknown>:0: error: symbol '_T04test10PropertiesC9publicVarSifm' (test.Properties.publicVar.materializeForSet : Swift.Int) is in TBD file, but not in generated IR
-<unknown>:0: error: symbol '_T04test10PropertiesC9publicVarSifs' (test.Properties.publicVar.setter : Swift.Int) is in TBD file, but not in generated IR
-<unknown>:0: error: symbol '_T04test7StaticsC15publicVarGetSetSifmZ' (static test.Statics.publicVarGetSet.materializeForSet : Swift.Int) is in TBD file, but not in generated IR
-<unknown>:0: error: symbol '_T04test7StaticsC9publicLetSifgZ' (static test.Statics.publicLet.getter : Swift.Int) is in TBD file, but not in generated IR
-<unknown>:0: error: symbol '_T04test7StaticsC9publicVarSifgZ' (static test.Statics.publicVar.getter : Swift.Int) is in TBD file, but not in generated IR
-<unknown>:0: error: symbol '_T04test7StaticsC9publicVarSifmZ' (static test.Statics.publicVar.materializeForSet : Swift.Int) is in TBD file, but not in generated IR
-<unknown>:0: error: symbol '_T04test7StaticsC9publicVarSifsZ' (static test.Statics.publicVar.setter : Swift.Int) is in TBD file, but not in generated IR
+<unknown>:0: error: symbol '_T04test10PublicInitCACSi7public__tcfCWo' (witness table offset for test.PublicInit.__allocating_init (public_ : Swift.Int) -> test.PublicInit) is in generated IR file, but not in TBD file
+<unknown>:0: error: symbol '_T04test10PublicInitCACSi7public__tcfc' (test.PublicInit.init (public_ : Swift.Int) -> test.PublicInit) is in generated IR file, but not in TBD file
+<unknown>:0: error: symbol '_T04test10PublicInitCACSi9internal__tcfCWo' (witness table offset for test.PublicInit.__allocating_init (internal_ : Swift.Int) -> test.PublicInit) is in generated IR file, but not in TBD file
+<unknown>:0: error: symbol '_T04test10PublicInitCACSi9internal__tcfc' (test.PublicInit.init (internal_ : Swift.Int) -> test.PublicInit) is in generated IR file, but not in TBD file
+<unknown>:0: error: symbol '_T04test10PublicInitCACycfCWo' (witness table offset for test.PublicInit.__allocating_init () -> test.PublicInit) is in generated IR file, but not in TBD file
+<unknown>:0: error: symbol '_T04test10PublicInitCACycfc' (test.PublicInit.init () -> test.PublicInit) is in generated IR file, but not in TBD file
+<unknown>:0: error: symbol '_T04test10PublicInitCMm' (metaclass for test.PublicInit) is in generated IR file, but not in TBD file
+<unknown>:0: error: symbol '_T04test10PublicInitCfd' (test.PublicInit.deinit) is in generated IR file, but not in TBD file
+<unknown>:0: error: symbol '_T04test12InternalInitCACSi9internal__tcfCWo' (witness table offset for test.InternalInit.__allocating_init (internal_ : Swift.Int) -> test.InternalInit) is in generated IR file, but not in TBD file
+<unknown>:0: error: symbol '_T04test12InternalInitCACSi9internal__tcfc' (test.InternalInit.init (internal_ : Swift.Int) -> test.InternalInit) is in generated IR file, but not in TBD file
+<unknown>:0: error: symbol '_T04test12InternalInitCACycfCWo' (witness table offset for test.InternalInit.__allocating_init () -> test.InternalInit) is in generated IR file, but not in TBD file
+<unknown>:0: error: symbol '_T04test12InternalInitCACycfc' (test.InternalInit.init () -> test.InternalInit) is in generated IR file, but not in TBD file
+<unknown>:0: error: symbol '_T04test12InternalInitCMm' (metaclass for test.InternalInit) is in generated IR file, but not in TBD file
+<unknown>:0: error: symbol '_T04test12InternalInitCfD' (test.InternalInit.__deallocating_deinit) is in generated IR file, but not in TBD file
+<unknown>:0: error: symbol '_T04test12InternalInitCfd' (test.InternalInit.deinit) is in generated IR file, but not in TBD file
+<unknown>:0: error: symbol '_T04test13PublicMethodsC12publicMethodyyFWo' (witness table offset for test.PublicMethods.publicMethod () -> ()) is in generated IR file, but not in TBD file
+<unknown>:0: error: symbol '_T04test13PublicMethodsC14internalMethodyyF' (test.PublicMethods.internalMethod () -> ()) is in generated IR file, but not in TBD file
+<unknown>:0: error: symbol '_T04test13PublicMethodsC14internalMethodyyFWo' (witness table offset for test.PublicMethods.internalMethod () -> ()) is in generated IR file, but not in TBD file
+<unknown>:0: error: symbol '_T04test13PublicMethodsCACycfCWo' (witness table offset for test.PublicMethods.__allocating_init () -> test.PublicMethods) is in generated IR file, but not in TBD file
+<unknown>:0: error: symbol '_T04test13PublicMethodsCACycfc' (test.PublicMethods.init () -> test.PublicMethods) is in generated IR file, but not in TBD file
+<unknown>:0: error: symbol '_T04test13PublicMethodsCMm' (metaclass for test.PublicMethods) is in generated IR file, but not in TBD file
+<unknown>:0: error: symbol '_T04test13PublicMethodsCfd' (test.PublicMethods.deinit) is in generated IR file, but not in TBD file
+<unknown>:0: error: symbol '_T04test13PublicNothingCACycfCWo' (witness table offset for test.PublicNothing.__allocating_init () -> test.PublicNothing) is in generated IR file, but not in TBD file
+<unknown>:0: error: symbol '_T04test13PublicNothingCACycfc' (test.PublicNothing.init () -> test.PublicNothing) is in generated IR file, but not in TBD file
+<unknown>:0: error: symbol '_T04test13PublicNothingCMm' (metaclass for test.PublicNothing) is in generated IR file, but not in TBD file
+<unknown>:0: error: symbol '_T04test13PublicNothingCfd' (test.PublicNothing.deinit) is in generated IR file, but not in TBD file
+<unknown>:0: error: symbol '_T04test13PublicStaticsCACycfCWo' (witness table offset for test.PublicStatics.__allocating_init () -> test.PublicStatics) is in generated IR file, but not in TBD file
+<unknown>:0: error: symbol '_T04test13PublicStaticsCACycfc' (test.PublicStatics.init () -> test.PublicStatics) is in generated IR file, but not in TBD file
+<unknown>:0: error: symbol '_T04test13PublicStaticsCMm' (metaclass for test.PublicStatics) is in generated IR file, but not in TBD file
+<unknown>:0: error: symbol '_T04test13PublicStaticsCfd' (test.PublicStatics.deinit) is in generated IR file, but not in TBD file
+<unknown>:0: error: symbol '_T04test15InternalMethodsC14internalMethodyyF' (test.InternalMethods.internalMethod () -> ()) is in generated IR file, but not in TBD file
+<unknown>:0: error: symbol '_T04test15InternalMethodsC14internalMethodyyFWo' (witness table offset for test.InternalMethods.internalMethod () -> ()) is in generated IR file, but not in TBD file
+<unknown>:0: error: symbol '_T04test15InternalMethodsCACycfCWo' (witness table offset for test.InternalMethods.__allocating_init () -> test.InternalMethods) is in generated IR file, but not in TBD file
+<unknown>:0: error: symbol '_T04test15InternalMethodsCACycfc' (test.InternalMethods.init () -> test.InternalMethods) is in generated IR file, but not in TBD file
+<unknown>:0: error: symbol '_T04test15InternalMethodsCMm' (metaclass for test.InternalMethods) is in generated IR file, but not in TBD file
+<unknown>:0: error: symbol '_T04test15InternalMethodsCfD' (test.InternalMethods.__deallocating_deinit) is in generated IR file, but not in TBD file
+<unknown>:0: error: symbol '_T04test15InternalMethodsCfd' (test.InternalMethods.deinit) is in generated IR file, but not in TBD file
+<unknown>:0: error: symbol '_T04test15InternalNothingCACycfCWo' (witness table offset for test.InternalNothing.__allocating_init () -> test.InternalNothing) is in generated IR file, but not in TBD file
+<unknown>:0: error: symbol '_T04test15InternalNothingCACycfc' (test.InternalNothing.init () -> test.InternalNothing) is in generated IR file, but not in TBD file
+<unknown>:0: error: symbol '_T04test15InternalNothingCMm' (metaclass for test.InternalNothing) is in generated IR file, but not in TBD file
+<unknown>:0: error: symbol '_T04test15InternalNothingCfD' (test.InternalNothing.__deallocating_deinit) is in generated IR file, but not in TBD file
+<unknown>:0: error: symbol '_T04test15InternalNothingCfd' (test.InternalNothing.deinit) is in generated IR file, but not in TBD file
+<unknown>:0: error: symbol '_T04test15InternalStaticsC11internalLetSivZ' (static test.InternalStatics.internalLet : Swift.Int) is in generated IR file, but not in TBD file
+<unknown>:0: error: symbol '_T04test15InternalStaticsC11internalVarSivZ' (static test.InternalStatics.internalVar : Swift.Int) is in generated IR file, but not in TBD file
+<unknown>:0: error: symbol '_T04test15InternalStaticsCACycfCWo' (witness table offset for test.InternalStatics.__allocating_init () -> test.InternalStatics) is in generated IR file, but not in TBD file
+<unknown>:0: error: symbol '_T04test15InternalStaticsCACycfc' (test.InternalStatics.init () -> test.InternalStatics) is in generated IR file, but not in TBD file
+<unknown>:0: error: symbol '_T04test15InternalStaticsCMm' (metaclass for test.InternalStatics) is in generated IR file, but not in TBD file
+<unknown>:0: error: symbol '_T04test15InternalStaticsCfD' (test.InternalStatics.__deallocating_deinit) is in generated IR file, but not in TBD file
+<unknown>:0: error: symbol '_T04test15InternalStaticsCfd' (test.InternalStatics.deinit) is in generated IR file, but not in TBD file
+<unknown>:0: error: symbol '_T04test16PublicPropertiesC11internalLetSivWvd' (direct field offset for test.PublicProperties.internalLet : Swift.Int) is in generated IR file, but not in TBD file
+<unknown>:0: error: symbol '_T04test16PublicPropertiesC11internalVarSifg' (test.PublicProperties.internalVar.getter : Swift.Int) is in generated IR file, but not in TBD file
+<unknown>:0: error: symbol '_T04test16PublicPropertiesC11internalVarSifgWo' (witness table offset for test.PublicProperties.internalVar.getter : Swift.Int) is in generated IR file, but not in TBD file
+<unknown>:0: error: symbol '_T04test16PublicPropertiesC11internalVarSifm' (test.PublicProperties.internalVar.materializeForSet : Swift.Int) is in generated IR file, but not in TBD file
+<unknown>:0: error: symbol '_T04test16PublicPropertiesC11internalVarSifmWo' (witness table offset for test.PublicProperties.internalVar.materializeForSet : Swift.Int) is in generated IR file, but not in TBD file
+<unknown>:0: error: symbol '_T04test16PublicPropertiesC11internalVarSifs' (test.PublicProperties.internalVar.setter : Swift.Int) is in generated IR file, but not in TBD file
+<unknown>:0: error: symbol '_T04test16PublicPropertiesC11internalVarSifsWo' (witness table offset for test.PublicProperties.internalVar.setter : Swift.Int) is in generated IR file, but not in TBD file
+<unknown>:0: error: symbol '_T04test16PublicPropertiesC11internalVarSivWvd' (direct field offset for test.PublicProperties.internalVar : Swift.Int) is in generated IR file, but not in TBD file
+<unknown>:0: error: symbol '_T04test16PublicPropertiesC12publicVarGetSifgWo' (witness table offset for test.PublicProperties.publicVarGet.getter : Swift.Int) is in generated IR file, but not in TBD file
+<unknown>:0: error: symbol '_T04test16PublicPropertiesC14internalVarGetSifg' (test.PublicProperties.internalVarGet.getter : Swift.Int) is in generated IR file, but not in TBD file
+<unknown>:0: error: symbol '_T04test16PublicPropertiesC14internalVarGetSifgWo' (witness table offset for test.PublicProperties.internalVarGet.getter : Swift.Int) is in generated IR file, but not in TBD file
+<unknown>:0: error: symbol '_T04test16PublicPropertiesC15publicVarGetSetSifgWo' (witness table offset for test.PublicProperties.publicVarGetSet.getter : Swift.Int) is in generated IR file, but not in TBD file
+<unknown>:0: error: symbol '_T04test16PublicPropertiesC15publicVarGetSetSifmWo' (witness table offset for test.PublicProperties.publicVarGetSet.materializeForSet : Swift.Int) is in generated IR file, but not in TBD file
+<unknown>:0: error: symbol '_T04test16PublicPropertiesC15publicVarGetSetSifsWo' (witness table offset for test.PublicProperties.publicVarGetSet.setter : Swift.Int) is in generated IR file, but not in TBD file
+<unknown>:0: error: symbol '_T04test16PublicPropertiesC17internalVarGetSetSifg' (test.PublicProperties.internalVarGetSet.getter : Swift.Int) is in generated IR file, but not in TBD file
+<unknown>:0: error: symbol '_T04test16PublicPropertiesC17internalVarGetSetSifgWo' (witness table offset for test.PublicProperties.internalVarGetSet.getter : Swift.Int) is in generated IR file, but not in TBD file
+<unknown>:0: error: symbol '_T04test16PublicPropertiesC17internalVarGetSetSifm' (test.PublicProperties.internalVarGetSet.materializeForSet : Swift.Int) is in generated IR file, but not in TBD file
+<unknown>:0: error: symbol '_T04test16PublicPropertiesC17internalVarGetSetSifmWo' (witness table offset for test.PublicProperties.internalVarGetSet.materializeForSet : Swift.Int) is in generated IR file, but not in TBD file
+<unknown>:0: error: symbol '_T04test16PublicPropertiesC17internalVarGetSetSifmytfU_' (test.PublicProperties.(internalVarGetSet.materializeForSet : Swift.Int).(closure #1)) is in generated IR file, but not in TBD file
+<unknown>:0: error: symbol '_T04test16PublicPropertiesC17internalVarGetSetSifs' (test.PublicProperties.internalVarGetSet.setter : Swift.Int) is in generated IR file, but not in TBD file
+<unknown>:0: error: symbol '_T04test16PublicPropertiesC17internalVarGetSetSifsWo' (witness table offset for test.PublicProperties.internalVarGetSet.setter : Swift.Int) is in generated IR file, but not in TBD file
+<unknown>:0: error: symbol '_T04test16PublicPropertiesC9publicLetSivWvd' (direct field offset for test.PublicProperties.publicLet : Swift.Int) is in generated IR file, but not in TBD file
+<unknown>:0: error: symbol '_T04test16PublicPropertiesC9publicLetSivfi' (test.PublicProperties.(publicLet : Swift.Int).(variable initialization expression)) is in generated IR file, but not in TBD file
+<unknown>:0: error: symbol '_T04test16PublicPropertiesC9publicVarSifgWo' (witness table offset for test.PublicProperties.publicVar.getter : Swift.Int) is in generated IR file, but not in TBD file
+<unknown>:0: error: symbol '_T04test16PublicPropertiesC9publicVarSifmWo' (witness table offset for test.PublicProperties.publicVar.materializeForSet : Swift.Int) is in generated IR file, but not in TBD file
+<unknown>:0: error: symbol '_T04test16PublicPropertiesC9publicVarSifsWo' (witness table offset for test.PublicProperties.publicVar.setter : Swift.Int) is in generated IR file, but not in TBD file
+<unknown>:0: error: symbol '_T04test16PublicPropertiesC9publicVarSivWvd' (direct field offset for test.PublicProperties.publicVar : Swift.Int) is in generated IR file, but not in TBD file
+<unknown>:0: error: symbol '_T04test16PublicPropertiesC9publicVarSivfi' (test.PublicProperties.(publicVar : Swift.Int).(variable initialization expression)) is in generated IR file, but not in TBD file
+<unknown>:0: error: symbol '_T04test16PublicPropertiesCACycfCWo' (witness table offset for test.PublicProperties.__allocating_init () -> test.PublicProperties) is in generated IR file, but not in TBD file
+<unknown>:0: error: symbol '_T04test16PublicPropertiesCACycfc' (test.PublicProperties.init () -> test.PublicProperties) is in generated IR file, but not in TBD file
+<unknown>:0: error: symbol '_T04test16PublicPropertiesCMm' (metaclass for test.PublicProperties) is in generated IR file, but not in TBD file
+<unknown>:0: error: symbol '_T04test16PublicPropertiesCfd' (test.PublicProperties.deinit) is in generated IR file, but not in TBD file
+<unknown>:0: error: symbol '_T04test18InternalPropertiesC11internalLetSivWvd' (direct field offset for test.InternalProperties.internalLet : Swift.Int) is in generated IR file, but not in TBD file
+<unknown>:0: error: symbol '_T04test18InternalPropertiesC11internalVarSifg' (test.InternalProperties.internalVar.getter : Swift.Int) is in generated IR file, but not in TBD file
+<unknown>:0: error: symbol '_T04test18InternalPropertiesC11internalVarSifgWo' (witness table offset for test.InternalProperties.internalVar.getter : Swift.Int) is in generated IR file, but not in TBD file
+<unknown>:0: error: symbol '_T04test18InternalPropertiesC11internalVarSifm' (test.InternalProperties.internalVar.materializeForSet : Swift.Int) is in generated IR file, but not in TBD file
+<unknown>:0: error: symbol '_T04test18InternalPropertiesC11internalVarSifmWo' (witness table offset for test.InternalProperties.internalVar.materializeForSet : Swift.Int) is in generated IR file, but not in TBD file
+<unknown>:0: error: symbol '_T04test18InternalPropertiesC11internalVarSifs' (test.InternalProperties.internalVar.setter : Swift.Int) is in generated IR file, but not in TBD file
+<unknown>:0: error: symbol '_T04test18InternalPropertiesC11internalVarSifsWo' (witness table offset for test.InternalProperties.internalVar.setter : Swift.Int) is in generated IR file, but not in TBD file
+<unknown>:0: error: symbol '_T04test18InternalPropertiesC11internalVarSivWvd' (direct field offset for test.InternalProperties.internalVar : Swift.Int) is in generated IR file, but not in TBD file
+<unknown>:0: error: symbol '_T04test18InternalPropertiesC14internalVarGetSifg' (test.InternalProperties.internalVarGet.getter : Swift.Int) is in generated IR file, but not in TBD file
+<unknown>:0: error: symbol '_T04test18InternalPropertiesC14internalVarGetSifgWo' (witness table offset for test.InternalProperties.internalVarGet.getter : Swift.Int) is in generated IR file, but not in TBD file
+<unknown>:0: error: symbol '_T04test18InternalPropertiesC17internalVarGetSetSifg' (test.InternalProperties.internalVarGetSet.getter : Swift.Int) is in generated IR file, but not in TBD file
+<unknown>:0: error: symbol '_T04test18InternalPropertiesC17internalVarGetSetSifgWo' (witness table offset for test.InternalProperties.internalVarGetSet.getter : Swift.Int) is in generated IR file, but not in TBD file
+<unknown>:0: error: symbol '_T04test18InternalPropertiesC17internalVarGetSetSifm' (test.InternalProperties.internalVarGetSet.materializeForSet : Swift.Int) is in generated IR file, but not in TBD file
+<unknown>:0: error: symbol '_T04test18InternalPropertiesC17internalVarGetSetSifmWo' (witness table offset for test.InternalProperties.internalVarGetSet.materializeForSet : Swift.Int) is in generated IR file, but not in TBD file
+<unknown>:0: error: symbol '_T04test18InternalPropertiesC17internalVarGetSetSifmytfU_' (test.InternalProperties.(internalVarGetSet.materializeForSet : Swift.Int).(closure #1)) is in generated IR file, but not in TBD file
+<unknown>:0: error: symbol '_T04test18InternalPropertiesC17internalVarGetSetSifs' (test.InternalProperties.internalVarGetSet.setter : Swift.Int) is in generated IR file, but not in TBD file
+<unknown>:0: error: symbol '_T04test18InternalPropertiesC17internalVarGetSetSifsWo' (witness table offset for test.InternalProperties.internalVarGetSet.setter : Swift.Int) is in generated IR file, but not in TBD file
+<unknown>:0: error: symbol '_T04test18InternalPropertiesCACycfCWo' (witness table offset for test.InternalProperties.__allocating_init () -> test.InternalProperties) is in generated IR file, but not in TBD file
+<unknown>:0: error: symbol '_T04test18InternalPropertiesCACycfc' (test.InternalProperties.init () -> test.InternalProperties) is in generated IR file, but not in TBD file
+<unknown>:0: error: symbol '_T04test18InternalPropertiesCMm' (metaclass for test.InternalProperties) is in generated IR file, but not in TBD file
+<unknown>:0: error: symbol '_T04test18InternalPropertiesCfD' (test.InternalProperties.__deallocating_deinit) is in generated IR file, but not in TBD file
+<unknown>:0: error: symbol '_T04test18InternalPropertiesCfd' (test.InternalProperties.deinit) is in generated IR file, but not in TBD file
+<unknown>:0: error: symbol '_T04test13PublicStaticsC15publicVarGetSetSifmZ' (static test.PublicStatics.publicVarGetSet.materializeForSet : Swift.Int) is in TBD file, but not in generated IR
+<unknown>:0: error: symbol '_T04test13PublicStaticsC9publicLetSifgZ' (static test.PublicStatics.publicLet.getter : Swift.Int) is in TBD file, but not in generated IR
+<unknown>:0: error: symbol '_T04test13PublicStaticsC9publicVarSifgZ' (static test.PublicStatics.publicVar.getter : Swift.Int) is in TBD file, but not in generated IR
+<unknown>:0: error: symbol '_T04test13PublicStaticsC9publicVarSifmZ' (static test.PublicStatics.publicVar.materializeForSet : Swift.Int) is in TBD file, but not in generated IR
+<unknown>:0: error: symbol '_T04test13PublicStaticsC9publicVarSifsZ' (static test.PublicStatics.publicVar.setter : Swift.Int) is in TBD file, but not in generated IR
+<unknown>:0: error: symbol '_T04test16PublicPropertiesC15publicVarGetSetSifm' (test.PublicProperties.publicVarGetSet.materializeForSet : Swift.Int) is in TBD file, but not in generated IR
+<unknown>:0: error: symbol '_T04test16PublicPropertiesC9publicLetSifg' (test.PublicProperties.publicLet.getter : Swift.Int) is in TBD file, but not in generated IR
+<unknown>:0: error: symbol '_T04test16PublicPropertiesC9publicVarSifg' (test.PublicProperties.publicVar.getter : Swift.Int) is in TBD file, but not in generated IR
+<unknown>:0: error: symbol '_T04test16PublicPropertiesC9publicVarSifm' (test.PublicProperties.publicVar.materializeForSet : Swift.Int) is in TBD file, but not in generated IR
+<unknown>:0: error: symbol '_T04test16PublicPropertiesC9publicVarSifs' (test.PublicProperties.publicVar.setter : Swift.Int) is in TBD file, but not in generated IR

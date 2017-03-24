@@ -2,102 +2,102 @@
 // RUN: not %target-swift-frontend -c -parse-as-library -module-name test -validate-tbd-against-ir %s > %t.log 2>&1
 // RUN: diff %t.log %S/Inputs/class.log
 
-public class Nothing {}
+public class PublicNothing {}
 
-public class Init {
+public class PublicInit {
     public init() {}
     public init(public_: Int) {}
     
-    init(private_: Int) {}
+    init(internal_: Int) {}
 
     deinit {}
 }
 
-public class Methods {
+public class PublicMethods {
     public init() {}
     public func publicMethod() {}
-    func privateMethod() {}
+    func internalMethod() {}
 }
 
-public class Properties {
+public class PublicProperties {
     public let publicLet: Int = 0
-    let privateLet: Int = 0
+    let internalLet: Int = 0
 
     public var publicVar: Int = 0
-    var privateVar: Int = 0
+    var internalVar: Int = 0
 
     public var publicVarGet: Int { return 0 }
-    var privateVarGet: Int { return 0 }
+    var internalVarGet: Int { return 0 }
 
     public var publicVarGetSet: Int {
         get { return 0 }
         set {}
     }
-    var privateVarGetSet: Int {
+    var internalVarGetSet: Int {
         get { return 0 }
         set {}
     }
 }
 
-public class Statics {
+public class PublicStatics {
     public static func publicStaticFunc() {}
-    static func privateStaticFunc() {}
+    static func internalStaticFunc() {}
 
     public static let publicLet: Int = 0
-    static let privateLet: Int = 0
+    static let internalLet: Int = 0
 
     public static var publicVar: Int = 0
-    static var privateVar: Int = 0
+    static var internalVar: Int = 0
 
     public static var publicVarGet: Int { return 0 }
-    static var privateVarGet: Int { return 0 }
+    static var internalVarGet: Int { return 0 }
 
     public static var publicVarGetSet: Int {
         get { return 0 }
         set {}
     }
-    static var privateVarGetSet: Int {
+    static var internalVarGetSet: Int {
         get { return 0 }
         set {}
     }
 }
 
 
-class PrivateNothing {}
+class InternalNothing {}
 
-class PrivateInit {
+class InternalInit {
     init() {}
-    init(private_: Int) {}
+    init(internal_: Int) {}
 }
 
-class PrivateMethods {
+class InternalMethods {
     init() {}
-    func privateMethod() {}
+    func internalMethod() {}
 }
 
-class PrivateProperties {
-    let privateLet: Int = 0
+class InternalProperties {
+    let internalLet: Int = 0
 
-    var privateVar: Int = 0
+    var internalVar: Int = 0
 
-    var privateVarGet: Int { return 0 }
+    var internalVarGet: Int { return 0 }
 
-    var privateVarGetSet: Int {
+    var internalVarGetSet: Int {
         get { return 0 }
         set {}
     }
 }
 
-class PrivateStatics {
-    static func privateStaticFunc() {}
+class InternalStatics {
+    static func internalStaticFunc() {}
 
-    static let privateLet: Int = 0
+    static let internalLet: Int = 0
 
-    static var privateVar: Int = 0
+    static var internalVar: Int = 0
 
-    static var privateVarGet: Int { return 0 }
+    static var internalVarGet: Int { return 0 }
 
-    static var privateVarGetSet: Int {
+    static var internalVarGetSet: Int {
         get { return 0 }
         set {}
     }
