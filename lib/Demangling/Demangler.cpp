@@ -1217,9 +1217,13 @@ NodePointer Demangler::demangleThunkOrSpecialization() {
     case 'O': return createNode(Node::Kind::NonObjCAttribute);
     case 'D': return createNode(Node::Kind::DynamicAttribute);
     case 'd': return createNode(Node::Kind::DirectMethodReferenceAttribute);
-    case 'V': return createNode(Node::Kind::VTableAttribute);
     case 'a': return createNode(Node::Kind::PartialApplyObjCForwarder);
     case 'A': return createNode(Node::Kind::PartialApplyForwarder);
+    case 'V': {
+      NodePointer Base = popNode(isEntity);
+      NodePointer Derived = popNode(isEntity);
+      return createWithChildren(Node::Kind::VTableThunk, Derived, Base);
+    }
     case 'W': {
       NodePointer Entity = popNode(isEntity);
       NodePointer Conf = popProtocolConformance();
