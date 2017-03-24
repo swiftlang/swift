@@ -687,8 +687,10 @@ bool StringConcatenationOptimizer::extractStringConcatOperands() {
   if (!Fn)
     return false;
 
-  if (AI->getNumOperands() != 3 || !Fn->hasSemanticsAttr("string.concat"))
+  if (AI->getNumArguments() != 3 || !Fn->hasSemanticsAttr("string.concat"))
     return false;
+
+  assert(Fn->getRepresentation() == SILFunctionTypeRepresentation::Method);
 
   // Left and right operands of a string concatenation operation.
   AILeft = dyn_cast<ApplyInst>(AI->getOperand(1));
@@ -729,6 +731,11 @@ bool StringConcatenationOptimizer::extractStringConcatOperands() {
         (FRIRightFun->hasSemanticsAttr("string.makeUTF8") &&
          AIRightOperandsNum == 5)))
     return false;
+
+  assert(FRILeftFun->getRepresentation() ==
+         SILFunctionTypeRepresentation::Method);
+  assert(FRIRightFun->getRepresentation() ==
+         SILFunctionTypeRepresentation::Method);
 
   SLILeft = dyn_cast<StringLiteralInst>(AILeft->getOperand(1));
   SLIRight = dyn_cast<StringLiteralInst>(AIRight->getOperand(1));
