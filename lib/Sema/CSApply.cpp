@@ -3904,10 +3904,13 @@ namespace {
     }
 
     Expr *visitKeyPathExpr(KeyPathExpr *E) {
-      if (auto semanticE = E->getSemanticExpr())
+      if (auto semanticE = E->getObjCStringLiteralExpr()) {
         cs.setType(E, cs.getType(semanticE));
-
-      return E;
+        return E;
+      }
+      
+      // TODO: Native keypaths
+      llvm_unreachable("not implemented");
     }
 
     /// Interface for ExprWalker

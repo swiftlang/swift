@@ -16,19 +16,23 @@
 //===----------------------------------------------------------------------===//
 #include "TypeChecker.h"
 #include "swift/Basic/Range.h"
+
 using namespace swift;
 
 Optional<Type> TypeChecker::checkKeyPathExpr(DeclContext *dc,
-                                                 KeyPathExpr *expr,
-                                                 bool requireResultType) {
+                                             KeyPathExpr *expr,
+                                             bool requireResultType) {
+  // TODO: Native keypaths
+  assert(expr->isObjC() && "native keypaths not implemented");
+  
   // If there is already a semantic expression, do nothing.
-  if (expr->getSemanticExpr() && !requireResultType) return None;
+  if (expr->getObjCStringLiteralExpr() && !requireResultType) return None;
 
-  // #keyPath only makes sense when we have the Objective-C runtime.
+  // ObjC #keyPath only makes sense when we have the Objective-C runtime.
   if (!Context.LangOpts.EnableObjCInterop) {
     diagnose(expr->getLoc(), diag::expr_keypath_no_objc_runtime);
 
-    expr->setSemanticExpr(
+    expr->setObjCStringLiteralExpr(
       new (Context) StringLiteralExpr("", expr->getSourceRange(),
                                       /*Implicit=*/true));
     return None;
@@ -162,7 +166,7 @@ Optional<Type> TypeChecker::checkKeyPathExpr(DeclContext *dc,
   };
   
   // Local function to perform name lookup for the current index.
-  auto performLookup = [&](unsigned idx, Identifier componentName,
+  auto performLookup = [&](Identifier componentName,
                            SourceLoc componentNameLoc,
                            Type &lookupType) -> LookupResult {
     if (state == Beginning)
@@ -194,9 +198,37 @@ Optional<Type> TypeChecker::checkKeyPathExpr(DeclContext *dc,
   };
 
   bool isInvalid = false;
-  for (unsigned idx : range(expr->getNumComponents())) {
-    auto componentName = expr->getComponentName(idx);
-    auto componentNameLoc = expr->getComponentNameLoc(idx);
+  SmallVector<KeyPathExpr::Component, 4> resolvedComponents;
+  
+  for (auto &componentAndLoc : expr->getComponents()) {
+    KeyPathExpr::Component component = componentAndLoc.first;
+    auto componentNameLoc = componentAndLoc.second;
+    
+    // ObjC keypaths only support named segments.
+    // TODO: Perhaps we can map subscript components to dictionary keys.
+    switch (auto kind = component.getKind()) {
+    case KeyPathExpr::Component::Kind::UnresolvedProperty:
+      break;
+    case KeyPathExpr::Component::Kind::UnresolvedSubscript:
+    case KeyPathExpr::Component::Kind::OptionalChain:
+    case KeyPathExpr::Component::Kind::OptionalForce:
+      diagnose(componentNameLoc,
+               diag::expr_unsupported_objc_key_path_component,
+               (unsigned)kind);
+      continue;
+    case KeyPathExpr::Component::Kind::OptionalWrap:
+    case KeyPathExpr::Component::Kind::Property:
+    case KeyPathExpr::Component::Kind::Subscript:
+      llvm_unreachable("already resolved!");
+    }
+    
+    auto componentFullName = component.getUnresolvedDeclName();
+    if (!componentFullName.isSimpleName()) {
+      diagnose(componentNameLoc,
+               diag::expr_unsupported_objc_key_path_compound_name);
+      continue;
+    }
+    auto componentName = componentFullName.getBaseName();
 
     // If we are resolving into a dictionary, any component is
     // well-formed because the keys are unknown dynamically.
@@ -213,7 +245,7 @@ Optional<Type> TypeChecker::checkKeyPathExpr(DeclContext *dc,
 
     // Look for this component.
     Type lookupType;
-    LookupResult lookup = performLookup(idx, componentName, componentNameLoc,
+    LookupResult lookup = performLookup(componentName, componentNameLoc,
                                         lookupType);
 
     // If we didn't find anything, try to apply typo-correction.
@@ -288,7 +320,10 @@ Optional<Type> TypeChecker::checkKeyPathExpr(DeclContext *dc,
       validateDecl(var);
 
       // Resolve this component to the variable we found.
-      expr->resolveComponent(idx, var);
+      auto varRef = ConcreteDeclRef(var);
+      auto resolved =
+        KeyPathExpr::Component::forProperty(varRef, Type());
+      resolvedComponents.push_back(resolved);
       updateState(/*isProperty=*/true,
                   var->getInterfaceType()->getRValueObjectType());
 
@@ -365,15 +400,19 @@ Optional<Type> TypeChecker::checkKeyPathExpr(DeclContext *dc,
     isInvalid = true;
     break;
   }
+  // A successful check of an ObjC keypath shouldn't add or remove components,
+  // currently.
+  if (resolvedComponents.size() == expr->getComponents().size())
+    expr->resolveComponents(Context, resolvedComponents);
 
   // Check for an empty key-path string.
   auto keyPathString = keyPathOS.str();
   if (keyPathString.empty() && !isInvalid)
     diagnose(expr->getLoc(), diag::expr_keypath_empty);
 
-  // Set the semantic expression.
-  if (!expr->getSemanticExpr()) {
-    expr->setSemanticExpr(
+  // Set the string literal expression for the ObjC key path.
+  if (!expr->getObjCStringLiteralExpr()) {
+    expr->setObjCStringLiteralExpr(
       new (Context) StringLiteralExpr(Context.AllocateCopy(keyPathString),
                                       expr->getSourceRange(),
                                       /*Implicit=*/true));

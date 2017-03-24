@@ -2806,7 +2806,11 @@ namespace {
     }
 
     Type visitKeyPathExpr(KeyPathExpr *E) {
-      return E->getSemanticExpr()->getType();
+      if (auto objCLiteral = E->getObjCStringLiteralExpr())
+        return objCLiteral->getType();
+      
+      // TODO: native key paths
+      llvm_unreachable("not implemented");
     }
   };
 

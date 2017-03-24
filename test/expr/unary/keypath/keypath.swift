@@ -123,7 +123,8 @@ func testParseErrors() {
   let _: String = #keyPath; // expected-error{{expected '(' following '#keyPath'}}
   let _: String = #keyPath(123; // expected-error{{expected property or type name within '#keyPath(...)'}}
   let _: String = #keyPath(a.123; // expected-error{{expected property or type name within '#keyPath(...)'}}
-  let _: String = #keyPath(A(b:c:d:).propSet); // expected-error{{cannot use compound name 'A(b:c:d:)' in '#keyPath' expression}}
+  // TODO: redundant compound name error
+  let _: String = #keyPath(A(b:c:d:).propSet); // expected-error{{cannot use compound name}} expected-error{{an Objective-C key path cannot reference a declaration with a compound name}} expected-error{{unresolved identifier 'propSet'}}
   let _: String = #keyPath(A.propString; // expected-error{{expected ')' to complete '#keyPath' expression}}
     // expected-note@-1{{to match this opening '('}}
 }

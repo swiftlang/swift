@@ -2384,7 +2384,12 @@ RValue RValueEmitter::visitObjCSelectorExpr(ObjCSelectorExpr *e, SGFContext C) {
 }
 
 RValue RValueEmitter::visitKeyPathExpr(KeyPathExpr *E, SGFContext C) {
-  return visit(E->getSemanticExpr(), C);
+  if (E->isObjC()) {
+    return visit(E->getObjCStringLiteralExpr(), C);
+  }
+  
+  // TODO: native keypaths
+  llvm_unreachable("not implemented");
 }
 
 RValue RValueEmitter::

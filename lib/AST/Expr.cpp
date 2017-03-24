@@ -1986,42 +1986,36 @@ ArchetypeType *OpenExistentialExpr::getOpenedArchetype() const {
   return type->castTo<ArchetypeType>();
 }
 
-KeyPathExpr::KeyPathExpr(SourceLoc keywordLoc, SourceLoc lParenLoc,
-                         ArrayRef<Identifier> names,
-                         ArrayRef<SourceLoc> nameLocs,
-                         SourceLoc rParenLoc)
-  : Expr(ExprKind::KeyPath, /*Implicit=*/nameLocs.empty()),
-    KeywordLoc(keywordLoc), LParenLoc(lParenLoc), RParenLoc(rParenLoc)
+KeyPathExpr::KeyPathExpr(ASTContext &C,
+                         SourceLoc keywordLoc, SourceLoc lParenLoc,
+                         ArrayRef<ComponentAndLoc> components,
+                         SourceLoc rParenLoc,
+                         bool isObjC,
+                         bool isImplicit)
+  : Expr(ExprKind::KeyPath, isImplicit),
+    KeywordLoc(keywordLoc), LParenLoc(lParenLoc), RParenLoc(rParenLoc),
+    Components(C.AllocateUninitialized<ComponentAndLoc>(components.size()))
 {
-  // Copy components (which are all names).
-  KeyPathExprBits.NumComponents = names.size();
-  for (auto idx : indices(names))
-    getComponentsMutable()[idx] = names[idx];
+  // Copy components into the AST context.
+  std::uninitialized_copy(components.begin(), components.end(),
+                          Components.begin());
+  
+  KeyPathExprBits.IsObjC = isObjC;
+}
 
-  assert(nameLocs.empty() || nameLocs.size() == names.size());
-  KeyPathExprBits.HaveSourceLocations = !nameLocs.empty();
-  if (KeyPathExprBits.HaveSourceLocations) {
-    memcpy(getNameLocsMutable().data(), nameLocs.data(),
-           nameLocs.size() * sizeof(SourceLoc));
+void
+KeyPathExpr::resolveComponents(ASTContext &C,
+                               ArrayRef<KeyPathExpr::Component> resolvedComponents){
+  // Reallocate the components array if it needs to be.
+  if (Components.size() < resolvedComponents.size()) {
+    Components = C.Allocate<ComponentAndLoc>(resolvedComponents.size());
+    for (unsigned i : indices(Components)) {
+      new ((void*)&Components[i]) ComponentAndLoc{};
+    }
   }
-}
-
-Identifier KeyPathExpr::getComponentName(unsigned i) const {
-  if (auto decl = getComponentDecl(i))
-    return decl->getFullName().getBaseName();
-
-  return getComponents()[i].get<Identifier>();
-}
-
-KeyPathExpr *KeyPathExpr::create(ASTContext &ctx,
-                                 SourceLoc keywordLoc, SourceLoc lParenLoc,
-                                 ArrayRef<Identifier> names,
-                                 ArrayRef<SourceLoc> nameLocs,
-                                 SourceLoc rParenLoc) {
-  unsigned size = sizeof(KeyPathExpr)
-    + names.size() * sizeof(Identifier)
-    + nameLocs.size() * sizeof(SourceLoc);
-  void *mem = ctx.Allocate(size, alignof(KeyPathExpr));
-  return new (mem) KeyPathExpr(keywordLoc, lParenLoc, names, nameLocs,
-                                   rParenLoc);
+  
+  for (unsigned i : indices(resolvedComponents)) {
+    Components[i].first = resolvedComponents[i];
+  }
+  Components = Components.slice(0, resolvedComponents.size());
 }

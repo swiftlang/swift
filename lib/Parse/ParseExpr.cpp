@@ -515,13 +515,13 @@ ParserResult<Expr> Parser::parseExprKeyPath() {
   SourceLoc lParenLoc = consumeToken(tok::l_paren);
 
   // Handle code completion.
-  SmallVector<Identifier, 4> names;
-  SmallVector<SourceLoc, 4> nameLocs;
+  SmallVector<KeyPathExpr::ComponentAndLoc, 4> componentsWithLocs;
   auto handleCodeCompletion = [&](bool hasDot) -> ParserResult<Expr> {
     KeyPathExpr *expr = nullptr;
-    if (!names.empty()) {
-      expr = KeyPathExpr::create(Context, keywordLoc, lParenLoc, names,
-                                     nameLocs, Tok.getLoc());
+    if (!componentsWithLocs.empty()) {
+      expr = new (Context) KeyPathExpr(Context, keywordLoc, lParenLoc,
+                                       componentsWithLocs, Tok.getLoc(),
+                                       /*isObjC TODO*/ true);
     }
 
     if (CodeCompletion)
@@ -537,11 +537,11 @@ ParserResult<Expr> Parser::parseExprKeyPath() {
   while (true) {
     // Handle code completion.
     if (Tok.is(tok::code_complete))
-      return handleCodeCompletion(!names.empty());
+      return handleCodeCompletion(!componentsWithLocs.empty());
 
     // Parse the next name.
     DeclNameLoc nameLoc;
-    bool afterDot = !names.empty();
+    bool afterDot = !componentsWithLocs.empty();
     auto name = parseUnqualifiedDeclName(
                   afterDot, nameLoc, 
                   diag::expr_keypath_expected_property_or_type);
@@ -551,6 +551,7 @@ ParserResult<Expr> Parser::parseExprKeyPath() {
     }
 
     // Cannot use compound names here.
+    // TODO: yet...
     if (name.isCompoundName()) {
       diagnose(nameLoc.getBaseNameLoc(), diag::expr_keypath_compound_name,
                name)
@@ -558,14 +559,15 @@ ParserResult<Expr> Parser::parseExprKeyPath() {
     }
 
     // Record the name we parsed.
-    names.push_back(name.getBaseName());
-    nameLocs.push_back(nameLoc.getBaseNameLoc());
+    auto component = KeyPathExpr::Component::forUnresolvedProperty(name);
+    componentsWithLocs.push_back({component, nameLoc.getBaseNameLoc()});
 
     // Handle code completion.
     if (Tok.is(tok::code_complete))
       return handleCodeCompletion(false);
 
     // Parse the next period to continue the path.
+    // TODO: subscripts, optional operators
     if (consumeIf(tok::period))
       continue;
 
@@ -587,15 +589,16 @@ ParserResult<Expr> Parser::parseExprKeyPath() {
 
   // If we cannot build a useful expression, just return an error
   // expression.
-  if (names.empty() || status.isError()) {
+  if (componentsWithLocs.empty() || status.isError()) {
     return makeParserResult<Expr>(
              new (Context) ErrorExpr(SourceRange(keywordLoc, rParenLoc)));
   }
 
   // We're done: create the key-path expression.
   return makeParserResult<Expr>(
-           KeyPathExpr::create(Context, keywordLoc, lParenLoc, names,
-                                   nameLocs, rParenLoc));
+    new (Context) KeyPathExpr(Context, keywordLoc, lParenLoc,
+                              componentsWithLocs,
+                              rParenLoc, /*isObjC TODO*/ true));
 }
 
 /// parseExprSelector

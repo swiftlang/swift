@@ -896,7 +896,53 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   }
 
   Expr *visitKeyPathExpr(KeyPathExpr *E) {
-    HANDLE_SEMANTIC_EXPR(E);
+    // For an ObjC key path, the string literal expr serves as the semantic
+    // expression.
+    if (auto objcStringLiteral = E->getObjCStringLiteralExpr()) {
+      Expr *sub = doIt(objcStringLiteral);
+      if (!sub) return nullptr;
+      E->setObjCStringLiteralExpr(sub);
+      return E;
+    }
+  
+    SmallVector<KeyPathExpr::Component, 4> updatedComponents;
+    bool didChangeComponents = false;
+    for (auto &componentAndLoc : E->getComponents()) {
+      auto component = componentAndLoc.first;
+      
+      switch (auto kind = component.getKind()) {
+      case KeyPathExpr::Component::Kind::Subscript:
+      case KeyPathExpr::Component::Kind::UnresolvedSubscript: {
+        Expr *origIndex = component.getIndexExpr();
+        Expr *newIndex = doIt(origIndex);
+        if (!newIndex) return nullptr;
+        if (newIndex != origIndex) {
+          didChangeComponents = true;
+          component = kind == KeyPathExpr::Component::Kind::Subscript
+            ? KeyPathExpr::Component::forSubscript(component.getDeclRef(),
+                                                   newIndex,
+                                                   component.getComponentType())
+            : KeyPathExpr::Component::forUnresolvedSubscript(newIndex);
+        }
+        break;
+      }
+        
+      case KeyPathExpr::Component::Kind::OptionalChain:
+      case KeyPathExpr::Component::Kind::OptionalWrap:
+      case KeyPathExpr::Component::Kind::OptionalForce:
+      case KeyPathExpr::Component::Kind::Property:
+      case KeyPathExpr::Component::Kind::UnresolvedProperty:
+        // No subexpr to visit.
+        break;
+      }
+      updatedComponents.push_back(component);
+    }
+    
+    if (didChangeComponents) {
+      E->resolveComponents(E->getType()->getASTContext(),
+                           updatedComponents);
+    }
+    
     return E;
   }
 
