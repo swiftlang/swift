@@ -1217,6 +1217,8 @@ GenericSignatureBuilder *ASTContext::getOrCreateGenericSignatureBuilder(
   builder->finalize(SourceLoc(), sig->getGenericParams(),
                     /*allowConcreteGenericParams=*/true);
 
+  assert(builder->getGenericSignature()->getCanonicalSignature() == sig);
+
   // Store this generic signature builder (no generic environment yet).
   Impl.GenericSignatureBuilders[{sig, mod}] =
     std::unique_ptr<GenericSignatureBuilder>(builder);
