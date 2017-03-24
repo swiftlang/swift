@@ -30,7 +30,7 @@ public protocol _UnicodeContent {
 
   /// A type that presents the string's UTF-16 code units without necessarily
   /// correcting encoding errors
-  associatedtype UTF16View : BidirectionalCollection
+  associatedtype UTF16View : UnicodeView
   // where Iterator.Element == UInt16
 
   /// The string's UTF-16 code units, without necessarily correcting encoding
@@ -38,19 +38,19 @@ public protocol _UnicodeContent {
   var utf16: UTF16View { get }
 
   /// A type that presents an FCC-normalized view of the string
-  associatedtype FCCNormalizedUTF16View : BidirectionalCollection
+  associatedtype FCCNormalizedUTF16View : UnicodeView
   // where Iterator.Element == UInt16
 
   /// An FCC-normalized view of the string
   var fccNormalizedUTF16: FCCNormalizedUTF16View { get }
 
-  associatedtype CharacterView : BidirectionalCollection
+  associatedtype CharacterView : UnicodeView
   // where Iterator.Element == Character
 
   var characters: CharacterView { get }
 
   /// A type that presents the string's unicode scalar values
-  associatedtype UnicodeScalarView : BidirectionalCollection
+  associatedtype UnicodeScalarView : UnicodeView
   // where Iterator.Element == UnicodeScalar
 
   var unicodeScalars: UnicodeScalarView { get }
@@ -59,7 +59,7 @@ public protocol _UnicodeContent {
   /// A type presenting ASCII-only extended grapheme clusters (`Character`s) as
   /// their (single) unicode scalar values, and presenting all other
   /// `Character`s as `nil`.
-  associatedtype ASCIIOnlyView : BidirectionalCollection
+  associatedtype ASCIIOnlyView : UnicodeView
   // where Iterator.Element : UInt8?
   
   var asciiOnlyView: ASCIIOnlyView { get }
@@ -109,11 +109,15 @@ where
   CodeUnits.SubSequence.SubSequence == CodeUnits.SubSequence,
   CodeUnits.SubSequence.Iterator.Element == CodeUnits.Iterator.Element {
 
-  var unicodeScalars: LazyMapRandomAccessCollection<CodeUnits, UnicodeScalar> {
-    return codeUnits.lazy.map {
-      UnicodeScalar($0)
-      ?? UnicodeScalar(_unchecked: 0xFFFD)
-    }
+  var unicodeScalars: RandomAccessUnicodeView<
+    LazyMapRandomAccessCollection<CodeUnits, UnicodeScalar>
+  > {
+    return RandomAccessUnicodeView(
+      codeUnits.lazy.map {
+        UnicodeScalar($0)
+        ?? UnicodeScalar(_unchecked: 0xFFFD)
+      }
+    )
   }
 }
 
@@ -188,25 +192,35 @@ where Encoding == Latin1,
   CodeUnits.SubSequence.SubSequence == CodeUnits.SubSequence,
   CodeUnits.SubSequence.Iterator.Element == CodeUnits.Iterator.Element
 {
-  var utf16: LazyMapRandomAccessCollection<CodeUnits, UInt16> {
+  var utf16: RandomAccessUnicodeView<
+    LazyMapRandomAccessCollection<CodeUnits, UInt16>
+  > {
     return fccNormalizedUTF16
   }
 
   /// An FCC-normalized view of the string
-  var fccNormalizedUTF16: LazyMapRandomAccessCollection<CodeUnits, UInt16> {
-    return codeUnits.lazy.map { numericCast($0) }
+  var fccNormalizedUTF16: RandomAccessUnicodeView<
+    LazyMapRandomAccessCollection<CodeUnits, UInt16>
+  > {
+    return RandomAccessUnicodeView(codeUnits.lazy.map { numericCast($0) })
   }
   
-  var characters: LazyMapRandomAccessCollection<CodeUnits, Character> {
-    return codeUnits.lazy.map {
-      Character(UnicodeScalar(_unchecked: numericCast($0)))
-    }
+  var characters: RandomAccessUnicodeView<
+    LazyMapRandomAccessCollection<CodeUnits, Character>
+  > {
+    return RandomAccessUnicodeView(
+      codeUnits.lazy.map {
+        Character(UnicodeScalar(_unchecked: numericCast($0)))
+      })
   }
 
-  var unicodeScalars: LazyMapRandomAccessCollection<CodeUnits, UnicodeScalar> {
-    return codeUnits.lazy.map {
+  var unicodeScalars: RandomAccessUnicodeView<
+    LazyMapRandomAccessCollection<CodeUnits, UnicodeScalar>
+  > {
+    return RandomAccessUnicodeView(
+      codeUnits.lazy.map {
       UnicodeScalar(_unchecked: numericCast($0))
-    }
+    })
   }
 }
   
@@ -227,8 +241,8 @@ where Encoding.EncodedScalar == UTF16.EncodedScalar,
     return _UnicodeViews(codeUnits, Encoding.self).fccNormalizedUTF16
   }
   
-  var utf16 : CodeUnits {
-    return codeUnits
+  var utf16 : RandomAccessUnicodeView<CodeUnits> {
+    return RandomAccessUnicodeView(codeUnits)
   }
 }
 
