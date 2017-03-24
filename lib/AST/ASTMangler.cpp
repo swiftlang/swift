@@ -98,7 +98,7 @@ std::string ASTMangler::mangleAccessorEntity(AccessorKind kind,
   return finalize();
 }
 
-std::string ASTMangler::mangleGlobalGetterEntity(ValueDecl *decl,
+std::string ASTMangler::mangleGlobalGetterEntity(const ValueDecl *decl,
                                                  SymbolKind SKind) {
   beginMangling();
   appendEntity(decl, "fG", false);
@@ -129,15 +129,39 @@ std::string ASTMangler::mangleNominalType(const NominalTypeDecl *decl) {
   return finalize();
 }
 
-std::string ASTMangler::mangleWitnessTable(NormalProtocolConformance *C) {
+std::string ASTMangler::mangleVTableThunk(const FuncDecl *Base,
+                                          const FuncDecl *Derived) {
+  beginMangling();
+
+  appendEntity(Derived);
+  appendEntity(Base);
+  appendOperator("TV");
+
+  return finalize();
+}
+
+std::string ASTMangler::mangleConstructorVTableThunk(
+                                               const ConstructorDecl *Base,
+                                               const ConstructorDecl *Derived,
+                                               bool isAllocating) {
+  beginMangling();
+
+  appendConstructorEntity(Derived, isAllocating);
+  appendConstructorEntity(Base, isAllocating);
+  appendOperator("TV");
+
+  return finalize();
+}
+
+std::string ASTMangler::mangleWitnessTable(const NormalProtocolConformance *C) {
   beginMangling();
   appendProtocolConformance(C);
   appendOperator("WP");
   return finalize();
 }
 
-std::string ASTMangler::mangleWitnessThunk(ProtocolConformance *Conformance,
-                                           ValueDecl *Requirement) {
+std::string ASTMangler::mangleWitnessThunk(const ProtocolConformance *Conformance,
+                                           const ValueDecl *Requirement) {
   beginMangling();
   // Concrete witness thunks get a special mangling.
   if (Conformance)
@@ -156,8 +180,8 @@ std::string ASTMangler::mangleWitnessThunk(ProtocolConformance *Conformance,
 }
 
 std::string ASTMangler::mangleClosureWitnessThunk(
-                                              ProtocolConformance *Conformance,
-                                              AbstractClosureExpr *Closure) {
+                                         const ProtocolConformance *Conformance,
+                                         const AbstractClosureExpr *Closure) {
   beginMangling();
   appendProtocolConformance(Conformance);
   appendClosureEntity(Closure);
@@ -334,7 +358,6 @@ std::string ASTMangler::mangleAccessorEntityAsUSR(AccessorKind kind,
 void ASTMangler::appendSymbolKind(SymbolKind SKind) {
   switch (SKind) {
     case SymbolKind::Default: return;
-    case SymbolKind::VTableMethod: return appendOperator("TV");
     case SymbolKind::DynamicThunk: return appendOperator("TD");
     case SymbolKind::SwiftAsObjCThunk: return appendOperator("To");
     case SymbolKind::ObjCAsSwiftThunk: return appendOperator("TO");
@@ -810,7 +833,7 @@ GenericTypeParamType *ASTMangler::appendAssocType(DependentMemberType *DepTy,
 }
 
 void ASTMangler::appendOpWithGenericParamIndex(StringRef Op,
-                                               GenericTypeParamType *paramTy) {
+                                          const GenericTypeParamType *paramTy) {
   llvm::SmallVector<char, 8> OpBuf(Op.begin(), Op.end());
   if (paramTy->getDepth() > 0) {
     OpBuf.push_back('d');

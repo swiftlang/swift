@@ -15,10 +15,10 @@ public class DerivedClass: BaseClass<Double> {
 }
 
 // CHECK: sil_vtable BaseClass {
-// CHECK:  #BaseClass.doSomething!1: {{.*}} : _{{.*}}// BaseClass.doSomething(A) -> Int
+// CHECK:  #BaseClass.doSomething!1: <T> (BaseClass<T>) -> (T) -> Int : _T023alive_method_with_thunk9BaseClassC11doSomethingSixF // BaseClass.doSomething(A) -> Int
 // CHECK: }
 
 // CHECK: sil_vtable DerivedClass {
-// CHECK:  #BaseClass.doSomething!1: {{.*}} : public _{{.*}}// override DerivedClass.doSomething(Double) -> Int
+// CHECK:  #BaseClass.doSomething!1: <T> (BaseClass<T>) -> (T) -> Int : public _T023alive_method_with_thunk12DerivedClassC11doSomethingSiSdFAA04BaseF0CADSixFTV  // vtable thunk for BaseClass.doSomething(A) -> Int dispatching to DerivedClass.doSomething(Double) -> Int
 // CHECK: }
 

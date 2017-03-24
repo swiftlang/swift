@@ -121,6 +121,10 @@ static llvm::cl::opt<unsigned>
 AssertConfId("assert-conf-id", llvm::cl::Hidden,
              llvm::cl::init(0));
 
+static llvm::cl::opt<bool>
+DisableSILLinking("disable-sil-linking",
+                  llvm::cl::desc("Disable SIL linking"));
+
 static llvm::cl::opt<int>
 SILInlineThreshold("sil-inline-threshold", llvm::cl::Hidden,
                    llvm::cl::init(-1));
@@ -324,7 +328,7 @@ int main(int argc, char **argv) {
     std::unique_ptr<SerializedSILLoader> SL = SerializedSILLoader::create(
         CI.getASTContext(), CI.getSILModule(), nullptr);
 
-    if (extendedInfo.isSIB())
+    if (extendedInfo.isSIB() || DisableSILLinking)
       SL->getAllForModule(CI.getMainModule()->getName(), nullptr);
     else
       SL->getAll();

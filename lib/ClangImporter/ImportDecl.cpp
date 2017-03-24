@@ -4409,8 +4409,13 @@ namespace {
                                       OptionalAttr(/*implicit*/false));
       // FIXME: Handle IBOutletCollection.
 
-      if (overridden)
+      if (overridden) {
         result->setOverriddenDecl(overridden);
+        getter->setOverriddenDecl(overridden->getGetter());
+        if (auto parentSetter = overridden->getSetter())
+          if (setter)
+            setter->setOverriddenDecl(parentSetter);
+      }
 
       // If this is a Swift 2 stub, mark it as such.
       if (correctSwiftName)

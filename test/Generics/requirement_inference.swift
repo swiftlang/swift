@@ -261,3 +261,19 @@ class X13<S: P14> {
   }
 }
 #endif
+
+protocol P16 {
+	associatedtype A
+}
+
+struct X15 { }
+
+struct X16<X, Y> : P16 {
+	typealias A = (X, Y)
+}
+
+// CHECK-LABEL: .X17.bar@
+// CHECK: Generic signature: <S, T, U, V where S == X16<X3, X15>, T == X3, U == X15>
+struct X17<S: P16, T, U> where S.A == (T, U) {
+	func bar<V>(_: V) where S == X16<X3, X15> { }
+}

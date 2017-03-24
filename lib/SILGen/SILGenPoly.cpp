@@ -632,7 +632,8 @@ ManagedValue Transform::transformTuple(ManagedValue inputTuple,
                                        SGFContext ctxt) {
   const TypeLowering &outputTL =
     SGF.getTypeLowering(outputOrigType, outputSubstType);
-  assert(outputTL.isAddressOnly() == inputTuple.getType().isAddress() &&
+  assert((outputTL.isAddressOnly() == inputTuple.getType().isAddress() ||
+          !SGF.silConv.useLoweredAddresses()) &&
          "expected loadable inputs to have been loaded");
 
   // If there's no representation difference, we're done.
@@ -647,7 +648,7 @@ ManagedValue Transform::transformTuple(ManagedValue inputTuple,
 
   // If the tuple is address only, we need to do the operation in memory.
   SILValue outputAddr;
-  if (outputTL.isAddressOnly())
+  if (outputTL.isAddressOnly() && SGF.silConv.useLoweredAddresses())
     outputAddr = SGF.getBufferForExprResult(Loc, outputTL.getLoweredType(),
                                             ctxt);
 
@@ -696,7 +697,7 @@ ManagedValue Transform::transformTuple(ManagedValue inputTuple,
     // later assembly into a tuple.
     if (!outputEltTemp) {
       assert(outputElt);
-      assert(!inputEltTL.isAddressOnly());
+      assert(!inputEltTL.isAddressOnly() || !SGF.silConv.useLoweredAddresses());
       outputElts.push_back(outputElt);
       continue;
     }
@@ -1056,7 +1057,7 @@ namespace {
       auto loweredTy = loweredTL.getLoweredType();
       auto optionalTy = SGF.getSILType(claimNextOutputType());
       auto someDecl = SGF.getASTContext().getOptionalSomeDecl();
-      if (loweredTL.isLoadable()) {
+      if (loweredTL.isLoadable() || !SGF.silConv.useLoweredAddresses()) {
         auto payload =
           translateAndImplodeIntoValue(inputOrigType, inputTupleType,
                                        outputOrigType, outputTupleType,
@@ -1170,7 +1171,8 @@ namespace {
         auto outputEltOrigType = outputOrigType.getTupleElementType(index);
         auto outputEltSubstType = outputSubstType.getElementType(index);
         auto inputEltAddr = inputEltAddrs[index].first;
-        assert(inputEltAddr.getType().isAddress());
+        assert(inputEltAddr.getType().isAddress() ||
+               !SGF.silConv.useLoweredAddresses());
 
         if (auto outputEltTupleType = dyn_cast<TupleType>(outputEltSubstType)) {
           assert(outputEltOrigType.isTuple());
@@ -1992,7 +1994,7 @@ ResultPlanner::planIntoDirectResult(AbstractionPattern innerOrigType,
                                     CanType outerSubstType,
                                     PlanData &planData,
                                     SILResultInfo outerResult) {
-  assert(!outerOrigType.isTuple());
+  assert(!outerOrigType.isTuple() || !Gen.silConv.useLoweredAddresses());
 
   // If the inner pattern is a tuple, expand it.
   if (innerOrigType.isTuple()) {

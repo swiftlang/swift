@@ -56,6 +56,23 @@ struct S: Fooable {
 
   var prop1: Int = 0
 
+  // Getter for prop1
+  // CHECK-LABEL: sil hidden [transparent] @_T015guaranteed_self1SV5prop1Sifg : $@convention(method) (@guaranteed S) -> Int
+  // CHECK:       bb0([[SELF:%.*]] : $S):
+  // CHECK-NOT:     destroy_value [[SELF]]
+
+  // Setter for prop1
+  // CHECK-LABEL: sil hidden [transparent] @_T015guaranteed_self1SV5prop1Sifs : $@convention(method) (Int, @inout S) -> ()
+  // CHECK:       bb0({{.*}} [[SELF_ADDR:%.*]] : $*S):
+  // CHECK-NOT:     load [[SELF_ADDR]]
+  // CHECK-NOT:     destroy_addr [[SELF_ADDR]]
+
+  // materializeForSet for prop1
+  // CHECK-LABEL: sil hidden [transparent] @_T015guaranteed_self1SV5prop1Sifm : $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout S) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>)
+  // CHECK:       bb0({{.*}} [[SELF_ADDR:%.*]] : $*S):
+  // CHECK-NOT:     load [[SELF_ADDR]]
+  // CHECK-NOT:     destroy_addr [[SELF_ADDR]]
+
   var prop2: Int {
     // CHECK-LABEL: sil hidden @_T015guaranteed_self1SV5prop2Sifg : $@convention(method) (@guaranteed S) -> Int
     // CHECK:       bb0([[SELF:%.*]] : $S):
@@ -79,23 +96,6 @@ struct S: Fooable {
     // CHECK-NOT:     destroy_value [[SELF]]
     nonmutating set { }
   }
-
-  // Getter for prop1
-  // CHECK-LABEL: sil hidden [transparent] @_T015guaranteed_self1SV5prop1Sifg : $@convention(method) (@guaranteed S) -> Int
-  // CHECK:       bb0([[SELF:%.*]] : $S):
-  // CHECK-NOT:     destroy_value [[SELF]]
-
-  // Setter for prop1
-  // CHECK-LABEL: sil hidden [transparent] @_T015guaranteed_self1SV5prop1Sifs : $@convention(method) (Int, @inout S) -> ()
-  // CHECK:       bb0({{.*}} [[SELF_ADDR:%.*]] : $*S):
-  // CHECK-NOT:     load [[SELF_ADDR]]
-  // CHECK-NOT:     destroy_addr [[SELF_ADDR]]
-
-  // materializeForSet for prop1
-  // CHECK-LABEL: sil hidden [transparent] @_T015guaranteed_self1SV5prop1Sifm : $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout S) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>)
-  // CHECK:       bb0({{.*}} [[SELF_ADDR:%.*]] : $*S):
-  // CHECK-NOT:     load [[SELF_ADDR]]
-  // CHECK-NOT:     destroy_addr [[SELF_ADDR]]
 }
 
 // Witness thunk for nonmutating 'foo'

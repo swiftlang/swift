@@ -663,9 +663,6 @@ std::string SILDeclRef::mangle(ManglingKind MKind) const {
         SKind = ASTMangler::SymbolKind::ObjCAsSwiftThunk;
       }
       break;
-    case SILDeclRef::ManglingKind::VTableMethod:
-      SKind = ASTMangler::SymbolKind::VTableMethod;
-      break;
     case SILDeclRef::ManglingKind::DynamicThunk:
       SKind = ASTMangler::SymbolKind::DynamicThunk;
       break;
@@ -772,11 +769,13 @@ SILDeclRef SILDeclRef::getNextOverriddenVTableEntry() const {
     // @NSManaged property, then it won't be in the vtable.
     if (overridden.getDecl()->hasClangNode())
       return SILDeclRef();
-    if (overridden.getDecl()->getAttrs().hasAttribute<DynamicAttr>())
+    if (overridden.getDecl()->isDynamic())
       return SILDeclRef();
     if (auto *ovFD = dyn_cast<FuncDecl>(overridden.getDecl()))
       if (auto *asd = ovFD->getAccessorStorageDecl()) {
         if (asd->hasClangNode())
+          return SILDeclRef();
+        if (asd->isDynamic())
           return SILDeclRef();
       }
 
@@ -795,19 +794,6 @@ SILDeclRef SILDeclRef::getNextOverriddenVTableEntry() const {
     return overridden;
   }
   return SILDeclRef();
-}
-
-SILDeclRef SILDeclRef::getBaseOverriddenVTableEntry() const {
-  // 'method' is the most final method in the hierarchy which we
-  // haven't yet found a compatible override for.  'cur' is the method
-  // we're currently looking at.  Compatibility is transitive,
-  // so we can forget our original method and just keep going up.
-  SILDeclRef method = *this;
-  SILDeclRef cur = method;
-  while ((cur = cur.getNextOverriddenVTableEntry())) {
-    method = cur;
-  }
-  return method;
 }
 
 SILLocation SILDeclRef::getAsRegularLocation() const {

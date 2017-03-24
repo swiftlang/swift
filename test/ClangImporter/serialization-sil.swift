@@ -40,4 +40,4 @@ public func testPartialApply(_ obj: Test) {
     // CHECK: = apply [[PROP2_PARTIAL]]() : $@callee_owned () -> UnsafeMutableRawPointer
     _ = prop2
   }
-} // CHECK: {{^}$}}
+} // CHECK: // end sil function '_T04Test16testPartialApplyySoAA_pF'

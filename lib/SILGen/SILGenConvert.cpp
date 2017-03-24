@@ -777,6 +777,12 @@ SILGenFunction::emitOpenExistential(
     if (existentialType.isAddress()) {
       OpenedExistentialAccess allowedAccess =
           getOpenedExistentialAccessFor(accessKind);
+      if (!loweredOpenedType.isAddress()) {
+        assert(!silConv.useLoweredAddresses() &&
+               "Non-address loweredOpenedType is only allowed under opaque "
+               "value mode");
+        loweredOpenedType = loweredOpenedType.getAddressType();
+      }
       archetypeValue =
           B.createOpenExistentialAddr(loc, existentialValue.forward(*this),
                                       loweredOpenedType, allowedAccess);

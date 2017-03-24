@@ -1426,7 +1426,6 @@ FunctionSignaturePartialSpecializer::createSpecializedGenericSignature(
 void ReabstractionInfo::specializeConcreteAndGenericSubstitutions(
     ApplySite Apply, SILFunction *Callee, ArrayRef<Substitution> ParamSubs) {
   SILModule &M = Callee->getModule();
-  auto *SM = M.getSwiftModule();
   auto &Ctx = M.getASTContext();
 
   // Caller is the SILFunction containing the apply instruction.

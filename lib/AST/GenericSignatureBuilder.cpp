@@ -277,6 +277,144 @@ bool RequirementSource::isSelfDerivedSource(PotentialArchetype *pa) const {
   return false;
 }
 
+/// Replace 'Self' in the given dependent type (\c depTy) with the given
+/// potential archetype, producing a new potential archetype that refers to
+/// the nested type. This limited operation makes sure that it does not
+/// create any new potential archetypes along the way, so it should only be
+/// used in cases where we're reconstructing something that we know exists.
+static PotentialArchetype *replaceSelfWithPotentialArchetype(
+                             PotentialArchetype *selfPA, Type depTy) {
+  if (auto depMemTy = depTy->getAs<DependentMemberType>()) {
+    // Recurse to produce the potential archetype for the base.
+    auto basePA = replaceSelfWithPotentialArchetype(selfPA,
+                                                    depMemTy->getBase());
+
+    PotentialArchetype *nestedPAByName = nullptr;
+
+    auto assocType = depMemTy->getAssocType();
+    auto name = depMemTy->getName();
+    auto findNested = [&](PotentialArchetype *pa) -> PotentialArchetype * {
+      const auto &nested = pa->getNestedTypes();
+      auto found = nested.find(name);
+
+      if (found == nested.end()) return nullptr;
+      if (found->second.empty()) return nullptr;
+
+      // Note that we've found a nested PA by name.
+      if (!nestedPAByName) {
+        nestedPAByName = found->second.front();
+      }
+
+      // If we don't have an associated type to look for, we're done.
+      if (!assocType) return nestedPAByName;
+
+      // Look for a nested PA matching the associated type.
+      for (auto nestedPA : found->second) {
+        if (nestedPA->getResolvedAssociatedType() == assocType)
+          return nestedPA;
+      }
+
+      return nullptr;
+    };
+
+    // First, look in the base potential archetype for the member we want.
+    if (auto result = findNested(basePA))
+      return result;
+
+    // Otherwise, look elsewhere in the equivalence class of the base potential
+    // archetype.
+    for (auto otherBasePA : basePA->getEquivalenceClassMembers()) {
+      if (otherBasePA == basePA) continue;
+
+      if (auto result = findNested(otherBasePA))
+        return result;
+    }
+
+    assert(nestedPAByName && "Didn't find the associated type we wanted");
+    return nestedPAByName;
+  }
+
+  assert(depTy->is<GenericTypeParamType>() && "missing Self?");
+  return selfPA;
+}
+
+bool RequirementSource::isSelfDerivedConformance(PotentialArchetype *currentPA,
+                                                 ProtocolDecl *proto) const {
+  /// Keep track of all of the requirements we've seen along the way. If
+  /// we see the same requirement twice, it's a self-derived conformance.
+  llvm::DenseSet<std::pair<PotentialArchetype *, ProtocolDecl *>>
+    constraintsSeen;
+
+  // Note that we've now seen a new constraint, returning true if we've seen
+  // it before.
+  auto addConstraint = [&](PotentialArchetype *pa, ProtocolDecl *proto) {
+    return !constraintsSeen.insert({pa->getRepresentative(), proto}).second;
+  };
+
+  // Insert our end state.
+  constraintsSeen.insert({currentPA->getRepresentative(), proto});
+
+  // Follow from the root of the
+  std::function<PotentialArchetype *(const RequirementSource *source)>
+    followFromRoot;
+
+  bool sawProtocolRequirement = false;
+  followFromRoot = [&](const RequirementSource *source) -> PotentialArchetype *{
+    // Handle protocol requirements.
+    if (source->kind == ProtocolRequirement) {
+      sawProtocolRequirement = true;
+
+      // Compute the base potential archetype.
+      auto basePA = followFromRoot(source->parent);
+      if (!basePA) return nullptr;
+
+      // The base potential archetype must conform to the protocol in which
+      // this requirement results.
+      if (addConstraint(basePA, source->getProtocolDecl()))
+        return nullptr;
+
+      // If there's no stored type, return the base.
+      if (!source->getStoredType()) return basePA;
+
+      // Follow the dependent type in the protocol requirement.
+      return replaceSelfWithPotentialArchetype(basePA, source->getStoredType());
+    }
+
+    if (source->kind == Parent) {
+      // Compute the base potential archetype.
+      auto basePA = followFromRoot(source->parent);
+      if (!basePA) return nullptr;
+
+      // Add on this associated type.
+      return replaceSelfWithPotentialArchetype(
+               basePA,
+               source->getAssociatedType()->getDeclaredInterfaceType());
+    }
+
+    if (source->parent)
+      return followFromRoot(source->parent);
+
+    // We are at a root, so the root potential archetype is our result.
+    auto rootPA = source->getRootPotentialArchetype();
+
+    // If we haven't seen a protocol requirement, we're done.
+    if (!sawProtocolRequirement) return rootPA;
+
+    // The root archetype might be a nested type, which implies constraints
+    // for each of the protocols of the associated types referenced (if any).
+    for (auto pa = rootPA; pa->getParent(); pa = pa->getParent()) {
+      if (auto assocType = pa->getResolvedAssociatedType()) {
+        if (addConstraint(pa->getParent(), assocType->getProtocol()))
+          return nullptr;
+      }
+    }
+
+    return rootPA;
+  };
+
+  return followFromRoot(this) == nullptr;
+}
+
 #define REQUIREMENT_SOURCE_FACTORY_BODY(ProfileArgs, ConstructorArgs,      \
                                         NumProtocolDecls, WrittenReq)      \
   llvm::FoldingSetNodeID nodeID;                                           \
@@ -3333,7 +3471,18 @@ void GenericSignatureBuilder::checkConformanceConstraints(
     return;
 
   for (auto &entry : equivClass->conformsTo) {
-    checkConstraintList<ProtocolDecl *>(
+    // Remove self-derived constraints.
+    assert(!entry.second.empty() && "No constraints to work with?");
+    entry.second.erase(
+      std::remove_if(entry.second.begin(), entry.second.end(),
+                     [&](const Constraint<ProtocolDecl *> &constraint) {
+                       return constraint.source->isSelfDerivedConformance(
+                                constraint.archetype, entry.first);
+                     }),
+      entry.second.end());
+    assert(!entry.second.empty() && "All constraints were self-derived!");
+
+    checkConstraintList<ProtocolDecl *, ProtocolDecl *>(
       genericParams, entry.second,
       [](const Constraint<ProtocolDecl *> &constraint) {
         return true;
@@ -3344,7 +3493,9 @@ void GenericSignatureBuilder::checkConformanceConstraints(
       },
       None,
       diag::redundant_conformance_constraint,
-      diag::redundant_conformance_here);
+      diag::redundant_conformance_here,
+      [](ProtocolDecl *proto) { return proto; },
+      /*removeSelfDerived=*/false);
   }
 }
 
@@ -4112,8 +4263,15 @@ static void collectRequirements(GenericSignatureBuilder &builder,
           GenericSignatureBuilder::PotentialArchetype *archetype,
           GenericSignatureBuilder::RequirementRHS type,
           const RequirementSource *source) {
-    // Filter out derived requirements.
-    if (source->isDerivedRequirement()) return;
+    // Filter out derived requirements... except for concrete-type requirements
+    // on generic parameters. The exception is due to the canonicalization of
+    // generic signatures, which never eliminates generic parameters even when
+    // they have been mapped to a concrete type.
+    if (source->isDerivedRequirement() &&
+        !(kind == RequirementKind::SameType &&
+          archetype->isGenericParam() &&
+          type.is<Type>()))
+      return;
 
     auto depTy = archetype->getDependentType(params,
                                              /*allowUnresolved=*/false);
