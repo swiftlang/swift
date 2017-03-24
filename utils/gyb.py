@@ -552,7 +552,6 @@ class ParseContext(object):
 
 _default_line_directive = '// ###sourceLocation'
 
-
 class ExecutionContext(object):
 
     """State we pass around during execution of a template"""
@@ -747,7 +746,6 @@ class Code(ASTNode):
             ) + '\n' + indent + '}'
         return s + self.format_children(indent)
 
-
 def expand(filename, line_directive=_default_line_directive, **local_bindings):
     r"""Return the contents of the givepn template file, executed with the given
     local bindings.
@@ -776,9 +774,13 @@ def expand(filename, line_directive=_default_line_directive, **local_bindings):
     """
     with open(filename) as f:
         t = parse_template(filename, f.read())
-        return execute_template(
-            t, line_directive=line_directive, **local_bindings)
-
+        d = os.getcwd()
+        os.chdir(os.path.dirname(os.path.abspath(filename)))
+        try:
+            return execute_template(
+                t, line_directive=line_directive, **local_bindings)
+        finally:
+            os.chdir(d)
 
 def parse_template(filename, text=None):
     r"""Return an AST corresponding to the given template file.
@@ -1182,8 +1184,10 @@ def main():
     ast = parse_template(args.file.name, args.file.read())
     if args.dump:
         print(ast)
-    # Allow the template to import .py files from its own directory
-    sys.path = [os.path.split(args.file.name)[0] or '.'] + sys.path
+    # Allow the template to open files and import .py files relative to its own
+    # directory
+    os.chdir(os.path.dirname(os.path.abspath(args.file.name)))
+    sys.path = ['.'] + sys.path
 
     args.target.write(execute_template(ast, args.line_directive, **bindings))
 
