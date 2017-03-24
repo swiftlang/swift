@@ -632,7 +632,8 @@ ManagedValue Transform::transformTuple(ManagedValue inputTuple,
                                        SGFContext ctxt) {
   const TypeLowering &outputTL =
     SGF.getTypeLowering(outputOrigType, outputSubstType);
-  assert(outputTL.isAddressOnly() == inputTuple.getType().isAddress() &&
+  assert((outputTL.isAddressOnly() == inputTuple.getType().isAddress() ||
+          !SGF.silConv.useLoweredAddresses()) &&
          "expected loadable inputs to have been loaded");
 
   // If there's no representation difference, we're done.
@@ -647,7 +648,7 @@ ManagedValue Transform::transformTuple(ManagedValue inputTuple,
 
   // If the tuple is address only, we need to do the operation in memory.
   SILValue outputAddr;
-  if (outputTL.isAddressOnly())
+  if (outputTL.isAddressOnly() && SGF.silConv.useLoweredAddresses())
     outputAddr = SGF.getBufferForExprResult(Loc, outputTL.getLoweredType(),
                                             ctxt);
 
@@ -696,7 +697,7 @@ ManagedValue Transform::transformTuple(ManagedValue inputTuple,
     // later assembly into a tuple.
     if (!outputEltTemp) {
       assert(outputElt);
-      assert(!inputEltTL.isAddressOnly());
+      assert(!inputEltTL.isAddressOnly() || !SGF.silConv.useLoweredAddresses());
       outputElts.push_back(outputElt);
       continue;
     }
