@@ -21,13 +21,23 @@
 #include "swift/AST/Attr.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Types.h"
+#include "swift/SIL/TypeLowering.h"
 
 namespace swift {
 
 /// A CRTP class for visiting virtually-dispatched methods of a class.
 ///
-/// You must override addMethod(SILDeclRef) in your subclass.
+/// You must override these two methods in your subclass:
+///
+/// - addMethod(SILDeclRef):
+///   introduce a new vtable entry
+///
+/// - addMethodOverride(SILDeclRef baseRef, SILDeclRef derivedRef):
+///   update vtable entry for baseRef to call derivedRef
+///
 template <class T> class SILVTableVisitor {
+  Lowering::TypeConverter &Types;
+
   T &asDerived() { return *static_cast<T*>(this); }
 
   void maybeAddMethod(FuncDecl *fd) {
@@ -63,35 +73,18 @@ template <class T> class SILVTableVisitor {
   }
 
   void maybeAddEntry(SILDeclRef declRef) {
-    // If the method overrides something, we don't need a new entry.
-    //
-    // FIXME: We do, if the override changes the AST type.
+    if (Types.requiresNewVTableEntry(declRef))
+      asDerived().addMethod(declRef);
+
     if (declRef.getNextOverriddenVTableEntry()) {
       auto baseRef = declRef.getBaseOverriddenVTableEntry();
       asDerived().addMethodOverride(baseRef, declRef);
-      return;
     }
-
-    auto *decl = declRef.getDecl();
-
-    // Final members are always be called directly.
-    // Dynamic methods are always accessed by objc_msgSend().
-    if (decl->isFinal() || decl->isDynamic())
-      return;
-
-    // Special case -- materializeForSet on dynamic storage is not
-    // itself dynamic, but should be treated as such for the
-    // purpose of constructing the vtable.
-    if (auto *fd = dyn_cast<FuncDecl>(decl)) {
-      if (fd->getAccessorKind() == AccessorKind::IsMaterializeForSet &&
-          fd->getAccessorStorageDecl()->isDynamic())
-        return;
-    }
-
-    asDerived().addMethod(declRef);
   }
 
 protected:
+  SILVTableVisitor(Lowering::TypeConverter &Types) : Types(Types) {}
+
   void addVTableEntries(ClassDecl *theClass) {
     // Imported classes do not have a vtable.
     if (!theClass->hasKnownSwiftImplementation())

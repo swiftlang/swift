@@ -500,7 +500,9 @@ class TypeConverter {
   llvm::DenseMap<SILDeclRef, SILConstantInfo> ConstantTypes;
   
   llvm::DenseMap<OverrideKey, SILConstantInfo> ConstantOverrideTypes;
-  
+
+  llvm::DenseMap<SILDeclRef, bool> RequiresVTableEntry;
+
   llvm::DenseMap<AnyFunctionRef, CaptureInfo> LoweredCaptures;
   
   /// The current generic context signature.
@@ -655,6 +657,11 @@ public:
   /// Returns the SILParameterInfo for the given declaration's `self` parameter.
   /// `constant` must refer to a method.
   SILParameterInfo getConstantSelfParameter(SILDeclRef constant);
+
+  /// Return if this method introduces a new vtable entry. This will be true
+  /// if the method does not override any method of its base class, or if it
+  /// overrides a method but has a more general AST type.
+  bool requiresNewVTableEntry(SILDeclRef method);
 
   /// Returns the SILFunctionType that must be used to perform a vtable dispatch
   /// to the given declaration.
@@ -831,6 +838,8 @@ private:
   CanAnyFunctionType getBridgedFunctionType(AbstractionPattern fnPattern,
                                             CanAnyFunctionType fnType,
                                             AnyFunctionType::ExtInfo extInfo);
+
+  bool requiresNewVTableEntryUncached(SILDeclRef method);
 };
 
 inline const TypeLowering &

@@ -181,7 +181,7 @@ public:
   SmallVector<std::pair<SILDeclRef, SILDeclRef>, 8> vtableMethods;
 
   SILGenVTable(SILGenModule &SGM, ClassDecl *theClass)
-    : SGM(SGM), theClass(theClass)
+    : SILVTableVisitor(SGM.Types), SGM(SGM), theClass(theClass)
   { }
 
   void emitVTable() {

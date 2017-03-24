@@ -1781,6 +1781,44 @@ SILParameterInfo TypeConverter::getConstantSelfParameter(SILDeclRef constant) {
   return ty->getParameters().back();
 }
 
+bool TypeConverter::requiresNewVTableEntry(SILDeclRef method) {
+  auto found = RequiresVTableEntry.find(method);
+  if (found != RequiresVTableEntry.end())
+    return found->second;
+
+  auto result = requiresNewVTableEntryUncached(method);
+  RequiresVTableEntry.insert(std::make_pair(method, result));
+  return result;
+}
+
+bool TypeConverter::requiresNewVTableEntryUncached(SILDeclRef method) {
+  auto *decl = method.getDecl();
+
+  // Final members are always be called directly.
+  // Dynamic methods are always accessed by objc_msgSend().
+  if (decl->isFinal() || decl->isDynamic())
+    return false;
+
+  // Special case -- materializeForSet on dynamic storage is not
+  // itself dynamic, but should be treated as such for the
+  // purpose of constructing the vtable.
+  if (auto *fd = dyn_cast<FuncDecl>(decl)) {
+    if (fd->getAccessorKind() == AccessorKind::IsMaterializeForSet &&
+        fd->getAccessorStorageDecl()->isDynamic())
+      return false;
+  }
+
+  // If the method overrides something, we only need a new entry
+  // if the override changes the AST type.
+  if (method.getNextOverriddenVTableEntry()) {
+    // FIXME: Check the type here.
+    return false;
+  }
+
+  // We need a new entry.
+  return true;
+}
+
 /// Returns the ConstantInfo corresponding to the VTable thunk for overriding.
 /// Will be the same as getConstantInfo if the declaration does not override.
 SILConstantInfo TypeConverter::getConstantOverrideInfo(SILDeclRef derived,
