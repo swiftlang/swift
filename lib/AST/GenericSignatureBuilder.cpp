@@ -4227,8 +4227,15 @@ static void collectRequirements(GenericSignatureBuilder &builder,
           GenericSignatureBuilder::PotentialArchetype *archetype,
           GenericSignatureBuilder::RequirementRHS type,
           const RequirementSource *source) {
-    // Filter out derived requirements.
-    if (source->isDerivedRequirement()) return;
+    // Filter out derived requirements... except for concrete-type requirements
+    // on generic parameters. The exception is due to the canonicalization of
+    // generic signatures, which never eliminates generic parameters even when
+    // they have been mapped to a concrete type.
+    if (source->isDerivedRequirement() &&
+        !(kind == RequirementKind::SameType &&
+          archetype->isGenericParam() &&
+          type.is<Type>()))
+      return;
 
     auto depTy = archetype->getDependentType(params,
                                              /*allowUnresolved=*/false);
