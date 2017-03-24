@@ -796,19 +796,6 @@ SILDeclRef SILDeclRef::getNextOverriddenVTableEntry() const {
   return SILDeclRef();
 }
 
-SILDeclRef SILDeclRef::getBaseOverriddenVTableEntry() const {
-  // 'method' is the most final method in the hierarchy which we
-  // haven't yet found a compatible override for.  'cur' is the method
-  // we're currently looking at.  Compatibility is transitive,
-  // so we can forget our original method and just keep going up.
-  SILDeclRef method = *this;
-  SILDeclRef cur = method;
-  while ((cur = cur.getNextOverriddenVTableEntry())) {
-    method = cur;
-  }
-  return method;
-}
-
 SILLocation SILDeclRef::getAsRegularLocation() const {
   if (hasDecl())
     return RegularLocation(getDecl());

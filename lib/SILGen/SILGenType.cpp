@@ -173,10 +173,15 @@ class SILGenVTable : public SILVTableVisitor<SILGenVTable> {
 public:
   SILGenModule &SGM;
   ClassDecl *theClass;
-  std::vector<SILVTable::Entry> vtableEntries;
+
+  // Map a base SILDeclRef to the corresponding element in vtableMethods.
+  llvm::DenseMap<SILDeclRef, unsigned> baseToIndexMap;
+
+  // For each base method, store the corresponding override.
+  SmallVector<std::pair<SILDeclRef, SILDeclRef>, 8> vtableMethods;
 
   SILGenVTable(SILGenModule &SGM, ClassDecl *theClass)
-    : SGM(SGM), theClass(theClass)
+    : SILVTableVisitor(SGM.Types), SGM(SGM), theClass(theClass)
   { }
 
   void emitVTable() {
@@ -196,6 +201,16 @@ public:
     if (SGM.requiresIVarDestroyer(theClass))
       addMethod(SILDeclRef(theClass, SILDeclRef::Kind::IVarDestroyer));
 
+    SmallVector<SILVTable::Entry, 8> vtableEntries;
+    vtableEntries.reserve(vtableMethods.size());
+
+    for (auto method : vtableMethods) {
+      SILDeclRef baseRef, derivedRef;
+      std::tie(baseRef, derivedRef) = method;
+
+      vtableEntries.push_back(SGM.emitVTableMethod(derivedRef, baseRef));
+    }
+
     // Create the vtable.
     SILVTable::create(SGM.M, theClass, vtableEntries);
   }
@@ -210,24 +225,20 @@ public:
 
   // Try to find an overridden entry.
   void addMethodOverride(SILDeclRef baseRef, SILDeclRef declRef) {
-    // NB: Mutates vtableEntries in-place
-    // FIXME: O(n^2)
-    for (SILVTable::Entry &entry : vtableEntries) {
-      // Replace the overridden member.
-      if (entry.Method == baseRef) {
-        // The entry is keyed by the least derived method.
-        entry = SGM.emitVTableMethod(declRef, baseRef);
-        return;
-      }
-    }
-    baseRef.dump();
-    declRef.dump();
-    llvm_unreachable("no overridden vtable entry?!");
+    auto found = baseToIndexMap.find(baseRef);
+    assert(found != baseToIndexMap.end());
+    auto &method = vtableMethods[found->second];
+    assert(method.first == baseRef);
+    method.second = declRef;
   }
 
   // Add an entry to the vtable.
   void addMethod(SILDeclRef member) {
-    vtableEntries.push_back(SGM.emitVTableMethod(member, member));
+    unsigned index = vtableMethods.size();
+    vtableMethods.push_back(std::make_pair(member, member));
+    auto result = baseToIndexMap.insert(std::make_pair(member, index));
+    assert(result.second);
+    (void) result;
   }
 };
 
