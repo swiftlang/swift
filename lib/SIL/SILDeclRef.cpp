@@ -772,11 +772,13 @@ SILDeclRef SILDeclRef::getNextOverriddenVTableEntry() const {
     // @NSManaged property, then it won't be in the vtable.
     if (overridden.getDecl()->hasClangNode())
       return SILDeclRef();
-    if (overridden.getDecl()->getAttrs().hasAttribute<DynamicAttr>())
+    if (overridden.getDecl()->isDynamic())
       return SILDeclRef();
     if (auto *ovFD = dyn_cast<FuncDecl>(overridden.getDecl()))
       if (auto *asd = ovFD->getAccessorStorageDecl()) {
         if (asd->hasClangNode())
+          return SILDeclRef();
+        if (asd->isDynamic())
           return SILDeclRef();
       }
 

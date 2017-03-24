@@ -169,15 +169,6 @@ class HasThrowingInit {
     field = value
   }
 }
-// CHECK-LABEL: sil hidden @_T06errors15HasThrowingInit{{.*}} : $@convention(method) (Int, @owned HasThrowingInit) -> (@owned HasThrowingInit, @error Error) {
-// CHECK:      [[T0:%.*]] = mark_uninitialized [rootself] %1 : $HasThrowingInit
-// CHECK-NEXT: [[BORROWED_T0:%.*]] = begin_borrow [[T0]]
-// CHECK-NEXT: [[T1:%.*]] = ref_element_addr [[BORROWED_T0]] : $HasThrowingInit
-// CHECK-NEXT: assign %0 to [[T1]] : $*Int
-// CHECK-NEXT: end_borrow [[BORROWED_T0]] from [[T0]]
-// CHECK-NEXT: [[T0_RET:%.*]] = copy_value [[T0]]
-// CHECK-NEXT: destroy_value [[T0]]
-// CHECK-NEXT: return [[T0_RET]] : $HasThrowingInit
 
 // CHECK-LABEL: sil hidden @_T06errors15HasThrowingInit{{.*}} : $@convention(method) (Int, @thick HasThrowingInit.Type) -> (@owned HasThrowingInit, @error Error)
 // CHECK:      [[SELF:%.*]] = alloc_ref $HasThrowingInit
@@ -188,6 +179,16 @@ class HasThrowingInit {
 // CHECK:    bb2([[ERROR:%.*]] : $Error):
 // CHECK-NEXT: builtin "willThrow"
 // CHECK-NEXT: throw [[ERROR]]
+
+// CHECK-LABEL: sil hidden @_T06errors15HasThrowingInit{{.*}} : $@convention(method) (Int, @owned HasThrowingInit) -> (@owned HasThrowingInit, @error Error) {
+// CHECK:      [[T0:%.*]] = mark_uninitialized [rootself] %1 : $HasThrowingInit
+// CHECK-NEXT: [[BORROWED_T0:%.*]] = begin_borrow [[T0]]
+// CHECK-NEXT: [[T1:%.*]] = ref_element_addr [[BORROWED_T0]] : $HasThrowingInit
+// CHECK-NEXT: assign %0 to [[T1]] : $*Int
+// CHECK-NEXT: end_borrow [[BORROWED_T0]] from [[T0]]
+// CHECK-NEXT: [[T0_RET:%.*]] = copy_value [[T0]]
+// CHECK-NEXT: destroy_value [[T0]]
+// CHECK-NEXT: return [[T0_RET]] : $HasThrowingInit
 
 
 enum ColorError : Error {
@@ -939,8 +940,8 @@ func testOptionalTryNeverFailsAddressOnlyVar<T>(_ obj: T) {
 class SomeErrorClass : Error { }
 
 // CHECK-LABEL: sil_vtable SomeErrorClass
-// CHECK-NEXT:   #SomeErrorClass.deinit!deallocator: _T06errors14SomeErrorClassCfD
 // CHECK-NEXT:   #SomeErrorClass.init!initializer.1: {{.*}} : _T06errors14SomeErrorClassCACycfc
+// CHECK-NEXT:   #SomeErrorClass.deinit!deallocator: _T06errors14SomeErrorClassCfD
 // CHECK-NEXT: }
 
 class OtherErrorSub : OtherError { }
