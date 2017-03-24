@@ -43,7 +43,12 @@ protocol SubscriptableGet {
   subscript(a : Int) -> Int { get }
 }
 
+protocol SubscriptableGetSet {
+  subscript(a : Int) -> Int { get set }
+}
+
 var subscriptableGet : SubscriptableGet
+var subscriptableGetSet : SubscriptableGetSet
 
 func s010_hasVarArg(_ args: Any...) {}
 
@@ -426,10 +431,9 @@ func s210______compErasure(_ x: Foo & Error) -> Error {
 // CHECK: bb0([[ARG:%.*]] : $Error):
 // CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
 // CHECK:   [[OPAQUE_ARG:%.*]] = open_existential_box [[BORROWED_ARG]] : $Error to $*@opened({{.*}}) Error
+// CHECK:   [[LOAD_ALLOC:%.*]] = load [copy] [[OPAQUE_ARG]]
 // CHECK:   [[ALLOC_OPEN:%.*]] = alloc_stack $@opened({{.*}}) Error
-// CHECK:   copy_addr [[OPAQUE_ARG]] to [initialization] [[ALLOC_OPEN]] : $*@opened({{.*}}) Error
-// CHECK:   [[LOAD_ALLOC:%.*]] = load [take] [[ALLOC_OPEN]]
-// CHECK:   destroy_value [[LOAD_ALLOC]]
+// CHECK:   store [[LOAD_ALLOC]] to [init] [[ALLOC_OPEN]]
 // CHECK:   dealloc_stack [[ALLOC_OPEN]]
 // CHECK:   end_borrow [[BORROWED_ARG]] from [[ARG]]
 // CHECK:   destroy_value [[ARG]] : $Error
@@ -801,6 +805,21 @@ func s400______maybeCloneP(c: Clonable) {
 // CHECK-LABEL: } // end sil function '_T020opaque_values_silgen21s410__globalRvalueGetS2iF'
 func s410__globalRvalueGet(_ i : Int) -> Int {
   return subscriptableGet[i]
+}
+
+// Tests global opaque values / subscript lvalues
+// ---
+// CHECK-LABEL: sil hidden @_T020opaque_values_silgen21s420__globalLvalueGetS2iF : $@convention(thin) (Int) -> Int {
+// CHECK: bb0([[ARG:%.*]] : $Int):
+// CHECK:   [[GLOBAL_ADDR:%.*]] = global_addr @_T020opaque_values_silgen19subscriptableGetSetAA013SubscriptableeF0_pv : $*SubscriptableGetSet
+// CHECK:   [[OPEN_ARG:%.*]] = open_existential_addr immutable_access [[GLOBAL_ADDR]] : $*SubscriptableGetSet to $*@opened
+// CHECK:   [[GET_OPAQUE:%.*]] = load [copy] [[OPEN_ARG]] : $*@opened
+// CHECK:   [[RETVAL:%.*]] = apply %{{.*}}<@opened({{.*}}) SubscriptableGetSet>([[ARG]], [[GET_OPAQUE]]) : $@convention(witness_method) <τ_0_0 where τ_0_0 : SubscriptableGetSet> (Int, @in_guaranteed τ_0_0) -> Int
+// CHECK:   destroy_value [[GET_OPAQUE]]
+// CHECK:   return [[RETVAL]] : $Int
+// CHECK-LABEL: } // end sil function '_T020opaque_values_silgen21s420__globalLvalueGetS2iF'
+func s420__globalLvalueGet(_ i : Int) -> Int {
+  return subscriptableGetSet[i]
 }
 
 // Tests conditional value casts and correspondingly generated reabstraction thunk, with <T> types
