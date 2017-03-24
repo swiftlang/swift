@@ -73,12 +73,16 @@ template <class T> class SILVTableVisitor {
   }
 
   void maybeAddEntry(SILDeclRef declRef) {
+    // Introduce a new entry if required.
     if (Types.requiresNewVTableEntry(declRef))
       asDerived().addMethod(declRef);
 
-    if (declRef.getNextOverriddenVTableEntry()) {
-      auto baseRef = declRef.getBaseOverriddenVTableEntry();
+    // Update any existing entries that it overrides.
+    auto nextRef = declRef;
+    while ((nextRef = nextRef.getNextOverriddenVTableEntry())) {
+      auto baseRef = Types.getOverriddenVTableEntry(nextRef);
       asDerived().addMethodOverride(baseRef, declRef);
+      nextRef = baseRef;
     }
   }
 

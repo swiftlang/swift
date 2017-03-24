@@ -1819,6 +1819,18 @@ bool TypeConverter::requiresNewVTableEntryUncached(SILDeclRef method) {
   return true;
 }
 
+SILDeclRef TypeConverter::getOverriddenVTableEntry(SILDeclRef method) {
+  SILDeclRef cur = method, next = method;
+  do {
+    cur = next;
+    if (requiresNewVTableEntry(cur))
+      return cur;
+    next = cur.getNextOverriddenVTableEntry();
+  } while (next);
+
+  return cur;
+}
+
 /// Returns the ConstantInfo corresponding to the VTable thunk for overriding.
 /// Will be the same as getConstantInfo if the declaration does not override.
 SILConstantInfo TypeConverter::getConstantOverrideInfo(SILDeclRef derived,

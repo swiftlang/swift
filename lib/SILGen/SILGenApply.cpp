@@ -279,7 +279,7 @@ public:
                                SILDeclRef c,
                                SubstitutionList subs,
                                SILLocation l) {
-    auto base = c.getBaseOverriddenVTableEntry();
+    auto base = SGF.SGM.Types.getOverriddenVTableEntry(c);
     auto formalType = getConstantFormalInterfaceType(SGF, base);
     auto substType = getConstantFormalInterfaceType(SGF, c);
     return Callee(Kind::ClassMethod, SGF, selfValue, c,
@@ -439,11 +439,9 @@ public:
              "Currying the self parameter of super method calls should've been emitted");
 
       constant = Constant.atUncurryLevel(level);
-      auto constantInfo = SGF.getConstantInfo(*constant);
 
-      if (SILDeclRef baseConstant = Constant.getBaseOverriddenVTableEntry())
-        constantInfo = SGF.SGM.Types.getConstantOverrideInfo(Constant,
-                                                             baseConstant);
+      auto base = SGF.SGM.Types.getOverriddenVTableEntry(*constant);
+      auto constantInfo = SGF.SGM.Types.getConstantOverrideInfo(*constant, base);
       auto methodVal = SGF.B.createSuperMethod(Loc,
                                                SelfValue,
                                                *constant,

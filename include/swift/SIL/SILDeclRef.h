@@ -351,10 +351,6 @@ struct SILDeclRef {
   /// declarations do not always have vtable entries.
   SILDeclRef getNextOverriddenVTableEntry() const;
 
-  /// Return a SILDeclRef referring to the ultimate base class's declaration,
-  /// which must be used with getConstantOverrideInfo.
-  SILDeclRef getBaseOverriddenVTableEntry() const;
-
   /// True if the referenced entity is some kind of thunk.
   bool isThunk() const;
 

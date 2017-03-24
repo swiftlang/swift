@@ -663,6 +663,11 @@ public:
   /// overrides a method but has a more general AST type.
   bool requiresNewVTableEntry(SILDeclRef method);
 
+  /// Return the most derived override which requires a new vtable entry.
+  /// If the method does not override anything or no override is vtable
+  /// dispatched, will return the least derived method.
+  SILDeclRef getOverriddenVTableEntry(SILDeclRef method);
+
   /// Returns the SILFunctionType that must be used to perform a vtable dispatch
   /// to the given declaration.
   ///
@@ -683,7 +688,7 @@ public:
     if (next.isNull())
       return getConstantInfo(constant);
 
-    auto base = constant.getBaseOverriddenVTableEntry();
+    auto base = getOverriddenVTableEntry(constant);
     return getConstantOverrideInfo(constant, base);
   }
 
