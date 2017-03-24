@@ -556,7 +556,7 @@ extension _BoundedBufferReference {
         start: b1.baseAddress + i2, count: b1.count - i2)
       let (_, i3) = tail._copyContents(initializing: b2)
       
-      assert(i3 == $0.endIndex)
+      assert(i3 == $0.endIndex, "Failed to consume input")
     }
   }
 }
