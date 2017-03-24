@@ -58,12 +58,6 @@
 // CHECK: symbol '_T04test013PrivatePublicB6StructVAA0C0A2aDP15publicVarGetSetSifsTW' (protocol witness for test.Public.publicVarGetSet.setter : Swift.Int in conformance test.PrivatePublicPrivateStruct : test.Public in test) is in generated IR file, but not in TBD file
 // CHECK: symbol '_T04test06PublicbB6StructV15publicVarGetSetSifs' (test.PublicPublicPublicStruct.publicVarGetSet.setter : Swift.Int) is in TBD file, but not in generated IR
 // CHECK: symbol '_T04test013PublicPrivateB6StructV16privateVarGetSetSifm' (test.PublicPrivatePublicStruct.privateVarGetSet.materializeForSet : Swift.Int) is in TBD file, but not in generated IR
-// CHECK: symbol '_T04test013PublicPrivateB6StructV16privateVarGetSetSifs' (test.PublicPrivatePublicStruct.privateVarGetSet.setter : Swift.Int) is in TBD file, but not in generated IR
-// CHECK: symbol '_T04test06PublicbB6StructV12publicVarGetSifg' (test.PublicPublicPublicStruct.publicVarGet.getter : Swift.Int) is in TBD file, but not in generated IR
-// CHECK: symbol '_T04test013PublicPrivateB6StructV13privateVarGetSifg' (test.PublicPrivatePublicStruct.privateVarGet.getter : Swift.Int) is in TBD file, but not in generated IR
-// CHECK: symbol '_T04test06PublicbB6StructV15publicVarGetSetSifg' (test.PublicPublicPublicStruct.publicVarGetSet.getter : Swift.Int) is in TBD file, but not in generated IR
-// CHECK: symbol '_T04test013PublicPrivateB6StructV16privateVarGetSetSifg' (test.PublicPrivatePublicStruct.privateVarGetSet.getter : Swift.Int) is in TBD file, but not in generated IR
-// CHECK: symbol '_T04test06PublicbB6StructV15publicVarGetSetSifm' (test.PublicPublicPublicStruct.publicVarGetSet.materializeForSet : Swift.Int) is in TBD file, but not in generated IR
 
 public protocol Public {
     func publicMethod()

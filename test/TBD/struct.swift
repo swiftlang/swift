@@ -2,23 +2,11 @@
 
 // FIXME: TBDGen is incorrect:
 // CHECK: symbol '_T04test10PropertiesV9publicVarSivfi' (test.Properties.(publicVar : Swift.Int).(variable initialization expression)) is in generated IR file, but not in TBD file
-// CHECK: symbol '_T04test7StaticsV9publicLetSivZ' (static test.Statics.publicLet : Swift.Int) is in generated IR file, but not in TBD file
 // CHECK: symbol '_T04test7StaticsV9publicVarSivZ' (static test.Statics.publicVar : Swift.Int) is in generated IR file, but not in TBD file
-// CHECK: symbol '_T04test7StaticsV9publicLetSifau' (test.Statics.publicLet.unsafeMutableAddressor : Swift.Int) is in generated IR file, but not in TBD file
 // CHECK: symbol '_T04test10PropertiesV9publicLetSivfi' (test.Properties.(publicLet : Swift.Int).(variable initialization expression)) is in generated IR file, but not in TBD file
-// CHECK: symbol '_T04test7StaticsV10privateLetSivZ' (static test.Statics.privateLet : Swift.Int) is in generated IR file, but not in TBD file
 // CHECK: symbol '_T04test7StaticsV10privateVarSivZ' (static test.Statics.privateVar : Swift.Int) is in generated IR file, but not in TBD file
 // CHECK: symbol '_T04test7StaticsV9publicVarSifau' (test.Statics.publicVar.unsafeMutableAddressor : Swift.Int) is in generated IR file, but not in TBD file
 // CHECK: symbol '_T04test10PropertiesV15publicVarGetSetSifm' (test.Properties.publicVarGetSet.materializeForSet : Swift.Int) is in TBD file, but not in generated IR
-// CHECK: symbol '_T04test7StaticsV9publicLetSifgZ' (static test.Statics.publicLet.getter : Swift.Int) is in TBD file, but not in generated IR
-// CHECK: symbol '_T04test10PropertiesV9publicLetSifg' (test.Properties.publicLet.getter : Swift.Int) is in TBD file, but not in generated IR
-// CHECK: symbol '_T04test7StaticsV15publicVarGetSetSifmZ' (static test.Statics.publicVarGetSet.materializeForSet : Swift.Int) is in TBD file, but not in generated IR
-// CHECK: symbol '_T04test7StaticsV9publicVarSifgZ' (static test.Statics.publicVar.getter : Swift.Int) is in TBD file, but not in generated IR
-// CHECK: symbol '_T04test10PropertiesV9publicVarSifg' (test.Properties.publicVar.getter : Swift.Int) is in TBD file, but not in generated IR
-// CHECK: symbol '_T04test10PropertiesV9publicVarSifm' (test.Properties.publicVar.materializeForSet : Swift.Int) is in TBD file, but not in generated IR
-// CHECK: symbol '_T04test7StaticsV9publicVarSifsZ' (static test.Statics.publicVar.setter : Swift.Int) is in TBD file, but not in generated IR
-// CHECK: symbol '_T04test10PropertiesV9publicVarSifs' (test.Properties.publicVar.setter : Swift.Int) is in TBD file, but not in generated IR
-// CHECK: symbol '_T04test7StaticsV9publicVarSifmZ' (static test.Statics.publicVar.materializeForSet : Swift.Int) is in TBD file, but not in generated IR
 
 public struct Nothing {}
 

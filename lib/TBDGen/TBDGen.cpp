@@ -16,6 +16,7 @@
 
 #include "swift/TBDGen/TBDGen.h"
 
+#include "swift/AST/ASTMangler.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/Module.h"
 #include "swift/Basic/LLVM.h"
@@ -123,7 +124,17 @@ public:
     // protocols, each conforming type has to handle them individually.
   }
 
-  void visitVarDecl(VarDecl *VD) { visitMembers(VD); }
+  void visitVarDecl(VarDecl *VD) {
+    if (VD->isLet()) {
+      auto accessor = SILDeclRef(VD, SILDeclRef::Kind::GlobalAccessor);
+      addSymbol(accessor.mangle());
+
+      // The actual let variable has a symbol.
+      Mangle::ASTMangler mangler;
+      addSymbol(mangler.mangleEntity(VD, false));
+    }
+    visitMembers(VD);
+  }
   void visitDecl(Decl *D) { visitMembers(D); }
 };
 }
