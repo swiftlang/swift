@@ -386,8 +386,8 @@ public struct Character :
     return String(self).hashValue
   }
 
-  typealias UTF16View = String.UTF16View
-  var utf16: UTF16View {
+  public typealias UTF16View = String.UTF16View
+  public var utf16: UTF16View {
     return String(self).utf16
   }
 
