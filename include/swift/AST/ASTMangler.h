@@ -40,7 +40,6 @@ protected:
 public:
   enum class SymbolKind {
     Default,
-    VTableMethod,
     DynamicThunk,
     SwiftAsObjCThunk,
     ObjCAsSwiftThunk,
@@ -82,6 +81,13 @@ public:
   std::string mangleInitializerEntity(const VarDecl *var, SymbolKind SKind);
 
   std::string mangleNominalType(const NominalTypeDecl *decl);
+
+  std::string mangleVTableThunk(const FuncDecl *Base,
+                                const FuncDecl *Derived);
+
+  std::string mangleConstructorVTableThunk(const ConstructorDecl *Base,
+                                           const ConstructorDecl *Derived,
+                                           bool isAllocating);
 
   std::string mangleWitnessTable(const NormalProtocolConformance *C);
 

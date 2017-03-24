@@ -80,7 +80,7 @@ import Swift
 // CHECK-objc-SAME:   %swift.opaque* @_objc_empty_cache,
 // CHECK-SAME:   %swift.opaque* null,
 // CHECK-SAME:   i64 1,
-// CHECK-SAME:   void (%TSi*, [[D]]*)* @_T013generic_types1DC3runySiFTV
+// CHECK-SAME:   void (%TSi*, [[D]]*)* @_T013generic_types1DC3runySiFAA1ACADyxFTV
 // CHECK-SAME: }
 
 // CHECK-LABEL: define{{( protected)?}} private %swift.type* @create_generic_metadata_A(%swift.type_pattern*, i8**) {{.*}} {

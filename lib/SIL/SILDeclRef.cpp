@@ -663,9 +663,6 @@ std::string SILDeclRef::mangle(ManglingKind MKind) const {
         SKind = ASTMangler::SymbolKind::ObjCAsSwiftThunk;
       }
       break;
-    case SILDeclRef::ManglingKind::VTableMethod:
-      SKind = ASTMangler::SymbolKind::VTableMethod;
-      break;
     case SILDeclRef::ManglingKind::DynamicThunk:
       SKind = ASTMangler::SymbolKind::DynamicThunk;
       break;

@@ -21,6 +21,7 @@
 #include "SILGenFunction.h"
 #include "Scope.h"
 #include "ManagedValue.h"
+#include "swift/AST/ASTMangler.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/TypeMemberVisitor.h"
 #include "swift/SIL/SILArgument.h"
@@ -58,6 +59,8 @@ SILFunction *SILGenModule::getDynamicThunk(SILDeclRef constant,
 
 SILVTable::Entry
 SILGenModule::emitVTableMethod(SILDeclRef derived, SILDeclRef base) {
+  assert(base.kind == derived.kind);
+
   SILFunction *implFn;
   SILLinkage implLinkage;
 
@@ -91,17 +94,26 @@ SILGenModule::emitVTableMethod(SILDeclRef derived, SILDeclRef base) {
     return {base, implFn, implLinkage};
 
   // Generate the thunk name.
-  // TODO: If we allocated a new vtable slot for the derived method, then
-  // further derived methods would potentially need multiple thunks, and we
-  // would need to mangle the base method into the symbol as well.
-  auto name = derived.mangle(SILDeclRef::ManglingKind::VTableMethod);
+  std::string name;
+  {
+    Mangle::ASTMangler mangler;
+    if (isa<FuncDecl>(base.getDecl())) {
+      name = mangler.mangleVTableThunk(
+        cast<FuncDecl>(base.getDecl()),
+        cast<FuncDecl>(derived.getDecl()));
+    } else {
+      name = mangler.mangleConstructorVTableThunk(
+        cast<ConstructorDecl>(base.getDecl()),
+        cast<ConstructorDecl>(derived.getDecl()),
+        base.kind == SILDeclRef::Kind::Allocator);
+    }
+  }
 
   // If we already emitted this thunk, reuse it.
-  // TODO: Allocating new vtable slots for derived methods with different ABIs
-  // would invalidate the assumption that the same thunk is correct, as above.
   if (auto existingThunk = M.lookUpFunction(name))
     return {base, existingThunk, implLinkage};
 
+  // Emit the thunk.
   auto *derivedDecl = cast<AbstractFunctionDecl>(derived.getDecl());
   SILLocation loc(derivedDecl);
   auto thunk =

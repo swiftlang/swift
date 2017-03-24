@@ -129,6 +129,30 @@ std::string ASTMangler::mangleNominalType(const NominalTypeDecl *decl) {
   return finalize();
 }
 
+std::string ASTMangler::mangleVTableThunk(const FuncDecl *Base,
+                                          const FuncDecl *Derived) {
+  beginMangling();
+
+  appendEntity(Derived);
+  appendEntity(Base);
+  appendOperator("TV");
+
+  return finalize();
+}
+
+std::string ASTMangler::mangleConstructorVTableThunk(
+                                               const ConstructorDecl *Base,
+                                               const ConstructorDecl *Derived,
+                                               bool isAllocating) {
+  beginMangling();
+
+  appendConstructorEntity(Derived, isAllocating);
+  appendConstructorEntity(Base, isAllocating);
+  appendOperator("TV");
+
+  return finalize();
+}
+
 std::string ASTMangler::mangleWitnessTable(const NormalProtocolConformance *C) {
   beginMangling();
   appendProtocolConformance(C);
@@ -334,7 +358,6 @@ std::string ASTMangler::mangleAccessorEntityAsUSR(AccessorKind kind,
 void ASTMangler::appendSymbolKind(SymbolKind SKind) {
   switch (SKind) {
     case SymbolKind::Default: return;
-    case SymbolKind::VTableMethod: return appendOperator("TV");
     case SymbolKind::DynamicThunk: return appendOperator("TD");
     case SymbolKind::SwiftAsObjCThunk: return appendOperator("To");
     case SymbolKind::ObjCAsSwiftThunk: return appendOperator("TO");
