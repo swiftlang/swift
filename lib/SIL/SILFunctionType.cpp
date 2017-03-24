@@ -1791,8 +1791,94 @@ bool TypeConverter::requiresNewVTableEntry(SILDeclRef method) {
   return result;
 }
 
-bool TypeConverter::requiresNewVTableEntryUncached(SILDeclRef method) {
-  auto *decl = method.getDecl();
+// This check duplicates TypeConverter::checkForABIDifferences(),
+// but on AST types. The issue is we only want to introduce a new
+// vtable thunk if the AST type changes, but an abstraction change
+// is OK; we don't want a new entry if an @in parameter became
+// @guaranteed or whatever.
+static bool checkASTTypeForABIDifferences(CanType type1,
+                                          CanType type2) {
+  // Unwrap optionals, but remember that we did.
+  bool type1WasOptional = false;
+  bool type2WasOptional = false;
+  if (auto object = type1.getAnyOptionalObjectType()) {
+    type1WasOptional = true;
+    type1 = object;
+  }
+  if (auto object = type2.getAnyOptionalObjectType()) {
+    type2WasOptional = true;
+    type2 = object;
+  }
+
+  // Forcing IUOs always requires a new vtable entry.
+  if (type1WasOptional && !type2WasOptional)
+    return true;
+
+  // Except for the above case, we should not be making a value less optional.
+
+  // If we're introducing a level of optionality, only certain types are
+  // ABI-compatible -- check below.
+  bool optionalityChange = (!type1WasOptional && type2WasOptional);
+
+  // If the types are identical and there was no optionality change,
+  // we're done.
+  if (type1 == type2 && !optionalityChange)
+    return false;
+
+  // Classes, class-constrained archetypes, and pure-ObjC existential types
+  // all have single retainable pointer representation; optionality change
+  // is allowed.
+  if ((type1->mayHaveSuperclass() ||
+       type1->isObjCExistentialType()) &&
+      (type2->mayHaveSuperclass() ||
+       type2->isObjCExistentialType()))
+    return false;
+
+  // Class metatypes are ABI-compatible even under optionality change.
+  if (auto metaTy1 = dyn_cast<MetatypeType>(type1)) {
+    if (auto metaTy2 = dyn_cast<MetatypeType>(type2)) {
+      if (metaTy1.getInstanceType().getClassOrBoundGenericClass() &&
+          metaTy2.getInstanceType().getClassOrBoundGenericClass())
+        return false;
+    }
+  }
+
+  if (!optionalityChange) {
+    // Function parameters are ABI compatible if their differences are
+    // trivial.
+    if (auto fnTy1 = dyn_cast<AnyFunctionType>(type1)) {
+      if (auto fnTy2 = dyn_cast<AnyFunctionType>(type2)) {
+        return (
+            checkASTTypeForABIDifferences(fnTy2.getInput(), fnTy1.getInput()) ||
+            checkASTTypeForABIDifferences(fnTy1.getResult(), fnTy2.getResult()));
+      }
+    }
+
+    // Tuple types are ABI-compatible if their elements are.
+    if (auto tuple1 = dyn_cast<TupleType>(type1)) {
+      if (auto tuple2 = dyn_cast<TupleType>(type2)) {
+        if (tuple1->getNumElements() != tuple2->getNumElements())
+          return true;
+
+        for (unsigned i = 0, e = tuple1->getNumElements(); i < e; i++) {
+          if (checkASTTypeForABIDifferences(tuple1.getElementType(i),
+                                            tuple2.getElementType(i)))
+            return true;
+        }
+
+        // Tuple lengths and elements match
+        return false;
+      }
+    }
+  }
+
+  // The types are different, or there was an optionality change resulting
+  // in a change in representation.
+  return true;
+}
+
+bool TypeConverter::requiresNewVTableEntryUncached(SILDeclRef derived) {
+  auto *decl = derived.getDecl();
 
   // Final members are always be called directly.
   // Dynamic methods are always accessed by objc_msgSend().
@@ -1808,10 +1894,27 @@ bool TypeConverter::requiresNewVTableEntryUncached(SILDeclRef method) {
       return false;
   }
 
-  // If the method overrides something, we only need a new entry
-  // if the override changes the AST type.
-  if (method.getNextOverriddenVTableEntry()) {
-    // FIXME: Check the type here.
+  // If the method overrides something, we only need a new entry if the
+  // override has a more general AST type. However an abstraction
+  // change is OK; we don't want to add a whole new vtable entry just
+  // because an @in parameter because @owned, or whatever.
+  if (auto base = derived.getNextOverriddenVTableEntry()) {
+    auto baseInfo = getConstantInfo(base);
+    auto derivedInfo = getConstantInfo(derived);
+
+    auto baseInterfaceTy = baseInfo.FormalInterfaceType;
+    auto derivedInterfaceTy = derivedInfo.FormalInterfaceType;
+
+    auto selfInterfaceTy = derivedInterfaceTy.getInput()->getRValueInstanceType();
+
+    auto overrideInterfaceTy =
+        selfInterfaceTy->adjustSuperclassMemberDeclType(
+            base.getDecl(), derived.getDecl(), baseInterfaceTy,
+            /*resolver=*/nullptr)->getCanonicalType();
+
+    if (checkASTTypeForABIDifferences(derivedInterfaceTy, overrideInterfaceTy))
+      return true;
+
     return false;
   }
 
@@ -1843,8 +1946,7 @@ SILConstantInfo TypeConverter::getConstantOverrideInfo(SILDeclRef derived,
   if (found != ConstantOverrideTypes.end())
     return found->second;
 
-  assert(base.getNextOverriddenVTableEntry().isNull()
-         && "base must not be an override");
+  assert(requiresNewVTableEntry(base) && "base must not be an override");
 
   auto baseInfo = getConstantInfo(base);
   auto derivedInfo = getConstantInfo(derived);
@@ -1853,8 +1955,8 @@ SILConstantInfo TypeConverter::getConstantOverrideInfo(SILDeclRef derived,
   // vtable thunk the same signature as the derived method.
   auto basePattern = AbstractionPattern(baseInfo.LoweredInterfaceType);
 
-  auto baseInterfaceTy = makeConstantInterfaceType(base);
-  auto derivedInterfaceTy = makeConstantInterfaceType(derived);
+  auto baseInterfaceTy = baseInfo.FormalInterfaceType;
+  auto derivedInterfaceTy = derivedInfo.FormalInterfaceType;
 
   auto selfInterfaceTy = derivedInterfaceTy.getInput()->getRValueInstanceType();
 
