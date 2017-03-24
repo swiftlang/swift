@@ -172,9 +172,8 @@ public:
   /// Emit a vtable thunk for a derived method if its natural abstraction level
   /// diverges from the overridden base method. If no thunking is needed,
   /// returns a static reference to the derived method.
-  SILFunction *emitVTableMethod(SILDeclRef derived,
-                                SILDeclRef base,
-                                SILLinkage &implLinkage);
+  SILVTable::Entry emitVTableMethod(SILDeclRef derived,
+                                    SILDeclRef base);
 
   /// True if a function has been emitted for a given SILDeclRef.
   bool hasFunction(SILDeclRef constant);
