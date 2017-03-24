@@ -223,7 +223,6 @@ struct SILDeclRef {
 
   enum class ManglingKind {
     Default,
-    VTableMethod,
     DynamicThunk,
   };
 

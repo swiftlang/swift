@@ -1605,6 +1605,11 @@ void Remangler::mangleVariadicTuple(Node *node) {
 }
 
 void Remangler::mangleVTableAttribute(Node *node) {
+  unreachable("Old-fashioned vtable thunk in new mangling format");
+}
+
+void Remangler::mangleVTableThunk(Node *node) {
+  mangleChildNodes(node);
   Buffer << "TV";
 }
 

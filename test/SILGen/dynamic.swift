@@ -474,7 +474,7 @@ public class ConcreteDerived : GenericBase<Int> {
 // so after re-abstracting the signature we must dispatch to the dynamic
 // thunk.
 
-// CHECK-LABEL: sil private @_T07dynamic15ConcreteDerivedC6methodySiFTV : $@convention(method) (@in Int, @guaranteed ConcreteDerived) -> ()
+// CHECK-LABEL: sil private @_T07dynamic15ConcreteDerivedC6methodySiFAA11GenericBaseCADyxFTV : $@convention(method) (@in Int, @guaranteed ConcreteDerived) -> ()
 // CHECK: bb0(%0 : $*Int, %1 : $ConcreteDerived):
 // CHECK-NEXT:  [[VALUE:%.*]] = load [trivial] %0 : $*Int
 // CHECK:       [[DYNAMIC_THUNK:%.*]] = function_ref @_T07dynamic15ConcreteDerivedC6methodySiFTD : $@convention(method) (Int, @guaranteed ConcreteDerived) -> ()
@@ -516,7 +516,7 @@ public class ConcreteDerived : GenericBase<Int> {
 
 // Dynamic thunk + vtable re-abstraction
 // CHECK-LABEL: sil_vtable ConcreteDerived {
-// CHECK-NEXT: #GenericBase.method!1: <T> (GenericBase<T>) -> (T) -> () : public _T07dynamic15ConcreteDerivedC6methodySiFTV  // override dynamic.ConcreteDerived.method (Swift.Int) -> ()
+// CHECK-NEXT: #GenericBase.method!1: <T> (GenericBase<T>) -> (T) -> () : public _T07dynamic15ConcreteDerivedC6methodySiFAA11GenericBaseCADyxFTV     // vtable thunk for dynamic.GenericBase.method (A) -> () dispatching to dynamic.ConcreteDerived.method (Swift.Int) -> ()
 // CHECK-NEXT: #GenericBase.init!initializer.1: <T> (GenericBase<T>.Type) -> () -> GenericBase<T> : _T07dynamic15ConcreteDerivedCACycfc      // dynamic.ConcreteDerived.init () -> dynamic.ConcreteDerived
 // CHECK-NEXT: #ConcreteDerived.deinit!deallocator: _T07dynamic15ConcreteDerivedCfD  // dynamic.ConcreteDerived.__deallocating_deinit
 // CHECK-NEXT: }
