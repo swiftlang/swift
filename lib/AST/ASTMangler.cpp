@@ -98,7 +98,7 @@ std::string ASTMangler::mangleAccessorEntity(AccessorKind kind,
   return finalize();
 }
 
-std::string ASTMangler::mangleGlobalGetterEntity(ValueDecl *decl,
+std::string ASTMangler::mangleGlobalGetterEntity(const ValueDecl *decl,
                                                  SymbolKind SKind) {
   beginMangling();
   appendEntity(decl, "fG", false);
@@ -129,15 +129,15 @@ std::string ASTMangler::mangleNominalType(const NominalTypeDecl *decl) {
   return finalize();
 }
 
-std::string ASTMangler::mangleWitnessTable(NormalProtocolConformance *C) {
+std::string ASTMangler::mangleWitnessTable(const NormalProtocolConformance *C) {
   beginMangling();
   appendProtocolConformance(C);
   appendOperator("WP");
   return finalize();
 }
 
-std::string ASTMangler::mangleWitnessThunk(ProtocolConformance *Conformance,
-                                           ValueDecl *Requirement) {
+std::string ASTMangler::mangleWitnessThunk(const ProtocolConformance *Conformance,
+                                           const ValueDecl *Requirement) {
   beginMangling();
   // Concrete witness thunks get a special mangling.
   if (Conformance)
@@ -156,8 +156,8 @@ std::string ASTMangler::mangleWitnessThunk(ProtocolConformance *Conformance,
 }
 
 std::string ASTMangler::mangleClosureWitnessThunk(
-                                              ProtocolConformance *Conformance,
-                                              AbstractClosureExpr *Closure) {
+                                         const ProtocolConformance *Conformance,
+                                         const AbstractClosureExpr *Closure) {
   beginMangling();
   appendProtocolConformance(Conformance);
   appendClosureEntity(Closure);
@@ -810,7 +810,7 @@ GenericTypeParamType *ASTMangler::appendAssocType(DependentMemberType *DepTy,
 }
 
 void ASTMangler::appendOpWithGenericParamIndex(StringRef Op,
-                                               GenericTypeParamType *paramTy) {
+                                          const GenericTypeParamType *paramTy) {
   llvm::SmallVector<char, 8> OpBuf(Op.begin(), Op.end());
   if (paramTy->getDepth() > 0) {
     OpBuf.push_back('d');

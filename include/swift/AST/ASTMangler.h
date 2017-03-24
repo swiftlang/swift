@@ -72,7 +72,7 @@ public:
                                    bool isStatic,
                                    SymbolKind SKind);
 
-  std::string mangleGlobalGetterEntity(ValueDecl *decl,
+  std::string mangleGlobalGetterEntity(const ValueDecl *decl,
                                        SymbolKind SKind = SymbolKind::Default);
 
   std::string mangleDefaultArgumentEntity(const DeclContext *func,
@@ -83,13 +83,13 @@ public:
 
   std::string mangleNominalType(const NominalTypeDecl *decl);
 
-  std::string mangleWitnessTable(NormalProtocolConformance *C);
+  std::string mangleWitnessTable(const NormalProtocolConformance *C);
 
-  std::string mangleWitnessThunk(ProtocolConformance *Conformance,
-                                 ValueDecl *Requirement);
+  std::string mangleWitnessThunk(const ProtocolConformance *Conformance,
+                                 const ValueDecl *Requirement);
 
-  std::string mangleClosureWitnessThunk(ProtocolConformance *Conformance,
-                                        AbstractClosureExpr *Closure);
+  std::string mangleClosureWitnessThunk(const ProtocolConformance *Conformance,
+                                        const AbstractClosureExpr *Closure);
 
   std::string mangleBehaviorInitThunk(const VarDecl *decl);
 
@@ -135,7 +135,7 @@ protected:
                                         bool &isAssocTypeAtDepth);
 
   void appendOpWithGenericParamIndex(StringRef,
-                                     GenericTypeParamType *paramTy);
+                                     const GenericTypeParamType *paramTy);
 
   void bindGenericParameters(const DeclContext *DC);
 
