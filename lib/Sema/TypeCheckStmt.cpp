@@ -222,10 +222,13 @@ diagnoseMissingCases(ASTContext &Context, const SwitchStmt *SwitchS) {
   SmallString<32> Buffer;
   llvm::raw_svector_ostream OS(Buffer);
 
+  bool InEditor = Context.LangOpts.DiagnosticsEditorMode;
+
   auto DefaultDiag = [&]() {
     OS << tok::kw_default << ": " << Placeholder << "\n";
     Context.Diags.diagnose(StartLoc, Empty ? diag::empty_switch_stmt :
-      diag::non_exhaustive_switch, true).fixItInsert(EndLoc, Buffer.str());
+      diag::non_exhaustive_switch, InEditor, true).fixItInsert(EndLoc,
+                                                               Buffer.str());
   };
   // To find the subject enum decl for this switch statement.
   EnumDecl *SubjectED = nullptr;
@@ -264,7 +267,8 @@ diagnoseMissingCases(ASTContext &Context, const SwitchStmt *SwitchS) {
 
   printEnumElmentsAsCases(UnhandledElements, OS);
   Context.Diags.diagnose(StartLoc, Empty ? diag::empty_switch_stmt :
-    diag::non_exhaustive_switch, false).fixItInsert(EndLoc, Buffer.str());
+    diag::non_exhaustive_switch, InEditor, false).fixItInsert(EndLoc,
+                                                              Buffer.str());
 }
 
 static void setAutoClosureDiscriminators(DeclContext *DC, Stmt *S) {
