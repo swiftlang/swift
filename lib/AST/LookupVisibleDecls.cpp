@@ -663,6 +663,17 @@ static bool relaxedConflicting(const OverloadSignature &sig1,
          sig1.IsInstanceMember == sig2.IsInstanceMember;
 }
 
+/// Hack to guess at whether substituting into the type of a declaration will
+/// be okay.
+/// FIXME: This is awful. We should either have Type::subst() work for
+/// GenericFunctionType, or we should kill it outright.
+static bool shouldSubstIntoDeclType(Type type) {
+  auto genericFnType = type->getAs<GenericFunctionType>();
+  if (!genericFnType) return true;
+
+  return false;
+}
+
 class OverrideFilteringConsumer : public VisibleDeclConsumer {
 public:
   std::set<ValueDecl *> AllFoundDecls;
@@ -748,7 +759,8 @@ public:
     ModuleDecl *M = DC->getParentModule();
 
     auto FoundSignature = VD->getOverloadSignature();
-    if (FoundSignature.InterfaceType && shouldSubst) {
+    if (FoundSignature.InterfaceType && shouldSubst &&
+        shouldSubstIntoDeclType(FoundSignature.InterfaceType)) {
       auto subs = BaseTy->getMemberSubstitutionMap(M, VD);
       if (auto CT = FoundSignature.InterfaceType.subst(subs))
         FoundSignature.InterfaceType = CT->getCanonicalType();
@@ -764,7 +776,8 @@ public:
       }
 
       auto OtherSignature = OtherVD->getOverloadSignature();
-      if (OtherSignature.InterfaceType && shouldSubst) {
+      if (OtherSignature.InterfaceType && shouldSubst &&
+          shouldSubstIntoDeclType(OtherSignature.InterfaceType)) {
         auto subs = BaseTy->getMemberSubstitutionMap(M, OtherVD);
         if (auto CT = OtherSignature.InterfaceType.subst(subs))
           OtherSignature.InterfaceType = CT->getCanonicalType();
