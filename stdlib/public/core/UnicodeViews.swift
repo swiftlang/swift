@@ -333,7 +333,7 @@ extension _UnicodeViews {
   public typealias TranscodedView<ToEncoding : UnicodeEncoding>
   = _TranscodedView<CodeUnits, Encoding, ToEncoding>
   
-  public func transcoded<ToEncoding: UnicodeEncoding>(
+  public func transcoded<ToEncoding>(
     to targetEncoding: ToEncoding.Type
   ) -> TranscodedView<ToEncoding> {
     return type(of: self).TranscodedView(self.codeUnits, to: targetEncoding)

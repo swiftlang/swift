@@ -624,7 +624,7 @@ extension String : RangeReplaceableCollection {
     }
   }
   
-  mutating func replaceUTF16InPlace<C: Collection>(
+  mutating func replaceUTF16InPlace<C>(
     _ target: Range<Index>, with replacement: Counted<C>
   ) -> Bool 
   where C.Iterator.Element == UTF16.CodeUnit {
