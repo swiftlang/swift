@@ -47,12 +47,6 @@ class TBDGenVisitor : public ASTVisitor<TBDGenVisitor> {
 
     auto declaredType = NTD->getDeclaredType()->getCanonicalType();
 
-    auto tmd = irgen::LinkEntity::forTypeMetadata(
-        declaredType, irgen::TypeMetadataAddress::AddressPoint,
-        /*isPattern=*/false);
-    addSymbol(tmd.mangleAsString());
-    auto tmda = irgen::LinkEntity::forTypeMetadataAccessFunction(declaredType);
-    addSymbol(tmda.mangleAsString());
     auto vwt = irgen::LinkEntity::forValueWitnessTable(declaredType);
     addSymbol(vwt.mangleAsString());
 
@@ -90,18 +84,24 @@ public:
     // any information here is encoded elsewhere
   }
   void visitNominalTypeDecl(NominalTypeDecl *NTD) {
-    if (isPrivateDecl(NTD))
-      return;
+    auto declaredType = NTD->getDeclaredType()->getCanonicalType();
 
     auto ntDescriptor = irgen::LinkEntity::forNominalTypeDescriptor(NTD);
     addSymbol(ntDescriptor.mangleAsString());
 
+    auto tmd = irgen::LinkEntity::forTypeMetadata(
+        declaredType, irgen::TypeMetadataAddress::AddressPoint,
+        /*isPattern=*/false);
+    addSymbol(tmd.mangleAsString());
+    auto tmda = irgen::LinkEntity::forTypeMetadataAccessFunction(declaredType);
+    addSymbol(tmda.mangleAsString());
+
+    if (isPrivateDecl(NTD))
+      return;
+
     visitMembers(NTD);
   }
   void visitClassDecl(ClassDecl *CD) {
-    if (isPrivateDecl(CD))
-      return;
-
     auto declaredType = CD->getDeclaredType()->getCanonicalType();
 
     auto tmlcv =
@@ -133,6 +133,7 @@ public:
       Mangle::ASTMangler mangler;
       addSymbol(mangler.mangleEntity(VD, false));
     }
+
     visitMembers(VD);
   }
   void visitDecl(Decl *D) { visitMembers(D); }

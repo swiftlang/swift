@@ -4,7 +4,6 @@
 // CHECK: symbol '_T04test10PropertiesC16privateVarGetSetSifgWo' (witness table offset for test.Properties.privateVarGetSet.getter : Swift.Int) is in generated IR file, but not in TBD file
 // CHECK: symbol '_T04test11PrivateInitCACycfc' (test.PrivateInit.init () -> test.PrivateInit) is in generated IR file, but not in TBD file
 // CHECK: symbol '_T04test14PrivateMethodsCfD' (test.PrivateMethods.__deallocating_deinit) is in generated IR file, but not in TBD file
-// CHECK: symbol '_T04test17PrivatePropertiesCN' (type metadata for test.PrivateProperties) is in generated IR file, but not in TBD file
 // CHECK: symbol '_T04test14PrivateNothingCfd' (test.PrivateNothing.deinit) is in generated IR file, but not in TBD file
 // CHECK: symbol '_T04test7MethodsC13privateMethodyyF' (test.Methods.privateMethod () -> ()) is in generated IR file, but not in TBD file
 // CHECK: symbol '_T04test14PrivateMethodsCACycfCWo' (witness table offset for test.PrivateMethods.__allocating_init () -> test.PrivateMethods) is in generated IR file, but not in TBD file
@@ -19,19 +18,13 @@
 // CHECK: symbol '_T04test10PropertiesC10privateVarSifmWo' (witness table offset for test.Properties.privateVar.materializeForSet : Swift.Int) is in generated IR file, but not in TBD file
 // CHECK: symbol '_T04test14PrivateNothingCACycfCWo' (witness table offset for test.PrivateNothing.__allocating_init () -> test.PrivateNothing) is in generated IR file, but not in TBD file
 // CHECK: symbol '_T04test17PrivatePropertiesC10privateVarSifmWo' (witness table offset for test.PrivateProperties.privateVar.materializeForSet : Swift.Int) is in generated IR file, but not in TBD file
-// CHECK: symbol '_T04test14PrivateStaticsCN' (type metadata for test.PrivateStatics) is in generated IR file, but not in TBD file
-// CHECK: symbol '_T04test7NothingCMa' (type metadata accessor for test.Nothing) is in generated IR file, but not in TBD file
-// CHECK: symbol '_T04test10PropertiesCN' (type metadata for test.Properties) is in generated IR file, but not in TBD file
 // CHECK: symbol '_T04test10PropertiesC13privateVarGetSifg' (test.Properties.privateVarGet.getter : Swift.Int) is in generated IR file, but not in TBD file
-// CHECK: symbol '_T04test7StaticsCMa' (type metadata accessor for test.Statics) is in generated IR file, but not in TBD file
-// CHECK: symbol '_T04test11PrivateInitCN' (type metadata for test.PrivateInit) is in generated IR file, but not in TBD file
 // CHECK: symbol '_T04test7NothingCMm' (metaclass for test.Nothing) is in generated IR file, but not in TBD file
 // CHECK: symbol '_T04test7StaticsCMm' (metaclass for test.Statics) is in generated IR file, but not in TBD file
 // CHECK: symbol '_T04test10PropertiesC16privateVarGetSetSifg' (test.Properties.privateVarGetSet.getter : Swift.Int) is in generated IR file, but not in TBD file
 // CHECK: symbol '_T04test10PropertiesC9publicVarSivfi' (test.Properties.(publicVar : Swift.Int).(variable initialization expression)) is in generated IR file, but not in TBD file
 // CHECK: symbol '_T04test4InitCfd' (test.Init.deinit) is in generated IR file, but not in TBD file
 // CHECK: symbol '_T04test10PropertiesC16privateVarGetSetSifm' (test.Properties.privateVarGetSet.materializeForSet : Swift.Int) is in generated IR file, but not in TBD file
-// CHECK: symbol '_T04test7MethodsCMa' (type metadata accessor for test.Methods) is in generated IR file, but not in TBD file
 // CHECK: symbol '_T04test10PropertiesC16privateVarGetSetSifs' (test.Properties.privateVarGetSet.setter : Swift.Int) is in generated IR file, but not in TBD file
 // CHECK: symbol '_T04test17PrivatePropertiesCfD' (test.PrivateProperties.__deallocating_deinit) is in generated IR file, but not in TBD file
 // CHECK: symbol '_T04test4InitCACSi7public__tcfCWo' (witness table offset for test.Init.__allocating_init (public_ : Swift.Int) -> test.Init) is in generated IR file, but not in TBD file
@@ -48,31 +41,19 @@
 // CHECK: symbol '_T04test10PropertiesC15publicVarGetSetSifmWo' (witness table offset for test.Properties.publicVarGetSet.materializeForSet : Swift.Int) is in generated IR file, but not in TBD file
 // CHECK: symbol '_T04test10PropertiesC10privateVarSifgWo' (witness table offset for test.Properties.privateVar.getter : Swift.Int) is in generated IR file, but not in TBD file
 // CHECK: symbol '_T04test17PrivatePropertiesC10privateVarSifgWo' (witness table offset for test.PrivateProperties.privateVar.getter : Swift.Int) is in generated IR file, but not in TBD file
-// CHECK: symbol '_T04test14PrivateNothingCN' (type metadata for test.PrivateNothing) is in generated IR file, but not in TBD file
-// CHECK: symbol '_T04test14PrivateNothingCML' (lazy cache variable for type metadata for test.PrivateNothing) is in generated IR file, but not in TBD file
-// CHECK: symbol '_T04test14PrivateStaticsCML' (lazy cache variable for type metadata for test.PrivateStatics) is in generated IR file, but not in TBD file
 // CHECK: symbol '_T04test7MethodsCACycfCWo' (witness table offset for test.Methods.__allocating_init () -> test.Methods) is in generated IR file, but not in TBD file
 // CHECK: symbol '_T04test14PrivateMethodsCACycfc' (test.PrivateMethods.init () -> test.PrivateMethods) is in generated IR file, but not in TBD file
 // CHECK: symbol '_T04test7StaticsC9publicVarSivZ' (static test.Statics.publicVar : Swift.Int) is in generated IR file, but not in TBD file
-// CHECK: symbol '_T04test7StaticsCN' (type metadata for test.Statics) is in generated IR file, but not in TBD file
 // CHECK: symbol '_T04test11PrivateInitCfD' (test.PrivateInit.__deallocating_deinit) is in generated IR file, but not in TBD file
-// CHECK: symbol '_T04test14PrivateNothingCMa' (type metadata accessor for test.PrivateNothing) is in generated IR file, but not in TBD file
-// CHECK: symbol '_T04test14PrivateStaticsCMa' (type metadata accessor for test.PrivateStatics) is in generated IR file, but not in TBD file
-// CHECK: symbol '_T04test14PrivateMethodsCML' (lazy cache variable for type metadata for test.PrivateMethods) is in generated IR file, but not in TBD file
 // CHECK: symbol '_T04test10PropertiesC9publicLetSivWvd' (direct field offset for test.Properties.publicLet : Swift.Int) is in generated IR file, but not in TBD file
 // CHECK: symbol '_T04test14PrivateNothingCMm' (metaclass for test.PrivateNothing) is in generated IR file, but not in TBD file
-// CHECK: symbol '_T04test14PrivateNothingCMn' (nominal type descriptor for test.PrivateNothing) is in generated IR file, but not in TBD file
-// CHECK: symbol '_T04test4InitCN' (type metadata for test.Init) is in generated IR file, but not in TBD file
-// CHECK: symbol '_T04test14PrivateStaticsCMn' (nominal type descriptor for test.PrivateStatics) is in generated IR file, but not in TBD file
 // CHECK: symbol '_T04test7NothingCACycfCWo' (witness table offset for test.Nothing.__allocating_init () -> test.Nothing) is in generated IR file, but not in TBD file
 // CHECK: symbol '_T04test11PrivateInitCfd' (test.PrivateInit.deinit) is in generated IR file, but not in TBD file
-// CHECK: symbol '_T04test14PrivateMethodsCMa' (type metadata accessor for test.PrivateMethods) is in generated IR file, but not in TBD file
 // CHECK: symbol '_T04test14PrivateStaticsCMm' (metaclass for test.PrivateStatics) is in generated IR file, but not in TBD file
 // CHECK: symbol '_T04test7MethodsC13privateMethodyyFWo' (witness table offset for test.Methods.privateMethod () -> ()) is in generated IR file, but not in TBD file
 // CHECK: symbol '_T04test10PropertiesC9publicVarSifsWo' (witness table offset for test.Properties.publicVar.setter : Swift.Int) is in generated IR file, but not in TBD file
 // CHECK: symbol '_T04test17PrivatePropertiesC13privateVarGetSifgWo' (witness table offset for test.PrivateProperties.privateVarGet.getter : Swift.Int) is in generated IR file, but not in TBD file
 // CHECK: symbol '_T04test14PrivateMethodsCMm' (metaclass for test.PrivateMethods) is in generated IR file, but not in TBD file
-// CHECK: symbol '_T04test14PrivateMethodsCMn' (nominal type descriptor for test.PrivateMethods) is in generated IR file, but not in TBD file
 // CHECK: symbol '_T04test4InitCACycfc' (test.Init.init () -> test.Init) is in generated IR file, but not in TBD file
 // CHECK: symbol '_T04test4InitCACSi8private__tcfc' (test.Init.init (private_ : Swift.Int) -> test.Init) is in generated IR file, but not in TBD file
 // CHECK: symbol '_T04test17PrivatePropertiesC16privateVarGetSetSifmWo' (witness table offset for test.PrivateProperties.privateVarGetSet.materializeForSet : Swift.Int) is in generated IR file, but not in TBD file
@@ -80,25 +61,18 @@
 // CHECK: symbol '_T04test10PropertiesC16privateVarGetSetSifsWo' (witness table offset for test.Properties.privateVarGetSet.setter : Swift.Int) is in generated IR file, but not in TBD file
 // CHECK: symbol '_T04test17PrivatePropertiesC10privateVarSifm' (test.PrivateProperties.privateVar.materializeForSet : Swift.Int) is in generated IR file, but not in TBD file
 // CHECK: symbol '_T04test17PrivatePropertiesC10privateVarSifs' (test.PrivateProperties.privateVar.setter : Swift.Int) is in generated IR file, but not in TBD file
-// CHECK: symbol '_T04test4InitCMa' (type metadata accessor for test.Init) is in generated IR file, but not in TBD file
 // CHECK: symbol '_T04test7NothingCACycfc' (test.Nothing.init () -> test.Nothing) is in generated IR file, but not in TBD file
 // CHECK: symbol '_T04test10PropertiesC15publicVarGetSetSifgWo' (witness table offset for test.Properties.publicVarGetSet.getter : Swift.Int) is in generated IR file, but not in TBD file
 // CHECK: symbol '_T04test17PrivatePropertiesCACycfc' (test.PrivateProperties.init () -> test.PrivateProperties) is in generated IR file, but not in TBD file
 // CHECK: symbol '_T04test7StaticsCACycfc' (test.Statics.init () -> test.Statics) is in generated IR file, but not in TBD file
 // CHECK: symbol '_T04test4InitCMm' (metaclass for test.Init) is in generated IR file, but not in TBD file
-// CHECK: symbol '_T04test14PrivateMethodsCN' (type metadata for test.PrivateMethods) is in generated IR file, but not in TBD file
-// CHECK: symbol '_T04test17PrivatePropertiesCML' (lazy cache variable for type metadata for test.PrivateProperties) is in generated IR file, but not in TBD file
 // CHECK: symbol '_T04test7StaticsC9publicVarSifau' (test.Statics.publicVar.unsafeMutableAddressor : Swift.Int) is in generated IR file, but not in TBD file
 // CHECK: symbol '_T04test14PrivateStaticsCACycfCWo' (witness table offset for test.PrivateStatics.__allocating_init () -> test.PrivateStatics) is in generated IR file, but not in TBD file
 // CHECK: symbol '_T04test4InitCACycfCWo' (witness table offset for test.Init.__allocating_init () -> test.Init) is in generated IR file, but not in TBD file
 // CHECK: symbol '_T04test10PropertiesC16privateVarGetSetSifmytfU_' (test.Properties.(privateVarGetSet.materializeForSet : Swift.Int).(closure #1)) is in generated IR file, but not in TBD file
-// CHECK: symbol '_T04test7NothingCN' (type metadata for test.Nothing) is in generated IR file, but not in TBD file
-// CHECK: symbol '_T04test17PrivatePropertiesCMa' (type metadata accessor for test.PrivateProperties) is in generated IR file, but not in TBD file
 // CHECK: symbol '_T04test4InitCACSi8private__tcfCWo' (witness table offset for test.Init.__allocating_init (private_ : Swift.Int) -> test.Init) is in generated IR file, but not in TBD file
-// CHECK: symbol '_T04test10PropertiesCMa' (type metadata accessor for test.Properties) is in generated IR file, but not in TBD file
 // CHECK: symbol '_T04test10PropertiesCMm' (metaclass for test.Properties) is in generated IR file, but not in TBD file
 // CHECK: symbol '_T04test17PrivatePropertiesCMm' (metaclass for test.PrivateProperties) is in generated IR file, but not in TBD file
-// CHECK: symbol '_T04test17PrivatePropertiesCMn' (nominal type descriptor for test.PrivateProperties) is in generated IR file, but not in TBD file
 // CHECK: symbol '_T04test7MethodsC12publicMethodyyFWo' (witness table offset for test.Methods.publicMethod () -> ()) is in generated IR file, but not in TBD file
 // CHECK: symbol '_T04test17PrivatePropertiesC16privateVarGetSetSifg' (test.PrivateProperties.privateVarGetSet.getter : Swift.Int) is in generated IR file, but not in TBD file
 // CHECK: symbol '_T04test17PrivatePropertiesC16privateVarGetSetSifm' (test.PrivateProperties.privateVarGetSet.materializeForSet : Swift.Int) is in generated IR file, but not in TBD file
@@ -116,18 +90,14 @@
 // CHECK: symbol '_T04test7StaticsC10privateVarSivZ' (static test.Statics.privateVar : Swift.Int) is in generated IR file, but not in TBD file
 // CHECK: symbol '_T04test11PrivateInitCACSi8private__tcfc' (test.PrivateInit.init (private_ : Swift.Int) -> test.PrivateInit) is in generated IR file, but not in TBD file
 // CHECK: symbol '_T04test10PropertiesC10privateVarSifs' (test.Properties.privateVar.setter : Swift.Int) is in generated IR file, but not in TBD file
-// CHECK: symbol '_T04test11PrivateInitCML' (lazy cache variable for type metadata for test.PrivateInit) is in generated IR file, but not in TBD file
 // CHECK: symbol '_T04test10PropertiesC10privateLetSivWvd' (direct field offset for test.Properties.privateLet : Swift.Int) is in generated IR file, but not in TBD file
 // CHECK: symbol '_T04test7MethodsCfd' (test.Methods.deinit) is in generated IR file, but not in TBD file
 // CHECK: symbol '_T04test17PrivatePropertiesC10privateLetSivWvd' (direct field offset for test.PrivateProperties.privateLet : Swift.Int) is in generated IR file, but not in TBD file
-// CHECK: symbol '_T04test11PrivateInitCMa' (type metadata accessor for test.PrivateInit) is in generated IR file, but not in TBD file
 // CHECK: symbol '_T04test11PrivateInitCMm' (metaclass for test.PrivateInit) is in generated IR file, but not in TBD file
-// CHECK: symbol '_T04test11PrivateInitCMn' (nominal type descriptor for test.PrivateInit) is in generated IR file, but not in TBD file
 // CHECK: symbol '_T04test10PropertiesC10privateVarSifsWo' (witness table offset for test.Properties.privateVar.setter : Swift.Int) is in generated IR file, but not in TBD file
 // CHECK: symbol '_T04test17PrivatePropertiesC10privateVarSifsWo' (witness table offset for test.PrivateProperties.privateVar.setter : Swift.Int) is in generated IR file, but not in TBD file
 // CHECK: symbol '_T04test14PrivateMethodsC13privateMethodyyFWo' (witness table offset for test.PrivateMethods.privateMethod () -> ()) is in generated IR file, but not in TBD file
 // CHECK: symbol '_T04test7MethodsCACycfc' (test.Methods.init () -> test.Methods) is in generated IR file, but not in TBD file
-// CHECK: symbol '_T04test7MethodsCN' (type metadata for test.Methods) is in generated IR file, but not in TBD file
 // CHECK: symbol '_T04test14PrivateStaticsC10privateLetSivZ' (static test.PrivateStatics.privateLet : Swift.Int) is in generated IR file, but not in TBD file
 // CHECK: symbol '_T04test14PrivateStaticsC10privateVarSivZ' (static test.PrivateStatics.privateVar : Swift.Int) is in generated IR file, but not in TBD file
 // CHECK: symbol '_T04test10PropertiesC9publicLetSivfi' (test.Properties.(publicLet : Swift.Int).(variable initialization expression)) is in generated IR file, but not in TBD file
@@ -137,15 +107,20 @@
 // CHECK: symbol '_T04test7StaticsCACycfCWo' (witness table offset for test.Statics.__allocating_init () -> test.Statics) is in generated IR file, but not in TBD file
 // CHECK: symbol '_T04test14PrivateNothingCfD' (test.PrivateNothing.__deallocating_deinit) is in generated IR file, but not in TBD file
 // CHECK: symbol '_T04test14PrivateStaticsCfD' (test.PrivateStatics.__deallocating_deinit) is in generated IR file, but not in TBD file
+// CHECK: symbol '_T04test10PropertiesC10privateLetSifau' (test.Properties.privateLet.unsafeMutableAddressor : Swift.Int) is in TBD file, but not in generated IR
+// CHECK: symbol '_T04test7StaticsC10privateLetSifau' (test.Statics.privateLet.unsafeMutableAddressor : Swift.Int) is in TBD file, but not in generated IR
+// CHECK: symbol '_T04test10PropertiesC9publicLetSiv' (test.Properties.publicLet : Swift.Int) is in TBD file, but not in generated IR
+// CHECK: symbol '_T04test7StaticsC9publicVarSifmZ' (static test.Statics.publicVar.materializeForSet : Swift.Int) is in TBD file, but not in generated IR
+// CHECK: symbol '_T04test10PropertiesC9publicLetSifau' (test.Properties.publicLet.unsafeMutableAddressor : Swift.Int) is in TBD file, but not in generated IR
 // CHECK: symbol '_T04test10PropertiesC9publicLetSifg' (test.Properties.publicLet.getter : Swift.Int) is in TBD file, but not in generated IR
 // CHECK: symbol '_T04test7StaticsC15publicVarGetSetSifmZ' (static test.Statics.publicVarGetSet.materializeForSet : Swift.Int) is in TBD file, but not in generated IR
 // CHECK: symbol '_T04test10PropertiesC15publicVarGetSetSifm' (test.Properties.publicVarGetSet.materializeForSet : Swift.Int) is in TBD file, but not in generated IR
 // CHECK: symbol '_T04test10PropertiesC9publicVarSifg' (test.Properties.publicVar.getter : Swift.Int) is in TBD file, but not in generated IR
-// CHECK: symbol '_T04test10PropertiesC9publicVarSifm' (test.Properties.publicVar.materializeForSet : Swift.Int) is in TBD file, but not in generated IR
+// CHECK: symbol '_T04test10PropertiesC10privateLetSiv' (test.Properties.privateLet : Swift.Int) is in TBD file, but not in generated IR
 // CHECK: symbol '_T04test10PropertiesC9publicVarSifs' (test.Properties.publicVar.setter : Swift.Int) is in TBD file, but not in generated IR
+// CHECK: symbol '_T04test10PropertiesC9publicVarSifm' (test.Properties.publicVar.materializeForSet : Swift.Int) is in TBD file, but not in generated IR
 // CHECK: symbol '_T04test7StaticsC9publicLetSifgZ' (static test.Statics.publicLet.getter : Swift.Int) is in TBD file, but not in generated IR
 // CHECK: symbol '_T04test7StaticsC9publicVarSifgZ' (static test.Statics.publicVar.getter : Swift.Int) is in TBD file, but not in generated IR
-// CHECK: symbol '_T04test7StaticsC9publicVarSifmZ' (static test.Statics.publicVar.materializeForSet : Swift.Int) is in TBD file, but not in generated IR
 // CHECK: symbol '_T04test7StaticsC9publicVarSifsZ' (static test.Statics.publicVar.setter : Swift.Int) is in TBD file, but not in generated IR
 
 public class Nothing {}
