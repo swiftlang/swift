@@ -277,3 +277,21 @@ struct X16<X, Y> : P16 {
 struct X17<S: P16, T, U> where S.A == (T, U) {
 	func bar<V>(_: V) where S == X16<X3, X15> { }
 }
+
+// Same-type constraints that are self-derived via a parent need to be
+// supressed in the resulting signature.
+protocol P17 { }
+
+protocol P18 {
+  associatedtype A: P17
+}
+
+struct X18: P18, P17 {
+  typealias A = X18
+}
+
+// CHECK-LABEL: .X19.foo@
+// CHECK: Generic signature: <T, U where T == X18>
+struct X19<T: P18> where T == T.A {
+  func foo<U>(_: U) where T == X18 { }
+}
