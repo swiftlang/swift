@@ -541,6 +541,7 @@ func _getSuperclass(_ t: Any.Type) -> AnyClass? {
 // and type checking will fail.
 
 /// Returns `true` if `object` is uniquely referenced.
+@_inlineable
 @_transparent  // WARNING: do not remove this or uniqueness testing will break!
 public // testable
 func _isUnique<T>(_ object: inout T) -> Bool {
