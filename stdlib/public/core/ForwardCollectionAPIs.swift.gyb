@@ -87,7 +87,9 @@ public func withExistingUnsafeBuffer<R>(
   return try ${base}.withExistingUnsafeBuffer(body)
 }
 public var first: ${Element}? { return ${base}.first }
+% if bidirectional:
 public var last: ${Element}? { return ${base}.last }
+% end
 public func map<T>(_ transform: (${Element}) throws -> T) rethrows -> [T] {
   return try ${base}.map(transform)
 }

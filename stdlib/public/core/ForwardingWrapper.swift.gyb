@@ -34,13 +34,15 @@ public extension ForwardingWrapper where Self : Comparable, Base : Comparable {
   }
 }
 
-//===--- BidirectionalCollection forwarding -------------------------------===//
+//===--- Collection forwarding -------------------------------===//
 
-/// A type that wraps a `BidirectionalCollection` and forwards most or all of
+// FIXME: introduce refinement, DGY (Don't Gyb Yourself)
+% for Bidirectional in '', 'Bidirectional':
+/// A type that wraps a `${Bidirectional}Collection` and forwards most or all of
 /// its API.
 ///
-/// - Note: Some models of `BidirectionalCollectionWrapper` are themselves
-///   models `BidirectionalCollection`, but some are not.
+/// - Note: Some models of `${Bidirectional}CollectionWrapper` are themselves
+///   models `${Bidirectional}Collection`, but some are not.
 ///
 /// - Note: works great for random access collections as well.
 ///
@@ -49,8 +51,8 @@ public extension ForwardingWrapper where Self : Comparable, Base : Comparable {
 ///   example) must explicitly implement defaults supplied by its other
 ///   conformances to prevent them from having semantics that simply forward to
 ///   the `Base`.
-public protocol BidirectionalCollectionWrapper : ForwardingWrapper {
-  associatedtype Base : BidirectionalCollection
+public protocol ${Bidirectional}CollectionWrapper : ForwardingWrapper {
+  associatedtype Base : ${Bidirectional}Collection
   var base: Base { get }
   associatedtype Index
   associatedtype IndexDistance : SignedInteger
@@ -60,33 +62,36 @@ public protocol BidirectionalCollectionWrapper : ForwardingWrapper {
 }
 
 /// When the `Iterator` type matches, just forward it.
-extension BidirectionalCollectionWrapper where Iterator == Base.Iterator {
+extension ${Bidirectional}CollectionWrapper where Iterator == Base.Iterator {
   public func makeIterator() -> Iterator { return base.makeIterator() }
 }
 
 /// When the `Index` type matches, wrapping/unwrapping is trivial
-public extension BidirectionalCollectionWrapper where Index == Base.Index {
+public extension ${Bidirectional}CollectionWrapper where Index == Base.Index {
   func _wrap(_ i: Base.Index) -> Index { return i }
   func _unwrap(_ i: Index) -> Base.Index { return i }
 }
 
-/// Forwards all the `BidirectionalCollection` APIs from `Base`, verbatim, but
+/// Forwards all the `${Bidirectional}Collection` APIs from `Base`, verbatim, but
 /// with whatever Index wrapping we have chosen.
-extension BidirectionalCollectionWrapper {
+extension ${Bidirectional}CollectionWrapper {
   ${gyb.expand(
-    'ForwardCollectionAPIs.swift.gyb',
-    base='base',
-    Element='Base.Iterator.Element')}
+      'ForwardCollectionAPIs.swift.gyb',
+      base='base',
+      bidirectional=(Bidirectional != ''), 
+      Element='Base.Iterator.Element')}
 }
 
-/// When the model of BidirectionalCollectionWrapper is itself a collection,
+/// When the model of ${Bidirectional}CollectionWrapper is itself a Collection,
 /// many of the defaults become redundant with defaults supplied by Indexable
 /// et. al., so repeat them with stricter constraints to resolve the ambiguity.
-extension BidirectionalCollectionWrapper
-where Self : BidirectionalCollection {
+extension ${Bidirectional}CollectionWrapper
+where Self : ${Bidirectional}Collection {
   ${gyb.expand(
-    'ForwardCollectionAPIs.swift.gyb',
-    base='base',
-    Element='Base.Iterator.Element')}
+      'ForwardCollectionAPIs.swift.gyb',
+      base='base',
+      bidirectional=(Bidirectional != ''), 
+      Element='Base.Iterator.Element')}
 }
+% end
 
