@@ -95,3 +95,23 @@ where Self : ${Bidirectional}Collection {
 }
 % end
 
+/// When the model of BidirectionalCollectionWrapper is itself a
+/// RandomAccessCollection, some of the defaults become redundant with defaults
+/// supplied by Indexable et. al., so repeat them with stricter constraints to
+/// resolve the ambiguity.
+extension BidirectionalCollectionWrapper
+where Self : RandomAccessCollection {
+  public func index(
+    _ i: Index,
+    offsetBy n: IndexDistance,
+    limitedBy limit: Index
+  ) -> Index? {
+    return base.index(
+      _unwrap(i),
+      offsetBy: numericCast(n),
+      limitedBy: _unwrap(limit)
+    ).map(_wrap)
+  }
+}
+% end
+
