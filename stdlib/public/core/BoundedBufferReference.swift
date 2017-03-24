@@ -83,11 +83,11 @@ extension _BoundedBufferReference {
   }
   
   internal func allocatedCapacity() -> Int {
-    let startAddr = UnsafeRawPointer(_baseAddress)
     let selfAddr = UnsafeRawPointer(Builtin.bridgeToRawPointer(self))
-    let endAddr = startAddr + _swift_stdlib_malloc_size(selfAddr)
-    return endAddr.assumingMemoryBound(to: Element.self)
-         - startAddr.assumingMemoryBound(to: Element.self)
+    let baseByteOffset = UnsafeRawPointer(_baseAddress) - selfAddr
+    let bytesAllocated = _swift_stdlib_malloc_size(selfAddr)
+    let elementBytes = bytesAllocated - baseByteOffset
+    return elementBytes / MemoryLayout<Element>.stride
   }  
 }
 
