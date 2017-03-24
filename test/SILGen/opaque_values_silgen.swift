@@ -848,6 +848,36 @@ func s430_callUnreachableF<T>(t: T) {
   let _: (Int, ((T) -> (), T))? = unreachableF()
 }
 
+// Further testing for conditional checked cast under opaque value mode - make sure we don't create a buffer for results
+// ---
+// CHECK-LABEL: sil hidden @_T020opaque_values_silgen21s440__cleanupEmissionyxlF : $@convention(thin) <T> (@in T) -> () {
+// CHECK: bb0([[ARG:%.*]] : $T):
+// CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
+// CHECK:   [[COPY_ARG:%.*]] = copy_value [[BORROWED_ARG]]
+// CHECK:   checked_cast_value_br [[COPY_ARG]] : $T to $EmptyP, bb2, bb1
+// CHECK: bb2([[PTYPE:%.*]] : $EmptyP):
+// CHECK:   [[PSOME:%.*]] = enum $Optional<EmptyP>, #Optional.some!enumelt.1, [[PTYPE]] : $EmptyP
+// CHECK:   br bb3([[PSOME]] : $Optional<EmptyP>)
+// CHECK: bb3([[ENUMRES:%.*]] : $Optional<EmptyP>):
+// CHECK:   switch_enum [[ENUMRES]] : $Optional<EmptyP>, case #Optional.some!enumelt.1: bb6, default bb4
+// CHECK: bb4:
+// CHECK:   end_borrow [[BORROWED_ARG]]
+// CHECK:   br bb5
+// CHECK: bb5:
+// CHECK:   br bb7
+// CHECK: bb6([[ENUMRES2:%.*]] : $EmptyP):
+// CHECK:   end_borrow [[BORROWED_ARG]]
+// CHECK:   destroy_value [[ENUMRES2]]
+// CHECK:   br bb7
+// CHECK: bb7:
+// CHECK:   destroy_value [[ARG]]
+// CHECK:   return %{{.*}} : $()
+// CHECK-LABEL: } // end sil function '_T020opaque_values_silgen21s440__cleanupEmissionyxlF'
+func s440__cleanupEmission<T>(_ x: T) {
+  guard let x2 = x as? EmptyP else { return }
+  _ = x2
+}
+
 // Tests conditional value casts and correspondingly generated reabstraction thunk, with <T> types
 // ---
 // CHECK-LABEL: sil hidden @_T020opaque_values_silgen21s999_____condTFromAnyyyp_xtlF : $@convention(thin) <T> (@in Any, @in T) -> () {
