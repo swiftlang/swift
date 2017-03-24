@@ -429,17 +429,6 @@ bool irgen::hasKnownSwiftMetadata(IRGenModule &IGM, ClassDecl *theClass) {
   return theClass->hasKnownSwiftImplementation();
 }
 
-/// Is the given method known to be callable by vtable lookup?
-bool irgen::hasKnownVTableEntry(IRGenModule &IGM,
-                                AbstractFunctionDecl *theMethod) {
-  auto theClass = dyn_cast<ClassDecl>(theMethod->getDeclContext());
-  // Extension methods don't get vtable entries.
-  if (!theClass) {
-    return false;
-  }
-  return theClass->hasKnownSwiftImplementation();
-}
-
 /// Is it basically trivial to access the given metadata?  If so, we don't
 /// need a cache variable in its accessor.
 bool irgen::isTypeMetadataAccessTrivial(IRGenModule &IGM, CanType type) {
@@ -3512,6 +3501,8 @@ namespace {
         B.addBitCast(IGM.getDeletedMethodErrorFn(), IGM.FunctionPtrTy);
       }
     }
+
+    void addMethodOverride(SILDeclRef baseRef, SILDeclRef declRef) {}
 
     void addGenericArgument(CanType argTy, ClassDecl *forClass) {
       B.addNullPointer(IGM.TypeMetadataPtrTy);

@@ -62,9 +62,6 @@ namespace irgen {
   /// metadata?
   bool hasKnownSwiftMetadata(IRGenModule &IGM, CanType theType);
 
-  /// Is the given method known to be callable by vtable dispatch?
-  bool hasKnownVTableEntry(IRGenModule &IGM, AbstractFunctionDecl *theMethod);
-
   /// Emit the body of a lazy cache access function.
   void emitLazyCacheAccessFunction(IRGenModule &IGM,
                                    llvm::Function *accessor,

@@ -3,10 +3,16 @@
 class Base {
   var stored: Int = 0
 
-// The ordering here is unfortunate: we generate the property
-// getters and setters after we've processed the decl.
+// CHECK-LABEL: sil hidden [transparent] @_T017materializeForSet4BaseC6storedSifm : $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @guaranteed Base) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>) {
+// CHECK: bb0([[BUFFER:%.*]] : $Builtin.RawPointer, [[STORAGE:%.*]] : $*Builtin.UnsafeValueBuffer, [[SELF:%.*]] : $Base):
+// CHECK:   [[T0:%.*]] = ref_element_addr [[SELF]] : $Base, #Base.stored
+// CHECK:   [[T1:%.*]] = address_to_pointer [[T0]] : $*Int to $Builtin.RawPointer
+// CHECK:   [[T2:%.*]] = enum $Optional<Builtin.RawPointer>, #Optional.none
+// CHECK:   [[T3:%.*]] = tuple ([[T1]] : $Builtin.RawPointer, [[T2]] : $Optional<Builtin.RawPointer>)
+// CHECK:   return [[T3]] : $(Builtin.RawPointer, Optional<Builtin.RawPointer>)
+// CHECK: }
 
-  // CHECK-LABEL: sil hidden [transparent] @_T017materializeForSet4BaseC8computedSifmytfU_ : $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout Base, @thick Base.Type) -> () {
+// CHECK-LABEL: sil hidden [transparent] @_T017materializeForSet4BaseC8computedSifmytfU_ : $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout Base, @thick Base.Type) -> () {
 // CHECK: bb0([[BUFFER:%.*]] : $Builtin.RawPointer, [[STORAGE:%.*]] : $*Builtin.UnsafeValueBuffer, [[SELF:%.*]] : $*Base, [[SELFTYPE:%.*]] : $@thick Base.Type):
 // CHECK:   [[T0:%.*]] = load_borrow [[SELF]]
 // CHECK:   [[T1:%.*]] = pointer_to_address [[BUFFER]] : $Builtin.RawPointer to [strict] $*Int
@@ -26,15 +32,6 @@ class Base {
 // CHECK:   [[T3:%.*]] = enum $Optional<Builtin.RawPointer>, #Optional.some!enumelt.1, [[T2]] : $Builtin.RawPointer
 // CHECK:   [[T4:%.*]] = tuple ([[BUFFER]] : $Builtin.RawPointer, [[T3]] : $Optional<Builtin.RawPointer>)
 // CHECK:   return [[T4]] : $(Builtin.RawPointer, Optional<Builtin.RawPointer>)
-// CHECK: }
-
-// CHECK-LABEL: sil hidden [transparent] @_T017materializeForSet4BaseC6storedSifm : $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @guaranteed Base) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>) {
-// CHECK: bb0([[BUFFER:%.*]] : $Builtin.RawPointer, [[STORAGE:%.*]] : $*Builtin.UnsafeValueBuffer, [[SELF:%.*]] : $Base):
-// CHECK:   [[T0:%.*]] = ref_element_addr [[SELF]] : $Base, #Base.stored
-// CHECK:   [[T1:%.*]] = address_to_pointer [[T0]] : $*Int to $Builtin.RawPointer
-// CHECK:   [[T2:%.*]] = enum $Optional<Builtin.RawPointer>, #Optional.none
-// CHECK:   [[T3:%.*]] = tuple ([[T1]] : $Builtin.RawPointer, [[T2]] : $Optional<Builtin.RawPointer>)
-// CHECK:   return [[T3]] : $(Builtin.RawPointer, Optional<Builtin.RawPointer>)
 // CHECK: }
 
   var computed: Int {
@@ -579,12 +576,12 @@ func testMaterializedSetter() {
 }
 
 // CHECK-LABEL: sil_vtable DerivedForOverride {
-// CHECK:   #BaseForOverride.valueComputed!getter.1: (BaseForOverride) -> () -> Int : _T017materializeForSet07DerivedB8OverrideC13valueComputedSifg
-// CHECK:   #BaseForOverride.valueComputed!setter.1: (BaseForOverride) -> (Int) -> () : _T017materializeForSet07DerivedB8OverrideC13valueComputedSifs
-// CHECK:   #BaseForOverride.valueComputed!materializeForSet.1: (BaseForOverride) -> (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer) -> (Builtin.RawPointer, Builtin.RawPointer?) : _T017materializeForSet07DerivedB8OverrideC13valueComputedSifm
 // CHECK:   #BaseForOverride.valueStored!getter.1: (BaseForOverride) -> () -> Int : _T017materializeForSet07DerivedB8OverrideC11valueStoredSifg
 // CHECK:   #BaseForOverride.valueStored!setter.1: (BaseForOverride) -> (Int) -> () : _T017materializeForSet07DerivedB8OverrideC11valueStoredSifs
 // CHECK:   #BaseForOverride.valueStored!materializeForSet.1: (BaseForOverride) -> (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer) -> (Builtin.RawPointer, Builtin.RawPointer?) : _T017materializeForSet07DerivedB8OverrideC11valueStoredSifm
+// CHECK:   #BaseForOverride.valueComputed!getter.1: (BaseForOverride) -> () -> Int : _T017materializeForSet07DerivedB8OverrideC13valueComputedSifg
+// CHECK:   #BaseForOverride.valueComputed!setter.1: (BaseForOverride) -> (Int) -> () : _T017materializeForSet07DerivedB8OverrideC13valueComputedSifs
+// CHECK:   #BaseForOverride.valueComputed!materializeForSet.1: (BaseForOverride) -> (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer) -> (Builtin.RawPointer, Builtin.RawPointer?) : _T017materializeForSet07DerivedB8OverrideC13valueComputedSifm
 // CHECK: }
 
 // CHECK-LABEL: sil_witness_table hidden Bill: Totalled module materializeForSet {
