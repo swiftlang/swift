@@ -115,10 +115,10 @@ public struct String {
     }
     internal var _rep: Representation
   }
-  var content: Content
+  public var content: Content
 }
 
-extension String : BidirectionalCollection, BidirectionalCollectionWrapper {
+extension String : Unicode, BidirectionalCollectionWrapper {
   public typealias Base = AnyCharacterUnicodeView
   public typealias Index = AnyCharacterUnicodeView.Index
   public typealias IndexDistance = AnyCharacterUnicodeView.IndexDistance
