@@ -40,9 +40,9 @@ postfix func +- <T>(a: T) {}
 // CHECK-LABEL: sil hidden @_T08mangling2psoiyx_xtlF
 func +- <T>(a: T, b: T) {}
 
-// CHECK-LABEL: sil hidden @_T08mangling2psopyx1a_x1btlF
+// CHECK-LABEL: sil hidden @_T08mangling2psopyx1a_x1bt_tlF
 prefix func +- <T>(_: (a: T, b: T)) {}
-// CHECK-LABEL: sil hidden @_T08mangling2psoPyx1a_x1btlF
+// CHECK-LABEL: sil hidden @_T08mangling2psoPyx1a_x1bt_tlF
 postfix func +- <T>(_: (a: T, b: T)) {}
 
 infix operator «+» {}
