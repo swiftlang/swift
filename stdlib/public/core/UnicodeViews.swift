@@ -37,6 +37,17 @@ public protocol UnicodeView : BidirectionalCollection {
   static func encodedOffset(of: Index) -> Int64
 }
 
+/// A UnicodeView that is already using AnyUnicodeIndex has trivial interchange
+/// with encoded offsets.
+extension UnicodeView where Index == AnyUnicodeIndex {
+  public func index(atEncodedOffset x: Int64) -> Index {
+    return Index(encodedOffset: x)
+  }
+  public static func encodedOffset(of i: Index) -> Int64 {
+    return i.encodedOffset
+  }
+}
+
 //===--- RandomAccessUnicodeView ------------------------------------------===//
 /// Adapts any `RandomAccessCollection` to a `UnicodeView`, with
 /// `encodedOffset`s equal to the number of index steps from the `startIndex`.

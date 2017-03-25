@@ -9,6 +9,9 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
+%{
+  import gyb
+}%
 
 /// Types that present useful views and information about Unicode content.
 ///
@@ -219,7 +222,7 @@ where Encoding == Latin1,
     })
   }
 }
-  
+
 //===--- Defaults for UTF16 and ValidUTF16 --------------------------------===//
 public extension _UnicodeStorage
 where Encoding.EncodedScalar == UTF16.EncodedScalar,
@@ -241,4 +244,218 @@ where Encoding.EncodedScalar == UTF16.EncodedScalar,
     return RandomAccessUnicodeView(codeUnits)
   }
 }
+
+//===--- AnyUnicodeIndex --------------------------------------------------===//
+
+/// Type eraser for indices into type-erased unicode views.
+///
+/// Not the underlying index, but a wrapper that UnicodeViews can create for it.
+public protocol AnyUnicodeIndex_ {
+  var encodedOffset: Int64 { get }
+  func isLess(than other: AnyUnicodeIndex_) -> Bool
+  func isEqual(to other: AnyUnicodeIndex_) -> Bool
+}
+
+/// Default support for comparison
+public extension AnyUnicodeIndex_ where Self : Comparable {
+  func isLess(than other: AnyUnicodeIndex_) -> Bool {
+    if let o = other as? Self {
+      return self < o
+    }
+    return self.encodedOffset < other.encodedOffset
+  }
+  func isEqual(to other: AnyUnicodeIndex_) -> Bool {
+    if let o = other as? Self {
+      return self == o
+    }
+    return self.encodedOffset == other.encodedOffset
+  }
+}
+
+/// ForwardingWrapper for instances of AnyUnicodeIndex_ that makes it a suitable
+/// Index type (Comparable has self-requirements).
+public struct AnyUnicodeIndex : Comparable {
+  public var encodedOffset: Int64 { return base.encodedOffset }
+  public var base: AnyUnicodeIndex_
+  public init(_ base: AnyUnicodeIndex_) { self.base = base }
+  public static func < (lhs: AnyUnicodeIndex, rhs: AnyUnicodeIndex) -> Bool {
+    return lhs.base.isLess(than: rhs.base)
+  }
+  public static func == (lhs: AnyUnicodeIndex, rhs: AnyUnicodeIndex) -> Bool {
+    return lhs.base.isEqual(to: rhs.base)
+  }
+
+  internal struct _OffsetAdapter
+    : AnyUnicodeIndex_, ForwardingWrapper, Comparable {
+    init(base: Int64) { self.base = base }
+    var encodedOffset: Int64 { return base }
+    var base: Int64
+  }
+
+  internal struct _IndexAdapter<BaseView: UnicodeView>
+  : AnyUnicodeIndex_, ForwardingWrapper, Comparable {
+    var base: BaseView.Index
+    var encodedOffset: Int64 {
+      return BaseView.encodedOffset(of: base)
+    }
+  }
+
+  public init(encodedOffset: Int64) {
+    self.base = _OffsetAdapter(base: encodedOffset)
+  }
+}
+
+//===----------------------------------------------------------------------===//
+
+
+//===--- AnyUnicodeView ---------------------------------------------------===//
+/// Type-eraser for bidirectional collections with index<->code unit offsets
+public protocol AnyUnicodeView_ {
+  typealias IndexDistance = Int64
+  var startIndex: AnyUnicodeIndex_ { get }
+  var endIndex: AnyUnicodeIndex_ { get }
+  func formIndex(after: inout AnyUnicodeIndex_)
+  func index(after: AnyUnicodeIndex_) -> AnyUnicodeIndex_
+  func formIndex(before: inout AnyUnicodeIndex_)
+  func index(before: AnyUnicodeIndex_) -> AnyUnicodeIndex_
+  func formIndex(_ i: inout AnyUnicodeIndex_, offsetBy: Int64)
+  func index(_ i: AnyUnicodeIndex_, offsetBy: Int64) -> AnyUnicodeIndex_
+  func index(
+    _ i: AnyUnicodeIndex_,
+    offsetBy n: Int64,
+    limitedBy limit: AnyUnicodeIndex_
+  ) -> AnyUnicodeIndex_?
+  func distance(from i: AnyUnicodeIndex_, to j: AnyUnicodeIndex_) -> Int64
+  var count: Int64 { get }
+  var underestimatedCount: Int { get }
+}
+
+/// Wrappers that present some `AnyUnicodeView_` instance as a
+/// `BidirectionalCollection` unwrap indices and forward all implementation to
+/// base
+public extension ForwardingWrapper
+where Base == AnyUnicodeView_,
+Self : BidirectionalCollection, Self.Index == AnyUnicodeIndex {
+  // TODO: Forward Iterators
+  ${gyb.expand(
+      'ForwardCollectionAPIs.swift.gyb', base='base', Element=None)}
+  
+  func _wrap(_ x: AnyUnicodeIndex_) -> AnyUnicodeIndex {
+    return AnyUnicodeIndex(x)
+  }
+  func _unwrap(_ x: AnyUnicodeIndex) -> AnyUnicodeIndex_ {
+    return x.base
+  }
+}
+
+/// Wrappers that present some `UnicodeView` as an `AnyUnicodeView_` forward all
+/// implementations by using `base` to `wrap`/`unwrap` indices and `numericCast`
+/// to translate `IndexDistance`s.
+public extension BidirectionalCollectionWrapper
+where Base : UnicodeView, Self : AnyUnicodeView_ {
+  func _wrap(_ i: Base.Index) -> AnyUnicodeIndex_ {
+    return AnyUnicodeIndex._IndexAdapter<Base>(base: i)
+  }
+  func _unwrap(_ i: AnyUnicodeIndex_) -> Base.Index {
+    return (i as? AnyUnicodeIndex._IndexAdapter<Base>).map { $0.base }
+    ?? base.index(atEncodedOffset: i.encodedOffset)
+  }
+}
+
+// Generate wrappers for specific element types.
+% for Element in ('UInt16', 'UInt32', 'UnicodeScalar', 'Character'):
+
+//===--- Any${Element}Iterator --------------------------------------------===//
+/// Type-eraser for Iterators over ${Element}s
+public protocol Any${Element}Iterator_ {
+  mutating func next() -> ${Element}?
+}
+
+public struct Any${Element}Iterator : IteratorProtocol {
+  public var base: Any${Element}Iterator_
+  public init(_ base: Any${Element}Iterator_) { self.base = base }
+  public mutating func next() -> ${Element}? { return base.next() }
+
+  public struct Adapter<Base : IteratorProtocol> : Any${Element}Iterator_
+  where Base.Element == ${Element}
+  {
+    public mutating func next() -> ${Element}? { return base.next() }
+    public var base: Base
+  }
+}
+
+/// Wrappers that present a base `Sequence` as an `AnyUnicodeView_` adapt and
+/// forward the base's `iterator`.
+public extension BidirectionalCollectionWrapper
+where Self : AnyUnicodeView_, Base.Iterator.Element == ${Element} {
+  func makeIterator() -> Any${Element}Iterator_ {
+    return Any${Element}Iterator.Adapter<Base.Iterator>(
+      base: base.makeIterator())
+  }
+}
+//===----------------------------------------------------------------------===//
+
+//===--- Any${Element}UnicodeView -----------------------------------------===//
+
+/// Type eraser for `UnicodeView`s with elements of type ${Element}.
+public protocol Any${Element}UnicodeView_ : AnyUnicodeView_ {
+  func makeIterator() -> Any${Element}Iterator_
+  subscript(_: AnyUnicodeIndex_) -> ${Element} { get }
+  func withExistingUnsafeBuffer<R>(
+    _ body: (UnsafeBufferPointer<${Element}>) throws -> R
+  ) rethrows -> R?
+  var first: ${Element}? { get }
+  var last: ${Element}? { get }
+  func map<T>(_ transform: (${Element}) throws -> T) rethrows -> [T]
+  func filter(_ inResult: (${Element}) throws -> Bool) rethrows -> [${Element}]
+  func forEach(_ body: (${Element}) throws -> Void) rethrows
+  func _copyToContiguousArray() -> ContiguousArray<${Element}>
+}
+
+public struct Any${Element}UnicodeView
+   : BidirectionalCollection, ForwardingWrapper {
+  public typealias Index = AnyUnicodeIndex
+  public typealias IndexDistance = Int64
+  public typealias Iterator = Any${Element}Iterator
+  public func makeIterator() -> Any${Element}Iterator {
+    return Any${Element}Iterator(base2.makeIterator())
+  }
+  
+  % # using element_only here because all the non-element stuff is handled in
+  % # one place above (where you see Element=None)
+  ${gyb.expand(
+      'ForwardCollectionAPIs.swift.gyb', base='base2',
+      element_only=True, Element=Element)}
+  
+  // `base` must have exactly this signature to match the needed constrained
+  // `ForwardingWrapper` extension, so we compute it and store the more refined
+  // existential in `base2`.
+  public var base: AnyUnicodeView_ { return base2 }
+  public var base2: Any${Element}UnicodeView_
+}
+
+/// Adapt any `UnicodeView` with elements of type `Element`
+extension Any${Element}UnicodeView {
+  /// An adaptor used to wrap `Base`
+  public struct Adapter<Base_: UnicodeView>
+  : Any${Element}UnicodeView_, BidirectionalCollectionWrapper  
+  where Base_.Iterator.Element == ${Element} {
+    public typealias IndexDistance = Int64
+    public typealias Index = AnyUnicodeIndex_
+    public typealias Base = Base_
+    public var base: Base
+  }
+
+  /// Creates an instance that wraps `base`.
+  public init<Base: UnicodeView>(_ base: Base)
+  where Base.Iterator.Element == ${Element} {
+    self.base2 = Adapter(base: base)
+  }
+}
+
+extension Any${Element}UnicodeView : UnicodeView {}
+
+//===----------------------------------------------------------------------===//
+
+% end
 
