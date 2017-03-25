@@ -448,7 +448,6 @@ extension ObjectIdentifier {
 //===--- Tests ------------------------------------------------------------===//
 //===----------------------------------------------------------------------===//
 
-print(MemoryLayout<String>.size)
 
 var suite = TestSuite("AnyUnicode")
 
@@ -461,80 +460,10 @@ let sample = "abcdefghijklmnopqrstuvwxyz\n"
   + "  ๏ แผ่นดินฮั่นเสื่อมโทรมแสนสังเวช  พระปกเกศกองบู๊กู้ขึ้นใหม่\n"
   + "ᚻᛖ ᚳᚹᚫᚦ ᚦᚫᛏ ᚻᛖ ᛒᚢᛞᛖ ᚩᚾ ᚦᚫᛗ ᛚᚪᚾᛞᛖ ᚾᚩᚱᚦᚹᛖᚪᚱᛞᚢᛗ ᚹᛁᚦ ᚦᚪ ᚹᛖᛥᚫ"
 
-/*
-suite.test("basics") {
-  let x = AnyUInt16UnicodeView.ZeroExtender(base: Array(3...7) as [UInt16])
-  let y = AnyUInt16UnicodeView.ZeroExtender(base: Array(3...7) as [UInt8])
-  expectTrue(x.elementsEqual(y))
+suite.test("MemoryLayout") {
+  expectEqual(8, MemoryLayout<String>.size)
+  expectEqual(8, MemoryLayout<String>.stride)
 }
-
-
-suite.test("AnyStringContents/_UTF16StringStorage") {
-
-  let s = AnyStringContents(_UTF16StringStorage(sample.utf16))
-  
-  expectEqual(
-    AnyCodeUnits.ZeroExtender<_UTF16StringStorage>.self,
-    type(of: s.codeUnits.base))
-  expectEqualSequence(sample.utf16.map { numericCast($0) }, s.codeUnits)
-  
-  expectEqual(
-    AnyUInt16UnicodeView.ZeroExtender<_UTF16StringStorage>.self,
-    type(of: s.utf16.base))
-  expectEqualSequence(sample.utf16, s.utf16)
-
-  expectEqual(
-    AnyUnicodeScalars.Eraser<_UTF16StringStorage.UnicodeScalarView>.self,
-    type(of: s.unicodeScalars.base))
-  expectEqualSequence(sample.unicodeScalars, s.unicodeScalars)
-}
-
-suite.test("AnyStringContents/_UTF8StringStorage") {
-
-  let s = AnyStringContents(_UTF8StringStorage(sample.utf8))
-  
-  expectEqual(
-    AnyCodeUnits.ZeroExtender<_UTF8StringStorage>.self,
-    type(of: s.codeUnits.base))
-  expectEqualSequence(sample.utf8.lazy.map { numericCast($0) }, s.codeUnits)
-  
-  expectEqual(
-    AnyUInt16UnicodeView.Eraser<
-      _UnicodeViews<_UTF8StringStorage.SubSequence, UTF8>.TranscodedView<UTF16>
-    >.self,
-    type(of: s.utf16.base))  
-  expectEqualSequence(sample.utf16, s.utf16)
-  
-  expectEqual(
-    AnyUnicodeScalars.Eraser<_UTF8StringStorage.UnicodeScalarView>.self,
-    type(of: s.unicodeScalars.base))
-  expectEqualSequence(sample.unicodeScalars, s.unicodeScalars)
-}
-
-suite.test("AnyStringContents/_Latin1StringStorage") {
-  let s = AnyStringContents(_Latin1StringStorage(latin1Sample.unicodeScalars.map {
-        numericCast($0.value)
-      }))
-  
-  expectEqual(
-    AnyCodeUnits.ZeroExtender<_Latin1StringStorage>.self,
-    type(of: s.codeUnits.base))  
-  expectEqualSequence(latin1Sample.utf16.map { numericCast($0) }, s.codeUnits)
-
-  expectEqual(
-    AnyUInt16UnicodeView.ZeroExtender<_Latin1StringStorage>.self,
-    type(of: s.utf16.base))
-  expectEqualSequence(latin1Sample.utf16, s.utf16)
-  
-  expectEqual(
-    AnyUnicodeScalars.Eraser<
-      OnePerCodeUnit<_Latin1StringStorage.UnicodeScalarView>
-    >.self,
-    type(of: s.unicodeScalars.base))
-  expectEqualSequence(latin1Sample.unicodeScalars, s.unicodeScalars)
-}
-*/
-
 
 suite.test("Latin1.smoke") {
   var latin1Sample = String(
