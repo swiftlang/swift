@@ -30,6 +30,7 @@ protected:
   CanGenericSignature CurGenericSignature;
   ModuleDecl *Mod = nullptr;
   const DeclContext *DeclCtx = nullptr;
+  GenericEnvironment *GenericEnv = nullptr;
 
   /// Optimize out protocol names if a type only conforms to one protocol.
   bool OptimizeProtocolNames = true;
@@ -108,8 +109,9 @@ public:
                                              Type FromType, Type ToType,
                                              ModuleDecl *Module);
 
-  std::string mangleTypeForDebugger(Type decl, const DeclContext *DC);
-  
+  std::string mangleTypeForDebugger(Type decl, const DeclContext *DC,
+                                    GenericEnvironment *GE);
+
   std::string mangleDeclType(const ValueDecl *decl);
   
   std::string mangleObjCRuntimeName(const NominalTypeDecl *Nominal);
