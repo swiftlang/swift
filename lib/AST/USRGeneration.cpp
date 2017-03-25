@@ -147,6 +147,8 @@ bool ide::printDeclUSR(const ValueDecl *D, raw_ostream &OS) {
     return true; // Ignore.
   if (D->getModuleContext()->isBuiltinModule())
     return true; // Ignore.
+  if (isa<ModuleDecl>(D))
+    return true; // Ignore.
 
   ValueDecl *VD = const_cast<ValueDecl *>(D);
 
@@ -207,6 +209,12 @@ bool ide::printDeclUSR(const ValueDecl *D, raw_ostream &OS) {
   }
 
   if (!D->hasInterfaceType())
+    return true;
+
+  // Invalid code.
+  if (D->getInterfaceType().findIf([](Type t) -> bool {
+        return t->is<ModuleType>();
+      }))
     return true;
 
   // FIXME: mangling 'self' in destructors crashes in mangler.
