@@ -188,20 +188,27 @@ extension String {
 // This allows us to subclass an Objective-C class and use the fast Swift
 // memory allocator.
 @objc @_swift_native_objc_runtime_base(_SwiftNativeNSStringBase)
-public class _SwiftNativeNSString {}
+// FIXME: change open back to final once the string prototype is incorporated
+// into the standard library.
+open class _SwiftNativeNSString {}
 
+
+/// Core requirements that should be implemented by any performant NSString
+/// subclass.
 @objc
-public protocol _NSStringCore :
-    _NSCopying, _NSFastEnumeration {
-
-  // The following methods should be overridden when implementing an
-  // NSString subclass.
-
+public protocol _NSStringCore : _NSCopying {
   func length() -> Int
 
   func characterAtIndex(_ index: Int) -> UInt16
 
   // We also override the following methods for efficiency.
+  func _fastCharacterContents() -> UnsafeMutablePointer<UInt16>?
+
+  // WARNING: Before you implement this as anything other than “return nil,”
+  // see https://github.com/apple/swift/pull/3151#issuecomment-285583557
+  func _fastCStringContents(
+    _ nullTerminationRequired: Int8
+  ) -> UnsafePointer<CChar>?
 }
 
 /// An `NSString` built around a slice of contiguous Swift `String` storage.
@@ -250,6 +257,13 @@ public final class _NSContiguousString : _SwiftNativeNSString {
   @objc
   func _fastCharacterContents() -> UnsafeMutablePointer<UInt16>? {
     return _core.elementWidth == 2 ? _core.startUTF16 : nil
+  }
+
+  @objc
+  func _fastCStringContents(
+    _ nullTerminationRequired: Int8
+  ) -> UnsafePointer<CChar>? {
+    return nil
   }
 
   //

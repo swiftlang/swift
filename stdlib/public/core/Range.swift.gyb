@@ -697,6 +697,116 @@ public func ..< <Bound>(
   return CountableRange(uncheckedBounds: (lower: minimum, upper: maximum))
 }
 
+extension Comparable {
+  public func clamped(to r: ClosedRange<Self>) -> Self {
+    return self < r.lowerBound ? r.lowerBound
+         : self > r.upperBound ? r.upperBound
+         : self
+  }
+}
+
+//===--- One-sided ranges -------------------------------------------------===//
+// Thanks to Joe Groff for the technique
+public enum UnboundedRange_ {
+  public static postfix func ... (_: UnboundedRange_) -> () { fatalError("uncallable") }
+}
+public typealias UnboundedRange = (UnboundedRange_)->()
+
+extension _Indexable {
+  public subscript(_: UnboundedRange) -> SubSequence {
+    return self[startIndex..<endIndex]
+  }
+}
+
+extension _MutableIndexable {
+  public subscript(_: UnboundedRange) -> SubSequence {
+    get {
+      return self[startIndex...]
+    }
+    set {
+      self[startIndex...] = newValue
+    }
+  }
+}
+
+prefix operator ..<
+public struct PartialRangeUpTo<T: Comparable> {
+  public init(_ upperBound: T) { self.upperBound = upperBound }
+  public let upperBound: T
+}
+extension Comparable {
+  public static prefix func ..<(x: Self) -> PartialRangeUpTo<Self> {
+    return PartialRangeUpTo(x)
+  }
+}
+extension _Indexable {
+  public subscript(r: PartialRangeUpTo<Index>) -> SubSequence {
+    return self[self.startIndex..<r.upperBound]
+  }
+}
+extension _MutableIndexable {
+  public subscript(r: PartialRangeUpTo<Index>) -> SubSequence {
+    get {
+      return self[self.startIndex..<r.upperBound]
+    }
+    set {
+      self[self.startIndex..<r.upperBound] = newValue
+    }
+  }
+}
+
+prefix operator ...
+public struct PartialRangeThrough<T: Comparable> {
+  public init(_ upperBound: T) { self.upperBound = upperBound }
+  public let upperBound: T
+}
+extension Comparable {
+  public static prefix func ...(x: Self) -> PartialRangeThrough<Self> {
+    return PartialRangeThrough(x)
+  }
+}
+extension _Indexable {
+  public subscript(r: PartialRangeThrough<Index>) -> SubSequence {
+    return self[self.startIndex...r.upperBound]
+  }
+}
+extension _MutableIndexable {
+  public subscript(r: PartialRangeThrough<Index>) -> SubSequence {
+    get {
+      return self[self.startIndex...r.upperBound]
+    }
+    set {
+      self[self.startIndex...r.upperBound] = newValue
+    }
+  }
+}
+
+postfix operator ...
+public struct PartialRangeFrom<T: Comparable> {
+  public init(_ lowerBound: T) { self.lowerBound = lowerBound }
+  public let lowerBound: T
+}
+extension Comparable {
+  public static postfix func ...(x: Self) -> PartialRangeFrom<Self> {
+    return PartialRangeFrom(x)
+  }
+}
+extension _Indexable {
+  public subscript(r: PartialRangeFrom<Index>) -> SubSequence {
+    return self[r.lowerBound..<self.endIndex]
+  }
+}
+extension _MutableIndexable {
+  public subscript(r: PartialRangeFrom<Index>) -> SubSequence {
+    get {
+      return self[r.lowerBound..<self.endIndex]
+    }
+    set {
+      self[r.lowerBound..<self.endIndex] = newValue
+    }
+  }
+}
+
 // swift-3-indexing-model: this is not really a proper rename
 @available(*, unavailable, renamed: "IndexingIterator")
 public struct RangeGenerator<Bound> {}

@@ -9,8 +9,6 @@
 
 // Test case submitted to project by https://github.com/tmu (Teemu Kurppa)
 
-extension String : RangeReplaceableCollection {}
-
 func f<S : RangeReplaceableCollection>(_ seq: S) -> S {
     return S() + seq
 }

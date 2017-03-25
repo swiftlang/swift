@@ -335,6 +335,12 @@ extension UnicodeScalar {
   }
 }
 
+extension UnicodeScalar {
+  static var replacementCharacter: UnicodeScalar {
+    return UnicodeScalar(_unchecked: 0xFFFD)
+  }
+}
+
 extension UInt8 {
   /// Construct with value `v.value`.
   ///

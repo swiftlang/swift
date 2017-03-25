@@ -19,6 +19,7 @@ set(SWIFTLIB_ESSENTIAL
   ### PLEASE KEEP THIS LIST IN ALPHABETICAL ORDER ###
   # Some files can't be sorted alphabetically, see notes in the list below.
   Algorithm.swift
+  AnyUnicode.swift
   ArrayBody.swift
   ArrayBuffer.swift
   ArrayBufferProtocol.swift
@@ -29,6 +30,8 @@ set(SWIFTLIB_ESSENTIAL
   AssertCommon.swift
   BidirectionalCollection.swift
   Bool.swift
+  BoundedBufferReference.swift
+  BoundedCapacity.swift
   BridgeObjectiveC.swift
   BridgeStorage.swift
   Builtin.swift
@@ -39,6 +42,7 @@ set(SWIFTLIB_ESSENTIAL
   CollectionAlgorithms.swift.gyb
   Comparable.swift
   CompilerProtocols.swift
+  ContiguouslyStored.swift
   ClosedRange.swift
   ContiguousArrayBuffer.swift
   CString.swift
@@ -51,6 +55,7 @@ set(SWIFTLIB_ESSENTIAL
   ErrorType.swift
   Existential.swift
   Filter.swift.gyb
+  FixedArray.swift
   FixedPoint.swift.gyb
   FlatMap.swift
   Flatten.swift.gyb
@@ -66,6 +71,7 @@ set(SWIFTLIB_ESSENTIAL
   HashedCollectionsAnyHashableExtensions.swift
   Hashing.swift
   HeapBuffer.swift
+  ICU.swift
   ImplicitlyUnwrappedOptional.swift
   Index.swift
   Indices.swift.gyb
@@ -123,13 +129,18 @@ set(SWIFTLIB_ESSENTIAL
   StringLegacy.swift
   StringRangeReplaceableCollection.swift.gyb
   StringIndexConversions.swift
+  StringStorage.swift
   StringUnicodeScalarView.swift
   StringUTF16.swift
   StringUTF8.swift
   SwiftNativeNSArray.swift
+  TranscodedView.swift
   UnavailableStringAPIs.swift.gyb
+  UnboundCapacity.swift
   Unicode.swift
+  Unicode2.swift
   UnicodeScalar.swift
+  UnicodeViews.swift
   UnicodeTrie.swift.gyb
   Unmanaged.swift
   UnsafeBitMap.swift
@@ -165,6 +176,7 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
   list(APPEND swift_core_link_flags "-all_load")
   list(APPEND swift_core_framework_depends Foundation)
   list(APPEND swift_core_framework_depends CoreFoundation)
+  list(APPEND swift_core_private_link_libraries -licucore)
 else()
   # With the GNU linker the equivalent of -all_load is to tell the linker
   # --whole-archive before the archive and --no-whole-archive after (without

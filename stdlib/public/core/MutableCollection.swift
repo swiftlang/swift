@@ -329,6 +329,19 @@ public protocol MutableCollection : _MutableIndexable, Collection {
   // <rdar://problem/21933004> Restore the signature of
   // _withUnsafeMutableBufferPointerIfSupported() that mentions
   // UnsafeMutableBufferPointer
+  
+  /// If there exists a contiguous memory buffer containing all elements in this
+  /// `Collection`, returns the result of calling `body` on that buffer.
+  ///
+  /// - Returns: the result of calling `body`, or `nil` if no such buffer
+  ///   exists.
+  ///
+  /// - Note: implementors should ensure that the lifetime of the memory
+  ///   persists throughout this call, typically by using
+  ///   `withExtendedLifetime(self)`.
+  func withExistingUnsafeMutableBuffer<R>(
+    _ body: (UnsafeMutableBufferPointer<Iterator.Element>) throws -> R
+  ) rethrows -> R?
 }
 
 // TODO: swift-3-indexing-model - review the following
@@ -337,9 +350,18 @@ extension MutableCollection {
   public mutating func _withUnsafeMutableBufferPointerIfSupported<R>(
     _ body: (UnsafeMutablePointer<Iterator.Element>, Int) throws -> R
   ) rethrows -> R? {
+    return try withExistingUnsafeMutableBuffer {
+      try body($0.baseAddress, $0.count)
+    }
+  }
+
+  public func withExistingUnsafeMutableBuffer<R>(
+    _ body: (UnsafeMutableBufferPointer<Iterator.Element>) throws -> R
+  ) rethrows -> R? {
     return nil
   }
 
+  
   /// Accesses a contiguous subrange of the collection's elements.
   ///
   /// The accessed slice uses the same indices for the same elements as the
@@ -371,6 +393,36 @@ extension MutableCollection {
     set {
       _writeBackMutableSlice(&self, bounds: bounds, slice: newValue)
     }
+  }
+}
+
+extension MutableCollection {
+  /// Copies elements from `source` into `self`, starting at the beginning of
+  /// each.
+  ///
+  /// - Returns:
+  ///
+  ///   - `limit`: the first index in `self` that was not copied into, or
+  ///     `endIndex` if all elements were assigned.
+  ///
+  ///   - `remainder`: the subsequence of source that didn't fit into `self`, 
+  ///     or `source[endIndex...]` if all elements fit.
+  @discardableResult
+  public mutating func copy<Source: Collection>(from source: Source)
+  -> (limit: Index, remainder: Source.SubSequence)
+  where Source.SubSequence : Collection,
+  Source.SubSequence.Iterator.Element == Iterator.Element,
+  Source.SubSequence == Source.SubSequence.SubSequence {
+    // This method should be optimizable for segmented collections
+    var r = source[source.startIndex..<source.endIndex]
+    var i: Index = startIndex
+    while i != endIndex {
+      guard let e = r.popFirst()
+      else { return (limit: i, remainder: r) }
+      self[i] = e
+      i = index(after: i)
+    }
+    return (limit: endIndex, remainder: r)
   }
 }
 

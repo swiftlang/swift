@@ -10,10 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-// `String` does not conform to `RangeReplaceableCollection`, but provides a
-// similar API.
-
-extension String {
+extension String : RangeReplaceableCollection {
   /// The index type for subscripting a string.
   public typealias Index = CharacterView.Index
 

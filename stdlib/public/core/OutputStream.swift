@@ -518,7 +518,7 @@ internal struct _Stdout : TextOutputStream {
       defer { _fixLifetime(string) }
 
       _swift_stdlib_fwrite_stdout(
-        UnsafePointer(asciiBuffer.baseAddress!),
+        UnsafePointer(asciiBuffer.baseAddress),
         asciiBuffer.count,
         1)
       return

@@ -647,6 +647,30 @@ public protocol Collection : _Indexable, Sequence {
   /// type.
   associatedtype Iterator = IndexingIterator<Self>
 
+  /// A type that provides access to sub-structure of the collection
+  associatedtype Segments : _Indexable = EmptyCollection<Self>
+  // where Segments : Collection, Segments.Iterator.Element : Collection,
+  // Segments.Iterator.Element.Iterator.Element == Iterator.Element
+
+  /// The collection's sub-structure, if any
+  ///
+  /// Anything for which a complete traversal can be most easily written using a
+  /// nested loop should provide segments.
+  var segments : Segments? { get }
+
+  /// If there exists a contiguous memory buffer containing all elements in this
+  /// `Collection`, returns the result of calling `body` on that buffer.
+  ///
+  /// - Returns: the result of calling `body`, or `nil` if no such buffer
+  ///   exists.
+  ///
+  /// - Note: implementors should ensure that the lifetime of the memory
+  ///   persists throughout this call, typically by using
+  ///   `withExtendedLifetime(self)`.
+  func withExistingUnsafeBuffer<R>(
+    _ body: (UnsafeBufferPointer<Iterator.Element>) throws -> R
+  ) rethrows -> R?
+  
   // FIXME(ABI)#179 (Type checker): Needed here so that the `Iterator` is properly deduced from
   // a custom `makeIterator()` function.  Otherwise we get an
   // `IndexingIterator`. <rdar://problem/21539115>
@@ -1283,6 +1307,20 @@ extension Collection where SubSequence == Self {
   }
 }
 
+/// Default implementation of Segments for collections that don't expose any
+/// sub-structure.
+extension Collection where Segments == EmptyCollection<Self> {
+  public var segments : Segments? { return Segments() }
+}
+
+extension Collection {
+  public func withExistingUnsafeBuffer<R>(
+    _ body: (UnsafeBufferPointer<Iterator.Element>) throws -> R
+  ) rethrows -> R? {
+    return nil // by default, collections have no contiguous storage.
+  }
+}
+
 /// Default implementations of core requirements
 extension Collection {
   /// A Boolean value indicating whether the collection is empty.
@@ -1865,6 +1903,15 @@ extension Collection {
     _ preprocess: () throws -> R
   ) rethrows -> R? {
     return try preprocess()
+  }
+}
+
+extension Collection {
+  public func index<I: SignedInteger>(atOffset offset: I) -> Index {
+    return index(startIndex, offsetBy: offset^)
+  }
+  public func offset(of i: Index) -> IndexDistance {
+    return distance(from: startIndex, to: i)
   }
 }
 

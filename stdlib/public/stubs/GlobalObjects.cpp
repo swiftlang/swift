@@ -51,6 +51,20 @@ swift::_SwiftEmptyArrayStorage swift::_swiftEmptyArrayStorage = {
 };
 
 
+swift::_SwiftEmptyStringStorage swift::_swiftEmptyStringStorage = {
+  // HeapObject header;
+  {
+    &CLASS_METADATA_SYM(s18_EmptyArrayStorage), // isa pointer
+  },
+
+  // _SwiftStringBodyStorage body;
+  {
+    0, // int count;
+    0, // int capacity;
+    0xFF // uint8 flags;
+  }
+};
+
 
 swift::_SwiftEmptyDictionaryStorage swift::_swiftEmptyDictionaryStorage = {
   // HeapObject header;

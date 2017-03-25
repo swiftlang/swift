@@ -333,9 +333,11 @@ extension _ArrayBuffer {
   @_versioned
   internal var count: Int {
     @inline(__always)
+    @_silgen_name("asdsdzxczxasdadasas")
     get {
       return _fastPath(_isNative) ? _native.count : _nonNative.count
     }
+    @_silgen_name("asdfdsfdsdasdadasas")
     set {
       _sanityCheck(_isNative, "attempting to update count of Cocoa array")
       _native.count = newValue
@@ -443,8 +445,7 @@ extension _ArrayBuffer {
         var refCopy = self
         refCopy.replaceSubrange(
           i..<(i + 1),
-          with: 1,
-          elementsOf: CollectionOfOne(newValue))
+          with: CollectionOfOne(newValue))
       }
     }
   }
@@ -479,8 +480,10 @@ extension _ArrayBuffer {
       "Array is bridging an opaque NSArray; can't get a pointer to the elements"
     )
     defer { _fixLifetime(self) }
-    return try body(UnsafeMutableBufferPointer(
-      start: firstElementAddressIfContiguous, count: count))
+    return try body(
+      !_isNative ? UnsafeMutableBufferPointer()
+      : UnsafeMutableBufferPointer(
+        start: firstElementAddressIfContiguous!, count: count))
   }
   
   /// An object that keeps the elements stored in this buffer alive.

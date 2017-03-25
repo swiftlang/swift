@@ -28,7 +28,7 @@ public func os_log(
   message.withUTF8Buffer { (buf: UnsafeBufferPointer<UInt8>) in
     // Since dladdr is in libc, it is safe to unsafeBitCast
     // the cstring argument type.
-    buf.baseAddress!.withMemoryRebound(
+    buf.baseAddress.withMemoryRebound(
       to: CChar.self, capacity: buf.count
     ) { str in
       withVaList(args) { valist in

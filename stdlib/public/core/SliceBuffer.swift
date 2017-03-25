@@ -84,27 +84,27 @@ internal struct _SliceBuffer<Element>
     return owner
   }
 
-  /// Replace the given subRange with the first newCount elements of
+  /// Replace the given subRange with the first insertCount elements of
   /// the given collection.
   ///
   /// - Precondition: This buffer is backed by a uniquely-referenced
-  ///   `_ContiguousArrayBuffer` and
-  ///   `insertCount <= numericCast(newValues.count)`.
+  ///   `_ContiguousArrayBuffer`
   @_versioned
-  internal mutating func replaceSubrange<C>(
+  internal mutating func replaceSubrangeInPlace<C>(
     _ subrange: Range<Int>,
-    with insertCount: Int,
-    elementsOf newValues: C
-  ) where C : Collection, C.Iterator.Element == Element {
+    with newValues: C,
+    insertCount: Int) where C : Collection, C.Iterator.Element == Element {
+
+    // Goals: 
+    // * adjust subrange to match native storage
+    // * fix up slice bounds to reflect subrange change
 
     _invariantCheck()
-    _sanityCheck(insertCount <= numericCast(newValues.count))
 
     _sanityCheck(_hasNativeBuffer && isUniquelyReferenced())
 
-    let eraseCount = subrange.count
-    let growth = insertCount - eraseCount
     let oldCount = count
+    let growth = insertCount - subrange.count
 
     var native = nativeBuffer
     let hiddenElementCount = firstElementAddress - native.firstElementAddress
@@ -113,10 +113,10 @@ internal struct _SliceBuffer<Element>
 
     let start = subrange.lowerBound - startIndex + hiddenElementCount
     let end = subrange.upperBound - startIndex + hiddenElementCount
-    native.replaceSubrange(
+    native.replaceSubrangeInPlace(
       start..<end,
-      with: insertCount,
-      elementsOf: newValues)
+      with: newValues,
+      insertCount: insertCount)
 
     self.endIndex = self.startIndex + oldCount + growth
 
@@ -171,10 +171,10 @@ internal struct _SliceBuffer<Element>
         let myCount = count
 
         if _slowPath(backingCount > myCount + offset) {
-          native.replaceSubrange(
+          native.replaceSubrangeInPlace(
             (myCount+offset)..<backingCount,
-            with: 0,
-            elementsOf: EmptyCollection())
+            with: EmptyCollection(),
+            insertCount: 0)
         }
         _invariantCheck()
         return native

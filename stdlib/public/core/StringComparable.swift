@@ -55,7 +55,7 @@ extension String {
   func _compareASCII(_ rhs: String) -> Int {
     var compare = Int(_swift_stdlib_memcmp(
       self._core.startASCII, rhs._core.startASCII,
-      min(self._core.count, rhs._core.count)))
+      Swift.min(self._core.count, rhs._core.count)))
     if compare == 0 {
       compare = self._core.count - rhs._core.count
     }
