@@ -20,7 +20,7 @@ extension _UText {
   mutating func withBuffer<R>(
     _ body: (UnsafeMutableBufferPointer<_UChar>)->R
   ) -> R {
-    // Currently we are using the p, q, and r fields to get 12 UWords of
+    // Currently we are using the p, q, and r fields to get 12 UChars of
     // contiguous storage on 64-bit machines and 6 on 32-bit.  It's not much.
     return withUnsafeMutablePointer(to: &p) { bufferStart in
       let rawBufferStart = UnsafeRawPointer(bufferStart)
@@ -41,6 +41,8 @@ extension _UText {
   mutating func validate() {
     let base = self.withBuffer { $0.baseAddress }
     _debugPrecondition(chunkContents == base, "UText moved!")
+    _debugPrecondition(chunkNativeStart <= chunkNativeLimit, "Invalid native range")
+    _debugPrecondition(chunkLength >= 0, "Negative chunkLength")
   }
 
   mutating func setup() {

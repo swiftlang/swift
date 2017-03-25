@@ -505,49 +505,47 @@ extension _UnicodeViews : _UTextable {
     
     u.withBuffer { buffer in
       if forward {
-        let chunkSource = _parsedSuffix(fromOffset: nativeTargetIndex)
+        let scalars = _parsedSuffix(fromOffset: nativeTargetIndex)
 
-        for (i, scalar) in zip(chunkSource.indices, chunkSource) {
-          let newChunkLength = u.chunkLength + scalar.utf16.count^          
+        for scalar in scalars {
           // don't overfill the buffer
-          if newChunkLength > buffer.count^ { break }
+          if u.chunkLength + scalar.utf16.count^ > buffer.count^ { break }
           for unit in scalar.utf16 {
             // _debugLog("# unit: \(String(unit, radix: 16))")
             buffer[u.chunkLength^] = unit
             u.chunkLength += 1
           }
-          u.chunkNativeLimit = (i.base + i.count^)^
+          u.chunkNativeLimit += scalar.count^
         }
       }
       else {
-        let chunkSource
+        let scalars
           = _parsedSlice(nativeTargetIndex, codeUnits.prefix(upTo:))
 
         // Transcode the source in reverse, filling the buffer forward
-        for (i, scalar) in zip(
-          chunkSource.indices.reversed(), chunkSource.reversed()) {
-          
-          let newChunkLength = u.chunkLength + scalar.utf16.count^
+        for scalar in scalars.reversed() {
           // don't overfill the buffer
-          if newChunkLength > buffer.count^ { break }
+          if u.chunkLength + scalar.utf16.count^ > buffer.count^ { break }
           for unit in scalar.utf16.reversed() {
             buffer[u.chunkLength^] = unit
             u.chunkLength += 1
           }
-          u.chunkNativeStart = i.base^
-          u.chunkOffset = u.chunkLength
+          u.chunkNativeStart -= scalar.count^
         }
+        u.chunkOffset = u.chunkLength
         // Reverse the buffer contents to get everything in the right order.
         var b = buffer // copy due to https://bugs.swift.org/browse/SR-3782
         b[..<buffer.index(atOffset: u.chunkLength)].reverse()
       }
     }
     // _debugLog("_access filled buffer, u = \(u)")
+
+    u.validate()
     
     // WORKAROUND? <rdar://30979421>: UBreakIterator attempts to index UText
     // out-of-range if we don't treat requests for empty chunks as
     // out-of-bounds.
-        return u.chunkLength > 0
+    return u.chunkLength > 0
   }
   
   internal func _extract(
@@ -594,14 +592,15 @@ extension _UnicodeViews : _UTextable {
     UnsafeMutablePointer(mutating: u)[0].validate()
     
     if u[0].chunkOffset == 0 { return u[0].chunkNativeStart }
-    
-    let chunkSource = _parsedSuffix(fromOffset: u[0].chunkNativeStart)
-    var chunkOffset = 0
-    
-    for i in chunkSource.indices {
-      chunkOffset += chunkSource[i].utf16.count
-      if chunkOffset == u[0].chunkOffset^ {
-        return (i.base + i.count^)^
+
+    // Advance scalar by scalar in the source until we find the offset
+    let scalars = _parsedSuffix(fromOffset: u[0].chunkNativeStart)
+    var utf16Offset = 0, nativeOffset = 0
+    for s in scalars {
+      nativeOffset += s.count^
+      utf16Offset += s.utf16.count^
+      if utf16Offset == u[0].chunkOffset^ {
+        return u[0].chunkNativeStart + nativeOffset^
       }
     }
     fatalError("supposed to be unreachable")
