@@ -1,7 +1,25 @@
+<unknown>:0: error: symbol '_T04test11PrivateInit33_E9A47EC66624A116D16B83DEC9D5EE5DLLVMa' (type metadata accessor for test.(PrivateInit in _E9A47EC66624A116D16B83DEC9D5EE5D)) is in generated IR file, but not in TBD file
+<unknown>:0: error: symbol '_T04test11PrivateInit33_E9A47EC66624A116D16B83DEC9D5EE5DLLVMn' (nominal type descriptor for test.(PrivateInit in _E9A47EC66624A116D16B83DEC9D5EE5D)) is in generated IR file, but not in TBD file
+<unknown>:0: error: symbol '_T04test11PrivateInit33_E9A47EC66624A116D16B83DEC9D5EE5DLLVN' (type metadata for test.(PrivateInit in _E9A47EC66624A116D16B83DEC9D5EE5D)) is in generated IR file, but not in TBD file
+<unknown>:0: error: symbol '_T04test11PrivateInit33_E9A47EC66624A116D16B83DEC9D5EE5DLLVWV' (value witness table for test.(PrivateInit in _E9A47EC66624A116D16B83DEC9D5EE5D)) is in generated IR file, but not in TBD file
 <unknown>:0: error: symbol '_T04test12InternalInitVMa' (type metadata accessor for test.InternalInit) is in generated IR file, but not in TBD file
 <unknown>:0: error: symbol '_T04test12InternalInitVMn' (nominal type descriptor for test.InternalInit) is in generated IR file, but not in TBD file
 <unknown>:0: error: symbol '_T04test12InternalInitVN' (type metadata for test.InternalInit) is in generated IR file, but not in TBD file
 <unknown>:0: error: symbol '_T04test12InternalInitVWV' (value witness table for test.InternalInit) is in generated IR file, but not in TBD file
+<unknown>:0: error: symbol '_T04test14PrivateMethods33_E9A47EC66624A116D16B83DEC9D5EE5DLLVMa' (type metadata accessor for test.(PrivateMethods in _E9A47EC66624A116D16B83DEC9D5EE5D)) is in generated IR file, but not in TBD file
+<unknown>:0: error: symbol '_T04test14PrivateMethods33_E9A47EC66624A116D16B83DEC9D5EE5DLLVMn' (nominal type descriptor for test.(PrivateMethods in _E9A47EC66624A116D16B83DEC9D5EE5D)) is in generated IR file, but not in TBD file
+<unknown>:0: error: symbol '_T04test14PrivateMethods33_E9A47EC66624A116D16B83DEC9D5EE5DLLVN' (type metadata for test.(PrivateMethods in _E9A47EC66624A116D16B83DEC9D5EE5D)) is in generated IR file, but not in TBD file
+<unknown>:0: error: symbol '_T04test14PrivateMethods33_E9A47EC66624A116D16B83DEC9D5EE5DLLVWV' (value witness table for test.(PrivateMethods in _E9A47EC66624A116D16B83DEC9D5EE5D)) is in generated IR file, but not in TBD file
+<unknown>:0: error: symbol '_T04test14PrivateNothing33_E9A47EC66624A116D16B83DEC9D5EE5DLLVMa' (type metadata accessor for test.(PrivateNothing in _E9A47EC66624A116D16B83DEC9D5EE5D)) is in generated IR file, but not in TBD file
+<unknown>:0: error: symbol '_T04test14PrivateNothing33_E9A47EC66624A116D16B83DEC9D5EE5DLLVMn' (nominal type descriptor for test.(PrivateNothing in _E9A47EC66624A116D16B83DEC9D5EE5D)) is in generated IR file, but not in TBD file
+<unknown>:0: error: symbol '_T04test14PrivateNothing33_E9A47EC66624A116D16B83DEC9D5EE5DLLVN' (type metadata for test.(PrivateNothing in _E9A47EC66624A116D16B83DEC9D5EE5D)) is in generated IR file, but not in TBD file
+<unknown>:0: error: symbol '_T04test14PrivateNothing33_E9A47EC66624A116D16B83DEC9D5EE5DLLVWV' (value witness table for test.(PrivateNothing in _E9A47EC66624A116D16B83DEC9D5EE5D)) is in generated IR file, but not in TBD file
+<unknown>:0: error: symbol '_T04test14PrivateStatics33_E9A47EC66624A116D16B83DEC9D5EE5DLLV10privateLetSivZ' (static test.(PrivateStatics in _E9A47EC66624A116D16B83DEC9D5EE5D).privateLet : Swift.Int) is in generated IR file, but not in TBD file
+<unknown>:0: error: symbol '_T04test14PrivateStatics33_E9A47EC66624A116D16B83DEC9D5EE5DLLV10privateVarSivZ' (static test.(PrivateStatics in _E9A47EC66624A116D16B83DEC9D5EE5D).privateVar : Swift.Int) is in generated IR file, but not in TBD file
+<unknown>:0: error: symbol '_T04test14PrivateStatics33_E9A47EC66624A116D16B83DEC9D5EE5DLLVMa' (type metadata accessor for test.(PrivateStatics in _E9A47EC66624A116D16B83DEC9D5EE5D)) is in generated IR file, but not in TBD file
+<unknown>:0: error: symbol '_T04test14PrivateStatics33_E9A47EC66624A116D16B83DEC9D5EE5DLLVMn' (nominal type descriptor for test.(PrivateStatics in _E9A47EC66624A116D16B83DEC9D5EE5D)) is in generated IR file, but not in TBD file
+<unknown>:0: error: symbol '_T04test14PrivateStatics33_E9A47EC66624A116D16B83DEC9D5EE5DLLVN' (type metadata for test.(PrivateStatics in _E9A47EC66624A116D16B83DEC9D5EE5D)) is in generated IR file, but not in TBD file
+<unknown>:0: error: symbol '_T04test14PrivateStatics33_E9A47EC66624A116D16B83DEC9D5EE5DLLVWV' (value witness table for test.(PrivateStatics in _E9A47EC66624A116D16B83DEC9D5EE5D)) is in generated IR file, but not in TBD file
 <unknown>:0: error: symbol '_T04test15InternalMethodsVMa' (type metadata accessor for test.InternalMethods) is in generated IR file, but not in TBD file
 <unknown>:0: error: symbol '_T04test15InternalMethodsVMn' (nominal type descriptor for test.InternalMethods) is in generated IR file, but not in TBD file
 <unknown>:0: error: symbol '_T04test15InternalMethodsVN' (type metadata for test.InternalMethods) is in generated IR file, but not in TBD file
@@ -10,6 +28,8 @@
 <unknown>:0: error: symbol '_T04test15InternalNothingVMn' (nominal type descriptor for test.InternalNothing) is in generated IR file, but not in TBD file
 <unknown>:0: error: symbol '_T04test15InternalNothingVN' (type metadata for test.InternalNothing) is in generated IR file, but not in TBD file
 <unknown>:0: error: symbol '_T04test15InternalNothingVWV' (value witness table for test.InternalNothing) is in generated IR file, but not in TBD file
+<unknown>:0: error: symbol '_T04test15InternalStaticsV10privateLet33_E9A47EC66624A116D16B83DEC9D5EE5DLLSivZ' (static test.InternalStatics.(privateLet in _E9A47EC66624A116D16B83DEC9D5EE5D) : Swift.Int) is in generated IR file, but not in TBD file
+<unknown>:0: error: symbol '_T04test15InternalStaticsV10privateVar33_E9A47EC66624A116D16B83DEC9D5EE5DLLSivZ' (static test.InternalStatics.(privateVar in _E9A47EC66624A116D16B83DEC9D5EE5D) : Swift.Int) is in generated IR file, but not in TBD file
 <unknown>:0: error: symbol '_T04test15InternalStaticsV11internalLetSivZ' (static test.InternalStatics.internalLet : Swift.Int) is in generated IR file, but not in TBD file
 <unknown>:0: error: symbol '_T04test15InternalStaticsV11internalVarSivZ' (static test.InternalStatics.internalVar : Swift.Int) is in generated IR file, but not in TBD file
 <unknown>:0: error: symbol '_T04test15InternalStaticsVMa' (type metadata accessor for test.InternalStatics) is in generated IR file, but not in TBD file
@@ -18,6 +38,10 @@
 <unknown>:0: error: symbol '_T04test15InternalStaticsVWV' (value witness table for test.InternalStatics) is in generated IR file, but not in TBD file
 <unknown>:0: error: symbol '_T04test16PublicPropertiesV9publicLetSivfi' (test.PublicProperties.(publicLet : Swift.Int).(variable initialization expression)) is in generated IR file, but not in TBD file
 <unknown>:0: error: symbol '_T04test16PublicPropertiesV9publicVarSivfi' (test.PublicProperties.(publicVar : Swift.Int).(variable initialization expression)) is in generated IR file, but not in TBD file
+<unknown>:0: error: symbol '_T04test17PrivateProperties33_E9A47EC66624A116D16B83DEC9D5EE5DLLVMa' (type metadata accessor for test.(PrivateProperties in _E9A47EC66624A116D16B83DEC9D5EE5D)) is in generated IR file, but not in TBD file
+<unknown>:0: error: symbol '_T04test17PrivateProperties33_E9A47EC66624A116D16B83DEC9D5EE5DLLVMn' (nominal type descriptor for test.(PrivateProperties in _E9A47EC66624A116D16B83DEC9D5EE5D)) is in generated IR file, but not in TBD file
+<unknown>:0: error: symbol '_T04test17PrivateProperties33_E9A47EC66624A116D16B83DEC9D5EE5DLLVN' (type metadata for test.(PrivateProperties in _E9A47EC66624A116D16B83DEC9D5EE5D)) is in generated IR file, but not in TBD file
+<unknown>:0: error: symbol '_T04test17PrivateProperties33_E9A47EC66624A116D16B83DEC9D5EE5DLLVWV' (value witness table for test.(PrivateProperties in _E9A47EC66624A116D16B83DEC9D5EE5D)) is in generated IR file, but not in TBD file
 <unknown>:0: error: symbol '_T04test18InternalPropertiesVMa' (type metadata accessor for test.InternalProperties) is in generated IR file, but not in TBD file
 <unknown>:0: error: symbol '_T04test18InternalPropertiesVMn' (nominal type descriptor for test.InternalProperties) is in generated IR file, but not in TBD file
 <unknown>:0: error: symbol '_T04test18InternalPropertiesVN' (type metadata for test.InternalProperties) is in generated IR file, but not in TBD file
