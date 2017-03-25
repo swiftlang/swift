@@ -213,6 +213,7 @@ extension String.Content : _UnicodeContent {
 }
 
 extension _BoundedBufferReference {
+  /// Construct the concatenation of head, middle, and tail
   init<Head : Collection, Middle : Collection, Tail : Collection>(
     joining head: Head, _ middle: Middle, _ tail: Tail
   )
@@ -246,6 +247,10 @@ extension _BoundedBufferReference {
 
 extension _BoundedBufferReference
 where Index == Int, IndexDistance == Int, SubSequence.IndexDistance == Int {
+  /// If there is sufficient capacity, replaces the elements bounded by `target`
+  /// with the contents of `replacement` and returns true.
+  ///
+  /// Returns `false` otherwise.
   public func tryToReplaceSubrange<C: Collection>(
     _ target: Range<Index>, with replacement: C
   ) -> Bool
