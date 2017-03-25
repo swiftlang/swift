@@ -1727,11 +1727,12 @@ void ConstraintSystem::shrink(Expr *expr) {
     ///
     /// \param collection The type of the collection container.
     ///
-    /// \returns ErrorType on failure, properly constructed type otherwise.
+    /// \returns Null type, ErrorType or UnresolvedType on failure,
+    /// properly constructed type otherwise.
     Type extractElementType(Type collection) {
       auto &ctx = CS.getASTContext();
-      if (collection.isNull() || collection->hasError())
-        return ErrorType::get(ctx);
+      if (!collection || collection->hasError())
+        return collection;
 
       auto base = collection.getPointer();
       auto isInvalidType = [](Type type) -> bool {
@@ -1743,19 +1744,19 @@ void ConstraintSystem::shrink(Expr *expr) {
       if (auto array = dyn_cast<ArraySliceType>(base)) {
         auto elementType = array->getBaseType();
         // If base type is invalid let's return error type.
-        return isInvalidType(elementType) ? ErrorType::get(ctx) : elementType;
+        return elementType;
       }
 
       // Map or Set or any other associated collection type.
       if (auto boundGeneric = dyn_cast<BoundGenericType>(base)) {
         if (boundGeneric->hasUnresolvedType())
-          return ErrorType::get(ctx);
+          return boundGeneric;
 
         llvm::SmallVector<TupleTypeElt, 2> params;
         for (auto &type : boundGeneric->getGenericArgs()) {
           // One of the generic arguments in invalid or unresolved.
           if (isInvalidType(type))
-            return ErrorType::get(ctx);
+            return type;
 
           params.push_back(type);
         }
@@ -1767,7 +1768,7 @@ void ConstraintSystem::shrink(Expr *expr) {
         return TupleType::get(params, ctx);
       }
 
-      return ErrorType::get(ctx);
+      return Type();
     }
 
     bool isSuitableCollection(TypeRepr *collectionTypeRepr) {
@@ -1848,7 +1849,9 @@ void ConstraintSystem::shrink(Expr *expr) {
         auto elementType = extractElementType(contextualType);
         // If we couldn't deduce element type for the collection, let's
         // not attempt to solve it.
-        if (elementType->hasError())
+        if (!elementType ||
+            elementType->hasError() ||
+            elementType->hasUnresolvedType())
           return;
 
         contextualType = elementType;

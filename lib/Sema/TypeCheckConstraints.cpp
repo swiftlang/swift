@@ -1315,7 +1315,7 @@ void CleanupIllFormedExpressionRAII::doIt(Expr *expr, ASTContext &Context) {
       // If the type of this expression has a type variable or is invalid,
       // overwrite it with ErrorType.
       Type type = expr->getType();
-      if (!type || type->hasTypeVariable())
+      if (type && type->hasTypeVariable())
         expr->setType(ErrorType::get(context));
 
       return { true, expr };
