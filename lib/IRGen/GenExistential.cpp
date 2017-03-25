@@ -356,7 +356,7 @@ public:
     auto layout = getLayout();
 
     // Use copy-on-write existentials?
-    if (IGF.IGM.getSILModule().getOptions().UseCOWExistentials) {
+    if (false && IGF.IGM.getSILModule().getOptions().UseCOWExistentials) {
       auto fn = getInitWithCopyBoxedOpaqueExistentialBufferFunction(
           IGF.IGM, getLayout(), src.getAddress()->getType());
       auto call =
@@ -383,7 +383,7 @@ public:
     auto layout = getLayout();
 
     // Use copy-on-write existentials?
-    if (IGF.IGM.getSILModule().getOptions().UseCOWExistentials) {
+    if (false && IGF.IGM.getSILModule().getOptions().UseCOWExistentials) {
       auto fn = getInitWithTakeBoxedOpaqueExistentialBufferFunction(
           IGF.IGM, getLayout(), src.getAddress()->getType());
       auto call =
