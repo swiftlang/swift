@@ -243,10 +243,7 @@ extension _BoundedBufferReference {
       assert(i2 == b2.endIndex, "Failed to consume input")
     }
   }
-}
 
-extension _BoundedBufferReference
-where Index == Int, IndexDistance == Int, SubSequence.IndexDistance == Int {
   /// If there is sufficient capacity, replaces the elements bounded by `target`
   /// with the contents of `replacement` and returns true.
   ///
@@ -255,10 +252,13 @@ where Index == Int, IndexDistance == Int, SubSequence.IndexDistance == Int {
     _ target: Range<Index>, with replacement: C
   ) -> Bool
   where C.Iterator.Element == Iterator.Element {
+    typealias D = IndexDistance
     let r = Counted(replacement)
-    let delta = numericCast(r.count) - self[target].count
-    if _fastPath(capacity >= self.count + delta) {
-      replaceSubrange(target, with: r)
+    let delta = numericCast(r.count) - numericCast(self[target].count) as D
+    if _fastPath(numericCast(capacity) as D >= self.count + delta) {
+      let start: Int = numericCast(offset(of: target.lowerBound))
+      let end: Int = numericCast(offset(of: target.upperBound))
+      replaceSubrange(start..<end, with: r)
       return true
     }
     return false
