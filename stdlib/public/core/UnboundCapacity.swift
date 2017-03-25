@@ -82,8 +82,20 @@ extension UnboundCapacity {
 
   /// Converts our contents into an array with at least the given
   /// capacity, and presents it to `body` for mutation.
+  //
+  // Michael NOTE: forwarding version added due to odd linker behavior. Linker
+  // couldn't find the version with a default argument. This is just for the
+  // prototype, we should remove and restore the default parameter.
+  //
+  // Michael NOTE: I'll also be dropping the use of this in favor of adding a
+  // withUnsafeMutableBufferPointer.
   internal mutating func withMutableArray<R>(
-    minCapacity: Int = 0,
+    body: (inout [Base.Iterator.Element]) throws->R
+  ) rethrows -> R {
+    return try withMutableArray(minCapacity: 0, body: body)
+  }
+  internal mutating func withMutableArray<R>(
+    minCapacity: Int,
     body: (inout [Base.Iterator.Element]) throws->R
   ) rethrows -> R {
     var result: [Base.Iterator.Element]
