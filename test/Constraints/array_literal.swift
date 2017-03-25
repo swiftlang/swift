@@ -146,7 +146,7 @@ func defaultToAny(i: Int, s: String) {
 }
 
 /// Check handling of 'nil'.
-func joinWithNil(s: String) {
+func joinWithNil<T>(s: String, a: Any, t: T) {
   let a1 = [s, nil]
   let _: Int = a1 // expected-error{{value of type '[String?]'}}
 
@@ -158,6 +158,36 @@ func joinWithNil(s: String) {
 
   let a4 = [nil, "hello"]
   let _: Int = a4 // expected-error{{value of type '[String?]'}}
+  
+  let a5 = [(s, s), nil]
+  let _: Int = a5 // expected-error{{value of type '[(String, String)?]'}}
+  
+  let a6 = [nil, (s, s)]
+  let _: Int = a6 // expected-error{{value of type '[(String, String)?]'}}
+  
+  let a7 = [("hello", "world"), nil]
+  let _: Int = a7 // expected-error{{value of type '[(String, String)?]'}}
+  
+  let a8 = [nil, ("hello", "world")]
+  let _: Int = a8 // expected-error{{value of type '[(String, String)?]'}}
+  
+  let a9 = [{ $0 * 2 }, nil]
+  let _: Int = a9 // expected-error{{value of type '[((Int) -> Int)?]'}}
+  
+  let a10 = [nil, { $0 * 2 }]
+  let _: Int = a10 // expected-error{{value of type '[((Int) -> Int)?]'}}
+  
+  let a11 = [a, nil]
+  let _: Int = a11 // expected-error{{value of type '[Any?]'}}
+  
+  let a12 = [nil, a]
+  let _: Int = a12 // expected-error{{value of type '[Any?]'}}
+  
+  let a13 = [t, nil]
+  let _: Int = a13 // expected-error{{value of type '[T?]'}}
+  
+  let a14 = [nil, t]
+  let _: Int = a14 // expected-error{{value of type '[T?]'}}
 }
 
 struct OptionSetLike : ExpressibleByArrayLiteral {

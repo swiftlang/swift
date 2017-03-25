@@ -1182,13 +1182,17 @@ static PotentialBindings getPotentialBindings(ConstraintSystem &cs,
       // overwrite the binding in place because the non-optional type
       // will fail to type-check against the nil-literal conformance.
       auto nominalBindingDecl = binding.BindingType->getAnyNominal();
-      if (!nominalBindingDecl) continue;
-      SmallVector<ProtocolConformance *, 2> conformances;
-      if (!nominalBindingDecl->lookupConformance(
-            cs.DC->getParentModule(),
-            cs.getASTContext().getProtocol(
-              KnownProtocolKind::ExpressibleByNilLiteral),
-            conformances)) {
+      bool conformsToExprByNilLiteral = false;
+      if (nominalBindingDecl) {
+        SmallVector<ProtocolConformance *, 2> conformances;
+        conformsToExprByNilLiteral = nominalBindingDecl->lookupConformance(
+                                       cs.DC->getParentModule(),
+                                       cs.getASTContext().getProtocol(
+                                         KnownProtocolKind::ExpressibleByNilLiteral),
+                                       conformances);
+      }
+
+      if (!conformsToExprByNilLiteral) {
         binding.BindingType = OptionalType::get(binding.BindingType);
       }
     }

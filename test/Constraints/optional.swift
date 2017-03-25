@@ -120,7 +120,7 @@ func testVoidOptional() {
   voidOptional(optNoop)
 }
 
-func testTernaryWithNil(b: Bool, s: String, i: Int) {
+func testTernaryWithNil<T>(b: Bool, s: String, i: Int, a: Any, t: T) {
   let t1 = b ? s : nil
   let _: Double = t1 // expected-error{{value of type 'String?'}}
   let t2 = b ? nil : i
@@ -129,6 +129,26 @@ func testTernaryWithNil(b: Bool, s: String, i: Int) {
   let _: Double = t3 // expected-error{{value of type 'String?'}}
   let t4 = b ? nil : 1
   let _: Double = t4 // expected-error{{value of type 'Int?'}}
+  let t5 = b ? (s, i) : nil
+  let _: Double = t5 // expected-error{{value of type '(String, Int)?}}
+  let t6 = b ? nil : (i, s)
+  let _: Double = t6 // expected-error{{value of type '(Int, String)?}}
+  let t7 = b ? ("hello", 1) : nil
+  let _: Double = t7 // expected-error{{value of type '(String, Int)?}}
+  let t8 = b ? nil : (1, "hello")
+  let _: Double = t8 // expected-error{{value of type '(Int, String)?}}
+  let t9 = b ? { $0 * 2 } : nil
+  let _: Double = t9 // expected-error{{value of type '((Int) -> Int)?}}
+  let t10 = b ? nil : { $0 * 2 }
+  let _: Double = t10 // expected-error{{value of type '((Int) -> Int)?}}
+  let t11 = b ? a : nil
+  let _: Double = t11 // expected-error{{value of type 'Any?'}}
+  let t12 = b ? nil : a
+  let _: Double = t12 // expected-error{{value of type 'Any?'}}
+  let t13 = b ? t : nil
+  let _: Double = t13 // expected-error{{value of type 'T?'}}
+  let t14 = b ? nil : t
+  let _: Double = t14 // expected-error{{value of type 'T?'}}
 }
 
 // inference with IUOs
