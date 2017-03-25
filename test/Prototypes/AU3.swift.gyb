@@ -12,31 +12,13 @@
 // RUN: rm -rf %t && mkdir -p %t && %gyb -DWORD_BITS=%target-ptrsize %s -o %t/out.swift
 // RUN: %line-directive %t/out.swift -- %target-build-swift %t/out.swift -o %t/a.out -Onone
 // RUN: %line-directive %t/out.swift -- %target-run %t/a.out
+// REQUIRES: executable_test
+
 %{
   import gyb
 }%
 
 import StdlibUnittest
-
-//===--- Adapt Swift.UnicodeView to this file's UnicodeView protocol ------===//
-struct AnyUnicodeIndexAdapter<BaseView: UnicodeView>
-: AnyUnicodeIndex_, ForwardingWrapper, Comparable {
-  var base: BaseView.Index
-  var encodedOffset: Int64 {
-    return BaseView.encodedOffset(of: base)
-  }
-}
-
-extension UnicodeView {
-  public func _wrap(_ i: Index) -> AnyUnicodeIndex_ {
-    return AnyUnicodeIndexAdapter<Self>(base: i)
-  }
-  public func _unwrap(_ i: AnyUnicodeIndex_) -> Index {
-    return (i as? AnyUnicodeIndexAdapter<Self>).map { $0.base }
-    ?? index(atEncodedOffset: i.encodedOffset)
-  }
-}
-//===----------------------------------------------------------------------===//
 
 //===--- Unicode ----------------------------------------------------------===//
 /// Collections of `Character` that are also `_UnicodeContent`.
