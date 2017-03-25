@@ -22,7 +22,8 @@ import StdlibUnittest
 
 //===--- Unicode ----------------------------------------------------------===//
 /// Collections of `Character` that are also `_UnicodeContent`.
-public protocol Unicode : BidirectionalCollection
+public protocol Unicode
+  : BidirectionalCollection, BidirectionalCollectionWrapper
 // where Iterator.Element == Character
 {
   // poor man's constraint on Iterator.Element
@@ -30,6 +31,10 @@ public protocol Unicode : BidirectionalCollection
   
   associatedtype Content : _UnicodeContent
   var content: Content { get }
+}
+
+extension Unicode {
+  public var base: Content.CharacterView { return content.characters }
 }
 
 class UnicodeContentBox : FactoryInitializable {
@@ -118,14 +123,10 @@ public struct String {
   public var content: Content
 }
 
-extension String : Unicode, BidirectionalCollectionWrapper {
+extension String : Unicode {
   public typealias Base = AnyCharacterUnicodeView
   public typealias Index = AnyCharacterUnicodeView.Index
   public typealias IndexDistance = AnyCharacterUnicodeView.IndexDistance
-  
-  public var base: Base {
-    return content.characters
-  }
 }
 
 %{
