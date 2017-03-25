@@ -552,6 +552,7 @@ class ParseContext(object):
 
 _default_line_directive = '// ###sourceLocation'
 
+
 class ExecutionContext(object):
 
     """State we pass around during execution of a template"""
@@ -578,10 +579,8 @@ class ExecutionContext(object):
                 elif '\n' in text:
                     i = text.find('\n')
                     self.result_text.append(text[:i + 1])
-                    self.last_file_line = (
-                        self.last_file_line[0], self.last_file_line[1] + 1)
                     # and try again
-                    self.append_text(text[i + 1:], file, line)
+                    self.append_text(text[i + 1:], file, line + 1)
                     return
 
         self.result_text.append(text)
@@ -746,6 +745,7 @@ class Code(ASTNode):
             ) + '\n' + indent + '}'
         return s + self.format_children(indent)
 
+
 def expand(filename, line_directive=_default_line_directive, **local_bindings):
     r"""Return the contents of the givepn template file, executed with the given
     local bindings.
@@ -753,10 +753,16 @@ def expand(filename, line_directive=_default_line_directive, **local_bindings):
     >>> from tempfile import NamedTemporaryFile
     >>> f = NamedTemporaryFile()
     >>> f.write(
-    ... '''---
+    ... r'''---
     ... % for i in range(int(x)):
     ... a pox on ${i} for epoxy
     ... % end
+    ... ${120 +
+    ... 
+    ...    3}
+    ... abc
+    ... ${"w\nx\nX\ny"}
+    ... z
     ... ''')
     >>> f.flush()
     >>> result = expand(
@@ -770,7 +776,16 @@ def expand(filename, line_directive=_default_line_directive, **local_bindings):
     a pox on 0 for epoxy
     //#sourceLocation(file: "dummy.file", line: 3)
     a pox on 1 for epoxy
-
+    //#sourceLocation(file: "dummy.file", line: 5)
+    123
+    //#sourceLocation(file: "dummy.file", line: 8)
+    abc
+    w
+    x
+    X
+    y
+    //#sourceLocation(file: "dummy.file", line: 10)
+    z
     """
     with open(filename) as f:
         t = parse_template(filename, f.read())
@@ -781,6 +796,7 @@ def expand(filename, line_directive=_default_line_directive, **local_bindings):
                 t, line_directive=line_directive, **local_bindings)
         finally:
             os.chdir(d)
+
 
 def parse_template(filename, text=None):
     r"""Return an AST corresponding to the given template file.
