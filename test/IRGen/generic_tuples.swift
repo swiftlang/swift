@@ -83,13 +83,13 @@ func lump3<T>(_ x: T) -> (T, T, T) { return (x,x,x) }
 // CHECK: define hidden swiftcc i64 @_T014generic_tuples5lump4x_SixtxlF(%swift.opaque* noalias nocapture, %swift.opaque* noalias nocapture, %swift.opaque* noalias nocapture, %swift.type* %T)
 func lump4<T>(_ x: T) -> (T, Int, T) { return (x,0,x) }
 
-// CHECK: define hidden swiftcc i64 @_T014generic_tuples6unlumpS2i_xxtlF(i64, %swift.opaque* noalias nocapture, %swift.opaque* noalias nocapture, %swift.type* %T)
+// CHECK: define hidden swiftcc i64 @_T014generic_tuples6unlumpS2i_xxt_tlF(i64, %swift.opaque* noalias nocapture, %swift.opaque* noalias nocapture, %swift.type* %T)
 func unlump<T>(_ x: (Int, T, T)) -> Int { return x.0 }
-// CHECK: define hidden swiftcc void @_T014generic_tuples7unlump1xSi_xxtlF(%swift.opaque* noalias nocapture sret, i64, %swift.opaque* noalias nocapture, %swift.opaque* noalias nocapture, %swift.type* %T)
+// CHECK: define hidden swiftcc void @_T014generic_tuples7unlump1xSi_xxt_tlF(%swift.opaque* noalias nocapture sret, i64, %swift.opaque* noalias nocapture, %swift.opaque* noalias nocapture, %swift.type* %T)
 func unlump1<T>(_ x: (Int, T, T)) -> T { return x.1 }
-// CHECK: define hidden swiftcc void @_T014generic_tuples7unlump2xx_SixtlF(%swift.opaque* noalias nocapture sret, %swift.opaque* noalias nocapture, i64, %swift.opaque* noalias nocapture, %swift.type* %T)
+// CHECK: define hidden swiftcc void @_T014generic_tuples7unlump2xx_Sixt_tlF(%swift.opaque* noalias nocapture sret, %swift.opaque* noalias nocapture, i64, %swift.opaque* noalias nocapture, %swift.type* %T)
 func unlump2<T>(_ x: (T, Int, T)) -> T { return x.0 }
-// CHECK: define hidden swiftcc i64 @_T014generic_tuples7unlump3Six_SixtlF(%swift.opaque* noalias nocapture, i64, %swift.opaque* noalias nocapture, %swift.type* %T)
+// CHECK: define hidden swiftcc i64 @_T014generic_tuples7unlump3Six_Sixt_tlF(%swift.opaque* noalias nocapture, i64, %swift.opaque* noalias nocapture, %swift.type* %T)
 func unlump3<T>(_ x: (T, Int, T)) -> Int { return x.1 }
 
 
