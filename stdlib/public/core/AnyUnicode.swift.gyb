@@ -65,6 +65,16 @@ public protocol _UnicodeContent {
 #endif
 }
 
+extension _UnicodeContent where UTF16View.Iterator.Element == UTF16.CodeUnit {
+  public func isLatin1() -> Bool {
+    return isKnownLatin1 || !utf16.contains { $0 > 0xFF }
+  }
+
+  public func isASCII() -> Bool {
+    return isKnownASCII || !utf16.contains { $0 > 0x7f }
+  }
+}
+
 /// Types that present Unicode content in a given encoding.
 ///
 /// Typical models are the buffers that provide storage for String

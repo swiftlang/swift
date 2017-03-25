@@ -37,6 +37,11 @@ public protocol UnicodeView : BidirectionalCollection {
   static func encodedOffset(of: Index) -> Int64
 }
 
+extension UnicodeView {
+  /// Constructs a copy of other
+  init(_ other: Self) { self = other }
+}
+
 /// A UnicodeView that is already using AnyUnicodeIndex has trivial interchange
 /// with encoded offsets.
 extension UnicodeView where Index == AnyUnicodeIndex {
