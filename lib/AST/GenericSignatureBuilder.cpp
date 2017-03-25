@@ -4092,6 +4092,13 @@ void GenericSignatureBuilder::enumerateRequirements(llvm::function_ref<
       // If this equivalence class is bound to a concrete type, equate the
       // anchor with a concrete type.
       if (Type concreteType = rep->getConcreteType()) {
+        // If the parent of this anchor is also in the equivalence class,
+        // don't create a requirement... it's covered by the "parent"
+        // relationship.
+        if (!archetype->isGenericParam() &&
+            archetype->getParent()->getRepresentative() == rep)
+          continue;
+
         auto source =
           knownAnchor->concreteTypeSource
             ? knownAnchor->concreteTypeSource
