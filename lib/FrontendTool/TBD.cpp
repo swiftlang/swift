@@ -74,7 +74,9 @@ static bool validateSymbolSet(DiagnosticEngine &diags,
     auto value = nameValue.getValue();
     if (auto GV = dyn_cast<llvm::GlobalValue>(value)) {
       // Is this a symbol that should be listed?
-      if (!GV->isDeclaration() && GV->hasExternalLinkage()) {
+      auto externallyVisible =
+          GV->hasExternalLinkage() && !GV->hasHiddenVisibility();
+      if (!GV->isDeclaration() && externallyVisible) {
         // Is it listed?
         if (!symbols.erase(name))
           irNotTBD.push_back(name);

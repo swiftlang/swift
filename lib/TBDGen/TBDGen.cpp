@@ -102,6 +102,9 @@ public:
     visitMembers(NTD);
   }
   void visitClassDecl(ClassDecl *CD) {
+    if (isPrivateDecl(CD))
+      return;
+
     auto declaredType = CD->getDeclaredType()->getCanonicalType();
 
     auto tmlcv =
@@ -131,15 +134,15 @@ public:
 }
 
 void TBDGenVisitor::visitVarDecl(VarDecl *VD) {
+  if (isPrivateDecl(VD))
+    return;
+
   // statically/globally stored variables have some special handling.
   if (VD->hasStorage() &&
       (VD->isStatic() || VD->getDeclContext()->isModuleScopeContext())) {
     // The actual variable has a symbol, even when private.
     Mangle::ASTMangler mangler;
     addSymbol(mangler.mangleEntity(VD, false));
-
-    if (isPrivateDecl(VD))
-      return;
 
     auto accessor = SILDeclRef(VD, SILDeclRef::Kind::GlobalAccessor);
     addSymbol(accessor.mangle());
