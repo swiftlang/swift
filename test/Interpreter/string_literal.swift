@@ -18,21 +18,26 @@ private struct Expressible<T: _ExpressibleByBuiltinStringLiteral>
 private func string(_ characters: UInt32...) -> String {
   return String(characters.map { Character(string($0)!) })
 }
+private func expressible<T:_ExpressibleByBuiltinStringLiteral>(
+  _ literal: Expressible<T>,
+  as type: T.Type) -> String where T: CustomStringConvertible {
+  return literal.value.description
+}
 
 private let b = string(0x62)
 private let 🇦🇺 = string(0x1F1E6, 0x1F1FA)
 private let abcde = string(0x61, 0x62, 0x63, 0x64, 0x65)
 
 testSuite.test("String literal type") {
-  expectEqual(("b" as Expressible<String>).value.description, b)
-  expectEqual(("🇦🇺" as Expressible<String>).value.description, 🇦🇺)
-  expectEqual(("abcde" as Expressible<String>).value.description, abcde)
+  expectEqual(expressible("b", as: String.self), b)
+  expectEqual(expressible("🇦🇺", as: String.self), 🇦🇺)
+  expectEqual(expressible("abcde", as: String.self), abcde)
 }
 
 testSuite.test("StaticString literal type") {
-  expectEqual(("b" as Expressible<StaticString>).value.description, b)
-  expectEqual(("🇦🇺" as Expressible<StaticString>).value.description, 🇦🇺)
-  expectEqual(("abcde" as Expressible<StaticString>).value.description, abcde)
+  expectEqual(expressible("b", as: StaticString.self), b)
+  expectEqual(expressible("🇦🇺", as: StaticString.self), 🇦🇺)
+  expectEqual(expressible("abcde", as: StaticString.self), abcde)
 }
 
 runAllTests()

@@ -19,27 +19,32 @@ private struct Expressible
 private func string(_ characters: UInt32...) -> String {
   return String(characters.map { Character(extendedGraphemeCluster($0)!) })
 }
+private func expressible<T:_ExpressibleByBuiltinExtendedGraphemeClusterLiteral>(
+  _ literal: Expressible<T>,
+  as type: T.Type) -> String where T: CustomStringConvertible {
+  return literal.value.description
+}
 
 private let b = string(0x62)
 private let 🇦🇺 = string(0x1F1E6, 0x1F1FA)
 private let 각 = string(0x1100, 0x1161, 0x11A8)
 
 testSuite.test("String literal type") {
-  expectEqual(("b" as Expressible<String>).value.description, b)
-  expectEqual(("🇦🇺" as Expressible<String>).value.description, 🇦🇺)
-  expectEqual(("각" as Expressible<String>).value.description, 각)
+  expectEqual(expressible("b", as: String.self), b)
+  expectEqual(expressible("🇦🇺", as: String.self), 🇦🇺)
+  expectEqual(expressible("각", as: String.self), 각)
 }
 
 testSuite.test("StaticString literal type") {
-  expectEqual(("b" as Expressible<StaticString>).value.description, b)
-  expectEqual(("🇦🇺" as Expressible<StaticString>).value.description, 🇦🇺)
-  expectEqual(("각" as Expressible<StaticString>).value.description, 각)
+  expectEqual(expressible("b", as: StaticString.self), b)
+  expectEqual(expressible("🇦🇺", as: StaticString.self), 🇦🇺)
+  expectEqual(expressible("각", as: StaticString.self), 각)
 }
 
 testSuite.test("Character literal type") {
-  expectEqual(("b" as Expressible<Character>).value.description, b)
-  expectEqual(("🇦🇺" as Expressible<Character>).value.description, 🇦🇺)
-  expectEqual(("각" as Expressible<Character>).value.description, 각)
+  expectEqual(expressible("b", as: Character.self), b)
+  expectEqual(expressible("🇦🇺", as: Character.self), 🇦🇺)
+  expectEqual(expressible("각", as: Character.self), 각)
 }
 
 runAllTests()
