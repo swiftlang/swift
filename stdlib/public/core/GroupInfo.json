@@ -38,6 +38,7 @@
   "Collection": [
     "Collection.swift",
     "ContiguouslyStored.swift",
+    "Counted.swift",
     "FixedArray.swift",
     "BidirectionalCollection.swift",
     "RandomAccessCollection.swift",

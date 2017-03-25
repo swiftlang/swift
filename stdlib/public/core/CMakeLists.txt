@@ -38,6 +38,7 @@ set(SWIFTLIB_ESSENTIAL
   BuiltinMath.swift.gyb
   Character.swift
   CocoaArray.swift
+  Counted.swift.gyb
   Collection.swift
   CollectionAlgorithms.swift.gyb
   Comparable.swift

@@ -105,40 +105,6 @@ class UnicodeContentBox : FactoryInitializable {
   init(fromSubclass: ()) {}
 }
 
-//===--- Counted ----------------------------------------------------------===//
-% for Bidirectional in '', 'Bidirectional':
-/// Adds a stored `count` to the given `Base` collection so that the cost of
-/// counting it is not repeated.
-public struct ${Bidirectional}Counted<Base_: ${Bidirectional}Collection> {
-  public let base: Base_
-  public let count: Base.IndexDistance
-}
-
-extension ${Bidirectional}Counted : ${Bidirectional}CollectionWrapper {
-  public typealias Base = Base_
-  public typealias Index = Base.Index
-  public typealias IndexDistance = Base.IndexDistance
-}
-
-extension ${Bidirectional}Counted : ${Bidirectional}Collection {
-  public init(_ base: Base) {
-    self.base = base
-    self.count = base.count
-  }
-  
-  public init(_ base: Base, count: Base.IndexDistance) {
-    _debugPrecondition(
-      count == base.count, "misstated count of base collection")
-    self.base = base
-    self.count = count
-  }
-  
-  public var underestimatedCount: Int {
-    return numericCast(count)
-  }
-}
-% end
-
 //===--- String -----------------------------------------------------------===//
 public struct String {
   public struct Content {
