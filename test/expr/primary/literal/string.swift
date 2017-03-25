@@ -15,16 +15,14 @@ struct CustomUnicodeScalar<T: _ExpressibleByBuiltinUnicodeScalarLiteral>
   }
 }
 
-func verify<T: _ExpressibleByBuiltinStringLiteral>(
-  stringLiteral value: CustomString<T>,
-  with: T.Type) {
+func verify<T>(stringLiteral value: CustomString<T>, with: T.Type) {
 }
-func verify<T: _ExpressibleByBuiltinExtendedGraphemeClusterLiteral>(
+func verify<T>(
   extendedGraphemeClusterLiteral value: CustomExtendedGraphemeCluster<T>,
   with: T.Type) {
 }
-func verify<T: _ExpressibleByBuiltinUnicodeScalarLiteral>(
-  unicodeScalarLiteral value: CustomUnicodeScalar<T>,
+func verify<T>(
+  unicodeScalarLiteral value: CustomUnicodeScalar<T>, 
   with: T.Type) {
 }
 
