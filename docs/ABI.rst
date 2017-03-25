@@ -1031,10 +1031,10 @@ Types
 
   throws ::= 'K'                             // 'throws' annotation on function types
 
-  type-list ::= list-type '_' list-type* 'd'?  // list of types with optional variadic specifier
+  type-list ::= list-type '_' list-type*     // list of types
   type-list ::= empty-list
 
-  list-type ::= type identifier? 'z'?        // type with optional label and inout convention
+  list-type ::= type identifier? 'z'? 'd'?   // type with optional label, inout convention and variadic specifier
 
   METATYPE-REPR ::= 't'                      // Thin metatype representation
   METATYPE-REPR ::= 'T'                      // Thick metatype representation

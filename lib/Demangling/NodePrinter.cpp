@@ -965,17 +965,27 @@ void NodePrinter::print(NodePointer pointer, bool asContext, bool suppressType) 
     Printer << ")";
     return;
   }
-  case Node::Kind::TupleElement:
-    if (pointer->getNumChildren() == 1) {
-      NodePointer type = pointer->getChild(0);
+  case Node::Kind::TupleElement: {
+    unsigned Idx = 0;
+    bool isVariadic = false;
+    if (pointer->getNumChildren() >= 1 &&
+        pointer->getFirstChild()->getKind() == Node::Kind::VariadicMarker) {
+      isVariadic = true;
+      Idx++;
+    }
+    if (pointer->getNumChildren() == Idx + 1) {
+      NodePointer type = pointer->getChild(Idx);
       print(type);
-    } else if (pointer->getNumChildren() == 2) {
-      NodePointer id = pointer->getChild(0);
-      NodePointer type = pointer->getChild(1);
+    } else if (pointer->getNumChildren() == Idx + 2) {
+      NodePointer id = pointer->getChild(Idx);
+      NodePointer type = pointer->getChild(Idx + 1);
       print(id);
       print(type);
     }
+    if (isVariadic)
+      Printer << "...";
     return;
+  }
   case Node::Kind::TupleElementName:
     Printer << pointer->getText() << " : ";
     return;

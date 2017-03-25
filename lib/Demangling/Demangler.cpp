@@ -822,6 +822,7 @@ NodePointer Demangler::popTuple() {
     do {
       firstElem = (popNode(Node::Kind::FirstElementMarker) != nullptr);
       NodePointer TupleElmt = createNode(Node::Kind::TupleElement);
+      addChild(TupleElmt, popNode(Node::Kind::VariadicMarker));
       if (NodePointer Ident = popNode(Node::Kind::Identifier)) {
         TupleElmt->addChild(createNodeWithAllocatedText(
                               Node::Kind::TupleElementName, Ident->getText()),
