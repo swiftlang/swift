@@ -680,6 +680,7 @@ Type TypeChecker::applyUnboundGenericArguments(
   options -= TR_SILType;
   options -= TR_ImmediateFunctionInput;
   options -= TR_FunctionInput;
+  options -= TR_TypeAliasUnderlyingType;
   options -= TR_AllowUnavailableProtocol;
 
   assert(genericArgs.size() == decl->getGenericParams()->size() &&
@@ -820,6 +821,7 @@ static Type resolveTypeDecl(TypeChecker &TC, TypeDecl *typeDecl, SourceLoc loc,
 
   if (type->is<UnboundGenericType>() && !generic &&
       !options.contains(TR_AllowUnboundGenerics) &&
+      !options.contains(TR_TypeAliasUnderlyingType) &&
       !options.contains(TR_ResolveStructure)) {
     diagnoseUnboundGenericType(TC, type, loc);
     return ErrorType::get(TC.Context);
@@ -1357,12 +1359,17 @@ static Type resolveNestedIdentTypeComponent(
 
     // If there are generic arguments, apply them now.
     if (auto genComp = dyn_cast<GenericIdentTypeRepr>(comp)) {
-      memberType = TC.applyGenericArguments(
+      return TC.applyGenericArguments(
           memberType, typeDecl, comp->getIdLoc(), DC, genComp,
           options, resolver, unsatisfiedDependency);
-
-      // Propagate failure.
-      if (!memberType || memberType->hasError()) return memberType;
+    }
+ 
+    if (memberType->is<UnboundGenericType>() &&
+        !options.contains(TR_AllowUnboundGenerics) &&
+        !options.contains(TR_TypeAliasUnderlyingType) &&
+        !options.contains(TR_ResolveStructure)) {
+      diagnoseUnboundGenericType(TC, memberType, comp->getLoc());
+      return ErrorType::get(TC.Context);
     }
 
     // We're done.
@@ -1459,6 +1466,15 @@ static Type resolveNestedIdentTypeComponent(
     return ErrorType::get(TC.Context);
   }
 
+  if (options & TR_TypeAliasUnderlyingType) {
+    if (parentTy->is<UnboundGenericType>()) {
+      if (diagnoseErrors)
+        diagnoseUnboundGenericType(TC, parentTy, parentRange.End);
+
+      return ErrorType::get(TC.Context);
+    }
+  }
+
   if (options & TR_NonEnumInheritanceClauseOuterLayer) {
     auto protocolOrClass =
         memberType->is<ProtocolType>() || memberType->is<ClassType>();
@@ -1470,10 +1486,17 @@ static Type resolveNestedIdentTypeComponent(
   }
 
   // If there are generic arguments, apply them now.
-  if (auto genComp = dyn_cast<GenericIdentTypeRepr>(comp))
+  if (auto genComp = dyn_cast<GenericIdentTypeRepr>(comp)) {
     memberType = TC.applyGenericArguments(
         memberType, member, comp->getIdLoc(), DC, genComp,
         options, resolver, unsatisfiedDependency);
+  } else if (memberType->is<UnboundGenericType>() &&
+             !options.contains(TR_AllowUnboundGenerics) &&
+             !options.contains(TR_TypeAliasUnderlyingType) &&
+             !options.contains(TR_ResolveStructure)) {
+    diagnoseUnboundGenericType(TC, memberType, comp->getLoc());
+    memberType = ErrorType::get(TC.Context);
+  }
 
   // If we found a reference to an associated type or other member type that
   // was marked invalid, just return ErrorType to silence downstream errors.
@@ -1855,6 +1878,7 @@ Type TypeResolver::resolveType(TypeRepr *repr, TypeResolutionOptions options) {
       !isa<IdentTypeRepr>(repr)) {
     options -= TR_ImmediateFunctionInput;
     options -= TR_FunctionInput;
+    options -= TR_TypeAliasUnderlyingType;
   }
 
   bool isImmediateSetterNewValue = options.contains(TR_ImmediateSetterNewValue);
@@ -1985,6 +2009,7 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
           instanceOptions -= TR_SILType;
           instanceOptions -= TR_ImmediateFunctionInput;
           instanceOptions -= TR_FunctionInput;
+          instanceOptions -= TR_TypeAliasUnderlyingType;
 
           auto instanceTy = resolveType(base, instanceOptions);
           if (!instanceTy || instanceTy->hasError())
@@ -2172,6 +2197,7 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
   auto instanceOptions = options;
   instanceOptions -= TR_ImmediateFunctionInput;
   instanceOptions -= TR_FunctionInput;
+  instanceOptions -= TR_TypeAliasUnderlyingType;
 
   // If we didn't build the type differently above, we might have
   // a typealias pointing at a function type with the @escaping
@@ -2288,6 +2314,7 @@ Type TypeResolver::resolveASTFunctionType(FunctionTypeRepr *repr,
                                           FunctionType::ExtInfo extInfo) {
   options -= TR_ImmediateFunctionInput;
   options -= TR_FunctionInput;
+  options -= TR_TypeAliasUnderlyingType;
 
   Type inputTy = resolveType(repr->getArgsTypeRepr(),
                              options | TR_ImmediateFunctionInput);
@@ -2435,6 +2462,7 @@ Type TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,
                                           ParameterConvention callee) {
   options -= TR_ImmediateFunctionInput;
   options -= TR_FunctionInput;
+  options -= TR_TypeAliasUnderlyingType;
 
   bool hasError = false;
 
@@ -2700,6 +2728,7 @@ Type TypeResolver::resolveInOutType(InOutTypeRepr *repr,
   // Anything within the inout isn't a parameter anymore.
   options -= TR_ImmediateFunctionInput;
   options -= TR_FunctionInput;
+  options -= TR_TypeAliasUnderlyingType;
 
   Type ty = resolveType(cast<InOutTypeRepr>(repr)->getBase(), options);
   if (!ty || ty->hasError()) return ty;

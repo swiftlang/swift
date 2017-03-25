@@ -340,7 +340,7 @@ void IterativeTypeChecker::processResolveTypeDecl(
         typeAliasDecl->getGenericParams() == nullptr) {
       typeAliasDecl->setValidationStarted();
 
-      TypeResolutionOptions options;
+      TypeResolutionOptions options = TR_TypeAliasUnderlyingType;
       if (typeAliasDecl->getFormalAccess() <= Accessibility::FilePrivate)
         options |= TR_KnownNonCascadingDependency;
 

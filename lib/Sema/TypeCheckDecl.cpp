@@ -7103,7 +7103,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
 
     validateGenericTypeSignature(typeAlias);
 
-    TypeResolutionOptions options;
+    TypeResolutionOptions options = TR_TypeAliasUnderlyingType;
     if (typeAlias->getFormalAccess() <= Accessibility::FilePrivate)
       options |= TR_KnownNonCascadingDependency;
 
