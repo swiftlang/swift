@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 // RUN: rm -rf %t && mkdir -p %t && %gyb -DWORD_BITS=%target-ptrsize %s -o %t/out.swift
-// RUN: %line-directive %t/out.swift -- %target-build-swift %t/out.swift -o %t/a.out -Onone
+// RUN: %line-directive %t/out.swift -- %target-build-swift %t/out.swift -o %t/a.out -Onone -g
 // RUN: %line-directive %t/out.swift -- %target-run %t/a.out
 // REQUIRES: executable_test
 
@@ -112,15 +112,38 @@ class UnicodeContentBox : FactoryInitializable {
 
 //===--- String -----------------------------------------------------------===//
 public struct String {
+%{
+    allCases = [
+      ('utf16', '_UTF16StringStorage'),
+      ('latin1', '_Latin1StringStorage'),
+      ('any', 'UnicodeContentBox')
+    ]
+}%
   public struct Content {
     internal enum Representation {
-    case utf16(_UTF16StringStorage)
-    case latin1(_Latin1StringStorage)
-    case any(UnicodeContentBox)
+      % for tag, Payload in allCases:
+    case ${tag}(${Payload})
+      % end
     }
     internal var _rep: Representation
   }
   public var content: Content
+}
+
+/// Case accessors
+extension String.Content {
+  % for tag, Payload in allCases:
+  internal var _${tag}: ${Payload}? {
+    get {
+      if case .${tag}(let x) = _rep { return x }
+      return nil
+    }
+    set {
+      if let v = newValue { _rep = .${tag}(v) }
+      else if _${tag} != nil { self = String.Content() }
+    }
+  }
+  % end
 }
 
 extension String : Unicode {
@@ -181,7 +204,7 @@ extension String.Content : _UnicodeContent {
 
 extension Collection where Iterator.Element == UTF16.CodeUnit {
   internal func _isLatin1() -> Bool {
-    return self.max() ?? 0 <= 0xFF
+    return !self.contains { $0 > 0xFF }
   }
   internal var _low8Bits : LazyMapCollection<Self, UInt8> {
     return self.lazy.map { UInt8(truncatingBitPattern: $0) }
@@ -245,12 +268,13 @@ extension String : RangeReplaceableCollection {
     if replacement._isLatin1() && (
       content.isKnownLatin1 || head._isLatin1() && tail._isLatin1()
     ) {
-      content._rep = .latin1(
-        _Latin1StringStorage(
-          joining: head._low8Bits, replacement._low8Bits, tail._low8Bits))
+      let s = _Latin1StringStorage(
+        joining: head._low8Bits, replacement._low8Bits, tail._low8Bits)
+      s.isKnownASCII = !s.contains { $0 > 0x7f }
+      content._latin1 = s
     }
     else {
-      content._rep = .utf16(_UTF16StringStorage(joining: head, replacement, tail))
+      content._utf16 = _UTF16StringStorage(joining: head, replacement, tail)
     }
   }
   
@@ -318,29 +342,89 @@ suite.test("MemoryLayout") {
   expectEqual(8, MemoryLayout<String>.stride)
 }
 
-suite.test("Latin1.smoke") {
-  var latin1Sample = String(
+suite.test("UTF16/smoke") {
+  let s0 = sample
+
+  var s = String()
+  s.append(contentsOf: s0)
+  expectFalse(s.content.isKnownLatin1)
+  expectFalse(s.content.isLatin1())
+  expectFalse(s.content.isKnownASCII)
+  expectFalse(s.content.isASCII())
+  
+  s.replaceSubrange(
+    s.index(atOffset: 3)..<s.index(atOffset: 10), with: "BRAK")
+  expectEqual(
+    "abcBRAKklmnopqrstuvw", Swift.String(s[..<s.index(atOffset: 20)]))
+  expectFalse(s.content.isKnownLatin1)
+  expectFalse(s.content.isLatin1())
+  expectFalse(s.content.isKnownASCII)
+  expectFalse(s.content.isASCII())
+
+  let s1 = s
+  // ensure that we modify a non-unique buffer this time
+  defer { _fixLifetime(s1) } 
+  
+  s.replaceSubrange(
+    s.index(atOffset: 5)..<s.index(atOffset: 6),
+    with: "---bl\u{f8}\u{f8}g---"
+  )
+  expectEqual(
+    "abcBR---bl\u{f8}\u{f8}g---Kklmnopqr",
+    Swift.String(s[..<s.index(atOffset: 25)]))
+  expectFalse(s.content.isKnownLatin1)
+  expectFalse(s.content.isLatin1())
+  expectFalse(s.content.isKnownASCII)
+  expectFalse(s.content.isASCII())
+}
+
+suite.test("Latin1/smoke") {
+  var s = String(
     sample.unicodeScalars.lazy.filter { $0.value < 0x100 }.map {
       Character($0)
     })
+  expectNotNil(s.content._latin1)
+  expectTrue(s.content.isKnownLatin1)
+  expectTrue(s.content.isLatin1())
+  expectEqual(!s.content.utf16.contains { $0 > 0x7f }, s.content.isKnownASCII)
+  expectEqual(!s.content.utf16.contains { $0 > 0x7f }, s.content.isASCII())
   
-  latin1Sample.replaceSubrange(
-    latin1Sample.index(atOffset: 3)..<latin1Sample.index(atOffset: 10),
-    with: "BRAK"
+  s.replaceSubrange(s.index(atOffset: 3)..<s.index(atOffset: 10), with: "BRAK")
+  expectEqual(
+    "abcBRAKklmnopqrstuvw", Swift.String(s[..<s.index(atOffset: 20)]))
+  expectTrue(s.content.isKnownLatin1)
+  expectTrue(s.content.isLatin1())
+  expectTrue(s.content.isKnownASCII)
+  expectTrue(s.content.isASCII())
+  
+  let s1 = s
+  // ensure that we modify a non-unique buffer this time
+  defer { _fixLifetime(s1) } 
+  
+  s.replaceSubrange(
+    s.index(atOffset: 5)..<s.index(atOffset: 6),
+    with: "---bl\u{f8}\u{f8}g---"
   )
+  expectNotNil(s.content._latin1)
+  expectEqual(
+    "abcBR---bl\u{f8}\u{f8}g---Kklmnopqr",
+    Swift.String(s[..<s.index(atOffset: 25)]))
+  expectTrue(s.content.isKnownLatin1)
+  expectTrue(s.content.isLatin1())
+  expectFalse(s.content.isKnownASCII)
+  expectFalse(s.content.isASCII())
   
-  let s1 = latin1Sample
-  
-  latin1Sample.replaceSubrange(
-    latin1Sample.index(atOffset: 5)..<latin1Sample.index(atOffset: 6),
-    with: "---bloog---"
-  )
-  expectEqualSequence(
-    "abcBRAKklmnopqrstuvw", Swift.String(s1[..<s1.index(atOffset: 20)]))
-
-  expectEqualSequence(
-    "abcBR---bloog---Kklmnopqr",
-    Swift.String(latin1Sample[..<latin1Sample.index(atOffset: 25)]))
+  s.replaceSubrange(
+    s.index(atOffset: 11)..<s.index(atOffset: 11),
+    with: "🇸🇸🇬🇱🇱🇸🇩🇯🇺🇸")
+  expectNil(s.content._latin1)
+  expectFalse(s.content.isKnownLatin1)
+  expectFalse(s.content.isLatin1())
+  expectFalse(s.content.isKnownASCII)
+  expectFalse(s.content.isASCII())
+  expectEqual(
+    "abcBR---blø🇸🇸🇬🇱🇱🇸🇩🇯🇺🇸øg---Kklm",
+    Swift.String(s[..<s.index(atOffset: 25)]))
 }
 
 suite.test("Bidirectional/UnicodeScalar") {
@@ -371,3 +455,7 @@ suite.test("RandomAccess/UnicodeScalar") {
   }
 }
 runAllTests()
+
+// ${'Local Variables'}:
+// eval: (read-only-mode 1)
+// End:
