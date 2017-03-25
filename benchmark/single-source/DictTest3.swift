@@ -54,13 +54,10 @@ class Box<T : Hashable> : Hashable {
   var hashValue: Int {
     return value.hashValue
   }
-}
-
-extension Box : Equatable {
-}
-
-func ==<T: Equatable>(lhs: Box<T>, rhs: Box<T>) -> Bool {
-  return lhs.value == rhs.value
+  
+  static func ==(lhs: Box, rhs: Box) -> Bool {
+    return lhs.value == rhs.value
+  }
 }
 
 @inline(never)
