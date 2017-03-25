@@ -3668,7 +3668,8 @@ namespace {
         : SGF(e.SGF), uncurriedSites(std::move(e.uncurriedSites)),
           extraSites(std::move(e.extraSites)), callee(std::move(e.callee)),
           initialWritebackScope(std::move(e.initialWritebackScope)),
-          uncurries(e.uncurries), applied(e.applied) {
+          uncurries(e.uncurries), applied(e.applied),
+          assumedPlusZeroSelf(e.assumedPlusZeroSelf) {
       e.applied = true;
     }
 
