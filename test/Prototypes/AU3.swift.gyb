@@ -178,59 +178,6 @@ extension String.Content : _UnicodeContent {
   }
 }
 
-extension _BoundedBufferReference {
-  /// Construct the concatenation of head, middle, and tail
-  init<Head : Collection, Middle : Collection, Tail : Collection>(
-    joining head: Head, _ middle: Middle, _ tail: Tail
-  )
-  where
-    Head.Iterator.Element == Iterator.Element,
-    Middle.Iterator.Element == Iterator.Element,
-    Tail.Iterator.Element == Iterator.Element
-  {
-    let newCount = numericCast(head.count) as IndexDistance
-      + numericCast(middle.count) as IndexDistance
-      + numericCast(tail.count) as IndexDistance
-
-    self.init(_uninitializedCount: numericCast(newCount))
-    
-    self.withUnsafeMutableBufferPointer { b0 in
-
-      let (_, i0) = head._copyContents(initializing: b0)
-      
-      let b1 = UnsafeMutableBufferPointer(
-        start: b0.baseAddress + i0, count: b0.count - b0[..<i0].count)
-      let (_, i1) = middle._copyContents(initializing: b1)
-
-      let b2 = UnsafeMutableBufferPointer(
-        start: b1.baseAddress + i1, count: b1.count - b1[..<i1].count)
-      let (_, i2) = tail._copyContents(initializing: b2)
-      
-      assert(i2 == b2.endIndex, "Failed to consume input")
-    }
-  }
-
-  /// If there is sufficient capacity, replaces the elements bounded by `target`
-  /// with the contents of `replacement` and returns true.
-  ///
-  /// Returns `false` otherwise.
-  public func tryToReplaceSubrange<C: Collection>(
-    _ target: Range<Index>, with replacement: C
-  ) -> Bool
-  where C.Iterator.Element == Iterator.Element {
-    typealias D = IndexDistance
-    let r = Counted(replacement)
-    let delta = numericCast(r.count) - numericCast(self[target].count) as D
-    if _fastPath(numericCast(capacity) as D >= self.count + delta) {
-      let start: Int = numericCast(offset(of: target.lowerBound))
-      let end: Int = numericCast(offset(of: target.upperBound))
-      replaceSubrange(start..<end, with: r)
-      return true
-    }
-    return false
-  }
-}
-
 extension Collection where Iterator.Element == UTF16.CodeUnit {
   internal func _isLatin1() -> Bool {
     return self.max() ?? 0 <= 0xFF
