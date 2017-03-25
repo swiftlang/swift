@@ -362,26 +362,43 @@ static bool isInPrivateOrLocalContext(const ValueDecl *D) {
   return isInPrivateOrLocalContext(nominal);
 }
 
-static unsigned getUnnamedParamIndex(const Decl *D) {
-  unsigned UnnamedIndex = 0;
+static unsigned getUnnamedParamIndex(const ParameterList *ParamList,
+                                     const ParamDecl *D,
+                                     unsigned &UnnamedIndex) {
+  for (auto Param : *ParamList) {
+    if (!Param->hasName()) {
+      if (Param == D)
+        return true;
+      ++UnnamedIndex;
+    }
+  }
+  return false;
+}
+
+static unsigned getUnnamedParamIndex(const ParamDecl *D) {
+  if (auto SD = dyn_cast<SubscriptDecl>(D->getDeclContext())) {
+    unsigned UnnamedIndex = 0;
+    auto *ParamList = SD->getIndices();
+    if (getUnnamedParamIndex(ParamList, D, UnnamedIndex))
+      return UnnamedIndex;
+    llvm_unreachable("param not found");
+  }
+
   ArrayRef<ParameterList *> ParamLists;
 
   if (auto AFD = dyn_cast<AbstractFunctionDecl>(D->getDeclContext())) {
     ParamLists = AFD->getParameterLists();
-  } else if (auto ACE = dyn_cast<AbstractClosureExpr>(D->getDeclContext())) {
-    ParamLists = ACE->getParameterLists();
   } else {
-    llvm_unreachable("unhandled param context");
+    auto ACE = cast<AbstractClosureExpr>(D->getDeclContext());
+    ParamLists = ACE->getParameterLists();
   }
+
+  unsigned UnnamedIndex = 0;
   for (auto ParamList : ParamLists) {
-    for (auto Param : *ParamList) {
-      if (!Param->hasName()) {
-        if (Param == D)
-          return UnnamedIndex;
-        ++UnnamedIndex;
-      }
-    }
+    if (getUnnamedParamIndex(ParamList, D, UnnamedIndex))
+      return UnnamedIndex;
   }
+
   llvm_unreachable("param not found");
 }
 
@@ -404,9 +421,11 @@ void ASTMangler::appendDeclName(const ValueDecl *decl) {
   }
 
   if (decl->getDeclContext()->isLocalContext()) {
-    if (isa<ParamDecl>(decl) && !decl->hasName()) {
-      // Mangle unnamed params with their ordering.
-      return appendOperator("L", Index(getUnnamedParamIndex(decl)));
+    if (auto *paramDecl = dyn_cast<ParamDecl>(decl)) {
+      if (!decl->hasName()) {
+        // Mangle unnamed params with their ordering.
+        return appendOperator("L", Index(getUnnamedParamIndex(paramDecl)));
+      }
     }
     // Mangle local declarations with a numeric discriminator.
     return appendOperator("L", Index(decl->getLocalDiscriminator()));
