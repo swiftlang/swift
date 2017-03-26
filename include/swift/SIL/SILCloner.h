@@ -727,6 +727,25 @@ void SILCloner<ImplClass>::visitEndBorrowArgumentInst(
 }
 
 template <typename ImplClass>
+void SILCloner<ImplClass>::visitBeginAccessInst(BeginAccessInst *Inst) {
+  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  doPostProcess(
+      Inst, getBuilder().createBeginAccess(getOpLocation(Inst->getLoc()),
+                                           getOpValue(Inst->getOperand()),
+                                           Inst->getAccessKind(),
+                                           Inst->getEnforcement()));
+}
+
+template <typename ImplClass>
+void SILCloner<ImplClass>::visitEndAccessInst(EndAccessInst *Inst) {
+  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  doPostProcess(
+      Inst, getBuilder().createEndAccess(getOpLocation(Inst->getLoc()),
+                                         getOpValue(Inst->getOperand()),
+                                         Inst->isAborting()));
+}
+
+template <typename ImplClass>
 void SILCloner<ImplClass>::visitAssignInst(AssignInst *Inst) {
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
   doPostProcess(Inst,
