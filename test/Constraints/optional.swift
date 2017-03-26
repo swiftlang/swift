@@ -120,7 +120,12 @@ func testVoidOptional() {
   voidOptional(optNoop)
 }
 
-func testTernaryWithNil<T>(b: Bool, s: String, i: Int, a: Any, t: T) {
+protocol Proto1 {}
+protocol Proto2 {}
+struct Nilable: ExpressibleByNilLiteral {
+	init(nilLiteral: ()) {}
+}
+func testTernaryWithNil<T>(b: Bool, s: String, i: Int, a: Any, t: T, m: T.Type, p: Proto1 & Proto2, arr: [Int], opt: Int?, iou: Int!, n: Nilable) {
   let t1 = b ? s : nil
   let _: Double = t1 // expected-error{{value of type 'String?'}}
   let t2 = b ? nil : i
@@ -149,6 +154,30 @@ func testTernaryWithNil<T>(b: Bool, s: String, i: Int, a: Any, t: T) {
   let _: Double = t13 // expected-error{{value of type 'T?'}}
   let t14 = b ? nil : t
   let _: Double = t14 // expected-error{{value of type 'T?'}}
+  let t15 = b ? m : nil
+  let _: Double = t15 // expected-error{{value of type 'T.Type?'}}
+  let t16 = b ? nil : m
+  let _: Double = t16 // expected-error{{value of type 'T.Type?'}}
+  let t17 = b ? p : nil
+  let _: Double = t17 // expected-error{{value of type '(Proto1 & Proto2)?'}}
+  let t18 = b ? nil : p
+  let _: Double = t18 // expected-error{{value of type '(Proto1 & Proto2)?'}}
+  let t19 = b ? arr : nil
+  let _: Double = t19 // expected-error{{value of type '[Int]?'}}
+  let t20 = b ? nil : arr
+  let _: Double = t20 // expected-error{{value of type '[Int]?'}}
+  let t21 = b ? opt : nil
+  let _: Double = t21 // expected-error{{value of type 'Int?'}}
+  let t22 = b ? nil : opt
+  let _: Double = t22 // expected-error{{value of type 'Int?'}}
+  let t23 = b ? iou : nil
+  let _: Double = t23 // expected-error{{value of type 'Int?'}}
+  let t24 = b ? nil : iou
+  let _: Double = t24 // expected-error{{value of type 'Int?'}}
+  let t25 = b ? n : nil
+  let _: Double = t25 // expected-error{{value of type 'Nilable'}}
+  let t26 = b ? nil : n
+  let _: Double = t26 // expected-error{{value of type 'Nilable'}}
 }
 
 // inference with IUOs
