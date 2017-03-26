@@ -21,9 +21,16 @@
 import StdlibUnittest
 
 //===--- Unicode ----------------------------------------------------------===//
-/// Collections of `Character` have `UnicodeContent`.
+
+/// Types that have an `AnyUnicodeContent` instance that describes their whole
+/// content.
+public protocol AnyUnicode {
+  var anyContent: AnyUnicodeContent { get }
+}
+
+/// Collections of `Character` that have `UnicodeContent`.
 public protocol Unicode
-  : BidirectionalCollection, BidirectionalCollectionWrapper
+  : AnyUnicode, BidirectionalCollection, BidirectionalCollectionWrapper
 // where Iterator.Element == Character
 {
   // poor man's constraint on Iterator.Element
@@ -35,6 +42,7 @@ public protocol Unicode
 
 extension Unicode {
   public var base: Content.CharacterView { return content.characters }
+  public var anyContent: AnyUnicodeContent { return content }
 }
 
 class UnicodeContentBox : FactoryInitializable {
@@ -233,14 +241,14 @@ extension String : RangeReplaceableCollection {
   public mutating func replaceSubrange<C: Collection>(
     _ target: Range<Index>, with replacement: C
   ) where C.Iterator.Element == Character {
-    // TODO:
-    //
-    // - Create an existential-able protocol that can be used to extract
-    //   underlying UTF16 (including normalized)
-    //
-    // - Optimize this so we're not working from Characters
-    let uncountedUTF16 = replacement.lazy.flatMap { $0.utf16 }
-    replaceUTF16(target, with: uncountedUTF16)
+    // Fast path: the incoming characters are Unicode
+    if let unicodeReplacement = replacement as? AnyUnicode {
+      replaceUTF16(target, with: unicodeReplacement.anyContent.anyUTF16)
+    }
+    else {
+      // Slow path: we have to reconstruct UTF-16 from Characters
+      replaceUTF16(target, with: replacement.lazy.flatMap { $0.utf16 })
+    }
   }
 
   /// Replaces the `target` subrange with the given UTF-16 encoded content.
@@ -339,10 +347,7 @@ suite.test("MemoryLayout") {
 }
 
 suite.test("UTF16/smoke") {
-  let s0 = sample
-
-  var s = String()
-  s.append(contentsOf: s0)
+  var s = String(sample)
   expectFalse(s.content.isKnownLatin1)
   expectFalse(s.content.isLatin1())
   expectFalse(s.content.isKnownASCII)
@@ -420,6 +425,51 @@ suite.test("Latin1/smoke") {
   expectFalse(s.content.isASCII())
   expectEqual(
     "abcBR---blø🇸🇸🇬🇱🇱🇸🇩🇯🇺🇸øg---Kklm",
+    Swift.String(s[..<s.index(atOffset: 25)]))
+}
+
+suite.test("RangeReplaceable/UTF16/FastPath") {
+  // Exercise the case where the source text is-a Unicode.
+  var s = String(sample)
+  s.replaceSubrange(
+    s.index(atOffset: 3)..<s.index(atOffset: 10), with: String("BRAK"))
+  expectEqual(
+    "abcBRAKklmnopqrstuvw", Swift.String(s[..<s.index(atOffset: 20)]))
+
+  let s1 = s
+  // ensure that we modify a non-unique buffer this time
+  defer { _fixLifetime(s1) } 
+  
+  s.replaceSubrange(
+    s.index(atOffset: 5)..<s.index(atOffset: 6),
+    with: String("---bl\u{f8}\u{f8}g---")
+  )
+  expectEqual(
+    "abcBR---bl\u{f8}\u{f8}g---Kklmnopqr",
+    Swift.String(s[..<s.index(atOffset: 25)]))
+}
+
+suite.test("RangeReplaceable/Latin1/FastPath") {
+  // Exercise the case where the source text is-a Unicode.
+  var s = String(
+    sample.unicodeScalars.lazy.filter { $0.value < 0x100 }.map {
+      Character($0)
+    })
+  s.replaceSubrange(
+    s.index(atOffset: 3)..<s.index(atOffset: 10), with: String("BRAK"))
+  expectEqual(
+    "abcBRAKklmnopqrstuvw", Swift.String(s[..<s.index(atOffset: 20)]))
+
+  let s1 = s
+  // ensure that we modify a non-unique buffer this time
+  defer { _fixLifetime(s1) } 
+  
+  s.replaceSubrange(
+    s.index(atOffset: 5)..<s.index(atOffset: 6),
+    with: String("---bl\u{f8}\u{f8}g---")
+  )
+  expectEqual(
+    "abcBR---bl\u{f8}\u{f8}g---Kklmnopqr",
     Swift.String(s[..<s.index(atOffset: 25)]))
 }
 

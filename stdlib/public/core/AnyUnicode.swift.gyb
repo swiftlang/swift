@@ -13,10 +13,8 @@
   import gyb
 }%
 
-/// Types that present useful views and information about Unicode content.
-///
-/// UnicodeStorage refines this protocol.
-public protocol UnicodeContent {
+/// A type that presents useful views and information about Unicode content.
+public protocol AnyUnicodeContent {
   var isKnownLatin1: Bool { get }
   var isKnownASCII: Bool { get }
   var isKnownFCCNormalized: Bool { get }
@@ -27,6 +25,14 @@ public protocol UnicodeContent {
   func isLatin1() -> Bool
   func isASCII() -> Bool
 
+  // NOTE: this protocol will likely grow more requirements
+  var anyUTF16: AnyUInt16UnicodeView { get }
+}
+
+/// Types that present useful views and information about Unicode content.
+///
+/// UnicodeStorage refines this protocol.
+public protocol UnicodeContent : AnyUnicodeContent {
   /// A type that presents the string's UTF-16 code units without necessarily
   /// correcting encoding errors
   associatedtype UTF16View : UnicodeView
@@ -66,6 +72,10 @@ public protocol UnicodeContent {
 }
 
 extension UnicodeContent where UTF16View.Iterator.Element == UTF16.CodeUnit {
+  /// Satisfy AnyUnicodeContent requirements
+  public var anyUTF16: AnyUInt16UnicodeView {
+    return AnyUInt16UnicodeView(utf16)
+  }
   public func isLatin1() -> Bool {
     return isKnownLatin1 || !utf16.contains { $0 > 0xFF }
   }
