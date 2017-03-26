@@ -1090,6 +1090,37 @@ static llvm::Constant *getCopyOutOfLinePointerFunction(IRGenModule &IGM) {
     IGF.Builder.CreateRet(ptr);
   });
 }
+/// Return a function which takes two buffer arguments, copies
+/// a pointer from the second to the first, and returns the pointer.
+static llvm::Constant *
+getCopyOutOfLineBoxPointerFunction(IRGenModule &IGM,
+                                   const FixedTypeInfo &fixedTI) {
+  llvm::Type *argTys[] = { IGM.Int8PtrPtrTy, IGM.Int8PtrPtrTy,
+                           IGM.TypeMetadataPtrTy };
+  llvm::SmallString<40> name;
+  {
+    llvm::raw_svector_ostream nameStream(name);
+    nameStream << "__swift_copy_outline_existential_box_pointer";
+    nameStream << fixedTI.getFixedAlignment().getValue();
+  }
+  return IGM.getOrCreateHelperFunction(
+      name, IGM.Int8PtrTy, argTys, [&](IRGenFunction &IGF) {
+        auto it = IGF.CurFn->arg_begin();
+        Address dest(&*it++, IGM.getPointerAlignment());
+        Address src(&*it++, IGM.getPointerAlignment());
+        auto *ptr = IGF.Builder.CreateLoad(src);
+        IGF.Builder.CreateStore(ptr, dest);
+        auto *alignmentMask = fixedTI.getStaticAlignmentMask(IGM);
+        auto *heapHeaderSize = llvm::ConstantInt::get(
+            IGM.SizeTy, getHeapHeaderSize(IGM).getValue());
+        auto *startOffset = IGF.Builder.CreateAnd(
+            IGF.Builder.CreateAdd(heapHeaderSize, alignmentMask),
+            IGF.Builder.CreateNot(alignmentMask));
+        auto *objectAddr =
+            IGF.emitByteOffsetGEP(ptr, startOffset, IGM.Int8Ty);
+        IGF.Builder.CreateRet(objectAddr);
+      });
+}
 
 namespace {
   enum class MemMoveOrCpy { MemMove, MemCpy };
@@ -1219,8 +1250,11 @@ static void addValueWitness(IRGenModule &IGM,
     goto standard;
 
   case ValueWitness::InitializeBufferWithTakeOfBuffer:
-    if (!IGM.getSILModule().getOptions().UseCOWExistentials &&
-        packing == FixedPacking::Allocate) {
+    if (packing == FixedPacking::Allocate) {
+      if (IGM.getSILModule().getOptions().UseCOWExistentials) {
+        return addFunction(getCopyOutOfLineBoxPointerFunction(
+            IGM, cast<FixedTypeInfo>(concreteTI)));
+      }
       // Copy-on-write existentials would have to do a projection in the buffer
       // to get the values starting address.
       return addFunction(getCopyOutOfLinePointerFunction(IGM));
