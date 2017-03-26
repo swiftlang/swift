@@ -23,12 +23,80 @@ comparableOperators = [
 
 }%
 
-/// Two tuples each of arity 0 are equal
+/// Returns a Boolean value indicating whether the corresponding components of
+/// two tuples are equal.
+///
+/// All arity zero tuples are equal.
+///
 /// - Parameters:
 ///   - lhs: An empty tuple.
 ///   - rhs: An empty tuple.
 public func ==(lhs: (), rhs: ()) -> Bool {
   return true
+}
+
+/// Returns a Boolean value indicating whether any corresponding components of
+/// the two tuples are not equal.
+///
+/// Two tuples each of arity zero are never unequal
+///
+/// - Parameters:
+///   - lhs: An empty tuple.
+///   - rhs: An empty tuple.
+public func !=(lhs: (), rhs: ()) -> Bool {
+    return false
+}
+
+/// Returns a Boolean value indicating whether the first tuple is ordered
+/// before the second in a lexicographical ordering.
+///
+/// An arity zero tuple is never strictly before another arity zero tuple in a
+/// lexicographical ordering
+///
+/// - Parameters:
+///   - lhs: An empty tuple.
+///   - rhs: An empty tuple.
+public func <(lhs: (), rhs: ()) -> Bool {
+    return false
+}
+
+/// Returns a Boolean value indicating whether the first tuple is ordered
+/// before or the same as the second in a lexicographical ordering.
+///
+/// An arity zero tuple is always before or the same as another arity zero tuple
+/// in a lexicographical ordering
+///
+/// - Parameters:
+///   - lhs: An empty tuple.
+///   - rhs: An empty tuple.
+public func <=(lhs: (), rhs: ()) -> Bool {
+    return true
+}
+
+/// Returns a Boolean value indicating whether the first tuple is ordered
+/// after the second in a lexicographical ordering.
+///
+/// An arity zero tuple is never strictly after another arity zero tuple in a
+/// lexicographical ordering
+///
+/// - Parameters:
+///   - lhs: An empty tuple.
+///   - rhs: An empty tuple.
+public func >(lhs: (), rhs: ()) -> Bool {
+    return false
+}
+
+/// Returns a Boolean value indicating whether the first tuple is ordered
+/// after or the same as the second in a lexicographical ordering.
+///
+/// An arity zero tuple is always after or the same as another arity zero tuple
+/// in a lexicographical ordering
+///
+/// - Parameters:
+///   - lhs: An empty tuple.
+///   - rhs: An empty tuple.
+public func >=(lhs: (), rhs: ()) -> Bool {
+    return true
 }
 
 % for arity in range(2,7):
