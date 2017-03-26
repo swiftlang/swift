@@ -2106,29 +2106,29 @@ namespace {
                          KnownProtocolKind::ExpressibleByStringInterpolation);
       assert(interpolationProto && "Missing string interpolation protocol?");
 
-      // Get the `init(stringLiteral:)` initializer for the concrete type in question.
+      // Get the `init(stringInterpolation:)` initializer for the concrete type in question.
       DeclName name(tc.Context, tc.Context.Id_init,
-                    { tc.Context.Id_stringLiteral });
+                    { tc.Context.Id_stringInterpolation });
       auto member
         = findNamedWitnessImpl<ConstructorDecl>(
             tc, dc, type,
             interpolationProto, name,
             diag::interpolation_broken_proto);
       
-      // Get the concrete StringInterpolationSegment type the initializer uses.
-      // This is way easier than parameterizing StringInterpolationSegment with the
+      // Get the concrete StringInterpolationType the initializer uses.
+      // This is way easier than parameterizing StringInterpolationType with the
       // associated types by hand.
       auto paramType = member->getParameters()->get(0)->getVarargBaseTy();
       auto *paramTypeRef = TypeExpr::createImplicitHack(expr->getStartLoc(), 
                                                         paramType, tc.Context);
       
-      // Get declarations to construct the .stringInterpolation and .stringLiteral 
+      // Get declarations to construct the .interpolation and .literal 
       // cases from StringInterpolationSegment.
       auto paramTypeDecl = paramType->getEnumOrBoundGenericEnum();
       auto stringInterpolationCase = paramTypeDecl->getElement(
-                                                               tc.Context.Id_stringInterpolation);
+                                                               tc.Context.Id_interpolation);
       auto stringLiteralCase = paramTypeDecl->getElement(
-                                                         tc.Context.Id_stringLiteral);
+                                                         tc.Context.Id_literal);
       if (!stringInterpolationCase || !stringLiteralCase) {
         tc.diagnose(expr->getStartLoc(), diag::interpolation_broken_proto);
         return nullptr;
@@ -2164,7 +2164,7 @@ namespace {
         segments.push_back(apply);
 
         if (names.empty()) {
-          names.push_back(tc.Context.Id_stringLiteral);
+          names.push_back(tc.Context.Id_stringInterpolation);
         } else {
           names.push_back(Identifier());
         }

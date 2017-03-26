@@ -142,14 +142,14 @@ public struct MyString : ExpressibleByStringLiteral,
     self.init(str: value)
   }
   
-  public init(stringLiteral segments: StringInterpolationSegment<String, String>...) {
+  public init(stringInterpolation segments: StringInterpolationSegment<String, String>...) {
     var result = ""
     for s in segments {
       switch s {
-      case .stringLiteral(let str):
+      case .literal(let str):
         result += str
-      case .stringInterpolation(let str):
-        result += "<segment " + String(describing: str) + ">"
+      case .interpolation(let str):
+        result += "<segment " + str + ">"
       }
     }
     self.init(str: result)

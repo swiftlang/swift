@@ -626,8 +626,8 @@ public protocol ExpressibleByDictionaryLiteral {
 }
 
 public enum StringInterpolationSegment<Literal: _ExpressibleByBuiltinStringLiteral, Interpolation> {
-  case stringLiteral(Literal)
-  case stringInterpolation(Interpolation)
+  case literal(Literal)
+  case interpolation(Interpolation)
 }
 
 /// A type that can be initialized by string interpolation with a string
@@ -656,15 +656,14 @@ public enum StringInterpolationSegment<Literal: _ExpressibleByBuiltinStringLiter
 /// or an interpolated segment containing a value computed at runtime. Each 
 /// segment is represented as an instance of the `StringInterpolationSegment` 
 /// enum. The segments are all passed to the 
-/// `init(stringLiteral: StringInterpolationSegment<StringLiteralType, StringInterpolationType>...)` 
+/// `init(stringInterpolation: StringInterpolationSegment<StringLiteralType, StringInterpolationType>...)` 
 /// initializer, which must concatenate them into a single instance of the 
 /// conforming type.
 /// 
 /// This type refines the `ExpressibleByStringLiteral` type, but it provides a 
 /// default implementation of the supertype `init(stringLiteral:)` which calls 
 /// this type's with a single literal segment.
-public typealias ExpressibleByStringInterpolation = _ExpressibleByStringInterpolation
-public protocol _ExpressibleByStringInterpolation: ExpressibleByStringLiteral {
+public protocol ExpressibleByStringInterpolation: ExpressibleByStringLiteral {
   associatedtype StringInterpolationType = String
   
   /// Creates an instance by concatenating the given values.
@@ -684,10 +683,13 @@ public protocol _ExpressibleByStringInterpolation: ExpressibleByStringLiteral {
   /// variables.
   ///
   /// - Parameter segments: An array of `StringInterpolationSegment` instances.
-  init(stringLiteral segments: StringInterpolationSegment<StringLiteralType, StringInterpolationType>...)
+  init(stringInterpolation segments: StringInterpolationSegment<StringLiteralType, StringInterpolationType>...)
 }
 
-extension _ExpressibleByStringInterpolation {
+// FIXME: This should probably be removed.
+public typealias _ExpressibleByStringInterpolation = ExpressibleByStringInterpolation
+
+extension ExpressibleByStringInterpolation {
   /// Creates an instance initialized to the given string value.
   /// 
   /// The default implementation for a type conforming to 
@@ -696,7 +698,7 @@ extension _ExpressibleByStringInterpolation {
   ///
   /// - Parameter value: The value of the new instance.
   public init(stringLiteral string: StringLiteralType) {
-    self.init(stringLiteral: StringInterpolationSegment.stringLiteral(string))
+    self.init(stringInterpolation: .literal(string))
   }
 }
 
