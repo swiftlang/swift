@@ -247,3 +247,5 @@ _T03foo6testityyyc_yyctF1a1bTf3pfpf_n ---> function signature specialization <Ar
 _SocketJoinOrLeaveMulticast ---> _SocketJoinOrLeaveMulticast
 _T0s10DictionaryV3t17E6Index2V1loiSbAEyxq__G_AGtFZ ---> static (extension in t17):Swift.Dictionary.Index2.< infix ((extension in t17):[A : B].Index2, (extension in t17):[A : B].Index2) -> Swift.Bool
 _T08mangling14varargsVsArrayySaySiG3arrd_SS1ntF ---> mangling.varargsVsArray (arr : [Swift.Int]..., n : Swift.String) -> ()
+_T08mangling14varargsVsArrayySaySiG3arrd_tF ---> mangling.varargsVsArray (arr : [Swift.Int]...) -> ()
+                                                                                                                           
