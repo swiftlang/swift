@@ -922,6 +922,8 @@ public:
   void visitStoreBorrowInst(StoreBorrowInst *i) {
     llvm_unreachable("unimplemented");
   }
+  void visitBeginAccessInst(BeginAccessInst *i);
+  void visitEndAccessInst(EndAccessInst *i);
   void visitUnmanagedRetainValueInst(UnmanagedRetainValueInst *i) {
     llvm_unreachable("unimplemented");
   }
@@ -3836,6 +3838,51 @@ void IRGenSILFunction::visitProjectBoxInst(swift::ProjectBoxInst *i) {
     auto addr = emitProjectBox(*this, box.claimNext(), boxTy);
     setLoweredAddress(i, addr);
   }
+}
+
+static void emitBeginAccess(IRGenSILFunction &IGF, BeginAccessInst *access,
+                            Address addr) {
+  switch (access->getEnforcement()) {
+  case SILAccessEnforcement::Unknown:
+    llvm_unreachable("unknown access enforcement in IRGen!");
+
+  case SILAccessEnforcement::Static:
+  case SILAccessEnforcement::Unsafe:
+    // nothing to do
+    return;
+
+  case SILAccessEnforcement::Dynamic:
+    // TODO
+    return;
+  }
+  llvm_unreachable("bad access enforcement");
+}
+
+static void emitEndAccess(IRGenSILFunction &IGF, BeginAccessInst *access) {
+  switch (access->getEnforcement()) {
+  case SILAccessEnforcement::Unknown:
+    llvm_unreachable("unknown access enforcement in IRGen!");
+
+  case SILAccessEnforcement::Static:
+  case SILAccessEnforcement::Unsafe:
+    // nothing to do
+    return;
+
+  case SILAccessEnforcement::Dynamic:
+    // TODO
+    return;
+  }
+  llvm_unreachable("bad access enforcement");
+}
+
+void IRGenSILFunction::visitBeginAccessInst(BeginAccessInst *i) {
+  Address addr = getLoweredAddress(i->getOperand());
+  emitBeginAccess(*this, i, addr);
+  setLoweredAddress(i, addr);
+}
+
+void IRGenSILFunction::visitEndAccessInst(EndAccessInst *i) {
+  emitEndAccess(*this, i->getBeginAccess());
 }
 
 void IRGenSILFunction::visitConvertFunctionInst(swift::ConvertFunctionInst *i) {
