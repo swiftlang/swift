@@ -20,31 +20,8 @@
 
 import StdlibUnittest
 
-//===--- Unicode ----------------------------------------------------------===//
-
-/// Types that have an `AnyUnicodeContent` instance that describes their whole
-/// content.
-public protocol AnyUnicode {
-  var anyContent: AnyUnicodeContent { get }
-}
-
-/// Collections of `Character` that have `UnicodeContent`.
-public protocol Unicode
-  : AnyUnicode, BidirectionalCollection, BidirectionalCollectionWrapper
-// where Iterator.Element == Character
-{
-  // poor man's constraint on Iterator.Element
-  subscript(i: Index) -> Character { get }
-  
-  associatedtype Content : UnicodeContent
-  var content: Content { get }
-}
-
-extension Unicode {
-  public var base: Content.CharacterView { return content.characters }
-  public var anyContent: AnyUnicodeContent { return content }
-}
-
+/// Implementation detail of `String` that type-erases any `UnicodeContent` into
+/// one word that can live in one of the cases.
 class UnicodeContentBox : FactoryInitializable {
   var utf16: AnyUInt16UnicodeView { fatalError("override me!") }
   var unicodeScalars: AnyUnicodeScalarUnicodeView { fatalError("override me!") }
@@ -117,6 +94,10 @@ class UnicodeContentBox : FactoryInitializable {
   
   init(fromSubclass: ()) {}
 }
+
+// FIXME: This conformance isn't really needed, at least so far, but it keeps us
+// in line.
+extension UnicodeContentBox : UnicodeContent {}
 
 //===--- String -----------------------------------------------------------===//
 public struct String {
@@ -500,6 +481,7 @@ suite.test("RandomAccess/UnicodeScalar") {
     lastEncodedOffset = o
   }
 }
+
 runAllTests()
 
 // ${'Local Variables'}:
