@@ -5404,7 +5404,9 @@ public:
     if (decl->isInvalid() || decl->getOverriddenDecl())
       return false;
 
-    auto owningTy = decl->getDeclContext()->getDeclaredInterfaceType();
+    auto *dc = decl->getDeclContext();
+
+    auto owningTy = dc->getDeclaredInterfaceType();
     if (!owningTy)
       return false;
 
@@ -5503,7 +5505,7 @@ public:
         lookupOptions -= NameLookupFlags::ProtocolMembers;
         lookupOptions -= NameLookupFlags::PerformConformanceCheck;
 
-        members = TC.lookupMember(decl->getDeclContext(), superclass,
+        members = TC.lookupMember(dc, superclass,
                                   name, lookupOptions);
       }
 
@@ -5516,7 +5518,7 @@ public:
         if (member->getKind() != decl->getKind())
           continue;
 
-        if (!member->getDeclContext()->getAsClassOrClassExtensionContext())
+        if (!dc->getAsClassOrClassExtensionContext())
           continue;
 
         auto parentDecl = cast<ValueDecl>(member);
@@ -5574,7 +5576,22 @@ public:
             continue;
         }
 
-        if (declTy->isEqual(parentDeclTy)) {
+        // Canonicalize with respect to the override's generic signature, if any.
+        CanType canDeclTy;
+        CanType canParentDeclTy;
+        if (auto *genericSig = decl->getInnermostDeclContext()
+              ->getGenericSignatureOfContext()) {
+          auto *module = dc->getParentModule();
+          canDeclTy = genericSig->getCanonicalTypeInContext(
+            declTy, *module);
+          canParentDeclTy = genericSig->getCanonicalTypeInContext(
+            parentDeclTy, *module);
+        } else {
+          canDeclTy = declTy->getCanonicalType();
+          canParentDeclTy = parentDeclTy->getCanonicalType();
+        }
+
+        if (canDeclTy == canParentDeclTy) {
           matches.push_back({parentDecl, true, parentDeclTy});
           hadExactMatch = true;
           continue;
@@ -5685,8 +5702,7 @@ public:
       // defining module.  This is not required for constructors, which are
       // never really "overridden" in the intended sense here, because of
       // course derived classes will change how the class is initialized.
-      Accessibility matchAccess =
-          matchDecl->getFormalAccess(decl->getDeclContext());
+      Accessibility matchAccess = matchDecl->getFormalAccess(dc);
       if (matchAccess < Accessibility::Open &&
           matchDecl->getModuleContext() != decl->getModuleContext() &&
           !isa<ConstructorDecl>(decl)) {
@@ -5694,7 +5710,7 @@ public:
                     decl->getDescriptiveKind());
 
       } else if (matchAccess == Accessibility::Open &&
-                 classDecl->getFormalAccess(decl->getDeclContext()) ==
+                 classDecl->getFormalAccess(dc) ==
                    Accessibility::Open &&
                  decl->getFormalAccess() != Accessibility::Open &&
                  !decl->isFinal()) {
@@ -5709,9 +5725,9 @@ public:
 
       } else {
         auto matchAccessScope =
-          matchDecl->getFormalAccessScope(decl->getDeclContext());
+          matchDecl->getFormalAccessScope(dc);
         auto classAccessScope =
-          classDecl->getFormalAccessScope(decl->getDeclContext());
+          classDecl->getFormalAccessScope(dc);
         auto requiredAccessScope =
           matchAccessScope.intersectWith(classAccessScope);
 
@@ -5719,15 +5735,16 @@ public:
         bool shouldDiagnose = false;
         bool shouldDiagnoseSetter = false;
         if (!isa<ConstructorDecl>(decl)) {
-          auto DC = requiredAccessScope->getDeclContext();
-          shouldDiagnose = !decl->isAccessibleFrom(DC);
+          auto scopeDC = requiredAccessScope->getDeclContext();
+          shouldDiagnose = !decl->isAccessibleFrom(scopeDC);
 
-          if (!shouldDiagnose && matchDecl->isSettable(decl->getDeclContext())){
+          if (!shouldDiagnose && matchDecl->isSettable(dc)){
             auto matchASD = cast<AbstractStorageDecl>(matchDecl);
-            if (matchASD->isSetterAccessibleFrom(decl->getDeclContext())) {
+            if (matchASD->isSetterAccessibleFrom(dc)) {
               const auto *ASD = cast<AbstractStorageDecl>(decl);
               shouldDiagnoseSetter =
-                  ASD->isSettable(DC) && !ASD->isSetterAccessibleFrom(DC);
+                  ASD->isSettable(scopeDC) &&
+                  !ASD->isSetterAccessibleFrom(scopeDC);
             }
           }
         }
