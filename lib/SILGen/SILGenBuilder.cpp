@@ -484,7 +484,7 @@ ManagedValue SILGenBuilder::createLoadCopy(SILLocation loc, ManagedValue v,
                                            const TypeLowering &lowering) {
   assert(lowering.getLoweredType().getAddressType() == v.getType());
   SILValue result =
-      lowering.emitLoadOfCopy(*this, loc, v.forward(SGF), IsNotTake);
+      lowering.emitLoadOfCopy(*this, loc, v.getValue(), IsNotTake);
   if (lowering.isTrivial())
     return ManagedValue::forUnmanaged(result);
   assert(!lowering.isAddressOnly() && "cannot retain an unloadable type");
