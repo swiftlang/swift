@@ -625,6 +625,19 @@ public protocol ExpressibleByDictionaryLiteral {
   init(dictionaryLiteral elements: (Key, Value)...)
 }
 
+/// A portion of a string literal containing interpolated expressions.
+/// 
+/// An interpolated string literal is divided into many segments. Each 
+/// is either a literal segment, containing a chunk of text found in 
+/// the source code, or an interpolated segment, containing the result 
+/// of an expression executed at runtime.
+/// 
+/// This type has two generic parameters. The first is the type of the 
+/// `literal` case's associated value; the second is the type of the 
+/// `interpolation` case's associated value. The `Literal` generic 
+/// parameter must be `ExpressibleByStringLiteral`.
+/// 
+/// - SeeAlso: ExpressibleByStringInterpolation
 public enum StringInterpolationSegment<Literal: _ExpressibleByBuiltinStringLiteral, Interpolation> {
   case literal(Literal)
   case interpolation(Interpolation)
@@ -652,18 +665,51 @@ public enum StringInterpolationSegment<Literal: _ExpressibleByBuiltinStringLiter
 /// `ExpressibleByStringInterpolation` conformance.
 /// 
 /// An interpolated string is split into multiple segments, each of which is 
-/// either a literal segment which appears exactly as it did in the source code, 
+/// either a literal segment containing hardcoded text from the source code, 
 /// or an interpolated segment containing a value computed at runtime. Each 
 /// segment is represented as an instance of the `StringInterpolationSegment` 
-/// enum. The segments are all passed to the 
-/// `init(stringInterpolation: StringInterpolationSegment<StringLiteralType, StringInterpolationType>...)` 
+/// enum. The segments are all passed to the `init(stringInterpolation:)` 
 /// initializer, which must concatenate them into a single instance of the 
 /// conforming type.
 /// 
-/// This type refines the `ExpressibleByStringLiteral` type, but it provides a 
-/// default implementation of the supertype `init(stringLiteral:)` which calls 
-/// this type's with a single literal segment.
+/// Literal segments are represented as instances of the associated 
+/// `StringLiteralType` type wrapped in a `StringInterpolationSegment.literal` 
+/// instance. `StringLiteralType` must be `ExpressibleByStringLiteral`.
+/// 
+/// Interpolated segments are represented as values of the associated
+/// `StringInterpolationType` type. The code beween the two parentheses is 
+/// treated as parameters to an initializer on the `StringInterpolationType`; 
+/// if the first parameter is unlabled, Swift will prefer an initializer with 
+/// the label `forInterpolation:`, but will also permit an initializer with 
+/// an unlabeled first parameter. Once a value of the `StringInterpolationType` 
+/// has been constructed, it is wrapped in a 
+/// `StringInterpolationSegment.interpolation` instance.
+/// 
+/// For example, the literal assigned to `message` in the example above would 
+/// be converted into code like:
+/// 
+///    String(stringInterpolation:
+///      .literal("One cookie: $"),
+///      .interpolation(String(price)),
+///      .literal(", "),
+///      .interpolation(String(number)),
+///      .literal(" cookies: $"),
+///      .interpolation(String(price * number)),
+///      .literal(".")
+///    )
+/// 
+/// This protocol refines the `ExpressibleByStringLiteral` protocol, but it 
+/// provides a default implementation of the supertype `init(stringLiteral:)` 
+/// which calls `init(stringInterpolation:) with a single literal segment.
 public protocol ExpressibleByStringInterpolation: ExpressibleByStringLiteral {
+  /// The type which is used to convert interpolated segments into values that 
+  /// can be interpolated.
+  /// 
+  /// Each interpolated segment will be treated as an initializer call on this 
+  /// type. You can use the default `String` to get basic formatting behavior 
+  /// that's sensible for ordinary text, or you can point it at a type of your 
+  /// own if you need precise control over the types and semantics of 
+  /// interpolations.
   associatedtype StringInterpolationType = String
   
   /// Creates an instance by concatenating the given values.
@@ -682,7 +728,8 @@ public protocol ExpressibleByStringInterpolation: ExpressibleByStringLiteral {
   /// `Self`, usually by concatenating or storing them inside its instance 
   /// variables.
   ///
-  /// - Parameter segments: An array of `StringInterpolationSegment` instances.
+  /// - Parameter segments: An array of `StringInterpolationSegment` instances, 
+  ///                       each containing a portion of the literal's contents.
   init(stringInterpolation segments: StringInterpolationSegment<StringLiteralType, StringInterpolationType>...)
 }
 
@@ -693,8 +740,8 @@ extension ExpressibleByStringInterpolation {
   /// Creates an instance initialized to the given string value.
   /// 
   /// The default implementation for a type conforming to 
-  /// `ExpressibleByStringInterpolation` calls the segment-based 
-  /// `init(stringLiteral:)` initializer with a single literal segment.
+  /// `ExpressibleByStringInterpolation` calls the `init(stringInterpolation:)` 
+  /// initializer with a single literal segment.
   ///
   /// - Parameter value: The value of the new instance.
   public init(stringLiteral string: StringLiteralType) {
