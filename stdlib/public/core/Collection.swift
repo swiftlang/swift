@@ -670,6 +670,21 @@ public protocol Collection : _Indexable, Sequence {
   func withExistingUnsafeBuffer<R>(
     _ body: (UnsafeBufferPointer<Iterator.Element>) throws -> R
   ) rethrows -> R?
+
+  /// Replaces the `target` elements with the contents of `replacement` if
+  /// possible and returns `true`, or returns `false` otherwise.
+  ///
+  /// - Note: `false` may be returned because `self` is truly immutable or
+  ///   because its length can't be changed appropriately.
+  //
+  // Note: this doesn't accept a Range<Index> for convenience of interoperation
+  // with AnyUnicodeIndex_, which needs to be an existential and thus can't
+  // conform to Comparable. We could fix that by having the things that traffic
+  // in AnyUnicodeIndex_ traffic in AnyUnicodeIndex instead.
+  mutating func _tryToReplaceSubrange<C: Collection>(
+    from: Index, to: Index, with replacement: C
+  ) -> Bool
+  where C.Iterator.Element == Iterator.Element
   
   // FIXME(ABI)#179 (Type checker): Needed here so that the `Iterator` is properly deduced from
   // a custom `makeIterator()` function.  Otherwise we get an
@@ -1317,6 +1332,12 @@ extension Collection {
     _ body: (UnsafeBufferPointer<Iterator.Element>) throws -> R
   ) rethrows -> R? {
     return nil // by default, collections have no contiguous storage.
+  }
+  public func _tryToReplaceSubrange<C: Collection>(
+    from _: Index, to _: Index, with _: C
+  ) -> Bool
+  where C.Iterator.Element == Iterator.Element {
+    return false
   }
 }
 

@@ -430,6 +430,10 @@ public protocol Any${Element}UnicodeView_ : AnyUnicodeView_ {
   func filter(_ inResult: (${Element}) throws -> Bool) rethrows -> [${Element}]
   func forEach(_ body: (${Element}) throws -> Void) rethrows
   func _copyToContiguousArray() -> ContiguousArray<${Element}>
+  mutating func _tryToReplaceSubrange<C: Collection>(
+    from: AnyUnicodeIndex_, to: AnyUnicodeIndex_, with replacement: C
+  ) -> Bool
+  where C.Iterator.Element == ${Element}
 }
 
 public struct Any${Element}UnicodeView
@@ -470,6 +474,38 @@ extension Any${Element}UnicodeView {
   public init<Base: UnicodeView>(_ base: Base)
   where Base.Iterator.Element == ${Element} {
     self.base2 = Adapter(base: base)
+  }
+}
+
+extension Any${Element}UnicodeView : RangeReplaceableCollection {
+  public init() {
+    self.init(RandomAccessUnicodeView(EmptyCollection()))
+  }
+  
+  public mutating func replaceSubrange<C>(
+    _ target: Range<Index>,
+    with replacement: C
+  ) where C : Collection, C.Iterator.Element == ${Element} {
+    let r = Counted(replacement)
+    // FIXME: wrappers like Counted interfere with dynamic introspection, such
+    // as downcasts to AnyUnicode, that can be crucial to optimization.  This
+    // problem seems solvable by giving Collections and wrappers something like
+    // func encodedContent<T>(as: T.Type) -> T?
+    if base2._tryToReplaceSubrange(
+      from: target.lowerBound.base, to: target.upperBound.base, with: r
+    ) { return }
+
+    let newCount = count + (r.count^ - self[target].count)^
+    // FIXME: Ideally we'd create new _[XXX]StringStorage for this part.  In
+    // principle that would imply renaming these from Any[Type]View to
+    // Any[Encoding]View, because one has to know how to get back into a
+    // String representation.  For now, though, this will do.
+    var newContent: [${Element}] = []
+    newContent.reserveCapacity(newCount^)
+    newContent.append(contentsOf: self[..<target.lowerBound])
+    newContent.append(contentsOf: r)
+    newContent.append(contentsOf: self[target.upperBound...])
+    self = Any${Element}UnicodeView(RandomAccessUnicodeView(newContent))
   }
 }
 

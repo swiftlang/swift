@@ -27,6 +27,16 @@ extension String : BidirectionalCollection, BidirectionalCollectionWrapper {
   public subscript(bounds: Range<Index>) -> String {
     return String(characters[bounds])
   }
+
+  // FIXME: figure out how to resolve ambiguities when we try to use the default
+  // from BidirectionalCollectionWrapper.
+  public mutating func _tryToReplaceSubrange<C: Collection>(
+    from targetStart: Index, to targetEnd: Index, with replacement: C
+  ) -> Bool
+  where C.Iterator.Element == Base.Iterator.Element {
+    return base._tryToReplaceSubrange(
+      from: targetStart, to: targetEnd,  with: replacement)
+  }
 }
 
 extension String.CharacterView.Index {

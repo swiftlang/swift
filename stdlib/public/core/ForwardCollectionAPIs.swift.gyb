@@ -86,6 +86,13 @@ public func withExistingUnsafeBuffer<R>(
 ) rethrows -> R? {
   return try ${base}.withExistingUnsafeBuffer(body)
 }
+public mutating func _tryToReplaceSubrange<C: Collection>(
+  from targetStart: Index, to targetEnd: Index, with replacement: C
+) -> Bool
+where C.Iterator.Element == ${Element} {
+  return ${base}._tryToReplaceSubrange(
+    from: _unwrap(targetStart), to: _unwrap(targetEnd),  with: replacement)
+}
 public var first: ${Element}? { return ${base}.first }
 % if bidirectional:
 public var last: ${Element}? { return ${base}.last }

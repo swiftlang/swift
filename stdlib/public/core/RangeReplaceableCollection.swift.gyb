@@ -991,6 +991,15 @@ extension RangeReplaceableCollection {
   public mutating func _customRemoveLast(_ n: Int) -> Bool {
     return false
   }
+  
+  @_inlineable
+  public mutating func _tryToReplaceSubrange<C: Collection>(
+    from targetStart: Index, to targetEnd: Index, with replacement: C
+  ) -> Bool
+  where C.Iterator.Element == Iterator.Element {
+    replaceSubrange(targetStart..<targetEnd, with: replacement)
+    return true
+  }
 }
 
 extension RangeReplaceableCollection

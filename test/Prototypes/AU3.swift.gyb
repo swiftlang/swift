@@ -139,6 +139,16 @@ extension String : Unicode {
   public typealias Base = AnyCharacterUnicodeView
   public typealias Index = AnyCharacterUnicodeView.Index
   public typealias IndexDistance = AnyCharacterUnicodeView.IndexDistance
+
+  // FIXME: figure out how to resolve ambiguities when we try to use the default
+  // from BidirectionalCollectionWrapper.
+  public mutating func _tryToReplaceSubrange<C: Collection>(
+    from targetStart: Index, to targetEnd: Index, with replacement: C
+  ) -> Bool
+  where C.Iterator.Element == Base.Iterator.Element {
+    return base._tryToReplaceSubrange(
+      from: targetStart, to: targetEnd,  with: replacement)
+  }
 }
 
 %{
@@ -156,23 +166,53 @@ def switch(s):
 
 extension String.Content : UnicodeContent {
   public typealias UTF16View = AnyUInt16UnicodeView
+  
+  // Once we get ownership and view/slice mutation worked out, it's conceivable
+  // we could detect in-place mutation of these views and avoid copying,
+  // especially after an append.  In the meantime, this'll have to do.
   public var utf16: UTF16View {
-    ${switch('return UTF16View(x.utf16)')}
+    get {
+      ${switch('return UTF16View(x.utf16)')}
+    }
+    set {
+      replaceUTF16(utf16.startIndex..<utf16.endIndex, with: newValue)
+    }
   }
 
   public typealias FCCNormalizedUTF16View = AnyUInt16UnicodeView
   public var fccNormalizedUTF16: FCCNormalizedUTF16View {
-    ${switch('return FCCNormalizedUTF16View(x.fccNormalizedUTF16)')}
+    get {
+      ${switch('return FCCNormalizedUTF16View(x.fccNormalizedUTF16)')}
+    }
+    set {
+      replaceUTF16(utf16.startIndex..<utf16.endIndex, with: newValue)
+    }
   }
 
   public typealias UnicodeScalarView = AnyUnicodeScalarUnicodeView
   public var unicodeScalars: UnicodeScalarView {
-    ${switch('return UnicodeScalarView(x.unicodeScalars)')}
+    get {
+      ${switch('return UnicodeScalarView(x.unicodeScalars)')}
+    }
+    set {
+      replaceUTF16(
+        utf16.startIndex..<utf16.endIndex, with: newValue.lazy.flatMap {
+          UTF16.EncodedScalar($0)
+        })
+    }
   }
 
   public typealias CharacterView = AnyCharacterUnicodeView
   public var characters: CharacterView {
-    ${switch('return CharacterView(x.characters)')}
+    get {
+      ${switch('return CharacterView(x.characters)')}
+    }
+    set {
+      replaceUTF16(
+        utf16.startIndex..<utf16.endIndex, with: newValue.lazy.flatMap {
+          $0.utf16
+        })
+    }
   }
   
   public func isLatin1() -> Bool { ${switch('return x.isLatin1()')} }
@@ -213,28 +253,10 @@ extension String.Content {
       return ObjectIdentifier(storage)
     }
   }
-}
-
-extension String : RangeReplaceableCollection {
-  
-  public init() { content = Content() }
-  
-  public mutating func replaceSubrange<C: Collection>(
-    _ target: Range<Index>, with replacement: C
-  ) where C.Iterator.Element == Character {
-    // Fast path: the incoming characters are Unicode
-    if let unicodeReplacement = replacement as? AnyUnicode {
-      replaceUTF16(target, with: unicodeReplacement.anyContent.anyUTF16)
-    }
-    else {
-      // Slow path: we have to reconstruct UTF-16 from Characters
-      replaceUTF16(target, with: replacement.lazy.flatMap { $0.utf16 })
-    }
-  }
 
   /// Replaces the `target` subrange with the given UTF-16 encoded content.
   internal mutating func replaceUTF16<C: Collection>(
-    _ target: Range<Index>, with replacement_: C
+    _ target: Range<String.Index>, with replacement_: C
   )  
   where C.Iterator.Element == UTF16.CodeUnit {
     // Pre-count replacement, once.
@@ -246,32 +268,32 @@ extension String : RangeReplaceableCollection {
     }
     // Otherwise, we need to allocate new storage
     
-    let head = content.utf16[..<target.lowerBound]
-    let tail = content.utf16[target.upperBound...]
+    let head = utf16[..<target.lowerBound]
+    let tail = utf16[target.upperBound...]
 
     // See if we can use 8-bit code units
     if replacement._isLatin1() && (
-      content.isKnownLatin1 || head._isLatin1() && tail._isLatin1()
+      isKnownLatin1 || head._isLatin1() && tail._isLatin1()
     ) {
       let s = _Latin1StringStorage(
         joining: head._low8Bits, replacement._low8Bits, tail._low8Bits)
       s.isKnownASCII = !s.contains { $0 > 0x7f }
-      content._latin1 = s
+      _latin1 = s
     }
     else {
-      content._utf16 = _UTF16StringStorage(joining: head, replacement, tail)
+      _utf16 = _UTF16StringStorage(joining: head, replacement, tail)
     }
   }
   
   internal var isMutable: Bool {
     mutating get {
       defer { _fixLifetime(self) }
-      return content._storageID?._liveObjectIsUniquelyReferenced() ?? true
+      return _storageID?._liveObjectIsUniquelyReferenced() ?? true
     }
   }
   
   internal mutating func replaceUTF16InPlace<C>(
-    _ target: Range<Index>, with replacement: Counted<C>
+    _ target: Range<String.Index>, with replacement: Counted<C>
   ) -> Bool 
   where C.Iterator.Element == UTF16.CodeUnit {
     if !isMutable { return false }
@@ -279,14 +301,34 @@ extension String : RangeReplaceableCollection {
     let t: Range<Int> = numericCast(target.lowerBound.encodedOffset)
       ..< numericCast(target.upperBound.encodedOffset)
 
-    switch content._rep {
+    switch _rep {
     case .utf16(let storage):
-      return storage.tryToReplaceSubrange(t, with: replacement)
+      return storage._tryToReplaceSubrange(
+        from: t.lowerBound, to: t.upperBound, with: replacement)
     case .latin1(let storage):
-      return storage.tryToReplaceSubrange(
-        t, with: replacement.lazy.map { UInt8(truncatingBitPattern: $0) })
+      return storage._tryToReplaceSubrange(
+        from: t.lowerBound, to: t.upperBound,
+        with: replacement.lazy.map { UInt8(truncatingBitPattern: $0) })
     case .any(_):
       return false
+    }
+  }
+}
+
+extension String : RangeReplaceableCollection {
+  
+  public init() { content = Content() }
+  
+  public mutating func replaceSubrange<C: Collection>(
+    _ target: Range<Index>, with replacement: C
+  ) where C.Iterator.Element == Character {
+    // Fast path: the incoming characters are Unicode
+    if let unicodeReplacement = replacement as? AnyUnicode {
+      content.replaceUTF16(target, with: unicodeReplacement.anyContent.anyUTF16)
+    }
+    else {
+      // Slow path: we have to reconstruct UTF-16 from Characters
+      content.replaceUTF16(target, with: replacement.lazy.flatMap { $0.utf16 })
     }
   }
 }
