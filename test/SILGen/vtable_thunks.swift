@@ -2,6 +2,46 @@
 
 protocol AddrOnly {}
 
+func callMethodsOnD<U>(d: D, b: B, a: AddrOnly, u: U, i: Int) {
+  _ = d.iuo(x: b, y: b, z: b)
+  _ = d.f(x: b, y: b)
+  _ = d.f2(x: b, y: b)
+  _ = d.f3(x: b, y: b)
+  _ = d.f4(x: b, y: b)
+  _ = d.g(x: a, y: a)
+  _ = d.g2(x: a, y: a)
+  _ = d.g3(x: a, y: a)
+  _ = d.g4(x: a, y: a)
+  _ = d.h(x: u, y: u)
+  _ = d.h2(x: u, y: u)
+  _ = d.h3(x: u, y: u)
+  _ = d.h4(x: u, y: u)
+  _ = d.i(x: i, y: i)
+  _ = d.i2(x: i, y: i)
+  _ = d.i3(x: i, y: i)
+  _ = d.i4(x: i, y: i)
+}
+
+func callMethodsOnF<U>(d: F, b: B, a: AddrOnly, u: U, i: Int) {
+  _ = d.iuo(x: b, y: b, z: b)
+  _ = d.f(x: b, y: b)
+  _ = d.f2(x: b, y: b)
+  _ = d.f3(x: b, y: b)
+  _ = d.f4(x: b, y: b)
+  _ = d.g(x: a, y: a)
+  _ = d.g2(x: a, y: a)
+  _ = d.g3(x: a, y: a)
+  _ = d.g4(x: a, y: a)
+  _ = d.h(x: u, y: u)
+  _ = d.h2(x: u, y: u)
+  _ = d.h3(x: u, y: u)
+  _ = d.h4(x: u, y: u)
+  _ = d.i(x: i, y: i)
+  _ = d.i2(x: i, y: i)
+  _ = d.i3(x: i, y: i)
+  _ = d.i4(x: i, y: i)
+}
+
 @objc class B {
   // We only allow B! -> B overrides for @objc methods.
   // The IUO force-unwrap requires a thunk.
