@@ -74,6 +74,7 @@ set(LLVM_OPTIONAL_SOURCES
     MutexWin32.cpp
     CygwinPort.cpp
     ImageInspectionInit.cpp
+    ImageInspectionDL.cpp
     ImageInspectionELF.cpp
     ImageInspectionStatic.cpp
     StaticBinaryELF.cpp

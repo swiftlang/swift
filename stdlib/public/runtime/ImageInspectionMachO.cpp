@@ -68,20 +68,9 @@ void swift::initializeTypeMetadataRecordLookup() {
   _dyld_register_func_for_add_image(
     addImageCallback<TypeMetadataRecordSection,
                      addImageTypeMetadataRecordBlockCallback>);
-  
+
 }
 
-int swift::lookupSymbol(const void *address, SymbolInfo *info) {
-  Dl_info dlinfo;
-  if (dladdr(address, &dlinfo) == 0) {
-    return 0;
-  }
-
-  info->fileName = dlinfo.dli_fname;
-  info->baseAddress = dlinfo.dli_fbase;
-  info->symbolName = dlinfo.dli_sname;
-  info->symbolAddress = dlinfo.dli_saddr;
-  return 1;
-}
+#include "ImageInspectionDL.cpp"
 
 #endif // defined(__APPLE__) && defined(__MACH__)

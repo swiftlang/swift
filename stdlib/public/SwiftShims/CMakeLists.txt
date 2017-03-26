@@ -4,6 +4,7 @@ set(sources
   FoundationShims.h
   GlobalObjects.h
   HeapObject.h
+  ImageInspectionShims.h
   LibcShims.h
   RefCount.h
   RuntimeShims.h
