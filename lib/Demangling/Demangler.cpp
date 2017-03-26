@@ -805,7 +805,7 @@ NodePointer Demangler::popFunctionType(Node::Kind kind) {
 NodePointer Demangler::popFunctionParams(Node::Kind kind) {
   NodePointer ParamsType = nullptr;
   if (popNode(Node::Kind::EmptyList)) {
-    ParamsType = createType(createNode(Node::Kind::NonVariadicTuple));
+    ParamsType = createType(createNode(Node::Kind::Tuple));
   } else {
     ParamsType = popNode(Node::Kind::Type);
   }
@@ -813,15 +813,14 @@ NodePointer Demangler::popFunctionParams(Node::Kind kind) {
 }
 
 NodePointer Demangler::popTuple() {
-  NodePointer Root = createNode(popNode(Node::Kind::VariadicMarker) ?
-                                         Node::Kind::VariadicTuple :
-                                         Node::Kind::NonVariadicTuple);
+  NodePointer Root = createNode(Node::Kind::Tuple);
 
   if (!popNode(Node::Kind::EmptyList)) {
     bool firstElem = false;
     do {
       firstElem = (popNode(Node::Kind::FirstElementMarker) != nullptr);
       NodePointer TupleElmt = createNode(Node::Kind::TupleElement);
+      addChild(TupleElmt, popNode(Node::Kind::VariadicMarker));
       if (NodePointer Ident = popNode(Node::Kind::Identifier)) {
         TupleElmt->addChild(createNodeWithAllocatedText(
                               Node::Kind::TupleElementName, Ident->getText()),
