@@ -211,10 +211,6 @@ extension Collection where Iterator.Element == UTF16.CodeUnit {
   }
 }
 
-// TODO:
-//
-// - Move Any*UnicodeView into the standard library
-//
 extension String.Content {
   public init() { _rep = .utf16(._emptyInstance()) }
 
