@@ -1333,10 +1333,10 @@ void ASTMangler::appendTypeList(Type listTy) {
       appendType(field.getType());
       if (field.hasName())
         appendIdentifier(field.getName().str());
+      if (field.isVararg())
+        appendOperator("d");
       appendListSeparator(firstField);
     }
-    if (tuple->getElements().back().isVararg())
-      return appendOperator("d");
   } else {
     appendType(listTy);
     appendListSeparator();
