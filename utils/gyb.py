@@ -758,7 +758,7 @@ def expand(filename, line_directive=_default_line_directive, **local_bindings):
     ... a pox on ${i} for epoxy
     ... % end
     ... ${120 +
-    ... 
+    ...
     ...    3}
     ... abc
     ... ${"w\nx\nX\ny"}
