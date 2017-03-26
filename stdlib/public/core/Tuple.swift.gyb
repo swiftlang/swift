@@ -23,6 +23,14 @@ comparableOperators = [
 
 }%
 
+/// Two tuples each of arity 0 are equal
+/// - Parameters:
+///   - lhs: An empty tuple.
+///   - rhs: An empty tuple.
+public func ==(lhs: (), rhs: ()) -> Bool {
+  return true
+}
+
 % for arity in range(2,7):
 %   typeParams = [chr(ord("A") + i) for i in range(arity)]
 %   tupleT = "({})".format(",".join(typeParams))
