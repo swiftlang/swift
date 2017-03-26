@@ -389,6 +389,10 @@ class FailableBaseClass {
   // CHECK:   [[NEW_SELF:%.*]] = apply {{.*}}([[TAKE_SELF]]) : $@convention(method) (@owned FailableBaseClass) -> @owned Optional<FailableBaseClass>
   // CHECK:   cond_br {{.*}}, [[SUCC_BB:bb[0-9]+]], [[FAIL_BB:bb[0-9]+]]
   //
+  // CHECK: [[FAIL_BB:bb[0-9]+]]:
+  // CHECK:   destroy_value [[NEW_SELF]]
+  // CHECK:   br [[FAIL_EPILOG_BB:bb[0-9]+]]
+  //
   // CHECK: [[SUCC_BB]]:
   // CHECK:   [[UNWRAPPED_NEW_SELF:%.*]] = unchecked_enum_data [[NEW_SELF]] : $Optional<FailableBaseClass>, #Optional.some!enumelt.1
   // CHECK:   store [[UNWRAPPED_NEW_SELF]] to [init] [[MUI]]
@@ -397,7 +401,7 @@ class FailableBaseClass {
   // CHECK:   destroy_value [[SELF_BOX]]
   // CHECK:   br [[EPILOG_BB:bb[0-9]+]]([[WRAPPED_RESULT]]
   //
-  // CHECK: [[FAIL_BB]]:
+  // CHECK: [[FAIL_EPILOG_BB]]:
   // CHECK:   destroy_value [[SELF_BOX]]
   // CHECK:   [[WRAPPED_RESULT:%.*]] = enum $Optional<FailableBaseClass>, #Optional.none!enumelt
   // CHECK:   br [[EPILOG_BB]]([[WRAPPED_RESULT]]
