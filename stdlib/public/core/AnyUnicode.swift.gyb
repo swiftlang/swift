@@ -16,7 +16,7 @@
 /// Types that present useful views and information about Unicode content.
 ///
 /// Unicode and _UnicodeStorage refine this protocol.
-public protocol _UnicodeContent {
+public protocol UnicodeContent {
   var isKnownLatin1: Bool { get }
   var isKnownASCII: Bool { get }
   var isKnownFCCNormalized: Bool { get }
@@ -65,7 +65,7 @@ public protocol _UnicodeContent {
 #endif
 }
 
-extension _UnicodeContent where UTF16View.Iterator.Element == UTF16.CodeUnit {
+extension UnicodeContent where UTF16View.Iterator.Element == UTF16.CodeUnit {
   public func isLatin1() -> Bool {
     return isKnownLatin1 || !utf16.contains { $0 > 0xFF }
   }
@@ -78,7 +78,7 @@ extension _UnicodeContent where UTF16View.Iterator.Element == UTF16.CodeUnit {
 /// Types that present Unicode content in a given encoding.
 ///
 /// Typical models are the buffers that provide storage for String
-public protocol _UnicodeStorage : _UnicodeContent {
+public protocol _UnicodeStorage : UnicodeContent {
   associatedtype Encoding: UnicodeEncoding
   var encoding: Encoding.Type { get }
   

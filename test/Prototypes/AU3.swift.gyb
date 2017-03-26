@@ -21,7 +21,7 @@
 import StdlibUnittest
 
 //===--- Unicode ----------------------------------------------------------===//
-/// Collections of `Character` that are also `_UnicodeContent`.
+/// Collections of `Character` have `UnicodeContent`.
 public protocol Unicode
   : BidirectionalCollection, BidirectionalCollectionWrapper
 // where Iterator.Element == Character
@@ -29,7 +29,7 @@ public protocol Unicode
   // poor man's constraint on Iterator.Element
   subscript(i: Index) -> Character { get }
   
-  associatedtype Content : _UnicodeContent
+  associatedtype Content : UnicodeContent
   var content: Content { get }
 }
 
@@ -62,7 +62,7 @@ class UnicodeContentBox : FactoryInitializable {
   func isLatin1() -> Bool  { fatalError("override me!") }
   func isASCII() -> Bool { fatalError("override me!") }
 
-  class Instance<Base: _UnicodeContent> : UnicodeContentBox
+  class Instance<Base: UnicodeContent> : UnicodeContentBox
   where Base.UTF16View.Iterator.Element == UTF16.CodeUnit,
   Base.UnicodeScalarView.Iterator.Element == UnicodeScalar
   {
@@ -100,7 +100,7 @@ class UnicodeContentBox : FactoryInitializable {
     }
   }
 
-  convenience init<Base: _UnicodeContent>(wrapping x: Base)
+  convenience init<Base: UnicodeContent>(wrapping x: Base)
   where Base.UTF16View.Iterator.Element == UTF16.CodeUnit,
   Base.UnicodeScalarView.Iterator.Element == UnicodeScalar
   {
@@ -165,7 +165,7 @@ def switch(s):
   
 }%
 
-extension String.Content : _UnicodeContent {
+extension String.Content : UnicodeContent {
   public typealias UTF16View = AnyUInt16UnicodeView
   public var utf16: UTF16View {
     ${switch('return UTF16View(x.utf16)')}
