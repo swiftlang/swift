@@ -1934,6 +1934,77 @@ SILDeclRef TypeConverter::getOverriddenVTableEntry(SILDeclRef method) {
   return cur;
 }
 
+// FIXME: This makes me very upset. Can we do without this?
+static CanType copyOptionalityFromDerivedToBase(TypeConverter &tc,
+                                                CanType derived,
+                                                CanType base) {
+  // Unwrap optionals, but remember that we did.
+  bool derivedWasOptional = false;
+  bool baseWasOptional = false;
+  if (auto object = derived.getAnyOptionalObjectType()) {
+    derivedWasOptional = true;
+    derived = object;
+  }
+  if (auto object = base.getAnyOptionalObjectType()) {
+    baseWasOptional = true;
+    base = object;
+  }
+
+  // T? +> S = (T +> S)?
+  // T? +> S? = (T +> S)?
+  if (derivedWasOptional) {
+    base = copyOptionalityFromDerivedToBase(tc, derived, base);
+
+    auto optDecl = tc.Context.getOptionalDecl();
+    return CanType(BoundGenericEnumType::get(optDecl, Type(), base));
+  }
+
+  // (T1, T2, ...) +> (S1, S2, ...) = (T1 +> S1, T2 +> S2, ...)
+  if (auto derivedTuple = dyn_cast<TupleType>(derived)) {
+    if (auto baseTuple = dyn_cast<TupleType>(base)) {
+      assert(derivedTuple->getNumElements() == baseTuple->getNumElements());
+      SmallVector<TupleTypeElt, 4> elements;
+      for (unsigned i = 0, e = derivedTuple->getNumElements(); i < e; i++) {
+        elements.push_back(
+          baseTuple->getElement(i).getWithType(
+            copyOptionalityFromDerivedToBase(
+              tc,
+              derivedTuple.getElementType(i),
+              baseTuple.getElementType(i))));
+      }
+      return CanType(TupleType::get(elements, tc.Context));
+    }
+  }
+
+  // (T1 -> T2) +> (S1 -> S2) = (T1 +> S1) -> (T2 +> S2)
+  if (auto derivedFunc = dyn_cast<AnyFunctionType>(derived)) {
+    if (auto baseFunc = dyn_cast<FunctionType>(base)) {
+      return CanFunctionType::get(
+        copyOptionalityFromDerivedToBase(tc,
+                                         derivedFunc.getInput(),
+                                         baseFunc.getInput()),
+        copyOptionalityFromDerivedToBase(tc,
+                                         derivedFunc.getResult(),
+                                         baseFunc.getResult()),
+        baseFunc->getExtInfo());
+    }
+
+    if (auto baseFunc = dyn_cast<GenericFunctionType>(base)) {
+      return CanGenericFunctionType::get(
+        baseFunc.getGenericSignature(),
+        copyOptionalityFromDerivedToBase(tc,
+                                         derivedFunc.getInput(),
+                                         baseFunc.getInput()),
+        copyOptionalityFromDerivedToBase(tc,
+                                         derivedFunc.getResult(),
+                                         baseFunc.getResult()),
+        baseFunc->getExtInfo());
+    }
+  }
+
+  return base;
+}
+
 /// Returns the ConstantInfo corresponding to the VTable thunk for overriding.
 /// Will be the same as getConstantInfo if the declaration does not override.
 SILConstantInfo TypeConverter::getConstantOverrideInfo(SILDeclRef derived,
@@ -1983,23 +2054,21 @@ SILConstantInfo TypeConverter::getConstantOverrideInfo(SILDeclRef derived,
       cast<AnyFunctionType>(overrideInterfaceTy->getCanonicalType()),
       derived.uncurryLevel, derived);
 
+  if (!checkASTTypeForABIDifferences(derivedInfo.LoweredInterfaceType,
+                                     overrideLoweredInterfaceTy)) {
+    basePattern = AbstractionPattern(
+      copyOptionalityFromDerivedToBase(
+        *this,
+        derivedInfo.LoweredInterfaceType,
+        baseInfo.LoweredInterfaceType));
+    overrideLoweredInterfaceTy = derivedInfo.LoweredInterfaceType;
+  }
+
   // Build the SILFunctionType for the vtable thunk.
   CanSILFunctionType fnTy = getNativeSILFunctionType(M, basePattern,
                                                      overrideLoweredInterfaceTy,
                                                      derived,
                                                      derived.kind);
-
-  {
-    GenericContextScope scope(*this, fnTy->getGenericSignature());
-
-    // Is the vtable thunk type actually ABI compatible with the derived type?
-    // Then we don't need a thunk.
-    if (checkFunctionForABIDifferences(derivedInfo.SILFnType, fnTy)
-          == ABIDifference::Trivial) {
-      ConstantOverrideTypes[{derived, base}] = derivedInfo;
-      return derivedInfo;
-    }
-  }
 
   // Build the SILConstantInfo and cache it.
   SILConstantInfo overrideInfo;

@@ -43,18 +43,18 @@ func callMethodsOnConcreteClass<U>(o: ConcreteClass, t: C, u: U, tt: C.Type) {
   _ = o.inAndOutGeneric(x: t, y: u)
   _ = o.inAndOutMetatypes(x: tt)
   _ = o.inAndOutTuples(x: (t, (tt, { $0 })))
-  //_ = o.variantOptionality(x: t) // FIXME
+  _ = o.variantOptionality(x: t)
   _ = o.variantOptionalityMetatypes(x: tt)
   _ = o.variantOptionalityFunctions(x: { $0 })
   _ = o.variantOptionalityTuples(x: (t, (tt, { $0 })))
 }
 
 func callMethodsOnConcreteClassVariance<U>(o: ConcreteClassVariance, b: B, c: C, u: U, tt: C.Type) {
-  //_ = o.inAndOut(x: b) // FIXME
+  _ = o.inAndOut(x: b)
   _ = o.inAndOutGeneric(x: c, y: u)
   _ = o.inAndOutMetatypes(x: tt)
   _ = o.inAndOutTuples(x: (c, (tt, { $0 })))
-  //_ = o.variantOptionality(x: t) // FIXME
+  _ = o.variantOptionality(x: b)
   _ = o.variantOptionalityMetatypes(x: tt)
   _ = o.variantOptionalityFunctions(x: { $0 })
   _ = o.variantOptionalityTuples(x: (c, (tt, { $0 })))
@@ -131,7 +131,7 @@ func callMethodsOnConcreteClassMetatype<U>(o: ConcreteClassMetatype, t: C.Type, 
   _ = o.inAndOutGeneric(x: t, y: u)
   _ = o.inAndOutMetatypes(x: tt)
   _ = o.inAndOutTuples(x: (t, (tt, { $0 })))
-  //_ = o.variantOptionality(x: t) // FIXME
+  _ = o.variantOptionality(x: t)
   _ = o.variantOptionalityMetatypes(x: tt)
   _ = o.variantOptionalityFunctions(x: { $0 })
   _ = o.variantOptionalityTuples(x: (t, (tt, { $0 })))
