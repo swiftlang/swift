@@ -29,6 +29,27 @@ public protocol AnyUnicodeContent {
   var anyUTF16: AnyUInt16UnicodeView { get }
 }
 
+
+/// Default implementations
+public extension AnyUnicodeContent {
+  public var isKnownLatin1: Bool { return false }
+  public var isKnownASCII: Bool { return false }
+  public var isKnownFCCNormalized: Bool { return false }
+  public var isKnownFCDForm: Bool {
+    return isKnownFCCNormalized || isKnownNFDNormalized
+  }
+  public var isKnownNFDNormalized: Bool { return false }
+  public var isKnownNFCNormalized: Bool { return false }
+  
+  public func isLatin1() -> Bool {
+    return isKnownLatin1 || !anyUTF16.contains { $0 > 0xFF }
+  }
+
+  public func isASCII() -> Bool {
+    return isKnownASCII || !anyUTF16.contains { $0 > 0x7f }
+  }
+}
+
 /// Types that present useful views and information about Unicode content.
 ///
 /// UnicodeStorage refines this protocol.
@@ -158,14 +179,7 @@ where
 
 /// Default implementations
 public extension UnicodeStorage {
-
-  var isKnownLatin1: Bool { return false }
-  var isKnownASCII: Bool { return false }
   var isKnownValidEncoding: Bool { return false }
-  var isKnownFCCNormalized: Bool { return false }
-  var isKnownFCDForm: Bool {
-    return isKnownFCCNormalized || isKnownNFDNormalized
-  }
 }
 
 public extension UnicodeStorage
