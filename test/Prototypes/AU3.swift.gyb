@@ -17,7 +17,6 @@
 %{
   import gyb
 }%
-import Swift
 import StdlibUnittest
 
 /// Implementation detail of `String` that type-erases any `UnicodeContent` into
@@ -150,33 +149,57 @@ extension String.Content.NSStringPayload : AnyUnicodeContent {
   // func isASCII() -> Bool
 }
 
-extension String.Content.NSStringPayload : UnicodeContent {  
-  public var utf16: RandomAccessUnicodeView<
-    LazyMapRandomAccessCollection<CountableRange<Int>, UTF16.CodeUnit>
-  > {
-    return RandomAccessUnicodeView(
-        (0..<object.length()).lazy.map { self.object.characterAtIndex($0) })
+extension String.Content.NSStringPayload : UnicodeContent {
+  internal var _utf16: _NSStringUTF16 {
+    return _NSStringUTF16(base: object)
+  }
+  
+  public var utf16: RandomAccessUnicodeView<_NSStringUTF16> {
+    return RandomAccessUnicodeView(_utf16)
   }
   
   public var fccNormalizedUTF16: AnyUInt16UnicodeView {
     return AnyUInt16UnicodeView(
-      _UnicodeViews(utf16, UTF16.self).fccNormalizedUTF16
+      _UnicodeViews(_utf16, UTF16.self).fccNormalizedUTF16
     )
   }
   
   public var characters: AnyCharacterUnicodeView {
-    return AnyCharacterUnicodeView(_UnicodeViews(utf16, UTF16.self).characters)
+    return AnyCharacterUnicodeView(_UnicodeViews(_utf16, UTF16.self).characters)
   }
   
   public var unicodeScalars: AnyUnicodeScalarUnicodeView {
     return AnyUnicodeScalarUnicodeView(
-      _UnicodeViews(utf16, UTF16.self).scalars)
+      _UnicodeViews(_utf16, UTF16.self).scalars)
   }
 }
+
+/// A wrapper around `_NSStringCore` that confers `RandomAccessCollection`
+/// conformance.
+internal struct _NSStringUTF16 : RandomAccessCollection {
+  var base: _NSStringCore
+  var startIndex: Int { return 0 }
+  var endIndex: Int { return base.length() }
+  subscript(i: Int) -> UTF16.CodeUnit {
+    return base.characterAtIndex(i)
+  }
+  public func withExistingUnsafeBuffer<R>(
+    _ body: (UnsafeBufferPointer<UTF16.CodeUnit>) throws -> R
+  ) rethrows -> R? {
+    guard let baseAddress = base._fastCharacterContents() else { return nil }
+    defer { _fixLifetime(self) }
+    return try body(UnsafeBufferPointer(start: baseAddress, count: base.length()))
+  }
+}
+
 
 /// Case accessors
 extension String.Content {
   % for tag, Payload in allCases:
+  /// Either the payload of `case .${tag}`, or `nil` if that is not the current
+  /// case.
+  ///
+  /// - Note: setting this property to nil clears the `String`
   internal var _${tag}: ${Payload}? {
     get {
       if case .${tag}(let x) = _rep { return x }
@@ -310,8 +333,10 @@ extension String.Content {
     case .any(let storage):
       return ObjectIdentifier(storage)
     case .cocoa(let storage):
+      // FIXME: don't we want to return nil in the cocoa case, since this is
+      // merely used for uniqueness checking and NSString is immutable?
       return ObjectIdentifier(storage.object)
-    case .cocoa, .small1, .small2, .small3:
+    case .small1, .small2, .small3:
       return nil
     }
   }

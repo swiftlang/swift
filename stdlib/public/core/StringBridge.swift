@@ -197,6 +197,7 @@ open class _SwiftNativeNSString {}
 /// subclass.
 @objc
 public protocol _NSStringCore : _NSCopying {
+  // FIXME: NSString imports with this as a property
   func length() -> Int
 
   func characterAtIndex(_ index: Int) -> UInt16
