@@ -18,6 +18,7 @@
     "StringIndexConversions.swift",
     "StringInterpolation.swift",
     "StringLegacy.swift",
+    "StringNormalization.swift",
     "StringRangeReplaceableCollection.swift",
     "StringStorage.swift",
     "StringUTF16.swift",
