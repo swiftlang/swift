@@ -2399,7 +2399,7 @@ extension UnsignedInteger where Self : FixedWidthInteger {
   public init<T : BinaryInteger>(_ source: T) {
     // This check is potentially removable by the optimizer
     if T.isSigned {
-      _precondition(source >= 0, "Negative value is not representable")
+      _precondition(source >= (0 as T), "Negative value is not representable")
     }
     // This check is potentially removable by the optimizer
     if source.bitWidth >= Self.bitWidth {
@@ -2475,7 +2475,7 @@ extension SignedInteger where Self : FixedWidthInteger {
   @_transparent
   public init<T : BinaryInteger>(_ source: T) {
     // This check is potentially removable by the optimizer
-    if T.isSigned {
+    if T.isSigned && source.bitWidth > Self.bitWidth {
       _precondition(source >= Self.min,
         "Not enough bits to represent a signed value")
     }
@@ -2491,7 +2491,7 @@ extension SignedInteger where Self : FixedWidthInteger {
   @_transparent
   public init?<T : BinaryInteger>(exactly source: T) {
     // This check is potentially removable by the optimizer
-    if T.isSigned && source < Self.min {
+    if T.isSigned && source.bitWidth > Self.bitWidth && source < Self.min {
       return nil
     }
     // The width check can be eliminated by the optimizer
@@ -3199,6 +3199,7 @@ public func _assumeNonNegative(_ x: ${Self}) -> ${Self} {
 ///
 /// - Parameter x: The integer to convert, and instance of type `T`.
 /// - Returns: The value of `x` converted to type `U`.
+@_transparent
 public func numericCast<T : BinaryInteger, U : BinaryInteger>(_ x: T) -> U {
   return U(x)
 }

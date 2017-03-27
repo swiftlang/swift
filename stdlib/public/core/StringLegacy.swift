@@ -153,10 +153,10 @@ extension String {
         // Prefix is longer than self.
         return false
       }
-      return Int(_swift_stdlib_memcmp(
+      return _swift_stdlib_memcmp(
         selfASCIIBuffer.baseAddress!,
         prefixASCIIBuffer.baseAddress!,
-        prefixASCIIBuffer.count)) == 0
+        prefixASCIIBuffer.count) == (0 as CInt)
     }
     if selfCore.hasContiguousStorage && prefixCore.hasContiguousStorage {
       let lhsStr = _NSContiguousString(selfCore)
@@ -211,11 +211,11 @@ extension String {
         // Suffix is longer than self.
         return false
       }
-      return Int(_swift_stdlib_memcmp(
+      return _swift_stdlib_memcmp(
         selfASCIIBuffer.baseAddress!
           + (selfASCIIBuffer.count - suffixASCIIBuffer.count),
         suffixASCIIBuffer.baseAddress!,
-        suffixASCIIBuffer.count)) == 0
+        suffixASCIIBuffer.count) == (0 as CInt)
     }
     if selfCore.hasContiguousStorage && suffixCore.hasContiguousStorage {
       let lhsStr = _NSContiguousString(selfCore)
