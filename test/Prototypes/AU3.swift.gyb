@@ -321,6 +321,125 @@ extension Collection where Iterator.Element == UTF16.CodeUnit {
   }
 }
 
+/// Bit packing
+///
+/// Packing a sequence of source integer values with a given limited bit width
+/// into a single representation integer.
+///
+/// * Lower-valued elements are assumed to be more common than higher-valued
+///   elements.  We want to optimize the representation for storing smaller
+///   numbers.
+///
+/// * Not doing anything fancy like huffman coding here; just direct bit
+///   manipulation.
+///
+/// * We divide the representation up into segments of `bitsPerElement` bits
+///   each, starting with the low bit, storing one source value per segment.
+///   That means we can't represent any elements with values wider than the bit
+///   width.
+///
+/// * In the general case, we have a partial segment in the high order bits.  
+///
+/// * We don't want to spend storage on representing a length.  A contiguous run
+///   of segments starting with the high order (partial) segment is considered
+///   to be empty space, containing no elements.  That means we can't represent
+///   any sequence whose last element would be represented as zero; it would be
+///   indistinguishable from a missing element.
+///
+/// * For each source element `e`, we store `(e + 1) & ~(~0 << bitsPerElement)`
+///   in its segment.  The result is that we cannot represent a source sequence 
+///   ending with the least-common value, and the most common values are
+///   still very likely to be representable in any partial segment.
+extension UnsignedInteger {
+  public init?<C: Collection>(packing source: C, bitsPerElement: Self)
+  where C.Iterator.Element : UnsignedInteger {
+    var r: Self = 0
+    var lastSegment: Self = 1
+    var shift: Self = 0
+    let mask = ~(0 as Self) << bitsPerElement
+    for x in source {
+      let x1 = numericCast(x) as Self
+      if x1 & mask != 0 { return nil } // value too large to represent
+      let segment = (x1 &+ 1) & ~mask
+      r |= segment << shift
+      if r >> shift != segment { return nil } // not enough bits
+      lastSegment = segment
+      shift += bitsPerElement
+    }
+    if lastSegment == 0 {  return nil  }
+    self = r
+  }
+}
+
+extension UnsignedInteger {
+  public static func <<(lhs: Self, rhs: Self) -> Self {
+    return Self(
+      (lhs.toUIntMax() << rhs.toUIntMax()) & (~(0 as Self)).toUIntMax())
+  }
+  public static func >>(lhs: Self, rhs: Self) -> Self {
+    return Self(
+      (lhs.toUIntMax() >> rhs.toUIntMax()) & (~(0 as Self)).toUIntMax())
+  }
+}
+
+//===----------------------------------------------------------------------===//
+// WORKAROUND: https://bugs.swift.org/browse/SR-4370
+extension UnsignedInteger {
+  static func _packing<C: Collection>(_ source: C, bitsPerElement: Self) -> Self?
+  where C.Iterator.Element : UnsignedInteger {
+    return Self(packing: source, bitsPerElement: bitsPerElement)
+  }
+}
+extension UInt61 {
+  public init?<C: Collection>(packing source: C, bitsPerElement: UInt61)
+  where C.Iterator.Element : UnsignedInteger {
+    guard let me = UInt61._packing(source, bitsPerElement: 5) else {
+      return nil
+    }
+    self = me
+  }
+}
+//===----------------------------------------------------------------------===//
+
+struct PackedUnsignedIntegers<
+  Representation : UnsignedInteger, Element : UnsignedInteger
+> {
+  init?<C: Collection>(
+    _ c: C,
+    bitsPerElement: Representation
+  )
+  where C.Iterator.Element : UnsignedInteger
+  {
+    guard let representation = Representation(
+      packing: c, bitsPerElement: bitsPerElement) else { return nil }
+    self.representation = representation
+    self.bitsPerElement = bitsPerElement
+  }
+  let bitsPerElement: Representation
+  let representation: Representation
+}
+
+extension PackedUnsignedIntegers : RandomAccessCollection {
+  var startIndex: Int { return 0 }
+  var endIndex: Int { return count }
+  
+  var count: Int {
+    var result = 0
+    var rep = representation
+    while rep != 0 {
+      rep = rep >> bitsPerElement
+      result += 1
+    }
+    return result
+  }
+  subscript(i: Int) -> Element {
+    var rep = representation
+    for _ in 0..<i { rep = rep >> bitsPerElement }
+    let mask = ~(0 as Representation) << bitsPerElement
+    return numericCast((rep &- 1) & ~mask)
+  }
+}
+
 extension String.Content {
   public init() { _rep = .utf16(._emptyInstance()) }
 
@@ -438,9 +557,52 @@ extension ObjectIdentifier {
 //===----------------------------------------------------------------------===//
 //===--- Tests ------------------------------------------------------------===//
 //===----------------------------------------------------------------------===//
-
-
 var suite = TestSuite("AnyUnicode")
+
+suite.test("UInt61.packing") {
+//  let five: UInt61 = 5
+  // Can't represent 32 as a 5-bit value
+  expectNil(UInt61(packing: CollectionOfOne(32 as UInt), bitsPerElement: 5))
+  
+  // The last value in the collection can't have all bits set because we can't
+  // distinguish that from "no more elements are left"
+  expectNil(UInt61(packing: CollectionOfOne(31 as UInt), bitsPerElement: 5))
+
+  expectEqual(
+    31,
+    UInt61(packing: CollectionOfOne(30 as UInt), bitsPerElement: 5))
+
+  expectEqual(
+    1,
+    UInt61(packing: CollectionOfOne(0 as UInt), bitsPerElement: 5))
+
+  expectEqual(
+    0b11111_00000,
+    UInt61(packing: [31, 30] as [UInt], bitsPerElement: 5))
+
+  expectNil(UInt61(packing: [31, 30, 31] as [UInt], bitsPerElement: 5))
+
+  expectEqual(
+    0b11111_00000_11111_00000,
+    UInt61(packing: [31, 30, 31, 30] as [UInt], bitsPerElement: 5))
+
+  let primesAndMore: [UInt] = [31, 29, 23, 19, 17, 13, 11, 7, 5, 3, 2, 1, 0]
+  expectEqual(
+    0b1_00010_00011_00100_00110_01000_01100_01110_10010_10100_11000_11110_00000,
+    UInt61(packing: primesAndMore, bitsPerElement: 5))
+  
+  if let c = expectNotNil(
+    PackedUnsignedIntegers<UInt61, UInt>(primesAndMore, bitsPerElement: 5)
+  ) {
+    expectEqualSequence(primesAndMore, Array(c))
+  }
+  
+  // There's only 1 bit left in the high-order partial segment.
+  expectNil(
+    UInt61(packing:
+      [31, 29, 23, 19, 17, 13, 11, 7, 5, 3, 2, 1, 1] as [UInt],
+      bitsPerElement: 5))
+}
 
 let sample = "abcdefghijklmnopqrstuvwxyz\n"
   + "🇸🇸🇬🇱🇱🇸🇩🇯🇺🇸\n"
