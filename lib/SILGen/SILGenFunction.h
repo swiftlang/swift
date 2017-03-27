@@ -467,7 +467,8 @@ public:
   SILFunction &getFunction() { return F; }
   SILModule &getModule() { return F.getModule(); }
   SILGenBuilder &getBuilder() { return B; }
-  
+  SILOptions &getOptions() { return getModule().getOptions(); }
+
   const TypeLowering &getTypeLowering(AbstractionPattern orig, Type subst) {
     return SGM.Types.getTypeLowering(orig, subst);
   }
