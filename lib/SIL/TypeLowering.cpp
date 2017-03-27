@@ -1370,18 +1370,28 @@ TypeConverter::~TypeConverter() {
 
 void *TypeLowering::operator new(size_t size, TypeConverter &tc,
                                  IsDependent_t dependent) {
-  return dependent
-    ? tc.DependentBPA.Allocate(size, alignof(TypeLowering&))
-    : tc.IndependentBPA.Allocate(size, alignof(TypeLowering&));
+  if (dependent) {
+    auto &state = tc.DependentTypes.back();
+    return state.BPA.Allocate(size, alignof(TypeLowering&));
+  }
+  return tc.IndependentBPA.Allocate(size, alignof(TypeLowering&));
 }
 
 const TypeLowering *TypeConverter::find(TypeKey k) {
   if (!k.isCacheable()) return nullptr;
 
-  auto &Types = k.isDependent() ? DependentTypes : IndependentTypes;
   auto ck = k.getCachingKey();
-  auto found = Types.find(ck);
-  if (found == Types.end())
+
+  llvm::DenseMap<CachingTypeKey, const TypeLowering *> *types;
+  if (k.isDependent()) {
+    auto &state = DependentTypes.back();
+    types = &state.Map;
+  } else {
+    types = &IndependentTypes;
+  }
+
+  auto found = types->find(ck);
+  if (found == types->end())
     return nullptr;
 
   assert(found->second && "type recursion not caught in Sema");
@@ -1391,9 +1401,15 @@ const TypeLowering *TypeConverter::find(TypeKey k) {
 void TypeConverter::insert(TypeKey k, const TypeLowering *tl) {
   if (!k.isCacheable()) return;
 
-  auto &Types = k.isDependent() ? DependentTypes : IndependentTypes;
+  llvm::DenseMap<CachingTypeKey, const TypeLowering *> *types;
+  if (k.isDependent()) {
+    auto &state = DependentTypes.back();
+    types = &state.Map;
+  } else {
+    types = &IndependentTypes;
+  }
 
-  Types[k.getCachingKey()] = tl;
+  (*types)[k.getCachingKey()] = tl;
 }
 
 /// Lower each of the elements of the substituted type according to
@@ -1491,7 +1507,7 @@ TypeConverter::getTypeLowering(AbstractionPattern origType,
   CanType substType = origSubstType->getCanonicalType();
   auto key = getTypeKey(origType, substType);
   
-  assert((!key.isDependent() || CurGenericContext)
+  assert((!key.isDependent() || getCurGenericContext())
          && "dependent type outside of generic context?!");
   
   if (auto existing = find(key))
@@ -1528,7 +1544,7 @@ TypeConverter::getTypeLowering(AbstractionPattern origType,
   // SILType-based lookup path for the type we just lowered to, then cache
   // that same result at this key if possible.
   AbstractionPattern origTypeForCaching =
-    AbstractionPattern(CurGenericContext, loweredSubstType);
+    AbstractionPattern(getCurGenericContext(), loweredSubstType);
   auto loweredKey = getTypeKey(origTypeForCaching, loweredSubstType);
 
   auto &lowering = getTypeLoweringForLoweredType(loweredKey);
@@ -2062,12 +2078,9 @@ void TypeConverter::pushGenericContext(CanGenericSignature sig) {
   // If the generic signature is empty, this is a no-op.
   if (!sig)
     return;
-  
-  // GenericFunctionTypes shouldn't nest.
-  assert(DependentTypes.empty() && "already in generic context?!");
-  assert(!CurGenericContext && "already in generic context!");
 
-  CurGenericContext = sig;
+  DependentTypeState state(sig);
+  DependentTypes.push_back(std::move(state));
 }
 
 void TypeConverter::popGenericContext(CanGenericSignature sig) {
@@ -2075,13 +2088,14 @@ void TypeConverter::popGenericContext(CanGenericSignature sig) {
   if (!sig)
     return;
 
-  assert(CurGenericContext == sig && "unpaired push/pop");
+  DependentTypeState &state = DependentTypes.back();
+  assert(state.Sig == sig && "unpaired push/pop");
   
   // Erase our cached TypeLowering objects and associated mappings for dependent
   // types.
   // Resetting the DependentBPA will deallocate but not run the destructor of
   // the dependent TypeLowerings.
-  for (auto &ti : DependentTypes) {
+  for (auto &ti : state.Map) {
     // Destroy only the unique entries.
     CanType srcType = ti.first.OrigType;
     if (!srcType) continue;
@@ -2089,9 +2103,8 @@ void TypeConverter::popGenericContext(CanGenericSignature sig) {
     if (srcType == mappedType || isa<LValueType>(srcType))
       ti.second->~TypeLowering();
   }
-  DependentTypes.clear();
-  DependentBPA.Reset();
-  CurGenericContext = nullptr;
+
+  DependentTypes.pop_back();
 }
 
 ProtocolDispatchStrategy
