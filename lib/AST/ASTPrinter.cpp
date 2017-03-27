@@ -54,14 +54,14 @@ using namespace swift;
 
 struct SynthesizedExtensionAnalyzer::Implementation {
   static bool isMemberFavored(const NominalTypeDecl* Target, const Decl* D) {
-    DeclContext* DC = Target->getDeclContext();
     Type BaseTy = Target->getDeclaredTypeInContext();
     const FuncDecl *FD = dyn_cast<FuncDecl>(D);
     if (!FD)
       return true;
-    ResolveMemberResult Result = resolveValueMember(*DC, BaseTy,
-                                                    FD->getEffectiveFullName());
-    return !(Result && Result.Favored != D);
+    ResolveMemberResult Result =
+      resolveValueMember(*Target->getInnermostDeclContext(), BaseTy,
+                         FD->getEffectiveFullName());
+    return !Result || Result.hasDeclFromNominal(FD);
   }
 
   static bool isExtensionFavored(const NominalTypeDecl* Target,
@@ -1646,9 +1646,10 @@ static bool shouldPrintAsFavorable(const Decl *D, PrintOptions &Options) {
   const FuncDecl *FD = dyn_cast<FuncDecl>(D);
   if (!FD)
     return true;
-  ResolveMemberResult Result = resolveValueMember(*Target->getDeclContext(),
-                                                  BaseTy, FD->getEffectiveFullName());
-  return !(Result && Result.Favored != D);
+  ResolveMemberResult Result =
+    resolveValueMember(*Target->getInnermostDeclContext(), BaseTy,
+                       FD->getEffectiveFullName());
+  return !Result || Result.hasDeclFromNominal(FD);
 }
 
 bool swift::shouldPrint(const Decl *D, PrintOptions &Options) {

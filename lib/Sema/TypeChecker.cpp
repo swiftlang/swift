@@ -1002,3 +1002,55 @@ TypeChecker::getDeclTypeCheckingSemantics(ValueDecl *decl) {
   }
   return DeclTypeCheckingSemantics::Normal;
 }
+
+ResolveMemberResult
+swift::resolveValueMember(DeclContext &DC, Type BaseTy, DeclName Name) {
+  ResolveMemberResult Result;
+  std::unique_ptr<TypeChecker> CreatedTC;
+  // If the current ast context has no type checker, create one for it.
+  auto *TC = static_cast<TypeChecker*>(DC.getASTContext().getLazyResolver());
+  if (!TC) {
+    CreatedTC.reset(new TypeChecker(DC.getASTContext()));
+    TC = CreatedTC.get();
+  }
+
+  for (auto Res : TC->lookupMember(&DC, BaseTy, Name)) {
+    auto *VD = Res.Decl;
+
+    // Categorize the found decl according to its decl context.
+    if (VD->getDeclContext()->isExtensionContext())
+      Result.FromExtensions.push_back(VD);
+    else
+      Result.FromNominals.push_back(VD);
+  }
+  return Result;
+}
+
+void swift::collectDefaultImplementationForProtocolMembers(ProtocolDecl *PD,
+    llvm::SmallDenseMap<ValueDecl*, ValueDecl*> &DefaultMap) {
+  Type BaseTy = PD->getDeclaredInterfaceType();
+  DeclContext *DC = PD->getInnermostDeclContext();
+  std::unique_ptr<TypeChecker> CreatedTC;
+  auto *TC = static_cast<TypeChecker*>(DC->getASTContext().getLazyResolver());
+  if (!TC) {
+    CreatedTC.reset(new TypeChecker(DC->getASTContext()));
+    TC = CreatedTC.get();
+  }
+  for (Decl *D : PD->getMembers()) {
+    ValueDecl *VD = dyn_cast<ValueDecl>(D);
+
+    // Skip non-value decl.
+    if (!VD)
+      continue;
+
+    // Skip nameless decl, e.g. a getter method for property.
+    if (VD->getName().empty())
+      continue;
+    ResolveMemberResult Result = resolveValueMember(*DC, BaseTy,
+                                                    VD->getFullName());
+    assert (Result.hasDeclFromNominal(VD));
+    for (auto *D : Result.FromExtensions) {
+      DefaultMap[D] = VD;
+    }
+  }
+}
