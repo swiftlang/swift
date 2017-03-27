@@ -369,6 +369,43 @@ suite.test("MemoryLayout") {
   expectEqual(8, MemoryLayout<String>.stride)
 }
 
+suite.test("InplaceViewMutation") {
+  var s = String(sample)
+  var s1 = s
+  expectEqualSequence(s.content.unicodeScalars, s1.content.unicodeScalars)
+  s.content.unicodeScalars.removeLast(1)
+  expectEqualSequence(
+    s.content.unicodeScalars, s1.content.unicodeScalars.dropLast()
+  )
+}
+
+suite.test("ViewValueSemantics") {
+  var u16 = String(sample).content.utf16
+  let u2 = u16
+  let snapshot = Array(u2)
+
+  // Unwrap the view
+  let wrapped = u16.base2 as! AnyUInt16UnicodeView.Adapter<
+    RandomAccessUnicodeView<_UTF16StringStorage>>
+  
+  // Tunnel all the way to the underlying storage, which has reference
+  // semantics.  FIXME: there should be no way for the user to do this!
+  var storage: _UTF16StringStorage = wrapped.base.base
+  storage.removeLast(1)                   
+  expectFalse(snapshot.elementsEqual(u2))
+  expectEqualSequence(storage, u2) 
+  expectEqualSequence(storage, u16)
+
+  // However, mutating u16 makes a copy
+  u16.removeLast()
+  expectEqualSequence(storage, u2) 
+  expectEqualSequence(storage.dropLast(), u16)
+  // FIXME: something in the collection forwarding stack is not forwarding
+  // _tryToReplaceSubrange, or this test would fail.  That means we're probably
+  // missing an optimization when it actually *is* OK to mutate the storage in
+  // place.
+}
+
 suite.test("UTF16/smoke") {
   var s = String(sample)
   expectFalse(s.content.isKnownLatin1)
