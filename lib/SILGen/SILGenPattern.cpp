@@ -1369,11 +1369,11 @@ void PatternMatchEmission::emitSpecializedDispatch(ClauseMatrix &clauses,
 /// and that we were supposed to use the given consumption rules on
 /// it, construct an appropriate managed value.
 static ConsumableManagedValue
-getManagedSubobject(SILGenFunction &gen, SILValue value,
+getManagedSubobject(SILGenFunction &SGF, SILValue value,
                     const TypeLowering &valueTL,
                     CastConsumptionKind consumption) {
   if (consumption != CastConsumptionKind::CopyOnSuccess) {
-    return {gen.emitManagedRValueWithCleanup(value, valueTL),
+    return {SGF.emitManagedRValueWithCleanup(value, valueTL),
              consumption};
   } else {
     return {ManagedValue::forUnmanaged(value), consumption};
@@ -1381,7 +1381,7 @@ getManagedSubobject(SILGenFunction &gen, SILValue value,
 }
 
 static ConsumableManagedValue
-emitReabstractedSubobject(SILGenFunction &gen, SILLocation loc,
+emitReabstractedSubobject(SILGenFunction &SGF, SILLocation loc,
                           ConsumableManagedValue value,
                           const TypeLowering &valueTL,
                           AbstractionPattern abstraction,
@@ -1389,13 +1389,13 @@ emitReabstractedSubobject(SILGenFunction &gen, SILLocation loc,
   // Return if there's no abstraction.  (The first condition is just
   // a fast path.)
   if (value.getType().getSwiftRValueType() == substFormalType ||
-      value.getType() == gen.getLoweredType(substFormalType))
+      value.getType() == SGF.getLoweredType(substFormalType))
     return value;
 
   // Otherwise, turn to +1 and re-abstract.
-  ManagedValue mv = gen.getManagedValue(loc, value);
+  ManagedValue mv = SGF.getManagedValue(loc, value);
   return ConsumableManagedValue::forOwned(
-           gen.emitOrigToSubstValue(loc, mv, abstraction, substFormalType));
+           SGF.emitOrigToSubstValue(loc, mv, abstraction, substFormalType));
 }
 
 void PatternMatchEmission::emitTupleDispatchWithOwnership(
