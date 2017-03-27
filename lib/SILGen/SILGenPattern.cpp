@@ -1427,15 +1427,7 @@ void PatternMatchEmission::emitTupleDispatchWithOwnership(
     SILType fieldTy = tupleSILTy.getTupleElementType(i);
     auto &fieldTL = SGF.getTypeLowering(fieldTy);
 
-    SILValue member;
-    if (tupleSILTy.isAddress()) {
-      member = SGF.B.createTupleElementAddr(loc, v, i, fieldTy);
-      if (!fieldTL.isAddressOnly())
-        member =
-            fieldTL.emitLoad(SGF.B, loc, member, LoadOwnershipQualifier::Take);
-    } else {
-      member = SGF.B.createTupleExtract(loc, v, i, fieldTy);
-    }
+    SILValue member = SGF.B.createTupleExtract(loc, v, i, fieldTy);
     auto memberCMV =
         getManagedSubobject(SGF, member, fieldTL, src.getFinalConsumption());
     destructured.push_back(memberCMV);
