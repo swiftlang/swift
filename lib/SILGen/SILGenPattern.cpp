@@ -438,6 +438,10 @@ private:
   void emitSpecializedDispatch(ClauseMatrix &matrix, ArgArray args,
                                unsigned &lastRow, unsigned column,
                                const FailureHandler &failure);
+  void emitTupleDispatchWithOwnership(ArrayRef<RowToSpecialize> rows,
+                                      ConsumableManagedValue src,
+                                      const SpecializationHandler &handleSpec,
+                                      const FailureHandler &failure);
   void emitTupleDispatch(ArrayRef<RowToSpecialize> rows,
                          ConsumableManagedValue src,
                          const SpecializationHandler &handleSpec,
@@ -1394,6 +1398,63 @@ emitReabstractedSubobject(SILGenFunction &gen, SILLocation loc,
            gen.emitOrigToSubstValue(loc, mv, abstraction, substFormalType));
 }
 
+void PatternMatchEmission::emitTupleDispatchWithOwnership(
+    ArrayRef<RowToSpecialize> rows, ConsumableManagedValue src,
+    const SpecializationHandler &handleCase,
+    const FailureHandler &outerFailure) {
+  auto firstPat = rows[0].Pattern;
+  auto sourceType = cast<TupleType>(firstPat->getType()->getCanonicalType());
+  SILLocation loc = firstPat;
+
+  SILValue v = src.getFinalManagedValue().forward(SGF);
+  SmallVector<ConsumableManagedValue, 4> destructured;
+
+  // Break down the values.
+  auto tupleSILTy = v->getType();
+  for (unsigned i = 0, e = sourceType->getNumElements(); i < e; ++i) {
+    SILType fieldTy = tupleSILTy.getTupleElementType(i);
+    auto &fieldTL = SGF.getTypeLowering(fieldTy);
+
+    SILValue member;
+    if (tupleSILTy.isAddress()) {
+      member = SGF.B.createTupleElementAddr(loc, v, i, fieldTy);
+      if (!fieldTL.isAddressOnly())
+        member =
+            fieldTL.emitLoad(SGF.B, loc, member, LoadOwnershipQualifier::Take);
+    } else {
+      member = SGF.B.createTupleExtract(loc, v, i, fieldTy);
+    }
+    auto memberCMV =
+        getManagedSubobject(SGF, member, fieldTL, src.getFinalConsumption());
+    destructured.push_back(memberCMV);
+  }
+
+  // Construct the specialized rows.
+  SmallVector<SpecializedRow, 4> specializedRows;
+  specializedRows.resize(rows.size());
+  for (unsigned i = 0, e = rows.size(); i != e; ++i) {
+    specializedRows[i].RowIndex = rows[i].RowIndex;
+
+    auto pattern = cast<TuplePattern>(rows[i].Pattern);
+    for (auto &elt : pattern->getElements()) {
+      specializedRows[i].Patterns.push_back(elt.getPattern());
+    }
+  }
+
+  // Maybe revert to the original cleanups during failure branches.
+  const FailureHandler *innerFailure = &outerFailure;
+  FailureHandler specializedFailure = [&](SILLocation loc) {
+    ArgUnforwarder unforwarder(SGF);
+    unforwarder.unforwardBorrowedValues(src, destructured);
+    outerFailure(loc);
+  };
+  if (ArgUnforwarder::requiresUnforwarding(SGF, src))
+    innerFailure = &specializedFailure;
+
+  // Recurse.
+  handleCase(destructured, specializedRows, *innerFailure);
+}
+
 /// Perform specialized dispatch for tuples.
 ///
 /// This is simple; all the tuples have the same structure.
@@ -1401,6 +1462,9 @@ void PatternMatchEmission::
 emitTupleDispatch(ArrayRef<RowToSpecialize> rows, ConsumableManagedValue src,
                   const SpecializationHandler &handleCase,
                   const FailureHandler &outerFailure) {
+  if (SGF.getOptions().EnableSILOwnership && src.getType().isObject()) {
+    return emitTupleDispatchWithOwnership(rows, src, handleCase, outerFailure);
+  }
   auto firstPat = rows[0].Pattern;
   auto sourceType = cast<TupleType>(firstPat->getType()->getCanonicalType());
   SILLocation loc = firstPat;
