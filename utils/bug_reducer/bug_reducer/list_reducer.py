@@ -115,7 +115,7 @@ class ListReducer(object):
 
             # Split the list into a prefix, suffix list and then run test on
             # those.
-            mid = self.mid_top/2
+            mid = self.mid_top / 2
             if not self._test_prefix_suffix(mid, self.target_list[:mid],
                                             self.target_list[mid:]):
                 # If we returned false, then we did some sort of work and there
@@ -151,7 +151,7 @@ class ListReducer(object):
             # Check interior elements, using an offset to make sure we do not
             # skip elements when we trim.
             offset = 0
-            for i in range(1, len(self.target_list)-1):
+            for i in range(1, len(self.target_list) - 1):
                 real_i = i + offset
                 test_list = self.target_list[real_i:]
                 (result, prefix, suffix) = self.run_test([], test_list)
