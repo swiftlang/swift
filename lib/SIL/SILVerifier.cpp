@@ -2678,9 +2678,13 @@ public:
         Def = OpenedArchetypes.getOpenedArchetypeDef(archetypeTy);
         require(Def, "Opened archetype should be registered in SILFunction");
       } else if (t->hasDynamicSelfType()) {
-        require(I->getFunction()->hasSelfParam(),
+        require(I->getFunction()->hasSelfParam() ||
+                I->getFunction()->hasSelfMetadataParam(),
               "Function containing dynamic self type must have self parameter");
-        Def = I->getFunction()->getSelfArgument();
+        if (I->getFunction()->hasSelfMetadataParam())
+          Def = I->getFunction()->getArguments().back();
+        else
+          Def = I->getFunction()->getSelfArgument();
       } else {
         return;
       }
