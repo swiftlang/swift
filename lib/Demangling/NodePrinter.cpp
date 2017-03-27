@@ -968,17 +968,23 @@ void NodePrinter::print(NodePointer pointer, bool asContext, bool suppressType) 
       isVariadic = true;
       Idx++;
     }
+    NodePointer type = nullptr;
     if (pointer->getNumChildren() == Idx + 1) {
-      NodePointer type = pointer->getChild(Idx);
-      print(type);
+      type = pointer->getChild(Idx);
     } else if (pointer->getNumChildren() == Idx + 2) {
       NodePointer id = pointer->getChild(Idx);
-      NodePointer type = pointer->getChild(Idx + 1);
+      type = pointer->getChild(Idx + 1);
       print(id);
+    }
+    if (isVariadic) {
+      SugarType Sugar = findSugar(type);
+      if (Sugar == SugarType::Array)
+        type = type->getFirstChild()->getChild(1)->getFirstChild();
+      print(type);
+      Printer << "...";
+    } else {
       print(type);
     }
-    if (isVariadic)
-      Printer << "...";
     return;
   }
   case Node::Kind::TupleElementName:
