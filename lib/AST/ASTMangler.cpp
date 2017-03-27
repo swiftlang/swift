@@ -17,6 +17,7 @@
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTVisitor.h"
+#include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ParameterList.h"
@@ -261,7 +262,9 @@ std::string ASTMangler::mangleReabstractionThunkHelper(
   return finalize();
 }
 
-std::string ASTMangler::mangleTypeForDebugger(Type Ty, const DeclContext *DC) {
+std::string ASTMangler::mangleTypeForDebugger(Type Ty, const DeclContext *DC,
+                                              GenericEnvironment *GE) {
+  GenericEnv = GE;
   DWARFMangling = true;
   beginMangling();
   
@@ -696,8 +699,8 @@ void ASTMangler::appendType(Type type) {
 
       // Find the archetype information.
       const DeclContext *DC = DeclCtx;
-      auto GTPT = DC->mapTypeOutOfContext(archetype)
-          ->castTo<GenericTypeParamType>();
+      auto GTPT = GenericEnvironment::mapTypeOutOfContext(GenericEnv, archetype)
+                      ->castTo<GenericTypeParamType>();
 
       // The DWARF output created by Swift is intentionally flat,
       // therefore archetypes are emitted with their DeclContext if
