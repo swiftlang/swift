@@ -391,22 +391,24 @@ void SILFunction::viewCFG() const {
 #endif
 }
 
-/// Returns true if this function has either a self metadata argument or
-/// object from which Self metadata may be obtained.
 bool SILFunction::hasSelfMetadataParam() const {
   auto paramTypes = getConventions().getParameterSILTypes();
   if (paramTypes.empty())
     return false;
 
   auto silTy = *std::prev(paramTypes.end());
-  if (!silTy.isClassOrClassMetatype())
+  if (!silTy.isObject())
     return false;
 
-  auto metaTy = dyn_cast<MetatypeType>(silTy.getSwiftRValueType());
-  (void)metaTy;
-  assert(!metaTy || metaTy->getRepresentation() != MetatypeRepresentation::Thin
-         && "Class metatypes are never thin.");
-  return true;
+  auto selfTy = silTy.getSwiftRValueType();
+
+  if (auto metaTy = dyn_cast<MetatypeType>(selfTy)) {
+    selfTy = metaTy.getInstanceType();
+    if (auto dynamicSelfTy = dyn_cast<DynamicSelfType>(selfTy))
+      selfTy = dynamicSelfTy.getSelfType();
+  }
+
+  return !!selfTy.getClassOrBoundGenericClass();
 }
 
 bool SILFunction::hasName(const char *Name) const {
