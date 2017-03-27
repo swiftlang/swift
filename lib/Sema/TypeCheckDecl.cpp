@@ -1167,7 +1167,8 @@ static void configureImplicitSelf(TypeChecker &tc,
   auto selfDecl = func->getImplicitSelfDecl();
 
   // Compute the type of self.
-  Type selfIfaceTy = func->computeInterfaceSelfType(/*isInitializingCtor*/true);
+  Type selfIfaceTy = func->computeInterfaceSelfType(/*isInitializingCtor*/true,
+                                                    /*wantDynamicSelf*/true);
   assert(selfDecl && selfIfaceTy && "Not a method");
 
   // 'self' is 'let' for reference types (i.e., classes) or when 'self' is

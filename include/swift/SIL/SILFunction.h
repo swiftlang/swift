@@ -354,6 +354,12 @@ public:
 
   /// Returns true if this function either has a self metadata argument or
   /// object that Self metadata may be derived from.
+  ///
+  /// Note that this is not the same as hasSelfParam().
+  ///
+  /// For closures that capture DynamicSelfType, hasSelfMetadataParam()
+  /// is true and hasSelfParam() is false. For methods on value types,
+  /// hasSelfParam() is true and hasSelfMetadataParam() is false.
   bool hasSelfMetadataParam() const;
 
   /// Return the mangled name of this SILFunction.

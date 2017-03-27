@@ -1,4 +1,6 @@
 // RUN: %target-swift-frontend -emit-silgen %s -disable-objc-attr-requires-foundation-module | %FileCheck %s
+// RUN: %target-swift-frontend -emit-sil -O %s -disable-objc-attr-requires-foundation-module
+// RUN: %target-swift-frontend -emit-ir %s -disable-objc-attr-requires-foundation-module
 
 protocol P {
   func f() -> Self
@@ -16,13 +18,17 @@ class X : P, CP {
 
   // CHECK-LABEL: sil hidden @_T012dynamic_self1XC7factory{{[_0-9a-zA-Z]*}}FZ : $@convention(method) (Int, @thick X.Type) -> @owned X
   // CHECK: bb0([[I:%[0-9]+]] : $Int, [[SELF:%[0-9]+]] : $@thick X.Type):
-  // CHECK: [[CTOR:%[0-9]+]] = class_method [[SELF]] : $@thick X.Type, #X.init!allocator.1 : (X.Type) -> (Int) -> X, $@convention(method) (Int, @thick X.Type) -> @owned X
-  // CHECK: apply [[CTOR]]([[I]], [[SELF]]) : $@convention(method) (Int, @thick X.Type) -> @owned X
+  // CHECK: [[DYNAMIC_SELF:%[0-9]+]] = unchecked_trivial_bit_cast [[SELF]] : $@thick X.Type to $@thick @dynamic_self X.Type
+  // CHECK: [[STATIC_SELF:%[0-9]+]] = upcast [[DYNAMIC_SELF]] : $@thick @dynamic_self X.Type to $@thick X.Type
+  // CHECK: [[CTOR:%[0-9]+]] = class_method [[STATIC_SELF]] : $@thick X.Type, #X.init!allocator.1 : (X.Type) -> (Int) -> X, $@convention(method) (Int, @thick X.Type) -> @owned X
+  // CHECK: apply [[CTOR]]([[I]], [[STATIC_SELF]]) : $@convention(method) (Int, @thick X.Type) -> @owned X
   class func factory(i: Int) -> Self { return self.init(int: i) }
 }
 
 class Y : X { 
-  required init(int i: Int) { }
+  required init(int i: Int) {
+    super.init(int: i)
+  }
 }
 
 class GX<T> {
@@ -45,7 +51,7 @@ class GY<T> : GX<[T]> { }
 // CHECK:   end_borrow [[BORROWED_Y]] from [[Y]]
 // CHECK:   destroy_value [[Y]] : $Y
 func testDynamicSelfDispatch(y: Y) {
-  y.f()
+  _ = y.f()
 }
 
 // CHECK-LABEL: sil hidden @_T012dynamic_self30testDynamicSelfDispatchGeneric{{[_0-9a-zA-Z]*}}F : $@convention(thin) (@owned GY<Int>) -> ()
@@ -61,7 +67,7 @@ func testDynamicSelfDispatchGeneric(gy: GY<Int>) {
   // CHECK:   destroy_value [[GY_RESULT]] : $GY<Int>
   // CHECK:   end_borrow [[BORROWED_GY]] from [[GY]]
   // CHECK:   destroy_value [[GY]]
-  gy.f()
+  _ = gy.f()
 }
 
 // CHECK-LABEL: sil hidden @_T012dynamic_self21testArchetypeDispatch{{[_0-9a-zA-Z]*}}F : $@convention(thin) <T where T : P> (@in T) -> ()
@@ -70,7 +76,7 @@ func testArchetypeDispatch<T: P>(t: T) {
   // CHECK:   [[ARCHETYPE_F:%[0-9]+]] = witness_method $T, #P.f!1 : {{.*}} : $@convention(witness_method) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> @out τ_0_0
   // CHECK:   [[T_RESULT:%[0-9]+]] = alloc_stack $T
   // CHECK:   [[SELF_RESULT:%[0-9]+]] = apply [[ARCHETYPE_F]]<T>([[T_RESULT]], [[T]]) : $@convention(witness_method) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> @out τ_0_0
-  t.f()
+  _ = t.f()
 }
 
 // CHECK-LABEL: sil hidden @_T012dynamic_self23testExistentialDispatch{{[_0-9a-zA-Z]*}}F
@@ -84,7 +90,7 @@ func testExistentialDispatch(p: P) {
 // CHECK:   destroy_addr [[P_RESULT]] : $*P
 // CHECK:   dealloc_stack [[P_RESULT]] : $*P
 // CHECK:   destroy_addr [[P]] : $*P
-  p.f()
+  _ = p.f()
 }
 
 // CHECK-LABEL: sil hidden @_T012dynamic_self28testExistentialDispatchClass{{[_0-9a-zA-Z]*}}F : $@convention(thin) (@owned CP) -> ()
@@ -98,7 +104,7 @@ func testExistentialDispatch(p: P) {
 // CHECK:   end_borrow [[BORROWED_CP]] from [[CP]]
 // CHECK:   destroy_value [[CP]]
 func testExistentialDispatchClass(cp: CP) {
-  cp.f()
+  _ = cp.f()
 }
 
 @objc class ObjC {
@@ -112,7 +118,7 @@ func testAnyObjectDispatch(o: AnyObject) {
   // CHECK: bb1([[METHOD:%[0-9]+]] : $@convention(objc_method) (@opened({{.*}}) AnyObject) -> @autoreleased AnyObject):
   // CHECK:   [[O_OBJ_COPY:%.*]] = copy_value [[O_OBJ]]
   // CHECK:   [[VAR_9:%[0-9]+]] = partial_apply [[METHOD]]([[O_OBJ_COPY]]) : $@convention(objc_method) (@opened({{.*}}) AnyObject) -> @autoreleased AnyObject
-  var x = o.method
+  var _ = o.method
 }
 // CHECK: } // end sil function '_T012dynamic_self21testAnyObjectDispatchys0dE0_p1o_tF'
 
@@ -122,20 +128,16 @@ class ObjCInit {
   dynamic required init() { }
 }
 
-// CHECK: sil hidden @_T012dynamic_self12testObjCInit{{[_0-9a-zA-Z]*}}F : $@convention(thin) (@thick ObjCInit.Type) -> ()
+// CHECK-LABEL: sil hidden @_T012dynamic_self12testObjCInit{{[_0-9a-zA-Z]*}}F : $@convention(thin) (@thick ObjCInit.Type) -> ()
 func testObjCInit(meta: ObjCInit.Type) {
 // CHECK: bb0([[THICK_META:%[0-9]+]] : $@thick ObjCInit.Type):
-// CHECK:   [[O:%[0-9]+]] = alloc_box ${ var ObjCInit }
-// CHECK:   [[PB:%.*]] = project_box [[O]]
 // CHECK:   [[OBJC_META:%[0-9]+]] = thick_to_objc_metatype [[THICK_META]] : $@thick ObjCInit.Type to $@objc_metatype ObjCInit.Type
 // CHECK:   [[OBJ:%[0-9]+]] = alloc_ref_dynamic [objc] [[OBJC_META]] : $@objc_metatype ObjCInit.Type, $ObjCInit
 // CHECK:   [[INIT:%[0-9]+]] = class_method [volatile] [[OBJ]] : $ObjCInit, #ObjCInit.init!initializer.1.foreign : (ObjCInit.Type) -> () -> ObjCInit, $@convention(objc_method) (@owned ObjCInit) -> @owned ObjCInit
 // CHECK:   [[RESULT_OBJ:%[0-9]+]] = apply [[INIT]]([[OBJ]]) : $@convention(objc_method) (@owned ObjCInit) -> @owned ObjCInit
-// CHECK:   store [[RESULT_OBJ]] to [init] [[PB]] : $*ObjCInit
-// CHECK:   destroy_value [[O]] : ${ var ObjCInit }
 // CHECK:   [[RESULT:%[0-9]+]] = tuple ()
 // CHECK:   return [[RESULT]] : $()
-  var o = meta.init()
+  _ = meta.init()
 }
 
 class OptionalResult {
@@ -170,7 +172,11 @@ func testOptionalResult(v : OptionalResultInheritor) {
 // CHECK-NEXT: [[T4:%.*]] = unchecked_ref_cast [[T1]] : $OptionalResult to $OptionalResultInheritor
 // CHECK-NEXT: enum $Optional<OptionalResultInheritor>, #Optional.some!enumelt.1, [[T4]]
 
+func id<T>(_ t: T) -> T { return t }
+
 class Z {
+
+  required init() {}
 
   // CHECK-LABEL: sil hidden @_T012dynamic_self1ZC23testDynamicSelfCapturesACXDSi1x_tF : $@convention(method) (Int, @guaranteed Z) -> @owned Z {
   func testDynamicSelfCaptures(x: Int) -> Self {
@@ -200,28 +206,65 @@ class Z {
     // so that IRGen can recover metadata.
 
     // CHECK:      [[WEAK_SELF:%.*]] = alloc_box ${ var @sil_weak Optional<Z> }
-    // CHECK:      [[FN:%.*]] = function_ref @_T012dynamic_self1ZC23testDynamicSelfCapturesACXDSi1x_tFyycfU1_ : $@convention(thin) (@owned { var @sil_weak Optional<Z> }, @thick Z.Type) -> ()
+    // CHECK:      [[FN:%.*]] = function_ref @_T012dynamic_self1ZC23testDynamicSelfCapturesACXDSi1x_tFyycfU1_ : $@convention(thin) (@owned { var @sil_weak Optional<Z> }, @thick @dynamic_self Z.Type) -> ()
     // CHECK:      [[WEAK_SELF_COPY:%.*]] = copy_value [[WEAK_SELF]] : ${ var @sil_weak Optional<Z> }
     // CHECK-NEXT: [[DYNAMIC_SELF:%.*]] = metatype $@thick @dynamic_self Z.Type
-    // CHECK-NEXT: [[STATIC_SELF:%.*]] = upcast [[DYNAMIC_SELF]] : $@thick @dynamic_self Z.Type to $@thick Z.Type
-    // CHECK:      partial_apply [[FN]]([[WEAK_SELF_COPY]], [[STATIC_SELF]]) : $@convention(thin) (@owned { var @sil_weak Optional<Z> }, @thick Z.Type) -> ()
+    // CHECK:      partial_apply [[FN]]([[WEAK_SELF_COPY]], [[DYNAMIC_SELF]]) : $@convention(thin) (@owned { var @sil_weak Optional<Z> }, @thick @dynamic_self Z.Type) -> ()
     let fn3 = {
       [weak self] in
       _ = self
     }
     fn3()
 
+    // Capturing a value with a complex type involving self
+
+    // CHECK:      [[FN:%.*]] = function_ref @_T012dynamic_self1ZC23testDynamicSelfCapturesACXDSi1x_tFyycfU2_ : $@convention(thin) (@owned (Z, Z), @thick @dynamic_self Z.Type) -> ()
+    let xx = (self, self)
+    let fn4 = {
+      _ = xx
+    }
+    fn4()
+
     return self
   }
 
+  // Capturing metatype of dynamic self
+  static func testStaticMethodDynamicSelfCaptures() -> Self {
+    let fn0 = { _ = self; _ = { _ = self } }
+    fn0()
+
+    let x = self
+    let fn1 = { _ = x; _ = { _ = x } }
+    fn1()
+
+    let xx = (self, self)
+    let fn2 = { _ = xx; _ = { _ = xx } }
+    fn2()
+
+    return self.init()
+  }
+
+  // Make sure the actual self value has the same lowered type as the
+  // substituted result of a generic function call
+  func testDynamicSelfSubstitution(_ b: Bool) -> Self {
+    return b ? self : id(self)
+  }
+
+  // Same for metatype of self
+  static func testStaticMethodDynamicSelfSubstitution(_ b: Bool) -> Self {
+    _ = (b ? self : id(self))
+    return self.init()
+  }
 }
 
 // Unbound reference to a method returning Self.
 
 class Factory {
-  func newInstance() -> Self {}
-  class func classNewInstance() -> Self {}
-  static func staticNewInstance() -> Self {}
+  required init() {}
+
+  func newInstance() -> Self { return self }
+  class func classNewInstance() -> Self { return self.init() }
+  static func staticNewInstance() -> Self { return self.init() }
 }
 
 // CHECK-LABEL: sil hidden @_T012dynamic_self22partialApplySelfReturnyAA7FactoryC1c_ADm1ttF : $@convention(thin) (@owned Factory, @thick Factory.Type) -> ()
@@ -255,11 +298,12 @@ class FactoryFactory {
   static func newInstance() -> Self {
     // CHECK: bb0(%0 : $@thick FactoryFactory.Type):
 
-    // CHECK: [[METATYPE:%.*]] = value_metatype $@thick @dynamic_self FactoryFactory.Type.Type, %0 : $@thick FactoryFactory.Type
+    // CHECK: [[DYNAMIC_SELF:%.*]] = unchecked_trivial_bit_cast %0 : $@thick FactoryFactory.Type to $@thick @dynamic_self FactoryFactory.Type
+    // CHECK: [[METATYPE:%.*]] = value_metatype $@thick @dynamic_self FactoryFactory.Type.Type, [[DYNAMIC_SELF]] : $@thick @dynamic_self FactoryFactory.Type
     // CHECK: [[ANY:%.*]] = init_existential_metatype [[METATYPE]] : $@thick @dynamic_self FactoryFactory.Type.Type, $@thick Any.Type
     let _: Any.Type = type(of: self)
 
-    // CHECK: unreachable
+    while true {}
   }
 }
 
@@ -284,7 +328,7 @@ class Derived : Base {
   // CHECK: apply [[METHOD]]([[SUPER]])
   // CHECK: return
   func superCall() {
-    super.returnsSelf()
+    _ = super.returnsSelf()
   }
 
   // CHECK-LABEL: sil hidden @_T012dynamic_self7DerivedC15superCallStaticyyFZ : $@convention(method) (@thick Derived.Type) -> ()
@@ -293,7 +337,7 @@ class Derived : Base {
   // CHECK: apply [[METHOD]]([[SUPER]])
   // CHECK: return
   static func superCallStatic() {
-    super.returnsSelfStatic()
+    _ = super.returnsSelfStatic()
   }
 
   // CHECK-LABEL: sil hidden @_T012dynamic_self7DerivedC32superCallFromMethodReturningSelfACXDyF : $@convention(method) (@guaranteed Derived) -> @owned Derived
@@ -303,17 +347,18 @@ class Derived : Base {
   // CHECK: apply [[METHOD]]([[SUPER]])
   // CHECK: return
   func superCallFromMethodReturningSelf() -> Self {
-    super.returnsSelf()
+    _ = super.returnsSelf()
     return self
   }
 
   // CHECK-LABEL: sil hidden @_T012dynamic_self7DerivedC38superCallFromMethodReturningSelfStaticACXDyFZ : $@convention(method) (@thick Derived.Type) -> @owned Derived
-  // CHECK: [[SUPER:%.*]] = upcast %0 : $@thick Derived.Type to $@thick Base.Type
+  // CHECK; [[DYNAMIC_SELF:%.*]] = unchecked_trivial_bit_cast %0 : $@thick Derived.Type to $@thick @synamic_self Derived.Type
+  // CHECK: [[SUPER:%.*]] = upcast [[DYNAMIC_SELF]] : $@thick @dynamic_self Derived.Type to $@thick Base.Type
   // CHECK: [[METHOD:%.*]] = function_ref @_T012dynamic_self4BaseC17returnsSelfStaticACXDyFZ
   // CHECK: apply [[METHOD]]([[SUPER]])
   // CHECK: return
   static func superCallFromMethodReturningSelfStatic() -> Self {
-    super.returnsSelfStatic()
+    _ = super.returnsSelfStatic()
     return self.init()
   }
 }

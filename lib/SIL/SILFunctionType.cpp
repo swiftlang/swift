@@ -779,7 +779,7 @@ static CanSILFunctionType getSILFunctionType(SILModule &M,
       if (capture.isDynamicSelfMetadata()) {
         ParameterConvention convention = ParameterConvention::Direct_Unowned;
         auto selfMetatype = MetatypeType::get(
-            loweredCaptures.getDynamicSelfType()->getSelfType(),
+            loweredCaptures.getDynamicSelfType(),
             MetatypeRepresentation::Thick);
         auto canSelfMetatype = getCanonicalType(selfMetatype);
         SILParameterInfo param(canSelfMetatype, convention);
