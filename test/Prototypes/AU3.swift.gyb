@@ -136,6 +136,44 @@ extension String.Content.NSStringPayload {
   }
 }
 
+// Conformance not actually needed, but it gets us a bunch of implementation for
+// free.
+extension String.Content.NSStringPayload : AnyUnicodeContent {
+  // FIXME: implement as many of these as possible
+  // public var isKnownLatin1: Bool { false }
+  public var isKnownASCII: Bool { return object._fastCStringContents(0) != nil }
+  // var isKnownFCCNormalized: Bool { get }
+  // var isKnownFCDForm: Bool { get }
+  // var isKnownNFDNormalized: Bool { get }
+  // var isKnownNFCNormalized: Bool { get }
+  // func isLatin1() -> Bool
+  // func isASCII() -> Bool
+}
+
+extension String.Content.NSStringPayload : UnicodeContent {  
+  public var utf16: RandomAccessUnicodeView<
+    LazyMapRandomAccessCollection<CountableRange<Int>, UTF16.CodeUnit>
+  > {
+    return RandomAccessUnicodeView(
+        (0..<object.length()).lazy.map { self.object.characterAtIndex($0) })
+  }
+  
+  public var fccNormalizedUTF16: AnyUInt16UnicodeView {
+    return AnyUInt16UnicodeView(
+      _UnicodeViews(utf16, UTF16.self).fccNormalizedUTF16
+    )
+  }
+  
+  public var characters: AnyCharacterUnicodeView {
+    return AnyCharacterUnicodeView(_UnicodeViews(utf16, UTF16.self).characters)
+  }
+  
+  public var unicodeScalars: AnyUnicodeScalarUnicodeView {
+    return AnyUnicodeScalarUnicodeView(
+      _UnicodeViews(utf16, UTF16.self).scalars)
+  }
+}
+
 /// Case accessors
 extension String.Content {
   % for tag, Payload in allCases:
@@ -177,7 +215,9 @@ def switch(s):
       %(s)s
     case .any(let x):
       %(s)s
-    case .cocoa, .small1, .small2, .small3: fatalError("unsupported")
+    case .cocoa(let x):
+      %(s)s
+    case .small1, .small2, .small3: fatalError("unsupported")
     }""" % locals()
   
 }%
@@ -269,7 +309,10 @@ extension String.Content {
       return ObjectIdentifier(storage)
     case .any(let storage):
       return ObjectIdentifier(storage)
-    case .cocoa, .small1, .small2, .small3: fatalError("unsupported")
+    case .cocoa(let storage):
+      return ObjectIdentifier(storage.object)
+    case .cocoa, .small1, .small2, .small3:
+      return nil
     }
   }
 
@@ -328,9 +371,8 @@ extension String.Content {
       return storage._tryToReplaceSubrange(
         from: t.lowerBound, to: t.upperBound,
         with: replacement.lazy.map { UInt8(truncatingBitPattern: $0) })
-    case .any(_):
+    case .any, .cocoa, .small1, .small2, .small3:
       return false
-    case .cocoa, .small1, .small2, .small3: fatalError("unsupported")
     }
   }
 }
