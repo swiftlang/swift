@@ -599,6 +599,11 @@ def run():
     >>> os.remove(target2.name)
     >>> raw_output.close()
     >>> os.remove(raw_output.name)
+
+    Lint this file.
+    >>> import python_lint
+    >>> python_lint.lint([os.path.realpath(__file__)], verbose=False)
+    0
     """
     if len(sys.argv) <= 1:
         import doctest
