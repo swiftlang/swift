@@ -1418,33 +1418,32 @@ void PatternMatchEmission::emitTupleDispatchWithOwnership(
   auto sourceType = cast<TupleType>(firstPat->getType()->getCanonicalType());
   SILLocation loc = firstPat;
 
-  SILValue v = src.getFinalManagedValue().forward(SGF);
+  // Final consumption here will be either CopyOnSuccess or AlwaysTake. Since we
+  // do not have a take operation, we treat it as copy on success always.
+  //
+  // Once we get a take operation, we should consider allowing for the value to
+  // be taken at this point.
+  ManagedValue v = src.getFinalManagedValue().borrow(SGF, loc);
   SmallVector<ConsumableManagedValue, 4> destructured;
 
   // Break down the values.
-  auto tupleSILTy = v->getType();
+  auto tupleSILTy = v.getType();
   for (unsigned i = 0, e = sourceType->getNumElements(); i < e; ++i) {
     SILType fieldTy = tupleSILTy.getTupleElementType(i);
     auto &fieldTL = SGF.getTypeLowering(fieldTy);
 
-    SILValue member = SGF.B.createTupleExtract(loc, v, i, fieldTy);
-    auto memberCMV =
-        getManagedSubobject(SGF, member, fieldTL, src.getFinalConsumption());
+    // This is a borrowed value, so we need to use copy on success.
+    ManagedValue member = SGF.B.createTupleExtract(loc, v, i, fieldTy);
+    // *NOTE* We leave this as getManagedSubobject so that when we get a
+    // destructure operation, we can pass in src.getFinalConsumption() here and
+    // get the correct behavior of performing the take.
+    auto memberCMV = getManagedSubobject(SGF, member.getValue(), fieldTL,
+                                         CastConsumptionKind::CopyOnSuccess);
     destructured.push_back(memberCMV);
   }
 
-  // Maybe revert to the original cleanups during failure branches.
-  const FailureHandler *innerFailure = &outerFailure;
-  FailureHandler specializedFailure = [&](SILLocation loc) {
-    ArgUnforwarder unforwarder(SGF);
-    unforwarder.unforwardBorrowedValues(src, destructured);
-    outerFailure(loc);
-  };
-  if (ArgUnforwarder::requiresUnforwarding(SGF, src))
-    innerFailure = &specializedFailure;
-
   // Recurse.
-  handleCase(destructured, specializedRows, *innerFailure);
+  handleCase(destructured, specializedRows, outerFailure);
 }
 
 /// Perform specialized dispatch for tuples.
