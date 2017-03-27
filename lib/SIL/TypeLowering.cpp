@@ -1719,12 +1719,9 @@ static CanAnyFunctionType getDefaultArgGeneratorInterfaceType(
 
   // The result type might be written in terms of type parameters
   // that have been made fully concrete.
-  CanType canResultTy;
-  if (auto *sig = AFD->getGenericSignature())
-    canResultTy = sig->getCanonicalTypeInContext(resultTy,
-                                                 *TC.M.getSwiftModule());
-  else
-    canResultTy = resultTy->getCanonicalType();
+  CanType canResultTy = resultTy->getCanonicalType(
+      AFD->getGenericSignature(),
+      *TC.M.getSwiftModule());
 
   // Get the generic signature from the surrounding context.
   auto funcInfo = TC.getConstantInfo(SILDeclRef(AFD));
@@ -2137,17 +2134,10 @@ getMaterializeForSetCallbackType(AbstractStorageDecl *storage,
     }
   }
 
-  CanType canSelfType;
-  CanType canSelfMetatypeType;
-  if (genericSig) {
-    canSelfType = genericSig->getCanonicalTypeInContext(
-        selfType, *M.getSwiftModule());
-    canSelfMetatypeType = genericSig->getCanonicalTypeInContext(
-        selfMetatypeType, *M.getSwiftModule());
-  } else {
-    canSelfType = selfType->getCanonicalType();
-    canSelfMetatypeType = selfMetatypeType->getCanonicalType();
-  }
+  auto canSelfType = selfType->getCanonicalType(
+    genericSig, *M.getSwiftModule());
+  auto canSelfMetatypeType = selfMetatypeType->getCanonicalType(
+    genericSig, *M.getSwiftModule());
 
   // Create the SILFunctionType for the callback.
   SILParameterInfo params[] = {
@@ -2564,12 +2554,11 @@ TypeConverter::getContextBoxTypeForCapture(ValueDecl *captured,
                                            bool isMutable) {
   CanType loweredInterfaceType = loweredContextType;
   if (env) {
-    if (auto homeSig = captured->getDeclContext()
-                               ->getGenericSignatureOfContext()) {
-      loweredInterfaceType = homeSig->getCanonicalTypeInContext(
-        env->mapTypeOutOfContext(loweredInterfaceType),
-        *M.getSwiftModule());
-    }
+    auto homeSig = captured->getDeclContext()
+        ->getGenericSignatureOfContext();
+    loweredInterfaceType =
+      env->mapTypeOutOfContext(loweredInterfaceType)
+        ->getCanonicalType(homeSig, *M.getSwiftModule());
   }
   
   auto boxType = getInterfaceBoxTypeForCapture(captured,

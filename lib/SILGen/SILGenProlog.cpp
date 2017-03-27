@@ -498,10 +498,9 @@ unsigned SILGenFunction::emitProlog(ArrayRef<ParameterList *> paramLists,
                                     Type resultType, DeclContext *DC,
                                     bool throws) {
   // Create the indirect result parameters.
-  if (auto *genericSig = DC->getGenericSignatureOfContext()) {
-    resultType = genericSig->getCanonicalTypeInContext(
-      resultType, *SGM.M.getSwiftModule());
-  }
+  auto *genericSig = DC->getGenericSignatureOfContext();
+  resultType = resultType->getCanonicalType(genericSig,
+                                            *SGM.M.getSwiftModule());
 
   emitIndirectResultParameters(*this, resultType, DC);
 

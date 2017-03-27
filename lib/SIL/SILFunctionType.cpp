@@ -766,10 +766,7 @@ static CanSILFunctionType getSILFunctionType(SILModule &M,
     auto origGenericSig
       = function->getGenericSignature();
     auto getCanonicalType = [origGenericSig, &M](Type t) -> CanType {
-      if (origGenericSig)
-        return origGenericSig->getCanonicalTypeInContext(t,
-                                                         *M.getSwiftModule());
-      return t->getCanonicalType();
+      return t->getCanonicalType(origGenericSig, *M.getSwiftModule());
     };
 
     auto &Types = M.Types;
