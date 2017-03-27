@@ -1575,6 +1575,9 @@ void PatternMatchEmission::emitEnumElementDispatchWithOwnership(
     ArrayRef<RowToSpecialize> rows, ConsumableManagedValue src,
     const SpecializationHandler &handleCase,
     const FailureHandler &outerFailure) {
+  assert(src.getFinalConsumption() != CastConsumptionKind::TakeOnSuccess &&
+         "SIL ownership does not support TakeOnSuccess");
+
   CanType sourceType = rows[0].Pattern->getType()->getCanonicalType();
 
   struct CaseInfo {
@@ -1675,9 +1678,11 @@ void PatternMatchEmission::emitEnumElementDispatchWithOwnership(
 
   assert(caseBBs.size() == caseInfos.size());
 
-  SILValue srcValue = src.getFinalManagedValue().forward(SGF);
   SILLocation loc = PatternMatchStmt;
   loc.setDebugLoc(rows[0].Pattern);
+  // SEMANTIC SIL TODO: Once we have the representation of a switch_enum that
+  // can take a +0 value, this extra copy should be a borrow.
+  SILValue srcValue = src.getFinalManagedValue().copy(SGF, loc).forward(SGF);
   SGF.B.createSwitchEnum(loc, srcValue, defaultBB, caseBBs);
 
   // Okay, now emit all the cases.
@@ -1734,23 +1739,12 @@ void PatternMatchEmission::emitEnumElementDispatchWithOwnership(
     } else {
       auto *eltTL = &SGF.getTypeLowering(eltTy);
 
-      // Normally we'd just use the consumption of the source
-      // because the difference between TakeOnSuccess and TakeAlways
-      // doesn't matter for irrefutable rows.  But if we need to
-      // re-abstract, we'll see a lot of benefit from figuring out
-      // that we can use TakeAlways here.
-      auto eltConsumption = src.getFinalConsumption();
-      if (caseInfo.Irrefutable &&
-          eltConsumption == CastConsumptionKind::TakeOnSuccess) {
-        assert(!SGF.F.getModule().getOptions().EnableSILOwnership &&
-               "TakeOnSuccess is not supported when compiling with ownership");
-        eltConsumption = CastConsumptionKind::TakeAlways;
-      }
-
       SILValue eltValue =
           caseBB->createPHIArgument(eltTy, ValueOwnershipKind::Owned);
 
-      origCMV = getManagedSubobject(SGF, eltValue, *eltTL, eltConsumption);
+      // We performed a copy early, so we get a +1 value here.
+      origCMV = getManagedSubobject(SGF, eltValue, *eltTL,
+                                    CastConsumptionKind::TakeAlways);
       eltCMV = origCMV;
 
       // If the payload is boxed, project it.
@@ -1786,22 +1780,14 @@ void PatternMatchEmission::emitEnumElementDispatchWithOwnership(
                                          substEltTy);
     }
 
-    const FailureHandler *innerFailure = &outerFailure;
-    FailureHandler specializedFailure = [&](SILLocation loc) {
-      ArgUnforwarder unforwarder(SGF);
-      unforwarder.unforwardBorrowedValues(src, origCMV);
-      outerFailure(loc);
-    };
-    if (ArgUnforwarder::requiresUnforwarding(SGF, src))
-      innerFailure = &specializedFailure;
-
-    handleCase(eltCMV, specializedRows, *innerFailure);
+    handleCase(eltCMV, specializedRows, outerFailure);
     assert(!SGF.B.hasValidInsertionPoint() && "did not end block");
   }
 
   // Emit the default block if we needed one.
   if (defaultBB) {
     SGF.B.setInsertionPoint(defaultBB);
+    SGF.B.createOwnedPHIArgument(src.getType());
     outerFailure(rows.back().Pattern);
   }
 }
