@@ -3221,6 +3221,9 @@ ERROR(dynamic_not_in_class,none,
 ERROR(dynamic_with_final,none,
       "a declaration cannot be both 'final' and 'dynamic'",
       ())
+ERROR(dynamic_with_nonobjc,none,
+      "a declaration cannot be both '@nonobjc' and 'dynamic'",
+      ())
 
 //------------------------------------------------------------------------------
 // @available

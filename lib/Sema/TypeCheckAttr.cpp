@@ -293,6 +293,10 @@ void AttributeEarlyChecker::visitDynamicAttr(DynamicAttr *attr) {
   // Members cannot be both dynamic and final.
   if (D->getAttrs().hasAttribute<FinalAttr>())
     return diagnoseAndRemoveAttr(attr, diag::dynamic_with_final);
+
+  // Members cannot be both dynamic and @nonobjc.
+  if (D->getAttrs().hasAttribute<NonObjCAttr>())
+    return diagnoseAndRemoveAttr(attr, diag::dynamic_with_nonobjc);
 }
 
 

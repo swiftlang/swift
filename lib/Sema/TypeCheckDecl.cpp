@@ -2349,8 +2349,10 @@ static Optional<ObjCReason> shouldMarkAsObjC(TypeChecker &TC,
     if (classDecl->isForeign())
       return None;
 
-    if (classDecl->checkObjCAncestry() != ObjCClassKind::NonObjC)
-      return ObjCReason::DoNotDiagnose;
+    if (classDecl->checkObjCAncestry() != ObjCClassKind::NonObjC) {
+      return VD->isImplicit() ? ObjCReason::ImplicitlyObjC
+                              : ObjCReason::MemberOfObjCSubclass;
+    }
   }
 
   return None;
@@ -2627,7 +2629,7 @@ void swift::markAsObjC(TypeChecker &TC, ValueDecl *D,
   // could be overridden by @nonobjc. If we see a @nonobjc and we are trying
   // to add an @objc for whatever reason, diagnose an error.
   if (auto *attr = D->getAttrs().getAttribute<NonObjCAttr>()) {
-    if (*isObjC == ObjCReason::DoNotDiagnose)
+    if (!shouldDiagnoseObjCReason(*isObjC))
       isObjC = ObjCReason::ImplicitlyObjC;
 
     TC.diagnose(D->getStartLoc(), diag::nonobjc_not_allowed,
@@ -4984,10 +4986,8 @@ public:
       ProtocolDecl *protocolContext = dyn_cast<ProtocolDecl>(
           FD->getDeclContext());
       if (protocolContext && FD->isAccessor()) {
-        // Don't complain about accessors in protocols.  We will emit a
-        // diagnostic about the property itself.
         if (isObjC)
-          isObjC = ObjCReason::DoNotDiagnose;
+          isObjC = ObjCReason::Accessor;
       }
 
       if (FD->isGetterOrSetter()) {
@@ -5004,7 +5004,7 @@ public:
         if (storage->getAttrs().hasAttribute<NonObjCAttr>())
           isObjC = None;
         else if (!isObjC && storage->isObjC())
-          isObjC = ObjCReason::DoNotDiagnose;
+          isObjC = ObjCReason::Accessor;
 
         // If the storage is dynamic, propagate to this accessor.
         if (isObjC && storage->isDynamic() && !FD->isDynamic())
