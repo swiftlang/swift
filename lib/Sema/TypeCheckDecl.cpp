@@ -2771,7 +2771,17 @@ void swift::markAsObjC(TypeChecker &TC, ValueDecl *D,
       TC.diagnose(D, diag::objc_inference_swift3, *deprecatedReason)
         .highlight(dynamicLoc)
         .fixItInsert(D->getAttributeInsertionLoc(false), "@objc ");
-    };
+    }
+
+    // Mark the attribute as having used Swift 3 inference, or create an
+    // implicit @objc for that purpose.
+    auto attr = D->getAttrs().getAttribute<ObjCAttr>();
+    if (!attr) {
+      attr = ObjCAttr::createUnnamedImplicit(TC.Context);
+      D->getAttrs().add(attr);
+    }
+
+    attr->setSwift3Inferred();
   }
 }
 

@@ -910,6 +910,25 @@ namespace {
 
         closeExistential(ref, locator, /*force=*/openedExistential);
 
+        // If this attribute was inferred based on deprecated Swift 3 rules,
+        // complain.
+        if (auto attr = member->getAttrs().getAttribute<ObjCAttr>()) {
+          if (attr->isSwift3Inferred() &&
+              !tc.Context.LangOpts.WarnSwift3ObjCInference) {
+            tc.diagnose(memberLoc,
+                        diag::expr_dynamic_lookup_swift3_objc_inference,
+                        member->getDescriptiveKind(),
+                        member->getFullName(),
+                        member->getDeclContext()
+                          ->getAsNominalTypeOrNominalTypeExtensionContext()
+                          ->getName());
+            tc.diagnose(member, diag::make_decl_objc,
+                        member->getDescriptiveKind())
+              .fixItInsert(member->getAttributeInsertionLoc(false),
+                           "@objc ");
+          }
+        }
+
         return ref;
       }
 
@@ -3772,6 +3791,11 @@ namespace {
           return E;
         }
 
+        if (cs.getType(subExpr)->isLValueType()) {
+          // Treat this like a read of the property.
+          cs.propagateLValueAccessKind(subExpr, AccessKind::Read);
+        }
+
         // Check that we requested a property getter or setter.
         switch (E->getSelectorKind()) {
         case ObjCSelectorExpr::Method: {
@@ -3856,6 +3880,22 @@ namespace {
           .fixItInsert(foundDecl->getAttributeInsertionLoc(false),
                        "@objc ");
         return E;
+      } else if (auto attr = foundDecl->getAttrs().getAttribute<ObjCAttr>()) {
+        // If this attribute was inferred based on deprecated Swift 3 rules,
+        // complain.
+        if (attr->isSwift3Inferred() &&
+            !tc.Context.LangOpts.WarnSwift3ObjCInference) {
+          tc.diagnose(E->getLoc(), diag::expr_selector_swift3_objc_inference,
+                      foundDecl->getDescriptiveKind(), foundDecl->getFullName(),
+                      foundDecl->getDeclContext()
+                        ->getAsNominalTypeOrNominalTypeExtensionContext()
+                        ->getName())
+            .highlight(subExpr->getSourceRange());
+          tc.diagnose(foundDecl, diag::make_decl_objc,
+                      foundDecl->getDescriptiveKind())
+            .fixItInsert(foundDecl->getAttributeInsertionLoc(false),
+                         "@objc ");
+        }
       }
 
       // Note which method we're referencing.

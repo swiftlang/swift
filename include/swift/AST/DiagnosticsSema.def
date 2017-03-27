@@ -415,6 +415,10 @@ ERROR(expression_unused_keypath_result,none,
 ERROR(expr_keypath_non_objc_property,none,
       "argument of '#keyPath' refers to non-'@objc' property %0",
       (DeclName))
+WARNING(expr_keypath_swift3_objc_inference,none,
+        "argument of '#keyPath' refers to property %0 in %1 that depends on "
+        "'@objc' attribute inference deprecated in Swift 4",
+        (DeclName, Identifier))
 ERROR(stdlib_anyobject_not_found,none,
       "broken standard library: cannot find 'AnyObject' protocol", ())
 ERROR(expr_keypath_type_of_property,none,
@@ -463,6 +467,10 @@ ERROR(expr_selector_not_objc,none,
 NOTE(make_decl_objc,none,
      "add '@objc' to expose this %0 to Objective-C",
      (DescriptiveDeclKind))
+WARNING(expr_selector_swift3_objc_inference,none,
+        "argument of '#selector' refers to %0 %1 in %2 that depends on "
+        "'@objc' attribute inference deprecated in Swift 4",
+        (DescriptiveDeclKind, DeclName, Identifier))
 
 // Selectors-as-string-literals.
 WARNING(selector_literal_invalid,none,
@@ -1110,6 +1118,11 @@ WARNING(unsupported_synthesize_init_variadic,none,
         (Type))
 NOTE(variadic_superclass_init_here,none,
      "variadic superclass initializer defined here", ())
+
+WARNING(expr_dynamic_lookup_swift3_objc_inference,none,
+        "reference to %0 %1 of %2 depends on '@objc' attribute inference "
+        "deprecated in Swift 4",
+        (DescriptiveDeclKind, DeclName, Identifier))
 
 // Alignment attribute
 ERROR(alignment_not_power_of_two,none,

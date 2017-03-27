@@ -197,8 +197,12 @@ protected:
 
     /// Whether the name is implicit, produced as the result of caching.
     unsigned ImplicitName : 1;
+
+    /// Whether the @objc was inferred using Swift 3's deprecated inference
+    /// rules.
+    unsigned Swift3Inferred : 1;
   };
-  enum { NumObjCAttrBits = NumDeclAttrBits + 2 };
+  enum { NumObjCAttrBits = NumDeclAttrBits + 3 };
   static_assert(NumObjCAttrBits <= 32, "fits in an unsigned");
 
   class AccessibilityAttrBitFields {
@@ -716,6 +720,7 @@ class ObjCAttr final : public DeclAttribute,
   {
     ObjCAttrBits.HasTrailingLocationInfo = false;
     ObjCAttrBits.ImplicitName = implicitName;
+    ObjCAttrBits.Swift3Inferred = false;
 
     if (name) {
       NameData = name->getOpaqueValue();
@@ -821,6 +826,18 @@ public:
 
     NameData = name.getOpaqueValue();
     ObjCAttrBits.ImplicitName = implicit;
+  }
+
+  /// Determine whether this attribute was inferred based on Swift 3's
+  /// deprecated @objc inference rules.
+  bool isSwift3Inferred() const {
+    return ObjCAttrBits.Swift3Inferred;
+  }
+
+  /// Set whether this attribute was inferred based on Swift 3's deprecated
+  /// @objc inference rules.
+  void setSwift3Inferred(bool inferred = true) {
+    ObjCAttrBits.Swift3Inferred = inferred;
   }
 
   /// Clear the name of this entity.

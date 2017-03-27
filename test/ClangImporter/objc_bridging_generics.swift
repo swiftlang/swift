@@ -108,7 +108,7 @@ extension GenericClass {
   }
   // Doesn't use 'T', since its metadata isn't necessary to erase to AnyObject
   // or to existential metatype
-  func doesntUseGenericParam5(_ x: T, _ y: T.Type) -> T {
+  @objc func doesntUseGenericParam5(_ x: T, _ y: T.Type) -> T {
     _ = y as AnyObject.Type
     _ = y as Any.Type
     _ = y as AnyObject
@@ -143,10 +143,10 @@ extension GenericClass {
   // expected-error@+1{{extension of a generic Objective-C class cannot access the class's generic parameters}}
   func usesGenericParamJ() -> [(T, T)]? {} // expected-note{{used here}}
 
-  static func doesntUseGenericParam() {}
-  static func doesntUseGenericParam2() -> Self {}
+  @objc static func doesntUseGenericParam() {}
+  @objc static func doesntUseGenericParam2() -> Self {}
   // Doesn't technically use 'T', since it's type-erased at runtime
-  static func doesntUseGenericParam3() -> GenericClass<T> {}
+  @objc static func doesntUseGenericParam3() -> GenericClass<T> {}
 
   // expected-error@+1{{extension of a generic Objective-C class cannot access the class's generic parameters}}
   static func usesGenericParamC(_ x: [(T, T)]?) {} // expected-note{{used here}}
@@ -175,12 +175,12 @@ extension GenericClass {
 func swiftFunction<T: Animal>(x: T) {}
 
 extension AnimalContainer {
-  func doesntUseGenericParam1(_ x: T, _ y: T.Type) {
+  @objc func doesntUseGenericParam1(_ x: T, _ y: T.Type) {
     _ = #selector(x.another)
     _ = #selector(y.create)
   }
 
-  func doesntUseGenericParam2(_ x: T, _ y: T.Type) {
+  @objc func doesntUseGenericParam2(_ x: T, _ y: T.Type) {
     let a = x.another()
     _ = a.another()
     _ = x.another().another()
@@ -193,7 +193,7 @@ extension AnimalContainer {
     x.eat(a)
   }
 
-  func doesntUseGenericParam3(_ x: T, _ y: T.Type) {
+  @objc func doesntUseGenericParam3(_ x: T, _ y: T.Type) {
     let sup: Animal = x
     sup.eat(x)
     _ = x.buddy
@@ -201,7 +201,7 @@ extension AnimalContainer {
     x[0] = x
   }
 
-  func doesntUseGenericParam4(_ x: T, _ y: T.Type) {
+  @objc func doesntUseGenericParam4(_ x: T, _ y: T.Type) {
     _ = type(of: x).apexPredator.another()
     type(of: x).apexPredator = x
 
@@ -290,7 +290,7 @@ extension AnimalContainer {
 }
 
 extension PettableContainer {
-  func doesntUseGenericParam(_ x: T, _ y: T.Type) {
+  @objc func doesntUseGenericParam(_ x: T, _ y: T.Type) {
     // TODO: rdar://problem/27796375--allocating entry points are emitted as
     // true generics.
     // _ = type(of: x).init(fur: x).other()

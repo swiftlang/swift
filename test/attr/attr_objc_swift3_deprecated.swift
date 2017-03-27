@@ -14,3 +14,10 @@ class DynamicMembers {
   dynamic var bar: NSObject? = nil // expected-warning{{inference of '@objc' for 'dynamic' members is deprecated in Swift 4}}{{3-3=@objc }}
 }
 
+// Suppress diagnostices about references to inferred @objc declarations
+// in this mode.
+func test(sc: ObjCSubclass, dm: DynamicMembers) {
+  _ = #selector(sc.foo)
+  _ = #selector(getter: dm.bar)
+  _ = #keyPath(DynamicMembers.bar)
+}
