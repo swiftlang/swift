@@ -17,7 +17,7 @@
 %{
   import gyb
 }%
-
+import Swift
 import StdlibUnittest
 
 /// Implementation detail of `String` that type-erases any `UnicodeContent` into
@@ -105,10 +105,12 @@ public struct String {
     allCases = [
       ('utf16', '_UTF16StringStorage'),
       ('latin1', '_Latin1StringStorage'),
-      ('any', 'UnicodeContentBox')
+      ('any', 'UnicodeContentBox'),
+      ('cocoa', '_NSStringCase')
     ]
 }%
   public struct Content {
+    typealias _NSStringCase = _UnknownObject<_NSStringCore>
     internal enum Representation {
       % for tag, Payload in allCases:
     case ${tag}(${Payload})
@@ -160,6 +162,7 @@ def switch(s):
       %(s)s
     case .any(let x):
       %(s)s
+  default: fatalError("unsupported")
     }""" % locals()
   
 }%
@@ -251,6 +254,7 @@ extension String.Content {
       return ObjectIdentifier(storage)
     case .any(let storage):
       return ObjectIdentifier(storage)
+    case .cocoa: fatalError("unsupported")
     }
   }
 
@@ -311,6 +315,7 @@ extension String.Content {
         with: replacement.lazy.map { UInt8(truncatingBitPattern: $0) })
     case .any(_):
       return false
+    case .cocoa: fatalError("unsupported")
     }
   }
 }

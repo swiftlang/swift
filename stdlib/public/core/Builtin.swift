@@ -855,3 +855,11 @@ public func _openExistential<ExistentialType, ContainedType, ResultType>(
   Builtin.unreachable()
 }
 
+/// A wrapper that can hold any object type with optimal layout properties
+/// (especially good for enum payloads). See
+/// https://bugs.swift.org/browse/SR-4365, for which this is a workaround.
+public struct _UnknownObject<T: AnyObject> {
+  public init(_ x: T) { _base = Builtin.castReference(x) }
+  public var object : T { return Builtin.castReference(_base) }
+  internal let _base: Builtin.UnknownObject
+}
