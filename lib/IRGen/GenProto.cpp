@@ -203,9 +203,8 @@ void PolymorphicConvention::enumerateRequirements(const RequirementCallback &cal
   if (!Generics) return;
 
   // Get all of the type metadata.
-  for (auto gp : Generics.getGenericParams()) {
-    if (Generics->getCanonicalTypeInContext(gp, M) == gp)
-      callback({gp, nullptr});
+  for (auto gp : Generics->getSubstitutableParams()) {
+    callback({CanType(gp), nullptr});
   }
 
   // Get the protocol conformances.
