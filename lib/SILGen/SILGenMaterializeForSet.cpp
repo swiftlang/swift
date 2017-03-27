@@ -438,11 +438,8 @@ public:
     }
 
     CanType witnessSelfType =
-      (GenericSig
-       ? GenericSig->getCanonicalTypeInContext(
-           Witness->computeInterfaceSelfType(),
-           *SGM.M.getSwiftModule())
-       : Witness->computeInterfaceSelfType()->getCanonicalType());
+      Witness->computeInterfaceSelfType()->getCanonicalType(
+        GenericSig, *SGM.M.getSwiftModule());
     witnessSelfType = getSubstWitnessInterfaceType(witnessSelfType);
     witnessSelfType = witnessSelfType->getInOutObjectType()
       ->getCanonicalType();
@@ -650,11 +647,9 @@ collectIndicesFromParameters(SILGenFunction &gen, SILLocation loc,
                              ArrayRef<ManagedValue> sourceIndices) {
   auto witnessSubscript = cast<SubscriptDecl>(WitnessStorage);
   CanType witnessIndicesType =
-    (GenericSig
-       ? GenericSig->getCanonicalTypeInContext(
-           witnessSubscript->getIndicesInterfaceType(),
-           *SGM.M.getSwiftModule())
-       : witnessSubscript->getIndicesInterfaceType()->getCanonicalType());
+    witnessSubscript->getIndicesInterfaceType()
+      ->getCanonicalType(GenericSig,
+                         *SGM.M.getSwiftModule());
   CanType substIndicesType =
     getSubstWitnessInterfaceType(witnessIndicesType);
 

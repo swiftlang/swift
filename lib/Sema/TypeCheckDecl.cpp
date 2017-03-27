@@ -5578,19 +5578,14 @@ public:
         }
 
         // Canonicalize with respect to the override's generic signature, if any.
-        CanType canDeclTy;
-        CanType canParentDeclTy;
-        if (auto *genericSig = decl->getInnermostDeclContext()
-              ->getGenericSignatureOfContext()) {
-          auto *module = dc->getParentModule();
-          canDeclTy = genericSig->getCanonicalTypeInContext(
-            declTy, *module);
-          canParentDeclTy = genericSig->getCanonicalTypeInContext(
-            parentDeclTy, *module);
-        } else {
-          canDeclTy = declTy->getCanonicalType();
-          canParentDeclTy = parentDeclTy->getCanonicalType();
-        }
+        auto *genericSig = decl->getInnermostDeclContext()
+          ->getGenericSignatureOfContext();
+        auto *module = dc->getParentModule();
+
+        auto canDeclTy =
+          declTy->getCanonicalType(genericSig, *module);
+        auto canParentDeclTy =
+          parentDeclTy->getCanonicalType(genericSig, *module);
 
         if (canDeclTy == canParentDeclTy) {
           matches.push_back({parentDecl, true, parentDeclTy});
