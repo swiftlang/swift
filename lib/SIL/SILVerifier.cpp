@@ -3283,10 +3283,16 @@ public:
       // The destination BB can take the argument payload, if any, as a BB
       // arguments, or it can ignore it and take no arguments.
       if (elt->getArgumentInterfaceType()) {
-        require(dest->getArguments().size() == 0 ||
-                    dest->getArguments().size() == 1,
-                "switch_enum destination for case w/ args must take 0 or 1 "
-                "arguments");
+        if (isSILOwnershipEnabled() && F.hasQualifiedOwnership()) {
+          require(dest->getArguments().size() == 1,
+                  "switch_enum destination for case w/ args must take 1 "
+                  "argument");
+        } else {
+          require(dest->getArguments().size() == 0 ||
+                      dest->getArguments().size() == 1,
+                  "switch_enum destination for case w/ args must take 0 or 1 "
+                  "arguments");
+        }
 
         if (dest->getArguments().size() == 1) {
           SILType eltArgTy = uTy.getEnumElementType(elt, F.getModule());
@@ -3307,9 +3313,23 @@ public:
     // If the switch is non-exhaustive, we require a default.
     require(unswitchedElts.empty() || SOI->hasDefault(),
             "nonexhaustive switch_enum must have a default destination");
-    if (SOI->hasDefault())
-      require(SOI->getDefaultBB()->args_empty(),
-              "switch_enum default destination must take no arguments");
+    if (SOI->hasDefault()) {
+      // When SIL ownership is enabled, we require all default branches to take
+      // an @owned original version of the enum.
+      //
+      // When SIL ownership is disabled, we no longer support this.
+      if (isSILOwnershipEnabled() && F.hasQualifiedOwnership()) {
+        require(SOI->getDefaultBB()->getNumArguments() == 1,
+                "Switch enum default block should have one argument");
+        require(SOI->getDefaultBB()->getArgument(0)->getType() ==
+                    SOI->getOperand()->getType(),
+                "Switch enum default block should have one argument that is "
+                "the same as the input type");
+      } else {
+        require(SOI->getDefaultBB()->args_empty(),
+                "switch_enum default destination must take no arguments");
+      }
+    }
   }
 
   void checkSwitchEnumAddrInst(SwitchEnumAddrInst *SOI) {
