@@ -123,6 +123,7 @@
       "Integers.swift",
       "IntegerArithmetic.swift",
       "FixedPoint.swift",
+      "AlternateIntegerWidths.swift",
       "IntegerParsing.swift"],
     "Floating": [
       "FloatingPoint.swift",

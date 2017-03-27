@@ -1,0 +1,129 @@
+//===--- AlternateIntegerWidths.swift.gyb ---------------------------------===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+%{
+  WORD_BITS = int(CMAKE_SIZEOF_VOID_P) * 8
+  builtinIntLiteralBits = 2048
+}%
+
+
+% for bits in set([2, 3, 57, 58, 59, 60, 61, 62, 63, WORD_BITS - 4]):
+%   signed = False
+%   (sign, ext) = ('u', 'zext')
+%   Self = 'UInt%s' % bits
+%   BuiltinName = 'Int%s' % bits
+public struct ${Self} {
+  @_versioned
+  internal init(_ storage: Builtin.${BuiltinName}) {
+    self._storage = storage
+  }
+  public init(_ value: Int) {
+    self.init(UInt64(bitPattern: Int64(value)))
+  }
+  public init(_ value: UInt) {
+    self.init(UInt64(value))
+  }
+  public init(_ value: UInt64) {
+    _precondition(value >> ${bits} == 0, "${Self} can't represent value")
+    _storage = Builtin.trunc_Int64_Int${bits}(value._value)
+  }
+
+  public var _storage: Builtin.Int${bits}
+}
+
+extension ${Self} : Equatable {
+  public static func ==(l: ${Self}, r: ${Self}) -> Bool {
+    return l.toUIntMax() == r.toUIntMax()
+  }
+}
+extension ${Self} : Comparable {
+  public static func <(l: ${Self}, r: ${Self}) -> Bool {
+    return l.toUIntMax() < r.toUIntMax()
+  }
+}
+extension ${Self} : _ExpressibleByBuiltinIntegerLiteral {
+  @_transparent
+  public init(_builtinIntegerLiteral value: Builtin.Int${builtinIntLiteralBits}) {
+    self._storage = Builtin.s_to_u_checked_trunc_Int${builtinIntLiteralBits}_${BuiltinName}(value).0
+  }
+}
+extension ${Self} : ExpressibleByIntegerLiteral {
+  public init(integerLiteral value: ${Self}) {
+    self = value
+  }
+}
+extension ${Self} : CustomStringConvertible {
+  public var description: String {
+    return self.toIntMax().description
+  }
+}
+extension ${Self} : Hashable {
+  public var hashValue: Int {
+    return self.toIntMax().hashValue
+  }
+}
+extension ${Self} : IntegerArithmetic {
+  public func toIntMax() -> IntMax { return numericCast(self) }
+% for Method, op in [('add', 'add'), ('subtract', 'sub'), ('multiply', 'mul')]:
+  @_transparent
+  public static func ${Method}WithOverflow(_ lhs: ${Self}, _ rhs: ${Self}) -> (${Self}, overflow: Bool) {
+    let tmp = Builtin.${sign}${op}_with_overflow_${BuiltinName}(lhs._storage, rhs._storage, false._value)
+    return (${Self}(tmp.0), Bool(tmp.1))
+  }
+% end
+
+% for Method, op in [('divide', 'div'), ('remainder', 'rem')]:
+  @_transparent
+  public static func ${Method}WithOverflow(_ lhs: ${Self}, _ rhs: ${Self}) -> (${Self}, overflow: Bool) {
+    if rhs == 0 {
+      return (0, true)
+    }
+    let tmp = Builtin.${sign}${op}_${BuiltinName}(lhs._storage, rhs._storage)
+    return (${Self}(tmp), false)
+  }
+%end
+}
+extension ${Self} : BitwiseOperations {
+% for op, name, comment in (
+%   ('&', 'and', 'intersection of bits set in'),
+%   ('^', 'xor', 'bits that are set in exactly one of'),
+%   ('|', 'or', 'union of bits set in'),
+% ):
+@_transparent
+  public static func ${op} (lhs: ${Self}, rhs: ${Self}) -> ${Self} {
+    return ${Self}(Builtin.${name}_${BuiltinName}(lhs._storage, rhs._storage))
+  }
+% end
+  @_transparent
+  public static prefix func ~ (rhs: ${Self}) -> ${Self} {
+    let mask = ${Self}.subtractWithOverflow(0, 1).0
+    return ${Self}(Builtin.xor_${BuiltinName}(rhs._storage, mask._storage))
+  }
+  public static var allZeros: ${Self} { return 0 }
+
+  % for op, name in (('<<','shl'), ('>>', 'lshr')):
+  @_transparent
+  public static func ${op} (lhs: ${Self}, rhs: ${Self}) -> ${Self} {
+    _precondition(rhs < ${bits},
+      "shift amount is larger than type size in bits")
+    return ${Self}(Builtin.${name}_${BuiltinName}(lhs._storage, rhs._storage))
+  }
+% end
+}
+extension ${Self} : UnsignedInteger {
+  public func toUIntMax() -> UIntMax {
+    return UIntMax(Builtin.zext_${BuiltinName}_Int64(_storage))
+  }
+}
+
+% end
+
+typealias UIntWordBitsMinus4 = UInt${WORD_BITS - 4}
