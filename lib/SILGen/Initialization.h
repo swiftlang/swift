@@ -24,10 +24,12 @@
 
 namespace swift {
 namespace Lowering {
-  class SILGenFunction;
 
+class SILGenFunction;
 class Initialization;
 using InitializationPtr = std::unique_ptr<Initialization>;
+class TemporaryInitialization;
+using TemporaryInitializationPtr = std::unique_ptr<TemporaryInitialization>;
   
 /// An abstract class for consuming a value.  This is used for initializing
 /// variables, although that is not the only way it is used.

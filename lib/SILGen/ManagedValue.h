@@ -372,6 +372,12 @@ public:
   ConsumableManagedValue asBorrowedOperand() const {
     return { asUnmanagedValue(), CastConsumptionKind::CopyOnSuccess };
   }
+
+  /// Return a managed value that's appropriate for copying this value and
+  /// always consuming it.
+  ConsumableManagedValue copy(SILGenFunction &SGF, SILLocation loc) const {
+    return ConsumableManagedValue::forOwned(asUnmanagedValue().copy(SGF, loc));
+  }
 };
 
 } // namespace Lowering
