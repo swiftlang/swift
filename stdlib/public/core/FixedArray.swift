@@ -13,7 +13,7 @@
 /// A collection containing a single element of type `Element`.
 ///
 /// Like CollectionOfOne but bypasses all the error checking we can find
-internal struct _FastCollectionOfOne<Element>
+public struct _FastCollectionOfOne<Element>
   : MutableCollection, RandomAccessCollection {
 
   /// Creates an instance containing just `element`.
@@ -102,7 +102,7 @@ internal struct _FastCollectionOfOne<Element>
   public var _element: Element
 }
 
-internal protocol _FixedSizeCollection : Collection {
+public protocol _FixedSizeCollection : Collection {
   init(repeating: Iterator.Element)
   
 /*  init<C: Collection>(_ x: C)
@@ -112,7 +112,7 @@ internal protocol _FixedSizeCollection : Collection {
 }
 
 /// A concatenation of B0 and B1 into a single Collection
-struct _Joined<B0 : MutableCollection, B1: MutableCollection>
+public struct _Joined<B0 : MutableCollection, B1: MutableCollection>
   : MutableCollection, RandomAccessCollection, _FixedSizeCollection
 where B0.IndexDistance == Int, 
   B1.IndexDistance == Int,
@@ -122,13 +122,13 @@ where B0.IndexDistance == Int,
 {
   var b0: B0, b1: B1
 
-  typealias Indices = CountableRange<Int>
-  typealias Element = B0.Iterator.Element
+  public typealias Indices = CountableRange<Int>
+  public typealias Element = B0.Iterator.Element
   
-  var startIndex : Int { return 0 }
-  var endIndex : Int { return b0.count &+ b1.count }
+  public var startIndex : Int { return 0 }
+  public var endIndex : Int { return b0.count &+ b1.count }
 
-  subscript(i: Int) -> B0.Iterator.Element {
+  public subscript(i: Int) -> B0.Iterator.Element {
     get {
       var s = self
       let d = distance(from: startIndex, to: i)
@@ -153,7 +153,7 @@ where B0.IndexDistance == Int,
     }
   }
 
-  subscript(r: Range<Int>) -> MutableRandomAccessSlice<_Joined> {
+  public subscript(r: Range<Int>) -> MutableRandomAccessSlice<_Joined> {
     get {
       return MutableRandomAccessSlice(
         base: self, bounds: r)
@@ -165,38 +165,38 @@ where B0.IndexDistance == Int,
     }
   }
   
-  func index(after i: Int) -> Int {
+  public func index(after i: Int) -> Int {
     return i &+ 1
   }
-  func index(before i: Int) -> Int {
+  public func index(before i: Int) -> Int {
     return i &- 1
   }
-  func index(i: Int, offsetBy offset: Int) -> Int {
+  public func index(i: Int, offsetBy offset: Int) -> Int {
     return i &+ offset
   }
-  init(repeating x: B0.Iterator.Element) {
+  public init(repeating x: B0.Iterator.Element) {
     b0 = B0(repeating: x)
     b1 = B1(repeating: x)
   }
 }
 
 extension _FastCollectionOfOne : _FixedSizeCollection {
-  init(repeating x: Element) {
+  public init(repeating x: Element) {
     self = _FastCollectionOfOne(x)
   }
 }
 
 extension CollectionOfOne : _FixedSizeCollection {
-  init(repeating x: Element) {
+  public init(repeating x: Element) {
     self = CollectionOfOne(x)
   }
 }
 
-typealias _DoubleLength<
+public typealias _DoubleLength<
   C : MutableCollection & RandomAccessCollection & _FixedSizeCollection
 > = _Joined<C,C> where C.IndexDistance == Int
-typealias _Array2<T> = _DoubleLength<_FastCollectionOfOne<T>>
-typealias _Array4<T> = _DoubleLength<_Array2<T>>
-typealias _Array8<T> = _DoubleLength<_Array4<T>>
-typealias _Array16<T> = _DoubleLength<_Array8<T>>
-typealias _Array32<T> = _DoubleLength<_Array16<T>>
+public typealias _Array2<T> = _DoubleLength<_FastCollectionOfOne<T>>
+public typealias _Array4<T> = _DoubleLength<_Array2<T>>
+public typealias _Array8<T> = _DoubleLength<_Array4<T>>
+public typealias _Array16<T> = _DoubleLength<_Array8<T>>
+public typealias _Array32<T> = _DoubleLength<_Array16<T>>
