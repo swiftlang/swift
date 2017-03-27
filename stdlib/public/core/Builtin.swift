@@ -855,11 +855,20 @@ public func _openExistential<ExistentialType, ContainedType, ResultType>(
   Builtin.unreachable()
 }
 
-/// A wrapper that can hold any object type with optimal layout properties
-/// (especially good for enum payloads). See
-/// https://bugs.swift.org/browse/SR-4365, for which this is a workaround.
-public struct _UnknownObject<T: AnyObject> {
-  public init(_ x: T) { _base = Builtin.castReference(x) }
+@unsafe_no_objc_tagged_pointer
+@objc
+internal protocol _TrueReference {}
+
+/// A type that can hold non-tagged-pointer representations of T, which allows
+/// more bits to be packed in with the object (especially good for enum
+/// payloads). 
+public struct TrueReference<T: AnyObject> {
+  /// Construct from `x`, as long as it doesn't have a tagged pointer
+  /// representation.
+  public init?(_ x: T) {
+    if _isObjCTaggedPointer(x) { return nil }
+    _base = Builtin.castReference(x)
+  }
   public var object : T { return Builtin.castReference(_base) }
-  internal let _base: Builtin.UnknownObject
+  internal let _base: _TrueReference
 }

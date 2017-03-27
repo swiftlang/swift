@@ -106,11 +106,16 @@ public struct String {
       ('utf16', '_UTF16StringStorage'),
       ('latin1', '_Latin1StringStorage'),
       ('any', 'UnicodeContentBox'),
-      ('cocoa', '_NSStringCase')
+      ('cocoa', 'NSStringPayload'),
+      ('small1', 'UInt61'),
+      ('small2', 'UInt61'),
+      ('small3', 'UInt61')
     ]
 }%
   public struct Content {
-    typealias _NSStringCase = _UnknownObject<_NSStringCore>
+    struct NSStringPayload {
+      let _base: TrueReference<_NSStringCore>
+    }
     internal enum Representation {
       % for tag, Payload in allCases:
     case ${tag}(${Payload})
@@ -119,6 +124,16 @@ public struct String {
     internal var _rep: Representation
   }
   public var content: Content
+}
+
+extension String.Content.NSStringPayload {
+  init(_ o: TrueReference<_NSStringCore>) {
+    _base = o
+  }
+  
+  internal var object: _NSStringCore {
+    return _base.object
+  }
 }
 
 /// Case accessors
@@ -162,7 +177,7 @@ def switch(s):
       %(s)s
     case .any(let x):
       %(s)s
-  default: fatalError("unsupported")
+    case .cocoa, .small1, .small2, .small3: fatalError("unsupported")
     }""" % locals()
   
 }%
@@ -254,7 +269,7 @@ extension String.Content {
       return ObjectIdentifier(storage)
     case .any(let storage):
       return ObjectIdentifier(storage)
-    case .cocoa: fatalError("unsupported")
+    case .cocoa, .small1, .small2, .small3: fatalError("unsupported")
     }
   }
 
@@ -315,7 +330,7 @@ extension String.Content {
         with: replacement.lazy.map { UInt8(truncatingBitPattern: $0) })
     case .any(_):
       return false
-    case .cocoa: fatalError("unsupported")
+    case .cocoa, .small1, .small2, .small3: fatalError("unsupported")
     }
   }
 }
