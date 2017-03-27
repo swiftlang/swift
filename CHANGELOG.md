@@ -65,6 +65,8 @@ Swift 4.0
 Swift 3.1
 ---------
 
+### 2017-03-27 (Xcode 8.3)
+
 * [SE-0080][]:
 
   Adds a new family of conversion initializers to all numeric types that
