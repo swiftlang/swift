@@ -52,9 +52,13 @@ TypeConverter::getIndicesAbstractionPattern(SubscriptDecl *decl) {
   CanGenericSignature genericSig;
   if (auto sig = decl->getGenericSignatureOfContext())
     genericSig = sig->getCanonicalSignature();
-  return AbstractionPattern(genericSig,
-                            decl->getIndicesInterfaceType()
-                                ->getCanonicalType());
+  auto indicesTy = decl->getIndicesInterfaceType();
+  auto indicesCanTy =
+    (genericSig
+     ? genericSig->getCanonicalTypeInContext(indicesTy,
+                                             *decl->getParentModule())
+     : indicesTy->getCanonicalType());
+  return AbstractionPattern(genericSig, indicesCanTy);
 }
 
 static const clang::Type *getClangType(const clang::Decl *decl) {
