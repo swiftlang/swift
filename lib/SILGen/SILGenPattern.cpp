@@ -1402,6 +1402,18 @@ void PatternMatchEmission::emitTupleDispatchWithOwnership(
     ArrayRef<RowToSpecialize> rows, ConsumableManagedValue src,
     const SpecializationHandler &handleCase,
     const FailureHandler &outerFailure) {
+  // Construct the specialized rows.
+  SmallVector<SpecializedRow, 4> specializedRows;
+  specializedRows.resize(rows.size());
+  for (unsigned i = 0, e = rows.size(); i != e; ++i) {
+    specializedRows[i].RowIndex = rows[i].RowIndex;
+
+    auto pattern = cast<TuplePattern>(rows[i].Pattern);
+    for (auto &elt : pattern->getElements()) {
+      specializedRows[i].Patterns.push_back(elt.getPattern());
+    }
+  }
+
   auto firstPat = rows[0].Pattern;
   auto sourceType = cast<TupleType>(firstPat->getType()->getCanonicalType());
   SILLocation loc = firstPat;
@@ -1427,18 +1439,6 @@ void PatternMatchEmission::emitTupleDispatchWithOwnership(
     auto memberCMV =
         getManagedSubobject(SGF, member, fieldTL, src.getFinalConsumption());
     destructured.push_back(memberCMV);
-  }
-
-  // Construct the specialized rows.
-  SmallVector<SpecializedRow, 4> specializedRows;
-  specializedRows.resize(rows.size());
-  for (unsigned i = 0, e = rows.size(); i != e; ++i) {
-    specializedRows[i].RowIndex = rows[i].RowIndex;
-
-    auto pattern = cast<TuplePattern>(rows[i].Pattern);
-    for (auto &elt : pattern->getElements()) {
-      specializedRows[i].Patterns.push_back(elt.getPattern());
-    }
   }
 
   // Maybe revert to the original cleanups during failure branches.
