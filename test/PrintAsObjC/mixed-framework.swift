@@ -23,12 +23,12 @@ import Foundation
 // CHECK-LABEL: @interface Dummy : NSNumber
 public class Dummy: NSNumber {
   // CHECK: - (CIntAlias)getIntAlias SWIFT_WARN_UNUSED_RESULT;
-  public func getIntAlias() -> CIntAlias {
+  @objc public func getIntAlias() -> CIntAlias {
     let result: CInt = 0
     return result
   }
 
   // FRAMEWORK: @property (nonatomic, readonly) NSInteger extraData;
   // HEADER: @property (nonatomic) NSInteger extraData;
-  public internal(set) var extraData: Int = 0
+  @objc public internal(set) var extraData: Int = 0
 } // CHECK: @end
