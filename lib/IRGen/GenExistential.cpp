@@ -2428,72 +2428,44 @@ getProjectBoxedOpaqueExistentialFunction(IRGenFunction &IGF,
         Builder.emitBlock(doneBB);
         IGF.Builder.CreateRet(addressInline);
 
-        // We have an allocated uninitialized box. Deallocate the box.
+        // We have a boxed representation.
         Builder.emitBlock(boxedBB);
 
-        // Project to the existential buffer address.
-        auto *boxReferenceAddr =
-            Builder.CreateBitCast(existentialBuffer.getAddress(),
-                                  IGM.RefCountedPtrTy->getPointerTo());
-        // Load the reference.
-        auto *boxReference = Builder.CreateLoad(
-            boxReferenceAddr, existentialBuffer.getAlignment());
+        if (accessKind == OpenedExistentialAccess::Immutable) {
+          // Project to the existential buffer address.
+          auto *boxReferenceAddr =
+              Builder.CreateBitCast(existentialBuffer.getAddress(),
+                                    IGM.RefCountedPtrTy->getPointerTo());
+          // Load the reference.
+          auto *boxReference = Builder.CreateLoad(
+              boxReferenceAddr, existentialBuffer.getAlignment());
 
-        // Size and alignment requirements of the boxed value.
-        auto *alignmentMask = emitAlignMaskFromFlags(IGF, flags);
+          // Size and alignment requirements of the boxed value.
+          auto *alignmentMask = emitAlignMaskFromFlags(IGF, flags);
 
-        //  StartOffset = ((sizeof(HeapObject) + align) & ~align)
-        auto *heapHeaderSize = llvm::ConstantInt::get(
-            IGF.IGM.SizeTy, getHeapHeaderSize(IGM).getValue());
-        auto *startOffset =
-            Builder.CreateAnd(Builder.CreateAdd(heapHeaderSize, alignmentMask),
-                              Builder.CreateNot(alignmentMask));
-        auto *addressInBox =
-            IGF.emitByteOffsetGEP(boxReference, startOffset, IGM.OpaqueTy);
-
+          //  StartOffset = ((sizeof(HeapObject) + align) & ~align)
+          auto *heapHeaderSize = llvm::ConstantInt::get(
+              IGF.IGM.SizeTy, getHeapHeaderSize(IGM).getValue());
+          auto *startOffset = Builder.CreateAnd(
+              Builder.CreateAdd(heapHeaderSize, alignmentMask),
+              Builder.CreateNot(alignmentMask));
+          auto *addressInBox =
+              IGF.emitByteOffsetGEP(boxReference, startOffset, IGM.OpaqueTy);
+          IGF.Builder.CreateRet(addressInBox);
+          return;
+        }
         // If we are opening this existential for mutating check the reference
         // count and copy if the boxed is not uniquely owned by this reference.
-        if (accessKind == OpenedExistentialAccess::Mutable) {
-          // Check if the reference holds unique ownership.
-          auto *isUnique =
-              IGF.emitIsUniqueCall(boxReference, SourceLoc(), true, false);
-          llvm::BasicBlock *uniqueBB = IGF.createBasicBlock("unique");
-          llvm::BasicBlock *makeUniqueBB = IGF.createBasicBlock("makeUnique");
-          Builder.CreateCondBr(isUnique, uniqueBB, makeUniqueBB);
+        assert(accessKind == OpenedExistentialAccess::Mutable);
+        auto *alignmentMask = emitAlignMaskFromFlags(IGF, flags);
 
-          // Make the box unique.
-          Builder.emitBlock(makeUniqueBB);
-          llvm::Value *box, *address;
+        llvm::Value *box, *objectAddr;
+        IGF.emitMakeBoxUniqueCall(
+            Builder.CreateBitCast(existentialBuffer.getAddress(),
+                                  IGM.OpaquePtrTy),
+            metadata, alignmentMask, box, objectAddr);
 
-          // Allocate a new box.
-          IGF.emitAllocBoxCall(metadata, box, address);
-          auto addressInNewBox =
-              IGF.Builder.CreateBitCast(address, IGF.IGM.OpaquePtrTy);
-          IGF.Builder.CreateStore(
-              box,
-              Address(IGF.Builder.CreateBitCast(existentialBuffer.getAddress(),
-                                                box->getType()->getPointerTo()),
-                      existLayout.getAlignment(IGF.IGM)));
-
-          // Copy the value to the new box.
-          emitInitializeWithCopyCall(
-              IGF, metadata,
-              Address(addressInNewBox, existLayout.getAlignment(IGM)),
-              Address(addressInBox, existLayout.getAlignment(IGM)));
-
-          // Release the ownership of the old box.
-          IGF.emitNativeStrongRelease(boxReference, IGF.getDefaultAtomicity());
-
-          Builder.CreateBr(uniqueBB);
-
-          // Okay we are unique.
-          Builder.emitBlock(uniqueBB);
-          auto uniqueAddressInBox = Builder.CreatePHI(IGM.OpaquePtrTy, 2);
-          uniqueAddressInBox->addIncoming(addressInBox, boxedBB);
-          uniqueAddressInBox->addIncoming(addressInNewBox, makeUniqueBB);
-          addressInBox = uniqueAddressInBox;
-        }
-        IGF.Builder.CreateRet(addressInBox);
+        IGF.Builder.CreateRet(objectAddr);
       }, true /*noinline*/);
 }
 
