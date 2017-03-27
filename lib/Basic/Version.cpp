@@ -372,31 +372,7 @@ std::string getSwiftFullVersion(Version effectiveVersion) {
   OS << SWIFT_VENDOR " ";
 #endif
 
-  OS << "Swift version " SWIFT_VERSION_STRING;
-#ifndef SWIFT_COMPILER_VERSION
-  OS << "-dev";
-#endif
-
-  if (!(effectiveVersion == Version::getCurrentLanguageVersion())) {
-    OS << " effective-" << effectiveVersion;
-  }
-
-#if defined(SWIFT_COMPILER_VERSION)
-  OS << " (swiftlang-" SWIFT_COMPILER_VERSION;
-#if defined(CLANG_COMPILER_VERSION)
-  OS << " clang-" CLANG_COMPILER_VERSION;
-#endif
-  OS << ")";
-#elif defined(LLVM_REVISION) || defined(CLANG_REVISION) || \
-      defined(SWIFT_REVISION)
-  OS << " (";
-  printFullRevisionString(OS);
-  OS << ")";
-#endif
-
-  // Suppress unused function warning
-  (void)&printFullRevisionString;
-
+  OS << "Swift version " SWIFT_VERSION_STRING " (swift-3.1-RELEASE)";
   return OS.str();
 }
 
