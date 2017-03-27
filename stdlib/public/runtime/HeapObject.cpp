@@ -178,7 +178,7 @@ BoxPair::Return swift::swift_makeBoxUnique(OpaqueValue *buffer, const Metadata *
   HeapObject *box = reinterpret_cast<HeapObject *>(inlineBuffer->PrivateData[0]);
 
   if (!swift_isUniquelyReferenced_nonNull_native(box)) {
-    auto refAndObjectAddr = swift_allocBox(type);
+    auto refAndObjectAddr = BoxPair(swift_allocBox(type));
     // Compute the address of the old object.
     auto headerOffset = sizeof(HeapObject) + alignMask & ~alignMask;
     auto *oldObjectAddr = reinterpret_cast<OpaqueValue *>(
@@ -193,7 +193,7 @@ BoxPair::Return swift::swift_makeBoxUnique(OpaqueValue *buffer, const Metadata *
     auto headerOffset = sizeof(HeapObject) + alignMask & ~alignMask;
     auto *objectAddr = reinterpret_cast<OpaqueValue *>(
         reinterpret_cast<char *>(box) + headerOffset);
-    return {box, objectAddr};
+    return BoxPair{box, objectAddr};
   }
 }
 
