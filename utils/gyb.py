@@ -1097,6 +1097,16 @@ def execute_template(
 
 
 def main():
+    """
+    Lint this file.
+    >>> import sys
+    >>> gyb_path = os.path.realpath(__file__)
+    >>> sys.path.append(os.path.dirname(gyb_path))
+    >>> import python_lint
+    >>> python_lint.lint([gyb_path], verbose=False)
+    0
+    """
+
     import argparse
     import sys
 

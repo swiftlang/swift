@@ -172,10 +172,10 @@ def linear_regression(x, y):
     sum_y = sum(y)
     sum_prod = sum(a * b for a, b in zip(x, y))
     sum_x_sq = sum(a ** 2 for a in x)
-    mean_x = sum_x/n
-    mean_y = sum_y/n
-    mean_prod = sum_prod/n
-    mean_x_sq = sum_x_sq/n
+    mean_x = sum_x / n
+    mean_y = sum_y / n
+    mean_prod = sum_prod / n
+    mean_x_sq = sum_x_sq / n
     covar_xy = mean_prod - mean_x * mean_y
     var_x = mean_x_sq - mean_x**2
     slope = covar_xy / var_x
