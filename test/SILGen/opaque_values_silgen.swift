@@ -130,13 +130,14 @@ enum AddressOnlyEnum {
 // CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_T020opaque_values_silgen1P_pAA13TrivialStructVIxid_AA2P2_pAaE_pIxir_TR : $@convention(thin) (@in P2, @owned @callee_owned (@in P) -> TrivialStruct) -> @out P2 {
 // CHECK: bb0([[ARG0:%.*]] : $P2, [[ARG1:%.*]] : $@callee_owned (@in P) -> TrivialStruct):
 // CHECK:   [[OPENED_ARG:%.*]] = open_existential_opaque [[ARG0]] : $P2 to $@opened({{.*}}) P2
-// CHECK:   [[INIT_P:%.*]] = init_existential_opaque [[OPENED_ARG]] : $@opened({{.*}}) P2, $@opened({{.*}}) P2, $P
+// CHECK:   [[COPIED_VAL:%.*]] = copy_value [[OPENED_ARG]]
+// CHECK:   [[INIT_P:%.*]] = init_existential_opaque [[COPIED_VAL]] : $@opened({{.*}}) P2, $@opened({{.*}}) P2, $P
 // CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[INIT_P]]
 // CHECK:   [[APPLY_P:%.*]] = apply [[ARG1]]([[BORROWED_ARG]]) : $@callee_owned (@in P) -> TrivialStruct
 // CHECK:   [[RETVAL:%.*]] = init_existential_opaque [[APPLY_P]] : $TrivialStruct, $TrivialStruct, $P2
 // CHECK:   end_borrow [[BORROWED_ARG]] from [[INIT_P]] : $P, $P
-// CHECK:   destroy_value [[OPENED_ARG]]
-// CHECK:   deinit_existential_opaque [[ARG0]]
+// CHECK:   destroy_value [[COPIED_VAL]]
+// CHECK:   destroy_value [[ARG0]]
 // CHECK:   return [[RETVAL]] : $P2
 // CHECK-LABEL: } // end sil function '_T020opaque_values_silgen1P_pAA13TrivialStructVIxid_AA2P2_pAaE_pIxir_TR'
 
@@ -455,8 +456,7 @@ func s190___return_foo_var() -> Foo {
 // CHECK:   [[OPEN_VAR:%.*]] = open_existential_opaque [[LOAD_GLOBAL]] : $Foo
 // CHECK:   [[WITNESS:%.*]] = witness_method $@opened
 // CHECK:   apply [[WITNESS]]
-// CHECK:   destroy_value [[OPEN_VAR]]
-// CHECK:   deinit_existential_opaque [[LOAD_GLOBAL]] : $Foo
+// CHECK:   destroy_value [[LOAD_GLOBAL]]
 // CHECK:   return %{{.*}} : $()
 // CHECK-LABEL: } // end sil function '_T020opaque_values_silgen21s200______use_foo_varyyF'
 func s200______use_foo_var() {

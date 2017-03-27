@@ -3097,8 +3097,7 @@ bb0(%0 : $VV):
   %13 = init_existential_addr %8 : $*PM, $@opened("090C3DB0-1C76-11E6-81C4-B8E856428C60") PM
   %14 = function_ref @plus : $@convention(method) <τ_0_0 where τ_0_0 : PM> (@in_guaranteed τ_0_0) -> @out τ_0_0
   %15 = apply %14<@opened("090C3DB0-1C76-11E6-81C4-B8E856428C60") PM>(%13, %12) : $@convention(method) <τ_0_0 where τ_0_0 : PM> (@in_guaranteed τ_0_0) -> @out τ_0_0
-  destroy_addr %12 : $*@opened("090C3DB0-1C76-11E6-81C4-B8E856428C60") PM
-  deinit_existential_addr %10 : $*PM
+  destroy_addr %10 : $*PM
   dealloc_stack %10 : $*PM
   %20 = function_ref @minus : $@convention(method) <τ_0_0 where τ_0_0 : PM> (@in_guaranteed τ_0_0) -> ()
   %21 = apply %20<@opened("090C3DB0-1C76-11E6-81C4-B8E856428C60") PM>(%13) : $@convention(method) <τ_0_0 where τ_0_0 : PM> (@in_guaranteed τ_0_0) -> ()
