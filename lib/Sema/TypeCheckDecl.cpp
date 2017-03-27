@@ -2323,8 +2323,10 @@ static Optional<ObjCReason> shouldMarkAsObjC(TypeChecker &TC,
     return ObjCReason::WitnessToObjC;
 
   // Infer '@objc' for 'dynamic' members.
-  if (VD->getAttrs().hasAttribute<DynamicAttr>())
-    return ObjCReason::ExplicitlyDynamic;
+  if (auto attr = VD->getAttrs().getAttribute<DynamicAttr>()) {
+    if (!attr->isImplicit())
+      return ObjCReason::ExplicitlyDynamic;
+  }
 
   // Infer '@objc' for valid, non-implicit, non-operator, members of classes
   // (and extensions thereof) whose class hierarchies originate in Objective-C,
@@ -2608,6 +2610,29 @@ static void inferObjCName(TypeChecker &tc, ValueDecl *decl) {
   }
 }
 
+/// Retrieves the index into diag::objc_inference_swift3_objc_subclass.
+static Optional<unsigned> getSwift3DeprecatedObjCReason(ObjCReason reason) {
+  switch(reason) {
+  case ObjCReason::ExplicitlyDynamic:
+    return 0;
+
+  case ObjCReason::MemberOfObjCSubclass:
+    return 1;
+
+  case ObjCReason::ExplicitlyCDecl:
+  case ObjCReason::ExplicitlyObjC:
+  case ObjCReason::ExplicitlyIBOutlet:
+  case ObjCReason::ExplicitlyIBAction:
+  case ObjCReason::ExplicitlyNSManaged:
+  case ObjCReason::MemberOfObjCProtocol:
+  case ObjCReason::OverridesObjC:
+  case ObjCReason::WitnessToObjC:
+  case ObjCReason::ImplicitlyObjC:
+  case ObjCReason::Accessor:
+    return None;
+  }
+}
+
 /// Mark the given declaration as being Objective-C compatible (or
 /// not) as appropriate.
 ///
@@ -2729,6 +2754,24 @@ void swift::markAsObjC(TypeChecker &TC, ValueDecl *D,
     if (auto sourceFile = method->getParentSourceFile()) {
       sourceFile->ObjCMethods[method->getObjCSelector()].push_back(method);
     }
+  }
+
+  // Special handling for Swift 3 @objc inference rules that are no longer
+  // present in later versions of Swift.
+  if (auto deprecatedReason = getSwift3DeprecatedObjCReason(*isObjC)) {
+    // If we've been asked to unconditionally warn about these deprecated
+    // @objc inference rules, do so now.
+    if (TC.Context.LangOpts.WarnSwift3ObjCInference) {
+      SourceLoc dynamicLoc;
+      if (*isObjC == ObjCReason::ExplicitlyDynamic) {
+        if (auto attr = D->getAttrs().getAttribute<DynamicAttr>())
+          dynamicLoc = attr->getLocation();
+      }
+
+      TC.diagnose(D, diag::objc_inference_swift3, *deprecatedReason)
+        .highlight(dynamicLoc)
+        .fixItInsert(D->getAttributeInsertionLoc(false), "@objc ");
+    };
   }
 }
 

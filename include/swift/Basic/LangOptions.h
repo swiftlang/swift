@@ -194,6 +194,10 @@ namespace swift {
     /// will be used in editor. This usually leads to more aggressive fixit.
     bool DiagnosticsEditorMode = false;
 
+    /// Warn about cases where Swift 3 would infer @objc but later versions
+    /// of Swift do not.
+    bool WarnSwift3ObjCInference = false;
+
     /// Sets the target we are building for and updates platform conditions
     /// to match.
     ///
