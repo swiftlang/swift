@@ -535,6 +535,8 @@ enum class ObjCReason {
   OverridesObjC,
   /// Is a witness to an @objc protocol requirement.
   WitnessToObjC,
+  /// Has an explicit '@IBInspectable' attribute.
+  ExplicitlyIBInspectable,
 
   // Note: Implicit reasons follow.
 
@@ -557,6 +559,7 @@ static inline bool shouldDiagnoseObjCReason(ObjCReason reason) {
   case ObjCReason::OverridesObjC:
   case ObjCReason::WitnessToObjC:
   case ObjCReason::ImplicitlyObjC:
+  case ObjCReason::ExplicitlyIBInspectable:
     return true;
 
   case ObjCReason::MemberOfObjCSubclass:
@@ -579,6 +582,7 @@ static inline unsigned getObjCDiagnosticAttrKind(ObjCReason reason) {
   case ObjCReason::OverridesObjC:
   case ObjCReason::WitnessToObjC:
   case ObjCReason::ImplicitlyObjC:
+  case ObjCReason::ExplicitlyIBInspectable:
     return static_cast<unsigned>(reason);
 
   case ObjCReason::MemberOfObjCSubclass:

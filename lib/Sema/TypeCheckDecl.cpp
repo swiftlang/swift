@@ -2287,6 +2287,7 @@ static void checkAccessibility(TypeChecker &TC, const Decl *D) {
 
 /// Figure out if a declaration should be exported to Objective-C.
 static Optional<ObjCReason> shouldMarkAsObjC(TypeChecker &TC,
+
                                              const ValueDecl *VD,
                                              bool allowImplicit = false){
   assert(!isa<ClassDecl>(VD));
@@ -2299,11 +2300,13 @@ static Optional<ObjCReason> shouldMarkAsObjC(TypeChecker &TC,
   // explicitly declared @objc.
   if (VD->getAttrs().hasAttribute<ObjCAttr>())
     return ObjCReason::ExplicitlyObjC;
-  // @IBOutlet, @IBAction, and @NSManaged imply @objc.
+  // @IBOutlet, @IBAction, @IBInspectable, @NSManaged imply @objc.
   if (VD->getAttrs().hasAttribute<IBOutletAttr>())
     return ObjCReason::ExplicitlyIBOutlet;
   if (VD->getAttrs().hasAttribute<IBActionAttr>())
     return ObjCReason::ExplicitlyIBAction;
+  if (VD->getAttrs().hasAttribute<IBInspectableAttr>())
+    return ObjCReason::ExplicitlyIBInspectable;
   if (VD->getAttrs().hasAttribute<NSManagedAttr>())
     return ObjCReason::ExplicitlyNSManaged;
   // A member of an @objc protocol is implicitly @objc.
@@ -2633,6 +2636,7 @@ static Optional<unsigned> getSwift3DeprecatedObjCReason(ObjCReason reason) {
   case ObjCReason::WitnessToObjC:
   case ObjCReason::ImplicitlyObjC:
   case ObjCReason::Accessor:
+  case ObjCReason::ExplicitlyIBInspectable:
     return None;
   }
 }

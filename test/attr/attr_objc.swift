@@ -1665,6 +1665,19 @@ class HasIBAction {
 }
 
 //===---
+//===--- @IBInspectable implies @objc
+//===---
+
+// CHECK-LABEL: {{^}}class HasIBInspectable {
+class HasIBInspectable {
+  @IBInspectable var goodProperty: AnyObject?
+  // CHECK: {{^}}  @IBInspectable @objc var goodProperty: AnyObject?
+
+  @IBInspectable var badProperty: PlainStruct?
+  // expected-error@-1{{property cannot be marked @IBInspectable because its type cannot be represented in Objective-C}}
+}
+
+//===---
 //===--- @NSManaged implies @objc
 //===---
 
