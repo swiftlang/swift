@@ -46,6 +46,7 @@ set(SWIFT_BENCH_MODULES
     single-source/DictTest3
     single-source/DropLast
     single-source/ErrorHandling
+    single-source/ExistentialPerformance
     single-source/Fibonacci
     single-source/GlobalClass
     single-source/Hanoi

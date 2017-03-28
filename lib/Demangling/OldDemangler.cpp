@@ -1654,13 +1654,12 @@ private:
   }
 
   NodePointer demangleTuple(IsVariadic isV) {
-    NodePointer tuple = Factory.createNode(
-        isV == IsVariadic::yes ? Node::Kind::VariadicTuple
-                               : Node::Kind::NonVariadicTuple);
+    NodePointer tuple = Factory.createNode(Node::Kind::Tuple);
+    NodePointer elt = nullptr;
     while (!Mangled.nextIf('_')) {
       if (!Mangled)
         return nullptr;
-      NodePointer elt = Factory.createNode(Node::Kind::TupleElement);
+      elt = Factory.createNode(Node::Kind::TupleElement);
 
       if (isStartOfIdentifier(Mangled.peek())) {
         NodePointer label = demangleIdentifier(Node::Kind::TupleElementName);
@@ -1675,6 +1674,12 @@ private:
       elt->addChild(type, Factory);
 
       tuple->addChild(elt, Factory);
+    }
+    if (isV == IsVariadic::yes && elt) {
+      elt->reverseChildren();
+      NodePointer marker = Factory.createNode(Node::Kind::VariadicMarker);
+      elt->addChild(marker, Factory);
+      elt->reverseChildren();
     }
     return tuple;
   }

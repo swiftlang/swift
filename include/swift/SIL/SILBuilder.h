@@ -529,6 +529,19 @@ public:
         getSILDebugLocation(Loc), cast<SILArgument>(Arg)));
   }
 
+  BeginAccessInst *createBeginAccess(SILLocation loc, SILValue address,
+                                     SILAccessKind accessKind,
+                                     SILAccessEnforcement enforcement) {
+    return insert(new (F.getModule()) BeginAccessInst(
+        getSILDebugLocation(loc), address, accessKind, enforcement));
+  }
+
+  EndAccessInst *createEndAccess(SILLocation loc, SILValue address,
+                                 bool aborted) {
+    return insert(new (F.getModule()) EndAccessInst(
+        getSILDebugLocation(loc), address, aborted));
+  }
+
   AssignInst *createAssign(SILLocation Loc, SILValue Src, SILValue DestAddr) {
     return insert(new (F.getModule())
                       AssignInst(getSILDebugLocation(Loc), Src, DestAddr));

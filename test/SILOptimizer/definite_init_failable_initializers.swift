@@ -136,16 +136,23 @@ struct FailableStruct {
 // CHECK:         [[INIT_FN:%.*]] = function_ref @_T035definite_init_failable_initializers14FailableStructVACSgyt24failBeforeInitialization_tcfC
 // CHECK-NEXT:    [[SELF_OPTIONAL:%.*]] = apply [[INIT_FN]](%0)
 // CHECK:         [[COND:%.*]] = select_enum [[SELF_OPTIONAL]]
-// CHECK-NEXT:    cond_br [[COND]], bb1, bb2
-// CHECK:       bb1:
+// CHECK-NEXT:    cond_br [[COND]], [[SUCC_BB:bb[0-9]+]], [[FAIL_BB:bb[0-9]+]]
+//
+// CHECK:       [[FAIL_BB]]:
+// CHECK-NEXT:    release_value [[SELF_OPTIONAL]]
+// CHECK-NEXT:    br [[FAIL_EPILOG_BB:bb[0-9]+]]
+//
+// CHECK:       [[SUCC_BB]]:
 // CHECK-NEXT:    [[SELF_VALUE:%.*]] = unchecked_enum_data [[SELF_OPTIONAL]]
 // CHECK-NEXT:    store [[SELF_VALUE]] to [[SELF_BOX]]
 // CHECK-NEXT:    [[NEW_SELF:%.*]] = enum $Optional<FailableStruct>, #Optional.some!enumelt.1, [[SELF_VALUE]]
-// CHECK-NEXT:    br bb3([[NEW_SELF]] : $Optional<FailableStruct>)
-// CHECK:       bb2:
+// CHECK-NEXT:    br [[EPILOG_BB:bb[0-9]+]]([[NEW_SELF]] : $Optional<FailableStruct>)
+//
+// CHECK:       [[FAIL_EPILOG_BB]]:
 // CHECK-NEXT:    [[NEW_SELF:%.*]] = enum $Optional<FailableStruct>, #Optional.none!enumelt
-// CHECK-NEXT:    br bb3([[NEW_SELF]] : $Optional<FailableStruct>)
-// CHECK:       bb3([[NEW_SELF:%.*]] : $Optional<FailableStruct>)
+// CHECK-NEXT:    br [[EPILOG_BB]]([[NEW_SELF]] : $Optional<FailableStruct>)
+//
+// CHECK:       [[EPILOG_BB]]([[NEW_SELF:%.*]] : $Optional<FailableStruct>)
 // CHECK-NEXT:    dealloc_stack [[SELF_BOX]]
 // CHECK-NEXT:    return [[NEW_SELF]]
   // Optional to optional
@@ -499,33 +506,44 @@ struct ThrowStruct {
   }
 
 // CHECK-LABEL: sil hidden @_T035definite_init_failable_initializers11ThrowStructVACSgSi16throwsToOptional_tcfC
-// CHECK:       bb0(%0 : $Int, %1 : $@thin ThrowStruct.Type):
+// CHECK:       bb0([[ARG1:%.*]] : $Int, [[ARG2:%.*]] : $@thin ThrowStruct.Type):
 // CHECK-NEXT:    [[SELF_BOX:%.*]] = alloc_stack $ThrowStruct
 // CHECK:         [[INIT_FN:%.*]] = function_ref @_T035definite_init_failable_initializers11ThrowStructVACSi20failDuringDelegation_tKcfC
-// CHECK-NEXT:    try_apply [[INIT_FN]](%0, %1)
-// CHECK:       bb1([[NEW_SELF:%.*]] : $ThrowStruct):
+// CHECK-NEXT:    try_apply [[INIT_FN]]([[ARG1]], [[ARG2]]) : $@convention(method) (Int, @thin ThrowStruct.Type) -> (@owned ThrowStruct, @error Error), normal [[TRY_APPLY_SUCC_BB:bb[0-9]+]], error [[TRY_APPLY_FAIL_BB:bb[0-9]+]]
+//
+// CHECK:       [[TRY_APPLY_SUCC_BB]]([[NEW_SELF:%.*]] : $ThrowStruct):
 // CHECK-NEXT:    [[SELF_OPTIONAL:%.*]] = enum $Optional<ThrowStruct>, #Optional.some!enumelt.1, [[NEW_SELF]]
-// CHECK-NEXT:    br bb2([[SELF_OPTIONAL]] : $Optional<ThrowStruct>)
-// CHECK:       bb2([[SELF_OPTIONAL:%.*]] : $Optional<ThrowStruct>):
+// CHECK-NEXT:    br [[TRY_APPLY_CONT:bb[0-9]+]]([[SELF_OPTIONAL]] : $Optional<ThrowStruct>)
+//
+// CHECK:       [[TRY_APPLY_CONT]]([[SELF_OPTIONAL:%.*]] : $Optional<ThrowStruct>):
 // CHECK:         [[COND:%.*]] = select_enum [[SELF_OPTIONAL]]
-// CHECK-NEXT:    cond_br [[COND]], bb3, bb4
-// CHECK:       bb3:
+// CHECK-NEXT:    cond_br [[COND]], [[SUCC_BB:bb[0-9]+]], [[FAIL_BB:bb[0-9]+]]
+//
+// CHECK:       [[FAIL_BB]]:
+// CHECK-NEXT:    release_value [[SELF_OPTIONAL]]
+// CHECK-NEXT:    br [[FAIL_EPILOG_BB:bb[0-9]+]]
+//
+// CHECK:       [[SUCC_BB]]:
 // CHECK-NEXT:    [[SELF_VALUE:%.*]] = unchecked_enum_data [[SELF_OPTIONAL]]
 // CHECK-NEXT:    store [[SELF_VALUE]] to [[SELF_BOX]]
 // CHECK-NEXT:    [[NEW_SELF:%.*]] = enum $Optional<ThrowStruct>, #Optional.some!enumelt.1, [[SELF_VALUE]]
-// CHECK-NEXT:    br bb5([[NEW_SELF]] : $Optional<ThrowStruct>)
-// CHECK:       bb4:
+// CHECK-NEXT:    br [[EPILOG_BB:bb[0-9]+]]([[NEW_SELF]] : $Optional<ThrowStruct>)
+//
+// CHECK:       [[FAIL_EPILOG_BB]]:
 // CHECK-NEXT:    [[NEW_SELF:%.*]] = enum $Optional<ThrowStruct>, #Optional.none!enumelt
-// CHECK-NEXT:    br bb5([[NEW_SELF]] : $Optional<ThrowStruct>)
-// CHECK:       bb5([[NEW_SELF:%.*]] : $Optional<ThrowStruct>):
+// CHECK-NEXT:    br [[EPILOG_BB]]([[NEW_SELF]] : $Optional<ThrowStruct>)
+//
+// CHECK:       [[EPILOG_BB]]([[NEW_SELF:%.*]] : $Optional<ThrowStruct>):
 // CHECK-NEXT:    dealloc_stack [[SELF_BOX]]
 // CHECK-NEXT:    return [[NEW_SELF]] : $Optional<ThrowStruct>
-// CHECK:       bb6:
+//
+// CHECK:       [[TRY_APPLY_FAIL_TRAMPOLINE_BB:bb[0-9]+]]:
 // CHECK-NEXT:    strong_release [[ERROR:%.*]] : $Error
 // CHECK-NEXT:    [[NEW_SELF:%.*]] = enum $Optional<ThrowStruct>, #Optional.none!enumelt
-// CHECK-NEXT:    br bb2([[NEW_SELF]] : $Optional<ThrowStruct>)
-// CHECK:       bb7([[ERROR]] : $Error):
-// CHECK-NEXT:    br bb6
+// CHECK-NEXT:    br [[TRY_APPLY_CONT]]([[NEW_SELF]] : $Optional<ThrowStruct>)
+//
+// CHECK:       [[TRY_APPLY_FAIL_BB]]([[ERROR]] : $Error):
+// CHECK-NEXT:    br [[TRY_APPLY_FAIL_TRAMPOLINE_BB]]
   init?(throwsToOptional: Int) {
     try? self.init(failDuringDelegation: throwsToOptional)
   }
@@ -764,16 +782,23 @@ class FailableBaseClass {
 // CHECK:         [[INIT_FN:%.*]] = class_method %0
 // CHECK-NEXT:    [[SELF_OPTIONAL:%.*]] = apply [[INIT_FN]](%0)
 // CHECK:         [[COND:%.*]] = select_enum [[SELF_OPTIONAL]]
-// CHECK-NEXT:    cond_br [[COND]], bb1, bb2
-// CHECK:       bb1:
+// CHECK-NEXT:    cond_br [[COND]], [[SUCC_BB:bb[0-9]+]], [[FAIL_BB:bb[0-9]+]]
+//
+// CHECK:       [[FAIL_BB]]:
+// CHECK:         release_value [[SELF_OPTIONAL]]
+// CHECK:         br [[FAIL_TRAMPOLINE_BB:bb[0-9]+]]
+//
+// CHECK:       [[SUCC_BB]]:
 // CHECK-NEXT:    [[SELF_VALUE:%.*]] = unchecked_enum_data [[SELF_OPTIONAL]]
 // CHECK-NEXT:    store [[SELF_VALUE]] to [[SELF_BOX]]
 // CHECK-NEXT:    [[NEW_SELF:%.*]] = enum $Optional<FailableBaseClass>, #Optional.some!enumelt.1, [[SELF_VALUE]]
-// CHECK-NEXT:    br bb3([[NEW_SELF]] : $Optional<FailableBaseClass>)
-// CHECK:       bb2:
+// CHECK-NEXT:    br [[EPILOG_BB:bb[0-9]+]]([[NEW_SELF]] : $Optional<FailableBaseClass>)
+//
+// CHECK:       [[FAIL_TRAMPOLINE_BB]]:
 // CHECK-NEXT:    [[NEW_SELF:%.*]] = enum $Optional<FailableBaseClass>, #Optional.none!enumelt
-// CHECK-NEXT:    br bb3([[NEW_SELF]] : $Optional<FailableBaseClass>)
-// CHECK:       bb3([[NEW_SELF:%.*]] : $Optional<FailableBaseClass>):
+// CHECK-NEXT:    br [[EPILOG_BB]]([[NEW_SELF]] : $Optional<FailableBaseClass>)
+//
+// CHECK:       [[EPILOG_BB]]([[NEW_SELF:%.*]] : $Optional<FailableBaseClass>):
 // CHECK-NEXT:    dealloc_stack [[SELF_BOX]]
 // CHECK-NEXT:    return [[NEW_SELF]]
   // Optional to optional
@@ -835,17 +860,24 @@ class FailableDerivedClass : FailableBaseClass {
 // CHECK:         [[INIT_FN:%.*]] = function_ref @_T035definite_init_failable_initializers17FailableBaseClassCACSgyt28failBeforeFullInitialization_tcfc
 // CHECK-NEXT:    [[SELF_OPTIONAL:%.*]] = apply [[INIT_FN]]([[BASE_SELF]])
 // CHECK:         [[COND:%.*]] = select_enum [[SELF_OPTIONAL]]
-// CHECK-NEXT:    cond_br [[COND]], bb1, bb2
-// CHECK:       bb1:
+// CHECK-NEXT:    cond_br [[COND]], [[SUCC_BB:bb[0-9]+]], [[FAIL_BB:bb[0-9]+]]
+//
+// CHECK:       [[FAIL_BB]]:
+// CHECK-NEXT:    release_value [[SELF_OPTIONAL]]
+// CHECK-NEXT:    br [[FAIL_TRAMPOLINE_BB:bb[0-9]+]]
+//
+// CHECK:       [[SUCC_BB]]:
 // CHECK-NEXT:    [[BASE_SELF_VALUE:%.*]] = unchecked_enum_data [[SELF_OPTIONAL]]
 // CHECK-NEXT:    [[SELF_VALUE:%.*]] = unchecked_ref_cast [[BASE_SELF_VALUE]]
 // CHECK-NEXT:    store [[SELF_VALUE]] to [[SELF_BOX]]
 // CHECK-NEXT:    [[NEW_SELF:%.*]] = enum $Optional<FailableDerivedClass>, #Optional.some!enumelt.1, [[SELF_VALUE]]
-// CHECK-NEXT:    br bb3([[NEW_SELF]] : $Optional<FailableDerivedClass>)
-// CHECK:       bb2:
+// CHECK-NEXT:    br [[EPILOG_BB:bb[0-9]+]]([[NEW_SELF]] : $Optional<FailableDerivedClass>)
+//
+// CHECK:       [[FAIL_TRAMPOLINE_BB]]:
 // CHECK-NEXT:    [[NEW_SELF:%.*]] = enum $Optional<FailableDerivedClass>, #Optional.none!enumelt
-// CHECK-NEXT:    br bb3([[NEW_SELF]] : $Optional<FailableDerivedClass>)
-// CHECK:       bb3([[NEW_SELF:%.*]] : $Optional<FailableDerivedClass>):
+// CHECK-NEXT:    br [[EPILOG_BB]]([[NEW_SELF]] : $Optional<FailableDerivedClass>)
+//
+// CHECK:       [[EPILOG_BB]]([[NEW_SELF:%.*]] : $Optional<FailableDerivedClass>):
 // CHECK-NEXT:    dealloc_stack [[SELF_BOX]]
 // CHECK-NEXT:    return [[NEW_SELF]] : $Optional<FailableDerivedClass>
   init?(derivedFailDuringDelegation: ()) {

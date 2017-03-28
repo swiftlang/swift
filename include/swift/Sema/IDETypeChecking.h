@@ -55,13 +55,19 @@ namespace swift {
   bool typeCheckUnresolvedExpr(DeclContext &DC, Expr* E,
                                Expr *P, SmallVectorImpl<Type> &PossibleTypes);
 
-  struct ResolveMemberResult {
-    ValueDecl *Favored = nullptr;
-    std::vector<ValueDecl*> OtherViables;
-    operator bool() const { return Favored; }
+  struct ResolvedMemberResult {
+    struct Implementation;
+    Implementation &Impl;
+
+    ResolvedMemberResult();
+    ~ResolvedMemberResult();
+    operator bool() const;
+    bool hasBestOverload() const;
+    ValueDecl* getBestOverload() const;
+    ArrayRef<ValueDecl*> getMemberDecls(bool Viable);
   };
 
-  ResolveMemberResult resolveValueMember(DeclContext &DC, Type BaseTy,
+  ResolvedMemberResult resolveValueMember(DeclContext &DC, Type BaseTy,
                                          DeclName Name);
 
   /// \brief Given a type and an extension to the original type decl of that type,

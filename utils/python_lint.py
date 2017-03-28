@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-# python-lint.py - Runs flake8 linting over the repository ------*- python -*-
+# python_lint.py - Runs flake8 linting over the repository ------*- python -*-
 #
 # This source file is part of the Swift.org open source project
 #
@@ -17,24 +17,26 @@ import subprocess
 import sys
 
 
-def main():
+def lint(arguments, verbose=True):
     flake8_result = subprocess.call(
-      [sys.executable, "-c", "import flake8; import flake8_import_order"]
+        [sys.executable, "-c", "import flake8; import flake8_import_order"]
     )
     if flake8_result != 0:
-        print("Missing modules flake8 or flake8-import-order. Please be sure "
-              "to install these python packages before linting.")
-        sys.exit(0)
+        if verbose:
+            print("Missing modules flake8 or flake8-import-order. Please be"
+                  " sure to install these python packages before linting.")
+        return 0
 
     utils_directory = os.path.dirname(os.path.abspath(__file__))
     parent_directory = os.path.dirname(utils_directory)
     linting_result = subprocess.call(
-      [sys.executable, "-m", "flake8"] + sys.argv[1:],
-      cwd=parent_directory,
-      universal_newlines=True
+        [sys.executable, "-m", "flake8"] + arguments,
+        cwd=parent_directory,
+        universal_newlines=True
     )
-    sys.exit(linting_result)
+    return linting_result
 
 
 if __name__ == '__main__':
-    main()
+    linting_result = lint(sys.argv[1:])
+    sys.exit(linting_result)

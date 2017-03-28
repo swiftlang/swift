@@ -295,7 +295,7 @@ def obtain_all_additional_swift_sources(args, config, with_ssh, scheme_name,
 def dump_repo_hashes(config):
     max_len = reduce(lambda acc, x: max(acc, len(x)),
                      config['repos'].keys(), 0)
-    fmt = "{:<%r}{}" % (max_len+5)
+    fmt = "{:<%r}{}" % (max_len + 5)
     for repo_name, repo_info in sorted(config['repos'].items(),
                                        key=lambda x: x[0]):
         with shell.pushd(os.path.join(SWIFT_SOURCE_ROOT, repo_name),

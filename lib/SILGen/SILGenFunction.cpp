@@ -233,20 +233,10 @@ void SILGenFunction::emitCaptures(SILLocation loc,
       // The parameter type is the static Self type, but the value we
       // want to pass is the dynamic Self type, so upcast it.
       auto dynamicSelfMetatype = MetatypeType::get(
-          captureInfo.getDynamicSelfType(),
-          MetatypeRepresentation::Thick)
-              ->getCanonicalType();
-      auto staticSelfMetatype = MetatypeType::get(
-          captureInfo.getDynamicSelfType()->getSelfType(),
-          MetatypeRepresentation::Thick)
-              ->getCanonicalType();
-      SILType dynamicSILType = SILType::getPrimitiveObjectType(
-          dynamicSelfMetatype);
-      SILType staticSILType = SILType::getPrimitiveObjectType(
-          staticSelfMetatype);
+        captureInfo.getDynamicSelfType());
+      SILType dynamicSILType = getLoweredType(dynamicSelfMetatype);
 
       SILValue value = B.createMetatype(loc, dynamicSILType);
-      value = B.createUpcast(loc, value, staticSILType);
       capturedArgs.push_back(ManagedValue::forUnmanaged(value));
       continue;
     }
@@ -286,10 +276,10 @@ void SILGenFunction::emitCaptures(SILLocation loc,
       // loaded it into a normal retained class pointer, but we capture it as
       // an unowned pointer.  Convert back now.
       if (var->getType()->is<ReferenceStorageType>()) {
-        auto type = getTypeLowering(var->getType()).getLoweredType();
+        auto type = getLoweredType(var->getType());
         Val = emitConversionFromSemanticValue(loc, Val, type);
       }
-      
+
       capturedArgs.push_back(emitManagedRValueWithCleanup(Val));
       break;
     }

@@ -233,17 +233,23 @@ class TypeDecoder {
       return decodeMangledType(Node->getChild(0));
     case NodeKind::ReturnType:
       return decodeMangledType(Node->getChild(0));
-    case NodeKind::NonVariadicTuple:
-    case NodeKind::VariadicTuple: {
+    case NodeKind::Tuple: {
       std::vector<BuiltType> elements;
       std::string labels;
+      bool variadic = false;
       for (auto &element : *Node) {
         if (element->getKind() != NodeKind::TupleElement)
           return BuiltType();
 
         // If the tuple element is labeled, add its label to 'labels'.
         unsigned typeChildIndex = 0;
-        if (element->getChild(0)->getKind() == NodeKind::TupleElementName) {
+        unsigned nameIdx = 0;
+        if (element->getChild(nameIdx)->getKind() == NodeKind::VariadicMarker) {
+          variadic = true;
+          nameIdx = 1;
+          typeChildIndex = 1;
+        }
+        if (element->getChild(nameIdx)->getKind() == NodeKind::TupleElementName) {
           // Add spaces to terminate all the previous labels if this
           // is the first we've seen.
           if (labels.empty()) labels.append(elements.size(), ' ');
@@ -251,7 +257,7 @@ class TypeDecoder {
           // Add the label and its terminator.
           labels += element->getChild(0)->getText();
           labels += ' ';
-          typeChildIndex = 1;
+          typeChildIndex++;
 
         // Otherwise, add a space if a previous element had a label.
         } else if (!labels.empty()) {
@@ -266,7 +272,6 @@ class TypeDecoder {
 
         elements.push_back(elementType);
       }
-      bool variadic = (Node->getKind() == NodeKind::VariadicTuple);
       return Builder.createTupleType(elements, std::move(labels), variadic);
     }
     case NodeKind::TupleElement:
@@ -378,8 +383,7 @@ private:
     };
 
     // Expand a single level of tuple.
-    if (node->getKind() == NodeKind::VariadicTuple ||
-        node->getKind() == NodeKind::NonVariadicTuple) {
+    if (node->getKind() == NodeKind::Tuple) {
       // TODO: preserve variadic somewhere?
 
       // Decode all the elements as separate arguments.

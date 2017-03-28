@@ -682,10 +682,11 @@ class BuildScriptInvocation(object):
                 "--distcc",
                 "--distcc-pump=%s" % toolchain.distcc_pump
             ]
+
+        # *NOTE* We use normal cmake to pass through tsan/ubsan options. We do
+        # NOT pass them to build-script-impl.
         if args.enable_asan:
             impl_args += ["--enable-asan"]
-        if args.enable_ubsan:
-            impl_args += ["--enable-ubsan"]
         if args.verbose_build:
             impl_args += ["--verbose-build"]
         if args.install_symroot:

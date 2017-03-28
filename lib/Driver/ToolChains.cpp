@@ -146,6 +146,7 @@ static void addCommonFrontendArgs(const ToolChain &TC,
   inputArgs.AddLastArg(arguments, options::OPT_sanitize_EQ);
   inputArgs.AddLastArg(arguments, options::OPT_sanitize_coverage_EQ);
   inputArgs.AddLastArg(arguments, options::OPT_swift_version);
+  inputArgs.AddLastArg(arguments, options::OPT_enforce_exclusivity_EQ);
 
   // Pass on any build config options
   inputArgs.AddAllArgs(arguments, options::OPT_D);
@@ -748,6 +749,26 @@ ToolChain::constructInvocation(const GenerateDSYMJobAction &job,
       context.Args.MakeArgString(context.Output.getPrimaryOutputFilename()));
 
   return {"dsymutil", Arguments};
+}
+
+ToolChain::InvocationInfo
+ToolChain::constructInvocation(const VerifyDebugInfoJobAction &job,
+                               const JobContext &context) const {
+  assert(context.Inputs.size() == 1);
+  assert(context.InputActions.empty());
+
+  // This mirrors the clang driver's --verify-debug-info option.
+  ArgStringList Arguments;
+  Arguments.push_back("--verify");
+  Arguments.push_back("--debug-info");
+  Arguments.push_back("--eh-frame");
+  Arguments.push_back("--quiet");
+
+  StringRef inputPath =
+      context.Inputs.front()->getOutput().getPrimaryOutputFilename();
+  Arguments.push_back(context.Args.MakeArgString(inputPath));
+
+  return {"dwarfdump", Arguments};
 }
 
 ToolChain::InvocationInfo

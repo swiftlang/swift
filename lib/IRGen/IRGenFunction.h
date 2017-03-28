@@ -177,6 +177,10 @@ public:
                          llvm::Value *&box,
                          llvm::Value *&valueAddress);
 
+  void emitMakeBoxUniqueCall(llvm::Value *box, llvm::Value *typeMetadata,
+                             llvm::Value *alignMask, llvm::Value *&outBox,
+                             llvm::Value *&outValueAddress);
+
   void emitDeallocBoxCall(llvm::Value *box, llvm::Value *typeMetadata);
 
   void emitTSanInoutAccessCall(llvm::Value *address);

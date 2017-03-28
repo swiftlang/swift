@@ -29,9 +29,9 @@ class MyCls {
   }
   // CHECK: [[@LINE+1]]:3 s:14swift_ide_test5MyClsC9subscriptSfSi_Sitci{{$}}
   subscript(_: Int, _: Int) -> Float {
-    // CHECK: [[@LINE+1]]:5 s:14swift_ide_test5MyClsC9subscriptSfSi_Sitcfg
+    // CHECK: [[@LINE+1]]:5 s:14swift_ide_test5MyClsC9subscriptSfSi_Sitcfg{{$}}
     get { return 0.0 }
-    // CHECK: [[@LINE+1]]:5 s:14swift_ide_test5MyClsC9subscriptSfSi_Sitcfs
+    // CHECK: [[@LINE+1]]:5 s:14swift_ide_test5MyClsC9subscriptSfSi_Sitcfs{{$}}
     set {}
   }
 }
