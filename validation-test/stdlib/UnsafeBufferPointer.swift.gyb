@@ -63,6 +63,39 @@ ${SelfName}TestSuite.test("AssociatedTypes") {
   expect${'Mutable' if IsMutable else ''}CollectionType(${SelfType}.self)
 }
 
+${SelfName}TestSuite.test("rebasing") {
+  let rawbuffer = UnsafeMutableRawBufferPointer.allocate(count: 4 * MemoryLayout<Int>.stride)
+  defer { rawbuffer.deallocate() }
+
+  rawbuffer.copyBytes(from: [0, 1, 2, 3])
+
+%   if IsRaw:
+  let buffer = rawbuffer
+%   else:
+  let intPtr = rawbuffer.baseAddress!.bindMemory(to: Int.self, capacity: 4)
+  let buffer = UnsafeMutableBufferPointer(start: intPtr, count: 4)
+%   end
+
+  for i in buffer.indices {
+    let slice = buffer[i..<buffer.endIndex]
+    let rebased = ${SelfName}(rebasing: slice)
+    expectEqual(rebased.startIndex, 0)
+    expectEqual(rebased.endIndex, rebased.count)
+    expectEqual(rebased.endIndex, buffer.endIndex - i)
+    expectEqual(rebased[0], slice[i])
+    if rebased.count > 1 {
+      expectEqual(rebased[1], slice[i + 1])
+
+      // Rebase again. Tests Mutable->Immutable initializer
+      // and an rvalue slice with literal indices.
+      let rebased2 = ${SelfName}(rebasing: rebased[1..<2])
+      expectEqual(rebased2.startIndex, 0)
+      expectEqual(rebased2.endIndex, 1)
+      expectEqual(rebased2[0], slice[i + 1])
+    }
+  }
+}
+
 // Allocate two buffers. Initialize one and copy it into the other. Pass those
 // to the specified generic collection test function `checkBuffers`.
 func checkWithExpectedBuffer(checkBuffers: (${SelfType}, ${SelfType}) -> Void) {

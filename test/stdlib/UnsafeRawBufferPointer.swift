@@ -9,26 +9,6 @@ import StdlibUnittest
 
 var UnsafeRawBufferPointerTestSuite = TestSuite("UnsafeRawBufferPointer")
 
-UnsafeRawBufferPointerTestSuite.test("rebasing") {
-  let buffer = UnsafeMutableRawBufferPointer.allocate(count: 4)
-  defer { buffer.deallocate() }
-
-  buffer.copyBytes(from: [0, 1, 2, 3] as [UInt8])
-
-  let slice = buffer[1..<3]
-  let rebased = UnsafeRawBufferPointer(rebasing: slice)
-  assert(rebased.startIndex == 0 && rebased.endIndex == 2)
-  assert(rebased[0] == slice[1] && rebased[1] == slice[2])
-
-  let mutableRebased = UnsafeMutableRawBufferPointer(rebasing: slice)
-  assert(mutableRebased.startIndex == 0 && mutableRebased.endIndex == 2)
-  assert(mutableRebased[0] == slice[1] && mutableRebased[1] == slice[2])
-
-  let rebased2 = UnsafeRawBufferPointer(rebasing: rebased[1..<2])
-  assert(rebased2.startIndex == 0 && rebased2.endIndex == 1)
-  assert(rebased2[0] == slice[2])
-}
-
 // View an in-memory value's bytes.
 // Use copyBytes to overwrite the value's bytes.
 UnsafeRawBufferPointerTestSuite.test("initFromValue") {
