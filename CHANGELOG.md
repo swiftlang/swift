@@ -21,6 +21,33 @@ CHANGELOG
 Swift 4.0
 ---------
 
+* [SR-1529](https://bugs.swift.org/browse/SR-1529):
+
+  Covariant method overrides are now fully supported, fixing many crashes
+  and compile-time assertions when defining or calling such methods.
+  Examples:
+
+  ```swift
+  class Bed {}
+  class Nook : Bed {}
+
+  class Cat<T> {
+    func eat(snack: T) {}
+    func play(game: String) {}
+    func sleep(where: Nook) {}
+  }
+
+  class Dog : Cat<(Int, Int)> {
+    // 'T' becomes concrete
+    override func eat(snack: (Int, Int)) {}
+
+    // 'game' becomes optional
+    override func play(game: String?) {}
+
+    // 'where' becomes a superclass
+    override func sleep(where: Bed) {}
+  }```
+
 * [SE-0148][]:
 
   Subscript declarations can now be defined to have generic parameter lists.
