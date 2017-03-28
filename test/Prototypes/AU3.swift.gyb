@@ -106,23 +106,182 @@ public struct String {
       ('latin1', '_Latin1StringStorage'),
       ('any', 'UnicodeContentBox'),
       ('cocoa', 'NSStringPayload'),
-      ('small1', 'UInt61'),
-      ('small2', 'UInt61'),
-      ('small3', 'UInt61')
+      ('inline5or6', 'Inline5or6'),
+      ('inline7or16', 'Inline7or16'),
     ]
 }%
+  
   public struct Content {
-    struct NSStringPayload {
-      let _base: TrueReference<_NSStringCore>
-    }
     internal enum Representation {
       % for tag, Payload in allCases:
     case ${tag}(${Payload})
       % end
     }
+    internal init(_ representation: Representation) {
+      self._rep = representation
+    }
     internal var _rep: Representation
   }
   public var content: Content
+}
+
+/// Case accessors
+extension String.Content {
+  % for tag, Payload in allCases:
+  /// Either the payload of `case .${tag}`, or `nil` if that is not the current
+  /// case.
+  ///
+  /// - Note: setting this property to nil clears the `String`
+  internal var _${tag}: ${Payload}? {
+    get {
+      if case .${tag}(let x) = _rep { return x }
+      return nil
+    }
+    set {
+      if let v = newValue { _rep = .${tag}(v) }
+      else if _${tag} != nil { self = String.Content() }
+    }
+  }
+  % end
+}
+
+//===--- Inline5or6/Inline7or16 --------------------------------------------===//
+extension String.Content {
+  static let packingTable: StaticString
+  = "eilotrm.apdnsIc ufkMShjTRxgC4013bDNvwyUL2O856P-B79AFKEWV_zGJ/HYX"
+
+  typealias Packed = PackedUnsignedIntegers<UInt60, UInt16>
+  
+  static func _pack<Source: Collection>(
+    utf16 source: Source, bitsPerElement: UInt16
+  ) -> Packed?
+  where Source.Iterator.Element == UTF16.CodeUnit {
+    return Packed(
+      bitsPerElement < 7 ?
+      String.Content.packingTable.withUTF8Buffer { table in
+        source.lazy.map { (x: UInt16) -> UInt16 in 
+          numericCast(table.lazy.map { UInt16($0) }.index(of: x) ?? 0xFF)
+        }
+      }:
+      source.lazy.map { 
+        [ mask = UInt16(truncatingBitPattern: ~0 << UInt32(bitsPerElement)) ]
+        (x: UInt16) -> UInt16 in (x & mask) | (x &- 32) & ~mask
+      },
+      bitsPerElement: numericCast(bitsPerElement)
+    )
+  }
+  
+  static func _unpack(
+    bits: UInt61, bitsPerElement: UInt16
+  ) -> LazyMapRandomAccessCollection<String.Content.Packed, UInt16> {
+    let source = String.Content.Packed(
+      representation: numericCast(bits & (~(0 as UInt61) >> 1)),
+      bitsPerElement: numericCast(bitsPerElement)
+    )
+    return bitsPerElement < 7
+    ? String.Content.packingTable.withUTF8Buffer {
+      table in source.lazy.map {
+        (x: UInt16) -> UInt16 in UInt16(table[numericCast(x)])
+      }
+    }
+    : source.lazy.map { 
+      [ mask = UInt16(truncatingBitPattern: ~0 << UInt32(bitsPerElement)) ]
+      (x: UInt16) -> UInt16 in
+      (x &+ 32) & ~mask
+    }
+  }
+}
+  
+% for (N,W) in (5,6), (7,16):
+extension String.Content {
+  struct Inline${N}or${W} {
+    let bits: UInt61
+  }
+}
+
+
+extension String.Content.Inline${N}or${W} {
+  init?<Source: Collection>(utf16 source: Source)
+  where Source.Iterator.Element == UTF16.CodeUnit {
+    if let c = String.Content._pack(utf16: source, bitsPerElement: ${W}) {
+      bits = numericCast(c.representation) | (1 as UInt61) << 60
+    }
+    else if let c = String.Content._pack(utf16: source, bitsPerElement: ${N}) {
+      bits = numericCast(c.representation) 
+    }
+    else { return nil }
+  }
+
+  var bitsPerElement: Int { return bits >> 60 == 0 ? ${N} : ${W} }
+}
+
+extension String.Content.Inline${N}or${W} : AnyUnicodeContent {
+  // FIXME: implement as many of these as possible
+  // public var isKnownLatin1: Bool { false }
+  public var isKnownASCII: Bool { return bitsPerElement <= 7 }
+  // var isKnownFCCNormalized: Bool { get }
+  // var isKnownFCDForm: Bool { get }
+  // var isKnownNFDNormalized: Bool { get }
+  // var isKnownNFCNormalized: Bool { get }
+  // func isLatin1() -> Bool
+  // func isASCII() -> Bool
+}
+
+extension String.Content.Inline${N}or${W} : UnicodeContent {
+  internal var _utf16: LazyMapRandomAccessCollection<String.Content.Packed, UTF16.CodeUnit>
+  {
+    return String.Content._unpack(
+      bits: bits, 
+      bitsPerElement: numericCast(self.bitsPerElement)
+    )
+  }
+  
+  public var utf16: AnyUInt16UnicodeView {
+    return AnyUInt16UnicodeView(RandomAccessUnicodeView(_utf16))
+  }
+  
+  public var fccNormalizedUTF16: AnyUInt16UnicodeView {
+    return bitsPerElement <= 8
+    ? utf16
+    : AnyUInt16UnicodeView(
+      _UnicodeViews(_utf16, UTF16.self).fccNormalizedUTF16
+    )
+  }
+  
+  public var characters: AnyCharacterUnicodeView {
+    if bitsPerElement <= 8 {
+      let _characters = _utf16.lazy.map {
+        // FIXME: Use _unchecked: in stdlib
+        Character(UnicodeScalar(UInt32($0))!)
+      }
+      return AnyCharacterUnicodeView(RandomAccessUnicodeView(_characters))
+    }
+    return AnyCharacterUnicodeView(
+      _UnicodeViews(_utf16, UTF16.self).characters)
+  }
+  
+  public var unicodeScalars: AnyUnicodeScalarUnicodeView {
+    if bitsPerElement <= 8 {
+      return AnyUnicodeScalarUnicodeView(
+      RandomAccessUnicodeView(
+        _utf16.lazy.map {
+            // FIXME: Use _unchecked: in stdlib
+            UnicodeScalar(UInt32($0))!
+          }))
+    }
+    return AnyUnicodeScalarUnicodeView(
+      _UnicodeViews(_utf16, UTF16.self).scalars)
+  }
+}
+
+% end
+
+
+//===--- NSStringPayload --------------------------------------------------===//
+extension String.Content {
+  struct NSStringPayload {
+    let _base: TrueReference<_NSStringCore>
+  }
 }
 
 extension String.Content.NSStringPayload {
@@ -135,8 +294,6 @@ extension String.Content.NSStringPayload {
   }
 }
 
-// Conformance not actually needed, but it gets us a bunch of implementation for
-// free.
 extension String.Content.NSStringPayload : AnyUnicodeContent {
   // FIXME: implement as many of these as possible
   // public var isKnownLatin1: Bool { false }
@@ -191,27 +348,8 @@ internal struct _NSStringUTF16 : RandomAccessCollection {
     return try body(UnsafeBufferPointer(start: baseAddress, count: base.length()))
   }
 }
+//===----------------------------------------------------------------------===//
 
-
-/// Case accessors
-extension String.Content {
-  % for tag, Payload in allCases:
-  /// Either the payload of `case .${tag}`, or `nil` if that is not the current
-  /// case.
-  ///
-  /// - Note: setting this property to nil clears the `String`
-  internal var _${tag}: ${Payload}? {
-    get {
-      if case .${tag}(let x) = _rep { return x }
-      return nil
-    }
-    set {
-      if let v = newValue { _rep = .${tag}(v) }
-      else if _${tag} != nil { self = String.Content() }
-    }
-  }
-  % end
-}
 
 extension String : Unicode {
   public typealias Base = AnyCharacterUnicodeView
@@ -240,9 +378,11 @@ def switch(s):
       %(s)s
     case .cocoa(let x):
       %(s)s
-    case .small1, .small2, .small3: fatalError("unsupported")
+    case .inline5or6(let x):
+      %(s)s
+    case .inline7or16(let x):
+      %(s)s
     }""" % locals()
-  
 }%
 
 extension String.Content : UnicodeContent {
@@ -353,6 +493,7 @@ extension Collection where Iterator.Element == UTF16.CodeUnit {
 extension UnsignedInteger {
   public init?<C: Collection>(packing source: C, bitsPerElement: Self)
   where C.Iterator.Element : UnsignedInteger {
+    // print("Packing \(Array(source)) into \(bitsPerElement) bits per element")
     var r: Self = 0
     var lastSegment: Self = 1
     var shift: Self = 0
@@ -371,14 +512,22 @@ extension UnsignedInteger {
   }
 }
 
+/// Add the missing shift operators
 extension UnsignedInteger {
+  // HACK: divide the shift amount into two parts for more-resilient shifting.
+  // This will work for the bit packing code I'm currently working on but is not
+  // very general (doesn't handle shift amounts >= 2N where N is the number of
+  // bits).  Smart shifts from the new-integer-protocols work should solve this
+  // in a more principled way.
   public static func <<(lhs: Self, rhs: Self) -> Self {
+    let r = rhs.toUIntMax()
     return Self(
-      (lhs.toUIntMax() << rhs.toUIntMax()) & (~(0 as Self)).toUIntMax())
+      ((lhs.toUIntMax() << (r >> 1)) << ((r + 1) >> 1)) & (~(0 as Self)).toUIntMax())
   }
   public static func >>(lhs: Self, rhs: Self) -> Self {
+    let r = rhs.toUIntMax()
     return Self(
-      (lhs.toUIntMax() >> rhs.toUIntMax()) & (~(0 as Self)).toUIntMax())
+      ((lhs.toUIntMax() >> (r >> 1)) >> ((r + 1) >> 1)) & (~(0 as Self)).toUIntMax())
   }
 }
 
@@ -393,7 +542,7 @@ extension UnsignedInteger {
 extension UInt61 {
   public init?<C: Collection>(packing source: C, bitsPerElement: UInt61)
   where C.Iterator.Element : UnsignedInteger {
-    guard let me = UInt61._packing(source, bitsPerElement: 5) else {
+    guard let me = UInt61._packing(source, bitsPerElement: bitsPerElement) else {
       return nil
     }
     self = me
@@ -415,6 +564,12 @@ struct PackedUnsignedIntegers<
     self.representation = representation
     self.bitsPerElement = bitsPerElement
   }
+
+  init(representation: Representation, bitsPerElement: Representation) {
+    self.representation = representation
+    self.bitsPerElement = bitsPerElement
+  }
+  
   let bitsPerElement: Representation
   let representation: Representation
 }
@@ -443,6 +598,28 @@ extension PackedUnsignedIntegers : RandomAccessCollection {
 extension String.Content {
   public init() { _rep = .utf16(._emptyInstance()) }
 
+  public init<C: Collection>(utf16 source: C)
+  where C.Iterator.Element == UTF16.CodeUnit {
+    if source.isEmpty {
+      self.init()
+    }
+    else if let x = Inline7or16(utf16: source) {
+      self.init(.inline7or16(x))
+    }
+    else if let x = Inline5or6(utf16: source) {
+      self.init(.inline5or6(x))
+    }
+    else if source.max().unsafelyUnwrapped <= 0xff {
+      self.init(
+        .latin1(
+          _Latin1StringStorage(
+            source.lazy.map { UInt8(truncatingBitPattern: $0) })))
+    }
+    else {
+      self.init(.utf16(_UTF16StringStorage(source)))
+    }
+  }
+  
   internal var _storageID: ObjectIdentifier? {
     switch _rep {
     case .utf16(let storage):
@@ -455,7 +632,7 @@ extension String.Content {
       // FIXME: don't we want to return nil in the cocoa case, since this is
       // merely used for uniqueness checking and NSString is immutable?
       return ObjectIdentifier(storage.object)
-    case .small1, .small2, .small3:
+    case .inline5or6, .inline7or16:
       return nil
     }
   }
@@ -481,12 +658,14 @@ extension String.Content {
     if replacement._isLatin1() && (
       isKnownLatin1 || head._isLatin1() && tail._isLatin1()
     ) {
+      // FIXME: check to see if we can use the inline5or6 representation.
       let s = _Latin1StringStorage(
         joining: head._low8Bits, replacement._low8Bits, tail._low8Bits)
       s.isKnownASCII = !s.contains { $0 > 0x7f }
       _latin1 = s
     }
     else {
+      // FIXME: check to see if we can use the inline7or16 representation.
       _utf16 = _UTF16StringStorage(joining: head, replacement, tail)
     }
   }
@@ -515,7 +694,7 @@ extension String.Content {
       return storage._tryToReplaceSubrange(
         from: t.lowerBound, to: t.upperBound,
         with: replacement.lazy.map { UInt8(truncatingBitPattern: $0) })
-    case .any, .cocoa, .small1, .small2, .small3:
+    case .any, .cocoa, .inline5or6, .inline7or16:
       return false
     }
   }
@@ -603,6 +782,101 @@ suite.test("UInt61.packing") {
       [31, 29, 23, 19, 17, 13, 11, 7, 5, 3, 2, 1, 1] as [UInt],
       bitsPerElement: 5))
 }
+
+extension String.Content {
+  var bitsPerCodeUnit: Int {
+    switch _rep {
+    case .utf16: return 16
+    case .latin1: return 8
+    case .cocoa(let n): return n.isKnownASCII ? 8 : 16
+    case .any: return 16
+    case .inline7or16(let x): return x.bitsPerElement
+    case .inline5or6(let x):  return x.bitsPerElement
+    }
+  }
+}
+
+suite.test("Content.Packing") {
+  // We can store up to 4 UTF16 code units in the inline7or16 case
+  var c = String.Content(utf16: "a".utf16)
+  expectEqualSequence("a".utf16, Array(c.utf16))
+  expectNotNil(c._inline7or16)
+  expectEqual(16, c.bitsPerCodeUnit)
+  
+  c = String.Content(utf16: "ab".utf16)
+  expectEqualSequence("ab".utf16, Array(c.utf16))
+  expectNotNil(c._inline7or16)
+  expectEqual(16, c.bitsPerCodeUnit)
+  
+  c = String.Content(utf16: "abc".utf16)
+  expectEqualSequence("abc".utf16, Array(c.utf16))
+  expectNotNil(c._inline7or16)
+  expectEqual(16, c.bitsPerCodeUnit)
+  
+  c = String.Content(utf16: "abcd".utf16)
+  expectEqualSequence("abcd".utf16, Array(c.utf16))
+  expectNotNil(c._inline7or16)
+  expectEqual(16, c.bitsPerCodeUnit)
+  
+  c = String.Content(utf16: "ab\u{ffe9}d".utf16)
+  expectEqualSequence("ab\u{ffe9}d".utf16, Array(c.utf16))
+  expectNotNil(c._inline7or16)
+  expectEqual(16, c.bitsPerCodeUnit)
+
+  // If the last code unit is sufficiently high-valued, we overflow the
+  // high-order partial segment and fall back to dynamic storage
+  c = String.Content(utf16: "abc\u{ffe9}".utf16)
+  expectEqualSequence("abc\u{ffe9}".utf16, Array(c.utf16))
+  expectNotNil(c._utf16)
+
+  // If it's all ASCII, we may fit in the inline 7 case.
+  c = String.Content(utf16: "abcde".utf16)
+  expectEqualSequence("abcde".utf16, Array(c.utf16))
+  expectNotNil(c._inline7or16)
+  expectEqual(7, c.bitsPerCodeUnit)
+
+  c = String.Content(utf16: "abcdefgh".utf16)
+  expectEqualSequence("abcdefgh".utf16, Array(c.utf16))
+  expectNotNil(c._inline7or16)
+  expectEqual(7, c.bitsPerCodeUnit)
+
+  // A sufficiently low-valued code unit will fit in the high-order partial
+  // segment
+  c = String.Content(utf16: "abcdefgh.".utf16)
+  expectEqualSequence("abcdefgh.".utf16, Array(c.utf16))
+  expectNotNil(c._inline7or16)
+  expectEqual(7, c.bitsPerCodeUnit)
+
+  // Higher than that and we fall back to a 6-bit representation
+  c = String.Content(utf16: "abcdefghi".utf16)
+  expectEqualSequence("abcdefghi".utf16, Array(c.utf16))
+  expectNotNil(c._inline5or6)
+  expectEqual(6, c.bitsPerCodeUnit)
+
+  c = String.Content(utf16: "abcdefghij".utf16)
+  expectEqualSequence("abcdefghij".utf16, Array(c.utf16))
+  expectNotNil(c._inline5or6)
+  expectEqual(6, c.bitsPerCodeUnit)
+
+  // If it gets too long for 6 bits it falls over into 5 bits per character
+  // Note "b" falls outside the common characters representable in 5 bits
+  c = String.Content(utf16: "aecdefghij0".utf16)
+  expectEqualSequence("aecdefghij0".utf16, Array(c.utf16))
+  expectNotNil(c._inline5or6)
+  expectEqual(5, c.bitsPerCodeUnit)
+
+  c = String.Content(utf16: "aecdefghij01".utf16)
+  expectEqualSequence("aecdefghij01".utf16, Array(c.utf16))
+  expectNotNil(c._inline5or6)
+  expectEqual(5, c.bitsPerCodeUnit)
+
+  // After 12 characters, we fall back to deep latin-1
+  c = String.Content(utf16: "aecdefghij010".utf16)
+  expectEqualSequence("aecdefghij010".utf16, Array(c.utf16))
+  expectNotNil(c._latin1)
+  expectEqual(8, c.bitsPerCodeUnit)
+}
+
 
 let sample = "abcdefghijklmnopqrstuvwxyz\n"
   + "🇸🇸🇬🇱🇱🇸🇩🇯🇺🇸\n"
