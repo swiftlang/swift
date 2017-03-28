@@ -2773,9 +2773,7 @@ CanSILFunctionType SILGenFunction::buildThunkType(
 
   auto &mod = *F.getModule().getSwiftModule();
   auto getCanonicalType = [&](Type t) -> CanType {
-    if (genericSig)
-      return genericSig->getCanonicalTypeInContext(t, mod);
-    return t->getCanonicalType();
+    return t->getCanonicalType(genericSig, mod);
   };
 
   // Map the parameter and expected types out of context to get the interface

@@ -543,6 +543,12 @@ ERROR(sil_objc_with_tail_elements,none,
       "alloc_ref [objc] cannot have tail allocated elements", ())
 ERROR(found_unqualified_instruction_in_qualified_function,none,
       "found unqualified instruction in qualified function '%0'", (StringRef))
+ERROR(sil_unknown_access_kind_or_enforcement,none,
+      "expected access kind or enforcement", ())
+ERROR(sil_expected_access_kind,none,
+      "%0 instruction must have explicit access kind", (StringRef))
+ERROR(sil_expected_access_enforcement,none,
+      "%0 instruction must have explicit access enforcement", (StringRef))
 
 // SIL Basic Blocks
 ERROR(expected_sil_block_name,none,

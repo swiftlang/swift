@@ -26,7 +26,7 @@ Swift 4.0
   Subscript declarations can now be defined to have generic parameter lists.
   Example:
 
-  ```
+  ```swift
   extension JSON {
     subscript<T>(key: String) -> T?
         where T : JSONConvertible {

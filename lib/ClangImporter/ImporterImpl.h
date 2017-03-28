@@ -296,7 +296,13 @@ private:
   /// (through the Swift name lookup module file extension).
   LookupTableMap LookupTables;
 
+  /// \brief The fake buffer used to import modules.
+  ///
+  /// FIXME: Horrible hack for loadModule().
+  clang::FileID DummyImportBuffer;
+
   /// \brief A count of the number of load module operations.
+  ///
   /// FIXME: Horrible, horrible hack for \c loadModule().
   unsigned ImportCounter = 0;
 

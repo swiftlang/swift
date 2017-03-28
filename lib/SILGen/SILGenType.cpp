@@ -90,7 +90,9 @@ SILGenModule::emitVTableMethod(SILDeclRef derived, SILDeclRef base) {
   // The override member type is semantically a subtype of the base
   // member type. If the override is ABI compatible, we do not need
   // a thunk.
-  if (overrideInfo == derivedInfo)
+  if (M.Types.checkFunctionForABIDifferences(derivedInfo.SILFnType,
+                                             overrideInfo.SILFnType)
+      == TypeConverter::ABIDifference::Trivial)
     return {base, implFn, implLinkage};
 
   // Generate the thunk name.

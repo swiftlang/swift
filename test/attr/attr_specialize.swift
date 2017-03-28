@@ -211,6 +211,9 @@ public func copyValue<S>(_ t: S, s: inout S) -> Int64 where S: P{
 @_specialize(exported: true, where S: _Trivial(64))
 @_specialize(exported: true, where S: _Trivial(32))
 @_specialize(exported: true, where S: _RefCountedObject)
+@_specialize(exported: true, where S: _NativeRefCountedObject)
+@_specialize(exported: true, where S: _Class)
+@_specialize(exported: true, where S: _NativeClass)
 @inline(never)
 public func copyValueAndReturn<S>(_ t: S, s: inout S) -> S where S: P{
   return s

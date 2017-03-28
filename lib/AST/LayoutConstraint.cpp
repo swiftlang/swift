@@ -39,6 +39,14 @@ LayoutConstraint getLayoutConstraint(Identifier ID, ASTContext &Ctx) {
     return LayoutConstraint::getLayoutConstraint(
         LayoutConstraintKind::NativeRefCountedObject, Ctx);
 
+  if (ID == Ctx.Id_ClassLayout)
+    return LayoutConstraint::getLayoutConstraint(
+      LayoutConstraintKind::Class, Ctx);
+
+  if (ID == Ctx.Id_NativeClassLayout)
+    return LayoutConstraint::getLayoutConstraint(
+      LayoutConstraintKind::NativeClass, Ctx);
+
   return LayoutConstraint::getLayoutConstraint(
       LayoutConstraintKind::UnknownLayout, Ctx);
 }

@@ -1083,8 +1083,8 @@ CanType TypeBase::getCanonicalType() {
     // Transform the input and result types.
     auto &ctx = function->getInput()->getASTContext();
     auto &mod = *ctx.TheBuiltinModule;
-    auto inputTy = sig->getCanonicalTypeInContext(function->getInput(), mod);
-    auto resultTy = sig->getCanonicalTypeInContext(function->getResult(), mod);
+    auto inputTy = function->getInput()->getCanonicalType(sig, mod);
+    auto resultTy = function->getResult()->getCanonicalType(sig, mod);
 
     Result = GenericFunctionType::get(sig, inputTy, resultTy,
                                       function->getExtInfo());
@@ -1166,6 +1166,14 @@ CanType TypeBase::getCanonicalType() {
   assert(Result && "Case not implemented!");
   CanonicalType = Result;
   return CanType(Result);
+}
+
+CanType TypeBase::getCanonicalType(GenericSignature *sig,
+                                   ModuleDecl &mod) {
+  if (!sig)
+    return getCanonicalType();
+
+  return sig->getCanonicalTypeInContext(this, mod);
 }
 
 TypeBase *TypeBase::reconstituteSugar(bool Recursive) {

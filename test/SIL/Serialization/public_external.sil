@@ -1,12 +1,36 @@
-// RUN: %target-swift-frontend %s -parse-sil -emit-module -module-name Swift -module-link-name swiftCore -parse-stdlib -parse-as-library -sil-serialize-all -o - | %target-sil-opt -assume-parsing-unqualified-ownership-sil -module-name Swift | %FileCheck %s
+// RUN: %target-swift-frontend %s -Xllvm -sil-disable-pass="External Defs To Decls" -parse-sil -emit-module -module-name Swift -module-link-name swiftCore -parse-stdlib -parse-as-library -sil-serialize-all -o - | %target-sil-opt -assume-parsing-unqualified-ownership-sil -module-name Swift -emit-sorted-sil | %FileCheck %s
 
-// CHECK-NOT: sil public_external @pe : $@convention(thin) () -> () {
-// CHECK-NOT: sil hidden_external @he : $@convention(thin) () -> () {
-// CHECK-NOT: sil shared_external @se : $@convention(thin) () -> () {
-
+sil_stage raw
 import Builtin
 
+// Check that bodies are not serialized for external functions.
+// CHECK-NOT: sil{{.*}}@pe : $@convention(thin) () -> () {
+// CHECK-NOT: sil{{.*}}@external_pe : $@convention(thin) () -> () {
+// CHECK-NOT: sil{{.*}}@he : $@convention(thin) () -> () {
+// CHECK-NOT: sil{{.*}}@external_he : $@convention(thin) () -> () {
+// CHECK-NOT: sil{{.*}}@se : $@convention(thin) () -> () {
+
+// Check that declarations are not serialized for external functions that are
+// not used, i.e. not referenced from serialized functions.
+// CHECK-NOT: sil{{.*}}@pe : $@convention(thin) () -> ()
+// CHECK-NOT: sil{{.*}}@external_pe : $@convention(thin) () -> ()
+// CHECK-NOT: sil{{.*}}@he : $@convention(thin) () -> ()
+// CHECK-NOT: sil{{.*}}@external_he : $@convention(thin) () -> ()
+// CHECK-NOT: sil{{.*}}@se : $@convention(thin) () -> ()
+
+// Check that declarations for shared external functions are not serialized,
+// because such functions should always have a serialized body.
+// CHECK-NOT: sil{{.*}}@se : $@convention(thin) () -> ()
+
+// Some functions are marked transparent to prevent ExternalDefsToDecls opt from
+// converting them into declarations.
+
 sil public_external @pe : $@convention(thin) () -> () {
+  %0 = tuple()
+  return %0 : $()
+}
+
+sil public_external [transparent] @transparent_pe : $@convention(thin) () -> () {
   %0 = tuple()
   return %0 : $()
 }
@@ -16,7 +40,88 @@ sil hidden_external @he : $@convention(thin) () -> () {
   return %0 : $()
 }
 
+sil hidden_external [transparent] @tranparent_he : $@convention(thin) () -> () {
+  %0 = tuple()
+  return %0 : $()
+}
+
 sil shared_external @se : $@convention(thin) () -> () {
   %0 = tuple()
   return %0 : $()
 }
+
+// Check that external non-shared functions are serialized only
+// if they are referenced from something reachable from non-external functions.
+// Since all these fN functions are referenced only from an external function,
+// do not serialize even their declrations.
+
+// CHECK-NOT: sil{{.*}}@fn1 : $@convention(thin) () -> ()
+sil public_external [noinline] @fn1 : $@convention(thin) () -> () {
+  %0 = tuple()
+  return %0 : $()
+}
+
+// CHECK-NOT: sil{{.*}}@fn2: $@convention(thin) () -> ()
+sil public_external [noinline] @fn2 : $@convention(thin) () -> () {
+  %0 = tuple()
+  return %0 : $()
+}
+
+// CHECK-NOT: sil{{.*}}@fn3 : $@convention(thin) () -> ()
+sil public_external [noinline] @fn3 : $@convention(thin) () -> () {
+  %0 = tuple()
+  return %0 : $()
+}
+
+// CHECK-NOT: sil{{.*}}@fn4 : $@convention(thin) () -> ()
+sil public_external [noinline] @fn4 : $@convention(thin) () -> () {
+  %0 = tuple()
+  return %0 : $()
+}
+
+// Emit the declaration of this function, because it is referenced from serialized
+// function use_external_functions.
+sil public_external [noinline] @used_external_fn : $@convention(thin) () -> () {
+  %0 = tuple()
+  return %0 : $()
+}
+
+// Do not serialize the body of this function, because it is public external.
+// But emit its declaration, because it is referenced from a body of serialized
+// fragile function.
+
+// There should be no body for this function.
+// CHECK-NOT: sil{{.*}}@public_external_fn : $@convention(thin) () -> () {
+// But declaration should be present.
+// CHECK: sil{{.*}}@public_external_fn : $@convention(thin) () -> ()
+sil public_external [noinline] @public_external_fn : $@convention(thin) () -> () {
+  %0 = function_ref @fn1 : $@convention(thin) () -> ()
+  %1 = apply %0 () : $@convention(thin) () -> ()
+  %2 = function_ref @fn2 : $@convention(thin) () -> ()
+  %3 = apply %2 () : $@convention(thin) () -> ()
+  %4 = function_ref @fn3 : $@convention(thin) () -> ()
+  %5 = apply %4 () : $@convention(thin) () -> ()
+  %6 = function_ref @fn4 : $@convention(thin) () -> ()
+  %7 = apply %6 () : $@convention(thin) () -> ()
+
+  %10 = tuple()
+  return %10 : $()
+}
+
+// The body of this fragile function has to be emitted.
+// CHECK-LABEL: sil{{.*}}@use_external_functions : $@convention(thin) () -> () {
+sil @use_external_functions: $@convention(thin) () -> () {
+  %0 = function_ref @public_external_fn : $@convention(thin) () -> ()
+  %1 = apply %0 () : $@convention(thin) () -> ()
+
+  %2 = function_ref @used_external_fn : $@convention(thin) () -> ()
+  %3 = apply %2 () : $@convention(thin) () -> ()
+
+  %4 = tuple()
+  return %4 : $()
+}
+
+// There should be no body for this function.
+// CHECK-NOT: sil{{.*}}@used_external_fn : $@convention(thin) () -> () {
+// But declaration should be present.
+// CHECK: sil{{.*}}@used_external_fn : $@convention(thin) () -> ()

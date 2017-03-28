@@ -410,7 +410,7 @@ func test_variadic(_ cat: Cat) throws {
 // CHECK-LABEL: sil hidden @_T06errors13test_variadicyAA3CatCKF : $@convention(thin) (@owned Cat) -> @error Error {
 // CHECK:       bb0([[ARG:%.*]] : $Cat):
 // CHECK:         debug_value undef : $Error, var, name "$error", argno 2
-// CHECK:         [[TAKE_FN:%.*]] = function_ref @_T06errors14take_many_catsySayAA3CatCG_dtKF : $@convention(thin) (@owned Array<Cat>) -> @error Error
+// CHECK:         [[TAKE_FN:%.*]] = function_ref @_T06errors14take_many_catsySayAA3CatCGd_tKF : $@convention(thin) (@owned Array<Cat>) -> @error Error
 // CHECK:         [[N:%.*]] = integer_literal $Builtin.Word, 4
 // CHECK:         [[T0:%.*]] = function_ref @_T0s27_allocateUninitializedArray{{.*}}F
 // CHECK:         [[T1:%.*]] = apply [[T0]]<Cat>([[N]])

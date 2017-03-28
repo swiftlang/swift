@@ -446,6 +446,9 @@ private:
                       ConsumableManagedValue src,
                       const SpecializationHandler &handleSpec,
                       const FailureHandler &failure);
+  void emitEnumElementDispatchWithOwnership(
+      ArrayRef<RowToSpecialize> rows, ConsumableManagedValue src,
+      const SpecializationHandler &handleSpec, const FailureHandler &failure);
   void emitEnumElementDispatch(ArrayRef<RowToSpecialize> rows,
                                ConsumableManagedValue src,
                                const SpecializationHandler &handleSpec,
@@ -696,9 +699,10 @@ void ClauseMatrix::print(llvm::raw_ostream &out) const {
 ///
 /// Essentially equivalent to forwardIntoIrrefutableSubtree, except it
 /// converts AlwaysTake to TakeOnSuccess.
-static
-ConsumableManagedValue forwardIntoSubtree(CleanupStateRestorationScope &scope,
-                                          ConsumableManagedValue outerCMV) {
+static ConsumableManagedValue
+forwardIntoSubtree(SILGenFunction &SGF, SILLocation loc,
+                   CleanupStateRestorationScope &scope,
+                   ConsumableManagedValue outerCMV) {
   ManagedValue outerMV = outerCMV.getFinalManagedValue();
   if (!outerMV.hasCleanup()) return outerCMV;
 
@@ -706,6 +710,12 @@ ConsumableManagedValue forwardIntoSubtree(CleanupStateRestorationScope &scope,
          && "copy-on-success value with cleanup?");
   scope.pushCleanupState(outerMV.getCleanup(),
                          CleanupState::PersistentlyActive);
+
+  // If SILOwnership is enabled, we always forward down values as borrows that
+  // are copied on success.
+  if (SGF.F.getModule().getOptions().EnableSILOwnership) {
+    return {outerMV.borrow(SGF, loc), CastConsumptionKind::CopyOnSuccess};
+  }
 
   // Success means that we won't end up in the other branch,
   // but failure doesn't.
@@ -716,13 +726,17 @@ ConsumableManagedValue forwardIntoSubtree(CleanupStateRestorationScope &scope,
 ///
 /// Essentially equivalent to forwardIntoSubtree, except it preserves
 /// AlwaysTake consumption.
-static void forwardIntoIrrefutableSubtree(CleanupStateRestorationScope &scope,
+static void forwardIntoIrrefutableSubtree(SILGenFunction &SGF,
+                                          CleanupStateRestorationScope &scope,
                                           ConsumableManagedValue outerCMV) {
   ManagedValue outerMV = outerCMV.getFinalManagedValue();
   if (!outerMV.hasCleanup()) return;
 
   assert(outerCMV.getFinalConsumption() != CastConsumptionKind::CopyOnSuccess
          && "copy-on-success value with cleanup?");
+  assert((!SGF.F.getModule().getOptions().EnableSILOwnership ||
+          outerCMV.getFinalConsumption() == CastConsumptionKind::TakeAlways) &&
+         "When semantic sil is enabled, we should never see TakeOnSuccess");
   scope.pushCleanupState(outerMV.getCleanup(),
                          CleanupState::PersistentlyActive);
 
@@ -731,17 +745,19 @@ static void forwardIntoIrrefutableSubtree(CleanupStateRestorationScope &scope,
 namespace {
 
 class ArgForwarderBase {
+  SILGenFunction &SGF;
   CleanupStateRestorationScope Scope;
-protected:
-  ArgForwarderBase(SILGenFunction &SGF)
-    : Scope(SGF.Cleanups) {}
 
-  ConsumableManagedValue forward(ConsumableManagedValue value) {
-    return forwardIntoSubtree(Scope, value);
+protected:
+  ArgForwarderBase(SILGenFunction &SGF) : SGF(SGF), Scope(SGF.Cleanups) {}
+
+  ConsumableManagedValue forward(ConsumableManagedValue value,
+                                 SILLocation loc) {
+    return forwardIntoSubtree(SGF, loc, Scope, value);
   }
 
   void forwardIntoIrrefutable(ConsumableManagedValue value) {
-    return forwardIntoIrrefutableSubtree(Scope, value);
+    return forwardIntoIrrefutableSubtree(SGF, Scope, value);
   }
 };
 
@@ -752,7 +768,8 @@ class ArgForwarder : private ArgForwarderBase {
   SmallVector<ConsumableManagedValue, 4> ForwardedArgsBuffer;
 
 public:
-  ArgForwarder(SILGenFunction &SGF, ArgArray outerArgs, bool isFinalUse)
+  ArgForwarder(SILGenFunction &SGF, ArgArray outerArgs, SILLocation loc,
+               bool isFinalUse)
       : ArgForwarderBase(SGF), OuterArgs(outerArgs) {
     // If this is a final use along this path, we don't need to change
     // any of the args.  However, we do need to make sure that the
@@ -764,7 +781,7 @@ public:
     } else {
       ForwardedArgsBuffer.reserve(outerArgs.size());
       for (auto &outerArg : outerArgs)
-        ForwardedArgsBuffer.push_back(forward(outerArg));
+        ForwardedArgsBuffer.push_back(forward(outerArg, loc));
     }
   }
 
@@ -788,7 +805,7 @@ public:
   /// Construct a specialized arg forwarder for a (locally) successful
   /// dispatch.
   SpecializedArgForwarder(SILGenFunction &SGF, ArgArray outerArgs,
-                          unsigned column, ArgArray newArgs,
+                          unsigned column, ArgArray newArgs, SILLocation loc,
                           bool isFinalUse)
       : ArgForwarderBase(SGF), OuterArgs(outerArgs), IsFinalUse(isFinalUse) {
     assert(column < outerArgs.size());
@@ -803,20 +820,20 @@ public:
 
     // The outer columns before the specialized column.
     for (unsigned i = 0, e = column; i != e; ++i)
-      ForwardedArgsBuffer.push_back(forward(outerArgs[i]));
+      ForwardedArgsBuffer.push_back(forward(outerArgs[i], loc));
 
     // The specialized column.
     if (!newArgs.empty()) {
       ForwardedArgsBuffer.push_back(newArgs[0]);
       newArgs = newArgs.slice(1);
     } else if (column + 1 < outerArgs.size()) {
-      ForwardedArgsBuffer.push_back(forward(outerArgs.back()));
+      ForwardedArgsBuffer.push_back(forward(outerArgs.back(), loc));
       outerArgs = outerArgs.slice(0, outerArgs.size() - 1);
     }
 
     // The rest of the outer columns.
     for (unsigned i = column + 1, e = outerArgs.size(); i != e; ++i)
-      ForwardedArgsBuffer.push_back(forward(outerArgs[i]));
+      ForwardedArgsBuffer.push_back(forward(outerArgs[i], loc));
 
     // The rest of the new args.
     ForwardedArgsBuffer.append(newArgs.begin(), newArgs.end());
@@ -829,12 +846,13 @@ public:
   }
 
 private:
-  ConsumableManagedValue forward(ConsumableManagedValue value) {
+  ConsumableManagedValue forward(ConsumableManagedValue value,
+                                 SILLocation loc) {
     if (IsFinalUse) {
       ArgForwarderBase::forwardIntoIrrefutable(value);
       return value;
     } else {
-      return ArgForwarderBase::forward(value);
+      return ArgForwarderBase::forward(value, loc);
     }
   }
 };
@@ -842,11 +860,21 @@ private:
 /// A RAII-ish object for undoing the forwarding of cleanups along a
 /// failure path.
 class ArgUnforwarder {
+  SILGenFunction &SGF;
   CleanupStateRestorationScope Scope;
 public:
-  ArgUnforwarder(SILGenFunction &SGF) : Scope(SGF.Cleanups) {}
+  ArgUnforwarder(SILGenFunction &SGF) : SGF(SGF), Scope(SGF.Cleanups) {}
 
-  static bool requiresUnforwarding(ConsumableManagedValue operand) {
+  static bool requiresUnforwarding(SILGenFunction &SGF,
+                                   ConsumableManagedValue operand) {
+    if (SGF.F.getModule().getOptions().EnableSILOwnership) {
+      assert(operand.getFinalConsumption() !=
+                 CastConsumptionKind::TakeOnSuccess &&
+             "When compiling with sil ownership take on success is disabled");
+      // No unforwarding is needed, we always copy.
+      return false;
+    }
+
     return (operand.hasCleanup() &&
             operand.getFinalConsumption()
               == CastConsumptionKind::TakeOnSuccess);
@@ -858,7 +886,8 @@ public:
   /// aggregate cleanup.
   void unforwardBorrowedValues(ConsumableManagedValue aggregate,
                                ArgArray subobjects) {
-    if (!requiresUnforwarding(aggregate)) return;
+    if (!requiresUnforwarding(SGF, aggregate))
+      return;
     Scope.pushCleanupState(aggregate.getCleanup(), CleanupState::Active);
     for (auto &subobject : subobjects) {
       if (subobject.hasCleanup())
@@ -995,7 +1024,7 @@ void PatternMatchEmission::emitWildcardDispatch(ClauseMatrix &clauses,
                                                 unsigned row,
                                                 const FailureHandler &failure) {
   // Get appropriate arguments.
-  ArgForwarder forwarder(SGF, matrixArgs,
+  ArgForwarder forwarder(SGF, matrixArgs, clauses[row].getCasePattern(),
                          /*isFinalUse*/ row + 1 == clauses.rows());
   ArgArray args = forwarder.getForwardedArgs();
 
@@ -1288,7 +1317,8 @@ void PatternMatchEmission::emitSpecializedDispatch(ClauseMatrix &clauses,
   // Forward just the specialized argument right now.  We'll forward
   // the rest in the handler.
   bool isFinalUse = (lastRow == clauses.rows());
-  ArgForwarder outerForwarder(SGF, matrixArgs[column], isFinalUse);
+  ArgForwarder outerForwarder(SGF, matrixArgs[column], firstSpecializer,
+                              isFinalUse);
   auto arg = outerForwarder.getForwardedArgs()[0];
 
   SpecializationHandler handler = [&](ArrayRef<ConsumableManagedValue> newArgs,
@@ -1301,7 +1331,7 @@ void PatternMatchEmission::emitSpecializedDispatch(ClauseMatrix &clauses,
     ClauseMatrix innerClauses = clauses.specializeRowsInPlace(column, rows);
 
     SpecializedArgForwarder innerForwarder(SGF, matrixArgs, column, newArgs,
-                                           isFinalUse);
+                                           firstSpecializer, isFinalUse);
     ArgArray innerArgs = innerForwarder.getForwardedArgs();
 
     emitDispatch(innerClauses, innerArgs, innerFailure);
@@ -1417,7 +1447,7 @@ emitTupleDispatch(ArrayRef<RowToSpecialize> rows, ConsumableManagedValue src,
     unforwarder.unforwardBorrowedValues(src, destructured);
     outerFailure(loc);
   };
-  if (ArgUnforwarder::requiresUnforwarding(src))
+  if (ArgUnforwarder::requiresUnforwarding(SGF, src))
     innerFailure = &specializedFailure;
 
   // Recurse.
@@ -1465,7 +1495,7 @@ emitCastOperand(SILGenFunction &SGF, SILLocation loc,
       init->finishInitialization(SGF);
       ConsumableManagedValue result =
         { init->getManagedAddress(), src.getFinalConsumption() };
-      if (ArgUnforwarder::requiresUnforwarding(src))
+      if (ArgUnforwarder::requiresUnforwarding(SGF, src))
         borrowedValues.push_back(result);
       return result;
     }
@@ -1523,7 +1553,7 @@ void PatternMatchEmission::emitIsDispatch(ArrayRef<RowToSpecialize> rows,
     unforwarder.unforwardBorrowedValues(src, borrowedValues);
     failure(loc);
   };
-  if (ArgUnforwarder::requiresUnforwarding(src))
+  if (ArgUnforwarder::requiresUnforwarding(SGF, src))
     innerFailure = &specializedFailure;
   
   // Perform a conditional cast branch.
@@ -1541,11 +1571,239 @@ void PatternMatchEmission::emitIsDispatch(ArrayRef<RowToSpecialize> rows,
 
 /// Perform specialized dispatch for a sequence of EnumElementPattern or an
 /// OptionalSomePattern.
-void PatternMatchEmission::
-emitEnumElementDispatch(ArrayRef<RowToSpecialize> rows,
-                        ConsumableManagedValue src,
-                        const SpecializationHandler &handleCase,
-                        const FailureHandler &outerFailure) {
+void PatternMatchEmission::emitEnumElementDispatchWithOwnership(
+    ArrayRef<RowToSpecialize> rows, ConsumableManagedValue src,
+    const SpecializationHandler &handleCase,
+    const FailureHandler &outerFailure) {
+  assert(src.getFinalConsumption() != CastConsumptionKind::TakeOnSuccess &&
+         "SIL ownership does not support TakeOnSuccess");
+
+  CanType sourceType = rows[0].Pattern->getType()->getCanonicalType();
+
+  struct CaseInfo {
+    EnumElementDecl *FormalElement;
+    Pattern *FirstMatcher;
+    bool Irrefutable = false;
+    SmallVector<SpecializedRow, 2> SpecializedRows;
+  };
+
+  SILBasicBlock *curBB = SGF.B.getInsertionBB();
+
+  // Collect the cases and specialized rows.
+  //
+  // These vectors are completely parallel, but the switch
+  // instructions want only the first information, so we split them up.
+  SmallVector<std::pair<EnumElementDecl *, SILBasicBlock *>, 4> caseBBs;
+  SmallVector<CaseInfo, 4> caseInfos;
+  SILBasicBlock *defaultBB = nullptr;
+
+  caseBBs.reserve(rows.size());
+  caseInfos.reserve(rows.size());
+
+  {
+    // Create destination blocks for all the cases.
+    llvm::DenseMap<EnumElementDecl *, unsigned> caseToIndex;
+    for (auto &row : rows) {
+      EnumElementDecl *formalElt;
+      Pattern *subPattern = nullptr;
+      if (auto eep = dyn_cast<EnumElementPattern>(row.Pattern)) {
+        formalElt = eep->getElementDecl();
+        subPattern = eep->getSubPattern();
+      } else {
+        auto *osp = cast<OptionalSomePattern>(row.Pattern);
+        formalElt = osp->getElementDecl();
+        subPattern = osp->getSubPattern();
+      }
+      auto elt = SGF.SGM.getLoweredEnumElementDecl(formalElt);
+
+      unsigned index = caseInfos.size();
+      auto insertionResult = caseToIndex.insert({elt, index});
+      if (!insertionResult.second) {
+        index = insertionResult.first->second;
+      } else {
+        curBB = SGF.createBasicBlock(curBB);
+        caseBBs.push_back({elt, curBB});
+        caseInfos.resize(caseInfos.size() + 1);
+        caseInfos.back().FormalElement = formalElt;
+        caseInfos.back().FirstMatcher = row.Pattern;
+      }
+      assert(caseToIndex[elt] == index);
+      assert(caseBBs[index].first == elt);
+
+      auto &info = caseInfos[index];
+      info.Irrefutable = (info.Irrefutable || row.Irrefutable);
+      info.SpecializedRows.resize(info.SpecializedRows.size() + 1);
+      auto &specRow = info.SpecializedRows.back();
+      specRow.RowIndex = row.RowIndex;
+
+      // Use the row pattern, if it has one.
+      if (subPattern) {
+        specRow.Patterns.push_back(subPattern);
+        // It's also legal to write:
+        //   case .Some { ... }
+        // which is an implicit wildcard.
+      } else {
+        specRow.Patterns.push_back(nullptr);
+      }
+    }
+
+    // We always need a default block if the enum is resilient.
+    // If the enum is @_fixed_layout, we only need one if the
+    // switch is not exhaustive.
+    bool exhaustive = false;
+    auto enumDecl = sourceType.getEnumOrBoundGenericEnum();
+
+    // The SIL values will range over Optional, so count against
+    // Optional's cases.
+    if (enumDecl == SGF.getASTContext().getImplicitlyUnwrappedOptionalDecl()) {
+      enumDecl = SGF.getASTContext().getOptionalDecl();
+    }
+
+    // FIXME: Get expansion from SILFunction
+    if (enumDecl->hasFixedLayout(SGF.SGM.M.getSwiftModule(),
+                                 ResilienceExpansion::Maximal)) {
+      exhaustive = true;
+
+      for (auto elt : enumDecl->getAllElements()) {
+        if (!caseToIndex.count(elt)) {
+          exhaustive = false;
+          break;
+        }
+      }
+    }
+
+    if (!exhaustive)
+      defaultBB = SGF.createBasicBlock(curBB);
+  }
+
+  assert(caseBBs.size() == caseInfos.size());
+
+  SILLocation loc = PatternMatchStmt;
+  loc.setDebugLoc(rows[0].Pattern);
+  // SEMANTIC SIL TODO: Once we have the representation of a switch_enum that
+  // can take a +0 value, this extra copy should be a borrow.
+  SILValue srcValue = src.getFinalManagedValue().copy(SGF, loc).forward(SGF);
+  SGF.B.createSwitchEnum(loc, srcValue, defaultBB, caseBBs);
+
+  // Okay, now emit all the cases.
+  for (unsigned i = 0, e = caseInfos.size(); i != e; ++i) {
+    auto &caseInfo = caseInfos[i];
+    SILLocation loc = caseInfo.FirstMatcher;
+    auto &specializedRows = caseInfo.SpecializedRows;
+
+    EnumElementDecl *elt = caseBBs[i].first;
+    EnumElementDecl *formalElt = caseInfos[i].FormalElement;
+    SILBasicBlock *caseBB = caseBBs[i].second;
+    SGF.B.setInsertionPoint(caseBB);
+
+    // We're in conditionally-executed code; enter a scope.
+    Scope scope(SGF.Cleanups, CleanupLocation::get(loc));
+
+    // Create a BB argument or 'unchecked_take_enum_data_addr'
+    // instruction to receive the enum case data if it has any.
+
+    SILType eltTy;
+    bool hasElt = false;
+    if (elt->getArgumentInterfaceType()) {
+      eltTy = src.getType().getEnumElementType(elt, SGF.SGM.M);
+      hasElt = !eltTy.getSwiftRValueType()->isVoid();
+    }
+
+    ConsumableManagedValue eltCMV, origCMV;
+
+    // Empty cases.  Try to avoid making an empty tuple value if it's
+    // obviously going to be ignored.  This assumes that we won't even
+    // try to touch the value in such cases, although we may touch the
+    // cleanup (enough to see that it's not present).
+    if (!hasElt) {
+      bool hasNonAny = false;
+      for (auto &specRow : specializedRows) {
+        auto pattern = specRow.Patterns[0];
+        if (pattern &&
+            !isa<AnyPattern>(pattern->getSemanticsProvidingPattern())) {
+          hasNonAny = true;
+          break;
+        }
+      }
+
+      SILValue result;
+      if (hasNonAny) {
+        result = SGF.emitEmptyTuple(loc);
+      } else {
+        result = SILUndef::get(SGF.SGM.Types.getEmptyTupleType(), SGF.SGM.M);
+      }
+      origCMV = ConsumableManagedValue::forUnmanaged(result);
+      eltCMV = origCMV;
+
+      // Okay, specialize on the argument.
+    } else {
+      auto *eltTL = &SGF.getTypeLowering(eltTy);
+
+      SILValue eltValue =
+          caseBB->createPHIArgument(eltTy, ValueOwnershipKind::Owned);
+
+      // We performed a copy early, so we get a +1 value here.
+      origCMV = getManagedSubobject(SGF, eltValue, *eltTL,
+                                    CastConsumptionKind::TakeAlways);
+      eltCMV = origCMV;
+
+      // If the payload is boxed, project it.
+      if (elt->isIndirect() || elt->getParentEnum()->isIndirect()) {
+        SILValue boxedValue =
+            SGF.B.createProjectBox(loc, origCMV.getValue(), 0);
+        eltTL = &SGF.getTypeLowering(boxedValue->getType());
+        if (eltTL->isLoadable()) {
+          ManagedValue newLoadedBoxValue = SGF.B.createLoadBorrow(
+              loc, ManagedValue::forUnmanaged(boxedValue));
+          boxedValue = newLoadedBoxValue.getUnmanagedValue();
+        }
+
+        // The boxed value may be shared, so we always have to copy it.
+        eltCMV = getManagedSubobject(SGF, boxedValue, *eltTL,
+                                     CastConsumptionKind::CopyOnSuccess);
+      }
+
+      // Reabstract to the substituted type, if needed.
+
+      CanType substEltTy =
+          sourceType
+              ->getTypeOfMember(SGF.SGM.M.getSwiftModule(), formalElt,
+                                formalElt->getArgumentInterfaceType())
+              ->getCanonicalType();
+
+      AbstractionPattern origEltTy =
+          (elt->getParentEnum()->classifyAsOptionalType()
+               ? AbstractionPattern(substEltTy)
+               : SGF.SGM.M.Types.getAbstractionPattern(elt));
+
+      eltCMV = emitReabstractedSubobject(SGF, loc, eltCMV, *eltTL, origEltTy,
+                                         substEltTy);
+    }
+
+    handleCase(eltCMV, specializedRows, outerFailure);
+    assert(!SGF.B.hasValidInsertionPoint() && "did not end block");
+  }
+
+  // Emit the default block if we needed one.
+  if (defaultBB) {
+    SGF.B.setInsertionPoint(defaultBB);
+    SGF.B.createOwnedPHIArgument(src.getType());
+    outerFailure(rows.back().Pattern);
+  }
+}
+
+/// Perform specialized dispatch for a sequence of EnumElementPattern or an
+/// OptionalSomePattern.
+void PatternMatchEmission::emitEnumElementDispatch(
+    ArrayRef<RowToSpecialize> rows, ConsumableManagedValue src,
+    const SpecializationHandler &handleCase,
+    const FailureHandler &outerFailure) {
+  // If sil ownership is enabled and we have that our source type is an object,
+  // use the dispatch code path.
+  if (SGF.getOptions().EnableSILOwnership && src.getType().isObject()) {
+    return emitEnumElementDispatchWithOwnership(rows, src, handleCase,
+                                                outerFailure);
+  }
 
   CanType sourceType = rows[0].Pattern->getType()->getCanonicalType();
 
@@ -1661,6 +1919,8 @@ emitEnumElementDispatch(ArrayRef<RowToSpecialize> rows,
       break;
 
     case CastConsumptionKind::TakeOnSuccess:
+      assert(!SGF.F.getModule().getOptions().EnableSILOwnership &&
+             "TakeOnSuccess is not supported when compiling with ownership");
       // If any of the specialization cases is refutable, we must copy.
       for (auto caseInfo : caseInfos)
         if (!caseInfo.Irrefutable)
@@ -1744,8 +2004,11 @@ emitEnumElementDispatch(ArrayRef<RowToSpecialize> rows,
       // that we can use TakeAlways here.
       auto eltConsumption = src.getFinalConsumption();
       if (caseInfo.Irrefutable &&
-          eltConsumption == CastConsumptionKind::TakeOnSuccess)
+          eltConsumption == CastConsumptionKind::TakeOnSuccess) {
+        assert(!SGF.F.getModule().getOptions().EnableSILOwnership &&
+               "TakeOnSuccess is not supported when compiling with ownership");
         eltConsumption = CastConsumptionKind::TakeAlways;
+      }
 
       SILValue eltValue;
       if (addressOnlyEnum) {
@@ -1825,7 +2088,7 @@ emitEnumElementDispatch(ArrayRef<RowToSpecialize> rows,
       unforwarder.unforwardBorrowedValues(src, origCMV);
       outerFailure(loc);
     };
-    if (ArgUnforwarder::requiresUnforwarding(src))
+    if (ArgUnforwarder::requiresUnforwarding(SGF, src))
       innerFailure = &specializedFailure;
 
     handleCase(eltCMV, specializedRows, *innerFailure);
@@ -2308,8 +2571,13 @@ void SILGenFunction::emitCatchDispatch(DoCatchStmt *S, ManagedValue exn,
 
   // Set up an initial clause matrix.
   ClauseMatrix clauseMatrix(clauseRows);
+  ConsumableManagedValue subject;
+  if (F.getModule().getOptions().EnableSILOwnership) {
+    subject = {exn.borrow(*this, S), CastConsumptionKind::CopyOnSuccess};
+  } else {
+    subject = {exn, CastConsumptionKind::TakeOnSuccess};
+  }
 
-  ConsumableManagedValue subject = { exn, CastConsumptionKind::TakeOnSuccess };
   auto failure = [&](SILLocation location) {
     // If we fail to match anything, just rethrow the exception.
 

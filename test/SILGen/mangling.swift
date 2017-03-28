@@ -22,7 +22,7 @@ func Pročprostěnemluvíčesky() { }
 
 // CHECK-LABEL: sil hidden @_T08mangling9r13757744ySaySiG1x_tF
 func r13757744(x x: [Int]) {}
-// CHECK-LABEL: sil hidden @_T08mangling9r13757744ySaySiG1x_dtF
+// CHECK-LABEL: sil hidden @_T08mangling9r13757744ySaySiG1xd_tF
 func r13757744(x x: Int...) {}
 
 // <rdar://problem/13757750> Prefix, postfix, and infix operators need
@@ -40,9 +40,9 @@ postfix func +- <T>(a: T) {}
 // CHECK-LABEL: sil hidden @_T08mangling2psoiyx_xtlF
 func +- <T>(a: T, b: T) {}
 
-// CHECK-LABEL: sil hidden @_T08mangling2psopyx1a_x1btlF
+// CHECK-LABEL: sil hidden @_T08mangling2psopyx1a_x1bt_tlF
 prefix func +- <T>(_: (a: T, b: T)) {}
-// CHECK-LABEL: sil hidden @_T08mangling2psoPyx1a_x1btlF
+// CHECK-LABEL: sil hidden @_T08mangling2psoPyx1a_x1bt_tlF
 postfix func +- <T>(_: (a: T, b: T)) {}
 
 infix operator «+» {}
@@ -179,3 +179,9 @@ func curry3() -> () throws -> () {
 func curry3Throws() throws -> () throws -> () {
   return curry1Throws
 }
+
+// CHECK-LABEL: sil hidden @_T08mangling14varargsVsArrayySaySiG3arrd_SS1ntF : $@convention(thin) (@owned Array<Int>, @owned String) -> ()
+func varargsVsArray(arr: Int..., n: String) { }
+
+// CHECK-LABEL: sil hidden @_T08mangling14varargsVsArrayySaySiG3arr_SS1ntF : $@convention(thin) (@owned Array<Int>, @owned String) -> ()
+func varargsVsArray(arr: [Int], n: String) { }

@@ -78,6 +78,7 @@ struct OwnershipModelEliminatorVisitor
   bool visitUnmanagedReleaseValueInst(UnmanagedReleaseValueInst *URVI);
   bool visitUnmanagedAutoreleaseValueInst(UnmanagedAutoreleaseValueInst *UAVI);
   bool visitCheckedCastBranchInst(CheckedCastBranchInst *CBI);
+  bool visitSwitchEnumInst(SwitchEnumInst *SWI);
 };
 
 } // end anonymous namespace
@@ -221,6 +222,27 @@ bool OwnershipModelEliminatorVisitor::visitCheckedCastBranchInst(
     return false;
   FailureBlock->getArgument(0)->replaceAllUsesWith(CBI->getOperand());
   FailureBlock->eraseArgument(0);
+  return true;
+}
+
+bool OwnershipModelEliminatorVisitor::visitSwitchEnumInst(
+    SwitchEnumInst *SWEI) {
+  // In ownership qualified SIL, switch_enum must pass its argument to the fail
+  // case so we can clean it up. In non-ownership qualified SIL, we expect no
+  // argument from the switch_enum in the default case. The way that we handle
+  // this transformation is that:
+  //
+  // 1. We replace all uses of the argument to the false block with a use of the
+  // checked cast branch's operand.
+  // 2. We delete the argument from the false block.
+  if (!SWEI->hasDefault())
+    return false;
+
+  SILBasicBlock *DefaultBlock = SWEI->getDefaultBB();
+  if (DefaultBlock->getNumArguments() == 0)
+    return false;
+  DefaultBlock->getArgument(0)->replaceAllUsesWith(SWEI->getOperand());
+  DefaultBlock->eraseArgument(0);
   return true;
 }
 

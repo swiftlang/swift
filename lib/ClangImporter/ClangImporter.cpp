@@ -58,6 +58,7 @@
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/Support/CrashRecoveryContext.h"
+#include "llvm/Support/Memory.h"
 #include "llvm/Support/Path.h"
 #include <algorithm>
 #include <memory>
@@ -204,6 +205,43 @@ namespace {
 
     BufferKind getBufferKind() const override {
       return MemoryBuffer_Malloc;
+    }
+  };
+
+  class ZeroFilledMemoryBuffer : public llvm::MemoryBuffer {
+    const std::string name;
+  public:
+    explicit ZeroFilledMemoryBuffer(size_t size, StringRef name)
+        : name(name.str()) {
+      assert(size > 0);
+      std::error_code error;
+      llvm::sys::MemoryBlock memory =
+          llvm::sys::Memory::allocateMappedMemory(size, nullptr,
+                                                  llvm::sys::Memory::MF_READ,
+                                                  error);
+      assert(!error && "failed to allocated read-only zero-filled memory");
+      init(static_cast<char *>(memory.base()),
+           static_cast<char *>(memory.base()) + memory.size() - 1,
+           /*null-terminated*/true);
+    }
+
+    ~ZeroFilledMemoryBuffer() {
+      llvm::sys::MemoryBlock memory{const_cast<char *>(getBufferStart()),
+        getBufferSize()};
+      std::error_code error = llvm::sys::Memory::releaseMappedMemory(memory);
+      assert(!error && "failed to deallocate read-only zero-filled memory");
+    }
+
+    ZeroFilledMemoryBuffer(const ZeroFilledMemoryBuffer &) = delete;
+    ZeroFilledMemoryBuffer(ZeroFilledMemoryBuffer &&) = delete;
+    void operator=(const ZeroFilledMemoryBuffer &) = delete;
+    void operator=(ZeroFilledMemoryBuffer &&) = delete;
+
+    StringRef getBufferIdentifier() const override {
+      return name;
+    }
+    BufferKind getBufferKind() const override {
+      return MemoryBuffer_MMap;
     }
   };
 } // end anonymous namespace
@@ -1192,11 +1230,22 @@ ModuleDecl *ClangImporter::loadModule(
                                               importLoc);
 
     // FIXME: The source location here is completely bogus. It can't be
-    // invalid, and it can't be the same thing twice in a row, so we just use
-    // a counter. Having real source locations would be far, far better.
+    // invalid, it can't be the same thing twice in a row, and it has to come
+    // from an actual buffer, so we make a fake buffer and just use a counter.
+    if (!Impl.DummyImportBuffer.isValid()) {
+      Impl.DummyImportBuffer = srcMgr.createFileID(
+          llvm::make_unique<ZeroFilledMemoryBuffer>(
+              256*1024, StringRef(Implementation::moduleImportBufferName)),
+          clang::SrcMgr::C_User,
+          /*LoadedID*/0, /*LoadedOffset*/0,
+          srcMgr.getLocForStartOfFile(srcMgr.getMainFileID()));
+    }
     clang::SourceLocation clangImportLoc
-      = srcMgr.getLocForStartOfFile(srcMgr.getMainFileID())
+      = srcMgr.getLocForStartOfFile(Impl.DummyImportBuffer)
               .getLocWithOffset(Impl.ImportCounter++);
+    assert(srcMgr.isInFileID(clangImportLoc, Impl.DummyImportBuffer) &&
+           "confused Clang's source manager with our fake locations");
+
     clang::ModuleLoadResult result =
         Impl.Instance->loadModule(clangImportLoc, path, visibility,
                                   /*IsInclusionDirective=*/false);
