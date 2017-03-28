@@ -141,7 +141,8 @@ entry:
 // CHECK:   [[ALIGNEDSTART:%.*]] = and {{(i64|i32)}} [[HEADERSIZEPLUSALIGN]], [[NOTALIGNMASK]]
 // CHECK:   [[HEAPSIZE:%.*]] = add {{(i64|i32)}} [[ALIGNEDSTART]], [[SIZE]]
 // CHECK:   [[ALIGNMASK_ATLEASTPOINTER:%.*]] = or {{(i64|i32)}} [[ALIGNMASK]], {{(7|3)}}
-// CHECK:   call void @swift_rt_swift_deallocObject(%swift.refcounted* %10, {{(i64|i32)}} [[HEAPSIZE]], {{(i64|i32)}} [[ALIGNMASK_ATLEASTPOINTER]])
+// CHECK:   [[PTR:%.*]] = bitcast %swift.refcounted* [[REFERENCE]] to i8*
+// CHECK:   call void @swift_rt_swift_slowDealloc(%swift.refcounted* [[PTR]], {{(i64|i32)}} [[HEAPSIZE]], {{(i64|i32)}} [[ALIGNMASK_ATLEASTPOINTER]])
 // CHECK:   ret void
 
 // CHECK-LABEL: define {{.*}} @test_open_existential_addr_immutable(%T25existentials_opaque_boxed11ExistentialP*
