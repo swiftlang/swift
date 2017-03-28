@@ -17,13 +17,16 @@ import os
 import shutil
 import sys
 
-sys.path.append(os.path.dirname(__file__))
-sys.path.append(os.path.join(os.path.dirname(__file__), 'swift_build_support'))
+from swift_build_support.swift_build_support import (
+    arguments,
+    shell
+)
 
-from SwiftBuildSupport import SWIFT_SOURCE_ROOT  # noqa (E402)
-from swift_build_support import arguments  # noqa (E402)
-from swift_build_support import shell  # noqa (E402)
-from swift_build_support.targets import StdlibDeploymentTarget  # noqa (E402)
+from swift_build_support.swift_build_support.SwiftBuildSupport import \
+    SWIFT_SOURCE_ROOT
+
+from swift_build_support.swift_build_support.targets import \
+    StdlibDeploymentTarget
 
 
 TEST_MODES = [
