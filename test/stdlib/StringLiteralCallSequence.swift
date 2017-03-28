@@ -28,7 +28,7 @@ StringLiteralCallSequenceTests.test("StringLiteralCallSequence/simple interpolat
     "Hello, \(1)!", 
     TracingString(stringInterpolation: 
       .literal("Hello, "), 
-      .interpolation(.init(forInterpolation: 1)), 
+      .interpolation(.init(stringInterpolationSegment: 1)), 
       .literal("!")
     )
   )
@@ -61,9 +61,9 @@ StringLiteralCallSequenceTests.test("StringLiteralCallSequence/adjacent interpol
     "Hello, \(1)\(2)!", 
     TracingString(stringInterpolation:
       .literal("Hello, "), 
-      .interpolation(.init(forInterpolation: 1)), 
+      .interpolation(.init(stringInterpolationSegment: 1)), 
       .literal(""),
-      .interpolation(.init(forInterpolation: 2)),
+      .interpolation(.init(stringInterpolationSegment: 2)),
       .literal("!")
     )
   )
@@ -74,7 +74,7 @@ StringLiteralCallSequenceTests.test("StringLiteralCallSequence/leading interpola
     "\(1)!", 
     TracingString(stringInterpolation:
       .literal(""), 
-      .interpolation(.init(forInterpolation: 1)), 
+      .interpolation(.init(stringInterpolationSegment: 1)), 
       .literal("!")
     )
   )
@@ -85,7 +85,7 @@ StringLiteralCallSequenceTests.test("StringLiteralCallSequence/trailing interpol
     "Hello, \(1)", 
     TracingString(stringInterpolation:
       .literal("Hello, "), 
-      .interpolation(.init(forInterpolation: 1)), 
+      .interpolation(.init(stringInterpolationSegment: 1)), 
       .literal("")
     )
   )

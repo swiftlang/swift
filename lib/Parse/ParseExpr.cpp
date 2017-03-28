@@ -1764,7 +1764,7 @@ ParserResult<Expr> Parser::parseExprStringLiteral() {
                                           rightLoc,
                                           trailingClosure);
       
-      // No leading label means a `forInterpolation:` label. (The constraint solver 
+      // No leading label means a `stringInterpolationSegment:` label. (The constraint solver 
       // will also consider no-leading-label candidates.)
       if (!args.empty()) {
         // If none of the arguments have labels, `argLabels` is empty. Why? 
@@ -1775,7 +1775,7 @@ ParserResult<Expr> Parser::parseExprStringLiteral() {
         }
         
         if (argLabels[0].empty()) {
-          argLabels[0] = Context.Id_forInterpolation;
+          argLabels[0] = Context.Id_stringInterpolationSegment;
           argLabelLocs[0] = args[0]->getStartLoc();
           // FIXME Do something better somewhere around here
         }

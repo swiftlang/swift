@@ -933,7 +933,7 @@ ClusteredBitVector swift::getOmittableArgumentLabelsOrElementNamesImpl(ArrayRef<
     vec.appendClearBits(identifiers.size());
   
     // FIXME: This is a despicable little hack.
-    if (identifiers[0] == Context.Id_forInterpolation) {
+    if (identifiers[0] == Context.Id_stringInterpolationSegment) {
       vec.setBit(0);
     }
   }

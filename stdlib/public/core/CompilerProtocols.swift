@@ -680,7 +680,7 @@ public enum StringInterpolationSegment<Literal: _ExpressibleByBuiltinStringLiter
 /// `StringInterpolationType` type. The code beween the two parentheses is 
 /// treated as parameters to an initializer on the `StringInterpolationType`; 
 /// if the first parameter is unlabled, Swift will prefer an initializer with 
-/// the label `forInterpolation:`, but will also permit an initializer with 
+/// the label `stringInterpolationSegment:`, but will also permit an initializer with 
 /// an unlabeled first parameter. Once a value of the `StringInterpolationType` 
 /// has been constructed, it is wrapped in a 
 /// `StringInterpolationSegment.interpolation` instance.

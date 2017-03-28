@@ -11,7 +11,7 @@ public struct TracingString {
   
   public struct Interpolation {
     enum Initializer {
-      case forInterpolation(AnyHashable)
+      case stringInterpolationSegment(AnyHashable)
       case _WithInteger(AnyHashable, radix: Int, uppercase: Bool)
     }
     var initializer: Initializer
@@ -37,8 +37,8 @@ extension TracingString: ExpressibleByStringInterpolation {
 }
 
 extension TracingString.Interpolation {
-  public init<T: Hashable>(forInterpolation value: T) {
-    initializer = .forInterpolation(value)
+  public init<T: Hashable>(stringInterpolationSegment value: T) {
+    initializer = .stringInterpolationSegment(value)
   }
   
   public init(_ value: Int, radix: Int = 10, uppercase: Bool = false) {
@@ -91,11 +91,11 @@ extension TracingString: Hashable {
 extension TracingString.Interpolation: Hashable {
   public static func == (lhs: TracingString.Interpolation, rhs: TracingString.Interpolation) -> Bool {
     switch (lhs.initializer, rhs.initializer) {
-    case let (.forInterpolation(l), .forInterpolation(r)):
+    case let (.stringInterpolationSegment(l), .stringInterpolationSegment(r)):
       return l == r
     case let (._WithInteger(lValue, radix: lRadix, uppercase: lUppercase), ._WithInteger(rValue, radix: rRadix, uppercase: rUppercase)):
       return (lValue, lRadix, lUppercase) == (rValue, rRadix, rUppercase)
-    case (.forInterpolation, _),
+    case (.stringInterpolationSegment, _),
           (._WithInteger, _):
       return false
     }
@@ -103,7 +103,7 @@ extension TracingString.Interpolation: Hashable {
   
   public var hashValue: Int {
     switch initializer {
-    case let .forInterpolation(value):
+    case let .stringInterpolationSegment(value):
       return value.hashValue
     case let ._WithInteger(value, radix: radix, uppercase: uppercase):
       return value.hashValue ^ ~radix.hashValue ^ uppercase.hashValue
@@ -141,8 +141,8 @@ extension TracingString: CustomDebugStringConvertible {
 extension TracingString.Interpolation: CustomDebugStringConvertible {
   public var debugDescription: String {
     switch initializer {
-    case .forInterpolation(let value):
-      return ".init(forInterpolation: \(reflecting: value))"
+    case .stringInterpolationSegment(let value):
+      return ".init(stringInterpolationSegment: \(reflecting: value))"
     case let ._WithInteger(value, radix: radix, uppercase: uppercase):
       // Strip off the AnyHashable() wrapper
       let valueDesc = String(String(reflecting: value).characters.dropFirst(12).dropLast())

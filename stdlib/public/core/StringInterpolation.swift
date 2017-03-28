@@ -36,7 +36,7 @@ extension String : _ExpressibleByStringInterpolation {
     }
   }
 
-  public init<T> (forInterpolation expr: T) {
+  public init<T> (stringInterpolationSegment expr: T) {
     self = String(describing: expr)
   }
 
@@ -46,7 +46,7 @@ extension String : _ExpressibleByStringInterpolation {
   /// interpreting string interpolations.
   ///
   /// - SeeAlso: `ExpressibleByStringInterpolation`
-  public init<T: TextOutputStreamable> (forInterpolation expr: T) {
+  public init<T: TextOutputStreamable> (stringInterpolationSegment expr: T) {
     self = _toStringReadOnlyStreamable(expr)
   }
 
@@ -56,7 +56,7 @@ extension String : _ExpressibleByStringInterpolation {
   /// interpreting string interpolations.
   ///
   /// - SeeAlso: `ExpressibleByStringInterpolation`
-  public init<T: CustomStringConvertible> (forInterpolation expr: T) {
+  public init<T: CustomStringConvertible> (stringInterpolationSegment expr: T) {
     self = _toStringReadOnlyPrintable(expr)
   }
 
@@ -66,7 +66,7 @@ extension String : _ExpressibleByStringInterpolation {
   /// interpreting string interpolations.
   ///
   /// - SeeAlso: `ExpressibleByStringInterpolation`
-  public init<T: TextOutputStreamable & CustomStringConvertible> (forInterpolation expr: T) {
+  public init<T: TextOutputStreamable & CustomStringConvertible> (stringInterpolationSegment expr: T) {
     self = _toStringReadOnlyStreamable(expr)
   }
 }
