@@ -570,4 +570,8 @@ def sanitize_coverage_EQ : CommaJoined<["-"], "sanitize-coverage=">,
   HelpText<"Specify the type of coverage instrumentation for Sanitizers and"
   " additional options separated by commas">;
 
+def enforce_exclusivity_EQ : Joined<["-"], "enforce-exclusivity=">,
+  Flags<[FrontendOption]>, MetaVarName<"<enforcement>">,
+  HelpText<"Enforce law of exclusivity">;
+
 include "FrontendOptions.td"
