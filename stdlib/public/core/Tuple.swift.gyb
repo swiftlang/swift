@@ -38,7 +38,7 @@ public func ==(lhs: (), rhs: ()) -> Bool {
 /// Returns a Boolean value indicating whether any corresponding components of
 /// the two tuples are not equal.
 ///
-/// Two tuples each of arity zero are never unequal
+/// All arity zero tuples are equal.
 ///
 /// - Parameters:
 ///   - lhs: An empty tuple.
@@ -51,7 +51,7 @@ public func !=(lhs: (), rhs: ()) -> Bool {
 /// before the second in a lexicographical ordering.
 ///
 /// An arity zero tuple is never strictly before another arity zero tuple in a
-/// lexicographical ordering
+/// lexicographical ordering.
 ///
 /// - Parameters:
 ///   - lhs: An empty tuple.
@@ -64,7 +64,7 @@ public func <(lhs: (), rhs: ()) -> Bool {
 /// before or the same as the second in a lexicographical ordering.
 ///
 /// An arity zero tuple is always before or the same as another arity zero tuple
-/// in a lexicographical ordering
+/// in a lexicographical ordering.
 ///
 /// - Parameters:
 ///   - lhs: An empty tuple.
@@ -77,7 +77,7 @@ public func <=(lhs: (), rhs: ()) -> Bool {
 /// after the second in a lexicographical ordering.
 ///
 /// An arity zero tuple is never strictly after another arity zero tuple in a
-/// lexicographical ordering
+/// lexicographical ordering.
 ///
 /// - Parameters:
 ///   - lhs: An empty tuple.
@@ -90,7 +90,7 @@ public func >(lhs: (), rhs: ()) -> Bool {
 /// after or the same as the second in a lexicographical ordering.
 ///
 /// An arity zero tuple is always after or the same as another arity zero tuple
-/// in a lexicographical ordering
+/// in a lexicographical ordering.
 ///
 /// - Parameters:
 ///   - lhs: An empty tuple.
