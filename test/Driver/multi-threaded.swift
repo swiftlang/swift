@@ -58,8 +58,8 @@
 // EXEC: ld
 // EXEC: /tmp/main{{[^ ]*}}.o /tmp/multi-threaded{{[^ ]*}}.o
 
-// DEPENDENCIES-DAG: {{.*}}/multi-threaded.o : {{.*}}/Inputs/main.swift {{.*}}/multi-threaded.swift
-// DEPENDENCIES-DAG: {{.*}}/main.o : {{.*}}/Inputs/main.swift {{.*}}/multi-threaded.swift
+// DEPENDENCIES-DAG: {{.*}}/multi-threaded.o : {{.*}}/multi-threaded.swift {{.*}}/Inputs/main.swift
+// DEPENDENCIES-DAG: {{.*}}/main.o : {{.*}}/multi-threaded.swift {{.*}}/Inputs/main.swift
 
 // PARSEABLE2: "name": "compile"
 // PARSEABLE2: "outputs": [
