@@ -553,7 +553,7 @@ public:
   void mangle(llvm::raw_ostream &out) const;
   void mangle(SmallVectorImpl<char> &buffer) const;
   std::string mangleAsString() const;
-  SILLinkage getLinkage(IRGenModule &IGM, ForDefinition_t isDefinition) const;
+  SILLinkage getLinkage(ForDefinition_t isDefinition) const;
 
   /// Returns true if this function or global variable is potentially defined
   /// in a different module.

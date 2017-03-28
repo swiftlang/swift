@@ -1078,18 +1078,19 @@ static SILLinkage getNonUniqueSILLinkage(FormalLinkage linkage,
   llvm_unreachable("bad formal linkage");
 }
 
-static SILLinkage getConformanceLinkage(IRGenModule &IGM,
-                                        const ProtocolConformance *conf) {
-  if (auto wt = IGM.getSILModule().lookUpWitnessTable(conf,
-                                               /*deserializeLazily*/ false)) {
-    return wt->getLinkage();
-  } else {
-    return SILLinkage::PublicExternal;
-  }
-}
+SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
+  // For when `this` is a protocol conformance of some kind.
+  auto getLinkageAsConformance = [&] {
+    auto linkage = getLinkageForProtocolConformance(
+        getProtocolConformance()->getRootNormalConformance(), forDefinition);
 
-SILLinkage LinkEntity::getLinkage(IRGenModule &IGM,
-                                  ForDefinition_t forDefinition) const {
+    // A hidden-external conformance doesn't make sense: we can't refer to
+    // it. Thus, the only way to end up in that situation is if the linkage is
+    // actually public.
+    return linkage == SILLinkage::HiddenExternal ? SILLinkage::PublicExternal
+                                                 : linkage;
+  };
+
   switch (getKind()) {
   // Most type metadata depend on the formal linkage of their type.
   case Kind::ValueWitnessTable: {
@@ -1100,7 +1101,7 @@ SILLinkage LinkEntity::getLinkage(IRGenModule &IGM,
       return getSILLinkage(FormalLinkage::PublicUnique, forDefinition);
 
     // Imported types.
-    if (getTypeMetadataAccessStrategy(IGM, type) ==
+    if (getTypeMetadataAccessStrategy(type) ==
           MetadataAccessStrategy::NonUniqueAccessor)
       return SILLinkage::Shared;
 
@@ -1112,7 +1113,7 @@ SILLinkage LinkEntity::getLinkage(IRGenModule &IGM,
     auto type = getType();
 
     // Imported types, non-primitive structural types.
-    if (getTypeMetadataAccessStrategy(IGM, type) ==
+    if (getTypeMetadataAccessStrategy(type) ==
           MetadataAccessStrategy::NonUniqueAccessor)
       return SILLinkage::Shared;
 
@@ -1142,7 +1143,7 @@ SILLinkage LinkEntity::getLinkage(IRGenModule &IGM,
     return SILLinkage::Shared;
 
   case Kind::TypeMetadataAccessFunction:
-    switch (getTypeMetadataAccessStrategy(IGM, getType())) {
+    switch (getTypeMetadataAccessStrategy(getType())) {
     case MetadataAccessStrategy::PublicUniqueAccessor:
       return getSILLinkage(FormalLinkage::PublicUnique, forDefinition);
     case MetadataAccessStrategy::HiddenUniqueAccessor:
@@ -1170,13 +1171,12 @@ SILLinkage LinkEntity::getLinkage(IRGenModule &IGM,
 
   case Kind::DirectProtocolWitnessTable:
   case Kind::ProtocolWitnessTableAccessFunction:
-    return getConformanceLinkage(IGM, getProtocolConformance());
+    return getLinkageAsConformance();
 
   case Kind::ProtocolWitnessTableLazyAccessFunction:
   case Kind::ProtocolWitnessTableLazyCacheVariable:
     if (getTypeLinkage(getType()) == FormalLinkage::Private ||
-        getConformanceLinkage(IGM, getProtocolConformance())
-          == SILLinkage::Private) {
+        getLinkageAsConformance() == SILLinkage::Private) {
       return SILLinkage::Private;
     } else {
       return SILLinkage::Shared;
@@ -1202,8 +1202,7 @@ SILLinkage LinkEntity::getLinkage(IRGenModule &IGM,
       return SILLinkage::Shared;
     return SILLinkage::Private;
   case Kind::ReflectionAssociatedTypeDescriptor:
-    if (getConformanceLinkage(IGM, getProtocolConformance())
-          == SILLinkage::Shared)
+    if (getLinkageAsConformance() == SILLinkage::Shared)
       return SILLinkage::Shared;
     return SILLinkage::Private;
   case Kind::ReflectionSuperclassDescriptor:
@@ -1439,8 +1438,8 @@ static void updateLinkageForDefinition(IRGenModule &IGM,
   // TODO: there are probably cases where we can avoid redoing the
   // entire linkage computation.
   auto linkage =
-      getIRLinkage(IGM, entity.getLinkage(IGM, ForDefinition),
-                   entity.isFragile(IGM), entity.isSILOnly(), ForDefinition,
+      getIRLinkage(IGM, entity.getLinkage(ForDefinition), entity.isFragile(IGM),
+                   entity.isSILOnly(), ForDefinition,
                    entity.isWeakImported(IGM.getSwiftModule()));
   global->setLinkage(std::get<0>(linkage));
   global->setVisibility(std::get<1>(linkage));
@@ -1465,8 +1464,8 @@ LinkInfo LinkInfo::get(IRGenModule &IGM, const LinkEntity &entity,
   entity.mangle(result.Name);
 
   std::tie(result.Linkage, result.Visibility, result.DLLStorageClass) =
-      getIRLinkage(IGM, entity.getLinkage(IGM, isDefinition),
-                   entity.isFragile(IGM), entity.isSILOnly(), isDefinition,
+      getIRLinkage(IGM, entity.getLinkage(isDefinition), entity.isFragile(IGM),
+                   entity.isSILOnly(), isDefinition,
                    entity.isWeakImported(IGM.getSwiftModule()));
 
   result.ForDefinition = isDefinition;
