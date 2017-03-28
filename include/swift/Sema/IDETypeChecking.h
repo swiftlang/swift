@@ -56,9 +56,12 @@ namespace swift {
                                Expr *P, SmallVectorImpl<Type> &PossibleTypes);
 
   struct ResolveMemberResult {
-    ValueDecl *Favored = nullptr;
-    std::vector<ValueDecl*> OtherViables;
-    operator bool() const { return Favored; }
+    llvm::SmallVector<ValueDecl *, 4> FromNominals;
+    llvm::SmallVector<ValueDecl *, 4> FromExtensions;
+    operator bool() const { return !FromNominals.empty(); }
+    bool hasDeclFromNominal(const ValueDecl *VD) const {
+      return llvm::find(FromNominals, VD) != FromNominals.end();
+    };
   };
 
   ResolveMemberResult resolveValueMember(DeclContext &DC, Type BaseTy,
