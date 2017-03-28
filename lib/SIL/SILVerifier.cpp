@@ -2299,11 +2299,16 @@ public:
               CastConsumptionKind::CopyOnSuccess)
             return true;
           break;
+        case ValueKind::LoadInst:
+          // A 'non-taking' value load is harmless.
+          return cast<LoadInst>(inst)->getOwnershipQualifier() !=
+                 LoadOwnershipQualifier::Copy;
+          break;
         case ValueKind::DebugValueAddrInst:
           // Harmless use.
           break;
         default:
-          assert(false && "Unhandled unexpected instruction");
+          llvm_unreachable("Unhandled unexpected instruction");
           break;
         }
       }

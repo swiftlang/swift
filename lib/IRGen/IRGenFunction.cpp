@@ -163,6 +163,24 @@ void IRGenFunction::emitAllocBoxCall(llvm::Value *typeMetadata,
   valueAddress = Builder.CreateExtractValue(call, 1);
 }
 
+void IRGenFunction::emitMakeBoxUniqueCall(llvm::Value *box,
+                                          llvm::Value *typeMetadata,
+                                          llvm::Value *alignMask,
+                                          llvm::Value *&outBox,
+                                          llvm::Value *&outValueAddress) {
+  auto attrs = llvm::AttributeSet::get(IGM.LLVMContext,
+                                       llvm::AttributeSet::FunctionIndex,
+                                       llvm::Attribute::NoUnwind);
+
+  llvm::CallInst *call = Builder.CreateCall(IGM.getMakeBoxUniqueFn(),
+                                            {box, typeMetadata, alignMask});
+  call->setAttributes(attrs);
+
+  outBox = Builder.CreateExtractValue(call, 0);
+  outValueAddress = Builder.CreateExtractValue(call, 1);
+}
+
+
 void IRGenFunction::emitDeallocBoxCall(llvm::Value *box,
                                         llvm::Value *typeMetadata) {
   auto attrs = llvm::AttributeSet::get(IGM.LLVMContext,

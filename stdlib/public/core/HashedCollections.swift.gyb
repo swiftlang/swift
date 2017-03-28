@@ -3563,6 +3563,23 @@ final internal class _SwiftDeferredNS${Self}<${TypeParametersDecl}>
   ) {
     bridgedAllKeysAndValues(objects, keys)
   }
+
+  @objc(enumerateKeysAndObjectsWithOptions:usingBlock:)
+  internal func enumerateKeysAndObjects(options: Int, 
+    using block: @convention(block) (Unmanaged<AnyObject>, Unmanaged<AnyObject>,
+     UnsafeMutablePointer<UInt8>) -> Void) {
+    bridgeEverything()
+    let capacity = nativeBuffer.capacity
+    var stop: UInt8 = 0
+    for position in 0..<capacity {
+      if bridgedBuffer.isInitializedEntry(at: position) {
+        block(Unmanaged.passUnretained(bridgedBuffer.key(at: position)), 
+          Unmanaged.passUnretained(bridgedBuffer.value(at: position)), 
+          &stop)
+      }
+      if stop != 0 { return }
+    }
+  }
 %end
 
   /// Returns the pointer to the stored property, which contains bridged

@@ -146,6 +146,7 @@ static void addCommonFrontendArgs(const ToolChain &TC,
   inputArgs.AddLastArg(arguments, options::OPT_sanitize_EQ);
   inputArgs.AddLastArg(arguments, options::OPT_sanitize_coverage_EQ);
   inputArgs.AddLastArg(arguments, options::OPT_swift_version);
+  inputArgs.AddLastArg(arguments, options::OPT_enforce_exclusivity_EQ);
 
   // Pass on any build config options
   inputArgs.AddAllArgs(arguments, options::OPT_D);
