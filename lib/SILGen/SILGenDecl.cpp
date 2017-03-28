@@ -300,11 +300,22 @@ public:
     gen.destroyLocalVariable(l, Var);
   }
 
-  void dump(SILGenFunction &) const override {
+  void dump(SILGenFunction &SGF) const override {
 #ifndef NDEBUG
     llvm::errs() << "DestroyLocalVariable\n"
-                 << "State:" << getState() << "\n";
-    // TODO: Make sure we dump var.
+                 << "State:" << getState() << "\n"
+                 << "Decl: ";
+    Var->print(llvm::errs());
+    llvm::errs() << "\n";
+    if (isActive()) {
+      auto loc = SGF.VarLocs[Var];
+      assert((loc.box || loc.value) && "One of box or value should be set");
+      if (loc.box) {
+        llvm::errs() << "Box: " << loc.box << "\n";
+      } else {
+        llvm::errs() << "Value: " << loc.value << "\n";
+      }
+    }
     llvm::errs() << "\n";
 #endif
   }
