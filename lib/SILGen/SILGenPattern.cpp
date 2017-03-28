@@ -438,6 +438,10 @@ private:
   void emitSpecializedDispatch(ClauseMatrix &matrix, ArgArray args,
                                unsigned &lastRow, unsigned column,
                                const FailureHandler &failure);
+  void emitTupleDispatchWithOwnership(ArrayRef<RowToSpecialize> rows,
+                                      ConsumableManagedValue src,
+                                      const SpecializationHandler &handleSpec,
+                                      const FailureHandler &failure);
   void emitTupleDispatch(ArrayRef<RowToSpecialize> rows,
                          ConsumableManagedValue src,
                          const SpecializationHandler &handleSpec,
@@ -1365,11 +1369,11 @@ void PatternMatchEmission::emitSpecializedDispatch(ClauseMatrix &clauses,
 /// and that we were supposed to use the given consumption rules on
 /// it, construct an appropriate managed value.
 static ConsumableManagedValue
-getManagedSubobject(SILGenFunction &gen, SILValue value,
+getManagedSubobject(SILGenFunction &SGF, SILValue value,
                     const TypeLowering &valueTL,
                     CastConsumptionKind consumption) {
   if (consumption != CastConsumptionKind::CopyOnSuccess) {
-    return {gen.emitManagedRValueWithCleanup(value, valueTL),
+    return {SGF.emitManagedRValueWithCleanup(value, valueTL),
              consumption};
   } else {
     return {ManagedValue::forUnmanaged(value), consumption};
@@ -1377,7 +1381,7 @@ getManagedSubobject(SILGenFunction &gen, SILValue value,
 }
 
 static ConsumableManagedValue
-emitReabstractedSubobject(SILGenFunction &gen, SILLocation loc,
+emitReabstractedSubobject(SILGenFunction &SGF, SILLocation loc,
                           ConsumableManagedValue value,
                           const TypeLowering &valueTL,
                           AbstractionPattern abstraction,
@@ -1385,13 +1389,61 @@ emitReabstractedSubobject(SILGenFunction &gen, SILLocation loc,
   // Return if there's no abstraction.  (The first condition is just
   // a fast path.)
   if (value.getType().getSwiftRValueType() == substFormalType ||
-      value.getType() == gen.getLoweredType(substFormalType))
+      value.getType() == SGF.getLoweredType(substFormalType))
     return value;
 
   // Otherwise, turn to +1 and re-abstract.
-  ManagedValue mv = gen.getManagedValue(loc, value);
+  ManagedValue mv = SGF.getManagedValue(loc, value);
   return ConsumableManagedValue::forOwned(
-           gen.emitOrigToSubstValue(loc, mv, abstraction, substFormalType));
+           SGF.emitOrigToSubstValue(loc, mv, abstraction, substFormalType));
+}
+
+void PatternMatchEmission::emitTupleDispatchWithOwnership(
+    ArrayRef<RowToSpecialize> rows, ConsumableManagedValue src,
+    const SpecializationHandler &handleCase,
+    const FailureHandler &outerFailure) {
+  // Construct the specialized rows.
+  SmallVector<SpecializedRow, 4> specializedRows;
+  specializedRows.resize(rows.size());
+  for (unsigned i = 0, e = rows.size(); i != e; ++i) {
+    specializedRows[i].RowIndex = rows[i].RowIndex;
+
+    auto pattern = cast<TuplePattern>(rows[i].Pattern);
+    for (auto &elt : pattern->getElements()) {
+      specializedRows[i].Patterns.push_back(elt.getPattern());
+    }
+  }
+
+  auto firstPat = rows[0].Pattern;
+  auto sourceType = cast<TupleType>(firstPat->getType()->getCanonicalType());
+  SILLocation loc = firstPat;
+
+  // Final consumption here will be either CopyOnSuccess or AlwaysTake. Since we
+  // do not have a take operation, we treat it as copy on success always.
+  //
+  // Once we get a take operation, we should consider allowing for the value to
+  // be taken at this point.
+  ManagedValue v = src.getFinalManagedValue().borrow(SGF, loc);
+  SmallVector<ConsumableManagedValue, 4> destructured;
+
+  // Break down the values.
+  auto tupleSILTy = v.getType();
+  for (unsigned i = 0, e = sourceType->getNumElements(); i < e; ++i) {
+    SILType fieldTy = tupleSILTy.getTupleElementType(i);
+    auto &fieldTL = SGF.getTypeLowering(fieldTy);
+
+    // This is a borrowed value, so we need to use copy on success.
+    ManagedValue member = SGF.B.createTupleExtract(loc, v, i, fieldTy);
+    // *NOTE* We leave this as getManagedSubobject so that when we get a
+    // destructure operation, we can pass in src.getFinalConsumption() here and
+    // get the correct behavior of performing the take.
+    auto memberCMV = getManagedSubobject(SGF, member.getValue(), fieldTL,
+                                         CastConsumptionKind::CopyOnSuccess);
+    destructured.push_back(memberCMV);
+  }
+
+  // Recurse.
+  handleCase(destructured, specializedRows, outerFailure);
 }
 
 /// Perform specialized dispatch for tuples.
@@ -1401,6 +1453,9 @@ void PatternMatchEmission::
 emitTupleDispatch(ArrayRef<RowToSpecialize> rows, ConsumableManagedValue src,
                   const SpecializationHandler &handleCase,
                   const FailureHandler &outerFailure) {
+  if (SGF.getOptions().EnableSILOwnership && src.getType().isObject()) {
+    return emitTupleDispatchWithOwnership(rows, src, handleCase, outerFailure);
+  }
   auto firstPat = rows[0].Pattern;
   auto sourceType = cast<TupleType>(firstPat->getType()->getCanonicalType());
   SILLocation loc = firstPat;
