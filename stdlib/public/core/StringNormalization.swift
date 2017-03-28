@@ -39,8 +39,11 @@ typealias UTF16CodeUnitBuffer =
 // suitable for segment-level-or-coarser granularity queries, which include any
 // grapheme-level queries as segments are sub- grapheme.
 //
+// TODO: verify above statement about segments being sub-grapheme, that is make
+// sure it is not possible to have segments span graphemes.
+//
 // TODO: Explore coalescing small segments together
-struct FCCNormalizedSegment : BidirectionalCollection {
+public struct FCCNormalizedSegment : BidirectionalCollection {
   let buffer: UTF16CodeUnitBuffer
 
   init(_ buffer: UTF16CodeUnitBuffer) {
@@ -50,7 +53,7 @@ struct FCCNormalizedSegment : BidirectionalCollection {
     self.buffer = UTF16CodeUnitBuffer()
   }
 
-  typealias Index = UTF16CodeUnitBuffer.Index
+  public typealias Index = Int // UTF16CodeUnitBuffer.Index
 
   public var startIndex : Index {
     return buffer.startIndex
@@ -76,7 +79,10 @@ internal func _hasBoundary(before value: UInt32) -> Bool {
   return __swift_stdlib_unorm2_hasBoundaryBefore(_fccNormalizer, value) != 0
 }
 
-struct FCCNormalizedLazySegments<
+// TODO: explore using hasBoundary(after:), and whether that will identify
+// finer-grained segments.
+
+public struct FCCNormalizedLazySegments<
   CodeUnits : RandomAccessCollection,
   FromEncoding : UnicodeEncoding
 >
@@ -100,6 +106,8 @@ where
     self.init(unicodeView.codeUnits)
   }
 
+  // Find the segment that terminates at `endingAt`. Optimized for backwards
+  // traversal.
   internal func priorSegment(
     endingAt end: CodeUnits.Index
   ) -> Index {
@@ -124,14 +132,16 @@ where
     }
 
     return Index(
-      nativeStartIndex: start,
-      nativeEndIndex: end,
+      nativeOffset: codeUnits.distance(
+        from: codeUnits.startIndex, to: start
+      ),
+      nativeCount: codeUnits.distance(from: start, to: end),
       segment: formSegment(from: start, until: end)
     )
   }
 
-  // Scan ahead and produce the next segment. `from` must be valid index (not
-  // end).
+  // Find the segment that starts with `startingAt`. Optimized for forwards
+  // traversal.
   internal func nextSegment(
     startingAt start: CodeUnits.Index
   ) -> Index {
@@ -162,8 +172,10 @@ where
     }
 
     return Index(
-      nativeStartIndex: start,
-      nativeEndIndex: end,
+      nativeOffset: codeUnits.distance(
+        from: codeUnits.startIndex, to: start
+      ),
+      nativeCount: codeUnits.distance(from: start, to: end),
       segment: formSegment(from: start, until: end)
     )
   }
@@ -241,8 +253,9 @@ where
     return FCCNormalizedSegment(buffer)
   }
 
+
   // Decode one or more code units, returning the unicode scalar value and the
-  // number of code units parsed. `startingFrom` should be on scalar boundary
+  // indices spanning the code units parsed. `from` should be on scalar boundary
   internal func decodeOne(from start: CodeUnits.Index)
     -> (scalarValue: UInt32,
         startIndex: CodeUnits.Index,
@@ -255,8 +268,8 @@ where
             endIndex: codeUnits.index(start, offsetBy: numericCast(encodedScalar.count)))
   }
 
-  // As decodeOne, but in reverse. `priorTo` is the index after the last code
-  // unit in the scalar, i.e. it is exclusive.
+  // As decodeOne(from:), but in reverse. `priorTo` is the index after the last
+  // code unit in the scalar, i.e. it is exclusive.
   internal func decodeOne(priorTo end: CodeUnits.Index)
     -> (scalarValue: UInt32,
         startIndex: CodeUnits.Index,
@@ -280,21 +293,22 @@ where
   }
 }
 
-extension FCCNormalizedLazySegments: BidirectionalCollection {
+extension FCCNormalizedLazySegments : BidirectionalCollection {
   // TODO?: This is really more like an iterator...
-  struct Index: Comparable {
+  public struct Index : Comparable {
     // The corresponding native begin/end indices for this segment
-    let nativeStartIndex: CodeUnits.Index
-    let nativeEndIndex: CodeUnits.Index
+    let nativeOffset: CodeUnits.IndexDistance
+    let nativeCount: CodeUnits.IndexDistance
     let segment: FCCNormalizedSegment
 
     public static func <(lhs: Index, rhs: Index) -> Bool {
-      if lhs.nativeStartIndex < rhs.nativeStartIndex {
+      if lhs.nativeOffset < rhs.nativeOffset {
         // Our ends should be ordered similarly, unless lhs is the last index
         // before endIndex and rhs is the endIndex.
         _sanityCheck(
-          lhs.nativeEndIndex < rhs.nativeEndIndex ||
-          rhs.nativeStartIndex == rhs.nativeEndIndex,
+          lhs.nativeOffset + lhs.nativeCount 
+            < rhs.nativeOffset + rhs.nativeCount ||
+          rhs.nativeCount == 0,
           "overlapping segments?")
 
         return true
@@ -305,9 +319,9 @@ extension FCCNormalizedLazySegments: BidirectionalCollection {
 
     public static func ==(lhs: Index, rhs: Index) -> Bool {
 
-      if lhs.nativeStartIndex == rhs.nativeStartIndex {
+      if lhs.nativeOffset == rhs.nativeOffset {
         _sanityCheck(
-          lhs.nativeEndIndex == rhs.nativeEndIndex,
+          lhs.nativeCount == rhs.nativeCount,
           "overlapping segments?")
 
         return true
@@ -317,38 +331,72 @@ extension FCCNormalizedLazySegments: BidirectionalCollection {
     }
   }
 
-  var startIndex: Index {
+  // TODO: formIndex(after:) that re-uses storage
+
+  public var startIndex: Index {
     return nextSegment(startingAt: codeUnits.startIndex)
   }
-  var endIndex: Index {
+  public var endIndex: Index {
     return Index(
-      nativeStartIndex: codeUnits.endIndex,
-      nativeEndIndex: codeUnits.endIndex,
-      segment: FCCNormalizedSegment())
+      nativeOffset: codeUnits.count,
+      nativeCount: 0,
+      segment: FCCNormalizedSegment()
+    )
   }
 
-  func index(after idx: Index) -> Index {
-    return nextSegment(startingAt: idx.nativeEndIndex)
+  public func index(after idx: Index) -> Index {
+    return nextSegment(
+      startingAt: codeUnits.index(atOffset: idx.nativeOffset + idx.nativeCount)
+    )
   }
-  func index(before idx: Index) -> Index {
-    return priorSegment(endingAt: idx.nativeStartIndex)
+  public func index(before idx: Index) -> Index {
+    return priorSegment(
+      endingAt: codeUnits.index(atOffset: idx.nativeOffset)
+    )
   }
-  subscript(position: Index) -> FCCNormalizedSegment {
+  public subscript(position: Index) -> FCCNormalizedSegment {
     return position.segment
   }
 
   public typealias SubSequence = BidirectionalSlice<FCCNormalizedLazySegments>
 }
 
-typealias FCCNormalizedUTF16View_2<
-  CodeUnits: RandomAccessCollection,
-  Encoding: UnicodeEncoding
-> = FlattenBidirectionalCollection<
-  FCCNormalizedLazySegments<CodeUnits, Encoding>
->
-where
-  CodeUnits.Index == CodeUnits.SubSequence.Index,
-  CodeUnits.SubSequence : RandomAccessCollection,
-  CodeUnits.SubSequence == CodeUnits.SubSequence.SubSequence,
-  CodeUnits.Iterator.Element == CodeUnits.SubSequence.Iterator.Element,
-  CodeUnits.Iterator.Element == Encoding.EncodedScalar.Iterator.Element
+extension _UnicodeViews {
+  public struct FCCNormalizedUTF16View: BidirectionalCollectionWrapper {
+    public typealias Base = FlattenBidirectionalCollection<
+      FCCNormalizedLazySegments<CodeUnits, Encoding>
+    >
+    public var base: Base
+    public typealias Index = Base.Index
+    public typealias IndexDistance = Base.IndexDistance
+
+    public init(_ unicodeView: _UnicodeViews<CodeUnits, Encoding>) {
+      self.base = Base(FCCNormalizedLazySegments(unicodeView))
+    }
+  }
+
+  public var fccNormalizedUTF16: FCCNormalizedUTF16View {
+    return FCCNormalizedUTF16View(self)
+  }
+}
+
+extension _UnicodeViews.FCCNormalizedUTF16View : UnicodeView {
+  // Returns the index for the segment containing `atEncodedOffset`
+  //
+  // TODO: What are the desired semantics if given an offset that does not begin
+  // a segment? We should be very explicit about our contract here.
+  public func index(atEncodedOffset i: Int64) -> Index {
+    let segmentIdx = base._base.nextSegment(
+      startingAt: base._base.codeUnits.index(
+        base._base.codeUnits.startIndex, offsetBy: numericCast(i)
+     )
+    )
+    return Index(segmentIdx, segmentIdx.segment.startIndex)
+  }
+
+  // Returns the offset of the beggining of `of`'s segment
+  public static func encodedOffset(of i: Index) -> Int64 {
+    return numericCast(i._outer.nativeOffset)
+  }
+}
+

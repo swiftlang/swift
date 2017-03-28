@@ -730,9 +730,6 @@ internal func _makeFCCNormalizer() -> OpaquePointer {
 public var _fccNormalizer = _makeFCCNormalizer()
 
 extension _UnicodeViews {
-  
-  public typealias FCCNormalizedUTF16View = RandomAccessUnicodeView<[UInt16]>
-
   /// Invokes `body` on a contiguous buffer of our UTF16.
   ///
   /// - Note: `body` should be prepared to deal with invalid UTF16.
@@ -747,30 +744,5 @@ extension _UnicodeViews {
       if r != nil { return r! }
     }
     return Array(self.transcoded(to: UTF16.self)).withUnsafeBufferPointer(body)
-  }
-
-  public var fccNormalizedUTF16: FCCNormalizedUTF16View {
-    return _withContiguousUTF16 {
-      // Start by assuming we need no more storage than we started with for the
-      // result.
-      var result  = Array<UInt16>(repeating: 0, count: $0.count)
-      while true {
-        var error = __swift_stdlib_U_ZERO_ERROR
-        let usedCount = __swift_stdlib_unorm2_normalize(
-          _fccNormalizer, $0.baseAddress, numericCast($0.count),
-          &result, numericCast(result.count), &error)
-        if __swift_stdlib_U_SUCCESS(error) {
-          result.removeLast(result.count - numericCast(usedCount))
-          return RandomAccessUnicodeView(result)
-        }
-        _sanityCheck(
-          error == __swift_stdlib_U_BUFFER_OVERFLOW_ERROR,
-          "Unknown normalization error")
-
-        // extend result storage by 25%
-        result.append(
-          contentsOf: repeatElement(0, count: (result.count + 3) >> 2))
-      }
-    }
   }
 }
