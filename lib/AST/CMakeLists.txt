@@ -34,6 +34,7 @@ add_swift_library(swiftAST STATIC
   LayoutConstraint.cpp
   LookupVisibleDecls.cpp
   Module.cpp
+  ModuleLoader.cpp
   ModuleNameLookup.cpp
   NameLookup.cpp
   Parameter.cpp

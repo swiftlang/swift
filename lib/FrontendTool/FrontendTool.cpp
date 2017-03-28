@@ -964,7 +964,7 @@ int swift::performFrontend(ArrayRef<const char *> Args,
     enableDiagnosticVerifier(Instance->getSourceMgr());
   }
 
-  DependencyTracker depTracker;
+  DependencyTracker depTracker(Invocation.getClangImporterOptions());
   if (!Invocation.getFrontendOptions().DependenciesFilePath.empty() ||
       !Invocation.getFrontendOptions().ReferenceDependenciesFilePath.empty()) {
     Instance->setDependencyTracker(&depTracker);
