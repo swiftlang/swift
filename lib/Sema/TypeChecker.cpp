@@ -1014,31 +1014,34 @@ collectDefaultImplementationForProtocolMembers(ProtocolDecl *PD,
     CreatedTC.reset(new TypeChecker(DC->getASTContext()));
     TC = CreatedTC.get();
   }
-  auto HandleDecl = [&](Decl *D) {
-    ValueDecl *VD = dyn_cast<ValueDecl>(D);
+  auto HandleProtocol = [&](ProtocolDecl *PD) {
+    for (Decl *D : PD->getMembers()) {
+      ValueDecl *VD = dyn_cast<ValueDecl>(D);
 
-    // Skip non-value decl.
-    if (!VD)
-      return;
+      // Skip non-value decl.
+      if (!VD)
+        continue;
 
-    // Skip decls with empty names, e.g. setter/getters for properties.
-    if (VD->getName().empty())
-      return;
+      // Skip decls with empty names, e.g. setter/getters for properties.
+      if (VD->getName().empty())
+        continue;
 
-    ResolvedMemberResult Result = resolveValueMember(*DC, BaseTy,
-                                                     VD->getFullName());
-    assert(Result);
-    for (ValueDecl *Default : Result.getMemberDecls(/*Viable*/true)) {
-      if (Default->getDeclContext()->isExtensionContext()) {
-        DefaultMap.insert({Default, VD});
+      ResolvedMemberResult Result = resolveValueMember(*DC, BaseTy,
+                                                       VD->getFullName());
+      assert(Result);
+      for (ValueDecl *Default : Result.getMemberDecls(/*Viable*/true)) {
+        if (Default->getDeclContext()->isExtensionContext()) {
+          DefaultMap.insert({Default, VD});
+        }
       }
     }
   };
-  for (Decl *D : PD->getMembers()) {
-    HandleDecl(D);
-  }
-  for (auto* IP : PD->getInheritedProtocols()) {
-    for (Decl *D : IP->getMembers())
-      HandleDecl(D);
-  }
+
+  // Collect the default implementations for the members in this given protocol.
+  HandleProtocol(PD);
+
+  // Collect the default implementations for the members in the inherited
+  // protocols.
+  for (auto* IP : PD->getInheritedProtocols())
+    HandleProtocol(IP);
 }
