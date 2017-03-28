@@ -2406,8 +2406,7 @@ public:
 
   void visitKeyPathExpr(KeyPathExpr *E) {
     printCommon(E, "keypath_expr");
-    for (auto &componentAndLoc : E->getComponents()) {
-      KeyPathExpr::Component component = componentAndLoc.first;
+    for (auto &component : E->getComponents()) {
       OS << '\n';
       OS.indent(Indent + 2);
       OS << "(component=";

@@ -200,9 +200,8 @@ Optional<Type> TypeChecker::checkKeyPathExpr(DeclContext *dc,
   bool isInvalid = false;
   SmallVector<KeyPathExpr::Component, 4> resolvedComponents;
   
-  for (auto &componentAndLoc : expr->getComponents()) {
-    KeyPathExpr::Component component = componentAndLoc.first;
-    auto componentNameLoc = componentAndLoc.second;
+  for (auto &component : expr->getComponents()) {
+    auto componentNameLoc = component.getLoc();
     
     // ObjC keypaths only support named segments.
     // TODO: Perhaps we can map subscript components to dictionary keys.
@@ -322,7 +321,7 @@ Optional<Type> TypeChecker::checkKeyPathExpr(DeclContext *dc,
       // Resolve this component to the variable we found.
       auto varRef = ConcreteDeclRef(var);
       auto resolved =
-        KeyPathExpr::Component::forProperty(varRef, Type());
+        KeyPathExpr::Component::forProperty(varRef, Type(), componentNameLoc);
       resolvedComponents.push_back(resolved);
       updateState(/*isProperty=*/true,
                   var->getInterfaceType()->getRValueObjectType());

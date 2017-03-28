@@ -638,8 +638,11 @@ void Lexer::lexHash() {
 
   // Scan for [a-zA-Z]+ to see what we match.
   const char *tmpPtr = CurPtr;
-  while (clang::isLetter(*tmpPtr))
-    ++tmpPtr;
+  if (clang::isIdentifierHead(*tmpPtr)) {
+    do {
+      ++tmpPtr;
+    } while (clang::isIdentifierBody(*tmpPtr));
+  }
 
   // Map the character sequence onto
   tok Kind = llvm::StringSwitch<tok>(StringRef(CurPtr, tmpPtr-CurPtr))

@@ -4544,6 +4544,7 @@ class KeyPathExpr : public Expr {
   SourceLoc KeywordLoc;
   SourceLoc LParenLoc;
   SourceLoc RParenLoc;
+  TypeRepr *RootType;
   Expr *ObjCStringLiteralExpr = nullptr;
 
 public:
@@ -4577,75 +4578,116 @@ public:
     
     llvm::PointerIntPair<Expr *, 3, Kind> SubscriptIndexExprAndKind;
     Type ComponentType;
+    SourceLoc Loc;
     
     explicit Component(DeclNameOrRef decl,
                        Expr *indexExpr,
                        Kind kind,
-                       Type type)
+                       Type type,
+                       SourceLoc loc)
       : Decl(decl), SubscriptIndexExprAndKind(indexExpr, kind),
-        ComponentType(type)
+        ComponentType(type), Loc(loc)
     {}
     
   public:
-    Component() : Component({}, nullptr, (Kind)0, Type()) {}
+    Component() : Component({}, nullptr, (Kind)0, Type(), SourceLoc()) {}
     
     /// Create an unresolved component for a property.
-    static Component forUnresolvedProperty(DeclName UnresolvedName) {
+    static Component forUnresolvedProperty(DeclName UnresolvedName,
+                                           SourceLoc Loc) {
       return Component(UnresolvedName, nullptr,
                        Kind::UnresolvedProperty,
-                       Type());
+                       Type(),
+                       Loc);
     }
     
     /// Create an unresolved component for a subscript.
-    static Component forUnresolvedSubscript(Expr *UnresolvedSubscriptIndex) {
-      return Component({}, UnresolvedSubscriptIndex,
-                       Kind::UnresolvedSubscript,
-                       Type());
+    static Component forUnresolvedSubscript(ASTContext &ctx,
+                                     SourceLoc lSquareLoc,
+                                     ArrayRef<Expr *> indexArgs,
+                                     ArrayRef<Identifier> indexArgLabels,
+                                     ArrayRef<SourceLoc> indexArgLabelLocs,
+                                     SourceLoc rSquareLoc,
+                                     Expr *trailingClosure);
+    
+    /// Create an unresolved component for a subscript.
+    ///
+    /// You shouldn't add new uses of this overload; use the one that takes a
+    /// list of index arguments.
+    static Component forUnresolvedSubscriptWithPrebuiltIndexExpr(Expr *index,
+                                                                 SourceLoc loc){
+      
+      return Component({}, index, Kind::UnresolvedSubscript, Type(), loc);
     }
     
     /// Create an unresolved optional force `!` component.
-    static Component forUnresolvedOptionalForce() {
+    static Component forUnresolvedOptionalForce(SourceLoc BangLoc) {
       return Component({}, nullptr,
                        Kind::OptionalForce,
-                       Type());
+                       Type(),
+                       BangLoc);
     }
     
     /// Create an unresolved optional chain `?` component.
-    static Component forUnresolvedOptionalChain() {
+    static Component forUnresolvedOptionalChain(SourceLoc QuestionLoc) {
       return Component({}, nullptr,
                        Kind::OptionalChain,
-                       Type());
+                       Type(),
+                       QuestionLoc);
     }
     
     /// Create a component for a property.
     static Component forProperty(ConcreteDeclRef property,
-                                 Type propertyType) {
+                                 Type propertyType,
+                                 SourceLoc loc) {
       return Component(property, nullptr, Kind::Property,
-                       propertyType);
+                       propertyType,
+                       loc);
     }
     
     /// Create a component for a subscript.
-    static Component forSubscript(ConcreteDeclRef subscript,
-                                  Expr *indexExpr,
-                                  Type elementType) {
-      return Component(subscript, indexExpr, Kind::Subscript, elementType);
+    static Component forSubscript(ASTContext &ctx,
+                                  ConcreteDeclRef subscript,
+                                  SourceLoc lSquareLoc,
+                                  ArrayRef<Expr *> indexArgs,
+                                  ArrayRef<Identifier> indexArgLabels,
+                                  ArrayRef<SourceLoc> indexArgLabelLocs,
+                                  SourceLoc rSquareLoc,
+                                  Expr *trailingClosure,
+                                  Type elementType);
+
+    /// Create a component for a subscript.
+    ///
+    /// You shouldn't add new uses of this overload; use the one that takes a
+    /// list of index arguments.
+    static Component forSubscriptWithPrebuiltIndexExpr(
+      ConcreteDeclRef subscript, Expr *index, Type elementType, SourceLoc loc) {
+      return Component(subscript, index, Kind::Subscript, elementType, loc);
     }
     
     /// Create an optional-forcing `!` component.
-    static Component forOptionalForce(Type forcedType) {
-      return Component({}, nullptr, Kind::OptionalForce, forcedType);
+    static Component forOptionalForce(Type forcedType, SourceLoc bangLoc) {
+      return Component({}, nullptr, Kind::OptionalForce, forcedType,
+                       bangLoc);
     }
     
     /// Create an optional-chaining `?` component.
-    static Component forOptionalChain(Type unwrappedType) {
-      return Component({}, nullptr, Kind::OptionalChain, unwrappedType);
+    static Component forOptionalChain(Type unwrappedType,
+                                      SourceLoc questionLoc) {
+      return Component({}, nullptr, Kind::OptionalChain, unwrappedType,
+                       questionLoc);
     }
     
     /// Create an optional-wrapping component. This doesn't have a surface
     /// syntax but may appear when the non-optional result of an optional chain
     /// is implicitly wrapped.
     static Component forOptionalWrap(Type wrappedType) {
-      return Component({}, nullptr, Kind::OptionalWrap, wrappedType);
+      return Component({}, nullptr, Kind::OptionalWrap, wrappedType,
+                       SourceLoc());
+    }
+    
+    SourceLoc getLoc() const {
+      return Loc;
     }
     
     Kind getKind() const {
@@ -4702,16 +4744,15 @@ public:
     }
   };
 
-  using ComponentAndLoc = std::pair<Component, SourceLoc>;
-  
 private:
-  llvm::MutableArrayRef<ComponentAndLoc> Components;
+  llvm::MutableArrayRef<Component> Components;
 
 public:
   /// Create a new #keyPath expression.
   KeyPathExpr(ASTContext &C,
               SourceLoc keywordLoc, SourceLoc lParenLoc,
-              ArrayRef<ComponentAndLoc> components,
+              TypeRepr *root,
+              ArrayRef<Component> components,
               SourceLoc rParenLoc,
               bool isObjC,
               bool isImplicit = false);
@@ -4722,7 +4763,7 @@ public:
   }
 
   /// Get the components array.
-  ArrayRef<ComponentAndLoc> getComponents() const {
+  ArrayRef<Component> getComponents() const {
     return Components;
   }
   
@@ -4734,10 +4775,14 @@ public:
   /// Retrieve the string literal expression, which will be \c NULL prior to
   /// type checking and a string literal after type checking for an
   /// @objc key path.
-  Expr *getObjCStringLiteralExpr() const { return ObjCStringLiteralExpr; }
+  Expr *getObjCStringLiteralExpr() const {
+    return ObjCStringLiteralExpr;
+  }
 
   /// Set the semantic expression.
-  void setObjCStringLiteralExpr(Expr *expr) { ObjCStringLiteralExpr = expr; }
+  void setObjCStringLiteralExpr(Expr *expr) {
+    ObjCStringLiteralExpr = expr;
+  }
   
   /// True if this is an ObjC key path expression.
   bool isObjC() const { return KeyPathExprBits.IsObjC; }

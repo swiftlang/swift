@@ -1,134 +1,55 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -parse-as-library  %s -verify
-import ObjectiveC
-import Foundation
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -parse -parse-as-library  %s -verify
 
-// REQUIRES: objc_interop
+func testKeyPath() {
+  _ = #keyPath2(A, .property)
+  _ = #keyPath2(A, [sub])
+  _ = #keyPath2(A, .property?)
+  _ = #keyPath2(A, .property!)
+  _ = #keyPath2(A, .property[sub]?!?.property!?![sub])
+  _ = #keyPath2([Array], .property)
+  _ = #keyPath2([Array], [sub])
+  _ = #keyPath2([Key: Value], [sub])
+  _ = #keyPath2(Generic<T>, .value)
+  _ = #keyPath2(() -> (), .ok)
 
-@objc class A : NSObject {
-  @objc var propB: B = B()
-  @objc var propString: String = "" // expected-note {{did you mean 'propString'}}
-  @objc var propArray: [String] = []
-  @objc var propDict: [String: B] = [:]
-  @objc var propSet: Set<String> = []
-  @objc var propNSString: NSString?
-  @objc var propNSArray: NSArray?
-  @objc var propNSDict: NSDictionary?
-  @objc var propNSSet: NSSet?
-  @objc var propAnyObject: AnyObject?
-
-  @objc var ambiguous: String? // expected-note{{'ambiguous' declared here}}
-
-  @objc func someMethod() { }
-
-  @objc var `repeat`: String?
+  _ = #keyPath2(.property)
+  _ = #keyPath2([sub])
+  _ = #keyPath2(.property?)
+  _ = #keyPath2(.property!)
+  _ = #keyPath2(.property[sub]?!?.property!?![sub])
 }
 
-@objc class B : NSObject  {
-  @objc var propA: A?
-
-  @objc var ambiguous: String? // expected-note{{'ambiguous' declared here}}
-}
-
-class C {
-  var nonObjC: String? // expected-note{{add '@objc' to expose this var to Objective-C}}{{3-3=@objc }}
-}
-
-extension NSArray {
-  @objc class Foo : NSObject {
-    @objc var propString: String = ""
-  }
-}
-
-extension Array {
-  typealias Foo = NSArray.Foo
-}
-
-func testKeyPath(a: A, b: B) {
-  // Property
-  let _: String = #keyPath(A.propB)
-
-  // Chained property
-  let _: String = #keyPath(A.propB.propA)
-
-  // Optional property
-  let _: String = #keyPath(A.propB.propA.propB)
-
-  // String property
-  let _: String = #keyPath(A.propString)
-
-  // Property of String property (which looks on NSString)
-  let _: String = #keyPath(A.propString.URLsInText)
-
-  // Array property (make sure we look at the array element).
-  let _: String = #keyPath(A.propArray)
-  let _: String = #keyPath(A.propArray.URLsInText)
-
-  // Dictionary property (make sure we look at the value type).
-  let _: String = #keyPath(A.propDict.anyKeyName)
-  let _: String = #keyPath(A.propDict.anyKeyName.propA)
-
-  // Set property (make sure we look at the set element).
-  let _: String = #keyPath(A.propSet)
-  let _: String = #keyPath(A.propSet.URLsInText)
-
-  // AnyObject property
-  let _: String = #keyPath(A.propAnyObject.URLsInText)  
-  let _: String = #keyPath(A.propAnyObject.propA)  
-  let _: String = #keyPath(A.propAnyObject.propB)  
-  let _: String = #keyPath(A.propAnyObject.description)  
-
-  // NSString property
-  let _: String = #keyPath(A.propNSString.URLsInText)  
-
-  // NSArray property (AnyObject array element).
-  let _: String = #keyPath(A.propNSArray)
-  let _: String = #keyPath(A.propNSArray.URLsInText)
-
-  // NSDictionary property (AnyObject value type).
-  let _: String = #keyPath(A.propNSDict.anyKeyName)
-  let _: String = #keyPath(A.propNSDict.anyKeyName.propA)
-
-  // NSSet property (AnyObject set element).
-  let _: String = #keyPath(A.propNSSet)
-  let _: String = #keyPath(A.propNSSet.URLsInText)
-
-  // Property with keyword name.
-  let _: String = #keyPath(A.repeat)
-
-  // Nested type of a bridged type (rdar://problem/28061409).
-  typealias IntArray = [Int]
-  let _: String = #keyPath(IntArray.Foo.propString)
-
-  let dict: [String: Int] = [:]
-  let _: Int? = dict[#keyPath(A.propB)]
-}
-
-func testAsStaticString() {
-  let _: StaticString = #keyPath(A.propB)
-}
-
-func testSemanticErrors() {
-  let _: String = #keyPath(A.blarg) // expected-error{{type 'A' has no member 'blarg'}}
-  let _: String = #keyPath(blarg) // expected-error{{use of unresolved identifier 'blarg'}}
-  let _: String = #keyPath(AnyObject.ambiguous) // expected-error{{ambiguous reference to member 'ambiguous'}}
-  let _: String = #keyPath(C.nonObjC) // expected-error{{argument of '#keyPath' refers to non-'@objc' property 'nonObjC'}}
-  let _: String = #keyPath(A.propArray.UTF8View) // expected-error{{type 'String' has no member 'UTF8View'}}
-  let _: String = #keyPath(A.someMethod) // expected-error{{'#keyPath' cannot refer to instance method 'someMethod()'}}
-  let _: String = #keyPath(A) // expected-error{{empty '#keyPath' does not refer to a property}}
-  let _: String = #keyPath(A.propDict.anyKeyName.unknown) // expected-error{{type 'B' has no member 'unknown'}}
-  let _: String = #keyPath(A.propNSDict.anyKeyName.unknown) // expected-error{{type 'AnyObject' has no member 'unknown'}}
-}
-
-func testParseErrors() {
-  let _: String = #keyPath; // expected-error{{expected '(' following '#keyPath'}}
-  let _: String = #keyPath(123; // expected-error{{expected property or type name within '#keyPath(...)'}}
-  let _: String = #keyPath(a.123; // expected-error{{expected property or type name within '#keyPath(...)'}}
-  // TODO: redundant compound name error
-  let _: String = #keyPath(A(b:c:d:).propSet); // expected-error{{cannot use compound name}} expected-error{{an Objective-C key path cannot reference a declaration with a compound name}} expected-error{{unresolved identifier 'propSet'}}
-  let _: String = #keyPath(A.propString; // expected-error{{expected ')' to complete '#keyPath' expression}}
-    // expected-note@-1{{to match this opening '('}}
-}
-
-func testTypoCorrection() {
-  let _: String = #keyPath(A.proString) // expected-error {{type 'A' has no member 'proString'}}
-}
+func testKeyPathErrors() { // expected-note{{}}
+  // TODO: recovery
+  _ = #keyPath2(.  ; // expected-error{{expected property or type name}}
+  _ = #keyPath2(.a ;
+  _ = #keyPath2([a ;
+  _ = #keyPath2([a];
+  _ = #keyPath2(?  ;
+  _ = #keyPath2(!  ;
+  _ = #keyPath2(.  ;
+  _ = #keyPath2(.a ;
+  _ = #keyPath2([a ;
+  _ = #keyPath2([a,;
+  _ = #keyPath2([a:;
+  _ = #keyPath2([a];
+  _ = #keyPath2(.a?;
+  _ = #keyPath2(.a!;
+  _ = #keyPath2(A     ;
+  _ = #keyPath2(A,    ;
+  _ = #keyPath2(A<    ;
+  _ = #keyPath2(A, .  ;
+  _ = #keyPath2(A, .a ;
+  _ = #keyPath2(A, [a ;
+  _ = #keyPath2(A, [a];
+  _ = #keyPath2(A, ?  ;
+  _ = #keyPath2(A, !  ;
+  _ = #keyPath2(A, .  ;
+  _ = #keyPath2(A, .a ;
+  _ = #keyPath2(A, [a ;
+  _ = #keyPath2(A, [a,;
+  _ = #keyPath2(A, [a:;
+  _ = #keyPath2(A, [a];
+  _ = #keyPath2(A, .a?;
+  _ = #keyPath2(A, .a!;
+} // expected-error@+1{{}}

@@ -1988,13 +1988,15 @@ ArchetypeType *OpenExistentialExpr::getOpenedArchetype() const {
 
 KeyPathExpr::KeyPathExpr(ASTContext &C,
                          SourceLoc keywordLoc, SourceLoc lParenLoc,
-                         ArrayRef<ComponentAndLoc> components,
+                         TypeRepr *root,
+                         ArrayRef<Component> components,
                          SourceLoc rParenLoc,
                          bool isObjC,
                          bool isImplicit)
   : Expr(ExprKind::KeyPath, isImplicit),
     KeywordLoc(keywordLoc), LParenLoc(lParenLoc), RParenLoc(rParenLoc),
-    Components(C.AllocateUninitialized<ComponentAndLoc>(components.size()))
+    RootType(root),
+    Components(C.AllocateUninitialized<Component>(components.size()))
 {
   // Copy components into the AST context.
   std::uninitialized_copy(components.begin(), components.end(),
@@ -2005,17 +2007,56 @@ KeyPathExpr::KeyPathExpr(ASTContext &C,
 
 void
 KeyPathExpr::resolveComponents(ASTContext &C,
-                               ArrayRef<KeyPathExpr::Component> resolvedComponents){
+                          ArrayRef<KeyPathExpr::Component> resolvedComponents) {
   // Reallocate the components array if it needs to be.
   if (Components.size() < resolvedComponents.size()) {
-    Components = C.Allocate<ComponentAndLoc>(resolvedComponents.size());
+    Components = C.Allocate<Component>(resolvedComponents.size());
     for (unsigned i : indices(Components)) {
-      new ((void*)&Components[i]) ComponentAndLoc{};
+      ::new ((void*)&Components[i]) Component{};
     }
   }
   
   for (unsigned i : indices(resolvedComponents)) {
-    Components[i].first = resolvedComponents[i];
+    Components[i] = resolvedComponents[i];
   }
   Components = Components.slice(0, resolvedComponents.size());
+}
+
+KeyPathExpr::Component
+KeyPathExpr::Component::forSubscript(ASTContext &ctx,
+                                     ConcreteDeclRef subscript,
+                                     SourceLoc lSquareLoc,
+                                     ArrayRef<Expr *> indexArgs,
+                                     ArrayRef<Identifier> indexArgLabels,
+                                     ArrayRef<SourceLoc> indexArgLabelLocs,
+                                     SourceLoc rSquareLoc,
+                                     Expr *trailingClosure,
+                                     Type elementType) {
+  SmallVector<Identifier, 4> indexArgLabelsScratch;
+  SmallVector<SourceLoc, 4> indexArgLabelLocsScratch;
+  Expr *index = packSingleArgument(ctx, lSquareLoc, indexArgs, indexArgLabels,
+                                   indexArgLabelLocs, rSquareLoc,
+                                   trailingClosure, /*implicit*/ false,
+                                   indexArgLabelsScratch,
+                                   indexArgLabelLocsScratch);
+  return forSubscriptWithPrebuiltIndexExpr(subscript, index, elementType,
+                                           lSquareLoc);
+}
+
+KeyPathExpr::Component
+KeyPathExpr::Component::forUnresolvedSubscript(ASTContext &ctx,
+                                         SourceLoc lSquareLoc,
+                                         ArrayRef<Expr *> indexArgs,
+                                         ArrayRef<Identifier> indexArgLabels,
+                                         ArrayRef<SourceLoc> indexArgLabelLocs,
+                                         SourceLoc rSquareLoc,
+                                         Expr *trailingClosure) {
+  SmallVector<Identifier, 4> indexArgLabelsScratch;
+  SmallVector<SourceLoc, 4> indexArgLabelLocsScratch;
+  Expr *index = packSingleArgument(ctx, lSquareLoc, indexArgs, indexArgLabels,
+                                   indexArgLabelLocs, rSquareLoc,
+                                   trailingClosure, /*implicit*/ false,
+                                   indexArgLabelsScratch,
+                                   indexArgLabelLocsScratch);
+  return forUnresolvedSubscriptWithPrebuiltIndexExpr(index, lSquareLoc);
 }

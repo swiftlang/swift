@@ -1153,6 +1153,9 @@ ERROR(string_interpolation_extra,none,
       "extra tokens after interpolated string expression", ())
 
 // Keypath expressions.
+ERROR(expr_keypath_invalid_component,PointsToFirstBadToken,
+      "key path can only contain property, subscript, optional chaining, or "
+      "optional force-unwrapping components", ())
 ERROR(expr_keypath_expected_lparen,PointsToFirstBadToken,
       "expected '(' following '#keyPath'", ())
 ERROR(expr_keypath_expected_property_or_type,PointsToFirstBadToken,

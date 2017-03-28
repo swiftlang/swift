@@ -907,9 +907,8 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   
     SmallVector<KeyPathExpr::Component, 4> updatedComponents;
     bool didChangeComponents = false;
-    for (auto &componentAndLoc : E->getComponents()) {
-      auto component = componentAndLoc.first;
-      
+    for (auto &origComponent : E->getComponents()) {
+      auto component = origComponent;
       switch (auto kind = component.getKind()) {
       case KeyPathExpr::Component::Kind::Subscript:
       case KeyPathExpr::Component::Kind::UnresolvedSubscript: {
@@ -919,10 +918,13 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
         if (newIndex != origIndex) {
           didChangeComponents = true;
           component = kind == KeyPathExpr::Component::Kind::Subscript
-            ? KeyPathExpr::Component::forSubscript(component.getDeclRef(),
-                                                   newIndex,
-                                                   component.getComponentType())
-            : KeyPathExpr::Component::forUnresolvedSubscript(newIndex);
+            ? KeyPathExpr::Component::forSubscriptWithPrebuiltIndexExpr(
+                component.getDeclRef(),
+                newIndex,
+                component.getComponentType(),
+                component.getLoc())
+            : KeyPathExpr::Component::forUnresolvedSubscriptWithPrebuiltIndexExpr(
+                newIndex, component.getLoc());
         }
         break;
       }
