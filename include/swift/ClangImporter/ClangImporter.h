@@ -30,6 +30,7 @@ namespace clang {
   class ASTContext;
   class CodeGenOptions;
   class Decl;
+  class DependencyCollector;
   class EnumConstantDecl;
   class EnumDecl;
   class MacroInfo;
@@ -93,6 +94,11 @@ public:
   ClangImporter &operator=(ClangImporter &&) = delete;
 
   ~ClangImporter();
+
+  /// \brief Create a new clang::DependencyCollector customized to Swift's
+  /// specific uses.
+  static std::shared_ptr<clang::DependencyCollector>
+  createDependencyCollector(const ClangImporterOptions &Options);
 
   /// \brief Check whether the module with a given name can be imported without
   /// importing it.
