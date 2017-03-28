@@ -3904,13 +3904,152 @@ namespace {
     }
 
     Expr *visitKeyPathExpr(KeyPathExpr *E) {
-      if (auto semanticE = E->getObjCStringLiteralExpr()) {
-        cs.setType(E, cs.getType(semanticE));
+      if (E->isObjC()) {
+        cs.setType(E, cs.getType(E->getObjCStringLiteralExpr()));
         return E;
       }
+
+      simplifyExprType(E);
+
+      SmallVector<KeyPathExpr::Component, 4> resolvedComponents;
+
+      // Resolve each of the components.
+      bool didOptionalChain = false;
+      auto keyPathTy = cs.getType(E)->castTo<BoundGenericType>();
+      // TODO: get root and leaf types
+      Type baseTy = keyPathTy->getGenericArgs()[0];
+      Type leafTy = keyPathTy->getGenericArgs()[1];
       
-      // TODO: Native keypaths
-      llvm_unreachable("not implemented");
+      for (unsigned i : indices(E->getComponents())) {
+        auto &origComponent = E->getComponents()[i];
+        
+        // If there were unresolved types, we may end up with a null base for
+        // following components.
+        if (!baseTy) {
+          resolvedComponents.push_back(origComponent);
+          continue;
+        }
+        
+        KeyPathExpr::Component component;
+        switch (auto kind = origComponent.getKind()) {
+        case KeyPathExpr::Component::Kind::UnresolvedProperty: {
+          auto locator = cs.getConstraintLocator(E,
+                       ConstraintLocator::PathElement::getKeyPathComponent(i));
+          auto foundDecl = getOverloadChoiceIfAvailable(locator);
+          // Leave the component unresolved if the overload was not resolved.
+          if (!foundDecl) {
+            component = origComponent;
+            break;
+          }
+          auto property = foundDecl->choice.getDecl();
+          
+          auto dc = property->getInnermostDeclContext();
+          SmallVector<Substitution, 4> subs;
+          if (auto sig = dc->getGenericSignatureOfContext()) {
+            // Compute substitutions to refer to the member.
+            solution.computeSubstitutions(sig, foundDecl->openedFullType,
+                                          locator, subs);
+          }
+          
+          auto resolvedTy = foundDecl->openedType;
+          resolvedTy = simplifyType(resolvedTy);
+          
+          auto ref = ConcreteDeclRef(cs.getASTContext(), property, subs);
+          component = KeyPathExpr::Component::forProperty(ref,
+                                                       resolvedTy,
+                                                       origComponent.getLoc());
+          break;
+        }
+        case KeyPathExpr::Component::Kind::UnresolvedSubscript: {
+          auto locator = cs.getConstraintLocator(E,
+                       ConstraintLocator::PathElement::getKeyPathComponent(i));
+          auto foundDecl = getOverloadChoiceIfAvailable(locator);
+          // Leave the component unresolved if the overload was not resolved.
+          if (!foundDecl) {
+            component = origComponent;
+            break;
+          }
+          auto property = foundDecl->choice.getDecl();
+          
+          auto dc = property->getInnermostDeclContext();
+          SmallVector<Substitution, 4> subs;
+          if (auto sig = dc->getGenericSignatureOfContext()) {
+            // Compute substitutions to refer to the member.
+            solution.computeSubstitutions(sig, foundDecl->openedFullType,
+                                          locator, subs);
+          }
+          
+          auto resolvedTy = foundDecl->openedType->castTo<AnyFunctionType>()
+            ->getResult();
+          resolvedTy = simplifyType(resolvedTy);
+          
+          auto ref = ConcreteDeclRef(cs.getASTContext(), property, subs);
+          component = KeyPathExpr::Component
+            ::forSubscriptWithPrebuiltIndexExpr(ref,
+                                                origComponent.getIndexExpr(),
+                                                resolvedTy,
+                                                origComponent.getLoc());
+          break;
+        }
+        case KeyPathExpr::Component::Kind::OptionalChain: {
+          didOptionalChain = true;
+          // Chaining always forces the element to be an rvalue.
+          auto objectTy = baseTy->getLValueOrInOutObjectType()
+            ->getAnyOptionalObjectType();
+          if (baseTy->hasUnresolvedType() && !objectTy) {
+            objectTy = baseTy;
+          }
+          assert(objectTy);
+          
+          component = KeyPathExpr::Component::forOptionalChain(objectTy,
+                                                        origComponent.getLoc());
+          break;
+        }
+        case KeyPathExpr::Component::Kind::OptionalForce: {
+          Type objectTy;
+          if (auto lvalue = baseTy->getAs<LValueType>()) {
+            objectTy = lvalue->getObjectType()->getAnyOptionalObjectType();
+            if (baseTy->hasUnresolvedType() && !objectTy) {
+              objectTy = baseTy;
+            }
+            objectTy = LValueType::get(objectTy);
+          } else {
+            objectTy = baseTy->getAnyOptionalObjectType();
+            if (baseTy->hasUnresolvedType() && !objectTy) {
+              objectTy = baseTy;
+            }
+            assert(objectTy);
+          }
+          
+          component = KeyPathExpr::Component::forOptionalForce(objectTy,
+                                                        origComponent.getLoc());
+          break;
+        }
+        case KeyPathExpr::Component::Kind::Property:
+        case KeyPathExpr::Component::Kind::Subscript:
+        case KeyPathExpr::Component::Kind::OptionalWrap:
+          llvm_unreachable("already resolved");
+        }
+
+        baseTy = component.getComponentType();
+        resolvedComponents.push_back(component);
+      }
+      
+      // Wrap a non-optional result if there was chaining involved.
+      if (didOptionalChain &&
+          baseTy &&
+          !baseTy->hasUnresolvedType() &&
+          !baseTy->isEqual(leafTy)) {
+        assert(leafTy->getAnyOptionalObjectType()->isEqual(baseTy));
+        auto component = KeyPathExpr::Component::forOptionalWrap(leafTy);
+        resolvedComponents.push_back(component);
+        baseTy = leafTy;
+      }
+      E->resolveComponents(cs.getASTContext(), resolvedComponents);
+      // The final component type ought to line up with the leaf type of the
+      // key path.
+      assert(!baseTy || baseTy->getLValueOrInOutObjectType()->isEqual(leafTy));
+      return E;
     }
 
     /// Interface for ExprWalker

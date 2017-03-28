@@ -520,8 +520,7 @@ ParserResult<Expr> Parser::parseExprKeyPath() {
   }
   SourceLoc lParenLoc = consumeToken(tok::l_paren);
   
-  TypeRepr *root;
-  
+  TypeRepr *root = nullptr;
 
   // Can we parse a root type followed by a comma?
   // We need to look ahead here since `[` could either start a sugar type or
@@ -655,7 +654,7 @@ ParserResult<Expr> Parser::parseExprKeyPathObjC() {
     if (!components.empty()) {
       expr = new (Context) KeyPathExpr(Context, keywordLoc, lParenLoc,
                                        nullptr, components, Tok.getLoc(),
-                                       /*isObjC TODO*/ true);
+                                       /*isObjC*/ true);
     }
 
     if (CodeCompletion)

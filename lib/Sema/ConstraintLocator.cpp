@@ -75,6 +75,7 @@ void ConstraintLocator::Profile(llvm::FoldingSetNodeID &id, Expr *anchor,
     case TupleElement:
     case ApplyArgToParam:
     case OpenedGeneric:
+    case KeyPathComponent:
       if (unsigned numValues = numNumericValuesInPathElement(elt.getKind())) {
         id.AddInteger(elt.getValue());
         if (numValues > 1)
@@ -218,6 +219,10 @@ void ConstraintLocator::dump(SourceManager *sm, raw_ostream &out) {
 
     case TupleElement:
       out << "tuple element #" << llvm::utostr(elt.getValue());
+      break;
+
+    case KeyPathComponent:
+      out << "key path component #" << llvm::utostr(elt.getValue());
       break;
 
     case Requirement:

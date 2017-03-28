@@ -19,11 +19,11 @@
 
 using namespace swift;
 
-Optional<Type> TypeChecker::checkKeyPathExpr(DeclContext *dc,
-                                             KeyPathExpr *expr,
-                                             bool requireResultType) {
+Optional<Type> TypeChecker::checkObjCKeyPathExpr(DeclContext *dc,
+                                                 KeyPathExpr *expr,
+                                                 bool requireResultType) {
   // TODO: Native keypaths
-  assert(expr->isObjC() && "native keypaths not implemented");
+  assert(expr->isObjC() && "native keypaths not type-checked this way");
   
   // If there is already a semantic expression, do nothing.
   if (expr->getObjCStringLiteralExpr() && !requireResultType) return None;

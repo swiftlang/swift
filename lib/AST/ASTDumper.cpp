@@ -2406,6 +2406,8 @@ public:
 
   void visitKeyPathExpr(KeyPathExpr *E) {
     printCommon(E, "keypath_expr");
+    if (E->isObjC())
+      OS << " objc";
     for (auto &component : E->getComponents()) {
       OS << '\n';
       OS.indent(Indent + 2);
@@ -2426,6 +2428,7 @@ public:
       case KeyPathExpr::Component::Kind::Property:
         OS << "property ";
         component.getDeclRef().dump(OS);
+        OS << " ";
         break;
       
       case KeyPathExpr::Component::Kind::Subscript:
@@ -2433,19 +2436,24 @@ public:
         component.getDeclRef().dump(OS);
         OS << '\n';
         component.getIndexExpr()->print(OS, Indent + 4);
+        OS.indent(Indent + 4);
         break;
       
       case KeyPathExpr::Component::Kind::UnresolvedProperty:
         OS << "unresolved_property ";
         component.getUnresolvedDeclName().print(OS);
+        OS << " ";
         break;
         
       case KeyPathExpr::Component::Kind::UnresolvedSubscript:
         OS << "unresolved_subscript";
         OS << '\n';
         component.getIndexExpr()->print(OS, Indent + 4);
+        OS.indent(Indent + 4);
         break;
       }
+      OS << "type=";
+      component.getComponentType().print(OS);
       OS << ")";
     }
     if (auto stringLiteral = E->getObjCStringLiteralExpr()) {

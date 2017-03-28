@@ -4742,6 +4742,10 @@ public:
     Type getComponentType() const {
       return ComponentType;
     }
+    
+    void setComponentType(Type t) {
+      ComponentType = t;
+    }
   };
 
 private:
@@ -4766,6 +4770,9 @@ public:
   ArrayRef<Component> getComponents() const {
     return Components;
   }
+  MutableArrayRef<Component> getMutableComponents() {
+    return Components;
+  }
   
   /// Resolve the components of an un-type-checked expr. This copies over the
   /// components from the argument array.
@@ -4782,6 +4789,10 @@ public:
   /// Set the semantic expression.
   void setObjCStringLiteralExpr(Expr *expr) {
     ObjCStringLiteralExpr = expr;
+  }
+  
+  TypeRepr *getRootType() const {
+    return RootType;
   }
   
   /// True if this is an ObjC key path expression.

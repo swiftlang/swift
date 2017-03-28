@@ -438,6 +438,8 @@ ERROR(expr_unsupported_objc_key_path_component,none,
 ERROR(expr_unsupported_objc_key_path_compound_name,none,
       "an Objective-C key path cannot reference a declaration with a "
       "compound name", ())
+ERROR(expr_keypath_no_keypath_type,none,
+      "broken standard library: no 'KeyPath' type found", ())
 
 // Selector expressions.
 ERROR(expr_selector_no_objc_runtime,none,
