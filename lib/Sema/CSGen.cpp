@@ -3349,11 +3349,17 @@ hasBestOverload() const { return Impl.BestIdx.hasValue(); }
 ValueDecl* ResolvedMemberResult::
 getBestOverload() const { return Impl.AllDecls[Impl.BestIdx.getValue()]; }
 
-ArrayRef<ValueDecl*> ResolvedMemberResult::getMemberDecls(bool Viable) {
-  if (Viable)
-    return llvm::makeArrayRef(Impl.AllDecls).slice(Impl.ViableStartIdx);
-  else
-    return llvm::makeArrayRef(Impl.AllDecls).slice(0, Impl.ViableStartIdx);
+ArrayRef<ValueDecl*> ResolvedMemberResult::
+getMemberDecls(InterestedMemberKind Kind) {
+  auto Result = llvm::makeArrayRef(Impl.AllDecls);
+  switch (Kind) {
+  case InterestedMemberKind::Viable:
+    return Result.slice(Impl.ViableStartIdx);
+  case InterestedMemberKind::Unviable:
+    return Result.slice(0, Impl.ViableStartIdx);
+  case InterestedMemberKind::All:
+    return Result;
+  }
 }
 
 ResolvedMemberResult

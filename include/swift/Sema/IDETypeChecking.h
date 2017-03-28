@@ -55,6 +55,12 @@ namespace swift {
   bool typeCheckUnresolvedExpr(DeclContext &DC, Expr* E,
                                Expr *P, SmallVectorImpl<Type> &PossibleTypes);
 
+  enum InterestedMemberKind : uint8_t {
+    Viable,
+    Unviable,
+    All,
+  };
+
   struct ResolvedMemberResult {
     struct Implementation;
     Implementation &Impl;
@@ -64,7 +70,7 @@ namespace swift {
     operator bool() const;
     bool hasBestOverload() const;
     ValueDecl* getBestOverload() const;
-    ArrayRef<ValueDecl*> getMemberDecls(bool Viable);
+    ArrayRef<ValueDecl*> getMemberDecls(InterestedMemberKind Kind);
   };
 
   ResolvedMemberResult resolveValueMember(DeclContext &DC, Type BaseTy,
