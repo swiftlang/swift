@@ -59,7 +59,7 @@ struct SynthesizedExtensionAnalyzer::Implementation {
     const FuncDecl *FD = dyn_cast<FuncDecl>(D);
     if (!FD)
       return true;
-    ResolveMemberResult Result = resolveValueMember(*DC, BaseTy,
+    ResolvedMemberResult Result = resolveValueMember(*DC, BaseTy,
                                                     FD->getEffectiveFullName());
     return !(Result.hasBestOverload() && Result.getBestOverload() != D);
   }
@@ -1646,7 +1646,7 @@ static bool shouldPrintAsFavorable(const Decl *D, PrintOptions &Options) {
   const FuncDecl *FD = dyn_cast<FuncDecl>(D);
   if (!FD)
     return true;
-  ResolveMemberResult Result = resolveValueMember(*Target->getDeclContext(),
+  ResolvedMemberResult Result = resolveValueMember(*Target->getDeclContext(),
                                                   BaseTy,
                                                   FD->getEffectiveFullName());
   return !(Result.hasBestOverload() && Result.getBestOverload() != D);
