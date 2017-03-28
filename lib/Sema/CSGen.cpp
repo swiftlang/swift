@@ -3340,23 +3340,39 @@ swift::resolveValueMember(DeclContext &DC, Type BaseTy, DeclName Name) {
     TC = CreatedTC.get();
   }
   ConstraintSystem CS(*TC, &DC, None);
+
+  // Look up all members of BaseTy with the given Name.
   MemberLookupResult LookupResult = CS.performMemberLookup(
-    ConstraintKind::ValueMember, Name, BaseTy, FunctionRefKind::DoubleApply,
+    ConstraintKind::ValueMember, Name, BaseTy, FunctionRefKind::SingleApply,
     nullptr, false);
+
+  // Keep track of all the unviable members.
+  for (auto Can : LookupResult.UnviableCandidates)
+    Result.AllDecls.push_back(Can.first);
+
+  // Keep track of the start of viable choices.
+  Result.ViableStartIdx = Result.AllDecls.size();
+
+  // If no viable members, we are done.
   if (LookupResult.ViableCandidates.empty())
     return Result;
+
+  // Try to figure out the best overload.
   ConstraintLocator *Locator = CS.getConstraintLocator(nullptr);
   TypeVariableType *TV = CS.createTypeVariable(Locator, TVO_CanBindToLValue);
   CS.addOverloadSet(TV, LookupResult.ViableCandidates, &DC, Locator);
   Optional<Solution> OpSolution = CS.solveSingle();
-  if (!OpSolution.hasValue())
-    return Result;
-  SelectedOverload Selected = OpSolution.getValue().overloadChoices[Locator];
-  Result.Favored = Selected.choice.getDecl();
+  ValueDecl *Selected = nullptr;
+  if (OpSolution.hasValue()) {
+    Selected = OpSolution.getValue().overloadChoices[Locator].choice.getDecl();
+  }
   for (OverloadChoice& Choice : LookupResult.ViableCandidates) {
     ValueDecl *VD = Choice.getDecl();
-    if (VD != Result.Favored)
-      Result.OtherViables.push_back(VD);
+
+    // If this VD is the best overload, keep track of its index.
+    if (VD == Selected)
+      Result.BestIdx = Result.AllDecls.size();
+    Result.AllDecls.push_back(VD);
   }
   return Result;
 }
@@ -3364,7 +3380,7 @@ swift::resolveValueMember(DeclContext &DC, Type BaseTy, DeclName Name) {
 void swift::collectDefaultImplementationForProtocolMembers(ProtocolDecl *PD,
                     llvm::SmallDenseMap<ValueDecl*, ValueDecl*> &DefaultMap) {
   Type BaseTy = PD->getDeclaredInterfaceType();
-  DeclContext *DC = PD->getDeclContext();
+  DeclContext *DC = PD->getInnermostDeclContext();
   std::unique_ptr<TypeChecker> CreatedTC;
   auto *TC = static_cast<TypeChecker*>(DC->getASTContext().getLazyResolver());
   if (!TC) {
@@ -3373,18 +3389,29 @@ void swift::collectDefaultImplementationForProtocolMembers(ProtocolDecl *PD,
   }
   for (Decl *D : PD->getMembers()) {
     ValueDecl *VD = dyn_cast<ValueDecl>(D);
+
+    // Skip non-value decl.
     if (!VD)
       continue;
+
+    // Skip decls with empty names, e.g. setter/getters for properties.
+    if (VD->getName().empty())
+      continue;
+
     ResolveMemberResult Result = resolveValueMember(*DC, BaseTy,
                                                     VD->getFullName());
-    if (Result.OtherViables.empty())
-      continue;
-    if (!Result.Favored->getDeclContext()->isGenericContext())
-      continue;
-    for (ValueDecl *Default : Result.OtherViables) {
+    assert(Result);
+    for (ValueDecl *Default : Result.getMemberDecls(/*Viable*/true)) {
       if (Default->getDeclContext()->isExtensionContext()) {
         DefaultMap.insert({Default, VD});
       }
     }
   }
+}
+
+ArrayRef<ValueDecl*> ResolveMemberResult::getMemberDecls(bool Viable) {
+  if (Viable)
+    return llvm::makeArrayRef(AllDecls).slice(ViableStartIdx);
+  else
+    return llvm::makeArrayRef(AllDecls).slice(0, ViableStartIdx);
 }
