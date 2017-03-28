@@ -162,10 +162,6 @@ class Remangler {
   class EntityContext {
     bool AsContext = false;
   public:
-    bool isAsContext() const {
-      return AsContext;
-    }
-
     class ManglingContextRAII {
       EntityContext &Ctx;
       bool SavedValue;
