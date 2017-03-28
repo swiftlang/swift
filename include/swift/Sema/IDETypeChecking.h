@@ -56,9 +56,13 @@ namespace swift {
                                Expr *P, SmallVectorImpl<Type> &PossibleTypes);
 
   struct ResolveMemberResult {
-    ValueDecl *Favored = nullptr;
-    std::vector<ValueDecl*> OtherViables;
-    operator bool() const { return Favored; }
+    llvm::SmallVector<ValueDecl*, 4> AllDecls;
+    unsigned ViableStartIdx;
+    Optional<unsigned> BestIdx;
+    operator bool() const { return !AllDecls.empty(); }
+    bool hasBestOverload() const { return BestIdx.hasValue(); }
+    ValueDecl* getBestOverload() const { return AllDecls[BestIdx.getValue()]; }
+    ArrayRef<ValueDecl*> getMemberDecls(bool Viable);
   };
 
   ResolveMemberResult resolveValueMember(DeclContext &DC, Type BaseTy,
