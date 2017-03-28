@@ -3363,7 +3363,7 @@ Constraint<T> GenericSignatureBuilder::checkConstraintList(
   llvm::array_pod_sort(constraints.begin(), constraints.end());
 
   // Find a representative constraint.
-	auto representativeConstraint =
+  auto representativeConstraint =
     findRepresentativeConstraint<T>(constraints, isSuitableRepresentative);
 
   // Local function to provide a note describing the representative constraint.
