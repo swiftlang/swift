@@ -3329,9 +3329,36 @@ bool swift::isConvertibleTo(Type T1, Type T2, DeclContext &DC) {
   return canSatisfy(T1, T2, DC, ConstraintKind::Conversion, false, false);
 }
 
-ResolveMemberResult
+struct ResolvedMemberResult::Implementation {
+  llvm::SmallVector<ValueDecl*, 4> AllDecls;
+  unsigned ViableStartIdx;
+  Optional<unsigned> BestIdx;
+};
+
+ResolvedMemberResult::ResolvedMemberResult(): Impl(*new Implementation()) {};
+
+ResolvedMemberResult::~ResolvedMemberResult() { delete &Impl; };
+
+ResolvedMemberResult::operator bool() const {
+  return !Impl.AllDecls.empty();
+}
+
+bool ResolvedMemberResult::
+hasBestOverload() const { return Impl.BestIdx.hasValue(); }
+
+ValueDecl* ResolvedMemberResult::
+getBestOverload() const { return Impl.AllDecls[Impl.BestIdx.getValue()]; }
+
+ArrayRef<ValueDecl*> ResolvedMemberResult::getMemberDecls(bool Viable) {
+  if (Viable)
+    return llvm::makeArrayRef(Impl.AllDecls).slice(Impl.ViableStartIdx);
+  else
+    return llvm::makeArrayRef(Impl.AllDecls).slice(0, Impl.ViableStartIdx);
+}
+
+ResolvedMemberResult
 swift::resolveValueMember(DeclContext &DC, Type BaseTy, DeclName Name) {
-  ResolveMemberResult Result;
+  ResolvedMemberResult Result;
   std::unique_ptr<TypeChecker> CreatedTC;
   // If the current ast context has no type checker, create one for it.
   auto *TC = static_cast<TypeChecker*>(DC.getASTContext().getLazyResolver());
@@ -3348,10 +3375,10 @@ swift::resolveValueMember(DeclContext &DC, Type BaseTy, DeclName Name) {
 
   // Keep track of all the unviable members.
   for (auto Can : LookupResult.UnviableCandidates)
-    Result.AllDecls.push_back(Can.first);
+    Result.Impl.AllDecls.push_back(Can.first);
 
   // Keep track of the start of viable choices.
-  Result.ViableStartIdx = Result.AllDecls.size();
+  Result.Impl.ViableStartIdx = Result.Impl.AllDecls.size();
 
   // If no viable members, we are done.
   if (LookupResult.ViableCandidates.empty())
@@ -3371,8 +3398,8 @@ swift::resolveValueMember(DeclContext &DC, Type BaseTy, DeclName Name) {
 
     // If this VD is the best overload, keep track of its index.
     if (VD == Selected)
-      Result.BestIdx = Result.AllDecls.size();
-    Result.AllDecls.push_back(VD);
+      Result.Impl.BestIdx = Result.Impl.AllDecls.size();
+    Result.Impl.AllDecls.push_back(VD);
   }
   return Result;
 }
@@ -3398,7 +3425,7 @@ void swift::collectDefaultImplementationForProtocolMembers(ProtocolDecl *PD,
     if (VD->getName().empty())
       continue;
 
-    ResolveMemberResult Result = resolveValueMember(*DC, BaseTy,
+    ResolvedMemberResult Result = resolveValueMember(*DC, BaseTy,
                                                     VD->getFullName());
     assert(Result);
     for (ValueDecl *Default : Result.getMemberDecls(/*Viable*/true)) {
@@ -3407,11 +3434,4 @@ void swift::collectDefaultImplementationForProtocolMembers(ProtocolDecl *PD,
       }
     }
   }
-}
-
-ArrayRef<ValueDecl*> ResolveMemberResult::getMemberDecls(bool Viable) {
-  if (Viable)
-    return llvm::makeArrayRef(AllDecls).slice(ViableStartIdx);
-  else
-    return llvm::makeArrayRef(AllDecls).slice(0, ViableStartIdx);
 }
