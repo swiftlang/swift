@@ -8,15 +8,15 @@ class ObjCSubclass : NSObject {
 }
 
 class DynamicMembers {
-  dynamic func foo() { }
+  dynamic func foo() { } // expected-error{{'dynamic' instance method 'foo()' must also be '@objc'}}{{3-3=@objc }}
   
-  dynamic var bar: NSObject? = nil // expected-note 2{{add '@objc' to expose this var to Objective-C}}
+  dynamic var bar: NSObject? = nil
+ // expected-error@-1{{'dynamic' var 'bar' must also be '@objc'}}{{3-3=@objc }}
 }
 
 func test(sc: ObjCSubclass, dm: DynamicMembers) {
   _ = #selector(sc.foo) // expected-error{{argument of '#selector' refers to instance method 'foo()' that is not exposed to Objective-C}}
 
-  // FIXME: should be errors, once 'dynamic' is updated
-  _ = #selector(getter: dm.bar) // expected-warning{{argument of '#selector' refers to var 'bar' in 'DynamicMembers' that depends on '@objc' attribute inference deprecated in Swift 4}}
-  _ = #keyPath(DynamicMembers.bar) // expected-warning{{argument of '#keyPath' refers to property 'bar' in 'DynamicMembers' that depends on '@objc' attribute inference deprecated in Swift 4}}
+  _ = #selector(getter: dm.bar)
+  _ = #keyPath(DynamicMembers.bar)
 }

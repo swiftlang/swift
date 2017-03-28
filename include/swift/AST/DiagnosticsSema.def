@@ -3241,6 +3241,9 @@ ERROR(dynamic_with_final,none,
 ERROR(dynamic_with_nonobjc,none,
       "a declaration cannot be both '@nonobjc' and 'dynamic'",
       ())
+ERROR(dynamic_requires_objc,none,
+      "'dynamic' %0 %1 must also be '@objc'",
+      (DescriptiveDeclKind, DeclName))
 
 //------------------------------------------------------------------------------
 // @available

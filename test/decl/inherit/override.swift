@@ -13,8 +13,8 @@ class A {
   @objc var v2: Int { return 0 } // expected-note{{overridden declaration is here}}
   @objc var v3: Int = 0 // expected-note{{overridden declaration is here}}
 
-  dynamic func f3D() { }
-  dynamic func f4D() -> ObjCClassA { }
+  dynamic func f3D() { } // expected-error{{'dynamic' instance method 'f3D()' must also be '@objc'}}{{3-3=@objc }}
+  dynamic func f4D() -> ObjCClassA { } // expected-error{{'dynamic' instance method 'f4D()' must also be '@objc'}}{{3-3=@objc }}
 }
 
 extension A {

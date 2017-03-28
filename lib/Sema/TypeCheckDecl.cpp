@@ -2330,8 +2330,22 @@ static Optional<ObjCReason> shouldMarkAsObjC(TypeChecker &TC,
 
   // Infer '@objc' for 'dynamic' members.
   if (auto attr = VD->getAttrs().getAttribute<DynamicAttr>()) {
-    if (!attr->isImplicit())
+    // For implicit 'dynamic', just infer '@objc' implicitly.
+    if (attr->isImplicit())
+      return ObjCReason::ImplicitlyObjC;
+
+    // Under Swift 3's @objc inference rules, 'dynamic' infers '@objc'.
+    if (TC.Context.LangOpts.EnableSwift3ObjCInference)
       return ObjCReason::ExplicitlyDynamic;
+
+    // Otherwise, complain about the lack of `@objc', but still infer it
+    // for better recovery.
+    TC.diagnose(VD, diag::dynamic_requires_objc,
+                VD->getDescriptiveKind(), VD->getFullName())
+      .highlight(attr->getRange())
+      .fixItInsert(VD->getAttributeInsertionLoc(false), "@objc ");
+
+    return ObjCReason::ImplicitlyObjC;
   }
 
   // If we aren't provided Swift 3's @objc inference rules, we're done.
