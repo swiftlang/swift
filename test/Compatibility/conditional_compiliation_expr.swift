@@ -112,9 +112,9 @@ foo bar baz // expected-error 2 {{consecutive statements}}
 
 // ---------------------------------------------------------------------------
 // SR-4031: Compound name in compilation condition
+// See test/Parse/ConditionalCompilation/compoundName_swift4.swift for Swfit 4 behavior
 
-// Accepted in Swift3. *source breaking*
-#if BAR(_:) // expected-error {{invalid conditional compilation expression}}
-#elseif os(x:)(macOS) // expected-error {{unexpected platform condition (expected 'os', 'arch', or 'swift')}}
-#elseif os(Linux(foo:bar:)) // expected-error {{unexpected platform condition argument: expected identifier}}
+#if BAR(_:) // expected-warning {{ignoring parentheses in compound name, which will be rejected in future version of Swift}} {{8-12=}}
+#elseif os(x:)(macOS) // expected-warning {{ignoring parentheses in compound name, which will be rejected in future version of Swift}} {{11-15=}}
+#elseif os(Linux(foo:bar:)) // expected-warning {{ignoring parentheses in compound name, which will be rejected in future version of Swift}} {{17-27=}}
 #endif

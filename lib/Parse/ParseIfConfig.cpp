@@ -46,17 +46,6 @@ static StringRef extractExprSource(SourceManager &SM, Expr *E) {
   return SM.extractText(Range);
 }
 
-/// Get the identifier string of the UnresolvedDeclRefExpr.
-/// Returns \c true if failed.
-static llvm::Optional<StringRef> getDeclRefStr(Expr *E, DeclRefKind Kind) {
-  auto UDRE = dyn_cast<UnresolvedDeclRefExpr>(E);
-  if (!UDRE ||
-      !UDRE->hasName() ||
-      UDRE->getRefKind() != Kind ||
-      UDRE->getName().isCompoundName())
-    return None;
-  return UDRE->getName().getBaseName().str();
-}
 
 /// The condition validator.
 class ValidateIfConfigCondition :
@@ -65,6 +54,26 @@ class ValidateIfConfigCondition :
   DiagnosticEngine &D;
 
   bool HasError;
+
+  /// Get the identifier string of the UnresolvedDeclRefExpr.
+  llvm::Optional<StringRef> getDeclRefStr(Expr *E, DeclRefKind Kind) {
+    auto UDRE = dyn_cast<UnresolvedDeclRefExpr>(E);
+    if (!UDRE ||
+        !UDRE->hasName() ||
+        UDRE->getRefKind() != Kind)
+      return None;
+    if (UDRE->getName().isCompoundName()) {
+      if (!Ctx.isSwiftVersion3())
+        return None;
+      // Swift3 used to accept compound names; warn and return the basename.
+      D.diagnose(UDRE->getNameLoc().getLParenLoc(),
+                 diag::swift3_conditional_compilation_expression_compound)
+        .fixItRemove({ UDRE->getNameLoc().getLParenLoc(),
+                       UDRE->getNameLoc().getRParenLoc() });
+    }
+
+    return UDRE->getName().getBaseName().str();
+  }
 
   Expr *diagnoseUnsupportedExpr(Expr *E) {
     D.diagnose(E->getLoc(),
@@ -401,6 +410,12 @@ class EvaluateIfConfigCondition :
   public ExprVisitor<EvaluateIfConfigCondition, bool> {
   ASTContext &Ctx;
 
+  /// Get the identifier string from an \c Expr assuming it's an
+  /// \c UnresolvedDeclRefExpr.
+  StringRef getDeclRefStr(Expr *E) {
+    return cast<UnresolvedDeclRefExpr>(E)->getName().getBaseName().str();
+  }
+
 public:
   EvaluateIfConfigCondition(ASTContext &Ctx) : Ctx(Ctx) {}
 
@@ -413,12 +428,12 @@ public:
   }
 
   bool visitUnresolvedDeclRefExpr(UnresolvedDeclRefExpr *E) {
-    auto Name = getDeclRefStr(E, DeclRefKind::Ordinary).getValue();
+    auto Name = getDeclRefStr(E);
     return Ctx.LangOpts.isCustomConditionalCompilationFlagSet(Name);
   }
 
   bool visitCallExpr(CallExpr *E) {
-    auto KindName = getDeclRefStr(E->getFn(), DeclRefKind::Ordinary).getValue();
+    auto KindName = getDeclRefStr(E->getFn());
     auto *Arg = cast<ParenExpr>(E->getArg())->getSubExpr();
 
     if (KindName == "_compiler_version") {
@@ -436,7 +451,7 @@ public:
       return thisVersion >= Val;
     }
 
-    auto Val = getDeclRefStr(Arg, DeclRefKind::Ordinary).getValue();
+    auto Val = getDeclRefStr(Arg);
     auto Kind = getPlatformConditionKind(KindName).getValue();
     auto Target = Ctx.LangOpts.getPlatformConditionValue(Kind);
     return Target == Val;
@@ -452,8 +467,7 @@ public:
 
   bool visitBinaryExpr(BinaryExpr *E) {
     assert(!Ctx.isSwiftVersion3() && "BinaryExpr in Swift3 mode");
-    auto OpName =
-      getDeclRefStr(E->getFn(), DeclRefKind::BinaryOperator).getValue();
+    auto OpName = getDeclRefStr(E->getFn());
     auto Args = E->getArg()->getElements();
     if (OpName == "||") return visit(Args[0]) || visit(Args[1]);
     if (OpName == "&&") return visit(Args[0]) && visit(Args[1]);
@@ -466,8 +480,7 @@ public:
     auto Result = visit(Elems[0]);
     Elems = Elems.slice(1);
     while (!Elems.empty()) {
-      auto OpName =
-        getDeclRefStr(Elems[0], DeclRefKind::BinaryOperator).getValue();
+      auto OpName = getDeclRefStr(Elems[0]);
 
       if (OpName == "||") {
         Result = Result || visit(Elems[1]);
@@ -502,12 +515,17 @@ static bool evaluateIfConfigCondition(Expr *Condition, ASTContext &Context) {
 class IsVersionIfConfigCondition :
   public ExprVisitor<IsVersionIfConfigCondition, bool> {
 
+  /// Get the identifier string from an \c Expr assuming it's an
+  /// \c UnresolvedDeclRefExpr.
+  StringRef getDeclRefStr(Expr *E) {
+    return cast<UnresolvedDeclRefExpr>(E)->getName().getBaseName().str();
+  }
+
 public:
   IsVersionIfConfigCondition() {}
 
   bool visitBinaryExpr(BinaryExpr *E) {
-    auto OpName =
-      getDeclRefStr(E->getFn(), DeclRefKind::BinaryOperator).getValue();
+    auto OpName = getDeclRefStr(E->getFn());
     auto Args = E->getArg()->getElements();
     if (OpName == "||") return visit(Args[0]) && visit(Args[1]);
     if (OpName == "&&") return visit(Args[0]) || visit(Args[1]);
@@ -515,7 +533,7 @@ public:
   }
 
   bool visitCallExpr(CallExpr *E) {
-    auto KindName = getDeclRefStr(E->getFn(), DeclRefKind::Ordinary).getValue();
+    auto KindName = getDeclRefStr(E->getFn());
     return KindName == "_compiler_version" || KindName == "swift";
   }
 

@@ -1408,6 +1408,9 @@ ERROR(unsupported_conditional_compilation_expression_type,none,
 WARNING(swift3_unsupported_conditional_compilation_expression_type,none,
         "ignoring invalid conditional compilation expression, "
         "which will be rejected in future version of Swift", ())
+WARNING(swift3_conditional_compilation_expression_compound,none,
+        "ignoring parentheses in compound name, "
+        "which will be rejected in future version of Swift", ())
 WARNING(swift3_conditional_compilation_expression_precedence,none,
         "future version of Swift have different rule for evaluating condition; "
         "add parentheses to make the condition compatible with Swift4", ())
