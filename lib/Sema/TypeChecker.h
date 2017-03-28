@@ -537,7 +537,8 @@ enum class ObjCReason {
   WitnessToObjC,
   /// Has an explicit '@IBInspectable' attribute.
   ExplicitlyIBInspectable,
-
+  /// Has an explicit '@GKInspectable' attribute.
+  ExplicitlyGKInspectable,
   // Note: Implicit reasons follow.
 
   /// A member of an Objective-C-defined class or subclass.
@@ -560,6 +561,7 @@ static inline bool shouldDiagnoseObjCReason(ObjCReason reason) {
   case ObjCReason::WitnessToObjC:
   case ObjCReason::ImplicitlyObjC:
   case ObjCReason::ExplicitlyIBInspectable:
+  case ObjCReason::ExplicitlyGKInspectable:
     return true;
 
   case ObjCReason::MemberOfObjCSubclass:
@@ -583,6 +585,7 @@ static inline unsigned getObjCDiagnosticAttrKind(ObjCReason reason) {
   case ObjCReason::WitnessToObjC:
   case ObjCReason::ImplicitlyObjC:
   case ObjCReason::ExplicitlyIBInspectable:
+  case ObjCReason::ExplicitlyGKInspectable:
     return static_cast<unsigned>(reason);
 
   case ObjCReason::MemberOfObjCSubclass:

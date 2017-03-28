@@ -1678,6 +1678,19 @@ class HasIBInspectable {
 }
 
 //===---
+//===--- @GKInspectable implies @objc
+//===---
+
+// CHECK-LABEL: {{^}}class HasGKInspectable {
+class HasGKInspectable {
+  @GKInspectable var goodProperty: AnyObject?
+  // CHECK: {{^}}  @GKInspectable @objc var goodProperty: AnyObject?
+
+  @GKInspectable var badProperty: PlainStruct?
+  // expected-error@-1{{property cannot be marked @GKInspectable because its type cannot be represented in Objective-C}}
+}
+
+//===---
 //===--- @NSManaged implies @objc
 //===---
 

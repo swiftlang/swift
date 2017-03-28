@@ -2300,13 +2300,16 @@ static Optional<ObjCReason> shouldMarkAsObjC(TypeChecker &TC,
   // explicitly declared @objc.
   if (VD->getAttrs().hasAttribute<ObjCAttr>())
     return ObjCReason::ExplicitlyObjC;
-  // @IBOutlet, @IBAction, @IBInspectable, @NSManaged imply @objc.
+  // @IBOutlet, @IBAction, @IBInspectable, @NSManaged, and @GKInspectable
+  // imply @objc.
   if (VD->getAttrs().hasAttribute<IBOutletAttr>())
     return ObjCReason::ExplicitlyIBOutlet;
   if (VD->getAttrs().hasAttribute<IBActionAttr>())
     return ObjCReason::ExplicitlyIBAction;
   if (VD->getAttrs().hasAttribute<IBInspectableAttr>())
     return ObjCReason::ExplicitlyIBInspectable;
+  if (VD->getAttrs().hasAttribute<GKInspectableAttr>())
+    return ObjCReason::ExplicitlyGKInspectable;
   if (VD->getAttrs().hasAttribute<NSManagedAttr>())
     return ObjCReason::ExplicitlyNSManaged;
   // A member of an @objc protocol is implicitly @objc.
@@ -2637,6 +2640,7 @@ static Optional<unsigned> getSwift3DeprecatedObjCReason(ObjCReason reason) {
   case ObjCReason::ImplicitlyObjC:
   case ObjCReason::Accessor:
   case ObjCReason::ExplicitlyIBInspectable:
+  case ObjCReason::ExplicitlyGKInspectable:
     return None;
   }
 }
