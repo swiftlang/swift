@@ -751,7 +751,11 @@ def expand(filename, line_directive=_default_line_directive, **local_bindings):
     local bindings.
 
     >>> from tempfile import NamedTemporaryFile
-    >>> f = NamedTemporaryFile()
+    >>> # On Windows, the name of a NamedTemporaryFile cannot be used to open
+    >>> # the file for a second time if delete=True. Therefore, we have to
+    >>> # manually handle closing and deleting this file to allow us to open
+    >>> # the file by its name across all platforms.
+    >>> f = NamedTemporaryFile(delete=False)
     >>> f.write(
     ... r'''---
     ... % for i in range(int(x)):
@@ -786,6 +790,8 @@ def expand(filename, line_directive=_default_line_directive, **local_bindings):
     y
     //#sourceLocation(file: "dummy.file", line: 10)
     z
+    >>> f.close()
+    >>> os.remove(f.name)
     """
     with open(filename) as f:
         t = parse_template(filename, f.read())
