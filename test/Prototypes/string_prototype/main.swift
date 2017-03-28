@@ -25,62 +25,7 @@ func _withDebugging(_ f: ()->()) {
 
 var testSuite = TestSuite("t")
 
-testSuite.test("CharacterView") {
-  // FIXME: precondition checks in Character prevent us from trying this last
-  // one.
-  let s = "🇸🇸🇬🇱abc🇱🇸🇩🇯🇺🇸\nΣὲ 👥🥓γ͙᷏̃̂᷀νω" // + "👩‍❤️‍👩"
-  let a: [Character] = [
-    "🇸🇸", "🇬🇱", "a", "b", "c", "🇱🇸", "🇩🇯", "🇺🇸", "\n",
-    "Σ", "ὲ", " ", "👥", "🥓", "γ͙᷏̃̂᷀", "ν", "ω"
-  ] // + "👩‍❤️‍👩"
-
-  // FIXME: the generic arguments should be deducible, but aren't; <rdar://30323161>
-  let v8 = _UnicodeViews<Array<UInt8>, UTF8>.CharacterView(Array(s.utf8), UTF8.self)
-  expectEqual(a, Array(v8))
-
-  // FIXME: We need to wrap s.utf16 in Array because of <rdar://30386193> Unaccountable link errors
-  // FIXME: the generic arguments should be deducible; <rdar://30323161>
-  let v16 = _UnicodeViews<Array<UInt16>, UTF16>.CharacterView(Array(s.utf16), UTF16.self)
-  expectEqual(a, Array(v16))
-
-  expectEqual(v8.reversed(), a.reversed())
-  expectEqual(v16.reversed(), a.reversed())
-
-  // This one demonstrates that we get grapheme breaking of regional indicators
-  // (RI) right, while Swift 3 string does not.
-  expectFalse(a.elementsEqual(s.characters))
-}
-
 testSuite.test("basic") {
-  let s = "abcdefghijklmnopqrstuvwxyz\n"
-  + "🇸🇸🇬🇱🇱🇸🇩🇯🇺🇸\n"
-  + "Σὲ 👥🥓γνωρίζω ἀπὸ τὴν κόψη χαῖρε, ὦ χαῖρε, ᾿Ελευθεριά!\n"
-  + "Οὐχὶ ταὐτὰ παρίσταταί μοι γιγνώσκειν, ὦ ἄνδρες ᾿Αθηναῖοι,\n"
-  + "გთხოვთ ახლავე გაიაროთ რეგისტრაცია Unicode-ის მეათე საერთაშორისო\n"
-  + "Зарегистрируйтесь сейчас на Десятую Международную Конференцию по\n"
-  + "  ๏ แผ่นดินฮั่นเสื่อมโทรมแสนสังเวช  พระปกเกศกองบู๊กู้ขึ้นใหม่\n"
-  + "ᚻᛖ ᚳᚹᚫᚦ ᚦᚫᛏ ᚻᛖ ᛒᚢᛞᛖ ᚩᚾ ᚦᚫᛗ ᛚᚪᚾᛞᛖ ᚾᚩᚱᚦᚹᛖᚪᚱᛞᚢᛗ ᚹᛁᚦ ᚦᚪ ᚹᛖᛥᚫ"
-  let s32 = s.unicodeScalars.lazy.map { $0.value }
-  let s16 = Array(s.utf16)
-  let s8 = Array(s.utf8)
-  let s16to32 = _UnicodeViews.TranscodedView(s16, from: UTF16.self, to: UTF32.self)
-  let s16to8 = _UnicodeViews.TranscodedView(s16, from: UTF16.self, to: UTF8.self)
-  let s8to16 = _UnicodeViews.TranscodedView(s8, from: UTF8.self, to: UTF16.self)
-  let s8Vto16 = _UnicodeViews.TranscodedView(s8, from: ValidUTF8.self, to: UTF16.self)
-  print(Array(s32))
-  print(Array(s16to32))
-  expectTrue(s32.elementsEqual(s16to32))
-  expectTrue(s8.elementsEqual(s16to8))
-  expectTrue(s16.elementsEqual(s8to16))
-  expectTrue(s16.elementsEqual(s8Vto16))
-
-  expectTrue(s32.reversed().elementsEqual(s16to32.reversed()))
-  expectTrue(s8.reversed().elementsEqual(s16to8.reversed()))
-  expectTrue(s16.reversed().elementsEqual(s8to16.reversed()))
-  expectTrue(s16.reversed().elementsEqual(s8Vto16.reversed()))
-  
-  
-
   do {
     // We happen to know that alphabet is non-ASCII, but we're not going to say
     // anything about that.
@@ -136,15 +81,6 @@ testSuite.test("SwiftCanonicalString") {
   expectEqual(sncFrom8, sncFrom16to32)
   expectEqual(sncFrom16to32, sncFrom16to8)
   expectEqual(sncFrom16to8, sncFrom8to16)
-}
-
-testSuite.test("literals") {
-  let ascii: String = "abcdef"
-  expectEqual(ascii.characters.count,6)
-  expectTrue(ascii.characters.elementsEqual(("abcdef" as Swift.String).characters))
-  let unicode: String = "abcdef🦊"
-  expectEqual(unicode.characters.count,7)
-  expectTrue(unicode.characters.elementsEqual(("abcdef🦊" as Swift.String).characters))  
 }
 
 testSuite.test("printing") {

@@ -733,6 +733,61 @@ extension ObjectIdentifier {
   }
 }
 
+//===--- Literal Support --------------------------------------------------===//
+
+extension String : ExpressibleByUnicodeScalarLiteral {
+  /// Creates an instance initialized to the given Unicode scalar value.
+  ///
+  /// Do not call this initializer directly. It may be used by the compiler when
+  /// you initialize a string using a string literal that contains a single
+  /// Unicode scalar value.
+  public init(unicodeScalarLiteral value: UnicodeScalar) {
+    content = Content(utf16: value.utf16)
+  }
+}
+
+extension String : ExpressibleByExtendedGraphemeClusterLiteral {
+  /// Creates an instance initialized to the given extended grapheme cluster
+  /// literal.
+  ///
+  /// Do not call this initializer directly. It may be used by the compiler when
+  /// you initialize a string using a string literal containing a single
+  /// extended grapheme cluster.
+  public init(extendedGraphemeClusterLiteral value: Character) {
+    content = Content(utf16: value.utf16)
+  }
+}
+
+extension String : ExpressibleByStringLiteral {
+  public init(stringLiteral value: StaticString) {
+    content = value.withUTF8Buffer {
+      Content(
+        utf16: _UnicodeViews($0, ValidUTF8.self).transcoded(to: UTF16.self))
+    }
+  }
+}
+
+/*
+extension String : CustomStringConvertible {
+  // TODO: once this replaces Swift.String this needs to revert
+  // back to the trivial implementation of returnning self
+  public var description: Swift.String {
+    return Swift.String(self)
+  }
+}
+
+extension String : CustomDebugStringConvertible {
+  public var debugDescription: Swift.String {
+    var result = "\""
+    for us in self.unicodeScalars {
+      result += us.escaped(asASCII: false)
+    }
+    result += "\""
+    return result
+  }
+}
+*/
+
 //===----------------------------------------------------------------------===//
 //===--- Tests ------------------------------------------------------------===//
 //===----------------------------------------------------------------------===//
@@ -1082,6 +1137,61 @@ suite.test("RandomAccess/UnicodeScalar") {
     expectLT(lastEncodedOffset, o)
     lastEncodedOffset = o
   }
+}
+
+suite.test("CharacterView") {
+  // FIXME: precondition checks in Character prevent us from trying this last
+  // one.
+  let s = "🇸🇸🇬🇱abc🇱🇸🇩🇯🇺🇸\nΣὲ 👥🥓γ͙᷏̃̂᷀νω" // + "👩‍❤️‍👩"
+  let a: [Character] = [
+    "🇸🇸", "🇬🇱", "a", "b", "c", "🇱🇸", "🇩🇯", "🇺🇸", "\n",
+    "Σ", "ὲ", " ", "👥", "🥓", "γ͙᷏̃̂᷀", "ν", "ω"
+  ] // + "👩‍❤️‍👩"
+
+  // FIXME: the generic arguments should be deducible, but aren't; <rdar://30323161>
+  let v8 = _UnicodeViews<Array<UInt8>, UTF8>.CharacterView(Array(s.utf8), UTF8.self)
+  expectEqual(a, Array(v8))
+
+  // FIXME: We need to wrap s.utf16 in Array because of <rdar://30386193> Unaccountable link errors
+  // FIXME: the generic arguments should be deducible; <rdar://30323161>
+  let v16 = _UnicodeViews<Array<UInt16>, UTF16>.CharacterView(Array(s.utf16), UTF16.self)
+  expectEqual(a, Array(v16))
+
+  expectEqual(v8.reversed(), a.reversed())
+  expectEqual(v16.reversed(), a.reversed())
+
+  // This one demonstrates that we get grapheme breaking of regional indicators
+  // (RI) right, while Swift 3 string does not.
+  expectFalse(a.elementsEqual(s.characters))
+}
+
+suite.test("basic") {
+  let s = sample
+  let s32 = s.unicodeScalars.lazy.map { $0.value }
+  let s16 = Array(s.utf16)
+  let s8 = Array(s.utf8)
+  let s16to32 = _UnicodeViews.TranscodedView(s16, from: UTF16.self, to: UTF32.self)
+  let s16to8 = _UnicodeViews.TranscodedView(s16, from: UTF16.self, to: UTF8.self)
+  let s8to16 = _UnicodeViews.TranscodedView(s8, from: UTF8.self, to: UTF16.self)
+  let s8Vto16 = _UnicodeViews.TranscodedView(s8, from: ValidUTF8.self, to: UTF16.self)
+  expectTrue(s32.elementsEqual(s16to32))
+  expectTrue(s8.elementsEqual(s16to8))
+  expectTrue(s16.elementsEqual(s8to16))
+  expectTrue(s16.elementsEqual(s8Vto16))
+
+  expectTrue(s32.reversed().elementsEqual(s16to32.reversed()))
+  expectTrue(s8.reversed().elementsEqual(s16to8.reversed()))
+  expectTrue(s16.reversed().elementsEqual(s8to16.reversed()))
+  expectTrue(s16.reversed().elementsEqual(s8Vto16.reversed()))
+}
+
+suite.test("literals") {
+  let ascii: String = "abcdef"
+  expectEqual(6, ascii.count)
+  expectEqualSequence("abcdef" as Swift.String, ascii)
+  let unicode: String = "abcdef🦊"
+  expectEqual(7, unicode.count)
+  expectEqualSequence("abcdef🦊" as Swift.String, unicode)
 }
 
 runAllTests()
