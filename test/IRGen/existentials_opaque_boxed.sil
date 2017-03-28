@@ -218,7 +218,7 @@ bb0(%0 : $*Existential):
 // CHECK:   ret %swift.opaque* [[VALUEADDRINLINE]]
 
 // CHECK: boxed:
-// CHECK:  [[ALIGNMASK:%.*]] = and i64 [[FLAGS]], 65535
+// CHECK:  [[ALIGNMASK:%.*]] = and {{(i64|i32)}} [[FLAGS]], 65535
 // CHECK:  [[OPAQUE_ADDR:%.*]] = bitcast [{{(24|12)}} x i8]* %0 to %swift.opaque*
 // CHECK:  [[REFANDADDR:%.*]] = call { %swift.refcounted*, %swift.opaque* } @swift_makeBoxUnique(%swift.opaque* [[OPAQUE_ADDR]], %swift.type* %1, {{(i64|i32)}} [[ALIGNMASK]])
 // CHECK:  [[REF:%.*]] = extractvalue { %swift.refcounted*, %swift.opaque* } [[REFANDADDR]], 0
