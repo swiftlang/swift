@@ -751,6 +751,26 @@ ToolChain::constructInvocation(const GenerateDSYMJobAction &job,
 }
 
 ToolChain::InvocationInfo
+ToolChain::constructInvocation(const VerifyDebugInfoJobAction &job,
+                               const JobContext &context) const {
+  assert(context.Inputs.size() == 1);
+  assert(context.InputActions.empty());
+
+  // This mirrors the clang driver's --verify-debug-info option.
+  ArgStringList Arguments;
+  Arguments.push_back("--verify");
+  Arguments.push_back("--debug-info");
+  Arguments.push_back("--eh-frame");
+  Arguments.push_back("--quiet");
+
+  StringRef inputPath =
+      context.Inputs.front()->getOutput().getPrimaryOutputFilename();
+  Arguments.push_back(context.Args.MakeArgString(inputPath));
+
+  return {"dwarfdump", Arguments};
+}
+
+ToolChain::InvocationInfo
 ToolChain::constructInvocation(const GeneratePCHJobAction &job,
                                const JobContext &context) const {
   assert(context.Inputs.empty());

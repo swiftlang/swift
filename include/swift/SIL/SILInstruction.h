@@ -1832,6 +1832,118 @@ class EndBorrowArgumentInst
   EndBorrowArgumentInst(SILDebugLocation DebugLoc, SILArgument *Arg);
 };
 
+/// Different kinds of access.
+enum class SILAccessKind : uint8_t {
+  /// An access which takes uninitialized memory and initializes it.
+  Init,
+
+  /// An access which reads the value of initialized memory, but doesn't
+  /// modify it.
+  Read,
+
+  /// An access which changes the value of initialized memory.
+  Modify,
+
+  /// An access which takes initialized memory and leaves it uninitialized.
+  Deinit
+};
+StringRef getSILAccessKindName(SILAccessKind kind);
+
+/// Different kinds of exclusivity enforcement for accesses.
+enum class SILAccessEnforcement : uint8_t {
+  /// The access's enforcement has not yet been determined.
+  Unknown,
+
+  /// The access is statically known to not conflict with other accesses.
+  Static,
+
+  /// TODO: maybe add InitiallyStatic for when the access is statically
+  /// known to not interfere with any accesses when it begins but where
+  /// it's possible that other accesses might be started during this access.
+
+  /// The access is not statically known to not conflict with anything
+  /// and must be dynamically checked.
+  Dynamic,
+
+  /// The access is not statically known to not conflict with anything
+  /// but dynamic checking should be suppressed, leaving it undefined
+  /// behavior.
+  Unsafe
+};
+StringRef getSILAccessEnforcementName(SILAccessEnforcement enforcement);
+
+/// Begins an access scope. Must be paired with an end_access instruction
+/// along every path.
+/// 
+class BeginAccessInst
+    : public UnaryInstructionBase<ValueKind::BeginAccessInst> {
+  friend class SILBuilder;
+
+  SILAccessKind AccessKind;
+  SILAccessEnforcement Enforcement;
+
+  BeginAccessInst(SILDebugLocation loc, SILValue lvalue,
+                  SILAccessKind accessKind, SILAccessEnforcement enforcement)
+      : UnaryInstructionBase(loc, lvalue, lvalue->getType()),
+        AccessKind(accessKind), Enforcement(enforcement) {
+
+  }
+
+public:
+  SILAccessKind getAccessKind() const {
+    return AccessKind;
+  }
+  void setAccessKind(SILAccessKind kind) {
+    AccessKind = kind;
+  }
+
+  SILAccessEnforcement getEnforcement() const {
+    return Enforcement;
+  }
+  void setEnforcement(SILAccessEnforcement enforcement) {
+    Enforcement = enforcement;
+  }
+
+  SILValue getSource() const {
+    return getOperand();
+  }
+};
+
+/// Represents the end of an access scope.
+class EndAccessInst : public UnaryInstructionBase<ValueKind::EndAccessInst> {
+  friend class SILBuilder;
+
+  bool Aborting;
+
+private:
+  EndAccessInst(SILDebugLocation loc, SILValue access,
+                bool aborting = false)
+    : UnaryInstructionBase(loc, access), Aborting(aborting) {
+  }
+
+public:
+  /// An aborted access is one that did not perform the expected
+  /// transition described by the begin_access instruction before it
+  /// reached this end_access.
+  ///
+  /// Only AccessKind::Init and AccessKind::Deinit accesses can be
+  /// aborted.
+  bool isAborting() const {
+    return Aborting;
+  }
+  void setAborting(bool aborting) {
+    Aborting = aborting;
+  }
+
+  BeginAccessInst *getBeginAccess() const {
+    return cast<BeginAccessInst>(getOperand());
+  }
+
+  SILValue getSource() const {
+    return getBeginAccess()->getSource();
+  }
+};
+
 /// AssignInst - Represents an abstract assignment to a memory location, which
 /// may either be an initialization or a store sequence.  This is only valid in
 /// Raw SIL.

@@ -1454,6 +1454,21 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     ResultVal = Builder.createEndBorrow(Loc, BorrowSource, BorrowDest);
     break;
   }
+  case ValueKind::BeginAccessInst: {
+    SILValue op = getLocalValue(
+        ValID, getSILType(MF->getType(TyID), (SILValueCategory)TyCategory));
+    auto accessKind = SILAccessKind(Attr & 0x7);
+    auto enforcement = SILAccessEnforcement(Attr >> 3);
+    ResultVal = Builder.createBeginAccess(Loc, op, accessKind, enforcement);
+    break;
+  }
+  case ValueKind::EndAccessInst: {
+    SILValue op = getLocalValue(
+        ValID, getSILType(MF->getType(TyID), (SILValueCategory)TyCategory));
+    bool aborted = Attr & 0x1;
+    ResultVal = Builder.createEndAccess(Loc, op, aborted);
+    break;
+  }
   case ValueKind::StoreUnownedInst: {
     auto Ty = MF->getType(TyID);
     SILType addrType = getSILType(Ty, (SILValueCategory)TyCategory);

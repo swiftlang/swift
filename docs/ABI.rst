@@ -819,7 +819,7 @@ types where the metadata itself has unknown layout.)
   global ::= global 'To'                 // swift-as-ObjC thunk
   global ::= global 'TD'                 // dynamic dispatch thunk
   global ::= global 'Td'                 // direct method reference thunk
-  global ::= global 'TV'                 // vtable override thunk
+  global ::= entity entity 'TV'          // vtable override thunk, derived followed by base
   global ::= type 'D'                    // type mangling for the debugger. TODO: check if we really need this
   global ::= protocol-conformance entity 'TW' // protocol witness thunk
   global ::= context identifier identifier 'TB' // property behavior initializer thunk (not used currently)
@@ -1031,10 +1031,10 @@ Types
 
   throws ::= 'K'                             // 'throws' annotation on function types
 
-  type-list ::= list-type '_' list-type* 'd'?  // list of types with optional variadic specifier
+  type-list ::= list-type '_' list-type*     // list of types
   type-list ::= empty-list
 
-  list-type ::= type identifier? 'z'?        // type with optional label and inout convention
+  list-type ::= type identifier? 'z'? 'd'?   // type with optional label, inout convention and variadic specifier
 
   METATYPE-REPR ::= 't'                      // Thin metatype representation
   METATYPE-REPR ::= 'T'                      // Thick metatype representation

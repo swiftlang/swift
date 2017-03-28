@@ -2556,7 +2556,19 @@ namespace {
       if (param.isConsumed() &&
           value.getOwnershipKind() == ValueOwnershipKind::Guaranteed) {
         value = value.copyUnmanaged(SGF, arg.getLocation());
+        Args.push_back(value);
+        return;
       }
+
+      if (SGF.F.getModule().getOptions().EnableSILOwnership) {
+        if (param.isDirectGuaranteed() &&
+            value.getOwnershipKind() == ValueOwnershipKind::Owned) {
+          value = value.borrow(SGF, arg.getLocation());
+          Args.push_back(value);
+          return;
+        }
+      }
+
       Args.push_back(value);
     }
     
@@ -3940,7 +3952,12 @@ RValue CallEmission::applyPartiallyAppliedSuperMethod(
   auto loc = uncurriedLoc.getValue();
   auto subs = callee.getSubstitutions();
   auto upcastedSelf = uncurriedArgs.back();
-  auto self = cast<UpcastInst>(upcastedSelf.getValue())->getOperand();
+  SILValue upcastedSelfValue = upcastedSelf.getValue();
+  // Support stripping off a borrow.
+  if (auto *borrowedSelf = dyn_cast<BeginBorrowInst>(upcastedSelfValue)) {
+    upcastedSelfValue = borrowedSelf->getOperand();
+  }
+  SILValue self = cast<UpcastInst>(upcastedSelfValue)->getOperand();
   auto constantInfo = SGF.getConstantInfo(callee.getMethodName());
   auto functionTy = constantInfo.getSILType();
   SILValue superMethodVal =
@@ -5370,4 +5387,11 @@ RValue SILGenFunction::emitDynamicSubscriptExpr(DynamicSubscriptExpr *e,
   if (optTL.isLoadable())
     optResult = optTL.emitLoad(B, e, optResult, LoadOwnershipQualifier::Take);
   return RValue(*this, e, emitManagedRValueWithCleanup(optResult, optTL));
+}
+
+ManagedValue ArgumentScope::popPreservingValue(ManagedValue mv) {
+  CleanupCloner cloner(SGF, mv);
+  SILValue value = mv.forward(SGF);
+  pop();
+  return cloner.clone(value);
 }

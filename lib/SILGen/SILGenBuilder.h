@@ -336,12 +336,12 @@ class CleanupCloner {
   ValueOwnershipKind ownershipKind;
 
 public:
-  CleanupCloner(SILGenBuilder &builder, ManagedValue mv)
-      : CleanupCloner(builder.getSILGenFunction(), mv) {}
-
   CleanupCloner(SILGenFunction &SGF, ManagedValue mv)
       : SGF(SGF), hasCleanup(mv.hasCleanup()), isLValue(mv.isLValue()),
         ownershipKind(mv.getOwnershipKind()) {}
+
+  CleanupCloner(SILGenBuilder &builder, ManagedValue mv)
+      : CleanupCloner(builder.getSILGenFunction(), mv) {}
 
   ManagedValue clone(SILValue value) const;
 };

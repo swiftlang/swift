@@ -1634,6 +1634,15 @@ public:
     *this << PEBI->getType().getObjectType()
           << " in " << getIDAndType(PEBI->getOperand());
   }
+  void visitBeginAccessInst(BeginAccessInst *BAI) {
+    *this << '[' << getSILAccessKindName(BAI->getAccessKind()) << "] ["
+          << getSILAccessEnforcementName(BAI->getEnforcement())
+          << "] " << getIDAndType(BAI->getOperand());
+  }
+  void visitEndAccessInst(EndAccessInst *EAI) {
+    *this << (EAI->isAborting() ? "[abort] " : "")
+          << getIDAndType(EAI->getOperand());
+  }
 
   void visitCondFailInst(CondFailInst *FI) {
     *this << getIDAndType(FI->getOperand());

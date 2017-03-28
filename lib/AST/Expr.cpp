@@ -1790,7 +1790,7 @@ RebindSelfInConstructorExpr::RebindSelfInConstructorExpr(Expr *SubExpr,
 
 OtherConstructorDeclRefExpr *
 RebindSelfInConstructorExpr::getCalledConstructor(bool &isChainToSuper) const {
-  // Dig out the OtherConstructorRefExpr. Note that this is the reverse
+  // Dig out the OtherConstructorDeclRefExpr. Note that this is the reverse
   // of what we do in pre-checking.
   Expr *candidate = getSubExpr();
   while (true) {

@@ -39,31 +39,36 @@ class DebugTypeInfo {
 public:
   /// The DeclContext of the function. This might not be the DeclContext of
   /// the variable if inlining took place.
-  DeclContext *DeclCtx;
+  DeclContext *DeclCtx = nullptr;
+
+  /// The generic environment of the type. Ideally we should need only this and
+  /// retire the DeclCtxt.
+  GenericEnvironment *GenericEnv = nullptr;
+
   /// The type we need to emit may be different from the type
   /// mentioned in the Decl, for example, stripped of qualifiers.
-  TypeBase *Type;
+  TypeBase *Type = nullptr;
   /// Needed to determine the size of basic types and to determine
   /// the storage type for undefined variables.
-  llvm::Type *StorageType;
-  Size size;
-  Alignment align;
+  llvm::Type *StorageType = nullptr;
+  Size size = Size(0);
+  Alignment align = Alignment(1);
 
-  DebugTypeInfo()
-      : DeclCtx(nullptr), Type(nullptr), StorageType(nullptr), size(0),
-        align(1) {}
-  DebugTypeInfo(DeclContext *DC, swift::Type Ty, llvm::Type *StorageTy,
-                Size SizeInBytes, Alignment AlignInBytes);
+  DebugTypeInfo() {}
+  DebugTypeInfo(DeclContext *DC, GenericEnvironment *GE, swift::Type Ty,
+                llvm::Type *StorageTy, Size SizeInBytes,
+                Alignment AlignInBytes);
   /// Create type for a local variable.
-  static DebugTypeInfo getLocalVariable(DeclContext *DeclCtx, VarDecl *Decl,
+  static DebugTypeInfo getLocalVariable(DeclContext *DeclCtx,
+                                        GenericEnvironment *GE, VarDecl *Decl,
                                         swift::Type Ty, const TypeInfo &Info,
                                         bool Unwrap);
   /// Create type for an artificial metadata variable.
   static DebugTypeInfo getMetadata(swift::Type Ty, llvm::Type *StorageTy,
                                    Size size, Alignment align);
   /// Create a standalone type from a TypeInfo object.
-  static DebugTypeInfo getFromTypeInfo(DeclContext *DC, swift::Type Ty,
-                                       const TypeInfo &Info);
+  static DebugTypeInfo getFromTypeInfo(DeclContext *DC, GenericEnvironment *GE,
+                                       swift::Type Ty, const TypeInfo &Info);
   /// Global variables.
   static DebugTypeInfo getGlobal(SILGlobalVariable *GV, llvm::Type *StorageType,
                                  Size size, Alignment align);
@@ -76,6 +81,7 @@ public:
 
   TypeDecl *getDecl() const;
   DeclContext *getDeclContext() const { return DeclCtx; }
+  GenericEnvironment *getGenericEnvironment() const { return GenericEnv; }
 
   void unwrapLValueOrInOutType() {
     Type = Type->getLValueOrInOutObjectType().getPointer();
@@ -115,8 +121,9 @@ template <> struct DenseMapInfo<swift::irgen::DebugTypeInfo> {
   }
   static swift::irgen::DebugTypeInfo getTombstoneKey() {
     return swift::irgen::DebugTypeInfo(
-        nullptr, llvm::DenseMapInfo<swift::TypeBase *>::getTombstoneKey(),
-          nullptr, swift::irgen::Size(0), swift::irgen::Alignment(0));
+        nullptr, nullptr,
+        llvm::DenseMapInfo<swift::TypeBase *>::getTombstoneKey(), nullptr,
+        swift::irgen::Size(0), swift::irgen::Alignment(0));
   }
   static unsigned getHashValue(swift::irgen::DebugTypeInfo Val) {
     return DenseMapInfo<swift::CanType>::getHashValue(Val.getType());

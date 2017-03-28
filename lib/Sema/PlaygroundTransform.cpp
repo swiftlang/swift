@@ -818,10 +818,10 @@ public:
     char *start_column_buf = (char *)Context.Allocate(buf_size, 1);
     char *end_column_buf = (char *)Context.Allocate(buf_size, 1);
 
-    ::snprintf(start_line_buf, buf_size, "%d", StartLC.first);
-    ::snprintf(start_column_buf, buf_size, "%d", StartLC.second);
-    ::snprintf(end_line_buf, buf_size, "%d", EndLC.first);
-    ::snprintf(end_column_buf, buf_size, "%d", EndLC.second);
+    ::snprintf(start_line_buf, buf_size, "%u", StartLC.first);
+    ::snprintf(start_column_buf, buf_size, "%u", StartLC.second);
+    ::snprintf(end_line_buf, buf_size, "%u", EndLC.first);
+    ::snprintf(end_column_buf, buf_size, "%u", EndLC.second);
 
     Expr *StartLine =
         new (Context) IntegerLiteralExpr(start_line_buf, SR.End, true);

@@ -5,6 +5,149 @@ class B {}
 class C: B {}
 class D: C {}
 
+func callMethodsOnOpaque<T, U>(o: Opaque<T>, t: T, u: U, tt: T.Type) {
+  _ = o.inAndOut(x: t)
+  _ = o.inAndOutGeneric(x: t, y: u)
+  _ = o.inAndOutMetatypes(x: tt)
+  _ = o.inAndOutTuples(x: (t, (tt, { $0 })))
+  _ = o.variantOptionality(x: t)
+  _ = o.variantOptionalityMetatypes(x: tt)
+  _ = o.variantOptionalityFunctions(x: { $0 })
+  _ = o.variantOptionalityTuples(x: (t, (tt, { $0 })))
+}
+
+func callMethodsOnStillOpaque<T, U>(o: StillOpaque<T>, t: T, u: U, tt: T.Type) {
+  _ = o.inAndOut(x: t)
+  _ = o.inAndOutGeneric(x: t, y: u)
+  _ = o.inAndOutMetatypes(x: tt)
+  _ = o.inAndOutTuples(x: (t, (tt, { $0 })))
+  _ = o.variantOptionality(x: t)
+  _ = o.variantOptionalityMetatypes(x: tt)
+  _ = o.variantOptionalityFunctions(x: { $0 })
+  _ = o.variantOptionalityTuples(x: (t, (tt, { $0 })))
+}
+
+func callMethodsOnConcreteValue<U>(o: ConcreteValue, t: S, u: U, tt: S.Type) {
+  _ = o.inAndOut(x: t)
+  _ = o.inAndOutGeneric(x: t, y: u)
+  _ = o.inAndOutMetatypes(x: tt)
+  _ = o.inAndOutTuples(x: (t, (tt, { $0 })))
+  _ = o.variantOptionality(x: t)
+  _ = o.variantOptionalityMetatypes(x: tt)
+  _ = o.variantOptionalityFunctions(x: { $0 })
+  _ = o.variantOptionalityTuples(x: (t, (tt, { $0 })))
+}
+
+func callMethodsOnConcreteClass<U>(o: ConcreteClass, t: C, u: U, tt: C.Type) {
+  _ = o.inAndOut(x: t)
+  _ = o.inAndOutGeneric(x: t, y: u)
+  _ = o.inAndOutMetatypes(x: tt)
+  _ = o.inAndOutTuples(x: (t, (tt, { $0 })))
+  _ = o.variantOptionality(x: t)
+  _ = o.variantOptionalityMetatypes(x: tt)
+  _ = o.variantOptionalityFunctions(x: { $0 })
+  _ = o.variantOptionalityTuples(x: (t, (tt, { $0 })))
+}
+
+func callMethodsOnConcreteClassVariance<U>(o: ConcreteClassVariance, b: B, c: C, u: U, tt: C.Type) {
+  _ = o.inAndOut(x: b)
+  _ = o.inAndOutGeneric(x: c, y: u)
+  _ = o.inAndOutMetatypes(x: tt)
+  _ = o.inAndOutTuples(x: (c, (tt, { $0 })))
+  _ = o.variantOptionality(x: b)
+  _ = o.variantOptionalityMetatypes(x: tt)
+  _ = o.variantOptionalityFunctions(x: { $0 })
+  _ = o.variantOptionalityTuples(x: (c, (tt, { $0 })))
+}
+
+func callMethodsOnOpaqueTuple<T, U>(o: OpaqueTuple<T>, t: (T, T), u: U, tt: (T, T).Type) {
+  _ = o.inAndOut(x: t)
+  _ = o.inAndOutGeneric(x: t, y: u)
+  _ = o.inAndOutMetatypes(x: tt)
+  _ = o.inAndOutTuples(x: (t, (tt, { $0 })))
+  _ = o.variantOptionality(x: t)
+  _ = o.variantOptionalityMetatypes(x: tt)
+  _ = o.variantOptionalityFunctions(x: { $0 })
+  _ = o.variantOptionalityTuples(x: (t, (tt, { $0 })))
+}
+
+func callMethodsOnConcreteTuple<U>(o: ConcreteTuple, t: (S, S), u: U, tt: (S, S).Type) {
+  _ = o.inAndOut(x: t)
+  _ = o.inAndOutGeneric(x: t, y: u)
+  _ = o.inAndOutMetatypes(x: tt)
+  _ = o.inAndOutTuples(x: (t, (tt, { $0 })))
+  _ = o.variantOptionality(x: t)
+  _ = o.variantOptionalityMetatypes(x: tt)
+  _ = o.variantOptionalityFunctions(x: { $0 })
+  _ = o.variantOptionalityTuples(x: (t, (tt, { $0 })))
+}
+
+func callMethodsOnOpaqueFunction<X, Y, U>(o: OpaqueFunction<X, Y>, t: @escaping (X) -> Y, u: U, tt: ((X) -> Y).Type) {
+  _ = o.inAndOut(x: t)
+  _ = o.inAndOutGeneric(x: t, y: u)
+  _ = o.inAndOutMetatypes(x: tt)
+  _ = o.inAndOutTuples(x: (t, (tt, { $0 })))
+  _ = o.variantOptionality(x: t)
+  _ = o.variantOptionalityMetatypes(x: tt)
+  _ = o.variantOptionalityFunctions(x: { $0 })
+  _ = o.variantOptionalityTuples(x: (t, (tt, { $0 })))
+}
+
+func callMethodsOnConcreteFunction<U>(o: ConcreteFunction, t: @escaping (S) -> S, u: U, tt: ((S) -> S).Type) {
+  _ = o.inAndOut(x: t)
+  _ = o.inAndOutGeneric(x: t, y: u)
+  _ = o.inAndOutMetatypes(x: tt)
+  _ = o.inAndOutTuples(x: (t, (tt, { $0 })))
+  _ = o.variantOptionality(x: t)
+  _ = o.variantOptionalityMetatypes(x: tt)
+  _ = o.variantOptionalityFunctions(x: { $0 })
+  _ = o.variantOptionalityTuples(x: (t, (tt, { $0 })))
+}
+
+func callMethodsOnOpaqueMetatype<T, U>(o: OpaqueMetatype<T>, t: T.Type, u: U, tt: T.Type.Type) {
+  _ = o.inAndOut(x: t)
+  _ = o.inAndOutGeneric(x: t, y: u)
+  _ = o.inAndOutMetatypes(x: tt)
+  _ = o.inAndOutTuples(x: (t, (tt, { $0 })))
+  _ = o.variantOptionality(x: t)
+  _ = o.variantOptionalityMetatypes(x: tt)
+  _ = o.variantOptionalityFunctions(x: { $0 })
+  _ = o.variantOptionalityTuples(x: (t, (tt, { $0 })))
+}
+
+func callMethodsOnConcreteValueMetatype<U>(o: ConcreteValueMetatype, t: S.Type, u: U, tt: S.Type.Type) {
+  _ = o.inAndOut(x: t)
+  _ = o.inAndOutGeneric(x: t, y: u)
+  _ = o.inAndOutMetatypes(x: tt)
+  _ = o.inAndOutTuples(x: (t, (tt, { $0 })))
+  _ = o.variantOptionality(x: t)
+  _ = o.variantOptionalityMetatypes(x: tt)
+  _ = o.variantOptionalityFunctions(x: { $0 })
+  _ = o.variantOptionalityTuples(x: (t, (tt, { $0 })))
+}
+
+func callMethodsOnConcreteClassMetatype<U>(o: ConcreteClassMetatype, t: C.Type, u: U, tt: C.Type.Type) {
+  _ = o.inAndOut(x: t)
+  _ = o.inAndOutGeneric(x: t, y: u)
+  _ = o.inAndOutMetatypes(x: tt)
+  _ = o.inAndOutTuples(x: (t, (tt, { $0 })))
+  _ = o.variantOptionality(x: t)
+  _ = o.variantOptionalityMetatypes(x: tt)
+  _ = o.variantOptionalityFunctions(x: { $0 })
+  _ = o.variantOptionalityTuples(x: (t, (tt, { $0 })))
+}
+
+func callMethodsOnConcreteOptional<U>(o: ConcreteOptional, t: S?, u: U, tt: S?.Type) {
+  _ = o.inAndOut(x: t)
+  _ = o.inAndOutGeneric(x: t, y: u)
+  _ = o.inAndOutMetatypes(x: tt)
+  _ = o.inAndOutTuples(x: (t, (tt, { $0 })))
+  _ = o.variantOptionality(x: t)
+  _ = o.variantOptionalityMetatypes(x: tt)
+  _ = o.variantOptionalityFunctions(x: { $0 })
+  _ = o.variantOptionalityTuples(x: (t, (tt, { $0 })))
+}
+
 class Opaque<T> {
   typealias ObnoxiousTuple = (T, (T.Type, (T) -> T))
 
@@ -48,6 +191,11 @@ class StillOpaque<T>: Opaque<T> {
 // CHECK-NEXT:   #Opaque.variantOptionalityFunctions!1: <T> (Opaque<T>) -> (@escaping (T) -> T) -> ((T) -> T)? : _T027vtable_thunks_reabstraction6OpaqueC27variantOptionalityFunctionsxxcSgxxc1x_tF	// Opaque.variantOptionalityFunctions(x : (A) -> A) -> (A) -> A?
 // CHECK-NEXT:   #Opaque.variantOptionalityTuples!1: <T> (Opaque<T>) -> ((T, (T.Type, (T) -> T))) -> (T, (T.Type, (T) -> T))? : hidden _T027vtable_thunks_reabstraction11StillOpaqueC24variantOptionalityTuplesx_xm_xxcttx_xm_xxcttSg1x_tFAA0E0CAdEx_xm_xxcttAF_tFTV	// vtable thunk for Opaque.variantOptionalityTuples(x : (A, (A.Type, (A) -> A))) -> (A, (A.Type, (A) -> A))? dispatching to StillOpaque.variantOptionalityTuples(x : (A, (A.Type, (A) -> A))?) -> (A, (A.Type, (A) -> A))
 // CHECK-NEXT:   #Opaque.init!initializer.1: <T> (Opaque<T>.Type) -> () -> Opaque<T> : _T027vtable_thunks_reabstraction11StillOpaqueCACyxGycfc	// StillOpaque.init() -> StillOpaque<A>
+
+// Tuple becomes more optional -- needs new vtable entry
+
+// CHECK-NEXT:  #StillOpaque.variantOptionalityTuples!1: <T> (StillOpaque<T>) -> ((T, (T.Type, (T) -> T))?) -> (T, (T.Type, (T) -> T)) : _T027vtable_thunks_reabstraction11StillOpaqueC24variantOptionalityTuplesx_xm_xxcttx_xm_xxcttSg1x_tF	// StillOpaque.variantOptionalityTuples(x : (A, (A.Type, (A) -> A))?) -> (A, (A.Type, (A) -> A))
+
 // CHECK-NEXT:   #StillOpaque.deinit!deallocator: _T027vtable_thunks_reabstraction11StillOpaqueCfD	// StillOpaque.__deallocating_deinit
 // CHECK-NEXT: }
 
@@ -74,6 +222,14 @@ class ConcreteValue: Opaque<S> {
 // CHECK-NEXT:   #Opaque.variantOptionalityFunctions!1: <T> (Opaque<T>) -> (@escaping (T) -> T) -> ((T) -> T)? : hidden _T027vtable_thunks_reabstraction13ConcreteValueC27variantOptionalityFunctionsAA1SVAFcA2FcSg1x_tFAA6OpaqueCADxxcSgxxcAH_tFTV	// vtable thunk for Opaque.variantOptionalityFunctions(x : (A) -> A) -> (A) -> A? dispatching to ConcreteValue.variantOptionalityFunctions(x : (S) -> S?) -> (S) -> S
 // CHECK-NEXT:   #Opaque.variantOptionalityTuples!1: <T> (Opaque<T>) -> ((T, (T.Type, (T) -> T))) -> (T, (T.Type, (T) -> T))? : hidden _T027vtable_thunks_reabstraction13ConcreteValueC24variantOptionalityTuplesAA1SV_AFm_A2FcttAF_AFm_A2FcttSg1x_tFAA6OpaqueCADx_xm_xxcttSgx_xm_xxcttAH_tFTV	// vtable thunk for Opaque.variantOptionalityTuples(x : (A, (A.Type, (A) -> A))) -> (A, (A.Type, (A) -> A))? dispatching to ConcreteValue.variantOptionalityTuples(x : (S, (S.Type, (S) -> S))?) -> (S, (S.Type, (S) -> S))
 // CHECK-NEXT:   #Opaque.init!initializer.1: <T> (Opaque<T>.Type) -> () -> Opaque<T> : _T027vtable_thunks_reabstraction13ConcreteValueCACycfc	// ConcreteValue.init() -> ConcreteValue
+
+// Value types becoming more optional -- needs new vtable entry
+
+// CHECK-NEXT:   #ConcreteValue.variantOptionality!1: (ConcreteValue) -> (S?) -> S : _T027vtable_thunks_reabstraction13ConcreteValueC18variantOptionalityAA1SVAFSg1x_tF // ConcreteValue.variantOptionality(x : S?) -> S
+// CHECK-NEXT:   #ConcreteValue.variantOptionalityMetatypes!1: (ConcreteValue) -> (S.Type?) -> S.Type : _T027vtable_thunks_reabstraction13ConcreteValueC27variantOptionalityMetatypesAA1SVmAFmSg1x_tF // ConcreteValue.variantOptionalityMetatypes(x : S.Type?) -> S.Type
+// CHECK-NEXT:   #ConcreteValue.variantOptionalityFunctions!1: (ConcreteValue) -> (((S) -> S)?) -> (S) -> S : _T027vtable_thunks_reabstraction13ConcreteValueC27variantOptionalityFunctionsAA1SVAFcA2FcSg1x_tF	// ConcreteValue.variantOptionalityFunctions(x : (S) -> S?) -> (S) -> S
+// CHECK-NEXT:   #ConcreteValue.variantOptionalityTuples!1: (ConcreteValue) -> ((S, (S.Type, (S) -> S))?) -> (S, (S.Type, (S) -> S)) : _T027vtable_thunks_reabstraction13ConcreteValueC24variantOptionalityTuplesAA1SV_AFm_A2FcttAF_AFm_A2FcttSg1x_tF	// ConcreteValue.variantOptionalityTuples(x : (S, (S.Type, (S) -> S))?) -> (S, (S.Type, (S) -> S))
+
 // CHECK-NEXT:   #ConcreteValue.deinit!deallocator: _T027vtable_thunks_reabstraction13ConcreteValueCfD	// ConcreteValue.__deallocating_deinit
 // CHECK-NEXT: }
 
@@ -99,6 +255,16 @@ class ConcreteClass: Opaque<C> {
 // CHECK-NEXT:   #Opaque.variantOptionalityFunctions!1: <T> (Opaque<T>) -> (@escaping (T) -> T) -> ((T) -> T)? : hidden _T027vtable_thunks_reabstraction13ConcreteClassC27variantOptionalityFunctionsAA1CCAFcA2FcSg1x_tFAA6OpaqueCADxxcSgxxcAH_tFTV	// vtable thunk for Opaque.variantOptionalityFunctions(x : (A) -> A) -> (A) -> A? dispatching to ConcreteClass.variantOptionalityFunctions(x : (C) -> C?) -> (C) -> C
 // CHECK-NEXT:   #Opaque.variantOptionalityTuples!1: <T> (Opaque<T>) -> ((T, (T.Type, (T) -> T))) -> (T, (T.Type, (T) -> T))? : hidden _T027vtable_thunks_reabstraction13ConcreteClassC24variantOptionalityTuplesAA1CC_AFm_A2FcttAF_AFm_A2FcttSg1x_tFAA6OpaqueCADx_xm_xxcttSgx_xm_xxcttAH_tFTV	// vtable thunk for Opaque.variantOptionalityTuples(x : (A, (A.Type, (A) -> A))) -> (A, (A.Type, (A) -> A))? dispatching to ConcreteClass.variantOptionalityTuples(x : (C, (C.Type, (C) -> C))?) -> (C, (C.Type, (C) -> C))
 // CHECK-NEXT:   #Opaque.init!initializer.1: <T> (Opaque<T>.Type) -> () -> Opaque<T> : _T027vtable_thunks_reabstraction13ConcreteClassCACycfc	// ConcreteClass.init() -> ConcreteClass
+
+// Class references are ABI-compatible with optional class references, and
+// similarly for class metatypes.
+//
+// Function and tuple optionality change still needs a new vtable entry
+// as above.
+
+// CHECK-NEXT:   #ConcreteClass.variantOptionalityFunctions!1: (ConcreteClass) -> (((C) -> C)?) -> (C) -> C : _T027vtable_thunks_reabstraction13ConcreteClassC27variantOptionalityFunctionsAA1CCAFcA2FcSg1x_tF	// ConcreteClass.variantOptionalityFunctions(x : (C) -> C?) -> (C) -> C
+// CHECK-NEXT:   #ConcreteClass.variantOptionalityTuples!1: (ConcreteClass) -> ((C, (C.Type, (C) -> C))?) -> (C, (C.Type, (C) -> C)) : _T027vtable_thunks_reabstraction13ConcreteClassC24variantOptionalityTuplesAA1CC_AFm_A2FcttAF_AFm_A2FcttSg1x_tF	// ConcreteClass.variantOptionalityTuples(x : (C, (C.Type, (C) -> C))?) -> (C, (C.Type, (C) -> C))
+
 // CHECK-NEXT:   #ConcreteClass.deinit!deallocator: _T027vtable_thunks_reabstraction13ConcreteClassCfD	// ConcreteClass.__deallocating_deinit
 // CHECK-NEXT: }
 
@@ -118,6 +284,10 @@ class ConcreteClassVariance: Opaque<C> {
 // CHECK-NEXT:   #Opaque.variantOptionalityFunctions!1: <T> (Opaque<T>) -> (@escaping (T) -> T) -> ((T) -> T)? : _T027vtable_thunks_reabstraction6OpaqueC27variantOptionalityFunctionsxxcSgxxc1x_tF	// Opaque.variantOptionalityFunctions(x : (A) -> A) -> (A) -> A?
 // CHECK-NEXT:   #Opaque.variantOptionalityTuples!1: <T> (Opaque<T>) -> ((T, (T.Type, (T) -> T))) -> (T, (T.Type, (T) -> T))? : _T027vtable_thunks_reabstraction6OpaqueC24variantOptionalityTuplesx_xm_xxcttSgx_xm_xxctt1x_tF	// Opaque.variantOptionalityTuples(x : (A, (A.Type, (A) -> A))) -> (A, (A.Type, (A) -> A))?
 // CHECK-NEXT:   #Opaque.init!initializer.1: <T> (Opaque<T>.Type) -> () -> Opaque<T> : _T027vtable_thunks_reabstraction21ConcreteClassVarianceCACycfc	// ConcreteClassVariance.init() -> ConcreteClassVariance
+
+// No new vtable entries -- class references are ABI compatible with
+// optional class references.
+
 // CHECK-NEXT:   #ConcreteClassVariance.deinit!deallocator: _T027vtable_thunks_reabstraction21ConcreteClassVarianceCfD	// ConcreteClassVariance.__deallocating_deinit
 // CHECK-NEXT: }
 
@@ -137,6 +307,11 @@ class OpaqueTuple<U>: Opaque<(U, U)> {
 // CHECK-NEXT:   #Opaque.variantOptionalityFunctions!1: <T> (Opaque<T>) -> (@escaping (T) -> T) -> ((T) -> T)? : _T027vtable_thunks_reabstraction6OpaqueC27variantOptionalityFunctionsxxcSgxxc1x_tF	// Opaque.variantOptionalityFunctions(x : (A) -> A) -> (A) -> A?
 // CHECK-NEXT:   #Opaque.variantOptionalityTuples!1: <T> (Opaque<T>) -> ((T, (T.Type, (T) -> T))) -> (T, (T.Type, (T) -> T))? : _T027vtable_thunks_reabstraction6OpaqueC24variantOptionalityTuplesx_xm_xxcttSgx_xm_xxctt1x_tF	// Opaque.variantOptionalityTuples(x : (A, (A.Type, (A) -> A))) -> (A, (A.Type, (A) -> A))?
 // CHECK-NEXT:   #Opaque.init!initializer.1: <T> (Opaque<T>.Type) -> () -> Opaque<T> : _T027vtable_thunks_reabstraction11OpaqueTupleCACyxGycfc	// OpaqueTuple.init() -> OpaqueTuple<A>
+
+// Optionality change of tuple.
+
+// CHECK-NEXT:  #OpaqueTuple.variantOptionality!1: <U> (OpaqueTuple<U>) -> ((U, U)?) -> (U, U) : _T027vtable_thunks_reabstraction11OpaqueTupleC18variantOptionalityx_xtx_xtSg1x_tF	// OpaqueTuple.variantOptionality(x : (A, A)?) -> (A, A)
+
 // CHECK-NEXT:   #OpaqueTuple.deinit!deallocator: _T027vtable_thunks_reabstraction11OpaqueTupleCfD	// OpaqueTuple.__deallocating_deinit
 // CHECK-NEXT: }
 
@@ -156,6 +331,11 @@ class ConcreteTuple: Opaque<(S, S)> {
 // CHECK-NEXT:   #Opaque.variantOptionalityFunctions!1: <T> (Opaque<T>) -> (@escaping (T) -> T) -> ((T) -> T)? : _T027vtable_thunks_reabstraction6OpaqueC27variantOptionalityFunctionsxxcSgxxc1x_tF	// Opaque.variantOptionalityFunctions(x : (A) -> A) -> (A) -> A?
 // CHECK-NEXT:   #Opaque.variantOptionalityTuples!1: <T> (Opaque<T>) -> ((T, (T.Type, (T) -> T))) -> (T, (T.Type, (T) -> T))? : _T027vtable_thunks_reabstraction6OpaqueC24variantOptionalityTuplesx_xm_xxcttSgx_xm_xxctt1x_tF	// Opaque.variantOptionalityTuples(x : (A, (A.Type, (A) -> A))) -> (A, (A.Type, (A) -> A))?
 // CHECK-NEXT:   #Opaque.init!initializer.1: <T> (Opaque<T>.Type) -> () -> Opaque<T> : _T027vtable_thunks_reabstraction13ConcreteTupleCACycfc	// ConcreteTuple.init() -> ConcreteTuple
+
+// Optionality change of tuple.
+
+// CHECK-NEXT:   #ConcreteTuple.variantOptionality!1: (ConcreteTuple) -> ((S, S)?) -> (S, S) : _T027vtable_thunks_reabstraction13ConcreteTupleC18variantOptionalityAA1SV_AFtAF_AFtSg1x_tF	// ConcreteTuple.variantOptionality(x : (S, S)?) -> (S, S)
+
 // CHECK-NEXT:   #ConcreteTuple.deinit!deallocator: _T027vtable_thunks_reabstraction13ConcreteTupleCfD	// ConcreteTuple.__deallocating_deinit
 // CHECK-NEXT: }
 
@@ -175,6 +355,11 @@ class OpaqueFunction<U, V>: Opaque<(U) -> V> {
 // CHECK-NEXT:   #Opaque.variantOptionalityFunctions!1: <T> (Opaque<T>) -> (@escaping (T) -> T) -> ((T) -> T)? : _T027vtable_thunks_reabstraction6OpaqueC27variantOptionalityFunctionsxxcSgxxc1x_tF	// Opaque.variantOptionalityFunctions(x : (A) -> A) -> (A) -> A?
 // CHECK-NEXT:   #Opaque.variantOptionalityTuples!1: <T> (Opaque<T>) -> ((T, (T.Type, (T) -> T))) -> (T, (T.Type, (T) -> T))? : _T027vtable_thunks_reabstraction6OpaqueC24variantOptionalityTuplesx_xm_xxcttSgx_xm_xxctt1x_tF	// Opaque.variantOptionalityTuples(x : (A, (A.Type, (A) -> A))) -> (A, (A.Type, (A) -> A))?
 // CHECK-NEXT:   #Opaque.init!initializer.1: <T> (Opaque<T>.Type) -> () -> Opaque<T> : _T027vtable_thunks_reabstraction14OpaqueFunctionCACyxq_Gycfc	// OpaqueFunction.init() -> OpaqueFunction<A, B>
+
+// Optionality change of function.
+
+// CHECK-NEXT:  #OpaqueFunction.variantOptionality!1: <U, V> (OpaqueFunction<U, V>) -> (((U) -> V)?) -> (U) -> V : _T027vtable_thunks_reabstraction14OpaqueFunctionC18variantOptionalityq_xcq_xcSg1x_tF	// OpaqueFunction.variantOptionality(x : (A) -> B?) -> (A) -> B
+
 // CHECK-NEXT:   #OpaqueFunction.deinit!deallocator: _T027vtable_thunks_reabstraction14OpaqueFunctionCfD	// OpaqueFunction.__deallocating_deinit
 // CHECK-NEXT: }
 
@@ -194,6 +379,11 @@ class ConcreteFunction: Opaque<(S) -> S> {
 // CHECK-NEXT:   #Opaque.variantOptionalityFunctions!1: <T> (Opaque<T>) -> (@escaping (T) -> T) -> ((T) -> T)? : _T027vtable_thunks_reabstraction6OpaqueC27variantOptionalityFunctionsxxcSgxxc1x_tF	// Opaque.variantOptionalityFunctions(x : (A) -> A) -> (A) -> A?
 // CHECK-NEXT:   #Opaque.variantOptionalityTuples!1: <T> (Opaque<T>) -> ((T, (T.Type, (T) -> T))) -> (T, (T.Type, (T) -> T))? : _T027vtable_thunks_reabstraction6OpaqueC24variantOptionalityTuplesx_xm_xxcttSgx_xm_xxctt1x_tF	// Opaque.variantOptionalityTuples(x : (A, (A.Type, (A) -> A))) -> (A, (A.Type, (A) -> A))?
 // CHECK-NEXT:   #Opaque.init!initializer.1: <T> (Opaque<T>.Type) -> () -> Opaque<T> : _T027vtable_thunks_reabstraction16ConcreteFunctionCACycfc	// ConcreteFunction.init() -> ConcreteFunction
+
+// Optionality change of function.
+
+// CHECK-NEXT:   #ConcreteFunction.variantOptionality!1: (ConcreteFunction) -> (((S) -> S)?) -> (S) -> S : _T027vtable_thunks_reabstraction16ConcreteFunctionC18variantOptionalityAA1SVAFcA2FcSg1x_tF	// ConcreteFunction.variantOptionality(x : (S) -> S?) -> (S) -> S
+
 // CHECK-NEXT:   #ConcreteFunction.deinit!deallocator: _T027vtable_thunks_reabstraction16ConcreteFunctionCfD	// ConcreteFunction.__deallocating_deinit
 // CHECK-NEXT: }
 
@@ -213,6 +403,11 @@ class OpaqueMetatype<U>: Opaque<U.Type> {
 // CHECK-NEXT:   #Opaque.variantOptionalityFunctions!1: <T> (Opaque<T>) -> (@escaping (T) -> T) -> ((T) -> T)? : _T027vtable_thunks_reabstraction6OpaqueC27variantOptionalityFunctionsxxcSgxxc1x_tF	// Opaque.variantOptionalityFunctions(x : (A) -> A) -> (A) -> A?
 // CHECK-NEXT:   #Opaque.variantOptionalityTuples!1: <T> (Opaque<T>) -> ((T, (T.Type, (T) -> T))) -> (T, (T.Type, (T) -> T))? : _T027vtable_thunks_reabstraction6OpaqueC24variantOptionalityTuplesx_xm_xxcttSgx_xm_xxctt1x_tF	// Opaque.variantOptionalityTuples(x : (A, (A.Type, (A) -> A))) -> (A, (A.Type, (A) -> A))?
 // CHECK-NEXT:   #Opaque.init!initializer.1: <T> (Opaque<T>.Type) -> () -> Opaque<T> : _T027vtable_thunks_reabstraction14OpaqueMetatypeCACyxGycfc	// OpaqueMetatype.init() -> OpaqueMetatype<A>
+
+// Optionality change of metatype.
+
+// CHECK-NEXT:   #OpaqueMetatype.variantOptionality!1: <U> (OpaqueMetatype<U>) -> (U.Type?) -> U.Type : _T027vtable_thunks_reabstraction14OpaqueMetatypeC18variantOptionalityxmxmSg1x_tF	// OpaqueMetatype.variantOptionality(x : A.Type?) -> A.Type
+
 // CHECK-NEXT:   #OpaqueMetatype.deinit!deallocator: _T027vtable_thunks_reabstraction14OpaqueMetatypeCfD	// OpaqueMetatype.__deallocating_deinit
 // CHECK-NEXT: }
 
@@ -232,6 +427,11 @@ class ConcreteValueMetatype: Opaque<S.Type> {
 // CHECK-NEXT:   #Opaque.variantOptionalityFunctions!1: <T> (Opaque<T>) -> (@escaping (T) -> T) -> ((T) -> T)? : _T027vtable_thunks_reabstraction6OpaqueC27variantOptionalityFunctionsxxcSgxxc1x_tF	// Opaque.variantOptionalityFunctions(x : (A) -> A) -> (A) -> A?
 // CHECK-NEXT:   #Opaque.variantOptionalityTuples!1: <T> (Opaque<T>) -> ((T, (T.Type, (T) -> T))) -> (T, (T.Type, (T) -> T))? : _T027vtable_thunks_reabstraction6OpaqueC24variantOptionalityTuplesx_xm_xxcttSgx_xm_xxctt1x_tF	// Opaque.variantOptionalityTuples(x : (A, (A.Type, (A) -> A))) -> (A, (A.Type, (A) -> A))?
 // CHECK-NEXT:   #Opaque.init!initializer.1: <T> (Opaque<T>.Type) -> () -> Opaque<T> : _T027vtable_thunks_reabstraction21ConcreteValueMetatypeCACycfc	// ConcreteValueMetatype.init() -> ConcreteValueMetatype
+
+// Optionality change of metatype.
+
+// CHECK-NEXT:   #ConcreteValueMetatype.variantOptionality!1: (ConcreteValueMetatype) -> (S.Type?) -> S.Type : _T027vtable_thunks_reabstraction21ConcreteValueMetatypeC18variantOptionalityAA1SVmAFmSg1x_tF	// ConcreteValueMetatype.variantOptionality(x : S.Type?) -> S.Type
+
 // CHECK-NEXT:   #ConcreteValueMetatype.deinit!deallocator: _T027vtable_thunks_reabstraction21ConcreteValueMetatypeCfD	// ConcreteValueMetatype.__deallocating_deinit
 // CHECK-NEXT: }
 
@@ -251,11 +451,16 @@ class ConcreteClassMetatype: Opaque<C.Type> {
 // CHECK-NEXT:   #Opaque.variantOptionalityFunctions!1: <T> (Opaque<T>) -> (@escaping (T) -> T) -> ((T) -> T)? : _T027vtable_thunks_reabstraction6OpaqueC27variantOptionalityFunctionsxxcSgxxc1x_tF	// Opaque.variantOptionalityFunctions(x : (A) -> A) -> (A) -> A?
 // CHECK-NEXT:   #Opaque.variantOptionalityTuples!1: <T> (Opaque<T>) -> ((T, (T.Type, (T) -> T))) -> (T, (T.Type, (T) -> T))? : _T027vtable_thunks_reabstraction6OpaqueC24variantOptionalityTuplesx_xm_xxcttSgx_xm_xxctt1x_tF	// Opaque.variantOptionalityTuples(x : (A, (A.Type, (A) -> A))) -> (A, (A.Type, (A) -> A))?
 // CHECK-NEXT:   #Opaque.init!initializer.1: <T> (Opaque<T>.Type) -> () -> Opaque<T> : _T027vtable_thunks_reabstraction21ConcreteClassMetatypeCACycfc	// ConcreteClassMetatype.init() -> ConcreteClassMetatype
+
+// Class metatypes are ABI compatible with optional class metatypes.
+
 // CHECK-NEXT:   #ConcreteClassMetatype.deinit!deallocator: _T027vtable_thunks_reabstraction21ConcreteClassMetatypeCfD	// ConcreteClassMetatype.__deallocating_deinit
 // CHECK-NEXT: }
 
 class ConcreteOptional: Opaque<S?> {
   override func inAndOut(x: S?) -> S? { return x }
+
+  // FIXME: Should we allow this override in Sema?
   // override func variantOptionality(x: S??) -> S? { return x! }
 }
 
