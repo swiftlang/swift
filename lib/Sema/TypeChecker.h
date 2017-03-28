@@ -539,8 +539,6 @@ enum class ObjCReason {
   ExplicitlyIBInspectable,
   /// Has an explicit '@GKInspectable' attribute.
   ExplicitlyGKInspectable,
-  // Note: Implicit reasons follow.
-
   /// A member of an Objective-C-defined class or subclass.
   MemberOfObjCSubclass,
   /// An accessor to a property.

@@ -2802,11 +2802,6 @@ void swift::markAsObjC(TypeChecker &TC, ValueDecl *D,
     // Mark the attribute as having used Swift 3 inference, or create an
     // implicit @objc for that purpose.
     auto attr = D->getAttrs().getAttribute<ObjCAttr>();
-    if (!attr) {
-      attr = ObjCAttr::createUnnamedImplicit(TC.Context);
-      D->getAttrs().add(attr);
-    }
-
     attr->setSwift3Inferred();
   }
 }
