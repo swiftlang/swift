@@ -76,7 +76,7 @@ class Sub : Base {
 
   func method2(_ x: Sub, withInt y: Int) { }
 
-  func method3(_ x: Base, withInt y: Int) { } // expected-note{{method 'method3(_:withInt:)' declared here}}
+  @objc func method3(_ x: Base, withInt y: Int) { } // expected-note{{method 'method3(_:withInt:)' declared here}}
 }
 
 class ObjCSub : ObjCSuper {
@@ -84,5 +84,5 @@ class ObjCSub : ObjCSuper {
 
   override func method2(_ x: Base, withInt y: Int) { } // okay, overrides trivially
 
-  func method3(_ x: Sub, withInt y: Int) { } // expected-error{{method3(_:withInt:)' with Objective-C selector 'method3:withInt:' conflicts with method 'method3(_:withInt:)' from superclass 'ObjCSuper' with the same Objective-C selector}}
+  @objc(method3:withInt:) func method3(_ x: Sub, with y: Int) { } // expected-error{{method3(_:with:)' with Objective-C selector 'method3:withInt:' conflicts with method 'method3(_:withInt:)' from superclass 'ObjCSuper' with the same Objective-C selector}}
 }

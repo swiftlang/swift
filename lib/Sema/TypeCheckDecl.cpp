@@ -2328,6 +2328,10 @@ static Optional<ObjCReason> shouldMarkAsObjC(TypeChecker &TC,
       return ObjCReason::ExplicitlyDynamic;
   }
 
+  // If we aren't provided Swift 3's @objc inference rules, we're done.
+  if (!TC.Context.LangOpts.EnableSwift3ObjCInference)
+    return None;
+
   // Infer '@objc' for valid, non-implicit, non-operator, members of classes
   // (and extensions thereof) whose class hierarchies originate in Objective-C,
   // e.g., which derive from NSObject, so long as the members have internal

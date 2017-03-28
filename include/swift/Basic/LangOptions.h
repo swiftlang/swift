@@ -194,6 +194,10 @@ namespace swift {
     /// will be used in editor. This usually leads to more aggressive fixit.
     bool DiagnosticsEditorMode = false;
 
+    /// Whether to enable Swift 3 @objc inference, e.g., for members of
+    /// Objective-C-derived classes and 'dynamic' members.
+    bool EnableSwift3ObjCInference = false;
+
     /// Warn about cases where Swift 3 would infer @objc but later versions
     /// of Swift do not.
     bool WarnSwift3ObjCInference = false;

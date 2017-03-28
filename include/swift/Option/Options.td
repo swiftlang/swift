@@ -247,6 +247,15 @@ def disable_swift_bridge_attr : Flag<["-"], "disable-swift-bridge-attr">,
   Flags<[FrontendOption, HelpHidden]>,
   HelpText<"Disable using the swift bridge attribute">;
 
+def enable_swift3_objc_inference : Flag<["-"], "enable-swift3-objc-inference">,
+  Flags<[FrontendOption, HelpHidden]>,
+HelpText<"Enable Swift 3's @objc inference rules for NSObject-derived classes and 'dynamic' members (emulates Swift 3 behavior)">;
+
+def disable_swift3_objc_inference :
+  Flag<["-"], "disable-swift3-objc-inference">,
+  Flags<[FrontendOption, HelpHidden]>,
+  HelpText<"Disable Swift 3's @objc inference rules for NSObject-derived classes and 'dynamic' members (emulates Swift 4 behavior)">;
+
 def enable_bridging_pch : Flag<["-"], "enable-bridging-pch">,
   Flags<[HelpHidden]>,
   HelpText<"Enable automatic generation of bridging PCH files">;
