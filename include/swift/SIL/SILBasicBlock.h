@@ -322,6 +322,9 @@ public:
   /// no-return apply or builtin.
   bool isNoReturn() const;
 
+  /// Returns true if this instruction only contains a branch instruction.
+  bool isTrampoline() const;
+
   //===--------------------------------------------------------------------===//
   // Debugging
   //===--------------------------------------------------------------------===//

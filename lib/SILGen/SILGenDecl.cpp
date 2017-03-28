@@ -13,18 +13,24 @@
 #include "SILGen.h"
 #include "Initialization.h"
 #include "RValue.h"
-#include "Scope.h"
 #include "SILGenDynamicCast.h"
+#include "Scope.h"
+#include "SwitchCaseFullExpr.h"
+#include "swift/AST/ASTMangler.h"
+#include "swift/AST/ASTMangler.h"
+#include "swift/AST/GenericEnvironment.h"
+#include "swift/AST/Module.h"
+#include "swift/AST/Module.h"
+#include "swift/AST/NameLookup.h"
+#include "swift/AST/NameLookup.h"
+#include "swift/AST/ProtocolConformance.h"
+#include "swift/AST/ProtocolConformance.h"
 #include "swift/SIL/FormalLinkage.h"
 #include "swift/SIL/PrettyStackTrace.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILDebuggerClient.h"
 #include "swift/SIL/SILType.h"
 #include "swift/SIL/TypeLowering.h"
-#include "swift/AST/ASTMangler.h"
-#include "swift/AST/Module.h"
-#include "swift/AST/NameLookup.h"
-#include "swift/AST/ProtocolConformance.h"
 #include "llvm/ADT/SmallString.h"
 #include <iterator>
 
@@ -718,139 +724,146 @@ public:
 };
 } // end anonymous namespace
 
-static bool shouldDisableCleanupOnFailurePath(ManagedValue value,
-                                              EnumElementDecl *elementDecl,
-                                              SILGenFunction &SGF) {
-  // If the enum is trivial, then there is no cleanup to disable.
-  if (value.isPlusZeroRValueOrTrivial()) return false;
-  
-  // Check all of the members of the enum.  If any have a non-trivial payload,
-  // then we can't disable the cleanup.
-  for (auto elt : elementDecl->getParentEnum()->getAllElements()) {
-    // Ignore the element that will be handled.
-    if (elt == elementDecl) continue;
-    
-    // Elements without payloads are trivial.
-    if (!elt->getArgumentInterfaceType()) continue;
+void EnumElementPatternInitialization::emitEnumMatch(
+    ManagedValue value, EnumElementDecl *eltDecl, Initialization *subInit,
+    JumpDest failureDest, SILLocation loc, SILGenFunction &SGF) {
 
-    auto eltTy = value.getType().getEnumElementType(elt, SGF.SGM.M);
-    if (!eltTy.isTrivial(SGF.SGM.M))
-      return false;
-  }
-  return true;
-}
-
-void EnumElementPatternInitialization::
-emitEnumMatch(ManagedValue value, EnumElementDecl *ElementDecl,
-              Initialization *subInit, JumpDest failureDest,
-              SILLocation loc, SILGenFunction &SGF) {
-  
-  SILBasicBlock *contBB = SGF.B.splitBlockForFallthrough();
-  auto destination = std::make_pair(ElementDecl, contBB);
-  
-  
-  // Get a destination that runs all of the cleanups needed when existing on the
-  // failure path.  If the enum we're testing is non-trivial, there will be a
-  // cleanup in this stack that will release its value.
+  // Create all of the blocks early so we can maintain a consistent ordering
+  // (and update less tests). Break this at your fingers parallel.
   //
-  // However, if the tested case is the only non-trivial case in the enum, then
-  // the destruction on the failure path will be a no-op, so we can disable the
-  // cleanup on that path.  This is an important micro-optimization for
-  // Optional, since the .None case doesn't need to be cleaned up.
-  bool ShouldDisableCleanupOnFailure =
-    shouldDisableCleanupOnFailurePath(value, ElementDecl, SGF);
-  
-  if (ShouldDisableCleanupOnFailure)
-    SGF.Cleanups.setCleanupState(value.getCleanup(), CleanupState::Dormant);
-  
-  auto defaultBB = SGF.Cleanups.emitBlockForCleanups(failureDest, loc);
+  // *NOTE* This needs to be in reverse order to preserve the textual SIL.
+  auto *contBlock = SGF.createBasicBlock();
+  auto *someBlock = SGF.createBasicBlock();
+  auto *defaultBlock = SGF.createBasicBlock();
+  auto *originalBlock = SGF.B.getInsertionBB();
 
-  // Restore it if we disabled it.
-  if (ShouldDisableCleanupOnFailure)
-    SGF.Cleanups.setCleanupState(value.getCleanup(), CleanupState::Active);
-  
-  if (value.getType().isAddress())
-    SGF.B.createSwitchEnumAddr(loc, value.getValue(), defaultBB, destination);
-  else
-    SGF.B.createSwitchEnum(loc, value.getValue(), defaultBB, destination);
-  
-  SGF.B.setInsertionPoint(contBB);
-  
-  // If the enum case has no bound value, we're done.
-  if (!ElementDecl->getArgumentInterfaceType()) {
-    assert(subInit == nullptr &&
-           "Cannot have a subinit when there is no value to match against");
-    return;
-  }
-  
-  // Otherwise, the bound value for the enum case is available.
-  SILType eltTy = value.getType().getEnumElementType(ElementDecl, SGF.SGM.M);
-  auto &eltTL = SGF.getTypeLowering(eltTy);
-  
-  // If the case value is provided to us as a BB argument as long as the enum
-  // is not address-only.
-  SILValue eltValue;
-  if (!value.getType().isAddress())
-    eltValue = contBB->createPHIArgument(eltTy, ValueOwnershipKind::Owned);
+  SwitchEnumBuilder switchBuilder(SGF.B, loc, value);
 
-  if (subInit == nullptr) {
-    // If there is no subinitialization, then we are done matching.  Don't
-    // bother projecting out the address-only element value only to ignore it.
-    return;
-  }
-  
-  if (value.getType().isAddress()) {
-    // If the enum is address-only, take from the enum we have and load it if
-    // the element value is loadable.
-    assert((eltTL.isTrivial() || value.hasCleanup())
-           && "must be able to consume value");
-    eltValue = SGF.B.createUncheckedTakeEnumDataAddr(loc, value.forward(SGF),
-                                                     ElementDecl, eltTy);
-    // Load a loadable data value.
-    if (eltTL.isLoadable())
-      eltValue =
-          eltTL.emitLoad(SGF.B, loc, eltValue, LoadOwnershipQualifier::Take);
+  // Handle the none case.
+  //
+  // *NOTE*: Since we are performing an initialization here, it is *VERY*
+  // important that we emit the negative case first. The reason why is that
+  // currently the initialization has a dormant cleanup in a scope that may be
+  // after the failureDest depth. Once we run the positive case, this
+  // initialization will be enabled. Thus if we run the negative case /after/
+  // the positive case, a cleanup will be emitted for the initialization on the
+  // negative path... but the actual initialization happened on the positive
+  // path, causing a use (the destroy on the negative path) to be created that
+  // does not dominate its definition (in the positive path).
+  auto handler = [&SGF, &loc, &failureDest](ManagedValue mv,
+                                            SwitchCaseFullExpr &expr) {
+    expr.exit();
+    SGF.Cleanups.emitBranchAndCleanups(failureDest, loc);
+  };
+
+  // If we have a binary enum, do not emit a true default case. This ensures
+  // that we do not emit a destroy_value on a .None.
+  bool inferredBinaryEnum = false;
+  auto *enumDecl = value.getType().getEnumOrBoundGenericEnum();
+  if (auto *otherDecl = enumDecl->getOppositeBinaryDecl(eltDecl)) {
+    inferredBinaryEnum = true;
+    switchBuilder.addCase(otherDecl, defaultBlock, nullptr, handler);
   } else {
-    // Otherwise, we're consuming this as a +1 value.
-    value.forward(SGF);
+    switchBuilder.addDefaultCase(
+        defaultBlock, nullptr, handler,
+        SwitchEnumBuilder::DefaultDispatchTime::BeforeNormalCases);
   }
-  
-  // Now we have a +1 value.
-  auto eltMV = SGF.emitManagedRValueWithCleanup(eltValue, eltTL);
 
-  // If the payload is indirect, project it out of the box.
-  if (ElementDecl->isIndirect() || ElementDecl->getParentEnum()->isIndirect()) {
-    SILValue boxedValue = SGF.B.createProjectBox(loc, eltMV.getValue(), 0);
-    auto &boxedTL = SGF.getTypeLowering(boxedValue->getType());
-    // SEMANTIC ARC TODO: Revisit this when the verifier is enabled.
-    if (boxedTL.isLoadable() || !SGF.silConv.useLoweredAddresses())
-      boxedValue = boxedTL.emitLoad(SGF.B, loc, boxedValue,
-                                    LoadOwnershipQualifier::Take);
+  // Always insert the some case at the front of the list. In the default case,
+  // this will not matter, but in the case where we have a binary enum, we want
+  // to preserve the old ordering of .some/.none. to make it easier to update
+  // tests.
+  switchBuilder.addCase(
+      eltDecl, someBlock, contBlock,
+      [&SGF, &loc, &eltDecl, &subInit, &value](ManagedValue mv,
+                                               SwitchCaseFullExpr &expr) {
+        // If the enum case has no bound value, we're done.
+        if (!eltDecl->getArgumentInterfaceType()) {
+          assert(
+              subInit == nullptr &&
+              "Cannot have a subinit when there is no value to match against");
+          expr.exitAndBranch(loc);
+          return;
+        }
 
-    // We must treat the boxed value as +0 since it may be shared. Copy it if
-    // nontrivial.
-    // TODO: Should be able to hand it off at +0 in some cases.
-    eltMV = ManagedValue::forUnmanaged(boxedValue);
-    eltMV = eltMV.copyUnmanaged(SGF, loc);
+        if (subInit == nullptr) {
+          // If there is no subinitialization, then we are done matching.  Don't
+          // bother projecting out the any elements value only to ignore it.
+          expr.exitAndBranch(loc);
+          return;
+        }
+
+        // Otherwise, the bound value for the enum case is available.
+        SILType eltTy = value.getType().getEnumElementType(eltDecl, SGF.SGM.M);
+        auto &eltTL = SGF.getTypeLowering(eltTy);
+
+        if (mv.getType().isAddress()) {
+          // If the enum is address-only, take from the enum we have and load it
+          // if
+          // the element value is loadable.
+          assert((eltTL.isTrivial() || mv.hasCleanup()) &&
+                 "must be able to consume value");
+          mv = SGF.B.createUncheckedTakeEnumDataAddr(loc, mv, eltDecl, eltTy);
+          // Load a loadable data value.
+          if (eltTL.isLoadable())
+            mv = SGF.B.createLoadTake(loc, mv);
+        }
+
+        // If the payload is indirect, project it out of the box.
+        if (eltDecl->isIndirect() || eltDecl->getParentEnum()->isIndirect()) {
+          SILValue boxedValue = SGF.B.createProjectBox(loc, mv.getValue(), 0);
+          auto &boxedTL = SGF.getTypeLowering(boxedValue->getType());
+          // SEMANTIC ARC TODO: Revisit this when the verifier is enabled.
+          if (boxedTL.isLoadable() || !SGF.silConv.useLoweredAddresses())
+            boxedValue = boxedTL.emitLoad(SGF.B, loc, boxedValue,
+                                          LoadOwnershipQualifier::Take);
+
+          // We must treat the boxed value as +0 since it may be shared. Copy it
+          // if nontrivial.
+          //
+          // TODO: Should be able to hand it off at +0 in some cases.
+          mv = ManagedValue::forUnmanaged(boxedValue);
+          mv = mv.copyUnmanaged(SGF, loc);
+        }
+
+        // Reabstract to the substituted type, if needed.
+        CanType substEltTy =
+            value.getType()
+                .getSwiftRValueType()
+                ->getTypeOfMember(SGF.SGM.M.getSwiftModule(), eltDecl,
+                                  eltDecl->getArgumentInterfaceType())
+                ->getCanonicalType();
+
+        AbstractionPattern origEltTy =
+            (eltDecl == SGF.getASTContext().getOptionalSomeDecl()
+                 ? AbstractionPattern(substEltTy)
+                 : SGF.SGM.M.Types.getAbstractionPattern(eltDecl));
+
+        mv = SGF.emitOrigToSubstValue(loc, mv, origEltTy, substEltTy);
+
+        // Pass the +1 value down into the sub initialization.
+        subInit->copyOrInitValueInto(SGF, loc, mv, /*is an init*/ true);
+        expr.exitAndBranch(loc);
+      });
+
+  std::move(switchBuilder).emit();
+
+  // If we inferred a binary enum, put the asked for case first so we preserve
+  // the current code structure. This just ensures that less test updates are
+  // needed.
+  if (inferredBinaryEnum) {
+    if (auto *switchEnum =
+            dyn_cast<SwitchEnumInst>(originalBlock->getTerminator())) {
+      switchEnum->swapCase(0, 1);
+    } else {
+      auto *switchEnumAddr =
+          cast<SwitchEnumAddrInst>(originalBlock->getTerminator());
+      switchEnumAddr->swapCase(0, 1);
+    }
   }
-  
-  // Reabstract to the substituted type, if needed.
-  CanType substEltTy =
-    value.getType().getSwiftRValueType()
-      ->getTypeOfMember(SGF.SGM.M.getSwiftModule(),
-                        ElementDecl,
-                        ElementDecl->getArgumentInterfaceType())
-      ->getCanonicalType();
 
-  AbstractionPattern origEltTy =
-    (ElementDecl == SGF.getASTContext().getOptionalSomeDecl()
-       ? AbstractionPattern(substEltTy)
-       : SGF.SGM.M.Types.getAbstractionPattern(ElementDecl));
-  
-  eltMV = SGF.emitOrigToSubstValue(loc, eltMV, origEltTy, substEltTy);
-
-  // Pass the +1 value down into the sub initialization.
-  subInit->copyOrInitValueInto(SGF, loc, eltMV, /*is an init*/true);
+  // Reset the insertion point to the end of contBlock.
+  SGF.B.setInsertionPoint(contBlock);
 }
 
 namespace {

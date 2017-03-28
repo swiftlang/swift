@@ -5323,6 +5323,9 @@ public:
     return {getCaseBuf()[i], getSuccessorBuf()[i].getBB()};
   }
 
+  // Swap the cases at indices \p i and \p j.
+  void swapCase(unsigned i, unsigned j);
+
   /// \brief Return the block that will be branched to on the specified enum
   /// case.
   SILBasicBlock *getCaseDestination(EnumElementDecl *D) {

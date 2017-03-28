@@ -3330,7 +3330,7 @@ public:
                     SOI->getOperand()->getType(),
                 "Switch enum default block should have one argument that is "
                 "the same as the input type");
-      } else {
+      } else if (F.hasUnqualifiedOwnership()) {
         require(SOI->getDefaultBB()->args_empty(),
                 "switch_enum default destination must take no arguments");
       }
