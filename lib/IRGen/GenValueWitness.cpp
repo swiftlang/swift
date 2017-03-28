@@ -38,6 +38,7 @@
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
 #include "Linking.h"
+#include "StructLayout.h"
 #include "TypeInfo.h"
 
 #include "GenValueWitness.h"
@@ -248,9 +249,32 @@ static Address emitDefaultProjectBuffer(IRGenFunction &IGF, Address buffer,
   llvm::PointerType *resultTy = type.getStorageType()->getPointerTo();
   switch (packing) {
   case FixedPacking::Allocate: {
-    Address slot = IGF.Builder.CreateBitCast(buffer, resultTy->getPointerTo(),
-                                             "storage-slot");
-    llvm::Value *address = IGF.Builder.CreateLoad(slot);
+
+    // Use copy-on-write existentials?
+    auto &IGM = IGF.IGM;
+    auto &Builder = IGF.Builder;
+    if (IGM.getSILModule().getOptions().UseCOWExistentials) {
+      Address boxAddress(
+          Builder.CreateBitCast(buffer.getAddress(),
+                                IGM.RefCountedPtrTy->getPointerTo()),
+          buffer.getAlignment());
+      auto *boxStart = IGF.Builder.CreateLoad(boxAddress);
+      auto *alignmentMask = type.getAlignmentMask(IGF, T);
+      auto *heapHeaderSize =
+          llvm::ConstantInt::get(IGM.SizeTy, getHeapHeaderSize(IGM).getValue());
+      auto *startOffset =
+        Builder.CreateAnd(Builder.CreateAdd(heapHeaderSize, alignmentMask),
+                              Builder.CreateNot(alignmentMask));
+      auto *addressInBox =
+          IGF.emitByteOffsetGEP(boxStart, startOffset, IGM.OpaqueTy);
+
+      addressInBox = Builder.CreateBitCast(addressInBox, resultTy);
+      return type.getAddressForPointer(addressInBox);
+    }
+
+    Address slot =
+        Builder.CreateBitCast(buffer, resultTy->getPointerTo(), "storage-slot");
+    llvm::Value *address = Builder.CreateLoad(slot);
     return type.getAddressForPointer(address);
   }
 
@@ -273,10 +297,38 @@ static Address emitDefaultAllocateBuffer(IRGenFunction &IGF, Address buffer,
                                          FixedPacking packing) {
   switch (packing) {
   case FixedPacking::Allocate: {
+
+    // Use copy-on-write existentials?
+    auto &IGM = IGF.IGM;
+    if (IGM.getSILModule().getOptions().UseCOWExistentials) {
+      /* This would be faster but what do we pass as genericEnv?
+      if (isa<FixedTypeInfo>(T)) {
+        assert(T->getFixedPacking() == FixedPacking::Allocate);
+        auto *genericEnv = nullptr; //???;
+          // Otherwise, allocate a box with enough storage.
+        Address addr = emitAllocateExistentialBoxInBuffer(
+          IGF, valueType, buffer, genericEnv, "exist.box.addr");
+        return type.getAddressForPointer(addr);
+      }
+      */
+
+      llvm::Value *box, *address;
+      auto *metadata = IGF.emitTypeMetadataRefForLayout(T);
+      IGF.emitAllocBoxCall(metadata, box, address);
+      IGF.Builder.CreateStore(
+          box, Address(IGF.Builder.CreateBitCast(
+                           buffer.getAddress(), box->getType()->getPointerTo()),
+                       buffer.getAlignment()));
+
+      llvm::PointerType *resultTy = type.getStorageType()->getPointerTo();
+      address = IGF.Builder.CreateBitCast(address, resultTy);
+      return type.getAddressForPointer(address);
+    }
+
     auto sizeAndAlign = type.getSizeAndAlignmentMask(IGF, T);
     llvm::Value *addr =
       IGF.emitAllocRawCall(sizeAndAlign.first, sizeAndAlign.second);
-    buffer = IGF.Builder.CreateBitCast(buffer, IGF.IGM.Int8PtrPtrTy);
+    buffer = IGF.Builder.CreateBitCast(buffer, IGM.Int8PtrPtrTy);
     IGF.Builder.CreateStore(addr, buffer);
 
     addr = IGF.Builder.CreateBitCast(addr,
@@ -350,6 +402,30 @@ emitDefaultInitializeBufferWithCopyOfBuffer(IRGenFunction &IGF,
                                  &emitDefaultInitializeBufferWithCopyOfBuffer,
                                  T, type, destBuffer, srcBuffer);
 
+  if (IGF.IGM.getSILModule().getOptions().UseCOWExistentials) {
+    if (packing == FixedPacking::OffsetZero) {
+      Address destObject =
+        emitDefaultAllocateBuffer(IGF, destBuffer, T, type, packing);
+      Address srcObject =
+        emitDefaultProjectBuffer(IGF, srcBuffer, T, type, packing);
+      type.initializeWithCopy(IGF, destObject, srcObject, T);
+      return destObject;
+    } else {
+      assert(packing == FixedPacking::Allocate);
+      auto *destReferenceAddr = IGF.Builder.CreateBitCast(
+          destBuffer.getAddress(), IGF.IGM.RefCountedPtrTy->getPointerTo());
+      auto *srcReferenceAddr = IGF.Builder.CreateBitCast(
+          srcBuffer.getAddress(), IGF.IGM.RefCountedPtrTy->getPointerTo());
+      auto *srcReference =
+        IGF.Builder.CreateLoad(srcReferenceAddr, srcBuffer.getAlignment());
+      IGF.emitNativeStrongRetain(srcReference, IGF.getDefaultAtomicity());
+      IGF.Builder.CreateStore(
+        srcReference,
+        Address(destReferenceAddr, destBuffer.getAlignment()));
+      return emitDefaultProjectBuffer(IGF, destBuffer, T, type, packing);
+    }
+  }
+
   Address destObject =
     emitDefaultAllocateBuffer(IGF, destBuffer, T, type, packing);
   Address srcObject =
@@ -387,12 +463,13 @@ emitDefaultInitializeBufferWithTakeOfBuffer(IRGenFunction &IGF,
 
   case FixedPacking::Allocate: {
     // Just copy the out-of-line storage pointers.
-    llvm::Type *ptrTy = type.getStorageType()->getPointerTo()->getPointerTo();
-    srcBuffer = IGF.Builder.CreateBitCast(srcBuffer, ptrTy);
+    srcBuffer = IGF.Builder.CreateBitCast(
+        srcBuffer, IGF.IGM.RefCountedPtrTy->getPointerTo());
     llvm::Value *addr = IGF.Builder.CreateLoad(srcBuffer);
-    destBuffer = IGF.Builder.CreateBitCast(destBuffer, ptrTy);
+    destBuffer = IGF.Builder.CreateBitCast(
+        destBuffer, IGF.IGM.RefCountedPtrTy->getPointerTo());
     IGF.Builder.CreateStore(addr, destBuffer);
-    return type.getAddressForPointer(addr);
+    return emitDefaultProjectBuffer(IGF, destBuffer, T, type, packing);
   }
   }
   llvm_unreachable("bad fixed packing");
@@ -1013,6 +1090,37 @@ static llvm::Constant *getCopyOutOfLinePointerFunction(IRGenModule &IGM) {
     IGF.Builder.CreateRet(ptr);
   });
 }
+/// Return a function which takes two buffer arguments, copies
+/// a pointer from the second to the first, and returns the pointer.
+static llvm::Constant *
+getCopyOutOfLineBoxPointerFunction(IRGenModule &IGM,
+                                   const FixedTypeInfo &fixedTI) {
+  llvm::Type *argTys[] = { IGM.Int8PtrPtrTy, IGM.Int8PtrPtrTy,
+                           IGM.TypeMetadataPtrTy };
+  llvm::SmallString<40> name;
+  {
+    llvm::raw_svector_ostream nameStream(name);
+    nameStream << "__swift_copy_outline_existential_box_pointer";
+    nameStream << fixedTI.getFixedAlignment().getValue();
+  }
+  return IGM.getOrCreateHelperFunction(
+      name, IGM.Int8PtrTy, argTys, [&](IRGenFunction &IGF) {
+        auto it = IGF.CurFn->arg_begin();
+        Address dest(&*it++, IGM.getPointerAlignment());
+        Address src(&*it++, IGM.getPointerAlignment());
+        auto *ptr = IGF.Builder.CreateLoad(src);
+        IGF.Builder.CreateStore(ptr, dest);
+        auto *alignmentMask = fixedTI.getStaticAlignmentMask(IGM);
+        auto *heapHeaderSize = llvm::ConstantInt::get(
+            IGM.SizeTy, getHeapHeaderSize(IGM).getValue());
+        auto *startOffset = IGF.Builder.CreateAnd(
+            IGF.Builder.CreateAdd(heapHeaderSize, alignmentMask),
+            IGF.Builder.CreateNot(alignmentMask));
+        auto *objectAddr =
+            IGF.emitByteOffsetGEP(ptr, startOffset, IGM.Int8Ty);
+        IGF.Builder.CreateRet(objectAddr);
+      });
+}
 
 namespace {
   enum class MemMoveOrCpy { MemMove, MemCpy };
@@ -1143,8 +1251,15 @@ static void addValueWitness(IRGenModule &IGM,
 
   case ValueWitness::InitializeBufferWithTakeOfBuffer:
     if (packing == FixedPacking::Allocate) {
+      if (IGM.getSILModule().getOptions().UseCOWExistentials) {
+        return addFunction(getCopyOutOfLineBoxPointerFunction(
+            IGM, cast<FixedTypeInfo>(concreteTI)));
+      }
+      // Copy-on-write existentials would have to do a projection in the buffer
+      // to get the values starting address.
       return addFunction(getCopyOutOfLinePointerFunction(IGM));
-    } else if (packing == FixedPacking::OffsetZero &&
+    } else
+      if (packing == FixedPacking::OffsetZero &&
                concreteTI.isBitwiseTakable(ResilienceExpansion::Maximal)) {
       return addFunction(getMemCpyFunction(IGM, concreteTI));
     }

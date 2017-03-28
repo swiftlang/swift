@@ -8,4 +8,5 @@ void _swift_slowDealloc(void) {}
 void _swift_storeEnumTagSinglePayload(void) {}
 void swift_allocateGenericValueMetadata(void) {}
 void swift_initEnumValueWitnessTableSinglePayload(void) {}
-
+void _swift_retain(){}
+void swift_allocBox(){}
