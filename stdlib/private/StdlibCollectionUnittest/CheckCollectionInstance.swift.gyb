@@ -337,8 +337,12 @@ public func check${Traversal}Collection<
   C.SubSequence.Index == C.Index,
   C.SubSequence.Indices.Iterator.Element == C.Index {
 
-  _checkOneLevelOf${Traversal}Collection(expected, collection, ${trace},
+  checkOneLevelOf${Traversal}Collection(expected, collection, ${trace},
     resiliencyChecks: resiliencyChecks, sameValue: sameValue)
+
+  // Avoid validation of all possible (n^2) slices on large collection.
+  // Test cases should call checkOneLevelOf${Traversal}Collection instead.
+  expectLT(expected.count, 30)
 
   _checkSliceableWith${Traversal}Index(expected, collection, ${trace},
     resiliencyChecks: resiliencyChecks, sameValue: sameValue)
@@ -352,7 +356,7 @@ public func check${Traversal}Collection<
 // associated type properties of SubSequence.
 //
 // Checks all slices: O(n^2).
-internal func _checkOneLevelOf${Traversal}Collection<
+public func checkOneLevelOf${Traversal}Collection<
   ${genericParam}, C : ${TraversalCollection}
 >(
   _ expected: ${Expected}, _ collection: C,
@@ -581,7 +585,7 @@ ${genericParam}, S : ${TraversalCollection}
       expectEqual(start, slice.startIndex)
       expectEqual(end, slice.endIndex)
 
-      _checkOneLevelOf${Traversal}Collection(expectedSlice, slice, ${trace},
+      checkOneLevelOf${Traversal}Collection(expectedSlice, slice, ${trace},
         resiliencyChecks: resiliencyChecks,
         sameValue: sameValue)
 
