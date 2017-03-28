@@ -8,6 +8,8 @@ protocol P1 {
     func foo2(a a: Int, b b: Int)
 
     subscript(_ a: Int) -> Int { get set }
+
+    func fooConstraint()
 }
 
 protocol P2 : P1 {
@@ -26,6 +28,16 @@ extension P2 {
     func foo2(a a: Int, b b: Int)
 
     subscript(_ a: Int) -> Int
+}
+
+extension P2 {
+
+    func fooConstraint()
+}
+
+protocol P3 {
+
+    func p3Required()
 }
 
 
@@ -187,177 +199,229 @@ extension P2 {
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 144,
+    key.offset: 146,
+    key.length: 4
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.offset: 151,
+    key.length: 13
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.keyword,
+    key.offset: 170,
     key.length: 8
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 153,
+    key.offset: 179,
     key.length: 2
   },
   {
     key.kind: source.lang.swift.ref.protocol,
     key.name: "P1",
     key.usr: "s:5cake12P1P",
-    key.offset: 158,
+    key.offset: 184,
     key.length: 2
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 168,
+    key.offset: 194,
     key.length: 4
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 173,
+    key.offset: 199,
     key.length: 4
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 185,
+    key.offset: 211,
     key.length: 4
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 190,
+    key.offset: 216,
     key.length: 4
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 200,
+    key.offset: 226,
     key.length: 9
   },
   {
     key.kind: source.lang.swift.ref.protocol,
     key.name: "P2",
     key.usr: "s:5cake12P2P",
-    key.offset: 210,
+    key.offset: 236,
     key.length: 2
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 220,
-    key.length: 4
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 225,
-    key.length: 4
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 237,
-    key.length: 3
-  },
-  {
-    key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 241,
-    key.length: 3
-  },
-  {
-    key.kind: source.lang.swift.ref.struct,
-    key.name: "Int",
-    key.usr: "s:Si",
     key.offset: 246,
+    key.length: 4
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.offset: 251,
+    key.length: 4
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.keyword,
+    key.offset: 263,
+    key.length: 3
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.offset: 267,
+    key.length: 3
+  },
+  {
+    key.kind: source.lang.swift.ref.struct,
+    key.name: "Int",
+    key.usr: "s:Si",
+    key.offset: 272,
     key.length: 3
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 255,
+    key.offset: 281,
     key.length: 4
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 260,
+    key.offset: 286,
     key.length: 4
   },
   {
     key.kind: source.lang.swift.syntaxtype.argument,
-    key.offset: 265,
+    key.offset: 291,
     key.length: 1
   },
   {
     key.kind: source.lang.swift.syntaxtype.parameter,
-    key.offset: 267,
+    key.offset: 293,
     key.length: 1
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 265,
+    key.offset: 291,
     key.length: 1
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 267,
+    key.offset: 293,
     key.length: 1
   },
   {
     key.kind: source.lang.swift.ref.struct,
     key.name: "Int",
     key.usr: "s:Si",
-    key.offset: 270,
+    key.offset: 296,
     key.length: 3
   },
   {
     key.kind: source.lang.swift.syntaxtype.argument,
-    key.offset: 275,
+    key.offset: 301,
     key.length: 1
   },
   {
     key.kind: source.lang.swift.syntaxtype.parameter,
-    key.offset: 277,
+    key.offset: 303,
     key.length: 1
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 275,
+    key.offset: 301,
     key.length: 1
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 277,
+    key.offset: 303,
     key.length: 1
   },
   {
     key.kind: source.lang.swift.ref.struct,
     key.name: "Int",
     key.usr: "s:Si",
-    key.offset: 280,
+    key.offset: 306,
     key.length: 3
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 290,
+    key.offset: 316,
     key.length: 9
   },
   {
     key.kind: source.lang.swift.syntaxtype.argument,
-    key.offset: 300,
+    key.offset: 326,
     key.length: 1
   },
   {
     key.kind: source.lang.swift.syntaxtype.parameter,
-    key.offset: 302,
+    key.offset: 328,
     key.length: 1
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 302,
+    key.offset: 328,
     key.length: 1
   },
   {
     key.kind: source.lang.swift.ref.struct,
     key.name: "Int",
     key.usr: "s:Si",
-    key.offset: 305,
+    key.offset: 331,
     key.length: 3
   },
   {
     key.kind: source.lang.swift.ref.struct,
     key.name: "Int",
     key.usr: "s:Si",
-    key.offset: 313,
+    key.offset: 339,
     key.length: 3
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.keyword,
+    key.offset: 346,
+    key.length: 9
+  },
+  {
+    key.kind: source.lang.swift.ref.protocol,
+    key.name: "P2",
+    key.usr: "s:5cake12P2P",
+    key.offset: 356,
+    key.length: 2
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.keyword,
+    key.offset: 366,
+    key.length: 4
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.offset: 371,
+    key.length: 13
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.keyword,
+    key.offset: 390,
+    key.length: 8
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.offset: 399,
+    key.length: 2
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.keyword,
+    key.offset: 409,
+    key.length: 4
+  },
+  {
+    key.kind: source.lang.swift.syntaxtype.identifier,
+    key.offset: 414,
+    key.length: 10
   }
 ]
 [
@@ -366,7 +430,7 @@ extension P2 {
     key.name: "P1",
     key.usr: "s:5cake12P1P",
     key.offset: 1,
-    key.length: 141,
+    key.length: 167,
     key.fully_annotated_decl: "<decl.protocol><syntaxtype.keyword>protocol</syntaxtype.keyword> <decl.name>P1</decl.name></decl.protocol>",
     key.entities: [
       {
@@ -425,6 +489,14 @@ extension P2 {
             key.length: 3
           }
         ]
+      },
+      {
+        key.kind: source.lang.swift.decl.function.method.instance,
+        key.name: "fooConstraint()",
+        key.usr: "s:5cake12P1P13fooConstraintyyF",
+        key.offset: 146,
+        key.length: 20,
+        key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>fooConstraint</decl.name>()</decl.function.method.instance>"
       }
     ]
   },
@@ -432,7 +504,7 @@ extension P2 {
     key.kind: source.lang.swift.decl.protocol,
     key.name: "P2",
     key.usr: "s:5cake12P2P",
-    key.offset: 144,
+    key.offset: 170,
     key.length: 54,
     key.fully_annotated_decl: "<decl.protocol><syntaxtype.keyword>protocol</syntaxtype.keyword> <decl.name>P2</decl.name> : <ref.protocol usr=\"s:5cake12P1P\">P1</ref.protocol></decl.protocol>",
     key.conforms: [
@@ -447,7 +519,7 @@ extension P2 {
         key.kind: source.lang.swift.decl.function.method.instance,
         key.name: "bar1()",
         key.usr: "s:5cake12P2P4bar1yyF",
-        key.offset: 168,
+        key.offset: 194,
         key.length: 11,
         key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>bar1</decl.name>()</decl.function.method.instance>"
       },
@@ -455,7 +527,7 @@ extension P2 {
         key.kind: source.lang.swift.decl.function.method.instance,
         key.name: "bar2()",
         key.usr: "s:5cake12P2P4bar2yyF",
-        key.offset: 185,
+        key.offset: 211,
         key.length: 11,
         key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>bar2</decl.name>()</decl.function.method.instance>"
       }
@@ -463,7 +535,7 @@ extension P2 {
   },
   {
     key.kind: source.lang.swift.decl.extension.protocol,
-    key.offset: 200,
+    key.offset: 226,
     key.length: 118,
     key.extends: {
       key.kind: source.lang.swift.ref.protocol,
@@ -476,7 +548,7 @@ extension P2 {
         key.name: "foo1()",
         key.usr: "s:5cake12P2PAAE4foo1yyF",
         key.default_implementation_of: "s:5cake12P1P4foo1yyF",
-        key.offset: 220,
+        key.offset: 246,
         key.length: 11,
         key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>foo1</decl.name>()</decl.function.method.instance>"
       },
@@ -485,7 +557,7 @@ extension P2 {
         key.name: "Ins",
         key.usr: "s:5cake12P2PAAE3InsSiv",
         key.default_implementation_of: "s:5cake12P1P3InsSiv",
-        key.offset: 237,
+        key.offset: 263,
         key.length: 12,
         key.fully_annotated_decl: "<decl.var.instance><syntaxtype.keyword>var</syntaxtype.keyword> <decl.name>Ins</decl.name>: <decl.var.type><ref.struct usr=\"s:Si\">Int</ref.struct></decl.var.type> { <syntaxtype.keyword>get</syntaxtype.keyword> <syntaxtype.keyword>set</syntaxtype.keyword> }</decl.var.instance>"
       },
@@ -494,7 +566,7 @@ extension P2 {
         key.name: "foo2(a:b:)",
         key.usr: "s:5cake12P2PAAE4foo2ySi1a_Si1btF",
         key.default_implementation_of: "s:5cake12P1P4foo2ySi1a_Si1btF",
-        key.offset: 255,
+        key.offset: 281,
         key.length: 29,
         key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>foo2</decl.name>(<decl.var.parameter><decl.var.parameter.argument_label>a</decl.var.parameter.argument_label>: <decl.var.parameter.type><ref.struct usr=\"s:Si\">Int</ref.struct></decl.var.parameter.type></decl.var.parameter>, <decl.var.parameter><decl.var.parameter.argument_label>b</decl.var.parameter.argument_label>: <decl.var.parameter.type><ref.struct usr=\"s:Si\">Int</ref.struct></decl.var.parameter.type></decl.var.parameter>)</decl.function.method.instance>",
         key.entities: [
@@ -502,14 +574,14 @@ extension P2 {
             key.kind: source.lang.swift.decl.var.local,
             key.keyword: "a",
             key.name: "a",
-            key.offset: 270,
+            key.offset: 296,
             key.length: 3
           },
           {
             key.kind: source.lang.swift.decl.var.local,
             key.keyword: "b",
             key.name: "b",
-            key.offset: 280,
+            key.offset: 306,
             key.length: 3
           }
         ]
@@ -519,7 +591,7 @@ extension P2 {
         key.name: "subscript(_:)",
         key.usr: "s:5cake12P2PAAE9subscriptS2ici",
         key.default_implementation_of: "s:5cake12P1P9subscriptS2ici",
-        key.offset: 290,
+        key.offset: 316,
         key.length: 26,
         key.fully_annotated_decl: "<decl.function.subscript><syntaxtype.keyword>subscript</syntaxtype.keyword>(<decl.var.parameter><decl.var.parameter.name>a</decl.var.parameter.name>: <decl.var.parameter.type><ref.struct usr=\"s:Si\">Int</ref.struct></decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><ref.struct usr=\"s:Si\">Int</ref.struct></decl.function.returntype> { <syntaxtype.keyword>get</syntaxtype.keyword> <syntaxtype.keyword>set</syntaxtype.keyword> }</decl.function.subscript>",
         key.entities: [
@@ -527,10 +599,54 @@ extension P2 {
             key.kind: source.lang.swift.decl.var.local,
             key.keyword: "_",
             key.name: "a",
-            key.offset: 305,
+            key.offset: 331,
             key.length: 3
           }
         ]
+      }
+    ]
+  },
+  {
+    key.kind: source.lang.swift.decl.extension.protocol,
+    key.generic_requirements: [
+      {
+        key.description: "Self : P3"
+      }
+    ],
+    key.offset: 346,
+    key.length: 42,
+    key.extends: {
+      key.kind: source.lang.swift.ref.protocol,
+      key.name: "P2",
+      key.usr: "s:5cake12P2P"
+    },
+    key.entities: [
+      {
+        key.kind: source.lang.swift.decl.function.method.instance,
+        key.name: "fooConstraint()",
+        key.usr: "s:5cake12P2PA2aBRzAA2P3RzlE13fooConstraintyyF",
+        key.default_implementation_of: "s:5cake12P1P13fooConstraintyyF",
+        key.offset: 366,
+        key.length: 20,
+        key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>fooConstraint</decl.name>()</decl.function.method.instance>"
+      }
+    ]
+  },
+  {
+    key.kind: source.lang.swift.decl.protocol,
+    key.name: "P3",
+    key.usr: "s:5cake12P3P",
+    key.offset: 390,
+    key.length: 38,
+    key.fully_annotated_decl: "<decl.protocol><syntaxtype.keyword>protocol</syntaxtype.keyword> <decl.name>P3</decl.name></decl.protocol>",
+    key.entities: [
+      {
+        key.kind: source.lang.swift.decl.function.method.instance,
+        key.name: "p3Required()",
+        key.usr: "s:5cake12P3P10p3RequiredyyF",
+        key.offset: 409,
+        key.length: 17,
+        key.fully_annotated_decl: "<decl.function.method.instance><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>p3Required</decl.name>()</decl.function.method.instance>"
       }
     ]
   }
