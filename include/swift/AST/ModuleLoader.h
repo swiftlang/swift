@@ -24,38 +24,41 @@
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/TinyPtrVector.h"
 
+namespace clang {
+class DependencyCollector;
+}
+
 namespace swift {
 
 class AbstractFunctionDecl;
+class ClangImporterOptions;
 class ClassDecl;
 class ModuleDecl;
 class NominalTypeDecl;
 
 enum class KnownProtocolKind : uint8_t;
 
-/// Records dependencies on files outside of the current module.
+/// Records dependencies on files outside of the current module;
+/// implemented in terms of a wrapped clang::DependencyCollector.
 class DependencyTracker {
-  llvm::SetVector<std::string, std::vector<std::string>,
-                  llvm::SmallSet<std::string, 16>> paths;
-
+  std::shared_ptr<clang::DependencyCollector> clangCollector;
 public:
+
+  DependencyTracker(const ClangImporterOptions &Options);
+
   /// Adds a file as a dependency.
   ///
-  /// The contents of \p file are taken literally, and should be appropriate
+  /// The contents of \p File are taken literally, and should be appropriate
   /// for appearing in a list of dependencies suitable for tooling like Make.
   /// No path canonicalization is done.
-  void addDependency(StringRef file) {
-    paths.insert(file);
-  }
+  void addDependency(StringRef File, bool IsSystem);
 
   /// Fetches the list of dependencies.
-  ArrayRef<std::string> getDependencies() const {
-    if (paths.empty())
-      return None;
-    assert((&paths[0]) + (paths.size() - 1) == &paths.back() &&
-           "elements not stored contiguously");
-    return llvm::makeArrayRef(&paths[0], paths.size());
-  }
+  ArrayRef<std::string> getDependencies() const;
+
+  /// Return the underlying clang::DependencyCollector that this
+  /// class wraps.
+  std::shared_ptr<clang::DependencyCollector> getClangCollector();
 };
 
 /// \brief Abstract interface that loads named modules into the AST.
@@ -66,9 +69,9 @@ class ModuleLoader {
 protected:
   ModuleLoader(DependencyTracker *tracker) : dependencyTracker(tracker) {}
 
-  void addDependency(StringRef file) {
+  void addDependency(StringRef file, bool IsSystem=false) {
     if (dependencyTracker)
-      dependencyTracker->addDependency(file);
+      dependencyTracker->addDependency(file, IsSystem);
   }
 
 public:
