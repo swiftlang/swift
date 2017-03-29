@@ -247,15 +247,6 @@ def disable_swift_bridge_attr : Flag<["-"], "disable-swift-bridge-attr">,
   Flags<[FrontendOption, HelpHidden]>,
   HelpText<"Disable using the swift bridge attribute">;
 
-def enable_swift3_objc_inference : Flag<["-"], "enable-swift3-objc-inference">,
-  Flags<[FrontendOption, HelpHidden]>,
-HelpText<"Enable Swift 3's @objc inference rules for NSObject-derived classes and 'dynamic' members (emulates Swift 3 behavior)">;
-
-def disable_swift3_objc_inference :
-  Flag<["-"], "disable-swift3-objc-inference">,
-  Flags<[FrontendOption, HelpHidden]>,
-  HelpText<"Disable Swift 3's @objc inference rules for NSObject-derived classes and 'dynamic' members (emulates Swift 4 behavior)">;
-
 def enable_bridging_pch : Flag<["-"], "enable-bridging-pch">,
   Flags<[HelpHidden]>,
   HelpText<"Enable automatic generation of bridging PCH files">;
@@ -276,6 +267,10 @@ def warnings_as_errors : Flag<["-"], "warnings-as-errors">,
 def continue_building_after_errors : Flag<["-"], "continue-building-after-errors">,
   Flags<[FrontendOption, DoesNotAffectIncrementalBuild]>,
   HelpText<"Continue building, even after errors are encountered">;
+
+def warn_swift3_objc_inference : Flag<["-"], "warn-swift3-objc-inference">,
+  Flags<[FrontendOption, DoesNotAffectIncrementalBuild]>,
+  HelpText<"Warn about deprecated @objc inference in Swift 3">;
 
 // Platform options.
 def enable_app_extension : Flag<["-"], "application-extension">,

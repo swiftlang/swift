@@ -273,7 +273,7 @@ function(_compile_swift_files
   endif()
 
 	if (SWIFTFILE_IS_STDLIB_CORE OR SWIFTFILE_IS_SDK_OVERLAY)
-		list(APPEND swift_flags "-Xfrontend" "-warn-swift3-objc-inference")
+		list(APPEND swift_flags "-warn-swift3-objc-inference")
   endif()
 
   list(APPEND swift_flags ${SWIFT_EXPERIMENTAL_EXTRA_FLAGS})
