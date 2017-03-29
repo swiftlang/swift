@@ -466,8 +466,8 @@ bb0(%0 : $Int):
   unreachable
 }
 
-// CHECK-LABEL: sil [transparent] [fragile] @mightApply : $@convention(thin) <U where U : P> (@owned @callee_owned () -> @out U) -> ()
-sil [transparent] [fragile] @mightApply : $@convention(thin) <U where U : P> (@owned @callee_owned () -> @out U) -> () {
+// CHECK-LABEL: sil [transparent] [serialized] @mightApply : $@convention(thin) <U where U : P> (@owned @callee_owned () -> @out U) -> ()
+sil [transparent] [serialized] @mightApply : $@convention(thin) <U where U : P> (@owned @callee_owned () -> @out U) -> () {
 // CHECK: bb0
 bb0(%0 : $@callee_owned () -> @out U):
   debug_value %0 : $@callee_owned () -> @out U
@@ -641,8 +641,8 @@ bb0(%0 : $Int, %1 : $<τ_0_0 where τ_0_0 : Count> { var S<τ_0_0> } <T>):
   return %8 : $Bool
 }
 
-// CHECK-LABEL: sil [transparent] [fragile] @binary
-sil [transparent] [fragile] @binary : $@convention(thin) (Int, Int) -> Bool
+// CHECK-LABEL: sil [transparent] [serialized] @binary
+sil [transparent] [serialized] @binary : $@convention(thin) (Int, Int) -> Bool
 
 // CHECK-LABEL: sil @destroy_stack_value_after_closure
 sil @destroy_stack_value_after_closure : $@convention(thin) <T> (@in T) -> @out T {

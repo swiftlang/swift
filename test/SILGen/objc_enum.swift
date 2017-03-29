@@ -40,10 +40,10 @@ extension NSRuncingOptions: Bub {}
 // CHECK-64-DAG: integer_literal $Builtin.Int2048, 2147483648
 _ = NSFungingMask.toTheMax
 
-// CHECK-DAG: sil_witness_table shared [fragile] NSRuncingOptions: RawRepresentable module gizmo
-// CHECK-DAG: sil_witness_table shared [fragile] NSRuncingOptions: Equatable module gizmo
-// CHECK-DAG: sil_witness_table shared [fragile] NSRuncingOptions: Hashable module gizmo
-// CHECK-DAG: sil_witness_table shared [fragile] NSFungingMask: RawRepresentable module gizmo
+// CHECK-DAG: sil_witness_table shared [serialized] NSRuncingOptions: RawRepresentable module gizmo
+// CHECK-DAG: sil_witness_table shared [serialized] NSRuncingOptions: Equatable module gizmo
+// CHECK-DAG: sil_witness_table shared [serialized] NSRuncingOptions: Hashable module gizmo
+// CHECK-DAG: sil_witness_table shared [serialized] NSFungingMask: RawRepresentable module gizmo
 
 // CHECK-DAG: sil shared [transparent] [thunk] @_T0SC16NSRuncingOptionsOs16RawRepresentable5gizmosACP{{[_0-9a-zA-Z]*}}fCTW
 

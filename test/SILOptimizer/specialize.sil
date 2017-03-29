@@ -315,7 +315,7 @@ bb0(%0 : $Int32, %1 : $*T, %2 : $<τ_0_0> { var τ_0_0 } <U>):
 }
 
 // static Swift.+ infix (Swift.Int32, Swift.Int32) -> Swift.Int32
-sil public_external [transparent] [fragile] @_T0s1pois5Int32VAC_ACtFZ : $@convention(thin) (Int32, Int32) -> Int32 {
+sil public_external [transparent] [serialized] @_T0s1pois5Int32VAC_ACtFZ : $@convention(thin) (Int32, Int32) -> Int32 {
 bb0(%0 : $Int32, %1 : $Int32):
   %2 = struct_extract %0 : $Int32, #Int32._value   // user: %5
   %3 = struct_extract %1 : $Int32, #Int32._value   // user: %5

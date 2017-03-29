@@ -236,7 +236,7 @@ static SILFunction *genGetterFromInit(StoreInst *Store,
       Store->getLoc(),
       getterName, SILLinkage::Private, LoweredType,
       IsBare_t::IsBare, IsTransparent_t::IsNotTransparent,
-      IsFragile_t::IsFragile);
+      IsSerialized_t::IsSerialized);
   GetterF->setDebugScope(Store->getFunction()->getDebugScope());
   if (Store->getFunction()->hasUnqualifiedOwnership())
     GetterF->setUnqualifiedOwnership();
@@ -490,7 +490,7 @@ static SILFunction *genGetterFromInit(SILFunction *InitF, VarDecl *varDecl) {
       InitF->getLocation(),
       getterName, SILLinkage::Private, LoweredType,
       IsBare_t::IsBare, IsTransparent_t::IsNotTransparent,
-      IsFragile_t::IsFragile);
+      IsSerialized_t::IsSerialized);
   if (InitF->hasUnqualifiedOwnership())
     GetterF->setUnqualifiedOwnership();
 

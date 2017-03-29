@@ -381,7 +381,7 @@ runOnFunctionRecursively(SILFunction *F, FullApplySite AI,
           CalleeFunction->isTransparent() == IsNotTransparent)
         continue;
 
-      if (F->isFragile() &&
+      if (F->isSerialized() &&
           !CalleeFunction->hasValidLinkageForFragileRef()) {
         if (!CalleeFunction->hasValidLinkageForFragileInline()) {
           llvm::errs() << "caller: " << F->getName() << "\n";

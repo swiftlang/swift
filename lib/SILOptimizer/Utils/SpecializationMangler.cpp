@@ -20,7 +20,7 @@ using namespace Mangle;
 
 void SpecializationMangler::beginMangling() {
   ASTMangler::beginMangling();
-  if (Fragile)
+  if (Serialized)
     ArgOpBuffer << 'q';
   ArgOpBuffer << char(uint8_t(Pass) + '0');
 }
@@ -89,8 +89,8 @@ std::string PartialSpecializationMangler::mangle() {
 
 FunctionSignatureSpecializationMangler::
 FunctionSignatureSpecializationMangler(Demangle::SpecializationPass P,
-                                       IsFragile_t Fragile, SILFunction *F)
-  : SpecializationMangler(P, Fragile, F) {
+                                       IsSerialized_t Serialized, SILFunction *F)
+  : SpecializationMangler(P, Serialized, F) {
   for (unsigned i = 0, e = F->getConventions().getNumSILArguments(); i != e;
        ++i) {
     (void)i;

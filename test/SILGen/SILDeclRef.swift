@@ -62,7 +62,7 @@ public func testBase(b: Base) -> Int32 {
 // CHECK-NEXT:  #Base.deinit!deallocator: _T010SILDeclRef4BaseCfD	// Base.__deallocating_deinit
 // CHECK-NEXT: }
 
-// CHECK:sil_witness_table [fragile] Base: P module SILDeclRef {
+// CHECK:sil_witness_table [serialized] Base: P module SILDeclRef {
 // CHECK-NEXT: method #P.foo!1: <Self where Self : P> (Self) -> () -> Int32 : @_T010SILDeclRef4BaseCAA1PA2aDP3foos5Int32VyFTW	// protocol witness for P.foo() -> Int32 in conformance Base
 // CHECK-NEXT: method #P.foo!1: <Self where Self : P> (Self) -> (Int32) -> () : @_T010SILDeclRef4BaseCAA1PA2aDP3fooys5Int32V1n_tFTW	// protocol witness for P.foo(n : Int32) -> () in conformance Base
 // CHECK-NEXT: }

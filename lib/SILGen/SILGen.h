@@ -196,7 +196,7 @@ public:
                                            CanSILFunctionType thunkType,
                                            CanSILFunctionType fromType,
                                            CanSILFunctionType toType,
-                                           IsFragile_t Fragile);
+                                           IsSerialized_t Serialized);
 
   /// Determine whether the given class has any instance variables that
   /// need to be destroyed.

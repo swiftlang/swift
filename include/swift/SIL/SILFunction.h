@@ -147,14 +147,10 @@ private:
   unsigned Bare : 1;
 
   /// The function's transparent attribute.
-  unsigned Transparent : 1; // FIXME: pack this somewhere
+  unsigned Transparent : 1;
 
-  /// The function's fragile attribute.
-  ///
-  /// Fragile means that the function can be inlined into another module.
-  /// Currently this flag is set for public transparent functions and for all
-  /// functions in the stdlib.
-  unsigned Fragile : 1;
+  /// The function's serialized attribute.
+  unsigned Serialized : 2;
 
   /// Specifies if this function is a thunk or a reabstraction thunk.
   ///
@@ -218,16 +214,17 @@ private:
   SILFunction(SILModule &module, SILLinkage linkage, StringRef mangledName,
               CanSILFunctionType loweredType, GenericEnvironment *genericEnv,
               Optional<SILLocation> loc, IsBare_t isBareSILFunction,
-              IsTransparent_t isTrans, IsFragile_t isFragile, IsThunk_t isThunk,
-              ClassVisibility_t classVisibility, Inline_t inlineStrategy,
-              EffectsKind E, SILFunction *insertBefore,
+              IsTransparent_t isTrans, IsSerialized_t isSerialized,
+              IsThunk_t isThunk, ClassVisibility_t classVisibility,
+              Inline_t inlineStrategy, EffectsKind E,
+              SILFunction *insertBefore,
               const SILDebugScope *debugScope);
 
   static SILFunction *
   create(SILModule &M, SILLinkage linkage, StringRef name,
          CanSILFunctionType loweredType, GenericEnvironment *genericEnv,
          Optional<SILLocation> loc, IsBare_t isBareSILFunction,
-         IsTransparent_t isTrans, IsFragile_t isFragile,
+         IsTransparent_t isTrans, IsSerialized_t isSerialized,
          IsThunk_t isThunk = IsNotThunk,
          ClassVisibility_t classVisibility = NotRelevant,
          Inline_t inlineStrategy = InlineDefault,
@@ -385,7 +382,7 @@ public:
   /// Returns true if this function can be inlined into a fragile function
   /// body.
   bool hasValidLinkageForFragileInline() const {
-    return isFragile() || isThunk() == IsReabstractionThunk;
+    return isSerialized() || isThunk() == IsReabstractionThunk;
   }
 
   /// Returns true if this function can be referenced from a fragile function
@@ -515,9 +512,9 @@ public:
   IsTransparent_t isTransparent() const { return IsTransparent_t(Transparent); }
   void setTransparent(IsTransparent_t isT) { Transparent = isT; }
 
-  /// Get this function's fragile attribute.
-  IsFragile_t isFragile() const { return IsFragile_t(Fragile); }
-  void setFragile(IsFragile_t isFrag) { Fragile = isFrag; }
+  /// Get this function's serialized attribute.
+  IsSerialized_t isSerialized() const { return IsSerialized_t(Serialized); }
+  void setSerialized(IsSerialized_t isSerialized) { Serialized = isSerialized; }
 
   /// Get this function's thunk attribute.
   IsThunk_t isThunk() const { return IsThunk_t(Thunk); }

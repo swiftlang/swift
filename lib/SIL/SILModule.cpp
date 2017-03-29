@@ -232,7 +232,7 @@ SILFunction *SILModule::getOrCreateFunction(SILLocation loc,
                                             CanSILFunctionType type,
                                             IsBare_t isBareSILFunction,
                                             IsTransparent_t isTransparent,
-                                            IsFragile_t isFragile,
+                                            IsSerialized_t isSerialized,
                                             IsThunk_t isThunk,
                                             SILFunction::ClassVisibility_t CV) {
   if (auto fn = lookUpFunction(name)) {
@@ -244,7 +244,7 @@ SILFunction *SILModule::getOrCreateFunction(SILLocation loc,
 
   auto fn = SILFunction::create(*this, linkage, name, type, nullptr,
                                 loc, isBareSILFunction, isTransparent,
-                                isFragile, isThunk, CV);
+                                isSerialized, isThunk, CV);
   fn->setDebugScope(new (*this) SILDebugScope(loc, fn));
   return fn;
 }
@@ -347,9 +347,9 @@ SILFunction *SILModule::getOrCreateFunction(SILLocation loc,
   IsTransparent_t IsTrans = constant.isTransparent()
                             ? IsTransparent
                             : IsNotTransparent;
-  IsFragile_t IsFrag = constant.isFragile()
-                       ? IsFragile
-                       : IsNotFragile;
+  IsSerialized_t IsSer = constant.isSerialized()
+                       ? IsSerialized
+                       : IsNotSerialized;
 
   EffectsKind EK = constant.hasEffectsAttribute()
                    ? constant.getEffectsAttribute()
@@ -363,7 +363,7 @@ SILFunction *SILModule::getOrCreateFunction(SILLocation loc,
 
   auto *F = SILFunction::create(*this, linkage, name,
                                 constantType, nullptr,
-                                None, IsNotBare, IsTrans, IsFrag, IsNotThunk,
+                                None, IsNotBare, IsTrans, IsSer, IsNotThunk,
                                 getClassVisibility(constant),
                                 inlineStrategy, EK);
   F->setDebugScope(new (*this) SILDebugScope(loc, F));
@@ -411,22 +411,23 @@ SILFunction *SILModule::getOrCreateSharedFunction(SILLocation loc,
                                                   CanSILFunctionType type,
                                                   IsBare_t isBareSILFunction,
                                                   IsTransparent_t isTransparent,
-                                                  IsFragile_t isFragile,
+                                                  IsSerialized_t isSerialized,
                                                   IsThunk_t isThunk) {
   return getOrCreateFunction(loc, name, SILLinkage::Shared,
-                             type, isBareSILFunction, isTransparent, isFragile,
+                             type, isBareSILFunction, isTransparent, isSerialized,
                              isThunk, SILFunction::NotRelevant);
 }
 
 SILFunction *SILModule::createFunction(
     SILLinkage linkage, StringRef name, CanSILFunctionType loweredType,
     GenericEnvironment *genericEnv, Optional<SILLocation> loc,
-    IsBare_t isBareSILFunction, IsTransparent_t isTrans, IsFragile_t isFragile,
-    IsThunk_t isThunk, SILFunction::ClassVisibility_t classVisibility,
+    IsBare_t isBareSILFunction, IsTransparent_t isTrans,
+    IsSerialized_t isSerialized, IsThunk_t isThunk,
+    SILFunction::ClassVisibility_t classVisibility,
     Inline_t inlineStrategy, EffectsKind EK, SILFunction *InsertBefore,
     const SILDebugScope *DebugScope) {
   return SILFunction::create(*this, linkage, name, loweredType, genericEnv, loc,
-                             isBareSILFunction, isTrans, isFragile, isThunk,
+                             isBareSILFunction, isTrans, isSerialized, isThunk,
                              classVisibility, inlineStrategy, EK, InsertBefore,
                              DebugScope);
 }
@@ -556,7 +557,7 @@ SILFunction *SILModule::findFunction(StringRef Name, SILLinkage Linkage) {
     F->convertToDeclaration();
   }
   if (F->isExternalDeclaration())
-    F->setFragile(IsFragile_t::IsNotFragile);
+    F->setSerialized(IsSerialized_t::IsNotSerialized);
   F->setLinkage(Linkage);
   return F;
 }

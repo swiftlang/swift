@@ -266,7 +266,7 @@ public:
   /// source file, starting from the specified element number.
   ///
   /// If \p makeModuleFragile is true, all functions and global variables of
-  /// the module are marked as fragile. This is used for compiling the stdlib.
+  /// the module are marked as serialized. This is used for compiling the stdlib.
   static std::unique_ptr<SILModule>
   constructSIL(ModuleDecl *M, SILOptions &Options, FileUnit *sf = nullptr,
                Optional<unsigned> startElem = None,
@@ -466,7 +466,7 @@ public:
                                          CanSILFunctionType type,
                                          IsBare_t isBareSILFunction,
                                          IsTransparent_t isTransparent,
-                                         IsFragile_t isFragile,
+                                         IsSerialized_t isSerialized,
                                          IsThunk_t isThunk);
 
   /// \brief Return the declaration of a function, or create it if it doesn't
@@ -477,7 +477,7 @@ public:
                                    CanSILFunctionType type,
                                    IsBare_t isBareSILFunction,
                                    IsTransparent_t isTransparent,
-                                   IsFragile_t isFragile,
+                                   IsSerialized_t isSerialized,
                                    IsThunk_t isThunk = IsNotThunk,
                                    SILFunction::ClassVisibility_t CV =
                                            SILFunction::NotRelevant);
@@ -497,7 +497,7 @@ public:
       SILLinkage linkage, StringRef name, CanSILFunctionType loweredType,
       GenericEnvironment *genericEnv, Optional<SILLocation> loc,
       IsBare_t isBareSILFunction, IsTransparent_t isTrans,
-      IsFragile_t isFragile, IsThunk_t isThunk = IsNotThunk,
+      IsSerialized_t isSerialized, IsThunk_t isThunk = IsNotThunk,
       SILFunction::ClassVisibility_t classVisibility = SILFunction::NotRelevant,
       Inline_t inlineStrategy = InlineDefault,
       EffectsKind EK = EffectsKind::Unspecified,
