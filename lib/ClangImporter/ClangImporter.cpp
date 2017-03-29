@@ -124,12 +124,24 @@ namespace {
   };
 
   class PCHDeserializationCallbacks : public clang::ASTDeserializationListener {
+    ClangImporter &Importer;
     ClangImporter::Implementation &Impl;
   public:
-    explicit PCHDeserializationCallbacks(ClangImporter::Implementation &impl)
-      : Impl(impl) {}
+    explicit PCHDeserializationCallbacks(ClangImporter &importer,
+                                         ClangImporter::Implementation &impl)
+      : Importer(importer),
+        Impl(impl) {}
+
+    void ReaderAttached(clang::ASTReader *Reader) override {
+      if (Impl.IsReadingBridgingPCH) {
+        Reader->addListener(
+          std::unique_ptr<clang::ASTReaderListener>(
+            new ASTReaderCallbacks(Importer)));
+      }
+    }
+
     void ModuleImportRead(clang::serialization::SubmoduleID ID,
-                          clang::SourceLocation ImportLoc) {
+                          clang::SourceLocation ImportLoc) override {
       if (Impl.IsReadingBridgingPCH) {
         Impl.PCHImportedSubmodules.push_back(ID);
       }
@@ -140,8 +152,9 @@ namespace {
     SmallVector<clang::DeclGroupRef, 4> DeclGroups;
     PCHDeserializationCallbacks PCHCallbacks;
   public:
-    explicit HeaderParsingASTConsumer(ClangImporter::Implementation &impl)
-      : PCHCallbacks(impl) {}
+    explicit HeaderParsingASTConsumer(ClangImporter &importer,
+                                      ClangImporter::Implementation &impl)
+      : PCHCallbacks(importer, impl) {}
     void
     HandleTopLevelDeclInObjCContainer(clang::DeclGroupRef decls) override {
       DeclGroups.push_back(decls);
@@ -171,7 +184,7 @@ namespace {
       : Ctx(ctx), Importer(importer), Impl(impl) {}
     std::unique_ptr<clang::ASTConsumer>
     CreateASTConsumer(clang::CompilerInstance &CI, StringRef InFile) override {
-      return llvm::make_unique<HeaderParsingASTConsumer>(Impl);
+      return llvm::make_unique<HeaderParsingASTConsumer>(Importer, Impl);
     }
     bool BeginSourceFileAction(CompilerInstance &CI,
                                StringRef Filename) override {
@@ -807,10 +820,12 @@ ClangImporter::create(ASTContext &ctx,
   auto ppTracker = llvm::make_unique<BridgingPPTracker>(importer->Impl);
   clangPP.addPPCallbacks(std::move(ppTracker));
 
-  instance.createModuleManager();
-  instance.getModuleManager()->addListener(
-         std::unique_ptr<clang::ASTReaderListener>(
-                 new ASTReaderCallbacks(*importer)));
+  if (!importer->Impl.IsReadingBridgingPCH) {
+    instance.createModuleManager();
+    instance.getModuleManager()->addListener(
+      std::unique_ptr<clang::ASTReaderListener>(
+        new ASTReaderCallbacks(*importer)));
+  }
 
   // Manually run the action, so that the TU stays open for additional parsing.
   instance.createSema(action->getTranslationUnitKind(), nullptr);
