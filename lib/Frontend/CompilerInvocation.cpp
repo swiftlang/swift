@@ -188,6 +188,8 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
     Args.hasArg(OPT_debug_time_expression_type_checking);
   Opts.DebugTimeCompilation |= Args.hasArg(OPT_debug_time_compilation);
 
+  Opts.ValidateTBDAgainstIR |= Args.hasArg(OPT_validate_tbd_against_ir);
+
   if (const Arg *A = Args.getLastArg(OPT_warn_long_function_bodies)) {
     unsigned attempt;
     if (StringRef(A->getValue()).getAsInteger(10, attempt)) {
@@ -267,6 +269,8 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
       Action = FrontendOptions::EmitPCH;
     } else if (Opt.matches(OPT_emit_imported_modules)) {
       Action = FrontendOptions::EmitImportedModules;
+    } else if (Opt.matches(OPT_emit_tbd)) {
+      Action = FrontendOptions::EmitTBD;
     } else if (Opt.matches(OPT_parse)) {
       Action = FrontendOptions::Parse;
     } else if (Opt.matches(OPT_typecheck)) {
@@ -552,6 +556,13 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
       else
         Suffix = "importedmodules";
       break;
+
+    case FrontendOptions::EmitTBD:
+      if (Opts.OutputFilenames.empty())
+        Opts.setSingleOutputFilename("-");
+      else
+        Suffix = "tbd";
+      break;
     }
 
     if (!Suffix.empty()) {
@@ -707,6 +718,7 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
     case FrontendOptions::EmitAssembly:
     case FrontendOptions::EmitObject:
     case FrontendOptions::EmitImportedModules:
+    case FrontendOptions::EmitTBD:
       break;
     }
   }
@@ -737,6 +749,7 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
     case FrontendOptions::EmitAssembly:
     case FrontendOptions::EmitObject:
     case FrontendOptions::EmitImportedModules:
+    case FrontendOptions::EmitTBD:
       break;
     }
   }
@@ -771,6 +784,7 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
     case FrontendOptions::EmitAssembly:
     case FrontendOptions::EmitObject:
     case FrontendOptions::EmitImportedModules:
+    case FrontendOptions::EmitTBD:
       break;
     }
   }
