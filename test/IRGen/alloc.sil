@@ -20,7 +20,6 @@ struct Huge {
 }
 
 // CHECK: @_swift_slowAlloc = external global i8* ([[SIZE_T:i(32|64)]],
-// CHECK: define linkonce_odr hidden i8* @swift_rt_swift_slowAlloc([[SIZE_T:i(32|64)]],
 
 // CHECK:    define linkonce_odr hidden void @_T04main4HugeVwde(
 // CHECK:      [[T0:%.*]] = bitcast [[BUFFER:.[0-9]+ x i8.]]* {{%.*}} to i8**
@@ -28,7 +27,9 @@ struct Huge {
 // CHECK-NEXT: call void @swift_rt_swift_slowDealloc(i8* [[T1]], [[SIZE_T]] 4097, [[SIZE_T]] 7)
 // CHECK-NEXT: ret void
 
-// CHECK:    define linkonce_odr hidden [[OPAQUE:%swift.opaque]]* @_T04main4HugeVwal(
-// CHECK:      [[T0:%.*]] = call noalias i8* @swift_rt_swift_slowAlloc([[SIZE_T]] 4097, [[SIZE_T]] 7)
-// CHECK-NEXT: [[T1:%.*]] = bitcast [[BUFFER]]* {{%.*}} to i8**
-// CHECK-NEXT: store i8* [[T0]], i8** [[T1]]
+
+// CHECK:    define linkonce_odr hidden [[OPAQUE:%swift.opaque]]* @_T04main4HugeVwal({{.*}}* [[BUFFER:%.*]], %swift.type
+// CHECK:  [[BOXPAIR:%.*]] = call { %swift.refcounted*, %swift.opaque* } @swift_allocBox({{.*}} @_T04main4HugeVMf
+// CHECK:  [[REF:%.*]] = extractvalue { %swift.refcounted*, %swift.opaque* } %0, 0
+// CHECK:  [[BUFFER_ADDR:%.*]] = bitcast {{.*}}* [[BUFFER]] to %swift.refcounted**
+// CHECK:  store %swift.refcounted* [[REF]], %swift.refcounted** [[BUFFER_ADDR]]
