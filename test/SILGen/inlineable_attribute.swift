@@ -56,3 +56,21 @@ public struct HasInitializers {
 
   @_inlineable public init() {}
 }
+
+public class Horse {
+  public func gallop() {}
+}
+
+// CHECK-LABEL: sil [serialized] @_T020inlineable_attribute15talkAboutAHorseyAA5HorseC1h_tF : $@convention(thin) (@owned Horse) -> () {
+// CHECK: function_ref @_T020inlineable_attribute5HorseC6gallopyyFTc
+// CHECK: return
+// CHECK: }
+
+// CHECK-LABEL: sil shared [serializable] [thunk] @_T020inlineable_attribute5HorseC6gallopyyFTc : $@convention(thin) (@owned Horse) -> @owned @callee_owned () -> () {
+// CHECK: class_method
+// CHECK: return
+// CHECK: }
+
+@_inlineable public func talkAboutAHorse(h: Horse) {
+  _ = h.gallop
+}

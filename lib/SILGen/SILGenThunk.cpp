@@ -38,14 +38,9 @@ SILFunction *SILGenModule::getDynamicThunk(SILDeclRef constant,
   // Mangle the constant with a _TTD header.
   auto name = constant.mangle(SILDeclRef::ManglingKind::DynamicThunk);
 
-  IsSerialized_t isSerialized = IsNotSerialized;
-  if (makeModuleFragile)
-    isSerialized = IsSerialized;
-  if (constant.isSerialized())
-    isSerialized = IsSerialized;
   auto F = M.getOrCreateFunction(constant.getDecl(), name, SILLinkage::Shared,
-                            constantInfo.getSILType().castTo<SILFunctionType>(),
-                            IsBare, IsTransparent, isSerialized, IsThunk);
+                                 constantInfo.SILFnType, IsBare, IsTransparent,
+                                 IsSerializable, IsThunk);
 
   if (F->empty()) {
     // Emit the thunk if we haven't yet.

@@ -10,7 +10,7 @@ func callInitializer() {
   _ = GenericClass(thing: NSObject())
 }
 
-// CHECK-LABEL: sil shared @_T0So12GenericClassCSQyAByxGGSQyxG5thing_tcfC
+// CHECK-LABEL: sil shared [serializable] @_T0So12GenericClassCSQyAByxGGSQyxG5thing_tcfC
 // CHECK:         thick_to_objc_metatype {{%.*}} : $@thick GenericClass<T>.Type to $@objc_metatype GenericClass<T>.Type
 
 public func genericMethodOnAnyObject(o: AnyObject, b: Bool) -> AnyObject {
@@ -128,14 +128,14 @@ func configureWithoutOptions() {
 // foreign to native thunk for init(options:), uses GenericOption : Hashable
 // conformance
 
-// CHECK-LABEL: sil shared [thunk] @_T0So12GenericClassCSQyAByxGGs10DictionaryVySC0A6OptionVypGSg7options_tcfcTO : $@convention(method) <T where T : AnyObject> (@owned Optional<Dictionary<GenericOption, Any>>, @owned GenericClass<T>) -> @owned Optional<GenericClass<T>>
+// CHECK-LABEL: sil shared [serializable] [thunk] @_T0So12GenericClassCSQyAByxGGs10DictionaryVySC0A6OptionVypGSg7options_tcfcTO : $@convention(method) <T where T : AnyObject> (@owned Optional<Dictionary<GenericOption, Any>>, @owned GenericClass<T>) -> @owned Optional<GenericClass<T>>
 // CHECK: [[FN:%.*]] = function_ref @_T0s10DictionaryV10FoundationE19_bridgeToObjectiveCSo12NSDictionaryCyF : $@convention(method) <τ_0_0, τ_0_1 where τ_0_0 : Hashable> (@guaranteed Dictionary<τ_0_0, τ_0_1>) -> @owned NSDictionary
 // CHECK: apply [[FN]]<GenericOption, Any>({{.*}}) : $@convention(method) <τ_0_0, τ_0_1 where τ_0_0 : Hashable> (@guaranteed Dictionary<τ_0_0, τ_0_1>) -> @owned NSDictionary
 // CHECK: return
 
 // This gets emitted down here for some reason
 
-// CHECK-LABEL: sil shared [thunk] @_T0So12GenericClassCSQyAByxGGSayxG13arrayOfThings_tcfcTO
+// CHECK-LABEL: sil shared [serializable] [thunk] @_T0So12GenericClassCSQyAByxGGSayxG13arrayOfThings_tcfcTO
 // CHECK:         class_method [volatile] {{%.*}} : $GenericClass<T>, #GenericClass.init!initializer.1.foreign {{.*}}, $@convention(objc_method) @pseudogeneric <τ_0_0 where τ_0_0 : AnyObject> (NSArray, @owned GenericClass<τ_0_0>) -> @owned Optional<GenericClass<τ_0_0>>
 
 // Make sure we emitted the witness table for the above conformance

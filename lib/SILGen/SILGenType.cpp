@@ -640,7 +640,9 @@ SILGenModule::emitProtocolWitness(ProtocolConformance *conformance,
   IsSerialized_t isSerialized = IsNotSerialized;
   if (makeModuleFragile)
     isSerialized = IsSerialized;
-  if (witnessRef.isSerialized())
+  if (witnessRef.isSerialized() &&
+      (hasSharedVisibility(linkage) ||
+       hasPublicVisibility(linkage)))
     isSerialized = IsSerialized;
 
   auto *f = M.createFunction(

@@ -76,7 +76,7 @@ protocol Proto {
 // TODO: dynamic initializing ctor must be objc dispatched
 // CHECK-LABEL: sil hidden @_T07dynamic3{{[_0-9a-zA-Z]*}}fC
 // CHECK:         function_ref @_T07dynamic3{{[_0-9a-zA-Z]*}}fcTD
-// CHECK-LABEL: sil shared [transparent] [thunk] @_T07dynamic3{{[_0-9a-zA-Z]*}}fcTD
+// CHECK-LABEL: sil shared [transparent] [serializable] [thunk] @_T07dynamic3{{[_0-9a-zA-Z]*}}fcTD
 // CHECK:         class_method [volatile] {{%.*}} : $Foo, #Foo.init!initializer.1.foreign :
 
 // CHECK-LABEL: sil hidden [thunk] @_T07dynamic3{{[_0-9a-zA-Z]*}}fcTo
@@ -115,27 +115,27 @@ protocol Proto {
 // Dynamic witnesses use objc dispatch:
 // CHECK-LABEL: sil hidden [transparent] [thunk] @_T07dynamic3FooCAA5ProtoA2aDP0A6Method{{[_0-9a-zA-Z]*}}FTW
 // CHECK:         function_ref @_T07dynamic3FooC0A6Method{{[_0-9a-zA-Z]*}}FTD
-// CHECK-LABEL: sil shared [transparent] [thunk] @_T07dynamic3FooC0A6Method{{[_0-9a-zA-Z]*}}FTD
+// CHECK-LABEL: sil shared [transparent] [serializable] [thunk] @_T07dynamic3FooC0A6Method{{[_0-9a-zA-Z]*}}FTD
 // CHECK:         class_method [volatile] {{%.*}} : $Foo, #Foo.dynamicMethod!1.foreign :
 
 // CHECK-LABEL: sil hidden [transparent] [thunk] @_T07dynamic3FooCAA5ProtoA2aDP0A4PropSifgTW
 // CHECK:         function_ref @_T07dynamic3FooC0A4PropSifgTD
-// CHECK-LABEL: sil shared [transparent] [thunk] @_T07dynamic3FooC0A4PropSifgTD
+// CHECK-LABEL: sil shared [transparent] [serializable] [thunk] @_T07dynamic3FooC0A4PropSifgTD
 // CHECK:         class_method [volatile] {{%.*}} : $Foo, #Foo.dynamicProp!getter.1.foreign :
 
 // CHECK-LABEL: sil hidden [transparent] [thunk] @_T07dynamic3FooCAA5ProtoA2aDP0A4PropSifsTW
 // CHECK:         function_ref @_T07dynamic3FooC0A4PropSifsTD
-// CHECK-LABEL: sil shared [transparent] [thunk] @_T07dynamic3FooC0A4PropSifsTD
+// CHECK-LABEL: sil shared [transparent] [serializable] [thunk] @_T07dynamic3FooC0A4PropSifsTD
 // CHECK:         class_method [volatile] {{%.*}} : $Foo, #Foo.dynamicProp!setter.1.foreign :
 
 // CHECK-LABEL: sil hidden [transparent] [thunk] @_T07dynamic3FooCAA5ProtoA2aDP9subscriptS2iAA_tcfgTW
 // CHECK:         function_ref @_T07dynamic3FooC9subscriptS2iAA_tcfgTD
-// CHECK-LABEL: sil shared [transparent] [thunk] @_T07dynamic3FooC9subscriptS2iAA_tcfgTD
+// CHECK-LABEL: sil shared [transparent] [serializable] [thunk] @_T07dynamic3FooC9subscriptS2iAA_tcfgTD
 // CHECK:         class_method [volatile] {{%.*}} : $Foo, #Foo.subscript!getter.1.foreign :
 
 // CHECK-LABEL: sil hidden [transparent] [thunk] @_T07dynamic3FooCAA5ProtoA2aDP9subscriptS2iAA_tcfsTW
 // CHECK:         function_ref @_T07dynamic3FooC9subscriptS2iAA_tcfsTD
-// CHECK-LABEL: sil shared [transparent] [thunk] @_T07dynamic3FooC9subscriptS2iAA_tcfsTD
+// CHECK-LABEL: sil shared [transparent] [serializable] [thunk] @_T07dynamic3FooC9subscriptS2iAA_tcfsTD
 // CHECK:         class_method [volatile] {{%.*}} : $Foo, #Foo.subscript!setter.1.foreign :
 
 // Superclass dispatch
