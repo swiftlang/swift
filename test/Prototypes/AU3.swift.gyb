@@ -925,6 +925,21 @@ extension String {
   }
 }
 
+//===--- StringCore -------------------------------------------------------===//
+import Swift
+extension String {
+  // FIXME: this is a kludgy method, but then again, we want to wean everything
+  // off of it...
+  public var _core: _StringCore {
+    get {
+      return Swift.String(self)._core
+    }
+    set {
+      self = String(Swift.String(newValue))
+    }
+  }
+}
+
 //===--- Objective C Bridging ---------------------------------------------===//
 import Foundation
 extension String : _ObjectiveCBridgeable {
@@ -1571,6 +1586,25 @@ suite.test("fcc-normalized-view") {
     expectEqualSequence(norm1rev, norm2rev)
     expectEqualSequence(norm1, form2)
   }
+}
+
+suite.test("_StringCore") {
+  let oldStr : Swift.String = "abcdefg"
+  let newStr : String = "abcdefg"
+  expectEqualSequence(oldStr._core, newStr._core)
+
+  // abcdefg ==> abcdef
+  var str = String()
+  str._core = newStr._core.dropLast()
+  expectEqualSequence(Swift.String("abcdef")!._core, str._core)
+
+  // abcdef ==> abc̀df
+  var idx = str._core.startIndex
+  idx = str._core.index(idx, offsetBy: 3)
+  str._core.insert(contentsOf: [0x0300], at: idx)
+  idx = str._core.index(idx, offsetBy: 2)
+  str._core.remove(at: idx)
+  expectEqualSequence(Swift.String("abc̀df")!._core, str._core)
 }
 
 suite.test("bridging") {
