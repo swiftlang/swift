@@ -635,6 +635,15 @@ extension PackedUnsignedIntegers : RandomAccessCollection {
 extension String.Content {
   public init() { _rep = .utf16(._emptyInstance()) }
 
+  public init(_ ns: _NSStringCore) {
+    if let nonTagged = TrueReference(ns) {
+      _rep = .cocoa(NSStringPayload(nonTagged))
+    }
+    else {
+      self = String.Content(utf16: _NSStringUTF16(base: ns))
+    }
+  }
+  
   public init<C: Collection>(utf16 source: C)
   where C.Iterator.Element == UTF16.CodeUnit {
     if source.isEmpty {
@@ -915,6 +924,75 @@ extension String {
     }
   }
 }
+
+//===--- Objective C Bridging ---------------------------------------------===//
+import Foundation
+extension String : _ObjectiveCBridgeable {
+  internal static func _withSmallUTF16<R, C: Collection>(
+    _ c: C,
+    body: (UnsafeBufferPointer<UTF16.CodeUnit>) throws->R
+  ) rethrows -> R
+  where C.Iterator.Element == UTF16.CodeUnit
+  {
+    let z: UTF16.CodeUnit = 0
+    var buffer = (z,z,z,z,z,z,z,z,z,z,z,z)
+    let capacity = MemoryLayout.size(ofValue: buffer)
+      / MemoryLayout.size(ofValue: buffer.0)
+    return try withUnsafeMutablePointer(to: &buffer.0) { p in
+      var (tail, count) = c._copyContents(
+        initializing: UnsafeMutableBufferPointer(start: p, count: capacity))
+      _debugPrecondition(tail.next() == nil)
+      return try body(UnsafeBufferPointer(start: p, count: count))
+    }
+  }
+  
+  @_semantics("convertToObjectiveC")
+  public func _bridgeToObjectiveC() -> NSString {
+    switch content._rep {
+    case .latin1(let x): return unsafeDowncast(x, to: NSString.self)
+    case .utf16(let x): return unsafeDowncast(x, to: NSString.self)
+    case .cocoa(let x): return unsafeDowncast(x.object, to: NSString.self)
+    case .any(let x): return unsafeDowncast(
+        _UTF16StringStorage(x.utf16), to: NSString.self)
+    case .inline5or6(let x):
+      return String._withSmallUTF16(x.utf16) {
+        NSString(characters: $0.baseAddress, length: $0.count)
+      }
+    case .inline7or16(let x):
+      return String._withSmallUTF16(x.utf16) {
+        NSString(characters: $0.baseAddress, length: $0.count)
+      }
+    }
+  }
+
+  public static func _forceBridgeFromObjectiveC(
+    _ x: NSString,
+    result: inout String?
+  ) {
+    result = _unconditionallyBridgeFromObjectiveC(x)
+  }
+
+  public static func _conditionallyBridgeFromObjectiveC(
+    _ x: NSString,
+    result: inout String?
+  ) -> Bool {
+    self._forceBridgeFromObjectiveC(x, result: &result)
+    return result != nil
+  }
+
+  public static func _unconditionallyBridgeFromObjectiveC(
+    _ source: NSString?
+  ) -> String {
+    // `nil` has historically been used as a stand-in for an empty
+    // string; map it to an empty string.
+    if _slowPath(source == nil) { return String() }
+    return String(
+      content: String.Content(
+        unsafeBitCast(
+          source!.copy() as! NSString, to: _NSStringCore.self)))
+  }
+}
+
 
 //===----------------------------------------------------------------------===//
 //===--- Tests ------------------------------------------------------------===//
@@ -1492,6 +1570,35 @@ suite.test("fcc-normalized-view") {
     expectEqualSequence(norm1, norm2)
     expectEqualSequence(norm1rev, norm2rev)
     expectEqualSequence(norm1, form2)
+  }
+}
+
+suite.test("bridging") {
+  do {
+    let s: String = "abc\n🇸🇸🇬🇱🇱🇸🇩🇯🇺🇸\nΣὲ 👥🥓γνωρίζω\nგთხოვთ\nงบู๊กู้ขึ้นม่\nᚹᛖᛥᚫ"
+    let n = s as NSString
+    expectNotNil(TrueReference(n))
+    let s2 = n as String
+    expectEqual(s, s2)
+  }
+
+  do {
+    let s: String = "ace of case"
+    expectNotNil(s.content._inline5or6)
+    let n = s as NSString
+    expectNil(TrueReference(n))
+    let s2 = n as String
+    expectEqual(s, s2)
+  }
+  
+  do {
+    let s: String = "UL2O85"
+    expectNotNil(s.content._inline7or16)
+    expectEqualSequence("UL2O85".characters, s)
+    let n = s as NSString
+    expectNil(TrueReference(n))
+    let s2 = n as String
+    expectEqual(s, s2)
   }
 }
 
