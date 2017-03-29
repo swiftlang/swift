@@ -294,7 +294,50 @@ private:
     Impl.BridgeHeaderMacros.push_back(MacroNameTok.getIdentifierInfo());
   }
 };
+
+class ClangImporterDependencyCollector : public clang::DependencyCollector
+{
+  llvm::StringSet<> ExcludedPaths;
+public:
+  ClangImporterDependencyCollector() = default;
+
+  void excludePath(StringRef filename) {
+    ExcludedPaths.insert(filename);
+  }
+
+  bool isClangImporterSpecialName(StringRef Filename) {
+    using ImporterImpl = ClangImporter::Implementation;
+    return (Filename == ImporterImpl::moduleImportBufferName
+            || Filename == ImporterImpl::bridgingHeaderBufferName);
+  }
+
+  // Currently preserving older ClangImporter behaviour of ignoring system
+  // dependencies, but possibly revisit?
+  bool needSystemDependencies() override { return false; }
+
+  bool sawDependency(StringRef Filename, bool FromClangModule,
+                     bool IsSystem, bool IsClangModuleFile,
+                     bool IsMissing) override {
+    if (!clang::DependencyCollector::sawDependency(Filename, FromClangModule,
+                                                   IsSystem, IsClangModuleFile,
+                                                   IsMissing))
+      return false;
+    // Currently preserving older ClangImporter behaviour of ignoring .pcm
+    // file dependencies, but possibly revisit?
+    if (IsClangModuleFile
+        || isClangImporterSpecialName(Filename)
+        || ExcludedPaths.count(Filename))
+      return false;
+    return true;
+  }
+};
 } // end anonymous namespace
+
+std::shared_ptr<clang::DependencyCollector>
+ClangImporter::createDependencyCollector()
+{
+  return std::make_shared<ClangImporterDependencyCollector>();
+}
 
 void ClangImporter::Implementation::addBridgeHeaderTopLevelDecls(
     clang::Decl *D) {
@@ -689,6 +732,14 @@ ClangImporter::create(ASTContext &ctx,
   if (llvm::sys::path::extension(importerOpts.BridgingHeader).endswith(
         PCH_EXTENSION)) {
     importer->Impl.IsReadingBridgingPCH = true;
+    if (tracker) {
+      // Currently ignoring dependency on bridging .pch files because they are
+      // temporaries; if and when they are no longer temporaries, this condition
+      // should be removed.
+      auto &coll = static_cast<ClangImporterDependencyCollector &>(
+        *tracker->getClangCollector());
+      coll.excludePath(importerOpts.BridgingHeader);
+    }
   }
 
   // FIXME: These can't be controlled from the command line.
@@ -877,59 +928,6 @@ bool ClangImporter::addSearchPath(StringRef newSearchPath, bool isFramework,
                                                /*IgnoreSysRoot=*/true);
   return false;
 }
-
-namespace {
-class ClangImporterDependencyCollector : public clang::DependencyCollector
-{
-  const ClangImporterOptions &Options;
-  const bool BridgingHeaderIsPCH;
-  public:
-  ClangImporterDependencyCollector(const ClangImporterOptions &Options)
-    : Options(Options),
-      BridgingHeaderIsPCH(
-          llvm::sys::path::extension(
-              Options.BridgingHeader).endswith(PCH_EXTENSION))
-  {}
-
-  bool isClangImporterSpecialName(StringRef Filename) {
-    using ImporterImpl = ClangImporter::Implementation;
-    return (Filename == ImporterImpl::moduleImportBufferName
-            || Filename == ImporterImpl::bridgingHeaderBufferName
-            // Currently ignoring dependency on bridging .pch files because
-            // they are temporaries; if and when they are no longer
-            // temporaries, this condition should be removed.
-            || (BridgingHeaderIsPCH
-                && Filename == Options.BridgingHeader));
-  }
-
-  // Currently preserving older ClangImporter behaviour of ignoring system
-  // dependencies, but possibly revisit?
-  bool needSystemDependencies() override { return false; }
-
-  bool sawDependency(StringRef Filename, bool FromClangModule,
-                     bool IsSystem, bool IsClangModuleFile,
-                     bool IsMissing) override {
-    if (!clang::DependencyCollector::sawDependency(Filename, FromClangModule,
-                                                   IsSystem, IsClangModuleFile,
-                                                   IsMissing))
-      return false;
-    // Currently preserving older ClangImporter behaviour of ignoring .pcm
-    // file dependencies, but possibly revisit?
-    if (IsClangModuleFile)
-      return false;
-    if (isClangImporterSpecialName(Filename))
-      return false;
-    return true;
-  }
-};
-}
-
-std::shared_ptr<clang::DependencyCollector>
-ClangImporter::createDependencyCollector(const ClangImporterOptions &Options)
-{
-  return std::make_shared<ClangImporterDependencyCollector>(Options);
-}
-
 
 bool ClangImporter::Implementation::importHeader(
     ModuleDecl *adapter, StringRef headerName, SourceLoc diagLoc,

@@ -95,10 +95,10 @@ public:
 
   ~ClangImporter();
 
-  /// \brief Create a new clang::DependencyCollector customized to Swift's
-  /// specific uses.
+  /// \brief Create a new clang::DependencyCollector customized to
+  /// ClangImporter's specific uses.
   static std::shared_ptr<clang::DependencyCollector>
-  createDependencyCollector(const ClangImporterOptions &Options);
+  createDependencyCollector();
 
   /// \brief Check whether the module with a given name can be imported without
   /// importing it.
