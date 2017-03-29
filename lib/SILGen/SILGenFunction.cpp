@@ -136,7 +136,7 @@ SILGenFunction::emitSiblingMethodRef(SILLocation loc,
   // If the method is dynamic, access it through runtime-hookable virtual
   // dispatch (viz. objc_msgSend for now).
   if (methodConstant.hasDecl()
-      && methodConstant.getDecl()->getAttrs().hasAttribute<DynamicAttr>())
+      && methodConstant.getDecl()->isDynamic())
     methodValue = emitDynamicMethodRef(loc, methodConstant,
                                      SGM.Types.getConstantInfo(methodConstant));
   else

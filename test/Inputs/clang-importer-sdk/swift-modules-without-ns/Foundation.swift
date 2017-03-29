@@ -2,11 +2,11 @@
 @_exported import CoreGraphics
 @_exported import Foundation
 
-@_silgen_name("swift_StringToNSString") internal
-func _convertStringToNSString(_ string: String) -> NSString
+@_silgen_name("swift_StringToNSString")
+public func _convertStringToNSString(_ string: String) -> NSString
 
-@_silgen_name("swift_NSStringToString") internal
-func _convertNSStringToString(_ nsstring: NSString?) -> String
+@_silgen_name("swift_NSStringToString")
+public func _convertNSStringToString(_ nsstring: NSString?) -> String
 
 public func == (lhs: NSObject, rhs: NSObject) -> Bool {
   return lhs.isEqual(rhs)
@@ -15,33 +15,33 @@ public func == (lhs: NSObject, rhs: NSObject) -> Bool {
 public let NSUTF8StringEncoding: UInt = 8
 
 // NSArray bridging entry points
-func _convertNSArrayToArray<T>(_ nsarr: NSArray?) -> [T] {
+public func _convertNSArrayToArray<T>(_ nsarr: NSArray?) -> [T] {
   return [T]()
 }
 
-func _convertArrayToNSArray<T>(_ arr: [T]) -> NSArray {
+public func _convertArrayToNSArray<T>(_ arr: [T]) -> NSArray {
   return NSArray()
 }
 
 // NSDictionary bridging entry points
-internal func _convertDictionaryToNSDictionary<Key, Value>(
+public func _convertDictionaryToNSDictionary<Key, Value>(
     _ d: Dictionary<Key, Value>
 ) -> NSDictionary {
   return NSDictionary()
 }
 
-internal func _convertNSDictionaryToDictionary<K: NSObject, V: AnyObject>(
+public func _convertNSDictionaryToDictionary<K: NSObject, V: AnyObject>(
        _ d: NSDictionary?
      ) -> Dictionary<K, V> {
   return Dictionary<K, V>()
 }
 
 // NSSet bridging entry points
-internal func _convertSetToNSSet<T : Hashable>(_ s: Set<T>) -> NSSet {
+public func _convertSetToNSSet<T>(_ s: Set<T>) -> NSSet {
   return NSSet()
 }
 
-internal func _convertNSSetToSet<T : Hashable>(_ s: NSSet?) -> Set<T> {
+public func _convertNSSetToSet<T>(_ s: NSSet?) -> Set<T> {
   return Set<T>()
 }
 
@@ -207,7 +207,7 @@ extension NSError : Error {
 }
 
 @_silgen_name("swift_convertNSErrorToError")
-func _convertNSErrorToError(_ string: NSError?) -> Error
+public func _convertNSErrorToError(_ string: NSError?) -> Error
 
 @_silgen_name("swift_convertErrorToNSError")
-func _convertErrorToNSError(_ string: Error) -> NSError
+public func _convertErrorToNSError(_ string: Error) -> NSError
