@@ -40,14 +40,6 @@
 // RUN: %FileCheck %s < %t.simple-macosx10.10.txt
 // RUN: %FileCheck -check-prefix SIMPLE %s < %t.simple-macosx10.10.txt
 
-// RUN: %swiftc_driver -driver-print-jobs -target x86_64-apple-ios8.0        %s > %t.simple-ios8.txt
-// RUN: %FileCheck -check-prefix IOS_ARCLITE %s < %t.simple-ios8.txt
-
-// RUN: %swiftc_driver -driver-print-jobs -target x86_64-apple-macosx10.11   %s | %FileCheck -check-prefix NO_ARCLITE %s
-// RUN: %swiftc_driver -driver-print-jobs -target x86_64-apple-ios9.0        %s | %FileCheck -check-prefix NO_ARCLITE %s
-// RUN: %swiftc_driver -driver-print-jobs -target arm64-apple-tvos9.0        %s | %FileCheck -check-prefix NO_ARCLITE %s
-// RUN: %swiftc_driver -driver-print-jobs -target armv7k-apple-watchos2.0    %s | %FileCheck -check-prefix NO_ARCLITE %s
-
 // RUN: rm -rf %t && mkdir -p %t
 // RUN: touch %t/a.o
 // RUN: %swiftc_driver -driver-print-jobs -target x86_64-apple-macosx10.9 %s %t/a.o -o linker 2>&1 | %FileCheck -check-prefix COMPILE_AND_LINK %s
@@ -58,12 +50,6 @@
 
 // There are more RUN lines further down in the file.
 
-// REQUIRES: CODEGENERATOR=X86
-
-// FIXME: Need to set up a sysroot for osx so the DEBUG checks work on linux/freebsd
-// rdar://problem/19692770
-// XFAIL: freebsd, linux
-
 // CHECK: swift
 // CHECK: -o [[OBJECTFILE:.*]]
 
@@ -73,7 +59,6 @@
 // CHECK-DAG: -rpath [[STDLIB_PATH]]
 // CHECK-DAG: -lSystem
 // CHECK-DAG: -arch x86_64
-// CHECK-DAG: -force_load {{[^ ]+/lib/arc/libarclite_macosx.a}} -framework CoreFoundation
 // CHECK: -o {{[^ ]+}}
 
 
@@ -231,19 +216,9 @@
 // DEBUG-NEXT: bin/ld{{"? }}
 // DEBUG: -add_ast_path {{.*}}/{{[^/]+}}.swiftmodule
 // DEBUG: -o linker
-// DEBUG-NEXT: bin/dsymutil
+// DEBUG-NEXT: {{^|bin/}}dsymutil
 // DEBUG: linker
 // DEBUG: -o linker.dSYM
-
-
-
-// IOS_ARCLITE: bin/ld{{"? }}
-// IOS_ARCLITE: -force_load {{[^ ]+/lib/arc/libarclite_iphonesimulator.a}}
-// IOS_ARCLITE: -o {{[^ ]+}}
-
-// NO_ARCLITE: bin/ld{{"? }}
-// NO_ARCLITE-NOT: arclite
-// NO_ARCLITE: -o {{[^ ]+}}
 
 
 // COMPILE_AND_LINK: bin/swift
@@ -268,7 +243,7 @@
 // INFERRED_NAME: bin/swift
 // INFERRED_NAME: -module-name LINKER
 // INFERRED_NAME: bin/ld{{"? }}
-// INFERRED_NAME: -o libLINKER.dylib
+// INFERRED_NAME: -o libLINKER.{{dylib|so}}
 
 
 // Test ld detection. We use hard links to make sure
@@ -279,7 +254,7 @@
 // RUN: touch %t/DISTINCTIVE-PATH/usr/bin/ld
 // RUN: chmod +x %t/DISTINCTIVE-PATH/usr/bin/ld
 // RUN: %hardlink-or-copy(from: %swift_driver_plain, to: %t/DISTINCTIVE-PATH/usr/bin/swiftc)
-// RUN: %t/DISTINCTIVE-PATH/usr/bin/swiftc %s -### | %FileCheck -check-prefix=RELATIVE-LINKER %s
+// RUN: %t/DISTINCTIVE-PATH/usr/bin/swiftc -target x86_64-apple-macosx10.9 %s -### | %FileCheck -check-prefix=RELATIVE-LINKER %s
 
 // RELATIVE-LINKER: /DISTINCTIVE-PATH/usr/bin/swift
 // RELATIVE-LINKER: /DISTINCTIVE-PATH/usr/bin/ld
