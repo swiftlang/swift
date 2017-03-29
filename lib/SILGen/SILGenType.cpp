@@ -31,31 +31,6 @@
 using namespace swift;
 using namespace Lowering;
 
-SILFunction *SILGenModule::getDynamicThunk(SILDeclRef constant,
-                                           SILConstantInfo constantInfo) {
-  // Mangle the constant with a _TTD header.
-  auto name = constant.mangle(SILDeclRef::ManglingKind::DynamicThunk);
-
-  IsFragile_t isFragile = IsNotFragile;
-  if (makeModuleFragile)
-    isFragile = IsFragile;
-  if (constant.isFragile())
-    isFragile = IsFragile;
-  auto F = M.getOrCreateFunction(constant.getDecl(), name, SILLinkage::Shared,
-                            constantInfo.getSILType().castTo<SILFunctionType>(),
-                            IsBare, IsTransparent, isFragile, IsThunk);
-
-  if (F->empty()) {
-    // Emit the thunk if we haven't yet.
-    // Currently a dynamic thunk looks just like a foreign-to-native thunk around
-    // an ObjC method. This would change if we introduced a native
-    // runtime-hookable mechanism.
-    SILGenFunction SGF(*this, *F);
-    SGF.emitForeignToNativeThunk(constant);
-  }
-
-  return F;
-}
 
 SILVTable::Entry
 SILGenModule::emitVTableMethod(SILDeclRef derived, SILDeclRef base) {
@@ -131,23 +106,6 @@ SILGenModule::emitVTableMethod(SILDeclRef derived, SILDeclRef base) {
                      derivedInfo.LoweredInterfaceType);
 
   return {base, thunk, implLinkage};
-}
-
-SILValue SILGenFunction::emitDynamicMethodRef(SILLocation loc,
-                                              SILDeclRef constant,
-                                              SILConstantInfo constantInfo) {
-  // If the method is foreign, its foreign thunk will handle the dynamic
-  // dispatch for us.
-  if (constant.isForeignToNativeThunk()) {
-    if (!SGM.hasFunction(constant))
-      SGM.emitForeignToNativeThunk(constant);
-    return B.createFunctionRef(loc, SGM.getFunction(constant, NotForDefinition));
-  }
-
-  // Otherwise, we need a dynamic dispatch thunk.
-  SILFunction *F = SGM.getDynamicThunk(constant, constantInfo);
-
-  return B.createFunctionRef(loc, F);
 }
 
 bool SILGenModule::requiresObjCMethodEntryPoint(FuncDecl *method) {
