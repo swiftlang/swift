@@ -76,90 +76,44 @@ SILValue SILGenFunction::emitDynamicMethodRef(SILLocation loc,
   return B.createFunctionRef(loc, F);
 }
 
-
-static void forwardCaptureArgs(SILGenFunction &gen,
-                               SmallVectorImpl<SILValue> &args,
-                               CapturedValue capture) {
-  auto addSILArgument = [&](SILType t, ValueDecl *d) {
-    args.push_back(gen.F.begin()->createFunctionArgument(t, d));
-  };
-
-  auto *vd = capture.getDecl();
-
-  switch (gen.SGM.Types.getDeclCaptureKind(capture)) {
-  case CaptureKind::None:
-    break;
-
-  case CaptureKind::Constant: {
-    auto *var = dyn_cast<VarDecl>(vd);
-    addSILArgument(gen.getLoweredType(var->getType()), vd);
-    break;
-  }
-
-  case CaptureKind::Box: {
-    // Forward the captured owning box.
-    auto *var = cast<VarDecl>(vd);
-    auto boxTy = gen.SGM.Types
-      .getInterfaceBoxTypeForCapture(vd,
-                                     gen.getLoweredType(var->getType())
-                                        .getSwiftRValueType(),
-                                     /*mutable*/ true);
-    addSILArgument(SILType::getPrimitiveObjectType(boxTy), vd);
-    break;
-  }
-
-  case CaptureKind::StorageAddress: {
-    auto *var = dyn_cast<VarDecl>(vd);
-    SILType ty = gen.getLoweredType(var->getType()->getRValueType())
-      .getAddressType();
-    // Forward the captured value address.
-    addSILArgument(ty, vd);
-    break;
-  }
-  }
-}
-
 static SILValue getNextUncurryLevelRef(SILGenFunction &gen,
                                        SILLocation loc,
                                        SILDeclRef next,
                                        bool direct,
-                                       ArrayRef<SILValue> curriedArgs,
+                                       SILValue selfArg,
                                        SubstitutionList curriedSubs) {
   if (next.isForeign || next.isCurried || !next.hasDecl() || direct)
     return gen.emitGlobalFunctionRef(loc, next.asForeign(false));
 
   auto constantInfo = gen.SGM.Types.getConstantInfo(next);
-  SILValue thisArg;
-  if (!curriedArgs.empty())
-      thisArg = curriedArgs.back();
 
   if (isa<AbstractFunctionDecl>(next.getDecl()) &&
       getMethodDispatch(cast<AbstractFunctionDecl>(next.getDecl()))
         == MethodDispatch::Class) {
-    SILValue thisArg = curriedArgs.back();
-
     // Use the dynamic thunk if dynamic.
     if (next.getDecl()->isDynamic()) {
       auto dynamicThunk = gen.SGM.getDynamicThunk(next, constantInfo);
       return gen.B.createFunctionRef(loc, dynamicThunk);
     }
 
-    return gen.B.createClassMethod(loc, thisArg, next);
+    return gen.B.createClassMethod(loc, selfArg, next);
   }
 
   // If the fully-uncurried reference is to a generic method, look up the
   // witness.
   if (constantInfo.SILFnType->getRepresentation()
         == SILFunctionTypeRepresentation::WitnessMethod) {
-    auto thisType = curriedSubs[0].getReplacement()->getCanonicalType();
-    assert(isa<ArchetypeType>(thisType) && "no archetype for witness?!");
+    // FIXME: This is wrong if the requirement makes Self non-canonical,
+    // eg <Self, T where Self : P, T : Q, T.X == Self>
+    auto selfType = curriedSubs[0].getReplacement()->getCanonicalType();
+    assert(isa<ArchetypeType>(selfType) && "no archetype for witness?!");
     SILValue OpenedExistential;
-    if (!cast<ArchetypeType>(thisType)->getOpenedExistentialType().isNull())
-      OpenedExistential = thisArg;
+    if (!cast<ArchetypeType>(selfType)->getOpenedExistentialType().isNull())
+      OpenedExistential = selfArg;
     auto protocol =
       next.getDecl()->getDeclContext()->getAsProtocolOrProtocolExtensionContext();
     auto conformance = ProtocolConformanceRef(protocol);
-    return gen.B.createWitnessMethod(loc, thisType, conformance, next,
+    return gen.B.createWitnessMethod(loc, selfType, conformance, next,
                                      constantInfo.getSILType(),
                                      OpenedExistential);
   }
@@ -170,72 +124,43 @@ static SILValue getNextUncurryLevelRef(SILGenFunction &gen,
 
 void SILGenFunction::emitCurryThunk(ValueDecl *vd,
                                     SILDeclRef from, SILDeclRef to) {
-  SmallVector<SILValue, 8> curriedArgs;
+#ifndef NDEBUG
+  assert(from.uncurryLevel == 0 && to.uncurryLevel == 1
+         && "currying function at level other than one?!");
 
-  unsigned paramCount = from.uncurryLevel + 1;
-
-  if (isa<ConstructorDecl>(vd) || isa<EnumElementDecl>(vd)) {
-    // The first body parameter pattern for a constructor specifies the
-    // "self" instance, but the constructor is invoked from outside on a
-    // metatype.
-    assert(from.uncurryLevel == 0 && to.uncurryLevel == 1
-           && "currying constructor at level other than one?!");
-    F.setBare(IsBare);
-    auto selfMetaTy = vd->getInterfaceType()->getAs<AnyFunctionType>()
-        ->getInput();
-    selfMetaTy = vd->getInnermostDeclContext()->mapTypeIntoContext(selfMetaTy);
-    auto metatypeVal =
-        F.begin()->createFunctionArgument(getLoweredLoadableType(selfMetaTy));
-    curriedArgs.push_back(metatypeVal);
-
-  } else if (auto fd = dyn_cast<AbstractFunctionDecl>(vd)) {
-    // Forward implicit closure context arguments.
-    bool hasCaptures = SGM.M.Types.hasLoweredLocalCaptures(fd);
-    if (hasCaptures)
-      --paramCount;
-
-    // Forward the curried formal arguments.
-    auto forwardedPatterns = fd->getParameterLists().slice(0, paramCount);
-    for (auto *paramPattern : reversed(forwardedPatterns))
-      bindParametersForForwarding(paramPattern, curriedArgs);
-
-    // Forward captures.
-    if (hasCaptures) {
-      auto captureInfo = SGM.Types.getLoweredLocalCaptures(fd);
-      for (auto capture : captureInfo.getCaptures())
-        forwardCaptureArgs(*this, curriedArgs, capture);
-    }
-  } else {
-    llvm_unreachable("don't know how to curry this decl");
+  if (auto *fd = dyn_cast<AbstractFunctionDecl>(vd)) {
+    assert(!SGM.M.Types.hasLoweredLocalCaptures(fd) &&
+           "methods cannot have captures");
   }
+#endif
+
+  auto selfTy = vd->getInterfaceType()->castTo<AnyFunctionType>()
+    ->getInput();
+  selfTy = vd->getInnermostDeclContext()->mapTypeIntoContext(selfTy);
+  auto selfArg = F.begin()->createFunctionArgument(getLoweredType(selfTy));
 
   // Forward substitutions.
-  SubstitutionList subs;
-  auto constantInfo = getConstantInfo(to);
-  if (auto *env = constantInfo.GenericEnv)
-    subs = env->getForwardingSubstitutions();
+  auto subs = F.getForwardingSubstitutions();
 
   SILValue toFn = getNextUncurryLevelRef(*this, vd, to, from.isDirectReference,
-                                         curriedArgs, subs);
+                                         selfArg, subs);
+
+  // FIXME: Using the type from the ConstantInfo instead of looking at
+  // getConstantOverrideInfo() for methods looks suspect in the presence
+  // of covariant overrides and multiple vtable entries.
   SILFunctionConventions fromConv(
-      SGM.getConstantType(from).castTo<SILFunctionType>(), SGM.M);
+      SGM.Types.getConstantInfo(from).SILFnType, SGM.M);
   SILType resultTy = fromConv.getSingleSILResultType();
   resultTy = F.mapTypeIntoContext(resultTy);
-  auto toTy = toFn->getType();
-
-  // Forward archetypes and specialize if the function is generic.
-  if (!subs.empty()) {
-    auto toFnTy = toFn->getType().castTo<SILFunctionType>();
-    toTy = getLoweredLoadableType(toFnTy->substGenericArgs(SGM.M,  subs));
-  }
+  auto substTy = toFn->getType().substGenericArgs(SGM.M,  subs);
 
   // Partially apply the next uncurry level and return the result closure.
   auto closureTy =
-    SILGenBuilder::getPartialApplyResultType(toFn->getType(), curriedArgs.size(),
+    SILGenBuilder::getPartialApplyResultType(toFn->getType(), /*appliedParams=*/1,
                                              SGM.M, subs,
                                              ParameterConvention::Direct_Owned);
   SILInstruction *toClosure =
-    B.createPartialApply(vd, toFn, toTy, subs, curriedArgs, closureTy);
+    B.createPartialApply(vd, toFn, substTy, subs, {selfArg}, closureTy);
   if (resultTy != closureTy)
     toClosure = B.createConvertFunction(vd, toClosure, resultTy);
   B.createReturn(ImplicitReturnLocation::getImplicitReturnLoc(vd), toClosure);
@@ -247,6 +172,7 @@ void SILGenModule::emitCurryThunk(ValueDecl *fd,
   // Thunks are always emitted by need, so don't need delayed emission.
   SILFunction *f = getFunction(entryPoint, ForDefinition);
   f->setThunk(IsThunk);
+  f->setBare(IsBare);
 
   preEmitFunction(entryPoint, fd, f, fd);
   PrettyStackTraceSILFunction X("silgen emitCurryThunk", f);
