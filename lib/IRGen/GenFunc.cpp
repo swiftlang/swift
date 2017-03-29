@@ -1168,7 +1168,7 @@ static llvm::Function *emitPartialApplicationForwarder(
     else {
       // Okay, we have called a function that expects an indirect return type
       // but the partially applied return type is direct.
-      assert(nativeResultSchema.requiresIndirect() == false);
+      assert(!nativeResultSchema.requiresIndirect());
       Explosion loadedResult;
       cast<LoadableTypeInfo>(outResultTI)
           .loadAsTake(subIGF, resultValueAddr, loadedResult);
