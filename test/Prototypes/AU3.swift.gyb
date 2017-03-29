@@ -235,18 +235,19 @@ extension String.Content.Inline${N}or${W} : AnyUnicodeContent {
 }
 
 extension String.Content.Inline${N}or${W} : UnicodeContent {
-  internal var _utf16: LazyMapRandomAccessCollection<
+  public typealias _UTF16View = LazyMapRandomAccessCollection<
     String.Content.Packed, UTF16.CodeUnit
-  > {
+  >
+  
+  internal var _utf16: _UTF16View {
     return String.Content._unpack(
       bits: bits, 
       bitsPerElement: numericCast(self.bitsPerElement)
     )
   }
 
-  // FIXME: do we really need type erasure here?
-  public var utf16: AnyUInt16UnicodeView {
-    return AnyUInt16UnicodeView(RandomAccessUnicodeView(_utf16))
+  public var utf16: RandomAccessUnicodeView<_UTF16View> {
+    return RandomAccessUnicodeView(_utf16)
   }
   
   public var utf8: AnyUInt8UnicodeView {
@@ -261,14 +262,14 @@ extension String.Content.Inline${N}or${W} : UnicodeContent {
   
   public var fccNormalizedUTF16: AnyUInt16UnicodeView {
     return bitsPerElement <= 8
-    ? utf16
+    ? AnyUInt16UnicodeView(utf16)
     : AnyUInt16UnicodeView(
       _UnicodeViews(_utf16, UTF16.self).fccNormalizedUTF16
     )
   }
   
   public var characters: AnyCharacterUnicodeView {
-    if bitsPerElement <= 8 {
+    if bitsPerElement <= 8 || !_utf16.contains(where: { $0 >= 0x300 }) {
       let _characters = _utf16.lazy.map {
         // FIXME: Use _unchecked: in stdlib
         Character(UnicodeScalar(UInt32($0))!)
@@ -280,7 +281,7 @@ extension String.Content.Inline${N}or${W} : UnicodeContent {
   }
   
   public var unicodeScalars: AnyUnicodeScalarUnicodeView {
-    if bitsPerElement <= 8 {
+    if bitsPerElement <= 8 || !_utf16.contains(where: { $0 >= 0xD800 }) {
       return AnyUnicodeScalarUnicodeView(
       RandomAccessUnicodeView(
         _utf16.lazy.map {
