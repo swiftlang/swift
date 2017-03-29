@@ -168,9 +168,9 @@ void IRGenFunction::emitMakeBoxUniqueCall(llvm::Value *box,
                                           llvm::Value *alignMask,
                                           llvm::Value *&outBox,
                                           llvm::Value *&outValueAddress) {
-  auto attrs = llvm::AttributeSet::get(IGM.LLVMContext,
-                                       llvm::AttributeSet::FunctionIndex,
-                                       llvm::Attribute::NoUnwind);
+  auto attrs = llvm::AttributeList::get(IGM.LLVMContext,
+                                        llvm::AttributeList::FunctionIndex,
+                                        llvm::Attribute::NoUnwind);
 
   llvm::CallInst *call = Builder.CreateCall(IGM.getMakeBoxUniqueFn(),
                                             {box, typeMetadata, alignMask});

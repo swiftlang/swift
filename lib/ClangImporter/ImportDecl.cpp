@@ -996,7 +996,7 @@ makeBitFieldAccessors(ClangImporter::Implementation &Impl,
                                                        clang::VK_RValue,
                                                        clang::OK_Ordinary,
                                                        clang::SourceLocation(),
-                                                       /*fpContractable=*/ false);
+                                                       clang::FPOptions());
     
     cSetterDecl->setBody(cSetterExpr);
 
