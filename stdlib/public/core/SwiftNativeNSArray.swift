@@ -148,15 +148,18 @@ extension _SwiftNativeNSArrayWithContiguousStorage : _NSArrayCore {
   //
   // Do not access this property directly.
   @_versioned
+  @nonobjc
   internal var _heapBufferBridged_DoNotUse: AnyObject?
 
   // When this class is allocated inline, this property can become a
   // computed one.
   @_versioned
+  @nonobjc
   internal let _nativeStorage: _ContiguousArrayStorageBase
 
   @_inlineable
   @_versioned
+  @nonobjc
   internal var _heapBufferBridgedPtr: UnsafeMutablePointer<AnyObject?> {
     return _getUnsafePointerToStoredProperties(self).assumingMemoryBound(
       to: Optional<AnyObject>.self)
@@ -175,6 +178,7 @@ extension _SwiftNativeNSArrayWithContiguousStorage : _NSArrayCore {
   }
 
   @_versioned
+  @nonobjc
   internal init(_nativeStorage: _ContiguousArrayStorageBase) {
     self._nativeStorage = _nativeStorage
   }
@@ -271,6 +275,7 @@ internal class _ContiguousArrayStorageBase
   @_versioned
   final var countAndCapacity: _ArrayBody
 
+  @nonobjc
   init(_doNotCallMeBase: ()) {
     _sanityCheckFailure("creating instance of _ContiguousArrayStorageBase")
   }
@@ -300,6 +305,7 @@ internal class _ContiguousArrayStorageBase
   }
 
   @_versioned
+  @nonobjc
   internal func _getNonVerbatimBridgedCount() -> Int {
     _sanityCheckFailure(
       "Concrete subclasses must implement _getNonVerbatimBridgedCount")
