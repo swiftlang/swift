@@ -2796,7 +2796,8 @@ void swift::markAsObjC(TypeChecker &TC, ValueDecl *D,
 
       TC.diagnose(D, diag::objc_inference_swift3, *deprecatedReason)
         .highlight(dynamicLoc)
-        .fixItInsert(D->getAttributeInsertionLoc(false), "@objc ");
+        .fixItInsert(D->getAttributeInsertionLoc(/*forModifier=*/false),
+                     "@objc ");
     }
 
     // Mark the attribute as having used Swift 3 inference, or create an
