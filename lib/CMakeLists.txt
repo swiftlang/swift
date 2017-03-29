@@ -25,4 +25,4 @@ add_subdirectory(SIL)
 add_subdirectory(SILGen)
 add_subdirectory(SILOptimizer)
 add_subdirectory(Syntax)
-
+add_subdirectory(TBDGen)

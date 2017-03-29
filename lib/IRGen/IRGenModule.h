@@ -38,7 +38,7 @@
 #include "llvm/Target/TargetMachine.h"
 #include "IRGen.h"
 #include "SwiftTargetInfo.h"
-#include "ValueWitness.h"
+#include "swift/IRGen/ValueWitness.h"
 
 #include <atomic>
 
