@@ -24,7 +24,7 @@ using namespace swift;
 
 /// Set to true to enable the support for partial specialization.
 llvm::cl::opt<bool> EnablePartialSpecialization(
-    "sil-partial-specialization", llvm::cl::init(false),
+    "sil-partial-specialization", llvm::cl::init(true),
     llvm::cl::desc("Enable partial specialization of generics"));
 
 /// If set, then generic specialization tries to specialize using
@@ -269,6 +269,11 @@ bool ReabstractionInfo::prepareAndCheck(ApplySite Apply, SILFunction *Callee,
   }
 
   if (HasUnboundGenericParams) {
+    // Bail if we cannot specialize generic substitutions, but all substitutions
+    // were generic.
+    if (!HasConcreteGenericParams && !SpecializeGenericSubstitutions)
+      return false;
+
     if (!HasNonArchetypeGenericParams && !HasConcreteGenericParams) {
       DEBUG(llvm::dbgs() << "    Partial specialization is not supported if "
                             "all substitutions are archetypes.\n");
@@ -713,11 +718,7 @@ static void verifySubstitutionList(SubstitutionList Subs, StringRef Name) {
 // according to the partial substitution. This way, the signature
 // has exactly the same generic parameter types, just with more
 // requirements.
-// Current issues:
-// - If Sig2 = GenericSignatureBuilder(Sig2 + Req), then GenericSignatureBuilder(Sig2) != Sig2
-// - The set of requirements is not really minimized.
-// - Some requirements are lost, when you add a same type parameter to the builder.
-
+//
 // Initialize SpecializedType if and only if the specialization is allowed.
 void ReabstractionInfo::specializeConcreteSubstitutions(
     ApplySite Apply, SILFunction *Callee, ArrayRef<Substitution> ParamSubs) {
@@ -762,10 +763,6 @@ void ReabstractionInfo::specializeConcreteSubstitutions(
       getSignatureWithRequirements(OrigGenericSig, OrigGenericEnv,
                                    Requirements, M);
   HasUnboundGenericParams = !SpecializedGenericSig->areAllParamsConcrete();
-
-  // No partial specializations!
-  //if (HasUnboundGenericParams)
-  //  return;
 
   {
     SmallVector<Substitution, 4> List;
