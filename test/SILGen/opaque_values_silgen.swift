@@ -653,7 +653,7 @@ func s300__convETupleToAny(_ t: @escaping () -> ()) {
   let _: () -> Any = t
 }
 
-// Tests corner-case: reabstraction of an non-empty tuple to any
+// Tests corner-case: reabstraction of a non-empty tuple to any
 // ---
 // CHECK-LABEL: sil hidden @_T020opaque_values_silgen21s310__convIntTupleAnyySi_SitycF : $@convention(thin) (@owned @callee_owned () -> (Int, Int)) -> () {
 // CHECK: bb0([[ARG:%.*]] : $@callee_owned () -> (Int, Int)):
