@@ -355,9 +355,9 @@ void SILGenFunction::bindParametersForForwarding(const ParameterList *params,
                                      SmallVectorImpl<SILValue> &parameters) {
   for (auto param : *params) {
     Type type = (param->hasType()
-                 ? param->getType()->eraseDynamicSelfType()
+                 ? param->getType()
                  : F.mapTypeIntoContext(param->getInterfaceType()));
-    makeArgument(type, param, parameters, *this);
+    makeArgument(type->eraseDynamicSelfType(), param, parameters, *this);
   }
 }
 
