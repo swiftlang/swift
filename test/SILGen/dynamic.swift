@@ -434,7 +434,7 @@ public class Sub : Base {
   // CHECK:     return {{%.*}} : $Bool
   // CHECK: } // end sil function '_T07dynamic3SubC1xSbfg'
 
-  // CHECK-LABEL: sil shared [transparent] @_T07dynamic3SubC1xSbfgSbyKXKfu_ : $@convention(thin) (@owned Sub) -> (Bool, @error Error) {
+  // CHECK-LABEL: sil private [transparent] @_T07dynamic3SubC1xSbfgSbyKXKfu_ : $@convention(thin) (@owned Sub) -> (Bool, @error Error) {
   // CHECK: bb0([[VALUE:%.*]] : $Sub):
   // CHECK:     [[BORROWED_VALUE:%.*]] = begin_borrow [[VALUE]]
   // CHECK:     [[VALUE_COPY:%.*]] = copy_value [[BORROWED_VALUE]]

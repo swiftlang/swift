@@ -122,9 +122,9 @@ class NestedGeneric<U> {
 
 // CHECK: sil hidden @_T016generic_closures018nested_closure_in_A0xxlF : $@convention(thin) <T> (@in T) -> @out T
 // CHECK:   function_ref [[OUTER_CLOSURE:@_T016generic_closures018nested_closure_in_A0xxlFxycfU_]]
-// CHECK: sil shared [[OUTER_CLOSURE]] : $@convention(thin) <T> (@inout_aliasable T) -> @out T
+// CHECK: sil private [[OUTER_CLOSURE]] : $@convention(thin) <T> (@inout_aliasable T) -> @out T
 // CHECK:   function_ref [[INNER_CLOSURE:@_T016generic_closures018nested_closure_in_A0xxlFxycfU_xycfU_]]
-// CHECK: sil shared [[INNER_CLOSURE]] : $@convention(thin) <T> (@inout_aliasable T) -> @out T {
+// CHECK: sil private [[INNER_CLOSURE]] : $@convention(thin) <T> (@inout_aliasable T) -> @out T {
 func nested_closure_in_generic<T>(_ x:T) -> T {
   return { { x }() }()
 }
@@ -291,9 +291,9 @@ func mixed_generic_nongeneric_nesting<T>(t: T) {
   outer()
 }
 
-// CHECK-LABEL: sil shared @_T016generic_closures06mixed_A19_nongeneric_nestingyx1t_tlF5outerL_yylF : $@convention(thin) <T> () -> ()
-// CHECK-LABEL: sil shared @_T016generic_closures06mixed_A19_nongeneric_nestingyx1t_tlF5outerL_yylF6middleL_yqd__1u_tr__lF : $@convention(thin) <T><U> (@in U) -> ()
-// CHECK-LABEL: sil shared @_T016generic_closures06mixed_A19_nongeneric_nestingyx1t_tlF5outerL_yylF6middleL_yqd__1u_tr__lF5innerL_qd__yr__lF : $@convention(thin) <T><U> (@owned <τ_0_0><τ_1_0> { var τ_1_0 } <T, U>) -> @out U
+// CHECK-LABEL: sil private @_T016generic_closures06mixed_A19_nongeneric_nestingyx1t_tlF5outerL_yylF : $@convention(thin) <T> () -> ()
+// CHECK-LABEL: sil private @_T016generic_closures06mixed_A19_nongeneric_nestingyx1t_tlF5outerL_yylF6middleL_yqd__1u_tr__lF : $@convention(thin) <T><U> (@in U) -> ()
+// CHECK-LABEL: sil private @_T016generic_closures06mixed_A19_nongeneric_nestingyx1t_tlF5outerL_yylF6middleL_yqd__1u_tr__lF5innerL_qd__yr__lF : $@convention(thin) <T><U> (@owned <τ_0_0><τ_1_0> { var τ_1_0 } <T, U>) -> @out U
 
 protocol Doge {
   associatedtype Nose : NoseProtocol

@@ -32,7 +32,7 @@ func assignment(_ x: Int, y: Int) {
   (x, y) = (1,2)
 }
 
-// CHECK-LABEL: sil hidden  @{{.*}}assignment
+// CHECK-LABEL: sil hidden @{{.*}}assignment
 // CHECK: integer_literal $Builtin.Int2048, 42
 // CHECK: assign
 // CHECK: integer_literal $Builtin.Int2048, 57
@@ -45,7 +45,7 @@ func if_test(_ x: Int, y: Bool) {
   bar(x);
 }
 
-// CHECK-LABEL: sil hidden  @_T010statements7if_test{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden @_T010statements7if_test{{[_0-9a-zA-Z]*}}F
 
 func if_else(_ x: Int, y: Bool) {
   if (y) {
@@ -56,7 +56,7 @@ func if_else(_ x: Int, y: Bool) {
   bar(x);
 }
 
-// CHECK-LABEL: sil hidden  @_T010statements7if_else{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden @_T010statements7if_else{{[_0-9a-zA-Z]*}}F
 
 func nested_if(_ x: Int, y: Bool, z: Bool) {
   if (y) {
@@ -71,7 +71,7 @@ func nested_if(_ x: Int, y: Bool, z: Bool) {
   bar(x);
 }
 
-// CHECK-LABEL: sil hidden  @_T010statements9nested_if{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden @_T010statements9nested_if{{[_0-9a-zA-Z]*}}F
 
 func nested_if_merge_noret(_ x: Int, y: Bool, z: Bool) {
   if (y) {
@@ -85,7 +85,7 @@ func nested_if_merge_noret(_ x: Int, y: Bool, z: Bool) {
   }
 }
 
-// CHECK-LABEL: sil hidden  @_T010statements21nested_if_merge_noret{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden @_T010statements21nested_if_merge_noret{{[_0-9a-zA-Z]*}}F
 
 func nested_if_merge_ret(_ x: Int, y: Bool, z: Bool) -> Int {
   if (y) {
@@ -101,7 +101,7 @@ func nested_if_merge_ret(_ x: Int, y: Bool, z: Bool) -> Int {
   return 2
 }
 
-// CHECK-LABEL: sil hidden  @_T010statements19nested_if_merge_ret{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden @_T010statements19nested_if_merge_ret{{[_0-9a-zA-Z]*}}F
 
 func else_break(_ x: Int, y: Bool, z: Bool) {
   while z {
@@ -112,7 +112,7 @@ func else_break(_ x: Int, y: Bool, z: Bool) {
   }
 }
 
-// CHECK-LABEL: sil hidden  @_T010statements10else_break{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden @_T010statements10else_break{{[_0-9a-zA-Z]*}}F
 
 func loop_with_break(_ x: Int, _ y: Bool, _ z: Bool) -> Int {
   while (x > 2) {
@@ -123,7 +123,7 @@ func loop_with_break(_ x: Int, _ y: Bool, _ z: Bool) -> Int {
   }
 }
 
-// CHECK-LABEL: sil hidden  @_T010statements15loop_with_break{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden @_T010statements15loop_with_break{{[_0-9a-zA-Z]*}}F
 
 func loop_with_continue(_ x: Int, y: Bool, z: Bool) -> Int {
   while (x > 2) {
@@ -136,7 +136,7 @@ func loop_with_continue(_ x: Int, y: Bool, z: Bool) -> Int {
   bar(x);
 }
 
-// CHECK-LABEL: sil hidden  @_T010statements18loop_with_continue{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden @_T010statements18loop_with_continue{{[_0-9a-zA-Z]*}}F
 
 func do_loop_with_continue(_ x: Int, y: Bool, z: Bool) -> Int {
   repeat {
@@ -150,10 +150,10 @@ func do_loop_with_continue(_ x: Int, y: Bool, z: Bool) -> Int {
   bar(x);
 }
 
-// CHECK-LABEL: sil hidden  @_T010statements21do_loop_with_continue{{[_0-9a-zA-Z]*}}F 
+// CHECK-LABEL: sil hidden @_T010statements21do_loop_with_continue{{[_0-9a-zA-Z]*}}F 
 
 
-// CHECK-LABEL: sil hidden  @{{.*}}for_loops1
+// CHECK-LABEL: sil hidden @{{.*}}for_loops1
 func for_loops1(_ x: Int, c: Bool) {
   for i in 1..<100 {
     markUsed(i)
@@ -161,7 +161,7 @@ func for_loops1(_ x: Int, c: Bool) {
 
 }
 
-// CHECK-LABEL: sil hidden  @{{.*}}for_loops2
+// CHECK-LABEL: sil hidden @{{.*}}for_loops2
 func for_loops2() {
   // rdar://problem/19316670
   // CHECK: [[NEXT:%[0-9]+]] = function_ref @_T0s16IndexingIteratorV4next{{[_0-9a-zA-Z]*}}F
@@ -182,7 +182,7 @@ func void_return() {
     return
   }
 }
-// CHECK-LABEL: sil hidden  @_T010statements11void_return{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden @_T010statements11void_return{{[_0-9a-zA-Z]*}}F
 // CHECK: cond_br {{%[0-9]+}}, [[BB1:bb[0-9]+]], [[BB2:bb[0-9]+]]
 // CHECK: [[BB1]]:
 // CHECK:   br [[EPILOG:bb[0-9]+]]
@@ -195,7 +195,7 @@ func void_return() {
 func foo() {}
 
 // <rdar://problem/13549626>
-// CHECK-LABEL: sil hidden  @_T010statements14return_from_if{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden @_T010statements14return_from_if{{[_0-9a-zA-Z]*}}F
 func return_from_if(_ a: Bool) -> Int {
   // CHECK: bb0(%0 : $Bool):
   // CHECK: cond_br {{.*}}, [[THEN:bb[0-9]+]], [[ELSE:bb[0-9]+]]
@@ -468,10 +468,10 @@ func defer_test1() {
   // CHECK: [[C1:%.*]] = function_ref @_T010statements11defer_test1yyF6
   // CHECK: apply [[C1]]
 }
-// CHECK: sil shared @_T010statements11defer_test1yyF6
+// CHECK: sil private @_T010statements11defer_test1yyF6
 // CHECK: function_ref @{{.*}}callee1yyF
 
-// CHECK: sil shared @_T010statements11defer_test1yyF6
+// CHECK: sil private @_T010statements11defer_test1yyF6
 // CHECK: function_ref @{{.*}}callee2yyF
 
 // CHECK-LABEL: sil hidden @_T010statements11defer_test2ySbF
