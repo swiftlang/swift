@@ -1131,8 +1131,25 @@ public:
                                     "result of function_ref");
     require(!fnType->getExtInfo().hasContext(),
             "function_ref should have a context-free function result");
+
+    // Note: in SingleFunction mode, we relax some of these checks because
+    // we may not have linked everything yet.
+
+    SILFunction *RefF = FRI->getReferencedFunction();
+
+    // A direct reference to a shared_external declaration is an error; we
+    // should have deserialized a body.
+    if (RefF->isExternalDeclaration()) {
+      require(SingleFunction ||
+              !hasSharedVisibility(RefF->getLinkage()) ||
+              RefF->hasForeignBody(),
+              "external declarations of SILFunctions with shared visibility is "
+              "not allowed");
+    }
+
+    // A direct reference to a non-public or shared but not fragile function
+    // from a fragile function is an error.
     if (F.isSerialized()) {
-      SILFunction *RefF = FRI->getReferencedFunction();
       require((SingleFunction && RefF->isExternalDeclaration()) ||
               RefF->hasValidLinkageForFragileRef(),
               "function_ref inside fragile function cannot "
@@ -3912,9 +3929,6 @@ public:
 
       assert(F->isAvailableExternally() &&
              "external declaration of internal SILFunction not allowed");
-      assert(!hasSharedVisibility(F->getLinkage()) &&
-             "external declarations of SILFunctions with shared visibility is not "
-             "allowed");
       // If F is an external declaration, there is nothing further to do,
       // return.
       return;
