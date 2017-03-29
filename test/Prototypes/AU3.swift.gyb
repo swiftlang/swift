@@ -767,10 +767,10 @@ extension String : ExpressibleByStringLiteral {
   }
 }
 
-/*
+//===--- CustomStringConvertible/CustomDebugStringConvertible -------------===//
 extension String : CustomStringConvertible {
   // TODO: once this replaces Swift.String this needs to revert
-  // back to the trivial implementation of returnning self
+  // back to the trivial implementation of returning self
   public var description: Swift.String {
     return Swift.String(self)
   }
@@ -779,14 +779,40 @@ extension String : CustomStringConvertible {
 extension String : CustomDebugStringConvertible {
   public var debugDescription: Swift.String {
     var result = "\""
-    for us in self.unicodeScalars {
+    for us in self.content.unicodeScalars {
       result += us.escaped(asASCII: false)
     }
     result += "\""
     return result
   }
 }
-*/
+
+//===--- Comparable/Hashable ----------------------------------------------===//
+extension String : Comparable {
+  public static func < (lhs: String, rhs: String) -> Bool {
+    return lhs.content.fccNormalizedUTF16.lexicographicallyPrecedes(
+      rhs.content.fccNormalizedUTF16
+    )
+  }
+  public static func == (lhs: String, rhs: String) -> Bool {
+    return lhs.content.fccNormalizedUTF16.elementsEqual(
+      rhs.content.fccNormalizedUTF16
+    )
+  }
+}
+
+extension String : Hashable {
+  public var hashValue : Int {
+    var hasher = _SipHash13Context(key: _Hashing.secretKey)
+    for x in content.fccNormalizedUTF16 { hasher.append(x) }
+    let resultBits = hasher.finalizeAndReturnHash()
+#if arch(i386) || arch(arm)
+    return Int(truncatingBitPattern: resultBits)
+#elseif arch(x86_64) || arch(arm64) || arch(powerpc64) || arch(powerpc64le) || arch(s390x)
+    return Int(Int64(bitPattern: resultBits))
+#endif
+  }
+}
 
 //===----------------------------------------------------------------------===//
 //===--- Tests ------------------------------------------------------------===//
@@ -1192,6 +1218,50 @@ suite.test("literals") {
   let unicode: String = "abcdef🦊"
   expectEqual(7, unicode.count)
   expectEqualSequence("abcdef🦊" as Swift.String, unicode)
+}
+
+suite.test("printing") {
+  let s: String = "a \"string\" with \"quotes\""
+  expectEqual(
+    "a \"string\" with \"quotes\"", s.description)
+  expectEqual(
+    "a \"string\" with \"quotes\"".debugDescription, s.debugDescription)
+}
+
+suite.test("character") {
+  let s1: String = "Héllo, 🌍!"
+  var s2: Swift.String = ""
+  for c in s1 {
+    s2.append(c)
+  }
+  // expectTrue(s1.elementsEqual(s2.characters))
+  expectEqual(9, s1.count)
+
+  // emoji with skin tone should be 1 character (are 2 in Swift 3)
+  let skinTone: String = "✌🏾"
+  expectEqual(1, skinTone.count)
+
+  let couple: String = "abc👩‍❤️‍👩def"
+  expectEqual(7, couple.count)
+}
+
+suite.test("string-compare-hash") {
+  let s1: String = "abcdez"
+  let s2: String = "abcdfz"
+  let s3: String = "abcde\u{304}z"
+  let s4: String = "abcd\u{113}z"
+
+  expectEqual(s1, s1)
+  expectEqual(s2, s2)
+  expectEqual(s3, s3)
+  expectEqual(s4, s4)
+
+  expectLT(s1, s2)
+  expectNotEqual(s1.hashValue, s2.hashValue)
+  expectLT(s2, s3)
+  expectNotEqual(s2.hashValue, s3.hashValue)
+  expectEqual(s3, s4)
+  expectEqual(s3.hashValue, s4.hashValue)
 }
 
 runAllTests()
