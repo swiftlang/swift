@@ -134,6 +134,7 @@ extension _UTF16StringStorage : UnicodeStorage {
 
   // WORKAROUND: helping type inference along will be unnecessary someday
   public typealias UTF16View = RandomAccessUnicodeView<_UTF16StringStorage>
+  public typealias UTF8View = _TranscodedView<_UTF16StringStorage, UTF16, UTF8>
   public typealias CodeUnits = _UTF16StringStorage
   public typealias FCCNormalizedUTF16View = _UnicodeViews<
     CodeUnits, Encoding

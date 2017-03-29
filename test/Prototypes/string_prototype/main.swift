@@ -83,63 +83,6 @@ testSuite.test("SwiftCanonicalString") {
   expectEqual(sncFrom16to8, sncFrom8to16)
 }
 
-testSuite.test("replaceSubrange") {
-  let initial: String = "hello world!"
-  expectEqual(MemoryLayout<Int64>.size, MemoryLayout<String>.size)
-
-  let cases: [(Int, String, String, String)] = 
-    [(0, "hello", "goodbye", "goodbye world!"),        // Edit start
-     (8, "world!", "moon?", "goodbye moon?"),          // Edit end
-     (4, "bye", " night", "good night moon?"),         // Edit middle
-     (4, "", " 🦊🦊🦊", "good 🦊🦊🦊 night moon?")]  // wide Characters
-
-  // TODO: String subrange search impl to eliminate need for `start`
-  func findSubrange(start: Int, haystack: String, needle: String) -> Range<Int> {
-    let start = start // haystack.index(of: needle)
-    let end = start.advanced(by: needle.count)
-    return start..<end
-  }
-
-  print(unsafeBitCast(initial.codeUnits, to: Int.self))
-  var testSubject = initial;
-  for (start, needle, replacement, result) in cases {
-    let subrange = findSubrange(start: start, haystack: testSubject, needle: needle)
-    testSubject.replaceSubrange(subrange, with: replacement)
-    expectEqual(testSubject, result)
-  }
-
-
-
-  // Make sure the initial value wasn't mutated
-  expectEqual(initial, "hello world!")
-
-  // Check implicit RangeReplaceable stuff works
-  var hello: String = "Hello!"
-  hello.removeLast()
-  let newElements: String = ", 🌎!"
-  hello += newElements
-  expectEqual(hello, "Hello, 🌎!")
-}
-
-testSuite.test("cstring") {
-  let s1: String = "abracadabra"
-  expectEqual(s1.withCString(strlen), 11)
-  let s2: String = "3.14159"
-  expectEqual(3.14159,s2.withCString(atof))
-  
-  let s3: Swift.String = "some string"
-  s3.withCString {
-    let s = String(cString: $0)
-    expectEqual("some string", s)
-  }
-
-  let utf16 = Array(s3.utf16) + [0]
-  let s4 = utf16.withUnsafeBufferPointer {
-    String(cString: $0.baseAddress, encoding: UTF16.self)
-  }
-  expectEqual(s4, "some string")
-}
-
 testSuite.test("substring") {
   let s: String = "hello world"
   let worldRange: Range = s.index(s.startIndex, offsetBy: 6)..<s.endIndex

@@ -17,12 +17,14 @@
 %{
   import gyb
 }%
+import Darwin
 import StdlibUnittest
 
 /// Implementation detail of `String` that type-erases any `UnicodeContent` into
 /// one word that can live in one of the cases.
 class UnicodeContentBox : FactoryInitializable {
   var utf16: AnyUInt16UnicodeView { fatalError("override me!") }
+  var utf8: AnyUInt8UnicodeView { fatalError("override me!") }
   var unicodeScalars: AnyUnicodeScalarUnicodeView { fatalError("override me!") }
   var fccNormalizedUTF16: AnyUInt16UnicodeView { fatalError("override me!") }
 #if false
@@ -48,12 +50,16 @@ class UnicodeContentBox : FactoryInitializable {
 
   class Instance<Base: UnicodeContent> : UnicodeContentBox
   where Base.UTF16View.Iterator.Element == UTF16.CodeUnit,
+  Base.UTF8View.Iterator.Element == UTF8.CodeUnit,
   Base.UnicodeScalarView.Iterator.Element == UnicodeScalar
   {
     var base: Base
     
     override var utf16: AnyUInt16UnicodeView {
       return AnyUInt16UnicodeView(base.utf16)
+    }
+    override var utf8: AnyUInt8UnicodeView {
+      return AnyUInt8UnicodeView(base.utf8)
     }
     override var unicodeScalars: AnyUnicodeScalarUnicodeView {
       return AnyUnicodeScalarUnicodeView(base.unicodeScalars)
@@ -86,6 +92,7 @@ class UnicodeContentBox : FactoryInitializable {
 
   convenience init<Base: UnicodeContent>(wrapping x: Base)
   where Base.UTF16View.Iterator.Element == UTF16.CodeUnit,
+  Base.UTF8View.Iterator.Element == UTF8.CodeUnit,
   Base.UnicodeScalarView.Iterator.Element == UnicodeScalar
   {
     self.init(Instance(x))
@@ -228,16 +235,28 @@ extension String.Content.Inline${N}or${W} : AnyUnicodeContent {
 }
 
 extension String.Content.Inline${N}or${W} : UnicodeContent {
-  internal var _utf16: LazyMapRandomAccessCollection<String.Content.Packed, UTF16.CodeUnit>
-  {
+  internal var _utf16: LazyMapRandomAccessCollection<
+    String.Content.Packed, UTF16.CodeUnit
+  > {
     return String.Content._unpack(
       bits: bits, 
       bitsPerElement: numericCast(self.bitsPerElement)
     )
   }
-  
+
+  // FIXME: do we really need type erasure here?
   public var utf16: AnyUInt16UnicodeView {
     return AnyUInt16UnicodeView(RandomAccessUnicodeView(_utf16))
+  }
+  
+  public var utf8: AnyUInt8UnicodeView {
+    return bitsPerElement < 8
+    ? AnyUInt8UnicodeView(
+      RandomAccessUnicodeView(
+        _utf16.lazy.map {
+          UInt8(truncatingBitPattern: $0) }))
+    : AnyUInt8UnicodeView(
+        _UnicodeViews(_utf16, UTF16.self).transcoded(to: UTF8.self))
   }
   
   public var fccNormalizedUTF16: AnyUInt16UnicodeView {
@@ -315,6 +334,10 @@ extension String.Content.NSStringPayload : UnicodeContent {
     return RandomAccessUnicodeView(_utf16)
   }
   
+  public var utf8: _TranscodedView<_NSStringUTF16, UTF16, UTF8> {
+    return _TranscodedView<_NSStringUTF16, UTF16, UTF8>(_utf16)
+  }
+  
   public var fccNormalizedUTF16: AnyUInt16UnicodeView {
     return AnyUInt16UnicodeView(
       _UnicodeViews(_utf16, UTF16.self).fccNormalizedUTF16
@@ -386,17 +409,31 @@ def switch(s):
 }%
 
 extension String.Content : UnicodeContent {
-  public typealias UTF16View = AnyUInt16UnicodeView
-  
   // Once we get ownership and view/slice mutation worked out, it's conceivable
   // we could detect in-place mutation of these views and avoid copying,
   // especially after an append.  In the meantime, this'll have to do.
+  
+  public typealias UTF16View = AnyUInt16UnicodeView
   public var utf16: UTF16View {
     get {
       ${switch('return UTF16View(x.utf16)')}
     }
     set {
       replaceUTF16(utf16.startIndex..<utf16.endIndex, with: newValue)
+    }
+  }
+
+  public typealias UTF8View = AnyUInt8UnicodeView
+  public var utf8: UTF8View {
+    get {
+      ${switch('return UTF8View(x.utf8)')}
+    }
+    set {
+      // Probably not the most efficient implementation, but it should work.
+      replaceUTF16(utf16.startIndex..<utf16.endIndex, with: EmptyCollection())
+      UTF8.parseForward(newValue) {
+        replaceUTF16(utf16.endIndex..<utf16.endIndex, with: $0.utf16)
+      }
     }
   }
 
@@ -691,6 +728,7 @@ extension String.Content {
       return storage._tryToReplaceSubrange(
         from: t.lowerBound, to: t.upperBound, with: replacement)
     case .latin1(let storage):
+      if replacement.contains(where: { $0 > 0xFF }) { return false }
       return storage._tryToReplaceSubrange(
         from: t.lowerBound, to: t.upperBound,
         with: replacement.lazy.map { UInt8(truncatingBitPattern: $0) })
@@ -811,6 +849,70 @@ extension String : Hashable {
 #elseif arch(x86_64) || arch(arm64) || arch(powerpc64) || arch(powerpc64le) || arch(s390x)
     return Int(Int64(bitPattern: resultBits))
 #endif
+  }
+}
+
+//===--- CString Interop --------------------------------------------------===//
+extension String {
+  /// Constructs a `String` having the same contents as `nulTerminatedUTF8`.
+  ///
+  /// - Parameter nulTerminatedUTF8: a sequence of contiguous UTF-8 encoded 
+  ///   bytes ending just before the first zero byte (NUL character).
+  init(cString nulTerminatedUTF8: UnsafePointer<CChar>) {
+    // FIXME: is UTF8 the right default way to interpret a C string?  Cocoa
+    // makes use of a "system encoding" that might be relevant.
+    
+    let count = UTF8._nullCodeUnitOffset(in: nulTerminatedUTF8)
+    content = nulTerminatedUTF8.withMemoryRebound(
+      to: UTF8.CodeUnit.self, capacity: count
+    ) {
+      Content(
+        utf16: _UnicodeViews(
+          UnsafeBufferPointer(start: $0, count: count),
+          UTF8.self).transcoded(to: UTF16.self))
+    }
+  }
+  
+  /// Constructs a `String` having the same contents as `nulTerminatedCodeUnits`.
+  ///
+  /// - Parameter nulTerminatedCodeUnits: a sequence of contiguous code units in
+  ///   the given `encoding`, ending just before the first zero code unit.
+  /// - Parameter encoding: describes the encoding in which the code units
+  ///   should be interpreted.
+  init<Encoding: UnicodeEncoding>(
+    cString nulTerminatedCodeUnits:
+    UnsafePointer<Encoding.EncodedScalar.Iterator.Element>,
+    encoding: Encoding.Type
+  )
+  where Encoding.EncodedScalar.Iterator.Element : UnsignedInteger {
+    let count = Encoding._nullCodeUnitOffset(in: nulTerminatedCodeUnits)
+    let source = UnsafeBufferPointer(
+      start: nulTerminatedCodeUnits, count: count)
+    content = Content(
+      utf16: _UnicodeViews(source, Encoding.self).transcoded(to: UTF16.self))
+  }
+ 
+  /// Invokes the given closure on the contents of the string, represented as a
+  /// pointer to a null-terminated sequence of UTF-8 code units.
+  func withCString<Result>(
+    _ body: (UnsafePointer<CChar>) throws -> Result) rethrows -> Result {
+    /*
+    // FIXME: add support for writing zero into the end of existing latin-1
+    // storage.
+    if let l = content._latin1, l.isASCII() {
+      return l.withExistingUnsafeBuffer(body)!
+    }
+    */
+    // FIXME: add a utf8 view to UnicodeContent so this can be faster in many
+    // cases.
+    var result = ContiguousArray<CChar>()
+    let source = Counted(content.utf8)
+    result.reserveCapacity(numericCast(source.count + 1))
+    result.append(contentsOf: source.lazy.map { numericCast($0) })
+    result.append(0)
+    return try result.withUnsafeBufferPointer {
+      try body($0.baseAddress)
+    }
   }
 }
 
@@ -1262,6 +1364,56 @@ suite.test("string-compare-hash") {
   expectNotEqual(s2.hashValue, s3.hashValue)
   expectEqual(s3, s4)
   expectEqual(s3.hashValue, s4.hashValue)
+}
+
+suite.test("replaceSubrange") {
+  let initial: String = "hello world!"
+
+  let cases: [(Int64, String, String, String)] = 
+    [(0, "hello", "goodbye", "goodbye world!"),        // Edit start
+     (8, "world!", "moon?", "goodbye moon?"),          // Edit end
+     (4, "bye", " night", "good night moon?"),         // Edit middle
+     (4, "", " 🦊🦊🦊", "good 🦊🦊🦊 night moon?")]  // wide Characters
+
+  var testSubject = initial;
+  for (start, needle, replacement, result) in cases {
+    let startIndex = testSubject.index(atOffset: start)
+    
+    testSubject.replaceSubrange(
+      startIndex..<testSubject.index(startIndex, offsetBy: needle.count),
+      with: replacement)
+    
+    expectEqual(testSubject, result)
+  }
+
+  // Make sure the initial value wasn't mutated
+  expectEqual(initial, "hello world!")
+
+  // Check implicit RangeReplaceable stuff works
+  var hello: String = "Hello!"
+  hello.removeLast()
+  let newElements: String = ", 🌎!"
+  hello += newElements
+  expectEqual(hello, "Hello, 🌎!")
+}
+
+suite.test("cstring") {
+  let s1: String = "abracadabra"
+  expectEqual(s1.withCString(strlen), 11)
+  let s2: String = "3.14159"
+  expectEqual(3.14159,s2.withCString(atof))
+  
+  let s3: Swift.String = "some string"
+  s3.withCString {
+    let s = String(cString: $0)
+    expectEqual("some string", s)
+  }
+
+  let utf16 = Array(s3.utf16) + [0]
+  let s4 = utf16.withUnsafeBufferPointer {
+    String(cString: $0.baseAddress, encoding: UTF16.self)
+  }
+  expectEqual(s4, "some string")
 }
 
 runAllTests()

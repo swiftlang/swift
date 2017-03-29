@@ -54,14 +54,25 @@ public extension AnyUnicodeContent {
 ///
 /// UnicodeStorage refines this protocol.
 public protocol UnicodeContent : AnyUnicodeContent {
-  /// A type that presents the string's UTF-16 code units without necessarily
-  /// correcting encoding errors
+  /// A type that presents the string's UTF-16 code units
   associatedtype UTF16View : UnicodeView
   // where Iterator.Element == UInt16
 
-  /// The string's UTF-16 code units, without necessarily correcting encoding
-  /// errors.
+  /// The string's UTF-16 code units.
+  ///
+  /// Note: this view may contain encoding errors, if the underlying encoding is
+  /// UTF16 and the source had encoding errors.
   var utf16: UTF16View { get }
+
+  /// A type that presents the string's UTF-8 code units
+  associatedtype UTF8View : UnicodeView
+  // where Iterator.Element == UInt8
+
+  /// The string's UTF-8 code units.
+  ///
+  /// Note: this view may contain encoding errors, if the underlying encoding is
+  /// UTF8 and the source had encoding errors.
+  var utf8: UTF8View { get }
 
   /// A type that presents an FCC-normalized view of the string
   associatedtype FCCNormalizedUTF16View : UnicodeView
@@ -134,6 +145,38 @@ where
   CodeUnits.SubSequence.Iterator.Element == CodeUnits.Iterator.Element {
   var characters: _UnicodeViews<CodeUnits,Encoding>.CharacterView {
     return _UnicodeViews(codeUnits).characters
+  }
+}
+
+// UTF8 presents its code units as the utf8 view
+public extension UnicodeStorage
+where
+  Encoding.EncodedScalar == UTF8.EncodedScalar,
+  CodeUnits.Iterator.Element  == Encoding.EncodedScalar.Iterator.Element,
+  CodeUnits.Iterator.Element : UnsignedInteger,
+  CodeUnits.SubSequence : RandomAccessCollection,
+  CodeUnits.SubSequence.Index == CodeUnits.Index,
+  CodeUnits.SubSequence.SubSequence == CodeUnits.SubSequence,
+  CodeUnits.SubSequence.Iterator.Element == CodeUnits.Iterator.Element {
+
+  var utf8: RandomAccessUnicodeView<CodeUnits> {
+    return RandomAccessUnicodeView(codeUnits)
+  }
+}
+
+// Everybody else gets UTF8 by transcoding the underlying code units
+public extension UnicodeStorage
+where
+  CodeUnits.Iterator.Element  == Encoding.EncodedScalar.Iterator.Element,
+  CodeUnits.Iterator.Element : UnsignedInteger,
+  CodeUnits.SubSequence : RandomAccessCollection,
+  CodeUnits.SubSequence.Index == CodeUnits.Index,
+  CodeUnits.SubSequence.SubSequence == CodeUnits.SubSequence,
+  CodeUnits.SubSequence.Iterator.Element == CodeUnits.Iterator.Element {
+
+  var utf8: _TranscodedView<CodeUnits, Encoding, UTF8> {
+    return _UnicodeViews(
+      codeUnits, Encoding.self).transcoded(to: UTF8.self)
   }
 }
 
@@ -231,6 +274,10 @@ where Encoding == Latin1,
     return fccNormalizedUTF16
   }
 
+  var utf8: RandomAccessUnicodeView<CodeUnits> {
+    return RandomAccessUnicodeView(codeUnits)
+  }
+  
   /// An FCC-normalized view of the string
   var fccNormalizedUTF16: RandomAccessUnicodeView<
     LazyMapRandomAccessCollection<CodeUnits, UInt16>
@@ -397,7 +444,7 @@ where Base : UnicodeView, Self : AnyUnicodeView_ {
 }
 
 // Generate wrappers for specific element types.
-% for Element in ('UInt16', 'UInt32', 'UnicodeScalar', 'Character'):
+% for Element in ('UInt8', 'UInt16', 'UInt32', 'UnicodeScalar', 'Character'):
 
 //===--- Any${Element}Iterator --------------------------------------------===//
 /// Type-eraser for Iterators over ${Element}s
