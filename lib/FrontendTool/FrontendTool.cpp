@@ -117,10 +117,11 @@ static bool emitMakeDependencies(DiagnosticEngine &diags,
     out << escape(targetName) << " :";
     // First include all other files in the module. Make-style dependencies
     // need to be conservative!
-    for (StringRef path : opts.InputFilenames)
+    for (auto const &path : reversePathSortedFilenames(opts.InputFilenames))
       out << ' ' << escape(path);
     // Then print dependencies we've picked up during compilation.
-    for (StringRef path : depTracker.getDependencies())
+    for (auto const &path :
+           reversePathSortedFilenames(depTracker.getDependencies()))
       out << ' ' << escape(path);
     out << '\n';
   });
