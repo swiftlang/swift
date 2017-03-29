@@ -4,8 +4,8 @@
 import Foundation
 
 class ObjCSubclass : NSObject {
-  func foo() { } // expected-warning{{inference of '@objc' for members of Objective-C--derived classes is deprecated in Swift 4}}{{3-3=@objc }}
-  var bar: NSObject? = nil // expected-warning{{inference of '@objc' for members of Objective-C--derived classes is deprecated in Swift 4}}{{3-3=@objc }}
+  func foo() { } // expected-warning{{inference of '@objc' for members of Objective-C-derived classes is deprecated in Swift 4}}{{3-3=@objc }}
+  var bar: NSObject? = nil // expected-warning{{inference of '@objc' for members of Objective-C-derived classes is deprecated in Swift 4}}{{3-3=@objc }}
 }
 
 class DynamicMembers {
