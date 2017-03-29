@@ -624,7 +624,7 @@ func test_open_existential_semantics_opaque(_ guaranteed: P1,
   // CHECK: [[METHOD:%.*]] = function_ref
   // -- Can consume the value from our own copy
   // CHECK: apply [[METHOD]]<{{.*}}>([[VALUE]])
-  // CHECK: deinit_existential_addr [[IMMEDIATE]]
+  // CHECK: destroy_addr [[IMMEDIATE]]
   // CHECK: dealloc_stack [[IMMEDIATE]]
   immediate.f1()
 
@@ -633,7 +633,7 @@ func test_open_existential_semantics_opaque(_ guaranteed: P1,
   // CHECK: [[METHOD:%.*]] = function_ref
   // -- Can consume the value from our own copy
   // CHECK: apply [[METHOD]]<{{.*}}>([[VALUE]])
-  // CHECK: deinit_existential_addr [[PLUS_ONE]]
+  // CHECK: destroy_addr [[PLUS_ONE]]
   // CHECK: dealloc_stack [[PLUS_ONE]]
   plusOneP1().f1()
 }

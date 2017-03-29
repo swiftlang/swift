@@ -234,11 +234,11 @@ func convExistentialTrivial(_ t2: @escaping (Q) -> Trivial, t3: @escaping (Q?) -
 // CHECK:         alloc_stack $Q
 // CHECK-NEXT:    open_existential_addr immutable_access %1 : $*P
 // CHECK-NEXT:    init_existential_addr %3 : $*Q
-// CHECK-NEXT:    copy_addr [take] {{.*}} to [initialization] {{.*}}
+// CHECK-NEXT:    copy_addr {{.*}} to [initialization] {{.*}}
 // CHECK-NEXT:    apply
 // CHECK-NEXT:    init_existential_addr
 // CHECK-NEXT:    store
-// CHECK:         deinit_existential_addr
+// CHECK:         destroy_addr
 // CHECK:         return
 
 // ==== Existential metatypes

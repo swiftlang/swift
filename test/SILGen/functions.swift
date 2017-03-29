@@ -218,8 +218,7 @@ func calls(_ i:Int, j:Int, k:Int) {
   // CHECK: [[PMETHOD:%[0-9]+]] = witness_method $[[OPENED]], #SomeProtocol.method!1
   // CHECK: [[I:%[0-9]+]] = load [trivial] [[IADDR]]
   // CHECK: apply [[PMETHOD]]<[[OPENED]]>([[I]], [[PVALUE]])
-  // CHECK: destroy_addr [[PVALUE]]
-  // CHECK: deinit_existential_addr [[TEMP]]
+  // CHECK: destroy_addr [[TEMP]]
   // CHECK: dealloc_stack [[TEMP]]
   p.method(i)
 

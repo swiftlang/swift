@@ -272,7 +272,7 @@ option(SWIFT_STDLIB_ENABLE_RESILIENCE
 
 option(SWIFT_RUNTIME_ENABLE_COW_EXISTENTIALS
     "Build the runtime with a copy-on-write implementation for opaque existentials"
-    FALSE)
+    TRUE)
 
 option(SWIFT_STDLIB_USE_NONATOMIC_RC
     "Build the standard libraries and overlays with nonatomic reference count operations enabled"

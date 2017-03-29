@@ -2342,7 +2342,9 @@ static llvm::Constant *getDeallocateBoxedOpaqueExistentialBufferFunction(
         llvm::Value *pointerAlignMask = llvm::ConstantInt::get(
             IGF.IGM.SizeTy, IGF.IGM.getPointerAlignment().getValue() - 1);
         alignmentMask = Builder.CreateOr(alignmentMask, pointerAlignMask);
-        emitDeallocateHeapObject(IGF, boxReference, size, alignmentMask);
+        IGF.emitDeallocRawCall(
+            Builder.CreateBitCast(boxReference, IGF.IGM.Int8PtrTy), size,
+            alignmentMask);
         // We are done. Return.
         Builder.CreateRetVoid();
       }, true /*noinline*/);
