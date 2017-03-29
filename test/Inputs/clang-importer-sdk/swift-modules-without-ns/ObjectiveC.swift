@@ -61,11 +61,11 @@ public struct NSZone {
   public var pointer : OpaquePointer
 }
 
-internal func _convertBoolToObjCBool(_ x: Bool) -> ObjCBool {
+public func _convertBoolToObjCBool(_ x: Bool) -> ObjCBool {
   return ObjCBool(x)
 }
 
-internal func _convertObjCBoolToBool(_ x: ObjCBool) -> Bool {
+public func _convertObjCBoolToBool(_ x: ObjCBool) -> Bool {
   return x.boolValue
 }
 

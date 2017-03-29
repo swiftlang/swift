@@ -123,8 +123,6 @@ struct MapRegionCounters : public ASTWalker {
       CounterMap[WS->getBody()] = NextCounter++;
     } else if (auto *RWS = dyn_cast<RepeatWhileStmt>(S)) {
       CounterMap[RWS->getBody()] = NextCounter++;
-    } else if (auto *FS = dyn_cast<ForStmt>(S)) {
-      CounterMap[FS->getBody()] = NextCounter++;
     } else if (auto *FES = dyn_cast<ForEachStmt>(S)) {
       CounterMap[FES->getBody()] = NextCounter++;
       walkPatternForProfiling(FES->getIterator(), *this);
@@ -536,14 +534,6 @@ public:
       assignCounter(RWS->getCond(), CounterExpr::Ref(BodyCounter));
       RepeatWhileStack.push_back(RWS);
 
-    } else if (auto *FS = dyn_cast<ForStmt>(S)) {
-      assignCounter(FS, CounterExpr::Zero());
-      if (Expr *E = FS->getCond().getPtrOrNull())
-        assignCounter(E, CounterExpr::Ref(getCurrentCounter()));
-      if (Expr *E = FS->getIncrement().getPtrOrNull())
-        assignCounter(E, CounterExpr::Zero());
-      assignCounter(FS->getBody());
-
     } else if (auto *FES = dyn_cast<ForEachStmt>(S)) {
       assignCounter(FES, CounterExpr::Zero());
       assignCounter(FES->getBody());
@@ -593,13 +583,6 @@ public:
       (void) RWS;
       RepeatWhileStack.pop_back();
 
-    } else if (auto *FS = dyn_cast<ForStmt>(S)) {
-      // Both the condition and the increment are reached through the backedge.
-      if (Expr *E = FS->getCond().getPtrOrNull())
-        addToCounter(E, getExitCounter());
-      if (Expr *E = FS->getIncrement().getPtrOrNull())
-        addToCounter(E, getExitCounter());
-
     } else if (auto *CS = dyn_cast<ContinueStmt>(S)) {
       // Continues create extra backedges, add them to the appropriate counters.
       if (!isa<RepeatWhileStmt>(CS->getTarget()))
@@ -607,9 +590,7 @@ public:
       if (auto *WS = dyn_cast<WhileStmt>(CS->getTarget())) {
         if (auto *E = getConditionNode(WS->getCond()))
           addToCounter(E, getCurrentCounter());
-      } else if (auto *FS = dyn_cast<ForStmt>(CS->getTarget()))
-        if (Expr *E = FS->getCond().getPtrOrNull())
-          addToCounter(E, getCurrentCounter());
+      }
       terminateRegion(S);
 
     } else if (auto *BS = dyn_cast<BreakStmt>(S)) {
