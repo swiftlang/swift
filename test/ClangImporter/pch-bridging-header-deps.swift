@@ -8,6 +8,7 @@
 // RUN: %target-swift-frontend -module-name test -c -emit-dependencies-path %t.d -emit-reference-dependencies-path %t.swiftdeps -primary-file %s %s -import-objc-header %t.pch
 // RUN: %FileCheck --check-prefix CHECK-DEPS %s < %t.d
 // RUN: %FileCheck --check-prefix CHECK-SWIFTDEPS %s < %t.swiftdeps
+// RUN: %FileCheck --check-prefix CHECK-SWIFTDEPS2 %s < %t.swiftdeps
 
 print(app_function(1))
 
@@ -17,3 +18,4 @@ print(app_function(1))
 // CHECK-SWIFTDEPS: - "SOURCE_DIR/test/ClangImporter/Inputs/app-bridging-header-to-pch.h"
 // CHECK-SWIFTDEPS: - "SOURCE_DIR/test/ClangImporter/Inputs/chained-unit-test-bridging-header-to-pch.h"
 
+// CHECK-SWIFTDEPS2-NOT: {{.*}}.pch
