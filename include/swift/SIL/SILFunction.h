@@ -382,7 +382,8 @@ public:
   /// Returns true if this function can be inlined into a fragile function
   /// body.
   bool hasValidLinkageForFragileInline() const {
-    return isSerialized() || isThunk() == IsReabstractionThunk;
+    return (isSerialized() == IsSerialized ||
+            isSerialized() == IsSerializable);
   }
 
   /// Returns true if this function can be referenced from a fragile function
