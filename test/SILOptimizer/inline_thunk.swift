@@ -9,7 +9,7 @@
 // CHECK: call swiftcc i32 @{{.*}}testit{{.*}}Tf{{.*}} #[[ATTR:[0-9]+]]
 // CHECK: ret
 
-// CHECK-LABEL: define hidden swiftcc i32 @{{.*}}testit{{.*}}FTW(i32
+// CHECK-LABEL: define internal swiftcc i32 @{{.*}}testit{{.*}}FTW(i32
 // CHECK: call swiftcc i32 @{{.*}}testit{{.*}}Tf{{.*}} #[[ATTR]]
 // CHECK: ret
 
