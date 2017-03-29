@@ -2992,10 +2992,18 @@ ERROR(objc_operator, none,
       "operator methods cannot be declared @objc", ())
 ERROR(objc_operator_proto, none,
       "@objc protocols may not have operator requirements", ())
-WARNING(objc_inference_swift3,none,
-        "inference of '@objc' for %select{'dynamic' members|members of "
-        "Objective-C-derived classes}0 is deprecated in Swift 4",
-        (unsigned))
+WARNING(objc_inference_swift3_dynamic,none,
+        "inference of '@objc' for 'dynamic' members is deprecated", ())
+WARNING(objc_inference_swift3_objc_derived,none,
+        "inference of '@objc' for members of Objective-C-derived classes is "
+        "deprecated", ())
+
+NOTE(objc_inference_swift3_addobjc,none,
+     "add `@objc` to continue exposing an Objective-C entry point (Swift 3 "
+     "behavior)", ())
+NOTE(objc_inference_swift3_addnonobjc,none,
+     "add `@nonobjc` to suppress the Objective-C entry point (Swift 4 "
+     "behavior)", ())
 
 ERROR(objc_for_generic_class,none,
       "generic subclasses of '@objc' classes cannot have an explicit '@objc' "
