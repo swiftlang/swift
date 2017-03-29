@@ -355,17 +355,6 @@ public:
 
     auto layout = getLayout();
 
-    // Use copy-on-write existentials?
-    if (false && IGF.IGM.getSILModule().getOptions().UseCOWExistentials) {
-      auto fn = getInitWithCopyBoxedOpaqueExistentialBufferFunction(
-          IGF.IGM, getLayout(), src.getAddress()->getType());
-      auto call =
-          IGF.Builder.CreateCall(fn, {dest.getAddress(), src.getAddress()});
-      call->setCallingConv(IGF.IGM.DefaultCC);
-      call->setDoesNotThrow();
-      return;
-    }
-
     // Project down to the buffers and ask the witnesses to do a
     // copy-initialize.
     Address srcBuffer = layout.projectExistentialBuffer(IGF, src);
@@ -381,17 +370,6 @@ public:
     llvm::Value *metadata = copyType(IGF, dest, src);
 
     auto layout = getLayout();
-
-    // Use copy-on-write existentials?
-    if (false && IGF.IGM.getSILModule().getOptions().UseCOWExistentials) {
-      auto fn = getInitWithTakeBoxedOpaqueExistentialBufferFunction(
-          IGF.IGM, getLayout(), src.getAddress()->getType());
-      auto call =
-          IGF.Builder.CreateCall(fn, {dest.getAddress(), src.getAddress()});
-      call->setCallingConv(IGF.IGM.DefaultCC);
-      call->setDoesNotThrow();
-      return;
-    }
 
     // Project down to the buffers and ask the witnesses to do a
     // take-initialize.
