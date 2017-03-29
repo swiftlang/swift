@@ -1416,6 +1416,85 @@ suite.test("cstring") {
   expectEqual(s4, "some string")
 }
 
+suite.test("fcc-normalized-view") {
+  let a: UInt16 = 0x0061
+  let aTic: UInt16 = 0x00e0
+  let aBackTic: UInt16 = 0x00e1
+  typealias UTF16String = _UnicodeViews<[UInt16], UTF16>
+  // typealias NormalizedView = FCCNormalizedUTF16View_2<[UInt16], UTF16>
+
+  // Helper functions, eagerly forms arrays of the forwards and reverse
+  // FCC normalized UTF16 code units
+  func fccNormView(_ codeUnits: [UInt16])
+    -> (forward: [UInt16], reversed: [UInt16]) {
+    let view = UTF16String(codeUnits).fccNormalizedUTF16
+    return (forward: Array(view),
+            reversed: Array(view.reversed()))
+  }
+
+  // Test canonical equivalence for:
+  //   1) a + ̀ + ́ == à + ́
+  //   2) a + ́ + ̀ == á + ̀
+  // BUT, the two are distinct, #1 != #2
+  do {
+    let str1form1 = [a, 0x0300, 0x0301]
+    let str1form2 = [aTic, 0x0301]
+    let str2form1 = [a, 0x0301, 0x0300]
+    let str2form2 = [aBackTic, 0x0300]
+
+    let (norm1_1, norm1_1rev) = fccNormView(str1form1)
+    let (norm1_2, norm1_2rev) = fccNormView(str1form2)
+    let (norm2_1, norm2_1rev) = fccNormView(str2form1)
+    let (norm2_2, norm2_2rev) = fccNormView(str2form2)
+
+    expectEqualSequence(norm1_1, norm1_2)
+    expectEqualSequence(norm2_1, norm2_2)
+    for (cu1, cu2) in zip(norm1_1, norm2_1) {
+      expectNotEqual(cu1, cu2)
+    }
+    expectEqualSequence(norm1_1rev, norm1_2rev)
+    expectEqualSequence(norm2_1rev, norm2_2rev)
+    for (cu1, cu2) in zip(norm1_1rev, norm2_1rev) {
+      expectNotEqual(cu1, cu2)
+    }
+  }
+
+  // Test canonical equivalence, and non-combining-ness of FCC for:
+  //   1) a + ̖ + ̀ == à + ̖ == a + ̀ + ̖
+  //   All will normalize under FCC as a + ̖ + ̀
+  do {
+    let form1 = [a, 0x0316, 0x0300]
+    let form2 = [a, 0x0300, 0x0316]
+    let form3 = [aTic, 0x0316]
+
+    let (norm1, norm1rev) = fccNormView(form1)
+    let (norm2, norm2rev) = fccNormView(form2)
+    let (norm3, norm3rev) = fccNormView(form3)
+
+    expectEqualSequence(norm1, norm2)
+    expectEqualSequence(norm2, norm3)
+    expectEqualSequence(norm1rev, norm2rev)
+    expectEqualSequence(norm2rev, norm3rev)
+
+    // Form 1 is already in FCC
+    expectEqualSequence(norm3, form1)
+    expectEqualSequence(norm3rev, form1.reversed())
+  }
+
+  // Test non-start first scalars
+  do {
+    let form1 = [0x0300, a, 0x0300]
+    let form2 = [0x0300, aTic] // In FCC normal form
+    let (norm1, norm1rev) = fccNormView(form1)
+    let (norm2, norm2rev) = fccNormView(form2)
+
+    // Sanity check existing impl
+    expectEqualSequence(norm1, norm2)
+    expectEqualSequence(norm1rev, norm2rev)
+    expectEqualSequence(norm1, form2)
+  }
+}
+
 runAllTests()
 
 // ${'Local Variables'}:

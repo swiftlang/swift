@@ -130,6 +130,7 @@ set(SWIFTLIB_ESSENTIAL
   StringHashable.swift
   StringInterpolation.swift
   StringLegacy.swift
+  StringNormalization.swift
   StringRangeReplaceableCollection.swift.gyb
   StringIndexConversions.swift
   StringStorage.swift
