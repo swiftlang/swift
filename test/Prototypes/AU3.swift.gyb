@@ -1620,6 +1620,13 @@ suite.test("bridging") {
   }
 }
 
+suite.test("AnyUInt16UnicodeView.DoubleWrapping") {
+  let s: String = "Bouffant Hairdo"
+  let u1 = s.content.utf16
+  let u2 = AnyUInt16UnicodeView(u1)
+  expectEqual(type(of: u1.base), type(of: u2.base))
+}
+
 runAllTests()
 
 // ${'Local Variables'}:

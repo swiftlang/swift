@@ -534,7 +534,8 @@ extension Any${Element}UnicodeView {
   /// Creates an instance that wraps `base`.
   public init<Base: UnicodeView>(_ base: Base)
   where Base.Iterator.Element == ${Element} {
-    self.base2 = Adapter(base: base)
+    if let me = base as? Any${Element}UnicodeView { self = me }
+    else { self.base2 = Adapter(base: base) }
   }
 }
 
