@@ -1577,6 +1577,7 @@ suite.test("bridging") {
   do {
     let s: String = "abc\n🇸🇸🇬🇱🇱🇸🇩🇯🇺🇸\nΣὲ 👥🥓γνωρίζω\nგთხოვთ\nงบู๊กู้ขึ้นม่\nᚹᛖᛥᚫ"
     let n = s as NSString
+    // Generalized NSString representation
     expectNotNil(TrueReference(n))
     let s2 = n as String
     expectEqual(s, s2)
@@ -1584,19 +1585,36 @@ suite.test("bridging") {
 
   do {
     let s: String = "ace of case"
-    expectNotNil(s.content._inline5or6)
+    expectNotNil(s.content._inline5or6) // 5-bit per character inline buffer
     let n = s as NSString
-    expectNil(TrueReference(n))
+    expectNil(TrueReference(n))         // 5-bit per character tagged NSString
     let s2 = n as String
     expectEqual(s, s2)
   }
   
   do {
-    let s: String = "UL2O85"
-    expectNotNil(s.content._inline7or16)
-    expectEqualSequence("UL2O85".characters, s)
+    let s: String = "UL2O85UL2" 
+    expectNotNil(s.content._inline5or6) // 6-bit per character inline buffer
     let n = s as NSString
-    expectNil(TrueReference(n))
+    expectNil(TrueReference(n))         // 6-bit per character tagged NSString
+    let s2 = n as String
+    expectEqual(s, s2)
+  }
+
+  do {
+    let s: String = "ZZZZ"              
+    expectNotNil(s.content._inline7or16) // 7 bit ASCII inline buffer
+    let n = s as NSString
+    expectNil(TrueReference(n))          // ASCII tagged NSString representation
+    let s2 = n as String
+    expectEqual(s, s2)
+  }
+
+  do {
+    let s: String = "¢¤¥"          // UTF16 inline buffer
+    expectNotNil(s.content._inline7or16)
+    let n = s as NSString
+    expectNotNil(TrueReference(n)) // No non-ASCII tagged NSStrings, it seems
     let s2 = n as String
     expectEqual(s, s2)
   }
