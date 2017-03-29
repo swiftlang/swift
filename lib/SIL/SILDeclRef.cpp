@@ -54,7 +54,7 @@ swift::getMethodDispatch(AbstractFunctionDecl *method) {
       if (fd->isAccessor() && fd->getAccessorStorageDecl()->hasClangNode())
         return MethodDispatch::Class;
     }
-    if (method->getAttrs().hasAttribute<DynamicAttr>())
+    if (method->isDynamic())
       return MethodDispatch::Class;
   }
 
@@ -96,20 +96,20 @@ bool swift::requiresForeignEntryPoint(ValueDecl *vd) {
     if (fd->isGetterOrSetter())
       return requiresForeignEntryPoint(fd->getAccessorStorageDecl());
 
-    return fd->getAttrs().hasAttribute<DynamicAttr>();
+    return fd->isDynamic();
   }
 
   if (auto *cd = dyn_cast<ConstructorDecl>(vd)) {
     if (cd->hasClangNode())
       return true;
 
-    return cd->getAttrs().hasAttribute<DynamicAttr>();
+    return cd->isDynamic();
   }
 
   if (auto *asd = dyn_cast<AbstractStorageDecl>(vd))
     return asd->requiresForeignGetterAndSetter();
 
-  return vd->getAttrs().hasAttribute<DynamicAttr>();
+  return vd->isDynamic();
 }
 
 /// TODO: We should consult the cached LoweredLocalCaptures the SIL

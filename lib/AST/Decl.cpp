@@ -3790,8 +3790,7 @@ bool AbstractStorageDecl::requiresForeignGetterAndSetter() const {
     return true;
   // Otherwise, we only dispatch by @objc if the declaration is dynamic or
   // NSManaged.
-  return getAttrs().hasAttribute<DynamicAttr>() ||
-         getAttrs().hasAttribute<NSManagedAttr>();
+  return isDynamic() || getAttrs().hasAttribute<NSManagedAttr>();
 }
 
 

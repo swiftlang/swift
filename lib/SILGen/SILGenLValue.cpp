@@ -720,7 +720,7 @@ namespace {
         return false;
 
       // If the declaration is dynamic, there's no materializeForSet.
-      if (decl->getAttrs().hasAttribute<DynamicAttr>())
+      if (decl->isDynamic())
         return false;
 
       // If the declaration was imported from C, we won't gain anything
