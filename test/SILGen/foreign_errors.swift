@@ -298,3 +298,14 @@ func testPreservedResultInverted() throws {
 // CHECK-NOT: destroy_value
 // CHECK:   return {{%.+}} : $()
 // CHECK: [[ERROR_BB]]
+
+// Make sure that we do not crash when emitting the error value here.
+//
+// TODO: Add some additional filecheck tests.
+extension NSURL {
+  func resourceValue<T>(forKey key: String) -> T? {
+    var prop: AnyObject? = nil
+    _ = try? self.getResourceValue(&prop, forKey: key)
+    return prop as? T
+  }
+}

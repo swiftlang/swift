@@ -1744,12 +1744,8 @@ RValue SILGenFunction::emitApply(ResultPlanPtr &&resultPlan,
   }
 
   // If there's a foreign error parameter, fill it in.
-  Optional<FormalEvaluationScope> errorTempWriteback;
   ManagedValue errorTemp;
   if (auto foreignError = calleeTypeInfo.foreignError) {
-    // Error-temporary emission may need writeback.
-    errorTempWriteback.emplace(*this);
-
     unsigned errorParamIndex =
         calleeTypeInfo.foreignError->getErrorParameterIndex();
 
@@ -1850,9 +1846,6 @@ RValue SILGenFunction::emitApply(ResultPlanPtr &&resultPlan,
   // TODO: maybe this should happen after managing the result if it's
   // not a result-checking convention?
   if (auto foreignError = calleeTypeInfo.foreignError) {
-    // Force immediate writeback to the error temporary.
-    errorTempWriteback.reset();
-
     bool doesNotThrow = (options & ApplyOptions::DoesNotThrow);
     emitForeignErrorCheck(loc, directResults, errorTemp,
                           doesNotThrow, *foreignError);
