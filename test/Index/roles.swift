@@ -333,3 +333,28 @@ func containing() {
     }
   }
 }
+
+protocol ProtRoot {
+  func fooCommon()
+  func foo1()
+  func foo2()
+}
+
+protocol ProtDerived : ProtRoot {
+  func fooCommon()
+  func bar1()
+  func bar2()
+}
+
+extension ProtDerived {
+  func fooCommon() {}
+  // CHECK: 350:8 | instance-method/Swift | fooCommon() | s:14swift_ide_test11ProtDerivedPAAE9fooCommonyyF | Def,RelChild,RelOver | rel: 2
+  // CHECK-NEXT: RelOver | instance-method/Swift | fooCommon() | s:14swift_ide_test11ProtDerivedP9fooCommonyyF
+
+  func foo1() {}
+  // FIXME: This should override foo1 from ProtRoot.
+
+  func bar1() {}
+  // CHECK: 357:8 | instance-method/Swift | bar1() | s:14swift_ide_test11ProtDerivedPAAE4bar1yyF | Def,RelChild,RelOver | rel: 2
+  // CHECK-NEXT: RelOver | instance-method/Swift | bar1() | s:14swift_ide_test11ProtDerivedP4bar1yyF
+}
