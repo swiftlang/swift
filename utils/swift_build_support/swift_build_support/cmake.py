@@ -111,11 +111,15 @@ class CMake(object):
             define("CMAKE_CONFIGURATION_TYPES",
                    "Debug;Release;MinSizeRel;RelWithDebInfo")
 
-        if args.clang_compiler_version:
-            major, minor, patch, _ = args.clang_compiler_version.components
+        if args.clang_user_visible_version:
+            major, minor, patch, _ = args.clang_user_visible_version.components
             define("LLVM_VERSION_MAJOR:STRING", major)
             define("LLVM_VERSION_MINOR:STRING", minor)
             define("LLVM_VERSION_PATCH:STRING", patch)
+            define("CLANG_VERSION_MAJOR:STRING", major)
+            define("CLANG_VERSION_MINOR:STRING", minor)
+            define("CLANG_VERSION_PATCH:STRING", patch)
+
 
         if args.build_ninja and args.cmake_generator == 'Ninja':
             define('CMAKE_MAKE_PROGRAM', toolchain.ninja)
