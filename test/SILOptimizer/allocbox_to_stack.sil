@@ -243,8 +243,8 @@ bb0:
   strong_release %1 : ${ var SomeUnion }
   %10 = tuple ()
   return %10 : $()
-// CHECK:  [[T0:%.*]] = tuple ()
 // CHECK: dealloc_stack [[UNION]]
+// CHECK:  [[T0:%.*]] = tuple ()
 // CHECK-NEXT:  return [[T0]] : $()
 }
 
@@ -276,24 +276,27 @@ bb0(%0 : $Bool):
 //
 // CHECK-LABEL: sil @box_reachable_from_release_test
 sil @box_reachable_from_release_test : $@convention(thin) () -> () {
-// CHECK: bb0:
-// CHECK: alloc_stack
 bb0:
   br bb1
 
+// CHECK: bb1:
+// CHECK-NEXT: alloc_stack
 bb1:
   %1 = alloc_box ${ var Bool }
   cond_br undef, bb2, bb3
 
+// CHECK: bb2:
+// CHECK-NEXT: dealloc_stack
 bb2:
   strong_release %1 : ${ var Bool }
   br bb1
 
+// CHECK: bb3:
+// CHECK-NEXT: dealloc_stack
 bb3:
   strong_release %1 : ${ var Bool }
   %2 = tuple ()
-// CHECK: dealloc_stack
-// CHECK-NEXT: return
+// CHECK: return
   return %2 : $()
 }
 
@@ -334,18 +337,19 @@ bb1:
 
   strong_release %2 : ${ var SomeClass }
   // CHECK: destroy_addr [[MUI]]
+  // CHECK-NEXT: dealloc_stack [[STACK]]
   br bb2
 
   // CHECK: bb2
 bb2:
   %17 = tuple ()
-  // CHECK: dealloc_stack [[STACK]]
-  // CHECK-NEXT: return
+  // CHECK: return
   return %17 : $()
 
 bb3:
   strong_release %2 : ${ var SomeClass }
   // CHECK: destroy_addr [[MUI]]
+  // CHECK-NEXT: dealloc_stack [[STACK]]
   br bb2
 }
 
@@ -486,13 +490,13 @@ bb0(%0 : $@callee_owned () -> @out U):
 sil @callWithAutoclosure : $@convention(thin) <T where T : P> (@in T) -> () {
 // CHECK: bb0
 bb0(%0 : $*T):
-  // CHECK: [[STACK:%[0-9a-zA-Z_]+]] = alloc_stack $T
   // CHECK: debug_value_addr
   debug_value_addr %0 : $*T
   // CHECK: function_ref @mightApply
   %2 = function_ref @mightApply : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@owned @callee_owned () -> @out τ_0_0) -> ()
   %3 = function_ref @closure_to_specialize : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@owned <τ_0_0> { var τ_0_0 } <τ_0_0>) -> @out τ_0_0
   // CHECK-NOT: alloc_box
+  // CHECK: [[STACK:%[0-9a-zA-Z_]+]] = alloc_stack $T
   %4 = alloc_box $<τ_0_0> { var τ_0_0 } <T>
   %4a = project_box %4 : $<τ_0_0> { var τ_0_0 } <T>, 0
   // CHECK: copy_addr %0 to [initialization] [[STACK]] : $*T
@@ -502,10 +506,10 @@ bb0(%0 : $*T):
   %6 = partial_apply %3<T>(%4) : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@owned <τ_0_0> { var τ_0_0 } <τ_0_0>) -> @out τ_0_0
   %7 = apply %2<T>(%6) : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@owned @callee_owned () -> @out τ_0_0) -> ()
   // CHECK: destroy_addr [[STACK]] : $*T
+  // CHECK: dealloc_stack [[STACK]] : $*T
   destroy_addr %0 : $*T
   %9 = tuple ()
- // CHECK: dealloc_stack [[STACK]] : $*T
- // CHECK: return
+  // CHECK: return
   return %9 : $()
 }
 
@@ -745,3 +749,253 @@ bb5(%25 : $Error):                                // Preds: bb4 bb3
   strong_release %2 : ${ var ThrowDerivedClass }
   throw %25 : $Error
 }
+
+// CHECK-LABEL: sil @deal_with_wrong_nesting
+// CHECK:      bb0(%0 : $Int):
+// CHECK-NEXT:   [[STACK1:%[0-9]+]] = alloc_stack $Bool
+// CHECK-NEXT:   [[BOX:%[0-9]+]] = alloc_stack $Int
+// CHECK:      bb1:
+// CHECK-NEXT:   dealloc_stack [[BOX]]
+// CHECK-NEXT:   dealloc_stack [[STACK1]]
+// CHECK:      bb2:
+// CHECK:        store
+// CHECK:        [[STACK2:%[0-9]+]] = alloc_stack $Bool
+// CHECK-NEXT:   dealloc_stack [[STACK2]]
+// CHECK-NEXT:   dealloc_stack [[BOX]]
+// CHECK-NEXT:   dealloc_stack [[STACK1]]
+// CHECK:      bb3:
+// CHECK-NEXT:   tuple
+// CHECK-NEXT:   return
+sil @deal_with_wrong_nesting : $(Int) -> () {
+bb0(%0 : $Int):
+  %as1 = alloc_stack $Bool
+  %1 = alloc_box ${ var Int }
+  cond_br undef, bb1, bb2
+
+bb1:
+  strong_release %1 : ${ var Int }
+  dealloc_stack %as1 : $*Bool
+  br bb3
+
+bb2:
+  %1a = project_box %1 : ${ var Int }, 0
+  %2 = store %0 to %1a : $*Int
+  dealloc_stack %as1 : $*Bool
+  %3 = load %1a : $*Int
+  %as2 = alloc_stack $Bool
+  strong_release %1 : ${ var Int }
+  dealloc_stack %as2 : $*Bool
+  br bb3
+
+bb3:
+  %r = tuple ()
+  %5 = return %r : $()
+}
+
+// CHECK-LABEL: sil @wrong_nesting_with_alloc_ref
+// CHECK:      bb0(%0 : $Int):
+// CHECK-NEXT:   [[REF:%[0-9]+]] = alloc_ref [stack] $SomeClass
+// CHECK-NEXT:   [[BOX:%[0-9]+]] = alloc_stack $Int
+// CHECK:        store
+// CHECK:        dealloc_stack [[BOX]]
+// CHECK-NEXT:   dealloc_ref [stack] [[REF]]
+// CHECK-NEXT:   tuple
+// CHECK-NEXT:   return
+sil @wrong_nesting_with_alloc_ref : $(Int) -> () {
+bb0(%0 : $Int):
+  %as1 = alloc_ref [stack] $SomeClass
+  %1 = alloc_box ${ var Int }
+  %1a = project_box %1 : ${ var Int }, 0
+  %2 = store %0 to %1a : $*Int
+  dealloc_ref [stack] %as1 : $SomeClass
+  %3 = load %1a : $*Int
+  strong_release %1 : ${ var Int }
+  %r = tuple ()
+  %5 = return %r : $()
+}
+
+// CHECK-LABEL: sil @nesting_and_unreachable1
+// CHECK:      bb0(%0 : $Int):
+// CHECK-NEXT:   [[STACK1:%[0-9]+]] = alloc_stack $Bool
+// CHECK-NEXT:   [[BOX:%[0-9]+]] = alloc_stack $Int
+// CHECK:      bb1:
+// CHECK-NEXT:   [[STACK2:%[0-9]+]] = alloc_stack $Bool
+// CHECK-NEXT:   dealloc_stack [[STACK2]]
+// CHECK-NEXT:   unreachable
+// CHECK:      bb2:
+// CHECK:        store
+// CHECK:        dealloc_stack [[BOX]]
+// CHECK-NEXT:   dealloc_stack [[STACK1]]
+// CHECK-NEXT:   tuple
+// CHECK-NEXT:   return
+sil @nesting_and_unreachable1 : $(Int) -> () {
+bb0(%0 : $Int):
+  %as1 = alloc_stack $Bool
+  %1 = alloc_box ${ var Int }
+  %1a = project_box %1 : ${ var Int }, 0
+  cond_br undef, bb1, bb2
+
+bb1:
+  %as2 = alloc_stack $Bool
+  dealloc_stack %as2 : $*Bool
+  unreachable
+
+bb2:
+  %2 = store %0 to %1a : $*Int
+  dealloc_stack %as1 : $*Bool
+  %3 = load %1a : $*Int
+  strong_release %1 : ${ var Int }
+  %r = tuple ()
+  %5 = return %r : $()
+}
+
+// CHECK-LABEL: sil @nesting_and_unreachable2
+// CHECK:      bb0(%0 : $Int):
+// CHECK-NEXT:   [[STACK1:%[0-9]+]] = alloc_stack $Bool
+// CHECK-NEXT:   [[BOX:%[0-9]+]] = alloc_stack $Int
+// CHECK:      bb1:
+// CHECK-NEXT:   [[STACK2:%[0-9]+]] = alloc_stack $Bool
+// CHECK-NEXT:   dealloc_stack [[STACK2]]
+// CHECK-NEXT:   dealloc_stack [[BOX]]
+// CHECK-NEXT:   dealloc_stack [[STACK1]]
+// CHECK-NEXT:   unreachable
+// CHECK:      bb2:
+// CHECK:        store
+// CHECK:        dealloc_stack [[BOX]]
+// CHECK-NEXT:   dealloc_stack [[STACK1]]
+// CHECK-NEXT:   tuple
+// CHECK-NEXT:   return
+sil @nesting_and_unreachable2 : $(Int) -> () {
+bb0(%0 : $Int):
+  %as1 = alloc_stack $Bool
+  %1 = alloc_box ${ var Int }
+  %1a = project_box %1 : ${ var Int }, 0
+  cond_br undef, bb1, bb2
+
+bb1:
+  %as2 = alloc_stack $Bool
+  strong_release %1 : ${ var Int }
+  dealloc_stack %as2 : $*Bool
+  unreachable
+
+bb2:
+  %2 = store %0 to %1a : $*Int
+  dealloc_stack %as1 : $*Bool
+  %3 = load %1a : $*Int
+  strong_release %1 : ${ var Int }
+  %r = tuple ()
+  %5 = return %r : $()
+}
+
+// CHECK-LABEL: sil @nesting_and_unreachable3
+// CHECK:      bb0(%0 : $Int):
+// CHECK-NEXT:   [[BOX:%[0-9]+]] = alloc_stack $Int
+// CHECK-NEXT:   [[STACK:%[0-9]+]] = alloc_stack $Bool
+// CHECK:      bb1:
+// CHECK-NEXT:   dealloc_stack [[STACK]]
+// CHECK-NEXT:   dealloc_stack [[BOX]]
+// CHECK-NEXT:   unreachable
+// CHECK:      bb2:
+// CHECK:        store
+// CHECK:        dealloc_stack [[STACK]]
+// CHECK-NEXT:   dealloc_stack [[BOX]]
+// CHECK-NEXT:   tuple
+// CHECK-NEXT:   return
+sil @nesting_and_unreachable3 : $(Int) -> () {
+bb0(%0 : $Int):
+  %1 = alloc_box ${ var Int }
+  %as1 = alloc_stack $Bool
+  %1a = project_box %1 : ${ var Int }, 0
+  cond_br undef, bb1, bb2
+
+bb1:
+  strong_release %1 : ${ var Int }
+  unreachable
+
+bb2:
+  %2 = store %0 to %1a : $*Int
+  %3 = load %1a : $*Int
+  dealloc_stack %as1 : $*Bool
+  strong_release %1 : ${ var Int }
+  %r = tuple ()
+  %5 = return %r : $()
+}
+
+// CHECK-LABEL: sil @nesting_and_unreachable4
+// CHECK:      bb0(%0 : $Int):
+// CHECK-NEXT:   [[BOX:%[0-9]+]] = alloc_stack $Int
+// CHECK:      bb1:
+// CHECK-NEXT:   unreachable
+// CHECK:      bb2:
+// CHECK:        store
+// CHECK:        dealloc_stack [[BOX]]
+// CHECK-NEXT:   tuple
+// CHECK-NEXT:   return
+sil @nesting_and_unreachable4 : $(Int) -> () {
+bb0(%0 : $Int):
+  %1 = alloc_box ${ var Int }
+  %1a = project_box %1 : ${ var Int }, 0
+  cond_br undef, bb1, bb2
+
+bb1:
+  unreachable
+
+bb2:
+  %2 = store %0 to %1a : $*Int
+  %3 = load %1a : $*Int
+  strong_release %1 : ${ var Int }
+  %r = tuple ()
+  %5 = return %r : $()
+}
+
+// CHECK-LABEL: sil @nesting_and_unreachable_critical_edge
+// CHECK:      bb0(%0 : $Int):
+// CHECK-NEXT:   [[BOX:%[0-9]+]] = alloc_stack $Int
+// CHECK-NEXT:   [[STACK1:%[0-9]+]] = alloc_stack $Bool
+// CHECK-NEXT:   cond_br
+// CHECK:      bb1:
+// CHECK-NEXT:   dealloc_stack [[STACK1]]
+// CHECK-NEXT:   br bb5
+// CHECK:      bb2:
+// CHECK-NEXT:   [[STACK2:%[0-9]+]] = alloc_stack $Bool
+// CHECK-NEXT:   cond_br
+// CHECK:      bb3:
+// CHECK-NEXT:   dealloc_stack [[STACK2]]
+// CHECK-NEXT:   dealloc_stack [[STACK1]]
+// CHECK-NEXT:   br bb5
+// CHECK:      bb4:
+// CHECK:        store
+// CHECK:        dealloc_stack [[STACK2]]
+// CHECK-NEXT:   dealloc_stack [[STACK1]]
+// CHECK-NEXT:   dealloc_stack [[BOX]]
+// CHECK-NEXT:   tuple
+// CHECK-NEXT:   return
+// CHECK:      bb5:
+// CHECK-NEXT:   dealloc_stack [[BOX]]
+// CHECK-NEXT:   unreachable
+sil @nesting_and_unreachable_critical_edge : $(Int) -> () {
+bb0(%0 : $Int):
+  %1 = alloc_box ${ var Int }
+  %as1 = alloc_stack $Bool
+  %1a = project_box %1 : ${ var Int }, 0
+  cond_br undef, bb1, bb3
+
+bb1:
+  %as2 = alloc_stack $Bool
+  cond_br undef, bb2, bb3
+
+bb2:
+  %2 = store %0 to %1a : $*Int
+  %3 = load %1a : $*Int
+  dealloc_stack %as2 : $*Bool
+  dealloc_stack %as1 : $*Bool
+  strong_release %1 : ${ var Int }
+  %r = tuple ()
+  %5 = return %r : $()
+
+bb3:
+  strong_release %1 : ${ var Int }
+  unreachable
+
+}
+

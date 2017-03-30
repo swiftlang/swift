@@ -2173,6 +2173,7 @@ iterations with -O",
 
     # Prepare and validate toolchain
     toolchain = host_toolchain(xcrun_toolchain=args.darwin_xcrun_toolchain)
+    os.environ['TOOLCHAINS'] = args.darwin_xcrun_toolchain
 
     if args.host_cc is not None:
         toolchain.cc = args.host_cc
