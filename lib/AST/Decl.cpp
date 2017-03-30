@@ -4294,6 +4294,14 @@ AbstractFunctionDecl::getDefaultArg(unsigned Index) const {
   llvm_unreachable("Invalid parameter index");
 }
 
+Type AbstractFunctionDecl::getMethodInterfaceType() const {
+  assert(getDeclContext()->isTypeContext());
+  auto Ty = getInterfaceType();
+  if (Ty->hasError())
+    return ErrorType::get(getASTContext());
+  return Ty->castTo<AnyFunctionType>()->getResult();
+}
+
 bool AbstractFunctionDecl::argumentNameIsAPIByDefault() const {
   // Initializers have argument labels.
   if (isa<ConstructorDecl>(this))
