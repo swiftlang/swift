@@ -350,8 +350,7 @@ computeNewArgInterfaceTypes(SILFunction *F,
     assert(paramBoxTy->getLayout()->getFields().size() == 1
            && "promoting compound box not implemented yet");
     auto paramBoxedTy = paramBoxTy->getFieldType(F->getModule(), 0);
-    auto &paramTL = F->getModule().Types.getTypeLowering(paramBoxedTy);
-
+    auto &paramTL = F->getTypeLowering(paramBoxedTy);
     ParameterConvention convention;
     if (paramTL.isFormallyPassedIndirectly()) {
       convention = ParameterConvention::Indirect_In;
@@ -863,8 +862,12 @@ processPartialApplyInst(PartialApplyInst *PAI, IndicesSet &PromotableIndices,
   // Populate the argument list for a new partial_apply instruction, taking into
   // consideration any captures.
   auto CalleeFunctionTy = PAI->getCallee()->getType().castTo<SILFunctionType>();
-  SILFunctionConventions calleeConv(CalleeFunctionTy, M);
-  auto CalleePInfo = CalleeFunctionTy->getParameters();
+  auto SubstCalleeFunctionTy = CalleeFunctionTy;
+  if (PAI->hasSubstitutions())
+    SubstCalleeFunctionTy =
+        CalleeFunctionTy->substGenericArgs(M, PAI->getSubstitutions());
+  SILFunctionConventions calleeConv(SubstCalleeFunctionTy, M);
+  auto CalleePInfo = SubstCalleeFunctionTy->getParameters();
   SILFunctionConventions paConv(PAI->getType().castTo<SILFunctionType>(), M);
   unsigned FirstIndex = paConv.getNumSILArguments();
   unsigned OpNo = 1, OpCount = PAI->getNumOperands();
@@ -879,10 +882,6 @@ processPartialApplyInst(PartialApplyInst *PAI, IndicesSet &PromotableIndices,
       SILParameterInfo CPInfo = CalleePInfo[Index - NumIndirectResults];
       assert(calleeConv.getSILType(CPInfo) == BoxValue->getType()
              && "SILType of parameter info does not match type of parameter");
-      // Cleanup the captured argument.
-      releasePartialApplyCapturedArg(B, PAI->getLoc(), BoxValue,
-                                     CPInfo);
-
       // Load and copy from the address value, passing the result as an argument
       // to the new closure.
       SILValue Addr;
@@ -906,6 +905,9 @@ processPartialApplyInst(PartialApplyInst *PAI, IndicesSet &PromotableIndices,
       auto &typeLowering = M.getTypeLowering(Addr->getType());
       Args.push_back(
         typeLowering.emitLoadOfCopy(B, PAI->getLoc(), Addr, IsNotTake));
+      // Cleanup the captured argument.
+      releasePartialApplyCapturedArg(B, PAI->getLoc(), BoxValue,
+                                     CPInfo);
       ++NumCapturesPromoted;
     } else {
       Args.push_back(PAI->getOperand(OpNo));
