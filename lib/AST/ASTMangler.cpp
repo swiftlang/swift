@@ -303,6 +303,7 @@ std::string ASTMangler::mangleObjCRuntimeName(const NominalTypeDecl *Nominal) {
     // Don't use word-substitutions and punycode encoding.
     MaxNumWords = 0;
     UsePunycode = false;
+    UseSubstitutions = false;
     Buffer << "_Tt";
     bool isProto = false;
     if (isa<ClassDecl>(Nominal)) {
