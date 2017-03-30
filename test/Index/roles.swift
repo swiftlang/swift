@@ -348,17 +348,13 @@ protocol ProtDerived : ProtRoot {
 
 extension ProtDerived {
   func fooCommon() {}
-  // CHECK: 350:8 | instance-method/Swift | fooCommon() | s:14swift_ide_test11ProtDerivedPAAE9fooCommonyyF | Def,RelChild,RelOver | rel: 3
+  // CHECK: 350:8 | instance-method/Swift | fooCommon() | s:14swift_ide_test11ProtDerivedPAAE9fooCommonyyF | Def,RelChild,RelOver | rel: 2
   // CHECK-NEXT: RelOver | instance-method/Swift | fooCommon() | s:14swift_ide_test11ProtDerivedP9fooCommonyyF
-  // CHECK-NEXT: RelOver | instance-method/Swift | fooCommon() | s:14swift_ide_test8ProtRootP9fooCommonyyF
 
   func foo1() {}
-  // CHECK: 355:8 | instance-method/Swift | foo1() | s:14swift_ide_test11ProtDerivedPAAE4foo1yyF | Def,RelChild,RelOver | rel: 2
-  // CHECK-NEXT: RelOver | instance-method/Swift | foo1() | s:14swift_ide_test8ProtRootP4foo1yyF
-  // CHECK-NEXT: RelChild | extension/ext-protocol/Swift | ProtDerived | s:e:s:14swift_ide_test11ProtDerivedPAAE9fooCommonyyF
+  // FIXME: This should override foo1 from ProtRoot.
 
   func bar1() {}
-  // CHECK: 360:8 | instance-method/Swift | bar1() | s:14swift_ide_test11ProtDerivedPAAE4bar1yyF | Def,RelChild,RelOver | rel: 2
+  // CHECK: 357:8 | instance-method/Swift | bar1() | s:14swift_ide_test11ProtDerivedPAAE4bar1yyF | Def,RelChild,RelOver | rel: 2
   // CHECK-NEXT: RelOver | instance-method/Swift | bar1() | s:14swift_ide_test11ProtDerivedP4bar1yyF
-  // CHECK-NEXT:RelChild | extension/ext-protocol/Swift | ProtDerived | s:e:s:14swift_ide_test11ProtDerivedPAAE9fooCommonyyF
 }
