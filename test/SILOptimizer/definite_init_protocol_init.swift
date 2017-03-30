@@ -100,8 +100,8 @@ struct AddressOnlyStruct : TriviallyConstructible {
 // CHECK-NEXT: copy_addr [take] [[SELF_BOX]] to [initialization] [[SELF]]
 // CHECK-NEXT: dealloc_stack [[SELF_BOX]]
 // CHECK-NEXT: copy_addr [take] [[SELF]] to [initialization] %0
-// CHECK-NEXT: dealloc_stack [[SELF]]
 // CHECK-NEXT: [[RESULT:%.*]] = tuple ()
+// CHECK-NEXT: dealloc_stack [[SELF]]
 // CHECK-NEXT: return [[RESULT]]
   init(upper: Int) {
     self.init(middle: upper)

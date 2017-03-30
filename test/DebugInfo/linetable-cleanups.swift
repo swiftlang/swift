@@ -1,8 +1,5 @@
 // RUN: %target-swift-frontend %s -emit-ir -g -o - | %FileCheck %s
 
-// TODO: check why this is failing on linux
-// REQUIRES: OS=macosx
-
 func markUsed<T>(_ t: T) {}
 
 class Person {
@@ -24,10 +21,12 @@ func main() {
 // CHECK: call void {{.*[rR]}}elease{{.*}} {{#[0-9]+}}, !dbg ![[LOOPHEADER_LOC]]
 // CHECK: call {{.*}}void @_T04main8markUsedyxlF
 // The cleanups should share the line number with the ret stmt.
-// CHECK:  call void @swift_bridgeObjectRelease({{.*}}) {{#[0-9]+}}, !dbg ![[CLEANUPS:.*]]
+// CHECK:  call void {{.*[rR]}}elease{{.*}} {{#[0-9]+}}, !dbg ![[CLEANUPS:.*]]
 // CHECK-NEXT:  !dbg ![[CLEANUPS]]
+// CHECK-NEXT:  bitcast
 // CHECK-NEXT:  llvm.lifetime.end
 // CHECK-NEXT:  bitcast
+// CHECK-NEXT:  llvm.lifetime.end
 // CHECK-NEXT:  bitcast
 // CHECK-NEXT:  llvm.lifetime.end
 // CHECK-NEXT:  ret void, !dbg ![[CLEANUPS]]
