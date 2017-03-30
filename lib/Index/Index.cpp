@@ -403,17 +403,6 @@ private:
     return SrcMgr.getLineAndColumn(Loc, BufferID);
   }
 
-  bool shouldIndex(ValueDecl *D, bool IsRef) const {
-    if (D->isImplicit())
-      return false;
-    if (isLocalSymbol(D) && (!isa<ParamDecl>(D) || IsRef))
-      return false;
-    if (D->isPrivateStdlibDecl())
-      return false;
-
-    return true;
-  }
-
   void getModuleHash(SourceFileOrModule SFOrMod, llvm::raw_ostream &OS);
   llvm::hash_code hashModule(llvm::hash_code code, SourceFileOrModule SFOrMod);
   llvm::hash_code hashFileReference(llvm::hash_code code,
@@ -1259,4 +1248,14 @@ void index::indexModule(ModuleDecl *module, StringRef hash,
                              /*bufferID*/ -1);
   walker.visitModule(*module, hash);
   consumer.finish();
+}
+
+bool index::shouldIndex(ValueDecl *D, bool IsRef) {
+  if (D->isImplicit())
+    return false;
+  if (isLocalSymbol(D) && (!isa<ParamDecl>(D) || IsRef))
+    return false;
+  if (D->isPrivateStdlibDecl())
+    return false;
+  return true;
 }
