@@ -24,6 +24,7 @@
     "StringUTF16.swift",
     "StringUTF8.swift",
     "StringUnicodeScalarView.swift",
+    "NewString.swift",
     "TranscodedView.swift",
     "AnyUnicode.swift",
     "Unicode.swift",

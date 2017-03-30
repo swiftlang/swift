@@ -353,16 +353,16 @@ extension String : _ExpressibleByBuiltinUnicodeScalarLiteral {
   }
 }
 
-extension String : ExpressibleByUnicodeScalarLiteral {
-  /// Creates an instance initialized to the given Unicode scalar value.
-  ///
-  /// Do not call this initializer directly. It may be used by the compiler when
-  /// you initialize a string using a string literal that contains a single
-  /// Unicode scalar value.
-  public init(unicodeScalarLiteral value: String) {
-    self = value
-  }
-}
+// extension String : ExpressibleByUnicodeScalarLiteral {
+//   /// Creates an instance initialized to the given Unicode scalar value.
+//   ///
+//   /// Do not call this initializer directly. It may be used by the compiler when
+//   /// you initialize a string using a string literal that contains a single
+//   /// Unicode scalar value.
+//   public init(unicodeScalarLiteral value: String) {
+//     self = value
+//   }
+// }
 
 extension String : _ExpressibleByBuiltinExtendedGraphemeClusterLiteral {
   @_inlineable
@@ -380,17 +380,17 @@ extension String : _ExpressibleByBuiltinExtendedGraphemeClusterLiteral {
   }
 }
 
-extension String : ExpressibleByExtendedGraphemeClusterLiteral {
-  /// Creates an instance initialized to the given extended grapheme cluster
-  /// literal.
-  ///
-  /// Do not call this initializer directly. It may be used by the compiler when
-  /// you initialize a string using a string literal containing a single
-  /// extended grapheme cluster.
-  public init(extendedGraphemeClusterLiteral value: String) {
-    self = value
-  }
-}
+// extension String : ExpressibleByExtendedGraphemeClusterLiteral {
+//   /// Creates an instance initialized to the given extended grapheme cluster
+//   /// literal.
+//   ///
+//   /// Do not call this initializer directly. It may be used by the compiler when
+//   /// you initialize a string using a string literal containing a single
+//   /// extended grapheme cluster.
+//   public init(extendedGraphemeClusterLiteral value: String) {
+//     self = value
+//   }
+// }
 
 extension String : _ExpressibleByBuiltinUTF16StringLiteral {
   @_inlineable
@@ -437,32 +437,32 @@ extension String : _ExpressibleByBuiltinStringLiteral {
   }
 }
 
-extension String : ExpressibleByStringLiteral {
-  /// Creates an instance initialized to the given string value.
-  ///
-  /// Do not call this initializer directly. It is used by the compiler when you
-  /// initialize a string using a string literal. For example:
-  ///
-  ///     let nextStop = "Clark & Lake"
-  ///
-  /// This assignment to the `nextStop` constant calls this string literal
-  /// initializer behind the scenes.
-  public init(stringLiteral value: String) {
-     self = value
-  }
-}
+// extension String : ExpressibleByStringLiteral {
+//   /// Creates an instance initialized to the given string value.
+//   ///
+//   /// Do not call this initializer directly. It is used by the compiler when you
+//   /// initialize a string using a string literal. For example:
+//   ///
+//   ///     let nextStop = "Clark & Lake"
+//   ///
+//   /// This assignment to the `nextStop` constant calls this string literal
+//   /// initializer behind the scenes.
+//   public init(stringLiteral value: String) {
+//      self = value
+//   }
+// }
 
-extension String : CustomDebugStringConvertible {
-  /// A representation of the string that is suitable for debugging.
-  public var debugDescription: String {
-    var result = "\""
-    for us in self.unicodeScalars {
-      result += us.escaped(asASCII: false)
-    }
-    result += "\""
-    return result
-  }
-}
+// extension String : CustomDebugStringConvertible {
+//   /// A representation of the string that is suitable for debugging.
+//   public var debugDescription: String {
+//     var result = "\""
+//     for us in self.unicodeScalars {
+//       result += us.escaped(asASCII: false)
+//     }
+//     result += "\""
+//     return result
+//   }
+// }
 
 extension String {
   /// Returns the number of code units occupied by this string
