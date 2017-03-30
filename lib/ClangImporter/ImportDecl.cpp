@@ -4325,25 +4325,36 @@ namespace {
       // Check whether there is a function with the same name as this
       // property. If so, suppress the property; the user will have to use
       // the methods directly, to avoid ambiguities.
-      auto containerTy = dc->getDeclaredTypeInContext();
-      VarDecl *overridden = nullptr;
-      SmallVector<ValueDecl *, 2> lookup;
-      dc->lookupQualified(containerTy, name,
-                          NL_QualifiedDefault | NL_KnownNoDependency,
-                          Impl.getTypeResolver(), lookup);
-      for (auto result : lookup) {
-        if (isa<FuncDecl>(result) &&
-            result->isInstanceMember() == decl->isInstanceProperty() &&
-            result->getFullName().getArgumentNames().empty())
-          return nullptr;
+      Type containerTy;
+      if (auto *classDecl = dyn_cast<ClassDecl>(dc)) {
+        // If we're importing into the primary @interface for something, as
+        // opposed to an extension, make sure we don't try to load any
+        // categories...by just looking into the super type.
+        containerTy = classDecl->getSuperclass();
+      } else {
+        containerTy = dc->getDeclaredTypeInContext();
+      }
 
-        if (auto var = dyn_cast<VarDecl>(result)) {
-          // If the selectors of the getter match in Objective-C, we have an
-          // override.
-          if (var->isInstanceMember() == decl->isInstanceProperty() &&
-              var->getObjCGetterSelector() ==
-                Impl.importSelector(decl->getGetterName()))
-            overridden = var;
+      VarDecl *overridden = nullptr;
+      if (containerTy) {
+        SmallVector<ValueDecl *, 2> lookup;
+        dc->lookupQualified(containerTy, name,
+                            NL_QualifiedDefault | NL_KnownNoDependency,
+                            Impl.getTypeResolver(), lookup);
+        for (auto result : lookup) {
+          if (isa<FuncDecl>(result) &&
+              result->isInstanceMember() == decl->isInstanceProperty() &&
+              result->getFullName().getArgumentNames().empty())
+            return nullptr;
+
+          if (auto var = dyn_cast<VarDecl>(result)) {
+            // If the selectors of the getter match in Objective-C, we have an
+            // override.
+            if (var->isInstanceMember() == decl->isInstanceProperty() &&
+                var->getObjCGetterSelector() ==
+                  Impl.importSelector(decl->getGetterName()))
+              overridden = var;
+          }
         }
       }
 
@@ -5531,7 +5542,9 @@ ConstructorDecl *SwiftDeclConverter::importConstructor(
                             ->getResult()
                             ->castTo<AnyFunctionType>()
                             ->getInput();
-  for (auto other : ownerNominal->lookupDirect(importedName.getDeclName())) {
+  bool ignoreNewExtensions = isa<ClassDecl>(dc);
+  for (auto other : ownerNominal->lookupDirect(importedName.getDeclName(),
+                                               ignoreNewExtensions)) {
     auto ctor = dyn_cast<ConstructorDecl>(other);
     if (!ctor || ctor->isInvalid() ||
         ctor->getAttrs().isUnavailable(Impl.SwiftContext) ||
@@ -7571,6 +7584,23 @@ ClangImporter::Implementation::loadAllMembers(Decl *D, uint64_t extra) {
     auto ext = cast<ExtensionDecl>(D);
     DC = ext;
     IDC = ext;
+
+
+    // If the base is also imported from Clang, load its members first.
+    const NominalTypeDecl *base = ext->getExtendedType()->getAnyNominal();
+    if (auto *clangBase = base->getClangDecl()) {
+      base->loadAllMembers();
+
+      // Sanity check: make sure we don't jump over to a category /while/
+      // loading the original class's members. Right now we only check if this
+      // happens on the first member.
+      if (auto *clangContainer = dyn_cast<clang::ObjCContainerDecl>(clangBase)){
+        if (!clangContainer->decls_empty()) {
+          assert(!base->getMembers().empty() &&
+                 "can't load extension members before base has finished");
+        }
+      }
+    }
   }
 
   ImportingEntityRAII Importing(*this);
