@@ -3,7 +3,7 @@
 import gizmo
 
 // CHECK: ModifyStruct
-// CHECK:   = alloc_stack $Drill
+// CHECK: %1 = alloc_stack $Drill
 // CHECK: ret
 func ModifyStruct(inDrill : Drill) -> Int32 {
   var D : Drill = inDrill
