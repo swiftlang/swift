@@ -1797,6 +1797,10 @@ ERROR(decl_already_final,none,
 ERROR(open_decl_cannot_be_final,none,
       "%0 cannot be declared both 'final' and 'open'", (DescriptiveDeclKind))
 
+WARNING(override_swift3_objc_inference,none,
+        "override of %0 %1 from extension of %2 depends on deprecated "
+        "inference of '@objc'",
+        (DescriptiveDeclKind, DeclName, Identifier))
 
 // Inheritance
 ERROR(duplicate_inheritance,none,

@@ -451,7 +451,7 @@ public class Sub : Base {
 public class BaseExt : NSObject {}
 
 extension BaseExt {
-  public var count: Int {
+  @objc public var count: Int {
     return 0
   }
 }
