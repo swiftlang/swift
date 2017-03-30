@@ -2316,8 +2316,10 @@ UnboundGenericType *TypeAliasDecl::getUnboundGenericType() const {
 }
 
 Type AbstractTypeParamDecl::getSuperclass() const {
-  auto *dc = getDeclContext();
-  auto contextTy = dc->mapTypeIntoContext(getDeclaredInterfaceType());
+  auto *genericEnv = getDeclContext()->getGenericEnvironmentOfContext();
+  assert(genericEnv != nullptr && "Too much circularity");
+
+  auto contextTy = genericEnv->mapTypeIntoContext(getDeclaredInterfaceType());
   if (auto *archetype = contextTy->getAs<ArchetypeType>())
     return archetype->getSuperclass();
 
@@ -2327,8 +2329,10 @@ Type AbstractTypeParamDecl::getSuperclass() const {
 
 ArrayRef<ProtocolDecl *>
 AbstractTypeParamDecl::getConformingProtocols() const {
-  auto *dc = getDeclContext();
-  auto contextTy = dc->mapTypeIntoContext(getDeclaredInterfaceType());
+  auto *genericEnv = getDeclContext()->getGenericEnvironmentOfContext();
+  assert(genericEnv != nullptr && "Too much circularity");
+
+  auto contextTy = genericEnv->mapTypeIntoContext(getDeclaredInterfaceType());
   if (auto *archetype = contextTy->getAs<ArchetypeType>())
     return archetype->getConformsTo();
 
