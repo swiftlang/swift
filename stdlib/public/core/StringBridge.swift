@@ -70,7 +70,7 @@ func _cocoaStringToSwiftString_NonASCII(
 internal func _cocoaStringToContiguous(
   source: _CocoaString, range: Range<Int>, minimumCapacity: Int
 ) -> _StringBuffer {
-  _sanityCheck(_swift_stdlib_CFStringGetCharactersPtr(source) == nil,
+  _sanityCheck( true || _swift_stdlib_CFStringGetCharactersPtr(source) == nil,
     "Known contiguously stored strings should already be converted to Swift")
 
   let startIndex = range.lowerBound
@@ -105,7 +105,7 @@ internal func _cocoaStringSlice(
   
   let cfSelf: _swift_shims_CFStringRef = target.cocoaBuffer.unsafelyUnwrapped
   
-  _sanityCheck(
+  _sanityCheck( true ||
     _swift_stdlib_CFStringGetCharactersPtr(cfSelf) == nil,
     "Known contiguously stored strings should already be converted to Swift")
 
@@ -123,7 +123,7 @@ internal func _cocoaStringSubscript(
 ) -> UTF16.CodeUnit {
   let cfSelf: _swift_shims_CFStringRef = target.cocoaBuffer.unsafelyUnwrapped
 
-  _sanityCheck(_swift_stdlib_CFStringGetCharactersPtr(cfSelf) == nil,
+  _sanityCheck( true || _swift_stdlib_CFStringGetCharactersPtr(cfSelf) == nil,
     "Known contiguously stored strings should already be converted to Swift")
 
   return _swift_stdlib_CFStringGetCharacterAtIndex(cfSelf, position)
