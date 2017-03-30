@@ -314,6 +314,44 @@ static ManagedValue getAddressOfOptionalValue(SILGenFunction &SGF,
 }
 
 namespace {
+  /// A helper class for creating writebacks associated with l-value
+  /// components that don't really need them.
+  class WritebackPseudoComponent : public LogicalPathComponent {
+  protected:
+    WritebackPseudoComponent(const LValueTypeData &typeData)
+      : LogicalPathComponent(typeData, WritebackPseudoKind) {}
+
+  public:
+    AccessKind getBaseAccessKind(SILGenFunction &SGF,
+                                 AccessKind accessKind) const override {
+      llvm_unreachable("called getBaseAccessKind on pseudo-component");
+    }
+    std::unique_ptr<LogicalPathComponent>
+    clone(SILGenFunction &SGF, SILLocation l) const override {
+      llvm_unreachable("called clone on pseudo-component");
+    }
+
+    RValue get(SILGenFunction &SGF, SILLocation loc,
+               ManagedValue base, SGFContext c) && override {
+      llvm_unreachable("called get on a pseudo-component");
+    }
+    void set(SILGenFunction &SGF, SILLocation loc,
+             RValue &&value, ManagedValue base) && override {
+      llvm_unreachable("called set on a pseudo-component");
+    }
+    ManagedValue getMaterialized(SILGenFunction &SGF, SILLocation loc,
+                                 ManagedValue base,
+                                 AccessKind accessKind) && override {
+      llvm_unreachable("called getMaterialized on a pseudo-component");
+    }
+
+    void diagnoseWritebackConflict(LogicalPathComponent *rhs,
+                                   SILLocation loc1, SILLocation loc2,
+                                   SILGenFunction &SGF) override {
+      // do nothing
+    }
+  };
+
   class RefElementComponent : public PhysicalPathComponent {
     VarDecl *Field;
     SILType SubstFieldType;
@@ -1065,41 +1103,12 @@ namespace {
     }
   };
 
-  class UnpinPseudoComponent : public LogicalPathComponent {
+  class UnpinPseudoComponent : public WritebackPseudoComponent {
   public:
     UnpinPseudoComponent(const LValueTypeData &typeData)
-      : LogicalPathComponent(typeData, WritebackPseudoKind) {}
+      : WritebackPseudoComponent(typeData) {}
 
   private:
-    AccessKind getBaseAccessKind(SILGenFunction &SGF,
-                                 AccessKind accessKind) const override {
-      llvm_unreachable("called getBaseAccessKind on pseudo-component");
-    }
-    std::unique_ptr<LogicalPathComponent>
-    clone(SILGenFunction &SGF, SILLocation l) const override {
-      llvm_unreachable("called clone on pseudo-component");
-    }
-
-    RValue get(SILGenFunction &SGF, SILLocation loc,
-               ManagedValue base, SGFContext c) && override {
-      llvm_unreachable("called get on a pseudo-component");
-    }
-    void set(SILGenFunction &SGF, SILLocation loc,
-             RValue &&value, ManagedValue base) && override {
-      llvm_unreachable("called set on a pseudo-component");
-    }
-    ManagedValue getMaterialized(SILGenFunction &SGF, SILLocation loc,
-                                 ManagedValue base,
-                                 AccessKind accessKind) && override {
-      llvm_unreachable("called getMaterialized on a pseudo-component");
-    }
-
-    void diagnoseWritebackConflict(LogicalPathComponent *rhs,
-                                   SILLocation loc1, SILLocation loc2,
-                                   SILGenFunction &SGF) override {
-      // do nothing
-    }
-
     void writeback(SILGenFunction &SGF, SILLocation loc,
                    ManagedValue base,
                    MaterializedLValue materialized,
