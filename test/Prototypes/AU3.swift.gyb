@@ -384,6 +384,21 @@ extension String : Unicode {
   public typealias Index = AnyCharacterUnicodeView.Index
   public typealias IndexDistance = AnyCharacterUnicodeView.IndexDistance
 
+  public struct SubSequence {
+    public typealias Base = RangeReplaceableBidirectionalSlice<String>
+    public var base: Base
+  }
+
+  public subscript(bounds: Range<Index>) -> SubSequence {
+    get {
+      return SubSequence(base:
+        RangeReplaceableBidirectionalSlice(base: self, bounds: bounds))
+    }
+    set {
+      fatalError("implement me!")
+    }
+  }
+
   // FIXME: figure out how to resolve ambiguities when we try to use the default
   // from BidirectionalCollectionWrapper.
   public mutating func _tryToReplaceSubrange<C: Collection>(
@@ -784,7 +799,98 @@ extension ObjectIdentifier {
     }    
   }
 }
+//===--- SubString --------------------------------------------------------===//
 
+
+extension String.SubSequence
+  : BidirectionalCollection, BidirectionalCollectionWrapper {
+  public typealias Index = Base.Index
+  public typealias IndexDistance = Base.IndexDistance
+  public typealias Iterator = Base.Iterator
+}
+
+extension String.SubSequence
+: RangeReplaceableCollection {
+  public init() { base = Base() }
+  
+  // FIXME: figure out how to resolve ambiguities when we try to use the default
+  // from BidirectionalCollectionWrapper.
+  public mutating func _tryToReplaceSubrange<C: Collection>(
+    from targetStart: Index, to targetEnd: Index, with replacement: C
+  ) -> Bool
+  where C.Iterator.Element == Base.Iterator.Element {
+    return base._tryToReplaceSubrange(
+      from: targetStart, to: targetEnd,  with: replacement)
+  }
+
+  public mutating func replaceSubrange<C: Collection>(
+    _ r: Range<Index>, with replacement: C
+  )
+  where C.Iterator.Element == Base.Iterator.Element {
+    return base.replaceSubrange(r,  with: replacement)
+  }
+}
+/*
+extension String.SubSequence : Unicode {
+  public struct Content {
+    var base: String.Content
+  }
+  public var content: Content {
+    return base.base.content[base.bounds]
+  }
+}
+
+public typealias SubString = String.SubSequence
+
+extension SubString.Content : AnyUnicodeContent {
+  var isKnownLatin1: Bool { return base.isKnownLatin1 }
+  var isKnownASCII: Bool { return base.isKnownASCII }
+  var isKnownFCCNormalized: Bool { return base.isKnownFCCNormalized }
+  var isKnownFCDForm: Bool { return base.isKnownFCDForm }
+  var isKnownNFDNormalized: Bool { return base.isKnownNFDNormalized }
+  var isKnownNFCNormalized: Bool { return base.isKnownNFCNormalized }
+}
+
+extension SubString.Content : UnicodeContent {
+  /// A type that presents the string's UTF-16 code units
+  associatedtype UTF16View : UnicodeView
+  // where Iterator.Element == UInt16
+
+  /// The string's UTF-16 code units.
+  ///
+  /// Note: this view may contain encoding errors, if the underlying encoding is
+  /// UTF16 and the source had encoding errors.
+  var utf16: UTF16View { get }
+
+  /// A type that presents the string's UTF-8 code units
+  associatedtype UTF8View : UnicodeView
+  // where Iterator.Element == UInt8
+
+  /// The string's UTF-8 code units.
+  ///
+  /// Note: this view may contain encoding errors, if the underlying encoding is
+  /// UTF8 and the source had encoding errors.
+  var utf8: UTF8View { get }
+
+  /// A type that presents an FCC-normalized view of the string
+  associatedtype FCCNormalizedUTF16View : UnicodeView
+  // where Iterator.Element == UInt16
+
+  /// An FCC-normalized view of the string
+  var fccNormalizedUTF16: FCCNormalizedUTF16View { get }
+
+  associatedtype CharacterView : UnicodeView
+  // where Iterator.Element == Character
+
+  var characters: CharacterView { get }
+
+  /// A type that presents the string's unicode scalar values
+  associatedtype UnicodeScalarView : UnicodeView
+  // where Iterator.Element == UnicodeScalar
+
+  var unicodeScalars: UnicodeScalarView { get }
+}
+*/
 //===--- Literal Support --------------------------------------------------===//
 
 extension String : ExpressibleByUnicodeScalarLiteral {
