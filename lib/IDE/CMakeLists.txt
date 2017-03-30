@@ -15,5 +15,5 @@ add_swift_library(swiftIDE STATIC
     swiftClangImporter
     swiftParse
     swiftSema
-    swiftAST)
+    swiftIndex)
 
