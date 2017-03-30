@@ -881,7 +881,7 @@ public:
                                                  /*isStmtCondition*/false)) {
           pattern = newPattern;
           // Coerce the pattern to the subject's type.
-          if (TC.coercePatternToType(pattern, DC, subjectType,
+          if (!subjectType || TC.coercePatternToType(pattern, DC, subjectType,
                                      TR_InExpression)) {
             hadError = true;
 
