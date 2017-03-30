@@ -18,6 +18,13 @@
 
 using namespace swift;
 
+static Type getContextFreeInterfaceType(ValueDecl *VD) {
+  if (auto AFD = dyn_cast<AbstractFunctionDecl>(VD)) {
+    return AFD->getMethodInterfaceType();
+  }
+  return VD->getInterfaceType();
+}
+
 ArrayRef<ValueDecl*> swift::
 canDeclProvideDefaultImplementationFor(ValueDecl* VD,
                                 llvm::SmallVectorImpl<ValueDecl*> &Scractch) {
@@ -37,10 +44,11 @@ canDeclProvideDefaultImplementationFor(ValueDecl* VD,
     resolveValueMember(*P->getInnermostDeclContext(),
                        P->getDeclaredInterfaceType(), VD->getFullName());
 
+  auto VDType = getContextFreeInterfaceType(VD);
   for (auto Mem : LookupResult.getMemberDecls(InterestedMemberKind::All)) {
     if (auto Pro = dyn_cast<ProtocolDecl>(Mem->getDeclContext())) {
       if (Mem->isProtocolRequirement() &&
-          Mem->getInterfaceType()->isEqual(VD->getInterfaceType())) {
+          getContextFreeInterfaceType(Mem)->isEqual(VDType)) {
         // We find a protocol requirement VD can provide default
         // implementation for.
         Scractch.push_back(Mem);
