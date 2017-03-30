@@ -347,9 +347,7 @@ SILFunction *SILModule::getOrCreateFunction(SILLocation loc,
   IsTransparent_t IsTrans = constant.isTransparent()
                             ? IsTransparent
                             : IsNotTransparent;
-  IsSerialized_t IsSer = constant.isSerialized()
-                       ? IsSerialized
-                       : IsNotSerialized;
+  IsSerialized_t IsSer = constant.isSerialized();
 
   EffectsKind EK = constant.hasEffectsAttribute()
                    ? constant.getEffectsAttribute()

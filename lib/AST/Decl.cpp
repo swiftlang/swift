@@ -1878,10 +1878,14 @@ static bool isVersionedInternalDecl(const ValueDecl *VD) {
   if (VD->getAttrs().hasAttribute<VersionedAttr>())
     return true;
 
-  if (auto *fn = dyn_cast<FuncDecl>(VD))
-    if (auto *ASD = fn->getAccessorStorageDecl())
+  if (auto *FD = dyn_cast<FuncDecl>(VD))
+    if (auto *ASD = FD->getAccessorStorageDecl())
       if (ASD->getAttrs().hasAttribute<VersionedAttr>())
         return true;
+
+  if (auto *EED = dyn_cast<EnumElementDecl>(VD))
+    if (EED->getParentEnum()->getAttrs().hasAttribute<VersionedAttr>())
+      return true;
 
   return false;
 }

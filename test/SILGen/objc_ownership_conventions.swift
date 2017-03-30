@@ -14,7 +14,7 @@ func test3() -> NSObject {
   // CHECK: [[GIZMO_NS:%[0-9]+]] = upcast [[GIZMO:%[0-9]+]] : $Gizmo to $NSObject
   // CHECK: return [[GIZMO_NS]] : $NSObject
 
-  // CHECK-LABEL: sil shared @_T0So5GizmoC{{[_0-9a-zA-Z]*}}fC : $@convention(method) (@thick Gizmo.Type) -> @owned Optional<Gizmo>
+  // CHECK-LABEL: sil shared [serializable] @_T0So5GizmoC{{[_0-9a-zA-Z]*}}fC : $@convention(method) (@thick Gizmo.Type) -> @owned Optional<Gizmo>
   // alloc is implicitly ns_returns_retained
   // init is implicitly ns_consumes_self and ns_returns_retained
   // CHECK: bb0([[GIZMO_META:%[0-9]+]] : $@thick Gizmo.Type):
