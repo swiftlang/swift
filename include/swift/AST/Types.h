@@ -506,6 +506,10 @@ public:
   /// underlying type.
   Type eraseDynamicSelfType();
 
+  /// Remove the 'self' type from the given type, if it's a method type.
+  /// value indicates the decl where the type is from.
+  Type removeSelfParam(ValueDecl *value);
+
   /// \brief Compute and return the set of type variables that occur within this
   /// type.
   ///

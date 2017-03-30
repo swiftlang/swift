@@ -3640,16 +3640,6 @@ static Type getWitnessTypeForMatching(TypeChecker &tc,
   return resultType.transform(mapErrorTypeToOriginal);
 }
 
-/// Remove the 'self' type from the given type, if it's a method type.
-static Type removeSelfParam(ValueDecl *value, Type type) {
-  if (auto func = dyn_cast<AbstractFunctionDecl>(value)) {
-    if (func->getDeclContext()->isTypeContext())
-      return type->castTo<AnyFunctionType>()->getResult();
-  }
-
-  return type;
-}
-
 /// Attempt to resolve a type witness via a specific value witness.
 InferredAssociatedTypesByWitness
 ConformanceChecker::inferTypeWitnessesViaValueWitness(ValueDecl *req,
@@ -3664,10 +3654,10 @@ ConformanceChecker::inferTypeWitnessesViaValueWitness(ValueDecl *req,
   }
 
   auto setup = [&]() -> std::tuple<Optional<RequirementMatch>, Type, Type> {
-    fullWitnessType = removeSelfParam(witness, fullWitnessType);
+    fullWitnessType = fullWitnessType->removeSelfParam(witness);
     return std::make_tuple(
         None,
-        removeSelfParam(req, req->getInterfaceType()),
+        req->getInterfaceType()->removeSelfParam(req),
         fullWitnessType);
   };
 

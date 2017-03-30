@@ -372,6 +372,14 @@ Type TypeBase::eraseDynamicSelfType() {
   });
 }
 
+Type TypeBase::removeSelfParam(ValueDecl *value) {
+  if (auto func = dyn_cast<AbstractFunctionDecl>(value)) {
+    if (func->getDeclContext()->isTypeContext())
+      return this->castTo<AnyFunctionType>()->getResult();
+  }
+  return this;
+}
+
 void
 TypeBase::getTypeVariables(SmallVectorImpl<TypeVariableType *> &typeVariables) {
   // If we know we don't have any type variables, we're done.
