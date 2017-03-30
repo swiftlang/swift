@@ -756,21 +756,28 @@ func s350_______addrOnlyIf(x: Bool) -> EmptyP {
 // CHECK: bb0([[ARG:%.*]] : $IndirectEnum<T>):
 // CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
 // CHECK:   [[COPY__ARG:%.*]] = copy_value [[BORROWED_ARG]]
-// CHECK:   switch_enum [[COPY__ARG]] : $IndirectEnum<T>, case #IndirectEnum.Node!enumelt.1: bb3, default bb1
-// CHECK: bb1:
+// CHECK:   switch_enum [[COPY__ARG]] : $IndirectEnum<T>, case #IndirectEnum.Node!enumelt.1: [[NODE_BB:bb[0-9]+]], case #IndirectEnum.Nil!enumelt: [[NIL_BB:bb[0-9]+]]
+//
+// CHECK: [[NIL_BB]]:
 // CHECK:   end_borrow [[BORROWED_ARG]] from [[ARG]] : $IndirectEnum<T>, $IndirectEnum<T>
-// CHECK:   br bb2
-// CHECK: bb2:
-// CHECK:   br bb4
-// CHECK: bb3([[EARG:%.*]] : $<τ_0_0> { var τ_0_0 } <T>):
+// CHECK:   br [[NIL_TRAMPOLINE:bb[0-9]+]]
+//
+// CHECK: [[NIL_TRAMPOLINE]]:
+// CHECK:   br [[EPILOG_BB:bb[0-9]+]]
+//
+// CHECK: [[NODE_BB]]([[EARG:%.*]] : $<τ_0_0> { var τ_0_0 } <T>):
 // CHECK:   [[PROJ_BOX:%.*]] = project_box [[EARG]]
 // CHECK:   [[LOAD_BOX:%.*]] = load [take] [[PROJ_BOX]] : $*T
 // CHECK:   [[COPY_BOX:%.*]] = copy_value [[LOAD_BOX]] : $T
 // CHECK:   destroy_value [[EARG]]
+// CHECK:   br [[CONT_BB:bb[0-9]+]]
+//
+// CHECK: [[CONT_BB]]:
 // CHECK:   end_borrow [[BORROWED_ARG]] from [[ARG]] : $IndirectEnum<T>, $IndirectEnum<T>
 // CHECK:   destroy_value [[COPY_BOX]]
-// CHECK:   br bb4
-// CHECK: bb4:
+// CHECK:   br [[EPILOG_BB]]
+//
+// CHECK: [[EPILOG_BB]]:
 // CHECK:   destroy_value [[ARG]]
 // CHECK:   return %{{.*}} : $()
 // CHECK-LABEL: } // end sil function '_T020opaque_values_silgen21s360________guardEnumyAA08IndirectF0OyxGlF'
@@ -909,21 +916,30 @@ func s430_callUnreachableF<T>(t: T) {
 // CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
 // CHECK:   [[COPY_ARG:%.*]] = copy_value [[BORROWED_ARG]]
 // CHECK:   checked_cast_value_br [[COPY_ARG]] : $T to $EmptyP, bb2, bb1
+//
 // CHECK: bb2([[PTYPE:%.*]] : $EmptyP):
 // CHECK:   [[PSOME:%.*]] = enum $Optional<EmptyP>, #Optional.some!enumelt.1, [[PTYPE]] : $EmptyP
 // CHECK:   br bb3([[PSOME]] : $Optional<EmptyP>)
+//
 // CHECK: bb3([[ENUMRES:%.*]] : $Optional<EmptyP>):
-// CHECK:   switch_enum [[ENUMRES]] : $Optional<EmptyP>, case #Optional.some!enumelt.1: bb6, default bb4
-// CHECK: bb4:
+// CHECK:   switch_enum [[ENUMRES]] : $Optional<EmptyP>, case #Optional.some!enumelt.1: [[SOME_BB:bb[0-9]+]], case #Optional.none!enumelt: [[NONE_BB:bb[0-9]+]]
+//
+// CHECK: [[NONE_BB]]:
 // CHECK:   end_borrow [[BORROWED_ARG]]
-// CHECK:   br bb5
-// CHECK: bb5:
-// CHECK:   br bb7
-// CHECK: bb6([[ENUMRES2:%.*]] : $EmptyP):
+// CHECK:   br [[NONE_TRAMPOLINE:bb[0-9]+]]
+//
+// CHECK: [[NONE_TRAMPOLINE]]:
+// CHECK:   br [[EPILOG_BB:bb[0-9]+]]
+//
+// CHECK: [[SOME_BB]]([[ENUMRES2:%.*]] : $EmptyP):
+// CHECK:   br [[CONT_BB:bb[0-9]+]]
+//
+// CHECK: [[CONT_BB]]:
 // CHECK:   end_borrow [[BORROWED_ARG]]
 // CHECK:   destroy_value [[ENUMRES2]]
-// CHECK:   br bb7
-// CHECK: bb7:
+// CHECK:   br [[EPILOG_BB]]
+//
+// CHECK: [[EPILOG_BB]]:
 // CHECK:   destroy_value [[ARG]]
 // CHECK:   return %{{.*}} : $()
 // CHECK-LABEL: } // end sil function '_T020opaque_values_silgen21s440__cleanupEmissionyxlF'
