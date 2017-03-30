@@ -49,6 +49,15 @@ namespace swift {
   void collectDefaultImplementationForProtocolMembers(ProtocolDecl *PD,
                         llvm::SmallDenseMap<ValueDecl*, ValueDecl*> &DefaultMap);
 
+  /// \brief Collect all the protocol requirements that a given declaration can
+  ///   provide default implementations for. VD is a declaration in extension
+  ///   declaration. Scratch is the buffer to collect those protocol
+  ///   requirements.
+  ///
+  /// \returns the slice of Scratch
+  ArrayRef<ValueDecl*> canDeclProvideDefaultImplementationFor(ValueDecl* VD,
+                                  llvm::SmallVectorImpl<ValueDecl*> &Scractch);
+
   /// \brief Given an unresolved member E and its parent P, this function tries
   /// to infer the type of E.
   /// \returns true on success, false on error.

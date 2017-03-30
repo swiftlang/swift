@@ -1003,6 +1003,37 @@ TypeChecker::getDeclTypeCheckingSemantics(ValueDecl *decl) {
   return DeclTypeCheckingSemantics::Normal;
 }
 
+ArrayRef<ValueDecl*> swift::
+canDeclProvideDefaultImplementationFor(ValueDecl* VD,
+                                llvm::SmallVectorImpl<ValueDecl*> &Scractch) {
+
+  // Skip decls that don't have valid names.
+  if (!VD->getFullName())
+    return {};
+
+  // Check if VD is from a protocol extension.
+  auto P = VD->getDeclContext()->getAsProtocolExtensionContext();
+  if (!P)
+    return {};
+
+  // Look up all decls in the protocol's inheritance chain for the ones with
+  // the same name with VD.
+  ResolvedMemberResult LookupResult =
+    resolveValueMember(*P->getInnermostDeclContext(),
+                       P->getDeclaredInterfaceType(), VD->getFullName());
+
+  for (auto Mem : LookupResult.getMemberDecls(InterestedMemberKind::All)) {
+    if (auto Pro = dyn_cast<ProtocolDecl>(Mem->getDeclContext())) {
+      if (Mem->isProtocolRequirement()) {
+        // We find a protocol requirement VD can provide default
+        // implementation for.
+        Scractch.push_back(Mem);
+      }
+    }
+  }
+  return Scractch;
+}
+
 void swift::
 collectDefaultImplementationForProtocolMembers(ProtocolDecl *PD,
                     llvm::SmallDenseMap<ValueDecl*, ValueDecl*> &DefaultMap) {
