@@ -42,20 +42,20 @@ internal func bar() {
 
 public func publicFunc() {}
 
-// CHECK-LABEL: sil [fragile] [always_inline] @_T04main3basyyF
+// CHECK-LABEL: sil [serialized] [always_inline] @_T04main3basyyF
 @inline(__always)
 public func bas() {
-  // CHECK-LABEL: sil shared [fragile] [always_inline] @_T04main3basyyF3zimL_yyF
+  // CHECK-LABEL: sil shared [serialized] [always_inline] @_T04main3basyyF3zimL_yyF
   @inline(__always)
   func zim() {
-    // CHECK-LABEL: sil shared [fragile] @_T04main3basyyF3zimL_yyF4zangL_yyF
+    // CHECK-LABEL: sil shared [serialized] @_T04main3basyyF3zimL_yyF4zangL_yyF
     func zang() { publicFunc() }
     publicFunc()
   }
 
-  // CHECK-LABEL: sil shared [fragile] @_T04main3bas{{[_0-9a-zA-Z]*}}U_
+  // CHECK-LABEL: sil shared [serialized] @_T04main3bas{{[_0-9a-zA-Z]*}}U_
   let zung = {
-    // CHECK-LABEL: sil shared [fragile] [always_inline] @_T04main3basyyFyycfU_7zippityL_yyF
+    // CHECK-LABEL: sil shared [serialized] [always_inline] @_T04main3basyyFyycfU_7zippityL_yyF
     @inline(__always)
     func zippity() { publicFunc() }
     publicFunc()

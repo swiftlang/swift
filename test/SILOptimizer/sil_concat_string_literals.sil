@@ -70,11 +70,11 @@ sil [readonly] [_semantics "string.concat"] @_T0SS1poiS2S_SStFZ : $@convention(m
 
 
 // String.init(_builtinStringLiteral : Builtin.RawPointer, utf8CodeUnitCount : Builtin.Word, isASCII : Builtin.Int1) -> String
-sil [fragile] [readonly] [_semantics "string.makeUTF8"] @_T0S2SBp21_builtinStringLiteral_Bw17utf8CodeUnitCountBi1_7isASCIItcfC : $@convention(method) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String
+sil [serialized] [readonly] [_semantics "string.makeUTF8"] @_T0S2SBp21_builtinStringLiteral_Bw17utf8CodeUnitCountBi1_7isASCIItcfC : $@convention(method) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String
 
 
 // String.init(_builtinUTF16StringLiteral : Builtin.RawPointer, utf16CodeUnitCount : Builtin.Word) -> String
-sil [fragile] [readonly] [_semantics "string.makeUTF16"] @_T0S2SBp26_builtinUTF16StringLiteral_Bw18utf16CodeUnitCounttcfC : $@convention(method) (Builtin.RawPointer, Builtin.Word, @thin String.Type) -> @owned String
+sil [serialized] [readonly] [_semantics "string.makeUTF16"] @_T0S2SBp26_builtinUTF16StringLiteral_Bw18utf16CodeUnitCounttcfC : $@convention(method) (Builtin.RawPointer, Builtin.Word, @thin String.Type) -> @owned String
 
 //CHECK-LABEL: sil @_TF12StringConcat51testStringConcat_UnicodeScalarLiteral_StringLiteralFT_SS : $@convention(thin) () -> @owned String
 //CHECK-NOT: string_literal utf8 "1"

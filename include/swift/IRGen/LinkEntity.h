@@ -582,7 +582,7 @@ public:
       return false;
 
     SILFunction *F = getSILFunction();
-    return F->isTransparent() && F->isDefinition() && F->isFragile();
+    return F->isTransparent() && F->isDefinition() && F->isSerialized();
   }
 
   SILGlobalVariable *getSILGlobalVariable() const {

@@ -396,7 +396,7 @@ ManagedValue SILGenFunction::emitFuncToBlock(SILLocation loc,
                                                  invokeTy,
                                                  fnTy,
                                                  blockTy,
-                                                 F.isFragile());
+                                                 F.isSerialized());
 
   // Build it if necessary.
   if (thunk->empty()) {
@@ -664,7 +664,7 @@ SILGenFunction::emitBlockToFunc(SILLocation loc,
                                                  thunkTy,
                                                  blockTy,
                                                  funcTy,
-                                                 F.isFragile());
+                                                 F.isSerialized());
 
   // Build it if necessary.
   if (thunk->empty()) {

@@ -24,7 +24,7 @@ public class FooClass {
 }
 
 // devirt_jump_thread.FooClass.value.getter : Swift.Int32
-sil [transparent] [fragile] @_TFC18devirt_jump_thread8FooClassg5valueSi : $@convention(method) (@guaranteed FooClass) -> Int32 {
+sil [transparent] [serialized] @_TFC18devirt_jump_thread8FooClassg5valueSi : $@convention(method) (@guaranteed FooClass) -> Int32 {
 bb0(%0 : $FooClass):
   %1 = ref_element_addr %0 : $FooClass, #FooClass.value // user: %2
   %2 = load %1 : $*Int32                            // user: %4
@@ -32,7 +32,7 @@ bb0(%0 : $FooClass):
 }
 
 // devirt_jump_thread.FooClass.value.setter : Swift.Int32
-sil [transparent] [fragile] @_TFC18devirt_jump_thread8FooClasss5valueSi : $@convention(method) (Int32, @guaranteed FooClass) -> () {
+sil [transparent] [serialized] @_TFC18devirt_jump_thread8FooClasss5valueSi : $@convention(method) (Int32, @guaranteed FooClass) -> () {
 bb0(%0 : $Int32, %1 : $FooClass):
   %2 = ref_element_addr %1 : $FooClass, #FooClass.value // user: %3
   store %0 to %2 : $*Int32                          // id: %3
@@ -437,10 +437,10 @@ bb14(%48 : $Int32):
 }
 
 
-sil [transparent] [fragile] @_TFSb21_getBuiltinLogicValuefSbFT_Bi1_ : $@convention(method) (Bool) -> Builtin.Int1
+sil [transparent] [serialized] @_TFSb21_getBuiltinLogicValuefSbFT_Bi1_ : $@convention(method) (Bool) -> Builtin.Int1
 
 
-sil [fragile] @_TZFsoi3eeeFTGSqPs9AnyObject__GSqPS____Sb : $@convention(thin) (@owned Optional<AnyObject>, @owned Optional<AnyObject>) -> Bool
+sil [serialized] @_TZFsoi3eeeFTGSqPs9AnyObject__GSqPS____Sb : $@convention(thin) (@owned Optional<AnyObject>, @owned Optional<AnyObject>) -> Bool
 
 sil_witness_table C: AnyObject module main
 

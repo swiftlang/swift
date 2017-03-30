@@ -38,7 +38,6 @@ namespace swift {
 namespace irgen {
 class IRGenModule;
 
-
 /// Encapsulated information about the linkage of an entity.
 class LinkInfo {
   LinkInfo() = default;

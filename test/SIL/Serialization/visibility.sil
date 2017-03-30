@@ -14,100 +14,100 @@ import Builtin
 // NEG-CHECK-NOT: sil private @private_function_test : $@convention(thin) () -> ()
 
 // Check Global Variables.
-// CHECK-DAG: sil_global shared [fragile] @shared_global : $Builtin.Word
-// CHECK-DAG: sil_global [fragile] @public_global : $Builtin.Word
-// CHECK-DAG: sil_global hidden [fragile] @hidden_global : $Builtin.Word
+// CHECK-DAG: sil_global shared [serialized] @shared_global : $Builtin.Word
+// CHECK-DAG: sil_global [serialized] @public_global : $Builtin.Word
+// CHECK-DAG: sil_global hidden [serialized] @hidden_global : $Builtin.Word
 
 // Check that all functions are defined/declared appropriately.
-// NEG-CHECK-NOT: sil [fragile] @public_external_function_test : $@convention(thin) () -> () {
-// CHECK-DAG: sil [fragile] @public_external_function_test : $@convention(thin) () -> ()
-// CHECK-DAG: sil hidden [fragile] @hidden_function_test : $@convention(thin) () -> () {
-// CHECK-DAG: sil [fragile] @references_public_function : $@convention(thin) () -> () {
-// CHECK-DAG: sil [fragile] @references_shared_function : $@convention(thin) () -> () {
-// CHECK-DAG: sil [fragile] @references_hidden_function : $@convention(thin) () -> () {
-// CHECK-DAG: sil [fragile] @references_private_function : $@convention(thin) () -> ()
-// CHECK-DAG: sil [fragile] @references_public_global : $@convention(thin) () -> () {
-// CHECK-DAG: sil [fragile] @references_shared_global : $@convention(thin) () -> () {
-// CHECK-DAG: sil [fragile] @references_hidden_global : $@convention(thin) () -> () {
-// CHECK-DAG: sil [fragile] @references_private_global : $@convention(thin) () -> ()
-// CHECK-DAG: sil hidden_external [fragile] @hidden_external_function_test : $@convention(thin) () -> ()
-// CHECK-DAG: sil [fragile] @public_function_test : $@convention(thin) () -> () {
-// CHECK-DAG: sil [fragile] @public_function : $@convention(thin) () -> () {
-// CHECK-DAG: sil hidden [fragile] @hidden_function : $@convention(thin) () -> () {
-// NEG-CHECK-NOT: sil shared_external [fragile] @shared_external_function_test : $@convention(thin) () -> ()
-// CHECK-DAG: sil shared [fragile] @shared_external_function_test : $@convention(thin) () -> ()
+// NEG-CHECK-NOT: sil [serialized] @public_external_function_test : $@convention(thin) () -> () {
+// CHECK-DAG: sil [serialized] @public_external_function_test : $@convention(thin) () -> ()
+// CHECK-DAG: sil hidden [serialized] @hidden_function_test : $@convention(thin) () -> () {
+// CHECK-DAG: sil [serialized] @references_public_function : $@convention(thin) () -> () {
+// CHECK-DAG: sil [serialized] @references_shared_function : $@convention(thin) () -> () {
+// CHECK-DAG: sil [serialized] @references_hidden_function : $@convention(thin) () -> () {
+// CHECK-DAG: sil [serialized] @references_private_function : $@convention(thin) () -> ()
+// CHECK-DAG: sil [serialized] @references_public_global : $@convention(thin) () -> () {
+// CHECK-DAG: sil [serialized] @references_shared_global : $@convention(thin) () -> () {
+// CHECK-DAG: sil [serialized] @references_hidden_global : $@convention(thin) () -> () {
+// CHECK-DAG: sil [serialized] @references_private_global : $@convention(thin) () -> ()
+// CHECK-DAG: sil hidden_external [serialized] @hidden_external_function_test : $@convention(thin) () -> ()
+// CHECK-DAG: sil [serialized] @public_function_test : $@convention(thin) () -> () {
+// CHECK-DAG: sil [serialized] @public_function : $@convention(thin) () -> () {
+// CHECK-DAG: sil hidden [serialized] @hidden_function : $@convention(thin) () -> () {
+// NEG-CHECK-NOT: sil shared_external [serialized] @shared_external_function_test : $@convention(thin) () -> ()
+// CHECK-DAG: sil shared [serialized] @shared_external_function_test : $@convention(thin) () -> ()
 
-sil_global private [fragile] @private_global : $Builtin.Word
-sil_global [fragile] @public_global : $Builtin.Word
-sil_global shared [fragile] @shared_global : $Builtin.Word
-sil_global hidden [fragile] @hidden_global : $Builtin.Word
+sil_global private [serialized] @private_global : $Builtin.Word
+sil_global [serialized] @public_global : $Builtin.Word
+sil_global shared [serialized] @shared_global : $Builtin.Word
+sil_global hidden [serialized] @hidden_global : $Builtin.Word
 
-sil private [fragile] @private_function : $@convention(thin) () -> () {
+sil private [serialized] @private_function : $@convention(thin) () -> () {
   %0 = integer_literal $Builtin.Int32, 0
   %1 = tuple()
   return %1 : $()
 }
-sil [fragile] @references_private_global : $@convention(thin) () -> () {
+sil [serialized] @references_private_global : $@convention(thin) () -> () {
   %0 = global_addr @private_global : $*Builtin.Word
   %1 = tuple()
   return %1 : $()
 }
-sil [fragile] @references_private_function : $@convention(thin) () -> () {
+sil [serialized] @references_private_function : $@convention(thin) () -> () {
   %0 = function_ref @private_function : $@convention(thin) () -> ()
   %1 = tuple()
   return %1 : $()
 }
 
-sil shared [fragile] @shared_function : $@convention(thin) () -> () {
+sil shared [serialized] @shared_function : $@convention(thin) () -> () {
   %0 = integer_literal $Builtin.Int32, 1
   %1 = tuple()
   return %1 : $()
 }
-sil [fragile] @references_shared_global : $@convention(thin) () -> () {
+sil [serialized] @references_shared_global : $@convention(thin) () -> () {
   %0 = global_addr @shared_global : $*Builtin.Word
   %1 = tuple()
   return %1 : $()
 }
-sil [fragile] @references_shared_function : $@convention(thin) () -> () {
+sil [serialized] @references_shared_function : $@convention(thin) () -> () {
   %0 = function_ref @shared_function : $@convention(thin) () -> ()
   %1 = tuple()
   return %1 : $()
 }
 
-sil hidden [fragile] @hidden_function : $@convention(thin) () -> () {
+sil hidden [serialized] @hidden_function : $@convention(thin) () -> () {
   %0 = integer_literal $Builtin.Int32, 2
   %1 = tuple()
   return %1 : $()
 }
-sil [fragile] @references_hidden_global : $@convention(thin) () -> () {
+sil [serialized] @references_hidden_global : $@convention(thin) () -> () {
   %0 = global_addr @hidden_global : $*Builtin.Word
   %1 = tuple()
   return %1 : $()
 }
-sil [fragile] @references_hidden_function : $@convention(thin) () -> () {
+sil [serialized] @references_hidden_function : $@convention(thin) () -> () {
   %0 = function_ref @hidden_function : $@convention(thin) () -> ()
   %1 = tuple()
   return %1 : $()
 }
 
-sil [fragile] @public_function : $@convention(thin) () -> () {
+sil [serialized] @public_function : $@convention(thin) () -> () {
   %0 = integer_literal $Builtin.Int32, 4
   %1 = tuple()
   return %1 : $()
 }
 
-sil [fragile] @references_public_global : $@convention(thin) () -> () {
+sil [serialized] @references_public_global : $@convention(thin) () -> () {
   %0 = global_addr @public_global : $*Builtin.Word
   %1 = tuple()
   return %1 : $()
 }
-sil [fragile] @references_public_function : $@convention(thin) () -> () {
+sil [serialized] @references_public_function : $@convention(thin) () -> () {
   %0 = function_ref @public_function : $@convention(thin) () -> ()
   %1 = tuple()
   return %1 : $()
 }
 
-sil private [fragile] @private_function_test : $@convention(thin) () -> () {
+sil private [serialized] @private_function_test : $@convention(thin) () -> () {
   %0 = function_ref @references_public_function : $@convention(thin) () -> ()
   %1 = function_ref @references_shared_function : $@convention(thin) () -> ()
   %2 = function_ref @references_hidden_function : $@convention(thin) () -> ()
@@ -128,7 +128,7 @@ sil private [fragile] @private_function_test : $@convention(thin) () -> () {
   return %8 : $()
 }
 
-sil shared [fragile] @shared_function_test : $@convention(thin) () -> () {
+sil shared [serialized] @shared_function_test : $@convention(thin) () -> () {
   %0 = function_ref @references_public_function : $@convention(thin) () -> ()
   %1 = function_ref @references_shared_function : $@convention(thin) () -> ()
   %2 = function_ref @references_hidden_function : $@convention(thin) () -> ()
@@ -149,7 +149,7 @@ sil shared [fragile] @shared_function_test : $@convention(thin) () -> () {
   return %8 : $()
 }
 
-sil hidden [fragile] @hidden_function_test : $@convention(thin) () -> () {
+sil hidden [serialized] @hidden_function_test : $@convention(thin) () -> () {
   %0 = function_ref @references_public_function : $@convention(thin) () -> ()
   %1 = function_ref @references_shared_function : $@convention(thin) () -> ()
   %2 = function_ref @references_hidden_function : $@convention(thin) () -> ()
@@ -170,7 +170,7 @@ sil hidden [fragile] @hidden_function_test : $@convention(thin) () -> () {
   return %8 : $()
 }
 
-sil [fragile] @public_function_test : $@convention(thin) () -> () {
+sil [serialized] @public_function_test : $@convention(thin) () -> () {
   %0 = function_ref @references_public_function : $@convention(thin) () -> ()
   %1 = function_ref @references_shared_function : $@convention(thin) () -> ()
   %2 = function_ref @references_hidden_function : $@convention(thin) () -> ()
@@ -191,7 +191,7 @@ sil [fragile] @public_function_test : $@convention(thin) () -> () {
   return %8 : $()
 }
 
-sil hidden_external [fragile] @hidden_external_function_test : $@convention(thin) () -> () {
+sil hidden_external [serialized] @hidden_external_function_test : $@convention(thin) () -> () {
   %0 = function_ref @references_public_function : $@convention(thin) () -> ()
   %1 = function_ref @references_shared_function : $@convention(thin) () -> ()
   %2 = function_ref @references_hidden_function : $@convention(thin) () -> ()
@@ -219,7 +219,7 @@ sil @hidden_external_function_test_caller : $@convention(thin) () -> () {
   return %2 : $()
 }
 
-sil public_external [fragile] @public_external_function_test : $@convention(thin) () -> () {
+sil public_external [serialized] @public_external_function_test : $@convention(thin) () -> () {
   %0 = function_ref @references_public_function : $@convention(thin) () -> ()
   %1 = function_ref @references_shared_function : $@convention(thin) () -> ()
   %2 = function_ref @references_hidden_function : $@convention(thin) () -> ()
@@ -247,7 +247,7 @@ sil @public_external_function_test_caller : $@convention(thin) () -> () {
   return %2 : $()
 }
 
-sil shared_external [fragile] @shared_external_function_test : $@convention(thin) () -> () {
+sil shared_external [serialized] @shared_external_function_test : $@convention(thin) () -> () {
   %0 = function_ref @references_public_function : $@convention(thin) () -> ()
   %1 = function_ref @references_shared_function : $@convention(thin) () -> ()
   %2 = function_ref @references_hidden_function : $@convention(thin) () -> ()

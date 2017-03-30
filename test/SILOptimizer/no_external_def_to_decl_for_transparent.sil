@@ -15,8 +15,8 @@ public class X {
 
 // Check if we keep the body of the externally available transparent function.
 
-// CHECK-LABEL: sil public_external [transparent] [fragile] @imported_transparent_func : $@convention(thin) () -> () {
-sil public_external [transparent] [fragile] @imported_transparent_func : $@convention(thin) () -> () {
+// CHECK-LABEL: sil public_external [transparent] [serialized] @imported_transparent_func : $@convention(thin) () -> () {
+sil public_external [transparent] [serialized] @imported_transparent_func : $@convention(thin) () -> () {
 bb0:
   %r = tuple ()
   return %r : $()

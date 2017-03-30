@@ -431,7 +431,7 @@ SILFunction *SILGenModule::emitTopLevelFunction(SILLocation Loc) {
 
   return M.createFunction(SILLinkage::Public, SWIFT_ENTRY_POINT_FUNCTION,
                           topLevelType, nullptr, Loc, IsBare,
-                          IsNotTransparent, IsNotFragile, IsNotThunk,
+                          IsNotTransparent, IsNotSerialized, IsNotThunk,
                           SILFunction::NotRelevant);
 }
 
@@ -452,7 +452,7 @@ SILFunction *SILGenModule::getEmittedFunction(SILDeclRef constant,
         F->setLinkage(constant.getLinkage(ForDefinition));
       }
       if (makeModuleFragile) {
-        F->setFragile(IsFragile);
+        F->setSerialized(IsSerialized);
       }
     }
     return F;
@@ -501,7 +501,7 @@ SILFunction *SILGenModule::getFunction(SILDeclRef constant,
   if (makeModuleFragile) {
     SILLinkage linkage = constant.getLinkage(forDefinition);
     if (linkage != SILLinkage::PublicExternal) {
-      F->setFragile(IsFragile);
+      F->setSerialized(IsSerialized);
     }
   }
 
@@ -962,8 +962,8 @@ SILFunction *SILGenModule::emitLazyGlobalInitializer(StringRef funcName,
                        funcName, initSILType, nullptr,
                        SILLocation(binding), IsNotBare, IsNotTransparent,
                        makeModuleFragile
-                           ? IsFragile
-                           : IsNotFragile);
+                           ? IsSerialized
+                           : IsNotSerialized);
   f->setDebugScope(new (M) SILDebugScope(RegularLocation(binding), f));
   SILGenFunction(*this, *f).emitLazyGlobalInitializer(binding, pbdEntry);
   f->verify();

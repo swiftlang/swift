@@ -100,7 +100,7 @@ SILGenModule::emitVTableMethod(SILDeclRef derived, SILDeclRef base) {
       M.createFunction(SILLinkage::Private,
                        name, overrideInfo.SILFnType,
                        derivedDecl->getGenericEnvironment(), loc, IsBare,
-                       IsNotTransparent, IsNotFragile);
+                       IsNotTransparent, IsNotSerialized);
   thunk->setDebugScope(new (M) SILDebugScope(loc, thunk));
 
   SILGenFunction(*this, *thunk)
@@ -337,14 +337,14 @@ public:
     // 1) We're serializing everything
     // 2) The type has a fixed layout in all resilience domains, and the
     //    conformance is externally visible
-    IsFragile_t isFragile = IsNotFragile;
+    IsSerialized_t isSerialized = IsNotSerialized;
     if (SGM.makeModuleFragile)
-      isFragile = IsFragile;
+      isSerialized = IsSerialized;
     if (auto nominal = Conformance->getInterfaceType()->getAnyNominal())
       if (nominal->hasFixedLayout() &&
           proto->getEffectiveAccess() >= Accessibility::Public &&
           nominal->getEffectiveAccess() >= Accessibility::Public)
-        isFragile = IsFragile;
+        isSerialized = IsSerialized;
 
     // Check if we already have a declaration or definition for this witness
     // table.
@@ -358,7 +358,7 @@ public:
 
       // If we have a declaration, convert the witness table to a definition.
       if (wt->isDeclaration()) {
-        wt->convertToDefinition(Entries, isFragile);
+        wt->convertToDefinition(Entries, isSerialized);
 
         // Since we had a declaration before, its linkage should be external,
         // ensure that we have a compatible linkage for sanity. *NOTE* we are ok
@@ -375,7 +375,7 @@ public:
     }
 
     // Otherwise if we have no witness table yet, create it.
-    return SILWitnessTable::create(SGM.M, Linkage, isFragile,
+    return SILWitnessTable::create(SGM.M, Linkage, isSerialized,
                                    Conformance, Entries);
   }
 
@@ -637,16 +637,16 @@ SILGenModule::emitProtocolWitness(ProtocolConformance *conformance,
   if (witnessRef.isAlwaysInline())
     InlineStrategy = AlwaysInline;
 
-  IsFragile_t isFragile = IsNotFragile;
+  IsSerialized_t isSerialized = IsNotSerialized;
   if (makeModuleFragile)
-    isFragile = IsFragile;
-  if (witnessRef.isFragile())
-    isFragile = IsFragile;
+    isSerialized = IsSerialized;
+  if (witnessRef.isSerialized())
+    isSerialized = IsSerialized;
 
   auto *f = M.createFunction(
       linkage, nameBuffer, witnessSILFnType,
       genericEnv, SILLocation(witnessRef.getDecl()),
-      IsNotBare, IsTransparent, isFragile, IsThunk,
+      IsNotBare, IsTransparent, isSerialized, IsThunk,
       SILFunction::NotRelevant, InlineStrategy);
 
   f->setDebugScope(new (M)

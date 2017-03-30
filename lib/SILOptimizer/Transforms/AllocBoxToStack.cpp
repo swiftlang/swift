@@ -472,7 +472,7 @@ class PromotedParamCloner : public SILClonerWithScopes<PromotedParamCloner> {
   friend class SILVisitor<PromotedParamCloner>;
   friend class SILCloner<PromotedParamCloner>;
 
-  PromotedParamCloner(SILFunction *Orig, IsFragile_t Fragile,
+  PromotedParamCloner(SILFunction *Orig, IsSerialized_t Serialized,
                       ArgIndexList &PromotedArgIndices,
                       llvm::StringRef ClonedName);
 
@@ -481,7 +481,7 @@ class PromotedParamCloner : public SILClonerWithScopes<PromotedParamCloner> {
   SILFunction *getCloned() { return &getBuilder().getFunction(); }
 
   private:
-    static SILFunction *initCloned(SILFunction *Orig, IsFragile_t Fragile,
+    static SILFunction *initCloned(SILFunction *Orig, IsSerialized_t Serialized,
                                    ArgIndexList &PromotedArgIndices,
                                    llvm::StringRef ClonedName);
 
@@ -498,20 +498,20 @@ class PromotedParamCloner : public SILClonerWithScopes<PromotedParamCloner> {
 };
 } // end anonymous namespace
 
-PromotedParamCloner::PromotedParamCloner(SILFunction *Orig, IsFragile_t Fragile,
+PromotedParamCloner::PromotedParamCloner(SILFunction *Orig, IsSerialized_t Serialized,
                                          ArgIndexList &PromotedArgIndices,
                                          llvm::StringRef ClonedName)
     : SILClonerWithScopes<PromotedParamCloner>(
-          *initCloned(Orig, Fragile, PromotedArgIndices, ClonedName)),
+          *initCloned(Orig, Serialized, PromotedArgIndices, ClonedName)),
       Orig(Orig), PromotedArgIndices(PromotedArgIndices) {
   assert(Orig->getDebugScope()->getParentFunction() !=
          getCloned()->getDebugScope()->getParentFunction());
 }
 
-static std::string getClonedName(SILFunction *F, IsFragile_t Fragile,
+static std::string getClonedName(SILFunction *F, IsSerialized_t Serialized,
                                  ArgIndexList &PromotedArgIndices) {
   auto P = Demangle::SpecializationPass::AllocBoxToStack;
-  Mangle::FunctionSignatureSpecializationMangler Mangler(P, Fragile, F);
+  Mangle::FunctionSignatureSpecializationMangler Mangler(P, Serialized, F);
   for (unsigned i : PromotedArgIndices) {
     Mangler.setArgumentBoxToStack(i);
   }
@@ -522,7 +522,7 @@ static std::string getClonedName(SILFunction *F, IsFragile_t Fragile,
 /// original closure with the signature modified to reflect promoted
 /// parameters (which are specified by PromotedArgIndices).
 SILFunction *PromotedParamCloner::initCloned(SILFunction *Orig,
-                                             IsFragile_t Fragile,
+                                             IsSerialized_t Serialized,
                                              ArgIndexList &PromotedArgIndices,
                                              llvm::StringRef ClonedName) {
   SILModule &M = Orig->getModule();
@@ -567,7 +567,7 @@ SILFunction *PromotedParamCloner::initCloned(SILFunction *Orig,
   assert(!Orig->isGlobalInit() && "Global initializer cannot be cloned");
   auto *Fn = M.createFunction(
       SILLinkage::Shared, ClonedName, ClonedTy, Orig->getGenericEnvironment(),
-      Orig->getLocation(), Orig->isBare(), IsNotTransparent, Fragile,
+      Orig->getLocation(), Orig->isBare(), IsNotTransparent, Serialized,
       Orig->isThunk(), Orig->getClassVisibility(), Orig->getInlineStrategy(),
       Orig->getEffectsKind(), Orig, Orig->getDebugScope());
   for (auto &Attr : Orig->getSemanticsAttrs()) {
@@ -675,21 +675,21 @@ specializePartialApply(PartialApplyInst *PartialApply,
   auto *F = FRI->getReferencedFunction();
   assert(F && "Expected a referenced function!");
 
-  IsFragile_t Fragile = IsNotFragile;
-  if (PartialApply->getFunction()->isFragile() && F->isFragile())
-    Fragile = IsFragile;
+  IsSerialized_t Serialized = IsNotSerialized;
+  if (PartialApply->getFunction()->isSerialized())
+    Serialized = IsSerializable;
 
-  std::string ClonedName = getClonedName(F, Fragile, PromotedArgIndices);
+  std::string ClonedName = getClonedName(F, Serialized, PromotedArgIndices);
 
   auto &M = PartialApply->getModule();
 
   SILFunction *ClonedFn;
   if (auto *PrevFn = M.lookUpFunction(ClonedName)) {
-    assert(PrevFn->isFragile() == Fragile);
+    assert(PrevFn->isSerialized() == Serialized);
     ClonedFn = PrevFn;
   } else {
     // Clone the function the existing partial_apply references.
-    PromotedParamCloner Cloner(F, Fragile, PromotedArgIndices, ClonedName);
+    PromotedParamCloner Cloner(F, Serialized, PromotedArgIndices, ClonedName);
     Cloner.populateCloned();
     ClonedFn = Cloner.getCloned();
   }

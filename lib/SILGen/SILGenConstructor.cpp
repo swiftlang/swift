@@ -884,7 +884,7 @@ static SILValue getBehaviorInitStorageFn(SILGenFunction &gen,
                                             behaviorInitName,
                                             SILLinkage::PrivateExternal,
                                             initConstantTy,
-                                            IsBare, IsTransparent, IsFragile);
+                                            IsBare, IsTransparent, IsSerialized);
     
     
   }
