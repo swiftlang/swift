@@ -120,7 +120,6 @@ class CMake(object):
             define("CLANG_VERSION_MINOR:STRING", minor)
             define("CLANG_VERSION_PATCH:STRING", patch)
 
-
         if args.build_ninja and args.cmake_generator == 'Ninja':
             define('CMAKE_MAKE_PROGRAM', toolchain.ninja)
         elif args.cmake_generator == 'Ninja' and toolchain.ninja is not None:
