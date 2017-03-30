@@ -214,7 +214,7 @@ internal func donotEliminate() {
 // CHECK: aliveWitness!1: {{.*}} : @{{.*}}aliveWitness
 // CHECK: DeadWitness!1: {{.*}} : nil
 
-// CHECK-TESTING-LABEL: sil_witness_table [fragile] Adopt: Prot
+// CHECK-TESTING-LABEL: sil_witness_table [serialized] Adopt: Prot
 // CHECK-TESTING: DeadWitness{{.*}}: @{{.*}}DeadWitness
 
 // CHECK-LABEL: sil_default_witness_table hidden Prot

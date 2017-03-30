@@ -39,15 +39,15 @@ func testError() {
   } catch {}
 
 #elseif ASQEXPR
-// ASQEXPR: sil_witness_table shared [fragile] TestError: _BridgedStoredNSError module __ObjC
+// ASQEXPR: sil_witness_table shared [serialized] TestError: _BridgedStoredNSError module __ObjC
   let wasTestError = testErrorNSError as? TestError; wasTestError
 
 #elseif ASBANGEXPR
-// ASBANGEXPR: sil_witness_table shared [fragile] TestError: _BridgedStoredNSError module __ObjC
+// ASBANGEXPR: sil_witness_table shared [serialized] TestError: _BridgedStoredNSError module __ObjC
   let terr2 = testErrorNSError as! TestError; terr2
 
 #elseif ISEXPR
-// ISEXPR: sil_witness_table shared [fragile] TestError: _BridgedStoredNSError module __ObjC
+// ISEXPR: sil_witness_table shared [serialized] TestError: _BridgedStoredNSError module __ObjC
   if (testErrorNSError is TestError) {
     print("true")
   } else {
@@ -55,14 +55,14 @@ func testError() {
   }
 
 #elseif CATCHIS
-// CATCHIS: sil_witness_table shared [fragile] TestError: _BridgedStoredNSError module __ObjC
+// CATCHIS: sil_witness_table shared [serialized] TestError: _BridgedStoredNSError module __ObjC
   do {
     throw TestError(.TETwo)
   } catch is TestError {
   } catch {}
 
 #elseif CATCHAS
-// CATCHAS: sil_witness_table shared [fragile] TestError: _BridgedStoredNSError module __ObjC
+// CATCHAS: sil_witness_table shared [serialized] TestError: _BridgedStoredNSError module __ObjC
   do {
     throw TestError(.TETwo)
   } catch let err as TestError {
@@ -77,7 +77,7 @@ func testError() {
   let _ : TestError = dyncast(testErrorNSError)
 
 #else
-// CHECK: sil_witness_table shared [fragile] TestError: _BridgedStoredNSError module __ObjC
+// CHECK: sil_witness_table shared [serialized] TestError: _BridgedStoredNSError module __ObjC
   let terr = getErr()
   switch (terr) { case .TENone, .TEOne, .TETwo: break } // ok
 

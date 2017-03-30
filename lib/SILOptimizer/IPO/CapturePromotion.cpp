@@ -196,7 +196,7 @@ public:
   friend class SILVisitor<ClosureCloner>;
   friend class SILCloner<ClosureCloner>;
 
-  ClosureCloner(SILFunction *Orig, IsFragile_t Fragile,
+  ClosureCloner(SILFunction *Orig, IsSerialized_t Serialized,
                 StringRef ClonedName,
                 IndicesSet &PromotableIndices);
 
@@ -205,7 +205,7 @@ public:
   SILFunction *getCloned() { return &getBuilder().getFunction(); }
 
 private:
-  static SILFunction *initCloned(SILFunction *Orig, IsFragile_t Fragile,
+  static SILFunction *initCloned(SILFunction *Orig, IsSerialized_t Serialized,
                                  StringRef ClonedName,
                                  IndicesSet &PromotableIndices);
 
@@ -299,11 +299,11 @@ ReachabilityInfo::isReachable(SILBasicBlock *From, SILBasicBlock *To) {
   return FromSet.test(FI->second);
 }
 
-ClosureCloner::ClosureCloner(SILFunction *Orig, IsFragile_t Fragile,
+ClosureCloner::ClosureCloner(SILFunction *Orig, IsSerialized_t Serialized,
                              StringRef ClonedName,
                              IndicesSet &PromotableIndices)
   : SILClonerWithScopes<ClosureCloner>(
-                           *initCloned(Orig, Fragile, ClonedName, PromotableIndices)),
+                           *initCloned(Orig, Serialized, ClonedName, PromotableIndices)),
     Orig(Orig), PromotableIndices(PromotableIndices) {
   assert(Orig->getDebugScope()->Parent != getCloned()->getDebugScope()->Parent);
 }
@@ -366,10 +366,10 @@ computeNewArgInterfaceTypes(SILFunction *F,
 }
 
 static std::string getSpecializedName(SILFunction *F,
-                                      IsFragile_t Fragile,
+                                      IsSerialized_t Serialized,
                                       IndicesSet &PromotableIndices) {
   auto P = Demangle::SpecializationPass::CapturePromotion;
-  Mangle::FunctionSignatureSpecializationMangler Mangler(P, Fragile, F);
+  Mangle::FunctionSignatureSpecializationMangler Mangler(P, Serialized, F);
   auto fnConv = F->getConventions();
 
   for (unsigned argIdx = 0, endIdx = fnConv.getNumSILArguments();
@@ -391,7 +391,7 @@ static std::string getSpecializedName(SILFunction *F,
 /// *NOTE* PromotableIndices only contains the container value of the box, not
 /// the address value.
 SILFunction*
-ClosureCloner::initCloned(SILFunction *Orig, IsFragile_t Fragile,
+ClosureCloner::initCloned(SILFunction *Orig, IsSerialized_t Serialized,
                           StringRef ClonedName,
                           IndicesSet &PromotableIndices) {
   SILModule &M = Orig->getModule();
@@ -417,7 +417,7 @@ ClosureCloner::initCloned(SILFunction *Orig, IsFragile_t Fragile,
 
   auto *Fn = M.createFunction(
       Orig->getLinkage(), ClonedName, ClonedTy, Orig->getGenericEnvironment(),
-      Orig->getLocation(), Orig->isBare(), IsNotTransparent, Fragile,
+      Orig->getLocation(), Orig->isBare(), IsNotTransparent, Serialized,
       Orig->isThunk(), Orig->getClassVisibility(), Orig->getInlineStrategy(),
       Orig->getEffectsKind(), Orig, Orig->getDebugScope());
   for (auto &Attr : Orig->getSemanticsAttrs())
@@ -820,20 +820,20 @@ constructClonedFunction(PartialApplyInst *PAI, FunctionRefInst *FRI,
   // Create the Cloned Name for the function.
   SILFunction *Orig = FRI->getReferencedFunction();
 
-  IsFragile_t Fragile = IsNotFragile;
-  if (F->isFragile() && Orig->isFragile())
-    Fragile = IsFragile;
+  IsSerialized_t Serialized = IsNotSerialized;
+  if (F->isSerialized() && Orig->isSerialized())
+    Serialized = IsSerializable;
 
-  auto ClonedName = getSpecializedName(Orig, Fragile, PromotableIndices);
+  auto ClonedName = getSpecializedName(Orig, Serialized, PromotableIndices);
 
   // If we already have such a cloned function in the module then just use it.
   if (auto *PrevF = F->getModule().lookUpFunction(ClonedName)) {
-    assert(PrevF->isFragile() == Fragile);
+    assert(PrevF->isSerialized() == Serialized);
     return PrevF;
   }
 
   // Otherwise, create a new clone.
-  ClosureCloner cloner(Orig, Fragile, ClonedName, PromotableIndices);
+  ClosureCloner cloner(Orig, Serialized, ClonedName, PromotableIndices);
   cloner.populateCloned();
   return cloner.getCloned();
 }

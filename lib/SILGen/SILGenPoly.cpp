@@ -2845,7 +2845,7 @@ static ManagedValue createThunk(SILGenFunction &gen,
                                        thunkType,
                                        sourceType,
                                        toType,
-                                       gen.F.isFragile());
+                                       gen.F.isSerialized());
 
   // Build it if necessary.
   if (thunk->empty()) {

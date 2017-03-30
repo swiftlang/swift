@@ -15,7 +15,7 @@ func createErrorDomain(str: String) -> ErrorDomain {
   return ErrorDomain(rawValue: str)
 }
 
-// CHECK-RAW-LABEL: sil shared [transparent] [fragile] @_T0SC11ErrorDomainVABSS8rawValue_tcfC
+// CHECK-RAW-LABEL: sil shared [transparent] [serialized] @_T0SC11ErrorDomainVABSS8rawValue_tcfC
 // CHECK-RAW: bb0([[STR:%[0-9]+]] : $String,
 // CHECK-RAW: [[SELF_BOX:%[0-9]+]] = alloc_box ${ var ErrorDomain }, var, name "self"
 // CHECK-RAW: [[SELF:%[0-9]+]] = project_box [[SELF_BOX]]

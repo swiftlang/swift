@@ -13,7 +13,7 @@
 
 // CHECK: sil @unknown : $@convention(thin) () -> ()
 
-// CHECK-LABEL: sil hidden [fragile] @_T0s1XV4testyyF : $@convention(method) (X) -> ()
+// CHECK-LABEL: sil hidden [serialized] @_T0s1XV4testyyF : $@convention(method) (X) -> ()
 // CHECK: bb0
 // CHECK-NEXT: function_ref
 // CHECK-NEXT: function_ref @unknown : $@convention(thin) () -> ()

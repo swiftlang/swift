@@ -524,7 +524,7 @@ bool SILDeclRef::isTransparent() const {
 }
 
 /// \brief True if the function should have its body serialized.
-bool SILDeclRef::isFragile() const {
+IsSerialized_t SILDeclRef::isSerialized() const {
   DeclContext *dc;
   if (auto closure = getAbstractClosureExpr())
     dc = closure->getLocalContext();
@@ -535,7 +535,7 @@ bool SILDeclRef::isFragile() const {
     // or public.
     if (isEnumElement())
       if (cast<EnumDecl>(dc)->getEffectiveAccess() >= Accessibility::Public)
-        return true;
+        return IsSerialized;
 
     // The allocating entry point for designated initializers are serialized
     // if the class is @_versioned or public.
@@ -545,13 +545,16 @@ bool SILDeclRef::isFragile() const {
           ctor->getDeclContext()->getAsClassOrClassExtensionContext()) {
         if (ctor->getEffectiveAccess() >= Accessibility::Public &&
             !ctor->hasClangNode())
-          return true;
+          return IsSerialized;
       }
     }
   }
 
   // Otherwise, ask the AST if we're inside an @_inlineable context.
-  return (dc->getResilienceExpansion() == ResilienceExpansion::Minimal);
+  if (dc->getResilienceExpansion() == ResilienceExpansion::Minimal)
+    return IsSerialized;
+
+  return IsNotSerialized;
 }
 
 /// \brief True if the function has noinline attribute.

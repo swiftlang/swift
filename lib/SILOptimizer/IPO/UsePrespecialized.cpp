@@ -105,8 +105,8 @@ bool UsePrespecialized::replaceByPrespecialized(SILFunction &F) {
 
     // Create a name of the specialization.
     Mangle::GenericSpecializationMangler NewGenericMangler(ReferencedF,
-                                                Subs, ReferencedF->isFragile(),
-                                                /*isReAbstracted*/ true);
+                                              Subs, ReferencedF->isSerialized(),
+                                              /*isReAbstracted*/ true);
     std::string ClonedName = NewGenericMangler.mangle();
       
     SILFunction *NewF = nullptr;

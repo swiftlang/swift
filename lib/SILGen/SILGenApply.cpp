@@ -133,7 +133,7 @@ static bool canUseStaticDispatch(SILGenFunction &SGF,
 
   // If we cannot form a direct reference due to resilience constraints,
   // we have to dynamic dispatch.
-  if (SGF.F.isFragile() && !constant.isFragile())
+  if (SGF.F.isSerialized())
     return false;
 
   // If the method is defined in the same module, we can reference it
