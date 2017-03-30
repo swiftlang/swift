@@ -119,7 +119,8 @@ bool StackNesting::solve() {
             // More locations are alive around the StackInst's location.
             // Update the AlivaLocs bitset, which contains all those alive
             // locations.
-            assert(Bits.test(BitNr) && "no dealloc found for alloc stack");
+            assert((Bits.test(BitNr) || (!BI.ExitReachable && !Bits.any()))
+                   && "no dealloc found for alloc stack");
             StackLocs[BitNr].AliveLocs = Bits;
             changed = true;
             isNested = true;
