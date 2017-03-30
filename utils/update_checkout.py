@@ -1,5 +1,4 @@
-#!/usr/bin/env python
-# utils/update-checkout - Utility to update your local checkouts -*- python -*-
+# utils/update_checkout.py - Utility to update local checkouts --*- python -*-
 #
 # This source file is part of the Swift.org open source project
 #
