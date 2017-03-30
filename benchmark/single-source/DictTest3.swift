@@ -56,10 +56,7 @@ class Box<T : Hashable> : Hashable {
   }
 }
 
-extension Box : Equatable {
-}
-
-func ==<T: Equatable>(lhs: Box<T>, rhs: Box<T>) -> Bool {
+func ==<T>(lhs: Box<T>, rhs: Box<T>) -> Bool {
   return lhs.value == rhs.value
 }
 
