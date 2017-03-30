@@ -190,6 +190,13 @@ extension String {
       self._endIndex = e
     }
 
+    // If not overridden, the default implementation provided by the Collection
+    // would be used, which unnecessarily penalizes algorithms that use
+    // UTF8View as a Sequence.
+    public var underestimatedCount: Int {
+      return _core.count
+    }
+
     /// A position in a string's `UTF8View` instance.
     ///
     /// You can convert between indices of the different string views by using
@@ -254,13 +261,13 @@ extension String {
 
       /// A Buffer value with the high byte set
       internal static var _bufferHiByte: Buffer {
-        return 0xFF &<< numericCast((MemoryLayout<Buffer>.size &- 1) &* 8)
+        return 0xFF &<< ((MemoryLayout<Buffer>.size &- 1) &* 8)
       }
       
       /// Consume a byte of the given buffer: shift out the low byte
       /// and put FF in the high byte
       internal static func _nextBuffer(after thisBuffer: Buffer) -> Buffer {
-        return (thisBuffer &>> 8) | _bufferHiByte
+        return (thisBuffer &>> (8 as Buffer)) | _bufferHiByte
       }
 
       /// The position of `self`, rounded up to the nearest unicode
@@ -296,7 +303,7 @@ extension String {
     public func index(after i: Index) -> Index {
       // FIXME: swift-3-indexing-model: range check i?
       let currentUnit = UTF8.CodeUnit(extendingOrTruncating: i._buffer)
-      let hiNibble = currentUnit &>> 4
+      let hiNibble = currentUnit &>> (4 as UTF8.CodeUnit)
 
       // Amounts to increment the UTF-16 index based on the high nibble of a
       // UTF-8 code unit. If the high nibble is:
@@ -312,7 +319,8 @@ extension String {
       
       // Map the high nibble of the current code unit into the
       // amount by which to increment the UTF-16 index.
-      let increment = (u16Increments &>> numericCast(hiNibble &<< 1)) & 0x3
+      let increment = (u16Increments &>>
+        Int(extendingOrTruncating: hiNibble &<< (1 as UTF8.CodeUnit))) & 0x3
       let nextCoreIndex = i._coreIndex &+ increment
       let nextBuffer = Index._nextBuffer(after: i._buffer)
 
