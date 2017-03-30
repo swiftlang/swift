@@ -156,7 +156,8 @@ public struct _StringCore {
       | UInt(extendingOrTruncating: count)
 
     self._owner = owner
-    _sanityCheck(UInt(count) & _flagMask == 0, "String too long to represent")
+    _sanityCheck(UInt(count) & _flagMask == (0 as UInt),
+      "String too long to represent")
     _invariantCheck()
   }
 
