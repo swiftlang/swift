@@ -141,43 +141,45 @@ extension String {
   @inline(never) @_semantics("stdlib_binary_only") // Hide the CF dependency
   public // SPI(Foundation)
   init(_cocoaString: AnyObject) {
-    if let wrapped = _cocoaString as? _NSContiguousString {
-      self._core = wrapped._core
-      return
-    }
 
-    // "copy" it into a value to be sure nobody will modify behind
-    // our backs.  In practice, when value is already immutable, this
-    // just does a retain.
-    let cfImmutableValue
-      = _stdlib_binary_CFStringCreateCopy(_cocoaString) as AnyObject
 
-    let length = _swift_stdlib_CFStringGetLength(cfImmutableValue)
+  //   if let wrapped = _cocoaString as? _NSContiguousString {
+  //     self._core = wrapped._core
+  //     return
+  //   }
 
-    // Look first for null-terminated ASCII
-    // Note: the code in clownfish appears to guarantee
-    // nul-termination, but I'm waiting for an answer from Chris Kane
-    // about whether we can count on it for all time or not.
-    let nulTerminatedASCII = _swift_stdlib_CFStringGetCStringPtr(
-      cfImmutableValue, kCFStringEncodingASCII)
+  //   // "copy" it into a value to be sure nobody will modify behind
+  //   // our backs.  In practice, when value is already immutable, this
+  //   // just does a retain.
+  //   let cfImmutableValue
+  //     = _stdlib_binary_CFStringCreateCopy(_cocoaString) as AnyObject
 
-    // start will hold the base pointer of contiguous storage, if it
-    // is found.
-    var start: UnsafeMutableRawPointer?
-    let isUTF16 = (nulTerminatedASCII == nil)
-    if isUTF16 {
-      let utf16Buf = _swift_stdlib_CFStringGetCharactersPtr(cfImmutableValue)
-      start = UnsafeMutableRawPointer(mutating: utf16Buf)
-    } else {
-      start = UnsafeMutableRawPointer(mutating: nulTerminatedASCII)
-    }
+  //   let length = _swift_stdlib_CFStringGetLength(cfImmutableValue)
 
-    self._core = _StringCore(
-      baseAddress: start,
-      count: length,
-      elementShift: isUTF16 ? 1 : 0,
-      hasCocoaBuffer: true,
-      owner: cfImmutableValue)
+  //   // Look first for null-terminated ASCII
+  //   // Note: the code in clownfish appears to guarantee
+  //   // nul-termination, but I'm waiting for an answer from Chris Kane
+  //   // about whether we can count on it for all time or not.
+  //   let nulTerminatedASCII = _swift_stdlib_CFStringGetCStringPtr(
+  //     cfImmutableValue, kCFStringEncodingASCII)
+
+  //   // start will hold the base pointer of contiguous storage, if it
+  //   // is found.
+  //   var start: UnsafeMutableRawPointer?
+  //   let isUTF16 = (nulTerminatedASCII == nil)
+  //   if isUTF16 {
+  //     let utf16Buf = _swift_stdlib_CFStringGetCharactersPtr(cfImmutableValue)
+  //     start = UnsafeMutableRawPointer(mutating: utf16Buf)
+  //   } else {
+  //     start = UnsafeMutableRawPointer(mutating: nulTerminatedASCII)
+  //   }
+
+  //   self._core = _StringCore(
+  //     baseAddress: start,
+  //     count: length,
+  //     elementShift: isUTF16 ? 1 : 0,
+  //     hasCocoaBuffer: true,
+  //     owner: cfImmutableValue)
   }
 }
 
@@ -327,18 +329,49 @@ public final class _NSContiguousString : _SwiftNativeNSString {
 extension String {
   /// Same as `_bridgeToObjectiveC()`, but located inside the core standard
   /// library.
-  public func _stdlib_binary_bridgeToObjectiveCImpl() -> AnyObject {
-    if let ns = _core.cocoaBuffer,
-        _swift_stdlib_CFStringGetLength(ns) == _core.count {
-      return ns
-    }
-    _sanityCheck(_core.hasContiguousStorage)
-    return _NSContiguousString(_core)
+  public func _stdlib_binary_bridgeToObjectiveCImpl(
+    factory: (UnsafePointer<UInt16>, Int)->AnyObject
+  ) -> AnyObject {
+    switch content._rep {
+    case .latin1(let x): return x
+    case .utf16(let x): return x
+    case .cocoa(let x): return x
+    case .any(let x): return _UTF16StringStorage(x.utf16)
+    case .inline5or6(let x):
+      return String._withSmallUTF16(x.utf16) {
+        factory($0.baseAddress, $0.count)
+      }
+    case .inline7or16(let x):
+      return String._withSmallUTF16(x.utf16) {
+        factory($0.baseAddress, $0.count)
+      }
+    }  
   }
 
+  // Michael NOTE: note sure if this is the right way to do this
+  // public func _bridgeToAnyObject() -> AnyObject {
+  //   switch content._rep {
+  //   case .latin1(let x): return x
+  //   case .utf16(let x): return x
+  //   case .cocoa(let x): return x
+  //   case .any(let x): return _UTF16StringStorage(x.utf16)
+  //   case .inline5or6(let x):
+  //     return String._withSmallUTF16(x.utf16) {
+  //       factory($0.baseAddress, $0.count)
+  //     }
+  //   case .inline7or16(let x):
+  //     return String._withSmallUTF16(x.utf16) {
+  //       factory($0.baseAddress, $0.count)
+  //     }
+  //   }  
+    
+  // }
+
   @inline(never) @_semantics("stdlib_binary_only") // Hide the CF dependency
-  public func _bridgeToObjectiveCImpl() -> AnyObject {
-    return _stdlib_binary_bridgeToObjectiveCImpl()
+  public func _bridgeToObjectiveCImpl(
+    factory: (UnsafePointer<UInt16>, Int)->AnyObject
+  ) -> AnyObject {
+    return _stdlib_binary_bridgeToObjectiveCImpl(factory: factory)
   }
 }
 #endif

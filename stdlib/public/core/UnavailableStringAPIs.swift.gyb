@@ -110,42 +110,4 @@ ${stringSubscriptComment}
   }
 }
 
-% for View in ['UTF8View', 'UTF16View', 'UnicodeScalarView', 'CharacterView']:
-%   Index = 'String.%s.Index' % View
-%   Distance = 'String.%s.IndexDistance' % View
-extension ${Index} {
-  @available(
-    *, unavailable,
-    message: "To get the next index call 'index(after:)' on the ${View} instance that produced the index.")
-  public func successor() -> ${Index} {
-    Builtin.unreachable()
-  }
-%   if View != 'UTF8View':
-  @available(
-    *, unavailable,
-    message: "To get the previous index call 'index(before:)' on the ${View} instance that produced the index.")
-  public func predecessor() -> ${Index} {
-    Builtin.unreachable()
-  }
-%   end
-  @available(
-    *, unavailable,
-    message: "To advance an index by n steps call 'index(_:offsetBy:)' on the ${View} instance that produced the index.")
-  public func advancedBy(_ n: ${Distance}) -> ${Index} {
-    Builtin.unreachable()
-  }
-  @available(
-    *, unavailable,
-    message: "To advance an index by n steps stopping at a given limit call 'index(_:offsetBy:limitedBy:)' on ${View} instance that produced the index.  Note that the Swift 3 API returns 'nil' when trying to advance past the limit; the Swift 2 API returned the limit.")
-  public func advancedBy(_ n: ${Distance}, limit: ${Index}) -> ${Index} {
-    Builtin.unreachable()
-  }
-  @available(
-    *, unavailable,
-    message: "To find the distance between two indices call 'distance(from:to:)' on the ${View} instance that produced the index.")
-  public func distanceTo(_ end: ${Index}) -> ${Distance} {
-    Builtin.unreachable()
-  }
-}
-% end
 

@@ -286,21 +286,21 @@ import SwiftShims
 ///
 /// - SeeAlso: `String.CharacterView`, `String.UnicodeScalarView`,
 ///   `String.UTF16View`, `String.UTF8View`
-@_fixed_layout
-public struct String {
-  /// Creates an empty string.
-  public init() {
-    _core = _StringCore()
-  }
+// @_fixed_layout
+// public struct String {
+//   /// Creates an empty string.
+//   public init() {
+//     _core = _StringCore()
+//   }
 
-  public // @testable
-  init(_ _core: _StringCore) {
-    self._core = _core
-  }
+//   public // @testable
+//   init(_ _core: _StringCore) {
+//     self._core = _core
+//   }
 
-  public // @testable
-  var _core: _StringCore
-}
+//   public // @testable
+//   var _core: _StringCore
+// }
 
 extension String {
   public // @testable
@@ -527,7 +527,7 @@ extension String {
 
   public // SPI(Foundation)
   init(_storage: _StringBuffer) {
-    _core = _StringCore(_storage)
+    self.init(_StringCore(_storage))
   }
 }
 
@@ -601,13 +601,13 @@ extension Sequence where Iterator.Element == String {
       for chunk in self {
         // FIXME(performance): this code assumes UTF-16 in-memory representation.
         // It should be switched to low-level APIs.
-        r += separatorSize + chunk.utf16.count
+        r += numericCast(separatorSize + chunk.utf16.count)
       }
-      return r - separatorSize
+      return r - numericCast(separatorSize)
     }
 
     if let n = reservation {
-      result.reserveCapacity(n)
+      result.reserveCapacity(numericCast(n))
     }
 
     if separatorSize == 0 {
@@ -814,11 +814,11 @@ extension String {
   }
 }
 
-extension String : CustomStringConvertible {
-  public var description: String {
-    return self
-  }
-}
+// extension String : CustomStringConvertible {
+//   public var description: String {
+//     return self
+//   }
+// }
 
 extension String : LosslessStringConvertible {
   public init?(_ description: String) {
@@ -827,67 +827,67 @@ extension String : LosslessStringConvertible {
 }
 
 extension String {
-  @available(*, unavailable, renamed: "append(_:)")
-  public mutating func appendContentsOf(_ other: String) {
-    Builtin.unreachable()
-  }
+  // @available(*, unavailable, renamed: "append(_:)")
+  // public mutating func appendContentsOf(_ other: String) {
+  //   Builtin.unreachable()
+  // }
 
-  @available(*, unavailable, renamed: "append(contentsOf:)")
-  public mutating func appendContentsOf<S : Sequence>(_ newElements: S)
-    where S.Iterator.Element == Character {
-    Builtin.unreachable()
-  }
+  // @available(*, unavailable, renamed: "append(contentsOf:)")
+  // public mutating func appendContentsOf<S : Sequence>(_ newElements: S)
+  //   where S.Iterator.Element == Character {
+  //   Builtin.unreachable()
+  // }
 
-  @available(*, unavailable, renamed: "insert(contentsOf:at:)")
-  public mutating func insertContentsOf<S : Collection>(
-    _ newElements: S, at i: Index
-  ) where S.Iterator.Element == Character {
-    Builtin.unreachable()
-  }
+  // @available(*, unavailable, renamed: "insert(contentsOf:at:)")
+  // public mutating func insertContentsOf<S : Collection>(
+  //   _ newElements: S, at i: Index
+  // ) where S.Iterator.Element == Character {
+  //   Builtin.unreachable()
+  // }
 
-  @available(*, unavailable, renamed: "replaceSubrange")
-  public mutating func replaceRange<C : Collection>(
-    _ subRange: Range<Index>, with newElements: C
-  ) where C.Iterator.Element == Character {
-    Builtin.unreachable()
-  }
+  // @available(*, unavailable, renamed: "replaceSubrange")
+  // public mutating func replaceRange<C : Collection>(
+  //   _ subRange: Range<Index>, with newElements: C
+  // ) where C.Iterator.Element == Character {
+  //   Builtin.unreachable()
+  // }
     
-  @available(*, unavailable, renamed: "replaceSubrange")
-  public mutating func replaceRange(
-    _ subRange: Range<Index>, with newElements: String
-  ) {
-    Builtin.unreachable()
-  }
+  // @available(*, unavailable, renamed: "replaceSubrange")
+  // public mutating func replaceRange(
+  //   _ subRange: Range<Index>, with newElements: String
+  // ) {
+  //   Builtin.unreachable()
+  // }
   
-  @available(*, unavailable, renamed: "remove(at:)")
-  public mutating func removeAtIndex(_ i: Index) -> Character {
-    Builtin.unreachable()
-  }
+  // @available(*, unavailable, renamed: "remove(at:)")
+  // public mutating func removeAtIndex(_ i: Index) -> Character {
+  //   Builtin.unreachable()
+  // }
 
-  @available(*, unavailable, renamed: "removeSubrange")
-  public mutating func removeRange(_ subRange: Range<Index>) {
-    Builtin.unreachable()
-  }
+  // @available(*, unavailable, renamed: "removeSubrange")
+  // public mutating func removeRange(_ subRange: Range<Index>) {
+  //   Builtin.unreachable()
+  // }
 
-  @available(*, unavailable, renamed: "lowercased()")
-  public var lowercaseString: String {
-    Builtin.unreachable()
-  }
+  // @available(*, unavailable, renamed: "lowercased()")
+  // public var lowercaseString: String {
+  //   Builtin.unreachable()
+  // }
 
-  @available(*, unavailable, renamed: "uppercased()")
-  public var uppercaseString: String {
-    Builtin.unreachable()
-  }
+  // @available(*, unavailable, renamed: "uppercased()")
+  // public var uppercaseString: String {
+  //   Builtin.unreachable()
+  // }
 
-  @available(*, unavailable, renamed: "init(describing:)")
-  public init<T>(_: T) {
-    Builtin.unreachable()
-  }
+  // @available(*, unavailable, renamed: "init(describing:)")
+  // public init<T>(_: T) {
+  //   Builtin.unreachable()
+  // }
 }
 
 extension Sequence where Iterator.Element == String {
-  @available(*, unavailable, renamed: "joined(separator:)")
-  public func joinWithSeparator(_ separator: String) -> String {
-    Builtin.unreachable()
-  }
+  // @available(*, unavailable, renamed: "joined(separator:)")
+  // public func joinWithSeparator(_ separator: String) -> String {
+  //   Builtin.unreachable()
+  // }
 }

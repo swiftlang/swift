@@ -135,7 +135,7 @@ extension ${Self} : LosslessStringConvertible {
 
     let (result, n) = text.withCString(parseNTBS)
 
-    if n == 0 || n != u16.count
+    if n == 0 || n != numericCast(u16.count)
     || u16.contains(where: { $0 > 127 || _isspace_clocale($0) }) {
       return nil
     }

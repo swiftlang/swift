@@ -13,139 +13,139 @@
 // `String` does not conform to `RangeReplaceableCollection`, but provides a
 // similar API.
 
-extension String : BidirectionalCollection, BidirectionalCollectionWrapper {
-  public typealias IndexDistance = CharacterView.IndexDistance
-  public typealias Index = CharacterView.Index
-  public typealias Base = CharacterView
-  public typealias SubSequence = String
-  public var base: CharacterView { return characters }
+// extension String : BidirectionalCollection, BidirectionalCollectionWrapper {
+//   public typealias IndexDistance = CharacterView.IndexDistance
+//   public typealias Index = CharacterView.Index
+//   public typealias Base = CharacterView
+//   public typealias SubSequence = String
+//   public var base: CharacterView { return characters }
   
-  /// Accesses the text in the given range.
-  ///
-  /// - Complexity: O(*n*) if the underlying string is bridged from
-  ///   Objective-C, where *n* is the length of the string; otherwise, O(1).
-  public subscript(bounds: Range<Index>) -> String {
-    return String(characters[bounds])
-  }
+//   /// Accesses the text in the given range.
+//   ///
+//   /// - Complexity: O(*n*) if the underlying string is bridged from
+//   ///   Objective-C, where *n* is the length of the string; otherwise, O(1).
+//   public subscript(bounds: Range<Index>) -> String {
+//     return String(characters[bounds])
+//   }
 
-  // FIXME: figure out how to resolve ambiguities when we try to use the default
-  // from BidirectionalCollectionWrapper.
-  public mutating func _tryToReplaceSubrange<C: Collection>(
-    from targetStart: Index, to targetEnd: Index, with replacement: C
-  ) -> Bool
-  where C.Iterator.Element == Base.Iterator.Element {
-    return base._tryToReplaceSubrange(
-      from: targetStart, to: targetEnd,  with: replacement)
-  }
-}
+//   // FIXME: figure out how to resolve ambiguities when we try to use the default
+//   // from BidirectionalCollectionWrapper.
+//   public mutating func _tryToReplaceSubrange<C: Collection>(
+//     from targetStart: Index, to targetEnd: Index, with replacement: C
+//   ) -> Bool
+//   where C.Iterator.Element == Base.Iterator.Element {
+//     return base._tryToReplaceSubrange(
+//       from: targetStart, to: targetEnd,  with: replacement)
+//   }
+// }
 
-extension String.CharacterView.Index {
-  public static func == (lhs: String.Index, rhs: String.Index) -> Bool {
-    return lhs._base == rhs._base
-  }
+// extension String.CharacterView.Index {
+//   public static func == (lhs: String.Index, rhs: String.Index) -> Bool {
+//     return lhs._base == rhs._base
+//   }
 
-  public static func < (lhs: String.Index, rhs: String.Index) -> Bool {
-    return lhs._base < rhs._base
-  }
-}
+//   public static func < (lhs: String.Index, rhs: String.Index) -> Bool {
+//     return lhs._base < rhs._base
+//   }
+// }
 
-extension String : RangeReplaceableCollection {
-  /// Creates a new string containing the characters in the given sequence.
-  ///
-  /// You can use this initializer to create a new string from the result of
-  /// one or more operations on a string's `characters` view. For example:
-  ///
-  ///     let str = "The rain in Spain stays mainly in the plain."
-  ///
-  ///     let vowels: Set<Character> = ["a", "e", "i", "o", "u"]
-  ///     let disemvoweled = String(str.characters.lazy.filter { !vowels.contains($0) })
-  ///
-  ///     print(disemvoweled)
-  ///     // Prints "Th rn n Spn stys mnly n th pln."
-  ///
-  /// - Parameter characters: A sequence of characters.
-  public init<S : Sequence>(_ characters: S)
-    where S.Iterator.Element == Character {
-    self._core = CharacterView(characters)._core
-  }
+// extension String : RangeReplaceableCollection {
+//   /// Creates a new string containing the characters in the given sequence.
+//   ///
+//   /// You can use this initializer to create a new string from the result of
+//   /// one or more operations on a string's `characters` view. For example:
+//   ///
+//   ///     let str = "The rain in Spain stays mainly in the plain."
+//   ///
+//   ///     let vowels: Set<Character> = ["a", "e", "i", "o", "u"]
+//   ///     let disemvoweled = String(str.characters.lazy.filter { !vowels.contains($0) })
+//   ///
+//   ///     print(disemvoweled)
+//   ///     // Prints "Th rn n Spn stys mnly n th pln."
+//   ///
+//   /// - Parameter characters: A sequence of characters.
+//   public init<S : Sequence>(_ characters: S)
+//     where S.Iterator.Element == Character {
+//     self._core = CharacterView(characters)._core
+//   }
 
-  /// Reserves enough space in the string's underlying storage to store the
-  /// specified number of ASCII characters.
-  ///
-  /// Because each character in a string can require more than a single ASCII
-  /// character's worth of storage, additional allocation may be necessary
-  /// when adding characters to a string after a call to
-  /// `reserveCapacity(_:)`.
-  ///
-  /// - Parameter n: The minimum number of ASCII character's worth of storage
-  ///   to allocate.
-  ///
-  /// - Complexity: O(*n*)
-  public mutating func reserveCapacity(_ n: Int) {
-    withMutableCharacters {
-      (v: inout CharacterView) in v.reserveCapacity(n)
-    }
-  }
+//   /// Reserves enough space in the string's underlying storage to store the
+//   /// specified number of ASCII characters.
+//   ///
+//   /// Because each character in a string can require more than a single ASCII
+//   /// character's worth of storage, additional allocation may be necessary
+//   /// when adding characters to a string after a call to
+//   /// `reserveCapacity(_:)`.
+//   ///
+//   /// - Parameter n: The minimum number of ASCII character's worth of storage
+//   ///   to allocate.
+//   ///
+//   /// - Complexity: O(*n*)
+//   public mutating func reserveCapacity(_ n: Int) {
+//     withMutableCharacters {
+//       (v: inout CharacterView) in v.reserveCapacity(n)
+//     }
+//   }
 
-  /// Replaces the text within the specified bounds with the given characters.
-  ///
-  /// Calling this method invalidates any existing indices for use with this
-  /// string.
-  ///
-  /// - Parameters:
-  ///   - bounds: The range of text to replace. The bounds of the range must be
-  ///     valid indices of the string.
-  ///   - newElements: The new characters to add to the string.
-  ///
-  /// - Complexity: O(*m*), where *m* is the combined length of the string and
-  ///   `newElements`. If the call to `replaceSubrange(_:with:)` simply
-  ///   removes text at the end of the string, the complexity is O(*n*), where
-  ///   *n* is equal to `bounds.count`.
-  public mutating func replaceSubrange<C>(
-    _ bounds: Range<Index>,
-    with newElements: C
-  ) where C : Collection, C.Iterator.Element == Character {
-    withMutableCharacters {
-      (v: inout CharacterView)
-      in v.replaceSubrange(bounds, with: newElements)
-    }
-  }
+//   /// Replaces the text within the specified bounds with the given characters.
+//   ///
+//   /// Calling this method invalidates any existing indices for use with this
+//   /// string.
+//   ///
+//   /// - Parameters:
+//   ///   - bounds: The range of text to replace. The bounds of the range must be
+//   ///     valid indices of the string.
+//   ///   - newElements: The new characters to add to the string.
+//   ///
+//   /// - Complexity: O(*m*), where *m* is the combined length of the string and
+//   ///   `newElements`. If the call to `replaceSubrange(_:with:)` simply
+//   ///   removes text at the end of the string, the complexity is O(*n*), where
+//   ///   *n* is equal to `bounds.count`.
+//   public mutating func replaceSubrange<C>(
+//     _ bounds: Range<Index>,
+//     with newElements: C
+//   ) where C : Collection, C.Iterator.Element == Character {
+//     withMutableCharacters {
+//       (v: inout CharacterView)
+//       in v.replaceSubrange(bounds, with: newElements)
+//     }
+//   }
 
 % for Range in ['Range', 'ClosedRange']:
-  /// Replaces the text within the specified bounds with the given string.
-  ///
-  /// Calling this method invalidates any existing indices for use with this
-  /// string.
-  ///
-  /// - Parameters:
-  ///   - bounds: The range of text to replace. The bounds of the range must be
-  ///     valid indices of the string.
-  ///   - newElements: The new text to add to the string.
-  ///
-  /// - Complexity: O(*m*), where *m* is the combined length of the string and
-  ///   `newElements`. If the call to `replaceSubrange(_:with:)` simply
-  ///   removes text at the end of the string, the complexity is O(*n*), where
-  ///   *n* is equal to `bounds.count`.
-  public mutating func replaceSubrange(
-    _ bounds: ${Range}<Index>, with newElements: String
-  ) {
-    replaceSubrange(bounds, with: newElements.characters)
-  }
+  // /// Replaces the text within the specified bounds with the given string.
+  // ///
+  // /// Calling this method invalidates any existing indices for use with this
+  // /// string.
+  // ///
+  // /// - Parameters:
+  // ///   - bounds: The range of text to replace. The bounds of the range must be
+  // ///     valid indices of the string.
+  // ///   - newElements: The new text to add to the string.
+  // ///
+  // /// - Complexity: O(*m*), where *m* is the combined length of the string and
+  // ///   `newElements`. If the call to `replaceSubrange(_:with:)` simply
+  // ///   removes text at the end of the string, the complexity is O(*n*), where
+  // ///   *n* is equal to `bounds.count`.
+  // public mutating func replaceSubrange(
+  //   _ bounds: ${Range}<Index>, with newElements: String
+  // ) {
+  //   replaceSubrange(bounds, with: newElements.characters)
+  // }
 % end
 
-  /// Replaces this string with the empty string.
-  ///
-  /// Calling this method invalidates any existing indices for use with this
-  /// string.
-  ///
-  /// - Parameter keepCapacity: Pass `true` to prevent the release of the
-  ///   string's allocated storage. Retaining the storage can be a useful
-  ///   optimization when you're planning to grow the string again. The
-  ///   default value is `false`.
-  public mutating func removeAll(keepingCapacity keepCapacity: Bool = false) {
-    withMutableCharacters {
-      (v: inout CharacterView) in v.removeAll(keepingCapacity: keepCapacity)
-    }
-  }
-}
+//   /// Replaces this string with the empty string.
+//   ///
+//   /// Calling this method invalidates any existing indices for use with this
+//   /// string.
+//   ///
+//   /// - Parameter keepCapacity: Pass `true` to prevent the release of the
+//   ///   string's allocated storage. Retaining the storage can be a useful
+//   ///   optimization when you're planning to grow the string again. The
+//   ///   default value is `false`.
+//   public mutating func removeAll(keepingCapacity keepCapacity: Bool = false) {
+//     withMutableCharacters {
+//       (v: inout CharacterView) in v.removeAll(keepingCapacity: keepCapacity)
+//     }
+//   }
+// }
 

@@ -1,42 +1,42 @@
-//===----------------------------------------------------------------------===//
-//
-// This source file is part of the Swift.org open source project
-//
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
-// Licensed under Apache License v2.0 with Runtime Library Exception
-//
-// See https://swift.org/LICENSE.txt for license information
-// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
-//
-//===----------------------------------------------------------------------===//
+// //===----------------------------------------------------------------------===//
+// //
+// // This source file is part of the Swift.org open source project
+// //
+// // Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// // Licensed under Apache License v2.0 with Runtime Library Exception
+// //
+// // See https://swift.org/LICENSE.txt for license information
+// // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// //
+// //===----------------------------------------------------------------------===//
 
-import SwiftShims
+// import SwiftShims
 
-#if _runtime(_ObjC)
-/// Compare two strings using the Unicode collation algorithm in the
-/// deterministic comparison mode. (The strings which are equivalent according
-/// to their NFD form are considered equal. Strings which are equivalent
-/// according to the plain Unicode collation algorithm are additionally ordered
-/// based on their NFD.)
-///
-/// See Unicode Technical Standard #10.
-///
-/// The behavior is equivalent to `NSString.compare()` with default options.
-///
-/// - returns:
-///   * an unspecified value less than zero if `lhs < rhs`,
-///   * zero if `lhs == rhs`,
-///   * an unspecified value greater than zero if `lhs > rhs`.
-@_silgen_name("swift_stdlib_compareNSStringDeterministicUnicodeCollation")
-public func _stdlib_compareNSStringDeterministicUnicodeCollation(
-  _ lhs: AnyObject, _ rhs: AnyObject
-) -> Int32
+// #if _runtime(_ObjC)
+// /// Compare two strings using the Unicode collation algorithm in the
+// /// deterministic comparison mode. (The strings which are equivalent according
+// /// to their NFD form are considered equal. Strings which are equivalent
+// /// according to the plain Unicode collation algorithm are additionally ordered
+// /// based on their NFD.)
+// ///
+// /// See Unicode Technical Standard #10.
+// ///
+// /// The behavior is equivalent to `NSString.compare()` with default options.
+// ///
+// /// - returns:
+// ///   * an unspecified value less than zero if `lhs < rhs`,
+// ///   * zero if `lhs == rhs`,
+// ///   * an unspecified value greater than zero if `lhs > rhs`.
+// @_silgen_name("swift_stdlib_compareNSStringDeterministicUnicodeCollation")
+// public func _stdlib_compareNSStringDeterministicUnicodeCollation(
+//   _ lhs: AnyObject, _ rhs: AnyObject
+// ) -> Int32
 
-@_silgen_name("swift_stdlib_compareNSStringDeterministicUnicodeCollationPtr")
-public func _stdlib_compareNSStringDeterministicUnicodeCollationPointer(
-  _ lhs: OpaquePointer, _ rhs: OpaquePointer
-) -> Int32
-#endif
+// @_silgen_name("swift_stdlib_compareNSStringDeterministicUnicodeCollationPtr")
+// public func _stdlib_compareNSStringDeterministicUnicodeCollationPointer(
+//   _ lhs: OpaquePointer, _ rhs: OpaquePointer
+// ) -> Int32
+// #endif
 
 // extension String {
 // #if _runtime(_ObjC)

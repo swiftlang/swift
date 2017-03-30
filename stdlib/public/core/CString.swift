@@ -43,14 +43,14 @@ extension String {
   ///     // Prints "Caf�"
   ///
   /// - Parameter cString: A pointer to a null-terminated UTF-8 code sequence.
-  public init(cString: UnsafePointer<CChar>) {
-    let len = UTF8._nullCodeUnitOffset(in: cString)
-    let (result, _) = cString.withMemoryRebound(to: UInt8.self, capacity: len) {
-      _decodeCString($0, as: UTF8.self, length: len,
-        repairingInvalidCodeUnits: true)!
-    }
-    self = result
-  }
+  // public init(cString: UnsafePointer<CChar>) {
+  //   let len = UTF8._nullCodeUnitOffset(in: cString)
+  //   let (result, _) = cString.withMemoryRebound(to: UInt8.self, capacity: len) {
+  //     _decodeCString($0, as: UTF8.self, length: len,
+  //       repairingInvalidCodeUnits: true)!
+  //   }
+  //   self = result
+  // }
 
   /// Creates a new string by copying the null-terminated UTF-8 data referenced
   /// by the given pointer.
