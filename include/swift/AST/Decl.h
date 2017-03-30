@@ -4974,7 +4974,10 @@ public:
   
   /// True if the declaration is forced to be statically dispatched.
   bool hasForcedStaticDispatch() const;
-  
+
+  /// Get the interface type of this decl and remove the Self context.
+  Type getMethodInterfaceType() const;
+
   using DeclContext::operator new;
   using Decl::getASTContext;
 };

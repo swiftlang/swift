@@ -517,7 +517,7 @@ private:
 
     Optional<ForeignErrorConvention> errorConvention
       = AFD->getForeignErrorConvention();
-    Type rawMethodTy = AFD->getInterfaceType()->castTo<AnyFunctionType>()->getResult();
+    Type rawMethodTy = AFD->getMethodInterfaceType();
     auto methodTy = rawMethodTy->castTo<FunctionType>();
     auto resultTy = getForeignResultType(AFD, methodTy, errorConvention);
 
