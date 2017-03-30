@@ -14,43 +14,44 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/ABI/MetadataValues.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/CanTypeVisitor.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/Types.h"
+#include "swift/IRGen/Linking.h"
+#include "swift/Runtime/Metadata.h"
 #include "swift/SIL/FormalLinkage.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/TypeLowering.h"
-#include "swift/Runtime/Metadata.h"
-#include "swift/ABI/MetadataValues.h"
-#include "llvm/IR/InlineAsm.h"
+#include "llvm/ADT/SmallString.h"
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/GlobalVariable.h"
+#include "llvm/IR/InlineAsm.h"
 #include "llvm/IR/Module.h"
-#include "llvm/ADT/SmallString.h"
 
 #include "Address.h"
 #include "Callee.h"
 #include "ClassMetadataLayout.h"
 #include "ConstantBuilder.h"
-#include "FixedTypeInfo.h"
-#include "GenClass.h"
-#include "GenPoly.h"
-#include "GenValueWitness.h"
-#include "GenArchetype.h"
-#include "GenStruct.h"
-#include "HeapTypeInfo.h"
-#include "IRGenModule.h"
-#include "IRGenDebugInfo.h"
-#include "Linking.h"
-#include "ScalarTypeInfo.h"
-#include "StructMetadataLayout.h"
-#include "StructLayout.h"
 #include "EnumMetadataLayout.h"
+#include "FixedTypeInfo.h"
+#include "GenArchetype.h"
+#include "GenClass.h"
+#include "GenDecl.h"
+#include "GenPoly.h"
+#include "GenStruct.h"
+#include "GenValueWitness.h"
+#include "HeapTypeInfo.h"
+#include "IRGenDebugInfo.h"
 #include "IRGenMangler.h"
+#include "IRGenModule.h"
+#include "ScalarTypeInfo.h"
+#include "StructLayout.h"
+#include "StructMetadataLayout.h"
 
 #include "GenMeta.h"
 
@@ -5455,8 +5456,8 @@ IRGenModule::getAddrOfForeignTypeMetadataCandidate(CanType type) {
   
   // Create the global variable.
   LinkInfo link = LinkInfo::get(*this, entity, ForDefinition);
-  auto var = link.createVariable(*this, definition.getType(),
-                                 getPointerAlignment());
+  auto var =
+      createVariable(*this, link, definition.getType(), getPointerAlignment());
   definition.installInGlobal(var);
   
   // Apply the offset.

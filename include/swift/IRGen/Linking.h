@@ -1,4 +1,4 @@
-//===--- LinkEntity.h - Named declarations ----------------------*- C++ -*-===//
+//===--- Linking.h - Named declarations and how to link to them -*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,17 +10,18 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_IRGEN_LINKENTITY_H
-#define SWIFT_IRGEN_LINKENTITY_H
+#ifndef SWIFT_IRGEN_LINKING_H
+#define SWIFT_IRGEN_LINKING_H
 
-#include "swift/AST/Types.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/ProtocolConformance.h"
+#include "swift/AST/Types.h"
 #include "swift/IRGen/ValueWitness.h"
-#include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILGlobalVariable.h"
+#include "swift/SIL/SILModule.h"
 #include "llvm/ADT/DenseMapInfo.h"
+#include "llvm/IR/GlobalValue.h"
 
 namespace swift {
 namespace irgen {
@@ -75,7 +76,7 @@ class LinkEntity {
     /// A function.
     /// The pointer is a FuncDecl*.
     Function,
-    
+
     /// The offset to apply to a witness table or metadata object
     /// in order to find the information for a declaration.  The
     /// pointer is a ValueDecl*.
@@ -99,7 +100,7 @@ class LinkEntity {
     /// The nominal type descriptor for a nominal type.
     /// The pointer is a NominalTypeDecl*.
     NominalTypeDescriptor,
-    
+
     /// The protocol descriptor for a protocol type.
     /// The pointer is a ProtocolDecl*.
     ProtocolDescriptor,
@@ -113,7 +114,7 @@ class LinkEntity {
 
     /// A SIL function. The pointer is a SILFunction*.
     SILFunction,
-    
+
     /// A SIL global variable. The pointer is a SILGlobalVariable*.
     SILGlobalVariable,
 
@@ -134,7 +135,7 @@ class LinkEntity {
     /// The instantiation function for a generic protocol witness table.
     /// The secondary pointer is a ProtocolConformance*.
     GenericProtocolWitnessTableInstantiationFunction,
-    
+
     /// A function which returns the type metadata for the associated type
     /// of a protocol.  The secondary pointer is a ProtocolConformance*.
     /// The index of the associated type declaration is stored in the data.
@@ -187,7 +188,7 @@ class LinkEntity {
     /// A foreign type metadata candidate.
     /// The pointer is a canonical TypeBase*.
     ForeignTypeMetadataCandidate,
-    
+
     /// A reflection metadata descriptor for a builtin or imported type.
     ReflectionBuiltinDescriptor,
 
@@ -215,7 +216,7 @@ class LinkEntity {
   static bool isTypeKind(Kind k) {
     return k >= Kind::ProtocolWitnessTableLazyAccessFunction;
   }
-  
+
   static bool isProtocolConformanceKind(Kind k) {
     return (k >= Kind::DirectProtocolWitnessTable &&
             k <= Kind::ProtocolWitnessTableLazyCacheVariable);
@@ -409,13 +410,13 @@ public:
     entity.setForType(Kind::ForeignTypeMetadataCandidate, type);
     return entity;
   }
-  
+
   static LinkEntity forNominalTypeDescriptor(NominalTypeDecl *decl) {
     LinkEntity entity;
     entity.setForDecl(Kind::NominalTypeDescriptor, decl);
     return entity;
   }
-  
+
   static LinkEntity forProtocolDescriptor(ProtocolDecl *decl) {
     LinkEntity entity;
     entity.setForDecl(Kind::ProtocolDescriptor, decl);
@@ -444,7 +445,7 @@ public:
     entity.Data = LINKENTITY_SET_FIELD(Kind, unsigned(Kind::SILFunction));
     return entity;
   }
-  
+
   static LinkEntity forSILGlobalVariable(SILGlobalVariable *G) {
     LinkEntity entity;
     entity.Pointer = G;
@@ -452,7 +453,7 @@ public:
     entity.Data = LINKENTITY_SET_FIELD(Kind, unsigned(Kind::SILGlobalVariable));
     return entity;
   }
-  
+
   static LinkEntity
   forDirectProtocolWitnessTable(const ProtocolConformance *C) {
     LinkEntity entity;
@@ -656,36 +657,75 @@ public:
 #undef LINKENTITY_GET_FIELD
 #undef LINKENTITY_SET_FIELD
 };
+
+/// Encapsulated information about the linkage of an entity.
+class LinkInfo {
+  LinkInfo() = default;
+
+  llvm::SmallString<32> Name;
+  llvm::GlobalValue::LinkageTypes Linkage;
+  llvm::GlobalValue::VisibilityTypes Visibility;
+  llvm::GlobalValue::DLLStorageClassTypes DLLStorageClass;
+  ForDefinition_t ForDefinition;
+
+public:
+  /// Compute linkage information for the given
+  static LinkInfo get(IRGenModule &IGM, const LinkEntity &entity,
+                      ForDefinition_t forDefinition);
+
+  StringRef getName() const {
+    return Name.str();
+  }
+  llvm::GlobalValue::LinkageTypes getLinkage() const {
+    return Linkage;
+  }
+  llvm::GlobalValue::VisibilityTypes getVisibility() const {
+    return Visibility;
+  }
+  llvm::GlobalValue::DLLStorageClassTypes getDLLStorage() const {
+    return DLLStorageClass;
+  }
+
+  bool isForDefinition() const {
+    return ForDefinition;
+  }
+  bool isUsed() const {
+    return ForDefinition && isUsed(Linkage, Visibility, DLLStorageClass);
+  }
+
+  static bool isUsed(llvm::GlobalValue::LinkageTypes Linkage,
+                     llvm::GlobalValue::VisibilityTypes Visibility,
+                     llvm::GlobalValue::DLLStorageClassTypes DLLStorage);
+};
 }
 }
 
 /// Allow LinkEntity to be used as a key for a DenseMap.
- template <> struct llvm::DenseMapInfo<swift::irgen::LinkEntity> {
-   typedef swift::irgen::LinkEntity LinkEntity;
-   static LinkEntity getEmptyKey() {
-     LinkEntity entity;
-     entity.Pointer = nullptr;
-     entity.SecondaryPointer = nullptr;
-     entity.Data = 0;
-     return entity;
-   }
-   static LinkEntity getTombstoneKey() {
-     LinkEntity entity;
-     entity.Pointer = nullptr;
-     entity.SecondaryPointer = nullptr;
-     entity.Data = 1;
-     return entity;
-   }
-   static unsigned getHashValue(const LinkEntity &entity) {
-     return DenseMapInfo<void*>::getHashValue(entity.Pointer)
-       ^ DenseMapInfo<void*>::getHashValue(entity.SecondaryPointer)
-       ^ entity.Data;
-   }
-   static bool isEqual(const LinkEntity &LHS, const LinkEntity &RHS) {
-     return LHS.Pointer == RHS.Pointer &&
-       LHS.SecondaryPointer == RHS.SecondaryPointer &&
-       LHS.Data == RHS.Data;
-   }
- };
+template <> struct llvm::DenseMapInfo<swift::irgen::LinkEntity> {
+  typedef swift::irgen::LinkEntity LinkEntity;
+  static LinkEntity getEmptyKey() {
+    LinkEntity entity;
+    entity.Pointer = nullptr;
+    entity.SecondaryPointer = nullptr;
+    entity.Data = 0;
+    return entity;
+  }
+  static LinkEntity getTombstoneKey() {
+    LinkEntity entity;
+    entity.Pointer = nullptr;
+    entity.SecondaryPointer = nullptr;
+    entity.Data = 1;
+    return entity;
+  }
+  static unsigned getHashValue(const LinkEntity &entity) {
+    return DenseMapInfo<void *>::getHashValue(entity.Pointer) ^
+           DenseMapInfo<void *>::getHashValue(entity.SecondaryPointer) ^
+           entity.Data;
+  }
+  static bool isEqual(const LinkEntity &LHS, const LinkEntity &RHS) {
+    return LHS.Pointer == RHS.Pointer &&
+           LHS.SecondaryPointer == RHS.SecondaryPointer && LHS.Data == RHS.Data;
+  }
+};
 
 #endif

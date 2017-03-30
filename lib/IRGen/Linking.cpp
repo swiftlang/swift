@@ -14,7 +14,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "Linking.h"
+#include "swift/IRGen/Linking.h"
 #include "IRGenMangler.h"
 #include "llvm/Support/raw_ostream.h"
 #include "swift/ClangImporter/ClangImporter.h"
