@@ -374,8 +374,8 @@ Type TypeBase::eraseDynamicSelfType() {
 
 Type TypeBase::removeSelfParam(ValueDecl *value) {
   if (auto func = dyn_cast<AbstractFunctionDecl>(value)) {
-    if (func->getDeclContext()->isTypeContext())
-      return this->castTo<AnyFunctionType>()->getResult();
+    assert(func->getDeclContext()->isTypeContext());
+    return this->castTo<AnyFunctionType>()->getResult();
   }
   return this;
 }
