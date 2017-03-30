@@ -51,7 +51,8 @@ class UnicodeContentBox : FactoryInitializable {
   class Instance<Base: UnicodeContent> : UnicodeContentBox
   where Base.UTF16View.Iterator.Element == UTF16.CodeUnit,
   Base.UTF8View.Iterator.Element == UTF8.CodeUnit,
-  Base.UnicodeScalarView.Iterator.Element == UnicodeScalar
+  Base.UnicodeScalarView.Iterator.Element == UnicodeScalar,
+  Base.CharacterView.Iterator.Element == Character
   {
     var base: Base
     
@@ -74,8 +75,10 @@ class UnicodeContentBox : FactoryInitializable {
     override var extendedASCII: UnicodeBidirectionalUInt32 {
       return base.extendedASCII
     }
-    override var characters: AnyCharacters { return base.characters }
 #endif
+    override var characters: AnyCharacterUnicodeView {
+      return AnyCharacterUnicodeView(base.characters)
+    }
     override var isKnownLatin1: Bool { return base.isKnownLatin1 }
     override var isKnownASCII: Bool { return base.isKnownASCII }
     override var isKnownFCCNormalized: Bool { return base.isKnownFCCNormalized }
@@ -93,7 +96,8 @@ class UnicodeContentBox : FactoryInitializable {
   convenience init<Base: UnicodeContent>(wrapping x: Base)
   where Base.UTF16View.Iterator.Element == UTF16.CodeUnit,
   Base.UTF8View.Iterator.Element == UTF8.CodeUnit,
-  Base.UnicodeScalarView.Iterator.Element == UnicodeScalar
+  Base.UnicodeScalarView.Iterator.Element == UnicodeScalar,
+  Base.CharacterView.Iterator.Element == Character
   {
     self.init(Instance(x))
   }
