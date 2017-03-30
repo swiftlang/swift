@@ -369,7 +369,9 @@ public:
   /// The destination block for a 'fallthrough' statement. Null if the switch
   /// scope depth is zero or if we are checking the final 'case' of the current
   /// switch.
+  CaseStmt /*nullable*/ *FallthroughSource = nullptr;
   CaseStmt /*nullable*/ *FallthroughDest = nullptr;
+  FallthroughStmt /*nullable*/ *PreviousFallthrough = nullptr;
 
   SourceLoc EndTypeCheckLoc;
 
@@ -921,9 +923,9 @@ public:
       TC.diagnose(S->getLoc(), diag::fallthrough_from_last_case);
       return nullptr;
     }
-    if (FallthroughDest->hasBoundDecls())
-      TC.diagnose(S->getLoc(), diag::fallthrough_into_case_with_var_binding);
+    S->setFallthroughSource(FallthroughSource);
     S->setFallthroughDest(FallthroughDest);
+    PreviousFallthrough = S;
     return S;
   }
   
@@ -947,6 +949,7 @@ public:
       auto *caseBlock = S->getCases()[i];
       // Fallthrough transfers control to the next case block. In the
       // final case block, it is invalid.
+      FallthroughSource = caseBlock;
       FallthroughDest = i+1 == e ? nullptr : S->getCases()[i+1];
 
       for (auto &labelItem : caseBlock->getMutableCaseLabelItems()) {
@@ -989,15 +992,51 @@ public:
             });
           }
         }
-
         // Check the guard expression, if present.
         if (auto *guard = labelItem.getGuardExpr()) {
           TC.typeCheckCondition(guard, DC);
           labelItem.setGuardExpr(guard);
         }
       }
+        
+      // If the previous case fellthrough, similarly check that that case's bindings
+      // includes our first label item's pattern bindings and types.
+      if (PreviousFallthrough) {
+        auto firstPattern = caseBlock->getCaseLabelItems()[0].getPattern();
+        SmallVector<VarDecl *, 4> Vars;
+        firstPattern->collectVariables(Vars);
+
+        auto previousBlock = S->getCases()[i-1];
+        for (auto &labelItem : previousBlock->getCaseLabelItems()) {
+          const Pattern *pattern = labelItem.getPattern();
+          SmallVector<VarDecl *, 4> PreviousVars;
+          pattern->collectVariables(PreviousVars);
+          for (auto expected : Vars) {
+            bool matched = false;
+            if (!expected->hasName())
+              continue;
+            for (auto previous: PreviousVars) {
+              if (previous->hasName() && expected->getName() == previous->getName()) {
+                if (!previous->getType()->isEqual(expected->getType())) {
+                  TC.diagnose(previous->getLoc(), diag::type_mismatch_fallthrough_pattern_list,
+                              previous->getType(), expected->getType());
+                  previous->markInvalid();
+                  expected->markInvalid();
+                }
+                matched = true;
+                break;
+              }
+            }
+            if (!matched) {
+              TC.diagnose(PreviousFallthrough->getLoc(),
+                          diag::fallthrough_into_case_with_var_binding, expected->getName());
+            }
+          }
+        }
+      }
       
       // Type-check the body statements.
+      PreviousFallthrough = nullptr;
       Stmt *body = caseBlock->getBody();
       typeCheckStmt(body);
       caseBlock->setBody(body);

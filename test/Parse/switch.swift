@@ -247,12 +247,28 @@ func patternVarUsedInAnotherPattern(x: Int) {
   }
 }
 
-// Fallthroughs can't transfer control into a case label with bindings.
+// Fallthroughs can only transfer control into a case label with bindings if the previous case binds a superset of those vars.
 switch t {
 case (1, 2):
-  fallthrough // expected-error {{'fallthrough' cannot transfer control to a case label that declares variables}}
+  fallthrough // expected-error {{'fallthrough' from a case which doesn't bind variable 'a'}} expected-error {{'fallthrough' from a case which doesn't bind variable 'b'}}
 case (var a, var b): // expected-warning {{variable 'a' was never mutated; consider changing to 'let' constant}} expected-warning {{variable 'b' was never mutated; consider changing to 'let' constant}}
   t = (b, a)
+}
+
+switch t { // specifically notice on next line that we shouldn't complain that a is unused - just never mutated
+case (var a, 1): // expected-warning {{variable 'a' was never mutated; consider changing to 'let' constant}}
+  fallthrough // ok
+case (2, let a):
+  t = (a, a)
+}
+
+func patternVarDiffType(x: Int, y: Double) {
+  switch (x, y) {
+  case (1, let a): // expected-error {{pattern variable bound to type 'Double', fallthrough case bound to type 'Int'}}
+    fallthrough
+  case (let a, _):
+    break
+  }
 }
 
 func test_label(x : Int) {

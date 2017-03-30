@@ -1097,18 +1097,29 @@ public:
 /// FallthroughStmt - The keyword "fallthrough".
 class FallthroughStmt : public Stmt {
   SourceLoc Loc;
+  CaseStmt *FallthroughSource;
   CaseStmt *FallthroughDest;
   
 public:
   FallthroughStmt(SourceLoc Loc, Optional<bool> implicit = None)
     : Stmt(StmtKind::Fallthrough, getDefaultImplicitFlag(implicit, Loc)),
-      Loc(Loc), FallthroughDest(nullptr)
+      Loc(Loc), FallthroughSource(nullptr), FallthroughDest(nullptr)
   {}
   
   SourceLoc getLoc() const { return Loc; }
   
   SourceRange getSourceRange() const { return Loc; }
-  
+
+  /// Get the CaseStmt block from which the fallthrough transfers control.
+  /// Set during Sema. (May stay null if fallthrough is invalid.)
+  CaseStmt *getFallthroughSource() const {
+    return FallthroughSource;
+  }
+  void setFallthroughSource(CaseStmt *C) {
+    assert(!FallthroughSource && "fallthrough source already set?!");
+    FallthroughSource = C;
+  }
+
   /// Get the CaseStmt block to which the fallthrough transfers control.
   /// Set during Sema.
   CaseStmt *getFallthroughDest() const {
