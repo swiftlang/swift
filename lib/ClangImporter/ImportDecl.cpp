@@ -3564,6 +3564,22 @@ namespace {
         prop = decl->findPropertyDecl();
         if (!prop) return nullptr;
 
+        // If the matching property is in a superclass, or if the getter and
+        // setter are redeclared in a potentially incompatible way, bail out.
+        if (prop->getGetterMethodDecl() != decl &&
+            prop->getSetterMethodDecl() != decl) {
+          return nullptr;
+        }
+
+        // Ask Clang to get the canonical declaration of the property. This will
+        // be the one in a class extension if that's visible, which might have
+        // a different type.
+        prop = clang::ObjCPropertyDecl::findPropertyDecl(prop->getDeclContext(),
+                                                         prop->getIdentifier(),
+                                                         prop->getQueryKind());
+        if (!prop)
+          return nullptr;
+
         // If we're importing just the accessors (not the property), ignore
         // the property.
         if (shouldImportPropertyAsAccessors(prop))
@@ -3571,11 +3587,6 @@ namespace {
       }
 
       if (prop) {
-        // If the matching property is in a superclass, or if the getter and
-        // setter are redeclared in a potentially incompatible way, bail out.
-        if (prop->getGetterMethodDecl() != decl &&
-            prop->getSetterMethodDecl() != decl)
-          return nullptr;
         type = Impl.importAccessorMethodType(dc, prop, decl,
                                              isInSystemModule(dc), importedName,
                                              &bodyParams.back());
