@@ -1037,16 +1037,21 @@ extension String {
 }
 
 //===--- StringCore -------------------------------------------------------===//
-import Swift
 extension String {
   // FIXME: this is a kludgy method, but then again, we want to wean everything
   // off of it...
   public var _core: _StringCore {
     get {
-      return Swift.String(self)._core
+      let _cocoaString = self as NSString
+      return _StringCore(
+        baseAddress: nil,
+        count: _cocoaString.length,
+        elementShift: 1, //isUTF16 ? 1 : 0,
+        hasCocoaBuffer: true,
+        owner: _cocoaString)
     }
     set {
-      self = String(Swift.String(newValue))
+      self = String(content: String.Content(utf16: newValue))
     }
   }
 }
