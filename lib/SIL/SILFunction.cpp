@@ -56,7 +56,7 @@ SILFunction *SILFunction::create(
     SILModule &M, SILLinkage linkage, StringRef name,
     CanSILFunctionType loweredType, GenericEnvironment *genericEnv,
     Optional<SILLocation> loc, IsBare_t isBareSILFunction,
-    IsTransparent_t isTrans, IsFragile_t isFragile, IsThunk_t isThunk,
+    IsTransparent_t isTrans, IsSerialized_t isSerialized, IsThunk_t isThunk,
     ClassVisibility_t classVisibility, Inline_t inlineStrategy, EffectsKind E,
     SILFunction *insertBefore, const SILDebugScope *debugScope) {
   // Get a StringMapEntry for the function.  As a sop to error cases,
@@ -70,7 +70,7 @@ SILFunction *SILFunction::create(
 
   auto fn = new (M)
       SILFunction(M, linkage, name, loweredType, genericEnv, loc,
-                  isBareSILFunction, isTrans, isFragile, isThunk,
+                  isBareSILFunction, isTrans, isSerialized, isThunk,
                   classVisibility, inlineStrategy, E, insertBefore, debugScope);
 
   if (entry) entry->setValue(fn);
@@ -81,14 +81,14 @@ SILFunction::SILFunction(SILModule &Module, SILLinkage Linkage, StringRef Name,
                          CanSILFunctionType LoweredType,
                          GenericEnvironment *genericEnv,
                          Optional<SILLocation> Loc, IsBare_t isBareSILFunction,
-                         IsTransparent_t isTrans, IsFragile_t isFragile,
+                         IsTransparent_t isTrans, IsSerialized_t isSerialized,
                          IsThunk_t isThunk, ClassVisibility_t classVisibility,
                          Inline_t inlineStrategy, EffectsKind E,
                          SILFunction *InsertBefore,
                          const SILDebugScope *DebugScope)
     : Module(Module), Name(Name), LoweredType(LoweredType),
       GenericEnv(genericEnv), DebugScope(DebugScope), Bare(isBareSILFunction),
-      Transparent(isTrans), Fragile(isFragile), Thunk(isThunk),
+      Transparent(isTrans), Serialized(isSerialized), Thunk(isThunk),
       ClassVisibility(classVisibility), GlobalInitFlag(false),
       InlineStrategy(inlineStrategy), Linkage(unsigned(Linkage)),
       KeepAsPublic(false), EffectsKindAttr(E) {
@@ -391,22 +391,24 @@ void SILFunction::viewCFG() const {
 #endif
 }
 
-/// Returns true if this function has either a self metadata argument or
-/// object from which Self metadata may be obtained.
 bool SILFunction::hasSelfMetadataParam() const {
   auto paramTypes = getConventions().getParameterSILTypes();
   if (paramTypes.empty())
     return false;
 
   auto silTy = *std::prev(paramTypes.end());
-  if (!silTy.isClassOrClassMetatype())
+  if (!silTy.isObject())
     return false;
 
-  auto metaTy = dyn_cast<MetatypeType>(silTy.getSwiftRValueType());
-  (void)metaTy;
-  assert(!metaTy || metaTy->getRepresentation() != MetatypeRepresentation::Thin
-         && "Class metatypes are never thin.");
-  return true;
+  auto selfTy = silTy.getSwiftRValueType();
+
+  if (auto metaTy = dyn_cast<MetatypeType>(selfTy)) {
+    selfTy = metaTy.getInstanceType();
+    if (auto dynamicSelfTy = dyn_cast<DynamicSelfType>(selfTy))
+      selfTy = dynamicSelfTy.getSelfType();
+  }
+
+  return !!selfTy.getClassOrBoundGenericClass();
 }
 
 bool SILFunction::hasName(const char *Name) const {

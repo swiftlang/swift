@@ -346,3 +346,10 @@ bool SILBasicBlock::isNoReturn() const {
 
   return false;
 }
+
+bool SILBasicBlock::isTrampoline() const {
+  auto *Branch = dyn_cast<BranchInst>(getTerminator());
+  if (!Branch)
+    return false;
+  return begin() == Branch->getIterator();
+}

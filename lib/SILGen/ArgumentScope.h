@@ -60,12 +60,7 @@ public:
   void pop() { popImpl(); }
 
   /// Pop the formal evaluation and argument scopes preserving the value mv.
-  ///
-  /// *NOTE* If mv is an address, it is assumed that one of the scopes will
-  /// cause a dealloc stack to be emitted for mv and that the alloc_stack is
-  /// within our scope. This means that we are essentially creating a lifetime
-  /// extension of this value.
-  ManagedValue popPreservingValue(ManagedValue mv) &&;
+  ManagedValue popPreservingValue(ManagedValue mv);
 
 private:
   void popImpl() {

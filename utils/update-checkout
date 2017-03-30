@@ -119,7 +119,7 @@ def update_single_repository(args):
                 # It is possible to reset --hard and still be mid-rebase.
                 try:
                     shell.run(['git', 'rebase', '--abort'], echo=True)
-                except:
+                except Exception:
                     pass
 
             if checkout_target:
@@ -170,7 +170,7 @@ def update_single_repository(args):
                       "to rebase.\n")
 
             shell.run(["git", "submodule", "update", "--recursive"], echo=True)
-    except:
+    except Exception:
         (type, value, tb) = sys.exc_info()
         print('Error on repo "%s": %s' % (repo_path, traceback.format_exc()))
         return value
@@ -295,7 +295,7 @@ def obtain_all_additional_swift_sources(args, config, with_ssh, scheme_name,
 def dump_repo_hashes(config):
     max_len = reduce(lambda acc, x: max(acc, len(x)),
                      config['repos'].keys(), 0)
-    fmt = "{:<%r}{}" % (max_len+5)
+    fmt = "{:<%r}{}" % (max_len + 5)
     for repo_name, repo_info in sorted(config['repos'].items(),
                                        key=lambda x: x[0]):
         with shell.pushd(os.path.join(SWIFT_SOURCE_ROOT, repo_name),

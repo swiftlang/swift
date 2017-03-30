@@ -491,6 +491,8 @@ function(_compile_swift_files
         COMMAND
           "${CMAKE_COMMAND}" "-E" "remove" "-f" "${module_file}"
         COMMAND
+          "${CMAKE_COMMAND}" "-E" "remove" "-f" "${module_doc_file}"
+        COMMAND
           "${PYTHON_EXECUTABLE}" "${line_directive_tool}" "@${file_path}" --
           "${swift_compiler_tool}" "-emit-module" "-o" "${module_file}" ${swift_flags}
           "@${file_path}"

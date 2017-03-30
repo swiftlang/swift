@@ -1131,7 +1131,7 @@ public:
                                     "result of function_ref");
     require(!fnType->getExtInfo().hasContext(),
             "function_ref should have a context-free function result");
-    if (F.isFragile()) {
+    if (F.isSerialized()) {
       SILFunction *RefF = FRI->getReferencedFunction();
       require((SingleFunction && RefF->isExternalDeclaration()) ||
               RefF->hasValidLinkageForFragileRef(),
@@ -1142,9 +1142,9 @@ public:
   }
 
   void checkAllocGlobalInst(AllocGlobalInst *AGI) {
-    if (F.isFragile()) {
+    if (F.isSerialized()) {
       SILGlobalVariable *RefG = AGI->getReferencedGlobal();
-      require(RefG->isFragile()
+      require(RefG->isSerialized()
                 || hasPublicVisibility(RefG->getLinkage()),
               "alloc_global inside fragile function cannot "
               "reference a private or hidden symbol");
@@ -1158,9 +1158,9 @@ public:
               GAI->getReferencedGlobal()->getLoweredType(),
             "global_addr must be the address type of the variable it "
             "references");
-    if (F.isFragile()) {
+    if (F.isSerialized()) {
       SILGlobalVariable *RefG = GAI->getReferencedGlobal();
-      require(RefG->isFragile()
+      require(RefG->isSerialized()
                 || hasPublicVisibility(RefG->getLinkage()),
               "global_addr inside fragile function cannot "
               "reference a private or hidden symbol");
@@ -1232,6 +1232,51 @@ public:
                 EBI->getOriginalValue()->getType().getObjectType(),
             "end_borrow can only relate the same types ignoring value "
             "category");
+  }
+
+  void checkBeginAccessInst(BeginAccessInst *BAI) {
+    auto op = BAI->getOperand();
+    requireSameType(BAI->getType(), op->getType(),
+                    "result must be same type as operand");
+    require(BAI->getType().isAddress(),
+            "begin_access operand must have address type");
+
+    require(isa<GlobalAddrInst>(op) ||
+            isa<AllocStackInst>(op) ||
+            isa<ProjectBoxInst>(op) ||
+            isa<RefElementAddrInst>(op) ||
+            isa<SILFunctionArgument>(op) ||
+            isa<BeginAccessInst>(op),
+            "begin_access operand must be a root address derivation");
+
+    if (BAI->getModule().getStage() != SILStage::Raw) {
+      require(BAI->getEnforcement() != SILAccessEnforcement::Unknown,
+              "access must have known enforcement outside raw stage");
+    }
+
+    switch (BAI->getAccessKind()) {
+    case SILAccessKind::Init:
+    case SILAccessKind::Deinit:
+      require(BAI->getEnforcement() == SILAccessEnforcement::Static,
+              "init/deinit accesses cannot use non-static enforcement");
+      break;
+
+    case SILAccessKind::Read:
+    case SILAccessKind::Modify:
+      break;
+    }
+  }
+
+  void checkEndAccessInst(EndAccessInst *EAI) {
+    auto BAI = dyn_cast<BeginAccessInst>(EAI->getOperand());
+    require(BAI != nullptr,
+            "operand of end_access must be a begin_access");
+
+    if (EAI->isAborting()) {
+      require(BAI->getAccessKind() == SILAccessKind::Init ||
+              BAI->getAccessKind() == SILAccessKind::Deinit,
+              "aborting access must apply to init or deinit");
+    }
   }
 
   void checkStoreInst(StoreInst *SI) {
@@ -2254,11 +2299,16 @@ public:
               CastConsumptionKind::CopyOnSuccess)
             return true;
           break;
+        case ValueKind::LoadInst:
+          // A 'non-taking' value load is harmless.
+          return cast<LoadInst>(inst)->getOwnershipQualifier() !=
+                 LoadOwnershipQualifier::Copy;
+          break;
         case ValueKind::DebugValueAddrInst:
           // Harmless use.
           break;
         default:
-          assert(false && "Unhandled unexpected instruction");
+          llvm_unreachable("Unhandled unexpected instruction");
           break;
         }
       }
@@ -2633,9 +2683,13 @@ public:
         Def = OpenedArchetypes.getOpenedArchetypeDef(archetypeTy);
         require(Def, "Opened archetype should be registered in SILFunction");
       } else if (t->hasDynamicSelfType()) {
-        require(I->getFunction()->hasSelfParam(),
+        require(I->getFunction()->hasSelfParam() ||
+                I->getFunction()->hasSelfMetadataParam(),
               "Function containing dynamic self type must have self parameter");
-        Def = I->getFunction()->getSelfArgument();
+        if (I->getFunction()->hasSelfMetadataParam())
+          Def = I->getFunction()->getArguments().back();
+        else
+          Def = I->getFunction()->getSelfArgument();
       } else {
         return;
       }
@@ -3234,10 +3288,16 @@ public:
       // The destination BB can take the argument payload, if any, as a BB
       // arguments, or it can ignore it and take no arguments.
       if (elt->getArgumentInterfaceType()) {
-        require(dest->getArguments().size() == 0 ||
-                    dest->getArguments().size() == 1,
-                "switch_enum destination for case w/ args must take 0 or 1 "
-                "arguments");
+        if (isSILOwnershipEnabled() && F.hasQualifiedOwnership()) {
+          require(dest->getArguments().size() == 1,
+                  "switch_enum destination for case w/ args must take 1 "
+                  "argument");
+        } else {
+          require(dest->getArguments().size() == 0 ||
+                      dest->getArguments().size() == 1,
+                  "switch_enum destination for case w/ args must take 0 or 1 "
+                  "arguments");
+        }
 
         if (dest->getArguments().size() == 1) {
           SILType eltArgTy = uTy.getEnumElementType(elt, F.getModule());
@@ -3258,9 +3318,23 @@ public:
     // If the switch is non-exhaustive, we require a default.
     require(unswitchedElts.empty() || SOI->hasDefault(),
             "nonexhaustive switch_enum must have a default destination");
-    if (SOI->hasDefault())
-      require(SOI->getDefaultBB()->args_empty(),
-              "switch_enum default destination must take no arguments");
+    if (SOI->hasDefault()) {
+      // When SIL ownership is enabled, we require all default branches to take
+      // an @owned original version of the enum.
+      //
+      // When SIL ownership is disabled, we no longer support this.
+      if (isSILOwnershipEnabled() && F.hasQualifiedOwnership()) {
+        require(SOI->getDefaultBB()->getNumArguments() == 1,
+                "Switch enum default block should have one argument");
+        require(SOI->getDefaultBB()->getArgument(0)->getType() ==
+                    SOI->getOperand()->getType(),
+                "Switch enum default block should have one argument that is "
+                "the same as the input type");
+      } else if (F.hasUnqualifiedOwnership()) {
+        require(SOI->getDefaultBB()->args_empty(),
+                "switch_enum default destination must take no arguments");
+      }
+    }
   }
 
   void checkSwitchEnumAddrInst(SwitchEnumAddrInst *SOI) {
@@ -3605,49 +3679,98 @@ public:
             "have at least one argument for self.");
   }
 
-  void verifyStackHeight(SILFunction *F) {
-    llvm::DenseMap<SILBasicBlock*, std::vector<SILInstruction*>> visitedBBs;
+  /// Verify the various control-flow-sensitive rules of SIL:
+  ///
+  /// - stack allocations and deallocations must obey a stack discipline
+  /// - accesses must be uniquely ended
+  /// - flow-sensitive states must be equivalent on all paths into a block
+  void verifyFlowSensitiveRules(SILFunction *F) {
+    struct BBState {
+      std::vector<SILInstruction*> Stack;
+      std::set<BeginAccessInst*> Accesses;
+    };
+
+    // Do a breath-first search through the basic blocks.
+    // Note that we intentionally don't verify these properties in blocks
+    // that can't be reached from the entry block.
+    llvm::DenseMap<SILBasicBlock*, BBState> visitedBBs;
     SmallVector<SILBasicBlock*, 16> Worklist;
-    visitedBBs[&*F->begin()] = {};
+    visitedBBs.try_emplace(&*F->begin());
     Worklist.push_back(&*F->begin());
     while (!Worklist.empty()) {
       SILBasicBlock *BB = Worklist.pop_back_val();
-      std::vector<SILInstruction*> stack = visitedBBs[BB];
+      BBState state = visitedBBs[BB];
       for (SILInstruction &i : *BB) {
         CurInstruction = &i;
 
         if (i.isAllocatingStack()) {
-          stack.push_back(&i);
-        }
-        if (i.isDeallocatingStack()) {
+          state.Stack.push_back(&i);
+
+        } else if (i.isDeallocatingStack()) {
           SILValue op = i.getOperand(0);
-          require(!stack.empty(),
+          require(!state.Stack.empty(),
                   "stack dealloc with empty stack");
-          require(op == stack.back(),
+          require(op == state.Stack.back(),
                   "stack dealloc does not match most recent stack alloc");
-          stack.pop_back();
-        }
-        if (auto term = dyn_cast<TermInst>(&i)) {
-          if (term->isFunctionExiting()) {
-            require(stack.empty(),
-                    "return with stack allocs that haven't been deallocated");
+          state.Stack.pop_back();
+
+        } else if (auto access = dyn_cast<BeginAccessInst>(&i)) {
+          bool notAlreadyPresent = state.Accesses.insert(access).second;
+          require(notAlreadyPresent,
+                  "access was not ended before re-beginning it");
+
+        } else if (auto endAccess = dyn_cast<EndAccessInst>(&i)) {
+          // We don't call getBeginAccess() because this isn't the right
+          // place to assert on malformed SIL.
+          if (auto access = dyn_cast<BeginAccessInst>(endAccess->getOperand())){
+            bool present = state.Accesses.erase(access);
+            require(present, "access has already been ended");
           }
-          for (auto &successor : term->getSuccessors()) {
-            SILBasicBlock *SuccBB = successor.getBB();
-            auto found = visitedBBs.find(SuccBB);
-            if (found != visitedBBs.end()) {
-              // Check that the stack height is consistent coming from all entry
-              // points into this BB. We only care about consistency if there is
-              // a possible return from this function along the path starting at
-              // this successor bb.
-              SmallPtrSet<SILBasicBlock *, 16> Visited;
-              require(isUnreachableAlongAllPathsStartingAt(SuccBB, Visited) ||
-                          stack == found->second,
-                      "inconsistent stack heights entering basic block");
+
+        } else if (auto term = dyn_cast<TermInst>(&i)) {
+          if (term->isFunctionExiting()) {
+            require(state.Stack.empty(),
+                    "return with stack allocs that haven't been deallocated");
+            require(state.Accesses.empty(),
+                    "return with accesses that haven't been ended");
+          }
+
+          auto successors = term->getSuccessors();
+          for (auto i : indices(successors)) {
+            SILBasicBlock *succBB = successors[i].getBB();
+
+            // Optimistically try to set our current state as the state
+            // of the successor.  We can use a move on the final successor;
+            // note that if the insertion fails, the move won't actually
+            // happen, which is important because we'll still need it
+            // to compare against the already-recorded state for the block.
+            auto insertResult =
+              i + 1 == successors.size()
+                ? visitedBBs.try_emplace(succBB, std::move(state))
+                : visitedBBs.try_emplace(succBB, state);
+
+            // If the insertion was successful, add the successor to the
+            // worklist and continue.
+            if (insertResult.second) {
+              Worklist.push_back(succBB);
               continue;
             }
-            Worklist.push_back(SuccBB);
-            visitedBBs.insert({SuccBB, stack});
+
+            // Check that the stack height is consistent coming from all entry
+            // points into this BB. We only care about consistency if there is
+            // a possible return from this function along the path starting at
+            // this successor bb.  (FIXME: Why? Infinite loops should still
+            // preserve consistency...)
+            auto isUnreachable = [&] {
+              SmallPtrSet<SILBasicBlock *, 16> visited;
+              return isUnreachableAlongAllPathsStartingAt(succBB, visited);
+            };
+            
+            const auto &foundState = insertResult.first->second;
+            require(state.Stack == foundState.Stack || isUnreachable(),
+                    "inconsistent stack heights entering basic block");
+            require(state.Accesses == foundState.Accesses || isUnreachable(),
+                    "inconsistent access sets entering basic block");
           }
         }
       }
@@ -3780,18 +3903,6 @@ public:
   void visitSILFunction(SILFunction *F) {
     PrettyStackTraceSILFunction stackTrace("verifying", F);
 
-    if (F->getLinkage() == SILLinkage::PrivateExternal) {
-      // FIXME: uncomment these checks.
-      // <rdar://problem/18635841> SILGen can create non-fragile external
-      // private_external declarations
-      //
-      // assert(!isExternalDeclaration() &&
-      //        "PrivateExternal should not be an external declaration");
-      // assert(isFragile() &&
-      //        "PrivateExternal should be fragile (otherwise, how did it appear "
-      //        "in this module?)");
-    }
-
     CanSILFunctionType FTy = F->getLoweredFunctionType();
     verifySILFunctionType(FTy);
 
@@ -3825,7 +3936,7 @@ public:
     // Otherwise, verify the body of the function.
     verifyEntryPointArguments(&*F->getBlocks().begin());
     verifyEpilogBlocks(F);
-    verifyStackHeight(F);
+    verifyFlowSensitiveRules(F);
     verifyBranches(F);
 
     visitSILBasicBlocks(F);

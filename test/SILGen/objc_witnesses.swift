@@ -64,7 +64,7 @@ protocol Subscriptable {
 
 // CHECK-LABEL: sil hidden [transparent] [thunk] @_T0So7NSArrayC14objc_witnesses13SubscriptableA2cDP9subscriptypSicfgTW : $@convention(witness_method) (Int, @in_guaranteed NSArray) -> @out Any {
 // CHECK:         function_ref @_T0So7NSArrayC9subscriptypSicfgTO : $@convention(method) (Int, @guaranteed NSArray) -> @out Any
-// CHECK-LABEL: sil shared [thunk] @_T0So7NSArrayC9subscriptypSicfgTO : $@convention(method) (Int, @guaranteed NSArray) -> @out Any {
+// CHECK-LABEL: sil shared [serializable] [thunk] @_T0So7NSArrayC9subscriptypSicfgTO : $@convention(method) (Int, @guaranteed NSArray) -> @out Any {
 // CHECK:         class_method [volatile] {{%.*}} : $NSArray, #NSArray.subscript!getter.1.foreign
 extension NSArray: Subscriptable {}
 
@@ -79,10 +79,10 @@ class Electron : Orbital {
 }
 
 // CHECK-LABEL: sil hidden [transparent] [thunk] @_T014objc_witnesses8ElectronCAA7OrbitalA2aDP13quantumNumberSifgTW
-// CHECK-LABEL: sil shared [transparent] [thunk] @_T014objc_witnesses8ElectronC13quantumNumberSifgTD
+// CHECK-LABEL: sil shared [transparent] [serializable] [thunk] @_T014objc_witnesses8ElectronC13quantumNumberSifgTD
 
 // CHECK-LABEL: sil hidden [transparent] [thunk] @_T014objc_witnesses8ElectronCAA7OrbitalA2aDP13quantumNumberSifsTW
-// CHECK-LABEL: sil shared [transparent] [thunk] @_T014objc_witnesses8ElectronC13quantumNumberSifsTD
+// CHECK-LABEL: sil shared [transparent] [serializable] [thunk] @_T014objc_witnesses8ElectronC13quantumNumberSifsTD
 
 // witness is a dynamic thunk and is public:
 
@@ -94,5 +94,5 @@ public class Positron : Lepton {
   public dynamic var spin: Float = 0.5
 }
 
-// CHECK-LABEL: sil [transparent] [fragile] [thunk] @_T014objc_witnesses8PositronCAA6LeptonA2aDP4spinSffgTW
-// CHECK-LABEL: sil shared [transparent] [fragile] [thunk] @_T014objc_witnesses8PositronC4spinSffgTD
+// CHECK-LABEL: sil [transparent] [serialized] [thunk] @_T014objc_witnesses8PositronCAA6LeptonA2aDP4spinSffgTW
+// CHECK-LABEL: sil shared [transparent] [serializable] [thunk] @_T014objc_witnesses8PositronC4spinSffgTD

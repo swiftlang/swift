@@ -1544,6 +1544,11 @@ function(add_swift_library name)
           endif()
         endif()
 
+        # Add PrivateFrameworks, rdar://28466433
+        if(SWIFTLIB_IS_SDK_OVERLAY)
+          list(APPEND swiftlib_swift_compile_flags_all "-Fsystem" "${SWIFT_SDK_${sdk}_PATH}/System/Library/PrivateFrameworks/")
+        endif()
+
         # Add this library variant.
         _add_swift_library_single(
           ${VARIANT_NAME}

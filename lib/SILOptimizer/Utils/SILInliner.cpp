@@ -216,6 +216,19 @@ SILInliner::getOrCreateInlineScope(const SILDebugScope *CalleeScope) {
 //                                 Cost Model
 //===----------------------------------------------------------------------===//
 
+static InlineCost getEnforcementCost(BeginAccessInst &I) {
+  switch (I.getEnforcement()) {
+  case SILAccessEnforcement::Unknown:
+    llvm_unreachable("evaluating cost of access with unknown enforcement?");
+  case SILAccessEnforcement::Dynamic:
+    return InlineCost::Expensive;
+  case SILAccessEnforcement::Static:
+  case SILAccessEnforcement::Unsafe:
+    return InlineCost::Free;
+  }
+  llvm_unreachable("bad enforcement");
+}
+
 /// For now just assume that every SIL instruction is one to one with an LLVM
 /// instruction. This is of course very much so not true.
 InlineCost swift::instructionInlineCost(SILInstruction &I) {
@@ -272,6 +285,12 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
 
     case ValueKind::BridgeObjectToWordInst:
       return InlineCost::Free;
+
+    // Access instructions are free unless we're dynamically enforcing them.
+    case ValueKind::BeginAccessInst:
+      return getEnforcementCost(cast<BeginAccessInst>(I));
+    case ValueKind::EndAccessInst:
+      return getEnforcementCost(*cast<EndAccessInst>(I).getBeginAccess());
 
     // TODO: These are free if the metatype is for a Swift class.
     case ValueKind::ThickToObjCMetatypeInst:

@@ -48,6 +48,7 @@ public:
     REPLJob,
     LinkJob,
     GenerateDSYMJob,
+    VerifyDebugInfoJob,
     GeneratePCHJob,
 
     JobFirst=CompileJob,
@@ -269,6 +270,17 @@ public:
   }
 };
 
+class VerifyDebugInfoJobAction : public JobAction {
+  virtual void anchor();
+public:
+  explicit VerifyDebugInfoJobAction(Action *Input)
+    : JobAction(Action::VerifyDebugInfoJob, Input, types::TY_Nothing) {}
+
+  static bool classof(const Action *A) {
+    return A->getKind() == Action::VerifyDebugInfoJob;
+  }
+};
+  
 class GeneratePCHJobAction : public JobAction {
   virtual void anchor();
 public:

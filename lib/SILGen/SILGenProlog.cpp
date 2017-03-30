@@ -236,7 +236,7 @@ struct ArgumentInitHelper {
     assert(ty && "no type?!");
 
     // Create an RValue by emitting destructured arguments into a basic block.
-    CanType canTy = ty->getCanonicalType();
+    CanType canTy = ty->eraseDynamicSelfType()->getCanonicalType();
     return EmitBBArguments(gen, parent, l, /*functionArgs*/ true,
                            parameters).visit(canTy);
   }
@@ -267,6 +267,17 @@ struct ArgumentInitHelper {
         return;
       }
       assert(argrv.getType().isAddress() && "expected inout to be address");
+    } else if (auto *metatypeTy = ty->getAs<MetatypeType>()) {
+      // This is a hack to deal with the fact that Self.Type comes in as a
+      // static metatype, but we have to downcast it to a dynamic Self
+      // metatype to get the right semantics.
+      if (metatypeTy->getInstanceType()->is<DynamicSelfType>()) {
+        auto loweredTy = gen.getLoweredType(ty);
+        if (loweredTy != argrv.getType()) {
+          argrv = ManagedValue::forUnmanaged(
+            gen.B.createUncheckedBitCast(loc, argrv.getValue(), loweredTy));
+        }
+      }
     } else {
       assert(vd->isLet() && "expected parameter to be immutable!");
       // If the variable is immutable, we can bind the value as is.
@@ -281,9 +292,7 @@ struct ArgumentInitHelper {
   }
 
   void emitParam(ParamDecl *PD) {
-    // The contextual type of a ParamDecl has DynamicSelfType. We don't want
-    // that here.
-    auto type = PD->getType()->eraseDynamicSelfType();
+    auto type = PD->getType();
 
     ++ArgNo;
     if (PD->hasName()) {
@@ -346,9 +355,9 @@ void SILGenFunction::bindParametersForForwarding(const ParameterList *params,
                                      SmallVectorImpl<SILValue> &parameters) {
   for (auto param : *params) {
     Type type = (param->hasType()
-                 ? param->getType()->eraseDynamicSelfType()
+                 ? param->getType()
                  : F.mapTypeIntoContext(param->getInterfaceType()));
-    makeArgument(type, param, parameters, *this);
+    makeArgument(type->eraseDynamicSelfType(), param, parameters, *this);
   }
 }
 
@@ -364,16 +373,9 @@ static void emitCaptureArguments(SILGenFunction &gen,
   // Local function to get the captured variable type within the capturing
   // context.
   auto getVarTypeInCaptureContext = [&]() -> Type {
-    auto interfaceType = cast<VarDecl>(VD)->getInterfaceType();
-    if (!interfaceType->hasTypeParameter()) return interfaceType;
-
-    // NB: The generic signature may be elided from the lowered function type
-    // if the function is in a fully-specialized context, but we still need to
-    // canonicalize references to the generic parameters that may appear in
-    // non-canonical types in that context. We need the original generic
-    // environment from the AST for that.
-    auto genericEnv = closure.getGenericEnvironment();
-    return genericEnv->mapTypeIntoContext(interfaceType);
+    auto interfaceType = VD->getInterfaceType();
+    return GenericEnvironment::mapTypeIntoContext(
+      closure.getGenericEnvironment(), interfaceType);
   };
 
   switch (gen.SGM.Types.getDeclCaptureKind(capture)) {
@@ -450,10 +452,8 @@ void SILGenFunction::emitProlog(AnyFunctionRef TheClosure,
   for (auto capture : captureInfo.getCaptures()) {
     if (capture.isDynamicSelfMetadata()) {
       auto selfMetatype = MetatypeType::get(
-          captureInfo.getDynamicSelfType()->getSelfType(),
-          MetatypeRepresentation::Thick)
-              ->getCanonicalType();
-      SILType ty = SILType::getPrimitiveObjectType(selfMetatype);
+        captureInfo.getDynamicSelfType());
+      SILType ty = getLoweredType(selfMetatype);
       SILValue val = F.begin()->createFunctionArgument(ty);
       (void) val;
 
@@ -498,10 +498,9 @@ unsigned SILGenFunction::emitProlog(ArrayRef<ParameterList *> paramLists,
                                     Type resultType, DeclContext *DC,
                                     bool throws) {
   // Create the indirect result parameters.
-  if (auto *genericSig = DC->getGenericSignatureOfContext()) {
-    resultType = genericSig->getCanonicalTypeInContext(
-      resultType, *SGM.M.getSwiftModule());
-  }
+  auto *genericSig = DC->getGenericSignatureOfContext();
+  resultType = resultType->getCanonicalType(genericSig,
+                                            *SGM.M.getSwiftModule());
 
   emitIndirectResultParameters(*this, resultType, DC);
 

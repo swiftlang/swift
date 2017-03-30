@@ -335,3 +335,30 @@ _ = ThrowingToNonThrowingReversed()
 _ = ThrowingToNonThrowingReversed.foo()
 // CHECK-3: :[[@LINE-1]]:{{.+}} not 4.0
 // CHECK-4: :[[@LINE-2]]:{{.+}} yes 4.0
+
+class ChangePropertyType {
+
+  // We don't allow this for stored properties.
+
+  @available(swift 4.0)
+  @available(*, deprecated, message: "yes 4.0")
+  public var stored: Int16 = 0
+
+  @available(swift, obsoleted: 4.0)
+  @available(*, deprecated, message: "not 4.0")
+  public var stored: Int8 = 0 // CHECK: :[[@LINE]]:{{.+}} error: invalid redeclaration of 'stored'
+
+  // OK for computed properties.
+
+  @available(swift 4.0)
+  @available(*, deprecated, message: "yes 4.0")
+  public var computed: Int16 { get { } set { } }
+
+  @available(swift, obsoleted: 4.0)
+  @available(*, deprecated, message: "not 4.0")
+  public var computed: Int8 { get { } set { } } // NEGATIVE-NOT: :[[@LINE]]:{{.+}}error
+}
+
+_ = ChangePropertyType().computed
+// CHECK-3: :[[@LINE-1]]:{{.+}} not 4.0
+// CHECK-4: :[[@LINE-2]]:{{.+}} yes 4.0

@@ -52,7 +52,7 @@ func main() {
   print(arr as Any)
   print(constArr as Any)
 
-  // CHECK: [[PRINT_FUN:%.*]] = function_ref @_T0s5printySayypG_SS9separatorSS10terminatortF : $@convention(thin) (@owned Array<Any>, @owned String, @owned String) -> ()
+  // CHECK: [[PRINT_FUN:%.*]] = function_ref @_T0s5printySayypGd_SS9separatorSS10terminatortF : $@convention(thin) (@owned Array<Any>, @owned String, @owned String) -> ()
   // CHECK: apply [[PRINT_FUN]]({{.*}})
   // CHECK: destroy_value [[load_4]]
   // CHECK: destroy_value [[load_3]]

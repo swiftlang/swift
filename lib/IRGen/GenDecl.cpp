@@ -1257,10 +1257,10 @@ bool LinkEntity::isAvailableExternally(IRGenModule &IGM) const {
 bool LinkEntity::isFragile(IRGenModule &IGM) const {
   switch (getKind()) {
     case Kind::SILFunction:
-      return getSILFunction()->isFragile();
+      return getSILFunction()->isSerialized();
       
     case Kind::SILGlobalVariable:
-      return getSILGlobalVariable()->isFragile();
+      return getSILGlobalVariable()->isSerialized();
       
     case Kind::ReflectionAssociatedTypeDescriptor:
     case Kind::ReflectionSuperclassDescriptor:
@@ -1283,7 +1283,7 @@ bool LinkEntity::isFragile(IRGenModule &IGM) const {
       // not public, it must be fragile.
       if (swift::isAvailableExternally(L) && !hasPublicVisibility(L))
         return true;
-      return wt->isFragile();
+      return wt->isSerialized();
     }
   }
   return false;

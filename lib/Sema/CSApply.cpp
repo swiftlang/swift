@@ -1389,21 +1389,28 @@ namespace {
 
         ref = ConcreteDeclRef(ctx, ctor, substitutions);
       } else {
-        Type containerTy = ctor->getDeclContext()->getDeclaredTypeOfContext();
-        resultTy = openedFullType->replaceCovariantResultType(
-                     containerTy, ctor->getNumParameterLists());
+        // No substitutions.
+        resultTy = openedFullType;
         ref = ConcreteDeclRef(ctor);
       }
 
       // The constructor was opened with the allocating type, not the
       // initializer type. Map the former into the latter.
-      auto resultFnTy = resultTy->castTo<FunctionType>();
-      auto selfTy = resultFnTy->getInput()->getRValueInstanceType();
+      auto selfTy = resultTy->castTo<FunctionType>()->getInput()
+        ->getRValueInstanceType();
+
+      // Also replace the result type with the base type, so that calls
+      // to constructors defined in a superclass will know to cast the
+      // result to the derived type.
+      resultTy = resultTy->replaceCovariantResultType(
+        selfTy, ctor->getNumParameterLists());
+
       if (!selfTy->hasReferenceSemantics())
         selfTy = InOutType::get(selfTy);
-      
-      resultTy = FunctionType::get(selfTy, resultFnTy->getResult(),
-                                   resultFnTy->getExtInfo());
+
+      resultTy = FunctionType::get(selfTy,
+                                   resultTy->castTo<FunctionType>()->getResult(),
+                                   resultTy->castTo<FunctionType>()->getExtInfo());
 
       // Build the constructor reference.
       Expr *ctorRef = cs.cacheType(

@@ -72,13 +72,13 @@ public func foo4(x: Int32, _ c: C) -> Int32
 public func boo4(c: C) -> Int32
 
 
-sil_global [fragile] @_T0s7ProcessO5_argcs5Int32VvZ : $Int32
+sil_global [serialized] @_T0s7ProcessO5_argcs5Int32VvZ : $Int32
 
 
-sil_global private_external [fragile] @globalinit_33_1BDF70FFC18749BAB495A73B459ED2F0_token5 : $Builtin.Word
+sil_global private_external [serialized] @globalinit_33_1BDF70FFC18749BAB495A73B459ED2F0_token5 : $Builtin.Word
 
 
-sil_global [fragile] @_T0s7ProcessO11_unsafeArgvSpySpys4Int8VGGvZ : $UnsafeMutablePointer<UnsafeMutablePointer<Int8>>
+sil_global [serialized] @_T0s7ProcessO11_unsafeArgvSpySpys4Int8VGGvZ : $UnsafeMutablePointer<UnsafeMutablePointer<Int8>>
 
 
 
@@ -90,7 +90,7 @@ bb0(%0 : $C):
 }
 
 
-sil [transparent] [fragile] @_T0s5Int32VABBi2048_22_builtinIntegerLiteral_tcfC : $@convention(thin) (Builtin.Int2048, @thin Int32.Type) -> Int32
+sil [transparent] [serialized] @_T0s5Int32VABBi2048_22_builtinIntegerLiteral_tcfC : $@convention(thin) (Builtin.Int2048, @thin Int32.Type) -> Int32
 
 
 sil @_T014optimize_never1CCfD : $@convention(method) (@owned C) -> () {
@@ -202,7 +202,7 @@ bb0(%0 : $*T, %1 : $C):
 }
 
 
-sil [transparent] [fragile] @_T0s1pois5Int32VAC_ACtFZ : $@convention(thin) (Int32, Int32) -> Int32
+sil [transparent] [serialized] @_T0s1pois5Int32VAC_ACtFZ : $@convention(thin) (Int32, Int32) -> Int32
 
 
 // CHECK-LABEL: sil @_T014optimize_never4boo1s5Int32VAA1CCF
@@ -226,7 +226,7 @@ bb0(%0 : $C):
 }
 
 
-sil [transparent] [fragile] @_T0S2iBi2048_22_builtinIntegerLiteral_tcfC : $@convention(thin) (Builtin.Int2048, @thin Int.Type) -> Int
+sil [transparent] [serialized] @_T0S2iBi2048_22_builtinIntegerLiteral_tcfC : $@convention(thin) (Builtin.Int2048, @thin Int.Type) -> Int
 
 
 sil @_T014optimize_never10transform2s5Int32VADF : $@convention(thin) (Int32) -> Int32 {

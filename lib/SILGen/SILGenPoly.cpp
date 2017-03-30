@@ -2773,9 +2773,7 @@ CanSILFunctionType SILGenFunction::buildThunkType(
 
   auto &mod = *F.getModule().getSwiftModule();
   auto getCanonicalType = [&](Type t) -> CanType {
-    if (genericSig)
-      return genericSig->getCanonicalTypeInContext(t, mod);
-    return t->getCanonicalType();
+    return t->getCanonicalType(genericSig, mod);
   };
 
   // Map the parameter and expected types out of context to get the interface
@@ -2847,7 +2845,7 @@ static ManagedValue createThunk(SILGenFunction &gen,
                                        thunkType,
                                        sourceType,
                                        toType,
-                                       gen.F.isFragile());
+                                       gen.F.isSerialized());
 
   // Build it if necessary.
   if (thunk->empty()) {
@@ -3166,7 +3164,7 @@ getWitnessDispatchKind(Type selfType, SILDeclRef witness, bool isFree) {
   auto *decl = witness.getDecl();
 
   // If the witness is dynamic, go through dynamic dispatch.
-  if (decl->getAttrs().hasAttribute<DynamicAttr>())
+  if (decl->isDynamic())
     return WitnessDispatchKind::Dynamic;
 
   bool isFinal = (decl->isFinal() || C->isFinal());

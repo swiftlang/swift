@@ -31,7 +31,7 @@ public final class ArrayClassReaderWriter : ReaderWriterType {
 @inline(never) public func readValues() -> Int32
 
 
-sil_global [fragile] @_swiftEmptyArrayStorage : $_SwiftEmptyArrayStorage
+sil_global [serialized] @_swiftEmptyArrayStorage : $_SwiftEmptyArrayStorage
 
 
 sil [noinline] @_TFC28existential_type_propagation22ArrayClassReaderWritercfMS0_FT_S0_ : $@convention(method) (@owned ArrayClassReaderWriter) -> @owned ArrayClassReaderWriter

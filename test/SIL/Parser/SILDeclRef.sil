@@ -49,7 +49,7 @@ public func testBase(b: Base) -> Int32
 sil @_TFE10SILDeclRefPS_1P3boofT_Vs5Int32 : $@convention(method) <Self where Self : P> (@in_guaranteed Self) -> Int32
 
 // Int32.init(_builtinIntegerLiteral : Builtin.Int2048) -> Int32
-sil public_external [transparent] [fragile] @_TFVs5Int32CfT22_builtinIntegerLiteralBi2048__S_ : $@convention(method) (Builtin.Int2048, @thin Int32.Type) -> Int32
+sil public_external [transparent] [serialized] @_TFVs5Int32CfT22_builtinIntegerLiteralBi2048__S_ : $@convention(method) (Builtin.Int2048, @thin Int32.Type) -> Int32
 
 // Base.foo() -> Int32
 sil @_TFC10SILDeclRef4Base3foofT_Vs5Int32 : $@convention(method) (@guaranteed Base) -> Int32
@@ -133,7 +133,7 @@ sil_vtable Derived2 {
   #Derived2.deinit!deallocator: (Derived2) -> () -> () : _TFC10SILDeclRef8Derived2D	// Derived2.__deallocating_deinit
 }
 
-sil_witness_table [fragile] Base: P module SILDeclRef {
+sil_witness_table [serialized] Base: P module SILDeclRef {
   method #P.foo!1: <Self where Self : P> (Self) -> () -> Int32 : @_TTWC10SILDeclRef4BaseS_1PS_FS1_3foofT_Vs5Int32	// protocol witness for P.foo() -> Int32 in conformance Base
   method #P.foo!1: <Self where Self : P> (Self) -> (Int32) -> () : @_TTWC10SILDeclRef4BaseS_1PS_FS1_3foofT1nVs5Int32_T_	// protocol witness for P.foo(n : Int32) -> () in conformance Base
 }

@@ -2434,7 +2434,7 @@ visitMagicIdentifierLiteralExpr(MagicIdentifierLiteralExpr *E, SGFContext C) {
     if (!DSOGlobal)
       DSOGlobal = SILGlobalVariable::create(SGF.SGM.M,
                                             SILLinkage::HiddenExternal,
-                                            IsNotFragile, "__dso_handle",
+                                            IsNotSerialized, "__dso_handle",
                                             BuiltinRawPtrTy);
     auto DSOAddr = SGF.B.createGlobalAddr(SILLoc, DSOGlobal);
 
@@ -2582,16 +2582,7 @@ RValue RValueEmitter::visitRebindSelfInConstructorExpr(
 
     assert(SGF.FailDest.isValid() && "too big to fail");
 
-    // On the failure case, we don't need to clean up the 'self' returned
-    // by the call to the other constructor, since we know it is nil and
-    // therefore dynamically trivial.
-    if (newSelf.getCleanup().isValid())
-      SGF.Cleanups.setCleanupState(newSelf.getCleanup(),
-                                   CleanupState::Dormant);
     auto noneBB = SGF.Cleanups.emitBlockForCleanups(SGF.FailDest, E);
-    if (newSelf.getCleanup().isValid())
-      SGF.Cleanups.setCleanupState(newSelf.getCleanup(),
-                                   CleanupState::Active);
 
     SGF.B.createCondBranch(E, hasValue, someBB, noneBB);
 
@@ -3188,26 +3179,15 @@ void SILGenFunction::emitBindOptional(SILLocation loc,
 
   // Check whether the optional has a value.
   SILBasicBlock *hasValueBB = createBasicBlock();
-  auto hasValue = emitDoesOptionalHaveValue(loc,optionalAddrOrValue.getValue());
+  auto hasValue =
+      emitDoesOptionalHaveValue(loc, optionalAddrOrValue.getValue());
 
-  // If there is a cleanup for the optional value being tested, we can disable
-  // it on the failure path.  We don't need to destroy it because we know that
-  // on that path it is nil.
-  if (optionalAddrOrValue.hasCleanup())
-    Cleanups.setCleanupState(optionalAddrOrValue.getCleanup(),
-                             CleanupState::Dormant);
-    
   // If not, thread out through a bunch of cleanups.
   SILBasicBlock *hasNoValueBB = Cleanups.emitBlockForCleanups(failureDest, loc);
   B.createCondBranch(loc, hasValue, hasValueBB, hasNoValueBB);
   
   // If so, continue.
   B.emitBlock(hasValueBB);
-
-  // Reenable the cleanup for the optional on the normal path.
-  if (optionalAddrOrValue.hasCleanup())
-    Cleanups.setCleanupState(optionalAddrOrValue.getCleanup(),
-                             CleanupState::Active);
 }
 
 RValue RValueEmitter::visitBindOptionalExpr(BindOptionalExpr *E, SGFContext C) {

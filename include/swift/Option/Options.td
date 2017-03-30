@@ -352,6 +352,11 @@ def gdwarf_types : Flag<["-"], "gdwarf-types">,
   Group<g_Group>, Flags<[FrontendOption]>,
   HelpText<"Emit full DWARF type info.">;
 
+// Verify debug info
+def verify_debug_info : Flag<["-"], "verify-debug-info">,
+  Flags<[NoInteractiveOption, DoesNotAffectIncrementalBuild]>,
+  HelpText<"Verify the binary representation of debug output.">;
+
 // Assert configuration identifiers.
 def AssertConfig : Separate<["-"], "assert-config">,
   Flags<[FrontendOption]>,
@@ -437,6 +442,9 @@ def emit_sibgen : Flag<["-"], "emit-sibgen">,
   Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
 def emit_imported_modules : Flag<["-"], "emit-imported-modules">,
   HelpText<"Emit a list of the imported modules">, ModeOpt,
+  Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
+def emit_tbd : Flag<["-"], "emit-tbd">,
+  HelpText<"Emit a TBD file">, ModeOpt,
   Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
 
 def c : Flag<["-"], "c">, Alias<emit_object>,
@@ -564,5 +572,9 @@ def sanitize_coverage_EQ : CommaJoined<["-"], "sanitize-coverage=">,
   MetaVarName<"<type>">,
   HelpText<"Specify the type of coverage instrumentation for Sanitizers and"
   " additional options separated by commas">;
+
+def enforce_exclusivity_EQ : Joined<["-"], "enforce-exclusivity=">,
+  Flags<[FrontendOption]>, MetaVarName<"<enforcement>">,
+  HelpText<"Enforce law of exclusivity">;
 
 include "FrontendOptions.td"
