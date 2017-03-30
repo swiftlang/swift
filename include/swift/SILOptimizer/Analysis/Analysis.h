@@ -168,6 +168,12 @@ namespace swift {
     /// meant to be overridden by subclasses.
     virtual void verify(AnalysisTy *A) const {}
 
+    void deleteAllAnalysisProviders() {
+      for (auto D : Storage)
+        delete D.second;
+      Storage.clear();
+    }
+
   public:
     /// Returns an analysis provider for a specific function \p F.
     AnalysisTy *get(SILFunction *F) {
@@ -183,7 +189,7 @@ namespace swift {
 
     /// Invalidate all information in this analysis.
     virtual void invalidate() override {
-      Storage.clear();
+      deleteAllAnalysisProviders();
     }
 
     /// Helper function to remove the analysis data for a function.
@@ -216,8 +222,7 @@ namespace swift {
 
     FunctionAnalysisBase() {}
     virtual ~FunctionAnalysisBase() {
-      for (auto D : Storage)
-        delete D.second;
+      deleteAllAnalysisProviders();
     }
     FunctionAnalysisBase(AnalysisKind K) : SILAnalysis(K), Storage() {}
     FunctionAnalysisBase(const FunctionAnalysisBase &) = delete;
