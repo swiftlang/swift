@@ -356,6 +356,7 @@ def validate_config(config):
 
 
 def main():
+    freeze_support()
     parser = argparse.ArgumentParser(
         formatter_class=argparse.RawDescriptionHelpFormatter,
         description="""
@@ -478,15 +479,13 @@ By default, updates your checkouts of Swift, SourceKit, LLDB, and SwiftPM.""")
 
     update_results = update_all_repositories(args, config, scheme,
                                              cross_repos_pr)
-    return (clone_results, update_results)
-
-
-if __name__ == "__main__":
-    freeze_support()
-    clone_results, update_results = main()
     fail_count = 0
     fail_count += shell.check_parallel_results(clone_results, "CLONE")
     fail_count += shell.check_parallel_results(update_results, "UPDATE")
     if fail_count > 0:
         print("update-checkout failed, fix errors and try again")
     sys.exit(fail_count)
+
+
+if __name__ == "__main__":
+    main()
