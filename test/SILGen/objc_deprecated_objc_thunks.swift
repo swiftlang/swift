@@ -33,3 +33,11 @@ class ObjCSubclass : NSObject {
   // CHECK-NEXT: builtin "swift3ImplicitObjCEntrypoint"() : $()
   subscript (i: Int) -> AnyObject { get { return self } set { } } 
 }
+
+extension ObjCSubclass {
+	// CHECK-LABEL: sil hidden [thunk] @_T0016objc_deprecated_A7_thunks12ObjCSubclassC13falsePositiveyyFTo : $@convention(objc_method) (ObjCSubclass) -> ()
+  // CHECK: bb0(%0 : $ObjCSubclass):
+  // CHECK-NOT: builtin "swift3ImplicitObjCEntrypoint"() : $()
+	// CHECK: return
+  func falsePositive() { }
+}

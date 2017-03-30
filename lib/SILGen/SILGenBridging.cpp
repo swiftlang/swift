@@ -1033,6 +1033,9 @@ void SILGenFunction::emitNativeToForeignThunk(SILDeclRef thunk) {
 
   // If the '@objc' was inferred due to deprecated rules,
   // emit a Builtin.swift3ImplicitObjCEntrypoint().
+  //
+  // However, don't do so for 'dynamic' members, which must use Objective-C
+  // dispatch and therefore create many false positives.
   if (thunk.hasDecl()) {
     auto decl = thunk.getDecl();
 
@@ -1043,7 +1046,8 @@ void SILGenFunction::emitNativeToForeignThunk(SILDeclRef thunk) {
     }
 
     if (auto attr = decl->getAttrs().getAttribute<ObjCAttr>()) {
-      if (attr->isSwift3Inferred()) {
+      if (attr->isSwift3Inferred() &&
+          !decl->getAttrs().hasAttribute<DynamicAttr>()) {
         B.createBuiltin(loc, getASTContext().getIdentifier("swift3ImplicitObjCEntrypoint"),
             getModule().Types.getEmptyTupleType(), { }, { });
       }
