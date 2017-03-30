@@ -30,9 +30,11 @@
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Pattern.h"
+#include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/Stmt.h"
 #include "swift/AST/Types.h"
+#include "swift/Basic/PrettyStackTrace.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Config.h"
@@ -7494,6 +7496,15 @@ ClangImporter::Implementation::loadAllMembers(Decl *D, uint64_t extra) {
       topLevelModule = topLevelModule->getTopLevelModule();
     auto table = findLookupTable(topLevelModule);
     if (!table) return;
+
+    StringRef traceName;
+    if (topLevelModule)
+      traceName = topLevelModule->getTopLevelModuleName();
+    else
+      traceName = "(bridging header)";
+    PrettyStackTraceStringAction trace("loading import-as-members from",
+                                       traceName);
+    PrettyStackTraceDecl trace2("...for", nominal);
 
     // Dig out the effective Clang context for this nominal type.
     auto effectiveClangContext = getEffectiveClangContext(nominal);
