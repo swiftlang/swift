@@ -3644,6 +3644,8 @@ namespace {
     }
 
     RValue apply(SGFContext C = SGFContext()) {
+      initialWritebackScope.verify();
+
       assert(!applied && "already applied!");
 
       applied = true;
@@ -3664,12 +3666,12 @@ namespace {
                                 foreignError, foreignSelf, uncurryLevel, C);
 
       // End of the initial writeback scope.
+      initialWritebackScope.verify();
       initialWritebackScope.pop();
 
       // Then handle the remaining call sites.
       result = applyRemainingCallSites(std::move(result), formalType,
                                        foreignSelf, foreignError, C);
-
       return result;
     }
 
@@ -4231,9 +4233,10 @@ static CallEmission prepareApplyExpr(SILGenFunction &SGF, Expr *e) {
                         apply.AssumedPlusZeroSelf);
 
   // Apply 'self' if provided.
-  if (apply.SelfParam)
+  if (apply.SelfParam) {
     emission.addCallSite(RegularLocation(e), std::move(apply.SelfParam),
                          apply.SelfType->getCanonicalType(), /*throws*/ false);
+  }
 
   // Apply arguments from call sites, innermost to outermost.
   for (auto site = apply.CallSites.rbegin(), end = apply.CallSites.rend();
@@ -4246,7 +4249,8 @@ static CallEmission prepareApplyExpr(SILGenFunction &SGF, Expr *e) {
 }
 
 RValue SILGenFunction::emitApplyExpr(Expr *e, SGFContext c) {
-  return prepareApplyExpr(*this, e).apply(c);
+  CallEmission emission = prepareApplyExpr(*this, e);
+  return emission.apply(c);
 }
 
 RValue
