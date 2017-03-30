@@ -127,7 +127,7 @@ enum AddressOnlyEnum {
 
 // part of s280_convExistTrivial: conversion between existential types - reabstraction thunk
 // ---
-// CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_T020opaque_values_silgen1P_pAA13TrivialStructVIxid_AA2P2_pAaE_pIxir_TR : $@convention(thin) (@in P2, @owned @callee_owned (@in P) -> TrivialStruct) -> @out P2 {
+// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @_T020opaque_values_silgen1P_pAA13TrivialStructVIxid_AA2P2_pAaE_pIxir_TR : $@convention(thin) (@in P2, @owned @callee_owned (@in P) -> TrivialStruct) -> @out P2 {
 // CHECK: bb0([[ARG0:%.*]] : $P2, [[ARG1:%.*]] : $@callee_owned (@in P) -> TrivialStruct):
 // CHECK:   [[OPENED_ARG:%.*]] = open_existential_opaque [[ARG0]] : $P2 to $@opened({{.*}}) P2
 // CHECK:   [[COPIED_VAL:%.*]] = copy_value [[OPENED_ARG]]
@@ -143,7 +143,7 @@ enum AddressOnlyEnum {
 
 // part of s290_convOptExistTriv: conversion between existential types - reabstraction thunk - optionals case
 // ---
-// CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_T020opaque_values_silgen1P_pSgAA13TrivialStructVIxid_AESgAA2P2_pIxyr_TR : $@convention(thin) (Optional<TrivialStruct>, @owned @callee_owned (@in Optional<P>) -> TrivialStruct) -> @out P2 {
+// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @_T020opaque_values_silgen1P_pSgAA13TrivialStructVIxid_AESgAA2P2_pIxyr_TR : $@convention(thin) (Optional<TrivialStruct>, @owned @callee_owned (@in Optional<P>) -> TrivialStruct) -> @out P2 {
 // CHECK: bb0([[ARG0:%.*]] : $Optional<TrivialStruct>, [[ARG1:%.*]] : $@callee_owned (@in Optional<P>) -> TrivialStruct):
 // CHECK:   switch_enum [[ARG0]] : $Optional<TrivialStruct>, case #Optional.some!enumelt.1: bb2, case #Optional.none!enumelt: bb1
 // CHECK: bb1:
@@ -977,7 +977,7 @@ func s999_____condTFromAny<T>(_ x: Any, _ y: T) {
 
 // s270_convOptAnyStruct continued Test: reabstraction thunk helper
 // ---
-// CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_T020opaque_values_silgen9AnyStructVSgACIxir_A2DIxir_TR : $@convention(thin) (@in Optional<AnyStruct>, @owned @callee_owned (@in Optional<AnyStruct>) -> @out AnyStruct) -> @out Optional<AnyStruct> {
+// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @_T020opaque_values_silgen9AnyStructVSgACIxir_A2DIxir_TR : $@convention(thin) (@in Optional<AnyStruct>, @owned @callee_owned (@in Optional<AnyStruct>) -> @out AnyStruct) -> @out Optional<AnyStruct> {
 // CHECK: bb0([[ARG0:%.*]] : $Optional<AnyStruct>, [[ARG1:%.*]] : $@callee_owned (@in Optional<AnyStruct>) -> @out AnyStruct):
 // CHECK:   [[APPLYARG:%.*]] = apply [[ARG1]]([[ARG0]]) : $@callee_owned (@in Optional<AnyStruct>) -> @out AnyStruct
 // CHECK:   [[RETVAL:%.*]] = enum $Optional<AnyStruct>, #Optional.some!enumelt.1, [[APPLYARG]] : $AnyStruct
@@ -986,7 +986,7 @@ func s999_____condTFromAny<T>(_ x: Any, _ y: T) {
 
 // s300__convETupleToAny continued Test: reabstraction of () to Any
 // ---
-// CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_T0Ix_ypIxr_TR : $@convention(thin) (@owned @callee_owned () -> ()) -> @out Any {
+// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @_T0Ix_ypIxr_TR : $@convention(thin) (@owned @callee_owned () -> ()) -> @out Any {
 // CHECK: bb0([[ARG:%.*]] : $@callee_owned () -> ()):
 // CHECK:   [[ASTACK:%.*]] = alloc_stack $Any
 // CHECK:   [[IADDR:%.*]] = init_existential_addr [[ASTACK]] : $*Any, $()
@@ -998,7 +998,7 @@ func s999_____condTFromAny<T>(_ x: Any, _ y: T) {
 
 // s310_convIntTupleAny continued Test: reabstraction of non-empty tuple to Any
 // ---
-// CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_T0S2iIxdd_ypIxr_TR : $@convention(thin) (@owned @callee_owned () -> (Int, Int)) -> @out Any {
+// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @_T0S2iIxdd_ypIxr_TR : $@convention(thin) (@owned @callee_owned () -> (Int, Int)) -> @out Any {
 // CHECK: bb0([[ARG:%.*]] : $@callee_owned () -> (Int, Int)):
 // CHECK:   [[ASTACK:%.*]] = alloc_stack $Any
 // CHECK:   [[IADDR:%.*]] = init_existential_addr [[ASTACK]] : $*Any, $(Int, Int)
@@ -1016,7 +1016,7 @@ func s999_____condTFromAny<T>(_ x: Any, _ y: T) {
 // CHECK-LABEL: } // end sil function '_T0S2iIxdd_ypIxr_TR'
 
 
-// CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @{{.*}} : $@convention(thin) (Int, Int, Int, Int, Int, @owned @callee_owned (@in (Int, (Int, (Int, Int)), Int)) -> @out (Int, (Int, (Int, Int)), Int)) -> (Int, Int, Int, Int, Int)
+// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @{{.*}} : $@convention(thin) (Int, Int, Int, Int, Int, @owned @callee_owned (@in (Int, (Int, (Int, Int)), Int)) -> @out (Int, (Int, (Int, Int)), Int)) -> (Int, Int, Int, Int, Int)
 // CHECK: bb0([[ARG0:%.*]] : $Int, [[ARG1:%.*]] : $Int, [[ARG2:%.*]] : $Int, [[ARG3:%.*]] : $Int, [[ARG4:%.*]] : $Int, [[ARG5:%.*]] : $@callee_owned (@in (Int, (Int, (Int, Int)), Int)) -> @out (Int, (Int, (Int, Int)), Int)):
 // CHECK:   [[TUPLE_TO_APPLY0:%.*]] = tuple ([[ARG2]] : $Int, [[ARG3]] : $Int)
 // CHECK:   [[TUPLE_TO_APPLY1:%.*]] = tuple ([[ARG1]] : $Int, [[TUPLE_TO_APPLY0]] : $(Int, Int))
@@ -1033,7 +1033,7 @@ func s999_____condTFromAny<T>(_ x: Any, _ y: T) {
 // CHECK:   return [[RET_VAL_TUPLE]] : $(Int, Int, Int, Int, Int)
 // CHECK-LABEL: } // end sil function '{{.*}}'
 
-// CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @{{.*}} : $@convention(thin) <T> (Int, @in T, @owned @callee_owned (@in (Int, T)) -> @out (Int, T)) -> (Int, @out T) {
+// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @{{.*}} : $@convention(thin) <T> (Int, @in T, @owned @callee_owned (@in (Int, T)) -> @out (Int, T)) -> (Int, @out T) {
 // CHECK: bb0([[ARG0:%.*]] : $Int, [[ARG1:%.*]] : $T, [[ARG2:%.*]] : $@callee_owned (@in (Int, T)) -> @out (Int, T)):
 // CHECK:   [[TUPLE_TO_APPLY:%.*]] = tuple ([[ARG0]] : $Int, [[ARG1]] : $T)
 // CHECK:   [[TUPLE_APPLY:%.*]] = apply [[ARG2]]([[TUPLE_TO_APPLY]]) : $@callee_owned (@in (Int, T)) -> @out (Int, T)
@@ -1090,7 +1090,7 @@ extension Dictionary {
 
 // s400______maybeCloneP continued Test: reabstraction thunk
 // ---
-// CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_T0xSgIxr_20opaque_values_silgen8Clonable_pSgIxr_AbCRzlTR : $@convention(thin) <τ_0_0 where τ_0_0 : Clonable> (@owned @callee_owned () -> @out Optional<τ_0_0>) -> @out Optional<Clonable> {
+// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @_T0xSgIxr_20opaque_values_silgen8Clonable_pSgIxr_AbCRzlTR : $@convention(thin) <τ_0_0 where τ_0_0 : Clonable> (@owned @callee_owned () -> @out Optional<τ_0_0>) -> @out Optional<Clonable> {
 // CHECK: bb0([[ARG:%.*]] : $@callee_owned () -> @out Optional<τ_0_0>):
 // CHECK:   [[APPLY_ARG:%.*]] = apply [[ARG]]() : $@callee_owned () -> @out Optional<τ_0_0>
 // CHECK:   switch_enum [[APPLY_ARG]] : $Optional<τ_0_0>, case #Optional.some!enumelt.1: bb2, case #Optional.none!enumelt: bb1
@@ -1107,7 +1107,7 @@ extension Dictionary {
 
 // s320__transImplodeAny continued Test: reabstraction thunk
 // ---
-// CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_T0ypIxi_S2iIxyy_TR : $@convention(thin) (Int, Int, @owned @callee_owned (@in Any) -> ()) -> () {
+// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @_T0ypIxi_S2iIxyy_TR : $@convention(thin) (Int, Int, @owned @callee_owned (@in Any) -> ()) -> () {
 // CHECK: bb0([[ARG0:%.*]] : $Int, [[ARG1:%.*]] : $Int, [[ARG2:%.*]] : $@callee_owned (@in Any) -> ()):
 // CHECK:   [[ASTACK:%.*]] = alloc_stack $Any
 // CHECK:   [[IADDR:%.*]] = init_existential_addr [[ASTACK]] : $*Any, $(Int, Int)

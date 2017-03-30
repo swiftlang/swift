@@ -548,7 +548,7 @@ func forceNSArrayMembers() -> (NSArray, NSArray) {
 // arguments lifetime-extends the bridged pointer for the right duration.
 // <rdar://problem/16738050>
 
-// CHECK-LABEL: sil shared @_T0So7NSArrayCABSQySPys9AnyObject_pSgGG7objects_s5Int32V5counttcfC
+// CHECK-LABEL: sil shared [serializable] @_T0So7NSArrayCABSQySPys9AnyObject_pSgGG7objects_s5Int32V5counttcfC
 // CHECK:         [[SELF:%.*]] = alloc_ref_dynamic
 // CHECK:         [[METHOD:%.*]] = function_ref @_T0So7NSArrayCABSQySPys9AnyObject_pSgGG7objects_s5Int32V5counttcfcTO
 // CHECK:         [[RESULT:%.*]] = apply [[METHOD]]

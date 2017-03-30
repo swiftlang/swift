@@ -555,7 +555,7 @@ class SwiftIdLover : NSObject, Anyable {
   // CHECK-NEXT:  destroy_value [[SELF_COPY]]
   // CHECK-NEXT:  return [[RESULT]]
 
-  // CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_T0s9AnyObject_pIyBy_ypIxi_TR
+  // CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @_T0s9AnyObject_pIyBy_ypIxi_TR
   // CHECK:     bb0([[ANY:%.*]] : $*Any, [[BLOCK:%.*]] : $@convention(block) (AnyObject) -> ()):
   // CHECK-NEXT:  [[OPENED_ANY:%.*]] = open_existential_addr immutable_access [[ANY]] : $*Any to $*[[OPENED_TYPE:@opened.*Any]],
 	// CHECK:   [[TMP:%.*]] = alloc_stack
@@ -594,7 +594,7 @@ class SwiftIdLover : NSObject, Anyable {
   // CHECK-NEXT:  destroy_value [[RESULT]]
   // CHECK-NEXT:  return [[BLOCK]]
 
-  // CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_T0ypIxi_s9AnyObject_pIyBy_TR : $@convention(c) (@inout_aliasable @block_storage @callee_owned (@in Any) -> (), AnyObject) -> ()
+  // CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @_T0ypIxi_s9AnyObject_pIyBy_TR : $@convention(c) (@inout_aliasable @block_storage @callee_owned (@in Any) -> (), AnyObject) -> ()
   // CHECK:     bb0([[BLOCK_STORAGE:%.*]] : $*@block_storage @callee_owned (@in Any) -> (), [[ANY:%.*]] : $AnyObject):
   // CHECK-NEXT:  [[BLOCK_STORAGE_ADDR:%.*]] = project_block_storage [[BLOCK_STORAGE]]
   // CHECK-NEXT:  [[FUNCTION:%.*]] = load [copy] [[BLOCK_STORAGE_ADDR]]
@@ -630,7 +630,7 @@ class SwiftIdLover : NSObject, Anyable {
   // CHECK-NEXT:  destroy_value [[ANY_COPY]]
   // CHECK-NEXT:  return [[RESULT]]
 
-  // CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_T0s9AnyObject_pIyBa_ypIxr_TR : $@convention(thin) (@owned @convention(block) () -> @autoreleased AnyObject) -> @out Any
+  // CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @_T0s9AnyObject_pIyBa_ypIxr_TR : $@convention(thin) (@owned @convention(block) () -> @autoreleased AnyObject) -> @out Any
   // CHECK:     bb0([[ANY_ADDR:%.*]] : $*Any, [[BLOCK:%.*]] : $@convention(block) () -> @autoreleased AnyObject):
   // CHECK-NEXT:  [[BRIDGED:%.*]] = apply [[BLOCK]]()
   // CHECK-NEXT:  [[OPTIONAL:%.*]] = unchecked_ref_cast [[BRIDGED]]
@@ -672,7 +672,7 @@ class SwiftIdLover : NSObject, Anyable {
   // CHECK-NEXT:  destroy_value [[FUNCTION]]
   // CHECK-NEXT:  return [[BLOCK]]
 
-  // CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_T0ypIxr_s9AnyObject_pIyBa_TR : $@convention(c) (@inout_aliasable @block_storage @callee_owned () -> @out Any) -> @autoreleased AnyObject
+  // CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @_T0ypIxr_s9AnyObject_pIyBa_TR : $@convention(c) (@inout_aliasable @block_storage @callee_owned () -> @out Any) -> @autoreleased AnyObject
   // CHECK:     bb0(%0 : $*@block_storage @callee_owned () -> @out Any):
   // CHECK-NEXT:  [[BLOCK_STORAGE_ADDR:%.*]] = project_block_storage %0
   // CHECK-NEXT:  [[FUNCTION:%.*]] = load [copy] [[BLOCK_STORAGE_ADDR]]
@@ -694,7 +694,7 @@ class SwiftIdLover : NSObject, Anyable {
   func methodReturningBlockReturningAny() -> (() -> Any) {}
 
   func methodReturningBlockReturningOptionalAny() -> (() -> Any?) {}
-  // CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_T0ypSgIxr_s9AnyObject_pSgIyBa_TR
+  // CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @_T0ypSgIxr_s9AnyObject_pSgIyBa_TR
   // CHECK: function_ref @_T0s27_bridgeAnythingToObjectiveC{{.*}}F
 
   override init() { super.init() }

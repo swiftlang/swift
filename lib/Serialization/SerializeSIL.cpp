@@ -270,13 +270,10 @@ void SILSerializer::addReferencedSILFunction(const SILFunction *F,
     return;
   }
 
-  // If we referenced a non-fragile shared function from a fragile
-  // function, serialize it too. In practice, it will either be a
-  // thunk, or an optimizer specialization. In both cases, we don't
-  // have enough information at the time we emit the function to
-  // know if it should be marked fragile or not.
   if (F->getLinkage() == SILLinkage::Shared && !DeclOnly) {
-    assert(F->isThunk() == IsReabstractionThunk || F->hasForeignBody());
+    assert(F->isSerialized() == IsSerializable ||
+           F->hasForeignBody());
+
     FuncsToEmit[F] = false;
     Worklist.push_back(F);
     return;
@@ -1996,7 +1993,7 @@ bool SILSerializer::shouldEmitFunctionBody(const SILFunction *F,
     return true;
 
   // If F is serialized, we should always emit its body.
-  if (F->isSerialized())
+  if (F->isSerialized() == IsSerialized)
     return true;
 
   return false;

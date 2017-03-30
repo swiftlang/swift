@@ -15,7 +15,7 @@ func createErrorDomain(str: String) -> ErrorDomain {
   return ErrorDomain(rawValue: str)
 }
 
-// CHECK-RAW-LABEL: sil shared [transparent] [serialized] @_T0SC11ErrorDomainVABSS8rawValue_tcfC
+// CHECK-RAW-LABEL: sil shared [transparent] [serializable] @_T0SC11ErrorDomainVABSS8rawValue_tcfC
 // CHECK-RAW: bb0([[STR:%[0-9]+]] : $String,
 // CHECK-RAW: [[SELF_BOX:%[0-9]+]] = alloc_box ${ var ErrorDomain }, var, name "self"
 // CHECK-RAW: [[SELF:%[0-9]+]] = project_box [[SELF_BOX]]
@@ -31,7 +31,7 @@ func getRawValue(ed: ErrorDomain) -> String {
   return ed.rawValue
 }
 
-// CHECK-RAW-LABEL: sil shared @_T0SC11ErrorDomainV8rawValueSSfg
+// CHECK-RAW-LABEL: sil shared [serializable] @_T0SC11ErrorDomainV8rawValueSSfg
 // CHECK-RAW: bb0([[SELF:%[0-9]+]] : $ErrorDomain):
 // CHECK-RAW: [[FORCE_BRIDGE:%[0-9]+]] = function_ref @_forceBridgeFromObjectiveC_bridgeable
 // CHECK-RAW: [[STRING_RESULT_ADDR:%[0-9]+]] = alloc_stack $String
