@@ -37,7 +37,9 @@ class TBDGenVisitor : public ASTVisitor<TBDGenVisitor> {
   StringSet &Symbols;
 
   void addSymbol(StringRef name) {
-    assert(Symbols.insert(name).second && "already inserted");
+    auto isNewValue = Symbols.insert(name).second;
+    (void)isNewValue;
+    assert(isNewValue && "already inserted");
   }
 
   void visitValueTypeDecl(NominalTypeDecl *NTD) {
