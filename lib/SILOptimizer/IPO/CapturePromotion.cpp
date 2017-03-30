@@ -589,7 +589,7 @@ static SILArgument *getBoxFromIndex(SILFunction *F, unsigned Index) {
 /// for the address of the box's contents), return true if the closure is known
 /// not to mutate the captured variable.
 static bool
-isNonmutatingCapture(SILArgument *BoxArg) {
+isNonMutatingCapture(SILArgument *BoxArg) {
   SmallVector<ProjectBoxInst*, 2> Projections;
   
   // Conservatively do not allow any use of the box argument other than a
@@ -636,7 +636,7 @@ isNonmutatingCapture(SILArgument *BoxArg) {
 /// instruction which possibly mutates the contents of the box, then add it to
 /// the Mutations vector.
 static bool
-isNonescapingUse(Operand *O, SmallVectorImpl<SILInstruction*> &Mutations) {
+isNonEscapingUse(Operand *O, SmallVectorImpl<SILInstruction*> &Mutations) {
   auto *U = O->getUser();
   if (U->isTypeDependentOperand(*O))
     return true;
@@ -668,7 +668,7 @@ isNonescapingUse(Operand *O, SmallVectorImpl<SILInstruction*> &Mutations) {
       Mutations.push_back(U);
     
     for (auto *UO : U->getUses())
-      if (!isNonescapingUse(UO, Mutations))
+      if (!isNonEscapingUse(UO, Mutations))
         return false;
     return true;
   }
@@ -744,7 +744,7 @@ examineAllocBoxInst(AllocBoxInst *ABI, ReachabilityInfo &RI,
       // Verify that this closure is known not to mutate the captured value; if
       // it does, then conservatively refuse to promote any captures of this
       // value.
-      if (!isNonmutatingCapture(BoxArg))
+      if (!isNonMutatingCapture(BoxArg))
         return false;
 
       // Record the index and continue.
@@ -763,14 +763,14 @@ examineAllocBoxInst(AllocBoxInst *ABI, ReachabilityInfo &RI,
       }
 
       for (Operand *AddrOp : Addr->getUses()) {
-        if (!isNonescapingUse(AddrOp, Mutations))
+        if (!isNonEscapingUse(AddrOp, Mutations))
           return false;
       }
       continue;
     }
     // Verify that this use does not otherwise allow the alloc_box to
     // escape.
-    if (!isNonescapingUse(O, Mutations))
+    if (!isNonEscapingUse(O, Mutations))
       return false;
   }
 
