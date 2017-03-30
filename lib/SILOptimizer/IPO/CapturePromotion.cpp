@@ -702,19 +702,24 @@ isNonEscapingUse(Operand *O, SmallVectorImpl<SILInstruction*> &Mutations) {
 static bool
 examineAllocBoxInst(AllocBoxInst *ABI, ReachabilityInfo &RI,
                     llvm::DenseMap<PartialApplyInst*, unsigned> &IM) {
+  DEBUG(llvm::dbgs() << "Visiting alloc box: " << *ABI);
   SmallVector<SILInstruction*, 32> Mutations;
   
   // Scan the box for interesting uses.
   for (Operand *O : ABI->getUses()) {
     if (auto *PAI = dyn_cast<PartialApplyInst>(O->getUser())) {
+      DEBUG(llvm::dbgs() << "    Found partial: " << *PAI);
+
       unsigned OpNo = O->getOperandNumber();
       assert(OpNo != 0 && "Alloc box used as callee of partial apply?");
 
       // If we've already seen this partial apply, then it means the same alloc
       // box is being captured twice by the same closure, which is odd and
       // unexpected: bail instead of trying to handle this case.
-      if (IM.count(PAI))
+      if (IM.count(PAI)) {
+        DEBUG(llvm::dbgs() << "        Already seen... bailing!\n");
         return false;
+      }
 
       SILModule &M = PAI->getModule();
       auto closureType = PAI->getType().castTo<SILFunctionType>();
@@ -726,8 +731,11 @@ examineAllocBoxInst(AllocBoxInst *ABI, ReachabilityInfo &RI,
       unsigned Index = OpNo - 1 + closureConv.getNumSILArguments();
 
       auto *Fn = PAI->getReferencedFunction();
-      if (!Fn || !Fn->isDefinition())
+      if (!Fn || !Fn->isDefinition()) {
+        DEBUG(llvm::dbgs() << "        Not a direct function definition "
+                              "reference. Bailing!\n");
         return false;
+      }
 
       SILArgument *BoxArg = getBoxFromIndex(Fn, Index);
 
@@ -737,20 +745,29 @@ examineAllocBoxInst(AllocBoxInst *ABI, ReachabilityInfo &RI,
       auto BoxTy = BoxArg->getType().castTo<SILBoxType>();
       assert(BoxTy->getLayout()->getFields().size() == 1
              && "promoting compound box not implemented yet");
-      if (BoxTy->getFieldType(M, 0).isAddressOnly(M))
+      if (BoxTy->getFieldType(M, 0).isAddressOnly(M)) {
+        DEBUG(llvm::dbgs()
+              << "        Box is an address only argument... Bailing!\n");
         return false;
+      }
 
       // Verify that this closure is known not to mutate the captured value; if
       // it does, then conservatively refuse to promote any captures of this
       // value.
-      if (!isNonMutatingCapture(BoxArg))
+      if (!isNonMutatingCapture(BoxArg)) {
+        DEBUG(llvm::dbgs() << "        Is a mutating capture... Bailing!\n");
         return false;
+      }
 
       // Record the index and continue.
+      DEBUG(llvm::dbgs() << "        Can be optimized!\n");
+      DEBUG(llvm::dbgs() << "        Index: " << Index << "\n");
       IM.insert(std::make_pair(PAI, Index));
       continue;
     }
+
     if (auto *PBI = dyn_cast<ProjectBoxInst>(O->getUser())) {
+      DEBUG(llvm::dbgs() << "    Found project box: " << *PBI);
       // Check for mutations of the address component.
       SILValue Addr = PBI;
       // If the AllocBox is used by a mark_uninitialized, scan the MUI for
@@ -762,15 +779,22 @@ examineAllocBoxInst(AllocBoxInst *ABI, ReachabilityInfo &RI,
       }
 
       for (Operand *AddrOp : Addr->getUses()) {
-        if (!isNonEscapingUse(AddrOp, Mutations))
+        if (!isNonEscapingUse(AddrOp, Mutations)) {
+          DEBUG(llvm::dbgs() << "    Has escaping user of addr... bailing: "
+                             << *AddrOp->getUser());
           return false;
+        }
       }
       continue;
     }
+
     // Verify that this use does not otherwise allow the alloc_box to
     // escape.
-    if (!isNonEscapingUse(O, Mutations))
+    if (!isNonEscapingUse(O, Mutations)) {
+      DEBUG(llvm::dbgs() << "    Have unknown escaping user: "
+                         << *O->getUser());
       return false;
+    }
   }
 
   // Helper lambda function to determine if instruction b is strictly after
@@ -787,6 +811,8 @@ examineAllocBoxInst(AllocBoxInst *ABI, ReachabilityInfo &RI,
     return false;
   };
 
+  DEBUG(llvm::dbgs()
+        << "Checking for any mutations that invalidate captures...\n");
   // Loop over all mutations to possibly invalidate captures.
   for (auto *I : Mutations) {
     auto Iter = IM.begin();
@@ -797,6 +823,8 @@ examineAllocBoxInst(AllocBoxInst *ABI, ReachabilityInfo &RI,
       // block is after the partial_apply.
       if (RI.isReachable(PAI->getParent(), I->getParent()) ||
           (PAI->getParent() == I->getParent() && isAfter(PAI, I))) {
+        DEBUG(llvm::dbgs() << "    Invalidating: " << *PAI);
+        DEBUG(llvm::dbgs() << "    Because of user: " << *I);
         auto Prev = Iter++;
         IM.erase(Prev);
         continue;
@@ -804,10 +832,13 @@ examineAllocBoxInst(AllocBoxInst *ABI, ReachabilityInfo &RI,
       ++Iter;
     }
     // If there are no valid captures left, then stop.
-    if (IM.empty())
+    if (IM.empty()) {
+      DEBUG(llvm::dbgs() << "    Ran out of valid captures... bailing!\n");
       return false;
+    }
   }
 
+  DEBUG(llvm::dbgs() << "    We can optimize this box!\n");
   return true;
 }
 
@@ -976,6 +1007,8 @@ class CapturePromotionPass : public SILModuleTransform {
 
 void CapturePromotionPass::processFunction(SILFunction *F,
                                       SmallVectorImpl<SILFunction*> &Worklist) {
+  DEBUG(llvm::dbgs() << "******** Performing Capture Promotion on: "
+                     << F->getName() << "********\n");
   // This is a map from each partial apply to a set of indices of promotable
   // box variables.
   PartialApplyIndicesMap IndicesMap;
