@@ -1042,10 +1042,11 @@ extension String {
   // off of it...
   public var _core: _StringCore {
     get {
-      let _cocoaString = self as NSString
+    	let utf16CUs = self.content.utf16
+      let _cocoaString = _UTF16StringStorage(utf16CUs)
       return _StringCore(
         baseAddress: nil,
-        count: _cocoaString.length,
+        count: numericCast(utf16CUs.count), // Michael NOTE: Is this ok?
         elementShift: 1, //isUTF16 ? 1 : 0,
         hasCocoaBuffer: true,
         owner: _cocoaString)
