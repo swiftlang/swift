@@ -20,11 +20,20 @@ using namespace Lowering;
 
 SwitchCaseFullExpr::SwitchCaseFullExpr(SILGenFunction &SGF, CleanupLocation loc,
                                        SILBasicBlock *contBlock)
-    : SGF(SGF), scope(SGF.Cleanups, loc), loc(loc),
-      contBlock(contBlock ? *contBlock : *SGF.B.splitBlockForFallthrough()) {}
+    : SGF(SGF), scope(SGF.Cleanups, loc), loc(loc), contBlock(contBlock) {}
 
-void SwitchCaseFullExpr::exit(SILLocation loc, ArrayRef<SILValue> branchArgs) {
+void SwitchCaseFullExpr::exitAndBranch(SILLocation loc,
+                                       ArrayRef<SILValue> branchArgs) {
+  assert(contBlock &&
+         "Should not call this if we do not have a continuation block");
   assert(SGF.B.hasValidInsertionPoint());
   scope.pop();
-  SGF.B.createBranch(loc, &contBlock, branchArgs);
+  SGF.B.createBranch(loc, contBlock.get(), branchArgs);
+}
+
+void SwitchCaseFullExpr::exit() {
+  assert(!contBlock &&
+         "Should not call this if we do have a continuation block");
+  assert(SGF.B.hasValidInsertionPoint());
+  scope.pop();
 }
