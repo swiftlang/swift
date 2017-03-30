@@ -2333,16 +2333,31 @@ static Optional<ObjCReason> shouldMarkAsObjC(TypeChecker &TC,
     if (attr->isImplicit())
       return ObjCReason::ImplicitlyObjC;
 
-    // Under Swift 3's @objc inference rules, 'dynamic' infers '@objc'.
-    if (TC.Context.LangOpts.EnableSwift3ObjCInference)
-      return ObjCReason::ExplicitlyDynamic;
+    bool isAccessor =
+      isa<FuncDecl>(VD) && cast<FuncDecl>(VD)->isGetterOrSetter();
 
-    // Otherwise, complain about the lack of `@objc', but still infer it
-    // for better recovery.
+    // Under Swift 3's @objc inference rules, 'dynamic' infers '@objc'.
+    if (TC.Context.LangOpts.EnableSwift3ObjCInference) {
+      // If we've been asked to warn about deprecated @objc inference, do so
+      // now.
+      if (TC.Context.LangOpts.WarnSwift3ObjCInference && !isAccessor) {
+        TC.diagnose(VD, diag::objc_inference_swift3_dynamic)
+          .highlight(attr->getLocation())
+          .fixItInsert(VD->getAttributeInsertionLoc(/*forModifier=*/false),
+                      "@objc ");
+      }
+
+      return ObjCReason::ExplicitlyDynamic;
+    }
+
+
+    // Complain that 'dynamic' requires '@objc', but (quietly) infer @objc
+    // anyway for better recovery.
     TC.diagnose(VD, diag::dynamic_requires_objc,
                 VD->getDescriptiveKind(), VD->getFullName())
       .highlight(attr->getRange())
-      .fixItInsert(VD->getAttributeInsertionLoc(false), "@objc ");
+      .fixItInsert(VD->getAttributeInsertionLoc(/*forModifier=*/false),
+                   "@objc ");
 
     return ObjCReason::ImplicitlyObjC;
   }
@@ -2633,29 +2648,6 @@ static void inferObjCName(TypeChecker &tc, ValueDecl *decl) {
   }
 }
 
-/// Whether this reason for @objc is deprecated in Swift 3.
-static bool isSwift3DeprecatedObjCReason(ObjCReason reason) {
-  switch(reason) {
-  case ObjCReason::ExplicitlyDynamic:
-  case ObjCReason::MemberOfObjCSubclass:
-    return true;
-
-  case ObjCReason::ExplicitlyCDecl:
-  case ObjCReason::ExplicitlyObjC:
-  case ObjCReason::ExplicitlyIBOutlet:
-  case ObjCReason::ExplicitlyIBAction:
-  case ObjCReason::ExplicitlyNSManaged:
-  case ObjCReason::MemberOfObjCProtocol:
-  case ObjCReason::OverridesObjC:
-  case ObjCReason::WitnessToObjC:
-  case ObjCReason::ImplicitlyObjC:
-  case ObjCReason::Accessor:
-  case ObjCReason::ExplicitlyIBInspectable:
-  case ObjCReason::ExplicitlyGKInspectable:
-    return false;
-  }
-}
-
 /// Mark the given declaration as being Objective-C compatible (or
 /// not) as appropriate.
 ///
@@ -2781,31 +2773,19 @@ void swift::markAsObjC(TypeChecker &TC, ValueDecl *D,
 
   // Special handling for Swift 3 @objc inference rules that are no longer
   // present in later versions of Swift.
-  if (isSwift3DeprecatedObjCReason(*isObjC)) {
+  if (*isObjC == ObjCReason::MemberOfObjCSubclass) {
     // If we've been asked to unconditionally warn about these deprecated
     // @objc inference rules, do so now. However, we don't warn about
     // accessors---just the main storage dclarations.
     if (TC.Context.LangOpts.WarnSwift3ObjCInference &&
         !(isa<FuncDecl>(D) && cast<FuncDecl>(D)->isGetterOrSetter())) {
-      if (*isObjC == ObjCReason::ExplicitlyDynamic) {
-        SourceLoc dynamicLoc;
-        if (auto attr = D->getAttrs().getAttribute<DynamicAttr>())
-          dynamicLoc = attr->getLocation();
-
-        TC.diagnose(D, diag::objc_inference_swift3_dynamic)
-          .highlight(dynamicLoc)
-          .fixItInsert(D->getAttributeInsertionLoc(/*forModifier=*/false),
-                      "@objc ");
-      } else {
-        assert(*isObjC == ObjCReason::MemberOfObjCSubclass);
-        TC.diagnose(D, diag::objc_inference_swift3_objc_derived);
-        TC.diagnose(D, diag::objc_inference_swift3_addobjc)
-          .fixItInsert(D->getAttributeInsertionLoc(/*forModifier=*/false),
-                       "@objc ");
-        TC.diagnose(D, diag::objc_inference_swift3_addnonobjc)
-          .fixItInsert(D->getAttributeInsertionLoc(/*forModifier=*/false),
-                       "@nonobjc ");
-      }
+      TC.diagnose(D, diag::objc_inference_swift3_objc_derived);
+      TC.diagnose(D, diag::objc_inference_swift3_addobjc)
+        .fixItInsert(D->getAttributeInsertionLoc(/*forModifier=*/false),
+                     "@objc ");
+      TC.diagnose(D, diag::objc_inference_swift3_addnonobjc)
+        .fixItInsert(D->getAttributeInsertionLoc(/*forModifier=*/false),
+                     "@nonobjc ");
     }
 
     // Mark the attribute as having used Swift 3 inference, or create an

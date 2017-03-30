@@ -11,7 +11,7 @@ class ObjCSubclass : NSObject {
 class DynamicMembers {
   dynamic func foo() { }
   
-  dynamic var bar: NSObject? = nil // expected-note 2{{add '@objc' to expose this var to Objective-C}}{{3-3=@objc }}
+  dynamic var bar: NSObject? = nil
 
   func overridableFunc() { }
   var overridableVar: NSObject? = nil
@@ -53,11 +53,11 @@ class SubclassDynamicMembers : DynamicMembers {
 
 func testSelector(sc: ObjCSubclass, dm: DynamicMembers) {
   _ = #selector(sc.foo) // expected-warning{{argument of '#selector' refers to instance method 'foo()' in 'ObjCSubclass' that depends on '@objc' attribute inference deprecated in Swift 4}}
-  _ = #selector(getter: dm.bar) // expected-warning{{argument of '#selector' refers to var 'bar' in 'DynamicMembers' that depends on '@objc' attribute inference deprecated in Swift 4}}
+  _ = #selector(getter: dm.bar) // okay, explicit dynamic
 }
 
 func testKeypath(dm: DynamicMembers) {
-  _ = #keyPath(DynamicMembers.bar) // expected-warning{{argument of '#keyPath' refers to property 'bar' in 'DynamicMembers' that depends on '@objc' attribute inference deprecated in Swift 4}}
+  _ = #keyPath(DynamicMembers.bar) // okay: dynamic keyword implies @objc
 }
 
 func testDynamicCalls(ao: AnyObject) {
