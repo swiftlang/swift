@@ -211,6 +211,7 @@ private:
 
   void visitDebugValueAddrInst(DebugValueAddrInst *Inst);
   void visitStrongReleaseInst(StrongReleaseInst *Inst);
+  void visitDestroyValueInst(DestroyValueInst *Inst);
   void visitStructElementAddrInst(StructElementAddrInst *Inst);
   void visitLoadInst(LoadInst *Inst);
   void visitProjectBoxInst(ProjectBoxInst *Inst);
@@ -502,6 +503,9 @@ void ClosureCloner::visitDebugValueAddrInst(DebugValueAddrInst *Inst) {
 /// normally.
 void
 ClosureCloner::visitStrongReleaseInst(StrongReleaseInst *Inst) {
+  assert(
+      Inst->getFunction()->hasUnqualifiedOwnership() &&
+      "Should not see strong release in a function with qualified ownership");
   SILValue Operand = Inst->getOperand();
   if (SILArgument *A = dyn_cast<SILArgument>(Operand)) {
     auto I = BoxArgumentMap.find(A);
@@ -517,6 +521,28 @@ ClosureCloner::visitStrongReleaseInst(StrongReleaseInst *Inst) {
   }
 
   SILCloner<ClosureCloner>::visitStrongReleaseInst(Inst);
+}
+
+/// \brief Handle a destroy_value instruction during cloning of a closure; if
+/// it is a strong release of a promoted box argument, then it is replaced with
+/// a destroy_value of the new object type argument, otherwise it is handled
+/// normally.
+void ClosureCloner::visitDestroyValueInst(DestroyValueInst *Inst) {
+  SILValue Operand = Inst->getOperand();
+  if (SILArgument *A = dyn_cast<SILArgument>(Operand)) {
+    auto I = BoxArgumentMap.find(A);
+    if (I != BoxArgumentMap.end()) {
+      // Releases of the box arguments get replaced with ReleaseValue of the new
+      // object type argument.
+      SILFunction &F = getBuilder().getFunction();
+      auto &typeLowering = F.getModule().getTypeLowering(I->second->getType());
+      SILBuilderWithPostProcess<ClosureCloner, 1> B(this, Inst);
+      typeLowering.emitDestroyValue(B, Inst->getLoc(), I->second);
+      return;
+    }
+  }
+
+  SILCloner<ClosureCloner>::visitDestroyValueInst(Inst);
 }
 
 /// \brief Handle a struct_element_addr instruction during cloning of a closure;
@@ -595,7 +621,8 @@ isNonMutatingCapture(SILArgument *BoxArg) {
   // strong_release or projection, since this is the pattern expected from
   // SILGen.
   for (auto *O : BoxArg->getUses()) {
-    if (isa<StrongReleaseInst>(O->getUser()))
+    if (isa<StrongReleaseInst>(O->getUser()) ||
+        isa<DestroyValueInst>(O->getUser()))
       continue;
     
     if (auto Projection = dyn_cast<ProjectBoxInst>(O->getUser())) {
@@ -687,6 +714,7 @@ public:
   ALWAYS_NON_ESCAPING_INST(StrongRetain)
   ALWAYS_NON_ESCAPING_INST(Load)
   ALWAYS_NON_ESCAPING_INST(StrongRelease)
+  ALWAYS_NON_ESCAPING_INST(DestroyValue)
 #undef ALWAYS_NON_ESCAPING_INST
 
   bool visitDeallocBoxInst(DeallocBoxInst *DBI) {
@@ -710,6 +738,14 @@ public:
     for (auto *User : I->getUses()) {
       Worklist.push_back(User);
     }
+  }
+
+  /// This is separate from the normal copy value handling since we are matching
+  /// the old behavior of non-top-level uses not being able to have partial
+  /// apply and project box uses.
+  bool visitCopyValueInst(CopyValueInst *CVI) {
+    addUserOperandsToWorklist(CVI);
+    return true;
   }
 
   bool visitStructElementAddrInst(StructElementAddrInst *I) {
@@ -870,6 +906,23 @@ static bool scanUsesForEscapesAndMutations(
 
   if (auto *PBI = dyn_cast<ProjectBoxInst>(Op->getUser())) {
     return isProjectBoxNonEscapingUse(PBI, Mutations);
+  }
+
+  // Given a top level copy value use, check all of its user operands as if
+  // they were apart of the use list of the base operand.
+  //
+  // This is because even though we are copying the box, a copy of the box is
+  // just a retain + bitwise copy of the pointer. This has nothing to do with
+  // whether or not the address escapes in some way.
+  //
+  // This is a separate code path from the non escaping user visitor check since
+  // we want to be more conservative around non-top level copies (i.e. a copy
+  // derived from a projection like instruction). In fact such a thing may not
+  // even make any sense!
+  if (auto *CVI = dyn_cast<CopyValueInst>(Op->getUser())) {
+    return any_of(CVI->getUses(), [&Mutations, &IM](Operand *CopyOp) -> bool {
+      return !scanUsesForEscapesAndMutations(CopyOp, Mutations, IM);
+    });
   }
 
   // Verify that this use does not otherwise allow the alloc_box to
