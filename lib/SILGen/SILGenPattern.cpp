@@ -1048,7 +1048,8 @@ void PatternMatchEmission::emitWildcardDispatch(ClauseMatrix &clauses,
 
   bool hasMultipleItems = false;
   if (auto *caseStmt = dyn_cast<CaseStmt>(stmt)) {
-    hasMultipleItems = caseStmt->getCaseLabelItems().size() > 1;
+    hasMultipleItems = clauses[row].hasFallthroughTo() ||
+      caseStmt->getCaseLabelItems().size() > 1;
   }
 
   // Bind the rest of the patterns.
@@ -2298,8 +2299,13 @@ JumpDest PatternMatchEmission::getSharedCaseBlockDest(CaseStmt *caseBlock,
         for (auto var : SGF.VarLocs) {
           auto varDecl = var.getFirst();
           if (varDecl->hasName() && varDecl->getName() == V->getName()) {
-            block->createPHIArgument(var.getSecond().value->getType(),
+            if (var.getSecond().box) {
+              block->createPHIArgument(var.getSecond().value->getType().getObjectType(),
                                        ValueOwnershipKind::Owned, V);
+            } else {
+              block->createPHIArgument(var.getSecond().value->getType(),
+                                       ValueOwnershipKind::Owned, V);
+            }
             break;
           }
         }
@@ -2616,9 +2622,15 @@ void SILGenFunction::emitSwitchFallthrough(FallthroughStmt *S) {
       for (auto var : VarLocs) {
         auto varDecl = var.getFirst();
         if (varDecl->hasName() && varDecl->getName() == expected->getName()) {
-          auto value = B.emitCopyValueOperation(CurrentSILLoc,
-                                                var.getSecond().value);
-          args.push_back(value);
+          SILValue value = var.getSecond().value;
+          SILValue argValue;
+          if (var.getSecond().box) {
+            auto &lowering = getTypeLowering(value->getType());
+            argValue = lowering.emitLoad(B, CurrentSILLoc, value, LoadOwnershipQualifier::Copy);
+          } else {
+            argValue = B.emitCopyValueOperation(CurrentSILLoc, value);
+          }
+          args.push_back(argValue);
           break;
         }
       }
