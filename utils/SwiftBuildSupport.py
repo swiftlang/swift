@@ -80,7 +80,8 @@ def _get_default_swift_repo_name():
         return result
     if not os.path.exists(os.path.join(swift_path, 'CMakeLists.txt')):
         return result
-    return swift_path
+    (_, swift_repo_name) = os.path.split(swift_path)
+    return swift_repo_name
 
 
 # Set SWIFT_REPO_NAME in your environment to control the name of the swift
