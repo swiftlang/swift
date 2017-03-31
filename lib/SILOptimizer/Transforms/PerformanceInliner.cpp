@@ -104,8 +104,11 @@ class SILPerformanceInliner {
     /// increasing the code size.
     TrivialFunctionThreshold = 18,
 
-    /// Configuration for the caller block limit.
-    BlockLimitDenominator = 10000,
+    /// Configuration for the "soft" caller block limit.
+    BlockLimitDenominator = 3000,
+
+    /// No inlining is done if the caller has more than this number of blocks.
+    OverallCallerBlockLimit = 400,
 
     /// The assumed execution length of a function call.
     DefaultApplyLength = 10
@@ -703,6 +706,9 @@ void SILPerformanceInliner::collectAppliesToInline(
           InitialCandidates.push_back(AI);
       }
     }
+    if (NumCallerBlocks > OverallCallerBlockLimit)
+      break;
+
     domOrder.pushChildrenIf(block, [&] (SILBasicBlock *child) {
       if (CBI.isSlowPath(block, child)) {
         // Handle cold blocks separately.
