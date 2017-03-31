@@ -1393,6 +1393,79 @@ public:
   }
 };
 
+/// Component of a KeyPathInst.
+class KeyPathInstComponent {
+public:
+  enum class Kind: unsigned {
+    StoredProperty,
+  };
+  
+private:
+  llvm::PointerIntPair<void *, 2, Kind> ValueAndKind;
+
+  KeyPathInstComponent(void *value, Kind kind)
+    : ValueAndKind(value, kind) {}
+
+public:
+  KeyPathInstComponent() : ValueAndKind(nullptr, (Kind)0) {}
+
+  Kind getKind() const {
+    return ValueAndKind.getInt();
+  }
+  
+  ValueDecl *getValueDecl() const {
+    switch (getKind()) {
+    case Kind::StoredProperty:
+      return static_cast<ValueDecl*>(ValueAndKind.getPointer());
+    }
+    llvm_unreachable("unhandled kind");
+  }
+  
+  static KeyPathInstComponent forStoredProperty(ValueDecl *property) {
+    return KeyPathInstComponent(property, Kind::StoredProperty);
+  }
+};
+  
+
+/// Instantiates a key path object.
+class KeyPathInst final : public SILInstruction,
+                          private llvm::TrailingObjects<KeyPathInst,
+                                                        KeyPathInstComponent>
+{
+  friend SILBuilder;
+  friend TrailingObjects;
+  
+  unsigned NumComponents;
+  
+  KeyPathInst(SILDebugLocation DebugLoc,
+              ArrayRef<KeyPathInstComponent> Components,
+              SILType Ty);
+  
+  static KeyPathInst *create(SILDebugLocation DebugLoc,
+                             ArrayRef<KeyPathInstComponent> Components,
+                             SILType Ty,
+                             SILFunction &F);
+
+public:
+  ArrayRef<KeyPathInstComponent> getComponents() const {
+    return const_cast<KeyPathInst*>(this)->getComponents();
+  }
+  MutableArrayRef<KeyPathInstComponent> getComponents();
+
+  ArrayRef<Operand> getAllOperands() const {
+    // TODO: Some components will have operands, such as getters/setters for
+    // computed properties and index values for subscripts
+    return {};
+  }
+  MutableArrayRef<Operand> getAllOperands() {
+    return {};
+  }
+  
+  static bool classof(const ValueBase *V) {
+    return V->getKind() == ValueKind::KeyPathInst;
+  }
+};
+
 /// Represents an invocation of builtin functionality provided by the code
 /// generator.
 class BuiltinInst : public SILInstruction {

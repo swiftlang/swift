@@ -550,6 +550,11 @@ ERROR(sil_expected_access_kind,none,
 ERROR(sil_expected_access_enforcement,none,
       "%0 instruction must have explicit access enforcement", (StringRef))
 
+ERROR(sil_keypath_expected_component_kind,none,
+      "expected keypath component kind", ())
+ERROR(sil_keypath_unknown_component_kind,none,
+      "unknown keypath component kind %0", (Identifier))
+
 // SIL Basic Blocks
 ERROR(expected_sil_block_name,none,
       "expected basic block name or '}'", ())

@@ -1878,3 +1878,29 @@ MetatypeInst *MetatypeInst::create(SILDebugLocation Loc, SILType Ty,
 
   return ::new (Buffer) MetatypeInst(Loc, Ty, TypeDependentOperands);
 }
+
+KeyPathInst::KeyPathInst(SILDebugLocation DebugLoc,
+                         ArrayRef<KeyPathInstComponent> Components,
+                         SILType Ty)
+  : SILInstruction(ValueKind::KeyPathInst, DebugLoc, Ty),
+    NumComponents(Components.size())
+{
+  auto tailObjects = getTrailingObjects<KeyPathInstComponent>();
+  std::uninitialized_copy(Components.begin(), Components.end(), tailObjects);
+}
+
+KeyPathInst *
+KeyPathInst::create(SILDebugLocation DebugLoc,
+                    ArrayRef<KeyPathInstComponent> Components,
+                    SILType Ty,
+                    SILFunction &F) {
+  auto allocSize = totalSizeToAlloc<KeyPathInstComponent>(Components.size());
+  void *buf = F.getModule().allocateInst(allocSize, alignof(KeyPathInst));
+  return ::new (buf) KeyPathInst(DebugLoc, Components, Ty);
+}
+
+MutableArrayRef<KeyPathInstComponent>
+KeyPathInst::getComponents() {
+  return MutableArrayRef<KeyPathInstComponent>(
+    getTrailingObjects<KeyPathInstComponent>(), NumComponents);
+}

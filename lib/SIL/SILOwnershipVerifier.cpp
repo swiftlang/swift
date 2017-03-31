@@ -353,6 +353,8 @@ NO_OPERAND_INST(StrongRetain)
 NO_OPERAND_INST(StrongRetainUnowned)
 NO_OPERAND_INST(UnownedRetain)
 NO_OPERAND_INST(Unreachable)
+// TODO: Some key path components will have operands
+NO_OPERAND_INST(KeyPath)
 #undef NO_OPERAND_INST
 
 /// Instructions whose arguments are always compatible with one convention.

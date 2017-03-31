@@ -288,6 +288,8 @@ CONSTANT_OWNERSHIP_INST(Unowned, RawPointerToRef)
 CONSTANT_OWNERSHIP_INST(Unowned, RefToUnowned)
 CONSTANT_OWNERSHIP_INST(Unowned, UnmanagedToRef)
 CONSTANT_OWNERSHIP_INST(Unowned, UnownedToRef)
+// TODO: With inert refcounting, global key path objects could be trivial
+CONSTANT_OWNERSHIP_INST(Owned, KeyPath)
 #undef CONSTANT_OWNERSHIP_INST
 
 #define CONSTANT_OR_TRIVIAL_OWNERSHIP_INST(OWNERSHIP, INST)                    \

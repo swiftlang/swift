@@ -1,0 +1,33 @@
+// RUN: %target-sil-opt %s | %target-sil-opt | %FileCheck %s
+
+sil_stage canonical
+
+import Swift
+
+struct S {
+  var x: Int
+  let y: String
+  var z: C
+}
+class C {
+  var x: Int
+  let y: String
+  var z: S
+
+  init()
+}
+
+// CHECK-LABEL: sil shared @stored_properties
+sil shared @stored_properties : $@convention(thin) () -> () {
+entry:
+  // CHECK: keypath $WritableKeyPath<S, Int> (stored_property #S.x)
+  %a = keypath $WritableKeyPath<S, Int> (stored_property #S.x)
+  // CHECK: keypath $ReferenceWritableKeyPath<C, Int> (stored_property #C.x)
+  %b = keypath $ReferenceWritableKeyPath<C, Int> (stored_property #C.x)
+  // CHECK: keypath $KeyPath<S, String> (stored_property #S.y)
+  %c = keypath $KeyPath<S, String> (stored_property #S.y)
+  // CHECK: keypath $ReferenceWritableKeyPath<S, Int> (stored_property #S.z, stored_property #C.x)
+  %d = keypath $ReferenceWritableKeyPath<S, Int> (stored_property #S.z, stored_property #C.x)
+
+  return undef : $()
+}

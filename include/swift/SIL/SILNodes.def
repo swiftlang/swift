@@ -245,6 +245,9 @@ ABSTRACT_VALUE(SILInstruction, ValueBase)
   INST(ProjectBlockStorageInst, SILInstruction, project_block_storage, None, DoesNotRelease)
   INST(InitBlockStorageHeaderInst, SILInstruction, init_block_storage_header, None, DoesNotRelease)
 
+  // Key paths
+  INST(KeyPathInst, SILInstruction, keypath, None, DoesNotRelease)
+
   // Conversions
   ABSTRACT_VALUE(ConversionInst, SILInstruction)
     INST(UpcastInst, ConversionInst, upcast, None, DoesNotRelease)

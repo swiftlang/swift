@@ -1771,6 +1771,25 @@ public:
     *this << ", " << getID(CBI->getFalseBB());
     printBranchArgs(CBI->getFalseArgs());
   }
+  
+  void visitKeyPathInst(KeyPathInst *KPI) {
+    *this << KPI->getType() << " (";
+    
+    interleave(KPI->getComponents(),
+               [&](KeyPathInstComponent component) {
+                 switch (component.getKind()) {
+                 case KeyPathInstComponent::Kind::StoredProperty: {
+                   auto prop = cast<VarDecl>(component.getValueDecl());
+                   *this << "stored_property #";
+                   printValueDecl(prop, PrintState.OS);
+                 }
+                 }
+               }, [&]{
+                 *this << ", ";
+               });
+    
+    *this << ')';
+  }
 };
 } // end anonymous namespace
 

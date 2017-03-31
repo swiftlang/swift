@@ -3916,7 +3916,6 @@ namespace {
       // Resolve each of the components.
       bool didOptionalChain = false;
       auto keyPathTy = cs.getType(E)->castTo<BoundGenericType>();
-      // TODO: get root and leaf types
       Type baseTy = keyPathTy->getGenericArgs()[0];
       Type leafTy = keyPathTy->getGenericArgs()[1];
       

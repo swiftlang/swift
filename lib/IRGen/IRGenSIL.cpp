@@ -1007,6 +1007,10 @@ public:
   void visitCheckedCastBranchInst(CheckedCastBranchInst *i);
   void visitCheckedCastValueBranchInst(CheckedCastValueBranchInst *i);
   void visitCheckedCastAddrBranchInst(CheckedCastAddrBranchInst *i);
+  
+  void visitKeyPathInst(KeyPathInst *I) {
+    llvm_unreachable("not implemented");
+  }
 };
 
 } // end anonymous namespace

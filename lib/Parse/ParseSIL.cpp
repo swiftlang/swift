@@ -2288,7 +2288,44 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB, SILBuilder &B) {
     break;
   }
 
-    // Conversion instructions.
+  case ValueKind::KeyPathInst: {
+    SmallVector<KeyPathInstComponent, 4> components;
+    SILType Ty;
+    if (parseSILType(Ty) ||
+        P.parseToken(tok::l_paren, diag::expected_tok_in_sil_instr, "("))
+      return true;
+    
+    while (true) {
+      Identifier componentKind;
+      SourceLoc componentLoc;
+      if (parseSILIdentifier(componentKind, componentLoc,
+                             diag::sil_keypath_expected_component_kind))
+        return true;
+
+      if (componentKind.str() == "stored_property") {
+        ValueDecl *prop;
+        if (parseSILDottedPath(prop))
+          return true;
+        components.push_back(KeyPathInstComponent::forStoredProperty(prop));
+      } else {
+        P.diagnose(componentLoc, diag::sil_keypath_unknown_component_kind,
+                   componentKind);
+        return true;
+      }
+      
+      if (!P.consumeIf(tok::comma))
+        break;
+    }
+    
+    if (P.parseToken(tok::r_paren, diag::expected_tok_in_sil_instr, ")") ||
+        parseSILDebugLocation(InstLoc, B))
+      return true;
+    
+    ResultVal = B.createKeyPath(InstLoc, components, Ty);
+    break;
+  }
+
+  // Conversion instructions.
   case ValueKind::UncheckedRefCastInst:
   case ValueKind::UncheckedAddrCastInst:
   case ValueKind::UncheckedTrivialBitCastInst:

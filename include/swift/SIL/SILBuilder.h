@@ -474,6 +474,13 @@ public:
     return insert(new (F.getModule())
                       LoadInst(getSILDebugLocation(Loc), LV, Qualifier));
   }
+  
+  KeyPathInst *createKeyPath(SILLocation Loc,
+                             ArrayRef<KeyPathInstComponent> Components,
+                             SILType Ty) {
+    return insert(KeyPathInst::create(getSILDebugLocation(Loc),
+                                      Components, Ty, F));
+  }
 
   /// Convenience function for calling emitLoad on the type lowering for
   /// non-address values.
