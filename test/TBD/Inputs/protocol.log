@@ -4,7 +4,6 @@
 <unknown>:0: error: symbol '_T04test014PublicInternalB6StructV17internalVarGetSetSivfi' (test.PublicInternalPublicStruct.(internalVarGetSet : Swift.Int).(variable initialization expression)) is in generated IR file, but not in TBD file
 <unknown>:0: error: symbol '_T04test06PublicbB6StructV12publicVarGetSivfi' (test.PublicPublicPublicStruct.(publicVarGet : Swift.Int).(variable initialization expression)) is in generated IR file, but not in TBD file
 <unknown>:0: error: symbol '_T04test06PublicbB6StructV15publicVarGetSetSivfi' (test.PublicPublicPublicStruct.(publicVarGetSet : Swift.Int).(variable initialization expression)) is in generated IR file, but not in TBD file
-<unknown>:0: error: symbol '_T04test06PublicbB6StructVAA0B0A2aDP12publicMethodyyFTW' (protocol witness for test.Public.publicMethod () -> () in conformance test.PublicPublicPublicStruct : test.Public in test) is in generated IR file, but not in TBD file
 <unknown>:0: error: symbol '_T04test06PublicbB6StructVAA0B0AAWP' (protocol witness table for test.PublicPublicPublicStruct : test.Public in test) is in generated IR file, but not in TBD file
 <unknown>:0: error: symbol '_T04test06PublicbB6StructVAA0B0AAWa' (protocol witness table accessor for test.PublicPublicPublicStruct : test.Public in test) is in generated IR file, but not in TBD file
 <unknown>:0: error: symbol '_T04test013PublicPrivateB6StructV13privateVarGetSifg' (test.PublicPrivatePublicStruct.privateVarGet.getter : Swift.Int) is in TBD file, but not in generated IR

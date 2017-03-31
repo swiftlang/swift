@@ -79,6 +79,6 @@ func testMakeFoo(_ p: P) -> Foo.Type {
 // The protocol witness for metadata_dominance.P.makeFoo () -> metadata_dominance.Foo in
 // conformance metadata_dominance.Foo : metadata_dominance.P should not use the Self type
 // as the type of the object to be created. It should dynamically obtain the type.
-// CHECK-OPT-LABEL: define hidden swiftcc %T18metadata_dominance3FooC* @_T018metadata_dominance3FooCAA1PA2aDP04makeC0ACyFTW
+// CHECK-OPT-LABEL: define internal swiftcc %T18metadata_dominance3FooC* @_T018metadata_dominance3FooCAA1PA2aDP04makeC0ACyFTW
 // CHECK-OPT-NOT: tail call noalias %swift.refcounted* @swift_rt_swift_allocObject(%swift.type* %Self
 

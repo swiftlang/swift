@@ -241,7 +241,7 @@ class ClassWithGetter : PropertyWithGetter {
 
 // Make sure we are generating a protocol witness that calls the class method on
 // ClassWithGetter.
-// CHECK-LABEL: sil hidden [transparent] [thunk] @_T09protocols15ClassWithGetterCAA08PropertycD0A2aDP1aSifgTW : $@convention(witness_method) (@in_guaranteed ClassWithGetter) -> Int {
+// CHECK-LABEL: sil private [transparent] [thunk] @_T09protocols15ClassWithGetterCAA08PropertycD0A2aDP1aSifgTW : $@convention(witness_method) (@in_guaranteed ClassWithGetter) -> Int {
 // CHECK: bb0([[C:%.*]] : $*ClassWithGetter):
 // CHECK-NEXT: [[CCOPY:%.*]] = alloc_stack $ClassWithGetter
 // CHECK-NEXT: copy_addr [[C]] to [initialization] [[CCOPY]]
@@ -269,7 +269,7 @@ class ClassWithGetterSetter : PropertyWithGetterSetter, PropertyWithGetter {
   }
 }
 
-// CHECK-LABEL: sil hidden [transparent] [thunk] @_T09protocols21ClassWithGetterSetterCAA08PropertycdE0A2aDP1bSifgTW : $@convention(witness_method) (@in_guaranteed ClassWithGetterSetter) -> Int {
+// CHECK-LABEL: sil private [transparent] [thunk] @_T09protocols21ClassWithGetterSetterCAA08PropertycdE0A2aDP1bSifgTW : $@convention(witness_method) (@in_guaranteed ClassWithGetterSetter) -> Int {
 // CHECK: bb0([[C:%.*]] : $*ClassWithGetterSetter):
 // CHECK-NEXT: [[CCOPY:%.*]] = alloc_stack $ClassWithGetterSetter
 // CHECK-NEXT: copy_addr [[C]] to [initialization] [[CCOPY]]
@@ -325,7 +325,7 @@ struct StructWithStoredProperty : PropertyWithGetter {
 // thunking code being too dumb but it is harmless to program
 // correctness.
 //
-// CHECK-LABEL: sil hidden [transparent] [thunk] @_T09protocols24StructWithStoredPropertyVAA0eC6GetterA2aDP1aSifgTW : $@convention(witness_method) (@in_guaranteed StructWithStoredProperty) -> Int {
+// CHECK-LABEL: sil private [transparent] [thunk] @_T09protocols24StructWithStoredPropertyVAA0eC6GetterA2aDP1aSifgTW : $@convention(witness_method) (@in_guaranteed StructWithStoredProperty) -> Int {
 // CHECK: bb0([[C:%.*]] : $*StructWithStoredProperty):
 // CHECK-NEXT: [[CCOPY:%.*]] = alloc_stack $StructWithStoredProperty
 // CHECK-NEXT: copy_addr [[C]] to [initialization] [[CCOPY]]
@@ -355,7 +355,7 @@ struct StructWithStoredClassProperty : PropertyWithGetter {
   // CHECK-NEXT: return %2 : $Int
 }
 
-// CHECK-LABEL: sil hidden [transparent] [thunk] @_T09protocols29StructWithStoredClassPropertyVAA0fC6GetterA2aDP1aSifgTW : $@convention(witness_method) (@in_guaranteed StructWithStoredClassProperty) -> Int {
+// CHECK-LABEL: sil private [transparent] [thunk] @_T09protocols29StructWithStoredClassPropertyVAA0fC6GetterA2aDP1aSifgTW : $@convention(witness_method) (@in_guaranteed StructWithStoredClassProperty) -> Int {
 // CHECK: bb0([[C:%.*]] : $*StructWithStoredClassProperty):
 // CHECK-NEXT: [[CCOPY:%.*]] = alloc_stack $StructWithStoredClassProperty
 // CHECK-NEXT: copy_addr [[C]] to [initialization] [[CCOPY]]
