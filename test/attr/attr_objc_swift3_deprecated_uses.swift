@@ -5,7 +5,7 @@ import Foundation
 
 class ObjCSubclass : NSObject {
   func foo() { } // expected-note 2{{add '@objc' to expose this instance method to Objective-C}}{{3-3=@objc }}
-  var bar: NSObject? = nil // expected-note{{add '@objc' to expose this var to Objective-C}}{{3-3=@objc }}
+  var bar: NSObject? = nil // expected-note 2{{add '@objc' to expose this var to Objective-C}}{{3-3=@objc }}
 }
 
 class DynamicMembers {
@@ -57,6 +57,7 @@ func testSelector(sc: ObjCSubclass, dm: DynamicMembers) {
 }
 
 func testKeypath(dm: DynamicMembers) {
+  _ = #keyPath(ObjCSubclass.bar)   // expected-warning{{argument of '#keyPath' refers to property 'bar' in 'ObjCSubclass' that depends on '@objc' attribute inference deprecated in Swift 4}}
   _ = #keyPath(DynamicMembers.bar) // okay: dynamic keyword implies @objc
 }
 
