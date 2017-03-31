@@ -32,25 +32,29 @@ public func __swift_stdlib_U_FAILURE(_ x: __swift_stdlib_UErrorCode) -> Bool {
 
 /// Unicode views should conform to this protocol, which supports index
 /// interchange and String type erasure.
-public protocol UnicodeView : BidirectionalCollection {
+public protocol _UnicodeView : BidirectionalCollection {
   func index(atEncodedOffset: Int64) -> Index
   static func encodedOffset(of: Index) -> Int64
 }
 
-extension UnicodeView {
+extension _UnicodeView {
   /// Constructs a copy of other
-  init(_ other: Self) { self = other }
+  public init(_ other: Self) { self = other }
 }
 
 /// A UnicodeView that is already using AnyUnicodeIndex has trivial interchange
 /// with encoded offsets.
-extension UnicodeView where Index == AnyUnicodeIndex {
+extension _UnicodeView where Index == AnyUnicodeIndex {
   public func index(atEncodedOffset x: Int64) -> Index {
     return Index(encodedOffset: x)
   }
   public static func encodedOffset(of i: Index) -> Int64 {
     return i.encodedOffset
   }
+}
+
+public protocol UnicodeView : _UnicodeView {
+  associatedtype SubSequence: _UnicodeView = UnicodeViewSlice<Self>
 }
 
 //===--- RandomAccessUnicodeView ------------------------------------------===//
@@ -62,6 +66,7 @@ extension UnicodeView where Index == AnyUnicodeIndex {
 /// unit, and in all the usual instances, N = 1
 public struct RandomAccessUnicodeView<Base_: RandomAccessCollection> {
   public typealias Base = Base_
+  public typealias Iterator = Base.Iterator
   public var base: Base
   public init(_ base: Base) { self.base = base }
 }
@@ -79,8 +84,7 @@ extension RandomAccessUnicodeView : BidirectionalCollectionWrapper {
   }
 }
 
-extension RandomAccessUnicodeView
-where Iterator.Element == Base_.Iterator.Element {
+extension RandomAccessUnicodeView {
   public mutating func _tryToReplaceSubrange<C: Collection>(
     from targetStart: Index, to targetEnd: Index, with replacement: C
   ) -> Bool
@@ -101,6 +105,13 @@ where Iterator.Element == Base_.Iterator.Element {
 extension RandomAccessUnicodeView : RandomAccessCollection {}
 
 extension RandomAccessUnicodeView : UnicodeView {
+  public typealias SubSequence
+  = RandomAccessUnicodeViewSlice<RandomAccessUnicodeView>
+  
+  public subscript(bounds: Range<Index>) -> SubSequence {
+    return SubSequence(base: self, bounds: bounds)
+  }
+  
   public func index(atEncodedOffset position: Int64) -> Index {
     return Index(base: position^)
   }
@@ -159,7 +170,8 @@ CodeUnits.SubSequence.Iterator.Element == CodeUnits.Iterator.Element
 extension _UnicodeViews {
   public struct EncodedScalars {
     let codeUnits: CodeUnits
-    
+
+    public typealias Self_ = EncodedScalars
     public init(_ codeUnits: CodeUnits, _: Encoding.Type = Encoding.self) {
       self.codeUnits = codeUnits
     }
@@ -285,6 +297,10 @@ extension _UnicodeViews.EncodedScalars : UnicodeView {
   public static func encodedOffset(of i: Index) -> Int64 {
     return numericCast(i.base)
   }
+  public typealias SubSequence = UnicodeViewSlice<Self_>
+  public subscript(bounds: Range<Index>) -> SubSequence {
+    return SubSequence(base: self, bounds: bounds)
+  }
 }
 
 //===----------------------------------------------------------------------===//
@@ -296,7 +312,8 @@ extension _UnicodeViews.EncodedScalars : UnicodeView {
 extension _UnicodeViews {
   public struct Scalars {
     let codeUnits: CodeUnits
-    
+
+    public typealias Self_ = Scalars
     public init(_ codeUnits: CodeUnits, _: Encoding.Type = Encoding.self) {
       self.codeUnits = codeUnits
     }
@@ -341,6 +358,10 @@ extension _UnicodeViews.Scalars : UnicodeView {
   }
   public static func encodedOffset(of i: Index) -> Int64 {
     return Base.encodedOffset(of: i)
+  }
+  public typealias SubSequence = UnicodeViewSlice<Self_>
+  public subscript(bounds: Range<Index>) -> SubSequence {
+    return SubSequence(base: self, bounds: bounds)
   }
 }
 
@@ -434,8 +455,10 @@ where FromEncoding_.EncodedScalar.Iterator.Element == CodeUnits.Iterator.Element
   public typealias Segments = Base.Segments
   public var segments: Segments? { return base.segments }
 
-  // FIXME: use Base.SubSequence?
-  public typealias SubSequence = BidirectionalSlice<_TranscodedView>
+  public typealias SubSequence = UnicodeViewSlice<_TranscodedView>
+  public subscript(bounds: Range<Index>) -> SubSequence {
+    return SubSequence(base: self, bounds: bounds)
+  }
 }
 
 
@@ -652,7 +675,10 @@ extension _UnicodeViews {
 
     internal let storage: _UnicodeViews
 
-    public typealias SubSequence = BidirectionalSlice<CharacterView>
+    public typealias SubSequence = UnicodeViewSlice<CharacterView>
+    public subscript(bounds: Range<Index>) -> SubSequence {
+      return SubSequence(base: self, bounds: bounds)
+    }
 
     public struct Index : ForwardingWrapper, Comparable {
       public var base: CodeUnits.IndexDistance

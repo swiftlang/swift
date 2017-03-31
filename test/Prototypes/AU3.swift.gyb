@@ -18,7 +18,6 @@
   import gyb
 }%
 import Darwin
-import StdlibUnittest
 
 /// Implementation detail of `String` that type-erases any `UnicodeContent` into
 /// one word that can live in one of the cases.
@@ -27,16 +26,16 @@ class UnicodeContentBox : FactoryInitializable {
   var utf8: AnyUInt8UnicodeView { fatalError("override me!") }
   var unicodeScalars: AnyUnicodeScalarUnicodeView { fatalError("override me!") }
   var fccNormalizedUTF16: AnyUInt16UnicodeView { fatalError("override me!") }
-#if false
+/*
   var utf32: AnyUInt32UnicodeView { fatalError("override me!") }
-#endif
-  
-#if false
+*/
+
+  /*
   // FIXME: Can this be Random Access?  If all encodings use a single code unit
   // per ASCII character and can statelessly identify a code unit that
   // represents ASCII, then yes.  Look into, e.g. shift-JIS.
   var extendedASCII: UnicodeBidirectionalUInt32 { fatalError("override me!") }
-#endif
+*/
   var characters: AnyCharacterUnicodeView { fatalError("override me!") }
   var isKnownLatin1: Bool { fatalError("override me!") }
   var isKnownASCII: Bool { fatalError("override me!") }
@@ -65,7 +64,7 @@ class UnicodeContentBox : FactoryInitializable {
     override var unicodeScalars: AnyUnicodeScalarUnicodeView {
       return AnyUnicodeScalarUnicodeView(base.unicodeScalars)
     }
-#if false
+/*
     override var utf32: AnyUInt32UnicodeView {
       return AnyUInt32UnicodeView(base.utf32)
     }
@@ -75,7 +74,7 @@ class UnicodeContentBox : FactoryInitializable {
     override var extendedASCII: UnicodeBidirectionalUInt32 {
       return base.extendedASCII
     }
-#endif
+*/
     override var characters: AnyCharacterUnicodeView {
       return AnyCharacterUnicodeView(base.characters)
     }
@@ -261,15 +260,14 @@ extension String.Content.Inline${N}or${W} : UnicodeContent {
         _utf16.lazy.map {
           UInt8(truncatingBitPattern: $0) }))
     : AnyUInt8UnicodeView(
-        _UnicodeViews(_utf16, UTF16.self).transcoded(to: UTF8.self))
+      _UnicodeViews(_utf16, UTF16.self).transcoded(to: UTF8.self))
   }
   
   public var fccNormalizedUTF16: AnyUInt16UnicodeView {
     return bitsPerElement <= 8
     ? AnyUInt16UnicodeView(utf16)
     : AnyUInt16UnicodeView(
-      _UnicodeViews(_utf16, UTF16.self).fccNormalizedUTF16
-    )
+      _UnicodeViews(_utf16, UTF16.self).fccNormalizedUTF16)
   }
   
   public var characters: AnyCharacterUnicodeView {
@@ -379,23 +377,19 @@ internal struct _NSStringUTF16 : RandomAccessCollection {
 //===----------------------------------------------------------------------===//
 
 
-extension String : Unicode {
+extension String : Unicode, BidirectionalCollectionWrapper {
   public typealias Base = AnyCharacterUnicodeView
   public typealias Index = AnyCharacterUnicodeView.Index
   public typealias IndexDistance = AnyCharacterUnicodeView.IndexDistance
 
-  public struct SubSequence {
-    public typealias Base = RangeReplaceableBidirectionalSlice<String>
-    public var base: Base
-  }
-
+  public typealias SubSequence = Substring
   public subscript(bounds: Range<Index>) -> SubSequence {
     get {
-      return SubSequence(base:
-        RangeReplaceableBidirectionalSlice(base: self, bounds: bounds))
+      return Substring(
+        content: Substring.Content(wholeContent: self.content, bounds: bounds))
     }
     set {
-      fatalError("implement me!")
+      replaceSubrange(bounds, with: newValue)
     }
   }
 
@@ -703,6 +697,19 @@ extension String.Content {
     }
   }
 
+  public mutating func replaceSubrange<C: Collection>(
+    _ target: Range<String.Index>, with replacement: C
+  ) where C.Iterator.Element == Character {
+    // Fast path: the incoming characters are Unicode
+    if let unicodeReplacement = replacement as? AnyUnicode {
+      replaceUTF16(target, with: unicodeReplacement.anyContent.anyUTF16)
+    }
+    else {
+      // Slow path: we have to reconstruct UTF-16 from Characters
+      replaceUTF16(target, with: replacement.lazy.flatMap { $0.utf16 })
+    }
+  }
+  
   /// Replaces the `target` subrange with the given UTF-16 encoded content.
   internal mutating func replaceUTF16<C: Collection>(
     _ target: Range<String.Index>, with replacement_: C
@@ -809,20 +816,45 @@ extension ObjectIdentifier {
     }    
   }
 }
-//===--- SubString --------------------------------------------------------===//
+//===--- Substring --------------------------------------------------------===//
 
+public struct Substring {
+  public struct Content {
+    // FIXME: small string optimization
+    public var _wholeContent: String.Content
+    // FIXME: Change this to a range of encodedOffset
+    public var _bounds: Range<String.Index>
 
-extension String.SubSequence
-  : BidirectionalCollection, BidirectionalCollectionWrapper {
-  public typealias Index = Base.Index
-  public typealias IndexDistance = Base.IndexDistance
-  public typealias Iterator = Base.Iterator
+    init() {
+      _wholeContent = String.Content()
+      _bounds = _wholeContent.utf16.startIndex..<_wholeContent.utf16.endIndex
+    }
+
+    init(wholeContent: String.Content, bounds: Range<String.Index>) {
+      self._wholeContent = wholeContent
+      self._bounds = bounds
+    }
+  }
+  public var content: Content
 }
 
-extension String.SubSequence
-: RangeReplaceableCollection {
-  public init() { base = Base() }
-  
+extension Substring : BidirectionalCollectionWrapper, Unicode {
+  public typealias Base = AnyCharacterUnicodeView.SubSequence
+  public typealias Iterator = Base.Iterator
+  public typealias Index = AnyCharacterUnicodeView.Index
+  public typealias IndexDistance = AnyCharacterUnicodeView.IndexDistance
+  public typealias SubSequence = Substring
+
+  public subscript(bounds: Range<Index>) -> SubSequence {
+    get {
+      return SubSequence(
+        content: Content(wholeContent: content._wholeContent, bounds: bounds))
+    }
+    set {
+      content._wholeContent.replaceUTF16(bounds, with: newValue.content.utf16)
+    }
+  }
+
   // FIXME: figure out how to resolve ambiguities when we try to use the default
   // from BidirectionalCollectionWrapper.
   public mutating func _tryToReplaceSubrange<C: Collection>(
@@ -832,75 +864,52 @@ extension String.SubSequence
     return base._tryToReplaceSubrange(
       from: targetStart, to: targetEnd,  with: replacement)
   }
+}
 
+extension Substring : RangeReplaceableCollection {
+  public init() { content = Content() }
+  
   public mutating func replaceSubrange<C: Collection>(
     _ r: Range<Index>, with replacement: C
   )
   where C.Iterator.Element == Base.Iterator.Element {
-    return base.replaceSubrange(r,  with: replacement)
-  }
-}
-/*
-extension String.SubSequence : Unicode {
-  public struct Content {
-    var base: String.Content
-  }
-  public var content: Content {
-    return base.base.content[base.bounds]
+    content._wholeContent.replaceSubrange(r,  with: replacement)
   }
 }
 
-public typealias SubString = String.SubSequence
-
-extension SubString.Content : AnyUnicodeContent {
-  var isKnownLatin1: Bool { return base.isKnownLatin1 }
-  var isKnownASCII: Bool { return base.isKnownASCII }
-  var isKnownFCCNormalized: Bool { return base.isKnownFCCNormalized }
-  var isKnownFCDForm: Bool { return base.isKnownFCDForm }
-  var isKnownNFDNormalized: Bool { return base.isKnownNFDNormalized }
-  var isKnownNFCNormalized: Bool { return base.isKnownNFCNormalized }
+extension Substring.Content : AnyUnicodeContent {
+  public var isKnownLatin1: Bool { return _wholeContent.isKnownLatin1 }
+  public var isKnownASCII: Bool { return _wholeContent.isKnownASCII }
+  public var isKnownFCCNormalized: Bool {
+    return _wholeContent.isKnownFCCNormalized
+  }
+  public var isKnownFCDForm: Bool { return _wholeContent.isKnownFCDForm }
+  public var isKnownNFDNormalized: Bool {
+    return _wholeContent.isKnownNFDNormalized
+  }
+  public var isKnownNFCNormalized: Bool {
+    return _wholeContent.isKnownNFCNormalized
+  }
 }
 
-extension SubString.Content : UnicodeContent {
-  /// A type that presents the string's UTF-16 code units
-  associatedtype UTF16View : UnicodeView
-  // where Iterator.Element == UInt16
-
-  /// The string's UTF-16 code units.
-  ///
-  /// Note: this view may contain encoding errors, if the underlying encoding is
-  /// UTF16 and the source had encoding errors.
-  var utf16: UTF16View { get }
-
-  /// A type that presents the string's UTF-8 code units
-  associatedtype UTF8View : UnicodeView
-  // where Iterator.Element == UInt8
-
-  /// The string's UTF-8 code units.
-  ///
-  /// Note: this view may contain encoding errors, if the underlying encoding is
-  /// UTF8 and the source had encoding errors.
-  var utf8: UTF8View { get }
-
-  /// A type that presents an FCC-normalized view of the string
-  associatedtype FCCNormalizedUTF16View : UnicodeView
-  // where Iterator.Element == UInt16
-
-  /// An FCC-normalized view of the string
-  var fccNormalizedUTF16: FCCNormalizedUTF16View { get }
-
-  associatedtype CharacterView : UnicodeView
-  // where Iterator.Element == Character
-
-  var characters: CharacterView { get }
-
-  /// A type that presents the string's unicode scalar values
-  associatedtype UnicodeScalarView : UnicodeView
-  // where Iterator.Element == UnicodeScalar
-
-  var unicodeScalars: UnicodeScalarView { get }
+extension Substring.Content : UnicodeContent {
+  public var utf16: String.Content.UTF16View.SubSequence {
+    return _wholeContent.utf16[_bounds]
+  }
+  public var utf8: String.Content.UTF8View.SubSequence {
+    return _wholeContent.utf8[_bounds]
+  }
+  public var fccNormalizedUTF16: String.Content.FCCNormalizedUTF16View.SubSequence {
+    return _wholeContent.fccNormalizedUTF16[_bounds]
+  }
+  public var characters: String.Content.CharacterView.SubSequence {
+    return _wholeContent.characters[_bounds]
+  }
+  public var unicodeScalars: String.Content.UnicodeScalarView.SubSequence {
+    return _wholeContent.unicodeScalars[_bounds]
+  }
 }
-*/
+
 //===--- Literal Support --------------------------------------------------===//
 
 extension String : ExpressibleByUnicodeScalarLiteral {
@@ -1134,10 +1143,10 @@ extension String : _ObjectiveCBridgeable {
   }
 }
 
-
 //===----------------------------------------------------------------------===//
 //===--- Tests ------------------------------------------------------------===//
 //===----------------------------------------------------------------------===//
+import StdlibUnittest
 var suite = TestSuite("AnyUnicode")
 
 suite.test("UInt61.packing") {
@@ -1498,19 +1507,19 @@ suite.test("RandomAccess/UnicodeScalar") {
 suite.test("CharacterView") {
   // FIXME: precondition checks in Character prevent us from trying this last
   // one.
-  let s = "🇸🇸🇬🇱abc🇱🇸🇩🇯🇺🇸\nΣὲ 👥🥓γ͙᷏̃̂᷀νω" // + "👩‍❤️‍👩"
+  let s = "🇸🇸🇬🇱abc🇱🇸🇩🇯🇺🇸\nΣὲ 👥🥓γ͙᷏̃̂᷀νω" // + "👩‍❤️‍👩"
   let a: [Character] = [
     "🇸🇸", "🇬🇱", "a", "b", "c", "🇱🇸", "🇩🇯", "🇺🇸", "\n",
-    "Σ", "ὲ", " ", "👥", "🥓", "γ͙᷏̃̂᷀", "ν", "ω"
+    "Σ", "ὲ", " ", "👥", "🥓", "γ͙᷏̃̂᷀", "ν", "ω"
   ] // + "👩‍❤️‍👩"
 
   // FIXME: the generic arguments should be deducible, but aren't; <rdar://30323161>
-  let v8 = _UnicodeViews<Array<UInt8>, UTF8>.CharacterView(Array(s.utf8), UTF8.self)
+  let v8 = _UnicodeViews(Array(s.utf8), UTF8.self).characters
   expectEqual(a, Array(v8))
 
   // FIXME: We need to wrap s.utf16 in Array because of <rdar://30386193> Unaccountable link errors
   // FIXME: the generic arguments should be deducible; <rdar://30323161>
-  let v16 = _UnicodeViews<Array<UInt16>, UTF16>.CharacterView(Array(s.utf16), UTF16.self)
+  let v16 = _UnicodeViews(Array(s.utf16), UTF16.self).characters
   expectEqual(a, Array(v16))
 
   expectEqual(v8.reversed(), a.reversed())
@@ -1526,10 +1535,10 @@ suite.test("basic") {
   let s32 = s.unicodeScalars.lazy.map { $0.value }
   let s16 = Array(s.utf16)
   let s8 = Array(s.utf8)
-  let s16to32 = _UnicodeViews.TranscodedView(s16, from: UTF16.self, to: UTF32.self)
-  let s16to8 = _UnicodeViews.TranscodedView(s16, from: UTF16.self, to: UTF8.self)
-  let s8to16 = _UnicodeViews.TranscodedView(s8, from: UTF8.self, to: UTF16.self)
-  let s8Vto16 = _UnicodeViews.TranscodedView(s8, from: ValidUTF8.self, to: UTF16.self)
+  let s16to32 = _UnicodeViews(s16, UTF16.self).transcoded(to: UTF32.self)
+  let s16to8 = _UnicodeViews(s16, UTF16.self).transcoded(to: UTF8.self)
+  let s8to16 = _UnicodeViews(s8, UTF8.self).transcoded(to: UTF16.self)
+  let s8Vto16 = _UnicodeViews(s8, ValidUTF8.self).transcoded(to: UTF16.self)
   expectTrue(s32.elementsEqual(s16to32))
   expectTrue(s8.elementsEqual(s16to8))
   expectTrue(s16.elementsEqual(s8to16))
@@ -1796,6 +1805,22 @@ suite.test("AnyUInt16UnicodeView.DoubleWrapping") {
   expectEqual(type(of: u1.base), type(of: u2.base))
 }
 
+suite.test("Substring") {
+  let s: String = "abc\n🇸🇸🇬🇱🇱🇸🇩🇯🇺🇸\nΣὲ 👥🥓γνωρίζω\nგთხოვთ\nงบู๊กู้ขึ้นม่\nᚹᛖᛥᚫ "
+  let u8 = s.content.utf8
+  let d = u8.base2.distance(
+    from: u8._unwrap(u8.startIndex),
+    to: u8._unwrap(s.index(atOffset: 1)))
+  expectNotEqual(0, d)
+  for i in s.indices {
+    for j in s[i...].indices {
+      expectEqualSequence(s.content.utf16[i..<j], s[i..<j].content.utf16)
+      expectEqualSequence(s.content.utf8[i..<j], s[i..<j].content.utf8)
+      expectEqualSequence(
+        s.content.unicodeScalars[i..<j], s[i..<j].content.unicodeScalars)
+    }
+  }
+}
 runAllTests()
 
 // ${'Local Variables'}:

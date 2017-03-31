@@ -30,6 +30,7 @@
     "Unicode2.swift",
     "UnicodeScalar.swift",
     "UnicodeViews.swift",
+    "UnicodeViewSlice.swift",
     "UnicodeTrie.swift",
     "UnavailableStringAPIs.swift"
   ],
