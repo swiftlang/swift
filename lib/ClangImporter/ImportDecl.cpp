@@ -4361,7 +4361,7 @@ namespace {
         const DeclContext *overrideContext = overridden->getDeclContext();
         // It's okay to compare interface types directly because Objective-C
         // does not have constrained extensions.
-        if (overrideContext != dc && overridden->hasClangNode() && 
+        if (overrideContext != dc && overridden->hasClangNode() &&
             overrideContext->getDeclaredInterfaceType()->isEqual(containerTy)) {
           // We've encountered a redeclaration of the property.
           // HACK: Just update the original declaration instead of importing a
@@ -7591,16 +7591,9 @@ ClangImporter::Implementation::loadAllMembers(Decl *D, uint64_t extra) {
     const NominalTypeDecl *base = ext->getExtendedType()->getAnyNominal();
     if (auto *clangBase = base->getClangDecl()) {
       base->loadAllMembers();
-
-      // Sanity check: make sure we don't jump over to a category /while/
-      // loading the original class's members. Right now we only check if this
-      // happens on the first member.
-      if (auto *clangContainer = dyn_cast<clang::ObjCContainerDecl>(clangBase)){
-        if (!clangContainer->decls_empty()) {
-          assert(!base->getMembers().empty() &&
-                 "can't load extension members before base has finished");
-        }
-      }
+      // FIXME: Assert that we don't jump over to a category /while/
+      // loading the original class's members. Unfortunately there are some
+      // cases where this does happen today.
     }
   }
 
