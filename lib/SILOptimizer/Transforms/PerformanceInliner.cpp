@@ -278,7 +278,7 @@ SILFunction *SILPerformanceInliner::getEligibleFunction(FullApplySite AI) {
   }
 
   // A non-fragile function may not be inlined into a fragile function.
-  if (Caller->isFragile() &&
+  if (Caller->isSerialized() &&
       !Callee->hasValidLinkageForFragileInline()) {
     if (!Callee->hasValidLinkageForFragileRef()) {
       llvm::errs() << "caller: " << Caller->getName() << "\n";

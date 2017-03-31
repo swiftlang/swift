@@ -55,6 +55,14 @@ FUNCTION_WITH_GLOBAL_SYMBOL_AND_IMPL(AllocBox, swift_allocBox,
          ARGS(TypeMetadataPtrTy),
          ATTRS(NoUnwind))
 
+//  BoxPair swift_makeBoxUnique(OpaqueValue *buffer, Metadata *type, size_t alignMask);
+FUNCTION(MakeBoxUnique,
+         swift_makeBoxUnique,
+         DefaultCC,
+         RETURNS(RefCountedPtrTy, OpaquePtrTy),
+         ARGS(OpaquePtrTy, TypeMetadataPtrTy, SizeTy),
+         ATTRS(NoUnwind, ZExt))
+
 FUNCTION(DeallocBox, swift_deallocBox, DefaultCC,
          RETURNS(VoidTy),
          ARGS(RefCountedPtrTy),

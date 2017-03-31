@@ -20,12 +20,12 @@ sil_stage canonical
 // CHECK: define{{( protected)?}} available_externally hidden swiftcc void @hidden_external_resilient_function_def_test() {{.*}} {
 // CHECK: define linkonce_odr hidden swiftcc void @shared_external_resilient_function_def_test() {{.*}} {
 
-sil public [fragile] @public_fragile_function_test : $@convention(thin) () -> () {
+sil public [serialized] @public_fragile_function_test : $@convention(thin) () -> () {
   %0 = tuple()
   return %0 : $()
 }
 
-sil public [transparent] [fragile] @public_transparent_fragile_function_test : $@convention(thin) () -> () {
+sil public [transparent] [serialized] @public_transparent_fragile_function_test : $@convention(thin) () -> () {
   %0 = tuple()
   return %0 : $()
 }
@@ -35,50 +35,50 @@ sil public [transparent] @public_transparent_function_test : $@convention(thin) 
   return %0 : $()
 }
 
-sil hidden [fragile] @hidden_fragile_function_test : $@convention(thin) () -> () {
+sil hidden [serialized] @hidden_fragile_function_test : $@convention(thin) () -> () {
   %0 = tuple()
   return %0 : $()
 }
 
-sil shared [fragile] @shared_fragile_function_test : $@convention(thin) () -> () {
+sil shared [serialized] @shared_fragile_function_test : $@convention(thin) () -> () {
   %0 = tuple()
   return %0 : $()
 }
 
-sil private [fragile] @private_fragile_function_test : $@convention(thin) () -> () {
+sil private [serialized] @private_fragile_function_test : $@convention(thin) () -> () {
   %0 = tuple()
   return %0 : $()
 }
 
-sil public_external [fragile] @public_external_fragile_function_def_test : $@convention(thin) () -> () {
+sil public_external [serialized] @public_external_fragile_function_def_test : $@convention(thin) () -> () {
   %0 = tuple()
   return %0 : $()
 }
 
-sil hidden_external [fragile] @hidden_external_fragile_function_def_test : $@convention(thin) () -> () {
+sil hidden_external [serialized] @hidden_external_fragile_function_def_test : $@convention(thin) () -> () {
   %0 = tuple()
   return %0 : $()
 }
 
-sil shared_external [fragile] @shared_external_fragile_function_def_test : $@convention(thin) () -> () {
+sil shared_external [serialized] @shared_external_fragile_function_def_test : $@convention(thin) () -> () {
   %0 = tuple()
   return %0 : $()
 }
 
-sil private_external [fragile] @private_external_fragile_function_def_test : $@convention(thin) () -> () {
+sil private_external [serialized] @private_external_fragile_function_def_test : $@convention(thin) () -> () {
   %0 = tuple()
   return %0 : $()
 }
 
-sil public_external [fragile] @public_external_fragile_function_decl_test : $@convention(thin) () -> ()
+sil public_external [serialized] @public_external_fragile_function_decl_test : $@convention(thin) () -> ()
 
-sil hidden_external [fragile] @hidden_external_fragile_function_decl_test : $@convention(thin) () -> ()
+sil hidden_external [serialized] @hidden_external_fragile_function_decl_test : $@convention(thin) () -> ()
 
 // 'shared' should always be a definition.
-// sil shared_external [fragile] @shared_external_fragile_function_decl_test : $@convention(thin) () -> ()
+// sil shared_external [serialized] @shared_external_fragile_function_decl_test : $@convention(thin) () -> ()
 
 // 'private' should always be a definition.
-// sil private_external [fragile] @private_external_fragile_function_decl_test : $@convention(thin) () -> ()
+// sil private_external [serialized] @private_external_fragile_function_decl_test : $@convention(thin) () -> ()
 
 sil public @public_resilient_function_test : $@convention(thin) () -> () {
   %0 = tuple()

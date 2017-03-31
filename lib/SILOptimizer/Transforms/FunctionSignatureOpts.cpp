@@ -468,7 +468,7 @@ void FunctionSignatureTransform::createFunctionSignatureOptimizedFunction() {
 
   NewF = M.createFunction(linkage, Name, createOptimizedSILFunctionType(),
                           F->getGenericEnvironment(), F->getLocation(),
-                          F->isBare(), F->isTransparent(), F->isFragile(),
+                          F->isBare(), F->isTransparent(), F->isSerialized(),
                           F->isThunk(), F->getClassVisibility(),
                           F->getInlineStrategy(), F->getEffectsKind(), nullptr,
                           F->getDebugScope());
@@ -919,7 +919,7 @@ public:
     // to the function.
     auto P = Demangle::SpecializationPass::FunctionSignatureOpts;
     Mangle::FunctionSignatureSpecializationMangler Mangler(P,
-                                                             F->isFragile(), F);
+                                                           F->isSerialized(), F);
 
     /// Keep a map between the exploded argument index and the original argument
     /// index.

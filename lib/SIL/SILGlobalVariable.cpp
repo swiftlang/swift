@@ -11,12 +11,13 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/SIL/SILGlobalVariable.h"
+#include "swift/SIL/SILLinkage.h"
 #include "swift/SIL/SILModule.h"
 
 using namespace swift;
 
 SILGlobalVariable *SILGlobalVariable::create(SILModule &M, SILLinkage linkage,
-                                             bool IsFragile,
+                                             IsSerialized_t isSerialized,
                                              StringRef name,
                                              SILType loweredType,
                                              Optional<SILLocation> loc,
@@ -30,7 +31,7 @@ SILGlobalVariable *SILGlobalVariable::create(SILModule &M, SILLinkage linkage,
     name = entry->getKey();
   }
 
-  auto var = new (M) SILGlobalVariable(M, linkage, IsFragile, name,
+  auto var = new (M) SILGlobalVariable(M, linkage, isSerialized, name,
                                        loweredType, loc, Decl);
 
   if (entry) entry->setValue(var);
@@ -39,7 +40,7 @@ SILGlobalVariable *SILGlobalVariable::create(SILModule &M, SILLinkage linkage,
 
 
 SILGlobalVariable::SILGlobalVariable(SILModule &Module, SILLinkage Linkage,
-                                     bool IsFragile,
+                                     IsSerialized_t isSerialized,
                                      StringRef Name, SILType LoweredType,
                                      Optional<SILLocation> Loc, VarDecl *Decl)
   : Module(Module),
@@ -47,8 +48,8 @@ SILGlobalVariable::SILGlobalVariable(SILModule &Module, SILLinkage Linkage,
     LoweredType(LoweredType),
     Location(Loc),
     Linkage(unsigned(Linkage)),
-    Fragile(IsFragile),
     VDecl(Decl) {
+  setSerialized(isSerialized);
   IsDeclaration = isAvailableExternally(Linkage);
   setLet(Decl ? Decl->isLet() : false);
   InitializerF = nullptr;
@@ -65,6 +66,15 @@ void SILGlobalVariable::setInitializer(SILFunction *InitF) {
 
 SILGlobalVariable::~SILGlobalVariable() {
   getModule().GlobalVariableMap.erase(Name);
+}
+
+/// Get this global variable's fragile attribute.
+IsSerialized_t SILGlobalVariable::isSerialized() const {
+  return Serialized ? IsSerialized : IsNotSerialized;
+}
+void SILGlobalVariable::setSerialized(IsSerialized_t isSerialized) {
+  assert(isSerialized != IsSerializable);
+  Serialized = isSerialized ? 1 : 0;
 }
 
 // FIXME

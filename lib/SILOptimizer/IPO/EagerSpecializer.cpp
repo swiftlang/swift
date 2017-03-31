@@ -705,7 +705,7 @@ static SILFunction *eagerSpecialize(SILFunction *GenericFunc,
 
   GenericFuncSpecializer
         FuncSpecializer(GenericFunc, ReInfo.getClonerParamSubstitutions(),
-                        GenericFunc->isFragile(), ReInfo);
+                        GenericFunc->isSerialized(), ReInfo);
 
   SILFunction *NewFunc = FuncSpecializer.trySpecialization();
   if (!NewFunc)

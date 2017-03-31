@@ -182,28 +182,27 @@ bool SILLinkerVisitor::visitApplyInst(ApplyInst *AI) {
   if (!Callee)
     return false;
 
-  // If the linking mode is not link all, AI is not transparent, and the
-  // callee is not shared, we don't want to perform any linking.
-  if (!isLinkAll() && !Callee->isTransparent() &&
-      !hasSharedVisibility(Callee->getLinkage()))
-    return false;
+  if (isLinkAll() ||
+      hasSharedVisibility(Callee->getLinkage())) {
+    addFunctionToWorklist(Callee);
+    return true;
+  }
 
-  // Otherwise we want to try and link in the callee... Add it to the callee
-  // list and return true.
-  addFunctionToWorklist(Callee);
-  return true;
+  return false;
 }
 
 bool SILLinkerVisitor::visitPartialApplyInst(PartialApplyInst *PAI) {
   SILFunction *Callee = PAI->getReferencedFunction();
   if (!Callee)
     return false;
-  if (!isLinkAll() && !Callee->isTransparent() &&
-      !hasSharedVisibility(Callee->getLinkage()))
-    return false;
 
-  addFunctionToWorklist(Callee);
-  return true;
+  if (isLinkAll() ||
+      hasSharedVisibility(Callee->getLinkage())) {
+    addFunctionToWorklist(Callee);
+    return true;
+  }
+
+  return false;
 }
 
 bool SILLinkerVisitor::visitFunctionRefInst(FunctionRefInst *FRI) {
@@ -211,12 +210,14 @@ bool SILLinkerVisitor::visitFunctionRefInst(FunctionRefInst *FRI) {
   // behind as dead code. This shouldn't happen, but if it does don't get into
   // an inconsistent state.
   SILFunction *Callee = FRI->getReferencedFunction();
-  if (!isLinkAll() && !Callee->isTransparent() &&
-      !hasSharedVisibility(Callee->getLinkage()))
-    return false;
 
-  addFunctionToWorklist(FRI->getReferencedFunction());
-  return true;
+  if (isLinkAll() ||
+      hasSharedVisibility(Callee->getLinkage())) {
+    addFunctionToWorklist(FRI->getReferencedFunction());
+    return true;
+  }
+
+  return false;
 }
 
 bool SILLinkerVisitor::visitProtocolConformance(

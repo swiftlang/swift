@@ -218,8 +218,7 @@ func calls(_ i:Int, j:Int, k:Int) {
   // CHECK: [[PMETHOD:%[0-9]+]] = witness_method $[[OPENED]], #SomeProtocol.method!1
   // CHECK: [[I:%[0-9]+]] = load [trivial] [[IADDR]]
   // CHECK: apply [[PMETHOD]]<[[OPENED]]>([[I]], [[PVALUE]])
-  // CHECK: destroy_addr [[PVALUE]]
-  // CHECK: deinit_existential_addr [[TEMP]]
+  // CHECK: destroy_addr [[TEMP]]
   // CHECK: dealloc_stack [[TEMP]]
   p.method(i)
 
@@ -381,7 +380,7 @@ func noinline_callee() {}
 @inline(__always)
 func always_inline_callee() {}
 
-// CHECK-LABEL: sil [fragile] [always_inline] @_T09functions27public_always_inline_calleeyyF : $@convention(thin) () -> ()
+// CHECK-LABEL: sil [serialized] [always_inline] @_T09functions27public_always_inline_calleeyyF : $@convention(thin) () -> ()
 @inline(__always)
 public func public_always_inline_callee() {}
 
@@ -392,7 +391,7 @@ protocol AlwaysInline {
 // CHECK-LABEL: sil hidden [always_inline] @_T09functions19AlwaysInlinedMemberV06alwaysC0{{[_0-9a-zA-Z]*}}F : $@convention(method) (AlwaysInlinedMember) -> () {
 
 // protocol witness for functions.AlwaysInline.alwaysInlined <A : functions.AlwaysInline>(functions.AlwaysInline.Self)() -> () in conformance functions.AlwaysInlinedMember : functions.AlwaysInline in functions
-// CHECK-LABEL: sil hidden [transparent] [thunk] [always_inline] @_T09functions19AlwaysInlinedMemberVAA0B6InlineA2aDP06alwaysC0{{[_0-9a-zA-Z]*}}FTW : $@convention(witness_method) (@in_guaranteed AlwaysInlinedMember) -> () {
+// CHECK-LABEL: sil private [transparent] [thunk] [always_inline] @_T09functions19AlwaysInlinedMemberVAA0B6InlineA2aDP06alwaysC0{{[_0-9a-zA-Z]*}}FTW : $@convention(witness_method) (@in_guaranteed AlwaysInlinedMember) -> () {
 struct AlwaysInlinedMember : AlwaysInline {
   @inline(__always)
   func alwaysInlined() {}

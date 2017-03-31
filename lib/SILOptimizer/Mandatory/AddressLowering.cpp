@@ -433,7 +433,8 @@ void OpaqueStorageAllocation::convertIndirectFunctionArgs() {
 
       loadArg->setOperand(arg);
 
-      pass.valueStorageMap.insertValue(loadArg).storageAddress = arg;
+      if (addrType.isAddressOnly(pass.F->getModule()))
+        pass.valueStorageMap.insertValue(loadArg).storageAddress = arg;
     }
     ++argIdx;
   }
@@ -1406,6 +1407,7 @@ static void rewriteFunction(AddressLoweringState &pass) {
 
   for (auto &valueStorageI : pass.valueStorageMap) {
     SILValue valueDef = valueStorageI.first;
+
     if (auto *defInst = dyn_cast<SILInstruction>(valueDef))
       defVisitor.visitInst(defInst);
 

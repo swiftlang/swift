@@ -133,7 +133,7 @@ static bool canUseStaticDispatch(SILGenFunction &SGF,
 
   // If we cannot form a direct reference due to resilience constraints,
   // we have to dynamic dispatch.
-  if (SGF.F.isFragile() && !constant.isFragile())
+  if (SGF.F.isSerialized())
     return false;
 
   // If the method is defined in the same module, we can reference it
@@ -1744,12 +1744,8 @@ RValue SILGenFunction::emitApply(ResultPlanPtr &&resultPlan,
   }
 
   // If there's a foreign error parameter, fill it in.
-  Optional<FormalEvaluationScope> errorTempWriteback;
   ManagedValue errorTemp;
   if (auto foreignError = calleeTypeInfo.foreignError) {
-    // Error-temporary emission may need writeback.
-    errorTempWriteback.emplace(*this);
-
     unsigned errorParamIndex =
         calleeTypeInfo.foreignError->getErrorParameterIndex();
 
@@ -1850,9 +1846,6 @@ RValue SILGenFunction::emitApply(ResultPlanPtr &&resultPlan,
   // TODO: maybe this should happen after managing the result if it's
   // not a result-checking convention?
   if (auto foreignError = calleeTypeInfo.foreignError) {
-    // Force immediate writeback to the error temporary.
-    errorTempWriteback.reset();
-
     bool doesNotThrow = (options & ApplyOptions::DoesNotThrow);
     emitForeignErrorCheck(loc, directResults, errorTemp,
                           doesNotThrow, *foreignError);
@@ -3644,6 +3637,8 @@ namespace {
     }
 
     RValue apply(SGFContext C = SGFContext()) {
+      initialWritebackScope.verify();
+
       assert(!applied && "already applied!");
 
       applied = true;
@@ -3664,12 +3659,12 @@ namespace {
                                 foreignError, foreignSelf, uncurryLevel, C);
 
       // End of the initial writeback scope.
+      initialWritebackScope.verify();
       initialWritebackScope.pop();
 
       // Then handle the remaining call sites.
       result = applyRemainingCallSites(std::move(result), formalType,
                                        foreignSelf, foreignError, C);
-
       return result;
     }
 
@@ -4231,9 +4226,10 @@ static CallEmission prepareApplyExpr(SILGenFunction &SGF, Expr *e) {
                         apply.AssumedPlusZeroSelf);
 
   // Apply 'self' if provided.
-  if (apply.SelfParam)
+  if (apply.SelfParam) {
     emission.addCallSite(RegularLocation(e), std::move(apply.SelfParam),
                          apply.SelfType->getCanonicalType(), /*throws*/ false);
+  }
 
   // Apply arguments from call sites, innermost to outermost.
   for (auto site = apply.CallSites.rbegin(), end = apply.CallSites.rend();
@@ -4246,7 +4242,8 @@ static CallEmission prepareApplyExpr(SILGenFunction &SGF, Expr *e) {
 }
 
 RValue SILGenFunction::emitApplyExpr(Expr *e, SGFContext c) {
-  return prepareApplyExpr(*this, e).apply(c);
+  CallEmission emission = prepareApplyExpr(*this, e);
+  return emission.apply(c);
 }
 
 RValue

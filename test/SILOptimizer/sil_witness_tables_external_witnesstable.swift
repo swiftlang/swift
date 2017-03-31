@@ -7,7 +7,7 @@ import Swift
 
 // Make sure the specializer produces an external witness table.
 //
-// CHECK: sil_witness_table public_external [fragile] X: P module Swift {
+// CHECK: sil_witness_table public_external [serialized] X: P module Swift {
 
 func doSomething<T : P>(_ t : T) -> Y {
   return t.doSomething()

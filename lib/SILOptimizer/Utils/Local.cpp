@@ -1533,7 +1533,7 @@ optimizeBridgedSwiftToObjCCast(SILInstruction *Inst,
   if (!BridgedFunc)
     return nullptr;
 
-  if (Inst->getFunction()->isFragile() &&
+  if (Inst->getFunction()->isSerialized() &&
       !BridgedFunc->hasValidLinkageForFragileRef())
     return nullptr;
 

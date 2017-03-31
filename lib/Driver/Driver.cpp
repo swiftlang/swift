@@ -1113,6 +1113,13 @@ void Driver::buildOutputInfo(const ToolChain &TC, const DerivedArgList &Args,
       OI.CompilerMode = OutputInfo::Mode::SingleCompile;
       break;
 
+    case options::OPT_emit_tbd:
+      OI.CompilerOutputType = types::TY_TBD;
+      // We want the symbols from the whole module, so let's do it in one
+      // invocation.
+      OI.CompilerMode = OutputInfo::Mode::SingleCompile;
+      break;
+
     case options::OPT_parse:
     case options::OPT_typecheck:
     case options::OPT_dump_parse:
@@ -1407,6 +1414,7 @@ void Driver::buildActions(const ToolChain &TC,
       case types::TY_Remapping:
       case types::TY_PCH:
       case types::TY_ImportedModules:
+      case types::TY_TBD:
         // We could in theory handle assembly or LLVM input, but let's not.
         // FIXME: What about LTO?
         Diags.diagnose(SourceLoc(), diag::error_unexpected_input_file,

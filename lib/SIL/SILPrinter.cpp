@@ -1886,8 +1886,11 @@ void SILFunction::print(SILPrintContext &PrintCtx) const {
   if (isTransparent())
     OS << "[transparent] ";
 
-  if (isFragile())
-    OS << "[fragile] ";
+  switch (isSerialized()) {
+  case IsNotSerialized: break;
+  case IsSerializable: OS << "[serializable] "; break;
+  case IsSerialized: OS << "[serialized] "; break;
+  }
 
   switch (isThunk()) {
   case IsNotThunk: break;
@@ -1997,8 +2000,8 @@ void SILGlobalVariable::print(llvm::raw_ostream &OS, bool Verbose) const {
   OS << "sil_global ";
   printLinkage(OS, getLinkage(), isDefinition());
 
-  if (isFragile())
-    OS << "[fragile] ";
+  if (isSerialized())
+    OS << "[serialized] ";
   
   if (isLet())
     OS << "[let] ";
@@ -2293,8 +2296,8 @@ void SILWitnessTable::print(llvm::raw_ostream &OS, bool Verbose) const {
   PrintOptions QualifiedSILTypeOptions = PrintOptions::printQualifiedSILType();
   OS << "sil_witness_table ";
   printLinkage(OS, getLinkage(), /*isDefinition*/ isDefinition());
-  if (isFragile())
-    OS << "[fragile] ";
+  if (isSerialized())
+    OS << "[serialized] ";
 
   getConformance()->printName(OS, Options);
 

@@ -276,6 +276,8 @@ public:
   using DefaultCaseHandler =
       std::function<void(ManagedValue, SwitchCaseFullExpr &)>;
 
+  enum class DefaultDispatchTime { BeforeNormalCases, AfterNormalCases };
+
 private:
   struct NormalCaseData {
     EnumElementDecl *decl;
@@ -294,10 +296,13 @@ private:
     SILBasicBlock *block;
     NullablePtr<SILBasicBlock> contBlock;
     DefaultCaseHandler handler;
+    DefaultDispatchTime dispatchTime;
 
     DefaultCaseData(SILBasicBlock *block, NullablePtr<SILBasicBlock> contBlock,
-                    DefaultCaseHandler handler)
-        : block(block), contBlock(contBlock), handler(handler) {}
+                    DefaultCaseHandler handler,
+                    DefaultDispatchTime dispatchTime)
+        : block(block), contBlock(contBlock), handler(handler),
+          dispatchTime(dispatchTime) {}
     ~DefaultCaseData() = default;
   };
 
@@ -314,8 +319,10 @@ public:
 
   void addDefaultCase(SILBasicBlock *defaultBlock,
                       NullablePtr<SILBasicBlock> contBlock,
-                      DefaultCaseHandler handle) {
-    defaultBlockData.emplace(defaultBlock, contBlock, handle);
+                      DefaultCaseHandler handle,
+                      DefaultDispatchTime dispatchTime =
+                          DefaultDispatchTime::AfterNormalCases) {
+    defaultBlockData.emplace(defaultBlock, contBlock, handle, dispatchTime);
   }
 
   void addCase(EnumElementDecl *decl, SILBasicBlock *caseBlock,

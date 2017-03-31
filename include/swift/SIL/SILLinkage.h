@@ -86,10 +86,15 @@ enum {
   NumSILLinkageBits = 3
 };
 
-/// Related to linkage: flag if a function or global variable is fragile.
-enum IsFragile_t {
-  IsNotFragile,
-  IsFragile
+/// Related to linkage: flag if a function or global variable is serialized,
+/// either unconditionally, or if referenced from another serialized function.
+enum IsSerialized_t : unsigned char {
+  // Never serialized.
+  IsNotSerialized,
+  // Serialized if referenced from another serialized function.
+  IsSerializable,
+  // Always serialized.
+  IsSerialized
 };
 
 /// Strip external from public_external, hidden_external. Otherwise just return

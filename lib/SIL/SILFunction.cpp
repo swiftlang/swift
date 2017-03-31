@@ -56,7 +56,7 @@ SILFunction *SILFunction::create(
     SILModule &M, SILLinkage linkage, StringRef name,
     CanSILFunctionType loweredType, GenericEnvironment *genericEnv,
     Optional<SILLocation> loc, IsBare_t isBareSILFunction,
-    IsTransparent_t isTrans, IsFragile_t isFragile, IsThunk_t isThunk,
+    IsTransparent_t isTrans, IsSerialized_t isSerialized, IsThunk_t isThunk,
     ClassVisibility_t classVisibility, Inline_t inlineStrategy, EffectsKind E,
     SILFunction *insertBefore, const SILDebugScope *debugScope) {
   // Get a StringMapEntry for the function.  As a sop to error cases,
@@ -70,7 +70,7 @@ SILFunction *SILFunction::create(
 
   auto fn = new (M)
       SILFunction(M, linkage, name, loweredType, genericEnv, loc,
-                  isBareSILFunction, isTrans, isFragile, isThunk,
+                  isBareSILFunction, isTrans, isSerialized, isThunk,
                   classVisibility, inlineStrategy, E, insertBefore, debugScope);
 
   if (entry) entry->setValue(fn);
@@ -81,14 +81,14 @@ SILFunction::SILFunction(SILModule &Module, SILLinkage Linkage, StringRef Name,
                          CanSILFunctionType LoweredType,
                          GenericEnvironment *genericEnv,
                          Optional<SILLocation> Loc, IsBare_t isBareSILFunction,
-                         IsTransparent_t isTrans, IsFragile_t isFragile,
+                         IsTransparent_t isTrans, IsSerialized_t isSerialized,
                          IsThunk_t isThunk, ClassVisibility_t classVisibility,
                          Inline_t inlineStrategy, EffectsKind E,
                          SILFunction *InsertBefore,
                          const SILDebugScope *DebugScope)
     : Module(Module), Name(Name), LoweredType(LoweredType),
       GenericEnv(genericEnv), DebugScope(DebugScope), Bare(isBareSILFunction),
-      Transparent(isTrans), Fragile(isFragile), Thunk(isThunk),
+      Transparent(isTrans), Serialized(isSerialized), Thunk(isThunk),
       ClassVisibility(classVisibility), GlobalInitFlag(false),
       InlineStrategy(inlineStrategy), Linkage(unsigned(Linkage)),
       KeepAsPublic(false), EffectsKindAttr(E) {

@@ -2971,7 +2971,51 @@ public:
   ElementRange getAllElements() const {
     return ElementRange(getMembers());
   }
-  
+
+  unsigned getNumElements() const {
+    auto eltRange = getAllElements();
+    return std::distance(eltRange.begin(), eltRange.end());
+  }
+
+  /// If this is an enum with two cases, return the other case. Otherwise,
+  /// return nullptr.
+  EnumElementDecl *getOppositeBinaryDecl(EnumElementDecl *decl) const {
+    ElementRange range = getAllElements();
+    auto iter = range.begin();
+    if (iter == range.end())
+      return nullptr;
+    bool seenDecl = false;
+    EnumElementDecl *result = nullptr;
+    if (*iter == decl) {
+      seenDecl = true;
+    } else {
+      result = *iter;
+    }
+
+    ++iter;
+    if (iter == range.end())
+      return nullptr;
+    if (seenDecl) {
+      assert(!result);
+      result = *iter;
+    } else {
+      if (decl != *iter)
+        return nullptr;
+      seenDecl = true;
+    }
+    ++iter;
+
+    // If we reach this point, we saw the decl we were looking for and one other
+    // case. If we have any additional cases, then we do not have a binary enum.
+    if (iter != range.end())
+      return nullptr;
+
+    // This is always true since we have already returned earlier nullptr if we
+    // did not see the decl at all.
+    assert(seenDecl);
+    return result;
+  }
+
   /// Return a range that iterates over all the cases of an enum.
   CaseRange getAllCases() const {
     return CaseRange(getMembers());
@@ -4930,7 +4974,10 @@ public:
   
   /// True if the declaration is forced to be statically dispatched.
   bool hasForcedStaticDispatch() const;
-  
+
+  /// Get the interface type of this decl and remove the Self context.
+  Type getMethodInterfaceType() const;
+
   using DeclContext::operator new;
   using Decl::getASTContext;
 };

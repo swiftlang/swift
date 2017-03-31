@@ -115,7 +115,7 @@ class Box<T : Hashable> : Hashable {
     return value.hashValue
   }
 
-  static func ==<T: Equatable>(lhs: Box<T>, rhs: Box<T>) -> Bool {
+  static func ==<T>(lhs: Box<T>, rhs: Box<T>) -> Bool {
     return lhs.value == rhs.value
   }
 }

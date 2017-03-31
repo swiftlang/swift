@@ -389,7 +389,7 @@ bb3(%3 : $FakeOptional<Builtin.NativeObject>):
 struct _SwiftEmptyArrayStorage {
 }
 
-sil_global [fragile] @_swiftEmptyArrayStorage : $_SwiftEmptyArrayStorage
+sil_global [serialized] @_swiftEmptyArrayStorage : $_SwiftEmptyArrayStorage
 
 // CHECK-LABEL: sil @dont_strip_rawpointer_to_address
 // CHECK: raw_pointer_to_ref

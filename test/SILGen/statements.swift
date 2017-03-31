@@ -245,7 +245,7 @@ func test_if_break(_ c : C?) {
 label1:
   // CHECK: [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
   // CHECK: [[ARG_COPY:%.*]] = copy_value [[BORROWED_ARG]]
-  // CHECK: switch_enum [[ARG_COPY]] : $Optional<C>, case #Optional.some!enumelt.1: [[TRUE:bb[0-9]+]], default [[FALSE:bb[0-9]+]]
+  // CHECK: switch_enum [[ARG_COPY]] : $Optional<C>, case #Optional.some!enumelt.1: [[TRUE:bb[0-9]+]], case #Optional.none!enumelt: [[FALSE:bb[0-9]+]]
   if let x = c {
 // CHECK: [[TRUE]]({{.*}} : $C):
 
@@ -268,7 +268,7 @@ func test_if_else_break(_ c : C?) {
 label2:
   // CHECK: [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
   // CHECK: [[ARG_COPY:%.*]] = copy_value [[BORROWED_ARG]]
-  // CHECK: switch_enum [[ARG_COPY]] : $Optional<C>, case #Optional.some!enumelt.1: [[TRUE:bb[0-9]+]], default [[FALSE:bb[0-9]+]]
+  // CHECK: switch_enum [[ARG_COPY]] : $Optional<C>, case #Optional.some!enumelt.1: [[TRUE:bb[0-9]+]], case #Optional.none!enumelt: [[FALSE:bb[0-9]+]]
 
   // CHECK: [[FALSE]]:
   // CHECK:   end_borrow [[BORROWED_ARG]] from [[ARG]]
@@ -276,16 +276,18 @@ label2:
   if let x = c {
     // CHECK: [[TRUE]]({{.*}} : $C):
     use(x)
-    // CHECK: br [[CONT:bb[0-9]+]]
+    // CHECK:   br [[CONT:bb[0-9]+]]
+    // CHECK: [[CONT]]:
+    // CHECK:   br [[EPILOG:bb[0-9]+]]
   } else {
     // CHECK: [[AFTER_FALSE]]:
     // CHECK: apply
-    // CHECK: br [[CONT]]
+    // CHECK: br [[EPILOG]]
     foo()
     break label2
     foo() // expected-warning {{will never be executed}}
   }
-  // CHECK: [[CONT]]:
+  // CHECK: [[EPILOG]]:
   // CHECK: return
 }
 
@@ -295,28 +297,33 @@ label3:
   // CHECK: bb0({{.*}}, [[ARG2:%.*]] : $Optional<C>):
   // CHECK: [[BORROWED_ARG2:%.*]] = begin_borrow [[ARG2]]
   // CHECK: [[ARG2_COPY:%.*]] = copy_value [[BORROWED_ARG2]]
-  // CHECK: switch_enum [[ARG2_COPY]] : $Optional<C>, case #Optional.some!enumelt.1: [[TRUE:bb[0-9]+]], default [[FALSE:bb[0-9]+]]
+  // CHECK: switch_enum [[ARG2_COPY]] : $Optional<C>, case #Optional.some!enumelt.1: [[TRUE:bb[0-9]+]], case #Optional.none!enumelt: [[FALSE:bb[0-9]+]]
 
   // CHECK: [[FALSE]]:
   // CHECK:   end_borrow [[BORROWED_ARG2]] from [[ARG2]]
-  // CHECK:   br [[FALSE_2:bb[0-9]+]]
+  // CHECK:   br [[COND2:bb[0-9]+]]
   if let x = c {
     // CHECK: [[TRUE]]({{.*}} : $C):
     use(x)
-    // CHECK: br [[CONT:bb[0-9]+]]
+    // CHECK:   br [[TRUE_TRAMPOLINE:bb[0-9]+]]
+    //
+    // CHECK: [[TRUE_TRAMPOLINE]]:
+    // CHECK:   br [[EPILOG_BB:bb[0-9]+]]
   } else if a {
-    // CHECK: [[FALSE_2]]:
-    // CHECK: cond_br {{.*}}, [[TRUE2:bb[0-9]+]], [[FALSE2:bb[0-9]+]]
-    // CHECK: apply
-    // CHECK: br [[CONT]]
+    // CHECK: [[COND2]]:
+    // CHECK:   cond_br {{.*}}, [[TRUE2:bb[0-9]+]], [[FALSE2:bb[0-9]+]]
+    //
+    // CHECK: [[TRUE2]]:
+    // CHECK:   apply
+    // CHECK:   br [[EPILOG_BB]]
     foo()
     break label3
     foo()    // expected-warning {{will never be executed}}
   }
-
   // CHECK: [[FALSE2]]:
-  // CHECK: br [[CONT]]
-  // CHECK: [[CONT]]:
+  // CHECK: br [[EPILOG_BB]]
+
+  // CHECK: [[EPILOG_BB]]:
   // CHECK: return
 
 
@@ -569,20 +576,26 @@ func testRequireExprPattern(_ a : Int) {
 
 
 // CHECK-LABEL: sil hidden @_T010statements20testRequireOptional1S2iSgF
-// CHECK: bb0(%0 : $Optional<Int>):
-// CHECK-NEXT:   debug_value %0 : $Optional<Int>, let, name "a"
-// CHECK-NEXT:   switch_enum %0 : $Optional<Int>, case #Optional.some!enumelt.1: bb1, default bb2
+// CHECK: bb0([[ARG:%.*]] : $Optional<Int>):
+// CHECK-NEXT:   debug_value [[ARG]] : $Optional<Int>, let, name "a"
+// CHECK-NEXT:   switch_enum [[ARG]] : $Optional<Int>, case #Optional.some!enumelt.1: [[SOME:bb[0-9]+]], case #Optional.none!enumelt: [[NONE:bb[0-9]+]]
 func testRequireOptional1(_ a : Int?) -> Int {
 
-  // CHECK: bb1(%3 : $Int):
-  // CHECK-NEXT:   debug_value %3 : $Int, let, name "t"
-  // CHECK-NEXT:   return %3 : $Int
+  // CHECK: [[NONE]]:
+  // CHECK:   br [[ABORT:bb[0-9]+]]
+
+  // CHECK: [[SOME]]([[PAYLOAD:%.*]] : $Int):
+  // CHECK-NEXT:   debug_value [[PAYLOAD]] : $Int, let, name "t"
+  // CHECK-NEXT:   br [[EPILOG:bb[0-9]+]]
+  //
+  // CHECK: [[EPILOG]]:
+  // CHECK-NEXT:   return [[PAYLOAD]] : $Int
   guard let t = a else { abort() }
 
-  // CHECK:  bb2:
+  // CHECK:  [[ABORT]]:
   // CHECK-NEXT:    // function_ref statements.abort () -> Swift.Never
-  // CHECK-NEXT:    %6 = function_ref @_T010statements5aborts5NeverOyF
-  // CHECK-NEXT:    %7 = apply %6() : $@convention(thin) () -> Never
+  // CHECK-NEXT:    [[FUNC_REF:%.*]] = function_ref @_T010statements5aborts5NeverOyF
+  // CHECK-NEXT:    apply [[FUNC_REF]]() : $@convention(thin) () -> Never
   // CHECK-NEXT:    unreachable
   return t
 }
@@ -592,16 +605,19 @@ func testRequireOptional1(_ a : Int?) -> Int {
 // CHECK-NEXT:   debug_value [[ARG]] : $Optional<String>, let, name "a"
 // CHECK-NEXT:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
 // CHECK-NEXT:   [[ARG_COPY:%.*]] = copy_value [[BORROWED_ARG]] : $Optional<String>
-// CHECK-NEXT:   switch_enum [[ARG_COPY]] : $Optional<String>, case #Optional.some!enumelt.1: bb2, default bb1
+// CHECK-NEXT:   switch_enum [[ARG_COPY]] : $Optional<String>, case #Optional.some!enumelt.1: [[SOME_BB:bb[0-9]+]], case #Optional.none!enumelt: [[NONE_BB:bb[0-9]+]]
 func testRequireOptional2(_ a : String?) -> String {
   guard let t = a else { abort() }
 
-  // CHECK: bb1:
+  // CHECK: [[NONE_BB]]:
   // CHECK-NEXT: end_borrow [[BORROWED_ARG]] from [[ARG]]
+  // CHECK-NEXT: br [[ABORT_BB:bb[0-9]+]]
   
-  // CHECK:  bb2([[STR:%.*]] : $String):
+  // CHECK:  [[SOME_BB]]([[STR:%.*]] : $String):
   // CHECK-NEXT:   debug_value [[STR]] : $String, let, name "t"
-  // CHECK-NEXT: end_borrow [[BORROWED_ARG]] from [[ARG]]
+  // CHECK-NEXT:   br [[CONT_BB:bb[0-9]+]]
+  // CHECK:  [[CONT_BB]]:
+  // CHECK-NEXT:   end_borrow [[BORROWED_ARG]] from [[ARG]]
   // CHECK-NEXT:   [[BORROWED_STR:%.*]] = begin_borrow [[STR]]
   // CHECK-NEXT:   [[RETURN:%.*]] = copy_value [[BORROWED_STR]]
   // CHECK-NEXT:   end_borrow [[BORROWED_STR]] from [[STR]]
@@ -609,7 +625,7 @@ func testRequireOptional2(_ a : String?) -> String {
   // CHECK-NEXT:   destroy_value [[ARG]]
   // CHECK-NEXT:   return [[RETURN]] : $String
 
-  // CHECK:        bb3:
+  // CHECK:        [[ABORT_BB]]:
   // CHECK-NEXT:   // function_ref statements.abort () -> Swift.Never
   // CHECK-NEXT:   [[ABORT_FUNC:%.*]] = function_ref @_T010statements5aborts5NeverOyF
   // CHECK-NEXT:   [[NEVER:%.*]] = apply [[ABORT_FUNC]]()
@@ -648,6 +664,8 @@ func test_as_pattern(_ y : BaseClass) -> DerivedClass {
 
   // CHECK: bb{{.*}}([[PTR:%[0-9]+]] : $DerivedClass):
   // CHECK-NEXT: debug_value [[PTR]] : $DerivedClass, let, name "result"
+  // CHECK-NEXT: br [[CONT_BB:bb[0-9]+]]
+  // CHECK: [[CONT_BB]]:
   // CHECK-NEXT: end_borrow [[BORROWED_ARG]] from [[ARG]]
   // CHECK-NEXT: [[BORROWED_PTR:%.*]] = begin_borrow [[PTR]]
   // CHECK-NEXT: [[RESULT:%.*]] = copy_value [[BORROWED_PTR]]
@@ -660,19 +678,21 @@ func test_as_pattern(_ y : BaseClass) -> DerivedClass {
 // CHECK-LABEL: sil hidden @_T010statements22let_else_tuple_bindingS2i_SitSgF
 func let_else_tuple_binding(_ a : (Int, Int)?) -> Int {
 
-  // CHECK: bb0(%0 : $Optional<(Int, Int)>):
-  // CHECK-NEXT:   debug_value %0 : $Optional<(Int, Int)>, let, name "a"
-  // CHECK-NEXT:   switch_enum %0 : $Optional<(Int, Int)>, case #Optional.some!enumelt.1: bb1, default bb2
+  // CHECK: bb0([[ARG:%.*]] : $Optional<(Int, Int)>):
+  // CHECK-NEXT:   debug_value [[ARG]] : $Optional<(Int, Int)>, let, name "a"
+  // CHECK-NEXT:   switch_enum [[ARG]] : $Optional<(Int, Int)>, case #Optional.some!enumelt.1: [[SOME_BB:bb[0-9]+]], case #Optional.none!enumelt: [[NONE_BB:bb[0-9]+]]
 
   guard let (x, y) = a else { }
   _ = y
   return x
 
-  // CHECK: bb1(%3 : $(Int, Int)):
-  // CHECK-NEXT:   %4 = tuple_extract %3 : $(Int, Int), 0
-  // CHECK-NEXT:   debug_value %4 : $Int, let, name "x"
-  // CHECK-NEXT:   %6 = tuple_extract %3 : $(Int, Int), 1
-  // CHECK-NEXT:   debug_value %6 : $Int, let, name "y"
-  // CHECK-NEXT:   return %4 : $Int
+  // CHECK: [[SOME_BB]]([[PAYLOAD:%.*]] : $(Int, Int)):
+  // CHECK-NEXT:   [[PAYLOAD_1:%.*]] = tuple_extract [[PAYLOAD]] : $(Int, Int), 0
+  // CHECK-NEXT:   debug_value [[PAYLOAD_1]] : $Int, let, name "x"
+  // CHECK-NEXT:   [[PAYLOAD_2:%.*]] = tuple_extract [[PAYLOAD]] : $(Int, Int), 1
+  // CHECK-NEXT:   debug_value [[PAYLOAD_2]] : $Int, let, name "y"
+  // CHECK-NEXT:   br [[CONT_BB:bb[0-9]+]]
+  // CHECK: [[CONT_BB]]:
+  // CHECK-NEXT:   return [[PAYLOAD_1]] : $Int
 }
 

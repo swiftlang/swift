@@ -5,7 +5,6 @@ add_swift_host_tool(swift-ide-test
   LINK_LIBRARIES
     swiftDriver
     swiftFrontend
-    swiftIndex
     swiftIDE
   LLVM_COMPONENT_DEPENDS
     DebugInfoCodeView

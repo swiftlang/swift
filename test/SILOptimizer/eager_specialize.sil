@@ -137,7 +137,7 @@ bb0(%0 : $*T, %1 : $G<T>, %2 : $*T.Elt):
 // Helper
 //
 // static != infix<A where ...> (A, A) -> Bool
-sil public_external [fragile] @_T0s2neoiSbx_xts9EquatableRzlFZ : $@convention(thin) <T where T : Equatable> (@in T, @in T) -> Bool {
+sil public_external [serialized] @_T0s2neoiSbx_xts9EquatableRzlFZ : $@convention(thin) <T where T : Equatable> (@in T, @in T) -> Bool {
 bb0(%0 : $*T, %1 : $*T):
   %4 = witness_method $T, #Equatable."=="!1 : $@convention(witness_method) <τ_0_0 where τ_0_0 : Equatable> (@in τ_0_0, @in τ_0_0, @thick τ_0_0.Type) -> Bool
   %5 = metatype $@thick T.Type

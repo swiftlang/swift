@@ -146,6 +146,7 @@ static void addCommonFrontendArgs(const ToolChain &TC,
   inputArgs.AddLastArg(arguments, options::OPT_sanitize_EQ);
   inputArgs.AddLastArg(arguments, options::OPT_sanitize_coverage_EQ);
   inputArgs.AddLastArg(arguments, options::OPT_swift_version);
+  inputArgs.AddLastArg(arguments, options::OPT_enforce_exclusivity_EQ);
 
   // Pass on any build config options
   inputArgs.AddAllArgs(arguments, options::OPT_D);
@@ -226,6 +227,9 @@ ToolChain::constructInvocation(const CompileJobAction &job,
       break;
     case types::TY_ImportedModules:
       FrontendModeOption = "-emit-imported-modules";
+      break;
+    case types::TY_TBD:
+      FrontendModeOption = "-emit-tbd";
       break;
     case types::TY_Nothing:
       // We were told to output nothing, so get the last mode option and use that.
@@ -495,6 +499,7 @@ ToolChain::constructInvocation(const BackendJobAction &job,
       break;
 
     case types::TY_ImportedModules:
+    case types::TY_TBD:
     case types::TY_SwiftModuleFile:
     case types::TY_RawSIL:
     case types::TY_RawSIB:
@@ -1143,7 +1148,11 @@ toolchains::Darwin::constructInvocation(const LinkJobAction &job,
 
   context.Args.AddAllArgValues(Arguments, options::OPT_Xlinker);
   context.Args.AddAllArgs(Arguments, options::OPT_linker_option_Group);
-  context.Args.AddAllArgs(Arguments, options::OPT_F, options::OPT_Fsystem);
+  for (const Arg *arg : context.Args.filtered(options::OPT_F,
+                                              options::OPT_Fsystem)) {
+    Arguments.push_back("-F");
+    Arguments.push_back(arg->getValue());
+  }
 
   if (context.Args.hasArg(options::OPT_enable_app_extension)) {
     // Keep this string fixed in case the option used by the
@@ -1465,7 +1474,14 @@ toolchains::GenericUnix::constructInvocation(const LinkJobAction &job,
 
   context.Args.AddAllArgs(Arguments, options::OPT_Xlinker);
   context.Args.AddAllArgs(Arguments, options::OPT_linker_option_Group);
-  context.Args.AddAllArgs(Arguments, options::OPT_F, options::OPT_Fsystem);
+  for (const Arg *arg : context.Args.filtered(options::OPT_F,
+                                              options::OPT_Fsystem)) {
+    if (arg->getOption().matches(options::OPT_Fsystem))
+      Arguments.push_back("-iframework");
+    else
+      Arguments.push_back(context.Args.MakeArgString(arg->getSpelling()));
+    Arguments.push_back(arg->getValue());
+  }
 
   if (!context.OI.SDKPath.empty()) {
     Arguments.push_back("--sysroot");

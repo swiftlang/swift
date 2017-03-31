@@ -953,10 +953,10 @@ static void checkRedeclaration(TypeChecker &tc, ValueDecl *current) {
           continue;
       }
 
-      // If the conflicting declarations have non-overlapping availability and
-      // - one throws and the other does not,
-      // - or they are initializers with different failability
-      // let them go.
+      // If the conflicting declarations have non-overlapping availability and,
+      // we allow the redeclaration to proceed if...
+      //
+      // - they are initializers with different failability,
       bool isAcceptableVersionBasedChange = false;
       {
         const auto *currentInit = dyn_cast<ConstructorDecl>(current);
@@ -967,6 +967,7 @@ static void checkRedeclaration(TypeChecker &tc, ValueDecl *current) {
           isAcceptableVersionBasedChange = true;
         }
       }
+      // - one throws and the other does not,
       {
         const auto *currentAFD = dyn_cast<AbstractFunctionDecl>(current);
         const auto *otherAFD = dyn_cast<AbstractFunctionDecl>(other);
@@ -975,6 +976,19 @@ static void checkRedeclaration(TypeChecker &tc, ValueDecl *current) {
           isAcceptableVersionBasedChange = true;
         }
       }
+      // - or they are computed properties of different types,
+      {
+        const auto *currentVD = dyn_cast<VarDecl>(current);
+        const auto *otherVD = dyn_cast<VarDecl>(other);
+        if (currentVD && otherVD &&
+            !currentVD->hasStorage() &&
+            !otherVD->hasStorage() &&
+            !currentVD->getInterfaceType()->isEqual(
+              otherVD->getInterfaceType())) {
+          isAcceptableVersionBasedChange = true;
+        }
+      }
+
       if (isAcceptableVersionBasedChange) {
         class AvailabilityRange {
           Optional<clang::VersionTuple> introduced;
@@ -6002,7 +6016,7 @@ public:
     }
 
     void visitDynamicAttr(DynamicAttr *attr) {
-      if (!Override->getAttrs().hasAttribute<DynamicAttr>())
+      if (!Override->isDynamic())
         // Dynamic is inherited.
         Override->getAttrs().add(
                                 new (TC.Context) DynamicAttr(/*implicit*/true));

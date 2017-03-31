@@ -1092,10 +1092,38 @@ SILLinkage LinkEntity::getLinkage(IRGenModule &IGM,
                                   ForDefinition_t forDefinition) const {
   switch (getKind()) {
   // Most type metadata depend on the formal linkage of their type.
-  case Kind::ValueWitnessTable:
-    return getSILLinkage(getTypeLinkage(getType()), forDefinition);
+  case Kind::ValueWitnessTable: {
+    auto type = getType();
+
+    // Builtin types, (), () -> () and so on are in the runtime.
+    if (!type.getAnyNominal())
+      return getSILLinkage(FormalLinkage::PublicUnique, forDefinition);
+
+    // Imported types.
+    if (getTypeMetadataAccessStrategy(IGM, type) ==
+          MetadataAccessStrategy::NonUniqueAccessor)
+      return SILLinkage::Shared;
+
+    // Everything else is only referenced inside its module.
+    return SILLinkage::Private;
+  }
+
+  case Kind::TypeMetadataLazyCacheVariable: {
+    auto type = getType();
+
+    // Imported types, non-primitive structural types.
+    if (getTypeMetadataAccessStrategy(IGM, type) ==
+          MetadataAccessStrategy::NonUniqueAccessor)
+      return SILLinkage::Shared;
+
+    // Everything else is only referenced inside its module.
+    return SILLinkage::Private;
+  }
 
   case Kind::TypeMetadata:
+    if (isMetadataPattern())
+      return SILLinkage::Private;
+
     switch (getMetadataAddress()) {
     case TypeMetadataAddress::FullMetadata:
       // The full metadata object is private to the containing module.
@@ -1114,7 +1142,6 @@ SILLinkage LinkEntity::getLinkage(IRGenModule &IGM,
     return SILLinkage::Shared;
 
   case Kind::TypeMetadataAccessFunction:
-  case Kind::TypeMetadataLazyCacheVariable:
     switch (getTypeMetadataAccessStrategy(IGM, getType())) {
     case MetadataAccessStrategy::PublicUniqueAccessor:
       return getSILLinkage(FormalLinkage::PublicUnique, forDefinition);
@@ -1257,10 +1284,10 @@ bool LinkEntity::isAvailableExternally(IRGenModule &IGM) const {
 bool LinkEntity::isFragile(IRGenModule &IGM) const {
   switch (getKind()) {
     case Kind::SILFunction:
-      return getSILFunction()->isFragile();
+      return getSILFunction()->isSerialized();
       
     case Kind::SILGlobalVariable:
-      return getSILGlobalVariable()->isFragile();
+      return getSILGlobalVariable()->isSerialized();
       
     case Kind::ReflectionAssociatedTypeDescriptor:
     case Kind::ReflectionSuperclassDescriptor:
@@ -1283,7 +1310,7 @@ bool LinkEntity::isFragile(IRGenModule &IGM) const {
       // not public, it must be fragile.
       if (swift::isAvailableExternally(L) && !hasPublicVisibility(L))
         return true;
-      return wt->isFragile();
+      return wt->isSerialized();
     }
   }
   return false;

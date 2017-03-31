@@ -1066,7 +1066,7 @@ public class DerivedClassWithPublicProperty : BaseClassWithInternalProperty {
 
 // CHECK-LABEL: sil hidden [transparent] @_T010properties29BaseClassWithInternalPropertyC1xytfg
 
-// CHECK-LABEL: sil [transparent] [fragile] @_T010properties30DerivedClassWithPublicPropertyC1xytfg
+// CHECK-LABEL: sil [transparent] [serialized] @_T010properties30DerivedClassWithPublicPropertyC1xytfg
 // CHECK:       bb0([[SELF:%.*]] : $DerivedClassWithPublicProperty):
 // CHECK:         [[SELF_COPY:%.*]] = copy_value [[SELF]] : $DerivedClassWithPublicProperty
 // CHECK-NEXT:    [[SUPER:%.*]] = upcast [[SELF_COPY]] : $DerivedClassWithPublicProperty to $BaseClassWithInternalProperty

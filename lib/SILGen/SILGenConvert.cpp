@@ -340,14 +340,14 @@ SILGenFunction::emitOptionalToOptional(SILLocation loc,
 
         if (!(resultTL.isAddressOnly() && silConv.useLoweredAddresses())) {
           SILValue some = B.createOptionalSome(loc, result).forward(*this);
-          return scope.exit(loc, some);
+          return scope.exitAndBranch(loc, some);
         }
 
         RValue R(*this, loc, noOptResultTy.getSwiftRValueType(), result);
         ArgumentSource resultValueRV(loc, std::move(R));
         emitInjectOptionalValueInto(loc, std::move(resultValueRV),
                                     finalResult.getValue(), resultTL);
-        return scope.exit(loc);
+        return scope.exitAndBranch(loc);
       });
 
   SEBuilder.addCase(
@@ -356,11 +356,11 @@ SILGenFunction::emitOptionalToOptional(SILLocation loc,
         if (!(resultTL.isAddressOnly() && silConv.useLoweredAddresses())) {
           SILValue none =
               B.createManagedOptionalNone(loc, resultTy).forward(*this);
-          return scope.exit(loc, none);
+          return scope.exitAndBranch(loc, none);
         }
 
         emitInjectOptionalNothingInto(loc, finalResult.getValue(), resultTL);
-        return scope.exit(loc);
+        return scope.exitAndBranch(loc);
       });
 
   std::move(SEBuilder).emit();
