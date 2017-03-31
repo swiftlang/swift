@@ -716,23 +716,33 @@ extension String.Content {
       return
     }
     // Otherwise, we need to allocate new storage
-    
     let head = utf16[..<target.lowerBound]
     let tail = utf16[target.upperBound...]
 
+    let oldCapacity: UTF16View.IndexDistance
+      = numericCast(_latin1?.capacity ?? _utf16?.capacity ?? 0)
+
+    let newCount = head.count + tail.count + numericCast(replacement.count)
+    let minimumCapacity = newCount > oldCapacity ? oldCapacity * 2 : 0
+    
     // See if we can use 8-bit code units
     if replacement._isLatin1() && (
       isKnownLatin1 || head._isLatin1() && tail._isLatin1()
     ) {
       // FIXME: check to see if we can use the inline5or6 representation.
       let s = _Latin1StringStorage(
-        joining: head._low8Bits, replacement._low8Bits, tail._low8Bits)
+        joining: head._low8Bits, replacement._low8Bits, tail._low8Bits,
+        minimumCapacity: numericCast(minimumCapacity)
+      )
       s.isKnownASCII = !s.contains { $0 > 0x7f }
       _latin1 = s
     }
     else {
       // FIXME: check to see if we can use the inline7or16 representation.
-      _utf16 = _UTF16StringStorage(joining: head, replacement, tail)
+      _utf16 = _UTF16StringStorage(
+        joining: head, replacement, tail,
+        minimumCapacity: numericCast(minimumCapacity)
+      )
     }
   }
   

@@ -243,7 +243,7 @@ extension _BoundedBufferReference {
 extension _BoundedBufferReference {
   /// Construct the concatenation of head, middle, and tail
   public init<Head : Collection, Middle : Collection, Tail : Collection>(
-    joining head: Head, _ middle: Middle, _ tail: Tail
+    joining head: Head, _ middle: Middle, _ tail: Tail, minimumCapacity: Int = 0
   )
   where
     Head.Iterator.Element == Iterator.Element,
@@ -254,7 +254,9 @@ extension _BoundedBufferReference {
       + numericCast(middle.count) as IndexDistance
       + numericCast(tail.count) as IndexDistance
 
-    self.init(_uninitializedCount: numericCast(newCount))
+    self.init(
+      _uninitializedCount: numericCast(newCount),
+      minimumCapacity: minimumCapacity)
     
     self.withUnsafeMutableBufferPointer { b0 in
 
