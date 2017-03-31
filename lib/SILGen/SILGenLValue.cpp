@@ -2560,12 +2560,11 @@ void SILGenFunction::emitCopyLValueInto(SILLocation loc, LValue &&src,
   // lvalue into the destination.
   if (!src.isPhysical())
     return skipPeephole();
-  auto destAddr = dest->getAddressOrNull();
-  if (!destAddr)
+  if (!dest->canPerformInPlaceInitialization())
     return skipPeephole();
-  if (src.getTypeOfRValue().getSwiftRValueType()
-        != destAddr->getType().getSwiftRValueType())
-    return skipPeephole();
+  auto destAddr = dest->getAddressForInPlaceInitialization(*this, loc);
+  assert(src.getTypeOfRValue().getSwiftRValueType()
+           == destAddr->getType().getSwiftRValueType());
   
   auto srcAddr = emitAddressOfLValue(loc, std::move(src), AccessKind::Read)
                    .getUnmanagedValue();
