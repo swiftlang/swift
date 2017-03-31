@@ -13,7 +13,7 @@
 /// Adds a stored `count` to the given `Base` collection so that the cost of
 /// counting it is not repeated.
 public struct ${Bidirectional}Counted<Base_: ${Bidirectional}Collection> {
-  public let base: Base_
+  public var base: Base_
   public let count: Base.IndexDistance
 }
 

@@ -79,6 +79,25 @@ extension RandomAccessUnicodeView : BidirectionalCollectionWrapper {
   }
 }
 
+extension RandomAccessUnicodeView
+where Iterator.Element == Base_.Iterator.Element {
+  public mutating func _tryToReplaceSubrange<C: Collection>(
+    from targetStart: Index, to targetEnd: Index, with replacement: C
+  ) -> Bool
+  where C.Iterator.Element == Iterator.Element {
+    // UnicodeViews must have value semantics.  Note that this check will fail
+    // to work if the view being wrapped is itself a wrapper that forwards
+    // _tryToReplaceSubrange to an underlying reference type.
+    if Base_.self is AnyObject.Type {
+      if
+      true || // WORKAROUND: https://bugs.swift.org/browse/SR-4449
+      !_isUnique(&base) { return false }
+    }
+    return base._tryToReplaceSubrange(
+      from: _unwrap(targetStart), to: _unwrap(targetEnd),  with: replacement)
+  }
+}
+
 extension RandomAccessUnicodeView : RandomAccessCollection {}
 
 extension RandomAccessUnicodeView : UnicodeView {
