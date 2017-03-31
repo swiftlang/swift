@@ -1131,8 +1131,25 @@ public:
                                     "result of function_ref");
     require(!fnType->getExtInfo().hasContext(),
             "function_ref should have a context-free function result");
+
+    // Note: in SingleFunction mode, we relax some of these checks because
+    // we may not have linked everything yet.
+
+    SILFunction *RefF = FRI->getReferencedFunction();
+
+    // A direct reference to a shared_external declaration is an error; we
+    // should have deserialized a body.
+    if (RefF->isExternalDeclaration()) {
+      require(SingleFunction ||
+              !hasSharedVisibility(RefF->getLinkage()) ||
+              RefF->hasForeignBody(),
+              "external declarations of SILFunctions with shared visibility is "
+              "not allowed");
+    }
+
+    // A direct reference to a non-public or shared but not fragile function
+    // from a fragile function is an error.
     if (F.isSerialized()) {
-      SILFunction *RefF = FRI->getReferencedFunction();
       require((SingleFunction && RefF->isExternalDeclaration()) ||
               RefF->hasValidLinkageForFragileRef(),
               "function_ref inside fragile function cannot "
@@ -3912,9 +3929,6 @@ public:
 
       assert(F->isAvailableExternally() &&
              "external declaration of internal SILFunction not allowed");
-      assert(!hasSharedVisibility(F->getLinkage()) &&
-             "external declarations of SILFunctions with shared visibility is not "
-             "allowed");
       // If F is an external declaration, there is nothing further to do,
       // return.
       return;
@@ -4037,15 +4051,20 @@ void SILWitnessTable::verify(const SILModule &M) const {
 
   auto *protocol = getConformance()->getProtocol();
 
-  // Currently all witness tables have public conformances, thus witness tables
-  // should not reference SILFunctions without public/public_external linkage.
-  // FIXME: Once we support private conformances, update this.
   for (const Entry &E : getEntries())
     if (E.getKind() == SILWitnessTable::WitnessKind::Method) {
       SILFunction *F = E.getMethodWitness().Witness;
       if (F) {
-        assert(!isLessVisibleThan(F->getLinkage(), getLinkage()) &&
-               "Witness tables should not reference less visible functions.");
+        // If a SILWitnessTable is going to be serialized, it must only
+        // reference public or serializable functions.
+        if (isSerialized()) {
+          assert((!isLessVisibleThan(F->getLinkage(), getLinkage()) ||
+                  (F->isSerialized() &&
+                   hasSharedVisibility(F->getLinkage()))) &&
+                 "Fragile witness tables should not reference "
+                 "less visible functions.");
+        }
+
         assert(F->getLoweredFunctionType()->getRepresentation() ==
                SILFunctionTypeRepresentation::WitnessMethod &&
                "Witnesses must have witness_method representation.");
@@ -4069,9 +4088,12 @@ void SILDefaultWitnessTable::verify(const SILModule &M) const {
       continue;
 
     SILFunction *F = E.getWitness();
+    // FIXME
+    #if 0
     assert(!isLessVisibleThan(F->getLinkage(), getLinkage()) &&
            "Default witness tables should not reference "
            "less visible functions.");
+    #endif
     assert(F->getLoweredFunctionType()->getRepresentation() ==
            SILFunctionTypeRepresentation::WitnessMethod &&
            "Default witnesses must have witness_method representation.");

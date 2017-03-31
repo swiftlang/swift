@@ -312,6 +312,7 @@ public:
   NormalProtocolConformance *Conformance;
   std::vector<SILWitnessTable::Entry> Entries;
   SILLinkage Linkage;
+  IsSerialized_t Serialized;
 
   SILGenConformance(SILGenModule &SGM, NormalProtocolConformance *C)
     // We only need to emit witness tables for base NormalProtocolConformances.
@@ -319,9 +320,26 @@ public:
       Linkage(getLinkageForProtocolConformance(Conformance,
                                                ForDefinition))
   {
-    // Not all protocols use witness tables.
-    if (!Lowering::TypeConverter::protocolRequiresWitnessTable(
-        Conformance->getProtocol()))
+    auto *proto = Conformance->getProtocol();
+
+    Serialized = IsNotSerialized;
+
+    // Serialize the witness table if we're serializing everything with
+    // -sil-serialize-all.
+    if (SGM.makeModuleFragile)
+      Serialized = IsSerialized;
+
+    // Serialize the witness table if type has a fixed layout in all
+    // resilience domains, and the conformance is externally visible.
+    auto nominal = Conformance->getInterfaceType()->getAnyNominal();
+    if (nominal->hasFixedLayout() &&
+        proto->getEffectiveAccess() >= Accessibility::Public &&
+        nominal->getEffectiveAccess() >= Accessibility::Public)
+      Serialized = IsSerialized;
+
+    // Not all protocols use witness tables; in this case we just skip
+    // all of emit() below completely.
+    if (!Lowering::TypeConverter::protocolRequiresWitnessTable(proto))
       Conformance = nullptr;
   }
 
@@ -332,19 +350,6 @@ public:
 
     auto *proto = Conformance->getProtocol();
     visitProtocolDecl(proto);
-
-    // Serialize the witness table in two cases:
-    // 1) We're serializing everything
-    // 2) The type has a fixed layout in all resilience domains, and the
-    //    conformance is externally visible
-    IsSerialized_t isSerialized = IsNotSerialized;
-    if (SGM.makeModuleFragile)
-      isSerialized = IsSerialized;
-    if (auto nominal = Conformance->getInterfaceType()->getAnyNominal())
-      if (nominal->hasFixedLayout() &&
-          proto->getEffectiveAccess() >= Accessibility::Public &&
-          nominal->getEffectiveAccess() >= Accessibility::Public)
-        isSerialized = IsSerialized;
 
     // Check if we already have a declaration or definition for this witness
     // table.
@@ -358,7 +363,7 @@ public:
 
       // If we have a declaration, convert the witness table to a definition.
       if (wt->isDeclaration()) {
-        wt->convertToDefinition(Entries, isSerialized);
+        wt->convertToDefinition(Entries, Serialized);
 
         // Since we had a declaration before, its linkage should be external,
         // ensure that we have a compatible linkage for sanity. *NOTE* we are ok
@@ -375,7 +380,7 @@ public:
     }
 
     // Otherwise if we have no witness table yet, create it.
-    return SILWitnessTable::create(SGM.M, Linkage, isSerialized,
+    return SILWitnessTable::create(SGM.M, Linkage, Serialized,
                                    Conformance, Entries);
   }
 
@@ -427,9 +432,33 @@ public:
       return;
     }
 
+    auto witnessLinkage = witnessRef.getLinkage(ForDefinition);
+    auto witnessSerialized = Serialized;
+    if (witnessSerialized &&
+        !hasPublicVisibility(witnessLinkage) &&
+        !hasSharedVisibility(witnessLinkage)) {
+      // FIXME: This should not happen, but it looks like visibility rules
+      // for extension members are slightly bogus.
+      //
+      // We allow a 'public' member of an extension to witness a public
+      // protocol requirement, even if the extended type is not public;
+      // then SILGen gives the member private linkage, ignoring the more
+      // visible accessibility it was given in the AST.
+      witnessLinkage = SILLinkage::Public;
+      witnessSerialized = (SGM.makeModuleFragile
+                           ? IsSerialized
+                           : IsNotSerialized);
+    } else {
+      // This is the "real" rule; the above case should go away once we
+      // figure out what's going on.
+      witnessLinkage = (witnessSerialized
+                        ? SILLinkage::Shared
+                        : SILLinkage::Private);
+    }
+
     SILFunction *witnessFn =
-      SGM.emitProtocolWitness(Conformance, Linkage, requirementRef, witnessRef,
-                              isFree, witness);
+      SGM.emitProtocolWitness(Conformance, witnessLinkage, witnessSerialized,
+                              requirementRef, witnessRef, isFree, witness);
     Entries.push_back(
                     SILWitnessTable::MethodWitness{requirementRef, witnessFn});
   }
@@ -540,6 +569,7 @@ static bool maybeOpenCodeProtocolWitness(SILGenFunction &gen,
 SILFunction *
 SILGenModule::emitProtocolWitness(ProtocolConformance *conformance,
                                   SILLinkage linkage,
+                                  IsSerialized_t isSerialized,
                                   SILDeclRef requirement,
                                   SILDeclRef witnessRef,
                                   IsFreeFunctionWitness_t isFree,
@@ -636,14 +666,6 @@ SILGenModule::emitProtocolWitness(ProtocolConformance *conformance,
   Inline_t InlineStrategy = InlineDefault;
   if (witnessRef.isAlwaysInline())
     InlineStrategy = AlwaysInline;
-
-  IsSerialized_t isSerialized = IsNotSerialized;
-  if (makeModuleFragile)
-    isSerialized = IsSerialized;
-  if (witnessRef.isSerialized() &&
-      (hasSharedVisibility(linkage) ||
-       hasPublicVisibility(linkage)))
-    isSerialized = IsSerialized;
 
   auto *f = M.createFunction(
       linkage, nameBuffer, witnessSILFnType,
@@ -742,7 +764,9 @@ public:
                  SILDeclRef witnessRef,
                  IsFreeFunctionWitness_t isFree,
                  Witness witness) {
-    SILFunction *witnessFn = SGM.emitProtocolWitness(nullptr, Linkage,
+    SILFunction *witnessFn = SGM.emitProtocolWitness(nullptr,
+                                                     SILLinkage::Private,
+                                                     IsNotSerialized,
                                                      requirementRef, witnessRef,
                                                      isFree, witness);
     auto entry = SILDefaultWitnessTable::Entry(requirementRef, witnessFn);

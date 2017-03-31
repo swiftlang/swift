@@ -311,7 +311,7 @@ func s100_________identity<T>(_ t: T) -> T {
 
 // Test a guaranteed opaque parameter.
 // ---
-// CHECK-LABEL: sil hidden [transparent] [thunk] @_T020opaque_values_silgen21s110___GuaranteedSelfVAA3FooA2aDP3fooyyFTW : $@convention(witness_method) (@in_guaranteed s110___GuaranteedSelf) -> () {
+// CHECK-LABEL: sil private [transparent] [thunk] @_T020opaque_values_silgen21s110___GuaranteedSelfVAA3FooA2aDP3fooyyFTW : $@convention(witness_method) (@in_guaranteed s110___GuaranteedSelf) -> () {
 // CHECK: bb0(%0 : $s110___GuaranteedSelf):
 // CHECK:   %[[F:.*]] = function_ref @_T020opaque_values_silgen21s110___GuaranteedSelfV3fooyyF : $@convention(method) (s110___GuaranteedSelf) -> ()
 // CHECK:   apply %[[F]](%0) : $@convention(method) (s110___GuaranteedSelf) -> ()
