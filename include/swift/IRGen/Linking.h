@@ -564,7 +564,8 @@ public:
   /// Returns true if this function or global variable may be inlined into
   /// another module.
   ///
-  bool isFragile(IRGenModule &IGM) const;
+  bool isFragile(ForDefinition_t isDefinition,
+                 bool wholeModuleSerialized) const;
 
   const ValueDecl *getDecl() const {
     assert(isDeclKind(getKind()));

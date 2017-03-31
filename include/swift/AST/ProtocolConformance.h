@@ -266,7 +266,11 @@ public:
   /// Determine whether the witness for the given requirement
   /// is either the default definition or was otherwise deduced.
   bool usesDefaultDefinition(AssociatedTypeDecl *requirement) const;
-  
+
+  /// Returns true if this conformance has a layout that is known to all
+  /// consumers, based on the type/protocol involved in it.
+  bool hasFixedLayout() const;
+
   // Make vanilla new/delete illegal for protocol conformances.
   void *operator new(size_t bytes) = delete;
   void operator delete(void *data) SWIFT_DELETE_OPERATOR_DELETED;

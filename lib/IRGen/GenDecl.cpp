@@ -1281,7 +1281,8 @@ bool LinkEntity::isAvailableExternally(IRGenModule &IGM) const {
   llvm_unreachable("bad link entity kind");
 }
 
-bool LinkEntity::isFragile(IRGenModule &IGM) const {
+bool LinkEntity::isFragile(ForDefinition_t isDefinition,
+                           bool wholeModuleSerialized) const {
   switch (getKind()) {
     case Kind::SILFunction:
       return getSILFunction()->isSerialized();
@@ -1302,16 +1303,17 @@ bool LinkEntity::isFragile(IRGenModule &IGM) const {
       break;
   }
   if (isProtocolConformanceKind(getKind())) {
-    if (SILWitnessTable *wt = IGM.getSILModule().lookUpWitnessTable(
-                                            getProtocolConformance(), false)) {
-      SILLinkage L = wt->getLinkage();
-      // We don't deserialize the fragile attribute correctly. But we know that
-      // if the witness table was deserialized (= available externally) and it's
-      // not public, it must be fragile.
-      if (swift::isAvailableExternally(L) && !hasPublicVisibility(L))
-        return true;
-      return wt->isSerialized();
-    }
+    auto conformance = getProtocolConformance();
+    SILLinkage L = getLinkageForProtocolConformance(
+        conformance->getRootNormalConformance(), isDefinition);
+
+    // We don't deserialize the fragile attribute correctly. But we know that
+    // if the witness table was deserialized (= available externally) and it's
+    // not public, it must be fragile.
+    if (swift::isAvailableExternally(L) && !hasPublicVisibility(L))
+      return true;
+
+    return wholeModuleSerialized || conformance->hasFixedLayout();
   }
   return false;
 }
@@ -1438,10 +1440,12 @@ static void updateLinkageForDefinition(IRGenModule &IGM,
                                        const LinkEntity &entity) {
   // TODO: there are probably cases where we can avoid redoing the
   // entire linkage computation.
-  auto linkage =
-      getIRLinkage(IGM, entity.getLinkage(ForDefinition), entity.isFragile(IGM),
-                   entity.isSILOnly(), ForDefinition,
-                   entity.isWeakImported(IGM.getSwiftModule()));
+  auto linkage = getIRLinkage(
+      IGM, entity.getLinkage(ForDefinition),
+      entity.isFragile(ForDefinition,
+                       IGM.getSILModule().isWholeModuleSerialized()),
+      entity.isSILOnly(), ForDefinition,
+      entity.isWeakImported(IGM.getSwiftModule()));
   global->setLinkage(std::get<0>(linkage));
   global->setVisibility(std::get<1>(linkage));
   global->setDLLStorageClass(std::get<2>(linkage));
@@ -1465,9 +1469,12 @@ LinkInfo LinkInfo::get(IRGenModule &IGM, const LinkEntity &entity,
   entity.mangle(result.Name);
 
   std::tie(result.Linkage, result.Visibility, result.DLLStorageClass) =
-      getIRLinkage(IGM, entity.getLinkage(isDefinition), entity.isFragile(IGM),
-                   entity.isSILOnly(), isDefinition,
-                   entity.isWeakImported(IGM.getSwiftModule()));
+      getIRLinkage(
+          IGM, entity.getLinkage(isDefinition),
+          entity.isFragile(isDefinition,
+                           IGM.getSILModule().isWholeModuleSerialized()),
+          entity.isSILOnly(), isDefinition,
+          entity.isWeakImported(IGM.getSwiftModule()));
 
   result.ForDefinition = isDefinition;
 

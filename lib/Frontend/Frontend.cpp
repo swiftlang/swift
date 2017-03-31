@@ -37,9 +37,9 @@ using namespace swift;
 
 void CompilerInstance::createSILModule(bool WholeModule) {
   assert(MainModule && "main module not created yet");
-  TheSILModule = SILModule::createEmptyModule(getMainModule(),
-                                              Invocation.getSILOptions(),
-                                              WholeModule);
+  TheSILModule = SILModule::createEmptyModule(
+      getMainModule(), Invocation.getSILOptions(), WholeModule,
+      Invocation.getFrontendOptions().SILSerializeAll);
 }
 
 void CompilerInstance::setPrimarySourceFile(SourceFile *SF) {
