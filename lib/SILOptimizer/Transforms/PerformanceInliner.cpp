@@ -566,8 +566,13 @@ decideInWarmBlock(FullApplySite AI,
 
   SILFunction *Callee = AI.getReferencedFunction();
 
-  if (Callee->getInlineStrategy() == AlwaysInline)
+  if (Callee->getInlineStrategy() == AlwaysInline) {
+    DEBUG(
+      dumpCaller(AI.getFunction());
+      llvm::dbgs() << "    always-inline decision " <<Callee->getName() << '\n';
+    );
     return true;
+  }
 
   return isProfitableToInline(AI, CallerWeight, callerTracker, NumCallerBlocks);
 }
