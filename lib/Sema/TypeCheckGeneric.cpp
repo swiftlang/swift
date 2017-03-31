@@ -626,14 +626,13 @@ static void checkReferencedGenericParams(GenericContext *dc,
     Action walkToTypePre(Type ty) override {
       // Find generic parameters or dependent member types.
       // Once such a type is found, don't recurse into its children.
-      if (ty->hasTypeParameter()) {
-        if (ty->isTypeParameter()) {
-          ReferencedGenericParams.insert(ty->getCanonicalType());
-          return Action::SkipChildren;
-        }
-        return Action::Continue;
+      if (!ty->hasTypeParameter())
+        return Action::SkipChildren;
+      if (ty->isTypeParameter()) {
+        ReferencedGenericParams.insert(ty->getCanonicalType());
+        return Action::SkipChildren;
       }
-      return Action::SkipChildren;
+      return Action::Continue;
     }
 
     SmallPtrSet<CanType, 4> &getReferencedGenericParams() {
@@ -716,25 +715,29 @@ static void checkReferencedGenericParams(GenericContext *dc,
     return FoundNewReferencedGenericParam;
   };
 
-  auto requirements = sig->getRequirements();
+  ArrayRef<Requirement> requirements;
 
-  // Try to find new referenced generic parameter types in requirements until we
-  // reach a fix point. We need to iterate until a fix point, because we may
-  // have e.g. chains of same-type requirements like:
-  // not-yet-referenced-T1 == not-yet-referenced-T2.DepType2,
-  // not-yet-referenced-T2 == not-yet-referenced-T3.DepType3,
-  // not-yet-referenced-T3 == referenced-T4.DepType4.
-  // When we process the first of these requirements, we don't know yet that T2
-  // will be referenced, because T3 will be referenced,
-  // because T3 == T4.DepType4.
-  while (true) {
-    bool FoundNewReferencedGenericParam = false;
-    for (auto req : requirements) {
-      FoundNewReferencedGenericParam |= reqTypesVisitor(req);
+  auto FindReferencedGenericParamsInRequirements = [&requirements, sig, &reqTypesVisitor] {
+    requirements = sig->getRequirements();
+    // Try to find new referenced generic parameter types in requirements until
+    // we reach a fix point. We need to iterate until a fix point, because we
+    // may have e.g. chains of same-type requirements like:
+    // not-yet-referenced-T1 == not-yet-referenced-T2.DepType2,
+    // not-yet-referenced-T2 == not-yet-referenced-T3.DepType3,
+    // not-yet-referenced-T3 == referenced-T4.DepType4.
+    // When we process the first of these requirements, we don't know yet that
+    // T2
+    // will be referenced, because T3 will be referenced,
+    // because T3 == T4.DepType4.
+    while (true) {
+      bool FoundNewReferencedGenericParam = false;
+      for (auto req : requirements) {
+        FoundNewReferencedGenericParam |= reqTypesVisitor(req);
+      }
+      if (!FoundNewReferencedGenericParam)
+        break;
     }
-    if (!FoundNewReferencedGenericParam)
-      break;
-  }
+  };
 
   // Find the depth of the function's own generic parameters.
   unsigned fnGenericParamsDepth = genericParams->getDepth();
@@ -746,6 +749,17 @@ static void checkReferencedGenericParams(GenericContext *dc,
     if (paramDecl->getDepth() != fnGenericParamsDepth)
       continue;
     if (!referencedGenericParams.count(genParam->getCanonicalType())) {
+      // Lazily search for generic params that are indirectly used in the
+      // function signature. Do it only if there is a generic parameter
+      // that is not known to be referenced yet.
+      if (requirements.empty()) {
+        FindReferencedGenericParamsInRequirements();
+        // Nothing to do if this generic parameter is considered to be
+        // referenced after analyzing the requirements from the generic
+        // signature.
+        if (referencedGenericParams.count(genParam->getCanonicalType()))
+          continue;
+      }
       // Produce an error that this generic parameter cannot be bound.
       TC.diagnose(paramDecl->getLoc(), diag::unreferenced_generic_parameter,
                   paramDecl->getNameStr());
