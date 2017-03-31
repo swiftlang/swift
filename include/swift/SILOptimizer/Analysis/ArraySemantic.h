@@ -135,6 +135,12 @@ public:
   /// Returns true on success, false otherwise.
   bool replaceByValue(SILValue V);
 
+  /// Replace a call to append(contentsOf: ) with a series of
+  /// append(element: ) calls.
+  bool replaceByAppendingValues(SILModule &M, SILFunction *AppendFn,
+                                const llvm::SmallVectorImpl<SILValue> &Vals,
+                                ArrayRef<Substitution> Subs);
+
   /// Hoist the call to the insert point.
   void hoist(SILInstruction *InsertBefore, DominanceInfo *DT) {
     hoistOrCopy(InsertBefore, DT, false);
