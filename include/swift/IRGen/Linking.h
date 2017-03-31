@@ -27,6 +27,14 @@ namespace swift {
 namespace irgen {
 class IRGenModule;
 
+class UniversalLinkageInfo {
+public:
+  bool IsELFObject, UseDLLStorage, HasMultipleIGMs, IsWholeModule,
+      IsWholeModuleSerialized;
+
+  UniversalLinkageInfo(IRGenModule &IGM);
+};
+
 /// Selector for type metadata symbol kinds.
 enum class TypeMetadataAddress {
   AddressPoint,
@@ -671,6 +679,10 @@ class LinkInfo {
 
 public:
   /// Compute linkage information for the given
+  static LinkInfo get(const UniversalLinkageInfo &linkInfo,
+                      ModuleDecl *swiftModule, const LinkEntity &entity,
+                      ForDefinition_t forDefinition);
+
   static LinkInfo get(IRGenModule &IGM, const LinkEntity &entity,
                       ForDefinition_t forDefinition);
 
