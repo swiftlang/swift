@@ -175,7 +175,7 @@ enum GenericFixedLayout<T> {
 // CHECK-SAME: }>
 
 
-// CHECK-LABEL: @_T020enum_value_semantics18GenericFixedLayoutOMP = hidden global <{{[{].*\* [}]}}> <{
+// CHECK-LABEL: @_T020enum_value_semantics18GenericFixedLayoutOMP = internal global <{{[{].*\* [}]}}> <{
 // CHECK:   %swift.type* (%swift.type_pattern*, i8**)* @create_generic_metadata_GenericFixedLayout
 // CHECK:   i32 48, i16 1, i16 8,
 // CHECK:   [16 x i8*] zeroinitializer,

@@ -1121,6 +1121,9 @@ SILLinkage LinkEntity::getLinkage(IRGenModule &IGM,
   }
 
   case Kind::TypeMetadata:
+    if (isMetadataPattern())
+      return SILLinkage::Private;
+
     switch (getMetadataAddress()) {
     case TypeMetadataAddress::FullMetadata:
       // The full metadata object is private to the containing module.
