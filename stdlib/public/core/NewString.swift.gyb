@@ -17,7 +17,7 @@
 %{
   import gyb
 }%
-import Darwin
+// import Darwin
 
 /// Implementation detail of `String` that type-erases any `UnicodeContent` into
 /// one word that can live in one of the cases.
@@ -1046,7 +1046,7 @@ extension String {
       let _cocoaString = _UTF16StringStorage(utf16CUs)
       return _StringCore(
         baseAddress: nil,
-        count: numericCast(utf16CUs.count), // Michael NOTE: Is this ok?
+        count: numericCast(_cocoaString.count),
         elementShift: 1, //isUTF16 ? 1 : 0,
         hasCocoaBuffer: true,
         owner: _cocoaString)
