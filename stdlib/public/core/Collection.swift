@@ -1333,7 +1333,7 @@ extension Collection {
   ) rethrows -> R? {
     return nil // by default, collections have no contiguous storage.
   }
-  public func _tryToReplaceSubrange<C: Collection>(
+  public mutating func _tryToReplaceSubrange<C: Collection>(
     from _: Index, to _: Index, with _: C
   ) -> Bool
   where C.Iterator.Element == Iterator.Element {

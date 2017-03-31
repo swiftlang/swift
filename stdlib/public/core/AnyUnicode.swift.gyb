@@ -601,3 +601,16 @@ extension Unicode {
   public var base: Content.CharacterView { return content.characters }
   public var anyContent: AnyUnicodeContent { return content }
 }
+
+extension Unicode where Self : RangeReplaceableCollection,
+Iterator.Element == Content.CharacterView.Iterator.Element {
+  public var base: Content.CharacterView {
+    get {
+      return content.characters
+    }
+    set {
+      replaceSubrange(startIndex..<endIndex, with: newValue)
+    }
+  }
+  public var anyContent: AnyUnicodeContent { return content }
+}

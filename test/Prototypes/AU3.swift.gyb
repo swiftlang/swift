@@ -1305,26 +1305,35 @@ suite.test("InplaceViewMutation") {
 }
 
 suite.test("ViewValueSemantics") {
-  var u16 = String(sample).content.utf16
-  let u2 = u16
-  let snapshot = Array(u2)
+  var sharesBuffer1 = String(sample).content.utf16
+  let sharesBuffer2 = sharesBuffer1
+  var snapshot = Array(sharesBuffer2)
 
   // Unwrap the view
-  let wrapped = u16.base2 as! AnyUInt16UnicodeView.Adapter<
+  let wrapped = sharesBuffer1.base2 as! AnyUInt16UnicodeView.Adapter<
     RandomAccessUnicodeView<_UTF16StringStorage>>
   
   // Tunnel all the way to the underlying storage, which has reference
   // semantics.  FIXME: there should be no way for the user to do this!
   var storage: _UTF16StringStorage = wrapped.base.base
-  storage.removeLast(1)                   
-  expectFalse(snapshot.elementsEqual(u2))
-  expectEqualSequence(storage, u2) 
-  expectEqualSequence(storage, u16)
 
-  // However, mutating u16 makes a copy
-  u16.removeLast()
-  expectEqualSequence(storage, u2) 
-  expectEqualSequence(storage.dropLast(), u16)
+  // Make a mutation there, and expect both views to reflect that.
+  storage.removeLast(1) 
+  expectEqualSequence(snapshot.dropLast(), storage)
+  expectEqualSequence(snapshot.dropLast(), sharesBuffer2) 
+  expectEqualSequence(snapshot.dropLast(), sharesBuffer1)
+
+  snapshot.removeLast()
+  
+  // However, mutating sharesBuffer1 makes a copy rather than modifying storage
+  let oldCount = sharesBuffer1.count
+  expectEqual(oldCount, numericCast(storage.count))
+  sharesBuffer1.removeLast()
+  expectEqual(oldCount, numericCast(storage.count))
+  expectEqual(oldCount - numericCast(1), sharesBuffer1.count)
+  expectEqualSequence(snapshot, storage) 
+  expectEqualSequence(snapshot, sharesBuffer2) 
+  expectEqualSequence(snapshot.dropLast(), Array(sharesBuffer1))
   // FIXME: something in the collection forwarding stack is not forwarding
   // _tryToReplaceSubrange, or this test would fail.  That means we're probably
   // missing an optimization when it actually *is* OK to mutate the storage in

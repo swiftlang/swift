@@ -18,7 +18,10 @@ extension String : BidirectionalCollection, BidirectionalCollectionWrapper {
   public typealias Index = CharacterView.Index
   public typealias Base = CharacterView
   public typealias SubSequence = String
-  public var base: CharacterView { return characters }
+  public var base: CharacterView {
+    get { return characters }
+    set { characters = newValue }
+  }
   
   /// Accesses the text in the given range.
   ///
