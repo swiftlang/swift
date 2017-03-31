@@ -674,7 +674,10 @@ public:
   /// Visit a random value base.
   ///
   /// These are considered to be escapes.
-  bool visitValueBase(ValueBase *V) { return false; }
+  bool visitValueBase(ValueBase *V) {
+    DEBUG(llvm::dbgs() << "    Have unknown escaping user: " << *V);
+    return false;
+  }
 
 #define ALWAYS_NON_ESCAPING_INST(INST)                                         \
   bool visit##INST##Inst(INST##Inst *V) { return true; }
@@ -769,17 +772,13 @@ static bool isNonEscapingUse(Operand *InitialOp,
   return NonEscapingUserVisitor(InitialOp, Mutations).compute();
 }
 
-/// \brief Examine an alloc_box instruction, returning true if at least one
-/// capture of the boxed variable is promotable.  If so, then the pair of the
-/// partial_apply instruction and the index of the box argument in the closure's
-/// argument list is added to IM.
 bool isPartialApplyNonEscapingUser(
-    Operand *Op, PartialApplyInst *PAI,
+    Operand *CurrentOp, PartialApplyInst *PAI,
     llvm::SmallVectorImpl<SILInstruction *> &Mutations,
     llvm::DenseMap<PartialApplyInst *, unsigned> &IM) {
   DEBUG(llvm::dbgs() << "    Found partial: " << *PAI);
 
-  unsigned OpNo = Op->getOperandNumber();
+  unsigned OpNo = CurrentOp->getOperandNumber();
   assert(OpNo != 0 && "Alloc box used as callee of partial apply?");
 
   // If we've already seen this partial apply, then it means the same alloc
@@ -862,6 +861,22 @@ isProjectBoxNonEscapingUse(ProjectBoxInst *PBI,
   return true;
 }
 
+static bool scanUsesForEscapesAndMutations(
+    Operand *Op, llvm::SmallVectorImpl<SILInstruction *> &Mutations,
+    llvm::DenseMap<PartialApplyInst *, unsigned> &IM) {
+  if (auto *PAI = dyn_cast<PartialApplyInst>(Op->getUser())) {
+    return isPartialApplyNonEscapingUser(Op, PAI, Mutations, IM);
+  }
+
+  if (auto *PBI = dyn_cast<ProjectBoxInst>(Op->getUser())) {
+    return isProjectBoxNonEscapingUse(PBI, Mutations);
+  }
+
+  // Verify that this use does not otherwise allow the alloc_box to
+  // escape.
+  return isNonEscapingUse(Op, Mutations);
+}
+
 /// \brief Examine an alloc_box instruction, returning true if at least one
 /// capture of the boxed variable is promotable.  If so, then the pair of the
 /// partial_apply instruction and the index of the box argument in the closure's
@@ -873,28 +888,10 @@ examineAllocBoxInst(AllocBoxInst *ABI, ReachabilityInfo &RI,
   SmallVector<SILInstruction *, 32> Mutations;
 
   // Scan the box for interesting uses.
-  for (Operand *O : ABI->getUses()) {
-    if (auto *PAI = dyn_cast<PartialApplyInst>(O->getUser())) {
-      if (isPartialApplyNonEscapingUser(O, PAI, Mutations, IM)) {
-        continue;
-      }
-      return false;
-    }
-
-    if (auto *PBI = dyn_cast<ProjectBoxInst>(O->getUser())) {
-      if (isProjectBoxNonEscapingUse(PBI, Mutations)) {
-        continue;
-      }
-      return false;
-    }
-
-    // Verify that this use does not otherwise allow the alloc_box to
-    // escape.
-    if (!isNonEscapingUse(O, Mutations)) {
-      DEBUG(llvm::dbgs() << "    Have unknown escaping user: "
-                         << *O->getUser());
-      return false;
-    }
+  if (any_of(ABI->getUses(), [&Mutations, &IM](Operand *Op) {
+        return !scanUsesForEscapesAndMutations(Op, Mutations, IM);
+      })) {
+    return false;
   }
 
   // Helper lambda function to determine if instruction b is strictly after
