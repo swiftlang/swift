@@ -1728,6 +1728,9 @@ namespace {
     /// Whether we've already complained about problems with this conformance.
     bool AlreadyComplained = false;
 
+    /// Whether we checked the requirement signature already.
+    bool CheckedRequirementSignature = false;
+
     /// Retrieve the associated types that are referenced by the given
     /// requirement with a base of 'Self'.
     ArrayRef<AssociatedTypeDecl *> getReferencedAssociatedTypes(ValueDecl *req);
@@ -3990,6 +3993,12 @@ compareDeclsForInference(TypeChecker &TC, DeclContext *DC,
 void ConformanceChecker::resolveTypeWitnesses() {
   llvm::SetVector<AssociatedTypeDecl *> unresolvedAssocTypes;
 
+  SWIFT_DEFER {
+    // Resolution attempts to have the witnesses be correct by construction, but
+    // this isn't guaranteed, so let's double check.
+    ensureRequirementsAreSatisfied();
+  };
+
   // Track when we are checking type witnesses.
   ProtocolConformanceState initialState = Conformance->getState();
   Conformance->setState(ProtocolConformanceState::CheckingTypeWitnesses);
@@ -4398,7 +4407,6 @@ void ConformanceChecker::resolveTypeWitnesses() {
     }
   };
   findSolutions(0);
-
 
   // Go make sure that type declarations that would act as witnesses
   // did not get injected while we were performing checks above. This
@@ -4866,6 +4874,11 @@ void ConformanceChecker::ensureRequirementsAreSatisfied() {
     return;
   }
 
+  if (CheckedRequirementSignature)
+    return;
+
+  CheckedRequirementSignature = true;
+
   auto reqSig = proto->getRequirementSignature();
 
   auto substitutions = SubstitutionMap::getProtocolSubstitutions(
@@ -4921,10 +4934,6 @@ void ConformanceChecker::checkConformance(MissingWitnessDiagnosisKind Kind) {
 
   // Diagnose missing type witnesses for now.
   diagnoseMissingWitnesses(Kind);
-
-  // Resolution attempts to have the witnesses be correct by construction, but
-  // this isn't guaranteed, so let's double check.
-  ensureRequirementsAreSatisfied();
 
   // Ensure the conforming type is used.
   //
