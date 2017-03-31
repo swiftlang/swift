@@ -1092,33 +1092,8 @@ SILLinkage LinkEntity::getLinkage(IRGenModule &IGM,
                                   ForDefinition_t forDefinition) const {
   switch (getKind()) {
   // Most type metadata depend on the formal linkage of their type.
-  case Kind::ValueWitnessTable: {
-    auto type = getType();
-
-    // Builtin types, (), () -> () and so on are in the runtime.
-    if (!type.getAnyNominal())
-      return getSILLinkage(FormalLinkage::PublicUnique, forDefinition);
-
-    // Imported types.
-    if (getTypeMetadataAccessStrategy(IGM, type) ==
-          MetadataAccessStrategy::NonUniqueAccessor)
-      return SILLinkage::Shared;
-
-    // Everything else is only referenced inside its module.
-    return SILLinkage::Private;
-  }
-
-  case Kind::TypeMetadataLazyCacheVariable: {
-    auto type = getType();
-
-    // Imported types, non-primitive structural types.
-    if (getTypeMetadataAccessStrategy(IGM, type) ==
-          MetadataAccessStrategy::NonUniqueAccessor)
-      return SILLinkage::Shared;
-
-    // Everything else is only referenced inside its module.
-    return SILLinkage::Private;
-  }
+  case Kind::ValueWitnessTable:
+    return getSILLinkage(getTypeLinkage(getType()), forDefinition);
 
   case Kind::TypeMetadata:
     switch (getMetadataAddress()) {
@@ -1139,6 +1114,7 @@ SILLinkage LinkEntity::getLinkage(IRGenModule &IGM,
     return SILLinkage::Shared;
 
   case Kind::TypeMetadataAccessFunction:
+  case Kind::TypeMetadataLazyCacheVariable:
     switch (getTypeMetadataAccessStrategy(IGM, getType())) {
     case MetadataAccessStrategy::PublicUniqueAccessor:
       return getSILLinkage(FormalLinkage::PublicUnique, forDefinition);
