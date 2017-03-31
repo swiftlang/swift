@@ -28,6 +28,11 @@ func _toNSArray<T, U : AnyObject>(_ a: [T], f: (T) -> U) -> NSArray {
   return result
 }
 
+extension String.Index {
+  // Michael NOTE: is this right?
+  var _utf16Index: Int { return numericCast(encodedOffset) }
+}
+
 func _toNSRange(_ r: Range<String.Index>) -> NSRange {
   return NSRange(
     location: r.lowerBound._utf16Index,
@@ -70,10 +75,7 @@ extension String {
   /// Return an `Index` corresponding to the given offset in our UTF-16
   /// representation.
   func _index(_ utf16Index: Int) -> Index {
-    return Index(
-      _base: String.UnicodeScalarView.Index(_position: utf16Index),
-      in: characters
-    )
+    return AnyUnicodeIndex(encodedOffset: numericCast(utf16Index)) // Michael NOTE: is this correct?
   }
 
   /// Return a `Range<Index>` corresponding to the given `NSRange` of
