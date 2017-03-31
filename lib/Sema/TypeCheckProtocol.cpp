@@ -5306,14 +5306,9 @@ Optional<ProtocolConformanceRef> TypeChecker::conformsToProtocol(
     }
   }
 
-  // When debugging, compute the conformance access path for each requirement.
-  // This acts as an assertion that the path itself makes sense.
-#ifndef NDEBUG
-  bool computeConformanceAccessPath = true;
-#else
-  bool computeConformanceAccessPath = Context.LangOpts.DebugGenericSignatures;
-#endif
-  if (computeConformanceAccessPath &&
+  // When requested, print the conformance access path used to find this
+  // conformance.
+  if (Context.LangOpts.DebugGenericSignatures &&
       InExpression && T->is<ArchetypeType>() && lookupResult->isAbstract() &&
       !T->castTo<ArchetypeType>()->isOpenedExistential() &&
       !T->castTo<ArchetypeType>()->requiresClass() &&
@@ -5327,13 +5322,11 @@ Optional<ProtocolConformanceRef> TypeChecker::conformsToProtocol(
 
       // Debugging aid: display the conformance access path for archetype
       // conformances.
-      if (Context.LangOpts.DebugGenericSignatures) {
-        llvm::errs() << "Conformance access path for ";
-        T.print(llvm::errs());
-        llvm::errs() << ": " << Proto->getName() << " is ";
-        path.print(llvm::errs());
-        llvm::errs() << "\n";
-      }
+      llvm::errs() << "Conformance access path for ";
+      T.print(llvm::errs());
+      llvm::errs() << ": " << Proto->getName() << " is ";
+      path.print(llvm::errs());
+      llvm::errs() << "\n";
     }
   }
 
