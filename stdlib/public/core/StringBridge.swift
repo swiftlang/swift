@@ -218,60 +218,6 @@ public final class _NSContiguousString : _SwiftNativeNSString {
     _sanityCheckFailure("init(coder:) not implemented for _NSContiguousString")
   }
 
-  func length() -> Int {
-    return _core.count
-  }
-
-  func characterAtIndex(_ index: Int) -> UInt16 {
-    return _core[index]
-  }
-
-  @inline(__always) // Performance: To save on reference count operations.
-  func getCharacters(
-    _ buffer: UnsafeMutablePointer<UInt16>,
-    range aRange: _SwiftNSRange) {
-
-    _precondition(aRange.location + aRange.length <= Int(_core.count))
-
-    if _core.elementWidth == 2 {
-      UTF16._copy(
-        source: _core.startUTF16 + aRange.location,
-        destination: UnsafeMutablePointer<UInt16>(buffer),
-        count: aRange.length)
-    }
-    else {
-      UTF16._copy(
-        source: _core.startASCII + aRange.location,
-        destination: UnsafeMutablePointer<UInt16>(buffer),
-        count: aRange.length)
-    }
-  }
-
-  @objc
-  func _fastCharacterContents() -> UnsafeMutablePointer<UInt16>? {
-    return _core.elementWidth == 2 ? _core.startUTF16 : nil
-  }
-
-  //
-  // Implement sub-slicing without adding layers of wrapping
-  //
-  func substringFromIndex(_ start: Int) -> _NSContiguousString {
-    return _NSContiguousString(_core[Int(start)..<Int(_core.count)])
-  }
-
-  func substringToIndex(_ end: Int) -> _NSContiguousString {
-    return _NSContiguousString(_core[0..<Int(end)])
-  }
-
-  func substringWithRange(_ aRange: _SwiftNSRange) -> _NSContiguousString {
-    return _NSContiguousString(
-      _core[Int(aRange.location)..<Int(aRange.location + aRange.length)])
-  }
-
-  func copy() -> AnyObject {
-    // Since this string is immutable we can just return ourselves.
-    return self
-  }
 
   /// The caller of this function guarantees that the closure 'body' does not
   /// escape the object referenced by the opaque pointer passed to it or
@@ -304,6 +250,94 @@ public final class _NSContiguousString : _SwiftNativeNSString {
       _fixLifetime(rhs)
     }
     return try body(selfAsPointer, rhsAsPointer)
+  }
+
+@objc
+  var length: Int {
+    return _core.count
+  }
+
+  @objc(characterAtIndex:)
+  func character(at index: Int) -> UInt16 {
+    return _core[index]
+  }
+
+  @inline(__always) // Performance: To save on reference count operations.
+  @objc(getCharacters:range:)
+  func getCharacters(_ buffer: UnsafeMutablePointer<UInt16>, range: _SwiftNSRange) {
+
+    _precondition(range.location + range.length <= Int(_core.count))
+
+    if _core.elementWidth == 2 {
+      UTF16._copy(
+        source: _core.startUTF16 + range.location,
+        destination: UnsafeMutablePointer<UInt16>(buffer),
+        count: range.length)
+    }
+    else {
+      UTF16._copy(
+        source: _core.startASCII + range.location,
+        destination: UnsafeMutablePointer<UInt16>(buffer),
+        count: range.length)
+    }
+  }
+
+  //
+  // Implement sub-slicing without adding layers of wrapping
+  //
+  @objc(substringFromIndex:)
+  func substring(from start: Int) -> _NSContiguousString {
+    return _NSContiguousString(_core[Int(start)..<Int(_core.count)])
+  }
+
+  @objc(substringToIndex:)
+  func substring(to end: Int) -> _NSContiguousString {
+    return _NSContiguousString(_core[0..<Int(end)])
+  }
+
+  @objc(substringWithRange:)
+  func substring(with range: _SwiftNSRange) -> _NSContiguousString {
+    return _NSContiguousString(
+      _core[Int(range.location)..<Int(range.location + range.length)])
+  }
+
+  @objc(copyWithZone:)
+  func copy(with zone: AnyObject?) -> Any {
+    // Since this string is immutable we can just return ourselves.
+    return self
+  }
+
+  @objc(copy)
+  func copy() -> Any {
+    return self
+  }
+
+  private static let _SwiftNSASCIIStringEncoding = UInt(1)
+  private static let _SwiftNSUnicodeStringEncoding = UInt(10)
+
+  @objc
+  var fastestEncoding: UInt {
+    return _core.elementWidth == 1 ? _NSContiguousString._SwiftNSASCIIStringEncoding : _NSContiguousString._SwiftNSUnicodeStringEncoding
+  }
+
+  @objc
+  var smallestEncoding: UInt {
+    return _core.elementWidth == 1 ? _NSContiguousString._SwiftNSASCIIStringEncoding : _NSContiguousString._SwiftNSUnicodeStringEncoding
+  }
+
+  /// The following methods are purely optimizations as special dispensation from
+  /// Foundation. Relying on these methods to exist, return sane results and/or being
+  /// used in production code is strictly not supported. They may change behavior in
+  /// future releases and are purely SPI for authorized consumers.
+  @objc(_fastCharacterContents)
+  func _fastCharacterContents() -> UnsafePointer<UInt16>? {
+    return _core.elementWidth == 2 ? UnsafePointer<UInt16>(_core.startUTF16) : nil
+  }
+
+  @objc(_fastCStringContents:)
+  func _fastCStringContents(_ nullTerminationRequired: UInt8) -> UnsafePointer<Int8>? {
+    // Note: this memory should NOT be rebound since it is immediately being returned to ObjC scope
+    return _core.elementWidth == 1 ? unsafeBitCast(_core.startASCII, to: UnsafePointer<Int8>.self) : nil
   }
 
   public let _core: _StringCore
