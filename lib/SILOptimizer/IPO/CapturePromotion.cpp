@@ -773,93 +773,119 @@ static bool isNonEscapingUse(Operand *InitialOp,
 /// capture of the boxed variable is promotable.  If so, then the pair of the
 /// partial_apply instruction and the index of the box argument in the closure's
 /// argument list is added to IM.
+bool isPartialApplyNonEscapingUser(
+    Operand *Op, PartialApplyInst *PAI,
+    llvm::SmallVectorImpl<SILInstruction *> &Mutations,
+    llvm::DenseMap<PartialApplyInst *, unsigned> &IM) {
+  DEBUG(llvm::dbgs() << "    Found partial: " << *PAI);
+
+  unsigned OpNo = Op->getOperandNumber();
+  assert(OpNo != 0 && "Alloc box used as callee of partial apply?");
+
+  // If we've already seen this partial apply, then it means the same alloc
+  // box is being captured twice by the same closure, which is odd and
+  // unexpected: bail instead of trying to handle this case.
+  if (IM.count(PAI)) {
+    DEBUG(llvm::dbgs() << "        Already seen... bailing!\n");
+    return false;
+  }
+
+  SILModule &M = PAI->getModule();
+  auto closureType = PAI->getType().castTo<SILFunctionType>();
+  SILFunctionConventions closureConv(closureType, M);
+
+  // Calculate the index into the closure's argument list of the captured
+  // box pointer (the captured address is always the immediately following
+  // index so is not stored separately);
+  unsigned Index = OpNo - 1 + closureConv.getNumSILArguments();
+
+  auto *Fn = PAI->getReferencedFunction();
+  if (!Fn || !Fn->isDefinition()) {
+    DEBUG(llvm::dbgs() << "        Not a direct function definition "
+                          "reference. Bailing!\n");
+    return false;
+  }
+
+  SILArgument *BoxArg = getBoxFromIndex(Fn, Index);
+
+  // For now, return false is the address argument is an address-only type,
+  // since we currently handle loadable types only.
+  // TODO: handle address-only types
+  auto BoxTy = BoxArg->getType().castTo<SILBoxType>();
+  assert(BoxTy->getLayout()->getFields().size() == 1 &&
+         "promoting compound box not implemented yet");
+  if (BoxTy->getFieldType(M, 0).isAddressOnly(M)) {
+    DEBUG(llvm::dbgs()
+          << "        Box is an address only argument... Bailing!\n");
+    return false;
+  }
+
+  // Verify that this closure is known not to mutate the captured value; if
+  // it does, then conservatively refuse to promote any captures of this
+  // value.
+  if (!isNonMutatingCapture(BoxArg)) {
+    DEBUG(llvm::dbgs() << "        Is a mutating capture... Bailing!\n");
+    return false;
+  }
+
+  // Record the index and continue.
+  DEBUG(llvm::dbgs() << "        Can be optimized!\n");
+  DEBUG(llvm::dbgs() << "        Index: " << Index << "\n");
+  IM.insert(std::make_pair(PAI, Index));
+  return true;
+}
+
+static bool
+isProjectBoxNonEscapingUse(ProjectBoxInst *PBI,
+                           llvm::SmallVectorImpl<SILInstruction *> &Mutations) {
+  DEBUG(llvm::dbgs() << "    Found project box: " << *PBI);
+
+  // Check for mutations of the address component.
+  SILValue Addr = PBI;
+
+  // If the AllocBox is used by a mark_uninitialized, scan the MUI for
+  // interesting uses.
+  if (Addr->hasOneUse()) {
+    SILInstruction *SingleAddrUser = Addr->use_begin()->getUser();
+    if (isa<MarkUninitializedInst>(SingleAddrUser))
+      Addr = SILValue(SingleAddrUser);
+  }
+
+  for (Operand *AddrOp : Addr->getUses()) {
+    if (!isNonEscapingUse(AddrOp, Mutations)) {
+      DEBUG(llvm::dbgs() << "    Has escaping user of addr... bailing: "
+                         << *AddrOp->getUser());
+      return false;
+    }
+  }
+
+  return true;
+}
+
+/// \brief Examine an alloc_box instruction, returning true if at least one
+/// capture of the boxed variable is promotable.  If so, then the pair of the
+/// partial_apply instruction and the index of the box argument in the closure's
+/// argument list is added to IM.
 static bool
 examineAllocBoxInst(AllocBoxInst *ABI, ReachabilityInfo &RI,
-                    llvm::DenseMap<PartialApplyInst*, unsigned> &IM) {
+                    llvm::DenseMap<PartialApplyInst *, unsigned> &IM) {
   DEBUG(llvm::dbgs() << "Visiting alloc box: " << *ABI);
-  SmallVector<SILInstruction*, 32> Mutations;
-  
+  SmallVector<SILInstruction *, 32> Mutations;
+
   // Scan the box for interesting uses.
   for (Operand *O : ABI->getUses()) {
     if (auto *PAI = dyn_cast<PartialApplyInst>(O->getUser())) {
-      DEBUG(llvm::dbgs() << "    Found partial: " << *PAI);
-
-      unsigned OpNo = O->getOperandNumber();
-      assert(OpNo != 0 && "Alloc box used as callee of partial apply?");
-
-      // If we've already seen this partial apply, then it means the same alloc
-      // box is being captured twice by the same closure, which is odd and
-      // unexpected: bail instead of trying to handle this case.
-      if (IM.count(PAI)) {
-        DEBUG(llvm::dbgs() << "        Already seen... bailing!\n");
-        return false;
+      if (isPartialApplyNonEscapingUser(O, PAI, Mutations, IM)) {
+        continue;
       }
-
-      SILModule &M = PAI->getModule();
-      auto closureType = PAI->getType().castTo<SILFunctionType>();
-      SILFunctionConventions closureConv(closureType, M);
-
-      // Calculate the index into the closure's argument list of the captured
-      // box pointer (the captured address is always the immediately following
-      // index so is not stored separately);
-      unsigned Index = OpNo - 1 + closureConv.getNumSILArguments();
-
-      auto *Fn = PAI->getReferencedFunction();
-      if (!Fn || !Fn->isDefinition()) {
-        DEBUG(llvm::dbgs() << "        Not a direct function definition "
-                              "reference. Bailing!\n");
-        return false;
-      }
-
-      SILArgument *BoxArg = getBoxFromIndex(Fn, Index);
-
-      // For now, return false is the address argument is an address-only type,
-      // since we currently handle loadable types only.
-      // TODO: handle address-only types
-      auto BoxTy = BoxArg->getType().castTo<SILBoxType>();
-      assert(BoxTy->getLayout()->getFields().size() == 1
-             && "promoting compound box not implemented yet");
-      if (BoxTy->getFieldType(M, 0).isAddressOnly(M)) {
-        DEBUG(llvm::dbgs()
-              << "        Box is an address only argument... Bailing!\n");
-        return false;
-      }
-
-      // Verify that this closure is known not to mutate the captured value; if
-      // it does, then conservatively refuse to promote any captures of this
-      // value.
-      if (!isNonMutatingCapture(BoxArg)) {
-        DEBUG(llvm::dbgs() << "        Is a mutating capture... Bailing!\n");
-        return false;
-      }
-
-      // Record the index and continue.
-      DEBUG(llvm::dbgs() << "        Can be optimized!\n");
-      DEBUG(llvm::dbgs() << "        Index: " << Index << "\n");
-      IM.insert(std::make_pair(PAI, Index));
-      continue;
+      return false;
     }
 
     if (auto *PBI = dyn_cast<ProjectBoxInst>(O->getUser())) {
-      DEBUG(llvm::dbgs() << "    Found project box: " << *PBI);
-      // Check for mutations of the address component.
-      SILValue Addr = PBI;
-      // If the AllocBox is used by a mark_uninitialized, scan the MUI for
-      // interesting uses.
-      if (Addr->hasOneUse()) {
-        SILInstruction *SingleAddrUser = Addr->use_begin()->getUser();
-        if (isa<MarkUninitializedInst>(SingleAddrUser))
-          Addr = SILValue(SingleAddrUser);
+      if (isProjectBoxNonEscapingUse(PBI, Mutations)) {
+        continue;
       }
-
-      for (Operand *AddrOp : Addr->getUses()) {
-        if (!isNonEscapingUse(AddrOp, Mutations)) {
-          DEBUG(llvm::dbgs() << "    Has escaping user of addr... bailing: "
-                             << *AddrOp->getUser());
-          return false;
-        }
-      }
-      continue;
+      return false;
     }
 
     // Verify that this use does not otherwise allow the alloc_box to
