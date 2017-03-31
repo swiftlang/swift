@@ -4325,20 +4325,19 @@ namespace {
       // Check whether there is a function with the same name as this
       // property. If so, suppress the property; the user will have to use
       // the methods directly, to avoid ambiguities.
-      Type containerTy;
+      Type containerTy = dc->getDeclaredInterfaceType();
+      Type lookupContextTy = containerTy;
       if (auto *classDecl = dyn_cast<ClassDecl>(dc)) {
         // If we're importing into the primary @interface for something, as
         // opposed to an extension, make sure we don't try to load any
         // categories...by just looking into the super type.
-        containerTy = classDecl->getSuperclass();
-      } else {
-        containerTy = dc->getDeclaredTypeInContext();
+        lookupContextTy = classDecl->getSuperclass();
       }
 
       VarDecl *overridden = nullptr;
-      if (containerTy) {
+      if (lookupContextTy) {
         SmallVector<ValueDecl *, 2> lookup;
-        dc->lookupQualified(containerTy, name,
+        dc->lookupQualified(lookupContextTy, name,
                             NL_QualifiedDefault | NL_KnownNoDependency,
                             Impl.getTypeResolver(), lookup);
         for (auto result : lookup) {
@@ -4360,8 +4359,10 @@ namespace {
 
       if (overridden) {
         const DeclContext *overrideContext = overridden->getDeclContext();
-        if (overrideContext != dc &&
-            overrideContext->getDeclaredTypeInContext()->isEqual(containerTy)) {
+        // It's okay to compare interface types directly because Objective-C
+        // does not have constrained extensions.
+        if (overrideContext != dc && overridden->hasClangNode() && 
+            overrideContext->getDeclaredInterfaceType()->isEqual(containerTy)) {
           // We've encountered a redeclaration of the property.
           // HACK: Just update the original declaration instead of importing a
           // second property.

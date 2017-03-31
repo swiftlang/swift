@@ -7,12 +7,28 @@ __attribute__((objc_root_class))
 @end
 
 @interface PropertiesInit : Base
+@property (readonly, nonnull) Base *readwriteChange;
 @property (readonly, nonnull) Base *nullabilityChange;
 @property (readonly, nonnull) GenericClass<Base *> *missingGenerics;
 @property (readonly, nonnull) Base *typeChange;
 @end
 
 @interface PropertiesNoInit : Base
+@property (readonly, nonnull) Base *readwriteChange;
+@property (readonly, nonnull) Base *nullabilityChange;
+@property (readonly, nonnull) GenericClass<Base *> *missingGenerics;
+@property (readonly, nonnull) Base *typeChange;
+@end
+
+@interface PropertiesInitGeneric<T> : Base
+@property (readonly, nonnull) Base *readwriteChange;
+@property (readonly, nonnull) Base *nullabilityChange;
+@property (readonly, nonnull) GenericClass<Base *> *missingGenerics;
+@property (readonly, nonnull) Base *typeChange;
+@end
+
+@interface PropertiesNoInitGeneric<T> : Base
+@property (readonly, nonnull) Base *readwriteChange;
 @property (readonly, nonnull) Base *nullabilityChange;
 @property (readonly, nonnull) GenericClass<Base *> *missingGenerics;
 @property (readonly, nonnull) Base *typeChange;
@@ -22,6 +38,7 @@ __attribute__((objc_root_class))
 @end
 
 @interface PropertiesInitCategory (Category)
+@property (readonly, nonnull) Base *readwriteChange;
 @property (readonly, nonnull) Base *nullabilityChange;
 @property (readonly, nonnull) GenericClass<Base *> *missingGenerics;
 @property (readonly, nonnull) Base *typeChange;
@@ -31,6 +48,7 @@ __attribute__((objc_root_class))
 @end
 
 @interface PropertiesNoInitCategory (Category)
+@property (readonly, nonnull) Base *readwriteChange;
 @property (readonly, nonnull) Base *nullabilityChange;
 @property (readonly, nonnull) GenericClass<Base *> *missingGenerics;
 @property (readonly, nonnull) Base *typeChange;
