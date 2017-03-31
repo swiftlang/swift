@@ -634,65 +634,84 @@ isNonMutatingCapture(SILArgument *BoxArg) {
 /// definitely does not allow the box to escape; also, if the use is an
 /// instruction which possibly mutates the contents of the box, then add it to
 /// the Mutations vector.
-static bool
-isNonEscapingUse(Operand *O, SmallVectorImpl<SILInstruction*> &Mutations) {
-  auto *U = O->getUser();
-  if (U->isTypeDependentOperand(*O))
-    return true;
-  // Marking the boxed value as escaping is OK. It's just a DI annotation.
-  if (isa<MarkFunctionEscapeInst>(U))
-    return true;
-  
-  // A store or assign is ok if the alloc_box is the destination.
-  if (isa<StoreInst>(U) || isa<AssignInst>(U)) {
-    if (O->getOperandNumber() != 1)
-      return false;
-    Mutations.push_back(cast<SILInstruction>(U));
-    return true;
-  }
-  // copy_addr is ok, but counts as a mutation if the use is as the
-  // destination or the copy_addr is a take.
-  if (auto *CAI = dyn_cast<CopyAddrInst>(U)) {
-    if (O->getOperandNumber() == 1 || CAI->isTakeOfSrc())
-      Mutations.push_back(CAI);
-    return true;
-  }
-  // Recursively see through struct_element_addr, tuple_element_addr, and
-  // open_existential_addr instructions.
-  if (isa<StructElementAddrInst>(U) || isa<TupleElementAddrInst>(U) ||
-      isa<InitEnumDataAddrInst>(U) ||
-      isa<OpenExistentialAddrInst>(U) || isa<UncheckedTakeEnumDataAddrInst>(U)) {
-    // UncheckedTakeEnumDataAddr is additionally a mutation.
-    if (isa<UncheckedTakeEnumDataAddrInst>(U))
-      Mutations.push_back(U);
-    
-    for (auto *UO : U->getUses())
-      if (!isNonEscapingUse(UO, Mutations))
+static bool isNonEscapingUse(Operand *InitialOp,
+                             SmallVectorImpl<SILInstruction *> &Mutations) {
+  llvm::SmallVector<Operand *, 32> Worklist;
+  Worklist.push_back(InitialOp);
+
+  while (!Worklist.empty()) {
+    auto *Op = Worklist.pop_back_val();
+    SILInstruction *User = Op->getUser();
+
+    if (User->isTypeDependentOperand(*Op))
+      continue;
+
+    // Marking the boxed value as escaping is OK. It's just a DI annotation.
+    if (isa<MarkFunctionEscapeInst>(User))
+      continue;
+
+    // A store or assign is ok if the alloc_box is the destination.
+    if (isa<StoreInst>(User) || isa<AssignInst>(User)) {
+      if (Op->getOperandNumber() != 1)
         return false;
-    return true;
-  }
-  // An apply is ok if the argument is used as an inout parameter or an
-  // indirect return, but counts as a possible mutation in both cases.
-  if (auto *AI = dyn_cast<ApplyInst>(U)) {
-    auto argIndex = O->getOperandNumber()-1;
-    SILFunctionConventions substConv(AI->getSubstCalleeType(), AI->getModule());
-    auto convention = substConv.getSILArgumentConvention(argIndex);
-    if (convention.isIndirectConvention()) {
-      Mutations.push_back(AI);
-      return true;
+      Mutations.push_back(User);
+      continue;
     }
+
+    // copy_addr is ok, but counts as a mutation if the use is as the
+    // destination or the copy_addr is a take.
+    if (auto *CAI = dyn_cast<CopyAddrInst>(User)) {
+      if (Op->getOperandNumber() == 1 || CAI->isTakeOfSrc())
+        Mutations.push_back(CAI);
+      continue;
+    }
+
+    // Recursively see through struct_element_addr, tuple_element_addr, and
+    // open_existential_addr instructions.
+    if (isa<StructElementAddrInst>(User) || isa<TupleElementAddrInst>(User) ||
+        isa<InitEnumDataAddrInst>(User) || isa<OpenExistentialAddrInst>(User) ||
+        isa<UncheckedTakeEnumDataAddrInst>(User)) {
+      // UncheckedTakeEnumDataAddr is additionally a mutation.
+      if (isa<UncheckedTakeEnumDataAddrInst>(User))
+        Mutations.push_back(User);
+
+      for (auto *UserOperand : User->getUses()) {
+        Worklist.push_back(UserOperand);
+      }
+
+      continue;
+    }
+
+    // An apply is ok if the argument is used as an inout parameter or an
+    // indirect return, but counts as a possible mutation in both cases.
+    if (auto *AI = dyn_cast<ApplyInst>(User)) {
+      auto argIndex = Op->getOperandNumber() - 1;
+      SILFunctionConventions substConv(AI->getSubstCalleeType(),
+                                       AI->getModule());
+      auto convention = substConv.getSILArgumentConvention(argIndex);
+      if (!convention.isIndirectConvention()) {
+        return false;
+      }
+      Mutations.push_back(AI);
+      continue;
+    }
+
+    // These instructions are ok but count as mutations.
+    if (isa<DeallocBoxInst>(User)) {
+      Mutations.push_back(User);
+      continue;
+    }
+
+    // These remaining instructions are ok and don't count as mutations.
+    if (isa<StrongRetainInst>(User) || isa<StrongReleaseInst>(User) ||
+        isa<LoadInst>(User)) {
+      continue;
+    }
+
     return false;
   }
-  // These instructions are ok but count as mutations.
-  if (isa<DeallocBoxInst>(U)) {
-    Mutations.push_back(cast<SILInstruction>(U));
-    return true;
-  }
-  // These remaining instructions are ok and don't count as mutations.
-  if (isa<StrongRetainInst>(U) || isa<StrongReleaseInst>(U) ||
-      isa<LoadInst>(U))
-    return true;
-  return false;
+
+  return true;
 }
 
 /// \brief Examine an alloc_box instruction, returning true if at least one
