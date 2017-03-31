@@ -3020,6 +3020,11 @@ ERROR(objc_setter_for_nonobjc_property,none,
       "'@objc' setter for non-'@objc' property", ())
 ERROR(objc_setter_for_nonobjc_subscript,none,
       "'@objc' setter for non-'@objc' subscript", ())
+WARNING(accessor_swift3_objc_inference,none,
+        "%select{%0 %1|%1}2 with '@objc' %select{getter|setter}3 depends on "
+        "deprecated inference of '@objc'",
+        (DescriptiveDeclKind, DeclName, bool, bool))
+
 ERROR(objc_enum_generic,none,
       "'@objc' enum cannot be generic", ())
 ERROR(objc_name_req_nullary,none,

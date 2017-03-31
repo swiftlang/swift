@@ -6,6 +6,22 @@ import Foundation
 class ObjCSubclass : NSObject {
   func foo() { } // expected-note 2{{add '@objc' to expose this instance method to Objective-C}}{{3-3=@objc }}
   var bar: NSObject? = nil // expected-note 2{{add '@objc' to expose this var to Objective-C}}{{3-3=@objc }}
+
+  var isEditing: Bool { // expected-warning{{var 'isEditing' with '@objc' setter depends on deprecated inference of '@objc'}}{{3-3=@objc }}
+    get { return false }
+
+    @objc(setEditing:)
+    set { }
+  }
+
+  subscript (i: Int) -> NSObject? { // expected-warning{{'subscript' with '@objc' getter depends on deprecated inference of '@objc'}}{{3-3=@objc }}
+    @objc(objectAtIndex:)
+    get {
+      return nil
+    }
+
+    set { }
+  }
 }
 
 class DynamicMembers {
