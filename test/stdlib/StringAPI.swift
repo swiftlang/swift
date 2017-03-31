@@ -354,10 +354,12 @@ StringTests.test("CompareStringsWithUnpairedSurrogates")
   let acceptor = "\u{1f601}\u{1f602}\u{1f603}"
 
   expectEqual("\u{fffd}\u{1f602}\u{fffd}",
-    acceptor[
-      donor.index(donor.startIndex, offsetBy: 1) ..<
-      donor.index(donor.startIndex, offsetBy: 5)
-    ]
+    String(
+      acceptor[
+        donor.index(donor.startIndex, offsetBy: 1) ..<
+        donor.index(donor.startIndex, offsetBy: 5)
+      ]
+    )
   )
 }
 
@@ -441,14 +443,14 @@ func expectEqualCString(_ lhs: UnsafePointer<UInt8>,
 func expectEqualCString(_ lhs: UnsafePointer<UInt8>,
   _ rhs: ContiguousArray<UInt8>) {
   rhs.withUnsafeBufferPointer {
-    expectEqualCString(lhs, $0.baseAddress!)
+    expectEqualCString(lhs, $0.baseAddress)
   }
 }
 
 func expectEqualCString(_ lhs: UnsafePointer<UInt8>,
   _ rhs: ContiguousArray<CChar>) {
   rhs.withUnsafeBufferPointer {
-    $0.baseAddress!.withMemoryRebound(
+    $0.baseAddress.withMemoryRebound(
       to: UInt8.self, capacity: rhs.count) {
       expectEqualCString(lhs, $0)
     }

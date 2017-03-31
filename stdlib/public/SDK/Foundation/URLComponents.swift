@@ -193,14 +193,9 @@ public struct URLComponents : ReferenceConvertible, Hashable, Equatable, _Mutabl
     @available(OSX 10.11, iOS 9.0, *)
     private func _toStringRange(_ r : NSRange) -> Range<String.Index>? {
         guard r.location != NSNotFound else { return nil }
-        
-        let utf16Start = AnyUnicodeIndex(encodedOffset: numericCast(r.location)) // Michael NOTE: is this correct?
-        let utf16End = AnyUnicodeIndex(encodedOffset: numericCast(r.location + r.length)) // Michael NOTE: is this correct?
-
-        guard let _ = self.string else { return nil }
-        // guard let start = String.Index(utf16Start, within: s) else { return nil }
-        // guard let end = String.Index(utf16End, within: s) else { return nil }
-        
+        guard let str = self.string else { return nil }
+        let utf16Start = AnyUnicodeIndex(encodedOffset: numericCast(r.location))
+        let utf16End = AnyUnicodeIndex(encodedOffset: numericCast(r.location + r.length))
         return utf16Start..<utf16End
     }
     
