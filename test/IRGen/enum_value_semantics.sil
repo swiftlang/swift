@@ -94,7 +94,7 @@ enum GenericFixedLayout<T> {
 }
 
 
-// CHECK-LABEL: @_T020enum_value_semantics20SinglePayloadTrivialOWV = hidden constant [26 x i8*] [
+// CHECK-LABEL: @_T020enum_value_semantics20SinglePayloadTrivialOWV = internal constant [26 x i8*] [
 // CHECK:   i8* bitcast (void (i8*, %swift.type*)* @__swift_noop_void_return to i8*),
 // CHECK:   i8* bitcast (i8* (i8*, i8*, %swift.type*)* @__swift_memcpy9_8 to i8*),
 // CHECK:   i8* bitcast (i8* (i8*, %swift.type*)* @__swift_noop_self_return to i8*),
@@ -133,7 +133,7 @@ enum GenericFixedLayout<T> {
 // CHECK-SAME: }>
 
 
-// CHECK-LABEL: @_T020enum_value_semantics23SinglePayloadNontrivialOWV = hidden constant [26 x i8*] [
+// CHECK-LABEL: @_T020enum_value_semantics23SinglePayloadNontrivialOWV = internal constant [26 x i8*] [
 // CHECK:   i8* bitcast (void ([24 x i8]*, %swift.type*)* @_T020enum_value_semantics23SinglePayloadNontrivialOwXX to i8*),
 // CHECK:   i8* bitcast (%swift.opaque* ([24 x i8]*, [24 x i8]*, %swift.type*)* @_T020enum_value_semantics23SinglePayloadNontrivialOwCP to i8*),
 // CHECK:   i8* bitcast (i8* (i8*, %swift.type*)* @__swift_noop_self_return to i8*),

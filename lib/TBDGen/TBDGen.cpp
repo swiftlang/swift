@@ -45,11 +45,6 @@ class TBDGenVisitor : public ASTVisitor<TBDGenVisitor> {
     if (isPrivateDecl(NTD))
       return;
 
-    auto declaredType = NTD->getDeclaredType()->getCanonicalType();
-
-    auto vwt = irgen::LinkEntity::forValueWitnessTable(declaredType);
-    addSymbol(vwt.mangleAsString());
-
     visitNominalTypeDecl(NTD);
   }
 
@@ -105,12 +100,6 @@ public:
     if (isPrivateDecl(CD))
       return;
 
-    auto declaredType = CD->getDeclaredType()->getCanonicalType();
-
-    auto tmlcv =
-        irgen::LinkEntity::forTypeMetadataLazyCacheVariable(declaredType);
-    addSymbol(tmlcv.mangleAsString());
-
     visitNominalTypeDecl(CD);
   }
 
@@ -125,6 +114,9 @@ public:
 
     // There's no relevant information about members of a protocol at individual
     // protocols, each conforming type has to handle them individually.
+
+    // FIXME: Eventually we might allow nominal type members of protocols.
+    // Should just visit that here or at least assert that there aren't any.
   }
 
   void visitVarDecl(VarDecl *VD);
