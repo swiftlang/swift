@@ -162,7 +162,10 @@ ArrayCallKind swift::ArraySemanticsCall::getKind() const {
             .Case("array.get_element_address",
                   ArrayCallKind::kGetElementAddress)
             .Case("array.mutate_unknown", ArrayCallKind::kMutateUnknown)
-            .Case("array.withUnsafeMutableBufferPointer", ArrayCallKind::kWithUnsafeMutableBufferPointer)
+            .Case("array.withUnsafeMutableBufferPointer",
+                  ArrayCallKind::kWithUnsafeMutableBufferPointer)
+            .Case("array.append_contentsOf", ArrayCallKind::kAppendContentsOf)
+            .Case("array.append_element", ArrayCallKind::kAppendElement)
             .Default(ArrayCallKind::kNone);
     if (Tmp != ArrayCallKind::kNone) {
       assert(Kind == ArrayCallKind::kNone && "Multiple array semantic "
@@ -560,6 +563,21 @@ bool swift::ArraySemanticsCall::mayHaveBridgedObjectElementType() const {
     return isClass;
   }
   return true;
+}
+
+bool swift::ArraySemanticsCall::canInlineEarly() const {
+  switch (getKind()) {
+    default:
+      return false;
+    case ArrayCallKind::kAppendContentsOf:
+    case ArrayCallKind::kAppendElement:
+      // append(Element) calls other semantics functions. Therefore it's
+      // important that it's inlined by the early inliner (which is before all
+      // the array optimizations). Also, this semantics is only used to lookup
+      // Array.append(Element), so inlining it does not prevent any other
+      // optimization.
+      return true;
+  }
 }
 
 SILValue swift::ArraySemanticsCall::getInitializationCount() const {

@@ -34,8 +34,12 @@ enum class ArrayCallKind {
   kMakeMutable,
   kMutateUnknown,
   kWithUnsafeMutableBufferPointer,
+  kAppendContentsOf,
+  kAppendElement,
   // The following two semantic function kinds return the result @owned
-  // instead of operating on self passed as parameter.
+  // instead of operating on self passed as parameter. If you are adding
+  // a function, and it has a self parameter, make sure that it is defined
+  // before this comment.
   kArrayInit,
   kArrayUninitialized
 };
@@ -152,6 +156,9 @@ public:
 
   /// Could this array be backed by an NSArray.
   bool mayHaveBridgedObjectElementType() const;
+  
+  /// Can this function be inlined by the early inliner.
+  bool canInlineEarly() const;
 
 protected:
   /// Validate the signature of this call.

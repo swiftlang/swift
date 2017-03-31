@@ -227,7 +227,9 @@ SILFunction *SILPerformanceInliner::getEligibleFunction(FullApplySite AI) {
   // attribute if the inliner is asked not to inline them.
   if (Callee->hasSemanticsAttrs() || Callee->hasEffectsKind()) {
     if (WhatToInline == InlineSelection::NoSemanticsAndGlobalInit) {
-      return nullptr;
+      ArraySemanticsCall ASC(AI.getInstruction());
+      if (!ASC.canInlineEarly())
+        return nullptr;
     }
     // The "availability" semantics attribute is treated like global-init.
     if (Callee->hasSemanticsAttrs() &&
