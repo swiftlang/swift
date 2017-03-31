@@ -709,6 +709,8 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
     performWholeModuleTypeChecking(SF);
   }
 
+  MyTC.reset();
+
   // Verify that we've checked types correctly.
   SF.ASTStage = SourceFile::TypeChecked;
 
