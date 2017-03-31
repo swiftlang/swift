@@ -2285,6 +2285,14 @@ static void checkAccessibility(TypeChecker &TC, const Decl *D) {
   }
 }
 
+/// Whether this declaration is a member of a class with the `@objcMembers`
+/// attribute.
+static bool isMemberOfObjCMembersClass(const ValueDecl *VD) {
+  auto classDecl = VD->getDeclContext()->getAsClassOrClassExtensionContext();
+  if (!classDecl) return false;
+
+  return classDecl->getAttrs().hasAttribute<ObjCMembersAttr>();
+}
 /// Figure out if a declaration should be exported to Objective-C.
 static Optional<ObjCReason> shouldMarkAsObjC(TypeChecker &TC,
                                              const ValueDecl *VD,
@@ -2295,6 +2303,23 @@ static Optional<ObjCReason> shouldMarkAsObjC(TypeChecker &TC,
       dyn_cast<ProtocolDecl>(VD->getDeclContext());
   bool isMemberOfObjCProtocol =
       protocolContext && protocolContext->isObjC();
+
+  // Local function to determine whether we can implicitly infer @objc.
+  auto canInferImplicitObjC = [&] {
+    if (VD->isInvalid())
+      return false;
+    if (VD->isOperator())
+      return false;
+
+    // Implicitly generated declarations are not @objc, except for constructors.
+    if (!allowImplicit && VD->isImplicit())
+      return false;
+
+    if (VD->getFormalAccess() <= Accessibility::FilePrivate)
+      return false;
+
+    return true;
+  };
 
   // explicitly declared @objc.
   if (VD->getAttrs().hasAttribute<ObjCAttr>())
@@ -2318,6 +2343,8 @@ static Optional<ObjCReason> shouldMarkAsObjC(TypeChecker &TC,
   // for @nonobjc first.
   if (VD->getAttrs().hasAttribute<NonObjCAttr>())
     return None;
+  if (isMemberOfObjCMembersClass(VD) && canInferImplicitObjC())
+    return ObjCReason::MemberOfObjCMembersClass;
   // An override of an @objc declaration is implicitly @objc.
   if (VD->getOverriddenDecl() && VD->getOverriddenDecl()->isObjC())
     return ObjCReason::OverridesObjC;
@@ -2350,7 +2377,6 @@ static Optional<ObjCReason> shouldMarkAsObjC(TypeChecker &TC,
       return ObjCReason::ExplicitlyDynamic;
     }
 
-
     // Complain that 'dynamic' requires '@objc', but (quietly) infer @objc
     // anyway for better recovery.
     TC.diagnose(VD, diag::dynamic_requires_objc,
@@ -2370,14 +2396,7 @@ static Optional<ObjCReason> shouldMarkAsObjC(TypeChecker &TC,
   // (and extensions thereof) whose class hierarchies originate in Objective-C,
   // e.g., which derive from NSObject, so long as the members have internal
   // access or greater.
-  if (VD->isInvalid())
-    return None;
-  if (VD->isOperator())
-    return None;
-  // Implicitly generated declarations are not @objc, except for constructors.
-  if (!allowImplicit && VD->isImplicit())
-    return None;
-  if (VD->getFormalAccess() <= Accessibility::FilePrivate)
+  if (!canInferImplicitObjC())
     return None;
 
   // If this declaration is part of a class with implicitly @objc members,
@@ -6054,6 +6073,8 @@ public:
     UNINTERESTING_ATTR(WarnUnqualifiedAccess)
     UNINTERESTING_ATTR(DiscardableResult)
 
+    UNINTERESTING_ATTR(ObjCMembers)
+
 #undef UNINTERESTING_ATTR
 
     void visitAvailableAttr(AvailableAttr *attr) {
@@ -7230,8 +7251,8 @@ void TypeChecker::validateDecl(ValueDecl *D) {
 
     validateAttributes(*this, D);
 
-    // Mark a class as @objc. This must happen before checking its members.
     if (auto CD = dyn_cast<ClassDecl>(nominal)) {
+      // Mark a class as @objc. This must happen before checking its members.
       Optional<ObjCReason> isObjC = shouldMarkClassAsObjC(*this, CD);
       markAsObjC(*this, CD, isObjC);
 
@@ -7241,6 +7262,14 @@ void TypeChecker::validateDecl(ValueDecl *D) {
            CD->getSuperclass()->getClassOrBoundGenericClass()
              ->requiresStoredPropertyInits()))
         CD->setRequiresStoredPropertyInits(true);
+
+      // Inherit @objcMembers.
+      if (auto superclass = CD->getSuperclassDecl()) {
+        if (superclass->getAttrs().hasAttribute<ObjCMembersAttr>() &&
+            !CD->getAttrs().hasAttribute<ObjCMembersAttr>()) {
+          CD->getAttrs().add(new (Context) ObjCMembersAttr(/*implicit=*/true));
+        }
+      }
     }
 
     if (auto *ED = dyn_cast<EnumDecl>(nominal)) {

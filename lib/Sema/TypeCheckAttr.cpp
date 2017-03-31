@@ -234,6 +234,7 @@ public:
   void visitSetterAccessibilityAttr(SetterAccessibilityAttr *attr);
   bool visitAbstractAccessibilityAttr(AbstractAccessibilityAttr *attr);
   void visitSILStoredAttr(SILStoredAttr *attr);
+  void visitObjCMembersAttr(ObjCMembersAttr *attr);
 };
 } // end anonymous namespace
 
@@ -633,6 +634,10 @@ void AttributeEarlyChecker::visitSetterAccessibilityAttr(
   }
 }
 
+void AttributeEarlyChecker::visitObjCMembersAttr(ObjCMembersAttr *attr) {
+  if (!isa<ClassDecl>(D))
+    return diagnoseAndRemoveAttr(attr, diag::objcmembers_attribute_nonclass);
+}
 
 void TypeChecker::checkDeclAttributesEarly(Decl *D) {
   // Don't perform early attribute validation more than once.
@@ -749,6 +754,7 @@ public:
     IGNORED_ATTR(Testable)
     IGNORED_ATTR(WarnUnqualifiedAccess)
     IGNORED_ATTR(ShowInInterface)
+    IGNORED_ATTR(ObjCMembers)
 #undef IGNORED_ATTR
 
   void visitAvailableAttr(AvailableAttr *attr);

@@ -1075,6 +1075,8 @@ ERROR(optional_attribute_non_objc_protocol,none,
 ERROR(optional_attribute_missing_explicit_objc,none,
       "'optional' requirements are an Objective-C compatibility feature; add '@objc'",
       ())
+ERROR(objcmembers_attribute_nonclass,none,
+      "'@objcMembers' attribute can only be applied to a class", ())
 ERROR(optional_attribute_initializer,none,
       "'optional' cannot be applied to an initializer", ())
 ERROR(unavailable_method_non_objc_protocol,none,

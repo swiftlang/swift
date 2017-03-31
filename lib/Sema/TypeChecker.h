@@ -539,6 +539,8 @@ enum class ObjCReason {
   ExplicitlyIBInspectable,
   /// Has an explicit '@GKInspectable' attribute.
   ExplicitlyGKInspectable,
+  /// Is it a member of an @objcMembers class.
+  MemberOfObjCMembersClass,
   /// A member of an Objective-C-defined class or subclass.
   MemberOfObjCSubclass,
   /// An accessor to a property.
@@ -563,6 +565,7 @@ static inline bool shouldDiagnoseObjCReason(ObjCReason reason) {
     return true;
 
   case ObjCReason::MemberOfObjCSubclass:
+  case ObjCReason::MemberOfObjCMembersClass:
   case ObjCReason::Accessor:
     return false;
   }
@@ -587,6 +590,7 @@ static inline unsigned getObjCDiagnosticAttrKind(ObjCReason reason) {
     return static_cast<unsigned>(reason);
 
   case ObjCReason::MemberOfObjCSubclass:
+  case ObjCReason::MemberOfObjCMembersClass:
   case ObjCReason::Accessor:
     llvm_unreachable("should not diagnose this @objc reason");
   }
