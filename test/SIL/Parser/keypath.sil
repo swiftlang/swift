@@ -10,9 +10,9 @@ struct S {
   var z: C
 }
 class C {
-  var x: Int
-  let y: String
-  var z: S
+  final var x: Int
+  final let y: String
+  final var z: S
 
   init()
 }

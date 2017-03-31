@@ -2387,9 +2387,68 @@ RValue RValueEmitter::visitKeyPathExpr(KeyPathExpr *E, SGFContext C) {
   if (E->isObjC()) {
     return visit(E->getObjCStringLiteralExpr(), C);
   }
+
+  SmallVector<KeyPathInstComponent, 4> loweredComponents;
+  auto loweredTy = SGF.getLoweredType(E->getType());
   
-  // TODO: native keypaths
-  llvm_unreachable("not implemented");
+  auto unsupported = [&](StringRef message) -> RValue {
+    SGF.SGM.diagnose(E->getLoc(), diag::not_implemented, message);
+    
+    auto undef = SILUndef::get(loweredTy, SGF.SGM.M);
+    return RValue(SGF, E, ManagedValue::forUnmanaged(undef));
+  };
+  
+  for (auto &component : E->getComponents()) {
+    switch (component.getKind()) {
+    case KeyPathExpr::Component::Kind::Property: {
+      auto decl = cast<VarDecl>(component.getDeclRef().getDecl());
+      
+      switch (decl->getAccessStrategy(AccessSemantics::Ordinary,
+                                      AccessKind::ReadWrite)) {
+      case AccessStrategy::Storage: {
+        // If the stored value would need to be reabstracted in fully opaque
+        // context, then we have to treat the component as computed.
+        auto componentObjTy =
+          component.getComponentType()->getLValueOrInOutObjectType();
+        auto storageTy = SGF.SGM.Types.getSubstitutedStorageType(decl,
+                                                                componentObjTy);
+        auto opaqueTy = SGF.getLoweredType(AbstractionPattern::getOpaque(),
+                                           componentObjTy);
+        
+        if (storageTy.getAddressType() == opaqueTy.getAddressType()) {
+          loweredComponents.push_back(
+                                 KeyPathInstComponent::forStoredProperty(decl));
+          break;
+        }
+        LLVM_FALLTHROUGH;
+      }
+      case AccessStrategy::Addressor:
+      case AccessStrategy::BehaviorStorage:
+      case AccessStrategy::DirectToAccessor:
+      case AccessStrategy::DispatchToAccessor:
+        return unsupported("computed property key path component");
+      }
+      
+      break;
+    }
+        
+    case KeyPathExpr::Component::Kind::Subscript:
+    case KeyPathExpr::Component::Kind::OptionalChain:
+    case KeyPathExpr::Component::Kind::OptionalForce:
+    case KeyPathExpr::Component::Kind::OptionalWrap:
+      return unsupported("non-property key path component");
+      
+    
+    case KeyPathExpr::Component::Kind::UnresolvedProperty:
+    case KeyPathExpr::Component::Kind::UnresolvedSubscript:
+      llvm_unreachable("not resolved");
+    }
+  }
+  
+  auto keyPath = SGF.B.createKeyPath(SILLocation(E), loweredComponents,
+                                     loweredTy);
+  auto value = SGF.emitManagedRValueWithCleanup(keyPath);
+  return RValue(SGF, E, value);
 }
 
 RValue RValueEmitter::
