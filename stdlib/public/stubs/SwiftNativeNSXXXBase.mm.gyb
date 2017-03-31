@@ -47,7 +47,7 @@
 
 using namespace swift;
 
-% for Class in ('Array', 'Dictionary', 'Set', 'String', 'Enumerator', 'Data', 'CharacterSet', 'IndexSet'):
+% for Class in ('Array', 'Dictionary', 'Set', 'String', 'Enumerator', 'Data', 'IndexSet'):
 SWIFT_RUNTIME_STDLIB_INTERFACE
 @interface _SwiftNativeNS${Class}Base : NS${Class}
 {

@@ -22,6 +22,8 @@ set(sources
   XPCOverlayShims.h
 
   CoreFoundationOverlayShims.h
+  CFCharacterSetShims.h
+  CFHashingShims.h
 
   FoundationOverlayShims.h
   FoundationShimSupport.h

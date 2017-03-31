@@ -160,9 +160,16 @@ class TestCharacterSet : TestCharacterSetSuper {
     func test_classForCoder() {
         // confirm internal bridged impl types are not exposed to archival machinery
         let cs = CharacterSet() as NSCharacterSet
-        let expected: AnyClass = NSCharacterSet.self as AnyClass
-        expectTrue(cs.classForCoder == expected)
-        expectTrue(cs.classForKeyedArchiver == expected)
+        
+        // Either of the following two are OK
+        let expectedImmutable: AnyClass = NSCharacterSet.self as AnyClass
+        let expectedMutable: AnyClass = NSMutableCharacterSet.self as AnyClass
+        
+        let actualClass: AnyClass = cs.classForCoder
+        let actualClassForCoder: AnyClass = cs.classForKeyedArchiver!
+        
+        expectTrue(actualClass == expectedImmutable || actualClass == expectedMutable)
+        expectTrue(actualClassForCoder == expectedImmutable || actualClassForCoder == expectedMutable)
     }
 
     func test_AnyHashableContainingCharacterSet() {
@@ -241,8 +248,57 @@ class TestCharacterSet : TestCharacterSetSuper {
         expectEqual(0x6, bitmap[12])
         expectEqual(8192, bitmap.count)
     }
+    
+    func test_setOperationsOfEmptySet() {
+        // The following tests pass on these versions of the OS
+        if #available(OSX 10.12.3, iOS 10.3, watchOS 3.2, tvOS 10.2, *) {
+            let emptySet = CharacterSet()
+            let abcSet = CharacterSet(charactersIn: "abc")
+            
+            expectTrue(abcSet.isSuperset(of: emptySet))
+            expectTrue(emptySet.isSuperset(of: emptySet))
+            expectFalse(emptySet.isSuperset(of: abcSet))
+            
+            expectTrue(abcSet.isStrictSuperset(of: emptySet))
+            expectFalse(emptySet.isStrictSuperset(of: emptySet))
+            expectFalse(emptySet.isStrictSuperset(of: abcSet))
+            
+            expectTrue(emptySet.isSubset(of: abcSet))
+            expectTrue(emptySet.isSubset(of: emptySet))
+            expectFalse(abcSet.isSubset(of: emptySet))
+            
+            expectTrue(emptySet.isStrictSubset(of: abcSet))
+            expectFalse(emptySet.isStrictSubset(of: emptySet))
+            expectFalse(abcSet.isStrictSubset(of: emptySet))
+            expectFalse(abcSet.isStrictSubset(of: abcSet))
+            
+            expectEqual(emptySet, emptySet)
+            expectNotEqual(abcSet, emptySet)
+        }
+    }
+    
+    func test_moreSetOperations() {
+        // previous to these releases the subset methods improperly calculated strict subsets
+        // as of macOS 10.12.4, iOS 10.3, watchOS 3.2 and tvOS 10.2 CoreFoundation had a bug
+        // fix that corrected this behavior.
+        // TODO: figure out why the simulator is claiming this as a failure.
+        // https://bugs.swift.org/browse/SR-4457
+        #if os(macOS)
+            if #available(OSX 10.12.4, iOS 10.3, watchOS 3.2, tvOS 10.2, *) {
+                let abcSet = CharacterSet(charactersIn: "abc")
+                let abcdSet = CharacterSet(charactersIn: "abcd")
+                
+                expectEqual(abcSet, abcSet)
+                expectNotEqual(abcSet, abcdSet)
+                
+                expectTrue(abcSet.isStrictSubset(of:abcdSet))
+                expectFalse(abcdSet.isStrictSubset(of:abcSet))
+                expectTrue(abcdSet.isStrictSuperset(of:abcSet))
+                expectFalse(abcSet.isStrictSuperset(of:abcdSet))
+            }
+        #endif
+    }
 }
-
 
 #if !FOUNDATION_XCTEST
 var CharacterSetTests = TestSuite("TestCharacterSet")
@@ -264,6 +320,8 @@ CharacterSetTests.test("test_subtractNonEmptySet") { TestCharacterSet().test_sub
 CharacterSetTests.test("test_symmetricDifference") { TestCharacterSet().test_symmetricDifference() }
 CharacterSetTests.test("test_hasMember") { TestCharacterSet().test_hasMember() }
 CharacterSetTests.test("test_bitmap") { TestCharacterSet().test_bitmap() }
+CharacterSetTests.test("test_setOperationsOfEmptySet") { TestCharacterSet().test_setOperationsOfEmptySet() }
+CharacterSetTests.test("test_moreSetOperations") { TestCharacterSet().test_moreSetOperations() }
 runAllTests()
 #endif
 
