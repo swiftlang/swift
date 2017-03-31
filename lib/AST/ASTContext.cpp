@@ -162,6 +162,9 @@ struct ASTContext::Implementation {
   /// func ==(Int, Int) -> Bool
   FuncDecl *EqualIntDecl = nullptr;
 
+  /// func append(Element) -> void
+  FuncDecl *ArrayAppendElementDecl = nullptr;
+
   /// func _unimplementedInitializer(className: StaticString).
   FuncDecl *UnimplementedInitializerDecl = nullptr;
 
@@ -881,6 +884,56 @@ FuncDecl *ASTContext::getEqualIntDecl() const {
         resultType->isEqual(boolType)) {
       Impl.EqualIntDecl = funcDecl;
       return funcDecl;
+    }
+  }
+  return nullptr;
+}
+
+FuncDecl *ASTContext::getArrayAppendElementDecl() const {
+  if (Impl.ArrayAppendElementDecl)
+    return Impl.ArrayAppendElementDecl;
+
+  auto AppendFunctions = getArrayDecl()->lookupDirect(getIdentifier("append"));
+
+  for (auto CandidateFn : AppendFunctions) {
+    auto FnDecl = dyn_cast<FuncDecl>(CandidateFn);
+    auto Attrs = FnDecl->getAttrs();
+    for (auto *A : Attrs.getAttributes<SemanticsAttr, false>()) {
+      if (A->Value != "array.append_element")
+        continue;
+
+      auto ParamLists = FnDecl->getParameterLists();
+      if (ParamLists.size() != 2)
+        return nullptr;
+      if (ParamLists[0]->size() != 1)
+        return nullptr;
+
+      InOutType *SelfInOutTy =
+        ParamLists[0]->get(0)->getInterfaceType()->getAs<InOutType>();
+      if (!SelfInOutTy)
+        return nullptr;
+
+      BoundGenericStructType *SelfGenericStructTy =
+        SelfInOutTy->getObjectType()->getAs<BoundGenericStructType>();
+      if (!SelfGenericStructTy)
+        return nullptr;
+      if (SelfGenericStructTy->getDecl() != getArrayDecl())
+        return nullptr;
+
+      if (ParamLists[1]->size() != 1)
+        return nullptr;
+      GenericTypeParamType *ElementType = ParamLists[1]->get(0)->
+                             getInterfaceType()->getAs<GenericTypeParamType>();
+      if (!ElementType)
+        return nullptr;
+      if (ElementType->getName() != getIdentifier("Element"))
+        return nullptr;
+
+      if (!FnDecl->getResultInterfaceType()->isVoid())
+        return nullptr;
+
+      Impl.ArrayAppendElementDecl = FnDecl;
+      return FnDecl;
     }
   }
   return nullptr;
