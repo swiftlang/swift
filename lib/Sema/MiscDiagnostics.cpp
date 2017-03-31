@@ -2074,18 +2074,18 @@ public:
     
     // A fallthrough dest case's bound variable means the source case's
     // var of the same name is read.
-    if (auto FS = dyn_cast<FallthroughStmt>(S)) {
-      if (auto sourceCase = FS->getFallthroughSource()) {
-        SmallVector<VarDecl *, 4> SourceVars;
+    if (auto *fallthroughStmt = dyn_cast<FallthroughStmt>(S)) {
+      if (auto *sourceCase = fallthroughStmt->getFallthroughSource()) {
+        SmallVector<VarDecl *, 4> sourceVars;
         auto sourcePattern = sourceCase->getCaseLabelItems()[0].getPattern();
-        sourcePattern->collectVariables(SourceVars);
+        sourcePattern->collectVariables(sourceVars);
         
-        auto destCase = FS->getFallthroughDest();
+        auto destCase = fallthroughStmt->getFallthroughDest();
         auto destPattern = destCase->getCaseLabelItems()[0].getPattern();
         destPattern->forEachVariable([&](VarDecl *V) {
           if (!V->hasName())
             return;
-          for (auto var : SourceVars) {
+          for (auto *var : sourceVars) {
             if (var->hasName() && var->getName() == V->getName()) {
               VarDecls[var] |= RK_Read;
               break;

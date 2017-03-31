@@ -973,12 +973,12 @@ public:
           // was in the first label item's pattern.
           auto firstPattern = caseBlock->getCaseLabelItems()[0].getPattern();
           if (pattern != firstPattern) {
-            SmallVector<VarDecl *, 4> Vars;
-            firstPattern->collectVariables(Vars);
+            SmallVector<VarDecl *, 4> vars;
+            firstPattern->collectVariables(vars);
             pattern->forEachVariable([&](VarDecl *VD) {
               if (!VD->hasName())
                 return;
-              for (auto expected : Vars) {
+              for (auto *expected : vars) {
                 if (expected->hasName() && expected->getName() == VD->getName()) {
                   if (!VD->getType()->isEqual(expected->getType())) {
                     TC.diagnose(VD->getLoc(), diag::type_mismatch_multiple_pattern_list,

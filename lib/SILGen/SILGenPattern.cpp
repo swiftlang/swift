@@ -2504,14 +2504,14 @@ void SILGenFunction::emitSwitchStmt(SwitchStmt *S) {
       ArrayRef<CaseLabelItem> labelItems = caseBlock->getCaseLabelItems();
       SmallVector<SILValue, 4> args;
       SmallVector<VarDecl *, 4> expectedVarOrder;
-      SmallVector<VarDecl *, 4> Vars;
+      SmallVector<VarDecl *, 4> vars;
       labelItems[0].getPattern()->collectVariables(expectedVarOrder);
-      row.getCasePattern()->collectVariables(Vars);
+      row.getCasePattern()->collectVariables(vars);
       
       for (auto expected : expectedVarOrder) {
         if (!expected->hasName())
           continue;
-        for (auto var : Vars) {
+        for (auto *var : vars) {
           if (var->hasName() && var->getName() == expected->getName()) {
             auto value = B.emitCopyValueOperation(CurrentSILLoc,
                                                   VarLocs[var].value);
@@ -2601,14 +2601,16 @@ void SILGenFunction::emitSwitchFallthrough(FallthroughStmt *S) {
   JumpDest sharedDest =
     context->Emission.getSharedCaseBlockDest(caseStmt, true);
     
-  if (caseStmt->hasBoundDecls()) {
+  if (!caseStmt->hasBoundDecls()) {
+    Cleanups.emitBranchAndCleanups(sharedDest, S);
+  } else {
     // Generate branch args to pass along current vars to fallthrough case.
     ArrayRef<CaseLabelItem> labelItems = caseStmt->getCaseLabelItems();
     SmallVector<SILValue, 4> args;
     SmallVector<VarDecl *, 4> expectedVarOrder;
     labelItems[0].getPattern()->collectVariables(expectedVarOrder);
     
-    for (auto expected : expectedVarOrder) {
+    for (auto *expected : expectedVarOrder) {
       if (!expected->hasName())
         continue;
       for (auto var : VarLocs) {
@@ -2622,8 +2624,6 @@ void SILGenFunction::emitSwitchFallthrough(FallthroughStmt *S) {
       }
     }
     Cleanups.emitBranchAndCleanups(sharedDest, S, args);
-  } else {
-    Cleanups.emitBranchAndCleanups(sharedDest, S);
   }
 }
 
