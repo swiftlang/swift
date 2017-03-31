@@ -241,6 +241,43 @@ class TestCharacterSet : TestCharacterSetSuper {
         expectEqual(0x6, bitmap[12])
         expectEqual(8192, bitmap.count)
     }
+    func test_setOperationsOfEmptySet(){
+        let emptySet = CharacterSet()
+        let immutableSet = CharacterSet(charactersIn:"abc")
+        expectTrue(immutableSet.isSuperset(of: emptySet)) 
+        expectTrue(emptySet.isSuperset(of: emptySet))
+        expectFalse(emptySet.isSuperset(of: immutableSet))
+        expectTrue(immutableSet.isStrictSuperset(of: emptySet))
+        expectFalse(emptySet.isStrictSuperset(of: emptySet))
+        expectFalse(emptySet.isStrictSuperset(of: immutableSet)) 
+        expectTrue(emptySet.isSubset(of: immutableSet))
+        expectTrue(emptySet.isSubset(of: emptySet))
+        expectFalse(immutableSet.isSubset(of: emptySet))
+        expectTrue(emptySet.isStrictSubset(of: immutableSet))
+        expectFalse(emptySet.isStrictSubset(of: emptySet))
+        expectFalse(immutableSet.isStrictSubset(of: emptySet))
+        expectFalse(immutableSet.isStrictSubset(of: immutableSet))
+        expectTrue(emptySet==emptySet)
+        expectFalse(immutableSet==emptySet)
+    }
+    func test_moreSetOperations(){
+        let firstSet = CharacterSet(charactersIn:"abc")
+        let secondSet = CharacterSet(charactersIn:"abcd")
+        expectTrue(firstSet==firstSet)
+        expectFalse(firstSet==secondSet)
+        expectTrue(firstSet.isStrictSubset(of:secondSet))
+        expectFalse(secondSet.isStrictSubset(of:firstSet))
+        expectTrue(secondSet.isStrictSuperset(of:firstSet))
+        expectFalse(firstSet.isStrictSuperset(of:secondSet))
+    }
+    func test_resilienceBug(){
+        // test if a fix or a workaround for rdar://29474937  is applied
+        for i in 1...100{
+            test_superSet()
+            test_setOperationsOfEmptySet()
+            test_moreSetOperations()
+        }
+    }
 }
 
 
@@ -264,6 +301,10 @@ CharacterSetTests.test("test_subtractNonEmptySet") { TestCharacterSet().test_sub
 CharacterSetTests.test("test_symmetricDifference") { TestCharacterSet().test_symmetricDifference() }
 CharacterSetTests.test("test_hasMember") { TestCharacterSet().test_hasMember() }
 CharacterSetTests.test("test_bitmap") { TestCharacterSet().test_bitmap() }
+CharacterSetTests.test("test_setOperationsOfEmptySet") { TestCharacterSet().test_setOperationsOfEmptySet() }
+CharacterSetTests.test("test_moreSetOperations") { TestCharacterSet().test_moreSetOperations() }
+CharacterSetTests.test("test_resilienceBug") { TestCharacterSet().test_resilienceBug() }
+
 runAllTests()
 #endif
 

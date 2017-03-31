@@ -436,6 +436,9 @@ public struct CharacterSet : ReferenceConvertible, Equatable, Hashable, SetAlgeb
     
     /// Returns true if `self` is a superset of `other`.
     public func isSuperset(of other: CharacterSet) -> Bool {
+        if other.isEmpty {
+            return true 
+        }
         return _mapUnmanaged { $0.isSuperset(of: other) }
     }
 
