@@ -2292,7 +2292,7 @@ JumpDest PatternMatchEmission::getSharedCaseBlockDest(CaseStmt *caseBlock,
       pattern->forEachVariable([&](VarDecl *V) {
         if (!V->hasName())
           return;
-        block->createPHIArgument(SGF.VarLocs[V].value->getType(),
+        block->createPHIArgument(SGF.getLoweredType(V->getType()),
                                  ValueOwnershipKind::Owned, V);
       });
     }
