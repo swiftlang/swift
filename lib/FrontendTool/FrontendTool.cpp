@@ -599,7 +599,7 @@ static bool performCompile(std::unique_ptr<CompilerInstance> &Instance,
     performSILLinking(SM.get(), true);
 
   {
-    SharedTimer timer("SIL verification (pre-optimization)");
+    SharedTimer timer("SIL verification, pre-optimization");
     SM->verify();
   }
 
@@ -626,7 +626,7 @@ static bool performCompile(std::unique_ptr<CompilerInstance> &Instance,
   }
 
   {
-    SharedTimer timer("SIL verification (post-optimization)");
+    SharedTimer timer("SIL verification, post-optimization");
     SM->verify();
   }
 
