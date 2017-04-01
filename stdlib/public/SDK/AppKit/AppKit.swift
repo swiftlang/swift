@@ -71,6 +71,7 @@ public func NSApplicationMain(
 }
 
 extension NSColor : _ExpressibleByColorLiteral {
+  @nonobjc
   public required convenience init(colorLiteralRed red: Float, green: Float,
                                    blue: Float, alpha: Float) {
     self.init(srgbRed: CGFloat(red), green: CGFloat(green),
@@ -85,6 +86,7 @@ extension NSImage : _ExpressibleByImageLiteral {
     self.init(named: name)
   }
 
+  @nonobjc
   public required convenience init(imageLiteralResourceName name: String) {
     self.init(failableImageLiteral: name)
   }

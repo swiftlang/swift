@@ -955,6 +955,12 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   }
 
   Opts.EnableAppExtensionRestrictions |= Args.hasArg(OPT_enable_app_extension);
+  Opts.WarnSwift3ObjCInference |= Args.hasArg(OPT_warn_swift3_objc_inference);
+
+  Opts.EnableSwift3ObjCInference =
+    Args.hasFlag(OPT_enable_swift3_objc_inference,
+                 OPT_disable_swift3_objc_inference,
+                 Opts.isSwiftVersion3());
 
   llvm::Triple Target = Opts.Target;
   StringRef TargetArg;

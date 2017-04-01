@@ -68,7 +68,7 @@ class ObjCAndNonObjCNotAllowed {
 }
 
 class DynamicAndNonObjCNotAllowed {
-  @nonobjc dynamic func redundantAttributes() { } // expected-error {{declaration is marked dynamic, and cannot be marked @nonobjc}}
+  @nonobjc dynamic func redundantAttributes() { } // expected-error {{a declaration cannot be both '@nonobjc' and 'dynamic'}}
 }
 
 class IBOutletAndNonObjCNotAllowed {

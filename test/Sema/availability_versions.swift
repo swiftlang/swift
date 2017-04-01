@@ -1310,7 +1310,7 @@ class Y {
 
 @objc
 class X {
-  var y = Y()
+  @objc var y = Y()
 }
 
 func testForFixitWithNestedMemberRefExpr() {

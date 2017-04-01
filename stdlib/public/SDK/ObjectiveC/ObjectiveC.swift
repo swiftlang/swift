@@ -220,6 +220,7 @@ extension NSObject : Equatable, Hashable {
   /// - Note: the hash value is not guaranteed to be stable across
   ///   different invocations of the same program.  Do not persist the
   ///   hash value across program runs.
+  @objc
   open var hashValue: Int {
     return hash
   }
