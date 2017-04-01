@@ -212,6 +212,14 @@ void addSSAPasses(SILPassPipelinePlan &P, OptimizationLevelKind OpLevel) {
   // Promote stack allocations to values.
   P.addMem2Reg();
 
+  // Cleanup, which is important if the inliner has restarted the pass pipeline.
+  P.addPerformanceConstantPropagation();
+  P.addSimplifyCFG();
+  P.addSILCombine();
+
+  // Mainly for Array.append(contentsOf) optimization.
+  P.addArrayElementPropagation();
+  
   // Run the devirtualizer, specializer, and inliner. If any of these
   // makes a change we'll end up restarting the function passes on the
   // current function (after optimizing any new callees).
