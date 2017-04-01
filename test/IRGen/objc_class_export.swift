@@ -75,19 +75,19 @@ struct BigStructWithNativeObjects {
 }
 
 @objc class Foo {
-  var x = 0
-  class func create() -> Foo {
+  @objc var x = 0
+  @objc class func create() -> Foo {
     return Foo()
   }
 
-  func drawInRect(dirty dirty: NSRect) {
+  @objc func drawInRect(dirty dirty: NSRect) {
   }
   // CHECK: define internal void @_T017objc_class_export3FooC10drawInRectySC6NSRectV5dirty_tFTo([[OPAQUE:%.*]]*, i8*, [[NSRECT]]* byval align 8) unnamed_addr {{.*}} {
   // CHECK:   [[CAST:%[a-zA-Z0-9]+]] = bitcast [[OPAQUE]]* %0 to [[FOO]]*
   // CHECK:   call swiftcc void @_T017objc_class_export3FooC10drawInRectySC6NSRectV5dirty_tF(double {{.*}}, double {{.*}}, double {{.*}}, double {{.*}}, [[FOO]]* swiftself [[CAST]])
   // CHECK: }
 
-  func bounds() -> NSRect {
+  @objc func bounds() -> NSRect {
     return NSRect(origin: NSPoint(x: 0, y: 0), 
                   size: NSSize(width: 0, height: 0))
   }
@@ -95,7 +95,7 @@ struct BigStructWithNativeObjects {
   // CHECK:   [[CAST:%[a-zA-Z0-9]+]] = bitcast [[OPAQUE4]]* %1 to [[FOO]]*
   // CHECK:   call swiftcc { double, double, double, double } @_T017objc_class_export3FooC6boundsSC6NSRectVyF([[FOO]]* swiftself [[CAST]])
 
-  func convertRectToBacking(r r: NSRect) -> NSRect {
+  @objc func convertRectToBacking(r r: NSRect) -> NSRect {
     return r
   }
   // CHECK: define internal void @_T017objc_class_export3FooC20convertRectToBackingSC6NSRectVAF1r_tFTo([[NSRECT]]* noalias nocapture sret, [[OPAQUE5:%.*]]*, i8*, [[NSRECT]]* byval align 8) unnamed_addr {{.*}} {

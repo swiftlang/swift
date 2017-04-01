@@ -1031,6 +1031,29 @@ void SILGenFunction::emitNativeToForeignThunk(SILDeclRef thunk) {
         emitTemporaryAllocation(loc, substConv.getSingleSILResultType()));
   }
 
+  // If the '@objc' was inferred due to deprecated rules,
+  // emit a Builtin.swift3ImplicitObjCEntrypoint().
+  //
+  // However, don't do so for 'dynamic' members, which must use Objective-C
+  // dispatch and therefore create many false positives.
+  if (thunk.hasDecl()) {
+    auto decl = thunk.getDecl();
+
+    // For an accessor, look at the storage declaration's attributes.
+    if (auto func = dyn_cast<FuncDecl>(decl)) {
+      if (func->isAccessor())
+        decl = func->getAccessorStorageDecl();
+    }
+
+    if (auto attr = decl->getAttrs().getAttribute<ObjCAttr>()) {
+      if (attr->isSwift3Inferred() &&
+          !decl->getAttrs().hasAttribute<DynamicAttr>()) {
+        B.createBuiltin(loc, getASTContext().getIdentifier("swift3ImplicitObjCEntrypoint"),
+            getModule().Types.getEmptyTupleType(), { }, { });
+      }
+    }
+  }
+
   // Now, enter a cleanup used for bridging the arguments. Note that if we
   // have an indirect result, it must be outside of this scope, otherwise
   // we will deallocate it too early.

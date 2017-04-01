@@ -1762,6 +1762,9 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
 
   case BuiltinValueKind::TSanInoutAccess:
     return getTSanInoutAccess(Context, Id);
+
+  case BuiltinValueKind::Swift3ImplicitObjCEntrypoint:
+    return getBuiltinFunction(Id, {}, TupleType::getEmpty(Context));
   }
 
   llvm_unreachable("bad builtin value!");

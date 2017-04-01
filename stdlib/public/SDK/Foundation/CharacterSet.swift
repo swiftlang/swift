@@ -35,11 +35,13 @@ fileprivate final class _CharacterSetStorage : Hashable {
     }
     
     fileprivate var _backing : Backing
-    
+   
+    @nonobjc 
     init(immutableReference r : CFCharacterSet) {
         _backing = .immutable(r)
     }
-    
+
+    @nonobjc
     init(mutableReference r : CFMutableCharacterSet) {
         _backing = .mutable(r)
     }
@@ -545,11 +547,13 @@ public struct CharacterSet : ReferenceConvertible, Equatable, Hashable, SetAlgeb
     // MARK: Immutable functions
     
     /// Returns a representation of the `CharacterSet` in binary format.
+    @nonobjc
     public var bitmapRepresentation: Data {
         return _storage.bitmapRepresentation
     }
     
     /// Returns an inverted copy of the receiver.
+    @nonobjc
     public var inverted : CharacterSet {
         return _storage.inverted
     }

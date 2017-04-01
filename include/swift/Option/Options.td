@@ -268,6 +268,10 @@ def continue_building_after_errors : Flag<["-"], "continue-building-after-errors
   Flags<[FrontendOption, DoesNotAffectIncrementalBuild]>,
   HelpText<"Continue building, even after errors are encountered">;
 
+def warn_swift3_objc_inference : Flag<["-"], "warn-swift3-objc-inference">,
+  Flags<[FrontendOption, DoesNotAffectIncrementalBuild]>,
+  HelpText<"Warn about deprecated @objc inference in Swift 3">;
+
 // Platform options.
 def enable_app_extension : Flag<["-"], "application-extension">,
   Flags<[FrontendOption, NoInteractiveOption]>,

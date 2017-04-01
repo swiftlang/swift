@@ -1,6 +1,6 @@
-// RUN: %target-swift-frontend -disable-objc-attr-requires-foundation-module -typecheck -verify %s -swift-version 4
-// RUN: %target-swift-ide-test -skip-deinit=false -print-ast-typechecked -source-filename %s -function-definitions=true -prefer-type-repr=false -print-implicit-attrs=true -explode-pattern-binding-decls=true -disable-objc-attr-requires-foundation-module -swift-version 4 | %FileCheck %s
-// RUN: not %target-swift-frontend -typecheck -dump-ast -disable-objc-attr-requires-foundation-module %s -swift-version 4 2> %t.dump
+// RUN: %target-swift-frontend -disable-objc-attr-requires-foundation-module -typecheck -verify %s -swift-version 4 -enable-source-import -I %S/Inputs -enable-swift3-objc-inference
+// RUN: %target-swift-ide-test -skip-deinit=false -print-ast-typechecked -source-filename %s -function-definitions=true -prefer-type-repr=false -print-implicit-attrs=true -explode-pattern-binding-decls=true -disable-objc-attr-requires-foundation-module -swift-version 4 -enable-source-import -I %S/Inputs -enable-swift3-objc-inference | %FileCheck %s
+// RUN: not %target-swift-frontend -typecheck -dump-ast -disable-objc-attr-requires-foundation-module %s -swift-version 4 -enable-source-import -I %S/Inputs -enable-swift3-objc-inference 2> %t.dump
 // RUN: %FileCheck -check-prefix CHECK-DUMP %s < %t.dump
 // REQUIRES: objc_interop
 
@@ -1662,6 +1662,32 @@ class HasIBAction {
   @IBAction func badAction(_ sender: PlainStruct?) { }
   // expected-error@-1{{argument to @IBAction method cannot have non-object type 'PlainStruct?'}}
   // expected-error@-2{{method cannot be marked @IBAction because the type of the parameter cannot be represented in Objective-C}}
+}
+
+//===---
+//===--- @IBInspectable implies @objc
+//===---
+
+// CHECK-LABEL: {{^}}class HasIBInspectable {
+class HasIBInspectable {
+  @IBInspectable var goodProperty: AnyObject?
+  // CHECK: {{^}}  @IBInspectable @objc var goodProperty: AnyObject?
+
+  @IBInspectable var badProperty: PlainStruct?
+  // expected-error@-1{{property cannot be marked @IBInspectable because its type cannot be represented in Objective-C}}
+}
+
+//===---
+//===--- @GKInspectable implies @objc
+//===---
+
+// CHECK-LABEL: {{^}}class HasGKInspectable {
+class HasGKInspectable {
+  @GKInspectable var goodProperty: AnyObject?
+  // CHECK: {{^}}  @GKInspectable @objc var goodProperty: AnyObject?
+
+  @GKInspectable var badProperty: PlainStruct?
+  // expected-error@-1{{property cannot be marked @GKInspectable because its type cannot be represented in Objective-C}}
 }
 
 //===---

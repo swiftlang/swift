@@ -514,7 +514,7 @@ class SwiftIdLover : NSObject, Anyable {
   // CHECK-LABEL: sil hidden [thunk] @_T017objc_bridging_any12SwiftIdLoverC26methodReturningOptionalAnyypSgyFTo
   // CHECK:       function_ref @_T0s27_bridgeAnythingToObjectiveC{{.*}}F
 
-  func methodTakingAny(a: Any) {}
+  @objc func methodTakingAny(a: Any) {}
   // CHECK-LABEL: sil hidden [thunk] @_T017objc_bridging_any12SwiftIdLoverC15methodTakingAnyyyp1a_tFTo : $@convention(objc_method) (AnyObject, SwiftIdLover) -> ()
   // CHECK:     bb0([[ARG:%.*]] : $AnyObject, [[SELF:%.*]] : $SwiftIdLover):
   // CHECK-NEXT:  [[ARG_COPY:%.*]] = copy_value [[ARG]]
@@ -571,7 +571,7 @@ class SwiftIdLover : NSObject, Anyable {
   // CHECK-NEXT:  destroy_addr [[ANY]]
   // CHECK-NEXT:  return [[VOID]]
 
-  func methodTakingBlockTakingAny(_: (Any) -> ()) {}
+  @objc func methodTakingBlockTakingAny(_: (Any) -> ()) {}
 
   // CHECK-LABEL: sil hidden @_T017objc_bridging_any12SwiftIdLoverC29methodReturningBlockTakingAnyyypcyF : $@convention(method) (@guaranteed SwiftIdLover) -> @owned @callee_owned (@in Any) -> ()
 
@@ -609,9 +609,9 @@ class SwiftIdLover : NSObject, Anyable {
   // CHECK-NEXT:  dealloc_stack [[RESULT]]
   // CHECK-NEXT:  return [[VOID]] : $()
 
-  func methodTakingBlockTakingOptionalAny(_: (Any?) -> ()) {}
+  @objc func methodTakingBlockTakingOptionalAny(_: (Any?) -> ()) {}
 
-  func methodReturningBlockTakingAny() -> ((Any) -> ()) {}
+  @objc func methodReturningBlockTakingAny() -> ((Any) -> ()) {}
 
   // CHECK-LABEL: sil hidden @_T017objc_bridging_any12SwiftIdLoverC29methodTakingBlockReturningAnyyypycF : $@convention(method) (@owned @callee_owned () -> @out Any, @guaranteed SwiftIdLover) -> () {
 
@@ -646,9 +646,9 @@ class SwiftIdLover : NSObject, Anyable {
   // CHECK-NEXT:  destroy_value [[BLOCK]]
   // CHECK-NEXT:  return [[EMPTY]]
 
-  func methodReturningBlockTakingOptionalAny() -> ((Any?) -> ()) {}
+  @objc func methodReturningBlockTakingOptionalAny() -> ((Any?) -> ()) {}
 
-  func methodTakingBlockReturningAny(_: () -> Any) {}
+  @objc func methodTakingBlockReturningAny(_: () -> Any) {}
 
   // CHECK-LABEL: sil hidden @_T017objc_bridging_any12SwiftIdLoverC020methodReturningBlockH3AnyypycyF : $@convention(method) (@guaranteed SwiftIdLover) -> @owned @callee_owned () -> @out Any
 
@@ -689,23 +689,23 @@ class SwiftIdLover : NSObject, Anyable {
   // CHECK-NEXT:  dealloc_stack [[RESULT]]
   // CHECK-NEXT:  return [[BRIDGED]]
 
-  func methodTakingBlockReturningOptionalAny(_: () -> Any?) {}
+  @objc func methodTakingBlockReturningOptionalAny(_: () -> Any?) {}
 
-  func methodReturningBlockReturningAny() -> (() -> Any) {}
+  @objc func methodReturningBlockReturningAny() -> (() -> Any) {}
 
-  func methodReturningBlockReturningOptionalAny() -> (() -> Any?) {}
+  @objc func methodReturningBlockReturningOptionalAny() -> (() -> Any?) {}
   // CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @_T0ypSgIxr_s9AnyObject_pSgIyBa_TR
   // CHECK: function_ref @_T0s27_bridgeAnythingToObjectiveC{{.*}}F
 
   override init() { super.init() }
-  dynamic required convenience init(any: Any) { self.init() }
-  dynamic required convenience init(anyMaybe: Any?) { self.init() }
-  dynamic var anyProperty: Any
-  dynamic var maybeAnyProperty: Any?
+  @objc dynamic required convenience init(any: Any) { self.init() }
+  @objc dynamic required convenience init(anyMaybe: Any?) { self.init() }
+  @objc dynamic var anyProperty: Any
+  @objc dynamic var maybeAnyProperty: Any?
 
   subscript(_: IndexForAnySubscript) -> Any { get {} set {} }
 
-  func methodReturningAnyOrError() throws -> Any {}
+  @objc func methodReturningAnyOrError() throws -> Any {}
 }
 
 class IndexForAnySubscript {}

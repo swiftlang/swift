@@ -515,24 +515,85 @@ withoutContext(TypeResolutionOptions options, bool preserveSIL = false) {
 /// Should only affect diagnostics. If you change this enum, also change
 /// the OBJC_ATTR_SELECT macro in DiagnosticsSema.def.
 enum class ObjCReason {
-  DoNotDiagnose,
+  /// Has the '@cdecl' attribute.
   ExplicitlyCDecl,
+  /// Has the 'dynamic' modifier.
   ExplicitlyDynamic,
+  /// Has an explicit '@objc' attribute.
   ExplicitlyObjC,
+  /// Has an explicit '@IBOutlet' attribute.
   ExplicitlyIBOutlet,
+  /// Has an explicit '@IBAction' attribute.
   ExplicitlyIBAction,
+  /// Has an explicit '@NSManaged' attribute.
   ExplicitlyNSManaged,
+  /// Is a member of an @objc protocol.
   MemberOfObjCProtocol,
+  /// Implicitly-introduced @objc.
   ImplicitlyObjC,
+  /// Is an override of an @objc member.
   OverridesObjC,
+  /// Is a witness to an @objc protocol requirement.
   WitnessToObjC,
+  /// Has an explicit '@IBInspectable' attribute.
+  ExplicitlyIBInspectable,
+  /// Has an explicit '@GKInspectable' attribute.
+  ExplicitlyGKInspectable,
+  /// Is it a member of an @objcMembers class.
+  MemberOfObjCMembersClass,
+  /// A member of an Objective-C-defined class or subclass.
+  MemberOfObjCSubclass,
+  /// An accessor to a property.
+  Accessor,
 };
+
+/// Determine whether we should diagnose conflicts due yo
+static inline bool shouldDiagnoseObjCReason(ObjCReason reason) {
+  switch(reason) {
+  case ObjCReason::ExplicitlyCDecl:
+  case ObjCReason::ExplicitlyDynamic:
+  case ObjCReason::ExplicitlyObjC:
+  case ObjCReason::ExplicitlyIBOutlet:
+  case ObjCReason::ExplicitlyIBAction:
+  case ObjCReason::ExplicitlyNSManaged:
+  case ObjCReason::MemberOfObjCProtocol:
+  case ObjCReason::OverridesObjC:
+  case ObjCReason::WitnessToObjC:
+  case ObjCReason::ImplicitlyObjC:
+  case ObjCReason::ExplicitlyIBInspectable:
+  case ObjCReason::ExplicitlyGKInspectable:
+    return true;
+
+  case ObjCReason::MemberOfObjCSubclass:
+  case ObjCReason::MemberOfObjCMembersClass:
+  case ObjCReason::Accessor:
+    return false;
+  }
+}
 
 /// Return the %select discriminator for the OBJC_ATTR_SELECT macro used to
 /// complain about the correct attribute during @objc inference.
-static inline unsigned getObjCDiagnosticAttrKind(ObjCReason Reason) {
-  assert(Reason != ObjCReason::DoNotDiagnose);
-  return static_cast<unsigned>(Reason) - 1;
+static inline unsigned getObjCDiagnosticAttrKind(ObjCReason reason) {
+  switch (reason) {
+  case ObjCReason::ExplicitlyCDecl:
+  case ObjCReason::ExplicitlyDynamic:
+  case ObjCReason::ExplicitlyObjC:
+  case ObjCReason::ExplicitlyIBOutlet:
+  case ObjCReason::ExplicitlyIBAction:
+  case ObjCReason::ExplicitlyNSManaged:
+  case ObjCReason::MemberOfObjCProtocol:
+  case ObjCReason::OverridesObjC:
+  case ObjCReason::WitnessToObjC:
+  case ObjCReason::ImplicitlyObjC:
+  case ObjCReason::ExplicitlyIBInspectable:
+  case ObjCReason::ExplicitlyGKInspectable:
+    return static_cast<unsigned>(reason);
+
+  case ObjCReason::MemberOfObjCSubclass:
+  case ObjCReason::MemberOfObjCMembersClass:
+  case ObjCReason::Accessor:
+    llvm_unreachable("should not diagnose this @objc reason");
+  }
 }
 
 /// Flags that control protocol conformance checking.

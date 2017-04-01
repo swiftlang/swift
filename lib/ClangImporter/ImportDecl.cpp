@@ -6714,12 +6714,20 @@ void ClangImporter::Implementation::importAttributes(
   if (AnyUnavailable)
     return;
 
-  // Ban NSInvocation.
   if (auto ID = dyn_cast<clang::ObjCInterfaceDecl>(ClangDecl)) {
+    // Ban NSInvocation.
     if (ID->getName() == "NSInvocation") {
       auto attr = AvailableAttr::createPlatformAgnostic(C, "");
       MappedDecl->getAttrs().add(attr);
       return;
+    }
+
+    // Infer @objcMembers on XCTestCase.
+    if (ID->getName() == "XCTestCase") {
+      if (!MappedDecl->getAttrs().hasAttribute<ObjCMembersAttr>()) {
+        auto attr = new (C) ObjCMembersAttr(/*implicit=*/true);
+        MappedDecl->getAttrs().add(attr);
+      }
     }
   }
 

@@ -171,6 +171,8 @@ DECL_ATTR(_specialize, Specialize,
           OnConstructor | OnFunc | AllowMultipleAttributes | LongAttribute
           | UserInaccessible, 33)
 
+SIMPLE_DECL_ATTR(objcMembers, ObjCMembers, OnClass, 34)
+
 // Non-serialized attributes.
 
 SIMPLE_DECL_ATTR(mutating, Mutating, OnFunc | DeclModifier | NotSerialized,
