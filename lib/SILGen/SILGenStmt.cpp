@@ -253,7 +253,6 @@ namespace {
                               SmallVectorImpl<CleanupHandle> &cleanups)
       : Storage(storage), Cleanups(cleanups) {}
 
-    SILValue getAddressOrNull() const override { return SILValue(); }
     void copyOrInitValueInto(SILGenFunction &gen, SILLocation loc,
                              ManagedValue value, bool isInit) override {
       Storage = value.getValue();

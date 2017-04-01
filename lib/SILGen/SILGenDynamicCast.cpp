@@ -224,11 +224,8 @@ namespace {
                                         const TypeLowering &origTargetTL,
                                         SGFContext ctx) {
       if (!hasAbstraction) {
-        if (auto emitInto = ctx.getEmitInto()) {
-          if (SILValue addr = emitInto->getAddressOrNull()) {
-            return addr;
-          }
-        }
+        if (auto address = ctx.getAddressForInPlaceInitialization(SGF, Loc))
+          return address;
       }
 
       return SGF.emitTemporaryAllocation(Loc, origTargetTL.getLoweredType());
@@ -239,12 +236,8 @@ namespace {
                                         const TypeLowering &origTargetTL,
                                         SGFContext ctx) {
       if (!hasAbstraction) {
-        if (auto emitInto = ctx.getEmitInto()) {
-          if (emitInto->getAddressOrNull()) {
-            emitInto->finishInitialization(SGF);
-            return ManagedValue::forInContext();
-          }
-        }
+        if (ctx.finishInPlaceInitialization(SGF))
+          return ManagedValue::forInContext();
       }
 
       ManagedValue result;
@@ -481,12 +474,11 @@ namespace {
     SILValue createAbstractResultBuffer(bool hasAbstraction,
                                         const TypeLowering &origTargetTL,
                                         SGFContext ctx) {
+      // Note that the conditions here must exactly match the criteria in
+      // finishFromResultBuffer.
       if (!hasAbstraction) {
-        if (auto emitInto = ctx.getEmitInto()) {
-          if (SILValue addr = emitInto->getAddressOrNull()) {
-            return addr;
-          }
-        }
+        if (auto address = ctx.getAddressForInPlaceInitialization(SGF, Loc))
+          return address;
       }
 
       return SGF.emitTemporaryAllocation(Loc, origTargetTL.getLoweredType());
@@ -497,13 +489,11 @@ namespace {
                                         AbstractionPattern abstraction,
                                         const TypeLowering &origTargetTL,
                                         SGFContext ctx) {
+      // Note that the conditions here must exactly match the criteria in
+      // createAbstractResultBuffer.
       if (!hasAbstraction) {
-        if (auto emitInto = ctx.getEmitInto()) {
-          if (emitInto->getAddressOrNull()) {
-            emitInto->finishInitialization(SGF);
-            return ManagedValue::forInContext();
-          }
-        }
+        if (ctx.finishInPlaceInitialization(SGF))
+          return ManagedValue::forInContext();
       }
 
       ManagedValue result;
@@ -713,7 +703,7 @@ RValue Lowering::emitConditionalCheckedCast(SILGenFunction &SGF,
   Optional<TemporaryInitialization> resultObjectTemp;
   SGFContext resultObjectCtx;
   if ((resultTL.isAddressOnly() && SGF.silConv.useLoweredAddresses()) ||
-      (C.getEmitInto() && C.getEmitInto()->getAddressOrNull())) {
+      (C.getEmitInto() && C.getEmitInto()->canPerformInPlaceInitialization())) {
     SILType resultTy = resultTL.getLoweredType();
     resultBuffer = SGF.getBufferForExprResult(loc, resultTy, C);
     resultObjectBuffer =

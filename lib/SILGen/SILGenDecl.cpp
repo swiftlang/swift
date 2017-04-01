@@ -48,8 +48,6 @@ namespace {
   public:
     BlackHoleInitialization() {}
 
-    SILValue getAddressOrNull() const override { return SILValue(); }
-
     bool canSplitIntoTupleElements() const override {
       return true;
     }
@@ -162,8 +160,9 @@ SingleBufferInitialization::
 splitIntoTupleElements(SILGenFunction &gen, SILLocation loc, CanType type,
                        SmallVectorImpl<InitializationPtr> &buf) {
   assert(SplitCleanups.empty() && "getting sub-initializations twice?");
-  return splitSingleBufferIntoTupleElements(gen, loc, type, getAddress(), buf,
-                                            SplitCleanups);
+  auto address = getAddressForInPlaceInitialization(gen, loc);
+  return splitSingleBufferIntoTupleElements(gen, loc, type, address,
+                                            buf, SplitCleanups);
 }
 
 MutableArrayRef<InitializationPtr>
@@ -218,7 +217,12 @@ void SingleBufferInitialization::finishInitialization(SILGenFunction &gen) {
     gen.Cleanups.forwardCleanup(eltCleanup);
 }
 
-void KnownAddressInitialization::anchor() const {
+bool KnownAddressInitialization::isInPlaceInitializationOfGlobal() const {
+  return isa<GlobalAddrInst>(address);
+}
+
+bool TemporaryInitialization::isInPlaceInitializationOfGlobal() const {
+  return isa<GlobalAddrInst>(Addr);
 }
 
 void TemporaryInitialization::finishInitialization(SILGenFunction &gen) {
@@ -412,9 +416,18 @@ public:
     assert(DidFinish && "did not call VarInit::finishInitialization!");
   }
 
-  SILValue getAddressOrNull() const override {
+  SILValue getAddress() const {
     assert(SGF.VarLocs.count(decl) && "did not emit var?!");
-    return SGF.VarLocs[decl].value;
+    return SGF.VarLocs[decl].value;    
+  }
+
+  SILValue getAddressForInPlaceInitialization(SILGenFunction &SGF,
+                                              SILLocation loc) override {
+    return getAddress();
+  }
+
+  bool isInPlaceInitializationOfGlobal() const override {
+    return isa<GlobalAddrInst>(getAddress());
   }
 
   void finishUninitialized(SILGenFunction &gen) override {
@@ -503,13 +516,21 @@ public:
   }
 
   bool hasAddress() const { return (bool)address; }
+
+  bool canPerformInPlaceInitialization() const override {
+    return hasAddress();
+  }
+
+  bool isInPlaceInitializationOfGlobal() const override {
+    return isa<GlobalAddrInst>(address);
+  }
   
-  // SingleBufferInitializations always have an address.
-  SILValue getAddressForInPlaceInitialization() const override {
+  SILValue getAddressForInPlaceInitialization(SILGenFunction &SGF,
+                                              SILLocation loc) override {
     // Emit into the buffer that 'let's produce for address-only values if
     // we have it.
-    if (hasAddress()) return address;
-    return SILValue();
+    assert(hasAddress());
+    return address;
   }
 
   /// Return true if we can get the addresses of elements with the
@@ -526,13 +547,10 @@ public:
   splitIntoTupleElements(SILGenFunction &gen, SILLocation loc, CanType type,
                          SmallVectorImpl<InitializationPtr> &buf) override {
     assert(SplitCleanups.empty());
+    auto address = getAddressForInPlaceInitialization(gen, loc);
     return SingleBufferInitialization
-       ::splitSingleBufferIntoTupleElements(gen, loc, type, getAddress(), buf,
+       ::splitSingleBufferIntoTupleElements(gen, loc, type, address, buf,
                                             SplitCleanups);
-  }
-
-  SILValue getAddressOrNull() const override {
-    return address;
   }
 
   void bindValue(SILValue value, SILGenFunction &gen) {
@@ -560,7 +578,7 @@ public:
     // buffer value.
     if (hasAddress())
       return SingleBufferInitialization::
-        copyOrInitValueIntoSingleBuffer(gen, loc, value, isInit, getAddress());
+        copyOrInitValueIntoSingleBuffer(gen, loc, value, isInit, address);
     
     // Otherwise, we bind the value.
     if (isInit) {
@@ -605,19 +623,19 @@ class ReferenceStorageInitialization : public Initialization {
   InitializationPtr VarInit;
 public:
   ReferenceStorageInitialization(InitializationPtr &&subInit)
-    : VarInit(std::move(subInit)) {}
-
-  SILValue getAddressOrNull() const override { return SILValue(); }
-
+    : VarInit(std::move(subInit)) {
+    assert(VarInit->canPerformInPlaceInitialization());
+  }
 
   void copyOrInitValueInto(SILGenFunction &gen, SILLocation loc,
                            ManagedValue value, bool isInit) override {
+    auto address = VarInit->getAddressForInPlaceInitialization(gen, loc);
     // If this is not an initialization, copy the value before we translateIt,
     // translation expects a +1 value.
     if (isInit)
-      value.forwardInto(gen, loc, VarInit->getAddress());
+      value.forwardInto(gen, loc, address);
     else
-      value.copyInto(gen, VarInit->getAddress(), loc);
+      value.copyInto(gen, address, loc);
   }
 
   void finishUninitialized(SILGenFunction &gen) override {
@@ -643,8 +661,6 @@ public:
   }
 
   JumpDest getFailureDest() const { return failureDest; }
-
-  SILValue getAddressOrNull() const override { return SILValue(); }
 
   void copyOrInitValueInto(SILGenFunction &gen, SILLocation loc,
                            ManagedValue value, bool isInit) override = 0;
