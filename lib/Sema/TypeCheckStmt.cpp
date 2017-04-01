@@ -1069,6 +1069,12 @@ void TypeChecker::checkIgnoredExpr(Expr *E) {
     }
     return;
   }
+  
+  // Skip checking if there is no type, which presumably means there was a 
+  // type error.
+  if (!E->getType()) {
+    return;
+  }
 
   // Complain about l-values that are neither loaded nor stored.
   if (E->getType()->isLValueType()) {
