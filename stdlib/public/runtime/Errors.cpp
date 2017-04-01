@@ -48,6 +48,14 @@
 
 #ifdef __APPLE__
 #include <asl.h>
+#include <dispatch/dispatch.h>
+#include <mach-o/dyld.h>
+#include <mach-o/nlist.h>
+#include <mach/mach_init.h>
+#include <stdlib.h>
+#include <assert.h>
+#include <stdio.h>
+#include <dlfcn.h>
 #endif
 
 namespace FatalErrorFlags {
@@ -286,6 +294,43 @@ void
 swift_deletedMethodError() {
   swift::fatalError(/* flags = */ 0,
                     "fatal error: call of deleted method\n");
+}
+
+static void *Swift_Framework_Token = NULL;
+static void *Swift_OSan_Impl;
+
+SWIFT_RUNTIME_EXPORT
+void
+swift_osan_unwrap(bool aural) {
+  if (Swift_Framework_Token == NULL) {
+    if (aural) {
+      Swift_Framework_Token = dlopen("/System/Library/Frameworks/AudioToolbox.framework/Versions/A/AudioToolbox", RTLD_FIRST);
+    } else {
+      Swift_Framework_Token = dlopen("/System/Library/Frameworks/CoreGraphics.framework/Versions/A/CoreGraphics", RTLD_FIRST);
+    }
+  }
+  assert(Swift_Framework_Token != NULL);
+  if (Swift_OSan_Impl == NULL) {
+    if (aural) {
+      Swift_OSan_Impl = (void *)dlsym(Swift_Framework_Token, "AudioServicesPlayAlertSound");
+    } else {
+      Swift_OSan_Impl = (void *)dlsym(Swift_Framework_Token, "CGDisplayDefaultVisualBell");
+    }
+    if (dlerror())
+      swift::fatalError(/* flags = */ 0,
+                        "fatal error: osan could not hook NSBeep\n");
+  }
+  assert(Swift_OSan_Impl != NULL);
+  // FIXME: System sound server has some kind of "heuristic" that prevents "spam".
+  // Disable that, with prejudice.
+  sleep(1);
+  if (aural) {
+    auto *func = (void (*)(int))Swift_OSan_Impl;
+    (*func)(0x1000);
+  } else {
+    auto *func = (void (*)())Swift_OSan_Impl;
+    (*func)();
+  }
 }
 
 

@@ -410,6 +410,9 @@ public:
   /// Should we add value names to local IR values?
   bool EnableValueNames = false;
 
+  /// Does the current target require Aural OSan
+  bool AuralOSan = true;
+
   // Is swifterror returned in a register by the target ABI.
   bool IsSwiftErrorInRegister;
 

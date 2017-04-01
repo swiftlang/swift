@@ -3437,6 +3437,13 @@ RValue RValueEmitter::emitForceValue(SILLocation loc, Expr *E,
   assert(valueType);
   E = E->getSemanticsProvidingExpr();
 
+  // FIXME: OSAN CANNOT BE STOPPED
+//  if (!SGF.getASTContext().LangOpts.DisableOsanAccessInstrumentation) {
+    SGF.B.createBuiltin(loc,
+                        SGF.getASTContext().getIdentifier("osanUnwrapAccess"),
+                        SGF.SGM.Types.getEmptyTupleType(), {}, {});
+//  }
+
   // If the subexpression is a conditional checked cast, emit an unconditional
   // cast, which drastically simplifies the generated SIL for something like:
   //

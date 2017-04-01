@@ -28,6 +28,8 @@ static StringRef toStringRef(const SanitizerKind kind) {
     return "address";
   case SanitizerKind::Thread:
     return "thread";
+  case SanitizerKind::Optional:
+    return "optional";
   case SanitizerKind::None:
     llvm_unreachable("Getting a name for SanitizerKind::None");
   }
@@ -107,6 +109,7 @@ SanitizerKind swift::parseSanitizerArgValues(const llvm::opt::Arg *A,
     llvm::StringSwitch<SanitizerKind>(A->getValue(i))
       .Case("address", SanitizerKind::Address)
       .Case("thread", SanitizerKind::Thread)
+      .Case("optional", SanitizerKind::Optional)
       .Default(SanitizerKind::None);
 
     if (kind == SanitizerKind::None) {

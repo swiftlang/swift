@@ -877,6 +877,9 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   Opts.DisableTsanInoutInstrumentation |=
       Args.hasArg(OPT_disable_tsan_inout_instrumentation);
 
+  Opts.VisualOsanAccessInstrumentation |=
+    Args.hasArg(OPT_visual_osan_unwrap_instrumentation);
+
   if (FrontendOpts.InputKind == InputFileKind::IFK_SIL)
     Opts.DisableAvailabilityChecking = true;
   

@@ -605,6 +605,8 @@ static bool isSanitizerInstrumentation(SILInstruction *Instruction,
   Identifier Name = BI->getName();
   if (Name == Ctx.getIdentifier("tsanInoutAccess"))
     return true;
+  if (Name == Ctx.getIdentifier("osanUnwrapAccess"))
+    return true;
 
   return false;
 }
