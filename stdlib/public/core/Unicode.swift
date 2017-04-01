@@ -346,11 +346,10 @@ public struct UTF8 : UnicodeCodec {
         return (nil, 3)
       }
       // Extract data bits.
-      // FIXME(integers): remove extra type casts
-      let value = (buffer & 0x3f000000) >> (24 as UInt32)
-                | (buffer & 0x003f0000) >> (10 as UInt32)
-                | (buffer & 0x00003f00) << (4 as UInt32)
-                | (buffer & 0x00000007) << (18 as UInt32)
+      let value = (buffer & 0x3f000000) >> 24
+                | (buffer & 0x003f0000) >> 10
+                | (buffer & 0x00003f00) << 4
+                | (buffer & 0x00000007) << 18
       return (value, 4)
 
     default: // Invalid sequence (CU0 invalid).
