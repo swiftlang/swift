@@ -38,6 +38,7 @@
 #include "swift/Basic/FileSystem.h"
 #include "swift/Basic/LLVMContext.h"
 #include "swift/Basic/SourceManager.h"
+#include "swift/Basic/Statistic.h"
 #include "swift/Basic/Timer.h"
 #include "swift/Frontend/DiagnosticVerifier.h"
 #include "swift/Frontend/Frontend.h"
@@ -325,6 +326,28 @@ static void debugFailWithCrash() {
   LLVM_BUILTIN_TRAP;
 }
 
+static void countStatsPostSILGen(UnifiedStatsReporter &Stats,
+                                 const SILModule& Module) {
+  auto &C = Stats.getFrontendCounters();
+  // FIXME: calculate these in constant time, via the dense maps.
+  C.NumSILGenFunctions = Module.getFunctionList().size();
+  C.NumSILGenVtables = Module.getVTableList().size();
+  C.NumSILGenWitnessTables = Module.getWitnessTableList().size();
+  C.NumSILGenDefaultWitnessTables = Module.getDefaultWitnessTableList().size();
+  C.NumSILGenGlobalVariables = Module.getSILGlobalList().size();
+}
+
+static void countStatsPostSILOpt(UnifiedStatsReporter &Stats,
+                                 const SILModule& Module) {
+  auto &C = Stats.getFrontendCounters();
+  // FIXME: calculate these in constant time, via the dense maps.
+  C.NumSILOptFunctions = Module.getFunctionList().size();
+  C.NumSILOptVtables = Module.getVTableList().size();
+  C.NumSILOptWitnessTables = Module.getWitnessTableList().size();
+  C.NumSILOptDefaultWitnessTables = Module.getDefaultWitnessTableList().size();
+  C.NumSILOptGlobalVariables = Module.getSILGlobalList().size();
+}
+
 /// Performs the compile requested by the user.
 /// \param Instance Will be reset after performIRGeneration when the verifier
 ///                 mode is NoVerify and there were no errors.
@@ -333,7 +356,8 @@ static bool performCompile(std::unique_ptr<CompilerInstance> &Instance,
                            CompilerInvocation &Invocation,
                            ArrayRef<const char *> Args,
                            int &ReturnValue,
-                           FrontendObserver *observer) {
+                           FrontendObserver *observer,
+                           UnifiedStatsReporter *Stats) {
   FrontendOptions opts = Invocation.getFrontendOptions();
   FrontendOptions::ActionType Action = opts.RequestedAction;
 
@@ -551,6 +575,9 @@ static bool performCompile(std::unique_ptr<CompilerInstance> &Instance,
   if (observer) {
     observer->performedSILGeneration(*SM);
   }
+  if (Stats) {
+    countStatsPostSILGen(*Stats, *SM);
+  }
 
   // We've been told to emit SIL after SILGen, so write it now.
   if (Action == FrontendOptions::EmitSILGen) {
@@ -623,6 +650,9 @@ static bool performCompile(std::unique_ptr<CompilerInstance> &Instance,
 
   if (observer) {
     observer->performedSILOptimization(*SM);
+  }
+  if (Stats) {
+    countStatsPostSILOpt(*Stats, *SM);
   }
 
   {
@@ -973,6 +1003,23 @@ int swift::performFrontend(ArrayRef<const char *> Args,
     llvm::EnableStatistics();
   }
 
+  const std::string &StatsOutputDir =
+      Invocation.getFrontendOptions().StatsOutputDir;
+  std::unique_ptr<UnifiedStatsReporter> StatsReporter;
+  if (!StatsOutputDir.empty()) {
+    auto &opts = Invocation.getFrontendOptions();
+    std::string TargetName = opts.ModuleName;
+    if (opts.PrimaryInput.hasValue() &&
+        opts.PrimaryInput.getValue().isFilename()) {
+      auto Index = opts.PrimaryInput.getValue().Index;
+      TargetName += ".";
+      TargetName += llvm::sys::path::filename(opts.InputFilenames[Index]);
+    }
+    StatsReporter = llvm::make_unique<UnifiedStatsReporter>("swift-frontend",
+                                                            TargetName,
+                                                            StatsOutputDir);
+  }
+
   const DiagnosticOptions &diagOpts = Invocation.getDiagnosticOptions();
   if (diagOpts.VerifyMode != DiagnosticOptions::NoVerify) {
     enableDiagnosticVerifier(Instance->getSourceMgr());
@@ -995,7 +1042,8 @@ int swift::performFrontend(ArrayRef<const char *> Args,
 
   int ReturnValue = 0;
   bool HadError =
-    performCompile(Instance, Invocation, Args, ReturnValue, observer);
+    performCompile(Instance, Invocation, Args, ReturnValue, observer,
+                   StatsReporter.get());
 
   if (!HadError) {
     Mangle::printManglingStats();

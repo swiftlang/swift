@@ -192,6 +192,9 @@ public:
   /// \sa swift::SharedTimer
   bool DebugTimeCompilation = false;
 
+  /// The path to which we should output statistics files.
+  std::string StatsOutputDir;
+
   /// Indicates whether function body parsing should be delayed
   /// until the end of all files.
   bool DelayedFunctionBodyParsing = false;

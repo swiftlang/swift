@@ -187,6 +187,9 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
   Opts.DebugTimeExpressionTypeChecking |=
     Args.hasArg(OPT_debug_time_expression_type_checking);
   Opts.DebugTimeCompilation |= Args.hasArg(OPT_debug_time_compilation);
+  if (const Arg *A = Args.getLastArg(OPT_stats_output_dir)) {
+    Opts.StatsOutputDir = A->getValue();
+  }
 
   Opts.ValidateTBDAgainstIR |= Args.hasArg(OPT_validate_tbd_against_ir);
 
