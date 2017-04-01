@@ -217,7 +217,7 @@ protocol Doomed {
   func check() throws
 }
 
-// CHECK-LABEL: sil hidden [transparent] [thunk] @_T06errors12DoomedStructVAA0B0A2aDP5checkyyKFTW : $@convention(witness_method) (@in_guaranteed DoomedStruct) -> @error Error
+// CHECK-LABEL: sil private [transparent] [thunk] @_T06errors12DoomedStructVAA0B0A2aDP5checkyyKFTW : $@convention(witness_method) (@in_guaranteed DoomedStruct) -> @error Error
 // CHECK:      [[TEMP:%.*]] = alloc_stack $DoomedStruct
 // CHECK:      copy_addr %0 to [initialization] [[TEMP]]
 // CHECK:      [[SELF:%.*]] = load [trivial] [[TEMP]] : $*DoomedStruct
@@ -235,7 +235,7 @@ struct DoomedStruct : Doomed {
   func check() throws {}
 }
 
-// CHECK-LABEL: sil hidden [transparent] [thunk] @_T06errors11DoomedClassCAA0B0A2aDP5checkyyKFTW : $@convention(witness_method) (@in_guaranteed DoomedClass) -> @error Error {
+// CHECK-LABEL: sil private [transparent] [thunk] @_T06errors11DoomedClassCAA0B0A2aDP5checkyyKFTW : $@convention(witness_method) (@in_guaranteed DoomedClass) -> @error Error {
 // CHECK:      [[TEMP:%.*]] = alloc_stack $DoomedClass
 // CHECK:      copy_addr %0 to [initialization] [[TEMP]]
 // CHECK:      [[SELF:%.*]] = load [take] [[TEMP]] : $*DoomedClass
@@ -258,7 +258,7 @@ class DoomedClass : Doomed {
   func check() throws {}
 }
 
-// CHECK-LABEL: sil hidden [transparent] [thunk] @_T06errors11HappyStructVAA6DoomedA2aDP5checkyyKFTW : $@convention(witness_method) (@in_guaranteed HappyStruct) -> @error Error
+// CHECK-LABEL: sil private [transparent] [thunk] @_T06errors11HappyStructVAA6DoomedA2aDP5checkyyKFTW : $@convention(witness_method) (@in_guaranteed HappyStruct) -> @error Error
 // CHECK:      [[TEMP:%.*]] = alloc_stack $HappyStruct
 // CHECK:      copy_addr %0 to [initialization] [[TEMP]]
 // CHECK:      [[SELF:%.*]] = load [trivial] [[TEMP]] : $*HappyStruct
@@ -271,7 +271,7 @@ struct HappyStruct : Doomed {
   func check() {}
 }
 
-// CHECK-LABEL: sil hidden [transparent] [thunk] @_T06errors10HappyClassCAA6DoomedA2aDP5checkyyKFTW : $@convention(witness_method) (@in_guaranteed HappyClass) -> @error Error
+// CHECK-LABEL: sil private [transparent] [thunk] @_T06errors10HappyClassCAA6DoomedA2aDP5checkyyKFTW : $@convention(witness_method) (@in_guaranteed HappyClass) -> @error Error
 // CHECK:      [[TEMP:%.*]] = alloc_stack $HappyClass
 // CHECK:      copy_addr %0 to [initialization] [[TEMP]]
 // CHECK:      [[SELF:%.*]] = load [take] [[TEMP]] : $*HappyClass
@@ -293,7 +293,7 @@ func create<T>(_ fn: () throws -> T) throws -> T {
 func testThunk(_ fn: () throws -> Int) throws -> Int {
   return try create(fn)
 }
-// CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_T0Sis5Error_pIxdzo_SisAA_pIxrzo_TR : $@convention(thin) (@owned @callee_owned () -> (Int, @error Error)) -> (@out Int, @error Error)
+// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @_T0Sis5Error_pIxdzo_SisAA_pIxrzo_TR : $@convention(thin) (@owned @callee_owned () -> (Int, @error Error)) -> (@out Int, @error Error)
 // CHECK: bb0(%0 : $*Int, %1 : $@callee_owned () -> (Int, @error Error)):
 // CHECK:   try_apply %1()
 // CHECK: bb1([[T0:%.*]] : $Int):
@@ -410,7 +410,7 @@ func test_variadic(_ cat: Cat) throws {
 // CHECK-LABEL: sil hidden @_T06errors13test_variadicyAA3CatCKF : $@convention(thin) (@owned Cat) -> @error Error {
 // CHECK:       bb0([[ARG:%.*]] : $Cat):
 // CHECK:         debug_value undef : $Error, var, name "$error", argno 2
-// CHECK:         [[TAKE_FN:%.*]] = function_ref @_T06errors14take_many_catsySayAA3CatCG_dtKF : $@convention(thin) (@owned Array<Cat>) -> @error Error
+// CHECK:         [[TAKE_FN:%.*]] = function_ref @_T06errors14take_many_catsySayAA3CatCGd_tKF : $@convention(thin) (@owned Array<Cat>) -> @error Error
 // CHECK:         [[N:%.*]] = integer_literal $Builtin.Word, 4
 // CHECK:         [[T0:%.*]] = function_ref @_T0s27_allocateUninitializedArray{{.*}}F
 // CHECK:         [[T1:%.*]] = apply [[T0]]<Cat>([[N]])

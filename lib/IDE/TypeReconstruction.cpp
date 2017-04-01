@@ -1716,7 +1716,7 @@ static void VisitNodeModule(
   }
 }
 
-static void VisitNodeNonVariadicTuple(
+static void VisitNodeTuple(
     ASTContext *ast, std::vector<Demangle::NodePointer> &nodes,
     Demangle::NodePointer &cur_node, VisitNodeResult &result,
     const VisitNodeResult &generic_context) { // set by GenericType case
@@ -2060,8 +2060,8 @@ static void visitNodeImpl(
     VisitNodeModule(ast, nodes, node, result, genericContext);
     break;
 
-  case Demangle::Node::Kind::NonVariadicTuple:
-    VisitNodeNonVariadicTuple(ast, nodes, node, result, genericContext);
+  case Demangle::Node::Kind::Tuple:
+    VisitNodeTuple(ast, nodes, node, result, genericContext);
     break;
 
   case Demangle::Node::Kind::PrivateDeclName:

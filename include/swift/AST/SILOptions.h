@@ -134,6 +134,12 @@ public:
   /// Indicates which sanitizer is turned on.
   SanitizerKind Sanitize : 2;
 
+  /// Emit compile-time diagnostics when the law of exclusivity is violated.
+  bool EnforceExclusivityStatic = false;
+
+  /// Emit checks to trap at run time when the law of exclusivity is violated.
+  bool EnforceExclusivityDynamic = false;
+
   SILOptions() : Sanitize(SanitizerKind::None) {}
 
 };

@@ -110,13 +110,32 @@ public:
     return state.getPointer();
   }
 
-  /// If we have an emit into, return the address of the emit into. Otherwise,
-  /// return an empty SILValue.
-  SILValue getAddressForInPlaceInitialization() const {
+  /// Try to get the address of the emit-into initialization if we can.
+  /// Otherwise, return an empty SILValue.
+  ///
+  /// Note that, if this returns a non-empty address, the caller must
+  /// finish the emit-into initialization.
+  SILValue getAddressForInPlaceInitialization(SILGenFunction &SGF,
+                                              SILLocation loc) const {
     if (auto *init = getEmitInto()) {
-      return init->getAddressForInPlaceInitialization();
+      if (init->canPerformInPlaceInitialization())
+        return init->getAddressForInPlaceInitialization(SGF, loc);
     }
     return SILValue();
+  }
+
+  /// If getAddressForInPlaceInitialization did (or would have)
+  /// returned a non-null address, finish the initialization and
+  /// return true.  Otherwise, return false.
+  bool finishInPlaceInitialization(SILGenFunction &SGF) const {
+    if (auto *init = getEmitInto()) {
+      if (init->canPerformInPlaceInitialization()) {
+        init->finishInitialization(SGF);
+        return true;
+      }
+    }
+
+    return false;
   }
 
   /// Return true if a ManagedValue producer is allowed to return at
@@ -467,7 +486,8 @@ public:
   SILFunction &getFunction() { return F; }
   SILModule &getModule() { return F.getModule(); }
   SILGenBuilder &getBuilder() { return B; }
-  
+  SILOptions &getOptions() { return getModule().getOptions(); }
+
   const TypeLowering &getTypeLowering(AbstractionPattern orig, Type subst) {
     return SGM.Types.getTypeLowering(orig, subst);
   }

@@ -23,6 +23,7 @@
 #include "swift/FrontendTool/FrontendTool.h"
 #include "ImportedModules.h"
 #include "ReferenceDependencies.h"
+#include "TBD.h"
 
 #include "swift/Subsystems.h"
 #include "swift/AST/ASTScope.h"
@@ -116,10 +117,11 @@ static bool emitMakeDependencies(DiagnosticEngine &diags,
     out << escape(targetName) << " :";
     // First include all other files in the module. Make-style dependencies
     // need to be conservative!
-    for (StringRef path : opts.InputFilenames)
+    for (auto const &path : reversePathSortedFilenames(opts.InputFilenames))
       out << ' ' << escape(path);
     // Then print dependencies we've picked up during compilation.
-    for (StringRef path : depTracker.getDependencies())
+    for (auto const &path :
+           reversePathSortedFilenames(depTracker.getDependencies()))
       out << ' ' << escape(path);
     out << '\n';
   });
@@ -522,6 +524,10 @@ static bool performCompile(std::unique_ptr<CompilerInstance> &Instance,
     return Context.hadError();
   }
 
+  if (Action == FrontendOptions::EmitTBD) {
+    return writeTBD(Instance->getMainModule(), opts.getSingleOutputFilename());
+  }
+
   assert(Action >= FrontendOptions::EmitSILGen &&
          "All actions not requiring SILGen must have been handled!");
 
@@ -752,6 +758,14 @@ static bool performCompile(std::unique_ptr<CompilerInstance> &Instance,
   // modules.
   if (!IRModule) {
     return HadError;
+  }
+
+  if (opts.ValidateTBDAgainstIR) {
+    bool validationError =
+        PrimarySourceFile ? validateTBD(PrimarySourceFile, *IRModule)
+                          : validateTBD(Instance->getMainModule(), *IRModule);
+    if (validationError)
+      return true;
   }
 
   std::unique_ptr<llvm::TargetMachine> TargetMachine =

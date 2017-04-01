@@ -1,4 +1,4 @@
-// RUN: not --crash %target-swift-frontend -emit-silgen -primary-file %s -o /dev/null
+// RUN: %target-swift-frontend -emit-silgen -primary-file %s -o /dev/null
 
 class Base<T> {
   convenience init(count: Int) {

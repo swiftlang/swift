@@ -1478,6 +1478,12 @@ bool RLEContext::run() {
                           BBToProcess.find(&B) != BBToProcess.end());
   }
 
+  DEBUG(llvm::dbgs() << "RLE START\n";
+        for (unsigned i = 0; i < LocationVault.size(); ++i) {
+          llvm::dbgs() << "LSLocation #" << i;
+          getLocation(i).print(llvm::dbgs(), &Fn->getModule());
+        });
+
   if (Optimistic)
     runIterativeRLE();
 

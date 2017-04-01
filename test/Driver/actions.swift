@@ -46,6 +46,25 @@
 // RUN: %swiftc_driver -driver-print-actions -gnone %s 2>&1 | %FileCheck %s -check-prefix=BASIC
 // RUN: %swiftc_driver -driver-print-actions -g -gnone %s 2>&1 | %FileCheck %s -check-prefix=BASIC
 
+// RUN: %swiftc_driver -driver-print-actions -g -verify-debug-info %s 2>&1 | %FileCheck %s -check-prefixes=DEBUG,VERIFY-DEBUG-INFO
+// RUN: %swiftc_driver -driver-print-actions -gnone -g -verify-debug-info %s 2>&1 | %FileCheck %s -check-prefixes=DEBUG,VERIFY-DEBUG-INFO
+// VERIFY-DEBUG-INFO: 5: verify-debug-info, {4}, none
+
+// RUN: %swiftc_driver -driver-print-actions -gdwarf-types -verify-debug-info %s 2>&1 | %FileCheck %s -check-prefixes=EXEC-AND-MODULE,VERIFY-DEBUG-DWARF
+// VERIFY-DEBUG-DWARF-TYPES: 4: generate-dSYM, {3}, dSYM
+// VERIFY-DEBUG-DWARF-TYPES: 5: verify-debug-info, {4}, none
+
+// RUN: %swiftc_driver -driver-print-actions -gline-tables-only -verify-debug-info %s 2>&1 | %FileCheck %s -check-prefixes=BASIC,VERIFY-DEBUG-LINE-TABLES
+// VERIFY-DEBUG-LINE-TABLES-ONLY: 3: generate-dSYM, {2}, dSYM
+// VERIFY-DEBUG-LINE-TABLES-ONLY: 4: verify-debug-info, {3}, none
+
+// RUN: %swiftc_driver -driver-print-actions -gnone -verify-debug-info %s 2>&1 | %FileCheck %s -check-prefixes=MISSING-DEBUG-OPTION
+// RUN: %swiftc_driver -driver-print-actions -g -gnone -verify-debug-info %s 2>&1 | %FileCheck %s -check-prefixes=MISSING-DEBUG-OPTION
+// MISSING-DEBUG-OPTION: warning: ignoring '-verify-debug-info'; no debug info is being generated
+// MISSING-DEBUG-OPTION: 0: input, "{{.*}}actions.swift", swift
+// MISSING-DEBUG-OPTION: 1: compile, {0}, object
+// MISSING-DEBUG-OPTION: 2: link, {1}, image
+
 // RUN: %swiftc_driver -driver-print-actions -g -c %s 2>&1 | %FileCheck %s -check-prefix=DEBUG-OBJECT
 // DEBUG-OBJECT: 0: input, "{{.*}}actions.swift", swift
 // DEBUG-OBJECT: 1: compile, {0}, object

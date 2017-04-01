@@ -55,6 +55,14 @@ FUNCTION_WITH_GLOBAL_SYMBOL_AND_IMPL(AllocBox, swift_allocBox,
          ARGS(TypeMetadataPtrTy),
          ATTRS(NoUnwind))
 
+//  BoxPair swift_makeBoxUnique(OpaqueValue *buffer, Metadata *type, size_t alignMask);
+FUNCTION(MakeBoxUnique,
+         swift_makeBoxUnique,
+         DefaultCC,
+         RETURNS(RefCountedPtrTy, OpaquePtrTy),
+         ARGS(OpaquePtrTy, TypeMetadataPtrTy, SizeTy),
+         ATTRS(NoUnwind, ZExt))
+
 FUNCTION(DeallocBox, swift_deallocBox, DefaultCC,
          RETURNS(VoidTy),
          ARGS(RefCountedPtrTy),
@@ -1197,6 +1205,13 @@ FUNCTION(TSanInoutAccess, __tsan_write1, C_CC,
 FUNCTION(GetInitializedObjCClass, swift_getInitializedObjCClass, RegisterPreservingCC,
          RETURNS(ObjCClassPtrTy),
          ARGS(ObjCClassPtrTy),
+         ATTRS(NoUnwind))
+
+// void swift_objc_swift3ImplicitObjCEntrypoint(id self, SEL selector)
+FUNCTION(Swift3ImplicitObjCEntrypoint, swift_objc_swift3ImplicitObjCEntrypoint,
+         DefaultCC,
+         RETURNS(VoidTy),
+         ARGS(ObjCPtrTy, ObjCSELTy),
          ATTRS(NoUnwind))
 
 #endif

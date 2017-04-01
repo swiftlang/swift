@@ -196,7 +196,7 @@ public:
   friend class SILVisitor<ClosureCloner>;
   friend class SILCloner<ClosureCloner>;
 
-  ClosureCloner(SILFunction *Orig, IsFragile_t Fragile,
+  ClosureCloner(SILFunction *Orig, IsSerialized_t Serialized,
                 StringRef ClonedName,
                 IndicesSet &PromotableIndices);
 
@@ -205,7 +205,7 @@ public:
   SILFunction *getCloned() { return &getBuilder().getFunction(); }
 
 private:
-  static SILFunction *initCloned(SILFunction *Orig, IsFragile_t Fragile,
+  static SILFunction *initCloned(SILFunction *Orig, IsSerialized_t Serialized,
                                  StringRef ClonedName,
                                  IndicesSet &PromotableIndices);
 
@@ -299,11 +299,11 @@ ReachabilityInfo::isReachable(SILBasicBlock *From, SILBasicBlock *To) {
   return FromSet.test(FI->second);
 }
 
-ClosureCloner::ClosureCloner(SILFunction *Orig, IsFragile_t Fragile,
+ClosureCloner::ClosureCloner(SILFunction *Orig, IsSerialized_t Serialized,
                              StringRef ClonedName,
                              IndicesSet &PromotableIndices)
   : SILClonerWithScopes<ClosureCloner>(
-                           *initCloned(Orig, Fragile, ClonedName, PromotableIndices)),
+                           *initCloned(Orig, Serialized, ClonedName, PromotableIndices)),
     Orig(Orig), PromotableIndices(PromotableIndices) {
   assert(Orig->getDebugScope()->Parent != getCloned()->getDebugScope()->Parent);
 }
@@ -350,8 +350,7 @@ computeNewArgInterfaceTypes(SILFunction *F,
     assert(paramBoxTy->getLayout()->getFields().size() == 1
            && "promoting compound box not implemented yet");
     auto paramBoxedTy = paramBoxTy->getFieldType(F->getModule(), 0);
-    auto &paramTL = F->getModule().Types.getTypeLowering(paramBoxedTy);
-
+    auto &paramTL = F->getTypeLowering(paramBoxedTy);
     ParameterConvention convention;
     if (paramTL.isFormallyPassedIndirectly()) {
       convention = ParameterConvention::Indirect_In;
@@ -366,10 +365,10 @@ computeNewArgInterfaceTypes(SILFunction *F,
 }
 
 static std::string getSpecializedName(SILFunction *F,
-                                      IsFragile_t Fragile,
+                                      IsSerialized_t Serialized,
                                       IndicesSet &PromotableIndices) {
   auto P = Demangle::SpecializationPass::CapturePromotion;
-  Mangle::FunctionSignatureSpecializationMangler Mangler(P, Fragile, F);
+  Mangle::FunctionSignatureSpecializationMangler Mangler(P, Serialized, F);
   auto fnConv = F->getConventions();
 
   for (unsigned argIdx = 0, endIdx = fnConv.getNumSILArguments();
@@ -391,7 +390,7 @@ static std::string getSpecializedName(SILFunction *F,
 /// *NOTE* PromotableIndices only contains the container value of the box, not
 /// the address value.
 SILFunction*
-ClosureCloner::initCloned(SILFunction *Orig, IsFragile_t Fragile,
+ClosureCloner::initCloned(SILFunction *Orig, IsSerialized_t Serialized,
                           StringRef ClonedName,
                           IndicesSet &PromotableIndices) {
   SILModule &M = Orig->getModule();
@@ -417,7 +416,7 @@ ClosureCloner::initCloned(SILFunction *Orig, IsFragile_t Fragile,
 
   auto *Fn = M.createFunction(
       Orig->getLinkage(), ClonedName, ClonedTy, Orig->getGenericEnvironment(),
-      Orig->getLocation(), Orig->isBare(), IsNotTransparent, Fragile,
+      Orig->getLocation(), Orig->isBare(), IsNotTransparent, Serialized,
       Orig->isThunk(), Orig->getClassVisibility(), Orig->getInlineStrategy(),
       Orig->getEffectsKind(), Orig, Orig->getDebugScope());
   for (auto &Attr : Orig->getSemanticsAttrs())
@@ -589,7 +588,7 @@ static SILArgument *getBoxFromIndex(SILFunction *F, unsigned Index) {
 /// for the address of the box's contents), return true if the closure is known
 /// not to mutate the captured variable.
 static bool
-isNonmutatingCapture(SILArgument *BoxArg) {
+isNonMutatingCapture(SILArgument *BoxArg) {
   SmallVector<ProjectBoxInst*, 2> Projections;
   
   // Conservatively do not allow any use of the box argument other than a
@@ -631,69 +630,143 @@ isNonmutatingCapture(SILArgument *BoxArg) {
   return true;
 }
 
+namespace {
+
+class NonEscapingUserVisitor
+    : public SILInstructionVisitor<NonEscapingUserVisitor, bool> {
+  llvm::SmallVector<Operand *, 32> Worklist;
+  llvm::SmallVectorImpl<SILInstruction *> &Mutations;
+  NullablePtr<Operand> CurrentOp;
+
+public:
+  NonEscapingUserVisitor(Operand *Op,
+                         llvm::SmallVectorImpl<SILInstruction *> &Mutations)
+      : Worklist(), Mutations(Mutations), CurrentOp() {
+    Worklist.push_back(Op);
+  }
+
+  NonEscapingUserVisitor(const NonEscapingUserVisitor &) = delete;
+  NonEscapingUserVisitor &operator=(const NonEscapingUserVisitor &) = delete;
+  NonEscapingUserVisitor(NonEscapingUserVisitor &&) = delete;
+  NonEscapingUserVisitor &operator=(NonEscapingUserVisitor &&) = delete;
+
+  bool compute() {
+    while (!Worklist.empty()) {
+      CurrentOp = Worklist.pop_back_val();
+      SILInstruction *User = CurrentOp.get()->getUser();
+
+      // Ignore type dependent operands.
+      if (User->isTypeDependentOperand(*(CurrentOp.get())))
+        continue;
+
+      // Then visit the specific user. This routine returns true if the value
+      // does not escape. In such a case, continue.
+      if (visit(User)) {
+        continue;
+      }
+
+      return false;
+    }
+
+    return true;
+  }
+
+  /// Visit a random value base.
+  ///
+  /// These are considered to be escapes.
+  bool visitValueBase(ValueBase *V) { return false; }
+
+#define ALWAYS_NON_ESCAPING_INST(INST)                                         \
+  bool visit##INST##Inst(INST##Inst *V) { return true; }
+  // Marking the boxed value as escaping is OK. It's just a DI annotation.
+  ALWAYS_NON_ESCAPING_INST(MarkFunctionEscape)
+  // These remaining instructions are ok and don't count as mutations.
+  ALWAYS_NON_ESCAPING_INST(StrongRetain)
+  ALWAYS_NON_ESCAPING_INST(Load)
+  ALWAYS_NON_ESCAPING_INST(StrongRelease)
+#undef ALWAYS_NON_ESCAPING_INST
+
+  bool visitDeallocBoxInst(DeallocBoxInst *DBI) {
+    Mutations.push_back(DBI);
+    return true;
+  }
+
+  bool visitApplyInst(ApplyInst *AI) {
+    auto argIndex = CurrentOp.get()->getOperandNumber() - 1;
+    SILFunctionConventions substConv(AI->getSubstCalleeType(), AI->getModule());
+    auto convention = substConv.getSILArgumentConvention(argIndex);
+    if (!convention.isIndirectConvention()) {
+      return false;
+    }
+    Mutations.push_back(AI);
+    return true;
+  }
+
+  /// Add the Operands of a transitive use instruction to the worklist.
+  void addUserOperandsToWorklist(SILInstruction *I) {
+    for (auto *User : I->getUses()) {
+      Worklist.push_back(User);
+    }
+  }
+
+  bool visitStructElementAddrInst(StructElementAddrInst *I) {
+    addUserOperandsToWorklist(I);
+    return true;
+  }
+
+  bool visitTupleElementAddrInst(TupleElementAddrInst *I) {
+    addUserOperandsToWorklist(I);
+    return true;
+  }
+
+  bool visitInitEnumDataAddrInst(InitEnumDataAddrInst *I) {
+    addUserOperandsToWorklist(I);
+    return true;
+  }
+
+  bool visitOpenExistentialAddrInst(OpenExistentialAddrInst *I) {
+    addUserOperandsToWorklist(I);
+    return true;
+  }
+
+  bool visitUncheckedTakeEnumDataAddrInst(UncheckedTakeEnumDataAddrInst *I) {
+    // UncheckedTakeEnumDataAddr is additionally a mutation.
+    Mutations.push_back(I);
+
+    addUserOperandsToWorklist(I);
+    return true;
+  }
+
+  bool visitCopyAddrInst(CopyAddrInst *CAI) {
+    if (CurrentOp.get()->getOperandNumber() == 1 || CAI->isTakeOfSrc())
+      Mutations.push_back(CAI);
+    return true;
+  }
+
+  bool visitStoreInst(StoreInst *SI) {
+    if (CurrentOp.get()->getOperandNumber() != 1)
+      return false;
+    Mutations.push_back(SI);
+    return true;
+  }
+
+  bool visitAssignInst(AssignInst *AI) {
+    if (CurrentOp.get()->getOperandNumber() != 1)
+      return false;
+    Mutations.push_back(AI);
+    return true;
+  }
+};
+
+} // end anonymous namespace
+
 /// \brief Given a use of an alloc_box instruction, return true if the use
 /// definitely does not allow the box to escape; also, if the use is an
 /// instruction which possibly mutates the contents of the box, then add it to
 /// the Mutations vector.
-static bool
-isNonescapingUse(Operand *O, SmallVectorImpl<SILInstruction*> &Mutations) {
-  auto *U = O->getUser();
-  if (U->isTypeDependentOperand(*O))
-    return true;
-  // Marking the boxed value as escaping is OK. It's just a DI annotation.
-  if (isa<MarkFunctionEscapeInst>(U))
-    return true;
-  
-  // A store or assign is ok if the alloc_box is the destination.
-  if (isa<StoreInst>(U) || isa<AssignInst>(U)) {
-    if (O->getOperandNumber() != 1)
-      return false;
-    Mutations.push_back(cast<SILInstruction>(U));
-    return true;
-  }
-  // copy_addr is ok, but counts as a mutation if the use is as the
-  // destination or the copy_addr is a take.
-  if (auto *CAI = dyn_cast<CopyAddrInst>(U)) {
-    if (O->getOperandNumber() == 1 || CAI->isTakeOfSrc())
-      Mutations.push_back(CAI);
-    return true;
-  }
-  // Recursively see through struct_element_addr, tuple_element_addr, and
-  // open_existential_addr instructions.
-  if (isa<StructElementAddrInst>(U) || isa<TupleElementAddrInst>(U) ||
-      isa<InitEnumDataAddrInst>(U) ||
-      isa<OpenExistentialAddrInst>(U) || isa<UncheckedTakeEnumDataAddrInst>(U)) {
-    // UncheckedTakeEnumDataAddr is additionally a mutation.
-    if (isa<UncheckedTakeEnumDataAddrInst>(U))
-      Mutations.push_back(U);
-    
-    for (auto *UO : U->getUses())
-      if (!isNonescapingUse(UO, Mutations))
-        return false;
-    return true;
-  }
-  // An apply is ok if the argument is used as an inout parameter or an
-  // indirect return, but counts as a possible mutation in both cases.
-  if (auto *AI = dyn_cast<ApplyInst>(U)) {
-    auto argIndex = O->getOperandNumber()-1;
-    SILFunctionConventions substConv(AI->getSubstCalleeType(), AI->getModule());
-    auto convention = substConv.getSILArgumentConvention(argIndex);
-    if (convention.isIndirectConvention()) {
-      Mutations.push_back(AI);
-      return true;
-    }
-    return false;
-  }
-  // These instructions are ok but count as mutations.
-  if (isa<DeallocBoxInst>(U)) {
-    Mutations.push_back(cast<SILInstruction>(U));
-    return true;
-  }
-  // These remaining instructions are ok and don't count as mutations.
-  if (isa<StrongRetainInst>(U) || isa<StrongReleaseInst>(U) ||
-      isa<LoadInst>(U))
-    return true;
-  return false;
+static bool isNonEscapingUse(Operand *InitialOp,
+                             SmallVectorImpl<SILInstruction *> &Mutations) {
+  return NonEscapingUserVisitor(InitialOp, Mutations).compute();
 }
 
 /// \brief Examine an alloc_box instruction, returning true if at least one
@@ -703,19 +776,24 @@ isNonescapingUse(Operand *O, SmallVectorImpl<SILInstruction*> &Mutations) {
 static bool
 examineAllocBoxInst(AllocBoxInst *ABI, ReachabilityInfo &RI,
                     llvm::DenseMap<PartialApplyInst*, unsigned> &IM) {
+  DEBUG(llvm::dbgs() << "Visiting alloc box: " << *ABI);
   SmallVector<SILInstruction*, 32> Mutations;
   
   // Scan the box for interesting uses.
   for (Operand *O : ABI->getUses()) {
     if (auto *PAI = dyn_cast<PartialApplyInst>(O->getUser())) {
+      DEBUG(llvm::dbgs() << "    Found partial: " << *PAI);
+
       unsigned OpNo = O->getOperandNumber();
       assert(OpNo != 0 && "Alloc box used as callee of partial apply?");
 
       // If we've already seen this partial apply, then it means the same alloc
       // box is being captured twice by the same closure, which is odd and
       // unexpected: bail instead of trying to handle this case.
-      if (IM.count(PAI))
+      if (IM.count(PAI)) {
+        DEBUG(llvm::dbgs() << "        Already seen... bailing!\n");
         return false;
+      }
 
       SILModule &M = PAI->getModule();
       auto closureType = PAI->getType().castTo<SILFunctionType>();
@@ -727,8 +805,11 @@ examineAllocBoxInst(AllocBoxInst *ABI, ReachabilityInfo &RI,
       unsigned Index = OpNo - 1 + closureConv.getNumSILArguments();
 
       auto *Fn = PAI->getReferencedFunction();
-      if (!Fn || !Fn->isDefinition())
+      if (!Fn || !Fn->isDefinition()) {
+        DEBUG(llvm::dbgs() << "        Not a direct function definition "
+                              "reference. Bailing!\n");
         return false;
+      }
 
       SILArgument *BoxArg = getBoxFromIndex(Fn, Index);
 
@@ -738,20 +819,29 @@ examineAllocBoxInst(AllocBoxInst *ABI, ReachabilityInfo &RI,
       auto BoxTy = BoxArg->getType().castTo<SILBoxType>();
       assert(BoxTy->getLayout()->getFields().size() == 1
              && "promoting compound box not implemented yet");
-      if (BoxTy->getFieldType(M, 0).isAddressOnly(M))
+      if (BoxTy->getFieldType(M, 0).isAddressOnly(M)) {
+        DEBUG(llvm::dbgs()
+              << "        Box is an address only argument... Bailing!\n");
         return false;
+      }
 
       // Verify that this closure is known not to mutate the captured value; if
       // it does, then conservatively refuse to promote any captures of this
       // value.
-      if (!isNonmutatingCapture(BoxArg))
+      if (!isNonMutatingCapture(BoxArg)) {
+        DEBUG(llvm::dbgs() << "        Is a mutating capture... Bailing!\n");
         return false;
+      }
 
       // Record the index and continue.
+      DEBUG(llvm::dbgs() << "        Can be optimized!\n");
+      DEBUG(llvm::dbgs() << "        Index: " << Index << "\n");
       IM.insert(std::make_pair(PAI, Index));
       continue;
     }
+
     if (auto *PBI = dyn_cast<ProjectBoxInst>(O->getUser())) {
+      DEBUG(llvm::dbgs() << "    Found project box: " << *PBI);
       // Check for mutations of the address component.
       SILValue Addr = PBI;
       // If the AllocBox is used by a mark_uninitialized, scan the MUI for
@@ -763,15 +853,22 @@ examineAllocBoxInst(AllocBoxInst *ABI, ReachabilityInfo &RI,
       }
 
       for (Operand *AddrOp : Addr->getUses()) {
-        if (!isNonescapingUse(AddrOp, Mutations))
+        if (!isNonEscapingUse(AddrOp, Mutations)) {
+          DEBUG(llvm::dbgs() << "    Has escaping user of addr... bailing: "
+                             << *AddrOp->getUser());
           return false;
+        }
       }
       continue;
     }
+
     // Verify that this use does not otherwise allow the alloc_box to
     // escape.
-    if (!isNonescapingUse(O, Mutations))
+    if (!isNonEscapingUse(O, Mutations)) {
+      DEBUG(llvm::dbgs() << "    Have unknown escaping user: "
+                         << *O->getUser());
       return false;
+    }
   }
 
   // Helper lambda function to determine if instruction b is strictly after
@@ -788,6 +885,8 @@ examineAllocBoxInst(AllocBoxInst *ABI, ReachabilityInfo &RI,
     return false;
   };
 
+  DEBUG(llvm::dbgs()
+        << "Checking for any mutations that invalidate captures...\n");
   // Loop over all mutations to possibly invalidate captures.
   for (auto *I : Mutations) {
     auto Iter = IM.begin();
@@ -798,6 +897,8 @@ examineAllocBoxInst(AllocBoxInst *ABI, ReachabilityInfo &RI,
       // block is after the partial_apply.
       if (RI.isReachable(PAI->getParent(), I->getParent()) ||
           (PAI->getParent() == I->getParent() && isAfter(PAI, I))) {
+        DEBUG(llvm::dbgs() << "    Invalidating: " << *PAI);
+        DEBUG(llvm::dbgs() << "    Because of user: " << *I);
         auto Prev = Iter++;
         IM.erase(Prev);
         continue;
@@ -805,10 +906,13 @@ examineAllocBoxInst(AllocBoxInst *ABI, ReachabilityInfo &RI,
       ++Iter;
     }
     // If there are no valid captures left, then stop.
-    if (IM.empty())
+    if (IM.empty()) {
+      DEBUG(llvm::dbgs() << "    Ran out of valid captures... bailing!\n");
       return false;
+    }
   }
 
+  DEBUG(llvm::dbgs() << "    We can optimize this box!\n");
   return true;
 }
 
@@ -820,20 +924,20 @@ constructClonedFunction(PartialApplyInst *PAI, FunctionRefInst *FRI,
   // Create the Cloned Name for the function.
   SILFunction *Orig = FRI->getReferencedFunction();
 
-  IsFragile_t Fragile = IsNotFragile;
-  if (F->isFragile() && Orig->isFragile())
-    Fragile = IsFragile;
+  IsSerialized_t Serialized = IsNotSerialized;
+  if (F->isSerialized() && Orig->isSerialized())
+    Serialized = IsSerializable;
 
-  auto ClonedName = getSpecializedName(Orig, Fragile, PromotableIndices);
+  auto ClonedName = getSpecializedName(Orig, Serialized, PromotableIndices);
 
   // If we already have such a cloned function in the module then just use it.
   if (auto *PrevF = F->getModule().lookUpFunction(ClonedName)) {
-    assert(PrevF->isFragile() == Fragile);
+    assert(PrevF->isSerialized() == Serialized);
     return PrevF;
   }
 
   // Otherwise, create a new clone.
-  ClosureCloner cloner(Orig, Fragile, ClonedName, PromotableIndices);
+  ClosureCloner cloner(Orig, Serialized, ClonedName, PromotableIndices);
   cloner.populateCloned();
   return cloner.getCloned();
 }
@@ -863,8 +967,12 @@ processPartialApplyInst(PartialApplyInst *PAI, IndicesSet &PromotableIndices,
   // Populate the argument list for a new partial_apply instruction, taking into
   // consideration any captures.
   auto CalleeFunctionTy = PAI->getCallee()->getType().castTo<SILFunctionType>();
-  SILFunctionConventions calleeConv(CalleeFunctionTy, M);
-  auto CalleePInfo = CalleeFunctionTy->getParameters();
+  auto SubstCalleeFunctionTy = CalleeFunctionTy;
+  if (PAI->hasSubstitutions())
+    SubstCalleeFunctionTy =
+        CalleeFunctionTy->substGenericArgs(M, PAI->getSubstitutions());
+  SILFunctionConventions calleeConv(SubstCalleeFunctionTy, M);
+  auto CalleePInfo = SubstCalleeFunctionTy->getParameters();
   SILFunctionConventions paConv(PAI->getType().castTo<SILFunctionType>(), M);
   unsigned FirstIndex = paConv.getNumSILArguments();
   unsigned OpNo = 1, OpCount = PAI->getNumOperands();
@@ -879,10 +987,6 @@ processPartialApplyInst(PartialApplyInst *PAI, IndicesSet &PromotableIndices,
       SILParameterInfo CPInfo = CalleePInfo[Index - NumIndirectResults];
       assert(calleeConv.getSILType(CPInfo) == BoxValue->getType()
              && "SILType of parameter info does not match type of parameter");
-      // Cleanup the captured argument.
-      releasePartialApplyCapturedArg(B, PAI->getLoc(), BoxValue,
-                                     CPInfo);
-
       // Load and copy from the address value, passing the result as an argument
       // to the new closure.
       SILValue Addr;
@@ -906,6 +1010,9 @@ processPartialApplyInst(PartialApplyInst *PAI, IndicesSet &PromotableIndices,
       auto &typeLowering = M.getTypeLowering(Addr->getType());
       Args.push_back(
         typeLowering.emitLoadOfCopy(B, PAI->getLoc(), Addr, IsNotTake));
+      // Cleanup the captured argument.
+      releasePartialApplyCapturedArg(B, PAI->getLoc(), BoxValue,
+                                     CPInfo);
       ++NumCapturesPromoted;
     } else {
       Args.push_back(PAI->getOperand(OpNo));
@@ -974,6 +1081,8 @@ class CapturePromotionPass : public SILModuleTransform {
 
 void CapturePromotionPass::processFunction(SILFunction *F,
                                       SmallVectorImpl<SILFunction*> &Worklist) {
+  DEBUG(llvm::dbgs() << "******** Performing Capture Promotion on: "
+                     << F->getName() << "********\n");
   // This is a map from each partial apply to a set of indices of promotable
   // box variables.
   PartialApplyIndicesMap IndicesMap;

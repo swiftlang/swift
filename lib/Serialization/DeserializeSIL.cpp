@@ -295,7 +295,7 @@ static SILFunction *createBogusSILFunction(SILModule &M,
   SourceLoc loc;
   return M.createFunction(
       SILLinkage::Private, name, type.castTo<SILFunctionType>(), nullptr,
-      RegularLocation(loc), IsNotBare, IsNotTransparent, IsNotFragile,
+      RegularLocation(loc), IsNotBare, IsNotTransparent, IsNotSerialized,
       IsNotThunk, SILFunction::NotRelevant);
 }
 
@@ -383,11 +383,11 @@ SILFunction *SILDeserializer::readSILFunction(DeclID FID,
   DeclID clangNodeOwnerID;
   TypeID funcTyID;
   GenericEnvironmentID genericEnvID;
-  unsigned rawLinkage, isTransparent, isFragile, isThunk, isGlobal,
+  unsigned rawLinkage, isTransparent, isSerialized, isThunk, isGlobal,
       inlineStrategy, effect, numSpecAttrs, hasQualifiedOwnership;
   ArrayRef<uint64_t> SemanticsIDs;
   // TODO: read fragile
-  SILFunctionLayout::readRecord(scratch, rawLinkage, isTransparent, isFragile,
+  SILFunctionLayout::readRecord(scratch, rawLinkage, isTransparent, isSerialized,
                                 isThunk, isGlobal, inlineStrategy, effect,
                                 numSpecAttrs, hasQualifiedOwnership, funcTyID,
                                 genericEnvID, clangNodeOwnerID, SemanticsIDs);
@@ -438,8 +438,7 @@ SILFunction *SILDeserializer::readSILFunction(DeclID FID,
       return nullptr;
     }
 
-    if (isFragile)
-      fn->setFragile(IsFragile);
+    fn->setSerialized(IsSerialized_t(isSerialized));
 
     // Don't override the transparency or linkage of a function with
     // an existing declaration.
@@ -449,7 +448,7 @@ SILFunction *SILDeserializer::readSILFunction(DeclID FID,
     fn = SILMod.createFunction(
         linkage.getValue(), name, ty.castTo<SILFunctionType>(), nullptr, loc,
         IsNotBare, IsTransparent_t(isTransparent == 1),
-        IsFragile_t(isFragile == 1), IsThunk_t(isThunk),
+        IsSerialized_t(isSerialized), IsThunk_t(isThunk),
         SILFunction::NotRelevant, (Inline_t)inlineStrategy);
     fn->setGlobalInit(isGlobal == 1);
     fn->setEffectsKind((EffectsKind)effect);
@@ -1454,6 +1453,21 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     ResultVal = Builder.createEndBorrow(Loc, BorrowSource, BorrowDest);
     break;
   }
+  case ValueKind::BeginAccessInst: {
+    SILValue op = getLocalValue(
+        ValID, getSILType(MF->getType(TyID), (SILValueCategory)TyCategory));
+    auto accessKind = SILAccessKind(Attr & 0x7);
+    auto enforcement = SILAccessEnforcement(Attr >> 3);
+    ResultVal = Builder.createBeginAccess(Loc, op, accessKind, enforcement);
+    break;
+  }
+  case ValueKind::EndAccessInst: {
+    SILValue op = getLocalValue(
+        ValID, getSILType(MF->getType(TyID), (SILValueCategory)TyCategory));
+    bool aborted = Attr & 0x1;
+    ResultVal = Builder.createEndAccess(Loc, op, aborted);
+    break;
+  }
   case ValueKind::StoreUnownedInst: {
     auto Ty = MF->getType(TyID);
     SILType addrType = getSILType(Ty, (SILValueCategory)TyCategory);
@@ -2086,10 +2100,10 @@ bool SILDeserializer::hasSILFunction(StringRef Name,
   DeclID clangOwnerID;
   TypeID funcTyID;
   GenericEnvironmentID genericEnvID;
-  unsigned rawLinkage, isTransparent, isFragile, isThunk, isGlobal,
+  unsigned rawLinkage, isTransparent, isSerialized, isThunk, isGlobal,
     inlineStrategy, effect, numSpecAttrs, hasQualifiedOwnership;
   ArrayRef<uint64_t> SemanticsIDs;
-  SILFunctionLayout::readRecord(scratch, rawLinkage, isTransparent, isFragile,
+  SILFunctionLayout::readRecord(scratch, rawLinkage, isTransparent, isSerialized,
                                 isThunk, isGlobal, inlineStrategy, effect,
                                 numSpecAttrs, hasQualifiedOwnership, funcTyID,
                                 genericEnvID, clangOwnerID, SemanticsIDs);
@@ -2161,8 +2175,8 @@ SILGlobalVariable *SILDeserializer::readGlobalVar(StringRef Name) {
 
   TypeID TyID;
   DeclID dID;
-  unsigned rawLinkage, isFragile, IsDeclaration, IsLet;
-  SILGlobalVarLayout::readRecord(scratch, rawLinkage, isFragile,
+  unsigned rawLinkage, isSerialized, IsDeclaration, IsLet;
+  SILGlobalVarLayout::readRecord(scratch, rawLinkage, isSerialized,
                                  IsDeclaration, IsLet, TyID, dID);
   if (TyID == 0) {
     DEBUG(llvm::dbgs() << "SILGlobalVariable typeID is 0.\n");
@@ -2178,10 +2192,11 @@ SILGlobalVariable *SILDeserializer::readGlobalVar(StringRef Name) {
 
   auto Ty = MF->getType(TyID);
   SILGlobalVariable *v = SILGlobalVariable::create(
-                           SILMod, linkage.getValue(), (IsFragile_t)isFragile,
-                           Name.str(), getSILType(Ty, SILValueCategory::Object),
-                           None,
-                           dID ? cast<VarDecl>(MF->getDecl(dID)): nullptr);
+      SILMod, linkage.getValue(),
+      isSerialized ? IsSerialized : IsNotSerialized,
+      Name.str(), getSILType(Ty, SILValueCategory::Object),
+      None,
+      dID ? cast<VarDecl>(MF->getDecl(dID)): nullptr);
   v->setLet(IsLet);
   globalVarOrOffset = v;
   v->setDeclaration(IsDeclaration);
@@ -2352,8 +2367,9 @@ SILWitnessTable *SILDeserializer::readWitnessTable(DeclID WId,
 
   unsigned RawLinkage;
   unsigned IsDeclaration;
-  unsigned IsFragile;
-  WitnessTableLayout::readRecord(scratch, RawLinkage, IsDeclaration, IsFragile);
+  unsigned Serialized;
+  WitnessTableLayout::readRecord(scratch, RawLinkage,
+                                 IsDeclaration, Serialized);
 
   auto Linkage = fromStableSILLinkage(RawLinkage);
   if (!Linkage) {
@@ -2465,7 +2481,8 @@ SILWitnessTable *SILDeserializer::readWitnessTable(DeclID WId,
     kind = SILCursor.readRecord(entry.ID, scratch);
   }
 
-  wT->convertToDefinition(witnessEntries, IsFragile != 0);
+  wT->convertToDefinition(witnessEntries,
+                          Serialized ? IsSerialized : IsNotSerialized);
   wTableOrOffset.set(wT, /*fully deserialized*/ true);
   if (Callback)
     Callback->didDeserializeWitnessTableEntries(MF->getAssociatedModule(), wT);

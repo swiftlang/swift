@@ -103,12 +103,12 @@ bb0(%0 : $B):
 // CHECK-LABEL: @store_after_store_struct
 // CHECK: #0 store
 // CHECK-NEXT: [[RET0:%.+]] = alloc_stack
-// CHECK-NEXT: Address Projection Type: $*Int
-// CHECK-NEXT: Field Type: var a: Int
+// CHECK-NEXT: Projection Path [$*S1
+// CHECK-NEXT:   Field: var a: Int of: $*Int]
 // CHECK: #1 store
 // CHECK-NEXT: [[RET0:%.+]] = alloc_stack
-// CHECK-NEXT: Address Projection Type: $*Int
-// CHECK-NEXT: Field Type: var a: Int
+// CHECK-NEXT: Projection Path [$*S1
+// CHECK-NEXT:   Field: var a: Int of: $*Int]
 sil @store_after_store_struct : $@convention(thin) () -> () {
   %1 = alloc_stack $S1
   %9 = integer_literal $Builtin.Int64, 0          // user: %10

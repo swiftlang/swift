@@ -2495,17 +2495,23 @@ internal class _RawNative${Self}Storage:
   _SwiftNativeNS${Self}, _NS${Self}Core
 {
   internal typealias RawStorage = _RawNative${Self}Storage
-  
+
+  @nonobjc
   internal final var capacity: Int
+
   internal final var count: Int
 
   internal final var initializedEntries: _UnsafeBitMap
+
+  @nonobjc
   internal final var keys: UnsafeMutableRawPointer
 % if Self == 'Dictionary':
+  @nonobjc
   internal final var values: UnsafeMutableRawPointer
 % end
 
   // This API is unsafe and needs a `_fixLifetime` in the caller.
+  @nonobjc
   internal final
   var _initializedHashtableEntriesBitMapBuffer: UnsafeMutablePointer<UInt> {
     return UnsafeMutablePointer(Builtin.projectTailElems(self, UInt.self))
@@ -2514,6 +2520,7 @@ internal class _RawNative${Self}Storage:
   /// The empty singleton that is used for every single Dictionary that is
   /// created without any elements. The contents of the storage should never
   /// be mutated.
+  @nonobjc
   internal static var empty: RawStorage {
     return Builtin.bridgeFromRawPointer(
       Builtin.addressof(&_swiftEmpty${Self}Storage))
@@ -2521,6 +2528,7 @@ internal class _RawNative${Self}Storage:
 
   // This type is made with allocWithTailElems, so no init is ever called.
   // But we still need to have an init to satisfy the compiler.
+  @nonobjc
   internal init(_doNotCallMe: ()) {
     _sanityCheckFailure("Only create this by using the `empty` singleton")
   }
@@ -2533,6 +2541,7 @@ internal class _RawNative${Self}Storage:
   /// Get the NSEnumerator implementation for self.
   /// _HashableTypedNative${Self}Storage overloads this to give 
   /// _NativeSelfNSEnumerator proper type parameters.
+	@objc
   func enumerator() -> _NSEnumerator {
     return _Native${Self}NSEnumerator<${AnyTypeParameters}>(
         _Native${Self}Buffer(_storage: self))
@@ -2646,6 +2655,7 @@ internal class _TypedNative${Self}Storage<${TypeParameters}> :
 
   // This type is made with allocWithTailElems, so no init is ever called.
   // But we still need to have an init to satisfy the compiler.
+  @nonobjc
   override internal init(_doNotCallMe: ()) {
     _sanityCheckFailure("Only create this by calling Buffer's inits")
   }
@@ -2680,6 +2690,7 @@ final internal class _HashableTypedNative${Self}Storage<${TypeParametersDecl}> :
 
   // This type is made with allocWithTailElems, so no init is ever called.
   // But we still need to have an init to satisfy the compiler.
+  @nonobjc
   override internal init(_doNotCallMe: ()) {
     _sanityCheckFailure("Only create this by calling Buffer's inits'")
   }
@@ -2744,7 +2755,8 @@ final internal class _HashableTypedNative${Self}Storage<${TypeParametersDecl}> :
     return stored
   }
 
-  internal func getObjectFor(_ aKey: AnyObject) -> AnyObject? {
+  @nonobjc
+	internal func getObjectFor(_ aKey: AnyObject) -> AnyObject? {
     guard let nativeKey = _conditionallyBridgeFromObjectiveC(aKey, Key.self)
     else { return nil }
 
@@ -3479,6 +3491,7 @@ final internal class _SwiftDeferredNS${Self}<${TypeParametersDecl}>
   internal typealias Value = Element
 %end
 
+  @nonobjc
   internal init(minimumCapacity: Int = 2) {
     nativeBuffer = NativeBuffer(minimumCapacity: minimumCapacity)
     super.init()
@@ -3493,6 +3506,7 @@ final internal class _SwiftDeferredNS${Self}<${TypeParametersDecl}>
   // operations on it.
   //
   // Do not access this property directly.
+  @nonobjc
   internal var _heapStorageBridged_DoNotUse: AnyObject?
 
   /// The unbridged elements.
@@ -3563,16 +3577,35 @@ final internal class _SwiftDeferredNS${Self}<${TypeParametersDecl}>
   ) {
     bridgedAllKeysAndValues(objects, keys)
   }
+
+  @objc(enumerateKeysAndObjectsWithOptions:usingBlock:)
+  internal func enumerateKeysAndObjects(options: Int, 
+    using block: @convention(block) (Unmanaged<AnyObject>, Unmanaged<AnyObject>,
+     UnsafeMutablePointer<UInt8>) -> Void) {
+    bridgeEverything()
+    let capacity = nativeBuffer.capacity
+    var stop: UInt8 = 0
+    for position in 0..<capacity {
+      if bridgedBuffer.isInitializedEntry(at: position) {
+        block(Unmanaged.passUnretained(bridgedBuffer.key(at: position)), 
+          Unmanaged.passUnretained(bridgedBuffer.value(at: position)), 
+          &stop)
+      }
+      if stop != 0 { return }
+    }
+  }
 %end
 
   /// Returns the pointer to the stored property, which contains bridged
   /// ${Self} elements.
+  @nonobjc
   internal var _heapStorageBridgedPtr: UnsafeMutablePointer<AnyObject?> {
     return _getUnsafePointerToStoredProperties(self).assumingMemoryBound(
       to: Optional<AnyObject>.self)
   }
 
   /// The buffer for bridged ${Self} elements, if present.
+  @nonobjc
   internal var _bridgedStorage:
     BridgedBuffer.RawStorage? {
     get {
@@ -3584,6 +3617,7 @@ final internal class _SwiftDeferredNS${Self}<${TypeParametersDecl}>
   }
 
   /// Attach a buffer for bridged ${Self} elements.
+  @nonobjc
   internal func _initializeHeapStorageBridged(_ newStorage: AnyObject) {
     _stdlib_atomicInitializeARCRef(
       object: _heapStorageBridgedPtr, desired: newStorage)
@@ -3594,6 +3628,7 @@ final internal class _SwiftDeferredNS${Self}<${TypeParametersDecl}>
     return BridgedBuffer(_storage: _bridgedStorage!)
   }
 
+  @nonobjc
   internal func bridgeEverything() {
     if _fastPath(_bridgedStorage != nil) {
       return
@@ -3626,6 +3661,7 @@ final internal class _SwiftDeferredNS${Self}<${TypeParametersDecl}>
 
 %if Self == 'Dictionary':
 
+  @nonobjc
   internal func bridgedAllKeysAndValues(
     _ objects: UnsafeMutablePointer<AnyObject>?,
     _ keys: UnsafeMutablePointer<AnyObject>?
@@ -3676,6 +3712,7 @@ final internal class _SwiftDeferredNS${Self}<${TypeParametersDecl}>
     return nativeBuffer.count
   }
 
+  @nonobjc
   internal func bridgingObjectForKey(_ aKey: AnyObject)
     -> AnyObject? {
     guard let nativeKey = _conditionallyBridgeFromObjectiveC(aKey, Key.self)
@@ -3690,6 +3727,7 @@ final internal class _SwiftDeferredNS${Self}<${TypeParametersDecl}>
     return nil
   }
 
+	@objc
   internal func enumerator() -> _NSEnumerator {
     bridgeEverything()
     return _Native${Self}NSEnumerator<${AnyTypeParameters}>(bridgedBuffer)

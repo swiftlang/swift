@@ -3046,7 +3046,7 @@ static void describeObjCReason(TypeChecker &TC, const ValueDecl *VD,
 static void diagnoseFunctionParamNotRepresentable(
     TypeChecker &TC, const AbstractFunctionDecl *AFD, unsigned NumParams,
     unsigned ParamIndex, const ParamDecl *P, ObjCReason Reason) {
-  if (Reason == ObjCReason::DoNotDiagnose)
+  if (!shouldDiagnoseObjCReason(Reason))
     return;
 
   if (NumParams == 1) {
@@ -3072,7 +3072,7 @@ static bool isParamListRepresentableInObjC(TypeChecker &TC,
                                            ObjCReason Reason) {
   // If you change this function, you must add or modify a test in PrintAsObjC.
 
-  bool Diagnose = (Reason != ObjCReason::DoNotDiagnose);
+  bool Diagnose = shouldDiagnoseObjCReason(Reason);
 
   bool IsObjC = true;
   unsigned NumParams = PL->size();
@@ -3081,7 +3081,7 @@ static bool isParamListRepresentableInObjC(TypeChecker &TC,
     
     // Swift Varargs are not representable in Objective-C.
     if (param->isVariadic()) {
-      if (Diagnose && Reason != ObjCReason::DoNotDiagnose) {
+      if (Diagnose && shouldDiagnoseObjCReason(Reason)) {
         TC.diagnose(param->getStartLoc(), diag::objc_invalid_on_func_variadic,
                     getObjCDiagnosticAttrKind(Reason))
           .highlight(param->getSourceRange());
@@ -3168,7 +3168,7 @@ static bool checkObjCInExtensionContext(TypeChecker &tc,
 static bool checkObjCWithGenericParams(TypeChecker &TC,
                                        const AbstractFunctionDecl *AFD,
                                        ObjCReason Reason) {
-  bool Diagnose = (Reason != ObjCReason::DoNotDiagnose);
+  bool Diagnose = shouldDiagnoseObjCReason(Reason);
 
   if (AFD->getGenericParams()) {
     // Diagnose this problem, if asked to.
@@ -3189,7 +3189,7 @@ static bool checkObjCWithGenericParams(TypeChecker &TC,
 static bool checkObjCInForeignClassContext(TypeChecker &TC,
                                            const ValueDecl *VD,
                                            ObjCReason Reason) {
-  bool Diagnose = (Reason != ObjCReason::DoNotDiagnose);
+  bool Diagnose = shouldDiagnoseObjCReason(Reason);
 
   auto type = VD->getDeclContext()->getDeclaredInterfaceType();
   if (!type)
@@ -3257,7 +3257,7 @@ bool TypeChecker::isRepresentableInObjC(
 
   // If you change this function, you must add or modify a test in PrintAsObjC.
 
-  bool Diagnose = (Reason != ObjCReason::DoNotDiagnose);
+  bool Diagnose = shouldDiagnoseObjCReason(Reason);
 
   if (checkObjCInForeignClassContext(*this, AFD, Reason))
     return false;
@@ -3589,7 +3589,7 @@ bool TypeChecker::isRepresentableInObjC(const VarDecl *VD, ObjCReason Reason) {
   }
   bool Result = T->isRepresentableIn(ForeignLanguage::ObjectiveC,
                                      VD->getDeclContext());
-  bool Diagnose = (Reason != ObjCReason::DoNotDiagnose);
+  bool Diagnose = shouldDiagnoseObjCReason(Reason);
 
   if (Result && checkObjCInExtensionContext(*this, VD, Diagnose))
     return false;
@@ -3620,7 +3620,7 @@ bool TypeChecker::isRepresentableInObjC(const SubscriptDecl *SD,
                                         ObjCReason Reason) {
   // If you change this function, you must add or modify a test in PrintAsObjC.
 
-  bool Diagnose = (Reason != ObjCReason::DoNotDiagnose);
+  bool Diagnose = shouldDiagnoseObjCReason(Reason);
 
   if (checkObjCInForeignClassContext(*this, SD, Reason))
     return false;

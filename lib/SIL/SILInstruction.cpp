@@ -992,6 +992,9 @@ SILInstruction *SILInstruction::clone(SILInstruction *InsertPt) {
 /// additional handling. It is important to know this information when
 /// you perform such optimizations like e.g. jump-threading.
 bool SILInstruction::isTriviallyDuplicatable() const {
+  if (isa<ThrowInst>(this))
+    return false;
+
   if (isa<AllocStackInst>(this) || isa<DeallocStackInst>(this)) {
     return false;
   }

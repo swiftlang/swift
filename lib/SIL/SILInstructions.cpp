@@ -678,6 +678,26 @@ EndBorrowArgumentInst::EndBorrowArgumentInst(SILDebugLocation DebugLoc,
                                              SILArgument *Arg)
     : UnaryInstructionBase(DebugLoc, SILValue(Arg)) {}
 
+StringRef swift::getSILAccessKindName(SILAccessKind kind) {
+  switch (kind) {
+  case SILAccessKind::Init: return "init";
+  case SILAccessKind::Read: return "read";
+  case SILAccessKind::Modify: return "modify";
+  case SILAccessKind::Deinit: return "deinit";
+  }
+  llvm_unreachable("bad access kind");
+}
+
+StringRef swift::getSILAccessEnforcementName(SILAccessEnforcement enforcement) {
+  switch (enforcement) {
+  case SILAccessEnforcement::Unknown: return "unknown";
+  case SILAccessEnforcement::Static: return "static";
+  case SILAccessEnforcement::Dynamic: return "dynamic";
+  case SILAccessEnforcement::Unsafe: return "unsafe";
+  }
+  llvm_unreachable("bad access enforcement");
+}
+
 AssignInst::AssignInst(SILDebugLocation Loc, SILValue Src, SILValue Dest)
     : SILInstruction(ValueKind::AssignInst, Loc), Operands(this, Src, Dest) {}
 
@@ -1315,6 +1335,28 @@ SwitchEnumInstBase::SwitchEnumInstBase(
 
   if (HasDefault)
     ::new (succs + NumCases) SILSuccessor(this, DefaultBB);
+}
+
+void SwitchEnumInstBase::swapCase(unsigned i, unsigned j) {
+  assert(i < getNumCases() && "First index is out of bounds?!");
+  assert(j < getNumCases() && "Second index is out of bounds?!");
+
+  auto *succs = getSuccessorBuf();
+
+  // First grab our destination blocks.
+  SILBasicBlock *iBlock = succs[i].getBB();
+  SILBasicBlock *jBlock = succs[j].getBB();
+
+  // Then destroy the sil successors and reinitialize them with the new things
+  // that they are pointing at.
+  succs[i].~SILSuccessor();
+  ::new (succs + i) SILSuccessor(this, jBlock);
+  succs[j].~SILSuccessor();
+  ::new (succs + j) SILSuccessor(this, iBlock);
+
+  // Now swap our cases.
+  auto *cases = getCaseBuf();
+  std::swap(cases[i], cases[j]);
 }
 
 namespace {

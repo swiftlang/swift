@@ -65,6 +65,8 @@ public:
 
   bool isFinished() const { return finished; }
 
+  void verify(SILGenFunction &SGF) const;
+
 protected:
   virtual void finishImpl(SILGenFunction &SGF) = 0;
 };
@@ -201,6 +203,10 @@ public:
 
   FormalEvaluationScope(FormalEvaluationScope &&o);
   FormalEvaluationScope &operator=(FormalEvaluationScope &&o) = delete;
+
+  /// Verify that we can successfully access all of the inner lexical scopes
+  /// that would be popped by this scope.
+  void verify() const;
 
 private:
   void popImpl();

@@ -396,7 +396,7 @@ ManagedValue SILGenFunction::emitFuncToBlock(SILLocation loc,
                                                  invokeTy,
                                                  fnTy,
                                                  blockTy,
-                                                 F.isFragile());
+                                                 F.isSerialized());
 
   // Build it if necessary.
   if (thunk->empty()) {
@@ -664,7 +664,7 @@ SILGenFunction::emitBlockToFunc(SILLocation loc,
                                                  thunkTy,
                                                  blockTy,
                                                  funcTy,
-                                                 F.isFragile());
+                                                 F.isSerialized());
 
   // Build it if necessary.
   if (thunk->empty()) {
@@ -1029,6 +1029,29 @@ void SILGenFunction::emitNativeToForeignThunk(SILDeclRef thunk) {
   if (substConv.hasIndirectSILResults()) {
     args.push_back(
         emitTemporaryAllocation(loc, substConv.getSingleSILResultType()));
+  }
+
+  // If the '@objc' was inferred due to deprecated rules,
+  // emit a Builtin.swift3ImplicitObjCEntrypoint().
+  //
+  // However, don't do so for 'dynamic' members, which must use Objective-C
+  // dispatch and therefore create many false positives.
+  if (thunk.hasDecl()) {
+    auto decl = thunk.getDecl();
+
+    // For an accessor, look at the storage declaration's attributes.
+    if (auto func = dyn_cast<FuncDecl>(decl)) {
+      if (func->isAccessor())
+        decl = func->getAccessorStorageDecl();
+    }
+
+    if (auto attr = decl->getAttrs().getAttribute<ObjCAttr>()) {
+      if (attr->isSwift3Inferred() &&
+          !decl->getAttrs().hasAttribute<DynamicAttr>()) {
+        B.createBuiltin(loc, getASTContext().getIdentifier("swift3ImplicitObjCEntrypoint"),
+            getModule().Types.getEmptyTupleType(), { }, { });
+      }
+    }
   }
 
   // Now, enter a cleanup used for bridging the arguments. Note that if we

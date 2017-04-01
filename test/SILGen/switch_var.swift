@@ -108,7 +108,7 @@ func test_var_2() {
   d()
 }
 
-// CHECK-LABEL: sil hidden  @_T010switch_var05test_B2_3yyF
+// CHECK-LABEL: sil hidden @_T010switch_var05test_B2_3yyF
 func test_var_3() {
   // CHECK:   function_ref @_T010switch_var3fooSiyF
   // CHECK:   function_ref @_T010switch_var3barSiyF
@@ -180,7 +180,7 @@ struct X : P { func p() {} }
 struct Y : P { func p() {} }
 struct Z : P { func p() {} }
 
-// CHECK-LABEL: sil hidden  @_T010switch_var05test_B2_4yAA1P_p1p_tF
+// CHECK-LABEL: sil hidden @_T010switch_var05test_B2_4yAA1P_p1p_tF
 func test_var_4(p p: P) {
   // CHECK:   function_ref @_T010switch_var3fooSiyF
   switch (p, foo()) {

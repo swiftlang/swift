@@ -162,10 +162,6 @@ class Remangler {
   class EntityContext {
     bool AsContext = false;
   public:
-    bool isAsContext() const {
-      return AsContext;
-    }
-
     class ManglingContextRAII {
       EntityContext &Ctx;
       bool SavedValue;
@@ -485,7 +481,7 @@ void Remangler::mangleAllocator(Node *node) {
 
 void Remangler::mangleArgumentTuple(Node *node) {
   Node *Child = skipType(getSingleChild(node));
-  if (Child->getKind() == Node::Kind::NonVariadicTuple &&
+  if (Child->getKind() == Node::Kind::Tuple &&
       Child->getNumChildren() == 0) {
     Buffer << 'y';
     return;
@@ -1327,7 +1323,7 @@ void Remangler::mangleNonObjCAttribute(Node *node) {
   Buffer << "TO";
 }
 
-void Remangler::mangleNonVariadicTuple(Node *node) {
+void Remangler::mangleTuple(Node *node) {
   mangleTypeList(node);
   Buffer << 't';
 }
@@ -1597,11 +1593,6 @@ void Remangler::mangleValueWitnessTable(Node *node) {
 void Remangler::mangleVariable(Node *node) {
   mangleChildNodes(node);
   Buffer << 'v';
-}
-
-void Remangler::mangleVariadicTuple(Node *node) {
-  mangleTypeList(node);
-  Buffer << "dt";
 }
 
 void Remangler::mangleVTableAttribute(Node *node) {

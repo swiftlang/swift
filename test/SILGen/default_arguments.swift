@@ -58,10 +58,10 @@ func autocloseFile(x: @autoclosure () -> String = #file,
                    y: @autoclosure () -> Int = #line) { }
 // CHECK-LABEL: sil hidden @_T017default_arguments17testAutocloseFileyyF
 func testAutocloseFile() {
-  // CHECK-LABEL: sil shared [transparent] @_T017default_arguments17testAutocloseFileyyFSSyXKfu_ : $@convention(thin) () -> @owned String
+  // CHECK-LABEL: sil private [transparent] @_T017default_arguments17testAutocloseFileyyFSSyXKfu_ : $@convention(thin) () -> @owned String
   // CHECK: string_literal utf16{{.*}}default_arguments.swift
 
-  // CHECK-LABEL: sil shared [transparent] @_T017default_arguments17testAutocloseFileyyFSiyXKfu0_ : $@convention(thin) () -> Int
+  // CHECK-LABEL: sil private [transparent] @_T017default_arguments17testAutocloseFileyyFSiyXKfu0_ : $@convention(thin) () -> Int
   // CHECK: integer_literal $Builtin.Int2048, [[@LINE+1]]
   autocloseFile()
 }
@@ -92,9 +92,9 @@ func autoclosure(_: @autoclosure () -> ()) {}
 // CHECK-LABEL: sil hidden @_T017default_arguments25testCallWithMagicLiteralsyyF
 // CHECK:         string_literal utf16 "testCallWithMagicLiterals()"
 // CHECK:         string_literal utf16 "testCallWithMagicLiterals()"
-// CHECK-LABEL: sil shared @_T017default_arguments25testCallWithMagicLiteralsyyFyycfU_
+// CHECK-LABEL: sil private @_T017default_arguments25testCallWithMagicLiteralsyyFyycfU_
 // CHECK:         string_literal utf16 "testCallWithMagicLiterals()"
-// CHECK-LABEL: sil shared [transparent] @_T017default_arguments25testCallWithMagicLiteralsyyFyyXKfu_
+// CHECK-LABEL: sil private [transparent] @_T017default_arguments25testCallWithMagicLiteralsyyFyyXKfu_
 // CHECK:         string_literal utf16 "testCallWithMagicLiterals()"
 func testCallWithMagicLiterals() {
   testMagicLiterals()
@@ -262,5 +262,5 @@ func localFunctionWithDefaultArg() {
   }
   bar()
 }
-// CHECK-LABEL: sil shared @_T017default_arguments27localFunctionWithDefaultArgyyF3barL_ySiSgFfA_
+// CHECK-LABEL: sil private @_T017default_arguments27localFunctionWithDefaultArgyyF3barL_ySiSgFfA_
 // CHECK-SAME: $@convention(thin) () -> Optional<Int>

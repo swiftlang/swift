@@ -133,7 +133,7 @@ static bool canUseStaticDispatch(SILGenFunction &SGF,
 
   // If we cannot form a direct reference due to resilience constraints,
   // we have to dynamic dispatch.
-  if (SGF.F.isFragile() && !constant.isFragile())
+  if (SGF.F.isSerialized())
     return false;
 
   // If the method is defined in the same module, we can reference it
@@ -1705,7 +1705,7 @@ RValue SILGenFunction::emitApply(ResultPlanPtr &&resultPlan,
 
   // Create the result plan.
   SmallVector<SILValue, 4> indirectResultAddrs;
-  resultPlan->gatherIndirectResultAddrs(indirectResultAddrs);
+  resultPlan->gatherIndirectResultAddrs(*this, loc, indirectResultAddrs);
 
   // If the function returns an inner pointer, we'll need to lifetime-extend
   // the 'self' parameter.
@@ -1744,12 +1744,8 @@ RValue SILGenFunction::emitApply(ResultPlanPtr &&resultPlan,
   }
 
   // If there's a foreign error parameter, fill it in.
-  Optional<FormalEvaluationScope> errorTempWriteback;
   ManagedValue errorTemp;
   if (auto foreignError = calleeTypeInfo.foreignError) {
-    // Error-temporary emission may need writeback.
-    errorTempWriteback.emplace(*this);
-
     unsigned errorParamIndex =
         calleeTypeInfo.foreignError->getErrorParameterIndex();
 
@@ -1850,9 +1846,6 @@ RValue SILGenFunction::emitApply(ResultPlanPtr &&resultPlan,
   // TODO: maybe this should happen after managing the result if it's
   // not a result-checking convention?
   if (auto foreignError = calleeTypeInfo.foreignError) {
-    // Force immediate writeback to the error temporary.
-    errorTempWriteback.reset();
-
     bool doesNotThrow = (options & ApplyOptions::DoesNotThrow);
     emitForeignErrorCheck(loc, directResults, errorTemp,
                           doesNotThrow, *foreignError);
@@ -2556,7 +2549,19 @@ namespace {
       if (param.isConsumed() &&
           value.getOwnershipKind() == ValueOwnershipKind::Guaranteed) {
         value = value.copyUnmanaged(SGF, arg.getLocation());
+        Args.push_back(value);
+        return;
       }
+
+      if (SGF.F.getModule().getOptions().EnableSILOwnership) {
+        if (param.isDirectGuaranteed() &&
+            value.getOwnershipKind() == ValueOwnershipKind::Owned) {
+          value = value.borrow(SGF, arg.getLocation());
+          Args.push_back(value);
+          return;
+        }
+      }
+
       Args.push_back(value);
     }
     
@@ -3253,8 +3258,13 @@ public:
         SGF.Cleanups.setCleanupState(initCleanup, CleanupState::Active);
   }
 
-  SILValue getAddressOrNull() const override {
+  SILValue getAddressForInPlaceInitialization(SILGenFunction &SGF,
+                                              SILLocation loc) override {
     return addr;
+  }
+
+  bool isInPlaceInitializationOfGlobal() const override {
+    return false;
   }
 
   ManagedValue getManagedBox() const {
@@ -3632,6 +3642,8 @@ namespace {
     }
 
     RValue apply(SGFContext C = SGFContext()) {
+      initialWritebackScope.verify();
+
       assert(!applied && "already applied!");
 
       applied = true;
@@ -3652,12 +3664,12 @@ namespace {
                                 foreignError, foreignSelf, uncurryLevel, C);
 
       // End of the initial writeback scope.
+      initialWritebackScope.verify();
       initialWritebackScope.pop();
 
       // Then handle the remaining call sites.
       result = applyRemainingCallSites(std::move(result), formalType,
                                        foreignSelf, foreignError, C);
-
       return result;
     }
 
@@ -3940,7 +3952,12 @@ RValue CallEmission::applyPartiallyAppliedSuperMethod(
   auto loc = uncurriedLoc.getValue();
   auto subs = callee.getSubstitutions();
   auto upcastedSelf = uncurriedArgs.back();
-  auto self = cast<UpcastInst>(upcastedSelf.getValue())->getOperand();
+  SILValue upcastedSelfValue = upcastedSelf.getValue();
+  // Support stripping off a borrow.
+  if (auto *borrowedSelf = dyn_cast<BeginBorrowInst>(upcastedSelfValue)) {
+    upcastedSelfValue = borrowedSelf->getOperand();
+  }
+  SILValue self = cast<UpcastInst>(upcastedSelfValue)->getOperand();
   auto constantInfo = SGF.getConstantInfo(callee.getMethodName());
   auto functionTy = constantInfo.getSILType();
   SILValue superMethodVal =
@@ -4214,9 +4231,10 @@ static CallEmission prepareApplyExpr(SILGenFunction &SGF, Expr *e) {
                         apply.AssumedPlusZeroSelf);
 
   // Apply 'self' if provided.
-  if (apply.SelfParam)
+  if (apply.SelfParam) {
     emission.addCallSite(RegularLocation(e), std::move(apply.SelfParam),
                          apply.SelfType->getCanonicalType(), /*throws*/ false);
+  }
 
   // Apply arguments from call sites, innermost to outermost.
   for (auto site = apply.CallSites.rbegin(), end = apply.CallSites.rend();
@@ -4229,7 +4247,8 @@ static CallEmission prepareApplyExpr(SILGenFunction &SGF, Expr *e) {
 }
 
 RValue SILGenFunction::emitApplyExpr(Expr *e, SGFContext c) {
-  return prepareApplyExpr(*this, e).apply(c);
+  CallEmission emission = prepareApplyExpr(*this, e);
+  return emission.apply(c);
 }
 
 RValue
@@ -5370,4 +5389,11 @@ RValue SILGenFunction::emitDynamicSubscriptExpr(DynamicSubscriptExpr *e,
   if (optTL.isLoadable())
     optResult = optTL.emitLoad(B, e, optResult, LoadOwnershipQualifier::Take);
   return RValue(*this, e, emitManagedRValueWithCleanup(optResult, optTL));
+}
+
+ManagedValue ArgumentScope::popPreservingValue(ManagedValue mv) {
+  CleanupCloner cloner(SGF, mv);
+  SILValue value = mv.forward(SGF);
+  pop();
+  return cloner.clone(value);
 }

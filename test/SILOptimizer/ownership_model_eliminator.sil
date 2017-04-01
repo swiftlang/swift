@@ -7,6 +7,11 @@ import Builtin
 sil @use_native_object : $@convention(thin) (@owned Builtin.NativeObject) -> ()
 sil @use_int32 : $@convention(thin) (Builtin.Int32) -> ()
 
+enum Either<T, R> {
+case left(T)
+case some(R)
+}
+
 class C {}
 
 // CHECK-LABEL: sil @load : $@convention(thin) (@in Builtin.NativeObject, @in Builtin.Int32) -> () {
@@ -193,3 +198,34 @@ bb0(%0 : @guaranteed $Builtin.NativeObject):
   return %1 : $Builtin.NativeObject
 }
 
+// CHECK-LABEL: sil @switch_enum_default_case : $@convention(thin) (@owned Either<Builtin.NativeObject, Builtin.UnknownObject>) -> () {
+// CHECK: bb0([[ARG:%.*]] : @owned $Either<Builtin.NativeObject, Builtin.UnknownObject>):
+// CHECK:   switch_enum [[ARG]] : $Either<Builtin.NativeObject, Builtin.UnknownObject>, case #Either.left!enumelt.1: [[SUCC_BB:bb[0-9]+]], default [[DEFAULT_BB:bb[0-9]+]]
+//
+// CHECK: [[SUCC_BB]]([[LHS:%.*]] : @owned $Builtin.NativeObject
+// CHECK:   strong_release [[LHS]]
+// CHECK:   br [[EPILOG_BB:bb[0-9]+]]
+//
+// CHECK: [[DEFAULT_BB]]:
+// CHECK:   release_value [[ARG]]
+// CHECK:   br [[EPILOG_BB]]
+//
+// CHECK: [[EPILOG_BB]]:
+// CHECK:   return
+// CHECK: } // end sil function 'switch_enum_default_case'
+sil @switch_enum_default_case : $@convention(thin) (@owned Either<Builtin.NativeObject, Builtin.UnknownObject>) -> () {
+bb0(%0 : @owned $Either<Builtin.NativeObject, Builtin.UnknownObject>):
+  switch_enum %0 : $Either<Builtin.NativeObject, Builtin.UnknownObject>, case #Either.left!enumelt.1: bb1, default bb2
+
+bb1(%1 : @owned $Builtin.NativeObject):
+  destroy_value %1 : $Builtin.NativeObject
+  br bb3
+
+bb2(%2 : @owned $Either<Builtin.NativeObject, Builtin.UnknownObject>):
+  destroy_value %2 : $Either<Builtin.NativeObject, Builtin.UnknownObject>
+  br bb3
+
+bb3:
+  %9999 = tuple()
+  return %9999 : $()
+}

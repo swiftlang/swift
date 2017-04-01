@@ -431,7 +431,7 @@ SILFunction *SILGenModule::emitTopLevelFunction(SILLocation Loc) {
 
   return M.createFunction(SILLinkage::Public, SWIFT_ENTRY_POINT_FUNCTION,
                           topLevelType, nullptr, Loc, IsBare,
-                          IsNotTransparent, IsNotFragile, IsNotThunk,
+                          IsNotTransparent, IsNotSerialized, IsNotThunk,
                           SILFunction::NotRelevant);
 }
 
@@ -452,7 +452,7 @@ SILFunction *SILGenModule::getEmittedFunction(SILDeclRef constant,
         F->setLinkage(constant.getLinkage(ForDefinition));
       }
       if (makeModuleFragile) {
-        F->setFragile(IsFragile);
+        F->setSerialized(IsSerialized);
       }
     }
     return F;
@@ -501,7 +501,7 @@ SILFunction *SILGenModule::getFunction(SILDeclRef constant,
   if (makeModuleFragile) {
     SILLinkage linkage = constant.getLinkage(forDefinition);
     if (linkage != SILLinkage::PublicExternal) {
-      F->setFragile(IsFragile);
+      F->setSerialized(IsSerialized);
     }
   }
 
@@ -583,14 +583,18 @@ void emitOrDelayFunction(SILGenModule &SGM,
   emitter(f);
 }
 
-template<typename T>
 void SILGenModule::preEmitFunction(SILDeclRef constant,
-                                   T *astNode,
+                              llvm::PointerUnion<ValueDecl *,
+                                                 Expr *> astNode,
                                    SILFunction *F,
                                    SILLocation Loc) {
   // By default, use the astNode to create the location.
-  if (Loc.isNull())
-    Loc = RegularLocation(astNode);
+  if (Loc.isNull()) {
+    if (auto *decl = astNode.get<ValueDecl *>())
+      Loc = RegularLocation(decl);
+    else
+      Loc = RegularLocation(astNode.get<Expr *>());
+  }
 
   assert(F->empty() && "already emitted function?!");
 
@@ -606,7 +610,10 @@ void SILGenModule::preEmitFunction(SILDeclRef constant,
         F->getLoweredType().print(llvm::dbgs());
         llvm::dbgs() << '\n';
         if (astNode) {
-          astNode->print(llvm::dbgs());
+          if (auto *decl = astNode.get<ValueDecl *>())
+            decl->dump(llvm::dbgs());
+          else
+            astNode.get<Expr *>()->dump(llvm::dbgs());
           llvm::dbgs() << '\n';
         });
 }
@@ -694,51 +701,6 @@ void SILGenModule::emitFunction(FuncDecl *fd) {
       postEmitFunction(constant, f);
     });
   }
-}
-
-void SILGenModule::emitCurryThunk(ValueDecl *fd,
-                                  SILDeclRef entryPoint,
-                                  SILDeclRef nextEntryPoint) {
-  // Thunks are always emitted by need, so don't need delayed emission.
-  SILFunction *f = getFunction(entryPoint, ForDefinition);
-  f->setThunk(IsThunk);
-
-  preEmitFunction(entryPoint, fd, f, fd);
-  PrettyStackTraceSILFunction X("silgen emitCurryThunk", f);
-
-  SILGenFunction(*this, *f)
-    .emitCurryThunk(fd, entryPoint, nextEntryPoint);
-  postEmitFunction(entryPoint, f);
-}
-
-void SILGenModule::emitForeignToNativeThunk(SILDeclRef thunk) {
-  // Thunks are always emitted by need, so don't need delayed emission.
-  assert(!thunk.isForeign && "foreign-to-native thunks only");
-  SILFunction *f = getFunction(thunk, ForDefinition);
-  f->setThunk(IsThunk);
-  if (thunk.asForeign().isClangGenerated())
-    f->setFragile(IsFragile);
-  preEmitFunction(thunk, thunk.getDecl(), f, thunk.getDecl());
-  PrettyStackTraceSILFunction X("silgen emitForeignToNativeThunk", f);
-  SILGenFunction(*this, *f).emitForeignToNativeThunk(thunk);
-  postEmitFunction(thunk, f);
-}
-
-void SILGenModule::emitNativeToForeignThunk(SILDeclRef thunk) {
-  // Thunks are always emitted by need, so don't need delayed emission.
-  assert(thunk.isForeign && "native-to-foreign thunks only");
-  
-  SILFunction *f = getFunction(thunk, ForDefinition);
-  if (thunk.hasDecl())
-    preEmitFunction(thunk, thunk.getDecl(), f, thunk.getDecl());
-  else
-    preEmitFunction(thunk, thunk.getAbstractClosureExpr(), f,
-                    thunk.getAbstractClosureExpr());
-  PrettyStackTraceSILFunction X("silgen emitNativeToForeignThunk", f);
-  f->setBare(IsBare);
-  f->setThunk(IsThunk);
-  SILGenFunction(*this, *f).emitNativeToForeignThunk(thunk);
-  postEmitFunction(thunk, f);
 }
 
 void SILGenModule::addGlobalVariable(VarDecl *global) {
@@ -1000,8 +962,8 @@ SILFunction *SILGenModule::emitLazyGlobalInitializer(StringRef funcName,
                        funcName, initSILType, nullptr,
                        SILLocation(binding), IsNotBare, IsNotTransparent,
                        makeModuleFragile
-                           ? IsFragile
-                           : IsNotFragile);
+                           ? IsSerialized
+                           : IsNotSerialized);
   f->setDebugScope(new (M) SILDebugScope(RegularLocation(binding), f));
   SILGenFunction(*this, *f).emitLazyGlobalInitializer(binding, pbdEntry);
   f->verify();

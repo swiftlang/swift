@@ -340,14 +340,14 @@ SILGenFunction::emitOptionalToOptional(SILLocation loc,
 
         if (!(resultTL.isAddressOnly() && silConv.useLoweredAddresses())) {
           SILValue some = B.createOptionalSome(loc, result).forward(*this);
-          return scope.exit(loc, some);
+          return scope.exitAndBranch(loc, some);
         }
 
         RValue R(*this, loc, noOptResultTy.getSwiftRValueType(), result);
         ArgumentSource resultValueRV(loc, std::move(R));
         emitInjectOptionalValueInto(loc, std::move(resultValueRV),
                                     finalResult.getValue(), resultTL);
-        return scope.exit(loc);
+        return scope.exitAndBranch(loc);
       });
 
   SEBuilder.addCase(
@@ -356,11 +356,11 @@ SILGenFunction::emitOptionalToOptional(SILLocation loc,
         if (!(resultTL.isAddressOnly() && silConv.useLoweredAddresses())) {
           SILValue none =
               B.createManagedOptionalNone(loc, resultTy).forward(*this);
-          return scope.exit(loc, none);
+          return scope.exitAndBranch(loc, none);
         }
 
         emitInjectOptionalNothingInto(loc, finalResult.getValue(), resultTL);
-        return scope.exit(loc);
+        return scope.exitAndBranch(loc);
       });
 
   std::move(SEBuilder).emit();
@@ -695,7 +695,7 @@ ManagedValue SILGenFunction::emitExistentialErasure(
                                             *this));
           ManagedValue mv = F(SGFContext(init.get()));
           if (!mv.isInContext()) {
-            mv.forwardInto(*this, loc, init->getAddress());
+            init->copyOrInitValueInto(*this, loc, mv, /*init*/ true);
             init->finishInitialization(*this);
           }
         });
@@ -888,14 +888,12 @@ ManagedValue SILGenFunction::manageOpaqueValue(OpaqueValueState &entry,
     return entry.Value;
   }
 
-  // If the context wants us to initialize a buffer, copy there instead
+  // If the context has an initialization a buffer, copy there instead
   // of making a temporary allocation.
   if (auto I = C.getEmitInto()) {
-    if (SILValue address = I->getAddressForInPlaceInitialization()) {
-      entry.Value.copyInto(*this, address, loc);
-      I->finishInitialization(*this);
-      return ManagedValue::forInContext();
-    }
+    I->copyOrInitValueInto(*this, loc, entry.Value, /*init*/ false);
+    I->finishInitialization(*this);
+    return ManagedValue::forInContext();
   }
 
   // Otherwise, copy the value into a temporary.

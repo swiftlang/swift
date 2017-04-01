@@ -756,7 +756,8 @@ class ExternalFunctionDefinitionsElimination : FunctionLivenessComputation {
         for (SILInstruction &I : BB) {
           if (auto *FRI = dyn_cast<FunctionRefInst>(&I)) {
             SILFunction *RefF = FRI->getReferencedFunction();
-            if (RefF->isTransparent() && RefF->isFragile())
+            // FIXME: Bad usage of transparent
+            if (RefF->isTransparent() && RefF->isSerialized())
               ensureAlive(RefF);
           }
         }

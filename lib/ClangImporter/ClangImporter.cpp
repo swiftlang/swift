@@ -74,12 +74,10 @@ using clang::CompilerInvocation;
 
 namespace {
   class HeaderImportCallbacks : public clang::PPCallbacks {
-    ClangImporter &Importer;
     ClangImporter::Implementation &Impl;
   public:
-    HeaderImportCallbacks(ClangImporter &importer,
-                          ClangImporter::Implementation &impl)
-      : Importer(importer), Impl(impl) {}
+    HeaderImportCallbacks(ClangImporter::Implementation &impl)
+      : Impl(impl) {}
 
     void handleImport(const clang::Module *imported) {
       if (!imported)
@@ -97,29 +95,12 @@ namespace {
                                     StringRef RelativePath,
                                     const clang::Module *Imported) override {
       handleImport(Imported);
-      if (!Imported && File)
-        Importer.addDependency(File->getName());
     }
 
     void moduleImport(clang::SourceLocation ImportLoc,
                               clang::ModuleIdPath Path,
                               const clang::Module *Imported) override {
       handleImport(Imported);
-    }
-  };
-
-  class ASTReaderCallbacks : public clang::ASTReaderListener {
-    ClangImporter &Importer;
-  public:
-    explicit ASTReaderCallbacks(ClangImporter &importer) : Importer(importer) {}
-
-    bool needsInputFileVisitation() override { return true; }
-
-    bool visitInputFile(StringRef file, bool isSystem,
-                        bool isOverridden, bool isExplicitModule) override {
-      if (!isOverridden)
-        Importer.addDependency(file);
-      return true;
     }
   };
 
@@ -313,7 +294,50 @@ private:
     Impl.BridgeHeaderMacros.push_back(MacroNameTok.getIdentifierInfo());
   }
 };
+
+class ClangImporterDependencyCollector : public clang::DependencyCollector
+{
+  llvm::StringSet<> ExcludedPaths;
+public:
+  ClangImporterDependencyCollector() = default;
+
+  void excludePath(StringRef filename) {
+    ExcludedPaths.insert(filename);
+  }
+
+  bool isClangImporterSpecialName(StringRef Filename) {
+    using ImporterImpl = ClangImporter::Implementation;
+    return (Filename == ImporterImpl::moduleImportBufferName
+            || Filename == ImporterImpl::bridgingHeaderBufferName);
+  }
+
+  // Currently preserving older ClangImporter behaviour of ignoring system
+  // dependencies, but possibly revisit?
+  bool needSystemDependencies() override { return false; }
+
+  bool sawDependency(StringRef Filename, bool FromClangModule,
+                     bool IsSystem, bool IsClangModuleFile,
+                     bool IsMissing) override {
+    if (!clang::DependencyCollector::sawDependency(Filename, FromClangModule,
+                                                   IsSystem, IsClangModuleFile,
+                                                   IsMissing))
+      return false;
+    // Currently preserving older ClangImporter behaviour of ignoring .pcm
+    // file dependencies, but possibly revisit?
+    if (IsClangModuleFile
+        || isClangImporterSpecialName(Filename)
+        || ExcludedPaths.count(Filename))
+      return false;
+    return true;
+  }
+};
 } // end anonymous namespace
+
+std::shared_ptr<clang::DependencyCollector>
+ClangImporter::createDependencyCollector()
+{
+  return std::make_shared<ClangImporterDependencyCollector>();
+}
 
 void ClangImporter::Implementation::addBridgeHeaderTopLevelDecls(
     clang::Decl *D) {
@@ -708,6 +732,14 @@ ClangImporter::create(ASTContext &ctx,
   if (llvm::sys::path::extension(importerOpts.BridgingHeader).endswith(
         PCH_EXTENSION)) {
     importer->Impl.IsReadingBridgingPCH = true;
+    if (tracker) {
+      // Currently ignoring dependency on bridging .pch files because they are
+      // temporaries; if and when they are no longer temporaries, this condition
+      // should be removed.
+      auto &coll = static_cast<ClangImporterDependencyCollector &>(
+        *tracker->getClangCollector());
+      coll.excludePath(importerOpts.BridgingHeader);
+    }
   }
 
   // FIXME: These can't be controlled from the command line.
@@ -764,6 +796,9 @@ ClangImporter::create(ASTContext &ctx,
       llvm::make_unique<clang::ObjectFilePCHContainerReader>());
   importer->Impl.Instance.reset(new CompilerInstance(PCHContainerOperations));
   auto &instance = *importer->Impl.Instance;
+  if (tracker)
+    instance.addDependencyCollector(tracker->getClangCollector());
+
   instance.setDiagnostics(&*clangDiags);
   instance.setInvocation(importer->Impl.Invocation);
 
@@ -808,9 +843,6 @@ ClangImporter::create(ASTContext &ctx,
   clangPP.addPPCallbacks(std::move(ppTracker));
 
   instance.createModuleManager();
-  instance.getModuleManager()->addListener(
-         std::unique_ptr<clang::ASTReaderListener>(
-                 new ASTReaderCallbacks(*importer)));
 
   // Manually run the action, so that the TU stays open for additional parsing.
   instance.createSema(action->getTranslationUnitKind(), nullptr);
@@ -840,7 +872,7 @@ ClangImporter::create(ASTContext &ctx,
   }
 
   // FIXME: This is missing implicit includes.
-  auto *CB = new HeaderImportCallbacks(*importer, importer->Impl);
+  auto *CB = new HeaderImportCallbacks(importer->Impl);
   clangPP.addPPCallbacks(std::unique_ptr<clang::PPCallbacks>(CB));
 
   // Create the selectors we'll be looking for.

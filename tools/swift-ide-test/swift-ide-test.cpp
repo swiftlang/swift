@@ -313,6 +313,12 @@ InferImportAsMember("enable-infer-import-as-member",
                    llvm::cl::init(false));
 
 static llvm::cl::opt<bool>
+EnableSwift3ObjCInference(
+                  "enable-swift3-objc-inference",
+                  llvm::cl::desc("Enable Swift 3's @objc inference rules"),
+                  llvm::cl::init(false));
+
+static llvm::cl::opt<bool>
 DisableObjCAttrRequiresFoundationModule(
     "disable-objc-attr-requires-foundation-module",
     llvm::cl::desc("Allow @objc to be used freely"),
@@ -1550,9 +1556,9 @@ static int doPrintLocalTypes(const CompilerInvocation &InitInvok,
     // Simulate already having mangled names
     for (auto LTD : LocalTypeDecls) {
       Mangle::ASTMangler Mangler;
-      std::string MangledName =
-        Mangler.mangleTypeForDebugger(LTD->getDeclaredInterfaceType(),
-                                      LTD->getDeclContext());
+      std::string MangledName = Mangler.mangleTypeForDebugger(
+          LTD->getDeclaredInterfaceType(), LTD->getDeclContext(),
+          LTD->getDeclContext()->getGenericEnvironmentOfContext());
       MangledNames.push_back(MangledName);
     }
 
@@ -2561,7 +2567,8 @@ public:
 private:
   void tryDemangleType(Type T, const DeclContext *DC, CharSourceRange range) {
     Mangle::ASTMangler Mangler;
-    std::string mangledName(Mangler.mangleTypeForDebugger(T, DC));
+    std::string mangledName(Mangler.mangleTypeForDebugger(
+        T, DC, DC->getGenericEnvironmentOfContext()));
     std::string Error;
     Type ReconstructedType =
         getTypeFromMangledSymbolname(Ctx, mangledName, Error);
@@ -2985,6 +2992,9 @@ int main(int argc, char *argv[]) {
       options::CodeCompleteInitsInPostfixExpr;
   InitInvok.getLangOptions().InferImportAsMember |=
     options::InferImportAsMember;
+  InitInvok.getLangOptions().EnableSwift3ObjCInference =
+    options::EnableSwift3ObjCInference ||
+    InitInvok.getLangOptions().isSwiftVersion3();
   InitInvok.getClangImporterOptions().ImportForwardDeclarations |=
     options::ObjCForwardDeclarations;
   InitInvok.getClangImporterOptions().InferImportAsMember |=

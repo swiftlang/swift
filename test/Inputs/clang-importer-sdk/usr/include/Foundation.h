@@ -257,6 +257,9 @@ __attribute__((warn_unused_result)) NSString *NSStringToNSString(NSString *str);
 @interface NSURL : NSObject
 - (instancetype)URLWithString:(NSString *)URLString;
 + (instancetype)URLWithString:(NSString *)URLString;
+- (BOOL)getResourceValue:(out id _Nullable *)value
+                  forKey:(NSString *)key
+                   error:(out NSError *_Nullable *)error;
 @end
 
 @interface NSAttributedString : NSString

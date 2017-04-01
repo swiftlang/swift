@@ -160,6 +160,14 @@ BoxPair::Return swift_allocBox(Metadata const *type);
 SWIFT_RUNTIME_EXPORT
 BoxPair::Return (*_swift_allocBox)(Metadata const *type);
 
+/// Performs a uniqueness check on the pointer to a box structure. If the check
+/// fails allocates a new box and stores the pointer in the buffer.
+///
+///  if (!isUnique(buffer[0]))
+///    buffer[0] = swift_allocBox(type)
+SWIFT_RUNTIME_EXPORT
+BoxPair::Return swift_makeBoxUnique(OpaqueValue *buffer, Metadata const *type,
+                                    size_t alignMask);
 
 // Allocate plain old memory. This is the generalized entry point
 // Never returns nil. The returned memory is uninitialized. 

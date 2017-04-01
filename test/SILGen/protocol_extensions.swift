@@ -69,7 +69,7 @@ class C : P1 {
 }
 
 //   (materializeForSet test from above)
-// CHECK-LABEL: sil hidden [transparent] [thunk] @_T019protocol_extensions1CCAA2P1A2aDP9subscriptS2icfmTW
+// CHECK-LABEL: sil private [transparent] [thunk] @_T019protocol_extensions1CCAA2P1A2aDP9subscriptS2icfmTW
 // CHECK: bb0(%0 : $Builtin.RawPointer, %1 : $*Builtin.UnsafeValueBuffer, %2 : $Int, %3 : $*C):
 // CHECK: function_ref @_T019protocol_extensions2P1PAAE9subscriptS2icfg
 // CHECK: return
@@ -624,7 +624,7 @@ func test_open_existential_semantics_opaque(_ guaranteed: P1,
   // CHECK: [[METHOD:%.*]] = function_ref
   // -- Can consume the value from our own copy
   // CHECK: apply [[METHOD]]<{{.*}}>([[VALUE]])
-  // CHECK: deinit_existential_addr [[IMMEDIATE]]
+  // CHECK: destroy_addr [[IMMEDIATE]]
   // CHECK: dealloc_stack [[IMMEDIATE]]
   immediate.f1()
 
@@ -633,7 +633,7 @@ func test_open_existential_semantics_opaque(_ guaranteed: P1,
   // CHECK: [[METHOD:%.*]] = function_ref
   // -- Can consume the value from our own copy
   // CHECK: apply [[METHOD]]<{{.*}}>([[VALUE]])
-  // CHECK: deinit_existential_addr [[PLUS_ONE]]
+  // CHECK: destroy_addr [[PLUS_ONE]]
   // CHECK: dealloc_stack [[PLUS_ONE]]
   plusOneP1().f1()
 }
