@@ -2039,7 +2039,7 @@ iterations with -O",
         "--clang-user-visible-version",
         help="User-visible version of the embedded Clang and LLVM compilers",
         type=arguments.type.clang_compiler_version,
-        default="4.0.0",
+        default="5.0.0",
         metavar="MAJOR.MINOR.PATCH")
     parser.add_argument(
         "--swift-compiler-version",
