@@ -439,7 +439,7 @@ extension Hoozit {
   // CHECK-LABEL: sil hidden [thunk] @_T011objc_thunks6HoozitC4foofyyFTo : $@convention(objc_method) (Hoozit) -> () {
 
   var extensionProperty: Int { return 0 }
-  // CHECK-LABEL: sil hidden  @_T011objc_thunks6HoozitC17extensionPropertySifg : $@convention(method) (@guaranteed Hoozit) -> Int
+  // CHECK-LABEL: sil hidden @_T011objc_thunks6HoozitC17extensionPropertySifg : $@convention(method) (@guaranteed Hoozit) -> Int
 }
 
 // Calling objc methods of subclass should go through native entry points

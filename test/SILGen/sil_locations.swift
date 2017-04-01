@@ -8,7 +8,7 @@ func ifexpr() -> Int {
     x+=1
   }
   return x
-  // CHECK-LABEL: sil hidden  @_T013sil_locations6ifexprSiyF
+  // CHECK-LABEL: sil hidden @_T013sil_locations6ifexprSiyF
   // CHECK: apply {{.*}}, loc "{{.*}}":[[@LINE-5]]:6
   // CHECK: cond_br {{%.*}}, [[TRUE_BB:bb[0-9]+]], [[FALSE_BB:bb[0-9]+]], loc "{{.*}}":[[@LINE-6]]:6
   // CHECK: br [[FALSE_BB]], loc "{{.*}}":[[@LINE-5]]:3
@@ -23,7 +23,7 @@ func ifelseexpr() -> Int {
     x-=1
   }
   return x
-  // CHECK-LABEL: sil hidden  @_T013sil_locations10ifelseexprSiyF
+  // CHECK-LABEL: sil hidden @_T013sil_locations10ifelseexprSiyF
   // CHECK: cond_br {{%.*}}, [[TRUE_BB:bb[0-9]+]], [[FALSE_BB:bb[0-9]+]], loc "{{.*}}":[[@LINE-7]]:6
   // CHECK: [[TRUE_BB]]:
   // CHECK: br bb{{[0-9]+}}, loc "{{.*}}":[[@LINE-7]]:3
@@ -40,7 +40,7 @@ func ifexpr_return() -> Int {
     return 5
   }
   return 6
-  // CHECK-LABEL: sil hidden  @_T013sil_locations13ifexpr_returnSiyF
+  // CHECK-LABEL: sil hidden @_T013sil_locations13ifexpr_returnSiyF
   // CHECK: apply {{.*}}, loc "{{.*}}":[[@LINE-5]]:6
   // CHECK: cond_br {{%.*}}, [[TRUE_BB:bb[0-9]+]], [[FALSE_BB:bb[0-9]+]], loc "{{.*}}":[[@LINE-6]]:6
   // CHECK: [[TRUE_BB]]:
@@ -53,7 +53,7 @@ func ifexpr_return() -> Int {
 func ifexpr_rval() -> Int {
   var x = true ? 5 : 6
   return x
-  // CHECK-LABEL: sil hidden  @_T013sil_locations11ifexpr_rvalSiyF
+  // CHECK-LABEL: sil hidden @_T013sil_locations11ifexpr_rvalSiyF
   // CHECK: apply {{.*}}, loc "{{.*}}":[[@LINE-3]]:11
   // CHECK: cond_br {{%.*}}, [[TRUE_BB:bb[0-9]+]], [[FALSE_BB:bb[0-9]+]], loc "{{.*}}":[[@LINE-4]]:11
   // CHECK: [[TRUE_BB]]:
@@ -62,20 +62,10 @@ func ifexpr_rval() -> Int {
   // CHECK: br bb{{[0-9]+}}({{%.*}}), loc "{{.*}}":[[@LINE-8]]:22
 }
 
-
-
-
-
-
-
-
-
-
-
 // --- Test function calls.
 func simpleDirectCallTest(_ i: Int) -> Int {
   return simpleDirectCallTest(i)
-  // CHECK-LABEL: sil hidden  @_T013sil_locations20simpleDirectCallTestS2iF
+  // CHECK-LABEL: sil hidden @_T013sil_locations20simpleDirectCallTestS2iF
   // CHECK: function_ref @_T013sil_locations20simpleDirectCallTestS2iF : {{.*}}, loc "{{.*}}":[[@LINE-2]]:10
   // CHECK: {{%.*}} apply {{%.*}} line:[[@LINE-3]]:10
 }
@@ -85,9 +75,8 @@ func templateTest<T>(_ value: T) -> T {
 }
 func useTemplateTest() -> Int {
   return templateTest(5);
-  // CHECK-LABEL: sil hidden  @_T013sil_locations15useTemplateTestSiyF
-
-  // CHECK: function_ref @_T0S2i{{[_0-9a-zA-Z]*}}fC :{{.*}}, loc "{{.*}}":87
+  // CHECK-LABEL: sil hidden @_T013sil_locations15useTemplateTestSiyF
+  // CHECK: function_ref @_T0S2i{{[_0-9a-zA-Z]*}}fC :{{.*}}, loc "{{.*}}":77
 }
 
 func foo(_ x: Int) -> Int {
@@ -95,7 +84,7 @@ func foo(_ x: Int) -> Int {
     return x + y
   }
   return bar(1)
-  // CHECK-LABEL: sil hidden  @_T013sil_locations3foo{{[_0-9a-zA-Z]*}}F
+  // CHECK-LABEL: sil hidden @_T013sil_locations3foo{{[_0-9a-zA-Z]*}}F
   // CHECK: [[CLOSURE:%[0-9]+]] = function_ref {{.*}}, loc "{{.*}}":[[@LINE-2]]:10
   // CHECK: apply [[CLOSURE:%[0-9]+]]
 }
@@ -106,7 +95,7 @@ class LocationClass {
 func testMethodCall() {
   var l: LocationClass
   l.mem();
-  // CHECK-LABEL: sil hidden  @_T013sil_locations14testMethodCallyyF
+  // CHECK-LABEL: sil hidden @_T013sil_locations14testMethodCallyyF
   
   // CHECK: class_method {{.[0-9]+}} : $LocationClass, #LocationClass.mem!1 {{.*}}, loc "{{.*}}":[[@LINE-3]]:5
 }
@@ -117,7 +106,7 @@ func multipleReturnsImplicitAndExplicit() {
     return
   }
   x += 1
-  // CHECK-LABEL: sil hidden  @_T013sil_locations34multipleReturnsImplicitAndExplicityyF
+  // CHECK-LABEL: sil hidden @_T013sil_locations34multipleReturnsImplicitAndExplicityyF
   // CHECK: cond_br
   // CHECK: br bb{{[0-9]+}}, loc "{{.*}}":[[@LINE-5]]:5, {{.*}}:return
   // CHECK: br bb{{[0-9]+}}, loc "{{.*}}":[[@LINE+2]]:1, {{.*}}:imp_return
@@ -126,7 +115,7 @@ func multipleReturnsImplicitAndExplicit() {
 
 func simplifiedImplicitReturn() -> () {
   var y = 0 
-  // CHECK-LABEL: sil hidden  @_T013sil_locations24simplifiedImplicitReturnyyF
+  // CHECK-LABEL: sil hidden @_T013sil_locations24simplifiedImplicitReturnyyF
   // CHECK: return {{.*}}, loc "{{.*}}":[[@LINE+1]]:1, {{.*}}:imp_return
 }
 
@@ -169,9 +158,6 @@ func testIf() {
   //
   //
   // CHECK: br {{.*}}, loc "{{.*}}":[[@LINE-13]]:6
-
-
-
 }
 
 func testFor() {
@@ -201,13 +187,11 @@ func testTuples() {
   var tt = (2, (4,5))
   var d = "foo"
   // CHECK-LABEL: sil hidden @_T013sil_locations10testTuplesyyF
-
-
-  // CHECK: tuple_element_addr {{.*}}, loc "{{.*}}":[[@LINE-6]]:11
-  // CHECK: integer_literal $Builtin.Int2048, 2, loc "{{.*}}":[[@LINE-7]]:12
-  // CHECK: integer_literal $Builtin.Int2048, 3, loc "{{.*}}":[[@LINE-8]]:14
-  // CHECK: tuple_element_addr {{.*}}, loc "{{.*}}":[[@LINE-8]]:12
-  // CHECK: tuple_element_addr {{.*}}, loc "{{.*}}":[[@LINE-9]]:16  
+  // CHECK: tuple_element_addr {{.*}}, loc "{{.*}}":[[@LINE-4]]:11
+  // CHECK: integer_literal $Builtin.Int2048, 2, loc "{{.*}}":[[@LINE-5]]:12
+  // CHECK: integer_literal $Builtin.Int2048, 3, loc "{{.*}}":[[@LINE-6]]:14
+  // CHECK: tuple_element_addr {{.*}}, loc "{{.*}}":[[@LINE-6]]:12
+  // CHECK: tuple_element_addr {{.*}}, loc "{{.*}}":[[@LINE-7]]:16  
 }
 
 // Test tuple imploding/exploding.
@@ -222,26 +206,18 @@ func b<T : Ordinable>(_ seq: T) -> (Int) -> Int {
 func captures_tuple<T, U>(x: (T, U)) -> () -> (T, U) {
   return {x}
   // CHECK-LABEL: sil hidden @_T013sil_locations14captures_tuple{{[_0-9a-zA-Z]*}}F
+  // CHECK: tuple_element_addr {{.*}}, loc "{{.*}}":[[@LINE-3]]:27
+  // CHECK: copy_addr [take] {{.*}}, loc "{{.*}}":[[@LINE-4]]:27
+  // CHECK: function_ref {{.*}}, loc "{{.*}}":[[@LINE-4]]:10
 
-
-  // CHECK: tuple_element_addr {{.*}}, loc "{{.*}}":[[@LINE-5]]:27
-  // CHECK: copy_addr [take] {{.*}}, loc "{{.*}}":[[@LINE-6]]:27
-  // CHECK: function_ref {{.*}}, loc "{{.*}}":[[@LINE-6]]:10
-
-  
-  // CHECK-LABEL: sil shared @_T013sil_locations14captures_tuple{{.*}}fU_
-  // CHECK: copy_addr {{.*}}, loc "{{.*}}":[[@LINE-10]]:11
+  // CHECK-LABEL: sil private @_T013sil_locations14captures_tuple{{.*}}fU_
+  // CHECK: copy_addr {{.*}}, loc "{{.*}}":[[@LINE-7]]:11
 }
 
 func interpolated_string(_ x: Int, y: String) -> String {
   return "The \(x) Million Dollar \(y)"
   // CHECK-LABEL: sil hidden @_T013sil_locations19interpolated_string{{[_0-9a-zA-Z]*}}F
-
-
-
-  // CHECK: copy_value{{.*}}, loc "{{.*}}":[[@LINE-5]]:37
-
-
+  // CHECK: copy_value{{.*}}, loc "{{.*}}":[[@LINE-2]]:37
 }
 
 

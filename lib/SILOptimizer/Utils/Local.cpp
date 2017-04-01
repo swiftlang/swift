@@ -407,30 +407,19 @@ TermInst *swift::addArgumentToBranch(SILValue Val, SILBasicBlock *Dest,
 }
 
 SILLinkage swift::getSpecializedLinkage(SILFunction *F, SILLinkage L) {
-  switch (L) {
-  case SILLinkage::Public:
-  case SILLinkage::PublicExternal:
-  case SILLinkage::Shared:
-  case SILLinkage::SharedExternal:
-  case SILLinkage::Hidden:
-  case SILLinkage::HiddenExternal:
-    // Specializations of public or hidden symbols can be shared by all TUs
-    // that specialize the definition.
-    // Treat stdlib_binary_only specially. We don't serialize the body of
-    // stdlib_binary_only functions so we can't mark them as Shared (making
-    // their visibility in the dylib hidden).
-    return F->hasSemanticsAttr("stdlib_binary_only") ? SILLinkage::Public
-                                                     : SILLinkage::Shared;
-
-  case SILLinkage::Private:
-  case SILLinkage::PrivateExternal:
-    // Specializations of private symbols should remain so.
-    // TODO: maybe PrivateExternals should get SharedExternal (these are private
-    // functions from the stdlib which are specialized in another module).
+  if (hasPrivateVisibility(L) &&
+      !F->isSerialized()) {
+    // Specializations of private symbols should remain so, unless
+    // they were serialized, which can only happen when specializing
+    // definitions from a standard library built with -sil-serialize-all.
     return SILLinkage::Private;
   }
 
-  llvm_unreachable("Unhandled SILLinkage in switch.");
+  // Treat stdlib_binary_only specially. We don't serialize the body of
+  // stdlib_binary_only functions so we can't mark them as Shared (making
+  // their visibility in the dylib hidden).
+  return F->hasSemanticsAttr("stdlib_binary_only") ? SILLinkage::Public
+                                                   : SILLinkage::Shared;
 }
 
 /// Remove all instructions in the body of \p BB in safe manner by using

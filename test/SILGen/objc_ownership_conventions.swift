@@ -4,7 +4,7 @@
 
 import gizmo
 
-// CHECK-LABEL: sil hidden  @_T026objc_ownership_conventions5test3So8NSObjectCyF
+// CHECK-LABEL: sil hidden @_T026objc_ownership_conventions5test3So8NSObjectCyF
 func test3() -> NSObject {
   // initializer returns at +1
   return Gizmo()
@@ -29,7 +29,7 @@ func test3() -> NSObject {
 
 
 // Normal message send with argument, no transfers.
-// CHECK-LABEL: sil hidden  @_T026objc_ownership_conventions5test5{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden @_T026objc_ownership_conventions5test5{{[_0-9a-zA-Z]*}}F
 func test5(_ g: Gizmo) {
   var g = g
   Gizmo.inspect(g)
@@ -53,7 +53,7 @@ func test5(_ g: Gizmo) {
 // CHECK: } // end sil function '_T026objc_ownership_conventions5test5{{[_0-9a-zA-Z]*}}F'
 
 // The argument to consume is __attribute__((ns_consumed)).
-// CHECK-LABEL: sil hidden  @_T026objc_ownership_conventions5test6{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden @_T026objc_ownership_conventions5test6{{[_0-9a-zA-Z]*}}F
 func test6(_ g: Gizmo) {
   var g = g
   Gizmo.consume(g)
@@ -79,7 +79,7 @@ func test6(_ g: Gizmo) {
 // CHECK: } // end sil function '_T026objc_ownership_conventions5test6{{[_0-9a-zA-Z]*}}F'
 
 // fork is __attribute__((ns_consumes_self)).
-// CHECK-LABEL: sil hidden  @_T026objc_ownership_conventions5test7{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden @_T026objc_ownership_conventions5test7{{[_0-9a-zA-Z]*}}F
 func test7(_ g: Gizmo) {
   var g = g
   g.fork()
@@ -102,7 +102,7 @@ func test7(_ g: Gizmo) {
 // CHECK: } // end sil function '_T026objc_ownership_conventions5test7{{[_0-9a-zA-Z]*}}F'
 
 // clone is __attribute__((ns_returns_retained)).
-// CHECK-LABEL: sil hidden  @_T026objc_ownership_conventions5test8{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden @_T026objc_ownership_conventions5test8{{[_0-9a-zA-Z]*}}F
 func test8(_ g: Gizmo) -> Gizmo {
   return g.clone()
   // CHECK: bb0([[G:%.*]] : $Gizmo):
@@ -117,7 +117,7 @@ func test8(_ g: Gizmo) -> Gizmo {
   // CHECK-NEXT: return [[RESULT]]
 }
 // duplicate returns an autoreleased object at +0.
-// CHECK-LABEL: sil hidden  @_T026objc_ownership_conventions5test9{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden @_T026objc_ownership_conventions5test9{{[_0-9a-zA-Z]*}}F
 func test9(_ g: Gizmo) -> Gizmo {
   return g.duplicate()
   // CHECK: bb0([[G:%.*]] : $Gizmo):
