@@ -442,7 +442,7 @@ func testNoescape() {
 // Despite being a noescape closure, this needs to capture 'a' by-box so it can
 // be passed to the capturing closure.closure
 // CHECK: functions.(testNoescape () -> ()).(closure #1)
-// CHECK-NEXT: sil shared @_T09functions12testNoescapeyyFyycfU_ : $@convention(thin) (@owned { var Int }) -> () {
+// CHECK-NEXT: sil private @_T09functions12testNoescapeyyFyycfU_ : $@convention(thin) (@owned { var Int }) -> () {
 
 
 
@@ -462,10 +462,10 @@ func testNoescape2() {
 // CHECK-LABEL: sil hidden @_T09functions13testNoescape2yyF : $@convention(thin) () -> () {
 
 // CHECK: // functions.(testNoescape2 () -> ()).(closure #1)
-// CHECK-NEXT: sil shared @_T09functions13testNoescape2yyFyycfU_ : $@convention(thin) (@owned { var Int }) -> () {
+// CHECK-NEXT: sil private @_T09functions13testNoescape2yyFyycfU_ : $@convention(thin) (@owned { var Int }) -> () {
 
 // CHECK: // functions.(testNoescape2 () -> ()).(closure #1).(closure #1)
-// CHECK-NEXT: sil shared @_T09functions13testNoescape2yyFyycfU_yycfU_ : $@convention(thin) (@owned { var Int }) -> () {
+// CHECK-NEXT: sil private @_T09functions13testNoescape2yyFyycfU_yycfU_ : $@convention(thin) (@owned { var Int }) -> () {
 
 enum PartialApplyEnumPayload<T, U> {
   case Left(T)

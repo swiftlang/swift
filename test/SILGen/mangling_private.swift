@@ -53,7 +53,7 @@ extension PrivateStruct {
   private func extPrivateMethod() {}
 }
 
-// CHECK-LABEL: sil shared @_T016mangling_private10localTypesyyF11LocalStructL_V0B6MethodyyFZ
+// CHECK-LABEL: sil private @_T016mangling_private10localTypesyyF11LocalStructL_V0B6MethodyyFZ
 
 // CHECK-LABEL: sil_vtable Sub {
 class Sub : Base {

@@ -24,7 +24,7 @@ protocol Ansible {
   func anse()
 }
 
-// CHECK-LABEL: sil hidden  @_T014objc_protocols0A8_generic{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden @_T014objc_protocols0A8_generic{{[_0-9a-zA-Z]*}}F
 // CHECK: bb0([[THIS:%.*]] : $T):
 // -- Result of runce is autoreleased according to default objc conv
 // CHECK: [[METHOD:%.*]] = witness_method [volatile] {{\$.*}},  #NSRuncing.runce!1.foreign
