@@ -2919,6 +2919,10 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
       (isConvertibleTo(fromType, toType, dc, &unwrappedIUO) &&
        !unwrappedIUO)) {
     return CheckedCastKind::Coercion;
+  } else if (contextKind == CheckedCastContextKind::IsntExpr) {
+    // If they are not convertible, and we are testing their inconvertability,
+    // then treat this as a "negative" coercion.
+    return CheckedCastKind::NegativeCoercion;
   }
   
   // Check for a bridging conversion.
@@ -2939,6 +2943,7 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
 
   // Determine whether we should suppress diagnostics.
   bool suppressDiagnostics = (contextKind == CheckedCastContextKind::None);
+  bool isIsnt = (contextKind == CheckedCastContextKind::IsntExpr);
 
   // Local function to indicate failure.
   auto failed = [&] {
@@ -2946,7 +2951,11 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
       return CheckedCastKind::Unresolved;
     }
 
-    diagnose(diagLoc, diag::downcast_to_unrelated, origFromType, origToType)
+    // If we're dealing with an "isn't" expression, 
+    auto diag = isIsnt ? diag::isnt_check_with_unrelated
+                       : diag::downcast_to_unrelated;
+
+    diagnose(diagLoc, diag, origFromType, origToType)
       .highlight(diagFromRange)
       .highlight(diagToRange);
 
@@ -3065,11 +3074,15 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
           // let the runtime handle it.
           break;
 
-        case CheckedCastContextKind::IsExpr:
+        case CheckedCastContextKind::IsntExpr:
+        case CheckedCastContextKind::IsExpr: {
           // If we're only unwrapping a single optional, we could have just
           // checked for 'nil'.
+          auto diagKind =
+            contextKind == CheckedCastContextKind::IsntExpr ?
+              diag::isnt_expr_same_type : diag::is_expr_same_type;
           if (extraFromOptionals == 1) {
-            auto diag = diagnose(diagLoc, diag::is_expr_same_type,
+            auto diag = diagnose(diagLoc, diagKind,
                                  origFromType, origToType);
             diag.highlight(diagFromRange);
             diag.highlight(diagToRange);
@@ -3086,7 +3099,7 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
           // If there is more than one extra optional, don't do anything: this
           // is performing a deeper check that the runtime will handle.
           break;
-
+        }
         case CheckedCastContextKind::IsPattern:
         case CheckedCastContextKind::EnumElementPattern:
           // Note: Don't diagnose these, because the code is testing whether
@@ -3106,6 +3119,7 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
     case CheckedCastKind::ValueCast:
       break;
 
+    case CheckedCastKind::NegativeCoercion:
     case CheckedCastKind::Unresolved:
       return failed();
     }
@@ -3124,6 +3138,9 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
 
       case CheckedCastKind::BridgingCoercion:
         return CheckedCastKind::BridgingCoercion;
+
+      case CheckedCastKind::NegativeCoercion:
+        return CheckedCastKind::NegativeCoercion;
 
       case CheckedCastKind::Swift3BridgingDowncast:
         return CheckedCastKind::Swift3BridgingDowncast;
@@ -3153,6 +3170,10 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
         hasCoercion = true;
         break;
 
+      case CheckedCastKind::NegativeCoercion:
+        hasCoercion = false;
+        break;
+
       case CheckedCastKind::BridgingCoercion:
         hasBridgingConversion = std::max(hasBridgingConversion,
                                          BridgingCoercion);
@@ -3178,6 +3199,10 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
                                    SourceLoc(), nullptr, SourceRange())) {
       case CheckedCastKind::Coercion:
         hasCoercion = true;
+        break;
+
+      case CheckedCastKind::NegativeCoercion:
+        hasCoercion = false;
         break;
 
       case CheckedCastKind::BridgingCoercion:
@@ -3224,6 +3249,9 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
 
       case CheckedCastKind::BridgingCoercion:
         return CheckedCastKind::BridgingCoercion;
+
+      case CheckedCastKind::NegativeCoercion:
+        return CheckedCastKind::NegativeCoercion;
       
       case CheckedCastKind::Swift3BridgingDowncast:
         return CheckedCastKind::Swift3BridgingDowncast;
@@ -3268,6 +3296,7 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
     case CheckedCastKind::ValueCast:
       return CheckedCastKind::ValueCast;
 
+    case CheckedCastKind::NegativeCoercion:
     case CheckedCastKind::Unresolved:
       break;
     }
@@ -3288,6 +3317,7 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
     case CheckedCastKind::ValueCast:
       return CheckedCastKind::ValueCast;
 
+    case CheckedCastKind::NegativeCoercion:
     case CheckedCastKind::Unresolved:
       break;
     }

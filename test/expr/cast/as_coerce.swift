@@ -89,6 +89,12 @@ Double(1) as Double as String // expected-error{{cannot convert value of type 'D
 (1.0, 1, "asd") as (String, Int, Float) // expected-error{{cannot convert value of type 'Double' to type 'String' in coercion}}
 (1, 1.0, "a", [1, 23]) as (Int, Double, String, [String]) // expected-error{{cannot convert value of type 'Int' to expected element type 'String'}}
 
+if 5 isn't String { // expected-warning{{'isn't' test always succeeds}}
+}
+
+if 5 isn't Int { // expected-warning{{'isn't' test always fails}}
+}
+
 _ = [1] as! [String] // expected-warning{{cast from '[Int]' to unrelated type '[String]' always fails}}
 _ = [(1, (1, 1))] as! [(Int, (String, Int))] // expected-warning{{cast from '[(Int, (Int, Int))]' to unrelated type '[(Int, (String, Int))]' always fails}}
 

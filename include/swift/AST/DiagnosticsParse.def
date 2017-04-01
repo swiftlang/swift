@@ -1143,6 +1143,8 @@ ERROR(expected_expr_after_if_colon,none,
       "expected expression after '? ... :' in ternary expression", ())
 
 // Cast expressions
+ERROR(expected_type_after_isnt,none,
+      "expected type after \"isn't\"", ())
 ERROR(expected_type_after_is,none,
       "expected type after 'is'", ())
 ERROR(expected_type_after_as,none,

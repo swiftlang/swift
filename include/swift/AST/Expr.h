@@ -95,6 +95,10 @@ enum class CheckedCastKind : unsigned {
   /// any conversions with this kind show up as ValueCasts.
   Swift3BridgingDowncast,
 
+  /// A coercion that is guaranteed to fail. Used for coercions that populate
+  /// the result of the `isn't` operator.
+  NegativeCoercion,
+
   Last_CheckedCastKind = Swift3BridgingDowncast,
 };
 
@@ -4153,15 +4157,17 @@ public:
 ///
 /// FIXME: We should support type queries with a runtime metatype value too.
 class IsExpr : public CheckedCastExpr {
+  bool IsIsnt;
 public:
-  IsExpr(Expr *sub, SourceLoc isLoc, TypeLoc type)
-    : CheckedCastExpr(ExprKind::Is,
-                      sub, isLoc, type, Type())
+  IsExpr(Expr *sub, SourceLoc isLoc, TypeLoc type, bool isIsnt)
+    : CheckedCastExpr(ExprKind::Is, sub, isLoc, type, Type()), IsIsnt(isIsnt)
   {}
   
-  IsExpr(SourceLoc isLoc, TypeLoc type)
-    : IsExpr(nullptr, isLoc, type)
+  IsExpr(SourceLoc isLoc, TypeLoc type, bool isIsnt)
+    : IsExpr(nullptr, isLoc, type, isIsnt)
   {}
+
+  bool isIsnt() const { return IsIsnt; }
   
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::Is;

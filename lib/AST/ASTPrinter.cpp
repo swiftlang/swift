@@ -4439,6 +4439,8 @@ StringRef swift::getCheckedCastKindName(CheckedCastKind kind) {
     return "set_downcast";
   case CheckedCastKind::BridgingCoercion:
     return "bridging_coercion";
+  case CheckedCastKind::NegativeCoercion:
+    return "negative_coercion";
   case CheckedCastKind::Swift3BridgingDowncast:
     return "bridging_downcast";
   }

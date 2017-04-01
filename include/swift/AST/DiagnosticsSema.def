@@ -734,11 +734,16 @@ ERROR(init_not_instance_member,none,
 ERROR(super_initializer_not_in_initializer,none,
       "'super.init' cannot be called outside of an initializer", ())
 
-WARNING(isa_is_always_true,none, "'%0' test is always true",
-        (StringRef))
+WARNING(isa_is_always_true,none, "'%0' test is always true", (StringRef))
+WARNING(isa_is_always_false,none, "'%0' test is always false", (StringRef))
 WARNING(isa_is_foreign_check,none,
-      "'is' test is always true because %0 is a Core Foundation type",
-      (Type))
+        "'is' test is always true because %0 is a Core Foundation type",
+(Type))
+WARNING(isnt_is_always_true,none, "'isn't' test is always true", ())
+WARNING(isnt_is_always_false,none, "'isn't' test is always false", ())
+WARNING(isnt_is_foreign_check,none,
+        "'isn't' test is always false because %0 is a Core Foundation type",
+        (Type))
 WARNING(conditional_downcast_coercion,none,
       "conditional cast from %0 to %1 always succeeds",
       (Type, Type))
@@ -768,8 +773,15 @@ WARNING(is_expr_same_type,none,
         "checking a value with optional type %0 against dynamic type %1 "
         "succeeds whenever the value is non-'nil'; did you mean to use "
         "'!= nil'?", (Type, Type))
+WARNING(isnt_expr_same_type,none,
+        "checking a value with optional type %0 against dynamic type %1 "
+        "succeeds whenever the value is 'nil'; did you mean to use "
+        "'== nil'?", (Type, Type))
 WARNING(downcast_to_unrelated,none,
         "cast from %0 to unrelated type %1 always fails", (Type, Type))
+WARNING(isnt_check_with_unrelated,none,
+        "'isn't' check between %0 and unrelated type %1 always succeeds",
+        (Type, Type))
 ERROR(downcast_to_more_optional,none,
       "cannot downcast from %0 to a more optional type %1",
       (Type, Type))

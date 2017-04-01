@@ -2986,7 +2986,9 @@ namespace {
       auto fromType = cs.getType(sub);
       auto castContextKind =
           SuppressDiagnostics ? CheckedCastContextKind::None
-                              : CheckedCastContextKind::IsExpr;
+                              : expr->isIsnt() ?
+                                  CheckedCastContextKind::IsntExpr :
+                                  CheckedCastContextKind::IsExpr;
       auto castKind = tc.typeCheckCheckedCast(
                         fromType, toType, castContextKind, cs.DC,
                         expr->getLoc(), sub,
@@ -2996,11 +2998,24 @@ namespace {
       case CheckedCastKind::Unresolved:
         expr->setCastKind(CheckedCastKind::ValueCast);
         break;
-          
+
+      case CheckedCastKind::NegativeCoercion:
+        if (expr->isIsnt()) {
+          tc.diagnose(expr->getLoc(), diag::isnt_is_always_true);
+        } else {
+          tc.diagnose(expr->getLoc(), diag::isa_is_always_false, "is");
+        }
+        expr->setCastKind(castKind);
+        break;
+
       case CheckedCastKind::Coercion:
       case CheckedCastKind::BridgingCoercion:
         // Check is trivially true.
-        tc.diagnose(expr->getLoc(), diag::isa_is_always_true, "is");
+        if (expr->isIsnt()) {
+          tc.diagnose(expr->getLoc(), diag::isnt_is_always_false);
+        } else {
+          tc.diagnose(expr->getLoc(), diag::isa_is_always_true, "is");
+        }
         expr->setCastKind(castKind);
         break;
       case CheckedCastKind::ValueCast:
@@ -3008,7 +3023,11 @@ namespace {
         if (auto cls = toType->getAs<ClassType>()) {
           if (cls->getDecl()->getForeignClassKind() ==
                 ClassDecl::ForeignKind::CFType) {
-            tc.diagnose(expr->getLoc(), diag::isa_is_foreign_check, toType);
+            if (expr->isIsnt()) {
+              tc.diagnose(expr->getLoc(), diag::isa_is_foreign_check, toType);
+            } else {
+              tc.diagnose(expr->getLoc(), diag::isnt_is_foreign_check, toType);
+            }
           }
         }
         expr->setCastKind(castKind);
@@ -3367,6 +3386,7 @@ namespace {
       switch (castKind) {
         /// Invalid cast.
       case CheckedCastKind::Unresolved:
+      case CheckedCastKind::NegativeCoercion:
         return nullptr;
       case CheckedCastKind::Coercion:
       case CheckedCastKind::BridgingCoercion: {
@@ -3435,6 +3455,7 @@ namespace {
                         expr->getCastTypeLoc().getSourceRange());
       switch (castKind) {
         /// Invalid cast.
+      case swift::CheckedCastKind::NegativeCoercion:
       case CheckedCastKind::Unresolved:
         expr->setCastKind(CheckedCastKind::ValueCast);
         break;
@@ -7078,6 +7099,7 @@ bool ConstraintSystem::applySolutionFix(Expr *expr,
         // Fix didn't work, let diagnoseFailureForExpr handle this.
         return false;
       case CheckedCastKind::Coercion:
+      case CheckedCastKind::NegativeCoercion:
       case CheckedCastKind::BridgingCoercion:
         llvm_unreachable("Coercions handled in other disjunction branch");
 

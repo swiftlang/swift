@@ -613,7 +613,20 @@ void Lexer::lexIdentifier() {
   // Lex [a-zA-Z_$0-9[[:XID_Continue:]]]*
   while (advanceIfValidContinuationOfIdentifier(CurPtr, BufferEnd));
 
-  tok Kind = kindOfIdentifier(StringRef(TokStart, CurPtr-TokStart), InSILMode);
+  auto Str = StringRef(TokStart, CurPtr-TokStart);
+  tok Kind = kindOfIdentifier(Str, InSILMode);
+
+  // We don't want to support "isnt" without an apostrophe
+  if (Kind == tok::kw_isnt) {
+    Kind = tok::identifier;
+  }
+
+  if (Kind == tok::identifier && Str == "isn" &&
+      CurPtr + 1 != BufferEnd &&
+      CurPtr[0] == '\'' && CurPtr[1] == 't') {
+    Kind = tok::kw_isnt;
+    CurPtr += 2;
+  }
   return formToken(Kind, TokStart);
 }
 

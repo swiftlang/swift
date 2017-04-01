@@ -973,16 +973,18 @@ ParserResult<Pattern> Parser::parseMatchingPattern(bool isExprBasic) {
     
     return parseMatchingPatternAsLetOrVar(isLet, varLoc, isExprBasic);
   }
-  
-  // matching-pattern ::= 'is' type
-  if (Tok.is(tok::kw_is)) {
-    SourceLoc isLoc = consumeToken(tok::kw_is);
+
+  // matching-pattern ::= 'is' type | 'isn't' type
+  if (Tok.is(tok::kw_is) || Tok.is(tok::kw_isnt)) {
+    bool isIsnt = Tok.is(tok::kw_isnt);
+    SourceLoc isLoc = consumeToken(isIsnt ? tok::kw_isnt : tok::kw_is);
     ParserResult<TypeRepr> castType = parseType();
     if (castType.isNull() || castType.hasCodeCompletion())
       return nullptr;
     return makeParserResult(new (Context) IsPattern(isLoc, castType.get(),
                                                     nullptr,
-                                                    CheckedCastKind::Unresolved));
+                                                    CheckedCastKind::Unresolved,
+                                                    isIsnt));
   }
 
   // matching-pattern ::= expr
@@ -1029,7 +1031,7 @@ ParserResult<Pattern> Parser::parseMatchingPatternAsLetOrVar(bool isLet,
 
 
 bool Parser::isOnlyStartOfMatchingPattern() {
-  return Tok.isAny(tok::kw_var, tok::kw_let, tok::kw_is);
+  return Tok.isAny(tok::kw_var, tok::kw_let, tok::kw_is, tok::kw_isnt);
 }
 
 
