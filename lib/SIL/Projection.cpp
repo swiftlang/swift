@@ -531,87 +531,59 @@ ProjectionPath::removePrefix(const ProjectionPath &Path,
 }
 
 raw_ostream &ProjectionPath::print(raw_ostream &os, SILModule &M) {
-  // Match how the memlocation print tests expect us to print projection paths.
-  //
-  // TODO: It sort of sucks having to print these bottom up computationally. We
-  // should really change the test so that prints out the path elements top
-  // down the path, rather than constructing all of these intermediate paths.
-  for (unsigned i : reversed(indices(Path))) {
-    SILType IterType = getDerivedType(i, M);
-    auto &IterProj = Path[i];
-    os << "Address Projection Type: ";
+  os << "Projection Path [";
+  SILType IterType = getBaseType();
+  for (const Projection &IterProj : Path) {
+    SILType BaseType = IterType;
+    IterType = IterProj.getType(IterType, M);
+
+    os << BaseType.getAddressType() << "\n  ";
+
     if (IterProj.isNominalKind()) {
-      auto *Decl = IterProj.getVarDecl(IterType);
-      IterType = IterProj.getType(IterType, M);
-      os << IterType.getAddressType() << "\n";
-      os << "Field Type: ";
+      auto *Decl = IterProj.getVarDecl(BaseType);
+      os << "Field: ";
       Decl->print(os);
-      os << "\n";
+      os << " of: ";
       continue;
     }
 
     if (IterProj.getKind() == ProjectionKind::Tuple) {
-      IterType = IterProj.getType(IterType, M);
-      os << IterType.getAddressType() << "\n";
-      os << "Index: ";
-      os << IterProj.getIndex() << "\n";
+      os << "Index: " << IterProj.getIndex() << " into: ";
       continue;
     }
 
+    if (IterProj.getKind() == ProjectionKind::BitwiseCast) {
+      os << "BitwiseCast to: ";
+      continue;
+    }
+    if (IterProj.getKind() == ProjectionKind::Index) {
+      os << "Index: " << IterProj.getIndex() << " into: ";
+      continue;
+    }
+    if (IterProj.getKind() == ProjectionKind::Upcast) {
+      os << "UpCast to: ";
+      continue;
+    }
+    if (IterProj.getKind() == ProjectionKind::RefCast) {
+      os << "RefCast to: ";
+      continue;
+    }
     if (IterProj.getKind() == ProjectionKind::Box) {
-      os << "Box: ";
+      os << " Box over: ";
       continue;
     }
-
-    llvm_unreachable("Can not print this projection kind");
-  }
-
-// Migrate the tests to this format eventually.
-#if 0
-  os << "(Projection Path [";
-  SILType NextType = BaseType;
-  os << NextType;
-  for (const Projection &P : Path) {
-    os << ", ";
-    NextType = P.getType(NextType, M);
-    os << NextType;
-  }
-  os << "]";
-#endif
-  return os;
-}
-
-raw_ostream &ProjectionPath::printProjections(raw_ostream &os, SILModule &M) const {
-  // Match how the memlocation print tests expect us to print projection paths.
-  //
-  // TODO: It sort of sucks having to print these bottom up computationally. We
-  // should really change the test so that prints out the path elements top
-  // down the path, rather than constructing all of these intermediate paths.
-  for (unsigned i : reversed(indices(Path))) {
-    auto &IterProj = Path[i];
-    if (IterProj.isNominalKind()) {
-      os << "Field Type: " << IterProj.getIndex() << "\n";
+    if (IterProj.getKind() == ProjectionKind::TailElems) {
+      os << " TailElems of: ";
       continue;
     }
-
-    if (IterProj.getKind() == ProjectionKind::Tuple) {
-      os << "Index: " << IterProj.getIndex() << "\n";
-      continue;
-    }
-
-    llvm_unreachable("Can not print this projection kind");
+    os << "<unexpected projection> into: ";
   }
-
+  os << IterType.getAddressType() << "]\n";
   return os;
 }
 
 void ProjectionPath::dump(SILModule &M) {
-  print(llvm::outs(), M);
-  llvm::outs() << "\n";
-}
-
-void ProjectionPath::dumpProjections(SILModule &M) const {
-  printProjections(llvm::outs(), M);
+  print(llvm::dbgs(), M);
 }
 
 void ProjectionPath::verify(SILModule &M) {
