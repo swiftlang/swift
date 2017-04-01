@@ -25,7 +25,7 @@ import SwiftShims
 extension UInt16 : _DefaultConstructible {}
 
 // TODO: Figure out a more sensible size
-typealias UTF16CodeUnitBuffer =
+public typealias UTF16CodeUnitBuffer =
   UnboundCapacity<_BoundedCapacity<_Array8<UInt16>>>
 
 // A normalization segment that is FCC-normalized. This is a collection of
@@ -46,10 +46,10 @@ typealias UTF16CodeUnitBuffer =
 public struct FCCNormalizedSegment : BidirectionalCollection {
   let buffer: UTF16CodeUnitBuffer
 
-  init(_ buffer: UTF16CodeUnitBuffer) {
+  public init(_ buffer: UTF16CodeUnitBuffer) {
     self.buffer = buffer
   }
-  init() {
+  public init() {
     self.buffer = UTF16CodeUnitBuffer()
   }
 
@@ -75,7 +75,7 @@ public struct FCCNormalizedSegment : BidirectionalCollection {
 
 // Ask ICU if the given unicode scalar value has a normalization boundary before
 // it, that is it begins a new normalization segment.
-internal func _hasBoundary(before value: UInt32) -> Bool {
+public func _hasBoundary(before value: UInt32) -> Bool {
   return __swift_stdlib_unorm2_hasBoundaryBefore(_fccNormalizer, value) != 0
 }
 

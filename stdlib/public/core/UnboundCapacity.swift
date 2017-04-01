@@ -15,7 +15,7 @@
 
 /// Augments a base collection, which may have limited capacity, with heap
 /// storage, such that the result has unbounded capacity.
-enum UnboundCapacity<
+public enum UnboundCapacity<
   Base: RandomAccessCollection & MutableCollection & _BoundedCollection
 > {
   case small(Base)
@@ -89,12 +89,12 @@ extension UnboundCapacity {
   //
   // Michael NOTE: I'll also be dropping the use of this in favor of adding a
   // withUnsafeMutableBufferPointer.
-  internal mutating func withMutableArray<R>(
+  public mutating func withMutableArray<R>(
     body: (inout [Base.Iterator.Element]) throws->R
   ) rethrows -> R {
     return try withMutableArray(minCapacity: 0, body: body)
   }
-  internal mutating func withMutableArray<R>(
+  public mutating func withMutableArray<R>(
     minCapacity: Int,
     body: (inout [Base.Iterator.Element]) throws->R
   ) rethrows -> R {
