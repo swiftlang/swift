@@ -230,14 +230,20 @@ public struct Character :
   /// Creates a Character from a String that is already known to require the
   /// large representation.
   internal init(_largeRepresentationString s: String) {
-    if let native = s._core.nativeBuffer,
-       native.start == s._core._baseAddress! {
-      _representation = .large(native._storage)
-      return
-    }
-    var nativeString = ""
-    nativeString.append(s)
-    _representation = .large(nativeString._core.nativeBuffer!._storage)
+    // Michael FIXME: Do we still want this init? If so, re-implement. Original
+    // version used _StringCore and assumed we had native buffers...
+    self.init(s)
+
+    // Old code:
+    //
+    // if let native = s._core.nativeBuffer,
+    //    native.start == s._core._baseAddress! {
+    //   _representation = .large(native._storage)
+    //   return
+    // }
+    // var nativeString = ""
+    // nativeString.append(s)
+    // _representation = .large(nativeString._core.nativeBuffer!._storage)
   }
 
   /// Returns the index of the lowest byte that is 0xFF, or 8 if
