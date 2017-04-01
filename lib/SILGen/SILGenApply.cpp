@@ -1705,7 +1705,7 @@ RValue SILGenFunction::emitApply(ResultPlanPtr &&resultPlan,
 
   // Create the result plan.
   SmallVector<SILValue, 4> indirectResultAddrs;
-  resultPlan->gatherIndirectResultAddrs(indirectResultAddrs);
+  resultPlan->gatherIndirectResultAddrs(*this, loc, indirectResultAddrs);
 
   // If the function returns an inner pointer, we'll need to lifetime-extend
   // the 'self' parameter.
@@ -3258,8 +3258,13 @@ public:
         SGF.Cleanups.setCleanupState(initCleanup, CleanupState::Active);
   }
 
-  SILValue getAddressOrNull() const override {
+  SILValue getAddressForInPlaceInitialization(SILGenFunction &SGF,
+                                              SILLocation loc) override {
     return addr;
+  }
+
+  bool isInPlaceInitializationOfGlobal() const override {
+    return false;
   }
 
   ManagedValue getManagedBox() const {

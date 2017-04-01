@@ -372,7 +372,7 @@ ManagedValue SILGenBuilder::bufferForExpr(
     SGFContext context, std::function<void (SILValue)> rvalueEmitter) {
   // If we have a single-buffer "emit into" initialization, use that for the
   // result.
-  SILValue address = context.getAddressForInPlaceInitialization();
+  SILValue address = context.getAddressForInPlaceInitialization(SGF, loc);
 
   // If we couldn't emit into the Initialization, emit into a temporary
   // allocation.
@@ -384,8 +384,7 @@ ManagedValue SILGenBuilder::bufferForExpr(
 
   // If we have a single-buffer "emit into" initialization, use that for the
   // result.
-  if (context.getAddressForInPlaceInitialization()) {
-    context.getEmitInto()->finishInitialization(SGF);
+  if (context.finishInPlaceInitialization(SGF)) {
     return ManagedValue::forInContext();
   }
 
@@ -402,7 +401,7 @@ ManagedValue SILGenBuilder::formalAccessBufferForExpr(
     SGFContext context, std::function<void(SILValue)> rvalueEmitter) {
   // If we have a single-buffer "emit into" initialization, use that for the
   // result.
-  SILValue address = context.getAddressForInPlaceInitialization();
+  SILValue address = context.getAddressForInPlaceInitialization(SGF, loc);
 
   // If we couldn't emit into the Initialization, emit into a temporary
   // allocation.
@@ -414,8 +413,7 @@ ManagedValue SILGenBuilder::formalAccessBufferForExpr(
 
   // If we have a single-buffer "emit into" initialization, use that for the
   // result.
-  if (context.getAddressForInPlaceInitialization()) {
-    context.getEmitInto()->finishInitialization(SGF);
+  if (context.finishInPlaceInitialization(SGF)) {
     return ManagedValue::forInContext();
   }
 
