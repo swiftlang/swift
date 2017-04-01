@@ -381,6 +381,9 @@ endif()
 option(SWIFT_BUILD_SOURCEKIT
     "Build SourceKit"
     ${SWIFT_BUILD_SOURCEKIT_default})
+option(SWIFT_ENABLE_SOURCEKIT_TESTS
+    "Enable running SourceKit tests"
+    ${SWIFT_BUILD_SOURCEKIT_default})
 
 #
 # Assume a new enough ar to generate the index at construction time. This avoids
