@@ -79,7 +79,7 @@ class NSManagedAndNonObjCNotAllowed {
   @nonobjc @NSManaged var rosie : NSObject // expected-error {{declaration is marked @NSManaged, and cannot be marked @nonobjc}}
 }
 
-@nonobjc func nonObjCTopLevelFuncNotAllowed() { } // expected-error {{only methods, initializers, properties and subscript declarations can be declared @nonobjc}} {{1-10=}}
+@nonobjc func nonObjCTopLevelFuncNotAllowed() { } // expected-error {{only class members and extensions of classes can be declared @nonobjc}} {{1-10=}}
 
 @objc class NonObjCPropertyObjCProtocolNotAllowed : ObjCProtocol { // expected-error {{does not conform to protocol}}
   @nonobjc func protocolMethod() { } // expected-note {{candidate is explicitly '@nonobjc'}}
@@ -105,3 +105,9 @@ class NSManagedAndNonObjCNotAllowed {
 
 struct SomeStruct { }
 @nonobjc extension SomeStruct { } // expected-error{{only extensions of classes can be declared @nonobjc}}
+
+protocol SR4226_Protocol : class {}
+
+extension SR4226_Protocol {
+  @nonobjc func function() {} // expected-error {{only class members and extensions of classes can be declared @nonobjc}}
+}
