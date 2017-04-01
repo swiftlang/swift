@@ -25,7 +25,7 @@ void indexSourceFile(SourceFile *SF, StringRef hash,
                      IndexDataConsumer &consumer);
 void indexModule(ModuleDecl *module, StringRef hash,
                  IndexDataConsumer &consumer);
-bool shouldIndex(ValueDecl *D, bool IsRef);
+
 } // end namespace index
 } // end namespace swift
 
