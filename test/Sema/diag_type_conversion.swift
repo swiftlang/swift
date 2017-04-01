@@ -48,3 +48,12 @@ func foo13(a : [AnyHashable : Any]) {}
 func foo14(b : [NSObject : AnyObject]) {
   foo13(a : b)
 }
+
+func foo15(a : AnyHashable) {}
+func foo16(a : String) {
+  foo15(a : a) // expected-error {{cannot convert value of type 'String' to expected argument type 'AnyHashable'}} {{13-13=AnyHashable(}} {{14-14=)}}
+}
+
+func foo17() {
+  var dict : [AnyHashable: String] = ["": ""] // expected-error {{cannot convert value of type 'String' to expected dictionary key type 'AnyHashable'}} {{39-39=AnyHashable(}} {{41-41=)}}
+}

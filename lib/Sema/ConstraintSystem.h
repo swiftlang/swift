@@ -1857,6 +1857,9 @@ public:
   /// type from the ConstraintSystem expression type map.
   Type getInstanceType(TypeExpr *E);
 
+  /// \brief Determine if the type in question is a AnyHashable.
+  bool isAnyHashableType(Type t);
+
 private:
   /// Introduce the constraints associated with the given type variable
   /// into the worklist.

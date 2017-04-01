@@ -3678,6 +3678,12 @@ static bool isIntegerType(Type fromType, const ConstraintSystem *CS) {
                                  CS);
 }
 
+static bool isStringType(Type fromType, ConstraintSystem *CS) {
+  return isExpressibleByLiteralType(fromType,
+                                  KnownProtocolKind::ExpressibleByStringLiteral,
+                                    CS);
+}
+
 /// Return true if the given type conforms to RawRepresentable.
 static Type isRawRepresentable(Type fromType,
                                const ConstraintSystem *CS) {
@@ -3898,6 +3904,23 @@ addTypeCoerceFixit(InFlightDiagnostic &diag, ConstraintSystem *CS,
                                                 expr->getEndLoc()),
                      (llvm::Twine(canUseAs ? " as " : " as! ") +
                       OS.str()).str());
+    return true;
+  }
+  return false;
+}
+
+
+/// Attempts to add fix-its for the mistake when fromType is String:
+/// - Passing a string to a parameter expecting AnyHashable. The fixit inserts
+///   'AnyHashable(' and ')' to initialize an AnyHashable from the string.
+static bool
+tryStringCastFixIts(InFlightDiagnostic &diag, ConstraintSystem *CS,
+                    Type fromType, Type toType, Expr *expr) {
+  if (!isStringType(fromType, CS))
+    return false;
+  if (CS->isAnyHashableType(toType)) {
+    diag.fixItInsert(expr->getStartLoc(), "AnyHashable(").
+      fixItInsertAfter(expr->getEndLoc(), ")");
     return true;
   }
   return false;
@@ -4281,7 +4304,8 @@ bool FailureDiagnosis::diagnoseContextualConversionError() {
                               KnownProtocolKind::AnyObject,
                               expr) ||
     tryIntegerCastFixIts(diag, CS, exprType, contextualType, expr) ||
-    addTypeCoerceFixit(diag, CS, exprType, contextualType, expr);
+    addTypeCoerceFixit(diag, CS, exprType, contextualType, expr) ||
+    tryStringCastFixIts(diag, CS, exprType, contextualType, expr);
     break;
 
   default:
