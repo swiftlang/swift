@@ -196,15 +196,8 @@ where
     // TODO: Find way to re-use the storage, maybe iterator pattern?
     var buffer = UTF16CodeUnitBuffer(utf16CodeUnits.lazy.joined())
 
-    // Single scalar is trivial segment, no need to normalize
-    //
     // TODO: fast pre-normalized checks (worth doing before calling over to
     //       ICU)
-    //
-    // TODO: non-BMP can hit this path too
-    if end == codeUnits.index(after: start) {
-      return FCCNormalizedSegment(buffer)
-    }
 
     _sanityCheck(buffer.count > 0, "How did this happen? Failed precondition?")
 
