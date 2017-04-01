@@ -20,16 +20,21 @@ func wantonlyWrapInAny<T>(_ x: T) -> Any {
 extension LifetimeTracked: Error {}
 extension String: Error {}
 
-struct KnownUnbridged: Equatable, Error {
+struct KnownUnbridged: Equatable, Hashable, Error {
   var x, y: LifetimeTracked
 
   init() {
     x = LifetimeTracked(17)
     y = LifetimeTracked(38)
   }
-}
-func ==(a: KnownUnbridged, b: KnownUnbridged) -> Bool {
-  return a.x === b.x && a.y === b.y
+
+  public static func ==(a: KnownUnbridged, b: KnownUnbridged) -> Bool {
+    return a.x === b.x && a.y === b.y
+  }
+
+  public var hashValue: Int {
+    return x.hashValue ^ y.hashValue
+  }
 }
 
 struct KnownUnbridgedWithDescription: CustomStringConvertible,
@@ -96,22 +101,22 @@ func boxedTypeRoundTripsThroughDynamicCasting(original: KnownUnbridged,
 
 func tupleCanBeDynamicallyCast(original: (Int, String),
                                bridged: AnyObject) {
-  expectTrue(original == bridged as! (Int, String))
+  expectTrue(original == (bridged as! (Int, String)))
 }
 func metatypeCanBeDynamicallyCast(original: Int.Type,
                                bridged: AnyObject) {
-  expectTrue(original == bridged as! Int.Type)
-  expectTrue(original == bridged as! Any.Type)
+  expectTrue(original == (bridged as! Int.Type))
+  expectTrue(original == (bridged as! Any.Type))
 }
 func metatypeCanBeDynamicallyCast(original: CFString.Type,
                                   bridged: AnyObject) {
-  expectTrue(original == bridged as! CFString.Type)
-  expectTrue(original == bridged as! Any.Type)
+  expectTrue(original == (bridged as! CFString.Type))
+  expectTrue(original == (bridged as! Any.Type))
 }
 func metatypeCanBeDynamicallyCastGenerically<T>(original: T.Type,
                                                 bridged: AnyObject) {
-  expectTrue(original == bridged as! T.Type)
-  expectTrue(original == bridged as! Any.Type)
+  expectTrue(original == (bridged as! T.Type))
+  expectTrue(original == (bridged as! Any.Type))
 }
 
 
@@ -151,32 +156,65 @@ protocol P {}
 // interesting bridging cases in different kinds of existential container.
 %{
 testCases = [
-  ("classes",                    "LifetimeTracked(0)",          "bridgedObjectPreservesIdentity",            True),
-  ("strings",                    '"vitameatavegamin"',          "stringBridgesToEqualNSString",              True),
-  ("unbridged type",             "KnownUnbridged()",            "boxedTypeRoundTripsThroughDynamicCasting",  True),
-  ("tuple",                      '(1, "2")',                    "tupleCanBeDynamicallyCast",                 False),
-  ("metatype",                   'Int.self',                    "metatypeCanBeDynamicallyCast",              False),
-  ("generic metatype",           'Int.self',                    "metatypeCanBeDynamicallyCastGenerically",   False),
-  ("CF metatype",                'CFString.self',               "metatypeCanBeDynamicallyCast",              False),
-  ("generic CF metatype",        'CFString.self',               "metatypeCanBeDynamicallyCastGenerically",   False),
-  ("class metatype",             'LifetimeTracked.self',        "classMetatypePreservesIdentity",            False),
-  ("objc metatype",              'NSObject.self',               "classMetatypePreservesIdentity",            False),
-  ("protocol",                   'P.self',                      "metatypeCanBeDynamicallyCastGenerically",   False),
-  ("objc protocol",              'NSCopying.self',              "protocolObjectPreservesIdentity",           False),
-  ("objc protocol composition",  '(NSCopying & NSCoding).self', "metatypeCanBeDynamicallyCastGenerically",   False),
-  ("mixed protocol composition", '(NSCopying & P).self',        "metatypeCanBeDynamicallyCastGenerically",   False),
-  ("generic class metatype",     'LifetimeTracked.self',        "classMetatypePreservesIdentityGenerically", False),
-  ("generic objc metatype",      'NSObject.self',               "classMetatypePreservesIdentityGenerically", False),
-  ("function",                   'guineaPigFunction',           "functionCanBeDynamicallyCast",              False),
+  # testName                     valueExpr                      testFunc                                     conformsToError  conformsToHashable
+  ("classes",                    "LifetimeTracked(0)",          "bridgedObjectPreservesIdentity",            True,            True),
+  ("strings",                    '"vitameatavegamin"',          "stringBridgesToEqualNSString",              True,            True),
+  ("unbridged type",             "KnownUnbridged()",            "boxedTypeRoundTripsThroughDynamicCasting",  True,            True),
+  ("tuple",                      '(1, "2")',                    "tupleCanBeDynamicallyCast",                 False,           False),
+  ("metatype",                   'Int.self',                    "metatypeCanBeDynamicallyCast",              False,           False),
+  ("generic metatype",           'Int.self',                    "metatypeCanBeDynamicallyCastGenerically",   False,           False),
+  ("CF metatype",                'CFString.self',               "metatypeCanBeDynamicallyCast",              False,           False),
+  ("generic CF metatype",        'CFString.self',               "metatypeCanBeDynamicallyCastGenerically",   False,           False),
+  ("class metatype",             'LifetimeTracked.self',        "classMetatypePreservesIdentity",            False,           False),
+  ("objc metatype",              'NSObject.self',               "classMetatypePreservesIdentity",            False,           False),
+  ("protocol",                   'P.self',                      "metatypeCanBeDynamicallyCastGenerically",   False,           False),
+  ("objc protocol",              'NSCopying.self',              "protocolObjectPreservesIdentity",           False,           False),
+  ("objc protocol composition",  '(NSCopying & NSCoding).self', "metatypeCanBeDynamicallyCastGenerically",   False,           False),
+  ("mixed protocol composition", '(NSCopying & P).self',        "metatypeCanBeDynamicallyCastGenerically",   False,           False),
+  ("generic class metatype",     'LifetimeTracked.self',        "classMetatypePreservesIdentityGenerically", False,           False),
+  ("generic objc metatype",      'NSObject.self',               "classMetatypePreservesIdentityGenerically", False,           False),
+  ("function",                   'guineaPigFunction',           "functionCanBeDynamicallyCast",              False,           False),
 ]
 }%
 
-% for testName, valueExpr, testFunc, conformsToError in testCases:
+% for testName, valueExpr, testFunc, conformsToError, conformsToHashable in testCases:
 BridgeAnything.test("${testName}") {
   do {
     let x = ${valueExpr}
     ${testFunc}(original: x, bridged: _bridgeAnythingToObjectiveC(x))
     ${testFunc}(original: x, bridged: _bridgeAnythingNonVerbatimToObjectiveC(x))
+
+    // Bridge an array containing x.
+    let xInArray = [x]
+    ${testFunc}(original: x, bridged: (_bridgeAnythingToObjectiveC(xInArray) as! [AnyObject])[0])
+    ${testFunc}(original: x, bridged: (_bridgeAnythingToObjectiveC(xInArray) as? [AnyObject])![0])
+    if (x as? NSObject) != nil {
+      ${testFunc}(original: x, bridged: (_bridgeAnythingToObjectiveC(xInArray) as! [AnyObject])[0])
+      ${testFunc}(original: x, bridged: (_bridgeAnythingToObjectiveC(xInArray) as? [AnyObject])![0])
+    }
+
+    // Bridge a dictionary containing x as a value.
+    let xInDictValue = ["key" : x]
+    ${testFunc}(original: x, bridged: (_bridgeAnythingToObjectiveC(xInDictValue) as! [String: AnyObject])["key"]!)
+    ${testFunc}(original: x, bridged: (_bridgeAnythingToObjectiveC(xInDictValue) as? [String: AnyObject])!["key"]!)
+    if (x as? NSObject) != nil {
+      ${testFunc}(original: x, bridged: (_bridgeAnythingToObjectiveC(xInDictValue) as! [String: NSObject])["key"]!)
+      ${testFunc}(original: x, bridged: (_bridgeAnythingToObjectiveC(xInDictValue) as? [String: NSObject])!["key"]!)
+    }
+
+    %  if conformsToHashable:
+    // Bridge a dictionary containing x as a key.
+    let xInDictKey = [x : "value"] as [AnyHashable: String]
+    // FIXME: need a way to express `AnyObject & Hashable`.
+    // The NSObject version below can't test class LifetimeTracked.
+    // ${testFunc}(original: x, bridged: (_bridgeAnythingToObjectiveC(xInDictKey) as! [(AnyObject & Hashable): String]).keys.first!)
+    // ${testFunc}(original: x, bridged: (_bridgeAnythingToObjectiveC(xInDictKey) as? [(AnyObject & Hashable): String])!.keys.first!)
+    if (x as? NSObject) != nil {
+      ${testFunc}(original: x, bridged: (_bridgeAnythingToObjectiveC(xInDictKey) as! [NSObject: String]).keys.first!)
+      ${testFunc}(original: x, bridged: (_bridgeAnythingToObjectiveC(xInDictKey) as? [NSObject: String])!.keys.first!)
+    }
+
+%  end
 
     let xInAny: Any = x
     ${testFunc}(original: x, bridged: _bridgeAnythingToObjectiveC(xInAny))

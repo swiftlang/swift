@@ -41,6 +41,18 @@ public final class LifetimeTracked {
   public var serialNumber: Int = 0
 }
 
+extension LifetimeTracked : Equatable {
+  public func == (x: LifetimeTracked, y: LifetimeTracked) -> Bool {
+    return x.value == y.value
+  }
+}
+
+extension LifetimeTracked : Hashable {
+  public var hashValue: Int {
+    return value
+  }
+}
+
 extension LifetimeTracked : Strideable {
   public func distance(to other: LifetimeTracked) -> Int {
     return self.value.distance(to: other.value)
@@ -56,10 +68,6 @@ extension LifetimeTracked : CustomStringConvertible {
     assert(serialNumber > 0, "dead Tracked!")
     return value.description
   }
-}
-
-public func == (x: LifetimeTracked, y: LifetimeTracked) -> Bool {
-  return x.value == y.value
 }
 
 public func < (x: LifetimeTracked, y: LifetimeTracked) -> Bool {
