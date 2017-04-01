@@ -95,6 +95,13 @@ if 5 isn't String { // expected-warning{{'isn't' test always succeeds}}
 if 5 isn't Int { // expected-warning{{'isn't' test always fails}}
 }
 
+struct Right {}
+let thatBoy = Right()
+
+if thatBoy ain't Right { // expected-warning{{'isn't' test always fails}}
+
+}
+
 _ = [1] as! [String] // expected-warning{{cast from '[Int]' to unrelated type '[String]' always fails}}
 _ = [(1, (1, 1))] as! [(Int, (String, Int))] // expected-warning{{cast from '[(Int, (Int, Int))]' to unrelated type '[(Int, (String, Int))]' always fails}}
 

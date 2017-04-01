@@ -621,7 +621,7 @@ void Lexer::lexIdentifier() {
     Kind = tok::identifier;
   }
 
-  if (Kind == tok::identifier && Str == "isn" &&
+  if (Kind == tok::identifier && (Str == "isn" || Str == "ain") &&
       CurPtr + 1 != BufferEnd &&
       CurPtr[0] == '\'' && CurPtr[1] == 't') {
     Kind = tok::kw_isnt;
