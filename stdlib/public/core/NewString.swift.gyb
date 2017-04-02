@@ -1039,7 +1039,7 @@ extension String {
     var result = ContiguousArray<CChar>()
     let source = Counted(content.utf8)
     result.reserveCapacity(numericCast(source.count + 1))
-    result.append(contentsOf: source.lazy.map { Int8(bitPattern: $0) })
+    result.append(contentsOf: source.lazy.map(Int8.init(bitPattern:)))
     result.append(0)
     return try result.withUnsafeBufferPointer {
       try body($0.baseAddress)
