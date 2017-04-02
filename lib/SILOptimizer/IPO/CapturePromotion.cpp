@@ -211,6 +211,7 @@ private:
 
   void visitDebugValueAddrInst(DebugValueAddrInst *Inst);
   void visitStrongReleaseInst(StrongReleaseInst *Inst);
+  void visitDestroyValueInst(DestroyValueInst *Inst);
   void visitStructElementAddrInst(StructElementAddrInst *Inst);
   void visitLoadInst(LoadInst *Inst);
   void visitProjectBoxInst(ProjectBoxInst *Inst);
@@ -502,6 +503,9 @@ void ClosureCloner::visitDebugValueAddrInst(DebugValueAddrInst *Inst) {
 /// normally.
 void
 ClosureCloner::visitStrongReleaseInst(StrongReleaseInst *Inst) {
+  assert(
+      Inst->getFunction()->hasUnqualifiedOwnership() &&
+      "Should not see strong release in a function with qualified ownership");
   SILValue Operand = Inst->getOperand();
   if (SILArgument *A = dyn_cast<SILArgument>(Operand)) {
     auto I = BoxArgumentMap.find(A);
@@ -517,6 +521,28 @@ ClosureCloner::visitStrongReleaseInst(StrongReleaseInst *Inst) {
   }
 
   SILCloner<ClosureCloner>::visitStrongReleaseInst(Inst);
+}
+
+/// \brief Handle a destroy_value instruction during cloning of a closure; if
+/// it is a strong release of a promoted box argument, then it is replaced with
+/// a destroy_value of the new object type argument, otherwise it is handled
+/// normally.
+void ClosureCloner::visitDestroyValueInst(DestroyValueInst *Inst) {
+  SILValue Operand = Inst->getOperand();
+  if (SILArgument *A = dyn_cast<SILArgument>(Operand)) {
+    auto I = BoxArgumentMap.find(A);
+    if (I != BoxArgumentMap.end()) {
+      // Releases of the box arguments get replaced with ReleaseValue of the new
+      // object type argument.
+      SILFunction &F = getBuilder().getFunction();
+      auto &typeLowering = F.getModule().getTypeLowering(I->second->getType());
+      SILBuilderWithPostProcess<ClosureCloner, 1> B(this, Inst);
+      typeLowering.emitDestroyValue(B, Inst->getLoc(), I->second);
+      return;
+    }
+  }
+
+  SILCloner<ClosureCloner>::visitDestroyValueInst(Inst);
 }
 
 /// \brief Handle a struct_element_addr instruction during cloning of a closure;
@@ -595,7 +621,8 @@ isNonMutatingCapture(SILArgument *BoxArg) {
   // strong_release or projection, since this is the pattern expected from
   // SILGen.
   for (auto *O : BoxArg->getUses()) {
-    if (isa<StrongReleaseInst>(O->getUser()))
+    if (isa<StrongReleaseInst>(O->getUser()) ||
+        isa<DestroyValueInst>(O->getUser()))
       continue;
     
     if (auto Projection = dyn_cast<ProjectBoxInst>(O->getUser())) {
@@ -674,7 +701,10 @@ public:
   /// Visit a random value base.
   ///
   /// These are considered to be escapes.
-  bool visitValueBase(ValueBase *V) { return false; }
+  bool visitValueBase(ValueBase *V) {
+    DEBUG(llvm::dbgs() << "    Have unknown escaping user: " << *V);
+    return false;
+  }
 
 #define ALWAYS_NON_ESCAPING_INST(INST)                                         \
   bool visit##INST##Inst(INST##Inst *V) { return true; }
@@ -684,6 +714,7 @@ public:
   ALWAYS_NON_ESCAPING_INST(StrongRetain)
   ALWAYS_NON_ESCAPING_INST(Load)
   ALWAYS_NON_ESCAPING_INST(StrongRelease)
+  ALWAYS_NON_ESCAPING_INST(DestroyValue)
 #undef ALWAYS_NON_ESCAPING_INST
 
   bool visitDeallocBoxInst(DeallocBoxInst *DBI) {
@@ -707,6 +738,14 @@ public:
     for (auto *User : I->getUses()) {
       Worklist.push_back(User);
     }
+  }
+
+  /// This is separate from the normal copy value handling since we are matching
+  /// the old behavior of non-top-level uses not being able to have partial
+  /// apply and project box uses.
+  bool visitCopyValueInst(CopyValueInst *CVI) {
+    addUserOperandsToWorklist(CVI);
+    return true;
   }
 
   bool visitStructElementAddrInst(StructElementAddrInst *I) {
@@ -769,106 +808,143 @@ static bool isNonEscapingUse(Operand *InitialOp,
   return NonEscapingUserVisitor(InitialOp, Mutations).compute();
 }
 
+bool isPartialApplyNonEscapingUser(
+    Operand *CurrentOp, PartialApplyInst *PAI,
+    llvm::SmallVectorImpl<SILInstruction *> &Mutations,
+    llvm::DenseMap<PartialApplyInst *, unsigned> &IM) {
+  DEBUG(llvm::dbgs() << "    Found partial: " << *PAI);
+
+  unsigned OpNo = CurrentOp->getOperandNumber();
+  assert(OpNo != 0 && "Alloc box used as callee of partial apply?");
+
+  // If we've already seen this partial apply, then it means the same alloc
+  // box is being captured twice by the same closure, which is odd and
+  // unexpected: bail instead of trying to handle this case.
+  if (IM.count(PAI)) {
+    DEBUG(llvm::dbgs() << "        Already seen... bailing!\n");
+    return false;
+  }
+
+  SILModule &M = PAI->getModule();
+  auto closureType = PAI->getType().castTo<SILFunctionType>();
+  SILFunctionConventions closureConv(closureType, M);
+
+  // Calculate the index into the closure's argument list of the captured
+  // box pointer (the captured address is always the immediately following
+  // index so is not stored separately);
+  unsigned Index = OpNo - 1 + closureConv.getNumSILArguments();
+
+  auto *Fn = PAI->getReferencedFunction();
+  if (!Fn || !Fn->isDefinition()) {
+    DEBUG(llvm::dbgs() << "        Not a direct function definition "
+                          "reference. Bailing!\n");
+    return false;
+  }
+
+  SILArgument *BoxArg = getBoxFromIndex(Fn, Index);
+
+  // For now, return false is the address argument is an address-only type,
+  // since we currently handle loadable types only.
+  // TODO: handle address-only types
+  auto BoxTy = BoxArg->getType().castTo<SILBoxType>();
+  assert(BoxTy->getLayout()->getFields().size() == 1 &&
+         "promoting compound box not implemented yet");
+  if (BoxTy->getFieldType(M, 0).isAddressOnly(M)) {
+    DEBUG(llvm::dbgs()
+          << "        Box is an address only argument... Bailing!\n");
+    return false;
+  }
+
+  // Verify that this closure is known not to mutate the captured value; if
+  // it does, then conservatively refuse to promote any captures of this
+  // value.
+  if (!isNonMutatingCapture(BoxArg)) {
+    DEBUG(llvm::dbgs() << "        Is a mutating capture... Bailing!\n");
+    return false;
+  }
+
+  // Record the index and continue.
+  DEBUG(llvm::dbgs() << "        Can be optimized!\n");
+  DEBUG(llvm::dbgs() << "        Index: " << Index << "\n");
+  IM.insert(std::make_pair(PAI, Index));
+  return true;
+}
+
+static bool
+isProjectBoxNonEscapingUse(ProjectBoxInst *PBI,
+                           llvm::SmallVectorImpl<SILInstruction *> &Mutations) {
+  DEBUG(llvm::dbgs() << "    Found project box: " << *PBI);
+
+  // Check for mutations of the address component.
+  SILValue Addr = PBI;
+
+  // If the AllocBox is used by a mark_uninitialized, scan the MUI for
+  // interesting uses.
+  if (Addr->hasOneUse()) {
+    SILInstruction *SingleAddrUser = Addr->use_begin()->getUser();
+    if (isa<MarkUninitializedInst>(SingleAddrUser))
+      Addr = SILValue(SingleAddrUser);
+  }
+
+  for (Operand *AddrOp : Addr->getUses()) {
+    if (!isNonEscapingUse(AddrOp, Mutations)) {
+      DEBUG(llvm::dbgs() << "    Has escaping user of addr... bailing: "
+                         << *AddrOp->getUser());
+      return false;
+    }
+  }
+
+  return true;
+}
+
+static bool scanUsesForEscapesAndMutations(
+    Operand *Op, llvm::SmallVectorImpl<SILInstruction *> &Mutations,
+    llvm::DenseMap<PartialApplyInst *, unsigned> &IM) {
+  if (auto *PAI = dyn_cast<PartialApplyInst>(Op->getUser())) {
+    return isPartialApplyNonEscapingUser(Op, PAI, Mutations, IM);
+  }
+
+  if (auto *PBI = dyn_cast<ProjectBoxInst>(Op->getUser())) {
+    return isProjectBoxNonEscapingUse(PBI, Mutations);
+  }
+
+  // Given a top level copy value use, check all of its user operands as if
+  // they were apart of the use list of the base operand.
+  //
+  // This is because even though we are copying the box, a copy of the box is
+  // just a retain + bitwise copy of the pointer. This has nothing to do with
+  // whether or not the address escapes in some way.
+  //
+  // This is a separate code path from the non escaping user visitor check since
+  // we want to be more conservative around non-top level copies (i.e. a copy
+  // derived from a projection like instruction). In fact such a thing may not
+  // even make any sense!
+  if (auto *CVI = dyn_cast<CopyValueInst>(Op->getUser())) {
+    return any_of(CVI->getUses(), [&Mutations, &IM](Operand *CopyOp) -> bool {
+      return !scanUsesForEscapesAndMutations(CopyOp, Mutations, IM);
+    });
+  }
+
+  // Verify that this use does not otherwise allow the alloc_box to
+  // escape.
+  return isNonEscapingUse(Op, Mutations);
+}
+
 /// \brief Examine an alloc_box instruction, returning true if at least one
 /// capture of the boxed variable is promotable.  If so, then the pair of the
 /// partial_apply instruction and the index of the box argument in the closure's
 /// argument list is added to IM.
 static bool
 examineAllocBoxInst(AllocBoxInst *ABI, ReachabilityInfo &RI,
-                    llvm::DenseMap<PartialApplyInst*, unsigned> &IM) {
+                    llvm::DenseMap<PartialApplyInst *, unsigned> &IM) {
   DEBUG(llvm::dbgs() << "Visiting alloc box: " << *ABI);
-  SmallVector<SILInstruction*, 32> Mutations;
-  
+  SmallVector<SILInstruction *, 32> Mutations;
+
   // Scan the box for interesting uses.
-  for (Operand *O : ABI->getUses()) {
-    if (auto *PAI = dyn_cast<PartialApplyInst>(O->getUser())) {
-      DEBUG(llvm::dbgs() << "    Found partial: " << *PAI);
-
-      unsigned OpNo = O->getOperandNumber();
-      assert(OpNo != 0 && "Alloc box used as callee of partial apply?");
-
-      // If we've already seen this partial apply, then it means the same alloc
-      // box is being captured twice by the same closure, which is odd and
-      // unexpected: bail instead of trying to handle this case.
-      if (IM.count(PAI)) {
-        DEBUG(llvm::dbgs() << "        Already seen... bailing!\n");
-        return false;
-      }
-
-      SILModule &M = PAI->getModule();
-      auto closureType = PAI->getType().castTo<SILFunctionType>();
-      SILFunctionConventions closureConv(closureType, M);
-
-      // Calculate the index into the closure's argument list of the captured
-      // box pointer (the captured address is always the immediately following
-      // index so is not stored separately);
-      unsigned Index = OpNo - 1 + closureConv.getNumSILArguments();
-
-      auto *Fn = PAI->getReferencedFunction();
-      if (!Fn || !Fn->isDefinition()) {
-        DEBUG(llvm::dbgs() << "        Not a direct function definition "
-                              "reference. Bailing!\n");
-        return false;
-      }
-
-      SILArgument *BoxArg = getBoxFromIndex(Fn, Index);
-
-      // For now, return false is the address argument is an address-only type,
-      // since we currently handle loadable types only.
-      // TODO: handle address-only types
-      auto BoxTy = BoxArg->getType().castTo<SILBoxType>();
-      assert(BoxTy->getLayout()->getFields().size() == 1
-             && "promoting compound box not implemented yet");
-      if (BoxTy->getFieldType(M, 0).isAddressOnly(M)) {
-        DEBUG(llvm::dbgs()
-              << "        Box is an address only argument... Bailing!\n");
-        return false;
-      }
-
-      // Verify that this closure is known not to mutate the captured value; if
-      // it does, then conservatively refuse to promote any captures of this
-      // value.
-      if (!isNonMutatingCapture(BoxArg)) {
-        DEBUG(llvm::dbgs() << "        Is a mutating capture... Bailing!\n");
-        return false;
-      }
-
-      // Record the index and continue.
-      DEBUG(llvm::dbgs() << "        Can be optimized!\n");
-      DEBUG(llvm::dbgs() << "        Index: " << Index << "\n");
-      IM.insert(std::make_pair(PAI, Index));
-      continue;
-    }
-
-    if (auto *PBI = dyn_cast<ProjectBoxInst>(O->getUser())) {
-      DEBUG(llvm::dbgs() << "    Found project box: " << *PBI);
-      // Check for mutations of the address component.
-      SILValue Addr = PBI;
-      // If the AllocBox is used by a mark_uninitialized, scan the MUI for
-      // interesting uses.
-      if (Addr->hasOneUse()) {
-        SILInstruction *SingleAddrUser = Addr->use_begin()->getUser();
-        if (isa<MarkUninitializedInst>(SingleAddrUser))
-          Addr = SILValue(SingleAddrUser);
-      }
-
-      for (Operand *AddrOp : Addr->getUses()) {
-        if (!isNonEscapingUse(AddrOp, Mutations)) {
-          DEBUG(llvm::dbgs() << "    Has escaping user of addr... bailing: "
-                             << *AddrOp->getUser());
-          return false;
-        }
-      }
-      continue;
-    }
-
-    // Verify that this use does not otherwise allow the alloc_box to
-    // escape.
-    if (!isNonEscapingUse(O, Mutations)) {
-      DEBUG(llvm::dbgs() << "    Have unknown escaping user: "
-                         << *O->getUser());
-      return false;
-    }
+  if (any_of(ABI->getUses(), [&Mutations, &IM](Operand *Op) {
+        return !scanUsesForEscapesAndMutations(Op, Mutations, IM);
+      })) {
+    return false;
   }
 
   // Helper lambda function to determine if instruction b is strictly after
