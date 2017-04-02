@@ -76,7 +76,7 @@ public struct Character :
   internal enum Representation {
     // A _StringBuffer whose first grapheme cluster is self.
     // NOTE: may be more than 1 Character long.
-    case large(_StringBuffer._Storage)
+    case large(_UTF16StringStorage)
     case small(Builtin.Int63)
   }
 
@@ -230,20 +230,7 @@ public struct Character :
   /// Creates a Character from a String that is already known to require the
   /// large representation.
   internal init(_largeRepresentationString s: String) {
-    // Michael FIXME: Do we still want this init? If so, re-implement. Original
-    // version used _StringCore and assumed we had native buffers...
-    self.init(s)
-
-    // Old code:
-    //
-    // if let native = s._core.nativeBuffer,
-    //    native.start == s._core._baseAddress! {
-    //   _representation = .large(native._storage)
-    //   return
-    // }
-    // var nativeString = ""
-    // nativeString.append(s)
-    // _representation = .large(nativeString._core.nativeBuffer!._storage)
+    _representation = .large(_UTF16StringStorage(s.content.utf16))
   }
 
   /// Returns the index of the lowest byte that is 0xFF, or 8 if
@@ -428,8 +415,7 @@ extension String {
       self = String._fromWellFormedCodeUnitSequence(
         UTF8.self, input: smallUTF8)
     case let .large(value):
-      let buf = String(_StringCore(_StringBuffer(value)))
-      self = String(buf[buf.startIndex..<buf.index(after: buf.startIndex)])
+      self.content = String.Content(utf16: value)
     }
   }
 }
