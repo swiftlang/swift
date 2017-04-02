@@ -712,33 +712,30 @@ public:
     }
   }
 
-  bool visitStructElementAddrInst(StructElementAddrInst *I) {
-    addUserOperandsToWorklist(I);
-    return true;
+  /// This is separate from the normal copy value handling since we are matching
+  /// the old behavior of non-top-level uses not being able to have partial
+  /// apply and project box uses.
+  struct detail {
+  enum IsMutating_t {
+    IsNotMutating = 0,
+    IsMutating = 1,
+  };
+  };
+#define RECURSIVE_INST_VISITOR(MUTATING, INST)    \
+  bool visit##INST##Inst(INST##Inst *I) {         \
+    if (bool(detail::MUTATING)) {                 \
+      Mutations.push_back(I);                     \
+    }                                             \
+    addUserOperandsToWorklist(I);                 \
+    return true;                                  \
   }
-
-  bool visitTupleElementAddrInst(TupleElementAddrInst *I) {
-    addUserOperandsToWorklist(I);
-    return true;
-  }
-
-  bool visitInitEnumDataAddrInst(InitEnumDataAddrInst *I) {
-    addUserOperandsToWorklist(I);
-    return true;
-  }
-
-  bool visitOpenExistentialAddrInst(OpenExistentialAddrInst *I) {
-    addUserOperandsToWorklist(I);
-    return true;
-  }
-
-  bool visitUncheckedTakeEnumDataAddrInst(UncheckedTakeEnumDataAddrInst *I) {
-    // UncheckedTakeEnumDataAddr is additionally a mutation.
-    Mutations.push_back(I);
-
-    addUserOperandsToWorklist(I);
-    return true;
-  }
+  RECURSIVE_INST_VISITOR(IsNotMutating, CopyValue)
+  RECURSIVE_INST_VISITOR(IsNotMutating, StructElementAddr)
+  RECURSIVE_INST_VISITOR(IsNotMutating, TupleElementAddr)
+  RECURSIVE_INST_VISITOR(IsNotMutating, InitEnumDataAddr)
+  RECURSIVE_INST_VISITOR(IsNotMutating, OpenExistentialAddr)
+  RECURSIVE_INST_VISITOR(IsMutating   , UncheckedTakeEnumDataAddr)
+#undef RECURSIVE_INST_VISITOR
 
   bool visitCopyAddrInst(CopyAddrInst *CAI) {
     if (CurrentOp.get()->getOperandNumber() == 1 || CAI->isTakeOfSrc())
