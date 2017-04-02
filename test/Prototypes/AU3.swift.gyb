@@ -802,20 +802,6 @@ extension String : RangeReplaceableCollection {
   }
 }
 
-extension ObjectIdentifier {
-  /// Returns true if the object identified by `self` is uniquely referenced.
-  ///
-  /// - Requires: the object identified by `self` exists.
-  /// - Note: will only work when called from a mutating method
-  internal func _liveObjectIsUniquelyReferenced() -> Bool {
-    var me = self
-    return withUnsafeMutablePointer(to: &me) {
-      $0.withMemoryRebound(to: AnyObject.self, capacity: 1) {
-        _isUnique(&$0.pointee)
-      }
-    }    
-  }
-}
 //===--- Substring --------------------------------------------------------===//
 
 public struct Substring {

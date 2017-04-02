@@ -93,9 +93,12 @@ extension RandomAccessUnicodeView {
     // to work if the view being wrapped is itself a wrapper that forwards
     // _tryToReplaceSubrange to an underlying reference type.
     if Base_.self is AnyObject.Type {
-      if
-      true || // WORKAROUND: https://bugs.swift.org/browse/SR-4449
-      !_isUnique(&base) { return false }
+      if (
+        withUnsafeMutablePointer(to: &base) {
+          !_isUnique(&UnsafeMutableRawPointer($0).assumingMemoryBound(
+              to: AnyObject.self).pointee)
+        }
+      ) { return false }
     }
     return base._tryToReplaceSubrange(
       from: _unwrap(targetStart), to: _unwrap(targetEnd),  with: replacement)

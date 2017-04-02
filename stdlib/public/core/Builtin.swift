@@ -541,11 +541,28 @@ func _getSuperclass(_ t: Any.Type) -> AnyClass? {
 // and type checking will fail.
 
 /// Returns `true` if `object` is uniquely referenced.
-@_inlineable
+@_versioned
 @_transparent  // WARNING: do not remove this or uniqueness testing will break!
-public // testable
+internal       // WARNING: do not remove this or uniqueness testing will break!
 func _isUnique<T>(_ object: inout T) -> Bool {
   return Bool(Builtin.isUnique(&object))
+}
+
+extension ObjectIdentifier {
+  /// Returns true if the object identified by `self` is uniquely referenced.
+  ///
+  /// - Requires: the object identified by `self` exists.
+  /// - Note: will only work when called from a context
+  ///   where that object is "inout".
+  public // @testable
+  func _liveObjectIsUniquelyReferenced() -> Bool {
+    var me = self
+    return withUnsafeMutablePointer(to: &me) {
+      $0.withMemoryRebound(to: AnyObject.self, capacity: 1) {
+        _isUnique(&$0.pointee)
+      }
+    }    
+  }
 }
 
 /// Returns `true` if `object` is uniquely referenced or pinned.
