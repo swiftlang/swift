@@ -267,8 +267,7 @@ extension String.Content.Inline${N}or${W} : UnicodeContent {
     return bitsPerElement <= 8
     ? AnyUInt16UnicodeView(utf16)
     : AnyUInt16UnicodeView(
-      _UnicodeViews(_utf16, UTF16.self).fccNormalizedUTF16
-    )
+      _UnicodeViews(_utf16, UTF16.self).fccNormalizedUTF16)
   }
   
   public var characters: AnyCharacterUnicodeView {
@@ -378,23 +377,20 @@ internal struct _NSStringUTF16 : RandomAccessCollection {
 //===----------------------------------------------------------------------===//
 
 
-extension String : Unicode {
+extension String : Unicode, BidirectionalCollectionWrapper {
   public typealias Base = AnyCharacterUnicodeView
   public typealias Index = AnyCharacterUnicodeView.Index
   public typealias IndexDistance = AnyCharacterUnicodeView.IndexDistance
 
-  public struct SubSequence {
-    public typealias Base = RangeReplaceableBidirectionalSlice<String>
-    public var base: Base
-  }
+  public typealias SubSequence = Substring
 
   public subscript(bounds: Range<Index>) -> SubSequence {
     get {
-      return SubSequence(base:
-        RangeReplaceableBidirectionalSlice(base: self, bounds: bounds))
+      return Substring(
+        content: Substring.Content(wholeContent: self.content, bounds: bounds))
     }
     set {
-      fatalError("implement me!")
+      replaceSubrange(bounds, with: newValue)
     }
   }
 
@@ -702,6 +698,19 @@ extension String.Content {
     }
   }
 
+  public mutating func replaceSubrange<C: Collection>(
+    _ target: Range<String.Index>, with replacement: C
+  ) where C.Iterator.Element == Character {
+    // Fast path: the incoming characters are Unicode
+    if let unicodeReplacement = replacement as? AnyUnicode {
+      replaceUTF16(target, with: unicodeReplacement.anyContent.anyUTF16)
+    }
+    else {
+      // Slow path: we have to reconstruct UTF-16 from Characters
+      replaceUTF16(target, with: replacement.lazy.flatMap { $0.utf16 })
+    }
+  }
+
   /// Replaces the `target` subrange with the given UTF-16 encoded content.
   internal mutating func replaceUTF16<C: Collection>(
     _ target: Range<String.Index>, with replacement_: C
@@ -795,33 +804,60 @@ extension String : RangeReplaceableCollection {
   }
 }
 
-extension ObjectIdentifier {
-  /// Returns true if the object identified by `self` is uniquely referenced.
-  ///
-  /// - Requires: the object identified by `self` exists.
-  /// - Note: will only work when called from a mutating method
-  internal func _liveObjectIsUniquelyReferenced() -> Bool {
-    var me = self
-    return withUnsafeMutablePointer(to: &me) {
-      $0.withMemoryRebound(to: AnyObject.self, capacity: 1) {
-        _isUnique(&$0.pointee)
-      }
-    }    
+// Michael NOTE: Not sure when, but the below is no longer part of prototype
+// extension ObjectIdentifier {
+//   /// Returns true if the object identified by `self` is uniquely referenced.
+//   ///
+//   /// - Requires: the object identified by `self` exists.
+//   /// - Note: will only work when called from a mutating method
+//   internal func _liveObjectIsUniquelyReferenced() -> Bool {
+//     var me = self
+//     return withUnsafeMutablePointer(to: &me) {
+//       $0.withMemoryRebound(to: AnyObject.self, capacity: 1) {
+//         _isUnique(&$0.pointee)
+//       }
+//     }    
+//   }
+// }
+
+//===--- Substring --------------------------------------------------------===//
+
+public struct Substring {
+  public struct Content {
+    // FIXME: small string optimization
+    public var _wholeContent: String.Content
+    // FIXME: Change this to a range of encodedOffset
+    public var _bounds: Range<String.Index>
+
+    init() {
+      _wholeContent = String.Content()
+      _bounds = _wholeContent.utf16.startIndex..<_wholeContent.utf16.endIndex
+    }
+    init(wholeContent: String.Content, bounds: Range<String.Index>) {
+      self._wholeContent = wholeContent
+      self._bounds = bounds
+    }
   }
-}
-//===--- SubString --------------------------------------------------------===//
+  public var content: Content
+}    
 
 
-extension String.SubSequence
-  : BidirectionalCollection, BidirectionalCollectionWrapper {
-  public typealias Index = Base.Index
-  public typealias IndexDistance = Base.IndexDistance
+extension Substring : BidirectionalCollectionWrapper, Unicode {
+  public typealias Base = AnyCharacterUnicodeView.SubSequence
   public typealias Iterator = Base.Iterator
-}
+  public typealias Index = AnyCharacterUnicodeView.Index
+  public typealias IndexDistance = AnyCharacterUnicodeView.IndexDistance
+  public typealias SubSequence = Substring
 
-extension String.SubSequence
-: RangeReplaceableCollection {
-  public init() { base = Base() }
+  public subscript(bounds: Range<Index>) -> SubSequence {
+    get {
+      return SubSequence(
+        content: Content(wholeContent: content._wholeContent, bounds: bounds))
+    }
+    set {
+      content._wholeContent.replaceUTF16(bounds, with: newValue.content.utf16)
+    }
+  }
   
   // FIXME: figure out how to resolve ambiguities when we try to use the default
   // from BidirectionalCollectionWrapper.
@@ -832,76 +868,53 @@ extension String.SubSequence
     return base._tryToReplaceSubrange(
       from: targetStart, to: targetEnd,  with: replacement)
   }
+}
+
+extension Substring : RangeReplaceableCollection {
+  public init() { content = Content() }
 
   public mutating func replaceSubrange<C: Collection>(
     _ r: Range<Index>, with replacement: C
   )
   where C.Iterator.Element == Base.Iterator.Element {
-    return base.replaceSubrange(r,  with: replacement)
+    content._wholeContent.replaceSubrange(r,  with: replacement)
   }
 }
 
-/*
-extension String.SubSequence : Unicode {
-  public struct Content {
-    var base: String.Content
+
+extension Substring.Content : AnyUnicodeContent {
+  public var isKnownLatin1: Bool { return _wholeContent.isKnownLatin1 }
+  public var isKnownASCII: Bool { return _wholeContent.isKnownASCII }
+  public var isKnownFCCNormalized: Bool {
+    return _wholeContent.isKnownFCCNormalized
   }
-  public var content: Content {
-    return base.base.content[base.bounds]
+  public var isKnownFCDForm: Bool { return _wholeContent.isKnownFCDForm }
+  public var isKnownNFDNormalized: Bool {
+    return _wholeContent.isKnownNFDNormalized
+  }
+  public var isKnownNFCNormalized: Bool {
+    return _wholeContent.isKnownNFCNormalized
+  }
+}
+  
+extension Substring.Content : UnicodeContent {
+  public var utf16: String.Content.UTF16View.SubSequence {
+    return _wholeContent.utf16[_bounds]
+  }
+  public var utf8: String.Content.UTF8View.SubSequence {
+    return _wholeContent.utf8[_bounds]
+  }
+  public var fccNormalizedUTF16: String.Content.FCCNormalizedUTF16View.SubSequence {
+    return _wholeContent.fccNormalizedUTF16[_bounds]
+  }
+  public var characters: String.Content.CharacterView.SubSequence {
+    return _wholeContent.characters[_bounds]
+  }
+  public var unicodeScalars: String.Content.UnicodeScalarView.SubSequence {
+    return _wholeContent.unicodeScalars[_bounds]
   }
 }
 
-public typealias SubString = String.SubSequence
-
-extension SubString.Content : AnyUnicodeContent {
-  var isKnownLatin1: Bool { return base.isKnownLatin1 }
-  var isKnownASCII: Bool { return base.isKnownASCII }
-  var isKnownFCCNormalized: Bool { return base.isKnownFCCNormalized }
-  var isKnownFCDForm: Bool { return base.isKnownFCDForm }
-  var isKnownNFDNormalized: Bool { return base.isKnownNFDNormalized }
-  var isKnownNFCNormalized: Bool { return base.isKnownNFCNormalized }
-}
-
-extension SubString.Content : UnicodeContent {
-  /// A type that presents the string's UTF-16 code units
-  associatedtype UTF16View : UnicodeView
-  // where Iterator.Element == UInt16
-
-  /// The string's UTF-16 code units.
-  ///
-  /// Note: this view may contain encoding errors, if the underlying encoding is
-  /// UTF16 and the source had encoding errors.
-  var utf16: UTF16View { get }
-
-  /// A type that presents the string's UTF-8 code units
-  associatedtype UTF8View : UnicodeView
-  // where Iterator.Element == UInt8
-
-  /// The string's UTF-8 code units.
-  ///
-  /// Note: this view may contain encoding errors, if the underlying encoding is
-  /// UTF8 and the source had encoding errors.
-  var utf8: UTF8View { get }
-
-  /// A type that presents an FCC-normalized view of the string
-  associatedtype FCCNormalizedUTF16View : UnicodeView
-  // where Iterator.Element == UInt16
-
-  /// An FCC-normalized view of the string
-  var fccNormalizedUTF16: FCCNormalizedUTF16View { get }
-
-  associatedtype CharacterView : UnicodeView
-  // where Iterator.Element == Character
-
-  var characters: CharacterView { get }
-
-  /// A type that presents the string's unicode scalar values
-  associatedtype UnicodeScalarView : UnicodeView
-  // where Iterator.Element == UnicodeScalar
-
-  var unicodeScalars: UnicodeScalarView { get }
-}
-*/
 //===--- Literal Support --------------------------------------------------===//
 
 extension String : ExpressibleByUnicodeScalarLiteral {
@@ -1053,7 +1066,7 @@ extension String {
   // off of it...
   public var _core: _StringCore {
     get {
-    	let utf16CUs = self.content.utf16
+      let utf16CUs = self.content.utf16
       let _cocoaString = _UTF16StringStorage(utf16CUs)
       return _StringCore(
         baseAddress: nil,
@@ -1067,8 +1080,8 @@ extension String {
     }
   }
   public init(_ core: _StringCore) {
-  	self.init()
-  	self._core = core
+    self.init()
+    self._core = core
   }
 }
 
