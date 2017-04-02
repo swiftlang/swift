@@ -1173,26 +1173,30 @@ static PotentialBindings getPotentialBindings(ConstraintSystem &cs,
   // If we're supposed to add optional supertype bindings, do so now.
   if (addOptionalSupertypeBindings) {
     for (unsigned i : indices(result.Bindings)) {
-      // Only interested in supertype bindings.
       auto &binding = result.Bindings[i];
-      if (binding.Kind != AllowedBindingKind::Supertypes) continue;
-
-      // If the type doesn't conform to ExpressibleByNilLiteral,
-      // produce an optional of that type as a potential binding. We
-      // overwrite the binding in place because the non-optional type
-      // will fail to type-check against the nil-literal conformance.
-      auto nominalBindingDecl = binding.BindingType->getAnyNominal();
-      bool conformsToExprByNilLiteral = false;
-      if (nominalBindingDecl) {
-        SmallVector<ProtocolConformance *, 2> conformances;
-        conformsToExprByNilLiteral = nominalBindingDecl->lookupConformance(
-                                       cs.DC->getParentModule(),
-                                       cs.getASTContext().getProtocol(
-                                         KnownProtocolKind::ExpressibleByNilLiteral),
-                                       conformances);
+      bool wrapInOptional = false;
+        
+      if (binding.Kind == AllowedBindingKind::Supertypes) {
+        // If the type doesn't conform to ExpressibleByNilLiteral,
+        // produce an optional of that type as a potential binding. We
+        // overwrite the binding in place because the non-optional type
+        // will fail to type-check against the nil-literal conformance.
+        auto nominalBindingDecl = binding.BindingType->getAnyNominal();
+        bool conformsToExprByNilLiteral = false;
+        if (nominalBindingDecl) {
+          SmallVector<ProtocolConformance *, 2> conformances;
+          conformsToExprByNilLiteral = nominalBindingDecl->lookupConformance(
+                                         cs.DC->getParentModule(),
+                                         cs.getASTContext().getProtocol(
+                                           KnownProtocolKind::ExpressibleByNilLiteral),
+                                         conformances);
+        }
+        wrapInOptional = !conformsToExprByNilLiteral;
+      } else if (binding.isDefaultableBinding() && binding.BindingType->isAny()) {
+        wrapInOptional = true;
       }
 
-      if (!conformsToExprByNilLiteral) {
+      if (wrapInOptional) {
         binding.BindingType = OptionalType::get(binding.BindingType);
       }
     }

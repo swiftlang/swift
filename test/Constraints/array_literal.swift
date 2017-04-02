@@ -121,7 +121,7 @@ class A { }
 class B : A { }
 class C : A { }
 
-/// Check for defaulting the element type to 'Any'.
+/// Check for defaulting the element type to 'Any' / 'Any?'.
 func defaultToAny(i: Int, s: String) {
   let a1 = [1, "a", 3.5]
   // expected-error@-1{{heterogeneous collection literal could only be inferred to '[Any]'; add explicit type annotation if this is intentional}}
@@ -129,20 +129,30 @@ func defaultToAny(i: Int, s: String) {
 
   let a2: Array = [1, "a", 3.5]
   // expected-error@-1{{heterogeneous collection literal could only be inferred to '[Any]'; add explicit type annotation if this is intentional}}
-
   let _: Int = a2  // expected-error{{value of type '[Any]'}}
+  
+  let a3 = [1, "a", nil, 3.5]
+  // expected-error@-1{{heterogeneous collection literal could only be inferred to '[Any?]'; add explicit type annotation if this is intentional}}
+  let _: Int = a3 // expected-error{{value of type '[Any?]'}}
+  
+  let a4: Array = [1, "a", nil, 3.5]
+  // expected-error@-1{{heterogeneous collection literal could only be inferred to '[Any?]'; add explicit type annotation if this is intentional}}
+  let _: Int = a4 // expected-error{{value of type '[Any?]'}}
 
-  let a3 = []
+  let a5 = []
   // expected-error@-1{{empty collection literal requires an explicit type}}
-
-  let _: Int = a3 // expected-error{{value of type '[Any]'}}
+  let _: Int = a5 // expected-error{{value of type '[Any]'}}
 
   let _: [Any] = [1, "a", 3.5]
   let _: [Any] = [1, "a", [3.5, 3.7, 3.9]]
   let _: [Any] = [1, "a", [3.5, "b", 3]]
+  
+  let _: [Any?] = [1, "a", nil, 3.5]
+  let _: [Any?] = [1, "a", nil, [3.5, 3.7, 3.9]]
+  let _: [Any?] = [1, "a", nil, [3.5, "b", nil]]
 
-  let a4 = [B(), C()]
-  let _: Int = a4 // expected-error{{value of type '[A]'}}
+  let a6 = [B(), C()]
+  let _: Int = a6 // expected-error{{value of type '[A]'}}
 }
 
 /// Check handling of 'nil'.
