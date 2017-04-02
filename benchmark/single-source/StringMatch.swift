@@ -20,12 +20,12 @@ import Darwin
 /* match: search for regexp anywhere in text */
 func match(regexp: String, text: String) -> Bool {
   if regexp.first == "^" {
-    return matchHere(regexp.dropFirst(), text)
+    return matchHere(String(regexp.dropFirst()), text)
   }
   
   var idx = text.startIndex
   while true {  // must look even if string is empty
-    if matchHere(regexp, text[idx..<text.endIndex]) {
+    if matchHere(String(regexp), String(text[idx..<text.endIndex])) {
       return true
     }
     guard idx != text.endIndex else { break }
@@ -43,7 +43,7 @@ func matchHere(_ regexp: String, _ text: String) -> Bool {
   }
   
   if let c = regexp.first, regexp.dropFirst().first == "*" {
-    return matchStar(c, regexp.dropFirst(2), text)
+    return matchStar(c, String(regexp.dropFirst(2)), text)
   }
   
   if regexp.first == "$" && regexp.dropFirst().isEmpty {
@@ -51,7 +51,7 @@ func matchHere(_ regexp: String, _ text: String) -> Bool {
   }
   
   if let tc = text.first, let rc = regexp.first, rc == "." || tc == rc {
-    return matchHere(regexp.dropFirst(), text.dropFirst())
+    return matchHere(String(regexp.dropFirst()), String(text.dropFirst()))
   }
   
   return false
@@ -61,7 +61,7 @@ func matchHere(_ regexp: String, _ text: String) -> Bool {
 func matchStar(_ c: Character, _ regexp: String, _ text: String) -> Bool {
   var idx = text.startIndex
   while true {   /* a * matches zero or more instances */
-    if matchHere(regexp, text[idx..<text.endIndex]) {
+    if matchHere(regexp, String(text[idx..<text.endIndex])) {
       return true
     }
     if idx == text.endIndex || (text[idx] != c && c != ".") {

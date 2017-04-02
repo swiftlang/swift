@@ -27,39 +27,52 @@ let alphabet = "abcdefghijklmnopqrstuvwxyz"
 /// All edits that are one edit away from `word`
 func edits(_ word: String) -> Set<String> {
   // create right/left splits as CharacterViews instead
-  let splits = word.characters.indices.map {
+  let splits = word.indices.map {
     (word.characters[word.characters.startIndex..<$0],word.characters[$0..<word.characters.endIndex])
   }
   
   // though it should be, CharacterView isn't hashable
   // so using an array for now, ignore that aspect...
-  var result: [String.CharacterView] = []
+  var result: Set<String> = []
   
   for (left,right) in splits {
     // drop a character
-    result.append(left + right.dropFirst())
+    result.insert(String(left + right.dropFirst()))
     
     // transpose two characters
     if let fst = right.first {
       let drop1 = right.dropFirst()
       if let snd = drop1.first {
-        result.append(left + [snd,fst] + drop1.dropFirst())
+        var str = ""
+        str += left
+        str.append(snd)
+        str.append(fst)
+        str += drop1.dropFirst()
+        result.insert(str)
       }
     }
     
     // replace each character with another
     for letter in alphabet {
-      result.append(left + [letter] + right.dropFirst())
+      var str = ""
+      str += left
+      str.append(letter)
+      str += right.dropFirst()
+      result.insert(str)
     }
     
     // insert rogue characters
     for letter in alphabet {
-      result.append(left + [letter] + right)
+      var str = ""
+      str += left
+      str.append(letter)
+      str += right
+      result.insert(str)
     }
   }
   
   // have to map back to strings right at the end
-  return Set(result.lazy.map(String.init))
+  return result
 }
 
 @inline(never)
