@@ -10,23 +10,23 @@ struct ReferenceStorageTypeLayout<T, Native : C, Unknown : AnyObject> {
   var z: T
 
   // -- Known-Swift-refcounted type
-  // CHECK: store i8** getelementptr inbounds (i8*, i8** @_T0BoXoWV, i32 17)
+  // CHECK: store i8** getelementptr inbounds (i8*, i8** @_T0BoXoWV, i32 11)
   unowned(safe)   var cs:  C
-  // CHECK: store i8** getelementptr inbounds (i8*, i8** @_T0BomWV, i32 17)
+  // CHECK: store i8** getelementptr inbounds (i8*, i8** @_T0BomWV, i32 11)
   unowned(unsafe) var cu:  C
-  // CHECK: store i8** getelementptr inbounds (i8*, i8** @_T0BoSgXwWV, i32 17)
+  // CHECK: store i8** getelementptr inbounds (i8*, i8** @_T0BoSgXwWV, i32 11)
   weak            var cwo: C?
-  // CHECK: store i8** getelementptr inbounds (i8*, i8** @_T0BoSgXwWV, i32 17)
+  // CHECK: store i8** getelementptr inbounds (i8*, i8** @_T0BoSgXwWV, i32 11)
   weak            var cwi: C!
 
   // -- Known-Swift-refcounted archetype
-  // CHECK: store i8** getelementptr inbounds (i8*, i8** @_T0BoXoWV, i32 17)
+  // CHECK: store i8** getelementptr inbounds (i8*, i8** @_T0BoXoWV, i32 11)
   unowned(safe)   var nc:  Native
-  // CHECK: store i8** getelementptr inbounds (i8*, i8** @_T0BomWV, i32 17)
+  // CHECK: store i8** getelementptr inbounds (i8*, i8** @_T0BomWV, i32 11)
   unowned(unsafe) var nu:  Native
-  // CHECK: store i8** getelementptr inbounds (i8*, i8** @_T0BoSgXwWV, i32 17)
+  // CHECK: store i8** getelementptr inbounds (i8*, i8** @_T0BoSgXwWV, i32 11)
   weak            var nwo: Native?
-  // CHECK: store i8** getelementptr inbounds (i8*, i8** @_T0BoSgXwWV, i32 17)
+  // CHECK: store i8** getelementptr inbounds (i8*, i8** @_T0BoSgXwWV, i32 11)
   weak            var nwi: Native!
 
   // -- Open-code layout for protocol types with witness tables.
@@ -72,22 +72,22 @@ struct ReferenceStorageTypeLayout<T, Native : C, Unknown : AnyObject> {
   weak            var pqcwi: (P & Q & C)!
 
   // -- Unknown-refcounted existential without witness tables.
-  // CHECK: store i8** getelementptr inbounds (i8*, i8** @_T0[[UNKNOWN:B[Oo]]]XoWV, i32 17)
+  // CHECK: store i8** getelementptr inbounds (i8*, i8** @_T0[[UNKNOWN:B[Oo]]]XoWV, i32 11)
   unowned(safe)   var aos:  AnyObject
-  // CHECK: store i8** getelementptr inbounds (i8*, i8** @_T0BomWV, i32 17)
+  // CHECK: store i8** getelementptr inbounds (i8*, i8** @_T0BomWV, i32 11)
   unowned(unsafe) var aou:  AnyObject
-  // CHECK: store i8** getelementptr inbounds (i8*, i8** @_T0[[UNKNOWN]]SgXwWV, i32 17)
+  // CHECK: store i8** getelementptr inbounds (i8*, i8** @_T0[[UNKNOWN]]SgXwWV, i32 11)
   weak            var aowo: AnyObject?
-  // CHECK: store i8** getelementptr inbounds (i8*, i8** @_T0[[UNKNOWN]]SgXwWV, i32 17)
+  // CHECK: store i8** getelementptr inbounds (i8*, i8** @_T0[[UNKNOWN]]SgXwWV, i32 11)
   weak            var aowi: AnyObject!
 
   // -- Unknown-refcounted archetype
-  // CHECK: store i8** getelementptr inbounds (i8*, i8** @_T0[[UNKNOWN:B[Oo]]]XoWV, i32 17)
+  // CHECK: store i8** getelementptr inbounds (i8*, i8** @_T0[[UNKNOWN:B[Oo]]]XoWV, i32 11)
   unowned(safe)   var us:  Unknown
-  // CHECK: store i8** getelementptr inbounds (i8*, i8** @_T0BomWV, i32 17)
+  // CHECK: store i8** getelementptr inbounds (i8*, i8** @_T0BomWV, i32 11)
   unowned(unsafe) var uu:  Unknown
-  // CHECK: store i8** getelementptr inbounds (i8*, i8** @_T0[[UNKNOWN]]SgXwWV, i32 17)
+  // CHECK: store i8** getelementptr inbounds (i8*, i8** @_T0[[UNKNOWN]]SgXwWV, i32 11)
   weak            var uwo: Unknown?
-  // CHECK: store i8** getelementptr inbounds (i8*, i8** @_T0[[UNKNOWN]]SgXwWV, i32 17)
+  // CHECK: store i8** getelementptr inbounds (i8*, i8** @_T0[[UNKNOWN]]SgXwWV, i32 11)
   weak            var uwi: Unknown!
 }

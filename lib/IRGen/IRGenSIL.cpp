@@ -1740,11 +1740,7 @@ void IRGenSILFunction::visitAllocGlobalInst(AllocGlobalInst *i) {
   // buffer.
   Address addr = IGM.getAddrOfSILGlobalVariable(var, ti,
                                                 NotForDefinition);
-  if (getSILModule().getOptions().UseCOWExistentials) {
-    emitAllocateValueInBuffer(*this, loweredTy, addr);
-  } else {
-    (void) ti.allocateBuffer(*this, addr, loweredTy);
-  }
+  emitAllocateValueInBuffer(*this, loweredTy, addr);
 }
 
 void IRGenSILFunction::visitGlobalAddrInst(GlobalAddrInst *i) {
@@ -1774,11 +1770,7 @@ void IRGenSILFunction::visitGlobalAddrInst(GlobalAddrInst *i) {
 
   // Otherwise, the static storage for the global consists of a fixed-size
   // buffer; project it.
-  if (getSILModule().getOptions().UseCOWExistentials) {
-    addr = emitProjectValueInBuffer(*this, loweredTy, addr);
-  } else {
-    addr = ti.projectBuffer(*this, addr, loweredTy);
-  }
+  addr = emitProjectValueInBuffer(*this, loweredTy, addr);
   
   setLoweredAddress(i, addr);
 }
@@ -3671,60 +3663,6 @@ visitIsUniqueOrPinnedInst(swift::IsUniqueOrPinnedInst *i) {
   setLoweredExplosion(i, out);
 }
 
-static bool tryDeferFixedSizeBufferInitialization(IRGenSILFunction &IGF,
-                                                  SILInstruction *allocInst,
-                                                  const TypeInfo &ti,
-                                                  Address fixedSizeBuffer,
-                                                  const llvm::Twine &name) {
-  // There's no point in doing this for fixed-sized types, since we'll allocate
-  // an appropriately-sized buffer for them statically.
-  if (ti.isFixedSize())
-    return false;
-
-  // TODO: More interesting dominance analysis could be done here to see
-  // if the alloc_stack is dominated by copy_addrs into it on all paths.
-  // For now, check only that the copy_addr is the first use within the same
-  // block.
-  for (auto ii = std::next(allocInst->getIterator()),
-            ie = std::prev(allocInst->getParent()->end());
-       ii != ie; ++ii) {
-    auto *inst = &*ii;
-
-    // Does this instruction use the allocation? If not, continue.
-    auto Ops = inst->getAllOperands();
-    if (std::none_of(Ops.begin(), Ops.end(),
-                     [allocInst](const Operand &Op) {
-                       return Op.get() == allocInst;
-                     }))
-      continue;
-
-    // Is this a copy?
-    auto *copy = dyn_cast<swift::CopyAddrInst>(inst);
-    if (!copy)
-      return false;
-
-    // Destination must be the allocation.
-    if (copy->getDest() != SILValue(allocInst))
-      return false;
-
-    // Copy must be an initialization.
-    if (!copy->isInitializationOfDest())
-      return false;
-    
-    // We can defer to this initialization. Allocate the fixed-size buffer
-    // now, but don't allocate the value inside it.
-    if (!fixedSizeBuffer.getAddress()) {
-      fixedSizeBuffer = IGF.createFixedSizeBufferAlloca(name);
-      IGF.Builder.CreateLifetimeStart(fixedSizeBuffer,
-                                      getFixedBufferSize(IGF.IGM));
-    }
-    IGF.setContainerOfUnallocatedAddress(allocInst, fixedSizeBuffer);
-    return true;
-  }
-  
-  return false;
-}
-
 void IRGenSILFunction::emitDebugInfoForAllocStack(AllocStackInst *i,
                                                   const TypeInfo &type,
                                                   llvm::Value *addr) {
@@ -4797,12 +4735,7 @@ void IRGenSILFunction::visitAllocValueBufferInst(
                                           swift::AllocValueBufferInst *i) {
   Address buffer = getLoweredAddress(i->getOperand());
   auto valueType = i->getValueType();
-  Address value;
-  if (getSILModule().getOptions().UseCOWExistentials) {
-    value = emitAllocateValueInBuffer(*this, valueType, buffer);
-  } else {
-    value = getTypeInfo(valueType).allocateBuffer(*this, buffer, valueType);
-  }
+  Address value = emitAllocateValueInBuffer(*this, valueType, buffer);
   setLoweredAddress(i, value);
 }
 
@@ -4810,12 +4743,7 @@ void IRGenSILFunction::visitProjectValueBufferInst(
                                           swift::ProjectValueBufferInst *i) {
   Address buffer = getLoweredAddress(i->getOperand());
   auto valueType = i->getValueType();
-  Address value;
-  if (getSILModule().getOptions().UseCOWExistentials) {
-    value = emitProjectValueInBuffer(*this, valueType, buffer);
-  } else {
-    value = getTypeInfo(valueType).projectBuffer(*this, buffer, valueType);
-  }
+  Address value = emitProjectValueInBuffer(*this, valueType, buffer);
   setLoweredAddress(i, value);
 }
 
@@ -4823,40 +4751,21 @@ void IRGenSILFunction::visitDeallocValueBufferInst(
                                           swift::DeallocValueBufferInst *i) {
   Address buffer = getLoweredAddress(i->getOperand());
   auto valueType = i->getValueType();
-  if (getSILModule().getOptions().UseCOWExistentials) {
-    emitDeallocateValueInBuffer(*this, valueType, buffer);
-    return;
-  }
-  getTypeInfo(valueType).deallocateBuffer(*this, buffer, valueType);
+  emitDeallocateValueInBuffer(*this, valueType, buffer);
 }
 
 void IRGenSILFunction::visitInitExistentialAddrInst(swift::InitExistentialAddrInst *i) {
   Address container = getLoweredAddress(i->getOperand());
   SILType destType = i->getOperand()->getType();
-  Address buffer = emitOpaqueExistentialContainerInit(*this,
-                                                container,
-                                                destType,
-                                                i->getFormalConcreteType(),
-                                                i->getLoweredConcreteType(),
-                                                i->getConformances());
+  emitOpaqueExistentialContainerInit(
+      *this, container, destType, i->getFormalConcreteType(),
+      i->getLoweredConcreteType(), i->getConformances());
   auto srcType = i->getLoweredConcreteType();
-  auto &srcTI = getTypeInfo(srcType);
 
   // Allocate a COW box for the value if necessary.
-  if (getSILModule().getOptions().UseCOWExistentials) {
-    auto *genericEnv = CurSILFn->getGenericEnvironment();
-    setLoweredAddress(i, emitAllocateBoxedOpaqueExistentialBuffer(
-                             *this, destType, srcType, container, genericEnv));
-    return;
-  }
-
-  // See if we can defer initialization of the buffer to a copy_addr into it.
-  if (tryDeferFixedSizeBufferInitialization(*this, i, srcTI, buffer, ""))
-    return;
-  
-  // Allocate in the destination fixed-size buffer.
-  Address address = srcTI.allocateBuffer(*this, buffer, srcType);
-  setLoweredAddress(i, address);
+  auto *genericEnv = CurSILFn->getGenericEnvironment();
+  setLoweredAddress(i, emitAllocateBoxedOpaqueExistentialBuffer(
+                           *this, destType, srcType, container, genericEnv));
 }
 
 void IRGenSILFunction::visitInitExistentialOpaqueInst(
@@ -4893,14 +4802,8 @@ void IRGenSILFunction::visitDeinitExistentialAddrInst(
   Address container = getLoweredAddress(i->getOperand());
 
   // Deallocate the COW box for the value if necessary.
-  if (getSILModule().getOptions().UseCOWExistentials) {
-    emitDeallocateBoxedOpaqueExistentialBuffer(
-        *this, i->getOperand()->getType(), container);
-    return;
-  }
-
-  emitOpaqueExistentialContainerDeinit(*this, container,
-                                       i->getOperand()->getType());
+  emitDeallocateBoxedOpaqueExistentialBuffer(*this, i->getOperand()->getType(),
+                                             container);
 }
 
 void IRGenSILFunction::visitDeinitExistentialOpaqueInst(
@@ -4916,17 +4819,9 @@ void IRGenSILFunction::visitOpenExistentialAddrInst(OpenExistentialAddrInst *i) 
                            i->getType().getSwiftRValueType());
 
   // Insert a copy of the boxed value for COW semantics if necessary.
-  if (getSILModule().getOptions().UseCOWExistentials) {
-    auto accessKind = i->getAccessKind();
-    Address object = emitOpaqueBoxedExistentialProjection(
-        *this, accessKind, base, baseTy, openedArchetype);
-
-    setLoweredAddress(i, object);
-    return;
-  }
-
-  Address object = emitOpaqueExistentialProjection(*this, base, baseTy,
-                                                   openedArchetype);
+  auto accessKind = i->getAccessKind();
+  Address object = emitOpaqueBoxedExistentialProjection(
+      *this, accessKind, base, baseTy, openedArchetype);
 
   setLoweredAddress(i, object);
 }
@@ -5091,37 +4986,20 @@ void IRGenSILFunction::visitCopyAddrInst(swift::CopyAddrInst *i) {
   Address src = getLoweredAddress(i->getSrc());
   // See whether we have a deferred fixed-size buffer initialization.
   auto &loweredDest = getLoweredValue(i->getDest());
+  assert(!loweredDest.isUnallocatedAddressInBuffer());
+  Address dest = loweredDest.getAnyAddress();
 
-  if (loweredDest.isUnallocatedAddressInBuffer()) {
-    // We should never have a deferred initialization with COW existentials.
-    assert(!getSILModule().getOptions().UseCOWExistentials &&
-           "Should never have an unallocated buffer and COW existentials");
-
-    assert(i->isInitializationOfDest()
-           && "need to initialize an unallocated buffer");
-    Address cont = loweredDest.getContainerOfAddress();
+  if (i->isInitializationOfDest()) {
     if (i->isTakeOfSrc()) {
-      Address addr = addrTI.initializeBufferWithTake(*this, cont, src, addrTy);
-      setAllocatedAddressForBuffer(i->getDest(), addr);
+      addrTI.initializeWithTake(*this, dest, src, addrTy);
     } else {
-      Address addr = addrTI.initializeBufferWithCopy(*this, cont, src, addrTy);
-      setAllocatedAddressForBuffer(i->getDest(), addr);
+      addrTI.initializeWithCopy(*this, dest, src, addrTy);
     }
   } else {
-    Address dest = loweredDest.getAnyAddress();
-    
-    if (i->isInitializationOfDest()) {
-      if (i->isTakeOfSrc()) {
-        addrTI.initializeWithTake(*this, dest, src, addrTy);
-      } else {
-        addrTI.initializeWithCopy(*this, dest, src, addrTy);
-      }
+    if (i->isTakeOfSrc()) {
+      addrTI.assignWithTake(*this, dest, src, addrTy);
     } else {
-      if (i->isTakeOfSrc()) {
-        addrTI.assignWithTake(*this, dest, src, addrTy);
-      } else {
-        addrTI.assignWithCopy(*this, dest, src, addrTy);
-      }
+      addrTI.assignWithCopy(*this, dest, src, addrTy);
     }
   }
 }

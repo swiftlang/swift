@@ -311,17 +311,6 @@ public:
 
 namespace value_witness_types {
 
-/// Given an initialized buffer, destroy its value and deallocate
-/// the buffer.  This can be decomposed as:
-///
-///   self->destroy(self->projectBuffer(buffer), self);
-///   self->deallocateBuffer(buffer), self);
-///
-/// Preconditions:
-///   'buffer' is an initialized buffer
-/// Postconditions:
-///   'buffer' is an unallocated buffer
-typedef void destroyBuffer(ValueBuffer *buffer, const Metadata *self);
 
 /// Given an unallocated buffer, initialize it as a copy of the
 /// object in the source buffer.  This can be decomposed as:
@@ -340,23 +329,6 @@ typedef OpaqueValue *initializeBufferWithCopyOfBuffer(ValueBuffer *dest,
                                                       ValueBuffer *src,
                                                       const Metadata *self);
 
-/// Given an allocated or initialized buffer, derive a pointer to
-/// the object.
-/// 
-/// Invariants:
-///   'buffer' is an allocated or initialized buffer
-typedef OpaqueValue *projectBuffer(ValueBuffer *buffer,
-                                   const Metadata *self);
-
-/// Given an allocated buffer, deallocate the object.
-///
-/// Preconditions:
-///   'buffer' is an allocated buffer
-/// Postconditions:
-///   'buffer' is an unallocated buffer
-typedef void deallocateBuffer(ValueBuffer *buffer,
-                              const Metadata *self);
-
 /// Given an initialized object, destroy it.
 ///
 /// Preconditions:
@@ -365,21 +337,6 @@ typedef void deallocateBuffer(ValueBuffer *buffer,
 ///   'object' is an uninitialized object
 typedef void destroy(OpaqueValue *object,
                      const Metadata *self);
-
-/// Given an uninitialized buffer and an initialized object, allocate
-/// storage in the buffer and copy the value there.
-///
-/// Returns the dest object.
-///
-/// Preconditions:
-///   'dest' is an uninitialized buffer
-/// Postconditions:
-///   'dest' is an initialized buffer
-/// Invariants:
-///   'src' is an initialized object
-typedef OpaqueValue *initializeBufferWithCopy(ValueBuffer *dest,
-                                              OpaqueValue *src,
-                                              const Metadata *self);
 
 /// Given an uninitialized object and an initialized object, copy
 /// the value.
@@ -411,24 +368,6 @@ typedef OpaqueValue *initializeWithCopy(OpaqueValue *dest,
 typedef OpaqueValue *assignWithCopy(OpaqueValue *dest,
                                     OpaqueValue *src,
                                     const Metadata *self);
-
-/// Given an uninitialized buffer and an initialized object, move
-/// the value from the object to the buffer, leaving the source object
-/// uninitialized.
-///
-/// This operation does not need to be safe against 'dest' and 'src' aliasing.
-/// 
-/// Returns the dest object.
-///
-/// Preconditions:
-///   'dest' is an uninitialized buffer
-///   'src' is an initialized object
-/// Postconditions:
-///   'dest' is an initialized buffer
-///   'src' is an uninitialized object
-typedef OpaqueValue *initializeBufferWithTake(ValueBuffer *dest,
-                                              OpaqueValue *src,
-                                              const Metadata *self);
 
 /// Given an uninitialized object and an initialized object, move
 /// the value from one to the other, leaving the source object
@@ -474,18 +413,6 @@ typedef OpaqueValue *assignWithTake(OpaqueValue *dest,
                                     OpaqueValue *src,
                                     const Metadata *self);
 
-/// Given an uninitialized buffer, allocate an object.
-///
-/// Returns the uninitialized object.
-///
-/// Preconditions:
-///   'buffer' is an uninitialized buffer
-/// Postconditions:
-///   'buffer' is an allocated buffer
-typedef OpaqueValue *allocateBuffer(ValueBuffer *buffer,
-                                    const Metadata *self);
-
-  
 /// Given an unallocated buffer and an initialized buffer, move the
 /// value from one buffer to the other, leaving the source buffer
 /// unallocated.
@@ -646,18 +573,12 @@ OpaqueValue *swift_copyPOD(OpaqueValue *dest,
                            const Metadata *self);
 
 #define FOR_ALL_FUNCTION_VALUE_WITNESSES(MACRO) \
-  MACRO(destroyBuffer) \
   MACRO(initializeBufferWithCopyOfBuffer) \
-  MACRO(projectBuffer) \
-  MACRO(deallocateBuffer) \
   MACRO(destroy) \
-  MACRO(initializeBufferWithCopy) \
   MACRO(initializeWithCopy) \
   MACRO(assignWithCopy) \
-  MACRO(initializeBufferWithTake) \
   MACRO(initializeWithTake) \
   MACRO(assignWithTake) \
-  MACRO(allocateBuffer) \
   MACRO(initializeBufferWithTakeOfBuffer) \
   MACRO(destroyArray) \
   MACRO(initializeArrayWithCopy) \
