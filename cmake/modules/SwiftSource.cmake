@@ -272,6 +272,10 @@ function(_compile_swift_files
     list(APPEND swift_flags "-autolink-force-load")
   endif()
 
+	if (SWIFTFILE_IS_STDLIB_CORE OR SWIFTFILE_IS_SDK_OVERLAY)
+		list(APPEND swift_flags "-warn-swift3-objc-inference")
+  endif()
+
   list(APPEND swift_flags ${SWIFT_EXPERIMENTAL_EXTRA_FLAGS})
 
   if(SWIFTFILE_OPT_FLAGS)

@@ -42,7 +42,8 @@ public:
   virtual ~ResultPlan() = default;
 
   virtual void
-  gatherIndirectResultAddrs(SmallVectorImpl<SILValue> &outList) const = 0;
+  gatherIndirectResultAddrs(SILGenFunction &SGF, SILLocation loc,
+                            SmallVectorImpl<SILValue> &outList) const = 0;
 
   virtual Optional<std::pair<ManagedValue, ManagedValue>>
   emitForeignErrorArgument(SILGenFunction &SGF, SILLocation loc) {

@@ -144,7 +144,7 @@ where
   CodeUnits.SubSequence.SubSequence == CodeUnits.SubSequence,
   CodeUnits.SubSequence.Iterator.Element == CodeUnits.Iterator.Element {
   var characters: _UnicodeViews<CodeUnits,Encoding>.CharacterView {
-    return _UnicodeViews(codeUnits).characters
+    return _UnicodeViews(codeUnits, Encoding.self).characters
   }
 }
 
@@ -499,6 +499,9 @@ public protocol Any${Element}UnicodeView_ : AnyUnicodeView_ {
 
 public struct Any${Element}UnicodeView
    : BidirectionalCollection, ForwardingWrapper {
+  public typealias SubSequence = RangeReplaceableUnicodeViewSlice<
+    Any${Element}UnicodeView
+  >
   public typealias Index = AnyUnicodeIndex
   public typealias IndexDistance = Int//64
   public typealias Iterator = Any${Element}Iterator
@@ -511,6 +514,10 @@ public struct Any${Element}UnicodeView
   ${gyb.expand(
       'ForwardCollectionAPIs.swift.gyb', base='base2',
       element_only=True, Element=Element)}
+
+  public subscript(bounds: Range<Index>) -> SubSequence {
+    return SubSequence(base: self, bounds: bounds)
+  }
   
   // `base` must have exactly this signature to match the needed constrained
   // `ForwardingWrapper` extension, so we compute it and store the more refined
@@ -586,8 +593,7 @@ public protocol AnyUnicode {
 }
 
 /// Collections of `Character` that have `UnicodeContent`.
-public protocol Unicode
-  : AnyUnicode, BidirectionalCollection, BidirectionalCollectionWrapper
+public protocol Unicode : AnyUnicode, BidirectionalCollection
 // where Iterator.Element == Character
 {
   // poor man's constraint on Iterator.Element
@@ -597,8 +603,27 @@ public protocol Unicode
   var content: Content { get }
 }
 
-extension Unicode {
-  public var base: Content.CharacterView { return content.characters }
+extension Unicode where Self : BidirectionalCollectionWrapper {
+  public var base: Content.CharacterView {
+    get {
+      return content.characters
+    }
+  }
+  public var anyContent: AnyUnicodeContent { return content }
+}
+
+extension Unicode
+where Self : BidirectionalCollectionWrapper & RangeReplaceableCollection,
+Iterator.Element == Content.CharacterView.Iterator.Element
+{
+  public var base: Content.CharacterView {
+    get {
+      return content.characters
+    }
+    set {
+      replaceSubrange(startIndex..<endIndex, with: newValue)
+    }
+  }
   public var anyContent: AnyUnicodeContent { return content }
 }
 

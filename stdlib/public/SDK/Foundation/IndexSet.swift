@@ -41,52 +41,6 @@ extension IndexSet.RangeView {
     }
 }
 
-// We currently cannot use this mechanism because NSIndexSet is not abstract; it has its own ivars and therefore subclassing it using the same trick as NSData, etc. does not work.
-
-/*
-private final class _SwiftNSIndexSet : _SwiftNativeNSIndexSet, _SwiftNativeFoundationType {
-    public typealias ImmutableType = NSIndexSet
-    public typealias MutableType = NSMutableIndexSet
-
-    var __wrapped : _MutableUnmanagedWrapper<ImmutableType, MutableType>
-
-    init(immutableObject: AnyObject) {
-      // Take ownership.
-      __wrapped = .Immutable(
-        Unmanaged.passRetained(
-          _unsafeReferenceCast(immutableObject, to: ImmutableType.self)))
-
-      super.init()
-    }
-
-    init(mutableObject: AnyObject) {
-      // Take ownership.
-      __wrapped = .Mutable(
-       Unmanaged.passRetained(
-         _unsafeReferenceCast(mutableObject, to: MutableType.self)))
-      super.init()
-    }
-
-    public required init(unmanagedImmutableObject: Unmanaged<ImmutableType>) {
-      // Take ownership.
-      __wrapped = .Immutable(unmanagedImmutableObject)
-
-      super.init()
-    }
-
-    public required init(unmanagedMutableObject: Unmanaged<MutableType>) {
-      // Take ownership.
-      __wrapped = .Mutable(unmanagedMutableObject)
-
-      super.init()
-    }
-
-    deinit {
-      releaseWrappedObject()
-    }
-}
-*/
-
 /// Manages a `Set` of integer values, which are commonly used as an index type in Cocoa API.
 ///
 /// The range of valid integer values is 0..<INT_MAX-1. Anything outside this range is an error.

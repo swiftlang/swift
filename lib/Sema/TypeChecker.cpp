@@ -714,12 +714,13 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
 
     typeCheckFunctionsAndExternalDecls(TC);
   }
-  MyTC.reset();
 
   // Checking that benefits from having the whole module available.
   if (!(Options & TypeCheckingFlags::DelayWholeModuleChecking)) {
     performWholeModuleTypeChecking(SF);
   }
+
+  MyTC.reset();
 
   // Verify that we've checked types correctly.
   SF.ASTStage = SourceFile::TypeChecked;
@@ -1001,47 +1002,4 @@ TypeChecker::getDeclTypeCheckingSemantics(ValueDecl *decl) {
       return DeclTypeCheckingSemantics::OpenExistential;
   }
   return DeclTypeCheckingSemantics::Normal;
-}
-
-void swift::
-collectDefaultImplementationForProtocolMembers(ProtocolDecl *PD,
-                    llvm::SmallDenseMap<ValueDecl*, ValueDecl*> &DefaultMap) {
-  Type BaseTy = PD->getDeclaredInterfaceType();
-  DeclContext *DC = PD->getInnermostDeclContext();
-  std::unique_ptr<TypeChecker> CreatedTC;
-  auto *TC = static_cast<TypeChecker*>(DC->getASTContext().getLazyResolver());
-  if (!TC) {
-    CreatedTC.reset(new TypeChecker(DC->getASTContext()));
-    TC = CreatedTC.get();
-  }
-  auto HandleProtocol = [&](ProtocolDecl *PD) {
-    for (Decl *D : PD->getMembers()) {
-      ValueDecl *VD = dyn_cast<ValueDecl>(D);
-
-      // Skip non-value decl.
-      if (!VD)
-        continue;
-
-      // Skip decls with empty names, e.g. setter/getters for properties.
-      if (VD->getName().empty())
-        continue;
-
-      ResolvedMemberResult Result = resolveValueMember(*DC, BaseTy,
-                                                       VD->getFullName());
-      assert(Result);
-      for (ValueDecl *Default : Result.getMemberDecls(/*Viable*/true)) {
-        if (Default->getDeclContext()->isExtensionContext()) {
-          DefaultMap.insert({Default, VD});
-        }
-      }
-    }
-  };
-
-  // Collect the default implementations for the members in this given protocol.
-  HandleProtocol(PD);
-
-  // Collect the default implementations for the members in the inherited
-  // protocols.
-  for (auto* IP : PD->getInheritedProtocols())
-    HandleProtocol(IP);
 }

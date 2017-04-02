@@ -146,6 +146,7 @@ set(SWIFTLIB_ESSENTIAL
   Unicode2.swift
   UnicodeScalar.swift
   UnicodeViews.swift
+  UnicodeViewSlice.swift
   UnicodeTrie.swift.gyb
   Unmanaged.swift
   UnsafeBitMap.swift

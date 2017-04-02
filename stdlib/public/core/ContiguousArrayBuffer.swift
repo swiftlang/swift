@@ -25,6 +25,7 @@ internal final class _EmptyArrayStorage
 
   @_inlineable
   @_versioned
+  @nonobjc
   init(_doNotCallMe: ()) {
     _sanityCheckFailure("creating instance of _EmptyArrayStorage")
   }
@@ -40,6 +41,7 @@ internal final class _EmptyArrayStorage
 
   @_inlineable
   @_versioned
+  @nonobjc
   override func _getNonVerbatimBridgedCount() -> Int {
     return 0
   }
@@ -121,6 +123,7 @@ final class _ContiguousArrayStorage<Element> : _ContiguousArrayStorageBase {
   /// - Precondition: `Element` is bridged non-verbatim.
   @_inlineable
   @_versioned
+  @nonobjc
   override internal func _getNonVerbatimBridgedCount() -> Int {
     _sanityCheck(
       !_isBridgedVerbatimToObjectiveC(Element.self),

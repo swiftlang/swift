@@ -35,6 +35,7 @@ public class _StringStorageBase<
   // Allows us to code init in terms of Builtin.allocWithTailElems_1
   FactoryInitializable  
 {
+  @nonobjc
   final public var _header: _SwiftUTF16StringHeader
   
   @objc

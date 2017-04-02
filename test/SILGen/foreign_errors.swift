@@ -148,12 +148,12 @@ extension NSObject {
 }
 
 let fn = ErrorProne.fail
-// CHECK-LABEL: sil shared [thunk] @_T0So10ErrorProneC4failyyKFZTcTO : $@convention(thin) (@thick ErrorProne.Type) -> @owned @callee_owned () -> @error Error
+// CHECK-LABEL: sil shared [serializable] [thunk] @_T0So10ErrorProneC4failyyKFZTcTO : $@convention(thin) (@thick ErrorProne.Type) -> @owned @callee_owned () -> @error Error
 // CHECK:      [[T0:%.*]] = function_ref @_T0So10ErrorProneC4failyyKFZTO : $@convention(method) (@thick ErrorProne.Type) -> @error Error
 // CHECK-NEXT: [[T1:%.*]] = partial_apply [[T0]](%0)
 // CHECK-NEXT: return [[T1]]
 
-// CHECK-LABEL: sil shared [thunk] @_T0So10ErrorProneC4failyyKFZTO : $@convention(method) (@thick ErrorProne.Type) -> @error Error {
+// CHECK-LABEL: sil shared [serializable] [thunk] @_T0So10ErrorProneC4failyyKFZTO : $@convention(method) (@thick ErrorProne.Type) -> @error Error {
 // CHECK:      [[SELF:%.*]] = thick_to_objc_metatype %0 : $@thick ErrorProne.Type to $@objc_metatype ErrorProne.Type
 // CHECK:      [[METHOD:%.*]] = class_method [volatile] [[T0]] : $@objc_metatype ErrorProne.Type, #ErrorProne.fail!1.foreign : (ErrorProne.Type) -> () throws -> (), $@convention(objc_method) (Optional<AutoreleasingUnsafeMutablePointer<Optional<NSError>>>, @objc_metatype ErrorProne.Type) -> ObjCBool
 // CHECK:      [[TEMP:%.*]] = alloc_stack $Optional<NSError>
@@ -298,3 +298,14 @@ func testPreservedResultInverted() throws {
 // CHECK-NOT: destroy_value
 // CHECK:   return {{%.+}} : $()
 // CHECK: [[ERROR_BB]]
+
+// Make sure that we do not crash when emitting the error value here.
+//
+// TODO: Add some additional filecheck tests.
+extension NSURL {
+  func resourceValue<T>(forKey key: String) -> T? {
+    var prop: AnyObject? = nil
+    _ = try? self.getResourceValue(&prop, forKey: key)
+    return prop as? T
+  }
+}

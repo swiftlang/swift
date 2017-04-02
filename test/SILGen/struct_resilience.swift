@@ -155,7 +155,7 @@ public func functionWithMyResilientTypes(_ s: MySize, f: (MySize) -> MySize) -> 
   return f(s)
 }
 
-// CHECK-LABEL: sil [transparent] [fragile] @_T017struct_resilience25publicTransparentFunctionSiAA6MySizeVF : $@convention(thin) (@in MySize) -> Int
+// CHECK-LABEL: sil [transparent] [serialized] @_T017struct_resilience25publicTransparentFunctionSiAA6MySizeVF : $@convention(thin) (@in MySize) -> Int
 @_transparent public func publicTransparentFunction(_ s: MySize) -> Int {
 
   // Since the body of a public transparent function might be inlined into
@@ -173,10 +173,10 @@ public func functionWithMyResilientTypes(_ s: MySize, f: (MySize) -> MySize) -> 
   return s.w
 }
 
-// CHECK-LABEL: sil [transparent] [fragile] @_T017struct_resilience30publicTransparentLocalFunctionSiycAA6MySizeVF : $@convention(thin) (@in MySize) -> @owned @callee_owned () -> Int
+// CHECK-LABEL: sil [transparent] [serialized] @_T017struct_resilience30publicTransparentLocalFunctionSiycAA6MySizeVF : $@convention(thin) (@in MySize) -> @owned @callee_owned () -> Int
 @_transparent public func publicTransparentLocalFunction(_ s: MySize) -> () -> Int {
 
-// CHECK-LABEL: sil shared [fragile] @_T017struct_resilience30publicTransparentLocalFunctionSiycAA6MySizeVFSiycfU_ : $@convention(thin) (@owned { var MySize }) -> Int
+// CHECK-LABEL: sil shared [serialized] @_T017struct_resilience30publicTransparentLocalFunctionSiycAA6MySizeVFSiycfU_ : $@convention(thin) (@owned { var MySize }) -> Int
 // CHECK: function_ref @_T017struct_resilience6MySizeV1wSifg : $@convention(method) (@in_guaranteed MySize) -> Int
 // CHECK: return {{.*}} : $Int
 
@@ -198,7 +198,7 @@ public func functionWithMyResilientTypes(_ s: MySize, f: (MySize) -> MySize) -> 
   return s.w
 }
 
-// CHECK-LABEL: sil [fragile] [always_inline] @_T017struct_resilience26publicInlineAlwaysFunctionSiAA6MySizeVF : $@convention(thin) (@in MySize) -> Int
+// CHECK-LABEL: sil [serialized] [always_inline] @_T017struct_resilience26publicInlineAlwaysFunctionSiAA6MySizeVF : $@convention(thin) (@in MySize) -> Int
 @inline(__always) public func publicInlineAlwaysFunction(_ s: MySize) -> Int {
 
   // Since the body of a public transparent function might be inlined into
@@ -229,7 +229,7 @@ public func functionWithMyResilientTypes(_ s: MySize, f: (MySize) -> MySize) -> 
   }
 }
 
-// CHECK-LABEL: sil [transparent] [fragile] @_T017struct_resilience27useVersionedResilientStructAA0deF0VADF : $@convention(thin) (@in VersionedResilientStruct) -> @out VersionedResilientStruct
+// CHECK-LABEL: sil [transparent] [serialized] @_T017struct_resilience27useVersionedResilientStructAA0deF0VADF : $@convention(thin) (@in VersionedResilientStruct) -> @out VersionedResilientStruct
 @_versioned
 @_transparent func useVersionedResilientStruct(_ s: VersionedResilientStruct)
     -> VersionedResilientStruct {

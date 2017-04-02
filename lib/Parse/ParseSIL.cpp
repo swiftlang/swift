@@ -462,7 +462,7 @@ SILFunction *SILParser::getGlobalNameForDefinition(Identifier Name,
       auto loc = RegularLocation(Loc);
       Fn =
           SILMod.createFunction(SILLinkage::Private, "", Ty, nullptr, loc,
-                                IsNotBare, IsNotTransparent, IsNotFragile);
+                                IsNotBare, IsNotTransparent, IsNotSerialized);
       Fn->setDebugScope(new (SILMod) SILDebugScope(loc, Fn));
     }
     
@@ -483,7 +483,7 @@ SILFunction *SILParser::getGlobalNameForDefinition(Identifier Name,
     P.diagnose(Loc, diag::sil_value_redefinition, Name.str());
     auto *fn =
         SILMod.createFunction(SILLinkage::Private, "", Ty, nullptr, loc,
-                              IsNotBare, IsNotTransparent, IsNotFragile);
+                              IsNotBare, IsNotTransparent, IsNotSerialized);
     fn->setDebugScope(new (SILMod) SILDebugScope(loc, fn));
     return fn;
   }
@@ -491,7 +491,7 @@ SILFunction *SILParser::getGlobalNameForDefinition(Identifier Name,
   // Otherwise, this definition is the first use of this name.
   auto *fn = SILMod.createFunction(SILLinkage::Private, Name.str(), Ty,
                                    nullptr, loc, IsNotBare,
-                                   IsNotTransparent, IsNotFragile);
+                                   IsNotTransparent, IsNotSerialized);
   fn->setDebugScope(new (SILMod) SILDebugScope(loc, fn));
   return fn;
 }
@@ -514,7 +514,7 @@ SILFunction *SILParser::getGlobalNameForReference(Identifier Name,
                  Name.str(), FnRef->getLoweredFunctionType(), Ty);
       FnRef =
           SILMod.createFunction(SILLinkage::Private, "", Ty, nullptr, loc,
-                                IsNotBare, IsNotTransparent, IsNotFragile);
+                                IsNotBare, IsNotTransparent, IsNotSerialized);
       FnRef->setDebugScope(new (SILMod) SILDebugScope(loc, FnRef));
     }
     return FnRef;
@@ -524,7 +524,7 @@ SILFunction *SILParser::getGlobalNameForReference(Identifier Name,
   // reference.
   auto *Fn = SILMod.createFunction(SILLinkage::Private, Name.str(), Ty,
                                    nullptr, loc, IsNotBare,
-                                   IsNotTransparent, IsNotFragile);
+                                   IsNotTransparent, IsNotSerialized);
   Fn->setDebugScope(new (SILMod) SILDebugScope(loc, Fn));
   TUState.ForwardRefFns[Name] = { Fn, IgnoreFwdRef ? SourceLoc() : Loc };
   TUState.Diags = &P.Diags;
@@ -817,7 +817,8 @@ void SILParser::convertRequirements(SILFunction *F,
   }
 }
 
-static bool parseDeclSILOptional(bool *isTransparent, bool *isFragile,
+static bool parseDeclSILOptional(bool *isTransparent,
+                                 IsSerialized_t *isSerialized,
                                  IsThunk_t *isThunk, bool *isGlobalInit,
                                  Inline_t *inlineStrategy, bool *isLet,
                                  SmallVectorImpl<std::string> *Semantics,
@@ -836,8 +837,10 @@ static bool parseDeclSILOptional(bool *isTransparent, bool *isFragile,
       return true;
     } else if (isTransparent && SP.P.Tok.getText() == "transparent")
       *isTransparent = true;
-    else if (isFragile && SP.P.Tok.getText() == "fragile")
-      *isFragile = true;
+    else if (isSerialized && SP.P.Tok.getText() == "serialized")
+      *isSerialized = IsSerialized;
+    else if (isSerialized && SP.P.Tok.getText() == "serializable")
+      *isSerialized = IsSerializable;
     else if (isThunk && SP.P.Tok.getText() == "thunk")
       *isThunk = IsThunk;
     else if (isThunk && SP.P.Tok.getText() == "reabstraction_thunk")
@@ -4445,7 +4448,7 @@ bool Parser::parseDeclSIL() {
 
   Scope S(this, ScopeKind::TopLevel);
   bool isTransparent = false;
-  bool isFragile = false;
+  IsSerialized_t isSerialized = IsNotSerialized;
   IsThunk_t isThunk = IsNotThunk;
   bool isGlobalInit = false;
   Inline_t inlineStrategy = InlineDefault;
@@ -4454,7 +4457,7 @@ bool Parser::parseDeclSIL() {
   ValueDecl *ClangDecl = nullptr;
   EffectsKind MRK = EffectsKind::Unspecified;
   if (parseSILLinkage(FnLinkage, *this) ||
-      parseDeclSILOptional(&isTransparent, &isFragile, &isThunk, &isGlobalInit,
+      parseDeclSILOptional(&isTransparent, &isSerialized, &isThunk, &isGlobalInit,
                            &inlineStrategy, nullptr, &Semantics, &SpecAttrs,
                            &ClangDecl, &MRK, FunctionState) ||
       parseToken(tok::at_sign, diag::expected_sil_function_name) ||
@@ -4478,7 +4481,7 @@ bool Parser::parseDeclSIL() {
       FunctionState.getGlobalNameForDefinition(FnName, SILFnType, FnNameLoc);
     FunctionState.F->setBare(IsBare);
     FunctionState.F->setTransparent(IsTransparent_t(isTransparent));
-    FunctionState.F->setFragile(IsFragile_t(isFragile));
+    FunctionState.F->setSerialized(IsSerialized_t(isSerialized));
     FunctionState.F->setThunk(IsThunk_t(isThunk));
     FunctionState.F->setGlobalInit(isGlobalInit);
     FunctionState.F->setInlineStrategy(inlineStrategy);
@@ -4608,7 +4611,7 @@ bool Parser::parseSILGlobal() {
   Identifier GlobalName;
   SILType GlobalType;
   SourceLoc NameLoc;
-  bool isFragile = false;
+  IsSerialized_t isSerialized = IsNotSerialized;
   bool isLet = false;
 
   // Inform the lexer that we're lexing the body of the SIL declaration.
@@ -4616,7 +4619,7 @@ bool Parser::parseSILGlobal() {
   Scope S(this, ScopeKind::TopLevel);
   SILParser State(*this);
   if (parseSILLinkage(GlobalLinkage, *this) ||
-      parseDeclSILOptional(nullptr, &isFragile, nullptr, nullptr,
+      parseDeclSILOptional(nullptr, &isSerialized, nullptr, nullptr,
                            nullptr, &isLet, nullptr, nullptr, nullptr,
                            nullptr, State) ||
       parseToken(tok::at_sign, diag::expected_sil_value_name) ||
@@ -4633,7 +4636,7 @@ bool Parser::parseSILGlobal() {
 
   // FIXME: check for existing global variable?
   auto *GV = SILGlobalVariable::create(*SIL->M, GlobalLinkage.getValue(),
-                                       (IsFragile_t)isFragile,
+                                       isSerialized,
                                        GlobalName.str(),GlobalType,
                                        RegularLocation(NameLoc));
 
@@ -4989,8 +4992,8 @@ bool Parser::parseSILWitnessTable() {
   Optional<SILLinkage> Linkage;
   parseSILLinkage(Linkage, *this);
   
-  bool isFragile = false;
-  if (parseDeclSILOptional(nullptr, &isFragile, nullptr, nullptr,
+  IsSerialized_t isSerialized = IsNotSerialized;
+  if (parseDeclSILOptional(nullptr, &isSerialized, nullptr, nullptr,
                            nullptr, nullptr, nullptr, nullptr, nullptr,
                            nullptr, WitnessState))
     return true;
@@ -5168,7 +5171,7 @@ bool Parser::parseSILWitnessTable() {
 
   if (!wt)
     wt = SILWitnessTable::create(*SIL->M, *Linkage, theConformance);
-  wt->convertToDefinition(witnessEntries, isFragile);
+  wt->convertToDefinition(witnessEntries, isSerialized);
   BodyScope.reset();
   return false;
 }

@@ -31,7 +31,7 @@ extension A1 {}
 // CHECK-DAG: @property (nonatomic, readonly) NSInteger some;
 // CHECK-NEXT: @end
 extension A2 {
-  var some: Int { return 1 }
+  @objc var some: Int { return 1 }
 }
 @objc class A2 {}
 
@@ -47,10 +47,10 @@ extension A2 {
 // CHECK-DAG: @end
 // CHECK: @end
 extension A3 {
-  var some: Int { return 1 }
+  @objc var some: Int { return 1 }
 }
 extension A3 {
-  var more: Int { return 10 }
+  @objc var more: Int { return 10 }
 }
 
 // CHECK-LABEL: @interface A4{{$}}
@@ -88,7 +88,7 @@ class ClassWithCustomName {
 // CHECK-NEXT: - (void)foo;
 // CHECK-NEXT: @end
 extension ClassWithCustomName {
-  func foo() {}
+  @objc func foo() {}
 }
 
 // NEGATIVE-NOT: CGColor
@@ -100,7 +100,7 @@ extension CGColor {
 // CHECK-NEXT: - (void)bar;
 // CHECK-NEXT: @end
 extension GenericClass {
-  func bar() {}
+  @objc func bar() {}
 }
 
 // NEGATIVE-NOT: NotObjC
@@ -113,7 +113,7 @@ extension NotObjC {}
 // CHECK-DAG: @property (nonatomic, readonly) NSInteger some;
 // CHECK-NEXT: @end
 extension NSObject {
-  var some: Int { return 1 }
+  @objc var some: Int { return 1 }
 }
 
 // NEGATIVE-NOT: @class NSString;
@@ -124,10 +124,10 @@ extension NSObject {
 // CHECK-NEXT: + (NSString * _Nullable)fromColor:(NSColor * _Nonnull)color SWIFT_WARN_UNUSED_RESULT;
 // CHECK-NEXT: @end
 extension NSString {
-  func test() {}
-  class func test2() {}
+  @objc func test() {}
+  @objc class func test2() {}
 
-  class func fromColor(_ color: NSColor) -> NSString? { return nil; }
+  @objc class func fromColor(_ color: NSColor) -> NSString? { return nil; }
 }
 
 // CHECK-LABEL: @interface PettableContainer<T> (SWIFT_EXTENSION(extensions))
@@ -138,9 +138,9 @@ extension NSString {
 // CHECK-NEXT: - (T _Nullable)extract2 SWIFT_WARN_UNUSED_RESULT;
 // CHECK-NEXT: @end
 extension PettableContainer {
-  func duplicate() -> PettableContainer { fatalError() }
-  func duplicate2() -> PettableContainer<T> { fatalError() }
-  func duplicate3() -> PettableContainer<PettableOverextendedMetaphor> { fatalError() }
-  func extract() -> T { fatalError() }
-  func extract2() -> T? { fatalError() }
+  @objc func duplicate() -> PettableContainer { fatalError() }
+  @objc func duplicate2() -> PettableContainer<T> { fatalError() }
+  @objc func duplicate3() -> PettableContainer<PettableOverextendedMetaphor> { fatalError() }
+  @objc func extract() -> T { fatalError() }
+  @objc func extract2() -> T? { fatalError() }
 }

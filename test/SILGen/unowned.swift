@@ -113,7 +113,7 @@ func test_unowned_let_capture(_ aC : C) {
   takeClosure { bC.f() }
 }
 
-// CHECK-LABEL: sil shared @_T07unowned05test_A12_let_captureyAA1CCFSiycfU_ : $@convention(thin) (@owned @sil_unowned C) -> Int {
+// CHECK-LABEL: sil private @_T07unowned05test_A12_let_captureyAA1CCFSiycfU_ : $@convention(thin) (@owned @sil_unowned C) -> Int {
 // CHECK: bb0([[ARG:%.*]] : $@sil_unowned C):
 // CHECK-NEXT:   debug_value %0 : $@sil_unowned C, let, name "bC", argno 1
 // CHECK-NEXT:   strong_retain_unowned [[ARG]] : $@sil_unowned C

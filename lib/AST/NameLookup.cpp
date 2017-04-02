@@ -1181,14 +1181,14 @@ void NominalTypeDecl::makeMemberVisible(ValueDecl *member) {
 TinyPtrVector<ValueDecl *> NominalTypeDecl::lookupDirect(
                                                   DeclName name,
                                                   bool ignoreNewExtensions) {
+  (void)getMembers();
+
   // Make sure we have the complete list of members (in this nominal and in all
   // extensions).
   if (!ignoreNewExtensions) {
     for (auto E : getExtensions())
       (void)E->getMembers();
   }
-
-  (void)getMembers();
 
   prepareLookupTable(ignoreNewExtensions);
 

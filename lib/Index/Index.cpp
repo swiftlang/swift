@@ -22,6 +22,7 @@
 #include "swift/AST/USRGeneration.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/StringExtras.h"
+#include "swift/Sema/IDETypeChecking.h"
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/ErrorHandling.h"
@@ -596,6 +597,17 @@ bool IndexSwiftASTWalker::startEntityDecl(ValueDecl *D) {
     if (addRelation(Info, (SymbolRoleSet) SymbolRole::RelationOverrideOf, Overridden))
       return false;
   }
+
+  {
+    // Collect the protocol requirements this decl can provide default
+    // implementations to, and record them as overriding.
+    llvm::SmallVector<ValueDecl*, 2> Buffer;
+    for (auto Req : canDeclProvideDefaultImplementationFor(D, Buffer)) {
+      if (addRelation(Info, (SymbolRoleSet) SymbolRole::RelationOverrideOf, Req))
+        return false;
+    }
+  }
+
   // FIXME: This is quite expensive and not worth the cost for indexing purposes
   // of system modules. Revisit if this becomes more efficient.
   if (!isSystemModule) {

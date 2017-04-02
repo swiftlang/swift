@@ -372,7 +372,7 @@ ManagedValue SILGenBuilder::bufferForExpr(
     SGFContext context, std::function<void (SILValue)> rvalueEmitter) {
   // If we have a single-buffer "emit into" initialization, use that for the
   // result.
-  SILValue address = context.getAddressForInPlaceInitialization();
+  SILValue address = context.getAddressForInPlaceInitialization(SGF, loc);
 
   // If we couldn't emit into the Initialization, emit into a temporary
   // allocation.
@@ -384,8 +384,7 @@ ManagedValue SILGenBuilder::bufferForExpr(
 
   // If we have a single-buffer "emit into" initialization, use that for the
   // result.
-  if (context.getAddressForInPlaceInitialization()) {
-    context.getEmitInto()->finishInitialization(SGF);
+  if (context.finishInPlaceInitialization(SGF)) {
     return ManagedValue::forInContext();
   }
 
@@ -402,7 +401,7 @@ ManagedValue SILGenBuilder::formalAccessBufferForExpr(
     SGFContext context, std::function<void(SILValue)> rvalueEmitter) {
   // If we have a single-buffer "emit into" initialization, use that for the
   // result.
-  SILValue address = context.getAddressForInPlaceInitialization();
+  SILValue address = context.getAddressForInPlaceInitialization(SGF, loc);
 
   // If we couldn't emit into the Initialization, emit into a temporary
   // allocation.
@@ -414,8 +413,7 @@ ManagedValue SILGenBuilder::formalAccessBufferForExpr(
 
   // If we have a single-buffer "emit into" initialization, use that for the
   // result.
-  if (context.getAddressForInPlaceInitialization()) {
-    context.getEmitInto()->finishInitialization(SGF);
+  if (context.finishInPlaceInitialization(SGF)) {
     return ManagedValue::forInContext();
   }
 
@@ -674,6 +672,28 @@ void SwitchEnumBuilder::emit() && {
     }
   }
 
+  // If we are asked to create a default block and it is specified that the
+  // default block should be emitted before normal cases, emit it now.
+  if (defaultBlockData &&
+      defaultBlockData->dispatchTime ==
+          DefaultDispatchTime::BeforeNormalCases) {
+    SILBasicBlock *defaultBlock = defaultBlockData->block;
+    NullablePtr<SILBasicBlock> contBB = defaultBlockData->contBlock;
+    DefaultCaseHandler handler = defaultBlockData->handler;
+
+    // Don't allow cleanups to escape the conditional block.
+    SwitchCaseFullExpr presentScope(builder.getSILGenFunction(),
+                                    CleanupLocation::get(loc),
+                                    contBB.getPtrOrNull());
+    builder.emitBlock(defaultBlock);
+    ManagedValue input = optional;
+    if (!isAddressOnly) {
+      input = builder.createOwnedPHIArgument(optional.getType());
+    }
+    handler(input, presentScope);
+    assert(!builder.hasValidInsertionPoint());
+  }
+
   for (NormalCaseData &caseData : caseDataArray) {
     EnumElementDecl *decl = caseData.decl;
     SILBasicBlock *caseBlock = caseData.block;
@@ -684,6 +704,7 @@ void SwitchEnumBuilder::emit() && {
     SwitchCaseFullExpr presentScope(builder.getSILGenFunction(),
                                     CleanupLocation::get(loc),
                                     contBlock.getPtrOrNull());
+
     builder.emitBlock(caseBlock);
 
     ManagedValue input;
@@ -700,9 +721,10 @@ void SwitchEnumBuilder::emit() && {
     assert(!builder.hasValidInsertionPoint());
   }
 
-  // If we have a default BB, create an argument for the original loaded value
-  // and destroy it there.
-  if (defaultBlockData) {
+  // If we are asked to create a default block and it is specified that the
+  // default block should be emitted after normal cases, emit it now.
+  if (defaultBlockData &&
+      defaultBlockData->dispatchTime == DefaultDispatchTime::AfterNormalCases) {
     SILBasicBlock *defaultBlock = defaultBlockData->block;
     NullablePtr<SILBasicBlock> contBB = defaultBlockData->contBlock;
     DefaultCaseHandler handler = defaultBlockData->handler;

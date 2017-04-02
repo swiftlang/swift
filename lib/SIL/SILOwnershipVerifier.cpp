@@ -1095,6 +1095,7 @@ CONSTANT_OWNERSHIP_BUILTIN(Trivial, false, Xor)
 CONSTANT_OWNERSHIP_BUILTIN(Trivial, false, ZExt)
 CONSTANT_OWNERSHIP_BUILTIN(Trivial, false, ZExtOrBitCast)
 CONSTANT_OWNERSHIP_BUILTIN(Trivial, false, ZeroInitializer)
+CONSTANT_OWNERSHIP_BUILTIN(Trivial, false, Swift3ImplicitObjCEntrypoint)
 #undef CONSTANT_OWNERSHIP_BUILTIN
 
 // Builtins that should be lowered to SIL instructions so we should never see

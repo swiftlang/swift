@@ -20,7 +20,7 @@ class C {
 struct S {
   var member: Int
 
-  // CHECK-LABEL: sil hidden  @{{.*}}1SV3foo{{.*}} : $@convention(method) (Int, @inout S) -> ()
+  // CHECK-LABEL: sil hidden @{{.*}}1SV3foo{{.*}} : $@convention(method) (Int, @inout S) -> ()
   mutating
   func foo(x x: Int) {
     var x = x
@@ -101,6 +101,6 @@ func referencedFromFunctionEnumFields(_ x: ReferencedFromFunctionEnum)
   }
 }
 
-// CHECK-LABEL: sil shared @_T05types1fyyF2FCL_C3zimyyF
-// CHECK-LABEL: sil shared @_T05types1gySb1b_tF2FCL_C3zimyyF
-// CHECK-LABEL: sil shared @_T05types1gySb1b_tF2FCL0_C3zimyyF
+// CHECK-LABEL: sil private @_T05types1fyyF2FCL_C3zimyyF
+// CHECK-LABEL: sil private @_T05types1gySb1b_tF2FCL_C3zimyyF
+// CHECK-LABEL: sil private @_T05types1gySb1b_tF2FCL0_C3zimyyF

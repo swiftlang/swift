@@ -362,7 +362,8 @@ extension _UnicodeViews {
     public var base: Base
     public typealias Index = Base.Index
     public typealias IndexDistance = Base.IndexDistance
-
+    public typealias Self_ = FCCNormalizedUTF16View
+    
     public init(_ unicodeView: _UnicodeViews<CodeUnits, Encoding>) {
       self.base = Base(FCCNormalizedLazySegments(unicodeView))
     }
@@ -387,9 +388,14 @@ extension _UnicodeViews.FCCNormalizedUTF16View : UnicodeView {
     return Index(segmentIdx, segmentIdx.segment.startIndex)
   }
 
-  // Returns the offset of the beggining of `of`'s segment
+  // Returns the offset of the beggining of `i`'s segment
   public static func encodedOffset(of i: Index) -> Int64 {
     return numericCast(i._outer.nativeOffset)
+  }
+
+  public typealias SubSequence = UnicodeViewSlice<Self_>
+  public subscript(bounds: Range<Index>) -> SubSequence {
+    return SubSequence(base: self, bounds: bounds)
   }
 }
 

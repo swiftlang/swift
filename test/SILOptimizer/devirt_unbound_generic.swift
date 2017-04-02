@@ -1,24 +1,24 @@
 // RUN: %target-swift-frontend -emit-sil -O %s | %FileCheck %s
 
 // We used to crash on this when trying to devirtualize t.boo(a, 1),
-// because it is an "apply" with unbound generic arguments and
-// devirtualizer is not able to devirtualize unbound generic
-// invocations yet.
+// because it is an "apply" with replacement types that contain
+// archetypes, and the devirtualizer was not able to handle that
+// case correctly.
 //
 // rdar://19912272
 
 protocol P {
-   associatedtype Node
+  associatedtype Node
 }
 
 class C<T:P> {
-   typealias Node = T.Node
+  typealias Node = T.Node
 
-   func foo(_ n:Node) {
-   }
+  func foo(_ n:Node) {
+  }
 
-   func boo<S>(_ n:Node, s:S) {
-   }
+  func boo<S>(_ n:Node, s:S) {
+  }
 }
 
 func test1<T>(_ t:C<T>, a: T.Node) {

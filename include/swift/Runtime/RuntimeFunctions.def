@@ -1207,6 +1207,13 @@ FUNCTION(GetInitializedObjCClass, swift_getInitializedObjCClass, RegisterPreserv
          ARGS(ObjCClassPtrTy),
          ATTRS(NoUnwind))
 
+// void swift_objc_swift3ImplicitObjCEntrypoint(id self, SEL selector)
+FUNCTION(Swift3ImplicitObjCEntrypoint, swift_objc_swift3ImplicitObjCEntrypoint,
+         DefaultCC,
+         RETURNS(VoidTy),
+         ARGS(ObjCPtrTy, ObjCSELTy),
+         ATTRS(NoUnwind))
+
 #endif
 
 #undef RETURNS

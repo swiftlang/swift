@@ -682,7 +682,7 @@ SILFunction *MaterializeForSetEmitter::createCallback(SILFunction &F,
   auto callback =
     SGM.M.createFunction(Linkage, CallbackName, callbackType,
                          genericEnv, SILLocation(Witness),
-                         IsBare, F.isTransparent(), F.isFragile(),
+                         IsBare, F.isTransparent(), F.isSerialized(),
                          IsNotThunk,
                          /*classVisibility=*/SILFunction::NotRelevant,
                          /*inlineStrategy=*/InlineDefault,

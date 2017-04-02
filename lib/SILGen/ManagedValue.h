@@ -296,6 +296,9 @@ public:
     // "InContext" is not considered false.
     return bool(getValue()) || valueAndFlag.getInt();
   }
+
+  void dump() const;
+  void print(raw_ostream &os) const;
 };
 
 /// A ManagedValue which may not be intended to be consumed.

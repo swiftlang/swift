@@ -76,25 +76,25 @@ func local_recursion(_ x: Int, y: Int) {
   f(x)
 }
 
-// CHECK: sil shared [[SELF_RECURSIVE]]
+// CHECK: sil private [[SELF_RECURSIVE]]
 // CHECK: bb0([[A:%0]] : $Int, [[X:%1]] : $Int):
 // CHECK:   [[SELF_REF:%.*]] = function_ref [[SELF_RECURSIVE]]
 // CHECK:   apply [[SELF_REF]]({{.*}}, [[X]])
 
-// CHECK: sil shared [[MUTUALLY_RECURSIVE_1]]
+// CHECK: sil private [[MUTUALLY_RECURSIVE_1]]
 // CHECK: bb0([[A:%0]] : $Int, [[Y:%1]] : $Int, [[X:%2]] : $Int):
 // CHECK:   [[MUTUALLY_RECURSIVE_REF:%.*]] = function_ref [[MUTUALLY_RECURSIVE_2:@_T015local_recursionAAySi_Si1ytF20mutually_recursive_2L_ySiF]]
 // CHECK:   apply [[MUTUALLY_RECURSIVE_REF]]({{.*}}, [[X]], [[Y]])
-// CHECK: sil shared [[MUTUALLY_RECURSIVE_2]]
+// CHECK: sil private [[MUTUALLY_RECURSIVE_2]]
 // CHECK: bb0([[B:%0]] : $Int, [[X:%1]] : $Int, [[Y:%2]] : $Int):
 // CHECK:   [[MUTUALLY_RECURSIVE_REF:%.*]] = function_ref [[MUTUALLY_RECURSIVE_1]]
 // CHECK:   apply [[MUTUALLY_RECURSIVE_REF]]({{.*}}, [[Y]], [[X]])
 
 
-// CHECK: sil shared [[TRANS_CAPTURE_1:@_T015local_recursionAAySi_Si1ytF20transitive_capture_1L_S2iF]]
+// CHECK: sil private [[TRANS_CAPTURE_1:@_T015local_recursionAAySi_Si1ytF20transitive_capture_1L_S2iF]]
 // CHECK: bb0([[A:%0]] : $Int, [[X:%1]] : $Int):
 
-// CHECK: sil shared [[TRANS_CAPTURE]]
+// CHECK: sil private [[TRANS_CAPTURE]]
 // CHECK: bb0([[B:%0]] : $Int, [[X:%1]] : $Int, [[Y:%2]] : $Int):
 // CHECK:   [[TRANS_CAPTURE_1_REF:%.*]] = function_ref [[TRANS_CAPTURE_1]]
 // CHECK:   apply [[TRANS_CAPTURE_1_REF]]({{.*}}, [[X]])

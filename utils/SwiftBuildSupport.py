@@ -68,6 +68,28 @@ SWIFT_BUILD_ROOT = os.environ.get(
     "SWIFT_BUILD_ROOT", os.path.join(SWIFT_SOURCE_ROOT, "build"))
 
 
+def _get_default_swift_repo_name():
+    result = ""
+
+    # Are we in a Swift checkout? Start from this file and check its parent
+    # directories.
+    #
+    # $SWIFT_SOURCE_ROOT/$SWIFT_REPO_NAME/utils/SwiftBuildSupport.py
+    (swift_path, parent_dirname) = os.path.split(os.path.dirname(__file__))
+    if parent_dirname != "utils":
+        return result
+    if not os.path.exists(os.path.join(swift_path, 'CMakeLists.txt')):
+        return result
+    (_, swift_repo_name) = os.path.split(swift_path)
+    return swift_repo_name
+
+
+# Set SWIFT_REPO_NAME in your environment to control the name of the swift
+# directory name that is used.
+SWIFT_REPO_NAME = os.environ.get(
+    "SWIFT_REPO_NAME", _get_default_swift_repo_name())
+
+
 def _load_preset_files_impl(preset_file_names, substitutions={}):
     config = ConfigParser.SafeConfigParser(substitutions, allow_no_value=True)
     if config.read(preset_file_names) == []:

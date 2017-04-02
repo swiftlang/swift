@@ -171,6 +171,13 @@ ERROR(error_formatting_invalid_range,none,
 WARNING(stats_disabled,none,
   "compiler was not built with support for collecting statistics", ())
 
+ERROR(symbol_in_tbd_not_in_ir,none,
+      "symbol '%0' (%1) is in TBD file, but not in generated IR",
+      (StringRef, StringRef))
+ERROR(symbol_in_ir_not_in_tbd,none,
+      "symbol '%0' (%1) is in generated IR file, but not in TBD file",
+      (StringRef, StringRef))
+
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)
 #  undef DIAG
