@@ -43,12 +43,13 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "sil-capture-promotion"
-#include "swift/SILOptimizer/PassManager/Passes.h"
-#include "swift/SILOptimizer/Utils/SpecializationMangler.h"
-#include "swift/SIL/SILCloner.h"
-#include "swift/SIL/TypeSubstCloner.h"
-#include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/AST/GenericEnvironment.h"
+#include "swift/SIL/SILCloner.h"
+#include "swift/SIL/SILInstIterator.h"
+#include "swift/SIL/TypeSubstCloner.h"
+#include "swift/SILOptimizer/PassManager/Passes.h"
+#include "swift/SILOptimizer/PassManager/Transforms.h"
+#include "swift/SILOptimizer/Utils/SpecializationMangler.h"
 #include "llvm/ADT/BitVector.h"
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/Statistic.h"
@@ -1046,16 +1047,14 @@ constructMapFromPartialApplyToPromotableIndices(SILFunction *F,
   llvm::DenseMap<PartialApplyInst*, unsigned> IndexMap;
 
   // Consider all alloc_box instructions in the function.
-  for (auto &BB : *F) {
-    for (auto &I : BB) {
-      if (auto *ABI = dyn_cast<AllocBoxInst>(&I)) {
-        IndexMap.clear();
-        if (examineAllocBoxInst(ABI, RS, IndexMap)) {
-          // If we are able to promote at least one capture of the alloc_box,
-          // then add the promotable index to the main map.
-          for (auto &IndexPair : IndexMap)
-            Map[IndexPair.first].insert(IndexPair.second);
-        }
+  for (auto &I : silinst_range(F)) {
+    if (auto *ABI = dyn_cast<AllocBoxInst>(&I)) {
+      IndexMap.clear();
+      if (examineAllocBoxInst(ABI, RS, IndexMap)) {
+        // If we are able to promote at least one capture of the alloc_box,
+        // then add the promotable index to the main map.
+        for (auto &IndexPair : IndexMap)
+          Map[IndexPair.first].insert(IndexPair.second);
       }
     }
   }
