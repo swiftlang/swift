@@ -264,6 +264,21 @@ swift::fatalError(uint32_t flags, const char *format, ...)
   abort();
 }
 
+// Report a warning to system console and stderr.
+void
+swift::warning(uint32_t flags, const char *format, ...)
+{
+  va_list args;
+  va_start(args, format);
+
+  char *log;
+  swift_vasprintf(&log, format, args);
+
+  reportNow(flags, log);
+
+  free(log);
+}
+
 // Crash when a deleted method is called by accident.
 SWIFT_RUNTIME_EXPORT
 LLVM_ATTRIBUTE_NORETURN

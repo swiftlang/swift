@@ -134,9 +134,16 @@ Optional<T> SubstitutionMap::forEachConformance(
 
     if (protoAssocType) {
       if (conformance.isAbstract()) {
-        for (auto assocProto : protoAssocType->getConformingProtocols()) {
-          if (auto found = fn(ProtocolConformanceRef(assocProto)))
-            return found;
+        // Narrow fix since this whole code path is going away soon
+        // (if you find this code still here a year from now, I will be
+        // very ashamed).
+        //
+        // FIXME: Should always have a valid generic environment.
+        if (protoAssocType->getProtocol()->getGenericEnvironment()) {
+          for (auto assocProto : protoAssocType->getConformingProtocols()) {
+            if (auto found = fn(ProtocolConformanceRef(assocProto)))
+              return found;
+          }
         }
       } else {
         auto sub = conformance.getConcrete()->getTypeWitnessSubstAndDecl(

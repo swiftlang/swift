@@ -1337,6 +1337,28 @@ SwitchEnumInstBase::SwitchEnumInstBase(
     ::new (succs + NumCases) SILSuccessor(this, DefaultBB);
 }
 
+void SwitchEnumInstBase::swapCase(unsigned i, unsigned j) {
+  assert(i < getNumCases() && "First index is out of bounds?!");
+  assert(j < getNumCases() && "Second index is out of bounds?!");
+
+  auto *succs = getSuccessorBuf();
+
+  // First grab our destination blocks.
+  SILBasicBlock *iBlock = succs[i].getBB();
+  SILBasicBlock *jBlock = succs[j].getBB();
+
+  // Then destroy the sil successors and reinitialize them with the new things
+  // that they are pointing at.
+  succs[i].~SILSuccessor();
+  ::new (succs + i) SILSuccessor(this, jBlock);
+  succs[j].~SILSuccessor();
+  ::new (succs + j) SILSuccessor(this, iBlock);
+
+  // Now swap our cases.
+  auto *cases = getCaseBuf();
+  std::swap(cases[i], cases[j]);
+}
+
 namespace {
   template <class Inst> EnumElementDecl *
   getUniqueCaseForDefaultValue(Inst *inst, SILValue enumValue) {

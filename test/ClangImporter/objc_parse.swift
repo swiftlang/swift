@@ -403,6 +403,23 @@ func testPropertyAndMethodCollision(_ obj: PropertyAndMethodCollision,
   _ = value
 }
 
+func testPropertyAndMethodCollisionInOneClass(
+  obj: PropertyAndMethodCollisionInOneClass,
+  rev: PropertyAndMethodReverseCollisionInOneClass
+) {
+  obj.object = nil
+  obj.object()
+
+  type(of: obj).classRef = nil
+  type(of: obj).classRef()
+
+  rev.object = nil
+  rev.object()
+
+  type(of: rev).classRef = nil
+  type(of: rev).classRef()
+}
+
 func testSubscriptAndPropertyRedeclaration(_ obj: SubscriptAndProperty) {
   _ = obj.x
   obj.x = 5

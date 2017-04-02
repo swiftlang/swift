@@ -1081,7 +1081,7 @@ void LifetimeChecker::handleInOutUse(const DIMemoryUse &Use) {
             FD = dyn_cast<FuncDecl>(DSCE->getCalledValue());
           else
             // Operators and normal function calls are just (CallExpr DRE)
-            FD = dyn_cast<FuncDecl>(CE->getCalledValue());
+            FD = dyn_cast_or_null<FuncDecl>(CE->getCalledValue());
         }
       }
     }

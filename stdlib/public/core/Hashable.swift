@@ -56,7 +56,7 @@
 ///
 ///     extension GridPoint: Hashable {
 ///         var hashValue: Int {
-///             return x.hashValue ^ y.hashValue
+///             return x.hashValue ^ y.hashValue &* 16777619
 ///         }
 ///
 ///         static func == (lhs: GridPoint, rhs: GridPoint) -> Bool {
@@ -64,12 +64,16 @@
 ///         }
 ///     }
 ///
-/// The `hashValue` property in this example combines the hash values of a grid
-/// point's `x` and `y` values using the bitwise XOR operator (`^`). The `^`
-/// operator is one way to combine two integer values into a single value.
+/// The `hashValue` property in this example combines the hash value of a grid
+/// point's `x` property with the hash value of its `y` property multiplied by
+/// a prime constant.
 ///
-/// - Note: Set and dictionary performance depends on hash values that minimize
-///   collisions for their associated element and key types, respectively.
+/// - Note: The example given above is a reasonably good hash function for a
+///   simple type. If you're writing a hash function for a custom type, choose
+///   a hashing algorithm that is appropriate for kinds of data your type
+///   comprises. Set and dictionary performance depends on hash values that
+///   minimize collisions for their associated element and key types,
+///   respectively.
 ///
 /// Now that `GridPoint` conforms to the `Hashable` protocol, you can create a
 /// set of previously tapped grid points.

@@ -39,7 +39,7 @@ func testClonable(c: Clonable) {
   let _: () -> () -> Clonable = c.getCloneFn
 }
 
-// CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_T0xIxr_22partial_apply_protocol8Clonable_pIxr_AaBRzlTR : $@convention(thin) <τ_0_0 where τ_0_0 : Clonable> (@owned @callee_owned () -> @out τ_0_0) -> @out Clonable
+// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @_T0xIxr_22partial_apply_protocol8Clonable_pIxr_AaBRzlTR : $@convention(thin) <τ_0_0 where τ_0_0 : Clonable> (@owned @callee_owned () -> @out τ_0_0) -> @out Clonable
 // CHECK:       bb0(%0 : $*Clonable, %1 : $@callee_owned () -> @out τ_0_0):
 // CHECK-NEXT:    [[INNER_RESULT:%.*]] = alloc_stack $τ_0_0
 // CHECK-NEXT:    apply %1([[INNER_RESULT]])
@@ -51,7 +51,7 @@ func testClonable(c: Clonable) {
 
 // FIXME: This is horribly inefficient, too much alloc_stack / copy_addr!
 
-// CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_T0xSgIxr_22partial_apply_protocol8Clonable_pSgIxr_AbCRzlTR : $@convention(thin) <τ_0_0 where τ_0_0 : Clonable> (@owned @callee_owned () -> @out Optional<τ_0_0>) -> @out Optional<Clonable>
+// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @_T0xSgIxr_22partial_apply_protocol8Clonable_pSgIxr_AbCRzlTR : $@convention(thin) <τ_0_0 where τ_0_0 : Clonable> (@owned @callee_owned () -> @out Optional<τ_0_0>) -> @out Optional<Clonable>
 // CHECK:       bb0(%0 : $*Optional<Clonable>, %1 : $@callee_owned () -> @out Optional<τ_0_0>):
 // CHECK-NEXT:    [[INNER_RESULT:%.*]] = alloc_stack $Optional<τ_0_0>
 // CHECK-NEXT:    apply %1([[INNER_RESULT]])
@@ -77,13 +77,13 @@ func testClonable(c: Clonable) {
 // CHECK-NEXT:    dealloc_stack [[INNER_RESULT]]
 // CHECK-NEXT:    return [[EMPTY]]
 
-// CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_T0xXMTIxd_22partial_apply_protocol8Clonable_pXmTIxd_AaBRzlTR : $@convention(thin) <τ_0_0 where τ_0_0 : Clonable> (@owned @callee_owned () -> @thick τ_0_0.Type) -> @thick Clonable.Type
+// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @_T0xXMTIxd_22partial_apply_protocol8Clonable_pXmTIxd_AaBRzlTR : $@convention(thin) <τ_0_0 where τ_0_0 : Clonable> (@owned @callee_owned () -> @thick τ_0_0.Type) -> @thick Clonable.Type
 // CHECK:       bb0(%0 : $@callee_owned () -> @thick τ_0_0.Type):
 // CHECK-NEXT:    [[INNER_RESULT:%.*]] = apply %0()
 // CHECK-NEXT:    [[OUTER_RESULT:%.*]] = init_existential_metatype [[INNER_RESULT]]
 // CHECK-NEXT:    return [[OUTER_RESULT]]
 
-// CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_T0xIxr_Ixo_22partial_apply_protocol8Clonable_pIxr_Ixo_AaBRzlTR : $@convention(thin) <τ_0_0 where τ_0_0 : Clonable> (@owned @callee_owned () -> @owned @callee_owned () -> @out τ_0_0) -> @owned @callee_owned () -> @out Clonable
+// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @_T0xIxr_Ixo_22partial_apply_protocol8Clonable_pIxr_Ixo_AaBRzlTR : $@convention(thin) <τ_0_0 where τ_0_0 : Clonable> (@owned @callee_owned () -> @owned @callee_owned () -> @out τ_0_0) -> @owned @callee_owned () -> @out Clonable
 // CHECK:       bb0(%0 : $@callee_owned () -> @owned @callee_owned () -> @out τ_0_0):
 // CHECK-NEXT:    [[INNER_RESULT:%.*]] = apply %0()
 // CHECK:         [[THUNK_FN:%.*]] = function_ref @_T0xIxr_22partial_apply_protocol8Clonable_pIxr_AaBRzlTR
@@ -129,7 +129,7 @@ func testClonableInGenericContext<T>(c: Clonable, t: T) {
   let _: (T) -> () -> Clonable = c.genericGetCloneFn
 }
 
-// CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_T0xqd__Ixir_x22partial_apply_protocol8Clonable_pIxir_AaBRd__r__lTR : $@convention(thin) <τ_0_0><τ_1_0 where τ_1_0 : Clonable> (@in τ_0_0, @owned @callee_owned (@in τ_0_0) -> @out τ_1_0) -> @out Clonable
+// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @_T0xqd__Ixir_x22partial_apply_protocol8Clonable_pIxir_AaBRd__r__lTR : $@convention(thin) <τ_0_0><τ_1_0 where τ_1_0 : Clonable> (@in τ_0_0, @owned @callee_owned (@in τ_0_0) -> @out τ_1_0) -> @out Clonable
 // CHECK:         bb0(%0 : $*Clonable, %1 : $*τ_0_0, %2 : $@callee_owned (@in τ_0_0) -> @out τ_1_0):
 // CHECK-NEXT:      [[INNER_RESULT:%.*]] = alloc_stack $τ_1_0
 // CHECK-NEXT:      apply %2([[INNER_RESULT]], %1)
@@ -139,14 +139,14 @@ func testClonableInGenericContext<T>(c: Clonable, t: T) {
 // CHECK-NEXT:      dealloc_stack [[INNER_RESULT]]
 // CHECK-NEXT:      return [[EMPTY]]
 
-// CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_T0xqd__Ixr_Ixio_x22partial_apply_protocol8Clonable_pIxr_Ixio_AaBRd__r__lTR : $@convention(thin) <τ_0_0><τ_1_0 where τ_1_0 : Clonable> (@in τ_0_0, @owned @callee_owned (@in τ_0_0) -> @owned @callee_owned () -> @out τ_1_0) -> @owned @callee_owned () -> @out Clonable
+// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @_T0xqd__Ixr_Ixio_x22partial_apply_protocol8Clonable_pIxr_Ixio_AaBRd__r__lTR : $@convention(thin) <τ_0_0><τ_1_0 where τ_1_0 : Clonable> (@in τ_0_0, @owned @callee_owned (@in τ_0_0) -> @owned @callee_owned () -> @out τ_1_0) -> @owned @callee_owned () -> @out Clonable
 // CHECK:         bb0(%0 : $*τ_0_0, %1 : $@callee_owned (@in τ_0_0) -> @owned @callee_owned () -> @out τ_1_0):
 // CHECK-NEXT:      apply %1(%0)
 // CHECK:           [[THUNK_FN:%.*]] = function_ref @_T0qd__Ixr_22partial_apply_protocol8Clonable_pIxr_AaBRd__r__lTR
 // CHECK-NEXT:      [[RESULT:%.*]] = partial_apply [[THUNK_FN]]<τ_0_0, τ_1_0>(%2)
 // CHECK-NEXT:      return [[RESULT]]
 
-// CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_T0qd__Ixr_22partial_apply_protocol8Clonable_pIxr_AaBRd__r__lTR : $@convention(thin) <τ_0_0><τ_1_0 where τ_1_0 : Clonable> (@owned @callee_owned () -> @out τ_1_0) -> @out Clonable {
+// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @_T0qd__Ixr_22partial_apply_protocol8Clonable_pIxr_AaBRd__r__lTR : $@convention(thin) <τ_0_0><τ_1_0 where τ_1_0 : Clonable> (@owned @callee_owned () -> @out τ_1_0) -> @out Clonable {
 // CHECK:         bb0(%0 : $*Clonable, %1 : $@callee_owned () -> @out τ_1_0):
 // CHECK-NEXT:      [[INNER_RESULT:%.*]] = alloc_stack $τ_1_0
 // CHECK-NEXT:      apply %1([[INNER_RESULT]])

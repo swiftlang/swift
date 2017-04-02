@@ -256,13 +256,13 @@ sil @_T04test3bazSiSi1m_tcSiF : $@convention(thin) (Int32, Int32) -> Int32
 // SIL verification should catch the incorrect type.
 // rdar:://19321284
 
-// CHECK-LABEL: sil hidden [fragile] @callee : $@convention(thin) (Builtin.Int32) -> () {
-sil hidden [fragile] @callee : $@convention(thin) (Builtin.Int32) -> () {
+// CHECK-LABEL: sil hidden [serialized] @callee : $@convention(thin) (Builtin.Int32) -> () {
+sil hidden [serialized] @callee : $@convention(thin) (Builtin.Int32) -> () {
 bb0(%0 : $Builtin.Int32):
   unreachable
 }
 
-sil hidden [fragile] @thunk : $@convention(thin) (@owned @callee_owned () -> ()) -> @out () {
+sil hidden [serialized] @thunk : $@convention(thin) (@owned @callee_owned () -> ()) -> @out () {
 bb0(%0 : $*(), %1 : $@callee_owned () -> ()):
   apply %1() : $@callee_owned () -> ()
   %9999 = tuple()
@@ -272,7 +272,7 @@ bb0(%0 : $*(), %1 : $@callee_owned () -> ()):
 // CHECK-LABEL: @test_closure_propagation : $@convention(thin) () -> () {
 // REMOVECLOSURES-LABEL: @test_closure_propagation : $@convention(thin) () -> () {
 // REMOVECLOSURES-NOT: partial_apply
-sil hidden [fragile] @test_closure_propagation : $@convention(thin) () -> () {
+sil hidden [serialized] @test_closure_propagation : $@convention(thin) () -> () {
 bb0:
   %f1 = function_ref @callee : $@convention(thin) (Builtin.Int32) -> ()
   %i1 = integer_literal $Builtin.Int32, 24

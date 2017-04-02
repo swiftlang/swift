@@ -54,7 +54,7 @@ swift::getMethodDispatch(AbstractFunctionDecl *method) {
       if (fd->isAccessor() && fd->getAccessorStorageDecl()->hasClangNode())
         return MethodDispatch::Class;
     }
-    if (method->getAttrs().hasAttribute<DynamicAttr>())
+    if (method->isDynamic())
       return MethodDispatch::Class;
   }
 
@@ -96,20 +96,20 @@ bool swift::requiresForeignEntryPoint(ValueDecl *vd) {
     if (fd->isGetterOrSetter())
       return requiresForeignEntryPoint(fd->getAccessorStorageDecl());
 
-    return fd->getAttrs().hasAttribute<DynamicAttr>();
+    return fd->isDynamic();
   }
 
   if (auto *cd = dyn_cast<ConstructorDecl>(vd)) {
     if (cd->hasClangNode())
       return true;
 
-    return cd->getAttrs().hasAttribute<DynamicAttr>();
+    return cd->isDynamic();
   }
 
   if (auto *asd = dyn_cast<AbstractStorageDecl>(vd))
     return asd->requiresForeignGetterAndSetter();
 
-  return vd->getAttrs().hasAttribute<DynamicAttr>();
+  return vd->isDynamic();
 }
 
 /// TODO: We should consult the cached LoweredLocalCaptures the SIL
@@ -415,39 +415,54 @@ bool SILDeclRef::isImplicit() const {
 }
 
 SILLinkage SILDeclRef::getLinkage(ForDefinition_t forDefinition) const {
-  // Anonymous functions have shared linkage.
-  // FIXME: This should really be the linkage of the parent function.
-  if (getAbstractClosureExpr())
-    return SILLinkage::Shared;
-  
+  if (auto *ace = getAbstractClosureExpr()) {
+    if (isSerialized())
+      return SILLinkage::Shared;
+    return SILLinkage::Private;
+  }
+
   // Native function-local declarations have shared linkage.
   // FIXME: @objc declarations should be too, but we currently have no way
   // of marking them "used" other than making them external. 
   ValueDecl *d = getDecl();
   DeclContext *moduleContext = d->getDeclContext();
   while (!moduleContext->isModuleScopeContext()) {
-    if (!isForeign && moduleContext->isLocalContext())
-      return SILLinkage::Shared;
+    if (!isForeign && moduleContext->isLocalContext()) {
+      if (isSerialized())
+        return SILLinkage::Shared;
+      return SILLinkage::Private;
+    }
     moduleContext = moduleContext->getParent();
   }
-  
-  // Currying and calling convention thunks have shared linkage.
-  if (isThunk())
-    // If a function declares a @_cdecl name, its native-to-foreign thunk
-    // is exported with the visibility of the function.
-    if (!isNativeToForeignThunk() || !d->getAttrs().hasAttribute<CDeclAttr>())
-      return SILLinkage::Shared;
-  
-  // Enum constructors are essentially the same as thunks, they are
+
+  // Enum constructors and curry thunks either have private or shared
+  // linkage, dependings are essentially the same as thunks, they are
   // emitted by need and have shared linkage.
-  if (isEnumElement())
+  if (isEnumElement() || isCurried) {
+    switch (d->getEffectiveAccess()) {
+    case Accessibility::Private:
+    case Accessibility::FilePrivate:
+      return (forDefinition
+              ? SILLinkage::Private
+              : SILLinkage::PrivateExternal);
+
+    default:
+      return SILLinkage::Shared;
+    }
+  }
+
+  // Calling convention thunks have shared linkage.
+  if (isForeignToNativeThunk())
+    return SILLinkage::Shared;
+
+  // If a function declares a @_cdecl name, its native-to-foreign thunk
+  // is exported with the visibility of the function.
+  if (isNativeToForeignThunk() && !d->getAttrs().hasAttribute<CDeclAttr>())
     return SILLinkage::Shared;
 
   // Declarations imported from Clang modules have shared linkage.
-  const SILLinkage ClangLinkage = SILLinkage::Shared;
-
   if (isClangImported())
-    return ClangLinkage;
+    return SILLinkage::Shared;
 
   // Otherwise, we have external linkage.
   switch (d->getEffectiveAccess()) {
@@ -524,34 +539,54 @@ bool SILDeclRef::isTransparent() const {
 }
 
 /// \brief True if the function should have its body serialized.
-bool SILDeclRef::isFragile() const {
+IsSerialized_t SILDeclRef::isSerialized() const {
   DeclContext *dc;
   if (auto closure = getAbstractClosureExpr())
     dc = closure->getLocalContext();
   else {
+    auto *d = getDecl();
     dc = getDecl()->getInnermostDeclContext();
 
-    // Enum case constructors are serialized if the enum is @_versioned
-    // or public.
+    // Enum element constructors are serialized if the enum is
+    // @_versioned or public.
     if (isEnumElement())
-      if (cast<EnumDecl>(dc)->getEffectiveAccess() >= Accessibility::Public)
-        return true;
+      if (d->getEffectiveAccess() >= Accessibility::Public)
+        return IsSerialized;
+
+    // Currying thunks are serialized if referenced from an inlinable
+    // context -- Sema's semantic checks ensure the serialization of
+    // such a thunk is valid, since it must in turn reference a public
+    // symbol, or dispatch via class_method or witness_method.
+    if (isCurried)
+      if (d->getEffectiveAccess() >= Accessibility::Public)
+        return IsSerializable;
+
+    if (isForeignToNativeThunk())
+      return IsSerializable;
 
     // The allocating entry point for designated initializers are serialized
     // if the class is @_versioned or public.
     if (kind == SILDeclRef::Kind::Allocator) {
-      auto *ctor = cast<ConstructorDecl>(getDecl());
+      auto *ctor = cast<ConstructorDecl>(d);
       if (ctor->isDesignatedInit() &&
           ctor->getDeclContext()->getAsClassOrClassExtensionContext()) {
         if (ctor->getEffectiveAccess() >= Accessibility::Public &&
             !ctor->hasClangNode())
-          return true;
+          return IsSerialized;
       }
     }
   }
 
+  // Declarations imported from Clang modules are serialized if
+  // referenced from an inlineable context.
+  if (isClangImported())
+    return IsSerializable;
+
   // Otherwise, ask the AST if we're inside an @_inlineable context.
-  return (dc->getResilienceExpansion() == ResilienceExpansion::Minimal);
+  if (dc->getResilienceExpansion() == ResilienceExpansion::Minimal)
+    return IsSerialized;
+
+  return IsNotSerialized;
 }
 
 /// \brief True if the function has noinline attribute.

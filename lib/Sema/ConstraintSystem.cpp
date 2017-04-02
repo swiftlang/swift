@@ -189,8 +189,7 @@ static std::tuple<char, ObjCSelector, CanType>
 getDynamicResultSignature(ValueDecl *decl) {
   if (auto func = dyn_cast<AbstractFunctionDecl>(decl)) {
     // Handle functions.
-    auto type =
-      decl->getInterfaceType()->castTo<AnyFunctionType>()->getResult();
+    auto type = func->getMethodInterfaceType();
     return std::make_tuple(func->isStatic(), func->getObjCSelector(),
                            type->getCanonicalType());
   }

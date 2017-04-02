@@ -141,14 +141,6 @@ static llvm::Constant *getDestroyBoxedOpaqueExistentialBufferFunction(
     IRGenModule &IGM, OpaqueExistentialLayout existLayout,
     llvm::Type *existContainerPointerTy);
 
-static llvm::Constant *getInitWithTakeBoxedOpaqueExistentialBufferFunction(
-    IRGenModule &IGM, OpaqueExistentialLayout existLayout,
-    llvm::Type *existContainerPointerTy);
-
-static llvm::Constant *getInitWithCopyBoxedOpaqueExistentialBufferFunction(
-    IRGenModule &IGM, OpaqueExistentialLayout existLayout,
-    llvm::Type *existContainerPointerTy);
-
 static llvm::Constant *
 getProjectBoxedOpaqueExistentialFunction(IRGenFunction &IGF,
                                          OpenedExistentialAccess accessKind,
@@ -355,17 +347,6 @@ public:
 
     auto layout = getLayout();
 
-    // Use copy-on-write existentials?
-    if (false && IGF.IGM.getSILModule().getOptions().UseCOWExistentials) {
-      auto fn = getInitWithCopyBoxedOpaqueExistentialBufferFunction(
-          IGF.IGM, getLayout(), src.getAddress()->getType());
-      auto call =
-          IGF.Builder.CreateCall(fn, {dest.getAddress(), src.getAddress()});
-      call->setCallingConv(IGF.IGM.DefaultCC);
-      call->setDoesNotThrow();
-      return;
-    }
-
     // Project down to the buffers and ask the witnesses to do a
     // copy-initialize.
     Address srcBuffer = layout.projectExistentialBuffer(IGF, src);
@@ -381,17 +362,6 @@ public:
     llvm::Value *metadata = copyType(IGF, dest, src);
 
     auto layout = getLayout();
-
-    // Use copy-on-write existentials?
-    if (false && IGF.IGM.getSILModule().getOptions().UseCOWExistentials) {
-      auto fn = getInitWithTakeBoxedOpaqueExistentialBufferFunction(
-          IGF.IGM, getLayout(), src.getAddress()->getType());
-      auto call =
-          IGF.Builder.CreateCall(fn, {dest.getAddress(), src.getAddress()});
-      call->setCallingConv(IGF.IGM.DefaultCC);
-      call->setDoesNotThrow();
-      return;
-    }
 
     // Project down to the buffers and ask the witnesses to do a
     // take-initialize.
@@ -2364,7 +2334,9 @@ static llvm::Constant *getDeallocateBoxedOpaqueExistentialBufferFunction(
         llvm::Value *pointerAlignMask = llvm::ConstantInt::get(
             IGF.IGM.SizeTy, IGF.IGM.getPointerAlignment().getValue() - 1);
         alignmentMask = Builder.CreateOr(alignmentMask, pointerAlignMask);
-        emitDeallocateHeapObject(IGF, boxReference, size, alignmentMask);
+        IGF.emitDeallocRawCall(
+            Builder.CreateBitCast(boxReference, IGF.IGM.Int8PtrTy), size,
+            alignmentMask);
         // We are done. Return.
         Builder.CreateRetVoid();
       }, true /*noinline*/);
@@ -2808,113 +2780,4 @@ static llvm::Constant *getDestroyBoxedOpaqueExistentialBufferFunction(
           Builder.CreateRetVoid();
         }
       }, true /*noinline*/);
-}
-
-static llvm::Constant *getInitWithTakeBoxedOpaqueExistentialBufferFunction(
-    IRGenModule &IGM, OpaqueExistentialLayout existLayout,
-    llvm::Type *existContainerPointerTy) {
-
-  llvm::Type *argTys[] = {existContainerPointerTy, existContainerPointerTy};
-
-  llvm::SmallString<40> fnName;
-  llvm::raw_svector_ostream(fnName)
-      << "__swift_initWithTake_boxed_opaque_existential_"
-      << existLayout.getNumTables();
-
-  return IGM.getOrCreateHelperFunction(
-      fnName, IGM.VoidTy, argTys, [&](IRGenFunction &IGF) {
-        auto &Builder = IGF.Builder;
-        auto it = IGF.CurFn->arg_begin();
-        Address dest(&*(it++), existLayout.getAlignment(IGM));
-        Address src(&*(it++), existLayout.getAlignment(IGM));
-        auto *metadata = existLayout.loadMetadataRef(IGF, src);
-        auto srcBuffer = existLayout.projectExistentialBuffer(IGF, src);
-        auto destBuffer = existLayout.projectExistentialBuffer(IGF, dest);
-        // Is the value stored inline?
-        //
-        llvm::Value *isInline, *flags;
-        std::tie(isInline, flags) = emitLoadOfIsInline(IGF, metadata);
-        auto *inlineBB = IGF.createBasicBlock("inline");
-        auto *outlineBB = IGF.createBasicBlock("outline");
-        Builder.CreateCondBr(isInline, inlineBB, outlineBB);
-
-        Builder.emitBlock(inlineBB);
-        {
-          ConditionalDominanceScope domScope(IGF);
-          emitInitializeWithTakeCall(IGF, metadata,
-                                     castToOpaquePtr(IGF, destBuffer),
-                                     castToOpaquePtr(IGF, srcBuffer));
-          Builder.CreateRetVoid();
-        }
-
-        Builder.emitBlock(outlineBB);
-        {
-          ConditionalDominanceScope domScope(IGF);
-
-          // destBuffer[0] = srcBuffer[0]
-          auto *srcReferenceAddr = Builder.CreateBitCast(
-              srcBuffer.getAddress(), IGM.RefCountedPtrTy->getPointerTo());
-          auto *reference =
-              Builder.CreateLoad(srcReferenceAddr, srcBuffer.getAlignment());
-          auto *destReferenceAddr = Builder.CreateBitCast(
-              destBuffer.getAddress(), IGM.RefCountedPtrTy->getPointerTo());
-          IGF.Builder.CreateStore(
-              reference,
-              Address(destReferenceAddr, existLayout.getAlignment(IGF.IGM)));
-          Builder.CreateRetVoid();
-        }
-
-      }, true /*noinline*/);
-}
-
-static llvm::Constant *getInitWithCopyBoxedOpaqueExistentialBufferFunction(
-    IRGenModule &IGM, OpaqueExistentialLayout existLayout,
-    llvm::Type *existContainerPointerTy) {
-
-  llvm::Type *argTys[] = {existContainerPointerTy, existContainerPointerTy};
-
-  llvm::SmallString<40> fnName;
-  llvm::raw_svector_ostream(fnName)
-      << "__swift_initWithCopy_boxed_opaque_existential_"
-      << existLayout.getNumTables();
-  return IGM.getOrCreateHelperFunction(
-      fnName, IGM.VoidTy, argTys,
-      [&](IRGenFunction &IGF) {
-        auto &Builder = IGF.Builder;
-        auto it = IGF.CurFn->arg_begin();
-        Address dest(&*(it++), existLayout.getAlignment(IGM));
-        Address src(&*(it++), existLayout.getAlignment(IGM));
-        auto *metadata = existLayout.loadMetadataRef(IGF, src);
-        auto srcBuffer = existLayout.projectExistentialBuffer(IGF, src);
-        auto destBuffer = existLayout.projectExistentialBuffer(IGF, dest);
-        // Is the value stored inline?
-        //
-        llvm::Value *isInline, *flags;
-        std::tie(isInline, flags) = emitLoadOfIsInline(IGF, metadata);
-        auto *inlineBB = IGF.createBasicBlock("inline");
-        auto *outlineBB = IGF.createBasicBlock("outline");
-        Builder.CreateCondBr(isInline, inlineBB, outlineBB);
-
-        Builder.emitBlock(inlineBB);
-        {
-          ConditionalDominanceScope domScope(IGF);
-          emitInitializeWithCopyCall(IGF, metadata,
-                                     castToOpaquePtr(IGF, destBuffer),
-                                     castToOpaquePtr(IGF, srcBuffer));
-          Builder.CreateRetVoid();
-        }
-
-        Builder.emitBlock(outlineBB);
-        {
-          ConditionalDominanceScope domScope(IGF);
-
-          // destBuffer[0] = srcBuffer[0]
-          // swift_retain(srcBuffer[0])
-          initBufferWithCopyOfReference(IGF, existLayout, destBuffer,
-                                        srcBuffer);
-          Builder.CreateRetVoid();
-        }
-
-      },
-      true /*noinline*/);
 }

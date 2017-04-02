@@ -304,7 +304,7 @@ public extension P7 {
 
 // CHECK13:       <decl:Protocol>public protocol <loc>P7</loc> {
 // CHECK13-NEXT:   <decl:AssociatedType>associatedtype <loc>T1</loc></decl>
-// CHECK13-NEXT:   <decl:Func>public func <loc>f1(<decl:Param>t: <ref:GenericTypeParam>Self</ref>.T1</decl>)</loc></decl>
+// CHECK13-NEXT:   <decl:Func(HasDefault)>public func <loc>f1(<decl:Param>t: <ref:GenericTypeParam>Self</ref>.T1</decl>)</loc></decl>
 // CHECK13-NEXT:  }</decl>
 
 // CHECK13:       <decl:Extension>extension <loc><ref:Protocol>P7</ref></loc> {

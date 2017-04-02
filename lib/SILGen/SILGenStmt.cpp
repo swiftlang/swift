@@ -253,7 +253,6 @@ namespace {
                               SmallVectorImpl<CleanupHandle> &cleanups)
       : Storage(storage), Cleanups(cleanups) {}
 
-    SILValue getAddressOrNull() const override { return SILValue(); }
     void copyOrInitValueInto(SILGenFunction &gen, SILLocation loc,
                              ManagedValue value, bool isInit) override {
       Storage = value.getValue();
@@ -861,7 +860,7 @@ void StmtEmitter::visitForEachStmt(ForEachStmt *S) {
         // Otherwise, associate the loop body's closing brace with this branch.
         RegularLocation L(S->getBody());
         L.pointToEnd();
-        scope.exit(L);
+        scope.exitAndBranch(L);
       });
 
   // We add loop fail block, just to be defensive about intermediate
@@ -872,7 +871,7 @@ void StmtEmitter::visitForEachStmt(ForEachStmt *S) {
       failExitingBlock,
       [&](ManagedValue inputValue, SwitchCaseFullExpr &scope) {
         assert(!inputValue && "None should not be passed an argument!");
-        scope.exit(S);
+        scope.exitAndBranch(S);
       });
 
   std::move(switchEnumBuilder).emit();

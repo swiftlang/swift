@@ -227,7 +227,7 @@ class Noot : Aap {
 // CHECK:         [[OUTER:%.*]] = partial_apply [[THUNK]]([[INNER]])
 // CHECK:         return [[OUTER]]
 
-// CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_T013vtable_thunks1SVIxd_ACSgIxd_TR
+// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @_T013vtable_thunks1SVIxd_ACSgIxd_TR
 // CHECK:         [[INNER:%.*]] = apply %0()
 // CHECK:         [[OUTER:%.*]] = enum $Optional<S>, #Optional.some!enumelt.1, %1 : $S
 // CHECK:         return [[OUTER]] : $Optional<S>
@@ -239,7 +239,7 @@ class Noot : Aap {
 // CHECK:         [[OUTER:%.*]] = partial_apply [[THUNK]]([[INNER]])
 // CHECK:         return [[OUTER]]
 
-// CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_T013vtable_thunks1SVSgAA4NootCIxo_Ixyo_AcA3AapCSgIxo_Ixyo_TR
+// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @_T013vtable_thunks1SVSgAA4NootCIxo_Ixyo_AcA3AapCSgIxo_Ixyo_TR
 // CHECK:         [[ARG:%.*]] = enum $Optional<S>, #Optional.some!enumelt.1, %0
 // CHECK:         [[INNER:%.*]] = apply %1(%2)
 // CHECK:         [[OUTER:%.*]] = convert_function [[INNER]] : $@callee_owned () -> @owned Noot to $@callee_owned () -> @owned Optional<Aap>

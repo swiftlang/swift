@@ -49,23 +49,23 @@ class ANonObjCClass {}
 // CHECK-NEXT: @end
 
 @objc class UseForward {
-  func definedAlready(_ a: AFullyDefinedClass) {}
+  @objc func definedAlready(_ a: AFullyDefinedClass) {}
 
-  func a(_ a: ZForwardClass1) {}
-  func b() -> ZForwardClass2 { return ZForwardClass2() }
-  func c(_ c: ZForwardAlias) {}
+  @objc func a(_ a: ZForwardClass1) {}
+  @objc func b() -> ZForwardClass2 { return ZForwardClass2() }
+  @objc func c(_ c: ZForwardAlias) {}
 
-  func d(_ d: (ZForwardProtocol1)) {}
-  func e(_ e: ZForwardProtocol2.Type) {}
-  func e2(_ e: ZForwardProtocol2) {}
-  func f(_ f: (ZForwardProtocol3, ZForwardProtocol4) -> ZForwardProtocol5) {}
-  func g(_ g: ZForwardProtocol6 & ZForwardProtocol7) {}
+  @objc func d(_ d: (ZForwardProtocol1)) {}
+  @objc func e(_ e: ZForwardProtocol2.Type) {}
+  @objc func e2(_ e: ZForwardProtocol2) {}
+  @objc func f(_ f: (ZForwardProtocol3, ZForwardProtocol4) -> ZForwardProtocol5) {}
+  @objc func g(_ g: ZForwardProtocol6 & ZForwardProtocol7) {}
 
   func h(_ h: ANonObjCClass) -> ANonObjCClass.Type { return type(of: h) }
-  func i(_: ZForwardProtocol8) {}
+  @objc func i(_: ZForwardProtocol8) {}
 
-  var j: ZForwardClass3 { return ZForwardClass3() }
-  var k: ZForwardClass4.Type { return ZForwardClass4.self }
+  @objc var j: ZForwardClass3 { return ZForwardClass3() }
+  @objc var k: ZForwardClass4.Type { return ZForwardClass4.self }
 }
 
 // CHECK-NOT: @class ZForwardClass1;
@@ -77,8 +77,8 @@ class ANonObjCClass {}
 // CHECK-NEXT: init
 // CHECK-NEXT: @end
 @objc class UseForwardAgain {
-  func a(_ a: ZForwardClass1) {}
-  func b(_ b: ZForwardProtocol1) {}
+  @objc func a(_ a: ZForwardClass1) {}
+  @objc func b(_ b: ZForwardProtocol1) {}
 }
 
 typealias ZForwardAlias = ZForwardAliasClass
@@ -91,7 +91,7 @@ typealias ZForwardAlias = ZForwardAliasClass
 // CHECK-NEXT: init
 // CHECK-NEXT: @end
 @objc class ZForwardClass1 {
-  func circular(_ a: UseForward) {}
+  @objc func circular(_ a: UseForward) {}
 }
 @objc class ZForwardClass2 {}
 @objc class ZForwardClass3 {}

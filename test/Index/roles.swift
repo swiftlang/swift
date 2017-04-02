@@ -333,3 +333,46 @@ func containing() {
     }
   }
 }
+
+protocol ProtRoot {
+  func fooCommon()
+  func foo1()
+  func foo2()
+  func foo3(a : Int)
+  func foo3(a : String)
+}
+
+protocol ProtDerived : ProtRoot {
+  func fooCommon()
+  func bar1()
+  func bar2()
+  func bar3(_ : Int)
+  func bar3(_ : String)
+}
+
+extension ProtDerived {
+  func fooCommon() {}
+  // CHECK: 354:8 | instance-method/Swift | fooCommon() | s:14swift_ide_test11ProtDerivedPAAE9fooCommonyyF | Def,RelChild,RelOver | rel: 3
+  // CHECK-NEXT: RelOver | instance-method/Swift | fooCommon() | s:14swift_ide_test11ProtDerivedP9fooCommonyyF
+  // CHECK-NEXT: RelOver | instance-method/Swift | fooCommon() | s:14swift_ide_test8ProtRootP9fooCommonyyF
+
+  func foo1() {}
+  // CHECK: 359:8 | instance-method/Swift | foo1() | s:14swift_ide_test11ProtDerivedPAAE4foo1yyF | Def,RelChild,RelOver | rel: 2
+  // CHECK-NEXT: RelOver | instance-method/Swift | foo1() | s:14swift_ide_test8ProtRootP4foo1yyF
+
+  func bar1() {}
+  // CHECK: 363:8 | instance-method/Swift | bar1() | s:14swift_ide_test11ProtDerivedPAAE4bar1yyF | Def,RelChild,RelOver | rel: 2
+  // CHECK-NEXT: RelOver | instance-method/Swift | bar1() | s:14swift_ide_test11ProtDerivedP4bar1yyF
+
+  func foo3(a : Int) {}
+  // CHECK: 367:8 | instance-method/Swift | foo3(a:) | s:14swift_ide_test11ProtDerivedPAAE4foo3ySi1a_tF | Def,RelChild,RelOver | rel: 2
+  // CHECK-NEXT: RelOver | instance-method/Swift | foo3(a:) | s:14swift_ide_test8ProtRootP4foo3ySi1a_tF
+
+  func foo3(a : String) {}
+  // CHECK: 371:8 | instance-method/Swift | foo3(a:) | s:14swift_ide_test11ProtDerivedPAAE4foo3ySS1a_tF | Def,RelChild,RelOver | rel: 2
+  // CHECK-NEXT: RelOver | instance-method/Swift | foo3(a:) | s:14swift_ide_test8ProtRootP4foo3ySS1a_tF
+
+  func bar3(_ : Int) {}
+  // CHECK: 375:8 | instance-method/Swift | bar3(_:) | s:14swift_ide_test11ProtDerivedPAAE4bar3ySiF | Def,RelChild,RelOver | rel: 2
+  // CHECK-NEXT: RelOver | instance-method/Swift | bar3(_:) | s:14swift_ide_test11ProtDerivedP4bar3ySiF
+}

@@ -41,7 +41,7 @@ func test2() {
 
 // The closure just returns its value, which it captured directly.
 
-// CHECK: sil shared @_T09let_decls5test2yyFSiycfU_ : $@convention(thin) (Int) -> Int
+// CHECK: sil private @_T09let_decls5test2yyFSiycfU_ : $@convention(thin) (Int) -> Int
 // CHECK: bb0(%0 : $Int):
 // CHECK:  return %0 : $Int
 

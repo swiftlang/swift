@@ -5,16 +5,18 @@ sil_stage canonical
 import Builtin
 import Swift
 
-// CHECK-LABEL: sil @_T010specialize4exp1yyF : $@convention(thin) () -> () {
+// CHECK-LABEL: sil @exp1 : $@convention(thin) () -> () {
 // CHECK-NOT: apply
-// CHECK: [[CTOR:%[0-9]+]] = function_ref @_T047_TFV10specialize3XXXCU__fMGS0_Q__FT1tQ__GS0_Q__s5Int32V_Tg5
+// Call of specialized intializer: <Int32>
+// CHECK: [[CTOR:%[0-9]+]] = function_ref @_T08XXX_inits5Int32V_Tg5
 // CHECK: apply [[CTOR]]
-// CHECK: [[ACCEPTS_INT:%[0-9]+]] = function_ref @_T010specialize10acceptsIntySiF
-// CHECK: [[FOO:%[0-9]+]] = function_ref @_T045_TFV10specialize3XXX3fooU__fRGS0_Q__FT1tQ__Sis5Int32V_Tg5
+// CHECK: [[ACCEPTS_INT:%[0-9]+]] = function_ref @acceptsInt
+// Call of specialized XXX_foo: <Int32>
+// CHECK: [[FOO:%[0-9]+]] = function_ref @_T07XXX_foos5Int32V_Tg5
 // CHECK: apply [[FOO]]
 // CHECK: apply [[ACCEPTS_INT]]
 // CHECK: return
-// CHEcK: sil @_T010specialize4exp2yyF : $@convention(thin) () -> () {
+// CHEcK: sil @exp2 : $@convention(thin) () -> () {
 
 struct XXX<T> {
   init(t: T)
@@ -30,7 +32,7 @@ bb0:
 }
 
 // specialize.XXX.init <A>(specialize.XXX<A>.Type)(t : A) -> specialize.XXX<A>
-sil [noinline] @_TFV10specialize3XXXCU__fMGS0_Q__FT1tQ__GS0_Q__ : $@convention(thin) <T> (@in T, @thin XXX<T>.Type) -> @out XXX<T> {
+sil [noinline] @XXX_init : $@convention(thin) <T> (@in T, @thin XXX<T>.Type) -> @out XXX<T> {
 bb0(%0 : $*XXX<T>, %1 : $*T, %2 : $@thin XXX<T>.Type):
   %3 = alloc_stack $XXX<T>, var, name "sf"           // users: %7, %11, %13
   debug_value_addr %1 : $*T, let, name "t" // id: %4
@@ -47,7 +49,7 @@ bb0(%0 : $*XXX<T>, %1 : $*T, %2 : $@thin XXX<T>.Type):
 }
 
 // specialize.XXX.foo <A>(@inout specialize.XXX<A>)(t : A) -> Swift.Int32
-sil [noinline] @_TFV10specialize3XXX3fooU__fRGS0_Q__FT1tQ__Si : $@convention(method) <T> (@in T, @inout XXX<T>) -> Int32 {
+sil [noinline] @XXX_foo : $@convention(method) <T> (@in T, @inout XXX<T>) -> Int32 {
 bb0(%0 : $*T, %1 : $*XXX<T>):
   debug_value_addr %0 : $*T, let, name "t" // id: %2
   %3 = alloc_stack $T                             // users: %4, %6, %7
@@ -71,7 +73,7 @@ bb0(%0 : $Builtin.Int2048, %1 : $@thin Int32.Type):
 }
 
 // specialize.acceptsInt (Swift.Int32) -> ()
-sil [noinline] @_T010specialize10acceptsIntySiF : $@convention(thin) (Int32) -> () {
+sil [noinline] @acceptsInt : $@convention(thin) (Int32) -> () {
 bb0(%0 : $Int32):
   debug_value %0 : $Int32, let, name "x" // id: %1
   %2 = tuple ()                                   // user: %3
@@ -79,11 +81,11 @@ bb0(%0 : $Int32):
 }
 
 // specialize.exp1 () -> ()
-sil @_T010specialize4exp1yyF : $@convention(thin) () -> () {
+sil @exp1 : $@convention(thin) () -> () {
 bb0:
   %0 = alloc_stack $XXX<Int32>, var, name "II"           // users: %7, %15, %19
   // function_ref specialize.XXX.init <A>(specialize.XXX<A>.Type)(t : A) -> specialize.XXX<A>
-  %1 = function_ref @_TFV10specialize3XXXCU__fMGS0_Q__FT1tQ__GS0_Q__ : $@convention(thin) <τ_0_0> (@in τ_0_0, @thin XXX<τ_0_0>.Type) -> @out XXX<τ_0_0> // user: %7
+  %1 = function_ref @XXX_init : $@convention(thin) <τ_0_0> (@in τ_0_0, @thin XXX<τ_0_0>.Type) -> @out XXX<τ_0_0> // user: %7
   %2 = metatype $@thin XXX<Int32>.Type              // user: %7
   %3 = alloc_stack $Int32                           // users: %6, %7, %8
   %4 = integer_literal $Builtin.Int32, 5            // user: %5
@@ -92,9 +94,9 @@ bb0:
   %7 = apply %1<Int32>(%0, %3, %2) : $@convention(thin) <τ_0_0> (@in τ_0_0, @thin XXX<τ_0_0>.Type) -> @out XXX<τ_0_0>
   dealloc_stack %3 : $*Int32       // id: %8
   // function_ref specialize.acceptsInt (Swift.Int32) -> ()
-  %9 = function_ref @_T010specialize10acceptsIntySiF : $@convention(thin) (Int32) -> () // user: %16
+  %9 = function_ref @acceptsInt : $@convention(thin) (Int32) -> () // user: %16
   // function_ref specialize.XXX.foo <A>(@inout specialize.XXX<A>)(t : A) -> Swift.Int32
-  %10 = function_ref @_TFV10specialize3XXX3fooU__fRGS0_Q__FT1tQ__Si : $@convention(method) <τ_0_0> (@in τ_0_0, @inout XXX<τ_0_0>) -> Int32 // user: %15
+  %10 = function_ref @XXX_foo : $@convention(method) <τ_0_0> (@in τ_0_0, @inout XXX<τ_0_0>) -> Int32 // user: %15
   %11 = alloc_stack $Int32                          // users: %14, %15, %17
   %12 = integer_literal $Builtin.Int32, 4           // user: %13
   %13 = struct $Int32 (%12 : $Builtin.Int32)        // user: %14
@@ -108,11 +110,11 @@ bb0:
 }
 
 // specialize.exp2 () -> ()
-sil @_T010specialize4exp2yyF : $@convention(thin) () -> () {
+sil @exp2 : $@convention(thin) () -> () {
 bb0:
   %0 = alloc_stack $XXX<UInt8>, var, name "I8"        // users: %7, %15, %19
   // function_ref specialize.XXX.init <A>(specialize.XXX<A>.Type)(t : A) -> specialize.XXX<A>
-  %1 = function_ref @_TFV10specialize3XXXCU__fMGS0_Q__FT1tQ__GS0_Q__ : $@convention(thin) <τ_0_0> (@in τ_0_0, @thin XXX<τ_0_0>.Type) -> @out XXX<τ_0_0> // user: %7
+  %1 = function_ref @XXX_init : $@convention(thin) <τ_0_0> (@in τ_0_0, @thin XXX<τ_0_0>.Type) -> @out XXX<τ_0_0> // user: %7
   %2 = metatype $@thin XXX<UInt8>.Type            // user: %7
   %3 = alloc_stack $UInt8                         // users: %6, %7, %8
   %4 = integer_literal $Builtin.Int8, 5           // user: %5
@@ -121,9 +123,9 @@ bb0:
   %7 = apply %1<UInt8>(%0, %3, %2) : $@convention(thin) <τ_0_0> (@in τ_0_0, @thin XXX<τ_0_0>.Type) -> @out XXX<τ_0_0>
   dealloc_stack %3 : $*UInt8     // id: %8
   // function_ref specialize.acceptsInt (Swift.Int32) -> ()
-  %9 = function_ref @_T010specialize10acceptsIntySiF : $@convention(thin) (Int32) -> () // user: %16
+  %9 = function_ref @acceptsInt : $@convention(thin) (Int32) -> () // user: %16
   // function_ref specialize.XXX.foo <A>(@inout specialize.XXX<A>)(t : A) -> Swift.Int32
-  %10 = function_ref @_TFV10specialize3XXX3fooU__fRGS0_Q__FT1tQ__Si : $@convention(method) <τ_0_0> (@in τ_0_0, @inout XXX<τ_0_0>) -> Int32 // user: %15
+  %10 = function_ref @XXX_foo : $@convention(method) <τ_0_0> (@in τ_0_0, @inout XXX<τ_0_0>) -> Int32 // user: %15
   %11 = alloc_stack $UInt8                        // users: %14, %15, %17
   %12 = integer_literal $Builtin.Int8, 4          // user: %13
   %13 = struct $UInt8 (%12 : $Builtin.Int8)       // user: %14
@@ -136,21 +138,8 @@ bb0:
   return %18 : $()                                // id: %20
 }
 
-// Swift.UInt8.init (Swift.UInt8.Type)(Swift.Int32) -> Swift.UInt8
-sil public_external [transparent] @_T0s5UInt8VABSicABmcfC : $@convention(thin) (Int32, @thin UInt8.Type) -> UInt8 {
-bb0(%0 : $Int32, %1 : $@thin UInt8.Type):
-  %3 = struct_extract %0 : $Int32, #Int32._value       // user: %4
-  %4 = builtin "zextOrBitCast_Int32_Int64"(%3 : $Builtin.Int32) : $Builtin.Int64 // user: %6
-  %6 = builtin "s_to_u_checked_trunc_Int64_Int8"(%4 : $Builtin.Int64) : $(Builtin.Int8, Builtin.Int1) // users: %7, %8
-  %7 = tuple_extract %6 : $(Builtin.Int8, Builtin.Int1), 0 // user: %10
-  %8 = tuple_extract %6 : $(Builtin.Int8, Builtin.Int1), 1 // user: %9
-  cond_fail %8 : $Builtin.Int1                    // id: %9
-  %10 = struct $UInt8 (%7 : $Builtin.Int8)        // user: %11
-  return %10 : $UInt8                             // id: %11
-}
-
 // specialize.useClosure <A>(fun : () -> A) -> A
-sil @_TF10specialize10useClosureU__FT3funFT_Q__Q_ : $@convention(thin) <T> (@owned @callee_owned () -> @out T) -> @out T {
+sil @useClosure : $@convention(thin) <T> (@owned @callee_owned () -> @out T) -> @out T {
 bb0(%0 : $*T, %1 : $@callee_owned () -> @out T):
   debug_value %1 : $@callee_owned () -> @out T, let, name "fun" // id: %2
   strong_retain %1 : $@callee_owned () -> @out T // id: %3
@@ -161,11 +150,11 @@ bb0(%0 : $*T, %1 : $@callee_owned () -> @out T):
 }
 
 // specialize.getGenericClosure <A>(t : A) -> () -> A
-sil @_TF10specialize17getGenericClosureU__FT1tQ__FT_Q_ : $@convention(thin) <T> (@in T) -> @owned @callee_owned () -> @out T {
+sil @getGenericClosure : $@convention(thin) <T> (@in T) -> @owned @callee_owned () -> @out T {
 bb0(%0 : $*T):
   debug_value_addr %0 : $*T, let, name "t" // id: %1
   // function_ref specialize.(getGenericClosure <A>(t : A) -> () -> A).(tmp #1) (())A
-  %2 = function_ref @_TFF10specialize17getGenericClosureU__FT1tQ__FT_Q_L_3tmpfT_Q_ : $@convention(thin) <τ_0_0> (@owned <τ_0_0> { var τ_0_0 } <τ_0_0>) -> @out τ_0_0 // user: %5
+  %2 = function_ref @getGenericClosure_closure : $@convention(thin) <τ_0_0> (@owned <τ_0_0> { var τ_0_0 } <τ_0_0>) -> @out τ_0_0 // user: %5
   %3 = alloc_box $<τ_0_0> { var τ_0_0 } <T>                               // users: %4, %5, %5
   %3a = project_box %3 : $<τ_0_0> { var τ_0_0 } <T>, 0
   copy_addr %0 to [initialization] %3a : $*T     // id: %4
@@ -175,7 +164,7 @@ bb0(%0 : $*T):
 }
 
 // specialize.(getGenericClosure <A>(t : A) -> () -> A).(tmp #1) (())
-sil shared @_TFF10specialize17getGenericClosureU__FT1tQ__FT_Q_L_3tmpfT_Q_ : $@convention(thin) <T> (@owned <τ_0_0> { var τ_0_0 } <T>) -> @out T {
+sil shared @getGenericClosure_closure : $@convention(thin) <T> (@owned <τ_0_0> { var τ_0_0 } <T>) -> @out T {
 bb0(%0 : $*T, %1 : $<τ_0_0> { var τ_0_0 } <T>):
   %2 = project_box %1 : $<τ_0_0> { var τ_0_0 } <T>, 0
   copy_addr %2 to [initialization] %0 : $*T       // id: %3
@@ -185,16 +174,16 @@ bb0(%0 : $*T, %1 : $<τ_0_0> { var τ_0_0 } <T>):
 }
 
 // specialize.specializePartialApplies () -> Swift.UInt8
-sil @_T010specialize0A14PartialAppliess5UInt8VyF : $@convention(thin) () -> UInt8 {
+sil @specializePartialApplies : $@convention(thin) () -> UInt8 {
 bb0:
   %0 = alloc_stack $UInt8, var, name "i"               // users: %3, %18
   %1 = integer_literal $Builtin.Int8, 5           // user: %2
   %2 = struct $UInt8 (%1 : $Builtin.Int8)         // users: %3, %7
   store %2 to %0 : $*UInt8                      // id: %3
   // function_ref specialize.useClosure <A>(fun : () -> A) -> A
-  %4 = function_ref @_TF10specialize10useClosureU__FT3funFT_Q__Q_ : $@convention(thin) <τ_0_0> (@owned @callee_owned () -> @out τ_0_0) -> @out τ_0_0 // user: %14
+  %4 = function_ref @useClosure : $@convention(thin) <τ_0_0> (@owned @callee_owned () -> @out τ_0_0) -> @out τ_0_0 // user: %14
   // function_ref specialize.getGenericClosure <A>(t : A) -> () -> A
-  %5 = function_ref @_TF10specialize17getGenericClosureU__FT1tQ__FT_Q_ : $@convention(thin) <τ_0_0> (@in τ_0_0) -> @owned @callee_owned () -> @out τ_0_0 // user: %8
+  %5 = function_ref @getGenericClosure : $@convention(thin) <τ_0_0> (@in τ_0_0) -> @owned @callee_owned () -> @out τ_0_0 // user: %8
   %6 = alloc_stack $UInt8                         // users: %7, %8, %17
   store %2 to %6 : $*UInt8                      // id: %7
   %8 = apply %5<UInt8>(%6) : $@convention(thin) <τ_0_0> (@in τ_0_0) -> @owned @callee_owned () -> @out τ_0_0 // user: %10
@@ -263,7 +252,7 @@ protocol P { func get() -> Int32 }
 struct C : P { func get() -> Int32 }
 
 // test4.C.get (test4.C)() -> Swift.Int32
-sil hidden @_T05test41CV3gets5Int32VycACF : $@convention(method) (C) -> Int32 {
+sil hidden @C_get : $@convention(method) (C) -> Int32 {
 bb0(%0 : $C):
   debug_value %0 : $C, let, name "self" // id: %1
   %2 = integer_literal $Builtin.Int32, 1          // user: %3
@@ -272,7 +261,7 @@ bb0(%0 : $C):
 }
 
 // test4.C.init (test4.C.Type)() -> test4.C
-sil hidden [noinline] @_T05test41CVACycACmcfC : $@convention(thin) (@thin C.Type) -> C {
+sil hidden [noinline] @C_init : $@convention(thin) (@thin C.Type) -> C {
 bb0(%0 : $@thin C.Type):
   %1 = alloc_stack $C, var, name "sf"                // user: %3
   %2 = struct $C ()                               // user: %4
@@ -281,21 +270,21 @@ bb0(%0 : $@thin C.Type):
 }
 
 // protocol witness for test4.P.get <A : test4.P>(test4.P.Self)() -> Swift.Int32 in conformance test4.C : test4.P in test4
-sil hidden [transparent] [thunk] @_TTWV5test41CS_1PS_FS1_3getUS1___fQPS1_FT_Vs5Int32 : $@convention(witness_method) (@in_guaranteed C) -> Int32 {
+sil hidden [transparent] [thunk] @test4_P_get_witness_C : $@convention(witness_method) (@in_guaranteed C) -> Int32 {
 bb0(%0 : $*C):
   %1 = load %0 : $*C                              // user: %3
   // function_ref test4.C.get (test4.C)() -> Swift.Int32
-  %2 = function_ref @_T05test41CV3gets5Int32VycACF : $@convention(method) (C) -> Int32 // user: %3
+  %2 = function_ref @C_get : $@convention(method) (C) -> Int32 // user: %3
   %3 = apply %2(%1) : $@convention(method) (C) -> Int32 // user: %4
   return %3 : $Int32                              // id: %4
 }
 
 // test4.boo <A : test4.P, B>(A) -> (Swift.Int32, B) -> Swift.Int32
-sil hidden [noinline] @_TF5test43booUS_1P___FQ_FTVs5Int32Q0__S1_ : $@convention(thin) <U, T where U : P> (@in U) -> @owned @callee_owned (Int32, @in T) -> Int32 {
+sil hidden [noinline] @boo : $@convention(thin) <U, T where U : P> (@in U) -> @owned @callee_owned (Int32, @in T) -> Int32 {
 bb0(%0 : $*U):
   debug_value_addr %0 : $*U, let, name "y" // id: %1
   // function_ref test4.(boo <A : test4.P, B>(A) -> (Swift.Int32, B) -> Swift.Int32).(closure #1)
-  %2 = function_ref @_TFF5test43booUS_1P___FQ_FTVs5Int32Q0__S1_U_FTS1_Q0__S1_ : $@convention(thin) <τ_0_0, τ_0_1 where τ_0_0 : P> (Int32, @in τ_0_1, @owned <τ_0_0> { var τ_0_0 } <τ_0_0>) -> Int32 // user: %5
+  %2 = function_ref @boo_closure : $@convention(thin) <τ_0_0, τ_0_1 where τ_0_0 : P> (Int32, @in τ_0_1, @owned <τ_0_0> { var τ_0_0 } <τ_0_0>) -> Int32 // user: %5
   %3 = alloc_box $<τ_0_0> { var τ_0_0 } <U>                               // users: %4, %5, %5
   %3a = project_box %3 : $<τ_0_0> { var τ_0_0 } <U>, 0
   copy_addr %0 to [initialization] %3a : $*U     // id: %4
@@ -305,7 +294,7 @@ bb0(%0 : $*U):
 }
 
 // test4.(boo <A : test4.P, B>(A) -> (Swift.Int32, B) -> Swift.Int32).(closure #1)
-sil shared [noinline] @_TFF5test43booUS_1P___FQ_FTVs5Int32Q0__S1_U_FTS1_Q0__S1_ : $@convention(thin) <U, T where U : P> (Int32, @in T, @owned <τ_0_0> { var τ_0_0 } <U>) -> Int32 {
+sil shared [noinline] @boo_closure : $@convention(thin) <U, T where U : P> (Int32, @in T, @owned <τ_0_0> { var τ_0_0 } <U>) -> Int32 {
 bb0(%0 : $Int32, %1 : $*T, %2 : $<τ_0_0> { var τ_0_0 } <U>):
   %3 = project_box %2 : $<τ_0_0> { var τ_0_0 } <U>, 0
   debug_value %0 : $Int32, let, name "x" // id: %4
@@ -326,7 +315,7 @@ bb0(%0 : $Int32, %1 : $*T, %2 : $<τ_0_0> { var τ_0_0 } <U>):
 }
 
 // static Swift.+ infix (Swift.Int32, Swift.Int32) -> Swift.Int32
-sil public_external [transparent] [fragile] @_T0s1pois5Int32VAC_ACtFZ : $@convention(thin) (Int32, Int32) -> Int32 {
+sil public_external [transparent] [serialized] @_T0s1pois5Int32VAC_ACtFZ : $@convention(thin) (Int32, Int32) -> Int32 {
 bb0(%0 : $Int32, %1 : $Int32):
   %2 = struct_extract %0 : $Int32, #Int32._value   // user: %5
   %3 = struct_extract %1 : $Int32, #Int32._value   // user: %5
@@ -340,12 +329,12 @@ bb0(%0 : $Int32, %1 : $Int32):
 }
 
 // test4.foo <A : test4.P, B : test4.P>(A, B) -> (Swift.Int32, Swift.Float) -> Swift.Int32
-sil hidden [noinline] @_TF5test43fooUS_1P_S0___FTQ_Q0__FTVs5Int32Sf_S1_ : $@convention(thin) <T, U where T : P, U : P> (@in T, @in U) -> @owned @callee_owned (Int32, Float) -> Int32 {
+sil hidden [noinline] @foo : $@convention(thin) <T, U where T : P, U : P> (@in T, @in U) -> @owned @callee_owned (Int32, Float) -> Int32 {
 bb0(%0 : $*T, %1 : $*U):
   debug_value_addr %0 : $*T, let, name "x" // id: %2
   debug_value_addr %1 : $*U, let, name "y" // id: %3
   // function_ref test4.boo <A : test4.P, B>(A) -> (Swift.Int32, B) -> Swift.Int32
-  %4 = function_ref @_TF5test43booUS_1P___FQ_FTVs5Int32Q0__S1_ : $@convention(thin) <τ_0_0, τ_0_1 where τ_0_0 : P> (@in τ_0_0) -> @owned @callee_owned (Int32, @in τ_0_1) -> Int32 // user: %7
+  %4 = function_ref @boo : $@convention(thin) <τ_0_0, τ_0_1 where τ_0_0 : P> (@in τ_0_0) -> @owned @callee_owned (Int32, @in τ_0_1) -> Int32 // user: %7
   %5 = alloc_stack $U                             // users: %6, %7, %10
   copy_addr %1 to [initialization] %5 : $*U     // id: %6
   %7 = apply %4<U, Float>(%5) : $@convention(thin) <τ_0_0, τ_0_1 where τ_0_0 : P> (@in τ_0_0) -> @owned @callee_owned (Int32, @in τ_0_1) -> Int32 // user: %9
@@ -369,11 +358,11 @@ bb0(%0 : $Int32, %1 : $Float, %2 : $@callee_owned (Int32, @in Float) -> Int32):
 }
 
 // test4.gen1 <A : test4.P>(A) -> (Swift.Int32) -> Swift.Int32
-sil hidden [noinline] @_TF5test44gen1US_1P__FQ_FVs5Int32S1_ : $@convention(thin) <T where T : P> (@in T) -> @owned @callee_owned (Int32) -> Int32 {
+sil hidden [noinline] @gen1 : $@convention(thin) <T where T : P> (@in T) -> @owned @callee_owned (Int32) -> Int32 {
 bb0(%0 : $*T):
   debug_value_addr %0 : $*T, let, name "x" // id: %1
   // function_ref test4.(gen1 <A : test4.P>(A) -> (Swift.Int32) -> Swift.Int32).(closure #1)
-  %2 = function_ref @_TFF5test44gen1US_1P__FQ_FVs5Int32S1_U_FS1_S1_ : $@convention(thin) <τ_0_0 where τ_0_0 : P> (Int32, @owned <τ_0_0> { var τ_0_0 } <τ_0_0>) -> Int32 // user: %5
+  %2 = function_ref @gen1_closure : $@convention(thin) <τ_0_0 where τ_0_0 : P> (Int32, @owned <τ_0_0> { var τ_0_0 } <τ_0_0>) -> Int32 // user: %5
   %3 = alloc_box $<τ_0_0> { var τ_0_0 } <T>                               // users: %4, %5, %5
   %3a = project_box %3 : $<τ_0_0> { var τ_0_0 } <T>, 0
   copy_addr %0 to [initialization] %3a : $*T     // id: %4
@@ -383,7 +372,7 @@ bb0(%0 : $*T):
 }
 
 // test4.(gen1 <A : test4.P>(A) -> (Swift.Int32) -> Swift.Int32).(closure #1)
-sil shared [noinline] @_TFF5test44gen1US_1P__FQ_FVs5Int32S1_U_FS1_S1_ : $@convention(thin) <T where T : P> (Int32, @owned <τ_0_0> { var τ_0_0 } <T>) -> Int32 {
+sil shared [noinline] @gen1_closure : $@convention(thin) <T where T : P> (Int32, @owned <τ_0_0> { var τ_0_0 } <T>) -> Int32 {
 bb0(%0 : $Int32, %1 : $<τ_0_0> { var τ_0_0 } <T>):
   %2 = project_box %1 : $<τ_0_0> { var τ_0_0 } <T>, 0
   debug_value %0 : $Int32 , let, name "$0"              // id: %3
@@ -402,18 +391,18 @@ bb0(%0 : $Int32, %1 : $<τ_0_0> { var τ_0_0 } <T>):
 }
 
 // check that there is a generic specialization of boo
-// CHECK-LABEL: sil shared [noinline] @_T041_TF5test43booUS_1P___FQ_FTVs5Int32Q0__S1_4main1CV_SfTg5 : $@convention(thin) (C) -> @owned @callee_owned (Int32, @in Float) -> Int32
-// CHECK: [[CLOSURE_SPECIALIZATION:%[0-9]+]] = function_ref @_T0049_TFF5test43booUS_1P___FQ_FTVs5Int32Q0__S1_U_FTS1_f2__G1_4main1CV_SfTG5
+// CHECK-LABEL: sil shared [noinline] @_T03booxs5Int32VSfACIxyid_4main1PRzSfRs_r0_lItio_Tp5AD1CV_Tg5 : $@convention(thin) (C) -> @owned @callee_owned (Int32, @in Float) -> Int32
+// CHECK: [[CLOSURE_SPECIALIZATION:%[0-9]+]] = function_ref @_T011boo_closures5Int32VSfxz_x_lXXAC4main1PRzSfRs_r0_lItyyxd_TP5AD1CV_TG5
 // CHECK: partial_apply [[CLOSURE_SPECIALIZATION:%[0-9]+]]
 // CHECK: return
 
 // Check that there is a generic specialization of a closure from boo
-// CHECK-LABEL: sil shared [noinline] @_T0049_TFF5test43booUS_1P___FQ_FTVs5Int32Q0__S1_U_FTS1_f2__G1_4main1CV_SfTg5
+// CHECK-LABEL: sil shared [noinline] @_T011boo_closures5Int32VSfxz_x_lXXAC4main1PRzSfRs_r0_lItyyxd_Tp5AD1CV_Tg5
 // CHECK: return
 
 // Check that there is a generic specialization of foo
-// CHECK-LABEL: sil shared [noinline] @_T048_TF5test43fooUS_1P_S0___FTQ_Q0__FTVs5Int32Sf_S1_4main1CV_ADTg5 : $@convention(thin) (C, C) -> @owned @callee_owned (Int32, Float) -> Int32
-// CHECK: function_ref @_T041_TF5test43booUS_1P___FQ_FTVs5Int32Q0__S1_4main1CV_SfTg5
+// CHECK-LABEL: sil shared [noinline] @_T03foo4main1CV_ADTg5 : $@convention(thin) (C, C) -> @owned @callee_owned (Int32, Float) -> Int32
+// CHECK: function_ref @_T03booxs5Int32VSfACIxyid_4main1PRzSfRs_r0_lItio_Tp5AD1CV_Tg5
 // check that it invokes a generic specialization of the reabstraction thunk helper which invokes a specialization boo
 // CHECK: [[THUNK_SPECIALIZATION:%[0-9]+]] = function_ref @_T0053_TTRG1_RPq_P5test41P_Pq0_PS0___XFo_dVs5Int32iSf_dS1__f2_dj2_di2_dJ2__4main1CV_ADTg5
 // CHECK-NOT: apply
@@ -423,36 +412,36 @@ bb0(%0 : $Int32, %1 : $<τ_0_0> { var τ_0_0 } <T>):
 
 
 // Check that there is a generic specialization of gen1
-// CHECK-LABEL: sil shared [noinline] @_T036_TF5test44gen1US_1P__FQ_FVs5Int32S1_4main1CV_Tg5 : $@convention(thin) (C) -> @owned @callee_owned (Int32) -> Int32
+// CHECK-LABEL: sil shared [noinline] @_T04gen14main1CV_Tg5 : $@convention(thin) (C) -> @owned @callee_owned (Int32) -> Int32
 // check that it invokes a generic specialization of the closure by mean of partial_apply
-// CHECK: [[CLOSURE_SPECIALIZATION:%[0-9]+]] = function_ref @_T0043_TFF5test44gen1US_1P__FQ_FVs5Int32S1_U_FS1_F1_4main1CV_Tg5
+// CHECK: [[CLOSURE_SPECIALIZATION:%[0-9]+]] = function_ref @_T012gen1_closure4main1CV_Tg5
 // CHECK-NOT: apply
 // CHECK: partial_apply [[CLOSURE_SPECIALIZATION]]
 // CHECK-NOT: apply
 // CHECK: return
 
 // Check that there is a generic specialization of a closure from gen1
-// CHECK-LABEL: sil shared [noinline] @_T0043_TFF5test44gen1US_1P__FQ_FVs5Int32S1_U_FS1_F1_4main1CV_Tg5 : $@convention(thin) (Int32, @owned <τ_0_0> { var τ_0_0 } <C>) -> Int32
+// CHECK-LABEL: sil shared [noinline] @_T012gen1_closure4main1CV_Tg5 : $@convention(thin) (Int32, @owned <τ_0_0> { var τ_0_0 } <C>) -> Int32
 // CHECK: return
 
 
 
 // test4.bar () -> Swift.Int32
-// CHECK-LABEL: sil hidden @_T05test43bars5Int32VyF
+// CHECK-LABEL: sil hidden @bar
 // check that it does not invoke a generic specialization of foo
-// CHECK-NOT:  function_ref @_TF5test43fooUS_1P_S0___FTQ_Q0__FTVs5Int32Sf_S1_
+// CHECK-NOT:  function_ref @foo
 // check that it invokes a generic specialization of foo
-// CHECK: function_ref @_T048_TF5test43fooUS_1P_S0___FTQ_Q0__FTVs5Int32Sf_S1_4main1CV_ADTg5
-sil hidden @_T05test43bars5Int32VyF : $@convention(thin) () -> Int32 {
+// CHECK: function_ref @_T03foo4main1CV_ADTg5
+sil hidden @bar : $@convention(thin) () -> Int32 {
 bb0:
   %0 = alloc_stack $@callee_owned (Int32, Float) -> Int32, var, name "f" // users: %11, %22
   // function_ref test4.C.init (test4.C.Type)() -> test4.C
-  %1 = function_ref @_T05test41CVACycACmcfC : $@convention(thin) (@thin C.Type) -> C // user: %3
+  %1 = function_ref @C_init : $@convention(thin) (@thin C.Type) -> C // user: %3
   %2 = metatype $@thin C.Type                     // user: %3
   %3 = apply %1(%2) : $@convention(thin) (@thin C.Type) -> C  // users: %4, %7, %9
   debug_value %3 : $C, let, name "c" // id: %4
   // function_ref test4.foo <A : test4.P, B : test4.P>(A, B) -> (Swift.Int32, Swift.Float) -> Swift.Int32
-  %5 = function_ref @_TF5test43fooUS_1P_S0___FTQ_Q0__FTVs5Int32Sf_S1_ : $@convention(thin) <τ_0_0, τ_0_1 where τ_0_0 : P, τ_0_1 : P> (@in τ_0_0, @in τ_0_1) -> @owned @callee_owned (Int32, Float) -> Int32 // user: %10
+  %5 = function_ref @foo : $@convention(thin) <τ_0_0, τ_0_1 where τ_0_0 : P, τ_0_1 : P> (@in τ_0_0, @in τ_0_1) -> @owned @callee_owned (Int32, Float) -> Int32 // user: %10
   %6 = alloc_stack $C                             // users: %7, %10, %13
   store %3 to %6 : $*C                          // id: %7
   %8 = alloc_stack $C                             // users: %9, %10, %12
@@ -474,31 +463,31 @@ bb0:
 }
 
 // test4.testBar () -> Swift.Int32
-sil @_T05test47testBars5Int32VyF : $@convention(thin) () -> Int32 {
+sil @testBar : $@convention(thin) () -> Int32 {
 bb0:
   // function_ref test4.bar () -> Swift.Int32
-  %0 = function_ref @_T05test43bars5Int32VyF : $@convention(thin) () -> Int32 // user: %1
+  %0 = function_ref @bar : $@convention(thin) () -> Int32 // user: %1
   %1 = apply %0() : $@convention(thin) () -> Int32            // user: %2
   return %1 : $Int32                              // id: %2
 }
 
-
-// CHECK-LABEL: sil @_T05test48testGen1s5Int32VyF
-// CHECK: function_ref @_T05test41CVACycACmcfC
+// CHECK-LABEL: sil @testGen1
+// Call of C_init
+// CHECK: function_ref @C_init
 // CHECK: apply
 // Reference to the generic specialization of gen1
-// CHECK-NOT: function_ref @_TF5test44gen1US_1P__FQ_FVs5Int32S1_
-// CHECK: function_ref @_T036_TF5test44gen1US_1P__FQ_FVs5Int32S1_4main1CV_Tg5 : $@convention(thin) (C) -> @owned @callee_owned (Int32) -> Int32
-sil @_T05test48testGen1s5Int32VyF : $@convention(thin) () -> Int32 {
+// CHECK-NOT: function_ref @gen1
+// CHECK: function_ref @_T04gen14main1CV_Tg5 : $@convention(thin) (C) -> @owned @callee_owned (Int32) -> Int32
+sil @testGen1 : $@convention(thin) () -> Int32 {
 bb0:
   %0 = alloc_stack $@callee_owned (Int32) -> Int32, var, name "f" // users: %9, %16
   // function_ref test4.C.init (test4.C.Type)() -> test4.C
-  %1 = function_ref @_T05test41CVACycACmcfC : $@convention(thin) (@thin C.Type) -> C // user: %3
+  %1 = function_ref @C_init : $@convention(thin) (@thin C.Type) -> C // user: %3
   %2 = metatype $@thin C.Type                     // user: %3
   %3 = apply %1(%2) : $@convention(thin) (@thin C.Type) -> C  // users: %4, %7
   debug_value %3 : $C, let, name "c" // id: %4
   // function_ref test4.gen1 <A : test4.P>(A) -> (Swift.Int32) -> Swift.Int32
-  %5 = function_ref @_TF5test44gen1US_1P__FQ_FVs5Int32S1_ : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@in τ_0_0) -> @owned @callee_owned (Int32) -> Int32 // user: %8
+  %5 = function_ref @gen1 : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@in τ_0_0) -> @owned @callee_owned (Int32) -> Int32 // user: %8
   %6 = alloc_stack $C                             // users: %7, %8, %10
   store %3 to %6 : $*C                          // id: %7
   %8 = apply %5<C>(%6) : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@in τ_0_0) -> @owned @callee_owned (Int32) -> Int32 // users: %9, %11, %14, %15
@@ -515,10 +504,10 @@ bb0:
 
 // test_bind<A> (Builtin.RawPointer, A.Type) -> ()
 // Check that this is specialized as T=Int.
-// CHECK-LABEL: sil shared @_T029_TF5test9test_bindurFTBpMx_T_Si_Tg5
+// CHECK-LABEL: sil shared @_T09test_bindSi_Tg5 : $@convention(thin) (Builtin.RawPointer, @thick Int.Type) -> ()
 // CHECK: bind_memory %0 : $Builtin.RawPointer, {{%.*}} : $Builtin.Word to $*Int
 // CHECK: return
-sil hidden @_TF5test9test_bindurFTBpMx_T_ : $@convention(thin) <T> (Builtin.RawPointer, @thick T.Type) -> () {
+sil hidden @test_bind : $@convention(thin) <T> (Builtin.RawPointer, @thick T.Type) -> () {
 bb0(%0 : $Builtin.RawPointer, %1 : $@thick T.Type):
   %4 = integer_literal $Builtin.Word, 1
   %5 = metatype $@thick T.Type
@@ -529,10 +518,10 @@ bb0(%0 : $Builtin.RawPointer, %1 : $@thick T.Type):
 }
 
 // Invoke test_bind with T=Int.
-sil @_TF5test8call_bindFT1pBp_T_ : $@convention(thin) (Builtin.RawPointer) -> () {
+sil @call_bind : $@convention(thin) (Builtin.RawPointer) -> () {
 bb0(%0 : $Builtin.RawPointer):
   // function_ref test_bind<A> (Builtin.RawPointer, A.Type) -> ()
-  %2 = function_ref @_TF5test9test_bindurFTBpMx_T_ : $@convention(thin) <τ_0_0> (Builtin.RawPointer, @thick τ_0_0.Type) -> ()
+  %2 = function_ref @test_bind : $@convention(thin) <τ_0_0> (Builtin.RawPointer, @thick τ_0_0.Type) -> ()
   %3 = metatype $@thick Int.Type
   %4 = apply %2<Int>(%0, %3) : $@convention(thin) <τ_0_0> (Builtin.RawPointer, @thick τ_0_0.Type) -> ()
   %5 = tuple ()

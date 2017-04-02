@@ -66,7 +66,7 @@ protocol Abstractable {
 
 extension Derived : Abstractable {}
 
-// CHECK: sil hidden [transparent] @_T017materializeForSet7DerivedCAA12AbstractableA2aDP14storedFunction6ResultQzycfmytfU_TW : $@convention(witness_method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout Derived, @thick Derived.Type) -> ()
+// CHECK: sil private [transparent] @_T017materializeForSet7DerivedCAA12AbstractableA2aDP14storedFunction6ResultQzycfmytfU_TW : $@convention(witness_method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout Derived, @thick Derived.Type) -> ()
 // CHECK: bb0(%0 : $Builtin.RawPointer, %1 : $*Builtin.UnsafeValueBuffer, %2 : $*Derived, %3 : $@thick Derived.Type):
 // CHECK-NEXT: [[T0:%.*]] = load_borrow %2 : $*Derived
 // CHECK-NEXT: [[SELF:%.*]] = upcast [[T0]] : $Derived to $Base
@@ -81,7 +81,7 @@ extension Derived : Abstractable {}
 // CHECK-NEXT: tuple ()
 // CHECK-NEXT: return
 
-// CHECK: sil hidden [transparent] [thunk] @_T017materializeForSet7DerivedCAA12AbstractableA2aDP14storedFunction{{[_0-9a-zA-Z]*}}fmTW
+// CHECK: sil private [transparent] [thunk] @_T017materializeForSet7DerivedCAA12AbstractableA2aDP14storedFunction{{[_0-9a-zA-Z]*}}fmTW
 // CHECK: bb0(%0 : $Builtin.RawPointer, %1 : $*Builtin.UnsafeValueBuffer, %2 : $*Derived):
 // CHECK-NEXT: [[RESULT_ADDR:%.*]] = pointer_to_address %0 : $Builtin.RawPointer to [strict] $*@callee_owned () -> @out Int
 // CHECK-NEXT: [[T0:%.*]] = load_borrow %2 : $*Derived
@@ -106,7 +106,7 @@ extension Derived : Abstractable {}
 // CHECK-NEXT: end_borrow [[T0]] from %2
 // CHECK-NEXT: return [[T4]]
 
-// CHECK: sil hidden [transparent] @_T017materializeForSet7DerivedCAA12AbstractableA2aDP19finalStoredFunction6ResultQzycfmytfU_TW :
+// CHECK: sil private [transparent] @_T017materializeForSet7DerivedCAA12AbstractableA2aDP19finalStoredFunction6ResultQzycfmytfU_TW :
 // CHECK: bb0(%0 : $Builtin.RawPointer, %1 : $*Builtin.UnsafeValueBuffer, %2 : $*Derived, %3 : $@thick Derived.Type):
 // CHECK-NEXT: [[T0:%.*]] = load_borrow %2 : $*Derived
 // CHECK-NEXT: [[SELF:%.*]] = upcast [[T0]] : $Derived to $Base
@@ -121,7 +121,7 @@ extension Derived : Abstractable {}
 // CHECK-NEXT: tuple ()
 // CHECK-NEXT: return
 
-// CHECK: sil hidden [transparent] [thunk] @_T017materializeForSet7DerivedCAA12AbstractableA2aDP19finalStoredFunction{{[_0-9a-zA-Z]*}}fmTW
+// CHECK: sil private [transparent] [thunk] @_T017materializeForSet7DerivedCAA12AbstractableA2aDP19finalStoredFunction{{[_0-9a-zA-Z]*}}fmTW
 // CHECK: bb0(%0 : $Builtin.RawPointer, %1 : $*Builtin.UnsafeValueBuffer, %2 : $*Derived):
 // CHECK-NEXT: [[RESULT_ADDR:%.*]] = pointer_to_address %0 : $Builtin.RawPointer to [strict] $*@callee_owned () -> @out Int
 // CHECK-NEXT: [[T0:%.*]] = load_borrow %2 : $*Derived
@@ -141,7 +141,7 @@ extension Derived : Abstractable {}
 // CHECK-NEXT: end_borrow [[T0]] from %2
 // CHECK-NEXT: return [[T4]]
 
-// CHECK-LABEL: sil hidden [transparent] @_T017materializeForSet7DerivedCAA12AbstractableA2aDP14staticFunction6ResultQzycfmZytfU_TW
+// CHECK-LABEL: sil private [transparent] @_T017materializeForSet7DerivedCAA12AbstractableA2aDP14staticFunction6ResultQzycfmZytfU_TW
 // CHECK: bb0([[ARG1:%.*]] : $Builtin.RawPointer, [[ARG2:%.*]] : $*Builtin.UnsafeValueBuffer, [[ARG3:%.*]] : $*@thick Derived.Type, [[ARG4:%.*]] : $@thick Derived.Type.Type):
 // CHECK-NEXT: [[SELF:%.*]] = load [trivial] [[ARG3]] : $*@thick Derived.Type
 // CHECK-NEXT: [[BASE_SELF:%.*]] = upcast [[SELF]] : $@thick Derived.Type to $@thick Base.Type
@@ -154,7 +154,7 @@ extension Derived : Abstractable {}
 // CHECK-NEXT: [[RESULT:%.*]] = tuple ()
 // CHECK-NEXT: return [[RESULT]] : $()
 
-// CHECK-LABEL: sil hidden [transparent] [thunk] @_T017materializeForSet7DerivedCAA12AbstractableA2aDP14staticFunction6ResultQzycfmZTW
+// CHECK-LABEL: sil private [transparent] [thunk] @_T017materializeForSet7DerivedCAA12AbstractableA2aDP14staticFunction6ResultQzycfmZTW
 // CHECK: bb0(%0 : $Builtin.RawPointer, %1 : $*Builtin.UnsafeValueBuffer, %2 : $@thick Derived.Type):
 // CHECK-NEXT: [[RESULT_ADDR:%.*]] = pointer_to_address %0 : $Builtin.RawPointer to [strict] $*@callee_owned () -> @out Int
 // CHECK-NEXT: [[SELF:%.*]] = upcast %2 : $@thick Derived.Type to $@thick Base.Type
@@ -337,7 +337,7 @@ struct Bill : Totalled {
 // CHECK:   return [[T4]] : $(Builtin.RawPointer, Optional<Builtin.RawPointer>)
 // CHECK: }
 
-// CHECK-LABEL:  sil hidden [transparent] [thunk] @_T017materializeForSet4BillVAA8TotalledA2aDP5totalSifmTW : $@convention(witness_method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout Bill) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>) {
+// CHECK-LABEL:  sil private [transparent] [thunk] @_T017materializeForSet4BillVAA8TotalledA2aDP5totalSifmTW : $@convention(witness_method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout Bill) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>) {
 // CHECK:        bb0([[BUFFER:%.*]] : $Builtin.RawPointer, [[STORAGE:%.*]] : $*Builtin.UnsafeValueBuffer, [[SELF:%.*]] : $*Bill):
 // CHECK:          [[T0:%.*]] = function_ref @_T017materializeForSet4BillV5totalSifm
 // CHECK-NEXT:     [[T1:%.*]] = apply [[T0]]([[BUFFER]], [[STORAGE]], [[SELF]])
@@ -481,7 +481,7 @@ extension Panda {
 
 struct TuxedoPanda : Panda { }
 
-// CHECK-LABEL: sil hidden [transparent] @_T017materializeForSet11TuxedoPandaVAA0E0A2aDP1xxxcfmytfU_TW : $@convention(witness_method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout TuxedoPanda, @thick TuxedoPanda.Type) -> ()
+// CHECK-LABEL: sil private [transparent] @_T017materializeForSet11TuxedoPandaVAA0E0A2aDP1xxxcfmytfU_TW : $@convention(witness_method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout TuxedoPanda, @thick TuxedoPanda.Type) -> ()
 
   // FIXME: Useless re-abstractions
 
@@ -493,7 +493,7 @@ struct TuxedoPanda : Panda { }
 
 // CHECK: }
 
-// CHECK-LABEL: sil hidden [transparent] [thunk] @_T017materializeForSet11TuxedoPandaVAA0E0A2aDP1xxxcfmTW
+// CHECK-LABEL: sil private [transparent] [thunk] @_T017materializeForSet11TuxedoPandaVAA0E0A2aDP1xxxcfmTW
 
 // Call the getter:
 

@@ -281,16 +281,19 @@ extension NSNumber
     ExpressibleByBooleanLiteral
 {
   /// Create an instance initialized to `value`.
+  @nonobjc
   public required convenience init(integerLiteral value: Int) {
     self.init(value: value)
   }
 
   /// Create an instance initialized to `value`.
+  @nonobjc
   public required convenience init(floatLiteral value: Double) {
     self.init(value: value)
   }
 
   /// Create an instance initialized to `value`.
+  @nonobjc
   public required convenience init(booleanLiteral value: Bool) {
     self.init(value: value)
   }

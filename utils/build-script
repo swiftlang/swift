@@ -30,6 +30,7 @@ sys.path.append(os.path.dirname(__file__))
 from SwiftBuildSupport import (
     HOME,
     SWIFT_BUILD_ROOT,
+    SWIFT_REPO_NAME,
     SWIFT_SOURCE_ROOT,
     get_all_preset_names,
     get_preset_options,
@@ -54,7 +55,7 @@ import swift_build_support.workspace    # noqa (E402)
 
 
 build_script_impl = os.path.join(
-    SWIFT_SOURCE_ROOT, "swift", "utils", "build-script-impl")
+    SWIFT_SOURCE_ROOT, SWIFT_REPO_NAME, "utils", "build-script-impl")
 
 
 def exit_rejecting_arguments(message, parser=None):
@@ -1096,7 +1097,8 @@ def main_preset():
         args.preset_file_names = [
             os.path.join(HOME, ".swift-build-presets"),
             os.path.join(
-                SWIFT_SOURCE_ROOT, "swift", "utils", "build-presets.ini")
+                SWIFT_SOURCE_ROOT, SWIFT_REPO_NAME, "utils",
+                "build-presets.ini")
         ]
 
     if args.show_presets:
@@ -2173,6 +2175,7 @@ iterations with -O",
 
     # Prepare and validate toolchain
     toolchain = host_toolchain(xcrun_toolchain=args.darwin_xcrun_toolchain)
+    os.environ['TOOLCHAINS'] = args.darwin_xcrun_toolchain
 
     if args.host_cc is not None:
         toolchain.cc = args.host_cc

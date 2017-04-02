@@ -1536,7 +1536,7 @@ static void fixItAvailableAttrRename(TypeChecker &TC,
     // We can only do a good job with the fix-it if we have the whole call
     // expression.
     // FIXME: Should we be validating the ContextName in some way?
-    if (!dyn_cast_or_null<CallExpr>(call))
+    if (!call || !isa<CallExpr>(call))
       return;
 
     unsigned selfIndex = parsed.SelfIndex.getValue();
@@ -1641,7 +1641,7 @@ static void fixItAvailableAttrRename(TypeChecker &TC,
     // Continue on to diagnose any argument label renames.
 
   } else if (parsed.BaseName == TC.Context.Id_init.str() &&
-             dyn_cast_or_null<CallExpr>(call)) {
+             call && isa<CallExpr>(call)) {
     // For initializers, replace with a "call" of the context type...but only
     // if we know we're doing a call (rather than a first-class reference).
     if (parsed.isMember()) {

@@ -104,8 +104,11 @@ class SILPerformanceInliner {
     /// increasing the code size.
     TrivialFunctionThreshold = 18,
 
-    /// Configuration for the caller block limit.
-    BlockLimitDenominator = 10000,
+    /// Configuration for the "soft" caller block limit.
+    BlockLimitDenominator = 3000,
+
+    /// No inlining is done if the caller has more than this number of blocks.
+    OverallCallerBlockLimit = 400,
 
     /// The assumed execution length of a function call.
     DefaultApplyLength = 10
@@ -227,7 +230,9 @@ SILFunction *SILPerformanceInliner::getEligibleFunction(FullApplySite AI) {
   // attribute if the inliner is asked not to inline them.
   if (Callee->hasSemanticsAttrs() || Callee->hasEffectsKind()) {
     if (WhatToInline == InlineSelection::NoSemanticsAndGlobalInit) {
-      return nullptr;
+      ArraySemanticsCall ASC(AI.getInstruction());
+      if (!ASC.canInlineEarly())
+        return nullptr;
     }
     // The "availability" semantics attribute is treated like global-init.
     if (Callee->hasSemanticsAttrs() &&
@@ -278,7 +283,7 @@ SILFunction *SILPerformanceInliner::getEligibleFunction(FullApplySite AI) {
   }
 
   // A non-fragile function may not be inlined into a fragile function.
-  if (Caller->isFragile() &&
+  if (Caller->isSerialized() &&
       !Callee->hasValidLinkageForFragileInline()) {
     if (!Callee->hasValidLinkageForFragileRef()) {
       llvm::errs() << "caller: " << Caller->getName() << "\n";
@@ -564,8 +569,13 @@ decideInWarmBlock(FullApplySite AI,
 
   SILFunction *Callee = AI.getReferencedFunction();
 
-  if (Callee->getInlineStrategy() == AlwaysInline)
+  if (Callee->getInlineStrategy() == AlwaysInline) {
+    DEBUG(
+      dumpCaller(AI.getFunction());
+      llvm::dbgs() << "    always-inline decision " <<Callee->getName() << '\n';
+    );
     return true;
+  }
 
   return isProfitableToInline(AI, CallerWeight, callerTracker, NumCallerBlocks);
 }
@@ -696,6 +706,9 @@ void SILPerformanceInliner::collectAppliesToInline(
           InitialCandidates.push_back(AI);
       }
     }
+    if (NumCallerBlocks > OverallCallerBlockLimit)
+      break;
+
     domOrder.pushChildrenIf(block, [&] (SILBasicBlock *child) {
       if (CBI.isSlowPath(block, child)) {
         // Handle cold blocks separately.

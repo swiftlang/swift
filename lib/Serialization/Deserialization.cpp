@@ -2377,10 +2377,12 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
       case decls_block::ObjC_DECL_ATTR: {
         bool isImplicit;
         bool isImplicitName;
+        bool isSwift3Inferred;
         uint64_t numArgs;
         ArrayRef<uint64_t> rawPieceIDs;
         serialization::decls_block::ObjCDeclAttrLayout::readRecord(
-          scratch, isImplicit, isImplicitName, numArgs, rawPieceIDs);
+          scratch, isImplicit, isSwift3Inferred, isImplicitName, numArgs,
+          rawPieceIDs);
 
         SmallVector<Identifier, 4> pieces;
         for (auto pieceID : rawPieceIDs)
@@ -2392,6 +2394,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
           Attr = ObjCAttr::create(ctx, ObjCSelector(ctx, numArgs-1, pieces),
                                   isImplicitName);
         Attr->setImplicit(isImplicit);
+        cast<ObjCAttr>(Attr)->setSwift3Inferred(isSwift3Inferred);
         break;
       }
 

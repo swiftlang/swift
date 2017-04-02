@@ -13,7 +13,7 @@ class AClass : AProtocol {
 }
 // CHECK: define hidden {{.*}}void @_T017ProtocolContainer3foo{{[_0-9a-zA-Z]*}}F
 // CHECK-NEXT: entry:
-// CHECK-NEXT: %[[X:.*]] = alloca %T17ProtocolContainer9AProtocolP, align {{(4|8)}}
+// CHECK:      %[[X:.*]] = alloca %T17ProtocolContainer9AProtocolP, align {{(4|8)}}
 // CHECK:      call void @llvm.dbg.declare(metadata %T17ProtocolContainer9AProtocolP* %[[X]], metadata ![[XMD:.*]], metadata !{{[0-9]+}})
 // CHECK-NOT: !DILocalVariable({{.*}} name: "x"
 // CHECK-NOT: !DILocalVariable({{.*}} name: "x"

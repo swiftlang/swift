@@ -25,7 +25,7 @@ func e() {}
 func f() {}
 func g() {}
 
-// CHECK-LABEL: sil hidden  @_T06switch5test1yyF
+// CHECK-LABEL: sil hidden @_T06switch5test1yyF
 func test1() {
   switch foo() {
   // CHECK:   function_ref @_T06switch3fooSiyF
@@ -39,7 +39,7 @@ func test1() {
   b()
 }
 
-// CHECK-LABEL: sil hidden  @_T06switch5test2yyF
+// CHECK-LABEL: sil hidden @_T06switch5test2yyF
 func test2() {
   switch foo() {
   // CHECK:   function_ref @_T06switch3fooSiyF
@@ -55,7 +55,7 @@ func test2() {
   c()
 }
 
-// CHECK-LABEL: sil hidden  @_T06switch5test3yyF
+// CHECK-LABEL: sil hidden @_T06switch5test3yyF
 func test3() {
   switch foo() {
   // CHECK:   function_ref @_T06switch3fooSiyF
@@ -81,7 +81,7 @@ func test3() {
   c()
 }
 
-// CHECK-LABEL: sil hidden  @_T06switch5test4yyF
+// CHECK-LABEL: sil hidden @_T06switch5test4yyF
 func test4() {
   switch (foo(), bar()) {
   // CHECK:   function_ref @_T06switch3fooSiyF
@@ -96,7 +96,7 @@ func test4() {
   b()
 }
 
-// CHECK-LABEL: sil hidden  @_T06switch5test5yyF
+// CHECK-LABEL: sil hidden @_T06switch5test5yyF
 func test5() {
   switch (foo(), bar()) {
   // CHECK:   function_ref @_T06switch3fooSiyF
@@ -131,7 +131,7 @@ func test5() {
   d()
 }
 
-// CHECK-LABEL: sil hidden  @_T06switch5test6yyF
+// CHECK-LABEL: sil hidden @_T06switch5test6yyF
 func test6() {
   switch (foo(), bar()) {
   // CHECK:   function_ref @_T06switch3fooSiyF
@@ -148,7 +148,7 @@ func test6() {
   c()
 }
 
-// CHECK-LABEL: sil hidden  @_T06switch5test7yyF
+// CHECK-LABEL: sil hidden @_T06switch5test7yyF
 func test7() {
   switch (foo(), bar()) {
   // CHECK:   function_ref @_T06switch3fooSiyF
@@ -174,7 +174,7 @@ func test7() {
   // CHECK:   function_ref @_T06switch1cyyF
 }
 
-// CHECK-LABEL: sil hidden  @_T06switch5test8yyF
+// CHECK-LABEL: sil hidden @_T06switch5test8yyF
 func test8() {
   switch (foo(), bar()) {
   // CHECK:   function_ref @_T06switch3fooSiyF
@@ -247,7 +247,7 @@ func test8() {
   g()
 }
 
-// CHECK-LABEL: sil hidden  @_T06switch5test9yyF
+// CHECK-LABEL: sil hidden @_T06switch5test9yyF
 func test9() {
   switch (foo(), bar()) {
   // CHECK:   function_ref @_T06switch3fooSiyF
@@ -282,7 +282,7 @@ func test9() {
   d()
 }
 
-// CHECK-LABEL: sil hidden  @_T06switch6test10yyF
+// CHECK-LABEL: sil hidden @_T06switch6test10yyF
 func test10() {
   switch (foo(), bar()) {
   // CHECK:   function_ref @_T06switch3fooSiyF
@@ -313,7 +313,7 @@ struct X : P { func p() {} }
 struct Y : P { func p() {} }
 struct Z : P { func p() {} }
 
-// CHECK-LABEL: sil hidden  @_T06switch10test_isa_1yAA1P_p1p_tF
+// CHECK-LABEL: sil hidden @_T06switch10test_isa_1yAA1P_p1p_tF
 func test_isa_1(p: P) {
   // CHECK: [[PTMPBUF:%[0-9]+]] = alloc_stack $P
   // CHECK-NEXT: copy_addr %0 to [initialization] [[PTMPBUF]] : $*P
@@ -360,7 +360,7 @@ func test_isa_1(p: P) {
   e()
 }
 
-// CHECK-LABEL: sil hidden  @_T06switch10test_isa_2yAA1P_p1p_tF
+// CHECK-LABEL: sil hidden @_T06switch10test_isa_2yAA1P_p1p_tF
 func test_isa_2(p: P) {
   switch (p, foo()) {
   // CHECK:   checked_cast_addr_br copy_on_success P in [[P:%.*]] : $*P to X in {{%.*}} : $*X, [[IS_X:bb[0-9]+]], [[IS_NOT_X:bb[0-9]+]]
@@ -648,7 +648,7 @@ enum MaybePair {
   case Both(Int, String)
 }
 
-// CHECK-LABEL: sil hidden  @_T06switch12test_union_1yAA9MaybePairO1u_tF
+// CHECK-LABEL: sil hidden @_T06switch12test_union_1yAA9MaybePairO1u_tF
 func test_union_1(u: MaybePair) {
   switch u {
   // CHECK: switch_enum [[SUBJECT:%.*]] : $MaybePair,
@@ -692,7 +692,7 @@ func test_union_1(u: MaybePair) {
   e()
 }
 
-// CHECK-LABEL: sil hidden  @_T06switch12test_union_2yAA9MaybePairO1u_tF
+// CHECK-LABEL: sil hidden @_T06switch12test_union_2yAA9MaybePairO1u_tF
 func test_union_2(u: MaybePair) {
   switch u {
   // CHECK: switch_enum {{%.*}} : $MaybePair,
@@ -729,7 +729,7 @@ func test_union_2(u: MaybePair) {
   d()
 }
 
-// CHECK-LABEL: sil hidden  @_T06switch12test_union_3yAA9MaybePairO1u_tF : $@convention(thin) (@owned MaybePair) -> () {
+// CHECK-LABEL: sil hidden @_T06switch12test_union_3yAA9MaybePairO1u_tF : $@convention(thin) (@owned MaybePair) -> () {
 func test_union_3(u: MaybePair) {
   // CHECK: bb0([[ARG:%.*]] : $MaybePair):
   // CHECK:   [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
@@ -776,7 +776,7 @@ func test_union_3(u: MaybePair) {
   e()
 }
 
-// CHECK-LABEL: sil hidden  @_T06switch12test_union_4yAA9MaybePairO1u_tF
+// CHECK-LABEL: sil hidden @_T06switch12test_union_4yAA9MaybePairO1u_tF
 func test_union_4(u: MaybePair) {
   switch u {
   // CHECK: switch_enum {{%.*}} : $MaybePair,
@@ -815,7 +815,7 @@ func test_union_4(u: MaybePair) {
   e()
 }
 
-// CHECK-LABEL: sil hidden  @_T06switch12test_union_5yAA9MaybePairO1u_tF
+// CHECK-LABEL: sil hidden @_T06switch12test_union_5yAA9MaybePairO1u_tF
 func test_union_5(u: MaybePair) {
   switch u {
   // CHECK: switch_enum {{%.*}} : $MaybePair,
@@ -1096,5 +1096,31 @@ func testOptionalEnumMixWithNil(_ a : Int?) -> Int {
 
   // CHECK: [[NILBB]]:
   // CHECK: integer_literal $Builtin.Int2048, 42
+  }
+}
+
+// SR-3518
+// CHECK-LABEL: sil hidden @_T06switch43testMultiPatternsWithOuterScopeSameNamedVarySiSg4base_AC6filtertF
+func testMultiPatternsWithOuterScopeSameNamedVar(base: Int?, filter: Int?) {
+  switch(base, filter) {
+    
+  case (.some(let base), .some(let filter)):
+    // CHECK: bb2(%10 : $Int):
+    // CHECK-NEXT: debug_value %10 : $Int, let, name "base"
+    // CHECK-NEXT: debug_value %8 : $Int, let, name "filter"
+    print("both: \(base), \(filter)")
+  case (.some(let base), .none), (.none, .some(let base)):
+    // CHECK: bb3:
+    // CHECK-NEXT: debug_value %8 : $Int, let, name "base"
+    // CHECK-NEXT: br bb6(%8 : $Int)
+
+    // CHECK: bb5([[OTHER_BASE:%.*]] : $Int)
+    // CHECK-NEXT: debug_value [[OTHER_BASE]] : $Int, let, name "base"
+    // CHECK-NEXT: br bb6([[OTHER_BASE]] : $Int)
+    
+    // CHECK: bb6([[ARG:%.*]] : $Int):
+    print("single: \(base)")
+  default:
+    print("default")
   }
 }

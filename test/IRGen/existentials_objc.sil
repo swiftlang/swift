@@ -23,6 +23,7 @@ bb0(%0 : $*Any, %1 : $T):
 // CHECK:         [[T0:%.*]] = getelementptr inbounds [[ANY]], [[ANY]]* %0, i32 0, i32 1
 // CHECK-NEXT:    store [[TYPE]]* %T, [[TYPE]]** [[T0]], align 8
 // CHECK-NEXT:    [[T0:%.*]] = getelementptr inbounds [[ANY]], [[ANY]]* %0, i32 0, i32 0
+// CHECK-NEXT:    [[T0:%.*]] = getelementptr inbounds [[ANY]], [[ANY]]* %0, i32 0, i32 0
 // CHECK-NEXT:    [[T1:%.*]] = bitcast [24 x i8]* [[T0]] to [[GIZMO]]**
 // CHECK-NEXT:    store [[GIZMO]]* %1, [[GIZMO]]** [[T1]], align 8
 // CHECK-NEXT:    ret void
@@ -39,15 +40,15 @@ bb0(%0 : $*Any, %1 : $*Any):
 // CHECK-NEXT:    [[TYPE:%.*]] = load %swift.type*, %swift.type** [[T0]], align 8
 // CHECK-NEXT:    [[T0:%.*]] = getelementptr inbounds [[ANY]], [[ANY]]* [[DEST:%0]], i32 0, i32 1
 // CHECK-NEXT:    store %swift.type* [[TYPE]], %swift.type** [[T0]], align 8
-// CHECK-NEXT:    [[SRC_BUF:%.*]] = getelementptr inbounds [[ANY]], [[ANY]]* [[SRC]], i32 0, i32 0
-// CHECK-NEXT:    [[DEST_BUF:%.*]] = getelementptr inbounds [[ANY]], [[ANY]]* [[DEST]], i32 0, i32 0
-// CHECK-NEXT:    [[T0:%.*]] = bitcast %swift.type* [[TYPE]] to i8***
-// CHECK-NEXT:    [[T1:%.*]] = getelementptr inbounds i8**, i8*** [[T0]], i64 -1
-// CHECK-NEXT:    [[VWTABLE:%.*]] = load i8**, i8*** [[T1]], align 8
-// CHECK-NEXT:    [[T0:%.*]] = getelementptr inbounds i8*, i8** [[VWTABLE]], i32 12
-// CHECK-NEXT:    [[T1:%.*]] = load i8*, i8** [[T0]], align 8
-// CHECK-NEXT:    [[INIT:%.*]] = bitcast i8* [[T1]] to %swift.opaque* ([24 x i8]*, [24 x i8]*, %swift.type*)*
-// CHECK-NEXT:    call %swift.opaque* [[INIT]]([24 x i8]* noalias [[DEST_BUF]], [24 x i8]* [[SRC_BUF]], %swift.type* [[TYPE]])
+// CHECK-NEXT: [[FROM_BUFFER_ADDR:%.*]] = getelementptr inbounds %Any, %Any* %1, i32 0, i32 0
+// CHECK-NEXT: [[TO_BUFFER_ADDR:%.*]] = getelementptr inbounds %Any, %Any* %0, i32 0, i32 0
+// CHECK-NEXT: [[CAST:%.*]] = bitcast %swift.type* [[TYPE]] to i8***
+// CHECK-NEXT: [[VWT_ADDR:%.*]] = getelementptr inbounds i8**, i8*** [[CAST]], i64 -1
+// CHECK-NEXT: [[VWT:%.*]] = load i8**, i8*** [[VWT_ADDR]]
+// CHECK-NEXT: [[VW_ADDR:%.*]] = getelementptr inbounds i8*, i8** [[VWT]], i32 12
+// CHECK-NEXT: [[VW:%.*]] = load i8*, i8** [[VW_ADDR]]
+// CHECK-NEXT: [[INITWITHTAKEBUFFER:%.*]] = bitcast i8* [[VW]]
+// CHECK-NEXT: call %swift.opaque* [[INITWITHTAKEBUFFER]]({{.*}} [[TO_BUFFER_ADDR]], {{.*}} [[FROM_BUFFER_ADDR]], %swift.type* [[TYPE]])
 // CHECK-NEXT:    ret void
 
 // rdar://problem/19035529

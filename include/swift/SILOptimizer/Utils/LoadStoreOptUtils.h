@@ -169,9 +169,9 @@ public:
   }
 
   /// Print the LSBase.
-  virtual void print(SILModule *Mod) { 
-    llvm::outs() << Base;
-    Path.getValue().print(llvm::outs(), *Mod);
+  virtual void print(llvm::raw_ostream &os, SILModule *Mod) { 
+    os << Base;
+    Path.getValue().print(os, *Mod);
   }
 };
 
@@ -255,12 +255,12 @@ public:
     return Path.getValue().createExtract(Base, Inst, true);
   }
 
-  void print(SILModule *Mod) {
+  void print(llvm::raw_ostream &os, SILModule *Mod) {
     if (CoveringValue) {
-      llvm::outs() << "Covering Value";
+      os << "Covering Value";
       return;
     }
-    LSBase::print(Mod);
+    LSBase::print(os, Mod);
   }
 
   /// Expand this SILValue to all individual fields it contains.

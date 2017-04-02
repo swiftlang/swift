@@ -222,19 +222,22 @@ public final class _NSContiguousString : _SwiftNativeNSString {
     super.init()
   }
 
+	@objc
   init(coder aDecoder: AnyObject) {
     _sanityCheckFailure("init(coder:) not implemented for _NSContiguousString")
   }
 
+	@objc
   func length() -> Int {
     return _core.count
   }
 
+	@objc
   func characterAtIndex(_ index: Int) -> UInt16 {
     return _core[index]
   }
 
-  @inline(__always) // Performance: To save on reference count operations.
+  @objc @inline(__always) // Performance: To save on reference count operations.
   func getCharacters(
     _ buffer: UnsafeMutablePointer<UInt16>,
     range aRange: _SwiftNSRange) {
@@ -270,20 +273,20 @@ public final class _NSContiguousString : _SwiftNativeNSString {
   //
   // Implement sub-slicing without adding layers of wrapping
   //
-  func substringFromIndex(_ start: Int) -> _NSContiguousString {
+  @objc func substringFromIndex(_ start: Int) -> _NSContiguousString {
     return _NSContiguousString(_core[Int(start)..<Int(_core.count)])
   }
 
-  func substringToIndex(_ end: Int) -> _NSContiguousString {
+  @objc func substringToIndex(_ end: Int) -> _NSContiguousString {
     return _NSContiguousString(_core[0..<Int(end)])
   }
 
-  func substringWithRange(_ aRange: _SwiftNSRange) -> _NSContiguousString {
+  @objc func substringWithRange(_ aRange: _SwiftNSRange) -> _NSContiguousString {
     return _NSContiguousString(
       _core[Int(aRange.location)..<Int(aRange.location + aRange.length)])
   }
 
-  func copy() -> AnyObject {
+  @objc func copy() -> AnyObject {
     // Since this string is immutable we can just return ourselves.
     return self
   }
