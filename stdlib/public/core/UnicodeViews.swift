@@ -402,13 +402,9 @@ where FromEncoding_.EncodedScalar.Iterator.Element == CodeUnits.Iterator.Element
   >
   public typealias Index = Base.Index
 
-  var base: Base { return _base(from: codeUnits.startIndex) }
-
-  /// Returns an instance of Base that starts at the given position in the
-  /// underlying code units.
-  internal func _base(from start: CodeUnits.Index) -> Base {
+  var base: Base {
     return Base(
-      _UnicodeViews_(codeUnits[start...]).scalarsTranscoded(to: ToEncoding.self))
+      _UnicodeViews_(codeUnits[...]).scalarsTranscoded(to: ToEncoding.self))
   }
 
   public init(_ codeUnits: CodeUnits,
@@ -445,10 +441,15 @@ where FromEncoding_.EncodedScalar.Iterator.Element == CodeUnits.Iterator.Element
 
 extension _TranscodedView : UnicodeView {
   public func index(atEncodedOffset offset: Int64) -> Base.Index {
-    return _base(from: codeUnits.index(atOffset: offset)).startIndex
+    let scalarsTranscoded = base._base
+    let encodedScalars = scalarsTranscoded._base
+    let outerIndex = encodedScalars.index(atEncodedOffset: offset)
+    if outerIndex == encodedScalars.endIndex { return endIndex }
+    return Index(outerIndex, scalarsTranscoded[outerIndex].startIndex)
   }
   public static func encodedOffset(of i: Index) -> Int64 {
-    return numericCast(i._outer.base)
+    return _UnicodeViews<CodeUnits.SubSequence, FromEncoding>
+    .Scalars.encodedOffset(of: i._outer)
   }
 }
 
