@@ -306,7 +306,7 @@ public:
   unsigned commonPartsCount(DeclNameViewer &Other) const;
 };
 
-/// This provide a utility for writing to an underlying string buffer mulitiple
+/// This provide a utility for writing to an underlying string buffer multiple
 /// string pieces and retrieve them later when the underlying buffer is stable.
 class DelayedStringRetriever : public raw_ostream {
     SmallVectorImpl<char> &OS;

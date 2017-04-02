@@ -99,7 +99,7 @@ public:
     // Do we have enough space in the current slab?
     if (CurPtr + ObjectSize > End) {
       // No. We have to malloc a new slab.
-      // We doulbe the slab size for each allocated slab.
+      // We double the slab size for each allocated slab.
       SlabSize = std::max(SlabSize * 2, ObjectSize + alignof(T));
       size_t AllocSize = sizeof(Slab) + SlabSize;
       Slab *newSlab = (Slab *)malloc(AllocSize);
@@ -125,7 +125,7 @@ public:
 
   /// Tries to enlarge the \p Capacity of an array of \p Objects.
   ///
-  /// If \p Objects is allcoated at the end of the current slab and the slab
+  /// If \p Objects is allocated at the end of the current slab and the slab
   /// has enough free space, the \p Capacity is simpliy enlarged and no new
   /// allocation needs to be done.
   /// Otherwise a new array of objects is allocated and \p Objects is set to the
@@ -171,7 +171,7 @@ public:
 
   /// Creates a node of kind \p K with a \p Text payload.
   ///
-  /// The \p Text string must be already allocted with the Factory and therefore
+  /// The \p Text string must be already allocated with the Factory and therefore
   /// it is _not_ copied.
   NodePointer createNodeWithAllocatedText(Node::Kind K, llvm::StringRef Text);
 
@@ -184,7 +184,7 @@ public:
 
   /// Creates a node of kind \p K with a \p Text payload.
   ///
-  /// The \p Text string is already allocted with the Factory and therefore
+  /// The \p Text string is already allocated with the Factory and therefore
   /// it is _not_ copied.
   NodePointer createNode(Node::Kind K, const CharVector &Text);
   
@@ -212,7 +212,7 @@ public:
 
   Vector() { }
 
-  /// Construct a vector with an inital capacity.
+  /// Construct a vector with an initial capacity.
   explicit Vector(NodeFactory &Factory, size_t InitialCapacity) {
     init(Factory, InitialCapacity);
   }
