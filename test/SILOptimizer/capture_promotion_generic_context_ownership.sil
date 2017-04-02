@@ -1,0 +1,127 @@
+// RUN: %target-swift-frontend -enable-sil-ownership -emit-sil -O %s | %FileCheck %s
+
+sil_stage raw
+
+import Builtin
+
+typealias Int = Builtin.Int32
+
+// rdar://problem/28945854: When a nongeneric closure was formed inside a
+// generic function, the capture promotion pass would erroneously try to
+// apply the generic caller's substitutions to the nongeneric callee, violating
+// invariants.
+
+// CHECK-LABEL: sil @_T014promotable_boxTf2i_n : $@convention(thin) (Builtin.Int32) -> Builtin.Int32
+sil @promotable_box : $@convention(thin) (@owned <τ_0_0> { var τ_0_0 } <Int>) -> Int {
+entry(%b : @owned $<τ_0_0> { var τ_0_0 } <Int>):
+  %a = project_box %b : $<τ_0_0> { var τ_0_0 } <Int>, 0
+  %v = load [trivial] %a : $*Int
+  destroy_value %b : $<τ_0_0> { var τ_0_0 } <Int>
+  return %v : $Int
+}
+
+// CHECK-LABEL: sil @call_promotable_box_from_generic
+// CHECK:         [[F:%.*]] = function_ref @_T014promotable_boxTf2i_n
+// CHECK:         partial_apply [[F]](
+
+sil @call_promotable_box_from_generic : $@convention(thin) <T> (@in T, Int) -> @owned @callee_owned () -> Int {
+entry(%0 : @trivial $*T, %1 : @trivial $Int):
+  destroy_addr %0 : $*T
+  %f = function_ref @promotable_box : $@convention(thin) (@owned <τ_0_0> { var τ_0_0 } <Int>) -> Int
+  %b = alloc_box $<τ_0_0> { var τ_0_0 } <Int>
+  %a = project_box %b : $<τ_0_0> { var τ_0_0 } <Int>, 0
+  store %1 to [trivial] %a : $*Int
+  %k = partial_apply %f(%b) : $@convention(thin) (@owned <τ_0_0> { var τ_0_0 } <Int>) -> Int
+  return %k : $@callee_owned () -> Int
+}
+
+protocol P {}
+
+// CHECK-LABEL: sil @_T022generic_promotable_boxTf2ni_n : $@convention(thin) <T> (@in T, Builtin.Int32) -> Builtin.Int32
+// CHECK:       bb0([[ARG0:%.*]] : @trivial $*T, [[ARG1:%.*]] : @trivial $Builtin.Int32):
+// CHECK-NEXT:    return [[ARG1]] : $Builtin.Int32
+
+sil @generic_promotable_box : $@convention(thin) <T> (@in T, @owned <τ_0_0> { var τ_0_0 } <Int>) -> Int {
+entry(%0 : @trivial $*T, %b : @owned $<τ_0_0> { var τ_0_0 } <Int>):
+  %a = project_box %b : $<τ_0_0> { var τ_0_0 } <Int>, 0
+  %v = load [trivial] %a : $*Int
+  destroy_value %b : $<τ_0_0> { var τ_0_0 } <Int>
+  return %v : $Int
+}
+
+// CHECK-LABEL: sil @call_generic_promotable_box_from_different_generic
+// CHECK:       bb0([[ARG0:%.*]] : @trivial $*T, [[ARG1:%.*]] : @trivial $*U, [[ARG2:%.*]] : @trivial $Builtin.Int32):
+// CHECK-NEXT:    destroy_addr [[ARG0]] : $*T
+// CHECK-NEXT:    destroy_addr [[ARG1]] : $*U
+// CHECK:         [[F:%.*]] = function_ref @_T022generic_promotable_boxTf2ni_n : $@convention(thin) <τ_0_0> (@in τ_0_0, Builtin.Int32) -> Builtin.Int32
+// CHECK-NEXT:    [[CLOSURE:%.*]] = partial_apply [[F]]<U>([[ARG2]])
+// CHECK-NEXT:    return [[CLOSURE]]
+
+sil @call_generic_promotable_box_from_different_generic : $@convention(thin) <T, U: P> (@in T, @in U, Int) -> @owned @callee_owned (@in U) -> Int {
+entry(%0 : @trivial $*T, %1 : @trivial $*U, %2 : @trivial $Int):
+  destroy_addr %0 : $*T
+  destroy_addr %1 : $*U
+  %f = function_ref @generic_promotable_box : $@convention(thin) <V> (@in V, @owned <τ_0_0> { var τ_0_0 } <Int>) -> Int
+  %b = alloc_box $<τ_0_0> { var τ_0_0 } <Int>
+  %a = project_box %b : $<τ_0_0> { var τ_0_0 } <Int>, 0
+  store %2 to [trivial] %a : $*Int
+  %k = partial_apply %f<U>(%b) : $@convention(thin) <V> (@in V, @owned <τ_0_0> { var τ_0_0 } <Int>) -> Int
+  return %k : $@callee_owned (@in U) -> Int
+}
+
+enum E<X> {
+  case None
+  case Some(X)
+}
+
+struct R<T> {
+}
+
+// Check that the capture promotion took place and the function now
+// take argument of a type  E<(R<T>) -> Builtin.Int32>, which used
+// to be a slot inside a box.
+// CHECK-LABEL: sil @_T023generic_promotable_box2Tf2nni_n : $@convention(thin) <T> (@in R<T>, @in Builtin.Int32, @owned E<(R<T>) -> Builtin.Int32>) -> () 
+// CHECK:       bb0([[ARG0:%.*]] : @trivial $*R<T>, [[ARG1:%.*]] : @trivial $*Builtin.Int32, [[ARG2:%.*]] : @owned $E<(R<T>) -> Builtin.Int32>):
+// CHECK-NOT:     project_box
+// CHECK:         switch_enum [[ARG2]] : $E<(R<T>) -> Builtin.Int32>
+// CHECK-NOT:     project_box
+// CHECK:       } // end sil function '_T023generic_promotable_box2Tf2nni_n'
+sil @generic_promotable_box2 : $@convention(thin) <T> (@in R<T>, @in Int, @owned <τ_0_0> { var E<(R<τ_0_0>) -> Int> } <T>) -> () {
+entry(%0 : @trivial $*R<T>, %1 : @trivial $*Int, %b : @owned $<τ_0_0> { var E<(R<τ_0_0>)->Int> } <T>):
+  %a = project_box %b : $<τ_0_0> { var E<(R<τ_0_0>)->Int> } <T>, 0
+  %e = load [copy] %a : $*E<(R<T>)->Int>
+  switch_enum %e : $E<(R<T>)->Int>, case #E.Some!enumelt.1 : bb1, default bb2
+
+bb1(%f : @owned $@callee_owned (@in R<T>) -> @out Int):
+  apply %f(%1, %0) : $@callee_owned (@in R<T>) -> @out Int
+  br exit
+
+bb2(%original : @owned $E<(R<T>)->Int>):
+  destroy_value %original : $E<(R<T>)->Int>
+  br exit
+
+exit:
+  destroy_value %b : $<τ_0_0> { var E<(R<τ_0_0>)->Int> } <T>
+  %r = tuple ()
+  return %r : $()
+}
+
+// Check that alloc_box was eliminated and a specialized version of the
+// closure is invoked.
+// CHECK-LABEL: sil @call_generic_promotable_box_from_different_generic2
+// CHECK:       bb0([[ARG0:%.*]] : @trivial $*R<T>, [[ARG1:%.*]] : @trivial $*E<(R<U>) -> Builtin.Int32>, [[ARG2:%.*]] : @trivial $*Builtin.Int32):
+// CHECK:         %3 = load [[ARG1]] : $*E<(R<U>) -> Builtin.Int32>
+// CHECK:         [[F:%.*]] = function_ref @_T023generic_promotable_box2Tf2nni_n : $@convention(thin) <τ_0_0> (@in R<τ_0_0>, @in Builtin.Int32, @owned E<(R<τ_0_0>) -> Builtin.Int32>) -> ()
+// CHECK-NEXT:    [[CLOSURE:%.*]] = partial_apply [[F]]<U>(%2, %3)
+// CHECK-NEXT:    return [[CLOSURE]]
+
+sil @call_generic_promotable_box_from_different_generic2 : $@convention(thin) <T, U: P> (@in R<T>, @in E<(R<U>)->Int>, @in Int) -> @owned @callee_owned (@in R<U>) -> () {
+entry(%0 : @trivial $*R<T>, %1 : @trivial $*E<(R<U>)->Int>, %2 : @trivial $*Int):
+  destroy_addr %0 : $*R<T>
+  %f = function_ref @generic_promotable_box2 : $@convention(thin) <V> (@in R<V>, @in Int, @owned <τ_0_0> { var E<(R<τ_0_0>)->Int> } <V>) -> ()
+  %b = alloc_box $<τ_0_0> { var E<(R<τ_0_0>)->Int> } <U>
+  %a = project_box %b : $<τ_0_0> { var E<(R<τ_0_0>)->Int> } <U>, 0
+  copy_addr [take] %1 to [initialization] %a : $*E<(R<U>)->Int>
+  %k = partial_apply %f<U>(%2, %b) : $@convention(thin) <V> (@in R<V>, @in Int, @owned <τ_0_0> { var E<(R<τ_0_0>)->Int> } <V>) -> ()
+  return %k : $@callee_owned (@in R<U>) -> ()
+}

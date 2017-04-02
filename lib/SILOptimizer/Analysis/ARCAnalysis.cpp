@@ -948,7 +948,8 @@ bool swift::getFinalReleasesForValue(SILValue V, ReleaseTracker &Tracker) {
     UseBlocks.insert(BB);
 
     // Try to speed up the trivial case of single release/dealloc.
-    if (isa<StrongReleaseInst>(User) || isa<DeallocBoxInst>(User)) {
+    if (isa<StrongReleaseInst>(User) || isa<DeallocBoxInst>(User) ||
+        isa<DestroyValueInst>(User)) {
       if (!seenRelease)
         OneRelease = User;
       else

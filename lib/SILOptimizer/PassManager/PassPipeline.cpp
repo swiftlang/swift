@@ -74,6 +74,8 @@ static void addOwnershipModelEliminatorPipeline(SILPassPipelinePlan &P) {
 static void addMandatoryOptPipeline(SILPassPipelinePlan &P) {
   P.startPipeline("Guaranteed Passes");
   P.addCapturePromotion();
+  P.addOwnershipModelEliminator();
+
   P.addAllocBoxToStack();
   P.addNoReturnFolding();
   P.addDefiniteInitialization();
@@ -103,9 +105,6 @@ SILPassPipelinePlan::getDiagnosticPassPipeline(const SILOptions &Options) {
     addMandatoryDebugSerialization(P);
     return P;
   }
-
-  // Lower all ownership instructions right after SILGen for now.
-  addOwnershipModelEliminatorPipeline(P);
 
   // Otherwise run the rest of diagnostics.
   addMandatoryOptPipeline(P);
