@@ -1379,8 +1379,8 @@ void swift_objc_swift3ImplicitObjCEntrypoint(id self, SEL selector) {
   if (storedReportLevel == 0) {
     auto reportLevelStr = getenv("SWIFT_DEBUG_IMPLICIT_OBJC_ENTRYPOINT");
     if (reportLevelStr &&
-	reportLevelStr[0] >= '0' && reportLevelStr[0] <= '3' &&
-	reportLevelStr[1] == 0)
+  reportLevelStr[0] >= '0' && reportLevelStr[0] <= '3' &&
+  reportLevelStr[1] == 0)
       storedReportLevel = (reportLevelStr[0] - '0') + 1;
     else
       storedReportLevel = 1;
