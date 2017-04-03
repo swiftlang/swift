@@ -1,4 +1,4 @@
-//===--- Tbd.h -- generates and validates TBD files -----------------------===//
+//===--- TBD.h -- generates and validates TBD files -------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //

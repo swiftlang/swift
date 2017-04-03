@@ -1,4 +1,4 @@
-//===--- NSTimeZoneShims.h - Foundation declarations for TimeZone overlay ------===//
+//===--- NSTimeZoneShims.h - Foundation declarations for TimeZone overlay -===//
 //
 // This source file is part of the Swift.org open source project
 //

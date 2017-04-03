@@ -1,4 +1,4 @@
-//===--- TBDGenPublic.h - Public interface to TBDGen ------------*- C++ -*-===//
+//===--- TBDGen.h - Public interface to TBDGen ------------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
