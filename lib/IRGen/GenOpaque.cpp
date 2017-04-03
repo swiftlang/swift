@@ -349,9 +349,9 @@ llvm::Value *IRGenFunction::emitValueWitnessForLayout(SILType type,
 static void setHelperAttributesForAggResult(llvm::CallInst *call,
                                             bool isFormalResult = true) {
   // Set as nounwind.
-  auto attrs = llvm::AttributeSet::get(call->getContext(),
-                                       llvm::AttributeSet::FunctionIndex,
-                                       llvm::Attribute::NoUnwind);
+  auto attrs = llvm::AttributeList::get(call->getContext(),
+                                        llvm::AttributeList::FunctionIndex,
+                                        llvm::Attribute::NoUnwind);
 
   attrs = attrs.addAttribute(call->getContext(), 1, llvm::Attribute::NoAlias);
 
@@ -367,9 +367,9 @@ static void setHelperAttributesForAggResult(llvm::CallInst *call,
 /// Given a call to a helper function, set attributes appropriately.
 static void setHelperAttributes(llvm::CallInst *call) {
   // Set as nounwind.
-  auto attrs = llvm::AttributeSet::get(call->getContext(),
-                                       llvm::AttributeSet::FunctionIndex,
-                                       llvm::Attribute::NoUnwind);
+  auto attrs = llvm::AttributeList::get(call->getContext(),
+                                        llvm::AttributeList::FunctionIndex,
+                                        llvm::Attribute::NoUnwind);
 
   call->setAttributes(attrs);
 }

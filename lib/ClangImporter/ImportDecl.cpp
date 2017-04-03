@@ -4225,12 +4225,12 @@ namespace {
       result->setCheckedInheritanceClause();
 
       // Add inferred attributes.
-#define INFERRED_ATTRIBUTES(ModuleName, ClassName, AttributeSet)        \
-      if (name.str().equals(#ClassName) &&                              \
-          result->getParentModule()->getName().str().equals(#ModuleName)) {  \
-        using namespace inferred_attributes;                            \
-        addInferredAttributes(result, AttributeSet);                    \
-      }
+#define INFERRED_ATTRIBUTES(ModuleName, ClassName, AttributeSet)               \
+  if (name.str().equals(#ClassName) &&                                         \
+      result->getParentModule()->getName().str().equals(#ModuleName)) {        \
+    using namespace inferred_attributes;                                       \
+    addInferredAttributes(result, AttributeSet);                               \
+  }
 #include "InferredAttributes.def"
 
       result->setMemberLoader(&Impl, 0);

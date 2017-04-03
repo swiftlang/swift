@@ -466,18 +466,16 @@ llvm::Constant *swift::getRuntimeFn(llvm::Module &Module,
     }
     // FIXME: getting attributes here without setting them does
     // nothing. This cannot be fixed until the attributes are correctly specified.
-    fn->getAttributes().
-      addAttributes(Module.getContext(),
-                    llvm::AttributeSet::FunctionIndex,
-                    llvm::AttributeSet::get(Module.getContext(),
-                                            llvm::AttributeSet::FunctionIndex,
-                                            buildFnAttr));
-    fn->getAttributes().
-      addAttributes(Module.getContext(),
-                    llvm::AttributeSet::ReturnIndex,
-                    llvm::AttributeSet::get(Module.getContext(),
-                                            llvm::AttributeSet::ReturnIndex,
-                                            buildRetAttr));
+    fn->getAttributes().addAttributes(
+        Module.getContext(), llvm::AttributeList::FunctionIndex,
+        llvm::AttributeList::get(Module.getContext(),
+                                 llvm::AttributeList::FunctionIndex,
+                                 buildFnAttr));
+    fn->getAttributes().addAttributes(
+        Module.getContext(), llvm::AttributeList::ReturnIndex,
+        llvm::AttributeList::get(Module.getContext(),
+                                 llvm::AttributeList::ReturnIndex,
+                                 buildRetAttr));
   }
 
   return cache;
@@ -504,7 +502,7 @@ llvm::Constant *swift::getWrapperFn(llvm::Module &Module,
   auto *fun = dyn_cast<llvm::Function>(fn);
   assert(fun && "Wrapper should be an llvm::Function");
   // Do not inline wrappers, because this would result in a code size increase.
-  fun->addAttribute(llvm::AttributeSet::FunctionIndex,
+  fun->addAttribute(llvm::AttributeList::FunctionIndex,
                     llvm::Attribute::NoInline);
   assert(fun->hasFnAttribute(llvm::Attribute::NoInline) &&
          "Wrappers should not be inlined");
@@ -754,32 +752,32 @@ void IRGenerator::addLazyWitnessTable(const ProtocolConformance *Conf) {
   }
 }
 
-llvm::AttributeSet IRGenModule::getAllocAttrs() {
+llvm::AttributeList IRGenModule::getAllocAttrs() {
   if (AllocAttrs.isEmpty()) {
-    AllocAttrs = llvm::AttributeSet::get(LLVMContext,
-                                         llvm::AttributeSet::ReturnIndex,
-                                         llvm::Attribute::NoAlias);
-    AllocAttrs = AllocAttrs.addAttribute(LLVMContext,
-                               llvm::AttributeSet::FunctionIndex,
-                               llvm::Attribute::NoUnwind);
+    AllocAttrs =
+        llvm::AttributeList::get(LLVMContext, llvm::AttributeList::ReturnIndex,
+                                 llvm::Attribute::NoAlias);
+    AllocAttrs =
+        AllocAttrs.addAttribute(LLVMContext, llvm::AttributeList::FunctionIndex,
+                                llvm::Attribute::NoUnwind);
   }
   return AllocAttrs;
 }
 
 /// Construct initial attributes from options.
-llvm::AttributeSet IRGenModule::constructInitialAttributes() {
-  llvm::AttributeSet attrsUpdated;
+llvm::AttributeList IRGenModule::constructInitialAttributes() {
+  llvm::AttributeList attrsUpdated;
   // Add DisableFPElim. 
   if (!IRGen.Opts.DisableFPElim) {
     attrsUpdated = attrsUpdated.addAttribute(LLVMContext,
-                     llvm::AttributeSet::FunctionIndex,
-                     "no-frame-pointer-elim", "false");
+                                             llvm::AttributeList::FunctionIndex,
+                                             "no-frame-pointer-elim", "false");
   } else {
     attrsUpdated = attrsUpdated.addAttribute(
-        LLVMContext, llvm::AttributeSet::FunctionIndex,
+        LLVMContext, llvm::AttributeList::FunctionIndex,
         "no-frame-pointer-elim", "true");
     attrsUpdated = attrsUpdated.addAttribute(
-        LLVMContext, llvm::AttributeSet::FunctionIndex,
+        LLVMContext, llvm::AttributeList::FunctionIndex,
         "no-frame-pointer-elim-non-leaf");
   }
 
@@ -789,8 +787,8 @@ llvm::AttributeSet IRGenModule::constructInitialAttributes() {
 
   std::string &CPU = ClangOpts.CPU;
   if (CPU != "")
-    attrsUpdated = attrsUpdated.addAttribute(LLVMContext,
-                     llvm::AttributeSet::FunctionIndex, "target-cpu", CPU);
+    attrsUpdated = attrsUpdated.addAttribute(
+        LLVMContext, llvm::AttributeList::FunctionIndex, "target-cpu", CPU);
 
   std::vector<std::string> &Features = ClangOpts.Features;
   if (!Features.empty()) {
@@ -801,7 +799,7 @@ llvm::AttributeSet IRGenModule::constructInitialAttributes() {
       allFeatures.push_back(',');
     });
     attrsUpdated = attrsUpdated.addAttribute(LLVMContext,
-                     llvm::AttributeSet::FunctionIndex, "target-features",
+                     llvm::AttributeList::FunctionIndex, "target-features",
                      allFeatures);
   }
   return attrsUpdated;

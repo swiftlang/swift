@@ -49,7 +49,7 @@ public:
 /// A signature represents something which can actually be called.
 class Signature {
   llvm::FunctionType *Type = nullptr;
-  llvm::AttributeSet Attributes;
+  llvm::AttributeList Attributes;
   ForeignFunctionInfo ForeignInfo;
 
 public:
@@ -64,7 +64,7 @@ public:
     return Type;
   }
 
-  llvm::AttributeSet getAttributes() const {
+  llvm::AttributeList getAttributes() const {
     assert(isValid());
     return Attributes;
   }

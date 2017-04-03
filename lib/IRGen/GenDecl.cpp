@@ -1482,7 +1482,7 @@ static bool isPointerTo(llvm::Type *ptrTy, llvm::Type *objTy) {
 llvm::Function *LinkInfo::createFunction(IRGenModule &IGM,
                                          llvm::FunctionType *fnType,
                                          llvm::CallingConv::ID cc,
-                                         const llvm::AttributeSet &attrs,
+                                         const llvm::AttributeList &attrs,
                                          llvm::Function *insertBefore) {
   llvm::Function *existing = IGM.Module.getFunction(getName());
   if (existing) {
@@ -1510,8 +1510,8 @@ llvm::Function *LinkInfo::createFunction(IRGenModule &IGM,
 
   auto initialAttrs = IGM.constructInitialAttributes();
   // Merge initialAttrs with attrs.
-  auto updatedAttrs = attrs.addAttributes(IGM.getLLVMContext(),
-                        llvm::AttributeSet::FunctionIndex, initialAttrs);
+  auto updatedAttrs = attrs.addAttributes(
+      IGM.getLLVMContext(), llvm::AttributeList::FunctionIndex, initialAttrs);
   if (!updatedAttrs.isEmpty())
     fn->setAttributes(updatedAttrs);
 
@@ -1835,7 +1835,7 @@ llvm::Function *IRGenModule::getAddrOfSILFunction(SILFunction *f,
     IRGen.addLazyFunction(f);
   }
 
-  llvm::AttributeSet attrs;
+  llvm::AttributeList attrs;
   llvm::FunctionType *fnType = getFunctionType(f->getLoweredFunctionType(),
                                                attrs);
 
@@ -1844,11 +1844,13 @@ llvm::Function *IRGenModule::getAddrOfSILFunction(SILFunction *f,
 
   if (f->getInlineStrategy() == NoInline) {
     attrs = attrs.addAttribute(fnType->getContext(),
-                llvm::AttributeSet::FunctionIndex, llvm::Attribute::NoInline);
+                               llvm::AttributeList::FunctionIndex,
+                               llvm::Attribute::NoInline);
   }
   if (isReadOnlyFunction(f)) {
     attrs = attrs.addAttribute(fnType->getContext(),
-                llvm::AttributeSet::FunctionIndex, llvm::Attribute::ReadOnly);
+                               llvm::AttributeList::FunctionIndex,
+                               llvm::Attribute::ReadOnly);
   }
   fn = link.createFunction(*this, fnType, cc, attrs, insertBefore);
 
@@ -2472,7 +2474,7 @@ IRGenModule::getAddrOfTypeMetadataAccessFunction(CanType type,
 
   auto fnType = llvm::FunctionType::get(TypeMetadataPtrTy, false);
   LinkInfo link = LinkInfo::get(*this, entity, forDefinition);
-  entry = link.createFunction(*this, fnType, DefaultCC, llvm::AttributeSet());
+  entry = link.createFunction(*this, fnType, DefaultCC, llvm::AttributeList());
   return entry;
 }
 
@@ -2497,7 +2499,7 @@ IRGenModule::getAddrOfGenericTypeMetadataAccessFunction(
 
   auto fnType = llvm::FunctionType::get(TypeMetadataPtrTy, genericArgs, false);
   LinkInfo link = LinkInfo::get(*this, entity, forDefinition);
-  entry = link.createFunction(*this, fnType, DefaultCC, llvm::AttributeSet());
+  entry = link.createFunction(*this, fnType, DefaultCC, llvm::AttributeList());
   return entry;
 }
 
@@ -2814,7 +2816,7 @@ llvm::Function *IRGenModule::getAddrOfValueWitness(CanType abstractType,
       cast<llvm::PointerType>(getValueWitnessTy(index))
         ->getElementType());
   LinkInfo link = LinkInfo::get(*this, entity, forDefinition);
-  entry = link.createFunction(*this, fnType, DefaultCC, llvm::AttributeSet());
+  entry = link.createFunction(*this, fnType, DefaultCC, llvm::AttributeList());
   return entry;
 }
 
@@ -3149,7 +3151,7 @@ IRGenModule::getAddrOfGenericWitnessTableInstantiationFunction(
                                           Int8PtrPtrTy },
                                         /*varargs*/ false);
   LinkInfo link = LinkInfo::get(*this, entity, forDefinition);
-  entry = link.createFunction(*this, fnType, DefaultCC, llvm::AttributeSet());
+  entry = link.createFunction(*this, fnType, DefaultCC, llvm::AttributeList());
   return entry;
 }
 
@@ -3197,7 +3199,7 @@ IRGenModule::getAddrOfWitnessTableAccessFunction(
   }
 
   LinkInfo link = LinkInfo::get(*this, entity, forDefinition);
-  entry = link.createFunction(*this, fnType, DefaultCC, llvm::AttributeSet());
+  entry = link.createFunction(*this, fnType, DefaultCC, llvm::AttributeList());
   return entry;
 }
 
@@ -3219,7 +3221,7 @@ IRGenModule::getAddrOfWitnessTableLazyAccessFunction(
     = llvm::FunctionType::get(WitnessTablePtrTy, false);
 
   LinkInfo link = LinkInfo::get(*this, entity, forDefinition);
-  entry = link.createFunction(*this, fnType, DefaultCC, llvm::AttributeSet());
+  entry = link.createFunction(*this, fnType, DefaultCC, llvm::AttributeList());
   return entry;
 }
 
@@ -3270,7 +3272,7 @@ IRGenModule::getAddrOfAssociatedTypeMetadataAccessFunction(
 
   auto fnType = getAssociatedTypeMetadataAccessFunctionTy();
   LinkInfo link = LinkInfo::get(*this, entity, forDefinition);
-  entry = link.createFunction(*this, fnType, DefaultCC, llvm::AttributeSet());
+  entry = link.createFunction(*this, fnType, DefaultCC, llvm::AttributeList());
   return entry;
 }
 
@@ -3293,7 +3295,7 @@ IRGenModule::getAddrOfAssociatedTypeWitnessTableAccessFunction(
 
   auto fnType = getAssociatedTypeWitnessTableAccessFunctionTy();
   LinkInfo link = LinkInfo::get(*this, entity, forDefinition);
-  entry = link.createFunction(*this, fnType, DefaultCC, llvm::AttributeSet());
+  entry = link.createFunction(*this, fnType, DefaultCC, llvm::AttributeList());
   return entry;
 }
 

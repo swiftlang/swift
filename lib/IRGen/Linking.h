@@ -29,7 +29,7 @@
 #include "swift/IRGen/ValueWitness.h"
 
 namespace llvm {
-  class AttributeSet;
+  class AttributeList;
   class Value;
   class FunctionType;
 }
@@ -66,12 +66,10 @@ public:
     return DLLStorageClass;
   }
 
-  llvm::Function *createFunction(IRGenModule &IGM,
-                                 llvm::FunctionType *fnType,
+  llvm::Function *createFunction(IRGenModule &IGM, llvm::FunctionType *fnType,
                                  llvm::CallingConv::ID cc,
-                                 const llvm::AttributeSet &attrs,
+                                 const llvm::AttributeList &attrs,
                                  llvm::Function *insertBefore = nullptr);
-
 
   llvm::GlobalVariable *createVariable(IRGenModule &IGM,
                                   llvm::Type *objectType,

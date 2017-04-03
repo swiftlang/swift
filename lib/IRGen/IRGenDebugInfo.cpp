@@ -1433,13 +1433,16 @@ llvm::DIType *IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
     auto IdTy = DBuilder.createForwardDecl(
       llvm::dwarf::DW_TAG_structure_type, MangledName, Scope, File, 0,
         llvm::dwarf::DW_LANG_ObjC, 0, 0);
-    return DBuilder.createPointerType(IdTy, PtrSize, PtrAlign, MangledName);
+    return DBuilder.createPointerType(IdTy, PtrSize, PtrAlign,
+                                      /* DWARFAddressSpace */ None,
+                                      MangledName);
   }
 
   case TypeKind::BuiltinNativeObject: {
     unsigned PtrSize = CI.getTargetInfo().getPointerWidth(0);
     unsigned PtrAlign = CI.getTargetInfo().getPointerAlign(0);
     auto PTy = DBuilder.createPointerType(nullptr, PtrSize, PtrAlign,
+                                          /* DWARFAddressSpace */ None,
                                           MangledName);
     return DBuilder.createObjectPointerType(PTy);
   }
@@ -1448,6 +1451,7 @@ llvm::DIType *IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
     unsigned PtrSize = CI.getTargetInfo().getPointerWidth(0);
     unsigned PtrAlign = CI.getTargetInfo().getPointerAlign(0);
     auto PTy = DBuilder.createPointerType(nullptr, PtrSize, PtrAlign,
+                                          /* DWARFAddressSpace */ None,
                                           MangledName);
     return DBuilder.createObjectPointerType(PTy);
   }
@@ -1456,6 +1460,7 @@ llvm::DIType *IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
     unsigned PtrSize = CI.getTargetInfo().getPointerWidth(0);
     unsigned PtrAlign = CI.getTargetInfo().getPointerAlign(0);
     return DBuilder.createPointerType(nullptr, PtrSize, PtrAlign,
+                                      /* DWARFAddressSpace */ None,
                                       MangledName);
   }
 

@@ -344,9 +344,9 @@ static llvm::Value *emitForeignTypeMetadataRef(IRGenFunction &IGF,
   llvm::Value *candidate = IGF.IGM.getAddrOfForeignTypeMetadataCandidate(type);
   auto call = IGF.Builder.CreateCall(IGF.IGM.getGetForeignTypeMetadataFn(),
                                 candidate);
-  call->addAttribute(llvm::AttributeSet::FunctionIndex,
+  call->addAttribute(llvm::AttributeList::FunctionIndex,
                      llvm::Attribute::NoUnwind);
-  call->addAttribute(llvm::AttributeSet::FunctionIndex,
+  call->addAttribute(llvm::AttributeList::FunctionIndex,
                      llvm::Attribute::ReadNone);
   return call;
 }
@@ -396,7 +396,7 @@ static llvm::Value *emitNominalMetadataRef(IRGenFunction &IGF,
 
   auto result = IGF.Builder.CreateCall(accessor, genericArgs.Values);
   result->setDoesNotThrow();
-  result->addAttribute(llvm::AttributeSet::FunctionIndex,
+  result->addAttribute(llvm::AttributeList::FunctionIndex,
                        llvm::Attribute::ReadNone);
 
   IGF.setScopedLocalTypeData(theType, LocalTypeDataKind::forTypeMetadata(),
@@ -1169,7 +1169,7 @@ static llvm::Value *emitGenericMetadataAccessFunction(IRGenFunction &IGF,
   auto result = IGF.Builder.CreateCall(IGF.IGM.getGetGenericMetadataFn(),
                                        {metadata, arguments});
   result->setDoesNotThrow();
-  result->addAttribute(llvm::AttributeSet::FunctionIndex,
+  result->addAttribute(llvm::AttributeList::FunctionIndex,
                        llvm::Attribute::ReadOnly);
 
   IGF.Builder.CreateLifetimeEnd(argsBuffer,
@@ -1541,7 +1541,7 @@ namespace {
 
         auto result = IGF.Builder.CreateCall(accessor, args);
         result->setDoesNotThrow();
-        result->addAttribute(llvm::AttributeSet::FunctionIndex,
+        result->addAttribute(llvm::AttributeList::FunctionIndex,
                              llvm::Attribute::ReadNone);
 
         return result;
@@ -4506,7 +4506,7 @@ emitHeapMetadataRefForUnknownHeapObject(IRGenFunction &IGF,
                                          object->getName() + ".Type");
   metadata->setCallingConv(llvm::CallingConv::C);
   metadata->setDoesNotThrow();
-  metadata->addAttribute(llvm::AttributeSet::FunctionIndex,
+  metadata->addAttribute(llvm::AttributeList::FunctionIndex,
                          llvm::Attribute::ReadOnly);
   return metadata;
 }
@@ -4645,7 +4645,7 @@ llvm::Value *irgen::emitVirtualMethodValue(IRGenFunction &IGF,
 
   // Use the type of the method we were type-checked against, not the
   // type of the overridden method.
-  llvm::AttributeSet attrs;
+  llvm::AttributeList attrs;
   auto fnTy = IGF.IGM.getFunctionType(methodType, attrs)->getPointerTo();
 
   auto declaringClass = cast<ClassDecl>(overridden.getDecl()->getDeclContext());

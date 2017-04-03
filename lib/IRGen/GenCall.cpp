@@ -76,7 +76,7 @@ static void addDereferenceableAttributeToBuilder(IRGenModule &IGM,
 }
 
 static void addIndirectValueParameterAttributes(IRGenModule &IGM,
-                                                llvm::AttributeSet &attrs,
+                                                llvm::AttributeList &attrs,
                                                 const TypeInfo &ti,
                                                 unsigned argIndex) {
   llvm::AttrBuilder b;
@@ -86,14 +86,13 @@ static void addIndirectValueParameterAttributes(IRGenModule &IGM,
   // The parameter must reference dereferenceable memory of the type.
   addDereferenceableAttributeToBuilder(IGM, b, ti);
 
-  auto resultAttrs = llvm::AttributeSet::get(IGM.LLVMContext, argIndex+1, b);
+  auto resultAttrs = llvm::AttributeList::get(IGM.LLVMContext, argIndex + 1, b);
   attrs = attrs.addAttributes(IGM.LLVMContext, argIndex+1, resultAttrs);
 }
 
 static void addInoutParameterAttributes(IRGenModule &IGM,
-                                        llvm::AttributeSet &attrs,
-                                        const TypeInfo &ti,
-                                        unsigned argIndex,
+                                        llvm::AttributeList &attrs,
+                                        const TypeInfo &ti, unsigned argIndex,
                                         bool aliasable) {
   llvm::AttrBuilder b;
   // Aliasing inouts is unspecified, but we still want aliasing to be memory-
@@ -103,7 +102,7 @@ static void addInoutParameterAttributes(IRGenModule &IGM,
   // The inout must reference dereferenceable memory of the type.
   addDereferenceableAttributeToBuilder(IGM, b, ti);
 
-  auto resultAttrs = llvm::AttributeSet::get(IGM.LLVMContext, argIndex+1, b);
+  auto resultAttrs = llvm::AttributeList::get(IGM.LLVMContext, argIndex + 1, b);
   attrs = attrs.addAttributes(IGM.LLVMContext, argIndex+1, resultAttrs);
 }
 
@@ -133,9 +132,8 @@ llvm::CallingConv::ID irgen::expandCallingConv(IRGenModule &IGM,
 }
 
 static void addIndirectResultAttributes(IRGenModule &IGM,
-                                        llvm::AttributeSet &attrs,
-                                        unsigned paramIndex,
-                                        bool allowSRet) {
+                                        llvm::AttributeList &attrs,
+                                        unsigned paramIndex, bool allowSRet) {
   static const llvm::Attribute::AttrKind attrKindsWithSRet[] = {
     llvm::Attribute::StructRet,
     llvm::Attribute::NoAlias,
@@ -145,14 +143,14 @@ static void addIndirectResultAttributes(IRGenModule &IGM,
     llvm::Attribute::NoAlias,
     llvm::Attribute::NoCapture,
   };
-  auto resultAttrs =
-    llvm::AttributeSet::get(IGM.LLVMContext, paramIndex + 1,
-                            (allowSRet ? makeArrayRef(attrKindsWithSRet)
-                                       : makeArrayRef(attrKindsWithoutSRet)));
+  auto resultAttrs = llvm::AttributeList::get(
+      IGM.LLVMContext, paramIndex + 1,
+      (allowSRet ? makeArrayRef(attrKindsWithSRet)
+                 : makeArrayRef(attrKindsWithoutSRet)));
   attrs = attrs.addAttributes(IGM.LLVMContext, paramIndex + 1, resultAttrs);
 }
 
-void IRGenModule::addSwiftSelfAttributes(llvm::AttributeSet &attrs,
+void IRGenModule::addSwiftSelfAttributes(llvm::AttributeList &attrs,
                                          unsigned argIndex) {
   if (!UseSwiftCC)
     return;
@@ -160,11 +158,11 @@ void IRGenModule::addSwiftSelfAttributes(llvm::AttributeSet &attrs,
     llvm::Attribute::SwiftSelf,
   };
   auto argAttrs =
-      llvm::AttributeSet::get(this->LLVMContext, argIndex + 1, attrKinds);
+      llvm::AttributeList::get(this->LLVMContext, argIndex + 1, attrKinds);
   attrs = attrs.addAttributes(this->LLVMContext, argIndex + 1, argAttrs);
 }
 
-void IRGenModule::addSwiftErrorAttributes(llvm::AttributeSet &attrs,
+void IRGenModule::addSwiftErrorAttributes(llvm::AttributeList &attrs,
                                           unsigned argIndex) {
   // Don't add the swifterror attribute on ABI that don't pass it in a register.
   // We create a shadow stack location of the swifterror parameter for the
@@ -177,33 +175,31 @@ void IRGenModule::addSwiftErrorAttributes(llvm::AttributeSet &attrs,
     llvm::Attribute::SwiftError,
   };
   auto argAttrs =
-      llvm::AttributeSet::get(this->LLVMContext, argIndex + 1, attrKinds);
+      llvm::AttributeList::get(this->LLVMContext, argIndex + 1, attrKinds);
   attrs = attrs.addAttributes(this->LLVMContext, argIndex + 1, argAttrs);
 }
 
 void irgen::addByvalArgumentAttributes(IRGenModule &IGM,
-                                       llvm::AttributeSet &attrs,
-                                       unsigned argIndex,
-                                       Alignment align) {
+                                       llvm::AttributeList &attrs,
+                                       unsigned argIndex, Alignment align) {
   llvm::AttrBuilder b;
   b.addAttribute(llvm::Attribute::ByVal);
   b.addAttribute(llvm::Attribute::getWithAlignment(IGM.LLVMContext,
                                                    align.getValue()));
-  auto resultAttrs = llvm::AttributeSet::get(IGM.LLVMContext, argIndex+1, b);
+  auto resultAttrs = llvm::AttributeList::get(IGM.LLVMContext, argIndex + 1, b);
   attrs = attrs.addAttributes(IGM.LLVMContext,
                               argIndex+1,
                               resultAttrs);
 }
 
-void irgen::addExtendAttribute(IRGenModule &IGM,
-                               llvm::AttributeSet &attrs,
+void irgen::addExtendAttribute(IRGenModule &IGM, llvm::AttributeList &attrs,
                                unsigned index, bool signExtend) {
   llvm::AttrBuilder b;
   if (signExtend)
     b.addAttribute(llvm::Attribute::SExt);
   else
     b.addAttribute(llvm::Attribute::ZExt);
-  auto resultAttrs = llvm::AttributeSet::get(IGM.LLVMContext, index, b);
+  auto resultAttrs = llvm::AttributeList::get(IGM.LLVMContext, index, b);
   attrs = attrs.addAttributes(IGM.LLVMContext, index, resultAttrs);
 }
 
@@ -213,7 +209,7 @@ namespace {
     CanSILFunctionType FnType;
   public:
     SmallVector<llvm::Type*, 8> ParamIRTypes;
-    llvm::AttributeSet Attrs;
+    llvm::AttributeList Attrs;
     ForeignFunctionInfo ForeignInfo;
     bool CanUseSRet = true;
     bool CanUseError = true;
@@ -517,6 +513,7 @@ namespace {
       case clang::Type::RValueReference:
       case clang::Type::MemberPointer:
       case clang::Type::Auto:
+      case clang::Type::DeducedTemplateSpecialization:
         llvm_unreachable("C++ type in ABI lowering?");
 
       case clang::Type::Pipe:
@@ -654,7 +651,6 @@ namespace {
       case clang::BuiltinType::OCLEvent:
       case clang::BuiltinType::OCLClkEvent:
       case clang::BuiltinType::OCLQueue:
-      case clang::BuiltinType::OCLNDRange:
       case clang::BuiltinType::OCLReserveID:
         llvm_unreachable("OpenCL type in ABI lowering");
 
@@ -902,7 +898,7 @@ llvm::Type *SignatureExpansion::expandExternalSignatureTypes() {
     bool signExt = clangResultTy->hasSignedIntegerRepresentation();
     assert((signExt || clangResultTy->hasUnsignedIntegerRepresentation()) &&
            "Invalid attempt to add extension attribute to argument!");
-    addExtendAttribute(IGM, Attrs, llvm::AttributeSet::ReturnIndex, signExt);
+    addExtendAttribute(IGM, Attrs, llvm::AttributeList::ReturnIndex, signExt);
   }
 
   // If we return indirectly, that is the first parameter type.
@@ -1305,8 +1301,8 @@ void CallEmission::emitToUnmappedMemory(Address result) {
 // FIXME: This doesn't belong on IGF.
 llvm::CallSite CallEmission::emitInvoke(llvm::CallingConv::ID convention,
                                         llvm::Value *fn,
-                                        ArrayRef<llvm::Value*> args,
-                                        const llvm::AttributeSet &attrs) {
+                                        ArrayRef<llvm::Value *> args,
+                                        const llvm::AttributeList &attrs) {
   // TODO: exceptions!
   llvm::CallInst *call = IGF.Builder.CreateCall(fn, args);
   call->setAttributes(attrs);
@@ -1339,9 +1335,8 @@ llvm::CallSite CallEmission::emitCallSite() {
       Args[i] = IGF.coerceValue(Args[i], paramTy, IGF.IGM.DataLayout);
   }
 
-  llvm::CallSite call = emitInvoke(cc, fnPtr, Args,
-                                   llvm::AttributeSet::get(fnPtr->getContext(),
-                                                           Attrs));
+  llvm::CallSite call = emitInvoke(
+      cc, fnPtr, Args, llvm::AttributeList::get(fnPtr->getContext(), Attrs));
   Args.clear();
 
   // Return.
