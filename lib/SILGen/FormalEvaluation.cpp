@@ -23,6 +23,26 @@ using namespace Lowering;
 
 void FormalAccess::_anchor() {}
 
+void FormalAccess::verify(SILGenFunction &SGF) const {
+#ifndef NDEBUG
+  // If this access was already finished, continue. This can happen if an
+  // owned formal access was forwarded.
+  if (isFinished()) {
+    assert(getKind() == FormalAccess::Owned &&
+           "Only owned formal accesses should be forwarded.");
+    // We can not check that our cleanup is actually dead since the cleanup
+    // may have been popped at this point and the stack may have new values.
+    return;
+  }
+
+  assert(!isFinished() && "Can not finish a formal access cleanup "
+         "twice");
+
+  // Now try to look up the cleanup handle of the formal access.
+  SGF.Cleanups.checkIterator(getCleanup());
+#endif
+}
+
 //===----------------------------------------------------------------------===//
 //                      Shared Borrow Formal Evaluation
 //===----------------------------------------------------------------------===//
@@ -139,6 +159,24 @@ void FormalEvaluationScope::popImpl() {
 
   // And then pop off all stack elements until we reach the savedDepth.
   context.pop(savedDepth.getValue());
+}
+
+void FormalEvaluationScope::verify() const {
+  // Check to see if there is anything going on here.
+  auto &context = SGF.FormalEvalContext;
+  using iterator = FormalEvaluationContext::iterator;
+
+  iterator unwrappedSavedDepth = context.find(savedDepth.getValue());
+  iterator iter = context.begin();
+  if (iter == unwrappedSavedDepth)
+    return;
+
+  // Then working down the stack until we visit unwrappedSavedDepth...
+  for (; iter != unwrappedSavedDepth; ++iter) {
+    // Grab the next evaluation verify that we can successfully access this
+    // formal access.
+    (*iter).verify(SGF);
+  }
 }
 
 //===----------------------------------------------------------------------===//
