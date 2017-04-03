@@ -2,6 +2,7 @@
 import APINotesTest
 import APINotesFrameworkTest
 
+#if _runtime(_ObjC)
 extension A {
   func implicitlyObjC() { }
 }
@@ -9,6 +10,7 @@ extension A {
 func testSelectors(a: AnyObject) {
   a.implicitlyObjC?()  // okay: would complain without SwiftObjCMembers
 }
+#endif
 
 func testSwiftName() {
   moveTo(x: 0, y: 0, z: 0)
