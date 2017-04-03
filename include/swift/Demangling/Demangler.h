@@ -126,7 +126,7 @@ public:
   /// Tries to enlarge the \p Capacity of an array of \p Objects.
   ///
   /// If \p Objects is allocated at the end of the current slab and the slab
-  /// has enough free space, the \p Capacity is simpliy enlarged and no new
+  /// has enough free space, the \p Capacity is simply enlarged and no new
   /// allocation needs to be done.
   /// Otherwise a new array of objects is allocated and \p Objects is set to the
   /// new memory address.
