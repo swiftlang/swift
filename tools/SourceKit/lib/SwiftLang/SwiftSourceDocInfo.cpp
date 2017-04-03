@@ -865,8 +865,8 @@ getClangDeclarationName(clang::ASTContext &Ctx, NameTranslatingInfo &Info) {
     return clang::DeclarationName(&Ctx.Idents.get(Info.BaseName));
   } else {
     ArrayRef<StringRef> Args = llvm::makeArrayRef(Info.ArgNames);
-    std::vector<clang::IdentifierInfo *> Pieces(Args.size(), nullptr);
-    std::transform(Args.begin(), Args.end(), Pieces.begin(),
+    std::vector<clang::IdentifierInfo *> Pieces;
+    std::transform(Args.begin(), Args.end(), std::back_inserter(Pieces),
       [&](StringRef T) { return &Ctx.Idents.get(T.endswith(":") ?
                                                 T.drop_back() : T); });
     return clang::DeclarationName(Ctx.Selectors.getSelector(
@@ -879,8 +879,9 @@ getClangDeclarationName(clang::ASTContext &Ctx, NameTranslatingInfo &Info) {
 static DeclName
 getSwiftDeclName(ASTContext &Ctx, NameTranslatingInfo &Info) {
   assert(SwiftLangSupport::getNameKindForUID(Info.NameKind) == NameKind::Swift);
-  std::vector<Identifier> Args(Info.ArgNames.size(), Identifier());
-  std::transform(Info.ArgNames.begin(), Info.ArgNames.end(), Args.begin(),
+  std::vector<Identifier> Args;
+  std::transform(Info.ArgNames.begin(), Info.ArgNames.end(),
+                 std::back_inserter(Args),
                  [&](StringRef T) { return Ctx.getIdentifier(T); });
   return DeclName(Ctx, Ctx.getIdentifier(Info.BaseName),
                   llvm::makeArrayRef(Args));
@@ -929,10 +930,9 @@ static bool passNameInfoForDecl(const ValueDecl *VD, NameTranslatingInfo &Info,
       NameTranslatingInfo Result;
       Result.NameKind = SwiftLangSupport::getUIDForNameKind(NameKind::Swift);
       Result.BaseName = Name.getBaseName().str();
-      Result.ArgNames.resize(Name.getArgumentNames().size());
       std::transform(Name.getArgumentNames().begin(),
                      Name.getArgumentNames().end(),
-                     Result.ArgNames.begin(),
+                     std::back_inserter(Result.ArgNames),
                      [](Identifier Id) { return Id.str(); });
       Receiver(Result);
       return false;
