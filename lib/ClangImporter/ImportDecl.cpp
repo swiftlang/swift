@@ -6722,6 +6722,14 @@ void ClangImporter::Implementation::importAttributes(
       return;
     }
 
+    // Map Clang's swift_objc_members attribute to @objcMembers.
+    if (ID->hasAttr<clang::SwiftObjCMembersAttr>()) {
+      if (!MappedDecl->getAttrs().hasAttribute<ObjCMembersAttr>()) {
+        auto attr = new (C) ObjCMembersAttr(/*implicit=*/true);
+        MappedDecl->getAttrs().add(attr);
+      }
+    }
+
     // Infer @objcMembers on XCTestCase.
     if (ID->getName() == "XCTestCase") {
       if (!MappedDecl->getAttrs().hasAttribute<ObjCMembersAttr>()) {
