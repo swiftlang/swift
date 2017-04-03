@@ -404,7 +404,7 @@ void GenericSignature::populateParentMap(SubstitutionMap &subMap) const {
 
 SubstitutionMap
 GenericSignature::getSubstitutionMap(SubstitutionList subs) const {
-  SubstitutionMap result;
+  SubstitutionMap result(const_cast<GenericSignature *>(this));
 
   enumeratePairedRequirements(
     [&](Type depTy, ArrayRef<Requirement> reqts) -> bool {
@@ -432,7 +432,7 @@ SubstitutionMap
 GenericSignature::
 getSubstitutionMap(TypeSubstitutionFn subs,
                    GenericSignature::LookupConformanceFn lookupConformance) const {
-  SubstitutionMap subMap;
+  SubstitutionMap subMap(const_cast<GenericSignature *>(this));
 
   // Enumerate all of the requirements that require substitution.
   enumeratePairedRequirements([&](Type depTy, ArrayRef<Requirement> reqs) {

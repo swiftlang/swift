@@ -22,15 +22,23 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/AST/ASTContext.h"
 #include "swift/AST/SubstitutionMap.h"
+#include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/Types.h"
 #include "llvm/Support/Debug.h"
 
 using namespace swift;
+
+GenericSignature *SubstitutionMap::getGenericSignature() const {
+  if (auto env = genericSigOrEnv.dyn_cast<GenericEnvironment *>())
+    return env->getGenericSignature();
+
+  return genericSigOrEnv.dyn_cast<GenericSignature *>();
+}
 
 bool SubstitutionMap::hasArchetypes() const {
   for (auto &entry : subMap)
@@ -64,6 +72,11 @@ Type SubstitutionMap::lookupSubstitution(CanSubstitutableType type) const {
 
 void SubstitutionMap::
 addSubstitution(CanSubstitutableType type, Type replacement) {
+  assert(!(type->isTypeParameter() && !getGenericSignature()) &&
+         "type parameter substitution map without generic signature");
+  assert(!(type->hasArchetype() &&
+           !genericSigOrEnv.is<GenericEnvironment *>()) &&
+         "archetype substitution map without generic environment");
   auto result = subMap.insert(std::make_pair(type, replacement));
   assert(result.second || result.first->second->isEqual(replacement));
   (void) result;

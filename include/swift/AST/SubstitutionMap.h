@@ -51,6 +51,10 @@ enum class CombineSubstitutionMaps {
 };
 
 class SubstitutionMap {
+  /// The generic signature (or full-fledged environment) for which we
+  /// are performing substitutions.
+  llvm::PointerUnion<GenericSignature *, GenericEnvironment *> genericSigOrEnv;
+
   using ParentType = std::pair<CanType, AssociatedTypeDecl *>;
 
   // FIXME: Switch to a more efficient representation.
@@ -80,6 +84,17 @@ class SubstitutionMap {
                 const;
 
 public:
+  SubstitutionMap()
+    : SubstitutionMap(static_cast<GenericSignature *>(nullptr)) { }
+
+  SubstitutionMap(llvm::PointerUnion<GenericSignature *, GenericEnvironment *>
+                    genericSigOrEnv)
+    : genericSigOrEnv(genericSigOrEnv) { }
+
+  /// Retrieve the generic signature describing the environment in which
+  /// substitutions occur.
+  GenericSignature *getGenericSignature() const;
+
   Optional<ProtocolConformanceRef>
   lookupConformance(
                 CanType type, ProtocolDecl *proto,

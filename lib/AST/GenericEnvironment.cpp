@@ -393,7 +393,7 @@ void GenericEnvironment::populateParentMap(SubstitutionMap &subMap) const {
 
 SubstitutionMap GenericEnvironment::
 getSubstitutionMap(SubstitutionList subs) const {
-  SubstitutionMap result;
+  SubstitutionMap result(const_cast<GenericEnvironment *>(this));
 
   getGenericSignature()->enumeratePairedRequirements(
     [&](Type depTy, ArrayRef<Requirement> reqts) -> bool {
@@ -428,7 +428,7 @@ SubstitutionMap
 GenericEnvironment::
 getSubstitutionMap(TypeSubstitutionFn subs,
                    GenericSignature::LookupConformanceFn lookupConformance) const {
-  SubstitutionMap subMap;
+  SubstitutionMap subMap(const_cast<GenericEnvironment *>(this));
 
   getGenericSignature()->enumeratePairedRequirements(
     [&](Type depTy, ArrayRef<Requirement> reqs) -> bool {
