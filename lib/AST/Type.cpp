@@ -2971,7 +2971,7 @@ static Type substType(Type derivedType,
     if (isa<GenericTypeParamType>(substOrig)) {
       if (options.contains(SubstFlags::UseErrorType))
         return ErrorType::get(type);
-      return Type(type);
+      return Type();
     }
 
     auto archetype = cast<ArchetypeType>(substOrig);
@@ -2987,7 +2987,7 @@ static Type substType(Type derivedType,
     if (!parent) {
       if (options.contains(SubstFlags::UseErrorType))
         return ErrorType::get(type);
-      return Type(type);
+      return Type();
     }
 
     // Substitute into the parent type.
