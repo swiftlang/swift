@@ -2983,13 +2983,16 @@ ERROR(invalid_objc_decl_context,none,
       "@objc can only be used with members of classes, @objc protocols, and "
       "concrete extensions of classes", ())
 ERROR(invalid_objc_decl,none,
-      "only classes, protocols, methods, initializers, properties, and "
-      "subscript declarations can be declared @objc", ())
+      "only classes (and their extensions), protocols, methods, initializers, "
+      "properties, and subscript declarations can be declared @objc", ())
 ERROR(invalid_objc_swift_rooted_class,none,
       "only classes that inherit from NSObject can be declared @objc", ())
 ERROR(invalid_nonobjc_decl,none,
       "only methods, initializers, properties and subscript declarations can "
       "be declared @nonobjc", ())
+ERROR(invalid_nonobjc_extension,none,
+      "only extensions of classes can be declared @nonobjc", ())
+
 ERROR(objc_in_extension_context,none,
       "members of constrained extensions cannot be declared @objc", ())
 ERROR(objc_in_generic_extension,none,
@@ -3050,8 +3053,11 @@ ERROR(objc_enum_case_req_objc_enum,none,
 ERROR(objc_enum_case_multi,none,
       "'@objc' enum case declaration defines multiple enum cases with the same Objective-C name", ())
 
+ERROR(objc_extension_not_class,none,
+      "'@objc' can only be applied to an extension of a class", ())
+
 // If you change this, also change enum ObjCReason
-#define OBJC_ATTR_SELECT "select{marked @_cdecl|marked dynamic|marked @objc|marked @IBOutlet|marked @IBAction|marked @NSManaged|a member of an @objc protocol|implicitly @objc|an @objc override|an implementation of an @objc requirement|marked @IBInspectable|marked @GKInspectable}"
+#define OBJC_ATTR_SELECT "select{marked @_cdecl|marked dynamic|marked @objc|marked @IBOutlet|marked @IBAction|marked @NSManaged|a member of an @objc protocol|implicitly @objc|an @objc override|an implementation of an @objc requirement|marked @IBInspectable|marked @GKInspectable|in an @objc extension of a class (without @nonobjc)}"
 
 ERROR(objc_invalid_on_var,none,
       "property cannot be %" OBJC_ATTR_SELECT "0 "
