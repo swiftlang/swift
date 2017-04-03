@@ -2050,7 +2050,7 @@ iterations with -O",
         "--swift-user-visible-version",
         help="User-visible version of the embedded Swift compiler",
         type=arguments.type.swift_compiler_version,
-        default="3.1",
+        default="4.0",
         metavar="MAJOR.MINOR")
 
     parser.add_argument(
