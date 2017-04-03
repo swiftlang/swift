@@ -7597,7 +7597,7 @@ ClangImporter::Implementation::loadAllMembers(Decl *D, uint64_t extra) {
 
     // If the base is also imported from Clang, load its members first.
     const NominalTypeDecl *base = ext->getExtendedType()->getAnyNominal();
-    if (auto *clangBase = base->getClangDecl()) {
+    if (base->getClangDecl()) {
       base->loadAllMembers();
       // FIXME: Assert that we don't jump over to a category /while/
       // loading the original class's members. Unfortunately there are some

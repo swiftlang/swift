@@ -14,7 +14,7 @@
 // referenced from code, such as dynamic thunks, curry thunks, native to foreign
 // thunks and foreign to native thunks.
 //
-// VTable thunks and witness thunks can be found in SILGenType.cpp, and and the
+// VTable thunks and witness thunks can be found in SILGenType.cpp, and the
 // meat of the bridging thunk implementation is in SILGenBridging.cpp, and
 // re-abstraction thunks are in SILGenPoly.cpp.
 //

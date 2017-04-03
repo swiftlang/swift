@@ -819,7 +819,7 @@ ConformanceAccessPath GenericSignature::getConformanceAccessPath(
       // If this step was computed via the requirement signature, add it
       // directly.
       if (source->usesRequirementSignature) {
-        // Add this step along the path, which involes looking for the
+        // Add this step along the path, which involves looking for the
         // conformance we want (\c conformingProto) within the protocol
         // described by this source.
 

@@ -415,7 +415,7 @@ bool SILDeclRef::isImplicit() const {
 }
 
 SILLinkage SILDeclRef::getLinkage(ForDefinition_t forDefinition) const {
-  if (auto *ace = getAbstractClosureExpr()) {
+  if (getAbstractClosureExpr()) {
     if (isSerialized())
       return SILLinkage::Shared;
     return SILLinkage::Private;

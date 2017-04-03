@@ -614,7 +614,7 @@ public:
   /// between the parameter type and the default value.
   FunctionParameterSyntax withEqualToken(RC<TokenSyntax> NewEqualToken) const;
 
-  /// Return the expresion for the default value of the parameter, if there
+  /// Return the expression for the default value of the parameter, if there
   /// is one.
   llvm::Optional<ExprSyntax> getDefaultValue() const;
 
@@ -712,7 +712,7 @@ public:
   /// Return the left parenthesis '(' token enclosing the parameter list.
   RC<TokenSyntax> getLeftParenToken() const;
 
-  /// Return a FunctionSignatureSyntax with the given left parentesis '(' token
+  /// Return a FunctionSignatureSyntax with the given left parenthesis '(' token
   /// enclosing the parameter list.
   FunctionSignatureSyntax
   withLeftParenToken(RC<TokenSyntax> NewLeftParen) const;
@@ -727,7 +727,7 @@ public:
   /// Return the right parenthesis ')' token enclosing the parameter list.
   RC<TokenSyntax> getRightParenToken() const;
 
-  /// Return a FunctionSignatureSyntax with the given right parentesis ')' token
+  /// Return a FunctionSignatureSyntax with the given right parenthesis ')' token
   /// enclosing the parameter list.
   FunctionSignatureSyntax
   withRightParenToken(RC<TokenSyntax> NewRightParen) const;

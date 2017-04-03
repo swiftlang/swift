@@ -4553,7 +4553,7 @@ void IRGenSILFunction::visitInitExistentialAddrInst(swift::InitExistentialAddrIn
   auto srcType = i->getLoweredConcreteType();
   auto &srcTI = getTypeInfo(srcType);
 
-  // Allocate a COW box for the value if neceesary.
+  // Allocate a COW box for the value if necessary.
   if (getSILModule().getOptions().UseCOWExistentials) {
     auto *genericEnv = CurSILFn->getGenericEnvironment();
     setLoweredAddress(i, emitAllocateBoxedOpaqueExistentialBuffer(
@@ -4603,7 +4603,7 @@ void IRGenSILFunction::visitDeinitExistentialAddrInst(
                                               swift::DeinitExistentialAddrInst *i) {
   Address container = getLoweredAddress(i->getOperand());
 
-  // Deallocate the COW box for the value if neceesary.
+  // Deallocate the COW box for the value if necessary.
   if (getSILModule().getOptions().UseCOWExistentials) {
     emitDeallocateBoxedOpaqueExistentialBuffer(
         *this, i->getOperand()->getType(), container);
