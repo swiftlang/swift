@@ -539,6 +539,8 @@ enum class ObjCReason {
   ExplicitlyIBInspectable,
   /// Has an explicit '@GKInspectable' attribute.
   ExplicitlyGKInspectable,
+  /// Is it a member of an @objc extension of a class.
+  MemberOfObjCExtension,
   /// Is it a member of an @objcMembers class.
   MemberOfObjCMembersClass,
   /// A member of an Objective-C-defined class or subclass.
@@ -547,7 +549,8 @@ enum class ObjCReason {
   Accessor,
 };
 
-/// Determine whether we should diagnose conflicts due yo
+/// Determine whether we should diagnose conflicts due to inferring @objc
+/// with this particular reason.
 static inline bool shouldDiagnoseObjCReason(ObjCReason reason) {
   switch(reason) {
   case ObjCReason::ExplicitlyCDecl:
@@ -562,6 +565,7 @@ static inline bool shouldDiagnoseObjCReason(ObjCReason reason) {
   case ObjCReason::ImplicitlyObjC:
   case ObjCReason::ExplicitlyIBInspectable:
   case ObjCReason::ExplicitlyGKInspectable:
+  case ObjCReason::MemberOfObjCExtension:
     return true;
 
   case ObjCReason::MemberOfObjCSubclass:
@@ -587,6 +591,7 @@ static inline unsigned getObjCDiagnosticAttrKind(ObjCReason reason) {
   case ObjCReason::ImplicitlyObjC:
   case ObjCReason::ExplicitlyIBInspectable:
   case ObjCReason::ExplicitlyGKInspectable:
+  case ObjCReason::MemberOfObjCExtension:
     return static_cast<unsigned>(reason);
 
   case ObjCReason::MemberOfObjCSubclass:

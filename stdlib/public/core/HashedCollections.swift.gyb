@@ -2541,7 +2541,7 @@ internal class _RawNative${Self}Storage:
   /// Get the NSEnumerator implementation for self.
   /// _HashableTypedNative${Self}Storage overloads this to give 
   /// _NativeSelfNSEnumerator proper type parameters.
-	@objc
+  @objc
   func enumerator() -> _NSEnumerator {
     return _Native${Self}NSEnumerator<${AnyTypeParameters}>(
         _Native${Self}Buffer(_storage: self))
@@ -2756,7 +2756,7 @@ final internal class _HashableTypedNative${Self}Storage<${TypeParametersDecl}> :
   }
 
   @nonobjc
-	internal func getObjectFor(_ aKey: AnyObject) -> AnyObject? {
+  internal func getObjectFor(_ aKey: AnyObject) -> AnyObject? {
     guard let nativeKey = _conditionallyBridgeFromObjectiveC(aKey, Key.self)
     else { return nil }
 
@@ -3727,7 +3727,7 @@ final internal class _SwiftDeferredNS${Self}<${TypeParametersDecl}>
     return nil
   }
 
-	@objc
+  @objc
   internal func enumerator() -> _NSEnumerator {
     bridgeEverything()
     return _Native${Self}NSEnumerator<${AnyTypeParameters}>(bridgedBuffer)
