@@ -252,31 +252,32 @@ bool OwnershipModelEliminatorVisitor::visitSwitchEnumInst(
 
 namespace {
 
-struct OwnershipModelEliminator : SILFunctionTransform {
+struct OwnershipModelEliminator : SILModuleTransform {
   void run() override {
-    SILFunction *F = getFunction();
+    for (auto &F : *getModule()) {
+      // Set F to have unqualified ownership.
+      F.setUnqualifiedOwnership();
 
-    // Set F to have unqualified ownership.
-    F->setUnqualifiedOwnership();
+      bool MadeChange = false;
+      SILBuilder B(F);
+      OwnershipModelEliminatorVisitor Visitor(B);
 
-    bool MadeChange = false;
-    SILBuilder B(*F);
-    OwnershipModelEliminatorVisitor Visitor(B);
+      for (auto &BB : F) {
+        for (auto II = BB.begin(), IE = BB.end(); II != IE;) {
+          // Since we are going to be potentially removing instructions, we need
+          // to make sure to grab out instruction and increment first.
+          SILInstruction *I = &*II;
+          ++II;
 
-    for (auto &BB : *F) {
-      for (auto II = BB.begin(), IE = BB.end(); II != IE;) {
-        // Since we are going to be potentially removing instructions, we need
-        // to make sure to grab out instruction and increment first.
-        SILInstruction *I = &*II;
-        ++II;
-
-        MadeChange |= Visitor.visit(I);
+          MadeChange |= Visitor.visit(I);
+        }
       }
-    }
 
-    if (MadeChange) {
-      invalidateAnalysis(
-          SILAnalysis::InvalidationKind::BranchesAndInstructions);
+      if (MadeChange) {
+        auto InvalidKind =
+            SILAnalysis::InvalidationKind::BranchesAndInstructions;
+        invalidateAnalysis(&F, InvalidKind);
+      }
     }
   }
 
