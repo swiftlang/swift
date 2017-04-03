@@ -506,10 +506,20 @@ inline bool ValueBase::hasOneUse() const {
 }
 inline Operand *ValueBase::getSingleUse() const {
   auto I = use_begin(), E = use_end();
+
+  // If we have no elements, return nullptr.
   if (I == E) return nullptr;
+
+  // Otherwise, grab the first element and then increment.
+  Operand *Op = *I;
   ++I;
+
+  // If the next element is not the end list, then return nullptr. We do not
+  // have one user.
   if (I != E) return nullptr;
-  return *I;
+
+  // Otherwise, the element that we accessed.
+  return Op;
 }
 
 /// A constant-size list of the operands of an instruction.
