@@ -32,9 +32,6 @@ namespace swift {
 class ASTContext;
 class SILInstruction;
 class SILModule;
-namespace Lowering {
-class TypeLowering;
-} // namespace Lowering
 
 enum IsBare_t { IsNotBare, IsBare };
 enum IsTransparent_t { IsNotTransparent, IsTransparent };
@@ -602,10 +599,6 @@ public:
   void setGenericEnvironment(GenericEnvironment *env) {
     GenericEnv = env;
   }
-
-  /// Returns the type lowering for the \p Type given the generic signature of
-  /// the current function.
-  const Lowering::TypeLowering &getTypeLowering(SILType Type) const;
 
   /// Map the given type, which is based on an interface SILFunctionType and may
   /// therefore be dependent, to a type based on the context archetypes of this
