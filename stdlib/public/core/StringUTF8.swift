@@ -190,6 +190,10 @@ extension String {
       self._endIndex = e
     }
 
+    public var underestimatedCount: Int {
+      return _core.count
+    }
+
     /// A position in a string's `UTF8View` instance.
     ///
     /// You can convert between indices of the different string views by using
