@@ -1483,7 +1483,7 @@ ManagedValue
 SILGenFunction::emitFormalAccessManagedBufferWithCleanup(SILLocation loc,
                                                          SILValue addr) {
   assert(InWritebackScope && "Must be in formal evaluation scope");
-  auto &lowering = F.getTypeLowering(addr->getType());
+  auto &lowering = getTypeLowering(addr->getType());
   if (lowering.isTrivial())
     return ManagedValue::forUnmanaged(addr);
 
@@ -1498,7 +1498,7 @@ ManagedValue
 SILGenFunction::emitFormalAccessManagedRValueWithCleanup(SILLocation loc,
                                                          SILValue value) {
   assert(InWritebackScope && "Must be in formal evaluation scope");
-  auto &lowering = F.getTypeLowering(value->getType());
+  auto &lowering = getTypeLowering(value->getType());
   if (lowering.isTrivial())
     return ManagedValue::forUnmanaged(value);
 

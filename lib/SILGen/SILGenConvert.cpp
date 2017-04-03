@@ -309,7 +309,7 @@ SILGenFunction::emitOptionalToOptional(SILLocation loc,
   assert(noOptResultTy);
 
   // Create a temporary for the output optional.
-  auto &resultTL = F.getTypeLowering(resultTy);
+  auto &resultTL = getTypeLowering(resultTy);
 
   // If the result is address-only, we need to return something in memory,
   // otherwise the result is the BBArgument in the merge point.
@@ -329,7 +329,7 @@ SILGenFunction::emitOptionalToOptional(SILLocation loc,
         // transforming the underlying type instead of the optional type. This
         // ensures that we use the more efficient non-generic code paths when
         // possible.
-        if (F.getTypeLowering(input.getType()).isAddressOnly() &&
+        if (getTypeLowering(input.getType()).isAddressOnly() &&
             silConv.useLoweredAddresses()) {
           auto *someDecl = B.getASTContext().getOptionalSomeDecl();
           input = B.createUncheckedTakeEnumDataAddr(
