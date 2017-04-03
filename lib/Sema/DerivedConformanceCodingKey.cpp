@@ -244,7 +244,7 @@ static void
 deriveBodyCodingKey_enum_stringValue(AbstractFunctionDecl *strValDecl) {
   // enum SomeEnum {
   //   case A, B, C
-  //   @derived var stringValue: String? {
+  //   @derived var stringValue: String {
   //     switch self {
   //       case A:
   //         return "A"
@@ -261,38 +261,44 @@ deriveBodyCodingKey_enum_stringValue(AbstractFunctionDecl *strValDecl) {
   auto *enumDecl = parentDC->getAsEnumOrEnumExtensionContext();
   Type enumType = parentDC->getDeclaredTypeInContext();
 
+  BraceStmt *body = nullptr;
   auto elements = enumDecl->getAllElements();
   if (elements.empty() /* empty enum */) {
-    deriveNilReturn(strValDecl);
-    return;
+    // return ""
+    auto *emptyStringExpr = new (C) StringLiteralExpr("", SourceRange(),
+                                                      /*Implicit=*/true);
+    auto *returnStmt = new (C) ReturnStmt(SourceLoc(), emptyStringExpr);
+    body = BraceStmt::create(C, SourceLoc(), ASTNode(returnStmt),
+                             SourceLoc());
+  } else {
+    SmallVector<CaseStmt *, 4> cases;
+    for (auto *elt : elements) {
+      auto *pat = new (C) EnumElementPattern(TypeLoc::withoutLoc(enumType),
+                                             SourceLoc(), SourceLoc(),
+                                             Identifier(), elt, nullptr);
+      pat->setImplicit();
+
+      auto labelItem = CaseLabelItem(/*IsDefault=*/false, pat, SourceLoc(),
+                                     nullptr);
+
+      auto *caseValue = new (C) StringLiteralExpr(elt->getNameStr(),
+                                                  SourceRange(),
+                                                  /*Implicit=*/true);
+      auto *returnStmt = new (C) ReturnStmt(SourceLoc(), caseValue);
+      auto *caseBody = BraceStmt::create(C, SourceLoc(), ASTNode(returnStmt),
+                                         SourceLoc());
+      cases.push_back(CaseStmt::create(C, SourceLoc(), labelItem,
+                                       /*HasBoundDecls=*/false, SourceLoc(),
+                                       caseBody));
+    }
+
+    auto *selfRef = createSelfDeclRef(strValDecl);
+    auto *switchStmt = SwitchStmt::create(LabeledStmtInfo(), SourceLoc(),
+                                          selfRef, SourceLoc(), cases,
+                                          SourceLoc(), C);
+    body = BraceStmt::create(C, SourceLoc(), ASTNode(switchStmt), SourceLoc());
   }
 
-  SmallVector<CaseStmt *, 4> cases;
-  for (auto *elt : elements) {
-    auto *pat = new (C) EnumElementPattern(TypeLoc::withoutLoc(enumType),
-                                           SourceLoc(), SourceLoc(),
-                                           Identifier(), elt, nullptr);
-    pat->setImplicit();
-
-    auto labelItem = CaseLabelItem(/*IsDefault=*/false, pat, SourceLoc(),
-                                   nullptr);
-
-    auto *returnExpr = new (C) StringLiteralExpr(elt->getNameStr(),
-                                                 SourceRange(),
-                                                 /*Implicit=*/true);
-    auto *returnStmt = new (C) ReturnStmt(SourceLoc(), returnExpr);
-    auto *body = BraceStmt::create(C, SourceLoc(), ASTNode(returnStmt),
-                                   SourceLoc());
-    cases.push_back(CaseStmt::create(C, SourceLoc(), labelItem,
-                                     /*HasBoundDecls=*/false, SourceLoc(),
-                                     body));
-  }
-
-  auto *selfRef = createSelfDeclRef(strValDecl);
-  auto *switchStmt = SwitchStmt::create(LabeledStmtInfo(), SourceLoc(), selfRef,
-                                        SourceLoc(), cases, SourceLoc(), C);
-  auto *body = BraceStmt::create(C, SourceLoc(), ASTNode(switchStmt),
-                                 SourceLoc());
   strValDecl->setBody(body);
 }
 
@@ -432,14 +438,14 @@ ValueDecl *DerivedConformance::deriveCodingKey(TypeChecker &tc,
       if (rawType && rawType->isEqual(stringType)) {
         // enum SomeStringEnum : String {
         //   case A, B, C
-        //   @derived var stringValue: String? {
+        //   @derived var stringValue: String {
         //     return self.rawValue
         //   }
         getterDecl->setBodySynthesizer(&deriveRawValueReturn);
       } else {
         // enum SomeEnum {
         //   case A, B, C
-        //   @derived var stringValue: String? {
+        //   @derived var stringValue: String {
         //     switch self {
         //       case A:
         //         return "A"
