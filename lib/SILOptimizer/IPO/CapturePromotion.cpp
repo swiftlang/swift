@@ -326,6 +326,11 @@ computeNewArgInterfaceTypes(SILFunction *F,
 
   DEBUG(llvm::dbgs() << "Preparing New Args!\n");
 
+  auto fnTy = F->getLoweredFunctionType();
+
+  auto &Types = F->getModule().Types;
+  Lowering::GenericContextScope scope(Types, fnTy->getGenericSignature());
+
   // For each parameter in the old function...
   for (unsigned Index : indices(Parameters)) {
     auto &param = Parameters[Index];
@@ -352,7 +357,7 @@ computeNewArgInterfaceTypes(SILFunction *F,
     assert(paramBoxTy->getLayout()->getFields().size() == 1
            && "promoting compound box not implemented yet");
     auto paramBoxedTy = paramBoxTy->getFieldType(F->getModule(), 0);
-    auto &paramTL = F->getTypeLowering(paramBoxedTy);
+    auto &paramTL = Types.getTypeLowering(paramBoxedTy);
     ParameterConvention convention;
     if (paramTL.isFormallyPassedIndirectly()) {
       convention = ParameterConvention::Indirect_In;
