@@ -74,9 +74,9 @@ static void addOwnershipModelEliminatorPipeline(SILPassPipelinePlan &P) {
 static void addMandatoryOptPipeline(SILPassPipelinePlan &P) {
   P.startPipeline("Guaranteed Passes");
   P.addCapturePromotion();
-  P.addOwnershipModelEliminator();
-
   P.addAllocBoxToStack();
+
+  P.addOwnershipModelEliminator();
   P.addNoReturnFolding();
   P.addDefiniteInitialization();
 
