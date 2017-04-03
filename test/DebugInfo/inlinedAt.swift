@@ -51,3 +51,4 @@ public func f(_ i : Int) -> Int { // 301
 // CHECK-SAME:                  inlinedAt: ![[L2:.*]])
 // CHECK: ![[L2]] = !DILocation(line: 203, column: 13, scope: ![[G_SCOPE]],
 // CHECK-SAME:                  inlinedAt: ![[L3]])
+
