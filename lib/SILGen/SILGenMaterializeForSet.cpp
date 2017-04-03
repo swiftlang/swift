@@ -359,7 +359,7 @@ public:
          emitter.WitnessStorage->hasAddressors()))
       emitter.TheAccessSemantics = AccessSemantics::DirectToStorage;
     else if (emitter.WitnessStorage->hasClangNode() ||
-             emitter.WitnessStorage->getAttrs().hasAttribute<NSManagedAttr>())
+             emitter.WitnessStorage->isDynamic())
       emitter.TheAccessSemantics = AccessSemantics::Ordinary;
     else
       emitter.TheAccessSemantics = AccessSemantics::DirectToAccessor;
