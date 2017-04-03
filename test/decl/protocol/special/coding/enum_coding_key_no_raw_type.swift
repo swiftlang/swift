@@ -31,7 +31,7 @@ enum PartialImplicitKey : CodingKey {
         }
     }
 
-    var stringValue: String? {
+    var stringValue: String {
         switch self {
         case .a: return "A"
         case .b: return "B"

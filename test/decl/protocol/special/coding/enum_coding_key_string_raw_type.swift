@@ -35,7 +35,7 @@ enum PartialStringKey : String, CodingKey {
         }
     }
 
-    var stringValue: String? {
+    var stringValue: String {
         switch self {
         case .a: return "x"
         case .b: return "y"

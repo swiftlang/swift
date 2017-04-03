@@ -17,7 +17,7 @@ let _ = NoRawTypeKey1(intValue: 0)
 
 enum NoRawTypeKey2 : CodingKey {
     case a, b, c
-    var stringValue: String? { return nil }
+    var stringValue: String { return "" }
 }
 
 let _ = NoRawTypeKey2.a.stringValue
@@ -57,7 +57,7 @@ let _ = NoRawTypeKey5(intValue: 0)
 
 enum NoRawTypeKey6 : CodingKey {
     case a, b, c
-    var stringValue: String? { return nil }
+    var stringValue: String { return "" }
     var intValue: Int? { return nil }
 }
 
@@ -68,7 +68,7 @@ let _ = NoRawTypeKey6(intValue: 0)
 
 enum NoRawTypeKey7 : CodingKey {
     case a, b, c
-    var stringValue: String? { return nil }
+    var stringValue: String { return "" }
     init?(stringValue: String) { return nil }
 }
 
@@ -79,7 +79,7 @@ let _ = NoRawTypeKey7(intValue: 0)
 
 enum NoRawTypeKey8 : CodingKey {
     case a, b, c
-    var stringValue: String? { return nil }
+    var stringValue: String { return "" }
     init?(intValue: Int) { return nil }
 }
 
@@ -112,7 +112,7 @@ let _ = NoRawTypeKey10(intValue: 0)
 
 enum NoRawTypeKey11 : CodingKey {
     case a, b, c
-    var stringValue: String? { return nil }
+    var stringValue: String { return "" }
     var intValue: Int? { return nil }
     init?(stringValue: String) { return nil }
 }
@@ -124,7 +124,7 @@ let _ = NoRawTypeKey11(intValue: 0)
 
 enum NoRawTypeKey12 : CodingKey {
     case a, b, c
-    var stringValue: String? { return nil }
+    var stringValue: String { return "" }
     var intValue: Int? { return nil }
     init?(intValue: Int) { return nil }
 }
@@ -139,7 +139,7 @@ let _ = NoRawTypeKey12(intValue: 0)
 // existing methods).
 enum NoRawTypeKey13 : CodingKey {
     case a, b, c
-    var stringValue: String? { return nil }
+    var stringValue: String { return "" }
     var intValue: Int? { return nil }
     init?(stringValue: String) { return nil }
     init?(intValue: Int) { return nil }

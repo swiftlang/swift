@@ -32,7 +32,7 @@ enum PartialIntKey : Int, CodingKey {
         return self.rawValue + 1
     }
 
-    var stringValue: String? {
+    var stringValue: String {
         switch self {
         case .a: return "A"
         case .b: return "B"
