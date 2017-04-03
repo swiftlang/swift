@@ -1355,10 +1355,13 @@ getIRLinkage(IRGenModule &IGM, SILLinkage linkage, bool isFragile,
       linkage = SILLinkage::Public;
       break;
 
-    case SILLinkage::Public:
-    case SILLinkage::Shared:
     case SILLinkage::HiddenExternal:
     case SILLinkage::PrivateExternal:
+      linkage = SILLinkage::PublicExternal;
+      break;
+
+    case SILLinkage::Public:
+    case SILLinkage::Shared:
     case SILLinkage::PublicExternal:
     case SILLinkage::SharedExternal:
       break;
