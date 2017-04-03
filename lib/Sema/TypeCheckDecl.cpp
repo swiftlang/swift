@@ -2285,6 +2285,15 @@ static void checkAccessibility(TypeChecker &TC, const Decl *D) {
   }
 }
 
+/// Whether this declaration is a member of a class extension marked @objc.
+static bool isMemberOfObjCClassExtension(const ValueDecl *VD) {
+  auto ext = dyn_cast<ExtensionDecl>(VD->getDeclContext());
+  if (!ext) return nullptr;
+
+  return ext->getAsClassOrClassExtensionContext() &&
+    ext->getAttrs().hasAttribute<ObjCAttr>();
+}
+
 /// Whether this declaration is a member of a class with the `@objcMembers`
 /// attribute.
 static bool isMemberOfObjCMembersClass(const ValueDecl *VD) {
@@ -2343,6 +2352,8 @@ static Optional<ObjCReason> shouldMarkAsObjC(TypeChecker &TC,
   // for @nonobjc first.
   if (VD->getAttrs().hasAttribute<NonObjCAttr>())
     return None;
+  if (isMemberOfObjCClassExtension(VD))
+    return ObjCReason::MemberOfObjCExtension;
   if (isMemberOfObjCMembersClass(VD) && canInferImplicitObjC())
     return ObjCReason::MemberOfObjCMembersClass;
   // An override of an @objc declaration is implicitly @objc.
@@ -8404,6 +8415,9 @@ static void validateAttributes(TypeChecker &TC, Decl *D) {
     if (isa<ClassDecl>(D) ||
         isa<ProtocolDecl>(D)) {
       /* ok */
+    } else if (auto Ext = dyn_cast<ExtensionDecl>(D)) {
+      if (!Ext->getAsClassOrClassExtensionContext())
+        error = diag::objc_extension_not_class;
     } else if (auto ED = dyn_cast<EnumDecl>(D)) {
       if (ED->isGenericContext())
         error = diag::objc_enum_generic;
