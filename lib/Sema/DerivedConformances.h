@@ -104,13 +104,21 @@ ValueDecl *deriveCodingKey(TypeChecker &tc,
                            NominalTypeDecl *type,
                            ValueDecl *requirement);
 
-/// Derive a Codable requirement for a struct type.
+/// Derive an Encodable requirement for a struct type.
 ///
 /// \returns the derived member, which will also be added to the type.
-ValueDecl *deriveCodable(TypeChecker &tc,
-                         Decl *parentDecl,
-                         NominalTypeDecl *type,
-                         ValueDecl *requirement);
+ValueDecl *deriveEncodable(TypeChecker &tc,
+                           Decl *parentDecl,
+                           NominalTypeDecl *type,
+                           ValueDecl *requirement);
+
+/// Derive a Decodable requirement for a struct type.
+///
+/// \returns the derived member, which will also be added to the type.
+ValueDecl *deriveDecodable(TypeChecker &tc,
+                           Decl *parentDecl,
+                           NominalTypeDecl *type,
+                           ValueDecl *requirement);
 
 /// Declare a getter for a derived property.
 FuncDecl *declareDerivedPropertyGetter(TypeChecker &tc,

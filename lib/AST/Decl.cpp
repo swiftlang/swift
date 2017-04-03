@@ -2113,8 +2113,11 @@ bool NominalTypeDecl::derivesProtocolConformance(ProtocolDecl *protocol) const {
       return false;
     }
   } else if (isa<StructDecl>(this) || isa<ClassDecl>(this)) {
-    // Structs and classes can explicitly derive Codable conformance.
-    if (*knownProtocol == KnownProtocolKind::Codable) {
+    // Structs and classes can explicitly derive Encodable and Decodable
+    // conformance (explicitly meaning we can synthesize an implementation if
+    // a type conforms manually).
+    if (*knownProtocol == KnownProtocolKind::Encodable ||
+        *knownProtocol == KnownProtocolKind::Decodable) {
       // FIXME: This is not actually correct. We cannot promise to always
       // provide a witness here for all structs and classes. Unfortunately,
       // figuring out whether this is actually possible requires much more

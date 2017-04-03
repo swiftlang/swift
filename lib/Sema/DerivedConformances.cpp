@@ -74,11 +74,11 @@ ValueDecl *DerivedConformance::getDerivableRequirement(NominalTypeDecl *nominal,
     if (func->isOperator() && name.getBaseName().str() == "==")
       return getRequirement(KnownProtocolKind::Equatable);
 
-    // Codable.encode(to: Encoder)
+    // Encodable.encode(to: Encoder)
     if (name.isCompoundName() && name.getBaseName() == ctx.Id_encode) {
       auto argumentNames = name.getArgumentNames();
       if (argumentNames.size() == 1 && argumentNames[0] == ctx.Id_to)
-        return getRequirement(KnownProtocolKind::Codable);
+        return getRequirement(KnownProtocolKind::Encodable);
     }
 
     return nullptr;
@@ -97,9 +97,9 @@ ValueDecl *DerivedConformance::getDerivableRequirement(NominalTypeDecl *nominal,
            argumentNames[0] == ctx.Id_intValue))
         return getRequirement(KnownProtocolKind::CodingKey);
 
-      // Codable.init(from: Decoder)
+      // Decodable.init(from: Decoder)
       if (argumentNames[0] == ctx.Id_from)
-        return getRequirement(KnownProtocolKind::Codable);
+        return getRequirement(KnownProtocolKind::Decodable);
     }
 
     return nullptr;
@@ -110,10 +110,6 @@ ValueDecl *DerivedConformance::getDerivableRequirement(NominalTypeDecl *nominal,
     // RawRepresentable.RawValue
     if (name.isSimpleName(ctx.Id_RawValue))
       return getRequirement(KnownProtocolKind::RawRepresentable);
-
-    // Codable.CodingKeys
-    if (name.isSimpleName(ctx.Id_CodingKeys))
-      return getRequirement(KnownProtocolKind::Codable);
 
     return nullptr;
   }
