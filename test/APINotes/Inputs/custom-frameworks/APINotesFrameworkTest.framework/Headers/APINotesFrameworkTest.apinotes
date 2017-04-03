@@ -84,6 +84,8 @@ SwiftVersions:
           - Name: accessorsOnlyRenamedRetypedClass
             PropertyKind:    Class
             SwiftImportAsAccessors: true
+      - Name: NewlyGenericSub
+        SwiftImportAsNonGeneric: true
     Protocols:
       - Name: ProtoWithVersionedUnavailableMember
         Methods:

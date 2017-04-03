@@ -15,8 +15,13 @@ __attribute__((objc_root_class))
 -(nonnull id)methodWithA:(nonnull id)a;
 @end
 
+__attribute__((objc_root_class))
+@interface Base
+@end
+
 #endif // __OBJC__
 
+#import <APINotesFrameworkTest/Classes.h>
 #import <APINotesFrameworkTest/ImportAsMember.h>
 #import <APINotesFrameworkTest/Properties.h>
 #import <APINotesFrameworkTest/Protocols.h>

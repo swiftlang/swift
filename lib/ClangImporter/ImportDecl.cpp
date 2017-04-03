@@ -1713,16 +1713,25 @@ getAccessorPropertyType(const clang::FunctionDecl *accessor, bool isSetter,
 /// Whether we should suppress importing the Objective-C generic type params
 /// of this class as Swift generic type params.
 static bool
-shouldSuppressGenericParamsImport(const clang::ObjCInterfaceDecl *decl) {
-  while (decl) {
-    StringRef name = decl->getName();
-    if (name == "NSArray" || name == "NSDictionary" || name == "NSSet" ||
-        name == "NSOrderedSet" || name == "NSEnumerator" ||
-        name == "NSMeasurement") {
-      return true;
+shouldSuppressGenericParamsImport(const LangOptions &langOpts,
+                                  const clang::ObjCInterfaceDecl *decl) {
+  if (decl->hasAttr<clang::SwiftImportAsNonGenericAttr>())
+    return true;
+
+  if (langOpts.isSwiftVersion3()) {
+    // In Swift 3 we used a hardcoded list of declarations, and made all of
+    // their subclasses drop their generic parameters when imported.
+    while (decl) {
+      StringRef name = decl->getName();
+      if (name == "NSArray" || name == "NSDictionary" || name == "NSSet" ||
+          name == "NSOrderedSet" || name == "NSEnumerator" ||
+          name == "NSMeasurement") {
+        return true;
+      }
+      decl = decl->getSuperClass();
     }
-    decl = decl->getSuperClass();
   }
+
   return false;
 }
 
@@ -6149,7 +6158,7 @@ Optional<GenericParamList *> SwiftDeclConverter::importObjCGenericParams(
   if (!typeParamList) {
     return nullptr;
   }
-  if (shouldSuppressGenericParamsImport(decl)) {
+  if (shouldSuppressGenericParamsImport(Impl.SwiftContext.LangOpts, decl)) {
     return nullptr;
   }
   assert(typeParamList->size() > 0);
