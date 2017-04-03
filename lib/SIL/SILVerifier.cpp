@@ -1556,6 +1556,17 @@ public:
     require(I->getType() == boxTy->getFieldType(F.getModule(),
                                                 I->getFieldIndex()),
             "project_box result should be address of boxed type");
+
+    // If we have a mark_uninitialized as a user, the mark_uninitialized must be
+    // our only user. This is a requirement that is asserted by allocbox to
+    // stack. This check just embeds the requirement into the IR.
+    require(I->hasOneUse() ||
+            none_of(I->getUses(),
+                    [](Operand *Op) -> bool {
+                      return isa<MarkUninitializedInst>(Op->getUser());
+                    }),
+            "project_box with more than one user when a user is a "
+            "mark_uninitialized");
   }
 
   void checkProjectExistentialBoxInst(ProjectExistentialBoxInst *PEBI) {
