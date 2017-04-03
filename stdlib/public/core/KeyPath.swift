@@ -10,17 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#if BUILDING_OUTSIDE_STDLIB
-import Swift
-
-internal func _conditionallyUnreachable() -> Never {
-  _conditionallyUnreachable()
-}
-
-extension Array {
-  func _getOwner_native() -> Builtin.NativeObject { fatalError() }
-}
-#endif
+import SwiftShims
 
 @_transparent
 internal func _abstract(
@@ -420,46 +410,76 @@ struct RawKeyPathComponent {
   var body: UnsafeRawBufferPointer
   
   struct Header {
-    static var payloadBits: Int { return 29 }
-    static var payloadMask: Int { return 0xFFFF_FFFF >> (32 - payloadBits) }
+    static var payloadMask: UInt32 {
+      return _SwiftKeyPathComponentHeader_PayloadMask
+    }
+    static var discriminatorMask: UInt32 {
+      return _SwiftKeyPathComponentHeader_DiscriminatorMask
+    }
+    static var discriminatorShift: UInt32 {
+      return _SwiftKeyPathComponentHeader_DiscriminatorShift
+    }
+    static var structTag: UInt32 {
+      return _SwiftKeyPathComponentHeader_StructTag
+    }
+    static var classTag: UInt32 {
+      return _SwiftKeyPathComponentHeader_ClassTag
+    }
+    static var optionalTag: UInt32 {
+      return _SwiftKeyPathComponentHeader_OptionalTag
+    }
+    static var optionalChainPayload: UInt32 {
+      return _SwiftKeyPathComponentHeader_OptionalChainPayload
+    }
+    static var optionalWrapPayload: UInt32 {
+      return _SwiftKeyPathComponentHeader_OptionalWrapPayload
+    }
+    static var optionalForcePayload: UInt32 {
+      return _SwiftKeyPathComponentHeader_OptionalForcePayload
+    }
+    static var endOfReferencePrefixFlag: UInt32 {
+      return _SwiftKeyPathComponentHeader_EndOfReferencePrefixFlag
+    }
     
     var _value: UInt32
     
-    var discriminator: Int { return Int(_value) >> Header.payloadBits & 0x3 }
-    var payload: Int {
-      get { return Int(_value) & Header.payloadMask }
+    var discriminator: UInt32 {
+      return (_value & Header.discriminatorMask) >> Header.discriminatorShift
+    }
+    var payload: UInt32 {
+      get {
+        return _value & Header.payloadMask
+      }
       set {
         _sanityCheck(newValue & Header.payloadMask == newValue,
                      "payload too big")
-        let shortMask = UInt32(Header.payloadMask)
-        _value = _value & ~shortMask | UInt32(newValue)
+        _value = _value & ~Header.payloadMask | newValue
       }
     }
     var endOfReferencePrefix: Bool {
       get {
-        return Int(_value) >> Header.payloadBits & 0x4 != 0
+        return _value & Header.endOfReferencePrefixFlag != 0
       }
       set {
-        let bit = 0x4 << UInt32(Header.payloadBits)
         if newValue {
-          _value = _value | bit
+          _value = _value | Header.endOfReferencePrefixFlag
         } else {
-          _value = _value & ~bit
+          _value = _value & ~Header.endOfReferencePrefixFlag
         }
       }
     }
 
     var kind: KeyPathComponentKind {
       switch (discriminator, payload) {
-      case (0, _):
+      case (Header.structTag, _):
         return .struct
-      case (2, _):
+      case (Header.classTag, _):
         return .class
-      case (3, 0):
+      case (Header.optionalTag, Header.optionalChainPayload):
         return .optionalChain
-      case (3, 1):
+      case (Header.optionalTag, Header.optionalWrapPayload):
         return .optionalWrap
-      case (3, 2):
+      case (Header.optionalTag, Header.optionalForcePayload):
         return .optionalForce
       default:
         _sanityCheckFailure("invalid header")
@@ -495,7 +515,7 @@ struct RawKeyPathComponent {
                    "component not big enough")
       return Int(body.load(as: UInt32.self))
     }
-    return header.payload
+    return Int(header.payload)
   }
 
   var value: KeyPathComponent {
@@ -621,20 +641,32 @@ internal struct KeyPathBuffer {
   var data: UnsafeRawBufferPointer
   var trivial: Bool
   var hasReferencePrefix: Bool
-  
+
   struct Header {
     var _value: UInt32
     
+    static var sizeMask: UInt32 {
+      return _SwiftKeyPathBufferHeader_SizeMask
+    }
+    static var trivialFlag: UInt32 {
+      return _SwiftKeyPathBufferHeader_TrivialFlag
+    }
+    static var hasReferencePrefixFlag: UInt32 {
+      return _SwiftKeyPathBufferHeader_HasReferencePrefixFlag
+    }
+  
     init(size: Int, trivial: Bool, hasReferencePrefix: Bool) {
-      _sanityCheck(size <= 0x3FFF_FFFF, "key path too big")
+      _sanityCheck(size <= Int(Header.sizeMask), "key path too big")
       _value = UInt32(size)
-        | (trivial ? 0x8000_0000 : 0)
-        | (hasReferencePrefix ? 0x4000_0000 : 0)
+        | (trivial ? Header.trivialFlag : 0)
+        | (hasReferencePrefix ? Header.hasReferencePrefixFlag : 0)
     }
     
-    var size: Int { return Int(_value & 0x3FFF_FFFF) }
-    var trivial: Bool { return _value & 0x8000_0000 != 0 }
-    var hasReferencePrefix: Bool { return _value & 0x4000_0000 != 0 }
+    var size: Int { return Int(_value & Header.sizeMask) }
+    var trivial: Bool { return _value & Header.trivialFlag != 0 }
+    var hasReferencePrefix: Bool {
+      return _value & Header.hasReferencePrefixFlag != 0
+    }
   }
 
   init(base: UnsafeRawPointer) {
