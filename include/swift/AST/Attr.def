@@ -92,7 +92,7 @@ SIMPLE_DECL_ATTR(final, Final,
                  OnClass | OnFunc | OnVar | OnSubscript|DeclModifier, 2)
 
 DECL_ATTR(objc, ObjC,
-          OnFunc | OnClass | OnProtocol | OnVar | OnSubscript |
+          OnFunc | OnClass | OnProtocol | OnExtension | OnVar | OnSubscript |
           OnConstructor | OnDestructor | OnEnum | OnEnumElement, 3)
 
 SIMPLE_DECL_ATTR(required, Required,
@@ -158,7 +158,7 @@ DECL_ATTR(autoclosure, AutoClosure, OnParam, 28)
 SIMPLE_DECL_ATTR(noescape, NoEscape, OnParam, 29)
 
 SIMPLE_DECL_ATTR(nonobjc, NonObjC,
-                 OnFunc | OnVar | OnSubscript | OnConstructor, 30)
+                 OnExtension | OnFunc | OnVar | OnSubscript | OnConstructor, 30)
 
 SIMPLE_DECL_ATTR(_fixed_layout, FixedLayout,
                  OnVar | OnClass | OnStruct | OnEnum | UserInaccessible, 31)
@@ -170,6 +170,8 @@ SIMPLE_DECL_ATTR(_inlineable, Inlineable,
 DECL_ATTR(_specialize, Specialize,
           OnConstructor | OnFunc | AllowMultipleAttributes | LongAttribute
           | UserInaccessible, 33)
+
+SIMPLE_DECL_ATTR(objcMembers, ObjCMembers, OnClass, 34)
 
 // Non-serialized attributes.
 

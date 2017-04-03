@@ -302,6 +302,20 @@ Optional<Type> TypeChecker::checkObjCKeyPathExpr(DeclContext *dc,
             .fixItInsert(var->getAttributeInsertionLoc(false),
                          "@objc ");
         }
+      } else if (auto attr = var->getAttrs().getAttribute<ObjCAttr>()) {
+        // If this attribute was inferred based on deprecated Swift 3 rules,
+        // complain.
+        if (attr->isSwift3Inferred() &&
+            !Context.LangOpts.WarnSwift3ObjCInference) {
+          diagnose(componentNameLoc, diag::expr_keypath_swift3_objc_inference,
+                   var->getFullName(),
+                   var->getDeclContext()
+                    ->getAsNominalTypeOrNominalTypeExtensionContext()
+                   ->getName());
+          diagnose(var, diag::make_decl_objc, var->getDescriptiveKind())
+            .fixItInsert(var->getAttributeInsertionLoc(false),
+                         "@objc ");
+        }
       } else {
         // FIXME: Warn about non-KVC-compliant getter/setter names?
       }

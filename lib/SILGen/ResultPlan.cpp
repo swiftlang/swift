@@ -40,8 +40,9 @@ public:
     return RValue();
   }
   void
-  gatherIndirectResultAddrs(SmallVectorImpl<SILValue> &outList) const override {
-    outList.emplace_back(init->getAddressForInPlaceInitialization());
+  gatherIndirectResultAddrs(SILGenFunction &SGF, SILLocation loc,
+                            SmallVectorImpl<SILValue> &outList) const override {
+    outList.emplace_back(init->getAddressForInPlaceInitialization(SGF, loc));
   }
 };
 
@@ -122,7 +123,8 @@ public:
   }
 
   void
-  gatherIndirectResultAddrs(SmallVectorImpl<SILValue> &outList) const override {
+  gatherIndirectResultAddrs(SILGenFunction &SGF, SILLocation loc,
+                            SmallVectorImpl<SILValue> &outList) const override {
     if (!temporary)
       return;
     outList.emplace_back(temporary->getAddress());
@@ -157,8 +159,9 @@ public:
   }
 
   void
-  gatherIndirectResultAddrs(SmallVectorImpl<SILValue> &outList) const override {
-    subPlan->gatherIndirectResultAddrs(outList);
+  gatherIndirectResultAddrs(SILGenFunction &SGF, SILLocation loc,
+                            SmallVectorImpl<SILValue> &outList) const override {
+    subPlan->gatherIndirectResultAddrs(SGF, loc, outList);
   }
 };
 
@@ -184,8 +187,9 @@ public:
   }
 
   void
-  gatherIndirectResultAddrs(SmallVectorImpl<SILValue> &outList) const override {
-    subPlan->gatherIndirectResultAddrs(outList);
+  gatherIndirectResultAddrs(SILGenFunction &SGF, SILLocation loc,
+                            SmallVectorImpl<SILValue> &outList) const override {
+    subPlan->gatherIndirectResultAddrs(SGF, loc, outList);
   }
 };
 
@@ -223,9 +227,10 @@ public:
   }
 
   void
-  gatherIndirectResultAddrs(SmallVectorImpl<SILValue> &outList) const override {
+  gatherIndirectResultAddrs(SILGenFunction &SGF, SILLocation loc,
+                            SmallVectorImpl<SILValue> &outList) const override {
     for (const auto &eltPlan : eltPlans) {
-      eltPlan->gatherIndirectResultAddrs(outList);
+      eltPlan->gatherIndirectResultAddrs(SGF, loc, outList);
     }
   }
 };
@@ -275,9 +280,10 @@ public:
   }
 
   void
-  gatherIndirectResultAddrs(SmallVectorImpl<SILValue> &outList) const override {
+  gatherIndirectResultAddrs(SILGenFunction &SGF, SILLocation loc,
+                            SmallVectorImpl<SILValue> &outList) const override {
     for (const auto &eltPlan : eltPlans) {
-      eltPlan->gatherIndirectResultAddrs(outList);
+      eltPlan->gatherIndirectResultAddrs(SGF, loc, outList);
     }
   }
 };
@@ -333,8 +339,9 @@ public:
   }
 
   void
-  gatherIndirectResultAddrs(SmallVectorImpl<SILValue> &outList) const override {
-    subPlan->gatherIndirectResultAddrs(outList);
+  gatherIndirectResultAddrs(SILGenFunction &SGF, SILLocation loc,
+                            SmallVectorImpl<SILValue> &outList) const override {
+    subPlan->gatherIndirectResultAddrs(SGF, loc, outList);
   }
 
   Optional<std::pair<ManagedValue, ManagedValue>>
@@ -421,17 +428,13 @@ ResultPlanPtr ResultPlanBuilder::build(Initialization *init,
   // Otherwise, grab the next result.
   auto result = allResults.pop_back_val();
 
-  SILValue initAddr;
-  if (init) {
-    initAddr = init->getAddressForInPlaceInitialization();
-
-    // If the result is indirect, and we have an address to emit into, and
-    // there are no abstraction differences, then just do it.
-    if (initAddr && SGF.silConv.isSILIndirect(result) &&
-        !initAddr->getType().hasAbstractionDifference(
+  // If the result is indirect, and we have an address to emit into, and
+  // there are no abstraction differences, then just do it.
+  if (init && init->canPerformInPlaceInitialization() &&
+      SGF.silConv.isSILIndirect(result) &&
+      !SGF.getLoweredType(substType).getAddressType().hasAbstractionDifference(
             calleeTypeInfo.getOverrideRep(), result.getSILStorageType())) {
-      return ResultPlanPtr(new InPlaceInitializationResultPlan(init));
-    }
+    return ResultPlanPtr(new InPlaceInitializationResultPlan(init));
   }
 
   // Otherwise, we need to:

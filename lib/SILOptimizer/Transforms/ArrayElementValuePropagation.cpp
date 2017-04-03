@@ -11,7 +11,9 @@
 //===----------------------------------------------------------------------===//
 #define DEBUG_TYPE "array-element-propagation"
 
-#include "llvm/ADT/SetVector.h"
+#include "swift/AST/NameLookup.h"
+#include "swift/AST/ParameterList.h"
+#include "swift/AST/GenericEnvironment.h"
 #include "swift/SIL/SILBasicBlock.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/DebugUtils.h"
@@ -23,12 +25,14 @@
 using namespace swift;
 
 /// Propagate the elements of array values to calls of the array's get_element
-/// method.
+/// method, and replace calls of append(contentsOf:) with append(element:).
 ///
 /// Array literal construction and array initialization of array values
 /// associates element values with the array value. These values can be
 /// propagated to the get_element method if we can prove that the array value
-/// has not changed until reading the array value's element.
+/// has not changed until reading the array value's element. These values can
+/// also be used to replace append(contentsOf:) with multiple append(element:)
+/// calls.
 ///
 /// Propagation of the elements of one array allocation.
 ///
@@ -42,53 +46,71 @@ using namespace swift;
 ///   The stores on the returned array element buffer pointer.
 ///
 namespace {
+
+/// Utility class for analysis array literal initializations.
+///
+/// Array literals are initialized by allocating an array buffer, and storing
+/// the elements into it.
+/// This class analysis all the code which does the array literal
+/// initialization. It also collects uses of the array, like getElement calls
+/// and append(contentsOf) calls.
 class ArrayAllocation {
-  /// The array allocation call.
-  ApplyInst *Alloc;
   /// The array value returned by the allocation call.
   SILValue ArrayValue;
 
-  /// The pointer to the returned array element buffer pointer.
-  SILValue ElementBuffer;
-
-  // The calls to Array get_element that use this array allocation.
+  /// The calls to Array get_element that use this array allocation.
   llvm::SmallSetVector<ApplyInst *, 16> GetElementCalls;
+
+  /// The calls to Array append_contentsOf that use this array allocation.
+  llvm::SmallVector<ApplyInst *, 4> AppendContentsOfCalls;
+
+  /// A map of Array indices to element values
   llvm::DenseMap<uint64_t, SILValue> ElementValueMap;
 
-  // Array get_element calls and their matching array element value for later
-  // replacement.
-  llvm::SmallVectorImpl<std::pair<ApplyInst *, SILValue>> &ReplacementMap;
-
-  ArrayAllocation(
-      ApplyInst *AI,
-      llvm::SmallVectorImpl<std::pair<ApplyInst *, SILValue>> &Replacements)
-      : Alloc(AI), ReplacementMap(Replacements) {}
-
-  bool findValueReplacements();
-  bool isInitializationWithKnownElements();
-  bool mapInitializationStores();
-  bool analyzeArrayValueUses();
+  bool mapInitializationStores(SILValue ElementBuffer);
   bool recursivelyCollectUses(ValueBase *Def);
-  bool collectForwardableValues();
+  bool replacementsAreValid();
+
+  // After approx. this many elements, it's faster to use append(contentsOf:)
+  static constexpr unsigned APPEND_CONTENTSOF_REPLACEMENT_VALUES_MAX = 6;
 
 public:
 
-  /// Find a set of get_element calls that can be replace by the initialization
-  /// value of the array allocation call.
-  ///
-  /// Returns true if an access can be replaced. The replacements are stored in
-  /// the \p ReplacementMap.
-  static bool findValueReplacements(
-      ApplyInst *Inst,
-      llvm::SmallVectorImpl<std::pair<ApplyInst *, SILValue>> &Replacements) {
-    return ArrayAllocation(Inst, Replacements).findValueReplacements();
-  }
-};
-} // end anonymous namespace
+  /// Specifies the value with which a get-element call can be replaced.
+  struct GetElementReplacement {
+    ApplyInst *GetElementCall;
+    SILValue Replacement;
+  };
 
+  /// Specifies the set of elements with which a append-contentof call can be
+  /// replaced.
+  struct AppendContentOfReplacement {
+    ApplyInst *AppendContentOfCall;
+    llvm::SmallVector<SILValue, 4> ReplacementValues;
+    SILValue Array;
+  };
+
+  ArrayAllocation() {}
+
+  /// Analyzes an array allocation call.
+  ///
+  /// Returns true if \p Alloc is the allocation of an array literal (or a
+  /// similar pattern) and the array values can be used to replace get_element
+  /// or append(contentof) calls.
+  bool analyze(ApplyInst *Alloc);
+
+  /// Gets the list of get_element calls which can be replaced.
+  void getGetElementReplacements(
+    llvm::SmallVectorImpl<GetElementReplacement> &Replacements);
+
+  /// Gets the list of append(contentof) calls which can be replaced by a
+  /// set of values.
+  void getAppendContentOfReplacements(
+    llvm::SmallVectorImpl<AppendContentOfReplacement> &Replacements);
+};
 
 /// Map the indices of array element initialization stores to their values.
-bool ArrayAllocation::mapInitializationStores() {
+bool ArrayAllocation::mapInitializationStores(SILValue ElementBuffer) {
   assert(ElementBuffer &&
          "Must have identified an array element storage pointer");
 
@@ -148,44 +170,18 @@ bool ArrayAllocation::mapInitializationStores() {
   return !ElementValueMap.empty();
 }
 
-/// Check that we have an array initialization call with known elements.
-///
-/// The returned array value is known not to be aliased since it was just
-/// allocated.
-bool ArrayAllocation::isInitializationWithKnownElements() {
-  ArraySemanticsCall Uninitialized(Alloc, "array.uninitialized");
-  if (Uninitialized &&
-      (ArrayValue = Uninitialized.getArrayValue()) &&
-      (ElementBuffer = Uninitialized.getArrayElementStoragePointer()))
-    return mapInitializationStores();
+bool ArrayAllocation::replacementsAreValid() {
+  unsigned ElementCount = ElementValueMap.size();
 
-  return false;
-}
-
-/// Propagate the elements of an array literal to get_element method calls on
-/// the same array.
-///
-/// We have to prove that the array value is not changed in between the
-/// creation and the method call to get_element.
-bool ArrayAllocation::findValueReplacements() {
-  if (!isInitializationWithKnownElements())
+  if (ElementCount > APPEND_CONTENTSOF_REPLACEMENT_VALUES_MAX)
     return false;
 
-  // The array value was stored or has escaped.
-  if (!analyzeArrayValueUses())
-    return false;
+  // Bail if elements aren't contiguous
+  for (unsigned i = 0; i < ElementCount; ++i)
+    if (!ElementValueMap.count(i))
+      return false;
 
-  // No count users.
-  if (GetElementCalls.empty())
-    return false;
-
-  return collectForwardableValues();
-}
-
-/// Collect all get_element users and check that there are no escapes or uses
-/// that could change the array value.
-bool ArrayAllocation::analyzeArrayValueUses() {
-  return recursivelyCollectUses(ArrayValue);
+  return true;
 }
 
 /// Recursively look at all uses of this definition. Abort if the array value
@@ -206,10 +202,16 @@ bool ArrayAllocation::recursivelyCollectUses(ValueBase *Def) {
 
     // Check array semantic calls.
     ArraySemanticsCall ArrayOp(User);
-    if (ArrayOp && ArrayOp.doesNotChangeArray()) {
-      if (ArrayOp.getKind() == ArrayCallKind::kGetElement)
+    if (ArrayOp) {
+      if (ArrayOp.getKind() == ArrayCallKind::kAppendContentsOf) {
+        AppendContentsOfCalls.push_back(ArrayOp);
+        continue;
+      } else if (ArrayOp.getKind() == ArrayCallKind::kGetElement) {
         GetElementCalls.insert(ArrayOp);
-      continue;
+        continue;
+      } else if (ArrayOp.doesNotChangeArray()) {
+        continue;
+      }
     }
 
     // An operation that escapes or modifies the array value.
@@ -218,9 +220,32 @@ bool ArrayAllocation::recursivelyCollectUses(ValueBase *Def) {
   return true;
 }
 
-/// Look at the get_element calls and match them to values by index.
-bool ArrayAllocation::collectForwardableValues() {
-  bool FoundForwardableValue = false;
+bool ArrayAllocation::analyze(ApplyInst *Alloc) {
+  ArraySemanticsCall Uninitialized(Alloc, "array.uninitialized");
+  if (!Uninitialized)
+    return false;
+
+  ArrayValue = Uninitialized.getArrayValue();
+  if (!ArrayValue)
+    return false;
+
+  SILValue ElementBuffer = Uninitialized.getArrayElementStoragePointer();
+  if (!ElementBuffer)
+    return false;
+
+  // Figure out all stores to the array.
+  if (!mapInitializationStores(ElementBuffer))
+    return false;
+
+  // Check if the array value was stored or has escaped.
+  if (!recursivelyCollectUses(ArrayValue))
+    return false;
+
+  return true;
+}
+
+void ArrayAllocation::getGetElementReplacements(
+                   llvm::SmallVectorImpl<GetElementReplacement> &Replacements) {
   for (auto *GetElementCall : GetElementCalls) {
     ArraySemanticsCall GetElement(GetElementCall);
     assert(GetElement.getKind() == ArrayCallKind::kGetElement);
@@ -235,18 +260,28 @@ bool ArrayAllocation::collectForwardableValues() {
     if (EltValueIt == ElementValueMap.end())
       continue;
 
-    ReplacementMap.push_back(
-        std::make_pair(GetElementCall, EltValueIt->second));
-    FoundForwardableValue = true;
+    Replacements.push_back({GetElementCall, EltValueIt->second});
   }
-  return FoundForwardableValue;
+}
+
+void ArrayAllocation::getAppendContentOfReplacements(
+              llvm::SmallVectorImpl<AppendContentOfReplacement> &Replacements) {
+  if (AppendContentsOfCalls.empty())
+    return;
+  if (!replacementsAreValid())
+    return;
+
+  llvm::SmallVector<SILValue, 4> ElementValueVector;
+  for (unsigned i = 0; i < ElementValueMap.size(); ++i)
+    ElementValueVector.push_back(ElementValueMap[i]);
+
+  for (auto *Call : AppendContentsOfCalls)
+    Replacements.push_back({Call, ElementValueVector, ArrayValue});
 }
 
 // =============================================================================
 //                                 Driver
 // =============================================================================
-
-namespace {
 
 class ArrayElementPropagation : public SILFunctionTransform {
 public:
@@ -256,29 +291,82 @@ public:
     return "Array Element Propagation";
   }
 
+  bool replaceAppendCalls(
+                  ArrayRef<ArrayAllocation::AppendContentOfReplacement> Repls) {
+    auto &Fn = *getFunction();
+    auto &M = Fn.getModule();
+    auto &Ctx = M.getASTContext();
+
+    if (Repls.empty())
+      return false;
+
+    DEBUG(llvm::dbgs() << "Array append contentsOf calls replaced in "
+                       << Fn.getName() << " (" << Repls.size() << ")\n");
+
+    auto *AppendFnDecl = Ctx.getArrayAppendElementDecl();
+    if (!AppendFnDecl)
+      return false;
+
+    auto Mangled = SILDeclRef(AppendFnDecl, SILDeclRef::Kind::Func).mangle();
+    auto *AppendFn = M.findFunction(Mangled, SILLinkage::PublicExternal);
+    if (!AppendFn)
+      return false;
+    
+    for (const ArrayAllocation::AppendContentOfReplacement &Repl : Repls) {
+      ArraySemanticsCall AppendContentsOf(Repl.AppendContentOfCall);
+      assert(AppendContentsOf && "Must be AppendContentsOf call");
+      
+      SILType ArrayType = Repl.Array->getType();
+      auto *NTD = ArrayType.getSwiftRValueType()->getAnyNominal();
+      SubstitutionMap ArraySubMap = ArrayType.getSwiftRValueType()
+        ->getContextSubstitutionMap(M.getSwiftModule(), NTD);
+      
+      GenericSignature *Sig = NTD->getGenericSignature();
+      assert(Sig && "Array type must have generic signature");
+      SmallVector<Substitution, 4> Subs;
+      Sig->getSubstitutions(ArraySubMap, Subs);
+      
+      AppendContentsOf.replaceByAppendingValues(M, AppendFn,
+                                                Repl.ReplacementValues, Subs);
+    }
+    return true;
+  }
+
   void run() override {
     auto &Fn = *getFunction();
 
-    bool Changed = false;
-
     // Propagate the elements an of array value to its users.
-    SmallVector<std::pair<ApplyInst *, SILValue>, 16> ValueReplacements;
+    llvm::SmallVector<ArrayAllocation::GetElementReplacement, 16>
+      GetElementReplacements;
+    llvm::SmallVector<ArrayAllocation::AppendContentOfReplacement, 4>
+      AppendContentsOfReplacements;
+
     for (auto &BB :Fn) {
       for (auto &Inst : BB) {
-        if (auto *Apply = dyn_cast<ApplyInst>(&Inst))
-          Changed |=
-              ArrayAllocation::findValueReplacements(Apply, ValueReplacements);
+        if (auto *Apply = dyn_cast<ApplyInst>(&Inst)) {
+          ArrayAllocation ALit;
+          if (ALit.analyze(Apply)) {
+            ALit.getGetElementReplacements(GetElementReplacements);
+            ALit.getAppendContentOfReplacements(AppendContentsOfReplacements);
+          }
+        }
       }
     }
-    DEBUG(if (Changed) {
+
+    DEBUG(if (!GetElementReplacements.empty()) {
       llvm::dbgs() << "Array elements replaced in " << Fn.getName() << " ("
-                   << ValueReplacements.size() << ")\n";
+                   << GetElementReplacements.size() << ")\n";
     });
+    
+    bool Changed = false;
+    
     // Perform the actual replacement of the get_element call by its value.
-    for (auto &Repl : ValueReplacements) {
-      ArraySemanticsCall GetElement(Repl.first);
-      GetElement.replaceByValue(Repl.second);
+    for (ArrayAllocation::GetElementReplacement &Repl : GetElementReplacements) {
+      ArraySemanticsCall GetElement(Repl.GetElementCall);
+      Changed |= GetElement.replaceByValue(Repl.Replacement);
     }
+
+    Changed |= replaceAppendCalls(AppendContentsOfReplacements);
 
     if (Changed) {
       PM->invalidateAnalysis(

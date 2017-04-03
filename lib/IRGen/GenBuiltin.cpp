@@ -850,5 +850,24 @@ if (Builtin.ID == BuiltinValueKind::id) { \
     return;
   }
 
+  if (Builtin.ID == BuiltinValueKind::Swift3ImplicitObjCEntrypoint) {
+    llvm::Value *args[2];
+    auto argIter = IGF.CurFn->arg_begin();
+
+    // self
+    args[0] = &*argIter++;
+    if (args[0]->getType() != IGF.IGM.ObjCPtrTy)
+      args[0] = IGF.Builder.CreateBitCast(args[0], IGF.IGM.ObjCPtrTy);
+
+    // _cmd
+    args[1] = &*argIter;
+    if (args[1]->getType() != IGF.IGM.ObjCSELTy)
+      args[1] = IGF.Builder.CreateBitCast(args[1], IGF.IGM.ObjCSELTy);
+
+    IGF.Builder.CreateCall(IGF.IGM.getSwift3ImplicitObjCEntrypointFn(), args);
+    return;
+  }
+
+
   llvm_unreachable("IRGen unimplemented for this builtin!");
 }

@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 // RUN: %target-run-simple-swift
 // REQUIRES: executable_test
+// REQUIRES: rdar31343594
 
 //===--- Niceties ---------------------------------------------------------===//
 typealias Element_<S: Sequence> = S.Iterator.Element

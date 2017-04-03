@@ -99,6 +99,8 @@ ArchetypeToConcreteConvertUInt8(t: f)
 // CHECK-LABEL: sil shared [noinline] @_T037specialize_unconditional_checked_cast31ArchetypeToConcreteConvertUInt8{{[_0-9a-zA-Z]*}}3Not{{.*}}Tg5 : $@convention(thin) (NotUInt8) -> NotUInt8 {
 // CHECK: bb0
 // CHECK-NEXT: debug_value %0
+// TODO: the second debug_value is redundant and should be removed
+// CHECK-NEXT: debug_value %0
 // CHECK-NEXT: return %0
 
 // x -> y where y is a class but x is not.

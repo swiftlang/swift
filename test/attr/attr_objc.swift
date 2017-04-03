@@ -1,6 +1,6 @@
-// RUN: %target-swift-frontend -disable-objc-attr-requires-foundation-module -typecheck -verify %s -swift-version 4
-// RUN: %target-swift-ide-test -skip-deinit=false -print-ast-typechecked -source-filename %s -function-definitions=true -prefer-type-repr=false -print-implicit-attrs=true -explode-pattern-binding-decls=true -disable-objc-attr-requires-foundation-module -swift-version 4 | %FileCheck %s
-// RUN: not %target-swift-frontend -typecheck -dump-ast -disable-objc-attr-requires-foundation-module %s -swift-version 4 2> %t.dump
+// RUN: %target-swift-frontend -disable-objc-attr-requires-foundation-module -typecheck -verify %s -swift-version 4 -enable-source-import -I %S/Inputs -enable-swift3-objc-inference
+// RUN: %target-swift-ide-test -skip-deinit=false -print-ast-typechecked -source-filename %s -function-definitions=true -prefer-type-repr=false -print-implicit-attrs=true -explode-pattern-binding-decls=true -disable-objc-attr-requires-foundation-module -swift-version 4 -enable-source-import -I %S/Inputs -enable-swift3-objc-inference | %FileCheck %s
+// RUN: not %target-swift-frontend -typecheck -dump-ast -disable-objc-attr-requires-foundation-module %s -swift-version 4 -enable-source-import -I %S/Inputs -enable-swift3-objc-inference 2> %t.dump
 // RUN: %FileCheck -check-prefix CHECK-DUMP %s < %t.dump
 // REQUIRES: objc_interop
 
@@ -30,7 +30,7 @@ protocol Protocol_Class2 : class {}
 
 //===--- Subjects of @objc attribute.
 
-@objc extension PlainClass { } // expected-error{{@objc cannot be applied to this declaration}}{{1-7=}}
+@objc extension PlainStruct { } // expected-error{{'@objc' can only be applied to an extension of a class}}{{1-7=}}
 
 @objc  
 var subject_globalVar: Int // expected-error {{@objc can only be used with members of classes, @objc protocols, and concrete extensions of classes}}
@@ -1665,6 +1665,32 @@ class HasIBAction {
 }
 
 //===---
+//===--- @IBInspectable implies @objc
+//===---
+
+// CHECK-LABEL: {{^}}class HasIBInspectable {
+class HasIBInspectable {
+  @IBInspectable var goodProperty: AnyObject?
+  // CHECK: {{^}}  @IBInspectable @objc var goodProperty: AnyObject?
+
+  @IBInspectable var badProperty: PlainStruct?
+  // expected-error@-1{{property cannot be marked @IBInspectable because its type cannot be represented in Objective-C}}
+}
+
+//===---
+//===--- @GKInspectable implies @objc
+//===---
+
+// CHECK-LABEL: {{^}}class HasGKInspectable {
+class HasGKInspectable {
+  @GKInspectable var goodProperty: AnyObject?
+  // CHECK: {{^}}  @GKInspectable @objc var goodProperty: AnyObject?
+
+  @GKInspectable var badProperty: PlainStruct?
+  // expected-error@-1{{property cannot be marked @GKInspectable because its type cannot be represented in Objective-C}}
+}
+
+//===---
 //===--- @NSManaged implies @objc
 //===---
 
@@ -2133,6 +2159,17 @@ class ConformsToProtocolThrowsObjCName2 : ProtocolThrowsObjCName {
   @objc func func_dictionary2b(x: Dictionary<String, Int>) { }
 }
 
+@objc extension PlainClass {
+  // CHECK-LABEL: @objc final func objc_ext_objc_okay(_: Int) {
+  final func objc_ext_objc_okay(_: Int) { }
+
+  final func objc_ext_objc_not_okay(_: PlainStruct) { }
+  // expected-error@-1{{method cannot be in an @objc extension of a class (without @nonobjc) because the type of the parameter cannot be represented in Objective-C}}
+  // expected-note@-2 {{Swift structs cannot be represented in Objective-C}}
+
+  // CHECK-LABEL: {{^}} @nonobjc final func objc_ext_objc_explicit_nonobjc(_: PlainStruct) {
+  @nonobjc final func objc_ext_objc_explicit_nonobjc(_: PlainStruct) { }
+}
 
 @objc class ObjC_Class1 : Hashable { 
   var hashValue: Int { return 0 }

@@ -313,6 +313,12 @@ InferImportAsMember("enable-infer-import-as-member",
                    llvm::cl::init(false));
 
 static llvm::cl::opt<bool>
+EnableSwift3ObjCInference(
+                  "enable-swift3-objc-inference",
+                  llvm::cl::desc("Enable Swift 3's @objc inference rules"),
+                  llvm::cl::init(false));
+
+static llvm::cl::opt<bool>
 DisableObjCAttrRequiresFoundationModule(
     "disable-objc-attr-requires-foundation-module",
     llvm::cl::desc("Allow @objc to be used freely"),
@@ -2986,6 +2992,9 @@ int main(int argc, char *argv[]) {
       options::CodeCompleteInitsInPostfixExpr;
   InitInvok.getLangOptions().InferImportAsMember |=
     options::InferImportAsMember;
+  InitInvok.getLangOptions().EnableSwift3ObjCInference =
+    options::EnableSwift3ObjCInference ||
+    InitInvok.getLangOptions().isSwiftVersion3();
   InitInvok.getClangImporterOptions().ImportForwardDeclarations |=
     options::ObjCForwardDeclarations;
   InitInvok.getClangImporterOptions().InferImportAsMember |=

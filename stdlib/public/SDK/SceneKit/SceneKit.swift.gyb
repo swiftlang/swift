@@ -187,12 +187,15 @@ extension SCNGeometryElement {
 @available(iOS, introduced: 8.0)
 @available(OSX, introduced: 10.8)
 extension SCNGeometrySource {
+  @nonobjc
   public convenience init(vertices: [SCNVector3]) {
     self.init(vertices: UnsafePointer(vertices), count: vertices.count)
   }
+  @nonobjc
   public convenience init(normals: [SCNVector3]) {
     self.init(normals: UnsafePointer(normals), count: normals.count)
   }
+  @nonobjc
   public convenience init(textureCoordinates: [CGPoint]) {
     self.init(textureCoordinates: UnsafePointer(textureCoordinates), count: textureCoordinates.count)
   }

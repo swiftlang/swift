@@ -16,7 +16,7 @@ func e() {}
 func f() {}
 func g() {}
 
-// CHECK-LABEL: sil hidden  @_T018switch_fallthrough5test1yyF
+// CHECK-LABEL: sil hidden @_T018switch_fallthrough5test1yyF
 func test1() {
   switch foo() {
   // CHECK:   cond_br {{%.*}}, [[YES_CASE1:bb[0-9]+]], {{bb[0-9]+}}
@@ -44,7 +44,7 @@ func test1() {
 }
 
 // Fallthrough should work even if the next case is normally unreachable
-// CHECK-LABEL: sil hidden  @_T018switch_fallthrough5test2yyF
+// CHECK-LABEL: sil hidden @_T018switch_fallthrough5test2yyF
 func test2() {
   switch foo() {
   // CHECK:   cond_br {{%.*}}, [[YES_CASE1:bb[0-9]+]], {{bb[0-9]+}}
@@ -71,7 +71,7 @@ func test2() {
   d()
 }
 
-// CHECK-LABEL: sil hidden  @_T018switch_fallthrough5test3yyF
+// CHECK-LABEL: sil hidden @_T018switch_fallthrough5test3yyF
 func test3() {
   switch (foo(), bar()) {
   // CHECK:   cond_br {{%.*}}, [[YES_CASE1:bb[0-9]+]], {{bb[0-9]+}}

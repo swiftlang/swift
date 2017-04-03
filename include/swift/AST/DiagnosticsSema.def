@@ -415,6 +415,10 @@ ERROR(expression_unused_keypath_result,none,
 ERROR(expr_keypath_non_objc_property,none,
       "argument of '#keyPath' refers to non-'@objc' property %0",
       (DeclName))
+WARNING(expr_keypath_swift3_objc_inference,none,
+        "argument of '#keyPath' refers to property %0 in %1 that depends on "
+        "'@objc' attribute inference deprecated in Swift 4",
+        (DeclName, Identifier))
 ERROR(stdlib_anyobject_not_found,none,
       "broken standard library: cannot find 'AnyObject' protocol", ())
 ERROR(expr_keypath_type_of_property,none,
@@ -463,6 +467,10 @@ ERROR(expr_selector_not_objc,none,
 NOTE(make_decl_objc,none,
      "add '@objc' to expose this %0 to Objective-C",
      (DescriptiveDeclKind))
+WARNING(expr_selector_swift3_objc_inference,none,
+        "argument of '#selector' refers to %0 %1 in %2 that depends on "
+        "'@objc' attribute inference deprecated in Swift 4",
+        (DescriptiveDeclKind, DeclName, Identifier))
 
 // Selectors-as-string-literals.
 WARNING(selector_literal_invalid,none,
@@ -1067,6 +1075,8 @@ ERROR(optional_attribute_non_objc_protocol,none,
 ERROR(optional_attribute_missing_explicit_objc,none,
       "'optional' requirements are an Objective-C compatibility feature; add '@objc'",
       ())
+ERROR(objcmembers_attribute_nonclass,none,
+      "'@objcMembers' attribute can only be applied to a class", ())
 ERROR(optional_attribute_initializer,none,
       "'optional' cannot be applied to an initializer", ())
 ERROR(unavailable_method_non_objc_protocol,none,
@@ -1110,6 +1120,11 @@ WARNING(unsupported_synthesize_init_variadic,none,
         (Type))
 NOTE(variadic_superclass_init_here,none,
      "variadic superclass initializer defined here", ())
+
+WARNING(expr_dynamic_lookup_swift3_objc_inference,none,
+        "reference to %0 %1 of %2 depends on '@objc' attribute inference "
+        "deprecated in Swift 4",
+        (DescriptiveDeclKind, DeclName, Identifier))
 
 // Alignment attribute
 ERROR(alignment_not_power_of_two,none,
@@ -1784,6 +1799,10 @@ ERROR(decl_already_final,none,
 ERROR(open_decl_cannot_be_final,none,
       "%0 cannot be declared both 'final' and 'open'", (DescriptiveDeclKind))
 
+WARNING(override_swift3_objc_inference,none,
+        "override of %0 %1 from extension of %2 depends on deprecated "
+        "inference of '@objc'",
+        (DescriptiveDeclKind, DeclName, Identifier))
 
 // Inheritance
 ERROR(duplicate_inheritance,none,
@@ -2964,13 +2983,16 @@ ERROR(invalid_objc_decl_context,none,
       "@objc can only be used with members of classes, @objc protocols, and "
       "concrete extensions of classes", ())
 ERROR(invalid_objc_decl,none,
-      "only classes, protocols, methods, initializers, properties, and "
-      "subscript declarations can be declared @objc", ())
+      "only classes (and their extensions), protocols, methods, initializers, "
+      "properties, and subscript declarations can be declared @objc", ())
 ERROR(invalid_objc_swift_rooted_class,none,
       "only classes that inherit from NSObject can be declared @objc", ())
 ERROR(invalid_nonobjc_decl,none,
       "only methods, initializers, properties and subscript declarations can "
       "be declared @nonobjc", ())
+ERROR(invalid_nonobjc_extension,none,
+      "only extensions of classes can be declared @nonobjc", ())
+
 ERROR(objc_in_extension_context,none,
       "members of constrained extensions cannot be declared @objc", ())
 ERROR(objc_in_generic_extension,none,
@@ -2979,6 +3001,18 @@ ERROR(objc_operator, none,
       "operator methods cannot be declared @objc", ())
 ERROR(objc_operator_proto, none,
       "@objc protocols may not have operator requirements", ())
+WARNING(objc_inference_swift3_dynamic,none,
+        "inference of '@objc' for 'dynamic' members is deprecated", ())
+WARNING(objc_inference_swift3_objc_derived,none,
+        "inference of '@objc' for members of Objective-C-derived classes is "
+        "deprecated", ())
+
+NOTE(objc_inference_swift3_addobjc,none,
+     "add `@objc` to continue exposing an Objective-C entry point (Swift 3 "
+     "behavior)", ())
+NOTE(objc_inference_swift3_addnonobjc,none,
+     "add `@nonobjc` to suppress the Objective-C entry point (Swift 4 "
+     "behavior)", ())
 
 ERROR(objc_for_generic_class,none,
       "generic subclasses of '@objc' classes cannot have an explicit '@objc' "
@@ -2991,6 +3025,11 @@ ERROR(objc_setter_for_nonobjc_property,none,
       "'@objc' setter for non-'@objc' property", ())
 ERROR(objc_setter_for_nonobjc_subscript,none,
       "'@objc' setter for non-'@objc' subscript", ())
+WARNING(accessor_swift3_objc_inference,none,
+        "%select{%0 %1|%1}2 with '@objc' %select{getter|setter}3 depends on "
+        "deprecated inference of '@objc'",
+        (DescriptiveDeclKind, DeclName, bool, bool))
+
 ERROR(objc_enum_generic,none,
       "'@objc' enum cannot be generic", ())
 ERROR(objc_name_req_nullary,none,
@@ -3014,8 +3053,11 @@ ERROR(objc_enum_case_req_objc_enum,none,
 ERROR(objc_enum_case_multi,none,
       "'@objc' enum case declaration defines multiple enum cases with the same Objective-C name", ())
 
+ERROR(objc_extension_not_class,none,
+      "'@objc' can only be applied to an extension of a class", ())
+
 // If you change this, also change enum ObjCReason
-#define OBJC_ATTR_SELECT "select{marked @_cdecl|marked dynamic|marked @objc|marked @IBOutlet|marked @IBAction|marked @NSManaged|a member of an @objc protocol|implicitly @objc|an @objc override|an implementation of an @objc requirement}"
+#define OBJC_ATTR_SELECT "select{marked @_cdecl|marked dynamic|marked @objc|marked @IBOutlet|marked @IBAction|marked @NSManaged|a member of an @objc protocol|implicitly @objc|an @objc override|an implementation of an @objc requirement|marked @IBInspectable|marked @GKInspectable|in an @objc extension of a class (without @nonobjc)}"
 
 ERROR(objc_invalid_on_var,none,
       "property cannot be %" OBJC_ATTR_SELECT "0 "
@@ -3221,6 +3263,12 @@ ERROR(dynamic_not_in_class,none,
 ERROR(dynamic_with_final,none,
       "a declaration cannot be both 'final' and 'dynamic'",
       ())
+ERROR(dynamic_with_nonobjc,none,
+      "a declaration cannot be both '@nonobjc' and 'dynamic'",
+      ())
+ERROR(dynamic_requires_objc,none,
+      "'dynamic' %0 %1 must also be '@objc'",
+      (DescriptiveDeclKind, DeclName))
 
 //------------------------------------------------------------------------------
 // @available

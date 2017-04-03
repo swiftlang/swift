@@ -109,7 +109,7 @@ class MetadataPath {
         return OperationCost::Call;
 
       case Kind::Impossible:
-        llvm_unreachable("cannot compute cost of an imposible path");
+        llvm_unreachable("cannot compute cost of an impossible path");
       }
       llvm_unreachable("bad path component");
     }

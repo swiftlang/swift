@@ -209,7 +209,7 @@ ManagedValue SILGenBuilder::createStructExtract(SILLocation loc,
 
 ManagedValue SILGenBuilder::createCopyValue(SILLocation loc,
                                             ManagedValue originalValue) {
-  auto &lowering = getFunction().getTypeLowering(originalValue.getType());
+  auto &lowering = SGF.getTypeLowering(originalValue.getType());
   return createCopyValue(loc, originalValue, lowering);
 }
 
@@ -314,7 +314,7 @@ ManagedValue SILGenBuilder::createTupleExtract(SILLocation loc,
 
 ManagedValue SILGenBuilder::createLoadBorrow(SILLocation loc,
                                              ManagedValue base) {
-  if (getFunction().getTypeLowering(base.getType()).isTrivial()) {
+  if (SGF.getTypeLowering(base.getType()).isTrivial()) {
     auto *i = SILBuilder::createLoad(loc, base.getValue(),
                                      LoadOwnershipQualifier::Trivial);
     return ManagedValue::forUnmanaged(i);
@@ -326,7 +326,7 @@ ManagedValue SILGenBuilder::createLoadBorrow(SILLocation loc,
 
 ManagedValue SILGenBuilder::createFormalAccessLoadBorrow(SILLocation loc,
                                                          ManagedValue base) {
-  if (getFunction().getTypeLowering(base.getType()).isTrivial()) {
+  if (SGF.getTypeLowering(base.getType()).isTrivial()) {
     auto *i = SILBuilder::createLoad(loc, base.getValue(),
                                      LoadOwnershipQualifier::Trivial);
     return ManagedValue::forUnmanaged(i);
@@ -342,7 +342,7 @@ ManagedValue
 SILGenBuilder::createFormalAccessCopyValue(SILLocation loc,
                                            ManagedValue originalValue) {
   SILType ty = originalValue.getType();
-  const auto &lowering = getFunction().getTypeLowering(ty);
+  const auto &lowering = SGF.getTypeLowering(ty);
   if (lowering.isTrivial())
     return originalValue;
 
@@ -372,7 +372,7 @@ ManagedValue SILGenBuilder::bufferForExpr(
     SGFContext context, std::function<void (SILValue)> rvalueEmitter) {
   // If we have a single-buffer "emit into" initialization, use that for the
   // result.
-  SILValue address = context.getAddressForInPlaceInitialization();
+  SILValue address = context.getAddressForInPlaceInitialization(SGF, loc);
 
   // If we couldn't emit into the Initialization, emit into a temporary
   // allocation.
@@ -384,8 +384,7 @@ ManagedValue SILGenBuilder::bufferForExpr(
 
   // If we have a single-buffer "emit into" initialization, use that for the
   // result.
-  if (context.getAddressForInPlaceInitialization()) {
-    context.getEmitInto()->finishInitialization(SGF);
+  if (context.finishInPlaceInitialization(SGF)) {
     return ManagedValue::forInContext();
   }
 
@@ -402,7 +401,7 @@ ManagedValue SILGenBuilder::formalAccessBufferForExpr(
     SGFContext context, std::function<void(SILValue)> rvalueEmitter) {
   // If we have a single-buffer "emit into" initialization, use that for the
   // result.
-  SILValue address = context.getAddressForInPlaceInitialization();
+  SILValue address = context.getAddressForInPlaceInitialization(SGF, loc);
 
   // If we couldn't emit into the Initialization, emit into a temporary
   // allocation.
@@ -414,8 +413,7 @@ ManagedValue SILGenBuilder::formalAccessBufferForExpr(
 
   // If we have a single-buffer "emit into" initialization, use that for the
   // result.
-  if (context.getAddressForInPlaceInitialization()) {
-    context.getEmitInto()->finishInitialization(SGF);
+  if (context.finishInPlaceInitialization(SGF)) {
     return ManagedValue::forInContext();
   }
 
@@ -460,7 +458,7 @@ ManagedValue SILGenBuilder::createUncheckedTakeEnumDataAddr(
 }
 
 ManagedValue SILGenBuilder::createLoadTake(SILLocation loc, ManagedValue v) {
-  auto &lowering = getFunction().getTypeLowering(v.getType());
+  auto &lowering = SGF.getTypeLowering(v.getType());
   return createLoadTake(loc, v, lowering);
 }
 
@@ -476,7 +474,7 @@ ManagedValue SILGenBuilder::createLoadTake(SILLocation loc, ManagedValue v,
 }
 
 ManagedValue SILGenBuilder::createLoadCopy(SILLocation loc, ManagedValue v) {
-  auto &lowering = getFunction().getTypeLowering(v.getType());
+  auto &lowering = SGF.getTypeLowering(v.getType());
   return createLoadCopy(loc, v, lowering);
 }
 
@@ -575,7 +573,7 @@ ManagedValue SILGenBuilder::createUpcast(SILLocation loc, ManagedValue original,
 ManagedValue SILGenBuilder::createOptionalSome(SILLocation loc,
                                                ManagedValue arg) {
   CleanupCloner cloner(*this, arg);
-  auto &argTL = getFunction().getTypeLowering(arg.getType());
+  auto &argTL = SGF.getTypeLowering(arg.getType());
   SILType optionalType = arg.getType().wrapAnyOptionalType(getFunction());
   if (argTL.isLoadable() || !SGF.silConv.useLoweredAddresses()) {
     SILValue someValue =
@@ -588,7 +586,7 @@ ManagedValue SILGenBuilder::createOptionalSome(SILLocation loc,
   ArgumentSource argValue(loc, std::move(rvalue));
   SGF.emitInjectOptionalValueInto(
       loc, std::move(argValue), tempResult,
-      getFunction().getTypeLowering(tempResult->getType()));
+      SGF.getTypeLowering(tempResult->getType()));
   return ManagedValue::forUnmanaged(tempResult);
 }
 
@@ -601,7 +599,7 @@ ManagedValue SILGenBuilder::createManagedOptionalNone(SILLocation loc,
 
   SILValue tempResult = SGF.emitTemporaryAllocation(loc, type);
   SGF.emitInjectOptionalNothingInto(loc, tempResult,
-                                    SGF.F.getTypeLowering(type));
+                                    SGF.getTypeLowering(type));
   return ManagedValue::forUnmanaged(tempResult);
 }
 

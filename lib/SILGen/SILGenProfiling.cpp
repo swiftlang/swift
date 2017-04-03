@@ -641,7 +641,7 @@ public:
       assignCounter(E);
     } else if (auto *IE = dyn_cast<IfExpr>(E)) {
       CounterExpr &ThenCounter = assignCounter(IE->getThenExpr());
-      if (Parent.isNull())
+      if (RegionStack.empty())
         assignCounter(IE->getElseExpr());
       else
         assignCounter(IE->getElseExpr(),

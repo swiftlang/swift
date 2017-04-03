@@ -23,26 +23,26 @@ import Foundation
 // CHECK-LABEL: @interface TestEnumLike : NSObject
 class TestEnumLike : NSObject {
   // CHECK: - (void)takesNewtype:(EnumLikeStringWrapper _Nonnull)a;
-  func takesNewtype(_ a: EnumLikeStringWrapper) {}
+  @objc func takesNewtype(_ a: EnumLikeStringWrapper) {}
   // CHECK: - (void)takesNewtypeArray:(NSArray<EnumLikeStringWrapper> * _Nonnull)a;
-  func takesNewtypeArray(_ a: [EnumLikeStringWrapper]) {}
+  @objc func takesNewtypeArray(_ a: [EnumLikeStringWrapper]) {}
   // CHECK: - (void)takesNewtypeDictionary:(NSDictionary<EnumLikeStringWrapper, EnumLikeStringWrapper> * _Nonnull)a;
-  func takesNewtypeDictionary(_ a: [EnumLikeStringWrapper: EnumLikeStringWrapper]) {}
+  @objc func takesNewtypeDictionary(_ a: [EnumLikeStringWrapper: EnumLikeStringWrapper]) {}
   // CHECK: - (void)takesNewtypeOptional:(EnumLikeStringWrapper _Nullable)a;
-  func takesNewtypeOptional(_ a: EnumLikeStringWrapper?) {}
+  @objc func takesNewtypeOptional(_ a: EnumLikeStringWrapper?) {}
 }
 // CHECK: @end
 
 // CHECK-LABEL: @interface TestStructLike : NSObject
 class TestStructLike : NSObject {
   // CHECK: - (void)takesNewtype:(StructLikeStringWrapper _Nonnull)a;
-  func takesNewtype(_ a: StructLikeStringWrapper) {}
+  @objc func takesNewtype(_ a: StructLikeStringWrapper) {}
   // CHECK: - (void)takesNewtypeArray:(NSArray<StructLikeStringWrapper> * _Nonnull)a;
-  func takesNewtypeArray(_ a: [StructLikeStringWrapper]) {}
+  @objc func takesNewtypeArray(_ a: [StructLikeStringWrapper]) {}
   // CHECK: - (void)takesNewtypeDictionary:(NSDictionary<StructLikeStringWrapper, StructLikeStringWrapper> * _Nonnull)a;
-  func takesNewtypeDictionary(_ a: [StructLikeStringWrapper: StructLikeStringWrapper]) {}
+  @objc func takesNewtypeDictionary(_ a: [StructLikeStringWrapper: StructLikeStringWrapper]) {}
   // CHECK: - (void)takesNewtypeOptional:(StructLikeStringWrapper _Nullable)a;
-  func takesNewtypeOptional(_ a: StructLikeStringWrapper?) {}
+  @objc func takesNewtypeOptional(_ a: StructLikeStringWrapper?) {}
 }
 // CHECK: @end
 

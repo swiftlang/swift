@@ -303,11 +303,17 @@ public func _swift_Foundation_getErrorDefaultUserInfo<T: Error>(_ error: T)
 // or CFError is used as an Error existential.
 
 extension NSError : Error {
+  @nonobjc
   public var _domain: String { return domain }
+
+  @nonobjc
   public var _code: Int { return code }
+
+  @nonobjc
   public var _userInfo: AnyObject? { return userInfo as NSDictionary }
 
   /// The "embedded" NSError is itself.
+  @nonobjc
   public func _getEmbeddedNSError() -> AnyObject? {
     return self
   }

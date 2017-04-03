@@ -4,7 +4,8 @@ include("../../../../cmake/modules/StandaloneOverlay.cmake")
 add_swift_library(swiftObjectiveC ${SWIFT_SDK_OVERLAY_LIBRARY_BUILD_TYPES} IS_SDK_OVERLAY
   ObjectiveC.swift
 
-  SWIFT_COMPILE_FLAGS "${SWIFT_RUNTIME_SWIFT_COMPILE_FLAGS}"
+  SWIFT_COMPILE_FLAGS "${SWIFT_RUNTIME_SWIFT_COMPILE_FLAGS}" "-Xfrontend"
+                      "-disable-objc-attr-requires-foundation-module"
   LINK_FLAGS "${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}"
 
   SWIFT_MODULE_DEPENDS_OSX Darwin # auto-updated

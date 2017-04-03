@@ -74,6 +74,8 @@ static void addOwnershipModelEliminatorPipeline(SILPassPipelinePlan &P) {
 static void addMandatoryOptPipeline(SILPassPipelinePlan &P) {
   P.startPipeline("Guaranteed Passes");
   P.addCapturePromotion();
+  P.addOwnershipModelEliminator();
+
   P.addAllocBoxToStack();
   P.addNoReturnFolding();
   P.addDefiniteInitialization();
@@ -103,9 +105,6 @@ SILPassPipelinePlan::getDiagnosticPassPipeline(const SILOptions &Options) {
     addMandatoryDebugSerialization(P);
     return P;
   }
-
-  // Lower all ownership instructions right after SILGen for now.
-  addOwnershipModelEliminatorPipeline(P);
 
   // Otherwise run the rest of diagnostics.
   addMandatoryOptPipeline(P);
@@ -212,6 +211,14 @@ void addSSAPasses(SILPassPipelinePlan &P, OptimizationLevelKind OpLevel) {
   // Promote stack allocations to values.
   P.addMem2Reg();
 
+  // Cleanup, which is important if the inliner has restarted the pass pipeline.
+  P.addPerformanceConstantPropagation();
+  P.addSimplifyCFG();
+  P.addSILCombine();
+
+  // Mainly for Array.append(contentsOf) optimization.
+  P.addArrayElementPropagation();
+  
   // Run the devirtualizer, specializer, and inliner. If any of these
   // makes a change we'll end up restarting the function passes on the
   // current function (after optimizing any new callees).

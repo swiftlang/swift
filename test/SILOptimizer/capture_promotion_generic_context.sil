@@ -77,7 +77,7 @@ struct R<T> {
 }
 
 // Check that the capture promotion took place and the function now
-// take argument of a type  E<(R<T>) -> Builtin.Int32>, which used
+// take argument of a type E<(R<T>) -> Builtin.Int32>, which used
 // to be a slot inside a box.
 // CHECK-LABEL: sil @_T023generic_promotable_box2Tf2nni_n : $@convention(thin) <T> (@in R<T>, @in Builtin.Int32, @owned E<(R<T>) -> Builtin.Int32>) -> () 
 // CHECK:       bb0(%0 : $*R<T>, %1 : $*Builtin.Int32, %2 : $E<(R<T>) -> Builtin.Int32>):

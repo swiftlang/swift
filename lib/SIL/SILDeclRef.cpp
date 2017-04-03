@@ -415,19 +415,23 @@ bool SILDeclRef::isImplicit() const {
 }
 
 SILLinkage SILDeclRef::getLinkage(ForDefinition_t forDefinition) const {
-  // Anonymous functions have shared linkage.
-  // FIXME: This should really be the linkage of the parent function.
-  if (getAbstractClosureExpr())
-    return SILLinkage::Shared;
-  
+  if (getAbstractClosureExpr()) {
+    if (isSerialized())
+      return SILLinkage::Shared;
+    return SILLinkage::Private;
+  }
+
   // Native function-local declarations have shared linkage.
   // FIXME: @objc declarations should be too, but we currently have no way
   // of marking them "used" other than making them external. 
   ValueDecl *d = getDecl();
   DeclContext *moduleContext = d->getDeclContext();
   while (!moduleContext->isModuleScopeContext()) {
-    if (!isForeign && moduleContext->isLocalContext())
-      return SILLinkage::Shared;
+    if (!isForeign && moduleContext->isLocalContext()) {
+      if (isSerialized())
+        return SILLinkage::Shared;
+      return SILLinkage::Private;
+    }
     moduleContext = moduleContext->getParent();
   }
 
