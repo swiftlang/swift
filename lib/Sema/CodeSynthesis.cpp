@@ -848,6 +848,11 @@ synthesizeSetterForMutableAddressedStorage(AbstractStorageDecl *storage,
 /// Add a materializeForSet accessor to the given declaration.
 static FuncDecl *addMaterializeForSet(AbstractStorageDecl *storage,
                                       TypeChecker &TC) {
+  if (TC.Context.getOptionalDecl() == nullptr) {
+    TC.diagnose(storage->getStartLoc(), diag::optional_intrinsics_not_found);
+    return nullptr;
+  }
+
   auto materializeForSet = createMaterializeForSetPrototype(
       storage, storage->getSetter(), TC);
   addMemberToContextIfNeeded(materializeForSet, storage->getDeclContext(),
