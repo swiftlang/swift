@@ -7661,11 +7661,18 @@ ClangImporter::Implementation::loadAllMembers(Decl *D, uint64_t extra) {
 
     // If the base is also imported from Clang, load its members first.
     const NominalTypeDecl *base = ext->getExtendedType()->getAnyNominal();
-    if (base->getClangDecl()) {
+    if (auto *clangBase = base->getClangDecl()) {
       base->loadAllMembers();
-      // FIXME: Assert that we don't jump over to a category /while/
-      // loading the original class's members. Unfortunately there are some
-      // cases where this does happen today.
+
+      // Sanity check: make sure we don't jump over to a category /while/
+      // loading the original class's members. Right now we only check if this
+      // happens on the first member.
+      if (auto *clangContainer = dyn_cast<clang::ObjCContainerDecl>(clangBase)){
+        if (!clangContainer->decls_empty()) {
+          assert(!base->getMembers().empty() &&
+                 "can't load extension members before base has finished");
+        }
+      }
     }
   }
 
