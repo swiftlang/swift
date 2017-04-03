@@ -531,7 +531,8 @@ const BuiltinInfo &BuiltinInst::getBuiltinInfo() const {
 }
 
 static unsigned getWordsForBitWidth(unsigned bits) {
-  return (bits + llvm::integerPartWidth - 1)/llvm::integerPartWidth;
+  return ((bits + llvm::APInt::APINT_BITS_PER_WORD - 1)
+          / llvm::APInt::APINT_BITS_PER_WORD);
 }
 
 template<typename INST>
@@ -543,7 +544,7 @@ template<typename INST>
 static void *allocateLiteralInstWithBitSize(SILFunction &F, unsigned bits) {
   unsigned words = getWordsForBitWidth(bits);
   return F.getModule().allocateInst(
-      sizeof(INST) + sizeof(llvm::integerPart)*words, alignof(INST));
+      sizeof(INST) + sizeof(llvm::APInt::WordType)*words, alignof(INST));
 }
 
 IntegerLiteralInst::IntegerLiteralInst(SILDebugLocation Loc, SILType Ty,
@@ -551,7 +552,7 @@ IntegerLiteralInst::IntegerLiteralInst(SILDebugLocation Loc, SILType Ty,
     : LiteralInst(ValueKind::IntegerLiteralInst, Loc, Ty),
       numBits(Value.getBitWidth()) {
   std::uninitialized_copy_n(Value.getRawData(), Value.getNumWords(),
-                            getTrailingObjects<llvm::integerPart>());
+                            getTrailingObjects<llvm::APInt::WordType>());
 }
 
 IntegerLiteralInst *IntegerLiteralInst::create(SILDebugLocation Loc,
@@ -587,7 +588,7 @@ IntegerLiteralInst *IntegerLiteralInst::create(IntegerLiteralExpr *E,
 
 /// getValue - Return the APInt for the underlying integer literal.
 APInt IntegerLiteralInst::getValue() const {
-  return APInt(numBits, {getTrailingObjects<llvm::integerPart>(),
+  return APInt(numBits, {getTrailingObjects<llvm::APInt::WordType>(),
                          getWordsForBitWidth(numBits)});
 }
 
@@ -596,7 +597,7 @@ FloatLiteralInst::FloatLiteralInst(SILDebugLocation Loc, SILType Ty,
     : LiteralInst(ValueKind::FloatLiteralInst, Loc, Ty),
       numBits(Bits.getBitWidth()) {
         std::uninitialized_copy_n(Bits.getRawData(), Bits.getNumWords(),
-                                  getTrailingObjects<llvm::integerPart>());
+                                  getTrailingObjects<llvm::APInt::WordType>());
 }
 
 FloatLiteralInst *FloatLiteralInst::create(SILDebugLocation Loc, SILType Ty,
@@ -626,7 +627,7 @@ FloatLiteralInst *FloatLiteralInst::create(FloatLiteralExpr *E,
 }
 
 APInt FloatLiteralInst::getBits() const {
-  return APInt(numBits, {getTrailingObjects<llvm::integerPart>(),
+  return APInt(numBits, {getTrailingObjects<llvm::APInt::WordType>(),
                          getWordsForBitWidth(numBits)});
 }
 

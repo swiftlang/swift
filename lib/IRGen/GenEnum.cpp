@@ -5993,10 +5993,10 @@ irgen::interleaveSpareBits(IRGenModule &IGM, const SpareBitVector &spareBits,
                            unsigned bits,
                            unsigned spareValue, unsigned occupiedValue) {
   // FIXME: endianness.
-  SmallVector<llvm::integerPart, 2> valueParts;
+  SmallVector<llvm::APInt::WordType, 2> valueParts;
   valueParts.push_back(0);
 
-  llvm::integerPart valueBit = 1;
+  llvm::APInt::WordType valueBit = 1;
   auto advanceValueBit = [&]{
     valueBit <<= 1;
     if (valueBit == 0) {
