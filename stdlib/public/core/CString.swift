@@ -58,8 +58,8 @@ extension String {
   /// This is identical to init(cString: UnsafePointer<CChar> but operates on an
   /// unsigned sequence of bytes.
   public init(cString: UnsafePointer<UInt8>) {
-    self = String.decodeCString(cString, as: UTF8.self,
-      repairingInvalidCodeUnits: true)!.result
+    self.init(
+      cString: UnsafeRawPointer(cString).assumingMemoryBound(to: CChar.self))
   }
 
   /// Creates a new string by copying and validating the null-terminated UTF-8
