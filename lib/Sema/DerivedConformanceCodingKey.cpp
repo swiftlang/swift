@@ -426,10 +426,8 @@ ValueDecl *DerivedConformance::deriveCodingKey(TypeChecker &tc,
   auto rawType = enumDecl->getRawType();
   auto name = requirement->getName();
   if (name == C.Id_stringValue) {
-    // Synthesize `var stringValue: String? { get }`
+    // Synthesize `var stringValue: String { get }`
     auto stringType = C.getStringDecl()->getDeclaredType();
-    auto optionalStringType = OptionalType::get(OTK_Optional, stringType);
-
     auto synth = [rawType, stringType](AbstractFunctionDecl *getterDecl) {
       if (rawType && rawType->isEqual(stringType)) {
         // enum SomeStringEnum : String {
@@ -456,7 +454,7 @@ ValueDecl *DerivedConformance::deriveCodingKey(TypeChecker &tc,
       }
     };
 
-    return deriveProperty(tc, parentDecl, enumDecl, optionalStringType,
+    return deriveProperty(tc, parentDecl, enumDecl, stringType,
                           C.Id_stringValue, synth);
 
   } else if (name == C.Id_intValue) {
