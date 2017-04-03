@@ -89,6 +89,29 @@ public class Positron : Lepton {
   public dynamic var spin: Float = 0.5
 }
 
-// CHECK-LABEL: sil [transparent] [fragile] [thunk] @_TTWC14objc_witnesses8PositronS_6LeptonS_FS1_g4spinSf
-// CHECK-LABEL: sil shared [transparent] [fragile] [thunk] @_TTDFC14objc_witnesses8Positrong4spinSf
+// CHECK-LABEL: sil [transparent] [fragile] [thunk] @_TToFC14objc_witnesses8Positrong4spinSf
+// CHECK-LABEL: sil [transparent] [fragile] [thunk] @_TToFC14objc_witnesses8Positrons4spinSf
 
+// Override of property defined in @objc extension
+
+class Derived : NSObject {
+  override var valence: Int {
+    get { return 2 } set { }
+  }
+}
+
+extension NSObject : Atom {
+  var valence: Int { get { return 1 } set { } }
+}
+
+// CHECK-LABEL: sil hidden @_TFE14objc_witnessesCSo8NSObjectm7valenceSi : $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @guaranteed NSObject) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>) {
+// CHECK: class_method [volatile] %2 : $NSObject, #NSObject.valence!getter.1.foreign
+// CHECK: }
+
+// CHECK-LABEL: sil hidden @_TFFE14objc_witnessesCSo8NSObjectm7valenceSiU_T_ : $@convention(thin) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout NSObject, @thick NSObject.Type) -> () {
+// CHECK: class_method [volatile] %4 : $NSObject, #NSObject.valence!setter.1.foreign
+// CHECK: }
+
+protocol Atom : class {
+  var valence: Int { get set }
+}

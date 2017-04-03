@@ -207,5 +207,36 @@ ClassProperties.test("namingConflict/protocol") {
   expectNil(type.protoProp)
 }
 
+var global1: Int = 0
+
+var global2: Int = 0
+
+class Steak : NSObject {
+  @objc override var thickness: Int {
+    get { return global1 } set { global1 = newValue }
+  }
+}
+
+extension NSObject : HasThickness {
+  @objc var thickness: Int { get { return global2 } set { global2 = newValue } }
+}
+
+protocol HasThickness : class {
+  var thickness: Int { get set }
+}
+
+ClassProperties.test("dynamicOverride") {
+  // Calls NSObject.thickness
+  NSObject().thickness += 1
+
+  // Calls Steak.thickness
+  (Steak() as NSObject).thickness += 1
+  Steak().thickness += 1
+  (Steak() as HasThickness).thickness += 1
+
+  expectEqual(3, global1)
+  expectEqual(1, global2)
+}
+
 runAllTests()
 
