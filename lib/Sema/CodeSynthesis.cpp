@@ -893,6 +893,8 @@ static void convertNSManagedStoredVarToComputed(VarDecl *VD, TypeChecker &TC) {
   // the members list.
   addMemberToContextIfNeeded(Get, VD->getDeclContext(), VD);
   addMemberToContextIfNeeded(Set, VD->getDeclContext(), Get);
+
+  maybeAddMaterializeForSet(VD, TC);
 }
 
 /// The specified AbstractStorageDecl was just found to satisfy a
@@ -1653,23 +1655,20 @@ void swift::maybeAddMaterializeForSet(AbstractStorageDecl *storage,
   if (!storage->getSetter()) return;
 
   // We only need materializeForSet in type contexts.
-  NominalTypeDecl *container = storage->getDeclContext()
-      ->getAsNominalTypeOrNominalTypeExtensionContext();
-  if (!container) return;
+  auto *dc = storage->getDeclContext();
+  if (!dc->isTypeContext())
+    return;
 
   // Requirements of ObjC protocols don't need this.
-  if (auto protocol = dyn_cast<ProtocolDecl>(container)) {
-    if (protocol->isObjC()) return;
+  if (auto protoDecl = dyn_cast<ProtocolDecl>(dc))
+    if (protoDecl->isObjC())
+      return;
 
-  // Types imported by Clang don't need this, because we can
+  // Members of structs imported by Clang don't need this, because we can
   // synthesize it later.
-  } else {
-    assert(isa<NominalTypeDecl>(container));
-    if (container->hasClangNode()) return;
-  }
-
-  // @NSManaged properties don't need this.
-  if (storage->getAttrs().hasAttribute<NSManagedAttr>()) return;
+  if (auto structDecl = dyn_cast<StructDecl>(dc))
+    if (structDecl->hasClangNode())
+      return;
 
   addMaterializeForSet(storage, TC);
 }
