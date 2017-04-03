@@ -883,6 +883,8 @@ static bool useDoesNotKeepClosureAlive(const SILInstruction *I) {
   switch (I->getKind()) {
   case ValueKind::StrongRetainInst:
   case ValueKind::StrongReleaseInst:
+  case ValueKind::CopyValueInst:
+  case ValueKind::DestroyValueInst:
   case ValueKind::RetainValueInst:
   case ValueKind::ReleaseValueInst:
   case ValueKind::DebugValueInst:
@@ -912,6 +914,12 @@ void swift::releasePartialApplyCapturedArg(SILBuilder &Builder, SILLocation Loc,
 
   // Otherwise, we need to destroy the argument.
   if (Arg->getType().isObject()) {
+    // If we have qualified ownership, we should just emit a destroy value.
+    if (Arg->getFunction()->hasQualifiedOwnership()) {
+      Callbacks.CreatedNewInst(Builder.createDestroyValue(Loc, Arg));
+      return;
+    }
+
     if (Arg->getType().hasReferenceSemantics()) {
       auto U = Builder.emitStrongRelease(Loc, Arg);
       if (U.isNull())
