@@ -2288,7 +2288,7 @@ static void checkAccessibility(TypeChecker &TC, const Decl *D) {
 /// Whether this declaration is a member of a class extension marked @objc.
 static bool isMemberOfObjCClassExtension(const ValueDecl *VD) {
   auto ext = dyn_cast<ExtensionDecl>(VD->getDeclContext());
-  if (!ext) return nullptr;
+  if (!ext) return false;
 
   return ext->getAsClassOrClassExtensionContext() &&
     ext->getAttrs().hasAttribute<ObjCAttr>();
@@ -2350,7 +2350,10 @@ static Optional<ObjCReason> shouldMarkAsObjC(TypeChecker &TC,
     return ObjCReason::MemberOfObjCProtocol;
   // A @nonobjc is not @objc, even if it is an override of an @objc, so check
   // for @nonobjc first.
-  if (VD->getAttrs().hasAttribute<NonObjCAttr>())
+  if (VD->getAttrs().hasAttribute<NonObjCAttr>() ||
+      (isa<ExtensionDecl>(VD->getDeclContext()) &&
+       cast<ExtensionDecl>(VD->getDeclContext())->getAttrs()
+        .hasAttribute<NonObjCAttr>()))
     return None;
   if (isMemberOfObjCClassExtension(VD))
     return ObjCReason::MemberOfObjCExtension;
@@ -8515,7 +8518,8 @@ static void validateAttributes(TypeChecker &TC, Decl *D) {
   }
 
   if (auto nonObjcAttr = Attrs.getAttribute<NonObjCAttr>()) {
-    // Only methods, properties, subscripts and constructors can be NonObjC.
+    // Only extensions of classes; methods, properties, subscripts
+    // and constructors can be NonObjC.
     // The last three are handled automatically by generic attribute
     // validation -- for the first one, we have to check FuncDecls
     // ourselves.
@@ -8527,6 +8531,11 @@ static void validateAttributes(TypeChecker &TC, Decl *D) {
          !checkObjCDeclContext(func) ||
          (func->isAccessor() && !func->isGetterOrSetter()))) {
       error = diag::invalid_nonobjc_decl;
+    }
+
+    if (auto ext = dyn_cast<ExtensionDecl>(D)) {
+      if (!ext->getAsClassOrClassExtensionContext())
+        error = diag::invalid_nonobjc_extension;
     }
 
     if (error) {

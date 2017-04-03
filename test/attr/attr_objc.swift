@@ -30,7 +30,7 @@ protocol Protocol_Class2 : class {}
 
 //===--- Subjects of @objc attribute.
 
-@objc extension PlainStruct { } // expected-error{{'@objc' cannot be applied to an extension of a class}}{{1-7=}}
+@objc extension PlainStruct { } // expected-error{{'@objc' can only be applied to an extension of a class}}{{1-7=}}
 
 @objc  
 var subject_globalVar: Int // expected-error {{@objc can only be used with members of classes, @objc protocols, and concrete extensions of classes}}
@@ -2160,16 +2160,15 @@ class ConformsToProtocolThrowsObjCName2 : ProtocolThrowsObjCName {
 }
 
 @objc extension PlainClass {
-  // CHECK-LABEL: @objc func objc_ext_objc_okay(_: Int) { }
-  func objc_ext_objc_okay(_: Int) { }
+  // CHECK-LABEL: @objc final func objc_ext_objc_okay(_: Int) {
+  final func objc_ext_objc_okay(_: Int) { }
 
-  // CHECK-LABEL: {{^}} func objc_ext_objc_not_okay(_: PlainStruct) { }
-  func objc_ext_objc_not_okay(_: PlainStruct) { }
-  // expected-error@-1 {{method cannot be in an @objc extension of a class because the type of the parameter cannot be represented in Objective-C}}
+  final func objc_ext_objc_not_okay(_: PlainStruct) { }
+  // expected-error@-1{{method cannot be in an @objc extension of a class (without @nonobjc) because the type of the parameter cannot be represented in Objective-C}}
   // expected-note@-2 {{Swift structs cannot be represented in Objective-C}}
 
-  // CHECK-LABEL: {{^}} @nonobjc func objc_ext_objc_explicit_nonobjc(_: PlainStruct) { }
-  @nonobjc func objc_ext_objc_explicit_nonobjc(_: PlainStruct) { }
+  // CHECK-LABEL: {{^}} @nonobjc final func objc_ext_objc_explicit_nonobjc(_: PlainStruct) {
+  @nonobjc final func objc_ext_objc_explicit_nonobjc(_: PlainStruct) { }
 }
 
 @objc class ObjC_Class1 : Hashable { 
