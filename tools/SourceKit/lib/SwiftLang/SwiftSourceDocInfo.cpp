@@ -900,6 +900,7 @@ static bool passNameInfoForDecl(const ValueDecl *VD, NameTranslatingInfo &Info,
     if (!Name.empty()) {
       Result.NameKind = SwiftLangSupport::getUIDForNameKind(NameKind::ObjC);
       Result.BaseName = Name.str();
+      Receiver(Result);
     } else if (ObjCSelector Selector = ResultPair.second) {
       Result.NameKind = SwiftLangSupport::getUIDForNameKind(NameKind::ObjC);
       SmallString<64> Buffer;
@@ -913,11 +914,11 @@ static bool passNameInfoForDecl(const ValueDecl *VD, NameTranslatingInfo &Info,
           [](StringRef P) { return StringRef(P.data(), P.size() + 1); });
       }
       Result.ArgNames.insert(Result.ArgNames.begin(), Pieces.begin(), Pieces.end());
+      Receiver(Result);
     } else {
       Receiver(Result);
       return true;
     }
-    Receiver(Result);
     return false;
   }
   case NameKind::ObjC: {
