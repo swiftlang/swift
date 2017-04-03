@@ -61,12 +61,7 @@ func needsNestedConforms<X: NestedConforms>(_: X.Type) {
 struct ConcreteNestedConforms: NestedConforms {
     typealias U = ConcreteParent
 }
-// FIXME: this should hit "type 'BadConcreteNestedConforms.U.T' (aka 'Float')
-// does not conform to protocol 'Foo2'", but the SubstitutionMap used in
-// ensureRequirementsAreSatified can't find the conformance of Self.U: Parent
-// because it only looks for the conformances implied directly by a protocol's
-// associated types. SubstitutionMap should use the requirement
-// signature/conformance access path.
 struct BadConcreteNestedConforms: NestedConforms {
-    typealias U = ConcreteParentNonFoo2
+  // expected-error@-1 {{type 'ConcreteParentNonFoo2.T' (aka 'Float') does not conform to protocol 'Foo2'}}
+  typealias U = ConcreteParentNonFoo2
 }
