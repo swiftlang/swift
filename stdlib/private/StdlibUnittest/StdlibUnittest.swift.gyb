@@ -803,7 +803,7 @@ struct _ParentProcess {
       var line = line
       if let index = findSubstring(line, _stdlibUnittestStreamPrefix) {
         let controlMessage =
-            line[index..<line.endIndex]._split(separator: ";")
+            String(line[index..<line.endIndex])._split(separator: ";")
         switch controlMessage[1] {
         case "expectCrash":
           if isStdout {
@@ -822,7 +822,7 @@ struct _ParentProcess {
         default:
           fatalError("unexpected message")
         }
-        line = line[line.startIndex..<index]
+        line = String(line[line.startIndex..<index])
         if line.isEmpty {
           return (done: stdoutEnd && stderrEnd, ())
         }

@@ -286,21 +286,6 @@ import SwiftShims
 ///
 /// - SeeAlso: `String.CharacterView`, `String.UnicodeScalarView`,
 ///   `String.UTF16View`, `String.UTF8View`
-@_fixed_layout
-public struct String {
-  /// Creates an empty string.
-  public init() {
-    _core = _StringCore()
-  }
-
-  public // @testable
-  init(_ _core: _StringCore) {
-    self._core = _core
-  }
-
-  public // @testable
-  var _core: _StringCore
-}
 
 extension String {
   public // @testable
@@ -353,17 +338,6 @@ extension String : _ExpressibleByBuiltinUnicodeScalarLiteral {
   }
 }
 
-extension String : ExpressibleByUnicodeScalarLiteral {
-  /// Creates an instance initialized to the given Unicode scalar value.
-  ///
-  /// Do not call this initializer directly. It may be used by the compiler when
-  /// you initialize a string using a string literal that contains a single
-  /// Unicode scalar value.
-  public init(unicodeScalarLiteral value: String) {
-    self = value
-  }
-}
-
 extension String : _ExpressibleByBuiltinExtendedGraphemeClusterLiteral {
   @_inlineable
   @effects(readonly)
@@ -377,18 +351,6 @@ extension String : _ExpressibleByBuiltinExtendedGraphemeClusterLiteral {
       input: UnsafeBufferPointer(
         start: UnsafeMutablePointer<UTF8.CodeUnit>(start),
         count: Int(utf8CodeUnitCount)))
-  }
-}
-
-extension String : ExpressibleByExtendedGraphemeClusterLiteral {
-  /// Creates an instance initialized to the given extended grapheme cluster
-  /// literal.
-  ///
-  /// Do not call this initializer directly. It may be used by the compiler when
-  /// you initialize a string using a string literal containing a single
-  /// extended grapheme cluster.
-  public init(extendedGraphemeClusterLiteral value: String) {
-    self = value
   }
 }
 
@@ -434,33 +396,6 @@ extension String : _ExpressibleByBuiltinStringLiteral {
           start: UnsafeMutablePointer<UTF8.CodeUnit>(start),
           count: Int(utf8CodeUnitCount)))
     }
-  }
-}
-
-extension String : ExpressibleByStringLiteral {
-  /// Creates an instance initialized to the given string value.
-  ///
-  /// Do not call this initializer directly. It is used by the compiler when you
-  /// initialize a string using a string literal. For example:
-  ///
-  ///     let nextStop = "Clark & Lake"
-  ///
-  /// This assignment to the `nextStop` constant calls this string literal
-  /// initializer behind the scenes.
-  public init(stringLiteral value: String) {
-     self = value
-  }
-}
-
-extension String : CustomDebugStringConvertible {
-  /// A representation of the string that is suitable for debugging.
-  public var debugDescription: String {
-    var result = "\""
-    for us in self.unicodeScalars {
-      result += us.escaped(asASCII: false)
-    }
-    result += "\""
-    return result
   }
 }
 
@@ -527,7 +462,7 @@ extension String {
 
   public // SPI(Foundation)
   init(_storage: _StringBuffer) {
-    _core = _StringCore(_storage)
+    self.init(_StringCore(_storage))
   }
 }
 
@@ -601,13 +536,13 @@ extension Sequence where Iterator.Element == String {
       for chunk in self {
         // FIXME(performance): this code assumes UTF-16 in-memory representation.
         // It should be switched to low-level APIs.
-        r += separatorSize + chunk.utf16.count
+        r += numericCast(separatorSize + chunk.utf16.count)
       }
-      return r - separatorSize
+      return r - numericCast(separatorSize)
     }
 
     if let n = reservation {
-      result.reserveCapacity(n)
+      result.reserveCapacity(numericCast(n))
     }
 
     if separatorSize == 0 {
@@ -814,11 +749,11 @@ extension String {
   }
 }
 
-extension String : CustomStringConvertible {
-  public var description: String {
-    return self
-  }
-}
+// extension String : CustomStringConvertible {
+//   public var description: String {
+//     return self
+//   }
+// }
 
 extension String : LosslessStringConvertible {
   public init?(_ description: String) {
@@ -827,67 +762,73 @@ extension String : LosslessStringConvertible {
 }
 
 extension String {
-  @available(*, unavailable, renamed: "append(_:)")
-  public mutating func appendContentsOf(_ other: String) {
-    Builtin.unreachable()
-  }
+  // Michael NOTE: temporarily disabled, as these can affect overload resolution
+  // when we're just missing a key API.
 
-  @available(*, unavailable, renamed: "append(contentsOf:)")
-  public mutating func appendContentsOf<S : Sequence>(_ newElements: S)
-    where S.Iterator.Element == Character {
-    Builtin.unreachable()
-  }
+  // @available(*, unavailable, renamed: "append(_:)")
+  // public mutating func appendContentsOf(_ other: String) {
+  //   Builtin.unreachable()
+  // }
 
-  @available(*, unavailable, renamed: "insert(contentsOf:at:)")
-  public mutating func insertContentsOf<S : Collection>(
-    _ newElements: S, at i: Index
-  ) where S.Iterator.Element == Character {
-    Builtin.unreachable()
-  }
+  // @available(*, unavailable, renamed: "append(contentsOf:)")
+  // public mutating func appendContentsOf<S : Sequence>(_ newElements: S)
+  //   where S.Iterator.Element == Character {
+  //   Builtin.unreachable()
+  // }
 
-  @available(*, unavailable, renamed: "replaceSubrange")
-  public mutating func replaceRange<C : Collection>(
-    _ subRange: Range<Index>, with newElements: C
-  ) where C.Iterator.Element == Character {
-    Builtin.unreachable()
-  }
+  // @available(*, unavailable, renamed: "insert(contentsOf:at:)")
+  // public mutating func insertContentsOf<S : Collection>(
+  //   _ newElements: S, at i: Index
+  // ) where S.Iterator.Element == Character {
+  //   Builtin.unreachable()
+  // }
+
+  // @available(*, unavailable, renamed: "replaceSubrange")
+  // public mutating func replaceRange<C : Collection>(
+  //   _ subRange: Range<Index>, with newElements: C
+  // ) where C.Iterator.Element == Character {
+  //   Builtin.unreachable()
+  // }
     
-  @available(*, unavailable, renamed: "replaceSubrange")
-  public mutating func replaceRange(
-    _ subRange: Range<Index>, with newElements: String
-  ) {
-    Builtin.unreachable()
-  }
+  // @available(*, unavailable, renamed: "replaceSubrange")
+  // public mutating func replaceRange(
+  //   _ subRange: Range<Index>, with newElements: String
+  // ) {
+  //   Builtin.unreachable()
+  // }
   
-  @available(*, unavailable, renamed: "remove(at:)")
-  public mutating func removeAtIndex(_ i: Index) -> Character {
-    Builtin.unreachable()
-  }
+  // @available(*, unavailable, renamed: "remove(at:)")
+  // public mutating func removeAtIndex(_ i: Index) -> Character {
+  //   Builtin.unreachable()
+  // }
 
-  @available(*, unavailable, renamed: "removeSubrange")
-  public mutating func removeRange(_ subRange: Range<Index>) {
-    Builtin.unreachable()
-  }
+  // @available(*, unavailable, renamed: "removeSubrange")
+  // public mutating func removeRange(_ subRange: Range<Index>) {
+  //   Builtin.unreachable()
+  // }
 
-  @available(*, unavailable, renamed: "lowercased()")
-  public var lowercaseString: String {
-    Builtin.unreachable()
-  }
+  // @available(*, unavailable, renamed: "lowercased()")
+  // public var lowercaseString: String {
+  //   Builtin.unreachable()
+  // }
 
-  @available(*, unavailable, renamed: "uppercased()")
-  public var uppercaseString: String {
-    Builtin.unreachable()
-  }
+  // @available(*, unavailable, renamed: "uppercased()")
+  // public var uppercaseString: String {
+  //   Builtin.unreachable()
+  // }
 
-  @available(*, unavailable, renamed: "init(describing:)")
-  public init<T>(_: T) {
-    Builtin.unreachable()
-  }
+  // @available(*, unavailable, renamed: "init(describing:)")
+  // public init<T>(_: T) {
+  //   Builtin.unreachable()
+  // }
 }
 
 extension Sequence where Iterator.Element == String {
-  @available(*, unavailable, renamed: "joined(separator:)")
-  public func joinWithSeparator(_ separator: String) -> String {
-    Builtin.unreachable()
-  }
+  // Michael NOTE: temporarily disabled, as these can affect overload resolution
+  // when we're just missing a key API.
+
+  // @available(*, unavailable, renamed: "joined(separator:)")
+  // public func joinWithSeparator(_ separator: String) -> String {
+  //   Builtin.unreachable()
+  // }
 }

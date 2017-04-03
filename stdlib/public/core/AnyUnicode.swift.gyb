@@ -392,22 +392,22 @@ public struct AnyUnicodeIndex : Comparable {
 //===--- AnyUnicodeView ---------------------------------------------------===//
 /// Type-eraser for bidirectional collections with index<->code unit offsets
 public protocol AnyUnicodeView_ {
-  typealias IndexDistance = Int64
+  typealias IndexDistance = Int//64
   var startIndex: AnyUnicodeIndex_ { get }
   var endIndex: AnyUnicodeIndex_ { get }
   func formIndex(after: inout AnyUnicodeIndex_)
   func index(after: AnyUnicodeIndex_) -> AnyUnicodeIndex_
   func formIndex(before: inout AnyUnicodeIndex_)
   func index(before: AnyUnicodeIndex_) -> AnyUnicodeIndex_
-  func formIndex(_ i: inout AnyUnicodeIndex_, offsetBy: Int64)
-  func index(_ i: AnyUnicodeIndex_, offsetBy: Int64) -> AnyUnicodeIndex_
+  func formIndex(_ i: inout AnyUnicodeIndex_, offsetBy: IndexDistance)
+  func index(_ i: AnyUnicodeIndex_, offsetBy: IndexDistance) -> AnyUnicodeIndex_
   func index(
     _ i: AnyUnicodeIndex_,
-    offsetBy n: Int64,
+    offsetBy n: IndexDistance,
     limitedBy limit: AnyUnicodeIndex_
   ) -> AnyUnicodeIndex_?
-  func distance(from i: AnyUnicodeIndex_, to j: AnyUnicodeIndex_) -> Int64
-  var count: Int64 { get }
+  func distance(from i: AnyUnicodeIndex_, to j: AnyUnicodeIndex_) -> IndexDistance
+  var count: IndexDistance { get }
   var underestimatedCount: Int { get }
 }
 
@@ -503,7 +503,7 @@ public struct Any${Element}UnicodeView
     Any${Element}UnicodeView
   >
   public typealias Index = AnyUnicodeIndex
-  public typealias IndexDistance = Int64
+  public typealias IndexDistance = Int//64
   public typealias Iterator = Any${Element}Iterator
   public func makeIterator() -> Any${Element}Iterator {
     return Any${Element}Iterator(base2.makeIterator())
@@ -532,7 +532,7 @@ extension Any${Element}UnicodeView {
   public struct Adapter<Base_: UnicodeView>
   : Any${Element}UnicodeView_, BidirectionalCollectionWrapper  
   where Base_.Iterator.Element == ${Element} {
-    public typealias IndexDistance = Int64
+    public typealias IndexDistance = Int//64
     public typealias Index = AnyUnicodeIndex_
     public typealias Base = Base_
     public var base: Base
@@ -616,6 +616,19 @@ extension Unicode
 where Self : BidirectionalCollectionWrapper & RangeReplaceableCollection,
 Iterator.Element == Content.CharacterView.Iterator.Element
 {
+  public var base: Content.CharacterView {
+    get {
+      return content.characters
+    }
+    set {
+      replaceSubrange(startIndex..<endIndex, with: newValue)
+    }
+  }
+  public var anyContent: AnyUnicodeContent { return content }
+}
+
+extension Unicode where Self : RangeReplaceableCollection,
+Iterator.Element == Content.CharacterView.Iterator.Element {
   public var base: Content.CharacterView {
     get {
       return content.characters

@@ -13,36 +13,36 @@
 //===----------------------------------------------------------------------===//
 
 /// A RangeReplaceableCollection that can report its maximum capacity
-internal protocol _BoundedCollection : RangeReplaceableCollection {
+public protocol _BoundedCollection : RangeReplaceableCollection {
   var maxCapacity : IndexDistance { get }
 }
 
-internal protocol _DefaultConstructible {
+public protocol _DefaultConstructible {
   init()
 }
 
 extension _FixedSizeCollection where Iterator.Element : _DefaultConstructible
 {
-  init() {
+  public init() {
     self.init(repeating: Iterator.Element())
   }
 }
 
 /// Wraps a fixed-length `Base` collection, making it variable-length up to the
 /// length of the base.
-internal struct _BoundedCapacity<
+public struct _BoundedCapacity<
   Base: MutableCollection & RandomAccessCollection & _FixedSizeCollection
 > : RandomAccessCollection,
     _BoundedCollection,
     MutableCollection
 where Base.Iterator.Element : _DefaultConstructible
 {
-  typealias Element = Base.Iterator.Element
-  typealias IndexDistance = Base.IndexDistance
+  public typealias Element = Base.Iterator.Element
+  public typealias IndexDistance = Base.IndexDistance
   
   public // accessed from @inline(__always)
   var _base: Base
-  var count: IndexDistance
+  public var count: IndexDistance
 
   public typealias Index = Base.Index
   
@@ -117,7 +117,7 @@ where Base.Iterator.Element : _DefaultConstructible
 
   }
 
-  var maxCapacity : IndexDistance {
+  public var maxCapacity : IndexDistance {
     @inline(__always)
     get {
       return _base.count

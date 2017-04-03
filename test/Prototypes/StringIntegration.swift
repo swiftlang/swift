@@ -1,3 +1,11 @@
+// RUN: rm -rf %t && mkdir -p %t && %gyb -DWORD_BITS=%target-ptrsize %s -o %t/out.swift
+// RUN: %line-directive %t/out.swift -- %target-build-swift %t/out.swift -o %t/a.out -Onone -g
+// RUN: %line-directive %t/out.swift -- %target-run %t/a.out
+// REQUIRES: executable_test
+
+
+/// Copy in StringNormalization.swift so we can prototype:
+
 //===--- StringNormalization.swift ----------------------------------------===//
 //
 // This source file is part of the Swift.org open source project
@@ -11,6 +19,21 @@
 //===----------------------------------------------------------------------===//
 
 import SwiftShims
+import Swift
+
+
+var _printDebugging = false
+func _debug(_ s: Swift.String) {
+  guard _printDebugging else { return }
+  print(s)
+}
+func _withDebugging(_ f: ()->()) {
+  let prior = _printDebugging
+  _printDebugging = true
+  f()
+  _printDebugging = prior
+}
+
 
 //
 // A "normalization segment" is a sequence that starts with a unicode scalar
@@ -22,67 +45,16 @@ import SwiftShims
 // represented by UnicodeView's "EncodedOffset" Int64.
 //
 
-extension UInt16 : _DefaultConstructible {}
-
-// TODO: Figure out a more sensible size
-public typealias UTF16CodeUnitBuffer =
-  UnboundCapacity<_BoundedCapacity<_Array8<UInt16>>>
-
-// A normalization segment that is FCC-normalized. This is a collection of
-// normalized UTF16 code units.
-//
-// Note that this is not a UnicodeView. Indices into a normalized segment are
-// not native indices, and do not necessarily correspond to any particular code
-// unit as they may of undergone composition or decomposition, which in turn may
-// also re-order code units. Thus, FCCNormalizedSegments are not suitable for
-// queries needing sub-segment granularity. However, FCCNormalizedSegments are
-// suitable for segment-level-or-coarser granularity queries, which include any
-// grapheme-level queries as segments are sub- grapheme.
-//
-// TODO: verify above statement about segments being sub-grapheme, that is make
-// sure it is not possible to have segments span graphemes.
-//
-// TODO: Explore coalescing small segments together
-public struct FCCNormalizedSegment : BidirectionalCollection {
-  let buffer: UTF16CodeUnitBuffer
-
-  public init(_ buffer: UTF16CodeUnitBuffer) {
-    self.buffer = buffer
-  }
-  public init() {
-    self.buffer = UTF16CodeUnitBuffer()
-  }
-
-  public typealias Index = Int // UTF16CodeUnitBuffer.Index
-
-  public var startIndex : Index {
-    return buffer.startIndex
-  }
-  public var endIndex : Index {
-    return buffer.endIndex
-  }
-  public subscript(i: Index) -> UInt16 {
-    return buffer[i]
-  }
-  public func index(after i: Index) -> Index {
-    return buffer.index(after: i)
-  }
-  public func index(before i: Index) -> Index {
-    return buffer.index(before: i)
-  }
-  public typealias SubSequence = BidirectionalSlice<FCCNormalizedSegment>
-}
-
 // Ask ICU if the given unicode scalar value has a normalization boundary before
 // it, that is it begins a new normalization segment.
-public func _hasBoundary(before value: UInt32) -> Bool {
+internal func _hasBoundary(before value: UInt32) -> Bool {
   return __swift_stdlib_unorm2_hasBoundaryBefore(_fccNormalizer, value) != 0
 }
 
 // TODO: explore using hasBoundary(after:), and whether that will identify
 // finer-grained segments.
 
-public struct FCCNormalizedLazySegments<
+public struct FCCNormalizedLazySegments2<
   CodeUnits : RandomAccessCollection,
   FromEncoding : UnicodeEncoding
 >
@@ -187,17 +159,21 @@ where
   ) -> FCCNormalizedSegment {
     precondition(start != end, "TODO: should we just have empty segment?")
 
+    _debug("Forming segment around \(start)..<\(end)")
+
     let utf16CodeUnits = unicodeView(
       from: start, until: end
     ).scalarsTranscoded(
       to: UTF16.self
     )
 
+    _debug("  Code units are \(Array(utf16CodeUnits))")
+
+
     // TODO: Find way to re-use the storage, maybe iterator pattern?
     var buffer = UTF16CodeUnitBuffer(utf16CodeUnits.lazy.joined())
 
     // TODO: fast pre-normalized checks (worth doing before calling over to
-    //       ICU)
 
     _sanityCheck(buffer.count > 0, "How did this happen? Failed precondition?")
 
@@ -211,6 +187,9 @@ where
         // based, should be finite number of possible decomps.
         let originalCount = buffer.count
         while true {
+
+        	_debug("  Trying to normalize: \(Array($0))")
+
           var error = __swift_stdlib_U_ZERO_ERROR
           let usedCount = __swift_stdlib_unorm2_normalize(
             _fccNormalizer, $0.baseAddress, numericCast($0.count),
@@ -286,7 +265,7 @@ where
   }
 }
 
-extension FCCNormalizedLazySegments : BidirectionalCollection {
+extension FCCNormalizedLazySegments2 : BidirectionalCollection {
   // TODO?: This is really more like an iterator...
   public struct Index : Comparable {
     // The corresponding native begin/end indices for this segment
@@ -351,51 +330,130 @@ extension FCCNormalizedLazySegments : BidirectionalCollection {
     return position.segment
   }
 
-  public typealias SubSequence = BidirectionalSlice<FCCNormalizedLazySegments>
+  public typealias SubSequence = BidirectionalSlice<FCCNormalizedLazySegments2>
 }
 
 extension _UnicodeViews {
-  public struct FCCNormalizedUTF16View: BidirectionalCollectionWrapper {
+  public struct FCCNormalizedUTF16View2: BidirectionalCollectionWrapper {
     public typealias Base = FlattenBidirectionalCollection<
-      FCCNormalizedLazySegments<CodeUnits, Encoding>
+      FCCNormalizedLazySegments2<CodeUnits, Encoding>
     >
     public var base: Base
     public typealias Index = Base.Index
     public typealias IndexDistance = Base.IndexDistance
-    public typealias Self_ = FCCNormalizedUTF16View
-    
+
     public init(_ unicodeView: _UnicodeViews<CodeUnits, Encoding>) {
-      self.base = Base(FCCNormalizedLazySegments(unicodeView))
+      self.base = Base(FCCNormalizedLazySegments2(unicodeView))
     }
   }
 
-  public var fccNormalizedUTF16: FCCNormalizedUTF16View {
-    return FCCNormalizedUTF16View(self)
+
+  public var fccNormalizedUTF16_2: FCCNormalizedUTF16View2 {
+    return FCCNormalizedUTF16View2(self)
   }
 }
 
-extension _UnicodeViews.FCCNormalizedUTF16View : UnicodeView {
-  // Returns the index for the segment containing `atEncodedOffset`
-  //
-  // TODO: What are the desired semantics if given an offset that does not begin
-  // a segment? We should be very explicit about our contract here.
-  public func index(atEncodedOffset i: Int64) -> Index {
-    let segmentIdx = base._base.nextSegment(
-      startingAt: base._base.codeUnits.index(
-        base._base.codeUnits.startIndex, offsetBy: numericCast(i)
-     )
-    )
-    return Index(segmentIdx, segmentIdx.segment.startIndex)
+  extension _UnicodeViews.FCCNormalizedUTF16View2 : BidirectionalCollection {
+  	
   }
 
-  // Returns the offset of the beggining of `i`'s segment
-  public static func encodedOffset(of i: Index) -> Int64 {
-    return numericCast(i._outer.nativeOffset)
-  }
+// extension _UnicodeViews.FCCNormalizedUTF16View2 : UnicodeView {
+//   // Returns the index for the segment containing `atEncodedOffset`
+//   //
+//   // TODO: What are the desired semantics if given an offset that does not begin
+//   // a segment? We should be very explicit about our contract here.
+//   public func index(atEncodedOffset i: Int64) -> Index {
+//     let segmentIdx = base._base.nextSegment(
+//       startingAt: base._base.codeUnits.index(
+//         base._base.codeUnits.startIndex, offsetBy: numericCast(i)
+//      )
+//     )
+//     return Index(segmentIdx, segmentIdx.segment.startIndex)
+//   }
 
-  public typealias SubSequence = UnicodeViewSlice<Self_>
-  public subscript(bounds: Range<Index>) -> SubSequence {
-    return SubSequence(base: self, bounds: bounds)
+//   // Returns the offset of the beggining of `of`'s segment
+//   public static func encodedOffset(of i: Index) -> Int64 {
+//     return numericCast(i._outer.nativeOffset)
+//   }
+// }
+
+
+//////////////
+
+/// Hack in the prototype
+
+public extension UnicodeStorage
+where Encoding.EncodedScalar == UTF16.EncodedScalar,
+  CodeUnits.Iterator.Element == UTF16.CodeUnit,
+  CodeUnits.SubSequence : RandomAccessCollection,
+  CodeUnits.SubSequence.Index == CodeUnits.Index,
+  CodeUnits.SubSequence.SubSequence == CodeUnits.SubSequence,
+  CodeUnits.SubSequence.Iterator.Element == CodeUnits.Iterator.Element {
+  
+  // FIXME: we should have a way to represent the validity of the encoding of
+  // this result—and maybe other nice properties—in the type system.  So maybe
+  // this thing should conform to UnicodeStorage
+  var fccNormalizedUTF16_2
+  : _UnicodeViews<CodeUnits,Encoding>.FCCNormalizedUTF16View2 {
+    return _UnicodeViews(codeUnits, Encoding.self).fccNormalizedUTF16_2
   }
 }
 
+
+import StdlibUnittest
+
+var suite = TestSuite("AnyUnicode")
+
+func printCU(_ x: UInt16) {
+		print(String(x, radix: 16))	
+}
+
+suite.test("Angstrom") {
+	let strNonNormal: [UInt16] = [0x212b] // "Å" 
+	let strNFD: [UInt16] = [0x0041, 0x030a] // "Å"
+	let strNFC: [UInt16] = [0x00c5] // "Å" 
+
+	print("NonNormal")
+	for cu in strNonNormal {
+		printCU(cu)
+	}
+
+	print("NFD")
+	for cu in strNFD {
+		printCU(cu)
+	}
+
+	print("NFC")
+	for cu in strNFC {
+		printCU(cu)
+	}
+
+	let strNonNormal_unicode = _UnicodeViews(strNonNormal, UTF16.self)
+	let strNFD_unicode = _UnicodeViews(strNFD, UTF16.self)
+	let strNFC_unicode = _UnicodeViews(strNFC, UTF16.self)
+
+	_withDebugging {
+		print("non-normal => FCC")
+		for cu in strNonNormal_unicode.fccNormalizedUTF16_2 {
+			printCU(cu)
+		}
+	}
+
+	print("NFD => FCC")
+	for cu in strNFD_unicode.fccNormalizedUTF16_2 {
+		printCU(cu)
+	}
+	print("NFC => FCC")
+	for cu in strNFC_unicode.fccNormalizedUTF16_2 {
+		printCU(cu)
+	}
+
+	// print(strNonNormal_unicode.fccNormalizedUTF16_2 == strNFD_unicode.fccNormalizedUTF16_2)
+	// print(strNonNormal_unicode.fccNormalizedUTF16_2 == strNFC_unicode.fccNormalizedUTF16_2)
+	// print(strNFD_unicode.fccNormalizedUTF16_2 == strNFC_unicode.fccNormalizedUTF16_2)
+
+	expectTrue(true)
+
+}
+
+runAllTests()
