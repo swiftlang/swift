@@ -30,32 +30,6 @@ public func withExtendedLifetime<T, Result>(
   return try body(x)
 }
 
-// extension String {
-
-//   /// Invokes the given closure on the contents of the string, represented as a
-//   /// pointer to a null-terminated sequence of UTF-8 code units.
-//   ///
-//   /// The `withCString(_:)` method ensures that the sequence's lifetime extends
-//   /// through the execution of `body`. The pointer argument to `body` is only
-//   /// valid for the lifetime of the closure. Do not escape it from the closure
-//   /// for later use.
-//   ///
-//   /// - Parameter body: A closure that takes a pointer to the string's UTF-8
-//   ///   code unit sequence as its sole argument. If the closure has a return
-//   ///   value, it is used as the return value of the `withCString(_:)` method.
-//   ///   The pointer argument is valid only for the duration of the closure's
-//   ///   execution.
-//   /// - Returns: The return value of the `body` closure, if any.
-//   @_inlineable
-//   public func withCString<Result>(
-//     _ body: (UnsafePointer<Int8>) throws -> Result
-//   ) rethrows -> Result {
-//     return try self.utf8CString.withUnsafeBufferPointer {
-//       try body($0.baseAddress)
-//     }
-//   }
-// }
-
 // Fix the lifetime of the given instruction so that the ARC optimizer does not
 // shorten the lifetime of x to be before this point.
 @_transparent
