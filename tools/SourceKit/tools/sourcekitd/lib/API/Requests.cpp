@@ -810,13 +810,14 @@ handleSemanticRequest(RequestDict Req,
       return Rec(createErrorRequestInvalid("cannot specify 'key.selectorpieces' "
                                            "and 'key.argnames' at the same time"));
     }
-    Input.ArgNames.resize(ArgParts.size() + Selectors.size());
-    std::transform(ArgParts.begin(), ArgParts.end(), Input.ArgNames.begin(),
+    std::transform(ArgParts.begin(), ArgParts.end(),
+                   std::back_inserter(Input.ArgNames),
       [](const char *C) {
         StringRef Original(C);
         return Original == "_" ? StringRef() : Original;
       });
-    std::transform(Selectors.begin(), Selectors.end(), Input.ArgNames.begin(),
+    std::transform(Selectors.begin(), Selectors.end(),
+                   std::back_inserter(Input.ArgNames),
                    [](const char *C) { return StringRef(C); });
     return Lang.getNameInfo(*SourceFile, Offset, Input, Args,
       [Rec](const NameTranslatingInfo &Info) { reportNameInfo(Info, Rec); });
