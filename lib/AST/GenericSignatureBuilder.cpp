@@ -430,7 +430,7 @@ bool RequirementSource::isSelfDerivedConformance(PotentialArchetype *currentPA,
     totalSizeToAlloc<ProtocolDecl *, WrittenRequirementLoc>(               \
                                            NumProtocolDecls,               \
                                            WrittenReq.isNull()? 0 : 1);    \
-  void *mem = malloc(size);                                                \
+  void *mem = ::operator new(size);                                        \
   auto result = new (mem) RequirementSource ConstructorArgs;               \
   builder.Impl->RequirementSources.InsertNode(result, insertPos);          \
   return result
@@ -1983,6 +1983,13 @@ GenericSignatureBuilder::GenericSignatureBuilder(GenericSignatureBuilder &&) = d
 GenericSignatureBuilder::~GenericSignatureBuilder() {
   if (!Impl)
     return;
+
+  SmallVector<RequirementSource *, 4> requirementSources;
+  for (auto &reqSource : Impl->RequirementSources)
+    requirementSources.push_back(&reqSource);
+  Impl->RequirementSources.clear();
+  for (auto reqSource : requirementSources)
+    delete reqSource;
 
   for (auto PA : Impl->PotentialArchetypes)
     delete PA;
