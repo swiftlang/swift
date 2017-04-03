@@ -794,3 +794,10 @@ internal struct _UnsafePartiallyInitializedContiguousArrayBuffer<Element> {
     return ContiguousArray(_buffer: finalResult)
   }
 }
+
+// Michael NOTE: trying to hack this in for String. Should string have it's own
+// empty storage representaiton?
+extension _EmptyArrayStorage {
+  @objc
+  func length() -> Int { return 0 }
+}

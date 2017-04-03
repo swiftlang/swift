@@ -937,13 +937,13 @@ extension String : ExpressibleByStringLiteral {
 extension String : CustomStringConvertible {
   // TODO: once this replaces Swift.String this needs to revert
   // back to the trivial implementation of returning self
-  public var description: Swift.String {
-    return Swift.String(self)
+  public var description: String {
+    return self
   }
 }
 
 extension String : CustomDebugStringConvertible {
-  public var debugDescription: Swift.String {
+  public var debugDescription: String {
     var result = "\""
     for us in self.content.unicodeScalars {
       result += us.escaped(asASCII: false)
