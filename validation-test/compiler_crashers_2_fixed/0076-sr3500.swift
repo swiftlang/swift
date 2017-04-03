@@ -1,4 +1,4 @@
-// RUN: not --crash %target-swift-frontend %s -emit-ir
+// RUN: %target-swift-frontend %s -emit-ir
 
 protocol A {
   associatedtype Coordinate: Strideable
