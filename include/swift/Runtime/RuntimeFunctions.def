@@ -1194,6 +1194,11 @@ FUNCTION(TSanInoutAccess, __tsan_write1, C_CC,
          ARGS(Int8PtrTy),
          ATTRS(NoUnwind))
 
+FUNCTION(GetKeyPath, swift_getKeyPath, C_CC,
+         RETURNS(RefCountedPtrTy),
+         ARGS(Int8PtrTy, Int8PtrTy),
+         ATTRS(NoUnwind))
+
 #if SWIFT_OBJC_INTEROP || !defined(SWIFT_RUNTIME_GENERATE_GLOBAL_SYMBOLS)
 
 // Put here all definitions of runtime functions which are:

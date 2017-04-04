@@ -440,6 +440,9 @@ struct RawKeyPathComponent {
     static var endOfReferencePrefixFlag: UInt32 {
       return _SwiftKeyPathComponentHeader_EndOfReferencePrefixFlag
     }
+    static var outOfLineOffsetPayload: UInt32 {
+      return _SwiftKeyPathComponentHeader_OutOfLineOffsetPayload
+    }
     
     var _value: UInt32
     
@@ -509,7 +512,7 @@ struct RawKeyPathComponent {
                  "no offset for this kind")
     // An offset too large to fit inline is represented by a signal and stored
     // in the body.
-    if header.payload == Header.payloadMask {
+    if header.payload == Header.outOfLineOffsetPayload {
       // Offset overflowed into body
       _sanityCheck(body.count >= MemoryLayout<UInt32>.size,
                    "component not big enough")
@@ -996,3 +999,12 @@ public func _appendingKeyPaths<
     }
   }
 }
+
+// Runtime entry point to instantiate a key path object.
+@_silgen_name("swift_getKeyPath")
+public func swift_getKeyPath(pattern: UnsafeMutableRawPointer,
+                             arguments: UnsafeRawPointer)
+    -> AnyKeyPath {
+  fatalError("not implemented")
+}
+

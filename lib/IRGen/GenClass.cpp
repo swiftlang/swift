@@ -436,6 +436,35 @@ static OwnedAddress emitAddressAtOffset(IRGenFunction &IGF,
   return OwnedAddress(addr, base);
 }
 
+llvm::Constant *
+irgen::tryEmitConstantClassFragilePhysicalMemberOffset(IRGenModule &IGM,
+                                                       SILType baseType,
+                                                       VarDecl *field) {
+  auto fieldType = baseType.getFieldType(field, IGM.getSILModule());
+  // If the field is empty, its address doesn't matter.
+  auto &fieldTI = IGM.getTypeInfo(fieldType);
+  if (fieldTI.isKnownEmpty(ResilienceExpansion::Maximal)) {
+    return llvm::ConstantInt::get(IGM.SizeTy, 0);
+  }
+
+  auto &baseClassTI = IGM.getTypeInfo(baseType).as<ClassTypeInfo>();
+
+  auto &classLayout = baseClassTI.getClassLayout(IGM, baseType);
+  unsigned fieldIndex = classLayout.getFieldIndex(field);
+
+  switch (classLayout.AllFieldAccesses[fieldIndex]) {
+  case FieldAccess::ConstantDirect: {
+    auto &element = baseClassTI.getElements(IGM, baseType)[fieldIndex];
+    return llvm::ConstantInt::get(IGM.SizeTy,
+                                  element.getByteOffset().getValue());
+  }
+  case FieldAccess::NonConstantDirect:
+  case FieldAccess::ConstantIndirect:
+  case FieldAccess::NonConstantIndirect:
+    return nullptr;
+  }
+}
+
 OwnedAddress irgen::projectPhysicalClassMemberAddress(IRGenFunction &IGF,
                                                       llvm::Value *base,
                                                       SILType baseType,

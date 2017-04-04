@@ -49,6 +49,7 @@ namespace swift {
   class PatternBindingDecl;
   class SILDebugScope;
   class SILType;
+  class KeyPathInst;
   class SourceLoc;
   class StructType;
   class Substitution;
@@ -386,6 +387,8 @@ public:
 
   llvm::Value *emitIsUniqueCall(llvm::Value *value, SourceLoc loc,
                                 bool isNonNull, bool checkPinned);
+  
+  llvm::Value *emitKeyPath(KeyPathInst *inst);
 
 //--- Expression emission ------------------------------------------------------
 public:

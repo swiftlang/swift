@@ -1402,9 +1402,11 @@ public:
   
 private:
   llvm::PointerIntPair<void *, 2, Kind> ValueAndKind;
+  CanType ComponentType;
 
-  KeyPathInstComponent(void *value, Kind kind)
-    : ValueAndKind(value, kind) {}
+
+  KeyPathInstComponent(void *value, Kind kind, CanType ComponentType)
+    : ValueAndKind(value, kind), ComponentType(ComponentType) {}
 
 public:
   KeyPathInstComponent() : ValueAndKind(nullptr, (Kind)0) {}
@@ -1413,6 +1415,10 @@ public:
     return ValueAndKind.getInt();
   }
   
+  CanType getComponentType() const {
+    return ComponentType;
+  }
+
   ValueDecl *getValueDecl() const {
     switch (getKind()) {
     case Kind::StoredProperty:
@@ -1421,9 +1427,11 @@ public:
     llvm_unreachable("unhandled kind");
   }
   
-  static KeyPathInstComponent forStoredProperty(ValueDecl *property) {
-    return KeyPathInstComponent(property, Kind::StoredProperty);
+  static KeyPathInstComponent forStoredProperty(ValueDecl *property,
+                                                CanType ty) {
+    return KeyPathInstComponent(property, Kind::StoredProperty, ty);
   }
+  
 };
   
 

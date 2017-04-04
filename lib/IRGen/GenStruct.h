@@ -44,7 +44,7 @@ namespace irgen {
                                                 Explosion &out);
 
   /// Return the constant offset of the given stored property in a struct,
-  /// or return nullptr if the field does not have fixed layout.
+  /// or return None if the field does not have fixed layout.
   llvm::Constant *emitPhysicalStructMemberFixedOffset(IRGenModule &IGM,
                                                       SILType baseType,
                                                       VarDecl *field);

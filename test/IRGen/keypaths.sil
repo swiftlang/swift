@@ -1,0 +1,157 @@
+// RUN: %target-swift-frontend -emit-ir %s | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
+
+sil_stage canonical
+import Swift
+
+struct S {
+  var x: Int
+  let y: String
+  var z: C
+}
+class C {
+  final var x: Int
+  final let y: String
+  final var z: S
+
+  init()
+}
+
+sil_vtable C {}
+
+// CHECK: %TSi = type <{ [[WORD:i.*]] }>
+
+// -- %a: S.x
+// CHECK: [[KP_A:@keypath.*]] = private global <{ {{.*}} }> <{
+// CHECK-SAME: [[WORD]] 1,
+// CHECK-SAME: %swift.type* ()* @_T08keypaths1SVMa,
+// CHECK-SAME: %swift.type* ()* @_T0SiMa, 
+//                  -- 0x8000_0010 - instantiable in-line, size 16
+// CHECK-32-SAME: i32 -2147483632,
+//                  -- 0x8000_0018 - instantiable in-line, size 24
+// CHECK-64-SAME: i32 -2147483624,
+// -- offset of S.x
+// CHECK-SAME: i32 0 }>
+
+// -- %b: S.y
+// CHECK: [[KP_B:@keypath.*]] = private global <{ {{.*}} }> <{
+// CHECK-SAME: [[WORD]] 1,
+// CHECK-SAME: %swift.type* ()* @_T08keypaths1SVMa,
+// CHECK-SAME: %swift.type* ()* @_T0SSMa, 
+//                  -- 0x8000_0010 - instantiable in-line, size 16
+// CHECK-32-SAME: i32 -2147483632,
+//                  -- 0x8000_0018 - instantiable in-line, size 24
+// CHECK-64-SAME: i32 -2147483624,
+// -- offset of S.y
+// CHECK-32-SAME: i32 4 }>
+// CHECK-64-SAME: i32 8 }>
+
+// -- %c: S.z
+// CHECK: [[KP_C:@keypath.*]] = private global <{ {{.*}} }> <{
+// CHECK-SAME: [[WORD]] 1,
+// CHECK-SAME: %swift.type* ()* @_T08keypaths1SVMa,
+// CHECK-SAME: %swift.type* ()* @_T08keypaths1CCMa, 
+//                  -- 0x8000_0010 - instantiable in-line, size 16
+// CHECK-32-SAME: i32 -2147483632,
+//                  -- 0x8000_0018 - instantiable in-line, size 24
+// CHECK-64-SAME: i32 -2147483624,
+// -- offset of S.z
+// CHECK-32-SAME: i32 16 }>
+// CHECK-64-SAME: i32 32 }>
+
+// -- %d: C.x
+// CHECK: [[KP_D:@keypath.*]] = private global <{ {{.*}} }> <{
+// CHECK-SAME: [[WORD]] 1,
+// CHECK-SAME: %swift.type* ()* @_T08keypaths1CCMa,
+// CHECK-SAME: %swift.type* ()* @_T0SiMa, 
+//                  -- 0x8000_0010 - instantiable in-line, size 16
+// CHECK-32-SAME: i32 -2147483632,
+//                  -- 0x8000_0018 - instantiable in-line, size 24
+// CHECK-64-SAME: i32 -2147483624,
+// -- 0x4000_0000 (class) + offset of C.x
+// CHECK-32-SAME: i32 1073741832 }>
+// CHECK-64-SAME: i32 1073741840 }>
+
+// -- %e: C.y
+// CHECK: [[KP_E:@keypath.*]] = private global <{ {{.*}} }> <{
+// CHECK-SAME: [[WORD]] 1,
+// CHECK-SAME: %swift.type* ()* @_T08keypaths1CCMa,
+// CHECK-SAME: %swift.type* ()* @_T0SSMa, 
+//                  -- 0x8000_0010 - instantiable in-line, size 16
+// CHECK-32-SAME: i32 -2147483632,
+//                  -- 0x8000_0018 - instantiable in-line, size 24
+// CHECK-64-SAME: i32 -2147483624,
+// -- 0x4000_0000 (class) + offset of C.y
+// CHECK-32-SAME: i32 1073741836 }>
+// CHECK-64-SAME: i32 1073741848 }>
+
+// -- %f: C.z
+// CHECK: [[KP_F:@keypath.*]] = private global <{ {{.*}} }> <{
+// CHECK-SAME: [[WORD]] 1,
+// CHECK-SAME: %swift.type* ()* @_T08keypaths1CCMa,
+// CHECK-SAME: %swift.type* ()* @_T08keypaths1SVMa, 
+//                  -- 0x8000_0010 - instantiable in-line, size 16
+// CHECK-32-SAME: i32 -2147483632,
+//                  -- 0x8000_0018 - instantiable in-line, size 24
+// CHECK-64-SAME: i32 -2147483624,
+// -- 0x4000_0000 (class) + offset of C.z
+// CHECK-32-SAME: i32 1073741848 }>
+// CHECK-64-SAME: i32 1073741872 }>
+
+// -- %g: S.z.x
+// CHECK: [[KP_G:@keypath.*]] = private global <{ {{.*}} }> <{
+// CHECK-SAME: [[WORD]] 1,
+// CHECK-SAME: %swift.type* ()* @_T08keypaths1SVMa,
+// CHECK-SAME: %swift.type* ()* @_T0SiMa, 
+//                  -- 0x8000_0010 - instantiable in-line, size 24
+// CHECK-32-SAME: i32 -2147483624,
+//                  -- 0x8000_0018 - instantiable in-line, size 36
+// CHECK-64-SAME: i32 -2147483612,
+// -- offset of S.z
+// CHECK-32-SAME: i32 16,
+// CHECK-64-SAME: i32 32,
+// CHECK: %swift.type* ()* @_T08keypaths1CCMa,
+// -- 0x4000_0000 (class) + offset of C.x
+// CHECK-32-SAME: i32 1073741832 }>
+// CHECK-64-SAME: i32 1073741840 }>
+
+// -- %h: C.z.x
+// CHECK: [[KP_H:@keypath.*]] = private global <{ {{.*}} }> <{
+// CHECK-SAME: [[WORD]] 1,
+// CHECK-SAME: %swift.type* ()* @_T08keypaths1CCMa,
+// CHECK-SAME: %swift.type* ()* @_T0SiMa, 
+//                  -- 0x8000_0010 - instantiable in-line, size 24
+// CHECK-32-SAME: i32 -2147483624,
+//                  -- 0x8000_0018 - instantiable in-line, size 36
+// CHECK-64-SAME: i32 -2147483612,
+// -- 0x4000_0000 (class) + offset of C.z
+// CHECK-32-SAME: i32 1073741848,
+// CHECK-64-SAME: i32 1073741872,
+// CHECK: %swift.type* ()* @_T08keypaths1SVMa,
+// -- offset of S.x
+// CHECK-SAME: i32 0 }>
+
+// CHECK-LABEL: define swiftcc void @stored_property_fixed_offsets()
+sil @stored_property_fixed_offsets : $@convention(thin) () -> () {
+entry:
+  // CHECK: call %swift.refcounted* @swift_getKeyPath(i8* bitcast ({{.*}} [[KP_A]] to i8*), i8* undef)
+  %a = keypath $KeyPath<S, Int> (stored_property #S.x : $Int)
+  // CHECK: call %swift.refcounted* @swift_getKeyPath(i8* bitcast ({{.*}} [[KP_B]] to i8*), i8* undef)
+  %b = keypath $KeyPath<S, String> (stored_property #S.y : $String)
+  // CHECK: call %swift.refcounted* @swift_getKeyPath(i8* bitcast ({{.*}} [[KP_C]] to i8*), i8* undef)
+  %c = keypath $KeyPath<S, C> (stored_property #S.z : $C)
+
+  // CHECK: call %swift.refcounted* @swift_getKeyPath(i8* bitcast ({{.*}} [[KP_D]] to i8*), i8* undef)
+  %d = keypath $KeyPath<C, Int> (stored_property #C.x : $Int)
+  // CHECK: call %swift.refcounted* @swift_getKeyPath(i8* bitcast ({{.*}} [[KP_E]] to i8*), i8* undef)
+  %e = keypath $KeyPath<C, String> (stored_property #C.y : $String)
+  // CHECK: call %swift.refcounted* @swift_getKeyPath(i8* bitcast ({{.*}} [[KP_F]] to i8*), i8* undef)
+  %f = keypath $KeyPath<C, S> (stored_property #C.z : $S)
+
+  // CHECK: call %swift.refcounted* @swift_getKeyPath(i8* bitcast ({{.*}} [[KP_G]] to i8*), i8* undef)
+  %g = keypath $KeyPath<S, Int> (stored_property #S.z : $C, stored_property #C.x : $Int)
+  // CHECK: call %swift.refcounted* @swift_getKeyPath(i8* bitcast ({{.*}} [[KP_H]] to i8*), i8* undef)
+  %h = keypath $KeyPath<C, Int> (stored_property #C.z : $S, stored_property #S.x : $Int)
+
+  return undef : $()
+}
+

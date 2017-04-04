@@ -2304,9 +2304,13 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB, SILBuilder &B) {
 
       if (componentKind.str() == "stored_property") {
         ValueDecl *prop;
-        if (parseSILDottedPath(prop))
+        CanType ty;
+        if (parseSILDottedPath(prop)
+            || P.parseToken(tok::colon, diag::expected_tok_in_sil_instr, ":")
+            || P.parseToken(tok::sil_dollar, diag::expected_tok_in_sil_instr, "$")
+            || parseASTType(ty))
           return true;
-        components.push_back(KeyPathInstComponent::forStoredProperty(prop));
+        components.push_back(KeyPathInstComponent::forStoredProperty(prop, ty));
       } else {
         P.diagnose(componentLoc, diag::sil_keypath_unknown_component_kind,
                    componentKind);

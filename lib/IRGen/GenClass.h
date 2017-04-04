@@ -133,6 +133,13 @@ namespace irgen {
   llvm::Constant *tryEmitClassConstantFragileInstanceAlignMask(IRGenModule &IGM,
                                                         ClassDecl *theClass);
   
+  /// Emit the constant fragile offset of the given property inside an instance
+  /// of the class.
+  llvm::Constant *
+  tryEmitConstantClassFragilePhysicalMemberOffset(IRGenModule &IGM,
+                                                  SILType baseType,
+                                                  VarDecl *field);
+
   /// What reference counting mechanism does a class use?
   ReferenceCounting getReferenceCountingForClass(IRGenModule &IGM,
                                                  ClassDecl *theClass);

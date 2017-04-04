@@ -20,14 +20,14 @@ class C {
 // CHECK-LABEL: sil shared @stored_properties
 sil shared @stored_properties : $@convention(thin) () -> () {
 entry:
-  // CHECK: keypath $WritableKeyPath<S, Int> (stored_property #S.x)
-  %a = keypath $WritableKeyPath<S, Int> (stored_property #S.x)
-  // CHECK: keypath $ReferenceWritableKeyPath<C, Int> (stored_property #C.x)
-  %b = keypath $ReferenceWritableKeyPath<C, Int> (stored_property #C.x)
-  // CHECK: keypath $KeyPath<S, String> (stored_property #S.y)
-  %c = keypath $KeyPath<S, String> (stored_property #S.y)
-  // CHECK: keypath $ReferenceWritableKeyPath<S, Int> (stored_property #S.z, stored_property #C.x)
-  %d = keypath $ReferenceWritableKeyPath<S, Int> (stored_property #S.z, stored_property #C.x)
+  // CHECK: keypath $WritableKeyPath<S, Int> (stored_property #S.x : $Int)
+  %a = keypath $WritableKeyPath<S, Int> (stored_property #S.x : $Int)
+  // CHECK: keypath $ReferenceWritableKeyPath<C, Int> (stored_property #C.x : $Int)
+  %b = keypath $ReferenceWritableKeyPath<C, Int> (stored_property #C.x : $Int)
+  // CHECK: keypath $KeyPath<S, String> (stored_property #S.y : $String)
+  %c = keypath $KeyPath<S, String> (stored_property #S.y : $String)
+  // CHECK: keypath $ReferenceWritableKeyPath<S, Int> (stored_property #S.z : $C, stored_property #C.x : $Int)
+  %d = keypath $ReferenceWritableKeyPath<S, Int> (stored_property #S.z : $C, stored_property #C.x : $Int)
 
   return undef : $()
 }

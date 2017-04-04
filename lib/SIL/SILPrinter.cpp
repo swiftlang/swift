@@ -1782,8 +1782,10 @@ public:
                    auto prop = cast<VarDecl>(component.getValueDecl());
                    *this << "stored_property #";
                    printValueDecl(prop, PrintState.OS);
+                   
                  }
                  }
+                 *this << " : $" << component.getComponentType();
                }, [&]{
                  *this << ", ";
                });

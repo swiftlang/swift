@@ -1008,9 +1008,7 @@ public:
   void visitCheckedCastValueBranchInst(CheckedCastValueBranchInst *i);
   void visitCheckedCastAddrBranchInst(CheckedCastAddrBranchInst *i);
   
-  void visitKeyPathInst(KeyPathInst *I) {
-    llvm_unreachable("not implemented");
-  }
+  void visitKeyPathInst(KeyPathInst *I);
 };
 
 } // end anonymous namespace
@@ -4415,6 +4413,13 @@ void IRGenSILFunction::visitCheckedCastAddrBranchInst(
   Builder.CreateCondBr(castSucceeded,
                        getLoweredBB(i->getSuccessBB()).bb,
                        getLoweredBB(i->getFailureBB()).bb);
+}
+
+void IRGenSILFunction::visitKeyPathInst(swift::KeyPathInst *I) {
+  auto result = emitKeyPath(I);
+  Explosion e;
+  e.add(result);
+  setLoweredExplosion(I, e);
 }
 
 void IRGenSILFunction::visitIsNonnullInst(swift::IsNonnullInst *i) {

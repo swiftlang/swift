@@ -2398,10 +2398,16 @@ RValue RValueEmitter::visitKeyPathExpr(KeyPathExpr *E, SGFContext C) {
     return RValue(SGF, E, ManagedValue::forUnmanaged(undef));
   };
   
+  CanType baseTy = E->getType()->castTo<BoundGenericType>()->getGenericArgs()[0]
+    ->getCanonicalType();
+  
   for (auto &component : E->getComponents()) {
     switch (component.getKind()) {
     case KeyPathExpr::Component::Kind::Property: {
       auto decl = cast<VarDecl>(component.getDeclRef().getDecl());
+      
+      baseTy = baseTy->getTypeOfMember(SGF.SGM.SwiftModule, decl)
+        ->getCanonicalType();
       
       switch (decl->getAccessStrategy(AccessSemantics::Ordinary,
                                       AccessKind::ReadWrite)) {
@@ -2417,7 +2423,7 @@ RValue RValueEmitter::visitKeyPathExpr(KeyPathExpr *E, SGFContext C) {
         
         if (storageTy.getAddressType() == opaqueTy.getAddressType()) {
           loweredComponents.push_back(
-                                 KeyPathInstComponent::forStoredProperty(decl));
+                         KeyPathInstComponent::forStoredProperty(decl, baseTy));
           break;
         }
         LLVM_FALLTHROUGH;

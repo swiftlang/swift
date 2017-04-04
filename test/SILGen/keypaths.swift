@@ -24,19 +24,19 @@ class C<T> {
 
 // CHECK-LABEL: sil hidden @{{.*}}storedProperties
 func storedProperties<T>(_: T) {
-  // CHECK: keypath $KeyPath<S<T>, T> (stored_property #S.x)
+  // CHECK: keypath $KeyPath<S<T>, T> (stored_property #S.x : $T)
   _ = #keyPath2(S<T>, .x)
-  // CHECK: keypath $KeyPath<S<T>, String> (stored_property #S.y)
+  // CHECK: keypath $KeyPath<S<T>, String> (stored_property #S.y : $String)
   _ = #keyPath2(S<T>, .y)
-  // CHECK: keypath $KeyPath<S<T>, T> (stored_property #S.z, stored_property #C.x)
+  // CHECK: keypath $KeyPath<S<T>, T> (stored_property #S.z : $C<T>, stored_property #C.x : $T)
   _ = #keyPath2(S<T>, .z.x)
-  // CHECK: keypath $KeyPath<C<T>, T> (stored_property #C.x)
+  // CHECK: keypath $KeyPath<C<T>, T> (stored_property #C.x : $T)
   _ = #keyPath2(C<T>, .x)
-  // CHECK: keypath $KeyPath<C<T>, String> (stored_property #C.y)
+  // CHECK: keypath $KeyPath<C<T>, String> (stored_property #C.y : $String)
   _ = #keyPath2(C<T>, .y)
-  // CHECK: keypath $KeyPath<C<T>, T> (stored_property #C.z, stored_property #S.x)
+  // CHECK: keypath $KeyPath<C<T>, T> (stored_property #C.z : $S<T>, stored_property #S.x : $T)
   _ = #keyPath2(C<T>, .z.x)
-  // CHECK: keypath $KeyPath<C<T>, String> (stored_property #C.z, stored_property #S.z, stored_property #C.y)
+  // CHECK: keypath $KeyPath<C<T>, String> (stored_property #C.z : $S<T>, stored_property #S.z : $C<T>, stored_property #C.y : $String)
   _ = #keyPath2(C<T>, .z.z.y)
 }
 
