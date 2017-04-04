@@ -3,6 +3,7 @@ let a = 0; let b = 0 }; unresolved
 
 // Test that offsets of diagnostic ranges and fixits get updated correctly after the edit request
 
+// XFAIL: linux
 // RUN: %sourcekitd-test -req=open %s -- %s == -req=print-diags %s \
 // RUN:    == -req=edit -pos=2:1 -replace="_" -length=5 %s -print-raw-response \
 // RUN: | %FileCheck %s

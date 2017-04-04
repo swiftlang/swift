@@ -3,3 +3,5 @@
 
 let color: S = #colorLiteral(red: 1, green: 0, blue: 0, alpha: 1)
 let image: I? = #imageLiteral(resourceName: "hello.png")
+
+// XFAIL: linux

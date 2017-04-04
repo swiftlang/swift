@@ -1,6 +1,6 @@
 {
   key.offset: 0,
-  key.length: 267,
+  key.length: 284,
   key.diagnostic_stage: source.diagnostic.stage.swift.parse,
   key.substructure: [
     {
