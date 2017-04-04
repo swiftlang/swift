@@ -1143,11 +1143,7 @@ RequirementCheckResult TypeChecker::checkGenericArguments(
     Type rawSecondType, secondType;
     if (kind != RequirementKind::Layout) {
       rawSecondType = rawReq.getSecondType();
-      secondType = req->getSecondType().subst(substitutions, conformances);
-      if (!secondType) {
-        valid = false;
-        continue;
-      }
+      secondType = req->getSecondType();
     }
 
     if (listener && !listener->shouldCheck(kind, firstType, secondType))
