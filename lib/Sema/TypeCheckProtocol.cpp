@@ -3908,7 +3908,7 @@ compareDeclsForInference(TypeChecker &TC, DeclContext *DC,
     switch (reqt.getKind()) {
     case RequirementKind::Conformance: {
       SmallVector<ProtocolDecl*, 4> protos;
-      reqt.getSecondType()->getAnyExistentialTypeProtocols(protos);
+      reqt.getSecondType()->getExistentialTypeProtocols(protos);
       
       for (auto proto : protos) {
         insertProtocol(proto);
@@ -3945,7 +3945,7 @@ compareDeclsForInference(TypeChecker &TC, DeclContext *DC,
     switch (reqt.getKind()) {
     case RequirementKind::Conformance: {
       SmallVector<ProtocolDecl*, 4> protos;
-      reqt.getSecondType()->getAnyExistentialTypeProtocols(protos);
+      reqt.getSecondType()->getExistentialTypeProtocols(protos);
       
       for (auto proto : protos) {
         removeProtocol(proto);
@@ -5244,7 +5244,7 @@ Optional<ProtocolConformanceRef> TypeChecker::containsProtocol(
   // contain the protocol.
   if (T->isExistentialType()) {
     SmallVector<ProtocolDecl *, 4> protocols;
-    T->getAnyExistentialTypeProtocols(protocols);
+    T->getExistentialTypeProtocols(protocols);
 
     for (auto P : protocols) {
       // Special case -- any class-bound protocol can be passed as an
@@ -5355,8 +5355,9 @@ TypeChecker::conformsToProtocol(Type T, ProtocolDecl *Proto, DeclContext *DC,
         return ConformsToProtocolResult::unsatisfiedDependency();
     }
 
-    SmallVector<ProtocolDecl *, 2> protos;
-    if (T->isExistentialType(protos)) {
+    if (T->isExistentialType()) {
+      SmallVector<ProtocolDecl *, 2> protos;
+      T->getExistentialTypeProtocols(protos);
       bool anyUnsatisfied = false;
       for (auto *proto : protos) {
         if ((*unsatisfiedDependency)(requestInheritedProtocols(proto)))

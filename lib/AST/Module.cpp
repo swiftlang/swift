@@ -606,7 +606,7 @@ ModuleDecl::lookupConformance(Type type, ProtocolDecl *protocol,
   // itself.
   if (type->isExistentialType()) {
     SmallVector<ProtocolDecl *, 4> protocols;
-    type->getAnyExistentialTypeProtocols(protocols);
+    type->getExistentialTypeProtocols(protocols);
 
     // Due to an IRGen limitation, witness tables cannot be passed from an
     // existential to an archetype parameter, so for now we restrict this to

@@ -487,11 +487,13 @@ SILType::getPreferredExistentialRepresentation(SILModule &M,
   if (is<ExistentialMetatypeType>())
     return ExistentialRepresentation::Metatype;
   
-  // Get the list of existential constraints. If the type isn't existential,
-  // then there is no representation.
-  if (!getSwiftRValueType()->isAnyExistentialType(protocols))
+  // If the type isn't existential, then there is no representation.
+  if (!isExistentialType())
     return ExistentialRepresentation::None;
-  
+
+  // Get the list of existential constraints.
+  getSwiftRValueType()->getExistentialTypeProtocols(protocols);
+
   // The (uncomposed) Error existential uses a special boxed representation.
   if (isErrorExistential(protocols)) {
     // NSError or CFError references can be adopted directly as Error
@@ -502,7 +504,7 @@ SILType::getPreferredExistentialRepresentation(SILModule &M,
       return ExistentialRepresentation::Boxed;
     }
   }
-  
+
   // A class-constrained protocol composition can adopt the conforming
   // class reference directly.
   for (auto proto : protocols) {
@@ -525,9 +527,11 @@ SILType::canUseExistentialRepresentation(SILModule &M,
   case ExistentialRepresentation::Class:
   case ExistentialRepresentation::Boxed: {
     // Look at the protocols to see what representation is appropriate.
-    SmallVector<ProtocolDecl *, 4> protocols;
-    if (!getSwiftRValueType()->isAnyExistentialType(protocols))
+    if (!getSwiftRValueType().isExistentialType())
       return false;
+    SmallVector<ProtocolDecl *, 4> protocols;
+    getSwiftRValueType().getExistentialTypeProtocols(protocols);
+
     // The (uncomposed) Error existential uses a special boxed
     // representation. It can also adopt class references of bridged error types
     // directly.

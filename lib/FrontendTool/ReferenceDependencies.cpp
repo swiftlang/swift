@@ -88,11 +88,13 @@ static bool extendedTypeIsPrivate(TypeLoc inheritedType) {
   if (!inheritedType.getType())
     return true;
 
-  SmallVector<ProtocolDecl *, 2> protocols;
-  if (!inheritedType.getType()->isAnyExistentialType(protocols)) {
+  if (!inheritedType.getType()->isExistentialType()) {
     // Be conservative. We don't know how to deal with other extended types.
     return false;
   }
+
+  SmallVector<ProtocolDecl *, 2> protocols;
+  inheritedType.getType()->getExistentialTypeProtocols(protocols);
 
   return std::all_of(protocols.begin(), protocols.end(), declIsPrivate);
 }

@@ -350,9 +350,7 @@ class CanType : public Type {
   static bool isReferenceTypeImpl(CanType type, bool functionsCount);
   static bool isExistentialTypeImpl(CanType type);
   static bool isAnyExistentialTypeImpl(CanType type);
-  static bool isExistentialTypeImpl(CanType type,
-                                    SmallVectorImpl<ProtocolDecl*> &protocols);
-  static bool isAnyExistentialTypeImpl(CanType type,
+  static void getExistentialTypeProtocolsImpl(CanType type,
                                     SmallVectorImpl<ProtocolDecl*> &protocols);
   static void getAnyExistentialTypeProtocolsImpl(CanType type,
                                     SmallVectorImpl<ProtocolDecl*> &protocols);
@@ -404,19 +402,16 @@ public:
     return isExistentialTypeImpl(*this);
   }
 
-  /// Is this type existential?
-  bool isExistentialType(SmallVectorImpl<ProtocolDecl *> &protocols) {
-    return isExistentialTypeImpl(*this, protocols);
-  }
-
   /// Is this type an existential or an existential metatype?
   bool isAnyExistentialType() const {
     return isAnyExistentialTypeImpl(*this);
   }
 
-  /// Is this type an existential or an existential metatype?
-  bool isAnyExistentialType(SmallVectorImpl<ProtocolDecl *> &protocols) {
-    return isAnyExistentialTypeImpl(*this, protocols);
+  /// Given that this type is an existential, return its
+  /// protocols in a canonical order.
+  void getExistentialTypeProtocols(
+                                SmallVectorImpl<ProtocolDecl *> &protocols) {
+    return getExistentialTypeProtocolsImpl(*this, protocols);
   }
 
   /// Given that this type is any kind of existential, return its

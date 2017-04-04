@@ -329,10 +329,11 @@ public:
     NewProto = Builder.CreateCall(objc_allocateProtocol, protocolName);
     
     // Add the parent protocols.
+    //
+    // FIXME: Look at the requirement signature instead.
     for (auto inherited : proto->getInherited()) {
       SmallVector<ProtocolDecl*, 4> protocols;
-      if (!inherited.getType()->isAnyExistentialType(protocols))
-        continue;
+      inherited.getType()->getExistentialTypeProtocols(protocols);
       for (auto parentProto : protocols) {
         if (!parentProto->isObjC())
           continue;
@@ -611,14 +612,14 @@ void IRGenModule::emitRuntimeRegistration() {
         protos.insert(proto.first);
       
       llvm::SmallVector<ProtocolDecl*, 4> protoInitOrder;
-      
+
+      // FIXME: Use the requirement signature instead.
       std::function<void(ProtocolDecl*)> orderProtocol
         = [&](ProtocolDecl *proto) {
           // Recursively put parents first.
           for (auto &inherited : proto->getInherited()) {
             SmallVector<ProtocolDecl*, 4> parents;
-            if (!inherited.getType()->isAnyExistentialType(parents))
-              continue;
+            inherited.getType()->getExistentialTypeProtocols(parents);
             for (auto parent : parents)
               orderProtocol(parent);
           }

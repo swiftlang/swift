@@ -575,13 +575,7 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
         // FIXME: We shouldn't need to compute a type to perform this lookup.
         Type lookupType = dc->getSelfTypeInContext();
 
-        // FIXME: Hack to deal with missing 'Self' archetypes.
-        if (!lookupType) {
-          if (auto proto = dc->getAsProtocolOrProtocolExtensionContext())
-            lookupType = proto->getDeclaredType();
-        }
-
-        if (!lookupType || lookupType->hasError()) continue;
+        if (lookupType->hasError()) continue;
 
         // Perform lookup into the type.
         NLOptions options = NL_UnqualifiedDefault;
@@ -686,12 +680,6 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
 
           if (AFD->getDeclContext()->isTypeContext()) {
             ExtendedType = AFD->getDeclContext()->getSelfTypeInContext();
-            // FIXME: Hack to deal with missing 'Self' archetypes.
-            if (!ExtendedType)
-              if (auto *PD = AFD->getDeclContext()
-                      ->getAsProtocolOrProtocolExtensionContext())
-                ExtendedType = PD->getDeclaredType();
-
             BaseDecl = AFD->getImplicitSelfDecl();
             MetaBaseDecl = AFD->getDeclContext()
                 ->getAsNominalTypeOrNominalTypeExtensionContext();
@@ -782,8 +770,8 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
           if (IgnoreAccessControl)
             options |= NL_IgnoreAccessibility;
 
-          if (!ExtendedType)
-            ExtendedType = ErrorType::get(Ctx);
+          if (ExtendedType->hasError())
+            continue;
 
           SmallVector<ValueDecl *, 4> Lookup;
           DC->lookupQualified(ExtendedType, Name, options, TypeResolver, Lookup);
@@ -1317,9 +1305,6 @@ bool DeclContext::lookupQualified(Type type,
   using namespace namelookup;
   assert(decls.empty() && "additive lookup not supported");
 
-  if (type->hasError())
-    return false;
-
   auto checkLookupCascading = [this, options]() -> Optional<bool> {
     switch (static_cast<unsigned>(options & NL_KnownDependencyMask)) {
     case 0:
@@ -1398,15 +1383,12 @@ bool DeclContext::lookupQualified(Type type,
   llvm::SmallPtrSet<NominalTypeDecl *, 4> visited;
 
   // Handle nominal types.
-  bool wantProtocolMembers = false;
+  bool wantProtocolMembers = (options & NL_ProtocolMembers);
   bool wantLookupInAllClasses = false;
   if (auto nominal = type->getAnyNominal()) {
     visited.insert(nominal);
     stack.push_back(nominal);
     
-    wantProtocolMembers = (options & NL_ProtocolMembers) &&
-                          !isa<ProtocolDecl>(nominal);
-
     // If we want dynamic lookup and we're searching in the
     // AnyObject protocol, note this for later.
     if (options & NL_DynamicLookup) {
@@ -1428,9 +1410,6 @@ bool DeclContext::lookupQualified(Type type,
       if (auto superclassDecl = superclassTy->getAnyNominal()) {
         if (visited.insert(superclassDecl).second) {
           stack.push_back(superclassDecl);
-
-          wantProtocolMembers = (options & NL_ProtocolMembers) &&
-                                !isa<ProtocolDecl>(superclassDecl);
         }
       }
     }
@@ -1438,17 +1417,16 @@ bool DeclContext::lookupQualified(Type type,
   // Handle protocol compositions.
   else if (auto compositionTy = type->getAs<ProtocolCompositionType>()) {
     SmallVector<ProtocolDecl *, 4> protocols;
-    if (compositionTy->isExistentialType(protocols)) {
-      for (auto proto : protocols) {
-        if (visited.insert(proto).second) {
-          stack.push_back(proto);
+    compositionTy->getExistentialTypeProtocols(protocols);
+    for (auto proto : protocols) {
+      if (visited.insert(proto).second) {
+        stack.push_back(proto);
 
-          // If we want dynamic lookup and this is the AnyObject
-          // protocol, note this for later.
-          if ((options & NL_DynamicLookup) &&
-              proto->isSpecificProtocol(KnownProtocolKind::AnyObject))
-            wantLookupInAllClasses = true;
-        }
+        // If we want dynamic lookup and this is the AnyObject
+        // protocol, note this for later.
+        if ((options & NL_DynamicLookup) &&
+            proto->isSpecificProtocol(KnownProtocolKind::AnyObject))
+          wantLookupInAllClasses = true;
       }
     }
   } else {
