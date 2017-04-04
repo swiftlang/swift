@@ -800,4 +800,14 @@ internal struct _UnsafePartiallyInitializedContiguousArrayBuffer<Element> {
 extension _EmptyArrayStorage {
   @objc
   func length() -> Int { return 0 }
+  @objc
+  func _fastCharacterContents() -> UnsafeMutablePointer<UInt16>? {
+    return nil
+  }
+  @objc
+  func _fastCStringContents(
+    _ nullTerminationRequired: Int8
+  ) -> UnsafePointer<CChar>? {
+    return nil
+  }
 }
