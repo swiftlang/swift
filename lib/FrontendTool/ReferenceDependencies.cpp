@@ -102,6 +102,17 @@ static std::string mangleTypeAsContext(const NominalTypeDecl *type) {
   return Mangler.mangleTypeAsContextUSR(type);
 }
 
+std::vector<std::string>
+swift::reversePathSortedFilenames(const ArrayRef<std::string> elts) {
+  std::vector<std::string> tmp(elts.begin(), elts.end());
+  std::sort(tmp.begin(), tmp.end(), [](const std::string &a,
+                                       const std::string &b) -> bool {
+              return std::lexicographical_compare(a.rbegin(), a.rend(),
+                                                  b.rbegin(), b.rend());
+            });
+  return tmp;
+}
+
 bool swift::emitReferenceDependencies(DiagnosticEngine &diags,
                                       SourceFile *SF,
                                       DependencyTracker &depTracker,
@@ -391,7 +402,7 @@ bool swift::emitReferenceDependencies(DiagnosticEngine &diags,
   }
 
   out << "depends-external:\n";
-  for (auto &entry : depTracker.getDependencies()) {
+  for (auto &entry : reversePathSortedFilenames(depTracker.getDependencies())) {
     out << "- \"" << llvm::yaml::escape(entry) << "\"\n";
   }
 
