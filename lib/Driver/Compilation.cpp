@@ -15,6 +15,7 @@
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsDriver.h"
 #include "swift/Basic/Program.h"
+#include "swift/Basic/Statistic.h"
 #include "swift/Basic/TaskQueue.h"
 #include "swift/Basic/Version.h"
 #include "swift/Basic/type_traits.h"
@@ -92,7 +93,8 @@ Compilation::Compilation(DiagnosticEngine &Diags, OutputLevel Level,
                          bool EnableIncrementalBuild,
                          bool SkipTaskExecution,
                          bool SaveTemps,
-                         bool ShowDriverTimeCompilation)
+                         bool ShowDriverTimeCompilation,
+                         std::unique_ptr<UnifiedStatsReporter> StatsReporter)
   : Diags(Diags), Level(Level), RawInputArgs(std::move(InputArgs)),
     TranslatedArgs(std::move(TranslatedArgs)), 
     InputFilesWithTypes(std::move(InputsWithTypes)), ArgsHash(ArgsHash),
@@ -101,7 +103,8 @@ Compilation::Compilation(DiagnosticEngine &Diags, OutputLevel Level,
     SkipTaskExecution(SkipTaskExecution),
     EnableIncrementalBuild(EnableIncrementalBuild),
     SaveTemps(SaveTemps),
-    ShowDriverTimeCompilation(ShowDriverTimeCompilation) {
+    ShowDriverTimeCompilation(ShowDriverTimeCompilation),
+    Stats(std::move(StatsReporter)) {
 };
 
 static bool writeFilelistIfNecessary(const Job *job, DiagnosticEngine &diags);
@@ -229,7 +232,13 @@ namespace driver {
                      << ": " << LogJob(Cmd) << "\n";
       }
       FinishedCommands.insert(Cmd);
-
+      if (Comp.Stats) {
+          auto &D = Comp.Stats->getDriverCounters();
+          if (Skipped)
+            D.NumDriverJobsSkipped++;
+          else
+            D.NumDriverJobsRun++;
+      }
       auto BlockedIter = BlockingCommands.find(Cmd);
       if (BlockedIter != BlockingCommands.end()) {
         auto AllBlocked = std::move(BlockedIter->second);
@@ -466,12 +475,14 @@ namespace driver {
     }
 
   public:
-    PerformJobsState(Compilation &Comp) : Comp(Comp) {
+    PerformJobsState(Compilation &Comp)
+      : Comp(Comp),
+        ActualIncrementalTracer(Comp.Stats.get()) {
       if (Comp.SkipTaskExecution)
         TQ.reset(new DummyTaskQueue(Comp.NumberOfParallelCommands));
       else
         TQ.reset(new TaskQueue(Comp.NumberOfParallelCommands));
-      if (Comp.ShowIncrementalBuildDecisions)
+      if (Comp.ShowIncrementalBuildDecisions || Comp.Stats)
         IncrementalTracer = &ActualIncrementalTracer;
     }
 
