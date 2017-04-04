@@ -263,11 +263,11 @@ extension _BoundedBufferReference {
       let (_, i0) = head._copyContents(initializing: b0)
       
       let b1 = UnsafeMutableBufferPointer(
-        start: b0.baseAddress + i0, count: b0.count - b0[..<i0].count)
+        start: b0.baseAddress! + i0, count: b0.count - b0[..<i0].count)
       let (_, i1) = middle._copyContents(initializing: b1)
 
       let b2 = UnsafeMutableBufferPointer(
-        start: b1.baseAddress + i1, count: b1.count - b1[..<i1].count)
+        start: b1.baseAddress! + i1, count: b1.count - b1[..<i1].count)
       let (_, i2) = tail._copyContents(initializing: b2)
       
       assert(i2 == b2.endIndex, "Failed to consume input")

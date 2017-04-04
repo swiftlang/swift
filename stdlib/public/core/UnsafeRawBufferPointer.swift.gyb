@@ -129,7 +129,7 @@ public struct Unsafe${Mutable}RawBufferPointer
 
     @_versioned
     @_inlineable
-    init(_position: UnsafeRawPointer, _end: UnsafeRawPointer) {
+    init(_position: UnsafeRawPointer?, _end: UnsafeRawPointer?) {
       self._position = _position
       self._end = _end
     }
