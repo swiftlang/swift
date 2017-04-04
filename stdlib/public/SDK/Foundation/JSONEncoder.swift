@@ -175,8 +175,9 @@ fileprivate class _JSONEncoder : Encoder {
         self.codingPath.removeLast()
     }
 
-    /// Validates that a new container can be requested. `preconditionFailure()`s if one cannot be requested.
-    func validateCanRequestContainer() {
+    /// Asserts that a new container can be requested at this coding path.
+    /// `preconditionFailure()`s if one cannot be requested.
+    func assertCanRequestNewContainer() {
         // Every time a new value gets encoded, the key it's encoded for is pushed onto the coding path (even if it's a nil key from an unkeyed container).
         // At the same time, every time a container is requested, a new value gets pushed onto the storage stack.
         // If there are more values on the storage stack than on the coding path, it means the value is requesting more than one container, which violates the precondition.
@@ -193,26 +194,26 @@ fileprivate class _JSONEncoder : Encoder {
                 previousContainerType = "single value"
             }
 
-            preconditionFailure("Attempted to encode with new container when already encoded with \(previousContainerType) container.")
+            preconditionFailure("Attempt to encode with new container when already encoded with \(previousContainerType) container.")
         }
     }
 
     // MARK: - Encoder Methods
     func container<Key>(keyedBy: Key.Type) -> KeyedEncodingContainer<Key> {
-        validateCanRequestContainer()
+        assertCanRequestNewContainer()
         let container = self.storage.pushKeyedContainer()
         let wrapper = _JSONKeyedEncodingContainer<Key>(referencing: self, wrapping: container)
         return KeyedEncodingContainer(wrapper)
     }
 
     func unkeyedContainer() -> UnkeyedEncodingContainer {
-        validateCanRequestContainer()
+        assertCanRequestNewContainer()
         let container = self.storage.pushUnkeyedContainer()
         return _JSONUnkeyedEncodingContainer(referencing: self, wrapping: container)
     }
 
     func singleValueContainer() -> SingleValueEncodingContainer {
-        validateCanRequestContainer()
+        assertCanRequestNewContainer()
         return self
     }
 }
@@ -452,25 +453,101 @@ fileprivate struct _JSONUnkeyedEncodingContainer : UnkeyedEncodingContainer {
 }
 
 extension _JSONEncoder : SingleValueEncodingContainer {
+    // MARK: Utility
+
+    /// Asserts that a single value can be encoded at the current coding path (i.e. that one has not already been encoded through this container).
+    /// `preconditionFailure()`s if one cannot be encoded.
+    ///
+    /// This is similar to assertCanRequestNewContainer above.
+    func assertCanEncodeSingleValue() {
+        guard self.storage.count == self.codingPath.count else {
+            let previousContainerType: String
+            if self.storage.containers.last is NSDictionary {
+                previousContainerType = "keyed"
+            } else if self.storage.containers.last is NSArray {
+                previousContainerType = "unkeyed"
+            } else {
+                preconditionFailure("Attempt to encode multiple values in a single value container.")
+            }
+
+            preconditionFailure("Attempt to encode with new container when already encoded with \(previousContainerType) container.")
+        }
+    }
+
     // MARK: SingleValueEncodingContainer Methods
 
-    func encode(_ value: Bool)   throws { self.storage.push(container: box(value)) }
-    func encode(_ value: Int)    throws { self.storage.push(container: box(value)) }
-    func encode(_ value: Int8)   throws { self.storage.push(container: box(value)) }
-    func encode(_ value: Int16)  throws { self.storage.push(container: box(value)) }
-    func encode(_ value: Int32)  throws { self.storage.push(container: box(value)) }
-    func encode(_ value: Int64)  throws { self.storage.push(container: box(value)) }
-    func encode(_ value: UInt)   throws { self.storage.push(container: box(value)) }
-    func encode(_ value: UInt8)  throws { self.storage.push(container: box(value)) }
-    func encode(_ value: UInt16) throws { self.storage.push(container: box(value)) }
-    func encode(_ value: UInt32) throws { self.storage.push(container: box(value)) }
-    func encode(_ value: UInt64) throws { self.storage.push(container: box(value)) }
-    func encode(_ value: String) throws { self.storage.push(container: box(value)) }
-    func encode(_ value: Float)  throws { try self.storage.push(container: box(value)) }
-    func encode(_ value: Double) throws { try self.storage.push(container: box(value)) }
+    func encode(_ value: Bool) throws {
+        assertCanEncodeSingleValue()
+        self.storage.push(container: box(value))
+    }
+
+    func encode(_ value: Int) throws {
+        assertCanEncodeSingleValue()
+        self.storage.push(container: box(value))
+    }
+
+    func encode(_ value: Int8) throws {
+        assertCanEncodeSingleValue()
+        self.storage.push(container: box(value))
+    }
+
+    func encode(_ value: Int16) throws {
+        assertCanEncodeSingleValue()
+        self.storage.push(container: box(value))
+    }
+
+    func encode(_ value: Int32) throws {
+        assertCanEncodeSingleValue()
+        self.storage.push(container: box(value))
+    }
+
+    func encode(_ value: Int64) throws {
+        assertCanEncodeSingleValue()
+        self.storage.push(container: box(value))
+    }
+
+    func encode(_ value: UInt) throws {
+        assertCanEncodeSingleValue()
+        self.storage.push(container: box(value))
+    }
+
+    func encode(_ value: UInt8) throws {
+        assertCanEncodeSingleValue()
+        self.storage.push(container: box(value))
+    }
+
+    func encode(_ value: UInt16) throws {
+        assertCanEncodeSingleValue()
+        self.storage.push(container: box(value))
+    }
+
+    func encode(_ value: UInt32) throws {
+        assertCanEncodeSingleValue()
+        self.storage.push(container: box(value))
+    }
+
+    func encode(_ value: UInt64) throws {
+        assertCanEncodeSingleValue()
+        self.storage.push(container: box(value))
+    }
+
+    func encode(_ value: String) throws {
+        assertCanEncodeSingleValue()
+        self.storage.push(container: box(value))
+    }
+
+    func encode(_ value: Float) throws {
+        assertCanEncodeSingleValue()
+        try self.storage.push(container: box(value))
+    }
+
+    func encode(_ value: Double) throws {
+        assertCanEncodeSingleValue()
+        try self.storage.push(container: box(value))
+    }
+
     func encode(_ value: Data) throws {
-        // The Data strategy may request a container through a closure.
-        // Normally we would have to push a key onto the coding path, but since the single value container doesn't push a container on its own, we're using whichever key has already been pushed onto here for us.
+        assertCanEncodeSingleValue()
         try self.storage.push(container: box(value))
     }
 }
