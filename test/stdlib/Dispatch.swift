@@ -426,14 +426,12 @@ DispatchAPI.test("DispatchData.buffers") {
 		expectEqual(data[i], bytes[i])
 	}
 
-	// Michael NOTE: disabled as part of buffer-pointer being non-nullable
-	//
-	// ptr = UnsafeBufferPointer<UInt8>(start: nil, count: 0)
-	// data = DispatchData(bytes: ptr)
-	// expectEqual(data.count, 0)
+	ptr = UnsafeBufferPointer<UInt8>(start: nil, count: 0)
+	data = DispatchData(bytes: ptr)
+	expectEqual(data.count, 0)
 
-	// data = DispatchData(bytesNoCopy: ptr, deallocator: .custom(nil, {}))
-	// expectEqual(data.count, 0)
+	data = DispatchData(bytesNoCopy: ptr, deallocator: .custom(nil, {}))
+	expectEqual(data.count, 0)
 }
 
 DispatchAPI.test("DispatchData.bufferUnsafeRawBufferPointer") {

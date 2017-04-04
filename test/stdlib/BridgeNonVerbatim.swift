@@ -90,7 +90,7 @@ func testScope() {
     // FIXME: Can't elide signature and use $0 here <rdar://problem/17770732> 
     (buf: inout UnsafeMutableBufferPointer<Int>) -> () in
     nsx.available_getObjects(
-      AutoreleasingUnsafeMutablePointer(buf.baseAddress), // Michael NOTE: unsafe buffer pointer ! change
+      AutoreleasingUnsafeMutablePointer(buf.baseAddress!),
       range: NSRange(location: 1, length: 2))
     return
   }
