@@ -241,9 +241,40 @@ void TypeChecker::resolveRawType(EnumDecl *enumDecl) {
   ITC.satisfy(requestTypeCheckRawType(enumDecl));
 }
 
+void TypeChecker::validateWhereClauses(ProtocolDecl *protocol) {
+  ProtocolRequirementTypeResolver resolver(protocol);
+  TypeResolutionOptions options;
+
+  if (auto whereClause = protocol->getTrailingWhereClause()) {
+    DeclContext *lookupDC = protocol;
+    for (auto &req : whereClause->getRequirements()) {
+      // FIXME: handle error?
+      (void)validateRequirement(whereClause->getWhereLoc(), req,
+                                lookupDC, options, &resolver);
+    }
+  }
+
+  for (auto member : protocol->getMembers()) {
+    if (auto assocType = dyn_cast<AssociatedTypeDecl>(member)) {
+      if (auto whereClause = assocType->getTrailingWhereClause()) {
+        DeclContext *lookupDC = assocType->getDeclContext();
+
+        for (auto &req : whereClause->getRequirements()) {
+          if (!validateRequirement(whereClause->getWhereLoc(), req,
+                                   lookupDC, options, &resolver))
+            // FIXME handle error?
+            continue;
+        }
+      }
+    }
+  }
+}
+
 void TypeChecker::resolveInheritedProtocols(ProtocolDecl *protocol) {
   IterativeTypeChecker ITC(*this);
   ITC.satisfy(requestInheritedProtocols(protocol));
+
+  validateWhereClauses(protocol);
 }
 
 void TypeChecker::resolveInheritanceClause(
@@ -4524,33 +4555,7 @@ public:
 
     if (!IsSecondPass) {
       checkUnsupportedNestedType(PD);
-
-      ProtocolRequirementTypeResolver resolver(PD);
-      TypeResolutionOptions options;
-
-      if (auto whereClause = PD->getTrailingWhereClause()) {
-        DeclContext *lookupDC = PD;
-        for (auto &req : whereClause->getRequirements()) {
-          // FIXME: handle error?
-          (void)TC.validateRequirement(whereClause->getWhereLoc(), req,
-                                       lookupDC, options, &resolver);
-        }
-      }
-
-      for (auto member : PD->getMembers()) {
-        if (auto assocType = dyn_cast<AssociatedTypeDecl>(member)) {
-          if (auto whereClause = assocType->getTrailingWhereClause()) {
-            DeclContext *lookupDC = assocType->getDeclContext();
-
-            for (auto &req : whereClause->getRequirements()) {
-              if (!TC.validateRequirement(whereClause->getWhereLoc(), req,
-                                          lookupDC, options, &resolver))
-                // FIXME handle error?
-                continue;
-            }
-          }
-        }
-      }
+      TC.validateWhereClauses(PD);
     }
 
     if (IsSecondPass) {

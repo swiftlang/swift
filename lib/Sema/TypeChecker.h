@@ -1344,6 +1344,10 @@ public:
   /// Resolve the inherited protocols of a given protocol.
   void resolveInheritedProtocols(ProtocolDecl *protocol) override;
 
+  /// Validate a protocol's where clause, along with the where clauses of
+  /// its associated types.
+  void validateWhereClauses(ProtocolDecl *protocol);
+
   /// Resolve the types in the inheritance clause of the given
   /// declaration context, which will be a nominal type declaration or
   /// extension declaration.
