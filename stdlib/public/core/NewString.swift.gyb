@@ -953,6 +953,21 @@ extension String : CustomDebugStringConvertible {
   }
 }
 
+// Substring too
+extension Substring : CustomStringConvertible {
+  // TODO: once this replaces Swift.String this needs to revert
+  // back to the trivial implementation of returning self
+  public var description: String {
+    return String(self).description
+  }
+}
+
+extension Substring : CustomDebugStringConvertible {
+  public var debugDescription: String {
+    return String(self).debugDescription
+  }
+}
+
 //===--- Comparable/Hashable ----------------------------------------------===//
 extension String : Comparable {
   public static func < (lhs: String, rhs: String) -> Bool {
@@ -979,6 +994,34 @@ extension String : Hashable {
 #endif
   }
 }
+
+// SubString too:
+extension Substring : Comparable {
+  public static func < (lhs: Substring, rhs: Substring) -> Bool {
+    return lhs.content.fccNormalizedUTF16.lexicographicallyPrecedes(
+      rhs.content.fccNormalizedUTF16
+    )
+  }
+  public static func == (lhs: Substring, rhs: Substring) -> Bool {
+    return lhs.content.fccNormalizedUTF16.elementsEqual(
+      rhs.content.fccNormalizedUTF16
+    )
+  }
+}
+
+extension Substring : Hashable {
+  public var hashValue : Int {
+    var hasher = _SipHash13Context(key: _Hashing.secretKey)
+    for x in content.fccNormalizedUTF16 { hasher.append(x) }
+    let resultBits = hasher.finalizeAndReturnHash()
+#if arch(i386) || arch(arm)
+    return Int(truncatingBitPattern: resultBits)
+#elseif arch(x86_64) || arch(arm64) || arch(powerpc64) || arch(powerpc64le) || arch(s390x)
+    return Int(Int64(bitPattern: resultBits))
+#endif
+  }
+}
+
 
 //===--- CString Interop --------------------------------------------------===//
 extension String {

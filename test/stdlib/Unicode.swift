@@ -24,11 +24,13 @@ UnicodeInternals.test("copy") {
 
   u16.withUnsafeMutableBufferPointer {
     (u16) -> () in
-    let p16 = u16.baseAddress!
+    // Michael NOTE: non-nil buffer pointer base address
+    let p16 = u16.baseAddress
 
     u8.withUnsafeMutableBufferPointer {
       (u8) -> () in
-      let p8 = u8.baseAddress!
+      // Michael NOTE: non-nil buffer pointer base address
+      let p8 = u8.baseAddress
 
       UTF16._copy(source: p8, destination: p16, count: 3)
       expectEqual([ 0, 1, 2, 9, 10, 11 ], Array(u16))

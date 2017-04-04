@@ -75,7 +75,8 @@ class TestUUID : TestUUIDSuper {
         var bytes: [UInt8] = [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
         let valFromBytes = bytes.withUnsafeMutableBufferPointer { buffer -> UUID in
             ref.getBytes(buffer.baseAddress)
-            return UUID(uuid: UnsafeRawPointer(buffer.baseAddress!).load(as: uuid_t.self))
+            // Michael NOTE: non-nil buffer pointer base address
+            return UUID(uuid: UnsafeRawPointer(buffer.baseAddress).load(as: uuid_t.self))
         }
         let valFromStr = UUID(uuidString: ref.uuidString)
         expectEqual(ref.uuidString, valFromRef.uuidString)

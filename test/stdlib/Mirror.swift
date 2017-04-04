@@ -65,7 +65,8 @@ func find(_ substring: String, within domain: String) -> String.Index? {
   var sliceEnd = domain.index(sliceStart, offsetBy: substringCount)
   var i = 0
   while true {
-    if domain[sliceStart..<sliceEnd] == substring {
+    // Michael NOTE: had to explicitly construct a String here
+    if String(domain[sliceStart..<sliceEnd]) == substring {
       return sliceStart
     }
     if i == domainCount - substringCount { break }
@@ -116,7 +117,8 @@ mirrors.test("BidirectionalStructure") {
   let description = y.testDescription
   expectEqual(
     "[nil: \"a\", nil: \"b\", nil: \"c\", nil: \"",
-    description[description.startIndex..<description.characters.index(of: "d")!])
+    // Michael NOTE: had to explicitly construct a String
+    String(description[description.startIndex..<description.characters.index(of: "d")!]))
 }
 
 mirrors.test("LabeledStructure") {
