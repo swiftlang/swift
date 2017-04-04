@@ -55,33 +55,10 @@ class SubstitutionMap {
   /// are performing substitutions.
   llvm::PointerUnion<GenericSignature *, GenericEnvironment *> genericSigOrEnv;
 
-  using ParentType = std::pair<CanType, AssociatedTypeDecl *>;
-
   // FIXME: Switch to a more efficient representation.
   llvm::DenseMap<SubstitutableType *, Type> subMap;
   llvm::DenseMap<TypeBase *, SmallVector<ProtocolConformanceRef, 1>>
     conformanceMap;
-  llvm::DenseMap<TypeBase *, SmallVector<ParentType, 1>> parentMap;
-
-  // Call the given function for each parent of the given type. The
-  // function \c fn should return an \c Optional<T>. \c forEachParent() will
-  // return the first non-empty \C Optional<T> returned by \c fn.
-  template<typename T>
-  Optional<T> forEachParent(
-                CanType type,
-                llvm::SmallPtrSetImpl<CanType> &visitedParents,
-                llvm::function_ref<Optional<T>(CanType,
-                                               AssociatedTypeDecl *)> fn) const;
-
-  // Call the given function for each conformance of the given type. The
-  // function \c fn should return an \c Optional<T>. \c forEachConformance()
-  // will return the first non-empty \C Optional<T> returned by \c fn.
-  template<typename T>
-  Optional<T> forEachConformance(
-                  CanType type,
-                  llvm::SmallPtrSetImpl<CanType> &visitedParents,
-                  llvm::function_ref<Optional<T>(ProtocolConformanceRef)> fn)
-                const;
 
 public:
   SubstitutionMap()
@@ -96,9 +73,7 @@ public:
   GenericSignature *getGenericSignature() const;
 
   Optional<ProtocolConformanceRef>
-  lookupConformance(
-                CanType type, ProtocolDecl *proto,
-                llvm::SmallPtrSetImpl<CanType> *visitedParents = nullptr) const;
+  lookupConformance(CanType type, ProtocolDecl *proto) const;
 
   bool empty() const {
     return subMap.empty();
@@ -194,8 +169,6 @@ private:
 
   void addSubstitution(CanSubstitutableType type, Type replacement);
   void addConformance(CanType type, ProtocolConformanceRef conformance);
-  void addParent(CanType type, CanType parent,
-                 AssociatedTypeDecl *assocType);
 };
 
 } // end namespace swift

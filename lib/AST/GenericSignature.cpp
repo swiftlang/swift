@@ -377,31 +377,6 @@ bool GenericSignature::enumeratePairedRequirements(
   return enumerateGenericParamsUpToDependentType(CanType());
 }
 
-void GenericSignature::populateParentMap(SubstitutionMap &subMap) const {
-  for (auto reqt : getRequirements()) {
-    if (reqt.getKind() != RequirementKind::SameType)
-      continue;
-
-    auto first = reqt.getFirstType();
-    auto second = reqt.getSecondType();
-
-    if (!first->isTypeParameter() || !second->isTypeParameter())
-      continue;
-
-    if (auto *firstMemTy = first->getAs<DependentMemberType>()) {
-      subMap.addParent(second->getCanonicalType(),
-                       firstMemTy->getBase()->getCanonicalType(),
-                       firstMemTy->getAssocType());
-    }
-
-    if (auto *secondMemTy = second->getAs<DependentMemberType>()) {
-      subMap.addParent(first->getCanonicalType(),
-                       secondMemTy->getBase()->getCanonicalType(),
-                       secondMemTy->getAssocType());
-    }
-  }
-}
-
 SubstitutionMap
 GenericSignature::getSubstitutionMap(SubstitutionList subs) const {
   SubstitutionMap result(const_cast<GenericSignature *>(this));
@@ -423,7 +398,6 @@ GenericSignature::getSubstitutionMap(SubstitutionList subs) const {
     });
 
   assert(subs.empty() && "did not use all substitutions?!");
-  populateParentMap(result);
   result.verify();
   return result;
 }
@@ -458,7 +432,6 @@ getSubstitutionMap(TypeSubstitutionFn subs,
     return false;
   });
 
-  populateParentMap(subMap);
   subMap.verify();
   return subMap;
 }
