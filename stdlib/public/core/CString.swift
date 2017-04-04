@@ -195,17 +195,3 @@ func _decodeCString<Encoding : UnicodeCodec>(
     (result: String(_storage: $0), repairsMade: hadError)
   }
 }
-
-extension String {
-  @available(*, unavailable, message: "Please use String.init?(validatingUTF8:) instead. Note that it no longer accepts NULL as a valid input. Also consider using String(cString:), that will attempt to repair ill-formed code units.")
-  public static func fromCString(_ cs: UnsafePointer<CChar>) -> String? {
-    Builtin.unreachable()
-  }
-
-  @available(*, unavailable, message: "Please use String.init(cString:) instead. Note that it no longer accepts NULL as a valid input. See also String.decodeCString if you need more control.")
-  public static func fromCStringRepairingIllFormedUTF8(
-    _ cs: UnsafePointer<CChar>
-  ) -> (String?, hadError: Bool) {
-    Builtin.unreachable()
-  }
-}
