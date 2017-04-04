@@ -68,16 +68,16 @@ struct FooBar<T: Fooable>: Barrable {
 
 // Test that associated types can be constrained to concrete types
 
-func concreteJungle<T where T : Fooable, T.Foo == C>() -> T.Foo {
+func concreteJungle<T where T : Fooable, T.Foo == C>(_: T) -> T.Foo {
   return C()
 }
 
-func concreteJungle<T where T : Fooable, T.Foo == C>(t: T.Foo) -> C {
+func concreteJungle<T where T : Fooable, T.Foo == C>(_: T, t: T.Foo) -> C {
   let c: C = t
   return c
 }
 
-func concreteJungle<T where T : Fooable, T.Foo == C>(f: @escaping (T.Foo) -> C) -> T.Foo {
+func concreteJungle<T where T : Fooable, T.Foo == C>(_: T, f: @escaping (T.Foo) -> C) -> T.Foo {
   let ff: (C) -> T.Foo = f
   return ff(C())
 }
