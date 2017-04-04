@@ -4,8 +4,8 @@
 // RUN: %FileCheck %s -check-prefix=PRINT -strict-whitespace < %t.printed.A.txt
 // RUN: %FileCheck %s -check-prefix=PRINTB -strict-whitespace < %t.printed.B.txt
 
-// RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -I %t -I %S/Inputs/custom-modules -print-module -source-filename %s -module-to-print=ImportAsMember.APINotes -swift-version 3 -always-argument-labels | %FileCheck %s -check-prefix=PRINT-APINOTES-3 -strict-whitespace
-// RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -I %t -I %S/Inputs/custom-modules -print-module -source-filename %s -module-to-print=ImportAsMember.APINotes -swift-version 4 -always-argument-labels | %FileCheck %s -check-prefix=PRINT-APINOTES-4 -strict-whitespace
+// RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -I %t -I %S/Inputs/custom-modules -print-module -source-filename %s -module-to-print=ImportAsMember.APINotes -swift-version 3 -always-argument-labels | %FileCheck %s -check-prefix=PRINT-APINOTES-3 -implicit-check-not "not inherited" -strict-whitespace
+// RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -I %t -I %S/Inputs/custom-modules -print-module -source-filename %s -module-to-print=ImportAsMember.APINotes -swift-version 4 -always-argument-labels | %FileCheck %s -check-prefix=PRINT-APINOTES-4 -implicit-check-not "not inherited" -strict-whitespace
 
 // RUN: %target-typecheck-verify-swift -I %S/Inputs/custom-modules
 

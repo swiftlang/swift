@@ -5070,6 +5070,8 @@ Decl *SwiftDeclConverter::importGlobalAsInitializer(
                                      decl->getName());
     return nullptr;
   }
+  if (!dc->getAsClassOrClassExtensionContext())
+    initKind = CtorInitializerKind::Designated;
 
   bool allowNSUIntegerAsInt =
       Impl.shouldAllowNSUIntegerAsInt(isInSystemModule(dc), decl);
