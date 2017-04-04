@@ -126,8 +126,8 @@ extension String {
         return false
       }
       return Int(_swift_stdlib_memcmp(
-        selfASCIIBuffer.baseAddress,
-        prefixASCIIBuffer.baseAddress,
+        selfASCIIBuffer.baseAddress!,
+        prefixASCIIBuffer.baseAddress!,
         prefixASCIIBuffer.count)) == 0
     }
     if selfCore.hasContiguousStorage && prefixCore.hasContiguousStorage {
@@ -184,9 +184,9 @@ extension String {
         return false
       }
       return Int(_swift_stdlib_memcmp(
-        selfASCIIBuffer.baseAddress
+        selfASCIIBuffer.baseAddress!
           + (selfASCIIBuffer.count - suffixASCIIBuffer.count),
-        suffixASCIIBuffer.baseAddress,
+        suffixASCIIBuffer.baseAddress!,
         suffixASCIIBuffer.count)) == 0
     }
     if selfCore.hasContiguousStorage && suffixCore.hasContiguousStorage {

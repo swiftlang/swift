@@ -96,7 +96,7 @@ public // SPI(Foundation)
 func _typeByName(_ name: String) -> Any.Type? {
   let nameUTF8 = Array(name.utf8)
   return nameUTF8.withUnsafeBufferPointer { (nameUTF8) in
-    let type = _getTypeByName(nameUTF8.baseAddress,
+    let type = _getTypeByName(nameUTF8.baseAddress!,
                               UInt(nameUTF8.endIndex))
 
     return type
