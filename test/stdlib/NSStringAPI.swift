@@ -530,8 +530,9 @@ NSStringAPIs.test("enumerateLinguisticTagsIn(_:scheme:options:orthography:_:") {
     (tag: String, tokenRange: Range<String.Index>, sentenceRange: Range<String.Index>, stop: inout Bool)
   in
     tags.append(tag)
-    tokens.append(s[tokenRange])
-    sentences.append(s[sentenceRange])
+    // Michael NOTE: explicitly construct String from Substring
+    tokens.append(String(s[tokenRange]))
+    sentences.append(String(s[sentenceRange]))
     if tags.count == 3 {
       stop = true
     }
@@ -540,7 +541,8 @@ NSStringAPIs.test("enumerateLinguisticTagsIn(_:scheme:options:orthography:_:") {
     [NSLinguisticTagWord, NSLinguisticTagWhitespace, NSLinguisticTagWord],
     tags)
   expectEqual(["Глокая", " ", "куздра"], tokens)
-  let sentence = s[startIndex..<endIndex]
+  // Michael NOTE: String(Substring)
+  let sentence = String(s[startIndex..<endIndex])
   expectEqual([sentence, sentence, sentence], sentences)
 }
 
@@ -555,9 +557,10 @@ NSStringAPIs.test("enumerateSubstringsIn(_:options:_:)") {
       (substring: String?, substringRange: Range<String.Index>,
        enclosingRange: Range<String.Index>, stop: inout Bool)
     in
-      substrings.append(substring!)
-      expectEqual(substring, s[substringRange])
-      expectEqual(substring, s[enclosingRange])
+      // Michael NOTE: explicit String 
+      substrings.append(String(substring!))
+      expectEqual(substring, String(s[substringRange]))
+      expectEqual(substring, String(s[enclosingRange]))
     }
     expectEqual(["\u{304b}\u{3099}", "お", "☺️", "😀"], substrings)
   }
@@ -724,10 +727,11 @@ NSStringAPIs.test("getLineStart(_:end:contentsEnd:forRange:)") {
     var outContentsEndIndex = s.startIndex
     s.getLineStart(&outStartIndex, end: &outLineEndIndex,
         contentsEnd: &outContentsEndIndex, for: r)
+    // Michael NOTE: explicit String of Substring
     expectEqual("штеко будланула\nбокра и кудрячит\n",
-        s[outStartIndex..<outLineEndIndex])
+        String(s[outStartIndex..<outLineEndIndex]))
     expectEqual("штеко будланула\nбокра и кудрячит",
-        s[outStartIndex..<outContentsEndIndex])
+        String(s[outStartIndex..<outContentsEndIndex]))
   }
 }
 
@@ -740,10 +744,11 @@ NSStringAPIs.test("getParagraphStart(_:end:contentsEnd:forRange:)") {
     var outContentsEndIndex = s.startIndex
     s.getParagraphStart(&outStartIndex, end: &outEndIndex,
         contentsEnd: &outContentsEndIndex, for: r)
+    // Michael NOTE: String(Substring())
     expectEqual("штеко будланула\u{2028}бокра и кудрячит\u{2028}бокрёнка.\n",
-        s[outStartIndex..<outEndIndex])
+        String(s[outStartIndex..<outEndIndex]))
     expectEqual("штеко будланула\u{2028}бокра и кудрячит\u{2028}бокрёнка.",
-        s[outStartIndex..<outContentsEndIndex])
+        String(s[outStartIndex..<outContentsEndIndex]))
   }
 }
 
@@ -856,7 +861,8 @@ NSStringAPIs.test("lineRangeFor(_:)") {
   let r = s.index(s.startIndex, offsetBy: 16)..<s.index(s.startIndex, offsetBy: 35)
   do {
     let result = s.lineRange(for: r)
-    expectEqual("штеко будланула\nбокра и кудрячит\n", s[result])
+    // Michael NOTE: explicit String of Substring
+    expectEqual("штеко будланула\nбокра и кудрячит\n", String(s[result]))
   }
 }
 
@@ -872,8 +878,9 @@ NSStringAPIs.test("linguisticTagsIn(_:scheme:options:orthography:tokenRanges:)")
   expectEqual(
     [NSLinguisticTagWord, NSLinguisticTagWhitespace, NSLinguisticTagWord],
     tags)
+  // Michael NOTE: explicit String of Substring
   expectEqual(["Глокая", " ", "куздра"],
-      tokenRanges.map { s[$0] } )
+      tokenRanges.map { String(s[$0]) } )
 }
 
 NSStringAPIs.test("localizedCaseInsensitiveCompare(_:)") {
@@ -1021,7 +1028,8 @@ NSStringAPIs.test("paragraphRangeFor(_:)") {
   let r = s.index(s.startIndex, offsetBy: 16)..<s.index(s.startIndex, offsetBy: 35)
   do {
     let result = s.paragraphRange(for: r)
-    expectEqual("штеко будланула\u{2028}бокра и кудрячит\u{2028}бокрёнка.\n", s[result])
+    // Michael NOTE: explicit String of Substring
+    expectEqual("штеко будланула\u{2028}бокра и кудрячит\u{2028}бокрёнка.\n", String(s[result]))
   }
 }
 
@@ -1104,8 +1112,9 @@ NSStringAPIs.test("rangeOfCharacterFrom(_:options:range:)") {
     let charset = CharacterSet(charactersIn: "\u{1F600}")
     do {
       let s = "abc\u{1F600}"
+      // Michael NOTE: String(Substring())
       expectEqual("\u{1F600}",
-          s[s.rangeOfCharacter(from: charset)!])
+          String(s[s.rangeOfCharacter(from: charset)!]))
     }
     do {
       expectNil("abc\u{1F601}".rangeOfCharacter(from: charset))
@@ -1115,23 +1124,25 @@ NSStringAPIs.test("rangeOfCharacterFrom(_:options:range:)") {
 
 NSStringAPIs.test("rangeOfComposedCharacterSequence(at:)") {
   let s = "\u{1F601}abc \u{305f}\u{3099} def"
-  expectEqual("\u{1F601}", s[s.rangeOfComposedCharacterSequence(
-      at: s.startIndex)])
-  expectEqual("a", s[s.rangeOfComposedCharacterSequence(
-      at: s.index(s.startIndex, offsetBy: 1))])
-  expectEqual("\u{305f}\u{3099}", s[s.rangeOfComposedCharacterSequence(
-      at: s.index(s.startIndex, offsetBy: 5))])
-  expectEqual(" ", s[s.rangeOfComposedCharacterSequence(
-      at: s.index(s.startIndex, offsetBy: 6))])
+  // Michael NOTE: explicit String of Substring
+  expectEqual("\u{1F601}", String(s[s.rangeOfComposedCharacterSequence(
+      at: s.startIndex)]))
+  expectEqual("a", String(s[s.rangeOfComposedCharacterSequence(
+      at: s.index(s.startIndex, offsetBy: 1))]))
+  expectEqual("\u{305f}\u{3099}", String(s[s.rangeOfComposedCharacterSequence(
+      at: s.index(s.startIndex, offsetBy: 5))]))
+  expectEqual(" ", String(s[s.rangeOfComposedCharacterSequence(
+      at: s.index(s.startIndex, offsetBy: 6))]))
 }
 
 NSStringAPIs.test("rangeOfComposedCharacterSequences(for:)") {
   let s = "\u{1F601}abc さ\u{3099}し\u{3099}す\u{3099}せ\u{3099}そ\u{3099}"
 
-  expectEqual("\u{1F601}a", s[s.rangeOfComposedCharacterSequences(
-      for: s.startIndex..<s.index(s.startIndex, offsetBy: 2))])
-  expectEqual("せ\u{3099}そ\u{3099}", s[s.rangeOfComposedCharacterSequences(
-      for: s.index(s.startIndex, offsetBy: 8)..<s.index(s.startIndex, offsetBy: 10))])
+  // Michael NOTE: explicit String of Substring
+  expectEqual("\u{1F601}a", String(s[s.rangeOfComposedCharacterSequences(
+      for: s.startIndex..<s.index(s.startIndex, offsetBy: 2))]))
+  expectEqual("せ\u{3099}そ\u{3099}", String(s[s.rangeOfComposedCharacterSequences(
+      for: s.index(s.startIndex, offsetBy: 8)..<s.index(s.startIndex, offsetBy: 10))]))
 }
 
 func toIntRange(
@@ -1170,7 +1181,9 @@ NSStringAPIs.test("range(of:options:range:locale:)") {
     //
     // FIXME: why does this search succeed and the above queries fail?  There is
     // no apparent pattern.
-    expectEqual("\u{3099}", s[s.range(of: "\u{3099}")!])
+    //
+    // Michael NOTE: String(Substring())
+    expectEqual("\u{3099}", String(s[s.range(of: "\u{3099}")!]))
   }
   do {
     let s = "а\u{0301}б\u{0301}в\u{0301}г\u{0301}"
@@ -1182,7 +1195,9 @@ NSStringAPIs.test("range(of:options:range:locale:)") {
 
     // FIXME: Again, indexes that don't correspond to grapheme
     // cluster boundaries.
-    expectEqual("\u{0301}", s[s.range(of: "\u{0301}")!])
+    //
+    // Michael NOTE: explicit String of Substring
+    expectEqual("\u{0301}", String(s[s.range(of: "\u{0301}")!]))
   }
 }
 
@@ -1292,8 +1307,9 @@ NSStringAPIs.test("localizedStandardRange(of:)") {
       do {
         // FIXME: Indices that don't correspond to grapheme cluster boundaries.
         let s = "a\u{0301}"
+        // Michael NOTE: String(Substring())
         expectEqual(
-          "\u{0301}", s[s.localizedStandardRange(of: "\u{0301}")!])
+          "\u{0301}", String(s[s.localizedStandardRange(of: "\u{0301}")!]))
       }
       expectNil(rangeOf("a", "\u{0301}"))
 
@@ -1812,8 +1828,9 @@ NSStringAPIs.test("CompareStringsWithUnpairedSurrogates")
   let donor = "abcdef"
   let acceptor = "\u{1f601}\u{1f602}\u{1f603}"
 
+  // Michael NOTE: String(Substring())
   expectEqual("\u{fffd}\u{1f602}\u{fffd}",
-    acceptor[donor.index(donor.startIndex, offsetBy: 1)..<donor.index(donor.startIndex, offsetBy: 5)])
+    String(acceptor[donor.index(donor.startIndex, offsetBy: 1)..<donor.index(donor.startIndex, offsetBy: 5)]))
 }
 
 NSStringAPIs.test("copy construction") {
