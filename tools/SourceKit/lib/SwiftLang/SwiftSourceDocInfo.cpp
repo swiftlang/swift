@@ -610,6 +610,29 @@ static bool passCursorInfoForModule(ModuleEntity Mod,
   return false;
 }
 
+static bool getParamParentNameLoc(const ValueDecl *VD, unsigned &Line,
+                                  unsigned &Column) {
+  SourceLoc Loc;
+  if (auto PD = dyn_cast<ParamDecl>(VD)) {
+    auto *DC = PD->getDeclContext();
+    switch (DC->getContextKind()) {
+      case DeclContextKind::SubscriptDecl:
+        Loc = cast<SubscriptDecl>(DC)->getNameLoc();
+        break;
+      case DeclContextKind::AbstractFunctionDecl:
+        Loc = cast<AbstractFunctionDecl>(DC)->getNameLoc();
+        break;
+      default:
+        return false;
+    }
+  }
+  if (Loc.isInvalid())
+    return false;
+  auto &SM = VD->getASTContext().SourceMgr;
+  std::tie(Line, Column) = SM.getLineAndColumn(Loc);
+  return true;
+}
+
 /// Returns true for failure to resolve.
 static bool passCursorInfoForDecl(const ValueDecl *VD,
                                   const ModuleDecl *MainModule,
@@ -830,6 +853,12 @@ static bool passCursorInfoForDecl(const ValueDecl *VD,
   bool IsSystem = VD->getModuleContext()->isSystemModule();
   std::string TypeInterface;
 
+  unsigned ParentLine, ParentCol;
+  llvm::Optional<std::pair<unsigned, unsigned>> ParentLoc;
+  if (getParamParentNameLoc(VD, ParentLine, ParentCol)) {
+    ParentLoc.emplace(ParentLine, ParentCol);
+  }
+
   CursorInfo Info;
   Info.Kind = Kind;
   Info.Name = Name;
@@ -850,6 +879,7 @@ static bool passCursorInfoForDecl(const ValueDecl *VD,
   Info.LocalizationKey = LocalizationKey;
   Info.IsSystem = IsSystem;
   Info.TypeInterface = StringRef();
+  Info.ParentNameLoc = ParentLoc;
   Receiver(Info);
   return false;
 }
@@ -1020,6 +1050,7 @@ public:
     return false;
   }
 };
+
 static void resolveCursor(SwiftLangSupport &Lang,
                           StringRef InputFile, unsigned Offset,
                           unsigned Length, bool Actionables,

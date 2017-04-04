@@ -41,6 +41,7 @@ extern SourceKit::UIdent KeyEnableDiagnostics;
 extern SourceKit::UIdent KeySyntacticOnly;
 extern SourceKit::UIdent KeyLength;
 extern SourceKit::UIdent KeyActionable;
+extern SourceKit::UIdent KeyParentLoc;
 extern SourceKit::UIdent KeyKind;
 extern SourceKit::UIdent KeyAccessibility;
 extern SourceKit::UIdent KeySetterAccessibility;
