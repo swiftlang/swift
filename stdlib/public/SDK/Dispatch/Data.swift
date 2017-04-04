@@ -132,6 +132,7 @@ public struct DispatchData : RandomAccessCollection, _ObjectiveCBridgeable {
 	/// - parameter count: The number of bytes to copy.
 	public mutating func append(_ bytes: UnsafeRawBufferPointer) {
 		// Nil base address does nothing.
+		guard bytes.baseAddress != nil else { return }
 		let data = _swift_dispatch_data_create(bytes.baseAddress!, bytes.count, nil, _swift_dispatch_data_destructor_default()) as! __DispatchData
 		self.append(DispatchData(data: data))
 	}
@@ -185,6 +186,7 @@ public struct DispatchData : RandomAccessCollection, _ObjectiveCBridgeable {
 	/// - parameter count: The number of bytes to copy.
 	public func copyBytes(to pointer: UnsafeMutableRawBufferPointer, count: Int) {
 		assert(count <= pointer.count, "Buffer too small to copy \(count) bytes")
+		guard pointer.baseAddress != nil else { return }
 		_copyBytesHelper(to: pointer.baseAddress!, from: 0..<count)
 	}
 
@@ -205,6 +207,7 @@ public struct DispatchData : RandomAccessCollection, _ObjectiveCBridgeable {
 	/// - parameter range: The range in the `Data` to copy.
 	public func copyBytes(to pointer: UnsafeMutableRawBufferPointer, from range: CountableRange<Index>) {
 		assert(range.count <= pointer.count, "Buffer too small to copy \(range.count) bytes")
+		guard pointer.baseAddress != nil else { return }
 		_copyBytesHelper(to: pointer.baseAddress!, from: range)
 	}
 
