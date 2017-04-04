@@ -2432,10 +2432,10 @@ bool ConstraintSystem::solveSimplified(
   // FIXME: This heuristic isn't great, but it helped somewhat for
   // overload sets.
   auto disjunction = disjunctions[0];
-  auto bestSize = disjunction->getNestedConstraints().size();
+  auto bestSize = disjunction->countActiveNestedConstraints();
   if (bestSize > 2) {
     for (auto contender : llvm::makeArrayRef(disjunctions).slice(1)) {
-      unsigned newSize = contender->getNestedConstraints().size();
+      unsigned newSize = contender->countActiveNestedConstraints();
       if (newSize < bestSize) {
         bestSize = newSize;
         disjunction = contender;
@@ -2445,6 +2445,11 @@ bool ConstraintSystem::solveSimplified(
       }
     }
   }
+
+  // If there are no active constraints in the disjunction, there is
+  // no solution.
+  if (bestSize == 0)
+    return true;
 
   // Remove this disjunction constraint from the list.
   auto afterDisjunction = InactiveConstraints.erase(disjunction);
@@ -2456,6 +2461,16 @@ bool ConstraintSystem::solveSimplified(
   auto constraints = disjunction->getNestedConstraints();
   for (auto index : indices(constraints)) {
     auto constraint = constraints[index];
+    if (constraint->isDisabled()) {
+      if (TC.getLangOpts().DebugConstraintSolver) {
+        auto &log = getASTContext().TypeCheckerDebug->getStream();
+        log.indent(solverState->depth)
+          << "(skipping ";
+        constraint->print(log, &TC.Context.SourceMgr);
+        log << '\n';
+      }
+      continue;
+    }
 
     // We already have a solution; check whether we should
     // short-circuit the disjunction.
