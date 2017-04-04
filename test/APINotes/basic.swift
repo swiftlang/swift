@@ -2,6 +2,16 @@
 import APINotesTest
 import APINotesFrameworkTest
 
+#if _runtime(_ObjC)
+extension A {
+  func implicitlyObjC() { }
+}
+
+func testSelectors(a: AnyObject) {
+  a.implicitlyObjC?()  // okay: would complain without SwiftObjCMembers
+}
+#endif
+
 func testSwiftName() {
   moveTo(x: 0, y: 0, z: 0)
   moveTo(0, 0, 0) // expected-error{{missing argument labels 'x:y:z:' in call}}

@@ -255,8 +255,9 @@ void IterativeTypeChecker::processInheritedProtocols(
 
     // Collect existential types.
     // FIXME: We'd prefer to keep what the user wrote here.
-    SmallVector<ProtocolDecl *, 4> protocols;
-    if (inherited.getType()->isExistentialType(protocols)) {
+    if (inherited.getType()->isExistentialType()) {
+      SmallVector<ProtocolDecl *, 4> protocols;
+      inherited.getType()->getExistentialTypeProtocols(protocols);
       for (auto inheritedProtocol: protocols) {
         if (inheritedProtocol == protocol ||
             inheritedProtocol->inheritsFrom(protocol)) {

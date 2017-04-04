@@ -653,6 +653,10 @@ ReabstractionInfo::ReabstractionInfo(SILFunction *OrigF,
   OriginalF = OrigF;
   ConvertIndirectToDirect = true;
 
+  // FIXME: All of the below initialization is then redone by
+  // specializeConcreteSubstitutions(), but there are still a
+  // couple of callers that aren't using the new API.
+
   SILModule &M = OrigF->getModule();
   auto &Ctx = M.getASTContext();
 
@@ -731,11 +735,8 @@ void ReabstractionInfo::specializeConcreteSubstitutions(
   auto OrigGenericSig = Callee->getLoweredFunctionType()->getGenericSignature();
   auto OrigGenericEnv = Callee->getGenericEnvironment();
 
-  SubstitutionMap InterfaceSubs;
   // Get the original substitution map.
-  if (Callee->getLoweredFunctionType()->getGenericSignature())
-    InterfaceSubs = Callee->getLoweredFunctionType()->getGenericSignature()
-      ->getSubstitutionMap(ParamSubs);
+  auto InterfaceSubs = OrigGenericSig->getSubstitutionMap(ParamSubs);
 
   // This is a workaround for the rdar://30610428
   if (!EnablePartialSpecialization) {
@@ -750,7 +751,7 @@ void ReabstractionInfo::specializeConcreteSubstitutions(
   // Build a set of requirements.
   SmallVector<Requirement, 4> Requirements;
 
-  for (auto DP : OrigGenericSig->getGenericParams()) {
+  for (auto DP : OrigGenericSig->getSubstitutableParams()) {
     auto Replacement = Type(DP).subst(InterfaceSubs);
     if (Replacement->hasArchetype())
       continue;
@@ -1645,17 +1646,7 @@ static CanSILFunctionType
 getCalleeSubstFunctionType(SILValue Callee, SubstitutionList Subs) {
   // Create a substituted callee type.
   auto CanFnTy = Callee->getType().castTo<SILFunctionType>();
-  auto CalleeSubstFnTy = CanFnTy;
-
-  if (CanFnTy->isPolymorphic() && !Subs.empty()) {
-    CalleeSubstFnTy = CanFnTy->substGenericArgs(*Callee->getModule(), Subs);
-    assert(!CalleeSubstFnTy->isPolymorphic() &&
-           "Substituted callee type should not be polymorphic");
-    assert(!CalleeSubstFnTy->hasTypeParameter() &&
-           "Substituted callee type should not have type parameters");
-  }
-
-  return CalleeSubstFnTy;
+  return CanFnTy->substGenericArgs(*Callee->getModule(), Subs);
 }
 
 // Create a new apply based on an old one, but with a different

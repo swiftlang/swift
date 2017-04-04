@@ -1045,9 +1045,17 @@ struct ASTNodeBase {};
         abort();
       }
 
-      SmallVector<ProtocolDecl*, 2> protocols;
-      if (!srcTy->isExistentialType(protocols)
-          || protocols.size() != 1
+      if (!srcTy->isExistentialType()) {
+        Out << "ProtocolMetatypeToObject with non-existential metatype:\n";
+        E->print(Out);
+        Out << "\n";
+        abort();
+      }
+
+      SmallVector<ProtocolDecl*, 1> protocols;
+      srcTy->getExistentialTypeProtocols(protocols);
+
+      if (protocols.size() != 1
           || !protocols[0]->isObjC()) {
         Out << "ProtocolMetatypeToObject with non-ObjC-protocol metatype:\n";
         E->print(Out);
@@ -1903,7 +1911,7 @@ struct ASTNodeBase {};
         protocolTypes.push_back(proto->getDeclaredType());
       SmallVector<ProtocolDecl *, 4> canonicalProtocols;
       ProtocolCompositionType::get(Ctx, protocolTypes)
-        ->isExistentialType(canonicalProtocols);
+        ->getExistentialTypeProtocols(canonicalProtocols);
       if (nominalProtocols != canonicalProtocols) {
         dumpRef(decl);
         Out << " doesn't have a complete set of protocols\n";

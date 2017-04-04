@@ -919,7 +919,7 @@ namespace {
       
     llvm::Value *emitExistentialTypeMetadata(CanType type) {
       SmallVector<ProtocolDecl*, 2> protocols;
-      type.getAnyExistentialTypeProtocols(protocols);
+      type.getExistentialTypeProtocols(protocols);
       
       // Collect references to the protocol descriptors.
       auto descriptorArrayTy
@@ -1935,11 +1935,13 @@ namespace {
 
       // Reference storage types with witness tables need open-coded layouts.
       // TODO: Maybe we could provide prefabs for 1 witness table.
-      SmallVector<ProtocolDecl*, 2> protocols;
-      if (referent.isAnyExistentialType(protocols))
+      if (referent.isExistentialType()) {
+        SmallVector<ProtocolDecl*, 2> protocols;
+        referent.getExistentialTypeProtocols(protocols);
         for (auto *proto : protocols)
           if (IGF.getSILTypes().protocolRequiresWitnessTable(proto))
             return visitType(type);
+      }
 
       // Unmanaged references are plain pointers with extra inhabitants,
       // which look like thick metatypes.

@@ -1516,9 +1516,7 @@ static ArrayRef<ProtocolConformanceRef>
 collectExistentialConformances(Parser &P, CanType conformingType, SourceLoc loc,
                                CanType protocolType) {
   SmallVector<ProtocolDecl *, 2> protocols;
-  bool isExistential = protocolType->isAnyExistentialType(protocols);
-  assert(isExistential);
-  (void)isExistential;
+  protocolType.getExistentialTypeProtocols(protocols);
   if (protocols.empty())
     return {};
 
@@ -4041,7 +4039,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB, SILBuilder &B) {
 
     ArrayRef<ProtocolConformanceRef> conformances
       = collectExistentialConformances(P, formalConcreteType, TyLoc,
-                            ExistentialTy.getSwiftRValueType());
+                                       baseExType);
     
     ResultVal = B.createInitExistentialMetatype(InstLoc, Val, ExistentialTy,
                                                 conformances);

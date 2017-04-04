@@ -2730,8 +2730,9 @@ ProtocolDecl::getInheritedProtocols() const {
     for (auto inherited : getInherited()) {
       SmallPtrSet<ProtocolDecl *, 4> known;
       if (auto type = inherited.getType()) {
-        SmallVector<ProtocolDecl *, 4> protocols;
-        if (type->isExistentialType(protocols)) {
+        if (type->isExistentialType()) {
+          SmallVector<ProtocolDecl *, 4> protocols;
+          type->getExistentialTypeProtocols(protocols);
           for (auto proto : protocols) {
             if (known.insert(proto).second)
               result.push_back(proto);

@@ -187,6 +187,9 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
   Opts.DebugTimeExpressionTypeChecking |=
     Args.hasArg(OPT_debug_time_expression_type_checking);
   Opts.DebugTimeCompilation |= Args.hasArg(OPT_debug_time_compilation);
+  if (const Arg *A = Args.getLastArg(OPT_stats_output_dir)) {
+    Opts.StatsOutputDir = A->getValue();
+  }
 
   Opts.ValidateTBDAgainstIR |= Args.hasArg(OPT_validate_tbd_against_ir);
 
@@ -1214,6 +1217,9 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
     else
       llvm_unreachable("Unknown SIL linking option!");
   }
+
+  if (Args.hasArg(OPT_sil_merge_partial_modules))
+    Opts.MergePartialModules = true;
 
   // Parse the optimization level.
   if (const Arg *A = Args.getLastArg(OPT_O_Group)) {

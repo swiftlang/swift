@@ -430,7 +430,7 @@ bool RequirementSource::isSelfDerivedConformance(PotentialArchetype *currentPA,
     totalSizeToAlloc<ProtocolDecl *, WrittenRequirementLoc>(               \
                                            NumProtocolDecls,               \
                                            WrittenReq.isNull()? 0 : 1);    \
-  void *mem = malloc(size);                                                \
+  void *mem = ::operator new(size);                                        \
   auto result = new (mem) RequirementSource ConstructorArgs;               \
   builder.Impl->RequirementSources.InsertNode(result, insertPos);          \
   return result
@@ -1984,6 +1984,13 @@ GenericSignatureBuilder::~GenericSignatureBuilder() {
   if (!Impl)
     return;
 
+  SmallVector<RequirementSource *, 4> requirementSources;
+  for (auto &reqSource : Impl->RequirementSources)
+    requirementSources.push_back(&reqSource);
+  Impl->RequirementSources.clear();
+  for (auto reqSource : requirementSources)
+    delete reqSource;
+
   for (auto PA : Impl->PotentialArchetypes)
     delete PA;
 }
@@ -2743,13 +2750,14 @@ bool GenericSignatureBuilder::addRequirement(const RequirementRepr *Req,
                                       source.getSource(PA, Req->getSubject()));
     }
 
-    SmallVector<ProtocolDecl *, 4> ConformsTo;
-    if (!Req->getConstraint()->isExistentialType(ConformsTo)) {
+    if (!Req->getConstraint()->isExistentialType()) {
       // FIXME: Diagnose this failure here, rather than over in type-checking.
       return true;
     }
 
     // Add each of the protocols.
+    SmallVector<ProtocolDecl *, 4> ConformsTo;
+    Req->getConstraint()->getExistentialTypeProtocols(ConformsTo);
     for (auto Proto : ConformsTo)
       if (addConformanceRequirement(PA, Proto,
                                     source.getSource(PA, Req->getSubject())))
@@ -2824,7 +2832,7 @@ bool GenericSignatureBuilder::addRequirement(
     if (!pa) return false;
 
     SmallVector<ProtocolDecl *, 4> conformsTo;
-    (void)req.getSecondType()->isExistentialType(conformsTo);
+    req.getSecondType()->getExistentialTypeProtocols(conformsTo);
 
     // Add each of the protocols.
     for (auto proto : conformsTo) {
@@ -4092,11 +4100,10 @@ void GenericSignatureBuilder::enumerateRequirements(llvm::function_ref<
       // If this equivalence class is bound to a concrete type, equate the
       // anchor with a concrete type.
       if (Type concreteType = rep->getConcreteType()) {
-        // If the parent of this anchor is also in the equivalence class,
-        // don't create a requirement... it's covered by the "parent"
-        // relationship.
+        // If the parent of this anchor is also a concrete type, don't
+        // create a requirement.
         if (!archetype->isGenericParam() &&
-            archetype->getParent()->getRepresentative() == rep)
+            archetype->getParent()->isConcreteType())
           continue;
 
         auto source =

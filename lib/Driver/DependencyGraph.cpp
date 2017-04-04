@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/Basic/Statistic.h"
 #include "swift/Driver/DependencyGraph.h"
 #include "swift/Demangling/Demangle.h"
 #include "llvm/ADT/SmallString.h"
@@ -41,7 +42,8 @@ public:
   DependencyMaskTy KindMask;
 };
 
-DependencyGraphImpl::MarkTracerImpl::MarkTracerImpl() = default;
+DependencyGraphImpl::MarkTracerImpl::MarkTracerImpl(UnifiedStatsReporter *Stats)
+  : Stats(Stats) {}
 DependencyGraphImpl::MarkTracerImpl::~MarkTracerImpl() = default;
 
 using LoadResult = DependencyGraphImpl::LoadResult;
@@ -350,6 +352,7 @@ DependencyGraphImpl::markTransitive(SmallVectorImpl<const void *> &visited,
 
         MutableArrayRef<MarkTracerImpl::Entry> newReason;
         if (tracer) {
+          tracer->countStatsForNodeMarking(intersectingKinds, isCascading);
           newReason = {scratchAlloc.Allocate(reason.size()+1), reason.size()+1};
           std::uninitialized_copy(reason.begin(), reason.end(),
                                   newReason.begin());
@@ -390,6 +393,38 @@ DependencyGraphImpl::markTransitive(SmallVectorImpl<const void *> &visited,
     if (!markIntransitive(next.Node))
       continue;
     record(next);
+  }
+}
+
+void DependencyGraphImpl::MarkTracerImpl::countStatsForNodeMarking(
+  const OptionSet<DependencyKind> &Kind, bool IsCascading) const {
+
+  if (!Stats)
+    return;
+
+  auto &D = Stats->getDriverCounters();
+  if (IsCascading) {
+    if (Kind & DependencyKind::TopLevelName)
+      D.DriverDepCascadingTopLevel++;
+    if (Kind & DependencyKind::DynamicLookupName)
+      D.DriverDepCascadingDynamic++;
+    if (Kind & DependencyKind::NominalType)
+      D.DriverDepCascadingNominal++;
+    if (Kind & DependencyKind::NominalTypeMember)
+      D.DriverDepCascadingMember++;
+    if (Kind & DependencyKind::NominalTypeMember)
+      D.DriverDepCascadingExternal++;
+  } else {
+    if (Kind & DependencyKind::TopLevelName)
+      D.DriverDepTopLevel++;
+    if (Kind & DependencyKind::DynamicLookupName)
+      D.DriverDepDynamic++;
+    if (Kind & DependencyKind::NominalType)
+      D.DriverDepNominal++;
+    if (Kind & DependencyKind::NominalTypeMember)
+      D.DriverDepMember++;
+    if (Kind & DependencyKind::NominalTypeMember)
+      D.DriverDepExternal++;
   }
 }
 

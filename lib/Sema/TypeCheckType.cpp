@@ -3710,8 +3710,9 @@ void TypeChecker::diagnoseTypeNotRepresentableInObjC(const DeclContext *DC,
   }
 
   // Special diagnostic for protocols and protocol compositions.
-  SmallVector<ProtocolDecl *, 4> Protocols;
-  if (T->isExistentialType(Protocols)) {
+  if (T->isExistentialType()) {
+    SmallVector<ProtocolDecl *, 4> Protocols;
+    T->getExistentialTypeProtocols(Protocols);
     if (Protocols.empty()) {
       // Any is not @objc.
       diagnose(TypeRange.Start, diag::not_objc_empty_protocol_composition);
@@ -3829,8 +3830,9 @@ public:
       type.findIf([&](Type type) -> bool {
         if (T->isInvalid())
           return false;
-        SmallVector<ProtocolDecl*, 2> protocols;
-        if (type->isExistentialType(protocols)) {
+        if (type->isExistentialType()) {
+          SmallVector<ProtocolDecl*, 2> protocols;
+          type->getExistentialTypeProtocols(protocols);
           for (auto *proto : protocols) {
             if (proto->existentialTypeSupported(&TC))
               continue;

@@ -1713,16 +1713,35 @@ getAccessorPropertyType(const clang::FunctionDecl *accessor, bool isSetter,
 /// Whether we should suppress importing the Objective-C generic type params
 /// of this class as Swift generic type params.
 static bool
-shouldSuppressGenericParamsImport(const clang::ObjCInterfaceDecl *decl) {
-  while (decl) {
-    StringRef name = decl->getName();
-    if (name == "NSArray" || name == "NSDictionary" || name == "NSSet" ||
-        name == "NSOrderedSet" || name == "NSEnumerator" ||
-        name == "NSMeasurement") {
-      return true;
+shouldSuppressGenericParamsImport(const LangOptions &langOpts,
+                                  const clang::ObjCInterfaceDecl *decl) {
+  if (decl->hasAttr<clang::SwiftImportAsNonGenericAttr>())
+    return true;
+
+  // FIXME: This check is only necessary to keep things working even without
+  // the SwiftImportAsNonGeneric API note. Once we can guarantee that that
+  // attribute is present in all contexts, we can remove this check.
+  auto isFromFoundationModule = [](const clang::Decl *decl) -> bool {
+    Optional<clang::Module *> module = getClangSubmoduleForDecl(decl);
+    if (!module)
+      return false;
+    return module.getValue()->getTopLevelModuleName() == "Foundation";
+  };
+
+  if (langOpts.isSwiftVersion3() || isFromFoundationModule(decl)) {
+    // In Swift 3 we used a hardcoded list of declarations, and made all of
+    // their subclasses drop their generic parameters when imported.
+    while (decl) {
+      StringRef name = decl->getName();
+      if (name == "NSArray" || name == "NSDictionary" || name == "NSSet" ||
+          name == "NSOrderedSet" || name == "NSEnumerator" ||
+          name == "NSMeasurement") {
+        return true;
+      }
+      decl = decl->getSuperClass();
     }
-    decl = decl->getSuperClass();
   }
+
   return false;
 }
 
@@ -4709,6 +4728,53 @@ Decl *SwiftDeclConverter::importCompatibilityTypeAlias(
   return alias;
 }
 
+static bool inheritanceListContainsProtocol(ArrayRef<TypeLoc> inherited,
+                                            const ProtocolDecl *proto) {
+  return llvm::any_of(inherited, [proto](TypeLoc type) -> bool {
+    if (!type.getType()->isExistentialType())
+      return false;
+    SmallVector<ProtocolDecl *, 8> protos;
+    type.getType()->getExistentialTypeProtocols(protos);
+    return ProtocolType::visitAllProtocols(protos,
+                                           [proto](const ProtocolDecl *next) {
+      return next == proto;
+    });
+  });
+}
+
+static bool conformsToProtocolInOriginalModule(NominalTypeDecl *nominal,
+                                               const ProtocolDecl *proto,
+                                               ModuleDecl *foundationModule,
+                                               LazyResolver *resolver) {
+  if (resolver)
+    resolver->resolveInheritanceClause(nominal);
+  if (inheritanceListContainsProtocol(nominal->getInherited(), proto))
+    return true;
+
+  // Only consider extensions from the original module...or from an overlay
+  // or the Swift half of a mixed-source framework.
+  const DeclContext *containingFile = nominal->getModuleScopeContext();
+  ModuleDecl *originalModule = containingFile->getParentModule();
+
+  ModuleDecl *adapterModule = nullptr;
+  if (auto *clangUnit = dyn_cast<ClangModuleUnit>(containingFile))
+    adapterModule = clangUnit->getAdapterModule();
+
+  for (ExtensionDecl *extension : nominal->getExtensions()) {
+    ModuleDecl *extensionModule = extension->getParentModule();
+    if (extensionModule != originalModule && extensionModule != adapterModule &&
+        extensionModule != foundationModule) {
+      continue;
+    }
+    if (resolver)
+      resolver->resolveInheritanceClause(extension);
+    if (inheritanceListContainsProtocol(extension->getInherited(), proto))
+      return true;
+  }
+
+  return false;
+}
+
 Decl *
 SwiftDeclConverter::importSwiftNewtype(const clang::TypedefNameDecl *decl,
                                        clang::SwiftNewtypeAttr *newtypeAttr,
@@ -4793,9 +4859,11 @@ SwiftDeclConverter::importSwiftNewtype(const clang::TypedefNameDecl *decl,
     if (!proto)
       return;
 
-    SmallVector<ProtocolConformance *, 1> conformances;
-    if (computedNominal->lookupConformance(computedNominal->getParentModule(),
-                                           proto, conformances)) {
+    // Break circularity by only looking for declared conformances in the
+    // original module, or possibly its adapter.
+    if (conformsToProtocolInOriginalModule(computedNominal, proto,
+                                           Impl.tryLoadFoundationModule(),
+                                           Impl.getTypeResolver())) {
       protocols.push_back(proto);
       synthesizedProtocols.push_back(kind);
     }
@@ -6149,7 +6217,7 @@ Optional<GenericParamList *> SwiftDeclConverter::importObjCGenericParams(
   if (!typeParamList) {
     return nullptr;
   }
-  if (shouldSuppressGenericParamsImport(decl)) {
+  if (shouldSuppressGenericParamsImport(Impl.SwiftContext.LangOpts, decl)) {
     return nullptr;
   }
   assert(typeParamList->size() > 0);
@@ -6720,6 +6788,14 @@ void ClangImporter::Implementation::importAttributes(
       auto attr = AvailableAttr::createPlatformAgnostic(C, "");
       MappedDecl->getAttrs().add(attr);
       return;
+    }
+
+    // Map Clang's swift_objc_members attribute to @objcMembers.
+    if (ID->hasAttr<clang::SwiftObjCMembersAttr>()) {
+      if (!MappedDecl->getAttrs().hasAttribute<ObjCMembersAttr>()) {
+        auto attr = new (C) ObjCMembersAttr(/*implicit=*/true);
+        MappedDecl->getAttrs().add(attr);
+      }
     }
 
     // Infer @objcMembers on XCTestCase.
@@ -7597,11 +7673,18 @@ ClangImporter::Implementation::loadAllMembers(Decl *D, uint64_t extra) {
 
     // If the base is also imported from Clang, load its members first.
     const NominalTypeDecl *base = ext->getExtendedType()->getAnyNominal();
-    if (base->getClangDecl()) {
+    if (auto *clangBase = base->getClangDecl()) {
       base->loadAllMembers();
-      // FIXME: Assert that we don't jump over to a category /while/
-      // loading the original class's members. Unfortunately there are some
-      // cases where this does happen today.
+
+      // Sanity check: make sure we don't jump over to a category /while/
+      // loading the original class's members. Right now we only check if this
+      // happens on the first member.
+      if (auto *clangContainer = dyn_cast<clang::ObjCContainerDecl>(clangBase)){
+        if (!clangContainer->decls_empty()) {
+          assert(!base->getMembers().empty() &&
+                 "can't load extension members before base has finished");
+        }
+      }
     }
   }
 

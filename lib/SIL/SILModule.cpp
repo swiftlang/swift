@@ -568,6 +568,11 @@ bool SILModule::hasFunction(StringRef Name) {
   return Visitor.hasFunction(Name);
 }
 
+void SILModule::linkAllFromCurrentModule() {
+  getSILLoader()->getAllForModule(getSwiftModule()->getName(),
+                                  /*PrimaryFile=*/nullptr);
+}
+
 void SILModule::linkAllWitnessTables() {
   getSILLoader()->getAllWitnessTables();
 }

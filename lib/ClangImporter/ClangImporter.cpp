@@ -718,7 +718,7 @@ ClangImporter::create(ASTContext &ctx,
   addCommonInvocationArguments(invocationArgStrs, ctx, importerOpts);
 
   if (importerOpts.DumpClangDiagnostics) {
-    llvm::errs() << "clang '";
+    llvm::errs() << "'";
     interleave(invocationArgStrs,
                [](StringRef arg) { llvm::errs() << arg; },
                [] { llvm::errs() << "' '"; });
