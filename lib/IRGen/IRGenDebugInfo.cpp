@@ -254,6 +254,23 @@ static bool isAbstractClosure(const SILLocation &Loc) {
   return false;
 }
 
+/// Both the code that is used to set up a closure object and the
+/// (beginning of) the closure itself has the AbstractClosureExpr as
+/// location. We are only interested in the latter case and want to
+/// ignore the setup code.
+///
+/// callWithClosure(
+///  { // <-- a breakpoint here should only stop inside of the closure.
+///    foo();
+///  })
+///
+/// The actual closure has a closure expression as scope.
+static bool shouldIgnoreAbstractClosure(Optional<SILLocation> Loc,
+                                        const SILDebugScope *DS) {
+  return Loc && isAbstractClosure(*Loc) && DS && !isAbstractClosure(DS->Loc) &&
+         !Loc->is<ImplicitReturnLocation>();
+}
+
 llvm::MDNode *IRGenDebugInfo::createInlinedAt(const SILDebugScope *DS) {
   auto *CS = DS->InlinedCallSite;
   if (!CS)
@@ -304,7 +321,22 @@ void IRGenDebugInfo::setCurrentLoc(IRBuilder &Builder, const SILDebugScope *DS,
   if (!Scope)
     return;
 
-  auto L = getDebugLocation(Loc);
+  SILFunction *Fn = DS->getInlinedFunction();
+  SILLocation::DebugLoc L;
+
+  if (shouldIgnoreAbstractClosure(Loc, DS) || (Fn && Fn->isThunk())) {
+    // Reuse the last source location if we are still in the same
+    // scope to get a more contiguous line table.
+    // Otherwise use a line 0 artificial location.
+    if (DS == LastScope)
+      L = LastDebugLoc;
+    else
+      L.Filename = LastDebugLoc.Filename;
+  } else {
+    // Decode the location.
+    L = getDebugLocation(Loc);
+  }
+
   auto *File = getOrCreateFile(L.Filename);
   if (File->getFilename() != Scope->getFilename()) {
     // We changed files in the middle of a scope. This happens, for
@@ -313,31 +345,7 @@ void IRGenDebugInfo::setCurrentLoc(IRBuilder &Builder, const SILDebugScope *DS,
     auto File = getOrCreateFile(L.Filename);
     Scope = DBuilder.createLexicalBlockFile(Scope, File);
   }
-
-  // Both the code that is used to set up a closure object and the
-  // (beginning of) the closure itself has the AbstractClosureExpr as
-  // location. We are only interested in the latter case and want to
-  // ignore the setup code.
-  //
-  // callWithClosure(
-  //  { // <-- a breakpoint here should only stop inside of the closure.
-  //    foo();
-  //  })
-  //
-  // The actual closure has a closure expression as scope.
-  if (Loc && isAbstractClosure(*Loc) && DS && !isAbstractClosure(DS->Loc) &&
-      !Loc->is<ImplicitReturnLocation>())
-    L.Line = L.Column = 0;
-
-  if (auto *Fn = DS->getInlinedFunction())
-    if (Fn->isThunk())
-      L.Line = L.Column = 0;
-
-  // Reuse the last source location if we are still in the same
-  // scope to get a more contiguous line table.
-  if (L.Line == 0 && DS == LastScope)
-    L = LastDebugLoc;
-
+  
   // FIXME: Enable this assertion.
   //assert(lineNumberIsSane(Builder, L.Line) &&
   //       "-Onone, but line numbers are not monotonically increasing within bb");
@@ -348,8 +356,6 @@ void IRGenDebugInfo::setCurrentLoc(IRBuilder &Builder, const SILDebugScope *DS,
   assert(((!InlinedAt) || (InlinedAt && Scope)) && "inlined w/o scope");
   assert(parentScopesAreSane(DS) && "parent scope sanity check failed");
   auto DL = llvm::DebugLoc::get(L.Line, L.Column, Scope, InlinedAt);
-  // TODO: Write a strongly-worded letter to the person that came up
-  // with a pair of functions spelled "get" and "Set".
   Builder.SetCurrentDebugLocation(DL);
 }
 
