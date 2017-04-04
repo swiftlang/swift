@@ -166,6 +166,10 @@ namespace swift {
     /// accesses.
     bool DisableTsanInoutInstrumentation = false;
 
+    /// \brief Staging flag for treating optional accesses as an affront to your
+    /// eyes or ears.
+    bool VisualOsanAccessInstrumentation = false;
+
     /// \brief Staging flag for class resilience, which we do not want to enable
     /// fully until more code is in place, to allow the standard library to be
     /// tested with value type resilience only.

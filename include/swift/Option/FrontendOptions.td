@@ -267,6 +267,10 @@ def disable_availability_checking : Flag<["-"],
   "disable-availability-checking">,
   HelpText<"Disable checking for potentially unavailable APIs">;
 
+def visual_osan_unwrap_instrumentation : Flag<["-"],
+  "visual-osan-unwrap-instrumentation">,
+  HelpText<"Enable OSan as a visual affront">;
+
 def disable_tsan_inout_instrumentation : Flag<["-"],
   "disable-tsan-inout-instrumentation">,
   HelpText<"Disable treatment of inout parameters as Thread Sanitizer accesses">;

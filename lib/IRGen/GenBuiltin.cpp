@@ -868,6 +868,10 @@ if (Builtin.ID == BuiltinValueKind::id) { \
     return;
   }
 
+  if (Builtin.ID == BuiltinValueKind::OSanUnwrapAccess) {
+    IGF.emitOSanUnwrapAccessCall(IGF.IGM.AuralOSan);
+    return;
+  }
 
   llvm_unreachable("IRGen unimplemented for this builtin!");
 }

@@ -239,6 +239,12 @@ void IRGenFunction::emitTSanInoutAccessCall(llvm::Value *address) {
   Builder.CreateCall(fn, {castAddress});
 }
 
+void IRGenFunction::emitOSanUnwrapAccessCall(bool aural) {
+  llvm::Function *fn = cast<llvm::Function>(IGM.getOSanUnwrapAccessFn());
+  llvm::Value *val = Builder.getInt1(aural);
+  Builder.CreateCall(fn, { val });
+}
+
 
 /// Initialize a relative indirectable pointer to the given value.
 /// This always leaves the value in the direct state; if it's not a

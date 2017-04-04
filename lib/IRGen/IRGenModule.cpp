@@ -142,6 +142,8 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
 
   auto &opts = irgen.Opts;
 
+  AuralOSan = !Context.LangOpts.VisualOsanAccessInstrumentation;
+
   EnableValueNames = opts.shouldProvideValueNames();
   
   VoidTy = llvm::Type::getVoidTy(getLLVMContext());

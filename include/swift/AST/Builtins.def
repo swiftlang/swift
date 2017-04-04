@@ -502,6 +502,10 @@ BUILTIN_MISC_OPERATION(Swift3ImplicitObjCEntrypoint, "swift3ImplicitObjCEntrypoi
 /// TSanInoutAccess has type (T) -> ()
 BUILTIN_SANITIZER_OPERATION(TSanInoutAccess, "tsanInoutAccess", "")
 
+/// Builtin representing a call to Optional Sanitizer instrumentation.
+/// OSanUnwrapAccess has type () -> ()
+BUILTIN_SANITIZER_OPERATION(OSanUnwrapAccess, "osanUnwrapAccess", "")
+
 #undef BUILTIN_SANITIZER_OPERATION
 
 // BUILTIN_TYPE_TRAIT_OPERATION - Compile-time type trait operations.

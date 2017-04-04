@@ -925,6 +925,11 @@ static ValueDecl *getTSanInoutAccess(ASTContext &Context, Identifier Id) {
   return builder.build(Id);
 }
 
+static ValueDecl *getOSanUnwrapAccess(ASTContext &C, Identifier Id) {
+  // (Builtin.Int1) -> ()
+  return getBuiltinFunction(Id, TupleType::get({ BuiltinIntegerType::get(1, C) }, C), TupleType::getEmpty(C));
+}
+
 static ValueDecl *getAddressOfOperation(ASTContext &Context, Identifier Id) {
   // <T> (@inout T) -> RawPointer
   BuiltinGenericSignatureBuilder builder(Context);
@@ -1765,6 +1770,9 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
 
   case BuiltinValueKind::Swift3ImplicitObjCEntrypoint:
     return getBuiltinFunction(Id, {}, TupleType::getEmpty(Context));
+      
+  case BuiltinValueKind::OSanUnwrapAccess:
+    return getOSanUnwrapAccess(Context, Id);
   }
 
   llvm_unreachable("bad builtin value!");

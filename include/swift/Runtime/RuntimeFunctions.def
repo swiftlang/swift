@@ -1194,6 +1194,12 @@ FUNCTION(TSanInoutAccess, __tsan_write1, C_CC,
          ARGS(Int8PtrTy),
          ATTRS(NoUnwind))
 
+// void swift_osan_unwrap(bool);
+FUNCTION(OSanUnwrapAccess, swift_osan_unwrap, C_CC,
+         RETURNS(VoidTy),
+         ARGS(Int1Ty),
+         ATTRS(NoUnwind))
+
 #if SWIFT_OBJC_INTEROP || !defined(SWIFT_RUNTIME_GENERATE_GLOBAL_SYMBOLS)
 
 // Put here all definitions of runtime functions which are:
