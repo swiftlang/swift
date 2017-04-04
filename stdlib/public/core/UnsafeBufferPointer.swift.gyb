@@ -24,19 +24,19 @@ public struct UnsafeBufferPointerIterator<Element>
   public mutating func next() -> Element? {
     if _position == _end { return nil }
 
-    let result = _position.pointee
-    _position += 1
+    let result = _position!.pointee
+    _position! += 1
     return result
   }
 
   @_inlineable
-  public init(_position: UnsafePointer<Element>, _end: UnsafePointer<Element>) {
+  public init(_position: UnsafePointer<Element>?, _end: UnsafePointer<Element>?) {
     self._position = _position
     self._end = _end
   }
   
   @_versioned
-  internal var _position, _end: UnsafePointer<Element>
+  internal var _position, _end: UnsafePointer<Element>?
 }
 
 % for mutable in (True, False):
@@ -224,13 +224,13 @@ public struct Unsafe${Mutable}BufferPointer<Element>
     get {
       _debugPrecondition(i >= 0)
       _debugPrecondition(i < endIndex)
-      return _position[i]
+      return _position![i]
     }
 %if Mutable:
     nonmutating set {
       _debugPrecondition(i >= 0)
       _debugPrecondition(i < endIndex)
-      _position[i] = newValue
+      _position![i] = newValue
     }
 %end
   }
@@ -255,15 +255,6 @@ public struct Unsafe${Mutable}BufferPointer<Element>
 %  end
   }
 
-  /// Creates an empty instance.
-  public init() {
-    // This is known to create a suitably-aligned pointer on all
-    // currently-supported platforms.
-    _position = Unsafe${Mutable}Pointer(
-      bitPattern: MemoryLayout<Element>.stride)!
-    _end = _position
-  }
-  
   /// Creates a new buffer pointer over the specified number of contiguous
   /// instances beginning at the given pointer.
   ///
@@ -275,11 +266,14 @@ public struct Unsafe${Mutable}BufferPointer<Element>
   ///   - count: The number of instances in the buffer. `count` must not be
   ///     negative.
   @_inlineable
-  public init(start: Unsafe${Mutable}Pointer<Element>, count: Int) {
+  public init(start: Unsafe${Mutable}Pointer<Element>?, count: Int) {
     _precondition(
       count >= 0, "Unsafe${Mutable}BufferPointer with negative count")
+    _precondition(
+      count == 0 || start != nil,
+      "Unsafe${Mutable}BufferPointer has a nil start and nonzero count")
     _position = start
-    _end = start + count
+    _end = start.map { $0 + count }
   }
 
   /// Returns an iterator over the elements of this buffer.
@@ -295,7 +289,7 @@ public struct Unsafe${Mutable}BufferPointer<Element>
   /// If the `baseAddress` of this buffer is `nil`, the count is zero. However,
   /// a buffer can have a `count` of zero even with a non-`nil` base address.
   @_inlineable
-  public var baseAddress: Unsafe${Mutable}Pointer<Element> {
+  public var baseAddress: Unsafe${Mutable}Pointer<Element>? {
     return _position
   }
 
@@ -305,18 +299,21 @@ public struct Unsafe${Mutable}BufferPointer<Element>
   /// a buffer can have a `count` of zero even with a non-`nil` base address.
   @_inlineable
   public var count: Int {
-    return _end - _position
+    if let pos = _position {
+      return _end! - pos
+    }
+    return 0
   }
 
   @_versioned
-  let _position, _end: Unsafe${Mutable}Pointer<Element>
+  let _position, _end: Unsafe${Mutable}Pointer<Element>?
 }
 
 extension Unsafe${Mutable}BufferPointer : CustomDebugStringConvertible {
   /// A textual representation of the buffer, suitable for debugging.
   public var debugDescription: String {
     return "Unsafe${Mutable}BufferPointer"
-      + "(start: \(_position), count: \(count))"
+      + "(start: \(_position.map(String.init(describing:)) ?? "nil"), count: \(count))"
   }
 }
 %end

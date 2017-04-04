@@ -350,8 +350,9 @@ extension MutableCollection {
   public mutating func _withUnsafeMutableBufferPointerIfSupported<R>(
     _ body: (UnsafeMutablePointer<Iterator.Element>, Int) throws -> R
   ) rethrows -> R? {
-    return try withExistingUnsafeMutableBuffer {
-      try body($0.baseAddress, $0.count)
+    return try withExistingUnsafeMutableBuffer { buffer in
+      // FIXME: audit force unwrap
+      try body(buffer.baseAddress!, buffer.count)
     }
   }
 

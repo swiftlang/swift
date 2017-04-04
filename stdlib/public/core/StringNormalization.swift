@@ -213,7 +213,8 @@ where
         while true {
           var error = __swift_stdlib_U_ZERO_ERROR
           let usedCount = __swift_stdlib_unorm2_normalize(
-            _fccNormalizer, $0.baseAddress, numericCast($0.count),
+            // FIXME: check valid force-unwrap
+            _fccNormalizer, $0.baseAddress!, numericCast($0.count),
             &array, numericCast(array.count), &error)
           if __swift_stdlib_U_SUCCESS(error) {
             array.removeLast(array.count - numericCast(usedCount))

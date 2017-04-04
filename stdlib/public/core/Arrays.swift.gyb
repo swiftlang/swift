@@ -1573,7 +1573,7 @@ extension ${Self} : RangeReplaceableCollection, _ArrayProtocol {
   ) rethrows -> R? {
     return try withUnsafeMutableBufferPointer {
       (bufferPointer) -> R in
-      let r = try body(bufferPointer.baseAddress, bufferPointer.count)
+      let r = try body(bufferPointer.baseAddress!, bufferPointer.count)
       return r
     }
   }
@@ -1777,8 +1777,9 @@ extension ${Self} {
 
     // It is not OK for there to be no pointer/not enough space, as this is
     // a precondition and Array never lies about its count.
-    var p = buffer.baseAddress
-        _precondition(self.count <= buffer.count, 
+    guard var p = buffer.baseAddress
+      else { _preconditionFailure("Attempt to copy contents into nil buffer pointer") }
+    _precondition(self.count <= buffer.count, 
       "Insufficient space allocated to copy array contents")
 
     if let s = _baseAddressIfContiguous {

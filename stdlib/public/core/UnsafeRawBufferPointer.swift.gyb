@@ -119,17 +119,17 @@ public struct Unsafe${Mutable}RawBufferPointer
     public mutating func next() -> UInt8? {
       if _position == _end { return nil }
 
-      let result = _position.load(as: UInt8.self)
-      _position += 1
+      let result = _position!.load(as: UInt8.self)
+      _position! += 1
       return result
     }
 
     @_versioned
-    internal var _position, _end: UnsafeRawPointer
+    internal var _position, _end: UnsafeRawPointer?
 
     @_versioned
     @_inlineable
-    init(_position: UnsafeRawPointer, _end: UnsafeRawPointer) {
+    init(_position: UnsafeRawPointer?, _end: UnsafeRawPointer?) {
       self._position = _position
       self._end = _end
     }
@@ -160,7 +160,7 @@ public struct Unsafe${Mutable}RawBufferPointer
   /// bytes referenced by `p` are deallocated.
   @_inlineable
   public func deallocate() {
-    _position.deallocate(
+    _position?.deallocate(
       bytes: count, alignedTo: MemoryLayout<UInt>.alignment)
   }
 
@@ -195,7 +195,7 @@ public struct Unsafe${Mutable}RawBufferPointer
     _debugPrecondition(offset >= 0, "${Self}.load with negative offset")
     _debugPrecondition(offset + MemoryLayout<T>.size <= self.count,
       "${Self}.load out of bounds")
-    return baseAddress.load(fromByteOffset: offset, as: T.self)
+    return baseAddress!.load(fromByteOffset: offset, as: T.self)
   }
 
 %  if mutable:
@@ -232,7 +232,7 @@ public struct Unsafe${Mutable}RawBufferPointer
     _debugPrecondition(offset + MemoryLayout<T>.size <= self.count,
       "${Self}.storeBytes out of bounds")
 
-    baseAddress.storeBytes(of: value, toByteOffset: offset, as: T.self)
+    baseAddress!.storeBytes(of: value, toByteOffset: offset, as: T.self)
   }
 
   /// Copies the specified number of bytes from the given raw pointer's memory
@@ -255,7 +255,7 @@ public struct Unsafe${Mutable}RawBufferPointer
   public func copyBytes(from source: UnsafeRawBufferPointer) {
     _debugPrecondition(source.count <= self.count,
       "${Self}.copyBytes source has too many elements")
-    baseAddress.copyBytes(from: source.baseAddress, count: source.count)
+    baseAddress?.copyBytes(from: source.baseAddress!, count: source.count)
   }
 
   /// Copies from a collection of `UInt8` into this buffer's memory.
@@ -276,7 +276,9 @@ public struct Unsafe${Mutable}RawBufferPointer
   ) where C.Iterator.Element == UInt8 {
     _debugPrecondition(numericCast(source.count) <= self.count,
       "${Self}.copyBytes source has too many elements")
-    let position = _position
+    guard let position = _position else {
+      return
+    }
     for (index, byteValue) in source.enumerated() {
       position.storeBytes(
         of: byteValue, toByteOffset: index, as: UInt8.self)
@@ -284,12 +286,6 @@ public struct Unsafe${Mutable}RawBufferPointer
   }
 %  end # mutable
 
-  /// Creates an empty instance.
-  public init() {
-    _position = Unsafe${Mutable}RawPointer(bitPattern: 1)!
-    _end = _position
-  }
-  
   /// Creates a buffer over the specified number of contiguous bytes starting
   /// at the given pointer.
   ///
@@ -300,10 +296,12 @@ public struct Unsafe${Mutable}RawBufferPointer
   ///   - count: The number of bytes to include in the buffer. `count` must not
   ///     be negative.
   @_inlineable
-  public init(start: Unsafe${Mutable}RawPointer, count: Int) {
+  public init(start: Unsafe${Mutable}RawPointer?, count: Int) {
     _precondition(count >= 0, "${Self} with negative count")
+    _precondition(count == 0 || start != nil,
+      "${Self} has a nil start and nonzero count")
     _position = start
-    _end = start + count
+    _end = start.map { $0 + count }
   }
 
   /// Creates a new buffer over the same memory as the given buffer.
@@ -339,7 +337,7 @@ public struct Unsafe${Mutable}RawBufferPointer
   ///   buffer's type `T` must be a trivial type.
   @_inlineable
   public init<T>(_ buffer: UnsafeMutableBufferPointer<T>) {
-    self.init(start: buffer.baseAddress,
+    self.init(start: buffer.baseAddress!,
       count: buffer.count * MemoryLayout<T>.stride)
   }
 
@@ -350,7 +348,7 @@ public struct Unsafe${Mutable}RawBufferPointer
   ///   buffer's type `T` must be a trivial type.
   @_inlineable
   public init<T>(_ buffer: UnsafeBufferPointer<T>) {
-    self.init(start: buffer.baseAddress,
+    self.init(start: buffer.baseAddress!,
       count: buffer.count * MemoryLayout<T>.stride)
   }
 %  end # !mutable
@@ -389,13 +387,13 @@ public struct Unsafe${Mutable}RawBufferPointer
     get {
       _debugPrecondition(i >= 0)
       _debugPrecondition(i < endIndex)
-      return _position.load(fromByteOffset: i, as: UInt8.self)
+      return _position!.load(fromByteOffset: i, as: UInt8.self)
     }
 %  if mutable:
     nonmutating set {
       _debugPrecondition(i >= 0)
       _debugPrecondition(i < endIndex)
-      _position.storeBytes(of: newValue, toByteOffset: i, as: UInt8.self)
+      _position!.storeBytes(of: newValue, toByteOffset: i, as: UInt8.self)
     }
 %  end # mutable
   }
@@ -410,7 +408,7 @@ public struct Unsafe${Mutable}RawBufferPointer
       _debugPrecondition(bounds.lowerBound >= startIndex)
       _debugPrecondition(bounds.upperBound <= endIndex)
       return Unsafe${Mutable}RawBufferPointer(
-        start: baseAddress + bounds.lowerBound,
+        start: baseAddress.map { $0 + bounds.lowerBound },
         count: bounds.count)
     }
 %  if mutable:
@@ -420,8 +418,8 @@ public struct Unsafe${Mutable}RawBufferPointer
       _debugPrecondition(bounds.count == newValue.count)
 
       if newValue.count > 0 {
-        (baseAddress + bounds.lowerBound).copyBytes(
-          from: newValue.baseAddress,
+        (baseAddress! + bounds.lowerBound).copyBytes(
+          from: newValue.baseAddress!,
           count: newValue.count)
       }
     }
@@ -439,7 +437,7 @@ public struct Unsafe${Mutable}RawBufferPointer
   /// If the `baseAddress` of this buffer is `nil`, the count is zero. However,
   /// a buffer can have a `count` of zero even with a non-`nil` base address.
   @_inlineable
-  public var baseAddress: Unsafe${Mutable}RawPointer {
+  public var baseAddress: Unsafe${Mutable}RawPointer? {
     return _position
   }
 
@@ -449,7 +447,10 @@ public struct Unsafe${Mutable}RawBufferPointer
   /// a buffer can have a `count` of zero even with a non-`nil` base address.
   @_inlineable
   public var count: Int {
-    return _end - _position
+    if let pos = _position {
+      return _end! - pos
+    }
+    return 0
   }
 
   %  if mutable:
@@ -487,7 +488,12 @@ public struct Unsafe${Mutable}RawBufferPointer
     // This has to be a debug precondition due to the cost of walking over some collections.
     _debugPrecondition(source.underestimatedCount <= (count / elementStride),
       "insufficient space to accommodate source.underestimatedCount elements")
-    let base = baseAddress
+    guard let base = baseAddress else {
+      // this can be a precondition since only an invalid argument should be costly
+      _precondition(source.underestimatedCount == 0, 
+        "no memory available to initialize from source")
+      return (it, UnsafeMutableBufferPointer(start: nil, count: 0))
+    }  
 
     for p in stride(from: base, 
       // only advance to as far as the last element that will fit
@@ -508,14 +514,14 @@ public struct Unsafe${Mutable}RawBufferPointer
   %  end # mutable
 
   @_versioned
-  let _position, _end: Unsafe${Mutable}RawPointer
+  let _position, _end: Unsafe${Mutable}RawPointer?
 }
 
 extension Unsafe${Mutable}RawBufferPointer : CustomDebugStringConvertible {
   /// A textual representation of the buffer, suitable for debugging.
   public var debugDescription: String {
     return "${Self}"
-      + "(start: \(_position), count: \(count))"
+      + "(start: \(_position.map(String.init(describing:)) ?? "nil"), count: \(count))"
   }
 }
 

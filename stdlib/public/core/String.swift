@@ -656,7 +656,7 @@ extension String {
   public func lowercased() -> String {
     if let asciiBuffer = self._core.asciiBuffer {
       let count = asciiBuffer.count
-      let source = asciiBuffer.baseAddress
+      let source = asciiBuffer.baseAddress!
       let buffer = _StringBuffer(
         capacity: count, initialSize: count, elementWidth: 1)
       let dest = buffer.start
@@ -706,7 +706,7 @@ extension String {
   public func uppercased() -> String {
     if let asciiBuffer = self._core.asciiBuffer {
       let count = asciiBuffer.count
-      let source = asciiBuffer.baseAddress
+      let source = asciiBuffer.baseAddress!
       let buffer = _StringBuffer(
         capacity: count, initialSize: count, elementWidth: 1)
       let dest = buffer.start

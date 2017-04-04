@@ -177,20 +177,14 @@ public final class _DataStorage {
     }
     
     public func enumerateBytes(_ block: (_ buffer: UnsafeBufferPointer<UInt8>, _ byteIndex: Data.Index, _ stop: inout Bool) -> Void) {
-    var stop: Bool = false
-    
-    var buf : UnsafeBufferPointer<UInt8> {
-      guard let b = _bytes else { return UnsafeBufferPointer() }
-      return UnsafeBufferPointer(start: b.assumingMemoryBound(to: UInt8.self), count: _length)
-    }
-    
+        var stop: Bool = false
         switch _backing {
         case .swift:
-            block(buf, 0, &stop)
+            block(UnsafeBufferPointer<UInt8>(start: _bytes?.assumingMemoryBound(to: UInt8.self), count: _length), 0, &stop)
         case .immutable:
-            block(buf, 0, &stop)
+            block(UnsafeBufferPointer<UInt8>(start: _bytes?.assumingMemoryBound(to: UInt8.self), count: _length), 0, &stop)
         case .mutable:
-            block(buf, 0, &stop)
+            block(UnsafeBufferPointer<UInt8>(start: _bytes?.assumingMemoryBound(to: UInt8.self), count: _length), 0, &stop)
         case .customReference(let d):
             d.enumerateBytes { (ptr, range, stop) in
                 var stopv = false
@@ -367,7 +361,7 @@ public final class _DataStorage {
     @inline(__always)
     public func append(_ otherData: Data) {
         otherData.enumerateBytes { (buffer: UnsafeBufferPointer<UInt8>, _, _) in
-            append(buffer.baseAddress, length: buffer.count)
+            append(buffer.baseAddress!, length: buffer.count)
         }
     }
     
@@ -1172,7 +1166,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
         guard !copyRange.isEmpty else { return 0 }
         
         let nsRange = NSMakeRange(copyRange.lowerBound, copyRange.upperBound - copyRange.lowerBound)
-        _copyBytesHelper(to: buffer.baseAddress, from: nsRange)
+        _copyBytesHelper(to: buffer.baseAddress!, from: nsRange)
         return copyRange.count
     }
     
@@ -1275,7 +1269,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
         if !isKnownUniquelyReferenced(&_backing) {
             _backing = _backing.mutableCopy(_sliceRange)
         }
-        _backing.append(buffer.baseAddress, length: buffer.count * MemoryLayout<SourceType>.stride)
+        _backing.append(buffer.baseAddress!, length: buffer.count * MemoryLayout<SourceType>.stride)
         _sliceRange = _sliceRange.lowerBound..<(_sliceRange.upperBound + buffer.count * MemoryLayout<SourceType>.stride)
     }
     

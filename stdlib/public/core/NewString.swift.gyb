@@ -1082,7 +1082,7 @@ extension String {
     result.append(contentsOf: source.lazy.map(Int8.init(bitPattern:)))
     result.append(0)
     return try result.withUnsafeBufferPointer {
-      try body($0.baseAddress)
+      try body($0.baseAddress!)
     }
   }
 }
