@@ -1,6 +1,7 @@
 
 var x: Int
 
+// XFAIL: linux
 // RUN: %sourcekitd-test -req=interface-gen -module Swift > %t.response
 // RUN: %FileCheck -check-prefix=CHECK-STDLIB -input-file %t.response %s
 // RUN: %FileCheck -check-prefix=CHECK-MUTATING-ATTR -input-file %t.response %s

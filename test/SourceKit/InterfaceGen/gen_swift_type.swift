@@ -1,3 +1,4 @@
+// XFAIL: linux
 // RUN: %sourcekitd-test -req=interface-gen -usr _TtGSaSi_ %s -- %s | %FileCheck -check-prefix=CHECK1 %s
 // RUN: %sourcekitd-test -req=interface-gen -usr _TtGSaSS_ %s -- %s | %FileCheck -check-prefix=CHECK2 %s
 // RUN: %sourcekitd-test -req=interface-gen -usr _TtV14gen_swift_type1A %s -- %s | %FileCheck -check-prefix=CHECK3 %s

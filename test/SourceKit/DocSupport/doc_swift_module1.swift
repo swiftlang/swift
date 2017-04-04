@@ -1,3 +1,4 @@
+// XFAIL: linux
 // RUN: rm -rf %t.mod
 // RUN: mkdir -p %t.mod
 // RUN: %swift -emit-module -o %t.mod/cake1.swiftmodule %S/Inputs/cake1.swift -parse-as-library

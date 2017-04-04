@@ -1,3 +1,4 @@
+// XFAIL: linux
 // RUN: %sourcekitd-test -req=interface-gen %S/Inputs/Foo2.swift -- %S/Inputs/Foo2.swift %mcp_opt %clang-importer-sdk > %t.response
 // RUN: diff -u %s.response %t.response
 

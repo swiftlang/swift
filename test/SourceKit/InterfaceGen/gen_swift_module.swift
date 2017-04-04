@@ -4,6 +4,7 @@ func f(s : inout [Int]) {
   s.sort()
 }
 
+// XFAIL: linux
 // RUN: rm -rf %t.mod
 // RUN: mkdir -p %t.mod
 // RUN: %swift -emit-module -o %t.mod/swift_mod.swiftmodule %S/Inputs/swift_mod.swift -parse-as-library
