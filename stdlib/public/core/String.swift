@@ -745,7 +745,7 @@ extension String {
 // }
 
 extension String : LosslessStringConvertible {
-  public init?(_ description: String) {
+  public init(_ description: String) {
     self = description
   }
 }

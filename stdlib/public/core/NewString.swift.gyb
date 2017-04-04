@@ -1,4 +1,4 @@
-//===--- AU3.swift.gyb ----------------------------------------------------===//
+//===--- NewString.swift.gyb ----------------------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -21,78 +21,80 @@
 
 /// Implementation detail of `String` that type-erases any `UnicodeContent` into
 /// one word that can live in one of the cases.
+public // @testable
 class UnicodeContentBox : FactoryInitializable {
-  var utf16: AnyUInt16UnicodeView { fatalError("override me!") }
-  var utf8: AnyUInt8UnicodeView { fatalError("override me!") }
-  var unicodeScalars: AnyUnicodeScalarUnicodeView { fatalError("override me!") }
-  var fccNormalizedUTF16: AnyUInt16UnicodeView { fatalError("override me!") }
+  public var utf16: AnyUInt16UnicodeView { fatalError("override me!") }
+  public var utf8: AnyUInt8UnicodeView { fatalError("override me!") }
+  public var unicodeScalars: AnyUnicodeScalarUnicodeView { fatalError("override me!") }
+  public var fccNormalizedUTF16: AnyUInt16UnicodeView { fatalError("override me!") }
 #if false
-  var utf32: AnyUInt32UnicodeView { fatalError("override me!") }
+  public var utf32: AnyUInt32UnicodeView { fatalError("override me!") }
 #endif
   
 #if false
   // FIXME: Can this be Random Access?  If all encodings use a single code unit
   // per ASCII character and can statelessly identify a code unit that
   // represents ASCII, then yes.  Look into, e.g. shift-JIS.
-  var extendedASCII: UnicodeBidirectionalUInt32 { fatalError("override me!") }
+  public var extendedASCII: UnicodeBidirectionalUInt32 { fatalError("override me!") }
 #endif
-  var characters: AnyCharacterUnicodeView { fatalError("override me!") }
-  var isKnownLatin1: Bool { fatalError("override me!") }
-  var isKnownASCII: Bool { fatalError("override me!") }
-  var isKnownFCCNormalized: Bool { fatalError("override me!") }
-  var isKnownFCDForm: Bool { fatalError("override me!") }
-  var isKnownNFDNormalized: Bool { fatalError("override me!") }
-  var isKnownNFCNormalized: Bool { fatalError("override me!") }
+  public var characters: AnyCharacterUnicodeView { fatalError("override me!") }
+  public var isKnownLatin1: Bool { fatalError("override me!") }
+  public var isKnownASCII: Bool { fatalError("override me!") }
+  public var isKnownFCCNormalized: Bool { fatalError("override me!") }
+  public var isKnownFCDForm: Bool { fatalError("override me!") }
+  public var isKnownNFDNormalized: Bool { fatalError("override me!") }
+  public var isKnownNFCNormalized: Bool { fatalError("override me!") }
 
-  func isLatin1() -> Bool  { fatalError("override me!") }
-  func isASCII() -> Bool { fatalError("override me!") }
+  public func isLatin1() -> Bool  { fatalError("override me!") }
+  public func isASCII() -> Bool { fatalError("override me!") }
 
-  class Instance<Base: UnicodeContent> : UnicodeContentBox
+  public // @testable
+  final class Instance<Base: UnicodeContent> : UnicodeContentBox
   where Base.UTF16View.Iterator.Element == UTF16.CodeUnit,
   Base.UTF8View.Iterator.Element == UTF8.CodeUnit,
   Base.UnicodeScalarView.Iterator.Element == UnicodeScalar,
   Base.CharacterView.Iterator.Element == Character
   {
-    var base: Base
+    public var base: Base
     
-    override var utf16: AnyUInt16UnicodeView {
+    public override var utf16: AnyUInt16UnicodeView {
       return AnyUInt16UnicodeView(base.utf16)
     }
-    override var utf8: AnyUInt8UnicodeView {
+    public override var utf8: AnyUInt8UnicodeView {
       return AnyUInt8UnicodeView(base.utf8)
     }
-    override var unicodeScalars: AnyUnicodeScalarUnicodeView {
+    public override var unicodeScalars: AnyUnicodeScalarUnicodeView {
       return AnyUnicodeScalarUnicodeView(base.unicodeScalars)
     }
 #if false
-    override var utf32: AnyUInt32UnicodeView {
+    public override var utf32: AnyUInt32UnicodeView {
       return AnyUInt32UnicodeView(base.utf32)
     }
-    override var fccNormalizedUTF16: AnyUInt16UnicodeView {
+    public override var fccNormalizedUTF16: AnyUInt16UnicodeView {
       return AnyUInt16UnicodeView(base.fccNormalizedUTF16)
     }
-    override var extendedASCII: UnicodeBidirectionalUInt32 {
+    public override var extendedASCII: UnicodeBidirectionalUInt32 {
       return base.extendedASCII
     }
 #endif
-    override var characters: AnyCharacterUnicodeView {
+    public override var characters: AnyCharacterUnicodeView {
       return AnyCharacterUnicodeView(base.characters)
     }
-    override var isKnownLatin1: Bool { return base.isKnownLatin1 }
-    override var isKnownASCII: Bool { return base.isKnownASCII }
-    override var isKnownFCCNormalized: Bool { return base.isKnownFCCNormalized }
-    override var isKnownFCDForm: Bool { return base.isKnownFCDForm }
-    override var isKnownNFDNormalized: Bool { return base.isKnownNFDNormalized }
-    override var isKnownNFCNormalized: Bool { return base.isKnownNFCNormalized }
-    override func isLatin1() -> Bool  { return base.isLatin1() }
-    override func isASCII() -> Bool  { return base.isASCII() }
-    init(_ x: Base) {
+    public override var isKnownLatin1: Bool { return base.isKnownLatin1 }
+    public override var isKnownASCII: Bool { return base.isKnownASCII }
+    public override var isKnownFCCNormalized: Bool { return base.isKnownFCCNormalized }
+    public override var isKnownFCDForm: Bool { return base.isKnownFCDForm }
+    public override var isKnownNFDNormalized: Bool { return base.isKnownNFDNormalized }
+    public override var isKnownNFCNormalized: Bool { return base.isKnownNFCNormalized }
+    public override func isLatin1() -> Bool  { return base.isLatin1() }
+    public override func isASCII() -> Bool  { return base.isASCII() }
+    public init(_ x: Base) {
       base = x
       super.init(fromSubclass: ())
     }
   }
 
-  convenience init<Base: UnicodeContent>(wrapping x: Base)
+  public convenience init<Base: UnicodeContent>(wrapping x: Base)
   where Base.UTF16View.Iterator.Element == UTF16.CodeUnit,
   Base.UTF8View.Iterator.Element == UTF8.CodeUnit,
   Base.UnicodeScalarView.Iterator.Element == UnicodeScalar,
@@ -101,7 +103,7 @@ class UnicodeContentBox : FactoryInitializable {
     self.init(Instance(x))
   }
   
-  init(fromSubclass: ()) {}
+  public init(fromSubclass: ()) {}
 }
 
 // FIXME: This conformance isn't really needed, at least so far, but it keeps us
@@ -122,15 +124,18 @@ public struct String {
 }%
   
   public struct Content {
-    internal enum Representation {
+    public // @testable
+    enum Representation {
       % for tag, Payload in allCases:
     case ${tag}(${Payload})
       % end
     }
-    internal init(_ representation: Representation) {
+    public // @testable
+    init(_ representation: Representation) {
       self._rep = representation
     }
-    internal var _rep: Representation
+    public // @testable
+    var _rep: Representation
   }
   public var content: Content
 }
@@ -142,7 +147,8 @@ extension String.Content {
   /// case.
   ///
   /// - Note: setting this property to nil clears the `String`
-  internal var _${tag}: ${Payload}? {
+  public // @testable
+  var _${tag}: ${Payload}? {
     get {
       if case .${tag}(let x) = _rep { return x }
       return nil
@@ -160,7 +166,7 @@ extension String.Content {
   static let packingTable: StaticString
   = "eilotrm.apdnsIc ufkMShjTRxgC4013bDNvwyUL2O856P-B79AFKEWV_zGJ/HYX"
 
-  typealias Packed = PackedUnsignedIntegers<UInt60, UInt16>
+  public typealias Packed = PackedUnsignedIntegers<UInt60, UInt16>
   
   static func _pack<Source: Collection>(
     utf16 source: Source, bitsPerElement: UInt16
@@ -204,6 +210,7 @@ extension String.Content {
   
 % for (N,W) in (5,6), (7,16):
 extension String.Content {
+  public // @testable
   struct Inline${N}or${W} {
     let bits: UInt61
   }
@@ -211,7 +218,7 @@ extension String.Content {
 
 
 extension String.Content.Inline${N}or${W} {
-  init?<Source: Collection>(utf16 source: Source)
+  public init?<Source: Collection>(utf16 source: Source)
   where Source.Iterator.Element == UTF16.CodeUnit {
     if let c = String.Content._pack(utf16: source, bitsPerElement: ${W}) {
       bits = numericCast(c.representation) | (1 as UInt61) << 60
@@ -222,7 +229,7 @@ extension String.Content.Inline${N}or${W} {
     else { return nil }
   }
 
-  var bitsPerElement: Int { return bits >> 60 == 0 ? ${N} : ${W} }
+  public var bitsPerElement: Int { return bits >> 60 == 0 ? ${N} : ${W} }
 }
 
 extension String.Content.Inline${N}or${W} : AnyUnicodeContent {
@@ -301,12 +308,14 @@ extension String.Content.Inline${N}or${W} : UnicodeContent {
 
 //===--- NSStringPayload --------------------------------------------------===//
 extension String.Content {
+  public // @testable
   struct NSStringPayload {
     let _base: TrueReference<_NSStringCore>
   }
 }
 
 extension String.Content.NSStringPayload {
+  public // @testable
   init(_ o: TrueReference<_NSStringCore>) {
     _base = o
   }
@@ -359,11 +368,12 @@ extension String.Content.NSStringPayload : UnicodeContent {
 
 /// A wrapper around `_NSStringCore` that confers `RandomAccessCollection`
 /// conformance.
-internal struct _NSStringUTF16 : RandomAccessCollection {
-  var base: _NSStringCore
-  var startIndex: Int { return 0 }
-  var endIndex: Int { return base.length() }
-  subscript(i: Int) -> UTF16.CodeUnit {
+public // @testable
+struct _NSStringUTF16 : RandomAccessCollection {
+  public var base: _NSStringCore
+  public var startIndex: Int { return 0 }
+  public var endIndex: Int { return base.length() }
+  public subscript(i: Int) -> UTF16.CodeUnit {
     return base.characterAtIndex(i)
   }
   public func withExistingUnsafeBuffer<R>(
@@ -602,10 +612,10 @@ extension UInt61 {
 }
 //===----------------------------------------------------------------------===//
 
-struct PackedUnsignedIntegers<
+public struct PackedUnsignedIntegers<
   Representation : UnsignedInteger, Element : UnsignedInteger
 > {
-  init?<C: Collection>(
+  public init?<C: Collection>(
     _ c: C,
     bitsPerElement: Representation
   )
@@ -617,20 +627,20 @@ struct PackedUnsignedIntegers<
     self.bitsPerElement = bitsPerElement
   }
 
-  init(representation: Representation, bitsPerElement: Representation) {
+  public init(representation: Representation, bitsPerElement: Representation) {
     self.representation = representation
     self.bitsPerElement = bitsPerElement
   }
   
-  let bitsPerElement: Representation
-  let representation: Representation
+  public let bitsPerElement: Representation
+  public let representation: Representation
 }
 
 extension PackedUnsignedIntegers : RandomAccessCollection {
-  var startIndex: Int { return 0 }
-  var endIndex: Int { return count }
+  public var startIndex: Int { return 0 }
+  public var endIndex: Int { return count }
   
-  var count: Int {
+  public var count: Int {
     var result = 0
     var rep = representation
     while rep != 0 {
@@ -639,7 +649,7 @@ extension PackedUnsignedIntegers : RandomAccessCollection {
     }
     return result
   }
-  subscript(i: Int) -> Element {
+  public subscript(i: Int) -> Element {
     var rep = representation
     for _ in 0..<i { rep = rep >> bitsPerElement }
     let mask = ~(0 as Representation) << bitsPerElement
@@ -807,16 +817,22 @@ extension String : RangeReplaceableCollection {
 //===--- Substring --------------------------------------------------------===//
 
 public struct Substring {
+  public init(_ other: Substring) { self = other }
+  public init(content: Content) { self.content = content }
+  
   public struct Content {
     // FIXME: small string optimization
     public var _wholeContent: String.Content
     // FIXME: Change this to a range of encodedOffset
     public var _bounds: Range<String.Index>
 
+    public // @testable
     init() {
       _wholeContent = String.Content()
       _bounds = _wholeContent.utf16.startIndex..<_wholeContent.utf16.endIndex
     }
+
+    public // @testable
     init(wholeContent: String.Content, bounds: Range<String.Index>) {
       self._wholeContent = wholeContent
       self._bounds = bounds
