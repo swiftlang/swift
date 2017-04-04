@@ -1253,7 +1253,9 @@ void Driver::buildOutputInfo(const ToolChain &TC, const DerivedArgList &Args,
                               int returnCode,
                               StringRef output,
                               StringRef errors,
-                              void *unused) -> sys::TaskFinishedResponse {
+                              void *unused,
+                              Optional<sys::ResourceStats> RS)
+                        -> sys::TaskFinishedResponse {
             if (returnCode == 0) {
               output = output.rtrim();
               auto lastLineStart = output.find_last_of("\n\r");

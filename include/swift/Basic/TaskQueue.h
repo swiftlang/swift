@@ -14,6 +14,7 @@
 #define SWIFT_BASIC_TASKQUEUE_H
 
 #include "swift/Basic/LLVM.h"
+#include "swift/Basic/Statistic.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/Config/config.h"
 #include "llvm/Support/Program.h"
@@ -47,6 +48,13 @@ class TaskQueue {
   unsigned NumberOfParallelTasks;
 
 public:
+
+  // \brief Get the resources used by just the current process.
+  static llvm::Optional<ResourceStats> OwnResourceStats();
+
+  // \brief Get the cumulative resources used by all children.
+  static llvm::Optional<ResourceStats> ChildResourceStats();
+
   /// \brief Create a new TaskQueue instance.
   ///
   /// \param NumberOfParallelTasks indicates the number of tasks which should
@@ -76,11 +84,14 @@ public:
   /// available and SeparateErrors was true.  (This may not be available on all
   /// platforms.)
   /// \param Context the context which was passed when the task was added
+  /// \param Resources an optional indication of resources consumed by the
+  /// subprocess during its execution
   ///
   /// \returns true if further execution of tasks should stop,
   /// false if execution should continue
   typedef std::function<TaskFinishedResponse(ProcessId Pid, int ReturnCode,
-                                             StringRef Output, StringRef Errors, void *Context)>
+                                             StringRef Output, StringRef Errors, void *Context,
+                                             llvm::Optional<ResourceStats> Resources)>
     TaskFinishedCallback;
 
   /// \brief A callback which will be executed if a task exited abnormally due
@@ -98,12 +109,15 @@ public:
   /// \param Signal the terminating signal number, if available.
   /// This may not be available on all platforms. If it is ever provided,
   /// it should not be removed in future versions of the compiler.
+  /// \param Resources an optional indication of resources consumed by the
+  /// subprocess during its execution
   ///
   /// \returns a TaskFinishedResponse indicating whether or not execution
   /// should proceed
   typedef std::function<TaskFinishedResponse(ProcessId Pid, StringRef ErrorMsg,
                                              StringRef Output, StringRef Errors,
-                                             void *Context, Optional<int> Signal)>
+                                             void *Context, Optional<int> Signal,
+                                             llvm::Optional<ResourceStats> Resources)>
     TaskSignalledCallback;
 #pragma clang diagnostic pop
 

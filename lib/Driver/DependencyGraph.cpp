@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Driver/DependencyGraph.h"
+#include "swift/Driver/ParseableOutput.h"
 #include "swift/Demangling/Demangle.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/SmallVector.h"
@@ -290,6 +291,7 @@ LoadResult DependencyGraphImpl::loadFromBuffer(const void *node,
 }
 
 void DependencyGraphImpl::markExternal(SmallVectorImpl<const void *> &visited,
+                                       CompilationCounters &counters,
                                        StringRef externalDependency) {
   auto allDependents = Dependencies.find(externalDependency);
   assert(allDependents != Dependencies.end() && "not a dependency!");
@@ -302,13 +304,43 @@ void DependencyGraphImpl::markExternal(SmallVectorImpl<const void *> &visited,
       continue;
     assert(dependent.flags & DependencyFlags::IsCascading);
     visited.push_back(dependent.node);
-    markTransitive(visited, dependent.node);
+    markTransitive(visited, dependent.node, counters);
+  }
+}
+
+void
+DependencyGraphImpl::countMarking(CompilationCounters &counters,
+                                  DependencyMaskTy kinds, bool isCascading) {
+  if (isCascading) {
+    if (kinds & DependencyKind::TopLevelName)
+      counters.DepCascadingTopLevel++;
+    if (kinds & DependencyKind::DynamicLookupName)
+      counters.DepCascadingDynamic++;
+    if (kinds & DependencyKind::NominalType)
+      counters.DepCascadingNominal++;
+    if (kinds & DependencyKind::NominalTypeMember)
+      counters.DepCascadingMember++;
+    if (kinds & DependencyKind::NominalTypeMember)
+      counters.DepCascadingExternal++;
+  } else {
+    if (kinds & DependencyKind::TopLevelName)
+      counters.DepTopLevel++;
+    if (kinds & DependencyKind::DynamicLookupName)
+      counters.DepDynamic++;
+    if (kinds & DependencyKind::NominalType)
+      counters.DepNominal++;
+    if (kinds & DependencyKind::NominalTypeMember)
+      counters.DepMember++;
+    if (kinds & DependencyKind::NominalTypeMember)
+      counters.DepExternal++;
   }
 }
 
 void
 DependencyGraphImpl::markTransitive(SmallVectorImpl<const void *> &visited,
-                                    const void *node, MarkTracerImpl *tracer) {
+                                    const void *node,
+                                    CompilationCounters &counters,
+                                    MarkTracerImpl *tracer) {
   assert(Provides.count(node) && "node is not in the graph");
   llvm::SpecificBumpPtrAllocator<MarkTracerImpl::Entry> scratchAlloc;
 
@@ -347,6 +379,8 @@ DependencyGraphImpl::markTransitive(SmallVectorImpl<const void *> &visited,
         if (isMarked(dependent.node))
           continue;
         bool isCascading{dependent.flags & DependencyFlags::IsCascading};
+
+        countMarking(counters, intersectingKinds, isCascading);
 
         MutableArrayRef<MarkTracerImpl::Entry> newReason;
         if (tracer) {

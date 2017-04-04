@@ -33,6 +33,7 @@
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/Path.h"
+#include "llvm/Support/Process.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/Timer.h"
 #include "llvm/Support/YAMLParser.h"
@@ -43,6 +44,7 @@ using namespace swift;
 using namespace swift::sys;
 using namespace swift::driver;
 using namespace llvm::opt;
+using namespace swift::driver::parseable_output;
 
 struct LogJob {
   const Job *j;
@@ -166,6 +168,9 @@ namespace driver {
     llvm::TimerGroup DriverTimerGroup {"driver", "Driver Compilation Time"};
     llvm::SmallDenseMap<const Job *, std::unique_ptr<llvm::Timer>, 16>
     DriverTimers;
+
+    /// Counters for characterizing the compilation as a whole.
+    CompilationCounters Counters{};
 
     void noteBuilding(const Job *cmd, StringRef reason) {
       if (!Comp.ShowIncrementalBuildDecisions)
@@ -318,7 +323,7 @@ namespace driver {
             LLVM_FALLTHROUGH;
           case DependencyGraphImpl::LoadResult::AffectsDownstream:
             DepGraph.markTransitive(Dependents, FinishedCmd,
-                                    IncrementalTracer);
+                                    Counters, IncrementalTracer);
             break;
           }
         } else {
@@ -329,7 +334,7 @@ namespace driver {
             // mark it as affecting other jobs, because some of them may have
             // completed already.
             DepGraph.markTransitive(Dependents, FinishedCmd,
-                                    IncrementalTracer);
+                                    Counters, IncrementalTracer);
             break;
           case Job::Condition::Always:
             // Any incremental task that shows up here has already been marked;
@@ -344,7 +349,7 @@ namespace driver {
             // have to conservatively assume the changes could affect other
             // files.
             DepGraph.markTransitive(Dependents, FinishedCmd,
-                                    IncrementalTracer);
+                                    Counters, IncrementalTracer);
             break;
           case Job::Condition::CheckDependencies:
             // If the only reason we're running this is because something else
@@ -365,7 +370,8 @@ namespace driver {
     /// any additional Jobs which we now know we need to run.
     TaskFinishedResponse
     taskFinished(ProcessId Pid, int ReturnCode, StringRef Output,
-                 StringRef Errors, void *Context) {
+                 StringRef Errors, void *Context,
+                 Optional<ResourceStats> Resources) {
       const Job *FinishedCmd = (const Job *)Context;
 
       if (Comp.ShowDriverTimeCompilation) {
@@ -375,7 +381,7 @@ namespace driver {
       if (Comp.Level == OutputLevel::Parseable) {
         // Parseable output was requested.
         parseable_output::emitFinishedMessage(llvm::errs(), *FinishedCmd, Pid,
-                                              ReturnCode, Output);
+                                              ReturnCode, Output, Resources);
       } else {
         // Otherwise, send the buffered output to stderr, though only if we
         // support getting buffered output.
@@ -427,7 +433,8 @@ namespace driver {
 
     TaskFinishedResponse
     taskSignalled(ProcessId Pid, StringRef ErrorMsg, StringRef Output,
-                  StringRef Errors, void *Context, Optional<int> Signal) {
+                  StringRef Errors, void *Context, Optional<int> Signal,
+                  Optional<ResourceStats> Resources) {
       const Job *SignalledCmd = (const Job *)Context;
 
       if (Comp.ShowDriverTimeCompilation) {
@@ -437,7 +444,8 @@ namespace driver {
       if (Comp.Level == OutputLevel::Parseable) {
         // Parseable output was requested.
         parseable_output::emitSignalledMessage(llvm::errs(), *SignalledCmd,
-                                               Pid, ErrorMsg, Output, Signal);
+                                               Pid, ErrorMsg, Output, Signal,
+                                               Resources);
       } else {
         // Otherwise, send the buffered output to stderr, though only if we
         // support getting buffered output.
@@ -538,7 +546,7 @@ namespace driver {
         // possible and after the first set of files if it's not.
         for (auto *Cmd : InitialOutOfDateCommands) {
           DepGraph.markTransitive(AdditionalOutOfDateCommands, Cmd,
-                                  IncrementalTracer);
+                                  Counters, IncrementalTracer);
         }
 
         for (auto *transitiveCmd : AdditionalOutOfDateCommands)
@@ -555,7 +563,7 @@ namespace driver {
           // If the dependency has been modified since the oldest built file,
           // or if we can't stat it for some reason (perhaps it's been deleted?),
           // trigger rebuilds through the dependency graph.
-          DepGraph.markExternal(AdditionalOutOfDateCommands, dependency);
+          DepGraph.markExternal(AdditionalOutOfDateCommands, Counters, dependency);
         }
 
         for (auto *externalCmd :
@@ -579,9 +587,9 @@ namespace driver {
         TQ->execute(std::bind(&PerformJobsState::taskBegan, this,
                               _1, _2),
                     std::bind(&PerformJobsState::taskFinished, this,
-                              _1, _2, _3, _4, _5),
+                              _1, _2, _3, _4, _5, _6),
                     std::bind(&PerformJobsState::taskSignalled, this,
-                              _1, _2, _3, _4, _5, _6));
+                              _1, _2, _3, _4, _5, _6, _7));
 
         // Mark all remaining deferred commands as skipped.
         for (const Job *Cmd : DeferredCommands) {
@@ -593,6 +601,7 @@ namespace driver {
 
           ScheduledCommands.insert(Cmd);
           markFinished(Cmd, /*Skipped=*/true);
+          Counters.JobsSkipped++;
         }
         DeferredCommands.clear();
 
@@ -671,6 +680,11 @@ namespace driver {
                              auto rhsIndex = rhs->first->getIndex();
                              return (lhsIndex < rhsIndex) ? -1 : (lhsIndex > rhsIndex) ? 1 : 0;
                            });
+    }
+
+    CompilationCounters finalizeCounters() {
+      Counters.JobsTotal = FinishedCommands.size();
+      return Counters;
     }
 
     int getResult() {
@@ -820,6 +834,13 @@ int Compilation::performJobsImpl() {
     checkForOutOfDateInputs(Diags, InputInfo);
     writeCompilationRecord(CompilationRecordPath, ArgsHash, BuildStartTime,
                            InputInfo);
+  }
+
+  if (Level == OutputLevel::Parseable) {
+    CompilationCounters C = State.finalizeCounters();
+    Optional<ResourceStats> R = TaskQueue::ChildResourceStats();
+    parseable_output::emitCompilationMessage(llvm::errs(), "swiftc",
+                                             C, R);
   }
 
   return State.getResult();

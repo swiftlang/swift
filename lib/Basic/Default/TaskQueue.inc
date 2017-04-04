@@ -52,6 +52,18 @@ public:
 } // end namespace sys
 } // end namespace swift
 
+Optional<ResourceStats>
+TaskQueue::OwnResourceStats()
+{
+  return Optional<ResourceStats>();
+}
+
+Optional<ResourceStats>
+TaskQueue::ChildResourceStats()
+{
+  return Optional<ResourceStats>();
+}
+
 bool TaskQueue::supportsBufferingOutput() {
   // The default implementation does not support buffering output.
   return false;

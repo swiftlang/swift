@@ -19,6 +19,7 @@
 
 #include <string>
 #include <cerrno>
+#include <chrono>
 
 #if HAVE_POSIX_SPAWN
 #include <spawn.h>
@@ -26,6 +27,10 @@
 
 #if HAVE_UNISTD_H
 #include <unistd.h>
+#endif
+
+#ifdef HAVE_SYS_RESOURCE_H
+#include <sys/resource.h>
 #endif
 
 #include <poll.h>
@@ -118,6 +123,51 @@ public:
 
 } // end namespace sys
 } // end namespace swift
+
+
+
+#if defined(HAVE_GETRUSAGE)
+inline std::chrono::microseconds toUsec(const struct timeval &TV) {
+  return std::chrono::seconds(TV.tv_sec) +
+         std::chrono::microseconds(TV.tv_usec);
+}
+
+static ResourceStats
+rusageToResourceStats(const struct rusage &RU)
+{
+  ResourceStats RS;
+  static_assert(sizeof(int64_t) >= sizeof(long), "time for int128_t");
+  RS.MaxResidentBytes = static_cast<int64_t>(RU.ru_maxrss);
+  RS.UserTimeUsec = toUsec(RU.ru_utime).count();
+  RS.SystemTimeUsec = toUsec(RU.ru_stime).count();
+  return RS;
+}
+#endif // defined(HAVE_GETRUSAGE)
+
+Optional<ResourceStats>
+TaskQueue::OwnResourceStats()
+{
+#if defined(HAVE_GETRUSAGE)
+  struct rusage RU;
+  ::getrusage(RUSAGE_SELF, &RU);
+  return rusageToResourceStats(RU);
+#else
+  return Optional<ResourceStats>();
+#endif
+}
+
+Optional<ResourceStats>
+TaskQueue::ChildResourceStats()
+{
+#if defined(HAVE_GETRUSAGE)
+  struct rusage RU;
+  ::getrusage(RUSAGE_CHILDREN, &RU);
+  return rusageToResourceStats(RU);
+#else
+  return Optional<ResourceStats>();
+#endif
+}
+
 
 bool Task::execute() {
   assert(State < Executing && "This Task cannot be executed twice!");
@@ -382,9 +432,16 @@ bool TaskQueue::execute(TaskBeganCallback Began, TaskFinishedCallback Finished,
           // Task and then clean up.
           pid_t Pid;
           int Status;
+          Optional<ResourceStats> Resources;
           do {
             Status = 0;
+#if defined(HAVE_GETRUSAGE)
+            struct rusage Rusage;
+            Pid = wait4(T.getPid(), &Status, 0, &Rusage);
+            Resources = rusageToResourceStats(Rusage);
+#else
             Pid = waitpid(T.getPid(), &Status, 0);
+#endif
             assert(Pid != 0 &&
                    "We do not pass WNOHANG, so we should always get a pid");
             if (Pid < 0 && (errno == ECHILD || errno == EINVAL))
@@ -403,7 +460,8 @@ bool TaskQueue::execute(TaskBeganCallback Began, TaskFinishedCallback Finished,
               // If we have a TaskFinishedCallback, only set SubtaskFailed to
               // true if the callback returns StopExecution.
               SubtaskFailed = Finished(T.getPid(), Result, T.getOutput(),
-                                       T.getErrors(), T.getContext()) ==
+                                       T.getErrors(), T.getContext(),
+                                       Resources) ==
                   TaskFinishedResponse::StopExecution;
             } else if (Result != 0) {
               // Since we don't have a TaskFinishedCallback, treat a subtask
@@ -419,7 +477,7 @@ bool TaskQueue::execute(TaskBeganCallback Began, TaskFinishedCallback Finished,
             if (Signalled) {
               TaskFinishedResponse Response =
                   Signalled(T.getPid(), ErrorMsg, T.getOutput(), T.getErrors(),
-                            T.getContext(), Signal);
+                            T.getContext(), Signal, Resources);
               if (Response == TaskFinishedResponse::StopExecution)
                 // If we have a TaskCrashedCallback, only set SubtaskFailed to
                 // true if the callback returns StopExecution.
