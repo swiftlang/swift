@@ -1177,11 +1177,11 @@ ConstraintSystem::matchExistentialTypes(Type type1, Type type2,
     }
   }
 
-  if (!type2->isAnyExistentialType())
+  if (!type2->isExistentialType())
     return SolutionKind::Error;
 
   SmallVector<ProtocolDecl *, 4> protocols;
-  type2->getAnyExistentialTypeProtocols(protocols);
+  type2->getExistentialTypeProtocols(protocols);
 
   for (auto proto : protocols) {
     switch (simplifyConformsToConstraint(type1, proto, kind, locator,

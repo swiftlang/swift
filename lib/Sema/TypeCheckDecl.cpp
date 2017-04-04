@@ -412,7 +412,7 @@ void TypeChecker::checkInheritanceClause(Decl *decl,
     // protocols.
     if (inheritedTy->isExistentialType()) {
       SmallVector<ProtocolDecl *, 4> protocols;
-      inheritedTy->isExistentialType(protocols);
+      inheritedTy->getExistentialTypeProtocols(protocols);
 
       allProtocols.insert(protocols.begin(), protocols.end());
       continue;

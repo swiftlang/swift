@@ -3456,7 +3456,7 @@ CanArchetypeType ArchetypeType::getOpened(Type existential,
 
   llvm::SmallVector<ProtocolDecl *, 4> conformsTo;
   assert(existential->isExistentialType());
-  existential->getAnyExistentialTypeProtocols(conformsTo);
+  existential->getExistentialTypeProtocols(conformsTo);
   Type superclass = existential->getSuperclass(nullptr);
 
   auto arena = AllocationArena::Permanent;

@@ -65,8 +65,7 @@ public struct S<A: P> where A.T == S<A> {
 }
 
 protocol I {
-  // FIXME: these are spurious
-  init() // expected-note {{protocol requires initializer 'init()' with type '()'}}
+  init()
 }
 
 protocol PI {
