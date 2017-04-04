@@ -719,6 +719,8 @@ extension _UnicodeViews {
     }     
 
     public func index(after i: Index) -> Index {
+      // Michael note: The below FIXME is not true for CR-LF
+      //
       // FIXME: there is always a grapheme break between two scalars that are
       // both < U+0300.  Use that to optimize.  Can we make a stronger
       // statement, that there's always a break before any scalar < U+0300?
@@ -731,6 +733,8 @@ extension _UnicodeViews {
     }
 
     public func index(before i: Index) -> Index {
+      // Michael note: The below FIXME is not true for CR-LF
+      //
       // FIXME: there is always a grapheme break between two scalars that are
       // both < U+0300.  Use that to optimize.  Can we make a stronger
       // statement, that there's always a break before any scalar < U+0300?
