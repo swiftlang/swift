@@ -267,10 +267,3 @@ extension String.UTF8View : CustomPlaygroundQuickLookable {
     return .text(description)
   }
 }
-
-extension String {
-  @available(*, unavailable, message: "Please use String.utf8CString instead.")
-  public var nulTerminatedUTF8: ContiguousArray<UTF8.CodeUnit> {
-    Builtin.unreachable()
-  }
-}

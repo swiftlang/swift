@@ -960,43 +960,6 @@ extension UnicodeEncoding {
 @available(*, unavailable, renamed: "UnicodeCodec")
 public typealias UnicodeCodecType = UnicodeCodec
 
-extension UnicodeCodec {
-  @available(*, unavailable, renamed: "encode(_:into:)")
-  public static func encode(
-    _ input: UnicodeScalar,
-    output put: (CodeUnit) -> Void
-  ) {
-    Builtin.unreachable()
-  }
-}
-
-@available(*, unavailable, message: "use 'transcode(_:from:to:stoppingOnError:into:)'")
-public func transcode<Input, InputEncoding, OutputEncoding>(
-  _ inputEncoding: InputEncoding.Type, _ outputEncoding: OutputEncoding.Type,
-  _ input: Input, _ output: (OutputEncoding.EncodedScalar.Iterator.Element) -> Void,
-  stopOnError: Bool
-) -> Bool
-  where
-  Input : IteratorProtocol,
-  InputEncoding : UnicodeCodec,
-  OutputEncoding : UnicodeCodec,
-  InputEncoding.EncodedScalar.Iterator.Element == Input.Element {
-  Builtin.unreachable()
-}
-
-extension UTF16 {
-  @available(*, unavailable, message: "use 'transcodedLength(of:decodedAs:repairingIllFormedSequences:)'")
-  public static func measure<Encoding, Input>(
-    _: Encoding.Type, input: Input, repairIllFormedSequences: Bool
-  ) -> (Int, Bool)?
-    where
-    Encoding : UnicodeCodec,
-    Input : IteratorProtocol,
-    Encoding.EncodedScalar.Iterator.Element == Input.Element {
-    Builtin.unreachable()
-  }
-}
-
 /// A namespace for Unicode utilities.
 internal enum _Unicode {}
 
