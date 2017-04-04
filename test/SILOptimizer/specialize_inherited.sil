@@ -39,7 +39,7 @@ bb0(%0 : $Int, %1 : $Int):
 
 // CHECK-LABEL: @_T06callee7inherit8MMStringC_SQyAB6MMFontCGTg5 : $@convention(method) (@owned MMString, Int, @owned MMStorage<MMString, ImplicitlyUnwrappedOptional<MMFont>>) -> Bool {
 // CHECK: [[META:%[0-9]+]] = metatype $@thick MMString.Type
-// CHECK: [[ID3:%[0-9]+]] = witness_method $MMObject, #Equatable."=="!1 :
+// CHECK: [[ID3:%[0-9]+]] = witness_method $MMString, #Equatable."=="!1 :
 // CHECK: [[STACK2:%[0-9]+]] = alloc_stack $MMString
 // CHECK: [[STACK3:%[0-9]+]] = alloc_stack $MMString
 // CHECK: apply [[ID3]]<MMString>([[STACK2]], [[STACK3]], [[META]]) : $@convention(witness_method) <τ_0_0 where τ_0_0 : Equatable> (@in τ_0_0, @in τ_0_0, @thick τ_0_0.Type) -> Bool
