@@ -101,6 +101,7 @@ static sourcekitd_uid_t KeyFilePath;
 static sourcekitd_uid_t KeyModuleInterfaceName;
 static sourcekitd_uid_t KeyLength;
 static sourcekitd_uid_t KeyActionable;
+static sourcekitd_uid_t KeyParentLoc;
 static sourcekitd_uid_t KeySourceText;
 static sourcekitd_uid_t KeyUSR;
 static sourcekitd_uid_t KeyOriginalUSR;
@@ -118,6 +119,7 @@ static sourcekitd_uid_t KeyEnableSyntaxMap;
 static sourcekitd_uid_t KeyEnableSubStructure;
 static sourcekitd_uid_t KeySyntacticOnly;
 static sourcekitd_uid_t KeyLine;
+static sourcekitd_uid_t KeyColumn;
 static sourcekitd_uid_t KeyFormatOptions;
 static sourcekitd_uid_t KeyCodeCompleteOptions;
 static sourcekitd_uid_t KeyAnnotations;
@@ -226,6 +228,7 @@ static int skt_main(int argc, const char **argv) {
   KeyModuleInterfaceName = sourcekitd_uid_get_from_cstr("key.module_interface_name");
   KeyLength = sourcekitd_uid_get_from_cstr("key.length");
   KeyActionable = sourcekitd_uid_get_from_cstr("key.actionable");
+  KeyParentLoc = sourcekitd_uid_get_from_cstr("key.parent_loc");;
   KeySourceText = sourcekitd_uid_get_from_cstr("key.sourcetext");
   KeyUSR = sourcekitd_uid_get_from_cstr("key.usr");
   KeyOriginalUSR = sourcekitd_uid_get_from_cstr("key.original_usr");
@@ -244,6 +247,7 @@ static int skt_main(int argc, const char **argv) {
   KeyEnableSubStructure = sourcekitd_uid_get_from_cstr("key.enablesubstructure");
   KeySyntacticOnly = sourcekitd_uid_get_from_cstr("key.syntactic_only");
   KeyLine = sourcekitd_uid_get_from_cstr("key.line");
+  KeyColumn = sourcekitd_uid_get_from_cstr("key.column");
   KeyFormatOptions = sourcekitd_uid_get_from_cstr("key.editor.format.options");
   KeyCodeCompleteOptions =
       sourcekitd_uid_get_from_cstr("key.codecomplete.options");
@@ -1265,6 +1269,16 @@ static void printCursorInfo(sourcekitd_variant_t Info, StringRef FilenameIn,
                                                                 KeyActionName));
   }
 
+  Optional<std::pair<unsigned, unsigned>> ParentLoc;
+  sourcekitd_variant_t ParentLocObj =
+    sourcekitd_variant_dictionary_get_value(Info, KeyParentLoc);
+  if (sourcekitd_variant_get_type(ParentLocObj) ==
+      SOURCEKITD_VARIANT_TYPE_DICTIONARY) {
+    ParentLoc.emplace(
+      sourcekitd_variant_dictionary_get_int64(ParentLocObj, KeyLine),
+      sourcekitd_variant_dictionary_get_int64(ParentLocObj, KeyColumn));
+  }
+
   OS << Kind << " (";
   if (Offset.hasValue()) {
     if (Filename != FilePath)
@@ -1321,6 +1335,9 @@ static void printCursorInfo(sourcekitd_variant_t Info, StringRef FilenameIn,
   for (auto Action : AvailableActions)
     OS << Action << '\n';
   OS << "ACTIONS END\n";
+  if (ParentLoc) {
+    OS << "PARENT LOC: " << ParentLoc->first << ":" << ParentLoc->second << "\n";
+  }
 }
 
 static void printRangeInfo(sourcekitd_variant_t Info, StringRef FilenameIn,
