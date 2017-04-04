@@ -4899,7 +4899,9 @@ void ConformanceChecker::ensureRequirementsAreSatisfied() {
       // FIXME: maybe this should be the conformance's type
       proto->getDeclaredInterfaceType(), reqSig,
       QuerySubstitutionMap{substitutions},
-      LookUpConformanceInSubstitutionMap{substitutions}, nullptr,
+      LookUpConformanceInModule(
+        Conformance->getDeclContext()->getParentModule()),
+      nullptr,
       ConformanceCheckFlags::Used, &listener);
 
   // If there were no errors, record the conformances.

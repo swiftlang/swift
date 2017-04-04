@@ -65,3 +65,12 @@ struct BadConcreteNestedConforms: NestedConforms {
   // expected-error@-1 {{type 'ConcreteParentNonFoo2.T' (aka 'Float') does not conform to protocol 'Foo2'}}
   typealias U = ConcreteParentNonFoo2
 }
+
+// <rdar://problem/31041997> Some where-clause requirements aren't checked on conforming types
+protocol P1 {}
+protocol P2 { associatedtype T }
+protocol P3 { associatedtype U }
+protocol P4: P3 where U: P2, U.T: P1 {}
+
+struct X: P2 { typealias T = Int }
+struct Y: P4 { typealias U = X } // expected-error{{type 'X.T' (aka 'Int') does not conform to protocol 'P1'}}
