@@ -2750,13 +2750,14 @@ bool GenericSignatureBuilder::addRequirement(const RequirementRepr *Req,
                                       source.getSource(PA, Req->getSubject()));
     }
 
-    SmallVector<ProtocolDecl *, 4> ConformsTo;
-    if (!Req->getConstraint()->isExistentialType(ConformsTo)) {
+    if (!Req->getConstraint()->isExistentialType()) {
       // FIXME: Diagnose this failure here, rather than over in type-checking.
       return true;
     }
 
     // Add each of the protocols.
+    SmallVector<ProtocolDecl *, 4> ConformsTo;
+    Req->getConstraint()->getExistentialTypeProtocols(ConformsTo);
     for (auto Proto : ConformsTo)
       if (addConformanceRequirement(PA, Proto,
                                     source.getSource(PA, Req->getSubject())))
@@ -2831,7 +2832,7 @@ bool GenericSignatureBuilder::addRequirement(
     if (!pa) return false;
 
     SmallVector<ProtocolDecl *, 4> conformsTo;
-    (void)req.getSecondType()->isExistentialType(conformsTo);
+    req.getSecondType()->getExistentialTypeProtocols(conformsTo);
 
     // Add each of the protocols.
     for (auto proto : conformsTo) {

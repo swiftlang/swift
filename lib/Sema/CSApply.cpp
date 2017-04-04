@@ -76,7 +76,7 @@ static bool isOpenedAnyObject(Type type) {
     return false;
 
   SmallVector<ProtocolDecl *, 2> protocols;
-  existential->isExistentialType(protocols);
+  existential->getExistentialTypeProtocols(protocols);
   return protocols.size() == 1 &&
          protocols[0]->isSpecificProtocol(KnownProtocolKind::AnyObject);
 }
@@ -4666,7 +4666,7 @@ static ArrayRef<ProtocolConformanceRef>
 collectExistentialConformances(TypeChecker &tc, Type fromType, Type toType,
                                DeclContext *DC) {
   SmallVector<ProtocolDecl *, 4> protocols;
-  toType->getAnyExistentialTypeProtocols(protocols);
+  toType->getExistentialTypeProtocols(protocols);
 
   SmallVector<ProtocolConformanceRef, 4> conformances;
   for (auto proto : protocols) {

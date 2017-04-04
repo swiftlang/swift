@@ -1417,17 +1417,16 @@ bool DeclContext::lookupQualified(Type type,
   // Handle protocol compositions.
   else if (auto compositionTy = type->getAs<ProtocolCompositionType>()) {
     SmallVector<ProtocolDecl *, 4> protocols;
-    if (compositionTy->isExistentialType(protocols)) {
-      for (auto proto : protocols) {
-        if (visited.insert(proto).second) {
-          stack.push_back(proto);
+    compositionTy->getExistentialTypeProtocols(protocols);
+    for (auto proto : protocols) {
+      if (visited.insert(proto).second) {
+        stack.push_back(proto);
 
-          // If we want dynamic lookup and this is the AnyObject
-          // protocol, note this for later.
-          if ((options & NL_DynamicLookup) &&
-              proto->isSpecificProtocol(KnownProtocolKind::AnyObject))
-            wantLookupInAllClasses = true;
-        }
+        // If we want dynamic lookup and this is the AnyObject
+        // protocol, note this for later.
+        if ((options & NL_DynamicLookup) &&
+            proto->isSpecificProtocol(KnownProtocolKind::AnyObject))
+          wantLookupInAllClasses = true;
       }
     }
   } else {

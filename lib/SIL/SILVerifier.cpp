@@ -2608,6 +2608,9 @@ public:
             "init_existential_metatype result must match representation of "
             "operand");
 
+    while(auto metatypeType = resultType.is<ExistentialMetatypeType>())
+      resultType = resultType.getMetatypeInstanceType(F.getModule());
+
     checkExistentialProtocolConformances(resultType, I->getConformances());
     verifyOpenedArchetype(I, MetaTy.getInstanceType());
   }
@@ -2615,7 +2618,7 @@ public:
   void checkExistentialProtocolConformances(SILType resultType,
                                 ArrayRef<ProtocolConformanceRef> conformances) {
     SmallVector<ProtocolDecl*, 4> protocols;
-    resultType.getSwiftRValueType().isAnyExistentialType(protocols);
+    resultType.getSwiftRValueType().getExistentialTypeProtocols(protocols);
 
     require(conformances.size() == protocols.size(),
             "init_existential instruction must have the "

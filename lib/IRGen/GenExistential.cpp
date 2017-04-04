@@ -1478,7 +1478,7 @@ const TypeInfo *
 TypeConverter::convertProtocolCompositionType(ProtocolCompositionType *T) {
   // Find the canonical protocols.  There might not be any.
   SmallVector<ProtocolDecl*, 4> protocols;
-  T->getAnyExistentialTypeProtocols(protocols);
+  T->getExistentialTypeProtocols(protocols);
 
   return createExistentialTypeInfo(IGM, CanType(T), protocols);
 }
@@ -1641,7 +1641,7 @@ static void forEachProtocolWitnessTable(IRGenFunction &IGF,
                           std::function<void (unsigned, llvm::Value*)> body) {
   // Collect the conformances that need witness tables.
   SmallVector<ProtocolDecl*, 2> destProtocols;
-  destType.getAnyExistentialTypeProtocols(destProtocols);
+  destType.getExistentialTypeProtocols(destProtocols);
 
   SmallVector<ProtocolConformanceRef, 2> witnessConformances;
   assert(destProtocols.size() == conformances.size() &&
@@ -1662,23 +1662,14 @@ static void forEachProtocolWitnessTable(IRGenFunction &IGF,
   }
 }
 
-#ifndef NDEBUG
-static bool _isError(SILType baseTy) {
-  llvm::SmallVector<ProtocolDecl*, 1> protos;
-  return baseTy.getSwiftRValueType()->isExistentialType(protos)
-    && protos.size() == 1
-    && protos[0]->getKnownProtocolKind()
-    && *protos[0]->getKnownProtocolKind() == KnownProtocolKind::Error;
-}
-#endif
-
 /// Project the address of the value inside a boxed existential container.
 ContainedAddress irgen::emitBoxedExistentialProjection(IRGenFunction &IGF,
                                               Explosion &base,
                                               SILType baseTy,
                                               CanType projectedType) {
   // TODO: Non-ErrorType boxed existentials.
-  assert(_isError(baseTy));
+  assert(baseTy.canUseExistentialRepresentation(
+           IGF.getSILModule(), ExistentialRepresentation::Boxed, Type()));
   
   // Get the reference to the existential box.
   llvm::Value *box = base.claimNext();
@@ -1730,7 +1721,8 @@ OwnedAddress irgen::emitBoxedExistentialContainerAllocation(IRGenFunction &IGF,
                                   CanType formalSrcType,
                                 ArrayRef<ProtocolConformanceRef> conformances) {
   // TODO: Non-Error boxed existentials.
-  assert(_isError(destType));
+  assert(destType.canUseExistentialRepresentation(
+           IGF.getSILModule(), ExistentialRepresentation::Boxed, Type()));
 
   auto &destTI = IGF.getTypeInfo(destType).as<ErrorExistentialTypeInfo>();
   auto srcMetadata = IGF.emitTypeMetadataRef(formalSrcType);
@@ -1769,7 +1761,8 @@ void irgen::emitBoxedExistentialContainerDeallocation(IRGenFunction &IGF,
                                                       SILType containerType,
                                                       CanType valueType) {
   // TODO: Non-Error boxed existentials.
-  assert(_isError(containerType));
+  assert(containerType.canUseExistentialRepresentation(
+           IGF.getSILModule(), ExistentialRepresentation::Boxed, Type()));
 
   auto box = container.claimNext();
   auto srcMetadata = IGF.emitTypeMetadataRef(valueType);
@@ -1803,20 +1796,21 @@ void irgen::emitClassExistentialContainer(IRGenFunction &IGF,
                                ArrayRef<ProtocolConformanceRef> conformances) {
   // As a special case, an Error existential can be represented as a
   // reference to an already existing NSError or CFError instance.
-  SmallVector<ProtocolDecl*, 4> protocols;
-  
-  if (outType.getSwiftRValueType()->isExistentialType(protocols)
-      && protocols.size() == 1) {
-    switch (getSpecialProtocolID(protocols[0])) {
-    case SpecialProtocol::Error: {
-      // Bitcast the incoming class reference to Error.
-      out.add(IGF.Builder.CreateBitCast(instance, IGF.IGM.ErrorPtrTy));
-      return;
-    }
+  if (outType.getSwiftRValueType().isExistentialType()) {
+    SmallVector<ProtocolDecl*, 4> protocols;
+    outType.getSwiftRValueType().getExistentialTypeProtocols(protocols);
+    if (protocols.size() == 1) {
+      switch (getSpecialProtocolID(protocols[0])) {
+      case SpecialProtocol::Error: {
+        // Bitcast the incoming class reference to Error.
+        out.add(IGF.Builder.CreateBitCast(instance, IGF.IGM.ErrorPtrTy));
+        return;
+      }
 
-    case SpecialProtocol::AnyObject:
-    case SpecialProtocol::None:
-      break;
+      case SpecialProtocol::AnyObject:
+      case SpecialProtocol::None:
+        break;
+      }
     }
   }
   
@@ -1946,7 +1940,8 @@ void irgen::emitMetatypeOfOpaqueExistential(IRGenFunction &IGF, Address addr,
 void irgen::emitMetatypeOfBoxedExistential(IRGenFunction &IGF, Explosion &value,
                                            SILType type, Explosion &out) {
   // TODO: Non-Error boxed existentials.
-  assert(_isError(type));
+  assert(type.canUseExistentialRepresentation(
+           IGF.getSILModule(), ExistentialRepresentation::Boxed, Type()));
 
   // Get the reference to the existential box.
   llvm::Value *box = value.claimNext();
