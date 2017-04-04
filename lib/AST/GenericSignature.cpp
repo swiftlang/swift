@@ -554,6 +554,28 @@ SmallVector<ProtocolDecl *, 2> GenericSignature::getConformsTo(Type type,
   return result;
 }
 
+bool GenericSignature::conformsToProtocol(Type type, ProtocolDecl *proto,
+                                          ModuleDecl &mod) {
+  // FIXME: Deal with concrete conformances here?
+  if (!type->isTypeParameter()) return false;
+
+  auto &builder = *getGenericSignatureBuilder(mod);
+  auto pa = builder.resolveArchetype(type);
+  if (!pa) return false;
+
+  pa = pa->getRepresentative();
+
+  // FIXME: Deal with concrete conformances here?
+  if (pa->isConcreteType()) return false;
+
+  // Check whether the representative conforms to this protocol.
+  if (auto equivClass = pa->getEquivalenceClassIfPresent())
+    if (equivClass->conformsTo.count(proto) > 0)
+      return true;
+
+  return false;
+}
+
 /// Determine whether the given dependent type is equal to a concrete type.
 bool GenericSignature::isConcreteType(Type type, ModuleDecl &mod) {
   return bool(getConcreteType(type, mod));

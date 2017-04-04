@@ -285,6 +285,9 @@ public:
   /// must conform.
   ConformsToArray getConformsTo(Type type, ModuleDecl &mod);
 
+  /// Determine whether the given dependent type conforms to this protocol.
+  bool conformsToProtocol(Type type, ProtocolDecl *proto, ModuleDecl &mod);
+
   /// Determine whether the given dependent type is equal to a concrete type.
   bool isConcreteType(Type type, ModuleDecl &mod);
 

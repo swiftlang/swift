@@ -86,11 +86,16 @@ Optional<ProtocolConformanceRef>
 SubstitutionMap::lookupConformance(CanType type, ProtocolDecl *proto) const {
   // If we have an archetype, map out of the context so we can compute a
   // conformance access path.
-  GenericEnvironment *genericEnv = nullptr;;
+  GenericEnvironment *genericEnv = nullptr;
   if (auto archetype = type->getAs<ArchetypeType>()) {
     genericEnv = archetype->getGenericEnvironment();
     type = genericEnv->mapTypeOutOfContext(type)->getCanonicalType();
   }
+
+  // Error path: if we don't have a type parameter, there is no conformance.
+  // FIXME: Query concrete conformances in the generic signature?
+  if (!type->isTypeParameter())
+    return None;
 
   // Retrieve the starting conformance from the conformance map.
   auto getInitialConformance =
@@ -114,6 +119,18 @@ SubstitutionMap::lookupConformance(CanType type, ProtocolDecl *proto) const {
 
   auto genericSig = getGenericSignature();
   auto &mod = *proto->getModuleContext();
+
+  // HACK: Deal with AnyObject conformances, which get magically dropped in
+  // frustrating ways.
+  // FIXME: This hack dies with AnyObject-as-a-protocol.
+  if (proto->isSpecificProtocol(KnownProtocolKind::AnyObject) &&
+      genericSig->requiresClass(type, mod))
+    return ProtocolConformanceRef(proto);
+
+  // If the type doesn't conform to this protocol, fail.
+  if (!genericSig->conformsToProtocol(type, proto, mod))
+    return None;
+
   auto canonType = genericSig->getCanonicalTypeInContext(type, mod);
   auto accessPath =
     genericSig->getConformanceAccessPath(canonType, proto, mod);
