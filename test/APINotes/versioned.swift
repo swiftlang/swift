@@ -63,5 +63,5 @@ func testRenamedTopLevel() {
 
   // CHECK-DIAGS-4-NOT: versioned.swift:[[@LINE+1]]:
   _ = Outer.Inner()
-  // CHECK-DIAGS-3: versioned.swift:[[@LINE-1]]:7: error: type 'Outer' has no member 'Inner'
+  // CHECK-DIAGS-3: versioned.swift:[[@LINE-1]]:13: error: 'Inner' has been renamed to 'InnerInSwift4'
 }
