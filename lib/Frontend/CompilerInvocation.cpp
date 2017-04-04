@@ -1218,6 +1218,9 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
       llvm_unreachable("Unknown SIL linking option!");
   }
 
+  if (Args.hasArg(OPT_sil_merge_partial_modules))
+    Opts.MergePartialModules = true;
+
   // Parse the optimization level.
   if (const Arg *A = Args.getLastArg(OPT_O_Group)) {
     if (A->getOption().matches(OPT_Onone)) {

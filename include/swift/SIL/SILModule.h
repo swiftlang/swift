@@ -459,6 +459,10 @@ public:
   /// Link in all VTables in the module.
   void linkAllVTables();
 
+  /// Link all definitions in all segments that are logically part of
+  /// the same AST module.
+  void linkAllFromCurrentModule();
+
   /// \brief Return the declaration of a utility function that can,
   /// but needn't, be shared between modules.
   SILFunction *getOrCreateSharedFunction(SILLocation loc,
