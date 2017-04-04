@@ -3530,11 +3530,11 @@ static PotentialArchetype *sameTypeDFS(PotentialArchetype *pa,
     // Skip non-derived constraints.
     if (!constraint.source->isDerivedRequirement()) continue;
 
-    sameTypeDFS(constraint.value, component, paToComponent);
+    auto newAnchor = sameTypeDFS(constraint.value, component, paToComponent);
 
     // If this type is better than the anchor, use it for the anchor.
-    if (compareDependentTypes(&constraint.value, &anchor) < 0)
-      anchor = constraint.value;
+    if (compareDependentTypes(&newAnchor, &anchor) < 0)
+      anchor = newAnchor;
   }
 
   return anchor;
