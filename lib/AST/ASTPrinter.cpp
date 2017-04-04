@@ -233,18 +233,19 @@ struct SynthesizedExtensionAnalyzer::Implementation {
     for (auto Req : Ext->getGenericSignature()->getRequirements()) {
       auto Kind = Req.getKind();
 
-      Type First = Req.getFirstType().subst(subMap);
-      Type Second = Req.getSecondType().subst(subMap);
+      auto First = Req.getFirstType();
+      auto Second = Req.getSecondType();
+      if (!BaseType->isExistentialType()) {
+        First = First.subst(subMap);
+        Second = Second.subst(subMap);
 
-      if (!First || !Second) {
-        // Substitution with interface type bases can only fail
-        // if a concrete type fails to conform to a protocol.
-        // In this case, just give up on the extension altogether.
-        return {Result, MergeInfo};
+        if (!First || !Second) {
+          // Substitution with interface type bases can only fail
+          // if a concrete type fails to conform to a protocol.
+          // In this case, just give up on the extension altogether.
+          return {Result, MergeInfo};
+        }
       }
-
-      First = First->getCanonicalType();
-      Second = Second->getCanonicalType();
 
       switch (Kind) {
         case RequirementKind::Conformance:
@@ -934,21 +935,18 @@ class PrintAST : public ASTVisitor<PrintAST> {
         T = Current->getInnermostDeclContext()->mapTypeOutOfContext(T);
       }
 
-      // Get the innermost nominal type context.
-      DeclContext *DC;
-      if (isa<NominalTypeDecl>(Current))
-        DC = Current->getInnermostDeclContext();
-      else if (isa<ExtensionDecl>(Current))
-        DC = Current->getInnermostDeclContext()->
-          getAsNominalTypeOrNominalTypeExtensionContext();
-      else
-        DC = Current->getDeclContext();
+      auto *M = Current->getDeclContext()->getParentModule();
+      SubstitutionMap subMap;
 
-      assert(DC->isTypeContext());
+      if (auto *NTD = dyn_cast<NominalTypeDecl>(Current))
+        subMap = CurrentType->getContextSubstitutionMap(M, NTD);
+      else if (auto *ED = dyn_cast<ExtensionDecl>(Current))
+        subMap = CurrentType->getContextSubstitutionMap(M, ED);
+      else {
+        subMap = CurrentType->getMemberSubstitutionMap(
+          M, cast<ValueDecl>(Current));
+      }
 
-      // Get the substitutions from our base type.
-      auto *M = DC->getParentModule();
-      auto subMap = CurrentType->getContextSubstitutionMap(M, DC);
       T = T.subst(subMap, SubstFlags::DesugarMemberTypes);
     }
 
