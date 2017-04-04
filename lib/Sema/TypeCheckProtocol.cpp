@@ -996,10 +996,6 @@ RequirementEnvironment::RequirementEnvironment(
   auto selfType = cast<GenericTypeParamType>(
                             proto->getSelfInterfaceType()->getCanonicalType());
 
-  // 'Self' is always at depth 0, index 0. Anything else is invalid code.
-  if (selfType->getDepth() != 0 || selfType->getIndex() != 0)
-    return;
-
   // Construct a generic signature builder by collecting the constraints from the
   // requirement and the context of the conformance together, because both
   // define the capabilities of the requirement.
