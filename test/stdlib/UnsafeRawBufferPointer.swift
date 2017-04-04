@@ -117,19 +117,23 @@ UnsafeRawBufferPointerTestSuite.test("initializeMemory(as:from:).exact") {
 }
 
 UnsafeRawBufferPointerTestSuite.test("initializeMemory(as:from:).invalidNilPtr") {
-  let buffer = UnsafeMutableRawBufferPointer(start: nil, count: 0)
-  let source: [Int64] = [5, 4, 3, 2, 1]
-  expectCrashLater()
-  var (it, bound) = buffer.initializeMemory(as: Int64.self, from: source)
+  // Michael NOTE: non-nil buffer pointer base address. Disabling...
+  //
+  //
+  // let buffer = UnsafeMutableRawBufferPointer(start: nil, count: 0)
+  // let source: [Int64] = [5, 4, 3, 2, 1]
+  // expectCrashLater()
+  // var (it, bound) = buffer.initializeMemory(as: Int64.self, from: source)
 }
 
 UnsafeRawBufferPointerTestSuite.test("initializeMemory(as:from:).validNilPtr") {
-  let buffer = UnsafeMutableRawBufferPointer(start: nil, count: 0)
-  let source: [Int64] = []
-  var (it, bound) = buffer.initializeMemory(as: Int64.self, from: source)
-  let idx = bound.endIndex * MemoryLayout<Int64>.stride
-  expectNil(it.next())
-  expectEqual(idx, source.endIndex)
+  // Michael NOTE: non-nil buffer pointer base address. Disabling...
+  // let buffer = UnsafeMutableRawBufferPointer(start: nil, count: 0)
+  // let source: [Int64] = []
+  // var (it, bound) = buffer.initializeMemory(as: Int64.self, from: source)
+  // let idx = bound.endIndex * MemoryLayout<Int64>.stride
+  // expectNil(it.next())
+  // expectEqual(idx, source.endIndex)
 }
 
 
@@ -147,15 +151,16 @@ UnsafeRawBufferPointerTestSuite.test("withUnsafeBytes.Sequence") {
 
 // Test the empty buffer.
 UnsafeRawBufferPointerTestSuite.test("empty") {
-  let emptyBytes = UnsafeRawBufferPointer(start: nil, count: 0)
-  for byte in emptyBytes {
-    expectUnreachable()
-  }
-  let emptyMutableBytes = UnsafeMutableRawBufferPointer.allocate(count: 0)
-  for byte in emptyMutableBytes {
-    expectUnreachable()
-  }
-  emptyMutableBytes.deallocate()
+  // Michael NOTE: non-nil buffer pointer base address. Disabling...
+  // let emptyBytes = UnsafeRawBufferPointer(start: nil, count: 0)
+  // for byte in emptyBytes {
+  //   expectUnreachable()
+  // }
+  // let emptyMutableBytes = UnsafeMutableRawBufferPointer.allocate(count: 0)
+  // for byte in emptyMutableBytes {
+  //   expectUnreachable()
+  // }
+  // emptyMutableBytes.deallocate()
 }
 
 // Store a sequence of integers to raw memory, and reload them as structs.

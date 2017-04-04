@@ -364,7 +364,8 @@ UnsafeMutablePointerTestSuite.test("initialize:from:/immutable") {
   }
   let source = (0..<3).map(Missile.init)
   source.withUnsafeBufferPointer { bufferPtr in
-    ptr.initialize(from: bufferPtr.baseAddress!, count: 3)
+    // Michael NOTE: non-nil buffer pointer base address
+    ptr.initialize(from: bufferPtr.baseAddress, count: 3)
     expectEqual(0, ptr[0].number)
     expectEqual(1, ptr[1].number)
     expectEqual(2, ptr[2].number)
@@ -381,7 +382,8 @@ UnsafeMutablePointerTestSuite.test("assign/immutable") {
   (ptr + 1).initialize(to: Missile(2))
   let source = (3..<5).map(Missile.init)
   source.withUnsafeBufferPointer { bufferPtr in
-    ptr.assign(from: bufferPtr.baseAddress!, count: 2)
+    // Michael NOTE: non-nil buffer pointer base address
+    ptr.assign(from: bufferPtr.baseAddress, count: 2)
     expectEqual(3, ptr[0].number)
     expectEqual(4, ptr[1].number)
   }

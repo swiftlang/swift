@@ -81,7 +81,8 @@ class TestData : TestDataSuper {
         
         override var bytes : UnsafeRawPointer {
             if let d = _pointer {
-                return UnsafeRawPointer(d.baseAddress!)
+                // Michael NOTE: non-nil buffer pointer base address
+                return UnsafeRawPointer(d.baseAddress)
             } else {
                 // Need to allocate the buffer now.
                 // It doesn't matter if the buffer is uniquely referenced or not here.
@@ -90,7 +91,8 @@ class TestData : TestDataSuper {
                 let bytePtr = buffer!.bindMemory(to: UInt8.self, capacity: length)
                 let result = UnsafeMutableBufferPointer(start: bytePtr, count: length)
                 _pointer = result
-                return UnsafeRawPointer(result.baseAddress!)
+                // Michael NOTE: non-nil buffer pointer base address
+                return UnsafeRawPointer(result.baseAddress)
             }
         }
         
@@ -108,7 +110,8 @@ class TestData : TestDataSuper {
             let result = UnsafeMutableBufferPointer(start: bytePtr, count: newBufferLength)
             _pointer = result
             _length = newBufferLength
-            return UnsafeMutableRawPointer(result.baseAddress!)
+            // Michael NOTE: non-nil buffer pointer base address
+            return UnsafeMutableRawPointer(result.baseAddress)
         }
         
         override func getBytes(_ buffer: UnsafeMutableRawPointer, length: Int) {
@@ -128,7 +131,8 @@ class TestData : TestDataSuper {
     func dataFrom(_ string : String) -> Data {
         // Create a Data out of those bytes
         return string.utf8CString.withUnsafeBufferPointer { (ptr) in
-            ptr.baseAddress!.withMemoryRebound(to: UInt8.self, capacity: ptr.count) {
+            // Michael NOTE: non-nil buffer pointer base address
+            ptr.baseAddress.withMemoryRebound(to: UInt8.self, capacity: ptr.count) {
                 // Subtract 1 so we don't get the null terminator byte. This matches NSString behavior.
                 return Data(bytes: $0, count: ptr.count - 1)
             }
