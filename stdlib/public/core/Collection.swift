@@ -724,14 +724,13 @@ public protocol Collection : _Indexable, Sequence {
   /// A type that represents the indices that are valid for subscripting the
   /// collection, in ascending order.
   associatedtype Indices : _Indexable, Sequence = DefaultIndices<Self>
+    where Indices.Iterator.Element == Index,
+          Indices.Index == Index,
+          Indices.SubSequence == Indices
 
-  // FIXME(ABI)#68 (Associated Types with where clauses):
   // FIXME(ABI)#100 (Recursive Protocol Constraints):
   // associatedtype Indices : Collection
   //   where
-  //   Indices.Iterator.Element == Index,
-  //   Indices.Index == Index,
-  //   Indices.SubSequence == Indices
   //   = DefaultIndices<Self>
 
   /// The indices that are valid for subscripting the collection, in ascending

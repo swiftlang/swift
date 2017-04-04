@@ -220,16 +220,10 @@ public struct Mirror {
     // associated types of Collection.
     C.SubSequence : Collection,
     C.SubSequence.Iterator.Element == Child,
-    C.SubSequence.Index == C.Index,
     C.SubSequence.Indices : Collection,
-    C.SubSequence.Indices.Iterator.Element == C.Index,
     C.SubSequence.Indices.Index == C.Index,
-    C.SubSequence.Indices.SubSequence == C.SubSequence.Indices,
     C.SubSequence.SubSequence == C.SubSequence,
-    C.Indices : Collection,
-    C.Indices.Iterator.Element == C.Index,
-    C.Indices.Index == C.Index,
-    C.Indices.SubSequence == C.Indices {
+    C.Indices : Collection {
 
     self.subjectType = Subject.self
     self._makeSuperclassMirror = Mirror._superclassIterator(
@@ -281,10 +275,7 @@ public struct Mirror {
     // associated types of Collection.
     C.SubSequence : Collection,
     C.SubSequence.SubSequence == C.SubSequence,
-    C.Indices : Collection,
-    C.Indices.Iterator.Element == C.Index,
-    C.Indices.Index == C.Index,
-    C.Indices.SubSequence == C.Indices {
+    C.Indices : Collection {
 
     self.subjectType = Subject.self
     self._makeSuperclassMirror = Mirror._superclassIterator(
