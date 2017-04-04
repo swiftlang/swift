@@ -321,6 +321,9 @@ def sil_inline_threshold : Separate<["-"], "sil-inline-threshold">,
   MetaVarName<"<50>">,
   HelpText<"Controls the aggressiveness of performance inlining">;
 
+def sil_merge_partial_modules : Flag<["-"], "sil-merge-partial-modules">,
+  HelpText<"Merge SIL from all partial swiftmodules into the final module">;
+
 def sil_link_all : Flag<["-"], "sil-link-all">,
   HelpText<"Link all SIL functions">;
 

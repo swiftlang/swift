@@ -625,6 +625,9 @@ static bool performCompile(std::unique_ptr<CompilerInstance> &Instance,
   if (Invocation.getSILOptions().LinkMode == SILOptions::LinkAll)
     performSILLinking(SM.get(), true);
 
+  if (Invocation.getSILOptions().MergePartialModules)
+    SM->linkAllFromCurrentModule();
+
   {
     SharedTimer timer("SIL verification, pre-optimization");
     SM->verify();
