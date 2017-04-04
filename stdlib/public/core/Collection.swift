@@ -646,6 +646,7 @@ public protocol Collection : _Indexable, Sequence {
   /// supplying `IndexingIterator` as its associated `Iterator`
   /// type.
   associatedtype Iterator = IndexingIterator<Self>
+    where Self.Iterator.Element == _Element
 
   // FIXME(ABI)#179 (Type checker): Needed here so that the `Iterator` is properly deduced from
   // a custom `makeIterator()` function.  Otherwise we get an
@@ -660,12 +661,13 @@ public protocol Collection : _Indexable, Sequence {
   /// protocol, but it is restated here with stricter constraints. In a
   /// collection, the subsequence should also conform to `Collection`.
   associatedtype SubSequence : _IndexableBase, Sequence = Slice<Self>
+      where Self.SubSequence.Index == Index,
+            Self.Iterator.Element == Self.SubSequence.Iterator.Element
   // FIXME(ABI)#98 (Recursive Protocol Constraints):
   // FIXME(ABI)#99 (Associated Types with where clauses):
   // associatedtype SubSequence : Collection
   //   where
-  //   Iterator.Element == SubSequence.Iterator.Element,
-  //   SubSequence.Index == Index,
+  //   ,
   //   SubSequence.Indices == Indices,
   //   SubSequence.SubSequence == SubSequence
   //

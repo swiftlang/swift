@@ -29,11 +29,9 @@ struct CollectionWithBadSubSequence : Collection {
   typealias SubSequence = OpaqueValue<Int8>
 }
 
-func useCollectionTypeSubSequenceIndex<C : Collection>(_ c: C)
-  where C.SubSequence.Index == C.Index {}
+func useCollectionTypeSubSequenceIndex<C : Collection>(_ c: C) {}
 
-func useCollectionTypeSubSequenceGeneratorElement<C : Collection>(_ c: C)
-  where C.SubSequence.Iterator.Element == C.Iterator.Element {}
+func useCollectionTypeSubSequenceGeneratorElement<C : Collection>(_ c: C) {}
 
 func sortResultIgnored<
   S : Sequence,

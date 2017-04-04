@@ -428,12 +428,13 @@ internal class _AnyRandomAccessCollectionBox<Element>
 internal final class _${Kind}Box<S : ${Kind}> : _Any${Kind}Box<S.Iterator.Element>
   where
   S.SubSequence : ${Kind},
+%  if Kind == 'Sequence':
   S.SubSequence.Iterator.Element == S.Iterator.Element,
+%end
   S.SubSequence.SubSequence == S.SubSequence
 %   if Kind != 'Sequence':
   ,
   S.SubSequence.Indices : ${Kind},
-  S.SubSequence.Indices.Index == S.Index,
   S.Indices : ${Kind}
 %   end
 {
@@ -1039,13 +1040,10 @@ public struct ${Self}<Element>
   @_inlineable
   public init<C : ${SubProtocol}>(_ base: C)
     where
-    C.Iterator.Element == Element,
-
     // FIXME(ABI)#101 (Associated Types with where clauses): these constraints should be applied to
     // associated types of Collection.
     C.SubSequence : ${SubProtocol},
     C.SubSequence.Iterator.Element == Element,
-    C.SubSequence.Index == C.Index,
     C.SubSequence.Indices : ${SubProtocol},
     C.SubSequence.SubSequence == C.SubSequence,
     C.Indices : ${SubProtocol}

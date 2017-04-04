@@ -366,8 +366,6 @@ public func expect${Mutable}CollectionType<X : ${Mutable}Collection>(
 %   if Mutable == '':
   X.SubSequence : Collection,
 %   end
-  X.SubSequence.Iterator.Element == X.Iterator.Element,
-  X.SubSequence.Index == X.Index,
   // X.SubSequence.Indices == X.Indices, // FIXME(ABI)#3 (Recursive Protocol Constraints): can't have this constraint now.
   X.SubSequence.SubSequence == X.SubSequence,
   X.Indices : Collection {}
@@ -411,10 +409,7 @@ public func expectCollectionAssociatedTypes<X : Collection>(
 ) where
   // FIXME(ABI)#6 (Associated Types with where clauses): there should be no constraints in
   // the 'where' clause, all of these should be required by the protocol.
-  X._Element == X.Iterator.Element,
   X.SubSequence : Collection,
-  X.SubSequence.Iterator.Element == X.Iterator.Element,
-  X.SubSequence.Index == X.Index,
   // X.SubSequence.Indices == X.Indices, // FIXME(ABI)#7 (Recursive Protocol Constraints): can't have this constraint now.
   X.SubSequence.SubSequence == X.SubSequence,
   X.Indices : Collection {}
@@ -431,10 +426,7 @@ public func expectBidirectionalCollectionAssociatedTypes<X : BidirectionalCollec
 ) where
   // FIXME(ABI)#8 (Associated Types with where clauses): there should be no constraints in
   // the 'where' clause, all of these should be required by the protocol.
-  X._Element == X.Iterator.Element,
   X.SubSequence : BidirectionalCollection,
-  X.SubSequence.Iterator.Element == X.Iterator.Element,
-  X.SubSequence.Index == X.Index,
   // X.SubSequence.Indices == X.Indices, // FIXME(ABI)#9 (Recursive Protocol Constraints): can't have this constraint now.
   X.SubSequence.SubSequence == X.SubSequence,
   X.Indices : BidirectionalCollection {}
@@ -451,10 +443,7 @@ public func expectRandomAccessCollectionAssociatedTypes<X : RandomAccessCollecti
 ) where
   // FIXME(ABI)#10 (Associated Types with where clauses): there should be no constraints in
   // the 'where' clause, all of these should be required by the protocol.
-  X._Element == X.Iterator.Element,
   X.SubSequence : RandomAccessCollection,
-  X.SubSequence.Iterator.Element == X.Iterator.Element,
-  X.SubSequence.Index == X.Index,
   // X.SubSequence.Indices == X.Indices, // FIXME(ABI)#11 (Recursive Protocol Constraints): can't have this constraint now.
   X.SubSequence.SubSequence == X.SubSequence,
   X.Indices : RandomAccessCollection {}
@@ -2280,11 +2269,7 @@ public func checkStrideable<Instances : Collection, Strides : Collection>(
   ${TRACE}
 ) where
   Instances.Iterator.Element : Strideable,
-  Instances.Iterator.Element.Stride == Strides.Iterator.Element,
-  // FIXME(ABI)#92 (Associated Types with where clauses): these constraints should be applied to
-  // associated types of Collection.
-  Instances.Indices.Iterator.Element == Instances.Index,
-  Strides.Indices.Iterator.Element == Strides.Index {
+  Instances.Iterator.Element.Stride == Strides.Iterator.Element {
 
   checkComparable(
     instances,

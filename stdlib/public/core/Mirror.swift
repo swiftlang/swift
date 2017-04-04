@@ -219,9 +219,7 @@ public struct Mirror {
     // FIXME(ABI)#47 (Associated Types with where clauses): these constraints should be applied to
     // associated types of Collection.
     C.SubSequence : Collection,
-    C.SubSequence.Iterator.Element == Child,
     C.SubSequence.Indices : Collection,
-    C.SubSequence.Indices.Index == C.Index,
     C.SubSequence.SubSequence == C.SubSequence,
     C.Indices : Collection {
 
