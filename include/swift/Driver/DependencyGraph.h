@@ -33,6 +33,8 @@ namespace llvm {
 
 namespace swift {
 
+class UnifiedStatsReporter;
+
 /// The non-templated implementation of DependencyGraph.
 ///
 /// \see DependencyGraph
@@ -65,12 +67,14 @@ public:
   class MarkTracerImpl {
     class Entry;
     llvm::DenseMap<const void *, SmallVector<Entry, 4>> Table;
+    UnifiedStatsReporter *Stats;
 
     friend class DependencyGraphImpl;
   protected:
-    MarkTracerImpl();
+    explicit MarkTracerImpl(UnifiedStatsReporter *Stats);
     ~MarkTracerImpl();
-
+    void countStatsForNodeMarking(const OptionSet<DependencyKind> &Kind,
+                                  bool Cascading) const;
     void printPath(raw_ostream &out, const void *item,
                    llvm::function_ref<void(const void *)> printItem) const;
   };
@@ -223,7 +227,8 @@ public:
   /// This is intended to be a debugging aid.
   class MarkTracer : public MarkTracerImpl {
   public:
-    MarkTracer() = default;
+    explicit MarkTracer(UnifiedStatsReporter *Stats)
+      : MarkTracerImpl(Stats) {}
 
     /// Dump the path that led to \p node.
     void printPath(raw_ostream &out, T node,

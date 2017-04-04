@@ -191,6 +191,9 @@ def save_temps : Flag<["-"], "save-temps">,
 def driver_time_compilation : Flag<["-"], "driver-time-compilation">,
   Flags<[NoInteractiveOption,DoesNotAffectIncrementalBuild]>,
   HelpText<"Prints the total time it took to execute all compilation tasks">;
+def stats_output_dir: Separate<["-"], "stats-output-dir">,
+  Flags<[FrontendOption, HelpHidden]>,
+  HelpText<"Directory to write unified compilation-statistics files to">;
 
 def emit_dependencies : Flag<["-"], "emit-dependencies">,
   Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>,
