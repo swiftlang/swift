@@ -25,36 +25,38 @@
 # Compute defaults for optional arguments
 bidirectional = locals().get('bidirectional', True)
 element_only = locals().get('element_only', False)
+wrap_index = locals().get('wrap_index', '_wrap')
+unwrap_index = locals().get('unwrap_index', '_unwrap')
 }%
 % if not element_only:
-public var startIndex: Index { return _wrap(${base}.startIndex) }
-public var endIndex: Index { return _wrap(${base}.endIndex) }
+public var startIndex: Index { return ${wrap_index}(${base}.startIndex) }
+public var endIndex: Index { return ${wrap_index}(${base}.endIndex) }
 public func index(after i: Index) -> Index {
-  return _wrap(${base}.index(after: _unwrap(i)))
+  return ${wrap_index}(${base}.index(after: ${unwrap_index}(i)))
 }
 
 public func formIndex(after i: inout Index) {
-  var i1 = _unwrap(i)
+  var i1 = ${unwrap_index}(i)
   ${base}.formIndex(after: &i1)
-  i = _wrap(i1)
+  i = ${wrap_index}(i1)
 }
 % if bidirectional:
 public func index(before i: Index) -> Index {
-  return _wrap(${base}.index(before: _unwrap(i)))
+  return ${wrap_index}(${base}.index(before: ${unwrap_index}(i)))
 }
 public func formIndex(before i: inout Index) {
-  var i1 = _unwrap(i)
+  var i1 = ${unwrap_index}(i)
   ${base}.formIndex(before: &i1)
-  i = _wrap(i1)
+  i = ${wrap_index}(i1)
 }
 % end
 public func formIndex(_ i: inout Index, offsetBy n: IndexDistance) {
-  var i1 = _unwrap(i)
-  ${base}.formIndex(&i1, offsetBy: numericCast(n))
-  i = _wrap(i1)
+  var i1 = ${unwrap_index}(i)
+  ${base}.formIndex(&i1, offsetBy: n^)
+  i = ${wrap_index}(i1)
 }
 public func index(_ i: Index, offsetBy n: IndexDistance) -> Index {
-  return _wrap(${base}.index(_unwrap(i), offsetBy: numericCast(n)))
+  return ${wrap_index}(${base}.index(${unwrap_index}(i), offsetBy: n^))
 }
 public func index(
   _ i: Index,
@@ -62,16 +64,16 @@ public func index(
   limitedBy limit: Index
 ) -> Index? {
   return ${base}.index(
-    _unwrap(i),
-    offsetBy: numericCast(n),
-    limitedBy: _unwrap(limit)
+    ${unwrap_index}(i),
+    offsetBy: n^,
+    limitedBy: ${unwrap_index}(limit)
   ).map(_wrap)
 }
 public func distance(from i: Index, to j: Index) -> IndexDistance {
-  return numericCast(${base}.distance(from: _unwrap(i), to: _unwrap(j)))
+  return ${base}.distance(from: ${unwrap_index}(i), to: ${unwrap_index}(j))^
 }
 public var count: IndexDistance {
-  return numericCast(${base}.count)
+  return ${base}.count^
 }
 public var underestimatedCount: Int {
   return ${base}.underestimatedCount
@@ -79,7 +81,7 @@ public var underestimatedCount: Int {
 % end
 % if Element is not None:
 public subscript(i: Index) -> ${Element} {
-  return ${base}[_unwrap(i)]
+  return ${base}[${unwrap_index}(i)]
 }
 public func withExistingUnsafeBuffer<R>(
   _ body: (UnsafeBufferPointer<${Element}>) throws -> R
@@ -91,7 +93,8 @@ public mutating func _tryToReplaceSubrange<C: Collection>(
 ) -> Bool
 where C.Iterator.Element == ${Element} {
   return ${base}._tryToReplaceSubrange(
-    from: _unwrap(targetStart), to: _unwrap(targetEnd),  with: replacement)
+    from: ${unwrap_index}(targetStart), 
+    to: ${unwrap_index}(targetEnd),  with: replacement)
 }
 public var first: ${Element}? { return ${base}.first }
 % if bidirectional:
