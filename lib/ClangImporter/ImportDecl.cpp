@@ -4731,8 +4731,10 @@ Decl *SwiftDeclConverter::importCompatibilityTypeAlias(
 static bool inheritanceListContainsProtocol(ArrayRef<TypeLoc> inherited,
                                             const ProtocolDecl *proto) {
   return llvm::any_of(inherited, [proto](TypeLoc type) -> bool {
+    if (!type.getType()->isExistentialType())
+      return false;
     SmallVector<ProtocolDecl *, 8> protos;
-    (void)type.getType()->isExistentialType(protos);
+    type.getType()->getExistentialTypeProtocols(protos);
     return ProtocolType::visitAllProtocols(protos,
                                            [proto](const ProtocolDecl *next) {
       return next == proto;
