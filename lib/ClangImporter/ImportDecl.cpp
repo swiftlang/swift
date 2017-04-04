@@ -1718,7 +1718,17 @@ shouldSuppressGenericParamsImport(const LangOptions &langOpts,
   if (decl->hasAttr<clang::SwiftImportAsNonGenericAttr>())
     return true;
 
-  if (langOpts.isSwiftVersion3()) {
+  // FIXME: This check is only necessary to keep things working even without
+  // the SwiftImportAsNonGeneric API note. Once we can guarantee that that
+  // attribute is present in all contexts, we can remove this check.
+  auto isFromFoundationModule = [](const clang::Decl *decl) -> bool {
+    Optional<clang::Module *> module = getClangSubmoduleForDecl(decl);
+    if (!module)
+      return false;
+    return module.getValue()->getTopLevelModuleName() == "Foundation";
+  };
+
+  if (langOpts.isSwiftVersion3() || isFromFoundationModule(decl)) {
     // In Swift 3 we used a hardcoded list of declarations, and made all of
     // their subclasses drop their generic parameters when imported.
     while (decl) {
