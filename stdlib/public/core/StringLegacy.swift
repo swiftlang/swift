@@ -13,34 +13,6 @@
 import SwiftShims
 
 extension String {
-  /// Creates a string representing the given character repeated the specified
-  /// number of times.
-  ///
-  /// For example, use this initializer to create a string with ten `"0"`
-  /// characters in a row.
-  ///
-  ///     let zeroes = String("0" as Character, count: 10)
-  ///     print(zeroes)
-  ///     // Prints "0000000000"
-  @available(*, unavailable, message: "Replaced by init(repeating: String, count: Int)")
-  public init(repeating repeatedValue: Character, count: Int) {
-    Builtin.unreachable()
-  }
-
-  /// Creates a string representing the given Unicode scalar repeated the
-  /// specified number of times.
-  ///
-  /// For example, use this initializer to create a string with ten `"0"`
-  /// scalars in a row.
-  ///
-  ///     let zeroes = String("0" as UnicodeScalar, count: 10)
-  ///     print(zeroes)
-  ///     // Prints "0000000000"
-  @available(*, unavailable, message: "Replaced by init(repeating: String, count: Int)")
-  public init(repeating repeatedValue: UnicodeScalar, count: Int) {
-    Builtin.unreachable()
-  }
-
   /// Creates a new string representing the given string repeated the specified
   /// number of times.
   ///
@@ -348,14 +320,3 @@ extension String {
   }
 }
 
-extension String {
-  @available(*, unavailable, message: "Renamed to init(repeating:count:) and reordered parameters")
-  public init(count: Int, repeatedValue c: Character) {
-    Builtin.unreachable()
-  }
-
-  @available(*, unavailable, message: "Renamed to init(repeating:count:) and reordered parameters")
-  public init(count: Int, repeatedValue c: UnicodeScalar) {
-    Builtin.unreachable()
-  }
-}
