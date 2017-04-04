@@ -642,15 +642,15 @@ static void checkReferencedGenericParams(GenericContext *dc,
 
   // Collect all generic params referenced in parameter types and
   // return type.
-  ReferencedGenericTypeWalker ParamsAndResultWalker;
+  ReferencedGenericTypeWalker paramsAndResultWalker;
   auto *funcTy = decl->getInterfaceType()->castTo<GenericFunctionType>();
-  funcTy->getInput().walk(ParamsAndResultWalker);
-  funcTy->getResult().walk(ParamsAndResultWalker);
+  funcTy->getInput().walk(paramsAndResultWalker);
+  funcTy->getResult().walk(paramsAndResultWalker);
 
   // Set of generic params referenced in parameter types,
   // return type or requirements.
   auto &referencedGenericParams =
-      ParamsAndResultWalker.getReferencedGenericParams();
+      paramsAndResultWalker.getReferencedGenericParams();
 
   // Check if at least one of the generic params in the requirment refers
   // to an already referenced generic parameter. If this is the case,
@@ -661,11 +661,11 @@ static void checkReferencedGenericParams(GenericContext *dc,
     Type second;
 
     switch (req.getKind()) {
+    case RequirementKind::Superclass:
     case RequirementKind::SameType:
       second = req.getSecondType();
       LLVM_FALLTHROUGH;
 
-    case RequirementKind::Superclass:
     case RequirementKind::Conformance:
     case RequirementKind::Layout:
       first = req.getFirstType();
@@ -673,13 +673,13 @@ static void checkReferencedGenericParams(GenericContext *dc,
     }
 
     // Collect generic parameter types refereced by types used in a requirement.
-    ReferencedGenericTypeWalker Walker;
+    ReferencedGenericTypeWalker walker;
     if (first && first->hasTypeParameter())
-      first.walk(Walker);
+      first.walk(walker);
     if (second && second->hasTypeParameter())
-      second.walk(Walker);
+      second.walk(walker);
     auto &genericParamsUsedByRequirementTypes =
-        Walker.getReferencedGenericParams();
+        walker.getReferencedGenericParams();
 
     // If at least one of the collected generic types or a root generic
     // parameter of dependent member types is known to be referenced by
@@ -687,7 +687,7 @@ static void checkReferencedGenericParams(GenericContext *dc,
     // then all the types used in the requirement are considered to be
     // referenced, because they are used to defined something that is known
     // to be referenced.
-    bool FoundNewReferencedGenericParam = false;
+    bool foundNewReferencedGenericParam = false;
     if (std::any_of(genericParamsUsedByRequirementTypes.begin(),
                     genericParamsUsedByRequirementTypes.end(),
                     [&referencedGenericParams](CanType t) {
@@ -700,7 +700,7 @@ static void checkReferencedGenericParams(GenericContext *dc,
       std::for_each(genericParamsUsedByRequirementTypes.begin(),
                     genericParamsUsedByRequirementTypes.end(),
                     [&referencedGenericParams,
-                     &FoundNewReferencedGenericParam](CanType t) {
+                     &foundNewReferencedGenericParam](CanType t) {
                       // Add only generic type parameters, but ignore any
                       // dependent member types, because requirement
                       // on a dependent member type does not provide enough
@@ -708,11 +708,12 @@ static void checkReferencedGenericParams(GenericContext *dc,
                       // parameter.
                       if (!t->is<GenericTypeParamType>())
                         return;
-                      FoundNewReferencedGenericParam |=
-                          referencedGenericParams.insert(t).second;
+                      foundNewReferencedGenericParam;
+                      if (referencedGenericParams.insert(t).second)
+                        foundNewReferencedGenericParam = true;
                     });
     }
-    return FoundNewReferencedGenericParam;
+    return foundNewReferencedGenericParam;
   };
 
   ArrayRef<Requirement> requirements;
@@ -730,11 +731,12 @@ static void checkReferencedGenericParams(GenericContext *dc,
     // will be referenced, because T3 will be referenced,
     // because T3 == T4.DepType4.
     while (true) {
-      bool FoundNewReferencedGenericParam = false;
+      bool foundNewReferencedGenericParam = false;
       for (auto req : requirements) {
-        FoundNewReferencedGenericParam |= reqTypesVisitor(req);
+        if (reqTypesVisitor(req))
+          foundNewReferencedGenericParam = true;
       }
-      if (!FoundNewReferencedGenericParam)
+      if (!foundNewReferencedGenericParam)
         break;
     }
   };
