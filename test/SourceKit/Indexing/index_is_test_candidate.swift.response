@@ -36,7 +36,7 @@
     {
       key.kind: source.lang.swift.decl.class,
       key.name: "XCTestCase",
-      key.usr: "s:C28index_is_test_candidate_objc10XCTestCase",
+      key.usr: "s:23index_is_test_candidate10XCTestCaseC",
       key.line: 15,
       key.column: 7
     },
@@ -50,7 +50,7 @@
         {
           key.kind: source.lang.swift.ref.class,
           key.name: "XCTestCase",
-          key.usr: "s:C28index_is_test_candidate_objc10XCTestCase",
+          key.usr: "s:23index_is_test_candidate10XCTestCaseC",
           key.line: 16,
           key.column: 32
         }
@@ -59,7 +59,7 @@
         {
           key.kind: source.lang.swift.ref.class,
           key.name: "XCTestCase",
-          key.usr: "s:C28index_is_test_candidate_objc10XCTestCase",
+          key.usr: "s:23index_is_test_candidate10XCTestCaseC",
           key.line: 16,
           key.column: 32
         },
@@ -70,7 +70,8 @@
           key.line: 17,
           key.column: 8
         }
-      ]
+      ],
+      key.is_test_candidate: 1
     },
     {
       key.kind: source.lang.swift.decl.class,
@@ -82,7 +83,7 @@
         {
           key.kind: source.lang.swift.ref.class,
           key.name: "XCTestCase",
-          key.usr: "s:C28index_is_test_candidate_objc10XCTestCase",
+          key.usr: "s:23index_is_test_candidate10XCTestCaseC",
           key.line: 20,
           key.column: 24
         }
@@ -91,7 +92,7 @@
         {
           key.kind: source.lang.swift.ref.class,
           key.name: "XCTestCase",
-          key.usr: "s:C28index_is_test_candidate_objc10XCTestCase",
+          key.usr: "s:23index_is_test_candidate10XCTestCaseC",
           key.line: 20,
           key.column: 24
         },
@@ -157,7 +158,8 @@
           key.column: 8,
           key.is_test_candidate: 1
         }
-      ]
+      ],
+      key.is_test_candidate: 1
     }
   ]
 }
