@@ -906,91 +906,118 @@ fileprivate struct _JSONKeyedDecodingContainer<K : CodingKey> : KeyedDecodingCon
     func decodeIfPresent(_ type: Bool.Type, forKey key: Key) throws -> Bool? {
         guard let value = self.container[key.stringValue] else { return nil }
         guard !(value is NSNull) else { return nil }
-        return try self.decoder.unbox(value, as: Bool.self)
+        return try self.decoder.with(pushedKey: key) {
+            return try self.decoder.unbox(value, as: Bool.self)
+        }
     }
 
     func decodeIfPresent(_ type: Int.Type, forKey key: Key) throws -> Int? {
         guard let value = self.container[key.stringValue] else { return nil }
         guard !(value is NSNull) else { return nil }
-        return try self.decoder.unbox(value, as: Int.self)
+        return try self.decoder.with(pushedKey: key) {
+            return try self.decoder.unbox(value, as: Int.self)
+        }
     }
 
     func decodeIfPresent(_ type: Int8.Type, forKey key: Key) throws -> Int8? {
         guard let value = self.container[key.stringValue] else { return nil }
         guard !(value is NSNull) else { return nil }
-        return try self.decoder.unbox(value, as: Int8.self)
+        return try self.decoder.with(pushedKey: key) {
+            return try self.decoder.unbox(value, as: Int8.self)
+        }
     }
 
     func decodeIfPresent(_ type: Int16.Type, forKey key: Key) throws -> Int16? {
         guard let value = self.container[key.stringValue] else { return nil }
         guard !(value is NSNull) else { return nil }
-        return try self.decoder.unbox(value, as: Int16.self)
+        return try self.decoder.with(pushedKey: key) {
+            return try self.decoder.unbox(value, as: Int16.self)
+        }
     }
 
     func decodeIfPresent(_ type: Int32.Type, forKey key: Key) throws -> Int32? {
         guard let value = self.container[key.stringValue] else { return nil }
         guard !(value is NSNull) else { return nil }
-        return try self.decoder.unbox(value, as: Int32.self)
+        return try self.decoder.with(pushedKey: key) {
+            return try self.decoder.unbox(value, as: Int32.self)
+        }
     }
 
     func decodeIfPresent(_ type: Int64.Type, forKey key: Key) throws -> Int64? {
         guard let value = self.container[key.stringValue] else { return nil }
         guard !(value is NSNull) else { return nil }
-        return try self.decoder.unbox(value, as: Int64.self)
+        return try self.decoder.with(pushedKey: key) {
+            return try self.decoder.unbox(value, as: Int64.self)
+        }
     }
 
     func decodeIfPresent(_ type: UInt.Type, forKey key: Key) throws -> UInt? {
         guard let value = self.container[key.stringValue] else { return nil }
         guard !(value is NSNull) else { return nil }
-        return try self.decoder.unbox(value, as: UInt.self)
+        return try self.decoder.with(pushedKey: key) {
+            return try self.decoder.unbox(value, as: UInt.self)
+        }
     }
 
     func decodeIfPresent(_ type: UInt8.Type, forKey key: Key) throws -> UInt8? {
         guard let value = self.container[key.stringValue] else { return nil }
         guard !(value is NSNull) else { return nil }
-        return try self.decoder.unbox(value, as: UInt8.self)
+        return try self.decoder.with(pushedKey: key) {
+            return try self.decoder.unbox(value, as: UInt8.self)
+        }
     }
 
     func decodeIfPresent(_ type: UInt16.Type, forKey key: Key) throws -> UInt16? {
         guard let value = self.container[key.stringValue] else { return nil }
         guard !(value is NSNull) else { return nil }
-        return try self.decoder.unbox(value, as: UInt16.self)
+        return try self.decoder.with(pushedKey: key) {
+            return try self.decoder.unbox(value, as: UInt16.self)
+        }
     }
 
     func decodeIfPresent(_ type: UInt32.Type, forKey key: Key) throws -> UInt32? {
         guard let value = self.container[key.stringValue] else { return nil }
         guard !(value is NSNull) else { return nil }
-        return try self.decoder.unbox(value, as: UInt32.self)
+        return try self.decoder.with(pushedKey: key) {
+            return try self.decoder.unbox(value, as: UInt32.self)
+        }
     }
 
     func decodeIfPresent(_ type: UInt64.Type, forKey key: Key) throws -> UInt64? {
         guard let value = self.container[key.stringValue] else { return nil }
         guard !(value is NSNull) else { return nil }
-        return try self.decoder.unbox(value, as: UInt64.self)
+        return try self.decoder.with(pushedKey: key) {
+            return try self.decoder.unbox(value, as: UInt64.self)
+        }
     }
 
     func decodeIfPresent(_ type: Float.Type, forKey key: Key) throws -> Float? {
         guard let value = self.container[key.stringValue] else { return nil }
         guard !(value is NSNull) else { return nil }
-        return try self.decoder.unbox(value, as: Float.self)
+        return try self.decoder.with(pushedKey: key) {
+            return try self.decoder.unbox(value, as: Float.self)
+        }
     }
 
     func decodeIfPresent(_ type: Double.Type, forKey key: Key) throws -> Double? {
         guard let value = self.container[key.stringValue] else { return nil }
         guard !(value is NSNull) else { return nil }
-        return try self.decoder.unbox(value, as: Double.self)
+        return try self.decoder.with(pushedKey: key) {
+            return try self.decoder.unbox(value, as: Double.self)
+        }
     }
 
     func decodeIfPresent(_ type: String.Type, forKey key: Key) throws -> String? {
         guard let value = self.container[key.stringValue] else { return nil }
         guard !(value is NSNull) else { return nil }
-        return try self.decoder.unbox(value, as: String.self)
+        return try self.decoder.with(pushedKey: key) {
+            return try self.decoder.unbox(value, as: String.self)
+        }
     }
 
     func decodeIfPresent(_ type: Data.Type, forKey key: Key) throws -> Data? {
         guard let value = self.container[key.stringValue] else { return nil }
         guard !(value is NSNull) else { return nil }
-        // Since the Data strategy may request a container through a closure, the coding path needs to contain this key.
         return try self.decoder.with(pushedKey: key) {
             return try self.decoder.unbox(value, as: Data.self)
         }
@@ -1015,42 +1042,42 @@ fileprivate struct _JSONKeyedDecodingContainer<K : CodingKey> : KeyedDecodingCon
     }
 
     func nestedContainer<NestedKey>(keyedBy type: NestedKey.Type, forKey key: Key) throws -> KeyedDecodingContainer<NestedKey> {
-        guard let value = self.container[key.stringValue] else {
-            var path = self.codingPath
-            path.append(key)
-            throw CocoaError.coderValueNotFound(at: path, reason: "Cannot get nested keyed container -- no value found for key \"\(key.stringValue)\"")
-        }
+        return try self.decoder.with(pushedKey: key) {
+            guard let value = self.container[key.stringValue] else {
+                throw CocoaError.coderValueNotFound(at: self.codingPath, reason: "Cannot get nested keyed container -- no value found for key \"\(key.stringValue)\"")
+            }
 
-        guard let container = value as? [String : Any] else {
-            throw CocoaError.typeMismatch(at: self.codingPath, expectation: [String : Any].self, reality: value)
-        }
+            guard let container = value as? [String : Any] else {
+                throw CocoaError.typeMismatch(at: self.codingPath, expectation: [String : Any].self, reality: value)
+            }
 
-        let wrapper = _JSONKeyedDecodingContainer<NestedKey>(referencing: self.decoder, wrapping: container)
-        return KeyedDecodingContainer(wrapper)
+            let wrapper = _JSONKeyedDecodingContainer<NestedKey>(referencing: self.decoder, wrapping: container)
+            return KeyedDecodingContainer(wrapper)
+        }
     }
 
     func nestedUnkeyedContainer(forKey key: Key) throws -> UnkeyedDecodingContainer {
-        guard let value = self.container[key.stringValue] else {
-            var path = self.codingPath
-            path.append(key)
-            throw CocoaError.coderValueNotFound(at: path, reason: "Cannot get nested unkeyed container -- no value found for key \"\(key.stringValue)\"")
-        }
+        return try self.decoder.with(pushedKey: key) {
+            guard let value = self.container[key.stringValue] else {
+                throw CocoaError.coderValueNotFound(at: self.codingPath, reason: "Cannot get nested unkeyed container -- no value found for key \"\(key.stringValue)\"")
+            }
 
-        guard let container = value as? [Any] else {
-            throw CocoaError.typeMismatch(at: self.codingPath, expectation: [Any].self, reality: value)
-        }
+            guard let container = value as? [Any] else {
+                throw CocoaError.typeMismatch(at: self.codingPath, expectation: [Any].self, reality: value)
+            }
 
-        return _JSONUnkeyedDecodingContainer(referencing: self.decoder, wrapping: container)
+            return _JSONUnkeyedDecodingContainer(referencing: self.decoder, wrapping: container)
+        }
     }
 
     func _superDecoder(forKey key: CodingKey) throws -> Decoder {
-        guard let value = self.container[key.stringValue] else {
-            var path = self.codingPath
-            path.append(key)
-            throw CocoaError.coderValueNotFound(at: path, reason: "Cannot get superDecoder() -- no value found for key \"\(key.stringValue)\"")
-        }
+        return try self.decoder.with(pushedKey: key) {
+            guard let value = self.container[key.stringValue] else {
+                throw CocoaError.coderValueNotFound(at: self.codingPath, reason: "Cannot get superDecoder() -- no value found for key \"\(key.stringValue)\"")
+            }
 
-        return _JSONDecoder(referencing: value, options: self.decoder.options)
+            return _JSONDecoder(referencing: value, options: self.decoder.options)
+        }
     }
 
     func superDecoder() throws -> Decoder {
@@ -1117,9 +1144,11 @@ fileprivate struct _JSONUnkeyedDecodingContainer : UnkeyedDecodingContainer {
         guard !(value is NSNull) else { return nil }
 
         // Don't want to increment currentIndex unless decode succeeds, since we want to be able to attempt to decode the same value again.
-        let decoded = try self.decoder.unbox(value, as: Bool.self)
-        self.currentIndex += 1
-        return decoded
+        return try self.decoder.with(pushedKey: nil) {
+            let decoded = try self.decoder.unbox(value, as: Bool.self)
+            self.currentIndex += 1
+            return decoded
+        }
     }
 
     mutating func decodeIfPresent(_ type: Int.Type) throws -> Int? {
@@ -1128,9 +1157,11 @@ fileprivate struct _JSONUnkeyedDecodingContainer : UnkeyedDecodingContainer {
         guard !(value is NSNull) else { return nil }
 
         // Don't want to increment currentIndex unless decode succeeds, since we want to be able to attempt to decode the same value again.
-        let decoded = try self.decoder.unbox(value, as: Int.self)
-        self.currentIndex += 1
-        return decoded
+        return try self.decoder.with(pushedKey: nil) {
+            let decoded = try self.decoder.unbox(value, as: Int.self)
+            self.currentIndex += 1
+            return decoded
+        }
     }
 
     mutating func decodeIfPresent(_ type: Int8.Type) throws -> Int8? {
@@ -1139,9 +1170,11 @@ fileprivate struct _JSONUnkeyedDecodingContainer : UnkeyedDecodingContainer {
         guard !(value is NSNull) else { return nil }
 
         // Don't want to increment currentIndex unless decode succeeds, since we want to be able to attempt to decode the same value again.
-        let decoded = try self.decoder.unbox(value, as: Int8.self)
-        self.currentIndex += 1
-        return decoded
+        return try self.decoder.with(pushedKey: nil) {
+            let decoded = try self.decoder.unbox(value, as: Int8.self)
+            self.currentIndex += 1
+            return decoded
+        }
     }
 
     mutating func decodeIfPresent(_ type: Int16.Type) throws -> Int16? {
@@ -1150,9 +1183,11 @@ fileprivate struct _JSONUnkeyedDecodingContainer : UnkeyedDecodingContainer {
         guard !(value is NSNull) else { return nil }
 
         // Don't want to increment currentIndex unless decode succeeds, since we want to be able to attempt to decode the same value again.
-        let decoded = try self.decoder.unbox(value, as: Int16.self)
-        self.currentIndex += 1
-        return decoded
+        return try self.decoder.with(pushedKey: nil) {
+            let decoded = try self.decoder.unbox(value, as: Int16.self)
+            self.currentIndex += 1
+            return decoded
+        }
     }
 
     mutating func decodeIfPresent(_ type: Int32.Type) throws -> Int32? {
@@ -1161,9 +1196,11 @@ fileprivate struct _JSONUnkeyedDecodingContainer : UnkeyedDecodingContainer {
         guard !(value is NSNull) else { return nil }
 
         // Don't want to increment currentIndex unless decode succeeds, since we want to be able to attempt to decode the same value again.
-        let decoded = try self.decoder.unbox(value, as: Int32.self)
-        self.currentIndex += 1
-        return decoded
+        return try self.decoder.with(pushedKey: nil) {
+            let decoded = try self.decoder.unbox(value, as: Int32.self)
+            self.currentIndex += 1
+            return decoded
+        }
     }
 
     mutating func decodeIfPresent(_ type: Int64.Type) throws -> Int64? {
@@ -1172,9 +1209,11 @@ fileprivate struct _JSONUnkeyedDecodingContainer : UnkeyedDecodingContainer {
         guard !(value is NSNull) else { return nil }
 
         // Don't want to increment currentIndex unless decode succeeds, since we want to be able to attempt to decode the same value again.
-        let decoded = try self.decoder.unbox(value, as: Int64.self)
-        self.currentIndex += 1
-        return decoded
+        return try self.decoder.with(pushedKey: nil) {
+            let decoded = try self.decoder.unbox(value, as: Int64.self)
+            self.currentIndex += 1
+            return decoded
+        }
     }
 
     mutating func decodeIfPresent(_ type: UInt.Type) throws -> UInt? {
@@ -1183,9 +1222,11 @@ fileprivate struct _JSONUnkeyedDecodingContainer : UnkeyedDecodingContainer {
         guard !(value is NSNull) else { return nil }
 
         // Don't want to increment currentIndex unless decode succeeds, since we want to be able to attempt to decode the same value again.
-        let decoded = try self.decoder.unbox(value, as: UInt.self)
-        self.currentIndex += 1
-        return decoded
+        return try self.decoder.with(pushedKey: nil) {
+            let decoded = try self.decoder.unbox(value, as: UInt.self)
+            self.currentIndex += 1
+            return decoded
+        }
     }
 
     mutating func decodeIfPresent(_ type: UInt8.Type) throws -> UInt8? {
@@ -1194,9 +1235,11 @@ fileprivate struct _JSONUnkeyedDecodingContainer : UnkeyedDecodingContainer {
         guard !(value is NSNull) else { return nil }
 
         // Don't want to increment currentIndex unless decode succeeds, since we want to be able to attempt to decode the same value again.
-        let decoded = try self.decoder.unbox(value, as: UInt8.self)
-        self.currentIndex += 1
-        return decoded
+        return try self.decoder.with(pushedKey: nil) {
+            let decoded = try self.decoder.unbox(value, as: UInt8.self)
+            self.currentIndex += 1
+            return decoded
+        }
     }
 
     mutating func decodeIfPresent(_ type: UInt16.Type) throws -> UInt16? {
@@ -1205,9 +1248,11 @@ fileprivate struct _JSONUnkeyedDecodingContainer : UnkeyedDecodingContainer {
         guard !(value is NSNull) else { return nil }
 
         // Don't want to increment currentIndex unless decode succeeds, since we want to be able to attempt to decode the same value again.
-        let decoded = try self.decoder.unbox(value, as: UInt16.self)
-        self.currentIndex += 1
-        return decoded
+        return try self.decoder.with(pushedKey: nil) {
+            let decoded = try self.decoder.unbox(value, as: UInt16.self)
+            self.currentIndex += 1
+            return decoded
+        }
     }
 
     mutating func decodeIfPresent(_ type: UInt32.Type) throws -> UInt32? {
@@ -1216,9 +1261,11 @@ fileprivate struct _JSONUnkeyedDecodingContainer : UnkeyedDecodingContainer {
         guard !(value is NSNull) else { return nil }
 
         // Don't want to increment currentIndex unless decode succeeds, since we want to be able to attempt to decode the same value again.
-        let decoded = try self.decoder.unbox(value, as: UInt32.self)
-        self.currentIndex += 1
-        return decoded
+        return try self.decoder.with(pushedKey: nil) {
+            let decoded = try self.decoder.unbox(value, as: UInt32.self)
+            self.currentIndex += 1
+            return decoded
+        }
     }
 
     mutating func decodeIfPresent(_ type: UInt64.Type) throws -> UInt64? {
@@ -1227,9 +1274,11 @@ fileprivate struct _JSONUnkeyedDecodingContainer : UnkeyedDecodingContainer {
         guard !(value is NSNull) else { return nil }
 
         // Don't want to increment currentIndex unless decode succeeds, since we want to be able to attempt to decode the same value again.
-        let decoded = try self.decoder.unbox(value, as: UInt64.self)
-        self.currentIndex += 1
-        return decoded
+        return try self.decoder.with(pushedKey: nil) {
+            let decoded = try self.decoder.unbox(value, as: UInt64.self)
+            self.currentIndex += 1
+            return decoded
+        }
     }
 
     mutating func decodeIfPresent(_ type: Float.Type) throws -> Float? {
@@ -1238,9 +1287,11 @@ fileprivate struct _JSONUnkeyedDecodingContainer : UnkeyedDecodingContainer {
         guard !(value is NSNull) else { return nil }
 
         // Don't want to increment currentIndex unless decode succeeds, since we want to be able to attempt to decode the same value again.
-        let decoded = try self.decoder.unbox(value, as: Float.self)
-        self.currentIndex += 1
-        return decoded
+        return try self.decoder.with(pushedKey: nil) {
+            let decoded = try self.decoder.unbox(value, as: Float.self)
+            self.currentIndex += 1
+            return decoded
+        }
     }
 
     mutating func decodeIfPresent(_ type: Double.Type) throws -> Double? {
@@ -1249,9 +1300,11 @@ fileprivate struct _JSONUnkeyedDecodingContainer : UnkeyedDecodingContainer {
         guard !(value is NSNull) else { return nil }
 
         // Don't want to increment currentIndex unless decode succeeds, since we want to be able to attempt to decode the same value again.
-        let decoded = try self.decoder.unbox(value, as: Double.self)
-        self.currentIndex += 1
-        return decoded
+        return try self.decoder.with(pushedKey: nil) {
+            let decoded = try self.decoder.unbox(value, as: Double.self)
+            self.currentIndex += 1
+            return decoded
+        }
     }
 
     mutating func decodeIfPresent(_ type: String.Type) throws -> String? {
@@ -1260,9 +1313,11 @@ fileprivate struct _JSONUnkeyedDecodingContainer : UnkeyedDecodingContainer {
         guard !(value is NSNull) else { return nil }
 
         // Don't want to increment currentIndex unless decode succeeds, since we want to be able to attempt to decode the same value again.
-        let decoded = try self.decoder.unbox(value, as: String.self)
-        self.currentIndex += 1
-        return decoded
+        return try self.decoder.with(pushedKey: nil) {
+            let decoded = try self.decoder.unbox(value, as: String.self)
+            self.currentIndex += 1
+            return decoded
+        }
     }
 
     mutating func decodeIfPresent(_ type: Data.Type) throws -> Data? {
@@ -1270,9 +1325,8 @@ fileprivate struct _JSONUnkeyedDecodingContainer : UnkeyedDecodingContainer {
         let value = self.container[self.currentIndex]
         guard !(value is NSNull) else { return nil }
 
-        // Since the Data strategy may request a container through a closure, the coding path needs to contain this key.
+        // Don't want to increment currentIndex unless decode succeeds, since we want to be able to attempt to decode the same value again.
         return try self.decoder.with(pushedKey: nil) {
-            // Don't want to increment currentIndex unless decode succeeds, since we want to be able to attempt to decode the same value again.
             let decoded = try self.decoder.unbox(value, as: Data.self)
             self.currentIndex += 1
             return decoded
@@ -1284,8 +1338,8 @@ fileprivate struct _JSONUnkeyedDecodingContainer : UnkeyedDecodingContainer {
         let value = self.container[self.currentIndex]
         guard !(value is NSNull) else { return nil }
 
+        // Don't want to increment currentIndex unless decode succeeds, since we want to be able to attempt to decode the same value again.
         return try self.decoder.with(pushedKey: nil) {
-            // Don't want to increment currentIndex unless decode succeeds, since we want to be able to attempt to decode the same value again.
             let decoded: T
             if T.self == Date.self {
                 decoded = (try self.decoder.unbox(value, as: Date.self) as! T)
@@ -1300,42 +1354,48 @@ fileprivate struct _JSONUnkeyedDecodingContainer : UnkeyedDecodingContainer {
     }
 
     mutating func nestedContainer<NestedKey>(keyedBy type: NestedKey.Type) throws -> KeyedDecodingContainer<NestedKey> {
-        guard !isAtEnd else {
-            throw CocoaError.coderValueNotFound(at: self.codingPath, reason: "Cannot get nested keyed container -- unkeyed container is at end.")
-        }
+        return try self.decoder.with(pushedKey: nil) {
+            guard !isAtEnd else {
+                throw CocoaError.coderValueNotFound(at: self.codingPath, reason: "Cannot get nested keyed container -- unkeyed container is at end.")
+            }
 
-        let value = self.container[self.currentIndex]
-        guard let container = value as? [String : Any] else {
-            throw CocoaError.typeMismatch(at: self.codingPath, expectation: [String : Any].self, reality: value)
-        }
+            let value = self.container[self.currentIndex]
+            guard let container = value as? [String : Any] else {
+                throw CocoaError.typeMismatch(at: self.codingPath, expectation: [String : Any].self, reality: value)
+            }
 
-        self.currentIndex += 1
-        let wrapper = _JSONKeyedDecodingContainer<NestedKey>(referencing: self.decoder, wrapping: container)
-        return KeyedDecodingContainer(wrapper)
+            self.currentIndex += 1
+            let wrapper = _JSONKeyedDecodingContainer<NestedKey>(referencing: self.decoder, wrapping: container)
+            return KeyedDecodingContainer(wrapper)
+        }
     }
 
     mutating func nestedUnkeyedContainer() throws -> UnkeyedDecodingContainer {
-        guard !isAtEnd else {
-            throw CocoaError.coderValueNotFound(at: self.codingPath, reason: "Cannot get nested unkeyed container -- unkeyed container is at end.")
-        }
+        return try self.decoder.with(pushedKey: nil) {
+            guard !isAtEnd else {
+                throw CocoaError.coderValueNotFound(at: self.codingPath, reason: "Cannot get nested unkeyed container -- unkeyed container is at end.")
+            }
 
-        let value = self.container[self.currentIndex]
-        guard let container = value as? [Any] else {
-            throw CocoaError.typeMismatch(at: self.codingPath, expectation: [Any].self, reality: value)
-        }
+            let value = self.container[self.currentIndex]
+            guard let container = value as? [Any] else {
+                throw CocoaError.typeMismatch(at: self.codingPath, expectation: [Any].self, reality: value)
+            }
 
-        self.currentIndex += 1
-        return _JSONUnkeyedDecodingContainer(referencing: self.decoder, wrapping: container)
+            self.currentIndex += 1
+            return _JSONUnkeyedDecodingContainer(referencing: self.decoder, wrapping: container)
+        }
     }
 
     mutating func superDecoder() throws -> Decoder {
-        guard !isAtEnd else {
-            throw CocoaError.coderValueNotFound(at: self.codingPath, reason: "Cannot get superDecoder() -- unkeyed container is at end.")
-        }
+        return try self.decoder.with(pushedKey: nil) {
+            guard !isAtEnd else {
+                throw CocoaError.coderValueNotFound(at: self.codingPath, reason: "Cannot get superDecoder() -- unkeyed container is at end.")
+            }
 
-        let value = self.container[self.currentIndex]
-        self.currentIndex += 1
-        return _JSONDecoder(referencing: value, options: self.decoder.options)
+            let value = self.container[self.currentIndex]
+            self.currentIndex += 1
+            return _JSONDecoder(referencing: value, options: self.decoder.options)
+        }
     }
 }
 
