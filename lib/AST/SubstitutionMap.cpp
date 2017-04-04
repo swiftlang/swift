@@ -196,6 +196,64 @@ Optional<ProtocolConformanceRef>
 SubstitutionMap::lookupConformance(
                          CanType type, ProtocolDecl *proto,
                          llvm::SmallPtrSetImpl<CanType> *visitedParents) const {
+  if (type->isTypeParameter()) {
+    // Retrieve the starting conformance from the conformance map.
+    auto getInitialConformance =
+      [&](Type type, ProtocolDecl *proto) -> Optional<ProtocolConformanceRef> {
+        auto known = conformanceMap.find(type->getCanonicalType().getPointer());
+        if (known == conformanceMap.end())
+          return None;
+
+        for (auto conformance : known->second) {
+          if (conformance.getRequirement() == proto)
+            return conformance;
+        }
+
+        return None;
+      };
+
+    auto genericSig = getGenericSignature();
+    auto &mod = *proto->getModuleContext();
+    auto canonType = genericSig->getCanonicalTypeInContext(type, mod);
+    auto accessPath =
+      genericSig->getConformanceAccessPath(canonType, proto, mod);
+
+    // Fall through because we cannot yet evaluate an access path.
+    Optional<ProtocolConformanceRef> conformance;
+    for (const auto &step : accessPath) {
+      // For the first step, grab the initial conformance.
+      if (!conformance) {
+        conformance = getInitialConformance(step.first, step.second);
+        if (!conformance)
+          return None;
+
+        continue;
+      }
+
+      // If we've hit an abstract conformance, everything from here on out is
+      // abstract.
+      // FIXME: This may not always be true, but it holds for now.
+      if (conformance->isAbstract())
+        return ProtocolConformanceRef(proto);
+
+      // For the second step, we're looking into the requirement signature for
+      // this protocol.
+      auto concrete = conformance->getConcrete();
+      auto normal = concrete->getRootNormalConformance();
+
+      // If we haven't set the signature conformances yet, force the issue now.
+      if (normal->getSignatureConformances().empty()) {
+        auto lazyResolver = canonType->getASTContext().getLazyResolver();
+        lazyResolver->resolveTypeWitness(normal, nullptr);
+      }
+
+      // Get the associated conformance.
+      conformance = concrete->getAssociatedConformance(step.first, step.second);
+    }
+
+    return conformance;
+  }
+
   // Local function to either record an abstract conformance or return a
   // concrete conformance. This allows us to check multiple parents and
   // find the most specific conformance that applies.

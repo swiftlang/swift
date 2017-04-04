@@ -473,6 +473,8 @@ NormalProtocolConformance::getAssociatedConformance(Type assocType,
                                                 LazyResolver *resolver) const {
   assert(assocType->isTypeParameter() &&
          "associated type must be a type parameter");
+  assert(!getSignatureConformances().empty() &&
+         "signature conformances not yet computed");
 
   unsigned conformanceIndex = 0;
   for (auto &reqt :

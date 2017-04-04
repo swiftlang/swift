@@ -6187,7 +6187,10 @@ void TypeChecker::resolveTypeWitness(
                        *this, 
                        const_cast<NormalProtocolConformance*>(conformance),
                        MissingWitnesses);
-  checker.resolveSingleTypeWitness(assocType);
+  if (!assocType)
+    checker.resolveTypeWitnesses();
+  else
+    checker.resolveSingleTypeWitness(assocType);
 }
 
 void TypeChecker::resolveWitness(const NormalProtocolConformance *conformance,
