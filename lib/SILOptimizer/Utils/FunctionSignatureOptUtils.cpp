@@ -18,6 +18,7 @@
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SILOptimizer/Utils/FunctionSignatureOptUtils.h"
 #include "swift/SILOptimizer/Utils/Local.h"
+#include "llvm/Support/CommandLine.h"
 
 using namespace swift;
 
