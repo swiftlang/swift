@@ -4919,9 +4919,10 @@ ParserResult<EnumDecl> Parser::parseDeclEnum(ParseDeclOptions Flags,
   setLocalDiscriminator(ED);
   ED->getAttrs() = Attributes;
 
+  ContextChange CC(*this, ED);
+
   // Parse optional inheritance clause within the context of the enum.
   if (Tok.is(tok::colon)) {
-    ContextChange CC(*this, ED);
     SmallVector<TypeLoc, 2> Inherited;
     Status |= parseInheritance(Inherited, /*classRequirementLoc=*/nullptr);
     ED->setInherited(Context.AllocateCopy(Inherited));
@@ -4943,7 +4944,6 @@ ParserResult<EnumDecl> Parser::parseDeclEnum(ParseDeclOptions Flags,
     RBLoc = LBLoc;
     Status.setIsParseError();
   } else {
-    ContextChange CC(*this, ED);
     Scope S(this, ScopeKind::ClassBody);
     ParseDeclOptions Options(PD_HasContainerType | PD_AllowEnumElement | PD_InEnum);
     if (parseDeclList(LBLoc, RBLoc, diag::expected_rbrace_enum,
@@ -5176,9 +5176,10 @@ ParserResult<StructDecl> Parser::parseDeclStruct(ParseDeclOptions Flags,
   setLocalDiscriminator(SD);
   SD->getAttrs() = Attributes;
 
+  ContextChange CC(*this, SD);
+
   // Parse optional inheritance clause within the context of the struct.
   if (Tok.is(tok::colon)) {
-    ContextChange CC(*this, SD);
     SmallVector<TypeLoc, 2> Inherited;
     Status |= parseInheritance(Inherited, /*classRequirementLoc=*/nullptr);
     SD->setInherited(Context.AllocateCopy(Inherited));
@@ -5202,7 +5203,6 @@ ParserResult<StructDecl> Parser::parseDeclStruct(ParseDeclOptions Flags,
     Status.setIsParseError();
   } else {
     // Parse the body.
-    ContextChange CC(*this, SD);
     Scope S(this, ScopeKind::StructBody);
     ParseDeclOptions Options(PD_HasContainerType | PD_InStruct);
     if (parseDeclList(LBLoc, RBLoc, diag::expected_rbrace_struct,
@@ -5255,13 +5255,12 @@ ParserResult<ClassDecl> Parser::parseDeclClass(SourceLoc ClassLoc,
   ClassDecl *CD = new (Context) ClassDecl(ClassLoc, ClassName, ClassNameLoc,
                                           { }, GenericParams, CurDeclContext);
   setLocalDiscriminator(CD);
-
-  // Attach attributes.
   CD->getAttrs() = Attributes;
+
+  ContextChange CC(*this, CD);
 
   // Parse optional inheritance clause within the context of the class.
   if (Tok.is(tok::colon)) {
-    ContextChange CC(*this, CD);
     SmallVector<TypeLoc, 2> Inherited;
     Status |= parseInheritance(Inherited, /*classRequirementLoc=*/nullptr);
     CD->setInherited(Context.AllocateCopy(Inherited));
@@ -5284,7 +5283,6 @@ ParserResult<ClassDecl> Parser::parseDeclClass(SourceLoc ClassLoc,
     Status.setIsParseError();
   } else {
     // Parse the body.
-    ContextChange CC(*this, CD);
     Scope S(this, ScopeKind::ClassBody);
     ParseDeclOptions Options(PD_HasContainerType | PD_AllowDestructor |
                              PD_InClass);
