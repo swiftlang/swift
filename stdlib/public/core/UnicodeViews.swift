@@ -829,7 +829,6 @@ public struct Latin1CharacterView<
   internal let _LF: CodeUnit = 0x0A
 
   public init(_ codeUnits: CodeUnits) {
-    print("created Latin1 character view")
     self.codeUnits = codeUnits
   }
 
@@ -864,7 +863,6 @@ public struct Latin1CharacterView<
 
   public subscript(i: Index) -> Character {
     let nextIdx = index(after: i)
-    print("subscripting the Latin1 character view")
 
     // Fast path: Single code unit character (i.e. not CR-LF)
     if _fastPath(nextIdx.base == i.base+1) {
@@ -880,7 +878,6 @@ public struct Latin1CharacterView<
   }
 
   public func index(after i: Index) -> Index {
-    print("index(after:) the Latin1 character view")
     let nextCUIdx = codeUnits.index(atOffset: i.base+1)
     // Fast path: Single code unit character (i.e. not CR-LF)
     if _fastPath(getCU(at: i) != _CR) {
@@ -898,7 +895,6 @@ public struct Latin1CharacterView<
   }
 
   public func index(before i: Index) -> Index {
-    print("index(before:) the Latin1 character view")
     let previousCUIdx = codeUnits.index(atOffset: i.base-1)
     // Fast path: Single code unit character (i.e. not CR-LF)
     if _fastPath(codeUnits[previousCUIdx] != _LF) {
