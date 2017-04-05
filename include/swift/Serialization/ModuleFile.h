@@ -436,6 +436,10 @@ public:
     return getStatus();
   }
 
+  /// Emits one last diagnostic, logs the error, and then aborts for the stack
+  /// trace.
+  void fatal(llvm::Error error) LLVM_ATTRIBUTE_NORETURN;
+
   ASTContext &getContext() const {
     assert(FileContext && "no associated context yet");
     return FileContext->getParentModule()->getASTContext();
