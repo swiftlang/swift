@@ -473,6 +473,8 @@ NormalProtocolConformance::getAssociatedConformance(Type assocType,
                                                 LazyResolver *resolver) const {
   assert(assocType->isTypeParameter() &&
          "associated type must be a type parameter");
+  assert(!getSignatureConformances().empty() &&
+         "signature conformances not yet computed");
 
   unsigned conformanceIndex = 0;
   for (auto &reqt :
@@ -645,9 +647,22 @@ ProtocolConformanceRef
 InheritedProtocolConformance::getAssociatedConformance(Type assocType,
                          ProtocolDecl *protocol,
                          LazyResolver *resolver) const {
-  // FIXME: Substitute!
-  return InheritedConformance->getAssociatedConformance(assocType, protocol,
-                                                        resolver);
+  auto underlying =
+    InheritedConformance->getAssociatedConformance(assocType, protocol,
+                                                   resolver);
+
+
+  // If the conformance is for Self, return an inherited conformance.
+  if (underlying.isConcrete() &&
+      assocType->isEqual(getProtocol()->getSelfInterfaceType())) {
+    auto subclassType = getType();
+    ASTContext &ctx = subclassType->getASTContext();
+    return ProtocolConformanceRef(
+             ctx.getInheritedConformance(subclassType,
+                                         underlying.getConcrete()));
+  }
+
+  return underlying;
 }
 
 const NormalProtocolConformance *

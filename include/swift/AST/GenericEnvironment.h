@@ -142,8 +142,6 @@ class alignas(1 << DeclAlignInBits) GenericEnvironment final
   };
   friend class QueryArchetypeToInterfaceSubstitutions;
 
-  void populateParentMap(SubstitutionMap &subMap) const;
-
 public:
   GenericSignature *getGenericSignature() const {
     return Signature;

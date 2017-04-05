@@ -377,34 +377,9 @@ bool GenericSignature::enumeratePairedRequirements(
   return enumerateGenericParamsUpToDependentType(CanType());
 }
 
-void GenericSignature::populateParentMap(SubstitutionMap &subMap) const {
-  for (auto reqt : getRequirements()) {
-    if (reqt.getKind() != RequirementKind::SameType)
-      continue;
-
-    auto first = reqt.getFirstType();
-    auto second = reqt.getSecondType();
-
-    if (!first->isTypeParameter() || !second->isTypeParameter())
-      continue;
-
-    if (auto *firstMemTy = first->getAs<DependentMemberType>()) {
-      subMap.addParent(second->getCanonicalType(),
-                       firstMemTy->getBase()->getCanonicalType(),
-                       firstMemTy->getAssocType());
-    }
-
-    if (auto *secondMemTy = second->getAs<DependentMemberType>()) {
-      subMap.addParent(first->getCanonicalType(),
-                       secondMemTy->getBase()->getCanonicalType(),
-                       secondMemTy->getAssocType());
-    }
-  }
-}
-
 SubstitutionMap
 GenericSignature::getSubstitutionMap(SubstitutionList subs) const {
-  SubstitutionMap result;
+  SubstitutionMap result(const_cast<GenericSignature *>(this));
 
   enumeratePairedRequirements(
     [&](Type depTy, ArrayRef<Requirement> reqts) -> bool {
@@ -423,7 +398,6 @@ GenericSignature::getSubstitutionMap(SubstitutionList subs) const {
     });
 
   assert(subs.empty() && "did not use all substitutions?!");
-  populateParentMap(result);
   result.verify();
   return result;
 }
@@ -432,7 +406,7 @@ SubstitutionMap
 GenericSignature::
 getSubstitutionMap(TypeSubstitutionFn subs,
                    GenericSignature::LookupConformanceFn lookupConformance) const {
-  SubstitutionMap subMap;
+  SubstitutionMap subMap(const_cast<GenericSignature *>(this));
 
   // Enumerate all of the requirements that require substitution.
   enumeratePairedRequirements([&](Type depTy, ArrayRef<Requirement> reqs) {
@@ -458,7 +432,6 @@ getSubstitutionMap(TypeSubstitutionFn subs,
     return false;
   });
 
-  populateParentMap(subMap);
   subMap.verify();
   return subMap;
 }
@@ -579,6 +552,28 @@ SmallVector<ProtocolDecl *, 2> GenericSignature::getConformsTo(Type type,
   ProtocolType::canonicalizeProtocols(result);
 
   return result;
+}
+
+bool GenericSignature::conformsToProtocol(Type type, ProtocolDecl *proto,
+                                          ModuleDecl &mod) {
+  // FIXME: Deal with concrete conformances here?
+  if (!type->isTypeParameter()) return false;
+
+  auto &builder = *getGenericSignatureBuilder(mod);
+  auto pa = builder.resolveArchetype(type);
+  if (!pa) return false;
+
+  pa = pa->getRepresentative();
+
+  // FIXME: Deal with concrete conformances here?
+  if (pa->isConcreteType()) return false;
+
+  // Check whether the representative conforms to this protocol.
+  if (auto equivClass = pa->getEquivalenceClassIfPresent())
+    if (equivClass->conformsTo.count(proto) > 0)
+      return true;
+
+  return false;
 }
 
 /// Determine whether the given dependent type is equal to a concrete type.

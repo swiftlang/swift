@@ -4899,7 +4899,9 @@ void ConformanceChecker::ensureRequirementsAreSatisfied() {
       // FIXME: maybe this should be the conformance's type
       proto->getDeclaredInterfaceType(), reqSig,
       QuerySubstitutionMap{substitutions},
-      LookUpConformanceInSubstitutionMap{substitutions}, nullptr,
+      LookUpConformanceInModule(
+        Conformance->getDeclContext()->getParentModule()),
+      nullptr,
       ConformanceCheckFlags::Used, &listener);
 
   // If there were no errors, record the conformances.
@@ -6185,7 +6187,10 @@ void TypeChecker::resolveTypeWitness(
                        *this, 
                        const_cast<NormalProtocolConformance*>(conformance),
                        MissingWitnesses);
-  checker.resolveSingleTypeWitness(assocType);
+  if (!assocType)
+    checker.resolveTypeWitnesses();
+  else
+    checker.resolveSingleTypeWitness(assocType);
 }
 
 void TypeChecker::resolveWitness(const NormalProtocolConformance *conformance,
