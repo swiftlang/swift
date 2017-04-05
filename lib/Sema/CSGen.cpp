@@ -3286,6 +3286,8 @@ static bool canSatisfy(Type T1, Type T2, DeclContext &DC, ConstraintKind Kind,
                        bool AllowFreeVariables) {
   assert(!T1->hasTypeVariable() && !T2->hasTypeVariable() &&
          "Unexpected type variable in constraint satisfaction testing");
+  assert(!T1->hasTypeParameter() && !T2->hasTypeParameter() &&
+         "Unexpected interface type in constraint satisfaction testing");
 
   std::unique_ptr<TypeChecker> CreatedTC;
   // If the current ast context has no type checker, create one for it.
@@ -3297,7 +3299,7 @@ static bool canSatisfy(Type T1, Type T2, DeclContext &DC, ConstraintKind Kind,
   ConstraintSystem CS(*TC, &DC, None);
   if (ReplaceArchetypeWithVariables) {
     std::function<Type(Type)> Trans = [&](Type Base) {
-      if (Base->isTypeParameter() || isa<ArchetypeType>(Base.getPointer())) {
+      if (isa<ArchetypeType>(Base.getPointer())) {
         return Type(CS.createTypeVariable(CS.getConstraintLocator(nullptr),
                                     TypeVariableOptions::TVO_CanBindToLValue));
       }

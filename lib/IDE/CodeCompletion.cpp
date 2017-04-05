@@ -914,9 +914,11 @@ static CodeCompletionResult::ExpectedTypeRelation calculateTypeRelation(
                                                                 Type Ty,
                                                                 Type ExpectedTy,
                                                                 DeclContext *DC) {
-  if (Ty.isNull() || ExpectedTy.isNull() ||
-      Ty->is<ErrorType>() ||
-      ExpectedTy->is<ErrorType>())
+  Ty = DC->mapTypeIntoContext(Ty);
+  if (ExpectedTy->hasTypeParameter())
+    ExpectedTy = DC->mapTypeIntoContext(ExpectedTy);
+
+  if (Ty->hasError() || ExpectedTy->hasError())
     return CodeCompletionResult::ExpectedTypeRelation::Unrelated;
   if (Ty->isEqual(ExpectedTy))
     return CodeCompletionResult::ExpectedTypeRelation::Identical;
@@ -934,21 +936,21 @@ calculateTypeRelationForDecl(const Decl *D, Type ExpectedType,
                              bool IsImplicitlyCurriedInstanceMethod,
                              bool UseFuncResultType = true) {
   auto VD = dyn_cast<ValueDecl>(D);
-  auto DC = D->getDeclContext();
+  auto DC = D->getInnermostDeclContext();
   if (!VD)
     return CodeCompletionResult::ExpectedTypeRelation::Unrelated;
 
   if (auto FD = dyn_cast<AbstractFunctionDecl>(VD)) {
-    auto funcType = FD->getInterfaceType()->getAs<AnyFunctionType>();
-    if (DC->isTypeContext() && funcType && funcType->is<AnyFunctionType>() &&
-        !IsImplicitlyCurriedInstanceMethod)
-      funcType = funcType->getResult()->getAs<AnyFunctionType>();
-    if (funcType) {
+    if (auto funcType = FD->getInterfaceType()->getAs<AnyFunctionType>()) {
+      if (FD->getDeclContext()->isTypeContext() &&
+          !IsImplicitlyCurriedInstanceMethod)
+        funcType = funcType->getResult()->getAs<AnyFunctionType>();
+
       auto relation = calculateTypeRelation(funcType, ExpectedType, DC);
       if (UseFuncResultType)
         relation =
-            std::max(relation, calculateTypeRelation(funcType->getResult(),
-                                                     ExpectedType, DC));
+          std::max(relation, calculateTypeRelation(funcType->getResult(),
+                                                   ExpectedType, DC));
       return relation;
     }
   }
@@ -3112,19 +3114,8 @@ public:
     Kind = LookupKind::ValueExpr;
     NeedLeadingDot = !HaveDot;
 
-    // This is horrible
     ExprType = ExprType->getRValueType();
     this->ExprType = ExprType;
-    if (ExprType->hasTypeParameter()) {
-      DeclContext *DC;
-      if (VD) {
-        DC = VD->getInnermostDeclContext();
-        this->ExprType = DC->mapTypeIntoContext(ExprType);
-      } else if (auto NTD = ExprType->getRValueInstanceType()->getAnyNominal()) {
-        DC = NTD;
-        this->ExprType = DC->mapTypeIntoContext(ExprType);
-      }
-    }
 
     bool Done = false;
     if (tryFunctionCallCompletions(ExprType, VD))
