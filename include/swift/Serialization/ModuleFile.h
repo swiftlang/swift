@@ -26,6 +26,7 @@
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/TinyPtrVector.h"
 #include "llvm/Bitcode/BitstreamReader.h"
+#include "llvm/Support/Error.h"
 #include "llvm/Support/MemoryBuffer.h"
 
 namespace llvm {
@@ -542,12 +543,14 @@ private:
   /// because it reads from the cursor, it is not possible to reset the cursor
   /// after reading. Nothing should ever follow an XREF record except
   /// XREF_PATH_PIECE records.
-  Decl *resolveCrossReference(ModuleDecl *M, uint32_t pathLen);
+  llvm::Expected<Decl *> resolveCrossReference(ModuleDecl *M, uint32_t pathLen);
 
   /// Populates TopLevelIDs for name lookup.
   void buildTopLevelDeclMap();
 
-  void configureStorage(AbstractStorageDecl *storage, unsigned rawStorageKind,
+  /// Sets the accessors for \p storage based on \p rawStorageKind.
+  void configureStorage(AbstractStorageDecl *storage,
+                        unsigned rawStorageKind,
                         serialization::DeclID getter,
                         serialization::DeclID setter,
                         serialization::DeclID materializeForSet,
@@ -743,7 +746,12 @@ public:
   }
 
   /// Returns the type with the given ID, deserializing it if needed.
+  ///
+  /// \sa getTypeChecked
   Type getType(serialization::TypeID TID);
+
+  /// Returns the type with the given ID, deserializing it if needed.
+  llvm::Expected<Type> getTypeChecked(serialization::TypeID TID);
 
   /// Returns the identifier with the given ID, deserializing it if needed.
   Identifier getIdentifier(serialization::IdentifierID IID);
@@ -754,8 +762,20 @@ public:
   /// \param ForcedContext Optional override for the decl context of certain
   ///                      kinds of decls, used to avoid re-entrant
   ///                      deserialization.
+  ///
+  /// \sa getDeclChecked
   Decl *getDecl(serialization::DeclID DID,
                 Optional<DeclContext *> ForcedContext = None);
+
+  /// Returns the decl with the given ID, deserializing it if needed.
+  ///
+  /// \param DID The ID for the decl within this module.
+  /// \param ForcedContext Optional override for the decl context of certain
+  ///                      kinds of decls, used to avoid re-entrant
+  ///                      deserialization.
+  llvm::Expected<Decl *>
+  getDeclChecked(serialization::DeclID DID,
+                 Optional<DeclContext *> ForcedContext = None);
 
   /// Returns the decl context with the given ID, deserializing it if needed.
   DeclContext *getDeclContext(serialization::DeclContextID DID);
