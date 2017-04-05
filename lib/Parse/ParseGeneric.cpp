@@ -393,11 +393,5 @@ ParserStatus Parser::parseProtocolOrAssociatedTypeWhereClause(
     }
   }
 
-  if (Context.isSwiftVersion3()) {
-    diagnose(whereLoc, diag::protocol_associatedtype_where_swift_3,
-             isProtocol ? "protocols" : "associated types");
-    // There's nothing to see here, move along.
-    trailingWhere = nullptr;
-  }
   return ParserStatus();
 }
