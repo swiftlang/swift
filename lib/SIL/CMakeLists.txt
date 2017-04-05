@@ -13,6 +13,7 @@ add_swift_library(swiftSIL STATIC
   SILBasicBlock.cpp
   SILBuilder.cpp
   SILCoverageMap.cpp
+  SILDebugScope.cpp
   SILDeclRef.cpp
   SILDefaultWitnessTable.cpp
   SILFunction.cpp

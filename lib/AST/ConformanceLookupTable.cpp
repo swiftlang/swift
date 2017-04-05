@@ -1110,7 +1110,7 @@ ConformanceLookupTable::getSatisfiedProtocolRequirementsForMember(
         continue;
 
       conf->forEachTypeWitness(resolver, [&](const AssociatedTypeDecl *assoc,
-                                             const Substitution &subst,
+                                             Type type,
                                              TypeDecl *typeDecl) -> bool {
         if (typeDecl == member)
           reqs.push_back(const_cast<AssociatedTypeDecl*>(assoc));
