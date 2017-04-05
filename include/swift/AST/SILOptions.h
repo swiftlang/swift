@@ -146,6 +146,9 @@ public:
   /// Emit checks to trap at run time when the law of exclusivity is violated.
   bool EnforceExclusivityDynamic = false;
 
+  /// Enable the mandatory semantic arc optimizer.
+  bool EnableMandatorySemanticARCOpts = false;
+
   SILOptions() : Sanitize(SanitizerKind::None) {}
 
   /// Return a hash code of any components from these options that should
