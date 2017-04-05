@@ -2941,6 +2941,8 @@ static Identifier typoCorrectNestedType(
       unsigned dist = name.edit_distance(assocType->getName().str(),
                                          /*AllowReplacements=*/true,
                                          maxScore);
+      if (dist == 0)
+        continue;
       assert(dist > 0 && "nested type should have matched associated type");
       if (bestEditDistance == 0 || dist == bestEditDistance) {
         bestEditDistance = dist;
