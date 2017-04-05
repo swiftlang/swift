@@ -837,12 +837,13 @@ static bool isDependentConformance(IRGenModule &IGM,
   if (isResilientConformance(conformance))
     return true;
 
-  // Check whether any of the inherited protocols are dependent.
-  for (auto &entry : conformance->getInheritedConformances()) {
-    if (isDependentConformance(IGM, entry.second->getRootNormalConformance(),
-                               expansion)) {
+  // Check whether any of the inherited conformances are dependent.
+  for (auto inherited : conformance->getProtocol()->getInheritedProtocols()) {
+    if (isDependentConformance(IGM,
+                               conformance->getInheritedConformance(inherited)
+                                 ->getRootNormalConformance(),
+                               expansion))
       return true;
-    }
   }
 
   // If the conforming type isn't dependent, the below check is never true.

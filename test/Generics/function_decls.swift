@@ -28,3 +28,52 @@ public class A<X> {
 protocol P { associatedtype A }
 
 func f12<T : P>(x: T) -> T.A<Int> {} //expected-error{{cannot specialize non-generic type 'T.A'}}{{29-34=}}
+
+public protocol Q {
+    associatedtype AT1
+    associatedtype AT2
+}
+
+public protocol R {
+  associatedtype I
+}
+
+public class C {
+}
+
+// Check that all generic params except for V can be inferred, because
+// they are directly or indirectly used to declare function's arguments.
+// In particular, T and U are considered to be used, because E is explicitly
+// used and there is a requirement E.I == (T, U)
+//expected-error@+1{{generic parameter 'V' is not used in function signature}}
+public func expectEqualSequence<E : R, A : R, T : Q, U : Q, V : Q>(
+  _ expected: E, _ actual: A
+) where
+  E.I == A.I,
+  E.I == (T, U) {
+}
+
+// Check that all generic params can be inferred, because
+// they are directly or indirectly used to declare function's arguments.
+// The only generic param that is used explicitly is T6.
+// All others are inferred from it step-by-step through the chain of
+// requirements.
+func foo<T1:Q, T2:Q, T3:Q, T4:Q, T5:Q, T6:Q> (x: T6)
+  where T1.AT1 == T2.AT1, T1 == T6.AT2, T2 == T3.AT1, T3 == T4.AT1, T4 == T5.AT2, T5 == T6.AT1 {
+}
+
+// Check that all generic params except for T1 and T2 can be inferred, because
+// they are directly or indirectly used to declare function's arguments.
+//expected-error@+2{{generic parameter 'T1' is not used in function signature}}
+//expected-error@+1{{generic parameter 'T2' is not used in function signature}}
+func boo<T1, T2:Q, T3:Q, T4:Q, T5:Q, T6:Q> (x: T6)
+  where T1:Q, T2:C, T3 == T4.AT1, T4 == T5.AT2, T5 == T6.AT1 {
+}
+
+// At the first glance U seems to be explicitly used for declaring a parameter d.
+// But in fact, the declaration of d uses the associated type U.A. This is not
+// enough to infer the type of U at any of the baz's call-sites.
+// Therefore we should reject this declaration.
+//expected-error@+1{{generic parameter 'U' is not used in function signature}}
+func baz<U:P>(_ d: U.A) {
+}

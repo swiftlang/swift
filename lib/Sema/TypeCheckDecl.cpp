@@ -241,9 +241,40 @@ void TypeChecker::resolveRawType(EnumDecl *enumDecl) {
   ITC.satisfy(requestTypeCheckRawType(enumDecl));
 }
 
+void TypeChecker::validateWhereClauses(ProtocolDecl *protocol) {
+  ProtocolRequirementTypeResolver resolver(protocol);
+  TypeResolutionOptions options;
+
+  if (auto whereClause = protocol->getTrailingWhereClause()) {
+    DeclContext *lookupDC = protocol;
+    for (auto &req : whereClause->getRequirements()) {
+      // FIXME: handle error?
+      (void)validateRequirement(whereClause->getWhereLoc(), req,
+                                lookupDC, options, &resolver);
+    }
+  }
+
+  for (auto member : protocol->getMembers()) {
+    if (auto assocType = dyn_cast<AssociatedTypeDecl>(member)) {
+      if (auto whereClause = assocType->getTrailingWhereClause()) {
+        DeclContext *lookupDC = assocType->getDeclContext();
+
+        for (auto &req : whereClause->getRequirements()) {
+          if (!validateRequirement(whereClause->getWhereLoc(), req,
+                                   lookupDC, options, &resolver))
+            // FIXME handle error?
+            continue;
+        }
+      }
+    }
+  }
+}
+
 void TypeChecker::resolveInheritedProtocols(ProtocolDecl *protocol) {
   IterativeTypeChecker ITC(*this);
   ITC.satisfy(requestInheritedProtocols(protocol));
+
+  validateWhereClauses(protocol);
 }
 
 void TypeChecker::resolveInheritanceClause(
@@ -3151,10 +3182,7 @@ static void checkVarBehavior(VarDecl *decl, TypeChecker &TC) {
     auto inherited = TC.conformsToProtocol(behaviorSelf, refinedProto, dc,
                                            ConformanceCheckFlags::Used,
                                            blameLoc);
-    if (inherited && inherited->isConcrete()) {
-      conformance->setInheritedConformance(refinedProto,
-                                           inherited->getConcrete());
-    } else {
+    if (!inherited || !inherited->isConcrete()) {
       // Add some notes that the conformance is behavior-driven.
       TC.diagnose(behavior->getLoc(),
                   diag::self_conformance_required_by_property_behavior,
@@ -4524,33 +4552,7 @@ public:
 
     if (!IsSecondPass) {
       checkUnsupportedNestedType(PD);
-
-      ProtocolRequirementTypeResolver resolver(PD);
-      TypeResolutionOptions options;
-
-      if (auto whereClause = PD->getTrailingWhereClause()) {
-        DeclContext *lookupDC = PD;
-        for (auto &req : whereClause->getRequirements()) {
-          // FIXME: handle error?
-          (void)TC.validateRequirement(whereClause->getWhereLoc(), req,
-                                       lookupDC, options, &resolver);
-        }
-      }
-
-      for (auto member : PD->getMembers()) {
-        if (auto assocType = dyn_cast<AssociatedTypeDecl>(member)) {
-          if (auto whereClause = assocType->getTrailingWhereClause()) {
-            DeclContext *lookupDC = assocType->getDeclContext();
-
-            for (auto &req : whereClause->getRequirements()) {
-              if (!TC.validateRequirement(whereClause->getWhereLoc(), req,
-                                          lookupDC, options, &resolver))
-                // FIXME handle error?
-                continue;
-            }
-          }
-        }
-      }
+      TC.validateWhereClauses(PD);
     }
 
     if (IsSecondPass) {

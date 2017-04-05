@@ -78,7 +78,7 @@ class C3 {
 }
 
 struct S2<T, U where T == U> {
-  func foo<V, W where V == W> (_ closure: ()->()) -> ()->() { return closure }
+  func foo<V, W where V == W> (_: V, _: W, _ closure: ()->()) -> ()->() { return closure }
 }
 class C4<T, U where T == U> {}
 enum E1<T, U where T == U> {}
@@ -434,12 +434,12 @@ func hasLocalizationKey2() {}
 // CHECK33-NEXT: <decl.struct><syntaxtype.keyword>struct</syntaxtype.keyword> <decl.name>S2</decl.name>&lt;<decl.generic_type_param usr="s:11cursor_info2S2V1Txmfp"><decl.generic_type_param.name>T</decl.generic_type_param.name></decl.generic_type_param>, <decl.generic_type_param usr="s:11cursor_info2S2V1Uq_mfp"><decl.generic_type_param.name>U</decl.generic_type_param.name></decl.generic_type_param>&gt; <syntaxtype.keyword>where</syntaxtype.keyword> <decl.generic_type_requirement>T == U</decl.generic_type_requirement></decl.struct>
 
 // RUN: %sourcekitd-test -req=cursor -pos=81:8 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | %FileCheck %s -check-prefix=CHECK34
-// CHECK34: source.lang.swift.decl.function.method.instance (81:8-81:50)
-// CHECK34-NEXT: foo(_:)
-// CHECK34-NEXT: s:11cursor_info2S2V3fooyycyycqd_0_Rsd__r0_lF
-// CHECK34-NEXT: <T, U, V, W where T == U, V == W> (S2<T, U>) -> (() -> ()) -> () -> ()
-// CHECK34: <Declaration>func foo&lt;V, W&gt;(_ closure: () -&gt; ()) -&gt; () -&gt; () where V == W</Declaration>
-// CHECK34-NEXT: <decl.function.method.instance><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>foo</decl.name>&lt;<decl.generic_type_param usr="s:11cursor_info2S2V3fooyycyycqd_0_Rsd__r0_lF1VL_qd__mfp"><decl.generic_type_param.name>V</decl.generic_type_param.name></decl.generic_type_param>, <decl.generic_type_param usr="s:11cursor_info2S2V3fooyycyycqd_0_Rsd__r0_lF1WL_qd_0_mfp"><decl.generic_type_param.name>W</decl.generic_type_param.name></decl.generic_type_param>&gt;(<decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>closure</decl.var.parameter.name>: <decl.var.parameter.type>() -&gt; <decl.function.returntype><tuple>()</tuple></decl.function.returntype></decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype>() -&gt; <decl.function.returntype><tuple>()</tuple></decl.function.returntype></decl.function.returntype> <syntaxtype.keyword>where</syntaxtype.keyword> <decl.generic_type_requirement>V == W</decl.generic_type_requirement></decl.function.method.instance>
+// CHECK34: source.lang.swift.decl.function.method.instance (81:8-81:62)
+// CHECK34-NEXT: foo(_:_:_:)
+// CHECK34-NEXT: s:11cursor_info2S2V3fooyycqd___qd__yyctqd_0_Rsd__r0_lF
+// CHECK34-NEXT: <T, U, V, W where T == U, V == W> (S2<T, U>) -> (V, W, () -> ()) -> () -> ()
+// CHECK34: <Declaration>func foo&lt;V, W&gt;(_: <Type usr="s:11cursor_info2S2V3fooyycqd___qd__yyctqd_0_Rsd__r0_lF1VL_qd__mfp">V</Type>, _: <Type usr="s:11cursor_info2S2V3fooyycqd___qd__yyctqd_0_Rsd__r0_lF1WL_qd_0_mfp">W</Type>, _ closure: () -&gt; ()) -&gt; () -&gt; () where V == W</Declaration>
+// CHECK34: <decl.function.method.instance><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>foo</decl.name>&lt;<decl.generic_type_param usr="s:11cursor_info2S2V3fooyycqd___qd__yyctqd_0_Rsd__r0_lF1VL_qd__mfp"><decl.generic_type_param.name>V</decl.generic_type_param.name></decl.generic_type_param>, <decl.generic_type_param usr="s:11cursor_info2S2V3fooyycqd___qd__yyctqd_0_Rsd__r0_lF1WL_qd_0_mfp"><decl.generic_type_param.name>W</decl.generic_type_param.name></decl.generic_type_param>&gt;(<decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label>: <decl.var.parameter.type><ref.generic_type_param usr="s:11cursor_info2S2V3fooyycqd___qd__yyctqd_0_Rsd__r0_lF1VL_qd__mfp">V</ref.generic_type_param></decl.var.parameter.type></decl.var.parameter>, <decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label>: <decl.var.parameter.type><ref.generic_type_param usr="s:11cursor_info2S2V3fooyycqd___qd__yyctqd_0_Rsd__r0_lF1WL_qd_0_mfp">W</ref.generic_type_param></decl.var.parameter.type></decl.var.parameter>, <decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>closure</decl.var.parameter.name>: <decl.var.parameter.type>() -&gt; <decl.function.returntype><tuple>()</tuple></decl.function.returntype></decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype>() -&gt; <decl.function.returntype><tuple>()</tuple></decl.function.returntype></decl.function.returntype> <syntaxtype.keyword>where</syntaxtype.keyword> <decl.generic_type_requirement>V == W</decl.generic_type_requirement></decl.function.method.instance>
 
 // RUN: %sourcekitd-test -req=cursor -pos=83:7 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | %FileCheck %s -check-prefix=CHECK35
 // CHECK35: source.lang.swift.decl.class (83:7-83:9)

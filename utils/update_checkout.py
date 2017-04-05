@@ -20,18 +20,13 @@ import traceback
 from functools import reduce
 from multiprocessing import freeze_support
 
-sys.path.append(os.path.dirname(__file__))
+from swift_build_support.swift_build_support import shell
+from swift_build_support.swift_build_support.SwiftBuildSupport import \
+    SWIFT_SOURCE_ROOT
 
-from SwiftBuildSupport import (
-    SWIFT_SOURCE_ROOT,
-)  # noqa (E402 module level import not at top of file)
 
 SCRIPT_FILE = os.path.abspath(__file__)
 SCRIPT_DIR = os.path.dirname(SCRIPT_FILE)
-
-sys.path.append(os.path.join(SCRIPT_DIR, 'swift_build_support'))
-
-from swift_build_support import shell  # noqa (E402)
 
 
 def confirm_tag_in_repo(tag, repo_name):

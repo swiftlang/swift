@@ -342,58 +342,9 @@ GenericEnvironment::getForwardingSubstitutions() const {
   return getGenericSignature()->getASTContext().AllocateCopy(result);
 }
 
-void GenericEnvironment::populateParentMap(SubstitutionMap &subMap) const {
-  for (auto reqt : getGenericSignature()->getRequirements()) {
-    if (reqt.getKind() != RequirementKind::SameType)
-      continue;
-
-    auto first = reqt.getFirstType();
-    auto second = reqt.getSecondType();
-
-    auto archetype = first.subst(
-        QueryInterfaceTypeSubstitutions(this),
-        MakeAbstractConformanceForGenericType())
-      ->getAs<ArchetypeType>();
-    if (!archetype)
-      continue;
-
-#ifndef NDEBUG
-    auto secondArchetype = second.subst(
-        QueryInterfaceTypeSubstitutions(this),
-        MakeAbstractConformanceForGenericType())
-      ->getAs<ArchetypeType>();
-    assert(secondArchetype == archetype);
-#endif
-
-    if (auto *firstMemTy = first->getAs<DependentMemberType>()) {
-      auto parent = firstMemTy->getBase().subst(
-        QueryInterfaceTypeSubstitutions(this),
-        MakeAbstractConformanceForGenericType())
-          ->getAs<ArchetypeType>();
-      if (parent && archetype->getParent() != parent) {
-        subMap.addParent(CanType(archetype),
-                         CanType(parent),
-                         firstMemTy->getAssocType());
-      }
-    }
-
-    if (auto *secondMemTy = second->getAs<DependentMemberType>()) {
-      auto parent = secondMemTy->getBase().subst(
-        QueryInterfaceTypeSubstitutions(this),
-        MakeAbstractConformanceForGenericType())
-          ->getAs<ArchetypeType>();
-      if (parent && archetype->getParent() != parent) {
-        subMap.addParent(CanType(archetype),
-                         CanType(parent),
-                         secondMemTy->getAssocType());
-      }
-    }
-  }
-}
-
 SubstitutionMap GenericEnvironment::
 getSubstitutionMap(SubstitutionList subs) const {
-  SubstitutionMap result;
+  SubstitutionMap result(const_cast<GenericEnvironment *>(this));
 
   getGenericSignature()->enumeratePairedRequirements(
     [&](Type depTy, ArrayRef<Requirement> reqts) -> bool {
@@ -419,7 +370,6 @@ getSubstitutionMap(SubstitutionList subs) const {
 
   assert(subs.empty() && "did not use all substitutions?!");
 
-  populateParentMap(result);
   result.verify();
   return result;
 }
@@ -428,7 +378,7 @@ SubstitutionMap
 GenericEnvironment::
 getSubstitutionMap(TypeSubstitutionFn subs,
                    GenericSignature::LookupConformanceFn lookupConformance) const {
-  SubstitutionMap subMap;
+  SubstitutionMap subMap(const_cast<GenericEnvironment *>(this));
 
   getGenericSignature()->enumeratePairedRequirements(
     [&](Type depTy, ArrayRef<Requirement> reqs) -> bool {
@@ -459,7 +409,6 @@ getSubstitutionMap(TypeSubstitutionFn subs,
       return false;
     });
 
-  populateParentMap(subMap);
   subMap.verify();
   return subMap;
 }

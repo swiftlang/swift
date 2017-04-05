@@ -610,6 +610,28 @@ static bool passCursorInfoForModule(ModuleEntity Mod,
   return false;
 }
 
+static Optional<unsigned> getParamParentNameOffset(const ValueDecl *VD) {
+  SourceLoc Loc;
+  if (auto PD = dyn_cast<ParamDecl>(VD)) {
+    auto *DC = PD->getDeclContext();
+    switch (DC->getContextKind()) {
+      case DeclContextKind::SubscriptDecl:
+        Loc = cast<SubscriptDecl>(DC)->getNameLoc();
+        break;
+      case DeclContextKind::AbstractFunctionDecl:
+        Loc = cast<AbstractFunctionDecl>(DC)->getNameLoc();
+        break;
+      default:
+        break;
+    }
+  }
+  if (Loc.isInvalid())
+    return None;
+  auto &SM = VD->getASTContext().SourceMgr;
+  return SM.getLocOffsetInBuffer(Loc, SM.getIDForBufferIdentifier(SM.
+    getBufferIdentifierForLoc(Loc)).getValue());
+}
+
 /// Returns true for failure to resolve.
 static bool passCursorInfoForDecl(const ValueDecl *VD,
                                   const ModuleDecl *MainModule,
@@ -850,6 +872,7 @@ static bool passCursorInfoForDecl(const ValueDecl *VD,
   Info.LocalizationKey = LocalizationKey;
   Info.IsSystem = IsSystem;
   Info.TypeInterface = StringRef();
+  Info.ParentNameOffset = getParamParentNameOffset(VD);
   Receiver(Info);
   return false;
 }
@@ -1020,6 +1043,7 @@ public:
     return false;
   }
 };
+
 static void resolveCursor(SwiftLangSupport &Lang,
                           StringRef InputFile, unsigned Offset,
                           unsigned Length, bool Actionables,

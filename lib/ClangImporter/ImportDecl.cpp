@@ -3084,10 +3084,12 @@ namespace {
 
     Decl *importGlobalAsInitializer(const clang::FunctionDecl *decl,
                                     DeclName name, DeclContext *dc,
-                                    CtorInitializerKind initKind);
+                                    CtorInitializerKind initKind,
+                                    Optional<ImportedName> correctSwiftName);
 
     Decl *importGlobalAsMethod(const clang::FunctionDecl *decl, DeclName name,
-                               DeclContext *dc, Optional<unsigned> selfIdx);
+                               DeclContext *dc, Optional<unsigned> selfIdx,
+                               Optional<ImportedName> correctSwiftName);
 
     /// Create an implicit property given the imported name of one of
     /// the accessors.
@@ -3137,16 +3139,16 @@ namespace {
 
       DeclName name = owningStorage ? DeclName() : importedName.getDeclName();
       if (importedName.importAsMember()) {
-        assert(!correctSwiftName && "Swift 2 didn't support import-as-member!");
-
         // Handle initializers.
         if (name.getBaseName() == Impl.SwiftContext.Id_init)
           return importGlobalAsInitializer(decl, name, dc,
-                                           importedName.getInitKind());
+                                           importedName.getInitKind(),
+                                           correctSwiftName);
 
         // Everything else is a method.
         return importGlobalAsMethod(decl, name, dc,
-                                    importedName.getSelfIndex());
+                                    importedName.getSelfIndex(),
+                                    correctSwiftName);
       }
 
       // Import the function type. If we have parameters, make sure their names
@@ -4705,12 +4707,8 @@ Decl *SwiftDeclConverter::importCompatibilityTypeAlias(
     }
   }
 
-  // Import the declaration context where this name will go. Note that
-  // this is the "natural" context for the declaration, without
-  // import-as-member inference or swift_name tricks.
-  EffectiveClangContext effectiveContext(
-      decl->getDeclContext()->getRedeclContext());
-  auto dc = Impl.importDeclContextOf(decl, effectiveContext);
+  auto dc = Impl.importDeclContextOf(decl,
+                                     compatibilityName.getEffectiveContext());
   if (!dc)
     return nullptr;
 
@@ -5054,10 +5052,12 @@ SwiftDeclConverter::importAsOptionSetType(DeclContext *dc, Identifier name,
   return structDecl;
 }
 
-Decl *
-SwiftDeclConverter::importGlobalAsInitializer(const clang::FunctionDecl *decl,
-                                               DeclName name, DeclContext *dc,
-                                               CtorInitializerKind initKind) {
+Decl *SwiftDeclConverter::importGlobalAsInitializer(
+    const clang::FunctionDecl *decl,
+    DeclName name,
+    DeclContext *dc,
+    CtorInitializerKind initKind,
+    Optional<ImportedName> correctSwiftName) {
   // TODO: Should this be an error? How can this come up?
   assert(dc->isTypeContext() && "cannot import as member onto non-type");
 
@@ -5124,12 +5124,17 @@ SwiftDeclConverter::importGlobalAsInitializer(const clang::FunctionDecl *decl,
   result->setInterfaceType(allocType);
 
   finishFuncDecl(decl, result);
+  if (correctSwiftName)
+    markAsVariant(result, *correctSwiftName);
   return result;
 }
 
-Decl *SwiftDeclConverter::importGlobalAsMethod(const clang::FunctionDecl *decl,
-                                                DeclName name, DeclContext *dc,
-                                                Optional<unsigned> selfIdx) {
+Decl *SwiftDeclConverter::importGlobalAsMethod(
+    const clang::FunctionDecl *decl,
+    DeclName name,
+    DeclContext *dc,
+    Optional<unsigned> selfIdx,
+    Optional<ImportedName> correctSwiftName) {
   if (dc->getAsProtocolOrProtocolExtensionContext() && !selfIdx) {
     // FIXME: source location...
     Impl.SwiftContext.Diags.diagnose({}, diag::swift_name_protocol_static,
@@ -5206,6 +5211,8 @@ Decl *SwiftDeclConverter::importGlobalAsMethod(const clang::FunctionDecl *decl,
     result->getAttrs().add(new (C) FinalAttr(/*IsImplicit=*/true));
 
   finishFuncDecl(decl, result);
+  if (correctSwiftName)
+    markAsVariant(result, *correctSwiftName);
   return result;
 }
 
@@ -7077,8 +7084,6 @@ void ClangImporter::Implementation::finishProtocolConformance(
                                                      /*resolver=*/nullptr);
     assert(inheritedConformance && inheritedConformance->isConcrete() &&
            "inherited conformance not found");
-    conformance->setInheritedConformance(inherited,
-                                         inheritedConformance->getConcrete());
   }
 
   // Collect conformances for the requirement signature.

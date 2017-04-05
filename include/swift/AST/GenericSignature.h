@@ -134,8 +134,6 @@ class alignas(1 << TypeAlignInBits) GenericSignature final
   /// Retrieve the generic signature builder for the given generic signature.
   GenericSignatureBuilder *getGenericSignatureBuilder(ModuleDecl &mod);
 
-  void populateParentMap(SubstitutionMap &subMap) const;
-
   friend class ArchetypeType;
 
 public:
@@ -286,6 +284,9 @@ public:
   /// Determine the set of protocols to which the given dependent type
   /// must conform.
   ConformsToArray getConformsTo(Type type, ModuleDecl &mod);
+
+  /// Determine whether the given dependent type conforms to this protocol.
+  bool conformsToProtocol(Type type, ProtocolDecl *proto, ModuleDecl &mod);
 
   /// Determine whether the given dependent type is equal to a concrete type.
   bool isConcreteType(Type type, ModuleDecl &mod);

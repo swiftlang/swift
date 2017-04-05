@@ -29,6 +29,7 @@
 #include "swift/AST/Type.h"
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/Basic/StringExtras.h"
+#include "swift/Strings.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/DeclVisitor.h"
 #include "clang/Basic/IdentifierTable.h"
@@ -40,6 +41,7 @@
 #include "llvm/ADT/SmallBitVector.h"
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/TinyPtrVector.h"
+#include "llvm/Support/Path.h"
 #include <set>
 
 namespace llvm {
@@ -386,6 +388,10 @@ public:
   llvm::DenseMap<std::pair<ObjCSelector, char>, unsigned>
     ActiveSelectors;
 
+  clang::CompilerInstance *getClangInstance() {
+    return Instance.get();
+  }
+
 private:
   /// \brief Generation number that is used for crude versioning.
   ///
@@ -531,6 +537,11 @@ private:
   /// For importing names. This is initialized by the ClangImporter::create()
   /// after having set up a suitable Clang instance.
   std::unique_ptr<importer::NameImporter> nameImporter = nullptr;
+
+  /// If there is a single .PCH file imported into the __ObjC module, this
+  /// is the filename of that PCH. When other files are imported, this should
+  /// be llvm::None.
+  Optional<std::string> SinglePCHImport = None;
 
 public:
   importer::NameImporter &getNameImporter() {
@@ -1158,6 +1169,22 @@ public:
 
   /// Dump the Swift-specific name lookup tables we generate.
   void dumpSwiftLookupTables();
+
+  void setSinglePCHImport(Optional<std::string> PCHFilename) {
+    if (PCHFilename.hasValue()) {
+      assert(llvm::sys::path::extension(PCHFilename.getValue())
+                 .endswith(PCH_EXTENSION) &&
+             "Single PCH imported filename doesn't have .pch extension!");
+    }
+    SinglePCHImport = PCHFilename;
+  }
+
+  /// If there was is a single .pch bridging header without other imported
+  /// files, we can provide the PCH filename for declaration caching,
+  /// especially in code completion. If there are other
+  Optional<std::string> getSinglePCHImport() const {
+    return SinglePCHImport;
+  }
 };
 
 namespace importer {
