@@ -21,6 +21,7 @@
 #include "swift/AST/Types.h"
 #include "swift/Basic/Range.h"
 #include "swift/Basic/STLExtras.h"
+#include "swift/Basic/TransformArrayRef.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/SIL/Dominance.h"
 #include "swift/SIL/DynamicCasts.h"
@@ -1208,6 +1209,9 @@ namespace {
 // TODO: This class uses a bunch of global state like variables. It should be
 // refactored into a large state object that is used by functions.
 class SILValueOwnershipChecker {
+  /// The result of performing the check.
+  llvm::Optional<bool> Result;
+
   /// The module that we are in.
   SILModule &Mod;
 
@@ -1221,40 +1225,82 @@ class SILValueOwnershipChecker {
   /// The action that the checker should perform on detecting an error.
   ErrorBehaviorKind ErrorBehavior;
 
-  // The worklist that we will use for our iterative reachability query.
+  /// The worklist that we will use for our iterative reachability query.
   llvm::SmallVector<SILBasicBlock *, 32> Worklist;
 
-  // The set of blocks with lifetime ending uses.
+  /// The set of blocks with lifetime ending uses.
   llvm::SmallPtrSet<SILBasicBlock *, 8> BlocksWithLifetimeEndingUses;
 
-  // The set of blocks with non-lifetime ending uses and the associated
-  // non-lifetime ending use SILInstruction.
+  /// The set of blocks with non-lifetime ending uses and the associated
+  /// non-lifetime ending use SILInstruction.
   llvm::SmallDenseMap<SILBasicBlock *, GeneralizedUser, 8>
       BlocksWithNonLifetimeEndingUses;
 
-  // The blocks that we have already visited.
+  /// The blocks that we have already visited.
   llvm::SmallPtrSet<SILBasicBlock *, 32> VisitedBlocks;
 
-  // A list of successor blocks that we must visit by the time the algorithm
-  // terminates.
+  /// A list of successor blocks that we must visit by the time the algorithm
+  /// terminates.
   llvm::SmallPtrSet<SILBasicBlock *, 8> SuccessorBlocksThatMustBeVisited;
+
+  /// The list of lifetime ending users that we found. Only valid if check is
+  /// successful.
+  llvm::SmallVector<GeneralizedUser, 16> LifetimeEndingUsers;
+
+  /// The list of non lifetime ending users that we found. Only valid if check
+  /// is successful.
+  llvm::SmallVector<GeneralizedUser, 16> RegularUsers;
 
 public:
   SILValueOwnershipChecker(SILModule &M,
                            const TransitivelyUnreachableBlocksInfo &TUB,
                            SILValue V, ErrorBehaviorKind ErrorBehavior)
-      : Mod(M), TUB(TUB), Value(V), ErrorBehavior(ErrorBehavior) {}
+      : Result(), Mod(M), TUB(TUB), Value(V), ErrorBehavior(ErrorBehavior) {
+    assert(Value && "Can not initialize a checker with an empty SILValue");
+  }
 
   ~SILValueOwnershipChecker() = default;
   SILValueOwnershipChecker(SILValueOwnershipChecker &) = delete;
   SILValueOwnershipChecker(SILValueOwnershipChecker &&) = delete;
 
   bool check() {
+    if (Result.hasValue())
+      return Result.getValue();
+
     DEBUG(llvm::dbgs() << "Verifying ownership of: " << *Value);
-    // First check that our uses have coherent ownership. If after evaluating
-    // the ownership we do not need to check dataflow (due to performs
-    // ValueOwnershipKind::None), then bail.
-    return checkUses() && checkDataflow();
+    Result = checkUses() && checkDataflow();
+
+    return Result.getValue();
+  }
+
+  using user_array_transform = std::function<SILInstruction *(GeneralizedUser)>;
+  using user_array = TransformArrayRef<user_array_transform>;
+
+  /// A function that returns a range of lifetime ending users found for the
+  /// given value.
+  user_array getLifetimeEndingUsers() const {
+    assert(Result.hasValue() && "Can not call until check() is called");
+    assert(Result.getValue() && "Can not call if check() returned false");
+
+    user_array_transform Transform(
+        [](GeneralizedUser User) -> SILInstruction * {
+          return User.getInst();
+        });
+    return user_array(ArrayRef<GeneralizedUser>(LifetimeEndingUsers),
+                      Transform);
+  }
+
+  /// A function that returns a range of regular (i.e. "non lifetime ending")
+  /// users found for the given value.
+  user_array getRegularUsers() const {
+    assert(Result.hasValue() && "Can not call until check() is called");
+    assert(Result.getValue() && "Can not call if check() returned false");
+
+    user_array_transform Transform(
+        [](GeneralizedUser User) -> SILInstruction * {
+          return User.getInst();
+        });
+    return user_array(ArrayRef<GeneralizedUser>(RegularUsers), Transform);
   }
 
 private:
@@ -1616,9 +1662,7 @@ bool SILValueOwnershipChecker::checkUses() {
   // 1. Verify that none of the uses are in the same block. This would be an
   // overconsume so in this case we assert.
   // 2. Verify that the uses are compatible with our ownership convention.
-  llvm::SmallVector<GeneralizedUser, 16> LifetimeEndingUsers;
-  llvm::SmallVector<GeneralizedUser, 16> NonLifetimeEndingUsers;
-  gatherUsers(LifetimeEndingUsers, NonLifetimeEndingUsers);
+  gatherUsers(LifetimeEndingUsers, RegularUsers);
 
   // We can only have no lifetime ending uses if we have:
   //
@@ -1664,7 +1708,7 @@ bool SILValueOwnershipChecker::checkUses() {
   // BlocksWithNonLifetimeEndingUses map. While we do this, if we have multiple
   // uses in the same block, we only accept the last use since from a liveness
   // perspective that is all we care about.
-  uniqueNonLifetimeEndingUsers(NonLifetimeEndingUsers);
+  uniqueNonLifetimeEndingUsers(RegularUsers);
 
   // Finally, we go through each one of our lifetime ending users performing the
   // following operation:
