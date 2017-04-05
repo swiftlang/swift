@@ -387,12 +387,7 @@ public:
   void addOutOfLineBaseProtocol(ProtocolDecl *baseProtocol) {
     assert(Lowering::TypeConverter::protocolRequiresWitnessTable(baseProtocol));
 
-    auto foundBaseConformance
-      = Conformance->getInheritedConformances().find(baseProtocol);
-    assert(foundBaseConformance != Conformance->getInheritedConformances().end()
-           && "no inherited conformance for base protocol");
-
-    auto conformance = foundBaseConformance->second;
+    auto conformance = Conformance->getInheritedConformance(baseProtocol);
 
     Entries.push_back(SILWitnessTable::BaseProtocolWitness{
       baseProtocol,
