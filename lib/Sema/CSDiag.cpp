@@ -4264,8 +4264,14 @@ bool TypeChecker::diagnoseSelfAssignment(const Expr *E) {
   if (!AE)
     return false;
 
+  // Allow the use of parentheses to express self-assignment when it's a deliberate choice
+  auto src = AE->getSrc();
+  auto loadSrc = dyn_cast<LoadExpr>(src);
+  if (loadSrc != nullptr && isa<ParenExpr>(loadSrc->getSubExpr()))
+    return false;
+
   auto LHSDecl = findReferencedDecl(AE->getDest());
-  auto RHSDecl = findReferencedDecl(AE->getSrc());
+  auto RHSDecl = findReferencedDecl(src);
 
   if (LHSDecl.second && LHSDecl == RHSDecl) {
     diagnose(AE->getLoc(), LHSDecl.first ? diag::self_assignment_prop
