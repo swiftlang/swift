@@ -285,7 +285,7 @@ struct CursorInfo {
   /// All available actions on the code under cursor.
   ArrayRef<StringRef> AvailableActions;
   bool IsSystem = false;
-  llvm::Optional<std::pair<unsigned, unsigned>> ParentNameLoc;
+  llvm::Optional<unsigned> ParentNameOffset;
 };
 
 struct RangeInfo {

@@ -1269,15 +1269,8 @@ static void printCursorInfo(sourcekitd_variant_t Info, StringRef FilenameIn,
                                                                 KeyActionName));
   }
 
-  Optional<std::pair<unsigned, unsigned>> ParentLoc;
-  sourcekitd_variant_t ParentLocObj =
-    sourcekitd_variant_dictionary_get_value(Info, KeyParentLoc);
-  if (sourcekitd_variant_get_type(ParentLocObj) ==
-      SOURCEKITD_VARIANT_TYPE_DICTIONARY) {
-    ParentLoc.emplace(
-      sourcekitd_variant_dictionary_get_int64(ParentLocObj, KeyLine),
-      sourcekitd_variant_dictionary_get_int64(ParentLocObj, KeyColumn));
-  }
+  uint64_t ParentOffset =
+    sourcekitd_variant_dictionary_get_int64(Info, KeyParentLoc);
 
   OS << Kind << " (";
   if (Offset.hasValue()) {
@@ -1335,8 +1328,8 @@ static void printCursorInfo(sourcekitd_variant_t Info, StringRef FilenameIn,
   for (auto Action : AvailableActions)
     OS << Action << '\n';
   OS << "ACTIONS END\n";
-  if (ParentLoc) {
-    OS << "PARENT LOC: " << ParentLoc->first << ":" << ParentLoc->second << "\n";
+  if (ParentOffset) {
+    OS << "PARENT OFFSET: " << ParentOffset << "\n";
   }
 }
 
