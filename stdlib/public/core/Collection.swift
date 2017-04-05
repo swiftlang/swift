@@ -682,7 +682,7 @@ public protocol Collection : _Indexable, Sequence {
   // conform to Comparable. We could fix that by having the things that traffic
   // in AnyUnicodeIndex_ traffic in AnyUnicodeIndex instead.
   mutating func _tryToReplaceSubrange<C: Collection>(
-    from: Index, to: Index, with replacement: C
+    _ target: Range<Index>, with replacement: C
   ) -> Bool
   where C.Iterator.Element == Iterator.Element
   
@@ -1334,7 +1334,7 @@ extension Collection {
     return nil // by default, collections have no contiguous storage.
   }
   public mutating func _tryToReplaceSubrange<C: Collection>(
-    from _: Index, to _: Index, with _: C
+    _: Range<Index>, with _: C
   ) -> Bool
   where C.Iterator.Element == Iterator.Element {
     return false

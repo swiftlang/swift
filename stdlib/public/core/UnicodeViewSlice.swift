@@ -20,11 +20,11 @@ public struct UnicodeViewSlice<BaseView: _UnicodeView>
   public init(base: BaseView, bounds: Range<BaseView.Index>) {
     self.base = Base(base: base, bounds: bounds)
   }
-  public func index(atEncodedOffset n: Int64) -> Index {
-    return base.base.index(atEncodedOffset: n)
+  public func nativeIndex(_ x: AnyUnicodeIndex) -> Index {
+    return base.base.nativeIndex(x)
   }
-  public static func encodedOffset(of i: Index) -> Int64 {
-    return BaseView.encodedOffset(of: i)
+  public func anyIndex(_ x: Index) -> AnyUnicodeIndex {
+    return base.base.anyIndex(x)
   }
   public typealias SubSequence = UnicodeViewSlice
   
@@ -45,11 +45,11 @@ public struct RandomAccessUnicodeViewSlice<
   init(base: BaseView, bounds: Range<BaseView.Index>) {
     self.base = Base(base: base, bounds: bounds)
   }
-  public func index(atEncodedOffset n: Int64) -> Index {
-    return base.base.index(atEncodedOffset: n)
+  public func nativeIndex(_ x: AnyUnicodeIndex) -> Index {
+    return base.base.nativeIndex(x)
   }
-  public static func encodedOffset(of i: Index) -> Int64 {
-    return BaseView.encodedOffset(of: i)
+  public func anyIndex(_ x: Index) -> AnyUnicodeIndex {
+    return base.base.anyIndex(x)
   }
   public typealias SubSequence = RandomAccessUnicodeViewSlice
   
@@ -67,11 +67,11 @@ public struct RangeReplaceableUnicodeViewSlice<
   public typealias Iterator = Base.Iterator
   public var base: Base
 
-  public func index(atEncodedOffset n: Int64) -> Index {
-    return base.base.index(atEncodedOffset: n)
+  public func nativeIndex(_ x: AnyUnicodeIndex) -> Index {
+    return base.base.nativeIndex(x)
   }
-  public static func encodedOffset(of i: Index) -> Int64 {
-    return BaseView.encodedOffset(of: i)
+  public func anyIndex(_ x: Index) -> AnyUnicodeIndex {
+    return base.base.anyIndex(x)
   }
   public typealias SubSequence = RangeReplaceableUnicodeViewSlice<BaseView>
   
@@ -92,10 +92,9 @@ public struct RangeReplaceableUnicodeViewSlice<
     base = Base()
   }
   public mutating func _tryToReplaceSubrange<C>(
-    from targetStart: Index, to targetEnd: Index,
+    _ target: Range<Index>,
     with replacement: C) -> Bool
   where C : Collection, C.Iterator.Element == Iterator.Element {
-    return base._tryToReplaceSubrange(
-      from: targetStart, to: targetEnd, with: replacement)
+    return base._tryToReplaceSubrange(target, with: replacement)
   }
 }

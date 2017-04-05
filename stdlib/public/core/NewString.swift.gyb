@@ -301,7 +301,7 @@ extension String.Content.Inline${N}or${W} : UnicodeContent {
           }))
     }
     return AnyUnicodeScalarUnicodeView(
-      _UnicodeViews(_utf16, UTF16.self).scalars)
+      _UnicodeViews(_utf16, UTF16.self).unicodeScalars)
   }
 }
 
@@ -364,7 +364,7 @@ extension String.Content.NSStringPayload : UnicodeContent {
   
   public var unicodeScalars: AnyUnicodeScalarUnicodeView {
     return AnyUnicodeScalarUnicodeView(
-      _UnicodeViews(_utf16, UTF16.self).scalars)
+      _UnicodeViews(_utf16, UTF16.self).unicodeScalars)
   }
 }
 
@@ -453,11 +453,10 @@ extension String : Unicode, BidirectionalCollectionWrapper {
   // FIXME: figure out how to resolve ambiguities when we try to use the default
   // from BidirectionalCollectionWrapper.
   public mutating func _tryToReplaceSubrange<C: Collection>(
-    from targetStart: Index, to targetEnd: Index, with replacement: C
+    _ target: Range<Index>, with replacement: C
   ) -> Bool
   where C.Iterator.Element == Base.Iterator.Element {
-    return base._tryToReplaceSubrange(
-      from: targetStart, to: targetEnd,  with: replacement)
+    return base._tryToReplaceSubrange(target,  with: replacement)
   }
 }
 
@@ -829,13 +828,11 @@ extension String.Content {
 
     switch _rep {
     case .utf16(let storage):
-      return storage._tryToReplaceSubrange(
-        from: t.lowerBound, to: t.upperBound, with: replacement)
+      return storage._tryToReplaceSubrange(t, with: replacement)
     case .latin1(let storage):
       if replacement.contains(where: { $0 > 0xFF }) { return false }
       return storage._tryToReplaceSubrange(
-        from: t.lowerBound, to: t.upperBound,
-        with: replacement.lazy.map { UInt8(truncatingBitPattern: $0) })
+        t, with: replacement.lazy.map { UInt8(truncatingBitPattern: $0) })
     case .any, .cocoa, .inline5or6, .inline7or16:
       return false
     }
@@ -908,11 +905,10 @@ extension Substring : BidirectionalCollectionWrapper, Unicode {
   // FIXME: figure out how to resolve ambiguities when we try to use the default
   // from BidirectionalCollectionWrapper.
   public mutating func _tryToReplaceSubrange<C: Collection>(
-    from targetStart: Index, to targetEnd: Index, with replacement: C
+    _ target: Range<Index>, with replacement: C
   ) -> Bool
   where C.Iterator.Element == Base.Iterator.Element {
-    return base._tryToReplaceSubrange(
-      from: targetStart, to: targetEnd,  with: replacement)
+    return base._tryToReplaceSubrange(target, with: replacement)
   }
 }
 

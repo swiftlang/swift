@@ -279,17 +279,16 @@ extension _BoundedBufferReference {
   ///
   /// Returns `false` otherwise.
   public func _tryToReplaceSubrange<C: Collection>(
-    from targetStart: Index, to targetEnd: Index, with replacement: C
+    _ target: Range<Index>, with replacement: C
   ) -> Bool
   where C.Iterator.Element == Iterator.Element {
     typealias D = IndexDistance
     let r = Counted(replacement)
-    let delta = numericCast(r.count)
-      - numericCast(self[targetStart..<targetEnd].count) as D
+    let delta = numericCast(r.count) - numericCast(self[target].count) as D
 
     if _fastPath(numericCast(capacity) as D >= self.count + delta) {
-      let start: Int = numericCast(offset(of: targetStart))
-      let end: Int = numericCast(offset(of: targetEnd))
+      let start: Int = numericCast(offset(of: target.lowerBound))
+      let end: Int = numericCast(offset(of: target.upperBound))
       replaceSubrange(start..<end, with: r)
       return true
     }

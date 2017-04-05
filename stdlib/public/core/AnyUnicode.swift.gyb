@@ -215,8 +215,8 @@ where
   CodeUnits.SubSequence.SubSequence == CodeUnits.SubSequence,
   CodeUnits.SubSequence.Iterator.Element == CodeUnits.Iterator.Element {
 
-  var unicodeScalars: _UnicodeViews<CodeUnits,Encoding>.Scalars {
-    return _UnicodeViews(codeUnits, Encoding.self).scalars
+  var unicodeScalars: _UnicodeViews<CodeUnits,Encoding>.UnicodeScalars {
+    return _UnicodeViews(codeUnits, Encoding.self).unicodeScalars
   }
 }
 
@@ -323,61 +323,56 @@ where Encoding.EncodedScalar == UTF16.EncodedScalar,
 
 //===--- AnyUnicodeIndex --------------------------------------------------===//
 
-/// Type eraser for indices into type-erased unicode views.
-///
-/// Not the underlying index, but a wrapper that UnicodeViews can create for it.
-public protocol AnyUnicodeIndex_ {
-  var encodedOffset: Int64 { get }
-  func isLess(than other: AnyUnicodeIndex_) -> Bool
-  func isEqual(to other: AnyUnicodeIndex_) -> Bool
-}
+public enum AnyUnicodeIndex : Comparable {
+case encodedOffset(Int)
+  
+case transcoded(
+    inputOffset: Int,
+    outputOffset: Int,
+    outputEncoding: Any.Type)
+  
+case character(
+    encodedOffset: Int,
+    width: Int)
+  
+case unicodeScalar(encodedOffset: Int, width: Int, scalar: UnicodeScalar?)
 
-/// Default support for comparison
-public extension AnyUnicodeIndex_ where Self : Comparable {
-  func isLess(than other: AnyUnicodeIndex_) -> Bool {
-    if let o = other as? Self {
-      return self < o
+  var encodedOffset: Int {
+    switch self {
+    case .encodedOffset(let x): return x
+    case .transcoded(let x, _,_): return x
+    case .character(let x, _): return x
+    case .unicodeScalar(let x, _, _): return x
     }
-    return self.encodedOffset < other.encodedOffset
   }
-  func isEqual(to other: AnyUnicodeIndex_) -> Bool {
-    if let o = other as? Self {
-      return self == o
-    }
-    return self.encodedOffset == other.encodedOffset
-  }
-}
 
-/// ForwardingWrapper for instances of AnyUnicodeIndex_ that makes it a suitable
-/// Index type (Comparable has self-requirements).
-public struct AnyUnicodeIndex : Comparable {
-  public var encodedOffset: Int64 { return base.encodedOffset }
-  public var base: AnyUnicodeIndex_
-  public init(_ base: AnyUnicodeIndex_) { self.base = base }
   public static func < (lhs: AnyUnicodeIndex, rhs: AnyUnicodeIndex) -> Bool {
-    return lhs.base.isLess(than: rhs.base)
-  }
-  public static func == (lhs: AnyUnicodeIndex, rhs: AnyUnicodeIndex) -> Bool {
-    return lhs.base.isEqual(to: rhs.base)
-  }
-
-  internal struct _OffsetAdapter
-    : AnyUnicodeIndex_, ForwardingWrapper, Comparable {
-    init(base: Int64) { self.base = base }
-    var encodedOffset: Int64 { return base }
-    var base: Int64
-  }
-
-  internal struct _IndexAdapter<BaseView: UnicodeView>
-  : AnyUnicodeIndex_, ForwardingWrapper, Comparable {
-    var base: BaseView.Index
-    var encodedOffset: Int64 {
-      return BaseView.encodedOffset(of: base)
+    let l = lhs.encodedOffset
+    let r = rhs.encodedOffset
+    if _fastPath(l < r) { return true }
+    if _fastPath(l > r) { return false }
+    switch (lhs, rhs) {
+    case (.transcoded(_, let l, let tl), (.transcoded(_, let r, let tr))):
+      return tl == tr && l < r
+    case (.character(_, let l), .character(_, let r)):
+      return l < r
+    default:
+      return false
     }
   }
 
-  public init(encodedOffset: Int64) {
-    self.base = _OffsetAdapter(base: encodedOffset)
+  public static func == (lhs: AnyUnicodeIndex, rhs: AnyUnicodeIndex) -> Bool {
+    let l = lhs.encodedOffset
+    let r = rhs.encodedOffset
+    if _fastPath(l != r) { return false }
+    switch (lhs, rhs) {
+    case (.transcoded(_, let l, let tl), (.transcoded(_, let r, let tr))):
+      return tl != tr || l == r
+    case (.character(_, let l), .character(_, let r)):
+      return l == r
+    default:
+      return true
+    }
   }
 }
 
@@ -388,20 +383,20 @@ public struct AnyUnicodeIndex : Comparable {
 /// Type-eraser for bidirectional collections with index<->code unit offsets
 public protocol AnyUnicodeView_ {
   typealias IndexDistance = Int//64
-  var startIndex: AnyUnicodeIndex_ { get }
-  var endIndex: AnyUnicodeIndex_ { get }
-  func formIndex(after: inout AnyUnicodeIndex_)
-  func index(after: AnyUnicodeIndex_) -> AnyUnicodeIndex_
-  func formIndex(before: inout AnyUnicodeIndex_)
-  func index(before: AnyUnicodeIndex_) -> AnyUnicodeIndex_
-  func formIndex(_ i: inout AnyUnicodeIndex_, offsetBy: IndexDistance)
-  func index(_ i: AnyUnicodeIndex_, offsetBy: IndexDistance) -> AnyUnicodeIndex_
+  var startIndex: AnyUnicodeIndex { get }
+  var endIndex: AnyUnicodeIndex { get }
+  func formIndex(after: inout AnyUnicodeIndex)
+  func index(after: AnyUnicodeIndex) -> AnyUnicodeIndex
+  func formIndex(before: inout AnyUnicodeIndex)
+  func index(before: AnyUnicodeIndex) -> AnyUnicodeIndex
+  func formIndex(_ i: inout AnyUnicodeIndex, offsetBy: IndexDistance)
+  func index(_ i: AnyUnicodeIndex, offsetBy: IndexDistance) -> AnyUnicodeIndex
   func index(
-    _ i: AnyUnicodeIndex_,
+    _ i: AnyUnicodeIndex,
     offsetBy n: IndexDistance,
-    limitedBy limit: AnyUnicodeIndex_
-  ) -> AnyUnicodeIndex_?
-  func distance(from i: AnyUnicodeIndex_, to j: AnyUnicodeIndex_) -> IndexDistance
+    limitedBy limit: AnyUnicodeIndex
+  ) -> AnyUnicodeIndex?
+  func distance(from i: AnyUnicodeIndex, to j: AnyUnicodeIndex) -> IndexDistance
   var count: IndexDistance { get }
   var underestimatedCount: Int { get }
 }
@@ -416,11 +411,11 @@ Self : BidirectionalCollection, Self.Index == AnyUnicodeIndex {
   ${gyb.expand(
       'ForwardCollectionAPIs.swift.gyb', base='base', Element=None)}
   
-  func _wrap(_ x: AnyUnicodeIndex_) -> AnyUnicodeIndex {
-    return AnyUnicodeIndex(x)
+  func _wrap(_ x: AnyUnicodeIndex) -> AnyUnicodeIndex {
+    return x
   }
-  func _unwrap(_ x: AnyUnicodeIndex) -> AnyUnicodeIndex_ {
-    return x.base
+  func _unwrap(_ x: AnyUnicodeIndex) -> AnyUnicodeIndex {
+    return x
   }
 }
 
@@ -429,12 +424,11 @@ Self : BidirectionalCollection, Self.Index == AnyUnicodeIndex {
 /// to translate `IndexDistance`s.
 public extension BidirectionalCollectionWrapper
 where Base : UnicodeView, Self : AnyUnicodeView_ {
-  func _wrap(_ i: Base.Index) -> AnyUnicodeIndex_ {
-    return AnyUnicodeIndex._IndexAdapter<Base>(base: i)
+  func _wrap(_ i: Base.Index) -> AnyUnicodeIndex {
+    return base.anyIndex(i)
   }
-  func _unwrap(_ i: AnyUnicodeIndex_) -> Base.Index {
-    return (i as? AnyUnicodeIndex._IndexAdapter<Base>).map { $0.base }
-    ?? base.index(atEncodedOffset: i.encodedOffset)
+  func _unwrap(_ i: AnyUnicodeIndex) -> Base.Index {
+    return base.nativeIndex(i)
   }
 }
 
@@ -476,7 +470,7 @@ where Self : AnyUnicodeView_, Base.Iterator.Element == ${Element} {
 /// Type eraser for `UnicodeView`s with elements of type ${Element}.
 public protocol Any${Element}UnicodeView_ : AnyUnicodeView_ {
   func makeIterator() -> Any${Element}Iterator_
-  subscript(_: AnyUnicodeIndex_) -> ${Element} { get }
+  subscript(_: AnyUnicodeIndex) -> ${Element} { get }
   func withExistingUnsafeBuffer<R>(
     _ body: (UnsafeBufferPointer<${Element}>) throws -> R
   ) rethrows -> R?
@@ -487,7 +481,7 @@ public protocol Any${Element}UnicodeView_ : AnyUnicodeView_ {
   func forEach(_ body: (${Element}) throws -> Void) rethrows
   func _copyToContiguousArray() -> ContiguousArray<${Element}>
   mutating func _tryToReplaceSubrange<C: Collection>(
-    from: AnyUnicodeIndex_, to: AnyUnicodeIndex_, with replacement: C
+    _: Range<AnyUnicodeIndex>, with replacement: C
   ) -> Bool
   where C.Iterator.Element == ${Element}
 }
@@ -528,7 +522,7 @@ extension Any${Element}UnicodeView {
   : Any${Element}UnicodeView_, BidirectionalCollectionWrapper  
   where Base_.Iterator.Element == ${Element} {
     public typealias IndexDistance = Int//64
-    public typealias Index = AnyUnicodeIndex_
+    public typealias Index = AnyUnicodeIndex
     public typealias Base = Base_
     public var base: Base
   }
@@ -555,9 +549,7 @@ extension Any${Element}UnicodeView : RangeReplaceableCollection {
     // as downcasts to AnyUnicode, that can be crucial to optimization.  This
     // problem seems solvable by giving Collections and wrappers something like
     // func encodedContent<T>(as: T.Type) -> T?
-    if base2._tryToReplaceSubrange(
-      from: target.lowerBound.base, to: target.upperBound.base, with: r
-    ) { return }
+    if base2._tryToReplaceSubrange(target, with: r) { return }
 
     let newCount = count + (r.count^ - self[target].count)^
     // FIXME: Ideally we'd create new _[XXX]StringStorage for this part.  In
@@ -583,7 +575,7 @@ extension Any${Element}UnicodeView : UnicodeView {}
 
 /// Types that have an `AnyUnicodeContent` instance that describes their whole
 /// content.
-public protocol AnyUnicode {
+public protocol AnyUnicode{
   var anyContent: AnyUnicodeContent { get }
 }
 

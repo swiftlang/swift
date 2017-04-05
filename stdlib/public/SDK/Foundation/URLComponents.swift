@@ -194,9 +194,7 @@ public struct URLComponents : ReferenceConvertible, Hashable, Equatable, _Mutabl
     private func _toStringRange(_ r : NSRange) -> Range<String.Index>? {
         guard r.location != NSNotFound else { return nil }
         guard let str = self.string else { return nil }
-        let utf16Start = AnyUnicodeIndex(encodedOffset: numericCast(r.location))
-        let utf16End = AnyUnicodeIndex(encodedOffset: numericCast(r.location + r.length))
-        return utf16Start..<utf16End
+        return str._range(r)
     }
     
     /// Returns the character range of the scheme in the string returned by `var string`.

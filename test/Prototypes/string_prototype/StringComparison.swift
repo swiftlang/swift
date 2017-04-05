@@ -605,7 +605,7 @@ where
           rhs.codeUnits.suffix(from: rhsIdx).map { $0 }, OtherEncoding.self
         )
         // Fall back to decoding and comparing decoded scalars
-        return lhsRest.scalars.lexicographicCompare(rhsRest.scalars) {
+        return lhsRest.unicodeScalars.lexicographicCompare(rhsRest.scalars) {
           lhsScalar, rhsScalar in
           return lhsScalar.ordered(with: rhsScalar)
         }
@@ -873,7 +873,7 @@ where
         endIndex: CodeUnits.Index) {
     precondition(start != codeUnits.endIndex, "Given empty slice")
 
-    let encodedScalar = unicodeView(from: start).scalars.first!
+    let encodedScalar = unicodeView(from: start).unicodeScalars.first!
     return (scalarValue: encodedScalar.utf32[0],
             startIndex: start,
             endIndex: codeUnits.index(start, offsetBy: numericCast(encodedScalar.count)))
@@ -887,7 +887,7 @@ where
         endIndex: CodeUnits.Index) {
     precondition(end != codeUnits.startIndex, "Given empty slice")
 
-    let encodedScalar = unicodeView(until: end).scalars.last!
+    let encodedScalar = unicodeView(until: end).unicodeScalars.last!
     return (scalarValue: encodedScalar.utf32[0],
             startIndex: codeUnits.index(end, offsetBy: -numericCast(encodedScalar.count)),
             endIndex: end)

@@ -994,10 +994,10 @@ extension RangeReplaceableCollection {
   
   @_inlineable
   public mutating func _tryToReplaceSubrange<C: Collection>(
-    from targetStart: Index, to targetEnd: Index, with replacement: C
+    _ target: Range<Index>, with replacement: C
   ) -> Bool
   where C.Iterator.Element == Iterator.Element {
-    replaceSubrange(targetStart..<targetEnd, with: replacement)
+    replaceSubrange(target, with: replacement)
     return true
   }
 }

@@ -141,8 +141,10 @@ extension _UTF16StringStorage : UnicodeStorage {
     CodeUnits, Encoding
   >.FCCNormalizedUTF16View
   
-  public typealias CharacterView = _UnicodeViews<CodeUnits,Encoding>.CharacterView
-  public typealias UnicodeScalarView = _UnicodeViews<CodeUnits,Encoding>.Scalars
+  public typealias CharacterView
+    = _UnicodeViews<CodeUnits,Encoding>.CharacterView
+  public typealias UnicodeScalarView
+    = _UnicodeViews<CodeUnits,Encoding>.UnicodeScalars
   
   public var encoding: UTF16.Type { return UTF16.self }
   public var codeUnits: _UTF16StringStorage { return self }
@@ -477,8 +479,10 @@ extension _UTF8StringStorage : UnicodeStorage {
     CodeUnits, Encoding
   >.FCCNormalizedUTF16View
 
-  public typealias CharacterView = _UnicodeViews<CodeUnits,Encoding>.CharacterView
-  public typealias UnicodeScalarView = _UnicodeViews<CodeUnits,Encoding>.Scalars
+  public typealias CharacterView
+    = _UnicodeViews<CodeUnits,Encoding>.CharacterView
+  public typealias UnicodeScalarView
+    = _UnicodeViews<CodeUnits,Encoding>.UnicodeScalars
   
   public var codeUnits: CodeUnits { return self }
   public var utf16: UTF16View { return UTF16View(self) }

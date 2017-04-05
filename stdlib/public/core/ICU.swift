@@ -187,3 +187,11 @@ extension _UErrorCode {
   var isWarning: Bool { return rawValue < __swift_stdlib_U_ZERO_ERROR.rawValue }
   var isSuccess: Bool { return rawValue <= __swift_stdlib_U_ZERO_ERROR.rawValue }
 }
+
+public func __swift_stdlib_U_SUCCESS(_ x: __swift_stdlib_UErrorCode) -> Bool {
+ return x.rawValue <= __swift_stdlib_U_ZERO_ERROR.rawValue
+}
+
+public func __swift_stdlib_U_FAILURE(_ x: __swift_stdlib_UErrorCode) -> Bool {
+ return x.rawValue > __swift_stdlib_U_ZERO_ERROR.rawValue
+}

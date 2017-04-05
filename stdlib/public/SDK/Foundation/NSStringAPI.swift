@@ -30,16 +30,6 @@ func _toNSArray<T, U : AnyObject>(_ a: [T], f: (T) -> U) -> NSArray {
   return result
 }
 
-extension String.Index {
-  var _utf16Index: Int { return numericCast(encodedOffset) }
-}
-
-func _toNSRange(_ r: Range<String.Index>) -> NSRange {
-  return NSRange(
-    location: r.lowerBound._utf16Index,
-    length: r.upperBound._utf16Index - r.lowerBound._utf16Index)
-}
-
 // We only need this for UnsafeMutablePointer, but there's not currently a way
 // to write that constraint.
 extension Optional {
@@ -76,13 +66,23 @@ extension String {
   /// Return an `Index` corresponding to the given offset in our UTF-16
   /// representation.
   func _index(_ utf16Index: Int) -> Index {
-    return AnyUnicodeIndex(encodedOffset: numericCast(utf16Index))
+    return content.utf16.index(atOffset: utf16Index)
   }
 
   /// Return a `Range<Index>` corresponding to the given `NSRange` of
   /// our UTF-16 representation.
   func _range(_ r: NSRange) -> Range<Index> {
     return _index(r.location)..<_index(r.location + r.length)
+  }
+  
+  func _nsRange(_ r: Range<Index>) -> NSRange {
+    return NSRange(
+      location: utf16.offset(of: r.lowerBound),
+      length: utf16.distance(from: r.lowerBound, to: r.upperBound))
+  }
+  
+  func _utf16Offset(_ i: Index) -> Int {
+    return content.utf16.offset(of: i)    
   }
 
   /// Return a `Range<Index>?` corresponding to the given `NSRange` of
@@ -321,7 +321,7 @@ extension String {
     return locale != nil ? _ns.compare(
       aString,
       options: mask,
-      range: _toNSRange(
+      range: _nsRange(
         range ?? self.characters.startIndex..<self.characters.endIndex
       ),
       locale: locale
@@ -330,7 +330,7 @@ extension String {
     : range != nil ? _ns.compare(
       aString,
       options: mask,
-      range: _toNSRange(range!)
+      range: _nsRange(range!)
     )
 
     : !mask.isEmpty ? _ns.compare(aString, options: mask)
@@ -500,7 +500,7 @@ extension String {
       (String, Range<Index>, Range<Index>, inout Bool) -> Void
   ) {
     _ns.enumerateLinguisticTags(
-      in: _toNSRange(range),
+      in: _nsRange(range),
       scheme: tagScheme,
       options: opts,
       orthography: orthography != nil ? orthography! : nil
@@ -534,7 +534,7 @@ extension String {
       _ enclosingRange: Range<Index>, inout Bool
     ) -> Void
   ) {
-    _ns.enumerateSubstrings(in: _toNSRange(range), options: opts) {
+    _ns.enumerateSubstrings(in: _nsRange(range), options: opts) {
       var stop_ = false
 
       body($0,
@@ -621,7 +621,7 @@ extension String {
         usedLength: usedBufferCount,
         encoding: encoding.rawValue,
         options: options,
-        range: _toNSRange(range),
+        range: _nsRange(range),
         remaining: $0)
     }
   }
@@ -676,7 +676,7 @@ extension String {
           contentsEnd in self._ns.getLineStart(
             start, end: end,
             contentsEnd: contentsEnd,
-            for: _toNSRange(range))
+            for: _nsRange(range))
         }
       }
     }
@@ -702,7 +702,7 @@ extension String {
           contentsEnd in self._ns.getParagraphStart(
             start, end: end,
             contentsEnd: contentsEnd,
-            for: _toNSRange(range))
+            for: _nsRange(range))
         }
       }
     }
@@ -999,7 +999,7 @@ extension String {
   /// Returns the range of characters representing the line or lines
   /// containing a given range.
   public func lineRange(for aRange: Range<Index>) -> Range<Index> {
-    return _range(_ns.lineRange(for: _toNSRange(aRange)))
+    return _range(_ns.lineRange(for: _nsRange(aRange)))
   }
 
   // - (NSArray *)
@@ -1021,7 +1021,7 @@ extension String {
     var nsTokenRanges: NSArray?
     let result = tokenRanges._withNilOrAddress(of: &nsTokenRanges) {
       self._ns.linguisticTags(
-        in: _toNSRange(range), scheme: tagScheme, options: opts,
+        in: _nsRange(range), scheme: tagScheme, options: opts,
         orthography: orthography, tokenRanges: $0) as NSArray
     }
 
@@ -1091,7 +1091,7 @@ extension String {
   /// Returns the range of characters representing the
   /// paragraph or paragraphs containing a given range.
   public func paragraphRange(for aRange: Range<Index>) -> Range<Index> {
-    return _range(_ns.paragraphRange(for: _toNSRange(aRange)))
+    return _range(_ns.paragraphRange(for: _nsRange(aRange)))
   }
 
   // @property NSArray* pathComponents
@@ -1169,7 +1169,7 @@ extension String {
       _ns.rangeOfCharacter(
         from: aSet,
         options: mask,
-        range: _toNSRange(
+        range: _nsRange(
           aRange ?? self.characters.startIndex..<self.characters.endIndex
         )
       )
@@ -1183,7 +1183,7 @@ extension String {
   public
   func rangeOfComposedCharacterSequence(at anIndex: Index) -> Range<Index> {
     return _range(
-      _ns.rangeOfComposedCharacterSequence(at: anIndex._utf16Index))
+      _ns.rangeOfComposedCharacterSequence(at: _utf16Offset(anIndex)))
   }
 
   // - (NSRange)rangeOfComposedCharacterSequencesForRange:(NSRange)range
@@ -1197,7 +1197,7 @@ extension String {
     // I think users will be able to observe differences in the input
     // and output ranges due (if nothing else) to locale changes
     return _range(
-      _ns.rangeOfComposedCharacterSequences(for: _toNSRange(range)))
+      _ns.rangeOfComposedCharacterSequences(for: _nsRange(range)))
   }
 
   // - (NSRange)rangeOfString:(NSString *)aString
@@ -1229,13 +1229,13 @@ extension String {
       locale != nil ? _ns.range(
         of: aString,
         options: mask,
-        range: _toNSRange(
+        range: _nsRange(
           searchRange ?? self.characters.startIndex..<self.characters.endIndex
         ),
         locale: locale
       )
       : searchRange != nil ? _ns.range(
-        of: aString, options: mask, range: _toNSRange(searchRange!)
+        of: aString, options: mask, range: _nsRange(searchRange!)
       )
       : !mask.isEmpty ? _ns.range(of: aString, options: mask)
       : _ns.range(of: aString)
@@ -1450,7 +1450,7 @@ extension String {
   public func replacingCharacters(
     in range: Range<Index>, with replacement: String
   ) -> String {
-    return _ns.replacingCharacters(in: _toNSRange(range), with: replacement)
+    return _ns.replacingCharacters(in: _nsRange(range), with: replacement)
   }
 
   // - (NSString *)
@@ -1477,7 +1477,7 @@ extension String {
       of: target,
       with: replacement,
       options: options,
-      range: _toNSRange(
+      range: _nsRange(
         searchRange ?? self.characters.startIndex..<self.characters.endIndex
       )
     )
@@ -1537,7 +1537,7 @@ extension String {
   /// Returns a new string containing the characters of the
   /// `String` from the one at a given index to the end.
   public func substring(from index: Index) -> String {
-    return _ns.substring(from: index._utf16Index)
+    return _ns.substring(from: _utf16Offset(index))
   }
 
   // - (NSString *)substringToIndex:(NSUInteger)anIndex
@@ -1545,7 +1545,7 @@ extension String {
   /// Returns a new string containing the characters of the
   /// `String` up to, but not including, the one at a given index.
   public func substring(to index: Index) -> String {
-    return _ns.substring(to: index._utf16Index)
+    return _ns.substring(to: _utf16Offset(index))
   }
 
   // - (NSString *)substringWithRange:(NSRange)aRange
@@ -1553,7 +1553,7 @@ extension String {
   /// Returns a string object containing the characters of the
   /// `String` that lie within a given range.
   public func substring(with aRange: Range<Index>) -> String {
-    return _ns.substring(with: _toNSRange(aRange))
+    return _ns.substring(with: _nsRange(aRange))
   }
 
   // @property (readonly, copy) NSString *localizedUppercaseString NS_AVAILABLE(10_11, 9_0);

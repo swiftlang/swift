@@ -650,10 +650,6 @@ suite.test("ViewValueSemantics") {
   expectEqualSequence(snapshot, storage) 
   expectEqualSequence(snapshot, sharesBuffer2) 
   expectEqualSequence(snapshot.dropLast(), Array(sharesBuffer1))
-  // FIXME: something in the collection forwarding stack is not forwarding
-  // _tryToReplaceSubrange, or this test would fail.  That means we're probably
-  // missing an optimization when it actually *is* OK to mutate the storage in
-  // place.
 }
 
 suite.test("UTF16/smoke") {
@@ -785,7 +781,7 @@ suite.test("RangeReplaceable/Latin1/FastPath") {
 
 suite.test("Bidirectional/UnicodeScalar") {
   let a = AnyUnicodeScalarUnicodeView(
-    _UnicodeViews(Array(sample.utf16), ValidUTF16.self).scalars)
+    _UnicodeViews(Array(sample.utf16), ValidUTF16.self).unicodeScalars)
   expectEqualSequence(sample.unicodeScalars, a)
   var lastEncodedOffset = Int64.min
   // Make sure it works as a collection, too.

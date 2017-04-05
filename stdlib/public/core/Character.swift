@@ -298,9 +298,10 @@ extension Character : Comparable {
 }
 
 extension Character {
-  public typealias UnicodeScalarView = _UnicodeViews<UTF16View, UTF16>.Scalars
+  public typealias UnicodeScalarView
+    = _UnicodeViews<UTF16View, UTF16>.UnicodeScalars
   public var unicodeScalars: UnicodeScalarView {
-    return _UnicodeViews(utf16, UTF16.self).scalars
+    return _UnicodeViews(utf16, UTF16.self).unicodeScalars
   }
 }
 

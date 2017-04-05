@@ -376,27 +376,34 @@ extension _UnicodeViews {
 }
 
 extension _UnicodeViews.FCCNormalizedUTF16View : UnicodeView {
-  // Returns the index for the segment containing `atEncodedOffset`
-  //
-  // TODO: What are the desired semantics if given an offset that does not begin
-  // a segment? We should be very explicit about our contract here.
-  public func index(atEncodedOffset i: Int64) -> Index {
+  public func nativeIndex(_ i: AnyUnicodeIndex) -> Index {
     let segmentIdx = base._base.nextSegment(
       startingAt: base._base.codeUnits.index(
-        base._base.codeUnits.startIndex, offsetBy: numericCast(i)
-     )
+        base._base.codeUnits.startIndex,
+        offsetBy: numericCast(i.encodedOffset)
+      )
     )
     return Index(segmentIdx, segmentIdx.segment.startIndex)
   }
-
-  // Returns the offset of the beggining of `i`'s segment
-  public static func encodedOffset(of i: Index) -> Int64 {
-    return numericCast(i._outer.nativeOffset)
+  
+  public func anyIndex(_ i: Index) -> AnyUnicodeIndex {
+    return .encodedOffset(numericCast(i._outer.nativeOffset))
   }
-
+  
   public typealias SubSequence = UnicodeViewSlice<Self_>
   public subscript(bounds: Range<Index>) -> SubSequence {
     return SubSequence(base: self, bounds: bounds)
   }
 }
+
+internal func _makeFCCNormalizer() -> OpaquePointer {
+  var err = __swift_stdlib_U_ZERO_ERROR;
+  let ret = __swift_stdlib_unorm2_getInstance(
+    nil, "nfc", __swift_stdlib_UNORM2_COMPOSE_CONTIGUOUS, &err)
+  _precondition(err.isSuccess, "unexpected unorm2_getInstance failure")
+  return ret!
+}
+
+// Michael NOTE: made public for prototype, should be internal
+public var _fccNormalizer = _makeFCCNormalizer()
 
