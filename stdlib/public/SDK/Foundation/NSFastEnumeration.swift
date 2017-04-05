@@ -50,7 +50,7 @@ final public class NSFastEnumerationIterator : IteratorProtocol {
     objects.withUnsafeMutableBufferPointer {
       count = enumerable.countByEnumerating(
         with: &state,
-        objects: AutoreleasingUnsafeMutablePointer($0.baseAddress),
+        objects: AutoreleasingUnsafeMutablePointer($0.baseAddress!),
         count: $0.count)
     }
   }

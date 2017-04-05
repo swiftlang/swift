@@ -189,7 +189,8 @@ class TestURL : TestURLSuper {
         if #available(OSX 10.11, iOS 9.0, *) {
             let rangeOfHost = components.rangeOfHost!
             expectNotNil(rangeOfHost)
-            expectEqual(s[rangeOfHost], "www.apple.com")
+            // Michael NOTE: String(Substring)
+            expectEqual(String(s[rangeOfHost]), "www.apple.com")
         }
         
         if #available(OSX 10.10, iOS 8.0, *) {

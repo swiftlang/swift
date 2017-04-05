@@ -19,9 +19,7 @@ extension UnsafeBufferPointer {
     let count = Int(audioBuffer.mDataByteSize) / MemoryLayout<Element>.stride
     let elementPtr = audioBuffer.mData?.bindMemory(
       to: Element.self, capacity: count)
-    
-    if let start = elementPtr { self.init(start: start, count: count) }
-    else { self.init() }
+    self.init(start: elementPtr, count: count)
   }
 }
 
@@ -32,8 +30,7 @@ extension UnsafeMutableBufferPointer {
     let count = Int(audioBuffer.mDataByteSize) / MemoryLayout<Element>.stride
     let elementPtr = audioBuffer.mData?.bindMemory(
       to: Element.self, capacity: count)
-    if let start = elementPtr { self.init(start: start, count: count) }
-    else { self.init() }
+    self.init(start: elementPtr, count: count)
   }
 }
 

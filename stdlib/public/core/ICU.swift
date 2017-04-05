@@ -39,14 +39,14 @@ extension _UText {
   }
   
   mutating func validate() {
-    let base = self.withBuffer { $0.baseAddress }
+    let base = self.withBuffer { $0.baseAddress! }
     _debugPrecondition(chunkContents == base, "UText moved!")
     _debugPrecondition(chunkNativeStart <= chunkNativeLimit, "Invalid native range")
     _debugPrecondition(chunkLength >= 0, "Negative chunkLength")
   }
 
   mutating func setup() {
-    chunkContents = self.withBuffer { UnsafePointer($0.baseAddress) }
+    chunkContents = self.withBuffer { UnsafePointer($0.baseAddress!) }
     pExtra = withUnsafeMutablePointer(to: &self) {
       UnsafeMutableRawPointer($0 + 1)
     }

@@ -191,8 +191,9 @@ where
         	_debug("  Trying to normalize: \(Array($0))")
 
           var error = __swift_stdlib_U_ZERO_ERROR
-          let usedCount = __swift_stdlib_unorm2_normalize(
-            _fccNormalizer, $0.baseAddress, numericCast($0.count),
+          let usedCount = $0.baseAddress == nil ? 0
+          : __swift_stdlib_unorm2_normalize(
+            _fccNormalizer, $0.baseAddress!, numericCast($0.count),
             &array, numericCast(array.count), &error)
           if __swift_stdlib_U_SUCCESS(error) {
             array.removeLast(array.count - numericCast(usedCount))
@@ -950,7 +951,7 @@ suite.test("cstring") {
 
   let utf16 = Array(s3.utf16) + [0]
   let s4 = utf16.withUnsafeBufferPointer {
-    String(cString: $0.baseAddress, encoding: UTF16.self)
+    String(cString: $0.baseAddress!, encoding: UTF16.self)
   }
   expectEqual(s4, "some string")
 }

@@ -81,7 +81,7 @@ public func withArrayOfCStrings<R>(
 
   return argsBuffer.withUnsafeMutableBufferPointer {
     (argsBuffer) in
-    let ptr = UnsafeMutableRawPointer(argsBuffer.baseAddress).bindMemory(
+    let ptr = UnsafeMutableRawPointer(argsBuffer.baseAddress!).bindMemory(
       to: CChar.self, capacity: argsBuffer.count)
     var cStrings: [UnsafeMutablePointer<CChar>?] = argsOffsets.map { ptr + numericCast($0) }
     cStrings[cStrings.count - 1] = nil
