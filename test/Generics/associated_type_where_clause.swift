@@ -135,3 +135,25 @@ protocol P {
 	associatedtype P2 where P2 == P1, P2 == X
 	// expected-warning@-1{{redundant same-type constraint 'Self.P2' == 'X'}}
 }
+
+// Lookup of same-named associated types aren't ambiguous in this context.
+protocol P1 {
+  associatedtype A
+}
+
+protocol P2: P1 {
+  associatedtype A
+  associatedtype B where A == B
+}
+
+protocol P3: P1 {
+  associatedtype A
+}
+
+protocol P4 {
+  associatedtype A
+}
+
+protocol P5: P3, P4 {
+  associatedtype B where B == A?
+}

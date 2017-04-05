@@ -158,7 +158,20 @@ Type ProtocolRequirementTypeResolver::resolveTypeOfDecl(TypeDecl *decl) {
 }
 
 bool ProtocolRequirementTypeResolver::areSameType(Type type1, Type type2) {
-  return type1->isEqual(type2);
+  if (type1->isEqual(type2))
+    return true;
+
+  // If both refer to associated types with the same name, they'll implicitly
+  // be considered equivalent.
+  auto depMem1 = type1->getAs<DependentMemberType>();
+  if (!depMem1) return false;
+
+  auto depMem2 = type2->getAs<DependentMemberType>();
+  if (!depMem2) return false;
+
+  if (depMem1->getName() != depMem2->getName()) return false;
+
+  return areSameType(depMem1->getBase(), depMem2->getBase());
 }
 
 void ProtocolRequirementTypeResolver::recordParamType(ParamDecl *decl,
@@ -354,16 +367,15 @@ bool TypeChecker::validateRequirement(SourceLoc whereLoc, RequirementRepr &req,
     // Validate the types.
     if (validateType(req.getSubjectLoc(), lookupDC, options, resolver)) {
       req.setInvalid();
-      return true;
     }
 
     if (validateType(req.getConstraintLoc(), lookupDC, options, resolver)) {
       req.setInvalid();
-      return true;
     }
 
     // FIXME: Feels too early to perform this check.
-    if (!req.getConstraint()->isExistentialType() &&
+    if (!req.isInvalid() &&
+        !req.getConstraint()->isExistentialType() &&
         !req.getConstraint()->getClassOrBoundGenericClass()) {
       diagnose(whereLoc, diag::requires_conformance_nonprotocol,
                req.getSubjectLoc(), req.getConstraintLoc());
@@ -371,34 +383,32 @@ bool TypeChecker::validateRequirement(SourceLoc whereLoc, RequirementRepr &req,
       req.setInvalid();
       return true;
     }
-    return false;
+
+    return req.isInvalid();
   }
 
   case RequirementReprKind::LayoutConstraint: {
     // Validate the types.
     if (validateType(req.getSubjectLoc(), lookupDC, options, resolver)) {
       req.setInvalid();
-      return true;
     }
 
     if (req.getLayoutConstraintLoc().isNull()) {
       req.setInvalid();
-      return true;
     }
-    return false;
+    return req.isInvalid();
   }
 
   case RequirementReprKind::SameType: {
     if (validateType(req.getFirstTypeLoc(), lookupDC, options, resolver)) {
       req.setInvalid();
-      return true;
     }
 
     if (validateType(req.getSecondTypeLoc(), lookupDC, options, resolver)) {
       req.setInvalid();
-      return true;
     }
-    return false;
+
+    return req.isInvalid();
   }
   }
 
