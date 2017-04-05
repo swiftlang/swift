@@ -51,12 +51,6 @@ class TestDate : TestDateSuper {
         d1 += 10
         expectTrue(d1 > d3)
     }
-    
-    func testDateHash() {
-        let d0 = NSDate()
-        let d1 = Date(timeIntervalSinceReferenceDate: d0.timeIntervalSinceReferenceDate)
-        expectEqual(d0.hashValue, d1.hashValue)
-    }
 
     func testCast() {
         let d0 = NSDate()
@@ -202,7 +196,6 @@ class TestDate : TestDateSuper {
 var DateTests = TestSuite("TestDate")
 DateTests.test("testDateComparison") { TestDate().testDateComparison() }
 DateTests.test("testDateMutation") { TestDate().testDateMutation() }
-DateTests.test("testDateHash") { TestDate().testDateHash() }
 DateTests.test("testCast") { TestDate().testCast() }
 DateTests.test("testDistantPast") { TestDate().testDistantPast() }
 DateTests.test("testDistantFuture") { TestDate().testDistantFuture() }
