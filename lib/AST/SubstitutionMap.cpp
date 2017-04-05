@@ -394,6 +394,9 @@ void SubstitutionMap::verify() const {
 }
 
 void SubstitutionMap::dump(llvm::raw_ostream &out) const {
+  out << "Generic signature: ";
+  getGenericSignature()->print(out);
+  out << "\n";
   out << "Substitutions:\n";
   for (const auto &sub : subMap) {
     out.indent(2);
