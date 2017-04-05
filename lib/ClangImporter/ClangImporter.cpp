@@ -176,11 +176,10 @@ namespace {
       }
 
       auto PCH = Importer.getOrCreatePCH(ImporterOpts, SwiftPCHHash);
-      if (PCH.hasValue()) {
-        Impl.getClangInstance()->getPreprocessorOpts().ImplicitPCHInclude =
-            PCH.getValue();
+      if (!PCH.empty()) {
+        Impl.getClangInstance()->getPreprocessorOpts().ImplicitPCHInclude = PCH;
         Impl.IsReadingBridgingPCH = true;
-        Impl.setSinglePCHImport(PCH.getValue());
+        Impl.setSinglePCHImport(PCH);
       }
 
       return true;
@@ -719,7 +718,7 @@ bool ClangImporter::canReadPCH(StringRef PCHFilename) {
     Impl.Instance->getSpecificModuleCachePath());
 }
 
-Optional<std::string>
+StringRef
 ClangImporter::getPCHFilename(const ClangImporterOptions &ImporterOptions,
                               const std::string &SwiftPCHHash) {
   if (llvm::sys::path::extension(ImporterOptions.BridgingHeader)
@@ -730,7 +729,7 @@ ClangImporter::getPCHFilename(const ClangImporterOptions &ImporterOptions,
   const auto &BridgingHeader = ImporterOptions.BridgingHeader;
   const auto &PCHOutputDir = ImporterOptions.PrecompiledHeaderOutputDir;
   if (SwiftPCHHash.empty() || BridgingHeader.empty() || PCHOutputDir.empty()) {
-    return None;
+    return StringRef();
   }
 
   SmallString<256> PCHBasename { llvm::sys::path::filename(BridgingHeader) };
@@ -742,18 +741,17 @@ ClangImporter::getPCHFilename(const ClangImporterOptions &ImporterOptions,
   llvm::sys::path::replace_extension(PCHBasename, ".pch");
   SmallString<256> PCHFilename { PCHOutputDir };
   llvm::sys::path::append(PCHFilename, PCHBasename);
-  return PCHFilename.str().str();
+  return Impl.SwiftContext.AllocateCopy(PCHFilename.str());
 }
 
-
-Optional<std::string>
+StringRef
 ClangImporter::getOrCreatePCH(const ClangImporterOptions &ImporterOptions,
                               const std::string &SwiftPCHHash) {
   auto PCHFilename = getPCHFilename(ImporterOptions, SwiftPCHHash);
-  if (!PCHFilename.hasValue()) {
-    return None;
+  if (PCHFilename.empty()) {
+    return StringRef();
   }
-  if (!canReadPCH(PCHFilename.getValue())) {
+  if (!canReadPCH(PCHFilename)) {
     SmallString<256> Message;
     llvm::raw_svector_ostream OS(Message);
     auto Diags = new clang::TextDiagnosticPrinter {
@@ -761,14 +759,14 @@ ClangImporter::getOrCreatePCH(const ClangImporterOptions &ImporterOptions,
       &Impl.Instance->getDiagnosticOpts()
     };
     auto FailedToEmit = emitBridgingPCH(ImporterOptions.BridgingHeader,
-                                        PCHFilename.getValue(),
+                                        PCHFilename,
                                         Diags);
     if (FailedToEmit) {
-      return None;
+      return StringRef();
     }
   }
 
-  return PCHFilename.getValue();
+  return PCHFilename;
 }
 
 std::unique_ptr<ClangImporter>
@@ -1149,7 +1147,7 @@ bool ClangImporter::importHeader(StringRef header, ModuleDecl *adapter,
   // If we've made it to here, this is some header other than the bridging
   // header, which means we can no longer rely on one file's modification time
   // to invalid code completion caches. :-(
-  Impl.setSinglePCHImport(None);
+  Impl.setSinglePCHImport(StringRef());
 
   if (!cachedContents.empty() && cachedContents.back() == '\0')
     cachedContents = cachedContents.drop_back();
@@ -2544,8 +2542,8 @@ void ClangModuleUnit::collectLinkLibraries(
 StringRef ClangModuleUnit::getFilename() const {
   if (!clangModule) {
     auto SinglePCH = owner.getSinglePCHImport();
-    if (SinglePCH.hasValue()) {
-      return SinglePCH.getValue();
+    if (!SinglePCH.empty()) {
+      return SinglePCH;
     } else {
       return "<imports>";
     }
