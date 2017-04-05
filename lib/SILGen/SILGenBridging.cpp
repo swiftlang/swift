@@ -51,8 +51,7 @@ emitBridgeNativeToObjectiveC(SILGenFunction &SGF,
   auto objcTypeReq = SGF.SGM.getBridgedObjectiveCTypeRequirement(loc);
   if (!objcTypeReq) return None;
 
-  Type objcType =
-      conformance->getTypeWitness(objcTypeReq, nullptr).getReplacement();
+  Type objcType = conformance->getTypeWitness(objcTypeReq, nullptr);
   assert(objcType);
 
   // Create a reference to the witness.
