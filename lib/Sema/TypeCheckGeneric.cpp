@@ -354,16 +354,15 @@ bool TypeChecker::validateRequirement(SourceLoc whereLoc, RequirementRepr &req,
     // Validate the types.
     if (validateType(req.getSubjectLoc(), lookupDC, options, resolver)) {
       req.setInvalid();
-      return true;
     }
 
     if (validateType(req.getConstraintLoc(), lookupDC, options, resolver)) {
       req.setInvalid();
-      return true;
     }
 
     // FIXME: Feels too early to perform this check.
-    if (!req.getConstraint()->isExistentialType() &&
+    if (!req.isInvalid() &&
+        !req.getConstraint()->isExistentialType() &&
         !req.getConstraint()->getClassOrBoundGenericClass()) {
       diagnose(whereLoc, diag::requires_conformance_nonprotocol,
                req.getSubjectLoc(), req.getConstraintLoc());
@@ -371,34 +370,32 @@ bool TypeChecker::validateRequirement(SourceLoc whereLoc, RequirementRepr &req,
       req.setInvalid();
       return true;
     }
-    return false;
+
+    return req.isInvalid();
   }
 
   case RequirementReprKind::LayoutConstraint: {
     // Validate the types.
     if (validateType(req.getSubjectLoc(), lookupDC, options, resolver)) {
       req.setInvalid();
-      return true;
     }
 
     if (req.getLayoutConstraintLoc().isNull()) {
       req.setInvalid();
-      return true;
     }
-    return false;
+    return req.isInvalid();
   }
 
   case RequirementReprKind::SameType: {
     if (validateType(req.getFirstTypeLoc(), lookupDC, options, resolver)) {
       req.setInvalid();
-      return true;
     }
 
     if (validateType(req.getSecondTypeLoc(), lookupDC, options, resolver)) {
       req.setInvalid();
-      return true;
     }
-    return false;
+
+    return req.isInvalid();
   }
   }
 

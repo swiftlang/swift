@@ -9,9 +9,11 @@ class dalet where A : B {} // expected-error {{'where' clause cannot be attached
 
 protocol he where A : B { // expected-error 2 {{use of undeclared type 'A'}}
   // expected-error@-1 3{{type 'A' in conformance requirement does not refer to a generic parameter or associated type}}
+  // expected-error@-2 {{use of undeclared type 'B'}}
 
   associatedtype vav where A : B // expected-error{{use of undeclared type 'A'}}
     // expected-error@-1 3{{type 'A' in conformance requirement does not refer to a generic parameter or associated type}}
+  // expected-error@-2 {{use of undeclared type 'B'}}
 }
 
 
@@ -90,4 +92,14 @@ class OuterGeneric<T> {
       _ = method
     }
   }
+}
+
+// Crash with missing types in requirements.
+protocol P1 {
+  associatedtype A where A == ThisTypeDoesNotExist
+  // expected-error@-1{{use of undeclared type 'ThisTypeDoesNotExist'}}
+  associatedtype B where ThisTypeDoesNotExist == B
+  // expected-error@-1{{use of undeclared type 'ThisTypeDoesNotExist'}}
+  associatedtype C where ThisTypeDoesNotExist == ThisTypeDoesNotExist
+  // expected-error@-1 2{{use of undeclared type 'ThisTypeDoesNotExist'}}
 }

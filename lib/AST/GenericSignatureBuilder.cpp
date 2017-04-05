@@ -2770,9 +2770,14 @@ bool GenericSignatureBuilder::addRequirement(const RequirementRepr *Req,
     // parameter.
     if (!Req->getFirstType()->hasTypeParameter() &&
         !Req->getSecondType()->hasTypeParameter()) {
-      Diags.diagnose(Req->getEqualLoc(), diag::requires_no_same_type_archetype)
-        .highlight(Req->getFirstTypeLoc().getSourceRange())
-        .highlight(Req->getSecondTypeLoc().getSourceRange());
+      if (!Req->getFirstType()->hasError() &&
+          !Req->getSecondType()->hasError()) {
+        Diags.diagnose(Req->getEqualLoc(),
+                       diag::requires_no_same_type_archetype)
+          .highlight(Req->getFirstTypeLoc().getSourceRange())
+          .highlight(Req->getSecondTypeLoc().getSourceRange());
+      }
+
       return true;
     }
 
