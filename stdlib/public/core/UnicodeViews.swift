@@ -719,6 +719,8 @@ extension _UnicodeViews {
     }     
 
     public func index(after i: Index) -> Index {
+      // Michael note: The below FIXME is not true for CR-LF
+      //
       // FIXME: there is always a grapheme break between two scalars that are
       // both < U+0300.  Use that to optimize.  Can we make a stronger
       // statement, that there's always a break before any scalar < U+0300?
@@ -731,6 +733,8 @@ extension _UnicodeViews {
     }
 
     public func index(before i: Index) -> Index {
+      // Michael note: The below FIXME is not true for CR-LF
+      //
       // FIXME: there is always a grapheme break between two scalars that are
       // both < U+0300.  Use that to optimize.  Can we make a stronger
       // statement, that there's always a break before any scalar < U+0300?
@@ -793,5 +797,134 @@ extension _UnicodeViews {
       if r != nil { return r! }
     }
     return Array(self.transcoded(to: UTF16.self)).withUnsafeBufferPointer(body)
+  }
+}
+
+// Michael NOTE: Trying to nest this crashed the remangler...
+//
+// A Latin1 character view, more efficient than a general purpose character
+// view. Checks for special cases inside Latin1, otherwise code-unit based.
+//
+// FIXME: Better name here. It's not just Latin1, but it's also a valid (TODO:
+// prove) view for many ranges of unicode scalar values. Maybe name based on the
+// GB_n level of rule application from the Unicode spec?
+//
+// TODO: Would it be better to unify under the general character view, and
+// incorporate our fast paths as applicable? This seems like the better long-
+// term direction to take here.
+//
+public struct Latin1CharacterView<
+  CodeUnits : RandomAccessCollection,
+  Encoding : UnicodeEncoding
+> : UnicodeView
+  where Encoding.EncodedScalar.Iterator.Element == CodeUnits.Iterator.Element,
+  CodeUnits.SubSequence : RandomAccessCollection,
+  CodeUnits.SubSequence.Index == CodeUnits.Index,
+  CodeUnits.SubSequence.SubSequence == CodeUnits.SubSequence,
+  CodeUnits.SubSequence.Iterator.Element == CodeUnits.Iterator.Element,
+  CodeUnits.Iterator.Element : UnsignedInteger
+{
+  typealias CodeUnit = CodeUnits.Iterator.Element
+  internal let _CR: CodeUnit = 0x0D
+  internal let _LF: CodeUnit = 0x0A
+
+  public init(_ codeUnits: CodeUnits) {
+    print("created Latin1 character view")
+    self.codeUnits = codeUnits
+  }
+
+  internal let codeUnits: CodeUnits
+
+  public typealias SubSequence = UnicodeViewSlice<Latin1CharacterView>
+  public subscript(bounds: Range<Index>) -> SubSequence {
+    return SubSequence(base: self, bounds: bounds)
+  }
+
+  public struct Index : ForwardingWrapper, Comparable {
+    public var base: CodeUnits.IndexDistance
+  }
+
+  public func index(atEncodedOffset position: Int64) -> Index {
+    return Index(base: numericCast(position))
+  }
+  public static func encodedOffset(of i: Index) -> Int64 {
+    return numericCast(i.base)
+  }
+
+  public var startIndex: Index { return Index(base: 0) }
+  public var endIndex: Index { return Index(base: codeUnits.count) }
+
+  internal func getCU(at i: Index) -> CodeUnit {
+    let idx = codeUnits.index(atOffset: i.base)
+    return codeUnits[idx]
+  }
+  internal func getIndex(_ i: CodeUnits.Index) -> Index {
+    return Index(base: codeUnits.distance(from: codeUnits.startIndex, to: i))
+  }
+
+  public subscript(i: Index) -> Character {
+    let nextIdx = index(after: i)
+    print("subscripting the Latin1 character view")
+
+    // Fast path: Single code unit character (i.e. not CR-LF)
+    if _fastPath(nextIdx.base == i.base+1) {
+      return Character(UnicodeScalar(numericCast(getCU(at: i))))
+    }
+
+    // FIXME: Is there anything else in Latin1 except CR-LF that's not single-
+    // code-unit-is-single-grapheme?
+    _sanityCheck(nextIdx.base == i.base+2)
+    _sanityCheck(getCU(at: i) == _CR)
+    _sanityCheck(getCU(at: nextIdx) == _LF)
+    return Character("\u{0D}\u{0A}")
+  }
+
+  public func index(after i: Index) -> Index {
+    print("index(after:) the Latin1 character view")
+    let nextCUIdx = codeUnits.index(atOffset: i.base+1)
+    // Fast path: Single code unit character (i.e. not CR-LF)
+    if _fastPath(getCU(at: i) != _CR) {
+      return getIndex(nextCUIdx)
+    }
+
+    // Special case: CR-LF is single grapheme
+    if nextCUIdx != codeUnits.endIndex && codeUnits[nextCUIdx] == _LF {
+      return getIndex(codeUnits.index(after: nextCUIdx))
+    }
+
+    // FIXME: Is there anything else in Latin1 except CR-LF that's not single-
+    // code-unit-is-single-grapheme?
+    return getIndex(nextCUIdx)
+  }
+
+  public func index(before i: Index) -> Index {
+    print("index(before:) the Latin1 character view")
+    let previousCUIdx = codeUnits.index(atOffset: i.base-1)
+    // Fast path: Single code unit character (i.e. not CR-LF)
+    if _fastPath(codeUnits[previousCUIdx] != _LF) {
+      return getIndex(previousCUIdx)
+    }
+
+    // Special case: CR-LF is single grapheme
+    if previousCUIdx != codeUnits.startIndex {
+      let previousPreviousCUIdx = codeUnits.index(before: previousCUIdx)
+      if codeUnits[previousPreviousCUIdx] == _CR {
+        return getIndex(previousPreviousCUIdx)
+      }
+    }
+
+    // FIXME: Is there anything else in Latin1 except CR-LF that's not single-
+    // code-unit-is-single-grapheme?
+    return getIndex(previousCUIdx)
+  }
+}
+
+// TODO: Also valid for other encodings when properties over scalar values still
+// apply.
+extension _UnicodeViews where CodeUnits.Iterator.Element : UnsignedInteger {
+  // TODO: Currently, present for all Strings. Might want to have type
+  // restrictions.
+  public var latin1CharacterView: Latin1CharacterView<CodeUnits, Encoding> {
+    return Latin1CharacterView<CodeUnits, Encoding>(codeUnits)
   }
 }

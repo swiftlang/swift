@@ -285,13 +285,8 @@ where Encoding == Latin1,
     return RandomAccessUnicodeView(codeUnits.lazy.map { numericCast($0) })
   }
   
-  var characters: RandomAccessUnicodeView<
-    LazyMapRandomAccessCollection<CodeUnits, Character>
-  > {
-    return RandomAccessUnicodeView(
-      codeUnits.lazy.map {
-        Character(UnicodeScalar(_unchecked: numericCast($0)))
-      })
+  var characters: Latin1CharacterView<CodeUnits, Encoding> {
+    return _UnicodeViews(codeUnits, Encoding.self).latin1CharacterView
   }
 
   var unicodeScalars: RandomAccessUnicodeView<
