@@ -89,7 +89,7 @@ class Hash {
     var Res = ""
     for _ in 0..<8 {
       Res = HexTbl[Int(In & 0xF)] + Res
-      In = In &>> 4
+      In = In >> 4
     }
     return Res
   }
@@ -99,25 +99,27 @@ class Hash {
     var In = In
     for i in 0..<4 {
       // Convert one byte each iteration.
-      Res[Index + 2*i] = HexTblFast[Int(In &>> 4) & 0xF]
+      Res[Index + 2*i] = HexTblFast[Int(In >> 4) & 0xF]
       Res[Index + 2*i + 1] = HexTblFast[Int(In & 0xF)]
-      In = In &>> 8
+      In = In >> 8
     }
   }
 
   /// \brief Left-rotate \p x by \p c.
   final
   func rol(_ x: UInt32, _ c: UInt32) -> UInt32 {
-    let a = UInt32(truncatingBitPattern: Int64(x) &<< Int64(c))
-    let b = UInt32(truncatingBitPattern: Int64(x) &>> (32 - Int64(c)))
+    // TODO: use the &>> operator.
+    let a = UInt32(truncatingBitPattern: Int64(x) << Int64(c))
+    let b = UInt32(truncatingBitPattern: Int64(x) >> (32 - Int64(c)))
     return a|b
   }
 
   /// \brief Right-rotate \p x by \p c.
   final
   func ror(_ x: UInt32, _ c: UInt32) -> UInt32 {
-    let a = UInt32(truncatingBitPattern: Int64(x) &>> Int64(c))
-    let b = UInt32(truncatingBitPattern: Int64(x) &<< (32 - Int64(c)))
+    // TODO: use the &>> operator.
+    let a = UInt32(truncatingBitPattern: Int64(x) >> Int64(c))
+    let b = UInt32(truncatingBitPattern: Int64(x) << (32 - Int64(c)))
     return a|b
   }
 }
