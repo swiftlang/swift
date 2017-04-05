@@ -1134,4 +1134,13 @@ suite.test("Substring") {
   }
 }
 
+// Quick test that we count CR-LF as single grapheme. As written, will use one
+// of the small, packed formed.
+suite.test("CR-LF") {
+  let crlf = "\u{0D}\u{0A}"
+  expectTrue(crlf.count == 1)
+  expectTrue(crlf.characters.count == 1)
+  expectTrue(crlf.content.characters.count == 1)
+}
+
 runAllTests()
