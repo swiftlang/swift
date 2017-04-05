@@ -2543,12 +2543,11 @@ void ClangModuleUnit::collectLinkLibraries(
 
 StringRef ClangModuleUnit::getFilename() const {
   if (!clangModule) {
-    auto SinglePCH = owner.getSinglePCHImport();
-    if (SinglePCH.hasValue()) {
-      return SinglePCH.getValue();
-    } else {
+    StringRef SinglePCH = owner.getSinglePCHImport();
+    if (SinglePCH.empty())
       return "<imports>";
-    }
+    else
+      return SinglePCH;
   }
   if (const clang::FileEntry *F = clangModule->getASTFile())
     if (!F->getName().empty())
