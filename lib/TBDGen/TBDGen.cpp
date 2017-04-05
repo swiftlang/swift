@@ -35,6 +35,7 @@ static bool isPrivateDecl(ValueDecl *VD) {
 namespace {
 class TBDGenVisitor : public ASTVisitor<TBDGenVisitor> {
   StringSet &Symbols;
+  const irgen::UniversalLinkageInfo &UniversalLinkInfo;
 
   void addSymbol(StringRef name) {
     auto isNewValue = Symbols.insert(name).second;
@@ -51,7 +52,9 @@ class TBDGenVisitor : public ASTVisitor<TBDGenVisitor> {
   }
 
 public:
-  TBDGenVisitor(StringSet &symbols) : Symbols(symbols) {}
+  TBDGenVisitor(StringSet &symbols,
+                const irgen::UniversalLinkageInfo &universalLinkInfo)
+      : Symbols(symbols), UniversalLinkInfo(universalLinkInfo) {}
 
   void visitMembers(Decl *D) {
     SmallVector<Decl *, 4> members;
@@ -145,11 +148,16 @@ void TBDGenVisitor::visitVarDecl(VarDecl *VD) {
   visitMembers(VD);
 }
 
-void swift::enumeratePublicSymbols(FileUnit *file, StringSet &symbols) {
+void swift::enumeratePublicSymbols(FileUnit *file, StringSet &symbols,
+                                   bool hasMultipleIRGenThreads,
+                                   bool isWholeModule) {
+  irgen::UniversalLinkageInfo linkInfo(file->getASTContext().LangOpts.Target,
+                                       hasMultipleIRGenThreads, isWholeModule);
+
   SmallVector<Decl *, 16> decls;
   file->getTopLevelDecls(decls);
 
-  TBDGenVisitor visitor(symbols);
+  TBDGenVisitor visitor(symbols, linkInfo);
   for (auto d : decls)
     visitor.visit(d);
 }

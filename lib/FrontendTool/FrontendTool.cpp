@@ -525,7 +525,9 @@ static bool performCompile(std::unique_ptr<CompilerInstance> &Instance,
   }
 
   if (Action == FrontendOptions::EmitTBD) {
-    return writeTBD(Instance->getMainModule(), opts.getSingleOutputFilename());
+    auto hasMultipleIRGenThreads = Invocation.getSILOptions().NumThreads > 1;
+    return writeTBD(Instance->getMainModule(), hasMultipleIRGenThreads,
+                    opts.getSingleOutputFilename());
   }
 
   assert(Action >= FrontendOptions::EmitSILGen &&
@@ -761,10 +763,15 @@ static bool performCompile(std::unique_ptr<CompilerInstance> &Instance,
   }
 
   if (opts.ValidateTBDAgainstIR) {
-    bool validationError =
-        PrimarySourceFile ? validateTBD(PrimarySourceFile, *IRModule)
-                          : validateTBD(Instance->getMainModule(), *IRModule);
-    if (validationError)
+    auto hasMultipleIRGenThreads = Invocation.getSILOptions().NumThreads > 1;
+    bool error;
+    if (PrimarySourceFile)
+      error =
+          validateTBD(PrimarySourceFile, *IRModule, hasMultipleIRGenThreads);
+    else
+      error = validateTBD(Instance->getMainModule(), *IRModule,
+                          hasMultipleIRGenThreads);
+    if (error)
       return true;
   }
 
