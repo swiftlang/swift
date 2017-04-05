@@ -1063,7 +1063,6 @@ namespace {
                                        outputOrigType, outputTupleType,
                                        loweredTy);
 
-        optionalTy = SGF.F.mapTypeIntoContext(optionalTy);
         auto optional = SGF.B.createEnum(Loc, payload.getValue(),
                                          someDecl, optionalTy);
         return ManagedValue(optional, payload.getCleanup());
