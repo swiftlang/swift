@@ -524,6 +524,10 @@ public:
     return SGM.Types.getConstantInfo(constant);
   }
 
+  Optional<SILAccessEnforcement> getStaticEnforcement(VarDecl *var = nullptr);
+  Optional<SILAccessEnforcement> getDynamicEnforcement(VarDecl *var = nullptr);
+  Optional<SILAccessEnforcement> getUnknownEnforcement(VarDecl *var = nullptr);
+
   SourceManager &getSourceManager() { return SGM.M.getASTContext().SourceMgr; }
 
   /// Push a new debug scope and set its parent pointer.
