@@ -2389,7 +2389,7 @@ extension UnsignedInteger {
         UnicodeScalar(
           ascii0 + Int(UInt(extendingOrTruncating: r)._value))!)
     }
-    while x != 0
+    while x != (0 as Self)
     return String(buf.reversed().lazy.map { Character($0) })
   }
 }
