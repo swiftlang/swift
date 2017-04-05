@@ -79,13 +79,13 @@ extension _Map${traversal}Collection : ${traversal}Collection {
       Element=None)}
 
   @inline(__always)
-  init(_ base: Unmapped, through transform: Transform) {
+  public init(_ base: Unmapped, through transform: Transform) {
     _unmapped = base
     _transform = transform
   }
   
   @inline(__always)
-  func makeIterator() -> _MapIterator<Unmapped.Iterator, Transform> {
+  public func makeIterator() -> _MapIterator<Unmapped.Iterator, Transform> {
     return _MapIterator(_unmapped.makeIterator(), through: _transform)
   }
 
