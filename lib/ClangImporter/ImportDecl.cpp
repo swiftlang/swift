@@ -7077,8 +7077,6 @@ void ClangImporter::Implementation::finishProtocolConformance(
                                                      /*resolver=*/nullptr);
     assert(inheritedConformance && inheritedConformance->isConcrete() &&
            "inherited conformance not found");
-    conformance->setInheritedConformance(inherited,
-                                         inheritedConformance->getConcrete());
   }
 
   // Collect conformances for the requirement signature.

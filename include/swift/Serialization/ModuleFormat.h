@@ -54,7 +54,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// in source control, you should also update the comment to briefly
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
-const uint16_t VERSION_MINOR = 329; // Last change: deprecated @objc inference
+const uint16_t VERSION_MINOR = 330; // Last change: inherited conformances
 
 using DeclID = PointerEmbeddedInt<unsigned, 31>;
 using DeclIDField = BCFixed<31>;
@@ -1135,7 +1135,6 @@ namespace decls_block {
     DeclContextIDField, // the decl that provided this conformance
     BCVBR<5>, // value mapping count
     BCVBR<5>, // type mapping count
-    BCVBR<5>, // inherited conformances count
     BCArray<DeclIDField>
     // The array contains archetype-value pairs, then type declarations.
     // Inherited conformances follow, then the substitution records for the

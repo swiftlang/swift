@@ -3182,10 +3182,7 @@ static void checkVarBehavior(VarDecl *decl, TypeChecker &TC) {
     auto inherited = TC.conformsToProtocol(behaviorSelf, refinedProto, dc,
                                            ConformanceCheckFlags::Used,
                                            blameLoc);
-    if (inherited && inherited->isConcrete()) {
-      conformance->setInheritedConformance(refinedProto,
-                                           inherited->getConcrete());
-    } else {
+    if (!inherited || !inherited->isConcrete()) {
       // Add some notes that the conformance is behavior-driven.
       TC.diagnose(behavior->getLoc(),
                   diag::self_conformance_required_by_property_behavior,

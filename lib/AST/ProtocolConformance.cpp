@@ -255,11 +255,6 @@ Witness ProtocolConformance::getWitness(ValueDecl *requirement,
   CONFORMANCE_SUBCLASS_DISPATCH(getWitness, (requirement, resolver))
 }
 
-const InheritedConformanceMap &
-ProtocolConformance::getInheritedConformances() const {
-  CONFORMANCE_SUBCLASS_DISPATCH(getInheritedConformances, ())
-}
-
 /// Determine whether the witness for the given requirement
 /// is either the default definition or was otherwise deduced.
 bool ProtocolConformance::
