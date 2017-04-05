@@ -53,6 +53,18 @@ struct HeapObject {
 };
 
 #ifdef __cplusplus
+extern "C" {
+#endif
+
+SWIFT_RUNTIME_STDLIB_INTERFACE
+void _swift_instantiateInertHeapObject(void *address,
+                                       const HeapMetadata *metadata);
+
+#ifdef __cplusplus
+} // extern "C"
+#endif
+
+#ifdef __cplusplus
 static_assert(swift::IsTriviallyConstructible<HeapObject>::value,
               "HeapObject must be trivially initializable");
 static_assert(std::is_trivially_destructible<HeapObject>::value,

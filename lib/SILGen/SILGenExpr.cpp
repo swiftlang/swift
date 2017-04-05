@@ -1555,6 +1555,31 @@ RValue RValueEmitter::visitFunctionConversionExpr(FunctionConversionExpr *e,
     }
     return RValue(SGF, e, result);
   }
+  
+  // Handle a reference to a "thin" native Swift function that only changes
+  // representation and refers to an inherently thin function reference.
+  if (destRepTy->getRepresentation() == FunctionTypeRepresentation::Thin) {
+    if (srcRepTy->getRepresentation() == FunctionTypeRepresentation::Swift
+        && srcRepTy->withExtInfo(destRepTy->getExtInfo())->isEqual(destRepTy)) {
+      auto value = SGF.emitRValueAsSingleValue(e->getSubExpr());
+      auto expectedTy = SGF.getLoweredType(e->getType());
+      if (auto thinToThick =
+            dyn_cast<ThinToThickFunctionInst>(value.getValue())) {
+        value = ManagedValue::forUnmanaged(thinToThick->getOperand());
+      } else {
+        SGF.SGM.diagnose(e->getLoc(), diag::not_implemented,
+                         "nontrivial thin function reference");
+        value = ManagedValue::forUnmanaged(SILUndef::get(expectedTy, SGF.SGM.M));
+      }
+      
+      if (value.getType() != expectedTy) {
+        SGF.SGM.diagnose(e->getLoc(), diag::not_implemented,
+                         "nontrivial thin function reference");
+        value = ManagedValue::forUnmanaged(SILUndef::get(expectedTy, SGF.SGM.M));
+      }
+      return RValue(SGF, e, value);
+    }
+  }
 
   // Break the conversion into three stages:
   // 1) changing the representation from foreign to native

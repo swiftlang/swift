@@ -43,7 +43,7 @@ typedef std::once_flag swift_once_t;
 /// The predicate argument must point to a global or static variable of static
 /// extent of type swift_once_t.
 SWIFT_RUNTIME_EXPORT
-void swift_once(swift_once_t *predicate, void (*fn)(void *));
+void swift_once(swift_once_t *predicate, void (*fn)(void *), void *context);
 
 }
 

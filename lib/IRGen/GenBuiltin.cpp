@@ -697,12 +697,20 @@ if (Builtin.ID == BuiltinValueKind::id) { \
     return out.add(V);
   }
 
-  if (Builtin.ID == BuiltinValueKind::Once) {
+  if (Builtin.ID == BuiltinValueKind::Once
+      || Builtin.ID == BuiltinValueKind::OnceWithContext) {
     // The input type is statically (Builtin.RawPointer, @convention(thin) () -> ()).
     llvm::Value *PredPtr = args.claimNext();
     // Cast the predicate to a OnceTy pointer.
     PredPtr = IGF.Builder.CreateBitCast(PredPtr, IGF.IGM.OnceTy->getPointerTo());
     llvm::Value *FnCode = args.claimNext();
+    // Get the context if any.
+    llvm::Value *Context;
+    if (Builtin.ID == BuiltinValueKind::OnceWithContext) {
+      Context = args.claimNext();
+    } else {
+      Context = llvm::UndefValue::get(IGF.IGM.Int8PtrTy);
+    }
     
     // If we know the platform runtime's "done" value, emit the check inline.
     llvm::BasicBlock *doneBB = nullptr;
@@ -723,7 +731,7 @@ if (Builtin.ID == BuiltinValueKind::id) { \
     
     // Emit the runtime "once" call.
     auto call
-      = IGF.Builder.CreateCall(IGF.IGM.getOnceFn(), {PredPtr, FnCode});
+      = IGF.Builder.CreateCall(IGF.IGM.getOnceFn(), {PredPtr, FnCode, Context});
     call->setCallingConv(IGF.IGM.DefaultCC);
     
     // If we emitted the "done" check inline, join the branches.

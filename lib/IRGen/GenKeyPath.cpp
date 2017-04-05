@@ -86,8 +86,8 @@ llvm::Value *IRGenFunction::emitKeyPath(KeyPathInst *inst) {
   ConstantInitBuilder builder(IGM);
   ConstantStructBuilder fields = builder.beginStruct();
   fields.setPacked(true);
-  // Add a version header in case we change the key path format later.
-  fields.add(llvm::ConstantInt::get(IGM.SizeTy, 1));
+  // Add a zero-initialized header we can use for lazy initialization.
+  fields.add(llvm::ConstantInt::get(IGM.SizeTy, 0));
   
   // Store references to metadata generator functions to generate the metadata
   // for the root and leaf. These sit in the "isa" and object header parts of
@@ -101,7 +101,6 @@ llvm::Value *IRGenFunction::emitKeyPath(KeyPathInst *inst) {
   
   // Build out the components.
   bool isInstantiableInPlace = true;
-  fields.setPacked(true);
   
   auto baseTy = rootTy;
   
@@ -175,8 +174,11 @@ llvm::Value *IRGenFunction::emitKeyPath(KeyPathInst *inst) {
     baseTy = component.getComponentType();
   }
   
-  // Save the total size of the buffer, minus a word for the version header.
-  Size componentSize = fields.getNextOffsetFromGlobal() - IGM.getPointerSize();
+  // Save the total size of the buffer, minus three words for the once token
+  // and object header, and 32 bits for the buffer header.
+  Size componentSize = fields.getNextOffsetFromGlobal()
+    - 3*IGM.getPointerSize()
+    - Size(4);
   
   // We now have enough info to build the header.
   KeyPathBufferHeader header(componentSize.getValue(), isInstantiableInPlace,

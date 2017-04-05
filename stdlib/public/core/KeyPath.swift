@@ -130,6 +130,7 @@ public class AnyKeyPath: Hashable, _AppendKeyPath {
 public class PartialKeyPath<Root>: AnyKeyPath { }
 
 // MARK: Concrete implementations
+internal enum KeyPathKind { case readOnly, value, reference }
 
 public class KeyPath<Root, Value>: PartialKeyPath<Root> {
   public typealias _Root = Root
@@ -143,8 +144,7 @@ public class KeyPath<Root, Value>: PartialKeyPath<Root> {
   }
   
   // MARK: Implementation
-  
-  enum Kind { case readOnly, value, reference }
+  typealias Kind = KeyPathKind
   class var kind: Kind { return .readOnly }
   
   static func appendedType<AppendedValue>(
@@ -443,6 +443,9 @@ struct RawKeyPathComponent {
     static var outOfLineOffsetPayload: UInt32 {
       return _SwiftKeyPathComponentHeader_OutOfLineOffsetPayload
     }
+    static var unresolvedOffsetPayload: UInt32 {
+      return _SwiftKeyPathComponentHeader_UnresolvedOffsetPayload
+    }
     
     var _value: UInt32
     
@@ -465,9 +468,9 @@ struct RawKeyPathComponent {
       }
       set {
         if newValue {
-          _value = _value | Header.endOfReferencePrefixFlag
+          _value |= Header.endOfReferencePrefixFlag
         } else {
-          _value = _value & ~Header.endOfReferencePrefixFlag
+          _value &= ~Header.endOfReferencePrefixFlag
         }
       }
     }
@@ -645,11 +648,18 @@ internal struct KeyPathBuffer {
   var trivial: Bool
   var hasReferencePrefix: Bool
 
+  var mutableData: UnsafeMutableRawBufferPointer {
+    return UnsafeMutableRawBufferPointer(mutating: data)
+  }
+
   struct Header {
     var _value: UInt32
     
     static var sizeMask: UInt32 {
       return _SwiftKeyPathBufferHeader_SizeMask
+    }
+    static var reservedMask: UInt32 {
+      return _SwiftKeyPathBufferHeader_ReservedMask
     }
     static var trivialFlag: UInt32 {
       return _SwiftKeyPathBufferHeader_TrivialFlag
@@ -657,18 +667,38 @@ internal struct KeyPathBuffer {
     static var hasReferencePrefixFlag: UInt32 {
       return _SwiftKeyPathBufferHeader_HasReferencePrefixFlag
     }
-  
+
     init(size: Int, trivial: Bool, hasReferencePrefix: Bool) {
       _sanityCheck(size <= Int(Header.sizeMask), "key path too big")
       _value = UInt32(size)
         | (trivial ? Header.trivialFlag : 0)
         | (hasReferencePrefix ? Header.hasReferencePrefixFlag : 0)
     }
-    
+
     var size: Int { return Int(_value & Header.sizeMask) }
     var trivial: Bool { return _value & Header.trivialFlag != 0 }
     var hasReferencePrefix: Bool {
-      return _value & Header.hasReferencePrefixFlag != 0
+      get {
+        return _value & Header.hasReferencePrefixFlag != 0
+      }
+      set {
+        if newValue {
+          _value |= Header.hasReferencePrefixFlag
+        } else {
+          _value &= ~Header.hasReferencePrefixFlag
+        }
+      }
+    }
+
+    // In a key path pattern, the "trivial" flag is used to indicate
+    // "instantiable in-line"
+    var instantiableInLine: Bool {
+      return trivial
+    }
+
+    func validateReservedBits() {
+      _precondition(_value & Header.reservedMask == 0,
+                    "reserved bits set to an unexpected bit pattern")
     }
   }
 
@@ -1001,10 +1031,164 @@ public func _appendingKeyPaths<
 }
 
 // Runtime entry point to instantiate a key path object.
-@_silgen_name("swift_getKeyPath")
+@_cdecl("swift_getKeyPath")
 public func swift_getKeyPath(pattern: UnsafeMutableRawPointer,
                              arguments: UnsafeRawPointer)
-    -> AnyKeyPath {
+    -> UnsafeRawPointer {
+  // The key path pattern is laid out like a key path object, with a few
+  // modifications:
+  // - Instead of the two-word object header with isa and refcount, two
+  //   pointers to metadata accessors are provided for the root and leaf
+  //   value types of the key path.
+  // - The header reuses the "trivial" bit to mean "instantiable in-line",
+  //   meaning that the key path described by this pattern has no contextually
+  //   dependent parts (no dependence on generic parameters, subscript indexes,
+  //   etc.), so it can be set up as a global object once. (The resulting
+  //   global object will itself always have the "trivial" bit set, since it
+  //   never needs to be destroyed.)
+  // - Components may have unresolved forms that require instantiation.
+  // - The component type metadata pointers are unresolved, and instead
+  //   point to accessor functions that instantiate the metadata.
+  //
+  // The pattern never precomputes the capabilities of the key path (readonly/
+  // writable/reference-writable), nor does it encode the reference prefix.
+  // These are resolved dynamically, so that they always reflect the dynamic
+  // capability of the properties involved.
+  let oncePtr = pattern
+  let objectPtr = pattern.advanced(by: MemoryLayout<Int>.size)
+  let bufferPtr = objectPtr.advanced(by: MemoryLayout<HeapObject>.size)
+
+  // If the pattern is instantiable in-line, do a dispatch_once to
+  // initialize it. (The resulting object will still have the collocated
+  // "trivial" bit set, since a global object never needs destruction.)
+  let bufferHeader = bufferPtr.load(as: KeyPathBuffer.Header.self)
+  bufferHeader.validateReservedBits()
+
+  if bufferHeader.instantiableInLine {
+    Builtin.onceWithContext(oncePtr._rawValue, _getKeyPath_instantiatedInline,
+                            objectPtr._rawValue)
+    // Return the instantiated object at +1.
+    // TODO: This will be unnecessary once we support global objects with inert
+    // refcounting.
+    let object = Unmanaged<AnyKeyPath>.fromOpaque(objectPtr)
+    _ = object.retain()
+    return UnsafeRawPointer(objectPtr)
+  }
+  // TODO: Handle cases that require per-instance instantiation
   fatalError("not implemented")
 }
 
+internal func _getKeyPath_instantiatedInline(
+  _ objectRawPtr: Builtin.RawPointer
+) {
+  let objectPtr = UnsafeMutableRawPointer(objectRawPtr)
+  let bufferPtr = objectPtr.advanced(by: MemoryLayout<HeapObject>.size)
+  var buffer = KeyPathBuffer(base: bufferPtr)
+  
+  // Resolve the root and leaf types.
+  typealias MetadataAccessor = @convention(c) () -> UnsafeRawPointer
+  let rootAccessor = objectPtr.load(as: MetadataAccessor.self)
+  let leafAccessor = objectPtr.load(fromByteOffset: MemoryLayout<Int>.size,
+                                    as: MetadataAccessor.self)
+
+  let root = unsafeBitCast(rootAccessor(), to: Any.Type.self)
+  let leaf = unsafeBitCast(leafAccessor(), to: Any.Type.self)
+
+  // Assume the key path is writable until proven otherwise
+  var capability: KeyPathKind = .value
+  // Track where the reference prefix begins
+  var endOfReferencePrefixComponent: UnsafeRawPointer? = nil
+  var previousComponentAddr: UnsafeRawPointer? = nil
+
+  // Instantiate components that need it.
+  while true {
+    let componentAddr = buffer.data.baseAddress.unsafelyUnwrapped
+    let header = buffer.pop(RawKeyPathComponent.Header.self)
+
+    func tryToResolveOffset() {
+      if header.payload == RawKeyPathComponent.Header.unresolvedOffsetPayload {
+        // TODO: Look up offset in type metadata
+        fatalError("not implemented")
+      }
+      if header.payload == RawKeyPathComponent.Header.outOfLineOffsetPayload {
+        _ = buffer.pop(UInt32.self)
+      }
+    }
+
+    switch header.kind {
+    case .struct:
+      // The offset may need to be resolved dynamically.
+      tryToResolveOffset()
+    case .class:
+      // The offset may need to be resolved dynamically.
+      tryToResolveOffset()
+      // Crossing a class can end the reference prefix, and makes the following
+      // key path potentially reference-writable.
+      endOfReferencePrefixComponent = previousComponentAddr
+      capability = .reference
+    case .optionalChain,
+         .optionalWrap,
+         .optionalForce:
+      // No instantiation necessary.
+      break
+    }
+
+    // Break if this is the last component.
+    if buffer.data.count == 0 { break }
+
+    // Resolve the component type.
+    if MemoryLayout<Int>.size == 4 {
+      let componentTyAccessor = buffer.data.load(as: MetadataAccessor.self)
+      let componentTy = unsafeBitCast(componentTyAccessor, to: Any.Type.self)
+      buffer.mutableData.storeBytes(of: componentTy, as: Any.Type.self)
+    } else if MemoryLayout<Int>.size == 8 {
+      let componentTyAccessorWords = buffer.data.load(as: (UInt32,UInt32).self)
+      let componentTyAccessor = unsafeBitCast(componentTyAccessorWords,
+                                              to: MetadataAccessor.self)
+      let componentTyWords = unsafeBitCast(componentTyAccessor(),
+                                           to: (UInt32, UInt32).self)
+      buffer.mutableData.storeBytes(of: componentTyWords,
+                                    as: (UInt32,UInt32).self)
+    } else {
+      fatalError("unsupported architecture")
+    }
+    _ = buffer.pop(Int.self)
+    previousComponentAddr = componentAddr
+  }
+
+  // Set up the reference prefix if there is one.
+  if let endOfReferencePrefixComponent = endOfReferencePrefixComponent {
+    var bufferHeader = bufferPtr.load(as: KeyPathBuffer.Header.self)
+    bufferHeader.hasReferencePrefix = true
+    bufferPtr.storeBytes(of: bufferHeader, as: KeyPathBuffer.Header.self)
+
+    var componentHeader = endOfReferencePrefixComponent
+      .load(as: RawKeyPathComponent.Header.self)
+    componentHeader.endOfReferencePrefix = true
+    UnsafeMutableRawPointer(mutating: endOfReferencePrefixComponent)
+      .storeBytes(of: componentHeader,
+                  as: RawKeyPathComponent.Header.self)
+  }
+
+  // Figure out the class type that the object will have based on its
+  // dynamic capability.
+  func openRoot<Root>(_: Root.Type) -> AnyKeyPath.Type {
+    func openLeaf<Leaf>(_: Leaf.Type) -> AnyKeyPath.Type {
+      switch capability {
+      case .readOnly:
+        return KeyPath<Root, Leaf>.self
+      case .value:
+        return WritableKeyPath<Root, Leaf>.self
+      case .reference:
+        return ReferenceWritableKeyPath<Root, Leaf>.self
+      }
+    }
+    return _openExistential(leaf, do: openLeaf)
+  }
+  let classTy = _openExistential(root, do: openRoot)
+
+  _swift_instantiateInertHeapObject(
+    objectPtr,
+    unsafeBitCast(classTy, to: OpaquePointer.self)
+  )
+}

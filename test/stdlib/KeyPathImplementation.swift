@@ -2,9 +2,6 @@
 // REQUIRES: executable_test
 
 import StdlibUnittest
-#if BUILDING_OUTSIDE_STDLIB
-import Swift
-#endif
 
 var keyPathImpl = TestSuite("key path implementation")
 

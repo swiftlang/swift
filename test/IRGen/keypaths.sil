@@ -22,90 +22,78 @@ sil_vtable C {}
 
 // -- %a: S.x
 // CHECK: [[KP_A:@keypath.*]] = private global <{ {{.*}} }> <{
-// CHECK-SAME: [[WORD]] 1,
+// CHECK-SAME: [[WORD]] 0,
 // CHECK-SAME: %swift.type* ()* @_T08keypaths1SVMa,
 // CHECK-SAME: %swift.type* ()* @_T0SiMa, 
-//                  -- 0x8000_0010 - instantiable in-line, size 16
-// CHECK-32-SAME: i32 -2147483632,
-//                  -- 0x8000_0018 - instantiable in-line, size 24
-// CHECK-64-SAME: i32 -2147483624,
+//               -- 0x8000_0018 - instantiable in-line, size 4
+// CHECK-SAME: i32 -2147483644,
 // -- offset of S.x
 // CHECK-SAME: i32 0 }>
 
 // -- %b: S.y
 // CHECK: [[KP_B:@keypath.*]] = private global <{ {{.*}} }> <{
-// CHECK-SAME: [[WORD]] 1,
+// CHECK-SAME: [[WORD]] 0,
 // CHECK-SAME: %swift.type* ()* @_T08keypaths1SVMa,
 // CHECK-SAME: %swift.type* ()* @_T0SSMa, 
-//                  -- 0x8000_0010 - instantiable in-line, size 16
-// CHECK-32-SAME: i32 -2147483632,
-//                  -- 0x8000_0018 - instantiable in-line, size 24
-// CHECK-64-SAME: i32 -2147483624,
+//               -- 0x8000_0018 - instantiable in-line, size 4
+// CHECK-SAME: i32 -2147483644,
 // -- offset of S.y
 // CHECK-32-SAME: i32 4 }>
 // CHECK-64-SAME: i32 8 }>
 
 // -- %c: S.z
 // CHECK: [[KP_C:@keypath.*]] = private global <{ {{.*}} }> <{
-// CHECK-SAME: [[WORD]] 1,
+// CHECK-SAME: [[WORD]] 0,
 // CHECK-SAME: %swift.type* ()* @_T08keypaths1SVMa,
 // CHECK-SAME: %swift.type* ()* @_T08keypaths1CCMa, 
-//                  -- 0x8000_0010 - instantiable in-line, size 16
-// CHECK-32-SAME: i32 -2147483632,
-//                  -- 0x8000_0018 - instantiable in-line, size 24
-// CHECK-64-SAME: i32 -2147483624,
+//               -- 0x8000_0018 - instantiable in-line, size 4
+// CHECK-SAME: i32 -2147483644,
 // -- offset of S.z
 // CHECK-32-SAME: i32 16 }>
 // CHECK-64-SAME: i32 32 }>
 
 // -- %d: C.x
 // CHECK: [[KP_D:@keypath.*]] = private global <{ {{.*}} }> <{
-// CHECK-SAME: [[WORD]] 1,
+// CHECK-SAME: [[WORD]] 0,
 // CHECK-SAME: %swift.type* ()* @_T08keypaths1CCMa,
 // CHECK-SAME: %swift.type* ()* @_T0SiMa, 
-//                  -- 0x8000_0010 - instantiable in-line, size 16
-// CHECK-32-SAME: i32 -2147483632,
-//                  -- 0x8000_0018 - instantiable in-line, size 24
-// CHECK-64-SAME: i32 -2147483624,
+//               -- 0x8000_0018 - instantiable in-line, size 4
+// CHECK-SAME: i32 -2147483644,
 // -- 0x4000_0000 (class) + offset of C.x
 // CHECK-32-SAME: i32 1073741832 }>
 // CHECK-64-SAME: i32 1073741840 }>
 
 // -- %e: C.y
 // CHECK: [[KP_E:@keypath.*]] = private global <{ {{.*}} }> <{
-// CHECK-SAME: [[WORD]] 1,
+// CHECK-SAME: [[WORD]] 0,
 // CHECK-SAME: %swift.type* ()* @_T08keypaths1CCMa,
 // CHECK-SAME: %swift.type* ()* @_T0SSMa, 
-//                  -- 0x8000_0010 - instantiable in-line, size 16
-// CHECK-32-SAME: i32 -2147483632,
-//                  -- 0x8000_0018 - instantiable in-line, size 24
-// CHECK-64-SAME: i32 -2147483624,
+//               -- 0x8000_0018 - instantiable in-line, size 4
+// CHECK-SAME: i32 -2147483644,
 // -- 0x4000_0000 (class) + offset of C.y
 // CHECK-32-SAME: i32 1073741836 }>
 // CHECK-64-SAME: i32 1073741848 }>
 
 // -- %f: C.z
 // CHECK: [[KP_F:@keypath.*]] = private global <{ {{.*}} }> <{
-// CHECK-SAME: [[WORD]] 1,
+// CHECK-SAME: [[WORD]] 0,
 // CHECK-SAME: %swift.type* ()* @_T08keypaths1CCMa,
 // CHECK-SAME: %swift.type* ()* @_T08keypaths1SVMa, 
-//                  -- 0x8000_0010 - instantiable in-line, size 16
-// CHECK-32-SAME: i32 -2147483632,
-//                  -- 0x8000_0018 - instantiable in-line, size 24
-// CHECK-64-SAME: i32 -2147483624,
+//               -- 0x8000_0018 - instantiable in-line, size 4
+// CHECK-SAME: i32 -2147483644,
 // -- 0x4000_0000 (class) + offset of C.z
 // CHECK-32-SAME: i32 1073741848 }>
 // CHECK-64-SAME: i32 1073741872 }>
 
 // -- %g: S.z.x
 // CHECK: [[KP_G:@keypath.*]] = private global <{ {{.*}} }> <{
-// CHECK-SAME: [[WORD]] 1,
+// CHECK-SAME: [[WORD]] 0,
 // CHECK-SAME: %swift.type* ()* @_T08keypaths1SVMa,
 // CHECK-SAME: %swift.type* ()* @_T0SiMa, 
-//                  -- 0x8000_0010 - instantiable in-line, size 24
-// CHECK-32-SAME: i32 -2147483624,
-//                  -- 0x8000_0018 - instantiable in-line, size 36
-// CHECK-64-SAME: i32 -2147483612,
+//                  -- 0x8000_0010 - instantiable in-line, size 12
+// CHECK-32-SAME: i32 -2147483636,
+//                  -- 0x8000_0018 - instantiable in-line, size 16
+// CHECK-64-SAME: i32 -2147483632,
 // -- offset of S.z
 // CHECK-32-SAME: i32 16,
 // CHECK-64-SAME: i32 32,
@@ -116,13 +104,13 @@ sil_vtable C {}
 
 // -- %h: C.z.x
 // CHECK: [[KP_H:@keypath.*]] = private global <{ {{.*}} }> <{
-// CHECK-SAME: [[WORD]] 1,
+// CHECK-SAME: [[WORD]] 0,
 // CHECK-SAME: %swift.type* ()* @_T08keypaths1CCMa,
 // CHECK-SAME: %swift.type* ()* @_T0SiMa, 
-//                  -- 0x8000_0010 - instantiable in-line, size 24
-// CHECK-32-SAME: i32 -2147483624,
-//                  -- 0x8000_0018 - instantiable in-line, size 36
-// CHECK-64-SAME: i32 -2147483612,
+//                  -- 0x8000_0010 - instantiable in-line, size 12
+// CHECK-32-SAME: i32 -2147483636,
+//                  -- 0x8000_0018 - instantiable in-line, size 16
+// CHECK-64-SAME: i32 -2147483632,
 // -- 0x4000_0000 (class) + offset of C.z
 // CHECK-32-SAME: i32 1073741848,
 // CHECK-64-SAME: i32 1073741872,

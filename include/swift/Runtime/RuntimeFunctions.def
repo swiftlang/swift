@@ -1064,10 +1064,11 @@ FUNCTION(IsOptionalType,
          ATTRS(NoUnwind, ReadNone))
 
 // void swift_once(swift_once_t *predicate,
-//                 void (*function_code)(RefCounted*));
+//                 void (*function_code)(RefCounted*),
+//                 void *context);
 FUNCTION(Once, swift_once, DefaultCC,
          RETURNS(VoidTy),
-         ARGS(OnceTy->getPointerTo(), Int8PtrTy),
+         ARGS(OnceTy->getPointerTo(), Int8PtrTy, Int8PtrTy),
          ATTRS())
 
 // void swift_registerProtocolConformances(const ProtocolConformanceRecord *begin,
