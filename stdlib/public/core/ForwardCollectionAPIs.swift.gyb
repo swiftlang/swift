@@ -52,28 +52,31 @@ public func formIndex(before i: inout Index) {
 % end
 public func formIndex(_ i: inout Index, offsetBy n: IndexDistance) {
   var i1 = ${unwrap_index}(i)
-  ${base}.formIndex(&i1, offsetBy: n^)
+  ${base}.formIndex(&i1, offsetBy: numericCast(n))
   i = ${wrap_index}(i1)
 }
 public func index(_ i: Index, offsetBy n: IndexDistance) -> Index {
-  return ${wrap_index}(${base}.index(${unwrap_index}(i), offsetBy: n^))
+  return ${wrap_index}(${base}.index(${unwrap_index}(i),
+      offsetBy: numericCast(n)))
 }
 public func index(
   _ i: Index,
   offsetBy n: IndexDistance,
   limitedBy limit: Index
 ) -> Index? {
-  return ${base}.index(
+  guard let r = ${base}.index(
     ${unwrap_index}(i),
-    offsetBy: n^,
+    offsetBy: numericCast(n),
     limitedBy: ${unwrap_index}(limit)
-  ).map(_wrap)
+  ) else { return nil }
+  return ${wrap_index}(r)
 }
 public func distance(from i: Index, to j: Index) -> IndexDistance {
-  return ${base}.distance(from: ${unwrap_index}(i), to: ${unwrap_index}(j))^
+  return numericCast(
+    ${base}.distance(from: ${unwrap_index}(i), to: ${unwrap_index}(j)))
 }
 public var count: IndexDistance {
-  return ${base}.count^
+  return numericCast(${base}.count)
 }
 public var underestimatedCount: Int {
   return ${base}.underestimatedCount

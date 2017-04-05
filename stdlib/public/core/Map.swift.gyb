@@ -15,8 +15,116 @@ from gyb_stdlib_support import (
     TRAVERSALS,
     collectionForTraversal,
     sliceTypeName
-)
+  )
+import gyb
 }%
+
+public // @testable
+protocol _Function {
+  associatedtype Input
+  associatedtype Output
+  func apply(_: Input) -> Output
+}
+
+struct _Closure<Input, Output> : _Function {
+  public func apply(_ input: Input) -> Output {
+    return _impl(input)
+  }
+  let _impl: (Input) -> Output
+}
+
+public // @testable
+struct _MapIterator<Unmapped: IteratorProtocol, Transform: _Function>
+where Transform.Input == Unmapped.Element
+{
+  public var _unmapped: Unmapped
+  public let _transform: Transform
+
+  @inline(__always)
+  public mutating func next() -> Transform.Output? {
+    guard let n = _unmapped.next() else { return nil }
+    return _transform.apply(n)
+  }
+
+  @inline(__always)
+  public init(_ base: Unmapped, through transform: Transform) {
+    self._unmapped = base
+    self._transform = transform
+  }
+}
+
+% for traversal in '', 'Bidirectional', 'RandomAccess':
+public // @testable
+struct _Map${traversal}Collection<
+  Unmapped_: ${traversal}Collection, 
+  Transform_: _Function
+> where Transform_.Input == Unmapped_.Iterator.Element {
+  public typealias Unmapped = Unmapped_
+  public typealias Transform = Transform_
+  
+  public var _unmapped: Unmapped
+  public let _transform: Transform
+}
+
+extension _Map${traversal}Collection : ${traversal}Collection {
+  public typealias Index = Unmapped.Index
+  public typealias IndexDistance = Unmapped.IndexDistance
+  public typealias Element = Transform.Output
+  
+  ${gyb.expand(
+      'ForwardCollectionAPIs.swift.gyb',
+      base='_unmapped',
+      bidirectional=(traversal != ''),
+      wrap_index='', unwrap_index='',
+      Element=None)}
+
+  @inline(__always)
+  init(_ base: Unmapped, through transform: Transform) {
+    _unmapped = base
+    _transform = transform
+  }
+  
+  @inline(__always)
+  func makeIterator() -> _MapIterator<Unmapped.Iterator, Transform> {
+    return _MapIterator(_unmapped.makeIterator(), through: _transform)
+  }
+
+  public subscript(i: Index) -> Element {
+    @inline(__always)
+    get {
+      return _transform.apply(_unmapped[i])
+    }
+  }
+
+  public var first: Element? {
+    @inline(__always)
+    get {
+      guard let r = _unmapped.first else { return nil }
+      return _transform.apply(r)
+    }
+  }
+  
+  % if traversal != '':
+  public var last: Element? {
+    @inline(__always)
+    get {
+      guard let r = _unmapped.last else { return nil }
+      return _transform.apply(r)
+    }
+  }
+  % end
+  
+  @inline(__always)
+  public func map<T>(_ transform: (Element) throws -> T) rethrows -> [T] {
+    return try _unmapped.map { try transform(_transform.apply($0)) }
+  }
+  
+  @inline(__always)
+  public func forEach(_ body: (Element) throws -> Void) rethrows {
+    try _unmapped.forEach { try body(_transform.apply($0)) }
+  }
+}
+% end
 
 /// The `IteratorProtocol` used by `MapSequence` and `MapCollection`.
 /// Produces each element by passing the output of the `Base`
