@@ -944,6 +944,23 @@ class TestData : TestDataSuper {
             }
         }
     }
+
+    func test_rangeZoo() {
+        let r1 = Range(0..<1)
+        let r2 = CountableRange(0..<1)
+        let r3 = ClosedRange(0..<1)
+        let r4 = CountableClosedRange(0..<1)
+
+        let data = Data(bytes: [8, 1, 2, 3, 4])
+        let slice1: Data = data[r1]
+        let slice2: Data = data[r2]
+        let slice3: Data = data[r3]
+        let slice4: Data = data[r4]
+        expectEqual(slice1[0], 8)
+        expectEqual(slice2[0], 8)
+        expectEqual(slice3[0], 8)
+        expectEqual(slice4[0], 8)
+    }
 }
 
 #if !FOUNDATION_XCTEST
@@ -989,6 +1006,7 @@ DataTests.test("test_AnyHashableCreatedFromNSData") { TestData().test_AnyHashabl
 DataTests.test("test_noCopyBehavior") { TestData().test_noCopyBehavior() }
 DataTests.test("test_doubleDeallocation") { TestData().test_doubleDeallocation() }
 DataTests.test("test_repeatingValueInitialization") { TestData().test_repeatingValueInitialization() }
+DataTests.test("test_rangeZoo") { TestData().test_rangeZoo() }
 
 // XCTest does not have a crash detection, whereas lit does
 DataTests.test("bounding failure subdata") {
