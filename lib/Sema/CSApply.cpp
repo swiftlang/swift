@@ -7056,6 +7056,9 @@ bool ConstraintSystem::applySolutionFix(Expr *expr,
   }
 
   case FixKind::ForceDowncast: {
+    if (auto *paren = dyn_cast<ParenExpr>(affected))
+      affected = paren->getSubExpr();
+
     auto fromType = solution.simplifyType(getType(affected))
                       ->getRValueObjectType();
     Type toType = solution.simplifyType(fix.first.getTypeArgument(*this));
@@ -7078,7 +7081,7 @@ bool ConstraintSystem::applySolutionFix(Expr *expr,
       insertAfter += ")";
     }
     insertAfter += useAs ? " as " : " as! ";
-    insertAfter += toType.getString();
+    insertAfter += toType->getWithoutParens()->getString();
     if (needsParensOutside)
       insertAfter += ")";
     
