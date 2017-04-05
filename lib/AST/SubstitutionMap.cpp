@@ -33,12 +33,8 @@
 
 using namespace swift;
 
-GenericSignature *SubstitutionMap::getGenericSignature() const {
-  if (auto env = genericSigOrEnv.dyn_cast<GenericEnvironment *>())
-    return env->getGenericSignature();
-
-  return genericSigOrEnv.dyn_cast<GenericSignature *>();
-}
+SubstitutionMap::SubstitutionMap(GenericEnvironment *genericEnv)
+  : SubstitutionMap(genericEnv->getGenericSignature()) { }
 
 bool SubstitutionMap::hasArchetypes() const {
   for (auto &entry : subMap)
@@ -74,9 +70,6 @@ void SubstitutionMap::
 addSubstitution(CanSubstitutableType type, Type replacement) {
   assert(!(type->isTypeParameter() && !getGenericSignature()) &&
          "type parameter substitution map without generic signature");
-  assert(!(type->hasArchetype() &&
-           !genericSigOrEnv.is<GenericEnvironment *>()) &&
-         "archetype substitution map without generic environment");
   auto result = subMap.insert(std::make_pair(type, replacement));
   assert(result.second || result.first->second->isEqual(replacement));
   (void) result;

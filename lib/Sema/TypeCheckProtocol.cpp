@@ -2372,7 +2372,7 @@ diagnoseMatch(ModuleDecl *module, NormalProtocolConformance *conformance,
   }
 }
 
-ArrayRef<AssociatedTypeDecl *> 
+ArrayRef<AssociatedTypeDecl *>
 ConformanceChecker::getReferencedAssociatedTypes(ValueDecl *req) {
   // Check whether we've already cached this information.
   auto known = ReferencedAssociatedTypes.find(req);
