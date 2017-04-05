@@ -1075,7 +1075,7 @@ suite.test("bridging") {
     expectNotNil(s.content._inline5or6) // 5-bit per character inline buffer
     let n = s as NSString
     // Need to fix bridging by introducing a shim for NSString construction.
-//    expectNil(TrueReference(n))         // 5-bit per character tagged NSString
+    expectNil(TrueReference(n))         // 5-bit per character tagged NSString
     let s2 = n as String
     expectEqual(s, s2)
   }
@@ -1085,7 +1085,7 @@ suite.test("bridging") {
     expectNotNil(s.content._inline5or6) // 6-bit per character inline buffer
     let n = s as NSString
     // Need to fix bridging by introducing a shim for NSString construction.
-//    expectNil(TrueReference(n))         // 6-bit per character tagged NSString
+    expectNil(TrueReference(n))         // 6-bit per character tagged NSString
     let s2 = n as String
     expectEqual(s, s2)
   }
@@ -1095,7 +1095,7 @@ suite.test("bridging") {
     expectNotNil(s.content._inline7or16) // 7 bit ASCII inline buffer
     let n = s as NSString
     // Need to fix bridging by introducing a shim for NSString construction.
-//    expectNil(TrueReference(n))          // ASCII tagged NSString representation
+    expectNil(TrueReference(n))          // ASCII tagged NSString representation
     let s2 = n as String
     expectEqual(s, s2)
   }

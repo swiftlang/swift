@@ -17,7 +17,7 @@
 %{
   import gyb
 }%
-// import Darwin
+import SwiftShims
 
 /// Implementation detail of `String` that type-erases any `UnicodeContent` into
 /// one word that can live in one of the cases.
@@ -1149,50 +1149,33 @@ extension String {// : _ObjectiveCBridgeable {
     }
   }
   
-  // @_semantics("convertToObjectiveC")
-  // public func _bridgeToObjectiveC() -> NSString {
-  //   switch content._rep {
-  //   case .latin1(let x): return unsafeDowncast(x, to: NSString.self)
-  //   case .utf16(let x): return unsafeDowncast(x, to: NSString.self)
-  //   case .cocoa(let x): return unsafeDowncast(x.object, to: NSString.self)
-  //   case .any(let x): return unsafeDowncast(
-  //       _UTF16StringStorage(x.utf16), to: NSString.self)
-  //   case .inline5or6(let x):
-  //     return String._withSmallUTF16(x.utf16) {
-  //       NSString(characters: $0.baseAddress, length: $0.count)
-  //     }
-  //   case .inline7or16(let x):
-  //     return String._withSmallUTF16(x.utf16) {
-  //       NSString(characters: $0.baseAddress, length: $0.count)
-  //     }
-  //   }
-  // }
+  @inline(never) @_semantics("stdlib_binary_only") // Hide the CF dependency
+  public func _bridgeToObjectiveCImpl() -> AnyObject {
+    switch content._rep {
+    case .latin1(let x): return x
+    case .utf16(let x): return x
+    case .cocoa(let x): return x.object
+    case .any(let x): return _UTF16StringStorage(x.utf16)
+    case .inline5or6(let x):
+      return String._withSmallUTF16(x.utf16) {
+        _stdlib_binary_CFStringCreateWithCharacters($0.baseAddress!, $0.count)
+      }
+    case .inline7or16(let x):
+      return String._withSmallUTF16(x.utf16) {
+        _stdlib_binary_CFStringCreateWithCharacters($0.baseAddress!, $0.count)
+      }
+    }
+  }
 
-  // public static func _forceBridgeFromObjectiveC(
-  //   _ x: NSString,
-  //   result: inout String?
-  // ) {
-  //   result = _unconditionallyBridgeFromObjectiveC(x)
-  // }
-
-  // public static func _conditionallyBridgeFromObjectiveC(
-  //   _ x: NSString,
-  //   result: inout String?
-  // ) -> Bool {
-  //   self._forceBridgeFromObjectiveC(x, result: &result)
-  //   return result != nil
-  // }
-
-  // public static func _unconditionallyBridgeFromObjectiveC(
-  //   _ source: NSString?
-  // ) -> String {
-  //   // `nil` has historically been used as a stand-in for an empty
-  //   // string; map it to an empty string.
-  //   if _slowPath(source == nil) { return String() }
-  //   return String(
-  //     content: String.Content(
-  //       unsafeBitCast(
-  //         source!.copy() as! NSString, to: _NSStringCore.self)))
-  // }
+  public static func _bridgeFromObjectiveCImpl(
+    _ source: AnyObject?
+  ) -> String {
+    // `nil` has historically been used as a stand-in for an empty
+    // string; map it to an empty string.
+    if _slowPath(source == nil) { return String() }
+    return String(
+      content: String.Content(
+        unsafeBitCast(source!.copy(), to: _NSStringCore.self)))
+  }
 }
 
