@@ -45,10 +45,6 @@
 
 using namespace swift;
 
-// The verifier is basically all assertions, so don't compile it with NDEBUG to
-// prevent release builds from triggering spurious unused variable warnings.
-#ifndef NDEBUG
-
 // This is an option to put the SILOwnershipVerifier in testing mode. This
 // causes the following:
 //
@@ -1893,8 +1889,6 @@ bool SILValueOwnershipChecker::checkDataflow() {
 
   return true;
 }
-
-#endif
 
 //===----------------------------------------------------------------------===//
 //                           Top Level Entrypoints
