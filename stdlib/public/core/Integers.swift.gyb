@@ -1755,7 +1755,7 @@ extension BinaryInteger {
   /// - Parameters:
   ///   - lhs: An integer to compare.
   ///   - rhs: Another integer to compare.
-  @_transparent
+  @inline(__always)
   public static func < <Other : BinaryInteger>(lhs: Self, rhs: Other) -> Bool {
     let lhsNegative = Self.isSigned && lhs < (0 as Self)
     let rhsNegative = Other.isSigned && rhs < (0 as Other)
@@ -2292,7 +2292,7 @@ ${unsafeOperationComment(x.operator)}
   }
 % end
 
-  @_transparent
+  @inline(__always)
   public init<T : BinaryInteger>(extendingOrTruncating source: T) {
     if Self.bitWidth <= ${word_bits} {
       self = Self.init(_truncatingBits: source.word(at: 0))
@@ -2395,7 +2395,7 @@ extension UnsignedInteger {
 }
 
 extension UnsignedInteger where Self : FixedWidthInteger {
-  @_transparent
+  @inline(__always)
   public init<T : BinaryInteger>(_ source: T) {
     // This check is potentially removable by the optimizer
     if T.isSigned {
@@ -2409,7 +2409,7 @@ extension UnsignedInteger where Self : FixedWidthInteger {
     self.init(extendingOrTruncating: source)
   }
 
-  @_transparent
+  @inline(__always)
   public init?<T : BinaryInteger>(exactly source: T) {
     // This check is potentially removable by the optimizer
     if T.isSigned && source < (0 as T) {
@@ -2472,7 +2472,7 @@ extension SignedInteger {
 }
 
 extension SignedInteger where Self : FixedWidthInteger {
-  @_transparent
+  @inline(__always)
   public init<T : BinaryInteger>(_ source: T) {
     // This check is potentially removable by the optimizer
     if T.isSigned && source.bitWidth > Self.bitWidth {
@@ -2488,7 +2488,7 @@ extension SignedInteger where Self : FixedWidthInteger {
     self.init(extendingOrTruncating: source)
   }
 
-  @_transparent
+  @inline(__always)
   public init?<T : BinaryInteger>(exactly source: T) {
     // This check is potentially removable by the optimizer
     if T.isSigned && source.bitWidth > Self.bitWidth && source < Self.min {
@@ -2518,7 +2518,7 @@ extension SignedInteger where Self : FixedWidthInteger {
   /// `**` is exponentiation.
   @_transparent
   public static var min: Self {
-    return -1 &<< Self._highBitIndex
+    return (-1 as Self) &<< Self._highBitIndex
   }
 }
 
