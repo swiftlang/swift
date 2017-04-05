@@ -1055,7 +1055,9 @@ public:
     if (Kind == Release) {
       // TODO: we should consider Throw block as well, or better we should
       // abstract the Return block or Throw block away in the matcher.
-      ConsumedArgToEpilogueReleaseMatcher ERM(RCFI, F, 
+      SILArgumentConvention Conv[] = {SILArgumentConvention::Direct_Owned};
+      ConsumedArgToEpilogueReleaseMatcher ERM(RCFI, F,
+            Conv,
             ConsumedArgToEpilogueReleaseMatcher::ExitKind::Return);
 
       ReleaseCodeMotionContext RelCM(BPA, F, PO, AA, RCFI, 
