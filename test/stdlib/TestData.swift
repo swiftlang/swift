@@ -627,11 +627,15 @@ class TestData : TestDataSuper {
         data.append(subdata2)
 
         var numChunks = 0
+        var offsets = [Int]()
         data.enumerateBytes() { buffer, offset, stop in
             numChunks += 1
+            offsets.append(offset)
         }
 
         expectEqual(2, numChunks, "composing two dispatch_data should enumerate as structural data as 2 chunks")
+        expectEqual(0, offsets[0], "composing two dispatch_data should enumerate as structural data with the first offset as the location of the region")
+        expectEqual(dataToEncode.count, offsets[1], "composing two dispatch_data should enumerate as structural data with the first offset as the location of the region")
     }
 
     func test_basicReadWrite() {
