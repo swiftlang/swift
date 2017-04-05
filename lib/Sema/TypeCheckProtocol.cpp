@@ -2042,11 +2042,7 @@ namespace {
       TC.conformsToProtocol(T, InheritedProto, DC,
                             ConformanceCheckFlags::Used,
                             ComplainLoc);
-      if (InheritedConformance && InheritedConformance->isConcrete()) {
-        if (!conformance->hasInheritedConformance(InheritedProto))
-          conformance->setInheritedConformance(InheritedProto,
-                                           InheritedConformance->getConcrete());
-      } else {
+      if (!InheritedConformance || !InheritedConformance->isConcrete()) {
         // Recursive call already diagnosed this problem, but tack on a note
         // to establish the relationship.
         if (ComplainLoc.isValid()) {
@@ -6201,19 +6197,6 @@ void TypeChecker::resolveWitness(const NormalProtocolConformance *conformance,
                        const_cast<NormalProtocolConformance*>(conformance),
                        MissingWitnesses);
   checker.resolveSingleWitness(requirement);
-}
-
-ProtocolConformance *TypeChecker::resolveInheritedConformance(
-       const NormalProtocolConformance *conformance,
-       ProtocolDecl *inherited) {
-  auto inheritedConformance =
-    conformsToProtocol(conformance->getType(), inherited,
-                       conformance->getDeclContext(),
-                       ConformanceCheckFlags::InExpression);
-  if (inheritedConformance && inheritedConformance->isConcrete())
-    return inheritedConformance->getConcrete();
-
-  return nullptr;
 }
 
 ValueDecl *TypeChecker::deriveProtocolRequirement(DeclContext *DC,

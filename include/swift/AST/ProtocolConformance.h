@@ -53,11 +53,6 @@ typedef llvm::DenseMap<ValueDecl *, Witness> WitnessMap;
 typedef llvm::DenseMap<AssociatedTypeDecl *, std::pair<Substitution, TypeDecl*>>
   TypeWitnessMap;
 
-/// Map from a directly-inherited protocol to its corresponding protocol
-/// conformance.
-typedef llvm::DenseMap<ProtocolDecl *, ProtocolConformance *>
-  InheritedConformanceMap;
-
 /// Describes the kind of protocol conformance structure used to encode
 /// conformance.
 enum class ProtocolConformanceKind {
@@ -226,10 +221,6 @@ public:
   /// Retrieve the protocol conformance for the inherited protocol.
   ProtocolConformance *getInheritedConformance(ProtocolDecl *protocol) const;
 
-  /// Retrieve the complete set of protocol conformances for directly inherited
-  /// protocols.
-  const InheritedConformanceMap &getInheritedConformances() const;
-
   /// Given a dependent type expressed in terms of the self parameter,
   /// map it into the context of this conformance.
   Type getAssociatedType(Type assocType,
@@ -342,11 +333,6 @@ class NormalProtocolConformance : public ProtocolConformance,
 
   /// The mapping from associated type requirements to their substitutions.
   mutable TypeWitnessMap TypeWitnesses;
-
-  /// \brief The mapping from any directly-inherited protocols over to the
-  /// protocol conformance structures that indicate how the given type meets
-  /// the requirements of those protocols.
-  InheritedConformanceMap InheritedMapping;
 
   /// Conformances that satisfy each of conformance requirements of the
   /// requirement signature of the protocol.
@@ -479,28 +465,6 @@ public:
   /// Set the witness for the given requirement.
   void setWitness(ValueDecl *requirement, Witness witness) const;
 
-  /// Retrieve the protocol conformances directly-inherited protocols.
-  const InheritedConformanceMap &getInheritedConformances() const {
-    return InheritedMapping;
-  }
-
-  /// Determine whether the protocol conformance has a particular inherited
-  /// conformance.
-  ///
-  /// Only usable on incomplete or invalid protocol conformances.
-  bool hasInheritedConformance(ProtocolDecl *proto) const {
-    return InheritedMapping.count(proto) > 0;
-  }
-
-  /// Set the given inherited conformance.
-  void setInheritedConformance(ProtocolDecl *proto,
-                               ProtocolConformance *conformance) {
-    assert(InheritedMapping.count(proto) == 0 &&
-           "Already recorded inherited conformance");
-    assert(!isComplete() && "Conformance already complete?");
-    InheritedMapping[proto] = conformance;
-  }
-
   /// Retrieve the protocol conformances that satisfy the requirements of the
   /// protocol, which line up with the conformance constraints in the
   /// protocol's requirement signature.
@@ -613,11 +577,6 @@ public:
   Witness getWitness(ValueDecl *requirement, LazyResolver *resolver) const;
 
 
-  /// Retrieve the protocol conformances directly-inherited protocols.
-  const InheritedConformanceMap &getInheritedConformances() const {
-    return GenericConformance->getInheritedConformances();
-  }
-
   /// Given that the requirement signature of the protocol directly states
   /// that the given dependent type must conform to the given protocol,
   /// return its associated conformance.
@@ -729,11 +688,6 @@ public:
   ProtocolConformanceRef
   getAssociatedConformance(Type assocType, ProtocolDecl *protocol,
                            LazyResolver *resolver = nullptr) const;
-
-  /// Retrieve the protocol conformances directly-inherited protocols.
-  const InheritedConformanceMap &getInheritedConformances() const {
-    return InheritedConformance->getInheritedConformances();
-  }
 
   /// Determine whether the witness for the given requirement
   /// is either the default definition or was otherwise deduced.

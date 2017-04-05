@@ -696,7 +696,7 @@ NormalProtocolConformance *ModuleFile::readNormalConformance(
 
   DeclID protoID;
   DeclContextID contextID;
-  unsigned valueCount, typeCount, inheritedCount;
+  unsigned valueCount, typeCount;
   ArrayRef<uint64_t> rawIDs;
   SmallVector<uint64_t, 16> scratch;
 
@@ -707,7 +707,7 @@ NormalProtocolConformance *ModuleFile::readNormalConformance(
   }
   NormalProtocolConformanceLayout::readRecord(scratch, protoID,
                                               contextID, valueCount,
-                                              typeCount, inheritedCount,
+                                              typeCount,
                                               rawIDs);
 
   ASTContext &ctx = getContext();
@@ -741,23 +741,9 @@ NormalProtocolConformance *ModuleFile::readNormalConformance(
   }
   conformance->setSignatureConformances(reqConformances);
 
-  // Read inherited conformances.
-  InheritedConformanceMap inheritedConformances;
-  while (inheritedCount--) {
-    auto inheritedRef = readConformance(DeclTypeCursor);
-    assert(inheritedRef.isConcrete());
-    auto inherited = inheritedRef.getConcrete();
-    inheritedConformances[inherited->getProtocol()] = inherited;
-  }
-
   // If the conformance is complete, we're done.
   if (conformance->isComplete())
     return conformance;
-
-  // Record the inherited conformance.
-  if (conformance->getInheritedConformances().empty())
-    for (auto inherited : inheritedConformances)
-      conformance->setInheritedConformance(inherited.first, inherited.second);
 
   conformance->setState(ProtocolConformanceState::Complete);
   conformance->setLazyLoader(this, offset);
@@ -4349,7 +4335,7 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
 
   DeclID protoID;
   DeclContextID contextID;
-  unsigned valueCount, typeCount, inheritedCount;
+  unsigned valueCount, typeCount;
   ArrayRef<uint64_t> rawIDs;
   SmallVector<uint64_t, 16> scratch;
 
@@ -4359,7 +4345,7 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
          "registered lazy loader incorrectly");
   NormalProtocolConformanceLayout::readRecord(scratch, protoID,
                                               contextID, valueCount,
-                                              typeCount, inheritedCount,
+                                              typeCount,
                                               rawIDs);
 
   // Skip requirement signature conformances.
@@ -4369,10 +4355,6 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
       (void)readConformance(DeclTypeCursor);
     }
   }
-
-  // Skip trailing inherited conformances.
-  while (inheritedCount--)
-    (void)readConformance(DeclTypeCursor);
 
   ArrayRef<uint64_t>::iterator rawIDIter = rawIDs.begin();
 
