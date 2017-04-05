@@ -28,6 +28,10 @@ namespace swift {
 SWIFT_RUNTIME_STDLIB_INTERFACE
 ClassMetadata CLASS_METADATA_SYM(s18_EmptyArrayStorage);
 
+// Michael NOTE: I have no idea what I'm doing, just cargo culting here...
+SWIFT_RUNTIME_STDLIB_INTERFACE
+ClassMetadata CLASS_METADATA_SYM(s19_UTF16StringStorage);
+
 // _direct type metadata for Swift._RawNativeDictionaryStorage
 SWIFT_RUNTIME_STDLIB_INTERFACE
 ClassMetadata CLASS_METADATA_SYM(s27_RawNativeDictionaryStorage);
@@ -54,7 +58,7 @@ swift::_SwiftEmptyArrayStorage swift::_swiftEmptyArrayStorage = {
 swift::_SwiftEmptyStringStorage swift::_swiftEmptyStringStorage = {
   // HeapObject header;
   {
-    &CLASS_METADATA_SYM(s18_EmptyArrayStorage), // isa pointer
+    &swift::CLASS_METADATA_SYM(s19_UTF16StringStorage), // isa pointer
   },
 
   // _SwiftStringBodyStorage body;
