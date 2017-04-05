@@ -610,8 +610,7 @@ static bool passCursorInfoForModule(ModuleEntity Mod,
   return false;
 }
 
-static bool getParamParentNameLoc(const ValueDecl *VD, unsigned &Line,
-                                  unsigned &Column) {
+static Optional<unsigned> getParamParentNameOffset(const ValueDecl *VD) {
   SourceLoc Loc;
   if (auto PD = dyn_cast<ParamDecl>(VD)) {
     auto *DC = PD->getDeclContext();
@@ -623,14 +622,14 @@ static bool getParamParentNameLoc(const ValueDecl *VD, unsigned &Line,
         Loc = cast<AbstractFunctionDecl>(DC)->getNameLoc();
         break;
       default:
-        return false;
+        break;
     }
   }
   if (Loc.isInvalid())
-    return false;
+    return None;
   auto &SM = VD->getASTContext().SourceMgr;
-  std::tie(Line, Column) = SM.getLineAndColumn(Loc);
-  return true;
+  return SM.getLocOffsetInBuffer(Loc, SM.getIDForBufferIdentifier(SM.
+    getBufferIdentifierForLoc(Loc)).getValue());
 }
 
 /// Returns true for failure to resolve.
@@ -853,12 +852,6 @@ static bool passCursorInfoForDecl(const ValueDecl *VD,
   bool IsSystem = VD->getModuleContext()->isSystemModule();
   std::string TypeInterface;
 
-  unsigned ParentLine, ParentCol;
-  llvm::Optional<std::pair<unsigned, unsigned>> ParentLoc;
-  if (getParamParentNameLoc(VD, ParentLine, ParentCol)) {
-    ParentLoc.emplace(ParentLine, ParentCol);
-  }
-
   CursorInfo Info;
   Info.Kind = Kind;
   Info.Name = Name;
@@ -879,7 +872,7 @@ static bool passCursorInfoForDecl(const ValueDecl *VD,
   Info.LocalizationKey = LocalizationKey;
   Info.IsSystem = IsSystem;
   Info.TypeInterface = StringRef();
-  Info.ParentNameLoc = ParentLoc;
+  Info.ParentNameOffset = getParamParentNameOffset(VD);
   Receiver(Info);
   return false;
 }

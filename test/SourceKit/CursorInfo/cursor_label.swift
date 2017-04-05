@@ -10,6 +10,6 @@ c.foo(aa : 1)
 // RUN: %sourcekitd-test -req=cursor -pos=3:13 %s -- %s | %FileCheck %s -check-prefix=CHECK2
 // RUN: %sourcekitd-test -req=cursor -pos=4:24 %s -- %s | %FileCheck %s -check-prefix=CHECK3
 
-// CHECK1: PARENT LOC: 2:3
-// CHECK2: PARENT LOC: 3:8
-// CHECK3: PARENT LOC: 4:3
+// CHECK1: PARENT OFFSET: 13
+// CHECK2: PARENT OFFSET: 37
+// CHECK3: PARENT OFFSET: 56

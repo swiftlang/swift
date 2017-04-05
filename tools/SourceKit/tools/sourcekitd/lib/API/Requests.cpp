@@ -1430,10 +1430,8 @@ static void reportCursorInfo(const CursorInfo &Info, ResponseReceiver Rec) {
       Entry.set(KeyActionName, Name);
     }
   }
-  if (Info.ParentNameLoc) {
-    auto PL = Elem.setDictionary(KeyParentLoc);
-    PL.set(KeyLine, Info.ParentNameLoc->first);
-    PL.set(KeyColumn, Info.ParentNameLoc->second);
+  if (Info.ParentNameOffset) {
+    Elem.set(KeyParentLoc, Info.ParentNameOffset.getValue());
   }
   if (!Info.AnnotatedRelatedDeclarations.empty()) {
     auto RelDecls = Elem.setArray(KeyRelatedDecls);
