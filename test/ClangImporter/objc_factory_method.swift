@@ -1,7 +1,7 @@
 // RUN: rm -rf %t && mkdir -p %t
 // RUN: %build-clang-importer-objc-overlays
 
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t) -target x86_64-apple-macosx10.51 -typecheck %s -verify -verify-ignore-unknown
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t) -target x86_64-apple-macosx10.51 -typecheck %s -verify
 
 // REQUIRES: OS=macosx
 // REQUIRES: objc_interop
@@ -108,10 +108,3 @@ func testURL() {
   _ = NSURLRequest.requestWithString("http://www.llvm.org") // expected-error{{'requestWithString' has been replaced by 'init(string:)'}}
   _ = NSURLRequest.URLRequestWithURL(url as URL) // expected-error{{'URLRequestWithURL' has been replaced by 'init(url:)'}}
 }
-
-// FIXME: Remove -verify-ignore-unknown.
-// <unknown>:0: error: unexpected note produced: 'hiveWithQueen' has been explicitly marked unavailable here
-// <unknown>:0: error: unexpected note produced: 'decimalNumberWithMantissa(_:exponent:isNegative:)' has been explicitly marked unavailable here
-// <unknown>:0: error: unexpected note produced: 'URLWithString' has been explicitly marked unavailable here
-// <unknown>:0: error: unexpected note produced: 'requestWithString' has been explicitly marked unavailable here
-// <unknown>:0: error: unexpected note produced: 'URLRequestWithURL' has been explicitly marked unavailable here
