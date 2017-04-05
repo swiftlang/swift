@@ -12,7 +12,6 @@
 
 #define DEBUG_TYPE "sil-ownership-verifier"
 
-#include "TransitivelyUnreachableBlocks.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/AnyFunctionRef.h"
 #include "swift/AST/Decl.h"
@@ -25,6 +24,7 @@
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/SIL/Dominance.h"
 #include "swift/SIL/DynamicCasts.h"
+#include "swift/SIL/OwnershipChecker.h"
 #include "swift/SIL/PrettyStackTrace.h"
 #include "swift/SIL/Projection.h"
 #include "swift/SIL/SILBuiltinVisitor.h"
@@ -34,6 +34,7 @@
 #include "swift/SIL/SILOpenedArchetypesTracker.h"
 #include "swift/SIL/SILVTable.h"
 #include "swift/SIL/SILVisitor.h"
+#include "swift/SIL/TransitivelyUnreachableBlocks.h"
 #include "swift/SIL/TypeLowering.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/PostOrderIterator.h"
@@ -1237,7 +1238,7 @@ class SILValueOwnershipChecker {
       BlocksWithNonLifetimeEndingUses;
 
   /// The blocks that we have already visited.
-  llvm::SmallPtrSet<SILBasicBlock *, 32> VisitedBlocks;
+  llvm::SmallPtrSet<SILBasicBlock *, 32> &VisitedBlocks;
 
   /// A list of successor blocks that we must visit by the time the algorithm
   /// terminates.
@@ -1252,10 +1253,12 @@ class SILValueOwnershipChecker {
   llvm::SmallVector<GeneralizedUser, 16> RegularUsers;
 
 public:
-  SILValueOwnershipChecker(SILModule &M,
-                           const TransitivelyUnreachableBlocksInfo &TUB,
-                           SILValue V, ErrorBehaviorKind ErrorBehavior)
-      : Result(), Mod(M), TUB(TUB), Value(V), ErrorBehavior(ErrorBehavior) {
+  SILValueOwnershipChecker(
+      SILModule &M, const TransitivelyUnreachableBlocksInfo &TUB, SILValue V,
+      ErrorBehaviorKind ErrorBehavior,
+      llvm::SmallPtrSet<SILBasicBlock *, 32> &VisitedBlocks)
+      : Result(), Mod(M), TUB(TUB), Value(V), ErrorBehavior(ErrorBehavior),
+        VisitedBlocks(VisitedBlocks) {
     assert(Value && "Can not initialize a checker with an empty SILValue");
   }
 
@@ -1959,12 +1962,48 @@ void SILValue::verifyOwnership(SILModule &Mod,
   } else {
     ErrorBehavior = ErrorBehaviorKind::PrintMessageAndAssert;
   }
+  llvm::SmallPtrSet<SILBasicBlock *, 32> LiveBlocks;
   if (TUB) {
-    SILValueOwnershipChecker(Mod, *TUB, *this, ErrorBehavior).check();
+    SILValueOwnershipChecker(Mod, *TUB, *this, ErrorBehavior, LiveBlocks)
+        .check();
   } else {
     PostOrderFunctionInfo NewPOFI((*this)->getFunction());
     TransitivelyUnreachableBlocksInfo TUB(NewPOFI);
-    SILValueOwnershipChecker(Mod, TUB, *this, ErrorBehavior).check();
+    SILValueOwnershipChecker(Mod, TUB, *this, ErrorBehavior, LiveBlocks)
+        .check();
   }
 #endif
+}
+
+bool OwnershipChecker::checkValue(SILValue Value) {
+  RegularUsers.clear();
+  LifetimeEndingUsers.clear();
+  LiveBlocks.clear();
+
+  // If we are SILUndef, just bail. SILUndef can pair with anything. Any uses of
+  // the SILUndef will make sure that the matching checks out.
+  if (isa<SILUndef>(Value))
+    return false;
+
+  // Since we do not have SILUndef, we now know that getFunction() should return
+  // a real function. Assert in case this assumption is no longer true.
+  SILFunction *F = Value->getFunction();
+  assert(F && "Instructions and arguments should have a function");
+
+  // If the given function has unqualified ownership, there is nothing further
+  // to verify.
+  if (F->hasUnqualifiedOwnership())
+    return false;
+
+  ErrorBehaviorKind ErrorBehavior(ErrorBehaviorKind::ReturnFalse);
+  SILValueOwnershipChecker Checker(Mod, TUB, Value, ErrorBehavior, LiveBlocks);
+  if (!Checker.check()) {
+    return false;
+  }
+
+  // TODO: Make this more efficient.
+  copy(Checker.getRegularUsers(), std::back_inserter(RegularUsers));
+  copy(Checker.getLifetimeEndingUsers(),
+       std::back_inserter(LifetimeEndingUsers));
+  return true;
 }
