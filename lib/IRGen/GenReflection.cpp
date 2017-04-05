@@ -889,11 +889,11 @@ emitAssociatedTypeMetadataRecord(const ProtocolConformance *Conformance) {
   SmallVector<std::pair<StringRef, CanType>, 2> AssociatedTypes;
 
   auto collectTypeWitness = [&](const AssociatedTypeDecl *AssocTy,
-                                const Substitution &Sub,
+                                Type Replacement,
                                 const TypeDecl *TD) -> bool {
 
     auto Subst = Conformance->getDeclContext()->mapTypeOutOfContext(
-        Sub.getReplacement());
+        Replacement);
 
     AssociatedTypes.push_back({
       AssocTy->getNameStr(),

@@ -187,7 +187,7 @@ ProtocolConformanceRef::getTypeWitnessByName(Type type,
   if (!concrete->hasTypeWitness(assocType, resolver)) {
     return nullptr;
   }
-  return concrete->getTypeWitness(assocType, resolver).getReplacement();
+  return concrete->getTypeWitness(assocType, resolver);
 }
 
 void *ProtocolConformance::operator new(size_t bytes, ASTContext &context,
@@ -237,17 +237,15 @@ ProtocolConformance::hasTypeWitness(AssociatedTypeDecl *assocType,
   CONFORMANCE_SUBCLASS_DISPATCH(hasTypeWitness, (assocType, resolver));
 }
 
-std::pair<const Substitution &, TypeDecl *>
-ProtocolConformance::getTypeWitnessSubstAndDecl(AssociatedTypeDecl *assocType,
+std::pair<Type, TypeDecl *>
+ProtocolConformance::getTypeWitnessAndDecl(AssociatedTypeDecl *assocType,
                                                 LazyResolver *resolver) const {
-  CONFORMANCE_SUBCLASS_DISPATCH(getTypeWitnessSubstAndDecl,
-                                (assocType, resolver))
+  CONFORMANCE_SUBCLASS_DISPATCH(getTypeWitnessAndDecl, (assocType, resolver))
 }
 
-const Substitution &
-ProtocolConformance::getTypeWitness(AssociatedTypeDecl *assocType, 
-                                    LazyResolver *resolver) const {
-  return getTypeWitnessSubstAndDecl(assocType, resolver).first;
+Type ProtocolConformance::getTypeWitness(AssociatedTypeDecl *assocType,
+                                         LazyResolver *resolver) const {
+  return getTypeWitnessAndDecl(assocType, resolver).first;
 }
 
 Witness ProtocolConformance::getWitness(ValueDecl *requirement,
@@ -363,10 +361,9 @@ bool NormalProtocolConformance::hasTypeWitness(AssociatedTypeDecl *assocType,
   return false;
 }
 
-std::pair<const Substitution &, TypeDecl *>
-NormalProtocolConformance::getTypeWitnessSubstAndDecl(
-                      AssociatedTypeDecl *assocType, 
-                      LazyResolver *resolver) const {
+std::pair<Type, TypeDecl *>
+NormalProtocolConformance::getTypeWitnessAndDecl(AssociatedTypeDecl *assocType,
+                                                 LazyResolver *resolver) const {
   if (Resolver)
     resolveLazyInfo();
 
@@ -381,15 +378,14 @@ NormalProtocolConformance::getTypeWitnessSubstAndDecl(
   return known->second;
 }
 
-void NormalProtocolConformance::setTypeWitness(
-       AssociatedTypeDecl *assocType,
-       const Substitution &substitution,
-       TypeDecl *typeDecl) const {
+void NormalProtocolConformance::setTypeWitness(AssociatedTypeDecl *assocType,
+                                               Type type,
+                                               TypeDecl *typeDecl) const {
   assert(getProtocol() == cast<ProtocolDecl>(assocType->getDeclContext()) &&
          "associated type in wrong protocol");
   assert(TypeWitnesses.count(assocType) == 0 && "Type witness already known");
   assert((!isComplete() || isInvalid()) && "Conformance already complete?");
-  TypeWitnesses[assocType] = std::make_pair(substitution, typeDecl);
+  TypeWitnesses[assocType] = std::make_pair(type, typeDecl);
 }
 
 Type ProtocolConformance::getAssociatedType(Type assocType,
@@ -421,7 +417,7 @@ Type ProtocolConformanceRef::getAssociatedType(Type conformingType,
   auto memberType = cast<DependentMemberType>(type);
   if (memberType.getBase()->isEqual(proto->getProtocolSelfType()) &&
       memberType->getAssocType()->getProtocol() == proto)
-    return getTypeWitness(memberType->getAssocType(), nullptr).getReplacement();
+    return getTypeWitness(memberType->getAssocType(), nullptr);
 #endif
 
   // General case: consult the substitution map.
@@ -548,8 +544,8 @@ bool SpecializedProtocolConformance::hasTypeWitness(
          GenericConformance->hasTypeWitness(assocType, resolver);
 }
 
-std::pair<const Substitution &, TypeDecl *>
-SpecializedProtocolConformance::getTypeWitnessSubstAndDecl(
+std::pair<Type, TypeDecl *>
+SpecializedProtocolConformance::getTypeWitnessAndDecl(
                       AssociatedTypeDecl *assocType, 
                       LazyResolver *resolver) const {
   // If we've already created this type witness, return it.
@@ -565,49 +561,24 @@ SpecializedProtocolConformance::getTypeWitnessSubstAndDecl(
       genericEnv->getSubstitutionMap(GenericSubstitutions);
 
   auto genericWitnessAndDecl
-    = GenericConformance->getTypeWitnessSubstAndDecl(assocType, resolver);
+    = GenericConformance->getTypeWitnessAndDecl(assocType, resolver);
 
   auto &genericWitness = genericWitnessAndDecl.first;
   auto *typeDecl = genericWitnessAndDecl.second;
 
   // Apply the substitution we computed above
   auto specializedType
-    = genericWitness.getReplacement().subst(substitutionMap);
+    = genericWitness.subst(substitutionMap);
   if (!specializedType)
-    specializedType = ErrorType::get(genericWitness.getReplacement());
+    specializedType = ErrorType::get(genericWitness);
 
   // If the type witness was unchanged, just copy it directly.
-  if (specializedType.getPointer() == genericWitness.getReplacement().getPointer()) {
+  if (specializedType.getPointer() == genericWitness.getPointer()) {
     TypeWitnesses[assocType] = genericWitnessAndDecl;
     return TypeWitnesses[assocType];
   }
 
-  auto conformingDC = getDeclContext();
-  auto conformingModule = conformingDC->getParentModule();
-
-  // Gather the conformances for the type witness. These should never fail.
-  // FIXME: We should just be able to use the SubstitutionMap from above,
-  // but we have no way to force inherited conformances to be filled in
-  // through that mechanism.
-  SmallVector<ProtocolConformanceRef, 4> conformances;
-  for (auto proto : assocType->getConformingProtocols()) {
-    auto conforms = conformingModule->lookupConformance(specializedType, proto,
-                                                        resolver);
-    assert((conforms ||
-            specializedType->isTypeVariableOrMember() ||
-            specializedType->isTypeParameter() ||
-            specializedType->hasError()) &&
-           "Improperly checked substitution");
-    conformances.push_back(conforms ? *conforms 
-                                    : ProtocolConformanceRef(proto));
-  }
-
-  // Form the substitution.
-  auto &ctx = assocType->getASTContext();
-  TypeWitnesses[assocType] = std::make_pair(
-                        Substitution{specializedType,
-                                     ctx.AllocateCopy(conformances)},
-                        typeDecl);
+  TypeWitnesses[assocType] = std::make_pair(specializedType, typeDecl);
   return TypeWitnesses[assocType];
 }
 
