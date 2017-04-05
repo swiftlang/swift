@@ -14,11 +14,12 @@ func checkMatch<S: Collection, T: Collection>(_ x: S, _ y: T, _ i: S.Index)
 
 SubstringTests.test("String") {
   let s = "abcdefg"
-  let s1 = s[s.index(s.startIndex, offsetBy: 2) ..<
-    s.index(s.startIndex, offsetBy: 4)]
-  let s2 = s1[s1.startIndex..<s1.endIndex]
-  let s3 = s2[s1.startIndex..<s1.endIndex]
-  
+  // Michael NOTE: String(Substring)
+  let s1 = String(s[s.index(s.startIndex, offsetBy: 2) ..<
+    s.index(s.startIndex, offsetBy: 4)])
+  let s2 = String(s1[s1.startIndex..<s1.endIndex])
+  let s3 = String(s2[s1.startIndex..<s1.endIndex])
+
   expectEqual(s1, "cd")
   expectEqual(s2, "cd")
   expectEqual(s3, "cd")
@@ -76,6 +77,24 @@ SubstringTests.test("UnicodeScalars") {
   expectEqual(s, "abcdefg")
 }
 
+// Michael NOTE: Temporary super ugly and inefficient inits, might be replaced
+// by having UnicodeViews have UnicodeContent.
+extension String {
+  public init(_fromView view: RangeReplaceableBidirectionalSlice<AnyUInt16UnicodeView>) {
+    self.init(AnyUInt16UnicodeView(Array<UInt16>(view)))
+  }
+  public init(_fromView view: RangeReplaceableBidirectionalSlice<AnyUInt8UnicodeView>) {
+    self.init(AnyUInt8UnicodeView(Array<UInt8>(view)))
+  }
+
+  public init(_fromView view: RangeReplaceableUnicodeViewSlice<AnyUInt16UnicodeView>) {
+    self.init(_fromView: view.base)
+  }
+  public init(_fromView view: RangeReplaceableUnicodeViewSlice<AnyUInt8UnicodeView>) {
+    self.init(_fromView: view.base)
+  }
+}
+
 SubstringTests.test("UTF16View") {
   let s = "abcdefg"
   let t = s.utf16.dropFirst(2)
@@ -89,11 +108,11 @@ SubstringTests.test("UTF16View") {
   checkMatch(t, u, u.startIndex)
   checkMatch(t, u, u.index(after: u.startIndex))
   checkMatch(t, u, u.index(before: u.endIndex))
-  
-  expectEqual("", String(t.dropFirst(10))!)
-  expectEqual("", String(t.dropLast(10))!)
-  expectEqual("", String(u.dropFirst(10))!)
-  expectEqual("", String(u.dropLast(10))!)
+
+  expectEqual("", String(_fromView: t.dropFirst(10)))
+  expectEqual("", String(_fromView: t.dropLast(10)))
+  expectEqual("", String(_fromView: u.dropFirst(10)))
+  expectEqual("", String(_fromView: u.dropLast(10)))
 }
 
 SubstringTests.test("UTF8View") {
@@ -108,10 +127,10 @@ SubstringTests.test("UTF8View") {
   checkMatch(t, u, u.startIndex)
   checkMatch(t, u, u.index(after: u.startIndex))
 
-  expectEqual("", String(t.dropFirst(10))!)
-  expectEqual("", String(t.dropLast(10))!)
-  expectEqual("", String(u.dropFirst(10))!)
-  expectEqual("", String(u.dropLast(10))!)
+  expectEqual("", String(_fromView: t.dropFirst(10)))
+  expectEqual("", String(_fromView: t.dropLast(10)))
+  expectEqual("", String(_fromView: u.dropFirst(10)))
+  expectEqual("", String(_fromView: u.dropLast(10)))
 }
 
 runAllTests()

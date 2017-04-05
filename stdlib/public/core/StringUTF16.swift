@@ -115,10 +115,10 @@ extension String {
   /// A UTF-16 encoding of `self`.
   public var utf16: UTF16View {
     get {
-      return UTF16View(_core)
+      return self.content.utf16
     }
     set {
-      self = String(describing: newValue)
+      self.content.utf16 = newValue
     }
   }
 
