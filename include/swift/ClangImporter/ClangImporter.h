@@ -306,10 +306,10 @@ public:
   DeclName importName(const clang::NamedDecl *D,
                       clang::DeclarationName givenName);
 
-  Optional<std::string>
+  StringRef
   getOrCreatePCH(const ClangImporterOptions &ImporterOptions,
                  const std::string &SwiftPCHHash);
-  Optional<std::string>
+  StringRef
   getPCHFilename(const ClangImporterOptions &ImporterOptions,
                  const std::string &SwiftPCHHash);
 };
