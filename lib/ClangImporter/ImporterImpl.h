@@ -1181,9 +1181,11 @@ public:
 
   /// If there was is a single .pch bridging header without other imported
   /// files, we can provide the PCH filename for declaration caching,
-  /// especially in code completion. If there are other
-  Optional<std::string> getSinglePCHImport() const {
-    return SinglePCHImport;
+  /// especially in code completion.
+  StringRef getSinglePCHImport() const {
+    if (SinglePCHImport.hasValue())
+      return *SinglePCHImport;
+    return StringRef();
   }
 };
 
