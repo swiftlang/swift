@@ -78,10 +78,10 @@ extension String {
   /// A view of the string's contents as a collection of characters.
   public var characters: CharacterView {
     get {
-      return CharacterView(self)
+      return content.characters
     }
     set {
-      self = String(newValue)
+      content.characters = newValue
     }
   }
 
@@ -146,6 +146,7 @@ extension String {
   ///
   /// - Parameter characters: A character view to convert to a string.
   public init(_ characters: CharacterView) {
-    self.init(characters)
+    self.init()
+    self.characters = characters
   }
 }

@@ -271,13 +271,15 @@ extension String.Content.Inline${N}or${W} : UnicodeContent {
   }
   
   public var characters: AnyCharacterUnicodeView {
-    if bitsPerElement <= 8 || !_utf16.contains(where: { $0 >= 0x300 }) {
-      let _characters = _utf16.lazy.map {
-        // FIXME: Use _unchecked: in stdlib
-        Character(UnicodeScalar(UInt32($0))!)
-      }
-      return AnyCharacterUnicodeView(RandomAccessUnicodeView(_characters))
+    // Check if we can use the fast view, which hard-codes special cases so long
+    // as grapheme-breaking is relatively simple.
+    if _fastPath(
+      bitsPerElement <= 8 || !_utf16.contains(where: { $0 >= 0x300 }))
+    {
+      return AnyCharacterUnicodeView(
+        _UnicodeViews(_utf16, UTF16.self).latin1CharacterView)
     }
+
     return AnyCharacterUnicodeView(
       _UnicodeViews(_utf16, UTF16.self).characters)
   }
