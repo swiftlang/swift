@@ -51,9 +51,8 @@ enum class CombineSubstitutionMaps {
 };
 
 class SubstitutionMap {
-  /// The generic signature (or full-fledged environment) for which we
-  /// are performing substitutions.
-  llvm::PointerUnion<GenericSignature *, GenericEnvironment *> genericSigOrEnv;
+  /// The generic signature for which we are performing substitutions.
+  GenericSignature *genericSig;
 
   // FIXME: Switch to a more efficient representation.
   llvm::DenseMap<SubstitutableType *, Type> subMap;
@@ -64,13 +63,14 @@ public:
   SubstitutionMap()
     : SubstitutionMap(static_cast<GenericSignature *>(nullptr)) { }
 
-  SubstitutionMap(llvm::PointerUnion<GenericSignature *, GenericEnvironment *>
-                    genericSigOrEnv)
-    : genericSigOrEnv(genericSigOrEnv) { }
+  SubstitutionMap(GenericSignature *genericSig)
+    : genericSig(genericSig) { }
+
+  SubstitutionMap(GenericEnvironment *genericEnv);
 
   /// Retrieve the generic signature describing the environment in which
   /// substitutions occur.
-  GenericSignature *getGenericSignature() const;
+  GenericSignature *getGenericSignature() const { return genericSig; }
 
   Optional<ProtocolConformanceRef>
   lookupConformance(CanType type, ProtocolDecl *proto) const;

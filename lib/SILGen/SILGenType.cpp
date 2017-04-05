@@ -460,11 +460,11 @@ public:
 
   void addAssociatedType(AssociatedTypeDecl *td) {
     // Find the substitution info for the witness type.
-    const auto &witness = Conformance->getTypeWitness(td, /*resolver=*/nullptr);
+    Type witness = Conformance->getTypeWitness(td, /*resolver=*/nullptr);
 
     // Emit the record for the type itself.
     Entries.push_back(SILWitnessTable::AssociatedTypeWitness{td,
-                                witness.getReplacement()->getCanonicalType()});    
+                                                witness->getCanonicalType()});
   }
 
   void addAssociatedConformance(CanType dependentType, ProtocolDecl *protocol) {

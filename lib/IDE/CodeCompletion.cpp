@@ -2036,8 +2036,7 @@ public:
         if (Conformance && Conformance->isConcrete()) {
           return Conformance->getConcrete()
               ->getTypeWitness(const_cast<AssociatedTypeDecl *>(ATD),
-                               TypeResolver.get())
-              .getReplacement();
+                               TypeResolver.get());
         }
       }
     }

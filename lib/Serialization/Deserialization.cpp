@@ -4430,10 +4430,9 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
     // FIXME: We don't actually want to allocate an archetype here; we just
     // want to get an access path within the protocol.
     auto first = cast<AssociatedTypeDecl>(getDecl(*rawIDIter++));
-    auto second = cast_or_null<TypeDecl>(getDecl(*rawIDIter++));
-    auto third = maybeReadSubstitution(DeclTypeCursor);
-    assert(third.hasValue());
-    typeWitnesses[first] = std::make_pair(*third, second);
+    auto second = getType(*rawIDIter++);
+    auto third = cast_or_null<TypeDecl>(getDecl(*rawIDIter++));
+    typeWitnesses[first] = std::make_pair(second, third);
   }
   assert(rawIDIter <= rawIDs.end() && "read too much");
 

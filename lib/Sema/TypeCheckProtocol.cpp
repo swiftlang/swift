@@ -2130,8 +2130,7 @@ static Type getRequirementTypeForDisplay(ModuleDecl *module,
       if (member->getBase()->isEqual(selfTy)) {
         // FIXME: Could handle inherited conformances here.
         if (conformance->hasTypeWitness(member->getAssocType()))
-          return conformance->getTypeWitness(member->getAssocType(), nullptr)
-                   .getReplacement();
+          return conformance->getTypeWitness(member->getAssocType(), nullptr);
       }
     }
 
@@ -2272,9 +2271,8 @@ diagnoseMatch(ModuleDecl *module, NormalProtocolConformance *conformance,
   for (auto member : conformance->getProtocol()->getMembers()) {
     if (auto assocType = dyn_cast<AssociatedTypeDecl>(member)) {
       if (conformance->usesDefaultDefinition(assocType)) {
-        auto &witness = conformance->getTypeWitness(assocType, nullptr);
-        addAssocTypeDeductionString(withAssocTypes, assocType,
-                                    witness.getReplacement());
+        Type witness = conformance->getTypeWitness(assocType, nullptr);
+        addAssocTypeDeductionString(withAssocTypes, assocType, witness);
       }
     }
   }
@@ -2374,35 +2372,7 @@ diagnoseMatch(ModuleDecl *module, NormalProtocolConformance *conformance,
   }
 }
 
-/// Compute the substitution for the given archetype and its replacement
-/// type.
-static Substitution getArchetypeSubstitution(TypeChecker &tc,
-                                             DeclContext *dc,
-                                             ArrayRef<ProtocolDecl *> protocols,
-                                             Type replacement) {
-  assert(!replacement->isTypeParameter() && "Can't be dependent");
-  SmallVector<ProtocolConformanceRef, 4> conformances;
-
-  bool isError = replacement->hasError();
-
-  for (auto proto : protocols) {
-    auto conformance = tc.conformsToProtocol(replacement, proto, dc, None);
-    assert((conformance || isError) &&
-           "Conformance should already have been verified");
-    (void)isError;
-    if (conformance)
-      conformances.push_back(*conformance);
-    else
-      conformances.push_back(ProtocolConformanceRef(proto));
-  }
-
-  return Substitution{
-    replacement,
-    tc.Context.AllocateCopy(conformances),
-  };
-}
-
-ArrayRef<AssociatedTypeDecl *> 
+ArrayRef<AssociatedTypeDecl *>
 ConformanceChecker::getReferencedAssociatedTypes(ValueDecl *req) {
   // Check whether we've already cached this information.
   auto known = ReferencedAssociatedTypes.find(req);
@@ -2478,7 +2448,7 @@ void ConformanceChecker::recordTypeWitness(AssociatedTypeDecl *assocType,
 
   // If we already recoded this type witness, there's nothing to do.
   if (Conformance->hasTypeWitness(assocType)) {
-    assert(Conformance->getTypeWitness(assocType, nullptr).getReplacement()
+    assert(Conformance->getTypeWitness(assocType, nullptr)
              ->isEqual(type) && "Conflicting type witness deductions");
     return;
   }
@@ -2579,11 +2549,7 @@ void ConformanceChecker::recordTypeWitness(AssociatedTypeDecl *assocType,
   }
 
   // Record the type witness.
-  auto protocols = assocType->getConformingProtocols();
-  Conformance->setTypeWitness(
-      assocType,
-      getArchetypeSubstitution(TC, DC, protocols, type),
-      typeDecl);
+  Conformance->setTypeWitness(assocType, type, typeDecl);
 }
 
 bool swift::
@@ -2778,8 +2744,7 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
   // If any of the type witnesses was erroneous, don't bother to check
   // this value witness: it will fail.
   for (auto assocType : getReferencedAssociatedTypes(requirement)) {
-    if (Conformance->getTypeWitness(assocType, nullptr).getReplacement()
-          ->hasError()) {
+    if (Conformance->getTypeWitness(assocType, nullptr)->hasError()) {
       return ResolveWitnessResult::ExplicitFailed;
     }
   }
@@ -3479,8 +3444,8 @@ ConformanceChecker::inferTypeWitnessesViaValueWitnesses(
       // witness completely.
       if (!allUnresolved.count(result.first)) {
         auto existingWitness =
-        Conformance->getTypeWitness(result.first, nullptr)
-        .getReplacement();
+          Conformance->getTypeWitness(result.first, nullptr);
+
         // If the deduced type contains an irreducible
         // DependentMemberType, that indicates a dependency
         // on another associated type we haven't deduced,
@@ -4080,8 +4045,8 @@ void ConformanceChecker::resolveTypeWitnesses() {
         if (!archetype)
           continue;
         if (Conformance->hasTypeWitness(assocType)) {
-          substitutions[archetype]
-            = Conformance->getTypeWitness(assocType, nullptr).getReplacement();
+          substitutions[archetype] =
+            Conformance->getTypeWitness(assocType, nullptr);
         } else {
           auto known = typeWitnesses.begin(assocType);
           if (known != typeWitnesses.end())
@@ -4749,8 +4714,7 @@ void ConformanceChecker::resolveSingleWitness(ValueDecl *requirement) {
   // If any of the type witnesses was erroneous, don't bother to check
   // this value witness: it will fail.
   for (auto assocType : getReferencedAssociatedTypes(requirement)) {
-    if (Conformance->getTypeWitness(assocType, nullptr).getReplacement()
-          ->hasError()) {
+    if (Conformance->getTypeWitness(assocType, nullptr)->hasError()) {
       Conformance->setInvalid();
       return;
     }
@@ -4845,16 +4809,11 @@ void ConformanceChecker::addUsedConformances(
   if (normalConf->isIncomplete())
     TC.UsedConformances.insert(normalConf);
 
-  // Mark each type witness conformance as used.
-  conformance->forEachTypeWitness(nullptr, [&](AssociatedTypeDecl *assocType,
-                                               Substitution sub,
-                                               TypeDecl *witness) -> bool {
-    for (auto nestedConformance : sub.getConformances())
-      if (nestedConformance.isConcrete())
-        addUsedConformances(nestedConformance.getConcrete(), visited);
-
-    return false;
-  });
+  // Mark each conformance in the signature as used.
+  for (auto sigConformance : normalConf->getSignatureConformances()) {
+    if (sigConformance.isConcrete())
+      addUsedConformances(sigConformance.getConcrete(), visited);
+  }
 }
 
 void ConformanceChecker::addUsedConformances(ProtocolConformance *conformance) {
