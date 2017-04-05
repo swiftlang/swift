@@ -386,11 +386,7 @@ ParserStatus Parser::parseProtocolOrAssociatedTypeWhereClause(
         TrailingWhereClause::create(Context, whereLoc, requirements);
   } else if (whereStatus.hasCodeCompletion()) {
     // FIXME: this is completely (hah) cargo culted.
-    if (CodeCompletion && firstTypeInComplete) {
-      CodeCompletion->completeGenericParams(nullptr);
-    } else {
-      return makeParserCodeCompletionStatus();
-    }
+    return makeParserCodeCompletionStatus();
   }
 
   return ParserStatus();
