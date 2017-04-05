@@ -32,29 +32,6 @@
 using namespace swift;
 using namespace constraints;
 
-/// \brief Get a substitution corresponding to the type witness.
-/// Inspired by ProtocolConformance::getTypeWitnessByName.
-const Substitution *
-getTypeWitnessByName(ProtocolConformance *conformance,
-                     Identifier name,
-                     LazyResolver *resolver) {
-  // Find the named requirement.
-  AssociatedTypeDecl *assocType = nullptr;
-  auto members = conformance->getProtocol()->lookupDirect(name);
-  for (auto member : members) {
-    assocType = dyn_cast<AssociatedTypeDecl>(member);
-    if (assocType)
-      break;
-  }
-
-  if (!assocType)
-    return nullptr;
-
-  assert(conformance && "Missing conformance information");
-  return &conformance->getTypeWitness(assocType, resolver);
-}
-
-
 /// \brief Retrieve the fixed type for the given type variable.
 Type Solution::getFixedType(TypeVariableType *typeVar) const {
   auto knownBinding = typeBindings.find(typeVar);

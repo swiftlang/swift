@@ -18,7 +18,7 @@
 
 #include "swift/AST/ConcreteDeclRef.h"
 #include "swift/AST/Decl.h"
-#include "swift/AST/Substitution.h"
+#include "swift/AST/SubstitutionList.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/Types.h"
 #include "swift/AST/TypeAlignments.h"
@@ -48,9 +48,9 @@ typedef llvm::DenseMap<SubstitutableType *, Type> TypeSubstitutionMap;
 /// Map from non-type requirements to the corresponding conformance witnesses.
 typedef llvm::DenseMap<ValueDecl *, Witness> WitnessMap;
 
-/// Map from associated type requirements to the corresponding substitution,
-/// which captures the replacement type along with any conformances it requires.
-typedef llvm::DenseMap<AssociatedTypeDecl *, std::pair<Substitution, TypeDecl*>>
+/// Map from associated type requirements to the corresponding type and
+/// the type declaration that was used to satisfy the requirement.
+typedef llvm::DenseMap<AssociatedTypeDecl *, std::pair<Type, TypeDecl*>>
   TypeWitnessMap;
 
 /// Describes the kind of protocol conformance structure used to encode
@@ -96,7 +96,6 @@ class alignas(1 << DeclAlignInBits) ProtocolConformance {
   
   /// \brief The interface type that conforms to the protocol.
   Type ConformingInterfaceType;
-  
 
 protected:
   ProtocolConformance(ProtocolConformanceKind kind, Type conformingType,
@@ -144,21 +143,21 @@ public:
   bool hasTypeWitness(AssociatedTypeDecl *assocType,
                       LazyResolver *resolver = nullptr) const;
 
-  /// Retrieve the type witness substitution for the given associated type.
-  const Substitution &getTypeWitness(AssociatedTypeDecl *assocType,
-                                     LazyResolver *resolver) const;
+  /// Retrieve the type witness for the given associated type.
+  Type getTypeWitness(AssociatedTypeDecl *assocType,
+                      LazyResolver *resolver) const;
 
-  /// Retrieve the type witness substitution and type decl (if one exists)
+  /// Retrieve the type witness and type decl (if one exists)
   /// for the given associated type.
-  std::pair<const Substitution &, TypeDecl *>
-  getTypeWitnessSubstAndDecl(AssociatedTypeDecl *assocType,
-                             LazyResolver *resolver) const;
+  std::pair<Type, TypeDecl *>
+  getTypeWitnessAndDecl(AssociatedTypeDecl *assocType,
+                        LazyResolver *resolver) const;
 
   /// Apply the given function object to each type witness within this
   /// protocol conformance.
   ///
   /// The function object should accept an \c AssociatedTypeDecl* for the
-  /// requirement followed by the \c Substitution for the witness and a
+  /// requirement followed by the \c Type for the witness and a
   /// (possibly null) \c TypeDecl* that explicitly declared the type.
   /// It should return true to indicate an early exit.
   ///
@@ -175,7 +174,7 @@ public:
       if (!resolver && !hasTypeWitness(assocTypeReq))
         continue;
 
-      const auto &TWInfo = getTypeWitnessSubstAndDecl(assocTypeReq, resolver);
+      const auto &TWInfo = getTypeWitnessAndDecl(assocTypeReq, resolver);
       if (f(assocTypeReq, TWInfo.first, TWInfo.second))
         return true;
     }
@@ -331,7 +330,7 @@ class NormalProtocolConformance : public ProtocolConformance,
   /// the declarations that satisfy those requirements.
   mutable WitnessMap Mapping;
 
-  /// The mapping from associated type requirements to their substitutions.
+  /// The mapping from associated type requirements to their types.
   mutable TypeWitnessMap TypeWitnesses;
 
   /// Conformances that satisfy each of conformance requirements of the
@@ -422,11 +421,11 @@ public:
     return ContextAndInvalid.getPointer().dyn_cast<AbstractStorageDecl *>();
   }
   
-  /// Retrieve the type witness substitution and type decl (if one exists)
+  /// Retrieve the type witness and type decl (if one exists)
   /// for the given associated type.
-  std::pair<const Substitution &, TypeDecl *>
-  getTypeWitnessSubstAndDecl(AssociatedTypeDecl *assocType,
-                             LazyResolver *resolver) const;
+  std::pair<Type, TypeDecl *>
+  getTypeWitnessAndDecl(AssociatedTypeDecl *assocType,
+                        LazyResolver *resolver) const;
 
   /// Determine whether the protocol conformance has a type witness for the
   /// given associated type.
@@ -435,8 +434,7 @@ public:
 
   /// Set the type witness for the given associated type.
   /// \param typeDecl the type decl the witness type came from, if one exists.
-  void setTypeWitness(AssociatedTypeDecl *assocType,
-                      const Substitution &substitution,
+  void setTypeWitness(AssociatedTypeDecl *assocType, Type type,
                       TypeDecl *typeDecl) const;
 
   /// Given that the requirement signature of the protocol directly states
@@ -479,7 +477,7 @@ public:
   /// Determine whether the witness for the given type requirement
   /// is the default definition.
   bool usesDefaultDefinition(AssociatedTypeDecl *requirement) const {
-    return getTypeWitnessSubstAndDecl(requirement, nullptr)
+    return getTypeWitnessAndDecl(requirement, nullptr)
         .second->isImplicit();
   }
 
@@ -567,11 +565,11 @@ public:
   bool hasTypeWitness(AssociatedTypeDecl *assocType,
                       LazyResolver *resolver = nullptr) const;
 
-  /// Retrieve the type witness substitution and type decl (if one exists)
+  /// Retrieve the type witness and type decl (if one exists)
   /// for the given associated type.
-  std::pair<const Substitution &, TypeDecl *>
-  getTypeWitnessSubstAndDecl(AssociatedTypeDecl *assocType,
-                             LazyResolver *resolver) const;
+  std::pair<Type, TypeDecl *>
+  getTypeWitnessAndDecl(AssociatedTypeDecl *assocType,
+                        LazyResolver *resolver) const;
 
   /// Retrieve the value witness corresponding to the given requirement.
   Witness getWitness(ValueDecl *requirement, LazyResolver *resolver) const;
@@ -668,12 +666,12 @@ public:
     return InheritedConformance->hasTypeWitness(assocType, resolver);
   }
 
-  /// Retrieve the type witness substitution and type decl (if one exists)
+  /// Retrieve the type witness and type decl (if one exists)
   /// for the given associated type.
-  std::pair<const Substitution &, TypeDecl *>
-  getTypeWitnessSubstAndDecl(AssociatedTypeDecl *assocType,
-                             LazyResolver *resolver) const {
-    return InheritedConformance->getTypeWitnessSubstAndDecl(assocType,resolver);
+  std::pair<Type, TypeDecl *>
+  getTypeWitnessAndDecl(AssociatedTypeDecl *assocType,
+                        LazyResolver *resolver) const {
+    return InheritedConformance->getTypeWitnessAndDecl(assocType, resolver);
   }
 
   /// Retrieve the value witness corresponding to the given requirement.
