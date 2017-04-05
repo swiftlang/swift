@@ -158,7 +158,20 @@ Type ProtocolRequirementTypeResolver::resolveTypeOfDecl(TypeDecl *decl) {
 }
 
 bool ProtocolRequirementTypeResolver::areSameType(Type type1, Type type2) {
-  return type1->isEqual(type2);
+  if (type1->isEqual(type2))
+    return true;
+
+  // If both refer to associated types with the same name, they'll implicitly
+  // be considered equivalent.
+  auto depMem1 = type1->getAs<DependentMemberType>();
+  if (!depMem1) return false;
+
+  auto depMem2 = type2->getAs<DependentMemberType>();
+  if (!depMem2) return false;
+
+  if (depMem1->getName() != depMem2->getName()) return false;
+
+  return areSameType(depMem1->getBase(), depMem2->getBase());
 }
 
 void ProtocolRequirementTypeResolver::recordParamType(ParamDecl *decl,
