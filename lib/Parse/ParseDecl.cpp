@@ -5276,6 +5276,11 @@ parseDeclProtocol(ParseDeclOptions Flags, DeclAttributes &Attributes) {
   }
 
   DebuggerContextChange DCC (*this);
+
+  ProtocolDecl *Proto = new (Context)
+      ProtocolDecl(CurDeclContext, ProtocolLoc, NameLoc, ProtocolName,
+                   {}, nullptr);
+  ContextChange CC(*this, Proto);
   
   // Parse optional inheritance clause.
   SmallVector<TypeLoc, 4> InheritedProtocols;
@@ -5286,8 +5291,7 @@ parseDeclProtocol(ParseDeclOptions Flags, DeclAttributes &Attributes) {
     Status |= parseInheritance(InheritedProtocols, &classRequirementLoc);
   }
 
-  // Parse a 'where' clause if present. These are not supported, but we will
-  // get better QoI this way.
+  // Parse a 'where' clause if present.
   TrailingWhereClause *TrailingWhere = nullptr;
   // Parse a 'where' clause if present.
   if (Tok.is(tok::kw_where)) {
@@ -5297,9 +5301,9 @@ parseDeclProtocol(ParseDeclOptions Flags, DeclAttributes &Attributes) {
       return whereStatus;
   }
 
-  ProtocolDecl *Proto = new (Context)
-      ProtocolDecl(CurDeclContext, ProtocolLoc, NameLoc, ProtocolName,
-                   Context.AllocateCopy(InheritedProtocols), TrailingWhere);
+  Proto->setInherited(Context.AllocateCopy(InheritedProtocols));
+  Proto->setTrailingWhereClause(TrailingWhere);
+
   // No need to setLocalDiscriminator: protocols can't appear in local contexts.
 
   // If there was a 'class' requirement, mark this as a class-bounded protocol.
@@ -5308,7 +5312,6 @@ parseDeclProtocol(ParseDeclOptions Flags, DeclAttributes &Attributes) {
 
   Proto->getAttrs() = Attributes;
 
-  ContextChange CC(*this, Proto);
   Scope ProtocolBodyScope(this, ScopeKind::ProtocolBody);
 
   // Parse the body.
