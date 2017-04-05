@@ -1,7 +1,7 @@
 // RUN: rm -rf %t && mkdir -p %t
 // RUN: %build-clang-importer-objc-overlays
 
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t) -I %S/Inputs/custom-modules -typecheck %s -verify -verify-ignore-unknown
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t) -I %S/Inputs/custom-modules -typecheck %s -verify
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t) -I %S/Inputs/custom-modules -emit-ir %s -D IRGEN | %FileCheck %s
 
 // RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk-nosource -I %t) -I %S/Inputs/custom-modules -print-module -source-filename="%s" -module-to-print SwiftPrivateAttr > %t.txt
@@ -139,9 +139,3 @@ func testRawNames() {
   let _ = Foo.__foo // expected-error{{'__foo' has been replaced by 'init(__:)'}}
 }
 #endif
-
-// FIXME: Remove -verify-ignore-unknown.
-// <unknown>:0: error: unexpected note produced: '__PrivCFTypeRef' was obsoleted in Swift 3
-// <unknown>:0: error: unexpected note produced: '__PrivCFSubRef' was obsoleted in Swift 3
-// <unknown>:0: error: unexpected note produced: '__fooWithOneArg' has been explicitly marked unavailable here
-// <unknown>:0: error: unexpected note produced: '__foo' has been explicitly marked unavailable here
