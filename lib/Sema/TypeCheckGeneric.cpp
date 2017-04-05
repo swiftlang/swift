@@ -708,7 +708,6 @@ static void checkReferencedGenericParams(GenericContext *dc,
                       // parameter.
                       if (!t->is<GenericTypeParamType>())
                         return;
-                      foundNewReferencedGenericParam;
                       if (referencedGenericParams.insert(t).second)
                         foundNewReferencedGenericParam = true;
                     });
