@@ -744,27 +744,24 @@ public:
         *this << ":in_prologue";
     }
 
-    // Print inlined-at location, if any.
-    if (DS) {
-      SILFunction *InlinedF = DS->getInlinedFunction();
-      auto InlineScopes = DS->flattenedInlineTree();
-      for (auto *CS : reversed(InlineScopes)) {
-        *this << ": ";
-        if (InlinedF) {
-          *this << demangleSymbol(InlinedF->getName());
-        } else {
-          *this << '?';
-        }
-        *this << " perf_inlined_at ";
-        auto CallSite = CS->Loc;
-        if (!CallSite.isNull() && CallSite.isASTNode())
-          CallSite.getSourceLoc().print(
-            PrintState.OS, M.getASTContext().SourceMgr, LastBufferID);
-        else
-          *this << "?";
+    if (!DS)
+      return;
 
-        InlinedF = CS->getInlinedFunction();
-      }
+    // Print inlined-at location, if any.
+    const SILDebugScope *CS = DS;
+    while ((CS = CS->InlinedCallSite)) {
+      *this << ": ";
+      if (auto *InlinedF = CS->getInlinedFunction())
+        *this << demangleSymbol(InlinedF->getName());
+      else
+        *this << '?';
+      *this << " perf_inlined_at ";
+      auto CallSite = CS->Loc;
+      if (!CallSite.isNull() && CallSite.isASTNode())
+        CallSite.getSourceLoc().print(
+            PrintState.OS, M.getASTContext().SourceMgr, LastBufferID);
+      else
+        *this << "?";
     }
   }
 
@@ -2440,17 +2437,7 @@ void SILCoverageMap::dump() const {
   print(llvm::errs());
 }
 
-void SILDebugScope::flatten(const SILDebugScope *DS,
-                            SILDebugScope::InlineScopeList &List) {
-  if (DS) {
-    if (auto *CS = DS->InlinedCallSite) {
-      flatten(CS->Parent.dyn_cast<const SILDebugScope *>(), List);
-      List.push_back(CS);
-    }
-    flatten(DS->Parent.dyn_cast<const SILDebugScope *>(), List);
-  }
-}
-
+#ifndef NDEBUG
 void SILDebugScope::dump(SourceManager &SM, llvm::raw_ostream &OS,
                          unsigned Indent) const {
   OS << "{\n";
@@ -2478,6 +2465,7 @@ void SILDebugScope::dump(SourceManager &SM, llvm::raw_ostream &OS,
   }
   OS << "}\n";
 }
+#endif
 
 void SILSpecializeAttr::print(llvm::raw_ostream &OS) const {
   SILPrintContext Ctx(OS);
