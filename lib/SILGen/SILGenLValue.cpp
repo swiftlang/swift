@@ -107,6 +107,35 @@ static LValueTypeData getPhysicalStorageTypeData(SILGenModule &SGM,
   };
 }
 
+static bool shouldUseUnsafeEnforcement(VarDecl *var) {
+  return false; // TODO
+}
+
+Optional<SILAccessEnforcement>
+SILGenFunction::getStaticEnforcement(VarDecl *var) {
+  if (getOptions().EnforceExclusivityStatic)
+    return SILAccessEnforcement::Static;
+  return None;
+}
+
+Optional<SILAccessEnforcement>
+SILGenFunction::getDynamicEnforcement(VarDecl *var) {
+  if (getOptions().EnforceExclusivityDynamic) {
+    if (var && shouldUseUnsafeEnforcement(var))
+      return SILAccessEnforcement::Unsafe;
+    return SILAccessEnforcement::Dynamic;
+  }
+  return None;
+}
+
+Optional<SILAccessEnforcement>
+SILGenFunction::getUnknownEnforcement(VarDecl *var) {
+  if (getOptions().EnforceExclusivityStatic ||
+      getOptions().EnforceExclusivityDynamic)
+    return SILAccessEnforcement::Unknown;
+  return None;
+}
+
 /// SILGenLValue - An ASTVisitor for building logical lvalues.
 class LLVM_LIBRARY_VISIBILITY SILGenLValue
   : public Lowering::ExprVisitor<SILGenLValue, LValue, AccessKind>
@@ -1659,10 +1688,23 @@ static LValue emitLValueForNonMemberVarDecl(SILGenFunction &SGF,
     // address.
     auto address = SGF.emitLValueForDecl(loc, var, formalRValueType,
                                          accessKind, semantics);
-    Optional<SILAccessEnforcement> enforcement;
     assert(address.isLValue() &&
            "physical lvalue decl ref must evaluate to an address");
     auto typeData = getPhysicalStorageTypeData(SGF.SGM, var, formalRValueType);
+
+    Optional<SILAccessEnforcement> enforcement;
+    if (!var->isLet()) {
+      if (var->getDeclContext()->isLocalContext()) {
+        enforcement = SGF.getUnknownEnforcement(var);
+      } else if (var->getDeclContext()->isModuleScopeContext()) {
+        enforcement = SGF.getDynamicEnforcement(var);
+      } else {
+        assert(var->getDeclContext()->isTypeContext() &&
+               !var->isInstanceMember());
+        enforcement = SGF.getDynamicEnforcement(var);
+      }
+    }
+
     lv.add<ValueComponent>(address, enforcement, typeData);
 
     if (address.getType().is<ReferenceStorageType>())
