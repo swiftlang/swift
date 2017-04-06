@@ -297,6 +297,26 @@ namespace {
     }
   };
   const char XRefError::ID = '\0';
+
+  class OverrideError : public llvm::ErrorInfo<OverrideError> {
+    friend ErrorInfo;
+    static const char ID;
+
+    DeclName name;
+  public:
+    explicit OverrideError(DeclName name) : name(name) {}
+
+    void log(raw_ostream &OS) const override {
+      OS << "could not find '" << name << "' in parent class";
+    }
+
+    std::error_code convertToErrorCode() const override {
+      // This is a deprecated part of llvm::Error, so we just return a very
+      // generic value.
+      return {EINVAL, std::generic_category()};
+    }
+  };
+  const char OverrideError::ID = '\0';
 } // end anonymous namespace
 
 
@@ -1220,9 +1240,23 @@ bool ModuleFile::readMembers(SmallVectorImpl<Decl *> &Members) {
 
   Members.reserve(rawMemberIDs.size());
   for (DeclID rawID : rawMemberIDs) {
-    Decl *D = getDecl(rawID);
-    assert(D && "unable to deserialize next member");
-    Members.push_back(D);
+    Expected<Decl *> D = getDeclChecked(rawID);
+    if (!D) {
+      if (!getContext().LangOpts.EnableDeserializationRecovery)
+        fatal(D.takeError());
+
+      // Silently drop the member if there was a problem.
+      // FIXME: This isn't sound for protocols; we need to at least record that
+      // it happened.
+      llvm::handleAllErrors(D.takeError(),
+                            [](const OverrideError &) { /* expected */ },
+                            [&](std::unique_ptr<llvm::ErrorInfoBase> unhandled){
+        fatal(std::move(unhandled));
+      });
+      continue;
+    }
+    assert(D.get() && "unchecked error deserializing next member");
+    Members.push_back(D.get());
   }
 
   return false;
@@ -2916,11 +2950,30 @@ ModuleFile::getDeclChecked(DeclID DID, Optional<DeclContext *> ForcedContext) {
                                         overriddenID, accessorStorageDeclID,
                                         hasCompoundName, rawAddressorKind,
                                         rawAccessLevel, nameIDs);
-    
+
     // Resolve the name ids.
     SmallVector<Identifier, 2> names;
     for (auto nameID : nameIDs)
       names.push_back(getIdentifier(nameID));
+
+    DeclName name;
+    if (!names.empty()) {
+      if (hasCompoundName)
+        name = DeclName(ctx, names[0],
+                        llvm::makeArrayRef(names.begin() + 1, names.end()));
+      else
+        name = DeclName(names[0]);
+    }
+
+    Expected<Decl *> overridden = getDeclChecked(overriddenID);
+    if (!overridden) {
+      llvm::handleAllErrors(overridden.takeError(),
+                            [](const XRefError &) { /* expected */ },
+                            [&](std::unique_ptr<llvm::ErrorInfoBase> unhandled){
+        fatal(std::move(unhandled));
+      });
+      return llvm::make_error<OverrideError>(name);
+    }
 
     auto DC = getDeclContext(contextID);
     if (declOrOffset.isComplete())
@@ -2940,14 +2993,6 @@ ModuleFile::getDeclChecked(DeclID DID, Optional<DeclContext *> ForcedContext) {
     if (declOrOffset.isComplete())
       return declOrOffset;
 
-    DeclName name;
-    if (!names.empty()) {
-      if (hasCompoundName)
-        name = DeclName(ctx, names[0],
-                        llvm::makeArrayRef(names.begin() + 1, names.end()));
-      else
-        name = DeclName(names[0]);
-    }
     auto fn = FuncDecl::createDeserialized(
         ctx, /*StaticLoc=*/SourceLoc(), staticSpelling.getValue(),
         /*FuncLoc=*/SourceLoc(), name, /*NameLoc=*/SourceLoc(),
@@ -3004,8 +3049,8 @@ ModuleFile::getDeclChecked(DeclID DID, Optional<DeclContext *> ForcedContext) {
     if (auto errorConvention = maybeReadForeignErrorConvention())
       fn->setForeignErrorConvention(*errorConvention);
 
-    if (auto overridden = cast_or_null<FuncDecl>(getDecl(overriddenID))) {
-      fn->setOverriddenDecl(overridden);
+    if (auto overriddenFunc = cast_or_null<FuncDecl>(overridden.get())) {
+      fn->setOverriddenDecl(overriddenFunc);
       AddAttribute(new (ctx) OverrideAttr(SourceLoc()));
     }
 
