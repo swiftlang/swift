@@ -1082,14 +1082,8 @@ static SILLinkage getNonUniqueSILLinkage(FormalLinkage linkage,
 SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
   // For when `this` is a protocol conformance of some kind.
   auto getLinkageAsConformance = [&] {
-    auto linkage = getLinkageForProtocolConformance(
+    return getLinkageForProtocolConformance(
         getProtocolConformance()->getRootNormalConformance(), forDefinition);
-
-    // A hidden-external conformance doesn't make sense: we can't refer to
-    // it. Thus, the only way to end up in that situation is if the linkage is
-    // actually public.
-    return linkage == SILLinkage::HiddenExternal ? SILLinkage::PublicExternal
-                                                 : linkage;
   };
 
   switch (getKind()) {
@@ -1281,8 +1275,7 @@ bool LinkEntity::isAvailableExternally(IRGenModule &IGM) const {
   llvm_unreachable("bad link entity kind");
 }
 
-bool LinkEntity::isFragile(ForDefinition_t isDefinition,
-                           bool wholeModuleSerialized) const {
+bool LinkEntity::isFragile(ForDefinition_t isDefinition) const {
   switch (getKind()) {
     case Kind::SILFunction:
       return getSILFunction()->isSerialized();
@@ -1304,16 +1297,14 @@ bool LinkEntity::isFragile(ForDefinition_t isDefinition,
   }
   if (isProtocolConformanceKind(getKind())) {
     auto conformance = getProtocolConformance();
-    SILLinkage L = getLinkageForProtocolConformance(
-        conformance->getRootNormalConformance(), isDefinition);
 
-    // We don't deserialize the fragile attribute correctly. But we know that
-    // if the witness table was deserialized (= available externally) and it's
-    // not public, it must be fragile.
-    if (swift::isAvailableExternally(L) && !hasPublicVisibility(L))
-      return true;
+    auto conformanceModule = conformance->getDeclContext()->getParentModule();
+    auto isCompletelySerialized = conformanceModule->getResilienceStrategy() ==
+                                  ResilienceStrategy::Fragile;
 
-    return wholeModuleSerialized || conformance->hasFixedLayout();
+    // The conformance is fragile if it is in a -sil-serialize-all module, or
+    // has a fully publicly determined layout.
+    return isCompletelySerialized || conformance->hasFixedLayout();
   }
   return false;
 }
@@ -1436,11 +1427,10 @@ static void updateLinkageForDefinition(IRGenModule &IGM,
   // TODO: there are probably cases where we can avoid redoing the
   // entire linkage computation.
   UniversalLinkageInfo linkInfo(IGM);
-  auto linkage = getIRLinkage(
-      linkInfo, entity.getLinkage(ForDefinition),
-      entity.isFragile(ForDefinition, linkInfo.IsWholeModuleSerialized),
-      entity.isSILOnly(), ForDefinition,
-      entity.isWeakImported(IGM.getSwiftModule()));
+  auto linkage =
+      getIRLinkage(linkInfo, entity.getLinkage(ForDefinition),
+                   entity.isFragile(ForDefinition), entity.isSILOnly(),
+                   ForDefinition, entity.isWeakImported(IGM.getSwiftModule()));
   global->setLinkage(std::get<0>(linkage));
   global->setVisibility(std::get<1>(linkage));
   global->setDLLStorageClass(std::get<2>(linkage));
@@ -1470,10 +1460,9 @@ LinkInfo LinkInfo::get(const UniversalLinkageInfo &linkInfo,
   entity.mangle(result.Name);
 
   std::tie(result.Linkage, result.Visibility, result.DLLStorageClass) =
-      getIRLinkage(
-          linkInfo, entity.getLinkage(isDefinition),
-          entity.isFragile(isDefinition, linkInfo.IsWholeModuleSerialized),
-          entity.isSILOnly(), isDefinition, entity.isWeakImported(swiftModule));
+      getIRLinkage(linkInfo, entity.getLinkage(isDefinition),
+                   entity.isFragile(isDefinition), entity.isSILOnly(),
+                   isDefinition, entity.isWeakImported(swiftModule));
 
   result.ForDefinition = isDefinition;
 

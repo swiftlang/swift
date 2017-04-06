@@ -32,8 +32,7 @@ UniversalLinkageInfo::UniversalLinkageInfo(IRGenModule &IGM)
     : IsELFObject(IGM.TargetInfo.OutputObjectFormat == llvm::Triple::ELF),
       UseDLLStorage(IGM.useDllStorage()),
       HasMultipleIGMs(IGM.IRGen.hasMultipleIGMs()),
-      IsWholeModule(IGM.getSILModule().isWholeModule()),
-      IsWholeModuleSerialized(IGM.getSILModule().isWholeModuleSerialized()) {}
+      IsWholeModule(IGM.getSILModule().isWholeModule()) {}
 
 /// Mangle this entity into the given buffer.
 void LinkEntity::mangle(SmallVectorImpl<char> &buffer) const {

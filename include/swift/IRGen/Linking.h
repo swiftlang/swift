@@ -29,8 +29,7 @@ class IRGenModule;
 
 class UniversalLinkageInfo {
 public:
-  bool IsELFObject, UseDLLStorage, HasMultipleIGMs, IsWholeModule,
-      IsWholeModuleSerialized;
+  bool IsELFObject, UseDLLStorage, HasMultipleIGMs, IsWholeModule;
 
   UniversalLinkageInfo(IRGenModule &IGM);
 };
@@ -572,8 +571,7 @@ public:
   /// Returns true if this function or global variable may be inlined into
   /// another module.
   ///
-  bool isFragile(ForDefinition_t isDefinition,
-                 bool wholeModuleSerialized) const;
+  bool isFragile(ForDefinition_t isDefinition) const;
 
   const ValueDecl *getDecl() const {
     assert(isDeclKind(getKind()));
