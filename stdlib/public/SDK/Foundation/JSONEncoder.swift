@@ -14,7 +14,7 @@
 // JSON Encoder
 //===----------------------------------------------------------------------===//
 
-/// `JSONEncoder` facilitates the encoding of `Codable` values into JSON.
+/// `JSONEncoder` facilitates the encoding of `Encodable` values into JSON.
 open class JSONEncoder {
     // MARK: Options
 
@@ -115,21 +115,21 @@ open class JSONEncoder {
     /// - returns: A new `Data` value containing the encoded JSON data.
     /// - throws: `CocoaError.coderInvalidValue` if a non-comforming floating-point value is encountered during encoding, and the encoding strategy is `.throw`.
     /// - throws: An error if any value throws an error during encoding.
-    open func encode<Value : Encodable>(_ value: Value) throws -> Data {
+    open func encode<T : Encodable>(_ value: T) throws -> Data {
         let encoder = _JSONEncoder(options: self.options)
         try value.encode(to: encoder)
 
         guard encoder.storage.count > 0 else {
-            throw CocoaError.coderInvalidValue(at: [], reason: "Top-level \(Value.self) did not encode any values.")
+            throw CocoaError.coderInvalidValue(at: [], reason: "Top-level \(T.self) did not encode any values.")
         }
 
         let topLevel = encoder.storage.popContainer()
         if topLevel is NSNull {
-            throw CocoaError.coderInvalidValue(at: [], reason: "Top-level \(Value.self) encoded as null JSON fragment.")
+            throw CocoaError.coderInvalidValue(at: [], reason: "Top-level \(T.self) encoded as null JSON fragment.")
         } else if topLevel is NSNumber {
-            throw CocoaError.coderInvalidValue(at: [], reason: "Top-level \(Value.self) encoded as number JSON fragment.")
+            throw CocoaError.coderInvalidValue(at: [], reason: "Top-level \(T.self) encoded as number JSON fragment.")
         } else if topLevel is NSString {
-            throw CocoaError.coderInvalidValue(at: [], reason: "Top-level \(Value.self) encoded as string JSON fragment.")
+            throw CocoaError.coderInvalidValue(at: [], reason: "Top-level \(T.self) encoded as string JSON fragment.")
         }
 
         return try JSONSerialization.data(withJSONObject: topLevel, options: outputFormatting == .prettyPrinted ? .prettyPrinted : [])
@@ -299,8 +299,21 @@ fileprivate struct _JSONKeyedEncodingContainer<K : CodingKey> : KeyedEncodingCon
     mutating func encode(_ value: UInt32?, forKey key: Key) throws { self.container[key.stringValue] = self.encoder.box(value) }
     mutating func encode(_ value: UInt64?, forKey key: Key) throws { self.container[key.stringValue] = self.encoder.box(value) }
     mutating func encode(_ value: String?, forKey key: Key) throws { self.container[key.stringValue] = self.encoder.box(value) }
-    mutating func encode(_ value: Float?, forKey key: Key)  throws { self.container[key.stringValue] = try self.encoder.box(value) }
-    mutating func encode(_ value: Double?, forKey key: Key) throws { self.container[key.stringValue] = try self.encoder.box(value) }
+
+    mutating func encode(_ value: Float?, forKey key: Key)  throws {
+        // Since the float may be invalid and throw, the coding path needs to contain this key.
+        try self.encoder.with(pushedKey: key) {
+            self.container[key.stringValue] = try self.encoder.box(value)
+        }
+    }
+
+    mutating func encode(_ value: Double?, forKey key: Key) throws {
+        // Since the double may be invalid and throw, the coding path needs to contain this key.
+        try self.encoder.with(pushedKey: key) {
+            self.container[key.stringValue] = try self.encoder.box(value)
+        }
+    }
+
     mutating func encode(_ value: Data?, forKey key: Key) throws {
         // Since the Data strategy may request a container through a closure, the coding path needs to contain this key.
         try self.encoder.with(pushedKey: key) {
@@ -309,33 +322,9 @@ fileprivate struct _JSONKeyedEncodingContainer<K : CodingKey> : KeyedEncodingCon
     }
 
     mutating func encode<T : Encodable>(_ value: T?, forKey key: Key) throws {
-        guard let value = value else {
-            self.container[key.stringValue] = NSNull()
-            return
-        }
-
-        // Respect Date encoding strategy
-        if T.self == Date.self {
-            // Since the Date strategy may request a container through a closure, the coding path needs to contain this key.
-            return try self.encoder.with(pushedKey: nil) {
-                self.container[key.stringValue] = try self.encoder.box((value as! Date))
-            }
-        }
-
-        // The value should request a container from the _JSONEncoder.
-        // Since the value is expected to request a container, the coding path needs to contain this key.
         try self.encoder.with(pushedKey: key) {
-            try value.encode(to: self.encoder)
+            self.container[key.stringValue] = try self.encoder.box(value)
         }
-
-        // The top container should be a new container.
-        guard self.encoder.storage.containers.last! !== self.container else {
-            // If the value didn't request a container at all, encode the default container instead.
-            self.container[key.stringValue] = NSDictionary()
-            return
-        }
-
-        self.container[key.stringValue] = self.encoder.storage.popContainer()
     }
 
     mutating func nestedContainer<NestedKey>(keyedBy keyType: NestedKey.Type, forKey key: Key) -> KeyedEncodingContainer<NestedKey> {
@@ -395,43 +384,32 @@ fileprivate struct _JSONUnkeyedEncodingContainer : UnkeyedEncodingContainer {
     mutating func encode(_ value: UInt32?) throws { self.container.add(self.encoder.box(value)) }
     mutating func encode(_ value: UInt64?) throws { self.container.add(self.encoder.box(value)) }
     mutating func encode(_ value: String?) throws { self.container.add(self.encoder.box(value)) }
-    mutating func encode(_ value: Float?)  throws { try self.container.add(self.encoder.box(value)) }
-    mutating func encode(_ value: Double?) throws { try self.container.add(self.encoder.box(value)) }
+
+    mutating func encode(_ value: Float?)  throws {
+        // Since the float may be invalid and throw, the coding path needs to contain this key.
+        try self.encoder.with(pushedKey: nil) {
+            self.container.add(try self.encoder.box(value))
+        }
+    }
+
+    mutating func encode(_ value: Double?) throws {
+        // Since the double may be invalid and throw, the coding path needs to contain this key.
+        try self.encoder.with(pushedKey: nil) {
+            self.container.add(try self.encoder.box(value))
+        }
+    }
+
     mutating func encode(_ value: Data?) throws {
         // Since the Data strategy may request a container through a closure, the coding path needs to contain this key.
         try self.encoder.with(pushedKey: nil) {
-            try self.container.add(self.encoder.box(value))
+            self.container.add(try self.encoder.box(value))
         }
     }
 
     mutating func encode<T : Encodable>(_ value: T?) throws {
-        guard let value = value else {
-            self.container.add(NSNull())
-            return
-        }
-
-        // Respect Date encoding strategy
-        if T.self == Date.self {
-            // Since the Date strategy may request a container through a closure, the coding path needs to contain this key.
-            return try self.encoder.with(pushedKey: nil) {
-                try self.container.add(self.encoder.box((value as! Date)))
-            }
-        }
-
-        // The value should request a container from the _JSONEncoder.
-        // Since the value is expected to request a container, the coding path needs to contain this key.
         try self.encoder.with(pushedKey: nil) {
-            try value.encode(to: self.encoder)
+            self.container.add(try self.encoder.box(value))
         }
-
-        // The top container should be a new container.
-        guard self.encoder.storage.containers.last! !== self.container else {
-            // If the value didn't request a container at all, encode the default container instead.
-            self.container.add(NSDictionary())
-            return
-        }
-
-        self.container.add(self.encoder.storage.popContainer())
     }
 
     mutating func nestedContainer<NestedKey>(keyedBy keyType: NestedKey.Type) -> KeyedEncodingContainer<NestedKey> {
@@ -474,7 +452,7 @@ extension _JSONEncoder : SingleValueEncodingContainer {
         }
     }
 
-    // MARK: SingleValueEncodingContainer Methods
+    // MARK: - SingleValueEncodingContainer Methods
 
     func encode(_ value: Bool) throws {
         assertCanEncodeSingleValue()
@@ -556,18 +534,18 @@ extension _JSONEncoder : SingleValueEncodingContainer {
 
 extension _JSONEncoder {
     /// Returns the given value boxed in a container appropriate for pushing onto the container stack.
-    fileprivate func box(_ value: Bool?)    -> NSObject { return value == nil ? NSNull() : NSNumber(value: value!) }
-    fileprivate func box(_ value: Int?)     -> NSObject { return value == nil ? NSNull() : NSNumber(value: value!) }
-    fileprivate func box(_ value: Int8?)    -> NSObject { return value == nil ? NSNull() : NSNumber(value: value!) }
-    fileprivate func box(_ value: Int16?)   -> NSObject { return value == nil ? NSNull() : NSNumber(value: value!) }
-    fileprivate func box(_ value: Int32?)   -> NSObject { return value == nil ? NSNull() : NSNumber(value: value!) }
-    fileprivate func box(_ value: Int64?)   -> NSObject { return value == nil ? NSNull() : NSNumber(value: value!) }
-    fileprivate func box(_ value: UInt?)    -> NSObject { return value == nil ? NSNull() : NSNumber(value: value!) }
-    fileprivate func box(_ value: UInt8?)   -> NSObject { return value == nil ? NSNull() : NSNumber(value: value!) }
-    fileprivate func box(_ value: UInt16?)  -> NSObject { return value == nil ? NSNull() : NSNumber(value: value!) }
-    fileprivate func box(_ value: UInt32?)  -> NSObject { return value == nil ? NSNull() : NSNumber(value: value!) }
-    fileprivate func box(_ value: UInt64?)  -> NSObject { return value == nil ? NSNull() : NSNumber(value: value!) }
-    fileprivate func box(_ string: String?) -> NSObject { return string == nil ? NSNull() : NSString(string: string!) }
+    fileprivate func box(_ value: Bool?)   -> NSObject { return value == nil ? NSNull() : NSNumber(value: value!) }
+    fileprivate func box(_ value: Int?)    -> NSObject { return value == nil ? NSNull() : NSNumber(value: value!) }
+    fileprivate func box(_ value: Int8?)   -> NSObject { return value == nil ? NSNull() : NSNumber(value: value!) }
+    fileprivate func box(_ value: Int16?)  -> NSObject { return value == nil ? NSNull() : NSNumber(value: value!) }
+    fileprivate func box(_ value: Int32?)  -> NSObject { return value == nil ? NSNull() : NSNumber(value: value!) }
+    fileprivate func box(_ value: Int64?)  -> NSObject { return value == nil ? NSNull() : NSNumber(value: value!) }
+    fileprivate func box(_ value: UInt?)   -> NSObject { return value == nil ? NSNull() : NSNumber(value: value!) }
+    fileprivate func box(_ value: UInt8?)  -> NSObject { return value == nil ? NSNull() : NSNumber(value: value!) }
+    fileprivate func box(_ value: UInt16?) -> NSObject { return value == nil ? NSNull() : NSNumber(value: value!) }
+    fileprivate func box(_ value: UInt32?) -> NSObject { return value == nil ? NSNull() : NSNumber(value: value!) }
+    fileprivate func box(_ value: UInt64?) -> NSObject { return value == nil ? NSNull() : NSNumber(value: value!) }
+    fileprivate func box(_ value: String?) -> NSObject { return value == nil ? NSNull() : NSString(string: value!) }
 
     fileprivate func box(_ float: Float?) throws -> NSObject {
         guard let float = float else {
@@ -681,6 +659,29 @@ extension _JSONEncoder {
             return self.storage.popContainer()
         }
     }
+
+    fileprivate func box<T : Encodable>(_ value: T?) throws -> NSObject {
+        guard let value = value else {
+            return NSNull()
+        }
+
+        // Respect Date encoding strategy
+        if T.self == Date.self {
+            return try self.box((value as! Date))
+        }
+
+        // The value should request a container from the _JSONEncoder.
+        let topContainer = self.storage.containers.last
+        try value.encode(to: self)
+
+        // The top container should be a new container.
+        guard self.storage.containers.last! !== topContainer else {
+            // If the value didn't request a container at all, encode the default container instead.
+            return NSDictionary()
+        }
+
+        return self.storage.popContainer()
+    }
 }
 
 // MARK: - _JSONReferencingEncoder
@@ -728,6 +729,7 @@ fileprivate class _JSONReferencingEncoder : _JSONEncoder {
 
     // Finalizes `self` by writing the contents of our storage to the referenced encoder's storage.
     deinit {
+        // TODO: Ensure self.storage.count == 1, otherwise something went wrong.
         let value = self.storage.popContainer()
         switch self.reference {
         case .array(let array, let index):
@@ -743,7 +745,7 @@ fileprivate class _JSONReferencingEncoder : _JSONEncoder {
 // JSON Decoder
 //===----------------------------------------------------------------------===//
 
-/// `JSONDecoder` facilitates the decoding of JSON into semantic `Codable` types.
+/// `JSONDecoder` facilitates the decoding of JSON into semantic `Decodable` types.
 open class JSONDecoder {
     // MARK: Options
 
@@ -815,7 +817,7 @@ open class JSONDecoder {
                         userInfo: userInfo)
     }
 
-    // MARK: - Constructing a JSON Encoder
+    // MARK: - Constructing a JSON Decoder
 
     /// Initializes `self` with default strategies.
     public init() {}
@@ -829,10 +831,10 @@ open class JSONDecoder {
     /// - returns: A value of the requested type.
     /// - throws: `CocoaError.coderReadCorrupt` if values requested from the payload are corrupted, or if the given data is not valid JSON.
     /// - throws: An error if any value throws an error during decoding.
-    open func decode<Value : Decodable>(_ type: Value.Type, from data: Data) throws -> Value {
+    open func decode<T : Decodable>(_ type: T.Type, from data: Data) throws -> T {
         let topLevel = try JSONSerialization.jsonObject(with: data)
         let decoder = _JSONDecoder(referencing: topLevel, options: self.options)
-        return try Value(from: decoder)
+        return try T(from: decoder)
     }
 }
 
@@ -880,6 +882,10 @@ fileprivate class _JSONDecoder : Decoder {
     // MARK: - Decoder Methods
 
     func container<Key>(keyedBy type: Key.Type) throws -> KeyedDecodingContainer<Key> {
+        guard !(self.storage.topContainer is NSNull) else {
+            throw CocoaError.coderValueNotFound(at: self.codingPath, reason: "Cannot get keyed decoding container -- found null value instead.")
+        }
+
         guard let container = self.storage.topContainer as? [String : Any] else {
             throw CocoaError.typeMismatch(at: self.codingPath, expectation: [String : Any].self, reality: self.storage.topContainer)
         }
@@ -889,6 +895,10 @@ fileprivate class _JSONDecoder : Decoder {
     }
 
     func unkeyedContainer() throws -> UnkeyedDecodingContainer {
+        guard !(self.storage.topContainer is NSNull) else {
+            throw CocoaError.coderValueNotFound(at: self.codingPath, reason: "Cannot get unkeyed decoding container -- found null value instead.")
+        }
+
         guard let container = self.storage.topContainer as? [Any] else {
             throw CocoaError.typeMismatch(at: self.codingPath, expectation: [Any].self, reality: self.storage.topContainer)
         }
@@ -898,6 +908,10 @@ fileprivate class _JSONDecoder : Decoder {
     }
 
     func singleValueContainer() throws -> SingleValueDecodingContainer {
+        guard !(self.storage.topContainer is NSNull) else {
+            throw CocoaError.coderValueNotFound(at: self.codingPath, reason: "Cannot get single value decoding container -- found null value instead.")
+        }
+
         guard !(self.storage.topContainer is [String : Any]) else {
             throw CocoaError.coderTypeMismatch(at: self.codingPath, reason: "Expected single value but keyed container instead.")
         }
@@ -981,140 +995,98 @@ fileprivate struct _JSONKeyedDecodingContainer<K : CodingKey> : KeyedDecodingCon
     }
 
     func decodeIfPresent(_ type: Bool.Type, forKey key: Key) throws -> Bool? {
-        guard let value = self.container[key.stringValue] else { return nil }
-        guard !(value is NSNull) else { return nil }
         return try self.decoder.with(pushedKey: key) {
-            return try self.decoder.unbox(value, as: Bool.self)
+            return try self.decoder.unbox(self.container[key.stringValue], as: Bool.self)
         }
     }
 
     func decodeIfPresent(_ type: Int.Type, forKey key: Key) throws -> Int? {
-        guard let value = self.container[key.stringValue] else { return nil }
-        guard !(value is NSNull) else { return nil }
         return try self.decoder.with(pushedKey: key) {
-            return try self.decoder.unbox(value, as: Int.self)
+            return try self.decoder.unbox(self.container[key.stringValue], as: Int.self)
         }
     }
 
     func decodeIfPresent(_ type: Int8.Type, forKey key: Key) throws -> Int8? {
-        guard let value = self.container[key.stringValue] else { return nil }
-        guard !(value is NSNull) else { return nil }
         return try self.decoder.with(pushedKey: key) {
-            return try self.decoder.unbox(value, as: Int8.self)
+            return try self.decoder.unbox(self.container[key.stringValue], as: Int8.self)
         }
     }
 
     func decodeIfPresent(_ type: Int16.Type, forKey key: Key) throws -> Int16? {
-        guard let value = self.container[key.stringValue] else { return nil }
-        guard !(value is NSNull) else { return nil }
         return try self.decoder.with(pushedKey: key) {
-            return try self.decoder.unbox(value, as: Int16.self)
+            return try self.decoder.unbox(self.container[key.stringValue], as: Int16.self)
         }
     }
 
     func decodeIfPresent(_ type: Int32.Type, forKey key: Key) throws -> Int32? {
-        guard let value = self.container[key.stringValue] else { return nil }
-        guard !(value is NSNull) else { return nil }
         return try self.decoder.with(pushedKey: key) {
-            return try self.decoder.unbox(value, as: Int32.self)
+            return try self.decoder.unbox(self.container[key.stringValue], as: Int32.self)
         }
     }
 
     func decodeIfPresent(_ type: Int64.Type, forKey key: Key) throws -> Int64? {
-        guard let value = self.container[key.stringValue] else { return nil }
-        guard !(value is NSNull) else { return nil }
         return try self.decoder.with(pushedKey: key) {
-            return try self.decoder.unbox(value, as: Int64.self)
+            return try self.decoder.unbox(self.container[key.stringValue], as: Int64.self)
         }
     }
 
     func decodeIfPresent(_ type: UInt.Type, forKey key: Key) throws -> UInt? {
-        guard let value = self.container[key.stringValue] else { return nil }
-        guard !(value is NSNull) else { return nil }
         return try self.decoder.with(pushedKey: key) {
-            return try self.decoder.unbox(value, as: UInt.self)
+            return try self.decoder.unbox(self.container[key.stringValue], as: UInt.self)
         }
     }
 
     func decodeIfPresent(_ type: UInt8.Type, forKey key: Key) throws -> UInt8? {
-        guard let value = self.container[key.stringValue] else { return nil }
-        guard !(value is NSNull) else { return nil }
         return try self.decoder.with(pushedKey: key) {
-            return try self.decoder.unbox(value, as: UInt8.self)
+            return try self.decoder.unbox(self.container[key.stringValue], as: UInt8.self)
         }
     }
 
     func decodeIfPresent(_ type: UInt16.Type, forKey key: Key) throws -> UInt16? {
-        guard let value = self.container[key.stringValue] else { return nil }
-        guard !(value is NSNull) else { return nil }
         return try self.decoder.with(pushedKey: key) {
-            return try self.decoder.unbox(value, as: UInt16.self)
+            return try self.decoder.unbox(self.container[key.stringValue], as: UInt16.self)
         }
     }
 
     func decodeIfPresent(_ type: UInt32.Type, forKey key: Key) throws -> UInt32? {
-        guard let value = self.container[key.stringValue] else { return nil }
-        guard !(value is NSNull) else { return nil }
         return try self.decoder.with(pushedKey: key) {
-            return try self.decoder.unbox(value, as: UInt32.self)
+            return try self.decoder.unbox(self.container[key.stringValue], as: UInt32.self)
         }
     }
 
     func decodeIfPresent(_ type: UInt64.Type, forKey key: Key) throws -> UInt64? {
-        guard let value = self.container[key.stringValue] else { return nil }
-        guard !(value is NSNull) else { return nil }
         return try self.decoder.with(pushedKey: key) {
-            return try self.decoder.unbox(value, as: UInt64.self)
+            return try self.decoder.unbox(self.container[key.stringValue], as: UInt64.self)
         }
     }
 
     func decodeIfPresent(_ type: Float.Type, forKey key: Key) throws -> Float? {
-        guard let value = self.container[key.stringValue] else { return nil }
-        guard !(value is NSNull) else { return nil }
         return try self.decoder.with(pushedKey: key) {
-            return try self.decoder.unbox(value, as: Float.self)
+            return try self.decoder.unbox(self.container[key.stringValue], as: Float.self)
         }
     }
 
     func decodeIfPresent(_ type: Double.Type, forKey key: Key) throws -> Double? {
-        guard let value = self.container[key.stringValue] else { return nil }
-        guard !(value is NSNull) else { return nil }
         return try self.decoder.with(pushedKey: key) {
-            return try self.decoder.unbox(value, as: Double.self)
+            return try self.decoder.unbox(self.container[key.stringValue], as: Double.self)
         }
     }
 
     func decodeIfPresent(_ type: String.Type, forKey key: Key) throws -> String? {
-        guard let value = self.container[key.stringValue] else { return nil }
-        guard !(value is NSNull) else { return nil }
         return try self.decoder.with(pushedKey: key) {
-            return try self.decoder.unbox(value, as: String.self)
+            return try self.decoder.unbox(self.container[key.stringValue], as: String.self)
         }
     }
 
     func decodeIfPresent(_ type: Data.Type, forKey key: Key) throws -> Data? {
-        guard let value = self.container[key.stringValue] else { return nil }
-        guard !(value is NSNull) else { return nil }
         return try self.decoder.with(pushedKey: key) {
-            return try self.decoder.unbox(value, as: Data.self)
+            return try self.decoder.unbox(self.container[key.stringValue], as: Data.self)
         }
     }
 
     func decodeIfPresent<T : Decodable>(_ type: T.Type, forKey key: Key) throws -> T? {
-        guard let value = self.container[key.stringValue] else { return nil }
-        guard !(value is NSNull) else { return nil }
-
         return try self.decoder.with(pushedKey: key) {
-            let decoded: T
-            if T.self == Date.self {
-                decoded = (try self.decoder.unbox(value, as: Date.self) as! T)
-            } else {
-                self.decoder.storage.push(container: value)
-                decoded = try T(from: self.decoder)
-                self.decoder.storage.popContainer()
-            }
-
-            return decoded
+            return try self.decoder.unbox(self.container[key.stringValue], as: T.self)
         }
     }
 
@@ -1216,227 +1188,176 @@ fileprivate struct _JSONUnkeyedDecodingContainer : UnkeyedDecodingContainer {
     }
 
     mutating func decodeIfPresent(_ type: Bool.Type) throws -> Bool? {
-        guard !isAtEnd else { return nil }
-        let value = self.container[self.currentIndex]
-        guard !(value is NSNull) else { return nil }
+        guard !self.isAtEnd else { return nil }
 
-        // Don't want to increment currentIndex unless decode succeeds, since we want to be able to attempt to decode the same value again.
         return try self.decoder.with(pushedKey: nil) {
-            let decoded = try self.decoder.unbox(value, as: Bool.self)
+            let decoded = try self.decoder.unbox(self.container[self.currentIndex], as: Bool.self)
             self.currentIndex += 1
             return decoded
         }
     }
 
     mutating func decodeIfPresent(_ type: Int.Type) throws -> Int? {
-        guard !isAtEnd else { return nil }
-        let value = self.container[self.currentIndex]
-        guard !(value is NSNull) else { return nil }
+        guard !self.isAtEnd else { return nil }
 
-        // Don't want to increment currentIndex unless decode succeeds, since we want to be able to attempt to decode the same value again.
         return try self.decoder.with(pushedKey: nil) {
-            let decoded = try self.decoder.unbox(value, as: Int.self)
+            let decoded = try self.decoder.unbox(self.container[self.currentIndex], as: Int.self)
             self.currentIndex += 1
             return decoded
         }
     }
 
     mutating func decodeIfPresent(_ type: Int8.Type) throws -> Int8? {
-        guard !isAtEnd else { return nil }
-        let value = self.container[self.currentIndex]
-        guard !(value is NSNull) else { return nil }
+        guard !self.isAtEnd else { return nil }
 
-        // Don't want to increment currentIndex unless decode succeeds, since we want to be able to attempt to decode the same value again.
         return try self.decoder.with(pushedKey: nil) {
-            let decoded = try self.decoder.unbox(value, as: Int8.self)
+            let decoded = try self.decoder.unbox(self.container[self.currentIndex], as: Int8.self)
             self.currentIndex += 1
             return decoded
         }
     }
 
     mutating func decodeIfPresent(_ type: Int16.Type) throws -> Int16? {
-        guard !isAtEnd else { return nil }
-        let value = self.container[self.currentIndex]
-        guard !(value is NSNull) else { return nil }
+        guard !self.isAtEnd else { return nil }
 
-        // Don't want to increment currentIndex unless decode succeeds, since we want to be able to attempt to decode the same value again.
         return try self.decoder.with(pushedKey: nil) {
-            let decoded = try self.decoder.unbox(value, as: Int16.self)
+            let decoded = try self.decoder.unbox(self.container[self.currentIndex], as: Int16.self)
             self.currentIndex += 1
             return decoded
         }
     }
 
     mutating func decodeIfPresent(_ type: Int32.Type) throws -> Int32? {
-        guard !isAtEnd else { return nil }
-        let value = self.container[self.currentIndex]
-        guard !(value is NSNull) else { return nil }
+        guard !self.isAtEnd else { return nil }
 
-        // Don't want to increment currentIndex unless decode succeeds, since we want to be able to attempt to decode the same value again.
         return try self.decoder.with(pushedKey: nil) {
-            let decoded = try self.decoder.unbox(value, as: Int32.self)
+            let decoded = try self.decoder.unbox(self.container[self.currentIndex], as: Int32.self)
             self.currentIndex += 1
             return decoded
         }
     }
 
     mutating func decodeIfPresent(_ type: Int64.Type) throws -> Int64? {
-        guard !isAtEnd else { return nil }
-        let value = self.container[self.currentIndex]
-        guard !(value is NSNull) else { return nil }
+        guard !self.isAtEnd else { return nil }
 
-        // Don't want to increment currentIndex unless decode succeeds, since we want to be able to attempt to decode the same value again.
         return try self.decoder.with(pushedKey: nil) {
-            let decoded = try self.decoder.unbox(value, as: Int64.self)
+            let decoded = try self.decoder.unbox(self.container[self.currentIndex], as: Int64.self)
             self.currentIndex += 1
             return decoded
         }
     }
 
     mutating func decodeIfPresent(_ type: UInt.Type) throws -> UInt? {
-        guard !isAtEnd else { return nil }
-        let value = self.container[self.currentIndex]
-        guard !(value is NSNull) else { return nil }
+        guard !self.isAtEnd else { return nil }
 
-        // Don't want to increment currentIndex unless decode succeeds, since we want to be able to attempt to decode the same value again.
         return try self.decoder.with(pushedKey: nil) {
-            let decoded = try self.decoder.unbox(value, as: UInt.self)
+            let decoded = try self.decoder.unbox(self.container[self.currentIndex], as: UInt.self)
             self.currentIndex += 1
             return decoded
         }
     }
 
     mutating func decodeIfPresent(_ type: UInt8.Type) throws -> UInt8? {
-        guard !isAtEnd else { return nil }
-        let value = self.container[self.currentIndex]
-        guard !(value is NSNull) else { return nil }
+        guard !self.isAtEnd else { return nil }
 
-        // Don't want to increment currentIndex unless decode succeeds, since we want to be able to attempt to decode the same value again.
         return try self.decoder.with(pushedKey: nil) {
-            let decoded = try self.decoder.unbox(value, as: UInt8.self)
+            let decoded = try self.decoder.unbox(self.container[self.currentIndex], as: UInt8.self)
             self.currentIndex += 1
             return decoded
         }
     }
 
     mutating func decodeIfPresent(_ type: UInt16.Type) throws -> UInt16? {
-        guard !isAtEnd else { return nil }
-        let value = self.container[self.currentIndex]
-        guard !(value is NSNull) else { return nil }
+        guard !self.isAtEnd else { return nil }
 
-        // Don't want to increment currentIndex unless decode succeeds, since we want to be able to attempt to decode the same value again.
         return try self.decoder.with(pushedKey: nil) {
-            let decoded = try self.decoder.unbox(value, as: UInt16.self)
+            let decoded = try self.decoder.unbox(self.container[self.currentIndex], as: UInt16.self)
             self.currentIndex += 1
             return decoded
         }
     }
 
     mutating func decodeIfPresent(_ type: UInt32.Type) throws -> UInt32? {
-        guard !isAtEnd else { return nil }
-        let value = self.container[self.currentIndex]
-        guard !(value is NSNull) else { return nil }
+        guard !self.isAtEnd else { return nil }
 
-        // Don't want to increment currentIndex unless decode succeeds, since we want to be able to attempt to decode the same value again.
         return try self.decoder.with(pushedKey: nil) {
-            let decoded = try self.decoder.unbox(value, as: UInt32.self)
+            let decoded = try self.decoder.unbox(self.container[self.currentIndex], as: UInt32.self)
             self.currentIndex += 1
             return decoded
         }
     }
 
     mutating func decodeIfPresent(_ type: UInt64.Type) throws -> UInt64? {
-        guard !isAtEnd else { return nil }
-        let value = self.container[self.currentIndex]
-        guard !(value is NSNull) else { return nil }
+        guard !self.isAtEnd else { return nil }
 
-        // Don't want to increment currentIndex unless decode succeeds, since we want to be able to attempt to decode the same value again.
         return try self.decoder.with(pushedKey: nil) {
-            let decoded = try self.decoder.unbox(value, as: UInt64.self)
+            let decoded = try self.decoder.unbox(self.container[self.currentIndex], as: UInt64.self)
             self.currentIndex += 1
             return decoded
         }
     }
 
     mutating func decodeIfPresent(_ type: Float.Type) throws -> Float? {
-        guard !isAtEnd else { return nil }
-        let value = self.container[self.currentIndex]
-        guard !(value is NSNull) else { return nil }
+        guard !self.isAtEnd else { return nil }
 
-        // Don't want to increment currentIndex unless decode succeeds, since we want to be able to attempt to decode the same value again.
         return try self.decoder.with(pushedKey: nil) {
-            let decoded = try self.decoder.unbox(value, as: Float.self)
+            let decoded = try self.decoder.unbox(self.container[self.currentIndex], as: Float.self)
             self.currentIndex += 1
             return decoded
         }
     }
 
     mutating func decodeIfPresent(_ type: Double.Type) throws -> Double? {
-        guard !isAtEnd else { return nil }
-        let value = self.container[self.currentIndex]
-        guard !(value is NSNull) else { return nil }
+        guard !self.isAtEnd else { return nil }
 
-        // Don't want to increment currentIndex unless decode succeeds, since we want to be able to attempt to decode the same value again.
         return try self.decoder.with(pushedKey: nil) {
-            let decoded = try self.decoder.unbox(value, as: Double.self)
+            let decoded = try self.decoder.unbox(self.container[self.currentIndex], as: Double.self)
             self.currentIndex += 1
             return decoded
         }
     }
 
     mutating func decodeIfPresent(_ type: String.Type) throws -> String? {
-        guard !isAtEnd else { return nil }
-        let value = self.container[self.currentIndex]
-        guard !(value is NSNull) else { return nil }
+        guard !self.isAtEnd else { return nil }
 
-        // Don't want to increment currentIndex unless decode succeeds, since we want to be able to attempt to decode the same value again.
         return try self.decoder.with(pushedKey: nil) {
-            let decoded = try self.decoder.unbox(value, as: String.self)
+            let decoded = try self.decoder.unbox(self.container[self.currentIndex], as: String.self)
             self.currentIndex += 1
             return decoded
         }
     }
 
     mutating func decodeIfPresent(_ type: Data.Type) throws -> Data? {
-        guard !isAtEnd else { return nil }
-        let value = self.container[self.currentIndex]
-        guard !(value is NSNull) else { return nil }
+        guard !self.isAtEnd else { return nil }
 
-        // Don't want to increment currentIndex unless decode succeeds, since we want to be able to attempt to decode the same value again.
         return try self.decoder.with(pushedKey: nil) {
-            let decoded = try self.decoder.unbox(value, as: Data.self)
+            let decoded = try self.decoder.unbox(self.container[self.currentIndex], as: Data.self)
             self.currentIndex += 1
             return decoded
         }
     }
 
     mutating func decodeIfPresent<T : Decodable>(_ type: T.Type) throws -> T? {
-        guard !isAtEnd else { return nil }
-        let value = self.container[self.currentIndex]
-        guard !(value is NSNull) else { return nil }
+        guard !self.isAtEnd else { return nil }
 
-        // Don't want to increment currentIndex unless decode succeeds, since we want to be able to attempt to decode the same value again.
         return try self.decoder.with(pushedKey: nil) {
-            let decoded: T
-            if T.self == Date.self {
-                decoded = (try self.decoder.unbox(value, as: Date.self) as! T)
-            } else {
-                self.decoder.storage.push(container: value)
-                decoded = try T(from: self.decoder)
-                self.decoder.storage.popContainer()
-            }
-
+            let decoded = try self.decoder.unbox(self.container[self.currentIndex], as: T.self)
+            self.currentIndex += 1
             return decoded
         }
     }
 
     mutating func nestedContainer<NestedKey>(keyedBy type: NestedKey.Type) throws -> KeyedDecodingContainer<NestedKey> {
         return try self.decoder.with(pushedKey: nil) {
-            guard !isAtEnd else {
+            guard !self.isAtEnd else {
                 throw CocoaError.coderValueNotFound(at: self.codingPath, reason: "Cannot get nested keyed container -- unkeyed container is at end.")
             }
 
             let value = self.container[self.currentIndex]
+            guard !(value is NSNull) else {
+                throw CocoaError.coderValueNotFound(at: self.codingPath, reason: "Cannot get keyed decoding container -- found null value instead.")
+            }
+
             guard let container = value as? [String : Any] else {
                 throw CocoaError.typeMismatch(at: self.codingPath, expectation: [String : Any].self, reality: value)
             }
@@ -1449,11 +1370,15 @@ fileprivate struct _JSONUnkeyedDecodingContainer : UnkeyedDecodingContainer {
 
     mutating func nestedUnkeyedContainer() throws -> UnkeyedDecodingContainer {
         return try self.decoder.with(pushedKey: nil) {
-            guard !isAtEnd else {
+            guard !self.isAtEnd else {
                 throw CocoaError.coderValueNotFound(at: self.codingPath, reason: "Cannot get nested unkeyed container -- unkeyed container is at end.")
             }
 
             let value = self.container[self.currentIndex]
+            guard !(value is NSNull) else {
+                throw CocoaError.coderValueNotFound(at: self.codingPath, reason: "Cannot get keyed decoding container -- found null value instead.")
+            }
+
             guard let container = value as? [Any] else {
                 throw CocoaError.typeMismatch(at: self.codingPath, expectation: [Any].self, reality: value)
             }
@@ -1465,11 +1390,15 @@ fileprivate struct _JSONUnkeyedDecodingContainer : UnkeyedDecodingContainer {
 
     mutating func superDecoder() throws -> Decoder {
         return try self.decoder.with(pushedKey: nil) {
-            guard !isAtEnd else {
+            guard !self.isAtEnd else {
                 throw CocoaError.coderValueNotFound(at: self.codingPath, reason: "Cannot get superDecoder() -- unkeyed container is at end.")
             }
 
             let value = self.container[self.currentIndex]
+            guard !(value is NSNull) else {
+                throw CocoaError.coderValueNotFound(at: self.codingPath, reason: "Cannot get superDecoder() -- found null value instead.")
+            }
+
             self.currentIndex += 1
             return _JSONDecoder(referencing: value, options: self.decoder.options)
         }
@@ -1479,28 +1408,32 @@ fileprivate struct _JSONUnkeyedDecodingContainer : UnkeyedDecodingContainer {
 extension _JSONDecoder : SingleValueDecodingContainer {
     // MARK: SingleValueDecodingContainer Methods
 
-    func decode(_ type: Bool.Type)   throws -> Bool   { return try unbox(self.storage.topContainer, as: Bool.self) }
-    func decode(_ type: Int.Type)    throws -> Int    { return try unbox(self.storage.topContainer, as: Int.self) }
-    func decode(_ type: Int8.Type)   throws -> Int8   { return try unbox(self.storage.topContainer, as: Int8.self) }
-    func decode(_ type: Int16.Type)  throws -> Int16  { return try unbox(self.storage.topContainer, as: Int16.self) }
-    func decode(_ type: Int32.Type)  throws -> Int32  { return try unbox(self.storage.topContainer, as: Int32.self) }
-    func decode(_ type: Int64.Type)  throws -> Int64  { return try unbox(self.storage.topContainer, as: Int64.self) }
-    func decode(_ type: UInt.Type)   throws -> UInt   { return try unbox(self.storage.topContainer, as: UInt.self) }
-    func decode(_ type: UInt8.Type)  throws -> UInt8  { return try unbox(self.storage.topContainer, as: UInt8.self) }
-    func decode(_ type: UInt16.Type) throws -> UInt16 { return try unbox(self.storage.topContainer, as: UInt16.self) }
-    func decode(_ type: UInt32.Type) throws -> UInt32 { return try unbox(self.storage.topContainer, as: UInt32.self) }
-    func decode(_ type: UInt64.Type) throws -> UInt64 { return try unbox(self.storage.topContainer, as: UInt64.self) }
-    func decode(_ type: Float.Type)  throws -> Float  { return try unbox(self.storage.topContainer, as: Float.self) }
-    func decode(_ type: Double.Type) throws -> Double { return try unbox(self.storage.topContainer, as: Double.self) }
-    func decode(_ type: String.Type) throws -> String { return try unbox(self.storage.topContainer, as: String.self) }
-    func decode(_ type: Data.Type)   throws -> Data   { return try unbox(self.storage.topContainer, as: Data.self) }
+    // These all unwrap the result, since we couldn't have gotten a single value container if the topContainer was null.
+    func decode(_ type: Bool.Type)   throws -> Bool   { return try self.unbox(self.storage.topContainer, as: Bool.self)! }
+    func decode(_ type: Int.Type)    throws -> Int    { return try self.unbox(self.storage.topContainer, as: Int.self)! }
+    func decode(_ type: Int8.Type)   throws -> Int8   { return try self.unbox(self.storage.topContainer, as: Int8.self)! }
+    func decode(_ type: Int16.Type)  throws -> Int16  { return try self.unbox(self.storage.topContainer, as: Int16.self)! }
+    func decode(_ type: Int32.Type)  throws -> Int32  { return try self.unbox(self.storage.topContainer, as: Int32.self)! }
+    func decode(_ type: Int64.Type)  throws -> Int64  { return try self.unbox(self.storage.topContainer, as: Int64.self)! }
+    func decode(_ type: UInt.Type)   throws -> UInt   { return try self.unbox(self.storage.topContainer, as: UInt.self)! }
+    func decode(_ type: UInt8.Type)  throws -> UInt8  { return try self.unbox(self.storage.topContainer, as: UInt8.self)! }
+    func decode(_ type: UInt16.Type) throws -> UInt16 { return try self.unbox(self.storage.topContainer, as: UInt16.self)! }
+    func decode(_ type: UInt32.Type) throws -> UInt32 { return try self.unbox(self.storage.topContainer, as: UInt32.self)! }
+    func decode(_ type: UInt64.Type) throws -> UInt64 { return try self.unbox(self.storage.topContainer, as: UInt64.self)! }
+    func decode(_ type: Float.Type)  throws -> Float  { return try self.unbox(self.storage.topContainer, as: Float.self)! }
+    func decode(_ type: Double.Type) throws -> Double { return try self.unbox(self.storage.topContainer, as: Double.self)! }
+    func decode(_ type: String.Type) throws -> String { return try self.unbox(self.storage.topContainer, as: String.self)! }
+    func decode(_ type: Data.Type)   throws -> Data   { return try self.unbox(self.storage.topContainer, as: Data.self)! }
 }
 
 // MARK: - Concrete Value Representations
 
 extension _JSONDecoder {
     /// Returns the given value unboxed from a container.
-    fileprivate func unbox(_ value: Any, as type: Bool.Type) throws -> Bool {
+    fileprivate func unbox(_ value: Any?, as type: Bool.Type) throws -> Bool? {
+        guard let value = value else { return nil }
+        guard !(value is NSNull) else { return nil }
+
         if let number = value as? NSNumber {
             // TODO: Add a flag to coerce non-boolean numbers into Bools?
             if number === kCFBooleanTrue as NSNumber {
@@ -1519,7 +1452,10 @@ extension _JSONDecoder {
         throw CocoaError.typeMismatch(at: self.codingPath, expectation: type, reality: value)
     }
 
-    fileprivate func unbox(_ value: Any, as type: Int.Type) throws -> Int {
+    fileprivate func unbox(_ value: Any?, as type: Int.Type) throws -> Int? {
+        guard let value = value else { return nil }
+        guard !(value is NSNull) else { return nil }
+
         guard let number = value as? NSNumber else {
             throw CocoaError.typeMismatch(at: self.codingPath, expectation: type, reality: value)
         }
@@ -1532,7 +1468,10 @@ extension _JSONDecoder {
         return int
     }
 
-    fileprivate func unbox(_ value: Any, as type: Int8.Type) throws -> Int8 {
+    fileprivate func unbox(_ value: Any?, as type: Int8.Type) throws -> Int8? {
+        guard let value = value else { return nil }
+        guard !(value is NSNull) else { return nil }
+
         guard let number = value as? NSNumber else {
             throw CocoaError.typeMismatch(at: self.codingPath, expectation: type, reality: value)
         }
@@ -1545,7 +1484,10 @@ extension _JSONDecoder {
         return int8
     }
 
-    fileprivate func unbox(_ value: Any, as type: Int16.Type) throws -> Int16 {
+    fileprivate func unbox(_ value: Any?, as type: Int16.Type) throws -> Int16? {
+        guard let value = value else { return nil }
+        guard !(value is NSNull) else { return nil }
+
         guard let number = value as? NSNumber else {
             throw CocoaError.typeMismatch(at: self.codingPath, expectation: type, reality: value)
         }
@@ -1558,7 +1500,10 @@ extension _JSONDecoder {
         return int16
     }
 
-    fileprivate func unbox(_ value: Any, as type: Int32.Type) throws -> Int32 {
+    fileprivate func unbox(_ value: Any?, as type: Int32.Type) throws -> Int32? {
+        guard let value = value else { return nil }
+        guard !(value is NSNull) else { return nil }
+
         guard let number = value as? NSNumber else {
             throw CocoaError.typeMismatch(at: self.codingPath, expectation: type, reality: value)
         }
@@ -1571,7 +1516,10 @@ extension _JSONDecoder {
         return int32
     }
 
-    fileprivate func unbox(_ value: Any, as type: Int64.Type) throws -> Int64 {
+    fileprivate func unbox(_ value: Any?, as type: Int64.Type) throws -> Int64? {
+        guard let value = value else { return nil }
+        guard !(value is NSNull) else { return nil }
+
         guard let number = value as? NSNumber else {
             throw CocoaError.typeMismatch(at: self.codingPath, expectation: type, reality: value)
         }
@@ -1584,7 +1532,10 @@ extension _JSONDecoder {
         return int64
     }
 
-    fileprivate func unbox(_ value: Any, as type: UInt.Type) throws -> UInt {
+    fileprivate func unbox(_ value: Any?, as type: UInt.Type) throws -> UInt? {
+        guard let value = value else { return nil }
+        guard !(value is NSNull) else { return nil }
+
         guard let number = value as? NSNumber else {
             throw CocoaError.typeMismatch(at: self.codingPath, expectation: type, reality: value)
         }
@@ -1597,7 +1548,10 @@ extension _JSONDecoder {
         return uint
     }
 
-    fileprivate func unbox(_ value: Any, as type: UInt8.Type) throws -> UInt8 {
+    fileprivate func unbox(_ value: Any?, as type: UInt8.Type) throws -> UInt8? {
+        guard let value = value else { return nil }
+        guard !(value is NSNull) else { return nil }
+
         guard let number = value as? NSNumber else {
             throw CocoaError.typeMismatch(at: self.codingPath, expectation: type, reality: value)
         }
@@ -1610,7 +1564,10 @@ extension _JSONDecoder {
         return uint8
     }
 
-    fileprivate func unbox(_ value: Any, as type: UInt16.Type) throws -> UInt16 {
+    fileprivate func unbox(_ value: Any?, as type: UInt16.Type) throws -> UInt16? {
+        guard let value = value else { return nil }
+        guard !(value is NSNull) else { return nil }
+
         guard let number = value as? NSNumber else {
             throw CocoaError.typeMismatch(at: self.codingPath, expectation: type, reality: value)
         }
@@ -1623,7 +1580,10 @@ extension _JSONDecoder {
         return uint16
     }
 
-    fileprivate func unbox(_ value: Any, as type: UInt32.Type) throws -> UInt32 {
+    fileprivate func unbox(_ value: Any?, as type: UInt32.Type) throws -> UInt32? {
+        guard let value = value else { return nil }
+        guard !(value is NSNull) else { return nil }
+
         guard let number = value as? NSNumber else {
             throw CocoaError.typeMismatch(at: self.codingPath, expectation: type, reality: value)
         }
@@ -1636,7 +1596,10 @@ extension _JSONDecoder {
         return uint32
     }
 
-    fileprivate func unbox(_ value: Any, as type: UInt64.Type) throws -> UInt64 {
+    fileprivate func unbox(_ value: Any?, as type: UInt64.Type) throws -> UInt64? {
+        guard let value = value else { return nil }
+        guard !(value is NSNull) else { return nil }
+
         guard let number = value as? NSNumber else {
             throw CocoaError.typeMismatch(at: self.codingPath, expectation: type, reality: value)
         }
@@ -1649,7 +1612,10 @@ extension _JSONDecoder {
         return uint64
     }
 
-    fileprivate func unbox(_ value: Any, as type: Float.Type) throws -> Float {
+    fileprivate func unbox(_ value: Any?, as type: Float.Type) throws -> Float? {
+        guard let value = value else { return nil }
+        guard !(value is NSNull) else { return nil }
+
         if let number = value as? NSNumber {
             // We are willing to return a Float by losing precision:
             // * If the original value was integral,
@@ -1693,7 +1659,10 @@ extension _JSONDecoder {
         throw CocoaError.typeMismatch(at: self.codingPath, expectation: type, reality: value)
     }
 
-    func unbox(_ value: Any, as type: Double.Type) throws -> Double {
+    func unbox(_ value: Any?, as type: Double.Type) throws -> Double? {
+        guard let value = value else { return nil }
+        guard !(value is NSNull) else { return nil }
+
         if let number = value as? NSNumber {
             // We are always willing to return the number as a Double:
             // * If the original value was integral, it is guaranteed to fit in a Double; we are willing to lose precision past 2^53 if you encoded a UInt64 but requested a Double
@@ -1726,7 +1695,10 @@ extension _JSONDecoder {
         throw CocoaError.typeMismatch(at: self.codingPath, expectation: type, reality: value)
     }
 
-    func unbox(_ value: Any, as type: String.Type) throws -> String {
+    func unbox(_ value: Any?, as type: String.Type) throws -> String? {
+        guard let value = value else { return nil }
+        guard !(value is NSNull) else { return nil }
+
         guard let string = value as? String else {
             throw CocoaError.typeMismatch(at: self.codingPath, expectation: type, reality: value)
         }
@@ -1734,7 +1706,10 @@ extension _JSONDecoder {
         return string
     }
 
-    func unbox(_ value: Any, as type: Data.Type) throws -> Data {
+    func unbox(_ value: Any?, as type: Data.Type) throws -> Data? {
+        guard let value = value else { return nil }
+        guard !(value is NSNull) else { return nil }
+
         switch self.options.dataDecodingStrategy {
         case .base64Decode:
             guard let string = value as? String else {
@@ -1755,7 +1730,10 @@ extension _JSONDecoder {
         }
     }
 
-    func unbox(_ value: Any, as type: Date.Type) throws -> Date {
+    func unbox(_ value: Any?, as type: Date.Type) throws -> Date? {
+        guard let value = value else { return nil }
+        guard !(value is NSNull) else { return nil }
+
         switch self.options.dateDecodingStrategy {
         case .deferredToDate:
             self.storage.push(container: value)
@@ -1764,16 +1742,16 @@ extension _JSONDecoder {
             return date
 
         case .secondsSince1970:
-            let double = try unbox(value, as: Double.self)
+            let double = try self.unbox(value, as: Double.self)!
             return Date(timeIntervalSince1970: double)
 
         case .millisecondsSince1970:
-            let double = try unbox(value, as: Double.self)
+            let double = try self.unbox(value, as: Double.self)!
             return Date(timeIntervalSince1970: double / 1000.0)
 
         case .iso8601:
             if #available(OSX 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *) {
-                let string = try unbox(value, as: String.self)
+                let string = try self.unbox(value, as: String.self)!
                 guard let date = _iso8601Formatter.date(from: string) else {
                     throw CocoaError.coderReadCorrupt(at: self.codingPath, reason: "Expected date string to be ISO8601-formatted.")
                 }
@@ -1784,7 +1762,7 @@ extension _JSONDecoder {
             }
 
         case .formatted(let formatter):
-            let string = try unbox(value, as: String.self)
+            let string = try self.unbox(value, as: String.self)!
             guard let date = formatter.date(from: string) else {
                 throw CocoaError.coderReadCorrupt(at: self.codingPath, reason: "Date string does not match format expected by formatter.")
             }
@@ -1797,6 +1775,22 @@ extension _JSONDecoder {
             self.storage.popContainer()
             return date
         }
+    }
+
+    func unbox<T : Decodable>(_ value: Any?, as type: T.Type) throws -> T? {
+        guard let value = value else { return nil }
+        guard !(value is NSNull) else { return nil }
+
+        let decoded: T
+        if T.self == Date.self {
+            decoded = (try self.unbox(value, as: Date.self) as! T)
+        } else {
+            self.storage.push(container: value)
+            decoded = try T(from: self)
+            self.storage.popContainer()
+        }
+
+        return decoded
     }
 }
 
