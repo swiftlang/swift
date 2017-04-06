@@ -760,9 +760,9 @@ bb5(%25 : $Error):                                // Preds: bb4 bb3
 // CHECK:      bb2:
 // CHECK:        store
 // CHECK:        [[STACK2:%[0-9]+]] = alloc_stack $Bool
-// CHECK-NEXT:   dealloc_stack [[STACK2]]
-// CHECK-NEXT:   dealloc_stack [[BOX]]
-// CHECK-NEXT:   dealloc_stack [[STACK1]]
+// CHECK-NEXT:   dealloc_stack [[STACK2]] : $*Bool, loc "testloc":27:27
+// CHECK-NEXT:   dealloc_stack [[BOX]] : $*Int, loc "testloc":27:27
+// CHECK-NEXT:   dealloc_stack [[STACK1]] : $*Bool, loc "testloc":27:27
 // CHECK:      bb3:
 // CHECK-NEXT:   tuple
 // CHECK-NEXT:   return
@@ -784,7 +784,7 @@ bb2:
   %3 = load %1a : $*Int
   %as2 = alloc_stack $Bool
   strong_release %1 : ${ var Int }
-  dealloc_stack %as2 : $*Bool
+  dealloc_stack %as2 : $*Bool, loc "testloc":27:27
   br bb3
 
 bb3:
