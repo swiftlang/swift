@@ -469,7 +469,7 @@ function(_compile_swift_files
       OUTPUT ${standard_outputs}
       DEPENDS
         ${swift_compiler_tool_dep}
-        ${source_files} ${SWIFTFILE_DEPENDS}
+        ${file_path} ${source_files} ${SWIFTFILE_DEPENDS}
         ${swift_ide_test_dependency} ${api_notes_dependency_target}
         ${obj_dirs_dependency_target}
       COMMENT "Compiling ${first_output}")
