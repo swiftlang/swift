@@ -2318,7 +2318,7 @@ static llvm::Constant *getDeallocateBoxedOpaqueExistentialBufferFunction(
 
         //  Size = ((sizeof(HeapObject) + align) & ~align) + size
         auto *heapHeaderSize = llvm::ConstantInt::get(
-            IGF.IGM.SizeTy, getHeapHeaderSize(IGM).getValue());
+            IGF.IGM.SizeTy, IGM.RefCountedStructSize.getValue());
         size = Builder.CreateAdd(
             Builder.CreateAnd(Builder.CreateAdd(heapHeaderSize, alignmentMask),
                               Builder.CreateNot(alignmentMask)),
@@ -2412,7 +2412,7 @@ getProjectBoxedOpaqueExistentialFunction(IRGenFunction &IGF,
 
           //  StartOffset = ((sizeof(HeapObject) + align) & ~align)
           auto *heapHeaderSize = llvm::ConstantInt::get(
-              IGF.IGM.SizeTy, getHeapHeaderSize(IGM).getValue());
+              IGF.IGM.SizeTy, IGM.RefCountedStructSize.getValue());
           auto *startOffset = Builder.CreateAnd(
               Builder.CreateAdd(heapHeaderSize, alignmentMask),
               Builder.CreateNot(alignmentMask));

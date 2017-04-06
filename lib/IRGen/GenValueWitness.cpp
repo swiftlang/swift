@@ -261,7 +261,8 @@ static Address emitDefaultProjectBuffer(IRGenFunction &IGF, Address buffer,
       auto *boxStart = IGF.Builder.CreateLoad(boxAddress);
       auto *alignmentMask = type.getAlignmentMask(IGF, T);
       auto *heapHeaderSize =
-          llvm::ConstantInt::get(IGM.SizeTy, getHeapHeaderSize(IGM).getValue());
+          llvm::ConstantInt::get(IGM.SizeTy,
+                                 IGM.RefCountedStructSize.getValue());
       auto *startOffset =
         Builder.CreateAnd(Builder.CreateAdd(heapHeaderSize, alignmentMask),
                               Builder.CreateNot(alignmentMask));
@@ -1112,7 +1113,7 @@ getCopyOutOfLineBoxPointerFunction(IRGenModule &IGM,
         IGF.Builder.CreateStore(ptr, dest);
         auto *alignmentMask = fixedTI.getStaticAlignmentMask(IGM);
         auto *heapHeaderSize = llvm::ConstantInt::get(
-            IGM.SizeTy, getHeapHeaderSize(IGM).getValue());
+            IGM.SizeTy, IGM.RefCountedStructSize.getValue());
         auto *startOffset = IGF.Builder.CreateAnd(
             IGF.Builder.CreateAdd(heapHeaderSize, alignmentMask),
             IGF.Builder.CreateNot(alignmentMask));
