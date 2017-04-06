@@ -2944,19 +2944,48 @@ Type TypeResolver::resolveCompositionType(CompositionTypeRepr *repr,
   if (auto fixed = fixCompositionWithPostfix(TC, repr))
     return resolveType(fixed, options);
 
+  Type SuperclassType;
   SmallVector<Type, 4> ProtocolTypes;
+
+  auto checkSuperclass = [&](SourceLoc loc, Type t) -> bool {
+    if (SuperclassType && !SuperclassType->isEqual(t)) {
+      TC.diagnose(loc, diag::protocol_composition_one_class, t,
+                  SuperclassType);
+      return true;
+    }
+
+    SuperclassType = t;
+    return false;
+  };
+
   for (auto tyR : repr->getTypes()) {
     Type ty = TC.resolveType(tyR, DC, withoutContext(options), Resolver);
     if (!ty || ty->hasError()) return ty;
 
-    if (!ty->isExistentialType()) {
-      TC.diagnose(tyR->getStartLoc(), diag::protocol_composition_not_protocol,
-                  ty);
+    auto nominalDecl = ty->getAnyNominal();
+    if (TC.Context.LangOpts.EnableExperimentalSubclassExistentials &&
+        nominalDecl && isa<ClassDecl>(nominalDecl)) {
+      if (checkSuperclass(tyR->getStartLoc(), ty))
+        continue;
+
+      ProtocolTypes.push_back(ty);
       continue;
     }
 
-    ProtocolTypes.push_back(ty);
+    if (ty->isExistentialType()) {
+      if (auto superclassTy = ty->getSuperclass(nullptr))
+        if (checkSuperclass(tyR->getStartLoc(), superclassTy))
+          continue;
+
+      ProtocolTypes.push_back(ty);
+      continue;
+    }
+
+    TC.diagnose(tyR->getStartLoc(),
+                diag::invalid_protocol_composition_member,
+                ty);
   }
+
   return ProtocolCompositionType::get(Context, ProtocolTypes);
 }
 

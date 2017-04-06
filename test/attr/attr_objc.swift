@@ -2024,7 +2024,7 @@ class ClassThrows1 {
 
   @objc func fooWithErrorProtocolComposition1(x: Error & Protocol_ObjC1) { }
   // expected-error@-1{{method cannot be marked @objc because the type of the parameter cannot be represented in Objective-C}}
-  // expected-note@-2{{protocol composition involving 'Error' cannot be represented in Objective-C}}
+  // expected-note@-2{{protocol-constrained type containing 'Error' cannot be represented in Objective-C}}
 
   // CHECK: {{^}} func fooWithErrorProtocolComposition2(x: Error & Protocol_ObjC1)
   func fooWithErrorProtocolComposition2(x: Error & Protocol_ObjC1) { }
