@@ -21,48 +21,6 @@ CHANGELOG
 Swift 4.0
 ---------
 
-* [SE-0138](https://github.com/apple/swift-evolution/blob/master/proposals/0138-unsaferawbufferpointer.md#amendment-to-normalize-the-slice-type):
-
-  Slicing a raw buffer no longer results in the same raw buffer
-  type. Specifically, `Unsafe[Mutable]BufferPointer.SubSequence` now has type
-  `[Mutable]RandomAccessSlice<Unsafe[Mutable]RawBufferPointer>`. Therefore,
-  indexing into a raw buffer slice is no longer zero-based. This is required for
-  raw buffers to fully conform to generic `Collection`. Changing the slice type
-  resulted in the following behavioral changes:
-
-  Passing a region within buffer to another function that takes a buffer can no
-  longer be done via subscript:
-
-  Incorrect: `takesRawBuffer(buffer[i..<j])`
-
-  This now requires explicit initialization, using a `rebasing:` initializer,
-  which converts from a slice to a zero-based `Unsafe[Mutable]RawBufferPointer`:
-
-  Correct: `takesRawBuffer(UnsafeRawBufferPointer(rebasing: buffer[i..<j]))`
-
-  Subscript assignment directly from a buffer no longer compiles:
-
-  Incorrect: `buffer[n..<m] = smaller_buffer`
-
-  This now requires creation of a slice from the complete source buffer:
-
-  Correct: `buffer[n..<m] = smaller_buffer.suffix(from: 0)`
-
-  `UnsafeRawBufferPointer`'s slice type no longer has a nonmutating subscript
-  setter. So assigning into a mutable `let` buffer no longer compiles:
-
-  ```
-  let slice = buffer[n..<m]
-  slice[i..<j] = buffer[k..<l]
-  ```
-
-  The assigned buffer slice now needs to be a `var`.
-
-  ```
-  var slice = buffer[n..<m]
-  slice[i..<j] = buffer[k..<l]
-  ```
-
 * [SR-1529](https://bugs.swift.org/browse/SR-1529):
 
   Covariant method overrides are now fully supported, fixing many crashes
