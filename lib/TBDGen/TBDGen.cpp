@@ -36,6 +36,7 @@ namespace {
 class TBDGenVisitor : public ASTVisitor<TBDGenVisitor> {
   StringSet &Symbols;
   const irgen::UniversalLinkageInfo &UniversalLinkInfo;
+  ModuleDecl *SwiftModule;
 
   void addSymbol(StringRef name) {
     auto isNewValue = Symbols.insert(name).second;
@@ -43,18 +44,29 @@ class TBDGenVisitor : public ASTVisitor<TBDGenVisitor> {
     assert(isNewValue && "already inserted");
   }
 
+  void addSymbol(irgen::LinkEntity entity) {
+    auto linkage = irgen::LinkInfo::get(UniversalLinkInfo, SwiftModule, entity,
+                                        ForDefinition);
+
+    auto externallyVisible =
+        llvm::GlobalValue::isExternalLinkage(linkage.getLinkage()) &&
+        linkage.getVisibility() != llvm::GlobalValue::HiddenVisibility;
+
+    if (externallyVisible)
+      addSymbol(linkage.getName());
+  }
+
   void visitValueTypeDecl(NominalTypeDecl *NTD) {
     assert(isa<StructDecl>(NTD) || isa<EnumDecl>(NTD));
-    if (isPrivateDecl(NTD))
-      return;
-
     visitNominalTypeDecl(NTD);
   }
 
 public:
   TBDGenVisitor(StringSet &symbols,
-                const irgen::UniversalLinkageInfo &universalLinkInfo)
-      : Symbols(symbols), UniversalLinkInfo(universalLinkInfo) {}
+                const irgen::UniversalLinkageInfo &universalLinkInfo,
+                ModuleDecl *swiftModule)
+      : Symbols(symbols), UniversalLinkInfo(universalLinkInfo),
+        SwiftModule(swiftModule) {}
 
   void visitMembers(Decl *D) {
     SmallVector<Decl *, 4> members;
@@ -86,36 +98,23 @@ public:
   void visitNominalTypeDecl(NominalTypeDecl *NTD) {
     auto declaredType = NTD->getDeclaredType()->getCanonicalType();
 
-    auto ntDescriptor = irgen::LinkEntity::forNominalTypeDescriptor(NTD);
-    addSymbol(ntDescriptor.mangleAsString());
+    addSymbol(irgen::LinkEntity::forNominalTypeDescriptor(NTD));
 
-    auto tmd = irgen::LinkEntity::forTypeMetadata(
+    addSymbol(irgen::LinkEntity::forTypeMetadata(
         declaredType, irgen::TypeMetadataAddress::AddressPoint,
-        /*isPattern=*/false);
-    addSymbol(tmd.mangleAsString());
-    auto tmda = irgen::LinkEntity::forTypeMetadataAccessFunction(declaredType);
-    addSymbol(tmda.mangleAsString());
-
-    if (isPrivateDecl(NTD))
-      return;
+        /*isPattern=*/false));
+    addSymbol(irgen::LinkEntity::forTypeMetadataAccessFunction(declaredType));
 
     visitMembers(NTD);
   }
   void visitClassDecl(ClassDecl *CD) {
-    if (isPrivateDecl(CD))
-      return;
-
     visitNominalTypeDecl(CD);
   }
 
   void visitStructDecl(StructDecl *SD) { visitValueTypeDecl(SD); }
   void visitEnumDecl(EnumDecl *ED) { visitValueTypeDecl(ED); }
   void visitProtocolDecl(ProtocolDecl *PD) {
-    if (isPrivateDecl(PD))
-      return;
-
-    auto pDescriptor = irgen::LinkEntity::forProtocolDescriptor(PD);
-    addSymbol(pDescriptor.mangleAsString());
+    addSymbol(irgen::LinkEntity::forProtocolDescriptor(PD));
 
     // There's no relevant information about members of a protocol at individual
     // protocols, each conforming type has to handle them individually.
@@ -157,7 +156,7 @@ void swift::enumeratePublicSymbols(FileUnit *file, StringSet &symbols,
   SmallVector<Decl *, 16> decls;
   file->getTopLevelDecls(decls);
 
-  TBDGenVisitor visitor(symbols, linkInfo);
+  TBDGenVisitor visitor(symbols, linkInfo, file->getParentModule());
   for (auto d : decls)
     visitor.visit(d);
 }
