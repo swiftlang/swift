@@ -15,18 +15,18 @@ protocol P3 { }
 protocol P4 { }
 
 // expected-error@+1{{'T' does not have a member type named 'assoc'; did you mean 'Assoc'?}}{{30-35=Assoc}}
-func typoAssoc1<T : P1>(x: T.assoc) { } 
+func typoAssoc1<T : P1>(x: T.assoc, _: T) { } 
 
-// expected-error@+2{{'T' does not have a member type named 'assoc'; did you mean 'Assoc'?}}{{43-48=Assoc}}
-// expected-error@+1{{'U' does not have a member type named 'assoc'; did you mean 'Assoc'?}}{{54-59=Assoc}}
-func typoAssoc2<T : P1, U : P1>() where T.assoc == U.assoc {}
+// expected-error@+2{{'T' does not have a member type named 'assoc'; did you mean 'Assoc'?}}{{53-58=Assoc}}
+// expected-error@+1{{'U' does not have a member type named 'assoc'; did you mean 'Assoc'?}}{{64-69=Assoc}}
+func typoAssoc2<T : P1, U : P1>(_: T, _: U) where T.assoc == U.assoc {}
 
 // CHECK-GENERIC-LABEL: .typoAssoc2
 // CHECK-GENERIC: Generic signature: <T, U where T : P1, U : P1, T.Assoc == U.Assoc>
 
 // expected-error@+3{{'T.AssocP2' does not have a member type named 'assoc'; did you mean 'Assoc'?}}{{42-47=Assoc}}
 // expected-error@+2{{'U.AssocP2' does not have a member type named 'assoc'; did you mean 'Assoc'?}}{{19-24=Assoc}}
-func typoAssoc3<T : P2, U : P2>()
+func typoAssoc3<T : P2, U : P2>(t: T, u: U)
   where U.AssocP2.assoc : P3,  T.AssocP2.assoc : P4,
         T.AssocP2 == U.AssocP2 {}
 

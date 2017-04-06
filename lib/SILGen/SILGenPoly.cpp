@@ -164,7 +164,7 @@ collectExistentialConformances(ModuleDecl *M, Type fromType, Type toType) {
   assert(!fromType->isAnyExistentialType());
   
   SmallVector<ProtocolDecl *, 4> protocols;
-  toType->getAnyExistentialTypeProtocols(protocols);
+  toType->getExistentialTypeProtocols(protocols);
   
   SmallVector<ProtocolConformanceRef, 4> conformances;
   for (auto proto : protocols) {

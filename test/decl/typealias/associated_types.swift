@@ -17,5 +17,5 @@ protocol DerivedProto : BaseProto {
 }
 
 
-func generic<T: BaseProto>(_ assoc: T.AssocTy) {} // no-warning
+func generic<T: BaseProto>(_: T, _ assoc: T.AssocTy) {} // no-warning
 

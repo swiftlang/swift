@@ -31,6 +31,7 @@ namespace clang {
   class CodeGenOptions;
   class Decl;
   class DependencyCollector;
+  class DiagnosticConsumer;
   class EnumConstantDecl;
   class EnumDecl;
   class MacroInfo;
@@ -44,6 +45,7 @@ namespace clang {
 
 namespace swift {
 class ASTContext;
+class CompilerInvocation;
 class ClangImporterOptions;
 class ClangModuleUnit;
 class ClangNode;
@@ -78,14 +80,19 @@ public:
   /// \param ctx The ASTContext into which the module will be imported.
   /// The ASTContext's SearchPathOptions will be used for the Clang importer.
   ///
-  /// \param clangImporterOpts The options to use for the Clang importer.
+  /// \param importerOpts The options to use for the Clang importer.
+  ///
+  /// \param swiftPCHHash A hash of Swift's various options in a compiler
+  /// invocation, used to create a unique Bridging PCH if requested.
   ///
   /// \param tracker The object tracking files this compilation depends on.
   ///
   /// \returns a new Clang module importer, or null (with a diagnostic) if
   /// an error occurred.
   static std::unique_ptr<ClangImporter>
-  create(ASTContext &ctx, const ClangImporterOptions &clangImporterOpts,
+  create(ASTContext &ctx,
+         const ClangImporterOptions &importerOpts,
+         std::string swiftPCHHash = "",
          DependencyTracker *tracker = nullptr);
 
   ClangImporter(const ClangImporter &) = delete;
@@ -234,7 +241,14 @@ public:
   /// replica.
   ///
   /// \sa clang::GeneratePCHAction
-  bool emitBridgingPCH(StringRef headerPath, StringRef outputPCHPath);
+  bool emitBridgingPCH(StringRef headerPath,
+                       StringRef outputPCHPath,
+                       clang::DiagnosticConsumer *Diags = nullptr);
+
+  /// Returns true if a clang CompilerInstance can successfully read in a PCH,
+  /// assuming it exists, with the current options. This can be used to find out
+  /// if we need to persist a PCH for later reuse.
+  bool canReadPCH(StringRef PCHFilename);
 
   const clang::Module *getClangOwningModule(ClangNode Node) const;
   bool hasTypedef(const clang::Decl *typeDecl) const;
@@ -291,6 +305,13 @@ public:
 
   DeclName importName(const clang::NamedDecl *D,
                       clang::DeclarationName givenName);
+
+  Optional<std::string>
+  getOrCreatePCH(const ClangImporterOptions &ImporterOptions,
+                 const std::string &SwiftPCHHash);
+  Optional<std::string>
+  getPCHFilename(const ClangImporterOptions &ImporterOptions,
+                 const std::string &SwiftPCHHash);
 };
 
 ImportDecl *createImportDecl(ASTContext &Ctx, DeclContext *DC, ClangNode ClangN,

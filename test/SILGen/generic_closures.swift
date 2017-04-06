@@ -307,7 +307,7 @@ protocol Doggo {}
 
 struct DogSnacks<A : Doggo> {}
 
-func capture_same_type_representative<Daisy: Doge, Roo: Doggo>(slobber: Roo)
+func capture_same_type_representative<Daisy: Doge, Roo: Doggo>(slobber: Roo, daisy: Daisy)
     where Roo == Daisy.Nose.Squeegee {
   var s = DogSnacks<Daisy.Nose.Squeegee>()
   _ = { _ = s }

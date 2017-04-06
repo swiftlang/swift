@@ -50,7 +50,7 @@ using namespace Lowering;
 
 ManagedValue SILGenFunction::emitManagedRetain(SILLocation loc,
                                                SILValue v) {
-  auto &lowering = F.getTypeLowering(v->getType());
+  auto &lowering = getTypeLowering(v->getType());
   return emitManagedRetain(loc, v, lowering);
 }
 
@@ -70,7 +70,7 @@ ManagedValue SILGenFunction::emitManagedRetain(SILLocation loc,
 }
 
 ManagedValue SILGenFunction::emitManagedLoadCopy(SILLocation loc, SILValue v) {
-  auto &lowering = F.getTypeLowering(v->getType());
+  auto &lowering = getTypeLowering(v->getType());
   return emitManagedLoadCopy(loc, v, lowering);
 }
 
@@ -88,7 +88,7 @@ ManagedValue SILGenFunction::emitManagedLoadCopy(SILLocation loc, SILValue v,
 
 ManagedValue SILGenFunction::emitManagedLoadBorrow(SILLocation loc,
                                                    SILValue v) {
-  auto &lowering = F.getTypeLowering(v->getType());
+  auto &lowering = getTypeLowering(v->getType());
   return emitManagedLoadBorrow(loc, v, lowering);
 }
 
@@ -108,7 +108,7 @@ SILGenFunction::emitManagedLoadBorrow(SILLocation loc, SILValue v,
 
 ManagedValue SILGenFunction::emitManagedStoreBorrow(SILLocation loc, SILValue v,
                                                     SILValue addr) {
-  auto &lowering = F.getTypeLowering(v->getType());
+  auto &lowering = getTypeLowering(v->getType());
   return emitManagedStoreBorrow(loc, v, addr, lowering);
 }
 
@@ -127,7 +127,7 @@ ManagedValue SILGenFunction::emitManagedStoreBorrow(
 
 ManagedValue SILGenFunction::emitManagedBeginBorrow(SILLocation loc,
                                                     SILValue v) {
-  auto &lowering = F.getTypeLowering(v->getType());
+  auto &lowering = getTypeLowering(v->getType());
   return emitManagedBeginBorrow(loc, v, lowering);
 }
 
@@ -212,7 +212,7 @@ SILGenFunction::emitFormalEvaluationManagedBeginBorrow(SILLocation loc,
                                                        SILValue v) {
   if (v.getOwnershipKind() == ValueOwnershipKind::Guaranteed)
     return ManagedValue::forUnmanaged(v);
-  auto &lowering = F.getTypeLowering(v->getType());
+  auto &lowering = getTypeLowering(v->getType());
   return emitFormalEvaluationManagedBeginBorrow(loc, v, lowering);
 }
 
@@ -232,7 +232,7 @@ ManagedValue SILGenFunction::emitFormalEvaluationManagedBeginBorrow(
 ManagedValue
 SILGenFunction::emitFormalEvaluationManagedBorrowedRValueWithCleanup(
     SILLocation loc, SILValue original, SILValue borrowed) {
-  auto &lowering = F.getTypeLowering(original->getType());
+  auto &lowering = getTypeLowering(original->getType());
   return emitFormalEvaluationManagedBorrowedRValueWithCleanup(
       loc, original, borrowed, lowering);
 }
@@ -264,7 +264,7 @@ SILGenFunction::emitManagedBorrowedRValueWithCleanup(SILValue original,
                                                      SILValue borrowed) {
   assert(original->getType().getObjectType() ==
          borrowed->getType().getObjectType());
-  auto &lowering = F.getTypeLowering(original->getType());
+  auto &lowering = getTypeLowering(original->getType());
   return emitManagedBorrowedRValueWithCleanup(original, borrowed, lowering);
 }
 
@@ -287,7 +287,7 @@ ManagedValue SILGenFunction::emitManagedBorrowedRValueWithCleanup(
 }
 
 ManagedValue SILGenFunction::emitManagedRValueWithCleanup(SILValue v) {
-  auto &lowering = F.getTypeLowering(v->getType());
+  auto &lowering = getTypeLowering(v->getType());
   return emitManagedRValueWithCleanup(v, lowering);
 }
 
@@ -305,7 +305,7 @@ ManagedValue SILGenFunction::emitManagedRValueWithCleanup(SILValue v,
 }
 
 ManagedValue SILGenFunction::emitManagedBufferWithCleanup(SILValue v) {
-  auto &lowering = F.getTypeLowering(v->getType());
+  auto &lowering = getTypeLowering(v->getType());
   return emitManagedBufferWithCleanup(v, lowering);
 }
 
@@ -541,7 +541,7 @@ struct DelegateInitSelfWritebackCleanup : Cleanup {
 
   void emit(SILGenFunction &gen, CleanupLocation) override {
     gen.emitSemanticStore(loc, value, lvalueAddress,
-                          gen.F.getTypeLowering(lvalueAddress->getType()),
+                          gen.getTypeLowering(lvalueAddress->getType()),
                           IsInitialization);
   }
 
@@ -570,7 +570,7 @@ RValue SILGenFunction::emitRValueForSelfInDelegationInit(SILLocation loc,
                                                          SGFContext C) {
   assert(SelfInitDelegationState != SILGenFunction::NormalSelf &&
          "This should never be called unless we are in a delegation sequence");
-  assert(F.getTypeLowering(addr->getType()).isLoadable() &&
+  assert(getTypeLowering(addr->getType()).isLoadable() &&
          "Make sure that we are not dealing with semantic rvalues");
 
   // If we are currently in the WillSharedBorrowSelf state, then we know that
@@ -595,7 +595,7 @@ RValue SILGenFunction::emitRValueForSelfInDelegationInit(SILLocation loc,
   // If we are in WillExclusiveBorrowSelf, then we need to perform an exclusive
   // borrow (i.e. a load take) and then move to DidExclusiveBorrowSelf.
   if (SelfInitDelegationState == SILGenFunction::WillExclusiveBorrowSelf) {
-    const auto &typeLowering = F.getTypeLowering(addr->getType());
+    const auto &typeLowering = getTypeLowering(addr->getType());
     SelfInitDelegationState = SILGenFunction::DidExclusiveBorrowSelf;
     SILValue self =
         emitLoad(loc, addr, typeLowering, C, IsTake, false).forward(*this);

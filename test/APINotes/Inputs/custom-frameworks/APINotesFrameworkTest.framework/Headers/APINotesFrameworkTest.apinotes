@@ -1,5 +1,7 @@
 Name: APINotesFrameworkTest
 Classes:
+  - Name: A
+    SwiftObjCMembers: true
   - Name: TestProperties
     Properties:
       - Name: accessorsOnly
@@ -82,6 +84,8 @@ SwiftVersions:
           - Name: accessorsOnlyRenamedRetypedClass
             PropertyKind:    Class
             SwiftImportAsAccessors: true
+      - Name: NewlyGenericSub
+        SwiftImportAsNonGeneric: true
     Protocols:
       - Name: ProtoWithVersionedUnavailableMember
         Methods:

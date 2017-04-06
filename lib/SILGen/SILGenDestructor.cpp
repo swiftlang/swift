@@ -150,7 +150,7 @@ void SILGenFunction::emitDeallocatingDestructor(DestructorDecl *dd) {
   //
   // This means that the lifetime of self can not be modeled statically in a
   // deallocating deinit without analyzing the body of the destroying deinit
-  // (something that violates semantic sil). Thus we add an artifical destroy of
+  // (something that violates semantic sil). Thus we add an artificial destroy of
   // self before the actual destroy of self so that the verifier can understand
   // that self is being properly balanced.
   B.createEndLifetime(loc, initialSelfValue);

@@ -430,7 +430,7 @@ bool RequirementSource::isSelfDerivedConformance(PotentialArchetype *currentPA,
     totalSizeToAlloc<ProtocolDecl *, WrittenRequirementLoc>(               \
                                            NumProtocolDecls,               \
                                            WrittenReq.isNull()? 0 : 1);    \
-  void *mem = malloc(size);                                                \
+  void *mem = ::operator new(size);                                        \
   auto result = new (mem) RequirementSource ConstructorArgs;               \
   builder.Impl->RequirementSources.InsertNode(result, insertPos);          \
   return result
@@ -1043,8 +1043,7 @@ static void maybeAddSameTypeRequirementForNestedType(
   // Dig out the type witness.
   auto superConformance = superSource->getProtocolConformance();
   auto concreteType =
-    superConformance->getTypeWitness(assocType, builder.getLazyResolver())
-      .getReplacement();
+    superConformance->getTypeWitness(assocType, builder.getLazyResolver());
   if (!concreteType) return;
 
   // Add the same-type constraint.
@@ -1348,9 +1347,9 @@ static void concretizeNestedTypeFromConcreteParent(
 
   Type witnessType;
   if (conformance.isConcrete()) {
-    witnessType = conformance.getConcrete()
-                      ->getTypeWitness(assocType, builder.getLazyResolver())
-                      .getReplacement();
+    witnessType =
+      conformance.getConcrete()
+        ->getTypeWitness(assocType, builder.getLazyResolver());
   } else {
     witnessType = DependentMemberType::get(concreteParent, assocType);
   }
@@ -1983,6 +1982,13 @@ GenericSignatureBuilder::GenericSignatureBuilder(GenericSignatureBuilder &&) = d
 GenericSignatureBuilder::~GenericSignatureBuilder() {
   if (!Impl)
     return;
+
+  SmallVector<RequirementSource *, 4> requirementSources;
+  for (auto &reqSource : Impl->RequirementSources)
+    requirementSources.push_back(&reqSource);
+  Impl->RequirementSources.clear();
+  for (auto reqSource : requirementSources)
+    delete reqSource;
 
   for (auto PA : Impl->PotentialArchetypes)
     delete PA;
@@ -2743,13 +2749,14 @@ bool GenericSignatureBuilder::addRequirement(const RequirementRepr *Req,
                                       source.getSource(PA, Req->getSubject()));
     }
 
-    SmallVector<ProtocolDecl *, 4> ConformsTo;
-    if (!Req->getConstraint()->isExistentialType(ConformsTo)) {
+    if (!Req->getConstraint()->isExistentialType()) {
       // FIXME: Diagnose this failure here, rather than over in type-checking.
       return true;
     }
 
     // Add each of the protocols.
+    SmallVector<ProtocolDecl *, 4> ConformsTo;
+    Req->getConstraint()->getExistentialTypeProtocols(ConformsTo);
     for (auto Proto : ConformsTo)
       if (addConformanceRequirement(PA, Proto,
                                     source.getSource(PA, Req->getSubject())))
@@ -2763,9 +2770,14 @@ bool GenericSignatureBuilder::addRequirement(const RequirementRepr *Req,
     // parameter.
     if (!Req->getFirstType()->hasTypeParameter() &&
         !Req->getSecondType()->hasTypeParameter()) {
-      Diags.diagnose(Req->getEqualLoc(), diag::requires_no_same_type_archetype)
-        .highlight(Req->getFirstTypeLoc().getSourceRange())
-        .highlight(Req->getSecondTypeLoc().getSourceRange());
+      if (!Req->getFirstType()->hasError() &&
+          !Req->getSecondType()->hasError()) {
+        Diags.diagnose(Req->getEqualLoc(),
+                       diag::requires_no_same_type_archetype)
+          .highlight(Req->getFirstTypeLoc().getSourceRange())
+          .highlight(Req->getSecondTypeLoc().getSourceRange());
+      }
+
       return true;
     }
 
@@ -2824,7 +2836,7 @@ bool GenericSignatureBuilder::addRequirement(
     if (!pa) return false;
 
     SmallVector<ProtocolDecl *, 4> conformsTo;
-    (void)req.getSecondType()->isExistentialType(conformsTo);
+    req.getSecondType()->getExistentialTypeProtocols(conformsTo);
 
     // Add each of the protocols.
     for (auto proto : conformsTo) {
@@ -3522,11 +3534,11 @@ static PotentialArchetype *sameTypeDFS(PotentialArchetype *pa,
     // Skip non-derived constraints.
     if (!constraint.source->isDerivedRequirement()) continue;
 
-    sameTypeDFS(constraint.value, component, paToComponent);
+    auto newAnchor = sameTypeDFS(constraint.value, component, paToComponent);
 
     // If this type is better than the anchor, use it for the anchor.
-    if (compareDependentTypes(&constraint.value, &anchor) < 0)
-      anchor = constraint.value;
+    if (compareDependentTypes(&newAnchor, &anchor) < 0)
+      anchor = newAnchor;
   }
 
   return anchor;
@@ -4092,11 +4104,10 @@ void GenericSignatureBuilder::enumerateRequirements(llvm::function_ref<
       // If this equivalence class is bound to a concrete type, equate the
       // anchor with a concrete type.
       if (Type concreteType = rep->getConcreteType()) {
-        // If the parent of this anchor is also in the equivalence class,
-        // don't create a requirement... it's covered by the "parent"
-        // relationship.
+        // If the parent of this anchor is also a concrete type, don't
+        // create a requirement.
         if (!archetype->isGenericParam() &&
-            archetype->getParent()->getRepresentative() == rep)
+            archetype->getParent()->isConcreteType())
           continue;
 
         auto source =

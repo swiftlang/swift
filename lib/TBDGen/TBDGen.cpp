@@ -20,7 +20,7 @@
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/Module.h"
 #include "swift/Basic/LLVM.h"
-#include "swift/IRGen/LinkEntity.h"
+#include "swift/IRGen/Linking.h"
 #include "swift/SIL/FormalLinkage.h"
 #include "swift/SIL/SILDeclRef.h"
 #include "llvm/ADT/StringSet.h"

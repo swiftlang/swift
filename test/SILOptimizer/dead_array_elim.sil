@@ -216,3 +216,37 @@ bb3:
   return %18 : $()
 }
 
+// CHECK-LABEL: sil @dead_array_in_single_cycle_loop
+// CHECK: bb0(%0 : $TrivialDestructor):
+// CHECK-NEXT: br bb1
+// CHECK: bb1:
+// CHECK-NEXT: strong_retain %0
+// CHECK-NEXT: strong_release %0
+// CHECK-NEXT: cond_br
+// CHECK: bb2:
+// CHECK-NEXT: tuple
+// CHECK-NEXT: return
+sil @dead_array_in_single_cycle_loop : $@convention(thin) (@guaranteed TrivialDestructor) -> () {
+bb0(%0 : $TrivialDestructor):
+  br bb1
+
+bb1:
+  %2 = integer_literal $Builtin.Word, 2
+  %3 = function_ref @allocArray : $@convention(thin) <τ_0_0> (Builtin.Word) -> @owned (Array<τ_0_0>, Builtin.RawPointer)
+  %4 = apply %3<TrivialDestructor>(%2) : $@convention(thin) <τ_0_0> (Builtin.Word) -> @owned (Array<τ_0_0>, Builtin.RawPointer)
+  %5 = tuple_extract %4 : $(Array<TrivialDestructor>, Builtin.RawPointer), 0
+  %6 = tuple_extract %4 : $(Array<TrivialDestructor>, Builtin.RawPointer), 1
+  %7 = pointer_to_address %6 : $Builtin.RawPointer to [strict] $*TrivialDestructor
+  %13 = struct_extract %5 : $Array<TrivialDestructor>, #Array._buffer
+  %14 = struct_extract %13 : $_ArrayBuffer<TrivialDestructor>, #_ArrayBuffer._storage
+  %15 = struct_extract %14 : $_BridgeStorage<_ContiguousArrayStorageBase, _NSArrayCore>, #_BridgeStorage.rawValue
+  strong_retain %0 : $TrivialDestructor
+  store %0 to %7 : $*TrivialDestructor
+  strong_release %15 : $Builtin.BridgeObject
+  cond_br undef, bb1, bb2
+
+bb2:
+  %18 = tuple ()
+  return %18 : $()
+}
+

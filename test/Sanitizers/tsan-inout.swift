@@ -19,7 +19,7 @@ import TSanUninstrumented
 var gInThread1: () -> () = { }
 var gInThread2: () -> () = { }
 
-// Spawn two threads, run the the two passed in closures simultaneously, and
+// Spawn two threads, run the two passed in closures simultaneously, and
 // join them.
 func testRace(name: String, thread inThread1: @escaping () -> (), thread inThread2: @escaping () -> ()) {
   var thread1: pthread_t?

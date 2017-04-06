@@ -211,14 +211,16 @@ private:
 
   void visitDebugValueAddrInst(DebugValueAddrInst *Inst);
   void visitStrongReleaseInst(StrongReleaseInst *Inst);
+  void visitDestroyValueInst(DestroyValueInst *Inst);
   void visitStructElementAddrInst(StructElementAddrInst *Inst);
   void visitLoadInst(LoadInst *Inst);
+  void visitLoadBorrowInst(LoadBorrowInst *Inst);
   void visitProjectBoxInst(ProjectBoxInst *Inst);
 
   SILFunction *Orig;
   IndicesSet &PromotableIndices;
-  llvm::DenseMap<SILArgument*, SILValue> BoxArgumentMap;
-  llvm::DenseMap<ProjectBoxInst*, SILValue> ProjectBoxArgumentMap;
+  llvm::DenseMap<SILArgument *, SILValue> BoxArgumentMap;
+  llvm::DenseMap<ProjectBoxInst *, SILValue> ProjectBoxArgumentMap;
 };
 } // end anonymous namespace
 
@@ -324,6 +326,11 @@ computeNewArgInterfaceTypes(SILFunction *F,
 
   DEBUG(llvm::dbgs() << "Preparing New Args!\n");
 
+  auto fnTy = F->getLoweredFunctionType();
+
+  auto &Types = F->getModule().Types;
+  Lowering::GenericContextScope scope(Types, fnTy->getGenericSignature());
+
   // For each parameter in the old function...
   for (unsigned Index : indices(Parameters)) {
     auto &param = Parameters[Index];
@@ -350,7 +357,7 @@ computeNewArgInterfaceTypes(SILFunction *F,
     assert(paramBoxTy->getLayout()->getFields().size() == 1
            && "promoting compound box not implemented yet");
     auto paramBoxedTy = paramBoxTy->getFieldType(F->getModule(), 0);
-    auto &paramTL = F->getTypeLowering(paramBoxedTy);
+    auto &paramTL = Types.getTypeLowering(paramBoxedTy);
     ParameterConvention convention;
     if (paramTL.isFormallyPassedIndirectly()) {
       convention = ParameterConvention::Indirect_In;
@@ -436,36 +443,45 @@ ClosureCloner::populateCloned() {
   // Create arguments for the entry block
   SILBasicBlock *OrigEntryBB = &*Orig->begin();
   SILBasicBlock *ClonedEntryBB = Cloned->createBasicBlock();
+  getBuilder().setInsertionPoint(ClonedEntryBB);
+
   unsigned ArgNo = 0;
   auto I = OrigEntryBB->args_begin(), E = OrigEntryBB->args_end();
-  while (I != E) {
-    if (PromotableIndices.count(ArgNo)) {
-      // Handle the case of a promoted capture argument.
-      auto BoxTy = (*I)->getType().castTo<SILBoxType>();
-      assert(BoxTy->getLayout()->getFields().size() == 1
-             && "promoting compound box not implemented");
-      auto BoxedTy = BoxTy->getFieldType(Cloned->getModule(),0).getObjectType();
-      SILValue MappedValue =
-          ClonedEntryBB->createFunctionArgument(BoxedTy, (*I)->getDecl());
-      BoxArgumentMap.insert(std::make_pair(*I, MappedValue));
-      
-      // Track the projections of the box.
-      for (auto *Use : (*I)->getUses()) {
-        if (auto Proj = dyn_cast<ProjectBoxInst>(Use->getUser())) {
-          ProjectBoxArgumentMap.insert(std::make_pair(Proj, MappedValue));
-        }
-      }
-    } else {
+  for (; I != E; ++ArgNo, ++I) {
+    if (!PromotableIndices.count(ArgNo)) {
       // Otherwise, create a new argument which copies the original argument
       SILValue MappedValue = ClonedEntryBB->createFunctionArgument(
           (*I)->getType(), (*I)->getDecl());
       ValueMap.insert(std::make_pair(*I, MappedValue));
+      continue;
     }
-    ++ArgNo;
-    ++I;
+
+    // Handle the case of a promoted capture argument.
+    auto BoxTy = (*I)->getType().castTo<SILBoxType>();
+    assert(BoxTy->getLayout()->getFields().size() == 1 &&
+           "promoting compound box not implemented");
+    auto BoxedTy = BoxTy->getFieldType(Cloned->getModule(), 0).getObjectType();
+    SILValue MappedValue =
+        ClonedEntryBB->createFunctionArgument(BoxedTy, (*I)->getDecl());
+
+    // If SIL ownership is enabled, we need to perform a borrow here if we have
+    // a non-trivial value. We know that our value is not written to and it does
+    // not escape. The use of a borrow enforces this.
+    if (Cloned->hasQualifiedOwnership() &&
+        MappedValue.getOwnershipKind() != ValueOwnershipKind::Trivial) {
+      SILLocation Loc(const_cast<ValueDecl *>((*I)->getDecl()));
+      MappedValue = getBuilder().createBeginBorrow(Loc, MappedValue);
+    }
+    BoxArgumentMap.insert(std::make_pair(*I, MappedValue));
+
+    // Track the projections of the box.
+    for (auto *Use : (*I)->getUses()) {
+      if (auto Proj = dyn_cast<ProjectBoxInst>(Use->getUser())) {
+        ProjectBoxArgumentMap.insert(std::make_pair(Proj, MappedValue));
+      }
+    }
   }
 
-  getBuilder().setInsertionPoint(ClonedEntryBB);
   BBMap.insert(std::make_pair(OrigEntryBB, ClonedEntryBB));
   // Recursively visit original BBs in depth-first preorder, starting with the
   // entry block, cloning all instructions other than terminators.
@@ -502,6 +518,9 @@ void ClosureCloner::visitDebugValueAddrInst(DebugValueAddrInst *Inst) {
 /// normally.
 void
 ClosureCloner::visitStrongReleaseInst(StrongReleaseInst *Inst) {
+  assert(
+      Inst->getFunction()->hasUnqualifiedOwnership() &&
+      "Should not see strong release in a function with qualified ownership");
   SILValue Operand = Inst->getOperand();
   if (SILArgument *A = dyn_cast<SILArgument>(Operand)) {
     auto I = BoxArgumentMap.find(A);
@@ -519,8 +538,43 @@ ClosureCloner::visitStrongReleaseInst(StrongReleaseInst *Inst) {
   SILCloner<ClosureCloner>::visitStrongReleaseInst(Inst);
 }
 
-/// \brief Handle a struct_element_addr instruction during cloning of a closure;
-/// if its operand is the promoted address argument then ignore it, otherwise it
+/// \brief Handle a destroy_value instruction during cloning of a closure; if
+/// it is a strong release of a promoted box argument, then it is replaced with
+/// a destroy_value of the new object type argument, otherwise it is handled
+/// normally.
+void ClosureCloner::visitDestroyValueInst(DestroyValueInst *Inst) {
+  SILValue Operand = Inst->getOperand();
+  if (SILArgument *A = dyn_cast<SILArgument>(Operand)) {
+    auto I = BoxArgumentMap.find(A);
+    if (I != BoxArgumentMap.end()) {
+      // Releases of the box arguments get replaced with an end_borrow,
+      // destroy_value of the new object type argument.
+      SILFunction &F = getBuilder().getFunction();
+      auto &typeLowering = F.getModule().getTypeLowering(I->second->getType());
+      SILBuilderWithPostProcess<ClosureCloner, 1> B(this, Inst);
+
+      SILValue Value = I->second;
+
+      // If ownership is enabled, then we must emit a begin_borrow for any
+      // non-trivial value.
+      if (F.hasQualifiedOwnership() &&
+          Value.getOwnershipKind() != ValueOwnershipKind::Trivial) {
+        auto *BBI = cast<BeginBorrowInst>(Value);
+        Value = BBI->getOperand();
+        B.createEndBorrow(Inst->getLoc(), BBI, Value);
+      }
+
+      typeLowering.emitDestroyValue(B, Inst->getLoc(), Value);
+      return;
+    }
+  }
+
+  SILCloner<ClosureCloner>::visitDestroyValueInst(Inst);
+}
+
+/// Handle a struct_element_addr instruction during cloning of a closure.
+///
+/// If its operand is the promoted address argument then ignore it, otherwise it
 /// is handled normally.
 void
 ClosureCloner::visitStructElementAddrInst(StructElementAddrInst *Inst) {
@@ -544,37 +598,87 @@ ClosureCloner::visitProjectBoxInst(ProjectBoxInst *I) {
   SILCloner<ClosureCloner>::visitProjectBoxInst(I);
 }
 
-/// \brief Handle a load instruction during cloning of a closure; the two
-/// relevant cases are a direct load from a promoted address argument or a load
-/// of a struct_element_addr of a promoted address argument.
-void
-ClosureCloner::visitLoadInst(LoadInst *Inst) {
-  SILValue Operand = Inst->getOperand();
+/// \brief Handle a load_borrow instruction during cloning of a closure.
+///
+/// The two relevant cases are a direct load from a promoted address argument or
+/// a load of a struct_element_addr of a promoted address argument.
+void ClosureCloner::visitLoadBorrowInst(LoadBorrowInst *LI) {
+  assert(LI->getFunction()->hasQualifiedOwnership() &&
+         "We should only see a load borrow in ownership qualified SIL");
+  SILValue Operand = LI->getOperand();
   if (auto *A = dyn_cast<ProjectBoxInst>(Operand)) {
     auto I = ProjectBoxArgumentMap.find(A);
     if (I != ProjectBoxArgumentMap.end()) {
       // Loads of the address argument get eliminated completely; the uses of
       // the loads get mapped to uses of the new object type argument.
-      ValueMap.insert(std::make_pair(Inst, I->second));
+      //
+      // We assume that the value is already guaranteed.
+      assert(I->second.getOwnershipKind() == ValueOwnershipKind::Guaranteed &&
+             "Expected out argument value to be guaranteed");
+      ValueMap.insert(std::make_pair(LI, I->second));
       return;
-    }
-  } else if (auto *SEAI = dyn_cast<StructElementAddrInst>(Operand)) {
-    if (auto *A = dyn_cast<ProjectBoxInst>(SEAI->getOperand())) {
-      auto I = ProjectBoxArgumentMap.find(A);
-      if (I != ProjectBoxArgumentMap.end()) {
-        // Loads of a struct_element_addr of an argument get replaced with
-        // struct_extract of the new object type argument.
-        SILBuilderWithPostProcess<ClosureCloner, 1> B(this, Inst);
-        SILValue V = B.emitStructExtract(Inst->getLoc(), I->second,
-                                         SEAI->getField(),
-                                         Inst->getType());
-        ValueMap.insert(std::make_pair(Inst, V));
-        return;
-      }
     }
   }
 
-  SILCloner<ClosureCloner>::visitLoadInst(Inst);
+  SILCloner<ClosureCloner>::visitLoadBorrowInst(LI);
+  return;
+}
+
+/// \brief Handle a load instruction during cloning of a closure.
+///
+/// The two relevant cases are a direct load from a promoted address argument or
+/// a load of a struct_element_addr of a promoted address argument.
+void ClosureCloner::visitLoadInst(LoadInst *LI) {
+  SILValue Operand = LI->getOperand();
+  if (auto *A = dyn_cast<ProjectBoxInst>(Operand)) {
+    auto I = ProjectBoxArgumentMap.find(A);
+    if (I != ProjectBoxArgumentMap.end()) {
+      // Loads of the address argument get eliminated completely; the uses of
+      // the loads get mapped to uses of the new object type argument.
+      //
+      // If we are compiling with SIL ownership, we need to take different
+      // behaviors depending on the type of load. Specifically, if we have a
+      // load [copy], then we need to add a copy_value here. If we have a take
+      // or trivial, we just propagate the value through.
+      SILValue Value = I->second;
+      if (A->getFunction()->hasQualifiedOwnership() &&
+          LI->getOwnershipQualifier() == LoadOwnershipQualifier::Copy) {
+        Value = getBuilder().createCopyValue(LI->getLoc(), Value);
+      }
+      ValueMap.insert(std::make_pair(LI, Value));
+      return;
+    }
+    SILCloner<ClosureCloner>::visitLoadInst(LI);
+    return;
+  }
+
+  auto *SEAI = dyn_cast<StructElementAddrInst>(Operand);
+  if (!SEAI) {
+    SILCloner<ClosureCloner>::visitLoadInst(LI);
+    return;
+  }
+
+  auto *PBI = dyn_cast<ProjectBoxInst>(SEAI->getOperand());
+  if (!PBI) {
+    SILCloner<ClosureCloner>::visitLoadInst(LI);
+    return;
+  }
+
+  auto I = ProjectBoxArgumentMap.find(PBI);
+  if (I == ProjectBoxArgumentMap.end()) {
+    SILCloner<ClosureCloner>::visitLoadInst(LI);
+    return;
+  }
+
+  // Loads of a struct_element_addr of an argument get replaced with a
+  // struct_extract of the new passed in value. The value should be borrowed
+  // already.
+  SILBuilderWithPostProcess<ClosureCloner, 1> B(this, LI);
+  assert(B.getFunction().hasUnqualifiedOwnership() ||
+         I->second.getOwnershipKind() == ValueOwnershipKind::Guaranteed);
+  SILValue V = B.emitStructExtract(LI->getLoc(), I->second, SEAI->getField(),
+                                   LI->getType());
+  ValueMap.insert(std::make_pair(LI, V));
 }
 
 static SILArgument *getBoxFromIndex(SILFunction *F, unsigned Index) {
@@ -595,7 +699,8 @@ isNonMutatingCapture(SILArgument *BoxArg) {
   // strong_release or projection, since this is the pattern expected from
   // SILGen.
   for (auto *O : BoxArg->getUses()) {
-    if (isa<StrongReleaseInst>(O->getUser()))
+    if (isa<StrongReleaseInst>(O->getUser()) ||
+        isa<DestroyValueInst>(O->getUser()))
       continue;
     
     if (auto Projection = dyn_cast<ProjectBoxInst>(O->getUser())) {
@@ -620,10 +725,11 @@ isNonMutatingCapture(SILArgument *BoxArg) {
             return false;
         continue;
       }
-      if (!isa<LoadInst>(O->getUser())
-          && !isa<DebugValueAddrInst>(O->getUser())
-          && !isa<MarkFunctionEscapeInst>(O->getUser()))
+      if (!isa<LoadInst>(O->getUser()) &&
+          !isa<DebugValueAddrInst>(O->getUser()) &&
+          !isa<MarkFunctionEscapeInst>(O->getUser())) {
         return false;
+      }
     }
   }
 
@@ -674,7 +780,10 @@ public:
   /// Visit a random value base.
   ///
   /// These are considered to be escapes.
-  bool visitValueBase(ValueBase *V) { return false; }
+  bool visitValueBase(ValueBase *V) {
+    DEBUG(llvm::dbgs() << "    FAIL! Have unknown escaping user: " << *V);
+    return false;
+  }
 
 #define ALWAYS_NON_ESCAPING_INST(INST)                                         \
   bool visit##INST##Inst(INST##Inst *V) { return true; }
@@ -684,6 +793,7 @@ public:
   ALWAYS_NON_ESCAPING_INST(StrongRetain)
   ALWAYS_NON_ESCAPING_INST(Load)
   ALWAYS_NON_ESCAPING_INST(StrongRelease)
+  ALWAYS_NON_ESCAPING_INST(DestroyValue)
 #undef ALWAYS_NON_ESCAPING_INST
 
   bool visitDeallocBoxInst(DeallocBoxInst *DBI) {
@@ -696,6 +806,7 @@ public:
     SILFunctionConventions substConv(AI->getSubstCalleeType(), AI->getModule());
     auto convention = substConv.getSILArgumentConvention(argIndex);
     if (!convention.isIndirectConvention()) {
+      DEBUG(llvm::dbgs() << "    FAIL! Found non indirect apply user: " << *AI);
       return false;
     }
     Mutations.push_back(AI);
@@ -709,33 +820,39 @@ public:
     }
   }
 
-  bool visitStructElementAddrInst(StructElementAddrInst *I) {
-    addUserOperandsToWorklist(I);
-    return true;
+  /// This is separate from the normal copy value handling since we are matching
+  /// the old behavior of non-top-level uses not being able to have partial
+  /// apply and project box uses.
+  struct detail {
+  enum IsMutating_t {
+    IsNotMutating = 0,
+    IsMutating = 1,
+  };
+  };
+#define RECURSIVE_INST_VISITOR(MUTATING, INST)    \
+  bool visit##INST##Inst(INST##Inst *I) {         \
+    if (bool(detail::MUTATING)) {                 \
+      Mutations.push_back(I);                     \
+    }                                             \
+    addUserOperandsToWorklist(I);                 \
+    return true;                                  \
   }
-
-  bool visitTupleElementAddrInst(TupleElementAddrInst *I) {
-    addUserOperandsToWorklist(I);
-    return true;
-  }
-
-  bool visitInitEnumDataAddrInst(InitEnumDataAddrInst *I) {
-    addUserOperandsToWorklist(I);
-    return true;
-  }
-
-  bool visitOpenExistentialAddrInst(OpenExistentialAddrInst *I) {
-    addUserOperandsToWorklist(I);
-    return true;
-  }
-
-  bool visitUncheckedTakeEnumDataAddrInst(UncheckedTakeEnumDataAddrInst *I) {
-    // UncheckedTakeEnumDataAddr is additionally a mutation.
-    Mutations.push_back(I);
-
-    addUserOperandsToWorklist(I);
-    return true;
-  }
+  // *NOTE* It is important that we do not have copy_value here. The reason why
+  // is that we only want to handle copy_value directly of the alloc_box without
+  // going through any other instructions. This protects our optimization later
+  // on.
+  //
+  // Additionally, copy_value is not a valid use of any of the instructions that
+  // we allow through.
+  //
+  // TODO: Can we ever hit copy_values here? If we do, we may be missing
+  // opportunities.
+  RECURSIVE_INST_VISITOR(IsNotMutating, StructElementAddr)
+  RECURSIVE_INST_VISITOR(IsNotMutating, TupleElementAddr)
+  RECURSIVE_INST_VISITOR(IsNotMutating, InitEnumDataAddr)
+  RECURSIVE_INST_VISITOR(IsNotMutating, OpenExistentialAddr)
+  RECURSIVE_INST_VISITOR(IsMutating   , UncheckedTakeEnumDataAddr)
+#undef RECURSIVE_INST_VISITOR
 
   bool visitCopyAddrInst(CopyAddrInst *CAI) {
     if (CurrentOp.get()->getOperandNumber() == 1 || CAI->isTakeOfSrc())
@@ -744,18 +861,38 @@ public:
   }
 
   bool visitStoreInst(StoreInst *SI) {
-    if (CurrentOp.get()->getOperandNumber() != 1)
+    if (CurrentOp.get()->getOperandNumber() != 1) {
+      DEBUG(llvm::dbgs() << "    FAIL! Found store of pointer: " << *SI);
       return false;
+    }
     Mutations.push_back(SI);
     return true;
   }
 
   bool visitAssignInst(AssignInst *AI) {
-    if (CurrentOp.get()->getOperandNumber() != 1)
+    if (CurrentOp.get()->getOperandNumber() != 1) {
+      DEBUG(llvm::dbgs() << "    FAIL! Found store of pointer: " << *AI);
       return false;
+    }
     Mutations.push_back(AI);
     return true;
   }
+};
+
+} // end anonymous namespace
+
+namespace {
+
+struct EscapeMutationScanningState {
+  /// The list of mutations that we found while checking for escapes.
+  llvm::SmallVector<SILInstruction *, 8> Mutations;
+
+  /// A flag that we use to ensure that we only ever see 1 project_box on an
+  /// alloc_box.
+  bool SawProjectBoxInst;
+
+  /// The global partial_apply -> index map.
+  llvm::DenseMap<PartialApplyInst *, unsigned> &IM;
 };
 
 } // end anonymous namespace
@@ -765,8 +902,132 @@ public:
 /// instruction which possibly mutates the contents of the box, then add it to
 /// the Mutations vector.
 static bool isNonEscapingUse(Operand *InitialOp,
-                             SmallVectorImpl<SILInstruction *> &Mutations) {
-  return NonEscapingUserVisitor(InitialOp, Mutations).compute();
+                             EscapeMutationScanningState &State) {
+  return NonEscapingUserVisitor(InitialOp, State.Mutations).compute();
+}
+
+bool isPartialApplyNonEscapingUser(Operand *CurrentOp, PartialApplyInst *PAI,
+                                   EscapeMutationScanningState &State) {
+  DEBUG(llvm::dbgs() << "    Found partial: " << *PAI);
+
+  unsigned OpNo = CurrentOp->getOperandNumber();
+  assert(OpNo != 0 && "Alloc box used as callee of partial apply?");
+
+  // If we've already seen this partial apply, then it means the same alloc
+  // box is being captured twice by the same closure, which is odd and
+  // unexpected: bail instead of trying to handle this case.
+  if (State.IM.count(PAI)) {
+    DEBUG(llvm::dbgs() << "        FAIL! Already seen.\n");
+    return false;
+  }
+
+  SILModule &M = PAI->getModule();
+  auto closureType = PAI->getType().castTo<SILFunctionType>();
+  SILFunctionConventions closureConv(closureType, M);
+
+  // Calculate the index into the closure's argument list of the captured
+  // box pointer (the captured address is always the immediately following
+  // index so is not stored separately);
+  unsigned Index = OpNo - 1 + closureConv.getNumSILArguments();
+
+  auto *Fn = PAI->getReferencedFunction();
+  if (!Fn || !Fn->isDefinition()) {
+    DEBUG(llvm::dbgs() << "        FAIL! Not a direct function definition "
+                          "reference.\n");
+    return false;
+  }
+
+  SILArgument *BoxArg = getBoxFromIndex(Fn, Index);
+
+  // For now, return false is the address argument is an address-only type,
+  // since we currently handle loadable types only.
+  // TODO: handle address-only types
+  auto BoxTy = BoxArg->getType().castTo<SILBoxType>();
+  assert(BoxTy->getLayout()->getFields().size() == 1 &&
+         "promoting compound box not implemented yet");
+  if (BoxTy->getFieldType(M, 0).isAddressOnly(M)) {
+    DEBUG(llvm::dbgs() << "        FAIL! Box is an address only argument!\n");
+    return false;
+  }
+
+  // Verify that this closure is known not to mutate the captured value; if
+  // it does, then conservatively refuse to promote any captures of this
+  // value.
+  if (!isNonMutatingCapture(BoxArg)) {
+    DEBUG(llvm::dbgs() << "        FAIL: Have a mutating capture!\n");
+    return false;
+  }
+
+  // Record the index and continue.
+  DEBUG(llvm::dbgs()
+        << "        Partial apply does not escape, may be optimizable!\n");
+  DEBUG(llvm::dbgs() << "        Index: " << Index << "\n");
+  State.IM.insert(std::make_pair(PAI, Index));
+  return true;
+}
+
+static bool isProjectBoxNonEscapingUse(ProjectBoxInst *PBI,
+                                       EscapeMutationScanningState &State) {
+  DEBUG(llvm::dbgs() << "    Found project box: " << *PBI);
+
+  // Check for mutations of the address component.
+  SILValue Addr = PBI;
+
+  // If the AllocBox is used by a mark_uninitialized, scan the MUI for
+  // interesting uses.
+  if (Addr->hasOneUse()) {
+    SILInstruction *SingleAddrUser = Addr->use_begin()->getUser();
+    if (isa<MarkUninitializedInst>(SingleAddrUser))
+      Addr = SILValue(SingleAddrUser);
+  }
+
+  for (Operand *AddrOp : Addr->getUses()) {
+    if (!isNonEscapingUse(AddrOp, State)) {
+      DEBUG(llvm::dbgs() << "    FAIL! Has escaping user of addr:"
+                         << *AddrOp->getUser());
+      return false;
+    }
+  }
+
+  return true;
+}
+
+static bool scanUsesForEscapesAndMutations(Operand *Op,
+                                           EscapeMutationScanningState &State) {
+  if (auto *PAI = dyn_cast<PartialApplyInst>(Op->getUser())) {
+    return isPartialApplyNonEscapingUser(Op, PAI, State);
+  }
+
+  if (auto *PBI = dyn_cast<ProjectBoxInst>(Op->getUser())) {
+    // It is assumed in later code that we will only have 1 project_box. This
+    // can be seen since there is no code for reasoning about multiple
+    // boxes. Just put in the restriction so we are consistent.
+    if (State.SawProjectBoxInst)
+      return false;
+    State.SawProjectBoxInst = true;
+    return isProjectBoxNonEscapingUse(PBI, State);
+  }
+
+  // Given a top level copy value use, check all of its user operands as if
+  // they were apart of the use list of the base operand.
+  //
+  // This is because even though we are copying the box, a copy of the box is
+  // just a retain + bitwise copy of the pointer. This has nothing to do with
+  // whether or not the address escapes in some way.
+  //
+  // This is a separate code path from the non escaping user visitor check since
+  // we want to be more conservative around non-top level copies (i.e. a copy
+  // derived from a projection like instruction). In fact such a thing may not
+  // even make any sense!
+  if (auto *CVI = dyn_cast<CopyValueInst>(Op->getUser())) {
+    return all_of(CVI->getUses(), [&State](Operand *CopyOp) -> bool {
+      return scanUsesForEscapesAndMutations(CopyOp, State);
+    });
+  }
+
+  // Verify that this use does not otherwise allow the alloc_box to
+  // escape.
+  return isNonEscapingUse(Op, State);
 }
 
 /// \brief Examine an alloc_box instruction, returning true if at least one
@@ -775,101 +1036,20 @@ static bool isNonEscapingUse(Operand *InitialOp,
 /// argument list is added to IM.
 static bool
 examineAllocBoxInst(AllocBoxInst *ABI, ReachabilityInfo &RI,
-                    llvm::DenseMap<PartialApplyInst*, unsigned> &IM) {
+                    llvm::DenseMap<PartialApplyInst *, unsigned> &IM) {
   DEBUG(llvm::dbgs() << "Visiting alloc box: " << *ABI);
-  SmallVector<SILInstruction*, 32> Mutations;
-  
+  EscapeMutationScanningState State{{}, false, IM};
+
   // Scan the box for interesting uses.
-  for (Operand *O : ABI->getUses()) {
-    if (auto *PAI = dyn_cast<PartialApplyInst>(O->getUser())) {
-      DEBUG(llvm::dbgs() << "    Found partial: " << *PAI);
-
-      unsigned OpNo = O->getOperandNumber();
-      assert(OpNo != 0 && "Alloc box used as callee of partial apply?");
-
-      // If we've already seen this partial apply, then it means the same alloc
-      // box is being captured twice by the same closure, which is odd and
-      // unexpected: bail instead of trying to handle this case.
-      if (IM.count(PAI)) {
-        DEBUG(llvm::dbgs() << "        Already seen... bailing!\n");
-        return false;
-      }
-
-      SILModule &M = PAI->getModule();
-      auto closureType = PAI->getType().castTo<SILFunctionType>();
-      SILFunctionConventions closureConv(closureType, M);
-
-      // Calculate the index into the closure's argument list of the captured
-      // box pointer (the captured address is always the immediately following
-      // index so is not stored separately);
-      unsigned Index = OpNo - 1 + closureConv.getNumSILArguments();
-
-      auto *Fn = PAI->getReferencedFunction();
-      if (!Fn || !Fn->isDefinition()) {
-        DEBUG(llvm::dbgs() << "        Not a direct function definition "
-                              "reference. Bailing!\n");
-        return false;
-      }
-
-      SILArgument *BoxArg = getBoxFromIndex(Fn, Index);
-
-      // For now, return false is the address argument is an address-only type,
-      // since we currently handle loadable types only.
-      // TODO: handle address-only types
-      auto BoxTy = BoxArg->getType().castTo<SILBoxType>();
-      assert(BoxTy->getLayout()->getFields().size() == 1
-             && "promoting compound box not implemented yet");
-      if (BoxTy->getFieldType(M, 0).isAddressOnly(M)) {
-        DEBUG(llvm::dbgs()
-              << "        Box is an address only argument... Bailing!\n");
-        return false;
-      }
-
-      // Verify that this closure is known not to mutate the captured value; if
-      // it does, then conservatively refuse to promote any captures of this
-      // value.
-      if (!isNonMutatingCapture(BoxArg)) {
-        DEBUG(llvm::dbgs() << "        Is a mutating capture... Bailing!\n");
-        return false;
-      }
-
-      // Record the index and continue.
-      DEBUG(llvm::dbgs() << "        Can be optimized!\n");
-      DEBUG(llvm::dbgs() << "        Index: " << Index << "\n");
-      IM.insert(std::make_pair(PAI, Index));
-      continue;
-    }
-
-    if (auto *PBI = dyn_cast<ProjectBoxInst>(O->getUser())) {
-      DEBUG(llvm::dbgs() << "    Found project box: " << *PBI);
-      // Check for mutations of the address component.
-      SILValue Addr = PBI;
-      // If the AllocBox is used by a mark_uninitialized, scan the MUI for
-      // interesting uses.
-      if (Addr->hasOneUse()) {
-        SILInstruction *SingleAddrUser = Addr->use_begin()->getUser();
-        if (isa<MarkUninitializedInst>(SingleAddrUser))
-          Addr = SILValue(SingleAddrUser);
-      }
-
-      for (Operand *AddrOp : Addr->getUses()) {
-        if (!isNonEscapingUse(AddrOp, Mutations)) {
-          DEBUG(llvm::dbgs() << "    Has escaping user of addr... bailing: "
-                             << *AddrOp->getUser());
-          return false;
-        }
-      }
-      continue;
-    }
-
-    // Verify that this use does not otherwise allow the alloc_box to
-    // escape.
-    if (!isNonEscapingUse(O, Mutations)) {
-      DEBUG(llvm::dbgs() << "    Have unknown escaping user: "
-                         << *O->getUser());
-      return false;
-    }
+  if (any_of(ABI->getUses(), [&State](Operand *Op) {
+        return !scanUsesForEscapesAndMutations(Op, State);
+      })) {
+    DEBUG(llvm::dbgs()
+          << "Found an escaping use! Can not optimize this alloc box?!\n");
+    return false;
   }
+
+  DEBUG(llvm::dbgs() << "We can optimize this alloc box!\n");
 
   // Helper lambda function to determine if instruction b is strictly after
   // instruction a, assuming both are in the same basic block.
@@ -888,7 +1068,7 @@ examineAllocBoxInst(AllocBoxInst *ABI, ReachabilityInfo &RI,
   DEBUG(llvm::dbgs()
         << "Checking for any mutations that invalidate captures...\n");
   // Loop over all mutations to possibly invalidate captures.
-  for (auto *I : Mutations) {
+  for (auto *I : State.Mutations) {
     auto Iter = IM.begin();
     while (Iter != IM.end()) {
       auto *PAI = Iter->first;
@@ -942,6 +1122,66 @@ constructClonedFunction(PartialApplyInst *PAI, FunctionRefInst *FRI,
   return cloner.getCloned();
 }
 
+/// For an alloc_box or iterated copy_value alloc_box, get or create the
+/// project_box for the copy or original alloc_box.
+///
+/// There are two possible case here:
+///
+/// 1. It could be an alloc box.
+/// 2. It could be an iterated copy_value from an alloc_box.
+///
+/// Some important constraints from our initial safety condition checks:
+///
+/// 1. We only see a project_box paired with an alloc_box. e.x.:
+///
+///       (project_box (alloc_box)).
+///
+/// 2. We only see a mark_uninitialized when paired with an (alloc_box,
+///    project_box). e.x.:
+///
+///       (mark_uninitialized (project_box (alloc_box)))
+///
+/// The asserts are to make sure that if the initial safety condition check
+/// is changed, this code is changed as well.
+static SILValue getOrCreateProjectBoxHelper(SILValue PartialOperand) {
+  // If we have a copy_value, just create a project_box on the copy and return.
+  if (auto *CVI = dyn_cast<CopyValueInst>(PartialOperand)) {
+    SILBuilder B(std::next(CVI->getIterator()));
+    return B.createProjectBox(CVI->getLoc(), CVI, 0);
+  }
+
+  // Otherwise, handle the alloc_box case.
+  auto *ABI = cast<AllocBoxInst>(PartialOperand);
+  // Load and copy from the address value, passing the result as an argument
+  // to the new closure.
+  //
+  // *NOTE* This code assumes that we only have one project box user. We
+  // enforce this with the assert below.
+  assert(count_if(ABI->getUses(), [](Operand *Op) -> bool {
+           return isa<ProjectBoxInst>(Op->getUser());
+         }) == 1);
+
+  // If the address is marked uninitialized, load through the mark, so
+  // that DI can reason about it.
+  for (Operand *BoxValueUse : ABI->getUses()) {
+    auto *PBI = dyn_cast<ProjectBoxInst>(BoxValueUse->getUser());
+    if (!PBI)
+      continue;
+
+    auto *OptIter = PBI->getSingleUse();
+    if (!OptIter)
+      continue;
+
+    if (!isa<MarkUninitializedInst>(OptIter->getUser()))
+      continue;
+
+    return OptIter->getUser();
+  }
+
+  // Otherwise, just return a project_box.
+  return getOrCreateProjectBox(ABI, 0);
+}
+
 /// \brief Given a partial_apply instruction and a set of promotable indices,
 /// clone the closure with the promoted captures and replace the partial_apply
 /// with a partial_apply of the new closure, fixing up reference counting as
@@ -978,46 +1218,33 @@ processPartialApplyInst(PartialApplyInst *PAI, IndicesSet &PromotableIndices,
   unsigned OpNo = 1, OpCount = PAI->getNumOperands();
   SmallVector<SILValue, 16> Args;
   auto NumIndirectResults = calleeConv.getNumIndirectSILResults();
-  while (OpNo != OpCount) {
+  for (; OpNo != OpCount; ++OpNo) {
     unsigned Index = OpNo - 1 + FirstIndex;
-    if (PromotableIndices.count(Index)) {
-      SILValue BoxValue = PAI->getOperand(OpNo);
-      AllocBoxInst *ABI = cast<AllocBoxInst>(BoxValue);
-
-      SILParameterInfo CPInfo = CalleePInfo[Index - NumIndirectResults];
-      assert(calleeConv.getSILType(CPInfo) == BoxValue->getType()
-             && "SILType of parameter info does not match type of parameter");
-      // Load and copy from the address value, passing the result as an argument
-      // to the new closure.
-      SILValue Addr;
-      for (Operand *BoxUse : ABI->getUses()) {
-        auto *PBI = dyn_cast<ProjectBoxInst>(BoxUse->getUser());
-          // If the address is marked uninitialized, load through the mark, so
-          // that DI can reason about it.
-        if (PBI && PBI->hasOneUse()) {
-          SILInstruction *PBIUser = PBI->use_begin()->getUser();
-          if (isa<MarkUninitializedInst>(PBIUser))
-            Addr = PBIUser;
-          break;
-        }
-      }
-      // We only reuse an existing project_box if it directly follows the
-      // alloc_box. This makes sure that the project_box dominates the
-      // partial_apply.
-      if (!Addr)
-        Addr = getOrCreateProjectBox(ABI, 0);
-
-      auto &typeLowering = M.getTypeLowering(Addr->getType());
-      Args.push_back(
-        typeLowering.emitLoadOfCopy(B, PAI->getLoc(), Addr, IsNotTake));
-      // Cleanup the captured argument.
-      releasePartialApplyCapturedArg(B, PAI->getLoc(), BoxValue,
-                                     CPInfo);
-      ++NumCapturesPromoted;
-    } else {
+    if (!PromotableIndices.count(Index)) {
       Args.push_back(PAI->getOperand(OpNo));
+      continue;
     }
-    ++OpNo;
+
+    // First the grab the box and projected_box for the box value.
+    //
+    // *NOTE* Box may be a copy_value.
+    SILValue Box = PAI->getOperand(OpNo);
+    SILValue Addr = getOrCreateProjectBoxHelper(Box);
+
+    auto &typeLowering = M.getTypeLowering(Addr->getType());
+    Args.push_back(
+        typeLowering.emitLoadOfCopy(B, PAI->getLoc(), Addr, IsNotTake));
+
+    // Cleanup the captured argument.
+    //
+    // *NOTE* If we initially had a box, then this is on the actual
+    // alloc_box. Otherwise, it is on the specific iterated copy_value that we
+    // started with.
+    SILParameterInfo CPInfo = CalleePInfo[Index - NumIndirectResults];
+    assert(calleeConv.getSILType(CPInfo) == Box->getType() &&
+           "SILType of parameter info does not match type of parameter");
+    releasePartialApplyCapturedArg(B, PAI->getLoc(), Box, CPInfo);
+    ++NumCapturesPromoted;
   }
 
   auto SubstFnTy = FnTy.substGenericArgs(M, PAI->getSubstitutions());
@@ -1056,27 +1283,32 @@ constructMapFromPartialApplyToPromotableIndices(SILFunction *F,
           for (auto &IndexPair : IndexMap)
             Map[IndexPair.first].insert(IndexPair.second);
         }
+        DEBUG(llvm::dbgs() << "\n");
       }
     }
   }
 }
 
 namespace {
+
 class CapturePromotionPass : public SILModuleTransform {
   /// The entry point to the transformation.
   void run() override {
     SmallVector<SILFunction*, 128> Worklist;
-    for (auto &F : *getModule())
+    for (auto &F : *getModule()) {
       processFunction(&F, Worklist);
+    }
 
-    while (!Worklist.empty())
+    while (!Worklist.empty()) {
       processFunction(Worklist.pop_back_val(), Worklist);
+    }
   }
 
   void processFunction(SILFunction *F, SmallVectorImpl<SILFunction*> &Worklist);
 
   StringRef getName() override { return "Capture Promotion"; }
 };
+
 } // end anonymous namespace
 
 void CapturePromotionPass::processFunction(SILFunction *F,

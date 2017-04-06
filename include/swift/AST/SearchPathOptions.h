@@ -13,6 +13,8 @@
 #ifndef SWIFT_AST_SEARCHPATHOPTIONS_H
 #define SWIFT_AST_SEARCHPATHOPTIONS_H
 
+#include "llvm/ADT/Hashing.h"
+
 #include <string>
 #include <vector>
 
@@ -67,6 +69,26 @@ public:
 
   /// Don't look in for compiler-provided modules.
   bool SkipRuntimeLibraryImportPath = false;
+
+  /// Return a hash code of any components from these options that should
+  /// contribute to a Swift Bridging PCH hash.
+  llvm::hash_code getPCHHashComponents() const {
+    using llvm::hash_value;
+    using llvm::hash_combine;
+    auto Code = hash_value(SDKPath);
+    for (auto Import : ImportSearchPaths) {
+      Code = hash_combine(Code, Import);
+    }
+    for (const auto &FrameworkPath : FrameworkSearchPaths) {
+      Code = hash_combine(Code, FrameworkPath.Path);
+    }
+    for (auto LibraryPath : LibrarySearchPaths) {
+      Code = hash_combine(Code, LibraryPath);
+    }
+    Code = hash_combine(Code, RuntimeResourcePath);
+    Code = hash_combine(Code, RuntimeLibraryImportPath);
+    return Code;
+  }
 };
 
 }

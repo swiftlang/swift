@@ -1,0 +1,17 @@
+// RUN: %target-sil-opt -enable-sil-verify-all -enable-sil-ownership -semantic-arc-opts %s | %FileCheck %s
+
+sil_stage canonical
+
+import Builtin
+
+// CHECK-LABEL: sil @only_destroy_user_test : $@convention(thin) (@guaranteed Builtin.NativeObject) -> () {
+// CHECK-NOT: copy_value
+// CHECK-NOT: destroy_value
+sil @only_destroy_user_test : $@convention(thin) (@guaranteed Builtin.NativeObject) -> () {
+bb0(%0 : @guaranteed $Builtin.NativeObject):
+  %1 = copy_value %0 : $Builtin.NativeObject
+  destroy_value %1 : $Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}
+

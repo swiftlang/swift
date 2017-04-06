@@ -31,3 +31,11 @@ func selectorTest() {
   _ = #selector(SubClassOfSomeClassWithObjCMembers.baz)
   _ = #selector(SubClassOfSomeClassWithObjCMembers.wibble)
 }
+
+@nonobjc extension SomeClassWithObjCMembers {
+  func notInferredObjC() { } // expected-note{{add '@objc' to expose this instance method to Objective-C}}
+}
+
+func selectorTestFail() {
+  _ = #selector(SomeClassWithObjCMembers.notInferredObjC) // expected-error{{argument of '#selector' refers to instance method 'notInferredObjC()' that is not exposed to Objective-C}}
+}

@@ -307,6 +307,10 @@ class Constraint final : public llvm::ilist_node<Constraint>,
   /// Whether this constraint is currently active, i.e., stored in the worklist.
   unsigned IsActive : 1;
 
+  /// Was this constraint was determined to be inconsistent with the
+  /// constraint graph during constraint propagation?
+  unsigned IsDisabled : 1;
+
   /// Whether the choice of this disjunction should be recorded in the
   /// solver state.
   unsigned RememberChoice : 1;
@@ -465,8 +469,20 @@ public:
   bool isActive() const { return IsActive; }
 
   /// Set whether this constraint is active or not.
-  void setActive(bool active) { IsActive = active; }
-  
+  void setActive(bool active) {
+    assert(!isDisabled() && "Cannot activate a constraint that is disabled!");
+    IsActive = active;
+  }
+
+  /// Whether this constraint is active, i.e., in the worklist.
+  bool isDisabled() const { return IsDisabled; }
+
+  /// Set whether this constraint is active or not.
+  void setDisabled() {
+    assert(!isActive() && "Cannot disable constraint marked as active!");
+    IsDisabled = true;
+  }
+
   /// Mark or retrieve whether this constraint should be favored in the system.
   void setFavored() { IsFavored = true; }
   bool isFavored() const { return IsFavored; }
@@ -586,6 +602,15 @@ public:
   ArrayRef<Constraint *> getNestedConstraints() const {
     assert(Kind == ConstraintKind::Disjunction);
     return Nested;
+  }
+
+  unsigned countActiveNestedConstraints() const {
+    unsigned count = 0;
+    for (auto *constraint : Nested)
+      if (!constraint->isDisabled())
+        count++;
+
+    return count;
   }
 
   /// Retrieve the overload choice for an overload-binding constraint.

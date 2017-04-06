@@ -400,6 +400,10 @@ public:
   /// Returns a *single* forwardable SILValue for the given LSLocation right
   /// before the InsertPt instruction.
   SILValue reduceValuesAtEndOfBlock(RLEContext &Ctx, LSLocation &L);
+
+#ifndef NDEBUG
+  void dump(RLEContext &Ctx);
+#endif
 };
 
 } // end anonymous namespace
@@ -477,6 +481,10 @@ private:
   /// walked, i.e. when the we generate the genset and killset.
   llvm::DenseSet<SILBasicBlock *> BBWithLoads;
 
+#ifndef NDEBUG
+  SILPrintContext printCtx;
+#endif
+
 public:
   RLEContext(SILFunction *F, SILPassManager *PM, AliasAnalysis *AA,
              TypeExpansionAnalysis *TE, PostOrderFunctionInfo *PO,
@@ -488,6 +496,8 @@ public:
 
   /// Entry point to redundant load elimination.
   bool run();
+
+  SILFunction *getFunction() const { return Fn; }
 
   /// Use a set of ad hoc rules to tell whether we should run a pessimistic
   /// one iteration data flow on the function.
@@ -714,6 +724,8 @@ bool BlockState::setupRLE(RLEContext &Ctx, SILInstruction *I, SILValue Mem) {
   // forwardable values are recorded in the function.
   //
   RedundantLoads[I] = TheForwardingValue;
+
+  DEBUG(llvm::dbgs() << "FORWARD " << TheForwardingValue << "  to" << *I);
   return true;
 }
 
@@ -1065,9 +1077,11 @@ void BlockState::processInstructionWithKind(RLEContext &Ctx,
   // that it and its operands cannot alias a load we have visited,
   // invalidate that load.
   if (Inst->mayWriteToMemory()) {
+    DEBUG(llvm::dbgs() << "WRITE " << *Inst);
     processUnknownWriteInst(Ctx, Inst, Kind);
     return;
   }
+  DEBUG(llvm::dbgs() << "READ " << *Inst);
 }
 
 RLEContext::ProcessKind
@@ -1121,6 +1135,39 @@ getProcessFunctionKind(unsigned LoadCount, unsigned StoreCount) {
   return ProcessKind::ProcessMultipleIterations;
 }
 
+#ifndef NDEBUG
+void BlockState::dump(RLEContext &Ctx) {
+  for (unsigned i = 0; i < LocationNum; ++i) {
+    if (!isTrackingLocation(ForwardSetMax, i))
+      continue;
+
+    llvm::dbgs() << "Loc #" << i << ":" << (BBGenSet[i] ? " Gen" : "")
+                 << (BBKillSet[i] ? " Kill" : "");
+    if (!ForwardSetIn.empty() && ForwardSetIn.test(i)) {
+      llvm::dbgs() << " IN ";
+      ValueTableMap::const_iterator inIter = ForwardValIn.find(i);
+      if (inIter != ForwardValIn.end()) {
+        if (SILValue base = Ctx.getValue(inIter->second).getBase())
+          llvm::dbgs() << base;
+        else
+          llvm::dbgs() << "no base";
+      }
+    }
+    if (!ForwardSetOut.empty() && ForwardSetOut.test(i)) {
+      llvm::dbgs() << " OUT ";
+      ValueTableMap::const_iterator outIter = ForwardValOut.find(i);
+      if (outIter != ForwardValOut.end()) {
+        if (SILValue base = Ctx.getValue(outIter->second).getBase())
+          llvm::dbgs() << base;
+        else
+          llvm::dbgs() << "no base";
+      }
+    }
+    llvm::dbgs() << "\n";
+  }
+}
+#endif
+
 //===----------------------------------------------------------------------===//
 //                          RLEContext Implementation
 //===----------------------------------------------------------------------===//
@@ -1128,7 +1175,12 @@ getProcessFunctionKind(unsigned LoadCount, unsigned StoreCount) {
 RLEContext::RLEContext(SILFunction *F, SILPassManager *PM, AliasAnalysis *AA,
                        TypeExpansionAnalysis *TE, PostOrderFunctionInfo *PO,
                        EpilogueARCFunctionInfo *EAFI)
-    : Fn(F), PM(PM), AA(AA), TE(TE), PO(PO), EAFI(EAFI) {
+    : Fn(F), PM(PM), AA(AA), TE(TE), PO(PO), EAFI(EAFI)
+#ifndef NDEBUG
+      ,
+      printCtx(llvm::dbgs(), /*Verbose=*/false, /*Sorted=*/true)
+#endif
+{
 }
 
 LSLocation &RLEContext::getLocation(const unsigned index) {
@@ -1306,6 +1358,10 @@ bool RLEContext::collectLocationValues(SILBasicBlock *BB, LSLocation &L,
 
 void RLEContext::processBasicBlocksForGenKillSet() {
   for (SILBasicBlock *BB : PO->getReversePostOrder()) {
+    DEBUG(llvm::dbgs() << "PROCESS " << printCtx.getID(BB)
+                       << " for Gen/Kill:\n";
+          BB->print(llvm::dbgs(), printCtx));
+
     BlockState &S = getBlockState(BB);
 
     // Compute the AvailSetMax at the beginning of the basic block.
@@ -1327,6 +1383,7 @@ void RLEContext::processBasicBlocksForGenKillSet() {
 
       S.processInstructionWithKind(*this, &*I, RLEKind::ComputeAvailGenKillSet);
     }
+    DEBUG(S.dump(*this));
   }
 }
 
@@ -1345,6 +1402,8 @@ void RLEContext::processBasicBlocksWithGenKillSet() {
   }
   while (!WorkList.empty()) {
     SILBasicBlock *BB = WorkList.pop_back_val();
+    DEBUG(llvm::dbgs() << "PROCESS " << printCtx.getID(BB)
+                       << " with Gen/Kill.\n");
     HandledBBs.erase(BB);
 
     // Intersection.
@@ -1361,11 +1420,15 @@ void RLEContext::processBasicBlocksWithGenKillSet() {
         WorkList.push_back(X);
       }
     }
+    DEBUG(Forwarder.dump(*this));
   }
 }
 
 void RLEContext::processBasicBlocksForAvailValue() {
   for (SILBasicBlock *BB : PO->getReversePostOrder()) {
+    DEBUG(llvm::dbgs() << "PROCESS " << printCtx.getID(BB)
+                       << " for available.\n");
+
     BlockState &Forwarder = getBlockState(BB);
 
     // Merge the predecessors. After merging, BlockState now contains
@@ -1382,11 +1445,15 @@ void RLEContext::processBasicBlocksForAvailValue() {
     // the available BitVector here as they should have been initialized and
     // stabilized in the processBasicBlocksWithGenKillSet.
     Forwarder.updateForwardValOut();
+
+    DEBUG(Forwarder.dump(*this));
   }
 }
 
 void RLEContext::processBasicBlocksForRLE(bool Optimistic) {
   for (SILBasicBlock *BB : PO->getReversePostOrder()) {
+    DEBUG(llvm::dbgs() << "PROCESS " << printCtx.getID(BB) << " for RLE.\n");
+
     // If we know this is not a one iteration function which means its
     // forward sets have been computed and converged, 
     // and this basic block does not even have LoadInsts, there is no point
@@ -1401,6 +1468,8 @@ void RLEContext::processBasicBlocksForRLE(bool Optimistic) {
     // lists of available LSLocations and their values that reach the
     // beginning of the basic block along all paths.
     Forwarder.mergePredecessorAvailSetAndValue(*this);
+
+    DEBUG(Forwarder.dump(*this));
 
     // Perform the actual redundant load elimination.
     Forwarder.processBasicBlockWithKind(*this, RLEKind::PerformRLE);
@@ -1478,11 +1547,10 @@ bool RLEContext::run() {
                           BBToProcess.find(&B) != BBToProcess.end());
   }
 
-  DEBUG(llvm::dbgs() << "RLE START\n";
-        for (unsigned i = 0; i < LocationVault.size(); ++i) {
-          llvm::dbgs() << "LSLocation #" << i;
-          getLocation(i).print(llvm::dbgs(), &Fn->getModule());
-        });
+  DEBUG(for (unsigned i = 0; i < LocationVault.size(); ++i) {
+    llvm::dbgs() << "LSLocation #" << i;
+    getLocation(i).print(llvm::dbgs(), &Fn->getModule());
+  });
 
   if (Optimistic)
     runIterativeRLE();

@@ -1256,16 +1256,6 @@ void Serializer::writeNormalConformance(
   unsigned numValueWitnesses = 0;
   unsigned numTypeWitnesses = 0;
 
-  // Collect the set of protocols inherited by this conformance.
-  SmallVector<ProtocolDecl *, 8> inheritedProtos;
-  for (auto inheritedMapping : conformance->getInheritedConformances()) {
-    inheritedProtos.push_back(inheritedMapping.first);
-  }
-
-  // Sort the protocols so that we get a deterministic ordering.
-  llvm::array_pod_sort(inheritedProtos.begin(), inheritedProtos.end(),
-                       ProtocolType::compareProtocols);
-
   conformance->forEachValueWitness(nullptr,
     [&](ValueDecl *req, Witness witness) {
       data.push_back(addDeclRef(req));
@@ -1300,16 +1290,14 @@ void Serializer::writeNormalConformance(
 
   conformance->forEachTypeWitness(/*resolver=*/nullptr,
                                   [&](AssociatedTypeDecl *assocType,
-                                      const Substitution &witness,
-                                      TypeDecl *typeDecl) {
+                                      Type type, TypeDecl *typeDecl) {
     data.push_back(addDeclRef(assocType));
+    data.push_back(addTypeRef(type));
     data.push_back(addDeclRef(typeDecl));
-    // The substitution record is serialized later.
     ++numTypeWitnesses;
     return false;
   });
 
-  unsigned numInheritedConformances = inheritedProtos.size();
   unsigned abbrCode
     = DeclTypeAbbrCodes[NormalProtocolConformanceLayout::Code];
   auto ownerID = addDeclContextRef(conformance->getDeclContext());
@@ -1317,19 +1305,12 @@ void Serializer::writeNormalConformance(
                                               addDeclRef(protocol), ownerID,
                                               numValueWitnesses,
                                               numTypeWitnesses,
-                                              numInheritedConformances,
                                               data);
 
   // Write requirement signature conformances.
   for (auto reqConformance : conformance->getSignatureConformances())
     writeConformance(reqConformance, DeclTypeAbbrCodes);
   
-  // Write inherited conformances.
-  for (auto inheritedProto : inheritedProtos) {
-    writeConformance(conformance->getInheritedConformance(inheritedProto),
-                     DeclTypeAbbrCodes);
-  }
-
   conformance->forEachValueWitness(nullptr,
                                    [&](ValueDecl *req, Witness witness) {
    // Bail out early for simple witnesses.
@@ -1356,14 +1337,6 @@ void Serializer::writeNormalConformance(
                       witness.requiresSubstitution()
                         ? witness.getSyntheticEnvironment()
                         : nullptr);
-  });
-
-  conformance->forEachTypeWitness(/*resolver=*/nullptr,
-                                  [&](AssociatedTypeDecl *assocType,
-                                      const Substitution &witness,
-                                      TypeDecl *typeDecl) {
-    writeSubstitutions(witness, DeclTypeAbbrCodes);
-    return false;
   });
 }
 
@@ -4526,7 +4499,7 @@ void swift::serialize(ModuleOrSourceFile DC,
 
   bool hadError = withOutputFile(getContext(DC), options.OutputPath,
                                  [&](raw_ostream &out) {
-    SharedTimer timer("Serialization (swiftmodule)");
+    SharedTimer timer("Serialization, swiftmodule");
     Serializer::writeToStream(out, DC, M, options);
   });
   if (hadError)
@@ -4535,7 +4508,7 @@ void swift::serialize(ModuleOrSourceFile DC,
   if (options.DocOutputPath && options.DocOutputPath[0] != '\0') {
     (void)withOutputFile(getContext(DC), options.DocOutputPath,
                          [&](raw_ostream &out) {
-      SharedTimer timer("Serialization (swiftdoc)");
+      SharedTimer timer("Serialization, swiftdoc");
       Serializer::writeDocToStream(out, DC, options.GroupInfoPath,
                                    getContext(DC));
     });

@@ -14,6 +14,7 @@
 
 // REQUIRES: executable_test
 // REQUIRES: objc_interop
+// REQUIRES: OS=macosx
 
 import StdlibUnittest
 import Foundation

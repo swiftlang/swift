@@ -1676,7 +1676,7 @@ static void fixItAvailableAttrRename(TypeChecker &TC,
     diag.fixItReplace(referenceRange, baseReplace);
   }
 
-  if (!dyn_cast_or_null<CallExpr>(call))
+  if (!call || !isa<CallExpr>(call))
     return;
 
   const Expr *argExpr = call->getArg();

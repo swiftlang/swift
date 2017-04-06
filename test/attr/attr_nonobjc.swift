@@ -102,3 +102,6 @@ class NSManagedAndNonObjCNotAllowed {
     }
   }
 }
+
+struct SomeStruct { }
+@nonobjc extension SomeStruct { } // expected-error{{only extensions of classes can be declared @nonobjc}}
