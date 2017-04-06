@@ -175,6 +175,12 @@ namespace swift {
     /// new enough?
     bool EnableTargetOSChecking = true;
 
+    /// Whether to attempt to recover from missing cross-references and other
+    /// errors when deserializing from a Swift module.
+    ///
+    /// This is a staging flag; eventually it will be on by default.
+    bool EnableDeserializationRecovery = false;
+
     /// Should we use \c ASTScope-based resolution for unqualified name lookup?
     bool EnableASTScopeLookup = false;
 

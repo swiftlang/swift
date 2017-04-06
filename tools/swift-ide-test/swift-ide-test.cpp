@@ -319,6 +319,12 @@ EnableSwift3ObjCInference(
                   llvm::cl::init(false));
 
 static llvm::cl::opt<bool>
+EnableDeserializationRecovery(
+    "enable-experimental-deserialization-recovery",
+    llvm::cl::desc("Attempt to recover from missing xrefs (etc) in swiftmodules"),
+    llvm::cl::init(false));
+
+static llvm::cl::opt<bool>
 DisableObjCAttrRequiresFoundationModule(
     "disable-objc-attr-requires-foundation-module",
     llvm::cl::desc("Allow @objc to be used freely"),
@@ -2995,6 +3001,8 @@ int main(int argc, char *argv[]) {
   InitInvok.getLangOptions().EnableSwift3ObjCInference =
     options::EnableSwift3ObjCInference ||
     InitInvok.getLangOptions().isSwiftVersion3();
+  InitInvok.getLangOptions().EnableDeserializationRecovery |=
+    options::EnableDeserializationRecovery;
   InitInvok.getClangImporterOptions().ImportForwardDeclarations |=
     options::ObjCForwardDeclarations;
   InitInvok.getClangImporterOptions().InferImportAsMember |=
