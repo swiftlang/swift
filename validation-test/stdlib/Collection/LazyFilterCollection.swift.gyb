@@ -109,12 +109,12 @@ CollectionTests.test("LazyFilterCollection instances (${traversal}${kind})") {
       expected,
       MinimalSequence(elements: base).lazy.filter(predicate))
 % elif traversal == '' and kind == 'Collection':
-    checkOneLevelOfForwardCollection(
+    checkForwardCollection(
       expected,
       MinimalCollection(elements: base).lazy.filter(predicate),
       sameValue: { $0 == $1 })
 % else:
-    checkOneLevelOf${traversal}${kind}(
+    check${traversal}${kind}(
       expected,
       Minimal${traversal}${kind}(elements: base).lazy.filter(predicate),
       sameValue: { $0 == $1 })
