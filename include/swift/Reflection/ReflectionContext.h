@@ -67,7 +67,7 @@ public:
 
   unsigned getSizeOfHeapObject() {
     // This must match sizeof(HeapObject) for the target.
-    return sizeof(StoredPointer) + 8;
+    return sizeof(StoredPointer) * 2;
   }
 
   void dumpAllSections(std::ostream &OS) {
@@ -487,9 +487,8 @@ private:
     case MetadataSourceKind::ClosureBinding: {
       unsigned Index = cast<ClosureBindingMetadataSource>(MS)->getIndex();
 
-      // Skip the context's isa pointer (4 or 8 bytes) and reference counts
-      // (4 bytes each regardless of platform word size). This is just
-      // sizeof(HeapObject) in the target.
+      // Skip the context's HeapObject header
+      // (one word each for isa pointer and reference counts).
       //
       // Metadata and conformance tables are stored consecutively after
       // the heap object header, in the 'necessary bindings' area.
