@@ -144,7 +144,7 @@ func checkGraphemeClusterSegmentation(
   )
 
   let expectedCharacters: [Character] = Array(subject.characters)
-  checkSliceableWithBidirectionalIndex(expectedCharacters, subject.characters)
+  checkBidirectionalCollection(expectedCharacters, subject.characters)
 }
 
 func checkGraphemeClusterSegmentation(

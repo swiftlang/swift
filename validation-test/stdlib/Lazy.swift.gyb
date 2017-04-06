@@ -698,7 +698,7 @@ tests.test("Lazy${TraversalCollection}/Collection") {
     Minimal${TraversalCollection}<OpaqueValue<Int>>
   >.self, &again)
 
-  check${Traversal}Collection(
+  checkOneLevelOf${Traversal}Collection(
     expected, base.lazy, resiliencyChecks: .none
   ) { $0.value == $1.value }
 
@@ -1124,7 +1124,7 @@ tests.test("LazyFilterCollection") {
     LazyFilterCollection<MinimalCollection<OpaqueValue<Int>>>
   >.test(filtered)
 
-  checkForwardCollection(
+  checkOneLevelOfForwardCollection(
     stride(from: 0, to: 100, by: 2).map(OpaqueValue.init), filtered,
     resiliencyChecks: .none
   ) {
