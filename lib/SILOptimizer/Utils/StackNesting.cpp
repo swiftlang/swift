@@ -148,15 +148,15 @@ bool StackNesting::solve() {
 }
 
 static SILInstruction *createDealloc(SILInstruction *Alloc,
-                                     SILInstruction *InsertionPoint) {
+                                     SILInstruction *InsertionPoint,
+                                     SILLocation Location) {
   SILBuilder B(InsertionPoint);
   switch (Alloc->getKind()) {
     case ValueKind::AllocStackInst:
-      return B.createDeallocStack(InsertionPoint->getLoc(), Alloc);
+      return B.createDeallocStack(Location, Alloc);
     case ValueKind::AllocRefInst:
       assert(cast<AllocRefInst>(Alloc)->canAllocOnStack());
-      return B.createDeallocRef(InsertionPoint->getLoc(), Alloc,
-                                /*canBeOnStack*/true);
+      return B.createDeallocRef(Location, Alloc, /*canBeOnStack*/true);
     default:
       llvm_unreachable("unknown stack allocation");
   }
@@ -164,7 +164,8 @@ static SILInstruction *createDealloc(SILInstruction *Alloc,
 
 bool StackNesting::insertDeallocs(const BitVector &AliveBefore,
                                   const BitVector &AliveAfter,
-                                  SILInstruction *InsertionPoint) {
+                                  SILInstruction *InsertionPoint,
+                                  Optional<SILLocation> Location) {
   if (!AliveBefore.test(AliveAfter))
     return false;
 
@@ -175,7 +176,9 @@ bool StackNesting::insertDeallocs(const BitVector &AliveBefore,
   for (int LocNr = AliveBefore.find_first(); LocNr >= 0;
        LocNr = AliveBefore.find_next(LocNr)) {
     if (!AliveAfter.test(LocNr)) {
-      InsertionPoint = createDealloc(StackLocs[LocNr].Alloc, InsertionPoint);
+      SILInstruction *Alloc = StackLocs[LocNr].Alloc;
+      InsertionPoint = createDealloc(Alloc, InsertionPoint,
+                   Location.hasValue() ? Location.getValue() : Alloc->getLoc());
       changesMade = true;
     }
   }
@@ -234,7 +237,7 @@ StackNesting::Changes StackNesting::adaptDeallocs() {
         CFGChanged = true;
       }
       InstChanged |= insertDeallocs(Bits, SuccBI->AliveStackLocsAtEntry,
-                                    &InsertionBlock->front());
+                                    &InsertionBlock->front(), None);
     }
 
     // Insert/remove deallocations inside blocks.
@@ -248,6 +251,7 @@ StackNesting::Changes StackNesting::adaptDeallocs() {
       } else if (StackInst->isDeallocatingStack()) {
         // Handle deallocations.
         auto *AllocInst = cast<SILInstruction>(StackInst->getOperand(0));
+        SILLocation Loc = StackInst->getLoc();
         int BitNr = StackLoc2BitNumbers.lookup(AllocInst);
         SILInstruction *InsertionPoint = &*std::next(StackInst->getIterator());
         if (Bits.test(BitNr)) {
@@ -264,7 +268,7 @@ StackNesting::Changes StackNesting::adaptDeallocs() {
         // Insert deallocations for all locations which are not alive after
         // StackInst but _are_ alive at the StackInst.
         InstChanged |= insertDeallocs(StackLocs[BitNr].AliveLocs, Bits,
-                                      InsertionPoint);
+                                      InsertionPoint, Loc);
         Bits |= StackLocs[BitNr].AliveLocs;
       }
     }

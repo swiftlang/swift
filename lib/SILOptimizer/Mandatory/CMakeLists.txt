@@ -8,4 +8,5 @@ set(MANDATORY_SOURCES
   Mandatory/MandatoryInlining.cpp
   Mandatory/PredictableMemOpt.cpp
   Mandatory/ConstantPropagation.cpp
+  Mandatory/SemanticARCOpts.cpp
   PARENT_SCOPE)

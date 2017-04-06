@@ -71,10 +71,10 @@ bool SILInliner::inlineFunction(FullApplySite AI, ArrayRef<SILValue> Args) {
     // Performance inlining. Construct a proper inline scope pointing
     // back to the call site.
     CallSiteScope = new (F.getModule())
-      SILDebugScope(AI.getLoc(), &F, AIScope);
-    assert(CallSiteScope->getParentFunction() == &F);
+        SILDebugScope(AI.getLoc(), nullptr, AIScope, AIScope->InlinedCallSite);
   }
   assert(CallSiteScope && "call site has no scope");
+  assert(CallSiteScope->getParentFunction() == &F);
 
   // Increment the ref count for the inlined function, so it doesn't
   // get deleted before we can emit abstract debug info for it.
@@ -198,19 +198,21 @@ void SILInliner::visitDebugValueAddrInst(DebugValueAddrInst *Inst) {
 
 const SILDebugScope *
 SILInliner::getOrCreateInlineScope(const SILDebugScope *CalleeScope) {
-  assert(CalleeScope);
+  if (!CalleeScope)
+    return CallSiteScope;
   auto it = InlinedScopeCache.find(CalleeScope);
   if (it != InlinedScopeCache.end())
     return it->second;
 
-  auto InlineScope = new (getBuilder().getFunction().getModule())
-      SILDebugScope(CallSiteScope, CalleeScope);
-  assert(CallSiteScope->Parent == InlineScope->InlinedCallSite->Parent);
-
-  InlinedScopeCache.insert({CalleeScope, InlineScope});
-  return InlineScope;
+  auto &M = getBuilder().getFunction().getModule();
+  auto InlinedAt =
+      getOrCreateInlineScope(CalleeScope->InlinedCallSite);
+  auto *InlinedScope = new (M) SILDebugScope(
+      CalleeScope->Loc, CalleeScope->Parent.dyn_cast<SILFunction *>(),
+      CalleeScope->Parent.dyn_cast<const SILDebugScope *>(), InlinedAt);
+  InlinedScopeCache.insert({CalleeScope, InlinedScope});
+  return InlinedScope;
 }
-
 
 //===----------------------------------------------------------------------===//
 //                                 Cost Model

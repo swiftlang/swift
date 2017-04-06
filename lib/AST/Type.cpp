@@ -2818,8 +2818,8 @@ static Type getMemberForBaseType(LookupConformanceFn lookupConformances,
         !conformance->getConcrete()->hasTypeWitness(assocType, nullptr))
       return failed();
 
-    auto witness = conformance->getConcrete()
-        ->getTypeWitness(assocType, resolver).getReplacement();
+    auto witness =
+      conformance->getConcrete()->getTypeWitness(assocType, resolver);
 
     // This is a hacky feature allowing code completion to migrate to
     // using Type::subst() without changing output.

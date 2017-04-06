@@ -3249,7 +3249,7 @@ static void checkVarBehavior(VarDecl *decl, TypeChecker &TC) {
       // FIXME: Maybe we should synthesize an implicit TypeAliasDecl? We
       // really don't want the behavior conformances to show up in the
       // enclosing namespace though.
-      conformance->setTypeWitness(assocTy, valueSub, /*typeDecl*/ nullptr);
+      conformance->setTypeWitness(assocTy, propTy, /*typeDecl*/ nullptr);
     }
   next_requirement:;
   }

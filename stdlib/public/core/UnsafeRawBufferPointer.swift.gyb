@@ -23,7 +23,7 @@
 /// uniqueness checks and release mode bounds checks. Bounds checks are always
 /// performed in debug mode.
 ///
-% if mutable:
+%  if mutable:
 /// An `${Self}` instance is a view of the raw bytes in a region of memory.
 /// Each byte in memory is viewed as a `UInt8` value independent of the type
 /// of values held in that memory. Reading from and writing to memory through
@@ -37,7 +37,7 @@
 /// - `load(fromByteOffset:as:)`
 /// - `storeBytes(of:toByteOffset:as:)`
 /// - `copyBytes(from:count:)`
-% else:
+%  else:
 /// An `${Self}` instance is a view of the raw bytes in a region of memory.
 /// Each byte in memory is viewed as a `UInt8` value independent of the type
 /// of values held in that memory. Reading from memory through a raw buffer is
@@ -46,7 +46,7 @@
 /// In addition to its collection interface, an `${Self}` instance also supports
 /// the `load(fromByteOffset:as:)` method provided by `UnsafeRawPointer`,
 /// including bounds checks in debug mode.
-% end
+%  end
 ///
 /// To access the underlying memory through typed operations, the memory must
 /// be bound to a trivial type.
@@ -102,7 +102,7 @@ public struct Unsafe${Mutable}RawBufferPointer
 
   public typealias Index = Int
   public typealias IndexDistance = Int
-  public typealias SubSequence = ${Self}
+  public typealias SubSequence = ${Mutable}RandomAccessSlice<${Self}>
 
   /// An iterator over the bytes viewed by a raw buffer pointer.
   @_fixed_layout
@@ -353,6 +353,44 @@ public struct Unsafe${Mutable}RawBufferPointer
   }
 %  end # !mutable
 
+%  if not mutable:
+  /// Creates a raw buffer over the same memory as the given raw buffer slice.
+  ///
+  /// The new raw buffer will represent the same region of memory as the slice,
+  /// but it's indices will be rebased to zero. Given:
+  ///
+  ///   let slice = buffer[n..<m]
+  ///   let rebased = UnsafeRawBufferPointer(rebasing: slice)
+  ///
+  /// One may assume `rebased.startIndex == 0` and `rebased[0] == slice[n]`.
+  ///
+  /// - Parameter slice: the raw buffer slice to rebase.
+  @_inlineable
+  public init(rebasing slice: RandomAccessSlice<UnsafeRawBufferPointer>) {
+    self.init(start: slice.base.baseAddress! + slice.startIndex,
+      count: slice.count)
+  }
+%  end # !mutable
+
+  /// Creates a raw buffer over the same memory as the given raw buffer slice.
+  ///
+  /// The new raw buffer will represent the same region of memory as the slice,
+  /// but it's indices will be rebased to zero. Given:
+  ///
+  ///   let slice = buffer[n..<m]
+  ///   let rebased = UnsafeRawBufferPointer(rebasing: slice)
+  ///
+  /// One may assume `rebased.startIndex == 0` and `rebased[0] == slice[n]`.
+  ///
+  /// - Parameter slice: the raw buffer slice to rebase.
+  @_inlineable
+  public init(
+    rebasing slice: MutableRandomAccessSlice<UnsafeMutableRawBufferPointer>
+  ) {
+    self.init(start: slice.base.baseAddress! + slice.startIndex,
+      count: slice.count)
+  }
+
   /// Always zero, which is the index of the first byte in a
   /// nonempty buffer.
   @_inlineable
@@ -403,13 +441,13 @@ public struct Unsafe${Mutable}RawBufferPointer
   /// - Parameter bounds: The range of byte offsets to access. The upper and
   ///   lower bounds of the range must be in the range `0...count`.
   @_inlineable
-  public subscript(bounds: Range<Int>) -> Unsafe${Mutable}RawBufferPointer {
+  public subscript(
+    bounds: Range<Int>
+  ) -> ${Mutable}RandomAccessSlice<Unsafe${Mutable}RawBufferPointer> {
     get {
       _debugPrecondition(bounds.lowerBound >= startIndex)
       _debugPrecondition(bounds.upperBound <= endIndex)
-      return Unsafe${Mutable}RawBufferPointer(
-        start: baseAddress.map { $0 + bounds.lowerBound },
-        count: bounds.count)
+      return ${Mutable}RandomAccessSlice(base: self, bounds: bounds)
     }
 %  if mutable:
     nonmutating set {
@@ -419,7 +457,7 @@ public struct Unsafe${Mutable}RawBufferPointer
 
       if newValue.count > 0 {
         (baseAddress! + bounds.lowerBound).copyBytes(
-          from: newValue.baseAddress!,
+          from: newValue.base.baseAddress! + newValue.startIndex,
           count: newValue.count)
       }
     }
@@ -523,6 +561,26 @@ extension Unsafe${Mutable}RawBufferPointer : CustomDebugStringConvertible {
     return "${Self}"
       + "(start: \(_position.map(String.init(describing:)) ?? "nil"), count: \(count))"
   }
+}
+
+extension ${Self} {
+  @available(*, unavailable, message:
+    "use 'Unsafe${Mutable}RawBufferPointer(rebasing:)' to convert a slice into a zero-based raw buffer.")
+  public subscript(bounds: Range<Int>) -> ${Self} {
+    get { return ${Self}(start: nil, count: 0) }
+%  if mutable:
+    nonmutating set {}
+%  end # mutable
+  }
+
+%  if mutable:
+  @available(*, unavailable, message:
+    "use 'UnsafeRawBufferPointer(rebasing:)' to convert a slice into a zero-based raw buffer.")
+  public subscript(bounds: Range<Int>) -> UnsafeRawBufferPointer {
+    get { return UnsafeRawBufferPointer(start: nil, count: 0) }
+    nonmutating set {}
+  }
+%  end # mutable
 }
 
 % end # for mutable

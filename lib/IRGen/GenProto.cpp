@@ -33,6 +33,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/SubstitutionMap.h"
+#include "swift/IRGen/Linking.h"
 #include "swift/SIL/SILDeclRef.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILValue.h"
@@ -61,7 +62,6 @@
 #include "IRGenDebugInfo.h"
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
-#include "Linking.h"
 #include "MetadataPath.h"
 #include "NecessaryBindings.h"
 #include "ProtocolInfo.h"
@@ -852,10 +852,10 @@ static bool isDependentConformance(IRGenModule &IGM,
 
   // Check whether any of the associated types are dependent.
   if (conformance->forEachTypeWitness(nullptr,
-        [&](AssociatedTypeDecl *requirement, const Substitution &sub,
+        [&](AssociatedTypeDecl *requirement, Type type,
             TypeDecl *explicitDecl) -> bool {
           // RESILIENCE: this could be an opaque conformance
-          return sub.getReplacement()->hasArchetype();
+          return type->hasArchetype();
        })) {
     return true;
   }
@@ -1124,12 +1124,11 @@ public:
 
       SILEntries = SILEntries.slice(1);
 
-      const Substitution &sub =
-        Conformance.getTypeWitness(requirement, nullptr);
+      CanType associate =
+        Conformance.getTypeWitness(requirement, nullptr)->getCanonicalType();
 
       // This type will be expressed in terms of the archetypes
       // of the conforming context.
-      CanType associate = sub.getReplacement()->getCanonicalType();
       assert(!associate->hasTypeParameter());
 
       llvm::Constant *metadataAccessFunction =

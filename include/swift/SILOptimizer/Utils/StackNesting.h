@@ -143,7 +143,8 @@ private:
   ///
   /// Returns true if any deallocations were inserted.
   bool insertDeallocs(const BitVector &AliveBefore, const BitVector &AliveAfter,
-                      SILInstruction *InsertionPoint);
+                      SILInstruction *InsertionPoint,
+                      Optional<SILLocation> Location);
 
   /// Modifies the SIL to end up with a correct stack nesting.
   ///

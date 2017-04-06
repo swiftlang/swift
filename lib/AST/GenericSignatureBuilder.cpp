@@ -1043,8 +1043,7 @@ static void maybeAddSameTypeRequirementForNestedType(
   // Dig out the type witness.
   auto superConformance = superSource->getProtocolConformance();
   auto concreteType =
-    superConformance->getTypeWitness(assocType, builder.getLazyResolver())
-      .getReplacement();
+    superConformance->getTypeWitness(assocType, builder.getLazyResolver());
   if (!concreteType) return;
 
   // Add the same-type constraint.
@@ -1348,9 +1347,9 @@ static void concretizeNestedTypeFromConcreteParent(
 
   Type witnessType;
   if (conformance.isConcrete()) {
-    witnessType = conformance.getConcrete()
-                      ->getTypeWitness(assocType, builder.getLazyResolver())
-                      .getReplacement();
+    witnessType =
+      conformance.getConcrete()
+        ->getTypeWitness(assocType, builder.getLazyResolver());
   } else {
     witnessType = DependentMemberType::get(concreteParent, assocType);
   }
@@ -2771,9 +2770,14 @@ bool GenericSignatureBuilder::addRequirement(const RequirementRepr *Req,
     // parameter.
     if (!Req->getFirstType()->hasTypeParameter() &&
         !Req->getSecondType()->hasTypeParameter()) {
-      Diags.diagnose(Req->getEqualLoc(), diag::requires_no_same_type_archetype)
-        .highlight(Req->getFirstTypeLoc().getSourceRange())
-        .highlight(Req->getSecondTypeLoc().getSourceRange());
+      if (!Req->getFirstType()->hasError() &&
+          !Req->getSecondType()->hasError()) {
+        Diags.diagnose(Req->getEqualLoc(),
+                       diag::requires_no_same_type_archetype)
+          .highlight(Req->getFirstTypeLoc().getSourceRange())
+          .highlight(Req->getSecondTypeLoc().getSourceRange());
+      }
+
       return true;
     }
 
