@@ -219,7 +219,7 @@ void Constraint::print(llvm::raw_ostream &Out, SourceManager *sm) const {
 
     interleave(getNestedConstraints(),
                [&](Constraint *constraint) {
-                 if (isDisabled())
+                 if (constraint->isDisabled())
                    Out << "[disabled] ";
                  constraint->print(Out, sm);
                },
