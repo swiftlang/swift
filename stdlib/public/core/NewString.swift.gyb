@@ -389,6 +389,49 @@ struct _NSStringUTF16 : RandomAccessCollection {
 //===----------------------------------------------------------------------===//
 
 
+#if false
+
+// TODO: basics of a Swift 3 compatibility shim for Substring start here
+
+// This protocol exists to house lower-priority Swift 4 APIs that
+// we still want to make available with type context in Swift 3
+public protocol _Swift3StringCompatibility: Unicode { }
+
+extension _Swift3StringCompatibility
+where
+  Self: RangeReplaceableCollection,
+  Index == String.Index, 
+  SubSequence == Substring, 
+  Content == String.Content, 
+  Iterator.Element == SubSequence.Iterator.Element 
+{
+  @available(swift, obsoleted: 4)
+  public subscript(bounds: Range<String.Index>) -> Substring {
+    get {
+      return Substring(
+        content: Substring.Content(wholeContent: self.content, bounds: bounds))
+    }
+    set {
+      replaceSubrange(bounds, with: newValue)
+    }
+  }
+}
+
+extension String: _Swift3StringCompatibility { 
+  @available(swift, obsoleted: 4)
+  public subscript(bounds: Range<Index>) -> String {
+    get {
+      return String(Substring(
+        content: Substring.Content(wholeContent: self.content, bounds: bounds)))
+    }
+    set {
+      replaceSubrange(bounds, with: newValue)
+    }
+  }
+}
+
+#endif
+
 extension String : Unicode, BidirectionalCollectionWrapper {
   public typealias Base = AnyCharacterUnicodeView
   public typealias Index = AnyCharacterUnicodeView.Index
@@ -396,7 +439,8 @@ extension String : Unicode, BidirectionalCollectionWrapper {
 
   public typealias SubSequence = Substring
 
-  public subscript(bounds: Range<Index>) -> SubSequence {
+  // @available(swift, introduced: 4)
+  public subscript(bounds: Range<Index>) -> Substring {
     get {
       return Substring(
         content: Substring.Content(wholeContent: self.content, bounds: bounds))
