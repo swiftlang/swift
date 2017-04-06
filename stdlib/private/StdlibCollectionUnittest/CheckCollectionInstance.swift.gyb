@@ -269,57 +269,9 @@ public func checkAdvancesAndDistances<Instances, Distances, BaseCollection>(
 %   ('Expected: Collection',  'Expected.Iterator.Element',  'Expected'),
 %   ('Element'             ,  'Element'                  ,  'Array<Element>')]:
 
-// Top-level check for Collection instances. Alias for checkForwardCollection.
-// Checks all slices: O(n^2).
-public func checkCollection<${genericParam}, C : Collection>(
-  _ expected: ${Expected},
-  _ collection: C,
-  ${TRACE},
-  resiliencyChecks: CollectionMisuseResiliencyChecks = .all,
-  sameValue: (${Element}, ${Element}) -> Bool
-) where C.Iterator.Element == ${Element},
-  // FIXME(ABI) (Associated Types with where clauses): these constraints should be applied to
-  // associated types of Collection.
-  C.Indices.Iterator.Element == C.Index,
-  C.SubSequence : Collection,
-  C.SubSequence.Iterator.Element == ${Element},
-  C.SubSequence.Indices.Iterator.Element == C.Index,
-  C.SubSequence.Index == C.Index {
-
-  checkForwardCollection(expected, collection, message(),
-    stackTrace: stackTrace, showFrame: showFrame, file: file, line: line,
-    resiliencyChecks: resiliencyChecks,
-    sameValue: sameValue)
-}
-
 %   for Traversal in TRAVERSALS:
 %     TraversalCollection = collectionForTraversal(Traversal)
 
-// Calls check${Traversal}Collection with default `sameValue`.
-public func check${Traversal}Collection<
-  ${genericParam}, C : ${TraversalCollection}
->(
-  _ expected: ${Expected}, _ collection: C,
-  ${TRACE},
-  resiliencyChecks: CollectionMisuseResiliencyChecks = .all
-) where
-  C.Iterator.Element == ${Element},
-  C.Indices.Iterator.Element == C.Index,
-  C.SubSequence : ${TraversalCollection},
-  C.SubSequence.Iterator.Element == ${Element},
-  C.SubSequence.Indices.Iterator.Element == C.Index,
-  C.SubSequence.Index == C.Index,
-  ${Element} : Equatable {
-
-  check${Traversal}Collection(
-    expected, collection, ${trace},
-    resiliencyChecks: resiliencyChecks) { $0 == $1 }
-}
-
-// Top-Level check for all ${TraversalCollection} semantics on a single
-// instance. This constrains SubSequence associated types in order to check
-// slice semantics.
-// Checks all slices: O(n^2).
 public func check${Traversal}Collection<
   ${genericParam}, C : ${TraversalCollection}
 >(
@@ -329,44 +281,6 @@ public func check${Traversal}Collection<
   sameValue: (${Element}, ${Element}) -> Bool
 ) where
   C.Iterator.Element == ${Element},
-  // FIXME(ABI) (Associated Types with where clauses): these constraints should be applied to
-  // associated types of Collection.
-  C.Indices.Iterator.Element == C.Index,
-  C.SubSequence : ${TraversalCollection},
-  C.SubSequence.Iterator.Element == ${Element},
-  C.SubSequence.Index == C.Index,
-  C.SubSequence.Indices.Iterator.Element == C.Index {
-
-  checkOneLevelOf${Traversal}Collection(expected, collection, ${trace},
-    resiliencyChecks: resiliencyChecks, sameValue: sameValue)
-
-  // Avoid validation of all possible (n^2) slices on large collection.
-  // Test cases should call checkOneLevelOf${Traversal}Collection instead.
-  expectLT(expected.count, 30)
-
-  _checkSliceableWith${Traversal}Index(expected, collection, ${trace},
-    resiliencyChecks: resiliencyChecks, sameValue: sameValue)
-}
-
-// Helper for check${Traversal}Collection. Check that instance of `C`,
-// `collection`, upholds the semantics of `${TraversalCollection}`,
-// non-recursively. This does not check subsequences. It may be called for each
-// subsequence without combinatorial explosion. Also, since recursive protocol
-// contraints are not supported, our second level of checks cannot depend on the
-// associated type properties of SubSequence.
-//
-// Checks all slices: O(n^2).
-public func checkOneLevelOf${Traversal}Collection<
-  ${genericParam}, C : ${TraversalCollection}
->(
-  _ expected: ${Expected}, _ collection: C,
-  ${TRACE},
-  resiliencyChecks: CollectionMisuseResiliencyChecks = .all,
-  sameValue: (${Element}, ${Element}) -> Bool
-) where
-  C.Iterator.Element == ${Element},
-  // FIXME(ABI) (Associated Types with where clauses): these constraints should be applied to
-  // associated types of Collection.
   C.Indices.Iterator.Element == C.Index {
 
   // A `Collection` is a multi-pass `Sequence`.
@@ -375,10 +289,6 @@ public func checkOneLevelOf${Traversal}Collection<
       expected, collection, ${trace},
       resiliencyChecks: resiliencyChecks, sameValue: sameValue)
   }
-
-  //===------------------------------------------------------------------===//
-  // Check Index semantics
-  //===------------------------------------------------------------------===//
 
   let succ = { collection.index(after: $0) }
 %     if Traversal != 'Forward':
@@ -446,13 +356,8 @@ public func checkOneLevelOf${Traversal}Collection<
 
   let expectedArray = Array(expected)
 
-  // Check `count`.
   expectEqual(
     expectedArray.count.toIntMax(), collection.count.toIntMax(), ${trace})
-
-  //===------------------------------------------------------------------===//
-  // Check Iteration behavior.
-  //===------------------------------------------------------------------===//
 
   for _ in 0..<3 {
     do {
@@ -509,7 +414,7 @@ public func checkOneLevelOf${Traversal}Collection<
           expectedArray[i], collection[index], ${trace}, sameValue: sameValue)
       }
 
-%       end # Traversal == "Bidirectional"
+%       end
 
     } // end of `if expectedArray.count >= 2`
 
@@ -535,59 +440,65 @@ public func checkOneLevelOf${Traversal}Collection<
   // FIXME: more checks for bidirectional and random access collections.
 }
 
-// Helper for check${Traversal}Collection to check Slices.
-//
-// Checks all slices: O(n^2).
-internal func _checkSliceableWith${Traversal}Index<
-${genericParam}, S : ${TraversalCollection}
+public func check${Traversal}Collection<
+  ${genericParam}, C : ${TraversalCollection}
 >(
-  _ expected: ${Expected}, _ sliceable: S, ${TRACE},
-  resiliencyChecks: CollectionMisuseResiliencyChecks = .all,
-  sameValue: (${Element}, ${Element}) -> Bool
+  _ expected: ${Expected}, _ collection: C,
+  ${TRACE},
+  resiliencyChecks: CollectionMisuseResiliencyChecks = .all
+) where
+  C.Iterator.Element == ${Element},
+  C.Indices.Iterator.Element == C.Index,
+  ${Element} : Equatable {
+
+  check${Traversal}Collection(
+    expected, collection, ${trace},
+    resiliencyChecks: resiliencyChecks) { $0 == $1 }
+}
+
+%   end
+
+// FIXME: merge into checkCollection()
+public func checkSliceableWithBidirectionalIndex<
+  ${genericParam}, S : BidirectionalCollection
+>(
+  _ expected: ${Expected}, _ sliceable: S, ${TRACE}
 ) where
   S.Iterator.Element == ${Element},
-  S.SubSequence : ${TraversalCollection},
+  S.Indices.Iterator.Element == S.Index,
+  S.SubSequence : BidirectionalCollection,
   S.SubSequence.Iterator.Element == ${Element},
-  S.SubSequence.Index == S.Index,
-  S.SubSequence.Indices.Iterator.Element == S.Index {
+  S.SubSequence.Indices.Iterator.Element == S.SubSequence.Index,
+  ${Element} : Equatable {
+
+  // A `Sliceable` is a `Collection`.
+  checkBidirectionalCollection(expected, sliceable, ${trace})
 
   let expectedArray = Array(expected)
 
   let succ = { sliceable.index(after: $0) }
-%       if Traversal != "Forward":
   let pred = { sliceable.index(before: $0) }
-%       end
 
   var start = sliceable.startIndex
   for startNumericIndex in 0...expectedArray.count {
-%       if Traversal != "Forward":
     if start != sliceable.endIndex {
       start = succ(start)
       start = pred(start)
       start = succ(start)
       start = pred(start)
     }
-%       end
     var end = start
     for endNumericIndex in startNumericIndex...expectedArray.count {
-%       if Traversal != "Forward":
       if end != sliceable.endIndex {
         end = succ(end)
         end = pred(end)
         end = succ(end)
         end = pred(end)
       }
-%       end
       let expectedSlice = expectedArray[startNumericIndex..<endNumericIndex]
       let slice = sliceable[start..<end]
-      // For every possible slice, verify that the slice's bounds are identical
-      // to the indices used to form the slice.
-      expectEqual(start, slice.startIndex)
-      expectEqual(end, slice.endIndex)
 
-      checkOneLevelOf${Traversal}Collection(expectedSlice, slice, ${trace},
-        resiliencyChecks: resiliencyChecks,
-        sameValue: sameValue)
+      checkBidirectionalCollection(expectedSlice, slice, ${trace})
 
       if end != sliceable.endIndex {
         end = succ(end)
@@ -599,13 +510,9 @@ ${genericParam}, S : ${TraversalCollection}
   }
 }
 
-%   end # Traversal
+% end
 
-% end # genericParam, Elements, Expected
 
-// Check RangeReplaceableCollection using a factory.
-//
-// Note: This does not invoke other collection tests.
 public func checkRangeReplaceable<C, N>(
   _ makeCollection: @escaping () -> C,
   _ makeNewValues: (Int) -> N
@@ -667,3 +574,13 @@ public func checkRangeReplaceable<C, N>(
     }
   }
 }
+
+public func checkCollection<C : Collection, Expected : Collection>(
+  _ subject: C,
+  expected: Expected,
+  ${TRACE},
+  resiliencyChecks: CollectionMisuseResiliencyChecks = .all,
+  sameValue: (Expected.Iterator.Element, Expected.Iterator.Element) -> Bool
+) where C.Iterator.Element == Expected.Iterator.Element {
+}
+

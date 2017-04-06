@@ -87,7 +87,7 @@ ${Suite}.test("${ArrayType}/Sliceable/Enums") {
   do {
     let expected = [E.A, E.B, E.C, E.D]
     let sliceable = ${ArrayType}(expected)
-    checkBidirectionalCollection(expected, sliceable)
+    checkSliceableWithBidirectionalIndex(expected, sliceable)
   }
 
   /*
@@ -95,7 +95,7 @@ ${Suite}.test("${ArrayType}/Sliceable/Enums") {
   do {
     let expected = [[E.A, E.B], [E.B, E.C], [E.D], [E.A, E.B, E.D]]
     let sliceable = ${ArrayType}(expected)
-    checkBidirectionalCollection(
+    checkSliceableWithBidirectionalIndex(
       expected, sliceable, SourceLocStack().withCurrentLoc())
   }
   */

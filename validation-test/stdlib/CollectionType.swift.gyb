@@ -474,8 +474,8 @@ CollectionTypeTests.test("Collection.makeIterator()/DefaultImplementation") {
     }
 
     checkCollection(
-      Array(1..<count+1).map(OpaqueValue.init) as [OpaqueValue<Int>],
-      collection
+      collection,
+      expected: Array(1..<count+1).map(OpaqueValue.init) as [OpaqueValue<Int>]
     ) { $0.value == $1.value }
   }
 }
@@ -547,8 +547,8 @@ CollectionTypeTests.test("Collection.makeIterator()/CustomImplementation") {
     }
 
     checkCollection(
-      Array(1..<count+1).map(OpaqueValue.init) as [OpaqueValue<Int>],
       collection,
+      expected: Array(1..<count+1).map(OpaqueValue.init) as [OpaqueValue<Int>],
       resiliencyChecks: .none) { $0.value == $1.value }
   }
 }

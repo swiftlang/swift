@@ -83,8 +83,8 @@ SliceTests.test("${Slice}/init(base:bounds:)") {
     expectType(${Slice}<${Collection}<OpaqueValue<Int>>>.self, &slice)
 
     checkCollection(
-      test.expected,
       slice,
+      expected: test.expected,
       stackTrace: SourceLocStack().with(test.loc))
       { $0.value == $1.value }
   }
