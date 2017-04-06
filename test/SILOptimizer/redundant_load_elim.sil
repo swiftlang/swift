@@ -1166,3 +1166,27 @@ bb0(%0 : $Builtin.RawPointer):
   return %6 : $Int
 }
 
+sil @overwrite_int : $@convention(thin) (@inout Int, Int) -> ()
+
+// CHECK-LABEL: sil @test_address_block_args
+// CHECK: bb2({{.*}}):
+// CHECK: apply
+// CHECK: [[L:%.*]] = load
+// CHECK: return [[L]]
+sil @test_address_block_args : $@convention(thin) (Int) -> Int {
+bb0(%0 : $Int):
+  %4 = alloc_stack $Int
+  store %0 to %4 : $*Int
+  cond_br undef, bb1(%4 : $*Int), bb2(%4 : $*Int)
+
+bb1(%a1 : $*Int):
+  br bb2(%a1 : $*Int)
+
+bb2(%a : $*Int):
+  %l1 = load %a : $*Int
+  %60 = function_ref @overwrite_int : $@convention(thin) (@inout Int, Int) -> ()
+  %61 = apply %60(%4, %l1) : $@convention(thin) (@inout Int, Int) -> ()
+  %r = load %a : $*Int
+  dealloc_stack %4 : $*Int
+  return %r : $Int
+} 
