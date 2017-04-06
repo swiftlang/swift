@@ -71,37 +71,48 @@ public func == <T : Strideable>(x: T, y: T) -> Bool {
 
 //===----------------------------------------------------------------------===//
 
-extension Strideable where Self : _Pointer {
+% for Base in ['_Pointer', 'SignedInteger']:
+%   Availability = (lambda what: '@available(swift, deprecated: 3.1, obsoleted: 4.0, message: "Mixed-type %s is deprecated. Please use explicit type conversion.")' % what) if Base != '_Pointer' else (lambda _: '')
+
+extension Strideable where Self : ${Base} {
   @_transparent
+  ${Availability('addition')}
   public static func + (lhs: Self, rhs: Self.Stride) -> Self {
     return lhs.advanced(by: rhs)
   }
 
   @_transparent
+  ${Availability('addition')}
   public static func + (lhs: Self.Stride, rhs: Self) -> Self {
     return rhs.advanced(by: lhs)
   }
 
   @_transparent
+  ${Availability('subtraction')}
   public static func - (lhs: Self, rhs: Self.Stride) -> Self {
     return lhs.advanced(by: -rhs)
   }
 
   @_transparent
+  ${Availability('subtraction')}
   public static func - (lhs: Self, rhs: Self) -> Self.Stride {
     return rhs.distance(to: lhs)
   }
 
   @_transparent
+  ${Availability('addition')}
   public static func += (lhs: inout Self, rhs: Self.Stride) {
     lhs = lhs.advanced(by: rhs)
   }
 
   @_transparent
+  ${Availability('subtraction')}
   public static func -= (lhs: inout Self, rhs: Self.Stride) {
     lhs = lhs.advanced(by: -rhs)
   }
 }
+
+% end
 
 //===----------------------------------------------------------------------===//
 
