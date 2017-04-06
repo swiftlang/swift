@@ -90,6 +90,13 @@ public class AnyKeyPath: Hashable, _AppendKeyPath {
       }
     }
   }
+
+  // SPI for the Foundation overlay to allow interop with KVC keypath-based
+  // APIs.
+  public var _kvcKeyPathString: String? {
+    // TODO
+    return nil
+  }
   
   // MARK: Implementation details
   
