@@ -2361,18 +2361,19 @@ private:
   /// \param expr The expression to find reductions for.
   void shrink(Expr *expr);
 
-  bool simplifyForConstraintPropagation(Constraint *applicableFn,
-                 llvm::SmallVectorImpl<Constraint *> &workList);
+  void gatherNeighboringApplicableFunctionConstraints(
+      Constraint *applicableFn,
+      SmallVectorImpl<Constraint *> &otherApplicableFn);
+  bool simplifyForConstraintPropagation();
   bool isBindOverloadConsistent(Constraint *bindConstraint,
                                 Constraint *applicableFn,
-                         llvm::SmallVectorImpl<Constraint *> &otherApplicableFn,
-                                int depth);
+                                llvm::SetVector<Constraint *> &workList,
+                                bool topLevel);
   bool isApplicableFunctionConsistent(Constraint *applicableFn,
                                       llvm::SetVector<Constraint *> &workList,
-                                      int depth);
+                                      bool topLevel);
 
- public:
-
+public:
   /// \brief Solve the system of constraints generated from provided expression.
   ///
   /// \param expr The expression to generate constraints from.
