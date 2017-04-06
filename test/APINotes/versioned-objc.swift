@@ -13,4 +13,14 @@ class ProtoWithVersionedUnavailableMemberImpl: ProtoWithVersionedUnavailableMemb
   func requirement() -> Any? { return nil }
 }
 
+func testNonGeneric() {
+  // CHECK-DIAGS-3:[[@LINE+1]]:{{[0-9]+}}: error: cannot convert value of type 'Any' to specified type 'Int'
+  let _: Int = NewlyGenericSub.defaultElement()
+  // CHECK-DIAGS-4:[[@LINE-1]]:{{[0-9]+}}: error: generic parameter 'Element' could not be inferred
+
+  // CHECK-DIAGS-3:[[@LINE+1]]:{{[0-9]+}}: error: cannot specialize non-generic type 'NewlyGenericSub'
+  let _: Int = NewlyGenericSub<Base>.defaultElement()
+  // CHECK-DIAGS-4:[[@LINE-1]]:{{[0-9]+}}: error: cannot convert value of type 'Base' to specified type 'Int'
+}
+
 let unrelatedDiagnostic: Int = nil

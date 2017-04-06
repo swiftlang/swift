@@ -61,14 +61,24 @@ class IRGenDebugInfo {
   llvm::DIBuilder DBuilder;
   IRGenModule &IGM;
 
-  // Various caches.
-  llvm::DenseMap<const SILDebugScope *, llvm::TrackingMDNodeRef> ScopeCache;
+  /// Used for caching SILDebugScopes without inline information.
+  typedef std::pair<const void *, void *> LocalScopeHash;
+  struct LocalScope : public LocalScopeHash {
+    LocalScope(const SILDebugScope *DS)
+        : LocalScopeHash({DS->Loc.getOpaquePointerValue(),
+                          DS->Parent.getOpaqueValue()}) {}
+  };
+
+  /// Various caches.
+  /// @{
+  llvm::DenseMap<LocalScopeHash, llvm::TrackingMDNodeRef> ScopeCache;
+  llvm::DenseMap<const SILDebugScope *, llvm::TrackingMDNodeRef> InlinedAtCache;
   llvm::DenseMap<llvm::StringRef, llvm::TrackingMDNodeRef> DIFileCache;
+  llvm::DenseMap<const void *, SILLocation::DebugLoc> DebugLocCache;
   llvm::DenseMap<TypeBase *, llvm::TrackingMDNodeRef> DITypeCache;
   llvm::StringMap<llvm::TrackingMDNodeRef> DIModuleCache;
   TrackingDIRefMap DIRefMap;
-  std::vector<std::pair<const SILDebugScope *, llvm::TrackingMDNodeRef>>
-      LastInlineChain;
+  /// @}
 
   /// A list of replaceable fwddecls that need to be RAUWed at the end.
   std::vector<std::pair<TypeBase *, llvm::TrackingMDRef>> ReplaceMap;
@@ -207,7 +217,17 @@ public:
   /// Return the DIBuilder.
   llvm::DIBuilder &getBuilder() { return DBuilder; }
 
+  /// Decode (and cache) a SourceLoc.
+  SILLocation::DebugLoc decodeSourceLoc(SourceLoc SL);
 private:
+  /// Decode (and cache) a SILLocation.
+  SILLocation::DebugLoc decodeDebugLoc(SILLocation Loc);
+  /// Return the debug location from a SILLocation.
+  SILLocation::DebugLoc getDebugLocation(Optional<SILLocation> OptLoc);
+  /// Return the start of the location's source range.
+  SILLocation::DebugLoc getStartLocation(Optional<SILLocation> OptLoc);
+
+
   StringRef BumpAllocatedString(const char *Data, size_t Length);
   StringRef BumpAllocatedString(std::string S);
   StringRef BumpAllocatedString(StringRef S);

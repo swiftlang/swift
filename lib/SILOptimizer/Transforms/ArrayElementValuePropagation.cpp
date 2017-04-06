@@ -69,7 +69,6 @@ class ArrayAllocation {
 
   bool mapInitializationStores(SILValue ElementBuffer);
   bool recursivelyCollectUses(ValueBase *Def);
-  bool collectForwardableValues();
   bool replacementsAreValid();
 
   // After approx. this many elements, it's faster to use append(contentsOf:)

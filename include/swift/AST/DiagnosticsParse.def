@@ -208,10 +208,6 @@ ERROR(decl_already_static,none,
 ERROR(enum_case_dot_prefix,none,
       "extraneous '.' in enum 'case' declaration", ())
 
-ERROR(protocol_associatedtype_where_swift_3,none,
-      "where clauses on %0 are fragile; use '-swift-version 4' to experiment.", (StringRef))
-
-
 // Variable getters/setters
 ERROR(static_var_decl_global_scope,none,
       "%select{%error|static properties|class properties}0 may only be declared on a type",

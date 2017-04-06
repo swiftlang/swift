@@ -1,6 +1,6 @@
 // RUN: %target-sil-opt -enable-sil-ownership -ownership-model-eliminator %s | %FileCheck %s
 
-sil_stage canonical
+sil_stage raw
 
 import Builtin
 
@@ -226,6 +226,35 @@ bb2(%2 : @owned $Either<Builtin.NativeObject, Builtin.UnknownObject>):
   br bb3
 
 bb3:
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil @mark_uninitialized_project_box : $@convention(thin) () -> () {
+// CHECK: [[BOX:%.*]] = alloc_box
+// CHECK: [[PB_BOX:%.*]] = project_box [[BOX]]
+// CHECK: [[MUI:%.*]] = mark_uninitialized [var] [[PB_BOX]]
+// CHECK: store {{%.*}} to [[MUI]]
+// CHECK: load [[MUI]]
+// CHECK: load [[MUI]]
+// CHECK: strong_release [[BOX]]
+// CHECK: } // end sil function 'mark_uninitialized_project_box'
+sil @mark_uninitialized_project_box : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_box $<τ_0_0> { var τ_0_0 } <Builtin.Int32>
+  %1 = project_box %0 : $<τ_0_0> { var τ_0_0 } <Builtin.Int32>, 0
+  %2 = mark_uninitialized [var] %1 : $*Builtin.Int32
+  %3 = integer_literal $Builtin.Int32, 0
+  store %3 to [trivial] %2 : $*Builtin.Int32
+
+  %4 = project_box %0 : $<τ_0_0> { var τ_0_0 } <Builtin.Int32>, 0
+  %5 = load [trivial] %4 : $*Builtin.Int32
+
+  %6 = copy_value %0 : $<τ_0_0> { var τ_0_0 } <Builtin.Int32>
+  %7 = project_box %0 : $<τ_0_0> { var τ_0_0 } <Builtin.Int32>, 0
+  %8 = load [trivial] %7 : $*Builtin.Int32
+  destroy_value %6 : $<τ_0_0> { var τ_0_0 } <Builtin.Int32>
+  destroy_value %0 : $<τ_0_0> { var τ_0_0 } <Builtin.Int32>
   %9999 = tuple()
   return %9999 : $()
 }

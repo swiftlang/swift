@@ -173,6 +173,8 @@ public:
     os << Base;
     Path.getValue().print(os, *Mod);
   }
+
+  virtual void dump(SILModule *Mod) { print(llvm::dbgs(), Mod); }
 };
 
 static inline llvm::hash_code hash_value(const LSBase &S) {

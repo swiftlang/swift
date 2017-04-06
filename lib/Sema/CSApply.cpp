@@ -32,29 +32,6 @@
 using namespace swift;
 using namespace constraints;
 
-/// \brief Get a substitution corresponding to the type witness.
-/// Inspired by ProtocolConformance::getTypeWitnessByName.
-const Substitution *
-getTypeWitnessByName(ProtocolConformance *conformance,
-                     Identifier name,
-                     LazyResolver *resolver) {
-  // Find the named requirement.
-  AssociatedTypeDecl *assocType = nullptr;
-  auto members = conformance->getProtocol()->lookupDirect(name);
-  for (auto member : members) {
-    assocType = dyn_cast<AssociatedTypeDecl>(member);
-    if (assocType)
-      break;
-  }
-
-  if (!assocType)
-    return nullptr;
-
-  assert(conformance && "Missing conformance information");
-  return &conformance->getTypeWitness(assocType, resolver);
-}
-
-
 /// \brief Retrieve the fixed type for the given type variable.
 Type Solution::getFixedType(TypeVariableType *typeVar) const {
   auto knownBinding = typeBindings.find(typeVar);
@@ -76,7 +53,7 @@ static bool isOpenedAnyObject(Type type) {
     return false;
 
   SmallVector<ProtocolDecl *, 2> protocols;
-  existential->isExistentialType(protocols);
+  existential->getExistentialTypeProtocols(protocols);
   return protocols.size() == 1 &&
          protocols[0]->isSpecificProtocol(KnownProtocolKind::AnyObject);
 }
@@ -4666,7 +4643,7 @@ static ArrayRef<ProtocolConformanceRef>
 collectExistentialConformances(TypeChecker &tc, Type fromType, Type toType,
                                DeclContext *DC) {
   SmallVector<ProtocolDecl *, 4> protocols;
-  toType->getAnyExistentialTypeProtocols(protocols);
+  toType->getExistentialTypeProtocols(protocols);
 
   SmallVector<ProtocolConformanceRef, 4> conformances;
   for (auto proto : protocols) {
@@ -7056,6 +7033,9 @@ bool ConstraintSystem::applySolutionFix(Expr *expr,
   }
 
   case FixKind::ForceDowncast: {
+    if (auto *paren = dyn_cast<ParenExpr>(affected))
+      affected = paren->getSubExpr();
+
     auto fromType = solution.simplifyType(getType(affected))
                       ->getRValueObjectType();
     Type toType = solution.simplifyType(fix.first.getTypeArgument(*this));
@@ -7078,7 +7058,7 @@ bool ConstraintSystem::applySolutionFix(Expr *expr,
       insertAfter += ")";
     }
     insertAfter += useAs ? " as " : " as! ";
-    insertAfter += toType.getString();
+    insertAfter += toType->getWithoutParens()->getString();
     if (needsParensOutside)
       insertAfter += ")";
     

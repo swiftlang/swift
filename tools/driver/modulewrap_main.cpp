@@ -168,7 +168,7 @@ int modulewrap_main(ArrayRef<const char *> Args, const char *Argv0,
   LangOpts.Target = Invocation.getTargetTriple();
   ASTContext ASTCtx(LangOpts, SearchPathOpts, SrcMgr, Instance.getDiags());
   ClangImporterOptions ClangImporterOpts;
-  ASTCtx.addModuleLoader(ClangImporter::create(ASTCtx, ClangImporterOpts),
+  ASTCtx.addModuleLoader(ClangImporter::create(ASTCtx, ClangImporterOpts, ""),
                          true);
   ModuleDecl *M = ModuleDecl::create(ASTCtx.getIdentifier("swiftmodule"), ASTCtx);
   SILOptions SILOpts;

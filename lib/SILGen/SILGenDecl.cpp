@@ -17,13 +17,9 @@
 #include "Scope.h"
 #include "SwitchCaseFullExpr.h"
 #include "swift/AST/ASTMangler.h"
-#include "swift/AST/ASTMangler.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Module.h"
-#include "swift/AST/Module.h"
 #include "swift/AST/NameLookup.h"
-#include "swift/AST/NameLookup.h"
-#include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/SIL/FormalLinkage.h"
 #include "swift/SIL/PrettyStackTrace.h"
@@ -1483,7 +1479,7 @@ ManagedValue
 SILGenFunction::emitFormalAccessManagedBufferWithCleanup(SILLocation loc,
                                                          SILValue addr) {
   assert(InWritebackScope && "Must be in formal evaluation scope");
-  auto &lowering = F.getTypeLowering(addr->getType());
+  auto &lowering = getTypeLowering(addr->getType());
   if (lowering.isTrivial())
     return ManagedValue::forUnmanaged(addr);
 
@@ -1498,7 +1494,7 @@ ManagedValue
 SILGenFunction::emitFormalAccessManagedRValueWithCleanup(SILLocation loc,
                                                          SILValue value) {
   assert(InWritebackScope && "Must be in formal evaluation scope");
-  auto &lowering = F.getTypeLowering(value->getType());
+  auto &lowering = getTypeLowering(value->getType());
   if (lowering.isTrivial())
     return ManagedValue::forUnmanaged(value);
 

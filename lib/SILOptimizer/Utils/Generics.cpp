@@ -50,7 +50,7 @@ static const unsigned TypeWidthThreshold = 2000;
 // Compute the width and the depth of a type.
 // We compute both, because some pathological test-cases result in very
 // wide types and some others result in very deep types. It is important
-// to bail as soon as we hit the threshold on any of both dimentions to
+// to bail as soon as we hit the threshold on any of both dimensions to
 // prevent compiler hangs and crashes.
 static std::pair<unsigned, unsigned> getTypeDepthAndWidth(Type t) {
   unsigned Depth = 0;
@@ -653,6 +653,10 @@ ReabstractionInfo::ReabstractionInfo(SILFunction *OrigF,
   OriginalF = OrigF;
   ConvertIndirectToDirect = true;
 
+  // FIXME: All of the below initialization is then redone by
+  // specializeConcreteSubstitutions(), but there are still a
+  // couple of callers that aren't using the new API.
+
   SILModule &M = OrigF->getModule();
   auto &Ctx = M.getASTContext();
 
@@ -731,11 +735,8 @@ void ReabstractionInfo::specializeConcreteSubstitutions(
   auto OrigGenericSig = Callee->getLoweredFunctionType()->getGenericSignature();
   auto OrigGenericEnv = Callee->getGenericEnvironment();
 
-  SubstitutionMap InterfaceSubs;
   // Get the original substitution map.
-  if (Callee->getLoweredFunctionType()->getGenericSignature())
-    InterfaceSubs = Callee->getLoweredFunctionType()->getGenericSignature()
-      ->getSubstitutionMap(ParamSubs);
+  auto InterfaceSubs = OrigGenericSig->getSubstitutionMap(ParamSubs);
 
   // This is a workaround for the rdar://30610428
   if (!EnablePartialSpecialization) {
@@ -750,7 +751,7 @@ void ReabstractionInfo::specializeConcreteSubstitutions(
   // Build a set of requirements.
   SmallVector<Requirement, 4> Requirements;
 
-  for (auto DP : OrigGenericSig->getGenericParams()) {
+  for (auto DP : OrigGenericSig->getSubstitutableParams()) {
     auto Replacement = Type(DP).subst(InterfaceSubs);
     if (Replacement->hasArchetype())
       continue;
@@ -883,7 +884,7 @@ static void remapRequirements(GenericSignature *GenSig,
     DEBUG(llvm::dbgs() << "\n\nRe-mapping the requirement:\n"; reqReq.dump());
 
     auto first = reqReq.getFirstType();
-    // Is this generic generic type equivalent to a concrete type?
+    // Is this generic type equivalent to a concrete type?
     if (first->hasTypeParameter() &&
         !GenSig->getCanonicalTypeInContext(first, *SM)->hasTypeParameter())
       continue;
@@ -1379,7 +1380,7 @@ FunctionSignaturePartialSpecializer::createSpecializedGenericSignature(
   computeCallerInterfaceToSpecializedInterfaceMap(CallerGenericSig);
 
   // Add generic parameters that will come from the callee.
-  // Introduce a new generic parameter in the new new generic signature
+  // Introduce a new generic parameter in the new generic signature
   // for each generic parameter from the callee.
   createGenericParamsForCalleeGenericParams(CalleeGenericSig, CallerGenericEnv);
 
@@ -1402,13 +1403,13 @@ FunctionSignaturePartialSpecializer::createSpecializedGenericSignature(
 // - For all other substitutions that are considered for partial specialization,
 // it collects first the archetypes used in the replacements. Then for each such
 // archetype A a new generic parameter T' introduced.
-// - If there is a substitution for type T and this substitution is execluded
+// - If there is a substitution for type T and this substitution is excluded
 // from partial specialization (e.g. because it is impossible or would result
 // in a less efficient code), then a new generic parameter T' is introduced,
 // which does not get any additional, more specific requirements based on the
 // substitutions.
 //
-// After all generic parameters are added accoriding to the rules above,
+// After all generic parameters are added according to the rules above,
 // the requirements of the callee's signature are re-mapped by re-formulating
 // them in terms of the newly introduced generic parameters. In case a remapped
 // requirement does not contain any generic types, it can be omitted, because
@@ -1435,7 +1436,7 @@ void ReabstractionInfo::specializeConcreteAndGenericSubstitutions(
   auto CalleeGenericSig = CalleeFnTy->getGenericSignature();
 
   // Used naming convention:
-  // Caller - the function containg the provided apply instruction.
+  // Caller - the function containing the provided apply instruction.
   // Callee - the callee of the provided apply instruction.
   // Specialized - the specialized callee which is being created.
 
@@ -1446,7 +1447,7 @@ void ReabstractionInfo::specializeConcreteAndGenericSubstitutions(
 
   FunctionSignaturePartialSpecializer FSPS(M);
 
-  // Get the parially specialized generic signature and generic environment.
+  // Get the partially specialized generic signature and generic environment.
   auto GenPair = FSPS.createSpecializedGenericSignature(
       CallerGenericSig, CallerGenericEnv, CalleeGenericSig, ParamSubs);
 
@@ -1645,17 +1646,7 @@ static CanSILFunctionType
 getCalleeSubstFunctionType(SILValue Callee, SubstitutionList Subs) {
   // Create a substituted callee type.
   auto CanFnTy = Callee->getType().castTo<SILFunctionType>();
-  auto CalleeSubstFnTy = CanFnTy;
-
-  if (CanFnTy->isPolymorphic() && !Subs.empty()) {
-    CalleeSubstFnTy = CanFnTy->substGenericArgs(*Callee->getModule(), Subs);
-    assert(!CalleeSubstFnTy->isPolymorphic() &&
-           "Substituted callee type should not be polymorphic");
-    assert(!CalleeSubstFnTy->hasTypeParameter() &&
-           "Substituted callee type should not have type parameters");
-  }
-
-  return CalleeSubstFnTy;
+  return CanFnTy->substGenericArgs(*Callee->getModule(), Subs);
 }
 
 // Create a new apply based on an old one, but with a different

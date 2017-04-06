@@ -77,7 +77,7 @@ std::string IRGenMangler::mangleTypeForLLVMTypeName(CanType Ty) {
 std::string IRGenMangler::
 mangleProtocolForLLVMTypeName(ProtocolCompositionType *type) {
   SmallVector<ProtocolDecl *, 4> protocols;
-  type->getAnyExistentialTypeProtocols(protocols);
+  type->getExistentialTypeProtocols(protocols);
 
   if (protocols.empty()) {
     Buffer << "Any";

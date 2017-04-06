@@ -250,6 +250,9 @@ def emit_pch : Flag<["-"], "emit-pch">,
 def enable_sil_ownership : Flag<["-"], "enable-sil-ownership">,
   HelpText<"Enable the SIL Ownership Model">;
 
+def disable_mandatory_semantic_arc_opts : Flag<["-"], "disable-mandatory-semantic-arc-opts">,
+  HelpText<"Disable the mandatory semantic arc optimizer">;
+
 def assume_parsing_unqualified_ownership_sil : Flag<["-"], "assume-parsing-unqualified-ownership-sil">,
   HelpText<"Assume unqualified SIL ownership when parsing SIL">;
 
@@ -320,6 +323,9 @@ def use_jit : Flag<["-"], "use-jit">,
 def sil_inline_threshold : Separate<["-"], "sil-inline-threshold">,
   MetaVarName<"<50>">,
   HelpText<"Controls the aggressiveness of performance inlining">;
+
+def sil_merge_partial_modules : Flag<["-"], "sil-merge-partial-modules">,
+  HelpText<"Merge SIL from all partial swiftmodules into the final module">;
 
 def sil_link_all : Flag<["-"], "sil-link-all">,
   HelpText<"Link all SIL functions">;

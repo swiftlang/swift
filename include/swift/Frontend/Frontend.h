@@ -292,6 +292,11 @@ public:
   bool isDelayedFunctionBodyParsing() const {
     return FrontendOpts.DelayedFunctionBodyParsing;
   }
+
+  /// Retrieve a module hash string that is suitable for uniquely
+  /// identifying the conditions under which the module was built, for use
+  /// in generating a cached PCH file for the bridging header.
+  std::string getPCHHash() const;
 };
 
 /// A class which manages the state and execution of the compiler.

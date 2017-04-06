@@ -100,7 +100,10 @@ static unsigned computeSubelement(SILValue Pointer, SILInstruction *RootInst) {
     auto *Inst = cast<SILInstruction>(Pointer);
     if (auto *PBI = dyn_cast<ProjectBoxInst>(Inst)) {
       Pointer = PBI->getOperand();
-    } else if (auto *TEAI = dyn_cast<TupleElementAddrInst>(Inst)) {
+      continue;
+    }
+
+    if (auto *TEAI = dyn_cast<TupleElementAddrInst>(Inst)) {
       SILType TT = TEAI->getOperand()->getType();
       
       // Keep track of what subelement is being referenced.
@@ -108,7 +111,10 @@ static unsigned computeSubelement(SILValue Pointer, SILInstruction *RootInst) {
         SubEltNumber += getNumSubElements(TT.getTupleElementType(i), M);
       }
       Pointer = TEAI->getOperand();
-    } else if (auto *SEAI = dyn_cast<StructElementAddrInst>(Inst)) {
+      continue;
+    }
+
+    if (auto *SEAI = dyn_cast<StructElementAddrInst>(Inst)) {
       SILType ST = SEAI->getOperand()->getType();
       
       // Keep track of what subelement is being referenced.
@@ -119,12 +125,14 @@ static unsigned computeSubelement(SILValue Pointer, SILInstruction *RootInst) {
       }
       
       Pointer = SEAI->getOperand();
-    } else {
-      assert((isa<InitExistentialAddrInst>(Inst) || isa<InjectEnumAddrInst>(Inst))&&
-             "Unknown access path instruction");
-      // Cannot promote loads and stores from within an existential projection.
-      return ~0U;
+      continue;
     }
+
+    
+    assert((isa<InitExistentialAddrInst>(Inst) || isa<InjectEnumAddrInst>(Inst))&&
+           "Unknown access path instruction");
+    // Cannot promote loads and stores from within an existential projection.
+    return ~0U;
   }
 }
 

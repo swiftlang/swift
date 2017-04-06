@@ -19,40 +19,34 @@ import platform
 import sys
 import time
 
-import android.adb.commands # noqa (E402 module level import not at top of file)
+import android.adb.commands
 
-# FIXME: Instead of modifying the system path in order to enable imports from
-#        other directories, all Python modules related to the build script
-#        should be moved to the `swift_build_support` module. Remove "noqa"
-#        markers when this is fixed.
-#        For additional information, see: https://bugs.swift.org/browse/SR-237.
-sys.path.append(os.path.dirname(__file__))
-from SwiftBuildSupport import (
+from swift_build_support.swift_build_support import (
+    arguments,
+    debug,
+    diagnostics,
+    host,
+    migration,
+    products,
+    shell,
+    tar,
+    targets,
+    workspace
+)
+
+from swift_build_support.swift_build_support.SwiftBuildSupport import (
     HOME,
     SWIFT_BUILD_ROOT,
     SWIFT_REPO_NAME,
     SWIFT_SOURCE_ROOT,
     get_all_preset_names,
-    get_preset_options,
-)  # noqa (E402 module level import not at top of file)
+    get_preset_options,  
+)
 
-sys.path.append(os.path.join(os.path.dirname(__file__), 'swift_build_support'))
-
-# E402 means module level import not at top of file
-from swift_build_support import arguments  # noqa (E402)
-from swift_build_support import diagnostics  # noqa (E402)
-from swift_build_support import host  # noqa (E402)
-from swift_build_support.toolchain import host_toolchain  # noqa (E402)
-import swift_build_support.debug      # noqa (E402)
-from swift_build_support import migration  # noqa (E402)
-from swift_build_support import products  # noqa (E402)
-from swift_build_support import shell  # noqa (E402)
-import swift_build_support.tar        # noqa (E402)
-import swift_build_support.targets    # noqa (E402)
-from swift_build_support.targets import StdlibDeploymentTarget  # noqa (E402)
-from swift_build_support.cmake import CMake  # noqa (E402)
-import swift_build_support.workspace    # noqa (E402)
-
+from swift_build_support.swift_build_support.cmake import CMake
+from swift_build_support.swift_build_support.targets import \
+    StdlibDeploymentTarget
+from swift_build_support.swift_build_support.toolchain import host_toolchain
 
 build_script_impl = os.path.join(
     SWIFT_SOURCE_ROOT, SWIFT_REPO_NAME, "utils", "build-script-impl")
@@ -444,7 +438,7 @@ class BuildScriptInvocation(object):
 
         if args.build_subdir is None:
             args.build_subdir = \
-                swift_build_support.workspace.compute_build_subdir(args)
+                workspace.compute_build_subdir(args)
 
         # Add optional stdlib-deployment-targets
         if args.android:
@@ -467,7 +461,7 @@ class BuildScriptInvocation(object):
         self.toolchain = toolchain
         self.args = args
 
-        self.workspace = swift_build_support.workspace.Workspace(
+        self.workspace = workspace.Workspace(
             source_root=SWIFT_SOURCE_ROOT,
             build_root=os.path.join(SWIFT_BUILD_ROOT, args.build_subdir))
 
@@ -819,7 +813,7 @@ class BuildScriptInvocation(object):
         if platform.system() == 'Darwin':
             impl_args += [
                 "--toolchain-prefix",
-                swift_build_support.targets.darwin_toolchain_prefix(
+                targets.darwin_toolchain_prefix(
                     args.install_prefix),
                 "--host-lipo", toolchain.lipo,
             ]
@@ -1896,7 +1890,7 @@ iterations with -O",
         help="The installation prefix. This is where built Swift products "
              "(like bin, lib, and include) will be installed.",
         metavar="PATH",
-        default=swift_build_support.targets.install_prefix())
+        default=targets.install_prefix())
     parser.add_argument(
         "--install-symroot",
         help="the path to install debug symbols into",
@@ -2202,7 +2196,7 @@ iterations with -O",
 
     # Show SDKs, if requested.
     if args.show_sdks:
-        swift_build_support.debug.print_xcodebuild_versions()
+        debug.print_xcodebuild_versions()
 
     # Clean build directory if requested.
     if args.clean:
@@ -2224,8 +2218,7 @@ iterations with -O",
         print('-- Package file: {} --'.format(args.symbols_package))
 
         if platform.system() == 'Darwin':
-            prefix = swift_build_support.targets.darwin_toolchain_prefix(
-                args.install_prefix)
+            prefix = targets.darwin_toolchain_prefix(args.install_prefix)
         else:
             prefix = args.install_prefix
 
@@ -2234,8 +2227,8 @@ iterations with -O",
         # run `tar` without the leading '/' (we remove it ourselves to keep
         # `tar` from emitting a warning).
         with shell.pushd(args.install_symroot):
-            swift_build_support.tar.tar(source=prefix.lstrip('/'),
-                                        destination=args.symbols_package)
+            tar.tar(source=prefix.lstrip('/'),
+                    destination=args.symbols_package)
 
     return 0
 

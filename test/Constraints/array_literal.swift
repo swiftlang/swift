@@ -121,7 +121,7 @@ class A { }
 class B : A { }
 class C : A { }
 
-/// Check for defaulting the element type to 'Any'.
+/// Check for defaulting the element type to 'Any' / 'Any?'.
 func defaultToAny(i: Int, s: String) {
   let a1 = [1, "a", 3.5]
   // expected-error@-1{{heterogeneous collection literal could only be inferred to '[Any]'; add explicit type annotation if this is intentional}}
@@ -129,24 +129,39 @@ func defaultToAny(i: Int, s: String) {
 
   let a2: Array = [1, "a", 3.5]
   // expected-error@-1{{heterogeneous collection literal could only be inferred to '[Any]'; add explicit type annotation if this is intentional}}
-
   let _: Int = a2  // expected-error{{value of type '[Any]'}}
+  
+  let a3 = [1, "a", nil, 3.5]
+  // expected-error@-1{{heterogeneous collection literal could only be inferred to '[Any?]'; add explicit type annotation if this is intentional}}
+  let _: Int = a3 // expected-error{{value of type '[Any?]'}}
+  
+  let a4: Array = [1, "a", nil, 3.5]
+  // expected-error@-1{{heterogeneous collection literal could only be inferred to '[Any?]'; add explicit type annotation if this is intentional}}
+  let _: Int = a4 // expected-error{{value of type '[Any?]'}}
 
-  let a3 = []
+  let a5 = []
   // expected-error@-1{{empty collection literal requires an explicit type}}
-
-  let _: Int = a3 // expected-error{{value of type '[Any]'}}
+  let _: Int = a5 // expected-error{{value of type '[Any]'}}
 
   let _: [Any] = [1, "a", 3.5]
   let _: [Any] = [1, "a", [3.5, 3.7, 3.9]]
   let _: [Any] = [1, "a", [3.5, "b", 3]]
+  
+  let _: [Any?] = [1, "a", nil, 3.5]
+  let _: [Any?] = [1, "a", nil, [3.5, 3.7, 3.9]]
+  let _: [Any?] = [1, "a", nil, [3.5, "b", nil]]
 
-  let a4 = [B(), C()]
-  let _: Int = a4 // expected-error{{value of type '[A]'}}
+  let a6 = [B(), C()]
+  let _: Int = a6 // expected-error{{value of type '[A]'}}
 }
 
 /// Check handling of 'nil'.
-func joinWithNil(s: String) {
+protocol Proto1 {}
+protocol Proto2 {}
+struct Nilable: ExpressibleByNilLiteral {
+	init(nilLiteral: ()) {}
+}
+func joinWithNil<T>(s: String, a: Any, t: T, m: T.Type, p: Proto1 & Proto2, arr: [Int], opt: Int?, iou: Int!, n: Nilable) {
   let a1 = [s, nil]
   let _: Int = a1 // expected-error{{value of type '[String?]'}}
 
@@ -158,6 +173,72 @@ func joinWithNil(s: String) {
 
   let a4 = [nil, "hello"]
   let _: Int = a4 // expected-error{{value of type '[String?]'}}
+  
+  let a5 = [(s, s), nil]
+  let _: Int = a5 // expected-error{{value of type '[(String, String)?]'}}
+  
+  let a6 = [nil, (s, s)]
+  let _: Int = a6 // expected-error{{value of type '[(String, String)?]'}}
+  
+  let a7 = [("hello", "world"), nil]
+  let _: Int = a7 // expected-error{{value of type '[(String, String)?]'}}
+  
+  let a8 = [nil, ("hello", "world")]
+  let _: Int = a8 // expected-error{{value of type '[(String, String)?]'}}
+  
+  let a9 = [{ $0 * 2 }, nil]
+  let _: Int = a9 // expected-error{{value of type '[((Int) -> Int)?]'}}
+  
+  let a10 = [nil, { $0 * 2 }]
+  let _: Int = a10 // expected-error{{value of type '[((Int) -> Int)?]'}}
+  
+  let a11 = [a, nil]
+  let _: Int = a11 // expected-error{{value of type '[Any?]'}}
+  
+  let a12 = [nil, a]
+  let _: Int = a12 // expected-error{{value of type '[Any?]'}}
+  
+  let a13 = [t, nil]
+  let _: Int = a13 // expected-error{{value of type '[T?]'}}
+  
+  let a14 = [nil, t]
+  let _: Int = a14 // expected-error{{value of type '[T?]'}}
+  
+  let a15 = [m, nil]
+  let _: Int = a15 // expected-error{{value of type '[T.Type?]'}}
+  
+  let a16 = [nil, m]
+  let _: Int = a16 // expected-error{{value of type '[T.Type?]'}}
+  
+  let a17 = [p, nil]
+  let _: Int = a17 // expected-error{{value of type '[(Proto1 & Proto2)?]'}}
+  
+  let a18 = [nil, p]
+  let _: Int = a18 // expected-error{{value of type '[(Proto1 & Proto2)?]'}}
+  
+  let a19 = [arr, nil]
+  let _: Int = a19 // expected-error{{value of type '[[Int]?]'}}
+  
+  let a20 = [nil, arr]
+  let _: Int = a20 // expected-error{{value of type '[[Int]?]'}}
+  
+  let a21 = [opt, nil]
+  let _: Int = a21 // expected-error{{value of type '[Int?]'}}
+  
+  let a22 = [nil, opt]
+  let _: Int = a22 // expected-error{{value of type '[Int?]'}}
+  
+  let a23 = [iou, nil]
+  let _: Int = a23 // expected-error{{value of type '[Int?]'}}
+  
+  let a24 = [nil, iou]
+  let _: Int = a24 // expected-error{{value of type '[Int?]'}}
+  
+  let a25 = [n, nil]
+  let _: Int = a25 // expected-error{{value of type '[Nilable]'}}
+  
+  let a26 = [nil, n]
+  let _: Int = a26 // expected-error{{value of type '[Nilable]'}}
 }
 
 struct OptionSetLike : ExpressibleByArrayLiteral {

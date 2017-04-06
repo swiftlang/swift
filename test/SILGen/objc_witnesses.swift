@@ -96,3 +96,27 @@ public class Positron : Lepton {
 
 // CHECK-LABEL: sil shared [transparent] [serialized] [thunk] @_T014objc_witnesses8PositronCAA6LeptonA2aDP4spinSffgTW
 // CHECK-LABEL: sil shared [transparent] [serializable] [thunk] @_T014objc_witnesses8PositronC4spinSffgTD
+
+// Override of property defined in @objc extension
+
+class Derived : NSObject {
+  override var valence: Int {
+    get { return 2 } set { }
+  }
+}
+
+extension NSObject : Atom {
+  var valence: Int { get { return 1 } set { } }
+}
+
+// CHECK-LABEL: sil hidden @_T0So8NSObjectC14objc_witnessesE7valenceSifmytfU_ : $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @inout NSObject, @thick NSObject.Type) -> () {
+// CHECK: class_method [volatile] %4 : $NSObject, #NSObject.valence!setter.1.foreign
+// CHECK: }
+
+// CHECK-LABEL: sil hidden @_T0So8NSObjectC14objc_witnessesE7valenceSifm : $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @guaranteed NSObject) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>) {
+// CHECK: class_method [volatile] %2 : $NSObject, #NSObject.valence!getter.1.foreign
+// CHECK: }
+
+protocol Atom : class {
+  var valence: Int { get set }
+}

@@ -330,6 +330,7 @@ public:
 
     // Create the appropriate pointer type.
     lvalue = LValue::forAddress(ManagedValue::forLValue(errorTemp),
+                                /*TODO: enforcement*/ None,
                                 AbstractionPattern(errorType), errorType);
   }
 

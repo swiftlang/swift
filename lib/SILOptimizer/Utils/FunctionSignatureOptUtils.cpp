@@ -18,8 +18,15 @@
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SILOptimizer/Utils/FunctionSignatureOptUtils.h"
 #include "swift/SILOptimizer/Utils/Local.h"
+#include "llvm/Support/CommandLine.h"
 
 using namespace swift;
+
+/// Set to true to enable the support for partial specialization.
+llvm::cl::opt<bool> FSOEnableGenerics(
+  "sil-fso-enable-generics", llvm::cl::init(true),
+    llvm::cl::desc("Support function signature optimization "
+                   "of generic functions"));
 
 bool swift::hasNonTrivialNonDebugUse(SILArgument *Arg) {
   llvm::SmallVector<SILInstruction *, 8> Worklist;
@@ -92,7 +99,7 @@ bool swift::canSpecializeFunction(SILFunction *F,
     return false;
 
   // For now ignore generic functions to keep things simple...
-  if (F->getLoweredFunctionType()->isPolymorphic())
+  if (!FSOEnableGenerics && F->getLoweredFunctionType()->isPolymorphic())
     return false;
 
   // Make sure F has a linkage that we can optimize.

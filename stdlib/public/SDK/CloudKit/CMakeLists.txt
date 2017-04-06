@@ -6,7 +6,7 @@ add_swift_library(swiftCloudKit ${SWIFT_SDK_OVERLAY_LIBRARY_BUILD_TYPES} IS_SDK_
 
   SWIFT_COMPILE_FLAGS "${SWIFT_RUNTIME_SWIFT_COMPILE_FLAGS}"
   LINK_FLAGS "${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}"
-  TARGET_SDKS ALL_APPLE_PLATFORMS
+  TARGET_SDKS OSX IOS IOS_SIMULATOR TVOS TVOS_SIMULATOR WATCHOS WATCHOS_SIMULATOR
 
   # The dependency on the 'os' module only appears in particular Apple-internal
   # configurations, but it causes no harm to specify it unconditionally.

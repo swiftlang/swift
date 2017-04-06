@@ -25,6 +25,7 @@
 #include "swift/Basic/TaskQueue.h"
 #include "swift/Basic/Version.h"
 #include "swift/Basic/Range.h"
+#include "swift/Basic/Statistic.h"
 #include "swift/Driver/Action.h"
 #include "swift/Driver/Compilation.h"
 #include "swift/Driver/Job.h"
@@ -554,6 +555,14 @@ std::unique_ptr<Compilation> Driver::buildCompilation(
   if (Diags.hadAnyError())
     return nullptr;
 
+  std::unique_ptr<UnifiedStatsReporter> StatsReporter;
+  if (const Arg *A =
+      ArgList->getLastArgNoClaim(options::OPT_stats_output_dir)) {
+    StatsReporter = llvm::make_unique<UnifiedStatsReporter>("swift-driver",
+                                                            OI.ModuleName,
+                                                            A->getValue());
+  }
+
   assert(OI.CompilerOutputType != types::ID::TY_INVALID &&
          "buildOutputInfo() must set a valid output type!");
   
@@ -655,7 +664,8 @@ std::unique_ptr<Compilation> Driver::buildCompilation(
                                                  Incremental,
                                                  DriverSkipExecution,
                                                  SaveTemps,
-                                                 ShowDriverTimeCompilation));
+                                                 ShowDriverTimeCompilation,
+                                                 std::move(StatsReporter)));
 
   buildJobs(Actions, OI, OFM.get(), *TC, *C);
 

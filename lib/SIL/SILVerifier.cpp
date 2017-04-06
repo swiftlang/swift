@@ -11,7 +11,6 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "sil-verifier"
-#include "TransitivelyUnreachableBlocks.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/AnyFunctionRef.h"
 #include "swift/AST/Decl.h"
@@ -31,6 +30,7 @@
 #include "swift/SIL/SILOpenedArchetypesTracker.h"
 #include "swift/SIL/SILVTable.h"
 #include "swift/SIL/SILVisitor.h"
+#include "swift/SIL/TransitivelyUnreachableBlocks.h"
 #include "swift/SIL/TypeLowering.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/PostOrderIterator.h"
@@ -1556,6 +1556,17 @@ public:
     require(I->getType() == boxTy->getFieldType(F.getModule(),
                                                 I->getFieldIndex()),
             "project_box result should be address of boxed type");
+
+    // If we have a mark_uninitialized as a user, the mark_uninitialized must be
+    // our only user. This is a requirement that is asserted by allocbox to
+    // stack. This check just embeds the requirement into the IR.
+    require(I->hasOneUse() ||
+            none_of(I->getUses(),
+                    [](Operand *Op) -> bool {
+                      return isa<MarkUninitializedInst>(Op->getUser());
+                    }),
+            "project_box with more than one user when a user is a "
+            "mark_uninitialized");
   }
 
   void checkProjectExistentialBoxInst(ProjectExistentialBoxInst *PEBI) {
@@ -2597,6 +2608,9 @@ public:
             "init_existential_metatype result must match representation of "
             "operand");
 
+    while(auto metatypeType = resultType.is<ExistentialMetatypeType>())
+      resultType = resultType.getMetatypeInstanceType(F.getModule());
+
     checkExistentialProtocolConformances(resultType, I->getConformances());
     verifyOpenedArchetype(I, MetaTy.getInstanceType());
   }
@@ -2604,7 +2618,7 @@ public:
   void checkExistentialProtocolConformances(SILType resultType,
                                 ArrayRef<ProtocolConformanceRef> conformances) {
     SmallVector<ProtocolDecl*, 4> protocols;
-    resultType.getSwiftRValueType().isAnyExistentialType(protocols);
+    resultType.getSwiftRValueType().getExistentialTypeProtocols(protocols);
 
     require(conformances.size() == protocols.size(),
             "init_existential instruction must have the "
