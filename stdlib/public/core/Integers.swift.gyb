@@ -3502,6 +3502,27 @@ internal func _unsafeMinus(_ lhs: Int, _ rhs: Int) -> Int {
 #endif
 }
 
+// Swift 3 compatibility APIs
+
+@available(swift, obsoleted: 4)
+public typealias Integer = BinaryInteger
+
+@available(swift, obsoleted: 4)
+extension BinaryInteger {
+  @available(swift, obsoleted: 4)
+  public func toIntMax() -> IntMax {
+    return IntMax(self)
+  }
+}
+
+extension UnsignedInteger {
+  @available(swift, obsoleted: 4)
+  public func toUIntMax() -> UIntMax {
+    return UIntMax(self)
+  }
+}
+
+
 // FIXME(integers): test more of these.
 // FIXME: should maybe be BinaryInteger & Numeric, but <rdar://27619386> prevents it
 @available(*, unavailable, renamed: "Numeric")
