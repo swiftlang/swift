@@ -161,7 +161,7 @@ public func cleanup_complex_simple(_ a: NSString) -> Int64 {
   }
 
   return 2
-  // CHECK_CLEANUP_COMPLEX_SIMPLE: ret {{.*}}, !dbg ![[CLEANUP_COMPLEX_SIMPLE_RET:.*]]
+  // CHECK_CLEANUP_COMPLEX_SIMPLE: ret i{{.*}}, !dbg ![[CLEANUP_COMPLEX_SIMPLE_RET:.*]]
   // CHECK_CLEANUP_COMPLEX_SIMPLE: ![[CLEANUP_COMPLEX_SIMPLE_RET]] = !DILocation(line: [[@LINE+1]], column: 1,
 }
 
@@ -172,7 +172,7 @@ public func cleanup_simple_complex(_ a: NSString) -> Int64 {
     return Int64(a.length*a.length)
   }
   return 2
-  // CHECK_CLEANUP_SIMPLE_COMPLEX: ret {{.*}}, !dbg ![[CLEANUP_SIMPLE_COMPLEX_RET:.*]]
+  // CHECK_CLEANUP_SIMPLE_COMPLEX: ret i{{.*}}, !dbg ![[CLEANUP_SIMPLE_COMPLEX_RET:.*]]
   // CHECK_CLEANUP_SIMPLE_COMPLEX: ![[CLEANUP_SIMPLE_COMPLEX_RET]] = !DILocation(line: [[@LINE+1]], column: 1,
 }
 
