@@ -26,12 +26,13 @@
 
 #include "swift/AST/Decl.h"
 #include "swift/AST/IRGenOptions.h"
-#include "swift/ClangImporter/ClangImporter.h"
 #include "swift/AST/Types.h"
+#include "swift/ClangImporter/ClangImporter.h"
+#include "swift/Demangling/ManglingMacros.h"
+#include "swift/IRGen/Linking.h"
 #include "swift/SIL/SILModule.h"
 #include "clang/AST/Attr.h"
 #include "clang/AST/DeclObjC.h"
-#include "swift/Demangling/ManglingMacros.h"
 
 #include "CallEmission.h"
 #include "ConstantBuilder.h"
@@ -47,7 +48,6 @@
 #include "IRGenDebugInfo.h"
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
-#include "Linking.h"
 #include "NativeConventionSchema.h"
 #include "ScalarTypeInfo.h"
 #include "StructLayout.h"

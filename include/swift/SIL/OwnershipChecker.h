@@ -14,13 +14,15 @@
 #define SWIFT_SIL_OWNERSHIPCHECKER_H
 
 #include "llvm/ADT/SmallVector.h"
+#include "llvm/ADT/SmallPtrSet.h"
 
 namespace swift {
 
+class SILBasicBlock;
+class SILInstruction;
 class SILModule;
 class SILValue;
 class TransitivelyUnreachableBlocksInfo;
-class SILInstruction;
 
 /// This class is a higher level interface to the ownership checker meant for
 /// use with SILPasses. It uses the actual checker as an internal PImpl detail

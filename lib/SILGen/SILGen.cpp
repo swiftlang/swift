@@ -1405,7 +1405,8 @@ SILModule::constructSIL(ModuleDecl *mod, SILOptions &options, FileUnit *SF,
     DC = mod;
   }
 
-  std::unique_ptr<SILModule> M(new SILModule(mod, options, DC, isWholeModule));
+  std::unique_ptr<SILModule> M(
+      new SILModule(mod, options, DC, isWholeModule, makeModuleFragile));
   SILGenModule SGM(*M, mod, makeModuleFragile);
 
   if (SF) {
