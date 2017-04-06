@@ -154,6 +154,9 @@ public:
                           unsigned origDepthOrIndex,
                           GenericSignature *genericSig);
 
+  /// Verify that this substitution map is valid.
+  void verify() const;
+
   /// Dump the contents of this substitution map for debugging purposes.
   void dump(llvm::raw_ostream &out) const;
 
