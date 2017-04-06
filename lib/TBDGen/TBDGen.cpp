@@ -23,6 +23,7 @@
 #include "swift/IRGen/Linking.h"
 #include "swift/SIL/FormalLinkage.h"
 #include "swift/SIL/SILDeclRef.h"
+#include "swift/SIL/TypeLowering.h"
 #include "llvm/ADT/StringSet.h"
 
 using namespace swift;
@@ -104,6 +105,18 @@ public:
         declaredType, irgen::TypeMetadataAddress::AddressPoint,
         /*isPattern=*/false));
     addSymbol(irgen::LinkEntity::forTypeMetadataAccessFunction(declaredType));
+
+    // There are symbols associated with any protocols this type conforms to.
+    for (auto conformance : NTD->getLocalConformances()) {
+      auto needsWTable = Lowering::TypeConverter::protocolRequiresWitnessTable(
+          conformance->getProtocol());
+      if (!needsWTable)
+        continue;
+
+      addSymbol(irgen::LinkEntity::forDirectProtocolWitnessTable(conformance));
+      addSymbol(irgen::LinkEntity::forProtocolWitnessTableAccessFunction(
+          conformance));
+    }
 
     visitMembers(NTD);
   }
