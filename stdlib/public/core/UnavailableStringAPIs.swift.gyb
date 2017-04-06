@@ -1,14 +1,4 @@
-//===----------------------------------------------------------------------===//
 //
-// This source file is part of the Swift.org open source project
-//
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
-// Licensed under Apache License v2.0 with Runtime Library Exception
-//
-// See https://swift.org/LICENSE.txt for license information
-// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
-//
-//===----------------------------------------------------------------------===//
-
-// Michael NOTE: These may collide with new functionality, as new String is a
-// collection. Removing everything in here to expedite integration.
+// Michael NOTE: Gutted. These APIs are are either actually are availabe now, or
+// are transitional from long-ago retired APIs that now conflict with our new
+// APIs.
