@@ -1231,9 +1231,7 @@ bool ModuleFile::readMembers(SmallVectorImpl<Decl *> &Members) {
       if (!getContext().LangOpts.EnableDeserializationRecovery)
         fatal(D.takeError());
 
-      // Silently drop the member if there was a problem.
-      // FIXME: This isn't sound for protocols; we need to at least record that
-      // it happened.
+      // Silently drop the member if it had an override-related problem.
       llvm::handleAllErrors(D.takeError(),
                             [](const OverrideError &) { /* expected */ },
                             [&](std::unique_ptr<llvm::ErrorInfoBase> unhandled){
