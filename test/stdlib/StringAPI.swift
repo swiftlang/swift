@@ -443,14 +443,14 @@ func expectEqualCString(_ lhs: UnsafePointer<UInt8>,
 func expectEqualCString(_ lhs: UnsafePointer<UInt8>,
   _ rhs: ContiguousArray<UInt8>) {
   rhs.withUnsafeBufferPointer {
-    expectEqualCString(lhs, $0.baseAddress)
+    expectEqualCString(lhs, $0.baseAddress!)
   }
 }
 
 func expectEqualCString(_ lhs: UnsafePointer<UInt8>,
   _ rhs: ContiguousArray<CChar>) {
   rhs.withUnsafeBufferPointer {
-    $0.baseAddress.withMemoryRebound(
+    $0.baseAddress!.withMemoryRebound(
       to: UInt8.self, capacity: rhs.count) {
       expectEqualCString(lhs, $0)
     }

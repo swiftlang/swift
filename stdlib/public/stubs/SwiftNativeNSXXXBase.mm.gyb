@@ -105,49 +105,10 @@ swift_stdlib_NSObject_isEqual(NSObject *NS_RELEASES_ARGUMENT lhs,
   return Result;
 }
 
-SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERFACE
-int32_t swift_stdlib_compareNSStringDeterministicUnicodeCollation(
-    NSString *NS_RELEASES_ARGUMENT lhs, NSString *NS_RELEASES_ARGUMENT rhs) {
-  // 'kCFCompareNonliteral' actually means "normalize to NFD".
-  int Result = CFStringCompare((__bridge CFStringRef)lhs,
-                               (__bridge CFStringRef)rhs, kCFCompareNonliteral);
-  swift_unknownRelease(lhs);
-  swift_unknownRelease(rhs);
-  return Result;
-}
-
-SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERFACE
-int32_t
-swift_stdlib_compareNSStringDeterministicUnicodeCollationPtr(void *Lhs,
-                                                             void *Rhs) {
-  NSString *lhs = (NSString *)Lhs;
-  NSString *rhs = (NSString *)Rhs;
-
-  // 'kCFCompareNonliteral' actually means "normalize to NFD".
-  int Result = CFStringCompare((__bridge CFStringRef)lhs,
-                               (__bridge CFStringRef)rhs, kCFCompareNonliteral);
-  return Result;
-}
-
-SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERFACE
-size_t
-swift_stdlib_NSStringHashValue(NSString *NS_RELEASES_ARGUMENT str,
-                               bool isASCII) {
-  size_t Result =
-      isASCII ? str.hash : str.decomposedStringWithCanonicalMapping.hash;
-
-  swift_unknownRelease(str);
-  return Result;
-}
-
-SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERFACE
-size_t
-swift_stdlib_NSStringHashValuePointer(void *opaque, bool isASCII) {
-  NSString *str = (NSString *)opaque;
-  return isASCII ? str.hash : str.decomposedStringWithCanonicalMapping.hash;
-}
-
-
+// Michael NOTE: the following few are only used in StringLegacy, and likely
+// will be replaced with other operations. When that happens, remove these shims
+// too.
+//
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERFACE
 bool swift_stdlib_NSStringHasPrefixNFD(NSString *theString,
                                        NSString *prefix) {
