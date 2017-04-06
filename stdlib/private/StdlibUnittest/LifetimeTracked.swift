@@ -42,7 +42,7 @@ public final class LifetimeTracked {
 }
 
 extension LifetimeTracked : Equatable {
-  public func == (x: LifetimeTracked, y: LifetimeTracked) -> Bool {
+  public static func == (x: LifetimeTracked, y: LifetimeTracked) -> Bool {
     return x.value == y.value
   }
 }
