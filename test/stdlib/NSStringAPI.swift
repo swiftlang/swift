@@ -573,7 +573,8 @@ NSStringAPIs.test("enumerateSubstringsIn(_:options:_:)") {
     in
       expectNil(substring_)
       let substring = s[substringRange]
-      substrings.append(substring)
+      // Michael NOTE: Explicit String(Substring(...))
+      substrings.append(String(substring))
       expectEqual(substring, s[enclosingRange])
     }
     expectEqual(["\u{304b}\u{3099}", "お", "☺️", "😀"], substrings)
