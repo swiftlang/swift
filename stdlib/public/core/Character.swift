@@ -64,6 +64,8 @@ public struct Character :
   _ExpressibleByBuiltinExtendedGraphemeClusterLiteral,
   ExpressibleByExtendedGraphemeClusterLiteral, Hashable {
 
+  internal typealias Packed = PackedUnsignedIntegers<UInt63, UInt16>
+  
   // Fundamentally, it is just a String, but it is optimized for the
   // common case where the UTF-8 representation fits in 63 bits.  The
   // remaining bit is used to discriminate between small and large
@@ -74,34 +76,21 @@ public struct Character :
   // should be represented as such.
   @_versioned
   internal enum Representation {
-    // A _StringBuffer whose first grapheme cluster is self.
-    // NOTE: may be more than 1 Character long.
-    case large(_UTF16StringStorage)
-    case small(Builtin.Int63)
+  case large(_UTF16StringStorage)
+  case small(UInt63)
   }
 
   /// Creates a character containing the given Unicode scalar value.
   ///
   /// - Parameter scalar: The Unicode scalar value to convert into a character.
   public init(_ scalar: UnicodeScalar) {
-    var asInt: UInt64 = 0
-    var shift: UInt64 = 0
-
-    let output: (UTF8.CodeUnit) -> Void = {
-      asInt |= UInt64($0) << shift
-      shift += 8
-    }
-
-    UTF8.encode(scalar, into: output)
-    asInt |= (~0) << shift
-    _representation = .small(Builtin.trunc_Int64_Int63(asInt._value))
+    _representation = .small(
+      Packed(UTF16.EncodedScalar(scalar), bitsPerElement: 16)!.representation)
   }
 
   @effects(readonly)
   public init(_builtinUnicodeScalarLiteral value: Builtin.Int32) {
-    self = Character(
-      String._fromWellFormedCodeUnitSequence(
-        UTF32.self, input: CollectionOfOne(UInt32(value))))
+    self.init(UnicodeScalar(_unchecked: UInt32(value)))
   }
 
   /// Creates a character with the specified value.
@@ -125,34 +114,50 @@ public struct Character :
     utf8CodeUnitCount: Builtin.Word,
     isASCII: Builtin.Int1
   ) {
-    // Most character literals are going to be fewer than eight UTF-8 code
-    // units; for those, build the small character representation directly.
-    let maxCodeUnitCount = MemoryLayout<UInt64>.size
-    if _fastPath(Int(utf8CodeUnitCount) <= maxCodeUnitCount) {
-      var buffer: UInt64 = ~0
-      _memcpy(
-        dest: UnsafeMutableRawPointer(Builtin.addressof(&buffer)),
-        src: UnsafeMutableRawPointer(start),
-        size: UInt(utf8CodeUnitCount))
-      // Copying the bytes directly from the literal into an integer assumes
-      // little endianness, so convert the copied data into host endianness.
-      let utf8Chunk = UInt64(littleEndian: buffer)
-      let bits = maxCodeUnitCount &* 8 &- 1
-      // Verify that the highest bit isn't set so that we can truncate it to
-      // 63 bits.
-      if _fastPath(utf8Chunk & (1 << numericCast(bits)) != 0) {
-        _representation = .small(Builtin.trunc_Int64_Int63(utf8Chunk._value))
-        return
-      }
-    }
-    // For anything that doesn't fit in 63 bits, build the large
-    // representation.
-    self = Character(_largeRepresentationString: String(
-      _builtinExtendedGraphemeClusterLiteral: start,
-      utf8CodeUnitCount: utf8CodeUnitCount,
-      isASCII: isASCII))
+    let utf8 = UnsafeBufferPointer(
+      start: UnsafePointer<UTF8.CodeUnit>(start), count: Int(utf8CodeUnitCount))
+    let utf16 = _UnicodeViews(utf8, ValidUTF8.self).transcoded(to: UTF16.self)
+    self.init(_utf16: utf16)
   }
 
+  public init<C: Collection>(_utf16: C)
+  where C.Iterator.Element == UTF16.CodeUnit {
+    if let small = Packed(_utf16, bitsPerElement: 16) {
+      _representation = .small(small.representation)
+    }
+    else {
+      _representation = .large(_UTF16StringStorage(_utf16))
+    }
+  }
+
+  public init<CodeUnits : RandomAccessCollection, Encoding : UnicodeEncoding>(
+    _codeUnits: CodeUnits, _: Encoding.Type
+  ) where
+  Encoding.EncodedScalar.Iterator.Element == CodeUnits.Iterator.Element,
+  CodeUnits.SubSequence : RandomAccessCollection,
+  CodeUnits.SubSequence.Index == CodeUnits.Index,
+  CodeUnits.SubSequence.SubSequence == CodeUnits.SubSequence,
+  CodeUnits.SubSequence.Iterator.Element == CodeUnits.Iterator.Element
+  {
+    // This is messy; we should be doing this on UnicodeContent
+    if _fastPath(Encoding.self is Latin1.Type) {
+      self.init(
+        _utf16: _codeUnits.lazy.map {
+          UTF16.CodeUnit($0 as Any as! Latin1.CodeUnit)
+        })
+    }
+    else if _fastPath(Encoding.EncodedScalar.self is UTF16.EncodedScalar.Type) {
+      self.init(
+        _utf16: _codeUnits.lazy.map { $0 as Any as! UTF16.CodeUnit })
+    }
+    else {
+      self.init(
+        _utf16: _UnicodeViews(_codeUnits, Encoding.self)
+          .transcoded(to: UTF16.self)
+      )
+    }
+  }
+  
   /// Creates a character with the specified value.
   ///
   /// Do not call this initializer directly. It is used by the compiler when
@@ -189,199 +194,50 @@ public struct Character :
     // one-byte code points there, we simplify decoding by banning
     // starting a code point in the last byte, and assuming that its
     // high bit is 1.
-    _precondition(
-      s._core.count != 0, "Can't form a Character from an empty String")
+    _precondition(!s.content.utf16.isEmpty, "Can't form a Character from an empty String")
     _precondition(
       s.index(after: s.startIndex) == s.endIndex,
       "Can't form a Character from a String containing more than one extended grapheme cluster")
 
-    let (count, initialUTF8) = s._core._encodeSomeUTF8(from: 0)
-    // Notice that the result of sizeof() is a small non-zero number and can't
-    // overflow when multiplied by 8.
-    let bits = MemoryLayout.size(ofValue: initialUTF8) &* 8 &- 1
-    if _fastPath(
-      count == s._core.count && (initialUTF8 & (1 << numericCast(bits))) != 0) {
-      _representation = .small(Builtin.trunc_Int64_Int63(initialUTF8._value))
-    }
-    else {
-      self = Character(_largeRepresentationString: s)
-    }
+    self.init(_utf16: s.content.utf16)
   }
   
-  // TODO: make one init responsible for both small and large
-  // TODO: this only handles 7-code-unit characters for now
-  internal init?<S: Sequence>(_smallUtf8: S) where S.Iterator.Element == UTF8.CodeUnit {
-    // TODO: would it be faster to get length via underestimatedCount,
-    //       even though that might take two transcoding passes?
-    //       (given anything with count > 1 would be non-ASCII by definition)
-    var u: UInt64 = ~0
-    var n: UInt64 = 0
-    var mask: UInt64 = 0xff
-    for u8 in _smallUtf8 {
-      guard n < 7 else { return nil }
-      u &= ~mask
-      u |= UInt64(u8) << (n * 8)
-      n += 1
-      mask <<= 8
-    }
-    _representation = .small(Builtin.trunc_Int64_Int63(u._value))
-  }
-
-  /// Creates a Character from a String that is already known to require the
-  /// large representation.
-  internal init(_largeRepresentationString s: String) {
-    _representation = .large(_UTF16StringStorage(s.content.utf16))
-  }
-
-  /// Returns the index of the lowest byte that is 0xFF, or 8 if
-  /// there is none.
-  static func _smallSize(_ value: UInt64) -> Int {
-    var mask: UInt64 = 0xFF
-    for i in 0..<8 {
-      if (value & mask) == mask {
-        return i
-      }
-      mask <<= 8
-    }
-    return 8
-  }
-
-  static func _smallValue(_ value: Builtin.Int63) -> UInt64 {
-    return UInt64(Builtin.zext_Int63_Int64(value)) | (1<<63)
-  }
-
-  internal struct _SmallUTF8 : RandomAccessCollection {
-
-    init(_ u8: UInt64) {
-      let utf8Count = Character._smallSize(u8)
-      _sanityCheck(utf8Count <= 8, "Character with more than 8 UTF-8 code units")
-      self.count = UInt16(utf8Count)
-      self.data = u8
-    }
-    
-    /// The position of the first element in a non-empty collection.
-    ///
-    /// In an empty collection, `startIndex == endIndex`.
-    var startIndex: Int {
-      return 0
-    }
-
-    /// The collection's "past the end" position.
-    ///
-    /// `endIndex` is not a valid argument to `subscript`, and is always
-    /// reachable from `startIndex` by zero or more applications of
-    /// `index(after:)`.
-    var endIndex: Int {
-      return Int(count)
-    }
-
-    /// Access the code unit at `position`.
-    ///
-    /// - Precondition: `position` is a valid position in `self` and
-    ///   `position != endIndex`.
-    subscript(position: Int) -> UTF8.CodeUnit {
-      _sanityCheck(position >= 0)
-      _sanityCheck(position < Int(count))
-      // Note: using unchecked arithmetic because overflow cannot happen if the
-      // above sanity checks hold.
-      return UTF8.CodeUnit(
-        truncatingBitPattern: data >> (UInt64(position) &* 8))
-    }
-
-    internal struct Iterator : IteratorProtocol {
-      init(_ data: UInt64) {
-        self._data = data
-      }
-
-      internal mutating func next() -> UInt8? {
-        let result = UInt8(truncatingBitPattern: _data)
-        if result == 0xFF {
-          return nil
-        }
-        _data = (_data >> 8) | 0xFF00_0000_0000_0000
-        return result
-      }
-
-      internal var _data: UInt64
-    }
-
-    internal func makeIterator() -> Iterator {
-      return Iterator(data)
-    }
-
-    var count: UInt16
-    var data: UInt64
-  }
-
-  struct _SmallUTF16 : RandomAccessCollection {
-    typealias Indices = CountableRange<Int>
-    
-    init(_ u8: UInt64) {
-      let count = UTF16.transcodedLength(
-        of: _SmallUTF8(u8).makeIterator(),
-        decodedAs: UTF8.self,
-        repairingIllFormedSequences: true)!.0
-      _sanityCheck(count <= 4, "Character with more than 4 UTF-16 code units")
-      self.count = UInt16(count)
-      var u16: UInt64 = 0
-      let output: (UTF16.CodeUnit) -> Void = {
-        u16 = u16 << 16
-        u16 = u16 | UInt64($0)
-      }
-      _ = transcode(
-        _SmallUTF8(u8).makeIterator(),
-        from: UTF8.self, to: UTF16.self,
-        stoppingOnError: false,
-        into: output)
-      self.data = u16
-    }
-
-    /// The position of the first element in a non-empty collection.
-    ///
-    /// In an empty collection, `startIndex == endIndex`.
-    var startIndex: Int {
-      return 0
-    }
-
-    /// The collection's "past the end" position.
-    ///
-    /// `endIndex` is not a valid argument to `subscript`, and is always
-    /// reachable from `startIndex` by zero or more applications of
-    /// `successor()`.
-    var endIndex: Int {
-      return Int(count)
-    }
-
-    /// Access the code unit at `position`.
-    ///
-    /// - Precondition: `position` is a valid position in `self` and
-    ///   `position != endIndex`.
-    subscript(position: Int) -> UTF16.CodeUnit {
-      _sanityCheck(position >= 0)
-      _sanityCheck(position < Int(count))
-      // Note: using unchecked arithmetic because overflow cannot happen if the
-      // above sanity checks hold.
-      return UTF16.CodeUnit(truncatingBitPattern:
-        data >> ((UInt64(count) &- UInt64(position) &- 1) &* 16))
-    }
-
-    var count: UInt16
-    var data: UInt64
-  }
-
   /// The character's hash value.
   ///
   /// Hash values are not guaranteed to be equal across different executions of
   /// your program. Do not save hash values to use during a future execution.
   public var hashValue: Int {
-    // FIXME(performance): constructing a temporary string is extremely
-    // wasteful and inefficient.
+    // FIXME(performance): constructing a temporary string is wasteful in some
+    // cases.
     return String(self).hashValue
   }
 
-  public typealias UTF16View = String.UTF16View
+  public struct UTF16View : RandomAccessCollection {
+    public var startIndex: Int { return 0 }
+    
+    public var endIndex: Int {
+      switch representation {
+      case .small(let r):
+        return Packed(representation: r, bitsPerElement: 16).count
+      case .large(let r):
+        return r.count
+      }
+    }
+
+    public subscript(i: Int) -> UTF16.CodeUnit {
+      switch representation {
+      case .small(let r):
+        return Packed(representation: r, bitsPerElement: 16)[i]
+      case .large(let r):
+        return r[i]
+      }
+    }
+    
+    let representation: Representation
+  }
+        
   public var utf16: UTF16View {
-    return String(self).utf16
+    return UTF16View(representation: _representation)
   }
 
   @_versioned
@@ -390,7 +246,7 @@ public struct Character :
 
 extension Character : CustomStringConvertible {
   public var description: String {
-    return String(describing: self)
+    return String(self)
   }
 }
 
@@ -409,76 +265,42 @@ extension String {
   /// - Parameter c: The character to convert to a string.
   public init(_ c: Character) {
     switch c._representation {
-    case let .small(_63bits):
-      let value = Character._smallValue(_63bits)
-      let smallUTF8 = Character._SmallUTF8(value)
-      self = String._fromWellFormedCodeUnitSequence(
-        UTF8.self, input: smallUTF8)
-    case let .large(value):
-      self.content = String.Content(utf16: value)
+    case .small:
+      self.init(content: Content(utf16: c.utf16))
+    case let .large(u16):
+      self.init(content: Content(.utf16(u16)))
     }
-  }
-}
-
-/// `.small` characters are stored in an Int63 with their UTF-8 representation,
-/// with any unused bytes set to 0xFF. ASCII characters will have all bytes set
-/// to 0xFF except for the lowest byte, which will store the ASCII value. Since
-/// 0x7FFFFFFFFFFFFF80 or greater is an invalid UTF-8 sequence, we know if a
-/// value is ASCII by checking if it is greater than or equal to
-/// 0x7FFFFFFFFFFFFF00.
-internal var _minASCIICharReprBuiltin: Builtin.Int63 {
-  @inline(__always) get {
-    let x: Int64 = 0x7FFFFFFFFFFFFF00
-    return Builtin.truncOrBitCast_Int64_Int63(x._value)
   }
 }
 
 extension Character : Equatable {
   public static func == (lhs: Character, rhs: Character) -> Bool {
-    switch (lhs._representation, rhs._representation) {
-    case let (.small(lbits), .small(rbits)) where
-      Bool(Builtin.cmp_uge_Int63(lbits, _minASCIICharReprBuiltin))
-      && Bool(Builtin.cmp_uge_Int63(rbits, _minASCIICharReprBuiltin)):
-      return Bool(Builtin.cmp_eq_Int63(lbits, rbits))
-    default:
-      // FIXME(performance): constructing two temporary strings is extremely
-      // wasteful and inefficient.
-      return String(lhs) == String(rhs)
+    // If both are Latin-1 there's no need to normalize
+    if (
+      !lhs.utf16.contains { $0 > 0xFF }
+      && !rhs.utf16.contains { $0 > 0xFF }) {
+      return lhs.utf16.elementsEqual(rhs.utf16)
     }
+    return String(lhs) == String(rhs)
   }
 }
 
 extension Character : Comparable {
   public static func < (lhs: Character, rhs: Character) -> Bool {
-    switch (lhs._representation, rhs._representation) {
-    case let (.small(lbits), .small(rbits)) where
-      // Note: This is consistent with Foundation but unicode incorrect.
-      // See String._compareASCII.
-      Bool(Builtin.cmp_uge_Int63(lbits, _minASCIICharReprBuiltin))
-      && Bool(Builtin.cmp_uge_Int63(rbits, _minASCIICharReprBuiltin)):
-      return Bool(Builtin.cmp_ult_Int63(lbits, rbits))
-    default:
-      // FIXME(performance): constructing two temporary strings is extremely
-      // wasteful and inefficient.
-      return String(lhs) < String(rhs)
+    // If both are Latin-1 there's no need to normalize
+    if (
+      !lhs.utf16.contains { $0 > 0xFF }
+      && !rhs.utf16.contains { $0 > 0xFF }) {
+      return lhs.utf16.lexicographicallyPrecedes(rhs.utf16)
     }
+    return String(lhs) < String(rhs)
   }
 }
 
 extension Character {
-  // public init<S: Sequence>(_ scalars: S) where S.Iterator.Element == UnicodeScalar {
-  //   // FIXME: Horribly inefficient, but the stuff to make it fast is private.
-  //   // FIXME: Also, constructing "👩‍❤️‍👩" is foiled by precondition checks
-  //   let string = String(String.UnicodeScalarView(scalars))
-  //   // TBD: failable initializer, precondition, or neither?
-  //   assert(string.characters.count == 1)
-  //   self = string.first!
-  // }
-  
-  // FIXME: Horribly inefficient, but the stuff to make it fast is private.
-  // TBD: set or get-only?
-  public var unicodeScalars: String.UnicodeScalarView {
-    return String(self).unicodeScalars
+  public typealias UnicodeScalarView = _UnicodeViews<UTF16View, UTF16>.Scalars
+  public var unicodeScalars: UnicodeScalarView {
+    return _UnicodeViews(utf16, UTF16.self).scalars
   }
 }
 

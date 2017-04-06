@@ -701,21 +701,12 @@ extension _UnicodeViews {
 
     public subscript(i: Index) -> Character {
       let j = index(after: i)
-      let contents = _UnicodeViews_(
-        storage.codeUnits[
+
+      let source = storage.codeUnits[
           storage.codeUnits.index(atOffset: i.base)
-          ..< storage.codeUnits.index(atOffset: j.base)],
-        Encoding.self)
-        
-      if let small = Character(_smallUtf8: contents.transcoded(to: UTF8.self)) {
-        return small
-      }
-      else {
-        // FIXME: there is undoubtley a less ridiculous way to do this
-        let scalars = contents.encodedScalars.lazy.map(UnicodeScalar.init)
-        let string = Swift.String(Swift.String.UnicodeScalarView(scalars))
-        return Character(_largeRepresentationString: string)
-      }
+        ..< storage.codeUnits.index(atOffset: j.base)]
+
+      return Character(_codeUnits: source, Encoding.self)
     }     
 
     public func index(after i: Index) -> Index {
