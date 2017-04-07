@@ -597,6 +597,7 @@ extension RangeReplaceableCollection {
   @_inlineable
   public mutating func append<S : Sequence>(contentsOf newElements: S)
     where S.Iterator.Element == Iterator.Element {
+      
     let approximateCapacity = self.count +
       numericCast(newElements.underestimatedCount)
     self.reserveCapacity(approximateCapacity)
