@@ -27,6 +27,7 @@
 #include "llvm/ADT/Optional.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/TinyPtrVector.h"
+#include "llvm/Support/Compiler.h"
 #include <functional>
 #include <utility>
 
@@ -133,8 +134,14 @@ public:
     return StringRef(Unresolved.Data, UnresolvedLength);
   }
 };
+
+#if LLVM_PTR_SIZE == 4
+static_assert(sizeof(EffectiveClangContext) <= 4 * sizeof(void *),
+              "should fit in four pointers");
+#else
 static_assert(sizeof(EffectiveClangContext) <= 2 * sizeof(void *),
               "should fit in a couple pointers");
+#endif
 
 class SwiftLookupTableReader;
 class SwiftLookupTableWriter;
