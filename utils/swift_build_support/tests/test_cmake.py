@@ -12,9 +12,9 @@ import os
 import unittest
 from argparse import Namespace
 
-from swift_build_support.arguments import CompilerVersion
-from swift_build_support.cmake import CMake, CMakeOptions
-from swift_build_support.toolchain import host_toolchain
+from swift_build_support.swift_build_support.arguments import CompilerVersion
+from swift_build_support.swift_build_support.cmake import CMake, CMakeOptions
+from swift_build_support.swift_build_support.toolchain import host_toolchain
 
 
 class CMakeTestCase(unittest.TestCase):

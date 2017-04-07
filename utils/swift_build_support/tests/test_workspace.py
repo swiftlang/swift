@@ -17,7 +17,7 @@ import shutil
 import tempfile
 import unittest
 
-from swift_build_support.workspace import (
+from swift_build_support.swift_build_support.workspace import (
     Workspace,
     compute_build_subdir,
 )

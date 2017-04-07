@@ -12,7 +12,7 @@ import argparse
 import os
 import unittest
 
-from swift_build_support import migration
+from swift_build_support.swift_build_support import migration
 
 
 class MigrateImplArgsTestCase(unittest.TestCase):

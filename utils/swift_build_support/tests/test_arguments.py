@@ -21,7 +21,7 @@ except ImportError:
     # py3
     from io import StringIO
 
-from swift_build_support.arguments import (
+from swift_build_support.swift_build_support.arguments import (
     action as argaction,
     type as argtype,
 )
