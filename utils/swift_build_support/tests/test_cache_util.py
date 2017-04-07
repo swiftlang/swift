@@ -12,7 +12,7 @@
 
 import unittest
 
-from swift_build_support import cache_util
+from swift_build_support.swift_build_support import cache_util
 
 
 my_func_called = 0

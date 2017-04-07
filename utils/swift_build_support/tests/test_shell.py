@@ -22,7 +22,7 @@ except ImportError:
     # py3
     from io import StringIO
 
-from swift_build_support import shell
+from swift_build_support.swift_build_support import shell
 
 
 class ShellTestCase(unittest.TestCase):
