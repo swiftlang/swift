@@ -231,7 +231,12 @@ UnsafeRawBufferPointerTestSuite.test("inBounds") {
   expectEqualSequence(firstHalf, secondHalf)
 }
 
-UnsafeRawBufferPointerTestSuite.test("subscript.get.underflow") {
+// FIXME: rdar:31495442. Enable this in release builds too.
+UnsafeRawBufferPointerTestSuite.test("subscript.get.underflow")
+.skip(.custom(
+    { !_isDebugAssertConfiguration() },
+    reason: "This tests a debug precondition."))
+.code {
   let buffer = UnsafeMutableRawBufferPointer.allocate(count: 2)
   defer { buffer.deallocate() }
 
@@ -244,7 +249,12 @@ UnsafeRawBufferPointerTestSuite.test("subscript.get.underflow") {
   _ = bytes[-1]
 }
 
-UnsafeRawBufferPointerTestSuite.test("subscript.get.overflow") {
+// FIXME: rdar:31495442. Enable this in release builds too.
+UnsafeRawBufferPointerTestSuite.test("subscript.get.overflow")
+.skip(.custom(
+    { !_isDebugAssertConfiguration() },
+    reason: "This tests a debug precondition."))
+.code {
   let buffer = UnsafeMutableRawBufferPointer.allocate(count: 2)
   defer { buffer.deallocate() }
 
@@ -257,7 +267,12 @@ UnsafeRawBufferPointerTestSuite.test("subscript.get.overflow") {
   _ = bytes[1]
 }
 
-UnsafeRawBufferPointerTestSuite.test("subscript.set.underflow") {
+// FIXME: rdar:31495442. Enable this in release builds too.
+UnsafeRawBufferPointerTestSuite.test("subscript.set.underflow")
+.skip(.custom(
+    { !_isDebugAssertConfiguration() },
+    reason: "This tests a debug precondition."))
+.code {
   let buffer = UnsafeMutableRawBufferPointer.allocate(count: 2)
   defer { buffer.deallocate() }
 
@@ -270,7 +285,12 @@ UnsafeRawBufferPointerTestSuite.test("subscript.set.underflow") {
   bytes[-1] = 0
 }
 
-UnsafeRawBufferPointerTestSuite.test("subscript.set.overflow") {
+// FIXME: rdar:31495442. Enable this in release builds too.
+UnsafeRawBufferPointerTestSuite.test("subscript.set.overflow")
+.skip(.custom(
+    { !_isDebugAssertConfiguration() },
+    reason: "This tests a debug precondition."))
+.code {
   let buffer = UnsafeMutableRawBufferPointer.allocate(count: 2)
   defer { buffer.deallocate() }
 
@@ -283,7 +303,12 @@ UnsafeRawBufferPointerTestSuite.test("subscript.set.overflow") {
   bytes[1] = 0
 }
 
-UnsafeRawBufferPointerTestSuite.test("subscript.range.get.underflow") {
+// FIXME: rdar:31495442. Enable this in release builds too.
+UnsafeRawBufferPointerTestSuite.test("subscript.range.get.underflow")
+.skip(.custom(
+    { !_isDebugAssertConfiguration() },
+    reason: "This tests a debug precondition."))
+.code {
   let buffer = UnsafeMutableRawBufferPointer.allocate(count: 3)
   defer { buffer.deallocate() }
 
@@ -296,7 +321,12 @@ UnsafeRawBufferPointerTestSuite.test("subscript.range.get.underflow") {
   _ = bytes[-1..<1]
 }
 
-UnsafeRawBufferPointerTestSuite.test("subscript.range.get.overflow") {
+// FIXME: rdar:31495442. Enable this in release builds too.
+UnsafeRawBufferPointerTestSuite.test("subscript.range.get.overflow")
+.skip(.custom(
+    { !_isDebugAssertConfiguration() },
+    reason: "This tests a debug precondition."))
+.code {
   let buffer = UnsafeMutableRawBufferPointer.allocate(count: 3)
   defer { buffer.deallocate() }
 
@@ -309,7 +339,12 @@ UnsafeRawBufferPointerTestSuite.test("subscript.range.get.overflow") {
   _ = bytes[1..<3]
 }
 
-UnsafeRawBufferPointerTestSuite.test("subscript.range.set.underflow") {
+// FIXME: rdar:31495442. Enable this in release builds too.
+UnsafeRawBufferPointerTestSuite.test("subscript.range.set.underflow")
+.skip(.custom(
+    { !_isDebugAssertConfiguration() },
+    reason: "This tests a debug precondition."))
+.code {
   var buffer = UnsafeMutableRawBufferPointer.allocate(count: 3)
   defer { buffer.deallocate() }
 
@@ -322,7 +357,12 @@ UnsafeRawBufferPointerTestSuite.test("subscript.range.set.underflow") {
   bytes[-1..<1] = bytes[0..<2]
 }
 
-UnsafeRawBufferPointerTestSuite.test("subscript.range.set.overflow") {
+// FIXME: rdar:31495442. Enable this in release builds too.
+UnsafeRawBufferPointerTestSuite.test("subscript.range.set.overflow")
+.skip(.custom(
+    { !_isDebugAssertConfiguration() },
+    reason: "This tests a debug precondition."))
+.code {
   var buffer = UnsafeMutableRawBufferPointer.allocate(count: 3)
   defer { buffer.deallocate() }
 
