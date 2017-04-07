@@ -463,7 +463,7 @@ extension String {
       return rhs
     }
     var lhs = lhs
-    lhs._core.append(rhs._core)
+    lhs.replaceSubrange(lhs.endIndex..<lhs.endIndex, with: rhs)
     return lhs
   }
 
@@ -473,7 +473,7 @@ extension String {
       lhs = rhs
     }
     else {
-      lhs._core.append(rhs._core)
+      lhs.replaceSubrange(lhs.endIndex..<lhs.endIndex, with: rhs)
     }
   }
 
