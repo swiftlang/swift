@@ -115,5 +115,5 @@ extension ProtoAdopter {
 // CHECK-NEXT: }
 
 // CHECK-LABEL: sil_vtable ProtoAdopter {
-// CHECK-NOT: managed{{.*}}Prop
+// CHECK-NOT: materializeForSet
 // CHECK: {{^}$}}
