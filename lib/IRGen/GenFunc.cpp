@@ -735,14 +735,34 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
   // Create a new explosion for potentially reabstracted parameters.
   Explosion args;
 
+  Address resultValueAddr;
   {
     // Lower the forwarded arguments in the original function's generic context.
     GenericContextScope scope(IGM, origType->getGenericSignature());
     
     // Forward the indirect return values.
-    auto &resultTI = IGM.getTypeInfo(outType->getSILResult());
-    if (resultTI.getSchema().requiresIndirectResult(IGM))
-      args.add(origParams.claimNext());
+    auto &outResultTI = IGM.getTypeInfo(outType->getSILResult());
+    auto &origResultTI = IGM.getTypeInfo(origType->getSILResult());
+    if (outResultTI.getSchema().requiresIndirectResult(IGM)) {
+      // Adjust the type of the indirect address they might be different.
+      assert(origResultTI.getSchema().requiresIndirectResult(IGM));
+      auto resultAddr = origParams.claimNext();
+      resultAddr = subIGF.Builder.CreateBitCast(
+          resultAddr, origResultTI.getStorageType()->getPointerTo());
+      args.add(resultAddr);
+    } else if (origResultTI.getSchema().requiresIndirectResult(IGM)) {
+      // The partially applied thunk requires a loaded value but the original
+      // convention was indirect -- create a temporary on the stack that we can
+      // load from before returning.
+      assert(!outResultTI.getSchema().requiresIndirectResult(IGM));
+      auto stackAddr = outResultTI.allocateStack(
+          subIGF, outType->getSILResult(), false, "return.temp");
+      resultValueAddr = stackAddr.getAddress();
+      auto resultAddr = subIGF.Builder.CreateBitCast(
+          resultValueAddr.getAddress(), IGM.getStoragePointerType(origType->getSILResult()));
+      args.add(resultAddr);
+    }
+
     for (unsigned i : indices(origType->getIndirectResults())) {
       SILResultInfo result = origType->getIndirectResults()[i];
       auto addr = origParams.claimNext();
@@ -1118,11 +1138,34 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
   if (rawData && consumesContext && dependsOnContextLifetime)
     subIGF.emitNativeStrongRelease(rawData);
   
-  // FIXME: Reabstract the result value as substituted.
-
-  if (call->getType()->isVoidTy())
-    subIGF.Builder.CreateRetVoid();
-  else {
+  // Reabstract the result value as substituted.
+  auto &outResultTI = IGM.getTypeInfo(outType->getSILResult());
+  if (call->getType()->isVoidTy()) {
+    if (!resultValueAddr.isValid())
+      subIGF.Builder.CreateRetVoid();
+    else {
+      // Okay, we have called a function that expects an indirect return type
+      // but the partially applied return type is direct. This means we have to
+      // load from the temporary storage location we created at resultValueAddr.
+      assert(outResultTI.getSchema().requiresIndirectResult(IGM) == false);
+      Explosion loadedResult;
+      cast<LoadableTypeInfo>(outResultTI)
+          .loadAsTake(subIGF, resultValueAddr, loadedResult);
+      outResultTI.deallocateStack(subIGF, resultValueAddr,
+                                  outType->getSILResult());
+      if (loadedResult.size() == 1)
+        subIGF.Builder.CreateRet(loadedResult.claimNext());
+      else {
+        auto *resultType = cast<llvm::StructType>(
+            outResultTI.getSchema().getScalarResultType(IGM));
+        llvm::Value *resultAgg = llvm::UndefValue::get(resultType);
+        for (unsigned i = 0, e = resultType->getNumElements(); i != e; ++i)
+          resultAgg = subIGF.Builder.CreateInsertValue(
+              resultAgg, loadedResult.claimNext(), i);
+        subIGF.Builder.CreateRet(resultAgg);
+      }
+    }
+  } else {
     llvm::Value *callResult = call;
     // If the result type is dependent on a type parameter we might have to cast
     // to the result type - it could be substituted.
