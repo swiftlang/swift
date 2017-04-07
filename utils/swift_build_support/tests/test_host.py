@@ -11,7 +11,7 @@
 import platform
 import unittest
 
-import swift_build_support.host as sbs_host
+import swift_build_support.swift_build_support.host as sbs_host
 
 
 class HostTestCase(unittest.TestCase):

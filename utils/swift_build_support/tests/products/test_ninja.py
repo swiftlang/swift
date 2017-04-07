@@ -23,11 +23,11 @@ except ImportError:
     # py3
     from io import StringIO
 
-from swift_build_support import shell
-from swift_build_support import xcrun
-from swift_build_support.products import Ninja
-from swift_build_support.toolchain import host_toolchain
-from swift_build_support.workspace import Workspace
+from swift_build_support.swift_build_support import shell
+from swift_build_support.swift_build_support import xcrun
+from swift_build_support.swift_build_support.products import Ninja
+from swift_build_support.swift_build_support.toolchain import host_toolchain
+from swift_build_support.swift_build_support.workspace import Workspace
 
 
 class NinjaTestCase(unittest.TestCase):
