@@ -702,7 +702,6 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
 
     typeCheckFunctionsAndExternalDecls(TC);
   }
-  MyTC.reset();
 
   // Checking that benefits from having the whole module available.
   if (!(Options & TypeCheckingFlags::DelayWholeModuleChecking)) {
