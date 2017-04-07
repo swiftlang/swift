@@ -16,6 +16,7 @@ from __future__ import print_function
 
 import argparse
 import json
+import math
 import os
 import os.path
 import shutil
@@ -162,9 +163,13 @@ def run_many(args):
         return (rng, [run_once(args, ast, [r]) for r in rng])
 
 
+def is_small(x):
+    return abs(x) < 1e-9
+
+
 def linear_regression(x, y):
     # By the book: https://en.wikipedia.org/wiki/Simple_linear_regression
-    n = len(x)
+    n = float(len(x))
     assert n == len(y)
     if n == 0:
         return 0, 0
@@ -172,19 +177,54 @@ def linear_regression(x, y):
     sum_y = sum(y)
     sum_prod = sum(a * b for a, b in zip(x, y))
     sum_x_sq = sum(a ** 2 for a in x)
+    sum_y_sq = sum(b ** 2 for b in y)
     mean_x = sum_x / n
     mean_y = sum_y / n
     mean_prod = sum_prod / n
     mean_x_sq = sum_x_sq / n
+    mean_y_sq = sum_y_sq / n
     covar_xy = mean_prod - mean_x * mean_y
     var_x = mean_x_sq - mean_x**2
+    var_y = mean_y_sq - mean_y**2
     slope = covar_xy / var_x
     inter = mean_y - slope * mean_x
-    return slope, inter
+
+    # Compute the correlation coefficient aka r^2, to compare goodness-of-fit.
+    if is_small(var_y):
+        # all of the outputs are the same, so this is a perfect fit
+        assert is_small(covar_xy)
+        cor_coeff_sq = 1.0
+    elif is_small(var_x):
+        # all of the inputs are the same, and the outputs are different, so
+        # this is a completely imperfect fit
+        assert is_small(covar_xy)
+        cor_coeff_sq = 0.0
+    else:
+        cor_coeff_sq = covar_xy**2 / (var_x * var_y)
+
+    return slope, inter, cor_coeff_sq
+
+
+# Y = a * X^b, returns a, b, R^2
+def fit_polynomial_model(x, y):
+    # transform into linear regression via log(Y) = b*log(X) + log(a)
+    log_x = [math.log(val) for val in x]
+    log_y = [math.log(val) for val in y]
+
+    b, log_a, r2 = linear_regression(log_x, log_y)
+    return b, math.exp(log_a), r2
+
+
+# Y = a * b^X, returns a, b, R^2
+def fit_exponential_model(x, y):
+    # transform into linear regression via log(Y) = log(b) * X + log(a)
+    log_y = [math.log(val) for val in y]
+
+    log_b, log_a, r2 = linear_regression(x, log_y)
+    return math.exp(log_b), math.exp(log_a), r2
 
 
 def report(args, rng, runs):
-    import math
     bad = False
     keys = set.intersection(*[set(j.keys()) for j in runs])
     if len(keys) == 0:
@@ -192,21 +232,35 @@ def report(args, rng, runs):
         if len(args.select) != 0:
             "(perhaps try a different --select?)"
         return True
-    x = [math.log(n) for n in rng]
     rows = []
     for k in keys:
         vals = [r[k] for r in runs]
         bounded = [max(v, 1) for v in vals]
-        y = [math.log(b) for b in bounded]
-        b, a = linear_regression(x, y)
-        b = 0 if abs(b) < 1e-9 else b
-        rows.append((b, k, vals))
+        p_b, p_a, p_r2 = fit_polynomial_model(rng, bounded)
+        e_b, e_a, e_r2 = fit_exponential_model(rng, bounded)
+        if p_r2 >= e_r2:
+            # polynomial is best
+            p_b = 0 if is_small(p_b) else p_b
+            rows.append((False, p_b, k, vals))
+        else:
+            # exponential is best
+            rows.append((True, e_b, k, vals))
+    # Exponential fits always go after polynomial fits.
     rows.sort()
-    for (b, k, vals) in rows:
-        if b >= args.threshold:
+    for (is_exp, b, k, vals) in rows:
+        # same threshold for both the polynomial exponent or the exponential
+        # base.
+        if is_exp:
+            this_is_bad = b >= args.exponential_threshold
+            formatted = '%1.1f^n' % b
+        else:
+            this_is_bad = b >= args.polynomial_threshold
+            formatted = 'n^%1.1f' % b
+
+        if this_is_bad:
             bad = True
-        if not args.quiet or b >= args.threshold:
-            print("O(n^%1.1f) : %s" % (b, k))
+        if not args.quiet or this_is_bad:
+            print("O(%s) : %s" % (formatted, k))
             if args.values:
                 print("                = ", vals)
     return bad
@@ -228,8 +282,13 @@ def main():
         '--quiet', action='store_true',
         default=False, help='only print superlinear stats')
     parser.add_argument(
-        '--threshold', type=float,
-        default=1.2, help='exponent beyond which to consider "bad scaling"')
+        '--polynomial-threshold', type=float,
+        default=1.2,
+        help='minimum exponent for polynomial fit to consider "bad scaling"')
+    parser.add_argument(
+        '--exponential-threshold', type=float,
+        default=1.2,
+        help='minimum base for exponential fit to consider "bad scaling"')
     parser.add_argument(
         '-typecheck', '--typecheck', action='store_true',
         default=False, help='only run compiler with -typecheck')
