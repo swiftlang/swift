@@ -895,6 +895,11 @@ void IRGenDebugInfo::emitVariableDeclaration(
   if (Opts.DebugInfoKind <= IRGenDebugInfoKind::LineTables)
     return;
 
+  // Currently, the DeclContext is needed to mangle archetypes. Bail out if it's
+  // missing.
+  if (DbgTy.Type->hasArchetype() && !DbgTy.DeclCtx)
+    return;
+
   if (!DbgTy.size)
     DbgTy.size = getStorageSize(IGM.DataLayout, Storage);
 
