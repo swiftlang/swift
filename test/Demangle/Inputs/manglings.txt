@@ -248,4 +248,5 @@ _SocketJoinOrLeaveMulticast ---> _SocketJoinOrLeaveMulticast
 _T0s10DictionaryV3t17E6Index2V1loiSbAEyxq__G_AGtFZ ---> static (extension in t17):Swift.Dictionary.Index2.< infix ((extension in t17):[A : B].Index2, (extension in t17):[A : B].Index2) -> Swift.Bool
 _T08mangling14varargsVsArrayySaySiG3arrd_SS1ntF ---> mangling.varargsVsArray (arr : Swift.Int..., n : Swift.String) -> ()
 _T08mangling14varargsVsArrayySaySiG3arrd_tF ---> mangling.varargsVsArray (arr : Swift.Int...) -> ()
-                                                                                                                           
+_T0s13_UnicodeViewsVss22RandomAccessCollectionRzs0A8EncodingR_11SubSequence_5IndexQZAFRtzsAcERpzAE_AEQZAIRSs15UnsignedInteger8Iterator_7ElementRPzAE_AlMQZANRS13EncodedScalar_AlMQY_AORSr0_lE13CharacterViewVyxq__G ---> (extension in Swift):Swift._UnicodeViews<A, B><A, B where A: Swift.RandomAccessCollection, B: Swift.UnicodeEncoding, A.Index == A.SubSequence.Index, A.SubSequence: Swift.RandomAccessCollection, A.SubSequence == A.SubSequence.SubSequence, A.Iterator.Element: Swift.UnsignedInteger, A.Iterator.Element == A.SubSequence.Iterator.Element, A.SubSequence.Iterator.Element == B.EncodedScalar.Iterator.Element>.CharacterView
+
