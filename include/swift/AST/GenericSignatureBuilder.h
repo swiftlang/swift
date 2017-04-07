@@ -295,6 +295,23 @@ private:
       Type T1, Type T2, FloatingRequirementSource Source,
       llvm::function_ref<void(Type, Type)> diagnoseMismatch);
 
+  /// \brief Add a new layout requirement directly on the potential archetype.
+  ///
+  /// \returns true if this requirement makes the set of requirements
+  /// inconsistent, in which case a diagnostic will have been issued.
+  bool addLayoutRequirementDirect(PotentialArchetype *PAT,
+                                  LayoutConstraint Layout,
+                                  const RequirementSource *Source);
+
+  /// Add a new layout requirement to the subject.
+  ///
+  /// FIXME: The "dependent type" is the subject type pre-substitution. We
+  /// should be able to compute this!
+  bool addLayoutRequirement(UnresolvedType subject,
+                            LayoutConstraint layout,
+                            FloatingRequirementSource source,
+                            Type dependentType);
+
   /// Add the requirements placed on the given type parameter
   /// to the given potential archetype.
   ///
@@ -388,15 +405,6 @@ public:
   bool addRequirement(const Requirement &req, FloatingRequirementSource source,
                       const SubstitutionMap *subMap,
                       llvm::SmallPtrSetImpl<ProtocolDecl *> &Visited);
-
-  /// \brief Add a new requirement.
-  ///
-  /// \returns true if this requirement makes the set of requirements
-  /// inconsistent, in which case a diagnostic will have been issued.
-
-  bool addLayoutRequirement(PotentialArchetype *PAT,
-                            LayoutConstraint Layout,
-                            const RequirementSource *Source);
 
   /// \brief Add all of a generic signature's parameters and requirements.
   void addGenericSignature(GenericSignature *sig);
@@ -1060,6 +1068,9 @@ public:
 
   /// Retrieve the source location for this requirement.
   SourceLoc getLoc() const;
+
+  /// Whether this is an explicitly-stated requirement.
+  bool isExplicit() const;
 };
 
 class GenericSignatureBuilder::PotentialArchetype {

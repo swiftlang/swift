@@ -829,6 +829,47 @@ SourceLoc FloatingRequirementSource::getLoc() const {
   return SourceLoc();
 }
 
+bool FloatingRequirementSource::isExplicit() const {
+  switch (kind) {
+  case Explicit:
+  case Inferred:
+    return true;
+
+  case AbstractProtocol:
+    switch (storage.get<const RequirementSource *>()->kind) {
+    case RequirementSource::RequirementSignatureSelf:
+      return true;
+
+    case RequirementSource::Concrete:
+    case RequirementSource::Explicit:
+    case RequirementSource::Inferred:
+    case RequirementSource::NestedTypeNameMatch:
+    case RequirementSource::Parent:
+    case RequirementSource::ProtocolRequirement:
+    case RequirementSource::Superclass:
+      return false;
+    }
+
+  case Resolved:
+    switch (storage.get<const RequirementSource *>()->kind) {
+    case RequirementSource::Explicit:
+    case RequirementSource::Inferred:
+      return true;
+
+    case RequirementSource::ProtocolRequirement:
+      return storage.get<const RequirementSource *>()->parent->kind
+        == RequirementSource::RequirementSignatureSelf;
+
+    case RequirementSource::RequirementSignatureSelf:
+    case RequirementSource::Concrete:
+    case RequirementSource::NestedTypeNameMatch:
+    case RequirementSource::Parent:
+    case RequirementSource::Superclass:
+      return false;
+    }
+  }
+}
+
 GenericSignatureBuilder::PotentialArchetype::~PotentialArchetype() {
   for (const auto &nested : NestedTypes) {
     for (auto pa : nested.second) {
@@ -1027,6 +1068,8 @@ public:
   PotentialArchetype *getPotentialArchetype() const {
     return paOrT.dyn_cast<PotentialArchetype *>();
   }
+
+  bool isType() const { return paOrT.is<Type>(); }
 };
 
 /// If there is a same-type requirement to be added for the given nested type
@@ -2220,7 +2263,7 @@ bool GenericSignatureBuilder::addConformanceRequirement(PotentialArchetype *PAT,
   return false;
 }
 
-bool GenericSignatureBuilder::addLayoutRequirement(
+bool GenericSignatureBuilder::addLayoutRequirementDirect(
                                              PotentialArchetype *PAT,
                                              LayoutConstraint Layout,
                                              const RequirementSource *Source) {
@@ -2240,6 +2283,41 @@ bool GenericSignatureBuilder::addLayoutRequirement(
   }
 
   return false;
+}
+
+bool GenericSignatureBuilder::addLayoutRequirement(
+                                             UnresolvedType subject,
+                                             LayoutConstraint layout,
+                                             FloatingRequirementSource source,
+                                             Type dependentType) {
+  // Resolve the subject.
+  auto resolvedSubject = resolve(subject, source);
+  if (!resolvedSubject) {
+    return recordUnresolvedRequirement(RequirementKind::Layout, subject,
+                                       layout, source);
+  }
+
+  // If this layout constraint applies to a concrete type, we can fully
+  // resolve it now.
+  if (resolvedSubject->isType()) {
+    // If a layout requirement was explicitly written on a concrete type,
+    // complain.
+    if (source.isExplicit() && source.getLoc().isValid()) {
+      // FIXME: TypeLoc() is unfortunate here.
+      Diags.diagnose(source.getLoc(), diag::requires_not_suitable_archetype,
+                     0, TypeLoc(), 0);
+      return true;
+    }
+
+    // FIXME: Check whether the layout constraint makes sense for this
+    // concrete type!
+
+    return false;
+  }
+
+  auto pa = resolvedSubject->getPotentialArchetype();
+  return addLayoutRequirementDirect(pa, layout,
+                                    source.getSource(pa, dependentType));
 }
 
 bool GenericSignatureBuilder::updateSuperclass(
@@ -2279,7 +2357,7 @@ bool GenericSignatureBuilder::updateSuperclass(
     // Presence of a superclass constraint implies a _Class layout
     // constraint.
     auto layoutReqSource = source->viaSuperclass(*this, nullptr);
-    addLayoutRequirement(T,
+    addLayoutRequirementDirect(T,
                          LayoutConstraint::getLayoutConstraint(
                              superclass->getClassOrBoundGenericClass()->isObjC()
                                  ? LayoutConstraintKind::Class
@@ -2744,18 +2822,9 @@ bool GenericSignatureBuilder::addRequirement(const RequirementRepr *Req,
 
   switch (Req->getKind()) {
   case RequirementReprKind::LayoutConstraint: {
-    // FIXME: Need to do something here.
-    PotentialArchetype *PA = resolveArchetype(subst(Req->getSubject()));
-    if (!PA) {
-      // FIXME: Poor location information.
-      // FIXME: Delay diagnostic until after type validation?
-      Diags.diagnose(Req->getColonLoc(), diag::requires_not_suitable_archetype,
-                     0, Req->getSubjectLoc(), 0);
-      return true;
-    }
-
-    if (addLayoutRequirement(PA, Req->getLayoutConstraint(),
-                             source.getSource(PA, Req->getSubject())))
+    if (addLayoutRequirement(subst(Req->getSubject()),
+                             Req->getLayoutConstraint(),
+                             source, Req->getSubject()))
       return true;
 
     return false;
@@ -2850,12 +2919,10 @@ bool GenericSignatureBuilder::addRequirement(
   }
 
   case RequirementKind::Layout: {
-    // FIXME: Diagnose this.
-    PotentialArchetype *pa = resolveArchetype(subst(req.getFirstType()));
-    if (!pa) return false;
-
-    return addLayoutRequirement(pa, req.getLayoutConstraint(),
-                                source.getSource(pa, req.getFirstType()));
+    return addLayoutRequirement(subst(req.getFirstType()),
+                                req.getLayoutConstraint(),
+                                source,
+                                req.getFirstType());
   }
 
   case RequirementKind::Conformance: {
