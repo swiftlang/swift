@@ -28,6 +28,7 @@ element_only = locals().get('element_only', False)
 wrap_index = locals().get('wrap_index', '_wrap')
 unwrap_index = locals().get('unwrap_index', '_unwrap')
 forward = locals().get('forward', lambda x: x)
+nonmutating = locals().get('nonmutating', False)
 Element = locals().get('Element')
 bindings = locals()
 def fwd(s):
@@ -119,6 +120,7 @@ public func withExistingUnsafeBuffer<R>(
   return try %(base)s.withExistingUnsafeBuffer(body)
 ''')} }
 
+% if not nonmutating:
 public mutating func _tryToReplaceSubrange<C: Collection>(
   _ target: Range<Index>, with replacement: C
 ) -> Bool
@@ -127,6 +129,7 @@ where C.Iterator.Element == ${Element} { ${fwd('''
     %(unwrap_index)s(target.lowerBound)
     ..< %(unwrap_index)s(target.upperBound), with: replacement)
 ''')} }
+% end
 
 public var first: ${Element}? { ${fwd('''
   return %(base)s.first 
