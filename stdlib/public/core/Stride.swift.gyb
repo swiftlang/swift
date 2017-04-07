@@ -71,10 +71,20 @@ public func == <T : Strideable>(x: T, y: T) -> Bool {
 
 //===----------------------------------------------------------------------===//
 
-% for Base in ['_Pointer', 'SignedInteger']:
-%   Availability = (lambda what: '@available(swift, deprecated: 3.1, obsoleted: 4.0, message: "Mixed-type %s is deprecated. Please use explicit type conversion.")' % what) if Base != '_Pointer' else (lambda _: '')
+%{
+  # Strideable used to provide + and - unconditionally. With the updated
+  # collection indexing model of Swift 3 this became unnecessary for integer
+  # types, and was deprecated, as it was a way to write mixed-type arithmetic
+  # expressions, that are otherwise are not allowed.
+}%
+% for Requirement, VersionInfo in [
+%   ('Self : _Pointer', None),
+%   ('Self : SignedInteger', 'deprecated: 3.1, obsoleted: 4.0'),
+%   ('Stride : ExpressibleByIntegerLiteral', 'obsoleted: 4.0')]:
+%   unavailable = 'Self : SignedInteger' == Requirement
+%   Availability = (lambda what: '@available(swift, %s, message: "Mixed-type %s is deprecated. Please use explicit type conversion.")' % (VersionInfo, what)) if unavailable else (lambda _: '')
 
-extension Strideable where Self : ${Base} {
+extension Strideable where ${Requirement} {
   @_transparent
   ${Availability('addition')}
   public static func + (lhs: Self, rhs: Self.Stride) -> Self {
