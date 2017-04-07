@@ -162,11 +162,6 @@ public:
       InputFilenames.push_back(A->getValue());
     }
 
-    if (InputFilenames.empty()) {
-      Diags.diagnose(SourceLoc(), diag::error_mode_requires_an_input_file);
-      return 1;
-    }
-
     if (const Arg *A = ParsedArgs.getLastArg(OPT_o)) {
       OutputFilename = A->getValue();
     }
