@@ -1953,7 +1953,7 @@ static void beginInOutFormalAccesses(SILGenFunction &SGF,
 
   llvm_unreachable("ran out of null arguments before we ran out of inouts");
 
- done:
+done:
 
   // Check to see if we have multiple inout arguments which obviously
   // alias.  Note that we could do this in a later SILDiagnostics pass
