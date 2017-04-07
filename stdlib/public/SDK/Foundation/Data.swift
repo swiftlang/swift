@@ -1290,7 +1290,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
         let count = other.count
         if count == 0 { return }
         other.base.withUnsafeBytes { (bytes: UnsafePointer<UInt8>) -> Void in
-            append(bytes, count: count)
+            append(bytes.advanced(by: other.startIndex), count: count)
         }
     }
     
