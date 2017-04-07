@@ -10,8 +10,7 @@
 
 import unittest
 
-from swift_build_support.swift_build_support.targets \
-    import StdlibDeploymentTarget
+from swift_build_support.targets import StdlibDeploymentTarget
 
 
 class HostTargetTestCase(unittest.TestCase):

@@ -11,7 +11,7 @@
 import platform
 import unittest
 
-from swift_build_support.swift_build_support import xcrun
+from swift_build_support import xcrun
 
 
 @unittest.skipUnless(platform.system() == 'Darwin',

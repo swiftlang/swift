@@ -18,7 +18,7 @@ try:
 except ImportError:
     from io import StringIO
 
-from swift_build_support.swift_build_support.tar import tar
+from swift_build_support.tar import tar
 
 
 class TarTestCase(unittest.TestCase):
