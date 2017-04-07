@@ -455,7 +455,7 @@ template <typename FnTy>
 void walkRelatedDecls(const ValueDecl *VD, const FnTy &Fn) {
   llvm::SmallDenseMap<DeclName, unsigned, 16> NamesSeen;
   ++NamesSeen[VD->getFullName()];
-  SmallVector<ValueDecl *, 8> RelatedDecls;
+  SmallVector<UnqualifiedLookupResult, 8> RelatedDecls;
 
   if (isa<ParamDecl>(VD))
     return; // Parameters don't have interesting related declarations.
@@ -473,13 +473,16 @@ void walkRelatedDecls(const ValueDecl *VD, const FnTy &Fn) {
 
     if (RelatedVD != VD) {
       ++NamesSeen[RelatedVD->getFullName()];
-      RelatedDecls.push_back(RelatedVD);
+      RelatedDecls.push_back(result);
     }
   }
 
   // Now provide the results along with whether the name is duplicate or not.
-  for (auto RelatedVD : RelatedDecls) {
-    Fn(RelatedVD, NamesSeen[RelatedVD->getFullName()] > 1);
+  ValueDecl *OriginalBase = VD->getDeclContext()->getAsNominalTypeOrNominalTypeExtensionContext();
+  for (auto Related : RelatedDecls) {
+    ValueDecl *RelatedVD = Related.getValueDecl();
+    bool SameBase = Related.getBaseDecl() && Related.getBaseDecl() == OriginalBase;
+    Fn(RelatedVD, SameBase, NamesSeen[RelatedVD->getFullName()] > 1);
   }
 }
 
@@ -763,7 +766,7 @@ static bool passCursorInfoForDecl(const ValueDecl *VD,
   });
 
   DelayedStringRetriever RelDeclsStream(SS);
-  walkRelatedDecls(VD, [&](const ValueDecl *RelatedDecl, bool DuplicateName) {
+  walkRelatedDecls(VD, [&](const ValueDecl *RelatedDecl, bool UseOriginalBase, bool DuplicateName) {
     RelDeclsStream.startPiece();
     {
       RelDeclsStream<<"<RelatedName usr=\"";
@@ -777,7 +780,7 @@ static bool passCursorInfoForDecl(const ValueDecl *VD,
         PO.SkipIntroducerKeywords = true;
         PO.ArgAndParamPrinting = PrintOptions::ArgAndParamPrintingMode::ArgumentOnly;
         XMLEscapingPrinter Printer(RelDeclsStream);
-        if (BaseType) {
+        if (UseOriginalBase && BaseType) {
           PO.setBaseType(BaseType);
           PO.PrintAsMember = true;
         }
