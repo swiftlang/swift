@@ -1004,14 +1004,6 @@ public:
     return ResolvedType(t);
   }
 
-  // FIXME: this probably shouldn't exist, the potential archetype modelling of
-  // generic typealiases is fundamentally broken (aka they're not modelled at
-  // all), but some things with them mostly work, so we just maintain that,
-  // despite this causing crashes and weird behavior.
-  static ResolvedType forConcreteTypeFromGenericTypeAlias(Type t) {
-    return ResolvedType(t);
-  }
-
   static ResolvedType forPotentialArchetype(PotentialArchetype *pa) {
     return ResolvedType(pa);
   }
@@ -2027,15 +2019,12 @@ auto GenericSignatureBuilder::resolveArchetype(Type type) -> PotentialArchetype 
   return nullptr;
 }
 
-auto GenericSignatureBuilder::resolve(UnresolvedType paOrT,
-                                      bool hackTypeFromGenericTypeAlias)
+auto GenericSignatureBuilder::resolve(UnresolvedType paOrT)
     -> ResolvedType {
   auto pa = paOrT.dyn_cast<PotentialArchetype *>();
   if (auto type = paOrT.dyn_cast<Type>()) {
     pa = resolveArchetype(type);
     if (!pa) {
-      if (hackTypeFromGenericTypeAlias)
-        return ResolvedType::forConcreteTypeFromGenericTypeAlias(type);
       return ResolvedType::forConcreteType(type);
     }
   }

@@ -549,11 +549,7 @@ public:
   ///
   /// This returns either a non-typealias potential archetype or a Type, if \c
   /// type is concrete.
-  // FIXME: the hackTypeFromGenericTypeAlias is just temporarily patching over
-  // problems with generic typealiases (see the comment on the ResolvedType
-  // function)
-  ResolvedType resolve(UnresolvedType type,
-                       bool hackTypeFromGenericTypeAlias = false);
+  ResolvedType resolve(UnresolvedType type);
 
   /// \brief Dump all of the requirements, both specified and inferred.
   LLVM_ATTRIBUTE_DEPRECATED(
