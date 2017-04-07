@@ -106,12 +106,15 @@ func nonASCII() {
   // CHECK-NEXT: String(Contiguous(owner: .cocoa@[[utf16address]], count: 6))
   let i2 = newNSUTF16.index(newNSUTF16.startIndex, offsetBy: 2)
   let i8 = newNSUTF16.index(newNSUTF16.startIndex, offsetBy: 6)
-  print("  \(repr(newNSUTF16[i2..<i8]))")
+  //
+  // Michael NOTE: Adding String(Substring(...))
+  //
+  print("  \(repr(String(newNSUTF16[i2..<i8])))")
 
   // Representing a slice as an NSString requires a new object
   // CHECK-NOT: NSString@[[utf16address]] = "❅❆❄︎⛄️"
   // CHECK-NEXT: _NSContiguousString@[[nsContiguousStringAddress:[x0-9a-f]+]] = "❅❆❄︎⛄️"
-  var nsSliceUTF16 = newNSUTF16[i2..<i8] as NSString
+  var nsSliceUTF16 = String(newNSUTF16[i2..<i8]) as NSString
   print("  \(repr(nsSliceUTF16))")
 
   // Check that we can recover the original buffer
@@ -149,12 +152,14 @@ func ascii() {
 
   let i3 = newNSASCII.index(newNSASCII.startIndex, offsetBy: 3)
   let i6 = newNSASCII.index(newNSASCII.startIndex, offsetBy: 6)
+
+  // Michael NOTE: Adding String(Substring(...))
   
   // Slicing the String
-  print("  \(repr(newNSASCII[i3..<i6]))")
+  print("  \(repr(String(newNSASCII[i3..<i6])))")
 
   // Representing a slice as an NSString
-  var nsSliceASCII = newNSASCII[i3..<i6] as NSString
+  var nsSliceASCII = String(newNSASCII[i3..<i6]) as NSString
   print("  \(repr(nsSliceASCII))")
 
   // Round-tripped back to Swift
