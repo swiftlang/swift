@@ -119,11 +119,6 @@ static clang::CodeGenerator *createClangCodeGenerator(ASTContext &Context,
   return ClangCodeGen;
 }
 
-/// A helper for determining if the triple uses the DLL storage
-static bool useDllStorage(const llvm::Triple &Triple) {
-  return Triple.isOSBinFormatCOFF() && !Triple.isOSCygMing();
-}
-
 IRGenModule::IRGenModule(IRGenerator &irgen,
                          std::unique_ptr<llvm::TargetMachine> &&target,
                          SourceFile *SF, llvm::LLVMContext &LLVMContext,
