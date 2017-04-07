@@ -6,6 +6,13 @@
 import Foundation
 import Swift
 
+// Michael NOTE: This test is inspecting internals of _StringCore, which we no
+// longer really use (except temporarily, in emergency situations). We should
+// replace this test file wholesale with our own internal tests of our new
+// representations. XFAILing this for now.
+
+// XFAIL: *
+
 // ==== Tests =====
 
 func hex(_ x: UInt64) -> String { return String(x, radix:16) }
