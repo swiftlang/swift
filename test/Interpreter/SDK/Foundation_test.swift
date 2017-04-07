@@ -117,6 +117,29 @@ FoundationTestSuite.test("arrayConversions") {
   nsArrayToAnyObjectArray(aoa as NSArray)
 }
 
+FoundationTestSuite.test("ComparisonResult") {
+  class IntBox: NSObject {
+    var value: Int
+    init(_ value: Int) {
+      self.value = value
+    }
+    
+    @objc func compare(_ other: IntBox) -> Swift.ComparisonResult {
+      // This is a reverse sort.
+      if value == other.value { return .orderedSame }
+      if value <  other.value { return .orderedDescending }
+      return .orderedAscending
+    }
+  }
+
+  let array = [IntBox(2), IntBox(3), IntBox(1)] as NSArray
+  let sorted = array.sortedArray(using: #selector(IntBox.compare))
+  let result = sorted as! [IntBox]
+  expectEqual(3, result[0].value)
+  expectEqual(2, result[1].value)
+  expectEqual(1, result[2].value)
+}
+
 //===----------------------------------------------------------------------===//
 // Dictionaries
 //===----------------------------------------------------------------------===//
