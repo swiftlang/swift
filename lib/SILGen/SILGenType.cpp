@@ -245,6 +245,13 @@ public:
     if (fd->isObservingAccessor())
       return;
 
+    // Special case -- materializeForSet on dynamic storage is not
+    // itself dynamic, but should be treated as such for the
+    // purpose of constructing the vtable.
+    if (fd->getAccessorKind() == AccessorKind::IsMaterializeForSet &&
+        fd->getAccessorStorageDecl()->isDynamic())
+      return;
+
     addEntry(SILDeclRef(fd));
   }
 

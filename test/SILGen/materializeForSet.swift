@@ -3,8 +3,14 @@
 class Base {
   var stored: Int = 0
 
-// The ordering here is unfortunate: we generate the property
-// getters and setters after we've processed the decl.
+// CHECK-LABEL: sil hidden [transparent] @_TFC17materializeForSet4Basem6storedSi : $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @guaranteed Base) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>) {
+// CHECK: bb0([[BUFFER:%.*]] : $Builtin.RawPointer, [[STORAGE:%.*]] : $*Builtin.UnsafeValueBuffer, [[SELF:%.*]] : $Base):
+// CHECK:   [[T0:%.*]] = ref_element_addr [[SELF]] : $Base, #Base.stored
+// CHECK:   [[T1:%.*]] = address_to_pointer [[T0]] : $*Int to $Builtin.RawPointer
+// CHECK:   [[T2:%.*]] = enum $Optional<Builtin.RawPointer>, #Optional.none
+// CHECK:   [[T3:%.*]] = tuple ([[T1]] : $Builtin.RawPointer, [[T2]] : $Optional<Builtin.RawPointer>)
+// CHECK:   return [[T3]] : $(Builtin.RawPointer, Optional<Builtin.RawPointer>)
+// CHECK: }
 
 // CHECK-LABEL: sil hidden [transparent] @_TFC17materializeForSet4Basem8computedSi : $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @guaranteed Base) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>) {
 // CHECK: bb0([[BUFFER:%.*]] : $Builtin.RawPointer, [[STORAGE:%.*]] : $*Builtin.UnsafeValueBuffer, [[SELF:%.*]] : $Base):
@@ -27,15 +33,6 @@ class Base {
 // CHECK:   [[T2:%.*]] = load [trivial] [[T1]] : $*Int
 // CHECK:   [[SETTER:%.*]] = function_ref @_TFC17materializeForSet4Bases8computedSi
 // CHECK:   apply [[SETTER]]([[T2]], [[T0]])
-
-// CHECK-LABEL: sil hidden [transparent] @_TFC17materializeForSet4Basem6storedSi : $@convention(method) (Builtin.RawPointer, @inout Builtin.UnsafeValueBuffer, @guaranteed Base) -> (Builtin.RawPointer, Optional<Builtin.RawPointer>) {
-// CHECK: bb0([[BUFFER:%.*]] : $Builtin.RawPointer, [[STORAGE:%.*]] : $*Builtin.UnsafeValueBuffer, [[SELF:%.*]] : $Base):
-// CHECK:   [[T0:%.*]] = ref_element_addr [[SELF]] : $Base, #Base.stored
-// CHECK:   [[T1:%.*]] = address_to_pointer [[T0]] : $*Int to $Builtin.RawPointer
-// CHECK:   [[T2:%.*]] = enum $Optional<Builtin.RawPointer>, #Optional.none
-// CHECK:   [[T3:%.*]] = tuple ([[T1]] : $Builtin.RawPointer, [[T2]] : $Optional<Builtin.RawPointer>)
-// CHECK:   return [[T3]] : $(Builtin.RawPointer, Optional<Builtin.RawPointer>)
-// CHECK: }
 
   var computed: Int {
     get { return 0 }
@@ -531,12 +528,12 @@ func testMaterializedSetter() {
 }
 
 // CHECK-LABEL: sil_vtable DerivedForOverride {
+// CHECK:   #BaseForOverride.valueStored!getter.1: _TFC17materializeForSet18DerivedForOverrideg11valueStoredSi
+// CHECK:   #BaseForOverride.valueStored!setter.1: _TFC17materializeForSet18DerivedForOverrides11valueStoredSi 
+// CHECK:   #BaseForOverride.valueStored!materializeForSet.1: _TFC17materializeForSet18DerivedForOverridem11valueStoredSi
 // CHECK:   #BaseForOverride.valueComputed!getter.1: _TFC17materializeForSet18DerivedForOverrideg13valueComputedSi
 // CHECK:   #BaseForOverride.valueComputed!setter.1: _TFC17materializeForSet18DerivedForOverrides13valueComputedSi
 // CHECK:   #BaseForOverride.valueComputed!materializeForSet.1: _TFC17materializeForSet18DerivedForOverridem13valueComputedSi
-// CHECK:   #BaseForOverride.valueStored!getter.1: _TFC17materializeForSet18DerivedForOverrideg11valueStoredSi
-// CHECK:   #BaseForOverride.valueStored!setter.1: _TFC17materializeForSet18DerivedForOverrides11valueStoredSi
-// CHECK:   #BaseForOverride.valueStored!materializeForSet.1: _TFC17materializeForSet18DerivedForOverridem11valueStoredSi
 // CHECK: }
 
 // CHECK-LABEL: sil_witness_table hidden Bill: Totalled module materializeForSet {
