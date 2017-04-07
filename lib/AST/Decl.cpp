@@ -2431,6 +2431,10 @@ DestructorDecl *ClassDecl::getDestructor() {
 }
 
 bool ClassDecl::inheritsSuperclassInitializers(LazyResolver *resolver) {
+  // Get a resolver from the ASTContext if we don't have one already.
+  if (resolver == nullptr)
+    resolver = getASTContext().getLazyResolver();
+
   // Check whether we already have a cached answer.
   switch (static_cast<StoredInheritsSuperclassInits>(
             ClassDeclBits.InheritsSuperclassInits)) {
@@ -2471,8 +2475,10 @@ bool ClassDecl::inheritsSuperclassInitializers(LazyResolver *resolver) {
       return false;
 
     // Resolve this initializer, if needed.
-    if (!ctor->hasInterfaceType())
+    if (!ctor->hasInterfaceType()) {
+      assert(resolver && "Should have a resolver here");
       resolver->resolveDeclSignature(ctor);
+    }
 
     // Ignore any stub implementations.
     if (ctor->hasStubImplementation())

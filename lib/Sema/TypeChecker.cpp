@@ -598,6 +598,13 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
   if (SF.ASTStage == SourceFile::TypeChecked)
     return;
 
+  auto &Ctx = SF.getASTContext();
+
+  // Make sure we have a type checker.
+  Optional<TypeChecker> MyTC;
+  if (!Ctx.getLazyResolver())
+    MyTC.emplace(Ctx);
+
   // Make sure that name binding has been completed before doing any type
   // checking.
   {
@@ -605,32 +612,35 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
     performNameBinding(SF, StartElem);
   }
 
-  auto &Ctx = SF.getASTContext();
   {
     // NOTE: The type checker is scoped to be torn down before AST
     // verification.
-    TypeChecker TC(Ctx);
     SharedTimer timer("Type checking / Semantic analysis");
 
-    TC.setWarnLongFunctionBodies(WarnLongFunctionBodies);
-    if (Options.contains(TypeCheckingFlags::DebugTimeFunctionBodies))
-      TC.enableDebugTimeFunctionBodies();
+    if (MyTC) {
+      MyTC->setWarnLongFunctionBodies(WarnLongFunctionBodies);
+      if (Options.contains(TypeCheckingFlags::DebugTimeFunctionBodies))
+        MyTC->enableDebugTimeFunctionBodies();
 
-    if (Options.contains(TypeCheckingFlags::DebugTimeExpressions))
-      TC.enableDebugTimeExpressions();
+      if (Options.contains(TypeCheckingFlags::DebugTimeExpressions))
+        MyTC->enableDebugTimeExpressions();
 
-    if (Options.contains(TypeCheckingFlags::ForImmediateMode))
-      TC.setInImmediateMode(true);
-    
-    // Lookup the swift module.  This ensures that we record all known
-    // protocols in the AST.
-    (void) TC.getStdlibModule(&SF);
+      if (Options.contains(TypeCheckingFlags::ForImmediateMode))
+        MyTC->setInImmediateMode(true);
+      
+      // Lookup the swift module.  This ensures that we record all known
+      // protocols in the AST.
+      (void) MyTC->getStdlibModule(&SF);
 
-    if (!Ctx.LangOpts.DisableAvailabilityChecking) {
-      // Build the type refinement hierarchy for the primary
-      // file before type checking.
-      TC.buildTypeRefinementContextHierarchy(SF, StartElem);
+      if (!Ctx.LangOpts.DisableAvailabilityChecking) {
+        // Build the type refinement hierarchy for the primary
+        // file before type checking.
+        MyTC->buildTypeRefinementContextHierarchy(SF, StartElem);
+      }
     }
+
+    TypeChecker &TC =
+      MyTC ? *MyTC : *static_cast<TypeChecker *>(Ctx.getLazyResolver());
 
     // Resolve extensions. This has to occur first during type checking,
     // because the extensions need to be wired into the AST for name lookup
@@ -687,7 +697,7 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
 
     // If we're in REPL mode, inject temporary result variables and other stuff
     // that the REPL needs to synthesize.
-    if (SF.Kind == SourceFileKind::REPL && !TC.Context.hadError())
+    if (SF.Kind == SourceFileKind::REPL && !Ctx.hadError())
       TC.processREPLTopLevel(SF, TLC, StartElem);
 
     typeCheckFunctionsAndExternalDecls(TC);
@@ -697,6 +707,8 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
   if (!(Options & TypeCheckingFlags::DelayWholeModuleChecking)) {
     performWholeModuleTypeChecking(SF);
   }
+
+  MyTC.reset();
 
   // Verify that we've checked types correctly.
   SF.ASTStage = SourceFile::TypeChecked;
