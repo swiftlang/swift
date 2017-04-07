@@ -905,6 +905,10 @@ NodePointer Demangler::demangleBoundGenericArgs(NodePointer Nominal,
       BoundParent = createWithChildren(Node::Kind::Extension,
                                        Context->getFirstChild(),
                                        BoundParent);
+      if (Context->getNumChildren() == 3) {
+        // Add the generic signature of the extension context.
+        addChild(BoundParent, Context->getChild(2));
+      }
     } else {
       BoundParent = demangleBoundGenericArgs(Context, TypeLists, TypeListIdx);
     }

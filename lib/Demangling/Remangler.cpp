@@ -1784,6 +1784,10 @@ NodePointer Demangle::getUnspecialized(Node *node, NodeFactory &Factory) {
       NodePointer result = Factory.createNode(Node::Kind::Extension);
       result->addChild(node->getFirstChild(), Factory);
       result->addChild(getUnspecialized(parent, Factory), Factory);
+      if (node->getNumChildren() == 3) {
+        // Add the generic signature of the extension.
+        result->addChild(node->getChild(2), Factory);
+      }
       return result;
     }
     default:

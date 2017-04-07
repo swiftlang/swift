@@ -455,6 +455,8 @@ private:
 
   NodePointer demangleObjCTypeName();
 
+  void dump();
+
 public:
   Demangler() {}
   

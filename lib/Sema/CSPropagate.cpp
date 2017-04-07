@@ -62,21 +62,14 @@ getBindOverloadDisjunction(ConstraintSystem &CS, Constraint *applicableFn) {
 // Simplify the active constraints, collecting any new applicable
 // function constraints we find along the way, and bailing if we fail
 // to simplify a constraint successfully.
-bool ConstraintSystem::simplifyForConstraintPropagation(
-    Constraint *applicableFn,
-    llvm::SmallVectorImpl<Constraint *> &otherApplicableFn) {
-  bool found = false;
-
+bool ConstraintSystem::simplifyForConstraintPropagation() {
   while (!ActiveConstraints.empty()) {
     auto *constraint = &ActiveConstraints.front();
     ActiveConstraints.pop_front();
+
     assert(constraint->isActive()
            && "Expected constraints to be active?");
-
-    if (constraint == applicableFn)
-      found = true;
-    else if (constraint->getKind() == ConstraintKind::ApplicableFunction)
-      otherApplicableFn.push_back(constraint);
+    assert(!constraint->isDisabled() && "Unexpected disabled constraint!");
 
     bool failed = false;
 
@@ -105,13 +98,34 @@ bool ConstraintSystem::simplifyForConstraintPropagation(
   return false;
 }
 
+// Gather the applicable function constraints associated with a
+// particular typevar, but do not include the one that is passed in
+// since that is the constraint that we're starting from.
+void ConstraintSystem::gatherNeighboringApplicableFunctionConstraints(
+    Constraint *applicableFn,
+    SmallVectorImpl<Constraint *> &otherApplicableFn) {
+
+  auto *tyvar = applicableFn->getSecondType()->getAs<TypeVariableType>();
+  assert(tyvar && "Expected type variable!");
+
+  SmallVector<Constraint *, 8> neighbors;
+  CG.gatherConstraints(tyvar, neighbors,
+                       ConstraintGraph::GatheringKind::AllMentions);
+
+  for (auto *constraint : neighbors) {
+    if (constraint->getKind() != ConstraintKind::ApplicableFunction ||
+        constraint == applicableFn)
+      continue;
+
+    otherApplicableFn.push_back(constraint);
+  }
+}
+
 // Test a bind overload constraint to see if it is consistent with the
 // rest of the constraint system.
 bool ConstraintSystem::isBindOverloadConsistent(
-    Constraint *bindConstraint,
-    Constraint *applicableFn,
-    llvm::SmallVectorImpl<Constraint *> &otherApplicableFn,
-    int depth) {
+    Constraint *bindConstraint, Constraint *applicableFn,
+    llvm::SetVector<Constraint *> &workList, bool topLevel) {
 
   // Set up a scope that will be torn down when we're done testing
   // this constraint.
@@ -131,9 +145,22 @@ bool ConstraintSystem::isBindOverloadConsistent(
     solverState->retireConstraint(bindConstraint);
     solverState->addGeneratedConstraint(bindConstraint);
 
-    if (simplifyForConstraintPropagation(applicableFn, otherApplicableFn)) {
+    if (simplifyForConstraintPropagation())
       return false;
-    }
+
+    if (!topLevel)
+      return true;
+
+    // Test the applicable function constraints that neighbor the bind
+    // overload constraint.
+    SmallVector<Constraint *, 8> otherApplicableFn;
+    gatherNeighboringApplicableFunctionConstraints(applicableFn,
+                                                   otherApplicableFn);
+
+    for (auto *constraint : otherApplicableFn)
+      if (!isApplicableFunctionConsistent(constraint, workList,
+                                          /* topLevel = */ false))
+        return false;
 
     return true;
   }
@@ -151,9 +178,8 @@ bool ConstraintSystem::isBindOverloadConsistent(
 // a related disjunction, or if all the constraints in that
 // disjunction are inconsistent with the system, we'll return false.
 bool ConstraintSystem::isApplicableFunctionConsistent(
-    Constraint *applicableFn,
-    llvm::SetVector<Constraint *> &workList,
-    int depth) {
+    Constraint *applicableFn, llvm::SetVector<Constraint *> &workList,
+    bool topLevel) {
 
   // Set up a scope that will be torn down when we're done testing
   // this constraint.
@@ -174,18 +200,28 @@ bool ConstraintSystem::isApplicableFunctionConsistent(
     if (bindConstraint->isDisabled())
       continue;
 
-    llvm::SmallVector<Constraint *, 4> otherApplicableFn;
+    if (!isBindOverloadConsistent(bindConstraint, applicableFn, workList,
+                                  topLevel)) {
+      if (topLevel) {
+        bindConstraint->setDisabled();
 
-    if (!isBindOverloadConsistent(bindConstraint, applicableFn,
-                                  otherApplicableFn, depth)) {
-      bindConstraint->setDisabled();
+        // Queue up other constraints that may be affected by disabling
+        // this one.
+        SmallVector<Constraint *, 8> otherApplicableFn;
+        gatherNeighboringApplicableFunctionConstraints(applicableFn,
+                                                       otherApplicableFn);
 
-      // Queue up other constraints that may be affected by disabling
-      // this one.
-      for (auto *constraint : otherApplicableFn)
-        workList.insert(constraint);
+        for (auto *constraint : otherApplicableFn)
+          workList.insert(constraint);
+      }
     } else {
       foundConsistent = true;
+
+      // If we find any bind overload that works when we're testing
+      // the "other" applicable function constraints, we know there is
+      // some working solution and can stop.
+      if (!topLevel)
+        break;
     }
   }
 
@@ -224,7 +260,8 @@ bool ConstraintSystem::propagateConstraints() {
     assert(constraint->getKind() == ConstraintKind::ApplicableFunction
            && "Expected ApplicableFunction constraint on work list!");
 
-    if (!isApplicableFunctionConsistent(constraint, workList, 1))
+    if (!isApplicableFunctionConsistent(constraint, workList,
+                                        /* topLevel = */ true))
       return true;
   }
 
