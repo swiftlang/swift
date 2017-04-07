@@ -268,6 +268,22 @@ void Expr::propagateLValueAccessKind(AccessKind accessKind,
       if (!GetType(E->getBase())->isLValueType()) return;
       visit(E->getBase(), getBaseAccessKind(E->getDecl(), accessKind));
     }
+    void visitKeyPathApplicationExpr(KeyPathApplicationExpr *E,
+                                     AccessKind accessKind) {
+      if (!GetType(E->getBase())->isLValueType()) return;
+      auto kpDecl = E->getKeyPath()->getType()->castTo<BoundGenericType>()
+        ->getDecl();
+      AccessKind baseAccess;
+      // A ReferenceWritableKeyPath only reads its base.
+      if (kpDecl ==
+            E->getType()->getASTContext().getReferenceWritableKeyPathDecl())
+        baseAccess = AccessKind::Read;
+      else
+        // Assuming a writable keypath projects a part of the base.
+        baseAccess = getPartialAccessKind(accessKind);
+      
+      visit(E->getBase(), baseAccess);
+    }
 
     static AccessKind getPartialAccessKind(AccessKind accessKind) {
       return (accessKind == AccessKind::Read
@@ -321,6 +337,7 @@ void Expr::propagateLValueAccessKind(AccessKind accessKind,
     LEAF_LVALUE_EXPR(DynamicLookup)
     LEAF_LVALUE_EXPR(OpaqueValue)
     LEAF_LVALUE_EXPR(EditorPlaceholder)
+    LEAF_LVALUE_EXPR(Error)
 
     COMPLETE_PHYSICAL_LVALUE_EXPR(AnyTry, getSubExpr())
     PARTIAL_PHYSICAL_LVALUE_EXPR(BindOptional, getSubExpr())
@@ -329,7 +346,6 @@ void Expr::propagateLValueAccessKind(AccessKind accessKind,
     COMPLETE_PHYSICAL_LVALUE_EXPR(Identity, getSubExpr())
     PARTIAL_PHYSICAL_LVALUE_EXPR(TupleElement, getBase())
 
-    NON_LVALUE_EXPR(Error)
     NON_LVALUE_EXPR(Literal)
     NON_LVALUE_EXPR(SuperRef)
     NON_LVALUE_EXPR(Type)
@@ -432,6 +448,7 @@ ConcreteDeclRef Expr::getReferencedDecl() const {
     return ConcreteDeclRef();
   }
 
+  NO_REFERENCE(KeyPathApplication);
   NO_REFERENCE(TupleElement);
   NO_REFERENCE(CaptureList);
   NO_REFERENCE(Closure);
@@ -700,6 +717,7 @@ bool Expr::canAppendCallParentheses() const {
   case ExprKind::Array:
   case ExprKind::Dictionary:
   case ExprKind::Subscript:
+  case ExprKind::KeyPathApplication:
   case ExprKind::TupleElement:
     return true;
 

@@ -409,6 +409,8 @@ enum ScoreKind {
   SK_ArrayPointerConversion,
   /// A conversion to an empty existential type ('Any' or '{}').
   SK_EmptyExistentialConversion,
+  /// A key path application subscript.
+  SK_KeyPathSubscript,
   
   SK_LastScoreKind = SK_EmptyExistentialConversion,
 };
@@ -1576,6 +1578,11 @@ public:
                      ConstraintLocatorBuilder locator,
                      bool isFavored = false);
 
+  /// \brief Add a key path application constraint to the constraint system.
+  void addKeyPathApplicationConstraint(Type keypath, Type root, Type value,
+                     ConstraintLocatorBuilder locator,
+                     bool isFavored = false);
+
   /// Add a new constraint with a restriction on its application.
   void addRestrictedConstraint(ConstraintKind kind,
                                ConversionRestrictionKind restriction,
@@ -2280,6 +2287,14 @@ private:
   /// \brief Attempt to simplify the given OpenedExistentialOf constraint.
   SolutionKind simplifyOpenedExistentialOfConstraint(
                                          Type type1, Type type2,
+                                         TypeMatchOptions flags,
+                                         ConstraintLocatorBuilder locator);
+
+  /// \brief Attempt to simplify the given KeyPathApplication constraint.
+  SolutionKind simplifyKeyPathApplicationConstraint(
+                                         Type keyPath,
+                                         Type root,
+                                         Type value,
                                          TypeMatchOptions flags,
                                          ConstraintLocatorBuilder locator);
 

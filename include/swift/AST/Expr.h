@@ -2357,6 +2357,33 @@ public:
   }
 };
 
+/// Subscripting expression that applies a keypath to a base.
+class KeyPathApplicationExpr : public Expr {
+  Expr *Base;
+  Expr *KeyPath;
+  SourceLoc LBracketLoc, RBracketLoc;
+  
+public:
+  KeyPathApplicationExpr(Expr *base, SourceLoc lBracket, Expr *keyPath,
+                         SourceLoc rBracket, Type ty, bool implicit)
+    : Expr(ExprKind::KeyPathApplication, implicit, ty),
+      Base(base), KeyPath(keyPath), LBracketLoc(lBracket), RBracketLoc(rBracket)
+  {}
+  
+  SourceLoc getLoc() const { return LBracketLoc; }
+  SourceLoc getStartLoc() const { return Base->getStartLoc(); }
+  SourceLoc getEndLoc() const { return RBracketLoc; }
+  
+  Expr *getBase() const { return Base; }
+  void setBase(Expr *E) { Base = E; }
+  Expr *getKeyPath() const { return KeyPath; }
+  void setKeyPath(Expr *E) { KeyPath = E; }
+  
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::KeyPathApplication;
+  }
+};
+
 /// A member access (foo.bar) on an expression with unresolved type.
 class UnresolvedDotExpr : public Expr {
   Expr *SubExpr;

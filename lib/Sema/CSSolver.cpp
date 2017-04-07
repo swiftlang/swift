@@ -703,6 +703,7 @@ static bool shouldBindToValueType(Constraint *constraint)
   case ConstraintKind::DynamicTypeOf:
   case ConstraintKind::EscapableFunctionOf:
   case ConstraintKind::OpenedExistentialOf:
+  case ConstraintKind::KeyPathApplication:
   case ConstraintKind::ValueMember:
   case ConstraintKind::UnresolvedValueMember:
   case ConstraintKind::Defaultable:
@@ -827,6 +828,7 @@ static PotentialBindings getPotentialBindings(ConstraintSystem &cs,
     case ConstraintKind::DynamicTypeOf:
     case ConstraintKind::EscapableFunctionOf:
     case ConstraintKind::OpenedExistentialOf:
+    case ConstraintKind::KeyPathApplication:
       // Constraints from which we can't do anything.
       continue;
 

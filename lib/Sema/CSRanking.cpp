@@ -80,6 +80,9 @@ void ConstraintSystem::increaseScore(ScoreKind kind, unsigned value) {
     case SK_EmptyExistentialConversion:
       log << "empty-existential conversion";
       break;
+    case SK_KeyPathSubscript:
+      log << "key path subscript";
+      break;
     }
     log << ")\n";
   }
@@ -136,6 +139,7 @@ static bool sameOverloadChoice(const OverloadChoice &x,
 
   switch (x.getKind()) {
   case OverloadChoiceKind::BaseType:
+  case OverloadChoiceKind::KeyPathApplication:
     // FIXME: Compare base types after substitution?
     return true;
 
@@ -854,6 +858,7 @@ ConstraintSystem::compareSolutions(ConstraintSystem &cs,
       continue;
 
     case OverloadChoiceKind::BaseType:
+    case OverloadChoiceKind::KeyPathApplication:
       llvm_unreachable("Never considered different");
 
     case OverloadChoiceKind::DeclViaDynamic:

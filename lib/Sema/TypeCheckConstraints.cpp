@@ -2663,6 +2663,11 @@ void Solution::dump(raw_ostream &out) const {
       out << "base type " << choice.getBaseType()->getString() << "\n";
       break;
 
+    case OverloadChoiceKind::KeyPathApplication:
+      out << "key path application root "
+          << choice.getBaseType()->getString() << "\n";
+      break;
+
     case OverloadChoiceKind::TupleIndex:
       out << "tuple " << choice.getBaseType()->getString() << " index "
         << choice.getTupleIndex() << "\n";
@@ -2824,6 +2829,11 @@ void ConstraintSystem::print(raw_ostream &out) {
 
       case OverloadChoiceKind::BaseType:
         out << "base type " << choice.getBaseType()->getString() << "\n";
+        break;
+
+      case OverloadChoiceKind::KeyPathApplication:
+        out << "key path application root "
+            << choice.getBaseType()->getString() << "\n";
         break;
 
       case OverloadChoiceKind::TupleIndex:

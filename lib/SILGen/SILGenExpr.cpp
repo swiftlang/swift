@@ -415,6 +415,7 @@ namespace {
                                          SGFContext C);
     RValue visitTupleElementExpr(TupleElementExpr *E, SGFContext C);
     RValue visitSubscriptExpr(SubscriptExpr *E, SGFContext C);
+    RValue visitKeyPathApplicationExpr(KeyPathApplicationExpr *E, SGFContext C);
     RValue visitDynamicSubscriptExpr(DynamicSubscriptExpr *E,
                                      SGFContext C);
     RValue visitTupleShuffleExpr(TupleShuffleExpr *E, SGFContext C);
@@ -2480,6 +2481,14 @@ RValue RValueEmitter::visitKeyPathExpr(KeyPathExpr *E, SGFContext C) {
                                      loweredTy);
   auto value = SGF.emitManagedRValueWithCleanup(keyPath);
   return RValue(SGF, E, value);
+}
+
+RValue RValueEmitter::
+visitKeyPathApplicationExpr(KeyPathApplicationExpr *E, SGFContext C) {
+  auto resultTy = SGF.getLoweredType(E->getType());
+  SGF.SGM.diagnose(E->getLoc(), diag::not_implemented, "key path application");
+  auto undef = SILUndef::get(resultTy, SGF.SGM.M);
+  return RValue(SGF, E, ManagedValue::forUnmanaged(undef));
 }
 
 RValue RValueEmitter::

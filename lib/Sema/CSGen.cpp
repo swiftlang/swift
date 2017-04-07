@@ -613,7 +613,8 @@ namespace {
         bool hasMustConsider = false;
         for (auto oldConstraint : oldConstraints) {
           auto overloadChoice = oldConstraint->getOverloadChoice();
-          if (mustConsider(overloadChoice.getDecl()))
+          if (overloadChoice.isDecl() &&
+              mustConsider(overloadChoice.getDecl()))
             hasMustConsider = true;
         }
         if (hasMustConsider) {
@@ -625,7 +626,8 @@ namespace {
       // into "favored" and non-favored lists.
       SmallVector<Constraint *, 4> favoredConstraints;
       for (auto oldConstraint : oldConstraints)
-        if (isFavored(oldConstraint->getOverloadChoice().getDecl()))
+        if (oldConstraint->getOverloadChoice().isDecl() &&
+            isFavored(oldConstraint->getOverloadChoice().getDecl()))
           favoredConstraints.push_back(oldConstraint);
 
       // If we did not find any favored constraints, we're done.
@@ -2756,6 +2758,9 @@ namespace {
       llvm_unreachable("Already type-checked");
     }
     Type visitMakeTemporarilyEscapableExpr(MakeTemporarilyEscapableExpr *expr) {
+      llvm_unreachable("Already type-checked");
+    }
+    Type visitKeyPathApplicationExpr(KeyPathApplicationExpr *expr) {
       llvm_unreachable("Already type-checked");
     }
     

@@ -1947,6 +1947,14 @@ public:
     printRec(E->getIndex());
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
+  void visitKeyPathApplicationExpr(KeyPathApplicationExpr *E) {
+    printCommon(E, "keypath_application_expr");
+    OS << '\n';
+    printRec(E->getBase());
+    OS << '\n';
+    printRec(E->getKeyPath());
+    PrintWithColorRAII(OS, ParenthesisColor) << ')';
+  }
   void visitDynamicSubscriptExpr(DynamicSubscriptExpr *E) {
     printCommon(E, "dynamic_subscript_expr")
       << " decl=";

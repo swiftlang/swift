@@ -49,6 +49,8 @@ enum class OverloadChoiceKind : int {
   /// base type. Used for unresolved member expressions like ".none" that
   /// refer to enum members with unit type.
   BaseType,
+  /// \brief The overload choice selects a key path subscripting operation.
+  KeyPathApplication,
   /// \brief The overload choice indexes into a tuple. Index zero will
   /// have the value of this enumerator, index one will have the value of this
   /// enumerator + 1, and so on. Thus, this enumerator must always be last.
@@ -230,6 +232,7 @@ public:
 
     case OverloadChoiceKind::BaseType:
     case OverloadChoiceKind::TupleIndex:
+    case OverloadChoiceKind::KeyPathApplication:
       return false;
     }
 
@@ -241,6 +244,9 @@ public:
     assert(isDecl() && "Not a declaration");
     return reinterpret_cast<ValueDecl *>(DeclOrKind & ~(uintptr_t)0x03);
   }
+  
+  /// Get the name of the overload choice.
+  DeclName getName() const;
 
   /// \brief Retrieve the tuple index that corresponds to this overload
   /// choice.

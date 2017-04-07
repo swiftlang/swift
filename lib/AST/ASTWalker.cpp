@@ -494,6 +494,19 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     
     return E;
   }
+  Expr *visitKeyPathApplicationExpr(KeyPathApplicationExpr *E) {
+    if (Expr *Base = doIt(E->getBase()))
+      E->setBase(Base);
+    else
+      return nullptr;
+    
+    if (Expr *KeyPath = doIt(E->getKeyPath()))
+      E->setKeyPath(KeyPath);
+    else
+      return nullptr;
+    
+    return E;
+  }
   Expr *visitDynamicSubscriptExpr(DynamicSubscriptExpr *E) {
     if (Expr *Base = doIt(E->getBase()))
       E->setBase(Base);

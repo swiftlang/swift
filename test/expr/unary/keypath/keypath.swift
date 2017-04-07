@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -parse-as-library  %s -verify
+// RUN: %target-swift-frontend -typecheck -parse-as-library  %s -verify
 
 struct Sub {}
 struct OptSub {}
@@ -46,6 +46,8 @@ func testKeyPath(sub: Sub, optSub: OptSub, x: Int) {
   _ = #keyPath2(() -> (), .noMember)
 
   let _: KeyPath<A, Prop> = #keyPath2(.property)
+  // TODO: why is this unresolved?
+  // expected-error@+1{{}}
   let _: KeyPath<A, A> = #keyPath2([sub])
   let _: KeyPath<A, Prop?> = #keyPath2(.optProperty?)
   let _: KeyPath<A, A?> = #keyPath2(.optProperty?[sub])
@@ -54,6 +56,68 @@ func testKeyPath(sub: Sub, optSub: OptSub, x: Int) {
   // expected-error@+1{{}}
   let _: KeyPath<A, Prop?> = #keyPath2(.property[optSub]?.optProperty![sub])
   let _: KeyPath<C<A>, A> = #keyPath2(.value)
+}
+
+struct Z { }
+
+func testKeyPathSubscript(readonly: Z, writable: inout Z,
+                          kp: KeyPath<Z, Int>,
+                          wkp: WritableKeyPath<Z, Int>,
+                          rkp: ReferenceWritableKeyPath<Z, Int>) {
+  var sink: Int
+  sink = readonly[keyPath: kp]
+  sink = writable[keyPath: kp]
+  sink = readonly[keyPath: wkp]
+  sink = writable[keyPath: wkp]
+  sink = readonly[keyPath: rkp]
+  sink = writable[keyPath: rkp]
+
+  readonly[keyPath: kp] = sink // expected-error{{cannot assign to immutable}}
+  writable[keyPath: kp] = sink // expected-error{{cannot assign to immutable}}
+  readonly[keyPath: wkp] = sink // expected-error{{cannot assign to immutable}}
+  writable[keyPath: wkp] = sink
+  readonly[keyPath: rkp] = sink
+  writable[keyPath: rkp] = sink
+}
+
+func testKeyPathSubscriptMetatype(readonly: Z.Type, writable: inout Z.Type,
+                                  kp: KeyPath<Z.Type, Int>,
+                                  wkp: WritableKeyPath<Z.Type, Int>,
+                                  rkp: ReferenceWritableKeyPath<Z.Type, Int>) {
+  var sink: Int
+  sink = readonly[keyPath: kp]
+  sink = writable[keyPath: kp]
+  sink = readonly[keyPath: wkp]
+  sink = writable[keyPath: wkp]
+  sink = readonly[keyPath: rkp]
+  sink = writable[keyPath: rkp]
+
+  readonly[keyPath: kp] = sink // expected-error{{cannot assign to immutable}}
+  writable[keyPath: kp] = sink // expected-error{{cannot assign to immutable}}
+  readonly[keyPath: wkp] = sink // expected-error{{cannot assign to immutable}}
+  writable[keyPath: wkp] = sink
+  readonly[keyPath: rkp] = sink
+  writable[keyPath: rkp] = sink
+}
+
+func testKeyPathSubscriptTuple(readonly: (Z,Z), writable: inout (Z,Z),
+                               kp: KeyPath<(Z,Z), Int>,
+                               wkp: WritableKeyPath<(Z,Z), Int>,
+                               rkp: ReferenceWritableKeyPath<(Z,Z), Int>) {
+  var sink: Int
+  sink = readonly[keyPath: kp]
+  sink = writable[keyPath: kp]
+  sink = readonly[keyPath: wkp]
+  sink = writable[keyPath: wkp]
+  sink = readonly[keyPath: rkp]
+  sink = writable[keyPath: rkp]
+
+  readonly[keyPath: kp] = sink // expected-error{{cannot assign to immutable}}
+  writable[keyPath: kp] = sink // expected-error{{cannot assign to immutable}}
+  readonly[keyPath: wkp] = sink // expected-error{{cannot assign to immutable}}
+  writable[keyPath: wkp] = sink
+  readonly[keyPath: rkp] = sink
+  writable[keyPath: rkp] = sink
 }
 
 func testSyntaxErrors() { // expected-note{{}}

@@ -1185,6 +1185,13 @@ RC<SyntaxData> LegacyASTTransformer::visitConditionalCheckedCastExpr(
   return getUnknownExpr(E);
 }
 
+RC<SyntaxData> LegacyASTTransformer::visitKeyPathApplicationExpr(
+    KeyPathApplicationExpr *E,
+    const SyntaxData *Parent,
+    const CursorIndex IndexInParent) {
+  return getUnknownExpr(E);
+}
+
 RC<SyntaxData>
 LegacyASTTransformer::visitIsExpr(IsExpr *E,
                                   const SyntaxData *Parent,

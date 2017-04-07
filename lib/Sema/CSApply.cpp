@@ -1241,6 +1241,43 @@ namespace {
       }
 
       auto choice = selected->choice;
+      
+      // Apply a key path if we have one.
+      if (choice.getKind() == OverloadChoiceKind::KeyPathApplication) {
+        // The index argument should be (keyPath: KeyPath<Root, Value>).
+        auto keyPathTy = index->getType()->castTo<TupleType>()
+          ->getElementType(0)->castTo<BoundGenericType>();
+        auto valueTy = keyPathTy->getGenericArgs()[1];
+        
+        // The result may be an lvalue based on the base and key path kind.
+        bool resultIsLValue;
+        if (keyPathTy->getDecl() == cs.getASTContext().getKeyPathDecl()) {
+          resultIsLValue = false;
+          base = cs.coerceToRValue(base);
+        } else if (keyPathTy->getDecl() ==
+                     cs.getASTContext().getWritableKeyPathDecl()) {
+          resultIsLValue = base->getType()->isLValueType();
+        } else if (keyPathTy->getDecl() ==
+                   cs.getASTContext().getReferenceWritableKeyPathDecl()) {
+          resultIsLValue = true;
+          base = cs.coerceToRValue(base);
+        } else {
+          llvm_unreachable("unknown key path class!");
+        }
+        if (resultIsLValue)
+          valueTy = LValueType::get(valueTy);
+        
+        // Dig the key path expression out of the argument tuple.
+        auto indexKP = cast<TupleExpr>(index)->getElement(0);
+        
+        auto keyPathAp = new (cs.getASTContext())
+           KeyPathApplicationExpr(base, index->getStartLoc(), indexKP,
+                                  index->getEndLoc(), valueTy,
+                                  base->isImplicit() && index->isImplicit());
+        cs.setType(keyPathAp, valueTy);
+        return keyPathAp;
+      }
+      
       auto subscript = cast<SubscriptDecl>(choice.getDecl());
 
       auto &tc = cs.getTypeChecker();
@@ -2594,10 +2631,11 @@ namespace {
       }
 
       case OverloadChoiceKind::BaseType: {
-        // FIXME: Losing ".0" sugar here.
         return base;
       }
 
+      case OverloadChoiceKind::KeyPathApplication:
+        llvm_unreachable("should only happen in a subscript");
       case OverloadChoiceKind::TypeDecl:
         llvm_unreachable("Nonsensical overload choice");
       }
@@ -3568,6 +3606,10 @@ namespace {
     }
     
     Expr *visitMakeTemporarilyEscapableExpr(MakeTemporarilyEscapableExpr *expr){
+      llvm_unreachable("Already type-checked");
+    }
+
+    Expr *visitKeyPathApplicationExpr(KeyPathApplicationExpr *expr){
       llvm_unreachable("Already type-checked");
     }
     
@@ -7080,7 +7122,6 @@ Expr *ConstraintSystem::coerceToRValue(Expr *expr) {
   return expr;
 }
 
-
 /// Emit the fixes computed as part of the solution, returning true if we were
 /// able to emit an error message, or false if none of the fixits worked out.
 bool ConstraintSystem::applySolutionFixes(Expr *E, const Solution &solution) {
@@ -7090,9 +7131,6 @@ bool ConstraintSystem::applySolutionFixes(Expr *E, const Solution &solution) {
 
   return diagnosed;
 }
-
-
-
 
 /// \brief Apply the specified Fix # to this solution, producing a fixit hint
 /// diagnostic for it and returning true.  If the fixit hint turned out to be
