@@ -270,9 +270,18 @@ public:
 private:
   /// \brief Add a new superclass requirement specifying that the given
   /// potential archetype has the given type as an ancestor.
-  bool addSuperclassRequirement(PotentialArchetype *T,
-                                Type Superclass,
-                                const RequirementSource *Source);
+  bool addSuperclassRequirementDirect(PotentialArchetype *T,
+                                      Type Superclass,
+                                      const RequirementSource *Source);
+
+  /// \brief Add a new type requirement specifying that the given
+  /// type conforms-to or is a superclass of the second type.
+  bool addTypeRequirement(UnresolvedType subject,
+                          UnresolvedType constraint,
+                          FloatingRequirementSource source,
+                          Type dependentType,
+                          llvm::SmallPtrSetImpl<ProtocolDecl *> *visited
+                            = nullptr);
 
   /// \brief Add a new conformance requirement specifying that the given
   /// potential archetypes are equivalent.
