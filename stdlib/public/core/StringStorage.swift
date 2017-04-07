@@ -36,7 +36,7 @@ public class _StringStorageBase<
   FactoryInitializable  
 {
   @nonobjc
-  final public var _header: _SwiftUTF16StringHeader
+  final public var _header: Header
   
   @objc
   final public func length() -> Int {
@@ -378,10 +378,10 @@ extension _Latin1StringStorage : UnicodeStorage {
 
   @nonobjc
   public var isKnownASCII: Bool {
-    get { return _header.flags & 1<<0 as UInt16 != 0 }
+    get { return _header.flags & (1 as UInt8)<<0 != 0 }
     set {
-      if newValue { _header.flags |= 1<<0 as UInt16 }
-      else { _header.flags &= ~(1<<0) }
+      if newValue { _header.flags |= (1 as UInt8)<<0 }
+      else { _header.flags &= ~((1 as UInt8)<<0) }
     }
   }
 }
