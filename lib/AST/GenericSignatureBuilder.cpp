@@ -2787,21 +2787,22 @@ bool GenericSignatureBuilder::addSameTypeRequirement(
                                        toRequirementRHS(paOrT2), source);
   }
 
-  return addSameTypeRequirement(*resolved1, *resolved2, source,
-                                diagnoseMismatch);
+  return addSameTypeRequirementDirect(*resolved1, *resolved2, source,
+                                      diagnoseMismatch);
 }
 
-bool GenericSignatureBuilder::addSameTypeRequirement(ResolvedType paOrT1,
-                                                     ResolvedType paOrT2,
-                                                     FloatingRequirementSource source) {
-  return addSameTypeRequirement(paOrT1, paOrT2, source,
-                                [&](Type type1, Type type2) {
+bool GenericSignatureBuilder::addSameTypeRequirementDirect(
+                                           ResolvedType paOrT1,
+                                           ResolvedType paOrT2,
+                                           FloatingRequirementSource source) {
+  return addSameTypeRequirementDirect(paOrT1, paOrT2, source,
+                                      [&](Type type1, Type type2) {
     Diags.diagnose(source.getLoc(), diag::requires_same_concrete_type,
                    type1, type2);
   });
 }
 
-bool GenericSignatureBuilder::addSameTypeRequirement(
+bool GenericSignatureBuilder::addSameTypeRequirementDirect(
     ResolvedType paOrT1, ResolvedType paOrT2, FloatingRequirementSource source,
     llvm::function_ref<void(Type, Type)> diagnoseMismatch) {
   auto pa1 = paOrT1.getPotentialArchetype();

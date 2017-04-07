@@ -232,7 +232,8 @@ public:
   /// called with the two types that don't match (\c Bar<T> and \c Baz for the
   /// previous example).
   bool
-  addSameTypeRequirement(ResolvedType paOrT1, ResolvedType paOrT2,
+  addSameTypeRequirementDirect(
+                         ResolvedType paOrT1, ResolvedType paOrT2,
                          FloatingRequirementSource Source,
                          llvm::function_ref<void(Type, Type)> diagnoseMismatch);
 
@@ -240,8 +241,8 @@ public:
   /// (output of GenericSignatureBuilder::resolve).
   ///
   /// The two types must not be incompatible concrete types.
-  bool addSameTypeRequirement(ResolvedType paOrT1, ResolvedType paOrT2,
-                              FloatingRequirementSource Source);
+  bool addSameTypeRequirementDirect(ResolvedType paOrT1, ResolvedType paOrT2,
+                                    FloatingRequirementSource Source);
 
   /// \brief Add a new same-type requirement between two unresolved types.
   ///
