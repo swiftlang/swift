@@ -30,8 +30,6 @@ DebugTypeInfo::DebugTypeInfo(DeclContext *DC, GenericEnvironment *GE,
                              Alignment align)
     : DeclCtx(DC), GenericEnv(GE), Type(Ty.getPointer()),
       StorageType(StorageTy), size(size), align(align) {
-  assert((!isArchetype() || (isArchetype() && DC)) &&
-         "archetype without a declcontext");
   assert(StorageType && "StorageType is a nullptr");
   assert(align.getValue() != 0);
 }
