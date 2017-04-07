@@ -4823,6 +4823,37 @@ static bool isReferenceToMetatypeMember(ConstraintSystem &cs, Expr *expr) {
   return false;
 }
 
+static unsigned computeCallLevel(
+    ConstraintSystem &cs, ConcreteDeclRef callee,
+    llvm::PointerUnion<ApplyExpr *, ExprRewriter::LevelTy> applyOrLevel) {
+  using LevelTy = ExprRewriter::LevelTy;
+
+  unsigned level = 0;
+  if (applyOrLevel.is<LevelTy>()) {
+    // Level specified by caller.
+    level = applyOrLevel.get<LevelTy>();
+  } else if (callee) {
+    // Determine the level based on the application itself.
+    auto apply = applyOrLevel.get<ApplyExpr *>();
+
+    // Only calls to members of types can have level > 0.
+    auto calleeDecl = callee.getDecl();
+    if (calleeDecl->getDeclContext()->isTypeContext()) {
+      // Level 1 if we're not applying "self".
+      if (auto call = dyn_cast<CallExpr>(apply)) {
+        if (!calleeDecl->isInstanceMember() ||
+            !isReferenceToMetatypeMember(cs, call->getDirectCallee()))
+          level = 1;
+      } else if (isa<PrefixUnaryExpr>(apply) || isa<PostfixUnaryExpr>(apply) ||
+                 isa<BinaryExpr>(apply)) {
+        level = 1;
+      }
+    }
+  }
+
+  return level;
+}
+
 Expr *ExprRewriter::coerceCallArguments(
     Expr *arg, Type paramType,
     llvm::PointerUnion<ApplyExpr *, LevelTy> applyOrLevel,
@@ -4870,29 +4901,7 @@ Expr *ExprRewriter::coerceCallArguments(
     findCalleeDeclRef(cs, solution, cs.getConstraintLocator(locator));
 
   // Determine the level,
-  unsigned level = 0;
-  if (applyOrLevel.is<LevelTy>()) {
-    // Level specified by caller.
-    level = applyOrLevel.get<LevelTy>();
-  } else if (callee) {
-    // Determine the level based on the application itself.
-    auto apply = applyOrLevel.get<ApplyExpr *>();
-
-    // Only calls to members of types can have level > 0.
-    auto calleeDecl = callee.getDecl();
-    if (calleeDecl->getDeclContext()->isTypeContext()) {
-      // Level 1 if we're not applying "self".
-      if (auto call = dyn_cast<CallExpr>(apply)) {
-        if (!calleeDecl->isInstanceMember() ||
-            !isReferenceToMetatypeMember(cs, call->getDirectCallee()))
-          level = 1;
-      } else if (isa<PrefixUnaryExpr>(apply) ||
-                 isa<PostfixUnaryExpr>(apply) ||
-                 isa<BinaryExpr>(apply)) {
-        level = 1;
-      }
-    }
-  }
+  unsigned level = computeCallLevel(cs, callee, applyOrLevel);
 
   // Determine the parameter bindings.
   auto params = decomposeParamType(paramType, callee.getDecl(), level);
