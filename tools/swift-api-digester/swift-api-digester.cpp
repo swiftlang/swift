@@ -1673,10 +1673,10 @@ class RemovedAddedNodeMatcher : public NodeMatcher, public MatchedNodeListener {
       auto LastPartOfA = getLastPartOfUsr(VC);
         if (LastPartOfA && LastPartOfR.getValue() == LastPartOfA.getValue()) {
           R->annotate(NodeAnnotation::ModernizeEnum);
-          llvm::Twine FullName = llvm::Twine().concat(A->getName()).concat(".").
-            concat(Child->getName());
+          std::string FullName = (llvm::Twine(A->getName()) + "." +
+            Child->getName()).str();
           R->addAnnotateComment(NodeAnnotation::ModernizeEnum,
-                                R->getSDKContext().buffer(FullName.str()));
+                                R->getSDKContext().buffer(FullName));
           foundMatch(R, A);
           return true;
         }

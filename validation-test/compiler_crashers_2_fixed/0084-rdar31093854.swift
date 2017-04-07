@@ -1,4 +1,4 @@
-// RUN: not --crash %target-swift-frontend -swift-version 4 %s -typecheck -o /dev/null
+// RUN: not %target-swift-frontend -swift-version 4 %s -typecheck -o /dev/null
 
 // This should actually type check successfully.
 

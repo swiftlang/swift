@@ -14,8 +14,11 @@
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SIL/SILVisitor.h"
+#include "llvm/ADT/Statistic.h"
 
 using namespace swift;
+
+STATISTIC(NumInstsEliminated, "Number of instructions eliminated");
 
 namespace {
 
@@ -47,6 +50,7 @@ bool GuaranteedARCOptsVisitor::visitDestroyAddrInst(DestroyAddrInst *DAI) {
       if (CA->getSrc() == Operand && !CA->isTakeOfSrc()) {
         CA->setIsTakeOfSrc(IsTake);
         DAI->eraseFromParent();
+        NumInstsEliminated += 2;
         return true;
       }
     }
@@ -107,6 +111,7 @@ bool GuaranteedARCOptsVisitor::visitStrongReleaseInst(StrongReleaseInst *SRI) {
   // Release on a functionref is a noop.
   if (isa<FunctionRefInst>(Operand)) {
     SRI->eraseFromParent();
+    ++NumInstsEliminated;
     return true;
   }
 
@@ -121,6 +126,7 @@ bool GuaranteedARCOptsVisitor::visitStrongReleaseInst(StrongReleaseInst *SRI) {
       if (SRA->getOperand() == Operand) {
         SRA->eraseFromParent();
         SRI->eraseFromParent();
+        NumInstsEliminated += 2;
         return true;
       }
       // Skip past unrelated retains.
@@ -148,6 +154,7 @@ bool GuaranteedARCOptsVisitor::visitDestroyValueInst(DestroyValueInst *DVI) {
         CVI->replaceAllUsesWith(CVI->getOperand());
         CVI->eraseFromParent();
         DVI->eraseFromParent();
+        NumInstsEliminated += 2;
         return true;
       }
       // Skip past unrelated retains.
@@ -174,6 +181,7 @@ bool GuaranteedARCOptsVisitor::visitReleaseValueInst(ReleaseValueInst *RVI) {
       if (SRA->getOperand() == Operand) {
         SRA->eraseFromParent();
         RVI->eraseFromParent();
+        NumInstsEliminated += 2;
         return true;
       }
       // Skip past unrelated retains.

@@ -13,6 +13,8 @@
 #ifndef SWIFT_SIL_PRINTCONTEXT_H
 #define SWIFT_SIL_PRINTCONTEXT_H
 
+#include "swift/SIL/SILDebugScope.h"
+#include "swift/SIL/SILValue.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/Support/raw_ostream.h"
 
@@ -21,10 +23,42 @@ namespace swift {
 class SILDebugScope;
 class SILInstruction;
 class SILFunction;
+class SILBasicBlock;
 
 /// Used as context for the SIL print functions.
 class SILPrintContext {
+public:
+  struct ID {
+    enum ID_Kind { SILBasicBlock, SILUndef, SSAValue } Kind;
+    unsigned Number;
+
+    // A stable ordering of ID objects.
+    bool operator<(ID Other) const {
+      if (unsigned(Kind) < unsigned(Other.Kind))
+        return true;
+      if (Number < Other.Number)
+        return true;
+      return false;
+    }
+
+    void print(raw_ostream &OS);
+  };
+
 protected:
+  // Cache block and value identifiers for this function. This is useful in
+  // general for identifying entities, not just emitting textual SIL.
+  //
+  // TODO: It would be more discplined for the caller to provide a function
+  // context. That way it would be impossible for IDs to change meaning within
+  // the caller's scope.
+  struct SILPrintFunctionContext {
+    const SILFunction *F = nullptr;
+    llvm::DenseMap<const SILBasicBlock *, unsigned> BlocksToIDMap;
+    llvm::DenseMap<const ValueBase *, unsigned> ValueToIDMap;
+  };
+
+  SILPrintFunctionContext FuncCtx;
+
   llvm::raw_ostream &OutStream;
 
   llvm::DenseMap<const SILDebugScope *, unsigned> ScopeToIDMap;
@@ -42,6 +76,11 @@ public:
 
   virtual ~SILPrintContext();
 
+  SILPrintFunctionContext &getFuncContext(const SILFunction *F);
+
+  // Initialized block IDs from the order provided in `blocks`.
+  void initBlockIDs(ArrayRef<const SILBasicBlock *> Blocks);
+
   /// Returns the output stream for printing.
   llvm::raw_ostream &OS() const { return OutStream; }
 
@@ -50,6 +89,10 @@ public:
   
   /// Returns true if verbose SIL should be printed.
   bool printVerbose() const { return Verbose; }
+
+  SILPrintContext::ID getID(const SILBasicBlock *Block);
+
+  SILPrintContext::ID getID(SILValue V);
 
   /// Returns true if the \p Scope has and ID assigned.
   bool hasScopeID(const SILDebugScope *Scope) const {
@@ -73,6 +116,8 @@ public:
   /// is written.
   virtual void printInstructionCallBack(const SILInstruction *I);
 };
+
+raw_ostream &operator<<(raw_ostream &OS, SILPrintContext::ID i);
 
 } // end namespace swift
 

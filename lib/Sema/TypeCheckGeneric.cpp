@@ -158,7 +158,20 @@ Type ProtocolRequirementTypeResolver::resolveTypeOfDecl(TypeDecl *decl) {
 }
 
 bool ProtocolRequirementTypeResolver::areSameType(Type type1, Type type2) {
-  return type1->isEqual(type2);
+  if (type1->isEqual(type2))
+    return true;
+
+  // If both refer to associated types with the same name, they'll implicitly
+  // be considered equivalent.
+  auto depMem1 = type1->getAs<DependentMemberType>();
+  if (!depMem1) return false;
+
+  auto depMem2 = type2->getAs<DependentMemberType>();
+  if (!depMem2) return false;
+
+  if (depMem1->getName() != depMem2->getName()) return false;
+
+  return areSameType(depMem1->getBase(), depMem2->getBase());
 }
 
 void ProtocolRequirementTypeResolver::recordParamType(ParamDecl *decl,
@@ -354,16 +367,15 @@ bool TypeChecker::validateRequirement(SourceLoc whereLoc, RequirementRepr &req,
     // Validate the types.
     if (validateType(req.getSubjectLoc(), lookupDC, options, resolver)) {
       req.setInvalid();
-      return true;
     }
 
     if (validateType(req.getConstraintLoc(), lookupDC, options, resolver)) {
       req.setInvalid();
-      return true;
     }
 
     // FIXME: Feels too early to perform this check.
-    if (!req.getConstraint()->isExistentialType() &&
+    if (!req.isInvalid() &&
+        !req.getConstraint()->isExistentialType() &&
         !req.getConstraint()->getClassOrBoundGenericClass()) {
       diagnose(whereLoc, diag::requires_conformance_nonprotocol,
                req.getSubjectLoc(), req.getConstraintLoc());
@@ -371,34 +383,32 @@ bool TypeChecker::validateRequirement(SourceLoc whereLoc, RequirementRepr &req,
       req.setInvalid();
       return true;
     }
-    return false;
+
+    return req.isInvalid();
   }
 
   case RequirementReprKind::LayoutConstraint: {
     // Validate the types.
     if (validateType(req.getSubjectLoc(), lookupDC, options, resolver)) {
       req.setInvalid();
-      return true;
     }
 
     if (req.getLayoutConstraintLoc().isNull()) {
       req.setInvalid();
-      return true;
     }
-    return false;
+    return req.isInvalid();
   }
 
   case RequirementReprKind::SameType: {
     if (validateType(req.getFirstTypeLoc(), lookupDC, options, resolver)) {
       req.setInvalid();
-      return true;
     }
 
     if (validateType(req.getSecondTypeLoc(), lookupDC, options, resolver)) {
       req.setInvalid();
-      return true;
     }
-    return false;
+
+    return req.isInvalid();
   }
   }
 
@@ -616,33 +626,129 @@ static void checkReferencedGenericParams(GenericContext *dc,
 
   auto *decl = cast<ValueDecl>(dc->getInnermostDeclarationDeclContext());
 
-  // Collect all generic params referenced in parameter types,
-  // return type or requirements.
-  SmallPtrSet<GenericTypeParamDecl *, 4> referencedGenericParams;
+  // A helper class to collect referenced generic type parameters
+  // and dependent memebr types.
+  class ReferencedGenericTypeWalker : public TypeWalker {
+    SmallPtrSet<CanType, 4> ReferencedGenericParams;
 
-  auto visitorFn = [&referencedGenericParams](Type t) {
-    if (auto *paramTy = t->getAs<GenericTypeParamType>())
-      referencedGenericParams.insert(paramTy->getDecl());
+  public:
+    ReferencedGenericTypeWalker() {}
+    Action walkToTypePre(Type ty) override {
+      // Find generic parameters or dependent member types.
+      // Once such a type is found, don't recurse into its children.
+      if (!ty->hasTypeParameter())
+        return Action::SkipChildren;
+      if (ty->isTypeParameter()) {
+        ReferencedGenericParams.insert(ty->getCanonicalType());
+        return Action::SkipChildren;
+      }
+      return Action::Continue;
+    }
+
+    SmallPtrSet<CanType, 4> &getReferencedGenericParams() {
+      return ReferencedGenericParams;
+    }
   };
 
+  // Collect all generic params referenced in parameter types and
+  // return type.
+  ReferencedGenericTypeWalker paramsAndResultWalker;
   auto *funcTy = decl->getInterfaceType()->castTo<GenericFunctionType>();
-  funcTy->getInput().visit(visitorFn);
-  funcTy->getResult().visit(visitorFn);
+  funcTy->getInput().walk(paramsAndResultWalker);
+  funcTy->getResult().walk(paramsAndResultWalker);
 
-  auto requirements = sig->getRequirements();
-  for (auto req : requirements) {
+  // Set of generic params referenced in parameter types,
+  // return type or requirements.
+  auto &referencedGenericParams =
+      paramsAndResultWalker.getReferencedGenericParams();
+
+  // Check if at least one of the generic params in the requirment refers
+  // to an already referenced generic parameter. If this is the case,
+  // then the other type is also considered as referenced, because
+  // it is used to put requirements on the first type.
+  auto reqTypesVisitor = [&referencedGenericParams](Requirement req) -> bool {
+    Type first;
+    Type second;
+
     switch (req.getKind()) {
-      case RequirementKind::SameType:
-      case RequirementKind::Superclass:
-        req.getSecondType().visit(visitorFn);
-        LLVM_FALLTHROUGH;
+    case RequirementKind::Superclass:
+    case RequirementKind::SameType:
+      second = req.getSecondType();
+      LLVM_FALLTHROUGH;
 
-      case RequirementKind::Conformance:
-      case RequirementKind::Layout:
-        req.getFirstType().visit(visitorFn);
+    case RequirementKind::Conformance:
+    case RequirementKind::Layout:
+      first = req.getFirstType();
+      break;
+    }
+
+    // Collect generic parameter types refereced by types used in a requirement.
+    ReferencedGenericTypeWalker walker;
+    if (first && first->hasTypeParameter())
+      first.walk(walker);
+    if (second && second->hasTypeParameter())
+      second.walk(walker);
+    auto &genericParamsUsedByRequirementTypes =
+        walker.getReferencedGenericParams();
+
+    // If at least one of the collected generic types or a root generic
+    // parameter of dependent member types is known to be referenced by
+    // parameter types, return types or other types known to be "referenced",
+    // then all the types used in the requirement are considered to be
+    // referenced, because they are used to defined something that is known
+    // to be referenced.
+    bool foundNewReferencedGenericParam = false;
+    if (std::any_of(genericParamsUsedByRequirementTypes.begin(),
+                    genericParamsUsedByRequirementTypes.end(),
+                    [&referencedGenericParams](CanType t) {
+                      assert(t->isTypeParameter());
+                      return referencedGenericParams.find(
+                                 t->getRootGenericParam()
+                                     ->getCanonicalType()) !=
+                             referencedGenericParams.end();
+                    })) {
+      std::for_each(genericParamsUsedByRequirementTypes.begin(),
+                    genericParamsUsedByRequirementTypes.end(),
+                    [&referencedGenericParams,
+                     &foundNewReferencedGenericParam](CanType t) {
+                      // Add only generic type parameters, but ignore any
+                      // dependent member types, because requirement
+                      // on a dependent member type does not provide enough
+                      // information to infer the base generic type
+                      // parameter.
+                      if (!t->is<GenericTypeParamType>())
+                        return;
+                      if (referencedGenericParams.insert(t).second)
+                        foundNewReferencedGenericParam = true;
+                    });
+    }
+    return foundNewReferencedGenericParam;
+  };
+
+  ArrayRef<Requirement> requirements;
+
+  auto FindReferencedGenericParamsInRequirements = [&requirements, sig, &reqTypesVisitor] {
+    requirements = sig->getRequirements();
+    // Try to find new referenced generic parameter types in requirements until
+    // we reach a fix point. We need to iterate until a fix point, because we
+    // may have e.g. chains of same-type requirements like:
+    // not-yet-referenced-T1 == not-yet-referenced-T2.DepType2,
+    // not-yet-referenced-T2 == not-yet-referenced-T3.DepType3,
+    // not-yet-referenced-T3 == referenced-T4.DepType4.
+    // When we process the first of these requirements, we don't know yet that
+    // T2
+    // will be referenced, because T3 will be referenced,
+    // because T3 == T4.DepType4.
+    while (true) {
+      bool foundNewReferencedGenericParam = false;
+      for (auto req : requirements) {
+        if (reqTypesVisitor(req))
+          foundNewReferencedGenericParam = true;
+      }
+      if (!foundNewReferencedGenericParam)
         break;
     }
-  }
+  };
 
   // Find the depth of the function's own generic parameters.
   unsigned fnGenericParamsDepth = genericParams->getDepth();
@@ -653,7 +759,18 @@ static void checkReferencedGenericParams(GenericContext *dc,
     auto *paramDecl = genParam->getDecl();
     if (paramDecl->getDepth() != fnGenericParamsDepth)
       continue;
-    if (!referencedGenericParams.count(paramDecl)) {
+    if (!referencedGenericParams.count(genParam->getCanonicalType())) {
+      // Lazily search for generic params that are indirectly used in the
+      // function signature. Do it only if there is a generic parameter
+      // that is not known to be referenced yet.
+      if (requirements.empty()) {
+        FindReferencedGenericParamsInRequirements();
+        // Nothing to do if this generic parameter is considered to be
+        // referenced after analyzing the requirements from the generic
+        // signature.
+        if (referencedGenericParams.count(genParam->getCanonicalType()))
+          continue;
+      }
       // Produce an error that this generic parameter cannot be bound.
       TC.diagnose(paramDecl->getLoc(), diag::unreferenced_generic_parameter,
                   paramDecl->getNameStr());

@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -emit-sil -O %s | %FileCheck %s
+// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -emit-sil -O -Xllvm -sil-fso-enable-generics=false %s | %FileCheck %s
 
 sil_stage raw
 
@@ -20,7 +20,7 @@ entry(%b : $<τ_0_0> { var τ_0_0 } <Int>):
   return %v : $Int
 }
 
-// CHECK-LABEL: sil @call_promotable_box_from_generic
+// CHECK-LABEL: sil {{.*}}@call_promotable_box_from_generic
 // CHECK:         [[F:%.*]] = function_ref @_T014promotable_boxTf2i_n
 // CHECK:         partial_apply [[F]](
 

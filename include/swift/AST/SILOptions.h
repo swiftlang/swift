@@ -19,6 +19,7 @@
 #define SWIFT_AST_SILOPTIONS_H
 
 #include "swift/Basic/Sanitizers.h"
+#include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/StringRef.h"
 #include <string>
 #include <climits>
@@ -145,8 +146,16 @@ public:
   /// Emit checks to trap at run time when the law of exclusivity is violated.
   bool EnforceExclusivityDynamic = false;
 
+  /// Enable the mandatory semantic arc optimizer.
+  bool EnableMandatorySemanticARCOpts = false;
+
   SILOptions() : Sanitize(SanitizerKind::None) {}
 
+  /// Return a hash code of any components from these options that should
+  /// contribute to a Swift Bridging PCH hash.
+  llvm::hash_code getPCHHashComponents() const {
+    return llvm::hash_value(0);
+  }
 };
 
 } // end namespace swift

@@ -2016,8 +2016,7 @@ struct ASTNodeBase {};
 
           // Make sure that the replacement type only uses archetypes allowed
           // in the context where the normal conformance exists.
-          auto replacementType
-            = normal->getTypeWitness(assocType, nullptr).getReplacement();
+          auto replacementType = normal->getTypeWitness(assocType, nullptr);
           Verifier(M, normal->getDeclContext())
             .verifyChecked(replacementType);
           continue;

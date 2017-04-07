@@ -706,6 +706,11 @@ inline bool is_sorted_and_uniqued(const Container &C) {
   return is_sorted_and_uniqued(C.begin(), C.end());
 }
 
+template <typename Container, typename OutputIterator>
+inline void copy(const Container &C, OutputIterator iter) {
+  std::copy(C.begin(), C.end(), iter);
+}
+
 //===----------------------------------------------------------------------===//
 //                              Function Traits
 //===----------------------------------------------------------------------===//

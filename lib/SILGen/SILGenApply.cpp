@@ -645,8 +645,8 @@ private:
       // Be sure not to consume the cleanup for an inout argument.
       auto selfLV = ManagedValue::forLValue(address.getValue());
       selfValue = ArgumentSource(loc,
-                    LValue::forAddress(selfLV, AbstractionPattern(formalTy),
-                                       formalTy));
+                    LValue::forAddress(selfLV, None,
+                                       AbstractionPattern(formalTy), formalTy));
     } else {
       selfValue = ArgumentSource(loc, RValue(SGF, loc, formalTy, address));
     }
@@ -2500,7 +2500,7 @@ namespace {
             .getAsSingleValue(SGF, arg.getKnownRValueLocation());
           assert(address.isLValue());
           auto substObjectType = cast<InOutType>(substType).getObjectType();
-          return LValue::forAddress(address,
+          return LValue::forAddress(address, None,
                                     AbstractionPattern(substObjectType),
                                     substObjectType);
         } else {
@@ -4740,7 +4740,7 @@ ArgumentSource AccessorBaseArgPreparer::prepareAccessorAddressBaseArg() {
     // FIXME: this assumes that there's never meaningful reabstraction of self
     // arguments.
     return ArgumentSource(
-        loc, LValue::forAddress(base, AbstractionPattern(baseFormalType),
+        loc, LValue::forAddress(base, None, AbstractionPattern(baseFormalType),
                                 baseFormalType));
   }
 
@@ -4787,7 +4787,8 @@ ArgumentSource AccessorBaseArgPreparer::prepareAccessorObjectBaseArg() {
       // Drop the cleanup if we have one.
       auto baseLV = ManagedValue::forLValue(base.getValue());
       return ArgumentSource(
-          loc, LValue::forAddress(baseLV, AbstractionPattern(baseFormalType),
+          loc, LValue::forAddress(baseLV, None,
+                                  AbstractionPattern(baseFormalType),
                                   baseFormalType));
     }
   }

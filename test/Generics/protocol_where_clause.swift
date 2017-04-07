@@ -53,6 +53,7 @@ struct BadConcreteSameType: SameType { // expected-error{{'SameType' requires th
   typealias U = Float
 }
 
+// <rdar://problem/31041997> Some where-clause requirements aren't checked on conforming types
 protocol NestedConforms: SecondParent where U: Parent, U.T: Foo2 {}
 func needsNestedConforms<X: NestedConforms>(_: X.Type) {
   needsParent(X.U.self)

@@ -7,11 +7,8 @@ import filecmp
 import os
 import os.path
 import shutil
-import sys
 
-sys.path.append(os.path.join(os.path.dirname(__file__), 'swift_build_support'))
-
-from swift_build_support import shell  # noqa (E402)
+from swift_build_support.swift_build_support import shell
 
 
 def merge_file_lists(src_root_dirs, skip_files, skip_subpaths):

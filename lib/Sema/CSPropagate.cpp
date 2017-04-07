@@ -52,12 +52,9 @@ getBindOverloadDisjunction(ConstraintSystem &CS, Constraint *applicableFn) {
   }
 #endif
 
-  // Ensure that we're applying this binding in our applicable
-  // function constraint.
+  // Verify the disjunction consists of BindOverload constraints.
   assert(found->getNestedConstraints().front()->getKind() ==
          ConstraintKind::BindOverload);
-  assert(tyvar->isEqual(
-             found->getNestedConstraints().front()->getFirstType()));
 
   return found;
 }

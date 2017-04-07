@@ -433,7 +433,7 @@ public:
       else {
         if (!self.isLValue())
           self = ManagedValue::forLValue(self.getValue());
-        return LValue::forAddress(self, selfPattern, SubstSelfType);
+        return LValue::forAddress(self, None, selfPattern, SubstSelfType);
       }
     }
 

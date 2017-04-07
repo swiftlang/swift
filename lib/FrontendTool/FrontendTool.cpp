@@ -367,7 +367,8 @@ static bool performCompile(std::unique_ptr<CompilerInstance> &Instance,
     auto clangImporter = static_cast<ClangImporter *>(
       Instance->getASTContext().getClangModuleLoader());
     return clangImporter->emitBridgingPCH(
-      Invocation.getInputFilenames()[0], opts.getSingleOutputFilename());
+      Invocation.getInputFilenames()[0],
+      opts.getSingleOutputFilename());
   }
 
   IRGenOptions &IRGenOpts = Invocation.getIRGenOptions();

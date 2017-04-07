@@ -1082,7 +1082,7 @@ bool ValueLifetimeAnalysis::computeFrontier(Frontier &Fr, Mode mode) {
     bool LiveInSucc = false;
     bool DeadInSucc = false;
     for (const SILSuccessor &Succ : BB->getSuccessors()) {
-      if (LiveBlocks.count(Succ)) {
+      if (isAliveAtBeginOfBlock(Succ)) {
         LiveInSucc = true;
       } else {
         DeadInSucc = true;
@@ -1105,7 +1105,7 @@ bool ValueLifetimeAnalysis::computeFrontier(Frontier &Fr, Mode mode) {
       // The value is not live in some of the successor blocks.
       LiveOutBlocks.insert(BB);
       for (const SILSuccessor &Succ : BB->getSuccessors()) {
-        if (!LiveBlocks.count(Succ)) {
+        if (!isAliveAtBeginOfBlock(Succ)) {
           // It's an "exit" edge from the lifetime region.
           FrontierBlocks.insert(Succ);
         }
@@ -1167,7 +1167,7 @@ bool ValueLifetimeAnalysis::isWithinLifetime(SILInstruction *Inst) {
     // live at the end of BB and therefore Inst is definitely in the lifetime
     // region (Note that we don't check in upward direction against the value's
     // definition).
-    if (LiveBlocks.count(Succ))
+    if (isAliveAtBeginOfBlock(Succ))
       return true;
   }
   // The value is live in the block but not at the end of the block. Check if

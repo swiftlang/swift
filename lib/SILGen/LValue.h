@@ -343,6 +343,7 @@ public:
                          CanType substFormalType);
 
   static LValue forAddress(ManagedValue address,
+                           Optional<SILAccessEnforcement> enforcement,
                            AbstractionPattern origFormalType,
                            CanType substFormalType);
 
