@@ -191,6 +191,16 @@ private:
   GenericSignatureBuilder(const GenericSignatureBuilder &) = delete;
   GenericSignatureBuilder &operator=(const GenericSignatureBuilder &) = delete;
 
+  /// When a particular requirement cannot be resolved due to, e.g., a
+  /// currently-unresolvable or nested type, this routine should be
+  /// called to record the unresolved requirement to be reconsidered later.
+  ///
+  /// \returns false, which is used elsewhere to indicate "no failure".
+  bool recordUnresolvedRequirement(RequirementKind kind,
+                                   UnresolvedType lhs,
+                                   RequirementRHS rhs,
+                                   FloatingRequirementSource source);
+
   /// Retrieve the constraint source conformance for the superclass constraint
   /// of the given potential archetype (if present) to the given protocol.
   ///
@@ -547,9 +557,12 @@ public:
 
   /// \brief Resolve the given type as far as this Builder knows how.
   ///
-  /// This returns either a non-typealias potential archetype or a Type, if \c
-  /// type is concrete.
-  ResolvedType resolve(UnresolvedType type);
+  /// If successful, this returns either a non-typealias potential archetype
+  /// or a Type, if \c type is concrete.
+  /// If the type cannot be resolved, e.g., because it is "too" recursive
+  /// given the source, returns \c None.
+  Optional<ResolvedType> resolve(UnresolvedType type,
+                                 FloatingRequirementSource source);
 
   /// \brief Dump all of the requirements, both specified and inferred.
   LLVM_ATTRIBUTE_DEPRECATED(

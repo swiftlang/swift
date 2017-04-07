@@ -959,6 +959,15 @@ bool EquivalenceClass::isConformanceSatisfiedBySuperclass(
   return false;
 }
 
+bool GenericSignatureBuilder::recordUnresolvedRequirement(
+                                         RequirementKind kind,
+                                         UnresolvedType lhs,
+                                         RequirementRHS rhs,
+                                         FloatingRequirementSource source) {
+  // FIXME: Drop the requirement for now. Nothing depends on this.
+  return false;
+}
+
 const RequirementSource *GenericSignatureBuilder::resolveSuperConformance(
                       GenericSignatureBuilder::PotentialArchetype *pa,
                       ProtocolDecl *proto) {
@@ -1613,9 +1622,9 @@ PotentialArchetype *PotentialArchetype::updateNestedTypeForConformance(
         type = type.subst(subMap, SubstFlags::UseErrorType);
 
         builder.addSameTypeRequirement(
-                           ResolvedType::forNewTypeAlias(resultPA),
-                           builder.resolve(type),
-                           RequirementSource::forNestedTypeNameMatch(resultPA));
+                         UnresolvedType(resultPA),
+                         UnresolvedType(type),
+                         RequirementSource::forNestedTypeNameMatch(resultPA));
       }
     }
 
@@ -2019,10 +2028,12 @@ auto GenericSignatureBuilder::resolveArchetype(Type type) -> PotentialArchetype 
   return nullptr;
 }
 
-auto GenericSignatureBuilder::resolve(UnresolvedType paOrT)
-    -> ResolvedType {
+auto GenericSignatureBuilder::resolve(UnresolvedType paOrT,
+                                      FloatingRequirementSource source)
+    -> Optional<ResolvedType> {
   auto pa = paOrT.dyn_cast<PotentialArchetype *>();
   if (auto type = paOrT.dyn_cast<Type>()) {
+    // FIXME: Limit the resolution of the archetype based on the source.
     pa = resolveArchetype(type);
     if (!pa) {
       return ResolvedType::forConcreteType(type);
@@ -2547,19 +2558,47 @@ bool GenericSignatureBuilder::addSameTypeRequirementBetweenConcrete(
   return !matcher.match(type1, type2);
 }
 
+/// Map an unresolved type to a requirement right-hand-side.
+static GenericSignatureBuilder::RequirementRHS
+toRequirementRHS(GenericSignatureBuilder::UnresolvedType unresolved) {
+  if (auto pa = unresolved.dyn_cast<PotentialArchetype *>())
+    return pa;
+
+  return unresolved.dyn_cast<Type>();
+}
+
 bool GenericSignatureBuilder::addSameTypeRequirement(
                                              UnresolvedType paOrT1,
                                              UnresolvedType paOrT2,
                                              FloatingRequirementSource source) {
-  return addSameTypeRequirement(resolve(paOrT1), resolve(paOrT2), source);
+  return addSameTypeRequirement(paOrT1, paOrT2, source,
+                                [&](Type type1, Type type2) {
+      Diags.diagnose(source.getLoc(), diag::requires_same_concrete_type,
+                     type1, type2);
+    });
 }
+
 bool GenericSignatureBuilder::addSameTypeRequirement(
     UnresolvedType paOrT1, UnresolvedType paOrT2,
     FloatingRequirementSource source,
     llvm::function_ref<void(Type, Type)> diagnoseMismatch) {
-  return addSameTypeRequirement(resolve(paOrT1), resolve(paOrT2), source,
+
+  auto resolved1 = resolve(paOrT1, source);
+  if (!resolved1) {
+    return recordUnresolvedRequirement(RequirementKind::SameType, paOrT1,
+                                       toRequirementRHS(paOrT2), source);
+  }
+
+  auto resolved2 = resolve(paOrT2, source);
+  if (!resolved2) {
+    return recordUnresolvedRequirement(RequirementKind::SameType, paOrT1,
+                                       toRequirementRHS(paOrT2), source);
+  }
+
+  return addSameTypeRequirement(*resolved1, *resolved2, source,
                                 diagnoseMismatch);
 }
+
 bool GenericSignatureBuilder::addSameTypeRequirement(ResolvedType paOrT1,
                                                      ResolvedType paOrT2,
                                                      FloatingRequirementSource source) {
