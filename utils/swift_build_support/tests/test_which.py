@@ -11,7 +11,7 @@
 import os
 import unittest
 
-from swift_build_support.swift_build_support.which import which
+from swift_build_support.which import which
 
 
 class WhichTestCase(unittest.TestCase):
