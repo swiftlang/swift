@@ -88,7 +88,8 @@ Swift 4.0
 
     // 'where' becomes a superclass
     override func sleep(where: Bed) {}
-  }```
+  }
+  ```
 
 * [SE-0148][]:
 
