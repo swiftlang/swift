@@ -214,3 +214,8 @@ public func >= <T : Comparable>(lhs: T, rhs: T) -> Bool {
   return !(lhs < rhs)
 }
 
+@objc public enum ComparisonResult : Int {
+  case orderedAscending = -1
+  case orderedSame = 0
+  case orderedDescending = 1
+}
