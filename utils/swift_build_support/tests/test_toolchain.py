@@ -12,8 +12,8 @@
 import os
 import unittest
 
-from swift_build_support.swift_build_support import toolchain
-from swift_build_support.swift_build_support.toolchain import host_toolchain
+from swift_build_support import toolchain
+from swift_build_support.toolchain import host_toolchain
 
 
 def get_suffix(path, prefix):

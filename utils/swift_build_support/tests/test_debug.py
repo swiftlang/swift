@@ -17,7 +17,7 @@ except ImportError:
     # py3
     from io import StringIO
 
-from swift_build_support.swift_build_support import debug
+from swift_build_support import debug
 
 
 class PrintXcodebuildVersionsTestCase(unittest.TestCase):
