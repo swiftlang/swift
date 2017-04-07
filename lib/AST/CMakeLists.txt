@@ -30,6 +30,7 @@ add_swift_library(swiftAST STATIC
   LookupVisibleDecls.cpp
   Mangle.cpp
   Module.cpp
+  ModuleLoader.cpp
   ModuleNameLookup.cpp
   NameLookup.cpp
   Parameter.cpp
