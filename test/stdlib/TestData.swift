@@ -921,6 +921,36 @@ class TestData : TestDataSuper {
         expectEqual(d[4], 0x02)
         expectEqual(d[5], 0x02)
     }
+
+    func test_sliceAppending() {
+        // https://bugs.swift.org/browse/SR-4473
+        var fooData = Data()
+        let barData = Data([0, 1, 2, 3, 4, 5])
+        let slice = barData.suffix(from: 3)
+        fooData.append(slice)
+        expectEqual(fooData[0], 0x03)
+        expectEqual(fooData[1], 0x04)
+        expectEqual(fooData[2], 0x05)
+    }
+    
+    func test_replaceSubrange() {
+        // https://bugs.swift.org/browse/SR-4462
+        let data = Data(bytes: [0x01, 0x02])
+        var dataII = Data(base64Encoded: data.base64EncodedString())!
+        dataII.replaceSubrange(0..<1, with: Data())
+        expectEqual(dataII[0], 0x02)
+    }
+    
+    func test_sliceIteration() {
+        let base = Data([0, 1, 2, 3, 4, 5])
+        let slice = base[2..<4]
+        var found = [UInt8]()
+        for byte in slice {
+            found.append(byte)
+        }
+        expectEqual(found[0], 2)
+        expectEqual(found[1], 3)
+    }
 }
 
 #if !FOUNDATION_XCTEST
@@ -966,6 +996,9 @@ DataTests.test("test_AnyHashableCreatedFromNSData") { TestData().test_AnyHashabl
 DataTests.test("test_noCopyBehavior") { TestData().test_noCopyBehavior() }
 DataTests.test("test_doubleDeallocation") { TestData().test_doubleDeallocation() }
 DataTests.test("test_repeatingValueInitialization") { TestData().test_repeatingValueInitialization() }
+DataTests.test("test_sliceAppending") { TestData().test_sliceAppending() }
+DataTests.test("test_replaceSubrange") { TestData().test_replaceSubrange() }
+DataTests.test("test_sliceIteration") { TestData().test_sliceIteration() }
 
 // XCTest does not have a crash detection, whereas lit does
 DataTests.test("bounding failure subdata") {
