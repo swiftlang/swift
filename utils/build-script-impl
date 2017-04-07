@@ -174,7 +174,7 @@ KNOWN_SETTINGS=(
     native-swift-tools-path     ""               "directory that contains Swift tools that are executable on the build machine"
     compiler-vendor             "none"           "compiler vendor name [none,apple]"
     clang-user-visible-version  "4.0.0"          "user-visible version of the embedded Clang and LLVM compilers"
-    swift-user-visible-version  "3.1"            "user-visible version of the Swift language"
+    swift-user-visible-version  "4.0"            "user-visible version of the Swift language"
     swift-compiler-version      ""               "string that indicates a compiler version for Swift"
     clang-compiler-version      ""               "string that indicates a compiler version for Clang"
     embed-bitcode-section       "0"              "embed an LLVM bitcode section in stdlib/overlay binaries for supported platforms"
