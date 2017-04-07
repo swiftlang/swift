@@ -3171,6 +3171,20 @@ public func _assumeNonNegative(_ x: ${Self}) -> ${Self} {
 }
 % end
 
+extension ${Self} {
+
+%   for op in maskingShifts:
+
+      public static func ${op.nonMaskingOperator} <
+        T : ExpressibleByIntegerLiteral
+      >(lhs: T, rhs: ${Self}) -> ${Self} {
+        return lhs ${op.nonMaskingOperator} rhs
+      }
+
+%   end
+
+}
+
 
 //===--- end of FIXME(integers) -------------------------------------------===//
 
