@@ -775,18 +775,18 @@ extension String.Content {
     }
   }
   
-  internal var _storageID: Unmanaged<AnyObject>? {
+  internal var _storageID: ObjectIdentifier? {
     switch _rep {
     case .utf16(let storage):
-      return Unmanaged.passUnretained(storage)
+      return ObjectIdentifier(storage)
     case .latin1(let storage):
-      return Unmanaged.passUnretained(storage)
+      return ObjectIdentifier(storage)
     case .any(let storage):
-      return Unmanaged.passUnretained(storage)
+      return ObjectIdentifier(storage)
     case .cocoa(let storage):
       // FIXME: don't we want to return nil in the cocoa case, since this is
       // merely used for uniqueness checking and NSString is immutable?
-      return Unmanaged.passUnretained(storage.object)
+      return ObjectIdentifier(storage.object)
     case .inline5or6, .inline7or16:
       return nil
     }
@@ -851,13 +851,8 @@ extension String.Content {
   
   internal var isMutable: Bool {
     mutating get {
-      guard var id = _storageID else { return true }
       defer { _fixLifetime(self) }
-      return withUnsafeMutablePointer(to: &id) {
-        let p = UnsafeMutableRawPointer($0)
-          .assumingMemoryBound(to: AnyObject.self)
-        return _isUnique(&p.pointee)
-      }
+      return _storageID?._liveObjectIsUniquelyReferenced() ?? true
     }
   }
   
