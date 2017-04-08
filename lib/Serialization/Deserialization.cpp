@@ -344,6 +344,17 @@ static bool skipRecord(llvm::BitstreamCursor &cursor, unsigned recordKind) {
 void ModuleFile::fatal(llvm::Error error) {
   if (FileContext) {
     getContext().Diags.diagnose(SourceLoc(), diag::serialization_fatal, Name);
+
+    if (!CompatibilityVersion.empty()) {
+      SmallString<16> buffer;
+      llvm::raw_svector_ostream out(buffer);
+      out << getContext().LangOpts.EffectiveLanguageVersion;
+      if (out.str() != CompatibilityVersion) {
+        getContext().Diags.diagnose(
+            SourceLoc(), diag::serialization_compatibility_version_mismatch,
+            out.str(), Name, CompatibilityVersion);
+      }
+    }
   }
 
   logAllUnhandledErrors(std::move(error), llvm::errs(),
