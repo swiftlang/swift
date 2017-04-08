@@ -1214,10 +1214,12 @@ ConstraintSystem::getTypeOfMemberReference(
     type = openedFnType->replaceSelfParameterType(baseObjTy);
   }
 
-  // When accessing members of an existential, replace the 'Self' type
-  // parameter with the existential type, since formally the access will
-  // operate on existentials and not type parameters.
-  if (!isDynamicResult && baseObjTy->isExistentialType()) {
+  // When accessing protocol members with an existential base, replace
+  // the 'Self' type parameter with the existential type, since formally
+  // the access will operate on existentials and not type parameters.
+  if (!isDynamicResult &&
+      baseObjTy->isExistentialType() &&
+      outerDC->getAsProtocolOrProtocolExtensionContext()) {
     auto selfTy = replacements[
       cast<GenericTypeParamType>(outerDC->getSelfInterfaceType()
                                  ->getCanonicalType())];
@@ -1226,7 +1228,7 @@ ConstraintSystem::getTypeOfMemberReference(
         t = selfTy->getSelfType();
       if (t->is<TypeVariableType>())
         if (t->isEqual(selfTy))
-        return baseObjTy;
+          return baseObjTy;
       if (auto *metatypeTy = t->getAs<MetatypeType>())
         if (metatypeTy->getInstanceType()->isEqual(selfTy))
           return ExistentialMetatypeType::get(baseObjTy);
