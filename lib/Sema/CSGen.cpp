@@ -1353,7 +1353,7 @@ namespace {
       // and possibly infer the type of the variable that way.
       CS.getTypeChecker().validateDecl(E->getDecl());
       if (E->getDecl()->isInvalid()) {
-        E->setType(E->getDecl()->getInterfaceType());
+        CS.setType(E, E->getDecl()->getInterfaceType());
         return nullptr;
       }
 
