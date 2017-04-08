@@ -749,7 +749,7 @@ extension _UnicodeViews {
         __swift_stdlib_ubrk_following($0, k^)
       }
       return Index(
-        base: i.next, next: codeUnits.index(i.base, offsetBy: nextOffset^))
+        base: i.next, next: codeUnits.index(atOffset: nextOffset))
     }
 
     public func index(before i: Index) -> Index {
