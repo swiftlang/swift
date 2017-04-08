@@ -179,7 +179,7 @@ testCases = [
 
 % for testName, valueExpr, testFunc, conformsToError, conformsToHashable in testCases:
 BridgeAnything.test("${testName}") {
-  do {
+  autoreleasepool {
     let x = ${valueExpr}
     ${testFunc}(original: x, bridged: _bridgeAnythingToObjectiveC(x))
     ${testFunc}(original: x, bridged: _bridgeAnythingNonVerbatimToObjectiveC(x))
