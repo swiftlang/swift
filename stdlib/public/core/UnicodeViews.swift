@@ -468,16 +468,22 @@ extension _TranscodedView : UnicodeView {
   public subscript(bounds: Range<Index>) -> SubSequence {
     return SubSequence(base: self, bounds: bounds)
   }
+  
   public func nativeIndex(_ x: AnyUnicodeIndex) -> Index {
-    let outer = base._base.nativeIndex(x)
+    let outputScalars = base._base
+    let scalarPosition = outputScalars.nativeIndex(x)
+    
+    if _slowPath(scalarPosition == outputScalars.endIndex) {
+      return Index(scalarPosition, nil)
+    }
+    
+    let codeUnits = outputScalars[scalarPosition]
     if case .transcoded(_, let outputOffset, let encodingID) = x {
-      if encodingID == ToEncoding.EncodedScalar.self
-      && outer != base._base.endIndex { 
-        let inner = base._base[outer].index(atOffset: outputOffset)
-        return Index(outer, inner)
+      if encodingID == ToEncoding.EncodedScalar.self { 
+        return Index(scalarPosition, codeUnits.index(atOffset: outputOffset))
       }
     }
-    return Index(outer,nil)
+    return Index(scalarPosition, codeUnits.startIndex)
   }
   
   public func anyIndex(_ i: Index) -> AnyUnicodeIndex {
