@@ -79,6 +79,7 @@ set(SWIFT_BENCH_MODULES
     single-source/PolymorphicCalls
     single-source/PopFront
     single-source/PopFrontGeneric
+    single-source/Prefix
     single-source/Prims
     single-source/ProtocolDispatch
     single-source/ProtocolDispatch2

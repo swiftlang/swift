@@ -19,6 +19,7 @@ from __future__ import print_function
 import glob
 import os
 import re
+import subprocess
 
 import jinja2
 
@@ -38,6 +39,13 @@ template_env = jinja2.Environment(loader=template_loader, trim_blocks=True,
                                   lstrip_blocks=True)
 
 if __name__ == '__main__':
+    # Generate Your Boilerplate single-source
+    gyb_files = glob.glob(os.path.join(single_source_dir, '*.swift.gyb'))
+    gyb_script = os.path.realpath(os.path.join(perf_dir, '../utils/gyb'))
+    for f in gyb_files:
+        print(f[:-4])
+        subprocess.call([gyb_script, '--line-directive', '', '-o', f[:-4], f])
+
     # CMakeList single-source
     test_files = glob.glob(os.path.join(single_source_dir, '*.swift'))
     tests = sorted(os.path.basename(x).split('.')[0] for x in test_files)

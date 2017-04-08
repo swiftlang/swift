@@ -1,4 +1,4 @@
-//===--- DropLast.swift ---------------------------------------------------===//
+//===--- Suffix.swift ---------------------------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -19,152 +19,151 @@
 import TestsUtils
 
 let sequenceCount = 4096
-let prefixCount = 1024
-let dropCount = sequenceCount - prefixCount
+let prefixCount = sequenceCount - 1024
 let sumCount = prefixCount * (prefixCount - 1) / 2
 
 
 @inline(never)
-public func run_DropLastCountableRange(_ N: Int) {
+public func run_PrefixCountableRange(_ N: Int) {
   let s = 0..<sequenceCount
   for _ in 1...20*N {
     var result = 0
-    for element in s.dropLast(dropCount) {
+    for element in s.prefix(prefixCount) {
       result += element
     }
     CheckResults(result == sumCount,
-      "IncorrectResults in DropLastCountableRange: \(result) != \(sumCount)")
+      "IncorrectResults in PrefixCountableRange: \(result) != \(sumCount)")
   }
 }
 @inline(never)
-public func run_DropLastSequence(_ N: Int) {
+public func run_PrefixSequence(_ N: Int) {
   let s = sequence(first: 0) { $0 < sequenceCount - 1 ? $0 &+ 1 : nil }
   for _ in 1...20*N {
     var result = 0
-    for element in s.dropLast(dropCount) {
+    for element in s.prefix(prefixCount) {
       result += element
     }
     CheckResults(result == sumCount,
-      "IncorrectResults in DropLastSequence: \(result) != \(sumCount)")
+      "IncorrectResults in PrefixSequence: \(result) != \(sumCount)")
   }
 }
 @inline(never)
-public func run_DropLastAnySequence(_ N: Int) {
+public func run_PrefixAnySequence(_ N: Int) {
   let s = AnySequence(sequence(first: 0) { $0 < sequenceCount - 1 ? $0 &+ 1 : nil })
   for _ in 1...20*N {
     var result = 0
-    for element in s.dropLast(dropCount) {
+    for element in s.prefix(prefixCount) {
       result += element
     }
     CheckResults(result == sumCount,
-      "IncorrectResults in DropLastAnySequence: \(result) != \(sumCount)")
+      "IncorrectResults in PrefixAnySequence: \(result) != \(sumCount)")
   }
 }
 @inline(never)
-public func run_DropLastAnySeqCntRange(_ N: Int) {
+public func run_PrefixAnySeqCntRange(_ N: Int) {
   let s = AnySequence(0..<sequenceCount)
   for _ in 1...20*N {
     var result = 0
-    for element in s.dropLast(dropCount) {
+    for element in s.prefix(prefixCount) {
       result += element
     }
     CheckResults(result == sumCount,
-      "IncorrectResults in DropLastAnySeqCntRange: \(result) != \(sumCount)")
+      "IncorrectResults in PrefixAnySeqCntRange: \(result) != \(sumCount)")
   }
 }
 @inline(never)
-public func run_DropLastAnyCollection(_ N: Int) {
+public func run_PrefixAnyCollection(_ N: Int) {
   let s = AnyCollection(0..<sequenceCount)
   for _ in 1...20*N {
     var result = 0
-    for element in s.dropLast(dropCount) {
+    for element in s.prefix(prefixCount) {
       result += element
     }
     CheckResults(result == sumCount,
-      "IncorrectResults in DropLastAnyCollection: \(result) != \(sumCount)")
+      "IncorrectResults in PrefixAnyCollection: \(result) != \(sumCount)")
   }
 }
 @inline(never)
-public func run_DropLastArray(_ N: Int) {
+public func run_PrefixArray(_ N: Int) {
   let s = Array(0..<sequenceCount)
   for _ in 1...20*N {
     var result = 0
-    for element in s.dropLast(dropCount) {
+    for element in s.prefix(prefixCount) {
       result += element
     }
     CheckResults(result == sumCount,
-      "IncorrectResults in DropLastArray: \(result) != \(sumCount)")
+      "IncorrectResults in PrefixArray: \(result) != \(sumCount)")
   }
 }
 @inline(never)
-public func run_DropLastCountableRangeLazy(_ N: Int) {
+public func run_PrefixCountableRangeLazy(_ N: Int) {
   let s = (0..<sequenceCount).lazy
   for _ in 1...20*N {
     var result = 0
-    for element in s.dropLast(dropCount) {
+    for element in s.prefix(prefixCount) {
       result += element
     }
     CheckResults(result == sumCount,
-      "IncorrectResults in DropLastCountableRangeLazy: \(result) != \(sumCount)")
+      "IncorrectResults in PrefixCountableRangeLazy: \(result) != \(sumCount)")
   }
 }
 @inline(never)
-public func run_DropLastSequenceLazy(_ N: Int) {
+public func run_PrefixSequenceLazy(_ N: Int) {
   let s = (sequence(first: 0) { $0 < sequenceCount - 1 ? $0 &+ 1 : nil }).lazy
   for _ in 1...20*N {
     var result = 0
-    for element in s.dropLast(dropCount) {
+    for element in s.prefix(prefixCount) {
       result += element
     }
     CheckResults(result == sumCount,
-      "IncorrectResults in DropLastSequenceLazy: \(result) != \(sumCount)")
+      "IncorrectResults in PrefixSequenceLazy: \(result) != \(sumCount)")
   }
 }
 @inline(never)
-public func run_DropLastAnySequenceLazy(_ N: Int) {
+public func run_PrefixAnySequenceLazy(_ N: Int) {
   let s = (AnySequence(sequence(first: 0) { $0 < sequenceCount - 1 ? $0 &+ 1 : nil })).lazy
   for _ in 1...20*N {
     var result = 0
-    for element in s.dropLast(dropCount) {
+    for element in s.prefix(prefixCount) {
       result += element
     }
     CheckResults(result == sumCount,
-      "IncorrectResults in DropLastAnySequenceLazy: \(result) != \(sumCount)")
+      "IncorrectResults in PrefixAnySequenceLazy: \(result) != \(sumCount)")
   }
 }
 @inline(never)
-public func run_DropLastAnySeqCntRangeLazy(_ N: Int) {
+public func run_PrefixAnySeqCntRangeLazy(_ N: Int) {
   let s = (AnySequence(0..<sequenceCount)).lazy
   for _ in 1...20*N {
     var result = 0
-    for element in s.dropLast(dropCount) {
+    for element in s.prefix(prefixCount) {
       result += element
     }
     CheckResults(result == sumCount,
-      "IncorrectResults in DropLastAnySeqCntRangeLazy: \(result) != \(sumCount)")
+      "IncorrectResults in PrefixAnySeqCntRangeLazy: \(result) != \(sumCount)")
   }
 }
 @inline(never)
-public func run_DropLastAnyCollectionLazy(_ N: Int) {
+public func run_PrefixAnyCollectionLazy(_ N: Int) {
   let s = (AnyCollection(0..<sequenceCount)).lazy
   for _ in 1...20*N {
     var result = 0
-    for element in s.dropLast(dropCount) {
+    for element in s.prefix(prefixCount) {
       result += element
     }
     CheckResults(result == sumCount,
-      "IncorrectResults in DropLastAnyCollectionLazy: \(result) != \(sumCount)")
+      "IncorrectResults in PrefixAnyCollectionLazy: \(result) != \(sumCount)")
   }
 }
 @inline(never)
-public func run_DropLastArrayLazy(_ N: Int) {
+public func run_PrefixArrayLazy(_ N: Int) {
   let s = (Array(0..<sequenceCount)).lazy
   for _ in 1...20*N {
     var result = 0
-    for element in s.dropLast(dropCount) {
+    for element in s.prefix(prefixCount) {
       result += element
     }
     CheckResults(result == sumCount,
-      "IncorrectResults in DropLastArrayLazy: \(result) != \(sumCount)")
+      "IncorrectResults in PrefixArrayLazy: \(result) != \(sumCount)")
   }
 }
