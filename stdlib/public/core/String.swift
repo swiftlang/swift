@@ -446,7 +446,9 @@ extension String {
   ///
   /// - Parameter other: Another string.
   public mutating func append(_ other: String) {
-    _core.append(other._core)
+    // Before you replace this with append(contentsOf: ), make sure that's just
+    // as efficient in all cases.
+    replaceSubrange(endIndex..<endIndex, with: other)
   }
 
   public // SPI(Foundation)
@@ -463,6 +465,8 @@ extension String {
       return rhs
     }
     var lhs = lhs
+    // Before you replace this with append(contentsOf: ), make sure that's just
+    // as efficient in all cases.
     lhs.replaceSubrange(lhs.endIndex..<lhs.endIndex, with: rhs)
     return lhs
   }
@@ -473,6 +477,8 @@ extension String {
       lhs = rhs
     }
     else {
+      // Before you replace this with append(contentsOf: ), make sure that's
+      // just as efficient in all cases.
       lhs.replaceSubrange(lhs.endIndex..<lhs.endIndex, with: rhs)
     }
   }
