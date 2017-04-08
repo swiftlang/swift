@@ -337,7 +337,7 @@ case character(
   
 case unicodeScalar(encodedOffset: Int, width: Int, scalar: UnicodeScalar?)
 
-  var encodedOffset: Int {
+  public var encodedOffset: Int {
     switch self {
     case .encodedOffset(let x): return x
     case .transcoded(let x, _,_): return x

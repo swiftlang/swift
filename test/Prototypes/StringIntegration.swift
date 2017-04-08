@@ -783,11 +783,11 @@ suite.test("Bidirectional/UnicodeScalar") {
   let a = AnyUnicodeScalarUnicodeView(
     _UnicodeViews(Array(sample.utf16), ValidUTF16.self).unicodeScalars)
   expectEqualSequence(sample.unicodeScalars, a)
-  var lastEncodedOffset = Int64.min
+  var lastEncodedOffset = Int.min
   // Make sure it works as a collection, too.
   for (s, i) in zip(sample.unicodeScalars, a.indices) {
     expectEqual(s, a[i])
-    let o = i.encodedOffset
+    let o = sample.unicodeScalars.anyIndex(i).encodedOffset
     expectLT(lastEncodedOffset, o)
     lastEncodedOffset = o
   }
@@ -797,11 +797,11 @@ suite.test("RandomAccess/UnicodeScalar") {
   let a = AnyUnicodeScalarUnicodeView(
     RandomAccessUnicodeView(Array(sample.unicodeScalars)))
   expectEqualSequence(sample.unicodeScalars, a)
-  var lastEncodedOffset = Int64.min
+  var lastEncodedOffset = Int.min
   // Make sure it works as a collection, too.
   for (s, i) in zip(sample.unicodeScalars, a.indices) {
     expectEqual(s, a[i])
-    let o = i.encodedOffset
+    let o = sample.unicodeScalars.anyIndex(i).encodedOffset
     expectLT(lastEncodedOffset, o)
     lastEncodedOffset = o
   }
