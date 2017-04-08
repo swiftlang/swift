@@ -19,6 +19,7 @@
 #include "ConstraintSystem.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
+#include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SubstitutionMap.h"
@@ -52,10 +53,7 @@ static bool isOpenedAnyObject(Type type) {
   if (!existential)
     return false;
 
-  SmallVector<ProtocolDecl *, 2> protocols;
-  existential->getExistentialTypeProtocols(protocols);
-  return protocols.size() == 1 &&
-         protocols[0]->isSpecificProtocol(KnownProtocolKind::AnyObject);
+  return existential->isAnyObject();
 }
 
 void Solution::computeSubstitutions(
@@ -4600,13 +4598,12 @@ Expr *ExprRewriter::coerceScalarToTuple(Expr *expr, TupleType *toTuple,
 static ArrayRef<ProtocolConformanceRef>
 collectExistentialConformances(TypeChecker &tc, Type fromType, Type toType,
                                DeclContext *DC) {
-  SmallVector<ProtocolDecl *, 4> protocols;
-  toType->getExistentialTypeProtocols(protocols);
+  auto layout = toType->getExistentialLayout();
 
   SmallVector<ProtocolConformanceRef, 4> conformances;
-  for (auto proto : protocols) {
+  for (auto proto : layout.getProtocols()) {
     conformances.push_back(
-      *tc.containsProtocol(fromType, proto, DC,
+      *tc.containsProtocol(fromType, proto->getDecl(), DC,
                            (ConformanceCheckFlags::InExpression|
                             ConformanceCheckFlags::Used)));
   }

@@ -584,6 +584,9 @@ public:
   /// its list of protocols.
   void getAnyExistentialTypeProtocols(SmallVectorImpl<ProtocolDecl *> &protocols);
 
+  /// Break an existential down into a set of constraints.
+  ExistentialLayout getExistentialLayout();
+
   /// Determines the element type of a known *UnsafeMutablePointer
   /// variant, or returns null if the type is not a pointer.
   Type getAnyPointerElementType(PointerTypeKind &PTK);

@@ -17,6 +17,7 @@
 #include "swift/AST/ASTContext.h"
 #include "ForeignRepresentationInfo.h"
 #include "swift/Strings.h"
+#include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/GenericSignatureBuilder.h"
 #include "swift/AST/ConcreteDeclRef.h"
 #include "swift/AST/DiagnosticEngine.h"
@@ -3454,19 +3455,22 @@ CanArchetypeType ArchetypeType::getOpened(Type existential,
     knownID = UUID::fromTime();
   }
 
-  llvm::SmallVector<ProtocolDecl *, 4> conformsTo;
-  assert(existential->isExistentialType());
-  existential->getExistentialTypeProtocols(conformsTo);
-  Type superclass = existential->getSuperclass(nullptr);
+  auto layout = existential->getExistentialLayout();
+
+  SmallVector<ProtocolDecl *, 2> protos;
+  for (auto proto : layout.getProtocols())
+    protos.push_back(proto->getDecl());
 
   auto arena = AllocationArena::Permanent;
   void *mem = ctx.Allocate(
       totalSizeToAlloc<ProtocolDecl *, Type, LayoutConstraint, UUID>(
-        conformsTo.size(), superclass ? 1 : 0, 0, 1),
+      protos.size(), layout.superclass ? 1 : 0, 0, 1),
       alignof(ArchetypeType), arena);
 
+  // FIXME: Pass in class layout constraint
   auto result =
-      ::new (mem) ArchetypeType(ctx, existential, conformsTo, superclass,
+      ::new (mem) ArchetypeType(ctx, existential,
+                                protos, layout.superclass,
                                 existential->getLayoutConstraint(), *knownID);
   openedExistentialArchetypes[*knownID] = result;
 

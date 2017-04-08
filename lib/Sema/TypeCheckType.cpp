@@ -22,6 +22,7 @@
 #include "swift/Strings.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
+#include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/NameLookup.h"
@@ -3902,14 +3903,14 @@ public:
         if (T->isInvalid())
           return false;
         if (type->isExistentialType()) {
-          SmallVector<ProtocolDecl*, 2> protocols;
-          type->getExistentialTypeProtocols(protocols);
-          for (auto *proto : protocols) {
-            if (proto->existentialTypeSupported(&TC))
+          for (auto *proto : type->getExistentialLayout().getProtocols()) {
+            auto *protoDecl = proto->getDecl();
+
+            if (protoDecl->existentialTypeSupported(&TC))
               continue;
             
             TC.diagnose(comp->getIdLoc(), diag::unsupported_existential_type,
-                        proto->getName());
+                        protoDecl->getName());
             T->setInvalid();
           }
         }

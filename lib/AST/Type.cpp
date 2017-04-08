@@ -17,6 +17,7 @@
 #include "swift/AST/Types.h"
 #include "ForeignRepresentationInfo.h"
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/TypeVisitor.h"
 #include "swift/AST/TypeWalker.h"
 #include "swift/AST/Decl.h"
@@ -217,27 +218,100 @@ void TypeBase::getAnyExistentialTypeProtocols(
   getCanonicalType().getAnyExistentialTypeProtocols(protocols);
 }
 
-void CanType::getExistentialTypeProtocolsImpl(CanType type,
+void CanType::getExistentialTypeProtocols(
                                    SmallVectorImpl<ProtocolDecl*> &protocols) {
-  if (auto proto = dyn_cast<ProtocolType>(type)) {
+  // FIXME: Remove this completely
+  auto layout = getExistentialLayout();
+  assert(!layout.superclass && "Subclass existentials not fully supported yet");
+  assert((!layout.requiresClass || layout.requiresClassImplied) &&
+         "Explicit AnyObject should not appear yet");
+  for (auto proto : layout.getProtocols())
     protocols.push_back(proto->getDecl());
-  } else if (auto comp = dyn_cast<ProtocolCompositionType>(type)) {
-    auto protos = comp.getProtocols();
-    for (auto proto : protos)
-      proto.getExistentialTypeProtocols(protocols);
-  } else {
-    llvm_unreachable("type was not any kind of existential type!");
-  }
 }
 
-void CanType::getAnyExistentialTypeProtocolsImpl(CanType type,
+void CanType::getAnyExistentialTypeProtocols(
                                    SmallVectorImpl<ProtocolDecl*> &protocols) {
-  if (auto metatype = dyn_cast<ExistentialMetatypeType>(type)) {
+  if (auto metatype = dyn_cast<ExistentialMetatypeType>(*this)) {
       metatype.getInstanceType().getAnyExistentialTypeProtocols(protocols);
       return;
   }
 
-  type.getExistentialTypeProtocols(protocols);
+  getExistentialTypeProtocols(protocols);
+}
+
+ExistentialLayout::ExistentialLayout(ProtocolType *type) {
+  assert(type->isCanonical());
+
+  auto *protoDecl = type->getDecl();
+
+  if (protoDecl->requiresClass()) {
+    requiresClass = true;
+    requiresClassImplied = true;
+  } else {
+    requiresClass = false;
+    requiresClassImplied = false;
+  }
+
+  containsNonObjCProtocol =
+    !(protoDecl->isSpecificProtocol(KnownProtocolKind::AnyObject) ||
+      protoDecl->isObjC());
+
+  singleProtocol = type;
+}
+
+ExistentialLayout::ExistentialLayout(ProtocolCompositionType *type) {
+  assert(type->isCanonical());
+
+  // FIXME: Eventually, there will be a requiresClass() bit in
+  // the ProtocolCompositionType
+  requiresClass = false;
+  requiresClassImplied = false;
+  containsNonObjCProtocol = false;
+
+  auto members = type->getProtocols();
+  if (!members.empty() &&
+      isa<ClassDecl>(members[0]->getAnyNominal())) {
+    superclass = members[0];
+    members = members.slice(1);
+  }
+
+  for (auto member : members) {
+    auto *protoDecl = member->castTo<ProtocolType>()->getDecl();
+    if (protoDecl->requiresClass()) {
+      requiresClass = true;
+      requiresClassImplied = true;
+    }
+
+    containsNonObjCProtocol |=
+      !(protoDecl->isSpecificProtocol(KnownProtocolKind::AnyObject) ||
+        protoDecl->isObjC());
+  }
+
+  singleProtocol = nullptr;
+  multipleProtocols = {
+    reinterpret_cast<ProtocolType * const *>(members.data()),
+    members.size()
+  };
+}
+
+
+ExistentialLayout TypeBase::getExistentialLayout() {
+  return getCanonicalType().getExistentialLayout();
+}
+
+ExistentialLayout CanType::getExistentialLayout() {
+  if (auto proto = dyn_cast<ProtocolType>(*this))
+    return ExistentialLayout(proto);
+
+  auto comp = cast<ProtocolCompositionType>(*this);
+  return ExistentialLayout(comp);
+}
+
+bool ExistentialLayout::isAnyObject() const {
+  // FIXME
+  auto protocols = getProtocols();
+  return protocols.size() == 1 &&
+    protocols[0]->getDecl()->isSpecificProtocol(KnownProtocolKind::AnyObject);
 }
 
 bool TypeBase::isObjCExistentialType() {
@@ -245,25 +319,10 @@ bool TypeBase::isObjCExistentialType() {
 }
 
 bool CanType::isObjCExistentialTypeImpl(CanType type) {
-  if (!type.isExistentialType()) return false;
-
-  SmallVector<ProtocolDecl *, 4> protocols;
-  type.getExistentialTypeProtocols(protocols);
-
-  // Must have at least one protocol to be class-bounded.
-  if (protocols.empty())
+  if (!type.isExistentialType())
     return false;
 
-  // Any non-AnyObject, non-@objc protocol makes this no longer ObjC-compatible.
-  for (auto proto : protocols) {
-    if (proto->isSpecificProtocol(KnownProtocolKind::AnyObject))
-      continue;
-    if (proto->isObjC())
-      continue;
-    
-    return false;
-  }
-  return true;
+  return type.getExistentialLayout().isObjC();
 }
 
 bool TypeBase::isSpecialized() {
@@ -533,8 +592,23 @@ LayoutConstraint CanType::getLayoutConstraint() const {
 }
 
 bool TypeBase::isAnyObject() {
-  if (auto proto = getAs<ProtocolType>())
-    return proto->getDecl()->isSpecificProtocol(KnownProtocolKind::AnyObject);
+  auto canTy = getCanonicalType();
+
+  if (!canTy.isExistentialType())
+    return false;
+
+  return canTy.getExistentialLayout().isAnyObject();
+}
+
+bool ExistentialLayout::isExistentialWithError(ASTContext &ctx) const {
+  auto errorProto = ctx.getProtocol(KnownProtocolKind::Error);
+  if (!errorProto) return false;
+
+  for (auto proto : getProtocols()) {
+    auto *protoDecl = proto->getDecl();
+    if (protoDecl == errorProto || protoDecl->inheritsFrom(errorProto))
+      return true;
+  }
 
   return false;
 }
@@ -546,19 +620,8 @@ bool TypeBase::isExistentialWithError() {
 
   // FIXME: Compute this as a bit in TypeBase so this operation isn't
   // overly expensive.
-  SmallVector<ProtocolDecl *, 4> protocols;
-  canTy.getExistentialTypeProtocols(protocols);
-
-  auto errorProto =
-    getASTContext().getProtocol(KnownProtocolKind::Error);
-  if (!errorProto) return false;
-
-  for (auto proto : protocols) {
-    if (proto == errorProto || proto->inheritsFrom(errorProto))
-      return true;
-  }
-
-  return false;
+  auto layout = canTy.getExistentialLayout();
+  return layout.isExistentialWithError(getASTContext());
 }
 
 
