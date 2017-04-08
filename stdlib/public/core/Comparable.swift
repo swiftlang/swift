@@ -157,30 +157,6 @@ public protocol Comparable : Equatable {
   ///   - lhs: A value to compare.
   ///   - rhs: Another value to compare.
   static func < (lhs: Self, rhs: Self) -> Bool
-
-  /// Returns a Boolean value indicating whether the value of the first
-  /// argument is less than or equal to that of the second argument.
-  ///
-  /// - Parameters:
-  ///   - lhs: A value to compare.
-  ///   - rhs: Another value to compare.
-  static func <= (lhs: Self, rhs: Self) -> Bool
-
-  /// Returns a Boolean value indicating whether the value of the first
-  /// argument is greater than or equal to that of the second argument.
-  ///
-  /// - Parameters:
-  ///   - lhs: A value to compare.
-  ///   - rhs: Another value to compare.
-  static func >= (lhs: Self, rhs: Self) -> Bool
-
-  /// Returns a Boolean value indicating whether the value of the first
-  /// argument is greater than that of the second argument.
-  ///
-  /// - Parameters:
-  ///   - lhs: A value to compare.
-  ///   - rhs: Another value to compare.
-  static func > (lhs: Self, rhs: Self) -> Bool
 }
 
 extension Comparable {
