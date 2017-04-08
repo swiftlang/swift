@@ -494,7 +494,9 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &out, const Score &score);
 
 /// Describes a dependent type that has been opened to a particular type
 /// variable.
-typedef std::pair<CanType, TypeVariableType *> OpenedType;
+typedef std::pair<GenericTypeParamType *, TypeVariableType *> OpenedType;
+
+typedef llvm::DenseMap<GenericTypeParamType *, TypeVariableType *> OpenedTypeMap;
 
 /// \brief A complete solution to a constraint system.
 ///
@@ -1874,7 +1876,7 @@ public:
   ///
   /// \returns The opened type.
   Type openType(Type type, ConstraintLocatorBuilder locator) {
-    llvm::DenseMap<CanType, TypeVariableType *> replacements;
+    OpenedTypeMap replacements;
     return openType(type, locator, replacements);
   }
 
@@ -1889,7 +1891,7 @@ public:
   /// \returns The opened type, or \c type if there are no archetypes in it.
   Type openType(Type type,
                 ConstraintLocatorBuilder locator,
-                llvm::DenseMap<CanType, TypeVariableType *> &replacements);
+                OpenedTypeMap &replacements);
 
   /// \brief "Open" the given function type.
   ///
@@ -1914,7 +1916,7 @@ public:
       AnyFunctionType *funcType,
       unsigned numArgumentLabelsToRemove,
       ConstraintLocatorBuilder locator,
-      llvm::DenseMap<CanType, TypeVariableType *> &replacements,
+      OpenedTypeMap &replacements,
       DeclContext *innerDC,
       DeclContext *outerDC,
       bool skipProtocolSelfConstraint);
@@ -1938,19 +1940,19 @@ public:
                    GenericSignature *signature,
                    bool skipProtocolSelfConstraint,
                    ConstraintLocatorBuilder locator,
-                   llvm::DenseMap<CanType, TypeVariableType *> &replacements);
+                   OpenedTypeMap &replacements);
   void openGeneric(DeclContext *innerDC,
                    DeclContext *outerDC,
                    ArrayRef<GenericTypeParamType *> params,
                    ArrayRef<Requirement> requirements,
                    bool skipProtocolSelfConstraint,
                    ConstraintLocatorBuilder locator,
-                   llvm::DenseMap<CanType, TypeVariableType *> &replacements);
+                   OpenedTypeMap &replacements);
 
   /// Record the set of opened types for the given locator.
   void recordOpenedTypes(
          ConstraintLocatorBuilder locator,
-         const llvm::DenseMap<CanType, TypeVariableType *> &replacements);
+         const OpenedTypeMap &replacements);
 
   /// \brief Retrieve the type of a reference to the given value declaration.
   ///
@@ -1997,8 +1999,7 @@ public:
                           FunctionRefKind functionRefKind,
                           ConstraintLocatorBuilder locator,
                           const DeclRefExpr *base = nullptr,
-                          llvm::DenseMap<CanType, TypeVariableType *>
-                            *replacements = nullptr);
+                          OpenedTypeMap *replacements = nullptr);
 
   /// \brief Add a new overload set to the list of unresolved overload
   /// sets.

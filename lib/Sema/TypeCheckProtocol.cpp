@@ -1193,7 +1193,7 @@ matchWitness(TypeChecker &tc,
     reqLocator = cs->getConstraintLocator(
                      static_cast<Expr *>(nullptr),
                      LocatorPathElt(ConstraintLocator::Requirement, req));
-    llvm::DenseMap<CanType, TypeVariableType *> reqReplacements;
+    OpenedTypeMap reqReplacements;
     std::tie(openedFullReqType, reqType)
       = cs->getTypeOfMemberReference(selfTy, req, dc,
                                      /*isTypeReference=*/false,
@@ -1207,7 +1207,7 @@ matchWitness(TypeChecker &tc,
     // For any type parameters we replaced in the witness, map them
     // to the corresponding archetypes in the witness's context.
     for (const auto &replacement : reqReplacements) {
-      auto replacedInReq = replacement.first.subst(reqSubMap);
+      auto replacedInReq = Type(replacement.first).subst(reqSubMap);
 
       // If substitution failed, skip the requirement. This only occurs in
       // invalid code.
@@ -1229,7 +1229,7 @@ matchWitness(TypeChecker &tc,
     witnessLocator = cs->getConstraintLocator(
                        static_cast<Expr *>(nullptr),
                        LocatorPathElt(ConstraintLocator::Witness, witness));
-    llvm::DenseMap<CanType, TypeVariableType *> witnessReplacements;
+    OpenedTypeMap witnessReplacements;
     if (witness->getDeclContext()->isTypeContext()) {
       std::tie(openedFullWitnessType, openWitnessType) 
         = cs->getTypeOfMemberReference(selfTy, witness, dc,
@@ -6318,7 +6318,7 @@ bool TypeChecker::isProtocolExtensionUsable(DeclContext *dc, Type type,
   // Set up a constraint system where we open the generic parameters of the
   // protocol extension.
   ConstraintSystem cs(*this, dc, None);
-  llvm::DenseMap<CanType, TypeVariableType *> replacements;
+  OpenedTypeMap replacements;
   auto genericSig = protocolExtension->getGenericSignature();
   
   cs.openGeneric(protocolExtension, protocolExtension,
@@ -6327,7 +6327,8 @@ bool TypeChecker::isProtocolExtensionUsable(DeclContext *dc, Type type,
                  ConstraintLocatorBuilder(nullptr), replacements);
 
   // Bind the 'Self' type variable to the provided type.
-  CanType selfType = genericSig->getGenericParams().back()->getCanonicalType();
+  auto selfType = cast<GenericTypeParamType>(
+    genericSig->getGenericParams().back()->getCanonicalType());
   auto selfTypeVar = replacements[selfType];
   cs.addConstraint(ConstraintKind::Bind, selfTypeVar, type, nullptr);
 
