@@ -3030,8 +3030,6 @@ Type TypeChecker::substMemberTypeWithBase(ModuleDecl *module,
   // derived class as the parent type.
   if (auto *ownerClass = member->getDeclContext()
           ->getAsClassOrClassExtensionContext()) {
-    if (auto *archetypeTy = baseTy->getAs<ArchetypeType>())
-      baseTy = archetypeTy->getSuperclass();
     baseTy = baseTy->getSuperclassForDecl(ownerClass, this);
   }
 

@@ -3105,10 +3105,19 @@ Type TypeBase::getSuperclassForDecl(const ClassDecl *baseClass,
                                     LazyResolver *resolver) {
   Type t(this);
   while (t) {
-    auto *derivedClass = dyn_cast_or_null<ClassDecl>(t->getAnyNominal());
-    assert(derivedClass && "expected a class here");
+    // If we have a class-constrained archetype or class-constrained
+    // existential, get the underlying superclass constraint.
+    auto *nominalDecl = t->getAnyNominal();
+    if (!nominalDecl) {
+      assert(t->is<ArchetypeType>() || t->isExistentialType() &&
+             "expected a class, archetype or existentiall");
+      t = t->getSuperclass(resolver);
+      assert(t && "archetype or existential is not class constrained");
+      continue;
+    }
+    assert(isa<ClassDecl>(nominalDecl) && "expected a class here");
 
-    if (derivedClass == baseClass)
+    if (nominalDecl == baseClass)
       return t;
 
     t = t->getSuperclass(resolver);
@@ -3139,19 +3148,10 @@ TypeBase::getContextSubstitutions(const DeclContext *dc,
     return substitutions;
   }
 
-  // If we found a member of a concrete type from a protocol extension,
-  // get the superclass out of the archetype.
-  if (auto *archetypeTy = baseTy->getAs<ArchetypeType>())
-    baseTy = archetypeTy->getSuperclass();
-
   // Extract the lazy resolver.
   LazyResolver *resolver = dc->getASTContext().getLazyResolver();
 
   // Find the superclass type with the context matching that of the member.
-  //
-  // FIXME: Do this in the caller?
-  assert(baseTy->getAnyNominal());
-
   auto *ownerNominal = dc->getAsNominalTypeOrNominalTypeExtensionContext();
   if (auto *ownerClass = dyn_cast<ClassDecl>(ownerNominal))
     baseTy = baseTy->getSuperclassForDecl(ownerClass, resolver);
