@@ -373,17 +373,6 @@ bool TypeChecker::validateRequirement(SourceLoc whereLoc, RequirementRepr &req,
       req.setInvalid();
     }
 
-    // FIXME: Feels too early to perform this check.
-    if (!req.isInvalid() &&
-        !req.getConstraint()->isExistentialType() &&
-        !req.getConstraint()->getClassOrBoundGenericClass()) {
-      diagnose(whereLoc, diag::requires_conformance_nonprotocol,
-               req.getSubjectLoc(), req.getConstraintLoc());
-      req.getConstraintLoc().setInvalidType(Context);
-      req.setInvalid();
-      return true;
-    }
-
     return req.isInvalid();
   }
 
