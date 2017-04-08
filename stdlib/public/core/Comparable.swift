@@ -10,6 +10,16 @@
 //
 //===----------------------------------------------------------------------===//
 
+/// A value used to indicate how items in a request are ordered, from the first
+/// one given in a method invocation or function call to the last (that is, left
+/// to right in code).
+@objc public enum ComparisonResult : Int {
+  case orderedAscending = -1
+  case orderedSame = 0
+  case orderedDescending = 1
+}
+
+
 /// A type that can be compared using the relational operators `<`, `<=`, `>=`,
 /// and `>`.
 ///
