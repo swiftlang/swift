@@ -611,24 +611,23 @@ public:
   /// contains a value.
   Expr *convertOptionalToBool(Expr *expr, ConstraintLocator *locator) const;
 
-  /// Compute the set of substitutions required to map the given type
-  /// to the provided "opened" type.
+  /// Compute the set of substitutions for a generic signature opened at the
+  /// given locator.
   ///
   /// \param sig The generic signature.
-  ///
-  /// \param openedType The type to which this reference to the given
-  /// generic function type was opened.
   ///
   /// \param locator The locator that describes where the substitutions came
   /// from.
   ///
   /// \param substitutions Will be populated with the set of substitutions
   /// to be applied to the generic function type.
-  ///
-  /// \returns The opened type after applying the computed substitutions.
-  Type computeSubstitutions(GenericSignature *sig,
-                            Type openedType,
+  void computeSubstitutions(GenericSignature *sig,
                             ConstraintLocator *locator,
+                            SmallVectorImpl<Substitution> &substitutions) const;
+
+  /// Same as above but with a lazily-constructed locator.
+  void computeSubstitutions(GenericSignature *sig,
+                            ConstraintLocatorBuilder locator,
                             SmallVectorImpl<Substitution> &substitutions) const;
 
   /// Return the disjunction choice for the given constraint location.

@@ -1282,17 +1282,11 @@ matchWitness(TypeChecker &tc,
                             witnessType,
                             optionalAdjustments);
 
-    // Record the substitutions.
-    if (openedFullWitnessType->hasTypeVariable()) {
-      // Figure out the context we're substituting into.
-      auto witnessDC = witness->getInnermostDeclContext();
-
-      // Compute the set of substitutions we'll need for the witness.
-      solution->computeSubstitutions(witnessDC->getGenericSignatureOfContext(),
-                                     openedFullWitnessType,
-                                     witnessLocator,
-                                     result.WitnessSubstitutions);
-    }
+    // Compute the set of substitutions we'll need for the witness.
+    solution->computeSubstitutions(
+      witness->getInnermostDeclContext()->getGenericSignatureOfContext(),
+      witnessLocator,
+      result.WitnessSubstitutions);
     
     return result;
   };

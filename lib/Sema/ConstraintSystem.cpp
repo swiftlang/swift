@@ -1092,19 +1092,6 @@ ConstraintSystem::getTypeOfMemberReference(
     openedType = openFunctionType(funcType, numRemovedArgumentLabels,
                                   locator, replacements, innerDC, outerDC,
                                   /*skipProtocolSelfConstraint=*/true);
-
-    if (!outerDC->getAsProtocolOrProtocolExtensionContext()) {
-      if (auto func = dyn_cast<AbstractFunctionDecl>(value)) {
-        if ((isa<FuncDecl>(func) &&
-             cast<FuncDecl>(func)->hasDynamicSelf()) ||
-            (isa<ConstructorDecl>(func) &&
-             !baseObjTy->getAnyOptionalObjectType())) {
-          openedType = openedType->replaceCovariantResultType(
-              baseObjTy,
-              func->getNumParameterLists());
-        }
-      }
-    }
   } else {
     // If we're not coming from something function-like, prepend the type
     // for 'self' to the type.
@@ -1152,7 +1139,20 @@ ConstraintSystem::getTypeOfMemberReference(
     openedType = FunctionType::get(selfTy, openedType);
   }
 
-  if (outerDC->getAsProtocolOrProtocolExtensionContext()) {
+  if (!outerDC->getAsProtocolOrProtocolExtensionContext()) {
+    // Class methods returning Self as well as constructors get the
+    // result replaced with the base object type.
+    if (auto func = dyn_cast<AbstractFunctionDecl>(value)) {
+      if ((isa<FuncDecl>(func) &&
+           cast<FuncDecl>(func)->hasDynamicSelf()) ||
+          (isa<ConstructorDecl>(func) &&
+           !baseObjTy->getAnyOptionalObjectType())) {
+        openedType = openedType->replaceCovariantResultType(
+          baseObjTy,
+            func->getNumParameterLists());
+      }
+    }
+  } else {
     // Protocol requirements returning Self have a dynamic Self return
     // type. Erase the dynamic Self since it only comes into play during
     // protocol conformance checking.

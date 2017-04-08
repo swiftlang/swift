@@ -58,25 +58,28 @@ static bool isOpenedAnyObject(Type type) {
          protocols[0]->isSpecificProtocol(KnownProtocolKind::AnyObject);
 }
 
-Type Solution::computeSubstitutions(
+void Solution::computeSubstitutions(
        GenericSignature *sig,
-       Type openedType,
        ConstraintLocator *locator,
        SmallVectorImpl<Substitution> &result) const {
-  auto &tc = getConstraintSystem().getTypeChecker();
-
-  // Produce the concrete form of the opened type.
-  Type type = simplifyType(openedType);
+  if (sig == nullptr)
+    return;
 
   // Gather the substitutions from dependent types to concrete types.
   auto openedTypes = OpenedTypes.find(locator);
+
+  // If we have a member reference on an existential, there are no
+  // opened types or substitutions.
   if (openedTypes == OpenedTypes.end())
-    return type;
+    return;
+
   TypeSubstitutionMap subs;
   for (const auto &opened : openedTypes->second) {
     subs[opened.first->castTo<GenericTypeParamType>()] =
       getFixedType(opened.second);
   }
+
+  auto &tc = getConstraintSystem().getTypeChecker();
 
   auto lookupConformanceFn =
       [&](CanType original, Type replacement, ProtocolType *protoType)
@@ -96,7 +99,18 @@ Type Solution::computeSubstitutions(
 
   sig->getSubstitutions(QueryTypeSubstitutionMap{subs},
                         lookupConformanceFn, result);
-  return type;
+}
+
+void Solution::computeSubstitutions(
+       GenericSignature *sig,
+       ConstraintLocatorBuilder locator,
+       SmallVectorImpl<Substitution> &result) const {
+  if (sig == nullptr)
+    return;
+
+  computeSubstitutions(sig,
+                       getConstraintSystem().getConstraintLocator(locator),
+                       result);
 }
 
 /// \brief Find a particular named function witness for a type that conforms to
@@ -453,27 +467,12 @@ namespace {
                               semantics, /*isDynamic=*/false);
       }
 
-      // If this is a declaration with generic function type, build a
-      // specialized reference to it.
-      if (auto genericFn
-            = decl->getInterfaceType()->getAs<GenericFunctionType>()) {
-        SmallVector<Substitution, 4> substitutions;
-        auto type = solution.computeSubstitutions(
-                      genericFn->getGenericSignature(), openedType,
-                      getConstraintSystem().getConstraintLocator(locator),
-                      substitutions);
-        auto declRefExpr =
-          new (ctx) DeclRefExpr(ConcreteDeclRef(ctx, decl, substitutions),
-                                loc, implicit, semantics, type);
-        cs.cacheType(declRefExpr);
-        declRefExpr->setFunctionRefKind(functionRefKind);
-        return declRefExpr;
-      }
+      auto type = solution.simplifyType(openedType);
 
-      auto type = simplifyType(openedType);
-        
       // If we've ended up trying to assign an inout type here, it means we're
       // missing an ampersand in front of the ref.
+      //
+      // FIXME: This is the wrong place for this diagnostic.
       if (auto inoutType = type->getAs<InOutType>()) {
         auto &tc = cs.getTypeChecker();
         tc.diagnose(loc.getBaseNameLoc(), diag::missing_address_of,
@@ -481,9 +480,21 @@ namespace {
           .fixItInsert(loc.getBaseNameLoc(), "&");
         return nullptr;
       }
-        
-      auto declRefExpr = new (ctx) DeclRefExpr(decl, loc, implicit, semantics,
-                                               type);
+
+      SmallVector<Substitution, 4> substitutions;
+
+      // Due to a SILGen quirk, unqualified property references do not
+      // need substitutions.
+      if (!isa<VarDecl>(decl)) {
+        solution.computeSubstitutions(
+            decl->getInnermostDeclContext()->getGenericSignatureOfContext(),
+            locator,
+            substitutions);
+      }
+
+      auto declRefExpr =
+        new (ctx) DeclRefExpr(ConcreteDeclRef(ctx, decl, substitutions),
+                              loc, implicit, semantics, type);
       cs.cacheType(declRefExpr);
       declRefExpr->setFunctionRefKind(functionRefKind);
       return declRefExpr;
@@ -756,28 +767,14 @@ namespace {
         }
       }
 
-      // Produce a reference to the member and the type produced by the
-      // reference itself.
-      ConcreteDeclRef memberRef;
-      Type refTy;
-      if (auto *sig = member->getInnermostDeclContext()
-              ->getGenericSignatureOfContext()) {
-        // We require substitutions. Figure out what they are.
+      // Build a member reference.
+      SmallVector<Substitution, 4> substitutions;
+      solution.computeSubstitutions(
+          member->getInnermostDeclContext()->getGenericSignatureOfContext(),
+          memberLocator, substitutions);
+      auto memberRef = ConcreteDeclRef(context, member, substitutions);
 
-        // Build a reference to the generic member.
-        SmallVector<Substitution, 4> substitutions;
-        refTy = solution.computeSubstitutions(
-                  sig,
-                  openedFullType,
-                  getConstraintSystem().getConstraintLocator(memberLocator),
-                  substitutions);
-
-        memberRef = ConcreteDeclRef(context, member, substitutions);
-      } else {
-        // No substitutions required; the declaration reference is simple.
-        memberRef = member;
-        refTy = openedFullType;
-      }
+      auto refTy = solution.simplifyType(openedFullType);
 
       // If we're referring to the member of a module, it's just a simple
       // reference.
@@ -795,9 +792,8 @@ namespace {
       // Produce a reference to the type of the container the member
       // resides in.
       Type containerTy =
-          openedFullType->castTo<FunctionType>()
+          refTy->castTo<FunctionType>()
               ->getInput()->getRValueInstanceType();
-      containerTy = solution.simplifyType(containerTy);
 
       // If we opened up an existential when referencing this member, update
       // the base accordingly.
@@ -1306,57 +1302,31 @@ namespace {
         return result;
       }
 
-      // Handle subscripting of generics.
-      auto *dc = subscript->getInnermostDeclContext();
-      if (auto *sig = dc->getGenericSignatureOfContext()) {
-        // Compute the substitutions used to reference the subscript.
-        SmallVector<Substitution, 4> substitutions;
-        solution.computeSubstitutions(
-          sig,
-          selected->openedFullType,
-          getConstraintSystem().getConstraintLocator(
-            locator.withPathElement(ConstraintLocator::SubscriptMember)),
-          substitutions);
+      // Compute the substitutions used to reference the subscript.
+      SmallVector<Substitution, 4> substitutions;
+      solution.computeSubstitutions(
+        subscript->getInnermostDeclContext()->getGenericSignatureOfContext(),
+        locator.withPathElement(ConstraintLocator::SubscriptMember),
+        substitutions);
 
-        // Convert the base.
-        auto openedFullFnType = selected->openedFullType->castTo<FunctionType>();
-        auto openedBaseType = openedFullFnType->getInput();
-        containerTy = solution.simplifyType(openedBaseType);
-        base = coerceObjectArgumentToType(
-            base, containerTy, subscript, AccessSemantics::Ordinary,
-            locator.withPathElement(ConstraintLocator::MemberRefBase));
-        if (!base)
-          return nullptr;
-
-        // Form the generic subscript expression.
-        auto subscriptExpr = SubscriptExpr::create(
-            tc.Context, base, index,
-            ConcreteDeclRef(tc.Context, subscript, substitutions), isImplicit,
-            semantics, getType);
-        cs.setType(subscriptExpr, resultTy);
-        subscriptExpr->setIsSuper(isSuper);
-
-        Expr *result = subscriptExpr;
-        closeExistential(result, locator);
-        return result;
-      }
-
-      Type selfTy = containerTy;
-      if (selfTy->isEqual(baseTy) && !selfTy->hasReferenceSemantics())
-        if (cs.getType(base)->is<LValueType>())
-          selfTy = InOutType::get(selfTy);
-
-      // Coerce the base to the container type.
-      base = coerceObjectArgumentToType(base, selfTy, subscript,
-                                        AccessSemantics::Ordinary, locator);
+      // Convert the base.
+      auto openedFullFnType = selected->openedFullType->castTo<FunctionType>();
+      auto openedBaseType = openedFullFnType->getInput();
+      containerTy = solution.simplifyType(openedBaseType);
+      base = coerceObjectArgumentToType(
+        base, containerTy, subscript, AccessSemantics::Ordinary,
+        locator.withPathElement(ConstraintLocator::MemberRefBase));
       if (!base)
         return nullptr;
 
-      // Form a normal subscript.
-      auto *subscriptExpr = SubscriptExpr::create(
-          tc.Context, base, index, subscript, isImplicit, semantics, getType);
+      // Form the subscript expression.
+      auto subscriptExpr = SubscriptExpr::create(
+        tc.Context, base, index,
+          ConcreteDeclRef(tc.Context, subscript, substitutions), isImplicit,
+          semantics, getType);
       cs.setType(subscriptExpr, resultTy);
       subscriptExpr->setIsSuper(isSuper);
+
       Expr *result = subscriptExpr;
       closeExistential(result, locator);
       return result;
@@ -1372,26 +1342,18 @@ namespace {
       auto &ctx = tc.Context;
 
       // Compute the concrete reference.
-      ConcreteDeclRef ref;
-      Type resultTy;
-      if (auto *sig = ctor->getGenericSignature()) {
-        // Compute the reference to the generic constructor.
-        SmallVector<Substitution, 4> substitutions;
-        resultTy = solution.computeSubstitutions(
-                     sig,
-                     openedFullType,
-                     getConstraintSystem().getConstraintLocator(locator),
-                     substitutions);
+      SmallVector<Substitution, 4> substitutions;
+      solution.computeSubstitutions(
+          ctor->getGenericSignature(),
+          locator,
+          substitutions);
 
-        ref = ConcreteDeclRef(ctx, ctor, substitutions);
-      } else {
-        // No substitutions.
-        resultTy = openedFullType;
-        ref = ConcreteDeclRef(ctor);
-      }
+      auto ref = ConcreteDeclRef(ctx, ctor, substitutions);
 
       // The constructor was opened with the allocating type, not the
       // initializer type. Map the former into the latter.
+      auto resultTy = solution.simplifyType(openedFullType);
+
       auto selfTy = resultTy->castTo<FunctionType>()->getInput()
         ->getRValueInstanceType();
 
@@ -4122,15 +4084,11 @@ ConcreteDeclRef Solution::resolveLocatorToDecl(
             },
             [&](ValueDecl *decl, Type openedType, ConstraintLocator *locator)
                   -> ConcreteDeclRef {
-              if (auto *sig = decl->getInnermostDeclContext()
-                      ->getGenericSignatureOfContext()) {
-                SmallVector<Substitution, 4> subs;
-                computeSubstitutions(
-                  sig, openedType, locator, subs);
-                return ConcreteDeclRef(cs.getASTContext(), decl, subs);
-              }
-              
-              return decl;
+              SmallVector<Substitution, 4> subs;
+              computeSubstitutions(
+                decl->getInnermostDeclContext()->getGenericSignatureOfContext(),
+                locator, subs);
+              return ConcreteDeclRef(cs.getASTContext(), decl, subs);
             })) {
     return resolved;
   }
