@@ -808,13 +808,15 @@ suite.test("RandomAccess/UnicodeScalar") {
 }
 
 suite.test("CharacterView") {
-  // FIXME: precondition checks in Character prevent us from trying this last
-  // one.
-  let s = "🇸🇸🇬🇱abc🇱🇸🇩🇯🇺🇸\nΣὲ 👥🥓γ͙᷏̃̂᷀νω" // + "👩‍❤️‍👩"
+  let s = "🇸🇸🇬🇱abc🇱🇸🇩🇯🇺🇸\nΣὲ 👥🥓γ͙᷏̃̂᷀νω👩‍❤️‍👩"
+  
   let a: [Character] = [
     "🇸🇸", "🇬🇱", "a", "b", "c", "🇱🇸", "🇩🇯", "🇺🇸", "\n",
-    "Σ", "ὲ", " ", "👥", "🥓", "γ͙᷏̃̂᷀", "ν", "ω"
-  ] // + "👩‍❤️‍👩"
+    "Σ", "ὲ", " ", "👥", "🥓", "γ͙᷏̃̂᷀", "ν", "ω",
+    // FIXME: the frontend currently prevents us writing this last
+    // one as a Character literal.
+    Character(_utf16: "👩‍❤️‍👩".content.utf16)
+  ]
 
   // FIXME: the generic arguments should be deducible, but aren't; <rdar://30323161>
   let v8 = _UnicodeViews(Array(s.utf8), UTF8.self).characters
