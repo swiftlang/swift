@@ -61,8 +61,8 @@ reflect(object: firstClassB)
 // CHECK-32: (class inherits_ObjCClasses.FirstClassB)
 
 // CHECK-32: Type info:
-// CHECK-32-NEXT: (class_instance size=16 alignment=4 stride=16 num_extra_inhabitants=0
-// CHECK-32-NEXT:   (field name=zz offset=12
+// CHECK-32-NEXT: (class_instance size=12 alignment=4 stride=12 num_extra_inhabitants=0
+// CHECK-32-NEXT:   (field name=zz offset=8
 // CHECK-32-NEXT:     (struct size=4 alignment=4 stride=4 num_extra_inhabitants=0
 // CHECK-32-NEXT:       (field name=_value offset=0
 // CHECK-32-NEXT:         (builtin size=4 alignment=4 stride=4 num_extra_inhabitants=0)))))

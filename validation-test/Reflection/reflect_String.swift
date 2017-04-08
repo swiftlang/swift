@@ -34,8 +34,8 @@ reflect(object: obj)
 // CHECK-32: (class reflect_String.TestClass)
 
 // CHECK-32: Type info:
-// CHECK-32-NEXT: (class_instance size=24 alignment=4 stride=24
-// CHECK-32-NEXT:   (field name=t offset=12
+// CHECK-32-NEXT: (class_instance size=20 alignment=4 stride=20
+// CHECK-32-NEXT:   (field name=t offset=8
 // CHECK-32-NEXT:     (struct size=12 alignment=4 stride=12 num_extra_inhabitants=0
 // (unstable implementation details omitted)
 
