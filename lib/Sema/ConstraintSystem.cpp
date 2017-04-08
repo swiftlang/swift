@@ -1654,6 +1654,9 @@ Type simplifyTypeImpl(ConstraintSystem &cs, Type type, Fn getFixedTypeFn) {
 }
 
 Type ConstraintSystem::simplifyType(Type type) {
+  if (!type->hasTypeVariable())
+    return type;
+
   // Map type variables down to the fixed types of their representatives.
   return simplifyTypeImpl(
       *this, type,
@@ -1668,6 +1671,9 @@ Type ConstraintSystem::simplifyType(Type type) {
 }
 
 Type Solution::simplifyType(Type type) const {
+  if (!type->hasTypeVariable())
+    return type;
+
   // Map type variables to fixed types from bindings.
   return simplifyTypeImpl(
       getConstraintSystem(), type,
