@@ -117,9 +117,9 @@ public struct String {
       ('utf16', '_UTF16StringStorage'),
       ('latin1', '_Latin1StringStorage'),
       ('any', 'UnicodeContentBox'),
-      ('cocoa', 'NSStringPayload'),
-      ('inline5or6', 'Inline5or6'),
-      ('inline7or16', 'Inline7or16'),
+      ('cocoa', 'String.Content.NSStringPayload'),
+      ('inline5or6', 'String.Content.Inline5or6'),
+      ('inline7or16', 'String.Content.Inline7or16'),
     ]
 }%
   
@@ -138,6 +138,40 @@ public struct String {
     var _rep: Representation
   }
   public var content: Content
+}
+
+extension String : Sequence {
+  public struct Iterator : IteratorProtocol {
+    public enum _Representation {
+    % for tag, Payload in allCases:
+    case ${tag}(${Payload}.CharacterView.Iterator)
+    % end
+    }
+    public var _rep: _Representation
+    
+    public init(_ content: Content) {
+      switch content._rep {
+    % for tag,_ in allCases:
+      case .${tag}(let x): _rep = .${tag}(x.characters.makeIterator())
+    % end
+      }
+    }
+    
+    public mutating func next() -> Character? {
+      switch _rep {
+    % for tag,_ in allCases:
+      case .${tag}(let x):
+        var x1 = x
+        defer { _rep = .${tag}(x1) }
+        return x1.next()
+    % end
+      }
+    }
+  }
+  
+  public func makeIterator() -> Iterator {
+    return Iterator(content)
+  }
 }
 
 /// Case accessors
@@ -432,8 +466,22 @@ extension String: _Swift3StringCompatibility {
 
 #endif
 
-extension String : Unicode, BidirectionalCollectionWrapper {
-  public typealias Base = AnyCharacterUnicodeView
+%{
+def switch_(onEnum, stmt):
+  return '\n'.join(
+    ['switch %s {' % onEnum]
+    + ['case .%s(let x): %s' % (tag, stmt)
+        for tag,_ in allCases
+      ]
+      + ['}'])
+  
+def switch(stmt):
+  return switch_('_rep', stmt)
+def switchContent(stmt): 
+  return switch_('content._rep', stmt)
+}%
+
+extension String : Unicode {
   public typealias Index = AnyCharacterUnicodeView.Index
   public typealias IndexDistance = AnyCharacterUnicodeView.IndexDistance
 
@@ -450,33 +498,24 @@ extension String : Unicode, BidirectionalCollectionWrapper {
     }
   }
 
-  // FIXME: figure out how to resolve ambiguities when we try to use the default
-  // from BidirectionalCollectionWrapper.
+  ${gyb.expand(
+      'ForwardCollectionAPIs.swift.gyb',
+      base='x.characters',
+      forward=switchContent,
+      wrap_index='x.characters.anyIndex',
+      unwrap_index='x.characters.nativeIndex',
+      nonmutating=True,
+      Element='Character')}
+  
   public mutating func _tryToReplaceSubrange<C: Collection>(
     _ target: Range<Index>, with replacement: C
   ) -> Bool
-  where C.Iterator.Element == Base.Iterator.Element {
-    return base._tryToReplaceSubrange(target,  with: replacement)
+  where C.Iterator.Element == Character {
+    // Doing this rather than switching will try to preserve value semantics
+    // even if a case is a reference type.
+    return content.characters._tryToReplaceSubrange(target, with: replacement)
   }
 }
-
-%{
-def switch(s):
-  return """switch _rep {
-    case .utf16(let x):
-      %(s)s
-    case .latin1(let x):
-      %(s)s
-    case .any(let x):
-      %(s)s
-    case .cocoa(let x):
-      %(s)s
-    case .inline5or6(let x):
-      %(s)s
-    case .inline7or16(let x):
-      %(s)s
-    }""" % locals()
-}%
 
 extension String.Content : UnicodeContent {
   // Once we get ownership and view/slice mutation worked out, it's conceivable
@@ -890,11 +929,9 @@ public struct Substring {
 }    
 
 
-extension Substring : BidirectionalCollectionWrapper, Unicode {
-  public typealias Base = AnyCharacterUnicodeView.SubSequence
-  public typealias Iterator = Base.Iterator
-  public typealias Index = AnyCharacterUnicodeView.Index
-  public typealias IndexDistance = AnyCharacterUnicodeView.IndexDistance
+extension Substring : Unicode {
+  public typealias Index = String.Index
+  public typealias IndexDistance = String.IndexDistance
   public typealias SubSequence = Substring
 
   public subscript(bounds: Range<Index>) -> SubSequence {
@@ -906,16 +943,68 @@ extension Substring : BidirectionalCollectionWrapper, Unicode {
       content._wholeContent.replaceUTF16(bounds, with: newValue.content.utf16)
     }
   }
-  
-  // FIXME: figure out how to resolve ambiguities when we try to use the default
-  // from BidirectionalCollectionWrapper.
+
+  ${gyb.expand(
+      'ForwardCollectionAPIs.swift.gyb',
+      base='''x.characters[
+        x.characters.nativeIndex(content._bounds.lowerBound)
+        ..< x.characters.nativeIndex(content._bounds.upperBound)]''',
+      forward=lambda stmt: 
+        switch_('content._wholeContent._rep', stmt),
+      wrap_index='x.characters.anyIndex',
+      unwrap_index='x.characters.nativeIndex',
+      nonmutating=True,
+      Element='Character')}
+
   public mutating func _tryToReplaceSubrange<C: Collection>(
     _ target: Range<Index>, with replacement: C
   ) -> Bool
-  where C.Iterator.Element == Base.Iterator.Element {
-    return base._tryToReplaceSubrange(target, with: replacement)
+  where C.Iterator.Element == Character {
+    // Doing this rather than switching will try to preserve value semantics
+    // even if a case is a reference type.
+    return content.characters._tryToReplaceSubrange(target, with: replacement)
   }
 }
+
+extension Substring : Sequence {
+  // FIXME: this is a copy/paste of the Iterator from String.
+  public struct Iterator : IteratorProtocol {
+    public enum _Representation {
+    % for tag, Payload in allCases:
+    case ${tag}(${Payload}.CharacterView.SubSequence.Iterator)
+    % end
+    }
+    public var _rep: _Representation
+    
+    public init(_ content: Content) {
+      switch content._wholeContent._rep {
+    % for tag,_ in allCases:
+      case .${tag}(let x): _rep = .${tag}(
+          x.characters[
+            x.characters.nativeIndex(content._bounds.lowerBound)
+            ..< x.characters.nativeIndex(content._bounds.upperBound)]
+          .makeIterator())
+    % end
+      }
+    }
+    
+    public mutating func next() -> Character? {
+      switch _rep {
+    % for tag,_ in allCases:
+      case .${tag}(let x):
+        var x1 = x
+        defer { _rep = .${tag}(x1) }
+        return x1.next()
+    % end
+      }
+    }
+  }
+  
+  public func makeIterator() -> Iterator {
+    return Iterator(content)
+  }
+}
+
 
 extension Substring : RangeReplaceableCollection {
   public init() { content = Content() }
@@ -923,7 +1012,7 @@ extension Substring : RangeReplaceableCollection {
   public mutating func replaceSubrange<C: Collection>(
     _ r: Range<Index>, with replacement: C
   )
-  where C.Iterator.Element == Base.Iterator.Element {
+  where C.Iterator.Element == Character {
     content._wholeContent.replaceSubrange(r,  with: replacement)
   }
 }
@@ -946,19 +1035,44 @@ extension Substring.Content : AnyUnicodeContent {
   
 extension Substring.Content : UnicodeContent {
   public var utf16: String.Content.UTF16View.SubSequence {
-    return _wholeContent.utf16[_bounds]
+    get {
+      return _wholeContent.utf16[_bounds]
+    }
+    set {
+      _wholeContent.utf16.replaceSubrange(_bounds, with: newValue)
+    }
   }
   public var utf8: String.Content.UTF8View.SubSequence {
-    return _wholeContent.utf8[_bounds]
+    get {
+      return _wholeContent.utf8[_bounds]
+    }
+    set {
+      _wholeContent.utf8.replaceSubrange(_bounds, with: newValue)
+    }
   }
   public var fccNormalizedUTF16: String.Content.FCCNormalizedUTF16View.SubSequence {
-    return _wholeContent.fccNormalizedUTF16[_bounds]
+    get {
+      return _wholeContent.fccNormalizedUTF16[_bounds]
+    }
+    set {
+      _wholeContent.fccNormalizedUTF16.replaceSubrange(_bounds, with: newValue)
+    }
   }
   public var characters: String.Content.CharacterView.SubSequence {
-    return _wholeContent.characters[_bounds]
+    get {
+      return _wholeContent.characters[_bounds]
+    }
+    set {
+      _wholeContent.characters.replaceSubrange(_bounds, with: newValue)
+    }
   }
   public var unicodeScalars: String.Content.UnicodeScalarView.SubSequence {
-    return _wholeContent.unicodeScalars[_bounds]
+    get {
+      return _wholeContent.unicodeScalars[_bounds]
+    }
+    set {
+      _wholeContent.unicodeScalars.replaceSubrange(_bounds, with: newValue)
+    }
   }
 }
 
