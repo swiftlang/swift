@@ -3132,3 +3132,22 @@ bb0:
   %3 = tuple ()
   return %3 : $()
 }
+
+// Int1_const == x -> x == Int1_const
+// CHECK-LABEL: sil @canonicalize_bool_eq_checks
+sil @canonicalize_bool_eq_checks : $@convention(thin) (Builtin.Int1) -> Builtin.Int1 {
+bb0(%0 : $Builtin.Int1):
+  %1 = integer_literal $Builtin.Int1, 0
+  %2 = builtin "cmp_eq_Int1"(%1 : $Builtin.Int1, %0 : $Builtin.Int1) : $Builtin.Int1
+  return %2 : $Builtin.Int1
+}
+
+// Int1_const != x -> x != Int1_const
+// CHECK-LABEL: sil @canonicalize_bool_ne_checks
+sil @canonicalize_bool_ne_checks : $@convention(thin) (Builtin.Int1) -> Builtin.Int1 {
+bb0(%0 : $Builtin.Int1):
+  %1 = integer_literal $Builtin.Int1, 0
+  %2 = builtin "cmp_ne_Int1"(%1 : $Builtin.Int1, %0 : $Builtin.Int1) : $Builtin.Int1
+  return %2 : $Builtin.Int1
+}
+
