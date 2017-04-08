@@ -1278,9 +1278,9 @@ extension String {
       self = String(content: String.Content(utf16: newValue))
     }
   }
-  public init(_ core: _StringCore) {
+  public init(_ _core: _StringCore) {
     self.init()
-    self._core = core
+    self._core = _core
   }
 }
 
