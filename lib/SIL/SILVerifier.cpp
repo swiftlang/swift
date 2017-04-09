@@ -1252,6 +1252,8 @@ public:
   }
 
   void checkBeginAccessInst(BeginAccessInst *BAI) {
+    require(F.hasAccessMarkers(), "Unexpected begin_access");
+
     auto op = BAI->getOperand();
     requireSameType(BAI->getType(), op->getType(),
                     "result must be same type as operand");
@@ -1286,6 +1288,8 @@ public:
   }
 
   void checkEndAccessInst(EndAccessInst *EAI) {
+    require(F.hasAccessMarkers(), "Unexpected end_access");
+
     auto BAI = dyn_cast<BeginAccessInst>(EAI->getOperand());
     require(BAI != nullptr,
             "operand of end_access must be a begin_access");
