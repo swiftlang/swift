@@ -43,8 +43,6 @@ class MergeCondFailInsts : public SILFunctionTransform {
 public:
   MergeCondFailInsts() {}
 
-  StringRef getName() override { return "Merge cond_fail instructions"; }
-
   void run() override {
     bool Changed = false;
     auto *F = getFunction();

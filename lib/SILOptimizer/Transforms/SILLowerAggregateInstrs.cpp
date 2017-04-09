@@ -269,7 +269,6 @@ class SILLowerAggregate : public SILFunctionTransform {
     }
   }
 
-  StringRef getName() override { return "Lower Aggregate Instructions"; }
 };
 } // end anonymous namespace
 

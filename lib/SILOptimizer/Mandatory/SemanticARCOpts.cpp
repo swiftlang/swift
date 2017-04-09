@@ -166,7 +166,6 @@ struct SemanticARCOpts : SILFunctionTransform {
     }
   }
 
-  StringRef getName() override { return "Semantic ARC Opts"; }
 };
 
 } // end anonymous namespace

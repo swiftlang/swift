@@ -158,7 +158,6 @@ class BugReducerTester : public SILFunctionTransform {
     }
   }
 
-  StringRef getName() override { return "Bug Reducer Tester"; }
 };
 
 } // end anonymous namespace

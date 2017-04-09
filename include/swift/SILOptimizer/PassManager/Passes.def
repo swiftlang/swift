@@ -14,21 +14,33 @@
 //
 //===----------------------------------------------------------------------===//
 
-/// PASS(Id, Name, Description)
-///   The pass is identified by PassKind::Id, and there exists a
-///   global function swift::create##Id().
+/// PASS(Id, Tag, Name)
+///   Id is a pass "identifier", used for its enum case, PassKind::Id,
+///   and type name, as returned by the global function swift::create##Id().
+///
+///   Tag identifies the pass as a command-line compatible option string.
+///
+///   Name is the descriptive, human readable pass name.
+///
+///   All three if these fields are unique identifiers which may be used in test
+///   cases and tools to specify a pass by string. Different tools simply prefer
+///   different identifier formats. Changing any of one these strings may change
+///   the functionality of some tests.
 ///
 ///   This macro must be defined by the includer.
 #ifndef PASS
 #error "Macro must be defined by includer"
 #endif
 
-/// IRGEN_PASS(Id, Name, Description)
-///   The pass is identified by PassKind::Id.
-///   An IRGen pass is created by IRGen and needs to be register with the pass
+/// IRGEN_PASS(Id, Tag, Name)
+///   This macro follows the same conventions as PASS(Id, Tag, Name),
+///   but is used for IRGen passes which are built outside of the
+///   SILOptimizer library.
+///   
+///   An IRGen pass is created by IRGen and needs to be registered with the pass
 ///   manager dynamically.
 #ifndef IRGEN_PASS
-#define IRGEN_PASS(Id, Name, Description) PASS(Id, Name, Description)
+#define IRGEN_PASS(Id, Tag, Name) PASS(Id, Tag, Name)
 #endif
 
 /// PASS_RANGE(RANGE_ID, START, END)

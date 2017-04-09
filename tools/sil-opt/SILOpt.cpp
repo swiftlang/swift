@@ -105,7 +105,7 @@ static llvm::cl::opt<OptGroup> OptimizationGroup(
 static llvm::cl::list<PassKind>
 Passes(llvm::cl::desc("Passes:"),
        llvm::cl::values(
-#define PASS(ID, NAME, DESCRIPTION) clEnumValN(PassKind::ID, NAME, DESCRIPTION),
+#define PASS(ID, TAG, NAME) clEnumValN(PassKind::ID, TAG, NAME),
 #include "swift/SILOptimizer/PassManager/Passes.def"
        clEnumValN(0, "", "")));
 
@@ -182,8 +182,8 @@ static void runCommandLineSelectedPasses(SILModule *Module,
                                          irgen::IRGenModule *IRGenMod) {
   SILPassManager PM(Module, IRGenMod);
   for (auto P : Passes) {
-#define PASS(ID, Name, Description)
-#define IRGEN_PASS(ID, Name, Description)                                      \
+#define PASS(ID, Tag, Name)
+#define IRGEN_PASS(ID, Tag, Name)                                              \
   if (P == PassKind::ID)                                                       \
     PM.registerIRGenPass(swift::PassKind::ID, irgen::create##ID());
 #include "swift/SILOptimizer/PassManager/Passes.def"
