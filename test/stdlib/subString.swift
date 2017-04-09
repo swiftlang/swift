@@ -77,21 +77,19 @@ SubstringTests.test("UnicodeScalars") {
   expectEqual(s, "abcdefg")
 }
 
-// Michael NOTE: Temporary super ugly and inefficient inits, might be replaced
-// by having UnicodeViews have UnicodeContent.
 extension String {
-  public init(_fromView view: RangeReplaceableBidirectionalSlice<AnyUInt16UnicodeView>) {
-    self.init(AnyUInt16UnicodeView(Array<UInt16>(view)))
-  }
-  public init(_fromView view: RangeReplaceableBidirectionalSlice<AnyUInt8UnicodeView>) {
-    self.init(AnyUInt8UnicodeView(Array<UInt8>(view)))
-  }
-
-  public init(_fromView view: RangeReplaceableUnicodeViewSlice<AnyUInt16UnicodeView>) {
-    self.init(_fromView: view.base)
-  }
-  public init(_fromView view: RangeReplaceableUnicodeViewSlice<AnyUInt8UnicodeView>) {
-    self.init(_fromView: view.base)
+  // FIXME: the one(s) we put in the standard library should be smarter (work on
+  // any Sequence, take advantage of underlying UTF16 codeUnits if/when they
+  // exist, etc.)
+  init<CodeUnits: BidirectionalCollection, Encoding: UnicodeEncoding>(
+    _ c: CodeUnits, fromEncoding e: Encoding.Type
+  ) where Encoding.EncodedScalar.Iterator.Element == CodeUnits.Iterator.Element,
+  CodeUnits.SubSequence : BidirectionalCollection,
+  CodeUnits.SubSequence.Index == CodeUnits.Index,
+  CodeUnits.SubSequence.SubSequence == CodeUnits.SubSequence,
+  CodeUnits.SubSequence.Iterator.Element == CodeUnits.Iterator.Element {
+    content = String.Content(utf16:
+      _UnicodeViews(c, e).transcoded(to: UTF16.self))
   }
 }
 
@@ -109,10 +107,10 @@ SubstringTests.test("UTF16View") {
   checkMatch(t, u, u.index(after: u.startIndex))
   checkMatch(t, u, u.index(before: u.endIndex))
 
-  expectEqual("", String(_fromView: t.dropFirst(10)))
-  expectEqual("", String(_fromView: t.dropLast(10)))
-  expectEqual("", String(_fromView: u.dropFirst(10)))
-  expectEqual("", String(_fromView: u.dropLast(10)))
+  expectEqual("", String(t.dropFirst(10), fromEncoding: UTF16.self))
+  expectEqual("", String(t.dropLast(10), fromEncoding: UTF16.self))
+  expectEqual("", String(u.dropFirst(10), fromEncoding: UTF16.self))
+  expectEqual("", String(u.dropLast(10), fromEncoding: UTF16.self))
 }
 
 SubstringTests.test("UTF8View") {
@@ -127,10 +125,10 @@ SubstringTests.test("UTF8View") {
   checkMatch(t, u, u.startIndex)
   checkMatch(t, u, u.index(after: u.startIndex))
 
-  expectEqual("", String(_fromView: t.dropFirst(10)))
-  expectEqual("", String(_fromView: t.dropLast(10)))
-  expectEqual("", String(_fromView: u.dropFirst(10)))
-  expectEqual("", String(_fromView: u.dropLast(10)))
+  expectEqual("", String(t.dropFirst(10), fromEncoding: UTF8.self))
+  expectEqual("", String(t.dropLast(10), fromEncoding: UTF8.self))
+  expectEqual("", String(u.dropFirst(10), fromEncoding: UTF8.self))
+  expectEqual("", String(u.dropLast(10), fromEncoding: UTF8.self))
 }
 
 runAllTests()
