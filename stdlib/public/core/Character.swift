@@ -130,11 +130,11 @@ public struct Character :
     }
   }
 
-  public init<CodeUnits : RandomAccessCollection, Encoding : UnicodeEncoding>(
+  public init<CodeUnits : BidirectionalCollection, Encoding : UnicodeEncoding>(
     _codeUnits: CodeUnits, _: Encoding.Type
   ) where
   Encoding.EncodedScalar.Iterator.Element == CodeUnits.Iterator.Element,
-  CodeUnits.SubSequence : RandomAccessCollection,
+  CodeUnits.SubSequence : BidirectionalCollection,
   CodeUnits.SubSequence.Index == CodeUnits.Index,
   CodeUnits.SubSequence.SubSequence == CodeUnits.SubSequence,
   CodeUnits.SubSequence.Iterator.Element == CodeUnits.Iterator.Element

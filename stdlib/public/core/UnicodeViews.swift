@@ -121,11 +121,11 @@ extension RandomAccessUnicodeView : UnicodeView {
 /// Latin1String would might be a simple lazy zero-extended mapping, rather than
 /// something that goes through the transcoding machinery.
 public struct _UnicodeViews<
-  CodeUnits : RandomAccessCollection,
+  CodeUnits : BidirectionalCollection,
   Encoding : UnicodeEncoding
 >
 where Encoding.EncodedScalar.Iterator.Element == CodeUnits.Iterator.Element,
-  CodeUnits.SubSequence : RandomAccessCollection,
+  CodeUnits.SubSequence : BidirectionalCollection,
   CodeUnits.SubSequence.Index == CodeUnits.Index,
   CodeUnits.SubSequence.SubSequence == CodeUnits.SubSequence,
   CodeUnits.SubSequence.Iterator.Element == CodeUnits.Iterator.Element {
@@ -144,11 +144,11 @@ where Encoding.EncodedScalar.Iterator.Element == CodeUnits.Iterator.Element,
 /// the name `_UnicodeViews` from within nested contexts
 /// (https://bugs.swift.org/browse/SR-4155).
 internal typealias _UnicodeViews_<
-  CodeUnits : RandomAccessCollection,
+  CodeUnits : BidirectionalCollection,
   Encoding : UnicodeEncoding
 >  = _UnicodeViews<CodeUnits, Encoding>
 where Encoding.EncodedScalar.Iterator.Element == CodeUnits.Iterator.Element,
-  CodeUnits.SubSequence : RandomAccessCollection,
+  CodeUnits.SubSequence : BidirectionalCollection,
   CodeUnits.SubSequence.Index == CodeUnits.Index,
   CodeUnits.SubSequence.SubSequence == CodeUnits.SubSequence,
 CodeUnits.SubSequence.Iterator.Element == CodeUnits.Iterator.Element
@@ -423,13 +423,13 @@ extension _UnicodeViews {
 /// `FromEncoding`, provides a collection of `ToEncoding.CodeUnit`s
 /// representing the same text.
 public struct _TranscodedView<
-CodeUnits : RandomAccessCollection,
+CodeUnits : BidirectionalCollection,
 FromEncoding_ : UnicodeEncoding,
 ToEncoding : UnicodeEncoding
 > 
   : BidirectionalCollection, BidirectionalCollectionWrapper
 where FromEncoding_.EncodedScalar.Iterator.Element == CodeUnits.Iterator.Element,
-  CodeUnits.SubSequence : RandomAccessCollection,
+  CodeUnits.SubSequence : BidirectionalCollection,
   CodeUnits.SubSequence.Index == CodeUnits.Index,
   CodeUnits.SubSequence.SubSequence == CodeUnits.SubSequence,
   CodeUnits.SubSequence.Iterator.Element == CodeUnits.Iterator.Element
@@ -844,11 +844,11 @@ extension _UnicodeViews {
 // term direction to take here.
 //
 public struct Latin1CharacterView<
-  CodeUnits : RandomAccessCollection,
+  CodeUnits : BidirectionalCollection,
   Encoding : UnicodeEncoding
 > : UnicodeView
   where Encoding.EncodedScalar.Iterator.Element == CodeUnits.Iterator.Element,
-  CodeUnits.SubSequence : RandomAccessCollection,
+  CodeUnits.SubSequence : BidirectionalCollection,
   CodeUnits.SubSequence.Index == CodeUnits.Index,
   CodeUnits.SubSequence.SubSequence == CodeUnits.SubSequence,
   CodeUnits.SubSequence.Iterator.Element == CodeUnits.Iterator.Element,

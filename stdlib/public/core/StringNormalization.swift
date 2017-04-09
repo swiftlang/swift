@@ -83,12 +83,12 @@ public func _hasBoundary(before value: UInt32) -> Bool {
 // finer-grained segments.
 
 public struct FCCNormalizedLazySegments<
-  CodeUnits : RandomAccessCollection,
+  CodeUnits : BidirectionalCollection,
   FromEncoding : UnicodeEncoding
 >
 where
   CodeUnits.Index == CodeUnits.SubSequence.Index,
-  CodeUnits.SubSequence : RandomAccessCollection,
+  CodeUnits.SubSequence : BidirectionalCollection,
   CodeUnits.SubSequence == CodeUnits.SubSequence.SubSequence,
   CodeUnits.Iterator.Element == CodeUnits.SubSequence.Iterator.Element,
   CodeUnits.Iterator.Element == FromEncoding.EncodedScalar.Iterator.Element
