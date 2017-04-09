@@ -44,7 +44,6 @@ class Devirtualizer : public SILFunctionTransform {
       invalidateAnalysis(SILAnalysis::InvalidationKind::CallsAndInstructions);
   }
 
-  StringRef getName() override { return "Devirtualizer"; }
 };
 
 } // end anonymous namespace

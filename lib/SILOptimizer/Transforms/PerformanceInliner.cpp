@@ -861,7 +861,6 @@ public:
     }
   }
 
-  StringRef getName() override { return PassName; }
 };
 } // end anonymous namespace
 

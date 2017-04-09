@@ -1608,8 +1608,6 @@ namespace {
 
 class RedundantLoadElimination : public SILFunctionTransform {
 
-  StringRef getName() override { return "SIL Redundant Load Elimination"; }
-
   /// The entry point to the transformation.
   void run() override {
     SILFunction *F = getFunction();

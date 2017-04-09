@@ -1154,8 +1154,6 @@ private:
       invalidateAnalysis(Invalidation);
     }
   }
-
-  StringRef getName() override { return "Constant Propagation"; }
 };
 
 } // end anonymous namespace

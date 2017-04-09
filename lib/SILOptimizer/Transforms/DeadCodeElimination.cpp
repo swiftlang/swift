@@ -176,7 +176,6 @@ class DCE : public SILFunctionTransform {
   SILBasicBlock *nearestUsefulPostDominator(SILBasicBlock *Block);
   void replaceBranchWithJump(SILInstruction *Inst, SILBasicBlock *Block);
 
-  StringRef getName() override { return "Dead Code Elimination"; }
 };
 
 // Keep track of the fact that V is live and add it to our worklist

@@ -1452,8 +1452,6 @@ class AddressLowering : public SILModuleTransform {
   /// The entry point to this function transformation.
   void run() override;
 
-  StringRef getName() override { return "Address Lowering"; }
-
   void runOnFunction(SILFunction *F);
 };
 } // end anonymous namespace

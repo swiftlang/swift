@@ -35,8 +35,6 @@ using namespace swift;
 
 namespace {
 class SILCFGPrinter : public SILFunctionTransform {
-  StringRef getName() override { return "SIL CFG Printer"; }
-
   /// The entry point to the transformation.
   void run() override {
     SILFunction *F = getFunction();

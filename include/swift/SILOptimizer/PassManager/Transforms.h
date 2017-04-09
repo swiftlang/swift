@@ -67,7 +67,7 @@ namespace swift {
     void injectPassManager(SILPassManager *PMM) { PM = PMM; }
 
     /// Get the name of the transform.
-    virtual llvm::StringRef getName() = 0;
+    llvm::StringRef getName() { return PassKindName(getPassKind()); }
 
   protected:
     /// \brief Searches for an analysis of type T in the list of registered

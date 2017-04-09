@@ -50,7 +50,7 @@ public:
   SILPassPipelinePlan(const SILPassPipelinePlan &) = default;
 
 // Each pass gets its own add-function.
-#define PASS(ID, NAME, DESCRIPTION)                                            \
+#define PASS(ID, TAG, NAME)                                                    \
   void add##ID() {                                                             \
     assert(!PipelineStages.empty() && "startPipeline before adding passes.");  \
     Kinds.push_back(PassKind::ID);                                             \
