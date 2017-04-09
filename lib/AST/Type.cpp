@@ -1574,8 +1574,11 @@ Type TypeBase::getSuperclass(LazyResolver *resolver) {
     if (auto dynamicSelfTy = getAs<DynamicSelfType>())
       return dynamicSelfTy->getSelfType();
 
+    if (auto compositionTy = getAs<ProtocolCompositionType>())
+      return compositionTy->getExistentialLayout().superclass;
+
     // No other types have superclasses.
-    return nullptr;
+    return Type();
   }
 
   // We have a class, so get the superclass type.
