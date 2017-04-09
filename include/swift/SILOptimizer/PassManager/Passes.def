@@ -54,6 +54,8 @@ PASS(AADumper, "aa-dump",
      "Dump Alias Analysis over all Pairs")
 PASS(ABCOpt, "abcopts",
      "Array Bounds Check Optimization")
+PASS(AccessMarkerElimination, "access-marker-elim",
+     "Access Marker Elimination.")
 PASS(AddressLowering, "address-lowering",
      "SIL Address Lowering")
 PASS(AllocBoxToStack, "allocbox-to-stack",
