@@ -1417,3 +1417,19 @@ bb0(%0 : $AB):                     // Preds: bb6 bb5 bb4 bb3
   dealloc_stack %1 : $*AB
   return %2 : $Builtin.Int1
 }
+
+// CHECK-LABEL: dont_remove_store
+// CHECK: load
+// CHECK: store
+// CHECK: value_metatype
+// CHECK: return
+sil @dont_remove_store : $@convention(thin) (@in_guaranteed foo) -> () {
+bb0(%0 : $*foo):
+  %1 = alloc_stack $foo
+  %2 = load %0 : $*foo
+  store %2 to %1 : $*foo
+  %3 = value_metatype $@thick foo.Type, %1 : $*foo
+  dealloc_stack %1 : $*foo
+  %20 = tuple()
+  return %20 : $()
+}
