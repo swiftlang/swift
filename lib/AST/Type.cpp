@@ -2744,21 +2744,12 @@ void ProtocolCompositionType::Profile(llvm::FoldingSetNodeID &ID,
     ID.AddPointer(P.getPointer());
 }
 
-bool ProtocolType::requiresClass() const {
+bool ProtocolType::requiresClass() {
   return getDecl()->requiresClass();
 }
 
-bool ProtocolCompositionType::requiresClass() const {
-  for (Type t : getProtocols()) {
-    if (const ProtocolType *proto = t->getAs<ProtocolType>()) {
-      if (proto->requiresClass())
-        return true;
-    } else {
-      if (t->castTo<ProtocolCompositionType>()->requiresClass())
-        return true;
-    }
-  }
-  return false;
+bool ProtocolCompositionType::requiresClass() {
+  return getExistentialLayout().requiresClass;
 }
 
 Type ProtocolCompositionType::get(const ASTContext &C,

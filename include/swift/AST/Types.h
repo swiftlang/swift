@@ -3605,7 +3605,7 @@ public:
   }
 
   /// True if only classes may conform to the protocol.
-  bool requiresClass() const;
+  bool requiresClass();
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {
@@ -3678,7 +3678,7 @@ public:
   static void Profile(llvm::FoldingSetNodeID &ID, ArrayRef<Type> Protocols);
 
   /// True if one or more of the protocols is class.
-  bool requiresClass() const;
+  bool requiresClass();
   
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {
