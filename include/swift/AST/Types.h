@@ -3689,10 +3689,11 @@ private:
   static ProtocolCompositionType *build(const ASTContext &C,
                                         ArrayRef<Type> Protocols);
 
-  ProtocolCompositionType(const ASTContext *Ctx, ArrayRef<Type> Protocols)
-    : TypeBase(TypeKind::ProtocolComposition, /*Context=*/Ctx,
-               RecursiveTypeProperties()),
-      Protocols(Protocols) { }
+  ProtocolCompositionType(const ASTContext *ctx, ArrayRef<Type> protocols,
+                          RecursiveTypeProperties properties)
+    : TypeBase(TypeKind::ProtocolComposition, /*Context=*/ctx,
+               properties),
+      Protocols(protocols) { }
 };
 BEGIN_CAN_TYPE_WRAPPER(ProtocolCompositionType, Type)
   /// In the canonical representation, these are all ProtocolTypes.
