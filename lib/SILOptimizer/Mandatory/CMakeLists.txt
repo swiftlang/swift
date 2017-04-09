@@ -1,4 +1,5 @@
 set(MANDATORY_SOURCES
+  Mandatory/AccessMarkerElimination.cpp
   Mandatory/AddressLowering.cpp
   Mandatory/DefiniteInitialization.cpp
   Mandatory/DIMemoryUseCollector.cpp

@@ -642,11 +642,14 @@ public:
   const BlockListType &getBlocks() const { return BlockList; }
 
   typedef BlockListType::iterator iterator;
+  typedef BlockListType::reverse_iterator reverse_iterator;
   typedef BlockListType::const_iterator const_iterator;
 
   bool empty() const { return BlockList.empty(); }
   iterator begin() { return BlockList.begin(); }
   iterator end() { return BlockList.end(); }
+  reverse_iterator rbegin() { return BlockList.rbegin(); }
+  reverse_iterator rend() { return BlockList.rend(); }
   const_iterator begin() const { return BlockList.begin(); }
   const_iterator end() const { return BlockList.end(); }
   unsigned size() const { return BlockList.size(); }
