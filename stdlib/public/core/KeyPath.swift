@@ -776,37 +776,30 @@ internal struct KeyPathBuffer {
   }
 }
 
-public struct _KeyPathBase<T> {
-  public var base: T
-  public init(base: T) { self.base = base }
-  
-  // TODO: These subscripts ought to sit on `Any`
-  public subscript<U>(keyPath: KeyPath<T, U>) -> U {
-    return keyPath.projectReadOnly(from: base)
-  }
-  
-  public subscript<U>(keyPath: WritableKeyPath<T, U>) -> U {
-    get {
-      return keyPath.projectReadOnly(from: base)
-    }
-    mutableAddressWithNativeOwner {
-      // The soundness of this `addressof` operation relies on the returned
-      // address from an address only being used during a single formal access
-      // of `self` (IOW, there's no end of the formal access between
-      // `materializeForSet` and its continuation).
-      let basePtr = UnsafeMutablePointer<T>(Builtin.addressof(&base))
-      return keyPath.projectMutableAddress(from: basePtr)
-    }
-  }
+// MARK: Library intrinsics for projecting key paths.
 
-  public subscript<U>(keyPath: ReferenceWritableKeyPath<T, U>) -> U {
-    get {
-      return keyPath.projectReadOnly(from: base)
-    }
-    nonmutating mutableAddressWithNativeOwner {
-      return keyPath.projectMutableAddress(from: base)
-    }
-  }
+public // COMPILER_INTRINSIC
+func _projectKeyPathReadOnly<Root, Value>(
+  root: Root,
+  keyPath: KeyPath<Root, Value>
+) -> Value {
+  return keyPath.projectReadOnly(from: root)
+}
+
+public // COMPILER_INTRINSIC
+func _projectKeyPathWritable<Root, Value>(
+  root: UnsafeMutablePointer<Root>,
+  keyPath: WritableKeyPath<Root, Value>
+) -> (UnsafeMutablePointer<Value>, Builtin.NativeObject) {
+  return keyPath.projectMutableAddress(from: root)
+}
+
+public // COMPILER_INTRINSIC
+func _projectKeyPathReferenceWritable<Root, Value>(
+  root: Root,
+  keyPath: ReferenceWritableKeyPath<Root, Value>
+) -> (UnsafeMutablePointer<Value>, Builtin.NativeObject) {
+  return keyPath.projectMutableAddress(from: root)
 }
 
 // MARK: Appending type system

@@ -220,67 +220,67 @@ keyPathImpl.test("struct components") {
 
   // \("") forces the string to be computed at runtime (and therefore allocated)
   let c = C(x: 679, y: nil, z: "buffalo\("")")
-  var value = _KeyPathBase(base: S(x: 1738, y: nil, z: "bottles of beer\("")",
-                                   p: .init(x: 0.5, y: -0.5), c: c))
-  expectEqual(value[s_x], 1738)
-  value[s_x] = 679
-  expectEqual(value[s_x], 679)
+  var value = S(x: 1738, y: nil, z: "bottles of beer\("")",
+                p: .init(x: 0.5, y: -0.5), c: c)
+  expectEqual(value[keyPath: s_x], 1738)
+  value[keyPath: s_x] = 679
+  expectEqual(value[keyPath: s_x], 679)
 
-  expectTrue(value[s_y] === nil)
+  expectTrue(value[keyPath: s_y] === nil)
 
   let object1 = LifetimeTracked(1739)
-  value[s_y] = object1
-  expectTrue(value[s_y] === object1)
-  expectTrue(value.base.y === object1)
+  value[keyPath: s_y] = object1
+  expectTrue(value[keyPath: s_y] === object1)
+  expectTrue(value.y === object1)
 
   let object2 = LifetimeTracked(1740)
-  value[s_y] = object2
-  expectTrue(value[s_y] === object2)
-  expectTrue(value.base.y === object2)
+  value[keyPath: s_y] = object2
+  expectTrue(value[keyPath: s_y] === object2)
+  expectTrue(value.y === object2)
 
-  expectEqual(value[s_z], "bottles of beer")
-  value[s_z] = "cans of lemonade\("")"
-  expectEqual(value[s_z], "cans of lemonade")
-  expectEqual(value.base.z, "cans of lemonade")
+  expectEqual(value[keyPath: s_z], "bottles of beer")
+  value[keyPath: s_z] = "cans of lemonade\("")"
+  expectEqual(value[keyPath: s_z], "cans of lemonade")
+  expectEqual(value.z, "cans of lemonade")
   
-  expectEqual(value[s_p], Point(x: 0.5, y: -0.5))
-  expectEqual(value.base.p, Point(x: 0.5, y: -0.5))
-  expectEqual(value[s_p_x], 0.5)
-  expectEqual(value.base.p.x, 0.5)
-  expectEqual(value[s_p_y], -0.5)
-  expectEqual(value.base.p.y, -0.5)
+  expectEqual(value[keyPath: s_p], Point(x: 0.5, y: -0.5))
+  expectEqual(value.p, Point(x: 0.5, y: -0.5))
+  expectEqual(value[keyPath: s_p_x], 0.5)
+  expectEqual(value.p.x, 0.5)
+  expectEqual(value[keyPath: s_p_y], -0.5)
+  expectEqual(value.p.y, -0.5)
 
-  value[s_p] = Point(x: -3.0, y: 4.0)
-  expectEqual(value[s_p], Point(x: -3.0, y: 4.0))
-  expectEqual(value.base.p, Point(x: -3.0, y: 4.0))
-  expectEqual(value[s_p_x], -3.0)
-  expectEqual(value.base.p.x, -3.0)
-  expectEqual(value[s_p_y], 4.0)
-  expectEqual(value.base.p.y, 4.0)
+  value[keyPath: s_p] = Point(x: -3.0, y: 4.0)
+  expectEqual(value[keyPath: s_p], Point(x: -3.0, y: 4.0))
+  expectEqual(value.p, Point(x: -3.0, y: 4.0))
+  expectEqual(value[keyPath: s_p_x], -3.0)
+  expectEqual(value.p.x, -3.0)
+  expectEqual(value[keyPath: s_p_y], 4.0)
+  expectEqual(value.p.y, 4.0)
   
-  value[s_p_x] = 5.0
-  expectEqual(value[s_p], Point(x: 5.0, y: 4.0))
-  expectEqual(value.base.p, Point(x: 5.0, y: 4.0))
-  expectEqual(value[s_p_x], 5.0)
-  expectEqual(value.base.p.x, 5.0)
-  expectEqual(value[s_p_y], 4.0)
-  expectEqual(value.base.p.y, 4.0)
+  value[keyPath: s_p_x] = 5.0
+  expectEqual(value[keyPath: s_p], Point(x: 5.0, y: 4.0))
+  expectEqual(value.p, Point(x: 5.0, y: 4.0))
+  expectEqual(value[keyPath: s_p_x], 5.0)
+  expectEqual(value.p.x, 5.0)
+  expectEqual(value[keyPath: s_p_y], 4.0)
+  expectEqual(value.p.y, 4.0)
   
-  value[s_p_y] = -11.0
-  expectEqual(value[s_p], Point(x: 5.0, y: -11.0))
-  expectEqual(value.base.p, Point(x: 5.0, y: -11.0))
-  expectEqual(value[s_p_x], 5.0)
-  expectEqual(value.base.p.x, 5.0)
-  expectEqual(value[s_p_y], -11.0)
-  expectEqual(value.base.p.y, -11.0)
+  value[keyPath: s_p_y] = -11.0
+  expectEqual(value[keyPath: s_p], Point(x: 5.0, y: -11.0))
+  expectEqual(value.p, Point(x: 5.0, y: -11.0))
+  expectEqual(value[keyPath: s_p_x], 5.0)
+  expectEqual(value.p.x, 5.0)
+  expectEqual(value[keyPath: s_p_y], -11.0)
+  expectEqual(value.p.y, -11.0)
   
-  value[s_p].x = 65.0
-  expectEqual(value[s_p], Point(x: 65.0, y: -11.0))
-  expectEqual(value.base.p, Point(x: 65.0, y: -11.0))
-  expectEqual(value[s_p_x], 65.0)
-  expectEqual(value.base.p.x, 65.0)
-  expectEqual(value[s_p_y], -11.0)
-  expectEqual(value.base.p.y, -11.0)
+  value[keyPath: s_p].x = 65.0
+  expectEqual(value[keyPath: s_p], Point(x: 65.0, y: -11.0))
+  expectEqual(value.p, Point(x: 65.0, y: -11.0))
+  expectEqual(value[keyPath: s_p_x], 65.0)
+  expectEqual(value.p.x, 65.0)
+  expectEqual(value[keyPath: s_p_y], -11.0)
+  expectEqual(value.p.y, -11.0)
 }
 
 keyPathImpl.test("class components") {
@@ -304,47 +304,47 @@ keyPathImpl.test("class components") {
     }
 
   let c = C(x: 679, y: nil, z: "buffalo\("")")
-  let value = _KeyPathBase(base: c)
+  let value = c
   
-  expectEqual(value[c_x], 679)
-  value[c_x] = 1738
-  expectEqual(value[c_x], 1738)
-  expectEqual(value.base.x, 1738)
+  expectEqual(value[keyPath: c_x], 679)
+  value[keyPath: c_x] = 1738
+  expectEqual(value[keyPath: c_x], 1738)
+  expectEqual(value.x, 1738)
 
-  expectTrue(value[c_y] === nil)
+  expectTrue(value[keyPath: c_y] === nil)
 
   let object1 = LifetimeTracked(680)
-  value[c_y] = object1
-  expectTrue(value[c_y] === object1)
-  expectTrue(value.base.y === object1)
+  value[keyPath: c_y] = object1
+  expectTrue(value[keyPath: c_y] === object1)
+  expectTrue(value.y === object1)
 
   let object2 = LifetimeTracked(681)
-  value[c_y] = object2
-  expectTrue(value[c_y] === object2)
-  expectTrue(value.base.y === object2)
+  value[keyPath: c_y] = object2
+  expectTrue(value[keyPath: c_y] === object2)
+  expectTrue(value.y === object2)
 
-  expectEqual(value[c_z], "buffalo")
-  value[c_z] = "water buffalo\("")"
-  expectEqual(value[c_z], "water buffalo")
-  expectEqual(value.base.z, "water buffalo")
+  expectEqual(value[keyPath: c_z], "buffalo")
+  value[keyPath: c_z] = "water buffalo\("")"
+  expectEqual(value[keyPath: c_z], "water buffalo")
+  expectEqual(value.z, "water buffalo")
   
   var mutValue = value
   let value_c_x: WritableKeyPath = c_x
   let value_c_y: WritableKeyPath = c_y
   
-  expectEqual(value[value_c_x], 1738)
-  mutValue[value_c_x] = 86
-  expectTrue(value.base === mutValue.base)
-  expectEqual(value[c_x], 86)
-  expectEqual(value[value_c_x], 86)
-  expectEqual(value.base.x, 86)
+  expectEqual(value[keyPath: value_c_x], 1738)
+  mutValue[keyPath: value_c_x] = 86
+  expectTrue(value === mutValue)
+  expectEqual(value[keyPath: c_x], 86)
+  expectEqual(value[keyPath: value_c_x], 86)
+  expectEqual(value.x, 86)
 
-  expectTrue(value[value_c_y] === object2)
-  mutValue[value_c_y] = object1
-  expectTrue(value.base === mutValue.base)
-  expectTrue(value[c_y] === object1)
-  expectTrue(value[value_c_y] === object1)
-  expectTrue(value.base.y === object1)
+  expectTrue(value[keyPath: value_c_y] === object2)
+  mutValue[keyPath: value_c_y] = object1
+  expectTrue(value === mutValue)
+  expectTrue(value[keyPath: c_y] === object1)
+  expectTrue(value[keyPath: value_c_y] === object1)
+  expectTrue(value.y === object1)
 }
 
 keyPathImpl.test("reference prefix") {
@@ -379,38 +379,38 @@ keyPathImpl.test("reference prefix") {
     }
   
   let c = C(x: 679, y: nil, z: "buffalo\("")")
-  let value = _KeyPathBase(base: S(x: 1738, y: nil, z: "bottles of beer\("")",
-    p: .init(x: 0.5, y: -0.5), c: c))
+  let value = S(x: 1738, y: nil, z: "bottles of beer\("")",
+                p: .init(x: 0.5, y: -0.5), c: c)
 
-  expectEqual(value[s_c_x], 679)
-  value[s_c_x] = 6
-  expectEqual(value[s_c_x], 6)
-  expectEqual(value.base.c.x, 6)
-  expectTrue(value.base.c.y === nil)
-  expectEqual(value.base.c.z, "buffalo")
+  expectEqual(value[keyPath: s_c_x], 679)
+  value[keyPath: s_c_x] = 6
+  expectEqual(value[keyPath: s_c_x], 6)
+  expectEqual(value.c.x, 6)
+  expectTrue(value.c.y === nil)
+  expectEqual(value.c.z, "buffalo")
 
   let object1 = LifetimeTracked(7)
   let object2 = LifetimeTracked(8)
-  expectTrue(value[s_c_y] === nil)
+  expectTrue(value[keyPath: s_c_y] === nil)
 
-  value[s_c_y] = object1
-  expectTrue(value[s_c_y] === object1)
-  expectTrue(value.base.c.y === object1)
-  expectEqual(value.base.c.x, 6)
-  expectEqual(value.base.c.z, "buffalo")
+  value[keyPath: s_c_y] = object1
+  expectTrue(value[keyPath: s_c_y] === object1)
+  expectTrue(value.c.y === object1)
+  expectEqual(value.c.x, 6)
+  expectEqual(value.c.z, "buffalo")
 
-  value[s_c_y] = object2
-  expectTrue(value[s_c_y] === object2)
-  expectTrue(value.base.c.y === object2)
-  expectEqual(value.base.c.x, 6)
-  expectEqual(value.base.c.z, "buffalo")
+  value[keyPath: s_c_y] = object2
+  expectTrue(value[keyPath: s_c_y] === object2)
+  expectTrue(value.c.y === object2)
+  expectEqual(value.c.x, 6)
+  expectEqual(value.c.z, "buffalo")
   
-  expectEqual(value[s_c_z], "buffalo")
-  value[s_c_z] = "antelope"
-  expectTrue(value[s_c_z] == "antelope")
-  expectTrue(value.base.c.z == "antelope")
-  expectEqual(value.base.c.x, 6)
-  expectTrue(value.base.c.y === object2)
+  expectEqual(value[keyPath: s_c_z], "buffalo")
+  value[keyPath: s_c_z] = "antelope"
+  expectTrue(value[keyPath: s_c_z] == "antelope")
+  expectTrue(value.c.z == "antelope")
+  expectEqual(value.c.x, 6)
+  expectTrue(value.c.y === object2)
   
   let value_s_c_x: WritableKeyPath = s_c_x
   let value_s_c_y: WritableKeyPath = s_c_y
@@ -418,26 +418,26 @@ keyPathImpl.test("reference prefix") {
   
   var mutValue = value
   
-  mutValue[value_s_c_x] = 7
-  expectEqual(value.base, mutValue.base)
-  expectEqual(value[s_c_x], 7)
-  expectEqual(value.base.c.x, 7)
-  expectTrue(value.base.c.y === object2)
-  expectEqual(value.base.c.z, "antelope")
+  mutValue[keyPath: value_s_c_x] = 7
+  expectEqual(value, mutValue)
+  expectEqual(value[keyPath: s_c_x], 7)
+  expectEqual(value.c.x, 7)
+  expectTrue(value.c.y === object2)
+  expectEqual(value.c.z, "antelope")
 
-  mutValue[value_s_c_y] = object1
-  expectEqual(value.base, mutValue.base)
-  expectTrue(value[s_c_y] === object1)
-  expectTrue(value.base.c.y === object1)
-  expectEqual(value.base.c.x, 7)
-  expectEqual(value.base.c.z, "antelope")
+  mutValue[keyPath: value_s_c_y] = object1
+  expectEqual(value, mutValue)
+  expectTrue(value[keyPath: s_c_y] === object1)
+  expectTrue(value.c.y === object1)
+  expectEqual(value.c.x, 7)
+  expectEqual(value.c.z, "antelope")
   
-  mutValue[value_s_c_z] = "elk"
-  expectEqual(value.base, mutValue.base)
-  expectTrue(value[s_c_z] == "elk")
-  expectTrue(value.base.c.z == "elk")
-  expectEqual(value.base.c.x, 7)
-  expectTrue(value.base.c.y === object1)
+  mutValue[keyPath: value_s_c_z] = "elk"
+  expectEqual(value, mutValue)
+  expectTrue(value[keyPath: s_c_z] == "elk")
+  expectTrue(value.c.z == "elk")
+  expectEqual(value.c.x, 7)
+  expectTrue(value.c.y === object1)
 }
 
 keyPathImpl.test("overflowed offsets") {
@@ -459,20 +459,20 @@ keyPathImpl.test("overflowed offsets") {
     }
   
   let c = C(x: 679, y: LifetimeTracked(42), z: "buffalo\("")")
-  var sValue = _KeyPathBase(base: S(x: 1738, y: LifetimeTracked(43),
-                                    z: "bottles of beer\("")",
-                                    p: .init(x: 0.5, y: -0.5), c: c))
-  let cValue = _KeyPathBase(base: c)
+  var sValue = S(x: 1738, y: LifetimeTracked(43),
+                 z: "bottles of beer\("")",
+                 p: .init(x: 0.5, y: -0.5), c: c)
+  let cValue = c
   
-  expectEqual(sValue[s_p], Point(x: 0.5, y: -0.5))
-  sValue[s_p] = Point(x: 1.0, y: -1.0)
-  expectEqual(sValue.base.p, Point(x: 1.0, y: -1.0))
-  expectEqual(sValue[s_p], Point(x: 1.0, y: -1.0))
+  expectEqual(sValue[keyPath: s_p], Point(x: 0.5, y: -0.5))
+  sValue[keyPath: s_p] = Point(x: 1.0, y: -1.0)
+  expectEqual(sValue.p, Point(x: 1.0, y: -1.0))
+  expectEqual(sValue[keyPath: s_p], Point(x: 1.0, y: -1.0))
   
-  expectEqual(cValue[c_z], "buffalo")
-  cValue[c_z] = "dik dik"
-  expectEqual(cValue.base.z, "dik dik")
-  expectEqual(cValue[c_z], "dik dik")
+  expectEqual(cValue[keyPath: c_z], "buffalo")
+  cValue[keyPath: c_z] = "dik dik"
+  expectEqual(cValue.z, "dik dik")
+  expectEqual(cValue[keyPath: c_z], "dik dik")
 }
 
 keyPathImpl.test("equality") {
@@ -730,14 +730,14 @@ keyPathImpl.test("appending") {
   let s_p_y = s_p.appending(path: p_y)
 
   let c = C(x: 679, y: nil, z: "buffalo\("")")
-  var value = _KeyPathBase(base: S(x: 1738, y: nil, z: "bottles of beer\("")",
-    p: .init(x: 0.5, y: -0.5), c: c))
+  var value = S(x: 1738, y: nil, z: "bottles of beer\("")",
+                p: .init(x: 0.5, y: -0.5), c: c)
   
-  expectEqual(value[s_p_y], -0.5)
-  value[s_p_y] = 4.0
-  expectEqual(value[s_p_y], 4.0)
-  expectEqual(value.base.p.x, 0.5)
-  expectEqual(value.base.p.y, 4.0)
+  expectEqual(value[keyPath: s_p_y], -0.5)
+  value[keyPath: s_p_y] = 4.0
+  expectEqual(value[keyPath: s_p_y], 4.0)
+  expectEqual(value.p.x, 0.5)
+  expectEqual(value.p.y, 4.0)
 
   let s_p_y2 = s_p.appending(path: p_y)
   expectEqual(s_p_y, s_p_y2)
@@ -761,17 +761,15 @@ keyPathImpl.test("appending") {
       $0.addClassComponent(offset: classHeaderSize + 2*intSize)
     }
   
-  let value2 = _KeyPathBase(
-    base: C(x: 17, y: LifetimeTracked(38), z: value.base)
-  )
+  let value2 = C(x: 17, y: LifetimeTracked(38), z: value)
   
   let c_z_p_y = c_z.appending(path: s_p_y)
   
-  expectEqual(value2[c_z_p_y], 4.0)
-  value2[c_z_p_y] = 5.0
-  expectEqual(value2[c_z_p_y], 5.0)
-  expectEqual(value2.base.z.p.y, 5.0)
-  expectEqual(value2.base.z.p.x, 0.5)
+  expectEqual(value2[keyPath: c_z_p_y], 4.0)
+  value2[keyPath: c_z_p_y] = 5.0
+  expectEqual(value2[keyPath: c_z_p_y], 5.0)
+  expectEqual(value2.z.p.y, 5.0)
+  expectEqual(value2.z.p.x, 0.5)
   
   let c_z_p_y_manual = ReferenceWritableKeyPath<C<S<String>>, Double>
     .build(capacityInBytes: 16 + intSize * 2) {
@@ -795,12 +793,12 @@ keyPathImpl.test("appending") {
   
   let s_c_z_p_y = s_c.appending(path: c_z_p_y)
   
-  let value3 = _KeyPathBase(base: S(x: 679, y: nil, z: value.base,
-                                    p: value.base.p, c: value2.base))
-  expectEqual(value3[s_c_z_p_y], 5.0)
-  value3[s_c_z_p_y] = 11.0
-  expectEqual(value3[s_c_z_p_y], 11.0)
-  expectEqual(value2[c_z_p_y], 11.0)
+  let value3 = S(x: 679, y: nil, z: value,
+                 p: value.p, c: value2)
+  expectEqual(value3[keyPath: s_c_z_p_y], 5.0)
+  value3[keyPath: s_c_z_p_y] = 11.0
+  expectEqual(value3[keyPath: s_c_z_p_y], 11.0)
+  expectEqual(value2[keyPath: c_z_p_y], 11.0)
   
   let s_c_z_p_y_manual = ReferenceWritableKeyPath<S<S<String>>, Double>
     .build(capacityInBytes: 20 + intSize * 3) {
@@ -832,14 +830,14 @@ keyPathImpl.test("appending") {
   let cratePair_left_value_c_z_p_y
     = cratePair_left_value.appending(path: s_c_z_p_y)
   
-  let crate1 = Crate(value: value3.base)
+  let crate1 = Crate(value: value3)
   let crate2 = Crate(value: 9)
-  let cratePair = _KeyPathBase(base: CratePair(left: crate1, right: crate2))
-  expectEqual(cratePair[cratePair_left_value_c_z_p_y], 11.0)
-  cratePair[cratePair_left_value_c_z_p_y] = 13.0
-  expectEqual(cratePair[cratePair_left_value_c_z_p_y], 13.0)
-  expectEqual(value3[s_c_z_p_y], 13.0)
-  expectEqual(value2[c_z_p_y], 13.0)
+  let cratePair = CratePair(left: crate1, right: crate2)
+  expectEqual(cratePair[keyPath: cratePair_left_value_c_z_p_y], 11.0)
+  cratePair[keyPath: cratePair_left_value_c_z_p_y] = 13.0
+  expectEqual(cratePair[keyPath: cratePair_left_value_c_z_p_y], 13.0)
+  expectEqual(value3[keyPath: s_c_z_p_y], 13.0)
+  expectEqual(value2[keyPath: c_z_p_y], 13.0)
 
   let cratePair_left_value_c_z_p_y_manual
     = ReferenceWritableKeyPath<CP, Double>

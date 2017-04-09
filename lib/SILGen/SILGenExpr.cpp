@@ -2485,10 +2485,39 @@ RValue RValueEmitter::visitKeyPathExpr(KeyPathExpr *E, SGFContext C) {
 
 RValue RValueEmitter::
 visitKeyPathApplicationExpr(KeyPathApplicationExpr *E, SGFContext C) {
-  auto resultTy = SGF.getLoweredType(E->getType());
-  SGF.SGM.diagnose(E->getLoc(), diag::not_implemented, "key path application");
-  auto undef = SILUndef::get(resultTy, SGF.SGM.M);
-  return RValue(SGF, E, ManagedValue::forUnmanaged(undef));
+  // An rvalue key path application always occurs as a read-only projection of
+  // the base. The base is received maximally abstracted.
+  auto root = SGF.emitMaterializedRValueAsOrig(E->getBase(),
+                                               AbstractionPattern::getOpaque());
+  auto keyPath = SGF.emitRValueAsSingleValue(E->getKeyPath());
+  
+  // Get the root and leaf type from the key path type.
+  auto keyPathTy = E->getKeyPath()->getType()->castTo<BoundGenericType>();
+
+  // Upcast the keypath to KeyPath<T, U> if it isn't already.
+  if (keyPathTy->getDecl() != SGF.getASTContext().getKeyPathDecl()) {
+    auto castToTy = BoundGenericType::get(SGF.getASTContext().getKeyPathDecl(),
+                                          nullptr,
+                                          keyPathTy->getGenericArgs())
+      ->getCanonicalType();
+    auto upcast = SGF.B.createUpcast(SILLocation(E),
+                                     keyPath.forward(SGF),
+                                     SILType::getPrimitiveObjectType(castToTy));
+    keyPath = SGF.emitManagedRValueWithCleanup(upcast);
+  }
+
+  auto projectFn = SGF.getASTContext().getProjectKeyPathReadOnly(nullptr);
+  Substitution genericArgs[] = {
+    Substitution(keyPathTy->getGenericArgs()[0], {}),
+    Substitution(keyPathTy->getGenericArgs()[1], {}),
+  };
+
+  auto genericArgsMap =
+    projectFn->getGenericSignature()->getSubstitutionMap(genericArgs);
+
+  return SGF.emitApplyOfLibraryIntrinsic(SILLocation(E),
+                        SGF.getASTContext().getProjectKeyPathReadOnly(nullptr),
+                        genericArgsMap, {root, keyPath}, C);
 }
 
 RValue RValueEmitter::
