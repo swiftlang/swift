@@ -1,4 +1,5 @@
-This will just be a shell script along the lines of bug-reducer.test-sh that 
-will generate the harness/gyb files in a temp directory and make sure that the
-diff to what is checked into tree is empty. Then at least we will know if
-someone forgets to regenerate the harness or gyb files.
+// RUN: rm -rfv %t
+// RUN: %swift_src_root/benchmarks/scripts/test_generate_harness.sh %swift_src_root %t
+// REQUIRES: OS=macosx
+// REQUIRES: asserts
+// REQUIRES: CMAKE_GENERATOR=Ninja
