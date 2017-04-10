@@ -4556,8 +4556,13 @@ inline bool TypeBase::mayHaveSuperclass() {
   if (getClassOrBoundGenericClass())
     return true;
 
+  // FIXME: requiresClass() is not the same as having an explicit superclass;
+  // is this wrong?
   if (auto archetype = getAs<ArchetypeType>())
     return (bool)archetype->requiresClass();
+
+  if (isExistentialType())
+    return (bool)getSuperclass(nullptr);
 
   return is<DynamicSelfType>();
 }
