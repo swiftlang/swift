@@ -27,6 +27,7 @@
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/SIL/CFG.h"
 #include "swift/SIL/SILInstruction.h"
+#include "swift/SILOptimizer/Analysis/PostOrderAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "llvm/ADT/PostOrderIterator.h"
@@ -255,7 +256,7 @@ static AccessedStorage findAccessedStorage(SILValue Source) {
   }
 }
 
-static void checkStaticExclusivity(SILFunction &Fn) {
+static void checkStaticExclusivity(SILFunction &Fn, PostOrderFunctionInfo *PO) {
   // The implementation relies on the following SIL invariants:
   //    - All incoming edges to a block must have the same in-progress
   //      accesses. This enables the analysis to not perform a data flow merge
@@ -286,8 +287,7 @@ static void checkStaticExclusivity(SILFunction &Fn) {
 
   BlockOutAccesses[Fn.getEntryBlock()] = StorageMap();
 
-  llvm::ReversePostOrderTraversal<SILFunction *> RPOT(&Fn);
-  for (auto *BB : RPOT) {
+  for (auto *BB : PO->getReversePostOrder()) {
     Optional<StorageMap> &BBState = BlockOutAccesses[BB];
 
     // Because we use a reverse post-order traversal, unless this is the entry
@@ -351,7 +351,11 @@ public:
   DiagnoseStaticExclusivity() {}
 
 private:
-  void run() override { checkStaticExclusivity(*getFunction()); }
+  void run() override {
+    SILFunction *Fn = getFunction();
+    PostOrderFunctionInfo *PO = getAnalysis<PostOrderAnalysis>()->get(Fn);
+    checkStaticExclusivity(*Fn, PO);
+  }
 };
 
 } // end anonymous namespace
