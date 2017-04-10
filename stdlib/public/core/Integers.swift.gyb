@@ -1681,7 +1681,7 @@ extension BinaryInteger {
   /// - Parameters:
   ///   - lhs: An integer to compare.
   ///   - rhs: Another integer to compare.
-  @_transparent
+  @inline(__always)
   public static func == <
     Other : BinaryInteger
   >(lhs: Self, rhs: Other) -> Bool {
@@ -2226,7 +2226,7 @@ ${operatorComment(x.nonMaskingOperator, True)}
 
 %   reversedOperator = x.operator.translate(maketrans('<>', '><'))
 %   isRightShift = '>' in x.operator
-  @_transparent
+  @inline(__always)
   public static func ${x.helper}(_ lhs: Self, _ rhs: Int) -> Self {
     let overshiftR = Self.isSigned ? lhs &>> (Self.bitWidth - 1) : 0
     let overshiftL: Self = 0
