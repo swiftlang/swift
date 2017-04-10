@@ -13,6 +13,7 @@
 #include "swift/Serialization/ModuleFile.h"
 #include "swift/Serialization/ModuleFormat.h"
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Initializer.h"
@@ -37,6 +38,7 @@ STATISTIC(NumNestedTypeShortcuts,
 
 using namespace swift;
 using namespace swift::serialization;
+using llvm::Expected;
 
 StringRef swift::getNameOfModule(const ModuleFile *MF) {
   return MF->Name;
@@ -94,7 +96,7 @@ namespace {
     }
   };
 
-  class PrettyXRefTrace : public llvm::PrettyStackTraceEntry {
+  class XRefTracePath {
     class PathPiece {
     public:
       enum class Kind {
@@ -195,12 +197,11 @@ namespace {
       }
     };
 
-  private:
     ModuleDecl &baseM;
     SmallVector<PathPiece, 8> path;
 
   public:
-    PrettyXRefTrace(ModuleDecl &M) : baseM(M) {}
+    explicit XRefTracePath(ModuleDecl &M) : baseM(M) {}
 
     void addValue(Identifier name) {
       path.push_back({ PathPiece::Kind::Value, name });
@@ -240,13 +241,24 @@ namespace {
       path.pop_back();
     }
 
-    void print(raw_ostream &os) const override {
+    void print(raw_ostream &os, StringRef leading = "") const {
       os << "Cross-reference to module '" << baseM.getName() << "'\n";
       for (auto &piece : path) {
-        os << "\t... ";
+        os << leading << "... ";
         piece.print(os);
         os << "\n";
       }
+    }
+  };
+
+  class PrettyXRefTrace :
+      public llvm::PrettyStackTraceEntry,
+      public XRefTracePath {
+  public:
+    explicit PrettyXRefTrace(ModuleDecl &M) : XRefTracePath(M) {}
+
+    void print(raw_ostream &os) const override {
+      XRefTracePath::print(os, "\t");
     }
   };
 
@@ -261,6 +273,50 @@ namespace {
       os << Action << " \'" << getNameOfModule(MF) << "'\n";
     }
   };
+
+  class XRefError : public llvm::ErrorInfo<XRefError> {
+    friend ErrorInfo;
+    static const char ID;
+
+    XRefTracePath path;
+    const char *message;
+  public:
+    template <size_t N>
+    XRefError(const char (&message)[N], XRefTracePath path)
+        : path(path), message(message) {}
+
+    void log(raw_ostream &OS) const override {
+      OS << message << "\n";
+      path.print(OS);
+    }
+
+    std::error_code convertToErrorCode() const override {
+      // This is a deprecated part of llvm::Error, so we just return a very
+      // generic value.
+      return {EINVAL, std::generic_category()};
+    }
+  };
+  const char XRefError::ID = '\0';
+
+  class OverrideError : public llvm::ErrorInfo<OverrideError> {
+    friend ErrorInfo;
+    static const char ID;
+
+    DeclName name;
+  public:
+    explicit OverrideError(DeclName name) : name(name) {}
+
+    void log(raw_ostream &OS) const override {
+      OS << "could not find '" << name << "' in parent class";
+    }
+
+    std::error_code convertToErrorCode() const override {
+      // This is a deprecated part of llvm::Error, so we just return a very
+      // generic value.
+      return {EINVAL, std::generic_category()};
+    }
+  };
+  const char OverrideError::ID = '\0';
 } // end anonymous namespace
 
 
@@ -283,6 +339,17 @@ static bool skipRecord(llvm::BitstreamCursor &cursor, unsigned recordKind) {
   unsigned kind = cursor.readRecord(next.ID, scratch, &blobData);
   return kind == recordKind;
 #endif
+}
+
+void ModuleFile::fatal(llvm::Error error) {
+  if (FileContext) {
+    getContext().Diags.diagnose(SourceLoc(), diag::serialization_fatal, Name);
+  }
+
+  logAllUnhandledErrors(std::move(error), llvm::errs(),
+                        "\n*** DESERIALIZATION FAILURE (please include this "
+                        "section in any bug report) ***\n");
+  abort();
 }
 
 ModuleFile &ModuleFile::getModuleFileForDelayedActions() {
@@ -1159,9 +1226,23 @@ bool ModuleFile::readMembers(SmallVectorImpl<Decl *> &Members) {
 
   Members.reserve(rawMemberIDs.size());
   for (DeclID rawID : rawMemberIDs) {
-    Decl *D = getDecl(rawID);
-    assert(D && "unable to deserialize next member");
-    Members.push_back(D);
+    Expected<Decl *> D = getDeclChecked(rawID);
+    if (!D) {
+      if (!getContext().LangOpts.EnableDeserializationRecovery)
+        fatal(D.takeError());
+
+      // Silently drop the member if there was a problem.
+      // FIXME: This isn't sound for protocols; we need to at least record that
+      // it happened.
+      llvm::handleAllErrors(D.takeError(),
+                            [](const OverrideError &) { /* expected */ },
+                            [&](std::unique_ptr<llvm::ErrorInfoBase> unhandled){
+        fatal(std::move(unhandled));
+      });
+      continue;
+    }
+    assert(D.get() && "unchecked error deserializing next member");
+    Members.push_back(D.get());
   }
 
   return false;
@@ -1284,8 +1365,8 @@ static void filterValues(Type expectedTy, ModuleDecl *expectedModule,
   values.erase(newEnd, values.end());
 }
 
-Decl *ModuleFile::resolveCrossReference(ModuleDecl *baseModule,
-                                        uint32_t pathLen) {
+Expected<Decl *>
+ModuleFile::resolveCrossReference(ModuleDecl *baseModule, uint32_t pathLen) {
   using namespace decls_block;
   assert(baseModule && "missing dependency");
   PrettyXRefTrace pathTrace(*baseModule);
@@ -1406,8 +1487,7 @@ Decl *ModuleFile::resolveCrossReference(ModuleDecl *baseModule,
   }
 
   if (values.empty()) {
-    error();
-    return nullptr;
+    return llvm::make_error<XRefError>("top-level value not found", pathTrace);
   }
 
   // Filters for values discovered in the remaining path pieces.
@@ -1526,16 +1606,16 @@ Decl *ModuleFile::resolveCrossReference(ModuleDecl *baseModule,
         pathTrace.addType(filterTy);
 
       if (values.size() != 1) {
-        error();
-        return nullptr;
+        return llvm::make_error<XRefError>("multiple matching base values",
+                                           pathTrace);
       }
 
       auto nominal = dyn_cast<NominalTypeDecl>(values.front());
       values.clear();
 
       if (!nominal) {
-        error();
-        return nullptr;
+        return llvm::make_error<XRefError>("base is not a nominal type",
+                                           pathTrace);
       }
 
       auto members = nominal->lookupDirect(memberName);
@@ -1624,8 +1704,8 @@ Decl *ModuleFile::resolveCrossReference(ModuleDecl *baseModule,
 
     case XREF_GENERIC_PARAM_PATH_PIECE: {
       if (values.size() != 1) {
-        error();
-        return nullptr;
+        return llvm::make_error<XRefError>("multiple matching base values",
+                                           pathTrace);
       }
 
       uint32_t paramIndex;
@@ -1658,9 +1738,15 @@ Decl *ModuleFile::resolveCrossReference(ModuleDecl *baseModule,
       } else if (auto fn = dyn_cast<AbstractFunctionDecl>(base))
         paramList = fn->getGenericParams();
 
-      if (!paramList || paramIndex >= paramList->size()) {
-        error();
-        return nullptr;
+      if (!paramList) {
+        return llvm::make_error<XRefError>(
+            "cross-reference to generic param for non-generic type",
+            pathTrace);
+      }
+      if (paramIndex >= paramList->size()) {
+        return llvm::make_error<XRefError>(
+            "generic argument index out of bounds",
+            pathTrace);
       }
 
       values.clear();
@@ -1684,8 +1770,7 @@ Decl *ModuleFile::resolveCrossReference(ModuleDecl *baseModule,
     }
 
     if (values.empty()) {
-      error();
-      return nullptr;
+      return llvm::make_error<XRefError>("result not found", pathTrace);
     }
 
     // Reset the module filter.
@@ -1704,8 +1789,9 @@ Decl *ModuleFile::resolveCrossReference(ModuleDecl *baseModule,
 
   // When all is said and done, we should have a single value here to return.
   if (values.size() != 1) {
-    error();
-    return nullptr;
+    return llvm::make_error<llvm::StringError>(
+        "result is ambiguous",
+        std::error_code(EINVAL, std::generic_category()));
   }
 
   return values.front();
@@ -2127,6 +2213,15 @@ static uint64_t encodeLazyConformanceContextData(uint64_t numProtocols,
 }
 
 Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
+  Expected<Decl *> deserialized = getDeclChecked(DID, ForcedContext);
+  if (!deserialized) {
+    fatal(deserialized.takeError());
+  }
+  return deserialized.get();
+}
+
+Expected<Decl *>
+ModuleFile::getDeclChecked(DeclID DID, Optional<DeclContext *> ForcedContext) {
   if (DID == 0)
     return nullptr;
 
@@ -2841,11 +2936,30 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
                                         overriddenID, accessorStorageDeclID,
                                         hasCompoundName, rawAddressorKind,
                                         rawAccessLevel, nameIDs);
-    
+
     // Resolve the name ids.
     SmallVector<Identifier, 2> names;
     for (auto nameID : nameIDs)
       names.push_back(getIdentifier(nameID));
+
+    DeclName name;
+    if (!names.empty()) {
+      if (hasCompoundName)
+        name = DeclName(ctx, names[0],
+                        llvm::makeArrayRef(names.begin() + 1, names.end()));
+      else
+        name = DeclName(names[0]);
+    }
+
+    Expected<Decl *> overridden = getDeclChecked(overriddenID);
+    if (!overridden) {
+      llvm::handleAllErrors(overridden.takeError(),
+                            [](const XRefError &) { /* expected */ },
+                            [&](std::unique_ptr<llvm::ErrorInfoBase> unhandled){
+        fatal(std::move(unhandled));
+      });
+      return llvm::make_error<OverrideError>(name);
+    }
 
     auto DC = getDeclContext(contextID);
     if (declOrOffset.isComplete())
@@ -2865,14 +2979,6 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     if (declOrOffset.isComplete())
       return declOrOffset;
 
-    DeclName name;
-    if (!names.empty()) {
-      if (hasCompoundName)
-        name = DeclName(ctx, names[0],
-                        llvm::makeArrayRef(names.begin() + 1, names.end()));
-      else
-        name = DeclName(names[0]);
-    }
     auto fn = FuncDecl::createDeserialized(
         ctx, /*StaticLoc=*/SourceLoc(), staticSpelling.getValue(),
         /*FuncLoc=*/SourceLoc(), name, /*NameLoc=*/SourceLoc(),
@@ -2929,8 +3035,8 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     if (auto errorConvention = maybeReadForeignErrorConvention())
       fn->setForeignErrorConvention(*errorConvention);
 
-    if (auto overridden = cast_or_null<FuncDecl>(getDecl(overriddenID))) {
-      fn->setOverriddenDecl(overridden);
+    if (auto overriddenFunc = cast_or_null<FuncDecl>(overridden.get())) {
+      fn->setOverriddenDecl(overriddenFunc);
       AddAttribute(new (ctx) OverrideAttr(SourceLoc()));
     }
 
@@ -3528,7 +3634,10 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     ModuleID baseModuleID;
     uint32_t pathLen;
     decls_block::XRefLayout::readRecord(scratch, baseModuleID, pathLen);
-    declOrOffset = resolveCrossReference(getModule(baseModuleID), pathLen);
+    auto resolved = resolveCrossReference(getModule(baseModuleID), pathLen);
+    if (!resolved)
+      return resolved;
+    declOrOffset = resolved.get();
     break;
   }
   
@@ -3643,6 +3752,14 @@ Optional<swift::ResultConvention> getActualResultConvention(uint8_t raw) {
 }
 
 Type ModuleFile::getType(TypeID TID) {
+  Expected<Type> deserialized = getTypeChecked(TID);
+  if (!deserialized) {
+    fatal(deserialized.takeError());
+  }
+  return deserialized.get();
+}
+
+Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
   if (TID == 0)
     return Type();
 
