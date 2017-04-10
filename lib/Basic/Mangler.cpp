@@ -163,20 +163,20 @@ void Mangler::verify(const std::string &mangledName) {
   if (Remangled == mangledName)
     return;
 
-  if (treeContains(Root,
-                   Demangle::Node::Kind::DependentAssociatedTypeRef)) {
-    // There are cases where dependent associated types results in different
-    // remangled names. See ASTMangler::appendAssociatedTypeName.
-    // This is no problem for the compiler, but we have to exclude this case
-    // for the check. Instead we try to re-de-mangle the remangled name.
-    nameStr = Remangled;
-    NodePointer RootOfRemangled = Dem.demangleSymbol(nameStr);
-    if (Remangled == mangleNode(RootOfRemangled))
-      return;
-  }
+  // There are cases (e.g. with dependent associated types) which results in
+  // different remangled names. See ASTMangler::appendAssociatedTypeName.
+  // This is no problem for the compiler, but we have to be more tolerant for
+  // those cases. Instead we try to re-de-mangle the remangled name.
+  nameStr = Remangled;
+  NodePointer RootOfRemangled = Dem.demangleSymbol(nameStr);
+  std::string ReDemangled = mangleNode(RootOfRemangled);
+  if (Remangled == ReDemangled)
+    return;
+
   llvm::errs() << "Remangling failed:\n"
-                  "original  = " << nameStr << "\n"
-                  "remangled = " << Remangled << '\n';
+                  "original     = " << nameStr << "\n"
+                  "remangled    = " << Remangled << "\n"
+                  "re-demangled = " << ReDemangled << '\n';
   abort();
 #endif
 }
