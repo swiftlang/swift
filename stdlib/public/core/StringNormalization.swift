@@ -196,8 +196,10 @@ where
     // TODO: Find way to re-use the storage, maybe iterator pattern?
     var buffer = UTF16CodeUnitBuffer(utf16CodeUnits.lazy.joined())
 
-    // TODO: fast pre-normalized checks (worth doing before calling over to
-    //       ICU)
+    // Fast pre-normalized checks (worth doing before calling over to ICU)
+    if _fastPath(FCCNormalizedLazySegments.isPreNormalized(buffer)) {
+      return FCCNormalizedSegment(buffer)
+    }
 
     _sanityCheck(buffer.count > 0, "How did this happen? Failed precondition?")
 
@@ -285,6 +287,33 @@ where
     let start = start ?? codeUnits.startIndex
     return _UnicodeViews(codeUnits[start..<end], FromEncoding.self)
   }
+
+  static func isPreNormalized(_ buffer: UTF16CodeUnitBuffer) -> Bool {
+    if buffer.count == 1 {
+      let cu = buffer[0]
+      // For single-code-unit normalization segments, the vast majority of the
+      // sub-surrogate BMP is already FCC normalized (~70 exceptions). Perform
+      // some quick checks over the largest ranges.
+
+      // The earliest exceptions is 0x340,
+      if _fastPath(cu < 0x340) {
+        return true
+      }
+
+      // The last exception, before the surrogate code units, is 0x2ADC, the
+      // FORKING supplemental mathematical operator.
+      if _fastPath(cu > 0x2ADC && cu < 0xd800) {
+        return true
+      }
+
+      // TODO: Worth checking the more narrow ranges?
+      return false
+    }
+
+    // TODO: Other quick checks
+    return false
+  }
+
 }
 
 extension FCCNormalizedLazySegments : BidirectionalCollection {
