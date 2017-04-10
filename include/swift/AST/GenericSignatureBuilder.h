@@ -178,6 +178,20 @@ public:
 
   friend class RequirementSource;
 
+  /// The result of introducing a new constraint.
+  enum class ConstraintResult {
+    /// The constraint was resolved and the relative potential archetypes
+    /// have been updated.
+    Resolved,
+
+    /// The constraint was written directly on a concrete type.
+    Concrete,
+
+    /// The constraint conflicted with existing constraints in some way;
+    /// the generic signature is ill-formed.
+    Conflicting,
+  };
+
 private:
   class InferRequirementsWalker;
   friend class InferRequirementsWalker;
@@ -195,8 +209,8 @@ private:
   /// currently-unresolvable or nested type, this routine should be
   /// called to record the unresolved requirement to be reconsidered later.
   ///
-  /// \returns false, which is used elsewhere to indicate "no failure".
-  bool recordUnresolvedRequirement(RequirementKind kind,
+  /// \returns ConstraintResult::Resolved.
+  ConstraintResult recordUnresolvedRequirement(RequirementKind kind,
                                    UnresolvedType lhs,
                                    RequirementRHS rhs,
                                    FloatingRequirementSource source);
@@ -214,14 +228,15 @@ private:
 
   /// \brief Add a new conformance requirement specifying that the given
   /// potential archetype conforms to the given protocol.
-  bool addConformanceRequirement(PotentialArchetype *T,
-                                 ProtocolDecl *Proto,
-                                 const RequirementSource *Source);
+  ConstraintResult addConformanceRequirement(PotentialArchetype *T,
+                                             ProtocolDecl *Proto,
+                                             const RequirementSource *Source);
 
-  bool addConformanceRequirement(PotentialArchetype *T,
-                                 ProtocolDecl *Proto,
-                                 const RequirementSource *Source,
-                                llvm::SmallPtrSetImpl<ProtocolDecl *> &Visited);
+  ConstraintResult addConformanceRequirement(
+                               PotentialArchetype *T,
+                               ProtocolDecl *Proto,
+                               const RequirementSource *Source,
+                               llvm::SmallPtrSetImpl<ProtocolDecl *> &Visited);
 
 public:
   /// \brief Add a new same-type requirement between two fully resolved types
@@ -231,7 +246,7 @@ public:
   /// incompatible (e.g. \c Foo<Bar<T>> and \c Foo<Baz>), \c diagnoseMismatch is
   /// called with the two types that don't match (\c Bar<T> and \c Baz for the
   /// previous example).
-  bool
+  ConstraintResult
   addSameTypeRequirementDirect(
                          ResolvedType paOrT1, ResolvedType paOrT2,
                          FloatingRequirementSource Source,
@@ -241,43 +256,48 @@ public:
   /// (output of GenericSignatureBuilder::resolve).
   ///
   /// The two types must not be incompatible concrete types.
-  bool addSameTypeRequirementDirect(ResolvedType paOrT1, ResolvedType paOrT2,
-                                    FloatingRequirementSource Source);
+  ConstraintResult addSameTypeRequirementDirect(
+                                            ResolvedType paOrT1,
+                                            ResolvedType paOrT2,
+                                            FloatingRequirementSource Source);
 
   /// \brief Add a new same-type requirement between two unresolved types.
   ///
   /// The types are resolved with \c GenericSignatureBuilder::resolve, and must
   /// not be incompatible concrete types.
-  bool addSameTypeRequirement(UnresolvedType paOrT1, UnresolvedType paOrT2,
-                              FloatingRequirementSource Source);
+  ConstraintResult addSameTypeRequirement(UnresolvedType paOrT1,
+                                          UnresolvedType paOrT2,
+                                          FloatingRequirementSource Source);
 
   /// \brief Add a new same-type requirement between two unresolved types.
   ///
   /// The types are resolved with \c GenericSignatureBuilder::resolve. \c
   /// diagnoseMismatch is called if the two types refer to incompatible concrete
   /// types.
-  bool
+  ConstraintResult
   addSameTypeRequirement(UnresolvedType paOrT1, UnresolvedType paOrT2,
                          FloatingRequirementSource Source,
                          llvm::function_ref<void(Type, Type)> diagnoseMismatch);
 
   /// Update the superclass for the equivalence class of \c T.
   ///
-  /// This assumes that the constraint has already been recorded
-  bool updateSuperclass(PotentialArchetype *T,
+  /// This assumes that the constraint has already been recorded.
+  void updateSuperclass(PotentialArchetype *T,
                         Type superclass,
                         const RequirementSource *source);
 
 private:
   /// \brief Add a new superclass requirement specifying that the given
   /// potential archetype has the given type as an ancestor.
-  bool addSuperclassRequirementDirect(PotentialArchetype *T,
-                                      Type Superclass,
-                                      const RequirementSource *Source);
+  ConstraintResult addSuperclassRequirementDirect(
+                                              PotentialArchetype *T,
+                                              Type Superclass,
+                                              const RequirementSource *Source);
 
   /// \brief Add a new type requirement specifying that the given
   /// type conforms-to or is a superclass of the second type.
-  bool addTypeRequirement(UnresolvedType subject,
+  ConstraintResult addTypeRequirement(
+                          UnresolvedType subject,
                           UnresolvedType constraint,
                           FloatingRequirementSource source,
                           llvm::SmallPtrSetImpl<ProtocolDecl *> *visited
@@ -285,13 +305,14 @@ private:
 
   /// \brief Add a new conformance requirement specifying that the given
   /// potential archetypes are equivalent.
-  bool addSameTypeRequirementBetweenArchetypes(PotentialArchetype *T1,
+  ConstraintResult addSameTypeRequirementBetweenArchetypes(
+                                               PotentialArchetype *T1,
                                                PotentialArchetype *T2,
                                                const RequirementSource *Source);
   
   /// \brief Add a new conformance requirement specifying that the given
   /// potential archetype is bound to a concrete type.
-  bool addSameTypeRequirementToConcrete(PotentialArchetype *T,
+  ConstraintResult addSameTypeRequirementToConcrete(PotentialArchetype *T,
                                         Type Concrete,
                                         const RequirementSource *Source);
 
@@ -300,7 +321,7 @@ private:
   ///
   /// \param diagnoseMismatch Callback invoked when the types in the same-type
   /// requirement mismatch.
-  bool addSameTypeRequirementBetweenConcrete(
+  ConstraintResult addSameTypeRequirementBetweenConcrete(
       Type T1, Type T2, FloatingRequirementSource Source,
       llvm::function_ref<void(Type, Type)> diagnoseMismatch);
 
@@ -308,18 +329,20 @@ private:
   ///
   /// \returns true if this requirement makes the set of requirements
   /// inconsistent, in which case a diagnostic will have been issued.
-  bool addLayoutRequirementDirect(PotentialArchetype *PAT,
-                                  LayoutConstraint Layout,
-                                  const RequirementSource *Source);
+  ConstraintResult addLayoutRequirementDirect(PotentialArchetype *PAT,
+                                              LayoutConstraint Layout,
+                                              const RequirementSource *Source);
 
   /// Add a new layout requirement to the subject.
-  bool addLayoutRequirement(UnresolvedType subject,
-                            LayoutConstraint layout,
-                            FloatingRequirementSource source);
+  ConstraintResult addLayoutRequirement(UnresolvedType subject,
+                                        LayoutConstraint layout,
+                                        FloatingRequirementSource source);
 
   /// Add the requirements placed on the given type parameter
   /// to the given potential archetype.
-  bool addInheritedRequirements(TypeDecl *decl, PotentialArchetype *pa,
+  ConstraintResult addInheritedRequirements(
+                                TypeDecl *decl,
+                                PotentialArchetype *pa,
                                 const RequirementSource *parentSource,
                                 llvm::SmallPtrSetImpl<ProtocolDecl *> &visited);
 
@@ -379,15 +402,15 @@ public:
   ///
   /// \returns true if this requirement makes the set of requirements
   /// inconsistent, in which case a diagnostic will have been issued.
-  bool addRequirement(const RequirementRepr *req);
+  ConstraintResult addRequirement(const RequirementRepr *req);
 
   /// \brief Add a new requirement.
   ///
   /// \returns true if this requirement makes the set of requirements
   /// inconsistent, in which case a diagnostic will have been issued.
-  bool addRequirement(const RequirementRepr *Req,
-                      FloatingRequirementSource source,
-                      const SubstitutionMap *subMap);
+  ConstraintResult addRequirement(const RequirementRepr *Req,
+                                  FloatingRequirementSource source,
+                                  const SubstitutionMap *subMap);
 
   /// \brief Add an already-checked requirement.
   ///
@@ -396,12 +419,15 @@ public:
   ///
   /// \returns true if this requirement makes the set of requirements
   /// inconsistent, in which case a diagnostic will have been issued.
-  bool addRequirement(const Requirement &req, FloatingRequirementSource source,
-                      const SubstitutionMap *subMap = nullptr);
+  ConstraintResult addRequirement(const Requirement &req,
+                                  FloatingRequirementSource source,
+                                  const SubstitutionMap *subMap = nullptr);
 
-  bool addRequirement(const Requirement &req, FloatingRequirementSource source,
-                      const SubstitutionMap *subMap,
-                      llvm::SmallPtrSetImpl<ProtocolDecl *> &Visited);
+  ConstraintResult addRequirement(
+                                const Requirement &req,
+                                FloatingRequirementSource source,
+                                const SubstitutionMap *subMap,
+                                llvm::SmallPtrSetImpl<ProtocolDecl *> &Visited);
 
   /// \brief Add all of a generic signature's parameters and requirements.
   void addGenericSignature(GenericSignature *sig);
@@ -1518,6 +1544,18 @@ public:
 
   friend class GenericSignatureBuilder;
 };
+
+/// Whether the given constraint result signals an error.
+inline bool isErrorResult(GenericSignatureBuilder::ConstraintResult result) {
+  switch (result) {
+  case GenericSignatureBuilder::ConstraintResult::Concrete:
+  case GenericSignatureBuilder::ConstraintResult::Conflicting:
+    return true;
+
+  case GenericSignatureBuilder::ConstraintResult::Resolved:
+    return false;
+  }
+}
 
 } // end namespace swift
 
