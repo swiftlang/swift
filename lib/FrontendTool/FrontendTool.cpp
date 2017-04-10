@@ -60,6 +60,7 @@
 #include "llvm/IRReader/IRReader.h"
 #include "llvm/Option/Option.h"
 #include "llvm/Option/OptTable.h"
+#include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/TargetSelect.h"
@@ -550,7 +551,9 @@ static bool performCompile(std::unique_ptr<CompilerInstance> &Instance,
   }
 
   if (Action == FrontendOptions::EmitTBD) {
-    return writeTBD(Instance->getMainModule(), opts.getSingleOutputFilename());
+    auto hasMultipleIRGenThreads = Invocation.getSILOptions().NumThreads > 1;
+    return writeTBD(Instance->getMainModule(), hasMultipleIRGenThreads,
+                    opts.getSingleOutputFilename());
   }
 
   assert(Action >= FrontendOptions::EmitSILGen &&
@@ -795,10 +798,15 @@ static bool performCompile(std::unique_ptr<CompilerInstance> &Instance,
   }
 
   if (opts.ValidateTBDAgainstIR) {
-    bool validationError =
-        PrimarySourceFile ? validateTBD(PrimarySourceFile, *IRModule)
-                          : validateTBD(Instance->getMainModule(), *IRModule);
-    if (validationError)
+    auto hasMultipleIRGenThreads = Invocation.getSILOptions().NumThreads > 1;
+    bool error;
+    if (PrimarySourceFile)
+      error =
+          validateTBD(PrimarySourceFile, *IRModule, hasMultipleIRGenThreads);
+    else
+      error = validateTBD(Instance->getMainModule(), *IRModule,
+                          hasMultipleIRGenThreads);
+    if (error)
       return true;
   }
 
@@ -891,9 +899,44 @@ int swift::performFrontend(ArrayRef<const char *> Args,
   llvm::InitializeAllAsmPrinters();
   llvm::InitializeAllAsmParsers();
 
+  PrintingDiagnosticConsumer PDC;
+
+  // Hopefully we won't trigger any LLVM-level fatal errors, but if we do try
+  // to route them through our usual textual diagnostics before crashing.
+  //
+  // Unfortunately it's not really safe to do anything else, since very
+  // low-level operations in LLVM can trigger fatal errors.
+  auto diagnoseFatalError = [&PDC](const std::string &reason, bool shouldCrash){
+    static const std::string *recursiveFatalError = nullptr;
+    if (recursiveFatalError) {
+      // Report the /original/ error through LLVM's default handler, not
+      // whatever we encountered.
+      llvm::remove_fatal_error_handler();
+      llvm::report_fatal_error(*recursiveFatalError, shouldCrash);
+    }
+    recursiveFatalError = &reason;
+
+    SourceManager dummyMgr;
+
+    PDC.handleDiagnostic(dummyMgr, SourceLoc(), DiagnosticKind::Error,
+                         "fatal error encountered during compilation; please "
+                           "file a bug report with your project and the crash "
+                           "log",
+                         DiagnosticInfo());
+    PDC.handleDiagnostic(dummyMgr, SourceLoc(), DiagnosticKind::Note, reason,
+                         DiagnosticInfo());
+    if (shouldCrash)
+      abort();
+  };
+  llvm::ScopedFatalErrorHandler handler([](void *rawCallback,
+                                           const std::string &reason,
+                                           bool shouldCrash) {
+    auto *callback = static_cast<decltype(&diagnoseFatalError)>(rawCallback);
+    (*callback)(reason, shouldCrash);
+  }, &diagnoseFatalError);
+
   std::unique_ptr<CompilerInstance> Instance =
     llvm::make_unique<CompilerInstance>();
-  PrintingDiagnosticConsumer PDC;
   Instance->addDiagnosticConsumer(&PDC);
 
   if (Args.empty()) {

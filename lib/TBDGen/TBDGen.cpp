@@ -23,9 +23,11 @@
 #include "swift/IRGen/Linking.h"
 #include "swift/SIL/FormalLinkage.h"
 #include "swift/SIL/SILDeclRef.h"
+#include "swift/SIL/TypeLowering.h"
 #include "llvm/ADT/StringSet.h"
 
 using namespace swift;
+using namespace swift::irgen;
 using StringSet = llvm::StringSet<>;
 
 static bool isPrivateDecl(ValueDecl *VD) {
@@ -35,6 +37,8 @@ static bool isPrivateDecl(ValueDecl *VD) {
 namespace {
 class TBDGenVisitor : public ASTVisitor<TBDGenVisitor> {
   StringSet &Symbols;
+  const UniversalLinkageInfo &UniversalLinkInfo;
+  ModuleDecl *SwiftModule;
 
   void addSymbol(StringRef name) {
     auto isNewValue = Symbols.insert(name).second;
@@ -42,16 +46,29 @@ class TBDGenVisitor : public ASTVisitor<TBDGenVisitor> {
     assert(isNewValue && "already inserted");
   }
 
+  void addSymbol(LinkEntity entity) {
+    auto linkage =
+        LinkInfo::get(UniversalLinkInfo, SwiftModule, entity, ForDefinition);
+
+    auto externallyVisible =
+        llvm::GlobalValue::isExternalLinkage(linkage.getLinkage()) &&
+        linkage.getVisibility() != llvm::GlobalValue::HiddenVisibility;
+
+    if (externallyVisible)
+      addSymbol(linkage.getName());
+  }
+
   void visitValueTypeDecl(NominalTypeDecl *NTD) {
     assert(isa<StructDecl>(NTD) || isa<EnumDecl>(NTD));
-    if (isPrivateDecl(NTD))
-      return;
-
     visitNominalTypeDecl(NTD);
   }
 
 public:
-  TBDGenVisitor(StringSet &symbols) : Symbols(symbols) {}
+  TBDGenVisitor(StringSet &symbols,
+                const UniversalLinkageInfo &universalLinkInfo,
+                ModuleDecl *swiftModule)
+      : Symbols(symbols), UniversalLinkInfo(universalLinkInfo),
+        SwiftModule(swiftModule) {}
 
   void visitMembers(Decl *D) {
     SmallVector<Decl *, 4> members;
@@ -83,36 +100,34 @@ public:
   void visitNominalTypeDecl(NominalTypeDecl *NTD) {
     auto declaredType = NTD->getDeclaredType()->getCanonicalType();
 
-    auto ntDescriptor = irgen::LinkEntity::forNominalTypeDescriptor(NTD);
-    addSymbol(ntDescriptor.mangleAsString());
+    addSymbol(LinkEntity::forNominalTypeDescriptor(NTD));
 
-    auto tmd = irgen::LinkEntity::forTypeMetadata(
-        declaredType, irgen::TypeMetadataAddress::AddressPoint,
-        /*isPattern=*/false);
-    addSymbol(tmd.mangleAsString());
-    auto tmda = irgen::LinkEntity::forTypeMetadataAccessFunction(declaredType);
-    addSymbol(tmda.mangleAsString());
+    addSymbol(LinkEntity::forTypeMetadata(declaredType,
+                                          TypeMetadataAddress::AddressPoint,
+                                          /*isPattern=*/false));
+    addSymbol(LinkEntity::forTypeMetadataAccessFunction(declaredType));
 
-    if (isPrivateDecl(NTD))
-      return;
+    // There are symbols associated with any protocols this type conforms to.
+    for (auto conformance : NTD->getLocalConformances()) {
+      auto needsWTable = Lowering::TypeConverter::protocolRequiresWitnessTable(
+          conformance->getProtocol());
+      if (!needsWTable)
+        continue;
+
+      addSymbol(LinkEntity::forDirectProtocolWitnessTable(conformance));
+      addSymbol(LinkEntity::forProtocolWitnessTableAccessFunction(conformance));
+    }
 
     visitMembers(NTD);
   }
   void visitClassDecl(ClassDecl *CD) {
-    if (isPrivateDecl(CD))
-      return;
-
     visitNominalTypeDecl(CD);
   }
 
   void visitStructDecl(StructDecl *SD) { visitValueTypeDecl(SD); }
   void visitEnumDecl(EnumDecl *ED) { visitValueTypeDecl(ED); }
   void visitProtocolDecl(ProtocolDecl *PD) {
-    if (isPrivateDecl(PD))
-      return;
-
-    auto pDescriptor = irgen::LinkEntity::forProtocolDescriptor(PD);
-    addSymbol(pDescriptor.mangleAsString());
+    addSymbol(LinkEntity::forProtocolDescriptor(PD));
 
     // There's no relevant information about members of a protocol at individual
     // protocols, each conforming type has to handle them individually.
@@ -145,11 +160,16 @@ void TBDGenVisitor::visitVarDecl(VarDecl *VD) {
   visitMembers(VD);
 }
 
-void swift::enumeratePublicSymbols(FileUnit *file, StringSet &symbols) {
+void swift::enumeratePublicSymbols(FileUnit *file, StringSet &symbols,
+                                   bool hasMultipleIRGenThreads,
+                                   bool isWholeModule) {
+  UniversalLinkageInfo linkInfo(file->getASTContext().LangOpts.Target,
+                                hasMultipleIRGenThreads, isWholeModule);
+
   SmallVector<Decl *, 16> decls;
   file->getTopLevelDecls(decls);
 
-  TBDGenVisitor visitor(symbols);
+  TBDGenVisitor visitor(symbols, linkInfo, file->getParentModule());
   for (auto d : decls)
     visitor.visit(d);
 }

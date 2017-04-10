@@ -17,7 +17,8 @@
 namespace swift {
 class FileUnit;
 
-void enumeratePublicSymbols(FileUnit *module, llvm::StringSet<> &symbols);
+void enumeratePublicSymbols(FileUnit *module, llvm::StringSet<> &symbols,
+                            bool hasMultipleIRGenThreads, bool isWholeModule);
 } // end namespace swift
 
 #endif

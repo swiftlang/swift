@@ -323,3 +323,72 @@ done:
 ; CHECK: ret i1
   ret i1 %result
 }
+
+; Check self recursive functions
+
+; CHECK-NOT: @recursive1(
+define internal void @recursive1(i32 %x, i32 %y) {
+  br i1 undef, label %bb1, label %bb2
+
+bb1:
+  call void @recursive1(i32 %x, i32 %y)
+  br label %bb2
+
+bb2:
+  ret void
+}
+
+; CHECK-LABEL: define internal void @recursive1_merged(i32, i32)
+; CHECK: call void @recursive1_merged(i32 %0, i32 %1)
+; CHECK: ret void
+define internal void @recursive2(i32 %x, i32 %y) {
+  br i1 undef, label %bb1, label %bb2
+
+bb1:
+  call void @recursive2(i32 %x, i32 %y)
+  br label %bb2
+
+bb2:
+  ret void
+}
+
+; CHECK-LABEL: define internal void @another_recursive_func_merged(i32, void (i32)*)
+; CHECK: call void %1(i32 %0)
+; CHECK: ret void
+define internal void @another_recursive_func(i32 %x) {
+  br i1 undef, label %bb1, label %bb2
+
+bb1:
+  call void @another_recursive_func(i32 %x)
+  br label %bb2
+
+bb2:
+  ret void
+}
+
+; CHECK-NOT: @not_really_recursive(
+define internal void @not_really_recursive(i32 %x) {
+  br i1 undef, label %bb1, label %bb2
+
+bb1:
+  call void @callee1(i32 %x)
+  br label %bb2
+
+bb2:
+  ret void
+}
+
+; CHECK-LABEL: define void @call_recursive_funcs(i32 %x)
+; CHECK: call void @recursive1_merged(i32 %x, i32 %x)
+; CHECK: call void @recursive1_merged(i32 %x, i32 %x)
+; CHECK: call void bitcast (void (i32, void (i32)*)* @another_recursive_func_merged to void (i32, void (i32, void (i32)*)*)*)(i32 %x, void (i32, void (i32)*)* @another_recursive_func_merged)
+; CHECK: call void @another_recursive_func_merged(i32 %x, void (i32)* @callee1)
+; CHECK: ret void
+define void @call_recursive_funcs(i32 %x) {
+  call void @recursive1(i32 %x, i32 %x)
+  call void @recursive2(i32 %x, i32 %x)
+  call void @another_recursive_func(i32 %x)
+  call void @not_really_recursive(i32 %x)
+  ret void
+}
+

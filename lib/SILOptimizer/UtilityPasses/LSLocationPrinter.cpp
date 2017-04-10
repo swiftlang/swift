@@ -253,7 +253,6 @@ public:
     }
   }
 
-  StringRef getName() override { return "Mem Location Dumper"; }
 };
 
 } // end anonymous namespace

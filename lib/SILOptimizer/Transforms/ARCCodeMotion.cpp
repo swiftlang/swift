@@ -1018,8 +1018,6 @@ class ARCCodeMotion : public SILFunctionTransform {
   bool FreezeEpilogueReleases;
 
 public:
-  StringRef getName() override { return "SIL ARC Code Motion"; }
-
   /// Constructor.
   ARCCodeMotion(CodeMotionKind H, bool F) : Kind(H), FreezeEpilogueReleases(F) {}
 

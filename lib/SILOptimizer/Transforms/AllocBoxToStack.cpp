@@ -942,7 +942,6 @@ class AllocBoxToStack : public SILFunctionTransform {
     }
   }
 
-  StringRef getName() override { return "AllocBox-To-Stack Optimization"; }
 };
 } // end anonymous namespace
 

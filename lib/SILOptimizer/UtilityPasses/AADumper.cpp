@@ -97,7 +97,6 @@ class SILAADumper : public SILModuleTransform {
     }
   }
 
-  StringRef getName() override { return "AA Dumper"; }
 };
         
 } // end anonymous namespace

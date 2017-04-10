@@ -349,7 +349,6 @@ class SILCombine : public SILFunctionTransform {
   
   bool needsNotifications() override { return true; }
 
-  StringRef getName() override { return "SIL Combine"; }
 };
 
 } // end anonymous namespace

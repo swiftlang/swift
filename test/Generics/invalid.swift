@@ -8,12 +8,10 @@ typealias gimel where A : B // expected-error {{'where' clause cannot be attache
 class dalet where A : B {} // expected-error {{'where' clause cannot be attached to a non-generic declaration}}
 
 protocol he where A : B { // expected-error 2 {{use of undeclared type 'A'}}
-  // expected-error@-1 3{{type 'A' in conformance requirement does not refer to a generic parameter or associated type}}
-  // expected-error@-2 {{use of undeclared type 'B'}}
+  // expected-error@-1 {{use of undeclared type 'B'}}
 
   associatedtype vav where A : B // expected-error{{use of undeclared type 'A'}}
-    // expected-error@-1 3{{type 'A' in conformance requirement does not refer to a generic parameter or associated type}}
-  // expected-error@-2 {{use of undeclared type 'B'}}
+  // expected-error@-1 {{use of undeclared type 'B'}}
 }
 
 

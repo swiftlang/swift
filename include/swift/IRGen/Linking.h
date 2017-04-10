@@ -23,16 +23,25 @@
 #include "llvm/ADT/DenseMapInfo.h"
 #include "llvm/IR/GlobalValue.h"
 
+namespace llvm {
+class Triple;
+}
+
 namespace swift {
 namespace irgen {
 class IRGenModule;
 
+/// Determine if the triple uses the DLL storage.
+bool useDllStorage(const llvm::Triple &triple);
+
 class UniversalLinkageInfo {
 public:
-  bool IsELFObject, UseDLLStorage, HasMultipleIGMs, IsWholeModule,
-      IsWholeModuleSerialized;
+  bool IsELFObject, UseDLLStorage, HasMultipleIGMs, IsWholeModule;
 
   UniversalLinkageInfo(IRGenModule &IGM);
+
+  UniversalLinkageInfo(const llvm::Triple &triple, bool hasMultipleIGMs,
+                       bool isWholeModule);
 };
 
 /// Selector for type metadata symbol kinds.
@@ -572,8 +581,7 @@ public:
   /// Returns true if this function or global variable may be inlined into
   /// another module.
   ///
-  bool isFragile(ForDefinition_t isDefinition,
-                 bool wholeModuleSerialized) const;
+  bool isFragile(ForDefinition_t isDefinition) const;
 
   const ValueDecl *getDecl() const {
     assert(isDeclKind(getKind()));

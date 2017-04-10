@@ -191,6 +191,16 @@ private:
   GenericSignatureBuilder(const GenericSignatureBuilder &) = delete;
   GenericSignatureBuilder &operator=(const GenericSignatureBuilder &) = delete;
 
+  /// When a particular requirement cannot be resolved due to, e.g., a
+  /// currently-unresolvable or nested type, this routine should be
+  /// called to record the unresolved requirement to be reconsidered later.
+  ///
+  /// \returns false, which is used elsewhere to indicate "no failure".
+  bool recordUnresolvedRequirement(RequirementKind kind,
+                                   UnresolvedType lhs,
+                                   RequirementRHS rhs,
+                                   FloatingRequirementSource source);
+
   /// Retrieve the constraint source conformance for the superclass constraint
   /// of the given potential archetype (if present) to the given protocol.
   ///
@@ -222,7 +232,8 @@ public:
   /// called with the two types that don't match (\c Bar<T> and \c Baz for the
   /// previous example).
   bool
-  addSameTypeRequirement(ResolvedType paOrT1, ResolvedType paOrT2,
+  addSameTypeRequirementDirect(
+                         ResolvedType paOrT1, ResolvedType paOrT2,
                          FloatingRequirementSource Source,
                          llvm::function_ref<void(Type, Type)> diagnoseMismatch);
 
@@ -230,8 +241,8 @@ public:
   /// (output of GenericSignatureBuilder::resolve).
   ///
   /// The two types must not be incompatible concrete types.
-  bool addSameTypeRequirement(ResolvedType paOrT1, ResolvedType paOrT2,
-                              FloatingRequirementSource Source);
+  bool addSameTypeRequirementDirect(ResolvedType paOrT1, ResolvedType paOrT2,
+                                    FloatingRequirementSource Source);
 
   /// \brief Add a new same-type requirement between two unresolved types.
   ///
@@ -260,9 +271,17 @@ public:
 private:
   /// \brief Add a new superclass requirement specifying that the given
   /// potential archetype has the given type as an ancestor.
-  bool addSuperclassRequirement(PotentialArchetype *T,
-                                Type Superclass,
-                                const RequirementSource *Source);
+  bool addSuperclassRequirementDirect(PotentialArchetype *T,
+                                      Type Superclass,
+                                      const RequirementSource *Source);
+
+  /// \brief Add a new type requirement specifying that the given
+  /// type conforms-to or is a superclass of the second type.
+  bool addTypeRequirement(UnresolvedType subject,
+                          UnresolvedType constraint,
+                          FloatingRequirementSource source,
+                          llvm::SmallPtrSetImpl<ProtocolDecl *> *visited
+                            = nullptr);
 
   /// \brief Add a new conformance requirement specifying that the given
   /// potential archetypes are equivalent.
@@ -285,17 +304,22 @@ private:
       Type T1, Type T2, FloatingRequirementSource Source,
       llvm::function_ref<void(Type, Type)> diagnoseMismatch);
 
+  /// \brief Add a new layout requirement directly on the potential archetype.
+  ///
+  /// \returns true if this requirement makes the set of requirements
+  /// inconsistent, in which case a diagnostic will have been issued.
+  bool addLayoutRequirementDirect(PotentialArchetype *PAT,
+                                  LayoutConstraint Layout,
+                                  const RequirementSource *Source);
+
+  /// Add a new layout requirement to the subject.
+  bool addLayoutRequirement(UnresolvedType subject,
+                            LayoutConstraint layout,
+                            FloatingRequirementSource source);
+
   /// Add the requirements placed on the given type parameter
   /// to the given potential archetype.
-  ///
-  /// \param dependentType A dependent type thar describes \c pa relative to
-  /// its protocol, for protocol requirements.
-  ///
-  /// FIXME: \c dependentType will be derivable from \c parentSource and \c pa
-  /// when we're no longer putting conformance requirements directly on the
-  /// representative.
   bool addInheritedRequirements(TypeDecl *decl, PotentialArchetype *pa,
-                                Type dependentType,
                                 const RequirementSource *parentSource,
                                 llvm::SmallPtrSetImpl<ProtocolDecl *> &visited);
 
@@ -378,15 +402,6 @@ public:
   bool addRequirement(const Requirement &req, FloatingRequirementSource source,
                       const SubstitutionMap *subMap,
                       llvm::SmallPtrSetImpl<ProtocolDecl *> &Visited);
-
-  /// \brief Add a new requirement.
-  ///
-  /// \returns true if this requirement makes the set of requirements
-  /// inconsistent, in which case a diagnostic will have been issued.
-
-  bool addLayoutRequirement(PotentialArchetype *PAT,
-                            LayoutConstraint Layout,
-                            const RequirementSource *Source);
 
   /// \brief Add all of a generic signature's parameters and requirements.
   void addGenericSignature(GenericSignature *sig);
@@ -547,13 +562,12 @@ public:
 
   /// \brief Resolve the given type as far as this Builder knows how.
   ///
-  /// This returns either a non-typealias potential archetype or a Type, if \c
-  /// type is concrete.
-  // FIXME: the hackTypeFromGenericTypeAlias is just temporarily patching over
-  // problems with generic typealiases (see the comment on the ResolvedType
-  // function)
-  ResolvedType resolve(UnresolvedType type,
-                       bool hackTypeFromGenericTypeAlias = false);
+  /// If successful, this returns either a non-typealias potential archetype
+  /// or a Type, if \c type is concrete.
+  /// If the type cannot be resolved, e.g., because it is "too" recursive
+  /// given the source, returns \c None.
+  Optional<ResolvedType> resolve(UnresolvedType type,
+                                 FloatingRequirementSource source);
 
   /// \brief Dump all of the requirements, both specified and inferred.
   LLVM_ATTRIBUTE_DEPRECATED(
@@ -864,6 +878,10 @@ public:
   /// Retrieve the potential archetype at the root.
   PotentialArchetype *getRootPotentialArchetype() const;
 
+  /// Retrieve the potential archetype to which this source refers.
+  PotentialArchetype *getAffectedPotentialArchetype(
+                                        GenericSignatureBuilder &builder) const;
+
   /// Whether the requirement is inferred or derived from an inferred
   /// requirment.
   bool isInferredRequirement() const {
@@ -1046,11 +1064,13 @@ public:
 
   /// Retrieve the complete requirement source rooted at the given potential
   /// archetype.
-  const RequirementSource *getSource(PotentialArchetype *pa,
-                                     Type dependentType) const;
+  const RequirementSource *getSource(PotentialArchetype *pa) const;
 
   /// Retrieve the source location for this requirement.
   SourceLoc getLoc() const;
+
+  /// Whether this is an explicitly-stated requirement.
+  bool isExplicit() const;
 };
 
 class GenericSignatureBuilder::PotentialArchetype {
@@ -1324,6 +1344,12 @@ public:
   /// \brief Determine the nesting depth of this potential archetype, e.g.,
   /// the number of associated type references.
   unsigned getNestingDepth() const;
+
+  /// Determine whether two potential archetypes are in the same equivalence
+  /// class.
+  bool isInSameEquivalenceClassAs(const PotentialArchetype *other) const {
+    return getRepresentative() == other->getRepresentative();
+  }
 
   /// Retrieve the equivalence class, if it's already present.
   ///

@@ -1146,15 +1146,14 @@ static SDKNode *constructTypeNode(SDKContext &Ctx, Type T) {
 // We sometimes skip the first parameter because it can be metatype of dynamic
 // this if the function is a member function.
 static SDKNode *constructFunctionNode(SDKContext &Ctx, FuncDecl* FD,
-                                      SDKNodeKind Kind, bool SkipFirst) {
+                                      SDKNodeKind Kind) {
   auto Func = SDKNodeInitInfo(Ctx, FD).createSDKNode(Kind);
   Func->addChild(constructTypeNode(Ctx, FD->getResultInterfaceType()));
   for (auto *paramList : FD->getParameterLists()) {
-    for (auto param : *paramList)
-      Func->addChild(constructTypeNode(Ctx, param->getInterfaceType()));
-  }
-  if (SkipFirst) {
-    Func->removeChild(Func->getChildBegin() + 1);
+    for (auto param : *paramList) {
+      if (!param->isSelfParameter())
+        Func->addChild(constructTypeNode(Ctx, param->getInterfaceType()));
+    }
   }
   return Func;
 }
@@ -1225,9 +1224,9 @@ static SDKNode *constructVarNode(SDKContext &Ctx, ValueDecl *VD) {
   Var->addChild(constructTypeNode(Ctx, VD->getInterfaceType()));
   if (auto VAD = dyn_cast<AbstractStorageDecl>(VD)) {
     if (auto Getter = VAD->getGetter())
-      Var->addChild(constructFunctionNode(Ctx, Getter, SDKNodeKind::Getter, false));
+      Var->addChild(constructFunctionNode(Ctx, Getter, SDKNodeKind::Getter));
     if (auto Setter = VAD->getSetter())
-      Var->addChild(constructFunctionNode(Ctx, Setter, SDKNodeKind::Setter, false));
+      Var->addChild(constructFunctionNode(Ctx, Setter, SDKNodeKind::Setter));
   }
   return Var;
 }
@@ -1244,7 +1243,7 @@ static void addMembersToRoot(SDKContext &Ctx, SDKNode *Root,
     if (shouldIgnore(Member))
       continue;
     if (auto Func = dyn_cast<FuncDecl>(Member)) {
-      Root->addChild(constructFunctionNode(Ctx, Func, SDKNodeKind::Function, true));
+      Root->addChild(constructFunctionNode(Ctx, Func, SDKNodeKind::Function));
     } else if (auto CD = dyn_cast<ConstructorDecl>(Member)) {
       Root->addChild(constructInitNode(Ctx, CD));
     } else if (auto VD = dyn_cast<VarDecl>(Member)) {
@@ -1334,7 +1333,7 @@ public:
       return;
 
     if (auto FD = dyn_cast<FuncDecl>(VD)) {
-      RootNode->addChild(constructFunctionNode(Ctx, FD, SDKNodeKind::Function, false));
+      RootNode->addChild(constructFunctionNode(Ctx, FD, SDKNodeKind::Function));
     } else if (auto NTD = dyn_cast<NominalTypeDecl>(VD)) {
       RootNode->addChild(constructTypeDeclNode(Ctx, NTD));
     }

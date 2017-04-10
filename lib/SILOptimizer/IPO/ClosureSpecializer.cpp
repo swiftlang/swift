@@ -677,7 +677,6 @@ public:
 
   void run() override;
 
-  StringRef getName() override { return "Closure Specialization"; }
 };
 
 void SILClosureSpecializerTransform::run() {

@@ -1234,7 +1234,6 @@ public:
     }
   }
 
-  StringRef getName() override { return "Function Signature Optimization"; }
 };
 
 } // end anonymous namespace

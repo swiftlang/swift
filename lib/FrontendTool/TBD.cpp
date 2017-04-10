@@ -38,7 +38,8 @@ static std::vector<StringRef> sortSymbols(llvm::StringSet<> &symbols) {
   return sorted;
 }
 
-bool swift::writeTBD(ModuleDecl *M, StringRef OutputFilename) {
+bool swift::writeTBD(ModuleDecl *M, bool hasMultipleIRGenThreads,
+                     StringRef OutputFilename) {
   std::error_code EC;
   llvm::raw_fd_ostream OS(OutputFilename, EC, llvm::sys::fs::F_None);
   if (EC) {
@@ -48,7 +49,8 @@ bool swift::writeTBD(ModuleDecl *M, StringRef OutputFilename) {
   }
   llvm::StringSet<> symbols;
   for (auto file : M->getFiles())
-    enumeratePublicSymbols(file, symbols);
+    enumeratePublicSymbols(file, symbols, hasMultipleIRGenThreads,
+                           /*isWholeModule=*/true);
 
   // Ensure the order is stable.
   for (auto &symbol : sortSymbols(symbols)) {
@@ -103,17 +105,21 @@ static bool validateSymbolSet(DiagnosticEngine &diags,
   return error;
 }
 
-bool swift::validateTBD(ModuleDecl *M, llvm::Module &IRModule) {
+bool swift::validateTBD(ModuleDecl *M, llvm::Module &IRModule,
+                        bool hasMultipleIRGenThreads) {
   llvm::StringSet<> symbols;
   for (auto file : M->getFiles())
-    enumeratePublicSymbols(file, symbols);
+    enumeratePublicSymbols(file, symbols, hasMultipleIRGenThreads,
+                           /*isWholeModule=*/true);
 
   return validateSymbolSet(M->getASTContext().Diags, symbols, IRModule);
 }
 
-bool swift::validateTBD(FileUnit *file, llvm::Module &IRModule) {
+bool swift::validateTBD(FileUnit *file, llvm::Module &IRModule,
+                        bool hasMultipleIRGenThreads) {
   llvm::StringSet<> symbols;
-  enumeratePublicSymbols(file, symbols);
+  enumeratePublicSymbols(file, symbols, hasMultipleIRGenThreads,
+                         /*isWholeModule=*/false);
 
   return validateSymbolSet(file->getParentModule()->getASTContext().Diags,
                            symbols, IRModule);
