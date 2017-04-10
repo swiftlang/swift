@@ -100,7 +100,7 @@ class OverloadChoice {
 
 public:
   OverloadChoice()
-    : BaseAndBits(nullptr, 0), DeclOrKind(),
+    : BaseAndBits(nullptr, 0), DeclOrKind(0),
       TheFunctionRefKind(FunctionRefKind::Unapplied) {}
 
   OverloadChoice(Type base, ValueDecl *value, bool isSpecialized,
@@ -145,6 +145,13 @@ public:
                     | (uintptr_t)0x03),
         TheFunctionRefKind(FunctionRefKind::Unapplied) {
     assert(base->getRValueType()->is<TupleType>() && "Must have tuple type");
+  }
+
+  bool isInvalid() const {
+    return BaseAndBits.getPointer().isNull()
+      && BaseAndBits.getInt() == 0
+      && DeclOrKind == 0
+      && TheFunctionRefKind == FunctionRefKind::Unapplied;
   }
 
   /// Retrieve an overload choice for a declaration that was found via

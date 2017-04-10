@@ -92,8 +92,9 @@ Constraint::Constraint(ConstraintKind Kind, Type First, Type Second,
   case ConstraintKind::Disjunction:
     llvm_unreachable("Disjunction constraints should use create()");
 
+  case ConstraintKind::KeyPath:
   case ConstraintKind::KeyPathApplication:
-    llvm_unreachable("Key path application takes three types");
+    llvm_unreachable("Key path constraint takes three types");
   }
 
   std::uninitialized_copy(typeVars.begin(), typeVars.end(),
@@ -137,6 +138,7 @@ Constraint::Constraint(ConstraintKind Kind, Type First, Type Second, Type Third,
   case ConstraintKind::Disjunction:
     llvm_unreachable("Wrong constructor");
 
+  case ConstraintKind::KeyPath:
   case ConstraintKind::KeyPathApplication:
     assert(!First.isNull());
     assert(!Second.isNull());
@@ -255,9 +257,10 @@ Constraint *Constraint::clone(ConstraintSystem &cs) const {
   case ConstraintKind::Disjunction:
     return createDisjunction(cs, getNestedConstraints(), getLocator());
 
+  case ConstraintKind::KeyPath:
   case ConstraintKind::KeyPathApplication:
-    return createKeyPathApplication(cs, getFirstType(), getSecondType(),
-                                    getThirdType(), getLocator());
+    return create(cs, getKind(), getFirstType(), getSecondType(), getThirdType(),
+                  getLocator());
   }
 
   llvm_unreachable("Unhandled ConstraintKind in switch.");
@@ -313,6 +316,14 @@ void Constraint::print(llvm::raw_ostream &Out, SourceManager *sm) const {
   case ConstraintKind::DynamicTypeOf: Out << " dynamicType type of "; break;
   case ConstraintKind::EscapableFunctionOf: Out << " @escaping type of "; break;
   case ConstraintKind::OpenedExistentialOf: Out << " opened archetype of "; break;
+  case ConstraintKind::KeyPath:
+      Out << " key path from ";
+      getSecondType()->print(Out);
+      Out << " -> ";
+      getThirdType()->print(Out);
+      skipSecond = true;
+      break;
+
   case ConstraintKind::KeyPathApplication:
       Out << " key path projecting ";
       getSecondType()->print(Out);
@@ -530,6 +541,7 @@ gatherReferencedTypeVars(Constraint *constraint,
       gatherReferencedTypeVars(nested, typeVars);
     return;
 
+  case ConstraintKind::KeyPath:
   case ConstraintKind::KeyPathApplication:
     constraint->getThirdType()->getTypeVariables(typeVars);
     LLVM_FALLTHROUGH;
@@ -613,23 +625,23 @@ Constraint *Constraint::create(ConstraintSystem &cs, ConstraintKind kind,
   return ::new (mem) Constraint(kind, first, second, locator, typeVars);
 }
 
-Constraint *Constraint::createKeyPathApplication(ConstraintSystem &cs,
-                            Type KeyPath, Type Root, Type Value,
-                            ConstraintLocator *locator) {
+Constraint *Constraint::create(ConstraintSystem &cs, ConstraintKind kind,
+                               Type first, Type second, Type third,
+                               ConstraintLocator *locator) {
   // Collect type variables.
   SmallVector<TypeVariableType *, 4> typeVars;
-  if (KeyPath->hasTypeVariable())
-    KeyPath->getTypeVariables(typeVars);
-  if (Root->hasTypeVariable())
-    Root->getTypeVariables(typeVars);
-  if (Value->hasTypeVariable())
-    Value->getTypeVariables(typeVars);
+  if (first->hasTypeVariable())
+    first->getTypeVariables(typeVars);
+  if (second->hasTypeVariable())
+    second->getTypeVariables(typeVars);
+  if (third->hasTypeVariable())
+    third->getTypeVariables(typeVars);
   uniqueTypeVariables(typeVars);
   
   unsigned size = totalSizeToAlloc<TypeVariableType*>(typeVars.size());
   void *mem = cs.getAllocator().Allocate(size, alignof(Constraint));
-  return ::new (mem) Constraint(ConstraintKind::KeyPathApplication,
-                                KeyPath, Root, Value,
+  return ::new (mem) Constraint(kind,
+                                first, second, third,
                                 locator, typeVars);
 }
 

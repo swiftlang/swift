@@ -1580,8 +1580,13 @@ public:
 
   /// \brief Add a key path application constraint to the constraint system.
   void addKeyPathApplicationConstraint(Type keypath, Type root, Type value,
-                     ConstraintLocatorBuilder locator,
-                     bool isFavored = false);
+                                       ConstraintLocatorBuilder locator,
+                                       bool isFavored = false);
+
+  /// \brief Add a key path constraint to the constraint system.
+  void addKeyPathConstraint(Type keypath, Type root, Type value,
+                            ConstraintLocatorBuilder locator,
+                            bool isFavored = false);
 
   /// Add a new constraint with a restriction on its application.
   void addRestrictedConstraint(ConstraintKind kind,
@@ -2298,6 +2303,13 @@ private:
                                          TypeMatchOptions flags,
                                          ConstraintLocatorBuilder locator);
 
+  /// \brief Attempt to simplify the given KeyPath constraint.
+  SolutionKind simplifyKeyPathConstraint(Type keyPath,
+                                         Type root,
+                                         Type value,
+                                         TypeMatchOptions flags,
+                                         ConstraintLocatorBuilder locator);
+
   /// \brief Attempt to simplify the given defaultable constraint.
   SolutionKind simplifyDefaultableConstraint(Type first, Type second,
                                              TypeMatchOptions flags,
@@ -2532,7 +2544,7 @@ public:
     auto threshold = TC.Context.LangOpts.SolverMemoryThreshold;
     return MaxMemory > threshold;
   }
-
+  
   LLVM_ATTRIBUTE_DEPRECATED(
       void dump() LLVM_ATTRIBUTE_USED,
       "only for use within the debugger");

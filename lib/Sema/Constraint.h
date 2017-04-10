@@ -137,6 +137,11 @@ enum class ConstraintKind : char {
   // The second and third types can be lvalues depending on the kind of key
   // path.
   KeyPathApplication,
+  /// \brief A relation between three types. The first is the key path type,
+  // the second is its root type, and the third is the projected value type.
+  // The key path type is chosen based on the selection of overloads for the
+  // member references along the path.
+  KeyPath,
 };
 
 /// \brief Classification of the different kinds of constraints.
@@ -427,9 +432,9 @@ public:
                             Type First, Type Second,
                             ConstraintLocator *locator);
 
-  /// Create a new key path application constraint.
-  static Constraint *createKeyPathApplication(ConstraintSystem &cs,
-                            Type KeyPath, Type Root, Type Value,
+  /// Create a new constraint.
+  static Constraint *create(ConstraintSystem &cs, ConstraintKind Kind, 
+                            Type First, Type Second, Type Third,
                             ConstraintLocator *locator);
 
   /// Create a new member constraint.
@@ -546,6 +551,7 @@ public:
     case ConstraintKind::DynamicTypeOf:
     case ConstraintKind::EscapableFunctionOf:
     case ConstraintKind::OpenedExistentialOf:
+    case ConstraintKind::KeyPath:
     case ConstraintKind::KeyPathApplication:
     case ConstraintKind::Defaultable:
       return ConstraintClassification::TypeProperty;
@@ -594,6 +600,7 @@ public:
   /// \brief Retrieve the third type in the constraint.
   Type getThirdType() const {
     switch (getKind()) {
+    case ConstraintKind::KeyPath:
     case ConstraintKind::KeyPathApplication:
       return Types.Third;
     default:

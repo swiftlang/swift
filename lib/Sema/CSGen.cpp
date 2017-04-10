@@ -2851,7 +2851,7 @@ namespace {
       Type base = LValueType::get(root);
       
       for (unsigned i : indices(E->getComponents())) {
-        auto &component = E->getMutableComponents()[i];
+        auto &component = E->getComponents()[i];
         switch (auto kind = component.getKind()) {
         case KeyPathExpr::Component::Kind::UnresolvedProperty: {
           auto memberTy = CS.createTypeVariable(locator, TVO_CanBindToLValue);
@@ -2904,7 +2904,7 @@ namespace {
         }        
       }
       
-      // If there were an optional chaining component, the end result must be
+      // If there was an optional chaining component, the end result must be
       // optional.
       if (didOptionalChain) {
         auto objTy = CS.createTypeVariable(locator, 0);
@@ -2918,9 +2918,17 @@ namespace {
       CS.addConstraint(ConstraintKind::Equal, base, rvalueBase, locator);
       
       // The result is a KeyPath from the root to the end component.
-      // TODO: Mutability.
-      Type keyPathArgs[] = {root, rvalueBase};
-      auto kpTy = BoundGenericType::get(kpDecl, Type(), keyPathArgs);
+      Type kpTy;
+      if (didOptionalChain) {
+        // Optional-chaining key paths are always read-only.
+        kpTy = BoundGenericType::get(kpDecl, Type(), {root, rvalueBase});
+      } else {
+        // The type of key path depends on the overloads chosen for the key
+        // path components.
+        kpTy = CS.createTypeVariable(CS.getConstraintLocator(E), 0);
+        CS.addKeyPathConstraint(kpTy, root, rvalueBase,
+                                CS.getConstraintLocator(E));
+      }
       return kpTy;
     }
   };
