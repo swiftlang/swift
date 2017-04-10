@@ -90,12 +90,13 @@ void SILBasicBlock::remove(SILInstruction *I) {
   InstList.remove(I);
 }
 
-void SILBasicBlock::erase(SILInstruction *I) {
+SILBasicBlock::iterator SILBasicBlock::erase(SILInstruction *I) {
   // Notify the delete handlers that this instruction is going away.
   getModule().notifyDeleteHandlers(&*I);
   auto *F = getParent();
-  InstList.erase(I);
+  auto II = InstList.erase(I);
   F->getModule().deallocateInst(I);
+  return II;
 }
 
 /// This method unlinks 'self' from the containing SILFunction and deletes it.
