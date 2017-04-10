@@ -795,8 +795,7 @@ static Type formProtocolRelativeType(ProtocolDecl *proto,
 }
 
 const RequirementSource *FloatingRequirementSource::getSource(
-                                                PotentialArchetype *pa,
-                                                Type dependentType) const {
+                                                PotentialArchetype *pa) const {
   switch (kind) {
   case Resolved:
       return storage.get<const RequirementSource *>();
@@ -818,11 +817,11 @@ const RequirementSource *FloatingRequirementSource::getSource(
     auto baseSourcePA =
       baseSource->getAffectedPotentialArchetype(*pa->getBuilder());
 
-    auto newDependentType =
+    auto dependentType =
       formProtocolRelativeType(protocolReq.protocol, baseSourcePA, pa);
 
     return storage.get<const RequirementSource *>()
-      ->viaProtocolRequirement(*pa->getBuilder(), newDependentType,
+      ->viaProtocolRequirement(*pa->getBuilder(), dependentType,
                                protocolReq.protocol, protocolReq.written);
   }
   }
@@ -2135,9 +2134,7 @@ bool GenericSignatureBuilder::addGenericParameterRequirements(
   
   // Add the requirements from the declaration.
   llvm::SmallPtrSet<ProtocolDecl *, 8> visited;
-  return addInheritedRequirements(GenericParam, PA,
-                                  GenericParam->getDeclaredInterfaceType(),
-                                  nullptr, visited);
+  return addInheritedRequirements(GenericParam, PA, nullptr, visited);
 }
 
 void GenericSignatureBuilder::addGenericParameter(GenericTypeParamType *GenericParam) {
@@ -2248,8 +2245,7 @@ bool GenericSignatureBuilder::addConformanceRequirement(PotentialArchetype *PAT,
   if (auto resolver = getLazyResolver())
     resolver->resolveInheritedProtocols(Proto);
 
-  if (addInheritedRequirements(Proto, PAT, Proto->getSelfInterfaceType(),
-                               Source, Visited))
+  if (addInheritedRequirements(Proto, PAT, Source, Visited))
     return true;
 
   // Add any requirements in the where clause on the protocol.
@@ -2268,9 +2264,7 @@ bool GenericSignatureBuilder::addConformanceRequirement(PotentialArchetype *PAT,
       auto AssocPA = T->getNestedType(AssocType, *this);
 
       if (AssocPA != T) {
-        if (addInheritedRequirements(AssocType, AssocPA,
-                                     AssocType->getDeclaredInterfaceType(),
-                                     Source, Visited))
+        if (addInheritedRequirements(AssocType, AssocPA, Source, Visited))
           return true;
       }
       if (auto WhereClause = AssocType->getTrailingWhereClause()) {
@@ -2320,8 +2314,7 @@ bool GenericSignatureBuilder::addLayoutRequirementDirect(
 bool GenericSignatureBuilder::addLayoutRequirement(
                                              UnresolvedType subject,
                                              LayoutConstraint layout,
-                                             FloatingRequirementSource source,
-                                             Type dependentType) {
+                                             FloatingRequirementSource source) {
   // Resolve the subject.
   auto resolvedSubject = resolve(subject, source);
   if (!resolvedSubject) {
@@ -2347,8 +2340,7 @@ bool GenericSignatureBuilder::addLayoutRequirement(
   }
 
   auto pa = resolvedSubject->getPotentialArchetype();
-  return addLayoutRequirementDirect(pa, layout,
-                                    source.getSource(pa, dependentType));
+  return addLayoutRequirementDirect(pa, layout, source.getSource(pa));
 }
 
 bool GenericSignatureBuilder::updateSuperclass(
@@ -2446,7 +2438,6 @@ bool GenericSignatureBuilder::addTypeRequirement(
                              UnresolvedType subject,
                              UnresolvedType constraint,
                              FloatingRequirementSource source,
-                             Type dependentType,
                              llvm::SmallPtrSetImpl<ProtocolDecl *> *visited) {
   // Make sure we always have a "visited" set to pass down.
   SmallPtrSet<ProtocolDecl *, 4> visitedSet;
@@ -2525,7 +2516,7 @@ bool GenericSignatureBuilder::addTypeRequirement(
   auto subjectPA = resolvedSubject->getPotentialArchetype();
   assert(subjectPA && "No potential archetype?");
 
-  auto resolvedSource = source.getSource(subjectPA, dependentType);
+  auto resolvedSource = source.getSource(subjectPA);
 
   // Protocol requirements.
   if (constraintType->isExistentialType()) {
@@ -2835,15 +2826,12 @@ bool GenericSignatureBuilder::addSameTypeRequirementDirect(
   // If both sides of the requirement are type parameters, equate them.
   if (pa1 && pa2) {
     return addSameTypeRequirementBetweenArchetypes(pa1, pa2,
-                                                   source.getSource(pa1,
-                                                                    Type()));
+                                                   source.getSource(pa1));
     // If just one side is a type parameter, map it to a concrete type.
   } else if (pa1) {
-    return addSameTypeRequirementToConcrete(pa1, t2,
-                                            source.getSource(pa1, Type()));
+    return addSameTypeRequirementToConcrete(pa1, t2, source.getSource(pa1));
   } else if (pa2) {
-    return addSameTypeRequirementToConcrete(pa2, t1,
-                                            source.getSource(pa2, Type()));
+    return addSameTypeRequirementToConcrete(pa2, t1, source.getSource(pa2));
   } else {
     return addSameTypeRequirementBetweenConcrete(t1, t2, source,
                                                  diagnoseMismatch);
@@ -2875,7 +2863,6 @@ void GenericSignatureBuilder::markPotentialArchetypeRecursive(
 bool GenericSignatureBuilder::addInheritedRequirements(
                              TypeDecl *decl,
                              PotentialArchetype *pa,
-                             Type dependentType,
                              const RequirementSource *parentSource,
                              llvm::SmallPtrSetImpl<ProtocolDecl *> &visited) {
   if (isa<AssociatedTypeDecl>(decl) &&
@@ -2913,8 +2900,7 @@ bool GenericSignatureBuilder::addInheritedRequirements(
     };
 
     // Protocol requirement.
-    return addTypeRequirement(pa, inheritedType, getFloatingSource(),
-                              dependentType, &visited);
+    return addTypeRequirement(pa, inheritedType, getFloatingSource(), &visited);
   });
 }
 
@@ -2938,12 +2924,12 @@ bool GenericSignatureBuilder::addRequirement(const RequirementRepr *Req,
   case RequirementReprKind::LayoutConstraint:
     return addLayoutRequirement(subst(Req->getSubject()),
                                 Req->getLayoutConstraint(),
-                                source, Req->getSubject());
+                                source);
 
   case RequirementReprKind::TypeConstraint:
     return addTypeRequirement(subst(Req->getSubject()),
                               subst(Req->getConstraint()),
-                              source, Req->getSubject());
+                              source);
 
   case RequirementReprKind::SameType:
     // Require that at least one side of the requirement contain a type
@@ -2995,14 +2981,12 @@ bool GenericSignatureBuilder::addRequirement(
   case RequirementKind::Conformance:
     return addTypeRequirement(subst(req.getFirstType()),
                               subst(req.getSecondType()),
-                              source, req.getFirstType(),
-                              &Visited);
+                              source, &Visited);
 
   case RequirementKind::Layout:
     return addLayoutRequirement(subst(req.getFirstType()),
                                 req.getLayoutConstraint(),
-                                source,
-                                req.getFirstType());
+                                source);
 
   case RequirementKind::SameType:
     return addSameTypeRequirement(
