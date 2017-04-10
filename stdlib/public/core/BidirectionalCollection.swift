@@ -198,17 +198,16 @@ extension _BidirectionalIndexable {
     var start = start
     var count: IndexDistance = 0
 
-    if start < end {
-      while start != end {
-        count += 1 as IndexDistance
-        formIndex(after: &start)
-      }
+    while start < end {
+      count += 1 as IndexDistance
+      formIndex(after: &start)
+      _debugPrecondition(start <= end, "Walked off the end of the collection")
     }
-    else if start > end {
-      while start != end {
-        count -= 1 as IndexDistance
-        formIndex(before: &start)
-      }
+    while start > end {
+      count -= 1 as IndexDistance
+      formIndex(before: &start)
+      _debugPrecondition(
+        start >= end, "Walked backwards past the start of the collection")
     }
 
     return count
