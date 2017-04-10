@@ -491,36 +491,10 @@ const RequirementSource *RequirementSource::forNestedTypeNameMatch(
                         0, WrittenRequirementLoc());
 }
 
-/// "Re-root" the given type parameter on the protocol's "Self", which replaces
-/// the
-static Type rerootOnProtocolSelf(Type depTy, ProtocolDecl *protocol) {
-  if (auto depMemTy = depTy->getAs<DependentMemberType>()) {
-    // FIXME: Allowing an identifier here is a hack.
-    if (auto assocType = depMemTy->getAssocType()) {
-      return DependentMemberType::get(
-                           rerootOnProtocolSelf(depMemTy->getBase(), protocol),
-                           assocType);
-    }
-
-    return DependentMemberType::get(
-                          rerootOnProtocolSelf(depMemTy->getBase(), protocol),
-                          depMemTy->getName());
-  }
-
-  assert(depTy->is<GenericTypeParamType>() && "not a type parameter!");
-  return protocol->getSelfInterfaceType();
-}
-
 const RequirementSource *RequirementSource::viaProtocolRequirement(
     GenericSignatureBuilder &builder, Type dependentType,
     ProtocolDecl *protocol,
     GenericSignatureBuilder::WrittenRequirementLoc writtenLoc) const {
-  // Re-root the dependent type on the protocol.
-  // FIXME: we really want to canonicalize w.r.t. the requirement signature of
-  // the protocol, but it might not have been computed yet.
-  if (dependentType)
-    dependentType = rerootOnProtocolSelf(dependentType, protocol);
-
   REQUIREMENT_SOURCE_FACTORY_BODY(
                         (nodeID, ProtocolRequirement, this,
                          dependentType.getPointer(), protocol,
@@ -574,6 +548,31 @@ PotentialArchetype *RequirementSource::getRootPotentialArchetype() const {
   // We're at the root, so it's in the inline storage.
   assert(root->storageKind == StorageKind::RootArchetype);
   return root->storage.rootArchetype;
+}
+
+PotentialArchetype *RequirementSource::getAffectedPotentialArchetype(GenericSignatureBuilder &builder) const {
+  switch (kind) {
+  case RequirementSource::Parent:
+  return parent->getAffectedPotentialArchetype(builder)
+           ->getNestedType(getAssociatedType(), builder);
+
+  case RequirementSource::NestedTypeNameMatch:
+    return getRootPotentialArchetype();
+
+  case RequirementSource::Explicit:
+  case RequirementSource::Inferred:
+  case RequirementSource::RequirementSignatureSelf:
+    return getRootPotentialArchetype();
+
+  case RequirementSource::Concrete:
+  case RequirementSource::Superclass:
+    return parent->getAffectedPotentialArchetype(builder);
+
+  case RequirementSource::ProtocolRequirement:
+    return replaceSelfWithPotentialArchetype(
+             parent->getAffectedPotentialArchetype(builder),
+             getStoredType());
+  }
 }
 
 Type RequirementSource::getStoredType() const {
@@ -778,6 +777,23 @@ void RequirementSource::print(llvm::raw_ostream &out,
   }
 }
 
+/// Form the dependent type such that the given protocol's \c Self can be
+/// replaced by \c basePA to reach \c pa.
+static Type formProtocolRelativeType(ProtocolDecl *proto,
+                                     PotentialArchetype *basePA,
+                                     PotentialArchetype *pa) {
+  // Basis case: we've hit the base potential archetype.
+  if (basePA->isInSameEquivalenceClassAs(pa))
+    return proto->getSelfInterfaceType();
+
+  // Recursive case: form a dependent member type.
+  auto baseType = formProtocolRelativeType(proto, basePA, pa->getParent());
+  if (auto assocType = pa->getResolvedAssociatedType())
+    return DependentMemberType::get(baseType, assocType);
+
+  return DependentMemberType::get(baseType, pa->getNestedName());
+}
+
 const RequirementSource *FloatingRequirementSource::getSource(
                                                 PotentialArchetype *pa,
                                                 Type dependentType) const {
@@ -796,11 +812,17 @@ const RequirementSource *FloatingRequirementSource::getSource(
     return RequirementSource::forInferred(pa, storage.get<const TypeRepr *>());
 
   case AbstractProtocol: {
-    // FIXME: dependent type would be derivable from \c pa and \c this if we
-    // were sure to never "re-root" \c pa by placing the requirement on
-    // the representative of the equivalence class.
+    // Derive the dependent type on which this requirement was written. It is
+    // the path from
+    auto baseSource = storage.get<const RequirementSource *>();
+    auto baseSourcePA =
+      baseSource->getAffectedPotentialArchetype(*pa->getBuilder());
+
+    auto newDependentType =
+      formProtocolRelativeType(protocolReq.protocol, baseSourcePA, pa);
+
     return storage.get<const RequirementSource *>()
-      ->viaProtocolRequirement(*pa->getBuilder(), dependentType,
+      ->viaProtocolRequirement(*pa->getBuilder(), newDependentType,
                                protocolReq.protocol, protocolReq.written);
   }
   }

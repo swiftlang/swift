@@ -891,6 +891,10 @@ public:
   /// Retrieve the potential archetype at the root.
   PotentialArchetype *getRootPotentialArchetype() const;
 
+  /// Retrieve the potential archetype to which this source refers.
+  PotentialArchetype *getAffectedPotentialArchetype(
+                                        GenericSignatureBuilder &builder) const;
+
   /// Whether the requirement is inferred or derived from an inferred
   /// requirment.
   bool isInferredRequirement() const {
@@ -1354,6 +1358,12 @@ public:
   /// \brief Determine the nesting depth of this potential archetype, e.g.,
   /// the number of associated type references.
   unsigned getNestingDepth() const;
+
+  /// Determine whether two potential archetypes are in the same equivalence
+  /// class.
+  bool isInSameEquivalenceClassAs(const PotentialArchetype *other) const {
+    return getRepresentative() == other->getRepresentative();
+  }
 
   /// Retrieve the equivalence class, if it's already present.
   ///
