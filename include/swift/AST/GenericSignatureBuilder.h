@@ -82,6 +82,8 @@ public:
 
   class FloatingRequirementSource;
 
+  class DelayedRequirement;
+
   /// Describes a specific constraint on a potential archetype.
   template<typename T>
   struct Constraint {
@@ -190,6 +192,21 @@ public:
     /// The constraint conflicted with existing constraints in some way;
     /// the generic signature is ill-formed.
     Conflicting,
+
+    /// The constraint could not be resolved immediately.
+    Unresolved,
+  };
+
+  /// Enum used to indicate how we should handle a constraint that cannot be
+  /// processed immediately for some reason.
+  enum class UnresolvedHandlingKind : char {
+    /// Generate a new, unresolved constraint and consider the constraint
+    /// "resolved" at this point.
+    GenerateConstraints = 0,
+
+    /// Do not generate a new constraint; rather, return
+    /// \c ConstraintResult::Unresolved and let the caller handle it.
+    ReturnUnresolved = 1,
   };
 
 private:
@@ -207,13 +224,15 @@ private:
 
   /// When a particular requirement cannot be resolved due to, e.g., a
   /// currently-unresolvable or nested type, this routine should be
-  /// called to record the unresolved requirement to be reconsidered later.
+  /// called to cope with the unresolved requirement.
   ///
-  /// \returns ConstraintResult::Resolved.
-  ConstraintResult recordUnresolvedRequirement(RequirementKind kind,
+  /// \returns \c ConstraintResult::Resolved or ConstraintResult::Delayed,
+  /// as appropriate based on \c unresolvedHandling.
+  ConstraintResult handleUnresolvedRequirement(RequirementKind kind,
                                    UnresolvedType lhs,
                                    RequirementRHS rhs,
-                                   FloatingRequirementSource source);
+                                   FloatingRequirementSource source,
+                                   UnresolvedHandlingKind unresolvedHandling);
 
   /// Retrieve the constraint source conformance for the superclass constraint
   /// of the given potential archetype (if present) to the given protocol.
@@ -265,9 +284,11 @@ public:
   ///
   /// The types are resolved with \c GenericSignatureBuilder::resolve, and must
   /// not be incompatible concrete types.
-  ConstraintResult addSameTypeRequirement(UnresolvedType paOrT1,
-                                          UnresolvedType paOrT2,
-                                          FloatingRequirementSource Source);
+  ConstraintResult addSameTypeRequirement(
+                                    UnresolvedType paOrT1,
+                                    UnresolvedType paOrT2,
+                                    FloatingRequirementSource Source,
+                                    UnresolvedHandlingKind unresolvedHandling);
 
   /// \brief Add a new same-type requirement between two unresolved types.
   ///
@@ -277,6 +298,7 @@ public:
   ConstraintResult
   addSameTypeRequirement(UnresolvedType paOrT1, UnresolvedType paOrT2,
                          FloatingRequirementSource Source,
+                         UnresolvedHandlingKind unresolvedHandling,
                          llvm::function_ref<void(Type, Type)> diagnoseMismatch);
 
   /// Update the superclass for the equivalence class of \c T.
@@ -300,6 +322,7 @@ private:
                           UnresolvedType subject,
                           UnresolvedType constraint,
                           FloatingRequirementSource source,
+                          UnresolvedHandlingKind unresolvedHandling,
                           llvm::SmallPtrSetImpl<ProtocolDecl *> *visited
                             = nullptr);
 
@@ -334,9 +357,11 @@ private:
                                               const RequirementSource *Source);
 
   /// Add a new layout requirement to the subject.
-  ConstraintResult addLayoutRequirement(UnresolvedType subject,
-                                        LayoutConstraint layout,
-                                        FloatingRequirementSource source);
+  ConstraintResult addLayoutRequirement(
+                                    UnresolvedType subject,
+                                    LayoutConstraint layout,
+                                    FloatingRequirementSource source,
+                                    UnresolvedHandlingKind unresolvedHandling);
 
   /// Add the requirements placed on the given type parameter
   /// to the given potential archetype.
@@ -480,6 +505,9 @@ public:
                                 ArrayRef<GenericTypeParamType *> genericParams);
 
 private:
+  /// Process any delayed requirements that can be handled now.
+  void processDelayedRequirements();
+
   /// Describes the relationship between a given constraint and
   /// the canonical constraint of the equivalence class.
   enum class ConstraintRelation {
@@ -1545,6 +1573,15 @@ public:
   friend class GenericSignatureBuilder;
 };
 
+/// Describes a requirement whose processing has been delayed for some reason.
+class GenericSignatureBuilder::DelayedRequirement {
+public:
+  RequirementKind kind;
+  UnresolvedType lhs;
+  RequirementRHS rhs;
+  FloatingRequirementSource source;
+};
+
 /// Whether the given constraint result signals an error.
 inline bool isErrorResult(GenericSignatureBuilder::ConstraintResult result) {
   switch (result) {
@@ -1553,6 +1590,7 @@ inline bool isErrorResult(GenericSignatureBuilder::ConstraintResult result) {
     return true;
 
   case GenericSignatureBuilder::ConstraintResult::Resolved:
+  case GenericSignatureBuilder::ConstraintResult::Unresolved:
     return false;
   }
 }
