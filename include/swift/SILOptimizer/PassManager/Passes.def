@@ -112,6 +112,8 @@ PASS(DefiniteInitialization, "definite-init",
      "Definite Initialization for Diagnostics")
 PASS(Devirtualizer, "devirtualizer",
      "Indirect Call Devirtualization")
+PASS(DiagnoseStaticExclusivity, "diagnose-static-exclusivity",
+     "Static Enforcement of Law of Exclusivity")
 PASS(DiagnoseUnreachable, "diagnose-unreachable",
      "Diagnose Unreachable Code")
 PASS(DiagnosticConstantPropagation, "diagnostic-constant-propagation",
