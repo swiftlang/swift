@@ -3669,9 +3669,6 @@ public:
   /// \brief Retrieve the set of protocols composed to create this type.
   ArrayRef<Type> getProtocols() const { return Protocols; }
 
-  /// \brief Return the protocols of this type in canonical order.
-  void getAnyExistentialTypeProtocols(SmallVectorImpl<ProtocolDecl *> &protos);
-
   void Profile(llvm::FoldingSetNodeID &ID) {
     Profile(ID, Protocols);
   }
