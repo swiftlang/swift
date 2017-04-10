@@ -258,35 +258,27 @@ public extension UnicodeStorage where Encoding == Latin1 {
   var isKnownValidEncoding: Bool { return true }
   var isKnownFCCNormalized: Bool { return true }
 }
-  
+
 public extension UnicodeStorage
-where Encoding == Latin1, 
-  CodeUnits.Iterator.Element == Encoding.EncodedScalar.Iterator.Element,
-  CodeUnits.Iterator.Element : UnsignedInteger,
-  CodeUnits.SubSequence : RandomAccessCollection,
+where Encoding == Latin1,
+  Encoding.EncodedScalar.Iterator.Element == CodeUnits.Iterator.Element,
+  CodeUnits.SubSequence : BidirectionalCollection,
   CodeUnits.SubSequence.Index == CodeUnits.Index,
   CodeUnits.SubSequence.SubSequence == CodeUnits.SubSequence,
-  CodeUnits.SubSequence.Iterator.Element == CodeUnits.Iterator.Element
-{
+  CodeUnits.SubSequence.Iterator.Element == CodeUnits.Iterator.Element,
+  CodeUnits.Iterator.Element : UnsignedInteger {
+  
   var utf16: RandomAccessUnicodeView<
     LazyMapRandomAccessCollection<CodeUnits, UInt16>
   > {
     return fccNormalizedUTF16
   }
 
-  var utf8: RandomAccessUnicodeView<CodeUnits> {
-    return RandomAccessUnicodeView(codeUnits)
-  }
-  
   /// An FCC-normalized view of the string
   var fccNormalizedUTF16: RandomAccessUnicodeView<
     LazyMapRandomAccessCollection<CodeUnits, UInt16>
   > {
     return RandomAccessUnicodeView(codeUnits.lazy.map { numericCast($0) })
-  }
-  
-  var characters: Latin1CharacterView<CodeUnits, Encoding> {
-    return _UnicodeViews(codeUnits, Encoding.self).latin1CharacterView
   }
 
   var unicodeScalars: RandomAccessUnicodeView<
@@ -296,6 +288,10 @@ where Encoding == Latin1,
       codeUnits.lazy.map {
       UnicodeScalar(_unchecked: numericCast($0))
     })
+  }
+  
+  var characters: Latin1CharacterView<CodeUnits, Encoding> {
+    return _UnicodeViews(codeUnits, Encoding.self).latin1CharacterView
   }
 }
 

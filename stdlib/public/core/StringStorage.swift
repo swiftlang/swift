@@ -372,6 +372,15 @@ extension _Latin1StringStorage : UnicodeStorage {
     LazyMapRandomAccessCollection<CodeUnits, UTF16.CodeUnit>
   >
   public typealias UTF16View = FCCNormalizedUTF16View
+
+  public typealias UTF8View = _TranscodedView<
+    _Latin1StringStorage, Encoding, UTF8>
+
+  public typealias UnicodeScalarView = RandomAccessUnicodeView<
+    LazyMapRandomAccessCollection<CodeUnits, UnicodeScalar>
+  >
+  
+  public typealias CharacterView = Latin1CharacterView<CodeUnits, Encoding>
   
   public var codeUnits: CodeUnits { return self }
 
@@ -385,6 +394,16 @@ extension _Latin1StringStorage : UnicodeStorage {
       if newValue { _header.flags |= (1 as UInt8)<<0 }
       else { _header.flags &= ~((1 as UInt8)<<0) }
     }
+  }
+
+  public var unicodeScalars: UnicodeScalarView {
+    return RandomAccessUnicodeView(
+      codeUnits.lazy.map {
+      UnicodeScalar(_unchecked: numericCast($0))
+    })
+  }
+  public var characters: CharacterView {
+    return _UnicodeViews(codeUnits, Encoding.self).latin1CharacterView
   }
 }
 

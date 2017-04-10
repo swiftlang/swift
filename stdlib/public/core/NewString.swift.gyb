@@ -539,66 +539,6 @@ extension String.Content : UnicodeContent {
   // we could detect in-place mutation of these views and avoid copying,
   // especially after an append.  In the meantime, this'll have to do.
   
-  public typealias UTF16View = AnyUInt16UnicodeView
-  public var utf16: UTF16View {
-    get {
-      ${switch('return UTF16View(x.utf16)')}
-    }
-    set {
-      replaceUTF16(utf16.startIndex..<utf16.endIndex, with: newValue)
-    }
-  }
-
-  public typealias UTF8View = AnyUInt8UnicodeView
-  public var utf8: UTF8View {
-    get {
-      ${switch('return UTF8View(x.utf8)')}
-    }
-    set {
-      // Probably not the most efficient implementation, but it should work.
-      replaceUTF16(utf16.startIndex..<utf16.endIndex, with: EmptyCollection())
-      UTF8.parseForward(newValue) {
-        replaceUTF16(utf16.endIndex..<utf16.endIndex, with: $0.utf16)
-      }
-    }
-  }
-
-  public typealias FCCNormalizedUTF16View = AnyUInt16UnicodeView
-  public var fccNormalizedUTF16: FCCNormalizedUTF16View {
-    get {
-      ${switch('return FCCNormalizedUTF16View(x.fccNormalizedUTF16)')}
-    }
-    set {
-      replaceUTF16(utf16.startIndex..<utf16.endIndex, with: newValue)
-    }
-  }
-
-  public typealias UnicodeScalarView = AnyUnicodeScalarUnicodeView
-  public var unicodeScalars: UnicodeScalarView {
-    get {
-      ${switch('return UnicodeScalarView(x.unicodeScalars)')}
-    }
-    set {
-      replaceUTF16(
-        utf16.startIndex..<utf16.endIndex, with: newValue.lazy.flatMap {
-          UTF16.EncodedScalar($0)
-        })
-    }
-  }
-
-  public typealias CharacterView = AnyCharacterUnicodeView
-  public var characters: CharacterView {
-    get {
-      ${switch('return CharacterView(x.characters)')}
-    }
-    set {
-      replaceUTF16(
-        utf16.startIndex..<utf16.endIndex, with: newValue.lazy.flatMap {
-          $0.utf16
-        })
-    }
-  }
-  
   public func isLatin1() -> Bool { ${switch('return x.isLatin1()')} }
   public func isASCII() -> Bool { ${switch('return x.isASCII()')} }
   public var isKnownLatin1: Bool { ${switch('return x.isKnownLatin1')} }
@@ -1363,3 +1303,152 @@ extension String {// : _ObjectiveCBridgeable {
   }
 }
 
+//===--- New Views --------------------------------------------------------===//
+
+%{
+  allViews = [
+    ('UTF8View', 'utf8', 'UTF8.CodeUnit'),
+    ('UTF16View', 'utf16', 'UTF16.CodeUnit'),
+    ('FCCNormalizedUTF16View', 'fccNormalizedUTF16', 'UTF16.CodeUnit'),
+    ('CharacterView', 'characters', 'Character'),
+    ('UnicodeScalarView', 'unicodeScalars', 'UnicodeScalar')
+  ]  
+}%
+
+% for View, view, Element in allViews:
+extension String.Content {
+  public struct ${View} {
+    public var content: String.Content
+  }
+}
+
+extension String.Content.${View} : Sequence {
+  public struct Iterator : IteratorProtocol {
+    public enum _Representation {
+    % for tag, Payload in allCases:
+    case ${tag}(${Payload}.${View}.Iterator)
+    % end
+    }
+    public var _rep: _Representation
+
+    @inline(__always)
+    public init(_ content: String.Content) {
+      switch content._rep {
+    % for tag,_ in allCases:
+      case .${tag}(let x): _rep = .${tag}(x.${view}.makeIterator())
+    % end
+      }
+    }
+
+    @inline(__always)
+    public mutating func next() -> ${Element}? {
+      switch _rep {
+    % for tag,_ in allCases:
+      case .${tag}(let x):
+        var x1 = x
+        defer { _rep = .${tag}(x1) }
+        return x1.next()
+    % end
+      }
+    }
+  }
+
+  @inline(__always)
+  public func makeIterator() -> Iterator {
+    return Iterator(content)
+  }
+}
+
+extension String.Content.${View} : UnicodeView {
+  public typealias Index = String.Index
+  public typealias IndexDistance = String.IndexDistance
+
+  public typealias SubSequence
+    = RangeReplaceableUnicodeViewSlice<String.Content.${View}>
+
+  public subscript(bounds: Range<Index>) -> SubSequence {
+    return SubSequence(base: self, bounds: bounds)
+  }
+
+  ${gyb.expand(
+      'ForwardCollectionAPIs.swift.gyb',
+      base='x.%s' % view,
+      forward=switchContent,
+      wrap_index='x.%s.anyIndex' % view,
+      unwrap_index='x.%s.nativeIndex' % view,
+      nonmutating=True,
+      Element=Element)}
+  
+  public mutating func _tryToReplaceSubrange<C: Collection>(
+    _ target: Range<Index>, with replacement: C
+  ) -> Bool
+  where C.Iterator.Element == ${Element} {
+    // Doing this rather than switching will try to preserve value semantics
+    // even if a case is a reference type.
+    return content.${view}._tryToReplaceSubrange(target, with: replacement)
+  }
+}
+
+extension String.Content.${View} : RangeReplaceableCollection {
+  
+  public init() { content = String.Content() }
+  
+  public mutating func replaceSubrange<C: Collection>(
+    _ target: Range<Index>, with replacement: C
+  ) where C.Iterator.Element == ${Element} {
+    // Fast path: the incoming characters are Unicode
+    if let unicodeReplacement = replacement as? AnyUnicode {
+      content.replaceUTF16(target, with: unicodeReplacement.anyContent.anyUTF16)
+    }
+    else {
+      % if view == 'utf8':
+      // FIXME: we really need a way to make a transcoded view that only
+      // requires that its CodeUnits be a Collection.  Until then, copy into a
+      // temporary array.
+      let r = Array(replacement)
+      // Slow path: we have to transcode UTF8 to UTF16
+      content.replaceUTF16(
+        target, with:
+        _UnicodeViews(r, UTF8.self).transcoded(to: UTF16.self))
+      % elif view in ('utf16', 'fccNormalizedUTF16'):
+      content.replaceUTF16(target, with: replacement)
+      % elif view == 'unicodeScalars':
+      content.replaceUTF16(
+        target, with: replacement.lazy.flatMap { UTF16.EncodedScalar($0) })
+      % elif view == 'characters':
+      content.replaceUTF16(target, with: replacement.lazy.flatMap { $0.utf16 })
+      % else:
+      %   raise RuntimeError, 'UNHANDLED VIEW'
+      % end
+    }
+  }
+}
+
+extension String.Content {
+  public var ${view}: ${View} {
+    get {
+      return ${View}(content: self)
+    }
+    set {
+      // Probably not the most efficient implementation, but it should work.
+      replaceUTF16(utf16.startIndex..<utf16.endIndex, with: EmptyCollection())
+      let target = utf16.startIndex..<utf16.endIndex
+      % if view == 'utf8':
+      UTF8.parseForward(newValue) {
+        replaceUTF16(target, with: $0.utf16)
+      }
+      % elif view in ('utf16', 'fccNormalizedUTF16'):
+      replaceUTF16(target, with: newValue)
+      % elif view == 'unicodeScalars':
+      replaceUTF16(
+        target, with: newValue.lazy.flatMap { UTF16.EncodedScalar($0) })
+      % elif view == 'characters':
+      replaceUTF16(target, with: newValue.lazy.flatMap { $0.utf16 })
+      % else:
+      %   raise RuntimeError, 'UNHANDLED VIEW'
+      % end
+    }
+  }
+}
+
+% end
