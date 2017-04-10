@@ -1252,6 +1252,8 @@ public:
   }
 
   void checkBeginAccessInst(BeginAccessInst *BAI) {
+    require(F.hasAccessMarkers(), "Unexpected begin_access");
+
     auto op = BAI->getOperand();
     requireSameType(BAI->getType(), op->getType(),
                     "result must be same type as operand");
@@ -1263,7 +1265,8 @@ public:
             isa<ProjectBoxInst>(op) ||
             isa<RefElementAddrInst>(op) ||
             isa<SILFunctionArgument>(op) ||
-            isa<BeginAccessInst>(op),
+            isa<BeginAccessInst>(op) ||
+            isa<MarkUninitializedInst>(op),
             "begin_access operand must be a root address derivation");
 
     if (BAI->getModule().getStage() != SILStage::Raw) {
@@ -1285,6 +1288,8 @@ public:
   }
 
   void checkEndAccessInst(EndAccessInst *EAI) {
+    require(F.hasAccessMarkers(), "Unexpected end_access");
+
     auto BAI = dyn_cast<BeginAccessInst>(EAI->getOperand());
     require(BAI != nullptr,
             "operand of end_access must be a begin_access");
