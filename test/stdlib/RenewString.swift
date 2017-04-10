@@ -184,13 +184,12 @@ suite.test("ViewValueSemantics") {
   let sharesBuffer2 = sharesBuffer1
   var snapshot = Array(sharesBuffer2)
 
-  // Unwrap the view
-  let wrapped = sharesBuffer1.base2 as! AnyUInt16UnicodeView.Adapter<
-    RandomAccessUnicodeView<_UTF16StringStorage>>
-  
   // Tunnel all the way to the underlying storage, which has reference
-  // semantics.  FIXME: there should be no way for the user to do this!
-  var storage: _UTF16StringStorage = wrapped.base.base
+  // semantics.
+  guard case .utf16(var storage) = sharesBuffer1.content._rep else {
+    expectTrue(false, "expected utf16 storage")
+    return
+  }
 
   // Make a mutation there, and expect both views to reflect that.
   storage.removeLast(1) 
@@ -671,16 +670,18 @@ suite.test("AnyUInt16UnicodeView.DoubleWrapping") {
   let s: String = "Bouffant Hairdo"
   let u1 = s.content.utf16
   let u2 = AnyUInt16UnicodeView(u1)
-  expectEqual(type(of: u1.base), type(of: u2.base))
+  let u3 = AnyUInt16UnicodeView(u2)
+  expectEqual(type(of: u2.base), type(of: u3.base))
 }
 
 suite.test("Substring") {
   let s: String = "abc\n🇸🇸🇬🇱🇱🇸🇩🇯🇺🇸\nΣὲ 👥🥓γνωρίζω\nგთხოვთ\nงบู๊กู้ขึ้นม่\nᚹᛖᛥᚫ "
   let u8 = s.content.utf8
-  let d = u8.base2.distance(
-    from: u8._unwrap(u8.startIndex),
-    to: u8._unwrap(s.index(atOffset: 1)))
-  expectNotEqual(0, d)
+  
+  expectNotEqual(
+    u8.nativeIndex(u8.startIndex),
+    u8.nativeIndex(s.index(atOffset: 1)))
+  
   for i in s.indices {
     for j in s[i...].indices {
       expectEqualSequence(s.content.utf16[i..<j], s[i..<j].content.utf16)
