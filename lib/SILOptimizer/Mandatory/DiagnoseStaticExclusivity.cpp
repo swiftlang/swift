@@ -104,10 +104,10 @@ public:
     if (Kind == SILAccessKind::Read) {
       // A read conflicts with any non-read accesses.
       return NonReads > 0;
-    } else {
-      // A non-read access conflicts any other access.
-      return NonReads > 0 || Reads > 0;
     }
+
+    // A non-read access conflicts with any other access.
+    return NonReads > 0 || Reads > 0;
   }
 
   /// Returns true when there must have already been a conflict diagnosed
@@ -150,6 +150,18 @@ public:
   const BeginAccessInst *getFirstAccess() { return FirstAccess; }
 };
 
+/// Indicates whether a 'begin_access' requires exclusive access
+/// or allows shared acceess. This needs to be kept in sync with
+/// diag::exclusivity_access_required and diag::exclusivity_conflicting_access.
+enum class ExclusiveOrShared_t : unsigned {
+  ExclusiveAccess = 0,
+  SharedAccess = 1
+};
+
+
+/// Tracks the in-progress accesses on per-storage-location basis.
+using StorageMap = llvm::SmallDenseMap<AccessedStorage, AccessInfo, 4>;
+
 } // end anonymous namespace
 
 namespace llvm {
@@ -191,33 +203,29 @@ template <> struct DenseMapInfo<AccessedStorage> {
 
 } // end namespace llvm
 
+
+/// Returns whether a 'begin_access' requires exclusive or shared access
+/// to its storage.
+static ExclusiveOrShared_t getRequiredAccess(const BeginAccessInst *BAI) {
+  if (BAI->getAccessKind() == SILAccessKind::Read)
+    return ExclusiveOrShared_t::SharedAccess;
+
+  return ExclusiveOrShared_t::ExclusiveAccess;
+}
+
 /// Emits a diagnostic if beginning an access with the given in-progress
 /// accesses violates the law of exclusivity. Returns true when a
 /// diagnostic was emitted.
 static void diagnoseExclusivityViolation(const BeginAccessInst *PriorAccess,
                                          const BeginAccessInst *NewAccess,
                                          ASTContext &Ctx) {
-  // This enum needs to be kept in sync with diag::exclusivity_access_required
-  // and diag::exclusivity_conflicting_access.
-  enum ExclusiveOrShared_t : unsigned { ExclusiveAccess = 0, SharedAccess = 1 };
 
   // Can't have a conflict if both accesses are reads.
   assert(!(PriorAccess->getAccessKind() == SILAccessKind::Read &&
            NewAccess->getAccessKind() == SILAccessKind::Read));
 
-  ExclusiveOrShared_t NewRequires;
-  if (NewAccess->getAccessKind() == SILAccessKind::Read) {
-    NewRequires = SharedAccess;
-  } else {
-    NewRequires = ExclusiveAccess;
-  }
-
-  ExclusiveOrShared_t PriorRequires;
-  if (PriorAccess->getAccessKind() == SILAccessKind::Read) {
-    PriorRequires = SharedAccess;
-  } else {
-    PriorRequires = ExclusiveAccess;
-  }
+  ExclusiveOrShared_t NewRequires = getRequiredAccess(NewAccess);
+  ExclusiveOrShared_t PriorRequires = getRequiredAccess(PriorAccess);
 
   diagnose(Ctx, NewAccess->getLoc().getSourceLoc(),
            diag::exclusivity_access_required,
@@ -246,8 +254,6 @@ static AccessedStorage findAccessedStorage(SILValue Source) {
     }
   }
 }
-
-using StorageMap = llvm::SmallDenseMap<AccessedStorage, AccessInfo, 4>;
 
 static void checkStaticExclusivity(SILFunction &Fn) {
   // The implementation relies on the following SIL invariants:
@@ -301,11 +307,11 @@ static void checkStaticExclusivity(SILFunction &Fn) {
     // location.
     StorageMap &Accesses = *BBState;
 
-    for (auto I = BB->begin(), E = BB->end(); I != E; ++I) {
+    for (auto &I : *BB) {
       // Apply transfer functions. Beginning an access
       // increments the read or write count for the storage location;
       // Ending onr decrements the count.
-      if (auto *BAI = dyn_cast<BeginAccessInst>(I)) {
+      if (auto *BAI = dyn_cast<BeginAccessInst>(&I)) {
         SILAccessKind Kind = BAI->getAccessKind();
         AccessInfo &Info = Accesses[findAccessedStorage(BAI->getSource())];
         if (Info.conflictsWithAccess(Kind) && !Info.alreadyHadConflict()) {
@@ -315,7 +321,10 @@ static void checkStaticExclusivity(SILFunction &Fn) {
         }
 
         Info.beginAccess(BAI);
-      } else if (auto *EAI = dyn_cast<EndAccessInst>(I)) {
+        continue;
+      }
+
+      if (auto *EAI = dyn_cast<EndAccessInst>(&I)) {
         auto It = Accesses.find(findAccessedStorage(EAI->getSource()));
         AccessInfo &Info = It->getSecond();
         Info.endAccess(EAI);
@@ -324,7 +333,10 @@ static void checkStaticExclusivity(SILFunction &Fn) {
         // it to keep the StorageMap lean.
         if (!Info.hasAccessesInProgress())
           Accesses.erase(It);
-      } else if (auto *RI = dyn_cast<ReturnInst>(I)) {
+        continue;
+      }
+
+      if (auto *RI = dyn_cast<ReturnInst>(&I)) {
         // Sanity check to make sure entries are properly removed.
         assert(Accesses.size() == 0);
       }
