@@ -125,9 +125,11 @@ ERROR(lex_invalid_u_escape_rbrace,none,
       "expected '}' in \\u{...} escape sequence", ())
 
 ERROR(lex_invalid_unicode_scalar,none,
-       "invalid unicode scalar", ())
+      "invalid unicode scalar", ())
 ERROR(lex_unicode_escape_braces,none,
       "expected hexadecimal code in braces after unicode escape", ())
+WARNING(lex_ambiguous_string_indent,none,
+        "invalid mix of multi-line string literal indentation", ())
 
 
 ERROR(lex_invalid_character,none,
