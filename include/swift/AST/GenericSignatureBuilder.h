@@ -280,7 +280,6 @@ private:
   bool addTypeRequirement(UnresolvedType subject,
                           UnresolvedType constraint,
                           FloatingRequirementSource source,
-                          Type dependentType,
                           llvm::SmallPtrSetImpl<ProtocolDecl *> *visited
                             = nullptr);
 
@@ -314,25 +313,13 @@ private:
                                   const RequirementSource *Source);
 
   /// Add a new layout requirement to the subject.
-  ///
-  /// FIXME: The "dependent type" is the subject type pre-substitution. We
-  /// should be able to compute this!
   bool addLayoutRequirement(UnresolvedType subject,
                             LayoutConstraint layout,
-                            FloatingRequirementSource source,
-                            Type dependentType);
+                            FloatingRequirementSource source);
 
   /// Add the requirements placed on the given type parameter
   /// to the given potential archetype.
-  ///
-  /// \param dependentType A dependent type thar describes \c pa relative to
-  /// its protocol, for protocol requirements.
-  ///
-  /// FIXME: \c dependentType will be derivable from \c parentSource and \c pa
-  /// when we're no longer putting conformance requirements directly on the
-  /// representative.
   bool addInheritedRequirements(TypeDecl *decl, PotentialArchetype *pa,
-                                Type dependentType,
                                 const RequirementSource *parentSource,
                                 llvm::SmallPtrSetImpl<ProtocolDecl *> &visited);
 
@@ -891,6 +878,10 @@ public:
   /// Retrieve the potential archetype at the root.
   PotentialArchetype *getRootPotentialArchetype() const;
 
+  /// Retrieve the potential archetype to which this source refers.
+  PotentialArchetype *getAffectedPotentialArchetype(
+                                        GenericSignatureBuilder &builder) const;
+
   /// Whether the requirement is inferred or derived from an inferred
   /// requirment.
   bool isInferredRequirement() const {
@@ -1073,8 +1064,7 @@ public:
 
   /// Retrieve the complete requirement source rooted at the given potential
   /// archetype.
-  const RequirementSource *getSource(PotentialArchetype *pa,
-                                     Type dependentType) const;
+  const RequirementSource *getSource(PotentialArchetype *pa) const;
 
   /// Retrieve the source location for this requirement.
   SourceLoc getLoc() const;
@@ -1354,6 +1344,12 @@ public:
   /// \brief Determine the nesting depth of this potential archetype, e.g.,
   /// the number of associated type references.
   unsigned getNestingDepth() const;
+
+  /// Determine whether two potential archetypes are in the same equivalence
+  /// class.
+  bool isInSameEquivalenceClassAs(const PotentialArchetype *other) const {
+    return getRepresentative() == other->getRepresentative();
+  }
 
   /// Retrieve the equivalence class, if it's already present.
   ///
