@@ -92,6 +92,7 @@ set(SWIFTLIB_ESSENTIAL
   Mirrors.swift.gyb
   Misc.swift
   MutableCollection.swift
+  NewString.swift.gyb
   NewtypeWrapper.swift.gyb
   ObjCMirrors.swift
   ObjectIdentifier.swift
@@ -138,7 +139,6 @@ set(SWIFTLIB_ESSENTIAL
   StringUTF16.swift
   StringUTF8.swift
   SwiftNativeNSArray.swift
-  NewString.swift.gyb
   TranscodedView.swift
   UnavailableStringAPIs.swift.gyb
   UnboundCapacity.swift
