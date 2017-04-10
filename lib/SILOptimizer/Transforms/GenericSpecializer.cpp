@@ -42,7 +42,6 @@ class GenericSpecializer : public SILFunctionTransform {
       invalidateAnalysis(SILAnalysis::InvalidationKind::Everything);
   }
 
-  StringRef getName() override { return "Generic Specializer"; }
 };
 
 } // end anonymous namespace

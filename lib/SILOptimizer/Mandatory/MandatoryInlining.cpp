@@ -582,7 +582,6 @@ class MandatoryInlining : public SILModuleTransform {
     }
   }
 
-  StringRef getName() override { return "Mandatory Inlining"; }
 };
 } // end anonymous namespace
 

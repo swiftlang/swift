@@ -607,14 +607,14 @@ void SILPassManager::addPass(PassKind Kind) {
   assert(unsigned(PassKind::AllPasses_Last) >= unsigned(Kind) &&
          "Invalid pass kind");
   switch (Kind) {
-#define PASS(ID, NAME, DESCRIPTION)                                            \
+#define PASS(ID, TAG, NAME)                                                    \
   case PassKind::ID: {                                                         \
     SILTransform *T = swift::create##ID();                                     \
     T->setPassKind(PassKind::ID);                                              \
     Transformations.push_back(T);                                              \
     break;                                                                     \
   }
-#define IRGEN_PASS(ID, NAME, DESCRIPTION)                                      \
+#define IRGEN_PASS(ID, TAG, NAME)                                              \
   case PassKind::ID: {                                                         \
     SILTransform *T = IRGenPasses[unsigned(Kind)];                             \
     assert(T && "Missing IRGen pass?");                                        \
@@ -631,7 +631,7 @@ void SILPassManager::addPass(PassKind Kind) {
 
 void SILPassManager::addPassForName(StringRef Name) {
   PassKind P = llvm::StringSwitch<PassKind>(Name)
-#define PASS(ID, NAME, DESCRIPTION) .Case(#ID, PassKind::ID)
+#define PASS(ID, TAG, NAME) .Case(#ID, PassKind::ID)
 #include "swift/SILOptimizer/PassManager/Passes.def"
   ;
   addPass(P);

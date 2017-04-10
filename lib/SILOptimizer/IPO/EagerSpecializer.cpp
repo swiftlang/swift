@@ -685,7 +685,6 @@ public:
 
   void run() override;
 
-  StringRef getName() override { return "Eager Specializer"; }
 };
 } // end anonymous namespace
 

@@ -930,7 +930,6 @@ class SILGlobalOptPass : public SILModuleTransform
     }
   }
 
-  StringRef getName() override { return "SIL Global Optimization"; }
 };
 } // end anonymous namespace
 

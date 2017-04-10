@@ -41,8 +41,6 @@ class CapturePropagation : public SILFunctionTransform
 public:
   void run() override;
 
-  StringRef getName() override { return "Captured Constant Propagation"; }
-
 protected:
   bool optimizePartialApply(PartialApplyInst *PAI);
   SILFunction *specializeConstClosure(PartialApplyInst *PAI,

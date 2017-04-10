@@ -577,7 +577,6 @@ namespace {
       }
     }
 
-    StringRef getName() override { return "Speculative Devirtualization"; }
   };
 
 } // end anonymous namespace

@@ -60,8 +60,6 @@ private:
   bool createDeallocCall(SILType AllocType, SILInstruction *ReleaseInst,
                          SILValue object);
 
-  StringRef getName() override { return "Release Devirtualizer"; }
-
   RCIdentityFunctionInfo *RCIA = nullptr;
 };
 

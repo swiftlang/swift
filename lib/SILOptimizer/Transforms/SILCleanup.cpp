@@ -64,7 +64,6 @@ class SILCleanup : public swift::SILFunctionTransform {
     invalidateAnalysis(SILAnalysis::InvalidationKind::FunctionBody);
   }
 
-  StringRef getName() override { return "SIL Cleanup"; }
 };
 } // end anonymous namespace
 

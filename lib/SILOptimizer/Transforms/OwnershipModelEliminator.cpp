@@ -344,7 +344,6 @@ struct OwnershipModelEliminator : SILModuleTransform {
     }
   }
 
-  StringRef getName() override { return "Ownership Model Eliminator"; }
 };
 
 } // end anonymous namespace

@@ -426,7 +426,6 @@ class AllocStackHoisting : public SILFunctionTransform {
       PM->invalidateAnalysis(F, SILAnalysis::InvalidationKind::Instructions);
     }
   }
-  StringRef getName() override { return "alloc_stack Hoisting"; }
 };
 } // end anonymous namespace
 
