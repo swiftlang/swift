@@ -1031,6 +1031,22 @@ public:
           << QuotedString(SLI->getValue());
   }
 
+  static StringRef
+  getStringEncodingName(ConstStringLiteralInst::Encoding kind) {
+    switch (kind) {
+    case ConstStringLiteralInst::Encoding::UTF8:
+      return "utf8 ";
+    case ConstStringLiteralInst::Encoding::UTF16:
+      return "utf16 ";
+    }
+    llvm_unreachable("bad string literal encoding");
+  }
+
+  void visitConstStringLiteralInst(ConstStringLiteralInst *SLI) {
+    *this << getStringEncodingName(SLI->getEncoding())
+          << QuotedString(SLI->getValue());
+  }
+
   void printLoadOwnershipQualifier(LoadOwnershipQualifier Qualifier) {
     switch (Qualifier) {
     case LoadOwnershipQualifier::Unqualified:

@@ -185,7 +185,8 @@ ABSTRACT_VALUE(SILInstruction, ValueBase)
     INST(IntegerLiteralInst, LiteralInst, integer_literal, None, DoesNotRelease)
     INST(FloatLiteralInst, LiteralInst, float_literal, None, DoesNotRelease)
     INST(StringLiteralInst, LiteralInst, string_literal, None, DoesNotRelease)
-    VALUE_RANGE(LiteralInst, FunctionRefInst, StringLiteralInst)
+    INST(ConstStringLiteralInst, LiteralInst, const_string_literal, None, DoesNotRelease)
+    VALUE_RANGE(LiteralInst, FunctionRefInst, ConstStringLiteralInst)
 
   // Dynamic Dispatch
   ABSTRACT_VALUE(MethodInst, SILInstruction)
