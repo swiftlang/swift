@@ -242,27 +242,3 @@ extension String {
   /// The index type for subscripting a string's `utf8` view.
   public typealias UTF8Index = UTF8View.Index
 }
-
-extension String.UTF8View : CustomStringConvertible, CustomDebugStringConvertible {
-  public var description: String {
-    return String(self)
-  }
-
-  public var debugDescription: String {
-    return "StringUnicodeScalarView(\(self.description.debugDescription))"
-  }
-}
-
-// Reflection
-extension String.UTF8View : CustomReflectable {
-  /// Returns a mirror that reflects the UTF-8 view of a string.
-  public var customMirror: Mirror {
-    return Mirror(self, unlabeledChildren: self)
-  }
-}
-
-extension String.UTF8View : CustomPlaygroundQuickLookable {
-  public var customPlaygroundQuickLook: PlaygroundQuickLook {
-    return .text(description)
-  }
-}

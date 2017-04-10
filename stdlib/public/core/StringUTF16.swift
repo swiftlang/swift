@@ -131,27 +131,3 @@ extension String {
   /// The index type for subscripting a string's `utf16` view.
   public typealias UTF16Index = UTF16View.Index
 }
-
-extension String.UTF16View : CustomStringConvertible, CustomDebugStringConvertible {
-  public var description: String {
-    return String(self)
-  }
-
-  public var debugDescription: String {
-    return "StringUnicodeScalarView(\(self.description.debugDescription))"
-  }
-}
-
-// Reflection
-extension String.UTF16View : CustomReflectable {
-  /// Returns a mirror that reflects the UTF-16 view of a string.
-  public var customMirror: Mirror {
-    return Mirror(self, unlabeledChildren: self)
-  }
-}
-
-extension String.UTF16View : CustomPlaygroundQuickLookable {
-  public var customPlaygroundQuickLook: PlaygroundQuickLook {
-    return .text(description)
-  }
-}

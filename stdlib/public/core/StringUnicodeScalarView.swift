@@ -95,17 +95,6 @@ extension String {
   public typealias UnicodeScalarIndex = UnicodeScalarView.Index
 }
 
-extension String.UnicodeScalarView : CustomStringConvertible, CustomDebugStringConvertible {
-  public var description: String {
-    return String(self)
-  }
-
-  public var debugDescription: String {
-    return "StringUnicodeScalarView(\(self.description.debugDescription))"
-  }
-}
-
-
 extension String {
   /// The string's value represented as a collection of Unicode scalar values.
   public var unicodeScalars: UnicodeScalarView {
@@ -118,43 +107,3 @@ extension String {
   }
 }
 
-
-extension String.UnicodeScalarView {
-  // NOTE: Don't make this function inlineable.  Grapheme cluster
-  // segmentation uses a completely different algorithm in Unicode 9.0.
-  internal func _isOnGraphemeClusterBoundary(_ i: Index) -> Bool {
-    if i == startIndex || i == endIndex {
-      return true
-    }
-    let precedingScalar = self[index(before: i)]
-
-    let graphemeClusterBreakProperty =
-      _UnicodeGraphemeClusterBreakPropertyTrie()
-    let segmenter = _UnicodeExtendedGraphemeClusterSegmenter()
-
-    let gcb0 = graphemeClusterBreakProperty.getPropertyRawValue(
-      precedingScalar.value)
-
-    if segmenter.isBoundaryAfter(gcb0) {
-      return true
-    }
-
-    let gcb1 = graphemeClusterBreakProperty.getPropertyRawValue(self[i].value)
-
-    return segmenter.isBoundary(gcb0, gcb1)
-  }
-}
-
-// Reflection
-extension String.UnicodeScalarView : CustomReflectable {
-  /// Returns a mirror that reflects the Unicode scalars view of a string.
-  public var customMirror: Mirror {
-    return Mirror(self, unlabeledChildren: self)
-  }
-}
-
-extension String.UnicodeScalarView : CustomPlaygroundQuickLookable {
-  public var customPlaygroundQuickLook: PlaygroundQuickLook {
-    return .text(description)
-  }
-}
