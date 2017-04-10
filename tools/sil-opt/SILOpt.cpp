@@ -43,6 +43,8 @@
 #include <cstdio>
 using namespace swift;
 
+namespace cl = llvm::cl;
+
 namespace {
 
 enum class OptGroup { Unknown, Diagnostics, Performance, Lowering };
@@ -80,6 +82,28 @@ EnableSILOwnershipOpt("enable-sil-ownership",
 static llvm::cl::opt<bool>
 EnableSILOpaqueValues("enable-sil-opaque-values",
                       llvm::cl::desc("Compile the module with sil-opaque-values enabled."));
+
+namespace {
+enum EnforceExclusivityMode {
+  Unchecked, // static only
+  Checked,   // static and dynamic
+  DynamicOnly,
+  None
+};
+}
+
+static cl::opt<EnforceExclusivityMode> EnforceExclusivity(
+  "enforce-exclusivity", cl::desc("Enforce law of exclusivity "
+                                  "(and support memory access markers)."),
+    cl::init(EnforceExclusivityMode::None),
+    cl::values(clEnumValN(EnforceExclusivityMode::Unchecked, "unchecked",
+                          "Static checking only."),
+               clEnumValN(EnforceExclusivityMode::Checked, "checked",
+                          "Static and dynamic checking."),
+               clEnumValN(EnforceExclusivityMode::DynamicOnly, "dynamic-only",
+                          "Dynamic checking only."),
+               clEnumValN(EnforceExclusivityMode::None, "none",
+                          "No exclusivity checking.")));
 
 static llvm::cl::opt<std::string>
 ResourceDir("resource-dir",
@@ -178,10 +202,6 @@ AssumeUnqualifiedOwnershipWhenParsing(
     "assume-parsing-unqualified-ownership-sil", llvm::cl::Hidden, llvm::cl::init(false),
     llvm::cl::desc("Assume all parsed functions have unqualified ownership"));
 
-static llvm::cl::opt<bool> EnforceExclusivityStatic(
-    "enforce-exclusivity-static", llvm::cl::Hidden, llvm::cl::init(false),
-    llvm::cl::desc("Diagnose static violations of law of exclusivity."));
-
 static void runCommandLineSelectedPasses(SILModule *Module,
                                          irgen::IRGenModule *IRGenMod) {
   SILPassManager PM(Module, IRGenMod);
@@ -268,7 +288,30 @@ int main(int argc, char **argv) {
   SILOpts.EnableSILOwnership = EnableSILOwnershipOpt;
   SILOpts.AssumeUnqualifiedOwnershipWhenParsing =
     AssumeUnqualifiedOwnershipWhenParsing;
-  SILOpts.EnforceExclusivityStatic = EnforceExclusivityStatic;
+
+  switch (EnforceExclusivity) {
+  case EnforceExclusivityMode::Unchecked:
+    // This option is analogous to the -Ounchecked optimization setting.
+    // It will disable dynamic checking but still diagnose statically.
+    SILOpts.EnforceExclusivityStatic = true;
+    SILOpts.EnforceExclusivityDynamic = false;
+    break;
+  case EnforceExclusivityMode::Checked:
+    SILOpts.EnforceExclusivityStatic = true;
+    SILOpts.EnforceExclusivityDynamic = true;
+    break;
+  case EnforceExclusivityMode::DynamicOnly:
+    // This option is intended for staging purposes. The intent is that
+    // it will eventually be removed.
+    SILOpts.EnforceExclusivityStatic = false;
+    SILOpts.EnforceExclusivityDynamic = true;
+    break;
+  case EnforceExclusivityMode::None:
+    // This option is for staging purposes.
+    SILOpts.EnforceExclusivityStatic = false;
+    SILOpts.EnforceExclusivityDynamic = false;
+    break;
+  }
 
   // Load the input file.
   llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> FileBufOrErr =
