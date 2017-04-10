@@ -178,6 +178,10 @@ AssumeUnqualifiedOwnershipWhenParsing(
     "assume-parsing-unqualified-ownership-sil", llvm::cl::Hidden, llvm::cl::init(false),
     llvm::cl::desc("Assume all parsed functions have unqualified ownership"));
 
+static llvm::cl::opt<bool> EnforceExclusivityStatic(
+    "enforce-exclusivity-static", llvm::cl::Hidden, llvm::cl::init(false),
+    llvm::cl::desc("Diagnose static violations of law of exclusivity."));
+
 static void runCommandLineSelectedPasses(SILModule *Module,
                                          irgen::IRGenModule *IRGenMod) {
   SILPassManager PM(Module, IRGenMod);
@@ -264,6 +268,7 @@ int main(int argc, char **argv) {
   SILOpts.EnableSILOwnership = EnableSILOwnershipOpt;
   SILOpts.AssumeUnqualifiedOwnershipWhenParsing =
     AssumeUnqualifiedOwnershipWhenParsing;
+  SILOpts.EnforceExclusivityStatic = EnforceExclusivityStatic;
 
   // Load the input file.
   llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> FileBufOrErr =
