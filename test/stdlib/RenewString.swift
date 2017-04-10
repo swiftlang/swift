@@ -693,11 +693,16 @@ suite.test("Substring") {
 }
 
 // Quick test that we count CR-LF as single grapheme. As written, will use one
-// of the small, packed formed.
+// of the small, packed formats.
 suite.test("CR-LF") {
   let crlf = "\u{0D}\u{0A}"
   expectEqual(1, crlf.count)
   expectEqual(1, crlf.content.characters.count)
+}
+
+suite.test("Latin1.UTF8.transcoding") {
+  let s = Latin1.EncodedScalar("\u{00a1}")!
+  expectEqualSequence([0xc2, 0xa1], s.utf8)
 }
 
 runAllTests()

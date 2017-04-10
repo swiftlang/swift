@@ -1081,7 +1081,13 @@ public enum Latin1 : UnicodeEncoding {
     }
     let value: UInt8
     
-    public var utf8 : UTF8.EncodedScalar { return UTF8.EncodedScalar(value) }
+    public var utf8 : UTF8.EncodedScalar {
+      return UTF8._isASCII(value)
+      ? UTF8.EncodedScalar(value)
+      : UTF8.EncodedScalar(
+        0b110_00000 | value >> 6, 0b10_000000 | value & 0b00_111111)
+    }
+    
     public var utf16 : UTF16.EncodedScalar { return UTF16.EncodedScalar(UInt16(value)) }
     public var utf32 : UTF32.EncodedScalar { return UTF32.EncodedScalar(UInt32(value)) }
   }
