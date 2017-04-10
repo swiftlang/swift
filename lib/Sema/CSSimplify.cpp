@@ -3760,7 +3760,9 @@ retry:
 
     // If our type constraints is for a FunctionType, move over the @noescape
     // flag.
-    if (func1->isNoEscape() && !func2->isNoEscape()) {
+    if (func1->isNoEscape() &&
+        !func2->isNoEscape() &&
+        func2->hasTypeVariable()) {
       auto &extraExtInfo = extraFunctionAttrs[func2];
       extraExtInfo = extraExtInfo.withNoEscape();
     }
