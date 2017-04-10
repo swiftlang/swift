@@ -45,17 +45,17 @@ struct AccessMarkerElimination : SILModuleTransform {
       // iterating in reverse eliminates more begin_access users before they
       // need to be replaced.
       for (auto &BB : reversed(F)) {
-        for (auto II = BB.rbegin(), IE = BB.rend(); II != IE;) {
-          SILInstruction *inst = &*II;
-          ++II;
+        // Don't cache the begin iterator since we're reverse iterating.
+        for (auto II = BB.end(); II != BB.begin();) {
+          SILInstruction *inst = &*(--II);
 
           if (auto beginAccess = dyn_cast<BeginAccessInst>(inst)) {
             beginAccess->replaceAllUsesWith(beginAccess->getSource());
-            beginAccess->eraseFromParent();
+            II = BB.erase(beginAccess);
           }
           if (auto endAccess = dyn_cast<EndAccessInst>(inst)) {
             assert(endAccess->use_empty());
-            endAccess->eraseFromParent();
+            II = BB.erase(endAccess);
           }
         }
       }
