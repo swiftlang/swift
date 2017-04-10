@@ -1149,6 +1149,9 @@ static SDKNode *constructFunctionNode(SDKContext &Ctx, FuncDecl* FD,
                                       SDKNodeKind Kind) {
   auto Func = SDKNodeInitInfo(Ctx, FD).createSDKNode(Kind);
   Func->addChild(constructTypeNode(Ctx, FD->getResultInterfaceType()));
+  if (FD->isObservingAccessor()) {
+    
+  }
   for (auto *paramList : FD->getParameterLists()) {
     for (auto param : *paramList) {
       if (!param->isSelfParameter())
