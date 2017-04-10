@@ -23,7 +23,6 @@ let prefixCount = 1024
 let dropCount = sequenceCount - prefixCount
 let sumCount = prefixCount * (prefixCount - 1) / 2
 
-
 @inline(never)
 public func run_DropLastCountableRange(_ N: Int) {
   let s = 0..<sequenceCount
@@ -70,6 +69,18 @@ public func run_DropLastAnySeqCntRange(_ N: Int) {
     }
     CheckResults(result == sumCount,
       "IncorrectResults in DropLastAnySeqCntRange: \(result) != \(sumCount)")
+  }
+}
+@inline(never)
+public func run_DropLastAnySeqCRangeIter(_ N: Int) {
+  let s = AnySequence((0..<sequenceCount).makeIterator())
+  for _ in 1...20*N {
+    var result = 0
+    for element in s.dropLast(dropCount) {
+      result += element
+    }
+    CheckResults(result == sumCount,
+      "IncorrectResults in DropLastAnySeqCRangeIter: \(result) != \(sumCount)")
   }
 }
 @inline(never)
@@ -142,6 +153,18 @@ public func run_DropLastAnySeqCntRangeLazy(_ N: Int) {
     }
     CheckResults(result == sumCount,
       "IncorrectResults in DropLastAnySeqCntRangeLazy: \(result) != \(sumCount)")
+  }
+}
+@inline(never)
+public func run_DropLastAnySeqCRangeIterLazy(_ N: Int) {
+  let s = (AnySequence((0..<sequenceCount).makeIterator())).lazy
+  for _ in 1...20*N {
+    var result = 0
+    for element in s.dropLast(dropCount) {
+      result += element
+    }
+    CheckResults(result == sumCount,
+      "IncorrectResults in DropLastAnySeqCRangeIterLazy: \(result) != \(sumCount)")
   }
 }
 @inline(never)

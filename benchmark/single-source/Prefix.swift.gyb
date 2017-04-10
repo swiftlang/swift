@@ -22,7 +22,6 @@ import TestsUtils
 let sequenceCount = 4096
 let prefixCount = sequenceCount - 1024
 let sumCount = prefixCount * (prefixCount - 1) / 2
-
 %{
 # Name and initializer Expression pairs for Sequences to test.
 
@@ -33,6 +32,7 @@ Sequences = [
   ('AnySequence',
     'AnySequence(sequence(first: 0) { $0 < sequenceCount - 1 ? $0 &+ 1 : nil })'),
   ('AnySeqCntRange', 'AnySequence(0..<sequenceCount)'),
+  ('AnySeqCRangeIter', 'AnySequence((0..<sequenceCount).makeIterator())'),
   ('AnyCollection', 'AnyCollection(0..<sequenceCount)'),
   ('Array', 'Array(0..<sequenceCount)'),
 ]

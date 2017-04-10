@@ -22,7 +22,6 @@ let sequenceCount = 4096
 let prefixCount = sequenceCount - 1024
 let sumCount = prefixCount * (prefixCount - 1) / 2
 
-
 @inline(never)
 public func run_PrefixCountableRange(_ N: Int) {
   let s = 0..<sequenceCount
@@ -69,6 +68,18 @@ public func run_PrefixAnySeqCntRange(_ N: Int) {
     }
     CheckResults(result == sumCount,
       "IncorrectResults in PrefixAnySeqCntRange: \(result) != \(sumCount)")
+  }
+}
+@inline(never)
+public func run_PrefixAnySeqCRangeIter(_ N: Int) {
+  let s = AnySequence((0..<sequenceCount).makeIterator())
+  for _ in 1...20*N {
+    var result = 0
+    for element in s.prefix(prefixCount) {
+      result += element
+    }
+    CheckResults(result == sumCount,
+      "IncorrectResults in PrefixAnySeqCRangeIter: \(result) != \(sumCount)")
   }
 }
 @inline(never)
@@ -141,6 +152,18 @@ public func run_PrefixAnySeqCntRangeLazy(_ N: Int) {
     }
     CheckResults(result == sumCount,
       "IncorrectResults in PrefixAnySeqCntRangeLazy: \(result) != \(sumCount)")
+  }
+}
+@inline(never)
+public func run_PrefixAnySeqCRangeIterLazy(_ N: Int) {
+  let s = (AnySequence((0..<sequenceCount).makeIterator())).lazy
+  for _ in 1...20*N {
+    var result = 0
+    for element in s.prefix(prefixCount) {
+      result += element
+    }
+    CheckResults(result == sumCount,
+      "IncorrectResults in PrefixAnySeqCRangeIterLazy: \(result) != \(sumCount)")
   }
 }
 @inline(never)
