@@ -121,6 +121,19 @@ public struct String {
       ('inline5or6', 'String.Content.Inline5or6'),
       ('inline7or16', 'String.Content.Inline7or16'),
     ]
+
+    def switch_(onEnum, stmt):
+      return '\n'.join(
+        ['switch %s {' % onEnum]
+        + ['case .%s(let x): %s' % (tag, stmt)
+            for tag,_ in allCases
+          ]
+          + ['}'])
+
+    def switch(stmt):
+      return switch_('_rep', stmt)
+    def switchContent(stmt): 
+      return switch_('content._rep', stmt)
 }%
   
   public struct Content {
@@ -173,6 +186,61 @@ extension String : Sequence {
     return Iterator(content)
   }
 }
+
+extension String : Unicode {
+  public typealias Index = AnyCharacterUnicodeView.Index
+  public typealias IndexDistance = AnyCharacterUnicodeView.IndexDistance
+
+  public typealias SubSequence = Substring
+
+  // @available(swift, introduced: 4)
+  public subscript(bounds: Range<Index>) -> Substring {
+    get {
+      return Substring(
+        content: Substring.Content(wholeContent: self.content, bounds: bounds))
+    }
+    set {
+      replaceSubrange(bounds, with: newValue)
+    }
+  }
+
+  ${gyb.expand(
+      'ForwardCollectionAPIs.swift.gyb',
+      base='x.characters',
+      forward=switchContent,
+      wrap_index='x.characters.anyIndex',
+      unwrap_index='x.characters.nativeIndex',
+      nonmutating=True,
+      Element='Character')}
+  
+  public mutating func _tryToReplaceSubrange<C: Collection>(
+    _ target: Range<Index>, with replacement: C
+  ) -> Bool
+  where C.Iterator.Element == Character {
+    // Doing this rather than switching will try to preserve value semantics
+    // even if a case is a reference type.
+    return content.characters._tryToReplaceSubrange(target, with: replacement)
+  }
+}
+
+extension String : RangeReplaceableCollection {
+  
+  public init() { content = Content() }
+  
+  public mutating func replaceSubrange<C: Collection>(
+    _ target: Range<Index>, with replacement: C
+  ) where C.Iterator.Element == Character {
+    // Fast path: the incoming characters are Unicode
+    if let unicodeReplacement = replacement as? AnyUnicode {
+      content.replaceUTF16(target, with: unicodeReplacement.anyContent.anyUTF16)
+    }
+    else {
+      // Slow path: we have to reconstruct UTF-16 from Characters
+      content.replaceUTF16(target, with: replacement.lazy.flatMap { $0.utf16 })
+    }
+  }
+}
+
 
 /// Case accessors
 extension String.Content {
@@ -465,57 +533,6 @@ extension String: _Swift3StringCompatibility {
 }
 
 #endif
-
-%{
-def switch_(onEnum, stmt):
-  return '\n'.join(
-    ['switch %s {' % onEnum]
-    + ['case .%s(let x): %s' % (tag, stmt)
-        for tag,_ in allCases
-      ]
-      + ['}'])
-  
-def switch(stmt):
-  return switch_('_rep', stmt)
-def switchContent(stmt): 
-  return switch_('content._rep', stmt)
-}%
-
-extension String : Unicode {
-  public typealias Index = AnyCharacterUnicodeView.Index
-  public typealias IndexDistance = AnyCharacterUnicodeView.IndexDistance
-
-  public typealias SubSequence = Substring
-
-  // @available(swift, introduced: 4)
-  public subscript(bounds: Range<Index>) -> Substring {
-    get {
-      return Substring(
-        content: Substring.Content(wholeContent: self.content, bounds: bounds))
-    }
-    set {
-      replaceSubrange(bounds, with: newValue)
-    }
-  }
-
-  ${gyb.expand(
-      'ForwardCollectionAPIs.swift.gyb',
-      base='x.characters',
-      forward=switchContent,
-      wrap_index='x.characters.anyIndex',
-      unwrap_index='x.characters.nativeIndex',
-      nonmutating=True,
-      Element='Character')}
-  
-  public mutating func _tryToReplaceSubrange<C: Collection>(
-    _ target: Range<Index>, with replacement: C
-  ) -> Bool
-  where C.Iterator.Element == Character {
-    // Doing this rather than switching will try to preserve value semantics
-    // even if a case is a reference type.
-    return content.characters._tryToReplaceSubrange(target, with: replacement)
-  }
-}
 
 extension String.Content : UnicodeContent {
   // Once we get ownership and view/slice mutation worked out, it's conceivable
@@ -874,24 +891,6 @@ extension String.Content {
         t, with: replacement.lazy.map { UInt8(truncatingBitPattern: $0) })
     case .any, .cocoa, .inline5or6, .inline7or16:
       return false
-    }
-  }
-}
-
-extension String : RangeReplaceableCollection {
-  
-  public init() { content = Content() }
-  
-  public mutating func replaceSubrange<C: Collection>(
-    _ target: Range<Index>, with replacement: C
-  ) where C.Iterator.Element == Character {
-    // Fast path: the incoming characters are Unicode
-    if let unicodeReplacement = replacement as? AnyUnicode {
-      content.replaceUTF16(target, with: unicodeReplacement.anyContent.anyUTF16)
-    }
-    else {
-      // Slow path: we have to reconstruct UTF-16 from Characters
-      content.replaceUTF16(target, with: replacement.lazy.flatMap { $0.utf16 })
     }
   }
 }
