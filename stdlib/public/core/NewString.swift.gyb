@@ -1143,14 +1143,36 @@ extension Substring : CustomDebugStringConvertible {
 //===--- Comparable/Hashable ----------------------------------------------===//
 extension String : Comparable {
   public static func < (lhs: String, rhs: String) -> Bool {
-    return lhs.content.fccNormalizedUTF16.lexicographicallyPrecedes(
-      rhs.content.fccNormalizedUTF16
-    )
+    // return lhs.content.fccNormalizedUTF16.lexicographicallyPrecedes(
+    //   rhs.content.fccNormalizedUTF16
+    switch lhs.content._rep {
+  % for outerTag,_ in allCases:
+    case .${outerTag}(let outerContent):
+      switch rhs.content._rep {
+    % for innerTag,_ in allCases:
+      case .${innerTag}(let innerContent):
+        return outerContent.fccNormalizedUTF16.lexicographicallyPrecedes(
+          innerContent.fccNormalizedUTF16)
+    % end
+      }
+  % end
+    }
   }
   public static func == (lhs: String, rhs: String) -> Bool {
-    return lhs.content.fccNormalizedUTF16.elementsEqual(
-      rhs.content.fccNormalizedUTF16
-    )
+    // return lhs.content.fccNormalizedUTF16.elementsEqual(
+    //   rhs.content.fccNormalizedUTF16
+    switch lhs.content._rep {
+  % for outerTag,_ in allCases:
+    case .${outerTag}(let outerContent):
+      switch rhs.content._rep {
+    % for innerTag,_ in allCases:
+      case .${innerTag}(let innerContent):
+        return outerContent.fccNormalizedUTF16.elementsEqual(
+          innerContent.fccNormalizedUTF16)
+    % end
+      }
+  % end
+    }
   }
 }
 
