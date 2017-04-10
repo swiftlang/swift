@@ -336,6 +336,20 @@ namespace {
                               int toScalarIdx,
                               ConstraintLocatorBuilder locator);
 
+    /// \brief Coerce a subclass, class-constrained archetype, class-constrained
+    /// existential or to a superclass type.
+    ///
+    /// Also supports metatypes of the above.
+    ///
+    /// \param expr The expression to be coerced.
+    /// \param toType The type to which the expression will be coerced.
+    /// \param locator Locator describing where this conversion occurs.
+    ///
+    /// \return The coerced expression, whose type will be equivalent to
+    /// \c toType.
+    Expr *coerceSuperclass(Expr *expr, Type toType,
+                           ConstraintLocatorBuilder locator);
+
     /// \brief Coerce the given value to existential type.
     ///
     /// The following conversions are supported:
@@ -4590,6 +4604,79 @@ Expr *ExprRewriter::coerceScalarToTuple(Expr *expr, TupleType *toTuple,
                                         destSugarTy));
 }
 
+static Type getMetatypeSuperclass(Type t, TypeChecker &tc) {
+  if (auto *metaTy = t->getAs<MetatypeType>())
+    return MetatypeType::get(getMetatypeSuperclass(
+                               metaTy->getInstanceType(),
+                               tc));
+
+  if (auto *metaTy = t->getAs<ExistentialMetatypeType>())
+    return ExistentialMetatypeType::get(getMetatypeSuperclass(
+                                          metaTy->getInstanceType(),
+                                          tc));
+
+  return tc.getSuperClassOf(t);
+}
+
+Expr *ExprRewriter::coerceSuperclass(Expr *expr, Type toType,
+                                     ConstraintLocatorBuilder locator) {
+  auto &tc = cs.getTypeChecker();
+
+  auto fromType = cs.getType(expr);
+
+  auto fromInstanceType = fromType;
+  auto toInstanceType = toType;
+
+  while (fromInstanceType->is<AnyMetatypeType>() &&
+         toInstanceType->is<MetatypeType>()) {
+    fromInstanceType = fromInstanceType->castTo<AnyMetatypeType>()
+      ->getInstanceType();
+    toInstanceType = toInstanceType->castTo<MetatypeType>()
+      ->getInstanceType();
+  }
+
+  if (fromInstanceType->is<ArchetypeType>()) {
+    // Coercion from archetype to its (concrete) superclass.
+    auto superclass = getMetatypeSuperclass(fromType, tc);
+
+    expr =
+      cs.cacheType(
+        new (tc.Context) ArchetypeToSuperExpr(expr, superclass));
+
+    if (!superclass->isEqual(toType))
+      return coerceSuperclass(expr, toType, locator);
+
+    return expr;
+
+  }
+
+  if (fromInstanceType->isExistentialType()) {
+    // Coercion from superclass-constrained existential to its
+    // concrete superclass.
+    auto fromArchetype = ArchetypeType::getAnyOpened(fromType);
+
+    auto *archetypeVal =
+      cs.cacheType(
+        new (tc.Context) OpaqueValueExpr(expr->getLoc(),
+                                         fromArchetype));
+
+    auto *result = coerceSuperclass(archetypeVal, toType, locator);
+
+    return cs.cacheType(
+      new (tc.Context) OpenExistentialExpr(expr, archetypeVal, result,
+                                           toType));
+  }
+
+  // Coercion from subclass to superclass.
+  if (toType->is<MetatypeType>()) {
+    return cs.cacheType(
+      new (tc.Context) MetatypeConversionExpr(expr, toType));
+  }
+
+  return cs.cacheType(
+    new (tc.Context) DerivedToBaseExpr(expr, toType));
+}
+
 /// Collect the conformances for all the protocols of an existential type.
 /// If the source type is also existential, we don't want to check conformance
 /// because most protocols do not conform to themselves -- however we still
@@ -5453,25 +5540,8 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       assert(toType->hasUnresolvedType() && "Should have handled this above");
       break;
 
-    case ConversionRestrictionKind::Superclass: {
-      // Coercion from archetype to its (concrete) superclass.
-      if (auto fromArchetype = fromType->getAs<ArchetypeType>()) {
-        expr =
-          cs.cacheType(
-              new (tc.Context) ArchetypeToSuperExpr(expr,
-                                               fromArchetype->getSuperclass()));
-
-        // If we are done succeeded, use the coerced result.
-        if (cs.getType(expr)->isEqual(toType)) {
-          return expr;
-        }
-
-        fromType = cs.getType(expr);
-      }
-      
-      // Coercion from subclass to superclass.
-      return cs.cacheType(new (tc.Context) DerivedToBaseExpr(expr, toType));
-    }
+    case ConversionRestrictionKind::Superclass:
+      return coerceSuperclass(expr, toType, locator);
 
     case ConversionRestrictionKind::LValueToRValue: {
       if (toType->is<TupleType>() || fromType->is<TupleType>())
@@ -5489,6 +5559,9 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     case ConversionRestrictionKind::Existential:
     case ConversionRestrictionKind::MetatypeToExistentialMetatype:
       return coerceExistential(expr, toType, locator);
+
+    case ConversionRestrictionKind::ExistentialMetatypeToMetatype:
+      return coerceSuperclass(expr, toType, locator);
 
     case ConversionRestrictionKind::ClassMetatypeToAnyObject: {
       assert(tc.getLangOpts().EnableObjCInterop
@@ -5752,25 +5825,16 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
   }
 
   // Coercion from a subclass to a superclass.
+  //
+  // FIXME: Can we rig things up so that we always have a Superclass
+  // conversion restriction in this case?
   if (fromType->mayHaveSuperclass() &&
       toType->getClassOrBoundGenericClass()) {
     for (auto fromSuperClass = tc.getSuperClassOf(fromType);
          fromSuperClass;
          fromSuperClass = tc.getSuperClassOf(fromSuperClass)) {
       if (fromSuperClass->isEqual(toType)) {
-        
-        // Coercion from archetype to its (concrete) superclass.
-        if (auto fromArchetype = fromType->getAs<ArchetypeType>()) {
-          expr = cs.cacheType(new (tc.Context) ArchetypeToSuperExpr(
-              expr, fromArchetype->getSuperclass()));
-
-          // If we succeeded, use the coerced result.
-          if (cs.getType(expr)->isEqual(toType))
-            return expr;
-        }
-
-        // Coercion from subclass to superclass.
-        return cs.cacheType(new (tc.Context) DerivedToBaseExpr(expr, toType));
+        return coerceSuperclass(expr, toType, locator);
       }
     }
   }
