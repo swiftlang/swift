@@ -94,7 +94,7 @@ public:
   void push_back(SILInstruction *I);
   void push_front(SILInstruction *I);
   void remove(SILInstruction *I);
-  void erase(SILInstruction *I);
+  iterator erase(SILInstruction *I);
 
   SILInstruction &back() { return InstList.back(); }
   const SILInstruction &back() const {
