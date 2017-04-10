@@ -110,7 +110,7 @@ extension String {
   ///         print(snowy.utf16[substringRange])
   ///     }
   ///     // Prints "Let it snow!"
-  public typealias UTF16View = AnyUInt16UnicodeView
+  public typealias UTF16View = Content.UTF16View
 
   /// A UTF-16 encoding of `self`.
   public var utf16: UTF16View {

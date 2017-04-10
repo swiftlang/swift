@@ -58,7 +58,7 @@ extension String {
   ///     }
   ///     // Prints "My favorite emoji is "
 
-  public typealias UnicodeScalarView = AnyUnicodeScalarUnicodeView
+  public typealias UnicodeScalarView = Content.UnicodeScalarView
 
   /// Creates a string corresponding to the given collection of Unicode
   /// scalars.

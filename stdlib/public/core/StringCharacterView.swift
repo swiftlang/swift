@@ -52,7 +52,7 @@ extension String {
   ///     }
   ///     // Prints "Marie"
 
-  public typealias CharacterView = AnyCharacterUnicodeView
+  public typealias CharacterView = Content.CharacterView
   // public struct CharacterView {
   //   internal var _core: _StringCore
 

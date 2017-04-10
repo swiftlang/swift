@@ -166,7 +166,7 @@ extension String {
   ///     print(String(s1.utf8.prefix(15)))
   ///     // Prints "They call me 'B"
 
-  public typealias UTF8View = AnyUInt8UnicodeView
+  public typealias UTF8View = Content.UTF8View
 
   // /// A UTF-8 encoding of `self`.
   public var utf8: UTF8View {
@@ -177,7 +177,6 @@ extension String {
       self.content.utf8 = newValue
     }
   }
-
   /// A contiguously stored null-terminated UTF-8 representation of the string.
   ///
   /// To access the underlying memory, invoke `withUnsafeBufferPointer` on the
