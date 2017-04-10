@@ -1263,7 +1263,8 @@ public:
             isa<ProjectBoxInst>(op) ||
             isa<RefElementAddrInst>(op) ||
             isa<SILFunctionArgument>(op) ||
-            isa<BeginAccessInst>(op),
+            isa<BeginAccessInst>(op) ||
+            isa<MarkUninitializedInst>(op),
             "begin_access operand must be a root address derivation");
 
     if (BAI->getModule().getStage() != SILStage::Raw) {
