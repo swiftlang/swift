@@ -549,6 +549,11 @@ ERROR(serialization_target_too_new_repl,none,
       "module file's minimum deployment target is %0 v%1.%2%select{|.%3}3: %4",
       (StringRef, unsigned, unsigned, unsigned, StringRef))
 
+ERROR(serialization_fatal,Fatal,
+      "fatal error encountered while reading from module '%0'; "
+      "please file a bug report with your project and the crash log",
+      (StringRef))
+
 ERROR(reserved_member_name,none,
       "type member may not be named %0, since it would conflict with the"
       " 'foo.%1' expression", (DeclName, StringRef))

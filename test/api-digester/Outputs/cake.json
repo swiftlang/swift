@@ -148,11 +148,6 @@
                       "printedName": "C1"
                     }
                   ]
-                },
-                {
-                  "kind": "TypeNominal",
-                  "name": "C1",
-                  "printedName": "C1"
                 }
               ]
             },
@@ -169,11 +164,6 @@
                   "kind": "TypeNominal",
                   "name": "Void",
                   "printedName": "()"
-                },
-                {
-                  "kind": "TypeNominal",
-                  "name": "C1",
-                  "printedName": "C1"
                 },
                 {
                   "kind": "TypeNominal",
@@ -219,11 +209,6 @@
                   "kind": "TypeNominal",
                   "name": "C1",
                   "printedName": "C1"
-                },
-                {
-                  "kind": "TypeNominal",
-                  "name": "C1",
-                  "printedName": "C1"
                 }
               ]
             },
@@ -240,11 +225,6 @@
                   "kind": "TypeNominal",
                   "name": "Void",
                   "printedName": "()"
-                },
-                {
-                  "kind": "TypeNominal",
-                  "name": "C1",
-                  "printedName": "C1"
                 },
                 {
                   "kind": "TypeNominal",
