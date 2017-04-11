@@ -3155,10 +3155,12 @@ void TupleShuffleArgEmitter::emitDefaultArgsAndFinalize(ArgEmitter &parent) {
       parent.Args.append(extent.Args.begin(), extent.Args.end());
       for (auto &inoutArg : extent.InOutArgs)
         parent.InOutArguments.push_back(std::move(inoutArg));
+      continue;
+    }
 
     // If this is default initialization, call the default argument
     // generator.
-    } else if (innerIndex == TupleShuffleExpr::DefaultInitialize) {
+    if (innerIndex == TupleShuffleExpr::DefaultInitialize) {
       // Otherwise, emit the default initializer, then map that as a
       // default argument.
       CanType eltType = outerElements[outerIndex].getType()->getCanonicalType();
@@ -3166,16 +3168,20 @@ void TupleShuffleArgEmitter::emitDefaultArgsAndFinalize(ArgEmitter &parent) {
       RValue value = parent.SGF.emitApplyOfDefaultArgGenerator(
           outer, defaultArgsOwner, outerIndex, eltType, origType);
       parent.emit(ArgumentSource(outer, std::move(value)), origType);
+      continue;
+    }
 
-      // If this is caller default initialization, generate the
-      // appropriate value.
-    } else if (innerIndex == TupleShuffleExpr::CallerDefaultInitialize) {
+    // If this is caller default initialization, generate the
+    // appropriate value.
+    if (innerIndex == TupleShuffleExpr::CallerDefaultInitialize) {
       auto arg = callerDefaultArgs[nextCallerDefaultArg++];
       parent.emit(ArgumentSource(arg),
                   origParamType.getTupleElementType(outerIndex));
+      continue;
+    }
 
-      // If we're supposed to create a varargs array with the rest, do so.
-    } else if (innerIndex == TupleShuffleExpr::Variadic) {
+    // If we're supposed to create a varargs array with the rest, do so.
+    if (innerIndex == TupleShuffleExpr::Variadic) {
       auto &varargsField = outerElements[outerIndex];
       assert(varargsField.isVararg() &&
              "Cannot initialize nonvariadic element");
@@ -3197,11 +3203,11 @@ void TupleShuffleArgEmitter::emitDefaultArgsAndFinalize(ArgEmitter &parent) {
       parent.emit(
           ArgumentSource(outer, RValue(parent.SGF, outer, eltType, varargs)),
           origParamType.getTupleElementType(outerIndex));
-
-      // That's the last special case defined so far.
-    } else {
-      llvm_unreachable("unexpected special case in tuple shuffle!");
+      continue;
     }
+
+    // That's the last special case defined so far.
+    llvm_unreachable("unexpected special case in tuple shuffle!");
   }
 }
 
