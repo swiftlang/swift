@@ -1,5 +1,4 @@
 // RUN: %target-sil-opt -enforce-exclusivity=checked -emit-sorted-sil -access-marker-elim %s | %FileCheck %s
-// REQUIRES: rdar:31550303 OSS Swift CI ASAN bot fails on AccessMarker tests.
 
 sil_stage raw
 
