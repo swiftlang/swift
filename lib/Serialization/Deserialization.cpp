@@ -459,15 +459,29 @@ ParameterList *ModuleFile::readParameterList() {
   return ParameterList::create(getContext(), params);
 }
 
-Pattern *ModuleFile::maybeReadPattern(DeclContext *owningDC) {
+Expected<Pattern *> ModuleFile::readPattern(DeclContext *owningDC) {
+  // Currently, the only case in which this function can fail (return an error)
+  // is when reading a pattern for a single variable declaration.
+
   using namespace decls_block;
+
+  auto readPatternUnchecked = [this](DeclContext *owningDC) -> Pattern * {
+    Expected<Pattern *> deserialized = readPattern(owningDC);
+    if (!deserialized) {
+      fatal(deserialized.takeError());
+    }
+    assert(deserialized.get());
+    return deserialized.get();
+  };
 
   SmallVector<uint64_t, 8> scratch;
 
   BCOffsetRAII restoreOffset(DeclTypeCursor);
   auto next = DeclTypeCursor.advance(AF_DontPopBlockAtEnd);
-  if (next.Kind != llvm::BitstreamEntry::Record)
+  if (next.Kind != llvm::BitstreamEntry::Record) {
+    error();
     return nullptr;
+  }
 
   /// Local function to record the type of this pattern.
   auto recordPatternType = [&](Pattern *pattern, Type type) {
@@ -483,8 +497,7 @@ Pattern *ModuleFile::maybeReadPattern(DeclContext *owningDC) {
     bool isImplicit;
     ParenPatternLayout::readRecord(scratch, isImplicit);
 
-    Pattern *subPattern = maybeReadPattern(owningDC);
-    assert(subPattern);
+    Pattern *subPattern = readPatternUnchecked(owningDC);
 
     auto result = new (getContext()) ParenPattern(SourceLoc(),
                                                   subPattern,
@@ -520,8 +533,7 @@ Pattern *ModuleFile::maybeReadPattern(DeclContext *owningDC) {
       TuplePatternEltLayout::readRecord(scratch, labelID);
       Identifier label = getIdentifier(labelID);
 
-      Pattern *subPattern = maybeReadPattern(owningDC);
-      assert(subPattern);
+      Pattern *subPattern = readPatternUnchecked(owningDC);
       elements.push_back(TuplePatternElt(label, SourceLoc(), subPattern));
     }
 
@@ -537,7 +549,14 @@ Pattern *ModuleFile::maybeReadPattern(DeclContext *owningDC) {
     bool isImplicit;
     NamedPatternLayout::readRecord(scratch, varID, typeID, isImplicit);
 
-    auto var = cast<VarDecl>(getDecl(varID));
+    auto deserialized = getDeclChecked(varID);
+    if (!deserialized) {
+      // Pass through the error. It's too bad that it affects the whole pattern,
+      // but that's what we get.
+      return deserialized.takeError();
+    }
+
+    auto var = cast<VarDecl>(deserialized.get());
     auto result = new (getContext()) NamedPattern(var, isImplicit);
     recordPatternType(result, getType(typeID));
     restoreOffset.reset();
@@ -556,12 +575,15 @@ Pattern *ModuleFile::maybeReadPattern(DeclContext *owningDC) {
   case decls_block::TYPED_PATTERN: {
     TypeID typeID;
     bool isImplicit;
-
     TypedPatternLayout::readRecord(scratch, typeID, isImplicit);
-    Pattern *subPattern = maybeReadPattern(owningDC);
-    assert(subPattern);
 
-    auto result = new (getContext()) TypedPattern(subPattern, TypeLoc(),
+    Expected<Pattern *> subPattern = readPattern(owningDC);
+    if (!subPattern) {
+      // Pass through any errors.
+      return subPattern;
+    }
+
+    auto result = new (getContext()) TypedPattern(subPattern.get(), TypeLoc(),
                                                   isImplicit);
     recordPatternType(result, getType(typeID));
     restoreOffset.reset();
@@ -570,8 +592,8 @@ Pattern *ModuleFile::maybeReadPattern(DeclContext *owningDC) {
   case decls_block::VAR_PATTERN: {
     bool isImplicit, isLet;
     VarPatternLayout::readRecord(scratch, isLet, isImplicit);
-    Pattern *subPattern = maybeReadPattern(owningDC);
-    assert(subPattern);
+
+    Pattern *subPattern = readPatternUnchecked(owningDC);
 
     auto result = new (getContext()) VarPattern(SourceLoc(), isLet, subPattern,
                                                 isImplicit);
@@ -1244,8 +1266,8 @@ bool ModuleFile::readMembers(SmallVectorImpl<Decl *> &Members) {
 
       // Silently drop the member if it had an override-related problem.
       llvm::handleAllErrors(D.takeError(),
-                            [](const OverrideError &) { /* expected */ },
-                            [&](std::unique_ptr<llvm::ErrorInfoBase> unhandled){
+          [](const OverrideError &) { /* expected */ },
+          [this](std::unique_ptr<llvm::ErrorInfoBase> unhandled) {
         fatal(std::move(unhandled));
       });
       continue;
@@ -2843,13 +2865,25 @@ ModuleFile::getDeclChecked(DeclID DID, Optional<DeclContext *> ForcedContext) {
                                        willSetID, didSetID, overriddenID,
                                        rawAccessLevel, rawSetterAccessLevel);
 
+    Identifier name = getIdentifier(nameID);
+
+    Expected<Decl *> overridden = getDeclChecked(overriddenID);
+    if (!overridden) {
+      llvm::handleAllErrors(overridden.takeError(),
+          [](const XRefError &) { /* expected */ },
+          [this](std::unique_ptr<llvm::ErrorInfoBase> unhandled){
+        fatal(std::move(unhandled));
+      });
+      return llvm::make_error<OverrideError>(name);
+    }
+
     auto DC = ForcedContext ? *ForcedContext : getDeclContext(contextID);
     if (declOrOffset.isComplete())
       return declOrOffset;
 
     auto var = createDecl<VarDecl>(/*IsStatic*/isStatic, /*IsLet*/isLet,
-                                   /*IsCaptureList*/false, SourceLoc(),
-                                   getIdentifier(nameID), Type(), DC);
+                                   /*IsCaptureList*/false, SourceLoc(), name,
+                                   Type(), DC);
     var->setHasNonPatternBindingInit(hasNonPatternBindingInit);
     declOrOffset = var;
 
@@ -2881,8 +2915,8 @@ ModuleFile::getDeclChecked(DeclID DID, Optional<DeclContext *> ForcedContext) {
     if (isImplicit)
       var->setImplicit();
 
-    if (auto overridden = cast_or_null<VarDecl>(getDecl(overriddenID))) {
-      var->setOverriddenDecl(overridden);
+    if (auto overriddenVar = cast_or_null<VarDecl>(overridden.get())) {
+      var->setOverriddenDecl(overriddenVar);
       AddAttribute(new (ctx) OverrideAttr(SourceLoc()));
     }
 
@@ -2963,8 +2997,8 @@ ModuleFile::getDeclChecked(DeclID DID, Optional<DeclContext *> ForcedContext) {
     Expected<Decl *> overridden = getDeclChecked(overriddenID);
     if (!overridden) {
       llvm::handleAllErrors(overridden.takeError(),
-                            [](const XRefError &) { /* expected */ },
-                            [&](std::unique_ptr<llvm::ErrorInfoBase> unhandled){
+          [](const XRefError &) { /* expected */ },
+          [this](std::unique_ptr<llvm::ErrorInfoBase> unhandled) {
         fatal(std::move(unhandled));
       });
       return llvm::make_error<OverrideError>(name);
@@ -3082,10 +3116,30 @@ ModuleFile::getDeclChecked(DeclID DID, Optional<DeclContext *> ForcedContext) {
     }
 
     auto dc = getDeclContext(contextID);
+
+    SmallVector<std::pair<Pattern *, DeclContextID>, 4> patterns;
+    for (unsigned i = 0; i != numPatterns; ++i) {
+      auto pattern = readPattern(dc);
+      if (!pattern) {
+        // Silently drop the pattern if it had an override-related problem.
+        llvm::handleAllErrors(pattern.takeError(),
+            [](const OverrideError &) { /* expected */ },
+            [this](std::unique_ptr<llvm::ErrorInfoBase> unhandled) {
+          fatal(std::move(unhandled));
+        });
+        // ...but continue to read any further patterns we're expecting.
+        continue;
+      }
+
+      patterns.emplace_back(pattern.get(), DeclContextID());
+      if (!initContextIDs.empty())
+        patterns.back().second = initContextIDs[i];
+    }
+
     auto binding =
       PatternBindingDecl::createDeserialized(ctx, SourceLoc(),
                                              StaticSpelling.getValue(),
-                                             SourceLoc(), numPatterns, dc);
+                                             SourceLoc(), patterns.size(), dc);
     binding->setEarlyAttrValidation(true);
     declOrOffset = binding;
 
@@ -3094,13 +3148,9 @@ ModuleFile::getDeclChecked(DeclID DID, Optional<DeclContext *> ForcedContext) {
     if (isImplicit)
       binding->setImplicit();
 
-    for (unsigned i = 0; i != numPatterns; ++i) {
-      auto pattern = maybeReadPattern(dc);
-      assert(pattern);
-      DeclContext *initContext = nullptr;
-      if (!initContextIDs.empty())
-        initContext = getDeclContext(initContextIDs[i]);
-      binding->setPattern(i, pattern, initContext);
+    for (unsigned i = 0; i != patterns.size(); ++i) {
+      DeclContext *initContext = getDeclContext(patterns[i].second);
+      binding->setPattern(i, patterns[i].first, initContext);
     }
 
     break;
@@ -3475,6 +3525,22 @@ ModuleFile::getDeclChecked(DeclID DID, Optional<DeclContext *> ForcedContext) {
                                              overriddenID, rawAccessLevel,
                                              rawSetterAccessLevel,
                                              argNameIDs);
+    // Resolve the name ids.
+    SmallVector<Identifier, 2> argNames;
+    for (auto argNameID : argNameIDs)
+      argNames.push_back(getIdentifier(argNameID));
+    DeclName name(ctx, ctx.Id_subscript, argNames);
+
+    Expected<Decl *> overridden = getDeclChecked(overriddenID);
+    if (!overridden) {
+      llvm::handleAllErrors(overridden.takeError(),
+          [](const XRefError &) { /* expected */ },
+          [this](std::unique_ptr<llvm::ErrorInfoBase> unhandled) {
+        fatal(std::move(unhandled));
+      });
+      return llvm::make_error<OverrideError>(name);
+    }
+
     auto parent = getDeclContext(contextID);
     if (declOrOffset.isComplete())
       return declOrOffset;
@@ -3483,12 +3549,6 @@ ModuleFile::getDeclChecked(DeclID DID, Optional<DeclContext *> ForcedContext) {
     if (declOrOffset.isComplete())
       return declOrOffset;
 
-    // Resolve the name ids.
-    SmallVector<Identifier, 2> argNames;
-    for (auto argNameID : argNameIDs)
-      argNames.push_back(getIdentifier(argNameID));
-
-    DeclName name(ctx, ctx.Id_subscript, argNames);
     auto subscript = createDecl<SubscriptDecl>(name, SourceLoc(), nullptr,
                                                SourceLoc(), TypeLoc(),
                                                parent, genericParams);
@@ -3523,8 +3583,8 @@ ModuleFile::getDeclChecked(DeclID DID, Optional<DeclContext *> ForcedContext) {
 
     if (isImplicit)
       subscript->setImplicit();
-    if (auto overridden = cast_or_null<SubscriptDecl>(getDecl(overriddenID))) {
-      subscript->setOverriddenDecl(overridden);
+    if (auto overriddenSub = cast_or_null<SubscriptDecl>(overridden.get())) {
+      subscript->setOverriddenDecl(overriddenSub);
       AddAttribute(new (ctx) OverrideAttr(SourceLoc()));
     }
     break;

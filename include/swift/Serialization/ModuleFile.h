@@ -503,9 +503,7 @@ private:
   bool readCommentBlock(llvm::BitstreamCursor &cursor);
 
   /// Recursively reads a pattern from \c DeclTypeCursor.
-  ///
-  /// If the record at the cursor is not a pattern, returns null.
-  Pattern *maybeReadPattern(DeclContext *owningDC);
+  llvm::Expected<Pattern *> readPattern(DeclContext *owningDC);
 
   ParameterList *readParameterList();
   
