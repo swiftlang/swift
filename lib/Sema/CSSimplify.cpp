@@ -1187,7 +1187,6 @@ ConstraintSystem::matchExistentialTypes(Type type1, Type type2,
          "explicit AnyObject not yet supported");
 
   if (layout.superclass) {
-    llvm::errs() << "superclass case\n";
     auto subKind = std::min(ConstraintKind::Subtype, kind);
     switch (matchTypes(type1, layout.superclass, subKind, subflags, locator)) {
     case SolutionKind::Solved:
