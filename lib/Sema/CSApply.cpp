@@ -6478,9 +6478,9 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
             ->castTo<ExistentialMetatypeType>()
             ->getInstanceType();
         }
-        auto openedArchetype = openedInstanceTy->castTo<ArchetypeType>();
-        assert(openedArchetype->getOpenedExistentialType()
-                              ->isEqual(existentialInstanceTy));
+        assert(openedInstanceTy->castTo<ArchetypeType>()
+                   ->getOpenedExistentialType()
+                   ->isEqual(existentialInstanceTy));
 
         auto opaqueValue = new (tc.Context)
           OpaqueValueExpr(apply->getLoc(), openedTy);
