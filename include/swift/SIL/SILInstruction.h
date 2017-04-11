@@ -1907,6 +1907,17 @@ public:
   SILValue getSource() const {
     return getOperand();
   }
+
+private:
+    /// Predicate used to filter EndAccessRange.
+  struct UseToEndAccess;
+
+public:
+  using EndAccessRange =
+    OptionalTransformRange<use_range, UseToEndAccess, use_iterator>;
+
+  /// Find all the associated end_access instructions for this begin_access.
+  EndAccessRange getEndAccesses() const;
 };
 
 /// Represents the end of an access scope.
@@ -1943,6 +1954,20 @@ public:
     return getBeginAccess()->getSource();
   }
 };
+
+struct BeginAccessInst::UseToEndAccess {
+  Optional<EndAccessInst *> operator()(Operand *use) const {
+    if (auto access = dyn_cast<EndAccessInst>(use->getUser())) {
+      return access;
+    } else {
+      return None;
+    }
+  }
+};
+
+inline auto BeginAccessInst::getEndAccesses() const -> EndAccessRange {
+  return EndAccessRange(getUses(), UseToEndAccess());
+}
 
 /// AssignInst - Represents an abstract assignment to a memory location, which
 /// may either be an initialization or a store sequence.  This is only valid in
