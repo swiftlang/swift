@@ -635,6 +635,17 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
       collectTupleElementUses(TEAI, BaseEltNo);
       continue;
     }
+
+    // Look through begin_access.
+    if (isa<BeginAccessInst>(User)) {
+      collectUses(User, BaseEltNo);
+      continue;
+    }
+
+    // Ignore end_access.
+    if (isa<EndAccessInst>(User)) {
+      continue;
+    }
     
     // Loads are a use of the value.
     if (isa<LoadInst>(User)) {
