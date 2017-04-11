@@ -1958,18 +1958,49 @@ namespace {
         builtinProtocol = tc.getProtocol(
             expr->getLoc(),
             KnownProtocolKind::ExpressibleByBuiltinUTF16StringLiteral);
+        auto *builtinConstUTF16StringProtocol = tc.getProtocol(
+            expr->getLoc(),
+            KnownProtocolKind::ExpressibleByBuiltinConstUTF16StringLiteral);
+        auto *builtinConstStringProtocol = tc.getProtocol(
+            expr->getLoc(),
+            KnownProtocolKind::ExpressibleByBuiltinConstStringLiteral);
+
+        // First try the constant string protocols.
         if (!forceASCII &&
-            tc.conformsToProtocol(type, builtinProtocol, cs.DC,
-                                  ConformanceCheckFlags::InExpression)) {
-          builtinLiteralFuncName 
-            = DeclName(tc.Context, tc.Context.Id_init,
-                       { tc.Context.Id_builtinUTF16StringLiteral,
-                         tc.Context.getIdentifier("utf16CodeUnitCount") });
+            (tc.conformsToProtocol(type, builtinConstUTF16StringProtocol, cs.DC,
+                                   ConformanceCheckFlags::InExpression))) {
+          builtinProtocol = builtinConstUTF16StringProtocol;
+          builtinLiteralFuncName =
+              DeclName(tc.Context, tc.Context.Id_init,
+                       {tc.Context.Id_builtinConstUTF16StringLiteral});
+
+          if (stringLiteral)
+            stringLiteral->setEncoding(StringLiteralExpr::UTF16ConstString);
+          else
+            magicLiteral->setStringEncoding(StringLiteralExpr::UTF16);
+        } else if (!forceASCII && (tc.conformsToProtocol(
+                                      type, builtinProtocol, cs.DC,
+                                      ConformanceCheckFlags::InExpression))) {
+          builtinLiteralFuncName =
+              DeclName(tc.Context, tc.Context.Id_init,
+                       {tc.Context.Id_builtinUTF16StringLiteral,
+                        tc.Context.getIdentifier("utf16CodeUnitCount")});
 
           if (stringLiteral)
             stringLiteral->setEncoding(StringLiteralExpr::UTF16);
           else
             magicLiteral->setStringEncoding(StringLiteralExpr::UTF16);
+        } else if (tc.conformsToProtocol(type, builtinConstStringProtocol,
+                                         cs.DC,
+                                         ConformanceCheckFlags::InExpression)) {
+          builtinProtocol = builtinConstStringProtocol;
+          builtinLiteralFuncName =
+              DeclName(tc.Context, tc.Context.Id_init,
+                       {tc.Context.Id_builtinConstStringLiteral});
+          if (stringLiteral)
+            stringLiteral->setEncoding(StringLiteralExpr::UTF8ConstString);
+          else
+            magicLiteral->setStringEncoding(StringLiteralExpr::UTF8);
         } else {
           // Otherwise, fall back to UTF-8.
           builtinProtocol = tc.getProtocol(
