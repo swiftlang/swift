@@ -1562,6 +1562,16 @@ LayoutConstraint TypeBase::getLayoutConstraint() {
   return LayoutConstraint();
 }
 
+bool TypeBase::mayHaveSuperclass() {
+  if (getClassOrBoundGenericClass())
+    return true;
+
+  if (auto archetype = getAs<ArchetypeType>())
+    return (bool)archetype->requiresClass();
+
+  return is<DynamicSelfType>();
+}
+
 Type TypeBase::getSuperclass(LazyResolver *resolver) {
   auto *nominalDecl = getAnyNominal();
   auto *classDecl = dyn_cast_or_null<ClassDecl>(nominalDecl);
