@@ -58,11 +58,6 @@ class TBDGenVisitor : public ASTVisitor<TBDGenVisitor> {
       addSymbol(linkage.getName());
   }
 
-  void visitValueTypeDecl(NominalTypeDecl *NTD) {
-    assert(isa<StructDecl>(NTD) || isa<EnumDecl>(NTD));
-    visitNominalTypeDecl(NTD);
-  }
-
 public:
   TBDGenVisitor(StringSet &symbols,
                 const UniversalLinkageInfo &universalLinkInfo,
@@ -85,53 +80,13 @@ public:
       ASTVisitor::visit(member);
     }
   }
-  void visitValueDecl(ValueDecl *VD) {
-    if (isPrivateDecl(VD))
-      return;
+  void visitValueDecl(ValueDecl *VD);
 
-    auto declRef = SILDeclRef(VD);
-
-    // Transparent symbols don't exist, even if public.
-    // FIXME: this should really be "is SIL only".
-    if (declRef.isTransparent())
-      return;
-
-    addSymbol(declRef.mangle());
-
-    visitMembers(VD);
-  }
   void visitTypeAliasDecl(TypeAliasDecl *TAD) {
     // any information here is encoded elsewhere
   }
-  void visitNominalTypeDecl(NominalTypeDecl *NTD) {
-    auto declaredType = NTD->getDeclaredType()->getCanonicalType();
+  void visitNominalTypeDecl(NominalTypeDecl *NTD);
 
-    addSymbol(LinkEntity::forNominalTypeDescriptor(NTD));
-
-    addSymbol(LinkEntity::forTypeMetadata(declaredType,
-                                          TypeMetadataAddress::AddressPoint,
-                                          /*isPattern=*/false));
-    addSymbol(LinkEntity::forTypeMetadataAccessFunction(declaredType));
-
-    // There are symbols associated with any protocols this type conforms to.
-    for (auto conformance : NTD->getLocalConformances()) {
-      auto needsWTable = Lowering::TypeConverter::protocolRequiresWitnessTable(
-          conformance->getProtocol());
-      if (!needsWTable)
-        continue;
-
-      addSymbol(LinkEntity::forDirectProtocolWitnessTable(conformance));
-      addSymbol(LinkEntity::forProtocolWitnessTableAccessFunction(conformance));
-    }
-
-    visitMembers(NTD);
-  }
-  void visitClassDecl(ClassDecl *CD) {
-    visitNominalTypeDecl(CD);
-  }
-
-  void visitStructDecl(StructDecl *SD) { visitValueTypeDecl(SD); }
-  void visitEnumDecl(EnumDecl *ED) { visitValueTypeDecl(ED); }
   void visitProtocolDecl(ProtocolDecl *PD) {
     addSymbol(LinkEntity::forProtocolDescriptor(PD));
 
@@ -156,6 +111,22 @@ public:
 };
 }
 
+void TBDGenVisitor::visitValueDecl(ValueDecl *VD) {
+  if (isPrivateDecl(VD))
+    return;
+
+  auto declRef = SILDeclRef(VD);
+
+  // Transparent symbols don't exist, even in public.
+  // FIXME: this should really be "is SIL only".
+  if (declRef.isTransparent())
+    return;
+
+  addSymbol(declRef.mangle());
+
+  visitMembers(VD);
+}
+
 void TBDGenVisitor::visitVarDecl(VarDecl *VD) {
   if (isPrivateDecl(VD))
     return;
@@ -163,7 +134,7 @@ void TBDGenVisitor::visitVarDecl(VarDecl *VD) {
   // statically/globally stored variables have some special handling.
   if (VD->hasStorage() &&
       (VD->isStatic() || VD->getDeclContext()->isModuleScopeContext())) {
-    // The actual variable has a symbol, even when private.
+    // The actual variable has a symbol.
     Mangle::ASTMangler mangler;
     addSymbol(mangler.mangleEntity(VD, false));
 
@@ -172,6 +143,30 @@ void TBDGenVisitor::visitVarDecl(VarDecl *VD) {
   }
 
   visitMembers(VD);
+}
+
+void TBDGenVisitor::visitNominalTypeDecl(NominalTypeDecl *NTD) {
+  auto declaredType = NTD->getDeclaredType()->getCanonicalType();
+
+  addSymbol(LinkEntity::forNominalTypeDescriptor(NTD));
+
+  addSymbol(LinkEntity::forTypeMetadata(declaredType,
+                                        TypeMetadataAddress::AddressPoint,
+                                        /*isPattern=*/false));
+  addSymbol(LinkEntity::forTypeMetadataAccessFunction(declaredType));
+
+  // There are symbols associated with any protocols this type conforms to.
+  for (auto conformance : NTD->getLocalConformances()) {
+    auto needsWTable = Lowering::TypeConverter::protocolRequiresWitnessTable(
+        conformance->getProtocol());
+    if (!needsWTable)
+      continue;
+
+    addSymbol(LinkEntity::forDirectProtocolWitnessTable(conformance));
+    addSymbol(LinkEntity::forProtocolWitnessTableAccessFunction(conformance));
+  }
+
+  visitMembers(NTD);
 }
 
 void swift::enumeratePublicSymbols(FileUnit *file, StringSet &symbols,
