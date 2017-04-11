@@ -333,7 +333,7 @@ struct ErrorTypeInVarDecl7 {
 }
 
 struct ErrorTypeInVarDecl8 {
-  var v1 : protocol<FooProtocol // expected-error {{expected '>' to complete protocol composition type}} expected-note {{to match this opening '<'}}
+  var v1 : protocol<FooProtocol // expected-error {{expected '>' to complete protocol-constrained type}} expected-note {{to match this opening '<'}}
   var v2 : Int
 }
 
@@ -343,7 +343,7 @@ struct ErrorTypeInVarDecl9 {
 }
 
 struct ErrorTypeInVarDecl10 {
-  var v1 : protocol<FooProtocol // expected-error {{expected '>' to complete protocol composition type}} expected-note {{to match this opening '<'}}
+  var v1 : protocol<FooProtocol // expected-error {{expected '>' to complete protocol-constrained type}} expected-note {{to match this opening '<'}}
   var v2 : Int
 }
 
@@ -353,7 +353,7 @@ struct ErrorTypeInVarDecl11 {
 }
 
 func ErrorTypeInPattern1(_: protocol<) { } // expected-error {{expected identifier for type name}}
-func ErrorTypeInPattern2(_: protocol<F) { } // expected-error {{expected '>' to complete protocol composition type}}
+func ErrorTypeInPattern2(_: protocol<F) { } // expected-error {{expected '>' to complete protocol-constrained type}}
                                             // expected-note@-1 {{to match this opening '<'}}
                                             // expected-error@-2 {{use of undeclared type 'F'}}
 

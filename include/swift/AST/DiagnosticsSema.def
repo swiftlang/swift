@@ -1552,13 +1552,18 @@ ERROR(circular_protocol_def,none,
       "circular protocol inheritance %0", (StringRef))
 NOTE(protocol_here,none,
      "protocol %0 declared here", (Identifier))
-ERROR(protocol_composition_not_protocol,none,
-      "non-protocol type %0 cannot be used within a protocol composition", (Type))
 ERROR(objc_protocol_inherits_non_objc_protocol,none,
       "@objc protocol %0 cannot refine non-@objc protocol %1", (Type, Type))
 WARNING(protocol_composition_with_postfix,none,
-        "protocol composition with postfix '%0' is ambiguous "
+        "protocol-constrained type with postfix '%0' is ambiguous "
         "and will be rejected in future version of Swift", (StringRef))
+
+ERROR(invalid_protocol_composition_member,none,
+      "non-protocol, non-class type %0 cannot be used within a "
+      "protocol-constrained type", (Type))
+ERROR(protocol_composition_one_class,none,
+      "protocol-constrained type cannot contain class %0 because it already "
+      "contains class %1", (Type, Type))
 
 ERROR(requires_conformance_nonprotocol,none,
       "type %0 constrained to non-protocol type %1", (TypeLoc, TypeLoc))
@@ -3090,7 +3095,7 @@ NOTE(not_objc_empty_protocol_composition,none,
 NOTE(not_objc_protocol,none,
      "protocol %0 is not '@objc'", (Type))
 NOTE(not_objc_error_protocol_composition,none,
-     "protocol composition involving 'Error' cannot be represented "
+     "protocol-constrained type containing 'Error' cannot be represented "
      "in Objective-C", ())
 NOTE(not_objc_empty_tuple,none,
       "empty tuple type cannot be represented in Objective-C", ())

@@ -17,6 +17,7 @@
 #include "swift/AST/ASTContext.h"
 #include "ForeignRepresentationInfo.h"
 #include "swift/Strings.h"
+#include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/GenericSignatureBuilder.h"
 #include "swift/AST/ConcreteDeclRef.h"
 #include "swift/AST/DiagnosticEngine.h"
@@ -269,6 +270,7 @@ struct ASTContext::Implementation {
     llvm::FoldingSet<UnboundGenericType> UnboundGenericTypes;
     llvm::FoldingSet<BoundGenericType> BoundGenericTypes;
     llvm::FoldingSet<ProtocolType> ProtocolTypes;
+    llvm::FoldingSet<ProtocolCompositionType> ProtocolCompositionTypes;
     llvm::FoldingSet<LayoutConstraintInfo> LayoutConstraints;
 
     /// The set of normal protocol conformances.
@@ -311,7 +313,6 @@ struct ASTContext::Implementation {
   llvm::DenseMap<CanType, SILBlockStorageType *> SILBlockStorageTypes;
   llvm::FoldingSet<SILBoxType> SILBoxTypes;
   llvm::DenseMap<BuiltinIntegerWidth, BuiltinIntegerType*> IntegerTypes;
-  llvm::FoldingSet<ProtocolCompositionType> ProtocolCompositionTypes;
   llvm::FoldingSet<BuiltinVectorType> BuiltinVectorTypes;
   llvm::FoldingSet<GenericSignature> GenericSignatures;
   llvm::FoldingSet<DeclName::CompoundDeclName> CompoundNames;
@@ -2797,23 +2798,31 @@ ProtocolCompositionType::build(const ASTContext &C, ArrayRef<Type> Protocols) {
   void *InsertPos = nullptr;
   llvm::FoldingSetNodeID ID;
   ProtocolCompositionType::Profile(ID, Protocols);
-  if (ProtocolCompositionType *Result
-        = C.Impl.ProtocolCompositionTypes.FindNodeOrInsertPos(ID, InsertPos))
-    return Result;
 
   bool isCanonical = true;
+  RecursiveTypeProperties properties;
   for (Type t : Protocols) {
     if (!t->isCanonical())
       isCanonical = false;
+    properties |= t->getRecursiveProperties();
   }
 
   // Create a new protocol composition type.
-  ProtocolCompositionType *New
-    = new (C, AllocationArena::Permanent)
+  auto arena = getArena(properties);
+
+  if (auto compTy
+      = C.Impl.getArena(arena).ProtocolCompositionTypes
+          .FindNodeOrInsertPos(ID, InsertPos))
+    return compTy;
+
+  auto compTy
+    = new (C, arena)
         ProtocolCompositionType(isCanonical ? &C : nullptr,
-                                C.AllocateCopy(Protocols));
-  C.Impl.ProtocolCompositionTypes.InsertNode(New, InsertPos);
-  return New;
+                                C.AllocateCopy(Protocols),
+                                properties);
+  C.Impl.getArena(arena).ProtocolCompositionTypes
+    .InsertNode(compTy, InsertPos);
+  return compTy;
 }
 
 ReferenceStorageType *ReferenceStorageType::get(Type T, Ownership ownership,
@@ -3454,19 +3463,22 @@ CanArchetypeType ArchetypeType::getOpened(Type existential,
     knownID = UUID::fromTime();
   }
 
-  llvm::SmallVector<ProtocolDecl *, 4> conformsTo;
-  assert(existential->isExistentialType());
-  existential->getExistentialTypeProtocols(conformsTo);
-  Type superclass = existential->getSuperclass(nullptr);
+  auto layout = existential->getExistentialLayout();
+
+  SmallVector<ProtocolDecl *, 2> protos;
+  for (auto proto : layout.getProtocols())
+    protos.push_back(proto->getDecl());
 
   auto arena = AllocationArena::Permanent;
   void *mem = ctx.Allocate(
       totalSizeToAlloc<ProtocolDecl *, Type, LayoutConstraint, UUID>(
-        conformsTo.size(), superclass ? 1 : 0, 0, 1),
+      protos.size(), layout.superclass ? 1 : 0, 0, 1),
       alignof(ArchetypeType), arena);
 
+  // FIXME: Pass in class layout constraint
   auto result =
-      ::new (mem) ArchetypeType(ctx, existential, conformsTo, superclass,
+      ::new (mem) ArchetypeType(ctx, existential,
+                                protos, layout.superclass,
                                 existential->getLayoutConstraint(), *knownID);
   openedExistentialArchetypes[*knownID] = result;
 

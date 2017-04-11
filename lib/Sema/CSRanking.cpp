@@ -442,7 +442,7 @@ static bool isProtocolExtensionAsSpecializedAs(TypeChecker &tc,
   // Form a constraint system where we've opened up all of the requirements of
   // the second protocol extension.
   ConstraintSystem cs(tc, dc1, None);
-  llvm::DenseMap<CanType, TypeVariableType *> replacements;
+  OpenedTypeMap replacements;
   cs.openGeneric(dc2, dc2, sig2,
                  /*skipProtocolSelfConstraint=*/false,
                  ConstraintLocatorBuilder(nullptr),
@@ -453,7 +453,7 @@ static bool isProtocolExtensionAsSpecializedAs(TypeChecker &tc,
   Type selfType1 = sig1->getGenericParams()[0];
   Type selfType2 = sig2->getGenericParams()[0];
   cs.addConstraint(ConstraintKind::Bind,
-                   replacements[selfType2->getCanonicalType()],
+                   replacements[cast<GenericTypeParamType>(selfType2->getCanonicalType())],
                    dc1->mapTypeIntoContext(selfType1),
                    nullptr);
 
@@ -568,7 +568,7 @@ static bool isDeclAsSpecializedAs(TypeChecker &tc, DeclContext *dc,
       auto locator = cs.getConstraintLocator(nullptr);
       // FIXME: Locator when anchored on a declaration.
       // Get the type of a reference to the second declaration.
-      llvm::DenseMap<CanType, TypeVariableType *> unused;
+      OpenedTypeMap unused;
       Type openedType2;
       if (auto *funcType = type2->getAs<AnyFunctionType>()) {
         openedType2 = cs.openFunctionType(
@@ -583,7 +583,7 @@ static bool isDeclAsSpecializedAs(TypeChecker &tc, DeclContext *dc,
 
       // Get the type of a reference to the first declaration, swapping in
       // archetypes for the dependent types.
-      llvm::DenseMap<CanType, TypeVariableType *> replacements;
+      OpenedTypeMap replacements;
       auto dc1 = decl1->getInnermostDeclContext();
       Type openedType1;
       if (auto *funcType = type1->getAs<AnyFunctionType>()) {
