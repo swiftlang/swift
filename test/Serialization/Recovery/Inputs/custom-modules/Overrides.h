@@ -7,10 +7,12 @@
 - (void)disappearingMethod;
 - (nullable id)nullabilityChangeMethod;
 - (nonnull id)typeChangeMethod;
+@property (readonly) long disappearingProperty;
 #else
 //- (void)disappearingMethod;
 - (nonnull id)nullabilityChangeMethod;
 - (nonnull Base *)typeChangeMethod;
+// @property (readonly) long disappearingProperty;
 #endif
 @end
 
@@ -66,4 +68,3 @@
 // - (nonnull Element)objectAtIndexedSubscript:(nonnull id)key;
 #endif
 @end
-

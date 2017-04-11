@@ -19,6 +19,7 @@ public class A_Sub: Base {
   public override func nullabilityChangeMethod() -> Any? { return nil }
   public override func typeChangeMethod() -> Any { return self }
   public override func disappearingMethodWithOverload() {}
+  public override var disappearingProperty: Int { return 0 }
 }
 
 // CHECK-LABEL: class A_Sub : Base {
@@ -26,6 +27,7 @@ public class A_Sub: Base {
 // CHECK-NEXT: func nullabilityChangeMethod() -> Any?
 // CHECK-NEXT: func typeChangeMethod() -> Any
 // CHECK-NEXT: func disappearingMethodWithOverload()
+// CHECK-NEXT: var disappearingProperty: Int { get }
 // CHECK-NEXT: init()
 // CHECK-NEXT: {{^}$}}
 
