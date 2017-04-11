@@ -15,9 +15,11 @@
 # -----------------------------------------------------------------------------
 
 import os
+
 import lit
 import lit.formats
 import lit.util
+
 
 class SwiftTest(lit.formats.ShTest, object):
     def __init__(self, coverage_mode=None, execute_external=True):
@@ -47,7 +49,7 @@ class SwiftTest(lit.formats.ShTest, object):
                     os.path.join(profdir, "swift-%p.profraw")
             else:
                 test.config.environment["LLVM_PROFILE_FILE"] = \
-                    os.path.join(config.swift_test_results_dir,
+                    os.path.join(test.config.swift_test_results_dir,
                                  "swift-%4m.profraw")
 
     def after_test(self, test, litConfig, result):
