@@ -90,13 +90,16 @@ void SILBasicBlock::remove(SILInstruction *I) {
   InstList.remove(I);
 }
 
+/// Returns the iterator following the erased instruction, STL-style.
 SILBasicBlock::iterator SILBasicBlock::erase(SILInstruction *I) {
   // Notify the delete handlers that this instruction is going away.
   getModule().notifyDeleteHandlers(&*I);
   auto *F = getParent();
-  auto II = InstList.erase(I);
+  // LLVM does not currently implement ilist::erase correctly. Compensate.
+  iterator next = std::next(SILBasicBlock::iterator(I));
+  InstList.erase(I);
   F->getModule().deallocateInst(I);
-  return II;
+  return next;
 }
 
 /// This method unlinks 'self' from the containing SILFunction and deletes it.
