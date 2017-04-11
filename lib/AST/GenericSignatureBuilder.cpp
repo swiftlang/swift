@@ -1516,6 +1516,18 @@ PotentialArchetype *PotentialArchetype::getNestedArchetypeAnchor(
                                               NestedTypeUpdate::AddIfMissing);
   }
 
+  // If we have an associated type, drop any typealiases that aren't in
+  // the same module as the protocol.
+  // FIXME: This is an unprincipled hack for an unprincipled feature.
+  typealiases.erase(
+    std::remove_if(typealiases.begin(), typealiases.end(),
+                   [&](TypeAliasDecl *typealias) {
+      return typealias->getParentModule() !=
+        typealias->getDeclContext()
+          ->getAsNominalTypeOrNominalTypeExtensionContext()->getParentModule();
+    }),
+    typealiases.end());
+
   // Update for all of the typealiases with this name, which will introduce
   // various same-type constraints.
   for (auto typealias : typealiases) {
@@ -2232,9 +2244,6 @@ ConstraintResult GenericSignatureBuilder::addConformanceRequirement(
     return ConstraintResult::Conflicting;
   }
 
-  // Add the requirement to the representative.
-  auto T = PAT->getRepresentative();
-
   bool inserted = Visited.insert(Proto).second;
   assert(inserted);
   (void) inserted;
@@ -2242,7 +2251,7 @@ ConstraintResult GenericSignatureBuilder::addConformanceRequirement(
     Visited.erase(Proto);
   };
 
-  auto concreteSelf = T->getDependentType({}, /*allowUnresolved=*/true);
+  auto concreteSelf = PAT->getDependentType({}, /*allowUnresolved=*/true);
   auto protocolSubMap = SubstitutionMap::getProtocolSubstitutions(
       Proto, concreteSelf, ProtocolConformanceRef(Proto));
 
@@ -2285,7 +2294,7 @@ ConstraintResult GenericSignatureBuilder::addConformanceRequirement(
   for (auto Member : getProtocolMembers(Proto)) {
     if (auto AssocType = dyn_cast<AssociatedTypeDecl>(Member)) {
       // Add requirements placed directly on this associated type.
-      auto AssocPA = T->getNestedType(AssocType, *this);
+      auto AssocPA = PAT->getNestedType(AssocType, *this);
 
       auto assocResult =
         addInheritedRequirements(AssocType, AssocPA, Source, Visited);
@@ -3804,6 +3813,18 @@ namespace swift {
   }
 }
 
+/// Retrieve the "local" archetype anchor for the given potential archetype,
+/// which rebuilds this potential archetype using the archetype anchors of
+/// the parent types.
+static PotentialArchetype *getLocalAnchor(PotentialArchetype *pa,
+                                          GenericSignatureBuilder &builder) {
+  auto parent = pa->getParent();
+  if (!parent) return pa;
+
+  auto parentAnchor = getLocalAnchor(parent, builder);
+  return parentAnchor->getNestedArchetypeAnchor(pa->getNestedName(), builder);
+}
+
 /// Computes the ordered set of archetype anchors required to form a minimum
 /// spanning tree among the connected components formed by only the derived
 /// same-type requirements within the equivalence class of \c rep.
@@ -3842,8 +3863,10 @@ namespace swift {
 /// canonical edges connects vertex i to vertex i+1 for i in 0..<size-1.
 static void computeDerivedSameTypeComponents(
               PotentialArchetype *rep,
-              std::vector<DerivedSameTypeComponent> &components,
               llvm::SmallDenseMap<PotentialArchetype *, unsigned> &componentOf){
+  // Perform a depth-first search to identify the components.
+  auto equivClass = rep->getOrCreateEquivalenceClass();
+  auto &components = equivClass->derivedSameTypeComponents;
   for (auto pa : rep->getEquivalenceClassMembers()) {
     // If we've already seen this potential archetype, there's nothing else to
     // do.
@@ -3858,7 +3881,6 @@ static void computeDerivedSameTypeComponents(
 
   // If there is a concrete type, figure out the best concrete type anchor
   // per component.
-  auto equivClass = rep->getOrCreateEquivalenceClass();
   for (const auto &concrete : equivClass->concreteTypeConstraints) {
     // Dig out the component associated with constraint.
     assert(componentOf.count(concrete.archetype) > 0);
@@ -3917,6 +3939,16 @@ void GenericSignatureBuilder::checkSameTypeConstraints(
   if (!equivClass || !equivClass->derivedSameTypeComponents.empty())
     return;
 
+  // Make sure that we've build the archetype anchors for each potential
+  // archetype in this equivalence class. This is important to do for *all*
+  // potential archetypes because some non-archetype anchors will nonetheless
+  // be used in the canonicalized requirements.
+  for (auto pa : pa->getEquivalenceClassMembers()) {
+    (void)getLocalAnchor(pa, *this);
+  }
+  equivClass = pa->getEquivalenceClassIfPresent();
+  assert(equivClass && "Equivalence class disappeared?");
+
   for (auto &entry : equivClass->sameTypeConstraints) {
     auto &constraints = entry.second;
 
@@ -3938,8 +3970,7 @@ void GenericSignatureBuilder::checkSameTypeConstraints(
   // Compute the components in the subgraph of the same-type constraint graph
   // that includes only derived constraints.
   llvm::SmallDenseMap<PotentialArchetype *, unsigned> componentOf;
-  computeDerivedSameTypeComponents(pa, equivClass->derivedSameTypeComponents,
-                                   componentOf);
+  computeDerivedSameTypeComponents(pa, componentOf);
 
   // Go through all of the same-type constraints, collecting all of the
   // non-derived constraints to put them into bins: intra-component and
