@@ -90,6 +90,12 @@ public:
       return;
 
     auto declRef = SILDeclRef(VD);
+
+    // Transparent symbols don't exist, even if public.
+    // FIXME: this should really be "is SIL only".
+    if (declRef.isTransparent())
+      return;
+
     addSymbol(declRef.mangle());
 
     visitMembers(VD);

@@ -46,13 +46,3 @@
 <unknown>:0: error: symbol '_T04test16PublicPropertiesCACycfc' (test.PublicProperties.init() -> test.PublicProperties) is in generated IR file, but not in TBD file
 <unknown>:0: error: symbol '_T04test16PublicPropertiesCMm' (metaclass for test.PublicProperties) is in generated IR file, but not in TBD file
 <unknown>:0: error: symbol '_T04test16PublicPropertiesCfd' (test.PublicProperties.deinit) is in generated IR file, but not in TBD file
-<unknown>:0: error: symbol '_T04test13PublicStaticsC15publicVarGetSetSifmZ' (static test.PublicStatics.publicVarGetSet.materializeForSet : Swift.Int) is in TBD file, but not in generated IR
-<unknown>:0: error: symbol '_T04test13PublicStaticsC9publicLetSifgZ' (static test.PublicStatics.publicLet.getter : Swift.Int) is in TBD file, but not in generated IR
-<unknown>:0: error: symbol '_T04test13PublicStaticsC9publicVarSifgZ' (static test.PublicStatics.publicVar.getter : Swift.Int) is in TBD file, but not in generated IR
-<unknown>:0: error: symbol '_T04test13PublicStaticsC9publicVarSifmZ' (static test.PublicStatics.publicVar.materializeForSet : Swift.Int) is in TBD file, but not in generated IR
-<unknown>:0: error: symbol '_T04test13PublicStaticsC9publicVarSifsZ' (static test.PublicStatics.publicVar.setter : Swift.Int) is in TBD file, but not in generated IR
-<unknown>:0: error: symbol '_T04test16PublicPropertiesC15publicVarGetSetSifm' (test.PublicProperties.publicVarGetSet.materializeForSet : Swift.Int) is in TBD file, but not in generated IR
-<unknown>:0: error: symbol '_T04test16PublicPropertiesC9publicLetSifg' (test.PublicProperties.publicLet.getter : Swift.Int) is in TBD file, but not in generated IR
-<unknown>:0: error: symbol '_T04test16PublicPropertiesC9publicVarSifg' (test.PublicProperties.publicVar.getter : Swift.Int) is in TBD file, but not in generated IR
-<unknown>:0: error: symbol '_T04test16PublicPropertiesC9publicVarSifm' (test.PublicProperties.publicVar.materializeForSet : Swift.Int) is in TBD file, but not in generated IR
-<unknown>:0: error: symbol '_T04test16PublicPropertiesC9publicVarSifs' (test.PublicProperties.publicVar.setter : Swift.Int) is in TBD file, but not in generated IR
