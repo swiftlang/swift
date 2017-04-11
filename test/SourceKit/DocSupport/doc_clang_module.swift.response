@@ -7550,7 +7550,8 @@ var FooSubUnnamedEnumeratorA1: Int { get }
         key.offset: 7514,
         key.length: 5
       }
-    ]
+    ],
+    key.modulename: "Foo.FooSub"
   },
   {
     key.kind: source.lang.swift.decl.struct,
@@ -7628,7 +7629,8 @@ var FooSubUnnamedEnumeratorA1: Int { get }
           }
         ]
       }
-    ]
+    ],
+    key.modulename: "Foo.FooSub"
   },
   {
     key.kind: source.lang.swift.decl.var.global,
@@ -7636,7 +7638,8 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     key.usr: "c:@E@FooSubEnum1@FooSubEnum1X",
     key.offset: 7676,
     key.length: 37,
-    key.fully_annotated_decl: "<decl.var.global><syntaxtype.keyword>var</syntaxtype.keyword> <decl.name>FooSubEnum1X</decl.name>: <decl.var.type><ref.struct usr=\"c:@E@FooSubEnum1\">FooSubEnum1</ref.struct></decl.var.type> { <syntaxtype.keyword>get</syntaxtype.keyword> }</decl.var.global>"
+    key.fully_annotated_decl: "<decl.var.global><syntaxtype.keyword>var</syntaxtype.keyword> <decl.name>FooSubEnum1X</decl.name>: <decl.var.type><ref.struct usr=\"c:@E@FooSubEnum1\">FooSubEnum1</ref.struct></decl.var.type> { <syntaxtype.keyword>get</syntaxtype.keyword> }</decl.var.global>",
+    key.modulename: "Foo.FooSub"
   },
   {
     key.kind: source.lang.swift.decl.var.global,
@@ -7644,7 +7647,8 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     key.usr: "c:@E@FooSubEnum1@FooSubEnum1Y",
     key.offset: 7714,
     key.length: 37,
-    key.fully_annotated_decl: "<decl.var.global><syntaxtype.keyword>var</syntaxtype.keyword> <decl.name>FooSubEnum1Y</decl.name>: <decl.var.type><ref.struct usr=\"c:@E@FooSubEnum1\">FooSubEnum1</ref.struct></decl.var.type> { <syntaxtype.keyword>get</syntaxtype.keyword> }</decl.var.global>"
+    key.fully_annotated_decl: "<decl.var.global><syntaxtype.keyword>var</syntaxtype.keyword> <decl.name>FooSubEnum1Y</decl.name>: <decl.var.type><ref.struct usr=\"c:@E@FooSubEnum1\">FooSubEnum1</ref.struct></decl.var.type> { <syntaxtype.keyword>get</syntaxtype.keyword> }</decl.var.global>",
+    key.modulename: "Foo.FooSub"
   },
   {
     key.kind: source.lang.swift.decl.var.global,
@@ -7652,6 +7656,7 @@ var FooSubUnnamedEnumeratorA1: Int { get }
     key.usr: "c:@Ea@FooSubUnnamedEnumeratorA1@FooSubUnnamedEnumeratorA1",
     key.offset: 7752,
     key.length: 42,
-    key.fully_annotated_decl: "<decl.var.global><syntaxtype.keyword>var</syntaxtype.keyword> <decl.name>FooSubUnnamedEnumeratorA1</decl.name>: <decl.var.type><ref.struct usr=\"s:Si\">Int</ref.struct></decl.var.type> { <syntaxtype.keyword>get</syntaxtype.keyword> }</decl.var.global>"
+    key.fully_annotated_decl: "<decl.var.global><syntaxtype.keyword>var</syntaxtype.keyword> <decl.name>FooSubUnnamedEnumeratorA1</decl.name>: <decl.var.type><ref.struct usr=\"s:Si\">Int</ref.struct></decl.var.type> { <syntaxtype.keyword>get</syntaxtype.keyword> }</decl.var.global>",
+    key.modulename: "Foo.FooSub"
   }
 ]
