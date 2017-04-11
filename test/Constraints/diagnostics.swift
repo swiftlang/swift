@@ -770,7 +770,7 @@ struct SR1752 {
 
 let sr1752: SR1752?
 
-true ? nil : sr1752?.foo() // don't generate a warning about unused result since foo returns Void
+true ? nil : sr1752?.foo() // expected-warning {{expression of type '()?' is unused}}
 
 // <rdar://problem/27891805> QoI: FailureDiagnosis doesn't look through 'try'
 struct rdar27891805 {
