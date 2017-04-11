@@ -2335,10 +2335,9 @@ ConstraintResult GenericSignatureBuilder::addConformanceRequirement(
   for (auto Member : getProtocolMembers(Proto)) {
     if (auto AssocType = dyn_cast<AssociatedTypeDecl>(Member)) {
       // Add requirements placed directly on this associated type.
-      auto AssocPA = PAT->getNestedType(AssocType, *this);
-
+      Type assocType = DependentMemberType::get(concreteSelf, AssocType);
       auto assocResult =
-        addInheritedRequirements(AssocType, AssocPA, Source, Visited,
+        addInheritedRequirements(AssocType, assocType, Source, Visited,
                                  protoModule);
       if (isErrorResult(assocResult))
         return assocResult;
@@ -2964,7 +2963,7 @@ void GenericSignatureBuilder::markPotentialArchetypeRecursive(
 
 ConstraintResult GenericSignatureBuilder::addInheritedRequirements(
                              TypeDecl *decl,
-                             PotentialArchetype *pa,
+                             UnresolvedType type,
                              const RequirementSource *parentSource,
                              llvm::SmallPtrSetImpl<ProtocolDecl *> &visited,
                              ModuleDecl *inferForModule) {
@@ -3011,7 +3010,7 @@ ConstraintResult GenericSignatureBuilder::addInheritedRequirements(
                         getFloatingSource(typeRepr, /*forInferred=*/true));
     }
 
-    return addTypeRequirement(pa, inheritedType,
+    return addTypeRequirement(type, inheritedType,
                               getFloatingSource(typeRepr,
                                                 /*forInferred=*/false),
                               UnresolvedHandlingKind::GenerateConstraints,
@@ -3019,7 +3018,7 @@ ConstraintResult GenericSignatureBuilder::addInheritedRequirements(
   };
 
   auto visitLayout = [&](LayoutConstraint layout, const TypeRepr *typeRepr) {
-    return addLayoutRequirement(pa, layout,
+    return addLayoutRequirement(type, layout,
                                 getFloatingSource(typeRepr,
                                                   /*forInferred=*/false),
                                 UnresolvedHandlingKind::GenerateConstraints);

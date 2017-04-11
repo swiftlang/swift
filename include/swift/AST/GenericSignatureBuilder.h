@@ -370,7 +370,7 @@ private:
   /// relative to the given module.
   ConstraintResult addInheritedRequirements(
                                 TypeDecl *decl,
-                                PotentialArchetype *pa,
+                                UnresolvedType type,
                                 const RequirementSource *parentSource,
                                 llvm::SmallPtrSetImpl<ProtocolDecl *> &visited,
                                 ModuleDecl *inferForModule);
