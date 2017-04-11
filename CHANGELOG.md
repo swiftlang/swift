@@ -51,14 +51,14 @@ Swift 4.0
   `UnsafeRawBufferPointer`'s slice type no longer has a nonmutating subscript
   setter. So assigning into a mutable `let` buffer no longer compiles:
 
-  ```
+  ```swift
   let slice = buffer[n..<m]
   slice[i..<j] = buffer[k..<l]
   ```
 
   The assigned buffer slice now needs to be a `var`.
 
-  ```
+  ```swift
   var slice = buffer[n..<m]
   slice[i..<j] = buffer[k..<l]
   ```

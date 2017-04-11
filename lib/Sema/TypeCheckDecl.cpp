@@ -24,6 +24,7 @@
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
+#include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/GenericEnvironment.h"
@@ -442,10 +443,11 @@ void TypeChecker::checkInheritanceClause(Decl *decl,
     // If this is a protocol or protocol composition type, record the
     // protocols.
     if (inheritedTy->isExistentialType()) {
-      SmallVector<ProtocolDecl *, 4> protocols;
-      inheritedTy->getExistentialTypeProtocols(protocols);
-
-      allProtocols.insert(protocols.begin(), protocols.end());
+      auto layout = inheritedTy->getExistentialLayout();
+      for (auto proto : layout.getProtocols()) {
+        auto *protoDecl = proto->getDecl();
+        allProtocols.insert(protoDecl);
+      }
       continue;
     }
     
