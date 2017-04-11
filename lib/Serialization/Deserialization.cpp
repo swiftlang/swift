@@ -1235,47 +1235,6 @@ GenericEnvironment *ModuleFile::getGenericEnvironment(
 ;
 }
 
-bool ModuleFile::readMembers(SmallVectorImpl<Decl *> &Members) {
-  using namespace decls_block;
-
-  auto entry = DeclTypeCursor.advance();
-  if (entry.Kind != llvm::BitstreamEntry::Record)
-    return true;
-
-  SmallVector<uint64_t, 16> memberIDBuffer;
-
-  unsigned kind = DeclTypeCursor.readRecord(entry.ID, memberIDBuffer);
-  assert(kind == MEMBERS);
-  (void)kind;
-
-  ArrayRef<uint64_t> rawMemberIDs;
-  decls_block::MembersLayout::readRecord(memberIDBuffer, rawMemberIDs);
-
-  if (rawMemberIDs.empty())
-    return false;
-
-  Members.reserve(rawMemberIDs.size());
-  for (DeclID rawID : rawMemberIDs) {
-    Expected<Decl *> D = getDeclChecked(rawID);
-    if (!D) {
-      if (!getContext().LangOpts.EnableDeserializationRecovery)
-        fatal(D.takeError());
-
-      // Silently drop the member if it had an override-related problem.
-      llvm::handleAllErrors(D.takeError(),
-          [](const OverrideError &) { /* expected */ },
-          [this](std::unique_ptr<llvm::ErrorInfoBase> unhandled) {
-        fatal(std::move(unhandled));
-      });
-      continue;
-    }
-    assert(D.get() && "unchecked error deserializing next member");
-    Members.push_back(D.get());
-  }
-
-  return false;
-}
-
 bool ModuleFile::readDefaultWitnessTable(ProtocolDecl *proto) {
   using namespace decls_block;
 
@@ -2834,7 +2793,7 @@ ModuleFile::getDeclChecked(DeclID DID, Optional<DeclContext *> ForcedContext) {
     if (!overridden) {
       llvm::handleAllErrors(overridden.takeError(),
           [](const XRefError &) { /* expected */ },
-          [this](std::unique_ptr<llvm::ErrorInfoBase> unhandled){
+          [this](std::unique_ptr<llvm::ErrorInfoBase> unhandled) {
         fatal(std::move(unhandled));
       });
       return llvm::make_error<OverrideError>(name);
@@ -4432,28 +4391,61 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
   return typeOrOffset;
 }
 
-void ModuleFile::loadAllMembers(Decl *D, uint64_t contextData) {
-  PrettyStackTraceDecl trace("loading members for", D);
+void ModuleFile::loadAllMembers(Decl *container, uint64_t contextData) {
+  PrettyStackTraceDecl trace("loading members for", container);
   ++NumMemberListsLoaded;
+
+  IterableDeclContext *IDC;
+  if (auto *nominal = dyn_cast<NominalTypeDecl>(container))
+    IDC = nominal;
+  else
+    IDC = cast<ExtensionDecl>(container);
 
   BCOffsetRAII restoreOffset(DeclTypeCursor);
   DeclTypeCursor.JumpToBit(contextData);
-  SmallVector<Decl *, 16> members;
-  bool Err = readMembers(members);
-  assert(!Err && "unable to read members");
-  (void)Err;
+  auto entry = DeclTypeCursor.advance();
+  if (entry.Kind != llvm::BitstreamEntry::Record) {
+    error();
+    return;
+  }
 
-  IterableDeclContext *IDC;
-  if (auto *nominal = dyn_cast<NominalTypeDecl>(D))
-    IDC = nominal;
-  else
-    IDC = cast<ExtensionDecl>(D);
+  SmallVector<uint64_t, 16> memberIDBuffer;
+
+  unsigned kind = DeclTypeCursor.readRecord(entry.ID, memberIDBuffer);
+  assert(kind == decls_block::MEMBERS);
+  (void)kind;
+
+  ArrayRef<uint64_t> rawMemberIDs;
+  decls_block::MembersLayout::readRecord(memberIDBuffer, rawMemberIDs);
+
+  if (rawMemberIDs.empty())
+    return;
+
+  SmallVector<Decl *, 16> members;
+  members.reserve(rawMemberIDs.size());
+  for (DeclID rawID : rawMemberIDs) {
+    Expected<Decl *> next = getDeclChecked(rawID);
+    if (!next) {
+      if (!getContext().LangOpts.EnableDeserializationRecovery)
+        fatal(next.takeError());
+
+      // Silently drop the member if it had an override-related problem.
+      llvm::handleAllErrors(next.takeError(),
+          [](const OverrideError &) { /* expected */ },
+          [this](std::unique_ptr<llvm::ErrorInfoBase> unhandled) {
+        fatal(std::move(unhandled));
+      });
+      continue;
+    }
+    assert(next.get() && "unchecked error deserializing next member");
+    members.push_back(next.get());
+  }
 
   for (auto member : members)
     IDC->addMember(member);
 
-  if (auto *proto = dyn_cast<ProtocolDecl>(D)) {
-    PrettyStackTraceDecl trace("reading default witness table for", D);
+  if (auto *proto = dyn_cast<ProtocolDecl>(container)) {
+    PrettyStackTraceDecl trace("reading default witness table for", proto);
     bool Err = readDefaultWitnessTable(proto);
     assert(!Err && "unable to read default witness table");
     (void)Err;
