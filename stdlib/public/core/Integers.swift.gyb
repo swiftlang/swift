@@ -2458,6 +2458,10 @@ public protocol SignedInteger : BinaryInteger, SignedNumeric {
   /// A type that can represent the absolute value of any possible value of the
   /// conforming type.
   associatedtype Magnitude : BinaryInteger
+
+  // These requirements are for the source code compatibility with Swift 3
+  static func _maskingAdd(_ lhs: Self, _ rhs: Self) -> Self
+  static func _maskingSubtract(_ lhs: Self, _ rhs: Self) -> Self
 }
 
 extension SignedInteger {
@@ -3549,6 +3553,45 @@ extension UnsignedInteger {
   public func toUIntMax() -> UIntMax {
     return UIntMax(self)
   }
+}
+
+// FIXME(integers): Absense of &+ causes ambiguity in the code like the
+// following:
+//    func f<T : SignedInteger>(_ x: T, _ y: T) {
+//      var _  = (x &+ (y - 1)) < x
+//    }
+//  Compiler output:
+//  error: ambiguous reference to member '-'
+//    var _  = (x &+ (y - 1)) < x
+//                      ^
+%   maskingOpsSwift3 = [
+%     ('&+', '_maskingAdd', 'adding'),
+%     ('&-', '_maskingSubtract', 'subtracting')]
+extension SignedInteger {
+%   for (op, helper, _) in maskingOpsSwift3:
+  public static func ${helper}(_ lhs: Self, _ rhs: Self) -> Self {
+    fatalError("Should be overridden in a more specific type")
+  }
+
+  @available(swift, obsoleted: 4.0)
+  public static func ${op} (lhs: Self, rhs: Self) -> Self {
+    return ${helper}(lhs, rhs)
+  }
+%   end
+}
+
+extension SignedInteger where Self : FixedWidthInteger {
+%   for (op, helper, action) in maskingOpsSwift3:
+  // This overload is supposed to break the ambiguity between the
+  // implementations on SignedInteger and FixedWidthInteger
+  public static func ${op} (lhs: Self, rhs: Self) -> Self {
+    return ${helper}(lhs, rhs)
+  }
+  @_transparent
+  public static func ${helper}(_ lhs: Self, _ rhs: Self) -> Self {
+    return lhs.${action}ReportingOverflow(rhs).partialValue
+  }
+%   end
 }
 
 
