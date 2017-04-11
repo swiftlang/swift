@@ -53,3 +53,59 @@ public class B_GenericSub : GenericBase<Base> {
 // CHECK-RECOVERY-LABEL: class B_GenericSub : GenericBase<Base> {
 // CHECK-RECOVERY-NEXT: init()
 // CHECK-RECOVERY-NEXT: {{^}$}}
+
+
+public class C1_IndexedSubscriptDisappears : IndexedSubscriptDisappearsBase {
+  public override subscript(index: Int) -> Any { return self }
+}
+
+// CHECK-LABEL: class C1_IndexedSubscriptDisappears : IndexedSubscriptDisappearsBase {
+// CHECK-NEXT: subscript(index: Int) -> Any { get }
+// CHECK-NEXT: init()
+// CHECK-NEXT: {{^}$}}
+
+// CHECK-RECOVERY-LABEL: class C1_IndexedSubscriptDisappears : IndexedSubscriptDisappearsBase {
+// CHECK-RECOVERY-NEXT: init()
+// CHECK-RECOVERY-NEXT: {{^}$}}
+
+
+public class C2_KeyedSubscriptDisappears : KeyedSubscriptDisappearsBase {
+  public override subscript(key: Any) -> Any { return key }
+}
+
+// CHECK-LABEL: class C2_KeyedSubscriptDisappears : KeyedSubscriptDisappearsBase {
+// CHECK-NEXT: subscript(key: Any) -> Any { get }
+// CHECK-NEXT: init()
+// CHECK-NEXT: {{^}$}}
+
+// CHECK-RECOVERY-LABEL: class C2_KeyedSubscriptDisappears : KeyedSubscriptDisappearsBase {
+// CHECK-RECOVERY-NEXT: init()
+// CHECK-RECOVERY-NEXT: {{^}$}}
+
+
+public class C3_GenericIndexedSubscriptDisappears : GenericIndexedSubscriptDisappearsBase<Base> {
+  public override subscript(index: Int) -> Base { fatalError() }
+}
+
+// CHECK-LABEL: class C3_GenericIndexedSubscriptDisappears : GenericIndexedSubscriptDisappearsBase<Base> {
+// CHECK-NEXT: subscript(index: Int) -> Base { get }
+// CHECK-NEXT: init()
+// CHECK-NEXT: {{^}$}}
+
+// CHECK-RECOVERY-LABEL: class C3_GenericIndexedSubscriptDisappears : GenericIndexedSubscriptDisappearsBase<Base> {
+// CHECK-RECOVERY-NEXT: init()
+// CHECK-RECOVERY-NEXT: {{^}$}}
+
+
+public class C4_GenericKeyedSubscriptDisappears : GenericKeyedSubscriptDisappearsBase<Base> {
+  public override subscript(key: Any) -> Base { fatalError() }
+}
+
+// CHECK-LABEL: class C4_GenericKeyedSubscriptDisappears : GenericKeyedSubscriptDisappearsBase<Base> {
+// CHECK-NEXT: subscript(key: Any) -> Base { get }
+// CHECK-NEXT: init()
+// CHECK-NEXT: {{^}$}}
+
+// CHECK-RECOVERY-LABEL: class C4_GenericKeyedSubscriptDisappears : GenericKeyedSubscriptDisappearsBase<Base> {
+// CHECK-RECOVERY-NEXT: init()
+// CHECK-RECOVERY-NEXT: {{^}$}}

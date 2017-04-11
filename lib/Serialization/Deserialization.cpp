@@ -3475,6 +3475,22 @@ ModuleFile::getDeclChecked(DeclID DID, Optional<DeclContext *> ForcedContext) {
                                              overriddenID, rawAccessLevel,
                                              rawSetterAccessLevel,
                                              argNameIDs);
+    // Resolve the name ids.
+    SmallVector<Identifier, 2> argNames;
+    for (auto argNameID : argNameIDs)
+      argNames.push_back(getIdentifier(argNameID));
+    DeclName name(ctx, ctx.Id_subscript, argNames);
+
+    Expected<Decl *> overridden = getDeclChecked(overriddenID);
+    if (!overridden) {
+      llvm::handleAllErrors(overridden.takeError(),
+                            [](const XRefError &) { /* expected */ },
+                            [&](std::unique_ptr<llvm::ErrorInfoBase> unhandled){
+        fatal(std::move(unhandled));
+      });
+      return llvm::make_error<OverrideError>(name);
+    }
+
     auto parent = getDeclContext(contextID);
     if (declOrOffset.isComplete())
       return declOrOffset;
@@ -3483,12 +3499,6 @@ ModuleFile::getDeclChecked(DeclID DID, Optional<DeclContext *> ForcedContext) {
     if (declOrOffset.isComplete())
       return declOrOffset;
 
-    // Resolve the name ids.
-    SmallVector<Identifier, 2> argNames;
-    for (auto argNameID : argNameIDs)
-      argNames.push_back(getIdentifier(argNameID));
-
-    DeclName name(ctx, ctx.Id_subscript, argNames);
     auto subscript = createDecl<SubscriptDecl>(name, SourceLoc(), nullptr,
                                                SourceLoc(), TypeLoc(),
                                                parent, genericParams);
@@ -3523,8 +3533,8 @@ ModuleFile::getDeclChecked(DeclID DID, Optional<DeclContext *> ForcedContext) {
 
     if (isImplicit)
       subscript->setImplicit();
-    if (auto overridden = cast_or_null<SubscriptDecl>(getDecl(overriddenID))) {
-      subscript->setOverriddenDecl(overridden);
+    if (auto overriddenSub = cast_or_null<SubscriptDecl>(overridden.get())) {
+      subscript->setOverriddenDecl(overriddenSub);
       AddAttribute(new (ctx) OverrideAttr(SourceLoc()));
     }
     break;
