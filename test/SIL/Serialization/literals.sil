@@ -1,0 +1,20 @@
+// First parse this and then emit a *.sib. Then read in the *.sib, then recreate
+// RUN: rm -rfv %t
+// RUN: mkdir %t
+// RUN: %target-sil-opt -enable-sil-ownership %s -emit-sib -o %t/tmp.sib -module-name literals
+// RUN: %target-sil-opt -enable-sil-ownership %t/tmp.sib -o %t/tmp.2.sib -module-name literals
+// RUN: %target-sil-opt -enable-sil-ownership %t/tmp.2.sib -module-name literals | %FileCheck %s
+
+sil_stage canonical
+
+sil @test : $@convention(thin) () -> () {
+bb0:
+// CHECK: string_literal utf8 "\u{0B}"
+  %1 = string_literal utf8 "\u{0B}"
+// CHECK: const_string_literal utf8 "\u{0B}"
+  %2 = const_string_literal utf8 "\u{0B}"
+// CHECK: const_string_literal utf16 "\u{0B}"
+  %3 = const_string_literal utf16 "\u{0B}"
+  %6 = tuple ()
+  return %6 : $()
+}

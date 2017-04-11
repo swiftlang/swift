@@ -1655,6 +1655,51 @@ public:
   }
 };
 
+/// ConstStringLiteralInst - Encapsulates a string constant, as defined
+/// originally by
+/// a StringLiteralExpr.  This produces the address of the string data as a
+/// Builtin.RawPointer.
+class ConstStringLiteralInst final
+    : public LiteralInst,
+      private llvm::TrailingObjects<ConstStringLiteralInst, char> {
+  friend TrailingObjects;
+  friend SILBuilder;
+
+public:
+  enum class Encoding {
+    UTF8,
+    UTF16,
+  };
+
+private:
+  unsigned Length;
+  Encoding TheEncoding;
+
+  ConstStringLiteralInst(SILDebugLocation DebugLoc, StringRef text,
+                         Encoding encoding, SILType ty);
+
+  static ConstStringLiteralInst *create(SILDebugLocation DebugLoc,
+                                        StringRef Text, Encoding encoding,
+                                        SILFunction &F);
+
+public:
+  /// getValue - Return the string data for the literal, in UTF-8.
+  StringRef getValue() const { return {getTrailingObjects<char>(), Length}; }
+
+  /// getEncoding - Return the desired encoding of the text.
+  Encoding getEncoding() const { return TheEncoding; }
+
+  /// getCodeUnitCount - Return encoding-based length of the string
+  /// literal in code units.
+  uint64_t getCodeUnitCount();
+
+  ArrayRef<Operand> getAllOperands() const { return {}; }
+  MutableArrayRef<Operand> getAllOperands() { return {}; }
+
+  static bool classof(const ValueBase *V) {
+    return V->getKind() == ValueKind::ConstStringLiteralInst;
+  }
+};
 //===----------------------------------------------------------------------===//
 // Memory instructions.
 //===----------------------------------------------------------------------===//
