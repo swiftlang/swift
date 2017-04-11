@@ -47,6 +47,18 @@ fromStableStringEncoding(unsigned value) {
   }
 }
 
+static Optional<ConstStringLiteralInst::Encoding>
+fromStableConstStringEncoding(unsigned value) {
+  switch (value) {
+  case SIL_UTF8:
+    return ConstStringLiteralInst::Encoding::UTF8;
+  case SIL_UTF16:
+    return ConstStringLiteralInst::Encoding::UTF16;
+  default:
+    return None;
+  }
+}
+
 static Optional<SILLinkage>
 fromStableSILLinkage(unsigned value) {
   switch (value) {
@@ -1306,6 +1318,15 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     if (!encoding) return true;
     ResultVal = Builder.createStringLiteral(Loc, StringVal.str(),
                                             encoding.getValue());
+    break;
+  }
+  case ValueKind::ConstStringLiteralInst: {
+    Identifier StringVal = MF->getIdentifier(ValID);
+    auto encoding = fromStableConstStringEncoding(Attr);
+    if (!encoding)
+      return true;
+    ResultVal = Builder.createConstStringLiteral(Loc, StringVal.str(),
+                                                 encoding.getValue());
     break;
   }
   case ValueKind::MarkFunctionEscapeInst: {
