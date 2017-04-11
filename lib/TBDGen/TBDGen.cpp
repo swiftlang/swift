@@ -135,11 +135,19 @@ public:
   void visitProtocolDecl(ProtocolDecl *PD) {
     addSymbol(LinkEntity::forProtocolDescriptor(PD));
 
-    // There's no relevant information about members of a protocol at individual
-    // protocols, each conforming type has to handle them individually.
-
-    // FIXME: Eventually we might allow nominal type members of protocols.
-    // Should just visit that here or at least assert that there aren't any.
+#ifndef NDEBUG
+    // There's no (currently) relevant information about members of a protocol
+    // at individual protocols, each conforming type has to handle them
+    // individually. Let's assert this fact:
+    for (auto *member : PD->getMembers()) {
+      auto isExpectedKind =
+          isa<TypeAliasDecl>(member) || isa<AssociatedTypeDecl>(member) ||
+          isa<AbstractStorageDecl>(member) || isa<PatternBindingDecl>(member) ||
+          isa<AbstractFunctionDecl>(member);
+      assert(isExpectedKind &&
+             "unexpected member of protocol during TBD generation");
+    }
+#endif
   }
 
   void visitVarDecl(VarDecl *VD);
