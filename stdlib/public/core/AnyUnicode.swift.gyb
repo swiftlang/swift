@@ -326,7 +326,11 @@ case transcoded(
     inputOffset: Int,
     outputOffset: Int,
     outputEncoding: Any.Type)
-  
+
+case fccNormalizedUTF16(
+    offsetOfSegment: Int,
+    offsetInSegment: Int
+  )
 case character(
     encodedOffset: Int,
     width: Int)
@@ -339,6 +343,7 @@ case unicodeScalar(encodedOffset: Int, width: Int, scalar: UnicodeScalar?)
     case .transcoded(let x, _,_): return x
     case .character(let x, _): return x
     case .unicodeScalar(let x, _, _): return x
+    case .fccNormalizedUTF16(let x, _): return x
     }
   }
 

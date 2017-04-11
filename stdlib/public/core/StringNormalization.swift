@@ -412,11 +412,19 @@ extension _UnicodeViews.FCCNormalizedUTF16View : UnicodeView {
         offsetBy: numericCast(i.encodedOffset)
       )
     )
+    if _slowPath(segmentIdx == base._base.endIndex) {
+      return endIndex
+    }
+    if case .fccNormalizedUTF16(_, let offsetInSegment) = i {
+      return Index(segmentIdx, offsetInSegment)
+    }
     return Index(segmentIdx, segmentIdx.segment.startIndex)
   }
   
   public func anyIndex(_ i: Index) -> AnyUnicodeIndex {
-    return .encodedOffset(numericCast(i._outer.nativeOffset))
+    return .fccNormalizedUTF16(
+      offsetOfSegment: numericCast(i._outer.nativeOffset),
+      offsetInSegment: i._inner ?? 0)
   }
   
   public typealias SubSequence = UnicodeViewSlice<Self_>
