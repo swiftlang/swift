@@ -77,6 +77,7 @@ static void addMandatoryOptPipeline(SILPassPipelinePlan &P,
   if (Options.EnableMandatorySemanticARCOpts) {
     P.addSemanticARCOpts();
   }
+  P.addDiagnoseStaticExclusivity();
   P.addCapturePromotion();
   P.addAllocBoxToStack();
 
