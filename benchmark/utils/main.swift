@@ -49,7 +49,9 @@ import DictionaryBridge
 import DictionaryLiteral
 import DictionaryRemove
 import DictionarySwap
+import DropFirst
 import DropLast
+import DropWhile
 import ErrorHandling
 import ExistentialPerformance
 import Fibonacci
@@ -85,6 +87,7 @@ import PolymorphicCalls
 import PopFront
 import PopFrontGeneric
 import Prefix
+import PrefixWhile
 import Prims
 import ProtocolDispatch
 import ProtocolDispatch2
@@ -173,6 +176,20 @@ precommitTests = [
   "DictionaryRemoveOfObjects": run_DictionaryRemoveOfObjects,
   "DictionarySwap": run_DictionarySwap,
   "DictionarySwapOfObjects": run_DictionarySwapOfObjects,
+  "DropFirstAnyCollection": run_DropFirstAnyCollection,
+  "DropFirstAnyCollectionLazy": run_DropFirstAnyCollectionLazy,
+  "DropFirstAnySeqCRangeIter": run_DropFirstAnySeqCRangeIter,
+  "DropFirstAnySeqCRangeIterLazy": run_DropFirstAnySeqCRangeIterLazy,
+  "DropFirstAnySeqCntRange": run_DropFirstAnySeqCntRange,
+  "DropFirstAnySeqCntRangeLazy": run_DropFirstAnySeqCntRangeLazy,
+  "DropFirstAnySequence": run_DropFirstAnySequence,
+  "DropFirstAnySequenceLazy": run_DropFirstAnySequenceLazy,
+  "DropFirstArray": run_DropFirstArray,
+  "DropFirstArrayLazy": run_DropFirstArrayLazy,
+  "DropFirstCountableRange": run_DropFirstCountableRange,
+  "DropFirstCountableRangeLazy": run_DropFirstCountableRangeLazy,
+  "DropFirstSequence": run_DropFirstSequence,
+  "DropFirstSequenceLazy": run_DropFirstSequenceLazy,
   "DropLastAnyCollection": run_DropLastAnyCollection,
   "DropLastAnyCollectionLazy": run_DropLastAnyCollectionLazy,
   "DropLastAnySeqCRangeIter": run_DropLastAnySeqCRangeIter,
@@ -187,6 +204,20 @@ precommitTests = [
   "DropLastCountableRangeLazy": run_DropLastCountableRangeLazy,
   "DropLastSequence": run_DropLastSequence,
   "DropLastSequenceLazy": run_DropLastSequenceLazy,
+  "DropWhileAnyCollection": run_DropWhileAnyCollection,
+  "DropWhileAnyCollectionLazy": run_DropWhileAnyCollectionLazy,
+  "DropWhileAnySeqCRangeIter": run_DropWhileAnySeqCRangeIter,
+  "DropWhileAnySeqCRangeIterLazy": run_DropWhileAnySeqCRangeIterLazy,
+  "DropWhileAnySeqCntRange": run_DropWhileAnySeqCntRange,
+  "DropWhileAnySeqCntRangeLazy": run_DropWhileAnySeqCntRangeLazy,
+  "DropWhileAnySequence": run_DropWhileAnySequence,
+  "DropWhileAnySequenceLazy": run_DropWhileAnySequenceLazy,
+  "DropWhileArray": run_DropWhileArray,
+  "DropWhileArrayLazy": run_DropWhileArrayLazy,
+  "DropWhileCountableRange": run_DropWhileCountableRange,
+  "DropWhileCountableRangeLazy": run_DropWhileCountableRangeLazy,
+  "DropWhileSequence": run_DropWhileSequence,
+  "DropWhileSequenceLazy": run_DropWhileSequenceLazy,
   "ErrorHandling": run_ErrorHandling,
   "ExistentialTestArrayConditionalShift_ClassValueBuffer1": run_ExistentialTestArrayConditionalShift_ClassValueBuffer1,
   "ExistentialTestArrayConditionalShift_ClassValueBuffer2": run_ExistentialTestArrayConditionalShift_ClassValueBuffer2,
@@ -378,6 +409,20 @@ precommitTests = [
   "PrefixCountableRangeLazy": run_PrefixCountableRangeLazy,
   "PrefixSequence": run_PrefixSequence,
   "PrefixSequenceLazy": run_PrefixSequenceLazy,
+  "PrefixWhileAnyCollection": run_PrefixWhileAnyCollection,
+  "PrefixWhileAnyCollectionLazy": run_PrefixWhileAnyCollectionLazy,
+  "PrefixWhileAnySeqCRangeIter": run_PrefixWhileAnySeqCRangeIter,
+  "PrefixWhileAnySeqCRangeIterLazy": run_PrefixWhileAnySeqCRangeIterLazy,
+  "PrefixWhileAnySeqCntRange": run_PrefixWhileAnySeqCntRange,
+  "PrefixWhileAnySeqCntRangeLazy": run_PrefixWhileAnySeqCntRangeLazy,
+  "PrefixWhileAnySequence": run_PrefixWhileAnySequence,
+  "PrefixWhileAnySequenceLazy": run_PrefixWhileAnySequenceLazy,
+  "PrefixWhileArray": run_PrefixWhileArray,
+  "PrefixWhileArrayLazy": run_PrefixWhileArrayLazy,
+  "PrefixWhileCountableRange": run_PrefixWhileCountableRange,
+  "PrefixWhileCountableRangeLazy": run_PrefixWhileCountableRangeLazy,
+  "PrefixWhileSequence": run_PrefixWhileSequence,
+  "PrefixWhileSequenceLazy": run_PrefixWhileSequenceLazy,
   "Prims": run_Prims,
   "ProtocolDispatch": run_ProtocolDispatch,
   "ProtocolDispatch2": run_ProtocolDispatch2,

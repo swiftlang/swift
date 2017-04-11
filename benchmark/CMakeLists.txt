@@ -44,7 +44,9 @@ set(SWIFT_BENCH_MODULES
     single-source/DictionaryLiteral
     single-source/DictionaryRemove
     single-source/DictionarySwap
+    single-source/DropFirst
     single-source/DropLast
+    single-source/DropWhile
     single-source/ErrorHandling
     single-source/ExistentialPerformance
     single-source/Fibonacci
@@ -80,6 +82,7 @@ set(SWIFT_BENCH_MODULES
     single-source/PopFront
     single-source/PopFrontGeneric
     single-source/Prefix
+    single-source/PrefixWhile
     single-source/Prims
     single-source/ProtocolDispatch
     single-source/ProtocolDispatch2
