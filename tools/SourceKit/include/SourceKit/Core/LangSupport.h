@@ -328,6 +328,7 @@ struct DocGenericParam {
 struct DocEntityInfo {
   UIdent Kind;
   llvm::SmallString<32> Name;
+  llvm::SmallString<32> SubModuleName;
   llvm::SmallString<32> Argument;
   llvm::SmallString<64> USR;
   llvm::SmallString<64> OriginalUSR;
