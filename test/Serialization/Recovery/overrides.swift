@@ -3,25 +3,53 @@
 
 // RUN: %target-swift-ide-test -source-filename=x -print-module -module-to-print Lib -I %t -I %S/Inputs/custom-modules | %FileCheck %s
 
-// RUN: not --crash %target-swift-ide-test -source-filename=x -print-module -module-to-print Lib -I %t -I %S/Inputs/custom-modules -Xcc -DBAD 2>&1 | %FileCheck -check-prefix CHECK-CRASH %s
 // RUN: %target-swift-ide-test -source-filename=x -print-module -module-to-print Lib -I %t -I %S/Inputs/custom-modules -Xcc -DBAD -enable-experimental-deserialization-recovery | %FileCheck -check-prefix CHECK-RECOVERY %s
 
 // REQUIRES: objc_interop
 
 import Overrides
 
-public class Sub: Base {
-  public override func method() {}
+// Please use prefixes to keep the printed parts of this file in alphabetical
+// order.
+
+public class SwiftOnlyClass {}
+
+public class A_Sub: Base {
+  public override func disappearingMethod() {}
+  public override func nullabilityChangeMethod() -> Any? { return nil }
+  public override func typeChangeMethod() -> Any { return self }
+  public override func disappearingMethodWithOverload() {}
 }
 
-// CHECK-LABEL: class Sub : Base {
-// CHECK-NEXT: func method()
+// CHECK-LABEL: class A_Sub : Base {
+// CHECK-NEXT: func disappearingMethod()
+// CHECK-NEXT: func nullabilityChangeMethod() -> Any?
+// CHECK-NEXT: func typeChangeMethod() -> Any
+// CHECK-NEXT: func disappearingMethodWithOverload()
+// CHECK-NEXT: init()
 // CHECK-NEXT: {{^}$}}
 
-// CHECK-CRASH: error: fatal error encountered while reading from module 'Lib'; please file a bug report with your project and the crash log
-// CHECK-CRASH-LABEL: *** DESERIALIZATION FAILURE (please include this section in any bug report) ***
-// CHECK-CRASH: could not find 'method()' in parent class
-// CHECK-CRASH: While loading members for 'Sub' in module 'Lib'
+// CHECK-RECOVERY-LABEL: class A_Sub : Base {
+// CHECK-RECOVERY-NEXT: init()
+// CHECK-RECOVERY-NEXT: {{^}$}}
 
-// CHECK-RECOVERY-LABEL: class Sub : Base {
+extension Base {
+  @nonobjc func disappearingMethodWithOverload() -> SwiftOnlyClass? { return nil }
+}
+
+public class B_GenericSub : GenericBase<Base> {
+  public override func disappearingMethod() {}
+  public override func nullabilityChangeMethod() -> Base? { return nil }
+  public override func typeChangeMethod() -> Any { return self }
+}
+
+// CHECK-LABEL: class B_GenericSub : GenericBase<Base> {
+// CHECK-NEXT: func disappearingMethod()
+// CHECK-NEXT: func nullabilityChangeMethod() -> Base?
+// CHECK-NEXT: func typeChangeMethod() -> Any
+// CHECK-NEXT: init()
+// CHECK-NEXT: {{^}$}}
+
+// CHECK-RECOVERY-LABEL: class B_GenericSub : GenericBase<Base> {
+// CHECK-RECOVERY-NEXT: init()
 // CHECK-RECOVERY-NEXT: {{^}$}}

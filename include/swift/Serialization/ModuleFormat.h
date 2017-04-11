@@ -443,6 +443,7 @@ namespace control_block {
     BCFixed<16>, // Module format major version
     BCFixed<16>, // Module format minor version
     BCVBR<8>, // length of "short version string" in the blob
+    BCVBR<8>, // length of "short compatibility version string" in the blob
     BCBlob // misc. version information
   >;
 
