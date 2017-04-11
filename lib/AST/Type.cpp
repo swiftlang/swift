@@ -602,6 +602,13 @@ bool TypeBase::isAnyObject() {
   return canTy.getExistentialLayout().isAnyObject();
 }
 
+bool ExistentialLayout::isErrorExistential() const {
+  auto protocols = getProtocols();
+  return (!requiresClass &&
+          protocols.size() == 1 &&
+          protocols[0]->getDecl()->isSpecificProtocol(KnownProtocolKind::Error));
+}
+
 bool ExistentialLayout::isExistentialWithError(ASTContext &ctx) const {
   auto errorProto = ctx.getProtocol(KnownProtocolKind::Error);
   if (!errorProto) return false;
