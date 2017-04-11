@@ -372,11 +372,24 @@ extension String.Content.Inline${N}or${W} : UnicodeContent {
         _UnicodeViews(_utf16, UTF16.self).transcoded(to: UTF8.self))
   }
   
-  public var fccNormalizedUTF16: AnyUInt16UnicodeView {
-    return bitsPerElement <= 8
-    ? AnyUInt16UnicodeView(utf16)
-    : AnyUInt16UnicodeView(
-      _UnicodeViews(_utf16, UTF16.self).fccNormalizedUTF16)
+  public var fccNormalizedUTF16: FCCNormalizedSegment {
+    let utf16CUs = self._utf16
+    let buffer = UTF16CodeUnitBuffer(utf16CUs)
+
+    // Latin1 already pre-normal
+    if (bitsPerElement <= 8) {
+      return FCCNormalizedSegment(
+        buffer,
+        nativeStart: utf16CUs.startIndex,
+        nativeEnd: utf16CUs.endIndex)
+    }
+
+    // UTF16 needs to be normalized
+    return FCCNormalizedSegment(
+      normalizing: buffer,
+      nativeStart: utf16CUs.startIndex,
+      nativeEnd: utf16CUs.endIndex
+    )
   }
   
   public var characters: AnyCharacterUnicodeView {
