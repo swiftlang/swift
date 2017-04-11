@@ -2287,12 +2287,11 @@ ConstraintResult GenericSignatureBuilder::addConformanceRequirement(
       // Add requirements placed directly on this associated type.
       auto AssocPA = T->getNestedType(AssocType, *this);
 
-      if (AssocPA != T) {
-        auto assocResult =
-          addInheritedRequirements(AssocType, AssocPA, Source, Visited);
-        if (isErrorResult(assocResult))
-          return assocResult;
-      }
+      auto assocResult =
+        addInheritedRequirements(AssocType, AssocPA, Source, Visited);
+      if (isErrorResult(assocResult))
+        return assocResult;
+
       if (auto WhereClause = AssocType->getTrailingWhereClause()) {
         for (auto &req : WhereClause->getRequirements()) {
           auto innerSource =
