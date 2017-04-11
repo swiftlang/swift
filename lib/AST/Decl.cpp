@@ -2413,6 +2413,8 @@ EnumDecl::EnumDecl(SourceLoc EnumLoc,
 {
   EnumDeclBits.Circularity
     = static_cast<unsigned>(CircularityCheck::Unchecked);
+  EnumDeclBits.HasAssociatedValues
+    = static_cast<unsigned>(AssociatedValueCheck::Unchecked);
 }
 
 StructDecl::StructDecl(SourceLoc StructLoc, Identifier Name, SourceLoc NameLoc,
@@ -2693,14 +2695,29 @@ EnumElementDecl *EnumDecl::getElement(Identifier Name) const {
 }
 
 bool EnumDecl::hasOnlyCasesWithoutAssociatedValues() const {
-  // FIXME: Should probably cache this.
-  bool hasElements = false;
-  for (auto elt : getAllElements()) {
-    hasElements = true;
-    if (!elt->getArgumentTypeLoc().isNull())
+  // Check whether we already have a cached answer.
+  switch (static_cast<AssociatedValueCheck>(
+            EnumDeclBits.HasAssociatedValues)) {
+    case AssociatedValueCheck::Unchecked:
+      // Compute below.
+      break;
+
+    case AssociatedValueCheck::NoAssociatedValues:
+      return true;
+
+    case AssociatedValueCheck::HasAssociatedValues:
       return false;
   }
-  return hasElements;
+  for (auto elt : getAllElements()) {
+    if (elt->hasAssociatedValues()) {
+      EnumDeclBits.HasAssociatedValues
+        = static_cast<unsigned>(AssociatedValueCheck::HasAssociatedValues);
+      return false;
+    }
+  }
+  EnumDeclBits.HasAssociatedValues
+    = static_cast<unsigned>(AssociatedValueCheck::NoAssociatedValues);
+  return true;
 }
 
 ProtocolDecl::ProtocolDecl(DeclContext *DC, SourceLoc ProtocolLoc,
