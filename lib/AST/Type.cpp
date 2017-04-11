@@ -273,6 +273,8 @@ ExistentialLayout::ExistentialLayout(ProtocolCompositionType *type) {
       isa<ClassDecl>(members[0]->getAnyNominal())) {
     superclass = members[0];
     members = members.slice(1);
+    requiresClass = true;
+    requiresClassImplied = true;
   }
 
   for (auto member : members) {
