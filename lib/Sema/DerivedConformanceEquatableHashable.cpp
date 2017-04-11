@@ -39,7 +39,11 @@ static bool canDeriveConformance(NominalTypeDecl *type) {
   auto enumDecl = dyn_cast<EnumDecl>(type);
   if (!enumDecl)
     return false;
-  
+
+  // The enum must have cases.
+  if (!enumDecl->hasCases())
+    return false;
+
   // The enum must not have associated values.
   // TODO: Enums with Equatable/Hashable/Comparable payloads
   if (!enumDecl->hasOnlyCasesWithoutAssociatedValues())

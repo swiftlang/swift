@@ -3084,10 +3084,15 @@ public:
     LazySemanticInfo.RawType.setPointerAndInt(rawType, true);
   }
   
-  /// True if the enum has cases, and none of those cases have associated values.
+  /// True if none of the enum cases have associated values.
   ///
-  /// Note that this is false for enums with absolutely no cases.
+  /// Note that this is true for enums with absolutely no cases.
   bool hasOnlyCasesWithoutAssociatedValues() const;
+
+  /// True if the enum has cases.
+  bool hasCases() const {
+    return !getAllElements().empty();
+  }
 
   /// True if the enum is marked 'indirect'.
   bool isIndirect() const {
