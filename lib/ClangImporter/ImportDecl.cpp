@@ -93,9 +93,7 @@ getDefaultMakeStructRawValuedOptions() {
 }
 
 static bool isInSystemModule(DeclContext *D) {
-  if (cast<ClangModuleUnit>(D->getModuleScopeContext())->isSystemModule())
-    return true;
-  return false;
+  return cast<ClangModuleUnit>(D->getModuleScopeContext())->isSystemModule();
 }
 
 static Accessibility getOverridableAccessibility(DeclContext *dc) {
