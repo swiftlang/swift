@@ -287,10 +287,6 @@ class ArrayElementPropagation : public SILFunctionTransform {
 public:
   ArrayElementPropagation() {}
 
-  StringRef getName() override {
-    return "Array Element Propagation";
-  }
-
   bool replaceAppendCalls(
                   ArrayRef<ArrayAllocation::AppendContentOfReplacement> Repls) {
     auto &Fn = *getFunction();

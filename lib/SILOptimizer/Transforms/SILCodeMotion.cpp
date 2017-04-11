@@ -1650,7 +1650,6 @@ public:
       invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
   }
 
-  StringRef getName() override { return "SIL Code Motion"; }
 };
 
 } // end anonymous namespace

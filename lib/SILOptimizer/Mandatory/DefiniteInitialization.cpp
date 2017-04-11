@@ -2701,7 +2701,6 @@ class DefiniteInitialization : public SILFunctionTransform {
       invalidateAnalysis(SILAnalysis::InvalidationKind::FunctionBody);
   }
 
-  StringRef getName() override { return "Definite Initialization"; }
 };
 } // end anonymous namespace
 

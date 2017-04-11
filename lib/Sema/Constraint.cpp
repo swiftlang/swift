@@ -219,7 +219,7 @@ void Constraint::print(llvm::raw_ostream &Out, SourceManager *sm) const {
 
     interleave(getNestedConstraints(),
                [&](Constraint *constraint) {
-                 if (isDisabled())
+                 if (constraint->isDisabled())
                    Out << "[disabled] ";
                  constraint->print(Out, sm);
                },
@@ -371,6 +371,8 @@ StringRef swift::constraints::getName(ConversionRestrictionKind kind) {
     return "[existential]";
   case ConversionRestrictionKind::MetatypeToExistentialMetatype:
     return "[metatype-to-existential-metatype]";
+  case ConversionRestrictionKind::ExistentialMetatypeToMetatype:
+    return "[existential-metatype-to-metatype]";
   case ConversionRestrictionKind::ValueToOptional:
     return "[value-to-optional]";
   case ConversionRestrictionKind::OptionalToOptional:

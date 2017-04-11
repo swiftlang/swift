@@ -153,7 +153,9 @@ ProtocolConformanceRef::subst(Type origType,
     return ProtocolConformanceRef(lookupResults.front());
   }
 
-  llvm_unreachable("Invalid conformance substitution");
+  // FIXME: Rip this out once ConformanceAccessPaths are plumbed through
+  auto *M = proto->getParentModule();
+  return *M->lookupConformance(substType, proto, nullptr);
 }
 
 Type
@@ -258,6 +260,18 @@ Witness ProtocolConformance::getWitness(ValueDecl *requirement,
 bool ProtocolConformance::
 usesDefaultDefinition(AssociatedTypeDecl *requirement) const {
   CONFORMANCE_SUBCLASS_DISPATCH(usesDefaultDefinition, (requirement))
+}
+
+bool ProtocolConformance::hasFixedLayout() const {
+  // A conformance/witness table has fixed layout if type has a fixed layout in
+  // all resilience domains, and the conformance is externally visible.
+  if (auto nominal = getInterfaceType()->getAnyNominal())
+    if (nominal->hasFixedLayout() &&
+        getProtocol()->getEffectiveAccess() >= Accessibility::Public &&
+        nominal->getEffectiveAccess() >= Accessibility::Public)
+      return true;
+
+  return false;
 }
 
 GenericEnvironment *ProtocolConformance::getGenericEnvironment() const {

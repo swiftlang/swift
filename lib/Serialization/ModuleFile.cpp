@@ -193,9 +193,20 @@ validateControlBlock(llvm::BitstreamCursor &cursor,
         }
       }
 
-      // This field was added later; be resilient against its absence.
-      if (scratch.size() > 2) {
+      // These fields were added later; be resilient against their absence.
+      switch (scratch.size()) {
+      default:
+        // Add new cases here, in descending order.
+      case 4:
+        result.compatibilityVersion = blobData.substr(scratch[2]+1, scratch[3]);
+        LLVM_FALLTHROUGH;
+      case 3:
         result.shortVersion = blobData.slice(0, scratch[2]);
+        LLVM_FALLTHROUGH;
+      case 2:
+      case 1:
+      case 0:
+        break;
       }
 
       versionSeen = true;
@@ -932,6 +943,7 @@ ModuleFile::ModuleFile(
       }
       Name = info.name;
       TargetTriple = info.targetTriple;
+      CompatibilityVersion = info.compatibilityVersion;
 
       hasValidControlBlock = true;
       break;

@@ -640,6 +640,11 @@ class RefCountBitsT {
     return SignedBitsType(rotatedBits) < SignedBitsType(X);
   }
 
+  LLVM_ATTRIBUTE_ALWAYS_INLINE
+  BitsType getBitsValue() {
+    return bits;
+  }
+
 # undef getFieldIn
 # undef setFieldIn
 # undef getField

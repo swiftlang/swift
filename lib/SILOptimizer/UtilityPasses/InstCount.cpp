@@ -94,8 +94,6 @@ struct InstCountVisitor : SILVisitor<InstCountVisitor> {
 namespace {
 class InstCount : public SILFunctionTransform {
 
-  StringRef getName() override { return "SIL Inst Count"; }
-
   /// The entry point to the transformation.
   void run() override {
     SILFunction *F = getFunction();

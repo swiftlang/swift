@@ -51,6 +51,7 @@ class SubstitutionMap;
 class TypeBase;
 class Type;
 class TypeWalker;
+struct ExistentialLayout;
 
 /// \brief Type substitution mapping from substitutable types to their
 /// replacements.
@@ -410,16 +411,15 @@ public:
   /// Given that this type is an existential, return its
   /// protocols in a canonical order.
   void getExistentialTypeProtocols(
-                                SmallVectorImpl<ProtocolDecl *> &protocols) {
-    return getExistentialTypeProtocolsImpl(*this, protocols);
-  }
+      SmallVectorImpl<ProtocolDecl *> &protocols);
 
   /// Given that this type is any kind of existential, return its
   /// protocols in a canonical order.
   void getAnyExistentialTypeProtocols(
-                                SmallVectorImpl<ProtocolDecl *> &protocols) {
-    return getAnyExistentialTypeProtocolsImpl(*this, protocols);
-  }
+      SmallVectorImpl<ProtocolDecl *> &protocols);
+
+  /// Break an existential down into a set of constraints.
+  ExistentialLayout getExistentialLayout();
 
   /// Is this an ObjC-compatible existential type?
   bool isObjCExistentialType() const {

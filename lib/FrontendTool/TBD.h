@@ -20,10 +20,14 @@ class Module;
 namespace swift {
 class ModuleDecl;
 class FileUnit;
+class FrontendOptions;
 
-bool writeTBD(ModuleDecl *M, llvm::StringRef OutputFilename);
-bool validateTBD(ModuleDecl *M, llvm::Module &IRModule);
-bool validateTBD(FileUnit *M, llvm::Module &IRModule);
+bool writeTBD(ModuleDecl *M, bool hasMultipleIRGenThreads,
+              llvm::StringRef OutputFilename);
+bool validateTBD(ModuleDecl *M, llvm::Module &IRModule,
+                 bool hasMultipleIRGenThreads);
+bool validateTBD(FileUnit *M, llvm::Module &IRModule,
+                 bool hasMultipleIRGenThreads);
 }
 
 #endif

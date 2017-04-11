@@ -41,8 +41,6 @@ bb0(%i: $Int, %p: $@thick P.Type):
 // CHECK-NEXT: (struct Swift.Int)
 // CHECK-NEXT: (sil_box
 // CHECK-NEXT:   (struct Swift.Int))
-// CHECK-NEXT: (metatype
-// CHECK-NEXT:   (struct Swift.Int))
 // CHECK-NEXT: (existential_metatype
 // CHECK-NEXT:   (protocol capture_descriptors.P))
 // CHECK-NEXT: - Metadata sources:

@@ -115,7 +115,6 @@ private:
     }
   }
 
-  StringRef getName() override { return "ConditionForwarding"; }
 };
 
 /// Returns true if all instructions of block \p BB are safe to be moved

@@ -18,7 +18,6 @@
 #include "IRGenDebugInfo.h"
 #include "GenOpaque.h"
 #include "GenType.h"
-#include "Linking.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/ASTMangler.h"
@@ -30,6 +29,7 @@
 #include "swift/Basic/Version.h"
 #include "swift/Demangling/ManglingMacros.h"
 #include "swift/ClangImporter/ClangImporter.h"
+#include "swift/IRGen/Linking.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBasicBlock.h"
 #include "swift/SIL/SILDebugScope.h"
@@ -418,27 +418,27 @@ llvm::DIFile *IRGenDebugInfo::getOrCreateFile(StringRef Filename) {
   if (Filename.empty())
     return MainFile;
 
-  if (MainFile) {
-    SmallString<256> AbsMainFile, ThisFile;
-    AbsMainFile = Filename;
-    llvm::sys::fs::make_absolute(AbsMainFile);
-    llvm::sys::path::append(ThisFile, MainFile->getDirectory(),
-                            MainFile->getFilename());
-    if (ThisFile == AbsMainFile) {
-      DIFileCache[Filename] = llvm::TrackingMDNodeRef(MainFile);
-      return MainFile;
-    }
-  }
-
   // Look in the cache first.
   auto CachedFile = DIFileCache.find(Filename);
-
   if (CachedFile != DIFileCache.end()) {
     // Verify that the information still exists.
     if (llvm::Metadata *V = CachedFile->second)
       return cast<llvm::DIFile>(V);
   }
 
+  // Detect the main file.
+  if (MainFile && Filename.endswith(MainFile->getFilename())) {
+    SmallString<256> AbsThisFile, AbsMainFile;
+    AbsThisFile = Filename;
+    llvm::sys::fs::make_absolute(AbsThisFile);
+    llvm::sys::path::append(AbsMainFile, MainFile->getDirectory(),
+                            MainFile->getFilename());
+    if (AbsThisFile == AbsMainFile) {
+      DIFileCache[Filename] = llvm::TrackingMDNodeRef(MainFile);
+      return MainFile;
+    }
+  }
+  
   // Create a new one.
   StringRef File = llvm::sys::path::filename(Filename);
   llvm::SmallString<512> Path(Filename);
@@ -893,6 +893,11 @@ void IRGenDebugInfo::emitVariableDeclaration(
     return;
 
   if (Opts.DebugInfoKind <= IRGenDebugInfoKind::LineTables)
+    return;
+
+  // Currently, the DeclContext is needed to mangle archetypes. Bail out if it's
+  // missing.
+  if (DbgTy.Type->hasArchetype() && !DbgTy.DeclCtx)
     return;
 
   if (!DbgTy.size)

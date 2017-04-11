@@ -23,8 +23,6 @@ namespace {
 
 class LoopInfoPrinter : public SILModuleTransform {
 
-  StringRef getName() override { return "SIL Loop Information Printer"; }
-
   /// The entry point to the transformation.
   void run() override {
     SILLoopAnalysis *LA = PM->getAnalysis<SILLoopAnalysis>();

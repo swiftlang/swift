@@ -782,20 +782,31 @@ bool SwiftMergeFunctions::deriveParams(ParamInfos &Params,
 
 /// Returns true if the \p OpIdx's constant operand in the current instruction
 /// does differ in any of the functions in \p FInfos.
+///
+/// But it accepts the case where all operands refer to their containing
+/// functions (in case of self recursive functions).
 bool SwiftMergeFunctions::constsDiffer(const FunctionInfos &FInfos,
                                        unsigned OpIdx) {
   Constant *CommonConst = nullptr;
+  bool matching = true;
+  bool selfReferencing = true;
 
   for (const FunctionInfo &FI : FInfos) {
     Value *Op = FI.CurrentInst->getOperand(OpIdx);
     if (Constant *C = dyn_cast<Constant>(Op)) {
+      if (C != FI.F)
+        selfReferencing = false;
+
       if (!CommonConst) {
         CommonConst = C;
       } else if (C != CommonConst) {
-        return true;
+        matching = false;
       }
+      if (!selfReferencing && !matching)
+        return true;
     }
   }
+  assert(selfReferencing || matching);
   return false;
 }
 
@@ -903,6 +914,7 @@ void SwiftMergeFunctions::mergeWithParams(const FunctionInfos &FInfos,
       assert(!isInEquivalenceClass(&*Iter->second));
       Iter->second->F = nullptr;
       FuncEntries.erase(Iter);
+      DEBUG(dbgs() << "    Erase " << OrigFunc->getName() << '\n');
       OrigFunc->eraseFromParent();
     } else {
       // Otherwise we need a thunk which calls the merged function.
@@ -1062,8 +1074,15 @@ bool SwiftMergeFunctions::replaceDirectCallers(Function *Old, Function *New,
     // Add the new parameters.
     for (const ParamInfo &PI : Params) {
       assert(ParamIdx < NewFuncTy->getNumParams());
-      NewArgs.push_back(PI.Values[FuncIdx]);
-      OldParamTypes.push_back(PI.Values[FuncIdx]->getType());
+      Constant *ArgValue = PI.Values[FuncIdx];
+
+      // Check if it's a self referencing function. We must not use the old
+      // function pointer as argument.
+      if (ArgValue == Old)
+        ArgValue = New;
+
+      NewArgs.push_back(ArgValue);
+      OldParamTypes.push_back(ArgValue->getType());
       ++ParamIdx;
     }
 
@@ -1080,6 +1099,7 @@ bool SwiftMergeFunctions::replaceDirectCallers(Function *Old, Function *New,
     CI->replaceAllUsesWith(NewCI);
     CI->eraseFromParent();
   }
+  assert(Old->use_empty() && "should have replaced all uses of old function");
   return Old->hasLocalLinkage();
 }
 

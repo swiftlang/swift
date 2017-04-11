@@ -1602,7 +1602,6 @@ class COWArrayOptPass : public SILFunctionTransform {
       }
   }
 
-  StringRef getName() override { return "SIL COW Array Optimization"; }
 };
 } // end anonymous namespace
 
@@ -2346,7 +2345,6 @@ class SwiftArrayOptPass : public SILFunctionTransform {
     }
   }
 
-  StringRef getName() override { return "SIL Swift Array Optimization"; }
 };
 } // end anonymous namespace
 

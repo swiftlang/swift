@@ -40,7 +40,6 @@ class SideEffectsDumper : public SILModuleTransform {
 #endif
   }
 
-  StringRef getName() override { return "SideEffectsDumper"; }
 };
 
 } // end anonymous namespace

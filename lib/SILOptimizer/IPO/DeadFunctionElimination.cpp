@@ -844,7 +844,6 @@ class SILDeadFuncElimination : public SILModuleTransform {
     deadFunctionElimination.eliminateFunctions(this);
   }
   
-  StringRef getName() override { return "Dead Function Elimination"; }
 };
 
 class SILExternalFuncDefinitionsElimination : public SILModuleTransform {
@@ -862,9 +861,6 @@ class SILExternalFuncDefinitionsElimination : public SILModuleTransform {
     EFDFE.eliminateFunctions(this);
  }
 
-  StringRef getName() override {
-    return "External Function Definitions Elimination";
-  }
 };
 
 } // end anonymous namespace

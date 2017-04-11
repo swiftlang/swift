@@ -250,6 +250,9 @@ def emit_pch : Flag<["-"], "emit-pch">,
 def enable_sil_ownership : Flag<["-"], "enable-sil-ownership">,
   HelpText<"Enable the SIL Ownership Model">;
 
+def disable_mandatory_semantic_arc_opts : Flag<["-"], "disable-mandatory-semantic-arc-opts">,
+  HelpText<"Disable the mandatory semantic arc optimizer">;
+
 def assume_parsing_unqualified_ownership_sil : Flag<["-"], "assume-parsing-unqualified-ownership-sil">,
   HelpText<"Assume unqualified SIL ownership when parsing SIL">;
 
@@ -259,6 +262,14 @@ def enable_sil_opaque_values : Flag<["-"], "enable-sil-opaque-values">,
 def enable_experimental_property_behaviors :
   Flag<["-"], "enable-experimental-property-behaviors">,
   HelpText<"Enable experimental property behaviors">;
+
+def enable_experimental_deserialization_recovery :
+  Flag<["-"], "enable-experimental-deserialization-recovery">,
+  HelpText<"Attempt to recover from missing xrefs (etc) in swiftmodules">;
+
+def enable_experimental_subclass_existentials : Flag<["-"],
+  "enable-experimental-subclass-existentials">,
+  HelpText<"Enable classes to appear in protocol composition types">;
 
 def enable_cow_existentials : Flag<["-"], "enable-cow-existentials">,
   HelpText<"Enable the copy-on-write existential implementation">;

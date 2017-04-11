@@ -1306,7 +1306,6 @@ class CapturePromotionPass : public SILModuleTransform {
 
   void processFunction(SILFunction *F, SmallVectorImpl<SILFunction*> &Worklist);
 
-  StringRef getName() override { return "Capture Promotion"; }
 };
 
 } // end anonymous namespace

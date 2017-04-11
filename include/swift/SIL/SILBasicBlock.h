@@ -28,6 +28,7 @@ class SILFunction;
 class SILArgument;
 class SILPHIArgument;
 class SILFunctionArgument;
+class SILPrintContext;
 
 class SILBasicBlock :
 public llvm::ilist_node<SILBasicBlock>, public SILAllocated<SILBasicBlock> {
@@ -93,7 +94,7 @@ public:
   void push_back(SILInstruction *I);
   void push_front(SILInstruction *I);
   void remove(SILInstruction *I);
-  void erase(SILInstruction *I);
+  iterator erase(SILInstruction *I);
 
   SILInstruction &back() { return InstList.back(); }
   const SILInstruction &back() const {
@@ -334,6 +335,9 @@ public:
 
   /// Pretty-print the SILBasicBlock with the designated stream.
   void print(llvm::raw_ostream &OS) const;
+
+  /// Pretty-print the SILBasicBlock with the designated stream and context.
+  void print(llvm::raw_ostream &OS, SILPrintContext &Ctx) const;
 
   void printAsOperand(raw_ostream &OS, bool PrintType = true);
 

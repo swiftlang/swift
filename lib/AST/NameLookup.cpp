@@ -20,6 +20,7 @@
 #include "swift/AST/ASTScope.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/DebuggerClient.h"
+#include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/ReferencedNameTracker.h"
@@ -1391,6 +1392,8 @@ bool DeclContext::lookupQualified(Type type,
     
     // If we want dynamic lookup and we're searching in the
     // AnyObject protocol, note this for later.
+    //
+    // FIXME: This will go away soon.
     if (options & NL_DynamicLookup) {
       if (auto proto = dyn_cast<ProtocolDecl>(nominal)) {
         if (proto->isSpecificProtocol(KnownProtocolKind::AnyObject))
@@ -1406,28 +1409,29 @@ bool DeclContext::lookupQualified(Type type,
         stack.push_back(proto);
 
     // Look into the superclasses of this archetype.
-    if (auto superclassTy = archetypeTy->getSuperclass()) {
-      if (auto superclassDecl = superclassTy->getAnyNominal()) {
-        if (visited.insert(superclassDecl).second) {
+    if (auto superclassTy = archetypeTy->getSuperclass())
+      if (auto superclassDecl = superclassTy->getAnyNominal())
+        if (visited.insert(superclassDecl).second)
           stack.push_back(superclassDecl);
-        }
-      }
-    }
   }
   // Handle protocol compositions.
   else if (auto compositionTy = type->getAs<ProtocolCompositionType>()) {
-    SmallVector<ProtocolDecl *, 4> protocols;
-    compositionTy->getExistentialTypeProtocols(protocols);
-    for (auto proto : protocols) {
-      if (visited.insert(proto).second) {
-        stack.push_back(proto);
+    auto layout = compositionTy->getExistentialLayout();
 
-        // If we want dynamic lookup and this is the AnyObject
-        // protocol, note this for later.
-        if ((options & NL_DynamicLookup) &&
-            proto->isSpecificProtocol(KnownProtocolKind::AnyObject))
-          wantLookupInAllClasses = true;
-      }
+    if (layout.isAnyObject() &&
+        (options & NL_DynamicLookup))
+      wantLookupInAllClasses = true;
+
+    for (auto proto : layout.getProtocols()) {
+      auto *protoDecl = proto->getDecl();
+      if (visited.insert(protoDecl).second)
+        stack.push_back(protoDecl);
+    }
+
+    if (layout.superclass) {
+      auto *nominalDecl = layout.superclass->getAnyNominal();
+      if (visited.insert(nominalDecl).second)
+        stack.push_back(nominalDecl);
     }
   } else {
     llvm_unreachable("Bad type for qualified lookup");

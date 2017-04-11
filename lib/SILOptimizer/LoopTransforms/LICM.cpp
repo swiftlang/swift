@@ -526,6 +526,10 @@ void LoopTreeOptimization::optimizeLoop(SILLoop *CurrentLoop,
 
 namespace {
 /// Hoist loop invariant code out of innermost loops.
+///
+/// Transforms are identified by type, not instance. Split this
+/// Into two types: "High-level Loop Invariant Code Motion"
+/// and "Loop Invariant Code Motion".
 class LICM : public SILFunctionTransform {
 
 public:
@@ -536,11 +540,6 @@ public:
   /// We only hoist semantic calls on high-level SIL because we can be sure that
   /// e.g. an Array as SILValue is really immutable (including its content).
   bool RunsOnHighLevelSil;
-  
-  StringRef getName() override {
-    return RunsOnHighLevelSil ? "High-level Loop Invariant Code Motion" :
-                                "Loop Invariant Code Motion";
-  }
 
   void run() override {
     SILFunction *F = getFunction();

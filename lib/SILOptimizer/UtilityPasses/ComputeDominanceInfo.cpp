@@ -24,7 +24,6 @@ class ComputeDominanceInfo : public SILFunctionTransform {
     PM->getAnalysis<PostDominanceAnalysis>()->get(getFunction());
   }
 
-  StringRef getName() override { return "Compute Dominance Info"; }
 };
 
 SILTransform *swift::createComputeDominanceInfo() { return new ComputeDominanceInfo(); }

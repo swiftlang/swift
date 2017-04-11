@@ -139,8 +139,6 @@ static bool isDeadStoreInertInstruction(SILInstruction *Inst) {
   case ValueKind::RetainValueInst:
   case ValueKind::DeallocStackInst:
   case ValueKind::CondFailInst:
-  case ValueKind::IsUniqueInst:
-  case ValueKind::IsUniqueOrPinnedInst:
   case ValueKind::FixLifetimeInst:
     return true;
   default:
@@ -1217,8 +1215,6 @@ namespace {
 
 class DeadStoreElimination : public SILFunctionTransform {
 public:
-  StringRef getName() override { return "SIL Dead Store Elimination"; }
-
   /// The entry point to the transformation.
   void run() override {
     SILFunction *F = getFunction();

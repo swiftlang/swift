@@ -325,16 +325,8 @@ public:
     Serialized = IsNotSerialized;
 
     // Serialize the witness table if we're serializing everything with
-    // -sil-serialize-all.
-    if (SGM.makeModuleFragile)
-      Serialized = IsSerialized;
-
-    // Serialize the witness table if type has a fixed layout in all
-    // resilience domains, and the conformance is externally visible.
-    auto nominal = Conformance->getInterfaceType()->getAnyNominal();
-    if (nominal->hasFixedLayout() &&
-        proto->getEffectiveAccess() >= Accessibility::Public &&
-        nominal->getEffectiveAccess() >= Accessibility::Public)
+    // -sil-serialize-all, or if the conformance itself thinks it should be.
+    if (SGM.makeModuleFragile || Conformance->hasFixedLayout())
       Serialized = IsSerialized;
 
     // Not all protocols use witness tables; in this case we just skip

@@ -523,7 +523,6 @@ class GlobalPropertyOptPass : public SILModuleTransform {
     GlobalPropertyOpt(*M).run(this);
   }
   
-  StringRef getName() override { return "GlobalPropertyOpt"; }
 };
 
 } // end anonymous namespace

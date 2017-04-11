@@ -19,20 +19,21 @@
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SubstitutionMap.h"
+#include "swift/IRGen/Linking.h"
 #include "swift/Reflection/MetadataSourceBuilder.h"
 #include "swift/Reflection/Records.h"
 #include "swift/SIL/SILModule.h"
 
 #include "ConstantBuilder.h"
 #include "GenClass.h"
+#include "GenDecl.h"
 #include "GenEnum.h"
 #include "GenHeap.h"
 #include "GenProto.h"
 #include "GenType.h"
-#include "IRGenModule.h"
-#include "Linking.h"
-#include "LoadableTypeInfo.h"
 #include "IRGenMangler.h"
+#include "IRGenModule.h"
+#include "LoadableTypeInfo.h"
 
 using namespace swift;
 using namespace irgen;
@@ -252,7 +253,7 @@ protected:
 
       auto init = B.finishAndCreateFuture();
 
-      var = info.createVariable(IGM, init.getType(), Alignment(4));
+      var = createVariable(IGM, info, init.getType(), Alignment(4));
       var->setConstant(true);
       init.installInGlobal(var);
 

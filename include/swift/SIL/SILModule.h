@@ -200,6 +200,9 @@ private:
   /// optimizations can assume that they see the whole module.
   bool wholeModule;
 
+  /// True if this SILModule is being completely serialized.
+  bool WholeModuleSerialized;
+
   /// The options passed into this SILModule.
   SILOptions &Options;
 
@@ -210,7 +213,7 @@ private:
   // Intentionally marked private so that we need to use 'constructSIL()'
   // to construct a SILModule.
   SILModule(ModuleDecl *M, SILOptions &Options, const DeclContext *associatedDC,
-            bool wholeModule);
+            bool wholeModule, bool wholeModuleSerialized);
 
   SILModule(const SILModule&) = delete;
   void operator=(const SILModule&) = delete;
@@ -275,10 +278,12 @@ public:
 
   /// \brief Create and return an empty SIL module that we can
   /// later parse SIL bodies directly into, without converting from an AST.
-  static std::unique_ptr<SILModule> createEmptyModule(ModuleDecl *M,
-                                                      SILOptions &Options,
-                                                      bool WholeModule = false) {
-    return std::unique_ptr<SILModule>(new SILModule(M, Options, M, WholeModule));
+  static std::unique_ptr<SILModule>
+  createEmptyModule(ModuleDecl *M, SILOptions &Options,
+                    bool WholeModule = false,
+                    bool WholeModuleSerialized = false) {
+    return std::unique_ptr<SILModule>(
+        new SILModule(M, Options, M, WholeModule, WholeModuleSerialized));
   }
 
   /// Get the Swift module associated with this SIL module.
@@ -305,6 +310,9 @@ public:
   bool isWholeModule() const {
     return wholeModule;
   }
+
+  /// Returns true if everything in this SILModule is being serialized.
+  bool isWholeModuleSerialized() const { return WholeModuleSerialized; }
 
   SILOptions &getOptions() const { return Options; }
 

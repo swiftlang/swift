@@ -37,9 +37,6 @@ class BasicInstructionPropertyDumper : public SILModuleTransform {
     }
   }
 
-  llvm::StringRef getName() override {
-    return "BasicInstructionPropertyDumper";
-  }
 };
 
 } // end anonymous namespace

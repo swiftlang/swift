@@ -1311,8 +1311,6 @@ class ABCOpt : public SILFunctionTransform {
 public:
   ABCOpt() {}
 
-  StringRef getName() override { return "SIL Array bounds check optimization"; }
-
   void run() override {
     if (!EnableABCOpts)
       return;
