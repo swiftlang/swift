@@ -267,6 +267,7 @@ private:
         return true;
       return false;
 
+    case Node::Kind::ProtocolListWithClass:
     case Node::Kind::Allocator:
     case Node::Kind::ArgumentTuple:
     case Node::Kind::AssociatedTypeMetadataAccessor:
@@ -578,7 +579,8 @@ private:
 
 static bool isExistentialType(NodePointer node) {
   return (node->getKind() == Node::Kind::ExistentialMetatype ||
-          node->getKind() == Node::Kind::ProtocolList);
+          node->getKind() == Node::Kind::ProtocolList ||
+          node->getKind() == Node::Kind::ProtocolListWithClass);
 }
 
 /// Print the relevant parameters and return the new index.
@@ -1386,6 +1388,16 @@ void NodePrinter::print(NodePointer pointer, bool asContext, bool suppressType) 
       Printer << "Any";
     else
       printChildren(type_list, " & ");
+    return;
+  }
+  case Node::Kind::ProtocolListWithClass: {
+    if (pointer->getNumChildren() < 2)
+      return;
+    NodePointer protocols = pointer->getChild(0);
+    NodePointer superclass = pointer->getChild(1);
+    print(superclass);
+    Printer << " & ";
+    printChildren(protocols, " & ");
     return;
   }
   case Node::Kind::AssociatedType:
