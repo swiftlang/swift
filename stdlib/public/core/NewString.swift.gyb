@@ -338,8 +338,40 @@ extension String.Content {
     let bits: UInt61
   }
 }
+% end
 
+// Faster, more tailored operations for specific forms
+extension String.Content.Inline5or6 {
+  public var fccNormalizedUTF16: UTF16View {
+    _sanityCheck(bitsPerElement <= 8, "5or6 can't encode UTF16")
 
+    // Already pre-normal. Just return the exploded code units
+    return utf16
+  }
+}
+extension String.Content.Inline7or16 {
+  public var fccNormalizedUTF16: FCCNormalizedSegment {
+    let utf16CUs = self._utf16
+    let buffer = UTF16CodeUnitBuffer(utf16CUs)
+
+    // Latin1 already pre-normal
+    if (bitsPerElement <= 8) {
+      return FCCNormalizedSegment(
+        buffer,
+        nativeStart: utf16CUs.startIndex,
+        nativeEnd: utf16CUs.endIndex)
+    }
+
+    // UTF16 needs to be normalized
+    return FCCNormalizedSegment(
+      normalizing: buffer,
+      nativeStart: utf16CUs.startIndex,
+      nativeEnd: utf16CUs.endIndex
+    )
+  }
+}
+
+% for (N,W) in (5,6), (7,16):
 extension String.Content.Inline${N}or${W} {
   public init?<Source: Collection>(utf16 source: Source)
   where Source.Iterator.Element == UTF16.CodeUnit {
@@ -392,29 +424,6 @@ extension String.Content.Inline${N}or${W} : UnicodeContent {
           UInt8(truncatingBitPattern: $0) }))
     : AnyUInt8UnicodeView(
         _UnicodeViews(_utf16, UTF16.self).transcoded(to: UTF8.self))
-  }
-  
-  public var fccNormalizedUTF16: FCCNormalizedSegment {
-    let utf16CUs = self._utf16
-
-    // FIXME: The 5or6 view might burst out of the small size here needlessly.
-    // Should be typed as a ExplodedUTF16CodeUnits instead for that...
-    let buffer = UTF16CodeUnitBuffer(utf16CUs)
-
-    // Latin1 already pre-normal
-    if (bitsPerElement <= 8) {
-      return FCCNormalizedSegment(
-        buffer,
-        nativeStart: utf16CUs.startIndex,
-        nativeEnd: utf16CUs.endIndex)
-    }
-
-    // UTF16 needs to be normalized
-    return FCCNormalizedSegment(
-      normalizing: buffer,
-      nativeStart: utf16CUs.startIndex,
-      nativeEnd: utf16CUs.endIndex
-    )
   }
   
   public var characters: AnyCharacterUnicodeView {
