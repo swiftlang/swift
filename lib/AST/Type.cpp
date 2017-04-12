@@ -2006,10 +2006,18 @@ getObjCObjectRepresentable(Type type, const DeclContext *dc) {
       return ForeignRepresentableKind::Object;
   }
 
-  // Objective-C existential types.
-  if (type->isObjCExistentialType())
-    return ForeignRepresentableKind::Object;
-  
+  // Objective-C existential types are trivially representable if
+  // they don't have a superclass constraint, or if the superclass
+  // constraint is an @objc class.
+  if (type->isExistentialType()) {
+    auto layout = type->getExistentialLayout();
+    if (layout.isObjC() &&
+        (!layout.superclass ||
+         getObjCObjectRepresentable(layout.superclass, dc) ==
+           ForeignRepresentableKind::Object))
+      return ForeignRepresentableKind::Object;
+  }
+
   // Any can be bridged to id.
   if (type->isAny()) {
     return ForeignRepresentableKind::Bridged;
