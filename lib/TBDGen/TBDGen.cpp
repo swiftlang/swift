@@ -88,7 +88,10 @@ public:
   void visitTypeAliasDecl(TypeAliasDecl *TAD) {
     // any information here is encoded elsewhere
   }
+
   void visitNominalTypeDecl(NominalTypeDecl *NTD);
+
+  void visitClassDecl(ClassDecl *CD);
 
   void visitProtocolDecl(ProtocolDecl *PD) {
     addSymbol(LinkEntity::forProtocolDescriptor(PD));
@@ -188,6 +191,39 @@ void TBDGenVisitor::visitNominalTypeDecl(NominalTypeDecl *NTD) {
   }
 
   visitMembers(NTD);
+}
+
+template <typename T> bool isaAnd(Decl *D, llvm::function_ref<bool(T *)> f) {
+  if (auto *x = dyn_cast_or_null<T>(D))
+    return f(x);
+
+  return false;
+}
+
+void TBDGenVisitor::visitClassDecl(ClassDecl *CD) {
+  // Some members of classes get extra handling, beyond members of struct/enums,
+  // so let's walk over them manually.
+  for (auto *member : CD->getMembers()) {
+    auto value = dyn_cast<ValueDecl>(member);
+    if (!value)
+      continue;
+
+    auto hasWitnessTableOffset =
+        isa<ConstructorDecl>(value) ||
+        isaAnd<FuncDecl>(value, [](FuncDecl *FD) {
+          auto ASD = FD->getAccessorStorageDecl();
+          // Static functions (including getters/setters of static variables)
+          // and getters of lets do not get WTOs.
+          auto forLet =
+              isaAnd<VarDecl>(ASD, [](VarDecl *VD) { return VD->isLet(); });
+          return !(FD->isStatic() || forLet);
+        });
+    if (hasWitnessTableOffset) {
+      addSymbol(LinkEntity::forWitnessTableOffset(value));
+    }
+  }
+
+  visitNominalTypeDecl(CD);
 }
 
 void swift::enumeratePublicSymbols(FileUnit *file, StringSet &symbols,
