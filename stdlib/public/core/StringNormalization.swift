@@ -228,6 +228,9 @@ extension FCCNormalizedSegment {
   }
 
   static func isPreNormalized(_ buffer: UTF16CodeUnitBuffer) -> Bool {
+    if _fastPath(buffer.count == 0) {
+      return true
+    }
     if _fastPath(buffer.count == 1) {
       return FCCNormalizedSegment.isPreNormalized(utf16CodeUnit: buffer[0])
     }
