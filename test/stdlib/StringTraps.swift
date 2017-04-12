@@ -38,6 +38,8 @@ StringTraps.test("endIndex/successor")
   i = s.index(after: i)
   expectCrashLater()
   i = s.index(after: i)
+  var c = s[i]
+  c = s[i]
 }
 
 StringTraps.test("subscript(_:)/endIndex")
