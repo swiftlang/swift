@@ -299,15 +299,30 @@ namespace {
   const char XRefError::ID = '\0';
 
   class OverrideError : public llvm::ErrorInfo<OverrideError> {
+  public:
+    enum Kind {
+      Normal,
+      DesignatedInitializer
+    };
+
+  private:
     friend ErrorInfo;
     static const char ID;
 
     DeclName name;
+    Kind kind;
+
   public:
-    explicit OverrideError(DeclName name) : name(name) {}
+
+    explicit OverrideError(DeclName name, Kind kind = Normal)
+        : name(name), kind(kind) {}
 
     void log(raw_ostream &OS) const override {
       OS << "could not find '" << name << "' in parent class";
+    }
+
+    Kind getKind() const {
+      return kind;
     }
 
     std::error_code convertToErrorCode() const override {
@@ -2694,6 +2709,29 @@ ModuleFile::getDeclChecked(DeclID DID, Optional<DeclContext *> ForcedContext) {
                                                genericEnvID, interfaceID,
                                                overriddenID, rawAccessLevel,
                                                argNameIDs);
+
+    // Resolve the name ids.
+    SmallVector<Identifier, 2> argNames;
+    for (auto argNameID : argNameIDs)
+      argNames.push_back(getIdentifier(argNameID));
+    DeclName name(ctx, ctx.Id_init, argNames);
+
+    Optional<swift::CtorInitializerKind> initKind =
+        getActualCtorInitializerKind(storedInitKind);
+
+    auto overridden = getDeclChecked(overriddenID);
+    if (!overridden) {
+      llvm::handleAllErrors(overridden.takeError(),
+          [](const XRefError &) { /* expected */ },
+          [this](std::unique_ptr<llvm::ErrorInfoBase> unhandled) {
+        fatal(std::move(unhandled));
+      });
+      auto kind = OverrideError::Normal;
+      if (initKind == CtorInitializerKind::Designated)
+        kind = OverrideError::DesignatedInitializer;
+      return llvm::make_error<OverrideError>(name, kind);
+    }
+
     auto parent = getDeclContext(contextID);
     if (declOrOffset.isComplete())
       return declOrOffset;
@@ -2702,16 +2740,10 @@ ModuleFile::getDeclChecked(DeclID DID, Optional<DeclContext *> ForcedContext) {
     if (declOrOffset.isComplete())
       return declOrOffset;
 
-    // Resolve the name ids.
-    SmallVector<Identifier, 2> argNames;
-    for (auto argNameID : argNameIDs)
-      argNames.push_back(getIdentifier(argNameID));
-
     OptionalTypeKind failability = OTK_None;
     if (auto actualFailability = getActualOptionalTypeKind(rawFailability))
       failability = *actualFailability;
 
-    DeclName name(ctx, ctx.Id_init, argNames);
     auto ctor =
       createDecl<ConstructorDecl>(name, SourceLoc(),
                                   failability, /*FailabilityLoc=*/SourceLoc(),
@@ -2761,11 +2793,10 @@ ModuleFile::getDeclChecked(DeclID DID, Optional<DeclContext *> ForcedContext) {
       ctor->setImplicit();
     if (hasStubImplementation)
       ctor->setStubImplementation(true);
-    if (auto initKind = getActualCtorInitializerKind(storedInitKind))
-      ctor->setInitKind(*initKind);
-    if (auto overridden
-          = dyn_cast_or_null<ConstructorDecl>(getDecl(overriddenID)))
-      ctor->setOverriddenDecl(overridden);
+    if (initKind.hasValue())
+      ctor->setInitKind(initKind.getValue());
+    if (auto overriddenCtor = cast_or_null<ConstructorDecl>(overridden.get()))
+      ctor->setOverriddenDecl(overriddenCtor);
     break;
   }
 
@@ -4429,9 +4460,17 @@ void ModuleFile::loadAllMembers(Decl *container, uint64_t contextData) {
       if (!getContext().LangOpts.EnableDeserializationRecovery)
         fatal(next.takeError());
 
-      // Silently drop the member if it had an override-related problem.
+      // Drop the member if it had an override-related problem.
+      auto handleMissingOverrideBase = [container](const OverrideError &error) {
+        if (error.getKind() != OverrideError::DesignatedInitializer)
+          return;
+        auto *containingClass = dyn_cast<ClassDecl>(container);
+        if (!containingClass)
+          return;
+        containingClass->setHasMissingDesignatedInitializers();
+      };
       llvm::handleAllErrors(next.takeError(),
-          [](const OverrideError &) { /* expected */ },
+          handleMissingOverrideBase,
           [this](std::unique_ptr<llvm::ErrorInfoBase> unhandled) {
         fatal(std::move(unhandled));
       });
