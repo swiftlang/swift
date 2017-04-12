@@ -267,6 +267,11 @@ SIMPLE_DECL_ATTR(discardableResult, DiscardableResult,
 
 SIMPLE_DECL_ATTR(GKInspectable, GKInspectable, OnVar, 66)
 
+DECL_ATTR(_implements, Implements,
+          OnFunc | OnVar | OnSubscript | OnTypeAlias
+          | NotSerialized | UserInaccessible,
+          /* Not serialized */ 67)
+
 #undef TYPE_ATTR
 #undef DECL_ATTR_ALIAS
 #undef SIMPLE_DECL_ATTR
