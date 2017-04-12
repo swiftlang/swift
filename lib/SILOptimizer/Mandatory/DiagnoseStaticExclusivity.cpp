@@ -295,7 +295,11 @@ static void checkStaticExclusivity(SILFunction &Fn, PostOrderFunctionInfo *PO) {
     // state for that predecessor as our in state. The SIL verifier guarantees
     // that all incoming edges must have the same current accesses.
     for (auto *Pred : BB->getPredecessorBlocks()) {
-      const Optional<StorageMap> &PredAccesses = BlockOutAccesses[Pred];
+      auto it = BlockOutAccesses.find(Pred);
+      if (it == BlockOutAccesses.end())
+        continue;
+
+      const Optional<StorageMap> &PredAccesses = it->getSecond();
       if (PredAccesses) {
         BBState = PredAccesses;
         break;
