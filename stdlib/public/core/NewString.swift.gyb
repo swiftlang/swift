@@ -153,46 +153,13 @@ public struct String {
   public var content: Content
 }
 
-extension String : Sequence {
-  public struct Iterator : IteratorProtocol {
-    public enum _Representation {
-    % for tag, Payload in allCases:
-    case ${tag}(${Payload}.CharacterView.Iterator)
-    % end
-    }
-    public var _rep: _Representation
-    
-    public init(_ content: Content) {
-      switch content._rep {
-    % for tag,_ in allCases:
-      case .${tag}(let x): _rep = .${tag}(x.characters.makeIterator())
-    % end
-      }
-    }
-    
-    public mutating func next() -> Character? {
-      switch _rep {
-    % for tag,_ in allCases:
-      case .${tag}(let x):
-        var x1 = x
-        defer { _rep = .${tag}(x1) }
-        return x1.next()
-    % end
-      }
-    }
-  }
-  
-  public func makeIterator() -> Iterator {
-    return Iterator(content)
-  }
-}
-
-extension String : Unicode {
-  public typealias Index = AnyCharacterUnicodeView.Index
-  public typealias IndexDistance = AnyCharacterUnicodeView.IndexDistance
-
+extension String : Unicode, BidirectionalCollectionWrapper {
+  public typealias Base = Content.CharacterView
+  public typealias Iterator = Base.Iterator  
+  public typealias Index = AnyUnicodeIndex
+  public typealias IndexDistance = Int
   public typealias SubSequence = Substring
-
+  
   // @available(swift, introduced: 4)
   public subscript(bounds: Range<Index>) -> Substring {
     get {
@@ -204,15 +171,6 @@ extension String : Unicode {
     }
   }
 
-  ${gyb.expand(
-      'ForwardCollectionAPIs.swift.gyb',
-      base='x.characters',
-      forward=switchContent,
-      wrap_index='x.characters.anyIndex',
-      unwrap_index='x.characters.nativeIndex',
-      nonmutating=True,
-      Element='Character')}
-  
   public mutating func _tryToReplaceSubrange<C: Collection>(
     _ target: Range<Index>, with replacement: C
   ) -> Bool
@@ -220,6 +178,11 @@ extension String : Unicode {
     // Doing this rather than switching will try to preserve value semantics
     // even if a case is a reference type.
     return content.characters._tryToReplaceSubrange(target, with: replacement)
+  }
+
+  public var base: Base {
+    get { return content.characters }
+    set { content.characters = newValue }
   }
 }
 
@@ -863,9 +826,11 @@ public struct Substring {
 }    
 
 
-extension Substring : Unicode {
-  public typealias Index = String.Index
-  public typealias IndexDistance = String.IndexDistance
+extension Substring : BidirectionalCollectionWrapper, Unicode {
+  public typealias Base = Content.CharacterView
+  public typealias Iterator = Base.Iterator  
+  public typealias Index = Base.Index
+  public typealias IndexDistance = Base.IndexDistance
   public typealias SubSequence = Substring
 
   public subscript(bounds: Range<Index>) -> SubSequence {
@@ -878,18 +843,6 @@ extension Substring : Unicode {
     }
   }
 
-  ${gyb.expand(
-      'ForwardCollectionAPIs.swift.gyb',
-      base='''x.characters[
-        x.characters.nativeIndex(content._bounds.lowerBound)
-        ..< x.characters.nativeIndex(content._bounds.upperBound)]''',
-      forward=lambda stmt: 
-        switch_('content._wholeContent._rep', stmt),
-      wrap_index='x.characters.anyIndex',
-      unwrap_index='x.characters.nativeIndex',
-      nonmutating=True,
-      Element='Character')}
-
   public mutating func _tryToReplaceSubrange<C: Collection>(
     _ target: Range<Index>, with replacement: C
   ) -> Bool
@@ -899,46 +852,6 @@ extension Substring : Unicode {
     return content.characters._tryToReplaceSubrange(target, with: replacement)
   }
 }
-
-extension Substring : Sequence {
-  // FIXME: this is a copy/paste of the Iterator from String.
-  public struct Iterator : IteratorProtocol {
-    public enum _Representation {
-    % for tag, Payload in allCases:
-    case ${tag}(${Payload}.CharacterView.SubSequence.Iterator)
-    % end
-    }
-    public var _rep: _Representation
-    
-    public init(_ content: Content) {
-      switch content._wholeContent._rep {
-    % for tag,_ in allCases:
-      case .${tag}(let x): _rep = .${tag}(
-          x.characters[
-            x.characters.nativeIndex(content._bounds.lowerBound)
-            ..< x.characters.nativeIndex(content._bounds.upperBound)]
-          .makeIterator())
-    % end
-      }
-    }
-    
-    public mutating func next() -> Character? {
-      switch _rep {
-    % for tag,_ in allCases:
-      case .${tag}(let x):
-        var x1 = x
-        defer { _rep = .${tag}(x1) }
-        return x1.next()
-    % end
-      }
-    }
-  }
-  
-  public func makeIterator() -> Iterator {
-    return Iterator(content)
-  }
-}
-
 
 extension Substring : RangeReplaceableCollection {
   public init() { content = Content() }
@@ -1360,8 +1273,8 @@ extension String.Content.${View} : Sequence {
 }
 
 extension String.Content.${View} : UnicodeView {
-  public typealias Index = String.Index
-  public typealias IndexDistance = String.IndexDistance
+  public typealias Index = AnyUnicodeIndex
+  public typealias IndexDistance = Int
 
   public typealias SubSequence
     = RangeReplaceableUnicodeViewSlice<String.Content.${View}>
