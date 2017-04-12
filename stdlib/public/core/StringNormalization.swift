@@ -46,11 +46,21 @@ public typealias UTF16CodeUnitBuffer =
 public struct FCCNormalizedSegment : BidirectionalCollection {
   let buffer: UTF16CodeUnitBuffer
 
-  public init(_ buffer: UTF16CodeUnitBuffer) {
+  // The corresponding native begin/end indices for this segment
+  let nativeStart: Int
+  let nativeEnd: Int
+
+  public init(_ buffer: UTF16CodeUnitBuffer, nativeStart: Int, nativeEnd: Int) {
     self.buffer = buffer
+    self.nativeStart = nativeStart
+    self.nativeEnd = nativeEnd
   }
-  public init() {
+
+  // Init for making empty/sentinel segments
+  public init(sentinelValue value: Int) {
     self.buffer = UTF16CodeUnitBuffer()
+    self.nativeStart = value
+    self.nativeEnd = value
   }
 
   public typealias Index = Int // UTF16CodeUnitBuffer.Index
@@ -70,7 +80,142 @@ public struct FCCNormalizedSegment : BidirectionalCollection {
   public func index(before i: Index) -> Index {
     return buffer.index(before: i)
   }
-  public typealias SubSequence = BidirectionalSlice<FCCNormalizedSegment>
+
+  // Michael TODO: understand this
+  public typealias SubSequence = UnicodeViewSlice<FCCNormalizedSegment>
+  public subscript(bounds: Range<Index>) -> SubSequence {
+    return SubSequence(base: self, bounds: bounds)
+  }
+}
+
+extension FCCNormalizedSegment {
+  // Perform normalization on the buffer
+  public init(
+    normalizing buffer: UTF16CodeUnitBuffer, nativeStart: Int, nativeEnd: Int
+  ) {
+    // Fast pre-normalized checks (worth doing before calling over to ICU)
+    if _fastPath(FCCNormalizedSegment.isPreNormalized(buffer)) {
+      self.init(buffer, nativeStart: nativeStart, nativeEnd: nativeEnd)
+      return
+    }
+    let normalizedBuffer = FCCNormalizedSegment.normalized(buffer)
+    self.init(normalizedBuffer, nativeStart: nativeStart, nativeEnd: nativeEnd)
+  }
+
+  internal static func normalized(
+    _ buffer: UTF16CodeUnitBuffer
+  ) -> UTF16CodeUnitBuffer {
+    _sanityCheck(buffer.count > 0, "How did this happen? Failed precondition?")
+
+    // Ask ICU to normalize
+    //
+    // FIXME: withMutableArray kind of defeats the purpose of the small
+    // buffer :-(
+    var buffer = buffer
+    buffer.withMutableArray { (array: inout [UInt16]) -> () in
+      array.withUnsafeBufferPointer {
+        // TODO: Just reserving one or two extra up front. If we're segment-
+        // based, should be finite number of possible decomps.
+        let originalCount = buffer.count
+        while true {
+          var error = __swift_stdlib_U_ZERO_ERROR
+          let usedCount = __swift_stdlib_unorm2_normalize(
+            // FIXME: check valid force-unwrap
+            _fccNormalizer, $0.baseAddress!, numericCast($0.count),
+            &array, numericCast(array.count), &error)
+          if __swift_stdlib_U_SUCCESS(error) {
+            array.removeLast(array.count - numericCast(usedCount))
+            return
+          }
+          _sanityCheck(
+            error == __swift_stdlib_U_BUFFER_OVERFLOW_ERROR,
+            "Unknown normalization error")
+
+          // Maximum number of NFC to FCC decompositions for a single unicode
+          // scalar value
+          //
+          // TODO: what is this really? Should be much less
+          let maxDecompSize = 8
+
+          // Very loose canary to check that we haven't grown exceedingly large
+          // (indicative of logic error). Loose by assuming that every original
+          // character could be decomposed the maximum number of times. Without
+          // this, an error would loop until we run out of memory or the array
+          // is larger than 2^32 on 64bit platforms.
+          _sanityCheck(buffer.count < originalCount*maxDecompSize)
+
+          // extend array storage by 25%
+          array.append(
+            contentsOf: repeatElement(0, count: (array.count + 3) >> 2))
+        }
+      }
+    }
+
+    return buffer
+  }
+
+  static func isPreNormalized(_ buffer: UTF16CodeUnitBuffer) -> Bool {
+    if _fastPath(buffer.count == 1) {
+      return FCCNormalizedSegment.isPreNormalized(utf16CodeUnit: buffer[0])
+    }
+
+    // TODO: There are much better pre-normalized checks we can do than just
+    // checking that all CUs are independently pre-normalized.
+
+    // As a quick check, see if we're just a coalesced buffer of pre-normalized
+    // scalars.
+    for cu in buffer {
+      guard _fastPath(isPreNormalized(utf16CodeUnit: cu)) else {
+        return false
+      }
+    }
+
+    // TODO: Other checks
+    return false
+  }
+
+  static func isPreNormalized(utf16CodeUnit cu: UInt16) -> Bool {
+    // For single-code-unit normalization segments, the vast majority of the
+    // sub-surrogate BMP is already FCC normalized (~70 exceptions). Perform
+    // some quick checks over the largest ranges.
+
+    // The earliest exceptions is 0x340,
+    if _fastPath(cu < 0x340) {
+      return true
+    }
+
+    // The last exception, before the surrogate code units, is 0x2ADC, the
+    // FORKING supplemental mathematical operator.
+    if _fastPath(cu > 0x2ADC && cu < 0xd800) {
+      return true
+    }
+
+    // TODO: Worth checking the more narrow ranges?
+    return false
+  }
+}
+
+extension FCCNormalizedSegment : UnicodeView {
+  public func nativeIndex(_ i: AnyUnicodeIndex) -> Index {
+    if (i.encodedOffset != nativeStart) {
+      // Can't translate indices
+      //
+      // TODO: Should this trigger an error?
+      return endIndex
+    }
+
+    if case .fccNormalizedUTF16(_, let offsetInSegment) = i {
+      return offsetInSegment
+    }
+    return startIndex
+  }
+
+  public func anyIndex(_ i: Index) -> AnyUnicodeIndex {
+    return .fccNormalizedUTF16(
+      offsetOfSegment: numericCast(nativeStart),
+      offsetInSegment: i)
+  }
+
 }
 
 // Ask ICU if the given unicode scalar value has a normalization boundary before
@@ -131,13 +276,7 @@ where
       }
     }
 
-    return Index(
-      nativeOffset: codeUnits.distance(
-        from: codeUnits.startIndex, to: start
-      ),
-      nativeCount: codeUnits.distance(from: start, to: end),
-      segment: formSegment(from: start, until: end)
-    )
+    return Index(formSegment(from: start, until: end))
   }
 
   // Find the segment that starts with `startingAt`. Optimized for forwards
@@ -152,7 +291,7 @@ where
     // Parse the first scalar, it will always be in the segment
     var (scalarValue: value, startIndex: s, endIndex: end)
       = decodeOne(from: start)
-    _sanityCheck(start == codeUnits.startIndex || 
+    _sanityCheck(start == codeUnits.startIndex ||
                  _hasBoundary(before: value), "Not on segment boundary")
     _sanityCheck(s == start, "Internal inconsistency in decodeOne")
 
@@ -171,13 +310,14 @@ where
       end = scalarEnd
     }
 
-    return Index(
-      nativeOffset: codeUnits.distance(
-        from: codeUnits.startIndex, to: start
-      ),
-      nativeCount: codeUnits.distance(from: start, to: end),
-      segment: formSegment(from: start, until: end)
-    )
+    return Index(formSegment(from: start, until: end))
+  }
+
+  internal func castCUIndex(_ idx: CodeUnits.Index) -> Int {
+    return numericCast(codeUnits.distance(from: codeUnits.startIndex, to: idx))
+  }
+  internal func formCUIndex(_ offset: Int) -> CodeUnits.Index {
+    return codeUnits.index(atOffset: offset)
   }
 
   // Normalize a segment. Indices must be on scalar boundaries.
@@ -198,7 +338,8 @@ where
 
     // Fast pre-normalized checks (worth doing before calling over to ICU)
     if _fastPath(FCCNormalizedLazySegments.isPreNormalized(buffer)) {
-      return FCCNormalizedSegment(buffer)
+      return FCCNormalizedSegment(
+        buffer, nativeStart: castCUIndex(start), nativeEnd: castCUIndex(end))
     }
 
     _sanityCheck(buffer.count > 0, "How did this happen? Failed precondition?")
@@ -246,9 +387,9 @@ where
       }
     }
 
-    return FCCNormalizedSegment(buffer)
+    return FCCNormalizedSegment(
+      buffer, nativeStart: castCUIndex(start), nativeEnd: castCUIndex(end))
   }
-
 
   // Decode one or more code units, returning the unicode scalar value and the
   // indices spanning the code units parsed. `from` should be on scalar boundary
@@ -319,19 +460,15 @@ where
 extension FCCNormalizedLazySegments : BidirectionalCollection {
   // TODO?: This is really more like an iterator...
   public struct Index : Comparable {
-    // The corresponding native begin/end indices for this segment
-    let nativeOffset: CodeUnits.IndexDistance
-    let nativeCount: CodeUnits.IndexDistance
     let segment: FCCNormalizedSegment
 
     public static func <(lhs: Index, rhs: Index) -> Bool {
-      if lhs.nativeOffset < rhs.nativeOffset {
+      if lhs.segment.nativeStart < rhs.segment.nativeStart {
         // Our ends should be ordered similarly, unless lhs is the last index
         // before endIndex and rhs is the endIndex.
         _sanityCheck(
-          lhs.nativeOffset + lhs.nativeCount 
-            < rhs.nativeOffset + rhs.nativeCount ||
-          rhs.nativeCount == 0,
+          lhs.segment.nativeEnd < rhs.segment.nativeEnd ||
+          rhs.segment.nativeStart == rhs.segment.nativeEnd,
           "overlapping segments?")
 
         return true
@@ -341,16 +478,18 @@ extension FCCNormalizedLazySegments : BidirectionalCollection {
     }
 
     public static func ==(lhs: Index, rhs: Index) -> Bool {
-
-      if lhs.nativeOffset == rhs.nativeOffset {
+      if lhs.segment.nativeStart == rhs.segment.nativeStart {
         _sanityCheck(
-          lhs.nativeCount == rhs.nativeCount,
+          lhs.segment.nativeEnd == rhs.segment.nativeEnd,
           "overlapping segments?")
-
         return true
       }
 
       return false
+    }
+
+    public init(_ segment: FCCNormalizedSegment) {
+      self.segment = segment
     }
   }
 
@@ -361,20 +500,17 @@ extension FCCNormalizedLazySegments : BidirectionalCollection {
   }
   public var endIndex: Index {
     return Index(
-      nativeOffset: codeUnits.count,
-      nativeCount: 0,
-      segment: FCCNormalizedSegment()
-    )
+      FCCNormalizedSegment(sentinelValue: numericCast(codeUnits.count)))
   }
 
   public func index(after idx: Index) -> Index {
     return nextSegment(
-      startingAt: codeUnits.index(atOffset: idx.nativeOffset + idx.nativeCount)
+      startingAt: formCUIndex(idx.segment.nativeEnd)
     )
   }
   public func index(before idx: Index) -> Index {
     return priorSegment(
-      endingAt: codeUnits.index(atOffset: idx.nativeOffset)
+      endingAt: formCUIndex(idx.segment.nativeStart)
     )
   }
   public subscript(position: Index) -> FCCNormalizedSegment {
@@ -393,7 +529,7 @@ extension _UnicodeViews {
     public typealias Index = Base.Index
     public typealias IndexDistance = Base.IndexDistance
     public typealias Self_ = FCCNormalizedUTF16View
-    
+
     public init(_ unicodeView: _UnicodeViews<CodeUnits, Encoding>) {
       self.base = Base(FCCNormalizedLazySegments(unicodeView))
     }
@@ -423,7 +559,7 @@ extension _UnicodeViews.FCCNormalizedUTF16View : UnicodeView {
   
   public func anyIndex(_ i: Index) -> AnyUnicodeIndex {
     return .fccNormalizedUTF16(
-      offsetOfSegment: numericCast(i._outer.nativeOffset),
+      offsetOfSegment: numericCast(i._outer.segment.nativeStart),
       offsetInSegment: i._inner ?? 0)
   }
   

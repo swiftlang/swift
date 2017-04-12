@@ -33,13 +33,10 @@ extension String {
       return
     }
     precondition(count > 0, "Negative count not allowed")
-    let s = repeatedValue
-    self = String(_storage: _StringBuffer(
-        capacity: s._core.count * count,
-        initialSize: 0,
-        elementWidth: s._core.elementWidth))
-    for _ in 0..<count {
-      self += s
+    self = repeatedValue
+    // FIXME: reserve capacity <rdar://problem/31570816>
+    for _ in 1..<count {
+      self += repeatedValue
     }
   }
 
@@ -50,11 +47,6 @@ extension String {
   public func _split(separator: UnicodeScalar) -> [String] {
     let scalarSlices = unicodeScalars.split { $0 == separator }
     return scalarSlices.map { String($0) }
-  }
-
-  /// A Boolean value indicating whether a string has no characters.
-  public var isEmpty: Bool {
-    return _core.count == 0
   }
 }
 

@@ -357,6 +357,8 @@ case unicodeScalar(encodedOffset: Int, width: Int, scalar: UnicodeScalar?)
       return tl == tr && l < r
     case (.character(_, let l), .character(_, let r)):
       return l < r
+    case (.fccNormalizedUTF16(_, let l), .fccNormalizedUTF16(_, let r)):
+      return l < r
     default:
       return false
     }
@@ -370,6 +372,8 @@ case unicodeScalar(encodedOffset: Int, width: Int, scalar: UnicodeScalar?)
     case (.transcoded(_, let l, let tl), (.transcoded(_, let r, let tr))):
       return tl != tr || l == r
     case (.character(_, let l), .character(_, let r)):
+      return l == r
+    case (.fccNormalizedUTF16(_, let l), .fccNormalizedUTF16(_, let r)):
       return l == r
     default:
       return true
