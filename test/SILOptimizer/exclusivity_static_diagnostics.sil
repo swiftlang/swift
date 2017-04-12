@@ -341,3 +341,64 @@ bb0(%0 : $Int):
   %9 = tuple ()
   return %9 : $()
 }
+
+// Check for iterator invalidation issues when the hash from
+// basic blocks to analysis state is re-hashed. The number of
+// blocks in this test is determined by the initial size of the
+// 'BlockOutAccesses' DenseMap in the implementation.
+//
+//  The unreachable block below must branch to bN where
+//    N = 3/4 * INITIAL_SIZE - 2
+sil @blockMapRehash : $@convention(method) (Builtin.Int1) -> () {
+bb0(%0: $Builtin.Int1):
+ br bb1
+bb1:
+  br bb2
+bb2:
+  br bb3
+bb3:
+  br bb4
+bb4:
+  br bb5
+bb5:
+  br bb6
+bb6:
+  br bb7
+bb7:
+  br bb8
+bb8:
+  br bb9
+bb9:
+  br bb10
+bb10:
+  br bb11
+bb11:
+  br bb12
+bb12:
+  br bb13
+bb13:
+  br bb14
+bb14:
+  br bb15
+bb15:
+  br bb16
+bb16:
+   br bb17
+bb17:
+  br bb18
+bb18:
+  br bb19
+bb19:
+  br bb20
+bb20:
+  br bb21
+bb21:
+  br bb22
+bb22:
+  br bb23 // no-crash
+bb23:
+  %1 = tuple ()
+  return %1 : $()
+bbUnreachable:
+  br bb22
+}
