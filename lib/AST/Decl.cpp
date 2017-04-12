@@ -3130,10 +3130,14 @@ void ProtocolDecl::computeRequirementSignature() {
   GenericSignatureBuilder builder(getASTContext(),
                                   LookUpConformanceInModule(module));
   builder.addGenericParameter(selfType);
+  auto selfPA =
+      builder.resolveArchetype(selfType,
+                               ArchetypeResolutionKind::CompleteWellFormed);
+
   builder.addRequirement(
          requirement,
          GenericSignatureBuilder::RequirementSource
-          ::forRequirementSignature(builder.resolveArchetype(selfType), this),
+          ::forRequirementSignature(selfPA, this),
          nullptr);
   builder.finalize(SourceLoc(), { selfType });
   
