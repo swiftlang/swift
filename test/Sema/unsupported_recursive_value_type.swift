@@ -1,82 +1,97 @@
 // RUN: %target-typecheck-verify-swift
 
-struct SelfRecursiveStruct { // expected-error{{value type 'SelfRecursiveStruct' cannot have a stored property that references itself}}
-  let a: SelfRecursiveStruct
+struct SelfRecursiveStruct {
+  let a: SelfRecursiveStruct // expected-error{{value type 'SelfRecursiveStruct' cannot have a stored property that recursively contains it}}
 }
 
-struct OptionallyRecursiveStruct { // expected-error{{value type 'OptionallyRecursiveStruct' cannot have a stored property that references itself}}
-  let a: OptionallyRecursiveStruct?
+struct OptionallyRecursiveStruct {
+  let a: OptionallyRecursiveStruct? // expected-error{{value type 'OptionallyRecursiveStruct' cannot have a stored property that recursively contains it}}
+  // expected-note@-1 {{cycle beginning here: OptionallyRecursiveStruct? -> (some: OptionallyRecursiveStruct)}}
 
   init() { a = OptionallyRecursiveStruct() }
 }
 
-struct IndirectlyRecursiveStruct1 { // expected-error{{value type 'IndirectlyRecursiveStruct1' cannot have a stored property that references itself}}
-  let a: IndirectlyRecursiveStruct2
+struct IndirectlyRecursiveStruct1 {
+  let a: IndirectlyRecursiveStruct2 // expected-error{{value type 'IndirectlyRecursiveStruct1' cannot have a stored property that recursively contains it}}
+  // expected-note@-1 {{cycle beginning here: IndirectlyRecursiveStruct2 -> (a: IndirectlyRecursiveStruct1)}}
 }
-struct IndirectlyRecursiveStruct2 { // expected-error{{value type 'IndirectlyRecursiveStruct2' cannot have a stored property that references itself}}
-  let a: IndirectlyRecursiveStruct1
+struct IndirectlyRecursiveStruct2 {
+  let a: IndirectlyRecursiveStruct1 // expected-error{{value type 'IndirectlyRecursiveStruct2' cannot have a stored property that recursively contains it}}
+  // expected-note@-1 {{cycle beginning here: IndirectlyRecursiveStruct1 -> (a: IndirectlyRecursiveStruct2)}}
 }
 
 enum NonterminatingSelfRecursiveEnum { // expected-error{{recursive enum 'NonterminatingSelfRecursiveEnum' is not marked 'indirect'}} {{1-1=indirect }}
-  case A(NonterminatingSelfRecursiveEnum)
+  case A(NonterminatingSelfRecursiveEnum) // expected-note {{recursive case here}}
 }
 
 enum TerminatingSelfRecursiveEnum { // expected-error{{recursive enum 'TerminatingSelfRecursiveEnum' is not marked 'indirect'}} {{1-1=indirect }}
-  case A(TerminatingSelfRecursiveEnum)
+  case A(TerminatingSelfRecursiveEnum) // expected-note {{recursive case here}}
   case B
 }
 
 enum IndirectlyRecursiveEnum1 { // expected-error{{recursive enum 'IndirectlyRecursiveEnum1' is not marked 'indirect'}} {{1-1=indirect }}
   case A(IndirectlyRecursiveEnum2)
+  // expected-note@-1 {{cycle beginning here: IndirectlyRecursiveEnum2 -> (A: IndirectlyRecursiveEnum1)}}
 }
 enum IndirectlyRecursiveEnum2 { // expected-error{{recursive enum 'IndirectlyRecursiveEnum2' is not marked 'indirect'}}
   case A(IndirectlyRecursiveEnum1)
+  // expected-note@-1 {{cycle beginning here: IndirectlyRecursiveEnum1 -> (A: IndirectlyRecursiveEnum2)}}
 }
 
 enum RecursiveByGenericSubstitutionEnum<T> {
   case A(T)
 }
 
-struct RecursiveByBeingInTupleStruct { // expected-error{{value type 'RecursiveByBeingInTupleStruct' cannot have a stored property that references itself}}
-  let a: (Int, RecursiveByBeingInTupleStruct)
+struct RecursiveByBeingInTupleStruct {
+  let a: (Int, RecursiveByBeingInTupleStruct) // expected-error{{value type 'RecursiveByBeingInTupleStruct' cannot have a stored property that recursively contains it}}
+  // expected-note@-1 {{cycle beginning here: (Int, RecursiveByBeingInTupleStruct) -> (.1: RecursiveByBeingInTupleStruct)}}
 }
 
-struct OptionallySelfRecursiveStruct { // expected-error{{value type 'OptionallySelfRecursiveStruct' cannot have a stored property that references itself}}
+struct OptionallySelfRecursiveStruct { // expected-error{{value type 'OptionallySelfRecursiveStruct' has infinite size}}
   let a: Optional<OptionallyRecursiveStruct>
+  // expected-note@-1 {{cycle beginning here: Optional<OptionallyRecursiveStruct> -> (some: OptionallyRecursiveStruct) -> (a: OptionallyRecursiveStruct?)}}
 }
 
 enum OptionallySelfRecursiveEnum { // expected-error{{recursive enum 'OptionallySelfRecursiveEnum' is not marked 'indirect'}}
   case A(Optional<OptionallySelfRecursiveEnum>)
+  // expected-note@-1 {{cycle beginning here: Optional<OptionallySelfRecursiveEnum> -> (some: OptionallySelfRecursiveEnum)}}
 }
 
 // self-recursive struct with self as member's type argument, a proper name would
 // be too long.
-struct X<T> { // expected-error{{value type 'X<T>' cannot have a stored property that references itself}}
+struct X<T> { // expected-error{{value type 'X<T>' has infinite size}}
   let s: X<X>
+  // expected-note@-1 {{cycle beginning here: X<X<T>> -> (s: X<X<X<T>>>) -> (s: X<X<X<X<T>>>>) -> (s: X<X<X<X<X<T>>>>>) -> (s: X<X<X<X<X<X<T>>>>>>) -> (s: X<X<X<X<X<X<X<T>>>>>>>) -> ...}}
 }
 
 // self-recursive enum with self as generic argument associated type, a proper
 // name would be too long
-enum Y<T> { // expected-error{{recursive enum 'Y<T>' is not marked 'indirect'}}
+enum Y<T> { // expected-error{{value type 'Y<T>' has infinite size}}
     case A(Int, Y<Y>)
+    // expected-note@-1 {{cycle beginning here: (Int, Y<Y<T>>) -> (.1: Y<Y<T>>) -> (A: (Int, Y<Y<Y<T>>>)) -> (.1: Y<Y<Y<T>>>) -> (A: (Int, Y<Y<Y<Y<T>>>>)) -> (.1: Y<Y<Y<Y<T>>>>) -> ...}}
 }
 
 // ultra super nest-acular type
-struct Z<T, U> { // expected-error{{value type 'Z<T, U>' cannot have a stored property that references itself}}
+struct Z<T, U> { // expected-error{{value type 'Z<T, U>' has infinite size}}
     let a: Z<Optional<Z<Z<Z, Z>, X<Z>>>, (Int, Z)>
+    // expected-note@-1 {{cycle beginning here}}
 }
 
-struct RecursiveByGenericSubstitutionStruct { // expected-error{{value type 'RecursiveByGenericSubstitutionStruct' cannot have a stored property that references itself}}
+struct RecursiveByGenericSubstitutionStruct {
   let a: RecursiveByGenericSubstitutionEnum<RecursiveByGenericSubstitutionStruct>
+  // expected-error@-1{{value type 'RecursiveByGenericSubstitutionStruct' cannot have a stored property that recursively contains it}}
+  // expected-note@-2 {{cycle beginning here: RecursiveByGenericSubstitutionEnum<RecursiveByGenericSubstitutionStruct> -> (A: RecursiveByGenericSubstitutionStruct)}}
 }
 
-struct RecursiveWithLocal { // expected-error{{value type 'RecursiveWithLocal' cannot have a stored property that references itself}}
+struct RecursiveWithLocal {
   init(t: Local) { self.t = t }
-  struct Local { // expected-error{{value type 'RecursiveWithLocal.Local'}}
+  struct Local {
     init(s: RecursiveWithLocal) { self.s = s }
-    var s: RecursiveWithLocal
+    var s: RecursiveWithLocal // expected-error{{value type 'RecursiveWithLocal.Local' cannot have a stored property that recursively contains it}}
+    // expected-note@-1 {{RecursiveWithLocal -> (t: RecursiveWithLocal.Local)}}
   }
-  var t: Local
+  var t: Local // expected-error{{value type 'RecursiveWithLocal' cannot have a stored property that recursively contains it}}
+  // expected-note@-1 {{RecursiveWithLocal.Local -> (s: RecursiveWithLocal)}}
 }
 
 struct R<T> { let t: () -> T }
@@ -120,6 +135,32 @@ struct NoStorage : Holdable {
     typealias Holding = Bad
 }
 
-struct Bad { // expected-error{{value type 'Bad' cannot have a stored property that references itself}}
-    var s: Holder<NoStorage>
+struct Bad {
+    var s: Holder<NoStorage> // expected-error{{value type 'Bad' cannot have a stored property that recursively contains it}}
+    // expected-note@-1 {{cycle beginning here: Holder<NoStorage> -> (x: NoStorage.Holding)}}
+}
+
+// FIXME: this diagnostic is unnecessary
+struct Test1 { // expected-error {{value type 'Test1' has infinite size}}
+  var test1: StructCyclesWithEnum<Int>
+  // expected-note@-1 {{cycle beginning here: StructCyclesWithEnum<Int> -> (sField: EnumCyclesWithStruct<Int>) -> (eCase: StructCyclesWithEnum<Int>)}}
+}
+
+struct StructCyclesWithEnum<T> {
+  var sField: EnumCyclesWithStruct<T> // expected-error {{value type 'StructCyclesWithEnum<T>' cannot have a stored property that recursively contains it}}
+  // expected-note@-1 {{cycle beginning here: EnumCyclesWithStruct<T> -> (eCase: StructCyclesWithEnum<T>)}}
+}
+
+enum EnumCyclesWithStruct<T> { // expected-error {{recursive enum 'EnumCyclesWithStruct<T>' is not marked 'indirect'}}
+  case eCase(StructCyclesWithEnum<T>)
+  // expected-note@-1 {{cycle beginning here: StructCyclesWithEnum<T> -> (sField: EnumCyclesWithStruct<T>)}}
+}
+
+struct Test2 {
+  var test1: Test1
+}
+
+struct IB<T> { // expected-error {{value type 'IB<T>' has infinite size}}
+  var member: IB<T?>
+  // expected-note@-1 {{cycle beginning here: IB<T?> -> (member: IB<T??>) -> (member: IB<T???>) -> (member: IB<T????>) -> (member: IB<T?????>) -> (member: IB<T??????>) -> ...}}
 }
