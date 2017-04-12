@@ -563,6 +563,10 @@ NoEmptyLineBetweenMembers("no-empty-line-between-members",
 
 static llvm::cl::opt<bool> DebugConstraintSolver("debug-constraints",
     llvm::cl::desc("Enable verbose debugging from the constraint solver."));
+
+static llvm::cl::opt<bool>
+IncludeLocals("include-locals", llvm::cl::desc("Index local symbols too."),
+              llvm::cl::init(false));
 } // namespace options
 
 static std::unique_ptr<llvm::MemoryBuffer>
@@ -2688,6 +2692,7 @@ static int doPrintRangeInfo(const CompilerInvocation &InitInvok,
 namespace {
   class PrintIndexDataConsumer : public IndexDataConsumer {
     raw_ostream &OS;
+    bool shouldIndexLocals;
     bool firstSourceEntity = true;
 
     void printSymbolInfo(SymbolInfo SymInfo) {
@@ -2703,8 +2708,10 @@ namespace {
     }
 
   public:
-    PrintIndexDataConsumer(raw_ostream &OS) : OS(OS) {}
+    PrintIndexDataConsumer(raw_ostream &OS, bool indexLocals = false) :
+      OS(OS), shouldIndexLocals(indexLocals) {}
 
+    bool indexLocals() override { return shouldIndexLocals; }
     void failed(StringRef error) override {}
 
     bool recordHash(StringRef hash, bool isKnown) override { return true; }
@@ -2749,7 +2756,7 @@ namespace {
 } // anonymous namespace
 
 static int doPrintIndexedSymbols(const CompilerInvocation &InitInvok,
-                                StringRef SourceFileName) {
+                                StringRef SourceFileName, bool indexLocals) {
 
   CompilerInvocation Invocation(InitInvok);
   Invocation.addInputFilename(SourceFileName);
@@ -2776,7 +2783,7 @@ static int doPrintIndexedSymbols(const CompilerInvocation &InitInvok,
 
   llvm::outs() << llvm::sys::path::filename(SF->getFilename()) << '\n';
   llvm::outs() << "------------\n";
-  PrintIndexDataConsumer consumer(llvm::outs());
+  PrintIndexDataConsumer consumer(llvm::outs(), indexLocals);
   indexSourceFile(SF, StringRef(), consumer);
 
   return 0;
@@ -3244,7 +3251,8 @@ int main(int argc, char *argv[]) {
     break;
   case ActionType::PrintIndexedSymbols:
       if (options::ModuleToPrint.empty()) {
-        ExitCode = doPrintIndexedSymbols(InitInvok, options::SourceFilename);
+        ExitCode = doPrintIndexedSymbols(InitInvok, options::SourceFilename,
+                                         options::IncludeLocals);
       } else {
         if (options::ModuleToPrint.size() > 1) {
           llvm::errs() << "printing symbols for the first module name, the rest "

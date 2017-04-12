@@ -227,12 +227,14 @@ class IndexSwiftASTWalker : public SourceEntityWalker {
 
 public:
   IndexSwiftASTWalker(IndexDataConsumer &IdxConsumer, ASTContext &Ctx,
-                      unsigned BufferID)
+                      unsigned BufferID = -1)
       : IdxConsumer(IdxConsumer), SrcMgr(Ctx.SourceMgr), BufferID(BufferID),
         enableWarnings(IdxConsumer.enableWarnings()) {}
+
   ~IndexSwiftASTWalker() override { assert(Cancelled || EntitiesStack.empty()); }
 
   void visitModule(ModuleDecl &Mod, StringRef Hash);
+  void visitDeclContext(DeclContext *DC);
 
 private:
   bool visitImports(SourceFileOrModule Mod,
@@ -406,7 +408,7 @@ private:
   bool shouldIndex(ValueDecl *D, bool IsRef) const {
     if (D->isImplicit())
       return false;
-    if (isLocalSymbol(D) && (!isa<ParamDecl>(D) || IsRef))
+    if (!IdxConsumer.indexLocals() && isLocalSymbol(D) && (!isa<ParamDecl>(D) || IsRef))
       return false;
     if (D->isPrivateStdlibDecl())
       return false;
@@ -437,6 +439,12 @@ private:
   llvm::DenseMap<ModuleDecl *, llvm::SmallVector<ModuleDecl *, 4>> ImportsMap;
 };
 } // anonymous namespace
+
+void IndexSwiftASTWalker::visitDeclContext(DeclContext *Context) {
+  IsModuleFile = false;
+  isSystemModule = Context->getParentModule()->isSystemModule();
+  walk(Context);
+}
 
 void IndexSwiftASTWalker::visitModule(ModuleDecl &Mod, StringRef KnownHash) {
   SourceFile *SrcFile = nullptr;
@@ -1243,6 +1251,14 @@ void IndexSwiftASTWalker::getModuleHash(SourceFileOrModule Mod,
 // Indexing entry points
 //===----------------------------------------------------------------------===//
 
+void index::indexDeclContext(DeclContext *DC, IndexDataConsumer &consumer) {
+  assert(DC);
+  unsigned bufferId = DC->getParentSourceFile()->getBufferID().getValue();
+  IndexSwiftASTWalker walker(consumer, DC->getASTContext(), bufferId);
+  walker.visitDeclContext(DC);
+  consumer.finish();
+}
+
 void index::indexSourceFile(SourceFile *SF, StringRef hash,
                             IndexDataConsumer &consumer) {
   assert(SF);
@@ -1255,8 +1271,7 @@ void index::indexSourceFile(SourceFile *SF, StringRef hash,
 void index::indexModule(ModuleDecl *module, StringRef hash,
                         IndexDataConsumer &consumer) {
   assert(module);
-  IndexSwiftASTWalker walker(consumer, module->getASTContext(),
-                             /*bufferID*/ -1);
+  IndexSwiftASTWalker walker(consumer, module->getASTContext());
   walker.visitModule(*module, hash);
   consumer.finish();
 }
