@@ -1,6 +1,8 @@
+// The tests in this file need to be audited and revised or removed for the new
+// string design
+//
 // Run the tests for the whole String prototype
-// RUN: %target-build-swift %s %S/String.swift %S/StringStorage.swift %S/Unicode.swift %S/Latin1String.swift %S/CanonicalString.swift %S/StringComparison.swift %S/StringCompatibility.swift %S/Substring.swift -parse-stdlib -Xfrontend -disable-access-control -Onone -g -o %t
-// RUN: %target-run %t
+// RUN: %target-run-simple-swift
 // REQUIRES: executable_test
 
 import Swift
