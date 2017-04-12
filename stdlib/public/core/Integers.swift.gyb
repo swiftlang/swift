@@ -3541,6 +3541,23 @@ internal func _unsafeMinus(_ lhs: Int, _ rhs: Int) -> Int {
 public typealias Integer = BinaryInteger
 
 @available(swift, obsoleted: 4)
+public typealias IntegerArithmetic = BinaryInteger
+
+@available(swift, obsoleted: 4)
+public typealias SignedNumber = SignedNumeric
+
+@available(swift, obsoleted: 4)
+public typealias AbsoluteValuable = SignedNumeric & Comparable
+
+extension SignedNumeric where Self : Comparable {
+  @available(swift, obsoleted: 4)
+  @_transparent
+  public static func abs(_ x: Self) -> Self {
+    return Swift.abs(x)
+  }
+}
+
+@available(swift, obsoleted: 4)
 extension BinaryInteger {
   @available(swift, obsoleted: 4)
   public func toIntMax() -> IntMax {
@@ -3593,33 +3610,3 @@ extension SignedInteger where Self : FixedWidthInteger {
   }
 %   end
 }
-
-
-// FIXME(integers): test more of these.
-// FIXME: should maybe be BinaryInteger & Numeric, but <rdar://27619386> prevents it
-@available(*, unavailable, renamed: "Numeric")
-public typealias _IntegerArithmeticType = Numeric
-
-@available(*, unavailable, renamed: "Numeric")
-public typealias IntegerArithmeticType = Numeric
-
-@available(*, unavailable, renamed: "SignedNumeric")
-public typealias SignedNumberType = SignedNumeric
-
-@available(*, unavailable, renamed: "SignedInteger")
-public typealias SignedIntegerType = SignedInteger
-
-@available(*, unavailable, renamed: "UnsignedInteger")
-public typealias UnsignedIntegerType = SignedNumeric
-
-@available(*, unavailable, renamed: "SignedNumeric")
-public typealias AbsoluteValuable = SignedNumeric
-
-@available(*, unavailable, renamed: "FixedWidthInteger")
-public typealias _IntegerType = FixedWidthInteger
-
-@available(*, unavailable, renamed: "FixedWidthInteger")
-public typealias IntegerType = FixedWidthInteger
-
-@available(*, unavailable, renamed: "SignedInteger")
-public typealias _SignedIntegerType = SignedInteger
