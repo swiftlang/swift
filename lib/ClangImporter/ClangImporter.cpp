@@ -228,6 +228,7 @@ namespace {
         getBufferSize()};
       std::error_code error = llvm::sys::Memory::releaseMappedMemory(memory);
       assert(!error && "failed to deallocate read-only zero-filled memory");
+      (void)error;
     }
 
     ZeroFilledMemoryBuffer(const ZeroFilledMemoryBuffer &) = delete;
