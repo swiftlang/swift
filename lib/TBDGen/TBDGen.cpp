@@ -80,6 +80,9 @@ public:
       ASTVisitor::visit(member);
     }
   }
+
+  void visitPatternBindingDecl(PatternBindingDecl *PBD);
+
   void visitValueDecl(ValueDecl *VD);
 
   void visitTypeAliasDecl(TypeAliasDecl *TAD) {
@@ -111,6 +114,25 @@ public:
 };
 }
 
+static bool isGlobalOrStaticVar(VarDecl *VD) {
+  return VD->isStatic() || VD->getDeclContext()->isModuleScopeContext();
+}
+
+void TBDGenVisitor::visitPatternBindingDecl(PatternBindingDecl *PBD) {
+  for (auto &entry : PBD->getPatternList()) {
+    auto *var = entry.getAnchoringVarDecl();
+    if (isPrivateDecl(var))
+      return;
+
+    // Non-global variables might have an explicit initializer symbol.
+    if (entry.getInit() && !isGlobalOrStaticVar(var)) {
+      auto declRef =
+          SILDeclRef(var, SILDeclRef::Kind::StoredPropertyInitializer);
+      addSymbol(declRef.mangle());
+    }
+  }
+}
+
 void TBDGenVisitor::visitValueDecl(ValueDecl *VD) {
   if (isPrivateDecl(VD))
     return;
@@ -132,8 +154,7 @@ void TBDGenVisitor::visitVarDecl(VarDecl *VD) {
     return;
 
   // statically/globally stored variables have some special handling.
-  if (VD->hasStorage() &&
-      (VD->isStatic() || VD->getDeclContext()->isModuleScopeContext())) {
+  if (VD->hasStorage() && isGlobalOrStaticVar(VD)) {
     // The actual variable has a symbol.
     Mangle::ASTMangler mangler;
     addSymbol(mangler.mangleEntity(VD, false));

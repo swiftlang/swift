@@ -1,2 +1,0 @@
-<unknown>:0: error: symbol '_T04test16PublicPropertiesV9publicLetSivfi' (variable initialization expression of test.PublicProperties.publicLet : Swift.Int) is in generated IR file, but not in TBD file
-<unknown>:0: error: symbol '_T04test16PublicPropertiesV9publicVarSivfi' (variable initialization expression of test.PublicProperties.publicVar : Swift.Int) is in generated IR file, but not in TBD file

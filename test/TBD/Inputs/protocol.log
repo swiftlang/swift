@@ -1,6 +1,0 @@
-<unknown>:0: error: symbol '_T04test013PublicPrivateB6StructV13privateVarGetSivfi' (variable initialization expression of test.PublicPrivatePublicStruct.privateVarGet : Swift.Int) is in generated IR file, but not in TBD file
-<unknown>:0: error: symbol '_T04test013PublicPrivateB6StructV16privateVarGetSetSivfi' (variable initialization expression of test.PublicPrivatePublicStruct.privateVarGetSet : Swift.Int) is in generated IR file, but not in TBD file
-<unknown>:0: error: symbol '_T04test014PublicInternalB6StructV14internalVarGetSivfi' (variable initialization expression of test.PublicInternalPublicStruct.internalVarGet : Swift.Int) is in generated IR file, but not in TBD file
-<unknown>:0: error: symbol '_T04test014PublicInternalB6StructV17internalVarGetSetSivfi' (variable initialization expression of test.PublicInternalPublicStruct.internalVarGetSet : Swift.Int) is in generated IR file, but not in TBD file
-<unknown>:0: error: symbol '_T04test06PublicbB6StructV12publicVarGetSivfi' (variable initialization expression of test.PublicPublicPublicStruct.publicVarGet : Swift.Int) is in generated IR file, but not in TBD file
-<unknown>:0: error: symbol '_T04test06PublicbB6StructV15publicVarGetSetSivfi' (variable initialization expression of test.PublicPublicPublicStruct.publicVarGetSet : Swift.Int) is in generated IR file, but not in TBD file

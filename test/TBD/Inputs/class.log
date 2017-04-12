@@ -37,12 +37,10 @@
 <unknown>:0: error: symbol '_T04test16PublicPropertiesC17internalVarGetSetSifm' (test.PublicProperties.internalVarGetSet.materializeForSet : Swift.Int) is in generated IR file, but not in TBD file
 <unknown>:0: error: symbol '_T04test16PublicPropertiesC17internalVarGetSetSifs' (test.PublicProperties.internalVarGetSet.setter : Swift.Int) is in generated IR file, but not in TBD file
 <unknown>:0: error: symbol '_T04test16PublicPropertiesC9publicLetSivWvd' (direct field offset for test.PublicProperties.publicLet : Swift.Int) is in generated IR file, but not in TBD file
-<unknown>:0: error: symbol '_T04test16PublicPropertiesC9publicLetSivfi' (variable initialization expression of test.PublicProperties.publicLet : Swift.Int) is in generated IR file, but not in TBD file
 <unknown>:0: error: symbol '_T04test16PublicPropertiesC9publicVarSifgWo' (witness table offset for test.PublicProperties.publicVar.getter : Swift.Int) is in generated IR file, but not in TBD file
 <unknown>:0: error: symbol '_T04test16PublicPropertiesC9publicVarSifmWo' (witness table offset for test.PublicProperties.publicVar.materializeForSet : Swift.Int) is in generated IR file, but not in TBD file
 <unknown>:0: error: symbol '_T04test16PublicPropertiesC9publicVarSifsWo' (witness table offset for test.PublicProperties.publicVar.setter : Swift.Int) is in generated IR file, but not in TBD file
 <unknown>:0: error: symbol '_T04test16PublicPropertiesC9publicVarSivWvd' (direct field offset for test.PublicProperties.publicVar : Swift.Int) is in generated IR file, but not in TBD file
-<unknown>:0: error: symbol '_T04test16PublicPropertiesC9publicVarSivfi' (variable initialization expression of test.PublicProperties.publicVar : Swift.Int) is in generated IR file, but not in TBD file
 <unknown>:0: error: symbol '_T04test16PublicPropertiesCACycfc' (test.PublicProperties.init() -> test.PublicProperties) is in generated IR file, but not in TBD file
 <unknown>:0: error: symbol '_T04test16PublicPropertiesCMm' (metaclass for test.PublicProperties) is in generated IR file, but not in TBD file
 <unknown>:0: error: symbol '_T04test16PublicPropertiesCfd' (test.PublicProperties.deinit) is in generated IR file, but not in TBD file
