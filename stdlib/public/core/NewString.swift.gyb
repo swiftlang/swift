@@ -1365,4 +1365,27 @@ extension String.Content {
   }
 }
 
+extension String.Content.${View} : CustomStringConvertible, CustomDebugStringConvertible {
+  public var description: String {
+    return String(content: self.content)
+  }
+
+  public var debugDescription: String {
+    return "String.Content.${View}(\(self.description.debugDescription))"
+  }
+}
+
+// Reflection
+extension String.Content.${View} : CustomReflectable {
+  public var customMirror: Mirror {
+    return Mirror(self, unlabeledChildren: self)
+  }
+}
+
+extension String.Content.${View} : CustomPlaygroundQuickLookable {
+  public var customPlaygroundQuickLook: PlaygroundQuickLook {
+    return .text(description)
+  }
+}
+
 % end

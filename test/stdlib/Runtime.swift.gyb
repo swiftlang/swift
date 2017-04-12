@@ -1229,7 +1229,7 @@ Reflection.test("String.UTF8View/Mirror") {
   dump("\u{61}\u{304b}\u{3099}".utf8, to: &output)
 
   let expected =
-    "▿ UTF8View(\"\u{61}\u{304b}\u{3099}\")\n" +
+    "▿ String.Content.UTF8View(\"\u{61}\u{304b}\u{3099}\")\n" +
     "  - 97\n" +
     "  - 227\n" +
     "  - 129\n" +
@@ -1250,7 +1250,7 @@ Reflection.test("String.UTF16View/Mirror") {
   dump("\u{61}\u{304b}\u{3099}\u{1f425}".utf16, to: &output)
 
   let expected =
-    "▿ StringUTF16(\"\u{61}\u{304b}\u{3099}\u{1f425}\")\n" +
+    "▿ String.Content.UTF16View(\"\u{61}\u{304b}\u{3099}\u{1f425}\")\n" +
     "  - 97\n" +
     "  - 12363\n" +
     "  - 12441\n" +
@@ -1269,7 +1269,7 @@ Reflection.test("String.UnicodeScalarView/Mirror") {
   dump("\u{61}\u{304b}\u{3099}\u{1f425}".unicodeScalars, to: &output)
 
   let expected =
-    "▿ StringUnicodeScalarView(\"\u{61}\u{304b}\u{3099}\u{1f425}\")\n" +
+    "▿ String.Content.UnicodeScalarView(\"\u{61}\u{304b}\u{3099}\u{1f425}\")\n" +
     "  - \"\u{61}\"\n" +
     "  - \"\\u{304B}\"\n" +
     "  - \"\\u{3099}\"\n" +
