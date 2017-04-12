@@ -52,10 +52,12 @@ struct AccessMarkerElimination : SILModuleTransform {
           if (auto beginAccess = dyn_cast<BeginAccessInst>(inst)) {
             beginAccess->replaceAllUsesWith(beginAccess->getSource());
             II = BB.erase(beginAccess);
+            continue;
           }
           if (auto endAccess = dyn_cast<EndAccessInst>(inst)) {
             assert(endAccess->use_empty());
             II = BB.erase(endAccess);
+            continue;
           }
         }
       }
