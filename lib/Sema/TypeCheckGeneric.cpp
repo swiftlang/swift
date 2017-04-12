@@ -350,7 +350,7 @@ void TypeChecker::checkGenericParamList(GenericSignatureBuilder *builder,
                             options, resolver))
       continue;
 
-    if (builder && builder->addRequirement(&req))
+    if (builder && isErrorResult(builder->addRequirement(&req)))
       req.setInvalid();
   }
 }
