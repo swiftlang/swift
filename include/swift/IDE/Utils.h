@@ -341,7 +341,63 @@ public:
       auto P = StartEnds[I];
       return StringRef(OS.begin() + P.first, P.second - P.first);
     }
-  };
+};
+
+enum class RegionType {
+  Unmatched,
+  Mismatch,
+  ActiveCode,
+  InactiveCode,
+  String,
+  Selector,
+  Comment,
+};
+
+enum class NoteRegionKind {
+  BaseName,
+};
+
+struct NoteRegion {
+  NoteRegionKind Kind;
+  unsigned Offset;
+  unsigned Length;
+};
+
+struct Replacement {
+  CharSourceRange Range;
+  StringRef Text;
+  ArrayRef<NoteRegion> RegionsWorthNote;
+};
+
+class EditConsumer {
+public:
+  virtual void accept(SourceManager &SM, RegionType RegionType, ArrayRef<Replacement> Replacements) = 0;
+  virtual ~EditConsumer() = default;
+  void accept(SourceManager &SM, CharSourceRange Range, StringRef Text, ArrayRef<NoteRegion> SubRegions = {});
+  void accept(SourceManager &SM, SourceLoc Loc, StringRef Text, ArrayRef<NoteRegion> SubRegions = {});
+  void insertAfter(SourceManager &SM, SourceLoc Loc, StringRef Text, ArrayRef<NoteRegion> SubRegions = {});
+  void accept(SourceManager &SM, Replacement Replacement) { accept(SM, RegionType::ActiveCode, {Replacement}); }
+};
+
+class EditJsonConsumer : public EditConsumer {
+  struct Implementation;
+  Implementation &Impl;
+public:
+  EditJsonConsumer(llvm::raw_ostream &OS);
+  ~EditJsonConsumer();
+  void accept(SourceManager &SM, RegionType RegionType, ArrayRef<Replacement> Replacements) override;
+};
+
+class EditOutputConsumer : public EditConsumer {
+  struct Implementation;
+  Implementation &Impl;
+
+public:
+  EditOutputConsumer(SourceManager &SM, unsigned BufferId,
+                                llvm::raw_ostream &OS);
+  ~EditOutputConsumer();
+  void accept(SourceManager &SM, RegionType RegionType, ArrayRef<Replacement> Replacements) override;
+};
 } // namespace ide
 } // namespace swift
 
