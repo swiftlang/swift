@@ -7,12 +7,16 @@ protocol P1 {
 class Base<T> : P1 {
   typealias DependentClass = T
 
+  required init(classInit: ()) {}
+
   func classSelfReturn() -> Self {}
 }
 
 protocol P2 {
   typealias FullyConcrete = Int
   typealias DependentProtocol = Self
+
+  init(protocolInit: ())
 
   func protocolSelfReturn() -> Self
 }
@@ -21,6 +25,14 @@ typealias BaseAndP2<T> = Base<T> & P2
 typealias BaseIntAndP2 = BaseAndP2<Int>
 
 class Derived : Base<Int>, P2 {
+  required init(protocolInit: ()) {
+    super.init(classInit: ())
+  }
+
+  required init(classInit: ()) {
+    super.init(classInit: ())
+  }
+
   func protocolSelfReturn() -> Self {}
 }
 
@@ -147,6 +159,14 @@ func conformsToBaseIntAndP2WithWhereClause<T>(_: T) where T : Base<Int> & P2 {}
 // expected-note@-1 2 {{in call to function 'conformsToBaseIntAndP2WithWhereClause'}}
 
 class FakeDerived : Base<String>, P2 {
+  required init(classInit: ()) {
+    super.init(classInit: ())
+  }
+
+  required init(protocolInit: ()) {
+    super.init(classInit: ())
+  }
+
   func protocolSelfReturn() -> Self { return self }
 }
 
@@ -177,6 +197,16 @@ func metatypeSubtyping(
   let _: P2.Type = derivedAndAnyObject
   let _: (P2 & AnyObject).Type = derived
   let _: (P2 & AnyObject).Type = derivedAndAnyObject
+
+  // Initializers
+  let _: Base<Int> & P2 = baseIntAndP2.init(classInit: ())
+  let _: Base<Int> & P2 = baseIntAndP2.init(protocolInit: ())
+  let _: Base<Int> & P2 & AnyObject = baseIntAndP2AndAnyObject.init(classInit: ())
+  let _: Base<Int> & P2 & AnyObject = baseIntAndP2AndAnyObject.init(protocolInit: ())
+  let _: Derived = derived.init(classInit: ())
+  let _: Derived = derived.init(protocolInit: ())
+  let _: Derived & AnyObject = derivedAndAnyObject.init(classInit: ())
+  let _: Derived & AnyObject = derivedAndAnyObject.init(protocolInit: ())
 }
 
 // There's a code path in CSApply that's hard to hit.
@@ -270,6 +300,14 @@ class ClassConformsToClassProtocolGood2 : Derived, ProtoRefinesClass {}
 
 // Subclass existentials inside inheritance clauses
 class CompositionInClassInheritanceClauseAlias : BaseIntAndP2 {
+  required init(classInit: ()) {
+    super.init(classInit: ()) // FIXME: expected-error {{}}
+  }
+
+  required init(protocolInit: ()) {
+    super.init(classInit: ()) // FIXME: expected-error {{}}
+  }
+
   func protocolSelfReturn() -> Self { return self }
   func asBase() -> Base<Int> { return self }
   // FIXME expected-error@-1 {{}}
@@ -277,6 +315,15 @@ class CompositionInClassInheritanceClauseAlias : BaseIntAndP2 {
 
 class CompositionInClassInheritanceClauseDirect : Base<Int> & P2 {
   // expected-error@-1 {{protocol-constrained type is neither allowed nor needed here}}
+
+  required init(classInit: ()) {
+    super.init(classInit: ())
+  }
+
+  required init(protocolInit: ()) {
+    super.init(classInit: ())
+  }
+
   func protocolSelfReturn() -> Self { return self }
   func asBase() -> Base<Int> { return self }
 }

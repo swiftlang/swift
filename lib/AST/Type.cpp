@@ -273,6 +273,8 @@ ExistentialLayout::ExistentialLayout(ProtocolCompositionType *type) {
       isa<ClassDecl>(members[0]->getAnyNominal())) {
     superclass = members[0];
     members = members.slice(1);
+    requiresClass = true;
+    requiresClassImplied = true;
   }
 
   for (auto member : members) {
@@ -598,6 +600,13 @@ bool TypeBase::isAnyObject() {
     return false;
 
   return canTy.getExistentialLayout().isAnyObject();
+}
+
+bool ExistentialLayout::isErrorExistential() const {
+  auto protocols = getProtocols();
+  return (!requiresClass &&
+          protocols.size() == 1 &&
+          protocols[0]->getDecl()->isSpecificProtocol(KnownProtocolKind::Error));
 }
 
 bool ExistentialLayout::isExistentialWithError(ASTContext &ctx) const {
@@ -1562,6 +1571,16 @@ LayoutConstraint TypeBase::getLayoutConstraint() {
   return LayoutConstraint();
 }
 
+bool TypeBase::mayHaveSuperclass() {
+  if (getClassOrBoundGenericClass())
+    return true;
+
+  if (auto archetype = getAs<ArchetypeType>())
+    return (bool)archetype->requiresClass();
+
+  return is<DynamicSelfType>();
+}
+
 Type TypeBase::getSuperclass(LazyResolver *resolver) {
   auto *nominalDecl = getAnyNominal();
   auto *classDecl = dyn_cast_or_null<ClassDecl>(nominalDecl);
@@ -1987,10 +2006,18 @@ getObjCObjectRepresentable(Type type, const DeclContext *dc) {
       return ForeignRepresentableKind::Object;
   }
 
-  // Objective-C existential types.
-  if (type->isObjCExistentialType())
-    return ForeignRepresentableKind::Object;
-  
+  // Objective-C existential types are trivially representable if
+  // they don't have a superclass constraint, or if the superclass
+  // constraint is an @objc class.
+  if (type->isExistentialType()) {
+    auto layout = type->getExistentialLayout();
+    if (layout.isObjC() &&
+        (!layout.superclass ||
+         getObjCObjectRepresentable(layout.superclass, dc) ==
+           ForeignRepresentableKind::Object))
+      return ForeignRepresentableKind::Object;
+  }
+
   // Any can be bridged to id.
   if (type->isAny()) {
     return ForeignRepresentableKind::Bridged;

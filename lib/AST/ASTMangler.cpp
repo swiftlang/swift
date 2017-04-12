@@ -17,6 +17,7 @@
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTVisitor.h"
+#include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/Module.h"
@@ -631,16 +632,32 @@ void ASTMangler::appendType(Type type) {
       appendTypeList(type);
       return appendOperator("t");
 
-    case TypeKind::Protocol:
+    case TypeKind::Protocol: {
+      bool First = true;
+      appendProtocolName(cast<ProtocolType>(tybase)->getDecl());
+      appendListSeparator(First);
+      return appendOperator("p");
+    }
+
     case TypeKind::ProtocolComposition: {
       // We mangle ProtocolType and ProtocolCompositionType using the
       // same production:
       bool First = true;
-      appendProtocolList(type, First);
+      auto layout = type->getExistentialLayout();
+      for (Type protoTy : layout.getProtocols()) {
+        appendProtocolName(protoTy->castTo<ProtocolType>()->getDecl());
+        appendListSeparator(First);
+      }
       if (First)
         appendOperator("y");
+
+      if (layout.superclass) {
+        appendType(layout.superclass);
+        return appendOperator("XE");
+      }
       return appendOperator("p");
     }
+
     case TypeKind::UnboundGeneric:
     case TypeKind::Class:
     case TypeKind::Enum:

@@ -752,6 +752,7 @@ namespace {
 
       bool isSuper = base->isSuperExpr();
 
+      // The formal type of the 'self' value for the call.
       Type baseTy = cs.getType(base)->getRValueType();
 
       // Explicit member accesses are permitted to implicitly look
@@ -801,11 +802,14 @@ namespace {
                                                          cs.getType(ref)));
       }
 
-      // Produce a reference to the type of the container the member
-      // resides in.
+      // The formal type of the 'self' value for the member's declaration.
       Type containerTy =
           refTy->castTo<FunctionType>()
               ->getInput()->getRValueInstanceType();
+
+      // If we have an opened existential, selfTy and baseTy will both be
+      // the same opened existential type.
+      Type selfTy = containerTy;
 
       // If we opened up an existential when referencing this member, update
       // the base accordingly.
@@ -816,7 +820,7 @@ namespace {
       if (knownOpened != solution.OpenedExistentialTypes.end()) {
         base = openExistentialReference(base, knownOpened->second, member);
         baseTy = knownOpened->second;
-        containerTy = baseTy;
+        selfTy = baseTy;
         openedExistential = true;
       }
 
@@ -852,17 +856,18 @@ namespace {
 
         // If the base is already an lvalue with the right base type, we can
         // pass it as an inout qualified type.
-        Type selfTy = containerTy;
+        auto selfParamTy = selfTy;
+
         if (selfTy->isEqual(baseTy))
           if (cs.getType(base)->is<LValueType>())
-            selfTy = InOutType::get(selfTy);
+            selfParamTy = InOutType::get(selfTy);
         base = coerceObjectArgumentToType(
-                 base, selfTy, member, semantics,
+                 base, selfParamTy, member, semantics,
                  locator.withPathElement(ConstraintLocator::MemberRefBase));
       } else {
         // Convert the base to an rvalue of the appropriate metatype.
         base = coerceToType(base,
-                            MetatypeType::get(containerTy),
+                            MetatypeType::get(selfTy),
                             locator.withPathElement(
                               ConstraintLocator::MemberRefBase));
         if (!base)
@@ -6585,9 +6590,6 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
     Expr *result = tc.substituteInputSugarTypeForResult(apply);
     cs.cacheExprTypes(result);
 
-    // Try closing the existential, if there is one.
-    closeExistential(result, locator);
-
     // If we have a covariant result type, perform the conversion now.
     if (covariantResultType) {
       if (covariantResultType->is<FunctionType>())
@@ -6597,6 +6599,9 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
         result = cs.cacheType(new (tc.Context) CovariantReturnConversionExpr(
             result, covariantResultType));
     }
+
+    // Try closing the existential, if there is one.
+    closeExistential(result, locator);
 
     // Extract all arguments.
     auto *CEA = arg;
