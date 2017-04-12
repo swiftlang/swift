@@ -2727,16 +2727,16 @@ ProtocolDecl::getInheritedProtocols() const {
   // FIXME: Gather inherited protocols from the "inherited" list.
   // We shouldn't need this, but it shows up in recursive invocations.
   if (!isRequirementSignatureComputed()) {
+    SmallPtrSet<ProtocolDecl *, 4> known;
     for (auto inherited : getInherited()) {
-      SmallPtrSet<ProtocolDecl *, 4> known;
       if (auto type = inherited.getType()) {
-        if (type->isExistentialType()) {
-          SmallVector<ProtocolDecl *, 4> protocols;
-          type->getExistentialTypeProtocols(protocols);
-          for (auto proto : protocols) {
-            if (known.insert(proto).second)
-              result.push_back(proto);
-          }
+        // Only protocols can appear in the inheritance clause
+        // of a protocol -- anything else should get diagnosed
+        // elsewhere.
+        if (auto *protoTy = type->getAs<ProtocolType>()) {
+          auto *protoDecl = protoTy->getDecl();
+          if (known.insert(protoDecl).second)
+            result.push_back(protoDecl);
         }
       }
     }

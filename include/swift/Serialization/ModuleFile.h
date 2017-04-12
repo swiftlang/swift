@@ -72,6 +72,9 @@ class ModuleFile : public LazyMemberLoader {
   /// The target the module was built for.
   StringRef TargetTriple;
 
+  /// The Swift compatibility version in use when this module was built.
+  StringRef CompatibilityVersion;
+
   /// The data blob containing all of the module's identifiers.
   StringRef IdentifierData;
 
@@ -500,9 +503,7 @@ private:
   bool readCommentBlock(llvm::BitstreamCursor &cursor);
 
   /// Recursively reads a pattern from \c DeclTypeCursor.
-  ///
-  /// If the record at the cursor is not a pattern, returns null.
-  Pattern *maybeReadPattern(DeclContext *owningDC);
+  llvm::Expected<Pattern *> readPattern(DeclContext *owningDC);
 
   ParameterList *readParameterList();
   

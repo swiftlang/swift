@@ -20,6 +20,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/DiagnosticEngine.h"
+#include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ParameterList.h"
@@ -2520,12 +2521,22 @@ bool GenericSignatureBuilder::addTypeRequirement(
 
   // Protocol requirements.
   if (constraintType->isExistentialType()) {
-    // FIXME: "Class" or arbitrary layout requirements.
-    SmallVector<ProtocolDecl *, 4> protocols;
-    (void)constraintType->getExistentialTypeProtocols(protocols);
     bool anyErrors = false;
-    for (auto proto : protocols) {
-      if (addConformanceRequirement(subjectPA, proto, resolvedSource,
+
+    auto layout = constraintType->getExistentialLayout();
+
+    assert((!layout.requiresClass || layout.requiresClassImplied) &&
+           "explicit AnyObject not yet supported");
+
+    if (layout.superclass) {
+      if (addSuperclassRequirementDirect(subjectPA, layout.superclass,
+                                         resolvedSource))
+        anyErrors = true;
+    }
+
+    for (auto *proto : layout.getProtocols()) {
+      auto *protoDecl = proto->getDecl();
+      if (addConformanceRequirement(subjectPA, protoDecl, resolvedSource,
                                     *visited))
         anyErrors = true;
     }

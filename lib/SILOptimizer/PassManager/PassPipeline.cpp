@@ -77,13 +77,16 @@ static void addMandatoryOptPipeline(SILPassPipelinePlan &P,
   if (Options.EnableMandatorySemanticARCOpts) {
     P.addSemanticARCOpts();
   }
+  P.addDiagnoseStaticExclusivity();
   P.addCapturePromotion();
   P.addAllocBoxToStack();
 
   P.addOwnershipModelEliminator();
   P.addNoReturnFolding();
-  P.addAccessMarkerElimination();
   P.addDefiniteInitialization();
+
+  P.addAccessEnforcementSelection();
+  P.addAccessMarkerElimination();
 
   P.addMandatoryInlining();
   P.addPredictableMemoryOptimizations();

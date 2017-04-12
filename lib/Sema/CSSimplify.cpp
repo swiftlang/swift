@@ -16,6 +16,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "ConstraintSystem.h"
+#include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/Basic/StringExtras.h"
 #include "swift/ClangImporter/ClangModule.h"
@@ -1180,11 +1181,27 @@ ConstraintSystem::matchExistentialTypes(Type type1, Type type2,
   if (!type2->isExistentialType())
     return SolutionKind::Error;
 
-  SmallVector<ProtocolDecl *, 4> protocols;
-  type2->getExistentialTypeProtocols(protocols);
+  auto layout = type2->getExistentialLayout();
 
-  for (auto proto : protocols) {
-    switch (simplifyConformsToConstraint(type1, proto, kind, locator,
+  assert((!layout.requiresClass || layout.requiresClassImplied) &&
+         "explicit AnyObject not yet supported");
+
+  if (layout.superclass) {
+    auto subKind = std::min(ConstraintKind::Subtype, kind);
+    switch (matchTypes(type1, layout.superclass, subKind, subflags, locator)) {
+    case SolutionKind::Solved:
+    case SolutionKind::Unsolved:
+      break;
+
+    case SolutionKind::Error:
+      return SolutionKind::Error;
+    }
+  }
+
+  for (auto *proto : layout.getProtocols()) {
+    auto *protoDecl = proto->getDecl();
+
+    switch (simplifyConformsToConstraint(type1, protoDecl, kind, locator,
                                          subflags)) {
       case SolutionKind::Solved:
       case SolutionKind::Unsolved:
@@ -1809,14 +1826,14 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
     }
 
     // Subclass-to-superclass conversion.
-    if (type1->mayHaveSuperclass() && type2->mayHaveSuperclass() &&
+    if (type1->mayHaveSuperclass() &&
+        type2->mayHaveSuperclass() &&
         type2->getClassOrBoundGenericClass() &&
         type1->getClassOrBoundGenericClass()
           != type2->getClassOrBoundGenericClass()) {
-      assert(!type2->is<LValueType>() && "Unexpected lvalue type!");
       conversionsOrFixes.push_back(ConversionRestrictionKind::Superclass);
     }
-    
+
     // T -> AnyHashable.
     if (isAnyHashableType(desugar2)) {
       // Don't allow this in operator contexts or we'll end up allowing
@@ -2059,18 +2076,31 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
   // equivalent to a conformance relationship on the instance types.
   // This applies to nested metatype levels, so if A : P then
   // A.Type : P.Type.
-  if (concrete && kind >= ConstraintKind::Subtype &&
-      type1->is<MetatypeType>() && type2->is<ExistentialMetatypeType>()) {
+  if (concrete &&
+      kind >= ConstraintKind::Subtype &&
+      type1->is<MetatypeType>() &&
+      type2->is<ExistentialMetatypeType>()) {
     conversionsOrFixes.push_back(
       ConversionRestrictionKind::MetatypeToExistentialMetatype);
   }
-  
+
+  // An existential metatype can be upcast to a class metatype if the
+  // existential contains a superclass constraint.
+  if (concrete &&
+      kind >= ConstraintKind::Subtype &&
+      type1->is<ExistentialMetatypeType>() &&
+      type2->is<MetatypeType>()) {
+    conversionsOrFixes.push_back(
+      ConversionRestrictionKind::ExistentialMetatypeToMetatype);
+  }
+
   // Instance type check for the above. We are going to check conformance once
   // we hit commit_to_conversions below, but we have to add a token restriction
   // to ensure we wrap the metatype value in a metatype erasure.
-  if (concrete && type2->isExistentialType() &&
+  if (concrete &&
+      kind >= ConstraintKind::Subtype &&
       !type1->is<LValueType>() &&
-      kind >= ConstraintKind::Subtype) {
+      type2->isExistentialType()) {
 
     // Penalize conversions to Any.
     if (kind >= ConstraintKind::Conversion && type2->isAny())
@@ -3760,7 +3790,9 @@ retry:
 
     // If our type constraints is for a FunctionType, move over the @noescape
     // flag.
-    if (func1->isNoEscape() && !func2->isNoEscape()) {
+    if (func1->isNoEscape() &&
+        !func2->isNoEscape() &&
+        func2->hasTypeVariable()) {
       auto &extraExtInfo = extraFunctionAttrs[func2];
       extraExtInfo = extraExtInfo.withNoEscape();
     }
@@ -3891,10 +3923,10 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
                                  subflags, locator);
 
   // for $< in { <, <c, <oc }:
-  //   for T protocol,
-  //     T : S ===> T.Protocol $< S.Type
-  //   else,
-  //     T : S ===> T.Type $< S.Type
+  //   for P protocol, Q protocol,
+  //     P : Q ===> T.Protocol $< Q.Type
+  //   for P protocol, Q protocol,
+  //     P $< Q ===> P.Type $< Q.Type
   case ConversionRestrictionKind::MetatypeToExistentialMetatype:
     addContextualScore();
 
@@ -3905,6 +3937,27 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
              subflags,
              locator.withPathElement(ConstraintLocator::InstanceType));
 
+  // for $< in { <, <c, <oc }:
+  //   for P protocol, C class, D class,
+  //     (P & C) : D ===> (P & C).Type $< D.Type
+  case ConversionRestrictionKind::ExistentialMetatypeToMetatype: {
+    addContextualScore();
+
+    auto instance1 = type1->castTo<ExistentialMetatypeType>()->getInstanceType();
+    auto instance2 = type2->castTo<MetatypeType>()->getInstanceType();
+    auto superclass1 = TC.getSuperClassOf(instance1);
+
+    if (!superclass1)
+      return SolutionKind::Error;
+
+    return matchTypes(
+             superclass1,
+             instance2,
+             ConstraintKind::Subtype,
+             subflags,
+             locator.withPathElement(ConstraintLocator::InstanceType));
+
+  }
   // for $< in { <, <c, <oc }:
   //   T $< U ===> T $< U?
   case ConversionRestrictionKind::ValueToOptional: {

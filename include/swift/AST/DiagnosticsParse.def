@@ -699,9 +699,9 @@ ERROR(tuple_type_multiple_labels,none,
 
 // Protocol Types
 ERROR(expected_rangle_protocol,PointsToFirstBadToken,
-      "expected '>' to complete protocol composition type", ())
+      "expected '>' to complete protocol-constrained type", ())
 ERROR(disallowed_protocol_composition,PointsToFirstBadToken,
-      "protocol composition is neither allowed nor needed here", ())
+      "protocol-constrained type is neither allowed nor needed here", ())
 
 WARNING(deprecated_protocol_composition,none,
         "'protocol<...>' composition syntax is deprecated; join the protocols using '&'", ())
@@ -1361,7 +1361,7 @@ ERROR(unexpected_class_constraint,none,
 NOTE(suggest_anyobject,none,
      "did you mean to constrain %0 with the 'AnyObject' protocol?", (Identifier))
 ERROR(expected_generics_type_restriction,none,
-      "expected a type name or protocol composition restricting %0",
+      "expected a class type or protocol-constrained type restricting %0",
       (Identifier))
 ERROR(requires_single_equal,none,
       "use '==' for same-type requirements rather than '='", ())

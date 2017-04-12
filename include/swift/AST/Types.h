@@ -584,6 +584,9 @@ public:
   /// its list of protocols.
   void getAnyExistentialTypeProtocols(SmallVectorImpl<ProtocolDecl *> &protocols);
 
+  /// Break an existential down into a set of constraints.
+  ExistentialLayout getExistentialLayout();
+
   /// Determines the element type of a known *UnsafeMutablePointer
   /// variant, or returns null if the type is not a pointer.
   Type getAnyPointerElementType(PointerTypeKind &PTK);
@@ -3602,7 +3605,7 @@ public:
   }
 
   /// True if only classes may conform to the protocol.
-  bool requiresClass() const;
+  bool requiresClass();
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {
@@ -3669,16 +3672,13 @@ public:
   /// \brief Retrieve the set of protocols composed to create this type.
   ArrayRef<Type> getProtocols() const { return Protocols; }
 
-  /// \brief Return the protocols of this type in canonical order.
-  void getAnyExistentialTypeProtocols(SmallVectorImpl<ProtocolDecl *> &protos);
-
   void Profile(llvm::FoldingSetNodeID &ID) {
     Profile(ID, Protocols);
   }
   static void Profile(llvm::FoldingSetNodeID &ID, ArrayRef<Type> Protocols);
 
   /// True if one or more of the protocols is class.
-  bool requiresClass() const;
+  bool requiresClass();
   
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {
@@ -3689,10 +3689,11 @@ private:
   static ProtocolCompositionType *build(const ASTContext &C,
                                         ArrayRef<Type> Protocols);
 
-  ProtocolCompositionType(const ASTContext *Ctx, ArrayRef<Type> Protocols)
-    : TypeBase(TypeKind::ProtocolComposition, /*Context=*/Ctx,
-               RecursiveTypeProperties()),
-      Protocols(Protocols) { }
+  ProtocolCompositionType(const ASTContext *ctx, ArrayRef<Type> protocols,
+                          RecursiveTypeProperties properties)
+    : TypeBase(TypeKind::ProtocolComposition, /*Context=*/ctx,
+               properties),
+      Protocols(protocols) { }
 };
 BEGIN_CAN_TYPE_WRAPPER(ProtocolCompositionType, Type)
   /// In the canonical representation, these are all ProtocolTypes.
@@ -4555,8 +4556,13 @@ inline bool TypeBase::mayHaveSuperclass() {
   if (getClassOrBoundGenericClass())
     return true;
 
+  // FIXME: requiresClass() is not the same as having an explicit superclass;
+  // is this wrong?
   if (auto archetype = getAs<ArchetypeType>())
     return (bool)archetype->requiresClass();
+
+  if (isExistentialType())
+    return (bool)getSuperclass(nullptr);
 
   return is<DynamicSelfType>();
 }
