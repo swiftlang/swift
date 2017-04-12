@@ -1376,6 +1376,7 @@ extension String.Content.${View} : UnicodeView {
       forward=switchContent,
       wrap_index='x.%s.anyIndex' % view,
       unwrap_index='x.%s.nativeIndex' % view,
+      bounds_check_access=True,
       nonmutating=True,
       Element=Element)}
   
