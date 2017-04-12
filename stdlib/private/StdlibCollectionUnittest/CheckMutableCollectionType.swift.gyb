@@ -26,6 +26,8 @@ public struct PartitionExhaustiveTest {
   }
 }
 
+enum SillyError : Error { case JazzHands }
+
 public let partitionExhaustiveTests = [
   PartitionExhaustiveTest([]),
   PartitionExhaustiveTest([ 10 ]),
@@ -47,6 +49,20 @@ public let partitionExhaustiveTests = [
   PartitionExhaustiveTest([ 10, 20, 30, 40, 50 ]),
   PartitionExhaustiveTest([ 10, 20, 30, 40, 50, 60 ]),
 ]
+
+//Random collection of 30 elements
+ public let largeElementSortTests = [
+   [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15,
+     16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30],
+   [30, 29, 28, 27, 26, 25, 24, 23, 22, 21, 20, 19, 18,
+     17, 16, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1],
+   [30, 29, 28, 27, 26, 25,  20, 19, 18, 5, 4, 3, 2, 1,
+     15, 14, 13, 12, 11, 10, 9, 24, 23, 22, 21, 8, 17, 16, 7, 6],
+   [30, 29, 25, 20, 19, 18, 5, 4, 3, 2, 1, 28, 27, 26,
+     15, 14, 13, 12,  24, 23, 22, 21, 8, 17, 16, 7, 6,  11, 10, 9],
+   [3, 2, 1, 20, 19, 18, 5, 4, 28, 27, 26, 11, 10, 9,
+     15, 14, 13, 12,  24, 23, 22, 21, 8, 17, 16, 7, 6, 30, 29, 25],
+ ]
 
 public func withInvalidOrderings(_ body: (@escaping (Int, Int) -> Bool) -> Void) {
   // Test some ordering predicates that don't create strict weak orderings
@@ -463,6 +479,61 @@ self.test("\(testNamePrefix)._withUnsafeMutableBufferPointerIfSupported()/semant
 // sort()
 //===----------------------------------------------------------------------===//
 
+func checkSortedPredicateThrow(
+  sequence: [Int],
+  lessImpl: ((Int, Int) -> Bool),
+  throwIndex: Int
+) {
+  let extract = extractValue
+  let throwElement = sequence[throwIndex]
+  var thrown = false
+  let elements: [OpaqueValue<Int>] =
+    zip(sequence, 0..<sequence.count).map {
+      OpaqueValue($0, identity: $1)
+    }
+  var result: [C.Iterator.Element] = []
+  let c = makeWrappedCollection(elements)
+  let closureLifetimeTracker = LifetimeTracked(0)
+  do {
+    result = try c.sorted {
+      (lhs, rhs) throws -> Bool in
+      _blackHole(closureLifetimeTracker)
+      if  throwElement == extractValue(rhs).value {
+        thrown = true
+        throw SillyError.JazzHands
+      }
+      return lessImpl(extractValue(lhs).value, extractValue(rhs).value)
+    }
+  } catch {}
+
+  // Check that the original collection is unchanged.
+  expectEqualSequence(
+    elements.map { $0.value },
+    c.map { extract($0).value })
+   
+  // If `sorted` throws then result will be empty else
+  // returned result must be sorted.
+  if thrown {
+    expectEqual(0, result.count)
+  } else {
+    // Check that the elements are sorted.
+    let extractedResult = result.map(extract)
+    for i in extractedResult.indices {
+      if i != extractedResult.index(before: extractedResult.endIndex) {
+        let first = extractedResult[i].value
+        let second = extractedResult[extractedResult.index(after: i)].value
+        let result = lessImpl(second, first)
+        if result == true {
+          print("yep ** Result should be true \(result)")
+        } else {
+          print("yep ** Test passed reult is false")
+        }
+        expectFalse(result)
+      }
+    }
+  }
+}
+
 % for predicate in [False, True]:
 
 self.test("\(testNamePrefix).sorted/DispatchesThrough_withUnsafeMutableBufferPointerIfSupported/${'Predicate' if predicate else 'WhereElementIsComparable'}") {
@@ -583,6 +654,30 @@ self.test("\(testNamePrefix).sorted/${'Predicate' if predicate else 'WhereElemen
           lessImpl: comparisonPredicate,
           verifyOrder: false)
       }
+    }
+  }
+}
+
+self.test("\(testNamePrefix).sorted/ThrowingPredicate") {
+  for test in partitionExhaustiveTests {
+    forAllPermutations(test.sequence) { (sequence) in
+      for i in 0..<sequence.count {
+      checkSortedPredicateThrow(
+       sequence: sequence,
+       lessImpl: { $0 < $1 },
+       throwIndex: i)
+      }
+    }
+  }
+}
+
+self.test("\(testNamePrefix).sorted/ThrowingPredicateWithLargeNumberElememts") {
+  for sequence in largeElementSortTests {
+      for i in 0..<sequence.count {
+      checkSortedPredicateThrow(
+       sequence: sequence,
+       lessImpl: { $0 < $1 },
+       throwIndex: i)
     }
   }
 }
@@ -921,6 +1016,36 @@ self.test("\(testNamePrefix).partition/DispatchesThrough_withUnsafeMutableBuffer
 // sort()
 //===----------------------------------------------------------------------===//
 
+func checkSortPredicateThrow(
+  sequence: [Int],
+  lessImpl: ((Int, Int) -> Bool),
+  throwIndex: Int
+) {
+  let extract = extractValue
+  let throwElement = sequence[throwIndex]
+  let elements: [OpaqueValue<Int>] =
+    zip(sequence, 0..<sequence.count).map {
+      OpaqueValue($0, identity: $1)
+    }
+  var c = makeWrappedCollection(elements)
+  let closureLifetimeTracker = LifetimeTracked(0)
+  do {
+    try c.sort {
+      (lhs, rhs) throws -> Bool in
+      _blackHole(closureLifetimeTracker)
+      if  throwElement == extractValue(rhs).value {
+        throw SillyError.JazzHands
+      }
+      return lessImpl(extractValue(lhs).value, extractValue(rhs).value)
+    }
+  } catch {}
+  
+  //Check no element should lost and added
+  expectEqualsUnordered(
+    sequence,
+    c.map { extract($0).value })
+}
+
 % for predicate in [False, True]:
 
 func checkSortInPlace_${'Predicate' if predicate else 'WhereElementIsComparable'}(
@@ -1005,6 +1130,30 @@ self.test("\(testNamePrefix).sort/${'Predicate' if predicate else 'WhereElementI
   }
 }
 
+self.test("\(testNamePrefix).sort/ThrowingPredicate") {
+  for test in partitionExhaustiveTests {
+    forAllPermutations(test.sequence) { (sequence) in
+      for i in 0..<sequence.count {
+        checkSortPredicateThrow(
+         sequence: sequence,
+         lessImpl: { $0 < $1 },
+         throwIndex: i)
+      }
+    }
+  }
+}
+
+self.test("\(testNamePrefix).sort/ThrowingPredicateWithLargeNumberElements") {
+  for sequence in largeElementSortTests {
+    for i in 0..<sequence.count {
+      checkSortPredicateThrow(
+        sequence: sequence,
+        lessImpl: { $0 < $1 },
+        throwIndex: i)
+    }
+  }
+}
+ 
 % end
 
 //===----------------------------------------------------------------------===//
