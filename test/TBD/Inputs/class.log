@@ -24,7 +24,5 @@
 <unknown>:0: error: symbol '_T04test16PublicPropertiesC17internalVarGetSetSifg' (test.PublicProperties.internalVarGetSet.getter : Swift.Int) is in generated IR file, but not in TBD file
 <unknown>:0: error: symbol '_T04test16PublicPropertiesC17internalVarGetSetSifm' (test.PublicProperties.internalVarGetSet.materializeForSet : Swift.Int) is in generated IR file, but not in TBD file
 <unknown>:0: error: symbol '_T04test16PublicPropertiesC17internalVarGetSetSifs' (test.PublicProperties.internalVarGetSet.setter : Swift.Int) is in generated IR file, but not in TBD file
-<unknown>:0: error: symbol '_T04test16PublicPropertiesC9publicLetSivWvd' (direct field offset for test.PublicProperties.publicLet : Swift.Int) is in generated IR file, but not in TBD file
-<unknown>:0: error: symbol '_T04test16PublicPropertiesC9publicVarSivWvd' (direct field offset for test.PublicProperties.publicVar : Swift.Int) is in generated IR file, but not in TBD file
 <unknown>:0: error: symbol '_T04test16PublicPropertiesCACycfc' (test.PublicProperties.init() -> test.PublicProperties) is in generated IR file, but not in TBD file
 <unknown>:0: error: symbol '_T04test16PublicPropertiesCfd' (test.PublicProperties.deinit) is in generated IR file, but not in TBD file

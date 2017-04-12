@@ -227,6 +227,13 @@ void TBDGenVisitor::visitClassDecl(ClassDecl *CD) {
     if (hasWitnessTableOffset) {
       addSymbol(LinkEntity::forWitnessTableOffset(value));
     }
+
+    auto var = dyn_cast<VarDecl>(value);
+    auto hasFieldOffset = var && var->hasStorage() && !var->isStatic();
+    if (hasFieldOffset) {
+      // These fields are always direct.
+      addSymbol(LinkEntity::forFieldOffset(var, /*isIndirect=*/false));
+    }
   }
 
   visitNominalTypeDecl(CD);
