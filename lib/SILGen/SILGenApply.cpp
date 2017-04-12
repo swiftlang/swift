@@ -1517,8 +1517,9 @@ static RValue emitStringLiteral(SILGenFunction &SGF, Expr *E, StringRef Str,
       break;
     }
   }
-
+  bool useConstantStringBuiltin = false;
   StringLiteralInst::Encoding instEncoding;
+  ConstStringLiteralInst::Encoding constInstEncoding;
   switch (encoding) {
   case StringLiteralExpr::UTF8:
     instEncoding = StringLiteralInst::Encoding::UTF8;
@@ -1528,6 +1529,16 @@ static RValue emitStringLiteral(SILGenFunction &SGF, Expr *E, StringRef Str,
   case StringLiteralExpr::UTF16: {
     instEncoding = StringLiteralInst::Encoding::UTF16;
     Length = unicode::getUTF16Length(Str);
+    break;
+  }
+  case StringLiteralExpr::UTF8ConstString:
+    constInstEncoding = ConstStringLiteralInst::Encoding::UTF8;
+    useConstantStringBuiltin = true;
+    break;
+
+  case StringLiteralExpr::UTF16ConstString: {
+    constInstEncoding = ConstStringLiteralInst::Encoding::UTF16;
+    useConstantStringBuiltin = true;
     break;
   }
   case StringLiteralExpr::OneUnicodeScalar: {
@@ -1540,8 +1551,18 @@ static RValue emitStringLiteral(SILGenFunction &SGF, Expr *E, StringRef Str,
   }
   }
 
+  // Should we build a constant string literal?
+  if (useConstantStringBuiltin) {
+    auto *string = SGF.B.createConstStringLiteral(E, Str, constInstEncoding);
+    ManagedValue Elts[] = {ManagedValue::forUnmanaged(string)};
+    TupleTypeElt TypeElts[] = {Elts[0].getType().getSwiftRValueType()};
+    CanType ty =
+        TupleType::get(TypeElts, SGF.getASTContext())->getCanonicalType();
+    return RValue::withPreExplodedElements(Elts, ty);
+  }
+
   // The string literal provides the data.
-  StringLiteralInst *string = SGF.B.createStringLiteral(E, Str, instEncoding);
+  auto *string = SGF.B.createStringLiteral(E, Str, instEncoding);
 
   // The length is lowered as an integer_literal.
   auto WordTy = SILType::getBuiltinWordType(SGF.getASTContext());
