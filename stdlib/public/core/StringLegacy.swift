@@ -48,11 +48,6 @@ extension String {
     let scalarSlices = unicodeScalars.split { $0 == separator }
     return scalarSlices.map { String($0) }
   }
-
-  /// A Boolean value indicating whether a string has no characters.
-  public var isEmpty: Bool {
-    return _core.count == 0
-  }
 }
 
 extension String {
