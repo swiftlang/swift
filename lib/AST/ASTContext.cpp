@@ -1277,9 +1277,50 @@ GenericSignatureBuilder *ASTContext::getOrCreateGenericSignatureBuilder(
     llvm::errs() << "Original generic signature   : ";
     sig->print(llvm::errs());
     llvm::errs() << "\nReprocessed generic signature: ";
-    builder->getGenericSignature()->getCanonicalSignature()
-    ->print(llvm::errs());
+    auto reprocessedSig =
+    builder->getGenericSignature()->getCanonicalSignature();
+
+    reprocessedSig->print(llvm::errs());
     llvm::errs() << "\n";
+
+    if (sig->getGenericParams().size() ==
+          reprocessedSig->getGenericParams().size() &&
+        sig->getRequirements().size() ==
+          reprocessedSig->getRequirements().size()) {
+      for (unsigned i : indices(sig->getRequirements())) {
+        auto sigReq = sig->getRequirements()[i];
+        auto reprocessedReq = reprocessedSig->getRequirements()[i];
+        if (sigReq.getKind() != reprocessedReq.getKind()) {
+          llvm::errs() << "Requirement mismatch:\n";
+          llvm::errs() << "  Original: ";
+          sigReq.print(llvm::errs(), PrintOptions());
+          llvm::errs() << "\n  Reprocessed: ";
+          reprocessedReq.print(llvm::errs(), PrintOptions());
+          llvm::errs() << "\n";
+          break;
+        }
+
+        if (!sigReq.getFirstType()->isEqual(reprocessedReq.getFirstType())) {
+          llvm::errs() << "First type mismatch, original is:\n";
+          sigReq.getFirstType().dump(llvm::errs());
+          llvm::errs() << "Reprocessed:\n";
+          reprocessedReq.getFirstType().dump(llvm::errs());
+          llvm::errs() << "\n";
+          break;
+        }
+
+        if (sigReq.getKind() == RequirementKind::SameType &&
+            !sigReq.getSecondType()->isEqual(reprocessedReq.getSecondType())) {
+          llvm::errs() << "Second type mismatch, original is:\n";
+          sigReq.getSecondType().dump(llvm::errs());
+          llvm::errs() << "Reprocessed:\n";
+          reprocessedReq.getSecondType().dump(llvm::errs());
+          llvm::errs() << "\n";
+          break;
+        }
+      }
+    }
+
     llvm_unreachable("idempotency problem with a generic signature");
   }
 #endif
