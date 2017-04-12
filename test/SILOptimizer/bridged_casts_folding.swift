@@ -39,7 +39,7 @@ var nsString: NSString = "string"
 // CHECK: return
 @inline(never)
 public func testForcedCastNStoSwiftString() -> String {
-  var o: String = forcedCast(nsString)
+  let o: String = forcedCast(nsString)
   return o
 }
 
@@ -49,7 +49,7 @@ public func testForcedCastNStoSwiftString() -> String {
 // CHECK: return
 @inline(never)
 public func testCondCastNStoSwiftString() -> String? {
-  var o: String? = condCast(nsString)
+  let o: String? = condCast(nsString)
   return o
 }
 
@@ -64,7 +64,7 @@ var nsIntNumber = NSNumber(value: 1)
 // CHECK: return
 @inline(never)
 public func testForcedCastNSNumberToSwiftInt() -> Int {
-  var o: Int = forcedCast(nsIntNumber)
+  let o: Int = forcedCast(nsIntNumber)
   return o
 }
 
@@ -74,7 +74,7 @@ public func testForcedCastNSNumberToSwiftInt() -> Int {
 // CHECK: return
 @inline(never)
 public func testCondCastNSNumberToSwiftInt() -> Int? {
-  var o: Int? = condCast(nsIntNumber)
+  let o: Int? = condCast(nsIntNumber)
   return o
 }
 
@@ -88,7 +88,7 @@ var nsDoubleNumber = NSNumber(value: 1.234)
 // CHECK: return
 @inline(never)
 public func testForcedCastNSNumberToSwiftDouble() -> Double {
-  var o: Double = forcedCast(nsDoubleNumber)
+  let o: Double = forcedCast(nsDoubleNumber)
   return o
 }
 
@@ -98,7 +98,7 @@ public func testForcedCastNSNumberToSwiftDouble() -> Double {
 // CHECK: return
 @inline(never)
 public func testCondCastNSNumberToSwiftDouble() -> Double? {
-  var o: Double? = condCast(nsDoubleNumber)
+  let o: Double? = condCast(nsDoubleNumber)
   return o
 }
 
@@ -108,7 +108,7 @@ public func testCondCastNSNumberToSwiftDouble() -> Double? {
 // CHECK: return
 @inline(never)
 public func testForcedCastNSIntNumberToSwiftDouble() -> Double {
-  var o: Double = forcedCast(nsIntNumber)
+  let o: Double = forcedCast(nsIntNumber)
   return o
 }
 
@@ -118,7 +118,7 @@ public func testForcedCastNSIntNumberToSwiftDouble() -> Double {
 // CHECK: return
 @inline(never)
 public func testCondCastNSIntNumberToSwiftDouble() -> Double? {
-  var o: Double? = condCast(nsIntNumber)
+  let o: Double? = condCast(nsIntNumber)
   return o
 }
 
@@ -136,7 +136,7 @@ var nsArrString: NSArray = ["One", "Two", "Three", "Four"]
 // CHECK: return
 @inline(never)
 public func testForcedCastNStoSwiftArrayInt() -> [Int] {
-  var arr: [Int] = forcedCast(nsArrInt)
+  let arr: [Int] = forcedCast(nsArrInt)
   return arr
 }
 
@@ -146,7 +146,7 @@ public func testForcedCastNStoSwiftArrayInt() -> [Int] {
 // CHECK: return
 @inline(never)
 public func testCondCastNStoSwiftArrayInt() -> [Int]? {
-  var arrOpt: [Int]? = condCast(nsArrInt)
+  let arrOpt: [Int]? = condCast(nsArrInt)
   return arrOpt
 }
 
@@ -156,7 +156,7 @@ public func testCondCastNStoSwiftArrayInt() -> [Int]? {
 // CHECK: return
 @inline(never)
 public func testForcedCastNStoSwiftArrayDouble() -> [Double] {
-  var arr: [Double] = forcedCast(nsArrDouble)
+  let arr: [Double] = forcedCast(nsArrDouble)
   return arr
 }
 
@@ -166,7 +166,7 @@ public func testForcedCastNStoSwiftArrayDouble() -> [Double] {
 // CHECK: return
 @inline(never)
 public func testCondCastNStoSwiftArrayDouble() -> [Double]? {
-  var arrOpt: [Double]? = condCast(nsArrDouble)
+  let arrOpt: [Double]? = condCast(nsArrDouble)
   return arrOpt
 }
 
@@ -177,7 +177,7 @@ public func testCondCastNStoSwiftArrayDouble() -> [Double]? {
 // CHECK: return
 @inline(never)
 public func testForcedCastNStoSwiftArrayString() -> [String] {
-  var arr: [String] = forcedCast(nsArrString)
+  let arr: [String] = forcedCast(nsArrString)
   return arr
 }
 
@@ -187,7 +187,7 @@ public func testForcedCastNStoSwiftArrayString() -> [String] {
 // CHECK: return
 @inline(never)
 public func testCondCastNStoSwiftArrayString() -> [String]? {
-  var arrOpt: [String]? = condCast(nsArrString)
+  let arrOpt: [String]? = condCast(nsArrString)
   return arrOpt
 }
 
@@ -205,7 +205,7 @@ var nsDictString: NSDictionary = ["One":"One", "Two":"Two", "Three":"Three", "Fo
 // CHECK: return
 @inline(never)
 public func testForcedCastNStoSwiftDictInt() -> [Int: Int] {
-  var dict: [Int: Int] = forcedCast(nsDictInt)
+  let dict: [Int: Int] = forcedCast(nsDictInt)
   return dict
 }
 
@@ -215,7 +215,7 @@ public func testForcedCastNStoSwiftDictInt() -> [Int: Int] {
 // CHECK: return
 @inline(never)
 public func testCondCastNStoSwiftDictInt() -> [Int: Int]? {
-  var dictOpt: [Int: Int]? = condCast(nsDictInt)
+  let dictOpt: [Int: Int]? = condCast(nsDictInt)
   return dictOpt
 }
 
@@ -225,7 +225,7 @@ public func testCondCastNStoSwiftDictInt() -> [Int: Int]? {
 // CHECK: return
 @inline(never)
 public func testForcedCastNStoSwiftDictDouble() -> [Double: Double] {
-  var dict: [Double: Double] = forcedCast(nsDictDouble)
+  let dict: [Double: Double] = forcedCast(nsDictDouble)
   return dict
 }
 
@@ -235,7 +235,7 @@ public func testForcedCastNStoSwiftDictDouble() -> [Double: Double] {
 // CHECK: return
 @inline(never)
 public func testCondCastNStoSwiftDictDouble() -> [Double: Double]? {
-  var dictOpt: [Double: Double]? = condCast(nsDictDouble)
+  let dictOpt: [Double: Double]? = condCast(nsDictDouble)
   return dictOpt
 }
 
@@ -246,7 +246,7 @@ public func testCondCastNStoSwiftDictDouble() -> [Double: Double]? {
 // CHECK: return
 @inline(never)
 public func testForcedCastNStoSwiftDictString() -> [String: String] {
-  var dict: [String: String] = forcedCast(nsDictString)
+  let dict: [String: String] = forcedCast(nsDictString)
   return dict
 }
 
@@ -256,7 +256,7 @@ public func testForcedCastNStoSwiftDictString() -> [String: String] {
 // CHECK: return
 @inline(never)
 public func testCondCastNStoSwiftDictString() -> [String: String]? {
-  var dictOpt: [String: String]? = condCast(nsDictString)
+  let dictOpt: [String: String]? = condCast(nsDictString)
   return dictOpt
 }
 
@@ -266,7 +266,7 @@ public func testCondCastNStoSwiftDictString() -> [String: String]? {
 // CHECK: return
 @inline(never)
 public func testForcedCastNSDictStringtoSwiftDictInt() -> [Int: Int] {
-  var dictOpt: [Int: Int] = forcedCast(nsDictString)
+  let dictOpt: [Int: Int] = forcedCast(nsDictString)
   return dictOpt
 }
 
@@ -277,7 +277,7 @@ public func testForcedCastNSDictStringtoSwiftDictInt() -> [Int: Int] {
 // CHECK: return
 @inline(never)
 public func testCondCastNSDictStringtoSwiftDictInt() -> [Int: Int]? {
-  var dictOpt: [Int: Int]? = condCast(nsDictString)
+  let dictOpt: [Int: Int]? = condCast(nsDictString)
   return dictOpt
 }
 
@@ -294,7 +294,7 @@ var nsSetString: NSSet = ["One", "Two", "Three", "Four"]
 // CHECK: return
 @inline(never)
 public func testForcedCastNStoSwiftSetInt() -> Set<Int> {
-  var set: Set<Int> = forcedCast(nsSetInt)
+  let set: Set<Int> = forcedCast(nsSetInt)
   return set
 }
 
@@ -304,7 +304,7 @@ public func testForcedCastNStoSwiftSetInt() -> Set<Int> {
 // CHECK: return
 @inline(never)
 public func testCondCastNStoSwiftSetInt() -> Set<Int>? {
-  var setOpt: Set<Int>? = condCast(nsSetInt)
+  let setOpt: Set<Int>? = condCast(nsSetInt)
   return setOpt
 }
 
@@ -314,7 +314,7 @@ public func testCondCastNStoSwiftSetInt() -> Set<Int>? {
 // CHECK: return
 @inline(never)
 public func testForcedCastNStoSwiftSetDouble() -> Set<Double> {
-  var set: Set<Double> = forcedCast(nsSetDouble)
+  let set: Set<Double> = forcedCast(nsSetDouble)
   return set
 }
 
@@ -324,7 +324,7 @@ public func testForcedCastNStoSwiftSetDouble() -> Set<Double> {
 // CHECK: return
 @inline(never)
 public func testCondCastNStoSwiftSetDouble() -> Set<Double>? {
-  var setOpt: Set<Double>? = condCast(nsSetDouble)
+  let setOpt: Set<Double>? = condCast(nsSetDouble)
   return setOpt
 }
 
@@ -335,7 +335,7 @@ public func testCondCastNStoSwiftSetDouble() -> Set<Double>? {
 // CHECK: return
 @inline(never)
 public func testForcedCastNStoSwiftSetString() -> Set<String> {
-  var set: Set<String> = forcedCast(nsSetString)
+  let set: Set<String> = forcedCast(nsSetString)
   return set
 }
 
@@ -345,7 +345,7 @@ public func testForcedCastNStoSwiftSetString() -> Set<String> {
 // CHECK: return
 @inline(never)
 public func testCondCastNStoSwiftSetString() -> Set<String>? {
-  var setOpt: Set<String>? = condCast(nsSetString)
+  let setOpt: Set<String>? = condCast(nsSetString)
   return setOpt
 }
 
@@ -360,7 +360,7 @@ var swiftString: String = "string"
 // CHECK: return
 @inline(never)
 public func testForcedCastSwiftToNSString() -> NSString {
-  var o: NSString = forcedCast(swiftString)
+  let o: NSString = forcedCast(swiftString)
   return o
 }
 
@@ -370,7 +370,7 @@ public func testForcedCastSwiftToNSString() -> NSString {
 // CHECK: return
 @inline(never)
 public func testCondCastSwiftToNSString() -> NSString? {
-  var o: NSString? = condCast(swiftString)
+  let o: NSString? = condCast(swiftString)
   return o
 }
 
@@ -385,7 +385,7 @@ var swiftIntNumber: Int = 1
 // CHECK: return
 @inline(never)
 public func testForcedCastSwiftIntToNSNumber() -> NSNumber {
-  var o: NSNumber = forcedCast(swiftIntNumber)
+  let o: NSNumber = forcedCast(swiftIntNumber)
   return o
 }
 
@@ -395,7 +395,7 @@ public func testForcedCastSwiftIntToNSNumber() -> NSNumber {
 // CHECK: return
 @inline(never)
 public func testCondCastSwiftIntToNSNumber() -> NSNumber? {
-  var o: NSNumber? = condCast(swiftIntNumber)
+  let o: NSNumber? = condCast(swiftIntNumber)
   return o
 }
 
@@ -409,7 +409,7 @@ var swiftDoubleNumber: Double = 1.234
 // CHECK: return
 @inline(never)
 public func testForcedCastSwiftDoubleToNSNumber() -> NSNumber {
-  var o: NSNumber = forcedCast(swiftDoubleNumber)
+  let o: NSNumber = forcedCast(swiftDoubleNumber)
   return o
 }
 
@@ -419,7 +419,7 @@ public func testForcedCastSwiftDoubleToNSNumber() -> NSNumber {
 // CHECK: return
 @inline(never)
 public func testCondCastSwiftDoubleToNSNumber() -> NSNumber? {
-  var o: NSNumber? = condCast(swiftDoubleNumber)
+  let o: NSNumber? = condCast(swiftDoubleNumber)
   return o
 }
 
@@ -436,7 +436,7 @@ var arrString: [String] = ["One", "Two", "Three", "Four"]
 // CHECK: return
 @inline(never)
 public func testForcedCastSwiftToNSArrayInt() -> NSArray {
-  var arr: NSArray = forcedCast(arrInt)
+  let arr: NSArray = forcedCast(arrInt)
   return arr
 }
 
@@ -446,7 +446,7 @@ public func testForcedCastSwiftToNSArrayInt() -> NSArray {
 // CHECK: return
 @inline(never)
 public func testCondCastSwiftToNSArrayInt() -> NSArray? {
-  var arrOpt: NSArray? = condCast(arrInt)
+  let arrOpt: NSArray? = condCast(arrInt)
   return arrOpt
 }
 
@@ -456,7 +456,7 @@ public func testCondCastSwiftToNSArrayInt() -> NSArray? {
 // CHECK: return
 @inline(never)
 public func testForcedCastSwiftToNSArrayDouble() -> NSArray {
-  var arr: NSArray = forcedCast(arrDouble)
+  let arr: NSArray = forcedCast(arrDouble)
   return arr
 }
 
@@ -466,7 +466,7 @@ public func testForcedCastSwiftToNSArrayDouble() -> NSArray {
 // CHECK: return
 @inline(never)
 public func testCondCastSwiftToNSArrayDouble() -> NSArray? {
-  var arrOpt: NSArray? = condCast(arrDouble)
+  let arrOpt: NSArray? = condCast(arrDouble)
   return arrOpt
 }
 
@@ -477,7 +477,7 @@ public func testCondCastSwiftToNSArrayDouble() -> NSArray? {
 // CHECK: return
 @inline(never)
 public func testForcedCastSwiftToNSArrayString() -> NSArray {
-  var arr: NSArray = forcedCast(arrString)
+  let arr: NSArray = forcedCast(arrString)
   return arr
 }
 
@@ -487,7 +487,7 @@ public func testForcedCastSwiftToNSArrayString() -> NSArray {
 // CHECK: return
 @inline(never)
 public func testCondCastSwiftToNSArrayString() -> NSArray? {
-  var arrOpt: NSArray? = condCast(arrString)
+  let arrOpt: NSArray? = condCast(arrString)
   return arrOpt
 }
 
@@ -504,7 +504,7 @@ var dictString: [String: String] = ["One":"One", "Two":"Two", "Three":"Three", "
 // CHECK: return
 @inline(never)
 public func testForcedCastSwiftToNSDictInt() -> NSDictionary {
-  var dict: NSDictionary = forcedCast(dictInt)
+  let dict: NSDictionary = forcedCast(dictInt)
   return dict
 }
 
@@ -514,7 +514,7 @@ public func testForcedCastSwiftToNSDictInt() -> NSDictionary {
 // CHECK: return
 @inline(never)
 public func testCondCastSwiftToNSDictInt() -> NSDictionary? {
-  var dictOpt: NSDictionary? = condCast(dictInt)
+  let dictOpt: NSDictionary? = condCast(dictInt)
   return dictOpt
 }
 
@@ -524,7 +524,7 @@ public func testCondCastSwiftToNSDictInt() -> NSDictionary? {
 // CHECK: return
 @inline(never)
 public func testForcedCastSwiftToNSDictDouble() -> NSDictionary {
-  var dict: NSDictionary = forcedCast(dictDouble)
+  let dict: NSDictionary = forcedCast(dictDouble)
   return dict
 }
 
@@ -534,7 +534,7 @@ public func testForcedCastSwiftToNSDictDouble() -> NSDictionary {
 // CHECK: return
 @inline(never)
 public func testCondCastSwiftToNSDictDouble() -> NSDictionary? {
-  var dictOpt: NSDictionary? = condCast(dictDouble)
+  let dictOpt: NSDictionary? = condCast(dictDouble)
   return dictOpt
 }
 
@@ -545,7 +545,7 @@ public func testCondCastSwiftToNSDictDouble() -> NSDictionary? {
 // CHECK: return
 @inline(never)
 public func testForcedCastSwiftToNSDictString() -> NSDictionary {
-  var dict: NSDictionary = forcedCast(dictString)
+  let dict: NSDictionary = forcedCast(dictString)
   return dict
 }
 
@@ -555,7 +555,7 @@ public func testForcedCastSwiftToNSDictString() -> NSDictionary {
 // CHECK: return
 @inline(never)
 public func testCondCastSwiftToNSDictString() -> NSDictionary? {
-  var dictOpt: NSDictionary? = condCast(dictString)
+  let dictOpt: NSDictionary? = condCast(dictString)
   return dictOpt
 }
 
@@ -572,7 +572,7 @@ var setString: Set<String> = ["One", "Two", "Three", "Four"]
 // CHECK: return
 @inline(never)
 public func testForcedCastSwiftToNSSetInt() -> NSSet {
-  var set: NSSet = forcedCast(setInt)
+  let set: NSSet = forcedCast(setInt)
   return set
 }
 
@@ -582,7 +582,7 @@ public func testForcedCastSwiftToNSSetInt() -> NSSet {
 // CHECK: return
 @inline(never)
 public func testCondCastSwiftToNSSetInt() -> NSSet? {
-  var setOpt: NSSet? = condCast(setInt)
+  let setOpt: NSSet? = condCast(setInt)
   return setOpt
 }
 
@@ -592,7 +592,7 @@ public func testCondCastSwiftToNSSetInt() -> NSSet? {
 // CHECK: return
 @inline(never)
 public func testForcedCastSwiftToNSSetDouble() -> NSSet {
-  var set: NSSet = forcedCast(setDouble)
+  let set: NSSet = forcedCast(setDouble)
   return set
 }
 
@@ -602,7 +602,7 @@ public func testForcedCastSwiftToNSSetDouble() -> NSSet {
 // CHECK: return
 @inline(never)
 public func testCondCastSwiftToNSSetDouble() -> NSSet? {
-  var setOpt: NSSet? = condCast(setDouble)
+  let setOpt: NSSet? = condCast(setDouble)
   return setOpt
 }
 
@@ -613,7 +613,7 @@ public func testCondCastSwiftToNSSetDouble() -> NSSet? {
 // CHECK: return
 @inline(never)
 public func testForcedCastSwiftToNSSetString() -> NSSet {
-  var set: NSSet = forcedCast(setString)
+  let set: NSSet = forcedCast(setString)
   return set
 }
 
@@ -623,7 +623,7 @@ public func testForcedCastSwiftToNSSetString() -> NSSet {
 // CHECK: return
 @inline(never)
 public func testCondCastSwiftToNSSetString() -> NSSet? {
-  var setOpt: NSSet? = condCast(setString)
+  let setOpt: NSSet? = condCast(setString)
   return setOpt
 }
 
@@ -634,7 +634,7 @@ public func testCondCastSwiftToNSSetString() -> NSSet? {
 // CHECK: return
 @inline(never)
 public func testForcedCastFromGeneric<T>(_ x: T) -> NSString {
-  var set: NSString = x as! NSString
+  let set: NSString = x as! NSString
   return set
 }
 
@@ -643,7 +643,7 @@ public func testForcedCastFromGeneric<T>(_ x: T) -> NSString {
 // CHECK: return
 @inline(never)
 public func testForcedCastToGeneric<T>(_ x: T) -> T {
-  var set: T = nsString as! T
+  let set: T = nsString as! T
   return set
 }
 
@@ -652,7 +652,7 @@ public func testForcedCastToGeneric<T>(_ x: T) -> T {
 // CHECK: return
 @inline(never)
 public func testCondCastFromGeneric<T>(_ x: T) -> NSString? {
-  var setOpt: NSString? = x as? NSString
+  let setOpt: NSString? = x as? NSString
   return setOpt
 }
 
@@ -661,7 +661,7 @@ public func testCondCastFromGeneric<T>(_ x: T) -> NSString? {
 // CHECK: return
 @inline(never)
 public func testCondCastToGeneric<T>(_ x: T) -> T? {
-  var setOpt: T? = nsString as? T
+  let setOpt: T? = nsString as? T
   return setOpt
 }
 
@@ -673,26 +673,26 @@ public func testCondCastToGeneric<T>(_ x: T) -> T? {
 // Arrays
 print("NS to Swift arrays: Start")
 print(testForcedCastNStoSwiftArrayInt())
-print(testCondCastNStoSwiftArrayInt())
+print(testCondCastNStoSwiftArrayInt() as Any)
 
 print(testForcedCastNStoSwiftArrayDouble())
-print(testCondCastNStoSwiftArrayDouble())
+print(testCondCastNStoSwiftArrayDouble() as Any)
 
 print(testForcedCastNStoSwiftArrayString())
-print(testCondCastNStoSwiftArrayString())
+print(testCondCastNStoSwiftArrayString() as Any)
 print("NS to Swift arrays: End")
 
 // Dicts
 print("NS to Swift dictionaries: Start")
 print(testForcedCastNStoSwiftDictInt())
-print(testCondCastNStoSwiftDictInt())
+print(testCondCastNStoSwiftDictInt() as Any)
 
 print(testForcedCastNStoSwiftDictDouble())
-print(testCondCastNStoSwiftDictDouble())
+print(testCondCastNStoSwiftDictDouble() as Any)
 
 print(testForcedCastNStoSwiftDictString())
-print(testCondCastNStoSwiftDictString())
-print(testCondCastNSDictStringtoSwiftDictInt())
+print(testCondCastNStoSwiftDictString() as Any)
+print(testCondCastNSDictStringtoSwiftDictInt() as Any)
 // This line should crash at run-time
 //print(testForcedCastNSDictStringtoSwiftDictInt())
 print("NS to Swift dictionaries: End")
@@ -700,13 +700,13 @@ print("NS to Swift dictionaries: End")
 // Sets
 print("NS to Swift sets: Start")
 print(testForcedCastNStoSwiftSetInt())
-print(testCondCastNStoSwiftSetInt())
+print(testCondCastNStoSwiftSetInt() as Any)
 
 print(testForcedCastNStoSwiftSetDouble())
-print(testCondCastNStoSwiftSetDouble())
+print(testCondCastNStoSwiftSetDouble() as Any)
 
 print(testForcedCastNStoSwiftSetString())
-print(testCondCastNStoSwiftSetString())
+print(testCondCastNStoSwiftSetString() as Any)
 print("NS to Swift sets: End")
 
 
@@ -714,16 +714,16 @@ print("NS to Swift sets: End")
 
 print("NS to Swift basic types: Start")
 print(testForcedCastNSNumberToSwiftInt())
-print(testCondCastNSNumberToSwiftInt())
+print(testCondCastNSNumberToSwiftInt() as Any)
 
 print(testForcedCastNSNumberToSwiftDouble())
-print(testCondCastNSNumberToSwiftDouble())
+print(testCondCastNSNumberToSwiftDouble() as Any)
 
 print(testForcedCastNSIntNumberToSwiftDouble())
-print(testCondCastNSIntNumberToSwiftDouble())
+print(testCondCastNSIntNumberToSwiftDouble() as Any)
 
 print(testForcedCastNStoSwiftString())
-print(testCondCastNStoSwiftString())
+print(testCondCastNStoSwiftString() as Any)
 print("NS to Swift basic types: End")
 
 //// Swift -> ObjC
@@ -732,26 +732,26 @@ print("NS to Swift basic types: End")
 
 print("Swift to NS basic types: Start")
 print(testForcedCastSwiftIntToNSNumber())
-print(testCondCastSwiftIntToNSNumber())
+print(testCondCastSwiftIntToNSNumber() as Any)
 
 print(testForcedCastSwiftDoubleToNSNumber())
-print(testCondCastSwiftDoubleToNSNumber())
+print(testCondCastSwiftDoubleToNSNumber() as Any)
 
 print(testForcedCastSwiftToNSString())
-print(testCondCastSwiftToNSString())
+print(testCondCastSwiftToNSString() as Any)
 print("Swift to NS basic types: End")
 
 // Arrays
 print("Swift to NS arrays: Start")
 
 print(testForcedCastSwiftToNSArrayInt())
-print(testCondCastSwiftToNSArrayInt())
+print(testCondCastSwiftToNSArrayInt() as Any)
 
 print(testForcedCastSwiftToNSArrayDouble())
-print(testCondCastSwiftToNSArrayDouble())
+print(testCondCastSwiftToNSArrayDouble() as Any)
 
 print(testForcedCastSwiftToNSArrayString())
-print(testCondCastSwiftToNSArrayString())
+print(testCondCastSwiftToNSArrayString() as Any)
 
 print("Swift to NS arrays: End")
 
@@ -760,13 +760,13 @@ print("Swift to NS arrays: End")
 print("Swift to NS dictionaries: Start")
 
 print(testForcedCastSwiftToNSDictInt())
-print(testCondCastSwiftToNSDictInt())
+print(testCondCastSwiftToNSDictInt() as Any)
 
 print(testForcedCastSwiftToNSDictDouble())
-print(testCondCastSwiftToNSDictDouble())
+print(testCondCastSwiftToNSDictDouble() as Any)
 
 print(testForcedCastSwiftToNSDictString())
-print(testCondCastSwiftToNSDictString())
+print(testCondCastSwiftToNSDictString() as Any)
 
 print("Swift to NS dictionaries: End")
 
@@ -774,13 +774,13 @@ print("Swift to NS dictionaries: End")
 print("Swift to NS sets: Start")
 
 print(testForcedCastSwiftToNSSetInt())
-print(testCondCastSwiftToNSSetInt())
+print(testCondCastSwiftToNSSetInt() as Any)
 
 print(testForcedCastSwiftToNSSetDouble())
-print(testCondCastSwiftToNSSetDouble())
+print(testCondCastSwiftToNSSetDouble() as Any)
 
 print(testForcedCastSwiftToNSSetString())
-print(testCondCastSwiftToNSSetString())
+print(testCondCastSwiftToNSSetString() as Any)
 
 print("Swift to NS sets: End")
 

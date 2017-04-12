@@ -355,7 +355,7 @@ tests.test("${TestType}/Fun${FuncName}") {
 %end
       value${TestType}9()
     )
-  } catch let e as MyError {
+  } catch let _ as MyError {
 % if DoesThrow == 'true':
      expectEqual(127, e.val)
 % else:
@@ -382,7 +382,7 @@ tests.test("${TestType}/RetFun${FuncName}") {
 % for Num in range(0, 10):
     expectEqual(value${TestType}${Num}(), res.${Num})
 % end
-  } catch let e as MyError {
+  } catch let _ as MyError {
 % if DoesThrow == 'true':
      expectEqual(127, e.val)
 % else:
@@ -412,7 +412,7 @@ tests.test("${TestType}/RetAndParamFun${FuncName}") {
 % for Num in range(0, 10):
     expectEqual(value${TestType}${Num}(), res.${Num})
 % end
-  } catch let e as MyError {
+  } catch let _ as MyError {
 % if DoesThrow == 'true':
      expectEqual(127, e.val)
 % else:
@@ -448,7 +448,7 @@ tests.test("${TestType}/Method${FuncName}") {
 %end
       value${TestType}9()
     )
-  } catch let e as MyError {
+  } catch let _ as MyError {
 % if DoesThrow == 'true':
      expectEqual(127, e.val)
 % else:
@@ -479,7 +479,7 @@ tests.test("${TestType}/RetMethod${FuncName}") {
 % for Num in range(0, 10):
     expectEqual(value${TestType}${Num}(), res.${Num})
 % end
-  } catch let e as MyError {
+  } catch let _ as MyError {
 % if DoesThrow == 'true':
      expectEqual(127, e.val)
 % else:
@@ -513,7 +513,7 @@ tests.test("${TestType}/RetAndParamMethod${FuncName}") {
 %for Num in range(0, 10):
     expectEqual(value${TestType}${Num}(), res.${Num})
 % end
-  } catch let e as MyError {
+  } catch let _ as MyError {
 % if DoesThrow == 'true':
      expectEqual(127, e.val)
 % else:
@@ -548,7 +548,7 @@ tests.test("${TestType}/WitnessMethod${FuncName}") {
 %end
       value${TestType}9()
     )
-  } catch let e as MyError {
+  } catch let _ as MyError {
 % if DoesThrow == 'true':
      expectEqual(127, e.val)
 % else:
@@ -578,7 +578,7 @@ tests.test("${TestType}/RetWitnessMethod${FuncName}") {
 % for Num in range(0, 10):
     expectEqual(value${TestType}${Num}(), res.${Num})
 % end
-  } catch let e as MyError {
+  } catch let _ as MyError {
 % if DoesThrow == 'true':
      expectEqual(127, e.val)
 % else:
@@ -611,7 +611,7 @@ tests.test("${TestType}/RetAndParamWitnessMethod${FuncName}") {
 %for Num in range(0, 10):
     expectEqual(value${TestType}${Num}(), res.${Num})
 % end
-  } catch let e as MyError {
+  } catch let _ as MyError {
 % if DoesThrow == 'true':
      expectEqual(127, e.val)
 % else:
