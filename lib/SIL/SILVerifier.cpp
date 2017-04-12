@@ -1264,6 +1264,7 @@ public:
             isa<AllocStackInst>(op) ||
             isa<ProjectBoxInst>(op) ||
             isa<RefElementAddrInst>(op) ||
+            isa<PointerToAddressInst>(op) ||
             isa<SILFunctionArgument>(op) ||
             isa<BeginAccessInst>(op) ||
             isa<MarkUninitializedInst>(op),
