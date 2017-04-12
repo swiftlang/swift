@@ -52,8 +52,8 @@
 ///
 %if mutable:
 /// You can use methods like `initialize(to:count:)`, `initialize(from:)`, and
-/// `moveInitializeMemory(from:count)` to initialize the memory referenced by
-/// a pointer with a value or series of values.
+/// `moveInitialize(from:count:)` to initialize the memory referenced by a
+/// pointer with a value or series of values.
 ///
 % end
 /// Initialized Memory
