@@ -28,6 +28,7 @@ element_only = locals().get('element_only', False)
 wrap_index = locals().get('wrap_index', '_wrap')
 unwrap_index = locals().get('unwrap_index', '_unwrap')
 forward = locals().get('forward', lambda x: x)
+bounds_check_access = locals().get('bounds_check_access', False)
 nonmutating = locals().get('nonmutating', False)
 Element = locals().get('Element')
 bindings = locals()
@@ -110,7 +111,11 @@ public var underestimatedCount: Int { ${fwd('''
 
 % if Element is not None:
 
-public subscript(i: Index) -> ${Element} { ${fwd('''
+public subscript(i: Index) -> ${Element} {
+% if bounds_check_access:
+  _failEarlyRangeCheck(i, bounds: startIndex..<endIndex)
+% end
+${fwd('''
   return %(base)s[%(unwrap_index)s(i)]
 ''')} }
 
