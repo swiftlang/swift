@@ -4748,31 +4748,10 @@ Expr *ExprRewriter::coerceExistential(Expr *expr, Type toType,
                                       cs.getType(result)));
   }
 
-  // If the type we are trying to coerce is a tuple, let's look through
-  // its elements to see if there are any LValue types present, such requires
-  // load or address-of operation first before proceeding with erasure.
+  // Load tuples with lvalue elements.
   if (auto tupleType = fromType->getAs<TupleType>()) {
-    bool coerceToRValue = false;
-    for (auto element : tupleType->getElements()) {
-      if (element.getType()->is<LValueType>()) {
-        coerceToRValue = true;
-        break;
-      }
-    }
-
-    // Tuple has one or more LValue types associated with it,
-    // which requires coercion to RValue, let's perform it here by creating
-    // new tuple type with LValue(s) stripped off and coercing
-    // expression to that type, which would do required transformation.
-    if (coerceToRValue) {
-      SmallVector<TupleTypeElt, 2> elements;
-      for (auto &element : tupleType->getElements())
-        elements.push_back(TupleTypeElt(element.getType()->getRValueType(),
-                                        element.getName(),
-                                        element.getParameterFlags()));
-
-      // New type is guaranteed to be a tuple because source type is one.
-      auto toTuple = TupleType::get(elements, ctx)->castTo<TupleType>();
+    if (tupleType->isLValueType()) {
+      auto toTuple = tupleType->getRValueType()->castTo<TupleType>();
       SmallVector<int, 4> sources;
       SmallVector<unsigned, 4> variadicArgs;
       bool failed = computeTupleShuffle(tupleType, toTuple,
