@@ -56,3 +56,19 @@ public func modifyAndReadS() {
   s.i = 42
   takeS(s)
 }
+
+var global = S(i: 0, o: nil)
+
+func readGlobal() -> AnyObject? {
+  return global.o
+}
+
+// CHECK-LABEL: sil hidden @_T017access_marker_gen10readGlobals9AnyObject_pSgyF
+// CHECK:         [[ADDRESSOR:%.*]] = function_ref @_T017access_marker_gen6globalAA1SVfau :
+// CHECK-NEXT:    [[T0:%.*]] = apply [[ADDRESSOR]]()
+// CHECK-NEXT:    [[T1:%.*]] = pointer_to_address [[T0]] : $Builtin.RawPointer to [strict] $*S
+// CHECK-NEXT:    [[T2:%.*]] = begin_access [read] [dynamic] [[T1]]
+// CHECK-NEXT:    [[T3:%.*]] = struct_element_addr [[T2]] : $*S, #S.o
+// CHECK-NEXT:    [[T4:%.*]] = load [copy] [[T3]]
+// CHECK-NEXT:    end_access [[T2]]
+// CHECK-NEXT:    return [[T4]]
