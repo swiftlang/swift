@@ -1451,9 +1451,7 @@ bool ValueDecl::needsCapture() const {
   if (!getDeclContext()->isLocalContext())
     return false;
   // We don't need to capture types.
-  if (isa<TypeDecl>(this))
-    return false;
-  return true;
+  return !isa<TypeDecl>(this);
 }
 
 ValueDecl *ValueDecl::getOverriddenDecl() const {
@@ -4912,9 +4910,7 @@ ConstructorDecl::getDelegatingOrChainedInitKind(DiagnosticEngine *diags,
 
     bool walkToDeclPre(class Decl *D) override {
       // Don't walk into further nominal decls.
-      if (isa<NominalTypeDecl>(D))
-        return false;
-      return true;
+      return !isa<NominalTypeDecl>(D);
     }
     
     std::pair<bool, Expr*> walkToExprPre(Expr *E) override {

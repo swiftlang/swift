@@ -269,9 +269,7 @@ static bool hoistInstructions(SILLoop *Loop, DominanceInfo *DT,
     // that dominate all exits.
     if (!std::all_of(ExitingBBs.begin(), ExitingBBs.end(),
                      [=](SILBasicBlock *ExitBB) {
-          if (DT->dominates(CurBB, ExitBB))
-            return true;
-          return false;
+          return DT->dominates(CurBB, ExitBB);
         })) {
       DEBUG(llvm::dbgs() << "  skipping conditional block " << *CurBB << "\n");
       It.skipChildren();

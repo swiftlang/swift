@@ -664,9 +664,7 @@ private:
 
     assert(SGF.silConv.useLoweredAddresses() ==
            SGF.silConv.isSILIndirect(getSelfParameterInfo()));
-    if (!SGF.silConv.useLoweredAddresses())
-      return false;
-    return true;
+    return SGF.silConv.useLoweredAddresses();
   }
 
   // If we're calling a member of a non-class-constrained protocol,

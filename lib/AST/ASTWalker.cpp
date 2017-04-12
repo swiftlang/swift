@@ -191,9 +191,7 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   }
 
   bool visitTypeAliasDecl(TypeAliasDecl *TAD) {
-    if (doIt(TAD->getUnderlyingTypeLoc()))
-      return true;
-    return false;
+    return doIt(TAD->getUnderlyingTypeLoc());
   }
 
   bool visitAbstractTypeParamDecl(AbstractTypeParamDecl *TPD) {
@@ -1501,9 +1499,7 @@ bool Traversal::visitErrorTypeRepr(ErrorTypeRepr *T) {
 }
 
 bool Traversal::visitAttributedTypeRepr(AttributedTypeRepr *T) {
-  if (doIt(T->getTypeRepr()))
-    return true;
-  return false;
+  return doIt(T->getTypeRepr());
 }
 
 bool Traversal::visitSimpleIdentTypeRepr(SimpleIdentTypeRepr *T) {
@@ -1527,37 +1523,23 @@ bool Traversal::visitCompoundIdentTypeRepr(CompoundIdentTypeRepr *T) {
 }
 
 bool Traversal::visitFunctionTypeRepr(FunctionTypeRepr *T) {
-  if (doIt(T->getArgsTypeRepr()))
-    return true;
-  if (doIt(T->getResultTypeRepr()))
-    return true;
-  return false;
+  return doIt(T->getArgsTypeRepr()) || doIt(T->getResultTypeRepr());
 }
 
 bool Traversal::visitArrayTypeRepr(ArrayTypeRepr *T) {
-  if (doIt(T->getBase()))
-    return true;
-  return false;
+  return doIt(T->getBase());
 }
 
 bool Traversal::visitDictionaryTypeRepr(DictionaryTypeRepr *T) {
-  if (doIt(T->getKey()))
-    return true;
-  if (doIt(T->getValue()))
-    return true;
-  return false;
+  return doIt(T->getKey()) || doIt(T->getValue());
 }
 
 bool Traversal::visitOptionalTypeRepr(OptionalTypeRepr *T) {
-  if (doIt(T->getBase()))
-    return true;
-  return false;
+  return doIt(T->getBase());
 }
 
 bool Traversal::visitImplicitlyUnwrappedOptionalTypeRepr(ImplicitlyUnwrappedOptionalTypeRepr *T) {
-  if (doIt(T->getBase()))
-    return true;
-  return false;
+  return doIt(T->getBase());
 }
 
 bool Traversal::visitTupleTypeRepr(TupleTypeRepr *T) {
@@ -1577,21 +1559,15 @@ bool Traversal::visitCompositionTypeRepr(CompositionTypeRepr *T) {
 }
 
 bool Traversal::visitMetatypeTypeRepr(MetatypeTypeRepr *T) {
-  if (doIt(T->getBase()))
-    return true;
-  return false;
+  return doIt(T->getBase());
 }
 
 bool Traversal::visitProtocolTypeRepr(ProtocolTypeRepr *T) {
-  if (doIt(T->getBase()))
-    return true;
-  return false;
+  return doIt(T->getBase());
 }
 
 bool Traversal::visitInOutTypeRepr(InOutTypeRepr *T) {
-  if (doIt(T->getBase()))
-    return true;
-  return false;
+  return doIt(T->getBase());
 }
 
 bool Traversal::visitFixedTypeRepr(FixedTypeRepr *T) {

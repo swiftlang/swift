@@ -6998,9 +6998,7 @@ bool FailureDiagnosis::visitUnresolvedMemberExpr(UnresolvedMemberExpr *E) {
   case CC_Unavailable:
   case CC_Inaccessible:
     // Diagnose some simple and common errors.
-    if (candidateInfo.diagnoseSimpleErrors(E))
-      return true;
-    return false;
+    return candidateInfo.diagnoseSimpleErrors(E);
       
   case CC_ArgumentLabelMismatch: { // Argument labels are not correct.
     auto argExpr = typeCheckArgumentChildIndependently(E->getArgument(),

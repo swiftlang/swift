@@ -506,9 +506,7 @@ static bool moduleIsInferImportAsMember(const clang::NamedDecl *decl,
     if (submodule->IsSwiftInferImportAsMember) {
       // HACK HACK HACK: This is a workaround for some module invalidation issue
       // and inconsistency. This will go away soon.
-      if (submodule->Name != "CoreGraphics")
-        return false;
-      return true;
+      return submodule->Name == "CoreGraphics";
     }
     submodule = submodule->Parent;
   }
