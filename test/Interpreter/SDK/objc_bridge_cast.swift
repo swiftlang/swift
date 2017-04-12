@@ -234,7 +234,9 @@ var CanaryAssocObjectHandle = 0
 
 func testValueToObjectBridgingInSwitch() {
   autoreleasepool {
-    let string = "hello"
+    // Use a long string here to avoid tagged pointers.  Otherwise the canary
+    // stays alive forever despite the noxious gases in the coal mine.
+    let string = "helloZZZZZZZZZZZZZZZZZZZZZZZZZ"
     let nsString = string as NSString
     objc_setAssociatedObject(nsString, &CanaryAssocObjectHandle, Canary(),
       .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
