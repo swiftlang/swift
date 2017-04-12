@@ -169,7 +169,17 @@ enum class StaticSpellingKind : uint8_t {
   KeywordStatic,
   KeywordClass,
 };
-  
+
+/// Keeps track of whether an enum has cases that have associated values.
+enum class AssociatedValueCheck {
+  /// We have not yet checked.
+  Unchecked,
+  /// The enum contains no cases or all cases contain no associated values.
+  NoAssociatedValues,
+  /// The enum contains at least one case with associated values.
+  HasAssociatedValues,
+};
+
 /// Describes if an enum element constructor directly or indirectly references
 /// its enclosing type.
 enum class ElementRecursiveness {
@@ -536,8 +546,11 @@ class alignas(1 << DeclAlignInBits) Decl {
     
     /// The stage of the raw type circularity check for this class.
     unsigned Circularity : 2;
+
+    /// True if the enum has cases and at least one case has associated values.
+    mutable unsigned HasAssociatedValues : 2;
   };
-  enum { NumEnumDeclBits = NumNominalTypeDeclBits + 2 };
+  enum { NumEnumDeclBits = NumNominalTypeDeclBits + 4 };
   static_assert(NumEnumDeclBits <= 32, "fits in an unsigned");
   
   class PrecedenceGroupDeclBitfields {
@@ -3071,10 +3084,15 @@ public:
     LazySemanticInfo.RawType.setPointerAndInt(rawType, true);
   }
   
-  /// True if the enum has cases, and none of those cases have associated values.
+  /// True if none of the enum cases have associated values.
   ///
-  /// Note that this is false for enums with absolutely no cases.
+  /// Note that this is true for enums with absolutely no cases.
   bool hasOnlyCasesWithoutAssociatedValues() const;
+
+  /// True if the enum has cases.
+  bool hasCases() const {
+    return !getAllElements().empty();
+  }
 
   /// True if the enum is marked 'indirect'.
   bool isIndirect() const {
@@ -5410,6 +5428,10 @@ public:
   
   void setRecursiveness(ElementRecursiveness recursiveness) {
     EnumElementDeclBits.Recursiveness = static_cast<unsigned>(recursiveness);
+  }
+
+  bool hasAssociatedValues() const {
+    return EnumElementDeclBits.HasArgumentType;
   }
 
   static bool classof(const Decl *D) {

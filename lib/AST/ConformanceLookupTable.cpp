@@ -528,6 +528,7 @@ void ConformanceLookupTable::expandImpliedConformances(NominalTypeDecl *nominal,
     if (conformingProtocol->isSpecificProtocol(
           KnownProtocolKind::Error) &&
         isa<EnumDecl>(nominal) && nominal->isObjC() &&
+        cast<EnumDecl>(nominal)->hasCases() &&
         cast<EnumDecl>(nominal)->hasOnlyCasesWithoutAssociatedValues()) {
       ASTContext &ctx = nominal->getASTContext();
       if (auto bridgedNSError
