@@ -37,9 +37,9 @@ func foo3(a: Float, b: Bool) {}
 // CHECK-REPLACEMENT1: <Group>Collection/Array</Group>
 // CHECK-REPLACEMENT1: <Declaration>{{.*}}func sorted() -&gt; [<Type usr="s:Si">Int</Type>]</Declaration>
 // CHECK-REPLACEMENT1: RELATED BEGIN
-// CHECK-REPLACEMENT1: sorted(by: (Int, Int) -&gt; Bool) -&gt; [Int]</RelatedName>
+// CHECK-REPLACEMENT1: sorted(by: (Int, Int) throws -&gt; Bool) rethrows -&gt; [Int]</RelatedName>
 // CHECK-REPLACEMENT1: sorted() -&gt; [Int]</RelatedName>
-// CHECK-REPLACEMENT1: sorted(by: (Int, Int) -&gt; Bool) -&gt; [Int]</RelatedName>
+// CHECK-REPLACEMENT1: sorted(by: (Int, Int) throws -&gt; Bool) rethrows -&gt; [Int]</RelatedName>
 // CHECK-REPLACEMENT1: RELATED END
 
 // RUN: %sourcekitd-test -req=cursor -pos=9:8 %s -- %s %mcp_opt %clang-importer-sdk | %FileCheck -check-prefix=CHECK-REPLACEMENT2 %s
@@ -51,7 +51,7 @@ func foo3(a: Float, b: Bool) {}
 // CHECK-REPLACEMENT3: func sorted(by areInIncreasingOrder: (<Type usr="s:13cursor_stdlib2S1V">S1</Type>
 // CHECK-REPLACEMENT3: sorted() -&gt; [S1]</RelatedName>
 // CHECK-REPLACEMENT3: sorted() -&gt; [S1]</RelatedName>
-// CHECK-REPLACEMENT3: sorted(by: (S1, S1) -&gt; Bool) -&gt; [S1]</RelatedName>
+// CHECK-REPLACEMENT3: sorted(by: (S1, S1) throws -&gt; Bool) rethrows -&gt; [S1]</RelatedName>
 
 // RUN: %sourcekitd-test -req=cursor -pos=18:8 %s -- %s %mcp_opt %clang-importer-sdk | %FileCheck -check-prefix=CHECK-REPLACEMENT4 %s
 // CHECK-REPLACEMENT4: <Group>Collection/Array</Group>
