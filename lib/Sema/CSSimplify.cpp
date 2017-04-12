@@ -1709,15 +1709,13 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
 
       ConstraintKind subKind = ConstraintKind::Equal;
       // A.Type < B.Type if A < B and both A and B are classes.
-      if (isa<MetatypeType>(desugar1) &&
-          kind != ConstraintKind::Equal &&
+      if (isa<MetatypeType>(meta1) &&
           meta1->getInstanceType()->mayHaveSuperclass() &&
           meta2->getInstanceType()->getClassOrBoundGenericClass())
         subKind = std::min(kind, ConstraintKind::Subtype);
       // P.Type < Q.Type if P < Q, both P and Q are protocols, and P.Type
       // and Q.Type are both existential metatypes.
-      else if (isa<ExistentialMetatypeType>(meta1)
-          && isa<ExistentialMetatypeType>(meta2))
+      else if (isa<ExistentialMetatypeType>(meta1))
         subKind = std::min(kind, ConstraintKind::Subtype);
       
       return matchTypes(meta1->getInstanceType(), meta2->getInstanceType(),
@@ -1827,11 +1825,46 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
 
     // Subclass-to-superclass conversion.
     if (type1->mayHaveSuperclass() &&
-        type2->mayHaveSuperclass() &&
         type2->getClassOrBoundGenericClass() &&
         type1->getClassOrBoundGenericClass()
           != type2->getClassOrBoundGenericClass()) {
       conversionsOrFixes.push_back(ConversionRestrictionKind::Superclass);
+    }
+
+    // Existential-to-superclass conversion.
+    if (type1->isClassExistentialType() &&
+        type2->getClassOrBoundGenericClass()) {
+      conversionsOrFixes.push_back(ConversionRestrictionKind::Superclass);
+    }
+
+    // Metatype-to-existential-metatype conversion.
+    //
+    // Equivalent to a conformance relation on the instance types.
+    if (type1->is<MetatypeType>() &&
+        type2->is<ExistentialMetatypeType>()) {
+      conversionsOrFixes.push_back(
+        ConversionRestrictionKind::MetatypeToExistentialMetatype);
+    }
+
+    // Existential-metatype-to-superclass-metatype conversion.
+    if (type2->is<MetatypeType>()) {
+      if (auto *meta1 = type1->getAs<ExistentialMetatypeType>()) {
+        if (meta1->getInstanceType()->isClassExistentialType()) {
+          conversionsOrFixes.push_back(
+            ConversionRestrictionKind::ExistentialMetatypeToMetatype);
+        }
+      }
+    }
+
+    // Concrete value to existential conversion.
+    if (!type1->is<LValueType>() &&
+        type2->isExistentialType()) {
+
+      // Penalize conversions to Any.
+      if (kind >= ConstraintKind::Conversion && type2->isAny())
+        increaseScore(ScoreKind::SK_EmptyExistentialConversion);
+
+      conversionsOrFixes.push_back(ConversionRestrictionKind::Existential);
     }
 
     // T -> AnyHashable.
@@ -2070,43 +2103,6 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
                         locator.withPathElement(
                                 ConstraintLocator::ArrayElementType));
     }
-  }
-
-  // Conformance of a metatype to an existential metatype is actually
-  // equivalent to a conformance relationship on the instance types.
-  // This applies to nested metatype levels, so if A : P then
-  // A.Type : P.Type.
-  if (concrete &&
-      kind >= ConstraintKind::Subtype &&
-      type1->is<MetatypeType>() &&
-      type2->is<ExistentialMetatypeType>()) {
-    conversionsOrFixes.push_back(
-      ConversionRestrictionKind::MetatypeToExistentialMetatype);
-  }
-
-  // An existential metatype can be upcast to a class metatype if the
-  // existential contains a superclass constraint.
-  if (concrete &&
-      kind >= ConstraintKind::Subtype &&
-      type1->is<ExistentialMetatypeType>() &&
-      type2->is<MetatypeType>()) {
-    conversionsOrFixes.push_back(
-      ConversionRestrictionKind::ExistentialMetatypeToMetatype);
-  }
-
-  // Instance type check for the above. We are going to check conformance once
-  // we hit commit_to_conversions below, but we have to add a token restriction
-  // to ensure we wrap the metatype value in a metatype erasure.
-  if (concrete &&
-      kind >= ConstraintKind::Subtype &&
-      !type1->is<LValueType>() &&
-      type2->isExistentialType()) {
-
-    // Penalize conversions to Any.
-    if (kind >= ConstraintKind::Conversion && type2->isAny())
-      increaseScore(ScoreKind::SK_EmptyExistentialConversion);
-
-    conversionsOrFixes.push_back(ConversionRestrictionKind::Existential);
   }
 
   // A value of type T! can be converted to type U if T is convertible
