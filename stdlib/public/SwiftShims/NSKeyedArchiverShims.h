@@ -1,4 +1,4 @@
-//===--- NSKeyedArchiverShims.h - Foundation declarations for NSKeyedArchiver overlay ------===//
+//===--- NSKeyedArchiverShims.h - Found. decl. for NSKeyedArchiver overlay ===//
 //
 // This source file is part of the Swift.org open source project
 //

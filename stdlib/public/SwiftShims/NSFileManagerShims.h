@@ -1,4 +1,4 @@
-//===--- NSFileManagerShims.h - Foundation declarations for FileManager overlay ------===//
+//===--- NSFileManagerShims.h - Foundation decl. for FileManager overlay --===//
 //
 // This source file is part of the Swift.org open source project
 //

@@ -1,4 +1,4 @@
-//===--- NSIndexSetShims.h - Foundation declarations for IndexSet overlay ------===//
+//===--- NSIndexSetShims.h - Foundation declarations for IndexSet overlay -===//
 //
 // This source file is part of the Swift.org open source project
 //
