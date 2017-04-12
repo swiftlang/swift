@@ -1,5 +1,4 @@
 // RUN: %target-swift-frontend -parse-as-library -Xllvm -sil-full-demangle -enforce-exclusivity=checked -emit-sil %s | %FileCheck %s
-// REQUIRES: rdar:31550303 OSS Swift CI ASAN bot fails on AccessMarker tests.
 
 public struct S {
   var i: Int
