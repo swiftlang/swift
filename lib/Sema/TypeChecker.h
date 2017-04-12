@@ -660,6 +660,9 @@ public:
   /// to be finalized before we can hand off to SILGen etc.
   llvm::SetVector<NominalTypeDecl *> TypesToFinalize;
 
+  /// The list of types whose circularity checks were delayed.
+  SmallVector<NominalTypeDecl*, 8> DelayedCircularityChecks;
+
   using TypeAccessScopeCacheMap = llvm::DenseMap<const ValueDecl *, AccessScope>;
 
   /// Caches the outermost scope where a particular declaration can be used,
