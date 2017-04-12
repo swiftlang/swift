@@ -781,6 +781,7 @@ private:
   Type ImageLiteralType;
   Type FileReferenceLiteralType;
   Type StringType;
+  Type IntType;
   Type Int8Type;
   Type UInt8Type;
   Type NSObjectType;
@@ -871,6 +872,7 @@ public:
   Type getOptionalType(SourceLoc loc, Type elementType);
   Type getImplicitlyUnwrappedOptionalType(SourceLoc loc, Type elementType);
   Type getStringType(DeclContext *dc);
+  Type getIntType(DeclContext *dc);
   Type getInt8Type(DeclContext *dc);
   Type getUInt8Type(DeclContext *dc);
   Type getNSObjectType(DeclContext *dc);

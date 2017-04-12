@@ -16,6 +16,8 @@ add_swift_library(swiftSema STATIC
   ConstraintGraph.cpp
   ConstraintLocator.cpp
   ConstraintSystem.cpp
+  DerivedConformanceCodable.cpp
+  DerivedConformanceCodingKey.cpp
   DerivedConformanceEquatableHashable.cpp
   DerivedConformanceError.cpp
   DerivedConformanceRawRepresentable.cpp
