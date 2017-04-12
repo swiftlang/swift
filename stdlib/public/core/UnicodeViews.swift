@@ -772,7 +772,7 @@ extension _UnicodeViews {
         if _fastPath(s0 < 0x300) {
           let width = (s0, s1) == (13, 10) ? 2 : 1
           return Index(
-            base: i.next, next: codeUnits.index(i.next, offsetBy: -width^))
+            base: codeUnits.index(i.base, offsetBy: -width^), next: i.base)
         }
       }
       
