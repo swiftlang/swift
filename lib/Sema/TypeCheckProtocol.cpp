@@ -1170,9 +1170,8 @@ matchWitness(TypeChecker &tc,
 
   // Initialized by the setup operation.
   Optional<ConstraintSystem> cs;
-  ConstraintLocator *locator = nullptr;
   ConstraintLocator *reqLocator = nullptr;
-  ConstraintLocator *witnessLocator = nullptr;
+  ConstraintLocator *locator = nullptr;
   Type witnessType, openWitnessType;
   Type openedFullWitnessType;
   Type reqType, openedFullReqType;
@@ -1225,11 +1224,9 @@ matchWitness(TypeChecker &tc,
 
     // Open up the witness type.
     witnessType = witness->getInterfaceType();
-    // FIXME: witness as a base locator?
-    locator = cs->getConstraintLocator(nullptr);
-    witnessLocator = cs->getConstraintLocator(
-                       static_cast<Expr *>(nullptr),
-                       LocatorPathElt(ConstraintLocator::Witness, witness));
+    locator = cs->getConstraintLocator(
+                static_cast<Expr *>(nullptr),
+                LocatorPathElt(ConstraintLocator::Witness, witness));
     OpenedTypeMap witnessReplacements;
     if (witness->getDeclContext()->isTypeContext()) {
       std::tie(openedFullWitnessType, openWitnessType) 
@@ -1237,7 +1234,7 @@ matchWitness(TypeChecker &tc,
                                        /*isTypeReference=*/false,
                                        /*isDynamicResult=*/false,
                                        FunctionRefKind::DoubleApply,
-                                       witnessLocator,
+                                       locator,
                                        /*base=*/nullptr,
                                        &witnessReplacements);
     } else {
@@ -1246,7 +1243,7 @@ matchWitness(TypeChecker &tc,
                                  /*isTypeReference=*/false,
                                  /*isSpecialized=*/false,
                                  FunctionRefKind::DoubleApply,
-                                 witnessLocator,
+                                 locator,
                                  /*base=*/nullptr);
     }
     openWitnessType = openWitnessType->getRValueType();
@@ -1255,9 +1252,16 @@ matchWitness(TypeChecker &tc,
   };
 
   // Match a type in the requirement to a type in the witness.
-  auto matchTypes = [&](Type reqType, Type witnessType) 
+  auto matchTypes = [&](Type reqType, Type witnessType)
                       -> Optional<RequirementMatch> {
-    cs->addConstraint(ConstraintKind::Equal, reqType, witnessType, locator);
+    ConstraintKind kind = ConstraintKind::Conversion;
+    if (auto func = dyn_cast<FuncDecl>(req)) {
+      auto name = req->getFullName().getBaseName();
+      if (func->isOperator() && name.str() == "==") {
+        kind = ConstraintKind::Equal;
+      }
+    }
+    cs->addConstraint(kind, witnessType, reqType, locator);
     // FIXME: Check whether this has already failed.
     return None;
   };
@@ -1286,7 +1290,7 @@ matchWitness(TypeChecker &tc,
     // Compute the set of substitutions we'll need for the witness.
     solution->computeSubstitutions(
       witness->getInnermostDeclContext()->getGenericSignatureOfContext(),
-      witnessLocator,
+      locator,
       result.WitnessSubstitutions);
     
     return result;

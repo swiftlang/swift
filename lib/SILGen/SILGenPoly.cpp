@@ -399,6 +399,12 @@ ManagedValue Transform::transform(ManagedValue v,
     inputOTK = OTK_None;
   }
 
+  if (inputOTK != OTK_None && outputOTK == OTK_None) {
+    SILValue result = SGF.B.createUncheckedBitCast(Loc, v.getValue(),
+                                                   loweredResultTy);
+    return ManagedValue(result, v.getCleanup());
+  }
+
   // Optional-to-optional conversion.
   if (inputOTK != OTK_None && outputOTK != OTK_None) {
     // If the conversion is trivial, just cast.

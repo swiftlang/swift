@@ -1038,9 +1038,13 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
 
   increaseScore(ScoreKind::SK_FunctionConversion);
 
-  // Input types can be contravariant (or equal).
-  SolutionKind result = matchTypes(func2->getInput(), func1->getInput(),
-                                   subKind, subflags,
+  // Input types can be contravariant (or equal),
+  // but witness constranit might be covarian (or equal).
+  bool isWitnessConstraint = locator.last() &&
+    locator.last()->getKind() == ConstraintLocator::Witness;
+  Type type1 = isWitnessConstraint ? func1->getInput() : func2->getInput();
+  Type type2 = isWitnessConstraint ? func2->getInput() : func1->getInput();
+  SolutionKind result = matchTypes(type1, type2, subKind, subflags,
                                    locator.withPathElement(
                                      ConstraintLocator::FunctionArgument));
   if (result == SolutionKind::Error)
