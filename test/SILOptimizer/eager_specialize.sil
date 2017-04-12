@@ -643,6 +643,57 @@ bb0(%0 : $*T, %1 : $*S):
 // CHECK:   br bb2
 // CHECK: } // end sil function '_T016eager_specialize34checkExplicitPartialSpecializationyx_q_tr0_lF'
 
+/////////////////////////////////////////////////////////////////////////
+// Check that functions with unreachable instructions can be specialized.
+/////////////////////////////////////////////////////////////////////////
+
+protocol P {
+}
+
+struct T : P {
+  init()
+}
+
+extension P {
+  public static func f(_ x: Self) -> Self
+}
+
+sil @error : $@convention(thin) () -> Never
+
+// CHECK-LABEL: sil @_T016eager_specialize1PPAAE1fxxFZ : $@convention(method) <Self where Self : P> (@in Self, @thick Self.Type) -> @out Self
+// CHECK: %3 = metatype $@thick Self.Type
+// CHECK:  %4 = metatype $@thick T.Type
+// CHECK:  %5 = unchecked_bitwise_cast %3 : $@thick Self.Type to $Builtin.Word
+// CHECK:  %6 = unchecked_bitwise_cast %4 : $@thick T.Type to $Builtin.Word
+// CHECK:  %7 = builtin "cmp_eq_Word"(%5 : $Builtin.Word, %6 : $Builtin.Word) : $Builtin.Int1
+// CHECK:  cond_br %7, bb2, bb1
+
+// CHECK: bb1:
+// CHECK:  %9 = function_ref @error : $@convention(thin) () -> Never
+// CHECK:  %10 = apply %9() : $@convention(thin) () -> Never
+// CHECK:  unreachable 
+
+// CHECK: bb2:
+// CHECK:  %12 = unchecked_addr_cast %0 : $*Self to $*T
+// CHECK:  %13 = unchecked_addr_cast %1 : $*Self to $*T
+// CHECK:  %14 = load %13 : $*T
+// CHECK:  %15 = unchecked_trivial_bit_cast %2 : $@thick Self.Type to $@thick T.Type
+// CHECK:  %16 = function_ref @_T016eager_specialize1PPAAE1fxxFZ4main1TV_Tg5 : $@convention(method) (T, @thick T.Type) -> T
+// CHECK:  %17 = apply %16(%14, %15) : $@convention(method) (T, @thick T.Type) -> T
+// CHECK:  store %17 to %12 : $*T
+// CHECK:  %19 = tuple ()
+// CHECK:  unreachable 
+// CHECK: } // end sil function '_T016eager_specialize1PPAAE1fxxFZ'
+
+sil [_specialize exported: false, kind: full, where Self == T] @_T016eager_specialize1PPAAE1fxxFZ : $@convention(method) <Self where Self : P> (@in Self, @thick Self.Type) -> @out Self {
+bb0(%0 : $*Self, %1 : $*Self, %2 : $@thick Self.Type):
+  // function_ref error
+  %5 = function_ref @error : $@convention(thin) () -> Never
+  %6 = apply %5() : $@convention(thin) () -> Never
+  unreachable 
+} // end sil function '_T016eager_specialize1PPAAE1fxxFZ'
+
+
 ////////////////////////////////////////////////////////////////////
 // Check that IRGen generates efficient code for fixed-size Trivial
 // constraints.

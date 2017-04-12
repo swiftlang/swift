@@ -324,7 +324,10 @@ protected:
 /// given specialized function. Converts call arguments. Emits an invocation of
 /// the specialized function. Handle the return value.
 void EagerDispatch::emitDispatchTo(SILFunction *NewFunc) {
-  SILBasicBlock *OldReturnBB = &*GenericFunc->findReturnBB();
+  SILBasicBlock *OldReturnBB = nullptr;
+  auto ReturnBB = GenericFunc->findReturnBB();
+  if (ReturnBB != GenericFunc->end())
+      OldReturnBB = &*ReturnBB;
   // 1. Emit a cascading sequence of type checks blocks.
 
   // First split the entry BB, moving all instructions to the FailedTypeCheckBB.
@@ -395,7 +398,7 @@ void EagerDispatch::emitDispatchTo(SILFunction *NewFunc) {
     Result = Builder.createTuple(Loc, VoidTy, { });
 
   // Function marked as @NoReturn must be followed by 'unreachable'.
-  if (NewFunc->isNoReturnFunction())
+  if (NewFunc->isNoReturnFunction() || !OldReturnBB)
     Builder.createUnreachable(Loc);
   else {
     auto resultTy = GenericFunc->getConventions().getSILResultType();
