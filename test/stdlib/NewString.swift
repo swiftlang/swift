@@ -334,38 +334,38 @@ print(delimit("""
 print("-12-")
 // Note: The next few tests use physical tab characters, not spaces.
 // FIXME: We also want to check that this emits a warning on the "Nu" line.
-// SKIP-CHECK-NEXT: {{^}}<Twelve
-// SKIP-CHECK-NEXT: {{^}}	Nu
-// SKIP-CHECK-NEXT: {{^}}>
-//print(delimit("""
-//	Twelve
-//\tNu
-//	"""
-//))
+// CHECK-NEXT: {{^}}<Twelve
+// CHECK-NEXT: {{^}}	Nu
+// CHECK-NEXT: {{^}}>
+print(delimit("""
+	Twelve
+\tNu
+	"""
+))
 
 // CHECK: -13-
 print("-13-")
 // FIXME: We also want to check that this emits a warning on the "Xi" line.
-// SKIP-CHECK-NEXT: {{^}}<Thirteen
-// SKIP-CHECK-NEXT: {{^}}	Xi
-// SKIP-CHECK-NEXT: {{^}}>
-//print(delimit("""
-//  Thirteen
-//	Xi
-//  """
-//))
+// CHECK-NEXT: {{^}}<Thirteen
+// CHECK-NEXT: {{^}}	Xi
+// CHECK-NEXT: {{^}}>
+print(delimit("""
+  Thirteen
+	Xi
+  """
+))
 
 // CHECK: -14-
 print("-14-")
 // FIXME: We also want to check that this emits a warning on the "Omicron" line.
-// SKIP-CHECK-NEXT: {{^}}<Fourteen
-// SKIP-CHECK-NEXT: {{^}}  	Pi
-// SKIP-CHECK-NEXT: {{^}}>
-//print(delimit("""
-//    Fourteen
-//  	Pi
-//    """
-//))
+// CHECK-NEXT: {{^}}<Fourteen
+// CHECK-NEXT: {{^}}  	Pi
+// CHECK-NEXT: {{^}}>
+print(delimit("""
+    Fourteen
+  	Pi
+    """
+))
 // Okay, we're done with tabs.
 
 // CHECK: -15-
