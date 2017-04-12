@@ -350,9 +350,8 @@ private:
 
       // Explicitly allow the selection of multiple case statments.
       auto IsCase = [](ASTNode N) { return N.isStmt(StmtKind::Case); };
-      if (llvm::any_of(StartMatches, IsCase) && llvm::any_of(EndMatches, IsCase))
-        return true;
-      return false;
+      return llvm::any_of(StartMatches, IsCase) &&
+          llvm::any_of(EndMatches, IsCase);
     }
   };
 
@@ -603,14 +602,12 @@ public:
     for (auto N : Nodes) {
       if (Stmt *S = N.is<Stmt*>() ? N.get<Stmt*>() : nullptr) {
         if (S->getKind() == StmtKind::Case)
-          CaseCount ++;
+          CaseCount++;
       }
     }
     // If there are more than one case/default statements, there are more than
     // one entry point.
-    if (CaseCount > 1)
-      return false;
-    return true;
+    return CaseCount == 0;
   }
 
   OrphanKind getOrphanKind(ArrayRef<ASTNode> Nodes) {

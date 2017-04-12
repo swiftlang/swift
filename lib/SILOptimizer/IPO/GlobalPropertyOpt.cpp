@@ -147,9 +147,7 @@ class GlobalPropertyOpt {
         linkage = SILLinkage::Public;
         break;
     }
-    if (isPossiblyUsedExternally(linkage, M.isWholeModule()))
-      return true;
-    return false;
+    return isPossiblyUsedExternally(linkage, M.isWholeModule());
   }
   
   static bool canAddressEscape(SILValue V, bool acceptStore);

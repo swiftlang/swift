@@ -263,9 +263,7 @@ private:
       return true;
 
     case Node::Kind::ProtocolList:
-      if (pointer->getChild(0)->getNumChildren() <= 1)
-        return true;
-      return false;
+      return pointer->getChild(0)->getNumChildren() <= 1;
 
     case Node::Kind::Allocator:
     case Node::Kind::ArgumentTuple:
