@@ -830,7 +830,7 @@ extension CountablePartialRangeFrom: Sequence {
 }
 
 extension Comparable {
-  /// Returns a partial range up to but not including its maximum.
+  /// Returns a partial range up to, but not including, its upper bound.
   ///
   /// Use the partial range up to operator (`..<`) to create a partial range of
   /// any type that conforms to the `Comparable` protocol. This example creates
@@ -840,29 +840,30 @@ extension Comparable {
   ///     print(lessThanFive.contains(3.14))  // Prints "true"
   ///     print(lessThanFive.contains(5.0))   // Prints "false"
   ///
-  /// Partial ranges can be used to slice types conforming to `Collection`
+  /// You can use a partial range to can be used to slice types conforming to `Collection`
   /// from the start of the collection up to, but not including, the maximum.
   ///
-  /// let array = Array(0..<5)
-  /// print(array[..<3])      // prints [0, 1, 2]
+  ///     let numbers = [10, 20, 30, 40, 50, 60, 70]
+  ///     print(numbers[..<3])
+  ///     // Prints "[0, 1, 2]"
   ///
-  /// - Parameters:
-  ///   - maximum: The upper bound for the range.
+  /// - Parameter maximum: The upper bound for the range.
   @_transparent
   public static prefix func ..<(maximum: Self) -> PartialRangeUpTo<Self> {
     return PartialRangeUpTo(maximum)
   }
 
-  /// Returns a partial range up to and including its maximum.
+  /// Returns a partial range up to, and including, its upper bound.
   ///
   /// Use the partial range up to operator (`...`) to create a partial range of
   /// any type that conforms to the `Comparable` protocol. This example creates
-  /// a `PartialRangeThrough<Double>` up to 5.
+  /// a `PartialRangeThrough<Double>` that includes any value less than or equal to `5.0`.
   ///
-  ///     let upToFive = ..<5.0
-  ///     print(upToFive.contains(4))   // Prints "true"
-  ///     print(upToFive.contains(5))   // Prints "true"
-  ///     print(upToFive.contains(6))  // Prints "false"
+  ///     let throughFive = ..<5.0
+  ///
+  ///     throughFive.contains(4.0)       // true
+  ///     throughFive.contains(5.0)       // true
+  ///     throughFive.contains(6.0)       // false
   ///
   /// Partial ranges can be used to slice types conforming to `Collection`
   /// from the start of the collection up to the maximum.

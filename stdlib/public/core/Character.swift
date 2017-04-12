@@ -16,11 +16,12 @@
 /// The `Character` type represents a character made up of one or more Unicode
 /// scalar values, grouped by a Unicode boundary algorithm. Generally, a
 /// `Character` instance matches what the reader of a string will perceive as
-/// a single character. The number of visible characters is generally the most
-/// natural way to count the length of a string.
+/// a single character. Strings are collections of `Character` instances, so
+/// the number of visible characters is generally the most natural way to
+/// count the length of a string.
 ///
 ///     let greeting = "Hello! 🐥"
-///     print("Character count: \(greeting.characters.count)")
+///     print("Character count: \(greeting.count)")
 ///     // Prints "Character count: 8"
 ///
 /// Because each character in a string can be made up of one or more Unicode

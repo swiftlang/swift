@@ -120,11 +120,11 @@ extension String {
     /// You can convert between indices of the different string views by using
     /// conversion initializers and the `samePosition(in:)` method overloads.
     /// For example, the following code sample finds the index of the first
-    /// space in the string's character view and then converts that to the same
+    /// space in a string and then converts that to the same
     /// position in the UTF-16 view.
     ///
     ///     let hearts = "Hearts <3 ♥︎ 💘"
-    ///     if let i = hearts.characters.index(of: " ") {
+    ///     if let i = hearts.index(of: " ") {
     ///         let j = i.samePosition(in: hearts.utf16)
     ///         print(Array(hearts.utf16.suffix(from: j)))
     ///         print(hearts.utf16.suffix(from: j))
@@ -440,16 +440,15 @@ extension String.UTF16View.Index {
   }
 
   /// Creates an index in the given UTF-16 view that corresponds exactly to the
-  /// specified `CharacterView` position.
+  /// specified string position.
   ///
-  /// The following example finds the position of a space in a string's `characters`
-  /// view and then converts that position to an index in the string's
+  /// The following example finds the position of a space in a string and then converts that position to an index in the string's
   /// `utf16` view.
   ///
   ///     let cafe = "Café 🍵"
   ///
-  ///     let characterIndex = cafe.characters.index(of: "é")!
-  ///     let utf16Index = String.UTF16View.Index(characterIndex, within: cafe.utf16)
+  ///     let index = cafe.index(of: "é")!
+  ///     let utf16Index = String.UTF16View.Index(index, within: cafe.utf16)
   ///
   ///     print(cafe.utf16.prefix(through: utf16Index))
   ///     // Prints "Café"

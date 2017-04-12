@@ -448,18 +448,17 @@ public struct IndexingIterator<
 /// at a specific position when using a collection.
 ///
 /// For example, if you want to print only the first word in a string, search
-/// for the index of the first space and then create a subsequence up to that
+/// for the index of the first space, and then create a subsequence up to that
 /// position.
 ///
 ///     let text = "Buffalo buffalo buffalo buffalo."
-///     if let firstSpace = text.characters.index(of: " ") {
-///         print(String(text.characters.prefix(upTo: firstSpace)))
+///     if let firstSpace = text.index(of: " ") {
+///         print(text.prefix(upTo: firstSpace))
 ///     }
 ///     // Prints "Buffalo"
 ///
-/// The `firstSpace` constant is an index into the `text.characters`
-/// collection. `firstSpace` is the position of the first space in the
-/// collection. You can store indices in variables, and pass them to
+/// The `firstSpace` constant is an index into the `text` string---the position of the first space in the
+/// string. You can store indices in variables, and pass them to
 /// collection algorithms or use them later to access the corresponding
 /// element. In the example above, `firstSpace` is used to extract the prefix
 /// that contains elements up to that index.
@@ -486,7 +485,7 @@ public struct IndexingIterator<
 /// Here's an example of accessing the first character in a string through its
 /// subscript:
 ///
-///     let firstChar = text.characters[text.characters.startIndex]
+///     let firstChar = text[text.startIndex]
 ///     print(firstChar)
 ///     // Prints "B"
 ///
@@ -496,7 +495,7 @@ public struct IndexingIterator<
 /// using the `first` property, which has the value of the first element of
 /// the collection, or `nil` if the collection is empty.
 ///
-///     print(text.characters.first)
+///     print(text.first)
 ///     // Prints "Optional("B")"
 ///
 /// Accessing Slices of a Collection
@@ -508,27 +507,26 @@ public struct IndexingIterator<
 /// and shares the original collection's semantics.
 ///
 /// The following example, creates a `firstWord` constant by using the
-/// `prefix(_:)` method to get a slice of the `text` string's `characters`
-/// view.
+/// `prefix(_:)` method to get a slice of the `text` string.
 ///
-///     let firstWord = text.characters.prefix(7)
-///     print(String(firstWord))
+///     let firstWord = text.prefix(7)
+///     print(firstWord)
 ///     // Prints "Buffalo"
 ///
 /// You can retrieve the same slice using other methods, such as finding the
 /// terminating index, and then using the `prefix(upTo:)` method, which takes
 /// an index as its parameter, or by using the view's ranged subscript.
 ///
-///     if let firstSpace = text.characters.index(of: " ") {
-///         print(text.characters.prefix(upTo: firstSpace))
+///     if let firstSpace = text.index(of: " ") {
+///         print(text.prefix(upTo: firstSpace))
 ///         // Prints "Buffalo"
 ///
-///         let start = text.characters.startIndex
-///         print(text.characters[start..<firstSpace])
+///         let start = text.startIndex
+///         print(text[start..<firstSpace])
 ///         // Prints "Buffalo"
 ///     }
 ///
-/// The retrieved slice of `text.characters` is equivalent in each of these
+/// The retrieved slice of `text` is equivalent in each of these
 /// cases.
 ///
 /// Slices Share Indices
@@ -598,7 +596,7 @@ public struct IndexingIterator<
 /// indices or the view itself is being iterated.
 ///
 ///     let word = "Swift"
-///     for character in word.characters {
+///     for character in word {
 ///         print(character)
 ///     }
 ///     // Prints "S"
@@ -607,8 +605,8 @@ public struct IndexingIterator<
 ///     // Prints "f"
 ///     // Prints "t"
 ///
-///     for i in word.characters.indices {
-///         print(word.characters[i])
+///     for i in word.indices {
+///         print(word[i])
 ///     }
 ///     // Prints "S"
 ///     // Prints "w"
@@ -864,7 +862,7 @@ public protocol Collection : _Indexable, Sequence
   /// through the elements of the collection.
   ///
   ///     let horseName = "Silver"
-  ///     if horseName.characters.isEmpty {
+  ///     if horseName.isEmpty {
   ///         print("I've been through the desert on a horse with no name.")
   ///     } else {
   ///         print("Hi ho, \(horseName)!")
@@ -1319,7 +1317,7 @@ extension Collection {
   /// through the elements of the collection.
   ///
   ///     let horseName = "Silver"
-  ///     if horseName.characters.isEmpty {
+  ///     if horseName.isEmpty {
   ///         print("I've been through the desert on a horse with no name.")
   ///     } else {
   ///         print("Hi ho, \(horseName)!")
@@ -1420,7 +1418,7 @@ extension Collection {
   ///     let cast = ["Vivien", "Marlon", "Kim", "Karl"]
   ///     let lowercaseNames = cast.map { $0.lowercaseString }
   ///     // 'lowercaseNames' == ["vivien", "marlon", "kim", "karl"]
-  ///     let letterCounts = cast.map { $0.characters.count }
+  ///     let letterCounts = cast.map { $0.count }
   ///     // 'letterCounts' == [6, 6, 3, 4]
   ///
   /// - Parameter transform: A mapping closure. `transform` accepts an
@@ -1701,25 +1699,20 @@ extension Collection {
   /// that was originally separated by one or more spaces.
   ///
   ///     let line = "BLANCHE:   I don't want realism. I want magic!"
-  ///     print(line.characters.split(whereSeparator: { $0 == " " })
-  ///                          .map(String.init))
+  ///     print(line.split(whereSeparator: { $0 == " " }))
   ///     // Prints "["BLANCHE:", "I", "don\'t", "want", "realism.", "I", "want", "magic!"]"
   ///
   /// The second example passes `1` for the `maxSplits` parameter, so the
   /// original string is split just once, into two new strings.
   ///
-  ///     print(
-  ///         line.characters.split(
-  ///             maxSplits: 1, whereSeparator: { $0 == " " }
-  ///             ).map(String.init))
+  ///     print(line.split(maxSplits: 1, whereSeparator: { $0 == " " }))
   ///     // Prints "["BLANCHE:", "  I don\'t want realism. I want magic!"]"
   ///
   /// The final example passes `false` for the `omittingEmptySubsequences`
   /// parameter, so the returned array contains empty strings where spaces
   /// were repeated.
   ///
-  ///     print(line.characters.split(omittingEmptySubsequences: false, whereSeparator: { $0 == " " })
-  ///                           .map(String.init))
+  ///     print(line.split(omittingEmptySubsequences: false, whereSeparator: { $0 == " " }))
   ///     // Prints "["BLANCHE:", "", "", "I", "don\'t", "want", "realism.", "I", "want", "magic!"]"
   ///
   /// - Parameters:
@@ -1801,23 +1794,20 @@ extension Collection where Iterator.Element : Equatable {
   /// was originally separated by one or more spaces.
   ///
   ///     let line = "BLANCHE:   I don't want realism. I want magic!"
-  ///     print(line.characters.split(separator: " ")
-  ///                          .map(String.init))
+  ///     print(line.split(separator: " "))
   ///     // Prints "["BLANCHE:", "I", "don\'t", "want", "realism.", "I", "want", "magic!"]"
   ///
   /// The second example passes `1` for the `maxSplits` parameter, so the
   /// original string is split just once, into two new strings.
   ///
-  ///     print(line.characters.split(separator: " ", maxSplits: 1)
-  ///                           .map(String.init))
+  ///     print(line.split(separator: " ", maxSplits: 1))
   ///     // Prints "["BLANCHE:", "  I don\'t want realism. I want magic!"]"
   ///
   /// The final example passes `false` for the `omittingEmptySubsequences`
   /// parameter, so the returned array contains empty strings where spaces
   /// were repeated.
   ///
-  ///     print(line.characters.split(separator: " ", omittingEmptySubsequences: false)
-  ///                           .map(String.init))
+  ///     print(line.split(separator: " ", omittingEmptySubsequences: false))
   ///     // Prints "["BLANCHE:", "", "", "I", "don\'t", "want", "realism.", "I", "want", "magic!"]"
   ///
   /// - Parameters:

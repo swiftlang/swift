@@ -38,32 +38,34 @@ public protocol StringProtocol
   func lowercased() -> String
   func uppercased() -> String
 
-  /// Constructs a `String` having the same contents as `codeUnits`.
+  /// Creates a string from the given Unicode code units in the specific encoding.
   ///
-  /// - Parameter codeUnits: a collection of code units in
-  ///   the given `encoding`.
-  /// - Parameter encoding: describes the encoding in which the code units
+  /// - Parameters:
+  ///   - codeUnits: A collection of code units encoded in the ecoding specified in
+  ///   `encoding`.
+  ///   - encoding: The encoding in which `codeUnits`
   ///   should be interpreted.
   init<C: Collection, Encoding: Unicode.Encoding>(
     decoding codeUnits: C, as encoding: Encoding.Type
   )
     where C.Iterator.Element == Encoding.CodeUnit
 
-  /// Constructs a `String` having the same contents as `nulTerminatedUTF8`.
+  /// Creates a string from the null-terminated, UTF-8 encoded sequence of bytes at the given pointer.
   ///
-  /// - Parameter nulTerminatedUTF8: a sequence of contiguous UTF-8 encoded 
-  ///   bytes ending just before the first zero byte (NUL character).
+  /// - Parameter nulTerminatedUTF8: A pointer to a sequence of contiguous, UTF-8 encoded
+  ///   bytes ending just before the first zero byte.
   init(cString nulTerminatedUTF8: UnsafePointer<CChar>)
   
-  /// Constructs a `String` having the same contents as `nulTerminatedCodeUnits`.
+  /// Creates a string from the null-terminated sequence of bytes at the given pointer.
   ///
-  /// - Parameter nulTerminatedCodeUnits: a sequence of contiguous code units in
-  ///   the given `encoding`, ending just before the first zero code unit.
-  /// - Parameter encoding: describes the encoding in which the code units
+  /// - Parameters:
+  ///   - nulTerminatedCodeUnits: A pointer to a sequence of contiguous code units in
+  ///   the encoding specified in `encoding`, ending just before the first zero code unit.
+  ///   - encoding: The encoding in which the code units
   ///   should be interpreted.
   init<Encoding: Unicode.Encoding>(
     decodingCString nulTerminatedCodeUnits: UnsafePointer<Encoding.CodeUnit>,
-    as: Encoding.Type)
+    as encoding: Encoding.Type)
     
   /// Invokes the given closure on the contents of the string, represented as a
   /// pointer to a null-terminated sequence of UTF-8 code units.

@@ -170,10 +170,11 @@ word_bits = int(CMAKE_SIZEOF_VOID_P) * 8
 public protocol FloatingPoint: SignedNumeric, Strideable, Hashable {
 
   // For the minimumMagnitude and maximumMagnitude methods
-  // FIXME(integers): document me properly
+  /// A type that can represent the absolute value of any possible value of the
+  /// conforming type.
   associatedtype Magnitude = Self
 
-  /// A type that represents any written exponent.
+  /// A type that can represent any written exponent.
   associatedtype Exponent: SignedInteger
 
   /// Creates a new value from the given sign, exponent, and significand.
