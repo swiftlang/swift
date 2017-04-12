@@ -1142,8 +1142,9 @@ unsigned Lexer::lexCharacter(const char *&CurPtr, char StopQuote,
     // If this is a "high" UTF-8 character, validate it.
     if ((signed char)(CurPtr[-1]) >= 0) {
       if (isPrintable(CurPtr[-1]) == 0)
-        if (EmitDiagnostics)
-          diagnose(CharStart, diag::lex_unprintable_ascii_character);
+        if (!((Modifiers & StringLiteralMultiline) && (CurPtr[-1] == '\t')))
+          if (EmitDiagnostics)
+            diagnose(CharStart, diag::lex_unprintable_ascii_character);
       return CurPtr[-1];
     }
     --CurPtr;
