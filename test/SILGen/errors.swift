@@ -947,6 +947,6 @@ class SomeErrorClass : Error { }
 class OtherErrorSub : OtherError { }
 
 // CHECK-LABEL: sil_vtable OtherErrorSub {
-// CHECK-NEXT:  #OtherError.init!initializer.1: {{.*}} : _T06errors13OtherErrorSubCACycfc     // OtherErrorSub.init() -> OtherErrorSub
+// CHECK-NEXT:  #OtherError.init!initializer.1: {{.*}} : _T06errors13OtherErrorSubCACycfc     // OtherErrorSub.init()
 // CHECK-NEXT:  #OtherErrorSub.deinit!deallocator: _T06errors13OtherErrorSubCfD        // OtherErrorSub.__deallocating_deinit
 // CHECK-NEXT:}

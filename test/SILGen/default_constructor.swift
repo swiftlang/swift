@@ -90,10 +90,10 @@ struct G {
   let bar: Int32?
 }
 
-// CHECK-NOT: default_constructor.G.init ()
-// CHECK-LABEL: default_constructor.G.init (bar : Swift.Optional<Swift.Int32>)
+// CHECK-NOT: default_constructor.G.init()
+// CHECK-LABEL: default_constructor.G.init(bar: Swift.Optional<Swift.Int32>)
 // CHECK-NEXT: sil hidden @_T019default_constructor1GV{{[_0-9a-zA-Z]*}}fC
-// CHECK-NOT: default_constructor.G.init ()
+// CHECK-NOT: default_constructor.G.init()
 
 struct H<T> {
   var opt: T?

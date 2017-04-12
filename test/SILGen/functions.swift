@@ -413,7 +413,7 @@ final class r17828355Class {
 // The curry thunk for the method should not include a class_method instruction.
 // CHECK-LABEL: sil shared [thunk] @_T09functions14r17828355ClassC6method
 // CHECK: bb0(%0 : $r17828355Class):
-// CHECK-NEXT: // function_ref functions.r17828355Class.method (Builtin.Int64) -> ()
+// CHECK-NEXT: // function_ref functions.r17828355Class.method(Builtin.Int64) -> ()
 // CHECK-NEXT:  %1 = function_ref @_T09functions14r17828355ClassC6method{{[_0-9a-zA-Z]*}}F : $@convention(method) (Builtin.Int64, @guaranteed r17828355Class) -> ()
 // CHECK-NEXT:  partial_apply %1(%0) : $@convention(method) (Builtin.Int64, @guaranteed r17828355Class) -> ()
 // CHECK-NEXT:  return
@@ -434,14 +434,14 @@ func testNoescape() {
   markUsed(a)
 }
 
-// CHECK-LABEL: functions.testNoescape () -> ()
+// CHECK-LABEL: functions.testNoescape() -> ()
 // CHECK-NEXT: sil hidden @_T09functions12testNoescapeyyF : $@convention(thin) () -> ()
-// CHECK: function_ref functions.(testNoescape () -> ()).(closure #1)
+// CHECK: function_ref closure #1 () -> () in functions.testNoescape() -> ()
 // CHECK-NEXT: function_ref @_T09functions12testNoescapeyyFyycfU_ : $@convention(thin) (@owned { var Int }) -> ()
 
 // Despite being a noescape closure, this needs to capture 'a' by-box so it can
 // be passed to the capturing closure.closure
-// CHECK: functions.(testNoescape () -> ()).(closure #1)
+// CHECK: closure #1 () -> () in functions.testNoescape() -> ()
 // CHECK-NEXT: sil private @_T09functions12testNoescapeyyFyycfU_ : $@convention(thin) (@owned { var Int }) -> () {
 
 
@@ -461,10 +461,10 @@ func testNoescape2() {
 
 // CHECK-LABEL: sil hidden @_T09functions13testNoescape2yyF : $@convention(thin) () -> () {
 
-// CHECK: // functions.(testNoescape2 () -> ()).(closure #1)
+// CHECK: // closure #1 () -> () in functions.testNoescape2() -> ()
 // CHECK-NEXT: sil private @_T09functions13testNoescape2yyFyycfU_ : $@convention(thin) (@owned { var Int }) -> () {
 
-// CHECK: // functions.(testNoescape2 () -> ()).(closure #1).(closure #1)
+// CHECK: // closure #1 () -> () in closure #1 () -> () in functions.testNoescape2() -> ()
 // CHECK-NEXT: sil private @_T09functions13testNoescape2yyFyycfU_yycfU_ : $@convention(thin) (@owned { var Int }) -> () {
 
 enum PartialApplyEnumPayload<T, U> {
