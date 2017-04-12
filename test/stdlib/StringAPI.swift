@@ -293,20 +293,7 @@ StringTests.test("LosslessStringConvertible") {
   checkLosslessStringConvertible(comparisonTests.map { $0.rhs })
 }
 
-// Mark the test cases that are expected to fail in checkHasPrefixHasSuffix
-
-let substringTests = tests.map {
-  (test: ComparisonTest) -> ComparisonTest in
-  switch (test.expectedUnicodeCollation, test.lhs, test.rhs) {
-  case (.eq, "\u{0301}", "\u{0341}"):
-    return test.replacingPredicate(.objCRuntime(
-      "https://bugs.swift.org/browse/SR-243"))
-
-  default:
-    return test
-  }
-}
-
+let substringTests = tests
 for test in substringTests {
   StringTests.test("hasPrefix,hasSuffix: line \(test.loc.line)")
     .skip(.nativeRuntime(
@@ -341,11 +328,7 @@ StringTests.test("SameTypeComparisons") {
   expectFalse(xs != xs)
 }
 
-StringTests.test("CompareStringsWithUnpairedSurrogates")
-  .xfail(
-    .always("<rdar://problem/18029104> Strings referring to underlying " +
-      "storage with unpaired surrogates compare unequal"))
-  .code {
+StringTests.test("CompareStringsWithUnpairedSurrogates") {
   let donor = "abcdef"
   let acceptor = "\u{1f601}\u{1f602}\u{1f603}"
 
