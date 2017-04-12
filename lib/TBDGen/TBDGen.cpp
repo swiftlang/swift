@@ -201,6 +201,9 @@ template <typename T> bool isaAnd(Decl *D, llvm::function_ref<bool(T *)> f) {
 }
 
 void TBDGenVisitor::visitClassDecl(ClassDecl *CD) {
+  if (isPrivateDecl(CD))
+    return;
+
   auto &ctxt = CD->getASTContext();
 
   if (ctxt.LangOpts.EnableObjCInterop) {
@@ -214,9 +217,10 @@ void TBDGenVisitor::visitClassDecl(ClassDecl *CD) {
     if (!value)
       continue;
 
+    auto ctor = dyn_cast<ConstructorDecl>(value);
+
     auto hasWitnessTableOffset =
-        isa<ConstructorDecl>(value) ||
-        isaAnd<FuncDecl>(value, [](FuncDecl *FD) {
+        ctor || isaAnd<FuncDecl>(value, [](FuncDecl *FD) {
           auto ASD = FD->getAccessorStorageDecl();
           // Static functions (including getters/setters of static variables)
           // and getters of lets do not get WTOs.
@@ -233,6 +237,15 @@ void TBDGenVisitor::visitClassDecl(ClassDecl *CD) {
     if (hasFieldOffset) {
       // These fields are always direct.
       addSymbol(LinkEntity::forFieldOffset(var, /*isIndirect=*/false));
+    }
+
+    // The non-allocating forms of the constructors and destructors.
+    if (auto ctor = dyn_cast<ConstructorDecl>(value)) {
+      auto initializer = SILDeclRef(ctor, SILDeclRef::Kind::Initializer);
+      addSymbol(initializer.mangle());
+    } else if (auto dtor = dyn_cast<DestructorDecl>(value)) {
+      auto destroyer = SILDeclRef(dtor, SILDeclRef::Kind::Destroyer);
+      addSymbol(destroyer.mangle());
     }
   }
 

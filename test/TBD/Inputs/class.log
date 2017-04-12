@@ -1,15 +1,5 @@
-<unknown>:0: error: symbol '_T04test10PublicInitCACSi7public__tcfc' (test.PublicInit.init(public_: Swift.Int) -> test.PublicInit) is in generated IR file, but not in TBD file
-<unknown>:0: error: symbol '_T04test10PublicInitCACSi9internal__tcfc' (test.PublicInit.init(internal_: Swift.Int) -> test.PublicInit) is in generated IR file, but not in TBD file
-<unknown>:0: error: symbol '_T04test10PublicInitCACycfc' (test.PublicInit.init() -> test.PublicInit) is in generated IR file, but not in TBD file
-<unknown>:0: error: symbol '_T04test10PublicInitCfd' (test.PublicInit.deinit) is in generated IR file, but not in TBD file
 <unknown>:0: error: symbol '_T04test13PublicMethodsC13privateMethod33_C78BF7A60640620A6DFBB107F4401C5CLLyyF' (test.PublicMethods.(privateMethod in _C78BF7A60640620A6DFBB107F4401C5C)() -> ()) is in generated IR file, but not in TBD file
 <unknown>:0: error: symbol '_T04test13PublicMethodsC14internalMethodyyF' (test.PublicMethods.internalMethod() -> ()) is in generated IR file, but not in TBD file
-<unknown>:0: error: symbol '_T04test13PublicMethodsCACycfc' (test.PublicMethods.init() -> test.PublicMethods) is in generated IR file, but not in TBD file
-<unknown>:0: error: symbol '_T04test13PublicMethodsCfd' (test.PublicMethods.deinit) is in generated IR file, but not in TBD file
-<unknown>:0: error: symbol '_T04test13PublicNothingCACycfc' (test.PublicNothing.init() -> test.PublicNothing) is in generated IR file, but not in TBD file
-<unknown>:0: error: symbol '_T04test13PublicNothingCfd' (test.PublicNothing.deinit) is in generated IR file, but not in TBD file
-<unknown>:0: error: symbol '_T04test13PublicStaticsCACycfc' (test.PublicStatics.init() -> test.PublicStatics) is in generated IR file, but not in TBD file
-<unknown>:0: error: symbol '_T04test13PublicStaticsCfd' (test.PublicStatics.deinit) is in generated IR file, but not in TBD file
 <unknown>:0: error: symbol '_T04test16PublicPropertiesC10privateVar33_C78BF7A60640620A6DFBB107F4401C5CLLSifg' (test.PublicProperties.(privateVar in _C78BF7A60640620A6DFBB107F4401C5C).getter : Swift.Int) is in generated IR file, but not in TBD file
 <unknown>:0: error: symbol '_T04test16PublicPropertiesC10privateVar33_C78BF7A60640620A6DFBB107F4401C5CLLSifm' (test.PublicProperties.(privateVar in _C78BF7A60640620A6DFBB107F4401C5C).materializeForSet : Swift.Int) is in generated IR file, but not in TBD file
 <unknown>:0: error: symbol '_T04test16PublicPropertiesC10privateVar33_C78BF7A60640620A6DFBB107F4401C5CLLSifs' (test.PublicProperties.(privateVar in _C78BF7A60640620A6DFBB107F4401C5C).setter : Swift.Int) is in generated IR file, but not in TBD file
@@ -24,5 +14,3 @@
 <unknown>:0: error: symbol '_T04test16PublicPropertiesC17internalVarGetSetSifg' (test.PublicProperties.internalVarGetSet.getter : Swift.Int) is in generated IR file, but not in TBD file
 <unknown>:0: error: symbol '_T04test16PublicPropertiesC17internalVarGetSetSifm' (test.PublicProperties.internalVarGetSet.materializeForSet : Swift.Int) is in generated IR file, but not in TBD file
 <unknown>:0: error: symbol '_T04test16PublicPropertiesC17internalVarGetSetSifs' (test.PublicProperties.internalVarGetSet.setter : Swift.Int) is in generated IR file, but not in TBD file
-<unknown>:0: error: symbol '_T04test16PublicPropertiesCACycfc' (test.PublicProperties.init() -> test.PublicProperties) is in generated IR file, but not in TBD file
-<unknown>:0: error: symbol '_T04test16PublicPropertiesCfd' (test.PublicProperties.deinit) is in generated IR file, but not in TBD file
