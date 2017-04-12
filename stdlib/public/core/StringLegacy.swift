@@ -66,21 +66,21 @@ extension String {
   }
 }
 
-#if _runtime(_ObjC)
-/// Determines if `theString` starts with `prefix` comparing the strings under
-/// canonical equivalence.
-@_silgen_name("swift_stdlib_NSStringHasPrefixNFD")
-func _stdlib_NSStringHasPrefixNFD(_ theString: AnyObject, _ prefix: AnyObject) -> Bool
-
-@_silgen_name("swift_stdlib_NSStringHasPrefixNFDPointer")
-func _stdlib_NSStringHasPrefixNFDPointer(_ theString: OpaquePointer, _ prefix: OpaquePointer) -> Bool
-
-/// Determines if `theString` ends with `suffix` comparing the strings under
-/// canonical equivalence.
-@_silgen_name("swift_stdlib_NSStringHasSuffixNFD")
-func _stdlib_NSStringHasSuffixNFD(_ theString: AnyObject, _ suffix: AnyObject) -> Bool
-@_silgen_name("swift_stdlib_NSStringHasSuffixNFDPointer")
-func _stdlib_NSStringHasSuffixNFDPointer(_ theString: OpaquePointer, _ suffix: OpaquePointer) -> Bool
+extension Collection {
+  public func _mismatch<Other: Collection>(
+    _ other: Other
+  ) -> (Index, Other.Index)
+  where Iterator.Element == Other.Iterator.Element,
+    Iterator.Element : Equatable {
+    var il = startIndex, ir = other.startIndex
+    let el = endIndex, er = other.endIndex
+    while il != el && ir != er && self[il] == other[ir] {
+      self.formIndex(after: &il)
+      other.formIndex(after: &ir)
+    }
+    return (il, ir)
+  }
+}
 
 extension String {
   /// Returns a Boolean value indicating whether the string begins with the
@@ -113,32 +113,14 @@ extension String {
   /// - Parameter prefix: A possible prefix to test against this string.
   /// - Returns: `true` if the string begins with `prefix`, otherwise, `false`.
   public func hasPrefix(_ prefix: String) -> Bool {
-    let selfCore = self._core
-    let prefixCore = prefix._core
-    let prefixCount = prefixCore.count
-    if prefixCount == 0 {
-      return true
-    }
-    if let selfASCIIBuffer = selfCore.asciiBuffer,
-       let prefixASCIIBuffer = prefixCore.asciiBuffer {
-      if prefixASCIIBuffer.count > selfASCIIBuffer.count {
-        // Prefix is longer than self.
-        return false
-      }
-      return Int(_swift_stdlib_memcmp(
-        selfASCIIBuffer.baseAddress!,
-        prefixASCIIBuffer.baseAddress!,
-        prefixASCIIBuffer.count)) == 0
-    }
-    if selfCore.hasContiguousStorage && prefixCore.hasContiguousStorage {
-      let lhsStr = _NSContiguousString(selfCore)
-      let rhsStr = _NSContiguousString(prefixCore)
-      return lhsStr._unsafeWithNotEscapedSelfPointerPair(rhsStr) {
-        return _stdlib_NSStringHasPrefixNFDPointer($0, $1)
-      }
-    }
-    return _stdlib_NSStringHasPrefixNFD(
-      self._bridgeToObjectiveCImpl(), prefix._bridgeToObjectiveCImpl())
+    let l = self.content.fccNormalizedUTF16
+    let r = prefix.content.fccNormalizedUTF16
+    let (ml, mr) = l._mismatch(r)
+    if mr != r.endIndex { return false }
+    if ml == l.endIndex { return true }
+    // verify that ml is on a Character boundary.
+    // FIXME: this is a really inefficient way to check!
+    return self.starts(with: prefix)
   }
 
   /// Returns a Boolean value indicating whether the string ends with the
@@ -171,39 +153,16 @@ extension String {
   /// - Parameter suffix: A possible suffix to test against this string.
   /// - Returns: `true` if the string ends with `suffix`, otherwise, `false`.
   public func hasSuffix(_ suffix: String) -> Bool {
-    let selfCore = self._core
-    let suffixCore = suffix._core
-    let suffixCount = suffixCore.count
-    if suffixCount == 0 {
-      return true
-    }
-    if let selfASCIIBuffer = selfCore.asciiBuffer,
-       let suffixASCIIBuffer = suffixCore.asciiBuffer {
-      if suffixASCIIBuffer.count > selfASCIIBuffer.count {
-        // Suffix is longer than self.
-        return false
-      }
-      return Int(_swift_stdlib_memcmp(
-        selfASCIIBuffer.baseAddress!
-          + (selfASCIIBuffer.count - suffixASCIIBuffer.count),
-        suffixASCIIBuffer.baseAddress!,
-        suffixASCIIBuffer.count)) == 0
-    }
-    if selfCore.hasContiguousStorage && suffixCore.hasContiguousStorage {
-      let lhsStr = _NSContiguousString(selfCore)
-      let rhsStr = _NSContiguousString(suffixCore)
-      return lhsStr._unsafeWithNotEscapedSelfPointerPair(rhsStr) {
-        return _stdlib_NSStringHasSuffixNFDPointer($0, $1)
-      }
-    }
-    return _stdlib_NSStringHasSuffixNFD(
-      self._bridgeToObjectiveCImpl(), suffix._bridgeToObjectiveCImpl())
+    let l = self.content.fccNormalizedUTF16.reversed()
+    let r = suffix.content.fccNormalizedUTF16.reversed()
+    let (ml, mr) = l._mismatch(r)
+    if mr != r.endIndex { return false }
+    if ml == l.endIndex { return true }
+    // verify that ml is on a Character boundary.
+    // FIXME: this is a really inefficient way to check!
+    return self.reversed().starts(with: suffix.reversed())
   }
 }
-#else
-// FIXME: Implement hasPrefix and hasSuffix without objc
-// rdar://problem/18878343
-#endif
 
 // Conversions to string from other types.
 extension String {
