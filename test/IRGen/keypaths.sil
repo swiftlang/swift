@@ -122,23 +122,23 @@ sil_vtable C {}
 sil @stored_property_fixed_offsets : $@convention(thin) () -> () {
 entry:
   // CHECK: call %swift.refcounted* @swift_getKeyPath(i8* bitcast ({{.*}} [[KP_A]] to i8*), i8* undef)
-  %a = keypath $KeyPath<S, Int> (stored_property #S.x : $Int)
+  %a = keypath $KeyPath<S, Int>, (root $S; stored_property #S.x : $Int)
   // CHECK: call %swift.refcounted* @swift_getKeyPath(i8* bitcast ({{.*}} [[KP_B]] to i8*), i8* undef)
-  %b = keypath $KeyPath<S, String> (stored_property #S.y : $String)
+  %b = keypath $KeyPath<S, String>, (root $S; stored_property #S.y : $String)
   // CHECK: call %swift.refcounted* @swift_getKeyPath(i8* bitcast ({{.*}} [[KP_C]] to i8*), i8* undef)
-  %c = keypath $KeyPath<S, C> (stored_property #S.z : $C)
+  %c = keypath $KeyPath<S, C>, (root $S; stored_property #S.z : $C)
 
   // CHECK: call %swift.refcounted* @swift_getKeyPath(i8* bitcast ({{.*}} [[KP_D]] to i8*), i8* undef)
-  %d = keypath $KeyPath<C, Int> (stored_property #C.x : $Int)
+  %d = keypath $KeyPath<C, Int>, (root $C; stored_property #C.x : $Int)
   // CHECK: call %swift.refcounted* @swift_getKeyPath(i8* bitcast ({{.*}} [[KP_E]] to i8*), i8* undef)
-  %e = keypath $KeyPath<C, String> (stored_property #C.y : $String)
+  %e = keypath $KeyPath<C, String>, (root $C; stored_property #C.y : $String)
   // CHECK: call %swift.refcounted* @swift_getKeyPath(i8* bitcast ({{.*}} [[KP_F]] to i8*), i8* undef)
-  %f = keypath $KeyPath<C, S> (stored_property #C.z : $S)
+  %f = keypath $KeyPath<C, S>, (root $C; stored_property #C.z : $S)
 
   // CHECK: call %swift.refcounted* @swift_getKeyPath(i8* bitcast ({{.*}} [[KP_G]] to i8*), i8* undef)
-  %g = keypath $KeyPath<S, Int> (stored_property #S.z : $C, stored_property #C.x : $Int)
+  %g = keypath $KeyPath<S, Int>, (root $S; stored_property #S.z : $C; stored_property #C.x : $Int)
   // CHECK: call %swift.refcounted* @swift_getKeyPath(i8* bitcast ({{.*}} [[KP_H]] to i8*), i8* undef)
-  %h = keypath $KeyPath<C, Int> (stored_property #C.z : $S, stored_property #S.x : $Int)
+  %h = keypath $KeyPath<C, Int>, (root $C; stored_property #C.z : $S; stored_property #S.x : $Int)
 
   return undef : $()
 }

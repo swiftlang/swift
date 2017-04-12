@@ -387,8 +387,6 @@ public:
 
   llvm::Value *emitIsUniqueCall(llvm::Value *value, SourceLoc loc,
                                 bool isNonNull, bool checkPinned);
-  
-  llvm::Value *emitKeyPath(KeyPathInst *inst);
 
 //--- Expression emission ------------------------------------------------------
 public:

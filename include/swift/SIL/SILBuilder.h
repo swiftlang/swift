@@ -476,10 +476,11 @@ public:
   }
   
   KeyPathInst *createKeyPath(SILLocation Loc,
-                             ArrayRef<KeyPathInstComponent> Components,
+                             KeyPathPattern *Pattern,
+                             SubstitutionList Subs,
                              SILType Ty) {
     return insert(KeyPathInst::create(getSILDebugLocation(Loc),
-                                      Components, Ty, F));
+                                      Pattern, Subs, Ty, F));
   }
 
   /// Convenience function for calling emitLoad on the type lowering for

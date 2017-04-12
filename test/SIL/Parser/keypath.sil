@@ -17,17 +17,39 @@ class C {
   init()
 }
 
+protocol P {}
+protocol Q {}
+protocol R {}
+
+struct Gen<A: P, B: Q, C: R> {
+  var x: A
+  let y: B
+  var z: C
+}
+
 // CHECK-LABEL: sil shared @stored_properties
 sil shared @stored_properties : $@convention(thin) () -> () {
 entry:
-  // CHECK: keypath $WritableKeyPath<S, Int> (stored_property #S.x : $Int)
-  %a = keypath $WritableKeyPath<S, Int> (stored_property #S.x : $Int)
-  // CHECK: keypath $ReferenceWritableKeyPath<C, Int> (stored_property #C.x : $Int)
-  %b = keypath $ReferenceWritableKeyPath<C, Int> (stored_property #C.x : $Int)
-  // CHECK: keypath $KeyPath<S, String> (stored_property #S.y : $String)
-  %c = keypath $KeyPath<S, String> (stored_property #S.y : $String)
-  // CHECK: keypath $ReferenceWritableKeyPath<S, Int> (stored_property #S.z : $C, stored_property #C.x : $Int)
-  %d = keypath $ReferenceWritableKeyPath<S, Int> (stored_property #S.z : $C, stored_property #C.x : $Int)
+  // CHECK: keypath $WritableKeyPath<S, Int>, (root $S; stored_property #S.x : $Int)
+  %a = keypath $WritableKeyPath<S, Int>, (root $S; stored_property #S.x : $Int)
+  // CHECK: keypath $ReferenceWritableKeyPath<C, Int>, (root $C; stored_property #C.x : $Int)
+  %b = keypath $ReferenceWritableKeyPath<C, Int>, (root $C; stored_property #C.x : $Int)
+  // CHECK: keypath $KeyPath<S, String>, (root $S; stored_property #S.y : $String)
+  %c = keypath $KeyPath<S, String>, (root $S; stored_property #S.y : $String)
+  // CHECK: keypath $ReferenceWritableKeyPath<S, Int>, (root $S; stored_property #S.z : $C; stored_property #C.x : $Int)
+  %d = keypath $ReferenceWritableKeyPath<S, Int>, (root $S; stored_property #S.z : $C; stored_property #C.x : $Int)
 
   return undef : $()
 }
+
+// CHECK-LABEL: sil shared @stored_properties_generic
+sil shared @stored_properties_generic : $@convention(thin) <D: P, E: Q, F: R> () -> () {
+entry:
+  // CHECK: keypath $WritableKeyPath<Gen<D, E, F>, D>, <τ_0_0, τ_0_1, τ_0_2 where {{.*}}> (root $Gen<τ_0_0, τ_0_1, τ_0_2>; stored_property #Gen.x : $τ_0_0) <D, E, F>
+  %a = keypath $WritableKeyPath<Gen<D,E,F>, D>, <G: P, H: Q, I: R> (root $Gen<G, H, I>; stored_property #Gen.x : $G) <D, E, F>
+  // CHECK: keypath $KeyPath<Gen<D, E, F>, E>, <τ_0_0, τ_0_1, τ_0_2 where {{.*}}> (root $Gen<τ_0_0, τ_0_1, τ_0_2>; stored_property #Gen.y : $τ_0_1) <D, E, F>
+  %b = keypath $KeyPath<Gen<D,E,F>, E>, <G: P, H: Q, I: R> (root $Gen<G, H, I>; stored_property #Gen.y : $H) <D, E, F>
+
+  return undef : $()
+}
+

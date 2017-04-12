@@ -2247,10 +2247,10 @@ void SILCloner<ImplClass>::visitObjCProtocolInst(ObjCProtocolInst *Inst) {
 template <typename ImplClass>
 void SILCloner<ImplClass>::visitKeyPathInst(KeyPathInst *Inst) {
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
-  // TODO: Process substitutions and operands in key path components that have
-  // them.
   doPostProcess(Inst, getBuilder().createKeyPath(
-                          getOpLocation(Inst->getLoc()), Inst->getComponents(),
+                          getOpLocation(Inst->getLoc()),
+                          Inst->getPattern(),
+                          getOpSubstitutions(Inst->getSubstitutions()),
                           getOpType(Inst->getType())));
 }
 

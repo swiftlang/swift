@@ -3593,6 +3593,146 @@ public:
     require(OMOI->getType().getSwiftRValueType()->isAnyObject(),
             "objc_metatype_to_object must produce an AnyObject value");
   }
+  
+  void checkKeyPathInst(KeyPathInst *KPI) {
+    auto kpTy = KPI->getType();
+    
+    require(kpTy.isObject(), "keypath result must be an object type");
+    
+    auto kpBGT = kpTy.getAs<BoundGenericType>();
+    require(kpBGT, "keypath result must be a generic type");
+    auto &C = F.getASTContext();
+    require(kpBGT->getDecl() == C.getKeyPathDecl()
+            || kpBGT->getDecl() == C.getWritableKeyPathDecl()
+            || kpBGT->getDecl() == C.getReferenceWritableKeyPathDecl(),
+            "keypath result must be a key path type");
+    
+    auto baseTy = CanType(kpBGT->getGenericArgs()[0]);
+    auto pattern = KPI->getPattern();
+    SubstitutionMap patternSubs;
+    if (pattern->getGenericSignature())
+      patternSubs = pattern->getGenericSignature()
+                           ->getSubstitutionMap(KPI->getSubstitutions());
+    require(baseTy == pattern->getRootType().subst(patternSubs)->getCanonicalType(),
+            "keypath root type should match root type of keypath pattern");
+
+    auto leafTy = CanType(kpBGT->getGenericArgs()[1]);
+    require(leafTy == pattern->getValueType().subst(patternSubs)->getCanonicalType(),
+            "keypath value type should match value type of keypath pattern");
+    
+    {
+      Lowering::GenericContextScope scope(F.getModule().Types,
+                                          pattern->getGenericSignature());
+      
+      for (auto &component : pattern->getComponents()) {
+        auto loweredBaseTy =
+          F.getModule().Types.getLoweredType(AbstractionPattern::getOpaque(),
+                                             baseTy);
+        auto componentTy = component.getComponentType().subst(patternSubs)
+          ->getCanonicalType();
+        auto loweredComponentTy =
+          F.getModule().Types.getLoweredType(AbstractionPattern::getOpaque(),
+                                             componentTy);
+        
+        switch (auto kind = component.getKind()) {
+        case KeyPathPatternComponent::Kind::StoredProperty: {
+          auto property = component.getStoredPropertyDecl();
+          require(property->getDeclContext()
+                   == baseTy->getAnyNominal(),
+                  "property decl should be a member of the component base type");
+          switch (property->getStorageKind()) {
+          case AbstractStorageDecl::Stored:
+          case AbstractStorageDecl::StoredWithObservers:
+          case AbstractStorageDecl::StoredWithTrivialAccessors:
+            break;
+          case AbstractStorageDecl::Addressed:
+          case AbstractStorageDecl::AddressedWithObservers:
+          case AbstractStorageDecl::AddressedWithTrivialAccessors:
+          case AbstractStorageDecl::Computed:
+          case AbstractStorageDecl::ComputedWithMutableAddress:
+          case AbstractStorageDecl::InheritedWithObservers:
+            require(false, "property must be stored");
+          }
+          auto propertyTy = loweredBaseTy.getFieldType(property, F.getModule());
+          require(propertyTy.subst(F.getModule(), patternSubs).getObjectType()
+                    == loweredComponentTy.getObjectType(),
+                  "component type should match the maximal abstraction of the "
+                  "formal type");
+          break;
+        }
+          
+        case KeyPathPatternComponent::Kind::GettableProperty:
+        case KeyPathPatternComponent::Kind::SettableProperty: {
+          require(component.getComputedPropertyIndices().empty(),
+                  "subscripts not implemented");
+        
+          // Getter should be <Sig...> @convention(thin) (@in Base) -> @out Result
+          {
+            auto getter = component.getComputedPropertyGetter();
+            auto substGetterType = getter->getLoweredFunctionType()
+              ->substGenericArgs(F.getModule(), KPI->getSubstitutions());
+            require(substGetterType->getRepresentation() ==
+                      SILFunctionTypeRepresentation::Thin,
+                    "getter should be a thin function");
+            
+              // TODO: indexes
+            require(substGetterType->getNumParameters() == 1,
+                    "getter should have one parameter");
+            auto baseParam = substGetterType->getSelfParameter();
+            require(baseParam.getConvention() == ParameterConvention::Indirect_In,
+                    "getter base parameter should be @in");
+            require(baseParam.getType() == loweredBaseTy.getSwiftRValueType(),
+                    "getter base parameter should match base of component");
+            require(substGetterType->getNumResults() == 1,
+                    "getter should have one result");
+            auto result = substGetterType->getResults()[0];
+            require(result.getConvention() == ResultConvention::Indirect,
+                    "getter result should be @out");
+            require(result.getType() == loweredComponentTy.getSwiftRValueType(),
+                    "getter result should match the maximal abstraction of the "
+                    "formal component type");
+          }
+          
+          if (kind == KeyPathPatternComponent::Kind::SettableProperty) {
+            // Setter should be
+            // <Sig...> @convention(thin) (@in Result, @in Base) -> ()
+            
+            auto setter = component.getComputedPropertySetter();
+            auto substSetterType = setter->getLoweredFunctionType()
+              ->substGenericArgs(F.getModule(), KPI->getSubstitutions());
+            
+            require(substSetterType->getRepresentation() ==
+                      SILFunctionTypeRepresentation::Thin,
+                    "getter should be a thin function");
+            
+            // TODO: indexes
+            require(substSetterType->getNumParameters() == 2,
+                    "setter should have two parameters");
+            auto baseParam = substSetterType->getSelfParameter();
+            require(baseParam.getConvention() == ParameterConvention::Indirect_In,
+                    "setter base parameter should be @in");
+            auto newValueParam = substSetterType->getParameters()[0];
+            require(newValueParam.getConvention() == ParameterConvention::Indirect_In,
+                    "setter value parameter should be @in");
+            
+            require(newValueParam.getType() == loweredBaseTy.getSwiftRValueType(),
+                    "setter value should match the maximal abstraction of the "
+                    "formal component type");
+            
+            require(substSetterType->getNumResults() == 0,
+                    "setter should have no results");
+          }
+
+          break;
+        }
+        }
+        
+        baseTy = component.getComponentType();
+      }
+    }
+    require(CanType(baseTy.subst(patternSubs)) == CanType(leafTy),
+            "final component should match leaf value type of key path type");
+  }
 
   void verifyEntryPointArguments(SILBasicBlock *entry) {
     DEBUG(llvm::dbgs() << "Argument types for entry point BB:\n";

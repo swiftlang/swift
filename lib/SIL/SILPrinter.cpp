@@ -1757,24 +1757,58 @@ public:
   }
   
   void visitKeyPathInst(KeyPathInst *KPI) {
-    *this << KPI->getType() << " (";
+    *this << KPI->getType() << ", ";
     
-    interleave(KPI->getComponents(),
-               [&](KeyPathInstComponent component) {
-                 switch (component.getKind()) {
-                 case KeyPathInstComponent::Kind::StoredProperty: {
-                   auto prop = cast<VarDecl>(component.getValueDecl());
-                   *this << "stored_property #";
-                   printValueDecl(prop, PrintState.OS);
-                   
-                 }
-                 }
-                 *this << " : $" << component.getComponentType();
-               }, [&]{
-                 *this << ", ";
-               });
+    auto pattern = KPI->getPattern();
+    
+    if (pattern->getGenericSignature()) {
+      pattern->getGenericSignature()->print(PrintState.OS);
+      *this << ' ';
+    }
+    
+    *this << "(root $" << KPI->getPattern()->getRootType();
+    
+    for (auto &component : pattern->getComponents()) {
+      *this << "; ";
+      
+      switch (auto kind = component.getKind()) {
+      case KeyPathPatternComponent::Kind::StoredProperty: {
+        auto prop = component.getStoredPropertyDecl();
+        *this << "stored_property #";
+        printValueDecl(prop, PrintState.OS);
+        *this << " : $" << component.getComponentType();
+        break;
+      }
+      case KeyPathPatternComponent::Kind::GettableProperty:
+      case KeyPathPatternComponent::Kind::SettableProperty: {
+        *this << (kind == KeyPathPatternComponent::Kind::GettableProperty
+                    ? "gettable_property" : "settable_property")
+              << " id ";
+        component.getComputedPropertyIdentifier()->printName(PrintState.OS);
+        *this << " : "
+              << component.getComputedPropertyIdentifier()->getLoweredType()
+              << ", getter ";
+        component.getComputedPropertyGetter()->printName(PrintState.OS);
+        *this << " : "
+              << component.getComputedPropertyGetter()->getLoweredType();
+        if (kind == KeyPathPatternComponent::Kind::SettableProperty) {
+          *this << ", setter ";
+          component.getComputedPropertySetter()->printName(PrintState.OS);
+          *this << " : "
+                << component.getComputedPropertySetter()->getLoweredType();
+        }
+        assert(component.getComputedPropertyIndices().empty()
+               && "todo");
+        break;
+      }
+      }
+    }
     
     *this << ')';
+    if (!KPI->getSubstitutions().empty()) {
+      *this << ' ';
+      printSubstitutions(KPI->getSubstitutions());
+    }
   }
 };
 } // end anonymous namespace

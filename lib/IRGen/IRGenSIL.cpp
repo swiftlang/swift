@@ -4416,9 +4416,22 @@ void IRGenSILFunction::visitCheckedCastAddrBranchInst(
 }
 
 void IRGenSILFunction::visitKeyPathInst(swift::KeyPathInst *I) {
-  auto result = emitKeyPath(I);
+  auto pattern = IGM.getAddrOfKeyPathPattern(I->getPattern(), I->getLoc());
+  
+  // Build up the argument vector to instantiate the pattern here.
+  llvm::Value *args;
+  if (!I->getSubstitutions().empty()
+      || !I->getAllOperands().empty()) {
+    llvm_unreachable("todo!");
+  } else {
+    args = llvm::UndefValue::get(IGM.Int8PtrTy);
+  }
+  auto patternPtr = llvm::ConstantExpr::getBitCast(pattern, IGM.Int8PtrTy);
+  auto call = Builder.CreateCall(IGM.getGetKeyPathFn(), {patternPtr, args});
+  call->setDoesNotThrow();
+
   Explosion e;
-  e.add(result);
+  e.add(call);
   setLoweredExplosion(I, e);
 }
 

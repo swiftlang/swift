@@ -24,19 +24,19 @@ class C<T> {
 
 // CHECK-LABEL: sil hidden @{{.*}}storedProperties
 func storedProperties<T>(_: T) {
-  // CHECK: keypath $KeyPath<S<T>, T> (stored_property #S.x : $T)
+  // CHECK: keypath $WritableKeyPath<S<T>, T>, <τ_0_0> (root $S<τ_0_0>; stored_property #S.x : $τ_0_0) <T>
   _ = #keyPath2(S<T>, .x)
-  // CHECK: keypath $KeyPath<S<T>, String> (stored_property #S.y : $String)
+  // CHECK: keypath $KeyPath<S<T>, String>, <τ_0_0> (root $S<τ_0_0>; stored_property #S.y : $String) <T>
   _ = #keyPath2(S<T>, .y)
-  // CHECK: keypath $KeyPath<S<T>, T> (stored_property #S.z : $C<T>, stored_property #C.x : $T)
+  // CHECK: keypath $ReferenceWritableKeyPath<S<T>, T>, <τ_0_0> (root $S<τ_0_0>; stored_property #S.z : $C<τ_0_0>; stored_property #C.x : $τ_0_0) <T>
   _ = #keyPath2(S<T>, .z.x)
-  // CHECK: keypath $KeyPath<C<T>, T> (stored_property #C.x : $T)
+  // CHECK: keypath $ReferenceWritableKeyPath<C<T>, T>, <τ_0_0> (root $C<τ_0_0>; stored_property #C.x : $τ_0_0) <T>
   _ = #keyPath2(C<T>, .x)
-  // CHECK: keypath $KeyPath<C<T>, String> (stored_property #C.y : $String)
+  // CHECK: keypath $KeyPath<C<T>, String>, <τ_0_0> (root $C<τ_0_0>; stored_property #C.y : $String) <T>
   _ = #keyPath2(C<T>, .y)
-  // CHECK: keypath $KeyPath<C<T>, T> (stored_property #C.z : $S<T>, stored_property #S.x : $T)
+  // CHECK: keypath $ReferenceWritableKeyPath<C<T>, T>, <τ_0_0> (root $C<τ_0_0>; stored_property #C.z : $S<τ_0_0>; stored_property #S.x : $τ_0_0) <T>
   _ = #keyPath2(C<T>, .z.x)
-  // CHECK: keypath $KeyPath<C<T>, String> (stored_property #C.z : $S<T>, stored_property #S.z : $C<T>, stored_property #C.y : $String)
+  // CHECK: keypath $KeyPath<C<T>, String>, <τ_0_0> (root $C<τ_0_0>; stored_property #C.z : $S<τ_0_0>; stored_property #S.z : $C<τ_0_0>; stored_property #C.y : $String) <T>
   _ = #keyPath2(C<T>, .z.z.y)
 }
 

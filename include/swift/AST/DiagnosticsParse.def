@@ -550,7 +550,13 @@ ERROR(sil_keypath_expected_component_kind,none,
       "expected keypath component kind", ())
 ERROR(sil_keypath_unknown_component_kind,none,
       "unknown keypath component kind %0", (Identifier))
-
+ERROR(sil_keypath_computed_property_missing_part,none,
+      "keypath %select{gettable|settable}0_property component needs an "
+      "%select{id and getter|id, getter, and setter}0", (bool))
+ERROR(sil_keypath_no_components,none,
+      "keypath must have at least one component", ())
+ERROR(sil_keypath_no_root,none,
+      "keypath must have a root component declared",())
 // SIL Basic Blocks
 ERROR(expected_sil_block_name,none,
       "expected basic block name or '}'", ())

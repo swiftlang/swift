@@ -32,62 +32,48 @@
 using namespace swift;
 using namespace irgen;
 
-llvm::Value *IRGenFunction::emitKeyPath(KeyPathInst *inst) {
-  // TODO: Parameterized key paths, such as for key paths in generic contexts
-  // or with subscript components, require instantiation. Key paths with
-  // resilient index components may need instantiation to adjust component
-  // sizes as well.
+llvm::Constant *
+IRGenModule::getAddrOfKeyPathPattern(KeyPathPattern *pattern,
+                                     SILLocation diagLoc) {
+  // See if we already emitted this.
+  auto found = KeyPathPatterns.find(pattern);
+  if (found != KeyPathPatterns.end())
+    return found->second;
   
-  llvm::SetVector<ArchetypeType *> TypeArgs;
-  
-  /// Find archetypes inside a type that need to be passed to the key path
-  /// pattern for instantiation.
-  auto findTypeArgs = [&](CanType type) {
-    type.findIf([&](Type t) -> bool {
-      if (auto archetype = t->getAs<ArchetypeType>()) {
-        IGM.Context.Diags.diagnose(inst->getLoc().getSourceLoc(),
-                                   diag::not_implemented,
-                                   "dependent generic key path");
-        TypeArgs.insert(archetype);
-      }
-      return false;
-    });
-  };
   // Gather type arguments from the root and leaf types of the key path.
-  auto keyPathTy = inst->getType().castTo<BoundGenericType>();
-  auto keyPathLoweredTy = IGM.getStorageType(inst->getType());
-  auto rootTy = keyPathTy->getGenericArgs()[0]->getCanonicalType();
-  auto valueTy = keyPathTy->getGenericArgs()[1]->getCanonicalType();
-  
-  findTypeArgs(rootTy);
-  findTypeArgs(valueTy);
-  
+  auto rootTy = pattern->getRootType();
+  auto valueTy = pattern->getValueType();
+
   // Check for type parameterization of any of the components.
-  for (auto component : inst->getComponents()) {
-    findTypeArgs(component.getComponentType());
+  if (pattern->getNumOperands() > 0
+      || pattern->getGenericSignature()) {
+    // TODO: Parameterized key paths, such as for key paths in generic contexts
+    // or with subscript components, require instantiation. Key paths with
+    // resilient index components may need instantiation to adjust component
+    // sizes as well.
+    Context.Diags.diagnose(diagLoc.getSourceLoc(),
+                           diag::not_implemented,
+                           "dependent key path");
+    return llvm::UndefValue::get(Int8PtrTy);
   }
-  
-  if (!TypeArgs.empty())
-    // TODO: implement
-    return llvm::UndefValue::get(keyPathLoweredTy);
 
   /// Generate a metadata accessor that produces metadata for the given type
   /// using arguments from the generic context of the key path.
   auto emitMetadataGenerator = [&](CanType type) -> llvm::Function * {
-    if (TypeArgs.empty())
+    if (!pattern->getGenericSignature())
       // We can just use the regular metadata accessor.
       // TODO: Make a local copy of public symbols we can relative-reference?
-      return IGM.getAddrOfTypeMetadataAccessFunction(type, NotForDefinition);
+      return getAddrOfTypeMetadataAccessFunction(type, NotForDefinition);
     llvm_unreachable("not implemented");
   };
   
   // Start building the key path pattern.
   // TODO: Coalesce equivalent key path patterns
-  ConstantInitBuilder builder(IGM);
+  ConstantInitBuilder builder(*this);
   ConstantStructBuilder fields = builder.beginStruct();
   fields.setPacked(true);
   // Add a zero-initialized header we can use for lazy initialization.
-  fields.add(llvm::ConstantInt::get(IGM.SizeTy, 0));
+  fields.add(llvm::ConstantInt::get(SizeTy, 0));
   
   // Store references to metadata generator functions to generate the metadata
   // for the root and leaf. These sit in the "isa" and object header parts of
@@ -97,30 +83,32 @@ llvm::Value *IRGenFunction::emitKeyPath(KeyPathInst *inst) {
   
   // Leave a placeholder for the buffer header, since we need to know the full
   // buffer size to fill it in.
-  auto headerPlaceholder = fields.addPlaceholderWithSize(IGM.Int32Ty);
+  auto headerPlaceholder = fields.addPlaceholderWithSize(Int32Ty);
+  
+  auto startOfKeyPathBuffer = fields.getNextOffsetFromGlobal();
   
   // Build out the components.
   bool isInstantiableInPlace = true;
   
   auto baseTy = rootTy;
   
-  for (unsigned i : indices(inst->getComponents())) {
-    auto loweredBaseTy = IGM.getLoweredType(AbstractionPattern::getOpaque(),
-                                          baseTy->getLValueOrInOutObjectType());
-    auto &component = inst->getComponents()[i];
+  for (unsigned i : indices(pattern->getComponents())) {
+    auto loweredBaseTy = getLoweredType(AbstractionPattern::getOpaque(),
+                                        baseTy->getLValueOrInOutObjectType());
+    auto &component = pattern->getComponents()[i];
     switch (component.getKind()) {
-    case KeyPathInstComponent::Kind::StoredProperty: {
+    case KeyPathPatternComponent::Kind::StoredProperty: {
       // Try to get a constant offset if we can.
-      auto property = cast<VarDecl>(component.getValueDecl());
+      auto property = cast<VarDecl>(component.getStoredPropertyDecl());
       llvm::Constant *offset;
       bool isStruct;
       if (auto structTy = loweredBaseTy.getStructOrBoundGenericStruct()) {
-        offset = emitPhysicalStructMemberFixedOffset(IGM,
+        offset = emitPhysicalStructMemberFixedOffset(*this,
                                                      loweredBaseTy,
                                                      property);
         isStruct = true;
       } else if (auto classTy = loweredBaseTy.getClassOrBoundGenericClass()) {
-        offset = tryEmitConstantClassFragilePhysicalMemberOffset(IGM,
+        offset = tryEmitConstantClassFragilePhysicalMemberOffset(*this,
                                                                  loweredBaseTy,
                                                                  property);
         isStruct = false;
@@ -141,7 +129,6 @@ llvm::Value *IRGenFunction::emitKeyPath(KeyPathInst *inst) {
         }
       }
       
-      
       // Add the resolved offset if we have one.
       if (offset) {
         auto header = isStruct
@@ -149,7 +136,7 @@ llvm::Value *IRGenFunction::emitKeyPath(KeyPathInst *inst) {
           : KeyPathComponentHeader::forClassComponentWithOutOfLineOffset();
         fields.addInt32(header.getData());
         
-        offset = llvm::ConstantExpr::getTruncOrBitCast(offset, IGM.Int32Ty);
+        offset = llvm::ConstantExpr::getTruncOrBitCast(offset, Int32Ty);
         fields.add(offset);
       } else {
         // Otherwise, stash a relative reference to the property name as a
@@ -159,16 +146,23 @@ llvm::Value *IRGenFunction::emitKeyPath(KeyPathInst *inst) {
           : KeyPathComponentHeader::forClassComponentWithUnresolvedOffset();
         fields.addInt32(header.getData());
 
-        auto name = IGM.getAddrOfGlobalString(property->getName().str(),
-                                              /*relativelyAddressed*/ true);
+        auto name = getAddrOfGlobalString(property->getName().str(),
+                                          /*relativelyAddressed*/ true);
         fields.addRelativeAddress(name);
       }
       break;
     }
+    case KeyPathPatternComponent::Kind::GettableProperty:
+    case KeyPathPatternComponent::Kind::SettableProperty: {
+      Context.Diags.diagnose(diagLoc.getSourceLoc(),
+                             diag::not_implemented,
+                             "computed key path");
+      return llvm::UndefValue::get(Int8PtrTy);
+    }
     }
     
     // For all but the last component, we pack in the type of the component.
-    if (i + 1 != inst->getComponents().size()) {
+    if (i + 1 != pattern->getComponents().size()) {
       fields.add(emitMetadataGenerator(component.getComponentType()));
     }
     baseTy = component.getComponentType();
@@ -177,35 +171,24 @@ llvm::Value *IRGenFunction::emitKeyPath(KeyPathInst *inst) {
   // Save the total size of the buffer, minus three words for the once token
   // and object header, and 32 bits for the buffer header.
   Size componentSize = fields.getNextOffsetFromGlobal()
-    - 3*IGM.getPointerSize()
-    - Size(4);
+    - startOfKeyPathBuffer;
   
   // We now have enough info to build the header.
   KeyPathBufferHeader header(componentSize.getValue(), isInstantiableInPlace,
                              /*reference prefix*/ false);
   // Add the header, followed by the components.
   fields.fillPlaceholder(headerPlaceholder,
-                         llvm::ConstantInt::get(IGM.Int32Ty, header.getData()));
+                         llvm::ConstantInt::get(Int32Ty, header.getData()));
   
   // Create the global variable.
   // TODO: Coalesce equivalent patterns. The pattern could be immutable if
   // it isn't instantiable in place, and if we made the type metadata accessor
   // references private, it could go in true-const memory.
-  auto pattern = fields.finishAndCreateGlobal("keypath",
-                                          IGM.getPointerAlignment(),
+  auto patternVar = fields.finishAndCreateGlobal("keypath",
+                                          getPointerAlignment(),
                                           /*constant*/ false,
                                           llvm::GlobalVariable::PrivateLinkage);
-  
-  // Build up the argument vector to instantiate the pattern here.
-  llvm::Value *args;
-  if (!TypeArgs.empty()) {
-    llvm_unreachable("todo!");
-  } else {
-    args = llvm::UndefValue::get(IGM.Int8PtrTy);
-  }
-  auto patternPtr = llvm::ConstantExpr::getBitCast(pattern, IGM.Int8PtrTy);
-  auto call = Builder.CreateCall(IGM.getGetKeyPathFn(), {patternPtr, args});
-  call->setDoesNotThrow();
-  return call;
+  KeyPathPatterns.insert({pattern, patternVar});
+  return patternVar;
 }
 

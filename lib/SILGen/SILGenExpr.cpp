@@ -2414,7 +2414,9 @@ RValue RValueEmitter::visitKeyPathExpr(KeyPathExpr *E, SGFContext C) {
     return visit(E->getObjCStringLiteralExpr(), C);
   }
 
-  SmallVector<KeyPathInstComponent, 4> loweredComponents;
+  // Figure out the key path pattern, abstracting out generic arguments and
+  // subscript indexes.
+  SmallVector<KeyPathPatternComponent, 4> loweredComponents;
   auto loweredTy = SGF.getLoweredType(E->getType());
   
   auto unsupported = [&](StringRef message) -> RValue {
@@ -2424,14 +2426,21 @@ RValue RValueEmitter::visitKeyPathExpr(KeyPathExpr *E, SGFContext C) {
     return RValue(SGF, E, ManagedValue::forUnmanaged(undef));
   };
   
-  CanType baseTy = E->getType()->castTo<BoundGenericType>()->getGenericArgs()[0]
+  CanType rootTy = E->getType()->castTo<BoundGenericType>()->getGenericArgs()[0]
     ->getCanonicalType();
+  
+  bool needsGenericContext = false;
+  if (rootTy->hasArchetype()) {
+    needsGenericContext = true;
+    rootTy = SGF.F.mapTypeOutOfContext(rootTy)->getCanonicalType();
+  }
+  
+  auto baseTy = rootTy;
   
   for (auto &component : E->getComponents()) {
     switch (component.getKind()) {
     case KeyPathExpr::Component::Kind::Property: {
       auto decl = cast<VarDecl>(component.getDeclRef().getDecl());
-      
       baseTy = baseTy->getTypeOfMember(SGF.SGM.SwiftModule, decl)
         ->getCanonicalType();
       
@@ -2449,16 +2458,20 @@ RValue RValueEmitter::visitKeyPathExpr(KeyPathExpr *E, SGFContext C) {
         
         if (storageTy.getAddressType() == opaqueTy.getAddressType()) {
           loweredComponents.push_back(
-                         KeyPathInstComponent::forStoredProperty(decl, baseTy));
+                      KeyPathPatternComponent::forStoredProperty(decl, baseTy));
           break;
         }
         LLVM_FALLTHROUGH;
       }
       case AccessStrategy::Addressor:
-      case AccessStrategy::BehaviorStorage:
       case AccessStrategy::DirectToAccessor:
-      case AccessStrategy::DispatchToAccessor:
-        return unsupported("computed property key path component");
+      case AccessStrategy::DispatchToAccessor: {
+        // We need thunks to bring the getter and setter to the right signature
+        // expected by the key path runtime.
+        return unsupported("todo");
+      }
+      case AccessStrategy::BehaviorStorage:
+        llvm_unreachable("should not occur");
       }
       
       break;
@@ -2477,7 +2490,17 @@ RValue RValueEmitter::visitKeyPathExpr(KeyPathExpr *E, SGFContext C) {
     }
   }
   
-  auto keyPath = SGF.B.createKeyPath(SILLocation(E), loweredComponents,
+  auto pattern = KeyPathPattern::get(SGF.SGM.M,
+                                     needsGenericContext
+                                       ? SGF.F.getLoweredFunctionType()
+                                             ->getGenericSignature()
+                                       : nullptr,
+                                     rootTy, baseTy,
+                                     loweredComponents);
+  auto keyPath = SGF.B.createKeyPath(SILLocation(E), pattern,
+                                     needsGenericContext
+                                       ? SGF.F.getForwardingSubstitutions()
+                                       : SubstitutionList(),
                                      loweredTy);
   auto value = SGF.emitManagedRValueWithCleanup(keyPath);
   return RValue(SGF, E, value);

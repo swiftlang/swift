@@ -1394,22 +1394,47 @@ public:
 };
 
 /// Component of a KeyPathInst.
-class KeyPathInstComponent {
+class KeyPathPatternComponent {
 public:
   enum class Kind: unsigned {
     StoredProperty,
+    GettableProperty,
+    SettableProperty,
+  };
+  
+  // The pair of a captured index value and its Hashable conformance for a
+  // subscript keypath.
+  struct IndexPair {
+    unsigned Operand;
+    ProtocolConformance *Hashable;
   };
   
 private:
   llvm::PointerIntPair<void *, 2, Kind> ValueAndKind;
+  SILFunction *Getter, *Setter;
+  ArrayRef<IndexPair> Indices;
   CanType ComponentType;
 
-
-  KeyPathInstComponent(void *value, Kind kind, CanType ComponentType)
+  KeyPathPatternComponent(void *value, Kind kind, CanType ComponentType)
     : ValueAndKind(value, kind), ComponentType(ComponentType) {}
 
+  KeyPathPatternComponent(void *value, Kind kind,
+                          SILFunction *getter,
+                          SILFunction *setter,
+                          ArrayRef<IndexPair> indices,
+                          CanType ComponentType)
+    : ValueAndKind(value, kind),
+      Getter(getter),
+      Setter(setter),
+      Indices(indices),
+      ComponentType(ComponentType) {}
+
 public:
-  KeyPathInstComponent() : ValueAndKind(nullptr, (Kind)0) {}
+  KeyPathPatternComponent() : ValueAndKind(nullptr, (Kind)0) {}
+
+  bool isNull() const {
+    return ValueAndKind.getPointer() == nullptr;
+  }
 
   Kind getKind() const {
     return ValueAndKind.getInt();
@@ -1419,59 +1444,189 @@ public:
     return ComponentType;
   }
 
-  ValueDecl *getValueDecl() const {
+  VarDecl *getStoredPropertyDecl() const {
     switch (getKind()) {
     case Kind::StoredProperty:
-      return static_cast<ValueDecl*>(ValueAndKind.getPointer());
+      return static_cast<VarDecl*>(ValueAndKind.getPointer());
+    case Kind::GettableProperty:
+    case Kind::SettableProperty:
+      llvm_unreachable("not a stored property");
     }
     llvm_unreachable("unhandled kind");
   }
   
-  static KeyPathInstComponent forStoredProperty(ValueDecl *property,
-                                                CanType ty) {
-    return KeyPathInstComponent(property, Kind::StoredProperty, ty);
+  SILFunction *getComputedPropertyIdentifier() const {
+    switch (getKind()) {
+    case Kind::StoredProperty:
+      llvm_unreachable("not a computed property");
+    case Kind::GettableProperty:
+    case Kind::SettableProperty:
+      return static_cast<SILFunction*>(ValueAndKind.getPointer());
+    }
+    llvm_unreachable("unhandled kind");
   }
   
-};
+  SILFunction *getComputedPropertyGetter() const {
+    switch (getKind()) {
+    case Kind::StoredProperty:
+      llvm_unreachable("not a computed property");
+    case Kind::GettableProperty:
+    case Kind::SettableProperty:
+      return Getter;
+    }
+    llvm_unreachable("unhandled kind");
+  }
+
+  SILFunction *getComputedPropertySetter() const {
+    switch (getKind()) {
+    case Kind::StoredProperty:
+    case Kind::GettableProperty:
+      llvm_unreachable("not a settable computed property");
+    case Kind::SettableProperty:
+      return Setter;
+    }
+    llvm_unreachable("unhandled kind");
+  }
   
+  ArrayRef<IndexPair> getComputedPropertyIndices() const {
+    switch (getKind()) {
+    case Kind::StoredProperty:
+      llvm_unreachable("not a computed property");
+    case Kind::GettableProperty:
+    case Kind::SettableProperty:
+      return Indices;
+    }
+  }
+  
+  static KeyPathPatternComponent forStoredProperty(VarDecl *property,
+                                                   CanType ty) {
+    return KeyPathPatternComponent(property, Kind::StoredProperty, ty);
+  }
+  
+  static KeyPathPatternComponent
+  forComputedGettableProperty(SILFunction *identifier,
+                              SILFunction *getter,
+                              ArrayRef<IndexPair> indices,
+                              CanType ty) {
+    return KeyPathPatternComponent(identifier, Kind::GettableProperty,
+                                   getter, nullptr, indices, ty);
+  }
+
+  static KeyPathPatternComponent
+  forComputedSettableProperty(SILFunction *identifier,
+                              SILFunction *getter,
+                              SILFunction *setter,
+                              ArrayRef<IndexPair> indices,
+                              CanType ty) {
+    return KeyPathPatternComponent(identifier, Kind::SettableProperty,
+                                   getter, setter, indices, ty);
+  }
+  
+  void Profile(llvm::FoldingSetNodeID &ID);
+};
+
+/// An abstract description of a key path pattern.
+class KeyPathPattern final
+  : public llvm::FoldingSetNode,
+    private llvm::TrailingObjects<KeyPathPattern,
+                                  KeyPathPatternComponent>
+{
+  friend TrailingObjects;
+
+  unsigned NumOperands, NumComponents;
+  CanGenericSignature Signature;
+  CanType RootType, ValueType;
+  
+  KeyPathPattern(CanGenericSignature signature,
+                 CanType rootType,
+                 CanType valueType,
+                 ArrayRef<KeyPathPatternComponent> components,
+                 unsigned numOperands);
+  
+  static KeyPathPattern *create(SILModule &M,
+                                CanGenericSignature signature,
+                                CanType rootType,
+                                CanType valueType,
+                                ArrayRef<KeyPathPatternComponent> components,
+                                unsigned numOperands);
+public:
+  CanGenericSignature getGenericSignature() const {
+    return Signature;
+  }
+  
+  CanType getRootType() const {
+    return RootType;
+  }
+  
+  CanType getValueType() const {
+    return ValueType;
+  }
+  
+  unsigned getNumOperands() const {
+    return NumOperands;
+  }
+  
+  ArrayRef<KeyPathPatternComponent> getComponents() const;
+  
+  static KeyPathPattern *get(SILModule &M,
+                             CanGenericSignature signature,
+                             CanType rootType,
+                             CanType valueType,
+                             ArrayRef<KeyPathPatternComponent> components);
+  
+  static void Profile(llvm::FoldingSetNodeID &ID,
+                      CanGenericSignature signature,
+                      CanType rootType,
+                      CanType valueType,
+                      ArrayRef<KeyPathPatternComponent> components);
+  
+  void Profile(llvm::FoldingSetNodeID &ID) {
+    Profile(ID, getGenericSignature(), getRootType(), getValueType(),
+            getComponents());
+  }
+};
 
 /// Instantiates a key path object.
-class KeyPathInst final : public SILInstruction,
-                          private llvm::TrailingObjects<KeyPathInst,
-                                                        KeyPathInstComponent>
+class KeyPathInst final
+  : public SILInstruction,
+    private llvm::TrailingObjects<KeyPathInst, Substitution>
 {
   friend SILBuilder;
   friend TrailingObjects;
   
-  unsigned NumComponents;
+  KeyPathPattern *Pattern;
+  unsigned NumSubstitutions;
   
-  KeyPathInst(SILDebugLocation DebugLoc,
-              ArrayRef<KeyPathInstComponent> Components,
-              SILType Ty);
-  
-  static KeyPathInst *create(SILDebugLocation DebugLoc,
-                             ArrayRef<KeyPathInstComponent> Components,
+  static KeyPathInst *create(SILDebugLocation Loc,
+                             KeyPathPattern *Pattern,
+                             SubstitutionList Subs,
                              SILType Ty,
                              SILFunction &F);
-
+  
+  KeyPathInst(SILDebugLocation Loc,
+              KeyPathPattern *Pattern,
+              SubstitutionList Subs,
+              SILType Ty);
+  
 public:
-  ArrayRef<KeyPathInstComponent> getComponents() const {
-    return const_cast<KeyPathInst*>(this)->getComponents();
-  }
-  MutableArrayRef<KeyPathInstComponent> getComponents();
+  KeyPathPattern *getPattern() const;
 
   ArrayRef<Operand> getAllOperands() const {
-    // TODO: Some components will have operands, such as getters/setters for
-    // computed properties and index values for subscripts
+    // TODO: Subscript keypaths will have operands.
     return {};
   }
-  MutableArrayRef<Operand> getAllOperands() {
-    return {};
+  MutableArrayRef<Operand> getAllOperands();
+
+  MutableArrayRef<Substitution> getSubstitutions();
+  SubstitutionList getSubstitutions() const {
+    return const_cast<KeyPathInst*>(this)->getSubstitutions();
   }
   
   static bool classof(const ValueBase *V) {
     return V->getKind() == ValueKind::KeyPathInst;
   }
+  
+  ~KeyPathInst();
 };
 
 /// Represents an invocation of builtin functionality provided by the code
