@@ -871,8 +871,14 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   Opts.EnableExperimentalPropertyBehaviors |=
     Args.hasArg(OPT_enable_experimental_property_behaviors);
 
+  Opts.EnableExperimentalSubclassExistentials |=
+    Args.hasArg(OPT_enable_experimental_subclass_existentials);
+
   Opts.EnableClassResilience |=
     Args.hasArg(OPT_enable_class_resilience);
+
+  Opts.EnableDeserializationRecovery |=
+    Args.hasArg(OPT_enable_experimental_deserialization_recovery);
 
   Opts.DisableAvailabilityChecking |=
       Args.hasArg(OPT_disable_availability_checking);

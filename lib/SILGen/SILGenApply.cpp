@@ -27,6 +27,7 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/Basic/Range.h"
+#include "swift/Basic/STLExtras.h"
 #include "swift/Basic/Unicode.h"
 #include "swift/SIL/PrettyStackTrace.h"
 #include "swift/SIL/SILArgument.h"
@@ -663,9 +664,7 @@ private:
 
     assert(SGF.silConv.useLoweredAddresses() ==
            SGF.silConv.isSILIndirect(getSelfParameterInfo()));
-    if (!SGF.silConv.useLoweredAddresses())
-      return false;
-    return true;
+    return SGF.silConv.useLoweredAddresses();
   }
 
   // If we're calling a member of a non-class-constrained protocol,
@@ -1518,8 +1517,9 @@ static RValue emitStringLiteral(SILGenFunction &SGF, Expr *E, StringRef Str,
       break;
     }
   }
-
+  bool useConstantStringBuiltin = false;
   StringLiteralInst::Encoding instEncoding;
+  ConstStringLiteralInst::Encoding constInstEncoding;
   switch (encoding) {
   case StringLiteralExpr::UTF8:
     instEncoding = StringLiteralInst::Encoding::UTF8;
@@ -1529,6 +1529,16 @@ static RValue emitStringLiteral(SILGenFunction &SGF, Expr *E, StringRef Str,
   case StringLiteralExpr::UTF16: {
     instEncoding = StringLiteralInst::Encoding::UTF16;
     Length = unicode::getUTF16Length(Str);
+    break;
+  }
+  case StringLiteralExpr::UTF8ConstString:
+    constInstEncoding = ConstStringLiteralInst::Encoding::UTF8;
+    useConstantStringBuiltin = true;
+    break;
+
+  case StringLiteralExpr::UTF16ConstString: {
+    constInstEncoding = ConstStringLiteralInst::Encoding::UTF16;
+    useConstantStringBuiltin = true;
     break;
   }
   case StringLiteralExpr::OneUnicodeScalar: {
@@ -1541,8 +1551,18 @@ static RValue emitStringLiteral(SILGenFunction &SGF, Expr *E, StringRef Str,
   }
   }
 
+  // Should we build a constant string literal?
+  if (useConstantStringBuiltin) {
+    auto *string = SGF.B.createConstStringLiteral(E, Str, constInstEncoding);
+    ManagedValue Elts[] = {ManagedValue::forUnmanaged(string)};
+    TupleTypeElt TypeElts[] = {Elts[0].getType().getSwiftRValueType()};
+    CanType ty =
+        TupleType::get(TypeElts, SGF.getASTContext())->getCanonicalType();
+    return RValue::withPreExplodedElements(Elts, ty);
+  }
+
   // The string literal provides the data.
-  StringLiteralInst *string = SGF.B.createStringLiteral(E, Str, instEncoding);
+  auto *string = SGF.B.createStringLiteral(E, Str, instEncoding);
 
   // The length is lowered as an integer_literal.
   auto WordTy = SILType::getBuiltinWordType(SGF.getASTContext());
@@ -1998,885 +2018,883 @@ static ManagedValue emitMaterializeIntoTemporary(SILGenFunction &SGF,
 }
 
 namespace {
-  /// A destination for an argument other than just "onto to the end
-  /// of the arguments lists".
+
+/// A destination for an argument other than just "onto to the end
+/// of the arguments lists".
+///
+/// This allows us to re-use the argument expression emitter for
+/// some weird cases, like a shuffled tuple where some of the
+/// arguments are going into a varargs array.
+struct ArgSpecialDest {
+  VarargsInfo *SharedInfo;
+  unsigned Index;
+  CleanupHandle Cleanup;
+
+  ArgSpecialDest() : SharedInfo(nullptr) {}
+  explicit ArgSpecialDest(VarargsInfo &info, unsigned index)
+    : SharedInfo(&info), Index(index) {}
+
+  // Reference semantics: need to preserve the cleanup handle.
+  ArgSpecialDest(const ArgSpecialDest &) = delete;
+  ArgSpecialDest &operator=(const ArgSpecialDest &) = delete;
+  ArgSpecialDest(ArgSpecialDest &&other)
+    : SharedInfo(other.SharedInfo), Index(other.Index),
+      Cleanup(other.Cleanup) {
+    other.SharedInfo = nullptr;
+  }
+  ArgSpecialDest &operator=(ArgSpecialDest &&other) {
+    assert(!isValid() && "overwriting valid special destination!");
+    SharedInfo = other.SharedInfo;
+    Index = other.Index;
+    Cleanup = other.Cleanup;
+    other.SharedInfo = nullptr;
+    return *this;
+  }
+
+  ~ArgSpecialDest() {
+    assert(!isValid() && "failed to deactivate special dest");
+  }
+
+  /// Is this a valid special destination?
   ///
-  /// This allows us to re-use the argument expression emitter for
-  /// some weird cases, like a shuffled tuple where some of the
-  /// arguments are going into a varargs array.
-  struct ArgSpecialDest {
-    VarargsInfo *SharedInfo;
-    unsigned Index;
-    CleanupHandle Cleanup;
+  /// Most of the time, most arguments don't have special
+  /// destinations, and making an array of Optional<Special special
+  /// destinations has t
+  bool isValid() const { return SharedInfo != nullptr; }
 
-    ArgSpecialDest() : SharedInfo(nullptr) {}
-    explicit ArgSpecialDest(VarargsInfo &info, unsigned index)
-      : SharedInfo(&info), Index(index) {}
+  /// Fill this special destination with a value.
+  void fill(SILGenFunction &SGF, ArgumentSource &&arg,
+            AbstractionPattern _unused_origType,
+            SILType loweredSubstParamType) {
+    assert(isValid() && "filling an invalid destination");
 
-    // Reference semantics: need to preserve the cleanup handle.
-    ArgSpecialDest(const ArgSpecialDest &) = delete;
-    ArgSpecialDest &operator=(const ArgSpecialDest &) = delete;
-    ArgSpecialDest(ArgSpecialDest &&other)
-      : SharedInfo(other.SharedInfo), Index(other.Index),
-        Cleanup(other.Cleanup) {
-      other.SharedInfo = nullptr;
+    SILLocation loc = arg.getLocation();
+    auto destAddr = SharedInfo->getBaseAddress();
+    if (Index != 0) {
+      SILValue index = SGF.B.createIntegerLiteral(loc,
+                  SILType::getBuiltinWordType(SGF.getASTContext()), Index);
+      destAddr = SGF.B.createIndexAddr(loc, destAddr, index);
     }
-    ArgSpecialDest &operator=(ArgSpecialDest &&other) {
-      assert(!isValid() && "overwriting valid special destination!");
-      SharedInfo = other.SharedInfo;
-      Index = other.Index;
-      Cleanup = other.Cleanup;
-      other.SharedInfo = nullptr;
+
+    assert(destAddr->getType() == loweredSubstParamType.getAddressType());
+
+    auto &destTL = SharedInfo->getBaseTypeLowering();
+    Cleanup =
+        SGF.enterDormantFormalAccessTemporaryCleanup(destAddr, loc, destTL);
+
+    TemporaryInitialization init(destAddr, Cleanup);
+    std::move(arg).forwardInto(SGF, SharedInfo->getBaseAbstractionPattern(),
+                               &init, destTL);
+  }
+
+  /// Deactivate this special destination.  Must always be called
+  /// before destruction.
+  void deactivate(SILGenFunction &SGF) {
+    assert(isValid() && "deactivating an invalid destination");
+    if (Cleanup.isValid())
+      SGF.Cleanups.forwardCleanup(Cleanup);
+    SharedInfo = nullptr;
+  }
+};
+
+/// A possibly-discontiguous slice of function parameters claimed by a
+/// function application.
+class ClaimedParamsRef {
+public:
+  static constexpr const unsigned NoSkip = (unsigned)-1;
+private:
+  ArrayRef<SILParameterInfo> Params;
+  
+  // The index of the param excluded from this range, if any, or ~0.
+  unsigned SkipParamIndex;
+  
+  friend struct ParamLowering;
+  explicit ClaimedParamsRef(ArrayRef<SILParameterInfo> params,
+                            unsigned skip)
+    : Params(params), SkipParamIndex(skip)
+  {
+    // Eagerly chop a skipped parameter off either end.
+    if (SkipParamIndex == 0) {
+      Params = Params.slice(1);
+      SkipParamIndex = NoSkip;
+    }
+    assert(!hasSkip() || SkipParamIndex < Params.size());
+  }
+  
+  bool hasSkip() const {
+    return SkipParamIndex != (unsigned)NoSkip;
+  }
+public:
+  ClaimedParamsRef() : Params({}), SkipParamIndex(-1) {}
+  explicit ClaimedParamsRef(ArrayRef<SILParameterInfo> params)
+    : Params(params), SkipParamIndex(NoSkip)
+  {}
+
+  struct iterator : public std::iterator<std::random_access_iterator_tag,
+                                         SILParameterInfo>
+  {
+    const SILParameterInfo *Base;
+    unsigned I, SkipParamIndex;
+    
+    iterator(const SILParameterInfo *Base,
+             unsigned I, unsigned SkipParamIndex)
+      : Base(Base), I(I), SkipParamIndex(SkipParamIndex)
+    {}
+    
+    iterator &operator++() {
+      ++I;
+      if (I == SkipParamIndex)
+        ++I;
       return *this;
     }
-
-    ~ArgSpecialDest() {
-      assert(!isValid() && "failed to deactivate special dest");
+    iterator operator++(int) {
+      iterator old(*this);
+      ++*this;
+      return old;
     }
-
-    /// Is this a valid special destination?
-    ///
-    /// Most of the time, most arguments don't have special
-    /// destinations, and making an array of Optional<Special special
-    /// destinations has t
-    bool isValid() const { return SharedInfo != nullptr; }
-
-    /// Fill this special destination with a value.
-    void fill(SILGenFunction &SGF, ArgumentSource &&arg,
-              AbstractionPattern _unused_origType,
-              SILType loweredSubstParamType) {
-      assert(isValid() && "filling an invalid destination");
-
-      SILLocation loc = arg.getLocation();
-      auto destAddr = SharedInfo->getBaseAddress();
-      if (Index != 0) {
-        SILValue index = SGF.B.createIntegerLiteral(loc,
-                    SILType::getBuiltinWordType(SGF.getASTContext()), Index);
-        destAddr = SGF.B.createIndexAddr(loc, destAddr, index);
-      }
-
-      assert(destAddr->getType() == loweredSubstParamType.getAddressType());
-
-      auto &destTL = SharedInfo->getBaseTypeLowering();
-      Cleanup =
-          SGF.enterDormantFormalAccessTemporaryCleanup(destAddr, loc, destTL);
-
-      TemporaryInitialization init(destAddr, Cleanup);
-      std::move(arg).forwardInto(SGF, SharedInfo->getBaseAbstractionPattern(),
-                                 &init, destTL);
-    }
-
-    /// Deactivate this special destination.  Must always be called
-    /// before destruction.
-    void deactivate(SILGenFunction &SGF) {
-      assert(isValid() && "deactivating an invalid destination");
-      if (Cleanup.isValid())
-        SGF.Cleanups.forwardCleanup(Cleanup);
-      SharedInfo = nullptr;
-    }
-  };
-
-  /// A possibly-discontiguous slice of function parameters claimed by a
-  /// function application.
-  class ClaimedParamsRef {
-  public:
-    static constexpr const unsigned NoSkip = (unsigned)-1;
-  private:
-    ArrayRef<SILParameterInfo> Params;
-    
-    // The index of the param excluded from this range, if any, or ~0.
-    unsigned SkipParamIndex;
-    
-    friend struct ParamLowering;
-    explicit ClaimedParamsRef(ArrayRef<SILParameterInfo> params,
-                              unsigned skip)
-      : Params(params), SkipParamIndex(skip)
-    {
-      // Eagerly chop a skipped parameter off either end.
-      if (SkipParamIndex == 0) {
-        Params = Params.slice(1);
-        SkipParamIndex = NoSkip;
-      }
-      assert(!hasSkip() || SkipParamIndex < Params.size());
-    }
-    
-    bool hasSkip() const {
-      return SkipParamIndex != (unsigned)NoSkip;
-    }
-  public:
-    ClaimedParamsRef() : Params({}), SkipParamIndex(-1) {}
-    explicit ClaimedParamsRef(ArrayRef<SILParameterInfo> params)
-      : Params(params), SkipParamIndex(NoSkip)
-    {}
-
-    struct iterator : public std::iterator<std::random_access_iterator_tag,
-                                           SILParameterInfo>
-    {
-      const SILParameterInfo *Base;
-      unsigned I, SkipParamIndex;
-      
-      iterator(const SILParameterInfo *Base,
-               unsigned I, unsigned SkipParamIndex)
-        : Base(Base), I(I), SkipParamIndex(SkipParamIndex)
-      {}
-      
-      iterator &operator++() {
-        ++I;
-        if (I == SkipParamIndex)
-          ++I;
-        return *this;
-      }
-      iterator operator++(int) {
-        iterator old(*this);
-        ++*this;
-        return old;
-      }
-      iterator &operator--() {
+    iterator &operator--() {
+      --I;
+      if (I == SkipParamIndex)
         --I;
-        if (I == SkipParamIndex)
-          --I;
-        return *this;
-      }
-      iterator operator--(int) {
-        iterator old(*this);
-        --*this;
-        return old;
-      }
-      
-      const SILParameterInfo &operator*() const {
-        return Base[I];
-      }
-      const SILParameterInfo *operator->() const {
-        return Base + I;
-      }
-      
-      bool operator==(iterator other) const {
-        return Base == other.Base && I == other.I
-            && SkipParamIndex == other.SkipParamIndex;
-      }
-      
-      bool operator!=(iterator other) const {
-        return !(*this == other);
-      }
-      
-      iterator operator+(std::ptrdiff_t distance) const {
-        if (distance > 0)
-          return goForward(distance);
-        if (distance < 0)
-          return goBackward(distance);
-        return *this;
-      }
-      iterator operator-(std::ptrdiff_t distance) const {
-        if (distance > 0)
-          return goBackward(distance);
-        if (distance < 0)
-          return goForward(distance);
-        return *this;
-      }
-      std::ptrdiff_t operator-(iterator other) const {
-        assert(Base == other.Base && SkipParamIndex == other.SkipParamIndex);
-        auto baseDistance = (std::ptrdiff_t)I - (std::ptrdiff_t)other.I;
-        if (std::min(I, other.I) < SkipParamIndex &&
-            std::max(I, other.I) > SkipParamIndex)
-          return baseDistance - 1;
-        return baseDistance;
-      }
-      
-      iterator goBackward(unsigned distance) const {
-        auto result = *this;
-        if (I > SkipParamIndex && I <= SkipParamIndex + distance)
-          result.I -= (distance + 1);
-        result.I -= distance;
-        return result;
-      }
-      
-      iterator goForward(unsigned distance) const {
-        auto result = *this;
-        if (I < SkipParamIndex && I + distance >= SkipParamIndex)
-          result.I += distance + 1;
-        result.I += distance;
-        return result;
-      }
-    };
-    
-    iterator begin() const {
-      return iterator{Params.data(), 0, SkipParamIndex};
+      return *this;
+    }
+    iterator operator--(int) {
+      iterator old(*this);
+      --*this;
+      return old;
     }
     
-    iterator end() const {
-      return iterator{Params.data(), (unsigned)Params.size(), SkipParamIndex};
+    const SILParameterInfo &operator*() const {
+      return Base[I];
+    }
+    const SILParameterInfo *operator->() const {
+      return Base + I;
     }
     
-    unsigned size() const {
-      return Params.size() - (hasSkip() ? 1 : 0);
+    bool operator==(iterator other) const {
+      return Base == other.Base && I == other.I
+          && SkipParamIndex == other.SkipParamIndex;
     }
     
-    bool empty() const { return size() == 0; }
-    
-    SILParameterInfo front() const { return *begin(); }
-    
-    ClaimedParamsRef slice(unsigned start) const {
-      if (start >= SkipParamIndex)
-        return ClaimedParamsRef(Params.slice(start + 1), NoSkip);
-      return ClaimedParamsRef(Params.slice(start),
-                              hasSkip() ? SkipParamIndex - start : NoSkip);
+    bool operator!=(iterator other) const {
+      return !(*this == other);
     }
-    ClaimedParamsRef slice(unsigned start, unsigned count) const {
-      if (start >= SkipParamIndex)
-        return ClaimedParamsRef(Params.slice(start + 1, count), NoSkip);
-      unsigned newSkip = SkipParamIndex;
-      if (hasSkip())
-        newSkip -= start;
-      
-      if (newSkip < count)
-        return ClaimedParamsRef(Params.slice(start, count+1), newSkip);
-      return ClaimedParamsRef(Params.slice(start, count), NoSkip);
+    
+    iterator operator+(std::ptrdiff_t distance) const {
+      if (distance > 0)
+        return goForward(distance);
+      if (distance < 0)
+        return goBackward(distance);
+      return *this;
+    }
+    iterator operator-(std::ptrdiff_t distance) const {
+      if (distance > 0)
+        return goBackward(distance);
+      if (distance < 0)
+        return goForward(distance);
+      return *this;
+    }
+    std::ptrdiff_t operator-(iterator other) const {
+      assert(Base == other.Base && SkipParamIndex == other.SkipParamIndex);
+      auto baseDistance = (std::ptrdiff_t)I - (std::ptrdiff_t)other.I;
+      if (std::min(I, other.I) < SkipParamIndex &&
+          std::max(I, other.I) > SkipParamIndex)
+        return baseDistance - 1;
+      return baseDistance;
+    }
+    
+    iterator goBackward(unsigned distance) const {
+      auto result = *this;
+      if (I > SkipParamIndex && I <= SkipParamIndex + distance)
+        result.I -= (distance + 1);
+      result.I -= distance;
+      return result;
+    }
+    
+    iterator goForward(unsigned distance) const {
+      auto result = *this;
+      if (I < SkipParamIndex && I + distance >= SkipParamIndex)
+        result.I += distance + 1;
+      result.I += distance;
+      return result;
     }
   };
+  
+  iterator begin() const {
+    return iterator{Params.data(), 0, SkipParamIndex};
+  }
+  
+  iterator end() const {
+    return iterator{Params.data(), (unsigned)Params.size(), SkipParamIndex};
+  }
+  
+  unsigned size() const {
+    return Params.size() - (hasSkip() ? 1 : 0);
+  }
+  
+  bool empty() const { return size() == 0; }
+  
+  SILParameterInfo front() const { return *begin(); }
+  
+  ClaimedParamsRef slice(unsigned start) const {
+    if (start >= SkipParamIndex)
+      return ClaimedParamsRef(Params.slice(start + 1), NoSkip);
+    return ClaimedParamsRef(Params.slice(start),
+                            hasSkip() ? SkipParamIndex - start : NoSkip);
+  }
+  ClaimedParamsRef slice(unsigned start, unsigned count) const {
+    if (start >= SkipParamIndex)
+      return ClaimedParamsRef(Params.slice(start + 1, count), NoSkip);
+    unsigned newSkip = SkipParamIndex;
+    if (hasSkip())
+      newSkip -= start;
+    
+    if (newSkip < count)
+      return ClaimedParamsRef(Params.slice(start, count+1), newSkip);
+    return ClaimedParamsRef(Params.slice(start, count), NoSkip);
+  }
+};
 
-  using ArgSpecialDestArray = MutableArrayRef<ArgSpecialDest>;
+using ArgSpecialDestArray = MutableArrayRef<ArgSpecialDest>;
 
-  class ArgEmitter {
-    SILGenFunction &SGF;
-    SILFunctionTypeRepresentation Rep;
-    const Optional<ForeignErrorConvention> &ForeignError;
-    ImportAsMemberStatus ForeignSelf;
-    ClaimedParamsRef ParamInfos;
-    SmallVectorImpl<ManagedValue> &Args;
+class TupleShuffleArgEmitter;
 
-    /// Track any inout arguments that are emitted.  Each corresponds
-    /// in order to a "hole" (a null value) in Args.
-    SmallVectorImpl<InOutArgument> &InOutArguments;
+class ArgEmitter {
+  // TODO: Refactor out the parts of ArgEmitter needed by TupleShuffleArgEmitter
+  // into its own "context struct".
+  friend class TupleShuffleArgEmitter;
 
-    Optional<ArgSpecialDestArray> SpecialDests;
-  public:
-    ArgEmitter(SILGenFunction &SGF, SILFunctionTypeRepresentation Rep,
-               ClaimedParamsRef paramInfos,
-               SmallVectorImpl<ManagedValue> &args,
-               SmallVectorImpl<InOutArgument> &inoutArgs,
-               const Optional<ForeignErrorConvention> &foreignError,
-               ImportAsMemberStatus foreignSelf,
-               Optional<ArgSpecialDestArray> specialDests = None)
-      : SGF(SGF), Rep(Rep), ForeignError(foreignError),
-        ForeignSelf(foreignSelf),
-        ParamInfos(paramInfos),
-        Args(args), InOutArguments(inoutArgs), SpecialDests(specialDests) {
-      assert(!specialDests || specialDests->size() == paramInfos.size());
+  SILGenFunction &SGF;
+  SILFunctionTypeRepresentation Rep;
+  const Optional<ForeignErrorConvention> &ForeignError;
+  ImportAsMemberStatus ForeignSelf;
+  ClaimedParamsRef ParamInfos;
+  SmallVectorImpl<ManagedValue> &Args;
+
+  /// Track any inout arguments that are emitted.  Each corresponds
+  /// in order to a "hole" (a null value) in Args.
+  SmallVectorImpl<InOutArgument> &InOutArguments;
+
+  Optional<ArgSpecialDestArray> SpecialDests;
+public:
+  ArgEmitter(SILGenFunction &SGF, SILFunctionTypeRepresentation Rep,
+             ClaimedParamsRef paramInfos,
+             SmallVectorImpl<ManagedValue> &args,
+             SmallVectorImpl<InOutArgument> &inoutArgs,
+             const Optional<ForeignErrorConvention> &foreignError,
+             ImportAsMemberStatus foreignSelf,
+             Optional<ArgSpecialDestArray> specialDests = None)
+    : SGF(SGF), Rep(Rep), ForeignError(foreignError),
+      ForeignSelf(foreignSelf),
+      ParamInfos(paramInfos),
+      Args(args), InOutArguments(inoutArgs), SpecialDests(specialDests) {
+    assert(!specialDests || specialDests->size() == paramInfos.size());
+  }
+
+  void emitTopLevel(ArgumentSource &&arg, AbstractionPattern origParamType) {
+    emit(std::move(arg), origParamType);
+    maybeEmitForeignErrorArgument();
+  }
+
+private:
+  void emit(ArgumentSource &&arg, AbstractionPattern origParamType) {
+    // If it was a tuple in the original type, or the argument
+    // requires the callee to evaluate, the parameters will have
+    // been exploded.
+    if (origParamType.isTuple() || arg.requiresCalleeToEvaluate()) {
+      emitExpanded(std::move(arg), origParamType);
+      return;
     }
 
-    void emitTopLevel(ArgumentSource &&arg, AbstractionPattern origParamType) {
-      emit(std::move(arg), origParamType);
-      maybeEmitForeignErrorArgument();
+    auto substArgType = arg.getSubstType();
+
+    // Otherwise, if the substituted type is a tuple, then we should
+    // emit the tuple in its most general form, because there's a
+    // substitution of an opaque archetype to a tuple or function
+    // type in play.  The most general convention is generally to
+    // pass the entire tuple indirectly, but if it's not
+    // materializable, the convention is actually to break it up
+    // into materializable chunks.  See the comment in SILType.cpp.
+    if (isUnmaterializableTupleType(substArgType)) {
+      assert(origParamType.isTypeParameter());
+      emitExpanded(std::move(arg), origParamType);
+      return;
     }
 
-  private:
-    void emit(ArgumentSource &&arg, AbstractionPattern origParamType) {
-      // If it was a tuple in the original type, or the argument
-      // requires the callee to evaluate, the parameters will have
-      // been exploded.
-      if (origParamType.isTuple() || arg.requiresCalleeToEvaluate()) {
-        emitExpanded(std::move(arg), origParamType);
-        return;
-      }
+    // Okay, everything else will be passed as a single value, one
+    // way or another.
 
-      auto substArgType = arg.getSubstType();
+    // If this is a discarded foreign static 'self' parameter, force the
+    // argument and discard it.
+    if (ForeignSelf.isStatic()) {
+      std::move(arg).getAsRValue(SGF);
+      return;
+    }
 
-      // Otherwise, if the substituted type is a tuple, then we should
-      // emit the tuple in its most general form, because there's a
-      // substitution of an opaque archetype to a tuple or function
-      // type in play.  The most general convention is generally to
-      // pass the entire tuple indirectly, but if it's not
-      // materializable, the convention is actually to break it up
-      // into materializable chunks.  See the comment in SILType.cpp.
-      if (isUnmaterializableTupleType(substArgType)) {
-        assert(origParamType.isTypeParameter());
-        emitExpanded(std::move(arg), origParamType);
-        return;
-      }
+    // Adjust for the foreign-error argument if necessary.
+    maybeEmitForeignErrorArgument();
 
-      // Okay, everything else will be passed as a single value, one
-      // way or another.
+    // The substituted parameter type.  Might be different from the
+    // substituted argument type by abstraction and/or bridging.
+    SILParameterInfo param = claimNextParameter();
+    ArgSpecialDest *specialDest = claimNextSpecialDest();
 
-      // If this is a discarded foreign static 'self' parameter, force the
-      // argument and discard it.
-      if (ForeignSelf.isStatic()) {
-        std::move(arg).getAsRValue(SGF);
-        return;
-      }
+    // Make sure we use the same value category for these so that we
+    // can hereafter just use simple equality checks to test for
+    // abstraction.
+    SILType loweredSubstArgType = SGF.getLoweredType(substArgType);
+    SILType loweredSubstParamType =
+      SILType::getPrimitiveType(param.getType(),
+                                loweredSubstArgType.getCategory());
 
-      // Adjust for the foreign-error argument if necessary.
-      maybeEmitForeignErrorArgument();
-
-      // The substituted parameter type.  Might be different from the
-      // substituted argument type by abstraction and/or bridging.
-      SILParameterInfo param = claimNextParameter();
-      ArgSpecialDest *specialDest = claimNextSpecialDest();
-
-      // Make sure we use the same value category for these so that we
-      // can hereafter just use simple equality checks to test for
-      // abstraction.
-      SILType loweredSubstArgType = SGF.getLoweredType(substArgType);
-      SILType loweredSubstParamType =
-        SILType::getPrimitiveType(param.getType(),
-                                  loweredSubstArgType.getCategory());
-
-      // If the caller takes the argument indirectly, the argument has an
-      // inout type.
-      if (param.isIndirectInOut()) {
-        assert(!specialDest);
-        assert(isa<InOutType>(substArgType));
-        emitInOut(std::move(arg), loweredSubstArgType, loweredSubstParamType,
-                  origParamType, substArgType);
-        return;
-      }
-
-      // If the original type is passed indirectly, copy to memory if
-      // it's not already there.  (Note that this potentially includes
-      // conventions which pass indirectly without transferring
-      // ownership, like Itanium C++.)
-      if (specialDest) {
-        assert(param.isFormalIndirect() &&
-               "SpecialDest should imply indirect parameter");
-        // TODO: Change the way we initialize array storage in opaque mode
-        emitIndirectInto(std::move(arg), origParamType, loweredSubstParamType,
-                         *specialDest);
-        Args.push_back(ManagedValue::forInContext());
-        return;
-      } else if (SGF.silConv.isSILIndirect(param)) {
-        auto value = emitIndirect(std::move(arg), loweredSubstArgType,
-                                  origParamType, param);
-        Args.push_back(value);
-        return;
-      }
-
-      // Okay, if the original parameter is passed directly, then we
-      // just need to handle abstraction differences and bridging.
+    // If the caller takes the argument indirectly, the argument has an
+    // inout type.
+    if (param.isIndirectInOut()) {
       assert(!specialDest);
-      emitDirect(std::move(arg), loweredSubstArgType, origParamType, param);
+      assert(isa<InOutType>(substArgType));
+      emitInOut(std::move(arg), loweredSubstArgType, loweredSubstParamType,
+                origParamType, substArgType);
+      return;
     }
 
-    SILParameterInfo claimNextParameter() {
-      assert(!ParamInfos.empty());
-      auto param = ParamInfos.front();
-      ParamInfos = ParamInfos.slice(1);
-      return param;
+    // If the original type is passed indirectly, copy to memory if
+    // it's not already there.  (Note that this potentially includes
+    // conventions which pass indirectly without transferring
+    // ownership, like Itanium C++.)
+    if (specialDest) {
+      assert(param.isFormalIndirect() &&
+             "SpecialDest should imply indirect parameter");
+      // TODO: Change the way we initialize array storage in opaque mode
+      emitIndirectInto(std::move(arg), origParamType, loweredSubstParamType,
+                       *specialDest);
+      Args.push_back(ManagedValue::forInContext());
+      return;
+    } else if (SGF.silConv.isSILIndirect(param)) {
+      auto value = emitIndirect(std::move(arg), loweredSubstArgType,
+                                origParamType, param);
+      Args.push_back(value);
+      return;
     }
 
-    /// Claim the next destination, returning a null pointer if there
-    /// is no special destination.
-    ArgSpecialDest *claimNextSpecialDest() {
-      if (!SpecialDests) return nullptr;
-      assert(!SpecialDests->empty());
-      auto dest = &SpecialDests->front();
-      SpecialDests = SpecialDests->slice(1);
-      return (dest->isValid() ? dest : nullptr);
-    }
+    // Okay, if the original parameter is passed directly, then we
+    // just need to handle abstraction differences and bridging.
+    assert(!specialDest);
+    emitDirect(std::move(arg), loweredSubstArgType, origParamType, param);
+  }
 
-    bool isUnmaterializableTupleType(CanType type) {
-      if (auto tuple = dyn_cast<TupleType>(type))
-        if (!tuple->isMaterializable())
-          return true;
-      return false;
-    }
+  SILParameterInfo claimNextParameter() {
+    assert(!ParamInfos.empty());
+    auto param = ParamInfos.front();
+    ParamInfos = ParamInfos.slice(1);
+    return param;
+  }
 
-    /// Emit an argument as an expanded tuple.
-    void emitExpanded(ArgumentSource &&arg, AbstractionPattern origParamType) {
-      assert(!arg.isLValue() && "argument is l-value but parameter is tuple?");
+  /// Claim the next destination, returning a null pointer if there
+  /// is no special destination.
+  ArgSpecialDest *claimNextSpecialDest() {
+    if (!SpecialDests) return nullptr;
+    assert(!SpecialDests->empty());
+    auto dest = &SpecialDests->front();
+    SpecialDests = SpecialDests->slice(1);
+    return (dest->isValid() ? dest : nullptr);
+  }
 
-      // If we're working with an r-value, just expand it out and emit
-      // all the elements individually.
-      if (arg.isRValue()) {
-        if (CanTupleType substArgType =
-                dyn_cast<TupleType>(arg.getSubstType())) {
-          // The original type isn't necessarily a tuple.
-          assert(origParamType.matchesTuple(substArgType));
+  bool isUnmaterializableTupleType(CanType type) {
+    if (auto tuple = dyn_cast<TupleType>(type))
+      if (!tuple->isMaterializable())
+        return true;
+    return false;
+  }
 
-          auto loc = arg.getKnownRValueLocation();
-          SmallVector<RValue, 4> elts;
-          std::move(arg).asKnownRValue().extractElements(elts);
-          for (auto i : indices(substArgType.getElementTypes())) {
-            emit({ loc, std::move(elts[i]) },
-                 origParamType.getTupleElementType(i));
-          }
-          return;
-        }
+  /// Emit an argument as an expanded tuple.
+  void emitExpanded(ArgumentSource &&arg, AbstractionPattern origParamType) {
+    assert(!arg.isLValue() && "argument is l-value but parameter is tuple?");
+
+    // If we're working with an r-value, just expand it out and emit
+    // all the elements individually.
+    if (arg.isRValue()) {
+      if (CanTupleType substArgType =
+              dyn_cast<TupleType>(arg.getSubstType())) {
+        // The original type isn't necessarily a tuple.
+        assert(origParamType.matchesTuple(substArgType));
 
         auto loc = arg.getKnownRValueLocation();
-        SmallVector<RValue, 1> elts;
+        SmallVector<RValue, 4> elts;
         std::move(arg).asKnownRValue().extractElements(elts);
-        emit({ loc, std::move(elts[0]) },
-             origParamType.getTupleElementType(0));
-        return;
-      }
-
-      // Otherwise, we're working with an expression.
-      Expr *e = std::move(arg).asKnownExpr();
-      e = e->getSemanticsProvidingExpr();
-
-      // If the source expression is a tuple literal, we can break it
-      // up directly.
-      if (auto tuple = dyn_cast<TupleExpr>(e)) {
-        for (auto i : indices(tuple->getElements())) {
-          emit(tuple->getElement(i),
+        for (auto i : indices(substArgType.getElementTypes())) {
+          emit({ loc, std::move(elts[i]) },
                origParamType.getTupleElementType(i));
         }
         return;
       }
 
-      if (auto shuffle = dyn_cast<TupleShuffleExpr>(e)) {
-        emitShuffle(shuffle, origParamType);
-        return;
-      }
-
-      // Fall back to the r-value case.
-      emitExpanded({ e, SGF.emitRValue(e) }, origParamType);
-    }
-
-    void emitShuffle(Expr *inner,
-                     Expr *outer,
-                     ArrayRef<TupleTypeElt> innerElts,
-                     ConcreteDeclRef defaultArgsOwner,
-                     ArrayRef<Expr*> callerDefaultArgs,
-                     ArrayRef<int> elementMapping,
-                     ArrayRef<unsigned> variadicArgs,
-                     Type varargsArrayType,
-                     AbstractionPattern origParamType);
-
-    void emitShuffle(TupleShuffleExpr *shuffle, AbstractionPattern origType);
-
-    ManagedValue emitIndirect(ArgumentSource &&arg,
-                              SILType loweredSubstArgType,
-                              AbstractionPattern origParamType,
-                              SILParameterInfo param) {
-      auto contexts = getRValueEmissionContexts(loweredSubstArgType, param);
-
-      // If no abstraction is required, try to honor the emission contexts.
-      if (!contexts.RequiresReabstraction) {
-        auto loc = arg.getLocation();
-        ManagedValue result =
-          std::move(arg).getAsSingleValue(SGF, contexts.ForEmission);
-
-        // If it's already in memory, great.
-        if (result.getType().isAddress()) {
-          return result;
-
-        // Otherwise, put it there.
-        } else {
-          return emitMaterializeIntoTemporary(SGF, loc, result);
-        }
-      }
-
-      // Otherwise, simultaneously emit and reabstract.
-      return std::move(arg).materialize(SGF, origParamType,
-                                        SGF.getSILType(param));
-    }
-
-    void emitIndirectInto(ArgumentSource &&arg,
-                          AbstractionPattern origType,
-                          SILType loweredSubstParamType,
-                          ArgSpecialDest &dest) {
-      dest.fill(SGF, std::move(arg), origType, loweredSubstParamType);
-    }
-
-    void emitInOut(ArgumentSource &&arg,
-                   SILType loweredSubstArgType, SILType loweredSubstParamType,
-                   AbstractionPattern origType, CanType substType) {
-      SILLocation loc = arg.getLocation();
-
-      LValue lv = [&]{
-        // If the argument is already lowered to an LValue, it must be the
-        // receiver of a self argument, which will be the first inout.
-        if (arg.isLValue()) {
-          return std::move(arg).asKnownLValue();
-
-        // This is logically wrong, but propagating l-values within
-        // RValues is hard to avoid in custom argument-emission code
-        // without making ArgumentSource capable of holding mixed
-        // RValue/LValue tuples.  (materializeForSet has to do this,
-        // for one.)  The onus is on the caller to ensure that formal
-        // access semantics are honored.
-        } else if (arg.isRValue()) {
-          auto address = std::move(arg).asKnownRValue()
-            .getAsSingleValue(SGF, arg.getKnownRValueLocation());
-          assert(address.isLValue());
-          auto substObjectType = cast<InOutType>(substType).getObjectType();
-          return LValue::forAddress(address, None,
-                                    AbstractionPattern(substObjectType),
-                                    substObjectType);
-        } else {
-          auto *e = cast<InOutExpr>(std::move(arg).asKnownExpr()->
-                                    getSemanticsProvidingExpr());
-          return SGF.emitLValue(e->getSubExpr(), AccessKind::ReadWrite);
-        }
-      }();
-
-      if (loweredSubstParamType.hasAbstractionDifference(Rep,
-                                                         loweredSubstArgType)) {
-        AbstractionPattern origObjectType = origType.transformType(
-          [](CanType type)->CanType {
-            return CanType(type->getInOutObjectType());
-          });
-        lv.addSubstToOrigComponent(origObjectType, loweredSubstParamType);
-      }
-
-      // Leave an empty space in the ManagedValue sequence and
-      // remember that we had an inout argument.
-      InOutArguments.push_back({std::move(lv), loc});
-      Args.push_back(ManagedValue());
+      auto loc = arg.getKnownRValueLocation();
+      SmallVector<RValue, 1> elts;
+      std::move(arg).asKnownRValue().extractElements(elts);
+      emit({ loc, std::move(elts[0]) },
+           origParamType.getTupleElementType(0));
       return;
     }
 
-    void emitDirect(ArgumentSource &&arg, SILType loweredSubstArgType,
-                    AbstractionPattern origParamType,
-                    SILParameterInfo param) {
-      ManagedValue value;
-      auto contexts = getRValueEmissionContexts(loweredSubstArgType, param);
-      if (contexts.RequiresReabstraction) {
-        switch (getSILFunctionLanguage(Rep)) {
-        case SILFunctionLanguage::Swift:
-          value = emitSubstToOrigArgument(std::move(arg), loweredSubstArgType,
-                                          origParamType, param);
-          break;
-        case SILFunctionLanguage::C:
-          value = emitNativeToBridgedArgument(
-              std::move(arg), loweredSubstArgType, origParamType, param);
-          break;
-        }
-      } else {
-        value = std::move(arg).getAsSingleValue(SGF, contexts.ForEmission);
-      }
+    // Otherwise, we're working with an expression.
+    Expr *e = std::move(arg).asKnownExpr();
+    e = e->getSemanticsProvidingExpr();
 
-      if (param.isConsumed() &&
-          value.getOwnershipKind() == ValueOwnershipKind::Guaranteed) {
-        value = value.copyUnmanaged(SGF, arg.getLocation());
+    // If the source expression is a tuple literal, we can break it
+    // up directly.
+    if (auto tuple = dyn_cast<TupleExpr>(e)) {
+      for (auto i : indices(tuple->getElements())) {
+        emit(tuple->getElement(i),
+             origParamType.getTupleElementType(i));
+      }
+      return;
+    }
+
+    if (auto shuffle = dyn_cast<TupleShuffleExpr>(e)) {
+      emitShuffle(shuffle, origParamType);
+      return;
+    }
+
+    // Fall back to the r-value case.
+    emitExpanded({ e, SGF.emitRValue(e) }, origParamType);
+  }
+
+  void emitShuffle(TupleShuffleExpr *shuffle, AbstractionPattern origType);
+
+  ManagedValue emitIndirect(ArgumentSource &&arg,
+                            SILType loweredSubstArgType,
+                            AbstractionPattern origParamType,
+                            SILParameterInfo param) {
+    auto contexts = getRValueEmissionContexts(loweredSubstArgType, param);
+
+    // If no abstraction is required, try to honor the emission contexts.
+    if (!contexts.RequiresReabstraction) {
+      auto loc = arg.getLocation();
+      ManagedValue result =
+        std::move(arg).getAsSingleValue(SGF, contexts.ForEmission);
+
+      // If it's already in memory, great.
+      if (result.getType().isAddress()) {
+        return result;
+
+      // Otherwise, put it there.
+      } else {
+        return emitMaterializeIntoTemporary(SGF, loc, result);
+      }
+    }
+
+    // Otherwise, simultaneously emit and reabstract.
+    return std::move(arg).materialize(SGF, origParamType,
+                                      SGF.getSILType(param));
+  }
+
+  void emitIndirectInto(ArgumentSource &&arg,
+                        AbstractionPattern origType,
+                        SILType loweredSubstParamType,
+                        ArgSpecialDest &dest) {
+    dest.fill(SGF, std::move(arg), origType, loweredSubstParamType);
+  }
+
+  void emitInOut(ArgumentSource &&arg,
+                 SILType loweredSubstArgType, SILType loweredSubstParamType,
+                 AbstractionPattern origType, CanType substType) {
+    SILLocation loc = arg.getLocation();
+
+    LValue lv = [&]{
+      // If the argument is already lowered to an LValue, it must be the
+      // receiver of a self argument, which will be the first inout.
+      if (arg.isLValue()) {
+        return std::move(arg).asKnownLValue();
+
+      // This is logically wrong, but propagating l-values within
+      // RValues is hard to avoid in custom argument-emission code
+      // without making ArgumentSource capable of holding mixed
+      // RValue/LValue tuples.  (materializeForSet has to do this,
+      // for one.)  The onus is on the caller to ensure that formal
+      // access semantics are honored.
+      } else if (arg.isRValue()) {
+        auto address = std::move(arg).asKnownRValue()
+          .getAsSingleValue(SGF, arg.getKnownRValueLocation());
+        assert(address.isLValue());
+        auto substObjectType = cast<InOutType>(substType).getObjectType();
+        return LValue::forAddress(address, None,
+                                  AbstractionPattern(substObjectType),
+                                  substObjectType);
+      } else {
+        auto *e = cast<InOutExpr>(std::move(arg).asKnownExpr()->
+                                  getSemanticsProvidingExpr());
+        return SGF.emitLValue(e->getSubExpr(), AccessKind::ReadWrite);
+      }
+    }();
+
+    if (loweredSubstParamType.hasAbstractionDifference(Rep,
+                                                       loweredSubstArgType)) {
+      AbstractionPattern origObjectType = origType.transformType(
+        [](CanType type)->CanType {
+          return CanType(type->getInOutObjectType());
+        });
+      lv.addSubstToOrigComponent(origObjectType, loweredSubstParamType);
+    }
+
+    // Leave an empty space in the ManagedValue sequence and
+    // remember that we had an inout argument.
+    InOutArguments.push_back({std::move(lv), loc});
+    Args.push_back(ManagedValue());
+    return;
+  }
+
+  void emitDirect(ArgumentSource &&arg, SILType loweredSubstArgType,
+                  AbstractionPattern origParamType,
+                  SILParameterInfo param) {
+    ManagedValue value;
+    auto contexts = getRValueEmissionContexts(loweredSubstArgType, param);
+    if (contexts.RequiresReabstraction) {
+      switch (getSILFunctionLanguage(Rep)) {
+      case SILFunctionLanguage::Swift:
+        value = emitSubstToOrigArgument(std::move(arg), loweredSubstArgType,
+                                        origParamType, param);
+        break;
+      case SILFunctionLanguage::C:
+        value = emitNativeToBridgedArgument(
+            std::move(arg), loweredSubstArgType, origParamType, param);
+        break;
+      }
+    } else {
+      value = std::move(arg).getAsSingleValue(SGF, contexts.ForEmission);
+    }
+
+    if (param.isConsumed() &&
+        value.getOwnershipKind() == ValueOwnershipKind::Guaranteed) {
+      value = value.copyUnmanaged(SGF, arg.getLocation());
+      Args.push_back(value);
+      return;
+    }
+
+    if (SGF.F.getModule().getOptions().EnableSILOwnership) {
+      if (param.isDirectGuaranteed() &&
+          value.getOwnershipKind() == ValueOwnershipKind::Owned) {
+        value = value.borrow(SGF, arg.getLocation());
         Args.push_back(value);
         return;
       }
-
-      if (SGF.F.getModule().getOptions().EnableSILOwnership) {
-        if (param.isDirectGuaranteed() &&
-            value.getOwnershipKind() == ValueOwnershipKind::Owned) {
-          value = value.borrow(SGF, arg.getLocation());
-          Args.push_back(value);
-          return;
-        }
-      }
-
-      Args.push_back(value);
     }
-    
-    ManagedValue emitSubstToOrigArgument(ArgumentSource &&arg,
-                                         SILType loweredSubstArgType,
-                                         AbstractionPattern origParamType,
-                                         SILParameterInfo param) {
-      Scope scope(SGF, arg.getLocation());
 
-      // TODO: We should take the opportunity to peephole certain abstraction
-      // changes here, for instance, directly emitting a closure literal at the
-      // callee's expected abstraction level instead of emitting it maximally
-      // substituted and thunking.
-      auto emitted = emitArgumentFromSource(std::move(arg), loweredSubstArgType,
-                                            origParamType, param);
-      ManagedValue result = SGF.emitSubstToOrigValue(
-          emitted.loc, std::move(emitted.value).getScalarValue(), origParamType,
-          emitted.value.getType(), emitted.contextForReabstraction);
-      return scope.popPreservingValue(result);
-    }
-    
-    CanType getAnyObjectType() {
-      return SGF.getASTContext()
-        .getProtocol(KnownProtocolKind::AnyObject)
-        ->getDeclaredType()
-        ->getCanonicalType();
-    }
-    bool isAnyObjectType(CanType t) {
-      return t == getAnyObjectType();
-    }
-    
-    ManagedValue emitNativeToBridgedArgument(ArgumentSource &&arg,
-                                             SILType loweredSubstArgType,
-                                             AbstractionPattern origParamType,
-                                             SILParameterInfo param) {
-      Scope scope(SGF, arg.getLocation());
+    Args.push_back(value);
+  }
+  
+  ManagedValue emitSubstToOrigArgument(ArgumentSource &&arg,
+                                       SILType loweredSubstArgType,
+                                       AbstractionPattern origParamType,
+                                       SILParameterInfo param) {
+    Scope scope(SGF, arg.getLocation());
 
-      // If we're bridging a concrete type to `id` via Any, skip the Any
-      // boxing.
-      
-      // TODO: Generalize. Similarly, when bridging from NSFoo -> Foo -> NSFoo,
-      // we should elide the bridge altogether and pass the original object.
-      auto paramObjTy = param.getType();
-      if (auto objTy = paramObjTy.getAnyOptionalObjectType())
-        paramObjTy = objTy;
-      if (isAnyObjectType(paramObjTy) && !arg.isRValue()) {
-        return scope.popPreservingValue(emitNativeToBridgedObjectArgument(
-            std::move(arg).asKnownExpr(), loweredSubstArgType, origParamType,
-            param));
-      }
-      
-      auto emitted = emitArgumentFromSource(std::move(arg), loweredSubstArgType,
-                                            origParamType, param);
-
-      return scope.popPreservingValue(SGF.emitNativeToBridgedValue(
-          emitted.loc,
-          std::move(emitted.value).getAsSingleValue(SGF, emitted.loc), Rep,
-          param.getType()));
-    }
-    
-    enum class ExistentialPeepholeOptionality {
-      /// A non-optional value erased to a non-optional existential.
-      Nonoptional,
-      
-      /// A non-optional value erased to an optional existential.
-      NonoptionalToOptional,
-      
-      /// An optional value erased to an optional existential.
-      OptionalToOptional,
-    };
-    
-    std::pair<Expr *, ExistentialPeepholeOptionality>
-    lookThroughExistentialErasures(Expr *argExpr) {
-      auto origArgExpr = argExpr;
-    
-      auto optionality = ExistentialPeepholeOptionality::Nonoptional;
-      argExpr = argExpr->getSemanticsProvidingExpr();
-      
-      // Check for an OptionalEvaluation. If we see one we'll want to match it
-      // to the inner BindOptional.
-      if (auto optEval = dyn_cast<OptionalEvaluationExpr>(argExpr)) {
-        
-        // The result of the conversion should be promoted back to optional
-        // at the outermost level.
-        if (auto inject = dyn_cast<InjectIntoOptionalExpr>(
-                         optEval->getSubExpr()->getSemanticsProvidingExpr())) {
-          optionality = ExistentialPeepholeOptionality::OptionalToOptional;
-          argExpr = inject->getSubExpr()->getSemanticsProvidingExpr();
-        }
-      }
-      
-      // Look through a BindOptionalExpr if we have an optional-to-optional
-      // peephole, or fail the peephole if there isn't a BindOptionalToOptional.
-      auto tryToBindOptional =
-        [&](Expr *subExpr) -> std::pair<Expr *, ExistentialPeepholeOptionality> {
-          if (optionality ==
-                ExistentialPeepholeOptionality::OptionalToOptional) {
-            // If we see the binding, look through it.
-            if (auto bind = dyn_cast<BindOptionalExpr>(subExpr))
-              return {bind->getSubExpr()->getSemanticsProvidingExpr(),
-                      optionality};
-            // Otherwise, we don't know what we're seeing. Back out of the
-            // peephole.
-            return {origArgExpr, ExistentialPeepholeOptionality::Nonoptional};
-          }
-          
-          return {subExpr, optionality};
-        };
-      
-      // Look through an optional injection.
-      if (auto inject = dyn_cast<InjectIntoOptionalExpr>(argExpr)) {
-        optionality = ExistentialPeepholeOptionality::NonoptionalToOptional;
-        argExpr = inject->getSubExpr()->getSemanticsProvidingExpr();
-      }
-
-      // When converting from an existential type to a more general existential,
-      // the inner existential is opened first. Look through this pattern.
-      if (auto open = dyn_cast<OpenExistentialExpr>(argExpr)) {
-        auto subExpr = open->getSubExpr()->getSemanticsProvidingExpr();
-        while (auto erasure = dyn_cast<ErasureExpr>(subExpr)) {
-          subExpr = erasure->getSubExpr()->getSemanticsProvidingExpr();
-        }
-        // If we drilled down to the underlying opened existential, look
-        // through it.
-        if (subExpr == open->getOpaqueValue())
-          return tryToBindOptional(open->getExistentialValue());
-        // TODO: Maybe there are other peepholes we could attempt on opened
-        // existentials?
-        return tryToBindOptional(open);
-      }
-      
-      // Look through ErasureExprs and try to bridge the underlying
-      // concrete value instead.
-      while (auto erasure = dyn_cast<ErasureExpr>(argExpr))
-        argExpr = erasure->getSubExpr()->getSemanticsProvidingExpr();
-
-      return tryToBindOptional(argExpr);
-    }
-    
-    /// Emit an argument expression that we know will be bridged to an
-    /// Objective-C object.
-    ManagedValue emitNativeToBridgedObjectArgument(Expr *argExpr,
-                                               SILType loweredSubstArgType,
-                                               AbstractionPattern origParamType,
-                                               SILParameterInfo param) {
-      auto origArgExpr = argExpr;
-      // Look through existential erasures.
-      ExistentialPeepholeOptionality optionality;
-      std::tie(argExpr, optionality) = lookThroughExistentialErasures(argExpr);
-      
-      // TODO: Only do the peephole for trivially-lowered types, since we
-      // unfortunately don't plumb formal types through
-      // emitNativeToBridgedValue, so can't correctly construct the
-      // substitution for the call to _bridgeAnythingToObjectiveC for function
-      // or metatype values.
-      if (!argExpr->getType()->isLegalSILType()) {
-        argExpr = origArgExpr;
-        optionality = ExistentialPeepholeOptionality::Nonoptional;
-      }
-      
-      // Emit the argument.
-      auto contexts = getRValueEmissionContexts(loweredSubstArgType, param);
-      ManagedValue emittedArg = SGF.emitRValue(argExpr, contexts.ForEmission)
-        .getAsSingleValue(SGF, argExpr);
-      
-      // Early exit if we already exactly match the parameter type.
-      if (emittedArg.getType() == SGF.getSILType(param)) {
-        return emittedArg;
-      }
-      
-      // Factor the bridging conversion out in case we need to do it as an
-      // optional-to-optional transform.
-      auto doBridge = [&](SILGenFunction &SGF,
-                          SILLocation loc,
-                          ManagedValue emittedArg,
-                          SILType loweredResultTy) -> ManagedValue {
-        // If the argument is not already a class instance, bridge it.
-        if (!emittedArg.getType().getSwiftRValueType()->mayHaveSuperclass()
-            && !emittedArg.getType().isClassExistentialType()) {
-          emittedArg = SGF.emitNativeToBridgedValue(loc, emittedArg, Rep,
-                                          loweredResultTy.getSwiftRValueType());
-        }
-        auto emittedArgTy = emittedArg.getType().getSwiftRValueType();
-        assert(emittedArgTy->mayHaveSuperclass()
-          || emittedArgTy->isClassExistentialType());
-        
-        // Upcast reference types to AnyObject.
-        if (!isAnyObjectType(emittedArgTy)) {
-          // Open class existentials first to upcast the reference inside.
-          if (emittedArgTy->isClassExistentialType()) {
-            emittedArgTy = ArchetypeType::getOpened(emittedArgTy);
-            auto opened = SGF.B.createOpenExistentialRef(loc,
-                                 emittedArg.getValue(),
-                                 SILType::getPrimitiveObjectType(emittedArgTy));
-            emittedArg = ManagedValue(opened, emittedArg.getCleanup());
-          }
-          
-          // Erase to AnyObject.
-          auto conformance = SGF.SGM.SwiftModule->lookupConformance(
-            emittedArgTy,
-            SGF.getASTContext().getProtocol(KnownProtocolKind::AnyObject),
-            nullptr);
-          assert(conformance &&
-                 "no AnyObject conformance for class?!");
-          
-          ArrayRef<ProtocolConformanceRef> conformances(*conformance);
-          auto ctxConformances = SGF.getASTContext().AllocateCopy(conformances);
-          
-          auto erased = SGF.B.createInitExistentialRef(loc,
-                           SILType::getPrimitiveObjectType(getAnyObjectType()),
-                           emittedArgTy, emittedArg.getValue(),
-                           ctxConformances);
-          emittedArg = ManagedValue(erased, emittedArg.getCleanup());
-        }
-        
-        assert(isAnyObjectType(emittedArg.getType().getSwiftRValueType()));
-        return emittedArg;
-      };
-      
-      // Bind the optional value if we started with an optional.
-      bool nativeIsOptional = (bool)emittedArg.getType().getSwiftRValueType()
-        ->getAnyOptionalObjectType();
-      bool bridgedIsOptional =
-          (bool)param.getType()->getAnyOptionalObjectType();
-      if (nativeIsOptional && bridgedIsOptional) {
-        return SGF.emitOptionalToOptional(argExpr, emittedArg,
-                                          SGF.getSILType(param), doBridge);
-      } else if (!nativeIsOptional && bridgedIsOptional) {
-        auto paramObjTy = SGF.getSILType(param).getAnyOptionalObjectType();
-        auto transformed = doBridge(SGF, argExpr, emittedArg,
-                                    paramObjTy);
-        // Inject into optional.
-        auto opt = SGF.B.createEnum(argExpr, transformed.getValue(),
-                                    SGF.getASTContext().getOptionalSomeDecl(),
-                                    SGF.getSILType(param));
-        return ManagedValue(opt, transformed.getCleanup());
-      } else {
-        return doBridge(SGF, argExpr, emittedArg, SGF.getSILType(param));
-      }
-    }
-    
-    struct EmittedArgument {
-      SILLocation loc;
-      RValue value;
-      SGFContext contextForReabstraction;
-    };
-    EmittedArgument emitArgumentFromSource(ArgumentSource &&arg,
+    // TODO: We should take the opportunity to peephole certain abstraction
+    // changes here, for instance, directly emitting a closure literal at the
+    // callee's expected abstraction level instead of emitting it maximally
+    // substituted and thunking.
+    auto emitted = emitArgumentFromSource(std::move(arg), loweredSubstArgType,
+                                          origParamType, param);
+    ManagedValue result = SGF.emitSubstToOrigValue(
+        emitted.loc, std::move(emitted.value).getScalarValue(), origParamType,
+        emitted.value.getType(), emitted.contextForReabstraction);
+    return scope.popPreservingValue(result);
+  }
+  
+  CanType getAnyObjectType() {
+    return SGF.getASTContext()
+      .getProtocol(KnownProtocolKind::AnyObject)
+      ->getDeclaredType()
+      ->getCanonicalType();
+  }
+  bool isAnyObjectType(CanType t) {
+    return t == getAnyObjectType();
+  }
+  
+  ManagedValue emitNativeToBridgedArgument(ArgumentSource &&arg,
                                            SILType loweredSubstArgType,
                                            AbstractionPattern origParamType,
                                            SILParameterInfo param) {
-      auto contexts = getRValueEmissionContexts(loweredSubstArgType, param);
-      Optional<SILLocation> loc;
-      RValue rv;
-      if (arg.isRValue()) {
-        loc = arg.getKnownRValueLocation();
-        rv = std::move(arg).asKnownRValue();
-      } else {
-        Expr *e = std::move(arg).asKnownExpr();
-        loc = e;
-        rv = SGF.emitRValue(e, contexts.ForEmission);
-      }
-      return {*loc, std::move(rv), contexts.ForReabstraction};
+    Scope scope(SGF, arg.getLocation());
+
+    // If we're bridging a concrete type to `id` via Any, skip the Any
+    // boxing.
+    
+    // TODO: Generalize. Similarly, when bridging from NSFoo -> Foo -> NSFoo,
+    // we should elide the bridge altogether and pass the original object.
+    auto paramObjTy = param.getType();
+    if (auto objTy = paramObjTy.getAnyOptionalObjectType())
+      paramObjTy = objTy;
+    if (isAnyObjectType(paramObjTy) && !arg.isRValue()) {
+      return scope.popPreservingValue(emitNativeToBridgedObjectArgument(
+          std::move(arg).asKnownExpr(), loweredSubstArgType, origParamType,
+          param));
     }
     
-    void maybeEmitForeignErrorArgument() {
-      if (!ForeignError ||
-          ForeignError->getErrorParameterIndex() != Args.size())
-        return;
+    auto emitted = emitArgumentFromSource(std::move(arg), loweredSubstArgType,
+                                          origParamType, param);
 
-      SILParameterInfo param = claimNextParameter();
-      ArgSpecialDest *specialDest = claimNextSpecialDest();
-
-      assert(param.getConvention() == ParameterConvention::Direct_Unowned);
-      assert(!specialDest && "special dest for error argument?");
-      (void) param; (void) specialDest;
-
-      // Leave a placeholder in the position.
-      Args.push_back(ManagedValue::forInContext());
-    }
-
-    struct EmissionContexts {
-      /// The context for emitting the r-value.
-      SGFContext ForEmission;
-      /// The context for reabstracting the r-value.
-      SGFContext ForReabstraction;
-      /// If the context requires reabstraction
-      bool RequiresReabstraction;
-    };
-    static EmissionContexts getRValueEmissionContexts(SILType loweredArgType,
-                                                      SILParameterInfo param) {
-      bool requiresReabstraction =
-          loweredArgType.getSwiftRValueType() != param.getType();
-      // If the parameter is consumed, we have to emit at +1.
-      if (param.isConsumed()) {
-        return {SGFContext(), SGFContext(), requiresReabstraction};
-      }
-
-      // Otherwise, we can emit the final value at +0 (but only with a
-      // guarantee that the value will survive).
-      //
-      // TODO: we can pass at +0 (immediate) to an unowned parameter
-      // if we know that there will be no arbitrary side-effects
-      // between now and the call.
-      SGFContext finalContext = SGFContext::AllowGuaranteedPlusZero;
-
-      // If the r-value doesn't require reabstraction, the final context
-      // is the emission context.
-      if (!requiresReabstraction) {
-        return {finalContext, SGFContext(), requiresReabstraction};
-      }
-
-      // Otherwise, the final context is the reabstraction context.
-      return {SGFContext(), finalContext, requiresReabstraction};
-    }
+    return scope.popPreservingValue(SGF.emitNativeToBridgedValue(
+        emitted.loc,
+        std::move(emitted.value).getAsSingleValue(SGF, emitted.loc), Rep,
+        param.getType()));
+  }
+  
+  enum class ExistentialPeepholeOptionality {
+    /// A non-optional value erased to a non-optional existential.
+    Nonoptional,
+    
+    /// A non-optional value erased to an optional existential.
+    NonoptionalToOptional,
+    
+    /// An optional value erased to an optional existential.
+    OptionalToOptional,
   };
+  
+  std::pair<Expr *, ExistentialPeepholeOptionality>
+  lookThroughExistentialErasures(Expr *argExpr) {
+    auto origArgExpr = argExpr;
+  
+    auto optionality = ExistentialPeepholeOptionality::Nonoptional;
+    argExpr = argExpr->getSemanticsProvidingExpr();
+    
+    // Check for an OptionalEvaluation. If we see one we'll want to match it
+    // to the inner BindOptional.
+    if (auto optEval = dyn_cast<OptionalEvaluationExpr>(argExpr)) {
+      
+      // The result of the conversion should be promoted back to optional
+      // at the outermost level.
+      if (auto inject = dyn_cast<InjectIntoOptionalExpr>(
+                       optEval->getSubExpr()->getSemanticsProvidingExpr())) {
+        optionality = ExistentialPeepholeOptionality::OptionalToOptional;
+        argExpr = inject->getSubExpr()->getSemanticsProvidingExpr();
+      }
+    }
+    
+    // Look through a BindOptionalExpr if we have an optional-to-optional
+    // peephole, or fail the peephole if there isn't a BindOptionalToOptional.
+    auto tryToBindOptional =
+      [&](Expr *subExpr) -> std::pair<Expr *, ExistentialPeepholeOptionality> {
+        if (optionality ==
+              ExistentialPeepholeOptionality::OptionalToOptional) {
+          // If we see the binding, look through it.
+          if (auto bind = dyn_cast<BindOptionalExpr>(subExpr))
+            return {bind->getSubExpr()->getSemanticsProvidingExpr(),
+                    optionality};
+          // Otherwise, we don't know what we're seeing. Back out of the
+          // peephole.
+          return {origArgExpr, ExistentialPeepholeOptionality::Nonoptional};
+        }
+        
+        return {subExpr, optionality};
+      };
+    
+    // Look through an optional injection.
+    if (auto inject = dyn_cast<InjectIntoOptionalExpr>(argExpr)) {
+      optionality = ExistentialPeepholeOptionality::NonoptionalToOptional;
+      argExpr = inject->getSubExpr()->getSemanticsProvidingExpr();
+    }
+
+    // When converting from an existential type to a more general existential,
+    // the inner existential is opened first. Look through this pattern.
+    if (auto open = dyn_cast<OpenExistentialExpr>(argExpr)) {
+      auto subExpr = open->getSubExpr()->getSemanticsProvidingExpr();
+      while (auto erasure = dyn_cast<ErasureExpr>(subExpr)) {
+        subExpr = erasure->getSubExpr()->getSemanticsProvidingExpr();
+      }
+      // If we drilled down to the underlying opened existential, look
+      // through it.
+      if (subExpr == open->getOpaqueValue())
+        return tryToBindOptional(open->getExistentialValue());
+      // TODO: Maybe there are other peepholes we could attempt on opened
+      // existentials?
+      return tryToBindOptional(open);
+    }
+    
+    // Look through ErasureExprs and try to bridge the underlying
+    // concrete value instead.
+    while (auto erasure = dyn_cast<ErasureExpr>(argExpr))
+      argExpr = erasure->getSubExpr()->getSemanticsProvidingExpr();
+
+    return tryToBindOptional(argExpr);
+  }
+  
+  /// Emit an argument expression that we know will be bridged to an
+  /// Objective-C object.
+  ManagedValue emitNativeToBridgedObjectArgument(Expr *argExpr,
+                                             SILType loweredSubstArgType,
+                                             AbstractionPattern origParamType,
+                                             SILParameterInfo param) {
+    auto origArgExpr = argExpr;
+    // Look through existential erasures.
+    ExistentialPeepholeOptionality optionality;
+    std::tie(argExpr, optionality) = lookThroughExistentialErasures(argExpr);
+    
+    // TODO: Only do the peephole for trivially-lowered types, since we
+    // unfortunately don't plumb formal types through
+    // emitNativeToBridgedValue, so can't correctly construct the
+    // substitution for the call to _bridgeAnythingToObjectiveC for function
+    // or metatype values.
+    if (!argExpr->getType()->isLegalSILType()) {
+      argExpr = origArgExpr;
+      optionality = ExistentialPeepholeOptionality::Nonoptional;
+    }
+    
+    // Emit the argument.
+    auto contexts = getRValueEmissionContexts(loweredSubstArgType, param);
+    ManagedValue emittedArg = SGF.emitRValue(argExpr, contexts.ForEmission)
+      .getAsSingleValue(SGF, argExpr);
+    
+    // Early exit if we already exactly match the parameter type.
+    if (emittedArg.getType() == SGF.getSILType(param)) {
+      return emittedArg;
+    }
+    
+    // Factor the bridging conversion out in case we need to do it as an
+    // optional-to-optional transform.
+    auto doBridge = [&](SILGenFunction &SGF,
+                        SILLocation loc,
+                        ManagedValue emittedArg,
+                        SILType loweredResultTy) -> ManagedValue {
+      // If the argument is not already a class instance, bridge it.
+      if (!emittedArg.getType().getSwiftRValueType()->mayHaveSuperclass()
+          && !emittedArg.getType().isClassExistentialType()) {
+        emittedArg = SGF.emitNativeToBridgedValue(loc, emittedArg, Rep,
+                                        loweredResultTy.getSwiftRValueType());
+      }
+      auto emittedArgTy = emittedArg.getType().getSwiftRValueType();
+      assert(emittedArgTy->mayHaveSuperclass()
+        || emittedArgTy->isClassExistentialType());
+      
+      // Upcast reference types to AnyObject.
+      if (!isAnyObjectType(emittedArgTy)) {
+        // Open class existentials first to upcast the reference inside.
+        if (emittedArgTy->isClassExistentialType()) {
+          emittedArgTy = ArchetypeType::getOpened(emittedArgTy);
+          auto opened = SGF.B.createOpenExistentialRef(loc,
+                               emittedArg.getValue(),
+                               SILType::getPrimitiveObjectType(emittedArgTy));
+          emittedArg = ManagedValue(opened, emittedArg.getCleanup());
+        }
+        
+        // Erase to AnyObject.
+        auto conformance = SGF.SGM.SwiftModule->lookupConformance(
+          emittedArgTy,
+          SGF.getASTContext().getProtocol(KnownProtocolKind::AnyObject),
+          nullptr);
+        assert(conformance &&
+               "no AnyObject conformance for class?!");
+        
+        ArrayRef<ProtocolConformanceRef> conformances(*conformance);
+        auto ctxConformances = SGF.getASTContext().AllocateCopy(conformances);
+        
+        auto erased = SGF.B.createInitExistentialRef(loc,
+                         SILType::getPrimitiveObjectType(getAnyObjectType()),
+                         emittedArgTy, emittedArg.getValue(),
+                         ctxConformances);
+        emittedArg = ManagedValue(erased, emittedArg.getCleanup());
+      }
+      
+      assert(isAnyObjectType(emittedArg.getType().getSwiftRValueType()));
+      return emittedArg;
+    };
+    
+    // Bind the optional value if we started with an optional.
+    bool nativeIsOptional = (bool)emittedArg.getType().getSwiftRValueType()
+      ->getAnyOptionalObjectType();
+    bool bridgedIsOptional =
+        (bool)param.getType()->getAnyOptionalObjectType();
+    if (nativeIsOptional && bridgedIsOptional) {
+      return SGF.emitOptionalToOptional(argExpr, emittedArg,
+                                        SGF.getSILType(param), doBridge);
+    } else if (!nativeIsOptional && bridgedIsOptional) {
+      auto paramObjTy = SGF.getSILType(param).getAnyOptionalObjectType();
+      auto transformed = doBridge(SGF, argExpr, emittedArg,
+                                  paramObjTy);
+      // Inject into optional.
+      auto opt = SGF.B.createEnum(argExpr, transformed.getValue(),
+                                  SGF.getASTContext().getOptionalSomeDecl(),
+                                  SGF.getSILType(param));
+      return ManagedValue(opt, transformed.getCleanup());
+    } else {
+      return doBridge(SGF, argExpr, emittedArg, SGF.getSILType(param));
+    }
+  }
+  
+  struct EmittedArgument {
+    SILLocation loc;
+    RValue value;
+    SGFContext contextForReabstraction;
+  };
+  EmittedArgument emitArgumentFromSource(ArgumentSource &&arg,
+                                         SILType loweredSubstArgType,
+                                         AbstractionPattern origParamType,
+                                         SILParameterInfo param) {
+    auto contexts = getRValueEmissionContexts(loweredSubstArgType, param);
+    Optional<SILLocation> loc;
+    RValue rv;
+    if (arg.isRValue()) {
+      loc = arg.getKnownRValueLocation();
+      rv = std::move(arg).asKnownRValue();
+    } else {
+      Expr *e = std::move(arg).asKnownExpr();
+      loc = e;
+      rv = SGF.emitRValue(e, contexts.ForEmission);
+    }
+    return {*loc, std::move(rv), contexts.ForReabstraction};
+  }
+  
+  void maybeEmitForeignErrorArgument() {
+    if (!ForeignError ||
+        ForeignError->getErrorParameterIndex() != Args.size())
+      return;
+
+    SILParameterInfo param = claimNextParameter();
+    ArgSpecialDest *specialDest = claimNextSpecialDest();
+
+    assert(param.getConvention() == ParameterConvention::Direct_Unowned);
+    assert(!specialDest && "special dest for error argument?");
+    (void) param; (void) specialDest;
+
+    // Leave a placeholder in the position.
+    Args.push_back(ManagedValue::forInContext());
+  }
+
+  struct EmissionContexts {
+    /// The context for emitting the r-value.
+    SGFContext ForEmission;
+    /// The context for reabstracting the r-value.
+    SGFContext ForReabstraction;
+    /// If the context requires reabstraction
+    bool RequiresReabstraction;
+  };
+  static EmissionContexts getRValueEmissionContexts(SILType loweredArgType,
+                                                    SILParameterInfo param) {
+    bool requiresReabstraction =
+        loweredArgType.getSwiftRValueType() != param.getType();
+    // If the parameter is consumed, we have to emit at +1.
+    if (param.isConsumed()) {
+      return {SGFContext(), SGFContext(), requiresReabstraction};
+    }
+
+    // Otherwise, we can emit the final value at +0 (but only with a
+    // guarantee that the value will survive).
+    //
+    // TODO: we can pass at +0 (immediate) to an unowned parameter
+    // if we know that there will be no arbitrary side-effects
+    // between now and the call.
+    SGFContext finalContext = SGFContext::AllowGuaranteedPlusZero;
+
+    // If the r-value doesn't require reabstraction, the final context
+    // is the emission context.
+    if (!requiresReabstraction) {
+      return {finalContext, SGFContext(), requiresReabstraction};
+    }
+
+    // Otherwise, the final context is the reabstraction context.
+    return {SGFContext(), finalContext, requiresReabstraction};
+  }
+};
+
 } // end anonymous namespace
 
 /// Decompose a type, whether it is a tuple or a single type, into an
@@ -2891,238 +2909,252 @@ static ArrayRef<TupleTypeElt> decomposeTupleOrSingle(Type type,
   return single;
 }
 
-void ArgEmitter::emitShuffle(Expr *inner,
-                             Expr *outer,
-                             ArrayRef<TupleTypeElt> innerElts,
-                             ConcreteDeclRef defaultArgsOwner,
-                             ArrayRef<Expr*> callerDefaultArgs,
-                             ArrayRef<int> elementMapping,
-                             ArrayRef<unsigned> variadicArgs,
-                             Type varargsArrayType,
-                             AbstractionPattern origParamType) {
+namespace {
+
+struct ElementExtent {
+  /// The parameters which go into this tuple element.
+  /// This is set in the first pass.
+  ClaimedParamsRef Params;
+  /// The destination index, if any.
+  /// This is set in the first pass.
+  unsigned DestIndex : 30;
+  unsigned HasDestIndex : 1;
+#ifndef NDEBUG
+  unsigned Used : 1;
+#endif
+  /// The arguments which feed this tuple element.
+  /// This is set in the second pass.
+  ArrayRef<ManagedValue> Args;
+  /// The inout arguments which feed this tuple element.
+  /// This is set in the second pass.
+  MutableArrayRef<InOutArgument> InOutArgs;
+
+  ElementExtent()
+      : HasDestIndex(false)
+#ifndef NDEBUG
+        ,
+        Used(false)
+#endif
+  {
+  }
+};
+
+class TupleShuffleArgEmitter {
+  Expr *inner;
+  Expr *outer;
+  ArrayRef<TupleTypeElt> innerElts;
+  ConcreteDeclRef defaultArgsOwner;
+  ArrayRef<Expr *> callerDefaultArgs;
+  ArrayRef<int> elementMapping;
+  ArrayRef<unsigned> variadicArgs;
+  Type varargsArrayType;
+  AbstractionPattern origParamType;
+
   TupleTypeElt singleOuterElement;
-  ArrayRef<TupleTypeElt> outerElements =
-    decomposeTupleOrSingle(outer->getType()->getCanonicalType(),
-                           singleOuterElement);
+  ArrayRef<TupleTypeElt> outerElements;
   CanType canVarargsArrayType;
-  if (varargsArrayType)
-    canVarargsArrayType = varargsArrayType->getCanonicalType();
 
-  // We could support dest addrs here, but it can't actually happen
-  // with the current limitations on default arguments in tuples.
-  assert(!SpecialDests && "shuffle nested within varargs expansion?");
-
-  struct ElementExtent {
-    /// The parameters which go into this tuple element.
-    /// This is set in the first pass.
-    ClaimedParamsRef Params;
-    /// The destination index, if any.
-    /// This is set in the first pass.
-    unsigned DestIndex : 30;
-    unsigned HasDestIndex : 1;
-#ifndef NDEBUG
-    unsigned Used : 1;
-#endif
-    /// The arguments which feed this tuple element.
-    /// This is set in the second pass.
-    ArrayRef<ManagedValue> Args;
-    /// The inout arguments which feed this tuple element.
-    /// This is set in the second pass.
-    MutableArrayRef<InOutArgument> InOutArgs;
-
-    ElementExtent() : HasDestIndex(false)
-#ifndef NDEBUG
-                    , Used(false)
-#endif
-    {}
-  };
-
-  // The original parameter type.
-  SmallVector<AbstractionPattern, 8>
-    origInnerElts(innerElts.size(), AbstractionPattern::getInvalid());
-  AbstractionPattern innerOrigParamType = AbstractionPattern::getInvalid();
-  // Flattened inner parameter sequence.
+  /// The original parameter type.
+  SmallVector<AbstractionPattern, 8> origInnerElts;
+  AbstractionPattern innerOrigParamType;
+  /// Flattened inner parameter sequence.
   SmallVector<SILParameterInfo, 8> innerParams;
-  // Extents of the inner elements.
-  SmallVector<ElementExtent, 8> innerExtents(innerElts.size());
-
+  /// Extents of the inner elements.
+  SmallVector<ElementExtent, 8> innerExtents;
   Optional<VarargsInfo> varargsInfo;
   SILParameterInfo variadicParamInfo; // innerExtents will point at this
   Optional<SmallVector<ArgSpecialDest, 8>> innerSpecialDests;
 
-  // First, construct an abstraction pattern and parameter sequence
-  // which we can use to emit the inner tuple.
-  {
-    unsigned nextParamIndex = 0;
-    for (unsigned outerIndex : indices(outerElements)) {
-      CanType substEltType =
+  // Used by flattenPatternFromInnerExtendIntoInnerParams and
+  // splitInnerArgumentsCorrectly.
+  SmallVector<ManagedValue, 8> innerArgs;
+  SmallVector<InOutArgument, 2> innerInOutArgs;
+
+public:
+  TupleShuffleArgEmitter(TupleShuffleExpr *e, ArrayRef<TupleTypeElt> innerElts,
+                         AbstractionPattern origParamType)
+      : inner(e->getSubExpr()), outer(e), innerElts(innerElts),
+        defaultArgsOwner(e->getDefaultArgsOwner()),
+        callerDefaultArgs(e->getCallerDefaultArgs()),
+        elementMapping(e->getElementMapping()),
+        variadicArgs(e->getVariadicArgs()),
+        varargsArrayType(e->getVarargsArrayTypeOrNull()),
+        origParamType(origParamType), singleOuterElement(), outerElements(),
+        canVarargsArrayType(),
+        origInnerElts(innerElts.size(), AbstractionPattern::getInvalid()),
+        innerOrigParamType(AbstractionPattern::getInvalid()), innerParams(),
+        innerExtents(innerElts.size()), varargsInfo(), variadicParamInfo(),
+        innerSpecialDests() {
+    outerElements = decomposeTupleOrSingle(outer->getType()->getCanonicalType(),
+                                           singleOuterElement);
+    if (varargsArrayType)
+      canVarargsArrayType = varargsArrayType->getCanonicalType();
+  }
+
+  TupleShuffleArgEmitter(const TupleShuffleArgEmitter &) = delete;
+  TupleShuffleArgEmitter &operator=(const TupleShuffleArgEmitter &) = delete;
+  TupleShuffleArgEmitter(TupleShuffleArgEmitter &&) = delete;
+  TupleShuffleArgEmitter &operator=(TupleShuffleArgEmitter &&) = delete;
+
+  void emit(ArgEmitter &parent);
+
+private:
+  void constructInnerTupleTypeInfo(ArgEmitter &parent);
+  void flattenPatternFromInnerExtendIntoInnerParams(ArgEmitter &parent);
+  void splitInnerArgumentsCorrectly(ArgEmitter &parent);
+  void emitDefaultArgsAndFinalize(ArgEmitter &parent);
+};
+
+} // end anonymous namespace
+
+void TupleShuffleArgEmitter::constructInnerTupleTypeInfo(ArgEmitter &parent) {
+  unsigned nextParamIndex = 0;
+  for (unsigned outerIndex : indices(outerElements)) {
+    CanType substEltType =
         outerElements[outerIndex].getType()->getCanonicalType();
-      AbstractionPattern origEltType =
+    AbstractionPattern origEltType =
         origParamType.getTupleElementType(outerIndex);
-      unsigned numParams = getFlattenedValueCount(origEltType, substEltType,
-                                                  ForeignSelf);
+    unsigned numParams =
+        getFlattenedValueCount(origEltType, substEltType, parent.ForeignSelf);
 
-      // Skip the foreign-error parameter.
-      assert((!ForeignError ||
-              ForeignError->getErrorParameterIndex() <= nextParamIndex ||
-              ForeignError->getErrorParameterIndex() >= nextParamIndex + numParams)
-             && "error parameter falls within shuffled range?");
-      if (numParams && // Don't skip it twice if there's an empty tuple.
-          ForeignError &&
-          ForeignError->getErrorParameterIndex() == nextParamIndex) {
-        nextParamIndex++;
-      }
+    // Skip the foreign-error parameter.
+    assert((!parent.ForeignError ||
+            parent.ForeignError->getErrorParameterIndex() <= nextParamIndex ||
+            parent.ForeignError->getErrorParameterIndex() >=
+                nextParamIndex + numParams) &&
+           "error parameter falls within shuffled range?");
+    if (numParams && // Don't skip it twice if there's an empty tuple.
+        parent.ForeignError &&
+        parent.ForeignError->getErrorParameterIndex() == nextParamIndex) {
+      nextParamIndex++;
+    }
 
-      // Grab the parameter infos corresponding to this tuple element
-      // (but don't drop them from ParamInfos yet).
-      auto eltParams = ParamInfos.slice(nextParamIndex, numParams);
-      nextParamIndex += numParams;
+    // Grab the parameter infos corresponding to this tuple element
+    // (but don't drop them from ParamInfos yet).
+    auto eltParams = parent.ParamInfos.slice(nextParamIndex, numParams);
+    nextParamIndex += numParams;
 
-      int innerIndex = elementMapping[outerIndex];
-      if (innerIndex >= 0) {
+    int innerIndex = elementMapping[outerIndex];
+    if (innerIndex >= 0) {
 #ifndef NDEBUG
-        assert(!innerExtents[innerIndex].Used && "using element twice");
-        innerExtents[innerIndex].Used = true;
+      assert(!innerExtents[innerIndex].Used && "using element twice");
+      innerExtents[innerIndex].Used = true;
 #endif
-        innerExtents[innerIndex].Params = eltParams;
-        origInnerElts[innerIndex] = origEltType;
-      } else if (innerIndex == TupleShuffleExpr::Variadic) {
-        auto &varargsField = outerElements[outerIndex];
-        assert(varargsField.isVararg());
-        assert(!varargsInfo.hasValue() && "already had varargs entry?");
+      innerExtents[innerIndex].Params = eltParams;
+      origInnerElts[innerIndex] = origEltType;
+    } else if (innerIndex == TupleShuffleExpr::Variadic) {
+      auto &varargsField = outerElements[outerIndex];
+      assert(varargsField.isVararg());
+      assert(!varargsInfo.hasValue() && "already had varargs entry?");
 
-        CanType varargsEltType = CanType(varargsField.getVarargBaseTy());
-        unsigned numVarargs = variadicArgs.size();
-        assert(canVarargsArrayType == substEltType);
+      CanType varargsEltType = CanType(varargsField.getVarargBaseTy());
+      unsigned numVarargs = variadicArgs.size();
+      assert(canVarargsArrayType == substEltType);
 
-        // Create the array value.
-        varargsInfo.emplace(emitBeginVarargs(SGF, outer, varargsEltType,
-                                             canVarargsArrayType, numVarargs));
+      // Create the array value.
+      varargsInfo.emplace(emitBeginVarargs(parent.SGF, outer, varargsEltType,
+                                           canVarargsArrayType, numVarargs));
 
-        // If we have any varargs, we'll need to actually initialize
-        // the array buffer.
-        if (numVarargs) {
-          // For this, we'll need special destinations.
-          assert(!innerSpecialDests);
-          innerSpecialDests.emplace();
+      // If we have any varargs, we'll need to actually initialize
+      // the array buffer.
+      if (numVarargs) {
+        // For this, we'll need special destinations.
+        assert(!innerSpecialDests);
+        innerSpecialDests.emplace();
 
-          // Prepare the variadic "arguments" as single +1 indirect
-          // parameters with the array's desired abstraction pattern.
-          // The vararg element type should be materializable, and the
-          // abstraction pattern should be opaque, so ArgEmitter's
-          // lowering should always generate exactly one "argument"
-          // per element even if the substituted element type is a tuple.
-          variadicParamInfo =
-            SILParameterInfo(varargsInfo->getBaseTypeLowering()
-                               .getLoweredType().getSwiftRValueType(),
-                             ParameterConvention::Indirect_In);
+        // Prepare the variadic "arguments" as single +1 indirect parameters
+        // with the array's desired abstraction pattern.  The vararg element
+        // type should be materializable, and the abstraction pattern should be
+        // opaque, so ArgEmitter's lowering should always generate exactly one
+        // "argument" per element even if the substituted element type is a
+        // tuple.
+        variadicParamInfo =
+          SILParameterInfo(varargsInfo->getBaseTypeLowering()
+                           .getLoweredType().getSwiftRValueType(),
+                           ParameterConvention::Indirect_In);
 
-          unsigned i = 0;
-          for (unsigned innerIndex : variadicArgs) {
-            // Find out where the next varargs element is coming from.
-            assert(innerIndex >= 0 && "special source for varargs element??");
+        unsigned i = 0;
+        for (unsigned innerIndex : variadicArgs) {
+          // Find out where the next varargs element is coming from.
+          assert(innerIndex >= 0 && "special source for varargs element??");
 #ifndef NDEBUG
-            assert(!innerExtents[innerIndex].Used && "using element twice");
-            innerExtents[innerIndex].Used = true;
+          assert(!innerExtents[innerIndex].Used && "using element twice");
+          innerExtents[innerIndex].Used = true;
 #endif
 
-            // Set the destination index.
-            innerExtents[innerIndex].HasDestIndex = true;
-            innerExtents[innerIndex].DestIndex = i++;
+          // Set the destination index.
+          innerExtents[innerIndex].HasDestIndex = true;
+          innerExtents[innerIndex].DestIndex = i++;
 
-            // Use the singleton param info we prepared before.
-            innerExtents[innerIndex].Params =
-              ClaimedParamsRef(variadicParamInfo);
+          // Use the singleton param info we prepared before.
+          innerExtents[innerIndex].Params =
+            ClaimedParamsRef(variadicParamInfo);
 
-            // Propagate the element abstraction pattern.
-            origInnerElts[innerIndex] =
-              varargsInfo->getBaseAbstractionPattern();
-          }
+          // Propagate the element abstraction pattern.
+          origInnerElts[innerIndex] =
+            varargsInfo->getBaseAbstractionPattern();
         }
       }
     }
+  }
+}
 
-    // The inner abstraction pattern is opaque if we started with an
-    // opaque pattern; otherwise, it's a tuple of the de-shuffled
-    // tuple elements.
-    innerOrigParamType = origParamType;
-    if (!origParamType.isTypeParameter()) {
-      // That "tuple" might not actually be a tuple.
-      if (innerElts.size() == 1 && !innerElts[0].hasName()) {
-        innerOrigParamType = origInnerElts[0];
-      } else {
-        innerOrigParamType = AbstractionPattern::getTuple(origInnerElts);
-      }
+void TupleShuffleArgEmitter::flattenPatternFromInnerExtendIntoInnerParams(
+    ArgEmitter &parent) {
+  for (auto &extent : innerExtents) {
+    assert(extent.Used && "didn't use all the inner tuple elements!");
+
+    for (auto param : extent.Params) {
+      innerParams.push_back(param);
     }
 
-    // Flatten the parameters from innerExtents into innerParams, and
-    // fill out varargsAddrs if necessary.
-    for (auto &extent : innerExtents) {
-      assert(extent.Used && "didn't use all the inner tuple elements!");
-
-      for (auto param : extent.Params) {
-        innerParams.push_back(param);
-      }
-
-      // Fill in the special destinations array.
-      if (innerSpecialDests) {
-        // Use the saved index if applicable.
-        if (extent.HasDestIndex) {
-          assert(extent.Params.size() == 1);
-          innerSpecialDests->push_back(
-                               ArgSpecialDest(*varargsInfo, extent.DestIndex));
+    // Fill in the special destinations array.
+    if (innerSpecialDests) {
+      // Use the saved index if applicable.
+      if (extent.HasDestIndex) {
+        assert(extent.Params.size() == 1);
+        innerSpecialDests->push_back(
+            ArgSpecialDest(*varargsInfo, extent.DestIndex));
 
         // Otherwise, fill in with the appropriate number of invalid
         // special dests.
-        } else {
-          // ArgSpecialDest isn't copyable, so we can't just use append.
-          for (auto &p : extent.Params) {
-            (void) p;
-            innerSpecialDests->push_back(ArgSpecialDest());
-          }
+      } else {
+        // ArgSpecialDest isn't copyable, so we can't just use append.
+        for (auto &p : extent.Params) {
+          (void)p;
+          innerSpecialDests->push_back(ArgSpecialDest());
         }
       }
     }
   }
+}
 
-  // Emit the inner expression.
-  SmallVector<ManagedValue, 8> innerArgs;
-  SmallVector<InOutArgument, 2> innerInOutArgs;
-  if (!innerParams.empty()) {
-    ArgEmitter(SGF, Rep, ClaimedParamsRef(innerParams), innerArgs, innerInOutArgs,
-               /*foreign error*/ None, /*foreign self*/ ImportAsMemberStatus(),
-               (innerSpecialDests ? ArgSpecialDestArray(*innerSpecialDests)
-                                  : Optional<ArgSpecialDestArray>()))
-      .emitTopLevel(ArgumentSource(inner), innerOrigParamType);
-  }
+void TupleShuffleArgEmitter::splitInnerArgumentsCorrectly(ArgEmitter &parent) {
+  ArrayRef<ManagedValue> nextArgs = innerArgs;
+  MutableArrayRef<InOutArgument> nextInOutArgs = innerInOutArgs;
+  for (auto &extent : innerExtents) {
+    auto length = extent.Params.size();
 
-  // Make a second pass to split the inner arguments correctly.
-  {
-    ArrayRef<ManagedValue> nextArgs = innerArgs;
-    MutableArrayRef<InOutArgument> nextInOutArgs = innerInOutArgs;
-    for (auto &extent : innerExtents) {
-      auto length = extent.Params.size();
+    // Claim the next N inner args for this inner argument.
+    extent.Args = nextArgs.slice(0, length);
+    nextArgs = nextArgs.slice(length);
 
-      // Claim the next N inner args for this inner argument.
-      extent.Args = nextArgs.slice(0, length);
-      nextArgs = nextArgs.slice(length);
-
-      // Claim the correct number of inout arguments as well.
-      unsigned numInOut = 0;
-      for (auto arg : extent.Args) {
-        assert(!arg.isInContext() || extent.HasDestIndex);
-        if (!arg) numInOut++;
-      }
-      extent.InOutArgs = nextInOutArgs.slice(0, numInOut);
-      nextInOutArgs = nextInOutArgs.slice(numInOut);
+    // Claim the correct number of inout arguments as well.
+    unsigned numInOut = 0;
+    for (auto arg : extent.Args) {
+      assert(!arg.isInContext() || extent.HasDestIndex);
+      if (!arg)
+        numInOut++;
     }
-
-    assert(nextArgs.empty() && "didn't claim all args");
-    assert(nextInOutArgs.empty() && "didn't claim all inout args");
+    extent.InOutArgs = nextInOutArgs.slice(0, numInOut);
+    nextInOutArgs = nextInOutArgs.slice(numInOut);
   }
 
-  // Make a final pass to emit default arguments and move things into
-  // the outer arguments lists.
+  assert(nextArgs.empty() && "didn't claim all args");
+  assert(nextInOutArgs.empty() && "didn't claim all inout args");
+}
+
+void TupleShuffleArgEmitter::emitDefaultArgsAndFinalize(ArgEmitter &parent) {
   unsigned nextCallerDefaultArg = 0;
   for (unsigned outerIndex = 0, e = outerElements.size();
          outerIndex != e; ++outerIndex) {
@@ -3133,36 +3165,42 @@ void ArgEmitter::emitShuffle(Expr *inner,
       auto &extent = innerExtents[innerIndex];
       auto numArgs = extent.Args.size();
 
-      maybeEmitForeignErrorArgument();
+      parent.maybeEmitForeignErrorArgument();
 
       // Drop N parameters off of ParamInfos.
-      ParamInfos = ParamInfos.slice(numArgs);
+      parent.ParamInfos = parent.ParamInfos.slice(numArgs);
 
       // Move the appropriate inner arguments over as outer arguments.
-      Args.append(extent.Args.begin(), extent.Args.end());
+      parent.Args.append(extent.Args.begin(), extent.Args.end());
       for (auto &inoutArg : extent.InOutArgs)
-        InOutArguments.push_back(std::move(inoutArg));
+        parent.InOutArguments.push_back(std::move(inoutArg));
+      continue;
+    }
 
     // If this is default initialization, call the default argument
     // generator.
-    } else if (innerIndex == TupleShuffleExpr::DefaultInitialize) {
+    if (innerIndex == TupleShuffleExpr::DefaultInitialize) {
       // Otherwise, emit the default initializer, then map that as a
       // default argument.
       CanType eltType = outerElements[outerIndex].getType()->getCanonicalType();
       auto origType = origParamType.getTupleElementType(outerIndex);
-      RValue value =
-        SGF.emitApplyOfDefaultArgGenerator(outer, defaultArgsOwner,
-                                           outerIndex, eltType, origType);
-      emit(ArgumentSource(outer, std::move(value)), origType);
+      RValue value = parent.SGF.emitApplyOfDefaultArgGenerator(
+          outer, defaultArgsOwner, outerIndex, eltType, origType);
+      parent.emit(ArgumentSource(outer, std::move(value)), origType);
+      continue;
+    }
 
-     // If this is caller default initialization, generate the
-     // appropriate value.
-    } else if (innerIndex == TupleShuffleExpr::CallerDefaultInitialize) {
+    // If this is caller default initialization, generate the
+    // appropriate value.
+    if (innerIndex == TupleShuffleExpr::CallerDefaultInitialize) {
       auto arg = callerDefaultArgs[nextCallerDefaultArg++];
-      emit(ArgumentSource(arg), origParamType.getTupleElementType(outerIndex));
+      parent.emit(ArgumentSource(arg),
+                  origParamType.getTupleElementType(outerIndex));
+      continue;
+    }
 
     // If we're supposed to create a varargs array with the rest, do so.
-    } else if (innerIndex == TupleShuffleExpr::Variadic) {
+    if (innerIndex == TupleShuffleExpr::Variadic) {
       auto &varargsField = outerElements[outerIndex];
       assert(varargsField.isVararg() &&
              "Cannot initialize nonvariadic element");
@@ -3174,20 +3212,64 @@ void ArgEmitter::emitShuffle(Expr *inner,
       if (innerSpecialDests) {
         for (auto &dest : *innerSpecialDests) {
           if (dest.isValid())
-            dest.deactivate(SGF);
+            dest.deactivate(parent.SGF);
         }
       }
 
       CanType eltType = outerElements[outerIndex].getType()->getCanonicalType();
-      ManagedValue varargs = emitEndVarargs(SGF, outer, std::move(*varargsInfo));
-      emit(ArgumentSource(outer, RValue(SGF, outer, eltType, varargs)),
-           origParamType.getTupleElementType(outerIndex));
+      ManagedValue varargs =
+          emitEndVarargs(parent.SGF, outer, std::move(*varargsInfo));
+      parent.emit(
+          ArgumentSource(outer, RValue(parent.SGF, outer, eltType, varargs)),
+          origParamType.getTupleElementType(outerIndex));
+      continue;
+    }
 
     // That's the last special case defined so far.
+    llvm_unreachable("unexpected special case in tuple shuffle!");
+  }
+}
+
+void TupleShuffleArgEmitter::emit(ArgEmitter &parent) {
+  // We could support dest addrs here, but it can't actually happen
+  // with the current limitations on default arguments in tuples.
+  assert(!parent.SpecialDests && "shuffle nested within varargs expansion?");
+
+  // First, construct an abstraction pattern and parameter sequence
+  // which we can use to emit the inner tuple.
+  constructInnerTupleTypeInfo(parent);
+
+  // The inner abstraction pattern is opaque if we started with an
+  // opaque pattern; otherwise, it's a tuple of the de-shuffled
+  // tuple elements.
+  innerOrigParamType = origParamType;
+  if (!origParamType.isTypeParameter()) {
+    // That "tuple" might not actually be a tuple.
+    if (innerElts.size() == 1 && !innerElts[0].hasName()) {
+      innerOrigParamType = origInnerElts[0];
     } else {
-      llvm_unreachable("unexpected special case in tuple shuffle!");
+      innerOrigParamType = AbstractionPattern::getTuple(origInnerElts);
     }
   }
+
+  flattenPatternFromInnerExtendIntoInnerParams(parent);
+
+  // Emit the inner expression.
+  if (!innerParams.empty()) {
+    ArgEmitter(parent.SGF, parent.Rep, ClaimedParamsRef(innerParams), innerArgs,
+               innerInOutArgs,
+               /*foreign error*/ None, /*foreign self*/ ImportAsMemberStatus(),
+               (innerSpecialDests ? ArgSpecialDestArray(*innerSpecialDests)
+                                  : Optional<ArgSpecialDestArray>()))
+        .emitTopLevel(ArgumentSource(inner), innerOrigParamType);
+  }
+
+  // Make a second pass to split the inner arguments correctly.
+  splitInnerArgumentsCorrectly(parent);
+
+  // Make a final pass to emit default arguments and move things into
+  // the outer arguments lists.
+  emitDefaultArgsAndFinalize(parent);
 }
 
 void ArgEmitter::emitShuffle(TupleShuffleExpr *E,
@@ -3201,13 +3283,8 @@ void ArgEmitter::emitShuffle(TupleShuffleExpr *E,
     srcElts = cast<TupleType>(E->getSubExpr()->getType()->getCanonicalType())
                      ->getElements();
   }
-  emitShuffle(E->getSubExpr(), E, srcElts,
-              E->getDefaultArgsOwner(),
-              E->getCallerDefaultArgs(),
-              E->getElementMapping(),
-              E->getVariadicArgs(),
-              E->getVarargsArrayTypeOrNull(),
-              origParamType);
+
+  TupleShuffleArgEmitter(E, srcElts, origParamType).emit(*this);
 }
 
 namespace {

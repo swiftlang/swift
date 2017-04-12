@@ -99,7 +99,7 @@ class BenchmarkDriver(object):
         if self.enable_parallel:
             p = multiprocessing.Pool()
             z = zip([self] * len(prepared_input), prepared_input)
-            results = p.map(_unwrap_self, z)
+            results = p.map_async(_unwrap_self, z).get(999999)
         else:
             results = map(self.process_input, prepared_input)
 

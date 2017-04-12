@@ -350,7 +350,7 @@ void TypeChecker::checkGenericParamList(GenericSignatureBuilder *builder,
                             options, resolver))
       continue;
 
-    if (builder && builder->addRequirement(&req))
+    if (builder && isErrorResult(builder->addRequirement(&req)))
       req.setInvalid();
   }
 }
@@ -371,17 +371,6 @@ bool TypeChecker::validateRequirement(SourceLoc whereLoc, RequirementRepr &req,
 
     if (validateType(req.getConstraintLoc(), lookupDC, options, resolver)) {
       req.setInvalid();
-    }
-
-    // FIXME: Feels too early to perform this check.
-    if (!req.isInvalid() &&
-        !req.getConstraint()->isExistentialType() &&
-        !req.getConstraint()->getClassOrBoundGenericClass()) {
-      diagnose(whereLoc, diag::requires_conformance_nonprotocol,
-               req.getSubjectLoc(), req.getConstraintLoc());
-      req.getConstraintLoc().setInvalidType(Context);
-      req.setInvalid();
-      return true;
     }
 
     return req.isInvalid();

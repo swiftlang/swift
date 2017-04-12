@@ -58,17 +58,48 @@ struct SillyUTF16String : _ExpressibleByBuiltinUTF16StringLiteral, ExpressibleBy
   init(stringLiteral value: SillyUTF16String) { }
 }
 
+struct SillyConstUTF16String : _ExpressibleByBuiltinConstUTF16StringLiteral, ExpressibleByStringLiteral {
+  init(_builtinUnicodeScalarLiteral value: Builtin.Int32) { }
+
+  init(unicodeScalarLiteral value: SillyString) { }
+
+  init(
+    _builtinExtendedGraphemeClusterLiteral start: Builtin.RawPointer,
+    utf8CodeUnitCount: Builtin.Word,
+    isASCII: Builtin.Int1
+  ) {
+  }
+
+  init(extendedGraphemeClusterLiteral value: SillyString) { }
+
+  init( _builtinConstStringLiteral start: Builtin.RawPointer) { }
+
+  init( _builtinConstUTF16StringLiteral start: Builtin.RawPointer) { }
+
+  init(stringLiteral value: SillyUTF16String) { }
+}
+
 func literals() {
   var a = 1
   var b = 1.25
   var d = "foö"
   var e:SillyString = "foo"
+
+  var f:SillyConstUTF16String = "foobar"
+  var non_ascii:SillyConstUTF16String = "foobarö"
 }
 // CHECK-LABEL: sil hidden @_T011expressions8literalsyyF
 // CHECK: integer_literal $Builtin.Int2048, 1
 // CHECK: float_literal $Builtin.FPIEEE{{64|80}}, {{0x3FF4000000000000|0x3FFFA000000000000000}}
 // CHECK: string_literal utf16 "foö"
 // CHECK: string_literal utf8 "foo"
+// CHECK: [[CONST_STRING_LIT:%.*]] = const_string_literal utf8 "foobar"
+// CHECK: [[METATYPE:%.*]] = metatype $@thin SillyConstUTF16String.Type
+// CHECK: [[FUN:%.*]] = function_ref @_T011expressions21SillyConstUTF16StringVACBp08_builtincE7Literal_tcfC : $@convention(method) (Builtin.RawPointer, @thin SillyConstUTF16String.Type) -> SillyConstUTF16String
+// CHECK: apply [[FUN]]([[CONST_STRING_LIT]], [[METATYPE]]) : $@convention(method) (Builtin.RawPointer, @thin SillyConstUTF16String.Type) -> SillyConstUTF16String
+// CHECK: [[CONST_UTF16STRING_LIT:%.*]] = const_string_literal utf16 "foobarö"
+// CHECK: [[FUN:%.*]] = function_ref @_T011expressions21SillyConstUTF16StringVACBp08_builtincdE7Literal_tcfC : $@convention(method) (Builtin.RawPointer, @thin SillyConstUTF16String.Type) -> SillyConstUTF16String
+// CHECK: apply [[FUN]]([[CONST_UTF16STRING_LIT]], {{.*}}) : $@convention(method) (Builtin.RawPointer, @thin SillyConstUTF16String.Type) -> SillyConstUTF16String
 
 func bar(_ x: Int) {}
 func bar(_ x: Int, _ y: Int) {}

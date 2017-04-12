@@ -70,7 +70,6 @@ class SILEpilogueARCMatcherDumper : public SILModuleTransform {
     }
   }
 
-  StringRef getName() override { return "Epilogue ARC Matcher Dumper"; }
 };
         
 } // end anonymous namespace

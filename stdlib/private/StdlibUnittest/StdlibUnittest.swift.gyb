@@ -158,6 +158,10 @@ public func expectEqual<T : Equatable, U : Equatable, V : Equatable, W : Equatab
   expectEqualTest(expected.3, actual.3, ${trace}, showFrame: false) {$0 == $1}
 }
 
+public func expectEqualReference(_ expected: AnyObject?, _ actual: AnyObject?, ${TRACE}) {
+  expectEqualTest(expected, actual, ${trace}, showFrame: false) {$0 === $1}
+}
+
 public func expectationFailure(
   _ reason: String,
   trace message: String,

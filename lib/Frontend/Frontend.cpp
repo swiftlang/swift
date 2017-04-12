@@ -580,6 +580,7 @@ void CompilerInstance::performParseOnly() {
   assert((Kind == InputFileKind::IFK_Swift ||
           Kind == InputFileKind::IFK_Swift_Library) &&
          "only supports parsing .swift files");
+  (void)Kind;
 
   auto modImpKind = SourceFile::ImplicitModuleImportKind::None;
 

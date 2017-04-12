@@ -187,6 +187,8 @@ enum class ConversionRestrictionKind {
   Existential,
   /// Metatype to existential metatype conversion.
   MetatypeToExistentialMetatype,
+  /// Existential metatype to metatype conversion.
+  ExistentialMetatypeToMetatype,
   /// T -> U? value to optional conversion (or to implicitly unwrapped optional).
   ValueToOptional,
   /// T? -> U? optional to optional conversion (or unchecked to unchecked).

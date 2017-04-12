@@ -147,9 +147,7 @@ class GlobalPropertyOpt {
         linkage = SILLinkage::Public;
         break;
     }
-    if (isPossiblyUsedExternally(linkage, M.isWholeModule()))
-      return true;
-    return false;
+    return isPossiblyUsedExternally(linkage, M.isWholeModule());
   }
   
   static bool canAddressEscape(SILValue V, bool acceptStore);
@@ -523,7 +521,6 @@ class GlobalPropertyOptPass : public SILModuleTransform {
     GlobalPropertyOpt(*M).run(this);
   }
   
-  StringRef getName() override { return "GlobalPropertyOpt"; }
 };
 
 } // end anonymous namespace

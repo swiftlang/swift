@@ -424,8 +424,6 @@ namespace {
 
 class LoopUnrolling : public SILFunctionTransform {
 
-  StringRef getName() override { return "SIL Loop Unrolling"; }
-
   void run() override {
     bool Changed = false;
 

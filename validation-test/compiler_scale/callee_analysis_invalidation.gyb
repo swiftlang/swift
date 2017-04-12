@@ -1,4 +1,4 @@
-// RUN: %scale-test -O --threshold 0.2 --begin 20 --end 25 --step 1 --select computeMethodCallees %s
+// RUN: %scale-test -O --polynomial-threshold 0.2 --begin 20 --end 25 --step 1 --select computeMethodCallees %s
 // REQUIRES: OS=macosx
 // REQUIRES: asserts
 

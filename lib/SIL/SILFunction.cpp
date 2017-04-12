@@ -92,6 +92,14 @@ SILFunction::SILFunction(SILModule &Module, SILLinkage Linkage, StringRef Name,
       ClassVisibility(classVisibility), GlobalInitFlag(false),
       InlineStrategy(inlineStrategy), Linkage(unsigned(Linkage)),
       KeepAsPublic(false), EffectsKindAttr(E) {
+
+  // For bootstrapping, enable access markers in raw SIL whenever enforcement is
+  // enabled.
+  if (Module.getStage() == SILStage::Raw
+      && (Module.getOptions().EnforceExclusivityDynamic
+          || Module.getOptions().EnforceExclusivityStatic)) {
+    HasAccessMarkers = true;
+  }
   if (InsertBefore)
     Module.functions.insert(SILModule::iterator(InsertBefore), this);
   else

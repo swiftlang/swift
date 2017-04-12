@@ -228,6 +228,7 @@ namespace {
         getBufferSize()};
       std::error_code error = llvm::sys::Memory::releaseMappedMemory(memory);
       assert(!error && "failed to deallocate read-only zero-filled memory");
+      (void)error;
     }
 
     ZeroFilledMemoryBuffer(const ZeroFilledMemoryBuffer &) = delete;
@@ -2014,13 +2015,8 @@ public:
       : NextConsumer(consumer), ClangASTContext(clangASTContext) {}
 
   static bool needsBlacklist(const clang::Module *topLevelModule) {
-    if (!topLevelModule)
-      return false;
-    if (topLevelModule->Name == "Darwin")
-      return true;
-    if (topLevelModule->Name == "CoreServices")
-      return true;
-    return false;
+    return topLevelModule && (topLevelModule->Name == "Darwin" ||
+                              topLevelModule->Name == "CoreServices");
   }
 
   void foundDecl(ValueDecl *VD, DeclVisibilityKind Reason) override {

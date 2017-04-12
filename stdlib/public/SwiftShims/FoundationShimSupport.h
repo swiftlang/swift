@@ -1,4 +1,4 @@
-//===--- FoundationShimSupport.h - Helper macros for Foundation overlay ------===//
+//===--- FoundationShimSupport.h - Helper macros for Foundation overlay ---===//
 //
 // This source file is part of the Swift.org open source project
 //

@@ -549,6 +549,15 @@ ERROR(serialization_target_too_new_repl,none,
       "module file's minimum deployment target is %0 v%1.%2%select{|.%3}3: %4",
       (StringRef, unsigned, unsigned, unsigned, StringRef))
 
+ERROR(serialization_fatal,Fatal,
+      "fatal error encountered while reading from module '%0'; "
+      "please file a bug report with your project and the crash log",
+      (StringRef))
+NOTE(serialization_compatibility_version_mismatch,none,
+     "compiling as Swift %0, with '%1' built as Swift %2 "
+     "(this is supported but may expose additional compiler issues)",
+     (StringRef, StringRef, StringRef))
+
 ERROR(reserved_member_name,none,
       "type member may not be named %0, since it would conflict with the"
       " 'foo.%1' expression", (DeclName, StringRef))
@@ -1543,13 +1552,18 @@ ERROR(circular_protocol_def,none,
       "circular protocol inheritance %0", (StringRef))
 NOTE(protocol_here,none,
      "protocol %0 declared here", (Identifier))
-ERROR(protocol_composition_not_protocol,none,
-      "non-protocol type %0 cannot be used within a protocol composition", (Type))
 ERROR(objc_protocol_inherits_non_objc_protocol,none,
       "@objc protocol %0 cannot refine non-@objc protocol %1", (Type, Type))
 WARNING(protocol_composition_with_postfix,none,
-        "protocol composition with postfix '%0' is ambiguous "
+        "protocol-constrained type with postfix '%0' is ambiguous "
         "and will be rejected in future version of Swift", (StringRef))
+
+ERROR(invalid_protocol_composition_member,none,
+      "non-protocol, non-class type %0 cannot be used within a "
+      "protocol-constrained type", (Type))
+ERROR(protocol_composition_one_class,none,
+      "protocol-constrained type cannot contain class %0 because it already "
+      "contains class %1", (Type, Type))
 
 ERROR(requires_conformance_nonprotocol,none,
       "type %0 constrained to non-protocol type %1", (TypeLoc, TypeLoc))
@@ -3081,7 +3095,7 @@ NOTE(not_objc_empty_protocol_composition,none,
 NOTE(not_objc_protocol,none,
      "protocol %0 is not '@objc'", (Type))
 NOTE(not_objc_error_protocol_composition,none,
-     "protocol composition involving 'Error' cannot be represented "
+     "protocol-constrained type containing 'Error' cannot be represented "
      "in Objective-C", ())
 NOTE(not_objc_empty_tuple,none,
       "empty tuple type cannot be represented in Objective-C", ())

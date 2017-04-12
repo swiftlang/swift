@@ -19,6 +19,7 @@
 #include "ConstraintSystem.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
+#include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SubstitutionMap.h"
@@ -52,31 +53,31 @@ static bool isOpenedAnyObject(Type type) {
   if (!existential)
     return false;
 
-  SmallVector<ProtocolDecl *, 2> protocols;
-  existential->getExistentialTypeProtocols(protocols);
-  return protocols.size() == 1 &&
-         protocols[0]->isSpecificProtocol(KnownProtocolKind::AnyObject);
+  return existential->isAnyObject();
 }
 
-Type Solution::computeSubstitutions(
+void Solution::computeSubstitutions(
        GenericSignature *sig,
-       Type openedType,
        ConstraintLocator *locator,
        SmallVectorImpl<Substitution> &result) const {
-  auto &tc = getConstraintSystem().getTypeChecker();
-
-  // Produce the concrete form of the opened type.
-  Type type = simplifyType(openedType);
+  if (sig == nullptr)
+    return;
 
   // Gather the substitutions from dependent types to concrete types.
   auto openedTypes = OpenedTypes.find(locator);
+
+  // If we have a member reference on an existential, there are no
+  // opened types or substitutions.
   if (openedTypes == OpenedTypes.end())
-    return type;
+    return;
+
   TypeSubstitutionMap subs;
   for (const auto &opened : openedTypes->second) {
     subs[opened.first->castTo<GenericTypeParamType>()] =
       getFixedType(opened.second);
   }
+
+  auto &tc = getConstraintSystem().getTypeChecker();
 
   auto lookupConformanceFn =
       [&](CanType original, Type replacement, ProtocolType *protoType)
@@ -96,7 +97,18 @@ Type Solution::computeSubstitutions(
 
   sig->getSubstitutions(QueryTypeSubstitutionMap{subs},
                         lookupConformanceFn, result);
-  return type;
+}
+
+void Solution::computeSubstitutions(
+       GenericSignature *sig,
+       ConstraintLocatorBuilder locator,
+       SmallVectorImpl<Substitution> &result) const {
+  if (sig == nullptr)
+    return;
+
+  computeSubstitutions(sig,
+                       getConstraintSystem().getConstraintLocator(locator),
+                       result);
 }
 
 /// \brief Find a particular named function witness for a type that conforms to
@@ -324,6 +336,20 @@ namespace {
                               int toScalarIdx,
                               ConstraintLocatorBuilder locator);
 
+    /// \brief Coerce a subclass, class-constrained archetype, class-constrained
+    /// existential or to a superclass type.
+    ///
+    /// Also supports metatypes of the above.
+    ///
+    /// \param expr The expression to be coerced.
+    /// \param toType The type to which the expression will be coerced.
+    /// \param locator Locator describing where this conversion occurs.
+    ///
+    /// \return The coerced expression, whose type will be equivalent to
+    /// \c toType.
+    Expr *coerceSuperclass(Expr *expr, Type toType,
+                           ConstraintLocatorBuilder locator);
+
     /// \brief Coerce the given value to existential type.
     ///
     /// The following conversions are supported:
@@ -453,27 +479,12 @@ namespace {
                               semantics, /*isDynamic=*/false);
       }
 
-      // If this is a declaration with generic function type, build a
-      // specialized reference to it.
-      if (auto genericFn
-            = decl->getInterfaceType()->getAs<GenericFunctionType>()) {
-        SmallVector<Substitution, 4> substitutions;
-        auto type = solution.computeSubstitutions(
-                      genericFn->getGenericSignature(), openedType,
-                      getConstraintSystem().getConstraintLocator(locator),
-                      substitutions);
-        auto declRefExpr =
-          new (ctx) DeclRefExpr(ConcreteDeclRef(ctx, decl, substitutions),
-                                loc, implicit, semantics, type);
-        cs.cacheType(declRefExpr);
-        declRefExpr->setFunctionRefKind(functionRefKind);
-        return declRefExpr;
-      }
+      auto type = solution.simplifyType(openedType);
 
-      auto type = simplifyType(openedType);
-        
       // If we've ended up trying to assign an inout type here, it means we're
       // missing an ampersand in front of the ref.
+      //
+      // FIXME: This is the wrong place for this diagnostic.
       if (auto inoutType = type->getAs<InOutType>()) {
         auto &tc = cs.getTypeChecker();
         tc.diagnose(loc.getBaseNameLoc(), diag::missing_address_of,
@@ -481,9 +492,21 @@ namespace {
           .fixItInsert(loc.getBaseNameLoc(), "&");
         return nullptr;
       }
-        
-      auto declRefExpr = new (ctx) DeclRefExpr(decl, loc, implicit, semantics,
-                                               type);
+
+      SmallVector<Substitution, 4> substitutions;
+
+      // Due to a SILGen quirk, unqualified property references do not
+      // need substitutions.
+      if (!isa<VarDecl>(decl)) {
+        solution.computeSubstitutions(
+            decl->getInnermostDeclContext()->getGenericSignatureOfContext(),
+            locator,
+            substitutions);
+      }
+
+      auto declRefExpr =
+        new (ctx) DeclRefExpr(ConcreteDeclRef(ctx, decl, substitutions),
+                              loc, implicit, semantics, type);
       cs.cacheType(declRefExpr);
       declRefExpr->setFunctionRefKind(functionRefKind);
       return declRefExpr;
@@ -756,28 +779,14 @@ namespace {
         }
       }
 
-      // Produce a reference to the member and the type produced by the
-      // reference itself.
-      ConcreteDeclRef memberRef;
-      Type refTy;
-      if (auto *sig = member->getInnermostDeclContext()
-              ->getGenericSignatureOfContext()) {
-        // We require substitutions. Figure out what they are.
+      // Build a member reference.
+      SmallVector<Substitution, 4> substitutions;
+      solution.computeSubstitutions(
+          member->getInnermostDeclContext()->getGenericSignatureOfContext(),
+          memberLocator, substitutions);
+      auto memberRef = ConcreteDeclRef(context, member, substitutions);
 
-        // Build a reference to the generic member.
-        SmallVector<Substitution, 4> substitutions;
-        refTy = solution.computeSubstitutions(
-                  sig,
-                  openedFullType,
-                  getConstraintSystem().getConstraintLocator(memberLocator),
-                  substitutions);
-
-        memberRef = ConcreteDeclRef(context, member, substitutions);
-      } else {
-        // No substitutions required; the declaration reference is simple.
-        memberRef = member;
-        refTy = openedFullType;
-      }
+      auto refTy = solution.simplifyType(openedFullType);
 
       // If we're referring to the member of a module, it's just a simple
       // reference.
@@ -795,9 +804,8 @@ namespace {
       // Produce a reference to the type of the container the member
       // resides in.
       Type containerTy =
-          openedFullType->castTo<FunctionType>()
+          refTy->castTo<FunctionType>()
               ->getInput()->getRValueInstanceType();
-      containerTy = solution.simplifyType(containerTy);
 
       // If we opened up an existential when referencing this member, update
       // the base accordingly.
@@ -1306,57 +1314,31 @@ namespace {
         return result;
       }
 
-      // Handle subscripting of generics.
-      auto *dc = subscript->getInnermostDeclContext();
-      if (auto *sig = dc->getGenericSignatureOfContext()) {
-        // Compute the substitutions used to reference the subscript.
-        SmallVector<Substitution, 4> substitutions;
-        solution.computeSubstitutions(
-          sig,
-          selected->openedFullType,
-          getConstraintSystem().getConstraintLocator(
-            locator.withPathElement(ConstraintLocator::SubscriptMember)),
-          substitutions);
+      // Compute the substitutions used to reference the subscript.
+      SmallVector<Substitution, 4> substitutions;
+      solution.computeSubstitutions(
+        subscript->getInnermostDeclContext()->getGenericSignatureOfContext(),
+        locator.withPathElement(ConstraintLocator::SubscriptMember),
+        substitutions);
 
-        // Convert the base.
-        auto openedFullFnType = selected->openedFullType->castTo<FunctionType>();
-        auto openedBaseType = openedFullFnType->getInput();
-        containerTy = solution.simplifyType(openedBaseType);
-        base = coerceObjectArgumentToType(
-            base, containerTy, subscript, AccessSemantics::Ordinary,
-            locator.withPathElement(ConstraintLocator::MemberRefBase));
-        if (!base)
-          return nullptr;
-
-        // Form the generic subscript expression.
-        auto subscriptExpr = SubscriptExpr::create(
-            tc.Context, base, index,
-            ConcreteDeclRef(tc.Context, subscript, substitutions), isImplicit,
-            semantics, getType);
-        cs.setType(subscriptExpr, resultTy);
-        subscriptExpr->setIsSuper(isSuper);
-
-        Expr *result = subscriptExpr;
-        closeExistential(result, locator);
-        return result;
-      }
-
-      Type selfTy = containerTy;
-      if (selfTy->isEqual(baseTy) && !selfTy->hasReferenceSemantics())
-        if (cs.getType(base)->is<LValueType>())
-          selfTy = InOutType::get(selfTy);
-
-      // Coerce the base to the container type.
-      base = coerceObjectArgumentToType(base, selfTy, subscript,
-                                        AccessSemantics::Ordinary, locator);
+      // Convert the base.
+      auto openedFullFnType = selected->openedFullType->castTo<FunctionType>();
+      auto openedBaseType = openedFullFnType->getInput();
+      containerTy = solution.simplifyType(openedBaseType);
+      base = coerceObjectArgumentToType(
+        base, containerTy, subscript, AccessSemantics::Ordinary,
+        locator.withPathElement(ConstraintLocator::MemberRefBase));
       if (!base)
         return nullptr;
 
-      // Form a normal subscript.
-      auto *subscriptExpr = SubscriptExpr::create(
-          tc.Context, base, index, subscript, isImplicit, semantics, getType);
+      // Form the subscript expression.
+      auto subscriptExpr = SubscriptExpr::create(
+        tc.Context, base, index,
+          ConcreteDeclRef(tc.Context, subscript, substitutions), isImplicit,
+          semantics, getType);
       cs.setType(subscriptExpr, resultTy);
       subscriptExpr->setIsSuper(isSuper);
+
       Expr *result = subscriptExpr;
       closeExistential(result, locator);
       return result;
@@ -1372,26 +1354,18 @@ namespace {
       auto &ctx = tc.Context;
 
       // Compute the concrete reference.
-      ConcreteDeclRef ref;
-      Type resultTy;
-      if (auto *sig = ctor->getGenericSignature()) {
-        // Compute the reference to the generic constructor.
-        SmallVector<Substitution, 4> substitutions;
-        resultTy = solution.computeSubstitutions(
-                     sig,
-                     openedFullType,
-                     getConstraintSystem().getConstraintLocator(locator),
-                     substitutions);
+      SmallVector<Substitution, 4> substitutions;
+      solution.computeSubstitutions(
+          ctor->getGenericSignature(),
+          locator,
+          substitutions);
 
-        ref = ConcreteDeclRef(ctx, ctor, substitutions);
-      } else {
-        // No substitutions.
-        resultTy = openedFullType;
-        ref = ConcreteDeclRef(ctor);
-      }
+      auto ref = ConcreteDeclRef(ctx, ctor, substitutions);
 
       // The constructor was opened with the allocating type, not the
       // initializer type. Map the former into the latter.
+      auto resultTy = solution.simplifyType(openedFullType);
+
       auto selfTy = resultTy->castTo<FunctionType>()->getInput()
         ->getRValueInstanceType();
 
@@ -1984,18 +1958,49 @@ namespace {
         builtinProtocol = tc.getProtocol(
             expr->getLoc(),
             KnownProtocolKind::ExpressibleByBuiltinUTF16StringLiteral);
+        auto *builtinConstUTF16StringProtocol = tc.getProtocol(
+            expr->getLoc(),
+            KnownProtocolKind::ExpressibleByBuiltinConstUTF16StringLiteral);
+        auto *builtinConstStringProtocol = tc.getProtocol(
+            expr->getLoc(),
+            KnownProtocolKind::ExpressibleByBuiltinConstStringLiteral);
+
+        // First try the constant string protocols.
         if (!forceASCII &&
-            tc.conformsToProtocol(type, builtinProtocol, cs.DC,
-                                  ConformanceCheckFlags::InExpression)) {
-          builtinLiteralFuncName 
-            = DeclName(tc.Context, tc.Context.Id_init,
-                       { tc.Context.Id_builtinUTF16StringLiteral,
-                         tc.Context.getIdentifier("utf16CodeUnitCount") });
+            (tc.conformsToProtocol(type, builtinConstUTF16StringProtocol, cs.DC,
+                                   ConformanceCheckFlags::InExpression))) {
+          builtinProtocol = builtinConstUTF16StringProtocol;
+          builtinLiteralFuncName =
+              DeclName(tc.Context, tc.Context.Id_init,
+                       {tc.Context.Id_builtinConstUTF16StringLiteral});
+
+          if (stringLiteral)
+            stringLiteral->setEncoding(StringLiteralExpr::UTF16ConstString);
+          else
+            magicLiteral->setStringEncoding(StringLiteralExpr::UTF16);
+        } else if (!forceASCII && (tc.conformsToProtocol(
+                                      type, builtinProtocol, cs.DC,
+                                      ConformanceCheckFlags::InExpression))) {
+          builtinLiteralFuncName =
+              DeclName(tc.Context, tc.Context.Id_init,
+                       {tc.Context.Id_builtinUTF16StringLiteral,
+                        tc.Context.getIdentifier("utf16CodeUnitCount")});
 
           if (stringLiteral)
             stringLiteral->setEncoding(StringLiteralExpr::UTF16);
           else
             magicLiteral->setStringEncoding(StringLiteralExpr::UTF16);
+        } else if (tc.conformsToProtocol(type, builtinConstStringProtocol,
+                                         cs.DC,
+                                         ConformanceCheckFlags::InExpression)) {
+          builtinProtocol = builtinConstStringProtocol;
+          builtinLiteralFuncName =
+              DeclName(tc.Context, tc.Context.Id_init,
+                       {tc.Context.Id_builtinConstStringLiteral});
+          if (stringLiteral)
+            stringLiteral->setEncoding(StringLiteralExpr::UTF8ConstString);
+          else
+            magicLiteral->setStringEncoding(StringLiteralExpr::UTF8);
         } else {
           // Otherwise, fall back to UTF-8.
           builtinProtocol = tc.getProtocol(
@@ -4122,15 +4127,11 @@ ConcreteDeclRef Solution::resolveLocatorToDecl(
             },
             [&](ValueDecl *decl, Type openedType, ConstraintLocator *locator)
                   -> ConcreteDeclRef {
-              if (auto *sig = decl->getInnermostDeclContext()
-                      ->getGenericSignatureOfContext()) {
-                SmallVector<Substitution, 4> subs;
-                computeSubstitutions(
-                  sig, openedType, locator, subs);
-                return ConcreteDeclRef(cs.getASTContext(), decl, subs);
-              }
-              
-              return decl;
+              SmallVector<Substitution, 4> subs;
+              computeSubstitutions(
+                decl->getInnermostDeclContext()->getGenericSignatureOfContext(),
+                locator, subs);
+              return ConcreteDeclRef(cs.getASTContext(), decl, subs);
             })) {
     return resolved;
   }
@@ -4634,6 +4635,79 @@ Expr *ExprRewriter::coerceScalarToTuple(Expr *expr, TupleType *toTuple,
                                         destSugarTy));
 }
 
+static Type getMetatypeSuperclass(Type t, TypeChecker &tc) {
+  if (auto *metaTy = t->getAs<MetatypeType>())
+    return MetatypeType::get(getMetatypeSuperclass(
+                               metaTy->getInstanceType(),
+                               tc));
+
+  if (auto *metaTy = t->getAs<ExistentialMetatypeType>())
+    return ExistentialMetatypeType::get(getMetatypeSuperclass(
+                                          metaTy->getInstanceType(),
+                                          tc));
+
+  return tc.getSuperClassOf(t);
+}
+
+Expr *ExprRewriter::coerceSuperclass(Expr *expr, Type toType,
+                                     ConstraintLocatorBuilder locator) {
+  auto &tc = cs.getTypeChecker();
+
+  auto fromType = cs.getType(expr);
+
+  auto fromInstanceType = fromType;
+  auto toInstanceType = toType;
+
+  while (fromInstanceType->is<AnyMetatypeType>() &&
+         toInstanceType->is<MetatypeType>()) {
+    fromInstanceType = fromInstanceType->castTo<AnyMetatypeType>()
+      ->getInstanceType();
+    toInstanceType = toInstanceType->castTo<MetatypeType>()
+      ->getInstanceType();
+  }
+
+  if (fromInstanceType->is<ArchetypeType>()) {
+    // Coercion from archetype to its (concrete) superclass.
+    auto superclass = getMetatypeSuperclass(fromType, tc);
+
+    expr =
+      cs.cacheType(
+        new (tc.Context) ArchetypeToSuperExpr(expr, superclass));
+
+    if (!superclass->isEqual(toType))
+      return coerceSuperclass(expr, toType, locator);
+
+    return expr;
+
+  }
+
+  if (fromInstanceType->isExistentialType()) {
+    // Coercion from superclass-constrained existential to its
+    // concrete superclass.
+    auto fromArchetype = ArchetypeType::getAnyOpened(fromType);
+
+    auto *archetypeVal =
+      cs.cacheType(
+        new (tc.Context) OpaqueValueExpr(expr->getLoc(),
+                                         fromArchetype));
+
+    auto *result = coerceSuperclass(archetypeVal, toType, locator);
+
+    return cs.cacheType(
+      new (tc.Context) OpenExistentialExpr(expr, archetypeVal, result,
+                                           toType));
+  }
+
+  // Coercion from subclass to superclass.
+  if (toType->is<MetatypeType>()) {
+    return cs.cacheType(
+      new (tc.Context) MetatypeConversionExpr(expr, toType));
+  }
+
+  return cs.cacheType(
+    new (tc.Context) DerivedToBaseExpr(expr, toType));
+}
+
 /// Collect the conformances for all the protocols of an existential type.
 /// If the source type is also existential, we don't want to check conformance
 /// because most protocols do not conform to themselves -- however we still
@@ -4642,13 +4716,12 @@ Expr *ExprRewriter::coerceScalarToTuple(Expr *expr, TupleType *toTuple,
 static ArrayRef<ProtocolConformanceRef>
 collectExistentialConformances(TypeChecker &tc, Type fromType, Type toType,
                                DeclContext *DC) {
-  SmallVector<ProtocolDecl *, 4> protocols;
-  toType->getExistentialTypeProtocols(protocols);
+  auto layout = toType->getExistentialLayout();
 
   SmallVector<ProtocolConformanceRef, 4> conformances;
-  for (auto proto : protocols) {
+  for (auto proto : layout.getProtocols()) {
     conformances.push_back(
-      *tc.containsProtocol(fromType, proto, DC,
+      *tc.containsProtocol(fromType, proto->getDecl(), DC,
                            (ConformanceCheckFlags::InExpression|
                             ConformanceCheckFlags::Used)));
   }
@@ -4706,31 +4779,10 @@ Expr *ExprRewriter::coerceExistential(Expr *expr, Type toType,
                                       cs.getType(result)));
   }
 
-  // If the type we are trying to coerce is a tuple, let's look through
-  // its elements to see if there are any LValue types present, such requires
-  // load or address-of operation first before proceeding with erasure.
+  // Load tuples with lvalue elements.
   if (auto tupleType = fromType->getAs<TupleType>()) {
-    bool coerceToRValue = false;
-    for (auto element : tupleType->getElements()) {
-      if (element.getType()->is<LValueType>()) {
-        coerceToRValue = true;
-        break;
-      }
-    }
-
-    // Tuple has one or more LValue types associated with it,
-    // which requires coercion to RValue, let's perform it here by creating
-    // new tuple type with LValue(s) stripped off and coercing
-    // expression to that type, which would do required transformation.
-    if (coerceToRValue) {
-      SmallVector<TupleTypeElt, 2> elements;
-      for (auto &element : tupleType->getElements())
-        elements.push_back(TupleTypeElt(element.getType()->getRValueType(),
-                                        element.getName(),
-                                        element.getParameterFlags()));
-
-      // New type is guaranteed to be a tuple because source type is one.
-      auto toTuple = TupleType::get(elements, ctx)->castTo<TupleType>();
+    if (tupleType->isLValueType()) {
+      auto toTuple = tupleType->getRValueType()->castTo<TupleType>();
       SmallVector<int, 4> sources;
       SmallVector<unsigned, 4> variadicArgs;
       bool failed = computeTupleShuffle(tupleType, toTuple,
@@ -4823,6 +4875,49 @@ static bool isReferenceToMetatypeMember(ConstraintSystem &cs, Expr *expr) {
   return false;
 }
 
+static unsigned computeCallLevel(
+    ConstraintSystem &cs, ConcreteDeclRef callee,
+    llvm::PointerUnion<ApplyExpr *, ExprRewriter::LevelTy> applyOrLevel) {
+  using LevelTy = ExprRewriter::LevelTy;
+
+  if (applyOrLevel.is<LevelTy>()) {
+    // Level specified by caller.
+    return applyOrLevel.get<LevelTy>();
+  }
+
+  // If we do not have a callee, return a level of 0.
+  if (!callee) {
+    return 0;
+  }
+
+  // Determine the level based on the application itself.
+  auto *apply = applyOrLevel.get<ApplyExpr *>();
+
+  // Only calls to members of types can have level > 0.
+  auto calleeDecl = callee.getDecl();
+  if (!calleeDecl->getDeclContext()->isTypeContext()) {
+    return 0;
+  }
+
+  // Level 1 if we're not applying "self".
+  if (auto *call = dyn_cast<CallExpr>(apply)) {
+    if (!calleeDecl->isInstanceMember() ||
+        !isReferenceToMetatypeMember(cs, call->getDirectCallee())) {
+      return 1;
+    }
+    return 0;
+  }
+
+  // Level 1 if we have an operator.
+  if (isa<PrefixUnaryExpr>(apply) || isa<PostfixUnaryExpr>(apply) ||
+      isa<BinaryExpr>(apply)) {
+    return 1;
+  }
+
+  // Otherwise, we have a normal application.
+  return 0;
+}
+
 Expr *ExprRewriter::coerceCallArguments(
     Expr *arg, Type paramType,
     llvm::PointerUnion<ApplyExpr *, LevelTy> applyOrLevel,
@@ -4870,29 +4965,7 @@ Expr *ExprRewriter::coerceCallArguments(
     findCalleeDeclRef(cs, solution, cs.getConstraintLocator(locator));
 
   // Determine the level,
-  unsigned level = 0;
-  if (applyOrLevel.is<LevelTy>()) {
-    // Level specified by caller.
-    level = applyOrLevel.get<LevelTy>();
-  } else if (callee) {
-    // Determine the level based on the application itself.
-    auto apply = applyOrLevel.get<ApplyExpr *>();
-
-    // Only calls to members of types can have level > 0.
-    auto calleeDecl = callee.getDecl();
-    if (calleeDecl->getDeclContext()->isTypeContext()) {
-      // Level 1 if we're not applying "self".
-      if (auto call = dyn_cast<CallExpr>(apply)) {
-        if (!calleeDecl->isInstanceMember() ||
-            !isReferenceToMetatypeMember(cs, call->getDirectCallee()))
-          level = 1;
-      } else if (isa<PrefixUnaryExpr>(apply) ||
-                 isa<PostfixUnaryExpr>(apply) ||
-                 isa<BinaryExpr>(apply)) {
-        level = 1;
-      }
-    }
-  }
+  unsigned level = computeCallLevel(cs, callee, applyOrLevel);
 
   // Determine the parameter bindings.
   auto params = decomposeParamType(paramType, callee.getDecl(), level);
@@ -5477,25 +5550,8 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       assert(toType->hasUnresolvedType() && "Should have handled this above");
       break;
 
-    case ConversionRestrictionKind::Superclass: {
-      // Coercion from archetype to its (concrete) superclass.
-      if (auto fromArchetype = fromType->getAs<ArchetypeType>()) {
-        expr =
-          cs.cacheType(
-              new (tc.Context) ArchetypeToSuperExpr(expr,
-                                               fromArchetype->getSuperclass()));
-
-        // If we are done succeeded, use the coerced result.
-        if (cs.getType(expr)->isEqual(toType)) {
-          return expr;
-        }
-
-        fromType = cs.getType(expr);
-      }
-      
-      // Coercion from subclass to superclass.
-      return cs.cacheType(new (tc.Context) DerivedToBaseExpr(expr, toType));
-    }
+    case ConversionRestrictionKind::Superclass:
+      return coerceSuperclass(expr, toType, locator);
 
     case ConversionRestrictionKind::LValueToRValue: {
       if (toType->is<TupleType>() || fromType->is<TupleType>())
@@ -5513,6 +5569,9 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     case ConversionRestrictionKind::Existential:
     case ConversionRestrictionKind::MetatypeToExistentialMetatype:
       return coerceExistential(expr, toType, locator);
+
+    case ConversionRestrictionKind::ExistentialMetatypeToMetatype:
+      return coerceSuperclass(expr, toType, locator);
 
     case ConversionRestrictionKind::ClassMetatypeToAnyObject: {
       assert(tc.getLangOpts().EnableObjCInterop
@@ -5776,25 +5835,16 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
   }
 
   // Coercion from a subclass to a superclass.
+  //
+  // FIXME: Can we rig things up so that we always have a Superclass
+  // conversion restriction in this case?
   if (fromType->mayHaveSuperclass() &&
       toType->getClassOrBoundGenericClass()) {
     for (auto fromSuperClass = tc.getSuperClassOf(fromType);
          fromSuperClass;
          fromSuperClass = tc.getSuperClassOf(fromSuperClass)) {
       if (fromSuperClass->isEqual(toType)) {
-        
-        // Coercion from archetype to its (concrete) superclass.
-        if (auto fromArchetype = fromType->getAs<ArchetypeType>()) {
-          expr = cs.cacheType(new (tc.Context) ArchetypeToSuperExpr(
-              expr, fromArchetype->getSuperclass()));
-
-          // If we succeeded, use the coerced result.
-          if (cs.getType(expr)->isEqual(toType))
-            return expr;
-        }
-
-        // Coercion from subclass to superclass.
-        return cs.cacheType(new (tc.Context) DerivedToBaseExpr(expr, toType));
+        return coerceSuperclass(expr, toType, locator);
       }
     }
   }
@@ -6438,9 +6488,9 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
             ->castTo<ExistentialMetatypeType>()
             ->getInstanceType();
         }
-        auto openedArchetype = openedInstanceTy->castTo<ArchetypeType>();
-        assert(openedArchetype->getOpenedExistentialType()
-                              ->isEqual(existentialInstanceTy));
+        assert(openedInstanceTy->castTo<ArchetypeType>()
+                   ->getOpenedExistentialType()
+                   ->isEqual(existentialInstanceTy));
 
         auto opaqueValue = new (tc.Context)
           OpaqueValueExpr(apply->getLoc(), openedTy);

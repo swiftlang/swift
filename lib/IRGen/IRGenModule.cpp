@@ -119,11 +119,6 @@ static clang::CodeGenerator *createClangCodeGenerator(ASTContext &Context,
   return ClangCodeGen;
 }
 
-/// A helper for determining if the triple uses the DLL storage
-static bool useDllStorage(const llvm::Triple &Triple) {
-  return Triple.isOSBinFormatCOFF() && !Triple.isOSCygMing();
-}
-
 IRGenModule::IRGenModule(IRGenerator &irgen,
                          std::unique_ptr<llvm::TargetMachine> &&target,
                          SourceFile *SF, llvm::LLVMContext &LLVMContext,
@@ -261,8 +256,7 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
   });
   FullBoxMetadataPtrTy = FullBoxMetadataStructTy->getPointerTo(DefaultAS);
 
-
-  llvm::Type *refCountedElts[] = { TypeMetadataPtrTy, Int32Ty, Int32Ty };
+  llvm::Type *refCountedElts[] = {TypeMetadataPtrTy, Int32Ty, Int32Ty};
   RefCountedStructTy->setBody(refCountedElts);
 
   PtrSize = Size(DataLayout.getPointerSize(DefaultAS));
@@ -356,7 +350,7 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
                                               openedErrorTriple,
                                               /*packed*/ false);
   OpenedErrorTriplePtrTy = OpenedErrorTripleTy->getPointerTo(DefaultAS);
-  
+
   InvariantMetadataID = LLVMContext.getMDKindID("invariant.load");
   InvariantNode = llvm::MDNode::get(LLVMContext, {});
   DereferenceableID = LLVMContext.getMDKindID("dereferenceable");

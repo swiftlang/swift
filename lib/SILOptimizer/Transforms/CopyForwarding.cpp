@@ -1209,7 +1209,6 @@ class CopyForwardingPass : public SILFunctionTransform
       }
   }
 
-  StringRef getName() override { return "Copy Forwarding"; }
 };
 } // end anonymous namespace
 

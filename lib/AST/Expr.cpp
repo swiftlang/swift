@@ -1321,6 +1321,7 @@ MemberRefExpr::MemberRefExpr(Expr *base, SourceLoc dotLoc,
    
   MemberRefExprBits.Semantics = (unsigned) semantics;
   MemberRefExprBits.IsSuper = false;
+  assert(Member);
 }
 
 Type OverloadSetRefExpr::getBaseType() const {

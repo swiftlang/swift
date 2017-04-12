@@ -82,7 +82,7 @@ public:
     SILValue Replacement;
   };
 
-  /// Specifies the set of elements with which a append-contentof call can be
+  /// Specifies the set of elements with which an append-contentof call can be
   /// replaced.
   struct AppendContentOfReplacement {
     ApplyInst *AppendContentOfCall;
@@ -286,10 +286,6 @@ void ArrayAllocation::getAppendContentOfReplacements(
 class ArrayElementPropagation : public SILFunctionTransform {
 public:
   ArrayElementPropagation() {}
-
-  StringRef getName() override {
-    return "Array Element Propagation";
-  }
 
   bool replaceAppendCalls(
                   ArrayRef<ArrayAllocation::AppendContentOfReplacement> Repls) {

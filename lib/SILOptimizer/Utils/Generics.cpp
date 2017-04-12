@@ -909,7 +909,7 @@ static void remapRequirements(GenericSignature *GenSig,
 
       Requirement Req(Kind, first, second);
       auto Failure = Builder.addRequirement(Req, source);
-      assert(!Failure);
+      assert(!isErrorResult(Failure));
       DEBUG(llvm::dbgs() << "\nRe-mapped requirement:\n"; Req.dump());
       break;
     }
@@ -920,7 +920,7 @@ static void remapRequirements(GenericSignature *GenSig,
       Requirement Req(RequirementKind::Layout, first,
                       reqReq.getLayoutConstraint());
       auto Failure = Builder.addRequirement(Req, source);
-      assert(!Failure);
+      assert(!!isErrorResult(Failure));
       DEBUG(llvm::dbgs() << "\nRe-mapped requirement:\n"; Req.dump());
       break;
     }

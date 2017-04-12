@@ -27,7 +27,9 @@
 #include "swift/AST/TypeMemberVisitor.h"
 #include "swift/AST/Types.h"
 #include "swift/ClangImporter/ClangModule.h"
+#include "swift/Demangling/ManglingMacros.h"
 #include "swift/IRGen/Linking.h"
+#include "swift/Runtime/HeapObject.h"
 #include "swift/SIL/FormalLinkage.h"
 #include "swift/SIL/SILDebugScope.h"
 #include "swift/SIL/SILModule.h"
@@ -1083,14 +1085,8 @@ static SILLinkage getNonUniqueSILLinkage(FormalLinkage linkage,
 SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
   // For when `this` is a protocol conformance of some kind.
   auto getLinkageAsConformance = [&] {
-    auto linkage = getLinkageForProtocolConformance(
+    return getLinkageForProtocolConformance(
         getProtocolConformance()->getRootNormalConformance(), forDefinition);
-
-    // A hidden-external conformance doesn't make sense: we can't refer to
-    // it. Thus, the only way to end up in that situation is if the linkage is
-    // actually public.
-    return linkage == SILLinkage::HiddenExternal ? SILLinkage::PublicExternal
-                                                 : linkage;
   };
 
   switch (getKind()) {
@@ -1282,8 +1278,7 @@ bool LinkEntity::isAvailableExternally(IRGenModule &IGM) const {
   llvm_unreachable("bad link entity kind");
 }
 
-bool LinkEntity::isFragile(ForDefinition_t isDefinition,
-                           bool wholeModuleSerialized) const {
+bool LinkEntity::isFragile(ForDefinition_t isDefinition) const {
   switch (getKind()) {
     case Kind::SILFunction:
       return getSILFunction()->isSerialized();
@@ -1305,16 +1300,14 @@ bool LinkEntity::isFragile(ForDefinition_t isDefinition,
   }
   if (isProtocolConformanceKind(getKind())) {
     auto conformance = getProtocolConformance();
-    SILLinkage L = getLinkageForProtocolConformance(
-        conformance->getRootNormalConformance(), isDefinition);
 
-    // We don't deserialize the fragile attribute correctly. But we know that
-    // if the witness table was deserialized (= available externally) and it's
-    // not public, it must be fragile.
-    if (swift::isAvailableExternally(L) && !hasPublicVisibility(L))
-      return true;
+    auto conformanceModule = conformance->getDeclContext()->getParentModule();
+    auto isCompletelySerialized = conformanceModule->getResilienceStrategy() ==
+                                  ResilienceStrategy::Fragile;
 
-    return wholeModuleSerialized || conformance->hasFixedLayout();
+    // The conformance is fragile if it is in a -sil-serialize-all module, or
+    // has a fully publicly determined layout.
+    return isCompletelySerialized || conformance->hasFixedLayout();
   }
   return false;
 }
@@ -1437,11 +1430,10 @@ static void updateLinkageForDefinition(IRGenModule &IGM,
   // TODO: there are probably cases where we can avoid redoing the
   // entire linkage computation.
   UniversalLinkageInfo linkInfo(IGM);
-  auto linkage = getIRLinkage(
-      linkInfo, entity.getLinkage(ForDefinition),
-      entity.isFragile(ForDefinition, linkInfo.IsWholeModuleSerialized),
-      entity.isSILOnly(), ForDefinition,
-      entity.isWeakImported(IGM.getSwiftModule()));
+  auto linkage =
+      getIRLinkage(linkInfo, entity.getLinkage(ForDefinition),
+                   entity.isFragile(ForDefinition), entity.isSILOnly(),
+                   ForDefinition, entity.isWeakImported(IGM.getSwiftModule()));
   global->setLinkage(std::get<0>(linkage));
   global->setVisibility(std::get<1>(linkage));
   global->setDLLStorageClass(std::get<2>(linkage));
@@ -1471,10 +1463,9 @@ LinkInfo LinkInfo::get(const UniversalLinkageInfo &linkInfo,
   entity.mangle(result.Name);
 
   std::tie(result.Linkage, result.Visibility, result.DLLStorageClass) =
-      getIRLinkage(
-          linkInfo, entity.getLinkage(isDefinition),
-          entity.isFragile(isDefinition, linkInfo.IsWholeModuleSerialized),
-          entity.isSILOnly(), isDefinition, entity.isWeakImported(swiftModule));
+      getIRLinkage(linkInfo, entity.getLinkage(isDefinition),
+                   entity.isFragile(isDefinition), entity.isSILOnly(),
+                   isDefinition, entity.isWeakImported(swiftModule));
 
   result.ForDefinition = isDefinition;
 
@@ -3088,6 +3079,169 @@ llvm::Constant *IRGenModule::getAddrOfGlobalUTF16String(StringRef utf8) {
   // Cache and return.
   entry = address;
   return address;
+}
+
+static llvm::Constant *getMetatypeDeclarationFor(IRGenModule &IGM,
+                                                 StringRef name) {
+  auto *storageType = IGM.ObjCClassStructTy;
+
+  // We may have defined the variable already.
+  if (auto existing = IGM.Module.getNamedGlobal(name))
+    return getElementBitCast(existing, storageType);
+
+  auto linkage = llvm::GlobalValue::ExternalLinkage;
+  auto visibility = llvm::GlobalValue::DefaultVisibility;
+  auto storageClass = llvm::GlobalValue::DefaultStorageClass;
+
+  auto var = new llvm::GlobalVariable(IGM.Module, storageType,
+                                      /*constant*/ false, linkage,
+                                      /*initializer*/ nullptr, name);
+  var->setVisibility(visibility);
+  var->setDLLStorageClass(storageClass);
+  var->setAlignment(IGM.getPointerAlignment().getValue());
+
+  return var;
+}
+#define STRINGIFY_IMPL(x) #x
+#define REALLY_STRINGIFY( x) STRINGIFY_IMPL(x)
+
+llvm::Constant *
+IRGenModule::getAddrOfGlobalConstantString(StringRef utf8) {
+  auto &entry = GlobalConstantStrings[utf8];
+  if (entry)
+    return entry;
+
+  // If not, create it.  This implicitly adds a trailing null.
+  auto data = llvm::ConstantDataArray::getString(LLVMContext, utf8);
+  auto *dataTy = data->getType();
+
+  llvm::Type *constantStringTy[] = {
+      RefCountedStructTy,
+      Int32Ty,
+      Int32Ty,
+      Int8Ty,
+      dataTy
+  };
+  auto *ConstantStringTy =
+      llvm::StructType::get(getLLVMContext(), constantStringTy,
+                            /*packed*/ false);
+
+  auto metaclass = getMetatypeDeclarationFor(
+      *this, REALLY_STRINGIFY(CLASS_METADATA_SYM(s20_Latin1StringStorage)));
+
+  metaclass = llvm::ConstantExpr::getBitCast(metaclass, TypeMetadataPtrTy);
+
+  // Get a reference count of two.
+  auto *strongRefCountInit = llvm::ConstantInt::get(
+      Int32Ty,
+      InlineRefCountBits(0 /*unowned ref count*/, 2 /*strong ref count*/)
+          .getBitsValue());
+  auto *unownedRefCountInit = llvm::ConstantInt::get(Int32Ty, 0);
+
+  auto *count = llvm::ConstantInt::get(Int32Ty, utf8.size());
+  // Capacitity is length plus one because of the implicitly added '\0'
+  // character.
+  auto *capacity = llvm::ConstantInt::get(Int32Ty, utf8.size() + 1);
+  auto *flags = llvm::ConstantInt::get(Int8Ty, 0);
+
+  // FIXME: Big endian-ness.
+  llvm::Constant *heapObjectHeaderFields[] = {
+      metaclass, strongRefCountInit, unownedRefCountInit
+  };
+
+  auto *initRefCountStruct = llvm::ConstantStruct::get(
+      RefCountedStructTy, makeArrayRef(heapObjectHeaderFields));
+
+  llvm::Constant *fields[] = {
+      initRefCountStruct, count, capacity, flags, data};
+  auto *init =
+      llvm::ConstantStruct::get(ConstantStringTy, makeArrayRef(fields));
+
+  auto global = new llvm::GlobalVariable(Module, init->getType(), true,
+                                         llvm::GlobalValue::PrivateLinkage,
+                                         init);
+  global->setUnnamedAddr(llvm::GlobalValue::UnnamedAddr::Global);
+
+  // Cache string entry.
+  entry = global;
+
+  return global;
+}
+
+llvm::Constant *
+IRGenModule::getAddrOfGlobalUTF16ConstantString(StringRef utf8) {
+  auto &entry = GlobalConstantUTF16Strings[utf8];
+  if (entry)
+    return entry;
+
+  // If not, first transcode it to UTF16.
+  SmallVector<llvm::UTF16, 128> buffer(utf8.size() + 1); // +1 for ending nulls.
+  const llvm::UTF8 *fromPtr = (const llvm::UTF8 *) utf8.data();
+  llvm::UTF16 *toPtr = &buffer[0];
+  (void) ConvertUTF8toUTF16(&fromPtr, fromPtr + utf8.size(),
+                            &toPtr, toPtr + utf8.size(),
+                            llvm::strictConversion);
+
+  // The length of the transcoded string in UTF-8 code points.
+  size_t utf16Length = toPtr - &buffer[0];
+
+  // Null-terminate the UTF-16 string.
+  *toPtr = 0;
+  ArrayRef<llvm::UTF16> utf16(&buffer[0], utf16Length + 1);
+
+  auto *data = llvm::ConstantDataArray::get(LLVMContext, utf16);
+  auto *dataTy = data->getType();
+
+  llvm::Type *constantUTFStringTy[] = {
+      RefCountedStructTy,
+      Int32Ty,
+      Int32Ty,
+      Int8Ty,
+      Int8Ty, // For 16-byte alignment.
+      dataTy
+  };
+  auto *ConstantUTFStringTy =
+      llvm::StructType::get(getLLVMContext(), constantUTFStringTy,
+                            /*packed*/ false);
+
+  auto metaclass = getMetatypeDeclarationFor(
+      *this, REALLY_STRINGIFY(CLASS_METADATA_SYM(s19_UTF16StringStorage)));
+
+  metaclass = llvm::ConstantExpr::getBitCast(metaclass, TypeMetadataPtrTy);
+
+  // Get a reference count of two.
+  auto *strongRefCountInit = llvm::ConstantInt::get(
+      Int32Ty,
+      InlineRefCountBits(0 /*unowned ref count*/, 2 /*strong ref count*/)
+          .getBitsValue());
+  auto *unownedRefCountInit = llvm::ConstantInt::get(Int32Ty, 0);
+
+  auto *count = llvm::ConstantInt::get(Int32Ty, utf16Length);
+  auto *capacity = llvm::ConstantInt::get(Int32Ty, utf16Length + 1);
+  auto *flags = llvm::ConstantInt::get(Int8Ty, 0);
+  auto *padding = llvm::ConstantInt::get(Int8Ty, 0);
+
+  llvm::Constant *heapObjectHeaderFields[] = {
+      metaclass, strongRefCountInit, unownedRefCountInit
+  };
+
+  auto *initRefCountStruct = llvm::ConstantStruct::get(
+      RefCountedStructTy, makeArrayRef(heapObjectHeaderFields));
+
+  llvm::Constant *fields[] = {
+      initRefCountStruct, count, capacity, flags, padding, data};
+  auto *init =
+      llvm::ConstantStruct::get(ConstantUTFStringTy, makeArrayRef(fields));
+
+  auto global = new llvm::GlobalVariable(Module, init->getType(), true,
+                                         llvm::GlobalValue::PrivateLinkage,
+                                         init);
+  global->setUnnamedAddr(llvm::GlobalValue::UnnamedAddr::Global);
+
+  // Cache string entry.
+  entry = global;
+
+  return global;
 }
 
 /// Do we have to use resilient access patterns when working with this
