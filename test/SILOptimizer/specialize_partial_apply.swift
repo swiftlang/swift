@@ -1,3 +1,7 @@
+// XFAIL: *
+//
+// https://bugs.swift.org/browse/SR-4565
+
 // First check the SIL.
 // RUN: %target-swift-frontend -O -Xllvm -sil-disable-pass="Function Signature Optimization" -module-name=test -emit-sil -primary-file %s | %FileCheck %s
 
