@@ -178,12 +178,6 @@ func _Filter<C>(c: LazyFilterCollection<C>) {
   _ = c.generate() // expected-error {{'generate()' has been renamed to 'makeIterator()'}} {{9-17=makeIterator}} {{none}}
 }
 
-func _FixedPoint() {
-  func fn1<T: IntegerType>(i: T) {} // expected-error {{'IntegerType' has been renamed to 'FixedWidthInteger'}} {{15-26=FixedWidthInteger}} {{none}}
-  func fn2<T: SignedIntegerType>(i: T) {} // expected-error {{'SignedIntegerType' has been renamed to 'SignedInteger'}} {{15-32=SignedInteger}} {{none}}
-  func fn3<T: UnsignedIntegerType>(i: T) {} // expected-error {{'UnsignedIntegerType' has been renamed to 'UnsignedInteger'}} {{15-34=UnsignedInteger}} {{none}}
-}
-
 func _Flatten() {
   func fn<T>(i: FlattenGenerator<T>) {} // expected-error {{'FlattenGenerator' has been renamed to 'FlattenIterator'}} {{17-33=FlattenIterator}} {{none}}
 }
@@ -258,11 +252,6 @@ func _Index() {
 func _InputStream() {
   _ = readLine(stripNewline: true) // expected-error {{'readLine(stripNewline:)' has been renamed to 'readLine(strippingNewline:)'}} {{7-15=readLine}} {{16-28=strippingNewline}} {{none}}
   _ = readLine() // ok
-}
-
-func _IntegerArithmetic() {
-  func fn1<T : IntegerArithmeticType>(_: T) {} // expected-error {{'IntegerArithmeticType' has been renamed to 'Numeric'}} {{16-37=Numeric}} {{none}}
-  func fn2<T : SignedNumberType>(_: T) {} // expected-error {{'SignedNumberType' has been renamed to 'SignedNumeric'}} {{16-32=SignedNumeric}} {{none}}
 }
 
 func _Join() {
