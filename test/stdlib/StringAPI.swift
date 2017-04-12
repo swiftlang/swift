@@ -92,7 +92,7 @@ let tests = [
   ComparisonTest(.eq, "\u{212b}", "A\u{30a}"),
   ComparisonTest(.eq, "\u{212b}", "\u{c5}"),
   ComparisonTest(.eq, "A\u{30a}", "\u{c5}"),
-  ComparisonTest(.lt, "A\u{30a}", "a"),
+  ComparisonTest(.gt, "A\u{30a}", "a"),
   ComparisonTest(.lt, "A", "A\u{30a}"),
 
   // U+2126 OHM SIGN
