@@ -388,7 +388,7 @@ public:
   void accept(SourceManager &SM, RegionType RegionType, ArrayRef<Replacement> Replacements) override;
 };
 
-class SourceEditOutputConsumer : public EditConsumer {
+class SourceEditOutputConsumer : public SourceEditConsumer {
   struct Implementation;
   Implementation &Impl;
 
