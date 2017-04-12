@@ -94,11 +94,6 @@ class LinkEntity {
     /// The pointer is a FuncDecl*.
     Function,
 
-    /// The offset to apply to a witness table or metadata object
-    /// in order to find the information for a declaration.  The
-    /// pointer is a ValueDecl*.
-    WitnessTableOffset,
-
     /// A field offset.  The pointer is a VarDecl*.
     FieldOffset,
 
@@ -356,12 +351,6 @@ public:
 
     LinkEntity entity;
     entity.setForDecl(Kind::Other, decl);
-    return entity;
-  }
-
-  static LinkEntity forWitnessTableOffset(ValueDecl *decl) {
-    LinkEntity entity;
-    entity.setForDecl(Kind::WitnessTableOffset, decl);
     return entity;
   }
 

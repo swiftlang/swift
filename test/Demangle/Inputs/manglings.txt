@@ -110,7 +110,6 @@ _TwTkC3foo3bar ---> {C} initializeBufferWithTake value witness for foo.bar
 _TwtkC3foo3bar ---> {C} initializeWithTake value witness for foo.bar
 _TwprC3foo3bar ---> {C} projectBuffer value witness for foo.bar
 _TWVC3foo3bar ---> value witness table for foo.bar
-_TWoFC3foo3bar3basFSiSi ---> witness table offset for foo.bar.bas(Swift.Int) -> Swift.Int
 _TWvdvC3foo3bar3basSi ---> direct field offset for foo.bar.bas : Swift.Int
 _TWvivC3foo3bar3basSi ---> indirect field offset for foo.bar.bas : Swift.Int
 _TWPC3foo3barS_8barrables ---> protocol witness table for foo.bar : foo.barrable in Swift
@@ -250,4 +249,3 @@ _T08mangling14varargsVsArrayySaySiG3arrd_SS1ntF ---> mangling.varargsVsArray(arr
 _T08mangling14varargsVsArrayySaySiG3arrd_tF ---> mangling.varargsVsArray(arr: Swift.Int...) -> ()
 _T0s13_UnicodeViewsVss22RandomAccessCollectionRzs0A8EncodingR_11SubSequence_5IndexQZAFRtzsAcERpzAE_AEQZAIRSs15UnsignedInteger8Iterator_7ElementRPzAE_AlMQZANRS13EncodedScalar_AlMQY_AORSr0_lE13CharacterViewVyxq__G ---> (extension in Swift):Swift._UnicodeViews<A, B><A, B where A: Swift.RandomAccessCollection, B: Swift.UnicodeEncoding, A.Index == A.SubSequence.Index, A.SubSequence: Swift.RandomAccessCollection, A.SubSequence == A.SubSequence.SubSequence, A.Iterator.Element: Swift.UnsignedInteger, A.Iterator.Element == A.SubSequence.Iterator.Element, A.SubSequence.Iterator.Element == B.EncodedScalar.Iterator.Element>.CharacterView
 _T010Foundation11MeasurementV12SimulatorKitSo9UnitAngleCRszlE11OrientationO2eeoiSbAcDEAGOyAF_G_AKtFZ ---> static (extension in SimulatorKit):Foundation.Measurement<A where A == __ObjC.UnitAngle>.Orientation.== infix((extension in SimulatorKit):Foundation.Measurement<__ObjC.UnitAngle>.Orientation, (extension in SimulatorKit):Foundation.Measurement<__ObjC.UnitAngle>.Orientation) -> Swift.Bool
-

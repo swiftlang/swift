@@ -392,7 +392,6 @@ private:
     case Node::Kind::VTableThunk:
     case Node::Kind::Weak:
     case Node::Kind::WillSet:
-    case Node::Kind::WitnessTableOffset:
     case Node::Kind::ReflectionMetadataBuiltinDescriptor:
     case Node::Kind::ReflectionMetadataFieldDescriptor:
     case Node::Kind::ReflectionMetadataAssocTypeDescriptor:
@@ -1255,10 +1254,6 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
     return nullptr;
   case Node::Kind::ValueWitnessTable:
     Printer << "value witness table for ";
-    print(Node->getFirstChild());
-    return nullptr;
-  case Node::Kind::WitnessTableOffset:
-    Printer << "witness table offset for ";
     print(Node->getFirstChild());
     return nullptr;
   case Node::Kind::BoundGenericClass:

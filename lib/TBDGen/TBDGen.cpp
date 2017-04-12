@@ -217,21 +217,6 @@ void TBDGenVisitor::visitClassDecl(ClassDecl *CD) {
     if (!value)
       continue;
 
-    auto ctor = dyn_cast<ConstructorDecl>(value);
-
-    auto hasWitnessTableOffset =
-        ctor || isaAnd<FuncDecl>(value, [](FuncDecl *FD) {
-          auto ASD = FD->getAccessorStorageDecl();
-          // Static functions (including getters/setters of static variables)
-          // and getters of lets do not get WTOs.
-          auto forLet =
-              isaAnd<VarDecl>(ASD, [](VarDecl *VD) { return VD->isLet(); });
-          return !(FD->isStatic() || forLet);
-        });
-    if (hasWitnessTableOffset) {
-      addSymbol(LinkEntity::forWitnessTableOffset(value));
-    }
-
     auto var = dyn_cast<VarDecl>(value);
     auto hasFieldOffset = var && var->hasStorage() && !var->isStatic();
     if (hasFieldOffset) {

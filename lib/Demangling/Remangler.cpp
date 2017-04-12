@@ -1630,11 +1630,6 @@ void Remangler::mangleWillSet(Node *node) {
   Buffer << "fw";
 }
 
-void Remangler::mangleWitnessTableOffset(Node *node) {
-  mangleChildNodes(node);
-  Buffer << "Wo";
-}
-
 void Remangler::mangleReflectionMetadataBuiltinDescriptor(Node *node) {
   mangleSingleChildNode(node);
   Buffer << "MB";
