@@ -1,4 +1,4 @@
-//===--- NSLocaleShims.h - Foundation declarations for Locale overlay ------===//
+//===--- NSLocaleShims.h - Foundation declarations for Locale overlay -----===//
 //
 // This source file is part of the Swift.org open source project
 //

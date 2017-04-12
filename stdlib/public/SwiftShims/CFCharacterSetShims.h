@@ -1,4 +1,4 @@
-//===--- CFCharacterSetShims.h - CoreFoundation declarations for CF hashing functions ------===//
+//===--- CFCharacterSetShims.h - Declarations for CF hashing functions ----===//
 //
 // This source file is part of the Swift.org open source project
 //
