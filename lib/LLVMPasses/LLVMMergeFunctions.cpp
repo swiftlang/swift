@@ -37,6 +37,7 @@
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/ADT/Hashing.h"
+#include "llvm/IR/AttributeSetNode.h"
 #include "llvm/IR/CallSite.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/DataLayout.h"
@@ -1063,8 +1064,7 @@ bool SwiftMergeFunctions::replaceDirectCallers(Function *Old, Function *New,
     
     // Add the existing parameters.
     for (Value *OldArg : CI->arg_operands()) {
-      AttributeList Attrs = NewFuncAttrs.getParamAttributes(ParamIdx);
-      if (Attrs.getNumSlots())
+      if (AttributeSetNode *Attrs = NewFuncAttrs.getParamAttributes(ParamIdx))
         CallSiteAttrs = CallSiteAttrs.addAttributes(Context, ParamIdx, Attrs);
 
       NewArgs.push_back(OldArg);
