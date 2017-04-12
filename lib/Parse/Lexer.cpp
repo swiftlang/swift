@@ -1358,16 +1358,15 @@ static std::string getTrailingIndentOrWindowsLineEnding(const Token &Str) {
   StringRef Bytes = getStringLiteralContent(Str);
   const char *end = Bytes.end(), *start = end;
 
-  // if literal starts with line ending
-  //if (*Bytes.begin() == '\n' || *Bytes.begin() == '\r')
-    // work back from the end to find whitespace to strip
-    while (start > Bytes.begin() && isWhitespace(start[-1]))
-      if (*--start == '\n' || *start == '\r') {
-        if (start[-1] == '\r')
-          start--;
-        // return it to be replaced including line sep
-        return std::string(start, end - start);
-      }
+  // work back from the end to find whitespace to strip
+  while (start > Bytes.begin() && isWhitespace(start[-1])) {
+    if (*--start == '\n' || *start == '\r') {
+      if (start[-1] == '\r')
+        start--;
+      // return it to be replaced including line sep
+      return std::string(start, end - start);
+    }
+  }
 
   // are there windows line endings in the file, if so return it to be replaced
   const char *windowsLinesep = strnstr(Bytes.begin(), "\r\n", Bytes.end()-Bytes.begin());
