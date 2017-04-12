@@ -201,6 +201,12 @@ template <typename T> bool isaAnd(Decl *D, llvm::function_ref<bool(T *)> f) {
 }
 
 void TBDGenVisitor::visitClassDecl(ClassDecl *CD) {
+  auto &ctxt = CD->getASTContext();
+
+  if (ctxt.LangOpts.EnableObjCInterop) {
+    addSymbol(LinkEntity::forSwiftMetaclassStub(CD));
+  }
+
   // Some members of classes get extra handling, beyond members of struct/enums,
   // so let's walk over them manually.
   for (auto *member : CD->getMembers()) {
