@@ -903,7 +903,7 @@ public struct Latin1CharacterView<
     // code-unit-is-single-grapheme?
     _sanityCheck(nextIdx.base == i.base+2)
     _sanityCheck(getCU(at: i) == _CR)
-    _sanityCheck(getCU(at: nextIdx) == _LF)
+    _sanityCheck(codeUnits[codeUnits.index(atOffset: i.base + 1)] == _LF)
     return Character("\u{0D}\u{0A}")
   }
 
