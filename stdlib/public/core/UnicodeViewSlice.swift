@@ -42,7 +42,7 @@ public struct RandomAccessUnicodeViewSlice<
   public typealias Iterator = Base.Iterator
   public var base: Base
 
-  init(base: BaseView, bounds: Range<BaseView.Index>) {
+  public init(base: BaseView, bounds: Range<BaseView.Index>) {
     self.base = Base(base: base, bounds: bounds)
   }
   public func nativeIndex(_ x: AnyUnicodeIndex) -> Index {
@@ -84,7 +84,7 @@ public struct RangeReplaceableUnicodeViewSlice<
   where C.Iterator.Element == Iterator.Element {
     return base.replaceSubrange(r,  with: replacement)
   }
-  init(base: BaseView, bounds: Range<BaseView.Index>) {
+  public init(base: BaseView, bounds: Range<BaseView.Index>) {
     self.base = Base(base: base, bounds: bounds)
   }
   
