@@ -1,8 +1,8 @@
 // RUN: rm -rf %t  &&  mkdir -p %t
 //
 // RUN: %gyb %s -o %t/Runtime.swift
-// RUN: %target-build-swift -parse-stdlib -module-name a %t/Runtime.swift -o %t.out
-// RUN: %target-run %t.out
+// RUN: %line-directive %t/Runtime.swift -- %target-build-swift -parse-stdlib -module-name a %t/Runtime.swift -o %t.out
+// RUN: %line-directive %t/Runtime.swift -- %target-run %t.out
 // REQUIRES: executable_test
 
 import Swift
@@ -1689,3 +1689,6 @@ AvailabilityVersionsTestSuite.test("_stdlib_isOSVersionAtLeast") {
 
 runAllTests()
 
+// ${'Local Variables'}:
+// eval: (read-only-mode 1)
+// End:
