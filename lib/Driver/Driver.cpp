@@ -826,8 +826,7 @@ Driver::parseArgStrings(ArrayRef<const char *> Args) {
   }
 
   // Check for unknown arguments.
-  for (const Arg *A : make_range(ArgList->filtered_begin(options::OPT_UNKNOWN),
-       ArgList->filtered_end())) {
+  for (const Arg *A :  ArgList->filtered(options::OPT_UNKNOWN)) {
     Diags.diagnose(SourceLoc(), diag::error_unknown_arg,
                    A->getAsString(*ArgList));
   }
