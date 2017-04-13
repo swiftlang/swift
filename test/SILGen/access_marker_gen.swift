@@ -72,3 +72,22 @@ func readGlobal() -> AnyObject? {
 // CHECK-NEXT:    [[T4:%.*]] = load [copy] [[T3]]
 // CHECK-NEXT:    end_access [[T2]]
 // CHECK-NEXT:    return [[T4]]
+
+
+public struct HasTwoStoredProperties {
+  var f: Int = 7
+  var g: Int = 9
+
+// CHECK-LABEL: sil hidden @_T017access_marker_gen22HasTwoStoredPropertiesV027noOverlapOnAssignFromPropToM0yyF : $@convention(method) (@inout HasTwoStoredProperties) -> ()
+// CHECK:       [[ACCESS1:%.*]] = begin_access [read] [unknown] [[SELF_ADDR:%.*]] : $*HasTwoStoredProperties
+// CHECK-NEXT:  [[G_ADDR:%.*]] = struct_element_addr [[ACCESS1]] : $*HasTwoStoredProperties, #HasTwoStoredProperties.g
+// CHECK-NEXT:  [[G_VAL:%.*]] = load [trivial] [[G_ADDR]] : $*Int
+// CHECK-NEXT:  end_access [[ACCESS1]] : $*HasTwoStoredProperties
+// CHECK-NEXT:  [[ACCESS2:%.*]] = begin_access [modify] [unknown] [[SELF_ADDR]] : $*HasTwoStoredProperties
+// CHECK-NEXT:  [[F_ADDR:%.*]] = struct_element_addr [[ACCESS2]] : $*HasTwoStoredProperties, #HasTwoStoredProperties.f
+// CHECK-NEXT:  assign [[G_VAL]] to [[F_ADDR]] : $*Int
+// CHECK-NEXT:  end_access [[ACCESS2]] : $*HasTwoStoredProperties
+  mutating func noOverlapOnAssignFromPropToProp() {
+    f = g
+  }
+}
