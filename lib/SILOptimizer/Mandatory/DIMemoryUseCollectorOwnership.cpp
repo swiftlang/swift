@@ -320,14 +320,19 @@ bool DIMemoryObjectInfo::isElementLetProperty(unsigned Element) const {
 
   auto &Module = MemoryInst->getModule();
 
-  if (auto *NTD = MemorySILType.getNominalOrBoundGenericNominal()) {
-    for (auto *VD : NTD->getStoredProperties()) {
-      auto FieldType = MemorySILType.getFieldType(VD, Module);
-      unsigned NumFieldElements = getElementCountRec(Module, FieldType, false);
-      if (Element < NumFieldElements)
-        return VD->isLet();
-      Element -= NumFieldElements;
-    }
+  auto *NTD = MemorySILType.getNominalOrBoundGenericNominal();
+  if (!NTD) {
+    // Otherwise, we miscounted elements?
+    assert(Element == 0 && "Element count problem");
+    return false;
+  }
+
+  for (auto *VD : NTD->getStoredProperties()) {
+    auto FieldType = MemorySILType.getFieldType(VD, Module);
+    unsigned NumFieldElements = getElementCountRec(Module, FieldType, false);
+    if (Element < NumFieldElements)
+      return VD->isLet();
+    Element -= NumFieldElements;
   }
 
   // Otherwise, we miscounted elements?
