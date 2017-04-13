@@ -1022,8 +1022,7 @@ private:
                       ArrayRef<TypeLoc> inherited,
                       ArrayRef<ProtocolDecl *> protos,
                       Type superclass = {},
-                      bool explicitClass = false,
-                      bool PrintAsProtocolComposition = false);
+                      bool explicitClass = false);
 
   void printInherited(const NominalTypeDecl *decl,
                       bool explicitClass = false);
@@ -2063,8 +2062,7 @@ void PrintAST::printInherited(const Decl *decl,
                               ArrayRef<TypeLoc> inherited,
                               ArrayRef<ProtocolDecl *> protos,
                               Type superclass,
-                              bool explicitClass,
-                              bool PrintAsProtocolComposition) {
+                              bool explicitClass) {
   if (inherited.empty() && superclass.isNull() && !explicitClass) {
     if (protos.empty())
       return;
@@ -2094,12 +2092,6 @@ void PrintAST::printInherited(const Decl *decl,
       }
     }
 
-    bool UseProtocolCompositionSyntax =
-        PrintAsProtocolComposition && protos.size() > 1;
-    if (UseProtocolCompositionSyntax) {
-      Printer << " : " << tok::kw_protocol << "<";
-      PrintedColon = true;
-    }
     for (auto Proto : protos) {
       if (!shouldPrint(Proto))
         continue;
@@ -2127,8 +2119,6 @@ void PrintAST::printInherited(const Decl *decl,
       PrintedInherited = true;
       PrintedColon = true;
     }
-    if (UseProtocolCompositionSyntax)
-      Printer << ">";
   } else {
     SmallVector<TypeLoc, 6> TypesToPrint;
     for (auto TL : inherited) {
