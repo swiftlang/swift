@@ -61,27 +61,38 @@ static unsigned getElementCountRec(SILModule &Module, SILType T,
   return 1;
 }
 
-DIMemoryObjectInfo::DIMemoryObjectInfo(SILInstruction *MI) {
-  auto &Module = MI->getModule();
-
-  MemoryInst = MI;
+static std::pair<SILType, bool>
+computeMemorySILType(SILInstruction *MemoryInst) {
   // Compute the type of the memory object.
   if (auto *ABI = dyn_cast<AllocBoxInst>(MemoryInst)) {
     assert(ABI->getBoxType()->getLayout()->getFields().size() == 1 &&
            "analyzing multi-field boxes not implemented");
-    MemorySILType = ABI->getBoxType()->getFieldType(Module, 0);
-  } else if (auto *ASI = dyn_cast<AllocStackInst>(MemoryInst)) {
-    MemorySILType = ASI->getElementType();
-  } else {
-    auto *MUI = cast<MarkUninitializedInst>(MemoryInst);
-    MemorySILType = MUI->getType().getObjectType();
-
-    // If this is a let variable we're initializing, remember this so we don't
-    // allow reassignment.
-    if (MUI->isVar())
-      if (auto *decl = MUI->getLoc().getAsASTNode<VarDecl>())
-        IsLet = decl->isLet();
+    return {ABI->getBoxType()->getFieldType(MemoryInst->getModule(), 0), false};
   }
+
+  if (auto *ASI = dyn_cast<AllocStackInst>(MemoryInst)) {
+    return {ASI->getElementType(), false};
+  }
+
+  auto *MUI = cast<MarkUninitializedInst>(MemoryInst);
+  SILType MemorySILType = MUI->getType().getObjectType();
+
+  // If this is a let variable we're initializing, remember this so we don't
+  // allow reassignment.
+  if (!MUI->isVar())
+    return {MemorySILType, false};
+
+  auto *VDecl = MUI->getLoc().getAsASTNode<VarDecl>();
+  if (!VDecl)
+    return {MemorySILType, false};
+
+  return {MemorySILType, VDecl->isLet()};
+}
+
+DIMemoryObjectInfo::DIMemoryObjectInfo(SILInstruction *MI) : MemoryInst(MI) {
+  auto &Module = MI->getModule();
+
+  std::tie(MemorySILType, IsLet) = computeMemorySILType(MemoryInst);
 
   // Compute the number of elements to track in this memory object.
   // If this is a 'self' in a delegating initializer, we only track one bit:
@@ -104,8 +115,7 @@ DIMemoryObjectInfo::DIMemoryObjectInfo(SILInstruction *MI) {
 
   // If this is a derived class init method, track an extra element to determine
   // whether super.init has been called at each program point.
-  if (isDerivedClassSelf())
-    ++NumElements;
+  NumElements += unsigned(isDerivedClassSelf());
 }
 
 SILInstruction *DIMemoryObjectInfo::getFunctionEntryPoint() const {
