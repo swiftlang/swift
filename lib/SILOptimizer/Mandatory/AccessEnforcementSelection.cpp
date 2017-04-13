@@ -16,6 +16,7 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "access-enforcement-selection"
+#include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 
@@ -24,11 +25,15 @@ using namespace swift;
 static void setStaticEnforcement(BeginAccessInst *access) {
   // TODO: delete if we're not using static enforcement?
   access->setEnforcement(SILAccessEnforcement::Static);
+
+  DEBUG(llvm::dbgs() << "Static Access: " << *access);
 }
 
 static void setDynamicEnforcement(BeginAccessInst *access) {
   // TODO: delete if we're not using dynamic enforcement?
   access->setEnforcement(SILAccessEnforcement::Dynamic);
+
+  DEBUG(llvm::dbgs() << "Dynamic Access: " << *access);
 }
 
 namespace {
@@ -283,6 +288,9 @@ namespace {
 /// The pass.
 struct AccessEnforcementSelection : SILFunctionTransform {
   void run() override {
+    DEBUG(llvm::dbgs() << "Access Enforcement Selection in "
+          << getFunction()->getName() << "\n");
+
     for (auto &bb : *getFunction()) {
       for (auto ii = bb.begin(), ie = bb.end(); ii != ie; ) {
         SILInstruction *inst = &*ii;
@@ -293,6 +301,7 @@ struct AccessEnforcementSelection : SILFunctionTransform {
         }
       }
     }
+    invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
   }
 
   void handleAccess(BeginAccessInst *access) {
@@ -306,9 +315,33 @@ struct AccessEnforcementSelection : SILFunctionTransform {
     if (auto box = dyn_cast<ProjectBoxInst>(address)) {
       return handleAccessToBox(access, box);
     }
+    if (auto arg = dyn_cast<SILFunctionArgument>(address)) {
+      switch (arg->getArgumentConvention()) {
+      case SILArgumentConvention::Indirect_Inout:
+        // `inout` arguments are checked on the caller side, either statically
+        // or dynamically if necessary. The @inout does not alias and cannot
+        // escape within the callee, so static enforcement is always sufficient.
+        setStaticEnforcement(access);
+        break;
+      case SILArgumentConvention::Indirect_InoutAliasable:
+        // `inout_aliasable` are not enforced on the caller side. Dynamic
+        // enforcement is required unless we have special knowledge of how this
+        // closure is used at its call-site.
+        //
+        // TODO: optimize closures passed to call sites in which the captured
+        // variable is not modified by any closure passed to the same call.
+        setDynamicEnforcement(access);
+        break;
+      default:
+        llvm_unreachable("Expecting an indirect argument.");
+      }
+      return;
+    }
 
-    // If we're not accessing a box, we must've lowered to
-    // a stack element.
+    // If we're not accessing a box or argument, we must've lowered to a stack
+    // element. Other sources of access are either outright dynamic (GlobalAddr,
+    // RefElementAddr), or only exposed after mandator inlining (nested
+    // dependent BeginAccess).
     assert(isa<AllocStackInst>(address));
     setStaticEnforcement(access);
   }
