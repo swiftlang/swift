@@ -123,8 +123,8 @@ class Traversal : public TypeVisitor<Traversal, bool>
   }
 
   bool visitProtocolCompositionType(ProtocolCompositionType *ty) {
-    for (auto proto : ty->getProtocols())
-      if (doIt(proto))
+    for (auto member : ty->getMembers())
+      if (doIt(member))
         return true;
     return false;
   }

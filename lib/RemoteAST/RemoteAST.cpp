@@ -321,7 +321,9 @@ public:
       if (!protocol->is<ProtocolType>())
         return Type();
     }
-    return ProtocolCompositionType::get(Ctx, protocols);
+    return ProtocolCompositionType::get(Ctx, protocols,
+                                        // FIXME
+                                        /*hasExplicitAnyObject=*/false);
   }
 
   Type createExistentialMetatypeType(Type instance) {

@@ -3389,11 +3389,12 @@ void Serializer::writeType(Type ty) {
     auto composition = cast<ProtocolCompositionType>(ty.getPointer());
 
     SmallVector<TypeID, 4> protocols;
-    for (auto proto : composition->getProtocols())
+    for (auto proto : composition->getMembers())
       protocols.push_back(addTypeRef(proto));
 
     unsigned abbrCode = DeclTypeAbbrCodes[ProtocolCompositionTypeLayout::Code];
     ProtocolCompositionTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
+                                              composition->hasExplicitAnyObject(),
                                               protocols);
     break;
   }

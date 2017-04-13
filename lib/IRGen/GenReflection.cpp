@@ -933,7 +933,7 @@ void IRGenModule::emitBuiltinReflectionMetadata() {
     BuiltinTypes.insert(thinFunction);
 
     CanType anyMetatype = CanExistentialMetatypeType::get(
-      ProtocolCompositionType::get(Context, {})->getCanonicalType());
+      Context.TheAnyType);
     BuiltinTypes.insert(anyMetatype);
   }
 

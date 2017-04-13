@@ -262,13 +262,11 @@ ExistentialLayout::ExistentialLayout(ProtocolType *type) {
 ExistentialLayout::ExistentialLayout(ProtocolCompositionType *type) {
   assert(type->isCanonical());
 
-  // FIXME: Eventually, there will be a requiresClass() bit in
-  // the ProtocolCompositionType
-  requiresClass = false;
+  requiresClass = type->hasExplicitAnyObject();
   requiresClassImplied = false;
   containsNonObjCProtocol = false;
 
-  auto members = type->getProtocols();
+  auto members = type->getMembers();
   if (!members.empty() &&
       isa<ClassDecl>(members[0]->getAnyNominal())) {
     superclass = members[0];
@@ -911,7 +909,7 @@ static void addProtocols(Type T, SmallVectorImpl<ProtocolDecl *> &Protocols,
   }
 
   if (auto PC = T->getAs<ProtocolCompositionType>()) {
-    for (auto P : PC->getProtocols())
+    for (auto P : PC->getMembers())
       addProtocols(P, Protocols, Superclass);
     return;
   }
@@ -950,7 +948,7 @@ static void addMinimumProtocols(Type T,
   }
   
   if (auto PC = T->getAs<ProtocolCompositionType>()) {
-    for (auto C : PC->getProtocols()) {
+    for (auto C : PC->getMembers()) {
       addMinimumProtocols(C, Protocols, Known, Visited, Stack, ZappedAny);
     }
   }
@@ -1174,12 +1172,14 @@ CanType TypeBase::getCanonicalType() {
     break;
   }
   case TypeKind::ProtocolComposition: {
+    auto *PCT = cast<ProtocolCompositionType>(this);
     SmallVector<Type, 4> CanProtos;
-    for (Type t : cast<ProtocolCompositionType>(this)->getProtocols())
+    for (Type t : PCT->getMembers())
       CanProtos.push_back(t->getCanonicalType());
     assert(!CanProtos.empty() && "Non-canonical empty composition?");
     const ASTContext &C = CanProtos[0]->getASTContext();
-    Type Composition = ProtocolCompositionType::get(C, CanProtos);
+    Type Composition = ProtocolCompositionType::get(C, CanProtos,
+                                                    PCT->hasExplicitAnyObject());
     Result = Composition.getPointer();
     break;
   }
@@ -1518,10 +1518,10 @@ bool TypeBase::isSpelledLike(Type other) {
   case TypeKind::ProtocolComposition: {
     auto pMe = cast<ProtocolCompositionType>(me);
     auto pThem = cast<ProtocolCompositionType>(them);
-    if (pMe->getProtocols().size() != pThem->getProtocols().size())
+    if (pMe->getMembers().size() != pThem->getMembers().size())
       return false;
-    for (size_t i = 0, sz = pMe->getProtocols().size(); i < sz; ++i)
-      if (!pMe->getProtocols()[i]->isSpelledLike(pThem->getProtocols()[i]))
+    for (size_t i = 0, sz = pMe->getMembers().size(); i < sz; ++i)
+      if (!pMe->getMembers()[i]->isSpelledLike(pThem->getMembers()[i]))
         return false;
     return true;
   }
@@ -2769,9 +2769,11 @@ GenericEnvironment *ArchetypeType::getGenericEnvironment() const {
 }
 
 void ProtocolCompositionType::Profile(llvm::FoldingSetNodeID &ID,
-                                      ArrayRef<Type> Protocols) {
-  for (auto P : Protocols)
-    ID.AddPointer(P.getPointer());
+                                      ArrayRef<Type> Members,
+                                      bool HasExplicitAnyObject) {
+  ID.AddInteger(HasExplicitAnyObject);
+  for (auto T : Members)
+    ID.AddPointer(T.getPointer());
 }
 
 bool ProtocolType::requiresClass() {
@@ -2783,23 +2785,25 @@ bool ProtocolCompositionType::requiresClass() {
 }
 
 Type ProtocolCompositionType::get(const ASTContext &C,
-                                  ArrayRef<Type> MemberTypes) {
-  for (Type t : MemberTypes) {
+                                  ArrayRef<Type> Members,
+                                  bool HasExplicitAnyObject) {
+  for (Type t : Members) {
     if (!t->isCanonical())
-      return build(C, MemberTypes);
+      return build(C, Members, HasExplicitAnyObject);
   }
     
   Type Superclass;
   SmallVector<ProtocolDecl *, 4> Protocols;
-  for (Type t : MemberTypes) {
+  for (Type t : Members) {
     addProtocols(t, Protocols, Superclass);
   }
   
   // Minimize the set of protocols composed together.
   ProtocolType::canonicalizeProtocols(Protocols);
 
-  // If one protocol remains, its nominal type is the canonical type.
-  if (Protocols.size() == 1 && !Superclass)
+  // If one protocol remains with no further constrants, its nominal
+  // type is the canonical type.
+  if (Protocols.size() == 1 && !Superclass && !HasExplicitAnyObject)
     return Protocols.front()->getDeclaredType();
 
   // Form the set of canonical protocol types from the protocol
@@ -2813,7 +2817,10 @@ Type ProtocolCompositionType::get(const ASTContext &C,
                    return Proto->getDeclaredType();
                  });
 
-  return build(C, CanTypes);
+  // TODO: Canonicalize away HasExplicitAnyObject if it is implied
+  // by one of our member protocols or the presence of a superclass
+  // constraint.
+  return build(C, CanTypes, HasExplicitAnyObject);
 }
 
 FunctionType *
@@ -3874,24 +3881,24 @@ case TypeKind::Id:
 
   case TypeKind::ProtocolComposition: {
     auto pc = cast<ProtocolCompositionType>(base);
-    SmallVector<Type, 4> protocols;
+    SmallVector<Type, 4> members;
     bool anyChanged = false;
     unsigned index = 0;
-    for (auto proto : pc->getProtocols()) {
-      auto substProto = proto.transformRec(fn);
-      if (!substProto)
+    for (auto member : pc->getMembers()) {
+      auto substMember = member.transformRec(fn);
+      if (!substMember)
         return Type();
       
       if (anyChanged) {
-        protocols.push_back(substProto);
+        members.push_back(substMember);
         ++index;
         continue;
       }
       
-      if (substProto.getPointer() != proto.getPointer()) {
+      if (substMember.getPointer() != member.getPointer()) {
         anyChanged = true;
-        protocols.append(protocols.begin(), protocols.begin() + index);
-        protocols.push_back(substProto);
+        members.append(members.begin(), members.begin() + index);
+        members.push_back(substMember);
       }
       
       ++index;
@@ -3900,7 +3907,8 @@ case TypeKind::Id:
     if (!anyChanged)
       return *this;
     
-    return ProtocolCompositionType::get(Ptr->getASTContext(), protocols);
+    return ProtocolCompositionType::get(Ptr->getASTContext(), members,
+                                        pc->hasExplicitAnyObject());
   }
   }
   

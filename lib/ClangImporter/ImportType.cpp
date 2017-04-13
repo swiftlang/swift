@@ -874,6 +874,7 @@ namespace {
               }
               importedTypeArg = subresult.AbstractType;
             } else if (typeParam->getSuperclass()) {
+              // FIXME: Can we have both a superclass and protocols?
               importedTypeArg = typeParam->getSuperclass();
             } else {
               auto protocols = typeParam->getConformingProtocols();
@@ -885,7 +886,8 @@ namespace {
                 protocolTypes.push_back(protocolDecl->getDeclaredType());
               }
               importedTypeArg = ProtocolCompositionType::get(
-                  Impl.SwiftContext, protocolTypes);
+                  Impl.SwiftContext, protocolTypes,
+                  /*hasExplicitAnyObject=*/false);
             }
             importedTypeArgs.push_back(importedTypeArg);
           }
@@ -1029,8 +1031,11 @@ namespace {
           protocols.push_back(proto->getDeclaredType());
         }
 
+        // FIXME: Handle isObjCQualifiedClassType() case by adding a superclass
+        // constraint here
         Type result = ProtocolCompositionType::get(Impl.SwiftContext,
-                                                   protocols);
+                                                   protocols,
+                                                 /*HasExplicitAnyObject=*/false);
         if (type->isObjCQualifiedClassType())
           result = ExistentialMetatypeType::get(result);
 

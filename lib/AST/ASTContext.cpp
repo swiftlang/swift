@@ -415,7 +415,8 @@ ASTContext::ASTContext(LangOptions &langOpts, SearchPathOptions &SearchPathOpts,
     TheUnresolvedType(new (*this, AllocationArena::Permanent)
                       UnresolvedType(*this)),
     TheEmptyTupleType(TupleType::get(ArrayRef<TupleTypeElt>(), *this)),
-    TheAnyType(ProtocolCompositionType::get(*this, ArrayRef<Type>())),
+    TheAnyType(ProtocolCompositionType::get(*this, ArrayRef<Type>(),
+                                            /*hasExplicitAnyObject=*/false)),
     TheNativeObjectType(new (*this, AllocationArena::Permanent)
                            BuiltinNativeObjectType(*this)),
     TheBridgeObjectType(new (*this, AllocationArena::Permanent)
@@ -2834,15 +2835,16 @@ void ClassType::Profile(llvm::FoldingSetNodeID &ID, ClassDecl *D, Type Parent) {
 }
 
 ProtocolCompositionType *
-ProtocolCompositionType::build(const ASTContext &C, ArrayRef<Type> Protocols) {
+ProtocolCompositionType::build(const ASTContext &C, ArrayRef<Type> Members,
+                               bool HasExplicitAnyObject) {
   // Check to see if we've already seen this protocol composition before.
   void *InsertPos = nullptr;
   llvm::FoldingSetNodeID ID;
-  ProtocolCompositionType::Profile(ID, Protocols);
+  ProtocolCompositionType::Profile(ID, Members, HasExplicitAnyObject);
 
   bool isCanonical = true;
   RecursiveTypeProperties properties;
-  for (Type t : Protocols) {
+  for (Type t : Members) {
     if (!t->isCanonical())
       isCanonical = false;
     properties |= t->getRecursiveProperties();
@@ -2859,7 +2861,8 @@ ProtocolCompositionType::build(const ASTContext &C, ArrayRef<Type> Protocols) {
   auto compTy
     = new (C, arena)
         ProtocolCompositionType(isCanonical ? &C : nullptr,
-                                C.AllocateCopy(Protocols),
+                                C.AllocateCopy(Members),
+                                HasExplicitAnyObject,
                                 properties);
   C.Impl.getArena(arena).ProtocolCompositionTypes
     .InsertNode(compTy, InsertPos);

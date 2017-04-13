@@ -2199,13 +2199,16 @@ static ConstraintResult visitInherited(
   // Local function that (recursively) adds inherited types.
   ConstraintResult result = ConstraintResult::Resolved;
   std::function<void(Type, const TypeRepr *)> visitInherited;
+
+  // FIXME: Should this whole thing use getExistentialLayout() instead?
+
   visitInherited = [&](Type inheritedType, const TypeRepr *typeRepr) {
     // Decompose protocol compositions.
     auto composition = dyn_cast_or_null<CompositionTypeRepr>(typeRepr);
     if (auto compositionType
           = inheritedType->getAs<ProtocolCompositionType>()) {
       unsigned index = 0;
-      for (auto protoType : compositionType->getProtocols()) {
+      for (auto protoType : compositionType->getMembers()) {
         if (composition && index < composition->getTypes().size())
           visitInherited(protoType, composition->getTypes()[index]);
         else

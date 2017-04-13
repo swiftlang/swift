@@ -3513,9 +3513,12 @@ class TypePrinter : public TypeVisitor<TypePrinter> {
     }
 
     case TypeKind::ProtocolComposition: {
-      // 'Any' and single protocol compositions are simple
+      // 'Any', 'AnyObject' and single protocol compositions are simple
       auto composition = type->getAs<ProtocolCompositionType>();
-      return composition->getProtocols().size() <= 1;
+      auto memberCount = composition->getMembers().size();
+      if (composition->hasExplicitAnyObject())
+        return memberCount == 0;
+      return memberCount <= 1;
     }
 
     default:
@@ -4187,11 +4190,16 @@ public:
   }
 
   void visitProtocolCompositionType(ProtocolCompositionType *T) {
-    if (T->getProtocols().empty()) {
-      Printer << "Any";
+    if (T->getMembers().empty()) {
+      if (T->hasExplicitAnyObject())
+        Printer << "AnyObject";
+      else
+        Printer << "Any";
     } else {
-      interleave(T->getProtocols(), [&](Type Proto) { visit(Proto); },
+      interleave(T->getMembers(), [&](Type Ty) { visit(Ty); },
                  [&] { Printer << " & "; });
+      if (T->hasExplicitAnyObject())
+        Printer << " & AnyObject";
     }
   }
 
