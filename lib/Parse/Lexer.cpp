@@ -44,7 +44,10 @@ using clang::isWhitespace;
 /// number of bits must tally with Token.h
 enum StringLiteralModifiers : unsigned {
   StringLiteralMultiline = 1 << 0,
-  StringLiteralFirstSegment = 1 << 1
+
+  // pseudo options not in Token.h
+  StringLiteralFirstSegment = 1 << 1,
+  StringLiteralLastSegment = 1 << 2
 };
 
 //===----------------------------------------------------------------------===//
@@ -1353,7 +1356,7 @@ static StringRef getStringLiteralContent(const Token &Str) {
 }
 
 /// determine contents of literal to be normalised - either
-/// to strip indenting or normalize line endings to a single \n
+/// to strip indenting or normalise line endings to a single \n
 static std::string getTrailingIndentOrWindowsLineEnding(const Token &Str) {
   StringRef Bytes = getStringLiteralContent(Str);
   const char *end = Bytes.end(), *start = end;
@@ -1368,7 +1371,7 @@ static std::string getTrailingIndentOrWindowsLineEnding(const Token &Str) {
     }
   }
 
-  // are there windows line endings in the file, if so return it to be replaced
+  // are there windows line endings in the source, if so return it to be replaced
   const char *windowsLinesep = strnstr(Bytes.begin(), "\r\n", Bytes.end()-Bytes.begin());
   return windowsLinesep != nullptr ? "\r\n" : "";
 }
@@ -1478,9 +1481,9 @@ void Lexer::lexStringLiteral() {
                              replacement);
       }
 
-      // is this the end of a multiline string litersl
+      // is this the end of a multiline string literal
       if (Modifiers & StringLiteralMultiline) {
-        if (*CurPtr == '"' && *(CurPtr + 1) == '"') {
+        if (*CurPtr == '"' && *(CurPtr + 1) == '"' && *(CurPtr + 2) != '"') {
           CurPtr += 2;
           formToken(tok::string_literal, TokStart, Modifiers);
           validateIndents(NextToken);
@@ -1667,11 +1670,13 @@ StringRef Lexer::getEncodedStringSegment(StringRef Bytes,
     IndentStripped = Bytes;
     size_t pos = 0;
     while ((pos = IndentStripped.find(ToReplace, pos)) != std::string::npos) {
-      bool removeInitialNewLine = pos == 0 && (Modifiers & StringLiteralFirstSegment);
-      IndentStripped.replace(pos, ToReplace.size(), removeInitialNewLine ? "" : "\n");
-      if (removeInitialNewLine && ToReplace == "\n")
+      bool removeNewLine = (pos == 0 && (Modifiers & StringLiteralFirstSegment));
+//                             || ((Modifiers & StringLiteralLastSegment) &&
+//                                 pos + ToReplace.size() == IndentStripped.size());
+      IndentStripped.replace(pos, ToReplace.size(), removeNewLine ? "" : "\n");
+      if (removeNewLine && ToReplace == "\n")
         break;
-      pos += 1;
+      pos++;
     }
     Bytes = IndentStripped;
   }
@@ -1800,6 +1805,7 @@ void Lexer::getStringLiteralSegments(
     SegmentStartPtr = BytesPtr = End;
   }
 
+  Modifiers |= StringLiteralLastSegment;
   Segments.push_back(
       StringSegment::getLiteral(getSourceLoc(SegmentStartPtr),
                                 Bytes.end()-SegmentStartPtr, Modifiers, ToReplace));
