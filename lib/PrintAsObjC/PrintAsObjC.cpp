@@ -229,6 +229,9 @@ private:
       return *knownProtocol != KnownProtocolKind::AnyObject;
     });
 
+    // Drop protocols from the list that are implied by other protocols.
+    ProtocolType::canonicalizeProtocols(protosToPrint);
+
     if (protosToPrint.empty())
       return;
 
