@@ -2191,12 +2191,13 @@ extension FixedWidthInteger {
 //===----------------------------------------------------------------------===//
 
 ${operatorComment(x.nonMaskingOperator, True)}
+  @available(swift, introduced: 4)
   @_transparent
   public static func ${x.nonMaskingOperator} <
     Other : BinaryInteger
   >(lhs: Self, rhs: Other) -> Self {
     var lhs = lhs
-    lhs ${x.nonMaskingOperator}= rhs
+    ${x.helper}Generic(&lhs, rhs)
     return lhs
   }
 
@@ -2214,6 +2215,7 @@ ${operatorComment(x.nonMaskingOperator, True)}
   }
 #endif
 
+  @available(swift, introduced: 4)
   @_transparent
   public static func ${x.nonMaskingOperator}= <
     Other : BinaryInteger
@@ -3182,29 +3184,6 @@ public func _assumeNonNegative(_ x: ${Self}) -> ${Self} {
 }
 % end
 
-extension ${Self} {
-
-%   for op in maskingShifts:
-
-  public static func ${op.nonMaskingOperator}(
-    lhs: ${Self}, rhs: ${Self}
-  ) -> ${Self} {
-    var lhs = lhs
-    lhs ${op.nonMaskingOperator}= rhs
-    return lhs
-  }
-
-  public static func ${op.nonMaskingOperator}=(
-    lhs: inout ${Self}, rhs: ${Self}
-  ) {
-    ${op.helper}Generic(&lhs, rhs)
-  }
-
-%   end
-
-}
-
-
 //===--- end of FIXME(integers) -------------------------------------------===//
 
 % end # end of concrete FixedWidthInteger section
@@ -3570,6 +3549,38 @@ extension UnsignedInteger {
   public func toUIntMax() -> UIntMax {
     return UIntMax(self)
   }
+}
+
+// FIXME(integers): These overloads allow expressions like the following in
+// Swift 3 compatibility mode:
+//    let x = 1 << i32
+//    f(i32: x)
+// At the same time, since they are obsolete in Swift 4, this will not cause
+// `u8 << -1` to fail due to an overflow in an unsigned value.
+extension FixedWidthInteger {
+
+%   for op in maskingShifts:
+
+  @available(swift, obsoleted: 4)
+  @_transparent
+  public static func ${op.nonMaskingOperator}(
+    lhs: Self, rhs: Self
+  ) -> Self {
+    var lhs = lhs
+    ${op.helper}Generic(&lhs, rhs)
+    return lhs
+  }
+
+  @available(swift, obsoleted: 4)
+  @_transparent
+  public static func ${op.nonMaskingOperator}=(
+    lhs: inout Self, rhs: Self
+  ) {
+    ${op.helper}Generic(&lhs, rhs)
+  }
+
+%   end
+
 }
 
 // FIXME(integers): Absense of &+ causes ambiguity in the code like the

@@ -10,7 +10,9 @@
 //
 //===----------------------------------------------------------------------===//
 // XFAIL: linux
-// RUN: %target-run-simple-swift
+// RUN: rm -rf %t ; mkdir -p %t
+// RUN: %target-build-swift -swift-version 4 -o %t/a.out %s
+// RUN: %target-run %t/a.out
 // REQUIRES: executable_test
 
 import StdlibUnittest
