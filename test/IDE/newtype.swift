@@ -12,6 +12,7 @@
 // PRINT-NEXT:    var _rawValue: NSString
 // PRINT-NEXT:    var rawValue: String { get }
 // PRINT-NEXT:    typealias RawValue = String
+// PRINT-NEXT:    typealias _ObjectiveCType = NSString
 // PRINT-NEXT:  }
 // PRINT-NEXT:  extension ErrorDomain {
 // PRINT-NEXT:    func process()
@@ -32,6 +33,7 @@
 // PRINT-NEXT:    var _rawValue: NSString
 // PRINT-NEXT:    var rawValue: String { get }
 // PRINT-NEXT:    typealias RawValue = String
+// PRINT-NEXT:    typealias _ObjectiveCType = NSString
 // PRINT-NEXT:  }
 // PRINT-NEXT:  extension ClosedEnum {
 // PRINT-NEXT:    static let firstClosedEntryEnum: ClosedEnum
@@ -44,6 +46,7 @@
 // PRINT-NEXT:    var _rawValue: NSString
 // PRINT-NEXT:    var rawValue: String { get }
 // PRINT-NEXT:    typealias RawValue = String
+// PRINT-NEXT:    typealias _ObjectiveCType = NSString
 // PRINT-NEXT:  }
 // PRINT-NEXT:  struct MyFloat : RawRepresentable, _SwiftNewtypeWrapper, Equatable, Hashable, Comparable {
 // PRINT-NEXT:    init(_ rawValue: Float)
@@ -121,6 +124,7 @@
 // PRINT-NEXT:    var _rawValue: NSString
 // PRINT-NEXT:    var rawValue: String { get }
 // PRINT-NEXT:    typealias RawValue = String
+// PRINT-NEXT:    typealias _ObjectiveCType = NSString
 // PRINT-NEXT:  }
 // PRINT-NEXT:  typealias MyABIOldTypeNS = NSString
 // PRINT-NEXT:  func getMyABINewTypeNS() -> MyABINewTypeNS!
@@ -140,6 +144,7 @@
 // PRINT-NEXT:      var _rawValue: NSString
 // PRINT-NEXT:      var rawValue: String { get }
 // PRINT-NEXT:      typealias RawValue = String
+// PRINT-NEXT:      typealias _ObjectiveCType = NSString
 // PRINT-NEXT:    }
 // PRINT-NEXT:  }
 // PRINT-NEXT:  extension NSSomeContext.Name {
