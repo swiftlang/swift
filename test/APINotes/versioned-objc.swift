@@ -26,9 +26,9 @@ func testNonGeneric() {
 func testRenamedGeneric() {
   // CHECK-DIAGS-3:[[@LINE+1]]:{{[0-9]+}}: error: 'RenamedGeneric' has been renamed to 'OldRenamedGeneric'
   let _: OldRenamedGeneric<Base> = RenamedGeneric<Base>()
-  // FIXME-DIAGS-4:[[@LINE-1]]:{{[0-9]+}}: error: 'OldRenamedGeneric' has been renamed to 'RenamedGeneric'
+  // CHECK-DIAGS-4:[[@LINE-1]]:{{[0-9]+}}: error: 'OldRenamedGeneric' has been renamed to 'RenamedGeneric'
 
-  // FIXME-DIAGS-3:[[@LINE+1]]:{{[0-9]+}}: error: 'RenamedGeneric' has been renamed to 'OldRenamedGeneric'
+  // CHECK-DIAGS-3:[[@LINE+1]]:{{[0-9]+}}: error: 'RenamedGeneric' has been renamed to 'OldRenamedGeneric'
   let _: RenamedGeneric<Base> = OldRenamedGeneric<Base>()
   // CHECK-DIAGS-4:[[@LINE-1]]:{{[0-9]+}}: error: 'OldRenamedGeneric' has been renamed to 'RenamedGeneric'
 
@@ -36,9 +36,9 @@ func testRenamedGeneric() {
 
   // CHECK-DIAGS-3:[[@LINE+1]]:{{[0-9]+}}: error: 'OldRenamedGeneric' requires that 'SwiftClass' inherit from 'Base'
   let _: OldRenamedGeneric<SwiftClass> = RenamedGeneric<SwiftClass>()
-  // CHECK-DIAGS-4:[[@LINE-1]]:{{[0-9]+}}: error: 'OldRenamedGeneric' requires that 'SwiftClass' inherit from 'Base'
+  // CHECK-DIAGS-4:[[@LINE-1]]:{{[0-9]+}}: error: 'RenamedGeneric' requires that 'SwiftClass' inherit from 'Base'
 
-  // CHECK-DIAGS-3:[[@LINE+1]]:{{[0-9]+}}: error: 'RenamedGeneric' requires that 'SwiftClass' inherit from 'Base'
+  // CHECK-DIAGS-3:[[@LINE+1]]:{{[0-9]+}}: error: 'OldRenamedGeneric' requires that 'SwiftClass' inherit from 'Base'
   let _: RenamedGeneric<SwiftClass> = OldRenamedGeneric<SwiftClass>()
   // CHECK-DIAGS-4:[[@LINE-1]]:{{[0-9]+}}: error: 'RenamedGeneric' requires that 'SwiftClass' inherit from 'Base'
 }
