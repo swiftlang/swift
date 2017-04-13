@@ -1969,6 +1969,17 @@ void LValue::addMemberSubscriptComponent(SILGenFunction &SGF, SILLocation loc,
   }
 }
 
+bool LValue::isObviouslyNonConflicting(const LValue &other,
+                                       AccessKind selfAccess,
+                                       AccessKind otherAccess) {
+  // Reads never conflict with reads.
+  if (selfAccess == AccessKind::Read && otherAccess == AccessKind::Read)
+    return true;
+
+  // We can cover more cases here.
+  return false;
+}
+
 LValue SILGenLValue::visitTupleElementExpr(TupleElementExpr *e,
                                            AccessKind accessKind) {
   unsigned index = e->getFieldNumber();
@@ -2668,12 +2679,18 @@ void SILGenFunction::emitCopyLValueInto(SILLocation loc, LValue &&src,
   dest->finishInitialization(*this);
 }
 
-void SILGenFunction::emitAssignLValueToLValue(SILLocation loc,
-                                              LValue &&src,
+void SILGenFunction::emitAssignLValueToLValue(SILLocation loc, LValue &&src,
                                               LValue &&dest) {
-  // Only perform the peephole if both operands are physical and there's no
-  // semantic conversion necessary.
-  if (!src.isPhysical() || !dest.isPhysical()) {
+  // Only perform the peephole if both operands are physical, there's no
+  // semantic conversion necessary, and exclusivity enforcement
+  // is not enabled. The peephole interferes with exclusivity enforcement
+  // because it causes the formal accesses to the source and destination to
+  // overlap.
+  bool peepholeConflict =
+      getOptions().isAnyExclusivityEnforcementEnabled() &&
+      !src.isObviouslyNonConflicting(dest, AccessKind::Read, AccessKind::Write);
+
+  if (peepholeConflict || !src.isPhysical() || !dest.isPhysical()) {
     RValue loaded = emitLoadOfLValue(loc, std::move(src), SGFContext());
     emitAssignToLValue(loc, std::move(loaded), std::move(dest));
     return;
