@@ -149,7 +149,7 @@ extension MutableCollection
     var f = subrange.lowerBound
     var l = index(before: subrange.upperBound)
     while f < l {
-      swap(&self[f], &self[l])
+      swapAt(f, l)
       formIndex(after: &f)
       formIndex(before: &l)
     }
@@ -195,7 +195,7 @@ extension MutableCollection
         repeat {
           formIndex(before: &j)
         } while !(elementAtBeforeI < self[j])
-        swap(&self[beforeI], &self[j])
+        swapAt(beforeI, j)
         _reverseSubrange(i..<endIndex)
         return .success
       }

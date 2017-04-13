@@ -27,7 +27,7 @@ extension MutableCollection where Self : BidirectionalCollection {
     var f = startIndex
     var l = index(before: endIndex)
     while f < l {
-      swap(&self[f], &self[l])
+      swapAt(f, l)
       formIndex(after: &f)
       formIndex(before: &l)
     }
