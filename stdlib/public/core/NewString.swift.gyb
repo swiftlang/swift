@@ -230,7 +230,7 @@ extension String.Content {
   public struct ExplodedUTF16CodeUnits {
     typealias _Self = ExplodedUTF16CodeUnits
     // TODO: could be smaller. e.g. 5or6 could just expode to UInt8.
-    public typealias Base = _BoundedCapacity<_CodeUnitArray16<UInt16>>
+    public typealias Base = _BoundedCapacity<_FixedArray16<UInt16>>
     public var base: Base
 
     public init(_ inlineStr: String.Content.Inline5or6) {

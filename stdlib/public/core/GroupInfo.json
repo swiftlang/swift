@@ -43,6 +43,7 @@
     "ContiguouslyStored.swift",
     "Counted.swift",
     "FixedArray.swift",
+    "FixedArray2.swift",
     "BidirectionalCollection.swift",
     "RandomAccessCollection.swift",
     "MutableCollection.swift",

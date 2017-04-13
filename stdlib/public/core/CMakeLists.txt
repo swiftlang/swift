@@ -58,6 +58,7 @@ set(SWIFTLIB_ESSENTIAL
   Existential.swift
   Filter.swift.gyb
   FixedArray.swift
+  FixedArray2.swift.gyb
   FixedPoint.swift.gyb
   FlatMap.swift
   Flatten.swift.gyb

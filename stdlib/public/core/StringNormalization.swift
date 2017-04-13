@@ -24,87 +24,9 @@ import SwiftShims
 
 extension UInt16 : _DefaultConstructible {}
 
-// ABI TODO: The has assumptions about tuple layout in the ABI, namely that they
-// are laid out contiguously and individually addressable (i.e. strided).
-//
-// WIP: Trying out a hard(er)-coded fixed size array to wrap. The _DoubleLength
-// approach yields absurd debug-stdlib performance, and absurd generic-
-// specialization compilation times in release.
-//
-// TODO: gyb this up and replace existing _array${N}<T> with it.
-public struct _CodeUnitArray8<T> {
-  public var storage: (T, T, T, T, T, T, T, T)
-
-  static var _arraySize : Int { return 8 }
-}
-
-extension _CodeUnitArray8 : RandomAccessCollection, MutableCollection {
-  public typealias Index = Int
-  public typealias IndexDistance = Int
-
-  public var startIndex : Index {
-    return 0
-  }
-  public var endIndex : Index {
-    return _CodeUnitArray8._arraySize
-  }
-  public var count : IndexDistance { return _CodeUnitArray8._arraySize }
-
-  public subscript(i: Index) -> T {
-    @inline(__always)
-    get {
-      var copy = storage
-      let res: T = withUnsafeBytes(of: &copy) {
-        (rawPtr : UnsafeRawBufferPointer) -> T in
-        let stride = MemoryLayout<T>.stride
-        _sanityCheck(rawPtr.count == 8*stride, "layout mismatch?")
-        let bufPtr = UnsafeBufferPointer(
-          start: rawPtr.baseAddress!.assumingMemoryBound(to: T.self),
-          count: count)
-        return bufPtr[i]
-      }
-      return res
-    }
-    @inline(__always)
-    set {
-      withUnsafeBytes(of: &storage) {
-        (rawPtr : UnsafeRawBufferPointer) -> () in
-        let rawPtr = UnsafeMutableRawBufferPointer(mutating: rawPtr)
-        let stride = MemoryLayout<T>.stride
-        _sanityCheck(rawPtr.count == 8*stride, "layout mismatch?")
-        let bufPtr = UnsafeMutableBufferPointer(
-          start: rawPtr.baseAddress!.assumingMemoryBound(to: T.self),
-          count: count)
-        bufPtr[i] = newValue
-      }
-    }
-  }
-  public func index(after i: Index) -> Index {
-    return i+1
-  }
-  public func index(before i: Index) -> Index {
-    return i-1
-  }
-
-  // TODO: Any customization hooks it's profitable to override, e.g. append?
-
-}
-extension _CodeUnitArray8 : _FixedSizeCollection {
-  public init(repeating x: Iterator.Element) {
-    storage = (x, x, x, x, x, x, x, x)
-  }
-}
-
-// With a hard-coded 8-wide, we have skipped the worst part. Use DoubleLength
-// for now.
-//
-public typealias _CodeUnitArray16<T : UnsignedInteger>
-  = _DoubleLength<_CodeUnitArray8<T>>
-
-
 // TODO: Figure out a more sensible size
 public typealias UTF16CodeUnitBuffer =
-  UnboundCapacity<_BoundedCapacity<_CodeUnitArray8<UInt16>>>
+  UnboundCapacity<_BoundedCapacity<_FixedArray8<UInt16>>>
 
 // A normalization segment that is FCC-normalized. This is a collection of
 // normalized UTF16 code units.
