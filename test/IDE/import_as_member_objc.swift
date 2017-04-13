@@ -11,6 +11,7 @@
 // PRINT-CLASS-NEXT:   struct Options : OptionSet {
 // PRINT-CLASS-NEXT:     init(rawValue rawValue: Int)
 // PRINT-CLASS-NEXT:     let rawValue: Int
+// PRINT-CLASS-NEXT:     typealias RawValue = Int
 // PRINT-CLASS-NEXT:     static var fuzzyDice: SomeClass.Options { get }
 // PRINT-CLASS-NEXT:     static var spoiler: SomeClass.Options { get }
 // PRINT-CLASS-NEXT:   }

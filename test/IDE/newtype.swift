@@ -11,6 +11,7 @@
 // PRINT-NEXT:    init(rawValue: String)
 // PRINT-NEXT:    var _rawValue: NSString
 // PRINT-NEXT:    var rawValue: String { get }
+// PRINT-NEXT:    typealias RawValue = String
 // PRINT-NEXT:  }
 // PRINT-NEXT:  extension ErrorDomain {
 // PRINT-NEXT:    func process()
@@ -30,6 +31,7 @@
 // PRINT-NEXT:    init(rawValue: String)
 // PRINT-NEXT:    var _rawValue: NSString
 // PRINT-NEXT:    var rawValue: String { get }
+// PRINT-NEXT:    typealias RawValue = String
 // PRINT-NEXT:  }
 // PRINT-NEXT:  extension ClosedEnum {
 // PRINT-NEXT:    static let firstClosedEntryEnum: ClosedEnum
@@ -41,11 +43,13 @@
 // PRINT-NEXT:    init(rawValue: String)
 // PRINT-NEXT:    var _rawValue: NSString
 // PRINT-NEXT:    var rawValue: String { get }
+// PRINT-NEXT:    typealias RawValue = String
 // PRINT-NEXT:  }
 // PRINT-NEXT:  struct MyFloat : RawRepresentable, _SwiftNewtypeWrapper, Equatable, Hashable, Comparable {
 // PRINT-NEXT:    init(_ rawValue: Float)
 // PRINT-NEXT:    init(rawValue: Float)
 // PRINT-NEXT:    let rawValue: Float
+// PRINT-NEXT:    typealias RawValue = Float
 // PRINT-NEXT:  }
 // PRINT-NEXT:  extension MyFloat {
 // PRINT-NEXT:    static let globalFloat: MyFloat{{$}}
@@ -57,6 +61,7 @@
 // PRINT-NEXT:    init(_ rawValue: Int32)
 // PRINT-NEXT:    init(rawValue: Int32)
 // PRINT-NEXT:    let rawValue: Int32
+// PRINT-NEXT:    typealias RawValue = Int32
 // PRINT-NEXT:  }
 // PRINT-NEXT:  extension MyInt {
 // PRINT-NEXT:    static let zero: MyInt{{$}}
@@ -83,6 +88,7 @@
 // PRINT-NEXT:    init(_ rawValue: CFString)
 // PRINT-NEXT:    init(rawValue: CFString)
 // PRINT-NEXT:    let rawValue: CFString
+// PRINT-NEXT:    typealias RawValue = CFString
 // PRINT-NEXT:  }
 // PRINT-NEXT:  extension CFNewType {
 // PRINT-NEXT:    static let MyCFNewTypeValue: CFNewType
@@ -96,6 +102,7 @@
 // PRINT-NEXT:    init(_ rawValue: CFString)
 // PRINT-NEXT:    init(rawValue: CFString)
 // PRINT-NEXT:    let rawValue: CFString
+// PRINT-NEXT:    typealias RawValue = CFString
 // PRINT-NEXT:  }
 // PRINT-NEXT:  typealias MyABIOldType = CFString
 // PRINT-NEXT:  extension MyABINewType {
@@ -113,6 +120,7 @@
 // PRINT-NEXT:    init(rawValue: String)
 // PRINT-NEXT:    var _rawValue: NSString
 // PRINT-NEXT:    var rawValue: String { get }
+// PRINT-NEXT:    typealias RawValue = String
 // PRINT-NEXT:  }
 // PRINT-NEXT:  typealias MyABIOldTypeNS = NSString
 // PRINT-NEXT:  func getMyABINewTypeNS() -> MyABINewTypeNS!
@@ -131,6 +139,7 @@
 // PRINT-NEXT:      init(rawValue: String)
 // PRINT-NEXT:      var _rawValue: NSString
 // PRINT-NEXT:      var rawValue: String { get }
+// PRINT-NEXT:      typealias RawValue = String
 // PRINT-NEXT:    }
 // PRINT-NEXT:  }
 // PRINT-NEXT:  extension NSSomeContext.Name {
