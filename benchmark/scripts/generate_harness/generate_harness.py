@@ -17,14 +17,15 @@
 from __future__ import print_function
 
 import argparse
-import jinja2
 import os
 import re
 import subprocess
 
+import jinja2
+
 script_dir = os.path.dirname(os.path.realpath(__file__))
 perf_dir = os.path.realpath(os.path.join(script_dir, '../..'))
-gyb_script = os.path.realpath(os.path.join(perf_dir, '../utils/gyb'))
+gyb = os.path.realpath(os.path.join(perf_dir, '../utils/gyb'))
 single_source_dir = os.path.join(perf_dir, 'single-source')
 multi_source_dir = os.path.join(perf_dir, 'multi-source')
 parser = argparse.ArgumentParser()
@@ -44,29 +45,33 @@ template_loader = jinja2.FileSystemLoader(searchpath="/")
 template_env = jinja2.Environment(loader=template_loader, trim_blocks=True,
                                   lstrip_blocks=True)
 
-def all_files(directory, extension): # matching: [directory]/**/*[extension]
+
+def all_files(directory, extension):  # matching: [directory]/**/*[extension]
     return [
         os.path.join(root, f)
         for root, _, files in os.walk(directory)
         for f in files if f.endswith(extension)
     ]
 
-def will_write(filename): # ensure path to file exists before writing
+
+def will_write(filename):  # ensure path to file exists before writing
     print(filename)
     output_path = os.path.split(filename)[0]
-    if not os.path.exists(output_path): os.makedirs(output_path)
+    if not os.path.exists(output_path):
+        os.makedirs(output_path)
+
 
 if __name__ == '__main__':
     # Generate Your Boilerplate
-    gyb_files = all_files(perf_dir, '.swift.gyb')
+    gyb_files = all_files(perf_dir, '.gyb')
     for f in gyb_files:
         relative_path = os.path.relpath(f[:-4], perf_dir)
         out_file = os.path.join(output_dir, relative_path)
         will_write(out_file)
-        subprocess.call([gyb_script, '--line-directive', '', '-o', out_file, f])
+        subprocess.call([gyb, '--line-directive', '', '-o', out_file, f])
 
     # CMakeList single-source
-    test_files = all_files(single_source_dir,'.swift')
+    test_files = all_files(single_source_dir, '.swift')
     tests = sorted(os.path.basename(x).split('.')[0] for x in test_files)
 
     # CMakeList multi-source
