@@ -1901,7 +1901,7 @@ namespace {
 
   void MultiConformanceChecker::checkAllConformances() {
     bool anyInvalid = false;
-    for(unsigned I = 0, N = AllConformances.size(); I < N; I ++) {
+    for (unsigned I = 0, N = AllConformances.size(); I < N; I ++) {
       auto *conformance = AllConformances[I];
       // Check this conformance and emit fixits if this is the last one in the pool.
       checkIndividualConformance(conformance, I == N - 1);

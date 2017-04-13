@@ -1515,7 +1515,7 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
         // Calculate the new prefix.
         // What if the preferred name causes longer prefix?
         StringRef subPrefix = [](StringRef LHS, StringRef RHS) {
-          if(LHS.size() > RHS.size())
+          if (LHS.size() > RHS.size())
             std::swap(LHS, RHS) ;
           return StringRef(LHS.data(), std::mismatch(LHS.begin(), LHS.end(),
             RHS.begin()).first - LHS.begin());

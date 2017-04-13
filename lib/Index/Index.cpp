@@ -178,7 +178,7 @@ class IndexSwiftASTWalker : public SourceEntityWalker {
       SmallString<128> storage;
       {
         llvm::raw_svector_ostream OS(storage);
-        if(ide::printAccessorUSR(D, AK, OS))
+        if (ide::printAccessorUSR(D, AK, OS))
           return true;
         result.USR = stringStorage.copyString(OS.str());
       }
@@ -661,7 +661,7 @@ bool IndexSwiftASTWalker::reportRelatedRef(ValueDecl *D, SourceLoc Loc, bool isI
   // don't report this ref again when visitDeclReference reports it
   repressRefAtLoc(Loc);
 
-  if(!reportRef(D, Loc, Info)) {
+  if (!reportRef(D, Loc, Info)) {
     Cancelled = true;
     return false;
   }
@@ -671,7 +671,7 @@ bool IndexSwiftASTWalker::reportRelatedRef(ValueDecl *D, SourceLoc Loc, bool isI
 
 bool IndexSwiftASTWalker::reportInheritedTypeRefs(ArrayRef<TypeLoc> Inherited, Decl *Inheritee) {
   for (auto Base : Inherited) {
-    if(!reportRelatedTypeRef(Base, (SymbolRoleSet) SymbolRole::RelationBaseOf, Inheritee))
+    if (!reportRelatedTypeRef(Base, (SymbolRoleSet) SymbolRole::RelationBaseOf, Inheritee))
       return false;
   }
   return true;

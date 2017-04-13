@@ -68,7 +68,7 @@ UnifiedStatsReporter::getFrontendCounters()
   do {                                                        \
     static Statistic Stat = {TY, #NAME, #NAME, {0}, false};   \
     Stat += (C).NAME;                                         \
-  } while(0)
+  } while (0)
 
 void
 UnifiedStatsReporter::publishAlwaysOnStatsToLLVM() {
@@ -109,7 +109,7 @@ UnifiedStatsReporter::publishAlwaysOnStatsToLLVM() {
   do {                                                   \
     OS << DELIM << "\t\"" TY "." #NAME "\": " << C.NAME; \
     delim = ",\n";                                       \
-  } while(0)
+  } while (0)
 
 void
 UnifiedStatsReporter::printAlwaysOnStatsAndTimers(raw_ostream &OS) {

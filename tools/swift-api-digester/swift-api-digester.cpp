@@ -468,7 +468,7 @@ StringRef SDKNode::getAnnotateComment(NodeAnnotation Anno) const {
 
 ArrayRef<NodeAnnotation> SDKNode::
 getAnnotations(std::vector<NodeAnnotation> &Scratch) const {
-  for(auto Ann : Annotations)
+  for (auto Ann : Annotations)
     Scratch.push_back(Ann);
   return llvm::makeArrayRef(Scratch);
 }
@@ -849,7 +849,7 @@ SDKNode* SDKNode::constructSDKNode(SDKContext &Ctx,
 }
 
 bool SDKNode::hasSameChildren(const SDKNode &Other) const {
-  if(Children.size() != Other.Children.size())
+  if (Children.size() != Other.Children.size())
     return false;
   for (unsigned I = 0; I < Children.size(); ++ I) {
     if (*Children[I] != *Other.Children[I])
