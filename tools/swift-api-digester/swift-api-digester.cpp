@@ -2595,6 +2595,8 @@ void removeRedundantAndSort(std::vector<T> &Diffs) {
 template<typename T>
 void serializeDiffs(llvm::raw_ostream &Fs, std::vector<T> &Diffs) {
   removeRedundantAndSort(Diffs);
+  if (Diffs.empty())
+    return;
   Fs << "\n";
   T::describe(Fs);
   for (auto &Diff : Diffs) {

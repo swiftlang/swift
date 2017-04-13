@@ -7,21 +7,3 @@ SDK_CHANGE(Function, Rename, "0", "s:12macrogenleft2S1V4foo5ySi1x_Si1ytF", "", "
 SDK_CHANGE(Constructor, TypeRewritten, "1", "s:12macrogenleft2S1VACSicfc", "", "Int", "Double", "macrogenleft")
 #undef SDK_CHANGE
 
-
-#ifndef SDK_CHANGE_TYPE_MEMBER
-#define SDK_CHANGE_TYPE_MEMBER(USR, NEW_TYPE_NAME, NEW_PRINTED_NAME, SELF_INDEX, OLD_PRINTED_NAME)
-#endif
-#undef SDK_CHANGE_TYPE_MEMBER
-
-
-#ifndef NOESCAPE_FUNC_PARAM
-#define NOESCAPE_FUNC_PARAM(USR, Index)
-#endif
-#undef NOESCAPE_FUNC_PARAM
-
-
-#ifndef OVERLOAD_FUNC_TRAILING_CLOSURE
-#define OVERLOAD_FUNC_TRAILING_CLOSURE(USR)
-#endif
-#undef OVERLOAD_FUNC_TRAILING_CLOSURE
-
