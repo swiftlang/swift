@@ -229,19 +229,7 @@ swift::findSwiftValueConformances(const ExistentialTypeMetadata *existentialType
   for (size_t i = 0, e = protocols.NumProtocols; i != e; ++i) {
     auto protocol = protocols[i];
 
-    // _SwiftValue does conform to AnyObject.
-    switch (protocol->Flags.getSpecialProtocol()) {
-    case SpecialProtocol::AnyObject:
-      continue;
-
-    case SpecialProtocol::Error:
-      return false;
-
-    case SpecialProtocol::None:
-      break;
-    }
-
-    // Otherwise, it only conforms to ObjC protocols.  We specifically
+    // _SwiftValue only conforms to ObjC protocols.  We specifically
     // don't want to say that _SwiftValue conforms to the Swift protocols
     // that NSObject conforms to because that would create a situation
     // where arguably an arbitrary type would conform to those protocols

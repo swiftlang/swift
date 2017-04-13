@@ -313,38 +313,6 @@ static bool _conformsToProtocol(const OpaqueValue *value,
                                 const Metadata *type,
                                 const ProtocolDescriptor *protocol,
                                 const WitnessTable **conformance) {
-  // Handle AnyObject directly.
-  if (protocol->Flags.getSpecialProtocol() == SpecialProtocol::AnyObject) {
-    switch (type->getKind()) {
-    case MetadataKind::Class:
-    case MetadataKind::ObjCClassWrapper:
-    case MetadataKind::ForeignClass:
-      // Classes conform to AnyObject.
-      return true;
-
-    case MetadataKind::Existential: {
-      auto sourceExistential = cast<ExistentialTypeMetadata>(type);
-      // The existential conforms to AnyObject if it's class-constrained.
-      // FIXME: It also must not carry witness tables.
-      return sourceExistential->isClassBounded();
-    }
-      
-    case MetadataKind::ExistentialMetatype:
-    case MetadataKind::Metatype:
-    case MetadataKind::Function:
-    case MetadataKind::HeapLocalVariable:
-    case MetadataKind::HeapGenericLocalVariable:
-    case MetadataKind::ErrorObject:
-    case MetadataKind::Enum:
-    case MetadataKind::Optional:
-    case MetadataKind::Opaque:
-    case MetadataKind::Struct:
-    case MetadataKind::Tuple:
-      return false;
-    }
-    _failCorruptType(type);
-  }
-
   // Look up the witness table for protocols that need them.
   if (protocol->Flags.needsWitnessTable()) {
     auto witness = swift_conformsToProtocol(type, protocol);
@@ -459,15 +427,9 @@ static void _maybeDeallocateOpaqueExistential(OpaqueValue *srcExistential,
 static bool
 isAnyObjectExistentialType(const ExistentialTypeMetadata *targetType) {
   unsigned numProtos =  targetType->Protocols.NumProtocols;
-  if (numProtos != 1)
-    return false;
-  const ProtocolDescriptor *protocol = targetType->Protocols[0];
-  bool isAnyObjectProtocol =
-      protocol->Flags.getSpecialProtocol() == SpecialProtocol::AnyObject;
-  // Assert that AnyObject does not need any witness tables. We rely on this.
-  assert(!isAnyObjectProtocol || !protocol->Flags.needsWitnessTable() &&
-         "AnyObject should not require witness tables");
-  return isAnyObjectProtocol;
+  return (numProtos == 0 &&
+          targetType->getSuperclassConstraint() == nullptr &&
+          targetType->isClassBounded());
 }
 
 /// Given a possibly-existential value, find its dynamic type and the
@@ -1075,10 +1037,6 @@ _dynamicCastUnknownClassToExistential(const void *object,
       return nullptr;
     case ProtocolDispatchStrategy::ObjC:
 #if SWIFT_OBJC_INTEROP
-      // All classes conform to AnyObject.
-      if (protocol->Flags.getSpecialProtocol() == SpecialProtocol::AnyObject)
-        break;
-
       if (!objectConformsToObjCProtocol(object, protocol))
         return nullptr;
       break;
@@ -1086,13 +1044,6 @@ _dynamicCastUnknownClassToExistential(const void *object,
       assert(false && "ObjC interop disabled?!");
       return nullptr;
 #endif
-    case ProtocolDispatchStrategy::Empty:
-      // The only non-@objc, non-witness-table-requiring protocol should be
-      // AnyObject for now.
-      assert(protocol->Flags.getSpecialProtocol() == SpecialProtocol::AnyObject
-             && "swift protocols besides AnyObject should always require a "
-                "witness table");
-      break;
     }
   }
   
@@ -2212,9 +2163,7 @@ static bool tryDynamicCastBoxedSwiftValue(OpaqueValue *dest,
   // Swift type should be AnyObject or a class type.
   if (!srcType->isAnyClass()) {
     auto existential = dyn_cast<ExistentialTypeMetadata>(srcType);
-    if (!existential ||
-        existential->Flags.getSpecialProtocol()
-          != SpecialProtocol::AnyObject)
+    if (!existential || !isAnyObjectExistentialType(existential))
       return false;
   }
   
@@ -2565,8 +2514,7 @@ bool swift::swift_dynamicCast(OpaqueValue *dest, OpaqueValue *src,
     if (auto srcExistentialType = dyn_cast<ExistentialTypeMetadata>(srcType)) {
 #if SWIFT_OBJC_INTEROP
       // If coming from AnyObject, we may want to bridge.
-      if (srcExistentialType->Flags.getSpecialProtocol()
-            == SpecialProtocol::AnyObject) {
+      if (isAnyObjectExistentialType(srcExistentialType)) {
         if (auto targetBridgeWitness = findBridgeWitness(targetType)) {
           return _dynamicCastClassToValueViaObjCBridgeable(dest, src, srcType,
                                                            targetType,
@@ -3213,7 +3161,8 @@ static bool tryBridgeNonVerbatimFromObjectiveCUniversal(
   // If the type is the Any type, we can bridge by "upcasting" the object
   // to Any.
   if (auto nativeExistential = dyn_cast<ExistentialTypeMetadata>(nativeType)) {
-    if (nativeExistential->Protocols.NumProtocols == 0) {
+    if (nativeExistential->Protocols.NumProtocols == 0 &&
+        !nativeExistential->isClassBounded()) {
       _swift_bridgeNonVerbatimFromObjectiveCToAny(sourceValue,
                                                   destValue);
       return true;

@@ -38,7 +38,7 @@ public enum FakeOptional<T> {
   case some(T)
 }
 
-public protocol AnyObject : class {}
+public typealias AnyObject = Builtin.AnyObject
 
 class C {
   init()

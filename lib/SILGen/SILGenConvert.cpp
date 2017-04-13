@@ -642,21 +642,13 @@ ManagedValue SILGenFunction::emitExistentialErasure(
   
     // If the concrete value is a pseudogeneric archetype, first erase it to
     // its upper bound.
-    auto anyObjectProto = getASTContext()
-      .getProtocol(KnownProtocolKind::AnyObject);
     auto anyObjectTy = getASTContext().getAnyObjectType();
     auto eraseToAnyObject =
     [&, concreteFormalType, F](SGFContext C) -> ManagedValue {
       auto concreteValue = F(SGFContext());
-      auto anyObjectConformance = SGM.SwiftModule
-        ->lookupConformance(concreteFormalType, anyObjectProto, nullptr);
-      ProtocolConformanceRef buf[] = {
-        *anyObjectConformance,
-      };
-
       return B.createInitExistentialRef(
           loc, SILType::getPrimitiveObjectType(anyObjectTy), concreteFormalType,
-          concreteValue, getASTContext().AllocateCopy(buf));
+          concreteValue, {});
     };
     
     auto concreteTLPtr = &concreteTL;

@@ -51,13 +51,13 @@ struct Unrelated {}
 // FIXME: Not implemented yet.
 //
 
-func alreadyConforms<T>(_: Base<T>) {}
-func alreadyConforms<T>(_: Base<T> & P1) {}
-func alreadyConforms<T>(_: Base<T> & AnyObject) {}
-func alreadyConforms<T>(_: Base<T> & P1 & AnyObject) {}
+func alreadyConforms<T>(_: Base<T>) {} // expected-note {{'alreadyConforms' previously declared here}}
+func alreadyConforms<T>(_: Base<T> & P1) {} // expected-note {{'alreadyConforms' previously declared here}}
+func alreadyConforms<T>(_: Base<T> & AnyObject) {} // expected-error {{invalid redeclaration of 'alreadyConforms'}}
+func alreadyConforms<T>(_: Base<T> & P1 & AnyObject) {} // expected-error {{invalid redeclaration of 'alreadyConforms'}}
 
-func alreadyConforms(_: P3) {}
-func alreadyConforms(_: P3 & AnyObject) {}
+func alreadyConforms(_: P3) {} // expected-note {{'alreadyConforms' previously declared here}}
+func alreadyConforms(_: P3 & AnyObject) {} // expected-error {{invalid redeclaration of 'alreadyConforms'}}
 
 // SE-0156 stipulates that a composition can contain multiple classes, as long
 // as they are all the same.

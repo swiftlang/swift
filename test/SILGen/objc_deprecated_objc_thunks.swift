@@ -24,11 +24,11 @@ class ObjCSubclass : NSObject {
   // CHECK-NEXT: builtin "swift3ImplicitObjCEntrypoint"() : $()
   var bar: NSObject? = nil
 
-  // CHECK-LABEL: sil hidden [thunk] @_T0016objc_deprecated_A7_thunks12ObjCSubclassC9subscripts9AnyObject_pSicfgTo : $@convention(objc_method) (Int, ObjCSubclass) -> @autoreleased AnyObject 
+  // CHECK-LABEL: sil hidden [thunk] @_T0016objc_deprecated_A7_thunks12ObjCSubclassC9subscriptyXlSicfgTo : $@convention(objc_method) (Int, ObjCSubclass) -> @autoreleased AnyObject 
   // CHECK: bb0(%0 : $Int, %1 : $ObjCSubclass):
   // CHECK-NEXT: builtin "swift3ImplicitObjCEntrypoint"() : $()
 
-  // CHECK-LABEL: sil hidden [thunk] @_T0016objc_deprecated_A7_thunks12ObjCSubclassC9subscripts9AnyObject_pSicfsTo : $@convention(objc_method) (AnyObject, Int, ObjCSubclass) ->
+  // CHECK-LABEL: sil hidden [thunk] @_T0016objc_deprecated_A7_thunks12ObjCSubclassC9subscriptyXlSicfsTo : $@convention(objc_method) (AnyObject, Int, ObjCSubclass) ->
   // CHECK: bb0(%0 : $AnyObject, %1 : $Int, %2 : $ObjCSubclass):
   // CHECK-NEXT: builtin "swift3ImplicitObjCEntrypoint"() : $()
   subscript (i: Int) -> AnyObject { get { return self } set { } } 

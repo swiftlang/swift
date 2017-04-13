@@ -191,10 +191,9 @@ func foo2(p: P1 & P2) {
   foo2(p: p)
 }
 
-// CHECK: func foo3(p: AnyObject & P1)
+// CHECK: func foo3(p: P1 & AnyObject)
 func foo3(p: P1 & AnyObject) {
-// CHECK: decl: let p: AnyObject & P1
-// CHECK: dref: {{(@objc )?}}protocol AnyObject
+// CHECK: decl: let p: P1 & AnyObject
   foo3(p: p)
 }
 
@@ -205,7 +204,7 @@ func foo4(p: P1 & P2 & Myclass1) {
 }
 
 func genericFunction<T : AnyObject>(t: T) {
-// CHECK: decl: FAILURE for 'T' usr=s:14swift_ide_test15genericFunctionyx1t_ts9AnyObjectRzlF1TL_xmfp
+// CHECK: decl: FAILURE for 'T' usr=s:14swift_ide_test15genericFunctionyx1t_tRlzClF1TL_xmfp
   genericFunction(t: t)
 }
 

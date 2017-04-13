@@ -226,10 +226,8 @@ enum class SpecialProtocol: uint8_t {
   ///
   /// This must be 0 for ABI compatibility with Objective-C protocol_t records.
   None = 0,
-  /// The AnyObject protocol.
-  AnyObject = 1,
   /// The Error protocol.
-  Error = 2,
+  Error = 1,
 };
 
 /// Identifiers for protocol method dispatch strategies.
@@ -244,10 +242,6 @@ enum class ProtocolDispatchStrategy: uint8_t {
   /// To invoke methods of this protocol, a pointer to a protocol witness table
   /// corresponding to the protocol conformance must be available.
   Swift = 1,
-  
-  /// The protocol guarantees that it has no methods to dispatch. It requires
-  /// neither Objective-C metadata nor a witness table.
-  Empty = 2,
 };
 
 /// Flags in a generic nominal type descriptor.
@@ -375,7 +369,6 @@ public:
   static bool needsWitnessTable(ProtocolDispatchStrategy strategy) {
     switch (strategy) {
     case ProtocolDispatchStrategy::ObjC:
-    case ProtocolDispatchStrategy::Empty:
       return false;
     case ProtocolDispatchStrategy::Swift:
       return true;
