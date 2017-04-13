@@ -22,3 +22,6 @@ typedef CF_ENUM(long, RenamedEnum) {
 
 @protocol RenamedProtocol
 @end
+
+@interface RenamedClass (RenamedProtocol) <RenamedProtocol>
+@end

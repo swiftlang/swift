@@ -760,7 +760,7 @@ ProtocolConformanceRef ModuleFile::readConformance(
     ProtocolConformanceXrefLayout::readRecord(scratch, protoID, nominalID,
                                               moduleID);
 
-    auto nominal = cast<NominalTypeDecl>(getDecl(nominalID));
+    auto nominal = castIgnoringSugar<NominalTypeDecl>(getDecl(nominalID));
     PrettyStackTraceDecl trace("cross-referencing conformance for", nominal);
     auto proto = castIgnoringSugar<ProtocolDecl>(getDecl(protoID));
     PrettyStackTraceDecl traceTo("... to", proto);

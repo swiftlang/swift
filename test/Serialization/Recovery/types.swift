@@ -14,6 +14,7 @@
 import Lib
 
 func requiresConformance(_: B_RequiresConformance<B_ConformsToProto>) {}
+func requiresConformance(_: B_RequiresConformance<C_RelyOnConformanceImpl.Assoc>) {}
 
 
 #else // TEST
@@ -73,5 +74,13 @@ public struct B_RequiresConformance<T: RenamedProtocol> {}
 
 // CHECK-LABEL: struct B_RequiresConformance<T> where T : RenamedProtocol
 // CHECK-RECOVERY-LABEL: struct B_RequiresConformance<T> where T : Swift3RenamedProtocol
+
+public protocol C_RelyOnConformance {
+  associatedtype Assoc: RenamedProtocol
+}
+
+public class C_RelyOnConformanceImpl: C_RelyOnConformance {
+  public typealias Assoc = RenamedClass
+}
 
 #endif
