@@ -19,6 +19,10 @@
 #include "llvm/Support/SaveAndRestore.h"
 #include "llvm/ADT/StringExtras.h"
 
+#ifdef SWIFT_SILOPTIMIZER_PASSMANAGER_DIMEMORYUSECOLLECTOROWNERSHIP_H
+#error "Included ownership header?!"
+#endif
+
 using namespace swift;
 
 //===----------------------------------------------------------------------===//
