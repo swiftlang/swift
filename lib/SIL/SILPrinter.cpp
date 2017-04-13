@@ -1782,12 +1782,20 @@ public:
       case KeyPathPatternComponent::Kind::GettableProperty:
       case KeyPathPatternComponent::Kind::SettableProperty: {
         *this << (kind == KeyPathPatternComponent::Kind::GettableProperty
-                    ? "gettable_property" : "settable_property")
+                    ? "gettable_property $" : "settable_property $")
+              << component.getComponentType() << ", "
               << " id ";
-        component.getComputedPropertyIdentifier()->printName(PrintState.OS);
-        *this << " : "
-              << component.getComputedPropertyIdentifier()->getLoweredType()
-              << ", getter ";
+        if (component.hasComputedPropertyIdentifierDeclRef()) {
+          auto declRef = component.getComputedPropertyIdentifierDeclRef();
+          *this << declRef << " : "
+                << declRef.getDecl()->getInterfaceType();
+        } else {
+          component.getComputedPropertyIdentifierFunction()->printName(PrintState.OS);
+          *this << " : "
+                << component.getComputedPropertyIdentifierFunction()
+                            ->getLoweredType();
+        }
+        *this << ", getter ";
         component.getComputedPropertyGetter()->printName(PrintState.OS);
         *this << " : "
               << component.getComputedPropertyGetter()->getLoweredType();

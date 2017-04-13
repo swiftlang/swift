@@ -20,6 +20,7 @@
 #include "swift/AST/Builtins.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/ProtocolConformanceRef.h"
+#include "swift/AST/TypeAlignments.h"
 #include "swift/Basic/Compiler.h"
 #include "swift/Basic/NullablePtr.h"
 #include "swift/SIL/Consumption.h"
@@ -1410,22 +1411,41 @@ public:
   };
   
 private:
+  // Value is the VarDecl* for StoredProperty, and the SILFunction* of the
+  // Getter for computed properties
   llvm::PointerIntPair<void *, 2, Kind> ValueAndKind;
-  SILFunction *Getter, *Setter;
+  // false if id is a SILFunction*; true if id is a SILDeclRef
+  llvm::PointerIntPair<SILFunction *, 1, bool> SetterAndIdKind;
+  union {
+    SILFunction *IdFunction;
+    SILDeclRef IdDeclRef;
+  };
   ArrayRef<IndexPair> Indices;
   CanType ComponentType;
 
-  KeyPathPatternComponent(void *value, Kind kind, CanType ComponentType)
-    : ValueAndKind(value, kind), ComponentType(ComponentType) {}
+  KeyPathPatternComponent(VarDecl *storedProp, Kind kind,
+                          CanType ComponentType)
+    : ValueAndKind(storedProp, kind), ComponentType(ComponentType) {}
 
-  KeyPathPatternComponent(void *value, Kind kind,
+  KeyPathPatternComponent(SILFunction *id, Kind kind,
                           SILFunction *getter,
                           SILFunction *setter,
                           ArrayRef<IndexPair> indices,
                           CanType ComponentType)
-    : ValueAndKind(value, kind),
-      Getter(getter),
-      Setter(setter),
+    : ValueAndKind(getter, kind),
+      SetterAndIdKind(setter, false),
+      IdFunction(id),
+      Indices(indices),
+      ComponentType(ComponentType) {}
+
+  KeyPathPatternComponent(SILDeclRef id, Kind kind,
+                          SILFunction *getter,
+                          SILFunction *setter,
+                          ArrayRef<IndexPair> indices,
+                          CanType ComponentType)
+    : ValueAndKind(getter, kind),
+      SetterAndIdKind(setter, true),
+      IdDeclRef(id),
       Indices(indices),
       ComponentType(ComponentType) {}
 
@@ -1455,15 +1475,24 @@ public:
     llvm_unreachable("unhandled kind");
   }
   
-  SILFunction *getComputedPropertyIdentifier() const {
+  bool hasComputedPropertyIdentifierDeclRef() const {
     switch (getKind()) {
     case Kind::StoredProperty:
       llvm_unreachable("not a computed property");
     case Kind::GettableProperty:
     case Kind::SettableProperty:
-      return static_cast<SILFunction*>(ValueAndKind.getPointer());
+      return SetterAndIdKind.getInt();
     }
-    llvm_unreachable("unhandled kind");
+  }
+  
+  SILFunction *getComputedPropertyIdentifierFunction() const {
+    assert(!hasComputedPropertyIdentifierDeclRef());
+    return IdFunction;
+  }
+  
+  SILDeclRef getComputedPropertyIdentifierDeclRef() const {
+    assert(hasComputedPropertyIdentifierDeclRef());
+    return IdDeclRef;
   }
   
   SILFunction *getComputedPropertyGetter() const {
@@ -1472,7 +1501,7 @@ public:
       llvm_unreachable("not a computed property");
     case Kind::GettableProperty:
     case Kind::SettableProperty:
-      return Getter;
+      return static_cast<SILFunction*>(ValueAndKind.getPointer());
     }
     llvm_unreachable("unhandled kind");
   }
@@ -1483,7 +1512,7 @@ public:
     case Kind::GettableProperty:
       llvm_unreachable("not a settable computed property");
     case Kind::SettableProperty:
-      return Setter;
+      return SetterAndIdKind.getPointer();
     }
     llvm_unreachable("unhandled kind");
   }
@@ -1513,7 +1542,26 @@ public:
   }
 
   static KeyPathPatternComponent
+  forComputedGettableProperty(SILDeclRef identifier,
+                              SILFunction *getter,
+                              ArrayRef<IndexPair> indices,
+                              CanType ty) {
+    return KeyPathPatternComponent(identifier, Kind::GettableProperty,
+                                   getter, nullptr, indices, ty);
+  }
+
+  static KeyPathPatternComponent
   forComputedSettableProperty(SILFunction *identifier,
+                              SILFunction *getter,
+                              SILFunction *setter,
+                              ArrayRef<IndexPair> indices,
+                              CanType ty) {
+    return KeyPathPatternComponent(identifier, Kind::SettableProperty,
+                                   getter, setter, indices, ty);
+  }
+
+  static KeyPathPatternComponent
+  forComputedSettableProperty(SILDeclRef identifier,
                               SILFunction *getter,
                               SILFunction *setter,
                               ArrayRef<IndexPair> indices,

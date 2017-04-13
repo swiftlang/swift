@@ -3709,13 +3709,16 @@ public:
             require(substSetterType->getNumParameters() == 2,
                     "setter should have two parameters");
             auto baseParam = substSetterType->getSelfParameter();
-            require(baseParam.getConvention() == ParameterConvention::Indirect_In,
+            require(baseParam.getConvention() ==
+                      ParameterConvention::Indirect_In,
                     "setter base parameter should be @in");
             auto newValueParam = substSetterType->getParameters()[0];
-            require(newValueParam.getConvention() == ParameterConvention::Indirect_In,
+            require(newValueParam.getConvention() ==
+                      ParameterConvention::Indirect_In,
                     "setter value parameter should be @in");
             
-            require(newValueParam.getType() == loweredBaseTy.getSwiftRValueType(),
+            require(newValueParam.getType() ==
+                      loweredComponentTy.getSwiftRValueType(),
                     "setter value should match the maximal abstraction of the "
                     "formal component type");
             

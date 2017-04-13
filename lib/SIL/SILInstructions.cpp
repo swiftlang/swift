@@ -1959,7 +1959,19 @@ void KeyPathPattern::Profile(llvm::FoldingSetNodeID &ID,
       LLVM_FALLTHROUGH;
     case KeyPathPatternComponent::Kind::GettableProperty:
       ID.AddPointer(component.getComputedPropertyGetter());
-      ID.AddPointer(component.getComputedPropertyIdentifier());
+      if (component.hasComputedPropertyIdentifierDeclRef()) {
+        auto declRef = component.getComputedPropertyIdentifierDeclRef();
+        ID.AddPointer(declRef.loc.getOpaqueValue());
+        ID.AddInteger((unsigned)declRef.kind);
+        ID.AddInteger(declRef.uncurryLevel);
+        ID.AddBoolean(declRef.Expansion);
+        ID.AddBoolean(declRef.isCurried);
+        ID.AddBoolean(declRef.isForeign);
+        ID.AddBoolean(declRef.isDirectReference);
+        ID.AddBoolean(declRef.defaultArgIndex);
+      } else {
+        ID.AddPointer(component.getComputedPropertyIdentifierFunction());
+      }
       assert(component.getComputedPropertyIndices().empty()
              && "todo");
       break;

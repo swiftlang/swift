@@ -68,7 +68,6 @@ IRGenModule::getAddrOfKeyPathPattern(KeyPathPattern *pattern,
   };
   
   // Start building the key path pattern.
-  // TODO: Coalesce equivalent key path patterns
   ConstantInitBuilder builder(*this);
   ConstantStructBuilder fields = builder.beginStruct();
   fields.setPacked(true);

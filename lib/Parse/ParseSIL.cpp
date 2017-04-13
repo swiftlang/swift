@@ -2343,48 +2343,79 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB, SILBuilder &B) {
               || P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ","))
             return true;
           
-          SILFunction *id = nullptr;
+          SILFunction *idFn = nullptr;
+          SILDeclRef idDecl;
           SILFunction *getter = nullptr;
           SILFunction *setter = nullptr;
           while (true) {
             Identifier subKind;
-            SourceLoc kindLoc;
-            SILFunction *f;
-            if (parseSILIdentifier(subKind, kindLoc,
-                                   diag::sil_keypath_expected_component_kind)
-                || parseSILFunctionRef(InstLoc, f))
+            SourceLoc subKindLoc;
+            if (parseSILIdentifier(subKind, subKindLoc,
+                                   diag::sil_keypath_expected_component_kind))
               return true;
+
             if (subKind.str() == "id") {
-              id = f;
-            } else if (subKind.str() == "getter") {
-              getter = f;
-            } else if (subKind.str() == "setter") {
-              setter = f;
+              // The identifier can be either a function ref or a SILDeclRef
+              // to a class or protocol method.
+              if (P.Tok.is(tok::at_sign)) {
+                if (parseSILFunctionRef(InstLoc, idFn))
+                  return true;
+              } else if (P.Tok.is(tok::pound)) {
+                if (parseSILDeclRef(idDecl, /*fnType*/ true))
+                  return true;
+              } else {
+                P.diagnose(subKindLoc, diag::expected_tok_in_sil_instr, "# or @");
+                return true;
+              }
+            } else if (subKind.str() == "getter" || subKind.str() == "setter") {
+              bool isSetter = subKind.str()[0] == 's';
+              if (parseSILFunctionRef(InstLoc, isSetter ? setter : getter))
+                return true;
             } else {
-              P.diagnose(kindLoc, diag::sil_keypath_unknown_component_kind,
+              P.diagnose(subKindLoc, diag::sil_keypath_unknown_component_kind,
                          subKind);
+              return true;
             }
             
             if (!P.consumeIf(tok::comma))
               break;
           }
-          
-          if (id == nullptr || getter == nullptr
+          if ((idFn == nullptr && idDecl.isNull())
+              || getter == nullptr
               || (isSettable && setter == nullptr)) {
             P.diagnose(componentLoc,
                        diag::sil_keypath_computed_property_missing_part,
                        isSettable);
             return true;
           }
+          
+          if ((idFn == nullptr) == (idDecl.isNull())) {
+            P.diagnose(componentLoc,
+                       diag::sil_keypath_computed_property_missing_part,
+                       isSettable);
+            return true;
+          }
+          
           // TODO: indexes
-          if (isSettable)
-            components.push_back(
-              KeyPathPatternComponent::forComputedSettableProperty(
-                id, getter, setter, {}, componentTy));
-          else
-            components.push_back(
-              KeyPathPatternComponent::forComputedGettableProperty(
-                id, getter, {}, componentTy));
+          if (isSettable) {
+            if (idFn)
+              components.push_back(
+                KeyPathPatternComponent::forComputedSettableProperty(
+                                   idFn, getter, setter, {}, componentTy));
+            else
+              components.push_back(
+                KeyPathPatternComponent::forComputedSettableProperty(
+                                   idDecl, getter, setter, {}, componentTy));
+          } else {
+            if (idFn)
+              components.push_back(
+                KeyPathPatternComponent::forComputedGettableProperty(
+                                   idFn, getter, {}, componentTy));
+            else
+              components.push_back(
+                KeyPathPatternComponent::forComputedGettableProperty(
+                                   idDecl, getter, {}, componentTy));
+          }
         } else {
           P.diagnose(componentLoc, diag::sil_keypath_unknown_component_kind,
                      componentKind);
