@@ -755,7 +755,7 @@ namespace decls_block {
     IdentifierIDField, // name
     DeclContextIDField,// context decl
     TypeIDField, // underlying type
-    TypeIDField, // interface type
+    TypeIDField, // interface type (no longer used)
     BCFixed<1>,  // implicit flag
     GenericEnvironmentIDField, // generic environment
     AccessibilityKindField // accessibility
