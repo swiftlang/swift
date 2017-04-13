@@ -1212,6 +1212,23 @@ addProtocolsToStruct(ClangImporter::Implementation &Impl,
                                    SynthesizedProtocolAttr(kind));
 }
 
+/// Add a synthesized typealias to the given nominal type.
+static void addSynthesizedTypealias(NominalTypeDecl *nominal, Identifier name,
+                                    Type underlyingType) {
+  auto &ctx = nominal->getASTContext();
+
+  auto typealias = new (ctx) TypeAliasDecl(SourceLoc(), SourceLoc(),
+                                           name, SourceLoc(),
+                                           nullptr, nominal);
+  typealias->setUnderlyingType(underlyingType);
+  typealias->setEarlyAttrValidation(true);
+  typealias->setAccessibility(Accessibility::Public);
+  typealias->setValidationStarted();
+  typealias->setImplicit();
+
+  nominal->addMember(typealias);
+}
+
 /// Make a struct declaration into a raw-value-backed struct
 ///
 /// \param structDecl the struct to make a raw value for
@@ -1258,6 +1275,8 @@ static void makeStructRawValued(
                              /*wantBody=*/!Impl.hasFinishedTypeChecking()));
   structDecl->addMember(patternBinding);
   structDecl->addMember(var);
+
+  addSynthesizedTypealias(structDecl, cxt.Id_RawValue, underlyingType);
 }
 
 /// Create a rawValue-ed constructor that bridges to its underlying storage.
@@ -1372,6 +1391,8 @@ static void makeStructRawValuedWithBridge(
   structDecl->addMember(computedPatternBinding);
   structDecl->addMember(computedVar);
   structDecl->addMember(computedVarGetter);
+
+  addSynthesizedTypealias(structDecl, cxt.Id_RawValue, bridgedType);
 }
 
 static Type getGenericMethodType(DeclContext *dc, AnyFunctionType *fnType) {
@@ -4846,11 +4867,11 @@ SwiftDeclConverter::importSwiftNewtype(const clang::TypedefNameDecl *decl,
   auto computedNominal = computedPropertyUnderlyingType->getAnyNominal();
   auto transferKnown = [&](KnownProtocolKind kind) {
     if (!computedNominal)
-      return;
+      return false;
 
     auto proto = cxt.getProtocol(kind);
     if (!proto)
-      return;
+      return false;
 
     // Break circularity by only looking for declared conformances in the
     // original module, or possibly its adapter.
@@ -4859,7 +4880,10 @@ SwiftDeclConverter::importSwiftNewtype(const clang::TypedefNameDecl *decl,
                                            Impl.getTypeResolver())) {
       protocols.push_back(proto);
       synthesizedProtocols.push_back(kind);
+      return true;
     }
+
+    return false;
   };
 
   // Transfer conformances. Each of these needs a forwarding
@@ -4867,7 +4891,8 @@ SwiftDeclConverter::importSwiftNewtype(const clang::TypedefNameDecl *decl,
   transferKnown(KnownProtocolKind::Equatable);
   transferKnown(KnownProtocolKind::Hashable);
   transferKnown(KnownProtocolKind::Comparable);
-  transferKnown(KnownProtocolKind::ObjectiveCBridgeable);
+  bool transferredObjCBridgeable =
+    transferKnown(KnownProtocolKind::ObjectiveCBridgeable);
 
   if (!isBridged) {
     // Simple, our stored type is equivalent to our computed
@@ -4885,6 +4910,10 @@ SwiftDeclConverter::importSwiftNewtype(const clang::TypedefNameDecl *decl,
                                   computedPropertyUnderlyingType,
                                   synthesizedProtocols, protocols,
                                   /*makeUnlabeledValueInit=*/unlabeledCtor);
+
+    if (transferredObjCBridgeable)
+      addSynthesizedTypealias(structDecl, cxt.Id_ObjectiveCType,
+                              storedUnderlyingType);
   }
 
   Impl.ImportedDecls[{decl->getCanonicalDecl(), getVersion()}] = structDecl;
@@ -5044,6 +5073,8 @@ SwiftDeclConverter::importAsOptionSetType(DeclContext *dc, Identifier name,
   ProtocolDecl *protocols[] = {cxt.getProtocol(KnownProtocolKind::OptionSet)};
   makeStructRawValued(Impl, structDecl, underlyingType,
                       {KnownProtocolKind::OptionSet}, protocols);
+  addSynthesizedTypealias(structDecl, cxt.Id_Element,
+                          structDecl->getDeclaredInterfaceType());
   return structDecl;
 }
 

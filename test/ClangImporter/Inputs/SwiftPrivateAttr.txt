@@ -60,18 +60,21 @@ struct E0 : RawRepresentable, Equatable {
   init(_ rawValue: UInt32)
   init(rawValue: UInt32)
   var rawValue: UInt32
+  typealias RawValue = UInt32
 }
 var __E0PrivA: E0 { get }
 struct __PrivE1 : RawRepresentable, Equatable {
   init(_ rawValue: UInt32)
   init(rawValue: UInt32)
   var rawValue: UInt32
+  typealias RawValue = UInt32
 }
 var __PrivE1A: __PrivE1 { get }
 struct __PrivE2 : RawRepresentable, Equatable {
   init(_ rawValue: UInt32)
   init(rawValue: UInt32)
   var rawValue: UInt32
+  typealias RawValue = UInt32
 }
 var __PrivE2A: __PrivE2 { get }
 enum __PrivNSEnum : Int {
@@ -90,11 +93,15 @@ enum NSEnum : Int {
 struct __PrivNSOptions : OptionSet {
   init(rawValue: Int)
   let rawValue: Int
+  typealias RawValue = Int
+  typealias Element = __PrivNSOptions
   static var A: __PrivNSOptions { get }
 }
 struct NSOptions : OptionSet {
   init(rawValue: Int)
   let rawValue: Int
+  typealias RawValue = Int
+  typealias Element = NSOptions
   static var __privA: NSOptions { get }
   @available(swift, obsoleted: 3, renamed: "__privA")
   static var __PrivA: NSOptions { get }
