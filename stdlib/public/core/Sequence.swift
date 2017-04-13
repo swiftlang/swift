@@ -1435,13 +1435,11 @@ extension Sequence {
 }
 
 extension Sequence {
-  /// Copies `self` into the supplied buffer.
+  /// Initializes the memory at `buffer.baseAddress` with elements of `self`,
+  /// stopping when either `self` or `buffer` is exhausted.
   ///
-  /// - Precondition: The memory in `self` is uninitialized. The buffer must
-  ///   contain sufficient uninitialized memory to accommodate `source.underestimatedCount`.
-  ///
-  /// - Postcondition: The `Pointee`s at `buffer[startIndex..<returned index]` are
-  ///   initialized.
+  /// - Returns: an iterator over any remaining elements of `self` and the index
+  ///   just beyond the newly-uninitialized memory.
   @_inlineable
   public func _copyContents(
     initializing buffer: UnsafeMutableBufferPointer<Iterator.Element>
