@@ -173,6 +173,7 @@ _TFIvVs8_Process10_argumentsGSaSS_iU_FT_GSaSS_ ---> closure #1 () -> [Swift.Stri
 _TFCSo1AE ---> __ObjC.A.__ivar_destroyer
 _TFCSo1Ae ---> __ObjC.A.__ivar_initializer
 _TTWC13call_protocol1CS_1PS_FS1_3foofT_Si ---> protocol witness for call_protocol.P.foo() -> Swift.Int in conformance call_protocol.C : call_protocol.P in call_protocol
+_T013call_protocol1CCAA1PA2aDP3fooSiyFTW ---> {T:} protocol witness for call_protocol.P.foo() -> Swift.Int in conformance call_protocol.C : call_protocol.P in call_protocol
 _TFC12dynamic_self1X1ffT_DS0_ ---> dynamic_self.X.f() -> Self
 _TTSg5Si___TFSqcfT_GSqx_ ---> generic specialization <Swift.Int> of Swift.Optional.init() -> A?
 _TTSgq5Si___TFSqcfT_GSqx_ ---> generic specialization <preserving fragile attribute, Swift.Int> of Swift.Optional.init() -> A?
