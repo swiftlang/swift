@@ -24,11 +24,18 @@ import SwiftShims
 
 extension UInt16 : _DefaultConstructible {}
 
+// ABI TODO: The has assumptions about tuple layout in the ABI, namely that they
+// are laid out contiguously and individually addressable (i.e. strided).
+//
 // WIP: Trying out a hard(er)-coded fixed size array to wrap. The _DoubleLength
 // approach yields absurd debug-stdlib performance, and absurd generic-
 // specialization compilation times in release.
-public struct _CodeUnitArray8<T : UnsignedInteger> {
+//
+// TODO: gyb this up and replace existing _array${N}<T> with it.
+public struct _CodeUnitArray8<T> {
   public var storage: (T, T, T, T, T, T, T, T)
+
+  static var _arraySize : Int { return 8 }
 }
 
 extension _CodeUnitArray8 : RandomAccessCollection, MutableCollection {
@@ -39,42 +46,37 @@ extension _CodeUnitArray8 : RandomAccessCollection, MutableCollection {
     return 0
   }
   public var endIndex : Index {
-    return 8
+    return _CodeUnitArray8._arraySize
   }
+  public var count : IndexDistance { return _CodeUnitArray8._arraySize }
+
   public subscript(i: Index) -> T {
+    @inline(__always)
     get {
-      // FIXME: unsafe pointer instead, for perf
-      switch i {
-        case 0: return storage.0
-        case 1: return storage.1
-        case 2: return storage.2
-        case 3: return storage.3
-        case 4: return storage.4
-        case 5: return storage.5
-        case 6: return storage.6
-        case 7: return storage.7
-        default:
-          _sanityCheck(false, "out of bounds access")
-          Builtin.unreachable()
-          // return numericCast(0)
-       }
+      var copy = storage
+      let res: T = withUnsafeBytes(of: &copy) {
+        (rawPtr : UnsafeRawBufferPointer) -> T in
+        let stride = MemoryLayout<T>.stride
+        _sanityCheck(rawPtr.count == 8*stride, "layout mismatch?")
+        let bufPtr = UnsafeBufferPointer(
+          start: rawPtr.baseAddress!.assumingMemoryBound(to: T.self),
+          count: count)
+        return bufPtr[i]
+      }
+      return res
     }
+    @inline(__always)
     set {
-      // FIXME: unsafe pointer instead, for perf
-      switch i {
-        case 0: storage.0 = newValue
-        case 1: storage.1 = newValue
-        case 2: storage.2 = newValue
-        case 3: storage.3 = newValue
-        case 4: storage.4 = newValue
-        case 5: storage.5 = newValue
-        case 6: storage.6 = newValue
-        case 7: storage.7 = newValue
-        default:
-          _sanityCheck(false, "out of bounds access")
-          Builtin.unreachable()
-          // fatalError("out of bounds")
-       }
+      withUnsafeBytes(of: &storage) {
+        (rawPtr : UnsafeRawBufferPointer) -> () in
+        let rawPtr = UnsafeMutableRawBufferPointer(mutating: rawPtr)
+        let stride = MemoryLayout<T>.stride
+        _sanityCheck(rawPtr.count == 8*stride, "layout mismatch?")
+        let bufPtr = UnsafeMutableBufferPointer(
+          start: rawPtr.baseAddress!.assumingMemoryBound(to: T.self),
+          count: count)
+        bufPtr[i] = newValue
+      }
     }
   }
   public func index(after i: Index) -> Index {
@@ -83,6 +85,8 @@ extension _CodeUnitArray8 : RandomAccessCollection, MutableCollection {
   public func index(before i: Index) -> Index {
     return i-1
   }
+
+  // TODO: Any customization hooks it's profitable to override, e.g. append?
 
 }
 extension _CodeUnitArray8 : _FixedSizeCollection {
@@ -94,7 +98,7 @@ extension _CodeUnitArray8 : _FixedSizeCollection {
 // With a hard-coded 8-wide, we have skipped the worst part. Use DoubleLength
 // for now.
 //
-public typealias _CodeUnitArray16<T : UnsignedInteger> 
+public typealias _CodeUnitArray16<T : UnsignedInteger>
   = _DoubleLength<_CodeUnitArray8<T>>
 
 
@@ -631,13 +635,13 @@ extension _UnicodeViews.FCCNormalizedUTF16View : UnicodeView {
     }
     return Index(segmentIdx, segmentIdx.segment.startIndex)
   }
-  
+
   public func anyIndex(_ i: Index) -> AnyUnicodeIndex {
     return .fccNormalizedUTF16(
       offsetOfSegment: numericCast(i._outer.segment.nativeStart),
       offsetInSegment: i._inner ?? 0)
   }
-  
+
   public typealias SubSequence = UnicodeViewSlice<Self_>
   public subscript(bounds: Range<Index>) -> SubSequence {
     return SubSequence(base: self, bounds: bounds)
