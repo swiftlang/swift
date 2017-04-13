@@ -340,7 +340,7 @@ static void checkStaticExclusivity(SILFunction &Fn, PostOrderFunctionInfo *PO) {
         continue;
       }
 
-      if (auto *RI = dyn_cast<ReturnInst>(&I)) {
+      if (dyn_cast<ReturnInst>(&I)) {
         // Sanity check to make sure entries are properly removed.
         assert(Accesses.size() == 0);
       }
