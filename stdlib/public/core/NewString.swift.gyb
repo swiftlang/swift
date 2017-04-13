@@ -193,14 +193,7 @@ extension String : RangeReplaceableCollection {
   public mutating func replaceSubrange<C: Collection>(
     _ target: Range<Index>, with replacement: C
   ) where C.Iterator.Element == Character {
-    // Fast path: the incoming characters are Unicode
-    if let unicodeReplacement = replacement as? AnyUnicode {
-      content.replaceUTF16(target, with: unicodeReplacement.anyContent.anyUTF16)
-    }
-    else {
-      // Slow path: we have to reconstruct UTF-16 from Characters
-      content.replaceUTF16(target, with: replacement.lazy.flatMap { $0.utf16 })
-    }
+    content.replaceSubrange(target, with: replacement)
   }
 }
 
@@ -823,8 +816,12 @@ extension String.Content {
   public mutating func replaceSubrange<C: Collection>(
     _ target: Range<String.Index>, with replacement: C
   ) where C.Iterator.Element == Character {
+    // Fastest path: the rhs is already a string
+    if let s = replacement as? String {
+      replaceUTF16(target, with: s.content.utf16)
+    }
     // Fast path: the incoming characters are Unicode
-    if let unicodeReplacement = replacement as? AnyUnicode {
+    else if let unicodeReplacement = replacement as? AnyUnicode {
       replaceUTF16(target, with: unicodeReplacement.anyContent.anyUTF16)
     }
     else {
