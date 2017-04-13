@@ -320,6 +320,16 @@ namespace {
 } // end anonymous namespace
 
 
+/// Finds a particular kind of nominal by looking through typealiases.
+template <typename T>
+static T *castIgnoringSugar(Decl *D) {
+  static_assert(std::is_base_of<NominalTypeDecl, T>::value,
+                "only meant for use with NominalTypeDecl and subclasses");
+  if (auto *alias = dyn_cast<TypeAliasDecl>(D))
+    D = alias->getDeclaredInterfaceType()->getAnyNominal();
+  return cast<T>(D);
+}
+
 /// Skips a single record in the bitstream.
 ///
 /// Returns true if the next entry is a record of type \p recordKind.
@@ -670,7 +680,7 @@ ProtocolConformanceRef ModuleFile::readConformance(
   case ABSTRACT_PROTOCOL_CONFORMANCE: {
     DeclID protoID;
     AbstractProtocolConformanceLayout::readRecord(scratch, protoID);
-    auto proto = cast<ProtocolDecl>(getDecl(protoID));
+    auto proto = castIgnoringSugar<ProtocolDecl>(getDecl(protoID));
     return ProtocolConformanceRef(proto);
   }
 
@@ -752,7 +762,7 @@ ProtocolConformanceRef ModuleFile::readConformance(
 
     auto nominal = cast<NominalTypeDecl>(getDecl(nominalID));
     PrettyStackTraceDecl trace("cross-referencing conformance for", nominal);
-    auto proto = cast<ProtocolDecl>(getDecl(protoID));
+    auto proto = castIgnoringSugar<ProtocolDecl>(getDecl(protoID));
     PrettyStackTraceDecl traceTo("... to", proto);
     auto module = getModule(moduleID);
 
@@ -815,7 +825,7 @@ NormalProtocolConformance *ModuleFile::readNormalConformance(
   Type conformingType = dc->getDeclaredTypeInContext();
   PrettyStackTraceType trace(ctx, "reading conformance for", conformingType);
 
-  auto proto = cast<ProtocolDecl>(getDecl(protoID));
+  auto proto = castIgnoringSugar<ProtocolDecl>(getDecl(protoID));
   PrettyStackTraceDecl traceTo("... to", proto);
 
   auto conformance = ctx.getConformance(conformingType, proto, SourceLoc(), dc,

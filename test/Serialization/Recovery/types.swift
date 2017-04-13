@@ -5,11 +5,25 @@
 
 // RUN: %target-swift-ide-test -source-filename=x -print-module -module-to-print Lib -I %t -I %S/Inputs/custom-modules -enable-experimental-deserialization-recovery -swift-version 3 | %FileCheck -check-prefix CHECK-RECOVERY %s
 
+// RUN: %target-swift-frontend -typecheck %s -I %t -I %S/Inputs/custom-modules  -swift-version 3 -enable-experimental-deserialization-recovery -D TEST -verify
+
 // REQUIRES: objc_interop
+
+#if TEST
+
+import Lib
+
+func requiresConformance(_: B_RequiresConformance<B_ConformsToProto>) {}
+
+
+#else // TEST
 
 import Types
 
-public func renameAllTheThings(
+// Please use prefixes to keep the printed parts of this file in alphabetical
+// order.
+
+public func A_renameAllTheThings(
   a: RenamedClass?,
   b: RenamedGenericClass<AnyObject>?,
   c: RenamedTypedef,
@@ -18,7 +32,7 @@ public func renameAllTheThings(
   f: RenamedProtocol
 ) {}
 
-// CHECK-LABEL: func renameAllTheThings(
+// CHECK-LABEL: func A_renameAllTheThings(
 // CHECK-SAME: a: RenamedClass?
 // CHECK-SAME: b: RenamedGenericClass<AnyObject>?
 // CHECK-SAME: c: RenamedTypedef
@@ -28,7 +42,7 @@ public func renameAllTheThings(
 // CHECK-SAME: )
 
 
-// CHECK-RECOVERY-LABEL: func renameAllTheThings(
+// CHECK-RECOVERY-LABEL: func A_renameAllTheThings(
 // CHECK-RECOVERY-SAME: a: Swift3RenamedClass?
 // CHECK-RECOVERY-SAME: b: Swift3RenamedGenericClass<AnyObject>?
 
@@ -42,10 +56,22 @@ public func renameAllTheThings(
 // CHECK-RECOVERY-SAME: )
 
 
-public func renameGeneric<T: RenamedProtocol>(obj: T) {}
+public func A_renameGeneric<T: RenamedProtocol>(obj: T) {}
 
-// CHECK-LABEL: func renameGeneric<T>(
+// CHECK-LABEL: func A_renameGeneric<T>(
 // CHECK-SAME: where T : RenamedProtocol
 
-// CHECK-RECOVERY-LABEL: func renameGeneric<T>(
+// CHECK-RECOVERY-LABEL: func A_renameGeneric<T>(
 // CHECK-RECOVERY-SAME: where T : Swift3RenamedProtocol
+
+public class B_ConformsToProto: RenamedProtocol {}
+
+// CHECK-LABEL: class B_ConformsToProto : RenamedProtocol
+// CHECK-RECOVERY-LABEL: class B_ConformsToProto : Swift3RenamedProtocol
+
+public struct B_RequiresConformance<T: RenamedProtocol> {}
+
+// CHECK-LABEL: struct B_RequiresConformance<T> where T : RenamedProtocol
+// CHECK-RECOVERY-LABEL: struct B_RequiresConformance<T> where T : Swift3RenamedProtocol
+
+#endif
