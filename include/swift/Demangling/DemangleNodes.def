@@ -166,7 +166,6 @@ NODE(VTableThunk)
 NODE(VTableAttribute) // note: old mangling only
 NODE(Weak)
 CONTEXT_NODE(WillSet)
-NODE(WitnessTableOffset)
 NODE(ReflectionMetadataBuiltinDescriptor)
 NODE(ReflectionMetadataFieldDescriptor)
 NODE(ReflectionMetadataAssocTypeDescriptor)

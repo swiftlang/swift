@@ -90,7 +90,6 @@ _TwTkC3foo3bar ---> initializeBufferWithTake for bar
 _TwtkC3foo3bar ---> initializeWithTake for bar
 _TwprC3foo3bar ---> projectBuffer for bar
 _TWVC3foo3bar ---> value witness table for bar
-_TWoFC3foo3bar3basFSiSi ---> witness table offset for bar.bas(_:)
 _TWvdvC3foo3bar3basSi ---> direct field offset for bar.bas
 _TWvivC3foo3bar3basSi ---> indirect field offset for bar.bas
 _TWPC3foo3barS_8barrables ---> protocol witness table for bar

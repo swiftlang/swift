@@ -919,10 +919,6 @@ public:
 
   Address getAddrOfFieldOffset(VarDecl *D, bool isIndirect,
                                ForDefinition_t forDefinition);
-  Address getAddrOfWitnessTableOffset(SILDeclRef fn,
-                                      ForDefinition_t forDefinition);
-  Address getAddrOfWitnessTableOffset(VarDecl *field,
-                                      ForDefinition_t forDefinition);
   llvm::Function *getAddrOfValueWitness(CanType concreteType,
                                         ValueWitness index,
                                         ForDefinition_t forDefinition);

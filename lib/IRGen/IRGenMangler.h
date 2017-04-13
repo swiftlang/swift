@@ -61,17 +61,6 @@ public:
     return finalize();
   }
 
-  std::string mangleWitnessTableOffset(const ValueDecl *Decl) {
-    beginMangling();
-    if (auto ctor = dyn_cast<ConstructorDecl>(Decl)) {
-      appendConstructorEntity(ctor, /*isAllocating=*/true);
-    } else {
-      appendEntity(Decl);
-    }
-    appendOperator("Wo");
-    return finalize();
-  }
-
   std::string mangleFieldOffsetFull(const ValueDecl *Decl, bool isIndirect) {
     beginMangling();
     appendEntity(Decl);
