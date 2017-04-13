@@ -1854,8 +1854,7 @@ class ReferencedTypeFinder : public TypeVisitor<ReferencedTypeFinder> {
   }
 
   void visitArchetypeType(ArchetypeType *archetype) {
-    // Appears in protocols and in generic ObjC classes.
-    return;
+    llvm_unreachable("Should not see archetypes in interface types");
   }
 
   void visitGenericTypeParamType(GenericTypeParamType *param) {
@@ -1887,14 +1886,14 @@ class ReferencedTypeFinder : public TypeVisitor<ReferencedTypeFinder> {
   }
 
   void visitLValueType(LValueType *lvalue) {
-    visit(lvalue->getObjectType());
+    llvm_unreachable("LValue types should not appear in interface types");
   }
 
   void visitInOutType(InOutType *inout) {
     visit(inout->getObjectType());
   }
 
-  /// Returns true if \p archetype has any constraints other than being
+  /// Returns true if \p paramTy has any constraints other than being
   /// class-bound ("conforms to" AnyObject).
   static bool isConstrained(ModuleDecl &mod,
                             GenericSignature *sig,
