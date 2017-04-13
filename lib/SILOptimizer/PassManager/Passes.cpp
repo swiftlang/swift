@@ -21,7 +21,6 @@
 
 #define DEBUG_TYPE "sil-optimizer"
 
-#include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Module.h"
 #include "swift/SIL/SILModule.h"
