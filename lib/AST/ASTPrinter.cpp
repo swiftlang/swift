@@ -183,7 +183,6 @@ struct SynthesizedExtensionAnalyzer::Implementation {
   typedef std::vector<ExtensionMergeGroup> MergeGroupVector;
 
   NominalTypeDecl *Target;
-  Type BaseType;
   DeclContext *DC;
   bool IncludeUnconditional;
   PrintOptions Options;
@@ -194,7 +193,6 @@ struct SynthesizedExtensionAnalyzer::Implementation {
                  bool IncludeUnconditional,
                  PrintOptions Options):
     Target(Target),
-    BaseType(Target->getDeclaredInterfaceType()),
     DC(Target),
     IncludeUnconditional(IncludeUnconditional),
     Options(Options), AllGroups(MergeGroupVector()),
@@ -211,6 +209,8 @@ struct SynthesizedExtensionAnalyzer::Implementation {
 
   std::pair<SynthesizedExtensionInfo, ExtensionMergeInfo>
   isApplicable(ExtensionDecl *Ext, bool IsSynthesized) {
+    auto BaseType = Target->getDeclaredTypeInContext();
+
     SynthesizedExtensionInfo Result(IsSynthesized);
     ExtensionMergeInfo MergeInfo;
     MergeInfo.HasDocComment = !Ext->getRawComment().isEmpty();
@@ -221,20 +221,37 @@ struct SynthesizedExtensionAnalyzer::Implementation {
       return {Result, MergeInfo};
     }
 
-    // Get the substitutions from the generic signature of
-    // the extension to the interface types of the base type's
-    // declaration.
-    auto *M = DC->getParentModule();
-    SubstitutionMap subMap;
-    if (!BaseType->isExistentialType())
-      subMap = BaseType->getContextSubstitutionMap(M, Ext);
-
     assert(Ext->getGenericSignature() && "No generic signature.");
+
+    // Protocol vs protocol extension.
+    //
+    // Just keep all the requirements.
+    if (BaseType->isExistentialType()) {
+      for (auto Req : Ext->getGenericSignature()->getRequirements()) {
+        auto Kind = Req.getKind();
+        auto First = Req.getFirstType();
+        auto Second = Req.getSecondType();
+        MergeInfo.addRequirement(First, Second, Kind);
+      }
+
+      Result.Ext = Ext;
+      return {Result, MergeInfo};
+    }
+
+    // Concrete type vs concrete extension or protocol extension.
+    //
+    // The general idea is that we keep the requirements which are
+    // conditionally satisfied, discard requirements that are
+    // always satisfied, and discard the extension altogether
+    // if any requirements are insatisfiable.
+    auto *M = DC->getParentModule();
+    auto subMap = BaseType->getContextSubstitutionMap(M, Ext);
+
     for (auto Req : Ext->getGenericSignature()->getRequirements()) {
       auto Kind = Req.getKind();
 
-      Type First = Req.getFirstType().subst(subMap);
-      Type Second = Req.getSecondType().subst(subMap);
+      auto First = Req.getFirstType().subst(subMap);
+      auto Second = Req.getSecondType().subst(subMap);
 
       if (!First || !Second) {
         // Substitution with interface type bases can only fail
@@ -242,9 +259,6 @@ struct SynthesizedExtensionAnalyzer::Implementation {
         // In this case, just give up on the extension altogether.
         return {Result, MergeInfo};
       }
-
-      First = First->getCanonicalType();
-      Second = Second->getCanonicalType();
 
       switch (Kind) {
         case RequirementKind::Conformance:
@@ -937,21 +951,18 @@ class PrintAST : public ASTVisitor<PrintAST> {
         T = Current->getInnermostDeclContext()->mapTypeOutOfContext(T);
       }
 
-      // Get the innermost nominal type context.
-      DeclContext *DC;
-      if (isa<NominalTypeDecl>(Current))
-        DC = Current->getInnermostDeclContext();
-      else if (isa<ExtensionDecl>(Current))
-        DC = Current->getInnermostDeclContext()->
-          getAsNominalTypeOrNominalTypeExtensionContext();
-      else
-        DC = Current->getDeclContext();
+      auto *M = Current->getDeclContext()->getParentModule();
+      SubstitutionMap subMap;
 
-      assert(DC->isTypeContext());
+      if (auto *NTD = dyn_cast<NominalTypeDecl>(Current))
+        subMap = CurrentType->getContextSubstitutionMap(M, NTD);
+      else if (auto *ED = dyn_cast<ExtensionDecl>(Current))
+        subMap = CurrentType->getContextSubstitutionMap(M, ED);
+      else {
+        subMap = CurrentType->getMemberSubstitutionMap(
+          M, cast<ValueDecl>(Current));
+      }
 
-      // Get the substitutions from our base type.
-      auto *M = DC->getParentModule();
-      auto subMap = CurrentType->getContextSubstitutionMap(M, DC);
       T = T.subst(subMap, SubstFlags::DesugarMemberTypes);
     }
 

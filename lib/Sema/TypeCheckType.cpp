@@ -490,6 +490,9 @@ Type TypeChecker::resolveTypeInContext(
 
   // If we found a generic parameter, map to the archetype if there is one.
   if (auto genericParam = dyn_cast<GenericTypeParamDecl>(typeDecl)) {
+    if (genericParam->getDepth() == GenericTypeParamDecl::InvalidDepth)
+      return ErrorType::get(Context);
+
     return resolver->resolveGenericTypeParamType(
         genericParam->getDeclaredInterfaceType()
             ->castTo<GenericTypeParamType>());

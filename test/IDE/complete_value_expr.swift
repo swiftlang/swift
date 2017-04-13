@@ -1266,8 +1266,8 @@ func testTypeCheckWithUnsolvedVariables1() {
 }
 // TC_UNSOLVED_VARIABLES_1: Begin completions
 // TC_UNSOLVED_VARIABLES_1-NEXT: Decl[InstanceVar]/CurrNominal: count[#Int#]{{; name=.+$}}
-// TC_UNSOLVED_VARIABLES_1-NEXT: Decl[InstanceMethod]/CurrNominal: addString({#(s): String#})[#BuilderStyle<T>#]{{; name=.+$}}
-// TC_UNSOLVED_VARIABLES_1-NEXT: Decl[InstanceMethod]/CurrNominal: add({#(t): T#})[#BuilderStyle<T>#]{{; name=.+$}}
+// TC_UNSOLVED_VARIABLES_1-NEXT: Decl[InstanceMethod]/CurrNominal: addString({#(s): String#})[#BuilderStyle<τ_0_0>#]{{; name=.+$}}
+// TC_UNSOLVED_VARIABLES_1-NEXT: Decl[InstanceMethod]/CurrNominal: add({#(t): τ_0_0#})[#BuilderStyle<τ_0_0>#]{{; name=.+$}}
 // TC_UNSOLVED_VARIABLES_1-NEXT: Decl[InstanceMethod]/CurrNominal: get()[#Int#]{{; name=.+$}}
 // TC_UNSOLVED_VARIABLES_1-NEXT: End completions
 
@@ -1276,8 +1276,8 @@ func testTypeCheckWithUnsolvedVariables2() {
 }
 // TC_UNSOLVED_VARIABLES_2: Begin completions
 // TC_UNSOLVED_VARIABLES_2-NEXT: Decl[InstanceVar]/CurrNominal:    count[#Int#]{{; name=.+$}}
-// TC_UNSOLVED_VARIABLES_2-NEXT: Decl[InstanceMethod]/CurrNominal: addString({#(s): String#})[#BuilderStyle<T>#]{{; name=.+$}}
-// TC_UNSOLVED_VARIABLES_2-NEXT: Decl[InstanceMethod]/CurrNominal: add({#(t): T#})[#BuilderStyle<T>#]{{; name=.+$}}
+// TC_UNSOLVED_VARIABLES_2-NEXT: Decl[InstanceMethod]/CurrNominal: addString({#(s): String#})[#BuilderStyle<τ_0_0>#]{{; name=.+$}}
+// TC_UNSOLVED_VARIABLES_2-NEXT: Decl[InstanceMethod]/CurrNominal: add({#(t): τ_0_0#})[#BuilderStyle<τ_0_0>#]{{; name=.+$}}
 // TC_UNSOLVED_VARIABLES_2-NEXT: Decl[InstanceMethod]/CurrNominal: get()[#Int#]{{; name=.+$}}
 // TC_UNSOLVED_VARIABLES_2-NEXT: End completions
 

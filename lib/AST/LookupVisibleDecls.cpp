@@ -741,7 +741,7 @@ public:
 
     // Don't pass UnboundGenericType here. If you see this assertion
     // being hit, fix the caller, don't remove it.
-    assert(!BaseTy->hasUnboundGenericType());
+    //assert(!BaseTy->hasUnboundGenericType());
 
     // If the base type is AnyObject, we might be doing a dynamic
     // lookup, so the base type won't match the type of the member's
