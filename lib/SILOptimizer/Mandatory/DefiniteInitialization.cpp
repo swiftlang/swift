@@ -120,13 +120,13 @@ static void LowerAssignInstruction(SILBuilder &B, AssignInst *Inst,
 }
 
 
-/// InsertCFGDiamond - Insert a CFG diamond at the position specified by the
-/// SILBuilder, with a conditional branch based on "Cond".  This returns the
-/// true, false, and continuation block.  If createTrueBB or createFalseBB is
-/// false, then only one of the two blocks is created - a CFG triangle instead
-/// of a diamond.
+/// Insert a CFG diamond at the position specified by the SILBuilder, with a
+/// conditional branch based on "Cond".
 ///
-/// The SILBuilder is left at the start of the ContBB block.
+/// This returns the true, false, and continuation block.  If createTrueBB or
+/// createFalseBB is false, then only one of the two blocks is created - a CFG
+/// triangle instead of a diamond. The SILBuilder is left at the start of the
+/// ContBB block.
 static void InsertCFGDiamond(SILValue Cond, SILLocation Loc, SILBuilder &B,
                              bool createTrueBB,
                              bool createFalseBB,
