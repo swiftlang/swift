@@ -489,7 +489,7 @@ public:
 
         // If this is a release or dealloc_stack, then remember it as such.
         if (isa<StrongReleaseInst>(User) || isa<DeallocStackInst>(User) ||
-            isa<DeallocBoxInst>(User)) {
+            isa<DeallocBoxInst>(User) || isa<DestroyValueInst>(User)) {
           Destroys.push_back(User);
         }
       }
@@ -592,11 +592,8 @@ void ElementUseCollector::collectContainerUses(AllocBoxInst *ABI) {
     auto *User = UI->getUser();
 
     // Deallocations and retain/release don't affect the value directly.
-    if (isa<DeallocBoxInst>(User))
-      continue;
-    if (isa<StrongRetainInst>(User))
-      continue;
-    if (isa<StrongReleaseInst>(User))
+    if (isa<DeallocBoxInst>(User) || isa<StrongRetainInst>(User) ||
+        isa<StrongReleaseInst>(User) || isa<DestroyValueInst>(User))
       continue;
 
     if (auto project = dyn_cast<ProjectBoxInst>(User)) {
@@ -605,10 +602,11 @@ void ElementUseCollector::collectContainerUses(AllocBoxInst *ABI) {
     }
 
     // Other uses of the container are considered escapes of the values.
-    for (unsigned field : indices(ABI->getBoxType()->getLayout()->getFields()))
+    for (unsigned field : indices(ABI->getBoxType()->getLayout()->getFields())) {
       addElementUses(field,
                      ABI->getBoxType()->getFieldType(ABI->getModule(), field),
                      User, DIUseKind::Escape);
+    }
   }
 }
 
@@ -1061,7 +1059,8 @@ void ElementUseCollector::collectClassSelfUses() {
     }
 
     // destroyaddr on the box is load+release, which is treated as a release.
-    if (isa<DestroyAddrInst>(User) || isa<StrongReleaseInst>(User)) {
+    if (isa<DestroyAddrInst>(User) || isa<StrongReleaseInst>(User) ||
+        isa<DestroyValueInst>(User)) {
       Destroys.push_back(User);
       continue;
     }
@@ -1294,10 +1293,11 @@ void ElementUseCollector::collectClassSelfUses(
       continue;
     }
 
-    // releases of self are tracked as a release. In the case of a failing
-    // initializer, the release on the exit path needs to cleanup the partially
-    // initialized elements.
-    if (isa<StrongReleaseInst>(User)) {
+    // Destroys of self are tracked as a release.
+    //
+    // *NOTE* In the case of a failing initializer, the release on the exit path
+    // needs to cleanup the partially initialized elements.
+    if (isa<StrongReleaseInst>(User) || isa<DestroyValueInst>(User)) {
       Destroys.push_back(User);
       continue;
     }
@@ -1374,7 +1374,7 @@ void ElementUseCollector::collectDelegatingClassInitSelfLoadUses(
     // A release of a load from the self box in a class delegating
     // initializer might be releasing an uninitialized self, which requires
     // special processing.
-    if (isa<StrongReleaseInst>(User)) {
+    if (isa<StrongReleaseInst>(User) || isa<DestroyValueInst>(User)) {
       Destroys.push_back(User);
       continue;
     }
@@ -1541,8 +1541,9 @@ void ElementUseCollector::collectDelegatingClassInitSelfUses() {
 
   for (auto UI : ABI->getUses()) {
     SILInstruction *User = UI->getUser();
-    if (isa<StrongReleaseInst>(User))
+    if (isa<StrongReleaseInst>(User) || isa<DestroyValueInst>(User)) {
       Destroys.push_back(User);
+    }
   }
 }
 
