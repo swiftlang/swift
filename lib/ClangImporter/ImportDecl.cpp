@@ -1212,19 +1212,21 @@ addProtocolsToStruct(ClangImporter::Implementation &Impl,
                                    SynthesizedProtocolAttr(kind));
 }
 
-/// Add the RawValue type to a RawRepresentable struct.
-static void addRawValueType(StructDecl *structDecl, Type rawType) {
-  auto &ctx = structDecl->getASTContext();
+/// Add a synthesized typealias to the given nominal type.
+static void addSynthesizedTypealias(NominalTypeDecl *nominal, Identifier name,
+                                    Type underlyingType) {
+  auto &ctx = nominal->getASTContext();
 
   auto typealias = new (ctx) TypeAliasDecl(SourceLoc(), SourceLoc(),
-                                           ctx.Id_RawValue, SourceLoc(),
-                                           nullptr, structDecl);
-  typealias->setUnderlyingType(rawType);
+                                           name, SourceLoc(),
+                                           nullptr, nominal);
+  typealias->setUnderlyingType(underlyingType);
   typealias->setEarlyAttrValidation(true);
   typealias->setAccessibility(Accessibility::Public);
   typealias->setValidationStarted();
   typealias->setImplicit();
-  structDecl->addMember(typealias);
+
+  nominal->addMember(typealias);
 }
 
 /// Make a struct declaration into a raw-value-backed struct
@@ -1274,7 +1276,7 @@ static void makeStructRawValued(
   structDecl->addMember(patternBinding);
   structDecl->addMember(var);
 
-  addRawValueType(structDecl, underlyingType);
+  addSynthesizedTypealias(structDecl, cxt.Id_RawValue, underlyingType);
 }
 
 /// Create a rawValue-ed constructor that bridges to its underlying storage.
@@ -1390,8 +1392,7 @@ static void makeStructRawValuedWithBridge(
   structDecl->addMember(computedVar);
   structDecl->addMember(computedVarGetter);
 
-  addRawValueType(structDecl, bridgedType);
-
+  addSynthesizedTypealias(structDecl, cxt.Id_RawValue, bridgedType);
 }
 
 static Type getGenericMethodType(DeclContext *dc, AnyFunctionType *fnType) {
@@ -5067,6 +5068,8 @@ SwiftDeclConverter::importAsOptionSetType(DeclContext *dc, Identifier name,
   ProtocolDecl *protocols[] = {cxt.getProtocol(KnownProtocolKind::OptionSet)};
   makeStructRawValued(Impl, structDecl, underlyingType,
                       {KnownProtocolKind::OptionSet}, protocols);
+  addSynthesizedTypealias(structDecl, cxt.Id_Element,
+                          structDecl->getDeclaredInterfaceType());
   return structDecl;
 }
 
