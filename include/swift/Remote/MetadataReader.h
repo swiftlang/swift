@@ -133,8 +133,42 @@ class TypeDecoder {
       }
       if (protocols.size() == 1)
         return protocols.front();
-      else
-        return Builder.createProtocolCompositionType(protocols);
+      return Builder.createProtocolCompositionType(
+          protocols,
+          /*hasExplicitAnyObject=*/false);
+    }
+    case NodeKind::ProtocolListWithAnyObject: {
+      std::vector<BuiltType> protocols;
+      auto ProtocolList = Node->getChild(0);
+      auto TypeList = ProtocolList->getChild(0);
+      for (auto componentType : *TypeList) {
+        if (auto protocol = decodeMangledType(componentType))
+          protocols.push_back(protocol);
+        else
+          return BuiltType();
+      }
+      return Builder.createProtocolCompositionType(
+          protocols,
+          /*hasExplicitAnyObject=*/true);
+    }
+    case NodeKind::ProtocolListWithClass: {
+      std::vector<BuiltType> members;
+      auto ProtocolList = Node->getChild(0);
+      auto TypeList = ProtocolList->getChild(0);
+      for (auto componentType : *TypeList) {
+        if (auto protocol = decodeMangledType(componentType))
+          members.push_back(protocol);
+        else
+          return BuiltType();
+      }
+
+      auto SuperclassNode = Node->getChild(1);
+      if (auto superclass = decodeMangledType(SuperclassNode))
+        members.push_back(superclass);
+
+      return Builder.createProtocolCompositionType(
+          members,
+          /*hasExplicitAnyObject=*/true);
     }
     case NodeKind::Protocol: {
       auto moduleName = Node->getChild(0)->getText();
@@ -724,7 +758,20 @@ public:
     }
     case MetadataKind::Existential: {
       auto Exist = cast<TargetExistentialTypeMetadata<Runtime>>(Meta);
-      std::vector<BuiltType> Protocols;
+      std::vector<BuiltType> Members;
+      bool HasExplicitAnyObject = false;
+
+      if (Exist->Flags.hasSuperclassConstraint()) {
+        // The superclass is stored after the list of protocols.
+        auto SuperclassType = readTypeFromMetadata(
+          Exist->Protocols[Exist->Protocols.NumProtocols]);
+        if (!SuperclassType) return BuiltType();
+        Members.push_back(SuperclassType);
+      }
+
+      if (Exist->isClassBounded())
+        HasExplicitAnyObject = true;
+
       for (size_t i = 0; i < Exist->Protocols.NumProtocols; ++i) {
         auto ProtocolAddress = Exist->Protocols[i];
         auto ProtocolDescriptor = readProtocolDescriptor(ProtocolAddress);
@@ -741,9 +788,10 @@ public:
         if (!Protocol)
           return BuiltType();
 
-        Protocols.push_back(Protocol);
+        Members.push_back(Protocol);
       }
-      auto BuiltExist = Builder.createProtocolCompositionType(Protocols);
+      auto BuiltExist = Builder.createProtocolCompositionType(
+        Members, HasExplicitAnyObject);
       TypeCache[MetadataAddress] = BuiltExist;
       return BuiltExist;
     }
@@ -1061,6 +1109,14 @@ protected:
       case MetadataKind::ErrorObject:
         return _readMetadata<TargetEnumMetadata>(address);
       case MetadataKind::Existential: {
+        StoredPointer flagsAddress = address +
+          sizeof(StoredPointer);
+
+        StoredPointer flags;
+        if (!Reader->readInteger(RemoteAddress(flagsAddress),
+                                 &flags))
+          return nullptr;
+
         StoredPointer numProtocolsAddress = address +
           TargetExistentialTypeMetadata<Runtime>::OffsetToNumProtocols;
         StoredPointer numProtocols;
@@ -1075,6 +1131,9 @@ protected:
         auto totalSize = sizeof(TargetExistentialTypeMetadata<Runtime>)
           + numProtocols *
           sizeof(ConstTargetMetadataPointer<Runtime, TargetProtocolDescriptor>);
+
+        if (ExistentialTypeFlags(flags).hasSuperclassConstraint())
+          totalSize += sizeof(StoredPointer);
 
         return _readMetadata(address, totalSize);
       }
