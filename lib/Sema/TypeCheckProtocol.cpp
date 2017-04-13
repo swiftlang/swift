@@ -5315,7 +5315,8 @@ TypeChecker::conformsToProtocol(Type T, ProtocolDecl *Proto, DeclContext *DC,
 
     if (T->isExistentialType()) {
       bool anyUnsatisfied = false;
-      for (auto *proto : T->getExistentialLayout().getProtocols()) {
+      auto layout = T->getExistentialLayout();
+      for (auto *proto : layout.getProtocols()) {
         auto *protoDecl = proto->getDecl();
         if ((*unsatisfiedDependency)(requestInheritedProtocols(protoDecl)))
           anyUnsatisfied = true;
