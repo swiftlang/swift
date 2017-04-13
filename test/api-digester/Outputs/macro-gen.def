@@ -1,0 +1,19 @@
+
+// SDK_CHANGE(node kind, diff kind, child index, left USR, right USR, left comment, right comment)
+SDK_CHANGE(Function, TypeRewritten, "1", "s:12macrogenleft2C1C4foo2ySiF", "", "Int", "() -> ()", "macrogenleft")
+SDK_CHANGE(Function, Rename, "0", "s:12macrogenleft2S1V4foo5ySi1x_Si1ytF", "", "foo5(x:y:)", "foo5(x:y:z:)", "macrogenleft")
+SDK_CHANGE(Constructor, TypeRewritten, "1", "s:12macrogenleft2S1VACSicfc", "", "Int", "Double", "macrogenleft")
+#undef SDK_CHANGE
+
+
+// SDK_CHANGE_TYPE_MEMBER(USR, new typename, new printed name, self index, old printed name)
+#undef SDK_CHANGE_TYPE_MEMBER
+
+
+// NOESCAPE_FUNC_PARAM(USR, Index)
+#undef NOESCAPE_FUNC_PARAM
+
+
+// OVERLOAD_FUNC_TRAILING_CLOSURE(USR)
+#undef OVERLOAD_FUNC_TRAILING_CLOSURE
+
