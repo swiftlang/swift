@@ -514,7 +514,7 @@
 
 12TypeLowering17ExistentialStructV
 // CHECK-64:      (struct TypeLowering.ExistentialStruct)
-// CHECK-64-NEXT: (struct size=448 alignment=8 stride=448 num_extra_inhabitants=0
+// CHECK-64-NEXT: (struct size=464 alignment=8 stride=464 num_extra_inhabitants=0
 // CHECK-64-NEXT:   (field name=any offset=0
 // CHECK-64-NEXT:     (opaque_existential size=32 alignment=8 stride=32 num_extra_inhabitants=0
 // CHECK-64-NEXT:       (field name=metadata offset=24
@@ -636,10 +636,16 @@
 // CHECK-64-NEXT:       (field name=object offset=0
 // CHECK-64-NEXT:         (reference kind=weak refcounting=unknown))
 // CHECK-64-NEXT:       (field name=wtable offset=8
+// CHECK-64-NEXT:         (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=1))))
+// CHECK-64-NEXT:   (field name=classConstrainedP1 offset=448
+// CHECK-64-NEXT:     (class_existential size=16 alignment=8 stride=16 num_extra_inhabitants=[[PTR_XI]]
+// CHECK-64-NEXT:       (field name=object offset=0
+// CHECK-64-NEXT:         (reference kind=strong refcounting=native))
+// CHECK-64-NEXT:       (field name=wtable offset=8
 // CHECK-64-NEXT:         (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=1)))))
 
 // CHECK-32: (struct TypeLowering.ExistentialStruct)
-// CHECK-32-NEXT: (struct size=224 alignment=4 stride=224 num_extra_inhabitants=0
+// CHECK-32-NEXT: (struct size=232 alignment=4 stride=232 num_extra_inhabitants=0
 // CHECK-32-NEXT:   (field name=any offset=0
 // CHECK-32-NEXT:     (opaque_existential size=16 alignment=4 stride=16 num_extra_inhabitants=0
 // CHECK-32-NEXT:       (field name=metadata offset=12
@@ -760,6 +766,12 @@
 // CHECK-32-NEXT:     (class_existential size=8 alignment=4 stride=8 num_extra_inhabitants=4096
 // CHECK-32-NEXT:       (field name=object offset=0
 // CHECK-32-NEXT:         (reference kind=weak refcounting=unknown))
+// CHECK-32-NEXT:       (field name=wtable offset=4
+// CHECK-32-NEXT:         (builtin size=4 alignment=4 stride=4 num_extra_inhabitants=1))))
+// CHECK-32-NEXT:   (field name=classConstrainedP1 offset=224
+// CHECK-32-NEXT:     (class_existential size=8 alignment=4 stride=8 num_extra_inhabitants=4096
+// CHECK-32-NEXT:       (field name=object offset=0
+// CHECK-32-NEXT:         (reference kind=strong refcounting=native))
 // CHECK-32-NEXT:       (field name=wtable offset=4
 // CHECK-32-NEXT:         (builtin size=4 alignment=4 stride=4 num_extra_inhabitants=1)))))
 
