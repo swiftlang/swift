@@ -38,4 +38,34 @@ extension ContiguouslyStoredMutableCollection {
   ) rethrows -> R? {
     return try withUnsafeMutableBufferPointer(body)
   }
+
+  @inline(__always)
+  public func withUnsafeBufferPointer<R>(
+    _ body: (UnsafeBufferPointer<Iterator.Element>) throws -> R
+  ) rethrows -> R {
+    var me = self
+    return try me.withUnsafeMutableBufferPointer {
+      try body(
+        UnsafeBufferPointer(
+          start: UnsafePointer($0.baseAddress), count: $0.count))
+    }
+  }
 }
+
+extension UnsafeBufferPointer : ContiguouslyStoredCollection {
+  public func withUnsafeBufferPointer<R>(
+    _ body: (UnsafeBufferPointer) throws -> R
+  ) rethrows -> R {
+    return try body(self)
+  }
+}
+
+extension UnsafeMutableBufferPointer : ContiguouslyStoredMutableCollection {
+  public mutating func withUnsafeMutableBufferPointer<R>(
+    _ body: (inout UnsafeMutableBufferPointer) throws -> R
+  ) rethrows -> R {
+    return try body(&self)
+  }
+}
+extension Array : ContiguouslyStoredMutableCollection {  }
+extension ArraySlice : ContiguouslyStoredMutableCollection {  }

@@ -13,9 +13,10 @@
 /// An iterator for the elements in the buffer referenced by an
 /// `UnsafeBufferPointer` or `UnsafeMutableBufferPointer` instance.
 @_fixed_layout
-public struct UnsafeBufferPointerIterator<Element>
+public struct UnsafeBufferPointerIterator<Element_>
   : IteratorProtocol, Sequence {
-
+  public typealias Element = Element_
+  
   /// Advances to the next element and returns it, or `nil` if no next element
   /// exists.
   ///
@@ -68,8 +69,7 @@ public struct Unsafe${Mutable}BufferPointer<Element>
 
   public typealias Index = Int
   public typealias IndexDistance = Int
-  public typealias Iterator =
-    IndexingIterator<Unsafe${Mutable}BufferPointer<Element>>
+  public typealias Iterator = UnsafeBufferPointerIterator<Element>
 
   /// The index of the first element in a nonempty buffer.
   ///
