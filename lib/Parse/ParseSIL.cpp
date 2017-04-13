@@ -2345,6 +2345,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB, SILBuilder &B) {
           
           SILFunction *idFn = nullptr;
           SILDeclRef idDecl;
+          VarDecl *idProperty = nullptr;
           SILFunction *getter = nullptr;
           SILFunction *setter = nullptr;
           while (true) {
@@ -2355,13 +2356,22 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB, SILBuilder &B) {
               return true;
 
             if (subKind.str() == "id") {
-              // The identifier can be either a function ref or a SILDeclRef
-              // to a class or protocol method.
+              // The identifier can be either a function ref, a SILDeclRef
+              // to a class or protocol method, or a decl ref to a property:
+              // @static_fn_ref : $...
+              // #Type.method!whatever : (T) -> ...
+              // ##Type.property
               if (P.Tok.is(tok::at_sign)) {
                 if (parseSILFunctionRef(InstLoc, idFn))
                   return true;
               } else if (P.Tok.is(tok::pound)) {
-                if (parseSILDeclRef(idDecl, /*fnType*/ true))
+                if (P.peekToken().is(tok::pound)) {
+                  ValueDecl *propertyValueDecl;
+                  P.consumeToken(tok::pound);
+                  if (parseSILDottedPath(propertyValueDecl))
+                    return true;
+                  idProperty = cast<VarDecl>(propertyValueDecl);
+                } else if (parseSILDeclRef(idDecl, /*fnType*/ true))
                   return true;
               } else {
                 P.diagnose(subKindLoc, diag::expected_tok_in_sil_instr, "# or @");
@@ -2380,7 +2390,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB, SILBuilder &B) {
             if (!P.consumeIf(tok::comma))
               break;
           }
-          if ((idFn == nullptr && idDecl.isNull())
+          if ((idFn == nullptr && idDecl.isNull() && idProperty == nullptr)
               || getter == nullptr
               || (isSettable && setter == nullptr)) {
             P.diagnose(componentLoc,
@@ -2389,32 +2399,27 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB, SILBuilder &B) {
             return true;
           }
           
-          if ((idFn == nullptr) == (idDecl.isNull())) {
+          if ((idFn != nullptr) + (!idDecl.isNull()) + (idProperty != nullptr)
+                == 1) {
             P.diagnose(componentLoc,
                        diag::sil_keypath_computed_property_missing_part,
                        isSettable);
             return true;
           }
           
+          KeyPathPatternComponent::ComputedPropertyId id
+            = idFn ? KeyPathPatternComponent::ComputedPropertyId(idFn)
+                   : idDecl;
+          
           // TODO: indexes
           if (isSettable) {
-            if (idFn)
-              components.push_back(
+            components.push_back(
                 KeyPathPatternComponent::forComputedSettableProperty(
-                                   idFn, getter, setter, {}, componentTy));
-            else
-              components.push_back(
-                KeyPathPatternComponent::forComputedSettableProperty(
-                                   idDecl, getter, setter, {}, componentTy));
+                                   id, getter, setter, {}, componentTy));
           } else {
-            if (idFn)
-              components.push_back(
+            components.push_back(
                 KeyPathPatternComponent::forComputedGettableProperty(
-                                   idFn, getter, {}, componentTy));
-            else
-              components.push_back(
-                KeyPathPatternComponent::forComputedGettableProperty(
-                                   idDecl, getter, {}, componentTy));
+                                   id, getter, {}, componentTy));
           }
         } else {
           P.diagnose(componentLoc, diag::sil_keypath_unknown_component_kind,

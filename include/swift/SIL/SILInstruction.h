@@ -1397,6 +1397,67 @@ public:
 /// Component of a KeyPathInst.
 class KeyPathPatternComponent {
 public:
+  /// Computed property components require an identifier so they can be stably
+  /// identified at runtime. This has to correspond to the ABI of the property--
+  /// whether a reabstracted stored property, a property dispatched through a
+  /// vtable or witness table, or a computed property.
+  class ComputedPropertyId {
+    friend KeyPathPatternComponent;
+  public:
+    enum KindType {
+      Property, Function, DeclRef,
+    };
+  private:
+  
+    union ValueType {
+      VarDecl *Property;
+      SILFunction *Function;
+      SILDeclRef DeclRef;
+      
+      ValueType() : Property(nullptr) {}
+      ValueType(VarDecl *p) : Property(p) {}
+      ValueType(SILFunction *f) : Function(f) {}
+      ValueType(SILDeclRef d) : DeclRef(d) {}
+    } Value;
+  
+    KindType Kind;
+    
+    explicit ComputedPropertyId(ValueType Value, KindType Kind)
+      : Value(Value), Kind(Kind)
+    {}
+    
+  public:
+    /*implicit*/ ComputedPropertyId(VarDecl *property)
+      : Value{property}, Kind{Property}
+    {
+    }
+    
+    /*implicit*/ ComputedPropertyId(SILFunction *function)
+      : Value{function}, Kind{Function}
+    {}
+    
+    /*implicit*/ ComputedPropertyId(SILDeclRef declRef)
+      : Value{declRef}, Kind{DeclRef}
+    {}
+    
+    KindType getKind() const { return Kind; }
+    
+    VarDecl *getProperty() const {
+      assert(getKind() == Property);
+      return Value.Property;
+    }
+    
+    SILFunction *getFunction() const {
+      assert(getKind() == Function);
+      return Value.Function;
+    }
+    
+    SILDeclRef getDeclRef() const {
+      assert(getKind() == DeclRef);
+      return Value.DeclRef;
+    }
+  };
+
   enum class Kind: unsigned {
     StoredProperty,
     GettableProperty,
@@ -1415,11 +1476,9 @@ private:
   // Getter for computed properties
   llvm::PointerIntPair<void *, 2, Kind> ValueAndKind;
   // false if id is a SILFunction*; true if id is a SILDeclRef
-  llvm::PointerIntPair<SILFunction *, 1, bool> SetterAndIdKind;
-  union {
-    SILFunction *IdFunction;
-    SILDeclRef IdDeclRef;
-  };
+  llvm::PointerIntPair<SILFunction *, 2, ComputedPropertyId::KindType>
+    SetterAndIdKind;
+  ComputedPropertyId::ValueType IdValue;
   ArrayRef<IndexPair> Indices;
   CanType ComponentType;
 
@@ -1427,25 +1486,14 @@ private:
                           CanType ComponentType)
     : ValueAndKind(storedProp, kind), ComponentType(ComponentType) {}
 
-  KeyPathPatternComponent(SILFunction *id, Kind kind,
+  KeyPathPatternComponent(ComputedPropertyId id, Kind kind,
                           SILFunction *getter,
                           SILFunction *setter,
                           ArrayRef<IndexPair> indices,
                           CanType ComponentType)
     : ValueAndKind(getter, kind),
-      SetterAndIdKind(setter, false),
-      IdFunction(id),
-      Indices(indices),
-      ComponentType(ComponentType) {}
-
-  KeyPathPatternComponent(SILDeclRef id, Kind kind,
-                          SILFunction *getter,
-                          SILFunction *setter,
-                          ArrayRef<IndexPair> indices,
-                          CanType ComponentType)
-    : ValueAndKind(getter, kind),
-      SetterAndIdKind(setter, true),
-      IdDeclRef(id),
+      SetterAndIdKind(setter, id.Kind),
+      IdValue(id.Value),
       Indices(indices),
       ComponentType(ComponentType) {}
 
@@ -1475,24 +1523,15 @@ public:
     llvm_unreachable("unhandled kind");
   }
   
-  bool hasComputedPropertyIdentifierDeclRef() const {
+  ComputedPropertyId getComputedPropertyId() const {
     switch (getKind()) {
     case Kind::StoredProperty:
       llvm_unreachable("not a computed property");
     case Kind::GettableProperty:
     case Kind::SettableProperty:
-      return SetterAndIdKind.getInt();
+      return ComputedPropertyId(IdValue, SetterAndIdKind.getInt());
     }
-  }
-  
-  SILFunction *getComputedPropertyIdentifierFunction() const {
-    assert(!hasComputedPropertyIdentifierDeclRef());
-    return IdFunction;
-  }
-  
-  SILDeclRef getComputedPropertyIdentifierDeclRef() const {
-    assert(hasComputedPropertyIdentifierDeclRef());
-    return IdDeclRef;
+    llvm_unreachable("unhandled kind");
   }
   
   SILFunction *getComputedPropertyGetter() const {
@@ -1533,7 +1572,7 @@ public:
   }
   
   static KeyPathPatternComponent
-  forComputedGettableProperty(SILFunction *identifier,
+  forComputedGettableProperty(ComputedPropertyId identifier,
                               SILFunction *getter,
                               ArrayRef<IndexPair> indices,
                               CanType ty) {
@@ -1542,26 +1581,7 @@ public:
   }
 
   static KeyPathPatternComponent
-  forComputedGettableProperty(SILDeclRef identifier,
-                              SILFunction *getter,
-                              ArrayRef<IndexPair> indices,
-                              CanType ty) {
-    return KeyPathPatternComponent(identifier, Kind::GettableProperty,
-                                   getter, nullptr, indices, ty);
-  }
-
-  static KeyPathPatternComponent
-  forComputedSettableProperty(SILFunction *identifier,
-                              SILFunction *getter,
-                              SILFunction *setter,
-                              ArrayRef<IndexPair> indices,
-                              CanType ty) {
-    return KeyPathPatternComponent(identifier, Kind::SettableProperty,
-                                   getter, setter, indices, ty);
-  }
-
-  static KeyPathPatternComponent
-  forComputedSettableProperty(SILDeclRef identifier,
+  forComputedSettableProperty(ComputedPropertyId identifier,
                               SILFunction *getter,
                               SILFunction *setter,
                               ArrayRef<IndexPair> indices,

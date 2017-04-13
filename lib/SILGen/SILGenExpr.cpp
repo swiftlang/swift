@@ -28,6 +28,8 @@
 #include "swift/AST/DiagnosticsCommon.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/ForeignErrorConvention.h"
+#include "swift/AST/GenericEnvironment.h"
+#include "swift/AST/ASTMangler.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/SourceManager.h"
@@ -2409,6 +2411,243 @@ RValue RValueEmitter::visitObjCSelectorExpr(ObjCSelectorExpr *e, SGFContext C) {
   return RValue(SGF, e, ManagedValue::forUnmanaged(selectorValue));
 }
 
+static SILFunction *getOrCreateKeyPathGetter(SILGenFunction &SGF,
+                                             SILLocation loc,
+                                             VarDecl *property,
+                                             AccessStrategy strategy,
+                                             GenericEnvironment *genericEnv,
+                                             CanType baseType,
+                                             CanType propertyType) {
+  auto genericSig = genericEnv
+    ? genericEnv->getGenericSignature()->getCanonicalSignature()
+    : nullptr;
+
+  // Build the signature of the thunk as expected by the keypath runtime.
+  SILType loweredBaseTy, loweredPropTy;
+  {
+    GenericContextScope scope(SGF.SGM.Types, genericSig);
+    loweredBaseTy = SGF.getLoweredType(AbstractionPattern::getOpaque(),
+                                       baseType);
+    loweredPropTy = SGF.getLoweredType(AbstractionPattern::getOpaque(),
+                                       propertyType);
+  }
+  
+  SILParameterInfo param(loweredBaseTy.getSwiftRValueType(),
+                         ParameterConvention::Indirect_In);
+  SILResultInfo result(loweredPropTy.getSwiftRValueType(),
+                       ResultConvention::Indirect);
+  
+  auto signature = SILFunctionType::get(genericSig,
+    SILFunctionType::ExtInfo(SILFunctionType::Representation::Thin,
+                             /*pseudogeneric*/ false),
+    ParameterConvention::Direct_Unowned,
+    param, result, None, SGF.getASTContext());
+  
+  // Find the function and see if we already created it.
+  auto name = Mangle::ASTMangler()
+    .mangleKeyPathGetterThunkHelper(property, genericSig, baseType);
+  auto thunk = SGF.SGM.M.getOrCreateSharedFunction(loc, name,
+                                                   signature,
+                                                   IsBare,
+                                                   IsNotTransparent,
+                                                   IsNotSerialized,
+                                                   IsThunk);
+  if (!thunk->empty())
+    return thunk;
+  
+  // Emit the thunk, which accesses the underlying property normally with
+  // reabstraction where necessary.
+  auto &SGM = SGF.SGM;
+  if (genericEnv) {
+    baseType = genericEnv->mapTypeIntoContext(baseType)->getCanonicalType();
+    propertyType = genericEnv->mapTypeIntoContext(propertyType)
+      ->getCanonicalType();
+    thunk->setGenericEnvironment(genericEnv);
+  }
+  
+  SILGenFunction subSGF(SGM, *thunk);
+  auto entry = thunk->begin();
+  auto resultArgTy = result.getSILStorageType();
+  auto paramArgTy = param.getSILStorageType();
+  if (genericEnv) {
+    resultArgTy = genericEnv->mapTypeIntoContext(subSGF.SGM.M, resultArgTy);
+    paramArgTy = genericEnv->mapTypeIntoContext(subSGF.SGM.M, paramArgTy);
+  }
+  auto resultArg = entry->createFunctionArgument(resultArgTy);
+  auto paramArg = entry->createFunctionArgument(paramArgTy);
+  
+  Scope scope(subSGF, loc);
+  
+  auto paramOrigValue = subSGF.emitManagedRValueWithCleanup(paramArg);
+  auto paramSubstValue = subSGF.emitOrigToSubstValue(loc, paramOrigValue,
+                                             AbstractionPattern::getOpaque(),
+                                             baseType);
+  auto subs = baseType->getContextSubstitutionMap(subSGF.SGM.M.getSwiftModule(),
+               property->getInnermostDeclContext()->getInnermostTypeContext());
+  SmallVector<Substitution, 4> subsList;
+  if (subs.getGenericSignature())
+    subs.getGenericSignature()->getSubstitutions(subs, subsList);
+  auto resultSubst = subSGF.emitRValueForPropertyLoad(loc, paramSubstValue,
+                                   baseType, /*super*/false, property,
+                                   subsList, AccessSemantics::Ordinary,
+                                   propertyType, SGFContext())
+    .getAsSingleValue(subSGF, loc);
+  if (resultSubst.getType().getAddressType() != resultArg->getType())
+    resultSubst = subSGF.emitSubstToOrigValue(loc, resultSubst,
+                                         AbstractionPattern::getOpaque(),
+                                         propertyType);
+  
+  resultSubst.forwardInto(subSGF, loc, resultArg);
+  scope.pop();
+  
+  subSGF.B.createReturn(loc, subSGF.emitEmptyTuple(loc));
+  
+  return thunk;
+}
+
+SILFunction *getOrCreateKeyPathSetter(SILGenFunction &SGF,
+                                      SILLocation loc,
+                                      VarDecl *property,
+                                      AccessStrategy strategy,
+                                      GenericEnvironment *genericEnv,
+                                      CanType baseType,
+                                      CanType propertyType) {
+  auto genericSig = genericEnv
+    ? genericEnv->getGenericSignature()->getCanonicalSignature()
+    : nullptr;
+
+  // Build the signature of the thunk as expected by the keypath runtime.
+  SILType loweredBaseTy, loweredPropTy;
+  {
+    GenericContextScope scope(SGF.SGM.Types, genericSig);
+    loweredBaseTy = SGF.getLoweredType(AbstractionPattern::getOpaque(),
+                                       baseType);
+    loweredPropTy = SGF.getLoweredType(AbstractionPattern::getOpaque(),
+                                       propertyType);
+  }
+  
+  SILParameterInfo propParam(loweredPropTy.getSwiftRValueType(),
+                             ParameterConvention::Indirect_In);
+  
+  SILParameterInfo baseParam(loweredBaseTy.getSwiftRValueType(),
+                             property->isSetterNonMutating()
+                             ? ParameterConvention::Indirect_In
+                             : ParameterConvention::Indirect_Inout);
+  
+  auto signature = SILFunctionType::get(genericSig,
+    SILFunctionType::ExtInfo(SILFunctionType::Representation::Thin,
+                             /*pseudogeneric*/ false),
+    ParameterConvention::Direct_Unowned,
+    {propParam, baseParam}, {}, None, SGF.getASTContext());
+  
+  // Mangle the name of the thunk to see if we already created it.
+  SmallString<64> nameBuf;
+  
+  // Find the function and see if we already created it.
+  auto name = Mangle::ASTMangler().mangleKeyPathSetterThunkHelper(property,
+                                                                  genericSig,
+                                                                  baseType);
+  auto thunk = SGF.SGM.M.getOrCreateSharedFunction(loc, name,
+                                                   signature,
+                                                   IsBare,
+                                                   IsNotTransparent,
+                                                   IsNotSerialized,
+                                                   IsThunk);
+  if (!thunk->empty())
+    return thunk;
+  
+  // Emit the thunk, which accesses the underlying property normally with
+  // reabstraction where necessary.
+  auto &SGM = SGF.SGM;
+  if (genericEnv) {
+    baseType = genericEnv->mapTypeIntoContext(baseType)->getCanonicalType();
+    propertyType = genericEnv->mapTypeIntoContext(propertyType)
+      ->getCanonicalType();
+    thunk->setGenericEnvironment(genericEnv);
+  }
+  
+  SILGenFunction subSGF(SGM, *thunk);
+  auto entry = thunk->begin();
+  auto valueArgTy = propParam.getSILStorageType();
+  auto baseArgTy = baseParam.getSILStorageType();
+  if (genericEnv) {
+    valueArgTy = genericEnv->mapTypeIntoContext(subSGF.SGM.M, valueArgTy);
+    baseArgTy = genericEnv->mapTypeIntoContext(subSGF.SGM.M, baseArgTy);
+  }
+  auto valueArg = entry->createFunctionArgument(valueArgTy);
+  auto baseArg = entry->createFunctionArgument(baseArgTy);
+  
+  Scope scope(subSGF, loc);
+  
+  auto valueOrig = subSGF.emitManagedRValueWithCleanup(valueArg);
+  auto valueSubst = subSGF.emitOrigToSubstValue(loc, valueOrig,
+                                                AbstractionPattern::getOpaque(),
+                                                propertyType);
+  
+  LValue lv;
+  if (property->isSetterNonMutating()) {
+    auto baseOrig = subSGF.emitManagedRValueWithCleanup(baseArg);
+    auto baseSubst = subSGF.emitOrigToSubstValue(loc, baseOrig,
+                                                 AbstractionPattern::getOpaque(),
+                                                 baseType);
+    lv = LValue::forValue(baseSubst, baseType);
+  } else {
+    auto baseOrig = ManagedValue::forLValue(baseArg);
+    lv = LValue::forAddress(baseOrig,
+                            SILAccessEnforcement::Static,
+                            AbstractionPattern::getOpaque(),
+                            baseType);
+  }
+
+  auto subs = baseType->getContextSubstitutionMap(subSGF.SGM.M.getSwiftModule(),
+               property->getInnermostDeclContext()->getInnermostTypeContext());
+  SmallVector<Substitution, 4> subsList;
+  if (subs.getGenericSignature())
+    subs.getGenericSignature()->getSubstitutions(subs, subsList);
+  
+  lv.addMemberVarComponent(subSGF, loc, property, subsList, /*super*/ false,
+                           AccessKind::Write, AccessSemantics::Ordinary,
+                           strategy, propertyType);
+
+  subSGF.emitAssignToLValue(loc,
+    RValue(subSGF, loc, propertyType, valueSubst),
+    std::move(lv));
+  scope.pop();
+  
+  subSGF.B.createReturn(loc, subSGF.emitEmptyTuple(loc));
+  
+  return thunk;
+}
+
+static KeyPathPatternComponent::ComputedPropertyId
+getIdForKeyPathComponentComputedProperty(SILGenFunction &SGF,
+                                         VarDecl *property,
+                                         AccessStrategy strategy) {
+  switch (strategy) {
+  case AccessStrategy::Storage:
+    // Identify reabstracted stored properties by the property itself.
+    return property;
+  case AccessStrategy::Addressor:
+  case AccessStrategy::DirectToAccessor: {
+    // Identify the property using its (unthunked) getter. For a
+    // computed property, this should be stable ABI; for a resilient public
+    // property, this should also be stable ABI across modules.
+    // TODO: If the getter has shared linkage (say it's synthesized for a
+    // Clang-imported thing), we'll need some other sort of
+    // stable identifier.
+    auto getterRef = SILDeclRef(property->getGetter(), SILDeclRef::Kind::Func);
+    return SGF.SGM.getFunction(getterRef, NotForDefinition);
+  }
+  case AccessStrategy::DispatchToAccessor: {
+    // Identify the property by its vtable or wtable slot.
+    return SILDeclRef(property->getGetter(), SILDeclRef::Kind::Func);
+  }
+  case AccessStrategy::BehaviorStorage:
+    llvm_unreachable("unpossible");
+  }
+  llvm_unreachable("unhandled access strategy");
+}
+
 RValue RValueEmitter::visitKeyPathExpr(KeyPathExpr *E, SGFContext C) {
   if (E->isObjC()) {
     return visit(E->getObjCStringLiteralExpr(), C);
@@ -2441,11 +2680,12 @@ RValue RValueEmitter::visitKeyPathExpr(KeyPathExpr *E, SGFContext C) {
     switch (component.getKind()) {
     case KeyPathExpr::Component::Kind::Property: {
       auto decl = cast<VarDecl>(component.getDeclRef().getDecl());
+      auto oldBaseTy = baseTy;
       baseTy = baseTy->getTypeOfMember(SGF.SGM.SwiftModule, decl)
         ->getCanonicalType();
       
-      switch (decl->getAccessStrategy(AccessSemantics::Ordinary,
-                                      AccessKind::ReadWrite)) {
+      switch (auto strategy = decl->getAccessStrategy(AccessSemantics::Ordinary,
+                                                      AccessKind::ReadWrite)) {
       case AccessStrategy::Storage: {
         // If the stored value would need to be reabstracted in fully opaque
         // context, then we have to treat the component as computed.
@@ -2468,7 +2708,29 @@ RValue RValueEmitter::visitKeyPathExpr(KeyPathExpr *E, SGFContext C) {
       case AccessStrategy::DispatchToAccessor: {
         // We need thunks to bring the getter and setter to the right signature
         // expected by the key path runtime.
-        return unsupported("todo");
+        auto id = getIdForKeyPathComponentComputedProperty(SGF, decl,
+                                                           strategy);
+        auto getter = getOrCreateKeyPathGetter(SGF, SILLocation(E),
+                 decl, strategy,
+                 needsGenericContext ? SGF.F.getGenericEnvironment() : nullptr,
+                 oldBaseTy, baseTy);
+        
+        if (decl->isSettable(decl->getDeclContext())) {
+          auto setter = getOrCreateKeyPathSetter(SGF, SILLocation(E),
+                 decl, strategy,
+                 needsGenericContext ? SGF.F.getGenericEnvironment() : nullptr,
+                 oldBaseTy, baseTy);
+          loweredComponents.push_back(
+            KeyPathPatternComponent::forComputedSettableProperty(id,
+                                                                 getter, setter,
+                                                                 {}, baseTy));
+        } else {
+          loweredComponents.push_back(
+            KeyPathPatternComponent::forComputedGettableProperty(id,
+                                                                 getter,
+                                                                 {}, baseTy));
+        }
+        break;
       }
       case AccessStrategy::BehaviorStorage:
         llvm_unreachable("should not occur");

@@ -1260,6 +1260,19 @@ NodePointer Demangler::demangleThunkOrSpecialization() {
     }
     case'f':
       return demangleFunctionSpecialization();
+    case 'K':
+    case 'k': {
+      auto nodeKind = c == 'K' ? Node::Kind::KeyPathGetterThunkHelper
+                               : Node::Kind::KeyPathSetterThunkHelper;
+      auto type = popNode();
+      auto sigOrDecl = popNode();
+      if (sigOrDecl->getKind() == Node::Kind::DependentGenericSignature) {
+        auto decl = popNode();
+        return createWithChildren(nodeKind, decl, sigOrDecl, type);
+      } else {
+        return createWithChildren(nodeKind, sigOrDecl, type);
+      }
+    }
     default:
       return nullptr;
   }

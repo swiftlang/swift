@@ -3710,8 +3710,10 @@ public:
                     "setter should have two parameters");
             auto baseParam = substSetterType->getSelfParameter();
             require(baseParam.getConvention() ==
-                      ParameterConvention::Indirect_In,
-                    "setter base parameter should be @in");
+                      ParameterConvention::Indirect_In
+                    || baseParam.getConvention() ==
+                        ParameterConvention::Indirect_Inout,
+                    "setter base parameter should be @in or @inout");
             auto newValueParam = substSetterType->getParameters()[0];
             require(newValueParam.getConvention() ==
                       ParameterConvention::Indirect_In,
@@ -3730,7 +3732,7 @@ public:
         }
         }
         
-        baseTy = component.getComponentType();
+        baseTy = componentTy;
       }
     }
     require(CanType(baseTy.subst(patternSubs)) == CanType(leafTy),

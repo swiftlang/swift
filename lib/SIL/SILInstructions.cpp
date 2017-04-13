@@ -1959,8 +1959,11 @@ void KeyPathPattern::Profile(llvm::FoldingSetNodeID &ID,
       LLVM_FALLTHROUGH;
     case KeyPathPatternComponent::Kind::GettableProperty:
       ID.AddPointer(component.getComputedPropertyGetter());
-      if (component.hasComputedPropertyIdentifierDeclRef()) {
-        auto declRef = component.getComputedPropertyIdentifierDeclRef();
+      auto id = component.getComputedPropertyId();
+      ID.AddInteger(id.getKind());
+      switch (id.getKind()) {
+      case KeyPathPatternComponent::ComputedPropertyId::DeclRef: {
+        auto declRef = id.getDeclRef();
         ID.AddPointer(declRef.loc.getOpaqueValue());
         ID.AddInteger((unsigned)declRef.kind);
         ID.AddInteger(declRef.uncurryLevel);
@@ -1969,8 +1972,16 @@ void KeyPathPattern::Profile(llvm::FoldingSetNodeID &ID,
         ID.AddBoolean(declRef.isForeign);
         ID.AddBoolean(declRef.isDirectReference);
         ID.AddBoolean(declRef.defaultArgIndex);
-      } else {
-        ID.AddPointer(component.getComputedPropertyIdentifierFunction());
+        break;
+      }
+      case KeyPathPatternComponent::ComputedPropertyId::Function: {
+        ID.AddPointer(id.getFunction());
+        break;
+      }
+      case KeyPathPatternComponent::ComputedPropertyId::Property: {
+        ID.AddPointer(id.getProperty());
+        break;
+      }
       }
       assert(component.getComputedPropertyIndices().empty()
              && "todo");

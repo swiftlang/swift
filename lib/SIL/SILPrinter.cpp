@@ -1785,15 +1785,24 @@ public:
                     ? "gettable_property $" : "settable_property $")
               << component.getComponentType() << ", "
               << " id ";
-        if (component.hasComputedPropertyIdentifierDeclRef()) {
-          auto declRef = component.getComputedPropertyIdentifierDeclRef();
+        auto id = component.getComputedPropertyId();
+        switch (id.getKind()) {
+        case KeyPathPatternComponent::ComputedPropertyId::DeclRef: {
+          auto declRef = id.getDeclRef();
           *this << declRef << " : "
                 << declRef.getDecl()->getInterfaceType();
-        } else {
-          component.getComputedPropertyIdentifierFunction()->printName(PrintState.OS);
-          *this << " : "
-                << component.getComputedPropertyIdentifierFunction()
-                            ->getLoweredType();
+          break;
+        }
+        case KeyPathPatternComponent::ComputedPropertyId::Function: {
+          id.getFunction()->printName(PrintState.OS);
+          *this << " : " << id.getFunction()->getLoweredType();
+          break;
+        }
+        case KeyPathPatternComponent::ComputedPropertyId::Property: {
+          *this << "##";
+          printValueDecl(id.getProperty(), PrintState.OS);
+          break;
+        }
         }
         *this << ", getter ";
         component.getComputedPropertyGetter()->printName(PrintState.OS);

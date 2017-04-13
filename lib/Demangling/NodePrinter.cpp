@@ -325,6 +325,8 @@ private:
     case Node::Kind::InOut:
     case Node::Kind::InfixOperator:
     case Node::Kind::Initializer:
+    case Node::Kind::KeyPathGetterThunkHelper:
+    case Node::Kind::KeyPathSetterThunkHelper:
     case Node::Kind::LazyProtocolWitnessTableAccessor:
     case Node::Kind::LazyProtocolWitnessTableCacheVariable:
     case Node::Kind::LocalDeclName:
@@ -1218,6 +1220,28 @@ void NodePrinter::print(NodePointer pointer, bool asContext, bool suppressType) 
     if (pointer->hasChildren()) {
       Printer << " for ";
       print(pointer->getFirstChild());
+    }
+    return;
+  case Node::Kind::KeyPathGetterThunkHelper:
+    Printer << "key path getter for ";
+    print(pointer->getChild(0));
+    Printer << " : ";
+    if (pointer->getNumChildren() == 2) {
+      print(pointer->getChild(1));
+    } else {
+      print(pointer->getChild(1));
+      print(pointer->getChild(2));
+    }
+    return;
+  case Node::Kind::KeyPathSetterThunkHelper:
+    Printer << "key path setter for ";
+    print(pointer->getChild(0));
+    Printer << " : ";
+    if (pointer->getNumChildren() == 2) {
+      print(pointer->getChild(1));
+    } else {
+      print(pointer->getChild(1));
+      print(pointer->getChild(2));
     }
     return;
   case Node::Kind::FieldOffset: {
