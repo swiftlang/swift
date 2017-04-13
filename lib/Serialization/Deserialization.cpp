@@ -2612,9 +2612,6 @@ ModuleFile::getDeclChecked(DeclID DID, Optional<DeclContext *> ForcedContext) {
       return nullptr;
     }
 
-    if (auto interfaceType = getType(interfaceTypeID))
-      alias->setInterfaceType(interfaceType);
-
     if (isImplicit)
       alias->setImplicit();
 

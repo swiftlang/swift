@@ -2523,7 +2523,7 @@ void Serializer::writeDecl(const Decl *D) {
                                 addIdentifierRef(typeAlias->getName()),
                                 contextID,
                                 addTypeRef(underlying),
-                                addTypeRef(typeAlias->getInterfaceType()),
+                                /*no longer used*/TypeID(),
                                 typeAlias->isImplicit(),
                                 addGenericEnvironmentRef(
                                              typeAlias->getGenericEnvironment()),
