@@ -836,3 +836,45 @@ SILLocation SILDeclRef::getAsRegularLocation() const {
     return RegularLocation(getDecl());
   return RegularLocation(getAbstractClosureExpr());
 }
+
+SubclassScope SILDeclRef::getSubclassScope() const {
+  if (!hasDecl())
+    return SubclassScope::NotApplicable;
+
+  // If this declaration is a function which goes into a vtable, then it's
+  // symbol must be as visible as its class. Derived classes even have to put
+  // all less visible methods of the base class into their vtables.
+
+  auto *FD = dyn_cast<AbstractFunctionDecl>(getDecl());
+  if (!FD)
+    return SubclassScope::NotApplicable;
+
+  DeclContext *context = FD->getDeclContext();
+
+  // Methods from extensions don't go into vtables (yet).
+  if (context->isExtensionContext())
+    return SubclassScope::NotApplicable;
+
+  auto *classType = context->getAsClassOrClassExtensionContext();
+  if (!classType || classType->isFinal())
+    return SubclassScope::NotApplicable;
+
+  if (FD->isFinal() && !FD->getOverriddenDecl())
+    return SubclassScope::NotApplicable;
+
+  assert(FD->getEffectiveAccess() <= classType->getEffectiveAccess() &&
+         "class must be as visible as its members");
+
+  switch (classType->getEffectiveAccess()) {
+  case Accessibility::Private:
+  case Accessibility::FilePrivate:
+    return SubclassScope::NotApplicable;
+  case Accessibility::Internal:
+    return SubclassScope::Internal;
+  case Accessibility::Public:
+  case Accessibility::Open:
+    return SubclassScope::External;
+  }
+
+  llvm_unreachable("Unhandled Accessibility in switch.");
+}

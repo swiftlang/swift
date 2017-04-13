@@ -547,7 +547,7 @@ ClosureSpecCloner::initCloned(const CallSiteDescriptor &CallSiteDesc,
       ClonedName, ClonedTy,
       ClosureUser->getGenericEnvironment(), ClosureUser->getLocation(),
       IsBare, ClosureUser->isTransparent(), CallSiteDesc.isSerialized(),
-      ClosureUser->isThunk(), ClosureUser->getClassVisibility(),
+      ClosureUser->isThunk(), ClosureUser->getClassSubclassScope(),
       ClosureUser->getInlineStrategy(), ClosureUser->getEffectsKind(),
       ClosureUser, ClosureUser->getDebugScope());
   if (ClosureUser->hasUnqualifiedOwnership()) {
