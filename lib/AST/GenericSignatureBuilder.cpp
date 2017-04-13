@@ -1093,19 +1093,12 @@ public:
     return ResolvedType(pa);
   }
 
-  static ResolvedType forNewTypeAlias(PotentialArchetype *pa) {
-    assert(pa->getParent() && pa->getTypeAliasDecl() &&
-           "not a new typealias");
-    return ResolvedType(pa);
-  }
-
   Type getType() const { return paOrT.dyn_cast<Type>(); }
   PotentialArchetype *getPotentialArchetype() const {
     return paOrT.dyn_cast<PotentialArchetype *>();
   }
 
   bool isType() const { return paOrT.is<Type>(); }
-  bool isPotentialArchetype() const { return paOrT.is<PotentialArchetype *>(); }
 };
 
 /// If there is a same-type requirement to be added for the given nested type
