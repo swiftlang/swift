@@ -9,8 +9,8 @@
 // RUN:  %target-swift-frontend(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -emit-module -o %t  %S/../Inputs/clang-importer-sdk/swift-modules/Foundation.swift
 // FIXME: END -enable-source-import hackaround
 
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource) -I %t -emit-module -o %t %s -disable-objc-attr-requires-foundation-module
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource) -I %t -parse-as-library %t/protocols.swiftmodule -typecheck -emit-objc-header-path %t/protocols.h -import-objc-header %S/../Inputs/empty.h -disable-objc-attr-requires-foundation-module
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource) -I %t -emit-module -o %t %s -disable-objc-attr-requires-foundation-module -enable-experimental-subclass-existentials
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource) -I %t -parse-as-library %t/protocols.swiftmodule -typecheck -emit-objc-header-path %t/protocols.h -import-objc-header %S/../Inputs/empty.h -disable-objc-attr-requires-foundation-module -enable-experimental-subclass-existentials
 // RUN: %FileCheck %s < %t/protocols.h
 // RUN: %FileCheck --check-prefix=NEGATIVE %s < %t/protocols.h
 // RUN: %check-in-clang %t/protocols.h
@@ -18,6 +18,7 @@
 // REQUIRES: objc_interop
 
 import Foundation
+import objc_generics
 
 // CHECK-LABEL: @protocol A{{$}}
 // CHECK-NEXT: @end
@@ -52,6 +53,17 @@ protocol CustomNameType2 {}
   init(object any: AnyObject)
 }
 
+// CHECK-LABEL: @interface MyObject : NSObject <NSCoding, Fungible>
+// CHECK-NEXT: initWithCoder
+// CHECK-NEXT: init SWIFT_UNAVAILABLE
+// CHECK-NEXT: @end
+// NEGATIVE-NOT: @protocol NSCoding
+class MyObject : NSObject, NSCoding, Fungible {
+  required init(coder aCoder: NSCoder) {
+    super.init()
+  }
+}
+
 // CHECK-LABEL: @protocol Methods{{$}}
 // CHECK-NEXT: - (void)test;
 // CHECK-NEXT: + (void)test2;
@@ -59,6 +71,8 @@ protocol CustomNameType2 {}
 // CHECK-NEXT: - (void)testSingleProtocolTypes:(id <A> _Nonnull)a aAgain:(id <A> _Nonnull)a2 b:(id <B> _Nonnull)b bAgain:(id <B> _Nonnull)b2 both:(id <B> _Nonnull)both;
 // CHECK-NEXT: - (void)testSingleProtocolClassTypes:(Class <A> _Nonnull)a aAgain:(Class <A> _Nonnull)a2 b:(Class <B> _Nonnull)b bAgain:(Class <B> _Nonnull)b2 both:(Class <B> _Nonnull)both;
 // CHECK-NEXT: - (void)testComposition:(id <A, ZZZ> _Nonnull)x meta:(Class <A, ZZZ> _Nonnull)xClass;
+// CHECK-NEXT: - (void)testSubclassComposition:(MyObject <ZZZ> * _Nonnull)x meta:(SWIFT_METATYPE(MyObject) <ZZZ> _Nonnull)xClass;
+// CHECK-NEXT: - (void)testGenericSubclassComposition:(FungibleContainer<MyObject *> <ZZZ> * _Nonnull)x meta:(SWIFT_METATYPE(FungibleContainer) <ZZZ> _Nonnull)xClass;
 // CHECK-NEXT: - (void)testOptional:(id <A> _Nullable)opt meta:(Class <A> _Nullable)m;
 // CHECK-NEXT: @end
 @objc protocol Methods {
@@ -70,19 +84,10 @@ protocol CustomNameType2 {}
   func testSingleProtocolTypes(_ a : A, aAgain a2: A, b: B, bAgain b2: B, both: A & B)
   func testSingleProtocolClassTypes(_ a : A.Type, aAgain a2: A.Type, b: B.Type, bAgain b2: B.Type, both: (A & B).Type)
   func testComposition(_ x: A & ZZZ, meta xClass: (A & ZZZ).Type)
+  func testSubclassComposition(_ x: MyObject & ZZZ, meta xClass: (MyObject & ZZZ).Type)
+  func testGenericSubclassComposition(_ x: FungibleContainer<MyObject> & ZZZ, meta xClass: (FungibleContainer<MyObject> & ZZZ).Type)
 
   func testOptional(_ opt: A?, meta m: A.Type?)
-}
-
-// CHECK-LABEL: @interface MyObject : NSObject <NSCoding>
-// CHECK-NEXT: initWithCoder
-// CHECK-NEXT: init SWIFT_UNAVAILABLE
-// CHECK-NEXT: @end
-// NEGATIVE-NOT: @protocol NSCoding
-class MyObject : NSObject, NSCoding {
-  required init(coder aCoder: NSCoder) {
-    super.init()
-  }
 }
 
 // NEGATIVE-NOT: NotObjC
@@ -142,6 +147,25 @@ extension NSString : A, ZZZ {}
   var b: Properties? { get set }
   @objc optional var c: String { get }
 }
+
+
+// Forward declaration of class referenced from subclass existential.
+
+// CHECK-LABEL: @class ReferencesSomeClass2;
+
+// CHECK-LABEL: @protocol ReferencesSomeClass1
+// CHECK-NEXT: - (void)referencesWithSomeClassAndZZZ:(ReferencesSomeClass2 <ZZZ> * _Nonnull)someClassAndZZZ;
+// CHECK-NEXT: @end
+
+// CHECK-LABEL: @interface ReferencesSomeClass2
+// CHECK-NEXT: - (nonnull instancetype)init OBJC_DESIGNATED_INITIALIZER;
+// CHECK-NEXT: @end
+
+@objc protocol ReferencesSomeClass1 {
+  @objc func references(someClassAndZZZ: ReferencesSomeClass2 & ZZZ)
+}
+
+@objc class ReferencesSomeClass2 {}
 
 
 // CHECK-LABEL: @protocol ReversedOrder2{{$}}

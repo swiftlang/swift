@@ -13,6 +13,7 @@
 #include "swift/PrintAsObjC/PrintAsObjC.h"
 #include "swift/Strings.h"
 #include "swift/AST/ASTVisitor.h"
+#include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/NameLookup.h"
@@ -1505,7 +1506,15 @@ private:
 
     visitBoundGenericType(BGT, optionalKind);
   }
-  
+
+  void printGenericArgs(BoundGenericType *BGT) {
+    os << '<';
+    interleave(BGT->getGenericArgs(),
+               [this](Type t) { print(t, None); },
+               [this] { os << ", "; });
+    os << '>';
+  }
+
   void visitBoundGenericClassType(BoundGenericClassType *BGT,
                                   Optional<OptionalTypeKind> optionalKind) {
     // Only handle imported ObjC generics.
@@ -1521,13 +1530,7 @@ private:
       maybePrintTagKeyword(CD);
       os << clangDecl->getName();
     }
-    os << '<';
-    print(BGT->getGenericArgs()[0], None);
-    for (auto arg : BGT->getGenericArgs().slice(1)) {
-      os << ", ";
-      print(arg, None);
-    }
-    os << '>';
+    printGenericArgs(BGT);
     if (isa<clang::ObjCInterfaceDecl>(clangDecl)) {
       os << " *";
     }
@@ -1582,62 +1585,56 @@ private:
     printNullability(optionalKind);
   }
 
-  void visitProtocolType(ProtocolType *PT, 
-                         Optional<OptionalTypeKind> optionalKind, 
-                         bool isMetatype = false) {
-    auto proto = PT->getDecl();
-    if (proto->isSpecificProtocol(KnownProtocolKind::Error)) {
+  void visitExistentialType(Type T,
+                            Optional<OptionalTypeKind> optionalKind,
+                            bool isMetatype = false) {
+    auto layout = T->getExistentialLayout();
+    if (layout.isErrorExistential()) {
       if (isMetatype) os << "Class";
       else os << "NSError *";
       printNullability(optionalKind);
       return;
     }
 
-    os << (isMetatype ? "Class" : "id");
-
-    assert(proto->isObjC());
-    if (auto knownKind = proto->getKnownProtocolKind()) {
-      if (*knownKind == KnownProtocolKind::AnyObject) {
-        printNullability(optionalKind);
-        return;
+    if (layout.superclass) {
+      auto *CD = layout.superclass->getClassOrBoundGenericClass();
+      assert(CD->isObjC());
+      if (isMetatype) {
+        os << "SWIFT_METATYPE(" << getNameForObjC(CD) << ")";
+      } else {
+        os << getNameForObjC(CD);
+        if (auto *BGT = layout.superclass->getAs<BoundGenericClassType>())
+          printGenericArgs(BGT);
       }
+    } else {
+      os << (isMetatype ? "Class" : "id");
     }
 
-    printProtocols(proto);
+    SmallVector<ProtocolDecl *, 2> protos;
+    for (auto proto : layout.getProtocols())
+      protos.push_back(proto->getDecl());
+    printProtocols(protos);
+
+    if (layout.superclass && !isMetatype)
+      os << " *";
+
     printNullability(optionalKind);
+  }
+
+  void visitProtocolType(ProtocolType *PT,
+                         Optional<OptionalTypeKind> optionalKind) {
+    visitExistentialType(PT, optionalKind, /*isMetatype=*/false);
   }
 
   void visitProtocolCompositionType(ProtocolCompositionType *PCT, 
-                                    Optional<OptionalTypeKind> optionalKind,
-                                    bool isMetatype = false) {
-    CanType canonicalComposition = PCT->getCanonicalType();
-    if (auto singleProto = dyn_cast<ProtocolType>(canonicalComposition))
-      return visitProtocolType(singleProto, optionalKind, isMetatype);
-    PCT = cast<ProtocolCompositionType>(canonicalComposition);
-
-    // Dig out the protocols. If we see 'Error', record that we saw it.
-    SmallVector<ProtocolDecl *, 4> protos;
-    for (auto protoTy : PCT->getProtocols()) {
-      auto proto = protoTy->castTo<ProtocolType>()->getDecl();
-      protos.push_back(proto);
-    }
-
-    os << (isMetatype ? "Class" : "id");
-    printProtocols(protos);
-
-    printNullability(optionalKind);
+                                    Optional<OptionalTypeKind> optionalKind) {
+    visitExistentialType(PCT, optionalKind, /*isMetatype=*/false);
   }
 
-  void visitExistentialMetatypeType(ExistentialMetatypeType *MT, 
+  void visitExistentialMetatypeType(ExistentialMetatypeType *MT,
                                     Optional<OptionalTypeKind> optionalKind) {
     Type instanceTy = MT->getInstanceType();
-    if (auto protoTy = instanceTy->getAs<ProtocolType>()) {
-      visitProtocolType(protoTy, optionalKind, /*isMetatype=*/true);
-    } else if (auto compTy = instanceTy->getAs<ProtocolCompositionType>()) {
-      visitProtocolCompositionType(compTy, optionalKind, /*isMetatype=*/true);
-    } else {
-      visitType(MT, optionalKind);
-    }
+    visitExistentialType(instanceTy, optionalKind, /*isMetatype=*/true);
   }
 
   void visitMetatypeType(MetatypeType *MT, 
@@ -1881,7 +1878,10 @@ class ReferencedTypeFinder : public TypeVisitor<ReferencedTypeFinder> {
   }
 
   void visitProtocolCompositionType(ProtocolCompositionType *composition) {
-    for (auto proto : composition->getProtocols())
+    auto layout = composition->getExistentialLayout();
+    if (layout.superclass)
+      visit(layout.superclass);
+    for (auto proto : layout.getProtocols())
       visit(proto);
   }
 
