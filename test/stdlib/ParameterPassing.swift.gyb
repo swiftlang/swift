@@ -351,10 +351,11 @@ tests.test("${TestType}/Fun${FuncName}") {
 %end
       value${TestType}9()
     )
-  } catch let _ as MyError {
+  } catch let e as MyError {
 % if DoesThrow == 'true':
      expectEqual(127, e.val)
 % else:
+     _=e
      preconditionFailure("Should not get there")
 % end
   } catch {
@@ -378,10 +379,11 @@ tests.test("${TestType}/RetFun${FuncName}") {
 % for Num in range(0, 10):
     expectEqual(value${TestType}${Num}(), res.${Num})
 % end
-  } catch let _ as MyError {
+  } catch let e as MyError {
 % if DoesThrow == 'true':
      expectEqual(127, e.val)
 % else:
+     _=e
      preconditionFailure("Should not get there")
 % end
   } catch {
@@ -408,10 +410,11 @@ tests.test("${TestType}/RetAndParamFun${FuncName}") {
 % for Num in range(0, 10):
     expectEqual(value${TestType}${Num}(), res.${Num})
 % end
-  } catch let _ as MyError {
+  } catch let e as MyError {
 % if DoesThrow == 'true':
      expectEqual(127, e.val)
 % else:
+     _=e
      preconditionFailure("Should not get there")
 % end
   } catch {
@@ -444,10 +447,11 @@ tests.test("${TestType}/Method${FuncName}") {
 %end
       value${TestType}9()
     )
-  } catch let _ as MyError {
+  } catch let e as MyError {
 % if DoesThrow == 'true':
      expectEqual(127, e.val)
 % else:
+     _=e
      preconditionFailure("Should not get there")
 % end
   } catch {
@@ -475,10 +479,11 @@ tests.test("${TestType}/RetMethod${FuncName}") {
 % for Num in range(0, 10):
     expectEqual(value${TestType}${Num}(), res.${Num})
 % end
-  } catch let _ as MyError {
+  } catch let e as MyError {
 % if DoesThrow == 'true':
      expectEqual(127, e.val)
 % else:
+     _=e
      preconditionFailure("Should not get there")
 % end
   } catch {
@@ -509,10 +514,11 @@ tests.test("${TestType}/RetAndParamMethod${FuncName}") {
 %for Num in range(0, 10):
     expectEqual(value${TestType}${Num}(), res.${Num})
 % end
-  } catch let _ as MyError {
+  } catch let e as MyError {
 % if DoesThrow == 'true':
      expectEqual(127, e.val)
 % else:
+     _=e
      preconditionFailure("Should not get there")
 % end
   } catch {
@@ -544,10 +550,11 @@ tests.test("${TestType}/WitnessMethod${FuncName}") {
 %end
       value${TestType}9()
     )
-  } catch let _ as MyError {
+  } catch let e as MyError {
 % if DoesThrow == 'true':
      expectEqual(127, e.val)
 % else:
+     _=e
      preconditionFailure("Should not get there")
 % end
   } catch {
@@ -574,10 +581,11 @@ tests.test("${TestType}/RetWitnessMethod${FuncName}") {
 % for Num in range(0, 10):
     expectEqual(value${TestType}${Num}(), res.${Num})
 % end
-  } catch let _ as MyError {
+  } catch let e as MyError {
 % if DoesThrow == 'true':
      expectEqual(127, e.val)
 % else:
+     _=e
      preconditionFailure("Should not get there")
 % end
   } catch {
@@ -607,10 +615,11 @@ tests.test("${TestType}/RetAndParamWitnessMethod${FuncName}") {
 %for Num in range(0, 10):
     expectEqual(value${TestType}${Num}(), res.${Num})
 % end
-  } catch let _ as MyError {
+  } catch let e as MyError {
 % if DoesThrow == 'true':
      expectEqual(127, e.val)
 % else:
+     _=e
      preconditionFailure("Should not get there")
 % end
   } catch {

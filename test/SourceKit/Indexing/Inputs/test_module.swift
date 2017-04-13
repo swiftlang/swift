@@ -12,7 +12,7 @@ public class TwoInts {
 public class ComputedProperty {
   public var value : Int {
     get {
-      var result = 0
+      let result = 0
       return result
     }
     set(newVal) {
