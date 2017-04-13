@@ -1478,8 +1478,6 @@ NodePointer Demangler::demangleWitness() {
     case 'V':
       return createWithChild(Node::Kind::ValueWitnessTable,
                              popNode(Node::Kind::Type));
-    case 'o':
-      return createWithChild(Node::Kind::WitnessTableOffset, popNode(isEntity));
     case 'v': {
       unsigned Directness;
       switch (nextChar()) {

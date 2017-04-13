@@ -3479,17 +3479,6 @@ namespace {
     }
 
     void addMethod(SILDeclRef fn) {
-      // If this function is associated with the target class, go
-      // ahead and emit the witness offset variable.
-      if (fn.getDecl()->getDeclContext() == Target) {
-        Address offsetVar = IGM.getAddrOfWitnessTableOffset(fn, ForDefinition);
-        auto global = cast<llvm::GlobalVariable>(offsetVar.getAddress());
-
-        auto offset = B.getNextOffsetFromGlobal();
-        auto offsetV = llvm::ConstantInt::get(IGM.SizeTy, offset.getValue());
-        global->setInitializer(offsetV);
-      }
-
       // Find the vtable entry.
       assert(VTable && "no vtable?!");
       if (SILFunction *func =
