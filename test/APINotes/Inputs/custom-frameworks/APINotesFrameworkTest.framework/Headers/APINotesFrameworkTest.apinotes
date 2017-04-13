@@ -86,6 +86,8 @@ SwiftVersions:
             SwiftImportAsAccessors: true
       - Name: NewlyGenericSub
         SwiftImportAsNonGeneric: true
+      - Name: RenamedGeneric
+        SwiftName: OldRenamedGeneric
     Protocols:
       - Name: ProtoWithVersionedUnavailableMember
         Methods:
