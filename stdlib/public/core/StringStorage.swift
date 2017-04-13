@@ -369,16 +369,16 @@ extension _Latin1StringStorage : UnicodeStorage {
   // WORKAROUND: helping type inference along will be unnecessary someday
   public typealias CodeUnits = _Latin1StringStorage
   public typealias FCCNormalizedUTF16View = RandomAccessUnicodeView<
-    LazyMapRandomAccessCollection<CodeUnits, UTF16.CodeUnit>
-  >
+    _MapRandomAccessCollection<
+      CodeUnits, _NumericCast<Latin1.CodeUnit, UTF16.CodeUnit>>>
   public typealias UTF16View = FCCNormalizedUTF16View
 
   public typealias UTF8View = _TranscodedView<
     _Latin1StringStorage, Encoding, UTF8>
 
   public typealias UnicodeScalarView = RandomAccessUnicodeView<
-    LazyMapRandomAccessCollection<CodeUnits, UnicodeScalar>
-  >
+    _MapRandomAccessCollection<
+      CodeUnits, _UncheckedUnicodeScalar<Latin1.CodeUnit>>>
   
   public typealias CharacterView = Latin1CharacterView<CodeUnits, Encoding>
   
@@ -398,10 +398,9 @@ extension _Latin1StringStorage : UnicodeStorage {
 
   public var unicodeScalars: UnicodeScalarView {
     return RandomAccessUnicodeView(
-      codeUnits.lazy.map {
-      UnicodeScalar(_unchecked: numericCast($0))
-    })
+      _MapRandomAccessCollection(codeUnits, through: _UncheckedUnicodeScalar()))
   }
+  
   public var characters: CharacterView {
     return _UnicodeViews(codeUnits, Encoding.self).latin1CharacterView
   }

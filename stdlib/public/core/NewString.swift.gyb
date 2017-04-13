@@ -251,6 +251,21 @@ extension String.Content {
       bitsPerElement: numericCast(bitsPerElement)
     )
   }
+
+  public struct _Unpack : _Function {
+    let bitsPerElement: UInt16
+    public func apply(_ input: UInt16) -> UInt16 {
+      if bitsPerElement < 7 {
+        return String.Content.packingTable.withUTF8Buffer {
+          UInt16($0[numericCast(input)])
+        }
+      }
+      else {
+        let mask = UInt16(truncatingBitPattern: ~0 << UInt32(bitsPerElement))
+        return (input &+ 32) & ~mask
+      }
+    }
+  }
   
   static func _unpack(
     bits: UInt61, bitsPerElement: UInt16
@@ -531,12 +546,21 @@ extension String.Content : UnicodeContent {
   }
 }
 
+struct _UInt8TruncatingBitPatternUTF16CodeUnit : _Function {
+  func apply(_ input: UTF16.CodeUnit) -> UInt8 {
+    return UInt8(truncatingBitPattern: input)
+  }
+}
+
 extension Collection where Iterator.Element == UTF16.CodeUnit {
   internal func _isLatin1() -> Bool {
     return !self.contains { $0 > 0xFF }
   }
-  internal var _low8Bits : LazyMapCollection<Self, UInt8> {
-    return self.lazy.map { UInt8(truncatingBitPattern: $0) }
+  
+  internal var _low8Bits :
+  _MapCollection<Self, _UInt8TruncatingBitPatternUTF16CodeUnit>
+  {
+    return _MapCollection(self, through: _UInt8TruncatingBitPatternUTF16CodeUnit())
   }
 }
 

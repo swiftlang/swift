@@ -259,35 +259,45 @@ public extension UnicodeStorage where Encoding == Latin1 {
   var isKnownFCCNormalized: Bool { return true }
 }
 
+public struct _NumericCast<Source: UnsignedInteger, Target: UnsignedInteger>
+  : _Function {
+  public func apply(_ source: Source) -> Target { return numericCast(source) }
+}
+
+public struct _UncheckedUnicodeScalar<Source: UnsignedInteger> : _Function {
+  public func apply(_ source: Source) -> UnicodeScalar {
+    return UnicodeScalar(_unchecked: numericCast(source))
+  }
+}
+
 public extension UnicodeStorage
 where Encoding == Latin1,
   Encoding.EncodedScalar.Iterator.Element == CodeUnits.Iterator.Element,
-  CodeUnits.SubSequence : BidirectionalCollection,
   CodeUnits.SubSequence.Index == CodeUnits.Index,
   CodeUnits.SubSequence.SubSequence == CodeUnits.SubSequence,
   CodeUnits.SubSequence.Iterator.Element == CodeUnits.Iterator.Element,
   CodeUnits.Iterator.Element : UnsignedInteger {
   
   var utf16: RandomAccessUnicodeView<
-    LazyMapRandomAccessCollection<CodeUnits, UInt16>
-  > {
+    _MapRandomAccessCollection<
+      CodeUnits, _NumericCast<Latin1.CodeUnit, UTF16.CodeUnit>>> {
     return fccNormalizedUTF16
   }
 
   /// An FCC-normalized view of the string
   var fccNormalizedUTF16: RandomAccessUnicodeView<
-    LazyMapRandomAccessCollection<CodeUnits, UInt16>
-  > {
-    return RandomAccessUnicodeView(codeUnits.lazy.map { numericCast($0) })
+    _MapRandomAccessCollection<
+      CodeUnits, _NumericCast<Latin1.CodeUnit, UTF16.CodeUnit>>> {
+    return RandomAccessUnicodeView(
+      _MapRandomAccessCollection(codeUnits, through: _NumericCast()))
   }
 
   var unicodeScalars: RandomAccessUnicodeView<
-    LazyMapRandomAccessCollection<CodeUnits, UnicodeScalar>
-  > {
+    _MapRandomAccessCollection<
+      CodeUnits, _UncheckedUnicodeScalar<Latin1.CodeUnit>>> {
     return RandomAccessUnicodeView(
-      codeUnits.lazy.map {
-      UnicodeScalar(_unchecked: numericCast($0))
-    })
+      _MapRandomAccessCollection(
+        codeUnits, through: _UncheckedUnicodeScalar()))
   }
   
   var characters: Latin1CharacterView<CodeUnits, Encoding> {
@@ -556,7 +566,8 @@ extension Any${Element}UnicodeView : RangeReplaceableCollection {
     // func encodedContent<T>(as: T.Type) -> T?
     if base2._tryToReplaceSubrange(target, with: r) { return }
 
-    let newCount = count + (r.count^ - self[target].count)^
+    let delta = r.count^ - self[target].count
+    let newCount = count + delta^
     // FIXME: Ideally we'd create new _[XXX]StringStorage for this part.  In
     // principle that would imply renaming these from Any[Type]View to
     // Any[Encoding]View, because one has to know how to get back into a
