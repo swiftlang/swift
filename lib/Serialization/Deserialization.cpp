@@ -3875,9 +3875,18 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
 
     Type parentTy = getType(parentID);
 
-    // Record the type as soon as possible. Members of a nominal type often
-    // try to refer back to the type.
-    auto nominal = cast<NominalTypeDecl>(getDecl(declID));
+    auto decl = getDecl(declID);
+    if (auto *alias = dyn_cast<TypeAliasDecl>(decl)) {
+      // Look through a single level of sugar if this looks like a forwarding
+      // typealias. This is just a guess, but does the right thing in the
+      // common case of an ordinary nominal getting renamed.
+      if (alias->getAttrs().isUnavailable(ctx))
+        typeOrOffset = alias->getUnderlyingTypeLoc().getType();
+      else
+        typeOrOffset = alias->getDeclaredInterfaceType();
+      break;
+    }
+    auto nominal = cast<NominalTypeDecl>(decl);
     typeOrOffset = NominalType::get(nominal, parentTy, ctx);
 
     assert(typeOrOffset.isComplete());
@@ -4148,7 +4157,17 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
     decls_block::BoundGenericTypeLayout::readRecord(scratch, declID, parentID,
                                                     rawArgumentIDs);
 
-    auto nominal = cast<NominalTypeDecl>(getDecl(declID));
+    auto *decl = getDecl(declID);
+    if (auto *alias = dyn_cast<TypeAliasDecl>(decl)) {
+      // FIXME: Support aliases with their own generic parameters, not just
+      // those that resolve to UnboundGenericTypes.
+      assert(alias->getDeclaredInterfaceType()->is<UnboundGenericType>() &&
+             "generic typealiases where a decl was expected are not supported");
+      decl = alias->getDeclaredInterfaceType()->getAnyNominal();
+      assert(decl && "alias does not resolve to a nominal type");
+    }
+
+    auto nominal = cast<NominalTypeDecl>(decl);
     auto parentTy = getType(parentID);
 
     SmallVector<Type, 8> genericArgs;
