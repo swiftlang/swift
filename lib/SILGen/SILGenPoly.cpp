@@ -163,8 +163,9 @@ namespace {
 static ArrayRef<ProtocolConformanceRef>
 collectExistentialConformances(ModuleDecl *M, CanType fromType, CanType toType) {
   assert(!fromType.isAnyExistentialType());
-  
-  auto protocols = toType.getExistentialLayout().getProtocols();
+
+  auto layout = toType.getExistentialLayout();
+  auto protocols = layout.getProtocols();
   
   SmallVector<ProtocolConformanceRef, 4> conformances;
   for (auto proto : protocols) {
