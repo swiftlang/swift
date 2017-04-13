@@ -1284,11 +1284,13 @@ extension String {// : _ObjectiveCBridgeable {
     var buffer = (z,z,z,z,z,z,z,z,z,z,z,z)
     let capacity = MemoryLayout.size(ofValue: buffer)
       / MemoryLayout.size(ofValue: buffer.0)
-    return try withUnsafeMutablePointer(to: &buffer.0) { p in
-      var (tail, count) = c._copyContents(
-        initializing: UnsafeMutableBufferPointer(start: p, count: capacity))
-      _debugPrecondition(tail.next() == nil)
-      return try body(UnsafeBufferPointer(start: p, count: count))
+    return try withUnsafeMutablePointer(to: &buffer) { 
+      try $0.withMemoryRebound(to: UTF16.CodeUnit.self, capacity: capacity) { p in
+        var (tail, count) = c._copyContents(
+          initializing: UnsafeMutableBufferPointer(start: p, count: capacity))
+        _debugPrecondition(tail.next() == nil)
+        return try body(UnsafeBufferPointer(start: p, count: count))
+      }
     }
   }
   
