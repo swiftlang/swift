@@ -1,7 +1,3 @@
-// XFAIL: *
-//
-// https://bugs.swift.org/browse/SR-4565
-
 // RUN: rm -rf %t  &&  mkdir -p %t
 //
 // RUN: %gyb %s -o %t/AnyHashableCasts.swift

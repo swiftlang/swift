@@ -26,6 +26,7 @@
 #include "swift/AST/TypeWalker.h"
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/TinyPtrVector.h"
+#include "llvm/Support/PrettyStackTrace.h"
 #include "llvm/Support/SaveAndRestore.h"
 
 using namespace swift;
@@ -358,6 +359,27 @@ void NormalProtocolConformance::setLazyLoader(LazyMemberLoader *resolver,
   ResolverContextData = contextData;
 }
 
+namespace {
+  class PrettyStackTraceRequirement : public llvm::PrettyStackTraceEntry {
+    const char *Action;
+    const ProtocolConformance *Conformance;
+    ValueDecl *Requirement;
+  public:
+    PrettyStackTraceRequirement(const char *action,
+                                const ProtocolConformance *conformance,
+                                ValueDecl *requirement)
+      : Action(action), Conformance(conformance), Requirement(requirement) { }
+
+    virtual void print(llvm::raw_ostream &out) const {
+      out << "While " << Action << " requirement ";
+      Requirement->dumpRef(out);
+      out << " in conformance ";
+      Conformance->printName(out);
+      out << "\n";
+    }
+  };
+}
+
 bool NormalProtocolConformance::hasTypeWitness(AssociatedTypeDecl *assocType,
                                                LazyResolver *resolver) const {
   if (Resolver)
@@ -367,6 +389,7 @@ bool NormalProtocolConformance::hasTypeWitness(AssociatedTypeDecl *assocType,
     return true;
   }
   if (resolver) {
+    PrettyStackTraceRequirement trace("resolving", this, assocType);
     resolver->resolveTypeWitness(this, assocType);
     if (TypeWitnesses.find(assocType) != TypeWitnesses.end()) {
       return true;
@@ -383,8 +406,43 @@ NormalProtocolConformance::getTypeWitnessAndDecl(AssociatedTypeDecl *assocType,
 
   auto known = TypeWitnesses.find(assocType);
   if (known == TypeWitnesses.end()) {
-    assert(resolver && "Unable to resolve type witness");
-    resolver->resolveTypeWitness(this, assocType);
+    PrettyStackTraceRequirement trace("resolving", this, assocType);
+
+    if (resolver) {
+      resolver->resolveTypeWitness(this, assocType);
+    } else if (getProtocol()->isSpecificProtocol(
+                                         KnownProtocolKind::RawRepresentable)) {
+      // Specific hack to resolve the RawValue type for imported types.
+      // FIXME: The type checker should be available to do this.
+      auto nominal = getType()->getAnyNominal();
+      if (nominal && nominal->hasClangNode()) {
+        if (auto enumDecl = dyn_cast_or_null<EnumDecl>(nominal)) {
+          // For an enum, use the raw type.
+          if (enumDecl->hasRawType()) {
+            TypeWitnesses.insert({assocType, { enumDecl->getRawType(), nullptr}});
+          }
+        } else {
+          // Otherwise, pull out the RawValue member.
+          ASTContext &ctx = nominal->getASTContext();
+          TypeDecl *rawValueTypeDecl = nullptr;
+          for (auto member : nominal->lookupDirect(ctx.Id_RawValue)) {
+            auto memberType = dyn_cast<TypeDecl>(member);
+            if (!memberType) continue;
+            if (memberType->getDeclContext() != nominal) continue;
+
+            rawValueTypeDecl = memberType;
+            break;
+          }
+
+          assert(rawValueTypeDecl && "Missing RawValue");
+          TypeWitnesses.insert({assocType,
+                                 {rawValueTypeDecl->getDeclaredInterfaceType(),
+                                   rawValueTypeDecl}});
+        }
+      }
+    }
+
+
     known = TypeWitnesses.find(assocType);
     assert(known != TypeWitnesses.end() && "Didn't resolve witness?");
   }
@@ -509,6 +567,7 @@ Witness NormalProtocolConformance::getWitness(ValueDecl *requirement,
 
   auto known = Mapping.find(requirement);
   if (known == Mapping.end()) {
+    PrettyStackTraceRequirement trace("resolving", this, requirement);
     assert(resolver && "Unable to resolve witness without resolver");
     resolver->resolveWitness(this, requirement);
     known = Mapping.find(requirement);

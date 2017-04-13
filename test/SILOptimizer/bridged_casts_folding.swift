@@ -1,7 +1,3 @@
-// XFAIL: *
-//
-// https://bugs.swift.org/browse/SR-4565
-
 // RUN: %target-swift-frontend -O -emit-sil %s | %FileCheck %s
 
 // REQUIRES: objc_interop

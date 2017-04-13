@@ -756,5 +756,13 @@ extension String : LosslessStringConvertible {
   }
 }
 
+// FIXME: Egregious hack so we can deserialize uses of this operator.
+extension __swift_stdlib_UErrorCode {
+  @_transparent
+  public static func ==(lhs: __swift_stdlib_UErrorCode, rhs: __swift_stdlib_UErrorCode) -> Bool {
+    return lhs.rawValue == rhs.rawValue
+  }
+}
+
 // Michael NOTE: Removed a lot of #availability(unavailable) APIs here, which
 // should no longer be relevant.
