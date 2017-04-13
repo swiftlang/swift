@@ -307,11 +307,13 @@ static bool shouldHideDeclFromCompletionResults(const ValueDecl *D) {
 }
 
 typedef std::function<bool(ValueDecl*, DeclVisibilityKind)> DeclFilter;
-DeclFilter DefaultFilter = [] (ValueDecl* VD, DeclVisibilityKind Kind) {return true;};
-DeclFilter KeyPathFilter = [](ValueDecl* decl, DeclVisibilityKind) -> bool {
+static bool DefaultFilter(ValueDecl* VD, DeclVisibilityKind Kind) {
+  return true;
+}
+static bool KeyPathFilter(ValueDecl* decl, DeclVisibilityKind) {
   return isa<TypeDecl>(decl) ||
          (isa<VarDecl>(decl) && decl->getDeclContext()->isTypeContext());
-};
+}
 
 std::string swift::ide::removeCodeCompletionTokens(
     StringRef Input, StringRef TokenName, unsigned *CompletionOffset) {

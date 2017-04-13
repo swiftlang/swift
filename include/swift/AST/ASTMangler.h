@@ -137,8 +137,6 @@ protected:
   
   void appendDeclName(const ValueDecl *decl);
 
-  void appendProtocolList(ArrayRef<Type> Protocols, bool &First);
-
   GenericTypeParamType *appendAssocType(DependentMemberType *DepTy,
                                         bool &isAssocTypeAtDepth);
 

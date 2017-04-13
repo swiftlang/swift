@@ -2863,12 +2863,19 @@ WARNING(no_throw_in_do_with_catch,none,
 // Type Check Types
 //------------------------------------------------------------------------------
 
-ERROR(unsupported_recursive_type,none,
-      "value type %0 cannot have a stored property that references itself",
+ERROR(unsupported_recursive_struct,none,
+      "value type %0 cannot have a stored property that recursively "
+      "contains it",
       (Type))
 
 ERROR(recursive_enum_not_indirect,none,
       "recursive enum %0 is not marked 'indirect'", (Type))
+ERROR(unsupported_infinitely_sized_type,none,
+      "value type %0 has infinite size", (Type))
+NOTE(note_type_cycle_starts_here,none,
+     "cycle beginning here: %0", (StringRef))
+NOTE(note_recursive_enum_case_here,none,
+     "recursive case here", ())
 
 ERROR(sugar_type_not_found,none,
       "broken standard library: cannot find "
@@ -3093,7 +3100,11 @@ ERROR(function_type_no_parens,none,
 NOTE(not_objc_empty_protocol_composition,none,
      "'Any' is not considered '@objc'; use 'AnyObject' instead", ())
 NOTE(not_objc_protocol,none,
-     "protocol %0 is not '@objc'", (Type))
+     "protocol-constrained type containing protocol %0 cannot be represented "
+     "in Objective-C", (Type))
+NOTE(not_objc_class_constraint,none,
+     "protocol-constrained type containing class %0 cannot be represented "
+     "in Objective-C", (Type))
 NOTE(not_objc_error_protocol_composition,none,
      "protocol-constrained type containing 'Error' cannot be represented "
      "in Objective-C", ())

@@ -1156,7 +1156,6 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
   case Kind::ObjCClassRef:
     return SILLinkage::Private;
 
-  case Kind::WitnessTableOffset:
   case Kind::Function:
   case Kind::Other:
   case Kind::ObjCClass:
@@ -1254,7 +1253,6 @@ bool LinkEntity::isAvailableExternally(IRGenModule &IGM) const {
 
   case Kind::ObjCClassRef:
   case Kind::ValueWitness:
-  case Kind::WitnessTableOffset:
   case Kind::TypeMetadataAccessFunction:
   case Kind::TypeMetadataLazyCacheVariable:
   case Kind::Function:
@@ -2852,30 +2850,6 @@ static Address getAddrOfSimpleVariable(IRGenModule &IGM,
 
   entry = addr;
   return Address(addr, alignment);
-}
-
-/// getAddrOfWitnessTableOffset - Get the address of the global
-/// variable which contains an offset within a witness table for the
-/// value associated with the given function.
-Address IRGenModule::getAddrOfWitnessTableOffset(SILDeclRef code,
-                                                ForDefinition_t forDefinition) {
-  LinkEntity entity =
-    LinkEntity::forWitnessTableOffset(code.getDecl());
-  return getAddrOfSimpleVariable(*this, GlobalVars, entity,
-                                 SizeTy, getPointerAlignment(),
-                                 forDefinition);
-}
-
-/// getAddrOfWitnessTableOffset - Get the address of the global
-/// variable which contains an offset within a witness table for the
-/// value associated with the given member variable..
-Address IRGenModule::getAddrOfWitnessTableOffset(VarDecl *field,
-                                                ForDefinition_t forDefinition) {
-  LinkEntity entity =
-    LinkEntity::forWitnessTableOffset(field);
-  return ::getAddrOfSimpleVariable(*this, GlobalVars, entity,
-                                   SizeTy, getPointerAlignment(),
-                                   forDefinition);
 }
 
 /// getAddrOfFieldOffset - Get the address of the global variable

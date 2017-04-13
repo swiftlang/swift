@@ -249,6 +249,8 @@ class Remangler {
     mangleChildNodes(Proto);
   }
 
+  void mangleProtocolList(Node *protocols, Node *superclass);
+
   bool trySubstitution(Node *node, SubstitutionEntry &entry,
                        bool treatAsIdentifier = false);
   void addSubstitution(const SubstitutionEntry &entry);
@@ -1401,15 +1403,29 @@ void Remangler::mangleProtocolDescriptor(Node *node) {
   Buffer << "Mp";
 }
 
-void Remangler::mangleProtocolList(Node *node) {
-  node = getSingleChild(node, Node::Kind::TypeList);
+void Remangler::mangleProtocolList(Node *node, Node *superclass) {
   bool FirstElem = true;
   for (NodePointer Child : *node) {
     manglePureProtocol(Child);
     mangleListSeparator(FirstElem);
   }
   mangleEndOfList(FirstElem);
+  if (superclass) {
+    mangleType(superclass);
+    Buffer << "XE";
+    return;
+  }
   Buffer << 'p';
+}
+
+void Remangler::mangleProtocolList(Node *node) {
+  auto *protocols = getSingleChild(node, Node::Kind::TypeList);
+  mangleProtocolList(protocols, nullptr);
+}
+
+void Remangler::mangleProtocolListWithClass(Node *node) {
+  mangleProtocolList(node->getChild(0),
+                     node->getChild(1));
 }
 
 void Remangler::mangleProtocolWitness(Node *node) {
@@ -1612,11 +1628,6 @@ void Remangler::mangleWeak(Node *node) {
 void Remangler::mangleWillSet(Node *node) {
   mangleChildNodes(node);
   Buffer << "fw";
-}
-
-void Remangler::mangleWitnessTableOffset(Node *node) {
-  mangleChildNodes(node);
-  Buffer << "Wo";
 }
 
 void Remangler::mangleReflectionMetadataBuiltinDescriptor(Node *node) {

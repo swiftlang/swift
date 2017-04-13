@@ -3810,16 +3810,27 @@ void TypeChecker::diagnoseTypeNotRepresentableInObjC(const DeclContext *DC,
 
   // Special diagnostic for protocols and protocol compositions.
   if (T->isExistentialType()) {
-    SmallVector<ProtocolDecl *, 4> Protocols;
-    T->getExistentialTypeProtocols(Protocols);
-    if (Protocols.empty()) {
+    if (T->isAny()) {
       // Any is not @objc.
       diagnose(TypeRange.Start, diag::not_objc_empty_protocol_composition);
       return;
     }
+
+    auto layout = T->getExistentialLayout();
+
+    // See if the superclass is not @objc.
+    if (layout.superclass &&
+        !layout.superclass->getClassOrBoundGenericClass()->isObjC()) {
+      diagnose(TypeRange.Start, diag::not_objc_class_constraint,
+               layout.superclass);
+      return;
+    }
+
     // Find a protocol that is not @objc.
     bool sawErrorProtocol = false;
-    for (auto PD : Protocols) {
+    for (auto P : layout.getProtocols()) {
+      auto *PD = P->getDecl();
+
       if (PD->isSpecificProtocol(KnownProtocolKind::Error)) {
         sawErrorProtocol = true;
         break;
@@ -3930,7 +3941,8 @@ public:
         if (T->isInvalid())
           return false;
         if (type->isExistentialType()) {
-          for (auto *proto : type->getExistentialLayout().getProtocols()) {
+          auto layout = type->getExistentialLayout();
+          for (auto *proto : layout.getProtocols()) {
             auto *protoDecl = proto->getDecl();
 
             if (protoDecl->existentialTypeSupported(&TC))

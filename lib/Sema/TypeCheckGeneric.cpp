@@ -146,6 +146,7 @@ Type ProtocolRequirementTypeResolver::resolveDependentMemberType(
 Type ProtocolRequirementTypeResolver::resolveSelfAssociatedType(
     Type selfTy, AssociatedTypeDecl *assocType) {
   assert(selfTy->isEqual(Proto->getSelfInterfaceType()));
+  (void)Proto;
   return assocType->getDeclaredInterfaceType();
 }
 

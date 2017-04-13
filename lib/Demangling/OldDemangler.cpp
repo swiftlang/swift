@@ -388,12 +388,6 @@ private:
         DEMANGLE_CHILD_OR_RETURN(witnessTable, Type);
         return witnessTable;
       }
-      if (Mangled.nextIf('o')) {
-        auto witnessTableOffset =
-            Factory.createNode(Node::Kind::WitnessTableOffset);
-        DEMANGLE_CHILD_OR_RETURN(witnessTableOffset, Entity);
-        return witnessTableOffset;
-      }
       if (Mangled.nextIf('v')) {
         auto fieldOffset = Factory.createNode(Node::Kind::FieldOffset);
         DEMANGLE_CHILD_AS_NODE_OR_RETURN(fieldOffset, Directness);

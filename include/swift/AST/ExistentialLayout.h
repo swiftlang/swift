@@ -58,7 +58,12 @@ struct ExistentialLayout {
     return requiresClass && !containsNonObjCProtocol;
   }
 
+  // Does this existential contain the Error protocol?
   bool isExistentialWithError(ASTContext &ctx) const;
+
+  // Does this existential consist of an Error protocol only with no other
+  // constraints?
+  bool isErrorExistential() const;
 
   ArrayRef<ProtocolType *> getProtocols() const {
     if (singleProtocol)

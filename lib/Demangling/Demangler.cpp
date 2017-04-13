@@ -1478,8 +1478,6 @@ NodePointer Demangler::demangleWitness() {
     case 'V':
       return createWithChild(Node::Kind::ValueWitnessTable,
                              popNode(Node::Kind::Type));
-    case 'o':
-      return createWithChild(Node::Kind::WitnessTableOffset, popNode(isEntity));
     case 'v': {
       unsigned Directness;
       switch (nextChar()) {
@@ -1583,6 +1581,12 @@ NodePointer Demangler::demangleSpecialType() {
     case 'p':
       return createType(createWithChild(Node::Kind::ExistentialMetatype,
                                         popNode(Node::Kind::Type)));
+    case 'E': {
+      NodePointer Superclass = popNode(Node::Kind::Type);
+      NodePointer Protocols = demangleProtocolListType();
+      return createType(createWithChildren(Node::Kind::ProtocolListWithClass,
+                                           Protocols, Superclass));
+    }
     case 'X':
     case 'x': {
       // SIL box types.

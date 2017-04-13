@@ -997,10 +997,6 @@ RequirementEnvironment::RequirementEnvironment(
   auto selfType = cast<GenericTypeParamType>(
                             proto->getSelfInterfaceType()->getCanonicalType());
 
-  // 'Self' is always at depth 0, index 0. Anything else is invalid code.
-  if (selfType->getDepth() != 0 || selfType->getIndex() != 0)
-    return;
-
   // Construct a generic signature builder by collecting the constraints from the
   // requirement and the context of the conformance together, because both
   // define the capabilities of the requirement.
@@ -5315,7 +5311,8 @@ TypeChecker::conformsToProtocol(Type T, ProtocolDecl *Proto, DeclContext *DC,
 
     if (T->isExistentialType()) {
       bool anyUnsatisfied = false;
-      for (auto *proto : T->getExistentialLayout().getProtocols()) {
+      auto layout = T->getExistentialLayout();
+      for (auto *proto : layout.getProtocols()) {
         auto *protoDecl = proto->getDecl();
         if ((*unsatisfiedDependency)(requestInheritedProtocols(protoDecl)))
           anyUnsatisfied = true;
