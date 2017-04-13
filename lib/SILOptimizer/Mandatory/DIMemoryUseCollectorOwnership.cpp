@@ -398,7 +398,7 @@ class ElementUseCollector {
   const DIMemoryObjectInfo &TheMemory;
   SmallVectorImpl<DIMemoryUse> &Uses;
   SmallVectorImpl<TermInst *> &FailableInits;
-  SmallVectorImpl<SILInstruction *> &Releases;
+  SmallVectorImpl<SILInstruction *> &Destroys;
 
   /// This is true if definite initialization has finished processing assign
   /// and other ambiguous instructions into init vs assign classes.
@@ -434,7 +434,7 @@ public:
                       bool isDefiniteInitFinished,
                       bool TreatAddressToPointerAsInout)
       : Module(TheMemory.MemoryInst->getModule()), TheMemory(TheMemory),
-        Uses(Uses), FailableInits(FailableInits), Releases(Releases),
+        Uses(Uses), FailableInits(FailableInits), Destroys(Releases),
         isDefiniteInitFinished(isDefiniteInitFinished),
         TreatAddressToPointerAsInout(TreatAddressToPointerAsInout) {}
 
@@ -472,7 +472,7 @@ public:
         // If this is a release or dealloc_stack, then remember it as such.
         if (isa<StrongReleaseInst>(User) || isa<DeallocStackInst>(User) ||
             isa<DeallocBoxInst>(User)) {
-          Releases.push_back(User);
+          Destroys.push_back(User);
         }
       }
     }
@@ -849,7 +849,7 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
 
     // We model destroy_addr as a release of the entire value.
     if (isa<DestroyAddrInst>(User)) {
-      Releases.push_back(User);
+      Destroys.push_back(User);
       continue;
     }
 
@@ -1044,7 +1044,7 @@ void ElementUseCollector::collectClassSelfUses() {
 
     // destroyaddr on the box is load+release, which is treated as a release.
     if (isa<DestroyAddrInst>(User) || isa<StrongReleaseInst>(User)) {
-      Releases.push_back(User);
+      Destroys.push_back(User);
       continue;
     }
 
@@ -1280,7 +1280,7 @@ void ElementUseCollector::collectClassSelfUses(
     // initializer, the release on the exit path needs to cleanup the partially
     // initialized elements.
     if (isa<StrongReleaseInst>(User)) {
-      Releases.push_back(User);
+      Destroys.push_back(User);
       continue;
     }
 
@@ -1357,7 +1357,7 @@ void ElementUseCollector::collectDelegatingClassInitSelfLoadUses(
     // initializer might be releasing an uninitialized self, which requires
     // special processing.
     if (isa<StrongReleaseInst>(User)) {
-      Releases.push_back(User);
+      Destroys.push_back(User);
       continue;
     }
 
@@ -1504,7 +1504,7 @@ void ElementUseCollector::collectDelegatingClassInitSelfUses() {
 
     // destroyaddr on the box is load+release, which is treated as a release.
     if (isa<DestroyAddrInst>(User)) {
-      Releases.push_back(User);
+      Destroys.push_back(User);
       continue;
     }
 
@@ -1524,7 +1524,7 @@ void ElementUseCollector::collectDelegatingClassInitSelfUses() {
   for (auto UI : ABI->getUses()) {
     SILInstruction *User = UI->getUser();
     if (isa<StrongReleaseInst>(User))
-      Releases.push_back(User);
+      Destroys.push_back(User);
   }
 }
 
@@ -1542,7 +1542,7 @@ void ElementUseCollector::collectDelegatingValueTypeInitSelfUses() {
     // destroy_addr is a release of the entire value.  This can be an early
     // release for a conditional initializer.
     if (isa<DestroyAddrInst>(User)) {
-      Releases.push_back(User);
+      Destroys.push_back(User);
       continue;
     }
 
