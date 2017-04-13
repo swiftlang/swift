@@ -214,19 +214,13 @@ public:
 private:
   /// Prints a protocol adoption list: <code>&lt;NSCoding, NSCopying&gt;</code>
   ///
-  /// This method filters out non-ObjC protocols, along with the special
-  /// AnyObject protocol.
+  /// This method filters out non-ObjC protocols.
   void printProtocols(ArrayRef<ProtocolDecl *> protos) {
     SmallVector<ProtocolDecl *, 4> protosToPrint;
     std::copy_if(protos.begin(), protos.end(),
                  std::back_inserter(protosToPrint),
                  [this](const ProtocolDecl *PD) -> bool {
-      if (!shouldInclude(PD))
-        return false;
-      auto knownProtocol = PD->getKnownProtocolKind();
-      if (!knownProtocol)
-        return true;
-      return *knownProtocol != KnownProtocolKind::AnyObject;
+      return shouldInclude(PD);
     });
 
     // Drop protocols from the list that are implied by other protocols.
@@ -1900,16 +1894,7 @@ class ReferencedTypeFinder : public TypeVisitor<ReferencedTypeFinder> {
       return true;
 
     auto conformsTo = sig->getConformsTo(paramTy, mod);
-
-    if (conformsTo.size() > 1)
-      return true;
-    if (conformsTo.size() == 0)
-      return false;
-
-    const ProtocolDecl *proto = conformsTo.front();
-    if (auto knownKind = proto->getKnownProtocolKind())
-      return knownKind.getValue() != KnownProtocolKind::AnyObject;
-    return true;
+    return conformsTo.size() > 0;
   }
 
   void visitBoundGenericType(BoundGenericType *boundGeneric) {
@@ -2077,7 +2062,6 @@ public:
 
   void forwardDeclare(const ProtocolDecl *PD) {
     assert(PD->isObjC() ||
-           *PD->getKnownProtocolKind() == KnownProtocolKind::AnyObject ||
            *PD->getKnownProtocolKind() == KnownProtocolKind::Error);
     forwardDeclare(PD, [&]{
       os << "@protocol " << getNameForObjC(PD) << ";\n";
@@ -2236,10 +2220,6 @@ public:
 
   bool writeProtocol(const ProtocolDecl *PD) {
     if (addImport(PD))
-      return true;
-
-    auto knownProtocol = PD->getKnownProtocolKind();
-    if (knownProtocol && *knownProtocol == KnownProtocolKind::AnyObject)
       return true;
 
     if (seenTypes[PD].first == EmissionState::Defined)

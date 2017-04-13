@@ -2282,7 +2282,6 @@ getExistentialValueWitnesses(ProtocolClassConstraint classConstraint,
 #endif
       
   // Other existentials use standard representation.
-  case SpecialProtocol::AnyObject:
   case SpecialProtocol::None:
     break;
   }
@@ -2305,7 +2304,6 @@ ExistentialTypeMetadata::getRepresentation() const {
   switch (Flags.getSpecialProtocol()) {
   case SpecialProtocol::Error:
     return ExistentialTypeRepresentation::Error;
-  case SpecialProtocol::AnyObject:
   case SpecialProtocol::None:
     break;
   }
@@ -2520,24 +2518,6 @@ ExistentialCacheEntry::ExistentialCacheEntry(Key key) {
     if (p->Flags.needsWitnessTable())
       ++numWitnessTables;
   }
-
-#ifndef NDEBUG
-  // Verify the class constraint.
-  {
-    auto classConstraint = ProtocolClassConstraint::Any;
-
-    if (key.SuperclassConstraint)
-      classConstraint = ProtocolClassConstraint::Class;
-    else {
-      for (auto p : make_range(key.Protocols, key.Protocols + key.NumProtocols)) {
-        if (p->Flags.getClassConstraint() == ProtocolClassConstraint::Class)
-          classConstraint = ProtocolClassConstraint::Class;
-      }
-    }
-    
-    assert(classConstraint == key.ClassConstraint);
-  }
-#endif
 
   // Get the special protocol kind for an uncomposed protocol existential.
   // Protocol compositions are currently never special.

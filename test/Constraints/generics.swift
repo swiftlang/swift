@@ -299,11 +299,11 @@ func testFixIts() {
   _ = FullyGeneric<Any>()
 
   _ = AnyClassBound() // expected-error {{generic parameter 'Foo' could not be inferred}} expected-note {{explicitly specify the generic arguments to fix this issue}} {{20-20=<AnyObject>}}
-  _ = AnyClassBound<Any>() // expected-error {{type 'Any' does not conform to protocol 'AnyObject'}}
+  _ = AnyClassBound<Any>() // expected-error {{'Any' is not convertible to 'AnyObject'}}
   _ = AnyClassBound<AnyObject>()
 
   _ = AnyClassBound2() // expected-error {{generic parameter 'Foo' could not be inferred}} expected-note {{explicitly specify the generic arguments to fix this issue}} {{21-21=<AnyObject>}}
-  _ = AnyClassBound2<Any>() // expected-error {{type 'Any' does not conform to protocol 'AnyObject'}}
+  _ = AnyClassBound2<Any>() // expected-error {{'Any' is not convertible to 'AnyObject'}}
   _ = AnyClassBound2<AnyObject>()
 
   _ = ProtoBound() // expected-error {{generic parameter 'Foo' could not be inferred}} expected-note {{explicitly specify the generic arguments to fix this issue}} {{17-17=<<#Foo: SubProto#>>}}
@@ -324,8 +324,8 @@ func testFixIts() {
   _ = ProtosBound2() // expected-error {{generic parameter 'Foo' could not be inferred}} expected-note {{explicitly specify the generic arguments to fix this issue}} {{19-19=<<#Foo: NSCopyish & SubProto#>>}}
   _ = ProtosBound3() // expected-error {{generic parameter 'Foo' could not be inferred}} expected-note {{explicitly specify the generic arguments to fix this issue}} {{19-19=<<#Foo: NSCopyish & SubProto#>>}}
 
-  _ = AnyClassAndProtoBound() // expected-error {{generic parameter 'Foo' could not be inferred}} expected-note {{explicitly specify the generic arguments to fix this issue}} {{28-28=<<#Foo: AnyObject & SubProto#>>}}
-  _ = AnyClassAndProtoBound2() // expected-error {{generic parameter 'Foo' could not be inferred}} expected-note {{explicitly specify the generic arguments to fix this issue}} {{29-29=<<#Foo: AnyObject & SubProto#>>}}
+  _ = AnyClassAndProtoBound() // expected-error {{generic parameter 'Foo' could not be inferred}} expected-note {{explicitly specify the generic arguments to fix this issue}} {{28-28=<<#Foo: SubProto & AnyObject#>>}}
+  _ = AnyClassAndProtoBound2() // expected-error {{generic parameter 'Foo' could not be inferred}} expected-note {{explicitly specify the generic arguments to fix this issue}} {{29-29=<<#Foo: SubProto & AnyObject#>>}}
 
   _ = ClassAndProtoBound() // expected-error {{generic parameter 'Foo' could not be inferred}} expected-note {{explicitly specify the generic arguments to fix this issue}} {{25-25=<<#Foo: X & SubProto#>>}}
 

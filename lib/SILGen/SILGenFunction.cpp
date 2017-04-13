@@ -478,11 +478,6 @@ void SILGenFunction::emitArtificialTopLevel(ClassDecl *mainClass) {
         ->getCanonicalType();
     CanType mainClassMetaty = CanMetatypeType::get(mainClassTy,
                                                    MetatypeRepresentation::ObjC);
-    ProtocolDecl *anyObjectProtocol =
-      ctx.getProtocol(KnownProtocolKind::AnyObject);
-    auto mainClassAnyObjectConformance = ProtocolConformanceRef(
-      *SGM.M.getSwiftModule()->lookupConformance(mainClassTy, anyObjectProtocol,
-                                                nullptr));
     CanType anyObjectTy = ctx.getAnyObjectType();
     CanType anyObjectMetaTy = CanExistentialMetatypeType::get(anyObjectTy,
                                                   MetatypeRepresentation::ObjC);
@@ -507,9 +502,7 @@ void SILGenFunction::emitArtificialTopLevel(ClassDecl *mainClass) {
     SILValue metaTy = B.createMetatype(mainClass,
                              SILType::getPrimitiveObjectType(mainClassMetaty));
     metaTy = B.createInitExistentialMetatype(mainClass, metaTy,
-                          SILType::getPrimitiveObjectType(anyObjectMetaTy),
-                          ctx.AllocateCopy(
-                            llvm::makeArrayRef(mainClassAnyObjectConformance)));
+                          SILType::getPrimitiveObjectType(anyObjectMetaTy), {});
     SILValue optName = B.createApply(mainClass,
                                NSStringFromClass,
                                NSStringFromClass->getType(),

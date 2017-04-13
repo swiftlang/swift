@@ -52,7 +52,7 @@ func test0() -> Bool {
 // the compiler does not statically know if this object
 // is NSNumber can be converted into Int.
 
-// CHECK-LABEL: sil [noinline] @_T017cast_folding_objc35testMayBeBridgedCastFromObjCtoSwiftSis9AnyObject_pF
+// CHECK-LABEL: sil [noinline] @_T017cast_folding_objc35testMayBeBridgedCastFromObjCtoSwiftSiyXlF
 // CHECK: unconditional_checked_cast_addr
 // CHECK: return
 @inline(never)
@@ -64,7 +64,7 @@ public func testMayBeBridgedCastFromObjCtoSwift(_ o: AnyObject) -> Int {
 // the compiler does not statically know if this object
 // is NSString can be converted into String.
 
-// CHECK-LABEL: sil [noinline] @_T017cast_folding_objc41testConditionalBridgedCastFromObjCtoSwiftSSSgs9AnyObject_pF
+// CHECK-LABEL: sil [noinline] @_T017cast_folding_objc41testConditionalBridgedCastFromObjCtoSwiftSSSgyXlF
 // CHECK: unconditional_checked_cast_addr
 // CHECK: return
 @inline(never)

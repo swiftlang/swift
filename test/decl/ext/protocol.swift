@@ -928,7 +928,7 @@ extension BadProto4 { } // expected-error{{protocol 'BadProto3' in the module be
 typealias RawRepresentableAlias = RawRepresentable
 extension RawRepresentableAlias { } // okay
 
-extension AnyObject { } // expected-error{{'AnyObject' protocol cannot be extended}}
+extension AnyObject { } // expected-error{{non-nominal type 'AnyObject' cannot be extended}}
 
 // Members of protocol extensions cannot be overridden.
 // rdar://problem/21075287
