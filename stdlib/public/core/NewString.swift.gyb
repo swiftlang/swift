@@ -757,8 +757,9 @@ extension String.Content {
 
     let oldCapacity: UTF16View.IndexDistance
       = numericCast(_latin1?.capacity ?? _utf16?.capacity ?? 0)
-
-    let newCount = head.count + tail.count + numericCast(replacement.count)
+    
+    let savedCount = head.count + tail.count
+    let newCount = savedCount + numericCast(replacement.count)
     let minimumCapacity = newCount > oldCapacity ? oldCapacity * 2 : 0
 
     // See if we can use 8-bit code units
@@ -795,8 +796,8 @@ extension String.Content {
   where C.Iterator.Element == UTF16.CodeUnit {
     if !isMutable { return false }
 
-    let t: Range<Int> = numericCast(target.lowerBound.encodedOffset)
-      ..< numericCast(target.upperBound.encodedOffset)
+    let t: Range<Int> = target.lowerBound.encodedOffset
+      ..< target.upperBound.encodedOffset
 
     switch _rep {
     case .utf16(let storage):

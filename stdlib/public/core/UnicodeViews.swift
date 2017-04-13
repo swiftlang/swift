@@ -572,7 +572,8 @@ extension _UnicodeViews : _UTextable {
 
         for scalar in scalars {
           // don't overfill the buffer
-          if u.chunkLength + scalar.utf16.count^ > buffer.count^ { break }
+          let end = u.chunkLength + scalar.utf16.count^
+          if end > buffer.count^ { break }
           for unit in scalar.utf16 {
             // _debugLog("# unit: \(String(unit, radix: 16))")
             buffer[u.chunkLength^] = unit
@@ -588,7 +589,8 @@ extension _UnicodeViews : _UTextable {
         // Transcode the source in reverse, filling the buffer forward
         for scalar in scalars.reversed() {
           // don't overfill the buffer
-          if u.chunkLength + scalar.utf16.count^ > buffer.count^ { break }
+          let end = u.chunkLength + scalar.utf16.count^
+          if end > buffer.count^ { break }
           for unit in scalar.utf16.reversed() {
             buffer[u.chunkLength^] = unit
             u.chunkLength += 1

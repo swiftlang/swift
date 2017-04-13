@@ -36,12 +36,10 @@ public func min<T : Comparable>(_ x: T, _ y: T) -> T {
 ///   least arguments, the result is the first one.
 @_inlineable
 public func min<T : Comparable>(_ x: T, _ y: T, _ z: T, _ rest: T...) -> T {
-  var minValue = min(min(x, y), z)
+  let min0 = min(x, y)
+  let minValue = min(min0, z)
   // In case `value == minValue`, we pick `minValue`. See min(_:_:).
-  for value in rest where value < minValue {
-    minValue = value
-  }
-  return minValue
+  return rest.reduce(minValue) { $1 < $0 ? $1 : $0 }
 }
 
 /// Returns the greater of two comparable values.
@@ -67,12 +65,9 @@ public func max<T : Comparable>(_ x: T, _ y: T) -> T {
 ///   greatest arguments, the result is the last one.
 @_inlineable
 public func max<T : Comparable>(_ x: T, _ y: T, _ z: T, _ rest: T...) -> T {
-  var maxValue = max(max(x, y), z)
+  let maxValue = max(max(x, y), z)
   // In case `value == maxValue`, we pick `value`. See min(_:_:).
-  for value in rest where value >= maxValue {
-    maxValue = value
-  }
-  return maxValue
+  return rest.reduce(maxValue) { $1 <= $0 ? $1 : $0 }
 }
 
 /// The iterator for `EnumeratedSequence`.

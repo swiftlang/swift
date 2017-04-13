@@ -538,9 +538,12 @@ public struct Unsafe${Mutable}RawBufferPointer
       return (it, UnsafeMutableBufferPointer(start: nil, count: 0))
     }  
 
-    for p in stride(from: base, 
+    let end1 = base + count
+    let end2 = end1 - elementStride
+    for p in stride(
+      from: base, 
       // only advance to as far as the last element that will fit
-      to: base + count - elementStride + 1, 
+      to: end2 + 1, 
       by: elementStride
     ) {
       // underflow is permitted -- e.g. a sequence into
