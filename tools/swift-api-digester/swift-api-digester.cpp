@@ -2361,8 +2361,7 @@ public:
 // Similarly, the second JSON element describes a type parameter down cast in the
 // second parameter of function "c:objc(cs)NSXMLDocument(im)insertChildren:atIndex:".
 // We keep both usrs because in the future this may support auto-rename.
-class DiffItem {
-public:
+struct DiffItem {
   SDKNodeKind NodeKind;
   NodeAnnotation DiffKind;
   StringRef ChildIndex;
@@ -2381,6 +2380,10 @@ public:
     assert(!ChildIndex.empty() && "Child index is empty.");
   }
 
+  static StringRef head() {
+    return "SDK_CHANGE";
+  }
+
   bool operator<(DiffItem Other) const {
     if (auto UsrCompare = LeftUsr.compare(Other.LeftUsr))
       return UsrCompare < 0;
@@ -2394,16 +2397,19 @@ public:
   }
 
   static void describe(llvm::raw_ostream &os) {
-    os << "// SDK_CHANGE(node kind, diff kind, child index, left USR, "
-          "right USR, left comment, right comment)\n";
+    os << "#ifndef " << head() << "\n";
+    os << "#define " << head() << "(NODE_KIND, DIFF_KIND, CHILD_INDEX, LEFT_USR, "
+                                  "RIGHT_USR, LEFT_COMMENT, RIGHT_COMMENT, "
+                                  "MODULENAME)\n";
+    os << "#endif\n";
   }
 
   static void undef(llvm::raw_ostream &os) {
-    os << "#undef SDK_CHANGE\n";
+    os << "#undef " << head() << "\n";
   }
 
   void streamDef(llvm::raw_ostream &S) const {
-    S << "SDK_CHANGE(" << NodeKind << ", " << DiffKind << ", \"" << ChildIndex
+    S << head() << "(" << NodeKind << ", " << DiffKind << ", \"" << ChildIndex
       << "\", \"" << LeftUsr << "\", \"" << RightUsr << "\", \""
       << LeftComment << "\", \"" << RightComment
       << "\", \"" << ModuleName << "\")";
@@ -2500,20 +2506,26 @@ struct TypeMemberDiffItem {
   Optional<uint8_t> selfIndex;
   StringRef oldPrintedName;
 
+  static StringRef head() {
+    return "SDK_CHANGE_TYPE_MEMBER";
+  }
+
   static void describe(llvm::raw_ostream &os) {
-    os << "// SDK_CHANGE_TYPE_MEMBER(USR, new typename, new printed name, "
-          "self index, old printed name)\n";
+    os << "#ifndef " << head() << "\n";
+    os << "#define " << head() << "(USR, NEW_TYPE_NAME, NEW_PRINTED_NAME, "
+                                  "SELF_INDEX, OLD_PRINTED_NAME)\n";
+    os << "#endif\n";
   }
 
   static void undef(llvm::raw_ostream &os) {
-    os << "#undef SDK_CHANGE_TYPE_MEMBER\n";
+    os << "#undef " << head() << "\n";
   }
 
   void streamDef(llvm::raw_ostream &os) const {
     std::string IndexContent = selfIndex.hasValue() ?
       std::to_string(selfIndex.getValue()) : "";
 
-    os << "SDK_CHANGE_TYPE_MEMBER("
+    os << head() << "("
        << "\"" << usr << "\"" << ", "
        << "\"" << newTypeName << "\"" << ", "
        << "\"" << newPrintedName << "\"" << ", "
@@ -2583,6 +2595,8 @@ void removeRedundantAndSort(std::vector<T> &Diffs) {
 template<typename T>
 void serializeDiffs(llvm::raw_ostream &Fs, std::vector<T> &Diffs) {
   removeRedundantAndSort(Diffs);
+  if (Diffs.empty())
+    return;
   Fs << "\n";
   T::describe(Fs);
   for (auto &Diff : Diffs) {
@@ -2603,23 +2617,23 @@ static bool isTypeChangeInterestedFuncNode(NodePtr Decl) {
   }
 }
 
-static bool isInterested(SDKNodeDecl* Decl, NodeAnnotation Anno) {
-  switch (Anno) {
-    case NodeAnnotation::WrapOptional:
-    case NodeAnnotation::UnwrapOptional:
-    case NodeAnnotation::ImplicitOptionalToOptional:
-    case NodeAnnotation::OptionalToImplicitOptional:
-    case NodeAnnotation::UnwrapUnmanaged:
-    case NodeAnnotation::TypeRewritten:
-      return isTypeChangeInterestedFuncNode(Decl) &&
-        Decl->getParent()->getKind() == SDKNodeKind::TypeDecl;
-    default:
-      return true;
-  }
-}
-
 class DiffItemEmitter : public SDKNodeVisitor {
   DiffVector &AllItems;
+
+  static bool isInterested(SDKNodeDecl* Decl, NodeAnnotation Anno) {
+    switch (Anno) {
+      case NodeAnnotation::WrapOptional:
+      case NodeAnnotation::UnwrapOptional:
+      case NodeAnnotation::ImplicitOptionalToOptional:
+      case NodeAnnotation::OptionalToImplicitOptional:
+      case NodeAnnotation::UnwrapUnmanaged:
+      case NodeAnnotation::TypeRewritten:
+        return isTypeChangeInterestedFuncNode(Decl) &&
+        Decl->getParent()->getKind() == SDKNodeKind::TypeDecl;
+      default:
+        return true;
+    }
+  }
 
   bool doesAncestorHaveTypeRewritten() {
     return std::find_if(Ancestors.begin(), Ancestors.end(),[](NodePtr N) {
@@ -2627,37 +2641,44 @@ class DiffItemEmitter : public SDKNodeVisitor {
     }) != Ancestors.end();
   }
 
-  StringRef getLeftComment(NodePtr Node, NodeAnnotation Anno) {
-    if (Anno == NodeAnnotation::TypeRewritten)
-      return Node->getAnnotateComment(NodeAnnotation::TypeRewrittenLeft);
-    else if (Anno == NodeAnnotation::Rename)
-      return Node->getAnnotateComment(NodeAnnotation::RenameOldName);
-    return StringRef();
-  }
-
-  StringRef getRightComment(NodePtr Node, NodeAnnotation Anno) {
-    if (Anno == NodeAnnotation::TypeRewritten)
-      return Node->getAnnotateComment(NodeAnnotation::TypeRewrittenRight);
-    else if (Anno == NodeAnnotation::ModernizeEnum)
-      return Node->getAnnotateComment(NodeAnnotation::ModernizeEnum);
-    else if (Anno == NodeAnnotation::Rename)
-      return Node->getAnnotateComment(NodeAnnotation::RenameNewName);
-    return StringRef();
-  }
-
-  bool handleAnnotation(NodePtr Node, SDKNodeDecl *NonTypeParent,
-                        StringRef Index, NodeAnnotation Annotation) {
-    if (isInterested(NonTypeParent, Annotation) &&
-        Node->isAnnotatedAs(Annotation)) {
-      auto Kind = NonTypeParent->getKind();
-      StringRef LC = getLeftComment(Node, Annotation);
-      StringRef RC = getRightComment(Node, Annotation);
-      AllItems.emplace_back(Kind, Annotation, Index,
-                            NonTypeParent->getUsr(), StringRef(), LC, RC,
-                            NonTypeParent->getModuleName());
-      return true;
+  static StringRef getLeftComment(NodePtr Node, NodeAnnotation Anno) {
+    switch(Anno) {
+      case NodeAnnotation::TypeRewritten:
+        return Node->getAnnotateComment(NodeAnnotation::TypeRewrittenLeft);
+      case NodeAnnotation::Rename:
+        return Node->getAnnotateComment(NodeAnnotation::RenameOldName);
+      default:
+        return StringRef();
     }
-    return false;
+  }
+
+  static StringRef getRightComment(NodePtr Node, NodeAnnotation Anno) {
+    switch (Anno) {
+      case NodeAnnotation::TypeRewritten:
+        return Node->getAnnotateComment(NodeAnnotation::TypeRewrittenRight);
+      case NodeAnnotation::ModernizeEnum:
+        return Node->getAnnotateComment(NodeAnnotation::ModernizeEnum);
+      case NodeAnnotation::Rename:
+        return Node->getAnnotateComment(NodeAnnotation::RenameNewName);
+      default:
+        return StringRef();
+    }
+  }
+
+  void handleAnnotations(NodePtr Node, SDKNodeDecl *NonTypeParent,
+                         StringRef Index, ArrayRef<NodeAnnotation> Annotations) {
+    for (auto Annotation: Annotations) {
+      if (isInterested(NonTypeParent, Annotation) &&
+          Node->isAnnotatedAs(Annotation)) {
+        auto Kind = NonTypeParent->getKind();
+        StringRef LC = getLeftComment(Node, Annotation);
+        StringRef RC = getRightComment(Node, Annotation);
+        AllItems.emplace_back(Kind, Annotation, Index,
+                              NonTypeParent->getUsr(), StringRef(), LC, RC,
+                              NonTypeParent->getModuleName());
+        return;
+      }
+    }
   }
 
   void visit(NodePtr Node) override {
@@ -2670,22 +2691,24 @@ class DiffItemEmitter : public SDKNodeVisitor {
 
     if (!Parent)
       return;
-    auto Index = isa<SDKNodeType>(Node) ? getIndexString(Node) : "0";
+    if (doesAncestorHaveTypeRewritten())
+      return;
 
-    bool Result =
-      doesAncestorHaveTypeRewritten() ||
-      handleAnnotation(Node, Parent, Index, NodeAnnotation::WrapOptional) ||
-      handleAnnotation(Node, Parent, Index, NodeAnnotation::UnwrapOptional) ||
-      handleAnnotation(Node, Parent, Index, NodeAnnotation::ImplicitOptionalToOptional) ||
-      handleAnnotation(Node, Parent, Index, NodeAnnotation::OptionalToImplicitOptional) ||
-      handleAnnotation(Node, Parent, Index, NodeAnnotation::UnwrapUnmanaged) ||
-      handleAnnotation(Node, Parent, Index, NodeAnnotation::TypeRewritten) ||
-      handleAnnotation(Node, Parent, Index, NodeAnnotation::SetterToProperty) ||
-      handleAnnotation(Node, Parent, Index, NodeAnnotation::GetterToProperty) ||
-      handleAnnotation(Node, Parent, Index, NodeAnnotation::ModernizeEnum) ||
-      handleAnnotation(Node, Parent, Index, NodeAnnotation::Rename) ||
-      handleAnnotation(Node, Parent, Index, NodeAnnotation::NowThrowing);
-    (void) Result;
+    handleAnnotations(Node, Parent,
+                      isa<SDKNodeType>(Node) ? getIndexString(Node) : "0",
+                      {
+                        NodeAnnotation::WrapOptional,
+                        NodeAnnotation::UnwrapOptional,
+                        NodeAnnotation::ImplicitOptionalToOptional,
+                        NodeAnnotation::OptionalToImplicitOptional,
+                        NodeAnnotation::UnwrapUnmanaged,
+                        NodeAnnotation::TypeRewritten,
+                        NodeAnnotation::SetterToProperty,
+                        NodeAnnotation::GetterToProperty,
+                        NodeAnnotation::ModernizeEnum,
+                        NodeAnnotation::Rename,
+                        NodeAnnotation::NowThrowing
+                      });
   }
 
   StringRef getIndexString(NodePtr Node) {
@@ -3053,17 +3076,22 @@ struct NoEscapeFuncParam {
 
   NoEscapeFuncParam(StringRef Usr, unsigned Index) : Usr(Usr), Index(Index) {}
 
+  static StringRef head() {
+    return "NOESCAPE_FUNC_PARAM";
+  }
+
   static void describe(llvm::raw_ostream &os) {
-    os << "// NOESCAPE_FUNC_PARAM(USR, Index)\n";
+    os << "#ifndef " << head() << "\n";
+    os << "#define " << head() << "(USR, Index)\n";
+    os << "#endif\n";
   }
 
   static void undef(llvm::raw_ostream &os) {
-    os << "#undef NOESCAPE_FUNC_PARAM\n";
+    os << "#undef " << head() << "\n";
   }
 
   void streamDef(llvm::raw_ostream &os) const {
-    os << "NOESCAPE_FUNC_PARAM("
-    << "\"" << Usr << "\"" << ", "
+    os << head() << "(" << "\"" << Usr << "\"" << ", "
     << "\"" << Index << "\"" << ")";
   }
 
@@ -3108,17 +3136,22 @@ struct OverloadedFuncInfo {
   StringRef Usr;
   OverloadedFuncInfo(StringRef Usr) : Usr(Usr) {}
 
+  static StringRef head() {
+    return "OVERLOAD_FUNC_TRAILING_CLOSURE";
+  }
+
   static void describe(llvm::raw_ostream &os) {
-    os << "// OVERLOAD_FUNC_TRAILING_CLOSURE(USR)\n";
+    os << "#ifndef " << head() << "\n";
+    os << "#define " << head() << "(USR)\n";
+    os << "#endif\n";
   }
 
   static void undef(llvm::raw_ostream &os) {
-    os << "#undef OVERLOAD_FUNC_TRAILING_CLOSURE\n";
+    os << "#undef " << head() << "\n";
   }
 
   void streamDef(llvm::raw_ostream &os) const {
-    os << "OVERLOAD_FUNC_TRAILING_CLOSURE("
-       << "\"" << Usr << "\"" << ")";
+    os << head() << "(" << "\"" << Usr << "\"" << ")";
   }
 
   bool operator<(OverloadedFuncInfo Other) const {

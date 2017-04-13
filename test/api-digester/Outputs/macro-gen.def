@@ -1,0 +1,11 @@
+
+#ifndef SDK_CHANGE
+#define SDK_CHANGE(NODE_KIND, DIFF_KIND, CHILD_INDEX, LEFT_USR, RIGHT_USR, LEFT_COMMENT, RIGHT_COMMENT, MODULENAME)
+#endif
+SDK_CHANGE(Function, TypeRewritten, "0", "s:12macrogenleft2C1C4foo2SSSi_SitF", "", "String", "Int", "macrogenleft")
+SDK_CHANGE(Function, TypeRewritten, "1", "s:12macrogenleft2C1C4foo2SSSi_SitF", "", "Int", "() -> ()", "macrogenleft")
+SDK_CHANGE(Function, TypeRewritten, "2", "s:12macrogenleft2C1C4foo2SSSi_SitF", "", "Int", "String", "macrogenleft")
+SDK_CHANGE(Function, Rename, "0", "s:12macrogenleft2S1V4foo5ySi1x_Si1ytF", "", "foo5(x:y:)", "foo5(x:y:z:)", "macrogenleft")
+SDK_CHANGE(Constructor, TypeRewritten, "1", "s:12macrogenleft2S1VACSicfc", "", "Int", "Double", "macrogenleft")
+#undef SDK_CHANGE
+
