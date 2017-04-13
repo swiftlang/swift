@@ -317,14 +317,15 @@ public:
     return decl->getDeclaredType();
   }
 
-  Type createProtocolCompositionType(ArrayRef<Type> protocols) {
-    for (auto protocol : protocols) {
-      if (!protocol->is<ProtocolType>())
+  Type createProtocolCompositionType(ArrayRef<Type> members,
+                                     bool hasExplicitAnyObject) {
+    for (auto member : members) {
+      if (!member->isExistentialType() &&
+          !member->getClassOrBoundGenericClass())
         return Type();
     }
-    return ProtocolCompositionType::get(Ctx, protocols,
-                                        // FIXME
-                                        /*HasExplicitAnyObject=*/false);
+
+    return ProtocolCompositionType::get(Ctx, members, hasExplicitAnyObject);
   }
 
   Type createExistentialMetatypeType(Type instance) {
