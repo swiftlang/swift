@@ -1,6 +1,4 @@
-// FIXME: TBDGen is incorrect:
-// RUN: not %target-swift-frontend -c -parse-as-library -module-name test -validate-tbd-against-ir %s > %t.log 2>&1
-// RUN: diff %t.log %S/Inputs/class.log
+// RUN: %target-swift-frontend -c -parse-as-library -module-name test -validate-tbd-against-ir %s
 
 open class OpenNothing {}
 
