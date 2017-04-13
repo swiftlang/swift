@@ -52,3 +52,5 @@ print("\(dyadic((named.b, i))) \(dyadic(both))\n", terminator: "")
 func check(_: BaseAlias) {
 }
 
+let x: GG<Int> = 0
+
