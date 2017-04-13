@@ -1,3 +1,4 @@
+// Compile with old and new compiler. Run old one with 1 argument, pipe results into new one
 // time xcrun swiftc -O -o stringbench-shipping stdlib/private/stringbench.swift
 // time xcrun ../build/Ninja-Release/swift-macosx-x86_64/bin/swiftc -O -o stringbench-branch stdlib/private/stringbench.swift
 // ./stringbench-shipping - | ./stringbench-branch
