@@ -117,11 +117,13 @@ extension _BoundedBufferReference {
 
 /// Fulfills the RangeReplaceableCollection requirements
 extension _BoundedBufferReference {
+  @nonobjc
   public init<S : Sequence>(_ elements: S)
     where S.Iterator.Element == Iterator.Element {
     self.init(Array(elements))
   }
   
+  @nonobjc
   public init<C : Collection>(_ elements: C)
     where C.Iterator.Element == Iterator.Element {
     self.init(_uninitializedCount: numericCast(elements.count))
@@ -242,6 +244,7 @@ extension _BoundedBufferReference {
 
 extension _BoundedBufferReference {
   /// Construct the concatenation of head, middle, and tail
+  @nonobjc
   public init<Head : Collection, Middle : Collection, Tail : Collection>(
     joining head: Head, _ middle: Middle, _ tail: Tail, minimumCapacity: Int = 0
   )
