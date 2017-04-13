@@ -2617,23 +2617,23 @@ static bool isTypeChangeInterestedFuncNode(NodePtr Decl) {
   }
 }
 
-static bool isInterested(SDKNodeDecl* Decl, NodeAnnotation Anno) {
-  switch (Anno) {
-    case NodeAnnotation::WrapOptional:
-    case NodeAnnotation::UnwrapOptional:
-    case NodeAnnotation::ImplicitOptionalToOptional:
-    case NodeAnnotation::OptionalToImplicitOptional:
-    case NodeAnnotation::UnwrapUnmanaged:
-    case NodeAnnotation::TypeRewritten:
-      return isTypeChangeInterestedFuncNode(Decl) &&
-        Decl->getParent()->getKind() == SDKNodeKind::TypeDecl;
-    default:
-      return true;
-  }
-}
-
 class DiffItemEmitter : public SDKNodeVisitor {
   DiffVector &AllItems;
+
+  static bool isInterested(SDKNodeDecl* Decl, NodeAnnotation Anno) {
+    switch (Anno) {
+      case NodeAnnotation::WrapOptional:
+      case NodeAnnotation::UnwrapOptional:
+      case NodeAnnotation::ImplicitOptionalToOptional:
+      case NodeAnnotation::OptionalToImplicitOptional:
+      case NodeAnnotation::UnwrapUnmanaged:
+      case NodeAnnotation::TypeRewritten:
+        return isTypeChangeInterestedFuncNode(Decl) &&
+        Decl->getParent()->getKind() == SDKNodeKind::TypeDecl;
+      default:
+        return true;
+    }
+  }
 
   bool doesAncestorHaveTypeRewritten() {
     return std::find_if(Ancestors.begin(), Ancestors.end(),[](NodePtr N) {
@@ -2641,37 +2641,44 @@ class DiffItemEmitter : public SDKNodeVisitor {
     }) != Ancestors.end();
   }
 
-  StringRef getLeftComment(NodePtr Node, NodeAnnotation Anno) {
-    if (Anno == NodeAnnotation::TypeRewritten)
-      return Node->getAnnotateComment(NodeAnnotation::TypeRewrittenLeft);
-    else if (Anno == NodeAnnotation::Rename)
-      return Node->getAnnotateComment(NodeAnnotation::RenameOldName);
-    return StringRef();
-  }
-
-  StringRef getRightComment(NodePtr Node, NodeAnnotation Anno) {
-    if (Anno == NodeAnnotation::TypeRewritten)
-      return Node->getAnnotateComment(NodeAnnotation::TypeRewrittenRight);
-    else if (Anno == NodeAnnotation::ModernizeEnum)
-      return Node->getAnnotateComment(NodeAnnotation::ModernizeEnum);
-    else if (Anno == NodeAnnotation::Rename)
-      return Node->getAnnotateComment(NodeAnnotation::RenameNewName);
-    return StringRef();
-  }
-
-  bool handleAnnotation(NodePtr Node, SDKNodeDecl *NonTypeParent,
-                        StringRef Index, NodeAnnotation Annotation) {
-    if (isInterested(NonTypeParent, Annotation) &&
-        Node->isAnnotatedAs(Annotation)) {
-      auto Kind = NonTypeParent->getKind();
-      StringRef LC = getLeftComment(Node, Annotation);
-      StringRef RC = getRightComment(Node, Annotation);
-      AllItems.emplace_back(Kind, Annotation, Index,
-                            NonTypeParent->getUsr(), StringRef(), LC, RC,
-                            NonTypeParent->getModuleName());
-      return true;
+  static StringRef getLeftComment(NodePtr Node, NodeAnnotation Anno) {
+    switch(Anno) {
+      case NodeAnnotation::TypeRewritten:
+        return Node->getAnnotateComment(NodeAnnotation::TypeRewrittenLeft);
+      case NodeAnnotation::Rename:
+        return Node->getAnnotateComment(NodeAnnotation::RenameOldName);
+      default:
+        return StringRef();
     }
-    return false;
+  }
+
+  static StringRef getRightComment(NodePtr Node, NodeAnnotation Anno) {
+    switch (Anno) {
+      case NodeAnnotation::TypeRewritten:
+        return Node->getAnnotateComment(NodeAnnotation::TypeRewrittenRight);
+      case NodeAnnotation::ModernizeEnum:
+        return Node->getAnnotateComment(NodeAnnotation::ModernizeEnum);
+      case NodeAnnotation::Rename:
+        return Node->getAnnotateComment(NodeAnnotation::RenameNewName);
+      default:
+        return StringRef();
+    }
+  }
+
+  void handleAnnotations(NodePtr Node, SDKNodeDecl *NonTypeParent,
+                         StringRef Index, ArrayRef<NodeAnnotation> Annotations) {
+    for (auto Annotation: Annotations) {
+      if (isInterested(NonTypeParent, Annotation) &&
+          Node->isAnnotatedAs(Annotation)) {
+        auto Kind = NonTypeParent->getKind();
+        StringRef LC = getLeftComment(Node, Annotation);
+        StringRef RC = getRightComment(Node, Annotation);
+        AllItems.emplace_back(Kind, Annotation, Index,
+                              NonTypeParent->getUsr(), StringRef(), LC, RC,
+                              NonTypeParent->getModuleName());
+        return;
+      }
+    }
   }
 
   void visit(NodePtr Node) override {
@@ -2684,22 +2691,24 @@ class DiffItemEmitter : public SDKNodeVisitor {
 
     if (!Parent)
       return;
-    auto Index = isa<SDKNodeType>(Node) ? getIndexString(Node) : "0";
+    if (doesAncestorHaveTypeRewritten())
+      return;
 
-    bool Result =
-      doesAncestorHaveTypeRewritten() ||
-      handleAnnotation(Node, Parent, Index, NodeAnnotation::WrapOptional) ||
-      handleAnnotation(Node, Parent, Index, NodeAnnotation::UnwrapOptional) ||
-      handleAnnotation(Node, Parent, Index, NodeAnnotation::ImplicitOptionalToOptional) ||
-      handleAnnotation(Node, Parent, Index, NodeAnnotation::OptionalToImplicitOptional) ||
-      handleAnnotation(Node, Parent, Index, NodeAnnotation::UnwrapUnmanaged) ||
-      handleAnnotation(Node, Parent, Index, NodeAnnotation::TypeRewritten) ||
-      handleAnnotation(Node, Parent, Index, NodeAnnotation::SetterToProperty) ||
-      handleAnnotation(Node, Parent, Index, NodeAnnotation::GetterToProperty) ||
-      handleAnnotation(Node, Parent, Index, NodeAnnotation::ModernizeEnum) ||
-      handleAnnotation(Node, Parent, Index, NodeAnnotation::Rename) ||
-      handleAnnotation(Node, Parent, Index, NodeAnnotation::NowThrowing);
-    (void) Result;
+    handleAnnotations(Node, Parent,
+                      isa<SDKNodeType>(Node) ? getIndexString(Node) : "0",
+                      {
+                        NodeAnnotation::WrapOptional,
+                        NodeAnnotation::UnwrapOptional,
+                        NodeAnnotation::ImplicitOptionalToOptional,
+                        NodeAnnotation::OptionalToImplicitOptional,
+                        NodeAnnotation::UnwrapUnmanaged,
+                        NodeAnnotation::TypeRewritten,
+                        NodeAnnotation::SetterToProperty,
+                        NodeAnnotation::GetterToProperty,
+                        NodeAnnotation::ModernizeEnum,
+                        NodeAnnotation::Rename,
+                        NodeAnnotation::NowThrowing
+                      });
   }
 
   StringRef getIndexString(NodePtr Node) {
