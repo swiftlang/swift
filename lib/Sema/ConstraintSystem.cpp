@@ -956,8 +956,16 @@ void ConstraintSystem::openGeneric(
     }
 
     case RequirementKind::Layout: {
-      // Do not process layout constraints yet, until we allow their use
-      // outside of @_specialize attribute.
+      auto subjectTy = req.getFirstType().transform(replaceDependentTypes);
+      auto layoutConstraint = req.getLayoutConstraint();
+
+      if (layoutConstraint->isClass())
+        addConstraint(ConstraintKind::ConformsTo, subjectTy,
+                      TC.Context.getAnyObjectType(),
+                      locatorPtr);
+
+      // Nothing else can appear outside of @_specialize yet, and Sema
+      // doesn't know how to check.
       break;
     }
 

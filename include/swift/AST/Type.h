@@ -434,11 +434,6 @@ public:
   NominalTypeDecl *getAnyNominal() const;
   GenericTypeDecl *getAnyGeneric() const;
 
-  /// Returns information about the layout constraint represented by
-  /// this type. If this type does not represent a layout constraint,
-  /// it returns an empty LayoutConstraint.
-  LayoutConstraint getLayoutConstraint() const;
-
   CanType getAnyOptionalObjectType() const {
     OptionalTypeKind kind;
     return getAnyOptionalObjectTypeImpl(*this, kind);

@@ -708,7 +708,6 @@ matchCallArguments(ConstraintSystem &cs, ConstraintKind kind,
   case ConstraintKind::BindOverload:
   case ConstraintKind::CheckedCast:
   case ConstraintKind::ConformsTo:
-  case ConstraintKind::Layout:
   case ConstraintKind::Defaultable:
   case ConstraintKind::Disjunction:
   case ConstraintKind::DynamicTypeOf:
@@ -834,7 +833,6 @@ ConstraintSystem::matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
   case ConstraintKind::BindOverload:
   case ConstraintKind::CheckedCast:
   case ConstraintKind::ConformsTo:
-  case ConstraintKind::Layout:
   case ConstraintKind::Defaultable:
   case ConstraintKind::Disjunction:
   case ConstraintKind::DynamicTypeOf:
@@ -950,7 +948,6 @@ static bool matchFunctionRepresentations(FunctionTypeRepresentation rep1,
   case ConstraintKind::BindOverload:
   case ConstraintKind::CheckedCast:
   case ConstraintKind::ConformsTo:
-  case ConstraintKind::Layout:
   case ConstraintKind::Defaultable:
   case ConstraintKind::Disjunction:
   case ConstraintKind::DynamicTypeOf:
@@ -1019,7 +1016,6 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
   case ConstraintKind::BindOverload:
   case ConstraintKind::CheckedCast:
   case ConstraintKind::ConformsTo:
-  case ConstraintKind::Layout:
   case ConstraintKind::Defaultable:
   case ConstraintKind::Disjunction:
   case ConstraintKind::DynamicTypeOf:
@@ -1156,10 +1152,8 @@ ConstraintSystem::matchExistentialTypes(Type type1, Type type2,
   if (type1->isTypeVariableOrMember()) {
     if (flags.contains(TMF_GenerateConstraints)) {
       addUnsolvedConstraint(
-        Constraint::createRestricted(*this, kind,
-                                     ConversionRestrictionKind::Existential,
-                                     type1, type2,
-                                     getConstraintLocator(locator)));
+        Constraint::create(*this, kind, type1, type2,
+                           getConstraintLocator(locator)));
       return SolutionKind::Solved;
     }
 
@@ -1183,8 +1177,30 @@ ConstraintSystem::matchExistentialTypes(Type type1, Type type2,
 
   auto layout = type2->getExistentialLayout();
 
-  assert((!layout.requiresClass || layout.requiresClassImplied) &&
-         "explicit AnyObject not yet supported");
+  if (auto layoutConstraint = layout.getLayoutConstraint()) {
+    if (layoutConstraint->isClass()) {
+      if (kind == ConstraintKind::ConformsTo) {
+        // Conformance to AnyObject is defined by having a single
+        // retainable pointer representation:
+        //
+        // - @objc existentials
+        // - class constrained archetypes
+        // - classes
+        if (!type1->isObjCExistentialType() &&
+            !type1->mayHaveSuperclass())
+          return SolutionKind::Error;
+      } else {
+        // Subtype relation to AnyObject also allows class-bound
+        // existentials that are not @objc and therefore carry
+        // witness tables.
+        if (!type1->isClassExistentialType() &&
+            !type1->mayHaveSuperclass())
+          return SolutionKind::Error;
+      }
+
+      // Keep going.
+    }
+  }
 
   if (layout.superclass) {
     auto subKind = std::min(ConstraintKind::Subtype, kind);
@@ -1562,7 +1578,6 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
     case ConstraintKind::BridgingConversion:
     case ConstraintKind::CheckedCast:
     case ConstraintKind::ConformsTo:
-    case ConstraintKind::Layout:
     case ConstraintKind::Defaultable:
     case ConstraintKind::Disjunction:
     case ConstraintKind::DynamicTypeOf:
@@ -2389,6 +2404,9 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
     return simplifyConformsToConstraint(type, proto->getDecl(), kind,
                                         locator, flags);
   }
+
+  // Dig out the fixed type to which this type refers.
+  type = getFixedTypeRecursive(type, flags, /*wantRValue=*/true);
 
   return matchExistentialTypes(type, protocol, kind, flags, locator);
 }
@@ -4383,7 +4401,6 @@ ConstraintSystem::addConstraintImpl(ConstraintKind kind, Type first,
                                                  subflags, locator);
 
   case ConstraintKind::ConformsTo:
-  case ConstraintKind::Layout:
   case ConstraintKind::LiteralConformsTo:
   case ConstraintKind::SelfObjectOfProtocol:
     return simplifyConformsToConstraint(first, second, kind, locator,
@@ -4540,7 +4557,6 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
     return SolutionKind::Solved;
 
   case ConstraintKind::ConformsTo:
-  case ConstraintKind::Layout:
   case ConstraintKind::LiteralConformsTo:
   case ConstraintKind::SelfObjectOfProtocol:
     return simplifyConformsToConstraint(

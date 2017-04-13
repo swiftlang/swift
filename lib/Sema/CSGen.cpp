@@ -3261,7 +3261,8 @@ bool swift::isExtensionApplied(DeclContext &DC, Type BaseTy,
         createMemberConstraint(Req, ConstraintKind::ConformsTo);
         break;
       case RequirementKind::Layout:
-        createMemberConstraint(Req, ConstraintKind::Layout);
+        // FIXME FIXME FIXME
+        createMemberConstraint(Req, ConstraintKind::ConformsTo);
         break;
       case RequirementKind::Superclass:
         createMemberConstraint(Req, ConstraintKind::Subtype);

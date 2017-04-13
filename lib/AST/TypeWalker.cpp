@@ -90,10 +90,11 @@ class Traversal : public TypeVisitor<Traversal, bool>
       switch (req.getKind()) {
       case RequirementKind::SameType:
       case RequirementKind::Conformance:
-      case RequirementKind::Layout:
       case RequirementKind::Superclass:
         if (doIt(req.getSecondType()))
           return true;
+        break;
+      case RequirementKind::Layout:
         break;
       }
     }

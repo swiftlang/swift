@@ -71,6 +71,8 @@ struct ExistentialLayout {
     return multipleProtocols;
   }
 
+  LayoutConstraint getLayoutConstraint() const;
+
 private:
   // Inline storage for 'protocols' member above when computing
   // layout of a single ProtocolType

@@ -60,7 +60,6 @@ Constraint::Constraint(ConstraintKind Kind, Type First, Type Second,
   case ConstraintKind::OperatorArgumentTupleConversion:
   case ConstraintKind::OperatorArgumentConversion:
   case ConstraintKind::ConformsTo:
-  case ConstraintKind::Layout:
   case ConstraintKind::LiteralConformsTo:
   case ConstraintKind::CheckedCast:
   case ConstraintKind::SelfObjectOfProtocol:
@@ -176,7 +175,6 @@ Constraint *Constraint::clone(ConstraintSystem &cs) const {
   case ConstraintKind::OperatorArgumentTupleConversion:
   case ConstraintKind::OperatorArgumentConversion:
   case ConstraintKind::ConformsTo:
-  case ConstraintKind::Layout:
   case ConstraintKind::LiteralConformsTo:
   case ConstraintKind::CheckedCast:
   case ConstraintKind::DynamicTypeOf:
@@ -247,7 +245,6 @@ void Constraint::print(llvm::raw_ostream &Out, SourceManager *sm) const {
   case ConstraintKind::OperatorArgumentConversion:
       Out << " operator arg conv "; break;
   case ConstraintKind::ConformsTo: Out << " conforms to "; break;
-  case ConstraintKind::Layout: Out << " layout of "; break;
   case ConstraintKind::LiteralConformsTo: Out << " literal conforms to "; break;
   case ConstraintKind::CheckedCast: Out << " checked cast to "; break;
   case ConstraintKind::SelfObjectOfProtocol: Out << " Self type of "; break;
@@ -484,21 +481,19 @@ gatherReferencedTypeVars(Constraint *constraint,
   case ConstraintKind::OpenedExistentialOf:
   case ConstraintKind::OptionalObject:
   case ConstraintKind::Defaultable:
-    constraint->getSecondType()->getTypeVariables(typeVars);
-    LLVM_FALLTHROUGH;
-
-  case ConstraintKind::BindOverload:
   case ConstraintKind::ConformsTo:
-  case ConstraintKind::Layout:
   case ConstraintKind::LiteralConformsTo:
   case ConstraintKind::SelfObjectOfProtocol:
     constraint->getFirstType()->getTypeVariables(typeVars);
+    constraint->getSecondType()->getTypeVariables(typeVars);
+    break;
+
+  case ConstraintKind::BindOverload:
+    constraint->getFirstType()->getTypeVariables(typeVars);
 
     // Special case: the base type of an overloading binding.
-    if (constraint->getKind() == ConstraintKind::BindOverload) {
-      if (auto baseType = constraint->getOverloadChoice().getBaseType()) {
-        baseType->getTypeVariables(typeVars);
-      }
+    if (auto baseType = constraint->getOverloadChoice().getBaseType()) {
+      baseType->getTypeVariables(typeVars);
     }
 
     break;
@@ -527,12 +522,15 @@ Constraint *Constraint::create(ConstraintSystem &cs, ConstraintKind kind,
     second->getTypeVariables(typeVars);
   uniqueTypeVariables(typeVars);
 
-  // Conformance constraints expect a protocol on the right-hand side, always.
+  // Conformance constraints expect an existential on the right-hand side.
   assert((kind != ConstraintKind::ConformsTo &&
-          kind != ConstraintKind::LiteralConformsTo &&
           kind != ConstraintKind::SelfObjectOfProtocol) ||
+         second->isExistentialType());
+
+  // Literal protocol conformances expect a protocol.
+  assert((kind != ConstraintKind::LiteralConformsTo) ||
          second->is<ProtocolType>());
-  
+
   // Bridging constraints require bridging to be enabled.
   assert(kind != ConstraintKind::BridgingConversion
          || cs.TC.Context.LangOpts.EnableObjCInterop);

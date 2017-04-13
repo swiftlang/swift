@@ -717,12 +717,6 @@ public:
   /// concrete types to form the argument type.
   bool isBindableTo(Type ty, LazyResolver *resolver);
 
-  /// \brief Retrieve the layout constraint of this type.
-  ///
-  /// \returns The layout constraint of this type, or a null layout constraint
-  ///          if it has no layout constraint.
-  LayoutConstraint getLayoutConstraint();
-
   /// \brief Determines whether this type is permitted as a method override
   /// of the \p other.
   bool canOverride(Type other, OverrideMatchMode matchMode,

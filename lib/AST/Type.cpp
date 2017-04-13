@@ -588,13 +588,6 @@ Type TypeBase::lookThroughAllAnyOptionalTypes(SmallVectorImpl<Type> &optionals){
   return type;
 }
 
-LayoutConstraint CanType::getLayoutConstraint() const {
-  if (auto archetypeTy = dyn_cast<ArchetypeType>(*this)) {
-    return archetypeTy->getLayoutConstraint();
-  }
-  return LayoutConstraint();
-}
-
 bool TypeBase::isAnyObject() {
   auto canTy = getCanonicalType();
 
@@ -622,6 +615,15 @@ bool ExistentialLayout::isExistentialWithError(ASTContext &ctx) const {
   }
 
   return false;
+}
+
+LayoutConstraint ExistentialLayout::getLayoutConstraint() const {
+  if (requiresClass && !requiresClassImplied) {
+    return LayoutConstraint::getLayoutConstraint(
+      LayoutConstraintKind::Class);
+  }
+
+  return LayoutConstraint();
 }
 
 bool TypeBase::isExistentialWithError() {
@@ -1567,12 +1569,6 @@ bool TypeBase::isSpelledLike(Type other) {
   }
 
   llvm_unreachable("Unknown type kind");
-}
-
-LayoutConstraint TypeBase::getLayoutConstraint() {
-  if (auto archetype = getAs<ArchetypeType>())
-    return archetype->getLayoutConstraint();
-  return LayoutConstraint();
 }
 
 bool TypeBase::mayHaveSuperclass() {
@@ -2614,6 +2610,9 @@ ArchetypeType::getNew(const ASTContext &Ctx,
 bool ArchetypeType::requiresClass() const {
   if (ArchetypeTypeBits.HasSuperclass)
     return true;
+  if (auto layout = getLayoutConstraint())
+    if (layout->isClass())
+      return true;
   for (ProtocolDecl *conformed : getConformsTo())
     if (conformed->requiresClass())
       return true;
@@ -3732,6 +3731,15 @@ case TypeKind::Id:
 
       if (firstType.getPointer() != req.getFirstType().getPointer())
         anyChanges = true;
+
+      if (req.getKind() == RequirementKind::Layout) {
+        if (!firstType->isTypeParameter())
+          continue;
+
+        requirements.push_back(Requirement(req.getKind(), firstType,
+                                           req.getLayoutConstraint()));
+        continue;
+      }
 
       Type secondType = req.getSecondType();
       if (secondType) {

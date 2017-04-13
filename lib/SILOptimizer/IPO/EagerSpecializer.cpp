@@ -349,10 +349,10 @@ void EagerDispatch::emitDispatchTo(SILFunction *NewFunc) {
     if (!Replacement->hasArchetype()) {
       // Dispatch on concrete type.
       emitTypeCheck(FailedTypeCheckBB, ParamTy, Replacement);
-    } else {
+    } else if (auto Archetype = Replacement->getAs<ArchetypeType>()) {
       // If Replacement has a layout constraint, then dispatch based
       // on its size and the fact that it is trivial.
-      auto LayoutInfo = Replacement->getLayoutConstraint();
+      auto LayoutInfo = Archetype->getLayoutConstraint();
       if (LayoutInfo && LayoutInfo->isTrivial()) {
         // Emit a check that it is a trivial type of a certain size.
         emitTrivialAndSizeCheck(FailedTypeCheckBB, ParamTy,

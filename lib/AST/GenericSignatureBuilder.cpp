@@ -2564,8 +2564,12 @@ ConstraintResult GenericSignatureBuilder::addTypeRequirement(
     bool anyErrors = false;
     auto layout = constraintType->getExistentialLayout();
 
-    assert((!layout.requiresClass || layout.requiresClassImplied) &&
-           "explicit AnyObject not yet supported");
+    if (auto layoutConstraint = layout.getLayoutConstraint()) {
+      if (isErrorResult(addLayoutRequirementDirect(subjectPA,
+                                                   layoutConstraint,
+                                                   resolvedSource)))
+        anyErrors = true;
+    }
 
     if (layout.superclass) {
       if (isErrorResult(addSuperclassRequirementDirect(subjectPA,
