@@ -35,12 +35,24 @@ extension Base {
 }
 
 public class PublicClass {
-  // CHECK: define{{( protected)?}} swiftcc void @_T014method_linkage11PublicClass{{.*}}4pfoo0
+  // CHECK: define hidden swiftcc void @_T014method_linkage11PublicClass{{.*}}4pfoo0
   @inline(never)
   fileprivate func pfoo() {
   }
 
-  // CHECK: define{{( protected)?}} swiftcc void @_T014method_linkage11PublicClassC4pbaryyF
+  // CHECK: define hidden swiftcc void @_T014method_linkage11PublicClassC4pbaryyF
+  @inline(never)
+  internal func pbar() {
+  }
+}
+
+open class OpenClass {
+  // CHECK: define{{( protected)?}} swiftcc void @_T014method_linkage9OpenClass{{.*}}4pfoo0
+  @inline(never)
+  fileprivate func pfoo() {
+  }
+
+  // CHECK: define{{( protected)?}} swiftcc void @_T014method_linkage9OpenClassC4pbaryyF
   @inline(never)
   internal func pbar() {
   }

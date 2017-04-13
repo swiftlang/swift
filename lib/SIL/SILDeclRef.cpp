@@ -870,8 +870,8 @@ SubclassScope SILDeclRef::getSubclassScope() const {
   case Accessibility::FilePrivate:
     return SubclassScope::NotApplicable;
   case Accessibility::Internal:
-    return SubclassScope::Internal;
   case Accessibility::Public:
+    return SubclassScope::Internal;
   case Accessibility::Open:
     return SubclassScope::External;
   }
