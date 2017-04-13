@@ -34,7 +34,6 @@ namespace Demangle {
 
 struct DemangleOptions {
   bool SynthesizeSugarOnTypes = false;
-  bool DisplayTypeOfIVarFieldOffset = true;
   bool DisplayDebuggerGeneratedModule = true;
   bool QualifyEntities = true;
   bool DisplayExtensionContexts = true;
@@ -49,6 +48,7 @@ struct DemangleOptions {
   bool ShortenValueWitness = false;
   bool ShortenArchetype = false;
   bool ShowPrivateDiscriminators = true;
+  bool ShowFunctionArgumentTypes = true;
 
   DemangleOptions() {}
 
@@ -68,6 +68,7 @@ struct DemangleOptions {
     Opt.ShortenValueWitness = true;
     Opt.ShortenArchetype = true;
     Opt.ShowPrivateDiscriminators = false;
+    Opt.ShowFunctionArgumentTypes = false;
     return Opt;
   };
 };

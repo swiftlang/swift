@@ -2,7 +2,7 @@
 
 import macros
 
-// CHECK-LABEL: // testBitwiseOperations() -> ()
+// CHECK-LABEL: // testBitwiseOperations()
 func testBitwiseOperations() {
   // CHECK: %0 = integer_literal $Builtin.Int64, -1, loc {{.*}}
   // CHECK-NEXT: %1 = struct $UInt64 (%0 : $Builtin.Int64), loc {{.*}}
@@ -43,7 +43,7 @@ func testBitwiseOperations() {
   _ = ATTR_UNDERLINE as CInt
 }
 
-// CHECK-LABEL: // testIntegerArithmetic() -> ()
+// CHECK-LABEL: // testIntegerArithmetic()
 func testIntegerArithmetic() {
 
   // CHECK: %0 = integer_literal $Builtin.Int32, 0, loc {{.*}}
@@ -114,7 +114,7 @@ func testIntegerArithmetic() {
   _ = DIVIDE_MIXED_TYPES as CLongLong
 }
 
-// CHECK-LABEL: // testIntegerComparisons() -> ()
+// CHECK-LABEL: // testIntegerComparisons()
 func testIntegerComparisons() {
 
   // CHECK: %0 = integer_literal $Builtin.Int1, 0, loc {{.*}}
@@ -154,7 +154,7 @@ func testIntegerComparisons() {
   _ = LTE_TRUE
 }
 
-// CHECK-LABEL: // testLogicalComparisons() -> ()
+// CHECK-LABEL: // testLogicalComparisons()
 func testLogicalComparisons() {
 
   // CHECK: %0 = integer_literal $Builtin.Int1, -1, loc {{.*}}
