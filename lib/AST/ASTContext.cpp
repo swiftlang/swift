@@ -112,6 +112,9 @@ struct ASTContext::Implementation {
   /// The declaration of Swift.DefaultPrecedence.
   PrecedenceGroupDecl *DefaultPrecedence = nullptr;
 
+  /// The AnyObject type.
+  CanType AnyObjectType;
+
 #define KNOWN_STDLIB_TYPE_DECL(NAME, DECL_CLASS, NUM_GENERIC_PARAMS) \
   /** The declaration of Swift.NAME. */ \
   DECL_CLASS *NAME##Decl = nullptr;
@@ -669,6 +672,29 @@ ASTContext::getPointerPointeePropertyDecl(PointerTypeKind ptrKind) const {
                              *this);
   }
   llvm_unreachable("bad pointer kind");
+}
+
+CanType ASTContext::getAnyObjectType() const {
+  if (Impl.AnyObjectType) {
+    return Impl.AnyObjectType;
+  }
+
+  // Go find 'AnyObject' in the Swift module.
+  //
+  // FIXME: This is going away.
+  SmallVector<ValueDecl *, 1> results;
+  lookupInSwiftModule("AnyObject", results);
+  for (auto result : results) {
+    if (auto proto = dyn_cast<ProtocolDecl>(result)) {
+      Impl.AnyObjectType = proto->getDeclaredType()->getCanonicalType();
+      return Impl.AnyObjectType;
+    }
+  }
+
+  Impl.AnyObjectType = CanType(
+    ProtocolCompositionType::get(
+      *this, {}, /*hasExplicitAnyObject=*/true));
+  return Impl.AnyObjectType;
 }
 
 CanType ASTContext::getNeverType() const {

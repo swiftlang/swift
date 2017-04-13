@@ -3513,8 +3513,7 @@ ConstraintSystem::simplifyBridgingConstraint(Type type1,
         if (fromBGT->getDecl() == TC.Context.getArrayDecl()) {
           // [AnyObject]
           addConstraint(ConstraintKind::Bind, fromBGT->getGenericArgs()[0],
-                        TC.Context.getProtocol(KnownProtocolKind::AnyObject)
-                          ->getDeclaredType(),
+                        TC.Context.getAnyObjectType(),
                         getConstraintLocator(
                           locator.withPathElement(
                                        LocatorPathElt::getGenericArgument(0))));
@@ -3533,8 +3532,7 @@ ConstraintSystem::simplifyBridgingConstraint(Type type1,
                             LocatorPathElt::getGenericArgument(0))));
 
           addConstraint(ConstraintKind::Bind, fromBGT->getGenericArgs()[1],
-                        TC.Context.getProtocol(KnownProtocolKind::AnyObject)
-                          ->getDeclaredType(),
+                        TC.Context.getAnyObjectType(),
                         getConstraintLocator(
                           locator.withPathElement(
                             LocatorPathElt::getGenericArgument(1))));

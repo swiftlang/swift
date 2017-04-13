@@ -419,8 +419,6 @@ WARNING(expr_keypath_swift3_objc_inference,none,
         "argument of '#keyPath' refers to property %0 in %1 that depends on "
         "'@objc' attribute inference deprecated in Swift 4",
         (DeclName, Identifier))
-ERROR(stdlib_anyobject_not_found,none,
-      "broken standard library: cannot find 'AnyObject' protocol", ())
 ERROR(expr_keypath_type_of_property,none,
       "cannot refer to type member %0 within instance of type %1",
       (DeclName, Type))

@@ -788,11 +788,9 @@ void irgen::emitScalarCheckedCast(IRGenFunction &IGF,
     llvm::Value *object =
       emitMetatypeToAnyObjectDowncast(IGF, metatypeVal, sourceMetatype, mode);
 
-    auto anyObjectProtocol =
-      IGF.IGM.Context.getProtocol(KnownProtocolKind::AnyObject);
     SILType anyObjectType =
       SILType::getPrimitiveObjectType(
-        CanType(anyObjectProtocol->getDeclaredType()));
+        IGF.IGM.Context.getAnyObjectType());
 
     // Continue, pretending that the source value was an (optional) value.
     Explosion newValue;

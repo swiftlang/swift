@@ -308,8 +308,12 @@ ExistentialLayout CanType::getExistentialLayout() {
 }
 
 bool ExistentialLayout::isAnyObject() const {
-  // FIXME
+  // New implementation
   auto protocols = getProtocols();
+  if (requiresClass && !requiresClassImplied && protocols.empty())
+    return true;
+
+  // Old implementation -- FIXME: remove this
   return protocols.size() == 1 &&
     protocols[0]->getDecl()->isSpecificProtocol(KnownProtocolKind::AnyObject);
 }

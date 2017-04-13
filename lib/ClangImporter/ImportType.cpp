@@ -1043,20 +1043,17 @@ namespace {
       }
       
       // Beyond here, we're using AnyObject.
-      auto proto = Impl.SwiftContext.getProtocol(KnownProtocolKind::AnyObject);
-      if (!proto)
-        return Type();
 
       // id maps to Any in bridgeable contexts, AnyObject otherwise.
       if (type->isObjCIdType()) {
-        return {proto->getDeclaredType(),
+        return {Impl.SwiftContext.getAnyObjectType(),
                 ImportHint(ImportHint::ObjCBridged,
                            Impl.SwiftContext.TheAnyType)};
       }
 
       // Class maps to AnyObject.Type.
       assert(type->isObjCClassType());
-      return { ExistentialMetatypeType::get(proto->getDeclaredType()),
+      return { ExistentialMetatypeType::get(Impl.SwiftContext.getAnyObjectType()),
                ImportHint::ObjCPointer };
     }
   };
@@ -1935,8 +1932,7 @@ Type ClangImporter::Implementation::importMethodType(
 
     // Undo 'Any' bridging.
     if (nonOptionalTy->isAny())
-      nonOptionalTy = SwiftContext.getProtocol(KnownProtocolKind::AnyObject)
-        ->getDeclaredType();
+      nonOptionalTy = SwiftContext.getAnyObjectType();
 
     if (nonOptionalTy->isAnyClassReferenceType()) {
       swiftResultTy = getUnmanagedType(*this, nonOptionalTy);

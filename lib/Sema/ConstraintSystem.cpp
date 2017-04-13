@@ -220,11 +220,7 @@ LookupResult &ConstraintSystem::lookupMember(Type base, DeclName name) {
   result = std::move(lookup);
 
   // If we aren't performing dynamic lookup, we're done.
-  auto protoTy = base->getAs<ProtocolType>();
-  if (!*result ||
-      !protoTy ||
-      !protoTy->getDecl()->isSpecificProtocol(
-                             KnownProtocolKind::AnyObject))
+  if (!*result || !base->isAnyObject())
     return *result;
 
   // We are performing dynamic lookup. Filter out redundant results early.
@@ -1203,10 +1199,7 @@ ConstraintSystem::getTypeOfMemberReference(
     // For a dynamic result referring to an instance function through
     // an object of metatype type, replace the 'Self' parameter with
     // a AnyObject member.
-    Type anyObjectTy = TC.getProtocol(SourceLoc(),
-                                      KnownProtocolKind::AnyObject)
-                                          ->getDeclaredTypeOfContext();
-
+    auto anyObjectTy = TC.Context.getAnyObjectType();
     type = openedFnType->replaceSelfParameterType(anyObjectTy);
   } else {
     // For an unbound instance method reference, replace the 'Self'

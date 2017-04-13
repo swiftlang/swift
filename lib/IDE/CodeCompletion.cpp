@@ -4657,9 +4657,7 @@ void CodeCompletionCallbacksImpl::completeNominalMemberBeginning(
 }
 
 static bool isDynamicLookup(Type T) {
-  if (auto *PT = T->getRValueType()->getAs<ProtocolType>())
-    return PT->getDecl()->isSpecificProtocol(KnownProtocolKind::AnyObject);
-  return false;
+  return T->getRValueType()->isAnyObject();
 }
 
 static bool isClangSubModule(ModuleDecl *TheModule) {
