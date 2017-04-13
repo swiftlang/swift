@@ -11,8 +11,8 @@
 //===----------------------------------------------------------------------===//
 // RUN: rm -rf %t ; mkdir -p %t
 // RUN: %gyb -DWORD_BITS=%target-ptrsize %s -o %t/Integers.swift
-// RUN: %line-directive %t/Integers.swift -- %target-build-swift %t/Integers.swift -Onone -o %t/a.out
-// RUN: %line-directive %t/Integers.swift -- %target-run %t/a.out
+// RUN: %line-directive %t/Integers.swift -- %target-build-swift %t/Integers.swift -swift-version 4 -Onone -o %t/a.out
+// RUN: %line-directive %t/Integers.swift -- %target-build-swift %t/Integers.swift -swift-version 4 -O -o %t/a.out
 // REQUIRES: executable_test
 
 // FIXME: this test runs forever on iOS arm64
