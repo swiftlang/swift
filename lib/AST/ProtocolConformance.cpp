@@ -26,6 +26,7 @@
 #include "swift/AST/TypeWalker.h"
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/TinyPtrVector.h"
+#include "llvm/Support/PrettyStackTrace.h"
 #include "llvm/Support/SaveAndRestore.h"
 
 using namespace swift;
@@ -358,6 +359,27 @@ void NormalProtocolConformance::setLazyLoader(LazyMemberLoader *resolver,
   ResolverContextData = contextData;
 }
 
+namespace {
+  class PrettyStackTraceRequirement : public llvm::PrettyStackTraceEntry {
+    const char *Action;
+    const ProtocolConformance *Conformance;
+    ValueDecl *Requirement;
+  public:
+    PrettyStackTraceRequirement(const char *action,
+                                const ProtocolConformance *conformance,
+                                ValueDecl *requirement)
+      : Action(action), Conformance(conformance), Requirement(requirement) { }
+
+    virtual void print(llvm::raw_ostream &out) const {
+      out << "While " << Action << " requirement ";
+      Requirement->dumpRef(out);
+      out << " in conformance ";
+      Conformance->printName(out);
+      out << "\n";
+    }
+  };
+}
+
 bool NormalProtocolConformance::hasTypeWitness(AssociatedTypeDecl *assocType,
                                                LazyResolver *resolver) const {
   if (Resolver)
@@ -367,6 +389,7 @@ bool NormalProtocolConformance::hasTypeWitness(AssociatedTypeDecl *assocType,
     return true;
   }
   if (resolver) {
+    PrettyStackTraceRequirement trace("resolving", this, assocType);
     resolver->resolveTypeWitness(this, assocType);
     if (TypeWitnesses.find(assocType) != TypeWitnesses.end()) {
       return true;
@@ -383,6 +406,7 @@ NormalProtocolConformance::getTypeWitnessAndDecl(AssociatedTypeDecl *assocType,
 
   auto known = TypeWitnesses.find(assocType);
   if (known == TypeWitnesses.end()) {
+    PrettyStackTraceRequirement trace("resolving", this, assocType);
     assert(resolver && "Unable to resolve type witness");
     resolver->resolveTypeWitness(this, assocType);
     known = TypeWitnesses.find(assocType);
