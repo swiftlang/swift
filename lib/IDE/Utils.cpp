@@ -812,25 +812,25 @@ unsigned DeclNameViewer::commonPartsCount(DeclNameViewer &Other) const {
   return Result;
 }
 
-void swift::ide::SourceEditConsumer::
+void swift::ide::EditConsumer::
 accept(SourceManager &SM, SourceLoc Loc, StringRef Text,
        ArrayRef<NoteRegion> SubRegions) {
   accept(SM, CharSourceRange(Loc, 0), Text, SubRegions);
 }
 
-void swift::ide::SourceEditConsumer::
+void swift::ide::EditConsumer::
 accept(SourceManager &SM, CharSourceRange Range, StringRef Text,
        ArrayRef<NoteRegion> SubRegions) {
   accept(SM, RegionType::ActiveCode, {{Range, Text, SubRegions}});
 }
 
-void swift::ide::SourceEditConsumer::
+void swift::ide::EditConsumer::
 insertAfter(SourceManager &SM, SourceLoc Loc, StringRef Text,
             ArrayRef<NoteRegion> SubRegions) {
   accept(SM, Lexer::getLocForEndOfToken(SM, Loc), Text, SubRegions);
 }
 
-struct swift::ide::SourceEditJsonConsumer::Implementation {
+struct swift::ide::EditJsonConsumer::Implementation {
   llvm::raw_ostream &OS;
   std::vector<SingleEdit> AllEdits;
   Implementation(llvm::raw_ostream &OS) : OS(OS) {}
@@ -843,12 +843,12 @@ struct swift::ide::SourceEditJsonConsumer::Implementation {
   }
 };
 
-swift::ide::SourceEditJsonConsumer::SourceEditJsonConsumer(llvm::raw_ostream &OS) :
+swift::ide::EditJsonConsumer::EditJsonConsumer(llvm::raw_ostream &OS) :
   Impl(*new Implementation(OS)) {}
 
-swift::ide::SourceEditJsonConsumer::~SourceEditJsonConsumer() { delete &Impl; }
+swift::ide::EditJsonConsumer::~EditJsonConsumer() { delete &Impl; }
 
-void swift::ide::SourceEditJsonConsumer::
+void swift::ide::EditJsonConsumer::
 accept(SourceManager &SM, RegionType Type, ArrayRef<Replacement> Replacements) {
   for (const auto &Replacement: Replacements) {
     Impl.accept(SM, Replacement.Range, Replacement.Text);
@@ -906,7 +906,7 @@ public:
   }
 };
 }
-struct swift::ide::SourceEditOutputConsumer::Implementation {
+struct swift::ide::EditOutputConsumer::Implementation {
   ClangFileRewriterHelper Rewriter;
   Implementation(SourceManager &SM, unsigned BufferId, llvm::raw_ostream &OS)
   : Rewriter(SM, BufferId, OS) {}
@@ -915,13 +915,13 @@ struct swift::ide::SourceEditOutputConsumer::Implementation {
   }
 };
 
-swift::ide::SourceEditOutputConsumer::
-SourceEditOutputConsumer(SourceManager &SM, unsigned BufferId,
-  llvm::raw_ostream &OS) : Impl(*new Implementation(SM, BufferId, OS)) {}
+swift::ide::EditOutputConsumer::
+EditOutputConsumer(SourceManager &SM, unsigned BufferId, llvm::raw_ostream &OS)
+  : Impl(*new Implementation(SM, BufferId, OS)) {}
 
-swift::ide::SourceEditOutputConsumer::~SourceEditOutputConsumer() { delete &Impl; }
+swift::ide::EditOutputConsumer::~EditOutputConsumer() { delete &Impl; }
 
-void swift::ide::SourceEditOutputConsumer::
+void swift::ide::EditOutputConsumer::
 accept(SourceManager &SM, RegionType RegionType,
        ArrayRef<Replacement> Replacements) {
   for (const auto &Replacement : Replacements) {

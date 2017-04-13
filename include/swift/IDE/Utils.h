@@ -369,32 +369,33 @@ struct Replacement {
   ArrayRef<NoteRegion> RegionsWorthNote;
 };
 
-class SourceEditConsumer {
+class EditConsumer {
 public:
   virtual void accept(SourceManager &SM, RegionType RegionType, ArrayRef<Replacement> Replacements) = 0;
-  virtual ~SourceEditConsumer() = default;
+  virtual ~EditConsumer() = default;
   void accept(SourceManager &SM, CharSourceRange Range, StringRef Text, ArrayRef<NoteRegion> SubRegions = {});
   void accept(SourceManager &SM, SourceLoc Loc, StringRef Text, ArrayRef<NoteRegion> SubRegions = {});
   void insertAfter(SourceManager &SM, SourceLoc Loc, StringRef Text, ArrayRef<NoteRegion> SubRegions = {});
   void accept(SourceManager &SM, Replacement Replacement) { accept(SM, RegionType::ActiveCode, {Replacement}); }
 };
 
-class SourceEditJsonConsumer : public SourceEditConsumer {
+class EditJsonConsumer : public EditConsumer {
   struct Implementation;
   Implementation &Impl;
 public:
-  SourceEditJsonConsumer(llvm::raw_ostream &OS);
-  ~SourceEditJsonConsumer();
+  EditJsonConsumer(llvm::raw_ostream &OS);
+  ~EditJsonConsumer();
   void accept(SourceManager &SM, RegionType RegionType, ArrayRef<Replacement> Replacements) override;
 };
 
-class SourceEditOutputConsumer : public SourceEditConsumer {
+class EditOutputConsumer : public EditConsumer {
   struct Implementation;
   Implementation &Impl;
 
 public:
-  SourceEditOutputConsumer(SourceManager &SM, unsigned BufferId, llvm::raw_ostream &OS);
-  ~SourceEditOutputConsumer();
+  EditOutputConsumer(SourceManager &SM, unsigned BufferId,
+                                llvm::raw_ostream &OS);
+  ~EditOutputConsumer();
   void accept(SourceManager &SM, RegionType RegionType, ArrayRef<Replacement> Replacements) override;
 };
 } // namespace ide
