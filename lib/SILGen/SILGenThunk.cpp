@@ -82,35 +82,36 @@ static SILValue getNextUncurryLevelRef(SILGenFunction &gen,
 
   auto constantInfo = gen.SGM.Types.getConstantInfo(next);
 
-  if (isa<AbstractFunctionDecl>(next.getDecl()) &&
-      getMethodDispatch(cast<AbstractFunctionDecl>(next.getDecl()))
-        == MethodDispatch::Class) {
-    // Use the dynamic thunk if dynamic.
-    if (next.getDecl()->isDynamic()) {
-      auto dynamicThunk = gen.SGM.getDynamicThunk(next, constantInfo);
-      return gen.B.createFunctionRef(loc, dynamicThunk);
+  if (auto *func = dyn_cast<AbstractFunctionDecl>(next.getDecl())) {
+    if (getMethodDispatch(cast<AbstractFunctionDecl>(next.getDecl()))
+          == MethodDispatch::Class) {
+      // Use the dynamic thunk if dynamic.
+      if (next.getDecl()->isDynamic()) {
+        auto dynamicThunk = gen.SGM.getDynamicThunk(next, constantInfo);
+        return gen.B.createFunctionRef(loc, dynamicThunk);
+      }
+
+      return gen.B.createClassMethod(loc, selfArg, next);
     }
 
-    return gen.B.createClassMethod(loc, selfArg, next);
-  }
-
-  // If the fully-uncurried reference is to a generic method, look up the
-  // witness.
-  if (constantInfo.SILFnType->getRepresentation()
-        == SILFunctionTypeRepresentation::WitnessMethod) {
-    // FIXME: This is wrong if the requirement makes Self non-canonical,
-    // eg <Self, T where Self : P, T : Q, T.X == Self>
-    auto selfType = curriedSubs[0].getReplacement()->getCanonicalType();
-    assert(isa<ArchetypeType>(selfType) && "no archetype for witness?!");
-    SILValue OpenedExistential;
-    if (!cast<ArchetypeType>(selfType)->getOpenedExistentialType().isNull())
-      OpenedExistential = selfArg;
-    auto protocol =
-      next.getDecl()->getDeclContext()->getAsProtocolOrProtocolExtensionContext();
-    auto conformance = ProtocolConformanceRef(protocol);
-    return gen.B.createWitnessMethod(loc, selfType, conformance, next,
-                                     constantInfo.getSILType(),
-                                     OpenedExistential);
+    // If the fully-uncurried reference is to a generic method, look up the
+    // witness.
+    if (constantInfo.SILFnType->getRepresentation()
+          == SILFunctionTypeRepresentation::WitnessMethod) {
+      auto protocol =
+        func->getDeclContext()->getAsProtocolOrProtocolExtensionContext();
+      auto subMap = func->getGenericSignature()
+        ->getSubstitutionMap(curriedSubs);
+      auto origSelfType = protocol->getSelfInterfaceType()->getCanonicalType();
+      auto substSelfType = origSelfType.subst(subMap)->getCanonicalType();
+      auto conformance = subMap.lookupConformance(origSelfType, protocol);
+      SILValue OpenedExistential;
+      if (substSelfType->isOpenedExistential())
+        OpenedExistential = selfArg;
+      return gen.B.createWitnessMethod(loc, substSelfType, *conformance, next,
+                                      constantInfo.getSILType(),
+                                      OpenedExistential);
+    }
   }
 
   // Otherwise, emit a direct call.

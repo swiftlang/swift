@@ -830,19 +830,6 @@ void ASTMangler::appendType(Type type) {
   llvm_unreachable("bad type kind");
 }
 
-/// Mangle a list of protocols.  Each protocol is a substitution
-/// candidate.
-void ASTMangler::appendProtocolList(ArrayRef<Type> Protocols, bool &First) {
-  for (Type protoTy : Protocols) {
-    if (auto *Composition = protoTy->getAs<ProtocolCompositionType>()) {
-      appendProtocolList(Composition->getProtocols(), First);
-    } else {
-      appendProtocolName(protoTy->castTo<ProtocolType>()->getDecl());
-      appendListSeparator(First);
-    }
-  }
-}
-
 GenericTypeParamType *ASTMangler::appendAssocType(DependentMemberType *DepTy,
                                                   bool &isAssocTypeAtDepth) {
   auto base = DepTy->getBase()->getCanonicalType();
