@@ -150,53 +150,42 @@ extension _BoundedBufferReference {
   ) where C : Collection, 
   C.Iterator.Element == Iterator.Element {
     defer { _fixLifetime(self) }
-    let oldCount: Int = numericCast(self.count)
-    let eraseCount: Int = numericCast(target.count)
+    let oldCount: Int = self.count^
+    let eraseCount: Int = target.count^
 
     let growth = newCount - eraseCount
     _sanityCheck(oldCount + growth <= capacity)
     self._header.count = numericCast(oldCount + growth)
 
     let elements = self._baseAddress
+    let targetStart = elements + target.lowerBound
     let oldTailIndex = target.upperBound
     let oldTailStart = elements + oldTailIndex
-    let newTailIndex = oldTailIndex + growth
     let newTailStart = oldTailStart + growth
     let tailCount = oldCount - target.upperBound
 
     if growth > 0 {
-      // Slide the tail part of the buffer forwards, in reverse order
-      // so as not to self-clobber.
+      // Slide the tail part of the buffer down to make space
       newTailStart.moveInitialize(from: oldTailStart, count: tailCount)
 
-      // Assign over the original target
-      var i = newValues.startIndex
-      for j in CountableRange(target) {
-        elements[j] = newValues[i]
-        newValues.formIndex(after: &i)
-      }
+      // Assign over the original target elements
+      let (i, _) = newValues._copyContents(
+        assigning: UnsafeMutableBufferPointer(
+          start: targetStart, count: eraseCount))
+      
       // Initialize the hole left by sliding the tail forward
-      for j in oldTailIndex..<newTailIndex {
-        (elements + j).initialize(to: newValues[i])
-        newValues.formIndex(after: &i)
-      }
-      _expectEnd(of: newValues, is: i)
+      IteratorSequence(i)._copyCompleteContents(
+        initializing: UnsafeMutableBufferPointer(
+          start: oldTailStart, count: growth))
     }
     else { // We're not growing the buffer
       // Assign all the new elements into the start of the target
-      var i = target.lowerBound
-      var j = newValues.startIndex
-      for _ in 0..<newCount {
-        elements[i] = newValues[j]
-        i += 1
-        newValues.formIndex(after: &j)
-      }
-      _expectEnd(of: newValues, is: j)
-
+      newValues._copyCompleteContents(
+        assigning: UnsafeMutableBufferPointer(
+          start: targetStart, count: newCount))
+      
       // If the size didn't change, we're done.
-      if growth == 0 {
-        return
-      }
+      if _slowPath(growth == 0) { return }
 
       // Move the tail backward to cover the shrinkage.
       let shrinkage = -growth
