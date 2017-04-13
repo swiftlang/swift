@@ -106,6 +106,9 @@ class CircularityChecker {
   /// The maximum circularity depth.
   unsigned MaxDepth;
 
+  /// Whether we encountered an unchecked declaration.
+  bool RequireDelayedChecking = false;
+
   llvm::DenseMap<CanType, TrackingInfo> TrackingMap;
   SmallVector<WorkItem, 8> Workstack;
 
@@ -197,6 +200,12 @@ void CircularityChecker::run() {
       return;
     }
   }
+
+  // If we didn't report an error, but we encountered a property that
+  // hadn't been type-checked, queue the type for delayed checking.
+  if (RequireDelayedChecking) {
+    TC.DelayedCircularityChecks.push_back(OriginalDecl);
+  }
 }
 
 /// Visit a type and try to expand it one level.
@@ -244,10 +253,9 @@ bool CircularityChecker::expandStruct(CanType type, StructDecl *S,
   startExpandingType(type);
 
   for (auto field: S->getStoredProperties()) {
-    // Ignore unchecked fields.
-    // FIXME: Strange that this can happen, it means we're potentially
-    // not diagnosing circularity when we should be.
-    if (!field->hasType()) {
+    // Ignore unchecked fields, but flag that we'll need more checking later.
+    if (!field->hasInterfaceType()) {
+      RequireDelayedChecking = true;
       continue;
     }
 
@@ -269,11 +277,11 @@ bool CircularityChecker::expandEnum(CanType type, EnumDecl *E,
   startExpandingType(type);
 
   for (auto elt: E->getAllElements()) {
-    // Ignore unchecked elements.
-    // FIXME: Strange that this can happen, it means we're potentially
-    // not diagnosing circularity when we should be.
-    if (!elt->hasInterfaceType())
+    // Ignore unchecked elements, but flag that we'll need more checking later.
+    if (!elt->hasInterfaceType()) {
+      RequireDelayedChecking = true;
       continue;
+    }
 
     // Indirect elements are representational leaves.
     if (elt->isIndirect())
