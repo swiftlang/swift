@@ -4428,7 +4428,7 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
     decls_block::UnboundGenericTypeLayout::readRecord(scratch,
                                                       genericID, parentID);
 
-    auto genericDecl = cast<NominalTypeDecl>(getDecl(genericID));
+    auto genericDecl = cast<GenericTypeDecl>(getDecl(genericID));
     typeOrOffset = UnboundGenericType::get(genericDecl, getType(parentID), ctx);
     break;
   }
