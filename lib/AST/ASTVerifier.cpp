@@ -2255,6 +2255,7 @@ public:
       verifyGenericEnvironment(generic,
                                generic->getGenericSignature(),
                                generic->getGenericEnvironment());
+      verifyCheckedBase(generic);
     }
 
     void verifyChecked(NominalTypeDecl *nominal) {

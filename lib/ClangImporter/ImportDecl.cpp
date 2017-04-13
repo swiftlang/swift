@@ -4691,18 +4691,16 @@ Decl *SwiftDeclConverter::importCompatibilityTypeAlias(
   if (!typeDecl)
     return nullptr;
 
-  // Handle generic types.
-  GenericParamList *genericParams = nullptr;
-  GenericEnvironment *genericEnv = nullptr;
-  auto underlyingType = typeDecl->getDeclaredInterfaceType();
-
-  if (auto generic = dyn_cast<GenericTypeDecl>(typeDecl)) {
-    if (generic->getGenericSignature() && !isa<ProtocolDecl>(typeDecl)) {
-      genericParams = generic->getGenericParams();
-      genericEnv = generic->getGenericEnvironment();
-
-      underlyingType = generic->mapTypeIntoContext(underlyingType);
-    }
+  // Deliberately use an UnboundGenericType to avoid having to translate over
+  // generic parameters.
+  Type underlyingType;
+  if (auto *underlyingAlias = dyn_cast<TypeAliasDecl>(typeDecl)) {
+    if (underlyingAlias->isGeneric())
+      underlyingType = underlyingAlias->getUnboundGenericType();
+    else
+      underlyingType = underlyingAlias->getDeclaredInterfaceType();
+  } else {
+    underlyingType = cast<NominalTypeDecl>(typeDecl)->getDeclaredType();
   }
 
   auto dc = Impl.importDeclContextOf(decl,
@@ -4714,9 +4712,8 @@ Decl *SwiftDeclConverter::importCompatibilityTypeAlias(
   auto alias = Impl.createDeclWithClangNode<TypeAliasDecl>(
       decl, Accessibility::Public, Impl.importSourceLoc(decl->getLocStart()),
       SourceLoc(), compatibilityName.getDeclName().getBaseName(),
-      Impl.importSourceLoc(decl->getLocation()), genericParams, dc);
+      Impl.importSourceLoc(decl->getLocation()), /*generic params*/nullptr, dc);
   alias->setUnderlyingType(underlyingType);
-  alias->setGenericEnvironment(genericEnv);
 
   // Record that this is the official version of this declaration.
   Impl.ImportedDecls[{decl->getCanonicalDecl(), getVersion()}] = alias;
