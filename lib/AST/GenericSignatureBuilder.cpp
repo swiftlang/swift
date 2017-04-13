@@ -3532,7 +3532,7 @@ bool GenericSignatureBuilder::diagnoseRemainingRenames(
   return invalid;
 }
 
-/// Turn an requirement right-hand side into an unresolved type.
+/// Turn a requirement right-hand side into an unresolved type.
 static GenericSignatureBuilder::UnresolvedType asUnresolvedType(
                                 GenericSignatureBuilder::RequirementRHS rhs) {
   if (auto pa = rhs.dyn_cast<PotentialArchetype *>())
