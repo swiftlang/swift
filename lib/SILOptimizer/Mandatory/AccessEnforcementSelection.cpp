@@ -333,7 +333,12 @@ struct AccessEnforcementSelection : SILFunctionTransform {
         setDynamicEnforcement(access);
         break;
       default:
-        llvm_unreachable("Expecting an indirect argument.");
+        // @in/@in_guaranteed cannot be mutably accessed, mutably captured, or
+        // passed as inout.
+        //
+        // FIXME: When we have borrowed arguments, a "read" needs to be enforced
+        // on the caller side.
+        llvm_unreachable("Expecting an inout argument.");
       }
       return;
     }
