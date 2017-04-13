@@ -142,6 +142,29 @@ extension UnboundCapacity : RangeReplaceableCollection {
     self.init(Base())
   }
 
+  public mutating func append(_ contents: Iterator.Element) {
+    let newCount = count + 1
+    let r = _small(minCapacity: newCount)
+    if _fastPath(r != nil), var s = r {
+      s.append(contents)
+      self = .small(s)
+      return
+    }
+    replaceSubrange(endIndex..<endIndex, with: CollectionOfOne(contents))
+  }
+
+  public mutating func append<C : Collection>(contentsOf contents: C)
+  where C.Iterator.Element == Iterator.Element {
+    let newCount = count + numericCast(contents.count)
+    let r = _small(minCapacity: newCount)
+    if _fastPath(r != nil), var s = r {
+      s.append(contentsOf: contents)
+      self = .small(s)
+      return
+    }
+    replaceSubrange(endIndex..<endIndex, with: contents)
+  }
+
   public mutating func replaceSubrange<C>(
     _ target: Range<Index>,
     with newElements: C

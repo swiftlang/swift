@@ -24,9 +24,83 @@ import SwiftShims
 
 extension UInt16 : _DefaultConstructible {}
 
+// WIP: Trying out a hard(er)-coded fixed size array to wrap. The _DoubleLength
+// approach yields absurd debug-stdlib performance, and absurd generic-
+// specialization compilation times in release.
+public struct _CodeUnitArray8<T : UnsignedInteger> {
+  public var storage: (T, T, T, T, T, T, T, T)
+}
+
+extension _CodeUnitArray8 : RandomAccessCollection, MutableCollection {
+  public typealias Index = Int
+  public typealias IndexDistance = Int
+
+  public var startIndex : Index {
+    return 0
+  }
+  public var endIndex : Index {
+    return 8
+  }
+  public subscript(i: Index) -> T {
+    get {
+      // FIXME: unsafe pointer instead, for perf
+      switch i {
+        case 0: return storage.0
+        case 1: return storage.1
+        case 2: return storage.2
+        case 3: return storage.3
+        case 4: return storage.4
+        case 5: return storage.5
+        case 6: return storage.6
+        case 7: return storage.7
+        default:
+          _sanityCheck(false, "out of bounds access")
+          Builtin.unreachable()
+          // return numericCast(0)
+       }
+    }
+    set {
+      // FIXME: unsafe pointer instead, for perf
+      switch i {
+        case 0: storage.0 = newValue
+        case 1: storage.1 = newValue
+        case 2: storage.2 = newValue
+        case 3: storage.3 = newValue
+        case 4: storage.4 = newValue
+        case 5: storage.5 = newValue
+        case 6: storage.6 = newValue
+        case 7: storage.7 = newValue
+        default:
+          _sanityCheck(false, "out of bounds access")
+          Builtin.unreachable()
+          // fatalError("out of bounds")
+       }
+    }
+  }
+  public func index(after i: Index) -> Index {
+    return i+1
+  }
+  public func index(before i: Index) -> Index {
+    return i-1
+  }
+
+}
+extension _CodeUnitArray8 : _FixedSizeCollection {
+  public init(repeating x: Iterator.Element) {
+    storage = (x, x, x, x, x, x, x, x)
+  }
+}
+
+// With a hard-coded 8-wide, we have skipped the worst part. Use DoubleLength
+// for now.
+//
+public typealias _CodeUnitArray16<T : UnsignedInteger> 
+  = _DoubleLength<_CodeUnitArray8<T>>
+
+
 // TODO: Figure out a more sensible size
 public typealias UTF16CodeUnitBuffer =
-  UnboundCapacity<_BoundedCapacity<_Array8<UInt16>>>
+  UnboundCapacity<_BoundedCapacity<_CodeUnitArray8<UInt16>>>
 
 // A normalization segment that is FCC-normalized. This is a collection of
 // normalized UTF16 code units.
@@ -81,7 +155,6 @@ public struct FCCNormalizedSegment : BidirectionalCollection {
     return buffer.index(before: i)
   }
 
-  // Michael TODO: understand this
   public typealias SubSequence = UnicodeViewSlice<FCCNormalizedSegment>
   public subscript(bounds: Range<Index>) -> SubSequence {
     return SubSequence(base: self, bounds: bounds)
@@ -155,6 +228,9 @@ extension FCCNormalizedSegment {
   }
 
   static func isPreNormalized(_ buffer: UTF16CodeUnitBuffer) -> Bool {
+    if _fastPath(buffer.count == 0) {
+      return true
+    }
     if _fastPath(buffer.count == 1) {
       return FCCNormalizedSegment.isPreNormalized(utf16CodeUnit: buffer[0])
     }
@@ -215,7 +291,6 @@ extension FCCNormalizedSegment : UnicodeView {
       offsetOfSegment: numericCast(nativeStart),
       offsetInSegment: i)
   }
-
 }
 
 // Ask ICU if the given unicode scalar value has a normalization boundary before
