@@ -76,8 +76,11 @@ static void LowerAssignInstruction(SILBuilder &B, AssignInst *Inst,
     assert(isInitialization != PartialInitializationKind::IsReinitialization);
     B.createStore(Loc, Src, Inst->getDest(),
                   StoreOwnershipQualifier::Unqualified);
-  } else if (isInitialization == PartialInitializationKind::IsReinitialization) {
+    Inst->eraseFromParent();
+    return;
+  }
 
+  if (isInitialization == PartialInitializationKind::IsReinitialization) {
     // We have a case where a convenience initializer on a class
     // delegates to a factory initializer from a protocol extension.
     // Factory initializers give us a whole new instance, so the existing
@@ -95,24 +98,24 @@ static void LowerAssignInstruction(SILBuilder &B, AssignInst *Inst,
     SILValue Metatype = B.createValueMetatype(Loc, SILMetatypeTy, Pointer);
 
     B.createDeallocPartialRef(Loc, Pointer, Metatype);
-  } else {
-    assert(isInitialization == PartialInitializationKind::IsNotInitialization);
-
-    // Otherwise, we need to replace the assignment with the full
-    // load/store/release dance. Note that the new value is already
-    // considered to be retained (by the semantics of the storage type),
-    // and we're transferring that ownership count into the destination.
-
-    // This is basically TypeLowering::emitStoreOfCopy, except that if we have
-    // a known incoming value, we can avoid the load.
-    SILValue IncomingVal =
-        B.createLoad(Loc, Inst->getDest(), LoadOwnershipQualifier::Unqualified);
-    B.createStore(Inst->getLoc(), Src, Inst->getDest(),
-                  StoreOwnershipQualifier::Unqualified);
-
-    B.emitDestroyValueOperation(Loc, IncomingVal);
+    Inst->eraseFromParent();
+    return;
   }
 
+  assert(isInitialization == PartialInitializationKind::IsNotInitialization);
+  // Otherwise, we need to replace the assignment with the full
+  // load/store/release dance. Note that the new value is already
+  // considered to be retained (by the semantics of the storage type),
+  // and we're transferring that ownership count into the destination.
+
+  // This is basically TypeLowering::emitStoreOfCopy, except that if we have
+  // a known incoming value, we can avoid the load.
+  SILValue IncomingVal =
+      B.createLoad(Loc, Inst->getDest(), LoadOwnershipQualifier::Unqualified);
+  B.createStore(Inst->getLoc(), Src, Inst->getDest(),
+                StoreOwnershipQualifier::Unqualified);
+
+  B.emitDestroyValueOperation(Loc, IncomingVal);
   Inst->eraseFromParent();
 }
 
