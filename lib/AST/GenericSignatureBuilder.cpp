@@ -2195,7 +2195,8 @@ ConstraintResult GenericSignatureBuilder::addConformanceRequirement(
 /// types.
 static ConstraintResult visitInherited(
          ArrayRef<TypeLoc> inheritedTypes,
-         llvm::function_ref<ConstraintResult(Type, const TypeRepr *)> visitor) {
+         llvm::function_ref<ConstraintResult(Type, const TypeRepr *)> visitType,
+         llvm::function_ref<ConstraintResult(LayoutConstraint, const TypeRepr *)> visitLayout) {
   // Local function that (recursively) adds inherited types.
   ConstraintResult result = ConstraintResult::Resolved;
   std::function<void(Type, const TypeRepr *)> visitInherited;
@@ -2203,23 +2204,26 @@ static ConstraintResult visitInherited(
   // FIXME: Should this whole thing use getExistentialLayout() instead?
 
   visitInherited = [&](Type inheritedType, const TypeRepr *typeRepr) {
-    // Decompose protocol compositions.
-    auto composition = dyn_cast_or_null<CompositionTypeRepr>(typeRepr);
-    if (auto compositionType
-          = inheritedType->getAs<ProtocolCompositionType>()) {
-      unsigned index = 0;
-      for (auto protoType : compositionType->getMembers()) {
-        if (composition && index < composition->getTypes().size())
-          visitInherited(protoType, composition->getTypes()[index]);
-        else
-          visitInherited(protoType, typeRepr);
+    // Decompose explicitly-written protocol compositions.
+    if (auto composition = dyn_cast_or_null<CompositionTypeRepr>(typeRepr)) {
+      if (auto compositionType
+            = inheritedType->getAs<ProtocolCompositionType>()) {
+        unsigned index = 0;
+        for (auto memberType : compositionType->getMembers()) {
+          visitInherited(memberType, composition->getTypes()[index]);
+          index++;
+        }
 
-        ++index;
+        auto layout = compositionType->getExistentialLayout()
+          .getLayoutConstraint();
+        if (layout)
+          visitLayout(layout, composition);
+
+        return;
       }
-      return;
     }
 
-    auto recursiveResult = visitor(inheritedType, typeRepr);
+    auto recursiveResult = visitType(inheritedType, typeRepr);
     if (isErrorResult(recursiveResult) && !isErrorResult(result))
       result = recursiveResult;
   };
@@ -2935,36 +2939,40 @@ ConstraintResult GenericSignatureBuilder::addInheritedRequirements(
   if (auto resolver = getLazyResolver())
     resolver->resolveInheritanceClause(decl);
 
-  return visitInherited(
-                    decl->getInherited(),
-                    [&](Type inheritedType, const TypeRepr *typeRepr) {
-    // Local function to get the source.
-    auto getFloatingSource = [&] {
-      if (parentSource) {
-        if (auto assocType = dyn_cast<AssociatedTypeDecl>(decl)) {
-          auto proto = assocType->getProtocol();
-          return FloatingRequirementSource::viaProtocolRequirement(
-                                                parentSource, proto, typeRepr);
-        }
-
-        auto proto = cast<ProtocolDecl>(decl);
+  // Local function to get the source.
+  auto getFloatingSource = [&](const TypeRepr *typeRepr) {
+    if (parentSource) {
+      if (auto assocType = dyn_cast<AssociatedTypeDecl>(decl)) {
+        auto proto = assocType->getProtocol();
         return FloatingRequirementSource::viaProtocolRequirement(
-                                              parentSource, proto, typeRepr);
+          parentSource, proto, typeRepr);
       }
 
-      // Explicit requirement.
-      if (typeRepr)
-        return FloatingRequirementSource::forExplicit(typeRepr);
+      auto proto = cast<ProtocolDecl>(decl);
+      return FloatingRequirementSource::viaProtocolRequirement(
+        parentSource, proto, typeRepr);
+    }
 
-      // An abstract explicit requirement.
-      return FloatingRequirementSource::forAbstract();
-    };
+    // Explicit requirement.
+    if (typeRepr)
+      return FloatingRequirementSource::forExplicit(typeRepr);
 
-    // Protocol requirement.
-    return addTypeRequirement(pa, inheritedType, getFloatingSource(),
+    // An abstract explicit requirement.
+    return FloatingRequirementSource::forAbstract();
+  };
+
+  auto visitType = [&](Type inheritedType, const TypeRepr *typeRepr) {
+    return addTypeRequirement(pa, inheritedType, getFloatingSource(typeRepr),
                               UnresolvedHandlingKind::GenerateConstraints,
                               &visited);
-  });
+  };
+
+  auto visitLayout = [&](LayoutConstraint layout, const TypeRepr *typeRepr) {
+    return addLayoutRequirement(pa, layout, getFloatingSource(typeRepr),
+                                UnresolvedHandlingKind::GenerateConstraints);
+  };
+
+  return visitInherited(decl->getInherited(), visitType, visitLayout);
 }
 
 ConstraintResult GenericSignatureBuilder::addRequirement(const RequirementRepr *req) {
