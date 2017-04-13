@@ -3941,7 +3941,8 @@ public:
         if (T->isInvalid())
           return false;
         if (type->isExistentialType()) {
-          for (auto *proto : type->getExistentialLayout().getProtocols()) {
+          auto layout = type->getExistentialLayout();
+          for (auto *proto : layout.getProtocols()) {
             auto *protoDecl = proto->getDecl();
 
             if (protoDecl->existentialTypeSupported(&TC))
