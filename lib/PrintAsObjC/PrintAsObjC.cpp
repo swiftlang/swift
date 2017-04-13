@@ -1642,10 +1642,8 @@ private:
     Type instanceTy = MT->getInstanceType();
     if (auto classTy = instanceTy->getAs<ClassType>()) {
       const ClassDecl *CD = classTy->getDecl();
-      if (CD->isObjC())
-        os << "SWIFT_METATYPE(" << getNameForObjC(CD) << ")";
-      else
-        os << "Class";
+      assert(CD->isObjC());
+      os << "SWIFT_METATYPE(" << getNameForObjC(CD) << ")";
       printNullability(optionalKind);
     } else {
       visitType(MT, optionalKind);
