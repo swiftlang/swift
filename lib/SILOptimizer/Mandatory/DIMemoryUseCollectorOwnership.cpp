@@ -237,31 +237,34 @@ SILValue DIMemoryObjectInfo::emitElementAddress(unsigned EltNo, SILLocation Loc,
 /// specified std::string.
 static void getPathStringToElementRec(SILModule &Module, SILType T,
                                       unsigned EltNo, std::string &Result) {
-  if (CanTupleType TT = T.getAs<TupleType>()) {
-    unsigned FieldNo = 0;
-    for (unsigned i = 0, e = TT->getNumElements(); i < e; i++) {
-      auto Field = TT->getElement(i);
-      SILType FieldTy = T.getTupleElementType(i);
-      unsigned NumFieldElements = getElementCountRec(Module, FieldTy, false);
-
-      if (EltNo < NumFieldElements) {
-        Result += '.';
-        if (Field.hasName())
-          Result += Field.getName().str();
-        else
-          Result += llvm::utostr(FieldNo);
-        return getPathStringToElementRec(Module, FieldTy, EltNo, Result);
-      }
-
-      EltNo -= NumFieldElements;
-
-      ++FieldNo;
-    }
-    llvm_unreachable("Element number is out of range for this type!");
+  CanTupleType TT = T.getAs<TupleType>();
+  if (!TT) {
+    // Otherwise, there are no subelements.
+    assert(EltNo == 0 && "Element count problem");
+    return;
   }
 
-  // Otherwise, there are no subelements.
-  assert(EltNo == 0 && "Element count problem");
+  unsigned FieldNo = 0;
+  for (unsigned i = 0, e = TT->getNumElements(); i < e; i++) {
+    auto Field = TT->getElement(i);
+    SILType FieldTy = T.getTupleElementType(i);
+    unsigned NumFieldElements = getElementCountRec(Module, FieldTy, false);
+
+    if (EltNo < NumFieldElements) {
+      Result += '.';
+      if (Field.hasName())
+        Result += Field.getName().str();
+      else
+        Result += llvm::utostr(FieldNo);
+      return getPathStringToElementRec(Module, FieldTy, EltNo, Result);
+    }
+
+    EltNo -= NumFieldElements;
+
+    ++FieldNo;
+  }
+
+  llvm_unreachable("Element number is out of range for this type!");
 }
 
 ValueDecl *
