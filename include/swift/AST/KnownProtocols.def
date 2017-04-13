@@ -50,7 +50,6 @@
 
 PROTOCOL(Sequence)
 PROTOCOL(IteratorProtocol)
-PROTOCOL(AnyObject)
 PROTOCOL(RawRepresentable)
 PROTOCOL(Equatable)
 PROTOCOL(Hashable)

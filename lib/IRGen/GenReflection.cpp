@@ -961,11 +961,6 @@ void IRGenModule::emitFieldMetadataRecord(const NominalTypeDecl *Decl) {
   FieldTypeMetadataBuilder builder(*this, Decl);
   builder.emit();
 
-  // So that -parse-stdlib tests don't need to define an AnyObject
-  // protocol (which will go away one day anyway).
-  if (!Context.getProtocol(KnownProtocolKind::AnyObject))
-    return;
-
   // If this is a class declaration with a superclass, record the
   // superclass as a special associated type named 'super' on the
   // 'AnyObject' protocol.

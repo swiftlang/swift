@@ -1389,17 +1389,6 @@ bool DeclContext::lookupQualified(Type type,
   if (auto nominal = type->getAnyNominal()) {
     visited.insert(nominal);
     stack.push_back(nominal);
-    
-    // If we want dynamic lookup and we're searching in the
-    // AnyObject protocol, note this for later.
-    //
-    // FIXME: This will go away soon.
-    if (options & NL_DynamicLookup) {
-      if (auto proto = dyn_cast<ProtocolDecl>(nominal)) {
-        if (proto->isSpecificProtocol(KnownProtocolKind::AnyObject))
-          wantLookupInAllClasses = true;
-      }
-    }
   }
   // Handle archetypes
   else if (auto archetypeTy = type->getAs<ArchetypeType>()) {

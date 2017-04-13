@@ -740,11 +740,6 @@ hasExplicitProtocolConformance(NominalTypeDecl *decl) {
     if (P->isObjC())
       continue;
 
-    // neither does AnyObject
-    if (P->getKnownProtocolKind().hasValue() &&
-        *P->getKnownProtocolKind() == KnownProtocolKind::AnyObject)
-      continue;
-
     return true;
   }
 

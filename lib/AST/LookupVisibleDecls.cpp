@@ -471,11 +471,12 @@ static void lookupVisibleProtocolMemberDecls(
     Type BaseTy, ProtocolType *PT, VisibleDeclConsumer &Consumer,
     const DeclContext *CurrDC, LookupState LS, DeclVisibilityKind Reason,
     LazyResolver *TypeResolver, VisitedSet &Visited) {
-  if (PT->getDecl()->isSpecificProtocol(KnownProtocolKind::AnyObject)) {
+  // FIXME FIXME FIXME
+  /*if (PT->getDecl()->isSpecificProtocol(KnownProtocolKind::AnyObject)) {
     // Handle AnyObject in a special way.
     doDynamicLookup(Consumer, CurrDC, LS, TypeResolver);
     return;
-  }
+    }*/
   if (!Visited.insert(PT->getDecl()).second)
     return;
 

@@ -1984,8 +1984,7 @@ namespace {
     }
 
     // Foreign classes cannot conform to objc protocols.
-    if (Proto->isObjC() &&
-        !Proto->isSpecificProtocol(KnownProtocolKind::AnyObject)) {
+    if (Proto->isObjC()) {
       if (auto clas = canT->getClassOrBoundGenericClass()) {
         Optional<decltype(diag::cf_class_cannot_conform_to_objc_protocol)>
         diagKind;
@@ -5184,16 +5183,7 @@ Optional<ProtocolConformanceRef> TypeChecker::containsProtocol(
   if (T->isExistentialType()) {
     auto layout = T->getExistentialLayout();
 
-    // First, any class-constrained existential semantically contains
-    // AnyObject.
-    //
-    // FIXME: This check is moving elsewhere soon.
-    if (layout.requiresClass &&
-        Proto->isSpecificProtocol(KnownProtocolKind::AnyObject)) {
-      return ProtocolConformanceRef(Proto);
-    }
-
-    // Next, if we have a superclass constraint, the class may conform
+    // First, if we have a superclass constraint, the class may conform
     // concretely.
     if (layout.superclass) {
       if (auto result = conformsToProtocol(layout.superclass, Proto,
@@ -5202,7 +5192,7 @@ Optional<ProtocolConformanceRef> TypeChecker::containsProtocol(
       }
     }
 
-    // Finally, check if the existential contains the protocol in question.
+    // Next, check if the existential contains the protocol in question.
     for (auto P : layout.getProtocols()) {
       auto *PD = P->getDecl();
       // If we found the protocol we're looking for, return an abstract

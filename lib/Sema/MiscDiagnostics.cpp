@@ -1489,13 +1489,13 @@ bool TypeChecker::getDefaultGenericArgumentsString(
       genericParamText << "<#" << genericParam->getName() << ": ";
       superclass.print(genericParamText);
       for (const ProtocolDecl *proto : protocols) {
-        if (proto->isSpecificProtocol(KnownProtocolKind::AnyObject))
-          continue;
         genericParamText << " & " << proto->getName();
       }
       genericParamText << "#>";
       return;
     }
+
+    // FIXME FIXME FIXME requiresClass()!
 
     if (protocols.empty()) {
       genericParamText << Context.Id_Any;
@@ -1503,8 +1503,7 @@ bool TypeChecker::getDefaultGenericArgumentsString(
     }
 
     if (protocols.size() == 1 &&
-        (protocols.front()->isObjC() ||
-         protocols.front()->isSpecificProtocol(KnownProtocolKind::AnyObject))) {
+        protocols.front()->isObjC()) {
       genericParamText << protocols.front()->getName();
       return;
     }
