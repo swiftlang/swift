@@ -99,18 +99,24 @@ private:
   }
 
 public:
-  enum class LookupKind { SwiftModule, Crawler, Decl, Extension, Invalid };
+  enum class LookupKind {
+    SwiftModule,
+    ClangImporter,
+    Decl,
+    Extension,
+    Invalid
+  };
 
   typedef Optional<std::string> PrivateDeclIdentifier;
 
-  static DeclsLookupSource GetDeclsLookupSource(ASTContext &ast,
-                                                ConstString module_name,
-                                                bool allow_crawler = true) {
+  static DeclsLookupSource
+  GetDeclsLookupSource(ASTContext &ast, ConstString module_name,
+                       bool allow_clang_importer = true) {
     assert(!module_name.empty());
     static ConstString g_ObjectiveCModule(MANGLING_MODULE_OBJC);
     static ConstString g_BuiltinModule("Builtin");
     static ConstString g_CModule(MANGLING_MODULE_CLANG_IMPORTER);
-    if (allow_crawler) {
+    if (allow_clang_importer) {
       if (module_name == g_ObjectiveCModule || module_name == g_CModule)
         return DeclsLookupSource(&ast, module_name);
     }
@@ -138,8 +144,8 @@ public:
 
   void lookupQualified(DeclBaseName name, NLOptions options,
                        LazyResolver *typeResolver, ValueDecls &result) {
-    if (_type == LookupKind::Crawler) {
-      ASTContext *ast_ctx = _crawler._ast;
+    if (_type == LookupKind::ClangImporter) {
+      ASTContext *ast_ctx = _clang_crawler._ast;
       if (ast_ctx) {
         VisibleDeclsConsumer consumer;
         ClangImporter *swift_clang_importer =
@@ -163,8 +169,8 @@ public:
 
   void lookupValue(ModuleDecl::AccessPathTy path, DeclBaseName name, NLKind kind,
                    ValueDecls &result) {
-    if (_type == LookupKind::Crawler) {
-      ASTContext *ast_ctx = _crawler._ast;
+    if (_type == LookupKind::ClangImporter) {
+      ASTContext *ast_ctx = _clang_crawler._ast;
       if (ast_ctx) {
         VisibleDeclsConsumer consumer;
         ClangImporter *swift_clang_importer =
@@ -222,7 +228,7 @@ public:
       return _extension._module->lookupLocalType(key);
     case LookupKind::Invalid:
       return nullptr;
-    case LookupKind::Crawler:
+    case LookupKind::ClangImporter:
       return nullptr;
     }
 
@@ -233,8 +239,8 @@ public:
     switch (_type) {
     case LookupKind::Invalid:
       return ConstString("Invalid");
-    case LookupKind::Crawler:
-      return ConstString("Crawler");
+    case LookupKind::ClangImporter:
+      return ConstString("ClangImporter");
     case LookupKind::SwiftModule:
       return ConstString(_module->getName().get());
     case LookupKind::Decl:
@@ -257,8 +263,8 @@ public:
     switch (_type) {
     case LookupKind::Invalid:
       break;
-    case LookupKind::Crawler:
-      _crawler._ast = rhs._crawler._ast;
+    case LookupKind::ClangImporter:
+      _clang_crawler._ast = rhs._clang_crawler._ast;
       break;
     case LookupKind::SwiftModule:
       _module = rhs._module;
@@ -281,8 +287,8 @@ public:
       switch (_type) {
       case LookupKind::Invalid:
         break;
-      case LookupKind::Crawler:
-        _crawler._ast = rhs._crawler._ast;
+      case LookupKind::ClangImporter:
+        _clang_crawler._ast = rhs._clang_crawler._ast;
         break;
       case LookupKind::SwiftModule:
         _module = rhs._module;
@@ -312,8 +318,8 @@ public:
     switch (_type) {
     case LookupKind::Invalid:
       return false;
-    case LookupKind::Crawler:
-      return _crawler._ast != nullptr;
+    case LookupKind::ClangImporter:
+      return _clang_crawler._ast != nullptr;
     case LookupKind::SwiftModule:
       return _module != nullptr;
     case LookupKind::Decl:
@@ -341,7 +347,7 @@ private:
     ModuleDecl *_module;
     struct {
       ASTContext *_ast;
-    } _crawler;
+    } _clang_crawler;
     NominalTypeDecl *_decl;
     struct {
       ModuleDecl *_module;    // extension in this module
@@ -361,8 +367,8 @@ private:
     // it is fine for the ASTContext to be null, so don't actually even
     // lldbassert there
     if (_a) {
-      _crawler._ast = _a;
-      _type = LookupKind::Crawler;
+      _clang_crawler._ast = _a;
+      _type = LookupKind::ClangImporter;
     } else
       _type = LookupKind::Invalid;
   }
