@@ -488,16 +488,16 @@ public class ConcreteDerived : GenericBase<Int> {
 // CHECK-NEXT:   #Foo.nativeProp!getter.1: {{.*}} :  _T07dynamic3FooC10nativePropSifg     // dynamic.Foo.nativeProp.getter : Swift.Int
 // CHECK-NEXT:   #Foo.nativeProp!setter.1: {{.*}} :  _T07dynamic3FooC10nativePropSifs     // dynamic.Foo.nativeProp.setter : Swift.Int
 // CHECK-NEXT:   #Foo.nativeProp!materializeForSet.1
-// CHECK-NEXT:   #Foo.subscript!getter.1: {{.*}} :   _T07dynamic3FooC9subscriptS2i6native_tcfg    // dynamic.Foo.subscript.getter : (native : Swift.Int) -> Swift.Int
-// CHECK-NEXT:   #Foo.subscript!setter.1: {{.*}} :   _T07dynamic3FooC9subscriptS2i6native_tcfs    // dynamic.Foo.subscript.setter : (native : Swift.Int) -> Swift.Int
+// CHECK-NEXT:   #Foo.subscript!getter.1: {{.*}} :   _T07dynamic3FooC9subscriptS2i6native_tcfg    // dynamic.Foo.subscript.getter : (native: Swift.Int) -> Swift.Int
+// CHECK-NEXT:   #Foo.subscript!setter.1: {{.*}} :   _T07dynamic3FooC9subscriptS2i6native_tcfs    // dynamic.Foo.subscript.setter : (native: Swift.Int) -> Swift.Int
 // CHECK-NEXT:   #Foo.subscript!materializeForSet.1
 // CHECK-NEXT:   #Foo.init!initializer.1: {{.*}} :   _T07dynamic3FooCACSi4objc_tcfc
 // CHECK-NEXT:   #Foo.objcMethod!1: {{.*}} :         _T07dynamic3FooC10objcMethodyyF
 // CHECK-NEXT:   #Foo.objcProp!getter.1: {{.*}} :    _T07dynamic3FooC8objcPropSifg  // dynamic.Foo.objcProp.getter : Swift.Int
 // CHECK-NEXT:   #Foo.objcProp!setter.1: {{.*}} :    _T07dynamic3FooC8objcPropSifs  // dynamic.Foo.objcProp.setter : Swift.Int
 // CHECK-NEXT:   #Foo.objcProp!materializeForSet.1
-// CHECK-NEXT:   #Foo.subscript!getter.1: {{.*}} : _T07dynamic3FooC9subscriptSis9AnyObject_p4objc_tcfg // dynamic.Foo.subscript.getter : (objc : Swift.AnyObject) -> Swift.Int
-// CHECK-NEXT:   #Foo.subscript!setter.1: {{.*}} : _T07dynamic3FooC9subscriptSis9AnyObject_p4objc_tcfs // dynamic.Foo.subscript.setter : (objc : Swift.AnyObject) -> Swift.Int
+// CHECK-NEXT:   #Foo.subscript!getter.1: {{.*}} : _T07dynamic3FooC9subscriptSis9AnyObject_p4objc_tcfg // dynamic.Foo.subscript.getter : (objc: Swift.AnyObject) -> Swift.Int
+// CHECK-NEXT:   #Foo.subscript!setter.1: {{.*}} : _T07dynamic3FooC9subscriptSis9AnyObject_p4objc_tcfs // dynamic.Foo.subscript.setter : (objc: Swift.AnyObject) -> Swift.Int
 // CHECK-NEXT:   #Foo.subscript!materializeForSet
 // CHECK-NEXT:   #Foo.overriddenByDynamic!1: {{.*}} : _T07dynamic3FooC19overriddenByDynamic{{[_0-9a-zA-Z]*}}
 // CHECK-NEXT:   #Foo.deinit!deallocator: {{.*}}
@@ -510,13 +510,13 @@ public class ConcreteDerived : GenericBase<Int> {
 
 // No vtable entry for override of @objc extension property
 // CHECK-LABEL: sil_vtable SubExt {
-// CHECK-NEXT: #BaseExt.init!initializer.1: (BaseExt.Type) -> () -> BaseExt : _T07dynamic6SubExtCACycfc // dynamic.SubExt.init () -> dynamic.SubExt
+// CHECK-NEXT: #BaseExt.init!initializer.1: (BaseExt.Type) -> () -> BaseExt : _T07dynamic6SubExtCACycfc // dynamic.SubExt.init() -> dynamic.SubExt
 // CHECK-NEXT: #SubExt.deinit!deallocator: _T07dynamic6SubExtCfD // dynamic.SubExt.__deallocating_deinit
 // CHECK-NEXT: }
 
 // Dynamic thunk + vtable re-abstraction
 // CHECK-LABEL: sil_vtable ConcreteDerived {
-// CHECK-NEXT: #GenericBase.method!1: <T> (GenericBase<T>) -> (T) -> () : public _T07dynamic15ConcreteDerivedC6methodySiFAA11GenericBaseCADyxFTV     // vtable thunk for dynamic.GenericBase.method (A) -> () dispatching to dynamic.ConcreteDerived.method (Swift.Int) -> ()
-// CHECK-NEXT: #GenericBase.init!initializer.1: <T> (GenericBase<T>.Type) -> () -> GenericBase<T> : _T07dynamic15ConcreteDerivedCACycfc      // dynamic.ConcreteDerived.init () -> dynamic.ConcreteDerived
+// CHECK-NEXT: #GenericBase.method!1: <T> (GenericBase<T>) -> (T) -> () : public _T07dynamic15ConcreteDerivedC6methodySiFAA11GenericBaseCADyxFTV     // vtable thunk for dynamic.GenericBase.method(A) -> () dispatching to dynamic.ConcreteDerived.method(Swift.Int) -> ()
+// CHECK-NEXT: #GenericBase.init!initializer.1: <T> (GenericBase<T>.Type) -> () -> GenericBase<T> : _T07dynamic15ConcreteDerivedCACycfc      // dynamic.ConcreteDerived.init() -> dynamic.ConcreteDerived
 // CHECK-NEXT: #ConcreteDerived.deinit!deallocator: _T07dynamic15ConcreteDerivedCfD  // dynamic.ConcreteDerived.__deallocating_deinit
 // CHECK-NEXT: }

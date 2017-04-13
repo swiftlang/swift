@@ -28,7 +28,7 @@
 // CHECK:   (enum TypesToReflect.E)
 // CHECK:   (struct Swift.Int))
 
-// CHECK: aTupleWithLabels: (a : TypesToReflect.C, s : TypesToReflect.S, e : TypesToReflect.E)
+// CHECK: aTupleWithLabels: (a: TypesToReflect.C, s: TypesToReflect.S, e: TypesToReflect.E)
 // CHECK: (tuple
 // CHECK:   (class TypesToReflect.C)
 // CHECK:   (struct TypesToReflect.S)

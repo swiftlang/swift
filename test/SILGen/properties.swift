@@ -488,7 +488,7 @@ struct DidSetWillSetTests: ForceAccessors {
 
       takeInt(newA)
 
-      // CHECK-NEXT: // function_ref properties.takeInt (Swift.Int) -> ()
+      // CHECK-NEXT: // function_ref properties.takeInt(Swift.Int) -> ()
       // CHECK-NEXT: [[TAKEINTFN:%.*]] = function_ref @_T010properties7takeInt{{[_0-9a-zA-Z]*}}F
       // CHECK-NEXT: apply [[TAKEINTFN]](%0) : $@convention(thin) (Int) -> ()
     }
@@ -502,7 +502,7 @@ struct DidSetWillSetTests: ForceAccessors {
 
       takeInt(a)
 
-      // CHECK-NEXT: // function_ref properties.takeInt (Swift.Int) -> ()
+      // CHECK-NEXT: // function_ref properties.takeInt(Swift.Int) -> ()
       // CHECK-NEXT: [[TAKEINTFN:%.*]] = function_ref @_T010properties7takeInt{{[_0-9a-zA-Z]*}}F
       // CHECK-NEXT: [[AADDR:%.*]] = struct_element_addr %1 : $*DidSetWillSetTests, #DidSetWillSetTests.a
       // CHECK-NEXT: [[A:%.*]] = load [trivial] [[AADDR]] : $*Int
@@ -680,7 +680,7 @@ func propertyWithDidSetTakingOldValue() {
   p = zero
 }
 
-// CHECK: // properties.(propertyWithDidSetTakingOldValue () -> ()).(p #1).setter : Swift.Int
+// CHECK: // setter of p #1 : Swift.Int in properties.propertyWithDidSetTakingOldValue()
 // CHECK-NEXT: sil {{.*}} @_T010properties32propertyWithDidSetTakingOldValueyyF1pL_Sifs
 // CHECK: bb0([[ARG1:%.*]] : $Int, [[ARG2:%.*]] : ${ var Int }):
 // CHECK-NEXT:  debug_value [[ARG1]] : $Int, let, name "newValue", argno 1
