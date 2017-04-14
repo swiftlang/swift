@@ -741,6 +741,42 @@ public struct PackedUnsignedIntegers<
   public let representation: Representation
 }
 
+extension PackedUnsignedIntegers : Sequence {
+  public struct Iterator : IteratorProtocol {
+    public var bits: Representation
+    public let shift: Representation
+
+    @inline(__always)
+    public mutating func next() -> Element? {
+      if (bits == 0) {
+        return nil
+      }
+
+      // Zero means empty, so we bias every element by 1
+      let bias: Representation = 1
+      let mask = (1 << shift) &- 1
+
+      let result = mask & (bits &- bias)
+      bits = bits >> shift
+      return numericCast(result)
+    }
+
+    public init(bits: Representation, shift: Representation) {
+      self.bits = bits
+      self.shift = shift
+    }
+  }
+
+  @inline(__always)
+  public func makeIterator() -> Iterator {
+    return Iterator(
+      bits: numericCast(representation),
+      shift: numericCast(bitsPerElement)
+    )
+  }
+
+}
+
 extension PackedUnsignedIntegers : RandomAccessCollection {
   public var startIndex: Int { return 0 }
   public var endIndex: Int { return count }
