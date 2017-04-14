@@ -53,10 +53,12 @@
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
 #include "swift/IDE/Utils.h"
+#include "swift/IDE/APIDigesterData.h"
 #include <functional>
 
 using namespace swift;
 using namespace ide;
+using namespace api;
 
 namespace  {
   enum class ActionType {
@@ -217,62 +219,36 @@ struct NodeMatcher {
 
 enum class KeyKind {
 #define KEY(NAME) KK_##NAME,
-#include "DigesterEnums.def"
+#include "swift/IDE/DigesterEnums.def"
 };
 
 static KeyKind parseKeyKind(StringRef Content) {
   return llvm::StringSwitch<KeyKind>(Content)
 #define KEY(NAME) .Case(#NAME, KeyKind::KK_##NAME)
-#include "DigesterEnums.def"
+#include "swift/IDE/DigesterEnums.def"
   ;
 }
 
 static StringRef getKeyContent(SDKContext &Ctx, KeyKind Kind) {
   switch (Kind) {
 #define KEY(NAME) case KeyKind::KK_##NAME: return Ctx.buffer(#NAME);
-#include "DigesterEnums.def"
+#include "swift/IDE/DigesterEnums.def"
   }
 
   llvm_unreachable("Unhandled KeyKind in switch.");
 }
 
-// The node kind appearing in the tree that describes the content of the SDK
-enum class SDKNodeKind: uint8_t {
-#define NODE_KIND(NAME) NAME,
-#include "DigesterEnums.def"
-};
-
-enum class NodeAnnotation: uint8_t{
-#define NODE_ANNOTATION(NAME) NAME,
-#include "DigesterEnums.def"
-};
-
 enum class KnownTypeKind: uint8_t {
 #define KNOWN_TYPE(NAME) NAME,
-#include "DigesterEnums.def"
+#include "swift/IDE/DigesterEnums.def"
   Unknown,
 };
 
 enum class SDKDeclAttrKind: uint8_t {
 #define DECL_ATTR(Name) DAK_##Name,
-#include "DigesterEnums.def"
+#include "swift/IDE/DigesterEnums.def"
 };
 
-// Redefine << so that we can output the name of the node kind.
-static raw_ostream &operator<<(raw_ostream &Out, const SDKNodeKind Value) {
-  switch (Value) {
-#define NODE_KIND(Name) case SDKNodeKind::Name: return Out << #Name;
-#include "DigesterEnums.def"
-  }
-  llvm_unreachable("Undefined SDK node kind.");
-}
-
-// Redefine << so that we can output the name of the annotation kind.
-static raw_ostream &operator<<(raw_ostream &Out, const NodeAnnotation Value) {
-#define NODE_ANNOTATION(X) if (Value == NodeAnnotation::X) { return Out << #X; }
-#include "DigesterEnums.def"
-  llvm_unreachable("Undefined SDK node kind.");
-}
   // Redefine << so that we can output the name of decl kind.
 static raw_ostream &operator<<(raw_ostream &Out, const DeclKind Value) {
   switch (Value) {
@@ -573,7 +549,7 @@ class SDKNodeDecl;
 
 KnownTypeKind SDKNodeType::getTypeKind() const {
 #define KNOWN_TYPE(NAME) if (getName() == #NAME) return KnownTypeKind::NAME;
-#include "DigesterEnums.def"
+#include "swift/IDE/DigesterEnums.def"
   return KnownTypeKind::Unknown;
 }
 
@@ -770,7 +746,7 @@ public:
   bool SDKNode##X::classof(const SDKNode *N) {                             \
     return N->getKind() == SDKNodeKind::X;                                 \
   }
-#include "DigesterEnums.def"
+#include "swift/IDE/DigesterEnums.def"
 
 
 SDKNode* SDKNode::constructSDKNode(SDKContext &Ctx,
@@ -792,7 +768,7 @@ SDKNode* SDKNode::constructSDKNode(SDKContext &Ctx,
     case KeyKind::KK_kind:
       Kind = llvm::StringSwitch<SDKNodeKind>(GetScalarString(Pair.getValue()))
 #define NODE_KIND(NAME) .Case(#NAME, SDKNodeKind::NAME)
-#include "DigesterEnums.def"
+#include "swift/IDE/DigesterEnums.def"
       ;
       break;
     case KeyKind::KK_name:
@@ -852,7 +828,7 @@ SDKNode* SDKNode::constructSDKNode(SDKContext &Ctx,
         Info.DeclAttrs.push_back(
           llvm::StringSwitch<SDKDeclAttrKind>(GetScalarString(&*It))
 #define DECL_ATTR(X) .Case(#X, SDKDeclAttrKind::DAK_##X)
-#include "DigesterEnums.def"
+#include "swift/IDE/DigesterEnums.def"
           );
       }
       break;
@@ -1092,7 +1068,7 @@ SDKNode *SDKNodeInitInfo::createSDKNode(SDKNodeKind Kind) {
 case SDKNodeKind::X:                                                           \
   Result = static_cast<SDKNode*>(new SDKNode##X(*this));                       \
   break;
-#include "DigesterEnums.def"
+#include "swift/IDE/DigesterEnums.def"
   }
   return Ctx.own(Result);
 }
@@ -1371,7 +1347,7 @@ namespace swift {
     struct ScalarEnumerationTraits<SDKNodeKind> {
       static void enumeration(Output &out, SDKNodeKind &value) {
 #define NODE_KIND(X) out.enumCase(value, #X, SDKNodeKind::X);
-#include "DigesterEnums.def"
+#include "swift/IDE/DigesterEnums.def"
       }
     };
 
@@ -1388,7 +1364,7 @@ namespace swift {
     struct ScalarEnumerationTraits<SDKDeclAttrKind> {
       static void enumeration(Output &out, SDKDeclAttrKind &value) {
 #define DECL_ATTR(X) out.enumCase(value, #X, SDKDeclAttrKind::DAK_##X);
-#include "DigesterEnums.def"
+#include "swift/IDE/DigesterEnums.def"
       }
     };
 
@@ -2353,191 +2329,8 @@ public:
   }
 };
 
-// DiffItem describes how an element in SDK evolves in a way that migrator can
-// read conveniently. Each DiffItem corresponds to one JSON element and contains
-// sub fields explaining how migrator can assist client code to cope with such
-// SDK change. For instance, the following first JSON element describes an unwrap
-// optional change in the first parameter of function "c:@F@CTTextTabGetOptions".
-// Similarly, the second JSON element describes a type parameter down cast in the
-// second parameter of function "c:objc(cs)NSXMLDocument(im)insertChildren:atIndex:".
-// We keep both usrs because in the future this may support auto-rename.
-struct DiffItem {
-  SDKNodeKind NodeKind;
-  NodeAnnotation DiffKind;
-  StringRef ChildIndex;
-  StringRef LeftUsr;
-  StringRef RightUsr;
-  StringRef LeftComment;
-  StringRef RightComment;
-  StringRef ModuleName;
-
-  DiffItem(SDKNodeKind NodeKind, NodeAnnotation DiffKind, StringRef ChildIndex,
-           StringRef LeftUsr, StringRef RightUsr, StringRef LeftComment,
-           StringRef RightComment, StringRef ModuleName) : NodeKind(NodeKind),
-           DiffKind(DiffKind), ChildIndex(ChildIndex), LeftUsr(LeftUsr),
-           RightUsr(RightUsr), LeftComment(LeftComment),
-           RightComment(RightComment), ModuleName(ModuleName) {
-    assert(!ChildIndex.empty() && "Child index is empty.");
-  }
-
-  static StringRef head() {
-    return "SDK_CHANGE";
-  }
-
-  bool operator<(DiffItem Other) const {
-    if (auto UsrCompare = LeftUsr.compare(Other.LeftUsr))
-      return UsrCompare < 0;
-    if (NodeKind != Other.NodeKind)
-      return NodeKind < Other.NodeKind;
-    if (DiffKind != Other.DiffKind)
-      return DiffKind < Other.DiffKind;
-    if (auto ChildCompare = ChildIndex.compare(Other.ChildIndex))
-      return ChildCompare < 0;
-    return false;
-  }
-
-  static void describe(llvm::raw_ostream &os) {
-    os << "#ifndef " << head() << "\n";
-    os << "#define " << head() << "(NODE_KIND, DIFF_KIND, CHILD_INDEX, LEFT_USR, "
-                                  "RIGHT_USR, LEFT_COMMENT, RIGHT_COMMENT, "
-                                  "MODULENAME)\n";
-    os << "#endif\n";
-  }
-
-  static void undef(llvm::raw_ostream &os) {
-    os << "#undef " << head() << "\n";
-  }
-
-  void streamDef(llvm::raw_ostream &S) const {
-    S << head() << "(" << NodeKind << ", " << DiffKind << ", \"" << ChildIndex
-      << "\", \"" << LeftUsr << "\", \"" << RightUsr << "\", \""
-      << LeftComment << "\", \"" << RightComment
-      << "\", \"" << ModuleName << "\")";
-  }
-};
-
 typedef std::vector<DiffItem> DiffVector;
 
-// TypeMemberDiffItem stores info about movements of functions to type members
-//
-// Outputs:
-//
-// SDK_CHANGE_TYPE_MEMBER(USR, new type context name, new printed name, self
-//                        index, old printed name)
-//
-// Examples:
-//----------------------------------------------------------------------------//
-// Init:
-//
-//  CGAffineTransformMakeScale(_:_:)
-//    ==>
-//  SDK_CHANGE_TYPE_MEMBER("c:@F@CGAffineTransformMakeScale",
-//                         "CGAffineTransform", "init(scaleX:y:)", ,
-//                         "CGAffineTransformMakeScale(_:_:)")
-//
-//  Meaning that source should transform like:
-//  let myAffineTransform = CGAffineTransformMakeScale(myX, myY)
-//    ==>
-//  let myAffineTransform = CGAffineTransform(scaleX: myX, y: myY)
-//
-//
-//----------------------------------------------------------------------------//
-// Static/Class Method:
-//
-//  CGColorGetConstantColor(_:)
-//    ==>
-//  SDK_CHANGE_TYPE_MEMBER("c:@F@CGColorGetConstantColor", "CGColor",
-//                         "constantColor(forName:)", ,
-//                         "CGColorGetConstantColor(_:)")
-//
-// Meaning that source should transform like:
-//  CGColorGetConstantColor(nameOfWhiteColor)
-//    ==>
-//  CGColor.constantColor(forName: nameOfWhiteColor)
-//
-//
-//----------------------------------------------------------------------------//
-// Instance Method:
-//
-//  CGEventPost(_:_:)
-//    ==>
-//  SDK_CHANGE_TYPE_MEMBER("c:@F@CGEventPost", "CGEvent", "post(tap:)", 1,
-//  "CGEventPost(_:_:)")
-//
-// Meaning that source should transform like:
-//  CGEventPost(myTap, myEvent)
-//    ==>
-//  myEvent.post(tap: myTap)
-//
-//
-//----------------------------------------------------------------------------//
-// Static/Class Stored Variable:
-//
-//  kCGColorWhite
-//    ==>
-//  SDK_CHANGE_TYPE_MEMBER("c:@kCGColorWhite", "CGColor", "white", ,
-//                         "kCGColorWhite")
-//
-// Meaning that source should transform like:
-//  let colorName = kCGColorWhite
-//    ==>
-//  let colorName = CGColor.white
-//
-//
-//----------------------------------------------------------------------------//
-// Instance Computed Property
-//
-//
-//  CGColorGetComponents(_:)
-//    ==>
-//  SDK_CHANGE_TYPE_MEMBER("c:@F@CGColorGetComponents", "CGColor",
-//                         "components", 0, "CGColorGetComponents(_:)")
-//
-// Meaning that source should transform like:
-//  CGColorGetComponents(myColor)
-//    ==>
-//  myColor.components
-//
-//
-struct TypeMemberDiffItem {
-  StringRef usr;
-  StringRef newTypeName;
-  StringRef newPrintedName;
-  Optional<uint8_t> selfIndex;
-  StringRef oldPrintedName;
-
-  static StringRef head() {
-    return "SDK_CHANGE_TYPE_MEMBER";
-  }
-
-  static void describe(llvm::raw_ostream &os) {
-    os << "#ifndef " << head() << "\n";
-    os << "#define " << head() << "(USR, NEW_TYPE_NAME, NEW_PRINTED_NAME, "
-                                  "SELF_INDEX, OLD_PRINTED_NAME)\n";
-    os << "#endif\n";
-  }
-
-  static void undef(llvm::raw_ostream &os) {
-    os << "#undef " << head() << "\n";
-  }
-
-  void streamDef(llvm::raw_ostream &os) const {
-    std::string IndexContent = selfIndex.hasValue() ?
-      std::to_string(selfIndex.getValue()) : "";
-
-    os << head() << "("
-       << "\"" << usr << "\"" << ", "
-       << "\"" << newTypeName << "\"" << ", "
-       << "\"" << newPrintedName << "\"" << ", "
-       << "\"" << IndexContent << "\"" << ", "
-       << "\"" << oldPrintedName << "\""
-       << ")";
-  }
-
-  bool operator<(TypeMemberDiffItem Other) const {
-    return usr.compare(Other.usr) < 0;
-  }
-};
 typedef std::vector<TypeMemberDiffItem> TypeMemberDiffVector;
 
 } // end anonymous namespace
@@ -3070,38 +2863,6 @@ void DiagnosisEmitter::visit(NodePtr Node) {
   }
 }
 
-struct NoEscapeFuncParam {
-  StringRef Usr;
-  unsigned Index;
-
-  NoEscapeFuncParam(StringRef Usr, unsigned Index) : Usr(Usr), Index(Index) {}
-
-  static StringRef head() {
-    return "NOESCAPE_FUNC_PARAM";
-  }
-
-  static void describe(llvm::raw_ostream &os) {
-    os << "#ifndef " << head() << "\n";
-    os << "#define " << head() << "(USR, Index)\n";
-    os << "#endif\n";
-  }
-
-  static void undef(llvm::raw_ostream &os) {
-    os << "#undef " << head() << "\n";
-  }
-
-  void streamDef(llvm::raw_ostream &os) const {
-    os << head() << "(" << "\"" << Usr << "\"" << ", "
-    << "\"" << Index << "\"" << ")";
-  }
-
-  bool operator<(NoEscapeFuncParam Other) const {
-    if (Usr != Other.Usr)
-      return Usr.compare(Other.Usr) < 0;
-    return Index < Other.Index;
-  }
-};
-
   typedef std::vector<NoEscapeFuncParam> NoEscapeFuncParamVector;
 
 class NoEscapingFuncEmitter : public SDKNodeVisitor {
@@ -3126,36 +2887,6 @@ public:
   static void collectDiffItems(NodePtr Root, NoEscapeFuncParamVector &DV) {
     NoEscapingFuncEmitter Emitter(DV);
     SDKNode::postorderVisit(Root, Emitter);
-  }
-};
-
-/// This info is about functions meet the following criteria:
-///   - This function is a member function of a type.
-///   - This function is overloaded.
-struct OverloadedFuncInfo {
-  StringRef Usr;
-  OverloadedFuncInfo(StringRef Usr) : Usr(Usr) {}
-
-  static StringRef head() {
-    return "OVERLOAD_FUNC_TRAILING_CLOSURE";
-  }
-
-  static void describe(llvm::raw_ostream &os) {
-    os << "#ifndef " << head() << "\n";
-    os << "#define " << head() << "(USR)\n";
-    os << "#endif\n";
-  }
-
-  static void undef(llvm::raw_ostream &os) {
-    os << "#undef " << head() << "\n";
-  }
-
-  void streamDef(llvm::raw_ostream &os) const {
-    os << head() << "(" << "\"" << Usr << "\"" << ")";
-  }
-
-  bool operator<(OverloadedFuncInfo Other) const {
-    return Usr.compare(Other.Usr) < 0;
   }
 };
 
