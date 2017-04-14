@@ -1635,7 +1635,7 @@ NodePointer Demangler::demangleSpecialType() {
       return createType(boxTy);
     }
     case 'e':
-      return createType(createNode(Node::Kind::ErrorType, StringRef()));
+      return createType(createNode(Node::Kind::ErrorType));
     default:
       return nullptr;
   }

@@ -1110,7 +1110,7 @@
     {
       key.kind: source.lang.swift.decl.function.method.instance,
       key.name: "meth()",
-      key.usr: "s:5index4methXeF",
+      key.usr: "s:5index4methXeXeF",
       key.line: 134,
       key.column: 8
     },

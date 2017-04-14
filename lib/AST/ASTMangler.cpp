@@ -1570,8 +1570,11 @@ CanType ASTMangler::getDeclTypeForMangling(
     ArrayRef<Requirement> &requirements,
     SmallVectorImpl<Requirement> &requirementsBuf) {
   auto &C = decl->getASTContext();
-  if (!decl->hasInterfaceType())
-    return ErrorType::get(C)->getCanonicalType();
+  if (!decl->hasInterfaceType() || decl->getInterfaceType()->is<ErrorType>()) {
+    if (isa<AbstractFunctionDecl>(decl))
+      return CanFunctionType::get(C.TheErrorType, C.TheErrorType);
+    return C.TheErrorType;
+  }
 
   auto type = decl->getInterfaceType()->getCanonicalType();
 
