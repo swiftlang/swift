@@ -1800,12 +1800,16 @@ void Parser::parseOptionalArgumentLabel(Identifier &name, SourceLoc &loc) {
 
 DeclName Parser::parseUnqualifiedDeclName(bool afterDot,
                                           DeclNameLoc &loc,
-                                          const Diagnostic &diag) {
+                                          const Diagnostic &diag,
+                                          bool allowOperators) {
   // Consume the base name.
   Identifier baseName = Context.getIdentifier(Tok.getText());
   SourceLoc baseNameLoc;
   if (Tok.isAny(tok::identifier, tok::kw_Self, tok::kw_self)) {
     baseNameLoc = consumeIdentifier(&baseName);
+  } else if (allowOperators && Tok.isAnyOperator()) {
+    baseName = Context.getIdentifier(Tok.getText());
+    baseNameLoc = consumeToken();
   } else if (afterDot && Tok.isKeyword()) {
     baseNameLoc = consumeToken();
   } else {

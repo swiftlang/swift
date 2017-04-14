@@ -1162,8 +1162,10 @@ public:
   /// enables '.init' and '.default' like expressions.
   /// \param loc Will be populated with the location of the name.
   /// \param diag The diagnostic to emit if this is not a name.
+  /// \param allowOperators Whether to allow operator basenames too.
   DeclName parseUnqualifiedDeclName(bool afterDot, DeclNameLoc &loc,
-                                    const Diagnostic &diag);
+                                    const Diagnostic &diag,
+                                    bool allowOperators=false);
 
   Expr *parseExprIdentifier();
   Expr *parseExprEditorPlaceholder(Token PlaceholderTok,
