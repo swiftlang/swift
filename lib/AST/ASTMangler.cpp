@@ -327,11 +327,14 @@ std::string ASTMangler::mangleObjCRuntimeName(const NominalTypeDecl *Nominal) {
 }
 
 std::string ASTMangler::mangleTypeAsContextUSR(const NominalTypeDecl *type) {
+  llvm::SaveAndRestore<bool> allowUnnamedRAII(AllowNamelessEntities, true);
   appendContext(type);
   return finalize();
 }
 
-std::string ASTMangler::mangleDeclAsUSR(ValueDecl *Decl, StringRef USRPrefix) {
+std::string ASTMangler::mangleDeclAsUSR(const ValueDecl *Decl,
+                                        StringRef USRPrefix) {
+  llvm::SaveAndRestore<bool> allowUnnamedRAII(AllowNamelessEntities, true);
   Buffer << USRPrefix;
   bindGenericParameters(Decl->getDeclContext());
 
@@ -354,6 +357,7 @@ std::string ASTMangler::mangleAccessorEntityAsUSR(AccessorKind kind,
                                                   AddressorKind addressorKind,
                                                   const ValueDecl *decl,
                                                   StringRef USRPrefix) {
+  llvm::SaveAndRestore<bool> allowUnnamedRAII(AllowNamelessEntities, true);
   Buffer << USRPrefix;
   appendAccessorEntity(kind, addressorKind, decl, /*isStatic*/ false);
   return finalize();
@@ -444,8 +448,13 @@ void ASTMangler::appendDeclName(const ValueDecl *decl) {
         appendOperator("oi");
         break;
     }
-  } else {
+  } else if (decl->hasName()) {
     appendIdentifier(decl->getName().str());
+  } else {
+    assert(AllowNamelessEntities && "attempt to mangle unnamed decl");
+    // Fall back to an unlikely name, so that we still generate a valid
+    // mangled name.
+    appendIdentifier("_");
   }
 
   if (decl->getDeclContext()->isLocalContext()) {

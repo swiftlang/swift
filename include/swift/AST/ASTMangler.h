@@ -38,6 +38,11 @@ protected:
   /// If enabled, Arche- and Alias types are mangled with context.
   bool DWARFMangling;
 
+  /// If enabled, entities that ought to have names but don't get a placeholder.
+  ///
+  /// If disabled, it is an error to try to mangle such an entity.
+  bool AllowNamelessEntities = false;
+
 public:
   enum class SymbolKind {
     Default,
