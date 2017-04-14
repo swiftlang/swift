@@ -15,7 +15,8 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "swift-basic"
-#include "swift/Basic/DiagnosticConsumer.h"
+#include "swift/AST/DiagnosticConsumer.h"
+#include "swift/AST/DiagnosticEngine.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
@@ -23,11 +24,14 @@ using namespace swift;
 
 DiagnosticConsumer::~DiagnosticConsumer() { }
 
-void NullDiagnosticConsumer::handleDiagnostic(SourceManager &SM,
-                                              SourceLoc Loc,
-                                              DiagnosticKind Kind,
-                                              StringRef Text,
-                                              const DiagnosticInfo &Info) {
-  DEBUG(llvm::dbgs() << "NullDiagnosticConsumer received diagnostic: "
-                     << Text << "\n");
+void NullDiagnosticConsumer::handleDiagnostic(
+    SourceManager &SM, SourceLoc Loc, DiagnosticKind Kind,
+    StringRef FormatString, ArrayRef<DiagnosticArgument> FormatArgs,
+    const DiagnosticInfo &Info) {
+  DEBUG({
+    llvm::dbgs() << "NullDiagnosticConsumer received diagnostic: ";
+    DiagnosticEngine::formatDiagnosticText(llvm::dbgs(), FormatString,
+                                           FormatArgs);
+    llvm::dbgs() << "\n";
+  });
 }

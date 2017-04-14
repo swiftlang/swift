@@ -33,12 +33,16 @@ public:
   }
   ~ErrorGatherer() override { diags.takeConsumers(); }
   void handleDiagnostic(SourceManager &SM, SourceLoc Loc,
-                        DiagnosticKind Kind, StringRef Text,
+                        DiagnosticKind Kind,
+                        StringRef FormatString,
+                        ArrayRef<DiagnosticArgument> FormatArgs,
                         const DiagnosticInfo &Info) override {
     if (Kind == swift::DiagnosticKind::Error) {
       error = true;
     }
-    llvm::errs() << Text << "\n";
+    DiagnosticEngine::formatDiagnosticText(llvm::errs(), FormatString,
+                                           FormatArgs);
+    llvm::errs() << "\n";
   }
   bool hadError() { return error; }
 };
