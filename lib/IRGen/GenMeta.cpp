@@ -17,6 +17,7 @@
 #include "swift/ABI/MetadataValues.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/CanTypeVisitor.h"
+#include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/SubstitutionMap.h"
@@ -917,9 +918,13 @@ namespace {
     }
       
     llvm::Value *emitExistentialTypeMetadata(CanType type) {
-      SmallVector<ProtocolDecl*, 2> protocols;
-      type.getExistentialTypeProtocols(protocols);
-      
+      if (auto metatype = tryGetLocal(type))
+        return metatype;
+
+      auto layout = type.getExistentialLayout();
+
+      auto protocols = layout.getProtocols();
+
       // Collect references to the protocol descriptors.
       auto descriptorArrayTy
         = llvm::ArrayType::get(IGF.IGM.ProtocolDescriptorPtrTy,
@@ -933,16 +938,30 @@ namespace {
                                IGF.IGM.ProtocolDescriptorPtrTy->getPointerTo());
       
       unsigned index = 0;
-      for (auto *p : protocols) {
-        llvm::Value *ref = emitProtocolDescriptorRef(IGF, p);
+      for (auto *protoTy : protocols) {
+        auto *protoDecl = protoTy->getDecl();
+        llvm::Value *ref = emitProtocolDescriptorRef(IGF, protoDecl);
         Address slot = IGF.Builder.CreateConstArrayGEP(descriptorArray,
                                                index, IGF.IGM.getPointerSize());
         IGF.Builder.CreateStore(ref, slot);
         ++index;
       }
-      
+
+      // Note: ProtocolClassConstraint::Class is 0, ::Any is 1.
+      auto classConstraint =
+        llvm::ConstantInt::get(IGF.IGM.Int1Ty,
+                               !layout.requiresClass);
+      llvm::Value *superclassConstraint =
+        llvm::ConstantPointerNull::get(IGF.IGM.TypeMetadataPtrTy);
+      if (layout.superclass) {
+        superclassConstraint = IGF.emitTypeMetadataRef(
+          CanType(layout.superclass));
+      }
+
       auto call = IGF.Builder.CreateCall(IGF.IGM.getGetExistentialMetadataFn(),
-                                         {IGF.IGM.getSize(Size(protocols.size())),
+                                         {classConstraint,
+                                          superclassConstraint,
+                                          IGF.IGM.getSize(Size(protocols.size())),
                                           descriptorArray.getAddress()});
       call->setDoesNotThrow();
       IGF.Builder.CreateLifetimeEnd(descriptorArray,

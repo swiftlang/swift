@@ -125,7 +125,7 @@ ProtocolConformanceRef::subst(Type origType,
   }
 
   // If that didn't find anything, we can still synthesize AnyObject
-  // conformances from thin air.  FIXME: gross.
+  // conformances from thin air.  FIXME: this is going away soon.
   if (proto->isSpecificProtocol(KnownProtocolKind::AnyObject)) {
     if (substType->isExistentialType())
       return *this;
@@ -889,6 +889,7 @@ void NominalTypeDecl::prepareConformanceTable() const {
 
   // Add any synthesized conformances.
   if (isa<ClassDecl>(this)) {
+    // FIXME: This is going away soon.
     if (auto anyObject = getASTContext().getProtocol(
                            KnownProtocolKind::AnyObject)) {
       ConformanceTable->addSynthesizedConformance(mutableThis, anyObject);

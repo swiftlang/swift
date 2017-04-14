@@ -18,6 +18,7 @@
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/AccessScope.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/GenericEnvironment.h"
@@ -1068,8 +1069,7 @@ public:
         abort();
       }
       
-      if (!E->getType()->isEqual(
-             Ctx.getProtocol(KnownProtocolKind::AnyObject)->getDeclaredType())){
+      if (!E->getType()->isEqual(Ctx.getAnyObjectType())) {
         Out << "ClassMetatypeToObject does not produce AnyObject:\n";
         E->print(Out);
         Out << "\n";
@@ -1099,8 +1099,7 @@ public:
         abort();
       }
       
-      if (!E->getType()->isEqual(
-             Ctx.getProtocol(KnownProtocolKind::AnyObject)->getDeclaredType())){
+      if (!E->getType()->isEqual(Ctx.getAnyObjectType())) {
         Out << "ExistentialMetatypeToObject does not produce AnyObject:\n";
         E->print(Out);
         Out << "\n";
@@ -2042,9 +2041,12 @@ public:
       SmallVector<Type, 4> protocolTypes;
       for (auto proto : protocols)
         protocolTypes.push_back(proto->getDeclaredType());
+      auto type = ProtocolCompositionType::get(Ctx, protocolTypes,
+                                               /*hasExplicitAnyObject=*/false);
+      auto layout = type->getExistentialLayout();
       SmallVector<ProtocolDecl *, 4> canonicalProtocols;
-      ProtocolCompositionType::get(Ctx, protocolTypes)
-        ->getExistentialTypeProtocols(canonicalProtocols);
+      for (auto *protoTy : layout.getProtocols())
+        canonicalProtocols.push_back(protoTy->getDecl());
       if (nominalProtocols != canonicalProtocols) {
         dumpRef(decl);
         Out << " doesn't have a complete set of protocols\n";

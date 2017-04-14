@@ -1940,7 +1940,8 @@ public:
       SmallVector<Type, 2> types;
       for (auto proto : protos)
         types.push_back(proto->getDeclaredInterfaceType());
-      return ProtocolCompositionType::get(M->getASTContext(), types);
+      return ProtocolCompositionType::get(M->getASTContext(), types,
+                                          /*hasExplicitAnyObject=*/false);
     };
 
     if (auto *genericFuncType = type->getAs<GenericFunctionType>()) {
@@ -4656,9 +4657,7 @@ void CodeCompletionCallbacksImpl::completeNominalMemberBeginning(
 }
 
 static bool isDynamicLookup(Type T) {
-  if (auto *PT = T->getRValueType()->getAs<ProtocolType>())
-    return PT->getDecl()->isSpecificProtocol(KnownProtocolKind::AnyObject);
-  return false;
+  return T->getRValueType()->isAnyObject();
 }
 
 static bool isClangSubModule(ModuleDecl *TheModule) {

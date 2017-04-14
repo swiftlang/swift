@@ -70,8 +70,7 @@ replaceSelfTypeForDynamicLookup(ASTContext &ctx,
   newResults.append(fnType->getResults().begin(), fnType->getResults().end());
   if (auto fnDecl = dyn_cast<FuncDecl>(methodName.getDecl())) {
     if (fnDecl->hasDynamicSelf()) {
-      auto anyObjectTy = ctx.getProtocol(KnownProtocolKind::AnyObject)
-                                  ->getDeclaredType();
+      auto anyObjectTy = ctx.getAnyObjectType();
       for (auto &result : newResults) {
         auto newResultTy
           = result.getType()->replaceCovariantResultType(anyObjectTy, 0);
@@ -2601,10 +2600,7 @@ private:
   }
   
   CanType getAnyObjectType() {
-    return SGF.getASTContext()
-      .getProtocol(KnownProtocolKind::AnyObject)
-      ->getDeclaredType()
-      ->getCanonicalType();
+    return SGF.getASTContext().getAnyObjectType();
   }
   bool isAnyObjectType(CanType t) {
     return t == getAnyObjectType();

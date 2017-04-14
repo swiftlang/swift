@@ -353,8 +353,6 @@ class CanType : public Type {
   static bool isAnyExistentialTypeImpl(CanType type);
   static void getExistentialTypeProtocolsImpl(CanType type,
                                     SmallVectorImpl<ProtocolDecl*> &protocols);
-  static void getAnyExistentialTypeProtocolsImpl(CanType type,
-                                    SmallVectorImpl<ProtocolDecl*> &protocols);
   static bool isObjCExistentialTypeImpl(CanType type);
   static CanType getAnyOptionalObjectTypeImpl(CanType type,
                                               OptionalTypeKind &kind);
@@ -413,11 +411,6 @@ public:
   void getExistentialTypeProtocols(
       SmallVectorImpl<ProtocolDecl *> &protocols);
 
-  /// Given that this type is any kind of existential, return its
-  /// protocols in a canonical order.
-  void getAnyExistentialTypeProtocols(
-      SmallVectorImpl<ProtocolDecl *> &protocols);
-
   /// Break an existential down into a set of constraints.
   ExistentialLayout getExistentialLayout();
 
@@ -433,11 +426,6 @@ public:
   CanType getNominalParent() const; // in Types.h
   NominalTypeDecl *getAnyNominal() const;
   GenericTypeDecl *getAnyGeneric() const;
-
-  /// Returns information about the layout constraint represented by
-  /// this type. If this type does not represent a layout constraint,
-  /// it returns an empty LayoutConstraint.
-  LayoutConstraint getLayoutConstraint() const;
 
   CanType getAnyOptionalObjectType() const {
     OptionalTypeKind kind;

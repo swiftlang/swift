@@ -112,6 +112,9 @@ struct ASTContext::Implementation {
   /// The declaration of Swift.DefaultPrecedence.
   PrecedenceGroupDecl *DefaultPrecedence = nullptr;
 
+  /// The AnyObject type.
+  CanType AnyObjectType;
+
 #define KNOWN_STDLIB_TYPE_DECL(NAME, DECL_CLASS, NUM_GENERIC_PARAMS) \
   /** The declaration of Swift.NAME. */ \
   DECL_CLASS *NAME##Decl = nullptr;
@@ -415,7 +418,8 @@ ASTContext::ASTContext(LangOptions &langOpts, SearchPathOptions &SearchPathOpts,
     TheUnresolvedType(new (*this, AllocationArena::Permanent)
                       UnresolvedType(*this)),
     TheEmptyTupleType(TupleType::get(ArrayRef<TupleTypeElt>(), *this)),
-    TheAnyType(ProtocolCompositionType::get(*this, ArrayRef<Type>())),
+    TheAnyType(ProtocolCompositionType::get(*this, ArrayRef<Type>(),
+                                            /*hasExplicitAnyObject=*/false)),
     TheNativeObjectType(new (*this, AllocationArena::Permanent)
                            BuiltinNativeObjectType(*this)),
     TheBridgeObjectType(new (*this, AllocationArena::Permanent)
@@ -668,6 +672,29 @@ ASTContext::getPointerPointeePropertyDecl(PointerTypeKind ptrKind) const {
                              *this);
   }
   llvm_unreachable("bad pointer kind");
+}
+
+CanType ASTContext::getAnyObjectType() const {
+  if (Impl.AnyObjectType) {
+    return Impl.AnyObjectType;
+  }
+
+  // Go find 'AnyObject' in the Swift module.
+  //
+  // FIXME: This is going away.
+  SmallVector<ValueDecl *, 1> results;
+  lookupInSwiftModule("AnyObject", results);
+  for (auto result : results) {
+    if (auto proto = dyn_cast<ProtocolDecl>(result)) {
+      Impl.AnyObjectType = proto->getDeclaredType()->getCanonicalType();
+      return Impl.AnyObjectType;
+    }
+  }
+
+  Impl.AnyObjectType = CanType(
+    ProtocolCompositionType::get(
+      *this, {}, /*hasExplicitAnyObject=*/true));
+  return Impl.AnyObjectType;
 }
 
 CanType ASTContext::getNeverType() const {
@@ -2834,15 +2861,16 @@ void ClassType::Profile(llvm::FoldingSetNodeID &ID, ClassDecl *D, Type Parent) {
 }
 
 ProtocolCompositionType *
-ProtocolCompositionType::build(const ASTContext &C, ArrayRef<Type> Protocols) {
+ProtocolCompositionType::build(const ASTContext &C, ArrayRef<Type> Members,
+                               bool HasExplicitAnyObject) {
   // Check to see if we've already seen this protocol composition before.
   void *InsertPos = nullptr;
   llvm::FoldingSetNodeID ID;
-  ProtocolCompositionType::Profile(ID, Protocols);
+  ProtocolCompositionType::Profile(ID, Members, HasExplicitAnyObject);
 
   bool isCanonical = true;
   RecursiveTypeProperties properties;
-  for (Type t : Protocols) {
+  for (Type t : Members) {
     if (!t->isCanonical())
       isCanonical = false;
     properties |= t->getRecursiveProperties();
@@ -2859,7 +2887,8 @@ ProtocolCompositionType::build(const ASTContext &C, ArrayRef<Type> Protocols) {
   auto compTy
     = new (C, arena)
         ProtocolCompositionType(isCanonical ? &C : nullptr,
-                                C.AllocateCopy(Protocols),
+                                C.AllocateCopy(Members),
+                                HasExplicitAnyObject,
                                 properties);
   C.Impl.getArena(arena).ProtocolCompositionTypes
     .InsertNode(compTy, InsertPos);
@@ -3510,17 +3539,21 @@ CanArchetypeType ArchetypeType::getOpened(Type existential,
   for (auto proto : layout.getProtocols())
     protos.push_back(proto->getDecl());
 
+  auto layoutConstraint = layout.getLayoutConstraint();
+
   auto arena = AllocationArena::Permanent;
   void *mem = ctx.Allocate(
       totalSizeToAlloc<ProtocolDecl *, Type, LayoutConstraint, UUID>(
-      protos.size(), layout.superclass ? 1 : 0, 0, 1),
+      protos.size(),
+      layout.superclass ? 1 : 0,
+      layoutConstraint ? 1 : 0, 1),
       alignof(ArchetypeType), arena);
 
   // FIXME: Pass in class layout constraint
   auto result =
       ::new (mem) ArchetypeType(ctx, existential,
                                 protos, layout.superclass,
-                                existential->getLayoutConstraint(), *knownID);
+                                layoutConstraint, *knownID);
   openedExistentialArchetypes[*knownID] = result;
 
   return CanArchetypeType(result);

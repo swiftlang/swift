@@ -4110,15 +4110,18 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
   }
 
   case decls_block::PROTOCOL_COMPOSITION_TYPE: {
+    bool hasExplicitAnyObject;
     ArrayRef<uint64_t> rawProtocolIDs;
 
     decls_block::ProtocolCompositionTypeLayout::readRecord(scratch,
+                                                           hasExplicitAnyObject,
                                                            rawProtocolIDs);
     SmallVector<Type, 4> protocols;
     for (TypeID protoID : rawProtocolIDs)
       protocols.push_back(getType(protoID));
 
-    typeOrOffset = ProtocolCompositionType::get(ctx, protocols);
+    typeOrOffset = ProtocolCompositionType::get(ctx, protocols,
+                                                hasExplicitAnyObject);
     break;
   }
 
