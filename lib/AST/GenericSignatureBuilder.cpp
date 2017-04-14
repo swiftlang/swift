@@ -4572,14 +4572,6 @@ void GenericSignatureBuilder::enumerateRequirements(llvm::function_ref<
 
     // If we have a layout constraint, produce a layout requirement.
     if (equivClass->layout) {
-      // Find the best source among the constraints that describe the layout
-      // of this type.
-      auto bestSource = equivClass->layoutConstraints.front().source;
-      for (const auto &constraint : equivClass->layoutConstraints) {
-        if (constraint.source->compare(bestSource) < 0)
-          bestSource = constraint.source;
-      }
-
       f(RequirementKind::Layout, archetype, equivClass->layout,
         getBestConstraintSource<LayoutConstraint>(
                                               equivClass->layoutConstraints));
@@ -4593,14 +4585,6 @@ void GenericSignatureBuilder::enumerateRequirements(llvm::function_ref<
         protocols.push_back(conforms.first);
         assert(protocolSources.count(conforms.first) == 0 && 
                "redundant protocol requirement?");
-
-        // Find the best source among the constraints that describe conformance
-        // to this protocol.
-        auto bestSource = conforms.second.front().source;
-        for (const auto &constraint : conforms.second) {
-          if (constraint.source->compare(bestSource) < 0)
-            bestSource = constraint.source;
-        }
 
         protocolSources.insert(
           {conforms.first,
