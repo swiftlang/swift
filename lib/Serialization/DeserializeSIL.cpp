@@ -308,7 +308,7 @@ static SILFunction *createBogusSILFunction(SILModule &M,
   return M.createFunction(
       SILLinkage::Private, name, type.castTo<SILFunctionType>(), nullptr,
       RegularLocation(loc), IsNotBare, IsNotTransparent, IsNotSerialized,
-      IsNotThunk, SILFunction::NotRelevant);
+      IsNotThunk, SubclassScope::NotApplicable);
 }
 
 /// Helper function to find a SILFunction, given its name and type.
@@ -461,7 +461,7 @@ SILFunction *SILDeserializer::readSILFunction(DeclID FID,
         linkage.getValue(), name, ty.castTo<SILFunctionType>(), nullptr, loc,
         IsNotBare, IsTransparent_t(isTransparent == 1),
         IsSerialized_t(isSerialized), IsThunk_t(isThunk),
-        SILFunction::NotRelevant, (Inline_t)inlineStrategy);
+        SubclassScope::NotApplicable, (Inline_t)inlineStrategy);
     fn->setGlobalInit(isGlobal == 1);
     fn->setEffectsKind((EffectsKind)effect);
     if (clangNodeOwner)
