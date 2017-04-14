@@ -77,47 +77,45 @@ public func == <T : Strideable>(x: T, y: T) -> Bool {
   # types, and was deprecated, as it was a way to write mixed-type arithmetic
   # expressions, that are otherwise are not allowed.
 }%
-% for Requirement, VersionInfo in [
-%   ('Self : _Pointer', None),
-%   #('Self : SignedInteger', 'deprecated: 3.1, obsoleted: 4.0'),
-%   #('Stride : ExpressibleByIntegerLiteral', 'obsoleted: 4.0'),
+% for Base, VersionInfo in [
+%   ('Strideable where Self : _Pointer', None),
+%   ('Strideable where Stride : SignedNumeric', 'deprecated: 3, obsoleted: 4'),
 %   ]:
-%   unavailable = 'Self : SignedInteger' == Requirement
-%   Availability = (lambda what: '@available(swift, %s, message: "Mixed-type %s is deprecated. Please use explicit type conversion.")' % (VersionInfo, what)) if unavailable else (lambda _: '')
+%   Availability = '@available(swift, %s, message: "Please use explicit type conversions or Strideable methods for mixed-type arithmetics.")' % (VersionInfo) if VersionInfo else ''
 
-extension Strideable where ${Requirement} {
+extension ${Base} {
   @_transparent
-  ${Availability('addition')}
+  ${Availability}
   public static func + (lhs: Self, rhs: Self.Stride) -> Self {
     return lhs.advanced(by: rhs)
   }
 
   @_transparent
-  ${Availability('addition')}
+  ${Availability}
   public static func + (lhs: Self.Stride, rhs: Self) -> Self {
     return rhs.advanced(by: lhs)
   }
 
   @_transparent
-  ${Availability('subtraction')}
+  ${Availability}
   public static func - (lhs: Self, rhs: Self.Stride) -> Self {
     return lhs.advanced(by: -rhs)
   }
 
   @_transparent
-  ${Availability('subtraction')}
+  ${Availability}
   public static func - (lhs: Self, rhs: Self) -> Self.Stride {
     return rhs.distance(to: lhs)
   }
 
   @_transparent
-  ${Availability('addition')}
+  ${Availability}
   public static func += (lhs: inout Self, rhs: Self.Stride) {
     lhs = lhs.advanced(by: rhs)
   }
 
   @_transparent
-  ${Availability('subtraction')}
+  ${Availability}
   public static func -= (lhs: inout Self, rhs: Self.Stride) {
     lhs = lhs.advanced(by: -rhs)
   }
