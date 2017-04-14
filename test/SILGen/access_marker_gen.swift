@@ -91,3 +91,23 @@ public struct HasTwoStoredProperties {
     f = g
   }
 }
+
+class C {
+  final var x: Int = 0
+}
+
+func testClassInstanceProperties(c: C) {
+  let y = c.x
+  c.x = y
+}
+// CHECK-LABEL: sil hidden @_T017access_marker_gen27testClassInstancePropertiesyAA1CC1c_tF :
+// CHECK:       [[C:%.*]] = begin_borrow %0 : $C
+// CHECK-NEXT:  [[CX:%.*]] = ref_element_addr [[C]] : $C, #C.x
+// CHECK-NEXT:  [[ACCESS:%.*]] = begin_access [read] [dynamic] [[CX]] : $*Int
+// CHECK-NEXT:  [[Y:%.*]] = load [trivial] [[ACCESS]]
+// CHECK-NEXT:  end_access [[ACCESS]]
+// CHECK:       [[C:%.*]] = begin_borrow %0 : $C
+// CHECK-NEXT:  [[CX:%.*]] = ref_element_addr [[C]] : $C, #C.x
+// CHECK-NEXT:  [[ACCESS:%.*]] = begin_access [modify] [dynamic] [[CX]] : $*Int
+// CHECK-NEXT:  assign [[Y]] to [[ACCESS]]
+// CHECK-NEXT:  end_access [[ACCESS]]

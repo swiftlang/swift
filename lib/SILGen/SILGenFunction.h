@@ -353,6 +353,10 @@ public:
   /// \brief The current context where formal evaluation cleanups are managed.
   FormalEvaluationContext FormalEvalContext;
 
+  /// \brief Values to end dynamic access enforcement on.  A hack for
+  /// materializeForSet.
+  SmallVectorImpl<SILValue> *ValuesToEndAccessForMaterializeForSet = nullptr;
+
   /// VarLoc - representation of an emitted local variable or constant.  There
   /// are three scenarios here:
   ///
