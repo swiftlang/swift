@@ -1673,7 +1673,7 @@ void Lexer::tryLexEditorPlaceholder() {
 
 StringRef Lexer::getEncodedStringSegment(StringRef Bytes,
                                          SmallVectorImpl<char> &TempString,
-                                         unsigned Modifiers, std::string ToReplace) {
+                                         unsigned Modifiers, const std::string &ToReplace) {
 
   // The next section of code is somewhat overcooked.
   // Strips any indent that corresponds to the indent

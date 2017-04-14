@@ -379,7 +379,7 @@ public:
     std::string ToReplace;
 
     static StringSegment getLiteral(SourceLoc Loc, unsigned Length,
-                                    unsigned Modifiers = 0, std::string ToReplace = "") {
+                                    unsigned Modifiers, const std::string &ToReplace) {
       StringSegment Result;
       Result.Kind = Literal;
       Result.Loc = Loc;
@@ -403,7 +403,7 @@ public:
   /// Buffer.
   static StringRef getEncodedStringSegment(StringRef Str,
                                            SmallVectorImpl<char> &Buffer,
-                                           unsigned Modifiers = 0, std::string ToReplace = "");
+                                           unsigned Modifiers = 0, const std::string &ToReplace = "");
   StringRef getEncodedStringSegment(StringSegment Segment,
                                     SmallVectorImpl<char> &Buffer) const {
     return getEncodedStringSegment(
@@ -511,6 +511,8 @@ private:
   /// Try to lex conflict markers by checking for the presence of the start and
   /// end of the marker in diff3 or Perforce style respectively.
   bool tryLexConflictMarker();
+
+  // new for multiline string literals
   void validateIndents(const Token &Str);
 };
   

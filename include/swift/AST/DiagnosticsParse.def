@@ -130,6 +130,8 @@ ERROR(lex_unicode_escape_braces,none,
       "expected hexadecimal code in braces after unicode escape", ())
 WARNING(lex_ambiguous_string_indent,none,
         "invalid mix of multi-line string literal indentation", ())
+WARNING(lex_trailing_multiline_whitespace,none,
+        "includes trailing space characters in multi-line string literal", ())
 
 
 ERROR(lex_invalid_character,none,
