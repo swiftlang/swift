@@ -24,6 +24,7 @@
 #include "swift/Runtime/Config.h"
 
 #if SWIFT_OBJC_INTEROP
+#include "swift/Runtime/Casting.h"
 #include "swift/Runtime/Debug.h"
 #include "swift/Runtime/ObjCBridge.h"
 #include "swift/Basic/Lazy.h"
