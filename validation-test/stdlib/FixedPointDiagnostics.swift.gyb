@@ -1,5 +1,5 @@
 // RUN: rm -rf %t && mkdir -p %t && %gyb %s -o %t/main.swift
-// RUN: %line-directive %t/main.swift -- %target-swift-frontend -typecheck -verify %t/main.swift
+// RUN: %line-directive %t/main.swift -- %target-swift-frontend -typecheck -verify -swift-version 3 %t/main.swift
 
 func testUnaryMinusInUnsigned() {
   var a: UInt8 = -(1) // expected-error {{}} expected-note * {{}} expected-warning * {{}}
@@ -88,15 +88,15 @@ func testMixedSignArithmetic() {
     typealias Stride = ${T}.Stride
     _ = ${T}(1) + 0     // OK
     _ = 0 + ${T}(1)     // OK
-    ${T}(1) + Stride(0) // expected-error {{}} expected-note {{}} // mixed-type arithmetics
-    Stride(1) + ${T}(0) // expected-error {{}} expected-note {{}} // mixed-type arithmetics
-    ${T}(1) - Stride(0) // expected-error {{}} expected-note {{}} // mixed-type arithmetics
+    _ = ${T}(1) + Stride(0) // expected-warning {{}} // mixed-type arithmetics
+    _ = Stride(1) + ${T}(0) // expected-warning {{}} // mixed-type arithmetics
+    _ = ${T}(1) - Stride(0) // expected-warning {{}} // mixed-type arithmetics
     var x: ${T} = 0
     x += 1              // OK
-    x += Stride(1)      // expected-error {{}} expected-note {{}} // mixed-type arithmetics
-    x -= Stride(1)      // expected-error {{}} expected-note {{}} // mixed-type arithmetics
+    x += Stride(1)      // expected-warning {{}} // mixed-type arithmetics
+    x -= Stride(1)      // expected-warning {{}} // mixed-type arithmetics
 
-    (x - x) as Stride   // expected-error {{}} // ambiguous use of operator '-'
+    _ = (x - x) as Stride   // expected-warning {{}} // ambiguous use of operator '-'
 
     //===------------------------------------------------------------------===//
     // The following errors are different because they're not being
