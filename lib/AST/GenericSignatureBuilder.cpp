@@ -3173,28 +3173,41 @@ ConstraintResult GenericSignatureBuilder::addRequirement(
 
   switch (req.getKind()) {
   case RequirementKind::Superclass:
-  case RequirementKind::Conformance:
-    return addTypeRequirement(subst(req.getFirstType()),
-                              subst(req.getSecondType()),
-                              source,
+  case RequirementKind::Conformance: {
+    auto firstType = subst(req.getFirstType());
+    auto secondType = subst(req.getSecondType());
+    if (!firstType || !secondType)
+      return ConstraintResult::Conflicting;
+
+    return addTypeRequirement(firstType, secondType, source,
                               UnresolvedHandlingKind::GenerateConstraints,
                               &Visited);
+  }
 
-  case RequirementKind::Layout:
-    return addLayoutRequirement(subst(req.getFirstType()),
-                                req.getLayoutConstraint(),
-                                source,
+  case RequirementKind::Layout: {
+    auto firstType = subst(req.getFirstType());
+    if (!firstType)
+      return ConstraintResult::Conflicting;
+
+    return addLayoutRequirement(firstType, req.getLayoutConstraint(), source,
                                 UnresolvedHandlingKind::GenerateConstraints);
+  }
 
-  case RequirementKind::SameType:
+  case RequirementKind::SameType: {
+    auto firstType = subst(req.getFirstType());
+    auto secondType = subst(req.getSecondType());
+    if (!firstType || !secondType)
+      return ConstraintResult::Conflicting;
+
     return addSameTypeRequirement(
-        subst(req.getFirstType()), subst(req.getSecondType()), source,
+        firstType, secondType, source,
         UnresolvedHandlingKind::GenerateConstraints,
         [&](Type type1, Type type2) {
           if (source.getLoc().isValid())
             Diags.diagnose(source.getLoc(), diag::requires_same_concrete_type,
                            type1, type2);
         });
+  }
   }
 
   llvm_unreachable("Unhandled requirement?");
