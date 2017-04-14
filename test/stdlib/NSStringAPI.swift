@@ -1820,20 +1820,6 @@ NSStringAPIs.test("MixedTypeComparisons") {
   expectFalse(ys != ys)
 }
 
-NSStringAPIs.test("CompareStringsWithUnpairedSurrogates")
-  .xfail(
-    .custom({ true },
-    reason: "<rdar://problem/18029104> Strings referring to underlying " +
-      "storage with unpaired surrogates compare unequal"))
-  .code {
-  let donor = "abcdef"
-  let acceptor = "\u{1f601}\u{1f602}\u{1f603}"
-
-  // Michael NOTE: String(Substring())
-  expectEqual("\u{fffd}\u{1f602}\u{fffd}",
-    String(acceptor[donor.index(donor.startIndex, offsetBy: 1)..<donor.index(donor.startIndex, offsetBy: 5)]))
-}
-
 NSStringAPIs.test("copy construction") {
   let expected = "abcd"
   let x = NSString(string: expected as NSString)

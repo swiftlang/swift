@@ -337,14 +337,12 @@ StringTests.test("CompareStringsWithUnpairedSurrogates")
   let donor = "abcdef"
   let acceptor = "\u{1f601}\u{1f602}\u{1f603}"
 
+  // Michael NOTE: String(Substring())
   expectEqual("\u{fffd}\u{1f602}\u{fffd}",
     String(
       acceptor[
-        donor.index(donor.startIndex, offsetBy: 1) ..<
-        donor.index(donor.startIndex, offsetBy: 5)
-      ]
-    )
-  )
+        donor.index(donor.startIndex, offsetBy: 1)
+        ..< donor.index(donor.startIndex, offsetBy: 5)]))
 }
 
 StringTests.test("MisalignedSliceBoundaries")
