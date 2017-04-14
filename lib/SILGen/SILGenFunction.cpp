@@ -482,9 +482,7 @@ void SILGenFunction::emitArtificialTopLevel(ClassDecl *mainClass) {
     auto mainClassAnyObjectConformance = ProtocolConformanceRef(
       *SGM.M.getSwiftModule()->lookupConformance(mainClassTy, anyObjectProtocol,
                                                 nullptr));
-    CanType anyObjectTy = anyObjectProtocol
-      ->getDeclaredInterfaceType()
-      ->getCanonicalType();
+    CanType anyObjectTy = ctx.getAnyObjectType();
     CanType anyObjectMetaTy = CanExistentialMetatypeType::get(anyObjectTy,
                                                   MetatypeRepresentation::ObjC);
 

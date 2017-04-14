@@ -1498,8 +1498,7 @@ namespace {
       auto bridgeAnythingRef = ConcreteDeclRef(tc.Context, bridgeAnything,
                                                valueSub);
       auto valueParenTy = ParenType::get(tc.Context, cs.getType(value));
-      auto bridgeTy = tc.Context.getProtocol(KnownProtocolKind::AnyObject)
-        ->getDeclaredType();
+      auto bridgeTy = tc.Context.getAnyObjectType();
       auto bridgeFnTy = FunctionType::get(valueParenTy, bridgeTy);
       // FIXME: Wrap in ParenExpr to prevent bogus "tuple passed as argument"
       // errors.

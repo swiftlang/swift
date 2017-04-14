@@ -1581,11 +1581,16 @@ NodePointer Demangler::demangleSpecialType() {
     case 'p':
       return createType(createWithChild(Node::Kind::ExistentialMetatype,
                                         popNode(Node::Kind::Type)));
-    case 'E': {
+    case 'c': {
       NodePointer Superclass = popNode(Node::Kind::Type);
-      NodePointer Protocols = demangleProtocolListType();
+      NodePointer Protocols = demangleProtocolList();
       return createType(createWithChildren(Node::Kind::ProtocolListWithClass,
                                            Protocols, Superclass));
+    }
+    case 'l': {
+      NodePointer Protocols = demangleProtocolList();
+      return createType(createWithChild(Node::Kind::ProtocolListWithAnyObject,
+                                        Protocols));
     }
     case 'X':
     case 'x': {
@@ -1738,7 +1743,7 @@ NodePointer Demangler::demangleEntity(Node::Kind Kind) {
   return createWithChildren(Kind, Context, Name, Type);
 }
 
-NodePointer Demangler::demangleProtocolListType() {
+NodePointer Demangler::demangleProtocolList() {
   NodePointer TypeList = createNode(Node::Kind::TypeList);
   NodePointer ProtoList = createWithChild(Node::Kind::ProtocolList, TypeList);
   if (!popNode(Node::Kind::EmptyList)) {
@@ -1753,6 +1758,11 @@ NodePointer Demangler::demangleProtocolListType() {
 
     TypeList->reverseChildren();
   }
+  return ProtoList;
+}
+
+NodePointer Demangler::demangleProtocolListType() {
+  NodePointer ProtoList = demangleProtocolList();
   return createType(ProtoList);
 }
 

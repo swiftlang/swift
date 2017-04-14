@@ -3075,7 +3075,9 @@ namespace {
     void visitProtocolCompositionType(ProtocolCompositionType *T,
                                       StringRef label) {
       printCommon(T, label, "protocol_composition_type");
-      for (auto proto : T->getProtocols()) {
+      if (T->hasExplicitAnyObject())
+        OS << " any_object";
+      for (auto proto : T->getMembers()) {
         printRec(proto);
       }
       OS << ")";

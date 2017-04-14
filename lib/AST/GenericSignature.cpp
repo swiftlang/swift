@@ -498,6 +498,11 @@ bool GenericSignature::requiresClass(Type type, ModuleDecl &mod) {
   // requirement.
   if (pa->isConcreteType()) return false;
 
+  // If there is a layout constraint, it might be a class.
+  if (auto layout = pa->getLayout())
+    if (layout->isClass())
+      return true;
+
   // If there is a superclass bound, then obviously it must be a class.
   if (pa->getSuperclass()) return true;
 

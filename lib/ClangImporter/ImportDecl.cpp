@@ -2172,11 +2172,6 @@ namespace {
             // If the pointee is 'void', 'CFTypeRef', bring it
             // in specifically as AnyObject.
             if (pointee.isVoid()) {
-              auto proto = Impl.SwiftContext.getProtocol(
-                                               KnownProtocolKind::AnyObject);
-              if (!proto)
-                return nullptr;
-
               // Create a typealias for this CF typedef.
               TypeAliasDecl *typealias = nullptr;
               typealias = Impl.createDeclWithClangNode<TypeAliasDecl>(
@@ -2186,7 +2181,7 @@ namespace {
                             Impl.importSourceLoc(Decl->getLocation()),
                             /*genericparams*/nullptr, DC);
               typealias->setUnderlyingType(
-                  proto->getDeclaredInterfaceType());
+                Impl.SwiftContext.getAnyObjectType());
 
               Impl.SpecialTypedefNames[Decl->getCanonicalDecl()] =
                 MappedTypeNameKind::DefineAndUse;
@@ -6292,13 +6287,8 @@ Optional<GenericParamList *> SwiftDeclConverter::importObjCGenericParams(
       }
     }
     if (inherited.empty()) {
-      auto anyObjectProto =
-          Impl.SwiftContext.getProtocol(KnownProtocolKind::AnyObject);
-      if (!anyObjectProto) {
-        return None;
-      }
       inherited.push_back(
-          TypeLoc::withoutLoc(anyObjectProto->getDeclaredType()));
+        TypeLoc::withoutLoc(Impl.SwiftContext.getAnyObjectType()));
     }
     genericParamDecl->setInherited(Impl.SwiftContext.AllocateCopy(inherited));
 

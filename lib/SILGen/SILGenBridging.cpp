@@ -484,9 +484,7 @@ static ManagedValue emitNativeToCBridgedNonoptionalValue(SILGenFunction &SGF,
 
   // Fall back to dynamic Any-to-id bridging.
   // The destination type should be AnyObject in this case.
-  assert(loweredBridgedTy->isEqual(
-           SGF.getASTContext().getProtocol(KnownProtocolKind::AnyObject)
-             ->getDeclaredType()));
+  assert(loweredBridgedTy->isEqual(SGF.getASTContext().getAnyObjectType()));
 
   // If the input argument is known to be an existential, save the runtime
   // some work by opening it.
@@ -757,10 +755,8 @@ static ManagedValue emitCBridgedToNativeValue(SILGenFunction &SGF,
 
   // id-to-Any bridging.
   if (loweredNativeTy->isAny()) {
-    assert(loweredBridgedTy->isEqual(
-      SGF.getASTContext().getProtocol(KnownProtocolKind::AnyObject)
-        ->getDeclaredType())
-      && "Any should bridge to AnyObject");
+    assert(loweredBridgedTy->isEqual(SGF.getASTContext().getAnyObjectType())
+           && "Any should bridge to AnyObject");
 
     // TODO: Ever need to handle +0 values here?
     assert(v.hasCleanup());

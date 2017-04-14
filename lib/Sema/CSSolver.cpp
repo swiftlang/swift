@@ -692,7 +692,6 @@ static bool shouldBindToValueType(Constraint *constraint)
   case ConstraintKind::BindParam:
   case ConstraintKind::BindToPointerType:
   case ConstraintKind::ConformsTo:
-  case ConstraintKind::Layout:
   case ConstraintKind::LiteralConformsTo:
   case ConstraintKind::CheckedCast:
   case ConstraintKind::SelfObjectOfProtocol:
@@ -852,9 +851,11 @@ static PotentialBindings getPotentialBindings(ConstraintSystem &cs,
       if (tc.Context.LangOpts.EffectiveLanguageVersion[0] >= 4)
         continue;
 
+      if (!constraint->getSecondType()->is<ProtocolType>())
+        continue;
+
       LLVM_FALLTHROUGH;
         
-    case ConstraintKind::Layout:
     case ConstraintKind::LiteralConformsTo: {
       // If there is a 'nil' literal constraint, we might need optional
       // supertype bindings.
