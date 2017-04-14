@@ -96,19 +96,6 @@ class SILFunction
 public:
   typedef llvm::iplist<SILBasicBlock> BlockListType;
 
-  /// The visibility of this method's class (if any).
-  enum ClassVisibility_t {
-    
-    /// This is a method in the vtable of a public class.
-    PublicClass,
-    
-    /// This is a method in the vtable of an internal class.
-    InternalClass,
-    
-    /// All other cases (e.g. this function is not a method).
-    NotRelevant
-  };
-    
 private:
   friend class SILBasicBlock;
   friend class SILModule;
@@ -155,10 +142,10 @@ private:
   /// functions into the thunk.
   unsigned Thunk : 2;
 
-  /// The visibility of the parent class, if this is a method which is contained
-  /// in the vtable of that class.
-  unsigned ClassVisibility : 2;
-    
+  /// The scope in which the parent class can be subclassed, if this is a method
+  /// which is contained in the vtable of that class.
+  unsigned ClassSubclassScope : 2;
+
   /// The function's global_init attribute.
   unsigned GlobalInitFlag : 1;
 
@@ -216,7 +203,7 @@ private:
               CanSILFunctionType loweredType, GenericEnvironment *genericEnv,
               Optional<SILLocation> loc, IsBare_t isBareSILFunction,
               IsTransparent_t isTrans, IsSerialized_t isSerialized,
-              IsThunk_t isThunk, ClassVisibility_t classVisibility,
+              IsThunk_t isThunk, SubclassScope classSubclassScope,
               Inline_t inlineStrategy, EffectsKind E,
               SILFunction *insertBefore,
               const SILDebugScope *debugScope);
@@ -227,7 +214,7 @@ private:
          Optional<SILLocation> loc, IsBare_t isBareSILFunction,
          IsTransparent_t isTrans, IsSerialized_t isSerialized,
          IsThunk_t isThunk = IsNotThunk,
-         ClassVisibility_t classVisibility = NotRelevant,
+         SubclassScope classSubclassScope = SubclassScope::NotApplicable,
          Inline_t inlineStrategy = InlineDefault,
          EffectsKind EffectsKindAttr = EffectsKind::Unspecified,
          SILFunction *InsertBefore = nullptr,
@@ -406,22 +393,8 @@ public:
   /// method itself, the function can be referenced from vtables of derived
   /// classes in other compilation units.
   SILLinkage getEffectiveSymbolLinkage() const {
-    SILLinkage L = getLinkage();
-    switch (getClassVisibility()) {
-      case NotRelevant:
-        break;
-      case InternalClass:
-        if (L == SILLinkage::Private)
-          return SILLinkage::Hidden;
-        break;
-      case PublicClass:
-        if (L == SILLinkage::Private || L == SILLinkage::Hidden)
-          return SILLinkage::Public;
-        if (L == SILLinkage::PrivateExternal || L == SILLinkage::HiddenExternal)
-          return SILLinkage::PublicExternal;
-        break;
-    }
-    return L;
+    return effectiveLinkageForClassMember(getLinkage(),
+                                          getClassSubclassScope());
   }
     
   /// Helper method which returns true if this function has "external" linkage.
@@ -532,8 +505,8 @@ public:
   void setThunk(IsThunk_t isThunk) { Thunk = isThunk; }
 
   /// Get the class visibility (relevant for class methods).
-  ClassVisibility_t getClassVisibility() const {
-    return ClassVisibility_t(ClassVisibility);
+  SubclassScope getClassSubclassScope() const {
+    return SubclassScope(ClassSubclassScope);
   }
     
   /// Get this function's noinline attribute.

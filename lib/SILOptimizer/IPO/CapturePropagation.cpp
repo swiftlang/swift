@@ -261,7 +261,7 @@ SILFunction *CapturePropagation::specializeConstClosure(PartialApplyInst *PAI,
       SILLinkage::Shared, Name, NewFTy,
       GenericEnv, OrigF->getLocation(), OrigF->isBare(),
       OrigF->isTransparent(), Serialized, OrigF->isThunk(),
-      OrigF->getClassVisibility(), OrigF->getInlineStrategy(),
+      OrigF->getClassSubclassScope(), OrigF->getInlineStrategy(),
       OrigF->getEffectsKind(),
       /*InsertBefore*/ OrigF, OrigF->getDebugScope());
   if (OrigF->hasUnqualifiedOwnership()) {

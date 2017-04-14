@@ -46,6 +46,8 @@ class TBDGenVisitor : public ASTVisitor<TBDGenVisitor> {
     assert(isNewValue && "already inserted");
   }
 
+  void addSymbol(SILDeclRef declRef, bool checkSILOnly = true);
+
   void addSymbol(LinkEntity entity) {
     auto linkage =
         LinkInfo::get(UniversalLinkInfo, SwiftModule, entity, ForDefinition);
@@ -131,24 +133,48 @@ void TBDGenVisitor::visitPatternBindingDecl(PatternBindingDecl *PBD) {
     if (entry.getInit() && !isGlobalOrStaticVar(var)) {
       auto declRef =
           SILDeclRef(var, SILDeclRef::Kind::StoredPropertyInitializer);
-      addSymbol(declRef.mangle());
+      // Stored property initializers for public properties are currently
+      // public, even when the initializer is marked as SIL only (transparent).
+      addSymbol(declRef, /*checkSILOnly=*/false);
     }
   }
 }
 
-void TBDGenVisitor::visitValueDecl(ValueDecl *VD) {
-  if (isPrivateDecl(VD))
+void TBDGenVisitor::addSymbol(SILDeclRef declRef, bool checkSILOnly) {
+  bool isPrivate = !hasPublicVisibility(declRef.getLinkage(ForDefinition));
+  // Even private methods of open classes (specifically, private methods that
+  // are in the vtable) have public symbols, because external subclasses
+  // currently need to refer to them by symbol for their own vtable.
+  switch (declRef.getSubclassScope()) {
+  case SubclassScope::External:
+    // Allocating constructors retain their normal linkage behaviour.
+    if (declRef.kind == SILDeclRef::Kind::Allocator)
+      break;
+
+    // Unlike the "truly" public things, private things have public symbols
+    // unconditionally, even if they're theoretically SIL only.
+    if (isPrivate) {
+      isPrivate = false;
+      checkSILOnly = false;
+    }
+    break;
+  case SubclassScope::Internal:
+  case SubclassScope::NotApplicable:
+    break;
+  }
+  if (isPrivate)
     return;
 
-  auto declRef = SILDeclRef(VD);
-
-  // Transparent symbols don't exist, even in public.
-  // FIXME: this should really be "is SIL only".
-  if (declRef.isTransparent())
+  // (Most) transparent things don't exist, even if they're public.
+  // FIXME: isTransparent should really be "is SIL only".
+  if (checkSILOnly && declRef.isTransparent())
     return;
 
   addSymbol(declRef.mangle());
+}
 
+void TBDGenVisitor::visitValueDecl(ValueDecl *VD) {
+  addSymbol(SILDeclRef(VD));
   visitMembers(VD);
 }
 
@@ -162,8 +188,7 @@ void TBDGenVisitor::visitVarDecl(VarDecl *VD) {
     Mangle::ASTMangler mangler;
     addSymbol(mangler.mangleEntity(VD, false));
 
-    auto accessor = SILDeclRef(VD, SILDeclRef::Kind::GlobalAccessor);
-    addSymbol(accessor.mangle());
+    addSymbol(SILDeclRef(VD, SILDeclRef::Kind::GlobalAccessor));
   }
 
   visitMembers(VD);
@@ -226,11 +251,9 @@ void TBDGenVisitor::visitClassDecl(ClassDecl *CD) {
 
     // The non-allocating forms of the constructors and destructors.
     if (auto ctor = dyn_cast<ConstructorDecl>(value)) {
-      auto initializer = SILDeclRef(ctor, SILDeclRef::Kind::Initializer);
-      addSymbol(initializer.mangle());
+      addSymbol(SILDeclRef(ctor, SILDeclRef::Kind::Initializer));
     } else if (auto dtor = dyn_cast<DestructorDecl>(value)) {
-      auto destroyer = SILDeclRef(dtor, SILDeclRef::Kind::Destroyer);
-      addSymbol(destroyer.mangle());
+      addSymbol(SILDeclRef(dtor, SILDeclRef::Kind::Destroyer));
     }
   }
 
