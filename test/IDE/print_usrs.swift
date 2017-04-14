@@ -64,7 +64,7 @@ class GenericClass {
   // CHECK: [[@LINE+1]]:3 s:14swift_ide_test12GenericClassCfd{{$}}
   deinit {
     // CHECK: [[@LINE+2]]:18 s:14swift_ide_test12GenericClassC9classFuncyACFZ{{$}}
-    // CHECK: [[@LINE+1]]:28 ERROR:no-usr{{$}}
+    // CHECK: [[@LINE+1]]:28 s:14swift_ide_test12GenericClassCfd4selfL_ACv{{$}}
     GenericClass.classFunc(self)
   }
 
