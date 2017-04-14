@@ -347,6 +347,17 @@ StringTests.test("CompareStringsWithUnpairedSurrogates")
   )
 }
 
+StringTests.test("MisalignedSliceBoundaries")
+.xfail(
+  .custom({ true },
+    reason: "we don't adjust slice boundaries to the right granularity yet"))
+.code {
+  let threeEmoji = "\u{1f601}\u{1f602}\u{1f603}"
+  let donor = threeEmoji.content.utf16.dropFirst().dropLast()
+  let expected: [Character] = ["\u{fffd}", "\u{1f602}", "\u{fffd}"]
+  expectEqualSequence(expected, threeEmoji[donor.startIndex..<donor.endIndex])
+}
+
 var CStringTests = TestSuite("CStringTests")
 
 func getNullUTF8() -> UnsafeMutablePointer<UInt8>? {
