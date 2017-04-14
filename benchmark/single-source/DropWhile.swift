@@ -1,4 +1,4 @@
-//===--- Suffix.swift -----------------------------------------------------===//
+//===--- DropWhile.swift --------------------------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -12,181 +12,182 @@
 
 ////////////////////////////////////////////////////////////////////////////////
 // WARNING: This file is manually generated from .gyb template and should not
-// be directly modified. Instead, make changes to Suffix.swift.gyb and run
+// be directly modified. Instead, make changes to DropWhile.swift.gyb and run
 // scripts/generate_harness/generate_harness.py to regenerate this file.
 ////////////////////////////////////////////////////////////////////////////////
 
 import TestsUtils
 
 let sequenceCount = 4096
-let suffixCount = 1024
+let dropCount = 1024
+let suffixCount = sequenceCount - dropCount
 let sumCount = suffixCount * (2 * sequenceCount - suffixCount - 1) / 2
 
 @inline(never)
-public func run_SuffixCountableRange(_ N: Int) {
+public func run_DropWhileCountableRange(_ N: Int) {
   let s = 0..<sequenceCount
   for _ in 1...20*N {
     var result = 0
-    for element in s.suffix(suffixCount) {
+    for element in s.drop(while: {$0 < dropCount} ) {
       result += element
     }
     CheckResults(result == sumCount,
-      "IncorrectResults in SuffixCountableRange: \(result) != \(sumCount)")
+      "IncorrectResults in DropWhileCountableRange: \(result) != \(sumCount)")
   }
 }
 @inline(never)
-public func run_SuffixSequence(_ N: Int) {
+public func run_DropWhileSequence(_ N: Int) {
   let s = sequence(first: 0) { $0 < sequenceCount - 1 ? $0 &+ 1 : nil }
   for _ in 1...20*N {
     var result = 0
-    for element in s.suffix(suffixCount) {
+    for element in s.drop(while: {$0 < dropCount} ) {
       result += element
     }
     CheckResults(result == sumCount,
-      "IncorrectResults in SuffixSequence: \(result) != \(sumCount)")
+      "IncorrectResults in DropWhileSequence: \(result) != \(sumCount)")
   }
 }
 @inline(never)
-public func run_SuffixAnySequence(_ N: Int) {
+public func run_DropWhileAnySequence(_ N: Int) {
   let s = AnySequence(sequence(first: 0) { $0 < sequenceCount - 1 ? $0 &+ 1 : nil })
   for _ in 1...20*N {
     var result = 0
-    for element in s.suffix(suffixCount) {
+    for element in s.drop(while: {$0 < dropCount} ) {
       result += element
     }
     CheckResults(result == sumCount,
-      "IncorrectResults in SuffixAnySequence: \(result) != \(sumCount)")
+      "IncorrectResults in DropWhileAnySequence: \(result) != \(sumCount)")
   }
 }
 @inline(never)
-public func run_SuffixAnySeqCntRange(_ N: Int) {
+public func run_DropWhileAnySeqCntRange(_ N: Int) {
   let s = AnySequence(0..<sequenceCount)
   for _ in 1...20*N {
     var result = 0
-    for element in s.suffix(suffixCount) {
+    for element in s.drop(while: {$0 < dropCount} ) {
       result += element
     }
     CheckResults(result == sumCount,
-      "IncorrectResults in SuffixAnySeqCntRange: \(result) != \(sumCount)")
+      "IncorrectResults in DropWhileAnySeqCntRange: \(result) != \(sumCount)")
   }
 }
 @inline(never)
-public func run_SuffixAnySeqCRangeIter(_ N: Int) {
+public func run_DropWhileAnySeqCRangeIter(_ N: Int) {
   let s = AnySequence((0..<sequenceCount).makeIterator())
   for _ in 1...20*N {
     var result = 0
-    for element in s.suffix(suffixCount) {
+    for element in s.drop(while: {$0 < dropCount} ) {
       result += element
     }
     CheckResults(result == sumCount,
-      "IncorrectResults in SuffixAnySeqCRangeIter: \(result) != \(sumCount)")
+      "IncorrectResults in DropWhileAnySeqCRangeIter: \(result) != \(sumCount)")
   }
 }
 @inline(never)
-public func run_SuffixAnyCollection(_ N: Int) {
+public func run_DropWhileAnyCollection(_ N: Int) {
   let s = AnyCollection(0..<sequenceCount)
   for _ in 1...20*N {
     var result = 0
-    for element in s.suffix(suffixCount) {
+    for element in s.drop(while: {$0 < dropCount} ) {
       result += element
     }
     CheckResults(result == sumCount,
-      "IncorrectResults in SuffixAnyCollection: \(result) != \(sumCount)")
+      "IncorrectResults in DropWhileAnyCollection: \(result) != \(sumCount)")
   }
 }
 @inline(never)
-public func run_SuffixArray(_ N: Int) {
+public func run_DropWhileArray(_ N: Int) {
   let s = Array(0..<sequenceCount)
   for _ in 1...20*N {
     var result = 0
-    for element in s.suffix(suffixCount) {
+    for element in s.drop(while: {$0 < dropCount} ) {
       result += element
     }
     CheckResults(result == sumCount,
-      "IncorrectResults in SuffixArray: \(result) != \(sumCount)")
+      "IncorrectResults in DropWhileArray: \(result) != \(sumCount)")
   }
 }
 @inline(never)
-public func run_SuffixCountableRangeLazy(_ N: Int) {
+public func run_DropWhileCountableRangeLazy(_ N: Int) {
   let s = (0..<sequenceCount).lazy
   for _ in 1...20*N {
     var result = 0
-    for element in s.suffix(suffixCount) {
+    for element in s.drop(while: {$0 < dropCount} ) {
       result += element
     }
     CheckResults(result == sumCount,
-      "IncorrectResults in SuffixCountableRangeLazy: \(result) != \(sumCount)")
+      "IncorrectResults in DropWhileCountableRangeLazy: \(result) != \(sumCount)")
   }
 }
 @inline(never)
-public func run_SuffixSequenceLazy(_ N: Int) {
+public func run_DropWhileSequenceLazy(_ N: Int) {
   let s = (sequence(first: 0) { $0 < sequenceCount - 1 ? $0 &+ 1 : nil }).lazy
   for _ in 1...20*N {
     var result = 0
-    for element in s.suffix(suffixCount) {
+    for element in s.drop(while: {$0 < dropCount} ) {
       result += element
     }
     CheckResults(result == sumCount,
-      "IncorrectResults in SuffixSequenceLazy: \(result) != \(sumCount)")
+      "IncorrectResults in DropWhileSequenceLazy: \(result) != \(sumCount)")
   }
 }
 @inline(never)
-public func run_SuffixAnySequenceLazy(_ N: Int) {
+public func run_DropWhileAnySequenceLazy(_ N: Int) {
   let s = (AnySequence(sequence(first: 0) { $0 < sequenceCount - 1 ? $0 &+ 1 : nil })).lazy
   for _ in 1...20*N {
     var result = 0
-    for element in s.suffix(suffixCount) {
+    for element in s.drop(while: {$0 < dropCount} ) {
       result += element
     }
     CheckResults(result == sumCount,
-      "IncorrectResults in SuffixAnySequenceLazy: \(result) != \(sumCount)")
+      "IncorrectResults in DropWhileAnySequenceLazy: \(result) != \(sumCount)")
   }
 }
 @inline(never)
-public func run_SuffixAnySeqCntRangeLazy(_ N: Int) {
+public func run_DropWhileAnySeqCntRangeLazy(_ N: Int) {
   let s = (AnySequence(0..<sequenceCount)).lazy
   for _ in 1...20*N {
     var result = 0
-    for element in s.suffix(suffixCount) {
+    for element in s.drop(while: {$0 < dropCount} ) {
       result += element
     }
     CheckResults(result == sumCount,
-      "IncorrectResults in SuffixAnySeqCntRangeLazy: \(result) != \(sumCount)")
+      "IncorrectResults in DropWhileAnySeqCntRangeLazy: \(result) != \(sumCount)")
   }
 }
 @inline(never)
-public func run_SuffixAnySeqCRangeIterLazy(_ N: Int) {
+public func run_DropWhileAnySeqCRangeIterLazy(_ N: Int) {
   let s = (AnySequence((0..<sequenceCount).makeIterator())).lazy
   for _ in 1...20*N {
     var result = 0
-    for element in s.suffix(suffixCount) {
+    for element in s.drop(while: {$0 < dropCount} ) {
       result += element
     }
     CheckResults(result == sumCount,
-      "IncorrectResults in SuffixAnySeqCRangeIterLazy: \(result) != \(sumCount)")
+      "IncorrectResults in DropWhileAnySeqCRangeIterLazy: \(result) != \(sumCount)")
   }
 }
 @inline(never)
-public func run_SuffixAnyCollectionLazy(_ N: Int) {
+public func run_DropWhileAnyCollectionLazy(_ N: Int) {
   let s = (AnyCollection(0..<sequenceCount)).lazy
   for _ in 1...20*N {
     var result = 0
-    for element in s.suffix(suffixCount) {
+    for element in s.drop(while: {$0 < dropCount} ) {
       result += element
     }
     CheckResults(result == sumCount,
-      "IncorrectResults in SuffixAnyCollectionLazy: \(result) != \(sumCount)")
+      "IncorrectResults in DropWhileAnyCollectionLazy: \(result) != \(sumCount)")
   }
 }
 @inline(never)
-public func run_SuffixArrayLazy(_ N: Int) {
+public func run_DropWhileArrayLazy(_ N: Int) {
   let s = (Array(0..<sequenceCount)).lazy
   for _ in 1...20*N {
     var result = 0
-    for element in s.suffix(suffixCount) {
+    for element in s.drop(while: {$0 < dropCount} ) {
       result += element
     }
     CheckResults(result == sumCount,
-      "IncorrectResults in SuffixArrayLazy: \(result) != \(sumCount)")
+      "IncorrectResults in DropWhileArrayLazy: \(result) != \(sumCount)")
   }
 }

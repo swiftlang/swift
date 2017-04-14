@@ -1,4 +1,4 @@
-//===--- Suffix.swift -----------------------------------------------------===//
+//===--- PrefixWhile.swift ------------------------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -12,181 +12,181 @@
 
 ////////////////////////////////////////////////////////////////////////////////
 // WARNING: This file is manually generated from .gyb template and should not
-// be directly modified. Instead, make changes to Suffix.swift.gyb and run
+// be directly modified. Instead, make changes to PrefixWhile.swift.gyb and run
 // scripts/generate_harness/generate_harness.py to regenerate this file.
 ////////////////////////////////////////////////////////////////////////////////
 
 import TestsUtils
 
 let sequenceCount = 4096
-let suffixCount = 1024
-let sumCount = suffixCount * (2 * sequenceCount - suffixCount - 1) / 2
+let prefixCount = sequenceCount - 1024
+let sumCount = prefixCount * (prefixCount - 1) / 2
 
 @inline(never)
-public func run_SuffixCountableRange(_ N: Int) {
+public func run_PrefixWhileCountableRange(_ N: Int) {
   let s = 0..<sequenceCount
   for _ in 1...20*N {
     var result = 0
-    for element in s.suffix(suffixCount) {
+    for element in s.prefix(while: {$0 < prefixCount} ) {
       result += element
     }
     CheckResults(result == sumCount,
-      "IncorrectResults in SuffixCountableRange: \(result) != \(sumCount)")
+      "IncorrectResults in PrefixWhileCountableRange: \(result) != \(sumCount)")
   }
 }
 @inline(never)
-public func run_SuffixSequence(_ N: Int) {
+public func run_PrefixWhileSequence(_ N: Int) {
   let s = sequence(first: 0) { $0 < sequenceCount - 1 ? $0 &+ 1 : nil }
   for _ in 1...20*N {
     var result = 0
-    for element in s.suffix(suffixCount) {
+    for element in s.prefix(while: {$0 < prefixCount} ) {
       result += element
     }
     CheckResults(result == sumCount,
-      "IncorrectResults in SuffixSequence: \(result) != \(sumCount)")
+      "IncorrectResults in PrefixWhileSequence: \(result) != \(sumCount)")
   }
 }
 @inline(never)
-public func run_SuffixAnySequence(_ N: Int) {
+public func run_PrefixWhileAnySequence(_ N: Int) {
   let s = AnySequence(sequence(first: 0) { $0 < sequenceCount - 1 ? $0 &+ 1 : nil })
   for _ in 1...20*N {
     var result = 0
-    for element in s.suffix(suffixCount) {
+    for element in s.prefix(while: {$0 < prefixCount} ) {
       result += element
     }
     CheckResults(result == sumCount,
-      "IncorrectResults in SuffixAnySequence: \(result) != \(sumCount)")
+      "IncorrectResults in PrefixWhileAnySequence: \(result) != \(sumCount)")
   }
 }
 @inline(never)
-public func run_SuffixAnySeqCntRange(_ N: Int) {
+public func run_PrefixWhileAnySeqCntRange(_ N: Int) {
   let s = AnySequence(0..<sequenceCount)
   for _ in 1...20*N {
     var result = 0
-    for element in s.suffix(suffixCount) {
+    for element in s.prefix(while: {$0 < prefixCount} ) {
       result += element
     }
     CheckResults(result == sumCount,
-      "IncorrectResults in SuffixAnySeqCntRange: \(result) != \(sumCount)")
+      "IncorrectResults in PrefixWhileAnySeqCntRange: \(result) != \(sumCount)")
   }
 }
 @inline(never)
-public func run_SuffixAnySeqCRangeIter(_ N: Int) {
+public func run_PrefixWhileAnySeqCRangeIter(_ N: Int) {
   let s = AnySequence((0..<sequenceCount).makeIterator())
   for _ in 1...20*N {
     var result = 0
-    for element in s.suffix(suffixCount) {
+    for element in s.prefix(while: {$0 < prefixCount} ) {
       result += element
     }
     CheckResults(result == sumCount,
-      "IncorrectResults in SuffixAnySeqCRangeIter: \(result) != \(sumCount)")
+      "IncorrectResults in PrefixWhileAnySeqCRangeIter: \(result) != \(sumCount)")
   }
 }
 @inline(never)
-public func run_SuffixAnyCollection(_ N: Int) {
+public func run_PrefixWhileAnyCollection(_ N: Int) {
   let s = AnyCollection(0..<sequenceCount)
   for _ in 1...20*N {
     var result = 0
-    for element in s.suffix(suffixCount) {
+    for element in s.prefix(while: {$0 < prefixCount} ) {
       result += element
     }
     CheckResults(result == sumCount,
-      "IncorrectResults in SuffixAnyCollection: \(result) != \(sumCount)")
+      "IncorrectResults in PrefixWhileAnyCollection: \(result) != \(sumCount)")
   }
 }
 @inline(never)
-public func run_SuffixArray(_ N: Int) {
+public func run_PrefixWhileArray(_ N: Int) {
   let s = Array(0..<sequenceCount)
   for _ in 1...20*N {
     var result = 0
-    for element in s.suffix(suffixCount) {
+    for element in s.prefix(while: {$0 < prefixCount} ) {
       result += element
     }
     CheckResults(result == sumCount,
-      "IncorrectResults in SuffixArray: \(result) != \(sumCount)")
+      "IncorrectResults in PrefixWhileArray: \(result) != \(sumCount)")
   }
 }
 @inline(never)
-public func run_SuffixCountableRangeLazy(_ N: Int) {
+public func run_PrefixWhileCountableRangeLazy(_ N: Int) {
   let s = (0..<sequenceCount).lazy
   for _ in 1...20*N {
     var result = 0
-    for element in s.suffix(suffixCount) {
+    for element in s.prefix(while: {$0 < prefixCount} ) {
       result += element
     }
     CheckResults(result == sumCount,
-      "IncorrectResults in SuffixCountableRangeLazy: \(result) != \(sumCount)")
+      "IncorrectResults in PrefixWhileCountableRangeLazy: \(result) != \(sumCount)")
   }
 }
 @inline(never)
-public func run_SuffixSequenceLazy(_ N: Int) {
+public func run_PrefixWhileSequenceLazy(_ N: Int) {
   let s = (sequence(first: 0) { $0 < sequenceCount - 1 ? $0 &+ 1 : nil }).lazy
   for _ in 1...20*N {
     var result = 0
-    for element in s.suffix(suffixCount) {
+    for element in s.prefix(while: {$0 < prefixCount} ) {
       result += element
     }
     CheckResults(result == sumCount,
-      "IncorrectResults in SuffixSequenceLazy: \(result) != \(sumCount)")
+      "IncorrectResults in PrefixWhileSequenceLazy: \(result) != \(sumCount)")
   }
 }
 @inline(never)
-public func run_SuffixAnySequenceLazy(_ N: Int) {
+public func run_PrefixWhileAnySequenceLazy(_ N: Int) {
   let s = (AnySequence(sequence(first: 0) { $0 < sequenceCount - 1 ? $0 &+ 1 : nil })).lazy
   for _ in 1...20*N {
     var result = 0
-    for element in s.suffix(suffixCount) {
+    for element in s.prefix(while: {$0 < prefixCount} ) {
       result += element
     }
     CheckResults(result == sumCount,
-      "IncorrectResults in SuffixAnySequenceLazy: \(result) != \(sumCount)")
+      "IncorrectResults in PrefixWhileAnySequenceLazy: \(result) != \(sumCount)")
   }
 }
 @inline(never)
-public func run_SuffixAnySeqCntRangeLazy(_ N: Int) {
+public func run_PrefixWhileAnySeqCntRangeLazy(_ N: Int) {
   let s = (AnySequence(0..<sequenceCount)).lazy
   for _ in 1...20*N {
     var result = 0
-    for element in s.suffix(suffixCount) {
+    for element in s.prefix(while: {$0 < prefixCount} ) {
       result += element
     }
     CheckResults(result == sumCount,
-      "IncorrectResults in SuffixAnySeqCntRangeLazy: \(result) != \(sumCount)")
+      "IncorrectResults in PrefixWhileAnySeqCntRangeLazy: \(result) != \(sumCount)")
   }
 }
 @inline(never)
-public func run_SuffixAnySeqCRangeIterLazy(_ N: Int) {
+public func run_PrefixWhileAnySeqCRangeIterLazy(_ N: Int) {
   let s = (AnySequence((0..<sequenceCount).makeIterator())).lazy
   for _ in 1...20*N {
     var result = 0
-    for element in s.suffix(suffixCount) {
+    for element in s.prefix(while: {$0 < prefixCount} ) {
       result += element
     }
     CheckResults(result == sumCount,
-      "IncorrectResults in SuffixAnySeqCRangeIterLazy: \(result) != \(sumCount)")
+      "IncorrectResults in PrefixWhileAnySeqCRangeIterLazy: \(result) != \(sumCount)")
   }
 }
 @inline(never)
-public func run_SuffixAnyCollectionLazy(_ N: Int) {
+public func run_PrefixWhileAnyCollectionLazy(_ N: Int) {
   let s = (AnyCollection(0..<sequenceCount)).lazy
   for _ in 1...20*N {
     var result = 0
-    for element in s.suffix(suffixCount) {
+    for element in s.prefix(while: {$0 < prefixCount} ) {
       result += element
     }
     CheckResults(result == sumCount,
-      "IncorrectResults in SuffixAnyCollectionLazy: \(result) != \(sumCount)")
+      "IncorrectResults in PrefixWhileAnyCollectionLazy: \(result) != \(sumCount)")
   }
 }
 @inline(never)
-public func run_SuffixArrayLazy(_ N: Int) {
+public func run_PrefixWhileArrayLazy(_ N: Int) {
   let s = (Array(0..<sequenceCount)).lazy
   for _ in 1...20*N {
     var result = 0
-    for element in s.suffix(suffixCount) {
+    for element in s.prefix(while: {$0 < prefixCount} ) {
       result += element
     }
     CheckResults(result == sumCount,
-      "IncorrectResults in SuffixArrayLazy: \(result) != \(sumCount)")
+      "IncorrectResults in PrefixWhileArrayLazy: \(result) != \(sumCount)")
   }
 }
