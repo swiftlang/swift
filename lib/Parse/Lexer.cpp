@@ -1372,7 +1372,7 @@ static std::string getTrailingIndentOrWindowsLineEnding(const Token &Str) {
 
   // are there windows line endings in the source, if so return it to be replaced
   const char *windowsLinesep = strnstr(Bytes.begin(), "\r\n", Bytes.end()-Bytes.begin());
-  return windowsLinesep != nullptr ? "\r\n" : "";
+  return windowsLinesep != nullptr ? "\r\n" : "\n";
 }
 
 /// validateIndents:
@@ -1387,10 +1387,12 @@ void Lexer::validateIndents(const Token &Str) {
   const char *BytesPtr = Bytes.begin();
   while ((BytesPtr = (const char *)memchr(BytesPtr, '\n', Bytes.end()-BytesPtr)) != nullptr) {
     const char *NextPtr = BytesPtr + 1;
-    if (BytesPtr[-1] == '\r')
-      BytesPtr--;
-    if (StringRef(BytesPtr, ToReplace.size()) != ToReplace)
-      diagnose(BytesPtr, diag::lex_ambiguous_string_indent);
+    if (*NextPtr != '\n' && *NextPtr != '\r') {
+      if (BytesPtr[-1] == '\r')
+        BytesPtr--;
+      if (StringRef(BytesPtr, ToReplace.size()) != ToReplace)
+        diagnose(NextPtr, diag::lex_ambiguous_string_indent);
+    }
     BytesPtr = NextPtr;
   }
 }
@@ -1435,6 +1437,7 @@ void Lexer::lexStringLiteral() {
         diagnose(TokStart, diag::lex_unterminated_string);
         return formToken(tok::unknown, TokStart);
       }
+      // warning for trailing whitespace
       else if (wasWhitespace && !allWhitespace)
         diagnose(CurPtr, diag::lex_trailing_multiline_whitespace)
           .fixItReplaceChars(getSourceLoc(CurPtr), getSourceLoc(CurPtr), "\\n\\");
@@ -1671,18 +1674,21 @@ void Lexer::tryLexEditorPlaceholder() {
 StringRef Lexer::getEncodedStringSegment(StringRef Bytes,
                                          SmallVectorImpl<char> &TempString,
                                          unsigned Modifiers, std::string ToReplace) {
-  // Strip any indent that corresponds to the indent
-  // of the multi-line string terminating line or
-  // or to normalize line endings in the source
+
+  // The next section of code is somewhat overcooked.
+  // Strips any indent that corresponds to the indent
+  // of the multi-line string terminating line and
+  // normalises line endings in the source to \n
+  // ... and strips any intial blank line
   std::string IndentStripped;
 
-  if ((Modifiers & StringLiteralMultiline) && !ToReplace.empty()) {
+  if (!ToReplace.empty()) {
     IndentStripped = Bytes;
     size_t pos = 0;
     while ((pos = IndentStripped.find(ToReplace, pos)) != std::string::npos) {
-      bool removeNewLine = pos == 0 && (Modifiers & StringLiteralFirstSegment);
-      IndentStripped.replace(pos, ToReplace.size(), removeNewLine ? "" : "\n");
-      if (removeNewLine && ToReplace == "\n")
+      bool removeInitialNewLine = pos == 0 && (Modifiers & StringLiteralFirstSegment);
+      IndentStripped.replace(pos, ToReplace.size(), removeInitialNewLine ? "" : "\n");
+      if ((removeInitialNewLine || !(Modifiers & StringLiteralFirstSegment)) && ToReplace == "\n")
         break;
       pos++;
     }
