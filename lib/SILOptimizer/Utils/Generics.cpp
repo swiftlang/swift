@@ -882,49 +882,7 @@ static void remapRequirements(GenericSignature *GenSig,
   // caller's archetypes mapped to the specialized signature.
   for (auto &reqReq : GenSig->getRequirements()) {
     DEBUG(llvm::dbgs() << "\n\nRe-mapping the requirement:\n"; reqReq.dump());
-
-    auto first = reqReq.getFirstType();
-    // Is this generic type equivalent to a concrete type?
-    if (first->hasTypeParameter() &&
-        !GenSig->getCanonicalTypeInContext(first, *SM)->hasTypeParameter())
-      continue;
-
-    first = reqReq.getFirstType().subst(SubsMap);
-    assert(!first->hasError());
-
-    auto Kind = reqReq.getKind();
-
-    switch (Kind) {
-    case RequirementKind::SameType:
-    case RequirementKind::Superclass:
-    case RequirementKind::Conformance: {
-      auto second = reqReq.getSecondType().subst(SubsMap);
-      assert(!second->hasError());
-      // Substitute the constrained types.
-      if (Kind != RequirementKind::SameType && !first->hasTypeParameter())
-        break;
-      if (Kind == RequirementKind::SameType && !first->hasTypeParameter() &&
-          !second->hasTypeParameter())
-        break;
-
-      Requirement Req(Kind, first, second);
-      auto Failure = Builder.addRequirement(Req, source);
-      assert(!isErrorResult(Failure));
-      DEBUG(llvm::dbgs() << "\nRe-mapped requirement:\n"; Req.dump());
-      break;
-    }
-    case RequirementKind::Layout: {
-      if (!first->hasTypeParameter())
-        break;
-
-      Requirement Req(RequirementKind::Layout, first,
-                      reqReq.getLayoutConstraint());
-      auto Failure = Builder.addRequirement(Req, source);
-      assert(!!isErrorResult(Failure));
-      DEBUG(llvm::dbgs() << "\nRe-mapped requirement:\n"; Req.dump());
-      break;
-    }
-    }
+    Builder.addRequirement(reqReq, source, &SubsMap);
   }
 }
 
