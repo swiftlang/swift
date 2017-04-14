@@ -240,16 +240,12 @@ extension String.Content {
         bitsPerElement: numericCast(inlineStr.bitsPerElement)
       )
       var storage = Base()
-      // dump(inlineStr)
       String.Content.packingTable.withUTF8Buffer { table in
         for cu in source {
-          // dump(cu)
-          // dump(table[Int(cu)])
           storage.append(UInt16(table[Int(cu)]))
         }
       }
       self.base = storage
-      // dump(storage)
     }
     public init(_ inlineStr: String.Content.Inline7or16) {
       // TODO: try skipping the packing struct directly...
@@ -259,7 +255,6 @@ extension String.Content {
       )
       let mask = UInt16(
         truncatingBitPattern: ~0 << UInt32(inlineStr.bitsPerElement))
-      // dump(inlineStr)
       var storage = Base()
       for cu in source {
         storage.append((cu &+ 32) & ~mask)
@@ -301,41 +296,6 @@ extension String.Content {
       },
       bitsPerElement: numericCast(bitsPerElement)
     )
-  }
-
-  public struct _Unpack : _Function {
-    let bitsPerElement: UInt16
-    public func apply(_ input: UInt16) -> UInt16 {
-      if bitsPerElement < 7 {
-        return String.Content.packingTable.withUTF8Buffer {
-          UInt16($0[numericCast(input)])
-        }
-      }
-      else {
-        let mask = UInt16(truncatingBitPattern: ~0 << UInt32(bitsPerElement))
-        return (input &+ 32) & ~mask
-      }
-    }
-  }
-  
-  static func _unpack(
-    bits: UInt61, bitsPerElement: UInt16
-  ) -> LazyMapRandomAccessCollection<String.Content.Packed, UInt16> {
-    let source = String.Content.Packed(
-      representation: numericCast(bits & (~(0 as UInt61) >> 1)),
-      bitsPerElement: numericCast(bitsPerElement)
-    )
-    return bitsPerElement < 7
-    ? String.Content.packingTable.withUTF8Buffer {
-      table in source.lazy.map {
-        (x: UInt16) -> UInt16 in UInt16(table[numericCast(x)])
-      }
-    }
-    : source.lazy.map { 
-      [ mask = UInt16(truncatingBitPattern: ~0 << UInt32(bitsPerElement)) ]
-      (x: UInt16) -> UInt16 in
-      (x &+ 32) & ~mask
-    }
   }
 }
   
