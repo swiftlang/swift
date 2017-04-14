@@ -1,4 +1,4 @@
-//===--- APIDigesterData.h - Routines for code completion -------*- C++ -*-===//
+//===--- APIDigesterData.h - Declaration of api digester data ---*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //

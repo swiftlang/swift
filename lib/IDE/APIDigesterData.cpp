@@ -1,4 +1,4 @@
-//===--- APIDigesterData.cpp - Code completion implementation --------------===//
+//===--- APIDigesterData.cpp - api digester data implementation -----------===//
 //
 // This source file is part of the Swift.org open source project
 //
