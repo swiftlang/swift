@@ -422,7 +422,9 @@ private:
   void bindExprPattern(ExprPattern *pattern, ConsumableManagedValue v,
                        const FailureHandler &failure);
   void emitGuardBranch(SILLocation loc, Expr *guard,
-                       const FailureHandler &failure);
+                       const FailureHandler &failure,
+                       Pattern *usingImplicitVariablesFromPattern,
+                       CaseStmt *usingImplicitVariablesFromStmt);
 
   void bindIrrefutablePatterns(const ClauseRow &row, ArgArray args,
                                bool forIrrefutableRow, bool hasMultipleItems);
@@ -1056,9 +1058,8 @@ void PatternMatchEmission::emitWildcardDispatch(ClauseMatrix &clauses,
 
   // Emit the guard branch, if it exists.
   if (guardExpr) {
-    SGF.usingImplicitVariablesForPattern(clauses[row].getCasePattern(), dyn_cast<CaseStmt>(stmt), [&]{
-      this->emitGuardBranch(guardExpr, guardExpr, failure);
-    });
+    this->emitGuardBranch(guardExpr, guardExpr, failure,
+                      clauses[row].getCasePattern(), dyn_cast<CaseStmt>(stmt));
   }
 
   // Enter the row.
@@ -1120,7 +1121,8 @@ void PatternMatchEmission::bindExprPattern(ExprPattern *pattern,
   bindVariable(pattern, pattern->getMatchVar(), value,
                pattern->getType()->getCanonicalType(),
                /*isForSuccess*/ false, /* hasMultipleItems */ false);
-  emitGuardBranch(pattern, pattern->getMatchExpr(), failure);
+  emitGuardBranch(pattern, pattern->getMatchExpr(), failure,
+                  nullptr, nullptr);
 }
 
 /// Bind all the irrefutable patterns in the given row, which is nothing
@@ -1229,7 +1231,9 @@ void PatternMatchEmission::bindVariable(SILLocation loc, VarDecl *var,
 /// Evaluate a guard expression and, if it returns false, branch to
 /// the given destination.
 void PatternMatchEmission::emitGuardBranch(SILLocation loc, Expr *guard,
-                                           const FailureHandler &failure) {
+                                   const FailureHandler &failure,
+                                   Pattern *usingImplicitVariablesFromPattern,
+                                   CaseStmt *usingImplicitVariablesFromStmt) {
   SILBasicBlock *falseBB = SGF.B.splitBlockForFallthrough();
   SILBasicBlock *trueBB = SGF.B.splitBlockForFallthrough();
 
@@ -1237,7 +1241,16 @@ void PatternMatchEmission::emitGuardBranch(SILLocation loc, Expr *guard,
   SILValue testBool;
   {
     FullExpr scope(SGF.Cleanups, CleanupLocation(guard));
-    testBool = SGF.emitRValueAsSingleValue(guard).getUnmanagedValue();
+    auto emitTest = [&]{
+      testBool = SGF.emitRValueAsSingleValue(guard).getUnmanagedValue();
+    };
+    
+    if (usingImplicitVariablesFromPattern)
+      SGF.usingImplicitVariablesForPattern(usingImplicitVariablesFromPattern,
+                                           usingImplicitVariablesFromStmt,
+                                           emitTest);
+    else
+      emitTest();
   }
 
   SGF.B.createCondBranch(loc, testBool, trueBB, falseBB);
