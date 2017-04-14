@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "definite-init"
-#include "DIMemoryUseCollector.h"
+#include "DIMemoryUseCollectorOwnership.h"
 #include "swift/AST/Expr.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
@@ -19,7 +19,12 @@
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/SaveAndRestore.h"
 
+#ifdef SWIFT_SILOPTIMIZER_MANDATORY_DIMEMORYUSECOLLECTOR_H
+#error "Included non ownership header?!"
+#endif
+
 using namespace swift;
+using namespace ownership;
 
 //===----------------------------------------------------------------------===//
 //                  DIMemoryObjectInfo Implementation
@@ -1574,7 +1579,7 @@ void ElementUseCollector::collectDelegatingValueTypeInitSelfUses() {
 /// collectDIElementUsesFrom - Analyze all uses of the specified allocation
 /// instruction (alloc_box, alloc_stack or mark_uninitialized), classifying them
 /// and storing the information found into the Uses and Releases lists.
-void swift::collectDIElementUsesFrom(
+void swift::ownership::collectDIElementUsesFrom(
     const DIMemoryObjectInfo &MemoryInfo, SmallVectorImpl<DIMemoryUse> &Uses,
     SmallVectorImpl<TermInst *> &FailableInits,
     SmallVectorImpl<SILInstruction *> &Releases, bool isDIFinished,
