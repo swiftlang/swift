@@ -1123,8 +1123,13 @@ void ASTMangler::appendContext(const DeclContext *ctx) {
     }
     case LocalDeclContextKind::PatternBindingInitializer: {
       auto patternInit = cast<SerializedPatternBindingInitializer>(local);
-      if (auto var = findFirstVariable(patternInit->getBinding()))
+      if (auto var = findFirstVariable(patternInit->getBinding())) {
         appendInitializerEntity(var.getValue());
+      } else {
+        // This is incorrect in that it does not produce a /unique/ mangling,
+        // but it will at least produce a /valid/ mangling.
+        appendContext(ctx->getParent());
+      }
       return;
     }
     case LocalDeclContextKind::TopLevelCodeDecl:
@@ -1194,7 +1199,7 @@ void ASTMangler::appendContext(const DeclContext *ctx) {
 
   case DeclContextKind::SubscriptDecl:
     // FIXME: We may need to do something here if subscripts contain any symbols
-    // exposed with linkage names.
+    // exposed with linkage names, or if/when they get generic parameters.
     return appendContext(ctx->getParent());
       
   case DeclContextKind::Initializer:
@@ -1206,8 +1211,13 @@ void ASTMangler::appendContext(const DeclContext *ctx) {
 
     case InitializerKind::PatternBinding: {
       auto patternInit = cast<PatternBindingInitializer>(ctx);
-      if (auto var = findFirstVariable(patternInit->getBinding()))
+      if (auto var = findFirstVariable(patternInit->getBinding())) {
         appendInitializerEntity(var.getValue());
+      } else {
+        // This is incorrect in that it does not produce a /unique/ mangling,
+        // but it will at least produce a /valid/ mangling.
+        appendContext(ctx->getParent());
+      }
       return;
     }
     }
