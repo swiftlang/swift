@@ -2322,7 +2322,7 @@ static bool shortCircuitDisjunctionAt(Constraint *constraint,
 
   // Binding an operator overloading to a generic operator is weaker than
   // binding to a non-generic operator, always.
-  // Note: this is a hack to improve performance when we're dealing with
+  // FIXME: this is a hack to improve performance when we're dealing with
   // overloaded operators.
   if (constraint->getKind() == ConstraintKind::BindOverload &&
       constraint->getOverloadChoice().getKind() == OverloadChoiceKind::Decl &&
@@ -2330,12 +2330,15 @@ static bool shortCircuitDisjunctionAt(Constraint *constraint,
       successfulConstraint->getKind() == ConstraintKind::BindOverload &&
       successfulConstraint->getOverloadChoice().getKind()
         == OverloadChoiceKind::Decl &&
-      successfulConstraint->getOverloadChoice().getDecl()->isOperator() &&
-      constraint->getOverloadChoice().getDecl()->getInterfaceType()
-        ->is<GenericFunctionType>() &&
-      !successfulConstraint->getOverloadChoice().getDecl()->getInterfaceType()
-         ->is<GenericFunctionType>()) {
-    return true;
+      successfulConstraint->getOverloadChoice().getDecl()->isOperator()) {
+    auto decl = constraint->getOverloadChoice().getDecl();
+    auto successfulDecl = successfulConstraint->getOverloadChoice().getDecl();
+    auto &ctx = decl->getASTContext();
+    if (decl->getInterfaceType()->is<GenericFunctionType>() &&
+        !successfulDecl->getInterfaceType()->is<GenericFunctionType>() &&
+        (!successfulDecl->getAttrs().isUnavailable(ctx) ||
+         decl->getAttrs().isUnavailable(ctx)))
+      return true;
   }
 
   return false;
