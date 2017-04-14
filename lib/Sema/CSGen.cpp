@@ -624,11 +624,14 @@ namespace {
       // into "favored" and non-favored lists.
       SmallVector<Constraint *, 4> favoredConstraints;
       SmallVector<Constraint *, 4> fallbackConstraints;
-      for (auto oldConstraint : oldConstraints)
-        if (isFavored(oldConstraint->getOverloadChoice().getDecl()))
+      for (auto oldConstraint : oldConstraints) {
+        auto decl = oldConstraint->getOverloadChoice().getDecl();
+        if (!decl->getAttrs().isUnavailable(CS.getASTContext()) &&
+            isFavored(decl))
           favoredConstraints.push_back(oldConstraint);
         else
           fallbackConstraints.push_back(oldConstraint);
+      }
 
       // If we did not find any favored constraints, we're done.
       if (favoredConstraints.empty()) break;
