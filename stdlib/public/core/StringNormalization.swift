@@ -167,13 +167,12 @@ extension FCCNormalizedSegment {
     // As a quick check, see if we're just a coalesced buffer of pre-normalized
     // scalars.
     for cu in buffer {
+      // TODO: Other checks
       guard _fastPath(isPreNormalized(utf16CodeUnit: cu)) else {
         return false
       }
     }
-
-    // TODO: Other checks
-    return false
+    return true
   }
 
   static func isPreNormalized(utf16CodeUnit cu: UInt16) -> Bool {
