@@ -590,10 +590,6 @@ public:
   /// its list of protocols.
   void getExistentialTypeProtocols(SmallVectorImpl<ProtocolDecl *> &protocols);
 
-  /// Given that this type is any kind of existential type, produce
-  /// its list of protocols.
-  void getAnyExistentialTypeProtocols(SmallVectorImpl<ProtocolDecl *> &protocols);
-
   /// Break an existential down into a set of constraints.
   ExistentialLayout getExistentialLayout();
 

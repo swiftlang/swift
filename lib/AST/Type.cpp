@@ -213,11 +213,6 @@ void TypeBase::getExistentialTypeProtocols(
   getCanonicalType().getExistentialTypeProtocols(protocols);
 }
 
-void TypeBase::getAnyExistentialTypeProtocols(
-                                   SmallVectorImpl<ProtocolDecl*> &protocols) {
-  getCanonicalType().getAnyExistentialTypeProtocols(protocols);
-}
-
 void CanType::getExistentialTypeProtocols(
                                    SmallVectorImpl<ProtocolDecl*> &protocols) {
   // FIXME: Remove this completely
@@ -227,16 +222,6 @@ void CanType::getExistentialTypeProtocols(
          "Explicit AnyObject should not appear yet");
   for (auto proto : layout.getProtocols())
     protocols.push_back(proto->getDecl());
-}
-
-void CanType::getAnyExistentialTypeProtocols(
-                                   SmallVectorImpl<ProtocolDecl*> &protocols) {
-  if (auto metatype = dyn_cast<ExistentialMetatypeType>(*this)) {
-      metatype.getInstanceType().getAnyExistentialTypeProtocols(protocols);
-      return;
-  }
-
-  getExistentialTypeProtocols(protocols);
 }
 
 ExistentialLayout::ExistentialLayout(ProtocolType *type) {
