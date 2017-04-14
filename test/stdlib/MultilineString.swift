@@ -198,12 +198,6 @@ print("4:" + delimit("""
     """
 ))
 
-// CHECK: -11-
-print("-11-")
-// CHECK-NEXT: <NineteenUpsilon>
-print(delimit("""Nineteen\
-Upsilon"""))
-
 // ===---------- Done --------===
 // CHECK-NEXT: Done.
 print("Done.")
