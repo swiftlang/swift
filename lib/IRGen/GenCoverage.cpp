@@ -32,12 +32,8 @@ using namespace irgen;
 using llvm::coverage::CovMapVersion;
 using llvm::coverage::CounterMappingRegion;
 
-static bool isMachO(IRGenModule &IGM) {
-  return SwiftTargetInfo::get(IGM).OutputObjectFormat == llvm::Triple::MachO;
-}
-
 static StringRef getCoverageSection(IRGenModule &IGM) {
-  return llvm::getInstrProfCoverageSectionName(isMachO(IGM));
+  return llvm::getInstrProfCoverageSectionName(&IGM.Module);
 }
 
 void IRGenModule::emitCoverageMapping() {
