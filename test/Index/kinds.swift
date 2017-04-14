@@ -158,7 +158,7 @@ extension AProtocol { func extFn() }
 
 // TypeAlias
 typealias SomeAlias = AStruct
-// CHECK: [[@LINE-1]]:11 | type-alias/Swift | SomeAlias | s:14swift_ide_test9SomeAlias | Def | rel: 0
+// CHECK: [[@LINE-1]]:11 | type-alias/Swift | SomeAlias | s:14swift_ide_test9SomeAliasa | Def | rel: 0
 // CHECK: [[@LINE-2]]:23 | struct/Swift | AStruct | s:14swift_ide_test7AStructV | Ref | rel: 0
 
 // GenericTypeParam

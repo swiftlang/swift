@@ -172,7 +172,7 @@ protected:
 
   void appendProtocolName(const ProtocolDecl *protocol);
 
-  void appendNominalType(const NominalTypeDecl *decl);
+  void appendAnyGenericType(const GenericTypeDecl *decl);
 
   void appendFunctionType(AnyFunctionType *fn, bool forceSingleParam);
 
@@ -212,7 +212,7 @@ protected:
 
   void appendDeclType(const ValueDecl *decl, bool isFunctionMangling = false);
 
-  bool tryAppendStandardSubstitution(const NominalTypeDecl *type);
+  bool tryAppendStandardSubstitution(const GenericTypeDecl *type);
 
   void appendConstructorEntity(const ConstructorDecl *ctor, bool isAllocating);
   

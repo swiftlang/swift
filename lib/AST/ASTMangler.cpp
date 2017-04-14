@@ -127,7 +127,7 @@ std::string ASTMangler::mangleInitializerEntity(const VarDecl *var,
 
 std::string ASTMangler::mangleNominalType(const NominalTypeDecl *decl) {
   beginMangling();
-  appendNominalType(decl);
+  appendAnyGenericType(decl);
   return finalize();
 }
 
@@ -322,7 +322,7 @@ std::string ASTMangler::mangleObjCRuntimeName(const NominalTypeDecl *Nominal) {
   }
   // For all other cases, we can use the new mangling.
   beginMangling();
-  appendNominalType(Nominal);
+  appendAnyGenericType(Nominal);
   return finalize();
 }
 
@@ -342,9 +342,9 @@ std::string ASTMangler::mangleDeclAsUSR(const ValueDecl *Decl,
     appendConstructorEntity(Ctor, /*isAllocating=*/false);
   } else if (auto Dtor = dyn_cast<DestructorDecl>(Decl)) {
     appendDestructorEntity(Dtor, /*isDeallocating=*/false);
-  } else if (auto NTD = dyn_cast<NominalTypeDecl>(Decl)) {
-    appendNominalType(NTD);
-  } else if (isa<TypeAliasDecl>(Decl) || isa<AssociatedTypeDecl>(Decl)) {
+  } else if (auto GTD = dyn_cast<GenericTypeDecl>(Decl)) {
+    appendAnyGenericType(GTD);
+  } else if (isa<AssociatedTypeDecl>(Decl)) {
     appendContextOf(Decl);
     appendDeclName(Decl);
   } else {
@@ -510,7 +510,7 @@ static const char *getMetatypeRepresentationOp(MetatypeRepresentation Rep) {
   llvm_unreachable("Unhandled MetatypeRepresentation in switch.");
 }
 
-static bool isStdlibType(const NominalTypeDecl *decl) {
+static bool isStdlibType(const TypeDecl *decl) {
   DeclContext *dc = decl->getDeclContext();
   return dc->isModuleScopeContext() && dc->getParentModule()->isStdlibModule();
 }
@@ -580,9 +580,7 @@ void ASTMangler::appendType(Type type) {
 
       // For the DWARF output we want to mangle the type alias + context,
       // unless the type alias references a builtin type.
-      appendContextOf(decl);
-      appendDeclName(decl);
-      return appendOperator("a");
+      return appendAnyGenericType(decl);
     }
 
     case TypeKind::Paren:
@@ -693,7 +691,7 @@ void ASTMangler::appendType(Type type) {
           appendType(GenArgs[0]);
           appendOperator("Sg");
         } else {
-          appendNominalType(NDecl);
+          appendAnyGenericType(NDecl);
           bool isFirstArgList = true;
           appendBoundGenericArgs(type, isFirstArgList);
           appendOperator("G");
@@ -701,7 +699,7 @@ void ASTMangler::appendType(Type type) {
         addSubstitution(type.getPointer());
         return;
       }
-      appendNominalType(tybase->getAnyNominal());
+      appendAnyGenericType(tybase->getAnyNominal());
       return;
 
     case TypeKind::SILFunction:
@@ -1143,10 +1141,7 @@ void ASTMangler::appendContext(const DeclContext *ctx) {
   }
 
   case DeclContextKind::GenericTypeDecl:
-    if (auto nomctx = dyn_cast<NominalTypeDecl>(ctx))
-      appendNominalType(nomctx);
-    else
-      appendContext(ctx->getParent());
+    appendAnyGenericType(cast<GenericTypeDecl>(ctx));
     return;
 
   case DeclContextKind::ExtensionDecl: {
@@ -1173,7 +1168,7 @@ void ASTMangler::appendContext(const DeclContext *ctx) {
       auto sig = ExtD->getGenericSignature();
       // If the extension is constrained, mangle the generic signature that
       // constrains it.
-      appendNominalType(decl);
+      appendAnyGenericType(decl);
       appendModule(ExtD->getParentModule());
       if (sig && ExtD->isConstrainedExtension()) {
         Mod = ExtD->getModuleContext();
@@ -1181,7 +1176,7 @@ void ASTMangler::appendContext(const DeclContext *ctx) {
       }
       return appendOperator("E");
     }
-    return appendNominalType(decl);
+    return appendAnyGenericType(decl);
   }
 
   case DeclContextKind::AbstractClosureExpr:
@@ -1258,42 +1253,50 @@ void ASTMangler::appendProtocolName(const ProtocolDecl *protocol) {
   appendDeclName(protocol);
 }
 
-void ASTMangler::appendNominalType(const NominalTypeDecl *decl) {
+void ASTMangler::appendAnyGenericType(const GenericTypeDecl *decl) {
   // Check for certain standard types.
   if (tryAppendStandardSubstitution(decl))
     return;
 
   // For generic types, this uses the unbound type.
-  TypeBase *key = decl->getDeclaredType().getPointer();
+  Type key;
+  if (auto *alias = dyn_cast<TypeAliasDecl>(decl)) {
+    if (alias->isGeneric())
+      key = alias->getUnboundGenericType();
+    else
+      key = alias->getDeclaredInterfaceType();
+  } else {
+    key = cast<NominalTypeDecl>(decl)->getDeclaredType();
+  }
 
   // Try to mangle the entire name as a substitution.
-  if (tryMangleSubstitution(key))
+  if (tryMangleSubstitution(key.getPointer()))
     return;
 
   appendContextOf(decl);
   appendDeclName(decl);
 
   switch (decl->getKind()) {
-#define NOMINAL_TYPE_DECL(id, parent)
-#define DECL(id, parent) \
-    case DeclKind::id:
-#include "swift/AST/DeclNodes.def"
-      llvm_unreachable("not a nominal type");
+  default:
+    llvm_unreachable("not a nominal type");
 
-    case DeclKind::Protocol:
-      appendOperator("P");
-      break;
-    case DeclKind::Class:
-      appendOperator("C");
-      break;
-    case DeclKind::Enum:
-      appendOperator("O");
-      break;
-    case DeclKind::Struct:
-      appendOperator("V");
-      break;
+  case DeclKind::TypeAlias:
+    appendOperator("a");
+    break;
+  case DeclKind::Protocol:
+    appendOperator("P");
+    break;
+  case DeclKind::Class:
+    appendOperator("C");
+    break;
+  case DeclKind::Enum:
+    appendOperator("O");
+    break;
+  case DeclKind::Struct:
+    appendOperator("V");
+    break;
   }
-  addSubstitution(key);
+  addSubstitution(key.getPointer());
 }
 
 void ASTMangler::appendFunctionType(AnyFunctionType *fn,
@@ -1522,7 +1525,7 @@ void ASTMangler::appendAssociatedTypeName(DependentMemberType *dmt) {
   appendIdentifier(assocTy->getName().str());
   if (!OptimizeProtocolNames || !CurGenericSignature || !Mod
       || CurGenericSignature->getConformsTo(dmt->getBase(), *Mod).size() > 1) {
-    appendNominalType(assocTy->getProtocol());
+    appendAnyGenericType(assocTy->getProtocol());
   }
 }
 
@@ -1708,7 +1711,7 @@ void ASTMangler::appendDeclType(const ValueDecl *decl, bool isFunctionMangling) 
   }
 }
 
-bool ASTMangler::tryAppendStandardSubstitution(const NominalTypeDecl *decl) {
+bool ASTMangler::tryAppendStandardSubstitution(const GenericTypeDecl *decl) {
   // Bail out if our parent isn't the swift standard library.
   if (!isStdlibType(decl))
     return false;

@@ -405,8 +405,7 @@ private:
   NodePointer popTypeAndGetChild();
   NodePointer popTypeAndGetNominal();
   NodePointer demangleBuiltinType();
-  NodePointer demangleNominalType(Node::Kind kind);
-  NodePointer demangleTypeAlias();
+  NodePointer demangleAnyGenericType(Node::Kind kind);
   NodePointer demangleExtensionContext();
   NodePointer demanglePlainFunction();
   NodePointer popFunctionType(Node::Kind kind);
