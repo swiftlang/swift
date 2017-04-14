@@ -362,6 +362,8 @@ case DeclKind::ID: return cast<ID##Decl>(this)->getLoc();
   llvm_unreachable("Unknown decl kind");
 }
 
+SourceLoc BehaviorRecord::getLoc() const { return ProtocolName->getLoc(); }
+
 bool AbstractStorageDecl::isTransparent() const {
   return getAttrs().hasAttribute<TransparentAttr>();
 }
