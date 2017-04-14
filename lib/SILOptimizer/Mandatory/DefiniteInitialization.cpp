@@ -12,7 +12,7 @@
 
 #define DEBUG_TYPE "definite-init"
 #include "swift/SILOptimizer/PassManager/Passes.h"
-#include "DIMemoryUseCollector.h"
+#include "DIMemoryUseCollectorOwnership.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/Expr.h"
@@ -28,7 +28,12 @@
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/Debug.h"
 
+#ifdef SWIFT_SILOPTIMIZER_PASSMANAGER_DIMEMORYUSECOLLECTOR_H
+#error "Included non ownership header?!"
+#endif
+
 using namespace swift;
+using namespace ownership;
 
 STATISTIC(NumAssignRewritten, "Number of assigns rewritten");
 
