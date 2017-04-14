@@ -1672,9 +1672,6 @@ class HasIBAction {
 class HasIBInspectable {
   @IBInspectable var goodProperty: AnyObject?
   // CHECK: {{^}}  @IBInspectable @objc var goodProperty: AnyObject?
-
-  @IBInspectable var badProperty: PlainStruct?
-  // expected-error@-1{{property cannot be marked @IBInspectable because its type cannot be represented in Objective-C}}
 }
 
 //===---
@@ -1685,9 +1682,6 @@ class HasIBInspectable {
 class HasGKInspectable {
   @GKInspectable var goodProperty: AnyObject?
   // CHECK: {{^}}  @GKInspectable @objc var goodProperty: AnyObject?
-
-  @GKInspectable var badProperty: PlainStruct?
-  // expected-error@-1{{property cannot be marked @GKInspectable because its type cannot be represented in Objective-C}}
 }
 
 //===---
