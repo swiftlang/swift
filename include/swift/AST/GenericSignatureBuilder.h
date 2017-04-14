@@ -365,11 +365,15 @@ private:
 
   /// Add the requirements placed on the given type parameter
   /// to the given potential archetype.
+  ///
+  /// \param inferForModule Infer additional requirements from the types
+  /// relative to the given module.
   ConstraintResult addInheritedRequirements(
                                 TypeDecl *decl,
                                 PotentialArchetype *pa,
                                 const RequirementSource *parentSource,
-                                llvm::SmallPtrSetImpl<ProtocolDecl *> &visited);
+                                llvm::SmallPtrSetImpl<ProtocolDecl *> &visited,
+                                ModuleDecl *inferForModule);
 
   /// Visit all of the potential archetypes.
   template<typename F>
@@ -425,17 +429,25 @@ public:
   
   /// \brief Add a new requirement.
   ///
+  /// \param inferForModule Infer additional requirements from the types
+  /// relative to the given module.
+  ///
   /// \returns true if this requirement makes the set of requirements
   /// inconsistent, in which case a diagnostic will have been issued.
-  ConstraintResult addRequirement(const RequirementRepr *req);
+  ConstraintResult addRequirement(const RequirementRepr *req,
+                                  ModuleDecl *inferForModule);
 
   /// \brief Add a new requirement.
+  ///
+  /// \param inferForModule Infer additional requirements from the types
+  /// relative to the given module.
   ///
   /// \returns true if this requirement makes the set of requirements
   /// inconsistent, in which case a diagnostic will have been issued.
   ConstraintResult addRequirement(const RequirementRepr *Req,
                                   FloatingRequirementSource source,
-                                  const SubstitutionMap *subMap);
+                                  const SubstitutionMap *subMap,
+                                  ModuleDecl *inferForModule);
 
   /// \brief Add an already-checked requirement.
   ///
@@ -472,7 +484,8 @@ public:
   /// where \c Dictionary requires that its key type be \c Hashable,
   /// the requirement \c K : Hashable is inferred from the parameter type,
   /// because the type \c Dictionary<K,V> cannot be formed without it.
-  void inferRequirements(ModuleDecl &module, TypeLoc type);
+  void inferRequirements(ModuleDecl &module, TypeLoc type,
+                         FloatingRequirementSource source);
 
   /// Infer requirements from the given pattern, recursively.
   ///
@@ -688,6 +701,14 @@ public:
     /// appertains.
     ProtocolRequirement,
 
+    /// The requirement is a protocol requirement that is inferred from
+    /// some part of the protocol definition.
+    ///
+    /// This stores the protocol that introduced the requirement as well as the
+    /// dependent type (relative to that protocol) to which the conformance
+    /// appertains.
+    InferredProtocolRequirement,
+
     /// A requirement that was resolved via a superclass requirement.
     ///
     /// This stores the \c ProtocolConformance* used to resolve the
@@ -749,6 +770,7 @@ private:
     switch (kind) {
     case RequirementSignatureSelf:
     case ProtocolRequirement:
+    case InferredProtocolRequirement:
       return 1;
 
     case Explicit:
@@ -795,6 +817,7 @@ private:
       return true;
 
     case ProtocolRequirement:
+    case InferredProtocolRequirement:
     case Superclass:
     case Parent:
     case Concrete:
@@ -904,6 +927,7 @@ private:
                              GenericSignatureBuilder &builder,
                              Type dependentType,
                              ProtocolDecl *protocol,
+                             bool inferred,
                              WrittenRequirementLoc writtenLoc =
                                WrittenRequirementLoc()) const;
 
@@ -938,9 +962,7 @@ public:
 
   /// Whether the requirement is inferred or derived from an inferred
   /// requirment.
-  bool isInferredRequirement() const {
-    return getRoot()->kind == Inferred;
-  }
+  bool isInferredRequirement() const;
 
   /// Classify the kind of this source for diagnostic purposes.
   unsigned classifyDiagKind() const;
@@ -1071,6 +1093,7 @@ class GenericSignatureBuilder::FloatingRequirementSource {
   struct {
     ProtocolDecl *protocol = nullptr;
     WrittenRequirementLoc written;
+    bool inferred = false;
   } protocolReq;
 
   FloatingRequirementSource(Kind kind, Storage storage)
@@ -1100,19 +1123,23 @@ public:
 
   static FloatingRequirementSource viaProtocolRequirement(
                                      const RequirementSource *base,
-                                     ProtocolDecl *inProtocol) {
+                                     ProtocolDecl *inProtocol,
+                                     bool inferred) {
     FloatingRequirementSource result{ AbstractProtocol, base };
     result.protocolReq.protocol = inProtocol;
+    result.protocolReq.inferred = inferred;
     return result;
   }
 
   static FloatingRequirementSource viaProtocolRequirement(
                                      const RequirementSource *base,
                                      ProtocolDecl *inProtocol,
-                                     WrittenRequirementLoc written) {
+                                     WrittenRequirementLoc written,
+                                     bool inferred) {
     FloatingRequirementSource result{ AbstractProtocol, base };
     result.protocolReq.protocol = inProtocol;
     result.protocolReq.written = written;
+    result.protocolReq.inferred = inferred;
     return result;
   }
 
@@ -1125,6 +1152,10 @@ public:
 
   /// Whether this is an explicitly-stated requirement.
   bool isExplicit() const;
+
+  /// Return the "inferred" version of this source, if it isn't already
+  /// inferred.
+  FloatingRequirementSource asInferred(const TypeRepr *typeRepr) const;
 };
 
 class GenericSignatureBuilder::PotentialArchetype {
