@@ -179,10 +179,6 @@ func checkStringComparison(
 let comparisonTests = tests.map {
   (test: ComparisonTest) -> ComparisonTest in
   switch (test.expectedUnicodeCollation, test.lhs, test.rhs) {
-  case (.gt, "t", "Tt"), (.lt, "A\u{30a}", "a"):
-    return test.replacingPredicate(.nativeRuntime(
-      "Comparison reversed between ICU and CFString, https://bugs.swift.org/browse/SR-530"))
-
   case (.gt, "\u{0}", ""), (.lt, "\u{0}", "\u{0}\u{0}"):
     return test.replacingPredicate(.nativeRuntime(
       "Null-related issue: https://bugs.swift.org/browse/SR-630"))
