@@ -19,7 +19,7 @@ class Derived : Base<Int>, P {
 
 protocol R {}
 
-// CHECK-LABEL: sil hidden @_T021subclass_existentials11conversionsyAA1P_AA4BaseCySiGXE8baseAndP_AA7DerivedC7derivedAA1R_AIXE0hF1RAaC_AFXEXp0eF5PTypeAIm0H4TypeAaK_AIXEXp0hF5RTypetF : $@convention(thin) (@owned Base<Int> & P, @owned Derived, @owned Derived & R, @thick (Base<Int> & P).Type, @thick Derived.Type, @thick (Derived & R).Type) -> () {
+// CHECK-LABEL: sil hidden @_T021subclass_existentials11conversionsyAA1P_AA4BaseCySiGXc8baseAndP_AA7DerivedC7derivedAA1R_AIXc0hF1RAaC_AFXcXp0eF5PTypeAIm0H4TypeAaK_AIXcXp0hF5RTypetF : $@convention(thin) (@owned Base<Int> & P, @owned Derived, @owned Derived & R, @thick (Base<Int> & P).Type, @thick Derived.Type, @thick (Derived & R).Type) -> () {
 
 func conversions(
   baseAndP: Base<Int> & P,

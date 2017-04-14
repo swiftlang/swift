@@ -279,6 +279,7 @@ private:
       return Node->getChild(0)->getNumChildren() <= 1;
 
     case Node::Kind::ProtocolListWithClass:
+    case Node::Kind::ProtocolListWithAnyObject:
     case Node::Kind::Allocator:
     case Node::Kind::ArgumentTuple:
     case Node::Kind::AssociatedTypeMetadataAccessor:
@@ -1342,6 +1343,20 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
     print(superclass);
     Printer << " & ";
     printChildren(protocols, " & ");
+    return nullptr;
+  }
+  case Node::Kind::ProtocolListWithAnyObject: {
+    if (Node->getNumChildren() < 1)
+      return nullptr;
+    NodePointer protocols = Node->getChild(0);
+    if (protocols->getNumChildren() < 1)
+      return nullptr;
+    if (protocols->getChild(0)->getNumChildren() == 0) {
+      Printer << "AnyObject";
+    } else {
+      printChildren(protocols->getChild(0), " & ");
+      Printer << " & AnyObject";
+    }
     return nullptr;
   }
   case Node::Kind::AssociatedType:
