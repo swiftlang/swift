@@ -350,6 +350,9 @@ std::string ASTMangler::mangleDeclAsUSR(const ValueDecl *Decl,
   } else {
     appendEntity(Decl);
   }
+
+  // We have a custom prefix, so finalize() won't verify for us. Do it manually.
+  verify(Storage.str().drop_front(USRPrefix.size()));
   return finalize();
 }
 
@@ -360,6 +363,8 @@ std::string ASTMangler::mangleAccessorEntityAsUSR(AccessorKind kind,
   llvm::SaveAndRestore<bool> allowUnnamedRAII(AllowNamelessEntities, true);
   Buffer << USRPrefix;
   appendAccessorEntity(kind, addressorKind, decl, /*isStatic*/ false);
+  // We have a custom prefix, so finalize() won't verify for us. Do it manually.
+  verify(Storage.str().drop_front(USRPrefix.size()));
   return finalize();
 }
 

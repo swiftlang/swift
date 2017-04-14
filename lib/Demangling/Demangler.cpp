@@ -237,6 +237,8 @@ NodePointer Demangler::demangleSymbol(StringRef MangledName) {
       && !nextIf("_S"))
     return nullptr;
 
+  // If any other prefixes are accepted, please update Mangler::verify.
+
   NodePointer topLevel = createNode(Node::Kind::Global);
 
   parseAndPushNodes();
