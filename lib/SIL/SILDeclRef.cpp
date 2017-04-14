@@ -859,7 +859,7 @@ SubclassScope SILDeclRef::getSubclassScope() const {
   if (!classType || classType->isFinal())
     return SubclassScope::NotApplicable;
 
-  if (FD->isFinal() && !FD->getOverriddenDecl())
+  if (FD->isFinal())
     return SubclassScope::NotApplicable;
 
   assert(FD->getEffectiveAccess() <= classType->getEffectiveAccess() &&

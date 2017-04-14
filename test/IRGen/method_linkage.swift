@@ -21,7 +21,7 @@ class Base {
   }
 }
 class Derived : Base {
-  // CHECK: define hidden swiftcc void @_T014method_linkage7Derived{{.*}}3foo0
+  // CHECK: define internal swiftcc void @_T014method_linkage7Derived{{.*}}3foo0
   @inline(never)
   fileprivate final override func foo() {
   }
