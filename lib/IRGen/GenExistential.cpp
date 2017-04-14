@@ -18,6 +18,7 @@
 
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/Types.h"
 #include "swift/IRGen/Linking.h"
@@ -1335,14 +1336,15 @@ public:
   
 } // end anonymous namespace
 
-static const TypeInfo *createErrorExistentialTypeInfo(IRGenModule &IGM,
-                                            ArrayRef<ProtocolDecl*> protocols) {
+static const TypeInfo *
+createErrorExistentialTypeInfo(IRGenModule &IGM,
+                               const ExistentialLayout &layout) {
   // The Error existential has a special boxed representation. It has
   // space only for witnesses to the Error protocol.
-  assert(protocols.size() == 1
-     && *protocols[0]->getKnownProtocolKind() == KnownProtocolKind::Error);
-  
-  const ProtocolInfo &impl = IGM.getProtocolInfo(protocols[0]);
+  assert(layout.isErrorExistential());
+  auto *protocol = layout.getProtocols()[0]->getDecl();
+  auto &impl = IGM.getProtocolInfo(protocol);
+
   auto refcounting = (!IGM.ObjCInterop
                       ? ReferenceCounting::Native
                       : ReferenceCounting::Error);
@@ -1351,36 +1353,28 @@ static const TypeInfo *createErrorExistentialTypeInfo(IRGenModule &IGM,
                                       IGM.getPointerSize(),
                                       IGM.getHeapObjectSpareBits(),
                                       IGM.getPointerAlignment(),
-                                      ProtocolEntry(protocols[0], impl),
+                                      ProtocolEntry(protocol, impl),
                                       refcounting);
 }
 
-static const TypeInfo *createExistentialTypeInfo(IRGenModule &IGM, CanType T,
-                                            ArrayRef<ProtocolDecl*> protocols) {
+static const TypeInfo *createExistentialTypeInfo(IRGenModule &IGM, CanType T) {
+  auto layout = T.getExistentialLayout();
+
   SmallVector<llvm::Type*, 5> fields;
   SmallVector<ProtocolEntry, 4> entries;
 
   // Check for special existentials.
-  if (protocols.size() == 1) {
-    switch (getSpecialProtocolID(protocols[0])) {
-    case SpecialProtocol::Error:
-      // Error has a special runtime representation.
-      return createErrorExistentialTypeInfo(IGM, protocols);
-    // Other existentials have standard representations.
-    case SpecialProtocol::AnyObject:
-    case SpecialProtocol::None:
-      break;
-    }
+  if (layout.isErrorExistential()) {
+    // Error has a special runtime representation.
+    return createErrorExistentialTypeInfo(IGM, layout);
   }
 
+  // Note: Protocol composition types are not nominal, but we name them anyway.
   llvm::StructType *type;
   if (isa<ProtocolType>(T))
     type = IGM.createNominalType(T);
-  else if (auto compT = dyn_cast<ProtocolCompositionType>(T))
-    // Protocol composition types are not nominal, but we name them anyway.
-    type = IGM.createNominalType(compT.getPointer());
   else
-    llvm_unreachable("unknown existential type kind");
+    type = IGM.createNominalType(cast<ProtocolCompositionType>(T.getPointer()));
     
   assert(type->isOpaque() && "creating existential type in concrete struct");
 
@@ -1392,25 +1386,25 @@ static const TypeInfo *createExistentialTypeInfo(IRGenModule &IGM, CanType T,
   fields.push_back(nullptr);
   fields.push_back(nullptr);
 
-  bool requiresClass = false;
+  // The existential container is class-constrained if any of its protocol
+  // constraints are.
+  bool requiresClass = layout.requiresClass;
   bool allowsTaggedPointers = true;
 
-  for (auto protocol : protocols) {
-    // The existential container is class-constrained if any of its protocol
-    // constraints are.
-    requiresClass |= protocol->requiresClass();
+  for (auto protoTy : layout.getProtocols()) {
+    auto *protoDecl = protoTy->getDecl();
 
-    if (protocol->getAttrs().hasAttribute<UnsafeNoObjCTaggedPointerAttr>())
+    if (protoDecl->getAttrs().hasAttribute<UnsafeNoObjCTaggedPointerAttr>())
       allowsTaggedPointers = false;
 
     // ObjC protocols need no layout or witness table info. All dispatch is done
     // through objc_msgSend.
-    if (!Lowering::TypeConverter::protocolRequiresWitnessTable(protocol))
+    if (!Lowering::TypeConverter::protocolRequiresWitnessTable(protoDecl))
       continue;
 
     // Find the protocol layout.
-    const ProtocolInfo &impl = IGM.getProtocolInfo(protocol);
-    entries.push_back(ProtocolEntry(protocol, impl));
+    const ProtocolInfo &impl = IGM.getProtocolInfo(protoDecl);
+    entries.push_back(ProtocolEntry(protoDecl, impl));
 
     // Each protocol gets a witness table.
     fields.push_back(IGM.WitnessTablePtrTy);
@@ -1423,7 +1417,8 @@ static const TypeInfo *createExistentialTypeInfo(IRGenModule &IGM, CanType T,
     // native reference counting entry points.
     ReferenceCounting refcounting;
 
-    // Replace the type metadata pointer with the class instance.
+    // FIXME: If there is a superclass constraint we might be able to
+    // use native refcounting.
     if (!IGM.ObjCInterop) {
       refcounting = ReferenceCounting::Native;
       fields[1] = IGM.RefCountedPtrTy;
@@ -1432,6 +1427,7 @@ static const TypeInfo *createExistentialTypeInfo(IRGenModule &IGM, CanType T,
       fields[1] = IGM.UnknownRefCountedPtrTy;
     }
 
+    // Replace the type metadata pointer with the class instance.
     auto classFields = llvm::makeArrayRef(fields).slice(1);
     type->setBody(classFields);
 
@@ -1463,24 +1459,19 @@ static const TypeInfo *createExistentialTypeInfo(IRGenModule &IGM, CanType T,
   fields[1] = IGM.TypeMetadataPtrTy;
   type->setBody(fields);
 
-  OpaqueExistentialLayout layout(entries.size());
-  Alignment align = layout.getAlignment(IGM);
-  Size size = layout.getSize(IGM);
+  OpaqueExistentialLayout opaque(entries.size());
+  Alignment align = opaque.getAlignment(IGM);
+  Size size = opaque.getSize(IGM);
   return OpaqueExistentialTypeInfo::create(entries, type, size, align);
 }
 
 const TypeInfo *TypeConverter::convertProtocolType(ProtocolType *T) {
-  // Protocol types are nominal.
-  return createExistentialTypeInfo(IGM, CanType(T), T->getDecl());
+  return createExistentialTypeInfo(IGM, CanType(T));
 }
 
 const TypeInfo *
 TypeConverter::convertProtocolCompositionType(ProtocolCompositionType *T) {
-  // Find the canonical protocols.  There might not be any.
-  SmallVector<ProtocolDecl*, 4> protocols;
-  T->getExistentialTypeProtocols(protocols);
-
-  return createExistentialTypeInfo(IGM, CanType(T), protocols);
+  return createExistentialTypeInfo(IGM, CanType(T));
 }
 
 const TypeInfo *
@@ -1488,8 +1479,11 @@ TypeConverter::convertExistentialMetatypeType(ExistentialMetatypeType *T) {
   assert(T->hasRepresentation() &&
          "metatype should have been assigned a representation by SIL");
 
-  SmallVector<ProtocolDecl*, 4> protocols;
-  T->getAnyExistentialTypeProtocols(protocols);
+  auto instanceT = CanExistentialMetatypeType(T).getInstanceType();
+  while (isa<ExistentialMetatypeType>(instanceT))
+    instanceT = cast<ExistentialMetatypeType>(instanceT).getInstanceType();
+
+  auto layout = instanceT.getExistentialLayout();
 
   SmallVector<ProtocolEntry, 4> entries;
   SmallVector<llvm::Type*, 4> fields;
@@ -1502,13 +1496,15 @@ TypeConverter::convertExistentialMetatypeType(ExistentialMetatypeType *T) {
   fields.push_back(baseTI.getStorageType());
   spareBits.append(baseTI.getSpareBits());
 
-  for (auto protocol : protocols) {
-    if (!Lowering::TypeConverter::protocolRequiresWitnessTable(protocol))
+  for (auto protoTy : layout.getProtocols()) {
+    auto *protoDecl = protoTy->getDecl();
+
+    if (!Lowering::TypeConverter::protocolRequiresWitnessTable(protoDecl))
       continue;
 
     // Find the protocol layout.
-    const ProtocolInfo &impl = IGM.getProtocolInfo(protocol);
-    entries.push_back(ProtocolEntry(protocol, impl));
+    const ProtocolInfo &impl = IGM.getProtocolInfo(protoDecl);
+    entries.push_back(ProtocolEntry(protoDecl, impl));
 
     // Each protocol gets a witness table.
     fields.push_back(IGM.WitnessTablePtrTy);
@@ -1640,15 +1636,17 @@ static void forEachProtocolWitnessTable(IRGenFunction &IGF,
                           ArrayRef<ProtocolConformanceRef> conformances,
                           std::function<void (unsigned, llvm::Value*)> body) {
   // Collect the conformances that need witness tables.
-  SmallVector<ProtocolDecl*, 2> destProtocols;
-  destType.getExistentialTypeProtocols(destProtocols);
+  auto layout = destType.getExistentialLayout();
+  auto destProtocols = layout.getProtocols();
 
   SmallVector<ProtocolConformanceRef, 2> witnessConformances;
   assert(destProtocols.size() == conformances.size() &&
          "mismatched protocol conformances");
-  for (unsigned i = 0, size = destProtocols.size(); i < size; ++i)
-    if (Lowering::TypeConverter::protocolRequiresWitnessTable(destProtocols[i]))
+  for (unsigned i = 0, size = destProtocols.size(); i < size; ++i) {
+    auto destProtocol = destProtocols[i]->getDecl();
+    if (Lowering::TypeConverter::protocolRequiresWitnessTable(destProtocol))
       witnessConformances.push_back(conformances[i]);
+  }
 
   assert(protocols.size() == witnessConformances.size() &&
          "mismatched protocol conformances");
@@ -1797,20 +1795,11 @@ void irgen::emitClassExistentialContainer(IRGenFunction &IGF,
   // As a special case, an Error existential can be represented as a
   // reference to an already existing NSError or CFError instance.
   if (outType.getSwiftRValueType().isExistentialType()) {
-    SmallVector<ProtocolDecl*, 4> protocols;
-    outType.getSwiftRValueType().getExistentialTypeProtocols(protocols);
-    if (protocols.size() == 1) {
-      switch (getSpecialProtocolID(protocols[0])) {
-      case SpecialProtocol::Error: {
-        // Bitcast the incoming class reference to Error.
-        out.add(IGF.Builder.CreateBitCast(instance, IGF.IGM.ErrorPtrTy));
-        return;
-      }
-
-      case SpecialProtocol::AnyObject:
-      case SpecialProtocol::None:
-        break;
-      }
+    auto layout = outType.getSwiftRValueType().getExistentialLayout();
+    if (layout.isErrorExistential()) {
+      // Bitcast the incoming class reference to Error.
+      out.add(IGF.Builder.CreateBitCast(instance, IGF.IGM.ErrorPtrTy));
+      return;
     }
   }
   
