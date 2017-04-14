@@ -43,11 +43,10 @@ using clang::isWhitespace;
 
 /// number of bits must tally with Token.h
 enum StringLiteralModifiers : unsigned {
-  StringLiteralMultiline = 1 << 0,
+  StringLiteralMultiline = 1<<0,
 
-  // pseudo options not in Token.h
-  StringLiteralFirstSegment = 1 << 1,
-  StringLiteralLastSegment = 1 << 2
+  // pseudo option not in Token.h
+  StringLiteralFirstSegment = 1<<1,
 };
 
 //===----------------------------------------------------------------------===//
@@ -1404,7 +1403,7 @@ void Lexer::lexStringLiteral() {
   // NOTE: We only allow single-quote string literals so we can emit useful
   // diagnostics about changing them to double quotes.
 
-  bool wasErroneous = false;
+  bool wasErroneous = false, wasWhitespace = false, allWhitespace = true;
   unsigned Modifiers = 0;
 
   // is this the start of a multiline string litersl
@@ -1431,12 +1430,23 @@ void Lexer::lexStringLiteral() {
     }
 
     // String literals cannot have \n or \r in them (unless multiline)
-    if (((*CurPtr == '\r' || *CurPtr == '\n') &&
-        !(Modifiers & StringLiteralMultiline)) || CurPtr == BufferEnd) {
-      diagnose(TokStart, diag::lex_unterminated_string);
-      return formToken(tok::unknown, TokStart);
+    if (*CurPtr == '\r' || *CurPtr == '\n' || CurPtr == BufferEnd) {
+      if (!(Modifiers & StringLiteralMultiline) || CurPtr == BufferEnd) {
+        diagnose(TokStart, diag::lex_unterminated_string);
+        return formToken(tok::unknown, TokStart);
+      }
+      else if (wasWhitespace && !allWhitespace)
+        diagnose(CurPtr, diag::lex_trailing_multiline_whitespace)
+          .fixItReplaceChars(getSourceLoc(CurPtr), getSourceLoc(CurPtr), "\\n\\");
+      wasWhitespace = false;
+      allWhitespace = true;
     }
-    
+    else {
+      wasWhitespace = *CurPtr == ' ' || *CurPtr == '\t';
+      if (!wasWhitespace)
+        allWhitespace = false;
+    }
+
     unsigned CharValue = lexCharacter(CurPtr, *TokStart, true, Modifiers);
     wasErroneous |= CharValue == ~1U;
 
@@ -1670,9 +1680,7 @@ StringRef Lexer::getEncodedStringSegment(StringRef Bytes,
     IndentStripped = Bytes;
     size_t pos = 0;
     while ((pos = IndentStripped.find(ToReplace, pos)) != std::string::npos) {
-      bool removeNewLine = (pos == 0 && (Modifiers & StringLiteralFirstSegment));
-//                             || ((Modifiers & StringLiteralLastSegment) &&
-//                                 pos + ToReplace.size() == IndentStripped.size());
+      bool removeNewLine = pos == 0 && (Modifiers & StringLiteralFirstSegment);
       IndentStripped.replace(pos, ToReplace.size(), removeNewLine ? "" : "\n");
       if (removeNewLine && ToReplace == "\n")
         break;
@@ -1805,7 +1813,6 @@ void Lexer::getStringLiteralSegments(
     SegmentStartPtr = BytesPtr = End;
   }
 
-  Modifiers |= StringLiteralLastSegment;
   Segments.push_back(
       StringSegment::getLiteral(getSourceLoc(SegmentStartPtr),
                                 Bytes.end()-SegmentStartPtr, Modifiers, ToReplace));
