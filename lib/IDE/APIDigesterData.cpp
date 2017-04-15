@@ -252,7 +252,7 @@ serializeDiffItem(llvm::BumpPtrAllocator &Alloc,
     return Result;
   }
   case APIDiffItemKind::ADK_TypeMemberDiffItem: {
-    TypeMemberDiffItem *Result = Alloc.Allocate<TypeMemberDiffItem>();
+    TypeMemberDiffItem *Result = Alloc.Allocate<TypeMemberDiffItem>(1);
     Optional<uint8_t> SelfIndexShort;
     if (SelfIndex)
       SelfIndexShort = SelfIndex.getValue();
@@ -264,13 +264,13 @@ serializeDiffItem(llvm::BumpPtrAllocator &Alloc,
     return Result;
   }
   case APIDiffItemKind::ADK_NoEscapeFuncParam: {
-    NoEscapeFuncParam *Result = Alloc.Allocate<NoEscapeFuncParam>();
+    NoEscapeFuncParam *Result = Alloc.Allocate<NoEscapeFuncParam>(1);
     Result->Usr = Usr;
     Result->Index = Index.getValue();
     return Result;
   }
   case APIDiffItemKind::ADK_OverloadedFuncInfo: {
-    OverloadedFuncInfo *Result = Alloc.Allocate<OverloadedFuncInfo>();
+    OverloadedFuncInfo *Result = Alloc.Allocate<OverloadedFuncInfo>(1);
     Result->Usr = Usr;
     return Result;
   }
@@ -380,7 +380,7 @@ private:
   llvm::BumpPtrAllocator Allocator;
 public:
   llvm::StringMap<std::vector<APIDiffItem*>> Data;
-
+  std::vector<APIDiffItem*> AllItems;
   Implementation(StringRef FileName):
       FileBufOrErr(llvm::MemoryBuffer::getFileOrSTDIN(FileName)) {
     if (!FileBufOrErr) {
@@ -395,6 +395,7 @@ public:
         APIDiffItem *Item = serializeDiffItem(Allocator,
           cast<llvm::yaml::MappingNode>(&*It));
         Data[Item->getKey()].push_back(Item);
+        AllItems.push_back(Item);
       }
     }
   }
@@ -402,6 +403,9 @@ public:
 
 ArrayRef<APIDiffItem*> swift::ide::api::APIDiffItemStore::
 getDiffItems(StringRef Key) const { return Impl.Data[Key]; }
+
+ArrayRef<APIDiffItem*> swift::ide::api::APIDiffItemStore::
+getAllDiffItems() const { return Impl.AllItems; }
 
 swift::ide::api::APIDiffItemStore::APIDiffItemStore(StringRef FileName) :
   Impl(*new Implementation(FileName)) {}

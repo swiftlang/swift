@@ -67,6 +67,7 @@ namespace  {
     DumpSwiftModules,
     CompareSDKs,
     DiagnoseSDKs,
+    DeserializeDiffItems,
   };
 } // end anonymous namespace
 
@@ -128,7 +129,10 @@ Action(llvm::cl::desc("Mode:"), llvm::cl::init(ActionType::None),
                      "Compare SDK content in JSON file"),
           clEnumValN(ActionType::DiagnoseSDKs,
                      "diagnose-sdk",
-                     "Diagnose SDK content in JSON file")));
+                     "Diagnose SDK content in JSON file"),
+          clEnumValN(ActionType::DeserializeDiffItems,
+                     "deserialize-diff",
+                     "Deserialize diff items in a JSON file")));
 
 static llvm::cl::list<std::string>
 SDKJsonPaths("input-paths",
@@ -3318,6 +3322,14 @@ static void readIgnoredUsrs(llvm::StringSet<> &IgnoredUsrs) {
   readFileLineByLine(Path, IgnoredUsrs);
 }
 
+static int deserializeDiffItems(StringRef DiffPath, StringRef OutputPath) {
+  APIDiffItemStore Store(DiffPath);
+  std::error_code EC;
+  llvm::raw_fd_ostream FS(OutputPath, EC, llvm::sys::fs::F_None);
+  APIDiffItemStore::serialize(FS, Store.getAllDiffItems());
+  return 0;
+}
+
 int main(int argc, char *argv[]) {
   INITIALIZE_LLVM(argc, argv);
 
@@ -3353,6 +3365,13 @@ int main(int argc, char *argv[]) {
     else
       return diagnoseModuleChange(options::SDKJsonPaths[0],
                                   options::SDKJsonPaths[1]);
+  case ActionType::DeserializeDiffItems: {
+    if (options::SDKJsonPaths.size() != 1) {
+      llvm::cl::PrintHelpMessage();
+      return 1;
+    }
+    return deserializeDiffItems(options::SDKJsonPaths[0], options::OutputFile);
+  }
   case ActionType::None:
     llvm::errs() << "Action required\n";
     llvm::cl::PrintHelpMessage();

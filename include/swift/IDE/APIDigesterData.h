@@ -240,6 +240,7 @@ struct APIDiffItemStore {
   APIDiffItemStore(StringRef FileName);
   ~APIDiffItemStore();
   ArrayRef<APIDiffItem*> getDiffItems(StringRef Key) const;
+  ArrayRef<APIDiffItem*> getAllDiffItems() const;
 };
 }
 }
