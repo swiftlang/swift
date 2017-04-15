@@ -739,7 +739,7 @@ void ReabstractionInfo::specializeConcreteSubstitutions(
   auto InterfaceSubs = OrigGenericSig->getSubstitutionMap(ParamSubs);
 
   // This is a workaround for the rdar://30610428
-  if (!EnablePartialSpecialization) {
+  if (!EnablePartialSpecialization || !HasUnboundGenericParams) {
     SubstitutedType =
         Callee->getLoweredFunctionType()->substGenericArgs(M, InterfaceSubs);
     ClonerParamSubs = OriginalParamSubs;
