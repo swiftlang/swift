@@ -279,4 +279,7 @@ void swift::enumeratePublicSymbols(FileUnit *file, StringSet &symbols,
   TBDGenVisitor visitor(symbols, linkInfo, file->getParentModule());
   for (auto d : decls)
     visitor.visit(d);
+
+  if (file->hasEntryPoint())
+    symbols.insert("main");
 }
