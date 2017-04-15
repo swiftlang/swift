@@ -454,15 +454,20 @@ public:
   /// Adding an already-checked requirement cannot fail. This is used to
   /// re-inject requirements from outer contexts.
   ///
+  /// \param inferForModule Infer additional requirements from the types
+  /// relative to the given module.
+  ///
   /// \returns true if this requirement makes the set of requirements
   /// inconsistent, in which case a diagnostic will have been issued.
   ConstraintResult addRequirement(const Requirement &req,
                                   FloatingRequirementSource source,
+                                  ModuleDecl *inferForModule,
                                   const SubstitutionMap *subMap = nullptr);
 
   ConstraintResult addRequirement(
                                 const Requirement &req,
                                 FloatingRequirementSource source,
+                                ModuleDecl *inferForModule,
                                 const SubstitutionMap *subMap,
                                 llvm::SmallPtrSetImpl<ProtocolDecl *> &Visited);
 

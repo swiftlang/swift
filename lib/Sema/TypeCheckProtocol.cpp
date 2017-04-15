@@ -1080,7 +1080,8 @@ RequirementEnvironment::RequirementEnvironment(
   auto source =
     GenericSignatureBuilder::FloatingRequirementSource::forAbstract();
   for (auto &req : reqSig->getRequirements()) {
-    builder.addRequirement(req, source, &reqToSyntheticEnvMap);
+    builder.addRequirement(req, source, conformanceDC->getParentModule(),
+                           &reqToSyntheticEnvMap);
   }
 
   // Finalize the generic signature builder.

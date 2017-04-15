@@ -604,7 +604,7 @@ getSignatureWithRequirements(GenericSignature *OrigGenSig,
   // For each substitution with a concrete type as a replacement,
   // add a new concrete type equality requirement.
   for (auto &Req : Requirements) {
-    Builder.addRequirement(Req, Source);
+    Builder.addRequirement(Req, Source, M.getSwiftModule());
   }
 
   Builder.finalize(SourceLoc(), OrigGenSig->getGenericParams(),
@@ -882,7 +882,7 @@ static void remapRequirements(GenericSignature *GenSig,
   // caller's archetypes mapped to the specialized signature.
   for (auto &reqReq : GenSig->getRequirements()) {
     DEBUG(llvm::dbgs() << "\n\nRe-mapping the requirement:\n"; reqReq.dump());
-    Builder.addRequirement(reqReq, source, &SubsMap);
+    Builder.addRequirement(reqReq, source, SM, &SubsMap);
   }
 }
 
@@ -1164,7 +1164,7 @@ void FunctionSignaturePartialSpecializer::
 
     Requirement Req(RequirementKind::SameType, SubstGenericParamCanTy,
                     SpecializedReplacementCallerInterfaceTy);
-    Builder.addRequirement(Req, Source);
+    Builder.addRequirement(Req, Source, SM);
 
     DEBUG(llvm::dbgs() << "Added a requirement:\n"; Req.dump());
 

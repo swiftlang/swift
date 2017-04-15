@@ -2331,8 +2331,8 @@ ConstraintResult GenericSignatureBuilder::addConformanceRequirement(
       FloatingRequirementSource::viaProtocolRequirement(Source, Proto,
                                                         /*inferred=*/false);
     for (auto req : reqSig->getRequirements()) {
-      auto reqResult = addRequirement(req, innerSource, &protocolSubMap,
-                                      Visited);
+      auto reqResult = addRequirement(req, innerSource, nullptr,
+                                      &protocolSubMap, Visited);
       if (isErrorResult(reqResult)) return reqResult;
     }
 
@@ -3143,7 +3143,7 @@ ConstraintResult GenericSignatureBuilder::addRequirement(
     }
     return addRequirement(Requirement(RequirementKind::SameType,
                                       firstType, secondType),
-                          source);
+                          source, nullptr);
   }
   }
 
@@ -3153,14 +3153,16 @@ ConstraintResult GenericSignatureBuilder::addRequirement(
 ConstraintResult GenericSignatureBuilder::addRequirement(
                                              const Requirement &req,
                                              FloatingRequirementSource source,
+                                             ModuleDecl *inferForModule,
                                              const SubstitutionMap *subMap) {
   llvm::SmallPtrSet<ProtocolDecl *, 8> visited;
-  return addRequirement(req, source, subMap, visited);
+  return addRequirement(req, source, inferForModule, subMap, visited);
 }
 
 ConstraintResult GenericSignatureBuilder::addRequirement(
                             const Requirement &req,
                             FloatingRequirementSource source,
+                            ModuleDecl *inferForModule,
                             const SubstitutionMap *subMap,
                             llvm::SmallPtrSetImpl<ProtocolDecl *> &Visited) {
   auto subst = [&](Type t) {
@@ -3179,6 +3181,13 @@ ConstraintResult GenericSignatureBuilder::addRequirement(
     if (!firstType || !secondType)
       return ConstraintResult::Conflicting;
 
+    if (inferForModule) {
+      inferRequirements(*inferForModule, TypeLoc::withoutLoc(firstType),
+                        FloatingRequirementSource::forInferred(nullptr));
+      inferRequirements(*inferForModule, TypeLoc::withoutLoc(secondType),
+                        FloatingRequirementSource::forInferred(nullptr));
+    }
+
     return addTypeRequirement(firstType, secondType, source,
                               UnresolvedHandlingKind::GenerateConstraints,
                               &Visited);
@@ -3189,6 +3198,11 @@ ConstraintResult GenericSignatureBuilder::addRequirement(
     if (!firstType)
       return ConstraintResult::Conflicting;
 
+    if (inferForModule) {
+      inferRequirements(*inferForModule, TypeLoc::withoutLoc(firstType),
+                        FloatingRequirementSource::forInferred(nullptr));
+    }
+
     return addLayoutRequirement(firstType, req.getLayoutConstraint(), source,
                                 UnresolvedHandlingKind::GenerateConstraints);
   }
@@ -3198,6 +3212,13 @@ ConstraintResult GenericSignatureBuilder::addRequirement(
     auto secondType = subst(req.getSecondType());
     if (!firstType || !secondType)
       return ConstraintResult::Conflicting;
+
+    if (inferForModule) {
+      inferRequirements(*inferForModule, TypeLoc::withoutLoc(firstType),
+                        FloatingRequirementSource::forInferred(nullptr));
+      inferRequirements(*inferForModule, TypeLoc::withoutLoc(secondType),
+                        FloatingRequirementSource::forInferred(nullptr));
+    }
 
     return addSameTypeRequirement(
         firstType, secondType, source,
@@ -3242,7 +3263,7 @@ public:
     // Handle the requirements.
     // FIXME: Inaccurate TypeReprs.
     for (const auto &req : genericSig->getRequirements()) {
-      Builder.addRequirement(req, source, &subMap);
+      Builder.addRequirement(req, source, nullptr, &subMap);
     }
 
     return Action::Continue;
@@ -4683,12 +4704,12 @@ void GenericSignatureBuilder::addGenericSignature(GenericSignature *sig) {
     if (reqt.getKind() == RequirementKind::SameType)
       sameTypeRequirements.push_back(reqt);
     else
-      addRequirement(reqt, FloatingRequirementSource::forAbstract());
+      addRequirement(reqt, FloatingRequirementSource::forAbstract(), nullptr);
   }
 
   // Handle same-type requirements.
   for (auto &reqt : sameTypeRequirements) {
-    addRequirement(reqt, FloatingRequirementSource::forAbstract());
+    addRequirement(reqt, FloatingRequirementSource::forAbstract(), nullptr);
   }
 }
 
