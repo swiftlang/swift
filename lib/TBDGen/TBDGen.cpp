@@ -199,9 +199,12 @@ void TBDGenVisitor::visitNominalTypeDecl(NominalTypeDecl *NTD) {
 
   addSymbol(LinkEntity::forNominalTypeDescriptor(NTD));
 
-  addSymbol(LinkEntity::forTypeMetadata(declaredType,
-                                        TypeMetadataAddress::AddressPoint,
-                                        /*isPattern=*/false));
+  // Generic types do not get metadata directly, only through the function.
+  if (!NTD->isGenericContext()) {
+    addSymbol(LinkEntity::forTypeMetadata(declaredType,
+                                          TypeMetadataAddress::AddressPoint,
+                                          /*isPattern=*/false));
+  }
   addSymbol(LinkEntity::forTypeMetadataAccessFunction(declaredType));
 
   // There are symbols associated with any protocols this type conforms to.
@@ -230,8 +233,11 @@ void TBDGenVisitor::visitClassDecl(ClassDecl *CD) {
     return;
 
   auto &ctxt = CD->getASTContext();
+  auto isGeneric = CD->isGenericContext();
 
-  if (ctxt.LangOpts.EnableObjCInterop) {
+  // Metaclasses are a ObjC thing, and so are not needed in build artifacts/for
+  // classes which can't touch ObjC.
+  if (ctxt.LangOpts.EnableObjCInterop && !isGeneric) {
     addSymbol(LinkEntity::forSwiftMetaclassStub(CD));
   }
 
@@ -243,7 +249,8 @@ void TBDGenVisitor::visitClassDecl(ClassDecl *CD) {
       continue;
 
     auto var = dyn_cast<VarDecl>(value);
-    auto hasFieldOffset = var && var->hasStorage() && !var->isStatic();
+    auto hasFieldOffset =
+        !isGeneric && var && var->hasStorage() && !var->isStatic();
     if (hasFieldOffset) {
       // These fields are always direct.
       addSymbol(LinkEntity::forFieldOffset(var, /*isIndirect=*/false));
