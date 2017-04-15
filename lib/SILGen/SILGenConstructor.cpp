@@ -200,7 +200,7 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
          && "can't emit a class ctor here");
 
   // Allocate the local variable for 'self'.
-  emitLocalVariableWithCleanup(selfDecl, false)->finishInitialization(*this);
+  emitLocalVariableWithCleanup(selfDecl, None)->finishInitialization(*this);
   
   // Mark self as being uninitialized so that DI knows where it is and how to
   // check for it.
@@ -575,7 +575,7 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
 
   if (NeedsBoxForSelf) {
     // Allocate the local variable for 'self'.
-    emitLocalVariableWithCleanup(selfDecl, false)->finishInitialization(*this);
+    emitLocalVariableWithCleanup(selfDecl, None)->finishInitialization(*this);
 
     auto &SelfVarLoc = VarLocs[selfDecl];
     SelfVarLoc.value = B.createMarkUninitialized(selfDecl,
