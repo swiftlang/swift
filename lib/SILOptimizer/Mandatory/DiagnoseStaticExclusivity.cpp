@@ -275,11 +275,6 @@ static void checkStaticExclusivity(SILFunction &Fn, PostOrderFunctionInfo *PO) {
   if (Fn.empty())
     return;
 
-  // This is a staging flag. Eventually the ability to turn off static
-  // enforcement will be removed.
-  if (!Fn.getModule().getOptions().EnforceExclusivityStatic)
-    return;
-
   // For each basic block, track the stack of current accesses on
   // exit from that block.
   llvm::SmallDenseMap<SILBasicBlock *, Optional<StorageMap>, 32>
@@ -357,6 +352,11 @@ public:
 private:
   void run() override {
     SILFunction *Fn = getFunction();
+    // This is a staging flag. Eventually the ability to turn off static
+    // enforcement will be removed.
+    if (!Fn->getModule().getOptions().EnforceExclusivityStatic)
+      return;
+
     PostOrderFunctionInfo *PO = getAnalysis<PostOrderAnalysis>()->get(Fn);
     checkStaticExclusivity(*Fn, PO);
   }
