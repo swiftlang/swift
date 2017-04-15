@@ -739,7 +739,7 @@ void ReabstractionInfo::specializeConcreteSubstitutions(
   auto InterfaceSubs = OrigGenericSig->getSubstitutionMap(ParamSubs);
 
   // This is a workaround for the rdar://30610428
-  if (!EnablePartialSpecialization) {
+  if (!EnablePartialSpecialization || !HasUnboundGenericParams) {
     SubstitutedType =
         Callee->getLoweredFunctionType()->substGenericArgs(M, InterfaceSubs);
     ClonerParamSubs = OriginalParamSubs;
@@ -1485,6 +1485,12 @@ GenericFuncSpecializer::GenericFuncSpecializer(SILFunction *GenericFunc,
 // Return an existing specialization if one exists.
 SILFunction *GenericFuncSpecializer::lookupSpecialization() {
   if (SILFunction *SpecializedF = M.lookUpFunction(ClonedName)) {
+    if (ReInfo.getSpecializedType() != SpecializedF->getLoweredFunctionType()) {
+      llvm::dbgs() << "Looking for a function: " << ClonedName << "\n"
+                   << "Expected type: " << ReInfo.getSpecializedType() << "\n"
+                   << "Found    type: "
+                   << SpecializedF->getLoweredFunctionType() << "\n";
+    }
     assert(ReInfo.getSpecializedType()
            == SpecializedF->getLoweredFunctionType() &&
            "Previously specialized function does not match expected type.");
