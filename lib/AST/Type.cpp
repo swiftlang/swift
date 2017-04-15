@@ -2621,7 +2621,7 @@ void ArchetypeType::populateNestedTypes() const {
   ProtocolType::visitAllProtocols(getConformsTo(),
                                   [&](ProtocolDecl *proto) -> bool {
     // Objective-C protocols don't have type members.
-    if (proto->hasClangNode()) return false;
+    if (proto->isObjC()) return false;
 
     for (auto member : proto->getMembers()) {
       if (auto assocType = dyn_cast<AssociatedTypeDecl>(member)) {
