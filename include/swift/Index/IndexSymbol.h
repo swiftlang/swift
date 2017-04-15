@@ -69,7 +69,7 @@ struct IndexSymbol : IndexRelation {
   IndexSymbol() = default;
 
   StringRef getReceiverUSR() const {
-    for(auto Relation: Relations) {
+    for (auto Relation: Relations) {
       if (Relation.roles & (SymbolRoleSet) SymbolRole::RelationReceivedBy)
         return Relation.USR;
     }

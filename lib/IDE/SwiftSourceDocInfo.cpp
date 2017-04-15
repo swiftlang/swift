@@ -541,8 +541,8 @@ public:
     if (auto *VD = dyn_cast_or_null<ValueDecl>(D)) {
       if (isContainedInSelection(CharSourceRange(SM, VD->getStartLoc(),
                                                  VD->getEndLoc())))
-        if(std::find(DeclaredDecls.begin(), DeclaredDecls.end(),
-                     DeclaredDecl(VD)) == DeclaredDecls.end())
+        if (std::find(DeclaredDecls.begin(), DeclaredDecls.end(),
+                      DeclaredDecl(VD)) == DeclaredDecls.end())
           DeclaredDecls.push_back(VD);
     }
   }

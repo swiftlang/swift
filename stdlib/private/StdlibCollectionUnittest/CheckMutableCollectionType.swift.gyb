@@ -523,10 +523,10 @@ func checkSortedPredicateThrow(
         let first = extractedResult[i].value
         let second = extractedResult[extractedResult.index(after: i)].value
         let result = lessImpl(second, first)
-        if result == true {
+        if result {
           print("yep ** Result should be true \(result)")
         } else {
-          print("yep ** Test passed reult is false")
+          print("yep ** Test passed result is false")
         }
         expectFalse(result)
       }

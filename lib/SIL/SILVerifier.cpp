@@ -2622,7 +2622,7 @@ public:
             "init_existential_metatype result must match representation of "
             "operand");
 
-    while(auto metatypeType = resultType.is<ExistentialMetatypeType>()) {
+    while (resultType.is<ExistentialMetatypeType>()) {
       resultType = resultType.getMetatypeInstanceType(F.getModule());
       operandType = operandType.getMetatypeInstanceType(F.getModule());
     }

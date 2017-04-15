@@ -316,8 +316,8 @@ struct RefCountBitOffsets<4> {
 };
 
 
-/*
-  FIXME: reinstate these assertions
+// FIXME: reinstate these assertions
+#if 0
   static_assert(StrongExtraRefCountShift == IsDeinitingShift + 1, 
                 "IsDeiniting must be LSB-wards of StrongExtraRefCount");
   static_assert(UseSlowRCShift + UseSlowRCBitCount == sizeof(bits)*8,
@@ -329,7 +329,7 @@ struct RefCountBitOffsets<4> {
                 IsDeinitingBitCount + StrongExtraRefCountBitCount +
                 UseSlowRCBitCount == sizeof(bits)*8,
                 "wrong bit count for RefCountBits refcount encoding");
-*/
+#endif
 
 
 // Basic encoding of refcount and flag data into the object's header.
@@ -1293,13 +1293,13 @@ static_assert(swift::IsTriviallyConstructible<InlineRefCounts>::value,
 static_assert(std::is_trivially_destructible<InlineRefCounts>::value,
               "InlineRefCounts must be trivially destructible");
 
-/* FIXME: small header for 32-bit
+// FIXME: small header for 32-bit
+#if 0
 static_assert(sizeof(InlineRefCounts) == sizeof(uintptr_t),
   "InlineRefCounts must be pointer-sized");
 static_assert(alignof(InlineRefCounts) == alignof(uintptr_t),
 "InlineRefCounts must be pointer-aligned");
-*/
-
+#endif
 
 class HeapObjectSideTableEntry {
   // FIXME: does object need to be atomic?

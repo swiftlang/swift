@@ -983,7 +983,8 @@ public:
         return true;
       if (Decl *ParentD = Walker.Parent.getAsDecl())
         return (isa<NominalTypeDecl>(ParentD) || isa<ExtensionDecl>(ParentD));
-      if (dyn_cast_or_null<BraceStmt>(Walker.Parent.getAsStmt()))
+      auto walkerParentAsStmt = Walker.Parent.getAsStmt();
+      if (walkerParentAsStmt && isa<BraceStmt>(walkerParentAsStmt))
         return true;
     }
     return false;

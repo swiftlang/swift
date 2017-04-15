@@ -201,7 +201,7 @@ private:
       // If the executable has been deleted the last column will be '(deleted)'.
       StringRef deleted = StringRef("(deleted)");
 
-      while(getdelim(&line, &size, '\n', fp) != -1) {
+      while (getdelim(&line, &size, '\n', fp) != -1) {
         StringRef entry = StringRef(line).rsplit('\n').first;
         auto addrRange = entry.split(' ').first.split('-');
         unsigned long long low = strtoull(addrRange.first.str().c_str(),
