@@ -222,7 +222,7 @@ static int getScalarInt(llvm::yaml::Node *N) {
 };
 
 static APIDiffItem*
-parseDiffItem(llvm::BumpPtrAllocator &Alloc, llvm::yaml::MappingNode* Node) {
+serializeDiffItem(llvm::BumpPtrAllocator &Alloc, llvm::yaml::MappingNode* Node) {
 #define DIFF_ITEM_KEY_KIND_STRING(NAME) StringRef NAME;
 #define DIFF_ITEM_KEY_KIND_INT(NAME) Optional<int> NAME;
 #include "swift/IDE/DigesterEnums.def"
@@ -380,7 +380,7 @@ struct swift::ide::api::APIDiffItemStore::Implementation {
     for (auto DI = Stream.begin(); DI != Stream.end(); ++ DI) {
       auto Array = cast<llvm::yaml::SequenceNode>(DI->getRoot());
       for (auto It = Array->begin(); It != Array->end(); ++ It) {
-        parseDiffItem(Allocator, cast<llvm::yaml::MappingNode>(&*It));
+        serializeDiffItem(Allocator, cast<llvm::yaml::MappingNode>(&*It));
       }
     }
   }
