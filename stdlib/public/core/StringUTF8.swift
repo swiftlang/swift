@@ -190,13 +190,6 @@ extension String {
       self._endIndex = e
     }
 
-    // If not overridden, the default implementation provided by the Collection
-    // would be used, which unnecessarily penalizes algorithms that use
-    // UTF8View as a Sequence.
-    public var underestimatedCount: Int {
-      return _core.count
-    }
-
     /// A position in a string's `UTF8View` instance.
     ///
     /// You can convert between indices of the different string views by using
