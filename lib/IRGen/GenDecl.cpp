@@ -3451,7 +3451,7 @@ static llvm::Function *shouldDefineHelper(IRGenModule &IGM,
   def->setDLLStorageClass(llvm::GlobalVariable::DefaultStorageClass);
   def->setDoesNotThrow();
   def->setCallingConv(IGM.DefaultCC);
-  if(setIsNoInline)
+  if (setIsNoInline)
     def->addFnAttr(llvm::Attribute::NoInline);
   return def;
 }

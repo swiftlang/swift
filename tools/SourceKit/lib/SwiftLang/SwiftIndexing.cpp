@@ -82,7 +82,7 @@ private:
 
 
     // start the entity (ref or def)
-    if(!withEntityInfo(symbol, [this](const EntityInfo &info) {
+    if (!withEntityInfo(symbol, [this](const EntityInfo &info) {
         return impl.startSourceEntity(info);
     })) return Abort;
 

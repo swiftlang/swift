@@ -283,7 +283,7 @@ findDeclContextForType(TypeChecker &TC,
     // When looking up a nominal type declaration inside of a
     // protocol extension, always use the nominal type and
     // not the protocol 'Self' type.
-    if (auto *nominalDecl = dyn_cast<NominalTypeDecl>(typeDecl))
+    if (isa<NominalTypeDecl>(typeDecl))
       return resolver->resolveTypeOfDecl(
         DC->getAsNominalTypeOrNominalTypeExtensionContext());
 

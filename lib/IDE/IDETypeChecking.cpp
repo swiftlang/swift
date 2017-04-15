@@ -46,7 +46,7 @@ canDeclProvideDefaultImplementationFor(ValueDecl* VD,
 
   auto VDType = getContextFreeInterfaceType(VD);
   for (auto Mem : LookupResult.getMemberDecls(InterestedMemberKind::All)) {
-    if (auto Pro = dyn_cast<ProtocolDecl>(Mem->getDeclContext())) {
+    if (isa<ProtocolDecl>(Mem->getDeclContext())) {
       if (Mem->isProtocolRequirement() &&
           getContextFreeInterfaceType(Mem)->isEqual(VDType)) {
         // We find a protocol requirement VD can provide default

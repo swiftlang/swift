@@ -62,7 +62,7 @@ namespace {
 
     std::vector<RC<TokenSyntax>> TokensInRange;
 
-    while(Start < End.base()) {
+    while (Start < End.base()) {
       TokensInRange.push_back(Start->first);
       ++Start;
     }

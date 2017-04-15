@@ -1286,7 +1286,8 @@ static void diagRecursivePropertyAccess(TypeChecker &TC, const Expr *E,
               shouldDiagnose = isStore;
 
             // But silence the warning if the base was explicitly qualified.
-            if (dyn_cast_or_null<DotSyntaxBaseIgnoredExpr>(Parent.getAsExpr()))
+            auto parentAsExpr = Parent.getAsExpr();
+            if (parentAsExpr && isa<DotSyntaxBaseIgnoredExpr>(parentAsExpr))
               shouldDiagnose = false;
 
             if (shouldDiagnose) {
@@ -1987,7 +1988,8 @@ public:
         unsigned defaultFlags = 0;
         // If this VarDecl is nested inside of a CaptureListExpr, remember that
         // fact for better diagnostics.
-        if (dyn_cast_or_null<CaptureListExpr>(Parent.getAsExpr()))
+        auto parentAsExpr = Parent.getAsExpr();
+        if (parentAsExpr && isa<CaptureListExpr>(parentAsExpr))
           defaultFlags = RK_CaptureList;
         VarDecls[vd] |= defaultFlags;
       }
