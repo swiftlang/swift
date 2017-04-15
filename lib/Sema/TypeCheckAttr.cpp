@@ -1786,7 +1786,7 @@ void AttributeChecker::visitSpecializeAttr(SpecializeAttr *attr) {
 
   // Add the requirements to the builder.
   for (auto &req : resolvedRequirements)
-    Builder.addRequirement(&req);
+    Builder.addRequirement(&req, DC->getParentModule());
 
   // Check the result.
   Builder.finalize(attr->getLocation(), genericSig->getGenericParams(),
