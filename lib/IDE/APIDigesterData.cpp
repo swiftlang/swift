@@ -240,39 +240,25 @@ serializeDiffItem(llvm::BumpPtrAllocator &Alloc,
   }
   switch (parseDiffItemKind(DiffItemKind)) {
   case APIDiffItemKind::ADK_CommonDiffItem: {
-    CommonDiffItem *Result = Alloc.Allocate<CommonDiffItem>();
-    Result->NodeKind = parseSDKNodeKind(NodeKind);
-    Result->DiffKind = parseSDKNodeAnnotation(NodeAnnotation);
-    Result->ChildIndex = ChildIndex;
-    Result->LeftUsr = LeftUsr;
-    Result->RightUsr = RightUsr;
-    Result->LeftComment = LeftComment;
-    Result->RightComment = RightComment;
-    Result->ModuleName = ModuleName;
-    return Result;
+    return new (Alloc.Allocate<CommonDiffItem>())
+      CommonDiffItem(parseSDKNodeKind(NodeKind),
+                     parseSDKNodeAnnotation(NodeAnnotation), ChildIndex,
+                     LeftUsr, RightUsr, LeftComment, RightComment, ModuleName);
   }
   case APIDiffItemKind::ADK_TypeMemberDiffItem: {
-    TypeMemberDiffItem *Result = Alloc.Allocate<TypeMemberDiffItem>(1);
     Optional<uint8_t> SelfIndexShort;
     if (SelfIndex)
       SelfIndexShort = SelfIndex.getValue();
-    Result->usr = Usr;
-    Result->newTypeName = NewTypeName;
-    Result->newPrintedName = NewPrintedName;
-    Result->selfIndex = SelfIndexShort;
-    Result->oldPrintedName = OldPrintedName;
-    return Result;
+    return new (Alloc.Allocate<TypeMemberDiffItem>())
+      TypeMemberDiffItem(Usr, NewTypeName, NewPrintedName, SelfIndexShort,
+                         OldPrintedName);
   }
   case APIDiffItemKind::ADK_NoEscapeFuncParam: {
-    NoEscapeFuncParam *Result = Alloc.Allocate<NoEscapeFuncParam>(1);
-    Result->Usr = Usr;
-    Result->Index = Index.getValue();
-    return Result;
+    return new (Alloc.Allocate<NoEscapeFuncParam>())
+      NoEscapeFuncParam(Usr, Index.getValue());
   }
   case APIDiffItemKind::ADK_OverloadedFuncInfo: {
-    OverloadedFuncInfo *Result = Alloc.Allocate<OverloadedFuncInfo>(1);
-    Result->Usr = Usr;
-    return Result;
+    return new (Alloc.Allocate<OverloadedFuncInfo>()) OverloadedFuncInfo(Usr);
   }
   }
 }
