@@ -221,8 +221,8 @@ static int getScalarInt(llvm::yaml::Node *N) {
   return std::stoi(cast<llvm::yaml::ScalarNode>(N)->getRawValue());
 };
 
-static std::unique_ptr<APIDiffItem>
-parseDiffItem(llvm::yaml::MappingNode* Node) {
+static APIDiffItem*
+parseDiffItem(llvm::BumpPtrAllocator &Alloc, llvm::yaml::MappingNode* Node) {
 #define DIFF_ITEM_KEY_KIND_STRING(NAME) StringRef NAME;
 #define DIFF_ITEM_KEY_KIND_INT(NAME) Optional<int> NAME;
 #include "swift/IDE/DigesterEnums.def"
@@ -237,30 +237,43 @@ parseDiffItem(llvm::yaml::MappingNode* Node) {
 #include "swift/IDE/DigesterEnums.def"
     }
   }
-  std::unique_ptr<APIDiffItem> Result;
   switch (parseDiffItemKind(DiffItemKind)) {
-  case APIDiffItemKind::ADK_CommonDiffItem:
-    Result.reset(new CommonDiffItem(parseSDKNodeKind(NodeKind),
-                                    parseSDKNodeAnnotation(NodeAnnotation),
-                                    ChildIndex, LeftUsr, RightUsr, LeftComment,
-                                    RightComment, ModuleName));
-    break;
+  case APIDiffItemKind::ADK_CommonDiffItem: {
+    CommonDiffItem *Result = Alloc.Allocate<CommonDiffItem>();
+    Result->NodeKind = parseSDKNodeKind(NodeKind);
+    Result->DiffKind = parseSDKNodeAnnotation(NodeAnnotation);
+    Result->ChildIndex = ChildIndex;
+    Result->LeftUsr = LeftUsr;
+    Result->RightUsr = RightUsr;
+    Result->LeftComment = LeftComment;
+    Result->RightComment = RightComment;
+    Result->ModuleName = ModuleName;
+    return Result;
+  }
   case APIDiffItemKind::ADK_TypeMemberDiffItem: {
+    TypeMemberDiffItem *Result = Alloc.Allocate<TypeMemberDiffItem>();
     Optional<uint8_t> SelfIndexShort;
     if (SelfIndex)
       SelfIndexShort = SelfIndex.getValue();
-    Result.reset(new TypeMemberDiffItem(Usr, NewTypeName, NewPrintedName,
-                                        SelfIndexShort, OldPrintedName));
-    break;
+    Result->usr = Usr;
+    Result->newTypeName = NewTypeName;
+    Result->newPrintedName = NewPrintedName;
+    Result->selfIndex = SelfIndexShort;
+    Result->oldPrintedName = OldPrintedName;
+    return Result;
   }
-  case APIDiffItemKind::ADK_NoEscapeFuncParam:
-    Result.reset(new NoEscapeFuncParam(Usr, Index.getValue()));
-    break;
-  case APIDiffItemKind::ADK_OverloadedFuncInfo:
-    Result.reset(new OverloadedFuncInfo(Usr));
-    break;
+  case APIDiffItemKind::ADK_NoEscapeFuncParam: {
+    NoEscapeFuncParam *Result = Alloc.Allocate<NoEscapeFuncParam>();
+    Result->Usr = Usr;
+    Result->Index = Index.getValue();
+    return Result;
   }
-  return Result;
+  case APIDiffItemKind::ADK_OverloadedFuncInfo: {
+    OverloadedFuncInfo *Result = Alloc.Allocate<OverloadedFuncInfo>();
+    Result->Usr = Usr;
+    return Result;
+  }
+  }
 }
 
 }// End of anonymous namespace.
@@ -352,6 +365,7 @@ serialize(llvm::raw_ostream &os, ArrayRef<APIDiffItem*> Items) {
 }
 
 struct swift::ide::api::APIDiffItemStore::Implementation {
+  llvm::BumpPtrAllocator Allocator;
   llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> FileBufOrErr;
 
   Implementation(StringRef FileName):
@@ -359,13 +373,14 @@ struct swift::ide::api::APIDiffItemStore::Implementation {
     if (!FileBufOrErr) {
       llvm_unreachable("Failed to read JSON file");
     }
+
     StringRef Buffer = FileBufOrErr->get()->getBuffer();
     llvm::SourceMgr SM;
     llvm::yaml::Stream Stream(Buffer, SM);
     for (auto DI = Stream.begin(); DI != Stream.end(); ++ DI) {
       auto Array = cast<llvm::yaml::SequenceNode>(DI->getRoot());
       for (auto It = Array->begin(); It != Array->end(); ++ It) {
-        parseDiffItem(cast<llvm::yaml::MappingNode>(&*It));
+        parseDiffItem(Allocator, cast<llvm::yaml::MappingNode>(&*It));
       }
     }
   }
