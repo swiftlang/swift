@@ -25,6 +25,10 @@
 
 #define DEBUG_TYPE "static-exclusivity"
 #include "swift/AST/DiagnosticsSIL.h"
+#include "swift/AST/ASTWalker.h"
+#include "swift/AST/Decl.h"
+#include "swift/AST/Expr.h"
+#include "swift/AST/Stmt.h"
 #include "swift/SIL/CFG.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SILOptimizer/Analysis/PostOrderAnalysis.h"
@@ -163,6 +167,12 @@ enum class ExclusiveOrShared_t : unsigned {
 /// Tracks the in-progress accesses on per-storage-location basis.
 using StorageMap = llvm::SmallDenseMap<AccessedStorage, AccessInfo, 4>;
 
+/// A pair of 'begin_access' instructions that conflict.
+struct ConflictingAccess {
+  const BeginAccessInst *FirstAccess;
+  const BeginAccessInst *SecondAccess;
+};
+
 } // end anonymous namespace
 
 namespace llvm {
@@ -214,6 +224,58 @@ static ExclusiveOrShared_t getRequiredAccess(const BeginAccessInst *BAI) {
   return ExclusiveOrShared_t::ExclusiveAccess;
 }
 
+/// Perform a syntactic suppression that returns true when the accesses are for
+/// inout arguments to a call that corresponds to to one of the passed-in
+/// 'apply' instructions.
+static bool
+isConflictOnInoutArgumentsToSuppressed(const BeginAccessInst *Access1,
+                                       const BeginAccessInst *Access2,
+                                       ArrayRef<ApplyInst *> CallsToSuppress) {
+  if (CallsToSuppress.empty())
+    return false;
+
+  // Inout arguments must be modifications.
+  if (Access1->getAccessKind() != SILAccessKind::Modify ||
+      Access2->getAccessKind() != SILAccessKind::Modify) {
+    return false;
+  }
+
+  SILLocation Loc1 = Access1->getLoc();
+  SILLocation Loc2 = Access2->getLoc();
+  if (Loc1.isNull() || Loc2.isNull())
+    return false;
+
+  auto *InOut1 = Loc1.getAsASTNode<InOutExpr>();
+  auto *InOut2 = Loc2.getAsASTNode<InOutExpr>();
+  if (!InOut1 || !InOut2)
+    return false;
+
+  for (ApplyInst *AI : CallsToSuppress) {
+    SILLocation CallLoc = AI->getLoc();
+    if (CallLoc.isNull())
+      continue;
+
+    auto *CE = CallLoc.getAsASTNode<CallExpr>();
+    if (!CE)
+      continue;
+
+    bool FoundTarget = false;
+    CE->forEachChildExpr([=,&FoundTarget](Expr *Child) {
+      if (Child == InOut1) {
+        FoundTarget = true;
+        // Stops the traversal.
+        return (Expr *)nullptr;
+      }
+      return Child;
+     }
+    );
+    if (FoundTarget)
+      return true;
+  }
+
+  return false;
+}
+
 /// Emits a diagnostic if beginning an access with the given in-progress
 /// accesses violates the law of exclusivity. Returns true when a
 /// diagnostic was emitted.
@@ -256,6 +318,23 @@ static AccessedStorage findAccessedStorage(SILValue Source) {
   }
 }
 
+/// Returns true when the apply calls the Standard Library swap().
+/// Used for diagnostic suppression.
+bool isCallToStandardLibrarySwap(ApplyInst *AI, ASTContext &Ctx) {
+  SILFunction *SF = AI->getReferencedFunction();
+  if (!SF)
+    return false;
+
+  if (!SF->hasLocation())
+    return false;
+
+  auto *FD = SF->getLocation().getAsASTNode<FuncDecl>();
+  if (!FD)
+    return false;
+
+  return FD == Ctx.getSwap(nullptr);
+}
+
 static void checkStaticExclusivity(SILFunction &Fn, PostOrderFunctionInfo *PO) {
   // The implementation relies on the following SIL invariants:
   //    - All incoming edges to a block must have the same in-progress
@@ -274,6 +353,15 @@ static void checkStaticExclusivity(SILFunction &Fn, PostOrderFunctionInfo *PO) {
 
   if (Fn.empty())
     return;
+
+  // Collects calls to functions for which diagnostics about conflicting inout
+  // arguments should be suppressed.
+  llvm::SmallVector<ApplyInst *, 8> CallsToSuppress;
+
+  // Stores the accesses that have been found to conflict. Used to defer
+  // emitting diagnostics until we can determine whether they should
+  // be suppressed.
+  llvm::SmallVector<ConflictingAccess, 4> ConflictingAccesses;
 
   // For each basic block, track the stack of current accesses on
   // exit from that block.
@@ -316,7 +404,7 @@ static void checkStaticExclusivity(SILFunction &Fn, PostOrderFunctionInfo *PO) {
         if (Info.conflictsWithAccess(Kind) && !Info.alreadyHadConflict()) {
           const BeginAccessInst *Conflict = Info.getFirstAccess();
           assert(Conflict && "Must already have had access to conflict!");
-          diagnoseExclusivityViolation(Conflict, BAI, Fn.getASTContext());
+          ConflictingAccesses.push_back({ Conflict, BAI });
         }
 
         Info.beginAccess(BAI);
@@ -335,11 +423,30 @@ static void checkStaticExclusivity(SILFunction &Fn, PostOrderFunctionInfo *PO) {
         continue;
       }
 
+      if (auto *AI = dyn_cast<ApplyInst>(&I)) {
+        // Suppress for the arguments to the Standard Library's swap()
+        // function until we can recommend a safe alternative.
+        if (isCallToStandardLibrarySwap(AI, Fn.getASTContext()))
+          CallsToSuppress.push_back(AI);
+      }
+
       if (isa<ReturnInst>(&I)) {
         // Sanity check to make sure entries are properly removed.
         assert(Accesses.size() == 0);
       }
     }
+  }
+
+  // Now that we've collected violations and suppressed calls, emit
+  // diagnostics.
+  for (auto &Violation : ConflictingAccesses) {
+    const BeginAccessInst *PriorAccess = Violation.FirstAccess;
+    const BeginAccessInst *NewAccess = Violation.SecondAccess;
+    if (isConflictOnInoutArgumentsToSuppressed(PriorAccess, NewAccess,
+                                               CallsToSuppress))
+      continue;
+
+    diagnoseExclusivityViolation(PriorAccess, NewAccess, Fn.getASTContext());
   }
 }
 
