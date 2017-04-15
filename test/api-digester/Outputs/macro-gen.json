@@ -1,6 +1,7 @@
 [
   {
     "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Constructor",
     "NodeAnnotation": "TypeRewritten",
     "ChildIndex": "1",
     "LeftUsr": "s:12macrogenleft2S1VACSicfc",
@@ -11,6 +12,7 @@
   },
   {
     "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
     "NodeAnnotation": "Rename",
     "ChildIndex": "0",
     "LeftUsr": "s:12macrogenleft2S1V4foo5ySi1x_Si1ytF",
@@ -21,6 +23,7 @@
   },
   {
     "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
     "NodeAnnotation": "TypeRewritten",
     "ChildIndex": "0",
     "LeftUsr": "s:12macrogenleft2C1C4foo2SSSi_SitF",
@@ -31,6 +34,7 @@
   },
   {
     "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
     "NodeAnnotation": "TypeRewritten",
     "ChildIndex": "1",
     "LeftUsr": "s:12macrogenleft2C1C4foo2SSSi_SitF",
@@ -41,6 +45,7 @@
   },
   {
     "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
     "NodeAnnotation": "TypeRewritten",
     "ChildIndex": "2",
     "LeftUsr": "s:12macrogenleft2C1C4foo2SSSi_SitF",

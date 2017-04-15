@@ -52,6 +52,7 @@ raw_ostream &operator<<(raw_ostream &Out, const SDKNodeKind Value);
 struct APIDiffItem {
   virtual void streamDef(llvm::raw_ostream &S) const = 0;
   virtual APIDiffItemKind getKind() const = 0;
+  virtual StringRef getKey() const = 0;
   virtual ~APIDiffItem() = default;
 };
 
@@ -84,6 +85,7 @@ struct CommonDiffItem: public APIDiffItem {
   static void describe(llvm::raw_ostream &os);
   static void undef(llvm::raw_ostream &os);
   void streamDef(llvm::raw_ostream &S) const override;
+  StringRef getKey() const override { return LeftUsr; }
   APIDiffItemKind getKind() const override {
     return APIDiffItemKind::ADK_CommonDiffItem;
   }
@@ -189,6 +191,7 @@ struct TypeMemberDiffItem: public APIDiffItem {
   void streamDef(llvm::raw_ostream &os) const override;
   bool operator<(TypeMemberDiffItem Other) const;
   static bool classof(const APIDiffItem *D);
+  StringRef getKey() const override { return usr; }
   APIDiffItemKind getKind() const override {
     return APIDiffItemKind::ADK_TypeMemberDiffItem;
   }
@@ -205,6 +208,7 @@ struct NoEscapeFuncParam: public APIDiffItem {
   void streamDef(llvm::raw_ostream &os) const override;
   bool operator<(NoEscapeFuncParam Other) const;
   static bool classof(const APIDiffItem *D);
+  StringRef getKey() const override { return Usr; }
   APIDiffItemKind getKind() const override {
     return APIDiffItemKind::ADK_NoEscapeFuncParam;
   }
@@ -223,6 +227,7 @@ struct OverloadedFuncInfo: public APIDiffItem {
   void streamDef(llvm::raw_ostream &os) const override;
   bool operator<(OverloadedFuncInfo Other) const;
   static bool classof(const APIDiffItem *D);
+  StringRef getKey() const override { return Usr; }
   APIDiffItemKind getKind() const override {
     return APIDiffItemKind::ADK_OverloadedFuncInfo;
   }
@@ -234,8 +239,8 @@ struct APIDiffItemStore {
   static void serialize(llvm::raw_ostream &os, ArrayRef<APIDiffItem*> Items);
   APIDiffItemStore(StringRef FileName);
   ~APIDiffItemStore();
+  ArrayRef<APIDiffItem*> getDiffItems(StringRef Key) const;
 };
-
 }
 }
 namespace json {

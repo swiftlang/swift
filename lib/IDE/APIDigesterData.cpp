@@ -222,7 +222,8 @@ static int getScalarInt(llvm::yaml::Node *N) {
 };
 
 static APIDiffItem*
-serializeDiffItem(llvm::BumpPtrAllocator &Alloc, llvm::yaml::MappingNode* Node) {
+serializeDiffItem(llvm::BumpPtrAllocator &Alloc,
+                  llvm::yaml::MappingNode* Node) {
 #define DIFF_ITEM_KEY_KIND_STRING(NAME) StringRef NAME;
 #define DIFF_ITEM_KEY_KIND_INT(NAME) Optional<int> NAME;
 #include "swift/IDE/DigesterEnums.def"
@@ -275,12 +276,10 @@ serializeDiffItem(llvm::BumpPtrAllocator &Alloc, llvm::yaml::MappingNode* Node) 
   }
   }
 }
-
 }// End of anonymous namespace.
 
 namespace swift {
 namespace json {
-
 template<>
 struct ScalarEnumerationTraits<APIDiffItemKind> {
   static void enumeration(Output &out, APIDiffItemKind &value) {
@@ -296,7 +295,6 @@ struct ScalarEnumerationTraits<NodeAnnotation> {
 #include "swift/IDE/DigesterEnums.def"
   }
 };
-
 template<>
 struct ObjectTraits<APIDiffItem*> {
   static void mapping(Output &out, APIDiffItem *&value) {
@@ -305,25 +303,38 @@ struct ObjectTraits<APIDiffItem*> {
       CommonDiffItem *Item = cast<CommonDiffItem>(value);
       auto ItemKind = Item->getKind();
       out.mapRequired(getKeyContent(DiffItemKeyKind::KK_DiffItemKind), ItemKind);
-      out.mapRequired(getKeyContent(DiffItemKeyKind::KK_NodeKind), Item->NodeKind);
-      out.mapRequired(getKeyContent(DiffItemKeyKind::KK_NodeAnnotation), Item->DiffKind);
-      out.mapRequired(getKeyContent(DiffItemKeyKind::KK_ChildIndex), Item->ChildIndex);
-      out.mapRequired(getKeyContent(DiffItemKeyKind::KK_LeftUsr), Item->LeftUsr);
-      out.mapRequired(getKeyContent(DiffItemKeyKind::KK_LeftComment), Item->LeftComment);
-      out.mapRequired(getKeyContent(DiffItemKeyKind::KK_RightUsr), Item->RightUsr);
-      out.mapRequired(getKeyContent(DiffItemKeyKind::KK_RightComment), Item->RightComment);
-      out.mapRequired(getKeyContent(DiffItemKeyKind::KK_ModuleName), Item->ModuleName);
+      out.mapRequired(getKeyContent(DiffItemKeyKind::KK_NodeKind),
+                      Item->NodeKind);
+      out.mapRequired(getKeyContent(DiffItemKeyKind::KK_NodeAnnotation),
+                      Item->DiffKind);
+      out.mapRequired(getKeyContent(DiffItemKeyKind::KK_ChildIndex),
+                      Item->ChildIndex);
+      out.mapRequired(getKeyContent(DiffItemKeyKind::KK_LeftUsr),
+                      Item->LeftUsr);
+      out.mapRequired(getKeyContent(DiffItemKeyKind::KK_LeftComment),
+                      Item->LeftComment);
+      out.mapRequired(getKeyContent(DiffItemKeyKind::KK_RightUsr),
+                      Item->RightUsr);
+      out.mapRequired(getKeyContent(DiffItemKeyKind::KK_RightComment),
+                      Item->RightComment);
+      out.mapRequired(getKeyContent(DiffItemKeyKind::KK_ModuleName),
+                      Item->ModuleName);
       return;
     }
     case APIDiffItemKind::ADK_TypeMemberDiffItem: {
       TypeMemberDiffItem *Item = cast<TypeMemberDiffItem>(value);
       auto ItemKind = Item->getKind();
-      out.mapRequired(getKeyContent(DiffItemKeyKind::KK_DiffItemKind), ItemKind);
+      out.mapRequired(getKeyContent(DiffItemKeyKind::KK_DiffItemKind),
+                      ItemKind);
       out.mapRequired(getKeyContent(DiffItemKeyKind::KK_Usr), Item->usr);
-      out.mapRequired(getKeyContent(DiffItemKeyKind::KK_OldPrintedName), Item->oldPrintedName);
-      out.mapRequired(getKeyContent(DiffItemKeyKind::KK_NewPrintedName), Item->newPrintedName);
-      out.mapRequired(getKeyContent(DiffItemKeyKind::KK_NewTypeName), Item->newTypeName);
-      out.mapOptional(getKeyContent(DiffItemKeyKind::KK_SelfIndex), Item->selfIndex);
+      out.mapRequired(getKeyContent(DiffItemKeyKind::KK_OldPrintedName),
+                      Item->oldPrintedName);
+      out.mapRequired(getKeyContent(DiffItemKeyKind::KK_NewPrintedName),
+                      Item->newPrintedName);
+      out.mapRequired(getKeyContent(DiffItemKeyKind::KK_NewTypeName),
+                      Item->newTypeName);
+      out.mapOptional(getKeyContent(DiffItemKeyKind::KK_SelfIndex),
+                      Item->selfIndex);
       return;
     }
     case APIDiffItemKind::ADK_NoEscapeFuncParam: {
@@ -344,7 +355,6 @@ struct ObjectTraits<APIDiffItem*> {
     }
   }
 };
-
 template<>
 struct ArrayTraits<ArrayRef<APIDiffItem*>> {
   static size_t size(Output &out, ArrayRef<APIDiffItem *> &seq) {
@@ -365,27 +375,35 @@ serialize(llvm::raw_ostream &os, ArrayRef<APIDiffItem*> Items) {
 }
 
 struct swift::ide::api::APIDiffItemStore::Implementation {
-  llvm::BumpPtrAllocator Allocator;
+private:
   llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> FileBufOrErr;
+  llvm::BumpPtrAllocator Allocator;
+public:
+  llvm::StringMap<std::vector<APIDiffItem*>> Data;
 
   Implementation(StringRef FileName):
       FileBufOrErr(llvm::MemoryBuffer::getFileOrSTDIN(FileName)) {
     if (!FileBufOrErr) {
       llvm_unreachable("Failed to read JSON file");
     }
-
     StringRef Buffer = FileBufOrErr->get()->getBuffer();
     llvm::SourceMgr SM;
     llvm::yaml::Stream Stream(Buffer, SM);
     for (auto DI = Stream.begin(); DI != Stream.end(); ++ DI) {
       auto Array = cast<llvm::yaml::SequenceNode>(DI->getRoot());
       for (auto It = Array->begin(); It != Array->end(); ++ It) {
-        serializeDiffItem(Allocator, cast<llvm::yaml::MappingNode>(&*It));
+        APIDiffItem *Item = serializeDiffItem(Allocator,
+          cast<llvm::yaml::MappingNode>(&*It));
+        Data[Item->getKey()].push_back(Item);
       }
     }
   }
 };
 
+ArrayRef<APIDiffItem*> swift::ide::api::APIDiffItemStore::
+getDiffItems(StringRef Key) const { return Impl.Data[Key]; }
+
 swift::ide::api::APIDiffItemStore::APIDiffItemStore(StringRef FileName) :
   Impl(*new Implementation(FileName)) {}
+
 swift::ide::api::APIDiffItemStore::~APIDiffItemStore() { delete &Impl; }
