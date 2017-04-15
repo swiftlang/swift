@@ -1676,10 +1676,13 @@ StringRef Lexer::getEncodedStringSegment(StringRef Bytes,
                                          unsigned Modifiers, const std::string &ToReplace) {
 
   // The next section of code is somewhat overcooked.
+  // It is a global replace of the string returned by
+  // getTrailingIndentOrWindowsLineEnding(token) which:
   // Strips any indent that corresponds to the indent
   // of the multi-line string terminating line and
-  // normalises line endings in the source to \n
-  // ... and strips any intial blank line
+  // normalises line endings in the source to \n.
+  // It also removes any intial empty line.
+
   std::string IndentStripped;
 
   if (!ToReplace.empty()) {
