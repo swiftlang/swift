@@ -80,9 +80,8 @@ static void addMandatoryOptPipeline(SILPassPipelinePlan &P,
   P.addDiagnoseStaticExclusivity();
   P.addCapturePromotion();
   P.addAllocBoxToStack();
-
-  P.addOwnershipModelEliminator();
   P.addNoReturnFolding();
+  P.addOwnershipModelEliminator();
   P.addDefiniteInitialization();
 
   P.addAccessEnforcementSelection();

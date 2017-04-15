@@ -3133,7 +3133,8 @@ void ProtocolDecl::computeRequirementSignature() {
   builder.addRequirement(
          requirement,
          GenericSignatureBuilder::RequirementSource
-          ::forRequirementSignature(builder.resolveArchetype(selfType), this));
+          ::forRequirementSignature(builder.resolveArchetype(selfType), this),
+         nullptr);
   builder.finalize(SourceLoc(), { selfType });
   
   RequirementSignature = builder.getGenericSignature();

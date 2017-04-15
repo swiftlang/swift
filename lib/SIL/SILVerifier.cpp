@@ -2139,8 +2139,7 @@ public:
     // If the method returns Self, substitute AnyObject for the result type.
     if (auto fnDecl = dyn_cast<FuncDecl>(method.getDecl())) {
       if (fnDecl->hasDynamicSelf()) {
-        auto anyObjectTy = C.getProtocol(KnownProtocolKind::AnyObject)
-                             ->getDeclaredType();
+        auto anyObjectTy = C.getAnyObjectType();
         for (auto &dynResult : dynResults) {
           auto newResultTy
             = dynResult.getType()->replaceCovariantResultType(anyObjectTy, 0);

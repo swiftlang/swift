@@ -19,6 +19,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/CanTypeVisitor.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/SIL/SILType.h"
 #include "swift/ClangImporter/ClangImporter.h"
@@ -600,8 +601,12 @@ clang::CanQualType GenClangType::visitProtocolCompositionType(
   CanProtocolCompositionType type) {
   // FIXME. Eventually, this will have its own helper routine.
   SmallVector<const clang::ObjCProtocolDecl *, 4> Protocols;
-  for (CanType t : type.getProtocols()) {
-    auto opt = cast<clang::ObjCObjectPointerType>(Converter.convert(IGM, t));
+  auto layout = type.getExistentialLayout();
+  assert(layout.requiresClass && "Cannot represent opaque existential in Clang");
+  assert(!layout.superclass && "Subclass existentials not supported here yet");
+  for (Type t : layout.getProtocols()) {
+    auto opt = cast<clang::ObjCObjectPointerType>(
+      Converter.convert(IGM, CanType(t)));
     for (auto p : opt->quals())
       Protocols.push_back(p);
   }

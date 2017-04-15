@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "definite-init"
-#include "DIMemoryUseCollector.h"
+#include "DIMemoryUseCollectorOwnership.h"
 #include "swift/AST/Expr.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
@@ -19,7 +19,12 @@
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/SaveAndRestore.h"
 
+#ifdef SWIFT_SILOPTIMIZER_MANDATORY_DIMEMORYUSECOLLECTOR_H
+#error "Included non ownership header?!"
+#endif
+
 using namespace swift;
+using namespace ownership;
 
 //===----------------------------------------------------------------------===//
 //                  DIMemoryObjectInfo Implementation
@@ -56,27 +61,38 @@ static unsigned getElementCountRec(SILModule &Module, SILType T,
   return 1;
 }
 
-DIMemoryObjectInfo::DIMemoryObjectInfo(SILInstruction *MI) {
-  auto &Module = MI->getModule();
-
-  MemoryInst = MI;
+static std::pair<SILType, bool>
+computeMemorySILType(SILInstruction *MemoryInst) {
   // Compute the type of the memory object.
   if (auto *ABI = dyn_cast<AllocBoxInst>(MemoryInst)) {
     assert(ABI->getBoxType()->getLayout()->getFields().size() == 1 &&
            "analyzing multi-field boxes not implemented");
-    MemorySILType = ABI->getBoxType()->getFieldType(Module, 0);
-  } else if (auto *ASI = dyn_cast<AllocStackInst>(MemoryInst)) {
-    MemorySILType = ASI->getElementType();
-  } else {
-    auto *MUI = cast<MarkUninitializedInst>(MemoryInst);
-    MemorySILType = MUI->getType().getObjectType();
-
-    // If this is a let variable we're initializing, remember this so we don't
-    // allow reassignment.
-    if (MUI->isVar())
-      if (auto *decl = MUI->getLoc().getAsASTNode<VarDecl>())
-        IsLet = decl->isLet();
+    return {ABI->getBoxType()->getFieldType(MemoryInst->getModule(), 0), false};
   }
+
+  if (auto *ASI = dyn_cast<AllocStackInst>(MemoryInst)) {
+    return {ASI->getElementType(), false};
+  }
+
+  auto *MUI = cast<MarkUninitializedInst>(MemoryInst);
+  SILType MemorySILType = MUI->getType().getObjectType();
+
+  // If this is a let variable we're initializing, remember this so we don't
+  // allow reassignment.
+  if (!MUI->isVar())
+    return {MemorySILType, false};
+
+  auto *VDecl = MUI->getLoc().getAsASTNode<VarDecl>();
+  if (!VDecl)
+    return {MemorySILType, false};
+
+  return {MemorySILType, VDecl->isLet()};
+}
+
+DIMemoryObjectInfo::DIMemoryObjectInfo(SILInstruction *MI) : MemoryInst(MI) {
+  auto &Module = MI->getModule();
+
+  std::tie(MemorySILType, IsLet) = computeMemorySILType(MemoryInst);
 
   // Compute the number of elements to track in this memory object.
   // If this is a 'self' in a delegating initializer, we only track one bit:
@@ -99,8 +115,7 @@ DIMemoryObjectInfo::DIMemoryObjectInfo(SILInstruction *MI) {
 
   // If this is a derived class init method, track an extra element to determine
   // whether super.init has been called at each program point.
-  if (isDerivedClassSelf())
-    ++NumElements;
+  NumElements += unsigned(isDerivedClassSelf());
 }
 
 SILInstruction *DIMemoryObjectInfo::getFunctionEntryPoint() const {
@@ -222,31 +237,34 @@ SILValue DIMemoryObjectInfo::emitElementAddress(unsigned EltNo, SILLocation Loc,
 /// specified std::string.
 static void getPathStringToElementRec(SILModule &Module, SILType T,
                                       unsigned EltNo, std::string &Result) {
-  if (CanTupleType TT = T.getAs<TupleType>()) {
-    unsigned FieldNo = 0;
-    for (unsigned i = 0, e = TT->getNumElements(); i < e; i++) {
-      auto Field = TT->getElement(i);
-      SILType FieldTy = T.getTupleElementType(i);
-      unsigned NumFieldElements = getElementCountRec(Module, FieldTy, false);
-
-      if (EltNo < NumFieldElements) {
-        Result += '.';
-        if (Field.hasName())
-          Result += Field.getName().str();
-        else
-          Result += llvm::utostr(FieldNo);
-        return getPathStringToElementRec(Module, FieldTy, EltNo, Result);
-      }
-
-      EltNo -= NumFieldElements;
-
-      ++FieldNo;
-    }
-    llvm_unreachable("Element number is out of range for this type!");
+  CanTupleType TT = T.getAs<TupleType>();
+  if (!TT) {
+    // Otherwise, there are no subelements.
+    assert(EltNo == 0 && "Element count problem");
+    return;
   }
 
-  // Otherwise, there are no subelements.
-  assert(EltNo == 0 && "Element count problem");
+  unsigned FieldNo = 0;
+  for (unsigned i = 0, e = TT->getNumElements(); i < e; i++) {
+    auto Field = TT->getElement(i);
+    SILType FieldTy = T.getTupleElementType(i);
+    unsigned NumFieldElements = getElementCountRec(Module, FieldTy, false);
+
+    if (EltNo < NumFieldElements) {
+      Result += '.';
+      if (Field.hasName())
+        Result += Field.getName().str();
+      else
+        Result += llvm::utostr(FieldNo);
+      return getPathStringToElementRec(Module, FieldTy, EltNo, Result);
+    }
+
+    EltNo -= NumFieldElements;
+
+    ++FieldNo;
+  }
+
+  llvm_unreachable("Element number is out of range for this type!");
 }
 
 ValueDecl *
@@ -302,14 +320,19 @@ bool DIMemoryObjectInfo::isElementLetProperty(unsigned Element) const {
 
   auto &Module = MemoryInst->getModule();
 
-  if (auto *NTD = MemorySILType.getNominalOrBoundGenericNominal()) {
-    for (auto *VD : NTD->getStoredProperties()) {
-      auto FieldType = MemorySILType.getFieldType(VD, Module);
-      unsigned NumFieldElements = getElementCountRec(Module, FieldType, false);
-      if (Element < NumFieldElements)
-        return VD->isLet();
-      Element -= NumFieldElements;
-    }
+  auto *NTD = MemorySILType.getNominalOrBoundGenericNominal();
+  if (!NTD) {
+    // Otherwise, we miscounted elements?
+    assert(Element == 0 && "Element count problem");
+    return false;
+  }
+
+  for (auto *VD : NTD->getStoredProperties()) {
+    auto FieldType = MemorySILType.getFieldType(VD, Module);
+    unsigned NumFieldElements = getElementCountRec(Module, FieldType, false);
+    if (Element < NumFieldElements)
+      return VD->isLet();
+    Element -= NumFieldElements;
   }
 
   // Otherwise, we miscounted elements?
@@ -393,7 +416,7 @@ class ElementUseCollector {
   const DIMemoryObjectInfo &TheMemory;
   SmallVectorImpl<DIMemoryUse> &Uses;
   SmallVectorImpl<TermInst *> &FailableInits;
-  SmallVectorImpl<SILInstruction *> &Releases;
+  SmallVectorImpl<SILInstruction *> &Destroys;
 
   /// This is true if definite initialization has finished processing assign
   /// and other ambiguous instructions into init vs assign classes.
@@ -429,7 +452,7 @@ public:
                       bool isDefiniteInitFinished,
                       bool TreatAddressToPointerAsInout)
       : Module(TheMemory.MemoryInst->getModule()), TheMemory(TheMemory),
-        Uses(Uses), FailableInits(FailableInits), Releases(Releases),
+        Uses(Uses), FailableInits(FailableInits), Destroys(Releases),
         isDefiniteInitFinished(isDefiniteInitFinished),
         TreatAddressToPointerAsInout(TreatAddressToPointerAsInout) {}
 
@@ -466,8 +489,8 @@ public:
 
         // If this is a release or dealloc_stack, then remember it as such.
         if (isa<StrongReleaseInst>(User) || isa<DeallocStackInst>(User) ||
-            isa<DeallocBoxInst>(User)) {
-          Releases.push_back(User);
+            isa<DeallocBoxInst>(User) || isa<DestroyValueInst>(User)) {
+          Destroys.push_back(User);
         }
       }
     }
@@ -569,11 +592,8 @@ void ElementUseCollector::collectContainerUses(AllocBoxInst *ABI) {
     auto *User = UI->getUser();
 
     // Deallocations and retain/release don't affect the value directly.
-    if (isa<DeallocBoxInst>(User))
-      continue;
-    if (isa<StrongRetainInst>(User))
-      continue;
-    if (isa<StrongReleaseInst>(User))
+    if (isa<DeallocBoxInst>(User) || isa<StrongRetainInst>(User) ||
+        isa<StrongReleaseInst>(User) || isa<DestroyValueInst>(User))
       continue;
 
     if (auto project = dyn_cast<ProjectBoxInst>(User)) {
@@ -582,10 +602,11 @@ void ElementUseCollector::collectContainerUses(AllocBoxInst *ABI) {
     }
 
     // Other uses of the container are considered escapes of the values.
-    for (unsigned field : indices(ABI->getBoxType()->getLayout()->getFields()))
+    for (unsigned field : indices(ABI->getBoxType()->getLayout()->getFields())) {
       addElementUses(field,
                      ABI->getBoxType()->getFieldType(ABI->getModule(), field),
                      User, DIUseKind::Escape);
+    }
   }
 }
 
@@ -844,7 +865,7 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
 
     // We model destroy_addr as a release of the entire value.
     if (isa<DestroyAddrInst>(User)) {
-      Releases.push_back(User);
+      Destroys.push_back(User);
       continue;
     }
 
@@ -1038,8 +1059,9 @@ void ElementUseCollector::collectClassSelfUses() {
     }
 
     // destroyaddr on the box is load+release, which is treated as a release.
-    if (isa<DestroyAddrInst>(User) || isa<StrongReleaseInst>(User)) {
-      Releases.push_back(User);
+    if (isa<DestroyAddrInst>(User) || isa<StrongReleaseInst>(User) ||
+        isa<DestroyValueInst>(User)) {
+      Destroys.push_back(User);
       continue;
     }
 
@@ -1271,11 +1293,12 @@ void ElementUseCollector::collectClassSelfUses(
       continue;
     }
 
-    // releases of self are tracked as a release. In the case of a failing
-    // initializer, the release on the exit path needs to cleanup the partially
-    // initialized elements.
-    if (isa<StrongReleaseInst>(User)) {
-      Releases.push_back(User);
+    // Destroys of self are tracked as a release.
+    //
+    // *NOTE* In the case of a failing initializer, the release on the exit path
+    // needs to cleanup the partially initialized elements.
+    if (isa<StrongReleaseInst>(User) || isa<DestroyValueInst>(User)) {
+      Destroys.push_back(User);
       continue;
     }
 
@@ -1351,8 +1374,8 @@ void ElementUseCollector::collectDelegatingClassInitSelfLoadUses(
     // A release of a load from the self box in a class delegating
     // initializer might be releasing an uninitialized self, which requires
     // special processing.
-    if (isa<StrongReleaseInst>(User)) {
-      Releases.push_back(User);
+    if (isa<StrongReleaseInst>(User) || isa<DestroyValueInst>(User)) {
+      Destroys.push_back(User);
       continue;
     }
 
@@ -1499,7 +1522,7 @@ void ElementUseCollector::collectDelegatingClassInitSelfUses() {
 
     // destroyaddr on the box is load+release, which is treated as a release.
     if (isa<DestroyAddrInst>(User)) {
-      Releases.push_back(User);
+      Destroys.push_back(User);
       continue;
     }
 
@@ -1518,8 +1541,9 @@ void ElementUseCollector::collectDelegatingClassInitSelfUses() {
 
   for (auto UI : ABI->getUses()) {
     SILInstruction *User = UI->getUser();
-    if (isa<StrongReleaseInst>(User))
-      Releases.push_back(User);
+    if (isa<StrongReleaseInst>(User) || isa<DestroyValueInst>(User)) {
+      Destroys.push_back(User);
+    }
   }
 }
 
@@ -1537,7 +1561,7 @@ void ElementUseCollector::collectDelegatingValueTypeInitSelfUses() {
     // destroy_addr is a release of the entire value.  This can be an early
     // release for a conditional initializer.
     if (isa<DestroyAddrInst>(User)) {
-      Releases.push_back(User);
+      Destroys.push_back(User);
       continue;
     }
 
@@ -1574,7 +1598,7 @@ void ElementUseCollector::collectDelegatingValueTypeInitSelfUses() {
 /// collectDIElementUsesFrom - Analyze all uses of the specified allocation
 /// instruction (alloc_box, alloc_stack or mark_uninitialized), classifying them
 /// and storing the information found into the Uses and Releases lists.
-void swift::collectDIElementUsesFrom(
+void swift::ownership::collectDIElementUsesFrom(
     const DIMemoryObjectInfo &MemoryInfo, SmallVectorImpl<DIMemoryUse> &Uses,
     SmallVectorImpl<TermInst *> &FailableInits,
     SmallVectorImpl<SILInstruction *> &Releases, bool isDIFinished,

@@ -430,11 +430,13 @@ public:
   /// as being malformed.
   Status error(Status issue = Status::Malformed) {
     assert(issue != Status::Valid);
-    // This would normally be an assertion but it's more useful to print the
-    // PrettyStackTrace here even in no-asserts builds. Malformed modules are
-    // generally unrecoverable.
-    if (FileContext && issue == Status::Malformed)
-      abort();
+    if (FileContext && issue == Status::Malformed) {
+      // This would normally be an assertion but it's more useful to print the
+      // PrettyStackTrace here even in no-asserts builds. Malformed modules are
+      // generally unrecoverable.
+      fatal(llvm::make_error<llvm::StringError>(
+          "(see \"While...\" info below)", llvm::inconvertibleErrorCode()));
+    }
     setStatus(issue);
     return getStatus();
   }

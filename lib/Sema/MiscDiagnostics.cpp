@@ -1738,9 +1738,7 @@ bool swift::fixItOverrideDeclarationTypes(InFlightDiagnostic &diag,
     // bridging---that doesn't count.
     Type bridged;
     if (normalizedBaseTy->isAny()) {
-      const ProtocolDecl *anyObjectProto =
-          ctx.getProtocol(KnownProtocolKind::AnyObject);
-      bridged = anyObjectProto->getDeclaredType();
+      bridged = ctx.getAnyObjectType();
     } else {
       bridged = ctx.getBridgedToObjC(DC, normalizedBaseTy);
     }

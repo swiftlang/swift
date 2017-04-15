@@ -2441,6 +2441,11 @@ struct TargetExistentialTypeMetadata : public TargetMetadata<Runtime> {
     return Flags.getClassConstraint() == ProtocolClassConstraint::Class;
   }
 
+  const Metadata *getSuperclassConstraint() const {
+    // FIXME
+    return nullptr;
+  }
+
   static bool classof(const TargetMetadata<Runtime> *metadata) {
     return metadata->getKind() == MetadataKind::Existential;
   }
@@ -3176,7 +3181,9 @@ swift_getExistentialMetatypeMetadata(const Metadata *instanceType);
 /// referenced by \c protocols will be sorted in-place.
 SWIFT_RT_ENTRY_VISIBILITY
 const ExistentialTypeMetadata *
-swift_getExistentialTypeMetadata(size_t numProtocols,
+swift_getExistentialTypeMetadata(ProtocolClassConstraint classConstraint,
+                                 const Metadata *superclassConstraint,
+                                 size_t numProtocols,
                                  const ProtocolDescriptor **protocols)
     SWIFT_CC(RegisterPreservingCC);
 

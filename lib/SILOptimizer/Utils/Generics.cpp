@@ -604,7 +604,7 @@ getSignatureWithRequirements(GenericSignature *OrigGenSig,
   // For each substitution with a concrete type as a replacement,
   // add a new concrete type equality requirement.
   for (auto &Req : Requirements) {
-    Builder.addRequirement(Req, Source);
+    Builder.addRequirement(Req, Source, M.getSwiftModule());
   }
 
   Builder.finalize(SourceLoc(), OrigGenSig->getGenericParams(),
@@ -739,7 +739,7 @@ void ReabstractionInfo::specializeConcreteSubstitutions(
   auto InterfaceSubs = OrigGenericSig->getSubstitutionMap(ParamSubs);
 
   // This is a workaround for the rdar://30610428
-  if (!EnablePartialSpecialization) {
+  if (!EnablePartialSpecialization || !HasUnboundGenericParams) {
     SubstitutedType =
         Callee->getLoweredFunctionType()->substGenericArgs(M, InterfaceSubs);
     ClonerParamSubs = OriginalParamSubs;
@@ -882,49 +882,7 @@ static void remapRequirements(GenericSignature *GenSig,
   // caller's archetypes mapped to the specialized signature.
   for (auto &reqReq : GenSig->getRequirements()) {
     DEBUG(llvm::dbgs() << "\n\nRe-mapping the requirement:\n"; reqReq.dump());
-
-    auto first = reqReq.getFirstType();
-    // Is this generic type equivalent to a concrete type?
-    if (first->hasTypeParameter() &&
-        !GenSig->getCanonicalTypeInContext(first, *SM)->hasTypeParameter())
-      continue;
-
-    first = reqReq.getFirstType().subst(SubsMap);
-    assert(!first->hasError());
-
-    auto Kind = reqReq.getKind();
-
-    switch (Kind) {
-    case RequirementKind::SameType:
-    case RequirementKind::Superclass:
-    case RequirementKind::Conformance: {
-      auto second = reqReq.getSecondType().subst(SubsMap);
-      assert(!second->hasError());
-      // Substitute the constrained types.
-      if (Kind != RequirementKind::SameType && !first->hasTypeParameter())
-        break;
-      if (Kind == RequirementKind::SameType && !first->hasTypeParameter() &&
-          !second->hasTypeParameter())
-        break;
-
-      Requirement Req(Kind, first, second);
-      auto Failure = Builder.addRequirement(Req, source);
-      assert(!isErrorResult(Failure));
-      DEBUG(llvm::dbgs() << "\nRe-mapped requirement:\n"; Req.dump());
-      break;
-    }
-    case RequirementKind::Layout: {
-      if (!first->hasTypeParameter())
-        break;
-
-      Requirement Req(RequirementKind::Layout, first,
-                      reqReq.getLayoutConstraint());
-      auto Failure = Builder.addRequirement(Req, source);
-      assert(!!isErrorResult(Failure));
-      DEBUG(llvm::dbgs() << "\nRe-mapped requirement:\n"; Req.dump());
-      break;
-    }
-    }
+    Builder.addRequirement(reqReq, source, SM, &SubsMap);
   }
 }
 
@@ -1206,7 +1164,7 @@ void FunctionSignaturePartialSpecializer::
 
     Requirement Req(RequirementKind::SameType, SubstGenericParamCanTy,
                     SpecializedReplacementCallerInterfaceTy);
-    Builder.addRequirement(Req, Source);
+    Builder.addRequirement(Req, Source, SM);
 
     DEBUG(llvm::dbgs() << "Added a requirement:\n"; Req.dump());
 
@@ -1527,6 +1485,12 @@ GenericFuncSpecializer::GenericFuncSpecializer(SILFunction *GenericFunc,
 // Return an existing specialization if one exists.
 SILFunction *GenericFuncSpecializer::lookupSpecialization() {
   if (SILFunction *SpecializedF = M.lookUpFunction(ClonedName)) {
+    if (ReInfo.getSpecializedType() != SpecializedF->getLoweredFunctionType()) {
+      llvm::dbgs() << "Looking for a function: " << ClonedName << "\n"
+                   << "Expected type: " << ReInfo.getSpecializedType() << "\n"
+                   << "Found    type: "
+                   << SpecializedF->getLoweredFunctionType() << "\n";
+    }
     assert(ReInfo.getSpecializedType()
            == SpecializedF->getLoweredFunctionType() &&
            "Previously specialized function does not match expected type.");

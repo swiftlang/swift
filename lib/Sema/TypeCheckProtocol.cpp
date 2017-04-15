@@ -1079,70 +1079,9 @@ RequirementEnvironment::RequirementEnvironment(
   // interface types into the abstract type parameters).
   auto source =
     GenericSignatureBuilder::FloatingRequirementSource::forAbstract();
-  for (auto &reqReq : reqSig->getRequirements()) {
-    switch (reqReq.getKind()) {
-    case RequirementKind::Conformance: {
-      // Substitute the constrained types.
-      auto first = reqReq.getFirstType().subst(reqToSyntheticEnvMap,
-                                               SubstFlags::UseErrorType);
-      if (!first->isTypeParameter()) break;
-
-      builder.addRequirement(Requirement(RequirementKind::Conformance,
-                                         first, reqReq.getSecondType()),
-                             source);
-      break;
-    }
-
-    case RequirementKind::Layout: {
-      // Substitute the constrained types.
-      auto first = reqReq.getFirstType().subst(reqToSyntheticEnvMap);
-      if (!first->isTypeParameter()) break;
-
-      builder.addRequirement(Requirement(RequirementKind::Layout, first,
-                                         reqReq.getLayoutConstraint()),
-                             source);
-      break;
-    }
-
-    case RequirementKind::Superclass: {
-      // Substitute the constrained types.
-      auto first = reqReq.getFirstType().subst(reqToSyntheticEnvMap,
-                                               SubstFlags::UseErrorType);
-      auto second = reqReq.getSecondType().subst(reqToSyntheticEnvMap,
-                                                 SubstFlags::UseErrorType);
-
-      if (!first->isTypeParameter()) break;
-
-      builder.addRequirement(Requirement(RequirementKind::Superclass,
-                                         first, second),
-                             source);
-      break;
-    }
-
-    case RequirementKind::SameType: {
-      // Substitute the constrained types.
-      auto first = reqReq.getFirstType().subst(reqToSyntheticEnvMap,
-                                               SubstFlags::UseErrorType);
-      auto second = reqReq.getSecondType().subst(reqToSyntheticEnvMap,
-                                                 SubstFlags::UseErrorType);
-
-      // FIXME: We really want to check hasTypeParameter here, but the
-      // GenericSignatureBuilder isn't ready for that.
-      if (!first->isTypeParameter()) {
-        // When the second is not a type parameter either, drop the requirement.
-        // If the types were different, this requirement will be unsatisfiable.
-        if (!second->isTypeParameter()) continue;
-
-        // Put the type parameter first.
-        std::swap(first, second);
-      }
-
-      builder.addRequirement(Requirement(RequirementKind::SameType,
-                                         first, second),
-                             source);
-      break;
-    }
-    }
+  for (auto &req : reqSig->getRequirements()) {
+    builder.addRequirement(req, source, conformanceDC->getParentModule(),
+                           &reqToSyntheticEnvMap);
   }
 
   // Finalize the generic signature builder.

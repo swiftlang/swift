@@ -2366,8 +2366,10 @@ static Optional<ObjCReason> shouldMarkAsObjC(TypeChecker &TC,
   // explicitly declared @objc.
   if (VD->getAttrs().hasAttribute<ObjCAttr>())
     return ObjCReason::ExplicitlyObjC;
-  // @IBOutlet, @IBAction, @IBInspectable, @NSManaged, and @GKInspectable
-  // imply @objc.
+  // @IBOutlet, @IBAction, @NSManaged, and @GKInspectable imply @objc.
+  //
+  // @IBInspectable and @GKInspectable imply @objc quietly in Swift 3
+  // (where they warn on failure) and loudly in Swift 4 (error on failure).
   if (VD->getAttrs().hasAttribute<IBOutletAttr>())
     return ObjCReason::ExplicitlyIBOutlet;
   if (VD->getAttrs().hasAttribute<IBActionAttr>())
@@ -2735,7 +2737,7 @@ void swift::markAsObjC(TypeChecker &TC, ValueDecl *D,
   // could be overridden by @nonobjc. If we see a @nonobjc and we are trying
   // to add an @objc for whatever reason, diagnose an error.
   if (auto *attr = D->getAttrs().getAttribute<NonObjCAttr>()) {
-    if (!shouldDiagnoseObjCReason(*isObjC))
+    if (!shouldDiagnoseObjCReason(*isObjC, TC.Context))
       isObjC = ObjCReason::ImplicitlyObjC;
 
     TC.diagnose(D->getStartLoc(), diag::nonobjc_not_allowed,
@@ -5113,7 +5115,7 @@ public:
             // complain.
             auto storageObjCAttr = storage->getAttrs().getAttribute<ObjCAttr>();
             if (storageObjCAttr->isSwift3Inferred() &&
-                shouldDiagnoseObjCReason(*isObjC)) {
+                shouldDiagnoseObjCReason(*isObjC, TC.Context)) {
               TC.diagnose(storage, diag::accessor_swift3_objc_inference,
                           storage->getDescriptiveKind(), storage->getFullName(),
                           isa<SubscriptDecl>(storage), FD->isSetter())
@@ -7282,6 +7284,24 @@ void TypeChecker::validateDecl(ValueDecl *D) {
 
         markAsObjC(*this, VD, isObjC);
 
+        // Under the Swift 3 inference rules, if we have @IBInspectable or
+        // @GKInspectable but did not infer @objc, warn that the attribute is
+        if (!isObjC && Context.LangOpts.EnableSwift3ObjCInference) {
+          if (auto attr = VD->getAttrs().getAttribute<IBInspectableAttr>()) {
+            diagnose(attr->getLocation(),
+                     diag::attribute_meaningless_when_nonobjc,
+                     attr->getAttrName())
+              .fixItRemove(attr->getRange());
+          }
+
+          if (auto attr = VD->getAttrs().getAttribute<GKInspectableAttr>()) {
+            diagnose(attr->getLocation(),
+                     diag::attribute_meaningless_when_nonobjc,
+                     attr->getAttrName())
+              .fixItRemove(attr->getRange());
+          }
+        }
+
         // Infer 'dynamic' before touching accessors.
         inferDynamic(Context, VD);
 
@@ -7550,8 +7570,12 @@ checkExtensionGenericParams(TypeChecker &tc, ExtensionDecl *ext, Type type,
 
   // Local function used to infer requirements from the extended type.
   auto inferExtendedTypeReqs = [&](GenericSignatureBuilder &builder) {
+    auto source =
+      GenericSignatureBuilder::FloatingRequirementSource::forInferred(nullptr);
+
     builder.inferRequirements(*ext->getModuleContext(),
-                              TypeLoc::withoutLoc(extInterfaceType));
+                              TypeLoc::withoutLoc(extInterfaceType),
+                              source);
   };
 
   // Validate the generic type signature.

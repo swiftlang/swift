@@ -1440,8 +1440,7 @@ private:
     // an imported type or a collection.
     const StructDecl *SD = ty->getStructOrBoundGenericStruct();
     if (ty->isAny()) {
-      ty = ctx.getProtocol(KnownProtocolKind::AnyObject)
-        ->getDeclaredType();
+      ty = ctx.getAnyObjectType();
     } else if (SD != ctx.getArrayDecl() &&
         SD != ctx.getDictionaryDecl() &&
         SD != ctx.getSetDecl() &&

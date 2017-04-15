@@ -54,7 +54,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// in source control, you should also update the comment to briefly
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
-const uint16_t VERSION_MINOR = 333; // Last change: AST constant_string_literal
+const uint16_t VERSION_MINOR = 334; // Last change: AnyObject bit in ProtocolCompositionType
 
 using DeclID = PointerEmbeddedInt<unsigned, 31>;
 using DeclIDField = BCFixed<31>;
@@ -660,6 +660,7 @@ namespace decls_block {
 
   using ProtocolCompositionTypeLayout = BCRecordLayout<
     PROTOCOL_COMPOSITION_TYPE,
+    BCFixed<1>,          // has AnyObject constraint
     BCArray<TypeIDField> // protocols
   >;
 
@@ -755,7 +756,7 @@ namespace decls_block {
     IdentifierIDField, // name
     DeclContextIDField,// context decl
     TypeIDField, // underlying type
-    TypeIDField, // interface type
+    TypeIDField, // interface type (no longer used)
     BCFixed<1>,  // implicit flag
     GenericEnvironmentIDField, // generic environment
     AccessibilityKindField // accessibility

@@ -224,7 +224,9 @@ public:
   }
 private:
   void handleDiagnostic(SourceManager &SM, SourceLoc Loc,
-                        DiagnosticKind Kind, StringRef Text,
+                        DiagnosticKind Kind,
+                        StringRef FormatString,
+                        ArrayRef<DiagnosticArgument> FormatArgs,
                         const DiagnosticInfo &Info) override {
     if (!shouldFix(Kind, Info))
       return;
@@ -921,10 +923,10 @@ int swift::performFrontend(ArrayRef<const char *> Args,
     PDC.handleDiagnostic(dummyMgr, SourceLoc(), DiagnosticKind::Error,
                          "fatal error encountered during compilation; please "
                            "file a bug report with your project and the crash "
-                           "log",
+                           "log", {},
                          DiagnosticInfo());
     PDC.handleDiagnostic(dummyMgr, SourceLoc(), DiagnosticKind::Note, reason,
-                         DiagnosticInfo());
+                         {}, DiagnosticInfo());
     if (shouldCrash)
       abort();
   };

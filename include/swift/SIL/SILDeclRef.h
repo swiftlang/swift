@@ -44,6 +44,7 @@ namespace swift {
   class SILFunctionType;
   enum class SILLinkage : unsigned char;
   enum IsSerialized_t : unsigned char;
+  enum class SubclassScope : unsigned char;
   class SILModule;
   class SILLocation;
   class AnyFunctionRef;
@@ -365,6 +366,12 @@ struct SILDeclRef {
   static bool isClangGenerated(ClangNode node);
 
   bool isImplicit() const;
+
+  /// Return the scope in which the parent class of a method (i.e. class
+  /// containing this declaration) can be subclassed, returning NotApplicable if
+  /// this is not a method, there is no such class, or the class cannot be
+  /// subclassed.
+  SubclassScope getSubclassScope() const;
 
 private:
   friend struct llvm::DenseMapInfo<swift::SILDeclRef>;

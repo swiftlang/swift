@@ -17,8 +17,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_SILOPTIMIZER_PASSMANAGER_DI_MEMORY_USE_COLLECTOR_H
-#define SWIFT_SILOPTIMIZER_PASSMANAGER_DI_MEMORY_USE_COLLECTOR_H
+#ifndef SWIFT_SILOPTIMIZER_PASSMANAGER_DIMEMORYUSECOLLECTOROWNERSHIP_H
+#define SWIFT_SILOPTIMIZER_PASSMANAGER_DIMEMORYUSECOLLECTOROWNERSHIP_H
 
 #include "swift/Basic/LLVM.h"
 #include "swift/SIL/SILInstruction.h"
@@ -26,7 +26,10 @@
 #include "llvm/ADT/APInt.h"
 
 namespace swift {
+
 class SILBuilder;
+
+namespace ownership {
 
 /// DIMemoryObjectInfo - This struct holds information about the memory object
 /// being analyzed that is required to correctly break it down into elements.
@@ -288,6 +291,7 @@ void collectDIElementUsesFrom(const DIMemoryObjectInfo &MemoryInfo,
                               bool isDefiniteInitFinished,
                               bool TreatAddressToPointerAsInout);
 
+} // end namespace ownership
 } // end namespace swift
 
 #endif

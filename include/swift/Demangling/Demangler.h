@@ -447,6 +447,7 @@ private:
   NodePointer demangleMetatypeRepresentation();
   NodePointer demangleFunctionEntity();
   NodePointer demangleEntity(Node::Kind Kind);
+  NodePointer demangleProtocolList();
   NodePointer demangleProtocolListType();
   NodePointer demangleGenericSignature(bool hasParamCounts);
   NodePointer demangleGenericRequirement();

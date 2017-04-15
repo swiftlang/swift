@@ -17,8 +17,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_SILOPTIMIZER_PASSMANAGER_DI_MEMORY_USE_COLLECTOR_H
-#define SWIFT_SILOPTIMIZER_PASSMANAGER_DI_MEMORY_USE_COLLECTOR_H
+#ifndef SWIFT_SILOPTIMIZER_MANDATORY_DIMEMORYUSECOLLECTOR_H
+#define SWIFT_SILOPTIMIZER_MANDATORY_DIMEMORYUSECOLLECTOR_H
 
 #include "swift/Basic/LLVM.h"
 #include "llvm/ADT/APInt.h"
