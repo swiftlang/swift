@@ -2715,7 +2715,7 @@ void SILGenFunction::emitAssignLValueToLValue(SILLocation loc, LValue &&src,
   // because it causes the formal accesses to the source and destination to
   // overlap.
   bool peepholeConflict =
-      getOptions().isAnyExclusivityEnforcementEnabled() &&
+    /*!!! getOptions().isAnyExclusivityEnforcementEnabled() && */
       !src.isObviouslyNonConflicting(dest, AccessKind::Read, AccessKind::Write);
 
   if (peepholeConflict || !src.isPhysical() || !dest.isPhysical()) {

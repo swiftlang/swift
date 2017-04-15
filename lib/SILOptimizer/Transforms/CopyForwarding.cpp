@@ -75,6 +75,7 @@ STATISTIC(NumCopyNRVO, "Number of copies removed via named return value opt.");
 STATISTIC(NumCopyForward, "Number of copies removed via forward propagation");
 STATISTIC(NumCopyBackward,
           "Number of copies removed via backward propagation");
+STATISTIC(NumUnusedTemp, "Number of copies removed from unused temporaries");
 
 using namespace swift;
 
@@ -427,6 +428,7 @@ public:
 protected:
   bool collectUsers();
   bool propagateCopy(CopyAddrInst *CopyInst);
+  CopyAddrInst *findCopyIntoUnusedTemp(CopyAddrInst *destCopy);
   bool forwardPropagateCopy(CopyAddrInst *CopyInst,
                             SmallPtrSetImpl<SILInstruction*> &DestUserInsts);
   bool backwardPropagateCopy(CopyAddrInst *CopyInst,
@@ -517,12 +519,37 @@ bool CopyForwarding::collectUsers() {
 ///
 /// The caller has already proven that lifetime of the value being copied ends
 /// at the copy. (Either it is a [take] or is immediately destroyed).
+/// 
 ///
 /// If the forwarded copy is not an [init], then insert a destroy of the copy's
 /// dest.
 bool CopyForwarding::propagateCopy(CopyAddrInst *CopyInst) {
   if (!EnableCopyForwarding)
     return false;
+
+  // Handle copy-of-copy without analyzing uses.
+  // Assumes that CopyInst->getSrc() is dead after CopyInst.
+  if (auto *srcCopy = findCopyIntoUnusedTemp(CopyInst)) {
+    DEBUG(llvm::dbgs() << "  Temp Copy:" << *srcCopy
+                       << "         to " << *CopyInst);
+    // This pattern needs no extra destroy of %temp:
+    // copy_addr [init] %src, %temp
+    // copy_addr [take] %temp, %dest
+    if (!srcCopy->isInitializationOfDest()) {
+      SILBuilderWithScope(srcCopy)
+        .createDestroyAddr(srcCopy->getLoc(), srcCopy->getDest());
+    }
+    // TODO: We could handle copy_addr %temp, %dest (with no take) by finding
+    // the subsequent destroy, but that case is unexpected.
+    if (CopyInst->isTakeOfSrc()) {
+      CopyInst->setSrc(srcCopy->getSrc());
+      CopyInst->setIsTakeOfSrc(srcCopy->isTakeOfSrc());
+      srcCopy->eraseFromParent();
+      HasChanged = true;
+      ++NumUnusedTemp;
+      return true;
+    }
+  }
 
   SILValue CopyDest = CopyInst->getDest();
   SILBasicBlock *BB = CopyInst->getParent();
@@ -559,6 +586,39 @@ bool CopyForwarding::propagateCopy(CopyAddrInst *CopyInst) {
     return true;
   }
   return false;
+}
+
+/// Find a copy into an otherwise dead temporary. The given `destCopy` copies
+/// out of the possible temporary, whose lifetime is already known to end here.
+///
+/// Returns the previous copy into the same temporary if it is safe to forward
+/// the source of that copy into the source of `destCopy`. Otherwise return
+/// nullptr. No instructions are harmed in this analysis.
+///
+/// This can be checked with a simple instruction walk that ends at:
+/// - an intervening instructions may write to memory
+/// - a use of the temporary
+///
+/// Unlike the forward and backward propagation that finds all use points, this
+/// handles copies of address projections. By conservatively checking all
+/// intervening instructions, it avoids the need to analyze projection paths.
+CopyAddrInst *CopyForwarding::findCopyIntoUnusedTemp(CopyAddrInst *destCopy) {
+  auto tmpVal = destCopy->getSrc();
+  assert(isIdentifiedSourceValue(tmpVal));
+  for (auto II = destCopy->getIterator(), IB = destCopy->getParent()->begin();
+       II != IB;) {
+    --II;
+    SILInstruction *UserInst = &*II;
+    if (auto *srcCopy = dyn_cast<CopyAddrInst>(UserInst)) {
+      if (srcCopy->getDest() == tmpVal)
+        return srcCopy;
+    }
+    if (SrcUserInsts.count(UserInst))
+      return nullptr;
+    if (UserInst->mayWriteToMemory())
+      return nullptr;
+  }
+  return nullptr;
 }
 
 /// Check that the lifetime of %src ends at the copy and is not reinitialized
