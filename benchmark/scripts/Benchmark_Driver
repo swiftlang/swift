@@ -82,7 +82,8 @@ def submit_to_lnt(data, url):
 def instrument_test(driver_path, test, num_samples):
     """Run a test and instrument its peak memory use"""
     test_output_raw = subprocess.check_output(
-        ['time', '-lp', driver_path, test, '--num-samples='+str(num_samples)],
+        ['time', '-lp', driver_path, test, '--num-samples=' +
+            str(num_samples)],
         stderr=subprocess.STDOUT
     )
     peak_memory = re.match('\s*(\d+)\s*maximum resident set size',
@@ -351,9 +352,9 @@ def main():
         help='Run benchmarks and submit results to LNT',
         parents=[parent_parser])
     submit_parser.add_argument(
-            '-o', '--optimization', nargs='+',
-            help='optimization levels to use (default: O Onone Ounchecked)',
-            default=['O', 'Onone', 'Ounchecked'])
+        '-o', '--optimization', nargs='+',
+        help='optimization levels to use (default: O Onone Ounchecked)',
+        default=['O', 'Onone', 'Ounchecked'])
     submit_parser.add_argument(
         '-i', '--iterations',
         help='number of times to run each test (default: 10)',
