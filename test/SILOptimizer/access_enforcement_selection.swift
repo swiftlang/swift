@@ -53,3 +53,15 @@ public func recaptureStack() -> Int {
 // enough to prove otherwise. Same as `captureStack` above.
 //
 // CHECK: Dynamic Access: %{{.*}} = begin_access [read] [dynamic] %0 : $*Int
+
+public func undefStack(i: Int) -> Int {
+  _preconditionFailure("unreachable")
+  var x = 3
+  if i != 0 {
+    x = 42
+  }
+  return x
+}
+// CHECK-LABEL: Access Enforcement Selection in _T028access_enforcement_selection10undefStackS2i1i_tF
+// CHECK: Static Access:   %{{.*}} = begin_access [modify] [static] undef : $*Int
+// CHECK: Static Access:   %{{.*}} = begin_access [read] [static] undef : $*Int
