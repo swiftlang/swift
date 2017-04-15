@@ -48,6 +48,9 @@ public:
   
   Substitution(Type Replacement, ArrayRef<ProtocolConformanceRef> Conformance);
 
+  /// Checks whether the current substituion is canonical.
+  bool isCanonical() const;
+
   /// Get the canonicalized substitution. If wasCanonical is not nullptr,
   /// store there whether the current substitution was canonical already.
   Substitution getCanonicalSubstitution(bool *wasCanonical = nullptr) const;

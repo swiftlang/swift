@@ -1073,11 +1073,8 @@ bool ProtocolConformance::isCanonical() const {
 
   switch (getKind()) {
   case ProtocolConformanceKind::Normal: {
-    auto normalConformance = cast<NormalProtocolConformance>(this);
-    auto sigConformances = normalConformance->getSignatureConformances();
-    for (auto conf : sigConformances)
-      if (!conf.isCanonical())
-        return false;
+    // Normal conformances are considered canonical by
+    // construction.
     return true;
   }
   case ProtocolConformanceKind::Inherited: {
@@ -1093,13 +1090,9 @@ bool ProtocolConformance::isCanonical() const {
     if (!genericConformance->isCanonical())
       return false;
     auto specSubs = spec->getGenericSubstitutions();
-    for (auto sub : specSubs) {
-      if (!sub.getReplacement()->isCanonical())
+    for (const auto &sub : specSubs) {
+      if (!sub.isCanonical())
         return false;
-      for (auto conf : sub.getConformances()) {
-        if (!conf.isCanonical())
-          return false;
-      }
     }
     return true;
   }
