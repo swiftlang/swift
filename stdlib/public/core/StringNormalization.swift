@@ -28,6 +28,24 @@ extension UInt16 : _DefaultConstructible {}
 public typealias UTF16CodeUnitBuffer =
   UnboundCapacity<_BoundedCapacity<_FixedArray8<UInt16>>>
 
+//
+// Useful thresholds
+//
+
+// The first combining code unit
+let _firstCombiningCodeUnit: UInt16 = 0x300
+
+// The first code unit that, when the sole member of a normalization segment, is
+// non-normal.
+let _firstIsolatedNonNormalCodeUnit: UInt16 = 0x340
+
+// The last code unit below the surrogates that, when the sole member of a
+// normalization segment, is non-normal.
+let _lastIsolatedSubSurrogateNonNormalCodeUnit: UInt16 = 0x2ADC
+
+// The first surrogate code unit
+let _firstSurrogateCodeUnit: UInt16 = 0xD800
+
 // A normalization segment that is FCC-normalized. This is a collection of
 // normalized UTF16 code units.
 //
@@ -158,7 +176,8 @@ extension FCCNormalizedSegment {
       return true
     }
     if _fastPath(buffer.count == 1) {
-      return FCCNormalizedSegment.isPreNormalized(utf16CodeUnit: buffer[0])
+      return FCCNormalizedSegment.isPreNormalized(
+        isolatedUTF16CodeUnit: buffer[0])
     }
 
     // TODO: There are much better pre-normalized checks we can do than just
@@ -168,26 +187,29 @@ extension FCCNormalizedSegment {
     // scalars.
     for cu in buffer {
       // TODO: Other checks
-      guard _fastPath(isPreNormalized(utf16CodeUnit: cu)) else {
+      guard _fastPath(cu < _firstCombiningCodeUnit) else {
         return false
       }
     }
     return true
   }
 
-  static func isPreNormalized(utf16CodeUnit cu: UInt16) -> Bool {
+  // A pre-normalized check for single-code-unit normalization segment
+  static func isPreNormalized(isolatedUTF16CodeUnit cu: UInt16) -> Bool {
     // For single-code-unit normalization segments, the vast majority of the
     // sub-surrogate BMP is already FCC normalized (~70 exceptions). Perform
     // some quick checks over the largest ranges.
 
-    // The earliest exceptions is 0x340,
-    if _fastPath(cu < 0x340) {
+    // The earliest exception is _firstIsolatedNonNormalCodeUnit,
+    if _fastPath(cu < _firstIsolatedNonNormalCodeUnit) {
       return true
     }
 
     // The last exception, before the surrogate code units, is 0x2ADC, the
     // FORKING supplemental mathematical operator.
-    if _fastPath(cu > 0x2ADC && cu < 0xd800) {
+    if _fastPath(
+      cu > _lastIsolatedSubSurrogateNonNormalCodeUnit
+      && cu < _firstSurrogateCodeUnit) {
       return true
     }
 
@@ -337,7 +359,7 @@ where
     var buffer = UTF16CodeUnitBuffer(utf16CodeUnits.lazy.joined())
 
     // Fast pre-normalized checks (worth doing before calling over to ICU)
-    if _fastPath(FCCNormalizedLazySegments.isPreNormalized(buffer)) {
+    if _fastPath(FCCNormalizedSegment.isPreNormalized(buffer)) {
       return FCCNormalizedSegment(
         buffer, nativeStart: castCUIndex(start), nativeEnd: castCUIndex(end))
     }
@@ -428,33 +450,6 @@ where
     let start = start ?? codeUnits.startIndex
     return _UnicodeViews(codeUnits[start..<end], FromEncoding.self)
   }
-
-  static func isPreNormalized(_ buffer: UTF16CodeUnitBuffer) -> Bool {
-    if buffer.count == 1 {
-      let cu = buffer[0]
-      // For single-code-unit normalization segments, the vast majority of the
-      // sub-surrogate BMP is already FCC normalized (~70 exceptions). Perform
-      // some quick checks over the largest ranges.
-
-      // The earliest exceptions is 0x340,
-      if _fastPath(cu < 0x340) {
-        return true
-      }
-
-      // The last exception, before the surrogate code units, is 0x2ADC, the
-      // FORKING supplemental mathematical operator.
-      if _fastPath(cu > 0x2ADC && cu < 0xd800) {
-        return true
-      }
-
-      // TODO: Worth checking the more narrow ranges?
-      return false
-    }
-
-    // TODO: Other quick checks
-    return false
-  }
-
 }
 
 extension FCCNormalizedLazySegments : BidirectionalCollection {

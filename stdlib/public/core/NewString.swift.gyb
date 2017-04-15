@@ -240,16 +240,12 @@ extension String.Content {
         bitsPerElement: numericCast(inlineStr.bitsPerElement)
       )
       var storage = Base()
-      // dump(inlineStr)
       String.Content.packingTable.withUTF8Buffer { table in
         for cu in source {
-          // dump(cu)
-          // dump(table[Int(cu)])
           storage.append(UInt16(table[Int(cu)]))
         }
       }
       self.base = storage
-      // dump(storage)
     }
     public init(_ inlineStr: String.Content.Inline7or16) {
       // TODO: try skipping the packing struct directly...
@@ -259,7 +255,6 @@ extension String.Content {
       )
       let mask = UInt16(
         truncatingBitPattern: ~0 << UInt32(inlineStr.bitsPerElement))
-      // dump(inlineStr)
       var storage = Base()
       for cu in source {
         storage.append((cu &+ 32) & ~mask)
@@ -282,7 +277,6 @@ extension String.Content.ExplodedUTF16CodeUnits
       Element='UInt16')}
 }
 
-
 extension String.Content {
   static func _pack<Source: Collection>(
     utf16 source: Source, bitsPerElement: UInt16
@@ -301,41 +295,6 @@ extension String.Content {
       },
       bitsPerElement: numericCast(bitsPerElement)
     )
-  }
-
-  public struct _Unpack : _Function {
-    let bitsPerElement: UInt16
-    public func apply(_ input: UInt16) -> UInt16 {
-      if bitsPerElement < 7 {
-        return String.Content.packingTable.withUTF8Buffer {
-          UInt16($0[numericCast(input)])
-        }
-      }
-      else {
-        let mask = UInt16(truncatingBitPattern: ~0 << UInt32(bitsPerElement))
-        return (input &+ 32) & ~mask
-      }
-    }
-  }
-  
-  static func _unpack(
-    bits: UInt61, bitsPerElement: UInt16
-  ) -> LazyMapRandomAccessCollection<String.Content.Packed, UInt16> {
-    let source = String.Content.Packed(
-      representation: numericCast(bits & (~(0 as UInt61) >> 1)),
-      bitsPerElement: numericCast(bitsPerElement)
-    )
-    return bitsPerElement < 7
-    ? String.Content.packingTable.withUTF8Buffer {
-      table in source.lazy.map {
-        (x: UInt16) -> UInt16 in UInt16(table[numericCast(x)])
-      }
-    }
-    : source.lazy.map { 
-      [ mask = UInt16(truncatingBitPattern: ~0 << UInt32(bitsPerElement)) ]
-      (x: UInt16) -> UInt16 in
-      (x &+ 32) & ~mask
-    }
   }
 }
   
@@ -1153,18 +1112,62 @@ extension String : Comparable {
     }
   }
   public static func == (lhs: String, rhs: String) -> Bool {
-    // return lhs.content.fccNormalizedUTF16.elementsEqual(
-    //   rhs.content.fccNormalizedUTF16
-    switch lhs.content._rep {
-  % for outerTag,_ in allCases:
-    case .${outerTag}(let outerContent):
-      switch rhs.content._rep {
-    % for innerTag,_ in allCases:
-      case .${innerTag}(let innerContent):
-        return outerContent.fccNormalizedUTF16.elementsEqual(
-          innerContent.fccNormalizedUTF16)
-    % end
+    // Faster equality for same-representation
+    switch (lhs.content._rep, rhs.content._rep) {
+    case (.inline5or6(let lhs), .inline5or6(let rhs)):
+      if lhs.bitsPerElement == rhs.bitsPerElement {
+        // Bit compare packed representation
+        return lhs.bits == rhs.bits
+      } else {
+        // Compare exploded code units
+        //
+        // TODO: Can use UInt8 exploded code units
+        //
+        // TODO: Segment should implement a memcmp-like comparison conformance
+        return lhs._utf16.base._base.elementsEqual(rhs._utf16.base._base)
       }
+    case (.inline7or16(let lhs), .inline7or16(let rhs)):
+      if lhs.bitsPerElement == 7 && rhs.bitsPerElement == 7 {
+        // Bit compare packed representation
+        return lhs.bits == rhs.bits
+      } else {
+        // Compare normalized exploded code units
+        //
+        // TODO: Might be able to avoid the bounded checks through a large
+        // enough static size. Worth a research project to confirm.
+        //
+        // TODO: Segment should implement a memcmp-like comparison conformance
+        return lhs.fccNormalizedUTF16.elementsEqual(rhs.fccNormalizedUTF16)
+      }
+    case (.latin1(let lhs), .latin1(let rhs)):
+      // TODO: more like memcmp
+      return lhs.codeUnits.elementsEqual(rhs.codeUnits)
+
+    // Faster same-type comparisons.
+    //
+    // TODO: Bake in more fast paths here, or in the normalization?
+    case (.utf16(let lhs), .utf16(let rhs)):
+      // TODO: == probably quicker than elementsEqual, at least after more
+      // tweaking.
+      return lhs.fccNormalizedUTF16.elementsEqual(rhs.fccNormalizedUTF16)
+    case (.any(let lhs), .any(let rhs)):
+      // TODO: == probably quicker than elementsEqual, at least after more
+      // tweaking.
+      return lhs.fccNormalizedUTF16.elementsEqual(rhs.fccNormalizedUTF16)
+    case (.cocoa(let lhs), .cocoa(let rhs)):
+      // TODO: == probably quicker than elementsEqual, at least after more
+      // tweaking.
+      return lhs.fccNormalizedUTF16.elementsEqual(rhs.fccNormalizedUTF16)
+
+    // Separate representation checks:
+  % for lhsTag,_ in allCases:
+  % for rhsTag,_ in allCases:
+  % if lhsTag != rhsTag:
+    case (.${lhsTag}(let lhs),.${rhsTag}(let rhs)):
+      return lhs.fccNormalizedUTF16.elementsEqual(
+        rhs.fccNormalizedUTF16)
+  % end
+  % end
   % end
     }
   }
