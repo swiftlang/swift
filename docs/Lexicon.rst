@@ -144,6 +144,14 @@ source code, tests, and commit messages. See also the `LLVM lexicon`_.
     themselves. They can be compared across declarations but cannot be used
     directly from within the context.
 
+  irrefutable pattern
+    A pattern that always matches. These patterns either bind to a variable or
+    perform structural modification, e.x.:
+
+    1. ``case _:``.
+    2. ``case let x:``.
+    3. ``case (_, _):``.
+
   IR
     1. "intermediate representation": a generic term for a format representing
        code in a way that is easy for a compiler or tool to manipulate.
@@ -303,6 +311,13 @@ source code, tests, and commit messages. See also the `LLVM lexicon`_.
   reabstraction
     An implicit representation change that occurs when a value is used with
     a different `abstraction pattern` from its current representation.
+
+  refutable pattern
+    A pattern that may not always match. These include patterns such as:
+
+    1. Isa check, e.g. ``case let x as String:``.
+    2. Enum case check: e.g. ``case .none:``.
+    3. Expr pattern: e.g. ``case foo():``.
 
   resilient
     Describes a type or function where making certain changes will not break
