@@ -147,6 +147,9 @@ IgnoreRemovedDeclUSRs("ignored-usrs",
 static llvm::cl::opt<std::string>
 SwiftVersion("swift-version",
              llvm::cl::desc("The Swift compiler version to invoke"));
+
+static llvm::cl::opt<bool>
+OutputInJson("json", llvm::cl::desc("Print output in JSON format."));
 } // namespace options
 
 namespace {
@@ -766,10 +769,7 @@ SDKNode* SDKNode::constructSDKNode(SDKContext &Ctx,
   for (auto Pair : *Node) {
     switch(parseKeyKind(GetScalarString(Pair.getKey()))) {
     case KeyKind::KK_kind:
-      Kind = llvm::StringSwitch<SDKNodeKind>(GetScalarString(Pair.getValue()))
-#define NODE_KIND(NAME) .Case(#NAME, SDKNodeKind::NAME)
-#include "swift/IDE/DigesterEnums.def"
-      ;
+      Kind = parseSDKNodeKind(GetScalarString(Pair.getValue()));
       break;
     case KeyKind::KK_name:
       Info.Name = GetScalarString(Pair.getValue());
@@ -1343,14 +1343,6 @@ namespace swift {
   // In the namespace of swift::json, we define several functions so that the
   // JSON serializer will know how to interpret and dump types defined in this
   // file.
-  template<>
-    struct ScalarEnumerationTraits<SDKNodeKind> {
-      static void enumeration(Output &out, SDKNodeKind &value) {
-#define NODE_KIND(X) out.enumCase(value, #X, SDKNodeKind::X);
-#include "swift/IDE/DigesterEnums.def"
-      }
-    };
-
     template<>
     struct ScalarEnumerationTraits<TypeAttrKind> {
       static void enumeration(Output &out, TypeAttrKind &value) {
@@ -2329,7 +2321,7 @@ public:
   }
 };
 
-typedef std::vector<DiffItem> DiffVector;
+typedef std::vector<CommonDiffItem> DiffVector;
 
 typedef std::vector<TypeMemberDiffItem> TypeMemberDiffVector;
 
@@ -3068,7 +3060,8 @@ static int compareSDKs(StringRef LeftPath, StringRef RightPath,
   RefinementPass.pass(LeftModule, RightModule);
   DiffVector AllItems;
   DiffItemEmitter::collectDiffItems(LeftModule, AllItems);
-  AllItems.erase(std::remove_if(AllItems.begin(), AllItems.end(), [&](DiffItem &Item) {
+  AllItems.erase(std::remove_if(AllItems.begin(), AllItems.end(),
+                                [&](CommonDiffItem &Item) {
     return Item.DiffKind == NodeAnnotation::RemovedDecl &&
       IgnoredRemoveUsrs.find(Item.LeftUsr) != IgnoredRemoveUsrs.end();
   }), AllItems.end());
@@ -3082,7 +3075,23 @@ static int compareSDKs(StringRef LeftPath, StringRef RightPath,
 
   std::error_code EC;
   llvm::raw_fd_ostream Fs(DiffPath, EC, llvm::sys::fs::F_None);
-
+  if (options::OutputInJson) {
+    std::vector<APIDiffItem*> TotalItems;
+    std::transform(AllItems.begin(), AllItems.end(),
+                   std::back_inserter(TotalItems),
+                   [](CommonDiffItem &Item) { return &Item; });
+    std::transform(typeMemberDiffs.begin(), typeMemberDiffs.end(),
+                   std::back_inserter(TotalItems),
+                   [](TypeMemberDiffItem &Item) { return &Item; });
+    std::transform(AllNoEscapingFuncs.begin(), AllNoEscapingFuncs.end(),
+                   std::back_inserter(TotalItems),
+                   [](NoEscapeFuncParam &Item) { return &Item; });
+    std::transform(Overloads.begin(), Overloads.end(),
+                   std::back_inserter(TotalItems),
+                   [](OverloadedFuncInfo &Item) { return &Item; });
+    APIDiffItemStore::serialize(Fs, TotalItems);
+    return 0;
+  }
   serializeDiffs(Fs, AllItems);
   serializeDiffs(Fs, typeMemberDiffs);
   serializeDiffs(Fs, AllNoEscapingFuncs);
