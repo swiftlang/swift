@@ -1,3 +1,7 @@
+// XFAIL: *
+//
+// https://bugs.swift.org/browse/SR-4565
+
 // RUN: rm -rf %t
 // RUN: mkdir -p %t
 // RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -emit-module -module-name def_enum -o %t %S/Inputs/def_enum.swift

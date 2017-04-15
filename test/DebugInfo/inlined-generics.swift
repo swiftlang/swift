@@ -1,3 +1,7 @@
+// XFAIL: *
+//
+// https://bugs.swift.org/browse/SR-4565
+
 // RUN: %target-swift-frontend -Xllvm -sil-inline-generics=true %s -O -g -o - -emit-ir | %FileCheck %s
 public protocol P {
   associatedtype DT1

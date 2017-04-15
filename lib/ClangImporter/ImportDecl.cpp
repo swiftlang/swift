@@ -1212,21 +1212,6 @@ addProtocolsToStruct(ClangImporter::Implementation &Impl,
                                    SynthesizedProtocolAttr(kind));
 }
 
-/// Add the RawValue type to a RawRepresentable struct.
-static void addRawValueType(StructDecl *structDecl, Type rawType) {
-  auto &ctx = structDecl->getASTContext();
-
-  auto typealias = new (ctx) TypeAliasDecl(SourceLoc(), SourceLoc(),
-                                           ctx.Id_RawValue, SourceLoc(),
-                                           nullptr, structDecl);
-  typealias->setUnderlyingType(rawType);
-  typealias->setEarlyAttrValidation(true);
-  typealias->setAccessibility(Accessibility::Public);
-  typealias->setValidationStarted();
-  typealias->setImplicit();
-  structDecl->addMember(typealias);
-}
-
 /// Make a struct declaration into a raw-value-backed struct
 ///
 /// \param structDecl the struct to make a raw value for
@@ -1273,8 +1258,6 @@ static void makeStructRawValued(
                              /*wantBody=*/!Impl.hasFinishedTypeChecking()));
   structDecl->addMember(patternBinding);
   structDecl->addMember(var);
-
-  addRawValueType(structDecl, underlyingType);
 }
 
 /// Create a rawValue-ed constructor that bridges to its underlying storage.
@@ -1389,9 +1372,6 @@ static void makeStructRawValuedWithBridge(
   structDecl->addMember(computedPatternBinding);
   structDecl->addMember(computedVar);
   structDecl->addMember(computedVarGetter);
-
-  addRawValueType(structDecl, bridgedType);
-
 }
 
 static Type getGenericMethodType(DeclContext *dc, AnyFunctionType *fnType) {
