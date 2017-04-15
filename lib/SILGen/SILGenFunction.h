@@ -1658,7 +1658,8 @@ public:
   /// \param ArgNo optionally describes this function argument's
   /// position for debug info.
   std::unique_ptr<Initialization>
-  emitLocalVariableWithCleanup(VarDecl *D, bool NeedsMarkUninit,
+  emitLocalVariableWithCleanup(VarDecl *D,
+                               Optional<MarkUninitializedInst::Kind> kind,
                                unsigned ArgNo = 0);
 
   /// Emit the allocation for a local temporary, provides an
