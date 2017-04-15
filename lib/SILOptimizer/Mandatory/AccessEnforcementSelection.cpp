@@ -18,6 +18,7 @@
 #define DEBUG_TYPE "access-enforcement-selection"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILFunction.h"
+#include "swift/SIL/SILUndef.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 
 using namespace swift;
@@ -333,7 +334,12 @@ struct AccessEnforcementSelection : SILFunctionTransform {
         setDynamicEnforcement(access);
         break;
       default:
-        llvm_unreachable("Expecting an indirect argument.");
+        // @in/@in_guaranteed cannot be mutably accessed, mutably captured, or
+        // passed as inout.
+        //
+        // FIXME: When we have borrowed arguments, a "read" needs to be enforced
+        // on the caller side.
+        llvm_unreachable("Expecting an inout argument.");
       }
       return;
     }
@@ -342,7 +348,9 @@ struct AccessEnforcementSelection : SILFunctionTransform {
     // element. Other sources of access are either outright dynamic (GlobalAddr,
     // RefElementAddr), or only exposed after mandator inlining (nested
     // dependent BeginAccess).
-    assert(isa<AllocStackInst>(address));
+    //
+    // Running before diagnostic constant propagation requires handling 'undef'.
+    assert(isa<AllocStackInst>(address) || isa<SILUndef>(address));
     setStaticEnforcement(access);
   }
 
