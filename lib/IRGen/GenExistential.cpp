@@ -1088,6 +1088,12 @@ class ClassExistentialTypeInfo final
 
 public:
 
+  llvm::PointerType *getPayloadType() const {
+    auto *ty = getStorageType();
+    llvm::StructType *structTy = cast<llvm::StructType>(ty);
+    return cast<llvm::PointerType>(structTy->elements()[0]);
+  }
+
   bool isSingleRetainablePointer(ResilienceExpansion expansion,
                                  ReferenceCounting *refcounting) const override{
     if (refcounting) *refcounting = Refcounting;
@@ -1388,7 +1394,6 @@ static const TypeInfo *createExistentialTypeInfo(IRGenModule &IGM, CanType T) {
 
   // The existential container is class-constrained if any of its protocol
   // constraints are.
-  bool requiresClass = layout.requiresClass;
   bool allowsTaggedPointers = true;
 
   for (auto protoTy : layout.getProtocols()) {
@@ -1412,20 +1417,22 @@ static const TypeInfo *createExistentialTypeInfo(IRGenModule &IGM, CanType T) {
 
   // If the existential is class, lower it to a class
   // existential representation.
-  if (requiresClass) {
+  if (layout.requiresClass) {
     // If we're not using the Objective-C runtime, we can use the
     // native reference counting entry points.
-    ReferenceCounting refcounting;
+    ReferenceCounting refcounting = getReferenceCountingForType(IGM, T);
 
-    // FIXME: If there is a superclass constraint we might be able to
-    // use native refcounting.
-    if (!IGM.ObjCInterop) {
-      refcounting = ReferenceCounting::Native;
-      fields[1] = IGM.RefCountedPtrTy;
+    llvm::PointerType *reprTy = nullptr;
+    if (layout.superclass) {
+      auto &superTI = IGM.getTypeInfoForUnlowered(layout.superclass);
+      reprTy = cast<llvm::PointerType>(superTI.getStorageType());
+    } else if (refcounting == ReferenceCounting::Native) {
+      reprTy = IGM.RefCountedPtrTy;
     } else {
-      refcounting = ReferenceCounting::Unknown;
-      fields[1] = IGM.UnknownRefCountedPtrTy;
+      reprTy = IGM.UnknownRefCountedPtrTy;
     }
+
+    fields[1] = reprTy;
 
     // Replace the type metadata pointer with the class instance.
     auto classFields = llvm::makeArrayRef(fields).slice(1);
@@ -1438,7 +1445,9 @@ static const TypeInfo *createExistentialTypeInfo(IRGenModule &IGM, CanType T) {
 
     // The class pointer is an unknown heap object, so it may be a tagged
     // pointer, if the platform has those.
-    if (allowsTaggedPointers && IGM.TargetInfo.hasObjCTaggedPointers()) {
+    if (allowsTaggedPointers &&
+        refcounting != ReferenceCounting::Native &&
+        IGM.TargetInfo.hasObjCTaggedPointers()) {
       spareBits.appendClearBits(IGM.getPointerSize().getValueInBits());
     } else {
       // If the platform doesn't use ObjC tagged pointers, we can go crazy.
@@ -1809,13 +1818,8 @@ void irgen::emitClassExistentialContainer(IRGenFunction &IGF,
   auto &destTI = IGF.getTypeInfo(outType).as<ClassExistentialTypeInfo>();
 
   // Cast the instance pointer to an opaque refcounted pointer.
-  llvm::Value *opaqueInstance;
-  if (!IGF.IGM.ObjCInterop)
-    opaqueInstance = IGF.Builder.CreateBitCast(instance,
-                                               IGF.IGM.RefCountedPtrTy);
-  else
-    opaqueInstance = IGF.Builder.CreateBitCast(instance,
-                                               IGF.IGM.UnknownRefCountedPtrTy);
+  auto opaqueInstance = IGF.Builder.CreateBitCast(instance,
+                                               destTI.getPayloadType());
   out.add(opaqueInstance);
 
   // Emit the witness table pointers.

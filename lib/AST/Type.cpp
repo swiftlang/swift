@@ -3977,7 +3977,6 @@ static bool doesOpaqueClassUseNativeReferenceCounting(const ASTContext &ctx) {
 
 static bool usesNativeReferenceCounting(ClassDecl *theClass,
                                         ResilienceExpansion resilience) {
-  // NOTE: if you change this, change irgen::getReferenceCountingForClass.
   // TODO: Resilience? there might be some legal avenue of changing this.
   while (Type supertype = theClass->getSuperclass()) {
     theClass = supertype->getClassOrBoundGenericClass();
@@ -3987,8 +3986,6 @@ static bool usesNativeReferenceCounting(ClassDecl *theClass,
 }
 
 bool TypeBase::usesNativeReferenceCounting(ResilienceExpansion resilience) {
-  assert(allowsOwnership());
-
   CanType type = getCanonicalType();
   switch (type->getKind()) {
 #define SUGARED_TYPE(id, parent) case TypeKind::id:
@@ -4011,6 +4008,10 @@ bool TypeBase::usesNativeReferenceCounting(ResilienceExpansion resilience) {
     return ::usesNativeReferenceCounting(
                                   cast<BoundGenericClassType>(type)->getDecl(),
                                          resilience);
+  case TypeKind::UnboundGeneric:
+    return ::usesNativeReferenceCounting(
+                    cast<ClassDecl>(cast<UnboundGenericType>(type)->getDecl()),
+                                         resilience);
 
   case TypeKind::DynamicSelf:
     return cast<DynamicSelfType>(type).getSelfType()
@@ -4018,17 +4019,23 @@ bool TypeBase::usesNativeReferenceCounting(ResilienceExpansion resilience) {
 
   case TypeKind::Archetype: {
     auto archetype = cast<ArchetypeType>(type);
-    assert(archetype->requiresClass());
+    auto layout = archetype->getLayoutConstraint();
+    assert(archetype->requiresClass() ||
+           (layout && layout->isRefCounted()));
     if (auto supertype = archetype->getSuperclass())
       return supertype->usesNativeReferenceCounting(resilience);
     return ::doesOpaqueClassUseNativeReferenceCounting(type->getASTContext());
   }
 
   case TypeKind::Protocol:
-  case TypeKind::ProtocolComposition:
+  case TypeKind::ProtocolComposition: {
+    auto layout = getExistentialLayout();
+    assert(layout.requiresClass && "Opaque existentials don't use refcounting");
+    if (layout.superclass)
+      return layout.superclass->usesNativeReferenceCounting(resilience);
     return ::doesOpaqueClassUseNativeReferenceCounting(type->getASTContext());
+  }
 
-  case TypeKind::UnboundGeneric:
   case TypeKind::Function:
   case TypeKind::GenericFunction:
   case TypeKind::SILFunction:

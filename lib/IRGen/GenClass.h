@@ -132,11 +132,11 @@ namespace irgen {
   /// correspond to the runtime alignment of instances of the class.
   llvm::Constant *tryEmitClassConstantFragileInstanceAlignMask(IRGenModule &IGM,
                                                         ClassDecl *theClass);
-  
-  /// What reference counting mechanism does a class use?
-  ReferenceCounting getReferenceCountingForClass(IRGenModule &IGM,
-                                                 ClassDecl *theClass);
-  
+
+  /// What reference counting mechanism does a class-like type use?
+  ReferenceCounting getReferenceCountingForType(IRGenModule &IGM,
+                                                CanType type);
+
   /// What isa-encoding mechanism does a type use?
   IsaEncoding getIsaEncodingForType(IRGenModule &IGM, CanType type);
   

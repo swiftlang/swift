@@ -63,20 +63,25 @@ static ClassDecl *getRootClass(ClassDecl *theClass) {
   return theClass;
 }
 
-/// What reference counting mechanism does a class have?
-ReferenceCounting irgen::getReferenceCountingForClass(IRGenModule &IGM,
-                                                      ClassDecl *theClass) {
+/// What reference counting mechanism does a class-like type have?
+ReferenceCounting irgen::getReferenceCountingForType(IRGenModule &IGM,
+                                                     CanType type) {
   // If ObjC interop is disabled, we have a Swift refcount.
   if (!IGM.ObjCInterop)
     return ReferenceCounting::Native;
 
-  // NOTE: if you change this, change Type::usesNativeReferenceCounting.
-  // If the root class is implemented in swift, then we have a swift
-  // refcount; otherwise, we have an ObjC refcount.
-  if (getRootClass(theClass)->hasKnownSwiftImplementation())
+  if (type->usesNativeReferenceCounting(ResilienceExpansion::Maximal))
     return ReferenceCounting::Native;
 
-  return ReferenceCounting::ObjC;
+  // Class-constrained archetypes and existentials that don't use
+  // native reference counting and yet have a superclass must be
+  // using ObjC reference counting.
+  auto superclass = type->getSuperclass(nullptr);
+  if (superclass)
+    return ReferenceCounting::ObjC;
+
+  // Otherwise, it could be either one.
+  return ReferenceCounting::Unknown;
 }
 
 /// What isa encoding mechanism does a type have?
@@ -2087,7 +2092,7 @@ const TypeInfo *
 TypeConverter::convertClassType(CanType type, ClassDecl *D) {
   llvm::StructType *ST = IGM.createNominalType(type);
   llvm::PointerType *irType = ST->getPointerTo();
-  ReferenceCounting refcount = ::getReferenceCountingForClass(IGM, D);
+  ReferenceCounting refcount = ::getReferenceCountingForType(IGM, type);
   
   SpareBitVector spareBits;
   
