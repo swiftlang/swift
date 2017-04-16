@@ -484,6 +484,15 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     break;
   }
 
+  case DAK_Implements: {
+    Printer.printAttrName("@_implements");
+    Printer << "(";
+    auto *attr = cast<ImplementsAttr>(this);
+    attr->getProtocolType().getType().print(Printer, Options);
+    Printer << ", " << attr->getMemberName() << ")";
+    break;
+  }
+
   case DAK_Count:
     llvm_unreachable("exceed declaration attribute kinds");
 
