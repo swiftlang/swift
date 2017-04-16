@@ -4,5 +4,4 @@
 // RUN: %api-digester -diagnose-sdk -input-paths %S/stdlib-stable.json -input-paths %S/tmp/current-stdlib.json >> %S/tmp/changes.txt
 // RUN: %clang -E -P -x c %S/source-stability.swift.expected -o - | sed '/^\s*$/d' > %S/tmp/source-stability.swift.expected
 // RUN: %clang -E -P -x c %S/tmp/changes.txt -o - | sed '/^\s*$/d' > %S/tmp/changes.txt.tmp
-// RUN: diff -u %S/tmp/source-stability.swift.expected %S/tmp/changes.txt.tmp
-// RUN: rm -rf %S/tmp
+// RUN: diff -u %S/tmp/source-stability.swift.expected %S/tmp/changes.txt.tmp ; rm -rf %S/tmp
