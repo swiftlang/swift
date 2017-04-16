@@ -2362,7 +2362,7 @@ private:
   void shrink(Expr *expr);
 
   bool simplifyForConstraintPropagation();
-  bool collectNeighboringBindOverloadDisjunctions(
+  void collectNeighboringBindOverloadDisjunctions(
       llvm::SetVector<Constraint *> &neighbors);
   bool isBindOverloadConsistent(Constraint *bindConstraint,
                                 llvm::SetVector<Constraint *> &workList);

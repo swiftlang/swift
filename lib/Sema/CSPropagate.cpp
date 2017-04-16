@@ -69,9 +69,8 @@ getBindOverloadDisjunction(ConstraintSystem &CS, Constraint *applicableFn) {
   return found;
 }
 
-bool ConstraintSystem::collectNeighboringBindOverloadDisjunctions(
+void ConstraintSystem::collectNeighboringBindOverloadDisjunctions(
     llvm::SetVector<Constraint *> &neighbors) {
-  bool failed = false;
 
   while (!ActiveConstraints.empty()) {
     auto *constraint = &ActiveConstraints.front();
@@ -87,32 +86,14 @@ bool ConstraintSystem::collectNeighboringBindOverloadDisjunctions(
     } else if (constraint->getKind() == ConstraintKind::ApplicableFunction) {
       if (auto *bindDisjunction =
               getBindOverloadDisjunction(*this, constraint)) {
-        // FIXME: should we bind this now so that we do something when
-        //        we test the applicable constraint?
         neighbors.insert(bindDisjunction);
       }
     }
 
-    // Simplify this constraint.
-    switch (simplifyConstraint(*constraint)) {
-    case SolutionKind::Error:
-      failed = true;
-      LLVM_FALLTHROUGH;
-
-    case SolutionKind::Solved:
-      solverState->retireConstraint(constraint);
-      CG.removeConstraint(constraint);
-      break;
-
-    case SolutionKind::Unsolved:
-      InactiveConstraints.push_back(constraint);
-      break;
-    }
-
+    solverState->retireConstraint(constraint);
+    CG.removeConstraint(constraint);
     constraint->setActive(false);
   }
-
-  return !failed;
 }
 
 // Simplify any active constraints, returning true on success, false
@@ -218,21 +199,7 @@ bool ConstraintSystem::isBindOverloadConsistent(
     solverState->retireConstraint(bindConstraint);
     solverState->addGeneratedConstraint(bindConstraint);
 
-    auto passed = collectNeighboringBindOverloadDisjunctions(otherDisjunctions);
-    if (!passed) {
-      if (TC.getLangOpts().DebugConstraintSolver) {
-        auto &log = getASTContext().TypeCheckerDebug->getStream();
-        log << "Disabling bind constraint: ";
-        bindConstraint->print(log, &TC.Context.SourceMgr);
-        log << "\n";
-      }
-
-      bindConstraint->setDisabled();
-      for (auto *disjunction : otherDisjunctions)
-        workList.insert(disjunction);
-
-      return false;
-    }
+    collectNeighboringBindOverloadDisjunctions(otherDisjunctions);
   }
 
   // Test the our primary constraint against all of the members of
