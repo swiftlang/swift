@@ -1,6 +1,9 @@
-// XFAIL: *
+// XFAIL: swift_stdlib_asserts
 //
 // <rdar://problem/31566154> Pure virtual function called
+//
+// Note: the condition above may not be properly expressed; it might have to do
+// with being a debug stdlib instead.
 
 // RUN: rm -rf %t
 // RUN: mkdir -p %t
