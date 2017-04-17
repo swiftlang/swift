@@ -1142,11 +1142,11 @@ extension RangeReplaceableCollection
 public func + <C : RangeReplaceableCollection, S : Sequence>(lhs: C, rhs: S) -> C
   where S.Iterator.Element == C.Iterator.Element {
 
-  var lhs = lhs
-  // FIXME: what if lhs is a reference type?  This will mutate it.
-  lhs.reserveCapacity(lhs.count + numericCast(rhs.underestimatedCount))
-  lhs.append(contentsOf: rhs)
-  return lhs
+  var result = C()
+  result.reserveCapacity(lhs.count + numericCast(rhs.underestimatedCount))
+  result.append(contentsOf: lhs)
+  result.append(contentsOf: rhs)
+  return result
 }
 
 /// Creates a new collection by concatenating the elements of a sequence and a
