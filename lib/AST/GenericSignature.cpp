@@ -498,6 +498,11 @@ bool GenericSignature::requiresClass(Type type, ModuleDecl &mod) {
   // requirement.
   if (pa->isConcreteType()) return false;
 
+  // If there is a layout constraint, it might be a class.
+  if (auto layout = pa->getLayout())
+    if (layout->isClass())
+      return true;
+
   // If there is a superclass bound, then obviously it must be a class.
   if (pa->getSuperclass()) return true;
 
@@ -803,7 +808,8 @@ ConformanceAccessPath GenericSignature::getConformanceAccessPath(
   buildPath = [&](GenericSignature *sig, const RequirementSource *source,
                   ProtocolDecl *conformingProto, Type rootType) {
     // Each protocol requirement is a step along the path.
-    if (source->kind == RequirementSource::ProtocolRequirement) {
+    if (source->kind == RequirementSource::ProtocolRequirement ||
+        source->kind == RequirementSource::InferredProtocolRequirement) {
       // Follow the rest of the path to derive the conformance into which
       // this particular protocol requirement step would look.
       auto inProtocol = source->getProtocolDecl();

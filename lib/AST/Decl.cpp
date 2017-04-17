@@ -1451,9 +1451,7 @@ bool ValueDecl::needsCapture() const {
   if (!getDeclContext()->isLocalContext())
     return false;
   // We don't need to capture types.
-  if (isa<TypeDecl>(this))
-    return false;
-  return true;
+  return !isa<TypeDecl>(this);
 }
 
 ValueDecl *ValueDecl::getOverriddenDecl() const {
@@ -2090,11 +2088,13 @@ bool NominalTypeDecl::derivesProtocolConformance(ProtocolDecl *protocol) const {
     // Hashable conformance.
     case KnownProtocolKind::Equatable:
     case KnownProtocolKind::Hashable:
-      return enumDecl->hasOnlyCasesWithoutAssociatedValues();
-    
+      return enumDecl->hasCases()
+          && enumDecl->hasOnlyCasesWithoutAssociatedValues();
+
     // @objc enums can explicitly derive their _BridgedNSError conformance.
     case KnownProtocolKind::BridgedNSError:
-      return isObjC() && enumDecl->hasOnlyCasesWithoutAssociatedValues();
+      return isObjC() && enumDecl->hasCases()
+          && enumDecl->hasOnlyCasesWithoutAssociatedValues();
 
     default:
       return false;
@@ -2413,6 +2413,8 @@ EnumDecl::EnumDecl(SourceLoc EnumLoc,
 {
   EnumDeclBits.Circularity
     = static_cast<unsigned>(CircularityCheck::Unchecked);
+  EnumDeclBits.HasAssociatedValues
+    = static_cast<unsigned>(AssociatedValueCheck::Unchecked);
 }
 
 StructDecl::StructDecl(SourceLoc StructLoc, Identifier Name, SourceLoc NameLoc,
@@ -2693,14 +2695,29 @@ EnumElementDecl *EnumDecl::getElement(Identifier Name) const {
 }
 
 bool EnumDecl::hasOnlyCasesWithoutAssociatedValues() const {
-  // FIXME: Should probably cache this.
-  bool hasElements = false;
-  for (auto elt : getAllElements()) {
-    hasElements = true;
-    if (!elt->getArgumentTypeLoc().isNull())
+  // Check whether we already have a cached answer.
+  switch (static_cast<AssociatedValueCheck>(
+            EnumDeclBits.HasAssociatedValues)) {
+    case AssociatedValueCheck::Unchecked:
+      // Compute below.
+      break;
+
+    case AssociatedValueCheck::NoAssociatedValues:
+      return true;
+
+    case AssociatedValueCheck::HasAssociatedValues:
       return false;
   }
-  return hasElements;
+  for (auto elt : getAllElements()) {
+    if (elt->hasAssociatedValues()) {
+      EnumDeclBits.HasAssociatedValues
+        = static_cast<unsigned>(AssociatedValueCheck::HasAssociatedValues);
+      return false;
+    }
+  }
+  EnumDeclBits.HasAssociatedValues
+    = static_cast<unsigned>(AssociatedValueCheck::NoAssociatedValues);
+  return true;
 }
 
 ProtocolDecl::ProtocolDecl(DeclContext *DC, SourceLoc ProtocolLoc,
@@ -3116,7 +3133,8 @@ void ProtocolDecl::computeRequirementSignature() {
   builder.addRequirement(
          requirement,
          GenericSignatureBuilder::RequirementSource
-          ::forRequirementSignature(builder.resolveArchetype(selfType), this));
+          ::forRequirementSignature(builder.resolveArchetype(selfType), this),
+         nullptr);
   builder.finalize(SourceLoc(), { selfType });
   
   RequirementSignature = builder.getGenericSignature();
@@ -4893,9 +4911,7 @@ ConstructorDecl::getDelegatingOrChainedInitKind(DiagnosticEngine *diags,
 
     bool walkToDeclPre(class Decl *D) override {
       // Don't walk into further nominal decls.
-      if (isa<NominalTypeDecl>(D))
-        return false;
-      return true;
+      return !isa<NominalTypeDecl>(D);
     }
     
     std::pair<bool, Expr*> walkToExprPre(Expr *E) override {

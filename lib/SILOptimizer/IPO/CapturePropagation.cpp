@@ -261,7 +261,7 @@ SILFunction *CapturePropagation::specializeConstClosure(PartialApplyInst *PAI,
       SILLinkage::Shared, Name, NewFTy,
       GenericEnv, OrigF->getLocation(), OrigF->isBare(),
       OrigF->isTransparent(), Serialized, OrigF->isThunk(),
-      OrigF->getClassVisibility(), OrigF->getInlineStrategy(),
+      OrigF->getClassSubclassScope(), OrigF->getInlineStrategy(),
       OrigF->getEffectsKind(),
       /*InsertBefore*/ OrigF, OrigF->getDebugScope());
   if (OrigF->hasUnqualifiedOwnership()) {
@@ -320,9 +320,7 @@ static bool onlyContainsReturnOrThrowOfArg(SILBasicBlock *BB) {
   for (SILInstruction &I : *BB) {
     if (isa<ReturnInst>(&I) || isa<ThrowInst>(&I)) {
       SILValue RetVal = I.getOperand(0);
-      if (BB->getNumArguments() == 1 && RetVal == BB->getArgument(0))
-        return true;
-      return false;
+      return BB->getNumArguments() == 1 && RetVal == BB->getArgument(0);
     }
     if (I.mayHaveSideEffects() || isa<TermInst>(&I))
       return false;

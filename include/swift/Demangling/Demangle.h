@@ -34,7 +34,6 @@ namespace Demangle {
 
 struct DemangleOptions {
   bool SynthesizeSugarOnTypes = false;
-  bool DisplayTypeOfIVarFieldOffset = true;
   bool DisplayDebuggerGeneratedModule = true;
   bool QualifyEntities = true;
   bool DisplayExtensionContexts = true;
@@ -49,6 +48,7 @@ struct DemangleOptions {
   bool ShortenValueWitness = false;
   bool ShortenArchetype = false;
   bool ShowPrivateDiscriminators = true;
+  bool ShowFunctionArgumentTypes = true;
 
   DemangleOptions() {}
 
@@ -68,6 +68,7 @@ struct DemangleOptions {
     Opt.ShortenValueWitness = true;
     Opt.ShortenArchetype = true;
     Opt.ShowPrivateDiscriminators = false;
+    Opt.ShowFunctionArgumentTypes = false;
     return Opt;
   };
 };
@@ -298,8 +299,9 @@ public:
   /// Returns the mangled name of the target of a thunk.
   ///
   /// \returns Returns the remaining name after removing the thunk mangling
-  /// characters from \p MangledName. If \p MangledName is not a thunk symbol,
-  /// an empty string is returned.
+  /// characters from \p MangledName. If \p MangledName is not a thunk symbol
+  /// or the thunk target cannot be derived from the mangling, an empty string
+  /// is returned.
   std::string getThunkTarget(llvm::StringRef MangledName);
 
   /// Returns true if the \p mangledName refers to a function which conforms to

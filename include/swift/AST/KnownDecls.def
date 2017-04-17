@@ -70,4 +70,6 @@ FUNC_DECL(GetErrorEmbeddedNSError, "_stdlib_getErrorEmbeddedNSError")
 
 FUNC_DECL(UnsafeBitCast, "unsafeBitCast")
 
+FUNC_DECL(Swap, "swap")
+
 #undef FUNC_DECL

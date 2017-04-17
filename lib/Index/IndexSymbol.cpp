@@ -136,8 +136,6 @@ static SymbolKind getVarSymbolKind(const VarDecl *VD) {
     }
     return SymbolKind::InstanceProperty;
   }
-
-  assert(!DC->isLocalContext() && "local variable seen while indexing");
   return SymbolKind::Variable;
 }
 

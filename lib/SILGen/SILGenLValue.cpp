@@ -381,6 +381,65 @@ namespace {
     }
   };
 
+  class EndAccessPseudoComponent : public WritebackPseudoComponent {
+  public:
+    EndAccessPseudoComponent(const LValueTypeData &typeData)
+      : WritebackPseudoComponent(typeData) {}
+
+  private:
+    void writeback(SILGenFunction &SGF, SILLocation loc,
+                   ManagedValue base,
+                   MaterializedLValue materialized,
+                   bool isFinal) override {
+      assert(base.isLValue());
+      SGF.B.createEndAccess(loc, base.getValue(), /*abort*/ false);
+    }
+
+    void print(raw_ostream &OS) const override {
+      OS << "EndAccessPseudoComponent";
+    }
+  };
+} // end anonymous namespace
+
+static SILValue enterAccessScope(SILGenFunction &SGF, SILLocation loc,
+                                 SILValue addr, LValueTypeData typeData,
+                                 AccessKind accessKind,
+                                 SILAccessEnforcement enforcement) {
+  auto silAccessKind = [&] {
+    switch (accessKind) {
+    case AccessKind::Read:
+      return SILAccessKind::Read;
+    case AccessKind::Write:
+    case AccessKind::ReadWrite:
+      return SILAccessKind::Modify;
+    }
+  }();
+
+  // Hack for materializeForSet emission, where we can't safely
+  // push a begin/end access.
+  if (!SGF.InWritebackScope) {
+    assert(SGF.ValuesToEndAccessForMaterializeForSet);
+    if (enforcement == SILAccessEnforcement::Dynamic) {
+      // FIXME: begin access.
+      SGF.ValuesToEndAccessForMaterializeForSet->push_back(addr);
+    }
+    return addr;
+  }
+
+  // Enter the access.
+  addr = SGF.B.createBeginAccess(loc, addr, silAccessKind, enforcement);
+
+  // Push a writeback to end it.
+  auto accessedMV = ManagedValue::forLValue(addr);
+  std::unique_ptr<LogicalPathComponent>
+    component(new EndAccessPseudoComponent(typeData));
+  pushWriteback(SGF, loc, std::move(component), accessedMV,
+                MaterializedLValue());
+
+  return addr;
+}
+
+namespace {
   class RefElementComponent : public PhysicalPathComponent {
     VarDecl *Field;
     SILType SubstFieldType;
@@ -399,9 +458,16 @@ namespace {
       // Borrow the ref element addr using formal access. If we need the ref
       // element addr, we will load it in this expression.
       base = base.formalAccessBorrow(SGF, loc);
-      auto Res = SGF.B.createRefElementAddr(loc, base.getUnmanagedValue(),
-                                            Field, SubstFieldType);
-      return ManagedValue::forLValue(Res);
+      SILValue result =
+        SGF.B.createRefElementAddr(loc, base.getUnmanagedValue(),
+                                   Field, SubstFieldType);
+
+      if (auto enforcement = SGF.getDynamicEnforcement(Field)) {
+        result = enterAccessScope(SGF, loc, result, getTypeData(),
+                                  accessKind, *enforcement);
+      }
+
+      return ManagedValue::forLValue(result);
     }
 
     void print(raw_ostream &OS) const override {
@@ -517,25 +583,6 @@ namespace {
     }
   };
 
-  class EndAccessPseudoComponent : public WritebackPseudoComponent {
-  public:
-    EndAccessPseudoComponent(const LValueTypeData &typeData)
-      : WritebackPseudoComponent(typeData) {}
-
-  private:
-    void writeback(SILGenFunction &SGF, SILLocation loc,
-                   ManagedValue base,
-                   MaterializedLValue materialized,
-                   bool isFinal) override {
-      assert(base.isLValue());
-      SGF.B.createEndAccess(loc, base.getValue(), /*abort*/ false);
-    }
-
-    void print(raw_ostream &OS) const override {
-      OS << "EndAccessPseudoComponent";
-    }
-  };
-
   /// A physical path component which returns a literal address.
   class ValueComponent : public PhysicalPathComponent {
     ManagedValue Value;
@@ -560,30 +607,11 @@ namespace {
       if (!Enforcement)
         return Value;
 
-      assert(Value.isLValue() && "nonlvalue has enforcement?");
-      auto silAccessKind = [&] {
-        switch (accessKind) {
-        case AccessKind::Read:
-          return SILAccessKind::Read;
-        case AccessKind::Write:
-        case AccessKind::ReadWrite:
-          return SILAccessKind::Modify;
-        }
-      }();
+      SILValue addr = Value.getLValueAddress();
+      addr = enterAccessScope(SGF, loc, addr, getTypeData(),
+                              accessKind, *Enforcement);
 
-      // Enter the access.
-      auto accessedValue =
-        SGF.B.createBeginAccess(loc, Value.getValue(),
-                                silAccessKind, *Enforcement);
-      auto accessedMV = ManagedValue::forLValue(accessedValue);
-
-      // Push a writeback to end it.
-      std::unique_ptr<LogicalPathComponent>
-        component(new EndAccessPseudoComponent(getTypeData()));
-      pushWriteback(SGF, loc, std::move(component), accessedMV,
-                    MaterializedLValue());
-
-      return ManagedValue::forLValue(accessedValue);
+      return ManagedValue::forLValue(addr);
     }
 
     bool isRValue() const override {
@@ -1969,6 +1997,17 @@ void LValue::addMemberSubscriptComponent(SILGenFunction &SGF, SILLocation loc,
   }
 }
 
+bool LValue::isObviouslyNonConflicting(const LValue &other,
+                                       AccessKind selfAccess,
+                                       AccessKind otherAccess) {
+  // Reads never conflict with reads.
+  if (selfAccess == AccessKind::Read && otherAccess == AccessKind::Read)
+    return true;
+
+  // We can cover more cases here.
+  return false;
+}
+
 LValue SILGenLValue::visitTupleElementExpr(TupleElementExpr *e,
                                            AccessKind accessKind) {
   unsigned index = e->getFieldNumber();
@@ -2668,12 +2707,18 @@ void SILGenFunction::emitCopyLValueInto(SILLocation loc, LValue &&src,
   dest->finishInitialization(*this);
 }
 
-void SILGenFunction::emitAssignLValueToLValue(SILLocation loc,
-                                              LValue &&src,
+void SILGenFunction::emitAssignLValueToLValue(SILLocation loc, LValue &&src,
                                               LValue &&dest) {
-  // Only perform the peephole if both operands are physical and there's no
-  // semantic conversion necessary.
-  if (!src.isPhysical() || !dest.isPhysical()) {
+  // Only perform the peephole if both operands are physical, there's no
+  // semantic conversion necessary, and exclusivity enforcement
+  // is not enabled. The peephole interferes with exclusivity enforcement
+  // because it causes the formal accesses to the source and destination to
+  // overlap.
+  bool peepholeConflict =
+      getOptions().isAnyExclusivityEnforcementEnabled() &&
+      !src.isObviouslyNonConflicting(dest, AccessKind::Read, AccessKind::Write);
+
+  if (peepholeConflict || !src.isPhysical() || !dest.isPhysical()) {
     RValue loaded = emitLoadOfLValue(loc, std::move(src), SGFContext());
     emitAssignToLValue(loc, std::move(loaded), std::move(dest));
     return;

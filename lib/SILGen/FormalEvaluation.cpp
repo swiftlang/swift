@@ -104,6 +104,7 @@ void FormalEvaluationScope::popImpl() {
   // Save our start point to make sure that we are not adding any new cleanups
   // to the front of the stack.
   stable_iterator originalBegin = context.stable_begin();
+  (void)originalBegin;
 
   // Then working down the stack until we visit unwrappedSavedDepth...
   for (; iter != unwrappedSavedDepth; ++iter) {

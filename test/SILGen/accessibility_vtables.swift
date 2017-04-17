@@ -21,7 +21,7 @@ class Sub : Base {
 // CHECK-NEXT:  #Base.prop!getter.1: {{.*}} : _T021accessibility_vtables3SubC4propSifg  // accessibility_vtables.Sub.prop.getter : Swift.Int
 // CHECK-NEXT:  #Base.prop!setter.1: {{.*}} : _T028accessibility_vtables_helper4BaseC4propSifs  // accessibility_vtables_helper.Base.prop.setter : Swift.Int
 // CHECK-NEXT:  #Base.prop!materializeForSet.1: {{.*}} : _T028accessibility_vtables_helper4BaseC4propSifm  // accessibility_vtables_helper.Base.prop.materializeForSet : Swift.Int
-// CHECK-NEXT:  #Base.init!initializer.1: {{.*}} : _T021accessibility_vtables3SubCACycfc  // accessibility_vtables.Sub.init () -> accessibility_vtables.Sub
+// CHECK-NEXT:  #Base.init!initializer.1: {{.*}} : _T021accessibility_vtables3SubCACycfc  // accessibility_vtables.Sub.init() -> accessibility_vtables.Sub
 // CHECK-NEXT: #Sub.internalMethod!1: {{.*}} : _T021accessibility_vtables3SubC14internalMethodyyF
 // CHECK-NEXT: #Sub.prop!setter.1: {{.*}} : _T021accessibility_vtables3SubC4propSifs   // accessibility_vtables.Sub.prop.setter : Swift.Int
 // CHECK-NEXT: #Sub.prop!materializeForSet.1: {{.*}} : _T021accessibility_vtables3SubC4propSifm  // accessibility_vtables.Sub.prop.materializeForSet : Swift.Int

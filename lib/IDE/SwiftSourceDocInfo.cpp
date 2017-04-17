@@ -350,9 +350,8 @@ private:
 
       // Explicitly allow the selection of multiple case statments.
       auto IsCase = [](ASTNode N) { return N.isStmt(StmtKind::Case); };
-      if (llvm::any_of(StartMatches, IsCase) && llvm::any_of(EndMatches, IsCase))
-        return true;
-      return false;
+      return llvm::any_of(StartMatches, IsCase) &&
+          llvm::any_of(EndMatches, IsCase);
     }
   };
 
@@ -542,8 +541,8 @@ public:
     if (auto *VD = dyn_cast_or_null<ValueDecl>(D)) {
       if (isContainedInSelection(CharSourceRange(SM, VD->getStartLoc(),
                                                  VD->getEndLoc())))
-        if(std::find(DeclaredDecls.begin(), DeclaredDecls.end(),
-                     DeclaredDecl(VD)) == DeclaredDecls.end())
+        if (std::find(DeclaredDecls.begin(), DeclaredDecls.end(),
+                      DeclaredDecl(VD)) == DeclaredDecls.end())
           DeclaredDecls.push_back(VD);
     }
   }
@@ -603,14 +602,12 @@ public:
     for (auto N : Nodes) {
       if (Stmt *S = N.is<Stmt*>() ? N.get<Stmt*>() : nullptr) {
         if (S->getKind() == StmtKind::Case)
-          CaseCount ++;
+          CaseCount++;
       }
     }
     // If there are more than one case/default statements, there are more than
     // one entry point.
-    if (CaseCount > 1)
-      return false;
-    return true;
+    return CaseCount == 0;
   }
 
   OrphanKind getOrphanKind(ArrayRef<ASTNode> Nodes) {

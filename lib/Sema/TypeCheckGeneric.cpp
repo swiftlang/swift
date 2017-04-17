@@ -146,6 +146,7 @@ Type ProtocolRequirementTypeResolver::resolveDependentMemberType(
 Type ProtocolRequirementTypeResolver::resolveSelfAssociatedType(
     Type selfTy, AssociatedTypeDecl *assocType) {
   assert(selfTy->isEqual(Proto->getSelfInterfaceType()));
+  (void)Proto;
   return assocType->getDeclaredInterfaceType();
 }
 
@@ -305,7 +306,8 @@ void TypeChecker::checkGenericParamList(GenericSignatureBuilder *builder,
   if (!genericParams)
     return;
 
-  assert(genericParams->size() > 0 && "Parsed an empty generic parameter list?");
+  assert(genericParams->size() > 0 &&
+         "Parsed an empty generic parameter list?");
 
   // Determine where and how to perform name lookup for the generic
   // parameter lists and where clause.
@@ -332,14 +334,8 @@ void TypeChecker::checkGenericParamList(GenericSignatureBuilder *builder,
   for (auto param : *genericParams) {
     checkInheritanceClause(param, resolver);
 
-    if (builder) {
+    if (builder)
       builder->addGenericParameterRequirements(param);
-
-      // Infer requirements from the inherited types.
-      for (const auto &inherited : param->getInherited()) {
-        builder->inferRequirements(*lookupDC->getParentModule(), inherited);
-      }
-    }
   }
 
   // Visit each of the requirements, adding them to the builder.
@@ -350,7 +346,9 @@ void TypeChecker::checkGenericParamList(GenericSignatureBuilder *builder,
                             options, resolver))
       continue;
 
-    if (builder && builder->addRequirement(&req))
+    if (builder &&
+        isErrorResult(builder->addRequirement(&req,
+                                              lookupDC->getParentModule())))
       req.setInvalid();
   }
 }
@@ -528,8 +526,12 @@ static bool checkGenericFuncSignature(TypeChecker &tc,
       // Infer requirements from it.
       if (builder && genericParams &&
           fn->getBodyResultTypeLoc().getTypeRepr()) {
+        auto source =
+          GenericSignatureBuilder::FloatingRequirementSource::forInferred(
+                                      fn->getBodyResultTypeLoc().getTypeRepr());
         builder->inferRequirements(*func->getParentModule(),
-                                   fn->getBodyResultTypeLoc());
+                                   fn->getBodyResultTypeLoc(),
+                                   source);
       }
     }
   }
@@ -965,10 +967,14 @@ static bool checkGenericSubscriptSignature(TypeChecker &tc,
                              &resolver);
 
   // Infer requirements from it.
-  if (genericParams && builder &&
-      subscript->getElementTypeLoc().getTypeRepr()) {
+  if (genericParams && builder) {
+    auto source =
+      GenericSignatureBuilder::FloatingRequirementSource::forInferred(
+                                  subscript->getElementTypeLoc().getTypeRepr());
+
     builder->inferRequirements(*subscript->getParentModule(),
-                               subscript->getElementTypeLoc());
+                               subscript->getElementTypeLoc(),
+                               source);
   }
 
   // Check the indices.

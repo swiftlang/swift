@@ -307,11 +307,13 @@ static bool shouldHideDeclFromCompletionResults(const ValueDecl *D) {
 }
 
 typedef std::function<bool(ValueDecl*, DeclVisibilityKind)> DeclFilter;
-DeclFilter DefaultFilter = [] (ValueDecl* VD, DeclVisibilityKind Kind) {return true;};
-DeclFilter KeyPathFilter = [](ValueDecl* decl, DeclVisibilityKind) -> bool {
+static bool DefaultFilter(ValueDecl* VD, DeclVisibilityKind Kind) {
+  return true;
+}
+static bool KeyPathFilter(ValueDecl* decl, DeclVisibilityKind) {
   return isa<TypeDecl>(decl) ||
          (isa<VarDecl>(decl) && decl->getDeclContext()->isTypeContext());
-};
+}
 
 std::string swift::ide::removeCodeCompletionTokens(
     StringRef Input, StringRef TokenName, unsigned *CompletionOffset) {
@@ -1938,7 +1940,8 @@ public:
       SmallVector<Type, 2> types;
       for (auto proto : protos)
         types.push_back(proto->getDeclaredInterfaceType());
-      return ProtocolCompositionType::get(M->getASTContext(), types);
+      return ProtocolCompositionType::get(M->getASTContext(), types,
+                                          /*hasExplicitAnyObject=*/false);
     };
 
     if (auto *genericFuncType = type->getAs<GenericFunctionType>()) {
@@ -4654,9 +4657,7 @@ void CodeCompletionCallbacksImpl::completeNominalMemberBeginning(
 }
 
 static bool isDynamicLookup(Type T) {
-  if (auto *PT = T->getRValueType()->getAs<ProtocolType>())
-    return PT->getDecl()->isSpecificProtocol(KnownProtocolKind::AnyObject);
-  return false;
+  return T->getRValueType()->isAnyObject();
 }
 
 static bool isClangSubModule(ModuleDecl *TheModule) {

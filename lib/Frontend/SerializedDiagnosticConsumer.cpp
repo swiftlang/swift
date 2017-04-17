@@ -15,7 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Frontend/SerializedDiagnosticConsumer.h"
-#include "swift/Basic/DiagnosticConsumer.h"
+#include "swift/AST/DiagnosticConsumer.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Parse/Lexer.h"
@@ -149,7 +149,9 @@ public:
   }
 
   void handleDiagnostic(SourceManager &SM, SourceLoc Loc,
-                                DiagnosticKind Kind, llvm::StringRef Text,
+                                DiagnosticKind Kind,
+                                StringRef FormatString,
+                                ArrayRef<DiagnosticArgument> FormatArgs,
                                 const DiagnosticInfo &Info) override;
 
   /// \brief The version of the diagnostics file.
@@ -493,12 +495,11 @@ emitDiagnosticMessage(SourceManager &SM,
   }
 }
 
-void
-SerializedDiagnosticConsumer::handleDiagnostic(SourceManager &SM,
-                                               SourceLoc Loc,
-                                               DiagnosticKind Kind,
-                                               StringRef Text,
-                                               const DiagnosticInfo &Info) {
+void SerializedDiagnosticConsumer::handleDiagnostic(
+    SourceManager &SM, SourceLoc Loc, DiagnosticKind Kind,
+    StringRef FormatString, ArrayRef<DiagnosticArgument> FormatArgs,
+    const DiagnosticInfo &Info) {
+
   // Enter the block for a non-note diagnostic immediately, rather
   // than waiting for beginDiagnostic, in case associated notes
   // are emitted before we get there.
@@ -517,6 +518,13 @@ SerializedDiagnosticConsumer::handleDiagnostic(SourceManager &SM,
   if (bracketDiagnostic)
     enterDiagBlock();
 
+  // Actually substitute the diagnostic arguments into the diagnostic text.
+  llvm::SmallString<256> Text;
+  {
+    llvm::raw_svector_ostream Out(Text);
+    DiagnosticEngine::formatDiagnosticText(Out, FormatString, FormatArgs);
+  }
+  
   emitDiagnosticMessage(SM, Loc, Kind, Text, Info);
 
   if (bracketDiagnostic)

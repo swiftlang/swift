@@ -56,3 +56,58 @@ public func modifyAndReadS() {
   s.i = 42
   takeS(s)
 }
+
+var global = S(i: 0, o: nil)
+
+func readGlobal() -> AnyObject? {
+  return global.o
+}
+
+// CHECK-LABEL: sil hidden @_T017access_marker_gen10readGlobals9AnyObject_pSgyF
+// CHECK:         [[ADDRESSOR:%.*]] = function_ref @_T017access_marker_gen6globalAA1SVfau :
+// CHECK-NEXT:    [[T0:%.*]] = apply [[ADDRESSOR]]()
+// CHECK-NEXT:    [[T1:%.*]] = pointer_to_address [[T0]] : $Builtin.RawPointer to [strict] $*S
+// CHECK-NEXT:    [[T2:%.*]] = begin_access [read] [dynamic] [[T1]]
+// CHECK-NEXT:    [[T3:%.*]] = struct_element_addr [[T2]] : $*S, #S.o
+// CHECK-NEXT:    [[T4:%.*]] = load [copy] [[T3]]
+// CHECK-NEXT:    end_access [[T2]]
+// CHECK-NEXT:    return [[T4]]
+
+
+public struct HasTwoStoredProperties {
+  var f: Int = 7
+  var g: Int = 9
+
+// CHECK-LABEL: sil hidden @_T017access_marker_gen22HasTwoStoredPropertiesV027noOverlapOnAssignFromPropToM0yyF : $@convention(method) (@inout HasTwoStoredProperties) -> ()
+// CHECK:       [[ACCESS1:%.*]] = begin_access [read] [unknown] [[SELF_ADDR:%.*]] : $*HasTwoStoredProperties
+// CHECK-NEXT:  [[G_ADDR:%.*]] = struct_element_addr [[ACCESS1]] : $*HasTwoStoredProperties, #HasTwoStoredProperties.g
+// CHECK-NEXT:  [[G_VAL:%.*]] = load [trivial] [[G_ADDR]] : $*Int
+// CHECK-NEXT:  end_access [[ACCESS1]] : $*HasTwoStoredProperties
+// CHECK-NEXT:  [[ACCESS2:%.*]] = begin_access [modify] [unknown] [[SELF_ADDR]] : $*HasTwoStoredProperties
+// CHECK-NEXT:  [[F_ADDR:%.*]] = struct_element_addr [[ACCESS2]] : $*HasTwoStoredProperties, #HasTwoStoredProperties.f
+// CHECK-NEXT:  assign [[G_VAL]] to [[F_ADDR]] : $*Int
+// CHECK-NEXT:  end_access [[ACCESS2]] : $*HasTwoStoredProperties
+  mutating func noOverlapOnAssignFromPropToProp() {
+    f = g
+  }
+}
+
+class C {
+  final var x: Int = 0
+}
+
+func testClassInstanceProperties(c: C) {
+  let y = c.x
+  c.x = y
+}
+// CHECK-LABEL: sil hidden @_T017access_marker_gen27testClassInstancePropertiesyAA1CC1c_tF :
+// CHECK:       [[C:%.*]] = begin_borrow %0 : $C
+// CHECK-NEXT:  [[CX:%.*]] = ref_element_addr [[C]] : $C, #C.x
+// CHECK-NEXT:  [[ACCESS:%.*]] = begin_access [read] [dynamic] [[CX]] : $*Int
+// CHECK-NEXT:  [[Y:%.*]] = load [trivial] [[ACCESS]]
+// CHECK-NEXT:  end_access [[ACCESS]]
+// CHECK:       [[C:%.*]] = begin_borrow %0 : $C
+// CHECK-NEXT:  [[CX:%.*]] = ref_element_addr [[C]] : $C, #C.x
+// CHECK-NEXT:  [[ACCESS:%.*]] = begin_access [modify] [dynamic] [[CX]] : $*Int
+// CHECK-NEXT:  assign [[Y]] to [[ACCESS]]
+// CHECK-NEXT:  end_access [[ACCESS]]

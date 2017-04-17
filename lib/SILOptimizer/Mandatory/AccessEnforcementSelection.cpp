@@ -16,7 +16,9 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "access-enforcement-selection"
+#include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILFunction.h"
+#include "swift/SIL/SILUndef.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 
 using namespace swift;
@@ -24,11 +26,15 @@ using namespace swift;
 static void setStaticEnforcement(BeginAccessInst *access) {
   // TODO: delete if we're not using static enforcement?
   access->setEnforcement(SILAccessEnforcement::Static);
+
+  DEBUG(llvm::dbgs() << "Static Access: " << *access);
 }
 
 static void setDynamicEnforcement(BeginAccessInst *access) {
   // TODO: delete if we're not using dynamic enforcement?
   access->setEnforcement(SILAccessEnforcement::Dynamic);
+
+  DEBUG(llvm::dbgs() << "Dynamic Access: " << *access);
 }
 
 namespace {
@@ -81,7 +87,12 @@ private:
   void propagateEscapesFrom(SILBasicBlock *bb);
 
   bool hasPotentiallyEscapedAt(SILInstruction *inst);
-  bool hasPotentiallyEscapedAtAnyReachableBlock(BeginAccessInst *access);
+
+  typedef llvm::SmallSetVector<SILBasicBlock*, 8> BlockSetVector;
+  void findBlocksAccessedAcross(EndAccessInst *endAccess,
+                                BlockSetVector &blocksAccessedAcross);
+  bool hasPotentiallyEscapedAtAnyReachableBlock(
+    BeginAccessInst *access, BlockSetVector &blocksAccessedAcross);
 
   void updateAccesses();
   void updateAccess(BeginAccessInst *access);
@@ -210,22 +221,53 @@ bool SelectEnforcement::hasPotentiallyEscapedAt(SILInstruction *point) {
   return false;
 }
 
-bool SelectEnforcement::hasPotentiallyEscapedAtAnyReachableBlock(
-                                                      BeginAccessInst *access) {
+/// Add all blocks to `Worklist` between the given `endAccess` and its
+/// `begin_access` in which the access is active at the end of the block.
+void SelectEnforcement::findBlocksAccessedAcross(
+  EndAccessInst *endAccess, BlockSetVector &blocksAccessedAcross) {
+
   // Fast path: we're not tracking any escapes.  (But the box should
   // probably have been promoted to the stack in this case.)
   if (StateMap.empty())
-    return false;
+    return;
 
-  auto bb = access->getParent();
+  SILBasicBlock *beginBB = endAccess->getBeginAccess()->getParent();
+  if (endAccess->getParent() == beginBB)
+    return;
+
+  assert(Worklist.empty());
+  Worklist.push_back(endAccess->getParent());
+  while (!Worklist.empty()) {
+    SILBasicBlock *bb = Worklist.pop_back_val();
+    for (auto *predBB : bb->getPredecessorBlocks()) {
+      if (!blocksAccessedAcross.insert(predBB)) continue;
+      if (predBB == beginBB) continue;
+      Worklist.push_back(predBB);
+    }
+  }
+}
+
+bool SelectEnforcement::hasPotentiallyEscapedAtAnyReachableBlock(
+  BeginAccessInst *access, BlockSetVector &blocksAccessedAcross) {
 
   assert(Worklist.empty());
   SmallPtrSet<SILBasicBlock*, 8> visited;
-  visited.insert(bb);
-  Worklist.push_back(bb);
+
+  // Don't follow any paths that lead to an end_access.
+  for (auto endAccess : access->getEndAccesses())
+    visited.insert(endAccess->getParent());
+
+  /// Initialize the worklist with all blocks that exit the access path.
+  for (SILBasicBlock *bb : blocksAccessedAcross) {
+    for (SILBasicBlock *succBB : bb->getSuccessorBlocks()) {
+      if (blocksAccessedAcross.count(succBB)) continue;
+      if (visited.insert(succBB).second)
+        Worklist.push_back(succBB);
+    }
+  }
 
   while (!Worklist.empty()) {
-    bb = Worklist.pop_back_val();
+    SILBasicBlock *bb = Worklist.pop_back_val();
     assert(visited.count(bb));
 
     // If we're tracking information for this block, there's an escape.
@@ -253,27 +295,23 @@ void SelectEnforcement::updateAccess(BeginAccessInst *access) {
   assert(access->getEnforcement() == SILAccessEnforcement::Unknown);
 
   // Check whether the variable escaped before any of the end_accesses.
-  bool anyDynamic = false;
-  bool hasEndAccess = false;
+  BlockSetVector blocksAccessedAcross;
   for (auto endAccess : access->getEndAccesses()) {
-    hasEndAccess = true;
-    if (hasPotentiallyEscapedAt(endAccess)) {
-      anyDynamic = true;
-      break;
-    }
-  }
-
-  // If so, make the access dynamic.
-  if (anyDynamic)
-    return setDynamicEnforcement(access);
-
-  // Otherwise, if there are no end_access instructions,
-  // check the terminators of every reachable block.
-  if (!hasEndAccess) {
-    if (hasPotentiallyEscapedAtAnyReachableBlock(access))
+    if (hasPotentiallyEscapedAt(endAccess))
       return setDynamicEnforcement(access);
-  }
 
+    // Add all blocks to blocksAccessedAcross between begin_access and this
+    // end_access.
+    findBlocksAccessedAcross(endAccess, blocksAccessedAcross);
+  }
+  assert(blocksAccessedAcross.empty()
+         || blocksAccessedAcross.count(access->getParent()));
+
+  // For every path through this access that doesn't reach an end_access, check
+  // if any block reachable from that path can see an escaped value.
+  if (hasPotentiallyEscapedAtAnyReachableBlock(access, blocksAccessedAcross)) {
+    return setDynamicEnforcement(access);
+  }
   // Otherwise, use static enforcement.
   setStaticEnforcement(access);
 }
@@ -283,6 +321,9 @@ namespace {
 /// The pass.
 struct AccessEnforcementSelection : SILFunctionTransform {
   void run() override {
+    DEBUG(llvm::dbgs() << "Access Enforcement Selection in "
+          << getFunction()->getName() << "\n");
+
     for (auto &bb : *getFunction()) {
       for (auto ii = bb.begin(), ie = bb.end(); ii != ie; ) {
         SILInstruction *inst = &*ii;
@@ -293,6 +334,7 @@ struct AccessEnforcementSelection : SILFunctionTransform {
         }
       }
     }
+    invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
   }
 
   void handleAccess(BeginAccessInst *access) {
@@ -306,10 +348,41 @@ struct AccessEnforcementSelection : SILFunctionTransform {
     if (auto box = dyn_cast<ProjectBoxInst>(address)) {
       return handleAccessToBox(access, box);
     }
+    if (auto arg = dyn_cast<SILFunctionArgument>(address)) {
+      switch (arg->getArgumentConvention()) {
+      case SILArgumentConvention::Indirect_Inout:
+        // `inout` arguments are checked on the caller side, either statically
+        // or dynamically if necessary. The @inout does not alias and cannot
+        // escape within the callee, so static enforcement is always sufficient.
+        setStaticEnforcement(access);
+        break;
+      case SILArgumentConvention::Indirect_InoutAliasable:
+        // `inout_aliasable` are not enforced on the caller side. Dynamic
+        // enforcement is required unless we have special knowledge of how this
+        // closure is used at its call-site.
+        //
+        // TODO: optimize closures passed to call sites in which the captured
+        // variable is not modified by any closure passed to the same call.
+        setDynamicEnforcement(access);
+        break;
+      default:
+        // @in/@in_guaranteed cannot be mutably accessed, mutably captured, or
+        // passed as inout.
+        //
+        // FIXME: When we have borrowed arguments, a "read" needs to be enforced
+        // on the caller side.
+        llvm_unreachable("Expecting an inout argument.");
+      }
+      return;
+    }
 
-    // If we're not accessing a box, we must've lowered to
-    // a stack element.
-    assert(isa<AllocStackInst>(address));
+    // If we're not accessing a box or argument, we must've lowered to a stack
+    // element. Other sources of access are either outright dynamic (GlobalAddr,
+    // RefElementAddr), or only exposed after mandator inlining (nested
+    // dependent BeginAccess).
+    //
+    // Running before diagnostic constant propagation requires handling 'undef'.
+    assert(isa<AllocStackInst>(address) || isa<SILUndef>(address));
     setStaticEnforcement(access);
   }
 

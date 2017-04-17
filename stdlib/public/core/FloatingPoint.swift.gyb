@@ -1518,8 +1518,6 @@ extension FloatingPoint {
 /// the standard library by `Float`, `Double`, and `Float80` where available.
 ///
 /// [spec]: http://ieeexplore.ieee.org/servlet/opac?punumber=4610933
-///
-/// - SeeAlso: `FloatingPoint`
 public protocol BinaryFloatingPoint: FloatingPoint, ExpressibleByFloatLiteral {
 
   /// A type that represents the encoded significand of a value.

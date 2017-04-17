@@ -874,6 +874,7 @@ namespace {
               }
               importedTypeArg = subresult.AbstractType;
             } else if (typeParam->getSuperclass()) {
+              // FIXME: Can we have both a superclass and protocols?
               importedTypeArg = typeParam->getSuperclass();
             } else {
               auto protocols = typeParam->getConformingProtocols();
@@ -885,7 +886,8 @@ namespace {
                 protocolTypes.push_back(protocolDecl->getDeclaredType());
               }
               importedTypeArg = ProtocolCompositionType::get(
-                  Impl.SwiftContext, protocolTypes);
+                  Impl.SwiftContext, protocolTypes,
+                  /*hasExplicitAnyObject=*/false);
             }
             importedTypeArgs.push_back(importedTypeArg);
           }
@@ -1029,8 +1031,11 @@ namespace {
           protocols.push_back(proto->getDeclaredType());
         }
 
+        // FIXME: Handle isObjCQualifiedClassType() case by adding a superclass
+        // constraint here
         Type result = ProtocolCompositionType::get(Impl.SwiftContext,
-                                                   protocols);
+                                                   protocols,
+                                                 /*HasExplicitAnyObject=*/false);
         if (type->isObjCQualifiedClassType())
           result = ExistentialMetatypeType::get(result);
 
@@ -1038,20 +1043,17 @@ namespace {
       }
       
       // Beyond here, we're using AnyObject.
-      auto proto = Impl.SwiftContext.getProtocol(KnownProtocolKind::AnyObject);
-      if (!proto)
-        return Type();
 
       // id maps to Any in bridgeable contexts, AnyObject otherwise.
       if (type->isObjCIdType()) {
-        return {proto->getDeclaredType(),
+        return {Impl.SwiftContext.getAnyObjectType(),
                 ImportHint(ImportHint::ObjCBridged,
                            Impl.SwiftContext.TheAnyType)};
       }
 
       // Class maps to AnyObject.Type.
       assert(type->isObjCClassType());
-      return { ExistentialMetatypeType::get(proto->getDeclaredType()),
+      return { ExistentialMetatypeType::get(Impl.SwiftContext.getAnyObjectType()),
                ImportHint::ObjCPointer };
     }
   };
@@ -1930,8 +1932,7 @@ Type ClangImporter::Implementation::importMethodType(
 
     // Undo 'Any' bridging.
     if (nonOptionalTy->isAny())
-      nonOptionalTy = SwiftContext.getProtocol(KnownProtocolKind::AnyObject)
-        ->getDeclaredType();
+      nonOptionalTy = SwiftContext.getAnyObjectType();
 
     if (nonOptionalTy->isAnyClassReferenceType()) {
       swiftResultTy = getUnmanagedType(*this, nonOptionalTy);

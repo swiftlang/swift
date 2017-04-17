@@ -141,6 +141,10 @@ public:
   }
   T front() const { assert(!empty()); return Begin; }
   T back() const { assert(!empty()); return End - 1; }
+  IntRange drop_back(size_t length = 1) const {
+    assert(length <= size());
+    return IntRange(Begin, End - length);
+  }
 
   IntRange slice(size_t start) const {
     assert(start <= size());

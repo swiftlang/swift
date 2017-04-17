@@ -57,7 +57,7 @@ SILFunction *SILFunction::create(
     CanSILFunctionType loweredType, GenericEnvironment *genericEnv,
     Optional<SILLocation> loc, IsBare_t isBareSILFunction,
     IsTransparent_t isTrans, IsSerialized_t isSerialized, IsThunk_t isThunk,
-    ClassVisibility_t classVisibility, Inline_t inlineStrategy, EffectsKind E,
+    SubclassScope classSubclassScope, Inline_t inlineStrategy, EffectsKind E,
     SILFunction *insertBefore, const SILDebugScope *debugScope) {
   // Get a StringMapEntry for the function.  As a sop to error cases,
   // allow the name to have an empty string.
@@ -68,10 +68,10 @@ SILFunction *SILFunction::create(
     name = entry->getKey();
   }
 
-  auto fn = new (M)
-      SILFunction(M, linkage, name, loweredType, genericEnv, loc,
-                  isBareSILFunction, isTrans, isSerialized, isThunk,
-                  classVisibility, inlineStrategy, E, insertBefore, debugScope);
+  auto fn = new (M) SILFunction(M, linkage, name, loweredType, genericEnv, loc,
+                                isBareSILFunction, isTrans, isSerialized,
+                                isThunk, classSubclassScope, inlineStrategy, E,
+                                insertBefore, debugScope);
 
   if (entry) entry->setValue(fn);
   return fn;
@@ -82,14 +82,14 @@ SILFunction::SILFunction(SILModule &Module, SILLinkage Linkage, StringRef Name,
                          GenericEnvironment *genericEnv,
                          Optional<SILLocation> Loc, IsBare_t isBareSILFunction,
                          IsTransparent_t isTrans, IsSerialized_t isSerialized,
-                         IsThunk_t isThunk, ClassVisibility_t classVisibility,
+                         IsThunk_t isThunk, SubclassScope classSubclassScope,
                          Inline_t inlineStrategy, EffectsKind E,
                          SILFunction *InsertBefore,
                          const SILDebugScope *DebugScope)
     : Module(Module), Name(Name), LoweredType(LoweredType),
       GenericEnv(genericEnv), DebugScope(DebugScope), Bare(isBareSILFunction),
       Transparent(isTrans), Serialized(isSerialized), Thunk(isThunk),
-      ClassVisibility(classVisibility), GlobalInitFlag(false),
+      ClassSubclassScope(unsigned(classSubclassScope)), GlobalInitFlag(false),
       InlineStrategy(inlineStrategy), Linkage(unsigned(Linkage)),
       KeepAsPublic(false), EffectsKindAttr(E) {
 
@@ -179,6 +179,8 @@ SILType SILFunction::mapTypeIntoContext(SILType type) const {
 
 SILType GenericEnvironment::mapTypeIntoContext(SILModule &M,
                                                SILType type) const {
+  assert(!type.hasArchetype());
+
   auto genericSig = getGenericSignature()->getCanonicalSignature();
   return type.subst(M,
                     QueryInterfaceTypeSubstitutions(this),

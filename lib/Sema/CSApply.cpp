@@ -752,6 +752,7 @@ namespace {
 
       bool isSuper = base->isSuperExpr();
 
+      // The formal type of the 'self' value for the call.
       Type baseTy = cs.getType(base)->getRValueType();
 
       // Explicit member accesses are permitted to implicitly look
@@ -801,11 +802,14 @@ namespace {
                                                          cs.getType(ref)));
       }
 
-      // Produce a reference to the type of the container the member
-      // resides in.
+      // The formal type of the 'self' value for the member's declaration.
       Type containerTy =
           refTy->castTo<FunctionType>()
               ->getInput()->getRValueInstanceType();
+
+      // If we have an opened existential, selfTy and baseTy will both be
+      // the same opened existential type.
+      Type selfTy = containerTy;
 
       // If we opened up an existential when referencing this member, update
       // the base accordingly.
@@ -816,7 +820,7 @@ namespace {
       if (knownOpened != solution.OpenedExistentialTypes.end()) {
         base = openExistentialReference(base, knownOpened->second, member);
         baseTy = knownOpened->second;
-        containerTy = baseTy;
+        selfTy = baseTy;
         openedExistential = true;
       }
 
@@ -852,17 +856,18 @@ namespace {
 
         // If the base is already an lvalue with the right base type, we can
         // pass it as an inout qualified type.
-        Type selfTy = containerTy;
+        auto selfParamTy = selfTy;
+
         if (selfTy->isEqual(baseTy))
           if (cs.getType(base)->is<LValueType>())
-            selfTy = InOutType::get(selfTy);
+            selfParamTy = InOutType::get(selfTy);
         base = coerceObjectArgumentToType(
-                 base, selfTy, member, semantics,
+                 base, selfParamTy, member, semantics,
                  locator.withPathElement(ConstraintLocator::MemberRefBase));
       } else {
         // Convert the base to an rvalue of the appropriate metatype.
         base = coerceToType(base,
-                            MetatypeType::get(containerTy),
+                            MetatypeType::get(selfTy),
                             locator.withPathElement(
                               ConstraintLocator::MemberRefBase));
         if (!base)
@@ -1493,8 +1498,7 @@ namespace {
       auto bridgeAnythingRef = ConcreteDeclRef(tc.Context, bridgeAnything,
                                                valueSub);
       auto valueParenTy = ParenType::get(tc.Context, cs.getType(value));
-      auto bridgeTy = tc.Context.getProtocol(KnownProtocolKind::AnyObject)
-        ->getDeclaredType();
+      auto bridgeTy = tc.Context.getAnyObjectType();
       auto bridgeFnTy = FunctionType::get(valueParenTy, bridgeTy);
       // FIXME: Wrap in ParenExpr to prevent bogus "tuple passed as argument"
       // errors.
@@ -1958,18 +1962,49 @@ namespace {
         builtinProtocol = tc.getProtocol(
             expr->getLoc(),
             KnownProtocolKind::ExpressibleByBuiltinUTF16StringLiteral);
+        auto *builtinConstUTF16StringProtocol = tc.getProtocol(
+            expr->getLoc(),
+            KnownProtocolKind::ExpressibleByBuiltinConstUTF16StringLiteral);
+        auto *builtinConstStringProtocol = tc.getProtocol(
+            expr->getLoc(),
+            KnownProtocolKind::ExpressibleByBuiltinConstStringLiteral);
+
+        // First try the constant string protocols.
         if (!forceASCII &&
-            tc.conformsToProtocol(type, builtinProtocol, cs.DC,
-                                  ConformanceCheckFlags::InExpression)) {
-          builtinLiteralFuncName 
-            = DeclName(tc.Context, tc.Context.Id_init,
-                       { tc.Context.Id_builtinUTF16StringLiteral,
-                         tc.Context.getIdentifier("utf16CodeUnitCount") });
+            (tc.conformsToProtocol(type, builtinConstUTF16StringProtocol, cs.DC,
+                                   ConformanceCheckFlags::InExpression))) {
+          builtinProtocol = builtinConstUTF16StringProtocol;
+          builtinLiteralFuncName =
+              DeclName(tc.Context, tc.Context.Id_init,
+                       {tc.Context.Id_builtinConstUTF16StringLiteral});
+
+          if (stringLiteral)
+            stringLiteral->setEncoding(StringLiteralExpr::UTF16ConstString);
+          else
+            magicLiteral->setStringEncoding(StringLiteralExpr::UTF16);
+        } else if (!forceASCII && (tc.conformsToProtocol(
+                                      type, builtinProtocol, cs.DC,
+                                      ConformanceCheckFlags::InExpression))) {
+          builtinLiteralFuncName =
+              DeclName(tc.Context, tc.Context.Id_init,
+                       {tc.Context.Id_builtinUTF16StringLiteral,
+                        tc.Context.getIdentifier("utf16CodeUnitCount")});
 
           if (stringLiteral)
             stringLiteral->setEncoding(StringLiteralExpr::UTF16);
           else
             magicLiteral->setStringEncoding(StringLiteralExpr::UTF16);
+        } else if (tc.conformsToProtocol(type, builtinConstStringProtocol,
+                                         cs.DC,
+                                         ConformanceCheckFlags::InExpression)) {
+          builtinProtocol = builtinConstStringProtocol;
+          builtinLiteralFuncName =
+              DeclName(tc.Context, tc.Context.Id_init,
+                       {tc.Context.Id_builtinConstStringLiteral});
+          if (stringLiteral)
+            stringLiteral->setEncoding(StringLiteralExpr::UTF8ConstString);
+          else
+            magicLiteral->setStringEncoding(StringLiteralExpr::UTF8);
         } else {
           // Otherwise, fall back to UTF-8.
           builtinProtocol = tc.getProtocol(
@@ -4748,31 +4783,10 @@ Expr *ExprRewriter::coerceExistential(Expr *expr, Type toType,
                                       cs.getType(result)));
   }
 
-  // If the type we are trying to coerce is a tuple, let's look through
-  // its elements to see if there are any LValue types present, such requires
-  // load or address-of operation first before proceeding with erasure.
+  // Load tuples with lvalue elements.
   if (auto tupleType = fromType->getAs<TupleType>()) {
-    bool coerceToRValue = false;
-    for (auto element : tupleType->getElements()) {
-      if (element.getType()->is<LValueType>()) {
-        coerceToRValue = true;
-        break;
-      }
-    }
-
-    // Tuple has one or more LValue types associated with it,
-    // which requires coercion to RValue, let's perform it here by creating
-    // new tuple type with LValue(s) stripped off and coercing
-    // expression to that type, which would do required transformation.
-    if (coerceToRValue) {
-      SmallVector<TupleTypeElt, 2> elements;
-      for (auto &element : tupleType->getElements())
-        elements.push_back(TupleTypeElt(element.getType()->getRValueType(),
-                                        element.getName(),
-                                        element.getParameterFlags()));
-
-      // New type is guaranteed to be a tuple because source type is one.
-      auto toTuple = TupleType::get(elements, ctx)->castTo<TupleType>();
+    if (tupleType->isLValueType()) {
+      auto toTuple = tupleType->getRValueType()->castTo<TupleType>();
       SmallVector<int, 4> sources;
       SmallVector<unsigned, 4> variadicArgs;
       bool failed = computeTupleShuffle(tupleType, toTuple,
@@ -6478,9 +6492,9 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
             ->castTo<ExistentialMetatypeType>()
             ->getInstanceType();
         }
-        auto openedArchetype = openedInstanceTy->castTo<ArchetypeType>();
-        assert(openedArchetype->getOpenedExistentialType()
-                              ->isEqual(existentialInstanceTy));
+        assert(openedInstanceTy->castTo<ArchetypeType>()
+                   ->getOpenedExistentialType()
+                   ->isEqual(existentialInstanceTy));
 
         auto opaqueValue = new (tc.Context)
           OpaqueValueExpr(apply->getLoc(), openedTy);
@@ -6575,9 +6589,6 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
     Expr *result = tc.substituteInputSugarTypeForResult(apply);
     cs.cacheExprTypes(result);
 
-    // Try closing the existential, if there is one.
-    closeExistential(result, locator);
-
     // If we have a covariant result type, perform the conversion now.
     if (covariantResultType) {
       if (covariantResultType->is<FunctionType>())
@@ -6587,6 +6598,9 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
         result = cs.cacheType(new (tc.Context) CovariantReturnConversionExpr(
             result, covariantResultType));
     }
+
+    // Try closing the existential, if there is one.
+    closeExistential(result, locator);
 
     // Extract all arguments.
     auto *CEA = arg;

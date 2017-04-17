@@ -477,7 +477,7 @@ static void passInherits(ArrayRef<TypeLoc> InheritedTypes,
 
     if (auto ProtoComposition
                = Inherited.getType()->getAs<ProtocolCompositionType>()) {
-      for (auto T : ProtoComposition->getProtocols())
+      for (auto T : ProtoComposition->getMembers())
         passInherits(TypeLoc::withoutLoc(T), Consumer);
       continue;
     }

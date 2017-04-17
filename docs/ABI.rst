@@ -1044,6 +1044,8 @@ Types
   type ::= associated-type
   type ::= nominal-type
   type ::= protocol-list 'p'                 // existential type
+  type ::= protocol-list superclass 'Xc'     // existential type with superclass
+  type ::= protocol-list 'Xl'                // existential type with AnyObject
   type ::= type-list 't'                     // tuple
   type ::= type generic-signature 'u'        // generic type
   type ::= 'x'                               // generic param, depth=0, idx=0

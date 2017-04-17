@@ -23,6 +23,7 @@
 #include "llvm/Support/SourceMgr.h"
 
 namespace swift {
+  class DiagnosticArgument;
   class SourceManager;
   enum class DiagID : uint32_t;
 
@@ -87,11 +88,13 @@ public:
   ///
   /// \param Kind The severity of the diagnostic (error, warning, note).
   ///
-  /// \param Text The diagnostic text.
+  /// \param FormatArgs The diagnostic format string arguments.
   ///
   /// \param Info Extra information associated with the diagnostic.
   virtual void handleDiagnostic(SourceManager &SM, SourceLoc Loc,
-                                DiagnosticKind Kind, StringRef Text,
+                                DiagnosticKind Kind,
+                                StringRef FormatString,
+                                ArrayRef<DiagnosticArgument> FormatArgs,
                                 const DiagnosticInfo &Info) = 0;
 };
   
@@ -99,7 +102,9 @@ public:
 class NullDiagnosticConsumer : public DiagnosticConsumer {
 public:
   void handleDiagnostic(SourceManager &SM, SourceLoc Loc,
-                        DiagnosticKind Kind, StringRef Text,
+                        DiagnosticKind Kind,
+                        StringRef FormatString,
+                        ArrayRef<DiagnosticArgument> FormatArgs,
                         const DiagnosticInfo &Info) override;
 };
   

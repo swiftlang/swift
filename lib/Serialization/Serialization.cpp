@@ -657,6 +657,8 @@ void Serializer::writeBlockInfoBlock() {
                               decls_block::GENERIC_PARAM);
   BLOCK_RECORD_WITH_NAMESPACE(sil_block,
                               decls_block::GENERIC_REQUIREMENT);
+  BLOCK_RECORD_WITH_NAMESPACE(sil_block,
+                              decls_block::LAYOUT_REQUIREMENT);
 
   BLOCK(SIL_INDEX_BLOCK);
   BLOCK_RECORD(sil_index_block, SIL_FUNC_NAMES);
@@ -2523,7 +2525,7 @@ void Serializer::writeDecl(const Decl *D) {
                                 addIdentifierRef(typeAlias->getName()),
                                 contextID,
                                 addTypeRef(underlying),
-                                addTypeRef(typeAlias->getInterfaceType()),
+                                /*no longer used*/TypeID(),
                                 typeAlias->isImplicit(),
                                 addGenericEnvironmentRef(
                                              typeAlias->getGenericEnvironment()),
@@ -3389,11 +3391,12 @@ void Serializer::writeType(Type ty) {
     auto composition = cast<ProtocolCompositionType>(ty.getPointer());
 
     SmallVector<TypeID, 4> protocols;
-    for (auto proto : composition->getProtocols())
+    for (auto proto : composition->getMembers())
       protocols.push_back(addTypeRef(proto));
 
     unsigned abbrCode = DeclTypeAbbrCodes[ProtocolCompositionTypeLayout::Code];
     ProtocolCompositionTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
+                                              composition->hasExplicitAnyObject(),
                                               protocols);
     break;
   }
@@ -3527,6 +3530,7 @@ void Serializer::writeAllDeclsAndTypes() {
   registerDeclTypeAbbr<GenericParamListLayout>();
   registerDeclTypeAbbr<GenericParamLayout>();
   registerDeclTypeAbbr<GenericRequirementLayout>();
+  registerDeclTypeAbbr<LayoutRequirementLayout>();
   registerDeclTypeAbbr<GenericEnvironmentLayout>();
   registerDeclTypeAbbr<SILGenericEnvironmentLayout>();
 

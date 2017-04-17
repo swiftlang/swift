@@ -4,6 +4,7 @@
 //
 // See https://swift.org/LICENSE.txt for license information
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+// RUN: not --crash %target-swift-frontend -primary-file %s -emit-ir -O
+// non-fuzz (@dusek)
 
-// RUN: not --crash %target-swift-frontend %s -emit-ir
-class a=protocol P{{}typealias e:P}}extension P{func a{}typealias e:a
+func f<T>(_ a:T)->Void{f(nil as[Any]?)}

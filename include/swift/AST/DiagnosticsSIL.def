@@ -84,9 +84,11 @@ ERROR(inout_argument_alias,none,
 NOTE(previous_inout_alias,none,
       "previous aliasing argument", ())
 
-ERROR(exclusivity_access_required,none,
-      "%select{initialization|read|modification|deinitialization}0 requires "
-      "%select{exclusive|shared}1 access", (unsigned, unsigned))
+// This is temporarily a warning during staging to make it easier to evaluate.
+// The intent is to change it to an error before turning it on by default.
+WARNING(exclusivity_access_required,none,
+        "%select{initialization|read|modification|deinitialization}0 requires "
+        "%select{exclusive|shared}1 access", (unsigned, unsigned))
 NOTE(exclusivity_conflicting_access,none,
      "conflicting %select{initialization|read|modification|deinitialization}0 "
      "requires %select{exclusive|shared}1 access", (unsigned, unsigned))
