@@ -33,7 +33,8 @@ using llvm::coverage::CovMapVersion;
 using llvm::coverage::CounterMappingRegion;
 
 static StringRef getCoverageSection(IRGenModule &IGM) {
-  return llvm::getInstrProfCoverageSectionName(&IGM.Module);
+  return llvm::getInstrProfSectionName(llvm::IPSK_covmap,
+                                       IGM.Triple.getObjectFormat());
 }
 
 void IRGenModule::emitCoverageMapping() {
