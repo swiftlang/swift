@@ -375,8 +375,7 @@ public:
         llvm_unreachable("Failed to read JSON file");
       }
       pMemBuffer = FileBufOrErr->get();
-      AllBuffer.emplace_back(pMemBuffer);
-      FileBufOrErr->reset();
+      AllBuffer.push_back(std::move(FileBufOrErr.get()));
     }
     assert(pMemBuffer);
     StringRef Buffer = pMemBuffer->getBuffer();

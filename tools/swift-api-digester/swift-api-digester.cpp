@@ -3323,7 +3323,8 @@ static void readIgnoredUsrs(llvm::StringSet<> &IgnoredUsrs) {
 }
 
 static int deserializeDiffItems(StringRef DiffPath, StringRef OutputPath) {
-  APIDiffItemStore Store(DiffPath);
+  APIDiffItemStore Store;
+  Store.addStorePath(DiffPath);
   std::error_code EC;
   llvm::raw_fd_ostream FS(OutputPath, EC, llvm::sys::fs::F_None);
   APIDiffItemStore::serialize(FS, Store.getAllDiffItems());
