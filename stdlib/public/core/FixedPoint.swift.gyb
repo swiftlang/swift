@@ -138,6 +138,28 @@ extension UnsignedInteger {
   }
 }
 
+//===--- Integer coercion operator ----------------------------------------===//
+// You may think it's icky, but it sure cleans up a lot of ugly numericCast()
+// invocations
+postfix operator ^
+
+extension _SignedInteger {
+  internal static postfix func ^ <U : _SignedInteger>(_ x: Self) -> U {
+    return numericCast(x)
+  }
+  internal static postfix func ^ <U : UnsignedInteger>(_ x: Self) -> U {
+    return numericCast(x)
+  }
+}
+extension UnsignedInteger {
+  internal static postfix func ^ <U : UnsignedInteger>(_ x: Self) -> U {
+    return numericCast(x)
+  }
+  internal static postfix func ^ <U : SignedInteger>(_ x: Self) -> U {
+    return numericCast(x)
+  }
+}
+
 /// Convert `x` to type `U`, trapping on overflow in -Onone and -O
 /// builds.
 ///

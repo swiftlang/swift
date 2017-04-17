@@ -31,7 +31,7 @@ UIntMax = 'UInt%s' % int_max_bits
 /// - Note: If `text` begins with `"+"` or `"-"`, even if the rest of
 ///   the characters are `"0"`, the result is `nil`.
 internal func _parseUnsignedAsciiAsUIntMax(
-  _ u16: String.UTF16View, _ radix: Int, _ maximum: UIntMax
+  _ u16: String.UTF16View.SubSequence, _ radix: Int, _ maximum: UIntMax
 ) -> UIntMax? {
   if u16.isEmpty { return nil }
 
@@ -109,11 +109,11 @@ internal func _parseAsciiAsIntMax(
 /// Strip an optional single leading ASCII plus/minus sign from `utf16`.
 private func _parseOptionalAsciiSign(
   _ utf16: String.UTF16View
-) -> (digitsUTF16: String.UTF16View, isMinus: Bool) {
+) -> (digitsUTF16: String.UTF16View.SubSequence, isMinus: Bool) {
   switch utf16.first {
-  case _ascii16("-")?: return (utf16.dropFirst(), true)
-  case _ascii16("+")?: return (utf16.dropFirst(), false)
-  default: return (utf16, false)
+  case _ascii16("-")?: return (utf16.dropFirst(1), true)
+  case _ascii16("+")?: return (utf16.dropFirst(1), false)
+  default: return (utf16.dropFirst(0), false)
   }
 }
 

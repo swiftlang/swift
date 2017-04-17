@@ -388,6 +388,7 @@ tests.test("${TestType}/Fun${FuncName}") {
 % if DoesThrow == 'true':
      expectEqual(127, e.val)
 % else:
+     _=e
      preconditionFailure("Should not get there")
 % end
   } catch {
@@ -415,6 +416,7 @@ tests.test("${TestType}/RetFun${FuncName}") {
 % if DoesThrow == 'true':
      expectEqual(127, e.val)
 % else:
+     _=e
      preconditionFailure("Should not get there")
 % end
   } catch {
@@ -445,6 +447,7 @@ tests.test("${TestType}/RetAndParamFun${FuncName}") {
 % if DoesThrow == 'true':
      expectEqual(127, e.val)
 % else:
+     _=e
      preconditionFailure("Should not get there")
 % end
   } catch {
@@ -481,6 +484,7 @@ tests.test("${TestType}/Method${FuncName}") {
 % if DoesThrow == 'true':
      expectEqual(127, e.val)
 % else:
+     _=e
      preconditionFailure("Should not get there")
 % end
   } catch {
@@ -512,6 +516,7 @@ tests.test("${TestType}/RetMethod${FuncName}") {
 % if DoesThrow == 'true':
      expectEqual(127, e.val)
 % else:
+     _=e
      preconditionFailure("Should not get there")
 % end
   } catch {
@@ -546,6 +551,7 @@ tests.test("${TestType}/RetAndParamMethod${FuncName}") {
 % if DoesThrow == 'true':
      expectEqual(127, e.val)
 % else:
+     _=e
      preconditionFailure("Should not get there")
 % end
   } catch {
@@ -581,6 +587,7 @@ tests.test("${TestType}/WitnessMethod${FuncName}") {
 % if DoesThrow == 'true':
      expectEqual(127, e.val)
 % else:
+     _=e
      preconditionFailure("Should not get there")
 % end
   } catch {
@@ -611,6 +618,7 @@ tests.test("${TestType}/RetWitnessMethod${FuncName}") {
 % if DoesThrow == 'true':
      expectEqual(127, e.val)
 % else:
+     _=e
      preconditionFailure("Should not get there")
 % end
   } catch {
@@ -644,6 +652,7 @@ tests.test("${TestType}/RetAndParamWitnessMethod${FuncName}") {
 % if DoesThrow == 'true':
      expectEqual(127, e.val)
 % else:
+     _=e
      preconditionFailure("Should not get there")
 % end
   } catch {

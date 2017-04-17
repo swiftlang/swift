@@ -17,13 +17,13 @@ func _convertArrayToNSArray<T>(array: Array<T>) -> NSArray
 func _convertNSArrayToArray<T>(nsstring: NSArray?) -> Array<T>
 
 @_silgen_name("swift_DictionaryToNSDictionary") internal
-func _convertDictionaryToNSDictionary<K: Hashable, V>(array: Dictionary<K, V>) -> NSDictionary
+func _convertDictionaryToNSDictionary<K, V>(array: Dictionary<K, V>) -> NSDictionary
 
 @_silgen_name("swift_NSDictionaryToDictionary") internal
-func _convertNSDictionaryToDictionary<K: Hashable, V>(nsstring: NSDictionary?) -> Dictionary<K, V>
+func _convertNSDictionaryToDictionary<K, V>(nsstring: NSDictionary?) -> Dictionary<K, V>
 
 // NSSet bridging entry points
-func _convertSetToNSSet<T: Hashable>(s: Set<T>) -> NSSet {
+func _convertSetToNSSet<T>(s: Set<T>) -> NSSet {
   return NSSet()
 }
 

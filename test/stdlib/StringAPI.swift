@@ -92,7 +92,7 @@ let tests = [
   ComparisonTest(.eq, "\u{212b}", "A\u{30a}"),
   ComparisonTest(.eq, "\u{212b}", "\u{c5}"),
   ComparisonTest(.eq, "A\u{30a}", "\u{c5}"),
-  ComparisonTest(.lt, "A\u{30a}", "a"),
+  ComparisonTest(.gt, "A\u{30a}", "a"),
   ComparisonTest(.lt, "A", "A\u{30a}"),
 
   // U+2126 OHM SIGN
@@ -275,8 +275,16 @@ func checkHasPrefixHasSuffix(
   let expectHasSuffix = lhsNFDGraphemeClusters.lazy.reversed()
     .starts(with: rhsNFDGraphemeClusters.lazy.reversed(), by: (==))
 
-  expectEqual(expectHasPrefix, lhs.hasPrefix(rhs), stackTrace: stackTrace)
-  expectEqual(expectHasSuffix, lhs.hasSuffix(rhs), stackTrace: stackTrace)
+  expectEqual(
+    expectHasPrefix, lhs.hasPrefix(rhs),
+    "lhsNFDGraphemeClusters: \(lhsNFDGraphemeClusters), rhsNFDGraphemeClusters: \(rhsNFDGraphemeClusters)",
+    stackTrace: stackTrace
+  )
+  expectEqual(
+    expectHasSuffix, lhs.hasSuffix(rhs),
+    "lhsNFDGraphemeClusters: \(lhsNFDGraphemeClusters), rhsNFDGraphemeClusters: \(rhsNFDGraphemeClusters)",
+    stackTrace: stackTrace
+  )
 #endif
 }
 
@@ -285,32 +293,7 @@ StringTests.test("LosslessStringConvertible") {
   checkLosslessStringConvertible(comparisonTests.map { $0.rhs })
 }
 
-// Mark the test cases that are expected to fail in checkHasPrefixHasSuffix
-
-let substringTests = tests.map {
-  (test: ComparisonTest) -> ComparisonTest in
-  switch (test.expectedUnicodeCollation, test.lhs, test.rhs) {
-  case (.eq, "\u{0}", "\u{0}"):
-    return test.replacingPredicate(.objCRuntime(
-      "https://bugs.swift.org/browse/SR-332"))
-
-  case (.gt, "\r\n", "\n"):
-    return test.replacingPredicate(.objCRuntime(
-      "blocked on rdar://problem/19036555"))
-
-  case (.eq, "\u{0301}", "\u{0341}"):
-    return test.replacingPredicate(.objCRuntime(
-      "https://bugs.swift.org/browse/SR-243"))
-
-  case (.lt, "\u{1F1E7}", "\u{1F1E7}\u{1F1E7}"):
-    return test.replacingPredicate(.objCRuntime(
-      "https://bugs.swift.org/browse/SR-367"))
-
-  default:
-    return test
-  }
-}
-
+let substringTests = tests
 for test in substringTests {
   StringTests.test("hasPrefix,hasSuffix: line \(test.loc.line)")
     .skip(.nativeRuntime(
@@ -346,19 +329,31 @@ StringTests.test("SameTypeComparisons") {
 }
 
 StringTests.test("CompareStringsWithUnpairedSurrogates")
-  .xfail(
-    .always("<rdar://problem/18029104> Strings referring to underlying " +
-      "storage with unpaired surrogates compare unequal"))
-  .code {
+.xfail(
+  .custom(
+    { true },
+    reason: "FIXME: we don't handle slice boundaries properly yet"))
+.code {
   let donor = "abcdef"
   let acceptor = "\u{1f601}\u{1f602}\u{1f603}"
 
+  // Michael NOTE: String(Substring())
   expectEqual("\u{fffd}\u{1f602}\u{fffd}",
-    acceptor[
-      donor.index(donor.startIndex, offsetBy: 1) ..<
-      donor.index(donor.startIndex, offsetBy: 5)
-    ]
-  )
+    String(
+      acceptor[
+        donor.index(donor.startIndex, offsetBy: 1)
+        ..< donor.index(donor.startIndex, offsetBy: 5)]))
+}
+
+StringTests.test("MisalignedSliceBoundaries")
+.xfail(
+  .custom({ true },
+    reason: "we don't adjust slice boundaries to the right granularity yet"))
+.code {
+  let threeEmoji = "\u{1f601}\u{1f602}\u{1f603}"
+  let donor = threeEmoji.content.utf16.dropFirst().dropLast()
+  let expected: [Character] = ["\u{fffd}", "\u{1f602}", "\u{fffd}"]
+  expectEqualSequence(expected, threeEmoji[donor.startIndex..<donor.endIndex])
 }
 
 var CStringTests = TestSuite("CStringTests")

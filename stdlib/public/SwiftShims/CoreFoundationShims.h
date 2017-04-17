@@ -74,6 +74,11 @@ _swift_shims_CFStringRef _Nonnull _swift_stdlib_CFStringCreateWithSubstring(
     _swift_shims_CFStringRef _Nonnull str, _swift_shims_CFRange range);
 
 SWIFT_RUNTIME_STDLIB_INTERFACE
+_swift_shims_CFStringRef _Nonnull _swift_stdlib_CFStringCreateWithCharacters(
+    _swift_shims_CFAllocatorRef _Nullable alloc,
+    const _swift_shims_UniChar *_Nonnull str, _swift_shims_CFIndex length);
+
+SWIFT_RUNTIME_STDLIB_INTERFACE
 _swift_shims_UniChar _swift_stdlib_CFStringGetCharacterAtIndex(
     _swift_shims_CFStringRef _Nonnull theString, _swift_shims_CFIndex idx);
 

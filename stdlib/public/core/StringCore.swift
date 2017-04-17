@@ -711,7 +711,9 @@ extension _StringCore : RangeReplaceableCollection {
         let destination8
           = destination.assumingMemoryBound(to: UTF8.CodeUnit.self)
         for i in 0..<growth {
-          destination8[i] = UTF8.CodeUnit(iter.next()!)
+          // Michael NOTE: this somehow stops compiler asserts:
+          let maybeNext = iter.next()
+          destination8[i] = UTF8.CodeUnit(maybeNext!)
         }
       }
       else {

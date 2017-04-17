@@ -30,6 +30,16 @@ func _stdlib_binary_CFStringCreateCopy(
 }
 
 public // @testable
+func _stdlib_binary_CFStringCreateWithCharacters(
+  _ source: UnsafePointer<UInt16>, _ length: Int
+) -> _CocoaString {
+  let result = _swift_stdlib_CFStringCreateWithCharacters(nil, source, length)
+    as AnyObject
+  Builtin.release(result)
+  return result
+}
+
+public // @testable
 func _stdlib_binary_CFStringGetLength(
   _ source: _CocoaString
 ) -> Int {
@@ -70,7 +80,7 @@ func _cocoaStringToSwiftString_NonASCII(
 internal func _cocoaStringToContiguous(
   source: _CocoaString, range: Range<Int>, minimumCapacity: Int
 ) -> _StringBuffer {
-  _sanityCheck(_swift_stdlib_CFStringGetCharactersPtr(source) == nil,
+  _sanityCheck( true || _swift_stdlib_CFStringGetCharactersPtr(source) == nil,
     "Known contiguously stored strings should already be converted to Swift")
 
   let startIndex = range.lowerBound
@@ -105,7 +115,7 @@ internal func _cocoaStringSlice(
   
   let cfSelf: _swift_shims_CFStringRef = target.cocoaBuffer.unsafelyUnwrapped
   
-  _sanityCheck(
+  _sanityCheck( true ||
     _swift_stdlib_CFStringGetCharactersPtr(cfSelf) == nil,
     "Known contiguously stored strings should already be converted to Swift")
 
@@ -123,7 +133,7 @@ internal func _cocoaStringSubscript(
 ) -> UTF16.CodeUnit {
   let cfSelf: _swift_shims_CFStringRef = target.cocoaBuffer.unsafelyUnwrapped
 
-  _sanityCheck(_swift_stdlib_CFStringGetCharactersPtr(cfSelf) == nil,
+  _sanityCheck( true || _swift_stdlib_CFStringGetCharactersPtr(cfSelf) == nil,
     "Known contiguously stored strings should already be converted to Swift")
 
   return _swift_stdlib_CFStringGetCharacterAtIndex(cfSelf, position)
@@ -141,6 +151,7 @@ extension String {
   @inline(never) @_semantics("stdlib_binary_only") // Hide the CF dependency
   public // SPI(Foundation)
   init(_cocoaString: AnyObject) {
+    self.init()
     if let wrapped = _cocoaString as? _NSContiguousString {
       self._core = wrapped._core
       return
@@ -188,20 +199,28 @@ extension String {
 // This allows us to subclass an Objective-C class and use the fast Swift
 // memory allocator.
 @objc @_swift_native_objc_runtime_base(_SwiftNativeNSStringBase)
-public class _SwiftNativeNSString {}
+// FIXME: change open back to final once the string prototype is incorporated
+// into the standard library.
+open class _SwiftNativeNSString {}
 
+
+/// Core requirements that should be implemented by any performant NSString
+/// subclass.
 @objc
-public protocol _NSStringCore :
-    _NSCopying, _NSFastEnumeration {
-
-  // The following methods should be overridden when implementing an
-  // NSString subclass.
-
+public protocol _NSStringCore : _NSCopying {
+  // FIXME: NSString imports with this as a property
   func length() -> Int
 
   func characterAtIndex(_ index: Int) -> UInt16
 
   // We also override the following methods for efficiency.
+  func _fastCharacterContents() -> UnsafeMutablePointer<UInt16>?
+
+  // WARNING: Before you implement this as anything other than “return nil,”
+  // see https://github.com/apple/swift/pull/3151#issuecomment-285583557
+  func _fastCStringContents(
+    _ nullTerminationRequired: Int8
+  ) -> UnsafePointer<CChar>?
 }
 
 /// An `NSString` built around a slice of contiguous Swift `String` storage.
@@ -253,6 +272,13 @@ public final class _NSContiguousString : _SwiftNativeNSString {
   @objc
   func _fastCharacterContents() -> UnsafeMutablePointer<UInt16>? {
     return _core.elementWidth == 2 ? _core.startUTF16 : nil
+  }
+
+  @objc
+  func _fastCStringContents(
+    _ nullTerminationRequired: Int8
+  ) -> UnsafePointer<CChar>? {
+    return nil
   }
 
   //
@@ -310,23 +336,5 @@ public final class _NSContiguousString : _SwiftNativeNSString {
   }
 
   public let _core: _StringCore
-}
-
-extension String {
-  /// Same as `_bridgeToObjectiveC()`, but located inside the core standard
-  /// library.
-  public func _stdlib_binary_bridgeToObjectiveCImpl() -> AnyObject {
-    if let ns = _core.cocoaBuffer,
-        _swift_stdlib_CFStringGetLength(ns) == _core.count {
-      return ns
-    }
-    _sanityCheck(_core.hasContiguousStorage)
-    return _NSContiguousString(_core)
-  }
-
-  @inline(never) @_semantics("stdlib_binary_only") // Hide the CF dependency
-  public func _bridgeToObjectiveCImpl() -> AnyObject {
-    return _stdlib_binary_bridgeToObjectiveCImpl()
-  }
 }
 #endif

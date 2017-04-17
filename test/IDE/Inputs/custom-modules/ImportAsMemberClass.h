@@ -20,7 +20,7 @@ void IAMSomeClassApplyOptions(IAMSomeClass * _Nonnull someClass,
                               IAMSomeClassOptions options);
 
 @interface UnavailableDefaultInit : NSObject
--(instancetype)init __attribute__((availability(swift,unavailable)));
+-(_Null_unspecified instancetype)init __attribute__((availability(swift,unavailable)));
 @end
 
 @interface UnavailableDefaultInitSub : UnavailableDefaultInit

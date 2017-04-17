@@ -412,7 +412,12 @@ public struct IndexingIterator<
   ///   exists; otherwise, `nil`.
   @_inlineable
   public mutating func next() -> Elements._Element? {
-    if _position == _elements.endIndex { return nil }
+    if _slowPath(_position >= _elements.endIndex) {
+      _debugPrecondition(
+        _position == _elements.endIndex,
+        "indexing past the end of a collection")
+      return nil
+    }
     let element = _elements[_position]
     _elements.formIndex(after: &_position)
     return element
@@ -647,6 +652,45 @@ public protocol Collection : _Indexable, Sequence {
   /// type.
   associatedtype Iterator = IndexingIterator<Self>
 
+  /// A type that provides access to sub-structure of the collection
+  associatedtype Segments : _Indexable = EmptyCollection<Self>
+  // where Segments : Collection, Segments.Iterator.Element : Collection,
+  // Segments.Iterator.Element.Iterator.Element == Iterator.Element
+
+  /// The collection's sub-structure, if any
+  ///
+  /// Anything for which a complete traversal can be most easily written using a
+  /// nested loop should provide segments.
+  var segments : Segments? { get }
+
+  /// If there exists a contiguous memory buffer containing all elements in this
+  /// `Collection`, returns the result of calling `body` on that buffer.
+  ///
+  /// - Returns: the result of calling `body`, or `nil` if no such buffer
+  ///   exists.
+  ///
+  /// - Note: implementors should ensure that the lifetime of the memory
+  ///   persists throughout this call, typically by using
+  ///   `withExtendedLifetime(self)`.
+  func withExistingUnsafeBuffer<R>(
+    _ body: (UnsafeBufferPointer<Iterator.Element>) throws -> R
+  ) rethrows -> R?
+
+  /// Replaces the `target` elements with the contents of `replacement` if
+  /// possible and returns `true`, or returns `false` otherwise.
+  ///
+  /// - Note: `false` may be returned because `self` is truly immutable or
+  ///   because its length can't be changed appropriately.
+  //
+  // Note: this doesn't accept a Range<Index> for convenience of interoperation
+  // with AnyUnicodeIndex_, which needs to be an existential and thus can't
+  // conform to Comparable. We could fix that by having the things that traffic
+  // in AnyUnicodeIndex_ traffic in AnyUnicodeIndex instead.
+  mutating func _tryToReplaceSubrange<C: Collection>(
+    _ target: Range<Index>, with replacement: C
+  ) -> Bool
+  where C.Iterator.Element == Iterator.Element
+  
   // FIXME(ABI)#179 (Type checker): Needed here so that the `Iterator` is properly deduced from
   // a custom `makeIterator()` function.  Otherwise we get an
   // `IndexingIterator`. <rdar://problem/21539115>
@@ -1178,10 +1222,11 @@ extension _Indexable {
 
     var start = start
     var count: IndexDistance = 0
-    while start != end {
+    while start < end {
       count = count + 1
       formIndex(after: &start)
     }
+    _debugPrecondition(start == end, "Walked off the end of the collection")
     return count
   }
 
@@ -1204,8 +1249,7 @@ extension _Indexable {
   @_inlineable
   @_versioned
   @inline(__always)
-  internal
-  func _advanceForward(
+  internal func _advanceForward(
     _ i: Index, by n: IndexDistance, limitedBy limit: Index
   ) -> Index? {
     _precondition(n >= 0,
@@ -1280,6 +1324,26 @@ extension Collection where SubSequence == Self {
     let element = first!
     self = self[index(after: startIndex)..<endIndex]
     return element
+  }
+}
+
+/// Default implementation of Segments for collections that don't expose any
+/// sub-structure.
+extension Collection where Segments == EmptyCollection<Self> {
+  public var segments : Segments? { return Segments() }
+}
+
+extension Collection {
+  public func withExistingUnsafeBuffer<R>(
+    _ body: (UnsafeBufferPointer<Iterator.Element>) throws -> R
+  ) rethrows -> R? {
+    return nil // by default, collections have no contiguous storage.
+  }
+  public mutating func _tryToReplaceSubrange<C: Collection>(
+    _: Range<Index>, with _: C
+  ) -> Bool
+  where C.Iterator.Element == Iterator.Element {
+    return false
   }
 }
 
@@ -1865,6 +1929,15 @@ extension Collection {
     _ preprocess: () throws -> R
   ) rethrows -> R? {
     return try preprocess()
+  }
+}
+
+extension Collection {
+  public func index<I: SignedInteger>(atOffset offset: I) -> Index {
+    return index(startIndex, offsetBy: offset^)
+  }
+  public func offset(of i: Index) -> IndexDistance {
+    return distance(from: startIndex, to: i)
   }
 }
 

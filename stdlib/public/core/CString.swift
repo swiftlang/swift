@@ -43,14 +43,14 @@ extension String {
   ///     // Prints "Caf�"
   ///
   /// - Parameter cString: A pointer to a null-terminated UTF-8 code sequence.
-  public init(cString: UnsafePointer<CChar>) {
-    let len = UTF8._nullCodeUnitOffset(in: cString)
-    let (result, _) = cString.withMemoryRebound(to: UInt8.self, capacity: len) {
-      _decodeCString($0, as: UTF8.self, length: len,
-        repairingInvalidCodeUnits: true)!
-    }
-    self = result
-  }
+  // public init(cString: UnsafePointer<CChar>) {
+  //   let len = UTF8._nullCodeUnitOffset(in: cString)
+  //   let (result, _) = cString.withMemoryRebound(to: UInt8.self, capacity: len) {
+  //     _decodeCString($0, as: UTF8.self, length: len,
+  //       repairingInvalidCodeUnits: true)!
+  //   }
+  //   self = result
+  // }
 
   /// Creates a new string by copying the null-terminated UTF-8 data referenced
   /// by the given pointer.
@@ -58,8 +58,8 @@ extension String {
   /// This is identical to init(cString: UnsafePointer<CChar> but operates on an
   /// unsigned sequence of bytes.
   public init(cString: UnsafePointer<UInt8>) {
-    self = String.decodeCString(cString, as: UTF8.self,
-      repairingInvalidCodeUnits: true)!.result
+    self.init(
+      cString: UnsafeRawPointer(cString).assumingMemoryBound(to: CChar.self))
   }
 
   /// Creates a new string by copying and validating the null-terminated UTF-8
@@ -193,19 +193,5 @@ func _decodeCString<Encoding : UnicodeCodec>(
     buffer, encoding: encoding, repairIllFormedSequences: isRepairing)
   return stringBuffer.map {
     (result: String(_storage: $0), repairsMade: hadError)
-  }
-}
-
-extension String {
-  @available(*, unavailable, message: "Please use String.init?(validatingUTF8:) instead. Note that it no longer accepts NULL as a valid input. Also consider using String(cString:), that will attempt to repair ill-formed code units.")
-  public static func fromCString(_ cs: UnsafePointer<CChar>) -> String? {
-    Builtin.unreachable()
-  }
-
-  @available(*, unavailable, message: "Please use String.init(cString:) instead. Note that it no longer accepts NULL as a valid input. See also String.decodeCString if you need more control.")
-  public static func fromCStringRepairingIllFormedUTF8(
-    _ cs: UnsafePointer<CChar>
-  ) -> (String?, hadError: Bool) {
-    Builtin.unreachable()
   }
 }

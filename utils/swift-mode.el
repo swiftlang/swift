@@ -486,7 +486,7 @@ directory."
              (funcall swift-find-executable-fn "swiftc")
              temp-file)))
 
-(add-to-list 'flymake-allowed-file-name-masks '(".+\\.swift$" flymake-swift-init))
+; (add-to-list 'flymake-allowed-file-name-masks '(".+\\.swift$" flymake-swift-init))
 
 (setq flymake-err-line-patterns
       (append

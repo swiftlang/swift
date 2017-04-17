@@ -517,15 +517,20 @@ public struct Unsafe${Mutable}RawBufferPointer
   @_inlineable
   public func initializeMemory<S: Sequence>(
     as: S.Iterator.Element.Type, from source: S
-  ) -> (unwritten: S.Iterator, initialized: UnsafeMutableBufferPointer<S.Iterator.Element>) {
+  ) -> (
+    unwritten: S.Iterator,
+    initialized: UnsafeMutableBufferPointer<S.Iterator.Element>
+  ) {
 
     var it = source.makeIterator()
     var idx = startIndex
     let elementStride = MemoryLayout<S.Iterator.Element>.stride
     
-    // This has to be a debug precondition due to the cost of walking over some collections.
+    // This has to be a debug precondition due to the cost of walking over some
+    // collections.
     _debugPrecondition(source.underestimatedCount <= (count / elementStride),
       "insufficient space to accommodate source.underestimatedCount elements")
+
     guard let base = baseAddress else {
       // this can be a precondition since only an invalid argument should be costly
       _precondition(source.underestimatedCount == 0, 
@@ -533,9 +538,12 @@ public struct Unsafe${Mutable}RawBufferPointer
       return (it, UnsafeMutableBufferPointer(start: nil, count: 0))
     }  
 
-    for p in stride(from: base, 
+    let end1 = base + count
+    let end2 = end1 - elementStride
+    for p in stride(
+      from: base, 
       // only advance to as far as the last element that will fit
-      to: base + count - elementStride + 1, 
+      to: end2 + 1, 
       by: elementStride
     ) {
       // underflow is permitted -- e.g. a sequence into
@@ -545,9 +553,11 @@ public struct Unsafe${Mutable}RawBufferPointer
       formIndex(&idx, offsetBy: elementStride)
     }
 
-    return (it, UnsafeMutableBufferPointer(
-                  start: base.assumingMemoryBound(to: S.Iterator.Element.self), 
-                  count: idx / elementStride))
+    return (
+      it,
+      UnsafeMutableBufferPointer(
+        start: base.assumingMemoryBound(to: S.Iterator.Element.self), 
+        count: idx / elementStride))
   }
   %  end # mutable
 
@@ -642,3 +652,7 @@ public func withUnsafeBytes<T, Result>(
     try body(UnsafeRawBufferPointer(start: $0, count: MemoryLayout<T>.size))
   }
 }
+
+// ${'Local Variables'}:
+// eval: (read-only-mode 1)
+// End:

@@ -29,6 +29,9 @@ using SubstitutionList = ArrayRef<Substitution>;
 
 void dump(SubstitutionList subs);
 
+/// Create a canonicalized substitution list.
+/// It may return the argument substitution list if it is canonical already.
+SubstitutionList getCanonicalSubstitutionList(SubstitutionList subs);
 } // end namespace swift
 
 #endif

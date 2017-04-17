@@ -335,6 +335,12 @@ extension UnicodeScalar {
   }
 }
 
+extension UnicodeScalar {
+  static var replacementCharacter: UnicodeScalar {
+    return UnicodeScalar(_unchecked: 0xFFFD)
+  }
+}
+
 extension UInt8 {
   /// Construct with value `v.value`.
   ///
@@ -416,15 +422,3 @@ func _ascii16(_ c: UnicodeScalar) -> UTF16.CodeUnit {
   return UTF16.CodeUnit(c.value)
 }
 
-extension UnicodeScalar {
-  /// Creates an instance of the NUL scalar value.
-  @available(*, unavailable, message: "use 'UnicodeScalar(0)'")
-  public init() {
-    Builtin.unreachable()
-  }
-
-  @available(*, unavailable, renamed: "escaped(asASCII:)")
-  public func escape(asASCII forceASCII: Bool) -> String {
-    Builtin.unreachable()
-  }
-}

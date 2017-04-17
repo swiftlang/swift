@@ -76,7 +76,9 @@ Reflection.test("Dictionary") {
   fatalError("unimplemented")
 #endif
 
-  expectEqual(expected, output)
+  // Michael NOTE: If hashing changes, this will be unstable. Disabled for now
+  //
+  // expectEqual(expected, output)
 }
 
 Reflection.test("Set") {

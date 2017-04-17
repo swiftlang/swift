@@ -1,0 +1,87 @@
+// WIP: Trying out a hard(er)-coded fixed size array to wrap. The _DoubleLength
+// approach yields absurd debug-stdlib performance, and absurd generic-
+// specialization compilation times in release.
+//
+
+// WIP NOTE: Just add whatever sized array you need to this list
+% for N in 8, 16:
+
+public struct _FixedArray${N}<T> {
+	// ABI TODO: The has assumptions about tuple layout in the ABI, namely that they
+	// are laid out contiguously and individually addressable (i.e. strided).
+	//
+  public var storage: (
+  	// A ${N}-wide tuple of type T
+% for i in range(0, N-1):
+  	T,
+% end
+    T
+  )
+
+  static var _arraySize : Int { return ${N} }
+}
+
+extension _FixedArray${N} : RandomAccessCollection, MutableCollection {
+  public typealias Index = Int
+  public typealias IndexDistance = Int
+
+  public var startIndex : Index {
+    return 0
+  }
+  public var endIndex : Index {
+    return _FixedArray${N}._arraySize
+  }
+  public var count : IndexDistance { return _FixedArray${N}._arraySize }
+
+  public subscript(i: Index) -> T {
+    @inline(__always)
+    get {
+      var copy = storage
+      let res: T = withUnsafeBytes(of: &copy) {
+        (rawPtr : UnsafeRawBufferPointer) -> T in
+        let stride = MemoryLayout<T>.stride
+        _sanityCheck(rawPtr.count == ${N}*stride, "layout mismatch?")
+        let bufPtr = UnsafeBufferPointer(
+          start: rawPtr.baseAddress!.assumingMemoryBound(to: T.self),
+          count: count)
+        return bufPtr[i]
+      }
+      return res
+    }
+    @inline(__always)
+    set {
+      withUnsafeBytes(of: &storage) {
+        (rawPtr : UnsafeRawBufferPointer) -> () in
+        let rawPtr = UnsafeMutableRawBufferPointer(mutating: rawPtr)
+        let stride = MemoryLayout<T>.stride
+        _sanityCheck(rawPtr.count == ${N}*stride, "layout mismatch?")
+        let bufPtr = UnsafeMutableBufferPointer(
+          start: rawPtr.baseAddress!.assumingMemoryBound(to: T.self),
+          count: count)
+        bufPtr[i] = newValue
+      }
+    }
+  }
+  public func index(after i: Index) -> Index {
+    return i+1
+  }
+  public func index(before i: Index) -> Index {
+    return i-1
+  }
+
+  // TODO: Any customization hooks it's profitable to override, e.g. append?
+
+}
+extension _FixedArray${N} : _FixedSizeCollection {
+  public init(repeating x: Iterator.Element) {
+    storage = (
+% for i in range(0, N-1):
+	  	x,
+% end
+	    x
+    )
+  }
+}
+
+% end
+

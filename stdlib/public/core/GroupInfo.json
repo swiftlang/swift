@@ -6,6 +6,7 @@
   "String": [
     "CString.swift",
     "Character.swift",
+    "ICU.swift",
     "StaticString.swift",
     "String.swift",
     "StringBridge.swift",
@@ -17,12 +18,20 @@
     "StringIndexConversions.swift",
     "StringInterpolation.swift",
     "StringLegacy.swift",
+    "StringNormalization.swift",
     "StringRangeReplaceableCollection.swift",
+    "StringStorage.swift",
     "StringUTF16.swift",
     "StringUTF8.swift",
     "StringUnicodeScalarView.swift",
+    "NewString.swift",
+    "TranscodedView.swift",
+    "AnyUnicode.swift",
     "Unicode.swift",
+    "Unicode2.swift",
     "UnicodeScalar.swift",
+    "UnicodeViews.swift",
+    "UnicodeViewSlice.swift",
     "UnicodeTrie.swift",
     "UnavailableStringAPIs.swift"
   ],
@@ -31,6 +40,10 @@
   ],
   "Collection": [
     "Collection.swift",
+    "ContiguouslyStored.swift",
+    "Counted.swift",
+    "FixedArray.swift",
+    "FixedArray2.swift",
     "BidirectionalCollection.swift",
     "RandomAccessCollection.swift",
     "MutableCollection.swift",
@@ -51,6 +64,9 @@
     "Existential.swift",
     "WriteBackMutableSlice.swift",
     "UnfoldSequence.swift",
+    "BoundedBufferReference.swift",
+    "BoundedCapacity.swift",
+    "UnboundCapacity.swift",
     {
       "Type-erased": [
         "ExistentialCollection.swift"
@@ -111,6 +127,7 @@
       "Integers.swift",
       "IntegerArithmetic.swift",
       "FixedPoint.swift",
+      "AlternateIntegerWidths.swift",
       "IntegerParsing.swift"],
     "Floating": [
       "FloatingPoint.swift",
@@ -158,6 +175,7 @@
     "DebuggerSupport.swift",
     "Equatable.swift",
     "Comparable.swift",
-    "Hashable.swift"
+    "Hashable.swift",
+    "ForwardingWrapper.swift"
   ]
 }

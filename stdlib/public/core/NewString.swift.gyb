@@ -1,0 +1,1444 @@
+//===--- NewString.swift.gyb ----------------------------------------------===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+// RUN: rm -rf %t && mkdir -p %t && %gyb -DWORD_BITS=%target-ptrsize %s -o %t/out.swift
+// RUN: %line-directive %t/out.swift -- %target-build-swift %t/out.swift -o %t/a.out -Onone -g
+// RUN: %line-directive %t/out.swift -- %target-run %t/a.out
+// REQUIRES: executable_test
+
+%{
+  import gyb
+}%
+import SwiftShims
+
+//===--- String -----------------------------------------------------------===//
+public struct String {
+%{
+    allCases = [
+      ('utf16', '_UTF16StringStorage'),
+      ('latin1', '_Latin1StringStorage'),
+      ('cocoa', 'String.Content.NSStringPayload'),
+      ('inline5or6', 'String.Content.Inline5or6'),
+      ('inline7or16', 'String.Content.Inline7or16'),
+    ]
+
+    def switch_(onEnum, stmt):
+      return '\n'.join(
+        ['switch %s {' % onEnum]
+        + ['case .%s(let x): %s' % (tag, stmt)
+            for tag,_ in allCases
+          ]
+          + ['}'])
+
+    def switch(stmt):
+      return switch_('_rep', stmt)
+    def switchContent(stmt): 
+      return switch_('content._rep', stmt)
+}%
+  
+  public struct Content {
+    public // @testable
+    enum Representation {
+      % for tag, Payload in allCases:
+    case ${tag}(${Payload})
+      % end
+    }
+    public // @testable
+    init(_ representation: Representation) {
+      self._rep = representation
+    }
+    public // @testable
+    var _rep: Representation
+  }
+  public var content: Content
+}
+
+extension String : Unicode, BidirectionalCollectionWrapper {
+  public typealias Base = Content.CharacterView
+  public typealias Iterator = Base.Iterator  
+  public typealias Index = AnyUnicodeIndex
+  public typealias IndexDistance = Int
+  public typealias SubSequence = Substring
+  
+  // @available(swift, introduced: 4)
+  public subscript(bounds: Range<Index>) -> Substring {
+    get {
+      return Substring(
+        content: Substring.Content(wholeContent: self.content, bounds: bounds))
+    }
+    set {
+      replaceSubrange(bounds, with: newValue)
+    }
+  }
+
+  public mutating func _tryToReplaceSubrange<C: Collection>(
+    _ target: Range<Index>, with replacement: C
+  ) -> Bool
+  where C.Iterator.Element == Character {
+    // Doing this rather than switching will try to preserve value semantics
+    // even if a case is a reference type.
+    return content.characters._tryToReplaceSubrange(target, with: replacement)
+  }
+
+  public var base: Base {
+    get { return content.characters }
+    set { content.characters = newValue }
+  }
+}
+
+extension String : RangeReplaceableCollection {
+  
+  public init() { content = Content() }
+  
+  public mutating func replaceSubrange<C: Collection>(
+    _ target: Range<Index>, with replacement: C
+  ) where C.Iterator.Element == Character {
+    content.replaceSubrange(target, with: replacement)
+  }
+}
+
+
+/// Case accessors
+extension String.Content {
+  % for tag, Payload in allCases:
+  /// Either the payload of `case .${tag}`, or `nil` if that is not the current
+  /// case.
+  ///
+  /// - Note: setting this property to nil clears the `String`
+  public // @testable
+  var _${tag}: ${Payload}? {
+    get {
+      if case .${tag}(let x) = _rep { return x }
+      return nil
+    }
+    set {
+      if let v = newValue { _rep = .${tag}(v) }
+      else if _${tag} != nil { self = String.Content() }
+    }
+  }
+  % end
+}
+
+//===--- Inline5or6/Inline7or16 --------------------------------------------===//
+extension String.Content {
+  static let packingTable: StaticString
+  = "eilotrm.apdnsIc ufkMShjTRxgC4013bDNvwyUL2O856P-B79AFKEWV_zGJ/HYX"
+
+  public typealias Packed = PackedUnsignedIntegers<UInt60, UInt16>
+
+  // An "exploded" or unpacked structure of UTF16 code units
+  public struct ExplodedUTF16CodeUnits {
+    typealias _Self = ExplodedUTF16CodeUnits
+    // TODO: could be smaller. e.g. 5or6 could just expode to UInt8.
+    public typealias Base = _BoundedCapacity<_FixedArray16<UInt16>>
+    public var base: Base
+
+    public init(_ inlineStr: String.Content.Inline5or6) {
+      // TODO: try skipping the packing struct directly...
+      let source = String.Content.Packed(
+        representation: numericCast(inlineStr.bits & (~(0 as UInt61) >> 1)),
+        bitsPerElement: numericCast(inlineStr.bitsPerElement)
+      )
+      var storage = Base()
+      String.Content.packingTable.withUTF8Buffer { table in
+        for cu in source {
+          storage.append(UInt16(table[Int(cu)]))
+        }
+      }
+      self.base = storage
+    }
+    public init(_ inlineStr: String.Content.Inline7or16) {
+      // TODO: try skipping the packing struct directly...
+      let source = String.Content.Packed(
+        representation: numericCast(inlineStr.bits & (~(0 as UInt61) >> 1)),
+        bitsPerElement: numericCast(inlineStr.bitsPerElement)
+      )
+      let mask = UInt16(
+        truncatingBitPattern: ~0 << UInt32(inlineStr.bitsPerElement))
+      var storage = Base()
+      for cu in source {
+        storage.append((cu &+ 32) & ~mask)
+      }
+
+      self.base = Base(storage)
+    }
+  }
+}
+
+extension String.Content.ExplodedUTF16CodeUnits 
+: BidirectionalCollectionWrapper, RandomAccessCollection {
+  public typealias Index = Base.Index
+  public typealias IndexDistance = Base.IndexDistance
+  public typealias Iterator = Base.Iterator
+  ${gyb.expand(
+      'ForwardCollectionAPIs.swift.gyb',
+      base='base',
+      nonmutating=True,
+      Element='UInt16')}
+}
+
+extension String.Content {
+  static func _pack<Source: Collection>(
+    utf16 source: Source, bitsPerElement: UInt16
+  ) -> Packed?
+  where Source.Iterator.Element == UTF16.CodeUnit {
+    return Packed(
+      bitsPerElement < 7 ?
+      String.Content.packingTable.withUTF8Buffer { table in
+        source.lazy.map { (x: UInt16) -> UInt16 in 
+          numericCast(table.lazy.map { UInt16($0) }.index(of: x) ?? 0xFF)
+        }
+      }:
+      source.lazy.map { 
+        [ mask = UInt16(truncatingBitPattern: ~0 << UInt32(bitsPerElement)) ]
+        (x: UInt16) -> UInt16 in (x & mask) | (x &- 32) & ~mask
+      },
+      bitsPerElement: numericCast(bitsPerElement)
+    )
+  }
+}
+  
+% for (N,W) in (5,6), (7,16):
+extension String.Content {
+  public // @testable
+  struct Inline${N}or${W} {
+    let bits: UInt61
+  }
+}
+% end
+
+// Faster, more tailored operations for specific forms
+extension String.Content.Inline5or6 {
+  public var fccNormalizedUTF16: UTF16View {
+    _sanityCheck(bitsPerElement <= 8, "5or6 can't encode UTF16")
+
+    // Already pre-normal. Just return the exploded code units
+    return utf16
+  }
+}
+extension String.Content.Inline7or16 {
+  public var fccNormalizedUTF16: FCCNormalizedSegment {
+    let utf16CUs = self._utf16
+    let buffer = UTF16CodeUnitBuffer(utf16CUs)
+
+    // Latin1 already pre-normal
+    if (bitsPerElement <= 8) {
+      return FCCNormalizedSegment(
+        buffer,
+        nativeStart: utf16CUs.startIndex,
+        nativeEnd: utf16CUs.endIndex)
+    }
+
+    // UTF16 needs to be normalized
+    return FCCNormalizedSegment(
+      normalizing: buffer,
+      nativeStart: utf16CUs.startIndex,
+      nativeEnd: utf16CUs.endIndex
+    )
+  }
+}
+
+% for (N,W) in (5,6), (7,16):
+extension String.Content.Inline${N}or${W} {
+  public init?<Source: Collection>(utf16 source: Source)
+  where Source.Iterator.Element == UTF16.CodeUnit {
+    if let c = String.Content._pack(utf16: source, bitsPerElement: ${W}) {
+      bits = numericCast(c.representation) | (1 as UInt61) << 60
+    }
+    else if let c = String.Content._pack(utf16: source, bitsPerElement: ${N}) {
+      bits = numericCast(c.representation) 
+    }
+    else { return nil }
+  }
+
+  public var bitsPerElement: Int { return bits >> 60 == 0 ? ${N} : ${W} }
+}
+
+extension String.Content.Inline${N}or${W} : AnyUnicodeContent {
+  // FIXME: implement as many of these as possible
+  // public var isKnownLatin1: Bool { false }
+  public var isKnownASCII: Bool { return bitsPerElement <= 7 }
+  // var isKnownFCCNormalized: Bool { get }
+  // var isKnownFCDForm: Bool { get }
+  // var isKnownNFDNormalized: Bool { get }
+  // var isKnownNFCNormalized: Bool { get }
+  // func isLatin1() -> Bool
+  // func isASCII() -> Bool
+}
+
+extension String.Content.Inline${N}or${W} : UnicodeContent {
+  // public typealias _UTF16View = LazyMapRandomAccessCollection<
+  //   String.Content.Packed, UTF16.CodeUnit
+  // >
+
+  // TODO: We could have a smaller size for 5or6 and 7or16.
+  public typealias _UTF16View = String.Content.ExplodedUTF16CodeUnits
+  public typealias UTF16View = RandomAccessUnicodeView<_UTF16View>
+  
+  public var _utf16: _UTF16View {
+    return _UTF16View(self)
+  }
+  // public var utf16: RandomAccessUnicodeView<UTF16View> {
+  public var utf16: UTF16View {
+    return RandomAccessUnicodeView(_utf16)
+  }
+  
+  public var utf8: AnyUInt8UnicodeView {
+    return bitsPerElement < 8
+    ? AnyUInt8UnicodeView(
+      RandomAccessUnicodeView(
+        _utf16.lazy.map {
+          UInt8(truncatingBitPattern: $0) }))
+    : AnyUInt8UnicodeView(
+        _UnicodeViews(_utf16, UTF16.self).transcoded(to: UTF8.self))
+  }
+  
+  public var characters: AnyCharacterUnicodeView {
+    // Check if we can use the fast view, which hard-codes special cases so long
+    // as grapheme-breaking is relatively simple.
+    if _fastPath(
+      bitsPerElement <= 8 || !_utf16.contains(where: { $0 >= 0x300 }))
+    {
+      return AnyCharacterUnicodeView(
+        _UnicodeViews(_utf16, UTF16.self).latin1CharacterView)
+    }
+
+    return AnyCharacterUnicodeView(
+      _UnicodeViews(_utf16, UTF16.self).characters)
+  }
+  
+  public var unicodeScalars: AnyUnicodeScalarUnicodeView {
+    if bitsPerElement <= 8 || !_utf16.contains(where: { $0 >= 0xD800 }) {
+      return AnyUnicodeScalarUnicodeView(
+      RandomAccessUnicodeView(
+        _utf16.lazy.map {
+            // FIXME: Use _unchecked: in stdlib
+            UnicodeScalar(UInt32($0))!
+          }))
+    }
+    return AnyUnicodeScalarUnicodeView(
+      _UnicodeViews(_utf16, UTF16.self).unicodeScalars)
+  }
+}
+
+% end
+
+
+//===--- NSStringPayload --------------------------------------------------===//
+extension String.Content {
+  public // @testable
+  struct NSStringPayload {
+    let _base: TrueReference<_NSStringCore>
+  }
+}
+
+extension String.Content.NSStringPayload {
+  public // @testable
+  init(_ o: TrueReference<_NSStringCore>) {
+    _base = o
+  }
+  
+  internal var object: _NSStringCore {
+    return _base.object
+  }
+}
+
+extension String.Content.NSStringPayload : AnyUnicodeContent {
+  // FIXME: implement as many of these as possible
+  // public var isKnownLatin1: Bool { false }
+  public var isKnownASCII: Bool { return object._fastCStringContents(0) != nil }
+  // var isKnownFCCNormalized: Bool { get }
+  // var isKnownFCDForm: Bool { get }
+  // var isKnownNFDNormalized: Bool { get }
+  // var isKnownNFCNormalized: Bool { get }
+  // func isLatin1() -> Bool
+  // func isASCII() -> Bool
+}
+
+extension String.Content.NSStringPayload : UnicodeContent {
+  internal var _utf16: _NSStringUTF16 {
+    return _NSStringUTF16(base: object)
+  }
+  
+  public var utf16: RandomAccessUnicodeView<_NSStringUTF16> {
+    return RandomAccessUnicodeView(_utf16)
+  }
+  
+  public var utf8: _TranscodedView<_NSStringUTF16, UTF16, UTF8> {
+    return _TranscodedView<_NSStringUTF16, UTF16, UTF8>(_utf16)
+  }
+  
+  public var fccNormalizedUTF16: AnyUInt16UnicodeView {
+    return AnyUInt16UnicodeView(
+      _UnicodeViews(_utf16, UTF16.self).fccNormalizedUTF16
+    )
+  }
+  
+  public var characters: AnyCharacterUnicodeView {
+    return AnyCharacterUnicodeView(_UnicodeViews(_utf16, UTF16.self).characters)
+  }
+  
+  public var unicodeScalars: AnyUnicodeScalarUnicodeView {
+    return AnyUnicodeScalarUnicodeView(
+      _UnicodeViews(_utf16, UTF16.self).unicodeScalars)
+  }
+}
+
+/// A wrapper around `_NSStringCore` that confers `RandomAccessCollection`
+/// conformance.
+public // @testable
+struct _NSStringUTF16 : RandomAccessCollection {
+  public var base: _NSStringCore
+  public var startIndex: Int { return 0 }
+  public var endIndex: Int { return base.length() }
+  public subscript(i: Int) -> UTF16.CodeUnit {
+    return base.characterAtIndex(i)
+  }
+  public func withExistingUnsafeBuffer<R>(
+    _ body: (UnsafeBufferPointer<UTF16.CodeUnit>) throws -> R
+  ) rethrows -> R? {
+    guard let baseAddress = base._fastCharacterContents() else { return nil }
+    defer { _fixLifetime(self) }
+    return try body(UnsafeBufferPointer(start: baseAddress, count: base.length()))
+  }
+}
+//===----------------------------------------------------------------------===//
+
+
+#if false
+
+// TODO: basics of a Swift 3 compatibility shim for Substring start here
+
+// This protocol exists to house lower-priority Swift 4 APIs that
+// we still want to make available with type context in Swift 3
+public protocol _Swift3StringCompatibility: Unicode { }
+
+extension _Swift3StringCompatibility
+where
+  Self: RangeReplaceableCollection,
+  Index == String.Index, 
+  SubSequence == Substring, 
+  Content == String.Content, 
+  Iterator.Element == SubSequence.Iterator.Element 
+{
+  @available(swift, obsoleted: 4)
+  public subscript(bounds: Range<String.Index>) -> Substring {
+    get {
+      return Substring(
+        content: Substring.Content(wholeContent: self.content, bounds: bounds))
+    }
+    set {
+      replaceSubrange(bounds, with: newValue)
+    }
+  }
+}
+
+extension String: _Swift3StringCompatibility { 
+  @available(swift, obsoleted: 4)
+  public subscript(bounds: Range<Index>) -> String {
+    get {
+      return String(Substring(
+        content: Substring.Content(wholeContent: self.content, bounds: bounds)))
+    }
+    set {
+      replaceSubrange(bounds, with: newValue)
+    }
+  }
+}
+
+#endif
+
+extension String.Content : UnicodeContent {
+  // Once we get ownership and view/slice mutation worked out, it's conceivable
+  // we could detect in-place mutation of these views and avoid copying,
+  // especially after an append.  In the meantime, this'll have to do.
+  
+  public func isLatin1() -> Bool { ${switch('return x.isLatin1()')} }
+  public func isASCII() -> Bool { ${switch('return x.isASCII()')} }
+  public var isKnownLatin1: Bool { ${switch('return x.isKnownLatin1')} }
+  public var isKnownASCII: Bool {  ${switch('return x.isKnownASCII')} }
+  public var isKnownFCCNormalized: Bool {
+    ${switch('return x.isKnownFCCNormalized')}
+  }
+  public var isKnownFCDForm: Bool { ${switch('return x.isKnownFCDForm')} }
+  public var isKnownNFDNormalized: Bool {
+    ${switch('return x.isKnownNFDNormalized')}
+  }
+  public var isKnownNFCNormalized: Bool {
+    ${switch('return x.isKnownNFCNormalized')}
+  }
+}
+
+struct _UInt8TruncatingBitPatternUTF16CodeUnit : _Function {
+  func apply(_ input: UTF16.CodeUnit) -> UInt8 {
+    return UInt8(truncatingBitPattern: input)
+  }
+}
+
+extension Collection where Iterator.Element == UTF16.CodeUnit {
+  internal func _isLatin1() -> Bool {
+    return !self.contains { $0 > 0xFF }
+  }
+  
+  internal var _low8Bits :
+  _MapCollection<Self, _UInt8TruncatingBitPatternUTF16CodeUnit>
+  {
+    return _MapCollection(self, through: _UInt8TruncatingBitPatternUTF16CodeUnit())
+  }
+}
+
+/// Bit packing
+///
+/// Packing a sequence of source integer values with a given limited bit width
+/// into a single representation integer.
+///
+/// * Lower-valued elements are assumed to be more common than higher-valued
+///   elements.  We want to optimize the representation for storing smaller
+///   numbers.
+///
+/// * Not doing anything fancy like huffman coding here; just direct bit
+///   manipulation.
+///
+/// * We divide the representation up into segments of `bitsPerElement` bits
+///   each, starting with the low bit, storing one source value per segment.
+///   That means we can't represent any elements with values wider than the bit
+///   width.
+///
+/// * In the general case, we have a partial segment in the high order bits.  
+///
+/// * We don't want to spend storage on representing a length.  A contiguous run
+///   of segments starting with the high order (partial) segment is considered
+///   to be empty space, containing no elements.  That means we can't represent
+///   any sequence whose last element would be represented as zero; it would be
+///   indistinguishable from a missing element.
+///
+/// * For each source element `e`, we store `(e + 1) & ~(~0 << bitsPerElement)`
+///   in its segment.  The result is that we cannot represent a source sequence 
+///   ending with the least-common value, and the most common values are
+///   still very likely to be representable in any partial segment.
+extension UnsignedInteger {
+  public init?<C: Collection>(packing source: C, bitsPerElement: Self)
+  where C.Iterator.Element : UnsignedInteger {
+    // print("Packing \(Array(source)) into \(bitsPerElement) bits per element")
+    var r: Self = 0
+    var lastSegment: Self = 1
+    var shift: Self = 0
+    let mask = ~(0 as Self) << bitsPerElement
+    for x in source {
+      let x1 = numericCast(x) as Self
+      if x1 & mask != 0 { return nil } // value too large to represent
+      let segment = (x1 &+ 1) & ~mask
+      r |= segment << shift
+      if r >> shift != segment { return nil } // not enough bits
+      lastSegment = segment
+      shift += bitsPerElement
+    }
+    if lastSegment == 0 {  return nil  }
+    self = r
+  }
+}
+
+/// Add the missing shift operators
+extension UnsignedInteger {
+  // HACK: divide the shift amount into two parts for more-resilient shifting.
+  // This will work for the bit packing code I'm currently working on but is not
+  // very general (doesn't handle shift amounts >= 2N where N is the number of
+  // bits).  Smart shifts from the new-integer-protocols work should solve this
+  // in a more principled way.
+  public static func <<(lhs: Self, rhs: Self) -> Self {
+    let r = rhs.toUIntMax()
+    return Self(
+      ((lhs.toUIntMax() << (r >> 1)) << ((r + 1) >> 1)) & (~(0 as Self)).toUIntMax())
+  }
+  public static func >>(lhs: Self, rhs: Self) -> Self {
+    let r = rhs.toUIntMax()
+    return Self(
+      ((lhs.toUIntMax() >> (r >> 1)) >> ((r + 1) >> 1)) & (~(0 as Self)).toUIntMax())
+  }
+}
+
+//===----------------------------------------------------------------------===//
+// WORKAROUND: https://bugs.swift.org/browse/SR-4370
+extension UnsignedInteger {
+  static func _packing<C: Collection>(_ source: C, bitsPerElement: Self) -> Self?
+  where C.Iterator.Element : UnsignedInteger {
+    return Self(packing: source, bitsPerElement: bitsPerElement)
+  }
+}
+extension UInt61 {
+  public init?<C: Collection>(packing source: C, bitsPerElement: UInt61)
+  where C.Iterator.Element : UnsignedInteger {
+    guard let me = UInt61._packing(source, bitsPerElement: bitsPerElement) else {
+      return nil
+    }
+    self = me
+  }
+}
+//===----------------------------------------------------------------------===//
+
+public struct PackedUnsignedIntegers<
+  Representation : UnsignedInteger, Element : UnsignedInteger
+> {
+  public init?<C: Collection>(
+    _ c: C,
+    bitsPerElement: Representation
+  )
+  where C.Iterator.Element : UnsignedInteger
+  {
+    guard let representation = Representation(
+      packing: c, bitsPerElement: bitsPerElement) else { return nil }
+    self.representation = representation
+    self.bitsPerElement = bitsPerElement
+  }
+
+  public init(representation: Representation, bitsPerElement: Representation) {
+    self.representation = representation
+    self.bitsPerElement = bitsPerElement
+  }
+  
+  public let bitsPerElement: Representation
+  public let representation: Representation
+}
+
+extension PackedUnsignedIntegers : Sequence {
+  public struct Iterator : IteratorProtocol {
+    public var bits: Representation
+    public let shift: Representation
+
+    @inline(__always)
+    public mutating func next() -> Element? {
+      if (bits == 0) {
+        return nil
+      }
+
+      // Zero means empty, so we bias every element by 1
+      let bias: Representation = 1
+      let mask = (1 << shift) &- 1
+
+      let result = mask & (bits &- bias)
+      bits = bits >> shift
+      return numericCast(result)
+    }
+
+    public init(bits: Representation, shift: Representation) {
+      self.bits = bits
+      self.shift = shift
+    }
+  }
+
+  @inline(__always)
+  public func makeIterator() -> Iterator {
+    return Iterator(
+      bits: numericCast(representation),
+      shift: numericCast(bitsPerElement)
+    )
+  }
+
+}
+
+extension PackedUnsignedIntegers : RandomAccessCollection {
+  public var startIndex: Int { return 0 }
+  public var endIndex: Int { return count }
+  
+  public var count: Int {
+    let significantBits: UInt = (
+      64 - _countLeadingZeros(
+        IntMax(bitPattern: representation.toUIntMax())))^
+    
+    let n = significantBits &+ numericCast(bitsPerElement) &- 1
+    // NOTE: this will bbe division by a small constant factor, which is
+    // implemented with multiplication and shifts
+    let r = Int(bitPattern:n / bitsPerElement^)
+    return r
+  }
+  
+  public subscript(i: Int) -> Element {
+    let bitsPerElement_ = bitsPerElement.toUIntMax()
+    let mask = ~(~0 << bitsPerElement_)
+    let representation_ = representation.toUIntMax()
+    let i_ = UInt(bitPattern: i).toUIntMax()
+    let r = (representation_ >> (bitsPerElement_ &* i_) &- 1) & mask
+    return numericCast(r)
+  }
+}
+
+extension String.Content {
+  public init() { _rep = .utf16(._emptyInstance()) }
+
+  public init(_ ns: _NSStringCore) {
+    if let nonTagged = TrueReference(ns) {
+      _rep = .cocoa(NSStringPayload(nonTagged))
+    }
+    else {
+      self = String.Content(utf16: _NSStringUTF16(base: ns))
+    }
+  }
+  
+  public init<C: Collection>(utf16 source: C)
+  where C.Iterator.Element == UTF16.CodeUnit {
+    if source.isEmpty {
+      self.init()
+    }
+    else if let x = Inline7or16(utf16: source) {
+      self.init(.inline7or16(x))
+    }
+    else if let x = Inline5or6(utf16: source) {
+      self.init(.inline5or6(x))
+    }
+    else if source.max().unsafelyUnwrapped <= 0xff {
+      self.init(
+        .latin1(
+          _Latin1StringStorage(
+            source.lazy.map { UInt8(truncatingBitPattern: $0) })))
+    }
+    else {
+      self.init(.utf16(_UTF16StringStorage(source)))
+    }
+  }
+  
+  internal var _storageID: ObjectIdentifier? {
+    switch _rep {
+    case .utf16(let storage):
+      return ObjectIdentifier(storage)
+    case .latin1(let storage):
+      return ObjectIdentifier(storage)
+    case .cocoa(let storage):
+      // FIXME: don't we want to return nil in the cocoa case, since this is
+      // merely used for uniqueness checking and NSString is immutable?
+      return ObjectIdentifier(storage.object)
+    case .inline5or6, .inline7or16:
+      return nil
+    }
+  }
+
+  public mutating func replaceSubrange<C: Collection>(
+    _ target: Range<String.Index>, with replacement: C
+  ) where C.Iterator.Element == Character {
+    // Fastest path: the rhs is already a string
+    if let s = replacement as? String {
+      replaceUTF16(target, with: s.content.utf16)
+    }
+    // Fast path: the incoming characters are Unicode
+    else if let unicodeReplacement = replacement as? AnyUnicode {
+      replaceUTF16(target, with: unicodeReplacement.anyContent.anyUTF16)
+    }
+    else {
+      // Slow path: we have to reconstruct UTF-16 from Characters
+      replaceUTF16(target, with: replacement.lazy.flatMap { $0.utf16 })
+    }
+  }
+
+  /// Replaces the `target` subrange with the given UTF-16 encoded content.
+  internal mutating func replaceUTF16<C: Collection>(
+    _ target: Range<String.Index>, with replacement_: C
+  )  
+  where C.Iterator.Element == UTF16.CodeUnit {
+    // Pre-count replacement, once.
+    let replacement = Counted(replacement_)
+
+    // Try to do in-place replacement
+    if _fastPath(replaceUTF16InPlace(target, with: replacement)) {
+      return
+    }
+    // Otherwise, we need to allocate new storage
+    
+    let head = utf16[..<target.lowerBound]
+    let tail = utf16[target.upperBound...]
+
+    let oldCapacity: UTF16View.IndexDistance
+      = numericCast(_latin1?.capacity ?? _utf16?.capacity ?? 0)
+    
+    let savedCount = head.count + tail.count
+    let newCount = savedCount + numericCast(replacement.count)
+    let minimumCapacity = newCount > oldCapacity ? oldCapacity * 2 : 0
+
+    // See if we can use 8-bit code units
+    if replacement._isLatin1() && (
+      isKnownLatin1 || head._isLatin1() && tail._isLatin1()
+    ) {
+      // FIXME: check to see if we can use the inline5or6 representation.
+      let s = _Latin1StringStorage(
+        joining: head._low8Bits, replacement._low8Bits, tail._low8Bits,
+        minimumCapacity: numericCast(minimumCapacity)
+      )
+      s.isKnownASCII = !s.contains { $0 > 0x7f }
+      _latin1 = s
+    }
+    else {
+      // FIXME: check to see if we can use the inline7or16 representation.
+      _utf16 = _UTF16StringStorage(
+        joining: head, replacement, tail,
+        minimumCapacity: numericCast(minimumCapacity)
+      )
+    }
+  }
+  
+  internal var isMutable: Bool {
+    mutating get {
+      defer { _fixLifetime(self) }
+      return _storageID?._liveObjectIsUniquelyReferenced() ?? true
+    }
+  }
+  
+  internal mutating func replaceUTF16InPlace<C>(
+    _ target: Range<String.Index>, with replacement: Counted<C>
+  ) -> Bool 
+  where C.Iterator.Element == UTF16.CodeUnit {
+    if !isMutable { return false }
+
+    let t: Range<Int> = target.lowerBound.encodedOffset
+      ..< target.upperBound.encodedOffset
+
+    switch _rep {
+    case .utf16(let storage):
+      return storage._tryToReplaceSubrange(t, with: replacement)
+    case .latin1(let storage):
+      if replacement.contains(where: { $0 > 0xFF }) { return false }
+      return storage._tryToReplaceSubrange(
+        t, with: replacement.lazy.map { UInt8(truncatingBitPattern: $0) })
+    case .cocoa, .inline5or6, .inline7or16:
+      return false
+    }
+  }
+}
+
+//===--- Substring --------------------------------------------------------===//
+
+public struct Substring {
+  public init(_ other: Substring) { self = other }
+  public init(content: Content) { self.content = content }
+  
+  public struct Content {
+    // FIXME: small string optimization
+    public var _wholeContent: String.Content
+    // FIXME: Change this to a range of encodedOffset
+    public var _bounds: Range<String.Index>
+
+    public // @testable
+    init() {
+      _wholeContent = String.Content()
+      _bounds = _wholeContent.utf16.startIndex..<_wholeContent.utf16.endIndex
+    }
+
+    public // @testable
+    init(wholeContent: String.Content, bounds: Range<String.Index>) {
+      self._wholeContent = wholeContent
+      self._bounds = bounds
+    }
+  }
+  public var content: Content
+}    
+
+
+extension Substring : BidirectionalCollectionWrapper, Unicode {
+  public typealias Base = Content.CharacterView
+  public typealias Iterator = Base.Iterator  
+  public typealias Index = Base.Index
+  public typealias IndexDistance = Base.IndexDistance
+  public typealias SubSequence = Substring
+
+  public subscript(bounds: Range<Index>) -> SubSequence {
+    get {
+      return SubSequence(
+        content: Content(wholeContent: content._wholeContent, bounds: bounds))
+    }
+    set {
+      content._wholeContent.replaceUTF16(bounds, with: newValue.content.utf16)
+    }
+  }
+
+  public mutating func _tryToReplaceSubrange<C: Collection>(
+    _ target: Range<Index>, with replacement: C
+  ) -> Bool
+  where C.Iterator.Element == Character {
+    // Doing this rather than switching will try to preserve value semantics
+    // even if a case is a reference type.
+    return content.characters._tryToReplaceSubrange(target, with: replacement)
+  }
+}
+
+extension Substring : RangeReplaceableCollection {
+  public init() { content = Content() }
+
+  public mutating func replaceSubrange<C: Collection>(
+    _ r: Range<Index>, with replacement: C
+  )
+  where C.Iterator.Element == Character {
+    content._wholeContent.replaceSubrange(r,  with: replacement)
+  }
+}
+
+
+extension Substring.Content : AnyUnicodeContent {
+  public var isKnownLatin1: Bool { return _wholeContent.isKnownLatin1 }
+  public var isKnownASCII: Bool { return _wholeContent.isKnownASCII }
+  public var isKnownFCCNormalized: Bool {
+    return _wholeContent.isKnownFCCNormalized
+  }
+  public var isKnownFCDForm: Bool { return _wholeContent.isKnownFCDForm }
+  public var isKnownNFDNormalized: Bool {
+    return _wholeContent.isKnownNFDNormalized
+  }
+  public var isKnownNFCNormalized: Bool {
+    return _wholeContent.isKnownNFCNormalized
+  }
+}
+  
+extension Substring.Content : UnicodeContent {
+  public var utf16: String.Content.UTF16View.SubSequence {
+    get {
+      return _wholeContent.utf16[_bounds]
+    }
+    set {
+      _wholeContent.utf16.replaceSubrange(_bounds, with: newValue)
+    }
+  }
+  public var utf8: String.Content.UTF8View.SubSequence {
+    get {
+      return _wholeContent.utf8[_bounds]
+    }
+    set {
+      _wholeContent.utf8.replaceSubrange(_bounds, with: newValue)
+    }
+  }
+  public var fccNormalizedUTF16: String.Content.FCCNormalizedUTF16View.SubSequence {
+    get {
+      return _wholeContent.fccNormalizedUTF16[_bounds]
+    }
+    set {
+      _wholeContent.fccNormalizedUTF16.replaceSubrange(_bounds, with: newValue)
+    }
+  }
+  public var characters: String.Content.CharacterView.SubSequence {
+    get {
+      return _wholeContent.characters[_bounds]
+    }
+    set {
+      _wholeContent.characters.replaceSubrange(_bounds, with: newValue)
+    }
+  }
+  public var unicodeScalars: String.Content.UnicodeScalarView.SubSequence {
+    get {
+      return _wholeContent.unicodeScalars[_bounds]
+    }
+    set {
+      _wholeContent.unicodeScalars.replaceSubrange(_bounds, with: newValue)
+    }
+  }
+}
+
+//===--- Literal Support --------------------------------------------------===//
+
+extension String : ExpressibleByUnicodeScalarLiteral {
+  /// Creates an instance initialized to the given Unicode scalar value.
+  ///
+  /// Do not call this initializer directly. It may be used by the compiler when
+  /// you initialize a string using a string literal that contains a single
+  /// Unicode scalar value.
+  public init(unicodeScalarLiteral value: UnicodeScalar) {
+    content = Content(utf16: value.utf16)
+  }
+}
+
+extension String : ExpressibleByExtendedGraphemeClusterLiteral {
+  /// Creates an instance initialized to the given extended grapheme cluster
+  /// literal.
+  ///
+  /// Do not call this initializer directly. It may be used by the compiler when
+  /// you initialize a string using a string literal containing a single
+  /// extended grapheme cluster.
+  public init(extendedGraphemeClusterLiteral value: Character) {
+    content = Content(utf16: value.utf16)
+  }
+}
+
+extension String : ExpressibleByStringLiteral {
+  public init(stringLiteral value: StaticString) {
+    content = value.withUTF8Buffer {
+      Content(
+        utf16: _UnicodeViews($0, ValidUTF8.self).transcoded(to: UTF16.self))
+    }
+  }
+}
+
+//===--- CustomStringConvertible/CustomDebugStringConvertible -------------===//
+extension String : CustomStringConvertible {
+  // TODO: once this replaces Swift.String this needs to revert
+  // back to the trivial implementation of returning self
+  public var description: String {
+    return self
+  }
+}
+
+extension String : CustomDebugStringConvertible {
+  public var debugDescription: String {
+    var result = "\""
+    for us in self.content.unicodeScalars {
+      result += us.escaped(asASCII: false)
+    }
+    result += "\""
+    return result
+  }
+}
+
+// Substring too
+extension Substring : CustomStringConvertible {
+  // TODO: once this replaces Swift.String this needs to revert
+  // back to the trivial implementation of returning self
+  public var description: String {
+    return String(self).description
+  }
+}
+
+extension Substring : CustomDebugStringConvertible {
+  public var debugDescription: String {
+    return String(self).debugDescription
+  }
+}
+
+//===--- Comparable/Hashable ----------------------------------------------===//
+extension String : Comparable {
+  public static func < (lhs: String, rhs: String) -> Bool {
+    // return lhs.content.fccNormalizedUTF16.lexicographicallyPrecedes(
+    //   rhs.content.fccNormalizedUTF16
+    switch lhs.content._rep {
+  % for outerTag,_ in allCases:
+    case .${outerTag}(let outerContent):
+      switch rhs.content._rep {
+    % for innerTag,_ in allCases:
+      case .${innerTag}(let innerContent):
+        return outerContent.fccNormalizedUTF16.lexicographicallyPrecedes(
+          innerContent.fccNormalizedUTF16)
+    % end
+      }
+  % end
+    }
+  }
+  public static func == (lhs: String, rhs: String) -> Bool {
+    // Faster equality for same-representation
+    switch (lhs.content._rep, rhs.content._rep) {
+    case (.inline5or6(let lhs), .inline5or6(let rhs)):
+      if lhs.bitsPerElement == rhs.bitsPerElement {
+        // Bit compare packed representation
+        return lhs.bits == rhs.bits
+      } else {
+        // Compare exploded code units
+        //
+        // TODO: Can use UInt8 exploded code units
+        //
+        // TODO: Segment should implement a memcmp-like comparison conformance
+        return lhs._utf16.base._base.elementsEqual(rhs._utf16.base._base)
+      }
+    case (.inline7or16(let lhs), .inline7or16(let rhs)):
+      if lhs.bitsPerElement == 7 && rhs.bitsPerElement == 7 {
+        // Bit compare packed representation
+        return lhs.bits == rhs.bits
+      } else {
+        // Compare normalized exploded code units
+        //
+        // TODO: Might be able to avoid the bounded checks through a large
+        // enough static size. Worth a research project to confirm.
+        //
+        // TODO: Segment should implement a memcmp-like comparison conformance
+        return lhs.fccNormalizedUTF16.elementsEqual(rhs.fccNormalizedUTF16)
+      }
+    case (.latin1(let lhs), .latin1(let rhs)):
+      // TODO: more like memcmp
+      return lhs.codeUnits.elementsEqual(rhs.codeUnits)
+
+    // Faster same-type comparisons.
+    //
+    // TODO: Bake in more fast paths here, or in the normalization?
+    case (.utf16(let lhs), .utf16(let rhs)):
+      // TODO: == probably quicker than elementsEqual, at least after more
+      // tweaking.
+      return lhs.fccNormalizedUTF16.elementsEqual(rhs.fccNormalizedUTF16)
+    case (.cocoa(let lhs), .cocoa(let rhs)):
+      // TODO: == probably quicker than elementsEqual, at least after more
+      // tweaking.
+      return lhs.fccNormalizedUTF16.elementsEqual(rhs.fccNormalizedUTF16)
+
+    // Separate representation checks:
+  % for lhsTag,_ in allCases:
+  % for rhsTag,_ in allCases:
+  % if lhsTag != rhsTag:
+    case (.${lhsTag}(let lhs),.${rhsTag}(let rhs)):
+      return lhs.fccNormalizedUTF16.elementsEqual(
+        rhs.fccNormalizedUTF16)
+  % end
+  % end
+  % end
+    }
+  }
+}
+
+extension String : Hashable {
+  public var hashValue : Int {
+    var hasher = _SipHash13Context(key: _Hashing.secretKey)
+
+    // for x in content.fccNormalizedUTF16 { hasher.append(x) }
+    switch content._rep {
+  % for tag,_ in allCases:
+    case .${tag}(let content): for x in content.fccNormalizedUTF16 { hasher.append(x) }
+  % end
+    }
+
+    let resultBits = hasher.finalizeAndReturnHash()
+#if arch(i386) || arch(arm)
+    return Int(truncatingBitPattern: resultBits)
+#elseif arch(x86_64) || arch(arm64) || arch(powerpc64) || arch(powerpc64le) || arch(s390x)
+    return Int(Int64(bitPattern: resultBits))
+#endif
+  }
+}
+
+// SubString too:
+extension Substring : Comparable {
+  public static func < (lhs: Substring, rhs: Substring) -> Bool {
+    return lhs.content.fccNormalizedUTF16.lexicographicallyPrecedes(
+      rhs.content.fccNormalizedUTF16
+    )
+  }
+  public static func == (lhs: Substring, rhs: Substring) -> Bool {
+    return lhs.content.fccNormalizedUTF16.elementsEqual(
+      rhs.content.fccNormalizedUTF16
+    )
+  }
+}
+
+extension Substring : Hashable {
+  public var hashValue : Int {
+    var hasher = _SipHash13Context(key: _Hashing.secretKey)
+    for x in content.fccNormalizedUTF16 { hasher.append(x) }
+    let resultBits = hasher.finalizeAndReturnHash()
+#if arch(i386) || arch(arm)
+    return Int(truncatingBitPattern: resultBits)
+#elseif arch(x86_64) || arch(arm64) || arch(powerpc64) || arch(powerpc64le) || arch(s390x)
+    return Int(Int64(bitPattern: resultBits))
+#endif
+  }
+}
+
+
+//===--- CString Interop --------------------------------------------------===//
+extension String {
+  /// Constructs a `String` having the same contents as `nulTerminatedUTF8`.
+  ///
+  /// - Parameter nulTerminatedUTF8: a sequence of contiguous UTF-8 encoded 
+  ///   bytes ending just before the first zero byte (NUL character).
+  public init(cString nulTerminatedUTF8: UnsafePointer<CChar>) {
+    // FIXME: is UTF8 the right default way to interpret a C string?  Cocoa
+    // makes use of a "system encoding" that might be relevant.
+    
+    let count = UTF8._nullCodeUnitOffset(in: nulTerminatedUTF8)
+    content = nulTerminatedUTF8.withMemoryRebound(
+      to: UTF8.CodeUnit.self, capacity: count
+    ) {
+      Content(
+        utf16: _UnicodeViews(
+          UnsafeBufferPointer(start: $0, count: count),
+          UTF8.self).transcoded(to: UTF16.self))
+    }
+  }
+  
+  /// Constructs a `String` having the same contents as `nulTerminatedCodeUnits`.
+  ///
+  /// - Parameter nulTerminatedCodeUnits: a sequence of contiguous code units in
+  ///   the given `encoding`, ending just before the first zero code unit.
+  /// - Parameter encoding: describes the encoding in which the code units
+  ///   should be interpreted.
+  public init<Encoding: UnicodeEncoding>(
+    cString nulTerminatedCodeUnits:
+    UnsafePointer<Encoding.EncodedScalar.Iterator.Element>,
+    encoding: Encoding.Type
+  )
+  where Encoding.EncodedScalar.Iterator.Element : UnsignedInteger {
+    let count = Encoding._nullCodeUnitOffset(in: nulTerminatedCodeUnits)
+    let source = UnsafeBufferPointer(
+      start: nulTerminatedCodeUnits, count: count)
+    content = Content(
+      utf16: _UnicodeViews(source, Encoding.self).transcoded(to: UTF16.self))
+  }
+ 
+  /// Invokes the given closure on the contents of the string, represented as a
+  /// pointer to a null-terminated sequence of UTF-8 code units.
+  public func withCString<Result>(
+    _ body: (UnsafePointer<CChar>) throws -> Result) rethrows -> Result {
+    /*
+    // FIXME: add support for writing zero into the end of existing latin-1
+    // storage.
+    if let l = content._latin1, l.isASCII() {
+      return l.withExistingUnsafeBuffer(body)!
+    }
+    */
+    // FIXME: add a utf8 view to UnicodeContent so this can be faster in many
+    // cases.
+    var result = ContiguousArray<CChar>()
+    let source = Counted(content.utf8)
+    result.reserveCapacity(numericCast(source.count + 1))
+    result.append(contentsOf: source.lazy.map(Int8.init(bitPattern:)))
+    result.append(0)
+    return try result.withUnsafeBufferPointer {
+      try body($0.baseAddress!)
+    }
+  }
+}
+
+//===--- StringCore -------------------------------------------------------===//
+extension String {
+  // FIXME: this is a kludgy method, but then again, we want to wean everything
+  // off of it...
+  public var _core: _StringCore {
+    get {
+      let utf16CUs = self.content.utf16
+      let _cocoaString = _UTF16StringStorage(utf16CUs)
+      return _StringCore(
+        baseAddress: nil,
+        count: numericCast(_cocoaString.count),
+        elementShift: 1, //isUTF16 ? 1 : 0,
+        hasCocoaBuffer: true,
+        owner: _cocoaString)
+    }
+    set {
+      self = String(content: String.Content(utf16: newValue))
+    }
+  }
+  public init(_ _core: _StringCore) {
+    self.init()
+    self._core = _core
+  }
+}
+
+//===--- Objective C Bridging ---------------------------------------------===//
+// import Foundation
+extension String {// : _ObjectiveCBridgeable {
+  internal static func _withSmallUTF16<R, C: Collection>(
+    _ c: C,
+    body: (UnsafeBufferPointer<UTF16.CodeUnit>) throws->R
+  ) rethrows -> R
+  where C.Iterator.Element == UTF16.CodeUnit
+  {
+    let z: UTF16.CodeUnit = 0
+    var buffer = (z,z,z,z,z,z,z,z,z,z,z,z)
+    let capacity = MemoryLayout.size(ofValue: buffer)
+      / MemoryLayout.size(ofValue: buffer.0)
+    return try withUnsafeMutablePointer(to: &buffer) { 
+      try $0.withMemoryRebound(to: UTF16.CodeUnit.self, capacity: capacity) { p in
+        var (tail, count) = c._copyContents(
+          initializing: UnsafeMutableBufferPointer(start: p, count: capacity))
+        _debugPrecondition(tail.next() == nil)
+        return try body(UnsafeBufferPointer(start: p, count: count))
+      }
+    }
+  }
+  
+  @inline(never) @_semantics("stdlib_binary_only") // Hide the CF dependency
+  public func _bridgeToObjectiveCImpl() -> AnyObject {
+    switch content._rep {
+    case .latin1(let x): return x
+    case .utf16(let x): return x
+    case .cocoa(let x): return x.object
+    case .inline5or6(let x):
+      return String._withSmallUTF16(x.utf16) {
+        _stdlib_binary_CFStringCreateWithCharacters($0.baseAddress!, $0.count)
+      }
+    case .inline7or16(let x):
+      return String._withSmallUTF16(x.utf16) {
+        _stdlib_binary_CFStringCreateWithCharacters($0.baseAddress!, $0.count)
+      }
+    }
+  }
+
+  public static func _bridgeFromObjectiveCImpl(
+    _ source: AnyObject?
+  ) -> String {
+    // `nil` has historically been used as a stand-in for an empty
+    // string; map it to an empty string.
+    if _slowPath(source == nil) { return String() }
+    return String(
+      content: String.Content(
+        unsafeBitCast(source!.copy(), to: _NSStringCore.self)))
+  }
+}
+
+//===--- New Views --------------------------------------------------------===//
+
+%{
+  allViews = [
+    ('UTF8View', 'utf8', 'UTF8.CodeUnit'),
+    ('UTF16View', 'utf16', 'UTF16.CodeUnit'),
+    ('FCCNormalizedUTF16View', 'fccNormalizedUTF16', 'UTF16.CodeUnit'),
+    ('CharacterView', 'characters', 'Character'),
+    ('UnicodeScalarView', 'unicodeScalars', 'UnicodeScalar')
+  ]  
+}%
+
+% for View, view, Element in allViews:
+extension String.Content {
+  public struct ${View} {
+    public var content: String.Content
+  }
+}
+
+extension String.Content.${View} : Sequence {
+  public struct Iterator : IteratorProtocol {
+    public enum _Representation {
+    % for tag, Payload in allCases:
+    case ${tag}(${Payload}.${View}.Iterator)
+    % end
+    }
+    public var _rep: _Representation
+
+    @inline(__always)
+    public init(_ content: String.Content) {
+      switch content._rep {
+    % for tag,_ in allCases:
+      case .${tag}(let x): _rep = .${tag}(x.${view}.makeIterator())
+    % end
+      }
+    }
+
+    @inline(__always)
+    public mutating func next() -> ${Element}? {
+      switch _rep {
+    % for tag,_ in allCases:
+      case .${tag}(let x):
+        var x1 = x
+        defer { _rep = .${tag}(x1) }
+        return x1.next()
+    % end
+      }
+    }
+  }
+
+  @inline(__always)
+  public func makeIterator() -> Iterator {
+    return Iterator(content)
+  }
+}
+
+extension String.Content.${View} : UnicodeView {
+  public typealias Index = AnyUnicodeIndex
+  public typealias IndexDistance = Int
+
+  public typealias SubSequence
+    = RangeReplaceableUnicodeViewSlice<String.Content.${View}>
+
+  public subscript(bounds: Range<Index>) -> SubSequence {
+    return SubSequence(base: self, bounds: bounds)
+  }
+
+  ${gyb.expand(
+      'ForwardCollectionAPIs.swift.gyb',
+      base='x.%s' % view,
+      forward=switchContent,
+      wrap_index='x.%s.anyIndex' % view,
+      unwrap_index='x.%s.nativeIndex' % view,
+      bounds_check_access=True,
+      nonmutating=True,
+      Element=Element)}
+  
+  public mutating func _tryToReplaceSubrange<C: Collection>(
+    _ target: Range<Index>, with replacement: C
+  ) -> Bool
+  where C.Iterator.Element == ${Element} {
+    // Doing this rather than switching will try to preserve value semantics
+    // even if a case is a reference type.
+    return content.${view}._tryToReplaceSubrange(target, with: replacement)
+  }
+}
+
+extension String.Content.${View} : RangeReplaceableCollection {
+  
+  public init() { content = String.Content() }
+  
+  public mutating func replaceSubrange<C: Collection>(
+    _ target: Range<Index>, with replacement: C
+  ) where C.Iterator.Element == ${Element} {
+    // Fast path: the incoming characters are Unicode
+    if let unicodeReplacement = replacement as? AnyUnicode {
+      content.replaceUTF16(target, with: unicodeReplacement.anyContent.anyUTF16)
+    }
+    else {
+      % if view == 'utf8':
+      // FIXME: we really need a way to make a transcoded view that only
+      // requires that its CodeUnits be a Collection.  Until then, copy into a
+      // temporary array.
+      let r = Array(replacement)
+      // Slow path: we have to transcode UTF8 to UTF16
+      content.replaceUTF16(
+        target, with:
+        _UnicodeViews(r, UTF8.self).transcoded(to: UTF16.self))
+      % elif view in ('utf16', 'fccNormalizedUTF16'):
+      content.replaceUTF16(target, with: replacement)
+      % elif view == 'unicodeScalars':
+      content.replaceUTF16(
+        target, with: replacement.lazy.flatMap { UTF16.EncodedScalar($0) })
+      % elif view == 'characters':
+      content.replaceUTF16(target, with: replacement.lazy.flatMap { $0.utf16 })
+      % else:
+      %   raise RuntimeError, 'UNHANDLED VIEW'
+      % end
+    }
+  }
+}
+
+extension String.Content {
+  public var ${view}: ${View} {
+    get {
+      return ${View}(content: self)
+    }
+    set {
+      // Probably not the most efficient implementation, but it should work.
+      replaceUTF16(utf16.startIndex..<utf16.endIndex, with: EmptyCollection())
+      let target = utf16.startIndex..<utf16.endIndex
+      % if view == 'utf8':
+      UTF8.parseForward(newValue) {
+        replaceUTF16(target, with: $0.utf16)
+      }
+      % elif view in ('utf16', 'fccNormalizedUTF16'):
+      replaceUTF16(target, with: newValue)
+      % elif view == 'unicodeScalars':
+      replaceUTF16(
+        target, with: newValue.lazy.flatMap { UTF16.EncodedScalar($0) })
+      % elif view == 'characters':
+      replaceUTF16(target, with: newValue.lazy.flatMap { $0.utf16 })
+      % else:
+      %   raise RuntimeError, 'UNHANDLED VIEW'
+      % end
+    }
+  }
+}
+
+extension String.Content.${View} : CustomStringConvertible, CustomDebugStringConvertible {
+  public var description: String {
+    return String(content: self.content)
+  }
+
+  public var debugDescription: String {
+    return "String.Content.${View}(\(self.description.debugDescription))"
+  }
+}
+
+// Reflection
+extension String.Content.${View} : CustomReflectable {
+  public var customMirror: Mirror {
+    return Mirror(self, unlabeledChildren: self)
+  }
+}
+
+extension String.Content.${View} : CustomPlaygroundQuickLookable {
+  public var customPlaygroundQuickLook: PlaygroundQuickLook {
+    return .text(description)
+  }
+}
+
+% end

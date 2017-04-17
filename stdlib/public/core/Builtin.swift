@@ -542,9 +542,27 @@ func _getSuperclass(_ t: Any.Type) -> AnyClass? {
 
 /// Returns `true` if `object` is uniquely referenced.
 @_versioned
-@_transparent
-internal func _isUnique<T>(_ object: inout T) -> Bool {
+@_transparent  // WARNING: do not remove this or uniqueness testing will break!
+internal       // WARNING: do not remove this or uniqueness testing will break!
+func _isUnique<T>(_ object: inout T) -> Bool {
   return Bool(Builtin.isUnique(&object))
+}
+
+extension ObjectIdentifier {
+  /// Returns true if the object identified by `self` is uniquely referenced.
+  ///
+  /// - Requires: the object identified by `self` exists.
+  /// - Note: will only work when called from a context
+  ///   where that object is "inout".
+  public // @testable
+  func _liveObjectIsUniquelyReferenced() -> Bool {
+    var me = self
+    return withUnsafeMutablePointer(to: &me) {
+      $0.withMemoryRebound(to: AnyObject.self, capacity: 1) {
+        _isUnique(&$0.pointee)
+      }
+    }    
+  }
 }
 
 /// Returns `true` if `object` is uniquely referenced or pinned.
@@ -854,3 +872,20 @@ public func _openExistential<ExistentialType, ContainedType, ResultType>(
   Builtin.unreachable()
 }
 
+@unsafe_no_objc_tagged_pointer
+@objc
+internal protocol _TrueReference {}
+
+/// A type that can hold non-tagged-pointer representations of T, which allows
+/// more bits to be packed in with the object (especially good for enum
+/// payloads). 
+public struct TrueReference<T: AnyObject> {
+  /// Construct from `x`, as long as it doesn't have a tagged pointer
+  /// representation.
+  public init?(_ x: T) {
+    if _isObjCTaggedPointer(x) { return nil }
+    _base = Builtin.castReference(x)
+  }
+  public var object : T { return Builtin.castReference(_base) }
+  internal let _base: _TrueReference
+}

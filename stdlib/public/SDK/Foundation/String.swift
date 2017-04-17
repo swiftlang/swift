@@ -32,31 +32,28 @@ extension String : _ObjectiveCBridgeable {
     // This method should not do anything extra except calling into the
     // implementation inside core.  (These two entry points should be
     // equivalent.)
-    return unsafeBitCast(_bridgeToObjectiveCImpl() as AnyObject, to: NSString.self)
+    return unsafeBitCast(_bridgeToObjectiveCImpl(), to: NSString.self)
   }
 
   public static func _forceBridgeFromObjectiveC(
     _ x: NSString,
     result: inout String?
   ) {
-    result = String(x)
+    result = _bridgeFromObjectiveCImpl(x)
   }
 
   public static func _conditionallyBridgeFromObjectiveC(
     _ x: NSString,
     result: inout String?
   ) -> Bool {
-    self._forceBridgeFromObjectiveC(x, result: &result)
-    return result != nil
+    result = self._bridgeFromObjectiveCImpl(x)
+    return true
   }
 
   public static func _unconditionallyBridgeFromObjectiveC(
     _ source: NSString?
   ) -> String {
-    // `nil` has historically been used as a stand-in for an empty
-    // string; map it to an empty string.
-    if _slowPath(source == nil) { return String() }
-    return String(source!)
+    return _bridgeFromObjectiveCImpl(source)
   }
 }
 

@@ -179,7 +179,11 @@ func isSmallRepresentation(_ s: String) -> Bool {
 }
 
 func checkRepresentation(_ s: String) {
-  let expectSmall = s.utf8.count <= 8
+  // The new representation can store some 4-utf16-code-unit characters but not
+  // others.  Simply skip checking the representations of those.
+  let u16Count = s.utf16.count
+  if u16Count == 4 { return }
+  let expectSmall = u16Count < 4
   let isSmall = isSmallRepresentation(s)
 
   let expectedSize = expectSmall ? "small" : "large"

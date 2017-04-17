@@ -107,7 +107,9 @@ ErrorHandlingTests.test("ErrorHandling/index(where:)") {
 
 ErrorHandlingTests.test("ErrorHandling/split") {
   do {
-    let _: [String.CharacterView] = try "foo".characters.split { _ in
+    let _: [
+      RangeReplaceableUnicodeViewSlice<String.CharacterView>
+    ] = try "foo".characters.split { _ in
       throw SillyError.JazzHands
       return false
     }

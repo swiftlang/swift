@@ -1,0 +1,644 @@
+//===--- AnyUnicode.swift -------------------------------------------------===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+%{
+  import gyb
+}%
+
+/// A type that presents useful views and information about Unicode content.
+public protocol AnyUnicodeContent {
+  var isKnownLatin1: Bool { get }
+  var isKnownASCII: Bool { get }
+  var isKnownFCCNormalized: Bool { get }
+  var isKnownFCDForm: Bool { get }
+  var isKnownNFDNormalized: Bool { get }
+  var isKnownNFCNormalized: Bool { get }
+
+  func isLatin1() -> Bool
+  func isASCII() -> Bool
+
+  // NOTE: this protocol will likely grow more requirements
+  var anyUTF16: AnyUInt16UnicodeView { get }
+}
+
+
+/// Default implementations
+public extension AnyUnicodeContent {
+  public var isKnownLatin1: Bool { return false }
+  public var isKnownASCII: Bool { return false }
+  public var isKnownFCCNormalized: Bool { return false }
+  public var isKnownFCDForm: Bool {
+    return isKnownFCCNormalized || isKnownNFDNormalized
+  }
+  public var isKnownNFDNormalized: Bool { return false }
+  public var isKnownNFCNormalized: Bool { return false }
+  
+  public func isLatin1() -> Bool {
+    return isKnownLatin1 || !anyUTF16.contains { $0 > 0xFF }
+  }
+
+  public func isASCII() -> Bool {
+    return isKnownASCII || !anyUTF16.contains { $0 > 0x7f }
+  }
+}
+
+/// Types that present useful views and information about Unicode content.
+///
+/// UnicodeStorage refines this protocol.
+public protocol UnicodeContent : AnyUnicodeContent {
+  /// A type that presents the string's UTF-16 code units
+  associatedtype UTF16View : UnicodeView
+  // where Iterator.Element == UInt16
+
+  /// The string's UTF-16 code units.
+  ///
+  /// Note: this view may contain encoding errors, if the underlying encoding is
+  /// UTF16 and the source had encoding errors.
+  var utf16: UTF16View { get }
+
+  /// A type that presents the string's UTF-8 code units
+  associatedtype UTF8View : UnicodeView
+  // where Iterator.Element == UInt8
+
+  /// The string's UTF-8 code units.
+  ///
+  /// Note: this view may contain encoding errors, if the underlying encoding is
+  /// UTF8 and the source had encoding errors.
+  var utf8: UTF8View { get }
+
+  /// A type that presents an FCC-normalized view of the string
+  associatedtype FCCNormalizedUTF16View : UnicodeView
+  // where Iterator.Element == UInt16
+
+  /// An FCC-normalized view of the string
+  var fccNormalizedUTF16: FCCNormalizedUTF16View { get }
+
+  associatedtype CharacterView : UnicodeView
+  // where Iterator.Element == Character
+
+  var characters: CharacterView { get }
+
+  /// A type that presents the string's unicode scalar values
+  associatedtype UnicodeScalarView : UnicodeView
+  // where Iterator.Element == UnicodeScalar
+
+  var unicodeScalars: UnicodeScalarView { get }
+  
+#if false
+  /// A type presenting ASCII-only extended grapheme clusters (`Character`s) as
+  /// their (single) unicode scalar values, and presenting all other
+  /// `Character`s as `nil`.
+  associatedtype ASCIIOnlyView : UnicodeView
+  // where Iterator.Element : UInt8?
+  
+  var asciiOnlyView: ASCIIOnlyView { get }
+#endif
+}
+
+extension UnicodeContent where UTF16View.Iterator.Element == UTF16.CodeUnit {
+  /// Satisfy AnyUnicodeContent requirements
+  public var anyUTF16: AnyUInt16UnicodeView {
+    return AnyUInt16UnicodeView(utf16)
+  }
+  public func isLatin1() -> Bool {
+    return isKnownLatin1 || !utf16.contains { $0 > 0xFF }
+  }
+
+  public func isASCII() -> Bool {
+    return isKnownASCII || !utf16.contains { $0 > 0x7f }
+  }
+}
+
+/// Types that present Unicode content in a given encoding.
+///
+/// Typical models are the buffers that provide storage for String
+public protocol UnicodeStorage : UnicodeContent {
+  associatedtype Encoding: UnicodeEncoding
+  var encoding: Encoding.Type { get }
+  
+  associatedtype CodeUnits : RandomAccessCollection
+  // where Iterator.Element == Encoding.CodeUnit
+
+  var isKnownValidEncoding: Bool { get }
+  func isValidEncoding() -> Bool
+  
+  var codeUnits : CodeUnits { get }
+  // func isFCCNormalized() -> Bool
+}
+
+/// Default views
+public extension UnicodeStorage
+where
+  CodeUnits.Iterator.Element  == Encoding.EncodedScalar.Iterator.Element,
+  CodeUnits.Iterator.Element : UnsignedInteger,
+  CodeUnits.SubSequence : RandomAccessCollection,
+  CodeUnits.SubSequence.Index == CodeUnits.Index,
+  CodeUnits.SubSequence.SubSequence == CodeUnits.SubSequence,
+  CodeUnits.SubSequence.Iterator.Element == CodeUnits.Iterator.Element {
+  var characters: _UnicodeViews<CodeUnits,Encoding>.CharacterView {
+    return _UnicodeViews(codeUnits, Encoding.self).characters
+  }
+}
+
+// UTF8 presents its code units as the utf8 view
+public extension UnicodeStorage
+where
+  Encoding.EncodedScalar == UTF8.EncodedScalar,
+  CodeUnits.Iterator.Element  == Encoding.EncodedScalar.Iterator.Element,
+  CodeUnits.Iterator.Element : UnsignedInteger,
+  CodeUnits.SubSequence : RandomAccessCollection,
+  CodeUnits.SubSequence.Index == CodeUnits.Index,
+  CodeUnits.SubSequence.SubSequence == CodeUnits.SubSequence,
+  CodeUnits.SubSequence.Iterator.Element == CodeUnits.Iterator.Element {
+
+  var utf8: RandomAccessUnicodeView<CodeUnits> {
+    return RandomAccessUnicodeView(codeUnits)
+  }
+}
+
+// Everybody else gets UTF8 by transcoding the underlying code units
+public extension UnicodeStorage
+where
+  CodeUnits.Iterator.Element  == Encoding.EncodedScalar.Iterator.Element,
+  CodeUnits.Iterator.Element : UnsignedInteger,
+  CodeUnits.SubSequence : RandomAccessCollection,
+  CodeUnits.SubSequence.Index == CodeUnits.Index,
+  CodeUnits.SubSequence.SubSequence == CodeUnits.SubSequence,
+  CodeUnits.SubSequence.Iterator.Element == CodeUnits.Iterator.Element {
+
+  var utf8: _TranscodedView<CodeUnits, Encoding, UTF8> {
+    return _UnicodeViews(
+      codeUnits, Encoding.self).transcoded(to: UTF8.self)
+  }
+}
+
+// UTF32 gets a default UnicodeScalarView that injects replacement characters
+// for illegal scalar values
+public extension UnicodeStorage
+where
+  Encoding == UTF32,
+  CodeUnits.Iterator.Element  == Encoding.EncodedScalar.Iterator.Element,
+  CodeUnits.Iterator.Element : UnsignedInteger,
+  CodeUnits.SubSequence : RandomAccessCollection,
+  CodeUnits.SubSequence.Index == CodeUnits.Index,
+  CodeUnits.SubSequence.SubSequence == CodeUnits.SubSequence,
+  CodeUnits.SubSequence.Iterator.Element == CodeUnits.Iterator.Element {
+
+  var unicodeScalars: RandomAccessUnicodeView<
+    LazyMapRandomAccessCollection<CodeUnits, UnicodeScalar>
+  > {
+    return RandomAccessUnicodeView(
+      codeUnits.lazy.map {
+        UnicodeScalar($0)
+        ?? UnicodeScalar(_unchecked: 0xFFFD)
+      }
+    )
+  }
+}
+
+// Everybody else gets a UnicodeScalarView based on transcoding to UTF32, which
+// already makes any necessary corrections.
+public extension UnicodeStorage
+where
+  CodeUnits.Iterator.Element  == Encoding.EncodedScalar.Iterator.Element,
+  CodeUnits.Iterator.Element : UnsignedInteger,
+  CodeUnits.SubSequence : RandomAccessCollection,
+  CodeUnits.SubSequence.Index == CodeUnits.Index,
+  CodeUnits.SubSequence.SubSequence == CodeUnits.SubSequence,
+  CodeUnits.SubSequence.Iterator.Element == CodeUnits.Iterator.Element {
+
+  var unicodeScalars: _UnicodeViews<CodeUnits,Encoding>.UnicodeScalars {
+    return _UnicodeViews(codeUnits, Encoding.self).unicodeScalars
+  }
+}
+
+/// Default implementations
+public extension UnicodeStorage {
+  var isKnownValidEncoding: Bool { return false }
+}
+
+public extension UnicodeStorage
+where UTF16View.Iterator.Element : UnsignedInteger {
+  // FIXME: we'd like to put this up in the unconditional extension, but we are
+  // forbidden.
+  var encoding: Encoding.Type { return Encoding.self }
+  
+  func isLatin1() -> Bool {
+    return isKnownLatin1 || !utf16.contains { $0 > 0xFF }
+  }
+  
+  func isASCII() -> Bool {
+    return isKnownASCII || !utf16.contains { $0 > 0x7f }
+  }
+}
+
+public extension UnicodeStorage
+where UTF16View.Iterator.Element : UnsignedInteger,
+  CodeUnits.SubSequence.SubSequence == CodeUnits.SubSequence,
+  CodeUnits.SubSequence.Iterator.Element == Encoding.EncodedScalar.Iterator.Element
+{
+  func isValidEncoding() -> Bool {
+    return Encoding.parseForward(
+      codeUnits, repairingIllFormedSequences: false
+    ) { _ in }.errorCount == 0
+  }
+}
+
+//===--- Defaults for Latin-1 ---------------------------------------------===//
+public extension UnicodeStorage where Encoding == Latin1 {
+  var isKnownLatin1: Bool { return true }
+  var isKnownValidEncoding: Bool { return true }
+  var isKnownFCCNormalized: Bool { return true }
+}
+
+public struct _NumericCast<Source: UnsignedInteger, Target: UnsignedInteger>
+  : _Function {
+  public func apply(_ source: Source) -> Target { return numericCast(source) }
+}
+
+public struct _UncheckedUnicodeScalar<Source: UnsignedInteger> : _Function {
+  public func apply(_ source: Source) -> UnicodeScalar {
+    return UnicodeScalar(_unchecked: numericCast(source))
+  }
+}
+
+public extension UnicodeStorage
+where Encoding == Latin1,
+  Encoding.EncodedScalar.Iterator.Element == CodeUnits.Iterator.Element,
+  CodeUnits.SubSequence.Index == CodeUnits.Index,
+  CodeUnits.SubSequence.SubSequence == CodeUnits.SubSequence,
+  CodeUnits.SubSequence.Iterator.Element == CodeUnits.Iterator.Element,
+  CodeUnits.Iterator.Element : UnsignedInteger {
+  
+  var utf16: RandomAccessUnicodeView<
+    _MapRandomAccessCollection<
+      CodeUnits, _NumericCast<Latin1.CodeUnit, UTF16.CodeUnit>>> {
+    return fccNormalizedUTF16
+  }
+
+  /// An FCC-normalized view of the string
+  var fccNormalizedUTF16: RandomAccessUnicodeView<
+    _MapRandomAccessCollection<
+      CodeUnits, _NumericCast<Latin1.CodeUnit, UTF16.CodeUnit>>> {
+    return RandomAccessUnicodeView(
+      _MapRandomAccessCollection(codeUnits, through: _NumericCast()))
+  }
+
+  var unicodeScalars: RandomAccessUnicodeView<
+    _MapRandomAccessCollection<
+      CodeUnits, _UncheckedUnicodeScalar<Latin1.CodeUnit>>> {
+    return RandomAccessUnicodeView(
+      _MapRandomAccessCollection(
+        codeUnits, through: _UncheckedUnicodeScalar()))
+  }
+  
+  var characters: Latin1CharacterView<CodeUnits, Encoding> {
+    return _UnicodeViews(codeUnits, Encoding.self).latin1CharacterView
+  }
+}
+
+//===--- Defaults for UTF16 and ValidUTF16 --------------------------------===//
+public extension UnicodeStorage
+where Encoding.EncodedScalar == UTF16.EncodedScalar,
+  CodeUnits.Iterator.Element == UTF16.CodeUnit,
+  CodeUnits.SubSequence : RandomAccessCollection,
+  CodeUnits.SubSequence.Index == CodeUnits.Index,
+  CodeUnits.SubSequence.SubSequence == CodeUnits.SubSequence,
+  CodeUnits.SubSequence.Iterator.Element == CodeUnits.Iterator.Element {
+  
+  // FIXME: we should have a way to represent the validity of the encoding of
+  // this result—and maybe other nice properties—in the type system.  So maybe
+  // this thing should conform to UnicodeStorage
+  var fccNormalizedUTF16
+  : _UnicodeViews<CodeUnits,Encoding>.FCCNormalizedUTF16View {
+    return _UnicodeViews(codeUnits, Encoding.self).fccNormalizedUTF16
+  }
+  
+  var utf16 : RandomAccessUnicodeView<CodeUnits> {
+    return RandomAccessUnicodeView(codeUnits)
+  }
+}
+
+//===--- AnyUnicodeIndex --------------------------------------------------===//
+
+public enum AnyUnicodeIndex : Comparable {
+case encodedOffset(Int)
+  
+case transcoded(
+    inputOffset: Int,
+    outputOffset: Int,
+    outputEncoding: Any.Type)
+
+case fccNormalizedUTF16(
+    offsetOfSegment: Int,
+    offsetInSegment: Int
+  )
+case character(
+    encodedOffset: Int,
+    width: Int)
+  
+case unicodeScalar(encodedOffset: Int, width: Int, scalar: UnicodeScalar?)
+
+  public var encodedOffset: Int {
+    switch self {
+    case .encodedOffset(let x): return x
+    case .transcoded(let x, _,_): return x
+    case .character(let x, _): return x
+    case .unicodeScalar(let x, _, _): return x
+    case .fccNormalizedUTF16(let x, _): return x
+    }
+  }
+
+  public static func < (lhs: AnyUnicodeIndex, rhs: AnyUnicodeIndex) -> Bool {
+    let l = lhs.encodedOffset
+    let r = rhs.encodedOffset
+    if _fastPath(l < r) { return true }
+    if _fastPath(l > r) { return false }
+    switch (lhs, rhs) {
+    case (.transcoded(_, let l, let tl), (.transcoded(_, let r, let tr))):
+      return tl == tr && l < r
+    case (.character(_, let l), .character(_, let r)):
+      return l < r
+    case (.fccNormalizedUTF16(_, let l), .fccNormalizedUTF16(_, let r)):
+      return l < r
+    default:
+      return false
+    }
+  }
+
+  public static func == (lhs: AnyUnicodeIndex, rhs: AnyUnicodeIndex) -> Bool {
+    let l = lhs.encodedOffset
+    let r = rhs.encodedOffset
+    if _fastPath(l != r) { return false }
+    switch (lhs, rhs) {
+    case (.transcoded(_, let l, let tl), (.transcoded(_, let r, let tr))):
+      return tl != tr || l == r
+    case (.character(_, let l), .character(_, let r)):
+      return l == r
+    case (.fccNormalizedUTF16(_, let l), .fccNormalizedUTF16(_, let r)):
+      return l == r
+    default:
+      return true
+    }
+  }
+}
+
+//===----------------------------------------------------------------------===//
+
+
+//===--- AnyUnicodeView ---------------------------------------------------===//
+/// Type-eraser for bidirectional collections with index<->code unit offsets
+public protocol AnyUnicodeView_ {
+  typealias IndexDistance = Int//64
+  var startIndex: AnyUnicodeIndex { get }
+  var endIndex: AnyUnicodeIndex { get }
+  func formIndex(after: inout AnyUnicodeIndex)
+  func index(after: AnyUnicodeIndex) -> AnyUnicodeIndex
+  func formIndex(before: inout AnyUnicodeIndex)
+  func index(before: AnyUnicodeIndex) -> AnyUnicodeIndex
+  func formIndex(_ i: inout AnyUnicodeIndex, offsetBy: IndexDistance)
+  func index(_ i: AnyUnicodeIndex, offsetBy: IndexDistance) -> AnyUnicodeIndex
+  func index(
+    _ i: AnyUnicodeIndex,
+    offsetBy n: IndexDistance,
+    limitedBy limit: AnyUnicodeIndex
+  ) -> AnyUnicodeIndex?
+  func distance(from i: AnyUnicodeIndex, to j: AnyUnicodeIndex) -> IndexDistance
+  var count: IndexDistance { get }
+  var underestimatedCount: Int { get }
+}
+
+/// Wrappers that present some `AnyUnicodeView_` instance as a
+/// `BidirectionalCollection` unwrap indices and forward all implementation to
+/// base
+public extension ForwardingWrapper
+where Base == AnyUnicodeView_,
+Self : BidirectionalCollection, Self.Index == AnyUnicodeIndex {
+  // TODO: Forward Iterators
+  ${gyb.expand(
+      'ForwardCollectionAPIs.swift.gyb', base='base', Element=None)}
+  
+  func _wrap(_ x: AnyUnicodeIndex) -> AnyUnicodeIndex {
+    return x
+  }
+  func _unwrap(_ x: AnyUnicodeIndex) -> AnyUnicodeIndex {
+    return x
+  }
+}
+
+/// Wrappers that present some `UnicodeView` as an `AnyUnicodeView_` forward all
+/// implementations by using `base` to `wrap`/`unwrap` indices and `numericCast`
+/// to translate `IndexDistance`s.
+public extension BidirectionalCollectionWrapper
+where Base : UnicodeView, Self : AnyUnicodeView_ {
+  func _wrap(_ i: Base.Index) -> AnyUnicodeIndex {
+    return base.anyIndex(i)
+  }
+  func _unwrap(_ i: AnyUnicodeIndex) -> Base.Index {
+    return base.nativeIndex(i)
+  }
+}
+
+// Generate wrappers for specific element types.
+% for Element in ('UInt8', 'UInt16', 'UInt32', 'UnicodeScalar', 'Character'):
+
+//===--- Any${Element}Iterator --------------------------------------------===//
+/// Type-eraser for Iterators over ${Element}s
+public protocol Any${Element}Iterator_ {
+  mutating func next() -> ${Element}?
+}
+
+public struct Any${Element}Iterator : IteratorProtocol {
+  public var base: Any${Element}Iterator_
+  public init(_ base: Any${Element}Iterator_) { self.base = base }
+  public mutating func next() -> ${Element}? { return base.next() }
+
+  public struct Adapter<Base : IteratorProtocol> : Any${Element}Iterator_
+  where Base.Element == ${Element}
+  {
+    public mutating func next() -> ${Element}? { return base.next() }
+    public var base: Base
+  }
+}
+
+/// Wrappers that present a base `Sequence` as an `AnyUnicodeView_` adapt and
+/// forward the base's `iterator`.
+public extension BidirectionalCollectionWrapper
+where Self : AnyUnicodeView_, Base.Iterator.Element == ${Element} {
+  func makeIterator() -> Any${Element}Iterator_ {
+    return Any${Element}Iterator.Adapter<Base.Iterator>(
+      base: base.makeIterator())
+  }
+}
+//===----------------------------------------------------------------------===//
+
+//===--- Any${Element}UnicodeView -----------------------------------------===//
+
+/// Type eraser for `UnicodeView`s with elements of type ${Element}.
+public protocol Any${Element}UnicodeView_ : AnyUnicodeView_ {
+  func makeIterator() -> Any${Element}Iterator_
+  subscript(_: AnyUnicodeIndex) -> ${Element} { get }
+  func withExistingUnsafeBuffer<R>(
+    _ body: (UnsafeBufferPointer<${Element}>) throws -> R
+  ) rethrows -> R?
+  var first: ${Element}? { get }
+  var last: ${Element}? { get }
+  func map<T>(_ transform: (${Element}) throws -> T) rethrows -> [T]
+  func filter(_ inResult: (${Element}) throws -> Bool) rethrows -> [${Element}]
+  func forEach(_ body: (${Element}) throws -> Void) rethrows
+  func _copyToContiguousArray() -> ContiguousArray<${Element}>
+  mutating func _tryToReplaceSubrange<C: Collection>(
+    _: Range<AnyUnicodeIndex>, with replacement: C
+  ) -> Bool
+  where C.Iterator.Element == ${Element}
+}
+
+public struct Any${Element}UnicodeView
+   : BidirectionalCollection, ForwardingWrapper {
+  public typealias SubSequence = RangeReplaceableUnicodeViewSlice<
+    Any${Element}UnicodeView
+  >
+  public typealias Index = AnyUnicodeIndex
+  public typealias IndexDistance = Int//64
+  public typealias Iterator = Any${Element}Iterator
+  public func makeIterator() -> Any${Element}Iterator {
+    return Any${Element}Iterator(base2.makeIterator())
+  }
+  
+  % # using element_only here because all the non-element stuff is handled in
+  % # one place above (where you see Element=None)
+  ${gyb.expand(
+      'ForwardCollectionAPIs.swift.gyb', base='base2',
+      element_only=True, Element=Element)}
+
+  public subscript(bounds: Range<Index>) -> SubSequence {
+    return SubSequence(base: self, bounds: bounds)
+  }
+  
+  // `base` must have exactly this signature to match the needed constrained
+  // `ForwardingWrapper` extension, so we compute it and store the more refined
+  // existential in `base2`.
+  public var base: AnyUnicodeView_ { return base2 }
+  public var base2: Any${Element}UnicodeView_
+}
+
+/// Adapt any `UnicodeView` with elements of type `Element`
+extension Any${Element}UnicodeView {
+  /// An adaptor used to wrap `Base`
+  public struct Adapter<Base_: UnicodeView>
+  : Any${Element}UnicodeView_, BidirectionalCollectionWrapper  
+  where Base_.Iterator.Element == ${Element} {
+    public typealias IndexDistance = Int//64
+    public typealias Index = AnyUnicodeIndex
+    public typealias Base = Base_
+    public var base: Base
+  }
+
+  /// Creates an instance that wraps `base`.
+  public init<Base: UnicodeView>(_ base: Base)
+  where Base.Iterator.Element == ${Element} {
+    if let me = base as? Any${Element}UnicodeView { self = me }
+    else { self.base2 = Adapter(base: base) }
+  }
+}
+
+extension Any${Element}UnicodeView : RangeReplaceableCollection {
+  public init() {
+    self.init(RandomAccessUnicodeView(EmptyCollection()))
+  }
+  
+  public mutating func replaceSubrange<C>(
+    _ target: Range<Index>,
+    with replacement: C
+  ) where C : Collection, C.Iterator.Element == ${Element} {
+    let r = Counted(replacement)
+    // FIXME: wrappers like Counted interfere with dynamic introspection, such
+    // as downcasts to AnyUnicode, that can be crucial to optimization.  This
+    // problem seems solvable by giving Collections and wrappers something like
+    // func encodedContent<T>(as: T.Type) -> T?
+    if base2._tryToReplaceSubrange(target, with: r) { return }
+
+    let delta = r.count^ - self[target].count
+    let newCount = count + delta^
+    // FIXME: Ideally we'd create new _[XXX]StringStorage for this part.  In
+    // principle that would imply renaming these from Any[Type]View to
+    // Any[Encoding]View, because one has to know how to get back into a
+    // String representation.  For now, though, this will do.
+    var newContent: [${Element}] = []
+    newContent.reserveCapacity(newCount^)
+    newContent.append(contentsOf: self[..<target.lowerBound])
+    newContent.append(contentsOf: r)
+    newContent.append(contentsOf: self[target.upperBound...])
+    self = Any${Element}UnicodeView(RandomAccessUnicodeView(newContent))
+  }
+}
+
+extension Any${Element}UnicodeView : UnicodeView {}
+
+//===----------------------------------------------------------------------===//
+
+% end
+
+//===--- Unicode ----------------------------------------------------------===//
+
+/// Types that have an `AnyUnicodeContent` instance that describes their whole
+/// content.
+public protocol AnyUnicode{
+  var anyContent: AnyUnicodeContent { get }
+}
+
+/// Collections of `Character` that have `UnicodeContent`.
+public protocol Unicode : AnyUnicode, BidirectionalCollection
+// where Iterator.Element == Character
+{
+  // poor man's constraint on Iterator.Element
+  subscript(i: Index) -> Character { get }
+  
+  associatedtype Content : UnicodeContent
+  var content: Content { get }
+}
+
+extension Unicode where Self : BidirectionalCollectionWrapper {
+  public var base: Content.CharacterView {
+    get {
+      return content.characters
+    }
+  }
+  public var anyContent: AnyUnicodeContent { return content }
+}
+
+extension Unicode
+where Self : BidirectionalCollectionWrapper & RangeReplaceableCollection,
+Iterator.Element == Content.CharacterView.Iterator.Element
+{
+  public var base: Content.CharacterView {
+    get {
+      return content.characters
+    }
+    set {
+      replaceSubrange(startIndex..<endIndex, with: newValue)
+    }
+  }
+  public var anyContent: AnyUnicodeContent { return content }
+}
+
+extension Unicode where Self : RangeReplaceableCollection,
+Iterator.Element == Content.CharacterView.Iterator.Element {
+  public var base: Content.CharacterView {
+    get {
+      return content.characters
+    }
+    set {
+      replaceSubrange(startIndex..<endIndex, with: newValue)
+    }
+  }
+  public var anyContent: AnyUnicodeContent { return content }
+}
