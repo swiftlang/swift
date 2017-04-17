@@ -12,8 +12,9 @@
 
 // Generic functions implementable directly on FloatingPoint.
 @_transparent
-public func fabs<T: FloatingPoint>(_ x: T) -> T {
-  return abs(x)
+public func fabs<T: FloatingPoint>(_ x: T) -> T
+  where T.Magnitude == T {
+  return x.magnitude
 }
 
 @_transparent

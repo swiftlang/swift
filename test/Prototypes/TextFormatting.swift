@@ -109,7 +109,7 @@ extension String : CustomFormatted {
 // but in the meantime they give us a decent protocol and explicit conversions
 // among integers.  You can skip this section if only interested in formatting
 //===----------------------------------------------------------------------===//
-public typealias Integer = Swift.Integer & Swift.IntegerArithmetic
+public typealias Integer = Swift.FixedWidthInteger
 
 extension Integer {
   /// Creates an instance with the same value as `i`

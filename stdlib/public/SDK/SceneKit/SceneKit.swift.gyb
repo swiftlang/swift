@@ -157,7 +157,7 @@ extension SCNGeometryElement {
   /// Creates an instance from `indices` for a `primitiveType`
   /// that has a constant number of indices per primitive
   /// - Precondition: the `primitiveType` must be `.triangles`, `.triangleStrip`, `.line` or `.point`
-  public convenience init<IndexType : Integer>(
+  public convenience init<IndexType : FixedWidthInteger>(
     indices: [IndexType], primitiveType: SCNGeometryPrimitiveType
   ) {
     precondition(primitiveType == .triangles || primitiveType == .triangleStrip || primitiveType == .line || primitiveType == .point, "Expected constant number of indices per primitive")

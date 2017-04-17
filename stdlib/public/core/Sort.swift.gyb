@@ -239,7 +239,7 @@ func _introSort<C>(
   ${"" if p else ", C.Iterator.Element : Comparable"} {
 
   let count =
-    elements.distance(from: range.lowerBound, to: range.upperBound).toIntMax()
+    elements.distance(from: range.lowerBound, to: range.upperBound)
   if count < 2 {
     return
   }

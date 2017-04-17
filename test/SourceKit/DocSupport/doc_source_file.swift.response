@@ -1083,7 +1083,7 @@
   {
     key.kind: source.lang.swift.ref.function.operator.infix,
     key.name: "+(_:_:)",
-    key.usr: "s:s1poiS2i_SitF",
+    key.usr: "s:Si1poiS2i_SitFZ",
     key.offset: 1217,
     key.length: 1
   },
@@ -1218,7 +1218,7 @@
   {
     key.kind: source.lang.swift.ref.function.operator.infix,
     key.name: "+=(_:_:)",
-    key.usr: "s:s2peoiySiz_SitF",
+    key.usr: "s:Si2peoiySiz_SitFZ",
     key.offset: 1343,
     key.length: 2
   },
@@ -1317,7 +1317,7 @@
   {
     key.kind: source.lang.swift.ref.function.operator.infix,
     key.name: "+=(_:_:)",
-    key.usr: "s:s2peoiySiz_SitF",
+    key.usr: "s:Si2peoiySiz_SitFZ",
     key.offset: 1383,
     key.length: 2
   },
@@ -2602,18 +2602,18 @@
         key.conforms: [
           {
             key.kind: source.lang.swift.ref.protocol,
+            key.name: "FixedWidthInteger",
+            key.usr: "s:s17FixedWidthIntegerP"
+          },
+          {
+            key.kind: source.lang.swift.ref.protocol,
             key.name: "SignedInteger",
             key.usr: "s:s13SignedIntegerP"
           },
           {
             key.kind: source.lang.swift.ref.protocol,
-            key.name: "Comparable",
-            key.usr: "s:s10ComparableP"
-          },
-          {
-            key.kind: source.lang.swift.ref.protocol,
-            key.name: "Equatable",
-            key.usr: "s:s9EquatableP"
+            key.name: "_ExpressibleByBuiltinIntegerLiteral",
+            key.usr: "s:s35_ExpressibleByBuiltinIntegerLiteralP"
           }
         ]
       },

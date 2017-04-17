@@ -338,10 +338,12 @@ public struct Unsafe${Mutable}BufferPointer<Element>
   /// a buffer can have a `count` of zero even with a non-`nil` base address.
   @_inlineable
   public var count: Int {
-    if let pos = _position {
-      return _end! - pos
+    switch(_position, _end) {
+    case (.some(let pos), .some(let end)):
+      return (end - pos)
+    case _:
+      return 0
     }
-    return 0
   }
 
   @_versioned

@@ -320,12 +320,12 @@ extension OptionSet where Element == Self {
 /// - Note: A type conforming to `OptionSet` can implement any of
 ///   these initializers or methods, and those implementations will be
 ///   used in lieu of these defaults.
-extension OptionSet where RawValue : BitwiseOperations {
+extension OptionSet where RawValue : FixedWidthInteger {
   /// Creates an empty option set.
   ///
   /// This initializer creates an option set with a raw value of zero.
   public init() {
-    self.init(rawValue: .allZeros)
+    self.init(rawValue: 0)
   }
 
   /// Inserts the elements of another set into this option set.

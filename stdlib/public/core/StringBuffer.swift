@@ -76,7 +76,7 @@ public struct _StringBuffer {
     _storage = _Storage(
       HeapBufferStorage.self,
       _StringBufferIVars(_elementWidth: elementWidth),
-      (capacity + capacityBump + divRound) >> divRound
+      (capacity + capacityBump + divRound) &>> divRound
     )
     // This conditional branch should fold away during code gen.
     if elementShift == 0 {
@@ -86,9 +86,9 @@ public struct _StringBuffer {
       start.bindMemory(to: UTF16.CodeUnit.self, capacity: initialSize)
     }
 
-    self.usedEnd = start + (initialSize << elementShift)
+    self.usedEnd = start + (initialSize &<< elementShift)
     _storage.value.capacityAndElementShift
-      = ((_storage._capacity() - capacityBump) << 1) + elementShift
+      = ((_storage._capacity() - capacityBump) &<< 1) + elementShift
   }
 
   static func fromCodeUnits<Input, Encoding>(
@@ -160,7 +160,7 @@ public struct _StringBuffer {
   }
 
   var usedCount: Int {
-    return (usedEnd - start) >> elementShift
+    return (usedEnd - start) &>> elementShift
   }
 
   /// A past-the-end pointer for this buffer's available storage.
@@ -170,7 +170,7 @@ public struct _StringBuffer {
 
   /// The number of elements that can be stored in this buffer.
   public var capacity: Int {
-    return _storage.value.byteCapacity >> elementShift
+    return _storage.value.byteCapacity &>> elementShift
   }
 
   /// 1 if the buffer stores UTF-16; 0 otherwise.
@@ -193,7 +193,7 @@ public struct _StringBuffer {
   ) -> Bool {
     // The substring to be grown could be pointing in the middle of this
     // _StringBuffer.
-    let offset = (r.lowerBound - UnsafeRawPointer(start)) >> elementShift
+    let offset = (r.lowerBound - UnsafeRawPointer(start)) &>> elementShift
     return cap + offset <= capacity
   }
 
@@ -217,13 +217,13 @@ public struct _StringBuffer {
     // _StringBuffer.  Adjust the size so that it covers the imaginary
     // substring from the start of the buffer to `oldUsedEnd`.
     newUsedCount
-      += (bounds.lowerBound - UnsafeRawPointer(start)) >> elementShift
+      += (bounds.lowerBound - UnsafeRawPointer(start)) &>> elementShift
 
     if _slowPath(newUsedCount > capacity) {
       return false
     }
 
-    let newUsedEnd = start + (newUsedCount << elementShift)
+    let newUsedEnd = start + (newUsedCount &<< elementShift)
 
     if _fastPath(self._storage.isUniquelyReferenced()) {
       usedEnd = newUsedEnd
