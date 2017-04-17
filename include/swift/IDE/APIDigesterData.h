@@ -233,6 +233,11 @@ struct OverloadedFuncInfo: public APIDiffItem {
   }
 };
 
+/// APIDiffItem store is the interface that migrator should communicates with;
+/// Given a key, usually the usr of the system entity under migration, the store
+/// should return a slice of related changes in the same format of
+/// swift-api-digester. This struct also handles the serialization and
+/// deserialization of all kinds of API diff items declared above.
 struct APIDiffItemStore {
   struct Implementation;
   Implementation &Impl;
@@ -241,6 +246,10 @@ struct APIDiffItemStore {
   ~APIDiffItemStore();
   ArrayRef<APIDiffItem*> getDiffItems(StringRef Key) const;
   ArrayRef<APIDiffItem*> getAllDiffItems() const;
+
+  /// Add a path of a JSON file dumped from swift-api-digester that contains
+  /// API changes we care about. Calling this can be heavy since the procedure
+  /// will parse and index the data inside of the given file.
   void addStorePath(StringRef Path);
 };
 }
