@@ -257,54 +257,31 @@ bool RequirementSource::isSelfDerivedSource(PotentialArchetype *pa) const {
   // If it's not a derived requirement, it's not self-derived.
   if (!isDerivedRequirement()) return false;
 
-  // Collect the path of associated types from the root pa.
-  SmallVector<AssociatedTypeDecl *, 4> assocTypes;
-  PotentialArchetype *currentPA = nullptr;
-  for (auto source = this; source; source = source->parent) {
+  return visitPotentialArchetypesAlongPath(
+           [&](PotentialArchetype *currentPA, const RequirementSource *source) {
     switch (source->kind) {
-    case RequirementSource::Parent:
-      assocTypes.push_back(source->getAssociatedType());
-      break;
-
-    case RequirementSource::NestedTypeNameMatch:
-      return false;
-
     case RequirementSource::Explicit:
     case RequirementSource::Inferred:
     case RequirementSource::RequirementSignatureSelf:
-      currentPA = source->getRootPotentialArchetype();
-      while (auto parent = currentPA->getParent()) {
-        if (auto assocType = currentPA->getResolvedAssociatedType())
-          assocTypes.push_back(assocType);
-        currentPA = parent;
+      for (auto parent = currentPA->getParent(); parent;
+           parent = parent->getParent()) {
+        if (parent->isInSameEquivalenceClassAs(pa))
+          return true;
       }
-      break;
 
+      return false;
+
+    case RequirementSource::Parent:
+      return currentPA->isInSameEquivalenceClassAs(pa);
+
+    case RequirementSource::NestedTypeNameMatch:
     case RequirementSource::Concrete:
     case RequirementSource::ProtocolRequirement:
     case RequirementSource::InferredProtocolRequirement:
     case RequirementSource::Superclass:
-      break;
+      return false;
     }
-  }
-
-  assert(currentPA && "Missing root potential archetype");
-
-  // Check whether anything of the potential archetypes in the path are
-  // equivalent to the end of the path.
-  auto rep = pa->getRepresentative();
-  for (auto assocType : reversed(assocTypes)) {
-    // Check whether this potential archetype is in the same equivalence class.
-    if (currentPA->getRepresentative() == rep) return true;
-
-    // Get the next nested type, but only if we've seen it before.
-    // FIXME: Feels hacky.
-    auto knownNested = currentPA->NestedTypes.find(assocType->getName());
-    if (knownNested == currentPA->NestedTypes.end()) return false;
-    currentPA = knownNested->second.front();
-  }
-
-  return false;
+  }) == nullptr;
 }
 
 /// Replace 'Self' in the given dependent type (\c depTy) with the given
@@ -1805,7 +1782,7 @@ PotentialArchetype *PotentialArchetype::updateNestedTypeForConformance(
     if (isConcreteType()) {
       for (auto equivT : getRepresentative()->getEquivalenceClassMembers()) {
         concretizeNestedTypeFromConcreteParent(
-            equivT, RequirementSource::forNestedTypeNameMatch(resultPA),
+            equivT, RequirementSource::forNestedTypeNameMatch(this),
             resultPA, builder,
             [&](ProtocolDecl *proto) -> ProtocolConformanceRef {
               auto depTy = resultPA->getDependentType({},
