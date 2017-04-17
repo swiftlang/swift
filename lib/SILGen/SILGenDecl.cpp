@@ -386,13 +386,14 @@ public:
 
     // The variable may have its lifetime extended by a closure, heap-allocate
     // it using a box.
-    AllocBoxInst *allocBox =
+    SILInstruction *allocBox =
         SGF.B.createAllocBox(decl, boxType, {decl->isLet(), ArgNo});
-    SILValue addr = SGF.B.createProjectBox(decl, allocBox, 0);
 
     // Mark the memory as uninitialized, so DI will track it for us.
     if (kind)
-      addr = SGF.B.createMarkUninitialized(decl, addr, kind.getValue());
+      allocBox = SGF.B.createMarkUninitialized(decl, allocBox, kind.getValue());
+
+    SILValue addr = SGF.B.createProjectBox(decl, allocBox, 0);
 
     /// Remember that this is the memory location that we're emitting the
     /// decl to.

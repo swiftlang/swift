@@ -366,23 +366,23 @@ class D: C {
   // CHECK-LABEL: sil hidden @_T015guaranteed_self1DC{{[_0-9a-zA-Z]*}}fc : $@convention(method) (@owned D) -> @owned D
   // CHECK:       bb0([[SELF:%.*]] : $D):
   // CHECK:         [[SELF_BOX:%.*]] = alloc_box ${ var D }
-  // CHECK-NEXT:    [[PB:%.*]] = project_box [[SELF_BOX]]
-  // CHECK-NEXT:    [[SELF_ADDR:%.*]] = mark_uninitialized [derivedself] [[PB]]
-  // CHECK-NEXT:    store [[SELF]] to [init] [[SELF_ADDR]]
-  // CHECK-NOT:     [[SELF_ADDR]]
-  // CHECK:         [[SELF1:%.*]] = load [take] [[SELF_ADDR]]
+  // CHECK-NEXT:    [[MARKED_SELF_BOX:%.*]] = mark_uninitialized [derivedself] [[SELF_BOX]]
+  // CHECK-NEXT:    [[PB:%.*]] = project_box [[MARKED_SELF_BOX]]
+  // CHECK-NEXT:    store [[SELF]] to [init] [[PB]]
+  // CHECK-NOT:     [[PB]]
+  // CHECK:         [[SELF1:%.*]] = load [take] [[PB]]
   // CHECK-NEXT:    [[SUPER1:%.*]] = upcast [[SELF1]]
-  // CHECK-NOT:     [[SELF_ADDR]]
+  // CHECK-NOT:     [[PB]]
   // CHECK:         [[SUPER2:%.*]] = apply {{.*}}([[SUPER1]])
   // CHECK-NEXT:    [[SELF2:%.*]] = unchecked_ref_cast [[SUPER2]]
-  // CHECK-NEXT:    store [[SELF2]] to [init] [[SELF_ADDR]]
-  // CHECK-NOT:     [[SELF_ADDR]]
+  // CHECK-NEXT:    store [[SELF2]] to [init] [[PB]]
+  // CHECK-NOT:     [[PB]]
   // CHECK-NOT:     [[SELF1]]
   // CHECK-NOT:     [[SUPER1]]
   // CHECK-NOT:     [[SELF2]]
   // CHECK-NOT:     [[SUPER2]]
-  // CHECK:         [[SELF_FINAL:%.*]] = load [copy] [[SELF_ADDR]]
-  // CHECK-NEXT:    destroy_value [[SELF_BOX]]
+  // CHECK:         [[SELF_FINAL:%.*]] = load [copy] [[PB]]
+  // CHECK-NEXT:    destroy_value [[MARKED_SELF_BOX]]
   // CHECK-NEXT:    return [[SELF_FINAL]]
   required init() {
     super.init()

@@ -711,6 +711,17 @@ inline void copy(const Container &C, OutputIterator iter) {
   std::copy(C.begin(), C.end(), iter);
 }
 
+template <typename Container, typename OutputIterator, typename Predicate>
+inline void copy_if(const Container &C, OutputIterator result, Predicate pred) {
+  std::copy_if(C.begin(), C.end(), result, pred);
+}
+
+template <typename Container, typename OutputIterator, typename UnaryOperation>
+inline OutputIterator transform(const Container &C, OutputIterator result,
+                                UnaryOperation op) {
+  return std::transform(C.begin(), C.end(), result, op);
+}
+
 //===----------------------------------------------------------------------===//
 //                              Function Traits
 //===----------------------------------------------------------------------===//
