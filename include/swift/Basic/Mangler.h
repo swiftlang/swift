@@ -14,13 +14,12 @@
 #define SWIFT_BASIC_MANGLER_H
 
 #include "swift/Demangling/ManglingUtils.h"
+#include "swift/Basic/LLVM.h"
 #include "llvm/ADT/DenseMap.h"
+#include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/Support/raw_ostream.h"
-
-using llvm::StringRef;
-using llvm::ArrayRef;
 
 namespace swift {
 namespace Mangle {
@@ -39,7 +38,7 @@ protected:
   friend class SubstitutionMerging;
 
   /// The storage for the mangled symbol.
-  llvm::SmallVector<char, 128> Storage;
+  llvm::SmallString<128> Storage;
 
   /// The output stream for the mangled symbol.
   llvm::raw_svector_ostream Buffer;
@@ -106,7 +105,7 @@ protected:
   void finalize(llvm::raw_ostream &stream);
 
   /// Verify that demangling and remangling works.
-  void verify(const std::string &mangledName);
+  static void verify(StringRef mangledName);
 
   /// Appends a mangled identifier string.
   void appendIdentifier(StringRef ident);

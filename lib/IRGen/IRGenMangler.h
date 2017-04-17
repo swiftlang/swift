@@ -114,7 +114,7 @@ public:
     beginMangling();
     appendProtocolConformance(Conformance);
     appendAssociatedTypePath(AssociatedType);
-    appendNominalType(Proto);
+    appendAnyGenericType(Proto);
     appendOperator("WT");
     return finalize();
   }
@@ -147,13 +147,13 @@ public:
 
   std::string mangleOutlinedCopyFunction(const NominalTypeDecl *Decl) {
     beginMangling();
-    appendNominalType(Decl);
+    appendAnyGenericType(Decl);
     appendOperator("Wy");
     return finalize();
   }
   std::string mangleOutlinedConsumeFunction(const NominalTypeDecl *Decl) {
     beginMangling();
-    appendNominalType(Decl);
+    appendAnyGenericType(Decl);
     appendOperator("We");
     return finalize();
   }
@@ -190,7 +190,7 @@ protected:
   std::string mangleNominalTypeSymbol(const NominalTypeDecl *Decl,
                                       const char *Op) {
     beginMangling();
-    appendNominalType(Decl);
+    appendAnyGenericType(Decl);
     appendOperator(Op);
     return finalize();
   }

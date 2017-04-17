@@ -346,7 +346,7 @@
     {
       key.kind: source.lang.swift.decl.typealias,
       key.name: "CCAlias",
-      key.usr: "s:5index7CCAlias",
+      key.usr: "s:5index7CCAliasa",
       key.line: 47,
       key.column: 11,
       key.entities: [
@@ -399,7 +399,7 @@
             {
               key.kind: source.lang.swift.ref.typealias,
               key.name: "CCAlias",
-              key.usr: "s:5index7CCAlias",
+              key.usr: "s:5index7CCAliasa",
               key.line: 50,
               key.column: 19
             }
@@ -1110,7 +1110,7 @@
     {
       key.kind: source.lang.swift.decl.function.method.instance,
       key.name: "meth()",
-      key.usr: "s:5index4methXeF",
+      key.usr: "s:5index4methXeXeF",
       key.line: 134,
       key.column: 8
     },
