@@ -961,6 +961,10 @@ class TestData : TestDataSuper {
         expectEqual(slice3[0], 8)
         expectEqual(slice4[0], 8)
     }
+
+    func test_unconditionallyBridgeFromObjectiveC() {
+        expectEqual(Data(), Data._unconditionallyBridgeFromObjectiveC(nil))
+    }
 }
 
 #if !FOUNDATION_XCTEST
@@ -1007,6 +1011,8 @@ DataTests.test("test_noCopyBehavior") { TestData().test_noCopyBehavior() }
 DataTests.test("test_doubleDeallocation") { TestData().test_doubleDeallocation() }
 DataTests.test("test_repeatingValueInitialization") { TestData().test_repeatingValueInitialization() }
 DataTests.test("test_rangeZoo") { TestData().test_rangeZoo() }
+DataTests.test("test_unconditionallyBridgeFromObjectiveC") { TestData().test_unconditionallyBridgeFromObjectiveC() }
+
 
 // XCTest does not have a crash detection, whereas lit does
 DataTests.test("bounding failure subdata") {
