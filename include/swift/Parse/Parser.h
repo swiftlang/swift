@@ -1163,9 +1163,11 @@ public:
   /// \param loc Will be populated with the location of the name.
   /// \param diag The diagnostic to emit if this is not a name.
   /// \param allowOperators Whether to allow operator basenames too.
+  /// \param allowZeroArgCompoundNames Whether to allow empty argument lists.
   DeclName parseUnqualifiedDeclName(bool afterDot, DeclNameLoc &loc,
                                     const Diagnostic &diag,
-                                    bool allowOperators=false);
+                                    bool allowOperators=false,
+                                    bool allowZeroArgCompoundNames=false);
 
   Expr *parseExprIdentifier();
   Expr *parseExprEditorPlaceholder(Token PlaceholderTok,

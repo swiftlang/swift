@@ -1801,7 +1801,8 @@ void Parser::parseOptionalArgumentLabel(Identifier &name, SourceLoc &loc) {
 DeclName Parser::parseUnqualifiedDeclName(bool afterDot,
                                           DeclNameLoc &loc,
                                           const Diagnostic &diag,
-                                          bool allowOperators) {
+                                          bool allowOperators,
+                                          bool allowZeroArgCompoundNames) {
   // Consume the base name.
   Identifier baseName = Context.getIdentifier(Tok.getText());
   SourceLoc baseNameLoc;
@@ -1822,6 +1823,18 @@ DeclName Parser::parseUnqualifiedDeclName(bool afterDot,
   if (!Tok.isFollowingLParen()) {
     loc = DeclNameLoc(baseNameLoc);
     return baseName;
+  }
+
+  // If the next token is a ')' then we have a 0-arg compound name. This is
+  // explicitly differentiated from "simple" (non-compound) name in DeclName.
+  // Unfortunately only some places in the grammar are ok with accepting this
+  // kind of name; in other places it's ambiguous with trailing calls.
+  if (allowZeroArgCompoundNames && peekToken().is(tok::r_paren)) {
+    consumeToken(tok::l_paren);
+    consumeToken(tok::r_paren);
+    loc = DeclNameLoc(baseNameLoc);
+    SmallVector<Identifier, 2> argumentLabels;
+    return DeclName(Context, baseName, argumentLabels);
   }
 
   // If the token after that isn't an argument label or ':', we don't have a
