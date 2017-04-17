@@ -1685,7 +1685,7 @@ StringRef Lexer::getEncodedStringSegment(StringRef Bytes,
 
   std::string IndentStripped;
 
-  if (!ToReplace.empty()) {
+  if ((Modifiers & StringLiteralMultiline) && !ToReplace.empty()) {
     IndentStripped = Bytes;
     size_t pos = 0;
     while ((pos = IndentStripped.find(ToReplace, pos)) != std::string::npos) {
@@ -1780,7 +1780,7 @@ void Lexer::getStringLiteralSegments(
   // or line ending normalization
   std::string ToReplace = "";
   unsigned Modifiers = Str.getStringModifiers() | StringLiteralFirstSegment;
-  if ((Modifiers & StringLiteralMultiline))
+  if (Modifiers & StringLiteralMultiline)
       ToReplace = getTrailingIndentOrWindowsLineEnding(Str);
 
   // Note that it is always safe to read one over the end of "Bytes" because
