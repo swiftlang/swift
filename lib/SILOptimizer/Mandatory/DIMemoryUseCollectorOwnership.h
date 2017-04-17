@@ -24,6 +24,7 @@
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILType.h"
 #include "llvm/ADT/APInt.h"
+#include "llvm/ADT/TinyPtrVector.h"
 
 namespace swift {
 
@@ -31,8 +32,10 @@ class SILBuilder;
 
 namespace ownership {
 
-/// DIMemoryObjectInfo - This struct holds information about the memory object
-/// being analyzed that is required to correctly break it down into elements.
+struct DIElementUseInfo;
+
+/// This struct holds information about the memory object being analyzed that is
+/// required to correctly break it down into elements.
 ///
 /// This includes a collection of utilities for reasoning about (potentially
 /// recursively) exploded aggregate elements, and computing access paths and
@@ -201,6 +204,8 @@ public:
 
   /// If the specified value is a 'let' property in an initializer, return true.
   bool isElementLetProperty(unsigned Element) const;
+
+  void collectRetainCountInfo(DIElementUseInfo &OutVar) const;
 };
 
 enum DIUseKind {
@@ -281,13 +286,28 @@ struct DIMemoryUse {
   }
 };
 
+struct DIElementUseInfo {
+  SmallVector<DIMemoryUse, 16> Uses;
+  SmallVector<SILInstruction *, 4> Releases;
+  TinyPtrVector<TermInst *> FailableInits;
+
+  void trackUse(DIMemoryUse Use) { Uses.push_back(Use); }
+
+  void trackDestroy(SILInstruction *Destroy) { Releases.push_back(Destroy); }
+
+  void trackFailableInitCall(const DIMemoryObjectInfo &TheMemory,
+                             SILInstruction *I);
+
+private:
+  void trackFailureBlock(const DIMemoryObjectInfo &TheMemory, TermInst *TI,
+                         SILBasicBlock *BB);
+};
+
 /// collectDIElementUsesFrom - Analyze all uses of the specified allocation
 /// instruction (alloc_box, alloc_stack or mark_uninitialized), classifying them
 /// and storing the information found into the Uses and Releases lists.
 void collectDIElementUsesFrom(const DIMemoryObjectInfo &MemoryInfo,
-                              SmallVectorImpl<DIMemoryUse> &Uses,
-                              SmallVectorImpl<TermInst *> &FailableInits,
-                              SmallVectorImpl<SILInstruction *> &Releases,
+                              DIElementUseInfo &UseInfo,
                               bool isDefiniteInitFinished,
                               bool TreatAddressToPointerAsInout);
 
