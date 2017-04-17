@@ -962,8 +962,21 @@ public:
   PotentialArchetype *getRootPotentialArchetype() const;
 
   /// Retrieve the potential archetype to which this source refers.
-  PotentialArchetype *getAffectedPotentialArchetype(
-                                        GenericSignatureBuilder &builder) const;
+  PotentialArchetype *getAffectedPotentialArchetype() const;
+
+  /// Visit each of the potential archetypes along the path, from the root
+  /// potential archetype to each potential archetype named via (e.g.) a
+  /// protocol requirement or parent source.
+  ///
+  /// \param visitor Called with each potential archetype along the path along
+  /// with the requirement source that is being applied on top of that
+  /// potential archetype. Can return \c true to halt the search.
+  ///
+  /// \returns nullptr if any call to \c visitor returned true. Otherwise,
+  /// returns the potential archetype to which the entire source refers.
+  PotentialArchetype *visitPotentialArchetypesAlongPath(
+           llvm::function_ref<bool(PotentialArchetype *,
+                                   const RequirementSource *)> visitor) const;
 
   /// Whether the requirement is inferred or derived from an inferred
   /// requirment.
@@ -979,22 +992,19 @@ public:
   /// path.
   bool isDerivedRequirement() const;
 
-  /// Whether the requirement is derived via some concrete conformance, e.g.,
-  /// a concrete type's conformance to a protocol or a superclass's conformance
-  /// to a protocol.
-  bool isDerivedViaConcreteConformance() const;
-
   /// Determine whether the given derived requirement \c source, when rooted at
   /// the potential archetype \c pa, is actually derived from the same
   /// requirement. Such "self-derived" requirements do not make the original
   /// requirement redundant, because without said original requirement, the
   /// derived requirement ceases to hold.
-  bool isSelfDerivedSource(PotentialArchetype *pa) const;
+  bool isSelfDerivedSource(PotentialArchetype *pa,
+                           bool &derivedViaConcrete) const;
 
   /// Determine whether a requirement \c pa: proto, when formed from this
   /// requirement source, is dependent on itself.
   bool isSelfDerivedConformance(PotentialArchetype *pa,
-                                ProtocolDecl *proto) const;
+                                ProtocolDecl *proto,
+                                bool &derivedViaConcrete) const;
 
   /// Retrieve a source location that corresponds to the requirement.
   SourceLoc getLoc() const;

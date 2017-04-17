@@ -1,5 +1,4 @@
-// RUN: not --crash %target-swift-frontend -primary-file %s -emit-ir
-// REQUIRES: asserts
+// RUN: %target-swift-frontend -primary-file %s -emit-ir
 
 protocol C {
   associatedtype I
