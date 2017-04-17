@@ -273,7 +273,9 @@ void TBDGenVisitor::visitClassDecl(ClassDecl *CD) {
     if (auto ctor = dyn_cast<ConstructorDecl>(value)) {
       addSymbol(SILDeclRef(ctor, SILDeclRef::Kind::Initializer));
     } else if (auto dtor = dyn_cast<DestructorDecl>(value)) {
-      addSymbol(SILDeclRef(dtor, SILDeclRef::Kind::Destroyer));
+      // ObjC classes don't have a symbol for their destructor.
+      if (!isObjC)
+        addSymbol(SILDeclRef(dtor, SILDeclRef::Kind::Destroyer));
     }
   }
 
