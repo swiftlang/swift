@@ -20,6 +20,7 @@
 #include "GenStruct.h"
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
+#include "NecessaryBindings.h"
 #include "llvm/ADT/SetVector.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILLocation.h"
@@ -27,6 +28,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsIRGen.h"
+#include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Types.h"
 
 using namespace swift;
@@ -44,27 +46,40 @@ IRGenModule::getAddrOfKeyPathPattern(KeyPathPattern *pattern,
   auto rootTy = pattern->getRootType();
   auto valueTy = pattern->getValueType();
 
-  // Check for type parameterization of any of the components.
-  if (pattern->getNumOperands() > 0
-      || pattern->getGenericSignature()) {
-    // TODO: Parameterized key paths, such as for key paths in generic contexts
-    // or with subscript components, require instantiation. Key paths with
-    // resilient index components may need instantiation to adjust component
-    // sizes as well.
-    Context.Diags.diagnose(diagLoc.getSourceLoc(),
-                           diag::not_implemented,
-                           "dependent key path");
-    return llvm::UndefValue::get(Int8PtrTy);
+  // Check for parameterization, whether by subscript indexes or by the generic
+  // environment. If there isn't any, we can instantiate the pattern in-place.
+  bool isInstantiableInPlace = pattern->getNumOperands() == 0
+    && !pattern->getGenericSignature();
+  
+  NecessaryBindings bindings;
+  GenericEnvironment *genericEnv = nullptr;
+  if (auto sig = pattern->getGenericSignature()) {
+    genericEnv = sig->createGenericEnvironment(*getSwiftModule());
+    auto subs = sig->getSubstitutionMap(
+                                      genericEnv->getForwardingSubstitutions());
+    auto fnTy = SILFunctionType::get(sig,
+         SILFunctionType::ExtInfo(SILFunctionType::Representation::Thin, false),
+         ParameterConvention::Direct_Unowned,
+         {}, {}, None, getSwiftModule()->getASTContext());
+    bindings = NecessaryBindings::forFunctionInvocations(*this, fnTy, subs);
   }
 
   /// Generate a metadata accessor that produces metadata for the given type
   /// using arguments from the generic context of the key path.
   auto emitMetadataGenerator = [&](CanType type) -> llvm::Function * {
-    if (!pattern->getGenericSignature())
+    if (!type->hasTypeParameter())
       // We can just use the regular metadata accessor.
       // TODO: Make a local copy of public symbols we can relative-reference?
       return getAddrOfTypeMetadataAccessFunction(type, NotForDefinition);
-    llvm_unreachable("not implemented");
+    
+    // Build a stub that loads the necessary bindings from the key path's
+    // argument buffer then fetches the metadata.
+    auto fnTy = llvm::FunctionType::get(TypeMetadataPtrTy,
+                                        {Int8PtrTy}, /*vararg*/ false);
+    auto accessorThunk = llvm::Function::Create(fnTy,
+                                              llvm::GlobalValue::PrivateLinkage,
+                                              "", getModule());
+    IRGen
   };
   
   // Start building the key path pattern.
@@ -87,8 +102,6 @@ IRGenModule::getAddrOfKeyPathPattern(KeyPathPattern *pattern,
   auto startOfKeyPathBuffer = fields.getNextOffsetFromGlobal();
   
   // Build out the components.
-  bool isInstantiableInPlace = true;
-  
   auto baseTy = rootTy;
   
   for (unsigned i : indices(pattern->getComponents())) {
@@ -180,7 +193,7 @@ IRGenModule::getAddrOfKeyPathPattern(KeyPathPattern *pattern,
                          llvm::ConstantInt::get(Int32Ty, header.getData()));
   
   // Create the global variable.
-  // TODO: Coalesce equivalent patterns. The pattern could be immutable if
+  // TODO: The pattern could be immutable if
   // it isn't instantiable in place, and if we made the type metadata accessor
   // references private, it could go in true-const memory.
   auto patternVar = fields.finishAndCreateGlobal("keypath",

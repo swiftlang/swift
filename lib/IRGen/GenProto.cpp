@@ -2438,7 +2438,6 @@ void EmitPolymorphicArguments::emit(CanSILFunctionType substFnType,
 NecessaryBindings
 NecessaryBindings::forFunctionInvocations(IRGenModule &IGM,
                                           CanSILFunctionType origType,
-                                          CanSILFunctionType substType,
                                           const SubstitutionMap &subs) {
   NecessaryBindings bindings;
 

@@ -1235,7 +1235,7 @@ void irgen::emitFunctionPartialApplication(IRGenFunction &IGF,
   if (auto genericSig = origType->getGenericSignature())
     subMap = genericSig->getSubstitutionMap(subs);
   auto bindings = NecessaryBindings::forFunctionInvocations(IGF.IGM,
-                                                   origType, substType, subMap);
+                                                            origType, subMap);
   if (!bindings.empty()) {
     hasSingleSwiftRefcountedContext = No;
     auto bindingsSize = bindings.getBufferSize(IGF.IGM);
