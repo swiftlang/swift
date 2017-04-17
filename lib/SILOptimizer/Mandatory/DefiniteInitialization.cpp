@@ -2629,9 +2629,9 @@ static bool processMemoryObject(MarkUninitializedInst *I) {
   return true;
 }
 
-/// checkDefiniteInitialization - Check that all memory objects that require
-/// initialization before use are properly set and transform the code as
-/// required for flow-sensitive properties.
+/// Check that all memory objects that require initialization before use are
+/// properly set and transform the code as required for flow-sensitive
+/// properties.
 static bool checkDefiniteInitialization(SILFunction &Fn) {
   DEBUG(llvm::dbgs() << "*** Definite Init visiting function: "
                      <<  Fn.getName() << "\n");
