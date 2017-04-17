@@ -1920,6 +1920,53 @@ public func abs<T : FloatingPoint>(_ x: T) -> T where T.Magnitude == T {
 }
 
 extension FloatingPoint {
+  @available(swift, obsoleted: 4, message: "Please use operators instead.")
+  public func negated() -> Self {
+    return -self
+  }
+
+  @available(swift, obsoleted: 4, message: "Please use operators instead.")
+  public func adding(_ other: Self) -> Self {
+    return self + other
+  }
+
+  @available(swift, obsoleted: 4, message: "Please use operators instead.")
+  public mutating func add(_ other: Self) {
+    self += other
+  }
+
+  @available(swift, obsoleted: 4, message: "Please use operators instead.")
+  public func subtracting(_ other: Self) -> Self {
+    return self - other
+  }
+
+  @available(swift, obsoleted: 4, message: "Please use operators instead.")
+  public mutating func subtract(_ other: Self) {
+    self -= other
+  }
+
+  @available(swift, obsoleted: 4, message: "Please use operators instead.")
+  public func multiplied(by other: Self) -> Self {
+    return self * other
+  }
+
+  @available(swift, obsoleted: 4, message: "Please use operators instead.")
+  public mutating func multiply(by other: Self) {
+    self *= other
+  }
+
+  @available(swift, obsoleted: 4, message: "Please use operators instead.")
+  public func divided(by other: Self) -> Self {
+    return self / other
+  }
+
+  @available(swift, obsoleted: 4, message: "Please use operators instead.")
+  public mutating func divide(by other: Self) {
+    self /= other
+  }
+}
+
+extension FloatingPoint {
   @available(*, unavailable, message: "Use bitPattern property instead")
   public func _toBitPattern() -> UInt {
     fatalError("unavailable")
