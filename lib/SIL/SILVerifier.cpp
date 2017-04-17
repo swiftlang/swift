@@ -1253,8 +1253,6 @@ public:
   }
 
   void checkBeginAccessInst(BeginAccessInst *BAI) {
-    require(F.hasAccessMarkers(), "Unexpected begin_access");
-
     auto op = BAI->getOperand();
     requireSameType(BAI->getType(), op->getType(),
                     "result must be same type as operand");
@@ -1271,9 +1269,35 @@ public:
             isa<MarkUninitializedInst>(op),
             "begin_access operand must be a root address derivation");
 
-    if (BAI->getModule().getStage() != SILStage::Raw) {
-      require(BAI->getEnforcement() != SILAccessEnforcement::Unknown,
+    // Any kind of access marker can be used in the raw stage if either kind
+    // of enforcement is enabled globally.
+    // After the raw stage, only dynamic access markers can be used, and
+    // only if dynamic enforcement is enabled globally.
+    // Eventually, we should allow access markers to persist in SIL, and
+    // even make them obligatory, but we'll need to update a bunch of
+    // passes first.
+    switch (BAI->getEnforcement()) {
+    case SILAccessEnforcement::Unknown:
+      require(F.getModule().getOptions().isAnyExclusivityEnforcementEnabled()
+              && BAI->getModule().getStage() == SILStage::Raw,
               "access must have known enforcement outside raw stage");
+      break;
+
+    case SILAccessEnforcement::Static:
+    case SILAccessEnforcement::Unsafe:
+      require(F.getModule().getOptions().isAnyExclusivityEnforcementEnabled()
+              && BAI->getModule().getStage() == SILStage::Raw,
+              "non-dynamic enforcement is currently disallowed outside "
+              "raw stage");
+      break;
+
+    case SILAccessEnforcement::Dynamic:
+      require(F.getModule().getOptions().EnforceExclusivityDynamic ||
+              (F.getModule().getOptions().EnforceExclusivityStatic &&
+               BAI->getModule().getStage() == SILStage::Raw),
+              "dynamic access enforcement is only allowed after raw stage when "
+              "globally enabled");
+      break;
     }
 
     switch (BAI->getAccessKind()) {
@@ -1290,8 +1314,6 @@ public:
   }
 
   void checkEndAccessInst(EndAccessInst *EAI) {
-    require(F.hasAccessMarkers(), "Unexpected end_access");
-
     auto BAI = dyn_cast<BeginAccessInst>(EAI->getOperand());
     require(BAI != nullptr,
             "operand of end_access must be a begin_access");
