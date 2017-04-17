@@ -253,7 +253,10 @@ bool RequirementSource::isDerivedViaConcreteConformance() const {
   return false;
 }
 
-bool RequirementSource::isSelfDerivedSource(PotentialArchetype *pa) const {
+bool RequirementSource::isSelfDerivedSource(PotentialArchetype *pa,
+                                            bool &derivedViaConcrete) const {
+  derivedViaConcrete = false;
+
   // If it's not a derived requirement, it's not self-derived.
   if (!isDerivedRequirement()) return false;
 
@@ -274,10 +277,15 @@ bool RequirementSource::isSelfDerivedSource(PotentialArchetype *pa) const {
     case RequirementSource::Parent:
       return currentPA->isInSameEquivalenceClassAs(pa);
 
-    case RequirementSource::NestedTypeNameMatch:
-    case RequirementSource::Concrete:
     case RequirementSource::ProtocolRequirement:
     case RequirementSource::InferredProtocolRequirement:
+      // Note whether we saw derivation through a concrete type.
+      if (currentPA->isConcreteType())
+        derivedViaConcrete = true;
+      return false;
+
+    case RequirementSource::NestedTypeNameMatch:
+    case RequirementSource::Concrete:
     case RequirementSource::Superclass:
       return false;
     }
@@ -3768,6 +3776,38 @@ Constraint<T> GenericSignatureBuilder::checkConstraintList(
                                    /*removeSelfDerived=*/true);
 }
 
+namespace {
+  /// Remove self-derived sources from the given vector of constraints.
+  template<typename T>
+  void removeSelfDerived(std::vector<Constraint<T>> &constraints) {
+    // Remove self-derived constraints.
+    Optional<Constraint<T>> remainingConcrete;
+    constraints.erase(
+      std::remove_if(constraints.begin(), constraints.end(),
+                     [&](const Constraint<T> &constraint) {
+                       bool derivedViaConcrete;
+                       if (constraint.source->isSelfDerivedSource(
+                                constraint.archetype, derivedViaConcrete))
+                         return true;
+
+                       if (!derivedViaConcrete)
+                         return false;
+
+                       // Drop derived-via-concrete requirements.
+                       if (!remainingConcrete)
+                         remainingConcrete = constraint;
+
+                       return true;
+                     }),
+      constraints.end());
+
+    if (constraints.empty() && remainingConcrete)
+      constraints.push_back(*remainingConcrete);
+
+    assert(!constraints.empty() && "All constraints were self-derived!");
+  }
+}
+
 template<typename T, typename DiagT>
 Constraint<T> GenericSignatureBuilder::checkConstraintList(
                            ArrayRef<GenericTypeParamType *> genericParams,
@@ -3784,15 +3824,7 @@ Constraint<T> GenericSignatureBuilder::checkConstraintList(
                            bool removeSelfDerived) {
   assert(!constraints.empty() && "No constraints?");
   if (removeSelfDerived) {
-    // Remove self-derived constraints.
-    constraints.erase(
-      std::remove_if(constraints.begin(), constraints.end(),
-                     [&](const Constraint<T> &constraint) {
-                       return constraint.source->isSelfDerivedSource(
-                                constraint.archetype);
-                     }),
-      constraints.end());
-    assert(!constraints.empty() && "All constraints were self-derived!");
+    ::removeSelfDerived(constraints);
   }
 
   // Sort the constraints, so we get a deterministic ordering of diagnostics.
@@ -4132,15 +4164,7 @@ void GenericSignatureBuilder::checkSameTypeConstraints(
     auto &constraints = entry.second;
 
     // Remove self-derived constraints.
-    assert(!constraints.empty() && "No constraints?");
-    constraints.erase(
-      std::remove_if(constraints.begin(), constraints.end(),
-                     [&](const Constraint<PotentialArchetype *> &constraint) {
-                       return constraint.source->isSelfDerivedSource(
-                                constraint.archetype);
-                     }),
-      constraints.end());
-    assert(!constraints.empty() && "All constraints were self-derived!");
+    removeSelfDerived(constraints);
 
     // Sort the constraints, so we get a deterministic ordering of diagnostics.
     llvm::array_pod_sort(constraints.begin(), constraints.end());

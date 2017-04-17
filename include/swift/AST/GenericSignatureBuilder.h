@@ -1002,7 +1002,8 @@ public:
   /// requirement. Such "self-derived" requirements do not make the original
   /// requirement redundant, because without said original requirement, the
   /// derived requirement ceases to hold.
-  bool isSelfDerivedSource(PotentialArchetype *pa) const;
+  bool isSelfDerivedSource(PotentialArchetype *pa,
+                           bool &derivedViaConcrete) const;
 
   /// Determine whether a requirement \c pa: proto, when formed from this
   /// requirement source, is dependent on itself.
