@@ -256,7 +256,7 @@ public:
 // DenseMapInfo for RC<SyntaxData>, used for a Syntax Node -> lib/AST mapping.
 namespace llvm {
   using SD = swift::syntax::SyntaxData;
-  using RCSD = swift::syntax::RC<SD>;
+  using RCSD = swift::RC<SD>;
   template <> struct llvm::DenseMapInfo<RCSD> {
     static inline RCSD getEmptyKey() {
       return SD::make(nullptr, nullptr, 0);

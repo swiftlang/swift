@@ -69,7 +69,7 @@ int getTokensFromFile(unsigned BufferID,
                       LangOptions &LangOpts,
                       SourceManager &SourceMgr,
                       DiagnosticEngine &Diags,
-                      std::vector<std::pair<syntax::RC<syntax::TokenSyntax>,
+                      std::vector<std::pair<RC<syntax::TokenSyntax>,
                       syntax::AbsolutePosition>> &Tokens) {
   Tokens = tokenizeWithTrivia(LangOpts, SourceMgr, BufferID);
   return Diags.hadAnyError() ? EXIT_FAILURE : EXIT_SUCCESS;
@@ -81,7 +81,7 @@ getTokensFromFile(const StringRef InputFilename,
                   LangOptions &LangOpts,
                   SourceManager &SourceMgr,
                   DiagnosticEngine &Diags,
-                  std::vector<std::pair<syntax::RC<syntax::TokenSyntax>,
+                  std::vector<std::pair<RC<syntax::TokenSyntax>,
                                         syntax::AbsolutePosition>> &Tokens) {
   auto Buffer = llvm::MemoryBuffer::getFile(InputFilename);
   if (!Buffer) {
@@ -101,7 +101,7 @@ int doFullLexRoundTrip(const StringRef InputFilename) {
   PrintingDiagnosticConsumer DiagPrinter;
   Diags.addConsumer(DiagPrinter);
 
-  std::vector<std::pair<syntax::RC<syntax::TokenSyntax>,
+  std::vector<std::pair<RC<syntax::TokenSyntax>,
                                    syntax::AbsolutePosition>> Tokens;
   if (getTokensFromFile(InputFilename, LangOpts, SourceMgr,
                         Diags, Tokens) == EXIT_FAILURE) {
@@ -123,7 +123,7 @@ int doDumpTokenSyntax(const StringRef InputFilename) {
   Diags.addConsumer(DiagPrinter);
 
 
-  std::vector<std::pair<syntax::RC<syntax::TokenSyntax>,
+  std::vector<std::pair<RC<syntax::TokenSyntax>,
                         syntax::AbsolutePosition>> Tokens;
   if (getTokensFromFile(InputFilename, LangOpts, SourceMgr,
                         Diags, Tokens) == EXIT_FAILURE) {
@@ -172,7 +172,7 @@ int doFullParseRoundTrip(const StringRef InputFilename) {
   assert(SF && "No source file");
 
   // Retokenize the buffer with full fidelity
-  std::vector<std::pair<syntax::RC<syntax::TokenSyntax>,
+  std::vector<std::pair<RC<syntax::TokenSyntax>,
                         syntax::AbsolutePosition>> Tokens;
   if (getTokensFromFile(BufferID, Invocation.getLangOptions(),
                         SourceMgr,
