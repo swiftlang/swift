@@ -994,7 +994,8 @@ public:
   /// Determine whether a requirement \c pa: proto, when formed from this
   /// requirement source, is dependent on itself.
   bool isSelfDerivedConformance(PotentialArchetype *pa,
-                                ProtocolDecl *proto) const;
+                                ProtocolDecl *proto,
+                                bool &derivedViaConcrete) const;
 
   /// Retrieve a source location that corresponds to the requirement.
   SourceLoc getLoc() const;

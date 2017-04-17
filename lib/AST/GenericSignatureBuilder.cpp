@@ -368,8 +368,10 @@ static PotentialArchetype *replaceSelfWithPotentialArchetype(
   return selfPA;
 }
 
-bool RequirementSource::isSelfDerivedConformance(PotentialArchetype *currentPA,
-                                                 ProtocolDecl *proto) const {
+bool RequirementSource::isSelfDerivedConformance(
+                                             PotentialArchetype *currentPA,
+                                             ProtocolDecl *proto,
+                                             bool &derivedViaConcrete) const {
   /// Keep track of all of the requirements we've seen along the way. If
   /// we see the same requirement twice, it's a self-derived conformance.
   llvm::DenseSet<std::pair<PotentialArchetype *, ProtocolDecl *>>
@@ -384,10 +386,12 @@ bool RequirementSource::isSelfDerivedConformance(PotentialArchetype *currentPA,
   // Insert our end state.
   constraintsSeen.insert({currentPA->getRepresentative(), proto});
 
-  // Follow from the root of the
+  // Follow from the root of the requirement source to the given requirement
+  // source, computing the potential archetype to which each step refers.
   std::function<PotentialArchetype *(const RequirementSource *source)>
     followFromRoot;
 
+  derivedViaConcrete = false;
   bool sawProtocolRequirement = false;
   followFromRoot = [&](const RequirementSource *source) -> PotentialArchetype *{
     // Handle protocol requirements.
@@ -397,6 +401,10 @@ bool RequirementSource::isSelfDerivedConformance(PotentialArchetype *currentPA,
       // Compute the base potential archetype.
       auto basePA = followFromRoot(source->parent);
       if (!basePA) return nullptr;
+
+      // If the base has been made concrete, note it.
+      if (basePA->isConcreteType())
+        derivedViaConcrete = true;
 
       // The base potential archetype must conform to the protocol in which
       // this requirement results.
@@ -2813,9 +2821,11 @@ ConstraintResult GenericSignatureBuilder::addSameTypeRequirementToConcrete(
                                protocol->getDeclaredInterfaceType()
                                  ->castTo<ProtocolType>());
     if (!conformance) {
-      Diags.diagnose(Source->getLoc(),
-                     diag::requires_generic_param_same_type_does_not_conform,
-                     Concrete, protocol->getName());
+      if (!Concrete->hasError()) {
+        Diags.diagnose(Source->getLoc(),
+                       diag::requires_generic_param_same_type_does_not_conform,
+                       Concrete, protocol->getName());
+      }
       return ConstraintResult::Conflicting;
     }
 
@@ -3913,13 +3923,30 @@ void GenericSignatureBuilder::checkConformanceConstraints(
   for (auto &entry : equivClass->conformsTo) {
     // Remove self-derived constraints.
     assert(!entry.second.empty() && "No constraints to work with?");
+    Optional<Constraint<ProtocolDecl *>> remainingConcrete;
     entry.second.erase(
       std::remove_if(entry.second.begin(), entry.second.end(),
                      [&](const Constraint<ProtocolDecl *> &constraint) {
-                       return constraint.source->isSelfDerivedConformance(
-                                constraint.archetype, entry.first);
+                       bool derivedViaConcrete;
+                       if (constraint.source->isSelfDerivedConformance(
+                                constraint.archetype, entry.first,
+                                derivedViaConcrete))
+                         return true;
+
+                       if (!derivedViaConcrete)
+                         return false;
+
+                       // Drop derived-via-concrete requirements.
+                       if (!remainingConcrete)
+                         remainingConcrete = constraint;
+                       return true;
                      }),
       entry.second.end());
+
+    // If we only had concrete conformances, put one back.
+    if (entry.second.empty() && remainingConcrete)
+      entry.second.push_back(*remainingConcrete);
+
     assert(!entry.second.empty() && "All constraints were self-derived!");
 
     checkConstraintList<ProtocolDecl *, ProtocolDecl *>(
