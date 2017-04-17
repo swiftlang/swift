@@ -1210,9 +1210,8 @@ unsigned Lexer::lexCharacter(const char *&CurPtr, char StopQuote,
   case '\n':
     LLVM_FALLTHROUGH;
   case '\r':
-    CurPtr++;
     if (Modifiers & StringLiteralMultiline)
-      return CurPtr[-1];
+      return *CurPtr++;
     if (EmitDiagnostics)
       diagnose(CurPtr, diag::lex_invalid_escape);
     return ~1U;
