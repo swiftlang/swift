@@ -2492,13 +2492,6 @@ TypeConverter::checkFunctionForABIDifferences(SILFunctionType *fnTy1,
   return ABIDifference::Trivial;
 }
 
-void canonicalizeSubstitutions(MutableArrayRef<Substitution> subs) {
-  for (auto &sub : subs) {
-    sub = Substitution(sub.getReplacement()->getCanonicalType(),
-                       sub.getConformances());
-  }
-}
-
 CanSILBoxType
 TypeConverter::getInterfaceBoxTypeForCapture(ValueDecl *captured,
                                              CanType loweredInterfaceType,
@@ -2536,8 +2529,7 @@ TypeConverter::getInterfaceBoxTypeForCapture(ValueDecl *captured,
       return ProtocolConformanceRef(conformedTy->getDecl());
     },
     genericArgs);
-  canonicalizeSubstitutions(genericArgs);
-  
+
   auto boxTy = SILBoxType::get(C, layout, genericArgs);
 #ifndef NDEBUG
   // FIXME: Map the box type out of context when asserting the field so

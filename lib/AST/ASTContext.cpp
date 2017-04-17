@@ -4189,7 +4189,8 @@ CanSILBoxType SILBoxType::get(ASTContext &C,
   llvm::FoldingSetNodeID id;
 
   // Canonicalize substitutions.
-  Args = getCanonicalSubstitutionList(Args);
+  SmallVector<Substitution, 4> CanArgs;
+  Args = getCanonicalSubstitutionList(Args, CanArgs);
 
   Profile(id, Layout, Args);
 

@@ -1062,19 +1062,17 @@ DeclContext::getLocalConformances(
 
 /// Check of all types used by the conformance are canonical.
 bool ProtocolConformance::isCanonical() const {
-  // Normal conformances are considered canonical by
-  // construction.
-  if (getKind() != ProtocolConformanceKind::Normal) {
-    if (!getType()->isCanonical())
-      return false;
-    if (!getInterfaceType()->isCanonical())
-      return false;
-  }
+  // Normal conformances are always canonical by construction.
+  if (getKind() == ProtocolConformanceKind::Normal)
+    return true;
+
+  if (!getType()->isCanonical())
+    return false;
+  if (!getInterfaceType()->isCanonical())
+    return false;
 
   switch (getKind()) {
   case ProtocolConformanceKind::Normal: {
-    // Normal conformances are considered canonical by
-    // construction.
     return true;
   }
   case ProtocolConformanceKind::Inherited: {
@@ -1136,20 +1134,25 @@ Substitution Substitution::getCanonicalSubstitution(bool *wasCanonical) const {
   return *this;
 }
 
-SubstitutionList swift::getCanonicalSubstitutionList(SubstitutionList subs) {
-  SmallVector<Substitution, 4> newCanSubstitutions;
+SubstitutionList
+swift::getCanonicalSubstitutionList(SubstitutionList subs,
+                                    SmallVectorImpl<Substitution> &canSubs) {
   bool subListWasCanonical = true;
   for (auto &sub : subs) {
     bool subWasCanonical = false;
     auto canSub = sub.getCanonicalSubstitution(&subWasCanonical);
     if (!subWasCanonical)
       subListWasCanonical = false;
-    newCanSubstitutions.push_back(canSub);
+    canSubs.push_back(canSub);
   }
-  if (subListWasCanonical)
+
+  if (subListWasCanonical) {
+    canSubs.clear();
     return subs;
-  return newCanSubstitutions[0].getReplacement()->getASTContext().AllocateCopy(
-      newCanSubstitutions);
+  }
+
+  subs = canSubs;
+  return subs;
 }
 
 /// Check of all types used by the conformance are canonical.
@@ -1159,7 +1162,7 @@ ProtocolConformance *ProtocolConformance::getCanonicalConformance() {
 
   switch (getKind()) {
   case ProtocolConformanceKind::Normal: {
-    //assert(isCanonical() && "Normal conformances should always be canonical");
+    // Normal conformances are always canonical by construction.
     return this;
   }
 
@@ -1178,10 +1181,12 @@ ProtocolConformance *ProtocolConformance::getCanonicalConformance() {
     auto spec = cast<SpecializedProtocolConformance>(this);
     auto genericConformance = spec->getGenericConformance();
     auto specSubs = spec->getGenericSubstitutions();
-    auto canSpecSubs = getCanonicalSubstitutionList(specSubs);
+    SmallVector<Substitution, 4> newSpecSubs;
+    auto canSpecSubs = getCanonicalSubstitutionList(specSubs, newSpecSubs);
     return Ctx.getSpecializedConformance(
         getType()->getCanonicalType(),
-        genericConformance->getCanonicalConformance(), canSpecSubs);
+        genericConformance->getCanonicalConformance(),
+        newSpecSubs.empty() ? canSpecSubs : Ctx.AllocateCopy(canSpecSubs));
   }
   }
   llvm_unreachable("bad ProtocolConformanceKind");
