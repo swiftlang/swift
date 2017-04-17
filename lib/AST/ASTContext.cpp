@@ -4187,8 +4187,13 @@ CanSILBoxType SILBoxType::get(ASTContext &C,
                               SILLayout *Layout,
                               SubstitutionList Args) {
   llvm::FoldingSetNodeID id;
+
+  // Canonicalize substitutions.
+  SmallVector<Substitution, 4> CanArgs;
+  Args = getCanonicalSubstitutionList(Args, CanArgs);
+
   Profile(id, Layout, Args);
-  
+
   // Return an existing layout if there is one.
   void *insertPos;
   auto &SILBoxTypes = C.Impl.SILBoxTypes;

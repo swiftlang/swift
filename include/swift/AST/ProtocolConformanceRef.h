@@ -127,6 +127,12 @@ public:
                        ProtocolConformanceRef conformance,
                        Identifier name,
                        LazyResolver *resolver);
+
+  /// Determine whether this conformance is canonical.
+  bool isCanonical() const;
+
+  /// Create a canonical conformance from the current one.
+  ProtocolConformanceRef getCanonicalConformanceRef() const;
 };
 
 } // end namespace swift
