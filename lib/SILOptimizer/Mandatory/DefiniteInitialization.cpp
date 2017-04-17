@@ -477,7 +477,7 @@ namespace {
     DIMemoryObjectInfo TheMemory;
 
     SmallVectorImpl<DIMemoryUse> &Uses;
-    SmallVectorImpl<TermInst *> &FailableInits;
+    TinyPtrVector<TermInst *> &FailableInits;
     SmallVectorImpl<SILInstruction *> &Destroys;
     std::vector<ConditionalDestroy> ConditionalDestroys;
 
@@ -506,9 +506,7 @@ namespace {
     
   public:
     LifetimeChecker(const DIMemoryObjectInfo &TheMemory,
-                    SmallVectorImpl<DIMemoryUse> &Uses,
-                    SmallVectorImpl<TermInst *> &FailableInits,
-                    SmallVectorImpl<SILInstruction*> &Releases);
+                    DIElementUseInfo &UseInfo);
 
     void doIt();
 
@@ -574,13 +572,11 @@ namespace {
   };
 } // end anonymous namespace
 
-
 LifetimeChecker::LifetimeChecker(const DIMemoryObjectInfo &TheMemory,
-                                 SmallVectorImpl<DIMemoryUse> &Uses,
-                                 SmallVectorImpl<TermInst*> &FailableInits,
-                                 SmallVectorImpl<SILInstruction*> &Releases)
-  : Module(TheMemory.MemoryInst->getModule()), TheMemory(TheMemory), Uses(Uses),
-    FailableInits(FailableInits), Destroys(Releases) {
+                                 DIElementUseInfo &UseInfo)
+    : Module(TheMemory.MemoryInst->getModule()), TheMemory(TheMemory),
+      Uses(UseInfo.Uses), FailableInits(UseInfo.FailableInits),
+      Destroys(UseInfo.Releases) {
 
   // The first step of processing an element is to collect information about the
   // element into data structures we use later.
@@ -2617,21 +2613,19 @@ static bool processMemoryObject(MarkUninitializedInst *I) {
   DIMemoryObjectInfo MemInfo(I);
 
   // Set up the datastructure used to collect the uses of the allocation.
-  SmallVector<DIMemoryUse, 16> Uses;
-  SmallVector<TermInst*, 1> FailableInits;
-  SmallVector<SILInstruction*, 4> Releases;
+  DIElementUseInfo UseInfo;
 
   // Walk the use list of the pointer, collecting them into the Uses array.
-  collectDIElementUsesFrom(MemInfo, Uses, FailableInits, Releases, false,
+  collectDIElementUsesFrom(MemInfo, UseInfo, false,
                            /*TreatAddressToPointerAsInout*/ true);
 
-  LifetimeChecker(MemInfo, Uses, FailableInits, Releases).doIt();
+  LifetimeChecker(MemInfo, UseInfo).doIt();
   return true;
 }
 
-/// checkDefiniteInitialization - Check that all memory objects that require
-/// initialization before use are properly set and transform the code as
-/// required for flow-sensitive properties.
+/// Check that all memory objects that require initialization before use are
+/// properly set and transform the code as required for flow-sensitive
+/// properties.
 static bool checkDefiniteInitialization(SILFunction &Fn) {
   DEBUG(llvm::dbgs() << "*** Definite Init visiting function: "
                      <<  Fn.getName() << "\n");

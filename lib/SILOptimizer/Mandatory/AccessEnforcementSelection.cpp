@@ -87,7 +87,12 @@ private:
   void propagateEscapesFrom(SILBasicBlock *bb);
 
   bool hasPotentiallyEscapedAt(SILInstruction *inst);
-  bool hasPotentiallyEscapedAtAnyReachableBlock(BeginAccessInst *access);
+
+  typedef llvm::SmallSetVector<SILBasicBlock*, 8> BlockSetVector;
+  void findBlocksAccessedAcross(EndAccessInst *endAccess,
+                                BlockSetVector &blocksAccessedAcross);
+  bool hasPotentiallyEscapedAtAnyReachableBlock(
+    BeginAccessInst *access, BlockSetVector &blocksAccessedAcross);
 
   void updateAccesses();
   void updateAccess(BeginAccessInst *access);
@@ -216,22 +221,53 @@ bool SelectEnforcement::hasPotentiallyEscapedAt(SILInstruction *point) {
   return false;
 }
 
-bool SelectEnforcement::hasPotentiallyEscapedAtAnyReachableBlock(
-                                                      BeginAccessInst *access) {
+/// Add all blocks to `Worklist` between the given `endAccess` and its
+/// `begin_access` in which the access is active at the end of the block.
+void SelectEnforcement::findBlocksAccessedAcross(
+  EndAccessInst *endAccess, BlockSetVector &blocksAccessedAcross) {
+
   // Fast path: we're not tracking any escapes.  (But the box should
   // probably have been promoted to the stack in this case.)
   if (StateMap.empty())
-    return false;
+    return;
 
-  auto bb = access->getParent();
+  SILBasicBlock *beginBB = endAccess->getBeginAccess()->getParent();
+  if (endAccess->getParent() == beginBB)
+    return;
+
+  assert(Worklist.empty());
+  Worklist.push_back(endAccess->getParent());
+  while (!Worklist.empty()) {
+    SILBasicBlock *bb = Worklist.pop_back_val();
+    for (auto *predBB : bb->getPredecessorBlocks()) {
+      if (!blocksAccessedAcross.insert(predBB)) continue;
+      if (predBB == beginBB) continue;
+      Worklist.push_back(predBB);
+    }
+  }
+}
+
+bool SelectEnforcement::hasPotentiallyEscapedAtAnyReachableBlock(
+  BeginAccessInst *access, BlockSetVector &blocksAccessedAcross) {
 
   assert(Worklist.empty());
   SmallPtrSet<SILBasicBlock*, 8> visited;
-  visited.insert(bb);
-  Worklist.push_back(bb);
+
+  // Don't follow any paths that lead to an end_access.
+  for (auto endAccess : access->getEndAccesses())
+    visited.insert(endAccess->getParent());
+
+  /// Initialize the worklist with all blocks that exit the access path.
+  for (SILBasicBlock *bb : blocksAccessedAcross) {
+    for (SILBasicBlock *succBB : bb->getSuccessorBlocks()) {
+      if (blocksAccessedAcross.count(succBB)) continue;
+      if (visited.insert(succBB).second)
+        Worklist.push_back(succBB);
+    }
+  }
 
   while (!Worklist.empty()) {
-    bb = Worklist.pop_back_val();
+    SILBasicBlock *bb = Worklist.pop_back_val();
     assert(visited.count(bb));
 
     // If we're tracking information for this block, there's an escape.
@@ -259,27 +295,23 @@ void SelectEnforcement::updateAccess(BeginAccessInst *access) {
   assert(access->getEnforcement() == SILAccessEnforcement::Unknown);
 
   // Check whether the variable escaped before any of the end_accesses.
-  bool anyDynamic = false;
-  bool hasEndAccess = false;
+  BlockSetVector blocksAccessedAcross;
   for (auto endAccess : access->getEndAccesses()) {
-    hasEndAccess = true;
-    if (hasPotentiallyEscapedAt(endAccess)) {
-      anyDynamic = true;
-      break;
-    }
-  }
-
-  // If so, make the access dynamic.
-  if (anyDynamic)
-    return setDynamicEnforcement(access);
-
-  // Otherwise, if there are no end_access instructions,
-  // check the terminators of every reachable block.
-  if (!hasEndAccess) {
-    if (hasPotentiallyEscapedAtAnyReachableBlock(access))
+    if (hasPotentiallyEscapedAt(endAccess))
       return setDynamicEnforcement(access);
-  }
 
+    // Add all blocks to blocksAccessedAcross between begin_access and this
+    // end_access.
+    findBlocksAccessedAcross(endAccess, blocksAccessedAcross);
+  }
+  assert(blocksAccessedAcross.empty()
+         || blocksAccessedAcross.count(access->getParent()));
+
+  // For every path through this access that doesn't reach an end_access, check
+  // if any block reachable from that path can see an escaped value.
+  if (hasPotentiallyEscapedAtAnyReachableBlock(access, blocksAccessedAcross)) {
+    return setDynamicEnforcement(access);
+  }
   // Otherwise, use static enforcement.
   setStaticEnforcement(access);
 }
