@@ -214,6 +214,11 @@ void TBDGenVisitor::visitNominalTypeDecl(NominalTypeDecl *NTD) {
     if (!needsWTable)
       continue;
 
+    // Only normal conformances get symbols; the others get any public symbols
+    // from their parent normal conformance.
+    if (conformance->getKind() != ProtocolConformanceKind::Normal)
+      continue;
+
     addSymbol(LinkEntity::forDirectProtocolWitnessTable(conformance));
     addSymbol(LinkEntity::forProtocolWitnessTableAccessFunction(conformance));
   }
