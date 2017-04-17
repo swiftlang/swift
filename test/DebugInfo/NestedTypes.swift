@@ -12,7 +12,7 @@ public class C { }
 public let e : Enum = .WithClass(C())
 
 // CHECK: !DIDerivedType(tag: DW_TAG_member, name: "WithClass",
-// CHECK-SAME:           size: {{32|64}},
+// CHECK-SAME:           size: {{32|64}})
 // CHECK: !DIDerivedType(tag: DW_TAG_member, name: "WithStruct",
-// CHECK-SAME:           size: 128,
+// CHECK-SAME:           size: 128)
 

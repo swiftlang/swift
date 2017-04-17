@@ -237,6 +237,8 @@ NodePointer Demangler::demangleSymbol(StringRef MangledName) {
       && !nextIf("_S"))
     return nullptr;
 
+  // If any other prefixes are accepted, please update Mangler::verify.
+
   NodePointer topLevel = createNode(Node::Kind::Global);
 
   parseAndPushNodes();
@@ -360,7 +362,7 @@ NodePointer Demangler::demangleOperator() {
   switch (char c = nextChar()) {
     case 'A': return demangleMultiSubstitutions();
     case 'B': return demangleBuiltinType();
-    case 'C': return demangleNominalType(Node::Kind::Class);
+    case 'C': return demangleAnyGenericType(Node::Kind::Class);
     case 'D': return createWithChild(Node::Kind::TypeMangling,
                                      popNode(Node::Kind::Type));
     case 'E': return demangleExtensionContext();
@@ -372,17 +374,17 @@ NodePointer Demangler::demangleOperator() {
     case 'M': return demangleMetatype();
     case 'N': return createWithChild(Node::Kind::TypeMetadata,
                                      popNode(Node::Kind::Type));
-    case 'O': return demangleNominalType(Node::Kind::Enum);
-    case 'P': return demangleNominalType(Node::Kind::Protocol);
+    case 'O': return demangleAnyGenericType(Node::Kind::Enum);
+    case 'P': return demangleAnyGenericType(Node::Kind::Protocol);
     case 'Q': return demangleArchetype();
     case 'R': return demangleGenericRequirement();
     case 'S': return demangleStandardSubstitution();
     case 'T': return demangleThunkOrSpecialization();
-    case 'V': return demangleNominalType(Node::Kind::Structure);
+    case 'V': return demangleAnyGenericType(Node::Kind::Structure);
     case 'W': return demangleWitness();
     case 'X': return demangleSpecialType();
     case 'Z': return createWithChild(Node::Kind::Static, popNode(isEntity));
-    case 'a': return demangleTypeAlias();
+    case 'a': return demangleAnyGenericType(Node::Kind::TypeAlias);
     case 'c': return popFunctionType(Node::Kind::FunctionType);
     case 'd': return createNode(Node::Kind::VariadicMarker);
     case 'f': return demangleFunctionEntity();
@@ -757,18 +759,12 @@ NodePointer Demangler::demangleBuiltinType() {
   return createType(Ty);
 }
 
-NodePointer Demangler::demangleNominalType(Node::Kind kind) {
+NodePointer Demangler::demangleAnyGenericType(Node::Kind kind) {
   NodePointer Name = popNode(isDeclName);
   NodePointer Ctx = popContext();
   NodePointer NTy = createType(createWithChildren(kind, Ctx, Name));
   addSubstitution(NTy);
   return NTy;
-}
-
-NodePointer Demangler::demangleTypeAlias() {
-  NodePointer Name = popNode(isDeclName);
-  NodePointer Ctx = popContext();
-  return createType(createWithChildren(Node::Kind::TypeAlias, Ctx, Name));
 }
 
 NodePointer Demangler::demangleExtensionContext() {
@@ -1635,7 +1631,7 @@ NodePointer Demangler::demangleSpecialType() {
       return createType(boxTy);
     }
     case 'e':
-      return createType(createNode(Node::Kind::ErrorType, StringRef()));
+      return createType(createNode(Node::Kind::ErrorType));
     default:
       return nullptr;
   }

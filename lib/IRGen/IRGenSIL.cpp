@@ -3295,7 +3295,7 @@ void IRGenSILFunction::emitErrorResultVar(SILResultInfo ErrorInfo,
                                 Var.Name, Var.ArgNo);
   DebugTypeInfo DTI(nullptr, nullptr, ErrorInfo.getType(),
                     ErrorResultSlot->getType(), IGM.getPointerSize(),
-                    IGM.getPointerAlignment());
+                    IGM.getPointerAlignment(), true);
   IGM.DebugInfo->emitVariableDeclaration(Builder, Storage, DTI, getDebugScope(),
                                          nullptr, Var.Name, Var.ArgNo,
                                          IndirectValue, ArtificialValue);
