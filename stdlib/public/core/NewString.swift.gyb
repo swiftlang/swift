@@ -741,19 +741,24 @@ extension PackedUnsignedIntegers : RandomAccessCollection {
   public var endIndex: Int { return count }
   
   public var count: Int {
-    var result = 0
-    var rep = representation
-    while rep != 0 {
-      rep = rep >> bitsPerElement
-      result += 1
-    }
-    return result
+    let significantBits: UInt = (
+      64 - _countLeadingZeros(
+        IntMax(bitPattern: representation.toUIntMax())))^
+    
+    let n = significantBits &+ numericCast(bitsPerElement) &- 1
+    // NOTE: this will bbe division by a small constant factor, which is
+    // implemented with multiplication and shifts
+    let r = Int(bitPattern:n / bitsPerElement^)
+    return r
   }
+  
   public subscript(i: Int) -> Element {
-    var rep = representation
-    for _ in 0..<i { rep = rep >> bitsPerElement }
-    let mask = ~(0 as Representation) << bitsPerElement
-    return numericCast((rep &- 1) & ~mask)
+    let bitsPerElement_ = bitsPerElement.toUIntMax()
+    let mask = ~(~0 << bitsPerElement_)
+    let representation_ = representation.toUIntMax()
+    let i_ = UInt(bitPattern: i).toUIntMax()
+    let r = (representation_ >> (bitsPerElement_ * i_) &- 1) & mask
+    return numericCast(r)
   }
 }
 
