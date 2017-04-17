@@ -3528,6 +3528,9 @@ public typealias SignedNumber = SignedNumeric
 @available(swift, obsoleted: 4)
 public typealias AbsoluteValuable = SignedNumeric & Comparable
 
+@available(swift, obsoleted: 4)
+public typealias _SignedInteger = SignedInteger
+
 extension SignedNumeric where Self : Comparable {
   @available(swift, obsoleted: 4)
   @_transparent
