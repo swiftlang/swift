@@ -237,10 +237,11 @@ struct APIDiffItemStore {
   struct Implementation;
   Implementation &Impl;
   static void serialize(llvm::raw_ostream &os, ArrayRef<APIDiffItem*> Items);
-  APIDiffItemStore(StringRef FileName);
+  APIDiffItemStore();
   ~APIDiffItemStore();
   ArrayRef<APIDiffItem*> getDiffItems(StringRef Key) const;
   ArrayRef<APIDiffItem*> getAllDiffItems() const;
+  void addStorePath(StringRef Path);
 };
 }
 }

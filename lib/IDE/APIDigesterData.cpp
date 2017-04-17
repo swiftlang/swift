@@ -362,17 +362,24 @@ serialize(llvm::raw_ostream &os, ArrayRef<APIDiffItem*> Items) {
 
 struct swift::ide::api::APIDiffItemStore::Implementation {
 private:
-  llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> FileBufOrErr;
+  llvm::SmallVector<std::shared_ptr<llvm::MemoryBuffer>, 2> AllBuffer;
   llvm::BumpPtrAllocator Allocator;
 public:
   llvm::StringMap<std::vector<APIDiffItem*>> Data;
   std::vector<APIDiffItem*> AllItems;
-  Implementation(StringRef FileName):
-      FileBufOrErr(llvm::MemoryBuffer::getFileOrSTDIN(FileName)) {
-    if (!FileBufOrErr) {
-      llvm_unreachable("Failed to read JSON file");
+  void addStorePath(StringRef FileName) {
+    llvm::MemoryBuffer *pMemBuffer = nullptr;
+    {
+      auto FileBufOrErr = llvm::MemoryBuffer::getFileOrSTDIN(FileName);
+      if (!FileBufOrErr) {
+        llvm_unreachable("Failed to read JSON file");
+      }
+      pMemBuffer = FileBufOrErr->get();
+      AllBuffer.emplace_back(pMemBuffer);
+      FileBufOrErr->reset();
     }
-    StringRef Buffer = FileBufOrErr->get()->getBuffer();
+    assert(pMemBuffer);
+    StringRef Buffer = pMemBuffer->getBuffer();
     llvm::SourceMgr SM;
     llvm::yaml::Stream Stream(Buffer, SM);
     for (auto DI = Stream.begin(); DI != Stream.end(); ++ DI) {
@@ -384,6 +391,7 @@ public:
         AllItems.push_back(Item);
       }
     }
+
   }
 };
 
@@ -393,7 +401,11 @@ getDiffItems(StringRef Key) const { return Impl.Data[Key]; }
 ArrayRef<APIDiffItem*> swift::ide::api::APIDiffItemStore::
 getAllDiffItems() const { return Impl.AllItems; }
 
-swift::ide::api::APIDiffItemStore::APIDiffItemStore(StringRef FileName) :
-  Impl(*new Implementation(FileName)) {}
+swift::ide::api::APIDiffItemStore::APIDiffItemStore() :
+  Impl(*new Implementation()) {}
 
 swift::ide::api::APIDiffItemStore::~APIDiffItemStore() { delete &Impl; }
+
+void swift::ide::api::APIDiffItemStore::addStorePath(StringRef Path) {
+  Impl.addStorePath(Path);
+}
