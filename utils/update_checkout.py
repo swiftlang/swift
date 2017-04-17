@@ -220,7 +220,7 @@ def obtain_additional_swift_sources(pool_args):
         print("Cloning '" + repo_name + "'")
 
         if skip_history:
-            shell.run(['git', 'clone', '--recursive', '--depth', '1',
+            shell.run(['git', 'clone', '--recursive', '--depth', '1', '--branch', repo_branch,
                        remote, repo_name], echo=True)
         else:
             shell.run(['git', 'clone', '--recursive', remote,
