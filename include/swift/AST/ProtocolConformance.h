@@ -138,6 +138,14 @@ public:
            getState() == ProtocolConformanceState::Checking;
   }
 
+  /// Determine whether this conformance is canonical.
+  bool isCanonical() const;
+
+  /// Create a canonical conformance from the current one.
+  /// If the current conformance is canonical already, it will be returned.
+  /// Otherwise a new conformance will be created.
+  ProtocolConformance *getCanonicalConformance();
+
   /// Return true if the conformance has a witness for the given associated
   /// type.
   bool hasTypeWitness(AssociatedTypeDecl *assocType,
@@ -703,7 +711,7 @@ public:
 
   static void Profile(llvm::FoldingSetNodeID &ID, Type type,
                       ProtocolConformance *inheritedConformance) {
-    ID.AddPointer(type->getCanonicalType().getPointer());
+    ID.AddPointer(type.getPointer());
     ID.AddPointer(inheritedConformance);
   }
 

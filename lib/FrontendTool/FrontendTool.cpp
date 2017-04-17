@@ -46,6 +46,7 @@
 #include "swift/Frontend/SerializedDiagnosticConsumer.h"
 #include "swift/Immediate/Immediate.h"
 #include "swift/Option/Options.h"
+#include "swift/Migrator/Migrator.h"
 #include "swift/PrintAsObjC/PrintAsObjC.h"
 #include "swift/Serialization/SerializationOptions.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
@@ -446,6 +447,10 @@ static bool performCompile(std::unique_ptr<CompilerInstance> &Instance,
     runREPL(*Instance, ProcessCmdLine(Args.begin(), Args.end()),
             Invocation.getParseStdlib());
     return Context.hadError();
+  }
+
+  if (Action == FrontendOptions::UpdateCode) {
+    return migrator::updateCodeAndEmitRemap(*Instance, Invocation);
   }
 
   SourceFile *PrimarySourceFile = Instance->getPrimarySourceFile();
