@@ -230,29 +230,6 @@ bool RequirementSource::isDerivedRequirement() const {
   llvm_unreachable("Unhandled RequirementSourceKind in switch.");
 }
 
-bool RequirementSource::isDerivedViaConcreteConformance() const {
-  for (auto source = this; source; source = source->parent) {
-    switch (source->kind) {
-    case Explicit:
-    case Inferred:
-    case NestedTypeNameMatch:
-    case RequirementSignatureSelf:
-      return false;
-
-    case Parent:
-    case ProtocolRequirement:
-    case InferredProtocolRequirement:
-      continue;
-
-    case Superclass:
-    case Concrete:
-      return true;
-    }
-  }
-
-  return false;
-}
-
 bool RequirementSource::isSelfDerivedSource(PotentialArchetype *pa,
                                             bool &derivedViaConcrete) const {
   derivedViaConcrete = false;

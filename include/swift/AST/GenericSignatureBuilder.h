@@ -992,11 +992,6 @@ public:
   /// path.
   bool isDerivedRequirement() const;
 
-  /// Whether the requirement is derived via some concrete conformance, e.g.,
-  /// a concrete type's conformance to a protocol or a superclass's conformance
-  /// to a protocol.
-  bool isDerivedViaConcreteConformance() const;
-
   /// Determine whether the given derived requirement \c source, when rooted at
   /// the potential archetype \c pa, is actually derived from the same
   /// requirement. Such "self-derived" requirements do not make the original
