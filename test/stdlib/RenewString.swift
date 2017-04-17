@@ -67,7 +67,6 @@ extension String.Content {
     case .utf16: return 16
     case .latin1: return 8
     case .cocoa(let n): return n.isKnownASCII ? 8 : 16
-    case .any: return 16
     case .inline7or16(let x): return x.bitsPerElement
     case .inline5or6(let x):  return x.bitsPerElement
     }

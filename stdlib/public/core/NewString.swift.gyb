@@ -19,104 +19,12 @@
 }%
 import SwiftShims
 
-/// Implementation detail of `String` that type-erases any `UnicodeContent` into
-/// one word that can live in one of the cases.
-public // @testable
-class UnicodeContentBox : FactoryInitializable {
-  public var utf16: AnyUInt16UnicodeView { fatalError("override me!") }
-  public var utf8: AnyUInt8UnicodeView { fatalError("override me!") }
-  public var unicodeScalars: AnyUnicodeScalarUnicodeView { fatalError("override me!") }
-  public var fccNormalizedUTF16: AnyUInt16UnicodeView { fatalError("override me!") }
-#if false
-  public var utf32: AnyUInt32UnicodeView { fatalError("override me!") }
-#endif
-  
-#if false
-  // FIXME: Can this be Random Access?  If all encodings use a single code unit
-  // per ASCII character and can statelessly identify a code unit that
-  // represents ASCII, then yes.  Look into, e.g. shift-JIS.
-  public var extendedASCII: UnicodeBidirectionalUInt32 { fatalError("override me!") }
-#endif
-  public var characters: AnyCharacterUnicodeView { fatalError("override me!") }
-  public var isKnownLatin1: Bool { fatalError("override me!") }
-  public var isKnownASCII: Bool { fatalError("override me!") }
-  public var isKnownFCCNormalized: Bool { fatalError("override me!") }
-  public var isKnownFCDForm: Bool { fatalError("override me!") }
-  public var isKnownNFDNormalized: Bool { fatalError("override me!") }
-  public var isKnownNFCNormalized: Bool { fatalError("override me!") }
-
-  public func isLatin1() -> Bool  { fatalError("override me!") }
-  public func isASCII() -> Bool { fatalError("override me!") }
-
-  public // @testable
-  final class Instance<Base: UnicodeContent> : UnicodeContentBox
-  where Base.UTF16View.Iterator.Element == UTF16.CodeUnit,
-  Base.UTF8View.Iterator.Element == UTF8.CodeUnit,
-  Base.UnicodeScalarView.Iterator.Element == UnicodeScalar,
-  Base.CharacterView.Iterator.Element == Character
-  {
-    public var base: Base
-    
-    public override var utf16: AnyUInt16UnicodeView {
-      return AnyUInt16UnicodeView(base.utf16)
-    }
-    public override var utf8: AnyUInt8UnicodeView {
-      return AnyUInt8UnicodeView(base.utf8)
-    }
-    public override var unicodeScalars: AnyUnicodeScalarUnicodeView {
-      return AnyUnicodeScalarUnicodeView(base.unicodeScalars)
-    }
-#if false
-    public override var utf32: AnyUInt32UnicodeView {
-      return AnyUInt32UnicodeView(base.utf32)
-    }
-    public override var fccNormalizedUTF16: AnyUInt16UnicodeView {
-      return AnyUInt16UnicodeView(base.fccNormalizedUTF16)
-    }
-    public override var extendedASCII: UnicodeBidirectionalUInt32 {
-      return base.extendedASCII
-    }
-#endif
-    public override var characters: AnyCharacterUnicodeView {
-      return AnyCharacterUnicodeView(base.characters)
-    }
-    public override var isKnownLatin1: Bool { return base.isKnownLatin1 }
-    public override var isKnownASCII: Bool { return base.isKnownASCII }
-    public override var isKnownFCCNormalized: Bool { return base.isKnownFCCNormalized }
-    public override var isKnownFCDForm: Bool { return base.isKnownFCDForm }
-    public override var isKnownNFDNormalized: Bool { return base.isKnownNFDNormalized }
-    public override var isKnownNFCNormalized: Bool { return base.isKnownNFCNormalized }
-    public override func isLatin1() -> Bool  { return base.isLatin1() }
-    public override func isASCII() -> Bool  { return base.isASCII() }
-    public init(_ x: Base) {
-      base = x
-      super.init(fromSubclass: ())
-    }
-  }
-
-  public convenience init<Base: UnicodeContent>(wrapping x: Base)
-  where Base.UTF16View.Iterator.Element == UTF16.CodeUnit,
-  Base.UTF8View.Iterator.Element == UTF8.CodeUnit,
-  Base.UnicodeScalarView.Iterator.Element == UnicodeScalar,
-  Base.CharacterView.Iterator.Element == Character
-  {
-    self.init(Instance(x))
-  }
-  
-  public init(fromSubclass: ()) {}
-}
-
-// FIXME: This conformance isn't really needed, at least so far, but it keeps us
-// in line.
-extension UnicodeContentBox : UnicodeContent {}
-
 //===--- String -----------------------------------------------------------===//
 public struct String {
 %{
     allCases = [
       ('utf16', '_UTF16StringStorage'),
       ('latin1', '_Latin1StringStorage'),
-      ('any', 'UnicodeContentBox'),
       ('cocoa', 'String.Content.NSStringPayload'),
       ('inline5or6', 'String.Content.Inline5or6'),
       ('inline7or16', 'String.Content.Inline7or16'),
@@ -757,7 +665,7 @@ extension PackedUnsignedIntegers : RandomAccessCollection {
     let mask = ~(~0 << bitsPerElement_)
     let representation_ = representation.toUIntMax()
     let i_ = UInt(bitPattern: i).toUIntMax()
-    let r = (representation_ >> (bitsPerElement_ * i_) &- 1) & mask
+    let r = (representation_ >> (bitsPerElement_ &* i_) &- 1) & mask
     return numericCast(r)
   }
 }
@@ -801,8 +709,6 @@ extension String.Content {
     case .utf16(let storage):
       return ObjectIdentifier(storage)
     case .latin1(let storage):
-      return ObjectIdentifier(storage)
-    case .any(let storage):
       return ObjectIdentifier(storage)
     case .cocoa(let storage):
       // FIXME: don't we want to return nil in the cocoa case, since this is
@@ -898,7 +804,7 @@ extension String.Content {
       if replacement.contains(where: { $0 > 0xFF }) { return false }
       return storage._tryToReplaceSubrange(
         t, with: replacement.lazy.map { UInt8(truncatingBitPattern: $0) })
-    case .any, .cocoa, .inline5or6, .inline7or16:
+    case .cocoa, .inline5or6, .inline7or16:
       return false
     }
   }
@@ -1155,10 +1061,6 @@ extension String : Comparable {
       // TODO: == probably quicker than elementsEqual, at least after more
       // tweaking.
       return lhs.fccNormalizedUTF16.elementsEqual(rhs.fccNormalizedUTF16)
-    case (.any(let lhs), .any(let rhs)):
-      // TODO: == probably quicker than elementsEqual, at least after more
-      // tweaking.
-      return lhs.fccNormalizedUTF16.elementsEqual(rhs.fccNormalizedUTF16)
     case (.cocoa(let lhs), .cocoa(let rhs)):
       // TODO: == probably quicker than elementsEqual, at least after more
       // tweaking.
@@ -1344,7 +1246,6 @@ extension String {// : _ObjectiveCBridgeable {
     case .latin1(let x): return x
     case .utf16(let x): return x
     case .cocoa(let x): return x.object
-    case .any(let x): return _UTF16StringStorage(x.utf16)
     case .inline5or6(let x):
       return String._withSmallUTF16(x.utf16) {
         _stdlib_binary_CFStringCreateWithCharacters($0.baseAddress!, $0.count)
