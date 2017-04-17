@@ -2584,6 +2584,13 @@ ObjCClassKind ClassDecl::checkObjCAncestry() const {
   return kind;
 }
 
+ClassDecl::MetaclassKind ClassDecl::getMetaclassKind() const {
+  assert(getASTContext().LangOpts.EnableObjCInterop &&
+         "querying metaclass kind without objc interop");
+  auto objc = checkObjCAncestry() != ObjCClassKind::NonObjC || hasClangNode();
+  return objc ? MetaclassKind::ObjC : MetaclassKind::SwiftStub;
+}
+
 /// Mangle the name of a protocol or class for use in the Objective-C
 /// runtime.
 static StringRef mangleObjCRuntimeName(const NominalTypeDecl *nominal,
