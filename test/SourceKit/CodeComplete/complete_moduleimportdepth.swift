@@ -11,6 +11,30 @@ func test() {
 
 // Swift == 1
 // CHECK-LABEL:  key.name: "abs(:)",
+// CHECK-NEXT:   key.sourcetext: "abs(<#T##x: Comparable & SignedNumeric##Comparable & SignedNumeric#>)",
+// CHECK-NEXT:   key.description: "abs(x: Comparable & SignedNumeric)",
+// CHECK-NEXT:   key.typename: "Comparable & SignedNumeric",
+// CHECK-NEXT:   key.doc.brief: "Returns the absolute value of the given number.",
+// CHECK-NEXT:   key.context: source.codecompletion.context.othermodule,
+// CHECK-NEXT:   key.moduleimportdepth: 1,
+// CHECK-NEXT:   key.num_bytes_to_erase: 0,
+// CHECK:        key.associated_usrs: "s:s3absxxs13SignedNumericRz9Magnitudes0C0PQzRszlF",
+// CHECK-NEXT:   key.modulename: "Swift"
+// CHECK-NEXT: },
+
+// CHECK-LABEL:  key.name: "abs(:)",
+// CHECK-NEXT:   key.sourcetext: "abs(<#T##x: Comparable & SignedNumeric##Comparable & SignedNumeric#>)",
+// CHECK-NEXT:   key.description: "abs(x: Comparable & SignedNumeric)",
+// CHECK-NEXT:   key.typename: "Comparable & SignedNumeric",
+// CHECK-NEXT:   key.doc.brief: "Returns the absolute value of the given number.",
+// CHECK-NEXT:   key.context: source.codecompletion.context.othermodule,
+// CHECK-NEXT:   key.moduleimportdepth: 1,
+// CHECK-NEXT:   key.num_bytes_to_erase: 0,
+// CHECK:        key.associated_usrs: "s:s3absxxs10ComparableRzs13SignedNumericRzlF",
+// CHECK-NEXT:   key.modulename: "Swift"
+// CHECK-NEXT: },
+
+// CHECK-LABEL:  key.name: "abs(:)",
 // CHECK-NEXT:   key.sourcetext: "abs(<#T##x: FloatingPoint##FloatingPoint#>)",
 // CHECK-NEXT:   key.description: "abs(x: FloatingPoint)",
 // CHECK-NEXT:   key.typename: "FloatingPoint",
@@ -18,7 +42,7 @@ func test() {
 // CHECK-NEXT:   key.context: source.codecompletion.context.othermodule,
 // CHECK-NEXT:   key.moduleimportdepth: 1,
 // CHECK-NEXT:   key.num_bytes_to_erase: 0,
-// CHECK:   key.associated_usrs: "s:s3absxxs12SignedNumberRzlF",
+// CHECK:        key.associated_usrs: "s:s3absxxs13FloatingPointRz9MagnitudeQzRszlF",
 // CHECK-NEXT:   key.modulename: "Swift"
 // CHECK-NEXT: },
 

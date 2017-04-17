@@ -17,18 +17,18 @@ let x = 2
 var y = x + 1
 // CHECK: [[@LINE-1]]:5 | variable/Swift | y | s:14swift_ide_test1ySiv | Def | rel: 0
 // CHECK: [[@LINE-2]]:9 | variable/Swift | x | s:14swift_ide_test1xSiv | Ref,Read | rel: 0
-// CHECK: [[@LINE-3]]:11 | function/infix-operator/Swift | +(_:_:) | s:s1poiS2i_SitF | Ref,Call | rel: 0
+// CHECK: [[@LINE-3]]:11 | static-method/infix-operator/Swift | +(_:_:) | s:Si1poiS2i_SitFZ | Ref | rel: 0
 
 // Read of x + Write of y
 y = x + 1
 // CHECK: [[@LINE-1]]:1 | variable/Swift | y | s:14swift_ide_test1ySiv | Ref,Writ | rel: 0
 // CHECK: [[@LINE-2]]:5 | variable/Swift | x | s:14swift_ide_test1xSiv | Ref,Read | rel: 0
-// CHECK: [[@LINE-3]]:7 | function/infix-operator/Swift | +(_:_:) | s:s1poiS2i_SitF | Ref,Call | rel: 0
+// CHECK: [[@LINE-3]]:7 | static-method/infix-operator/Swift | +(_:_:) | s:Si1poiS2i_SitFZ | Ref | rel: 0
 
 // Read of y + Write of y
 y += x
 // CHECK: [[@LINE-1]]:1 | variable/Swift | y | s:14swift_ide_test1ySiv | Ref,Read,Writ | rel: 0
-// CHECK: [[@LINE-2]]:3 | function/infix-operator/Swift | +=(_:_:) | s:s2peoiySiz_SitF | Ref,Call | rel: 0
+// CHECK: [[@LINE-2]]:3 | static-method/infix-operator/Swift | +=(_:_:) | s:Si2peoiySiz_SitFZ | Ref | rel: 0
 // CHECK: [[@LINE-3]]:6 | variable/Swift | x | s:14swift_ide_test1xSiv | Ref,Read | rel: 0
 
 var z: Int {
@@ -110,8 +110,8 @@ struct AStruct {
     // CHECK: [[@LINE-6]]:5 | function/acc-set/Swift | setter:x | s:14swift_ide_test7AStructV1xSifs | Ref,Call,Impl,RelRec,RelCall,RelCont | rel: 2
     // CHECK-NEXT: RelCall,RelCont | instance-method/Swift | aMethod() | s:14swift_ide_test7AStructV7aMethodyyF
     // CHECK-NEXT: RelRec | struct/Swift | AStruct | s:14swift_ide_test7AStructV
-    // CHECK: [[@LINE-9]]:7 | function/infix-operator/Swift | +=(_:_:) | s:s2peoiySiz_SitF | Ref,Call,RelCall,RelCont | rel: 1
-    // CHECK-NEXT: RelCall,RelCont | instance-method/Swift | aMethod() | s:14swift_ide_test7AStructV7aMethodyyF
+    // CHECK: [[@LINE-9]]:7 | static-method/infix-operator/Swift | +=(_:_:) | s:Si2peoiySiz_SitFZ | Ref,RelCont | rel: 1
+    // CHECK-NEXT: RelCont | instance-method/Swift | aMethod() | s:14swift_ide_test7AStructV7aMethodyyF
   }
 
   // RelationChildOf, RelationAccessorOf

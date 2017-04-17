@@ -9,22 +9,22 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -swift-version 3
 
 
 func mixedTypeArithemtics() {
-  _ = (42 as Int64) + (0 as Int) // expected-warning {{'+' is deprecated:}}
+  _ = (42 as Int64) + (0 as Int) // expected-warning {{'+' is deprecated}}
 
   do {
     var x = Int8()
-    x += (42 as Int) // expected-warning {{'+=' is deprecated:}}
+    x += (42 as Int) // expected-warning {{'+=' is deprecated}}
   }
 
-  _ = (42 as Int32) - (0 as Int) // expected-warning {{'-' is deprecated:}}
+  _ = (42 as Int32) - (0 as Int) // expected-warning {{'-' is deprecated}}
 
   do {
     var x = Int16()
-    x -= (42 as Int) // expected-warning {{'-=' is deprecated:}}
+    x -= (42 as Int) // expected-warning {{'-=' is deprecated}}
   }
 
   // With Int on both sides should NOT result in warning

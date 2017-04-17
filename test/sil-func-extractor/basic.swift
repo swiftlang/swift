@@ -20,8 +20,8 @@
 // EXTRACT-FOO-LABEL: sil hidden @_T05basic3fooSiyF : $@convention(thin) () -> Int {
 // EXTRACT-FOO:       bb0:
 // EXTRACT-FOO-NEXT:    %0 = integer_literal
-// EXTRACT-FOO-NEXT:    %1 = struct $Int
-// EXTRACT-FOO-NEXT:    return %1 : $Int
+// EXTRACT-FOO:         %[[POS:.*]] = struct $Int
+// EXTRACT-FOO-NEXT:    return %[[POS]] : $Int
 
 
 // EXTRACT-TEST-NOT: sil hidden @_T05basic3fooSiyF : $@convention(thin) () -> Int {
@@ -76,6 +76,7 @@ class Vehicle {
     }
 }
 
+@discardableResult
 func foo() -> Int {
   return 7
 }

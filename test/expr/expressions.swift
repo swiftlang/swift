@@ -783,12 +783,12 @@ func testOptionalTypeParsing(_ a : AnyObject) -> String {
 func testParenExprInTheWay() {
   let x = 42
   
-  if x & 4.0 {}  // expected-error {{binary operator '&' cannot be applied to operands of type 'Int' and 'Double'}} expected-note {{expected an argument list of type '(Int, Int)'}}
+  if x & 4.0 {}  // expected-error {{binary operator '&' cannot be applied to operands of type 'Int' and 'Double'}} expected-note {{expected an argument list of type '(Self, Self)'}}
 
-  if (x & 4.0) {}   // expected-error {{binary operator '&' cannot be applied to operands of type 'Int' and 'Double'}} expected-note {{expected an argument list of type '(Int, Int)'}}
+  if (x & 4.0) {}   // expected-error {{binary operator '&' cannot be applied to operands of type 'Int' and 'Double'}} expected-note {{expected an argument list of type '(Self, Self)'}}
 
   if !(x & 4.0) {}  // expected-error {{binary operator '&' cannot be applied to operands of type 'Int' and 'Double'}}
-  //expected-note @-1 {{expected an argument list of type '(Int, Int)'}}
+  //expected-note @-1 {{expected an argument list of type '(Self, Self)'}}
 
   
   if x & x {} // expected-error {{'Int' is not convertible to 'Bool'}}
@@ -820,7 +820,7 @@ func inoutTests(_ arr: inout Int) {
   inoutTests(&x)
   
   // <rdar://problem/17489894> inout not rejected as operand to assignment operator
-  &x += y  // expected-error {{'&' can only appear immediately in a call argument list}}
+  &x += y  // expected-error {{'&' can only appear immediately in a call argument list}}}
 
   // <rdar://problem/23249098>
   func takeAny(_ x: Any) {}
@@ -871,25 +871,6 @@ func r22913570() {
   f(1 + 1) // expected-error{{missing argument for parameter 'to' in call}}
 }
 
-
-// <rdar://problem/23708702> Emit deprecation warnings for ++/-- in Swift 2.2
-func swift22_deprecation_increment_decrement() {
-  var i = 0
-  var f = 1.0
-
-  i++     // expected-error {{'++' is unavailable}} {{4-6= += 1}}
-  --i     // expected-error {{'--' is unavailable}} {{3-5=}} {{6-6= -= 1}}
-  _ = i++ // expected-error {{'++' is unavailable}}
-
-  ++f     // expected-error {{'++' is unavailable}} {{3-5=}} {{6-6= += 1}}
-  f--     // expected-error {{'--' is unavailable}} {{4-6= -= 1}}
-  _ = f-- // expected-error {{'--' is unavailable}} {{none}}
-
-  // <rdar://problem/24530312> Swift ++fix-it produces bad code in nested expressions
-  // This should not get a fixit hint.
-  var j = 2
-  i = ++j   // expected-error {{'++' is unavailable}} {{none}}
-}
 
 // SR-628 mixing lvalues and rvalues in tuple expression
 var x = 0

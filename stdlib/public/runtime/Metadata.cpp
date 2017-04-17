@@ -1381,6 +1381,9 @@ void swift::installCommonValueWitnesses(ValueWitnessTable *vwtable) {
     case sizeWithAlignmentMask(32, 31):
       commonVWT = &VALUE_WITNESS_SYM(Bi256_);
       break;
+    case sizeWithAlignmentMask(64, 63):
+      commonVWT = &VALUE_WITNESS_SYM(Bi512_);
+      break;
     }
     
   #define INSTALL_POD_COMMON_WITNESS(NAME) vwtable->NAME = commonVWT->NAME;

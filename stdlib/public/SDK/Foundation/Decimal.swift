@@ -58,26 +58,6 @@ extension Decimal {
     @available(*, unavailable, message: "Decimal does not yet fully adopt FloatingPoint.")
     public mutating func formTruncatingRemainder(dividingBy other: Decimal) { fatalError("Decimal does not yet fully adopt FloatingPoint") }
 
-    public mutating func add(_ other: Decimal) {
-        var rhs = other
-        NSDecimalAdd(&self, &self, &rhs, .plain)
-    }
-
-    public mutating func subtract(_ other: Decimal) {
-        var rhs = other
-        NSDecimalSubtract(&self, &self, &rhs, .plain)
-    }
-
-    public mutating func multiply(by other: Decimal) {
-        var rhs = other
-        NSDecimalMultiply(&self, &self, &rhs, .plain)
-    }
-
-    public mutating func divide(by other: Decimal) {
-        var rhs = other
-        NSDecimalDivide(&self, &self, &rhs, .plain)
-    }
-
     public mutating func negate() {
         _isNegative = _isNegative == 0 ? 1 : 0
     }
@@ -157,7 +137,6 @@ extension Decimal {
         NSDecimalMultiply(&res, &leftOp, &rightOp, .plain)
         return res
     }
-
 }
 
 public func pow(_ x: Decimal, _ y: Int) -> Decimal {
@@ -239,7 +218,39 @@ extension Decimal : ExpressibleByIntegerLiteral {
     }
 }
 
-extension Decimal : SignedNumber { }
+extension Decimal : SignedNumeric {
+  public var magnitude: Decimal {
+    return Decimal(
+      _exponent: self._exponent, _length: self._length,
+       _isNegative: 0, _isCompact: self._isCompact,
+       _reserved: 0, _mantissa: self._mantissa)
+  }
+
+  // FIXME(integers): implement properly
+  public init?<T : BinaryInteger>(exactly source: T) {
+    fatalError()
+  }
+
+  public static func +=(_ lhs: inout Decimal, _ rhs: Decimal) {
+      var rhs = rhs
+      NSDecimalAdd(&lhs, &lhs, &rhs, .plain)
+  }
+
+  public static func -=(_ lhs: inout Decimal, _ rhs: Decimal) {
+      var rhs = rhs
+      NSDecimalSubtract(&lhs, &lhs, &rhs, .plain)
+  }
+
+  public static func *=(_ lhs: inout Decimal, _ rhs: Decimal) {
+      var rhs = rhs
+      NSDecimalMultiply(&lhs, &lhs, &rhs, .plain)
+  }
+
+  public static func /=(_ lhs: inout Decimal, _ rhs: Decimal) {
+      var rhs = rhs
+      NSDecimalDivide(&lhs, &lhs, &rhs, .plain)
+  }
+}
 
 extension Decimal : Strideable {
     public func distance(to other: Decimal) -> Decimal {
@@ -248,12 +259,6 @@ extension Decimal : Strideable {
 
     public func advanced(by n: Decimal) -> Decimal {
         return self + n
-    }
-}
-
-extension Decimal : AbsoluteValuable {
-    public static func abs(_ x: Decimal) -> Decimal {
-        return Decimal(_exponent: x._exponent, _length: x._length, _isNegative: 0, _isCompact: x._isCompact, _reserved: 0, _mantissa: x._mantissa)
     }
 }
 

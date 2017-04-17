@@ -4,7 +4,7 @@
 // CHECK-NOT: ret void
 // CHECK: call void @llvm.dbg.declare{{.*}}, !dbg
 // CHECK-NOT: ret void
-// CHECK: , !dbg ![[DBG:.*]]
+// CHECK: _value {{.*}}, !dbg ![[DBG:.*]]
 // CHECK: ret void
 
 func get_truth(_ input: Int64) -> Int64 {

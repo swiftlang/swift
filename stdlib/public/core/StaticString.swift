@@ -134,7 +134,7 @@ public struct StaticString
     _ body: (UnsafeBufferPointer<UInt8>) -> R) -> R {
     if hasPointerRepresentation {
       return body(UnsafeBufferPointer(
-        start: utf8Start, count: Int(utf8CodeUnitCount)))
+        start: utf8Start, count: utf8CodeUnitCount))
     } else {
       var buffer: UInt64 = 0
       var i = 0
@@ -171,7 +171,9 @@ public struct StaticString
     // unrelated buffer is not accessed or freed.
     self._startPtrOrData = Builtin.ptrtoint_Word(_start)
     self._utf8CodeUnitCount = utf8CodeUnitCount
-    self._flags = Bool(isASCII) ? (0x2 as UInt8)._value : (0x0 as UInt8)._value
+    self._flags = Bool(isASCII)
+      ? (0x2 as UInt8)._value
+      : (0x0 as UInt8)._value
   }
 
   @_versioned
