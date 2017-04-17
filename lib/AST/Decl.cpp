@@ -2587,7 +2587,7 @@ ObjCClassKind ClassDecl::checkObjCAncestry() const {
 ClassDecl::MetaclassKind ClassDecl::getMetaclassKind() const {
   assert(getASTContext().LangOpts.EnableObjCInterop &&
          "querying metaclass kind without objc interop");
-  auto objc = checkObjCAncestry() != ObjCClassKind::NonObjC || hasClangNode();
+  auto objc = checkObjCAncestry() != ObjCClassKind::NonObjC;
   return objc ? MetaclassKind::ObjC : MetaclassKind::SwiftStub;
 }
 
