@@ -362,7 +362,7 @@ serialize(llvm::raw_ostream &os, ArrayRef<APIDiffItem*> Items) {
 
 struct swift::ide::api::APIDiffItemStore::Implementation {
 private:
-  llvm::SmallVector<std::shared_ptr<llvm::MemoryBuffer>, 2> AllBuffer;
+  llvm::SmallVector<std::unique_ptr<llvm::MemoryBuffer>, 2> AllBuffer;
   llvm::BumpPtrAllocator Allocator;
 public:
   llvm::StringMap<std::vector<APIDiffItem*>> Data;
