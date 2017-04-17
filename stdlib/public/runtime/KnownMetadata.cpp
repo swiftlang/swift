@@ -61,7 +61,7 @@ const ValueWitnessTable swift::VALUE_WITNESS_SYM(Bi128_) =
 const ValueWitnessTable swift::VALUE_WITNESS_SYM(Bi256_) =
   ValueWitnessTableForBox<NativeBox<int256_like, 32>>::table;
 const ValueWitnessTable swift::VALUE_WITNESS_SYM(Bi512_) =
-  ValueWitnessTableForBox<NativeBox<int512_like, 32>>::table;
+  ValueWitnessTableForBox<NativeBox<int512_like, 64>>::table;
 
 /// The basic value-witness table for Swift object pointers.
 const ExtraInhabitantsValueWitnessTable swift::VALUE_WITNESS_SYM(Bo) =
