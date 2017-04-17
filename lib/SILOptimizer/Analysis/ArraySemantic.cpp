@@ -698,8 +698,8 @@ bool swift::ArraySemanticsCall::replaceByValue(SILValue V) {
 }
 
 bool swift::ArraySemanticsCall::replaceByAppendingValues(
-    SILModule &M, SILFunction *AppendFn, const SmallVectorImpl<SILValue> &Vals,
-    ArrayRef<Substitution> Subs) {
+    SILModule &M, SILFunction *AppendFn, SILFunction *ReserveFn,
+    const SmallVectorImpl<SILValue> &Vals, ArrayRef<Substitution> Subs) {
   assert(getKind() == ArrayCallKind::kAppendContentsOf &&
          "Must be an append_contentsOf call");
   assert(AppendFn && "Must provide an append SILFunction");
@@ -716,6 +716,28 @@ bool swift::ArraySemanticsCall::replaceByAppendingValues(
   auto Loc = SemanticsCall->getLoc();
   auto *FnRef = Builder.createFunctionRef(Loc, AppendFn);
   auto FnTy = FnRef->getType();
+
+  if (Vals.size() > 1) {
+    // Create a call to reserveCapacityForAppend() to reserve apce for multiple
+    // elements.
+    FunctionRefInst *ReserveFnRef = Builder.createFunctionRef(Loc, ReserveFn);
+    SILFunctionType *ReserveFnTy =
+      ReserveFnRef->getType().castTo<SILFunctionType>();
+    assert(ReserveFnTy->getNumParameters() == 2);
+    StructType *IntType =
+      ReserveFnTy->getParameters()[0].getType()->castTo<StructType>();
+    StructDecl *IntDecl = IntType->getDecl();
+    VarDecl *field = *IntDecl->getStoredProperties().begin();
+    SILType BuiltinIntTy =SILType::getPrimitiveObjectType(
+                               field->getInterfaceType()->getCanonicalType());
+    IntegerLiteralInst *CapacityLiteral =
+      Builder.createIntegerLiteral(Loc, BuiltinIntTy, Vals.size());
+    StructInst *Capacity = Builder.createStruct(Loc,
+        SILType::getPrimitiveObjectType(CanType(IntType)), {CapacityLiteral});
+    Builder.createApply(Loc, ReserveFnRef, FnTy.substGenericArgs(M, Subs),
+                        ReserveFnTy->getAllResultsType(), Subs,
+                        {Capacity, ArrRef}, false);
+  }
 
   for (SILValue V : Vals) {
     auto SubTy = V->getType();

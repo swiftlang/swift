@@ -169,6 +169,9 @@ struct ASTContext::Implementation {
   /// func append(Element) -> void
   FuncDecl *ArrayAppendElementDecl = nullptr;
 
+  /// func reserveCapacityForAppend(newElementsCount: Int)
+  FuncDecl *ArrayReserveCapacityDecl = nullptr;
+
   /// func _unimplementedInitializer(className: StaticString).
   FuncDecl *UnimplementedInitializerDecl = nullptr;
 
@@ -961,6 +964,68 @@ FuncDecl *ASTContext::getArrayAppendElementDecl() const {
         return nullptr;
 
       Impl.ArrayAppendElementDecl = FnDecl;
+      return FnDecl;
+    }
+  }
+  return nullptr;
+}
+
+FuncDecl *ASTContext::getArrayReserveCapacityDecl() const {
+  if (Impl.ArrayReserveCapacityDecl)
+    return Impl.ArrayReserveCapacityDecl;
+
+  auto ReserveFunctions = getArrayDecl()->lookupDirect(
+                                   getIdentifier("reserveCapacityForAppend"));
+
+  for (auto CandidateFn : ReserveFunctions) {
+    auto FnDecl = dyn_cast<FuncDecl>(CandidateFn);
+    auto Attrs = FnDecl->getAttrs();
+    for (auto *A : Attrs.getAttributes<SemanticsAttr, false>()) {
+      if (A->Value != "array.reserve_capacity_for_append")
+        continue;
+
+      auto ParamLists = FnDecl->getParameterLists();
+      if (ParamLists.size() != 2)
+        return nullptr;
+      if (ParamLists[0]->size() != 1)
+        return nullptr;
+
+      InOutType *SelfInOutTy =
+        ParamLists[0]->get(0)->getInterfaceType()->getAs<InOutType>();
+      if (!SelfInOutTy)
+        return nullptr;
+
+      BoundGenericStructType *SelfGenericStructTy =
+        SelfInOutTy->getObjectType()->getAs<BoundGenericStructType>();
+      if (!SelfGenericStructTy)
+        return nullptr;
+      if (SelfGenericStructTy->getDecl() != getArrayDecl())
+        return nullptr;
+
+      if (ParamLists[1]->size() != 1)
+        return nullptr;
+      StructType *IntType =
+        ParamLists[1]->get(0)->getInterfaceType()->getAs<StructType>();
+      if (!IntType)
+        return nullptr;
+
+      StructDecl *IntDecl = IntType->getDecl();
+      auto StoredProperties = IntDecl->getStoredProperties();
+      auto FieldIter = StoredProperties.begin();
+      if (FieldIter == StoredProperties.end())
+        return nullptr;
+      VarDecl *field = *FieldIter;
+      if (field->hasClangNode())
+        return nullptr;
+      if (!field->getInterfaceType()->is<BuiltinIntegerType>())
+        return nullptr;
+      if (std::next(FieldIter) != StoredProperties.end())
+        return nullptr;
+
+      if (!FnDecl->getResultInterfaceType()->isVoid())
+        return nullptr;
+
+      Impl.ArrayReserveCapacityDecl = FnDecl;
       return FnDecl;
     }
   }
