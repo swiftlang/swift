@@ -51,8 +51,8 @@ class AClass {
   // CHECK-NEXT: RelChild | instance-method/Swift | instanceMethod(a:b:_:d:_:) | s:14swift_ide_test6AClassC14instanceMethodySi1a_Si1bS2i1dSitF
   // CHECK: [[@LINE-5]]:33 | param(local)/Swift | b | s:{{.*}} | Def,RelChild | rel: 1
   // CHECK: [[@LINE-6]]:43 | param(local)/Swift | c | s:{{.*}} | Def,RelChild | rel: 1
-  // CHECK: [[@LINE-7]]:53 | param(local)/Swift | _ | s:{{.*}} | Def,RelChild | rel: 1
-  // CHECK: [[@LINE-8]]:61 | param/Swift | _ | s:{{.*}} | Def,RelChild | rel: 1
+  // CHECK-NOT: {{^}}[[@LINE-7]]:53 |
+  // CHECK-NOT: {{^}}[[@LINE-8]]:61 |
 
     _ = a
     // CHECK: [[@LINE-1]]:9 | param/Swift | a | s:{{.*}} | Ref,Read,RelCont | rel: 1
@@ -158,7 +158,7 @@ extension AProtocol { func extFn() }
 
 // TypeAlias
 typealias SomeAlias = AStruct
-// CHECK: [[@LINE-1]]:11 | type-alias/Swift | SomeAlias | s:14swift_ide_test9SomeAlias | Def | rel: 0
+// CHECK: [[@LINE-1]]:11 | type-alias/Swift | SomeAlias | s:14swift_ide_test9SomeAliasa | Def | rel: 0
 // CHECK: [[@LINE-2]]:23 | struct/Swift | AStruct | s:14swift_ide_test7AStructV | Ref | rel: 0
 
 // GenericTypeParam

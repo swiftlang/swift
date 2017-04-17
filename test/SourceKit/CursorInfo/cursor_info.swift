@@ -612,17 +612,17 @@ func hasLocalizationKey2() {}
 // RUN: %sourcekitd-test -req=cursor -pos=152:11 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | %FileCheck %s -check-prefix=CHECK68
 // CHECK68: source.lang.swift.decl.typealias (152:11-152:18)
 // CHECK68-NEXT: MyAlias
-// CHECK68-NEXT: s:11cursor_info7MyAlias
+// CHECK68-NEXT: s:11cursor_info7MyAliasa
 // CHECK68-NEXT: (T, U, T, U).Type
-// CHECK68: <Declaration>typealias MyAlias&lt;T, U&gt; = (<Type usr="s:11cursor_info1Txmfp">T</Type>, <Type usr="s:11cursor_info1Uq_mfp">U</Type>, <Type usr="s:11cursor_info1Txmfp">T</Type>, <Type usr="s:11cursor_info1Uq_mfp">U</Type>)</Declaration>
+// CHECK68: <Declaration>typealias MyAlias&lt;T, U&gt; = (<Type usr="s:11cursor_info7MyAliasa1Txmfp">T</Type>, <Type usr="s:11cursor_info7MyAliasa1Uq_mfp">U</Type>, <Type usr="s:11cursor_info7MyAliasa1Txmfp">T</Type>, <Type usr="s:11cursor_info7MyAliasa1Uq_mfp">U</Type>)</Declaration>
 // CHECK68-NEXT: <decl.typealias><syntaxtype.keyword>typealias</syntaxtype.keyword> <decl.name>MyAlias</decl.name>&lt;<decl.generic_type_param usr="{{.*}}"><decl.generic_type_param.name>T</decl.generic_type_param.name></decl.generic_type_param>, <decl.generic_type_param usr="{{.*}}"><decl.generic_type_param.name>U</decl.generic_type_param.name></decl.generic_type_param>&gt; = <tuple>(<tuple.element><tuple.element.type><ref.generic_type_param usr="{{.*}}">T</ref.generic_type_param></tuple.element.type></tuple.element>, <tuple.element><tuple.element.type><ref.generic_type_param usr="{{.*}}">U</ref.generic_type_param></tuple.element.type></tuple.element>, <tuple.element><tuple.element.type><ref.generic_type_param usr="{{.*}}">T</ref.generic_type_param></tuple.element.type></tuple.element>, <tuple.element><tuple.element.type><ref.generic_type_param usr="{{.*}}">U</ref.generic_type_param></tuple.element.type></tuple.element>)</tuple></decl.typealias>
 
 // RUN: %sourcekitd-test -req=cursor -pos=153:28 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | %FileCheck %s -check-prefix=CHECK69
 // CHECK69: source.lang.swift.ref.typealias (152:11-152:18)
 // CHECK69-NEXT: MyAlias
-// CHECK69-NEXT: s:11cursor_info7MyAlias
+// CHECK69-NEXT: s:11cursor_info7MyAliasa
 // CHECK69-NEXT: (T, U, T, U).Type
-// CHECK69: <Declaration>typealias MyAlias&lt;T, U&gt; = (<Type usr="s:11cursor_info1Txmfp">T</Type>, <Type usr="s:11cursor_info1Uq_mfp">U</Type>, <Type usr="s:11cursor_info1Txmfp">T</Type>, <Type usr="s:11cursor_info1Uq_mfp">U</Type>)</Declaration>
+// CHECK69: <Declaration>typealias MyAlias&lt;T, U&gt; = (<Type usr="s:11cursor_info7MyAliasa1Txmfp">T</Type>, <Type usr="s:11cursor_info7MyAliasa1Uq_mfp">U</Type>, <Type usr="s:11cursor_info7MyAliasa1Txmfp">T</Type>, <Type usr="s:11cursor_info7MyAliasa1Uq_mfp">U</Type>)</Declaration>
 // CHECK69-NEXT: <decl.typealias><syntaxtype.keyword>typealias</syntaxtype.keyword> <decl.name>MyAlias</decl.name>&lt;<decl.generic_type_param usr="{{.*}}"><decl.generic_type_param.name>T</decl.generic_type_param.name></decl.generic_type_param>, <decl.generic_type_param usr="{{.*}}"><decl.generic_type_param.name>U</decl.generic_type_param.name></decl.generic_type_param>&gt; = <tuple>(<tuple.element><tuple.element.type><ref.generic_type_param usr="{{.*}}">T</ref.generic_type_param></tuple.element.type></tuple.element>, <tuple.element><tuple.element.type><ref.generic_type_param usr="{{.*}}">U</ref.generic_type_param></tuple.element.type></tuple.element>, <tuple.element><tuple.element.type><ref.generic_type_param usr="{{.*}}">T</ref.generic_type_param></tuple.element.type></tuple.element>, <tuple.element><tuple.element.type><ref.generic_type_param usr="{{.*}}">U</ref.generic_type_param></tuple.element.type></tuple.element>)</tuple></decl.typealias>
 
 // RUN: %sourcekitd-test -req=cursor -pos=155:6 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | %FileCheck %s -check-prefix=CHECK70
@@ -691,7 +691,7 @@ func hasLocalizationKey2() {}
 // CHECK82: <decl.function.returntype><tuple>(<tuple.element><tuple.element.type><ref.struct usr="s:Si">Int</ref.struct></tuple.element.type></tuple.element>, <tuple.element><tuple.element.type><ref.struct usr="s:Si">Int</ref.struct></tuple.element.type></tuple.element>)</tuple>
 
 // RUN: %sourcekitd-test -req=cursor -pos=196:6 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | %FileCheck -check-prefix=CHECK83 %s
-// CHECK83: <decl.var.parameter.type>() -&gt; <decl.function.returntype><ref.typealias usr="s:s4Void">Void</ref.typealias>
+// CHECK83: <decl.var.parameter.type>() -&gt; <decl.function.returntype><ref.typealias usr="s:s4Voida">Void</ref.typealias>
 
 // RUN: %sourcekitd-test -req=cursor -pos=197:11 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %mcp_opt %s | %FileCheck -check-prefix=CHECK84 %s
 // CHECK84: <decl.typealias><syntaxtype.keyword>typealias</syntaxtype.keyword> <decl.name>MyVoid</decl.name> = <tuple>()</tuple></decl.typealias>

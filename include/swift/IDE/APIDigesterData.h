@@ -14,7 +14,9 @@
 #define SWIFT_IDE_APIDIGESTERDATA_H
 
 #include "swift/Basic/LLVM.h"
+#include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/StringRef.h"
+#include "llvm/ADT/StringSwitch.h"
 #include "llvm/Support/raw_ostream.h"
 
 namespace swift {
@@ -27,8 +29,17 @@ enum class SDKNodeKind: uint8_t {
 #include "DigesterEnums.def"
 };
 
+SDKNodeKind parseSDKNodeKind(StringRef Content);
+
 enum class NodeAnnotation: uint8_t{
 #define NODE_ANNOTATION(NAME) NAME,
+#include "DigesterEnums.def"
+};
+
+NodeAnnotation parseSDKNodeAnnotation(StringRef Content);
+
+enum class APIDiffItemKind: uint8_t{
+#define DIFF_ITEM_KIND(NAME) ADK_##NAME,
 #include "DigesterEnums.def"
 };
 
@@ -38,15 +49,22 @@ raw_ostream &operator<<(raw_ostream &Out, const NodeAnnotation Value);
 // Redefine << so that we can output the name of the node kind.
 raw_ostream &operator<<(raw_ostream &Out, const SDKNodeKind Value);
 
-// DiffItem describes how an element in SDK evolves in a way that migrator can
-// read conveniently. Each DiffItem corresponds to one JSON element and contains
+struct APIDiffItem {
+  virtual void streamDef(llvm::raw_ostream &S) const = 0;
+  virtual APIDiffItemKind getKind() const = 0;
+  virtual StringRef getKey() const = 0;
+  virtual ~APIDiffItem() = default;
+};
+
+// CommonDiffItem describes how an element in SDK evolves in a way that migrator can
+// read conveniently. Each CommonDiffItem corresponds to one JSON element and contains
 // sub fields explaining how migrator can assist client code to cope with such
 // SDK change. For instance, the following first JSON element describes an unwrap
 // optional change in the first parameter of function "c:@F@CTTextTabGetOptions".
 // Similarly, the second JSON element describes a type parameter down cast in the
 // second parameter of function "c:objc(cs)NSXMLDocument(im)insertChildren:atIndex:".
 // We keep both usrs because in the future this may support auto-rename.
-struct DiffItem {
+struct CommonDiffItem: public APIDiffItem {
   SDKNodeKind NodeKind;
   NodeAnnotation DiffKind;
   StringRef ChildIndex;
@@ -56,15 +74,21 @@ struct DiffItem {
   StringRef RightComment;
   StringRef ModuleName;
 
-  DiffItem(SDKNodeKind NodeKind, NodeAnnotation DiffKind, StringRef ChildIndex,
-           StringRef LeftUsr, StringRef RightUsr, StringRef LeftComment,
-           StringRef RightComment, StringRef ModuleName);
+  CommonDiffItem(SDKNodeKind NodeKind, NodeAnnotation DiffKind,
+                 StringRef ChildIndex, StringRef LeftUsr, StringRef RightUsr,
+                 StringRef LeftComment, StringRef RightComment,
+                 StringRef ModuleName);
 
   static StringRef head();
-  bool operator<(DiffItem Other) const;
+  bool operator<(CommonDiffItem Other) const;
+  static bool classof(const APIDiffItem *D);
   static void describe(llvm::raw_ostream &os);
   static void undef(llvm::raw_ostream &os);
-  void streamDef(llvm::raw_ostream &S) const;
+  void streamDef(llvm::raw_ostream &S) const override;
+  StringRef getKey() const override { return LeftUsr; }
+  APIDiffItemKind getKind() const override {
+    return APIDiffItemKind::ADK_CommonDiffItem;
+  }
 };
 
 
@@ -149,21 +173,31 @@ struct DiffItem {
 //  myColor.components
 //
 //
-struct TypeMemberDiffItem {
+struct TypeMemberDiffItem: public APIDiffItem {
   StringRef usr;
   StringRef newTypeName;
   StringRef newPrintedName;
   Optional<uint8_t> selfIndex;
   StringRef oldPrintedName;
 
+  TypeMemberDiffItem(StringRef usr, StringRef newTypeName,
+                     StringRef newPrintedName, Optional<uint8_t> selfIndex,
+                     StringRef oldPrintedName) : usr(usr),
+    newTypeName(newTypeName), newPrintedName(newPrintedName),
+    selfIndex(selfIndex), oldPrintedName(oldPrintedName) {}
   static StringRef head();
   static void describe(llvm::raw_ostream &os);
   static void undef(llvm::raw_ostream &os);
-  void streamDef(llvm::raw_ostream &os) const;
+  void streamDef(llvm::raw_ostream &os) const override;
   bool operator<(TypeMemberDiffItem Other) const;
+  static bool classof(const APIDiffItem *D);
+  StringRef getKey() const override { return usr; }
+  APIDiffItemKind getKind() const override {
+    return APIDiffItemKind::ADK_TypeMemberDiffItem;
+  }
 };
 
-struct NoEscapeFuncParam {
+struct NoEscapeFuncParam: public APIDiffItem {
   StringRef Usr;
   unsigned Index;
 
@@ -171,24 +205,63 @@ struct NoEscapeFuncParam {
   static StringRef head();
   static void describe(llvm::raw_ostream &os);
   static void undef(llvm::raw_ostream &os);
-  void streamDef(llvm::raw_ostream &os) const;
+  void streamDef(llvm::raw_ostream &os) const override;
   bool operator<(NoEscapeFuncParam Other) const;
+  static bool classof(const APIDiffItem *D);
+  StringRef getKey() const override { return Usr; }
+  APIDiffItemKind getKind() const override {
+    return APIDiffItemKind::ADK_NoEscapeFuncParam;
+  }
 };
 
 /// This info is about functions meet the following criteria:
 ///   - This function is a member function of a type.
 ///   - This function is overloaded.
-struct OverloadedFuncInfo {
+struct OverloadedFuncInfo: public APIDiffItem {
   StringRef Usr;
 
   OverloadedFuncInfo(StringRef Usr) : Usr(Usr) {}
   static StringRef head();
   static void describe(llvm::raw_ostream &os);
   static void undef(llvm::raw_ostream &os);
-  void streamDef(llvm::raw_ostream &os) const;
+  void streamDef(llvm::raw_ostream &os) const override;
   bool operator<(OverloadedFuncInfo Other) const;
+  static bool classof(const APIDiffItem *D);
+  StringRef getKey() const override { return Usr; }
+  APIDiffItemKind getKind() const override {
+    return APIDiffItemKind::ADK_OverloadedFuncInfo;
+  }
+};
+
+/// APIDiffItem store is the interface that migrator should communicates with;
+/// Given a key, usually the usr of the system entity under migration, the store
+/// should return a slice of related changes in the same format of
+/// swift-api-digester. This struct also handles the serialization and
+/// deserialization of all kinds of API diff items declared above.
+struct APIDiffItemStore {
+  struct Implementation;
+  Implementation &Impl;
+  static void serialize(llvm::raw_ostream &os, ArrayRef<APIDiffItem*> Items);
+  APIDiffItemStore();
+  ~APIDiffItemStore();
+  ArrayRef<APIDiffItem*> getDiffItems(StringRef Key) const;
+  ArrayRef<APIDiffItem*> getAllDiffItems() const;
+
+  /// Add a path of a JSON file dumped from swift-api-digester that contains
+  /// API changes we care about. Calling this can be heavy since the procedure
+  /// will parse and index the data inside of the given file.
+  void addStorePath(StringRef Path);
 };
 }
+}
+namespace json {
+template<>
+struct ScalarEnumerationTraits<ide::api::SDKNodeKind> {
+  static void enumeration(Output &out, ide::api::SDKNodeKind &value) {
+#define NODE_KIND(X) out.enumCase(value, #X, ide::api::SDKNodeKind::X);
+#include "swift/IDE/DigesterEnums.def"
+  }
+};
 }
 }
 #endif // SWIFT_IDE_APIDIGESTERDATA_H

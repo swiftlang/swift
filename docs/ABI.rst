@@ -889,7 +889,7 @@ Entities
   entity-spec ::= decl-name type 'i'                 // subscript ('i'ndex) itself (not the individual accessors)
   entity-spec ::= decl-name type 'v'                 // variable
   entity-spec ::= decl-name type 'f' ACCESSOR
-  entity-spec ::= decl-name type 'fp'                // generic type parameter (not used?)
+  entity-spec ::= decl-name type 'fp'                // generic type parameter
   entity-spec ::= decl-name type 'fo'                // enum element (currently not used)
 
   ACCESSOR ::= 'm'                           // materializeForSet
@@ -958,14 +958,15 @@ Types
 
 ::
 
-  nominal-type ::= substitution
-  nominal-type ::= context decl-name 'C'     // nominal class type
-  nominal-type ::= context decl-name 'O'     // nominal enum type
-  nominal-type ::= context decl-name 'V'     // nominal struct type
-  nominal-type ::= protocol 'P'              // nominal protocol type
+  any-generic-type ::= substitution
+  any-generic-type ::= context decl-name 'C'     // nominal class type
+  any-generic-type ::= context decl-name 'O'     // nominal enum type
+  any-generic-type ::= context decl-name 'V'     // nominal struct type
+  any-generic-type ::= protocol 'P'              // nominal protocol type
+  any-generic-type ::= context decl-name 'a'     // typealias type (used in DWARF and USRs)
 
-  nominal-type ::= 'S' KNOWN-TYPE-KIND       // known nominal type substitution
-  nominal-type ::= 'S' NATURAL KNOWN-TYPE-KIND    // repeated known type substitutions of the same kind
+  any-generic-type ::= 'S' KNOWN-TYPE-KIND       // known nominal type substitution
+  any-generic-type ::= 'S' NATURAL KNOWN-TYPE-KIND    // repeated known type substitutions of the same kind
 
   KNOWN-TYPE-KIND ::= 'a'                    // Swift.Array
   KNOWN-TYPE-KIND ::= 'b'                    // Swift.Bool
@@ -995,7 +996,6 @@ Types
   type ::= 'Bp'                              // Builtin.RawPointer
   type ::= type 'Bv' NATURAL '_'             // Builtin.Vec<n>x<type>
   type ::= 'Bw'                              // Builtin.Word
-  type ::= context decl-name 'a'             // Type alias (DWARF only)
   type ::= function-signature 'c'            // function type
   type ::= function-signature 'X' FUNCTION-KIND // special function type
   type ::= bound-generic-type
@@ -1042,7 +1042,7 @@ Types
 
   type ::= archetype
   type ::= associated-type
-  type ::= nominal-type
+  type ::= any-generic-type
   type ::= protocol-list 'p'                 // existential type
   type ::= protocol-list superclass 'Xc'     // existential type with superclass
   type ::= protocol-list 'Xl'                // existential type with AnyObject
