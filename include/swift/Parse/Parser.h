@@ -730,6 +730,11 @@ public:
   bool parseSpecializeAttribute(swift::tok ClosingBrace, SourceLoc AtLoc,
                                 SourceLoc Loc, SpecializeAttr *&Attr);
 
+  /// Parse the @_implements attribute.
+  /// \p Attr is where to store the parsed attribute
+  ParserResult<ImplementsAttr> parseImplementsAttribute(SourceLoc AtLoc,
+                                                        SourceLoc Loc);
+
   /// Parse a specific attribute.
   bool parseDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc);
 
