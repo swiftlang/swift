@@ -1093,7 +1093,100 @@ extension Substring : CustomDebugStringConvertible {
   }
 }
 
+
+
 //===--- Comparable/Hashable ----------------------------------------------===//
+
+//
+// Michael NOTE: The below are ludicrously fragile WRT the enum layout of our
+// internal rep.
+//
+extension String {
+  // Whether the given bit-representations of Strings are the same case.
+  @inline(__always)
+  static func _hasSameRep(_ lhs: UInt64, _ rhs: UInt64) -> Bool {
+    // ABI FIXME: This bakes in a ton of assumptions about enum layout
+    //
+    // Platform ABI FIXME: This may not be valid on all platforms
+    //
+
+    // Enum tag is in top 3 bits
+    return (lhs >> 61) == (rhs >> 61)
+  }
+
+  // Whether the given bit-representation of a string is a small case.
+  @inline(__always)
+  static func _isSmallRep(_ bits: UInt64) -> Bool {
+    // ABI FIXME: This bakes in a ton of assumptions about enum layout
+    //
+    // Platform ABI FIXME: This may not be valid on all platforms
+    //
+
+    // The small case representation stores either 0b100 or 0b101 in the top 3
+    // bits. So, we need only check that the top two are 0b10.
+    return (bits >> 62) == 0b10
+  }
+
+  // Whether the given bit-representation of a string is the small-16
+  // representation
+  @inline(__always)
+  static func _isSmall16Rep(_ bits: UInt64) -> Bool {
+    // ABI FIXME: This bakes in a ton of assumptions about enum layout
+    //
+    // Platform ABI FIXME: This may not be valid on all platforms
+    //
+
+    // The small case representation stores either 0b100 or 0b101 in the top 3
+    // bits. So, we need only check that the top two are 0b10.
+    return (bits >> 60) == 0b1011
+  }
+
+  // Whether the given bit-representation of two small strings have the same
+  // number of bits per component.
+  @inline(__always)
+  static func _isSameBitWidthAssumingSmallRep(
+    _ lhs: UInt64, _ rhs: UInt64
+  ) -> Bool {
+    _sanityCheck(_isSmallRep(lhs) && _isSmallRep(rhs), "not small")
+    // ABI FIXME: This bakes in a ton of assumptions about enum layout
+    //
+    // Platform ABI FIXME: This may not be valid on all platforms
+    //
+
+    // The 61st bit is used to tell if we're the larger of the rep's two
+    // possible bit widths. The 61st bit has the same value in lhs and rhs iff
+    // lhs_61 ^ rhs_61 == 0.
+    return 0 == (0x10000000_00000000 & (lhs ^ rhs))
+  }
+
+  // Whether canonical equivalence of the given bit-representation of two
+  // strings is equivalent to bitwise equality.
+  @inline(__always)
+  static func _hasBitwiseEqualitySemantics(
+    _ lhs: UInt64, _ rhs: UInt64
+  ) -> Bool {
+    // Small strings: With the exception of the 16-bit representation, small
+    // strings with the same number of bits-per-component are equal iff they
+    // are bitwise equal. We already checked for bitwise equality above, thus
+    // if we are small, non-16bit, and same bits per component, we must be
+    // unequal.
+    //
+    // 16-bit is an exception because it can represent strings needing
+    // normalization for canonical equivalence checking.
+    //
+    // TODO: Is it worth a packed-pre-norm check prior to explosion?
+    //
+    // TODO: Is this a compelling enough argument for preferring the non-16bit
+    // small forms even for tiny ASCII strings?
+    //
+    // Michael TODO: check generated code, make sure it's not too branchy.
+    // Otherwise, hack by hand.
+    return _hasSameRep(lhs, rhs) && _isSmallRep(lhs)
+      && _isSameBitWidthAssumingSmallRep(lhs, rhs)
+      && !_isSmall16Rep(lhs)
+  }
+}
+
 extension String : Comparable {
   public static func < (lhs: String, rhs: String) -> Bool {
     // return lhs.content.fccNormalizedUTF16.lexicographicallyPrecedes(
@@ -1111,13 +1204,14 @@ extension String : Comparable {
   % end
     }
   }
-  public static func == (lhs: String, rhs: String) -> Bool {
-    // Faster equality for same-representation
+
+  @inline(never)
+  public static func _equalsSameRep(_ lhs: String, _ rhs: String) -> Bool {
     switch (lhs.content._rep, rhs.content._rep) {
     case (.inline5or6(let lhs), .inline5or6(let rhs)):
       if lhs.bitsPerElement == rhs.bitsPerElement {
-        // Bit compare packed representation
-        return lhs.bits == rhs.bits
+        _sanityCheck(false, "should of been covered earlier")
+        Builtin.unreachable()
       } else {
         // Compare exploded code units
         //
@@ -1128,8 +1222,8 @@ extension String : Comparable {
       }
     case (.inline7or16(let lhs), .inline7or16(let rhs)):
       if lhs.bitsPerElement == 7 && rhs.bitsPerElement == 7 {
-        // Bit compare packed representation
-        return lhs.bits == rhs.bits
+        _sanityCheck(false, "should of been covered earlier")
+        Builtin.unreachable()
       } else {
         // Compare normalized exploded code units
         //
@@ -1159,7 +1253,16 @@ extension String : Comparable {
       // tweaking.
       return lhs.fccNormalizedUTF16.elementsEqual(rhs.fccNormalizedUTF16)
 
+    default:
+      _sanityCheck(false, "Should be impossible")
+      Builtin.unreachable()
+    }
+  }
+
+  @inline(never)
+  static func _equalsDifferentRep(_ lhs: String, _ rhs: String) -> Bool {
     // Separate representation checks:
+    switch (lhs.content._rep, rhs.content._rep) {
   % for lhsTag,_ in allCases:
   % for rhsTag,_ in allCases:
   % if lhsTag != rhsTag:
@@ -1169,7 +1272,34 @@ extension String : Comparable {
   % end
   % end
   % end
+    default:
+      _sanityCheck(false, "Should be impossible")
+      Builtin.unreachable()
     }
+  }
+
+  public static func == (lhs: String, rhs: String) -> Bool {
+    let lhsBits = unsafeBitCast(lhs, to: UInt64.self)
+    let rhsBits = unsafeBitCast(rhs, to: UInt64.self)
+
+    // Total bitwise equality implies string equality, whatever form
+    if _fastPath(lhsBits == rhsBits) {
+      return true
+    }
+
+    // For many of the small string forms, bitwise equality is equivalent to
+    // canonical equivalence. Since we checked bitwise equality already, if
+    // we're in one of those forms, then we must be unequal.
+    if _fastPath(_hasBitwiseEqualitySemantics(lhsBits, rhsBits)) {
+      return false
+    }
+
+    // Faster, more specialized equality for same-representation
+    if _fastPath(_hasSameRep(lhsBits, rhsBits)) {
+      return _equalsSameRep(lhs, rhs)
+    }
+
+    return _equalsDifferentRep(lhs, rhs)
   }
 }
 
