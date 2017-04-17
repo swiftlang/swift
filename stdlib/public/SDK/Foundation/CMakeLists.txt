@@ -29,7 +29,7 @@ add_swift_library(swiftFoundation ${SWIFT_SDK_OVERLAY_LIBRARY_BUILD_TYPES} IS_SD
   NSFastEnumeration.swift
   NSGeometry.swift
   NSIndexSet.swift
-  NSNumber.swift.gyb
+  NSNumber.swift
   NSPredicate.swift
   NSRange.swift
   NSSet.swift
@@ -44,7 +44,6 @@ add_swift_library(swiftFoundation ${SWIFT_SDK_OVERLAY_LIBRARY_BUILD_TYPES} IS_SD
   ReferenceConvertible.swift
   String.swift
   TimeZone.swift
-  TypePreservingNSNumber.mm
   URL.swift
   URLComponents.swift
   URLRequest.swift
