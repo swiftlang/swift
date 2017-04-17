@@ -239,11 +239,19 @@ void TBDGenVisitor::visitClassDecl(ClassDecl *CD) {
 
   auto &ctxt = CD->getASTContext();
   auto isGeneric = CD->isGenericContext();
+  auto objCCompatible = ctxt.LangOpts.EnableObjCInterop && !isGeneric;
+  auto isObjC = objCCompatible && CD->isObjC();
 
-  // Metaclasses are a ObjC thing, and so are not needed in build artifacts/for
-  // classes which can't touch ObjC.
-  if (ctxt.LangOpts.EnableObjCInterop && !isGeneric) {
-    addSymbol(LinkEntity::forSwiftMetaclassStub(CD));
+  // Metaclasses and ObjC class (duh) are a ObjC thing, and so are not needed in
+  // build artifacts/for classes which can't touch ObjC.
+  if (objCCompatible) {
+    if (isObjC)
+      addSymbol(LinkEntity::forObjCClass(CD));
+
+    if (CD->getMetaclassKind() == ClassDecl::MetaclassKind::ObjC)
+      addSymbol(LinkEntity::forObjCMetaclass(CD));
+    else
+      addSymbol(LinkEntity::forSwiftMetaclassStub(CD));
   }
 
   // Some members of classes get extra handling, beyond members of struct/enums,
