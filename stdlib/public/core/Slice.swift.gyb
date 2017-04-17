@@ -178,6 +178,24 @@ public struct ${Self}<Base : ${BaseRequirements}>
     // FIXME: swift-3-indexing-model: range check.
     _base.formIndex(after: &i)
   }
+  
+% if Traversal == 'RandomAccess':
+  @inline(__always)
+  public func withExistingUnsafeBuffer<R>(
+    _ body: (UnsafeBufferPointer<Base._Element>) throws -> R
+  ) rethrows -> R? {
+    return try base.withExistingUnsafeBuffer {
+      try body(
+        UnsafeBufferPointer(
+          start: $0.baseAddress != nil
+          ? $0.baseAddress! + numericCast(
+            base.distance(
+              from: base.startIndex, to: startIndex))
+          : nil,
+          count: numericCast(count)))
+    }
+  }
+% end
 
 %     if Traversal in ['Bidirectional', 'RandomAccess']:
   public func index(before i: Index) -> Index {

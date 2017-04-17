@@ -313,6 +313,10 @@ public protocol _Indexable : _IndexableBase {
   ///   `RandomAccessCollection`; otherwise, O(*n*), where *n* is the
   ///   resulting distance.
   func distance(from start: Index, to end: Index) -> IndexDistance
+
+  func withExistingUnsafeBuffer<R>(
+    _ body: (UnsafeBufferPointer<_Element>) throws -> R
+  ) rethrows -> R?
 }
 
 /// A type that iterates over a collection using its indices.
@@ -663,19 +667,6 @@ public protocol Collection : _Indexable, Sequence {
   /// nested loop should provide segments.
   var segments : Segments? { get }
 
-  /// If there exists a contiguous memory buffer containing all elements in this
-  /// `Collection`, returns the result of calling `body` on that buffer.
-  ///
-  /// - Returns: the result of calling `body`, or `nil` if no such buffer
-  ///   exists.
-  ///
-  /// - Note: implementors should ensure that the lifetime of the memory
-  ///   persists throughout this call, typically by using
-  ///   `withExtendedLifetime(self)`.
-  func withExistingUnsafeBuffer<R>(
-    _ body: (UnsafeBufferPointer<Iterator.Element>) throws -> R
-  ) rethrows -> R?
-
   /// Replaces the `target` elements with the contents of `replacement` if
   /// possible and returns `true`, or returns `false` otherwise.
   ///
@@ -1015,6 +1006,10 @@ public protocol Collection : _Indexable, Sequence {
   ///   `RandomAccessCollection`; otherwise, O(*n*), where *n* is the
   ///   resulting distance.
   func distance(from start: Index, to end: Index) -> IndexDistance
+
+  func withExistingUnsafeBuffer<R>(
+    _ body: (UnsafeBufferPointer<Iterator.Element>) throws -> R
+  ) rethrows -> R?
 }
 
 /// Default implementation for forward collections.
@@ -1334,11 +1329,6 @@ extension Collection where Segments == EmptyCollection<Self> {
 }
 
 extension Collection {
-  public func withExistingUnsafeBuffer<R>(
-    _ body: (UnsafeBufferPointer<Iterator.Element>) throws -> R
-  ) rethrows -> R? {
-    return nil // by default, collections have no contiguous storage.
-  }
   public mutating func _tryToReplaceSubrange<C: Collection>(
     _: Range<Index>, with _: C
   ) -> Bool
