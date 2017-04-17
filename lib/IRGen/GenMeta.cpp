@@ -3992,6 +3992,8 @@ static void emitObjCClassSymbol(IRGenModule &IGM,
                                           metadata->getLinkage(),
                                           classSymbol.str(), metadata,
                                           IGM.getModule());
+  alias->setVisibility(metadata->getVisibility());
+
   if (IGM.useDllStorage())
     alias->setDLLStorageClass(metadata->getDLLStorageClass());
 }
