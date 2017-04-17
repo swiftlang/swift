@@ -33,6 +33,7 @@ enum class ArrayCallKind {
   kGetElementAddress,
   kMakeMutable,
   kMutateUnknown,
+  kReserveCapacityForAppend,
   kWithUnsafeMutableBufferPointer,
   kAppendContentsOf,
   kAppendElement,
@@ -138,6 +139,7 @@ public:
   /// Replace a call to append(contentsOf: ) with a series of
   /// append(element: ) calls.
   bool replaceByAppendingValues(SILModule &M, SILFunction *AppendFn,
+                                SILFunction *ReserveFn,
                                 const llvm::SmallVectorImpl<SILValue> &Vals,
                                 ArrayRef<Substitution> Subs);
 

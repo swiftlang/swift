@@ -162,6 +162,8 @@ ArrayCallKind swift::ArraySemanticsCall::getKind() const {
             .Case("array.get_element_address",
                   ArrayCallKind::kGetElementAddress)
             .Case("array.mutate_unknown", ArrayCallKind::kMutateUnknown)
+            .Case("array.reserve_capacity_for_append",
+                  ArrayCallKind::kReserveCapacityForAppend)
             .Case("array.withUnsafeMutableBufferPointer",
                   ArrayCallKind::kWithUnsafeMutableBufferPointer)
             .Case("array.append_contentsOf", ArrayCallKind::kAppendContentsOf)
@@ -570,6 +572,7 @@ bool swift::ArraySemanticsCall::canInlineEarly() const {
     default:
       return false;
     case ArrayCallKind::kAppendContentsOf:
+    case ArrayCallKind::kReserveCapacityForAppend:
     case ArrayCallKind::kAppendElement:
       // append(Element) calls other semantics functions. Therefore it's
       // important that it's inlined by the early inliner (which is before all

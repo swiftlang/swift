@@ -1439,18 +1439,9 @@ extension ${Self} : RangeReplaceableCollection, _ArrayProtocol {
     where S.Iterator.Element == Element {
 
     let newElementsCount = newElements.underestimatedCount
+    reserveCapacityForAppend(newElementsCount: newElementsCount)
 
     let oldCount = self.count
-    let oldCapacity = self.capacity
-    let newCount = oldCount + newElementsCount
-
-    // Ensure uniqueness, mutability, and sufficient storage.  Note that
-    // for consistency, we need unique self even if newElements is empty.
-    self.reserveCapacity(
-      newCount > oldCapacity ?
-      Swift.max(newCount, _growArrayCapacity(oldCapacity))
-      : newCount)
-
     let startNewElements = _buffer.firstElementAddress + oldCount
     let buf = UnsafeMutableBufferPointer(
                 start: startNewElements, 
@@ -1471,6 +1462,22 @@ extension ${Self} : RangeReplaceableCollection, _ArrayProtocol {
       // append them in slow sequence-only mode
       _buffer._arrayAppendSequence(IteratorSequence(remainder))
     }
+  }
+
+  @_inlineable
+  @_versioned
+  @_semantics("array.reserve_capacity_for_append")
+  internal mutating func reserveCapacityForAppend(newElementsCount: Int) {
+    let oldCount = self.count
+    let oldCapacity = self.capacity
+    let newCount = oldCount + newElementsCount
+
+    // Ensure uniqueness, mutability, and sufficient storage.  Note that
+    // for consistency, we need unique self even if newElements is empty.
+    self.reserveCapacity(
+      newCount > oldCapacity ?
+      Swift.max(newCount, _growArrayCapacity(oldCapacity))
+      : newCount)
   }
 
 %if Self == 'ArraySlice':
