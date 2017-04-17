@@ -300,21 +300,26 @@ static void diagnoseExclusivityViolation(const BeginAccessInst *PriorAccess,
            static_cast<unsigned>(PriorRequires));
 }
 
-/// Look through a value to find the underlying storage
-/// accessed.
+/// Look through a value to find the underlying storage accessed.
 static AccessedStorage findAccessedStorage(SILValue Source) {
   SILValue Iter = Source;
   while (true) {
     if (auto *PBI = dyn_cast<ProjectBoxInst>(Iter)) {
       Iter = PBI->getOperand();
-    } else if (auto *CVI = dyn_cast<CopyValueInst>(Iter)) {
-      Iter = CVI->getOperand();
-    } else if (auto *GAI = dyn_cast<GlobalAddrInst>(Iter)) {
-      return AccessedStorage(GAI->getReferencedGlobal());
-    } else {
-      assert(Iter->getType().isAddress() || Iter->getType().is<SILBoxType>());
-      return AccessedStorage(Iter);
+      continue;
     }
+
+    if (auto *CVI = dyn_cast<CopyValueInst>(Iter)) {
+      Iter = CVI->getOperand();
+      continue;
+    }
+
+    if (auto *GAI = dyn_cast<GlobalAddrInst>(Iter)) {
+      return AccessedStorage(GAI->getReferencedGlobal());
+    }
+
+    assert(Iter->getType().isAddress() || Iter->getType().is<SILBoxType>());
+    return AccessedStorage(Iter);
   }
 }
 
@@ -430,10 +435,9 @@ static void checkStaticExclusivity(SILFunction &Fn, PostOrderFunctionInfo *PO) {
           CallsToSuppress.push_back(AI);
       }
 
-      if (isa<ReturnInst>(&I)) {
-        // Sanity check to make sure entries are properly removed.
-        assert(Accesses.size() == 0);
-      }
+      // Sanity check to make sure entries are properly removed.
+      assert((!isa<ReturnInst>(&I) || Accesses.size() == 0) &&
+             "Entries were not properly removed?!");
     }
   }
 

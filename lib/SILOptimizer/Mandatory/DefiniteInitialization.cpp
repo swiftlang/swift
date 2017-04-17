@@ -2612,7 +2612,7 @@ bool LifetimeChecker::isInitializedAtUse(const DIMemoryUse &Use,
 //                           Top Level Driver
 //===----------------------------------------------------------------------===//
 
-static bool processMemoryObject(SILInstruction *I) {
+static bool processMemoryObject(MarkUninitializedInst *I) {
   DEBUG(llvm::dbgs() << "*** Definite Init looking at: " << *I << "\n");
   DIMemoryObjectInfo MemInfo(I);
 
@@ -2639,8 +2639,8 @@ static bool checkDefiniteInitialization(SILFunction &Fn) {
   for (auto &BB : Fn) {
     for (auto I = BB.begin(), E = BB.end(); I != E; ++I) {
       SILInstruction *Inst = &*I;
-      if (isa<MarkUninitializedInst>(Inst))
-        Changed |= processMemoryObject(Inst);
+      if (auto *MUI = dyn_cast<MarkUninitializedInst>(Inst))
+        Changed |= processMemoryObject(MUI);
     }
   }
   return Changed;
