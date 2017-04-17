@@ -2786,9 +2786,18 @@ public struct ${Self}
 
   @_transparent
   public static func %=(_ lhs: inout ${Self}, _ rhs: ${Self}) {
+    // No LLVM primitives for checking overflow of division
+    // operations, so we check manually.
     if _slowPath(rhs == (0 as ${Self})) {
       _preconditionFailure("Remainder of division by zero")
     }
+%     if signed:
+    if _slowPath(
+      ${'lhs == %s.min && rhs == (-1 as %s)' % (Self, Self)}
+    ) {
+      _preconditionFailure("Overflow in remainder of division")
+    }
+%     end
 
     let (newStorage, _) = (
       Builtin.${u}rem_Int${bits}(lhs._value, rhs._value),
