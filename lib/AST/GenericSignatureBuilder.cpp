@@ -386,71 +386,57 @@ bool RequirementSource::isSelfDerivedConformance(
   // Insert our end state.
   constraintsSeen.insert({currentPA->getRepresentative(), proto});
 
-  // Follow from the root of the requirement source to the given requirement
-  // source, computing the potential archetype to which each step refers.
-  std::function<PotentialArchetype *(const RequirementSource *source)>
-    followFromRoot;
-
   derivedViaConcrete = false;
   bool sawProtocolRequirement = false;
-  followFromRoot = [&](const RequirementSource *source) -> PotentialArchetype *{
-    // Handle protocol requirements.
-    if (source->kind == ProtocolRequirement) {
+
+  PotentialArchetype *rootPA = nullptr;
+  auto resultPA = visitPotentialArchetypesAlongPath(
+                    [&](PotentialArchetype *parentPA,
+                        const RequirementSource *source) {
+    switch (source->kind) {
+    case ProtocolRequirement:
+    case InferredProtocolRequirement: {
+      // Note that we've seen a protocol requirement.
       sawProtocolRequirement = true;
 
-      // Compute the base potential archetype.
-      auto basePA = followFromRoot(source->parent);
-      if (!basePA) return nullptr;
-
       // If the base has been made concrete, note it.
-      if (basePA->isConcreteType())
+      if (parentPA->isConcreteType())
         derivedViaConcrete = true;
 
-      // The base potential archetype must conform to the protocol in which
-      // this requirement results.
-      if (addConstraint(basePA, source->getProtocolDecl()))
-        return nullptr;
-
-      // If there's no stored type, return the base.
-      if (!source->getStoredType()) return basePA;
-
-      // Follow the dependent type in the protocol requirement.
-      return replaceSelfWithPotentialArchetype(basePA, source->getStoredType());
+      // The parent potential archetype must conform to the protocol in which
+      // this requirement resides.
+      return addConstraint(parentPA, source->getProtocolDecl());
     }
 
-    if (source->kind == Parent) {
-      // Compute the base potential archetype.
-      auto basePA = followFromRoot(source->parent);
-      if (!basePA) return nullptr;
-
-      // Add on this associated type.
-      return replaceSelfWithPotentialArchetype(
-               basePA,
-               source->getAssociatedType()->getDeclaredInterfaceType());
+    case Concrete:
+    case Superclass:
+    case Parent:
+      return false;
+    case Explicit:
+    case Inferred:
+    case NestedTypeNameMatch:
+    case RequirementSignatureSelf:
+      rootPA = parentPA;
+      return false;
     }
+  });
 
-    if (source->parent)
-      return followFromRoot(source->parent);
+  // If we saw a constraint twice, it's self-derived.
+  if (!resultPA) return true;
 
-    // We are at a root, so the root potential archetype is our result.
-    auto rootPA = source->getRootPotentialArchetype();
+  // If we haven't seen a protocol requirement, we're done.
+  if (!sawProtocolRequirement) return false;
 
-    // If we haven't seen a protocol requirement, we're done.
-    if (!sawProtocolRequirement) return rootPA;
-
-    // The root archetype might be a nested type, which implies constraints
-    // for each of the protocols of the associated types referenced (if any).
-    for (auto pa = rootPA; pa->getParent(); pa = pa->getParent()) {
-      if (auto assocType = pa->getResolvedAssociatedType()) {
-        if (addConstraint(pa->getParent(), assocType->getProtocol()))
-          return nullptr;
-      }
+  // The root archetype might be a nested type, which implies constraints
+  // for each of the protocols of the associated types referenced (if any).
+  for (auto pa = rootPA; pa->getParent(); pa = pa->getParent()) {
+    if (auto assocType = pa->getResolvedAssociatedType()) {
+      if (addConstraint(pa->getParent(), assocType->getProtocol()))
+        return true;
     }
+  }
 
-    return rootPA;
-  };
-
-  return followFromRoot(this) == nullptr;
+  return false;
 }
 
 #define REQUIREMENT_SOURCE_FACTORY_BODY(ProfileArgs, ConstructorArgs,      \
@@ -594,29 +580,52 @@ PotentialArchetype *RequirementSource::getRootPotentialArchetype() const {
   return root->storage.rootArchetype;
 }
 
-PotentialArchetype *RequirementSource::getAffectedPotentialArchetype(GenericSignatureBuilder &builder) const {
+PotentialArchetype *RequirementSource::getAffectedPotentialArchetype() const {
+  return visitPotentialArchetypesAlongPath(
+                         [](PotentialArchetype *, const RequirementSource *) {
+                           return false;
+                         });
+}
+
+PotentialArchetype *
+RequirementSource::visitPotentialArchetypesAlongPath(
+         llvm::function_ref<bool(PotentialArchetype *,
+                                 const RequirementSource *)> visitor) const {
   switch (kind) {
-  case RequirementSource::Parent:
-  return parent->getAffectedPotentialArchetype(builder)
-           ->getNestedType(getAssociatedType(), builder);
+  case RequirementSource::Parent: {
+    auto parentPA = parent->visitPotentialArchetypesAlongPath(visitor);
+    if (!parentPA) return nullptr;
+
+    if (visitor(parentPA, this)) return nullptr;
+
+    return replaceSelfWithPotentialArchetype(
+                             parentPA,
+                             getAssociatedType()->getDeclaredInterfaceType());
+  }
 
   case RequirementSource::NestedTypeNameMatch:
-    return getRootPotentialArchetype();
-
   case RequirementSource::Explicit:
   case RequirementSource::Inferred:
-  case RequirementSource::RequirementSignatureSelf:
-    return getRootPotentialArchetype();
+  case RequirementSource::RequirementSignatureSelf: {
+    auto rootPA = getRootPotentialArchetype();
+    if (visitor(rootPA, this)) return nullptr;
+
+    return rootPA;
+  }
 
   case RequirementSource::Concrete:
   case RequirementSource::Superclass:
-    return parent->getAffectedPotentialArchetype(builder);
+    return parent->visitPotentialArchetypesAlongPath(visitor);
 
   case RequirementSource::ProtocolRequirement:
-  case RequirementSource::InferredProtocolRequirement:
-    return replaceSelfWithPotentialArchetype(
-             parent->getAffectedPotentialArchetype(builder),
-             getStoredType());
+  case RequirementSource::InferredProtocolRequirement: {
+    auto parentPA = parent->visitPotentialArchetypesAlongPath(visitor);
+    if (!parentPA) return nullptr;
+
+    if (visitor(parentPA, this)) return nullptr;
+
+    return replaceSelfWithPotentialArchetype(parentPA, getStoredType());
+  }
   }
 }
 
@@ -866,7 +875,7 @@ const RequirementSource *FloatingRequirementSource::getSource(
     // to the potential archetype on which the requirement is being placed.
     auto baseSource = storage.get<const RequirementSource *>();
     auto baseSourcePA =
-      baseSource->getAffectedPotentialArchetype(*pa->getBuilder());
+      baseSource->getAffectedPotentialArchetype();
 
     auto dependentType =
       formProtocolRelativeType(protocolReq.protocol, baseSourcePA, pa);

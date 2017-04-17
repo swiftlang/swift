@@ -962,8 +962,21 @@ public:
   PotentialArchetype *getRootPotentialArchetype() const;
 
   /// Retrieve the potential archetype to which this source refers.
-  PotentialArchetype *getAffectedPotentialArchetype(
-                                        GenericSignatureBuilder &builder) const;
+  PotentialArchetype *getAffectedPotentialArchetype() const;
+
+  /// Visit each of the potential archetypes along the path, from the root
+  /// potential archetype to each potential archetype named via (e.g.) a
+  /// protocol requirement or parent source.
+  ///
+  /// \param visitor Called with each potential archetype along the path along
+  /// with the requirement source that is being applied on top of that
+  /// potential archetype. Can return \c true to halt the search.
+  ///
+  /// \returns nullptr if any call to \c visitor returned true. Otherwise,
+  /// returns the potential archetype to which the entire source refers.
+  PotentialArchetype *visitPotentialArchetypesAlongPath(
+           llvm::function_ref<bool(PotentialArchetype *,
+                                   const RequirementSource *)> visitor) const;
 
   /// Whether the requirement is inferred or derived from an inferred
   /// requirment.
