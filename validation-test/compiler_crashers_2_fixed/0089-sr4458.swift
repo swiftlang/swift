@@ -1,4 +1,7 @@
 // RUN: %target-swift-frontend -primary-file %s -emit-ir
+
+// REQUIRES: objc_interop
+
 import Foundation
 
 extension _MutableIndexable {
