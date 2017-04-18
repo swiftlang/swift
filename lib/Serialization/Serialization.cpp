@@ -4119,13 +4119,15 @@ namespace {
       auto keyLength = key.getString(scratch).size();
       assert(keyLength <= std::numeric_limits<uint16_t>::max() &&
              "selector too long");
-      size_t entrySize = sizeof(uint32_t) + 1 + sizeof(uint32_t);
-      uint16_t dataLength = entrySize * data.size();
-      assert(dataLength / entrySize == data.size() && "too many methods");
+      uint32_t dataLength = 0;
+      for (const auto &entry : data) {
+        dataLength += sizeof(uint32_t) + 1 + sizeof(uint32_t);
+        dataLength += std::get<0>(entry).size();
+      }
 
       endian::Writer<little> writer(out);
       writer.write<uint16_t>(keyLength);
-      writer.write<uint16_t>(dataLength);
+      writer.write<uint32_t>(dataLength);
       return { keyLength, dataLength };
     }
 
@@ -4141,10 +4143,11 @@ namespace {
                   unsigned len) {
       static_assert(declIDFitsIn32Bits(), "DeclID too large");
       endian::Writer<little> writer(out);
-      for (auto entry : data) {
-        writer.write<uint32_t>(std::get<0>(entry));
+      for (const auto &entry : data) {
+        writer.write<uint32_t>(std::get<0>(entry).size());
         writer.write<uint8_t>(std::get<1>(entry));
         writer.write<uint32_t>(std::get<2>(entry));
+        out.write(std::get<0>(entry).c_str(), std::get<0>(entry).size());
       }
     }
   };
@@ -4234,12 +4237,17 @@ static void collectInterestingNestedDeclarations(
     if (!isLocal) {
       if (auto func = dyn_cast<AbstractFunctionDecl>(member)) {
         if (func->isObjC()) {
-          TypeID owningTypeID
-            = S.addTypeRef(func->getDeclContext()->getDeclaredInterfaceType());
-          objcMethods[func->getObjCSelector()].push_back(
-            std::make_tuple(owningTypeID,
-                            func->isObjCInstanceMethod(),
-                            S.addDeclRef(func)));
+          if (auto owningClass =
+                func->getDeclContext()->getAsClassOrClassExtensionContext()) {
+            Mangle::ASTMangler mangler;
+            std::string ownerName = mangler.mangleNominalType(owningClass);
+            assert(!ownerName.empty() && "Mangled type came back empty!");
+
+            objcMethods[func->getObjCSelector()].push_back(
+              std::make_tuple(ownerName,
+                              func->isObjCInstanceMethod(),
+                              S.addDeclRef(func)));
+          }
         }
       }
     }
