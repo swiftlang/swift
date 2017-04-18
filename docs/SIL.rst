@@ -2513,7 +2513,7 @@ An ``init`` access takes uninitialized memory and initializes it.
 It must always use ``static`` enforcement.
 
 An ``deinit`` access takes initialized memory and leaves it uninitialized.
-It must always use ``static`` enforcemnet.
+It must always use ``static`` enforcement.
 
 ``read`` and ``modify`` accesses take initialized memory and leave it
 initialized.  They may use ``unknown`` enforcement only in the ``raw``

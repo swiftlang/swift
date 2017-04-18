@@ -1612,7 +1612,7 @@ LValue SILGenLValue::visitRec(Expr *e, AccessKind accessKind) {
           DRE->getDecl()->isImplicit()) {
         Ctx = SGFContext::AllowGuaranteedPlusZero;
         if (SGF.SelfInitDelegationState != SILGenFunction::NormalSelf) {
-          // This needs to be inlined since there is a Formal EvaluatioN Scope
+          // This needs to be inlined since there is a Formal Evaluation Scope
           // in emitRValueForDecl that causing any borrow for this LValue to be
           // popped too soon.
           auto *vd = cast<ParamDecl>(DRE->getDecl());

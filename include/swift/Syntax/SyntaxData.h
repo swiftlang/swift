@@ -26,7 +26,7 @@
 // Conceptually, SyntaxData add the characteristic of specific identity in a
 // piece of Swift source code. While the RawSyntax for the integer literal
 // token '1' can be reused anywhere a '1' occurs and has identical formatting,
-// a SyntaxData reprsents *a* specific '1' at a particular location in
+// a SyntaxData represents *a* specific '1' at a particular location in
 // Swift source.
 //
 // These are effectively internal implementation. For all public APIs, look
@@ -178,7 +178,7 @@ public:
   }
 
   /// Replace a child in the raw syntax and recursively rebuild the
-  /// parental chain up to the rooet.
+  /// parental chain up to the root.
   ///
   /// This is the effective private implementation of all setters in
   /// subclasses of `SyntaxData`.

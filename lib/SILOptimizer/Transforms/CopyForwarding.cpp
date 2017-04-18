@@ -624,7 +624,7 @@ CopyAddrInst *CopyForwarding::findCopyIntoDeadTemp(CopyAddrInst *destCopy) {
   return nullptr;
 }
 
-/// Forward a copy into a dead temporary as idenitified by
+/// Forward a copy into a dead temporary as identified by
 /// `findCopyIntoDeadTemp`.
 ///
 /// Returns true if the copy was successfully forwarded.

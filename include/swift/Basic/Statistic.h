@@ -27,7 +27,7 @@
 // Helper class designed to consolidate reporting of LLVM statistics and timers
 // across swift compilations that typically invoke many drivers, each running
 // many frontends. Additionally collects some cheap "always-on" statistics,
-// beyond those that are (compile-time) parametrized by -DLLVM_ENABLE_STATS
+// beyond those that are (compile-time) parameterized by -DLLVM_ENABLE_STATS
 // (LLVM's stats are global and involve some amount of locking and mfences).
 //
 // Assumes it's given a process name and target name (the latter used as

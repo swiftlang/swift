@@ -671,7 +671,7 @@ self.test("\(testNamePrefix).sorted/ThrowingPredicate") {
   }
 }
 
-self.test("\(testNamePrefix).sorted/ThrowingPredicateWithLargeNumberElememts") {
+self.test("\(testNamePrefix).sorted/ThrowingPredicateWithLargeNumberElements") {
   for sequence in largeElementSortTests {
       for i in 0..<sequence.count {
       checkSortedPredicateThrow(

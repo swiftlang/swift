@@ -632,7 +632,7 @@ public struct _BigInt<Word: FixedWidthInteger & UnsignedInteger> :
     _standardize()
   }
 
-  /// Returns a array of the value's data using two's complement representation.
+  /// Returns an array of the value's data using two's complement representation.
   func _dataAsTwosComplement() -> [Word] {
     // Special cases:
     // * Nonnegative values are already in 2's complement

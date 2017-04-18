@@ -612,8 +612,8 @@ uint8_t swift::getKeywordLen(tok keyword) {
 StringRef swift::getCodePlaceholder() { return "<#code#>"; }
 
 void swift::
-printEnumElmentsAsCases(llvm::DenseSet<EnumElementDecl*> &UnhandledElements,
-                        llvm::raw_ostream &OS) {
+printEnumElementsAsCases(llvm::DenseSet<EnumElementDecl*> &UnhandledElements,
+                         llvm::raw_ostream &OS) {
   // Sort the missing elements to a vector because set does not guarantee orders.
   SmallVector<EnumElementDecl*, 4> SortedElements;
   SortedElements.insert(SortedElements.begin(), UnhandledElements.begin(),

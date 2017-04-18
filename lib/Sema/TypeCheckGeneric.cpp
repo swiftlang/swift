@@ -618,7 +618,7 @@ static void checkReferencedGenericParams(GenericContext *dc,
   auto *decl = cast<ValueDecl>(dc->getInnermostDeclarationDeclContext());
 
   // A helper class to collect referenced generic type parameters
-  // and dependent memebr types.
+  // and dependent member types.
   class ReferencedGenericTypeWalker : public TypeWalker {
     SmallPtrSet<CanType, 4> ReferencedGenericParams;
 
@@ -653,7 +653,7 @@ static void checkReferencedGenericParams(GenericContext *dc,
   auto &referencedGenericParams =
       paramsAndResultWalker.getReferencedGenericParams();
 
-  // Check if at least one of the generic params in the requirment refers
+  // Check if at least one of the generic params in the requirement refers
   // to an already referenced generic parameter. If this is the case,
   // then the other type is also considered as referenced, because
   // it is used to put requirements on the first type.
@@ -673,7 +673,7 @@ static void checkReferencedGenericParams(GenericContext *dc,
       break;
     }
 
-    // Collect generic parameter types refereced by types used in a requirement.
+    // Collect generic parameter types referenced by types used in a requirement.
     ReferencedGenericTypeWalker walker;
     if (first && first->hasTypeParameter())
       first.walk(walker);

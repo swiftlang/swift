@@ -1,4 +1,4 @@
-//===- SILFunctionConventions.h - Defines SILFunctioConventions -*- C++ -*-===//
+//===- SILFunctionConventions.h - Defines SIL func. conventions -*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
