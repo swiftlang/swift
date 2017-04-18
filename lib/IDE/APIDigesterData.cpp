@@ -262,7 +262,7 @@ serializeDiffItem(llvm::BumpPtrAllocator &Alloc,
   }
   }
 }
-}// End of anonymous namespace.
+} // end anonymous namespace
 
 namespace swift {
 namespace json {
