@@ -1394,7 +1394,7 @@ Serializer::writeConformance(ProtocolConformanceRef conformanceRef,
     auto substitutions = conf->getGenericSubstitutions();
     unsigned abbrCode = abbrCodes[SpecializedProtocolConformanceLayout::Code];
     auto type = conf->getType();
-    if (genericEnv)
+    if (genericEnv && type->hasArchetype())
       type = genericEnv->mapTypeOutOfContext(type);
     SpecializedProtocolConformanceLayout::emitRecord(Out, ScratchRecord,
                                                      abbrCode,
@@ -1412,7 +1412,7 @@ Serializer::writeConformance(ProtocolConformanceRef conformanceRef,
       = abbrCodes[InheritedProtocolConformanceLayout::Code];
 
     auto type = conf->getType();
-    if (genericEnv)
+    if (genericEnv && type->hasArchetype())
       type = genericEnv->mapTypeOutOfContext(type);
 
     InheritedProtocolConformanceLayout::emitRecord(
@@ -1451,7 +1451,7 @@ Serializer::writeSubstitutions(SubstitutionList substitutions,
 
   for (auto &sub : substitutions) {
     auto replacementType = sub.getReplacement();
-    if (genericEnv) {
+    if (genericEnv && replacementType->hasArchetype()) {
       replacementType =
         genericEnv->mapTypeOutOfContext(replacementType);
     }
