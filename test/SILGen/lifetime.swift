@@ -17,7 +17,8 @@ struct Val {
 func local_valtype() {
     var b: Val
     // CHECK: [[B:%[0-9]+]] = alloc_box ${ var Val }
-    // CHECK: destroy_value [[B]]
+    // CHECK: [[MARKED_B:%.*]] = mark_uninitialized [var] [[B]]
+    // CHECK: destroy_value [[MARKED_B]]
     // CHECK: return
 }
 
@@ -33,11 +34,12 @@ func local_valtype_branch(_ a: Bool) {
 
     var x:Int
     // CHECK: [[X:%[0-9]+]] = alloc_box ${ var Int }
+    // CHECK: [[MARKED_X:%.*]] = mark_uninitialized [var] [[X]]
 
     if a { return }
     // CHECK: cond_br
     // CHECK: {{bb.*:}}
-    // CHECK: destroy_value [[X]]
+    // CHECK: destroy_value [[MARKED_X]]
     // CHECK: br [[EPILOG]]
 
     while a {
@@ -51,63 +53,65 @@ func local_valtype_branch(_ a: Bool) {
         if a { return }
         // CHECK: cond_br
         // CHECK: {{bb.*:}}
-        // CHECK: destroy_value [[X]]
+        // CHECK: destroy_value [[MARKED_X]]
         // CHECK: br [[EPILOG]]
 
         var y:Int
         // CHECK: [[Y:%[0-9]+]] = alloc_box ${ var Int }
+        // CHECK: [[MARKED_Y:%.*]] = mark_uninitialized [var] [[Y]]
 
         if a { break }
         // CHECK: cond_br
         // CHECK: {{bb.*:}}
-        // CHECK: destroy_value [[Y]]
-        // CHECK-NOT: destroy_value [[X]]
+        // CHECK: destroy_value [[MARKED_Y]]
+        // CHECK-NOT: destroy_value [[MARKED_X]]
         // CHECK-NOT: destroy_value [[A]]
         // CHECK: br
 
         if a { return }
         // CHECK: cond_br
         // CHECK: {{bb.*:}}
-        // CHECK: destroy_value [[Y]]
-        // CHECK: destroy_value [[X]]
+        // CHECK: destroy_value [[MARKED_Y]]
+        // CHECK: destroy_value [[MARKED_X]]
         // CHECK: br [[EPILOG]]
 
         if true {
             var z:Int
             // CHECK: [[Z:%[0-9]+]] = alloc_box ${ var Int }
+            // CHECK: [[MARKED_Z:%.*]] = mark_uninitialized [var] [[Z]]
 
             if a { break }
             // CHECK: cond_br
             // CHECK: {{bb.*:}}
-            // CHECK: destroy_value [[Z]]
-            // CHECK: destroy_value [[Y]]
-            // CHECK-NOT: destroy_value [[X]]
+            // CHECK: destroy_value [[MARKED_Z]]
+            // CHECK: destroy_value [[MARKED_Y]]
+            // CHECK-NOT: destroy_value [[MARKED_X]]
             // CHECK-NOT: destroy_value [[A]]
             // CHECK: br
 
             if a { return }
             // CHECK: cond_br
             // CHECK: {{bb.*:}}
-            // CHECK: destroy_value [[Z]]
-            // CHECK: destroy_value [[Y]]
-            // CHECK: destroy_value [[X]]
+            // CHECK: destroy_value [[MARKED_Z]]
+            // CHECK: destroy_value [[MARKED_Y]]
+            // CHECK: destroy_value [[MARKED_X]]
             // CHECK: br [[EPILOG]]
 
-            // CHECK: destroy_value [[Z]]
+            // CHECK: destroy_value [[MARKED_Z]]
         }
         if a { break }
         // CHECK: cond_br
         // CHECK: {{bb.*:}}
-        // CHECK: destroy_value [[Y]]
-        // CHECK-NOT: destroy_value [[X]]
+        // CHECK: destroy_value [[MARKED_Y]]
+        // CHECK-NOT: destroy_value [[MARKED_X]]
         // CHECK-NOT: destroy_value [[A]]
         // CHECK: br
 
         // CHECK: {{bb.*:}}
-        // CHECK: destroy_value [[Y]]
+        // CHECK: destroy_value [[MARKED_Y]]
         // CHECK: br
     }
-    // CHECK: destroy_value [[X]]
+    // CHECK: destroy_value [[MARKED_X]]
     // CHECK: [[EPILOG]]:
     // CHECK: return
 }
@@ -654,18 +658,18 @@ struct Bar {
   // CHECK-LABEL: sil hidden @_T08lifetime3BarV{{[_0-9a-zA-Z]*}}fC
   init() {
     // CHECK: bb0([[METATYPE:%[0-9]+]] : $@thin Bar.Type):
-    // CHECK: [[THISADDRBOX:%[0-9]+]] = alloc_box ${ var Bar }
-    // CHECK: [[PB:%.*]] = project_box [[THISADDRBOX]]
-    // CHECK: [[THISADDR:%[0-9]+]] = mark_uninitialized [rootself] [[PB]]
+    // CHECK: [[SELF_BOX:%[0-9]+]] = alloc_box ${ var Bar }
+    // CHECK: [[MARKED_SELF_BOX:%[0-9]+]] = mark_uninitialized [rootself] [[SELF_BOX]]
+    // CHECK: [[PB_BOX:%.*]] = project_box [[MARKED_SELF_BOX]]
 
     x = bar()
-    // CHECK: [[THIS_X:%[0-9]+]] = struct_element_addr [[THISADDR]] : $*Bar, #Bar.x
-    // CHECK: assign {{.*}} to [[THIS_X]]
+    // CHECK: [[SELF_X:%[0-9]+]] = struct_element_addr [[PB_BOX]] : $*Bar, #Bar.x
+    // CHECK: assign {{.*}} to [[SELF_X]]
 
     // -- load and return this
-    // CHECK: [[THISVAL:%[0-9]+]] = load [trivial] [[THISADDR]]
-    // CHECK: destroy_value [[THISADDRBOX]]
-    // CHECK: return [[THISVAL]]
+    // CHECK: [[SELF_VAL:%[0-9]+]] = load [trivial] [[PB_BOX]]
+    // CHECK: destroy_value [[MARKED_SELF_BOX]]
+    // CHECK: return [[SELF_VAL]]
   }
 
   init<T:Intifiable>(xx:T) {
@@ -681,17 +685,17 @@ struct Bas<T> {
   // CHECK-LABEL: sil hidden @_T08lifetime3BasV{{[_0-9a-zA-Z]*}}fC
   init(yy:T) {
     // CHECK: bb0([[THISADDRPTR:%[0-9]+]] : $*Bas<T>, [[YYADDR:%[0-9]+]] : $*T, [[META:%[0-9]+]] : $@thin Bas<T>.Type):
-    // CHECK: [[THISADDRBOX:%[0-9]+]] = alloc_box $<τ_0_0> { var Bas<τ_0_0> } <T>
-    // CHECK: [[PB:%.*]] = project_box [[THISADDRBOX]]
-    // CHECK: [[THISADDR:%[0-9]+]] = mark_uninitialized [rootself] [[PB]]
+    // CHECK: [[SELF_BOX:%[0-9]+]] = alloc_box $<τ_0_0> { var Bas<τ_0_0> } <T>
+    // CHECK: [[MARKED_SELF_BOX:%[0-9]+]] = mark_uninitialized [rootself] [[SELF_BOX]]
+    // CHECK: [[PB_BOX:%.*]] = project_box [[MARKED_SELF_BOX]]
 
     x = bar()
-    // CHECK: [[THIS_X:%[0-9]+]] = struct_element_addr [[THISADDR]] : $*Bas<T>, #Bas.x
-    // CHECK: assign {{.*}} to [[THIS_X]]
+    // CHECK: [[SELF_X:%[0-9]+]] = struct_element_addr [[PB_BOX]] : $*Bas<T>, #Bas.x
+    // CHECK: assign {{.*}} to [[SELF_X]]
 
     y = yy
-    // CHECK: [[THIS_Y:%[0-9]+]] = struct_element_addr [[THISADDR]] : $*Bas<T>, #Bas.y
-    // CHECK: copy_addr {{.*}} to [[THIS_Y]]
+    // CHECK: [[SELF_Y:%[0-9]+]] = struct_element_addr [[PB_BOX]] : $*Bas<T>, #Bas.y
+    // CHECK: copy_addr {{.*}} to [[SELF_Y]]
     // CHECK: destroy_value
 
     // -- 'self' was emplaced into indirect return slot
@@ -707,14 +711,14 @@ struct Bas<T> {
 class B { init(y:Int) {} }
 class D : B {
   // CHECK-LABEL: sil hidden @_T08lifetime1DCACSi1x_Si1ytcfc
-  // CHECK: bb0([[X:%[0-9]+]] : $Int, [[Y:%[0-9]+]] : $Int, [[THIS:%[0-9]+]] : $D):
+  // CHECK: bb0([[X:%[0-9]+]] : $Int, [[Y:%[0-9]+]] : $Int, [[SELF:%[0-9]+]] : $D):
   init(x: Int, y: Int) {
     var x = x
     var y = y
-    // CHECK: [[THISADDR1:%[0-9]+]] = alloc_box ${ var D }
-    // CHECK: [[PTHIS:%[0-9]+]] = project_box [[THISADDR1]]
-    // CHECK: [[THISADDR:%[0-9]+]] = mark_uninitialized [derivedself] [[PTHIS]]
-    // CHECK: store [[THIS]] to [init] [[THISADDR]]
+    // CHECK: [[SELF_BOX:%[0-9]+]] = alloc_box ${ var D }
+    // CHECK: [[MARKED_SELF_BOX:%[0-9]+]] = mark_uninitialized [derivedself] [[SELF_BOX]]
+    // CHECK: [[PB_BOX:%[0-9]+]] = project_box [[MARKED_SELF_BOX]]
+    // CHECK: store [[SELF]] to [init] [[PB_BOX]]
     // CHECK: [[XADDR:%[0-9]+]] = alloc_box ${ var Int }
     // CHECK: [[PX:%[0-9]+]] = project_box [[XADDR]]
     // CHECK: store [[X]] to [trivial] [[PX]]
@@ -723,14 +727,14 @@ class D : B {
     // CHECK: store [[Y]] to [trivial] [[PY]]
 
     super.init(y: y)
-    // CHECK: [[THIS1:%[0-9]+]] = load [take] [[THISADDR]]
+    // CHECK: [[THIS1:%[0-9]+]] = load [take] [[PB_BOX]]
     // CHECK: [[THIS1_SUP:%[0-9]+]] = upcast [[THIS1]] : ${{.*}} to $B
     // CHECK: [[SUPER_CTOR:%[0-9]+]] = function_ref @_T08lifetime1BCACSi1y_tcfc : $@convention(method) (Int, @owned B) -> @owned B
     // CHECK: [[Y:%[0-9]+]] = load [trivial] [[PY]]
     // CHECK: [[THIS2_SUP:%[0-9]+]] = apply [[SUPER_CTOR]]([[Y]], [[THIS1_SUP]])
     // CHECK: [[THIS2:%[0-9]+]] = unchecked_ref_cast [[THIS2_SUP]] : $B to $D
-    // CHECK: [[THIS1:%[0-9]+]] = load [copy] [[THISADDR]]
-    // CHECK: destroy_value [[THISADDR1]]
+    // CHECK: [[THIS1:%[0-9]+]] = load [copy] [[PB_BOX]]
+    // CHECK: destroy_value [[MARKED_SELF_BOX]]
   }
 
   func foo() {}

@@ -502,15 +502,15 @@ class BaseThrowingInit : HasThrowingInit {
 }
 // CHECK: sil hidden @_T06errors16BaseThrowingInit{{.*}}c : $@convention(method) (Int, Int, @owned BaseThrowingInit) -> (@owned BaseThrowingInit, @error Error)
 // CHECK:      [[BOX:%.*]] = alloc_box ${ var BaseThrowingInit }
-// CHECK:      [[PB:%.*]] = project_box [[BOX]]
-// CHECK:      [[MARKED_BOX:%.*]] = mark_uninitialized [derivedself] [[PB]]
+// CHECK:      [[MARKED_BOX:%.*]] = mark_uninitialized [derivedself] [[BOX]]
+// CHECK:      [[PB:%.*]] = project_box [[MARKED_BOX]]
 //   Initialize subField.
-// CHECK:      [[T0:%.*]] = load_borrow [[MARKED_BOX]]
+// CHECK:      [[T0:%.*]] = load_borrow [[PB]]
 // CHECK-NEXT: [[T1:%.*]] = ref_element_addr [[T0]] : $BaseThrowingInit, #BaseThrowingInit.subField
 // CHECK-NEXT: assign %1 to [[T1]]
-// CHECK-NEXT: end_borrow [[T0]] from [[MARKED_BOX]]
+// CHECK-NEXT: end_borrow [[T0]] from [[PB]]
 //   Super delegation.
-// CHECK-NEXT: [[T0:%.*]] = load [take] [[MARKED_BOX]]
+// CHECK-NEXT: [[T0:%.*]] = load [take] [[PB]]
 // CHECK-NEXT: [[T2:%.*]] = upcast [[T0]] : $BaseThrowingInit to $HasThrowingInit
 // CHECK: [[T3:%[0-9]+]] = function_ref @_T06errors15HasThrowingInitCACSi5value_tKcfc : $@convention(method) (Int, @owned HasThrowingInit) -> (@owned HasThrowingInit, @error Error)
 // CHECK-NEXT: apply [[T3]](%0, [[T2]])

@@ -74,6 +74,7 @@ static void addOwnershipModelEliminatorPipeline(SILPassPipelinePlan &P) {
 static void addMandatoryOptPipeline(SILPassPipelinePlan &P,
                                     const SILOptions &Options) {
   P.startPipeline("Guaranteed Passes");
+  P.addMarkUninitializedFixup();
   if (Options.EnableMandatorySemanticARCOpts) {
     P.addSemanticARCOpts();
   }
