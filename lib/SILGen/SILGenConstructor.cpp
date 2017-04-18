@@ -567,11 +567,7 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
 
   if (NeedsBoxForSelf) {
     // Allocate the local variable for 'self'.
-    emitLocalVariableWithCleanup(selfDecl, None)->finishInitialization(*this);
-
-    auto &SelfVarLoc = VarLocs[selfDecl];
-    SelfVarLoc.value = B.createMarkUninitialized(selfDecl,
-                                                 SelfVarLoc.value, MUKind);
+    emitLocalVariableWithCleanup(selfDecl, MUKind)->finishInitialization(*this);
   }
 
   // Emit the prolog for the non-self arguments.

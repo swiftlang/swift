@@ -19,8 +19,8 @@ func test0(c c: C) {
 
   var a: A
 // CHECK:      [[A1:%.*]] = alloc_box ${ var A }
-// CHECK-NEXT: [[PBA:%.*]] = project_box [[A1]]
-// CHECK:      [[A:%.*]] = mark_uninitialized [var] [[PBA]]
+// CHECK:      [[MARKED_A1:%.*]] = mark_uninitialized [var] [[A1]]
+// CHECK-NEXT: [[PBA:%.*]] = project_box [[MARKED_A1]]
 
   weak var x = c
 // CHECK:      [[X:%.*]] = alloc_box ${ var @sil_weak Optional<C> }, var, name "x"
@@ -37,7 +37,7 @@ func test0(c c: C) {
 // CHECK-NEXT: [[OPTVAL:%.*]] = enum $Optional<C>, #Optional.some!enumelt.1, [[TMP]] : $C
 
 //   Drill to a.x
-// CHECK-NEXT: [[A_X:%.*]] = struct_element_addr [[A]] : $*A, #A.x
+// CHECK-NEXT: [[A_X:%.*]] = struct_element_addr [[PBA]] : $*A, #A.x
 
 //   Store to a.x.
 // CHECK-NEXT: store_weak [[OPTVAL]] to [[A_X]] : $*@sil_weak Optional<C>
