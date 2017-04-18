@@ -19,79 +19,8 @@ import argparse
 import csv
 import sys
 
-TESTNAME = 1
-SAMPLES = 2
-MIN = 3
-MAX = 4
-MEAN = 5
-SD = 6
-MEDIAN = 7
-
-HTML = """
-<!DOCTYPE html>
-<html>
-<head>
-    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
-</head>
-<body>
-{0}
-</body>
-</html>"""
-
-HTML_TABLE = """
-<table>
-        <tr>
-                <th align='left'>{0}</th>
-                <th align='left'>{1}</th>
-                <th align='left'>{2}</th>
-                <th align='left'>{3}</th>
-                <th align='left'>{4}</th>
-        </tr>
-        {5}
-</table>
-"""
-
-HTML_ROW = """
-        <tr>
-                <td align='left'>{0}</td>
-                <td align='left'>{1}</td>
-                <td align='left'>{2}</td>
-                <td align='left'>{3}</td>
-                <td align='left'><font color='{4}'>{5}</font></td>
-        </tr>
-"""
-
-MARKDOWN_ROW = "{0} | {1} | {2} | {3} | {4} \n"
-HEADER_SPLIT = "---"
-MARKDOWN_DETAIL = """
-<details {3}>
-  <summary>{0} ({1})</summary>
-  {2}
-</details>
-"""
-
-PAIN_DETAIL = """
-{0}: {1}"""
-
-RATIO_MIN = None
-RATIO_MAX = None
-
 
 def main():
-    global RATIO_MIN
-    global RATIO_MAX
-
-    old_results = {}
-    new_results = {}
-    old_max_results = {}
-    new_max_results = {}
-    ratio_list = {}
-    delta_list = {}
-    unknown_list = {}
-    complete_perf_list = []
-    increased_perf_list = []
-    decreased_perf_list = []
-    normal_perf_list = []
 
     parser = argparse.ArgumentParser(description="Compare Performance tests.")
     parser.add_argument('--old-file',
@@ -101,7 +30,8 @@ def main():
                         help='New performance test suite (csv file)',
                         required=True)
     parser.add_argument('--format',
-                        help='Supported format git, html and markdown',
+                        choices=['markdown', 'git', 'html'],
+                        help='Output format. Default is markdown.',
                         default="markdown")
     parser.add_argument('--output', help='Output file name')
     parser.add_argument('--changes-only',
@@ -111,33 +41,20 @@ def main():
     parser.add_argument('--old-branch',
                         help='Name of the old branch', default="OLD_MIN")
     parser.add_argument('--delta-threshold',
-                        help='delta threshold', default="0.05")
+                        help='Delta threshold. Default 0.05.', default="0.05")
 
     args = parser.parse_args()
-
-    old_file = args.old_file
-    new_file = args.new_file
 
     new_branch = args.new_branch
     old_branch = args.old_branch
 
-    old_data = csv.reader(open(old_file))
-    new_data = csv.reader(open(new_file))
-
+    global RATIO_MIN
+    global RATIO_MAX
     RATIO_MIN = 1 - float(args.delta_threshold)
     RATIO_MAX = 1 + float(args.delta_threshold)
 
-    for row in old_data:
-        if (len(row) > 8):  # skip Totals row
-            old_results[row[TESTNAME]] = int(row[MIN])
-            old_max_results[row[TESTNAME]] = int(row[MAX])
-
-    for row in new_data:
-        if (len(row) > 8):  # skip Totals row
-            new_results[row[TESTNAME]] = int(row[MIN])
-            new_max_results[row[TESTNAME]] = int(row[MAX])
-
-    ratio_total = 0
+    (old_results, old_max_results) = load_tests_CSV(args.old_file)
+    (new_results, new_max_results) = load_tests_CSV(args.new_file)
 
     new_tests = set(new_results.keys())
     old_tests = set(old_results.keys())
@@ -145,10 +62,13 @@ def main():
     # removed_tests = old_tests.difference(new_tests)
     comparable_tests = new_tests.intersection(old_tests)
 
+    ratio_list = {}
+    delta_list = {}
+    unknown_list = {}
+
     for key in comparable_tests:
             ratio = (old_results[key] + 0.001) / (new_results[key] + 0.001)
             ratio_list[key] = round(ratio, 2)
-            ratio_total *= ratio
             delta = (((float(new_results[key] + 0.001) /
                       (old_results[key] + 0.001)) - 1) * 100)
             delta_list[key] = round(delta, 2)
@@ -168,69 +88,55 @@ def main():
     """
     Create markdown formatted table
     """
-    test_name_width = max_width(ratio_list, title='TEST', key_len=True)
-    new_time_width = max_width(new_results, title=new_branch)
-    old_time_width = max_width(old_results, title=old_branch)
-    delta_width = max_width(delta_list, title='DELTA')
 
-    markdown_table_header = "\n" + MARKDOWN_ROW.format(
-        "TEST".ljust(test_name_width),
-        old_branch.ljust(old_time_width),
-        new_branch.ljust(new_time_width),
-        "DELTA".ljust(delta_width),
-        "SPEEDUP".ljust(2))
-    markdown_table_header += MARKDOWN_ROW.format(
-        HEADER_SPLIT.ljust(test_name_width),
-        HEADER_SPLIT.ljust(old_time_width),
-        HEADER_SPLIT.ljust(new_time_width),
-        HEADER_SPLIT.ljust(delta_width),
-        HEADER_SPLIT.ljust(2))
-    markdown_regression = ""
-    for i, key in enumerate(decreased_perf_list):
-        ratio = "{0:.2f}x".format(ratio_list[key])
-        if i == 0:
-            markdown_regression = markdown_table_header
-        markdown_regression += MARKDOWN_ROW.format(
-            key.ljust(test_name_width),
-            str(old_results[key]).ljust(old_time_width),
-            str(new_results[key]).ljust(new_time_width),
-            ("{0:+.1f}%".format(delta_list[key])).ljust(delta_width),
-            "**{0}{1}**".format(str(ratio).ljust(2), unknown_list[key]))
+    def max_width(items, title, key_len=False):
+        def length(key):
+            return len(str(key)) if key_len else len(str(items[key]))
+        return max(len(title), max(map(length, items.keys())))
 
-    markdown_improvement = ""
-    for i, key in enumerate(increased_perf_list):
-        ratio = "{0:.2f}x".format(ratio_list[key])
-        if i == 0:
-            markdown_improvement = markdown_table_header
-        markdown_improvement += MARKDOWN_ROW.format(
-            key.ljust(test_name_width),
-            str(old_results[key]).ljust(old_time_width),
-            str(new_results[key]).ljust(new_time_width),
-            ("{0:+.1f}%".format(delta_list[key])).ljust(delta_width),
-            "**{0}{1}**".format(str(ratio).ljust(2), unknown_list[key]))
+    widths = (  # column widths
+        max_width(ratio_list, 'TEST', key_len=True),
+        max_width(new_results, str(new_branch)),
+        max_width(old_results, str(old_branch)),
+        max_width(delta_list, 'DELTA (%)'),
+        2
+    )
 
-    markdown_normal = ""
-    for i, key in enumerate(normal_perf_list):
-        ratio = "{0:.2f}x".format(ratio_list[key])
-        if i == 0:
-            markdown_normal = markdown_table_header
-        markdown_normal += MARKDOWN_ROW.format(
-            key.ljust(test_name_width),
-            str(old_results[key]).ljust(old_time_width),
-            str(new_results[key]).ljust(new_time_width),
-            ("{0:+.1f}%".format(delta_list[key])).ljust(delta_width),
-            "{0}{1}".format(str(ratio).ljust(2), unknown_list[key]))
+    def justify_columns(contents):
+        return tuple(map(lambda (w, c): c.ljust(w), zip(widths, contents)))
 
-    markdown_data = MARKDOWN_DETAIL.format("Regression",
-                                           len(decreased_perf_list),
-                                           markdown_regression, "open")
-    markdown_data += MARKDOWN_DETAIL.format("Improvement",
-                                            len(increased_perf_list),
-                                            markdown_improvement, "")
+    def add_row(contents):
+        return MARKDOWN_ROW.format(* justify_columns(contents))
+
+    header = ("TEST", old_branch, new_branch, "DELTA", "SPEEDUP")
+    markdown_table_header = "\n" + add_row(header)
+    markdown_table_header += add_row(tuple([HEADER_SPLIT] * len(header)))
+
+    def markdown_table(perf_list, strong):
+        markdown_table = markdown_table_header
+        for key in perf_list:
+            ratio = "{0:.2f}x".format(ratio_list[key])
+            markdown_table += add_row(
+                (
+                    key, str(old_results[key]), str(new_results[key]),
+                    "{0:+.1f}%".format(delta_list[key]),
+                    ("**{0}{1}**" if strong else "{0}{1}")
+                    .format(str(ratio), unknown_list[key])
+                )
+            )
+        return markdown_table
+
+    markdown_regression = markdown_table(decreased_perf_list, True)
+    markdown_improvement = markdown_table(increased_perf_list, True)
+    markdown_normal = markdown_table(normal_perf_list, False)
+
+    markdown_data = MARKDOWN_DETAIL.format(
+        "Regression", len(decreased_perf_list), markdown_regression, "open")
+    markdown_data += MARKDOWN_DETAIL.format(
+        "Improvement", len(increased_perf_list), markdown_improvement, "")
     if not args.changes_only:
-        markdown_data += MARKDOWN_DETAIL.format("No Changes",
-                                                len(normal_perf_list),
-                                                markdown_normal, "")
+        markdown_data += MARKDOWN_DETAIL.format(
+            "No Changes", len(normal_perf_list), markdown_normal, "")
 
     if args.format:
         if args.format.lower() != "markdown":
@@ -264,6 +170,24 @@ def main():
         elif args.format.lower() != "git":
             print("{0} is unknown format.".format(args.format))
             sys.exit(1)
+
+
+def load_tests_CSV(filename):
+    TESTNAME = 1
+    # SAMPLES = 2
+    MIN = 3
+    MAX = 4
+    # MEAN = 5
+    # SD = 6
+    # MEDIAN = 7
+
+    results = {}
+    max_results = {}
+    for row in csv.reader(open(filename)):
+        if (len(row) > 8):  # skip Totals row
+            results[row[TESTNAME]] = int(row[MIN])
+            max_results[row[TESTNAME]] = int(row[MAX])
+    return (results, max_results)
 
 
 def convert_to_html(ratio_list, old_results, new_results, delta_list,
@@ -347,20 +271,51 @@ def sort_ratio_list(ratio_list, changes_only=False):
             decreased_perf_list, sorted_normal_perf_list)
 
 
-def max_width(items, title, key_len=False):
-    """
-    Returns the max length of string in the list
-    """
-    width = len(str(title))
-    for key in items.keys():
-        if key_len:
-            if width < len(str(key)):
-                width = len(str(key))
-        else:
-            if width < len(str(items[key])):
-                width = len(str(items[key]))
-    return width
+HTML = """
+<!DOCTYPE html>
+<html>
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+</head>
+<body>
+{0}
+</body>
+</html>"""
 
+HTML_TABLE = """
+<table>
+        <tr>
+                <th align='left'>{0}</th>
+                <th align='left'>{1}</th>
+                <th align='left'>{2}</th>
+                <th align='left'>{3}</th>
+                <th align='left'>{4}</th>
+        </tr>
+        {5}
+</table>
+"""
+
+HTML_ROW = """
+        <tr>
+                <td align='left'>{0}</td>
+                <td align='left'>{1}</td>
+                <td align='left'>{2}</td>
+                <td align='left'>{3}</td>
+                <td align='left'><font color='{4}'>{5}</font></td>
+        </tr>
+"""
+
+MARKDOWN_ROW = "{0} | {1} | {2} | {3} | {4} \n"
+HEADER_SPLIT = "---"
+MARKDOWN_DETAIL = """
+<details {3}>
+  <summary>{0} ({1})</summary>
+  {2}
+</details>
+"""
+
+PAIN_DETAIL = """
+{0}: {1}"""
 
 if __name__ == "__main__":
-        sys.exit(main())
+    sys.exit(main())
