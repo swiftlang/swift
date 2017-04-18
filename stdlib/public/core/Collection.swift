@@ -383,6 +383,7 @@ public struct IndexingIterator<
 > : IteratorProtocol, Sequence {
 
   @_inlineable
+  @inline(__always)
   /// Creates an iterator over the given collection.
   public /// @testable
   init(_elements: Elements) {
@@ -415,6 +416,7 @@ public struct IndexingIterator<
   /// - Returns: The next element in the underlying sequence if a next element
   ///   exists; otherwise, `nil`.
   @_inlineable
+  @inline(__always)
   public mutating func next() -> Elements._Element? {
     if _slowPath(_position >= _elements.endIndex) {
       _debugPrecondition(
