@@ -419,6 +419,11 @@ def dump_migration_states_dir: Separate<["-"], "dump-migration-states-dir">,
   HelpText<"Dump the input text, output text, and states for migration to <path>">,
   MetaVarName<"<path>">;
 
+def api_diff_data_file: Separate<["-"], "api-diff-data-file">,
+  Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>,
+  HelpText<"API migration data is from <path>">,
+  MetaVarName<"<path>">;
+
 // File types
 
 def parse_as_library : Flag<["-"], "parse-as-library">,
