@@ -563,6 +563,17 @@ public:
   }
 };
 
+/// Flags for exclusivity-checking operations.
+enum class ExclusivityFlags : uintptr_t {
+  Read             = 0x0,
+  Modify           = 0x1,
+  ActionMask       = 0x1
+};
+static inline ExclusivityFlags getAccessAction(ExclusivityFlags flags) {
+  return ExclusivityFlags(uintptr_t(flags)
+                        & uintptr_t(ExclusivityFlags::ActionMask));
 }
+
+} // end namespace swift
 
 #endif /* SWIFT_ABI_METADATAVALUES_H */
