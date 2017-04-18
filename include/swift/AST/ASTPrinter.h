@@ -178,6 +178,13 @@ public:
 
   ASTPrinter &operator<<(DeclName name);
 
+  // Special case for 'char', but not arbitrary things that convert to 'char'.
+  template <typename T>
+  typename std::enable_if<std::is_same<T, char>::value, ASTPrinter &>::type
+  operator<<(T c) {
+    return *this << StringRef(&c, 1);
+  }
+
   void printKeyword(StringRef name) {
     callPrintNamePre(PrintNameContext::Keyword);
     *this << name;

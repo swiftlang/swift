@@ -344,6 +344,8 @@ void CommentToXMLConverter::visitDocComment(const DocComment *DC) {
     PO.PrintDocumentationComments = false;
     PO.TypeDefinitions = false;
     PO.VarInitializers = false;
+    PO.ShouldQualifyNestedDeclarations =
+        PrintOptions::QualifyNestedDeclarations::TypesOnly;
 
     OS << "<Declaration>";
     llvm::SmallString<32> DeclSS;
