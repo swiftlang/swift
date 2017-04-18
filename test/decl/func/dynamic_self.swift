@@ -91,6 +91,13 @@ class C1 {
 
     return Self() // expected-error{{use of unresolved identifier 'Self'}} expected-note {{did you mean 'self'?}}
   }
+
+  // This used to crash because metatype construction went down a
+  // different code path that didn't handle DynamicSelfType.
+  class func badFactory() -> Self {
+    return self(int: 0)
+    // expected-error@-1 {{initializing from a metatype value must reference 'init' explicitly}}
+  }
 }
 
 // ----------------------------------------------------------------------------
