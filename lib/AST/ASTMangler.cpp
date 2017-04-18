@@ -1839,7 +1839,10 @@ void ASTMangler::appendProtocolConformance(const ProtocolConformance *conformanc
     appendProtocolName(conformance->getProtocol());
     appendIdentifier(behaviorStorage->getName().str());
   } else {
-    appendType(conformance->getInterfaceType()->getCanonicalType());
+    auto conformanceDC = conformance->getDeclContext();
+    auto conformingType =
+      conformanceDC->mapTypeOutOfContext(conformance->getType());
+    appendType(conformingType->getCanonicalType());
     appendProtocolName(conformance->getProtocol());
     appendModule(conformance->getDeclContext()->getParentModule());
   }

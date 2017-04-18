@@ -94,14 +94,9 @@ class alignas(1 << DeclAlignInBits) ProtocolConformance {
   /// conformance definition.
   Type ConformingType;
   
-  /// \brief The interface type that conforms to the protocol.
-  Type ConformingInterfaceType;
-
 protected:
-  ProtocolConformance(ProtocolConformanceKind kind, Type conformingType,
-                      Type conformingInterfaceType)
-    : Kind(kind), ConformingType(conformingType),
-      ConformingInterfaceType(conformingInterfaceType) { }
+  ProtocolConformance(ProtocolConformanceKind kind, Type conformingType)
+    : Kind(kind), ConformingType(conformingType) { }
 
 public:
   /// Determine the kind of protocol conformance.
@@ -110,9 +105,6 @@ public:
   /// Get the conforming type.
   Type getType() const { return ConformingType; }
 
-  /// Get the conforming interface type.
-  Type getInterfaceType() const { return ConformingInterfaceType; }
-  
   /// Get the protocol being conformed to.
   ProtocolDecl *getProtocol() const;
 
@@ -357,9 +349,7 @@ class NormalProtocolConformance : public ProtocolConformance,
   NormalProtocolConformance(Type conformingType, ProtocolDecl *protocol,
                             SourceLoc loc, DeclContext *dc,
                             ProtocolConformanceState state)
-    : ProtocolConformance(ProtocolConformanceKind::Normal, conformingType,
-                          // FIXME: interface type should be passed in
-                          dc->getDeclaredInterfaceType()),
+    : ProtocolConformance(ProtocolConformanceKind::Normal, conformingType),
       ProtocolAndState(protocol, state), Loc(loc), ContextAndInvalid(dc, false)
   {
   }
@@ -369,9 +359,7 @@ class NormalProtocolConformance : public ProtocolConformance,
                             ProtocolDecl *protocol,
                             SourceLoc loc, AbstractStorageDecl *behaviorStorage,
                             ProtocolConformanceState state)
-    : ProtocolConformance(ProtocolConformanceKind::Normal, conformingType,
-                          // FIXME: interface type should be passed in
-                          conformingInterfaceType),
+    : ProtocolConformance(ProtocolConformanceKind::Normal, conformingType),
       ProtocolAndState(protocol, state), Loc(loc),
       ContextAndInvalid(behaviorStorage, false)
   {
@@ -640,9 +628,7 @@ class InheritedProtocolConformance : public ProtocolConformance,
 
   InheritedProtocolConformance(Type conformingType,
                                ProtocolConformance *inheritedConformance)
-    : ProtocolConformance(ProtocolConformanceKind::Inherited, conformingType,
-            // FIXME: interface type should be passed in
-            inheritedConformance->getDeclContext()->getDeclaredInterfaceType()),
+    : ProtocolConformance(ProtocolConformanceKind::Inherited, conformingType),
       InheritedConformance(inheritedConformance)
   {
   }

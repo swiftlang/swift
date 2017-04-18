@@ -283,7 +283,7 @@ class AssociatedTypeMetadataBuilder : public ReflectionMetadataBuilder {
   void layout() override {
     // If the conforming type is generic, we just want to emit the
     // unbound generic type here.
-    auto *Nominal = Conformance->getInterfaceType()->getAnyNominal();
+    auto *Nominal = Conformance->getType()->getAnyNominal();
     assert(Nominal && "Structural conformance?");
 
     PrettyStackTraceDecl DebugStack("emitting associated type metadata",
