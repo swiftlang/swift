@@ -4093,8 +4093,10 @@ public:
       return;
     }
 
-    if (SD->hasInterfaceType())
+    if (SD->hasInterfaceType() || SD->isBeingValidated())
       return;
+
+    SD->setIsBeingValidated();
 
     auto dc = SD->getDeclContext();
     assert(dc->isTypeContext() &&
@@ -4138,6 +4140,8 @@ public:
       if (!SD->getGenericSignatureOfContext())
         TC.configureInterfaceType(SD, SD->getGenericSignature());
     }
+
+    SD->setIsBeingValidated(false);
 
     TC.checkDeclAttributesEarly(SD);
     TC.computeAccessibility(SD);
