@@ -227,6 +227,10 @@ Type GenericEnvironment::QueryArchetypeToInterfaceSubstitutions::operator()(
   auto archetype = type->getAs<ArchetypeType>();
   if (!archetype) return Type();
 
+  // Only top-level archetypes need to be substituted directly; nested
+  // archetypes will be handled via their root archetypes.
+  if (archetype->getParent()) return Type();
+
   // If not all generic parameters have had their context types recorded,
   // perform a linear search.
   auto genericParams = self->Signature->getGenericParams();
