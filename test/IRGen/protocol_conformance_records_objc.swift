@@ -18,9 +18,9 @@ public protocol Runcible {
 // -- protocol descriptor
 // CHECK:           [[RUNCIBLE:%swift.protocol\* @"\$S33protocol_conformance_records_objc8RuncibleMp"]]
 // -- nominal type descriptor
-// CHECK:           @"$SSC6NSRectVMn"
+// CHECK:           @"$SSo6NSRectVMn"
 // -- witness table
-// CHECK:           @"$SSC6NSRectV33protocol_conformance_records_objc8RuncibleACWP"
+// CHECK:           @"$SSo6NSRectV33protocol_conformance_records_objc8RuncibleACWP"
 // -- reserved
 // CHECK:           i32 0
 // CHECK:         },

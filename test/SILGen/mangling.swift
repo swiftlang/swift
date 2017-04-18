@@ -83,7 +83,7 @@ func uses_objc_class_and_protocol(o: NSObject, p: NSAnsing) {}
 // Clang-imported structs get mangled using their Clang module name.
 // FIXME: Temporarily mangles everything into the virtual module __C__
 // <rdar://problem/14221244>
-// CHECK-LABEL: sil hidden @$S8mangling17uses_clang_struct1rySC6NSRectV_tF
+// CHECK-LABEL: sil hidden @$S8mangling17uses_clang_struct1rySo6NSRectV_tF
 func uses_clang_struct(r: NSRect) {}
 
 // CHECK-LABEL: sil hidden @$S8mangling14uses_optionals1xs7UnicodeO6ScalarVSgSiSg_tF
