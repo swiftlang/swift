@@ -332,22 +332,22 @@ public:
     NewProto = Builder.CreateCall(objc_allocateProtocol, protocolName);
     
     // Add the parent protocols.
-    //
-    // FIXME: Look at the requirement signature instead.
-    for (auto inherited : proto->getInherited()) {
-      SmallVector<ProtocolDecl*, 4> protocols;
-      inherited.getType()->getExistentialTypeProtocols(protocols);
-      for (auto parentProto : protocols) {
-        if (!parentProto->isObjC())
-          continue;
-        llvm::Value *parentRef
-          = IGM.getAddrOfObjCProtocolRef(parentProto, NotForDefinition);
-        parentRef = IGF.Builder.CreateBitCast(parentRef,
-                                   IGM.ProtocolDescriptorPtrTy->getPointerTo());
-        auto parent = Builder.CreateLoad(parentRef,
-                                             IGM.getPointerAlignment());
-        Builder.CreateCall(protocol_addProtocol, {NewProto, parent});
-      }
+    auto *requirementSig = proto->getRequirementSignature();
+    auto conformsTo =
+      requirementSig->getConformsTo(proto->getSelfInterfaceType(),
+                                    *IGF.IGM.getSwiftModule());
+
+    for (auto parentProto : conformsTo) {
+      if (!parentProto->isObjC())
+        continue;
+      llvm::Value *parentRef = IGM.getAddrOfObjCProtocolRef(parentProto,
+                                                            NotForDefinition);
+      parentRef = IGF.Builder.CreateBitCast(parentRef,
+                                            IGM.ProtocolDescriptorPtrTy
+                                              ->getPointerTo());
+      auto parent = Builder.CreateLoad(parentRef,
+                                       IGM.getPointerAlignment());
+      Builder.CreateCall(protocol_addProtocol, {NewProto, parent});
     }
     
     // Add the members.
@@ -616,16 +616,17 @@ void IRGenModule::emitRuntimeRegistration() {
       
       llvm::SmallVector<ProtocolDecl*, 4> protoInitOrder;
 
-      // FIXME: Use the requirement signature instead.
       std::function<void(ProtocolDecl*)> orderProtocol
         = [&](ProtocolDecl *proto) {
+          auto *requirementSig = proto->getRequirementSignature();
+          auto conformsTo = requirementSig->getConformsTo(
+              proto->getSelfInterfaceType(),
+              *getSwiftModule());
+
           // Recursively put parents first.
-          for (auto &inherited : proto->getInherited()) {
-            SmallVector<ProtocolDecl*, 4> parents;
-            inherited.getType()->getExistentialTypeProtocols(parents);
-            for (auto parent : parents)
-              orderProtocol(parent);
-          }
+          for (auto parent : conformsTo)
+            orderProtocol(parent);
+
           // Skip if we don't need to reify this protocol.
           auto found = protos.find(proto);
           if (found == protos.end())

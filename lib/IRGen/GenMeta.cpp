@@ -1906,7 +1906,8 @@ namespace {
 
     llvm::Value *visitAnyClassType(ClassDecl *classDecl) {
       // All class types have the same layout.
-      switch (getReferenceCountingForClass(IGF.IGM, classDecl)) {
+      auto type = classDecl->getDeclaredType()->getCanonicalType();
+      switch (getReferenceCountingForType(IGF.IGM, type)) {
       case ReferenceCounting::Native:
         return emitFromValueWitnessTable(IGF.IGM.Context.TheNativeObjectType);
 
@@ -1953,39 +1954,26 @@ namespace {
       // Reference storage types with witness tables need open-coded layouts.
       // TODO: Maybe we could provide prefabs for 1 witness table.
       if (referent.isExistentialType()) {
-        SmallVector<ProtocolDecl*, 2> protocols;
-        referent.getExistentialTypeProtocols(protocols);
-        for (auto *proto : protocols)
-          if (IGF.getSILTypes().protocolRequiresWitnessTable(proto))
+        auto layout = referent.getExistentialLayout();
+        for (auto *protoTy : layout.getProtocols()) {
+          auto *protoDecl = protoTy->getDecl();
+          if (IGF.getSILTypes().protocolRequiresWitnessTable(protoDecl))
             return visitType(type);
+        }
       }
 
       // Unmanaged references are plain pointers with extra inhabitants,
       // which look like thick metatypes.
+      //
+      // FIXME: This sounds wrong, an Objective-C tagged pointer could be
+      // stored in an unmanaged reference for instance.
       if (type->getOwnership() == Ownership::Unmanaged) {
         auto metatype = CanMetatypeType::get(C.TheNativeObjectType);
         return emitFromValueWitnessTable(metatype);
       }
 
-      auto getReferenceCountingForReferent
-        = [&](CanType referent) -> ReferenceCounting {
-          // If Objective-C interop is enabled, generic types might contain
-          // Objective-C references, so we have to use unknown reference
-          // counting.
-          if (isa<ArchetypeType>(referent) ||
-              referent->isExistentialType())
-            return (IGF.IGM.ObjCInterop ?
-                    ReferenceCounting::Unknown :
-                    ReferenceCounting::Native);
-
-          if (auto classDecl = referent->getClassOrBoundGenericClass())
-            return getReferenceCountingForClass(IGF.IGM, classDecl);
-
-          llvm_unreachable("unexpected referent for ref storage type");
-        };
-
       CanType valueWitnessReferent;
-      switch (getReferenceCountingForReferent(referent)) {
+      switch (getReferenceCountingForType(IGF.IGM, referent)) {
       case ReferenceCounting::Unknown:
       case ReferenceCounting::Block:
       case ReferenceCounting::ObjC:
@@ -3355,7 +3343,8 @@ namespace {
       ClassFlags flags = ClassFlags::IsSwift1;
 
       // Set a flag if the class uses Swift 1.0 refcounting.
-      if (getReferenceCountingForClass(IGM, Target)
+      auto type = Target->getDeclaredType()->getCanonicalType();
+      if (getReferenceCountingForType(IGM, type)
             == ReferenceCounting::Native) {
         flags |= ClassFlags::UsesSwift1Refcounting;
       }

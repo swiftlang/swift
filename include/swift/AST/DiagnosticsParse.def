@@ -528,7 +528,10 @@ ERROR(sil_member_decl_type_mismatch,none,
       "member defined with mismatching type %0 (expected %1)", (Type, Type))
 ERROR(sil_substitution_mismatch,none,
       "substitution replacement type %0 does not conform to protocol %1",
-      (Type, DeclName))
+      (Type, Type))
+ERROR(sil_not_class,none,
+      "substitution replacement type %0 is not a class type",
+      (Type))
 ERROR(sil_missing_substitutions,none,
       "missing substitutions", ())
 ERROR(sil_too_many_substitutions,none,
