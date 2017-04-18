@@ -22,6 +22,7 @@
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/Types.h"
+#include "swift/ClangImporter/ClangModule.h"
 #include "swift/IRGen/Linking.h"
 #include "swift/Runtime/Metadata.h"
 #include "swift/SIL/FormalLinkage.h"
@@ -442,7 +443,7 @@ bool irgen::isTypeMetadataAccessTrivial(IRGenModule &IGM, CanType type) {
     auto nominalType = cast<NominalType>(type);
 
     // Imported type metadata always requires an accessor.
-    if (nominalType->getDecl()->hasClangNode())
+    if (isa<ClangModuleUnit>(nominalType->getDecl()->getModuleScopeContext()))
       return false;
 
     // Metadata with a non-trivial parent node always requires an accessor.
@@ -1311,7 +1312,8 @@ static llvm::Value *emitTypeMetadataAccessFunctionBody(IRGenFunction &IGF,
     return emitDirectTypeMetadataRef(IGF, type);
 
   if (typeDecl->isGenericContext() &&
-      !(isa<ClassDecl>(typeDecl) && typeDecl->hasClangNode())) {
+      !(isa<ClassDecl>(typeDecl) &&
+        isa<ClangModuleUnit>(typeDecl->getModuleScopeContext()))) {
     // This is a metadata accessor for a fully substituted generic type.
     return emitDirectTypeMetadataRef(IGF, type);
   }
@@ -1342,7 +1344,7 @@ static llvm::Value *emitTypeMetadataAccessFunctionBody(IRGenFunction &IGF,
     }
 
   // Imported value types require foreign metadata uniquing.
-  } else if (typeDecl->hasClangNode()) {
+  } else if (isa<ClangModuleUnit>(typeDecl->getModuleScopeContext())) {
     return emitForeignTypeMetadataRef(IGF, type);
   }
 
@@ -5446,7 +5448,7 @@ IRGenModule::getAddrOfForeignTypeMetadataCandidate(CanType type) {
     addressPoint = builder.getOffsetOfAddressPoint();
   } else if (auto structType = dyn_cast<StructType>(type)) {
     auto structDecl = structType->getDecl();
-    assert(structDecl->hasClangNode());
+    assert(isa<ClangModuleUnit>(structDecl->getModuleScopeContext()));
     
     ForeignStructMetadataBuilder builder(*this, structDecl, init);
     builder.layout();

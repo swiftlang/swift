@@ -898,8 +898,11 @@ void NominalTypeDecl::prepareConformanceTable() const {
 
   // If this type declaration was not parsed from source code or introduced
   // via the Clang importer, don't add any synthesized conformances.
-  if (!getParentSourceFile() && !hasClangNode())
+  auto *file = cast<FileUnit>(getModuleScopeContext());
+  if (file->getKind() != FileUnitKind::Source &&
+      file->getKind() != FileUnitKind::ClangModule) {
     return;
+  }
 
   // Add any synthesized conformances.
   if (isa<ClassDecl>(this)) {
