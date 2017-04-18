@@ -2593,7 +2593,7 @@ static llvm::Constant *getAssignBoxedOpaqueExistentialBufferFunction(
 
         Builder.emitBlock(noMatchBB);
         {
-          // Metdata pointers don't match.
+          // Metadata pointers don't match.
           ConditionalDominanceScope noMatchCondition(IGF);
           // Store the metadata ref.
           IGF.Builder.CreateStore(srcMetadata, destMetadataSlot);

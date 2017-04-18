@@ -538,11 +538,11 @@ void EagerDispatch::emitRefCountedObjectCheck(SILBasicBlock *FailedTypeCheckBB,
                                         {CanBeClass, ClassConst});
 
   auto *SuccessBB = Builder.getFunction().createBasicBlock();
-  auto *MayBeCalssCheckBB = Builder.getFunction().createBasicBlock();
+  auto *MayBeCallsCheckBB = Builder.getFunction().createBasicBlock();
   Builder.createCondBranch(Loc, Cmp1, SuccessBB,
-                           MayBeCalssCheckBB);
+                           MayBeCallsCheckBB);
 
-  Builder.emitBlock(MayBeCalssCheckBB);
+  Builder.emitBlock(MayBeCallsCheckBB);
 
   auto MayBeClassConst =
       Builder.createIntegerLiteral(Loc, Int8Ty, 2);

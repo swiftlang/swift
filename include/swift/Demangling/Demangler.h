@@ -283,7 +283,7 @@ public:
 
 /// The demangler.
 ///
-/// It de-mangles a string and it also ownes the returned node-tree. This means
+/// It de-mangles a string and it also owns the returned node-tree. This means
 /// The nodes of the tree only live as long as the Demangler itself.
 class Demangler : public NodeFactory {
 private:

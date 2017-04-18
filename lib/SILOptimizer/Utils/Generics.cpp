@@ -382,7 +382,7 @@ ReabstractionInfo::ReabstractionInfo(ApplySite Apply, SILFunction *Callee,
   }
 
   if (SpecializedGenericSig) {
-    // It is a partial specializaiton.
+    // It is a partial specialization.
     DEBUG(llvm::dbgs() << "Specializing the call:\n";
           Apply.getInstruction()->dumpInContext();
           llvm::dbgs() << "\n\nPartially specialized types for function: "
@@ -755,7 +755,7 @@ void ReabstractionInfo::specializeConcreteSubstitutions(
     auto Replacement = Type(DP).subst(InterfaceSubs);
     if (Replacement->hasArchetype())
       continue;
-    // Replacemengt is concrete. Add a same type requirement.
+    // Replacement is concrete. Add a same type requirement.
     Requirement Req(RequirementKind::SameType, DP, Replacement);
     Requirements.push_back(Req);
   }
@@ -913,7 +913,7 @@ class FunctionSignaturePartialSpecializer {
   // It is computed from the original SubstitutionList.
   SubstitutionMap CalleeInterfaceToCallerArchetypeMap;
 
-  // Maps callee's interface types to specialzed functions interface types.
+  // Maps callee's interface types to specialized functions interface types.
   SubstitutionMap CalleeInterfaceToSpecializedInterfaceMap;
 
   SILModule &M;
@@ -955,7 +955,7 @@ class FunctionSignaturePartialSpecializer {
   /// Take into account only those archetypes that occur in the
   /// substitutions of generic parameters which will be partially
   /// specialized. Ignore all others.
-  void callectUsedCallerArchetypes(SubstitutionList ParamSubs);
+  void collectUsedCallerArchetypes(SubstitutionList ParamSubs);
 
   // Create a new generic parameter.
   GenericTypeParamType *createGenericParam();
@@ -998,7 +998,7 @@ FunctionSignaturePartialSpecializer::createGenericParam() {
 }
 
 /// Collect all used caller's archetypes from all the substitutions.
-void FunctionSignaturePartialSpecializer::callectUsedCallerArchetypes(
+void FunctionSignaturePartialSpecializer::collectUsedCallerArchetypes(
     SubstitutionList ParamSubs) {
   for (auto Sub : ParamSubs) {
     auto Replacement = Sub.getReplacement();
@@ -1091,7 +1091,7 @@ void FunctionSignaturePartialSpecializer::
 }
 
 /// Create a new generic parameter for each of the callee's generic parameters
-/// which require a substition.
+/// which require a substitution.
 void FunctionSignaturePartialSpecializer::
     createGenericParamsForCalleeGenericParams(
         GenericSignature *CalleeGenericSig,
@@ -1140,7 +1140,7 @@ void FunctionSignaturePartialSpecializer::
 
     // if (!Replacement->hasArchetype()) {
     if (!ShouldSpecializeGP) {
-      // Remember the original subsitution from the apply instruction.
+      // Remember the original substitution from the apply instruction.
       SpecializedInterfaceToCallerArchetypeMapping[SubstGenericParam] =
           Replacement;
       DEBUG(llvm::dbgs() << "Created a mapping (specialized interface -> "
@@ -1169,8 +1169,8 @@ void FunctionSignaturePartialSpecializer::
     DEBUG(llvm::dbgs() << "Added a requirement:\n"; Req.dump());
 
     if (ReplacementCallerInterfaceTy->is<GenericTypeParamType>()) {
-      // Remember that the new generic parameter corrsponds
-      // to the same caller archetype, which correponds to
+      // Remember that the new generic parameter corresponds
+      // to the same caller archetype, which corresponds to
       // the ReplacementCallerInterfaceTy.
       SpecializedInterfaceToCallerArchetypeMapping[SubstGenericParam] =
           SpecializedInterfaceToCallerArchetypeMapping.lookup(
@@ -1241,7 +1241,7 @@ void FunctionSignaturePartialSpecializer::computeCallerParamSubs(
     SubstitutionList &CallerParamSubs) {
   // TODO: Handle the case where calle's generic type parameter should
   // not be partially specialized. In this case,
-  // CalleeInterfaceToCallerArchetypeMap would not contian a mapping for it.
+  // CalleeInterfaceToCallerArchetypeMap would not contain a mapping for it.
 
   SmallVector<Substitution, 4> List;
 
@@ -1327,7 +1327,7 @@ FunctionSignaturePartialSpecializer::createSpecializedGenericSignature(
       CalleeGenericSig->getSubstitutionMap(ParamSubs);
 
   // Collect all used caller's archetypes from all the substitutions.
-  callectUsedCallerArchetypes(ParamSubs);
+  collectUsedCallerArchetypes(ParamSubs);
 
   // Generate a new generic type parameter for each used archetype from
   // the caller.
@@ -1351,7 +1351,7 @@ FunctionSignaturePartialSpecializer::createSpecializedGenericSignature(
 }
 
 // Builds a new generic and function signatures for a partial specialization.
-// Allows for partial specializations even if substitututions contain
+// Allows for partial specializations even if substitutions contain
 // type parameters.
 //
 // The new generic signature has the following generic parameters:

@@ -61,8 +61,8 @@
 // this value and using the same storage over the interval from this value to
 // the use does not overlap with the existing live range.
 //
-// Checking interference requries checking all operands that have been marked as
-// projections. In the case of block arguments, it meens checking the terminator
+// Checking interference requires checking all operands that have been marked as
+// projections. In the case of block arguments, it means checking the terminator
 // operands of all predecessor blocks.
 //
 // [REUSE] Rather than checking all value operands, each live range will contain
@@ -543,7 +543,7 @@ void OpaqueStorageAllocation::allocateForValue(SILValue value,
   assert(!isa<SILFunctionArgument>(value));
 
   if (ApplySite::isa(value)) {
-    // Result tuples will be canonicalized during apply rewritting so the tuple
+    // Result tuples will be canonicalized during apply rewriting so the tuple
     // itself is unused.
     if (value->getType().is<TupleType>()) {
       assert(ApplySite(value).getSubstCalleeType()->getNumResults() > 1);
@@ -594,7 +594,7 @@ namespace {
 /// `SILBuilder`.
 ///
 /// This is a common utility for ApplyRewriter, AddressOnlyDefRewriter,
-/// and AddressOnlyUseRewritter.
+/// and AddressOnlyUseRewriter.
 class AddressMaterialization {
   AddressLoweringState &pass;
   SILBuilder &B;
@@ -836,7 +836,7 @@ void ApplyRewriter::canonicalizeResults(
 }
 
 /// Return the storage address for the indirect result corresponding to the
-/// given orignal result value. Allocate temporary argument storage for any
+/// given original result value. Allocate temporary argument storage for any
 /// indirect results that are unmapped because they are loadable or unused.
 ///
 /// origDirectResultVal may be nullptr for unused results.

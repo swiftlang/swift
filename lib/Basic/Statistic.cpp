@@ -167,7 +167,7 @@ UnifiedStatsReporter::~UnifiedStatsReporter()
   if (EC)
     return;
 
-  // We change behaviour here depending on whether -DLLVM_ENABLE_STATS and/or
+  // We change behavior here depending on whether -DLLVM_ENABLE_STATS and/or
   // assertions were on in this build; this is somewhat subtle, but turning on
   // all stats for all of LLVM and clang is a bit more expensive and intrusive
   // than we want to be in release builds.

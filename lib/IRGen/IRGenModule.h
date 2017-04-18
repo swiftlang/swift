@@ -295,7 +295,7 @@ public:
   /// Emit a symbol identifying the reflection metadata version.
   void emitReflectionMetadataVersion();
 
-  /// Checks if the metadata of \p Nominal can be emitted lazyly.
+  /// Checks if the metadata of \p Nominal can be emitted lazily.
   ///
   /// If yes, \p Nominal is added to eligibleLazyMetadata and true is returned.
   bool tryEnableLazyTypeMetadata(NominalTypeDecl *Nominal);
@@ -318,7 +318,7 @@ public:
     }
   }
 
-  /// Return true if \p wt can be emitted lazyly.
+  /// Return true if \p wt can be emitted lazily.
   bool canEmitWitnessTableLazily(SILWitnessTable *wt);
 
   /// Adds \p Conf to LazyWitnessTables if it has not been added yet.

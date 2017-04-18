@@ -378,7 +378,7 @@ struct AccessEnforcementSelection : SILFunctionTransform {
 
     // If we're not accessing a box or argument, we must've lowered to a stack
     // element. Other sources of access are either outright dynamic (GlobalAddr,
-    // RefElementAddr), or only exposed after mandator inlining (nested
+    // RefElementAddr), or only exposed after mandatory inlining (nested
     // dependent BeginAccess).
     //
     // Running before diagnostic constant propagation requires handling 'undef'.

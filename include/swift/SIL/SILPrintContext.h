@@ -48,7 +48,7 @@ protected:
   // Cache block and value identifiers for this function. This is useful in
   // general for identifying entities, not just emitting textual SIL.
   //
-  // TODO: It would be more discplined for the caller to provide a function
+  // TODO: It would be more disciplined for the caller to provide a function
   // context. That way it would be impossible for IDs to change meaning within
   // the caller's scope.
   struct SILPrintFunctionContext {

@@ -27,7 +27,7 @@ static Type getContextFreeInterfaceType(ValueDecl *VD) {
 
 ArrayRef<ValueDecl*> swift::
 canDeclProvideDefaultImplementationFor(ValueDecl* VD,
-                                llvm::SmallVectorImpl<ValueDecl*> &Scractch) {
+                                llvm::SmallVectorImpl<ValueDecl*> &Scratch) {
 
   // Skip decls that don't have valid names.
   if (!VD->getFullName())
@@ -51,11 +51,11 @@ canDeclProvideDefaultImplementationFor(ValueDecl* VD,
           getContextFreeInterfaceType(Mem)->isEqual(VDType)) {
         // We find a protocol requirement VD can provide default
         // implementation for.
-        Scractch.push_back(Mem);
+        Scratch.push_back(Mem);
       }
     }
   }
-  return Scractch;
+  return Scratch;
 }
 
 void swift::
