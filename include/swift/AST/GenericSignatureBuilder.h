@@ -869,7 +869,7 @@ public:
            "RequirementSource kind/storageKind mismatch");
 
     storage.type = type.getPointer();
-    if (kind == ProtocolRequirement)
+    if (isProtocolRequirement())
       getTrailingObjects<ProtocolDecl *>()[0] = protocol;
     if (hasTrailingWrittenRequirementLoc)
       getTrailingObjects<WrittenRequirementLoc>()[0] = writtenReqLoc;
@@ -978,6 +978,11 @@ public:
   PotentialArchetype *visitPotentialArchetypesAlongPath(
            llvm::function_ref<bool(PotentialArchetype *,
                                    const RequirementSource *)> visitor) const;
+
+  /// Whether this source is a requirement in a protocol.
+  bool isProtocolRequirement() const {
+    return kind == ProtocolRequirement || kind == InferredProtocolRequirement;
+  }
 
   /// Whether the requirement is inferred or derived from an inferred
   /// requirement.
