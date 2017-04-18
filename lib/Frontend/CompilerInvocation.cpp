@@ -323,7 +323,7 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
       Action = FrontendOptions::REPL;
     } else if (Opt.matches(OPT_interpret)) {
       Action = FrontendOptions::Immediate;
-    } else if(Opt.matches(OPT_update_code)) {
+    } else if (Opt.matches(OPT_update_code)) {
       Action = FrontendOptions::UpdateCode;
     } else {
       llvm_unreachable("Unhandled mode option");
