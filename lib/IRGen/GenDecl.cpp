@@ -3114,7 +3114,7 @@ IRGenModule::getAddrOfGlobalConstantString(StringRef utf8) {
   auto *unownedRefCountInit = llvm::ConstantInt::get(Int32Ty, 0);
 
   auto *count = llvm::ConstantInt::get(Int32Ty, utf8.size());
-  // Capacitity is length plus one because of the implicitly added '\0'
+  // Capacity is length plus one because of the implicitly added '\0'
   // character.
   auto *capacity = llvm::ConstantInt::get(Int32Ty, utf8.size() + 1);
   auto *flags = llvm::ConstantInt::get(Int8Ty, 0);

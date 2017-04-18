@@ -352,7 +352,7 @@ public func check${Traversal}Collection<
 // `collection`, upholds the semantics of `${TraversalCollection}`,
 // non-recursively. This does not check subsequences. It may be called for each
 // subsequence without combinatorial explosion. Also, since recursive protocol
-// contraints are not supported, our second level of checks cannot depend on the
+// constraints are not supported, our second level of checks cannot depend on the
 // associated type properties of SubSequence.
 //
 // Checks all slices: O(n^2).

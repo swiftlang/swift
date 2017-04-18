@@ -980,7 +980,7 @@ public:
                                    const RequirementSource *)> visitor) const;
 
   /// Whether the requirement is inferred or derived from an inferred
-  /// requirment.
+  /// requirement.
   bool isInferredRequirement() const;
 
   /// Classify the kind of this source for diagnostic purposes.

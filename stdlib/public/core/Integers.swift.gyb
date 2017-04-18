@@ -1383,7 +1383,7 @@ public protocol BinaryInteger :
   ///   `source` must be representable in this type after truncation.
   init<T : FloatingPoint>(_ source: T)
 
-  /// Creates an new instance from the given integer.
+  /// Creates a new instance from the given integer.
   ///
   /// If the value passed as `source` is not representable in this type, a
   /// runtime error may occur.
@@ -1778,7 +1778,7 @@ extension BinaryInteger {
       // Since the types are of the same width, init(extendingOrTruncating:)
       // will result in a simple bitcast, so that rhsAsSelf would be -128, and
       // `lhs < rhsAsSelf` will return false.
-      // We basically guard agains that bitcast by requiring rhs and rhsAsSelf
+      // We basically guard against that bitcast by requiring rhs and rhsAsSelf
       // to be the same sign.
       rhsNegative == rhsAsSelfNegative {
       return lhs < rhsAsSelf
@@ -1798,7 +1798,7 @@ extension BinaryInteger {
   ///   - lhs: An integer to compare.
   ///   - rhs: Another integer to compare.
   @_transparent
-  //@inine(__always)
+  //@inline(__always)
   public static func <= <Other : BinaryInteger>(lhs: Self, rhs: Other) -> Bool {
     return !(rhs < lhs)
   }
@@ -1839,7 +1839,7 @@ extension BinaryInteger {
 //===----------------------------------------------------------------------===//
 //===--- Ambiguity breakers -----------------------------------------------===//
 // These two versions of the operators are not ordered with respect to one
-// another, but the compiler choses the second one, and that results in infinte
+// another, but the compiler choses the second one, and that results in infinite
 // recursion.
 //
 //     <T : Comparable>(T, T) -> Bool
@@ -1937,7 +1937,7 @@ extension BinaryInteger {
 public enum ArithmeticOverflow {
   @_transparent
   public init(_ overflow: Bool) { self = overflow ? .overflow : .none }
-  /// An indication that no overflow occured in the operation.
+  /// An indication that no overflow occurred in the operation.
   case none
   /// An indication that an overflow did occur in the operation.
   case overflow
@@ -3595,7 +3595,7 @@ extension FixedWidthInteger {
 
 }
 
-// FIXME(integers): Absense of &+ causes ambiguity in the code like the
+// FIXME(integers): Absence of &+ causes ambiguity in the code like the
 // following:
 //    func f<T : SignedInteger>(_ x: T, _ y: T) {
 //      var _  = (x &+ (y - 1)) < x

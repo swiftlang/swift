@@ -146,7 +146,7 @@ namespace swift {
 
     SILModule *getModule() { return M; }
 
-    /// Invalidate all analsysis data for the whole module.
+    /// Invalidate all analysis data for the whole module.
     void invalidateAll() {
       PM->invalidateAllAnalysis();
     }

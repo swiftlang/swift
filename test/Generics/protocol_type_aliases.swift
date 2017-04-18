@@ -65,7 +65,7 @@ protocol P3_1 {
 protocol Q3_1: P3, P3_1 {}
 
 // FIXME: these shouldn't be necessary to trigger the errors above, but are, due to
-// the 'recusive decl validation' FIXME in GenericSignatureBuilder.cpp.
+// the 'recursive decl validation' FIXME in GenericSignatureBuilder.cpp.
 func useTypealias<T: Q3>(_: T, _: T.T) {}
 func useTypealias1<T: Q3_1>(_: T, _: T.T) {}
 

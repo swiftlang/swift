@@ -2773,7 +2773,7 @@ Type ProtocolCompositionType::get(const ASTContext &C,
   // Minimize the set of protocols composed together.
   ProtocolType::canonicalizeProtocols(Protocols);
 
-  // If one protocol remains with no further constrants, its nominal
+  // If one protocol remains with no further constraints, its nominal
   // type is the canonical type.
   if (Protocols.size() == 1 && !Superclass && !HasExplicitAnyObject)
     return Protocols.front()->getDeclaredType();
@@ -3116,7 +3116,7 @@ Type TypeBase::getSuperclassForDecl(const ClassDecl *baseClass,
     auto *nominalDecl = t->getAnyNominal();
     if (!nominalDecl) {
       assert(t->is<ArchetypeType>() || t->isExistentialType() &&
-             "expected a class, archetype or existentiall");
+             "expected a class, archetype or existential");
       t = t->getSuperclass(resolver);
       assert(t && "archetype or existential is not class constrained");
       continue;

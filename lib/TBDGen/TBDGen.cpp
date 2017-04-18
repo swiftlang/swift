@@ -147,7 +147,7 @@ void TBDGenVisitor::addSymbol(SILDeclRef declRef, bool checkSILOnly) {
   // currently need to refer to them by symbol for their own vtable.
   switch (declRef.getSubclassScope()) {
   case SubclassScope::External:
-    // Allocating constructors retain their normal linkage behaviour.
+    // Allocating constructors retain their normal linkage behavior.
     if (declRef.kind == SILDeclRef::Kind::Allocator)
       break;
 

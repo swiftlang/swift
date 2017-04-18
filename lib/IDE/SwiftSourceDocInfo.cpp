@@ -339,7 +339,7 @@ private:
     ContextInfo(ASTNode Parent, bool ContainedInRange) : Parent(Parent),
       ContainedInRange(ContainedInRange) {}
 
-    bool isMultiStatment() {
+    bool isMultiStatement() {
       if (StartMatches.empty() || EndMatches.empty())
         return false;
 
@@ -348,7 +348,7 @@ private:
       if (Parent.isStmt(StmtKind::Brace))
         return true;
 
-      // Explicitly allow the selection of multiple case statments.
+      // Explicitly allow the selection of multiple case statements.
       auto IsCase = [](ASTNode N) { return N.isStmt(StmtKind::Case); };
       return llvm::any_of(StartMatches, IsCase) &&
           llvm::any_of(EndMatches, IsCase);
@@ -685,7 +685,7 @@ public:
       }
     }
 
-    if (DCInfo.isMultiStatment()) {
+    if (DCInfo.isMultiStatement()) {
       postAnalysis(DCInfo.EndMatches.back());
       Result = {RangeKind::MultiStatement,
                 /* Last node has the type */

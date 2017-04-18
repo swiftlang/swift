@@ -329,7 +329,7 @@ public:
             || Filename == ImporterImpl::bridgingHeaderBufferName);
   }
 
-  // Currently preserving older ClangImporter behaviour of ignoring system
+  // Currently preserving older ClangImporter behavior of ignoring system
   // dependencies, but possibly revisit?
   bool needSystemDependencies() override { return false; }
 
@@ -340,7 +340,7 @@ public:
                                                    IsSystem, IsClangModuleFile,
                                                    IsMissing))
       return false;
-    // Currently preserving older ClangImporter behaviour of ignoring .pcm
+    // Currently preserving older ClangImporter behavior of ignoring .pcm
     // file dependencies, but possibly revisit?
     if (IsClangModuleFile
         || isClangImporterSpecialName(Filename)

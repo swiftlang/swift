@@ -46,7 +46,7 @@ public:
   /// compilations.
   static constexpr unsigned MaxCompilerFixitPassIterations = 7;
 
-  /// Repeatedly perform a number of compielr-fix-it migrations in a row, until
+  /// Repeatedly perform a number of compiler-fix-it migrations in a row, until
   /// there are no new suggestions from the compiler or some other error
   /// occurred.
   void repeatFixitMigrations(const unsigned Iterations);
