@@ -2364,7 +2364,12 @@ ConstraintSystem::simplifyConstructionConstraint(
   NameLookupOptions lookupOptions = defaultConstructorLookupOptions;
   if (isa<AbstractFunctionDecl>(useDC))
     lookupOptions |= NameLookupFlags::KnownPrivate;
-  auto ctors = TC.lookupConstructors(useDC, valueType, lookupOptions);
+
+  auto instanceType = valueType;
+  if (auto *selfType = instanceType->getAs<DynamicSelfType>())
+    instanceType = selfType->getSelfType();
+
+  auto ctors = TC.lookupConstructors(useDC, instanceType, lookupOptions);
   if (!ctors)
     return SolutionKind::Error;
 
