@@ -1337,6 +1337,11 @@ struct Bit : FixedWidthInteger, UnsignedInteger {
       return rhs == 0 ? (self, .none) : (self, .overflow)
   }
 
+  func remainderReportingOverflow(dividingBy rhs: Bit) ->
+    (partialValue: Bit, overflow: ArithmeticOverflow) {
+      fatalError()
+  }
+
   static func +=(lhs: inout Bit, rhs: Bit) {
     let result = lhs.addingReportingOverflow(rhs)
     assert(result.overflow == .none, "Addition overflow")

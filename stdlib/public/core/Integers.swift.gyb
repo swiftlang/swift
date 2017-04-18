@@ -886,7 +886,8 @@ def overflowOperationComment(operator):
   ///
   /// - SeeAlso: `doubleWidthDivide(_:_:)`
 """,
-        '/': """\
+        '%': """\
+  // FIXME(integers): the comment is for division instead of remainder
   /// Returns the remainder of dividing this value by the given value along with
   /// a flag indicating whether overflow occurred in the operation.
   ///
@@ -2033,7 +2034,7 @@ public protocol FixedWidthInteger : BinaryInteger, BitwiseOperations {
   /// exponentiation.
   static var min: Self { get }
 
-% for x in binaryArithmetic['Numeric'] + binaryArithmetic['BinaryInteger'][:1]:
+% for x in binaryArithmetic['Numeric'] + binaryArithmetic['BinaryInteger']:
 ${overflowOperationComment(x.operator)}
   func ${x.name}ReportingOverflow(
     ${x.firstArg} rhs: Self
@@ -3417,6 +3418,11 @@ public struct DoubleWidth<T : FixedWidthInteger>
     fatalError()
   }
 
+  public func remainderReportingOverflow(dividingBy other: DoubleWidth<T>)
+    -> (partialValue: DoubleWidth<T>, overflow: ArithmeticOverflow) {
+    fatalError()
+  }
+
   public func multipliedFullWidth(by other: DoubleWidth<T>)
     -> (high: DoubleWidth<T>, low: DoubleWidth<T>.Magnitude) {
     fatalError()
@@ -3593,6 +3599,27 @@ extension FixedWidthInteger {
 
 %   end
 
+}
+
+extension FixedWidthInteger {
+% for oldPrefix, newPrefix, argLabel in [
+%   ('add', 'adding', ''),
+%   ('subtract', 'subtracting', ''),
+%   ('multiply', 'multiplied', 'by:'),
+%   ('divide', 'divided', 'by:'),
+%   ('remainder', 'remainder', 'dividingBy:'),
+%   ]:
+  @available(swift, obsoleted: 4, message: "Use ${newPrefix}ReportingOverflow(${argLabel or '_:'}) instead.")
+  @_transparent
+  public static func ${oldPrefix}WithOverflow(
+    _ lhs: Self, _ rhs: Self
+  ) -> (Self, overflow: Bool) {
+    let (partialValue, overflow) =
+      lhs.${newPrefix}ReportingOverflow(${argLabel} rhs)
+    return (partialValue, overflow == .overflow)
+  }
+
+% end
 }
 
 // FIXME(integers): Absence of &+ causes ambiguity in the code like the
