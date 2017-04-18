@@ -991,18 +991,7 @@ static bool isProjectBoxNonEscapingUse(ProjectBoxInst *PBI,
                                        EscapeMutationScanningState &State) {
   DEBUG(llvm::dbgs() << "    Found project box: " << *PBI);
 
-  // Check for mutations of the address component.
-  SILValue Addr = PBI;
-
-  // If the AllocBox is used by a mark_uninitialized, scan the MUI for
-  // interesting uses.
-  if (Addr->hasOneUse()) {
-    SILInstruction *SingleAddrUser = Addr->use_begin()->getUser();
-    if (isa<MarkUninitializedInst>(SingleAddrUser))
-      Addr = SILValue(SingleAddrUser);
-  }
-
-  for (Operand *AddrOp : Addr->getUses()) {
+  for (Operand *AddrOp : PBI->getUses()) {
     if (!isNonEscapingUse(AddrOp, State)) {
       DEBUG(llvm::dbgs() << "    FAIL! Has escaping user of addr:"
                          << *AddrOp->getUser());
@@ -1015,11 +1004,13 @@ static bool isProjectBoxNonEscapingUse(ProjectBoxInst *PBI,
 
 static bool scanUsesForEscapesAndMutations(Operand *Op,
                                            EscapeMutationScanningState &State) {
-  if (auto *PAI = dyn_cast<PartialApplyInst>(Op->getUser())) {
+  SILInstruction *User = Op->getUser();
+
+  if (auto *PAI = dyn_cast<PartialApplyInst>(User)) {
     return isPartialApplyNonEscapingUser(Op, PAI, State);
   }
 
-  if (auto *PBI = dyn_cast<ProjectBoxInst>(Op->getUser())) {
+  if (auto *PBI = dyn_cast<ProjectBoxInst>(User)) {
     // It is assumed in later code that we will only have 1 project_box. This
     // can be seen since there is no code for reasoning about multiple
     // boxes. Just put in the restriction so we are consistent.
@@ -1029,20 +1020,16 @@ static bool scanUsesForEscapesAndMutations(Operand *Op,
     return isProjectBoxNonEscapingUse(PBI, State);
   }
 
-  // Given a top level copy value use, check all of its user operands as if
-  // they were apart of the use list of the base operand.
-  //
-  // This is because even though we are copying the box, a copy of the box is
-  // just a retain + bitwise copy of the pointer. This has nothing to do with
-  // whether or not the address escapes in some way.
+  // Given a top level copy value use or mark_uninitialized, check all of its
+  // user operands as if they were apart of the use list of the base operand.
   //
   // This is a separate code path from the non escaping user visitor check since
   // we want to be more conservative around non-top level copies (i.e. a copy
   // derived from a projection like instruction). In fact such a thing may not
   // even make any sense!
-  if (auto *CVI = dyn_cast<CopyValueInst>(Op->getUser())) {
-    return all_of(CVI->getUses(), [&State](Operand *CopyOp) -> bool {
-      return scanUsesForEscapesAndMutations(CopyOp, State);
+  if (isa<CopyValueInst>(User) || isa<MarkUninitializedInst>(User)) {
+    return all_of(User->getUses(), [&State](Operand *UserOp) -> bool {
+      return scanUsesForEscapesAndMutations(UserOp, State);
     });
   }
 
@@ -1171,36 +1158,18 @@ static SILValue getOrCreateProjectBoxHelper(SILValue PartialOperand) {
     return B.createProjectBox(CVI->getLoc(), CVI, 0);
   }
 
-  // Otherwise, handle the alloc_box case.
-  auto *ABI = cast<AllocBoxInst>(PartialOperand);
-  // Load and copy from the address value, passing the result as an argument
-  // to the new closure.
-  //
-  // *NOTE* This code assumes that we only have one project box user. We
-  // enforce this with the assert below.
-  assert(count_if(ABI->getUses(), [](Operand *Op) -> bool {
-           return isa<ProjectBoxInst>(Op->getUser());
-         }) == 1);
-
-  // If the address is marked uninitialized, load through the mark, so
-  // that DI can reason about it.
-  for (Operand *BoxValueUse : ABI->getUses()) {
-    auto *PBI = dyn_cast<ProjectBoxInst>(BoxValueUse->getUser());
-    if (!PBI)
-      continue;
-
-    auto *OptIter = PBI->getSingleUse();
-    if (!OptIter)
-      continue;
-
-    if (!isa<MarkUninitializedInst>(OptIter->getUser()))
-      continue;
-
-    return OptIter->getUser();
+  // Otherwise, handle the alloc_box case. If we have a mark_uninitialized on
+  // the box, we create the project value through that.
+  SILInstruction *Box = cast<AllocBoxInst>(PartialOperand);
+  if (auto *Op = Box->getSingleUse()) {
+    if (auto *MUI = dyn_cast<MarkUninitializedInst>(Op->getUser())) {
+      Box = MUI;
+    }
   }
 
-  // Otherwise, just return a project_box.
-  return getOrCreateProjectBox(ABI, 0);
+  // Just return a project_box.
+  SILBuilder B(std::next(Box->getIterator()));
+  return B.createProjectBox(Box->getLoc(), Box, 0);
 }
 
 /// \brief Given a partial_apply instruction and a set of promotable indices,
