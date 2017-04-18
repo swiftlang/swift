@@ -164,15 +164,12 @@ bool ide::printDeclUSR(const ValueDecl *D, raw_ostream &OS) {
       //     static var errSecond: MyError.Code { get }
       // }
       //
-      // The clang enum and enum constants are associated with both the
-      // struct/nested enum, and the static vars/enum cases.
+      // The clang enum constants are associated with both the static vars and
+      // the enum cases.
       // But we want unique USRs for the above symbols, so use the clang USR
-      // for the enum and enum cases, and the Swift USR for the struct and vars.
+      // for the enum cases, and the Swift USR for the vars.
       //
-      if (isa<clang::EnumDecl>(ClangD)) {
-        if (ClangD->hasAttr<clang::NSErrorDomainAttr>() && isa<StructDecl>(D))
-          return ClangNode();
-      } else if (auto *ClangEnumConst = dyn_cast<clang::EnumConstantDecl>(ClangD)) {
+      if (auto *ClangEnumConst = dyn_cast<clang::EnumConstantDecl>(ClangD)) {
         if (auto *ClangEnum = dyn_cast<clang::EnumDecl>(ClangEnumConst->getDeclContext())) {
           if (ClangEnum->hasAttr<clang::NSErrorDomainAttr>() && isa<VarDecl>(D))
             return ClangNode();

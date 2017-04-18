@@ -2329,7 +2329,6 @@ namespace {
       // Create the enum declaration and record it.
       StructDecl *errorWrapper = nullptr;
       NominalTypeDecl *result;
-      NominalTypeDecl *enumeratorContext;
       auto enumInfo = Impl.getEnumInfo(decl);
       auto enumKind = enumInfo.getKind();
       switch (enumKind) {
@@ -2368,7 +2367,6 @@ namespace {
                             /*setterAccessibility=*/Accessibility::Public);
 
         result = structDecl;
-        enumeratorContext = structDecl;
         break;
       }
 
@@ -2403,10 +2401,9 @@ namespace {
             (errorCodeProto =
                C.getProtocol(KnownProtocolKind::ErrorCodeProtocol))) {
           // Create the wrapper struct.
-          errorWrapper = Impl.createDeclWithClangNode<StructDecl>(
-                           decl, Accessibility::Public, loc, name, loc,
-                           None, nullptr, dc);
+          errorWrapper = new (C) StructDecl(loc, name, loc, None, nullptr, dc);
           errorWrapper->computeType();
+          errorWrapper->setAccessibility(Accessibility::Public);
 
           // Add inheritance clause.
           TypeLoc inheritedTypes[1] = {
@@ -2527,13 +2524,11 @@ namespace {
 
           // Add the 'Code' enum to the error wrapper.
           errorWrapper->addMember(enumDecl);
-          result = errorWrapper;
-        } else {
-          result = enumDecl;
+          Impl.addAlternateDecl(enumDecl, errorWrapper);
         }
 
         // The enumerators go into this enumeration.
-        enumeratorContext = enumDecl;
+        result = enumDecl;
         break;
       }
 
@@ -2545,8 +2540,6 @@ namespace {
         // HACK: Make sure PrintAsObjC always omits the 'enum' tag for
         // option set enums.
         Impl.DeclsWithSuperfluousTypedefs.insert(decl);
-
-        enumeratorContext = result;
         break;
       }
       }
@@ -2592,10 +2585,10 @@ namespace {
         case EnumKind::Options:
           enumeratorDecl =
               SwiftDeclConverter(Impl, getActiveSwiftVersion())
-                  .importOptionConstant(constant, decl, enumeratorContext);
+                  .importOptionConstant(constant, decl, result);
           swift2EnumeratorDecl =
               SwiftDeclConverter(Impl, ImportNameVersion::Swift2)
-                  .importOptionConstant(constant, decl, enumeratorContext);
+                  .importOptionConstant(constant, decl, result);
           break;
         case EnumKind::Enum: {
           auto canonicalCaseIter =
@@ -2605,8 +2598,7 @@ namespace {
             // Unavailable declarations get no special treatment.
             enumeratorDecl =
                 SwiftDeclConverter(Impl, getActiveSwiftVersion())
-                    .importEnumCase(constant, decl,
-                                    cast<EnumDecl>(enumeratorContext));
+                    .importEnumCase(constant, decl, cast<EnumDecl>(result));
           } else {
             const clang::EnumConstantDecl *unimported =
                 canonicalCaseIter->
@@ -2615,8 +2607,7 @@ namespace {
             // Import the canonical enumerator for this case first.
             if (unimported) {
               enumeratorDecl = SwiftDeclConverter(Impl, getActiveSwiftVersion())
-                  .importEnumCase(unimported, decl,
-                                  cast<EnumDecl>(enumeratorContext));
+                  .importEnumCase(unimported, decl, cast<EnumDecl>(result));
               if (enumeratorDecl) {
                 canonicalCaseIter->getSecond() =
                     cast<EnumElementDecl>(enumeratorDecl);
@@ -2637,15 +2628,14 @@ namespace {
               } else {
                 auto original = cast<ValueDecl>(enumeratorDecl);
                 enumeratorDecl = importEnumCaseAlias(name, constant, original,
-                                                     decl, enumeratorContext);
+                                                     decl, result);
               }
             }
           }
 
           swift2EnumeratorDecl =
               SwiftDeclConverter(Impl, ImportNameVersion::Swift2)
-                  .importEnumCase(constant, decl,
-                                  cast<EnumDecl>(enumeratorContext),
+                  .importEnumCase(constant, decl, cast<EnumDecl>(result),
                                   enumeratorDecl);
           break;
         }
@@ -2662,8 +2652,8 @@ namespace {
               nominal->addMember(var->getGetter());
           };
 
-          addDecl(enumeratorContext, enumeratorDecl);
-          addDecl(enumeratorContext, swift2EnumeratorDecl);
+          addDecl(result, enumeratorDecl);
+          addDecl(result, swift2EnumeratorDecl);
           
           // If there is an error wrapper, add an alias within the
           // wrapper to the corresponding value within the enumerator
@@ -2674,9 +2664,9 @@ namespace {
                                              constant,
                                              enumeratorValue,
                                              decl,
-                                             enumeratorContext,
-                                             result);
-            addDecl(result, alias);
+                                             result,
+                                             errorWrapper);
+            addDecl(errorWrapper, alias);
           }
         }
       }
@@ -2685,8 +2675,8 @@ namespace {
       // raw values and SILGen can emit witness tables for derived conformances.
       // FIXME: There might be better ways to do this.
       Impl.registerExternalDecl(result);
-      if (result != enumeratorContext)
-        Impl.registerExternalDecl(enumeratorContext);
+      if (errorWrapper)
+        Impl.registerExternalDecl(errorWrapper);
       return result;
     }
 
