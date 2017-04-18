@@ -68,10 +68,8 @@ IRGenModule::getAddrOfKeyPathPattern(KeyPathPattern *pattern,
   /// Generate a metadata accessor that produces metadata for the given type
   /// using arguments from the generic context of the key path.
   auto emitMetadataGenerator = [&](CanType type) -> llvm::Function * {
-    if (!type->hasTypeParameter())
-      // We can just use the regular metadata accessor.
-      // TODO: Make a local copy of public symbols we can relative-reference?
-      return getAddrOfTypeMetadataAccessFunction(type, NotForDefinition);
+    // TODO: Use the standard metadata accessor when there are no arguments
+    // and the metadata accessor is defined.
     
     // Build a stub that loads the necessary bindings from the key path's
     // argument buffer then fetches the metadata.
@@ -85,17 +83,21 @@ IRGenModule::getAddrOfKeyPathPattern(KeyPathPattern *pattern,
       IRGenFunction IGF(*this, accessorThunk);
       if (DebugInfo)
         DebugInfo->emitArtificialFunction(IGF, accessorThunk);
-      
-      auto bindingsBufPtr = IGF.collectParameters().claimNext();
 
-      bindFromGenericRequirementsBuffer(IGF, requirements,
-        Address(bindingsBufPtr, getPointerAlignment()),
-        [&](CanType t) {
-          return genericEnv->mapTypeIntoContext(t)->getCanonicalType();
-        });
+      if (type->hasTypeParameter()) {
+        auto bindingsBufPtr = IGF.collectParameters().claimNext();
+
+        bindFromGenericRequirementsBuffer(IGF, requirements,
+          Address(bindingsBufPtr, getPointerAlignment()),
+          [&](CanType t) {
+            if (!genericEnv)
+              return t;
+            return genericEnv->mapTypeIntoContext(t)->getCanonicalType();
+          });
       
-      auto ret = IGF.emitTypeMetadataRef(genericEnv->mapTypeIntoContext(type)
-                                                   ->getCanonicalType());
+        type = genericEnv->mapTypeIntoContext(type)->getCanonicalType();
+      }
+      auto ret = IGF.emitTypeMetadataRef(type);
       IGF.Builder.CreateRet(ret);
     }
     return accessorThunk;

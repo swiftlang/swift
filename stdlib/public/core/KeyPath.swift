@@ -1055,8 +1055,8 @@ public func swift_getKeyPath(pattern: UnsafeMutableRawPointer,
   // These are resolved dynamically, so that they always reflect the dynamic
   // capability of the properties involved.
   let oncePtr = pattern
-  let objectPtr = pattern.advanced(by: MemoryLayout<Int>.size)
-  let bufferPtr = objectPtr.advanced(by: MemoryLayout<HeapObject>.size)
+  let patternPtr = pattern.advanced(by: MemoryLayout<Int>.size)
+  let bufferPtr = patternPtr.advanced(by: MemoryLayout<HeapObject>.size)
 
   // If the pattern is instantiable in-line, do a dispatch_once to
   // initialize it. (The resulting object will still have the collocated
@@ -1065,113 +1065,144 @@ public func swift_getKeyPath(pattern: UnsafeMutableRawPointer,
   bufferHeader.validateReservedBits()
 
   if bufferHeader.instantiableInLine {
-    Builtin.onceWithContext(oncePtr._rawValue, _getKeyPath_instantiatedInline,
-                            objectPtr._rawValue)
+    Builtin.onceWithContext(oncePtr._rawValue, _getKeyPath_instantiateInline,
+                            patternPtr._rawValue)
     // Return the instantiated object at +1.
     // TODO: This will be unnecessary once we support global objects with inert
     // refcounting.
-    let object = Unmanaged<AnyKeyPath>.fromOpaque(objectPtr)
+    let object = Unmanaged<AnyKeyPath>.fromOpaque(patternPtr)
     _ = object.retain()
-    return UnsafeRawPointer(objectPtr)
+    return UnsafeRawPointer(patternPtr)
   }
-  // TODO: Handle cases that require per-instance instantiation
-  fatalError("not implemented")
+
+  // Otherwise, instantiate a new key path object modeled on the pattern.
+  return _getKeyPath_instantiatedOutOfLine(patternPtr, arguments)
 }
 
-internal func _getKeyPath_instantiatedInline(
+internal func _getKeyPath_instantiatedOutOfLine(
+  _ pattern: UnsafeRawPointer,
+  _ arguments: UnsafeRawPointer)
+    -> UnsafeRawPointer {
+  // Do a pass to determine the class of the key path we'll be instantiating
+  // and how much space we'll need for it.
+  let (keyPathClass, rootType, size)
+    = _getKeyPathClassAndInstanceSize(pattern, arguments)
+
+  // Allocate the instance.
+  let instance = keyPathClass._create(capacityInBytes: size) { instanceData in
+    // Instantiate the pattern into the instance.
+    let patternBufferPtr = pattern.advanced(by: MemoryLayout<HeapObject>.size)
+    let patternBuffer = KeyPathBuffer(base: patternBufferPtr)
+
+    _instantiateKeyPathBuffer(patternBuffer, instanceData, rootType, arguments)
+  }
+
+  // Hand it off at +1.
+  return UnsafeRawPointer(Unmanaged.passRetained(instance).toOpaque())
+}
+
+internal func _getKeyPath_instantiateInline(
   _ objectRawPtr: Builtin.RawPointer
 ) {
   let objectPtr = UnsafeMutableRawPointer(objectRawPtr)
+
+  // Do a pass to determine the class of the key path we'll be instantiating
+  // and how much space we'll need for it.
+  // The pattern argument doesn't matter since an in-place pattern should never
+  // have arguments.
+  let (keyPathClass, rootType, instantiatedSize)
+    = _getKeyPathClassAndInstanceSize(objectPtr, objectPtr)
+
+  // TODO: Eventually, we'll need to handle cases where the instantiated
+  // key path has a different size from the pattern (because it involves
+  // resilient types, for example). For now, require that the size match the
+  // buffer.
+
   let bufferPtr = objectPtr.advanced(by: MemoryLayout<HeapObject>.size)
-  var buffer = KeyPathBuffer(base: bufferPtr)
-  
+  let buffer = KeyPathBuffer(base: bufferPtr)
+  let totalSize = buffer.data.count + MemoryLayout<KeyPathBuffer.Header>.size
+  let bufferData = UnsafeMutableRawBufferPointer(
+    start: bufferPtr,
+    count: totalSize)
+
+  _sanityCheck(instantiatedSize == totalSize,
+               "size-changing in-place instantiation not implemented")
+
+  // Instantiate the pattern in place.
+  _instantiateKeyPathBuffer(buffer, bufferData, rootType, bufferPtr)
+
+  _swift_instantiateInertHeapObject(objectPtr,
+    unsafeBitCast(keyPathClass, to: OpaquePointer.self))
+}
+
+internal typealias MetadataAccessor =
+  @convention(c) (UnsafeRawPointer) -> UnsafeRawPointer
+
+internal func _getKeyPathClassAndInstanceSize(
+  _ pattern: UnsafeRawPointer,
+  _ arguments: UnsafeRawPointer
+) -> (
+  keyPathClass: AnyKeyPath.Type,
+  rootType: Any.Type,
+  size: Int
+) {
   // Resolve the root and leaf types.
-  typealias MetadataAccessor = @convention(c) () -> UnsafeRawPointer
-  let rootAccessor = objectPtr.load(as: MetadataAccessor.self)
-  let leafAccessor = objectPtr.load(fromByteOffset: MemoryLayout<Int>.size,
+  let rootAccessor = pattern.load(as: MetadataAccessor.self)
+  let leafAccessor = pattern.load(fromByteOffset: MemoryLayout<Int>.size,
                                     as: MetadataAccessor.self)
 
-  let root = unsafeBitCast(rootAccessor(), to: Any.Type.self)
-  let leaf = unsafeBitCast(leafAccessor(), to: Any.Type.self)
+  let root = unsafeBitCast(rootAccessor(arguments), to: Any.Type.self)
+  let leaf = unsafeBitCast(leafAccessor(arguments), to: Any.Type.self)
 
-  // Assume the key path is writable until proven otherwise
+  // Scan the pattern to figure out the dynamic capability of the key path.
+  // Start off assuming the key path is writable.
   var capability: KeyPathKind = .value
-  // Track where the reference prefix begins
-  var endOfReferencePrefixComponent: UnsafeRawPointer? = nil
-  var previousComponentAddr: UnsafeRawPointer? = nil
 
-  // Instantiate components that need it.
-  while true {
-    let componentAddr = buffer.data.baseAddress.unsafelyUnwrapped
+  let bufferPtr = pattern.advanced(by: MemoryLayout<HeapObject>.size)
+  var buffer = KeyPathBuffer(base: bufferPtr)
+  let size = buffer.data.count + MemoryLayout<KeyPathBuffer.Header>.size
+
+  scanComponents: while true {
     let header = buffer.pop(RawKeyPathComponent.Header.self)
 
-    func tryToResolveOffset() {
-      if header.payload == RawKeyPathComponent.Header.unresolvedOffsetPayload {
-        // TODO: Look up offset in type metadata
-        fatalError("not implemented")
-      }
-      if header.payload == RawKeyPathComponent.Header.outOfLineOffsetPayload {
+    func popOffset() {
+      if header.payload == RawKeyPathComponent.Header.unresolvedOffsetPayload
+        || header.payload == RawKeyPathComponent.Header.outOfLineOffsetPayload {
         _ = buffer.pop(UInt32.self)
       }
     }
 
     switch header.kind {
     case .struct:
-      // The offset may need to be resolved dynamically.
-      tryToResolveOffset()
+      // No effect on the capability.
+      // TODO: we should dynamically prevent "let" properties from being
+      // reassigned.
+      popOffset()
     case .class:
-      // The offset may need to be resolved dynamically.
-      tryToResolveOffset()
-      // Crossing a class can end the reference prefix, and makes the following
-      // key path potentially reference-writable.
-      endOfReferencePrefixComponent = previousComponentAddr
+      // The rest of the key path could be reference-writable.
+      // TODO: we should dynamically prevent "let" properties from being
+      // reassigned.
       capability = .reference
+      popOffset()
     case .optionalChain,
-         .optionalWrap,
-         .optionalForce:
-      // No instantiation necessary.
+         .optionalWrap:
+      // Chaining always renders the whole key path read-only.
+      capability = .readOnly
+      break scanComponents
+
+    case .optionalForce:
+      // No effect.
       break
     }
 
     // Break if this is the last component.
     if buffer.data.count == 0 { break }
 
-    // Resolve the component type.
-    if MemoryLayout<Int>.size == 4 {
-      let componentTyAccessor = buffer.data.load(as: MetadataAccessor.self)
-      let componentTy = unsafeBitCast(componentTyAccessor, to: Any.Type.self)
-      buffer.mutableData.storeBytes(of: componentTy, as: Any.Type.self)
-    } else if MemoryLayout<Int>.size == 8 {
-      let componentTyAccessorWords = buffer.data.load(as: (UInt32,UInt32).self)
-      let componentTyAccessor = unsafeBitCast(componentTyAccessorWords,
-                                              to: MetadataAccessor.self)
-      let componentTyWords = unsafeBitCast(componentTyAccessor(),
-                                           to: (UInt32, UInt32).self)
-      buffer.mutableData.storeBytes(of: componentTyWords,
-                                    as: (UInt32,UInt32).self)
-    } else {
-      fatalError("unsupported architecture")
-    }
-    _ = buffer.pop(Int.self)
-    previousComponentAddr = componentAddr
+    // Pop the type accessor reference.
+    _ = buffer.popRaw(MemoryLayout<Int>.size)
   }
 
-  // Set up the reference prefix if there is one.
-  if let endOfReferencePrefixComponent = endOfReferencePrefixComponent {
-    var bufferHeader = bufferPtr.load(as: KeyPathBuffer.Header.self)
-    bufferHeader.hasReferencePrefix = true
-    bufferPtr.storeBytes(of: bufferHeader, as: KeyPathBuffer.Header.self)
-
-    var componentHeader = endOfReferencePrefixComponent
-      .load(as: RawKeyPathComponent.Header.self)
-    componentHeader.endOfReferencePrefix = true
-    UnsafeMutableRawPointer(mutating: endOfReferencePrefixComponent)
-      .storeBytes(of: componentHeader,
-                  as: RawKeyPathComponent.Header.self)
-  }
-
-  // Figure out the class type that the object will have based on its
-  // dynamic capability.
+  // Grab the class object for the key path type we'll end up with.
   func openRoot<Root>(_: Root.Type) -> AnyKeyPath.Type {
     func openLeaf<Leaf>(_: Leaf.Type) -> AnyKeyPath.Type {
       switch capability {
@@ -1187,8 +1218,126 @@ internal func _getKeyPath_instantiatedInline(
   }
   let classTy = _openExistential(root, do: openRoot)
 
-  _swift_instantiateInertHeapObject(
-    objectPtr,
-    unsafeBitCast(classTy, to: OpaquePointer.self)
-  )
+  return (keyPathClass: classTy, rootType: root, size: size)
+}
+
+internal func _instantiateKeyPathBuffer(
+  _ origPatternBuffer: KeyPathBuffer,
+  _ origDestData: UnsafeMutableRawBufferPointer,
+  _ rootType: Any.Type,
+  _ arguments: UnsafeRawPointer
+) {
+  // NB: patternBuffer and destData alias when the pattern is instantiable
+  // in-line. Therefore, do not read from patternBuffer after the same position
+  // in destBuffer has been written to.
+
+  var patternBuffer = origPatternBuffer
+  let destHeaderPtr = origDestData.baseAddress.unsafelyUnwrapped
+  _sanityCheck(origDestData.count >= MemoryLayout<KeyPathBuffer.Header>.size)
+  var destData = UnsafeMutableRawBufferPointer(
+    start: destHeaderPtr.advanced(by: MemoryLayout<KeyPathBuffer.Header>.size),
+    count: origDestData.count - MemoryLayout<KeyPathBuffer.Header>.size)
+
+  func pushDest<T>(_ value: T) {
+    print("\(destData) \(value)")
+    let size = MemoryLayout<T>.size
+    _sanityCheck(destData.count >= size)
+    destData.storeBytes(of: value, as: T.self)
+    destData = UnsafeMutableRawBufferPointer(
+      start: destData.baseAddress.unsafelyUnwrapped.advanced(by: size),
+      count: destData.count - size)
+  }
+
+  // Track where the reference prefix begins.
+  var endOfReferencePrefixComponent: UnsafeMutableRawPointer? = nil
+  var previousComponentAddr: UnsafeMutableRawPointer? = nil
+
+  // Instantiate components that need it.
+  var base: Any.Type = rootType
+  while true {
+    let componentAddr = destData.baseAddress.unsafelyUnwrapped
+    let header = patternBuffer.pop(RawKeyPathComponent.Header.self)
+
+    func tryToResolveOffset() {
+      if header.payload == RawKeyPathComponent.Header.unresolvedOffsetPayload {
+        // Look up offset in type metadata. The value in the pattern is the
+        // offset within the metadata object.
+        let metadataPtr = unsafeBitCast(base, to: UnsafeRawPointer.self)
+        let offsetOfOffset = patternBuffer.pop(UInt32.self)
+        let offset = metadataPtr.load(fromByteOffset: Int(offsetOfOffset),
+                                      as: UInt32.self)
+        // Rewrite the header for a resolved offset.
+        var newHeader = header
+        newHeader.payload = RawKeyPathComponent.Header.outOfLineOffsetPayload
+        pushDest(newHeader)
+        pushDest(offset)
+        return
+      }
+
+      // Otherwise, just transfer the pre-resolved component.
+      pushDest(header)
+      if header.payload == RawKeyPathComponent.Header.outOfLineOffsetPayload {
+        let offset = patternBuffer.pop(UInt32.self)
+        pushDest(offset)
+      }
+    }
+
+    switch header.kind {
+    case .struct:
+      // The offset may need to be resolved dynamically.
+      tryToResolveOffset()
+    case .class:
+      // Crossing a class can end the reference prefix, and makes the following
+      // key path potentially reference-writable.
+      endOfReferencePrefixComponent = previousComponentAddr
+      // The offset may need to be resolved dynamically.
+      tryToResolveOffset()
+    case .optionalChain,
+         .optionalWrap,
+         .optionalForce:
+      // No instantiation necessary.
+      pushDest(header)
+      break
+    }
+
+    // Break if this is the last component.
+    if patternBuffer.data.count == 0 { break }
+
+    // Resolve the component type.
+    if MemoryLayout<Int>.size == 4 {
+      let componentTyAccessor = patternBuffer.pop(MetadataAccessor.self)
+      base = unsafeBitCast(componentTyAccessor(arguments), to: Any.Type.self)
+      pushDest(base)
+    } else if MemoryLayout<Int>.size == 8 {
+      let componentTyAccessorWords = patternBuffer.pop((UInt32,UInt32).self)
+      let componentTyAccessor = unsafeBitCast(componentTyAccessorWords,
+                                              to: MetadataAccessor.self)
+      base = unsafeBitCast(componentTyAccessor(arguments), to: Any.Type.self)
+      let componentTyWords = unsafeBitCast(base,
+                                           to: (UInt32, UInt32).self)
+      pushDest(componentTyWords)
+    } else {
+      fatalError("unsupported architecture")
+    }
+    previousComponentAddr = componentAddr
+  }
+
+  // We should have traversed both buffers.
+  _sanityCheck(patternBuffer.data.isEmpty && destData.isEmpty)
+
+  // Write out the header.
+  let destHeader = KeyPathBuffer.Header(size: origPatternBuffer.data.count,
+    trivial: true, // TODO: nontrivial indexes
+    hasReferencePrefix: endOfReferencePrefixComponent != nil)
+
+  destHeaderPtr.storeBytes(of: destHeader, as: KeyPathBuffer.Header.self)
+
+  // Mark the reference prefix if there is one.
+  if let endOfReferencePrefixComponent = endOfReferencePrefixComponent {
+    var componentHeader = endOfReferencePrefixComponent
+      .load(as: RawKeyPathComponent.Header.self)
+    componentHeader.endOfReferencePrefix = true
+    endOfReferencePrefixComponent.storeBytes(of: componentHeader,
+      as: RawKeyPathComponent.Header.self)
+  }
 }

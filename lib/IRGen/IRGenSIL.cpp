@@ -4448,8 +4448,10 @@ void IRGenSILFunction::visitKeyPathInst(swift::KeyPathInst *I) {
   auto call = Builder.CreateCall(IGM.getGetKeyPathFn(), {patternPtr, args});
   call->setDoesNotThrow();
 
+  auto resultStorageTy = IGM.getTypeInfo(I->getType()).getStorageType();
+
   Explosion e;
-  e.add(call);
+  e.add(Builder.CreateBitCast(call, resultStorageTy));
   setLoweredExplosion(I, e);
 }
 
