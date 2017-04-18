@@ -3094,6 +3094,12 @@ ${operatorComment(x.operator, True)}
   public func to${U}IntMax() -> ${U}IntMax {
     return numericCast(self)
   }
+
+  @available(swift, obsoleted: 4, message: "Use bitWidth instead.")
+  public static var _sizeInBits: ${Self} { return ${bits} }
+
+  @available(swift, obsoleted: 4)
+  public static var _sizeInBytes: ${Self} { return ${bits}/8 }
 }
 %# end of concrete type: ${Self}
 
