@@ -574,10 +574,6 @@ public:
     return getLoweredValue(v).getStackAddress();
   }
 
-  DynamicallyEnforcedAddress getLoweredDynamicallyEnforcedAddress(SILValue v) {
-    return getLoweredValue(v).getDynamicallyEnforcedAddress();
-  }
-
   llvm::Value *getLoweredDynamicEnforcementScratchBuffer(BeginAccessInst *v) {
     return getLoweredValue(v).getDynamicallyEnforcedAddress().ScratchBuffer;
   }
