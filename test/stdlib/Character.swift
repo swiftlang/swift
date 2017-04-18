@@ -68,7 +68,7 @@ let continuingScalars: [UnicodeScalar] = [
   "\u{200D}",
 ]
 
-let testCharacters = [
+let testCharacters: [Character] = [
   // U+000D CARRIAGE RETURN (CR)
   // U+000A LINE FEED (LF)
   "\u{000d}\u{000a}",
@@ -92,13 +92,12 @@ let testCharacters = [
   "\u{00a9}\u{0300}\u{0300}\u{0300}\u{0300}", // UTF-8: 10 bytes
 ]
 
-func randomGraphemeCluster(_ minSize: Int, _ maxSize: Int) -> String {
+func randomGraphemeCluster(_ minSize: Int, _ maxSize: Int) -> Character {
   let n = pickRandom((minSize + 1)..<maxSize)
-  var result = String(pickRandom(baseScalars))
-  for _ in 0..<n {
-    result += String(pickRandom(continuingScalars))
+  let u32 = (0..<n).map {
+    pickRandom($0 == 0 ? baseScalars : continuingScalars).value
   }
-  return result
+  return Character(_codeUnits: u32, UTF32.self)
 }
 
 //===---
@@ -141,7 +140,7 @@ CharacterTests.test("sizeof") {
   let size1 = MemoryLayout<Character>.size
   expectTrue(size1 == 8 || size1 == 9)
 
-  var a: Character = "a"
+  let a: Character = "a"
   let size2 = MemoryLayout.size(ofValue: a)
   expectTrue(size2 == 8 || size2 == 9)
 
@@ -150,8 +149,8 @@ CharacterTests.test("sizeof") {
 
 CharacterTests.test("Hashable") {
   for characters in [
-    baseScalars.map { String($0) },
-    continuingScalars.map { String($0) },
+    baseScalars.map { Character($0) },
+    continuingScalars.map { Character($0) },
     testCharacters
   ] {
     checkHashable(characters, equalityOracle: { $0 == $1 })
@@ -160,17 +159,21 @@ CharacterTests.test("Hashable") {
 
 /// Test that a given `String` can be transformed into a `Character` and back
 /// without loss of information.
-func checkRoundTripThroughCharacter(_ s: String) {
-  let c = Character(s)
-  var s2 = String(c)
-  expectEqual(
-    Array(s.unicodeScalars), Array(s2.unicodeScalars),
-    "round-tripping error: \"\(s)\" != \"\(s2)\""
+func checkRoundTrip(_ c: Character) {
+  let s = String(c)
+  expectEqualSequence(
+    c.unicodeScalars, s.unicodeScalars,
+    "round-tripping error:\(String(reflecting: s)) != \(String(reflecting: c))"
+  )
+  let c1 = Character(_codeUnits: Array(s.utf16), UTF16.self)
+  expectEqualSequence(
+    c.unicodeScalars, c1.unicodeScalars,
+    "round-tripping error:\(String(reflecting: c1)) != \(String(reflecting: c))"
   )
 }
 
-func isSmallRepresentation(_ s: String) -> Bool {
-  switch Character(s)._representation {
+func isSmallRepresentation(_ c: Character) -> Bool {
+  switch c._representation {
     case .small:
       return true
     default:
@@ -178,42 +181,43 @@ func isSmallRepresentation(_ s: String) -> Bool {
   }
 }
 
-func checkRepresentation(_ s: String) {
-  // The new representation can store some 4-utf16-code-unit characters but not
-  // others.  Simply skip checking the representations of those.
-  let u16Count = s.utf16.count
+func checkRepresentation(_ c: Character) {
+  let u16Count = c.utf16.count
+  // Some characters with exactly 4 utf16 code units fit in the small
+  // representation, but not all.  Simply don't check those here.
   if u16Count == 4 { return }
   let expectSmall = u16Count < 4
-  let isSmall = isSmallRepresentation(s)
+  let isSmall = isSmallRepresentation(c)
 
   let expectedSize = expectSmall ? "small" : "large"
   expectEqual(
     expectSmall, isSmall,
-    "expected \"\(s)\" to use the \(expectedSize) representation")
+    "expected \(String(reflecting: c)) to use the \(expectedSize) representation")
 }
 
 CharacterTests.test("RoundTripping") {
   // Single Unicode Scalar Value tests
   for s in baseScalars {
-    checkRepresentation(String(s))
-    checkRoundTripThroughCharacter(String(s))
+    let c = Character(s)
+    checkRepresentation(c)
+    checkRoundTrip(c)
   }
 
   // Edge case tests
-  for s in testCharacters {
-    checkRepresentation(s)
-    checkRoundTripThroughCharacter(s)
+  for c in testCharacters {
+    checkRepresentation(c)
+    checkRoundTrip(c)
   }
 }
 
 CharacterTests.test("RoundTripping/Random") {
   // Random tests
-  for x in 0..<500 {
+  for _ in 0..<500 {
     // Character's small representation variant has 63 bits. Making
     // the maximum length 9 scalars tests both sides of the limit.
-    var s = randomGraphemeCluster(1, 9)
-    checkRepresentation(s)
-    checkRoundTripThroughCharacter(s)
+    let c = randomGraphemeCluster(1, 9)
+    checkRepresentation(c)
+    checkRoundTrip(c)
   }
 }
 
@@ -233,6 +237,7 @@ CharacterTests.test(
   let asciiDomain = Array(0..<127)
   let ascii0to126 = asciiDomain.map({ UnicodeScalar(Int($0))! })
   let ascii1to127 = asciiDomain.map({ UnicodeScalar(Int($0 + 1))! })
+
   typealias PredicateFn = (UnicodeScalar) -> (UnicodeScalar) -> Bool
   expectEqualMethodsForDomain(
     ascii0to126,
@@ -242,12 +247,11 @@ CharacterTests.test(
 }
 
 CharacterTests.test("String.append(_: Character)") {
-  for test in testCharacters {
-    let character = Character(test)
+  for c in testCharacters {
     var result = ""
-    result.append(character)
+    result.append(c)
     expectEqualSequence(
-      test.unicodeScalars,
+      c.unicodeScalars,
       result.unicodeScalars)
   }
 }
@@ -289,7 +293,7 @@ UnicodeScalarTests.test("isASCII()") {
 UnicodeScalarTests.test("Comparable") {
   // FIXME: these tests are insufficient.
 
-  var CharA: UnicodeScalar = "A"
+  let CharA: UnicodeScalar = "A"
 
   expectTrue(CharA == "A")
   expectTrue("A" == CharA)
