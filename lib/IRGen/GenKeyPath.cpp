@@ -221,8 +221,7 @@ IRGenModule::getAddrOfKeyPathPattern(KeyPathPattern *pattern,
     baseTy = component.getComponentType();
   }
   
-  // Save the total size of the buffer, minus three words for the once token
-  // and object header, and 32 bits for the buffer header.
+  // Save the total size of the buffer.
   Size componentSize = fields.getNextOffsetFromGlobal()
     - startOfKeyPathBuffer;
   

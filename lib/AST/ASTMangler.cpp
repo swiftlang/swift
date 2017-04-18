@@ -224,26 +224,16 @@ std::string ASTMangler::mangleGlobalVariableFull(const VarDecl *decl) {
   return finalize();
 }
 
-std::string ASTMangler::mangleKeyPathGetterThunkHelper(const VarDecl *property,
-                                                   GenericSignature *signature,
-                                                   CanType baseType) {
+std::string ASTMangler::mangleKeyPathGetterThunkHelper(const VarDecl *property) {
   beginMangling();
   appendEntity(property);
-  if (signature)
-    appendGenericSignature(signature);
-  appendType(baseType);
   appendOperator("TK");
   return finalize();
 }
 
-std::string ASTMangler::mangleKeyPathSetterThunkHelper(const VarDecl *property,
-                                                   GenericSignature *signature,
-                                                   CanType baseType) {
+std::string ASTMangler::mangleKeyPathSetterThunkHelper(const VarDecl *property) {
   beginMangling();
   appendEntity(property);
-  if (signature)
-    appendGenericSignature(signature);
-  appendType(baseType);
   appendOperator("Tk");
   return finalize();
 }

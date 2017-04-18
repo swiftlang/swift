@@ -1264,14 +1264,8 @@ NodePointer Demangler::demangleThunkOrSpecialization() {
     case 'k': {
       auto nodeKind = c == 'K' ? Node::Kind::KeyPathGetterThunkHelper
                                : Node::Kind::KeyPathSetterThunkHelper;
-      auto type = popNode();
-      auto sigOrDecl = popNode();
-      if (sigOrDecl->getKind() == Node::Kind::DependentGenericSignature) {
-        auto decl = popNode();
-        return createWithChildren(nodeKind, decl, sigOrDecl, type);
-      } else {
-        return createWithChildren(nodeKind, sigOrDecl, type);
-      }
+      auto decl = popNode();
+      return createWithChild(nodeKind, decl);
     }
     default:
       return nullptr;

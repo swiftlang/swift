@@ -2400,7 +2400,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB, SILBuilder &B) {
           }
           
           if ((idFn != nullptr) + (!idDecl.isNull()) + (idProperty != nullptr)
-                == 1) {
+                != 1) {
             P.diagnose(componentLoc,
                        diag::sil_keypath_computed_property_missing_part,
                        isSettable);
