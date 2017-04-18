@@ -737,10 +737,10 @@ extension String.Content {
   }
 
   /// Replaces the `target` subrange with the given UTF-16 encoded content.
-  internal mutating func replaceUTF16<C: Collection>(
-    _ target: Range<String.Index>, with replacement_: C
+  internal mutating func replaceUTF16<Replacement: Collection>(
+    _ target: Range<String.Index>, with replacement_: Replacement
   )  
-  where C.Iterator.Element == UTF16.CodeUnit {
+  where Replacement.Iterator.Element == UTF16.CodeUnit {
     // Pre-count replacement, once.
     let replacement = Counted(replacement_)
 
@@ -749,36 +749,50 @@ extension String.Content {
       return
     }
     // Otherwise, we need to allocate new storage
-    
-    let head = utf16[..<target.lowerBound]
-    let tail = utf16[target.upperBound...]
+    replaceUTF16OutOfPlace(target, with: replacement)
+  }
 
-    let oldCapacity: UTF16View.IndexDistance
+  internal mutating func replaceUTF16OutOfPlace<Replacement: Collection>(
+    _ target: Range<String.Index>, with replacement: Replacement
+  )  
+  where Replacement.Iterator.Element == UTF16.CodeUnit {
+
+    func impl<Base: UnicodeView>(base: Base)
+    where Base.Iterator.Element == UTF16.CodeUnit,
+    Base.SubSequence.Iterator.Element == UTF16.CodeUnit,
+    Base.SubSequence.IndexDistance == Base.IndexDistance {
+      
+      let head = base[..<base.nativeIndex(target.lowerBound)]
+      let tail = base[base.nativeIndex(target.upperBound)...]
+
+      let oldCapacity: Base.IndexDistance
       = numericCast(_latin1?.capacity ?? _utf16?.capacity ?? 0)
-    
-    let savedCount = head.count + tail.count
-    let newCount = savedCount + numericCast(replacement.count)
-    let minimumCapacity = newCount > oldCapacity ? oldCapacity * 2 : 0
+      
+      let savedCount = head.count + tail.count
+      let newCount = savedCount + numericCast(replacement.count)
+      let minimumCapacity = newCount > oldCapacity ? oldCapacity * 2 : 0
 
-    // See if we can use 8-bit code units
-    if replacement._isLatin1() && (
-      isKnownLatin1 || head._isLatin1() && tail._isLatin1()
-    ) {
-      // FIXME: check to see if we can use the inline5or6 representation.
-      let s = _Latin1StringStorage(
-        joining: head._low8Bits, replacement._low8Bits, tail._low8Bits,
-        minimumCapacity: numericCast(minimumCapacity)
-      )
-      s.isKnownASCII = !s.contains { $0 > 0x7f }
-      _latin1 = s
+      // See if we can use 8-bit code units
+      if replacement._isLatin1() && (
+        isKnownLatin1 || head._isLatin1() && tail._isLatin1()
+      ) {
+        // FIXME: check to see if we can use the inline5or6 representation.
+        let s = _Latin1StringStorage(
+          joining: head._low8Bits, replacement._low8Bits, tail._low8Bits,
+          minimumCapacity: numericCast(minimumCapacity)
+        )
+        s.isKnownASCII = !s.contains { $0 > 0x7f }
+        _latin1 = s
+      }
+      else {
+        // FIXME: check to see if we can use the inline7or16 representation.
+        _utf16 = _UTF16StringStorage(
+          joining: head, replacement, tail,
+          minimumCapacity: numericCast(minimumCapacity)
+        )
+      }
     }
-    else {
-      // FIXME: check to see if we can use the inline7or16 representation.
-      _utf16 = _UTF16StringStorage(
-        joining: head, replacement, tail,
-        minimumCapacity: numericCast(minimumCapacity)
-      )
-    }
+    ${switch('impl(base: x.utf16)')}
   }
   
   internal var isMutable: Bool {
