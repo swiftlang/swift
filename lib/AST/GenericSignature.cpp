@@ -823,8 +823,7 @@ ConformanceAccessPath GenericSignature::getConformanceAccessPath(
   buildPath = [&](GenericSignature *sig, const RequirementSource *source,
                   ProtocolDecl *conformingProto, Type rootType) {
     // Each protocol requirement is a step along the path.
-    if (source->kind == RequirementSource::ProtocolRequirement ||
-        source->kind == RequirementSource::InferredProtocolRequirement) {
+    if (source->isProtocolRequirement()) {
       // Follow the rest of the path to derive the conformance into which
       // this particular protocol requirement step would look.
       auto inProtocol = source->getProtocolDecl();
