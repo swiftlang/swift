@@ -1530,7 +1530,8 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
   return false;
 }
 
-bool ParseMigratorArgs(MigratorOptions &Opts, ArgList &Args,
+bool ParseMigratorArgs(MigratorOptions &Opts, llvm::Triple &Triple,
+                       StringRef ResourcePath, ArgList &Args,
                        DiagnosticEngine &Diags) {
   using namespace options;
 
@@ -1548,6 +1549,25 @@ bool ParseMigratorArgs(MigratorOptions &Opts, ArgList &Args,
     Opts.DumpMigrationStatesDir = Dumpster->getValue();
   }
 
+  if (auto DataPath = Args.getLastArg(OPT_api_diff_data_file)) {
+    Opts.APIDigesterDataStorePath = DataPath->getValue();
+  } else {
+    bool Supported = true;
+    llvm::SmallString<128> dataPath(ResourcePath);
+    llvm::sys::path::append(dataPath, "migrator");
+    if (Triple.isMacOSX())
+      llvm::sys::path::append(dataPath, "macos.json");
+    else if (Triple.isiOS())
+      llvm::sys::path::append(dataPath, "ios.json");
+    else if (Triple.isTvOS())
+      llvm::sys::path::append(dataPath, "tvos.json");
+    else if (Triple.isWatchOS())
+      llvm::sys::path::append(dataPath, "watchos.json");
+    else
+      Supported = false;
+    if (Supported)
+      Opts.APIDigesterDataStorePath = dataPath.str();
+  }
   return false;
 }
 
@@ -1612,7 +1632,8 @@ bool CompilerInvocation::parseArgs(ArrayRef<const char *> Args,
     return true;
   }
 
-  if (ParseMigratorArgs(MigratorOpts, ParsedArgs, Diags)) {
+  if (ParseMigratorArgs(MigratorOpts, LangOpts.Target,
+                        SearchPathOpts.RuntimeResourcePath, ParsedArgs, Diags)) {
     return true;
   }
 

@@ -34,6 +34,9 @@ struct MigratorOptions {
 
   /// If non-empty, dump all Migrator::States to this directory.
   std::string DumpMigrationStatesDir = "";
+
+  /// If non-empty, use the api change data serialized to this path.
+  std::string APIDigesterDataStorePath = "";
 };
 
 } // end namespace swift

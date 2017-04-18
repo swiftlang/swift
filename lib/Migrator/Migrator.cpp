@@ -15,9 +15,11 @@
 #include "swift/Migrator/Migrator.h"
 #include "clang/Rewrite/Core/RewriteBuffer.h"
 #include "llvm/Support/FileSystem.h"
+#include "swift/IDE/APIDigesterData.h"
 
 using namespace swift;
 using namespace swift::migrator;
+using namespace swift::ide::api;
 
 bool migrator::updateCodeAndEmitRemap(CompilerInstance &Instance,
                                       const CompilerInvocation &Invocation) {
@@ -26,6 +28,12 @@ bool migrator::updateCodeAndEmitRemap(CompilerInstance &Instance,
 
   // Phase 1:
   // Perform any syntactic transformations if requested.
+
+  // Prepare diff item store to use.
+  APIDiffItemStore DiffStore;
+  if (!M.getMigratorOptions().APIDigesterDataStorePath.empty()) {
+    DiffStore.addStorePath(M.getMigratorOptions().APIDigesterDataStorePath);
+  }
 
   // TODO
 
