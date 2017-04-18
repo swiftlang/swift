@@ -14,6 +14,7 @@
 #define SWIFT_IDE_APIDIGESTERDATA_H
 
 #include "swift/Basic/LLVM.h"
+#include "swift/Basic/JSONSerialization.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/StringSwitch.h"
@@ -242,6 +243,7 @@ struct APIDiffItemStore {
   struct Implementation;
   Implementation &Impl;
   static void serialize(llvm::raw_ostream &os, ArrayRef<APIDiffItem*> Items);
+  APIDiffItemStore(const APIDiffItemStore& that) = delete;
   APIDiffItemStore();
   ~APIDiffItemStore();
   ArrayRef<APIDiffItem*> getDiffItems(StringRef Key) const;
