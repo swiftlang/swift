@@ -1,4 +1,4 @@
-//===--- DIMemoryUseCollector.cpp - Memory use analysis for DI ------------===//
+//===--- DIMemoryUseCollectorOwnership.cpp - Memory use analysis for DI ---===//
 //
 // This source file is part of the Swift.org open source project
 //
