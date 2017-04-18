@@ -232,13 +232,6 @@ void TBDGenVisitor::visitNominalTypeDecl(NominalTypeDecl *NTD) {
   visitMembers(NTD);
 }
 
-template <typename T> bool isaAnd(Decl *D, llvm::function_ref<bool(T *)> f) {
-  if (auto *x = dyn_cast_or_null<T>(D))
-    return f(x);
-
-  return false;
-}
-
 void TBDGenVisitor::visitClassDecl(ClassDecl *CD) {
   if (isPrivateDecl(CD))
     return;

@@ -1,4 +1,4 @@
-//===--- DIMemoryUseCollector.h - Memory use information for DI -*- C++ -*-===//
+//===--- DIMemoryUseCollectorOwnership.h - Mem. use info for DI -*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
