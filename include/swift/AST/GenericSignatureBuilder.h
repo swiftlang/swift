@@ -267,12 +267,6 @@ private:
                                              ProtocolDecl *Proto,
                                              const RequirementSource *Source);
 
-  ConstraintResult addConformanceRequirement(
-                               PotentialArchetype *T,
-                               ProtocolDecl *Proto,
-                               const RequirementSource *Source,
-                               llvm::SmallPtrSetImpl<ProtocolDecl *> &Visited);
-
 public:
   /// \brief Add a new same-type requirement between two fully resolved types
   /// (output of \c GenericSignatureBuilder::resolve).
@@ -338,9 +332,7 @@ private:
                           UnresolvedType subject,
                           UnresolvedType constraint,
                           FloatingRequirementSource source,
-                          UnresolvedHandlingKind unresolvedHandling,
-                          llvm::SmallPtrSetImpl<ProtocolDecl *> *visited
-                            = nullptr);
+                          UnresolvedHandlingKind unresolvedHandling);
 
   /// \brief Add a new conformance requirement specifying that the given
   /// potential archetypes are equivalent.
@@ -388,7 +380,6 @@ private:
                                 TypeDecl *decl,
                                 UnresolvedType type,
                                 const RequirementSource *parentSource,
-                                llvm::SmallPtrSetImpl<ProtocolDecl *> &visited,
                                 ModuleDecl *inferForModule);
 
   /// Visit all of the potential archetypes.
@@ -479,13 +470,6 @@ public:
                                   FloatingRequirementSource source,
                                   ModuleDecl *inferForModule,
                                   const SubstitutionMap *subMap = nullptr);
-
-  ConstraintResult addRequirement(
-                                const Requirement &req,
-                                FloatingRequirementSource source,
-                                ModuleDecl *inferForModule,
-                                const SubstitutionMap *subMap,
-                                llvm::SmallPtrSetImpl<ProtocolDecl *> &Visited);
 
   /// \brief Add all of a generic signature's parameters and requirements.
   void addGenericSignature(GenericSignature *sig);

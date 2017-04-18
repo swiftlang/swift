@@ -2273,9 +2273,8 @@ bool GenericSignatureBuilder::addGenericParameterRequirements(
   auto PA = Impl->PotentialArchetypes[Key.findIndexIn(Impl->GenericParams)];
   
   // Add the requirements from the declaration.
-  llvm::SmallPtrSet<ProtocolDecl *, 8> visited;
   return isErrorResult(
-           addInheritedRequirements(GenericParam, PA, nullptr, visited,
+           addInheritedRequirements(GenericParam, PA, nullptr,
                                     GenericParam->getModuleContext()));
 }
 
@@ -2291,14 +2290,6 @@ void GenericSignatureBuilder::addGenericParameter(GenericTypeParamType *GenericP
   auto PA = new PotentialArchetype(this, GenericParam);
   Impl->GenericParams.push_back(GenericParam);
   Impl->PotentialArchetypes.push_back(PA);
-}
-
-ConstraintResult GenericSignatureBuilder::addConformanceRequirement(
-                                             PotentialArchetype *PAT,
-                                             ProtocolDecl *Proto,
-                                             const RequirementSource *Source) {
-  llvm::SmallPtrSet<ProtocolDecl *, 8> Visited;
-  return addConformanceRequirement(PAT, Proto, Source, Visited);
 }
 
 /// Visit all of the types that show up in the list of inherited
@@ -2349,8 +2340,7 @@ static ConstraintResult visitInherited(
 ConstraintResult GenericSignatureBuilder::addConformanceRequirement(
                                PotentialArchetype *PAT,
                                ProtocolDecl *Proto,
-                               const RequirementSource *Source,
-                               llvm::SmallPtrSetImpl<ProtocolDecl *> &Visited) {
+                               const RequirementSource *Source) {
   // Add the requirement, if we haven't done so already.
   if (!PAT->addConformance(Proto, Source, *this))
     return ConstraintResult::Resolved;
@@ -2370,7 +2360,7 @@ ConstraintResult GenericSignatureBuilder::addConformanceRequirement(
                                                         /*inferred=*/false);
     for (auto req : reqSig->getRequirements()) {
       auto reqResult = addRequirement(req, innerSource, nullptr,
-                                      &protocolSubMap, Visited);
+                                      &protocolSubMap);
       if (isErrorResult(reqResult)) return reqResult;
     }
 
@@ -2384,7 +2374,7 @@ ConstraintResult GenericSignatureBuilder::addConformanceRequirement(
   auto protoModule = Proto->getParentModule();
 
   auto inheritedReqResult =
-    addInheritedRequirements(Proto, PAT, Source, Visited, protoModule);
+    addInheritedRequirements(Proto, PAT, Source, protoModule);
   if (isErrorResult(inheritedReqResult))
     return inheritedReqResult;
 
@@ -2403,8 +2393,7 @@ ConstraintResult GenericSignatureBuilder::addConformanceRequirement(
       // Add requirements placed directly on this associated type.
       Type assocType = DependentMemberType::get(concreteSelf, AssocType);
       auto assocResult =
-        addInheritedRequirements(AssocType, assocType, Source, Visited,
-                                 protoModule);
+        addInheritedRequirements(AssocType, assocType, Source, protoModule);
       if (isErrorResult(assocResult))
         return assocResult;
 
@@ -2581,13 +2570,7 @@ ConstraintResult GenericSignatureBuilder::addTypeRequirement(
                              UnresolvedType subject,
                              UnresolvedType constraint,
                              FloatingRequirementSource source,
-                             UnresolvedHandlingKind unresolvedHandling,
-                             llvm::SmallPtrSetImpl<ProtocolDecl *> *visited) {
-  // Make sure we always have a "visited" set to pass down.
-  SmallPtrSet<ProtocolDecl *, 4> visitedSet;
-  if (!visited)
-    visited = &visitedSet;
-
+                             UnresolvedHandlingKind unresolvedHandling) {
   // Resolve the constraint.
   auto resolvedConstraint = resolve(constraint, source);
   if (!resolvedConstraint) {
@@ -2685,7 +2668,7 @@ ConstraintResult GenericSignatureBuilder::addTypeRequirement(
     for (auto *proto : layout.getProtocols()) {
       auto *protoDecl = proto->getDecl();
       if (isErrorResult(addConformanceRequirement(subjectPA, protoDecl,
-                                                  resolvedSource, *visited)))
+                                                  resolvedSource)))
         anyErrors = true;
     }
 
@@ -3031,7 +3014,6 @@ ConstraintResult GenericSignatureBuilder::addInheritedRequirements(
                              TypeDecl *decl,
                              UnresolvedType type,
                              const RequirementSource *parentSource,
-                             llvm::SmallPtrSetImpl<ProtocolDecl *> &visited,
                              ModuleDecl *inferForModule) {
   if (isa<AssociatedTypeDecl>(decl) &&
       decl->hasInterfaceType() &&
@@ -3096,8 +3078,7 @@ ConstraintResult GenericSignatureBuilder::addInheritedRequirements(
     return addTypeRequirement(type, inheritedType,
                               getFloatingSource(typeRepr,
                                                 /*forInferred=*/false),
-                              UnresolvedHandlingKind::GenerateConstraints,
-                              &visited);
+                              UnresolvedHandlingKind::GenerateConstraints);
   };
 
   auto visitLayout = [&](LayoutConstraint layout, const TypeRepr *typeRepr) {
@@ -3207,20 +3188,10 @@ ConstraintResult GenericSignatureBuilder::addRequirement(
 }
 
 ConstraintResult GenericSignatureBuilder::addRequirement(
-                                             const Requirement &req,
-                                             FloatingRequirementSource source,
-                                             ModuleDecl *inferForModule,
-                                             const SubstitutionMap *subMap) {
-  llvm::SmallPtrSet<ProtocolDecl *, 8> visited;
-  return addRequirement(req, source, inferForModule, subMap, visited);
-}
-
-ConstraintResult GenericSignatureBuilder::addRequirement(
                             const Requirement &req,
                             FloatingRequirementSource source,
                             ModuleDecl *inferForModule,
-                            const SubstitutionMap *subMap,
-                            llvm::SmallPtrSetImpl<ProtocolDecl *> &Visited) {
+                            const SubstitutionMap *subMap) {
   auto subst = [&](Type t) {
     if (subMap)
       return t.subst(*subMap);
@@ -3245,8 +3216,7 @@ ConstraintResult GenericSignatureBuilder::addRequirement(
     }
 
     return addTypeRequirement(firstType, secondType, source,
-                              UnresolvedHandlingKind::GenerateConstraints,
-                              &Visited);
+                              UnresolvedHandlingKind::GenerateConstraints);
   }
 
   case RequirementKind::Layout: {
