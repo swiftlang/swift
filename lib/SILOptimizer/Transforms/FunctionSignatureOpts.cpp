@@ -637,8 +637,17 @@ void FunctionSignatureTransform::createFunctionSignatureOptimizedFunction() {
   // Create the optimized function !
   SILModule &M = F->getModule();
   std::string Name = createOptimizedSILFunctionName();
+
+  // Any function that can be seen in other compilation units within this module
+  // (either because the function is from another module, or because it public
+  // or internal) needs to be considered shared, because those compilation units
+  // may choose to do exactly the same specialization. However, specializations
+  // of serialized functions are serialized too, and so behave more like the
+  // original.
   SILLinkage linkage = F->getLinkage();
-  if (isAvailableExternally(linkage))
+  auto localVisibleInOtherObjects =
+      !hasPrivateVisibility(linkage) && !F->isSerialized();
+  if (isAvailableExternally(linkage) || localVisibleInOtherObjects)
     linkage = SILLinkage::Shared;
 
   DEBUG(llvm::dbgs() << "  -> create specialized function " << Name << "\n");
