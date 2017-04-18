@@ -30,7 +30,7 @@ struct FormatSyntaxRewriter : public SyntaxRewriter {
 
 /// Format a Syntax tree with the given rules.
 Syntax format(Syntax Tree);
-// TODO: Represenation for formatting rules, etc. This is just a figment
+// TODO: Representation for formatting rules, etc. This is just a figment
 // for now.
 
 }

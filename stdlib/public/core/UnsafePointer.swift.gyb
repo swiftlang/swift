@@ -1188,6 +1188,13 @@ extension ${Self} {
 }
 
 extension Int {
+  /// Creates a new value with the bit pattern of the given pointer.
+  ///
+  /// The new value represents the address of the pointer passed as `pointer`.
+  /// If `pointer` is `nil`, the result is `0`.
+  ///
+  /// - Parameter pointer: The pointer to use as the source for the new
+  ///   integer.
   @_inlineable
   public init<U>(bitPattern: ${Self}<U>?) {
     if let bitPattern = bitPattern {
@@ -1199,6 +1206,13 @@ extension Int {
 }
 
 extension UInt {
+  /// Creates a new value with the bit pattern of the given pointer.
+  ///
+  /// The new value represents the address of the pointer passed as `pointer`.
+  /// If `pointer` is `nil`, the result is `0`.
+  ///
+  /// - Parameter pointer: The pointer to use as the source for the new
+  ///   integer.
   @_inlineable
   public init<U>(bitPattern: ${Self}<U>?) {
     if let bitPattern = bitPattern {

@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/ASTWalker.h"
+#include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/ProtocolConformance.h"
@@ -1437,21 +1438,23 @@ bool SILParser::parseSubstitutions(SmallVectorImpl<ParsedSubstitution> &parsed,
 /// Collect conformances by looking up the conformance from replacement
 /// type and protocol decl.
 static bool getConformancesForSubstitution(Parser &P,
-              ArrayRef<ProtocolDecl *> protocols,
+              ArrayRef<ProtocolType *> protocols,
               Type subReplacement,
               SourceLoc loc,
               SmallVectorImpl<ProtocolConformanceRef> &conformances) {
   auto M = P.SF.getParentModule();
 
-  for (auto proto : protocols) {
-    auto conformance = M->lookupConformance(subReplacement, proto, nullptr);
+  for (auto protoTy : protocols) {
+    auto conformance = M->lookupConformance(subReplacement,
+                                            protoTy->getDecl(),
+                                            nullptr);
     if (conformance) {
       conformances.push_back(*conformance);
       continue;
     }
 
     P.diagnose(loc, diag::sil_substitution_mismatch, subReplacement,
-               proto->getName());
+               protoTy);
     return true;
   }
 
@@ -1485,11 +1488,9 @@ bool getApplySubstitutionsFromParsed(
       parses = parses.slice(1);
 
       SmallVector<ProtocolConformanceRef, 2> conformances;
-      SmallVector<ProtocolDecl *, 2> protocols;
-      for (auto reqt : reqts) {
-        protocols.push_back(reqt.getSecondType()
-                            ->castTo<ProtocolType>()->getDecl());
-      }
+      SmallVector<ProtocolType *, 2> protocols;
+      for (auto reqt : reqts)
+        protocols.push_back(reqt.getSecondType()->castTo<ProtocolType>());
 
       if (getConformancesForSubstitution(SP.P, protocols,
                                          parsed.replacement,
@@ -1515,8 +1516,18 @@ bool getApplySubstitutionsFromParsed(
 static ArrayRef<ProtocolConformanceRef>
 collectExistentialConformances(Parser &P, CanType conformingType, SourceLoc loc,
                                CanType protocolType) {
-  SmallVector<ProtocolDecl *, 2> protocols;
-  protocolType.getExistentialTypeProtocols(protocols);
+  auto layout = protocolType.getExistentialLayout();
+
+  if (layout.requiresClass) {
+    if (!conformingType->mayHaveSuperclass() &&
+        !conformingType->isObjCExistentialType()) {
+      P.diagnose(loc, diag::sil_not_class, conformingType);
+    }
+  }
+
+  // FIXME: Check superclass also.
+
+  auto protocols = layout.getProtocols();
   if (protocols.empty())
     return {};
 

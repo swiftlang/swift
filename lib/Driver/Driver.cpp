@@ -494,6 +494,8 @@ std::unique_ptr<Compilation> Driver::buildCompilation(
     ArgList->hasArg(options::OPT_driver_show_incremental);
   bool ShowJobLifecycle =
     ArgList->hasArg(options::OPT_driver_show_job_lifecycle);
+  bool UpdateCode =
+    ArgList->hasArg(options::OPT_update_code);
 
   bool Incremental = ArgList->hasArg(options::OPT_incremental);
   if (ArgList->hasArg(options::OPT_whole_module_optimization)) {
@@ -672,9 +674,7 @@ std::unique_ptr<Compilation> Driver::buildCompilation(
   // For updating code we need to go through all the files and pick up changes,
   // even if they have compiler errors. Also for getting bulk fixits, or for when
   // users explicitly request to continue building despite errors.
-  if (OI.CompilerMode == OutputInfo::Mode::UpdateCode ||
-      OI.ShouldGenerateFixitEdits ||
-      ContinueBuildingAfterErrors)
+  if (UpdateCode || ContinueBuildingAfterErrors)
     C->setContinueBuildingAfterErrors();
 
   if (ShowIncrementalBuildDecisions || ShowJobLifecycle)
@@ -1059,10 +1059,6 @@ void Driver::buildOutputInfo(const ToolChain &TC, const DerivedArgList &Args,
     } else if (driverKind != DriverKind::Interactive) {
       OI.LinkAction = LinkKind::Executable;
     }
-  } else if (Args.hasArg(options::OPT_update_code)) {
-    OI.CompilerMode = OutputInfo::Mode::UpdateCode;
-    OI.CompilerOutputType = types::TY_Remapping;
-    OI.LinkAction = LinkKind::None;
   } else {
     diagnoseOutputModeArg(Diags, OutputModeArg, !Inputs.empty(), Args,
                           driverKind == DriverKind::Interactive, Name);
@@ -1128,6 +1124,11 @@ void Driver::buildOutputInfo(const ToolChain &TC, const DerivedArgList &Args,
       // We want the symbols from the whole module, so let's do it in one
       // invocation.
       OI.CompilerMode = OutputInfo::Mode::SingleCompile;
+      break;
+
+    case options::OPT_update_code:
+      OI.CompilerOutputType = types::TY_Remapping;
+      OI.LinkAction = LinkKind::None;
       break;
 
     case options::OPT_parse:
@@ -1235,10 +1236,6 @@ void Driver::buildOutputInfo(const ToolChain &TC, const DerivedArgList &Args,
     }
   }
 
-  if (Args.hasArg(options::OPT_fixit_code)) {
-    OI.ShouldGenerateFixitEdits = true;
-  }
-
   {
     if (const Arg *A = Args.getLastArg(options::OPT_sdk)) {
       OI.SDKPath = A->getValue();
@@ -1322,8 +1319,7 @@ void Driver::buildActions(const ToolChain &TC,
   ActionList AllLinkerInputs;
 
   switch (OI.CompilerMode) {
-  case OutputInfo::Mode::StandardCompile:
-  case OutputInfo::Mode::UpdateCode: {
+  case OutputInfo::Mode::StandardCompile: {
 
     // If the user is importing a textual (.h) bridging header and we're in
     // standard-compile (non-WMO) mode, we take the opportunity to precompile
@@ -2051,26 +2047,6 @@ Job *Driver::buildJobsForAction(Compilation &C, const JobAction *JA,
       llvm::sys::path::replace_extension(Path,
                                          SERIALIZED_MODULE_DOC_EXTENSION);
       Output->setAdditionalOutputForType(types::TY_SwiftModuleDocFile, Path);
-      if (isTempFile)
-        C.addTemporaryFile(Path);
-    }
-  }
-
-  if (OI.ShouldGenerateFixitEdits && isa<CompileJobAction>(JA)) {
-    StringRef OFMFixitsOutputPath;
-    if (OutputMap) {
-      auto iter = OutputMap->find(types::TY_Remapping);
-      if (iter != OutputMap->end())
-        OFMFixitsOutputPath = iter->second;
-    }
-    if (!OFMFixitsOutputPath.empty()) {
-      Output->setAdditionalOutputForType(types::ID::TY_Remapping,
-                                         OFMFixitsOutputPath);
-    } else {
-      llvm::SmallString<128> Path(Output->getPrimaryOutputFilenames()[0]);
-      bool isTempFile = C.isTemporaryFile(Path);
-      llvm::sys::path::replace_extension(Path, "remap");
-      Output->setAdditionalOutputForType(types::ID::TY_Remapping, Path);
       if (isTempFile)
         C.addTemporaryFile(Path);
     }

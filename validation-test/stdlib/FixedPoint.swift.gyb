@@ -180,7 +180,7 @@ FixedPoint.test("${Dst}(bitPattern:) from ${Src}(${bit_pattern})") {
 %     input = prepare_bit_pattern(bit_pattern, src_ty.bits, src_ty.is_signed)
     let input = get${Src}(${input})
 %     input = prepare_bit_pattern(input, src_ty.bits, False)
-    let output = get${Dst}(${Dst}(bitPattern: input))
+    let output = get${Dst}(${Dst}(bitPattern: input as ${Src}))
     let expected = get${Dst}(${prepare_bit_pattern(input, dst_ty.bits, dst_ty.is_signed)})
     expectEqual(expected, output)
   }
@@ -190,7 +190,7 @@ FixedPoint.test("${Dst}(bitPattern:) from ${Src}(${bit_pattern})") {
     let input = get${Src}(${input})
 
     // Pass a literal directly.
-    let literalOutput = get${Dst}(${Dst}(bitPattern: ${input}))
+    let literalOutput = get${Dst}(${Dst}(bitPattern: ${input} as ${Src}))
     let output = get${Dst}(${Dst}(bitPattern: input))
 
 %     input = prepare_bit_pattern(input, src_ty.bits, False)
@@ -292,7 +292,9 @@ _UnimplementedError()
 // Misc tests that should be expanded to cover all types (FIXME)
 //===----------------------------------------------------------------------===//
 
-func testBitwiseOperationsImpl<T : UnsignedInteger>(_: T.Type) {
+func testBitwiseOperationsImpl<
+  T : FixedWidthInteger & UnsignedInteger
+>(_: T.Type) {
   let x = numericCast(0b11_1010_00) as T
   let y = numericCast(0b10_1100_10) as T
 
@@ -301,7 +303,7 @@ func testBitwiseOperationsImpl<T : UnsignedInteger>(_: T.Type) {
   expectEqual(0b01_0110_10, x ^ y)
   expectEqual(0b00_0101_11, (~x) & 0xff)
 
-  let z = T.allZeros
+  let z: T = 0
   expectEqual(x, x | z)
   expectEqual(x, x ^ z)
   expectEqual(z, x & z)
@@ -325,9 +327,12 @@ FixedPoint.test("BitwiseOperations/UInt64") {
 }
 
 FixedPoint.test("OverflowCheck") {
-  expectEqual(Int8.addWithOverflow(4, 5), (9, false))
-  expectEqual(Int8.addWithOverflow(1, 127), (-128, true))
-  expectEqual(UInt8.multiplyWithOverflow(2,128), (0, true))
+  expectEqual((partialValue: 9, overflow: .none),
+    (4 as Int8).addingReportingOverflow(5))
+  expectEqual((partialValue: -128, overflow: .overflow),
+    (1 as Int8).addingReportingOverflow(127))
+  expectEqual((partialValue: 0, overflow: .overflow),
+    (2 as UInt8).multipliedReportingOverflow(by: 128))
 }
 
 FixedPoint.test("String.init") {

@@ -55,7 +55,7 @@ extension Sequence {
 }
 
 // CHECK: 15
-print([1, 2, 3, 4, 5].myReduce(0, combine: +))
+print([1, 2, 3, 4, 5].myReduce(0, combine: { $0 + $1 }))
 
 
 extension Sequence {
@@ -82,9 +82,9 @@ extension MutableCollection
 }
 
 extension RangeReplaceableCollection {
-  public func myJoin<S : Sequence where S.Iterator.Element == Self>(
+  public func myJoin<S : Sequence>(
     _ elements: S
-  ) -> Self {
+  ) -> Self where S.Iterator.Element == Self {
     var result = Self()
     var iter = elements.makeIterator()
     if let first = iter.next() {

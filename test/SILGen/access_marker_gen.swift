@@ -7,23 +7,23 @@ public struct S {
 
 // CHECK-LABEL: sil hidden [noinline] @_T017access_marker_gen5initSAA1SVs9AnyObject_pSgF : $@convention(thin) (@owned Optional<AnyObject>) -> @owned S {
 // CHECK: bb0(%0 : $Optional<AnyObject>):
-// CHECK: %[[BOX:.*]] = alloc_box ${ var S }, var, name "s"
-// CHECK: %[[ADDRS:.*]] = project_box %[[BOX]] : ${ var S }, 0
-// CHECK: %[[UNINIT:.*]] = mark_uninitialized [var] %[[ADDRS]] : $*S
+// CHECK: [[BOX:%.*]] = alloc_box ${ var S }, var, name "s"
+// CHECK: [[MARKED_BOX:%.*]] = mark_uninitialized [var] [[BOX]] : ${ var S }
+// CHECK: [[ADDR:%.*]] = project_box [[MARKED_BOX]] : ${ var S }, 0
 // CHECK: cond_br %{{.*}}, bb1, bb2
 // CHECK: bb1:
-// CHECK: %[[ACCESS1:.*]] = begin_access [modify] [unknown] %[[UNINIT]] : $*S
-// CHECK: assign %{{.*}} to %[[ACCESS1]] : $*S
-// CHECK: end_access %[[ACCESS1]] : $*S
+// CHECK: [[ACCESS1:%.*]] = begin_access [modify] [unknown] [[ADDR]] : $*S
+// CHECK: assign %{{.*}} to [[ACCESS1]] : $*S
+// CHECK: end_access [[ACCESS1]] : $*S
 // CHECK: bb2:
-// CHECK: %[[ACCESS2:.*]] = begin_access [modify] [unknown] %[[UNINIT]] : $*S
-// CHECK: assign %{{.*}} to %[[ACCESS2]] : $*S
-// CHECK: end_access %[[ACCESS2]] : $*S
+// CHECK: [[ACCESS2:%.*]] = begin_access [modify] [unknown] [[ADDR]] : $*S
+// CHECK: assign %{{.*}} to [[ACCESS2]] : $*S
+// CHECK: end_access [[ACCESS2]] : $*S
 // CHECK: bb3:
-// CHECK: %[[ACCESS3:.*]] = begin_access [read] [unknown] %[[UNINIT]] : $*S
-// CHECK: %[[RET:.*]] = load [copy] %[[ACCESS3]] : $*S
-// CHECK: end_access %[[ACCESS3]] : $*S
-// CHECK: return %[[RET]] : $S
+// CHECK: [[ACCESS3:%.*]] = begin_access [read] [unknown] [[ADDR]] : $*S
+// CHECK: [[RET:%.*]] = load [copy] [[ACCESS3]] : $*S
+// CHECK: end_access [[ACCESS3]] : $*S
+// CHECK: return [[RET]] : $S
 // CHECK-LABEL: } // end sil function '_T017access_marker_gen5initSAA1SVs9AnyObject_pSgF'
 @inline(never)
 func initS(_ o: AnyObject?) -> S {

@@ -1415,9 +1415,17 @@ public:
     require(MU->getModule().getStage() == SILStage::Raw,
             "mark_uninitialized instruction can only exist in raw SIL");
     require(Src->getType().isAddress() ||
-            Src->getType().getSwiftRValueType()->getClassOrBoundGenericClass(),
-            "mark_uninitialized must be an address or class");
+                Src->getType()
+                    .getSwiftRValueType()
+                    ->getClassOrBoundGenericClass() ||
+                Src->getType().getAs<SILBoxType>(),
+            "mark_uninitialized must be an address, class, or box type");
     require(Src->getType() == MU->getType(),"operand and result type mismatch");
+#if 0
+    // This will be turned back on in a couple of commits.
+    require(isa<AllocationInst>(Src) || isa<SILArgument>(Src),
+            "Mark Uninitialized should always be on the storage location");
+#endif
   }
   
   void checkMarkUninitializedBehaviorInst(MarkUninitializedBehaviorInst *MU) {
@@ -1888,9 +1896,19 @@ public:
 
     require(AI->getType().isObject(),
             "result of alloc_box must be an object");
-    for (unsigned field : indices(AI->getBoxType()->getLayout()->getFields()))
+    for (unsigned field : indices(AI->getBoxType()->getLayout()->getFields())) {
       verifyOpenedArchetype(AI,
                    AI->getBoxType()->getFieldLoweredType(F.getModule(), field));
+    }
+
+    // An alloc_box with a mark_uninitialized user can not have any other users.
+    require(none_of(AI->getUses(),
+                    [](Operand *Op) -> bool {
+                      return isa<MarkUninitializedInst>(Op->getUser());
+                    }) ||
+                AI->hasOneUse(),
+            "An alloc_box with a mark_uninitialized user can not have any "
+            "other users.");
   }
 
   void checkDeallocBoxInst(DeallocBoxInst *DI) {

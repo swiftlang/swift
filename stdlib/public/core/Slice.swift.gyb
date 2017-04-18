@@ -396,7 +396,7 @@ public struct ${Self}<Base : ${BaseRequirements}>
     } else {
       let shouldUpdateStartIndex = bounds.lowerBound == _startIndex
       let lastValidIndex = _base.index(before: bounds.lowerBound)
-      let newEndIndexOffset =
+      let newEndIndexOffset: Base.IndexDistance =
         _base.distance(from: bounds.lowerBound, to: _endIndex)
         - _base.distance(from: bounds.lowerBound, to: bounds.upperBound)
         + 1

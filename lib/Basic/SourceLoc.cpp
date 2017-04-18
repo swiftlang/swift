@@ -174,6 +174,10 @@ unsigned SourceManager::getByteDistance(SourceLoc Start, SourceLoc End) const {
   return End.Value.getPointer() - Start.Value.getPointer();
 }
 
+StringRef SourceManager::getEntireTextForBuffer(unsigned BufferID) const {
+  return LLVMSourceMgr.getMemoryBuffer(BufferID)->getBuffer();
+}
+
 StringRef SourceManager::extractText(CharSourceRange Range,
                                      Optional<unsigned> BufferID) const {
   assert(Range.isValid() && "range should be valid");

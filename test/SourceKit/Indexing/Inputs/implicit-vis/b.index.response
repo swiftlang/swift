@@ -22,7 +22,21 @@
           key.name: "a",
           key.usr: "s:12implicit_vis1BC1aAA1ACv",
           key.line: 2,
-          key.column: 6
+          key.column: 6,
+          key.entities: [
+            {
+              key.kind: source.lang.swift.decl.function.accessor.getter,
+              key.usr: "s:12implicit_vis1BC1aAA1ACfg",
+              key.line: 2,
+              key.column: 6
+            },
+            {
+              key.kind: source.lang.swift.decl.function.accessor.setter,
+              key.usr: "s:12implicit_vis1BC1aAA1ACfs",
+              key.line: 2,
+              key.column: 6
+            }
+          ]
         },
         {
           key.kind: source.lang.swift.ref.class,

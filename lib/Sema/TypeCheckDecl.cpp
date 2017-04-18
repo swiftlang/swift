@@ -2844,7 +2844,7 @@ void swift::markAsObjC(TypeChecker &TC, ValueDecl *D,
   if (*isObjC == ObjCReason::MemberOfObjCSubclass) {
     // If we've been asked to unconditionally warn about these deprecated
     // @objc inference rules, do so now. However, we don't warn about
-    // accessors---just the main storage dclarations.
+    // accessors---just the main storage declarations.
     if (TC.Context.LangOpts.WarnSwift3ObjCInference &&
         !(isa<FuncDecl>(D) && cast<FuncDecl>(D)->isGetterOrSetter())) {
       TC.diagnose(D, diag::objc_inference_swift3_objc_derived);
@@ -4093,8 +4093,10 @@ public:
       return;
     }
 
-    if (SD->hasInterfaceType())
+    if (SD->hasInterfaceType() || SD->isBeingValidated())
       return;
+
+    SD->setIsBeingValidated();
 
     auto dc = SD->getDeclContext();
     assert(dc->isTypeContext() &&
@@ -4138,6 +4140,8 @@ public:
       if (!SD->getGenericSignatureOfContext())
         TC.configureInterfaceType(SD, SD->getGenericSignature());
     }
+
+    SD->setIsBeingValidated(false);
 
     TC.checkDeclAttributesEarly(SD);
     TC.computeAccessibility(SD);

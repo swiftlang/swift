@@ -323,6 +323,8 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
       Action = FrontendOptions::REPL;
     } else if (Opt.matches(OPT_interpret)) {
       Action = FrontendOptions::Immediate;
+    } else if(Opt.matches(OPT_update_code)) {
+      Action = FrontendOptions::UpdateCode;
     } else {
       llvm_unreachable("Unhandled mode option");
     }
@@ -560,6 +562,10 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
         Suffix = "importedmodules";
       break;
 
+    case FrontendOptions::UpdateCode:
+      Suffix = REMAP_EXTENSION;
+      break;
+
     case FrontendOptions::EmitTBD:
       if (Opts.OutputFilenames.empty())
         Opts.setSingleOutputFilename("-");
@@ -706,6 +712,7 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
     case FrontendOptions::DumpTypeRefinementContexts:
     case FrontendOptions::Immediate:
     case FrontendOptions::REPL:
+    case FrontendOptions::UpdateCode:
       Diags.diagnose(SourceLoc(), diag::error_mode_cannot_emit_dependencies);
       return true;
     case FrontendOptions::Parse:
@@ -738,6 +745,7 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
     case FrontendOptions::DumpTypeRefinementContexts:
     case FrontendOptions::Immediate:
     case FrontendOptions::REPL:
+    case FrontendOptions::UpdateCode:
       Diags.diagnose(SourceLoc(), diag::error_mode_cannot_emit_header);
       return true;
     case FrontendOptions::Parse:
@@ -773,6 +781,7 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
     case FrontendOptions::EmitSILGen:
     case FrontendOptions::Immediate:
     case FrontendOptions::REPL:
+    case FrontendOptions::UpdateCode:
       if (!Opts.ModuleOutputPath.empty())
         Diags.diagnose(SourceLoc(), diag::error_mode_cannot_emit_module);
       else
@@ -1535,6 +1544,27 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
   return false;
 }
 
+bool ParseMigratorArgs(MigratorOptions &Opts, ArgList &Args,
+                       DiagnosticEngine &Diags) {
+  using namespace options;
+
+  Opts.AddObjC |= Args.hasArg(OPT_warn_swift3_objc_inference);
+
+  if (Args.hasArg(OPT_disable_migrator_fixits)) {
+    Opts.EnableMigratorFixits = false;
+  }
+
+  if (auto MigratedFilePath = Args.getLastArg(OPT_emit_migrated_file_path)) {
+    Opts.EmitMigratedFilePath = MigratedFilePath->getValue();
+  }
+
+  if (auto Dumpster = Args.getLastArg(OPT_dump_migration_states_dir)) {
+    Opts.DumpMigrationStatesDir = Dumpster->getValue();
+  }
+
+  return false;
+}
+
 bool CompilerInvocation::parseArgs(ArrayRef<const char *> Args,
                                    DiagnosticEngine &Diags,
                                    StringRef workingDirectory) {
@@ -1594,6 +1624,10 @@ bool CompilerInvocation::parseArgs(ArrayRef<const char *> Args,
   }
 
   if (ParseDiagnosticArgs(DiagnosticOpts, ParsedArgs, Diags)) {
+    return true;
+  }
+
+  if (ParseMigratorArgs(MigratorOpts, ParsedArgs, Diags)) {
     return true;
   }
 

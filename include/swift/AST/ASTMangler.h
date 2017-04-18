@@ -38,6 +38,11 @@ protected:
   /// If enabled, Arche- and Alias types are mangled with context.
   bool DWARFMangling;
 
+  /// If enabled, entities that ought to have names but don't get a placeholder.
+  ///
+  /// If disabled, it is an error to try to mangle such an entity.
+  bool AllowNamelessEntities = false;
+
 public:
   enum class SymbolKind {
     Default,
@@ -122,7 +127,7 @@ public:
 
   std::string mangleTypeAsContextUSR(const NominalTypeDecl *type);
 
-  std::string mangleDeclAsUSR(ValueDecl *Decl, StringRef USRPrefix);
+  std::string mangleDeclAsUSR(const ValueDecl *Decl, StringRef USRPrefix);
 
   std::string mangleAccessorEntityAsUSR(AccessorKind kind,
                                         AddressorKind addressorKind,
@@ -167,7 +172,7 @@ protected:
 
   void appendProtocolName(const ProtocolDecl *protocol);
 
-  void appendNominalType(const NominalTypeDecl *decl);
+  void appendAnyGenericType(const GenericTypeDecl *decl);
 
   void appendFunctionType(AnyFunctionType *fn, bool forceSingleParam);
 
@@ -207,7 +212,7 @@ protected:
 
   void appendDeclType(const ValueDecl *decl, bool isFunctionMangling = false);
 
-  bool tryAppendStandardSubstitution(const NominalTypeDecl *type);
+  bool tryAppendStandardSubstitution(const GenericTypeDecl *type);
 
   void appendConstructorEntity(const ConstructorDecl *ctor, bool isAllocating);
   

@@ -489,7 +489,8 @@ bool GenericSignature::requiresClass(Type type, ModuleDecl &mod) {
   if (!type->isTypeParameter()) return false;
 
   auto &builder = *getGenericSignatureBuilder(mod);
-  auto pa = builder.resolveArchetype(type);
+  auto pa =
+    builder.resolveArchetype(type, ArchetypeResolutionKind::CompleteWellFormed);
   if (!pa) return false;
 
   pa = pa->getRepresentative();
@@ -519,7 +520,8 @@ Type GenericSignature::getSuperclassBound(Type type, ModuleDecl &mod) {
   if (!type->isTypeParameter()) return nullptr;
 
   auto &builder = *getGenericSignatureBuilder(mod);
-  auto pa = builder.resolveArchetype(type);
+  auto pa =
+    builder.resolveArchetype(type, ArchetypeResolutionKind::CompleteWellFormed);
   if (!pa) return nullptr;
 
   pa = pa->getRepresentative();
@@ -539,7 +541,8 @@ SmallVector<ProtocolDecl *, 2> GenericSignature::getConformsTo(Type type,
   if (!type->isTypeParameter()) return { };
 
   auto &builder = *getGenericSignatureBuilder(mod);
-  auto pa = builder.resolveArchetype(type);
+  auto pa =
+    builder.resolveArchetype(type, ArchetypeResolutionKind::CompleteWellFormed);
   if (!pa) return { };
 
   pa = pa->getRepresentative();
@@ -565,7 +568,8 @@ bool GenericSignature::conformsToProtocol(Type type, ProtocolDecl *proto,
   if (!type->isTypeParameter()) return false;
 
   auto &builder = *getGenericSignatureBuilder(mod);
-  auto pa = builder.resolveArchetype(type);
+  auto pa =
+    builder.resolveArchetype(type, ArchetypeResolutionKind::CompleteWellFormed);
   if (!pa) return false;
 
   pa = pa->getRepresentative();
@@ -593,7 +597,8 @@ Type GenericSignature::getConcreteType(Type type, ModuleDecl &mod) {
   if (!type->isTypeParameter()) return Type();
 
   auto &builder = *getGenericSignatureBuilder(mod);
-  auto pa = builder.resolveArchetype(type);
+  auto pa =
+    builder.resolveArchetype(type, ArchetypeResolutionKind::CompleteWellFormed);
   if (!pa) return Type();
 
   pa = pa->getRepresentative();
@@ -607,7 +612,8 @@ LayoutConstraint GenericSignature::getLayoutConstraint(Type type,
   if (!type->isTypeParameter()) return LayoutConstraint();
 
   auto &builder = *getGenericSignatureBuilder(mod);
-  auto pa = builder.resolveArchetype(type);
+  auto pa =
+    builder.resolveArchetype(type, ArchetypeResolutionKind::CompleteWellFormed);
   if (!pa) return LayoutConstraint();
 
   pa = pa->getRepresentative();
@@ -623,12 +629,16 @@ bool GenericSignature::areSameTypeParameterInContext(Type type1, Type type2,
     return true;
 
   auto &builder = *getGenericSignatureBuilder(mod);
-  auto pa1 = builder.resolveArchetype(type1);
+  auto pa1 =
+    builder.resolveArchetype(type1,
+                             ArchetypeResolutionKind::CompleteWellFormed);
   assert(pa1 && "not a valid dependent type of this signature?");
   pa1 = pa1->getRepresentative();
   assert(!pa1->isConcreteType());
 
-  auto pa2 = builder.resolveArchetype(type2);
+  auto pa2 =
+    builder.resolveArchetype(type2,
+                             ArchetypeResolutionKind::CompleteWellFormed);
   assert(pa2 && "not a valid dependent type of this signature?");
   pa2 = pa2->getRepresentative();
   assert(!pa2->isConcreteType());
@@ -667,7 +677,9 @@ bool GenericSignature::isCanonicalTypeInContext(Type type,
   return !type.findIf([&](Type component) -> bool {
     if (!component->isTypeParameter()) return false;
 
-    auto pa = builder.resolveArchetype(component);
+    auto pa =
+      builder.resolveArchetype(component,
+                               ArchetypeResolutionKind::CompleteWellFormed);
     if (!pa) return false;
 
     auto rep = pa->getArchetypeAnchor(builder);
@@ -692,7 +704,9 @@ CanType GenericSignature::getCanonicalTypeInContext(Type type,
 
     // Resolve the potential archetype.  This can be null in nested generic
     // types, which we can't immediately canonicalize.
-    auto pa = builder.resolveArchetype(Type(component));
+    auto pa =
+      builder.resolveArchetype(Type(component),
+                               ArchetypeResolutionKind::CompleteWellFormed);
     if (!pa) return None;
 
     auto rep = pa->getArchetypeAnchor(builder);
@@ -768,7 +782,8 @@ ConformanceAccessPath GenericSignature::getConformanceAccessPath(
 
   // Resolve this type to a potential archetype.
   auto &builder = *getGenericSignatureBuilder(mod);
-  auto pa = builder.resolveArchetype(type);
+  auto pa =
+    builder.resolveArchetype(type, ArchetypeResolutionKind::CompleteWellFormed);
   auto equivClass = pa->getOrCreateEquivalenceClass();
 
   // Dig out the conformance of this type to the given protocol, because we
@@ -859,7 +874,11 @@ ConformanceAccessPath GenericSignature::getConformanceAccessPath(
       Type storedType = eraseAssociatedTypes(source->getStoredType());
 
       // Dig out the potential archetype for this stored type.
-      auto pa = reqSigBuilder.resolveArchetype(storedType);
+      // FIXME: CompleteWellFormed here?
+      auto pa =
+        reqSigBuilder.resolveArchetype(
+                                 storedType,
+                                 ArchetypeResolutionKind::AlwaysPartial);
       auto equivClass = pa->getOrCreateEquivalenceClass();
 
       // Find the conformance of this potential archetype to the protocol in

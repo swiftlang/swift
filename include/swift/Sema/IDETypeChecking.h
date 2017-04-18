@@ -56,7 +56,7 @@ namespace swift {
   ///
   /// \returns the slice of Scratch
   ArrayRef<ValueDecl*> canDeclProvideDefaultImplementationFor(ValueDecl* VD,
-                                  llvm::SmallVectorImpl<ValueDecl*> &Scractch);
+                                  llvm::SmallVectorImpl<ValueDecl*> &Scratch);
 
   /// \brief Given an unresolved member E and its parent P, this function tries
   /// to infer the type of E.

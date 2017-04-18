@@ -280,7 +280,7 @@ std::vector<Token> swift::tokenize(const LangOptions &LangOpts,
 }
 
 // TODO: Refactor into common implementation with swift::tokenize.
-std::vector<std::pair<syntax::RC<syntax::TokenSyntax>,
+std::vector<std::pair<RC<syntax::TokenSyntax>,
                                  syntax::AbsolutePosition>>
 swift::tokenizeWithTrivia(const LangOptions &LangOpts,
                           const SourceManager &SM,
@@ -294,7 +294,7 @@ swift::tokenizeWithTrivia(const LangOptions &LangOpts,
           CommentRetentionMode::AttachToNextToken,
           TriviaRetentionMode::WithTrivia,
           Offset, EndOffset);
-  std::vector<std::pair<syntax::RC<syntax::TokenSyntax>,
+  std::vector<std::pair<RC<syntax::TokenSyntax>,
                         syntax::AbsolutePosition>> Tokens;
   syntax::AbsolutePosition RunningPos;
   do {

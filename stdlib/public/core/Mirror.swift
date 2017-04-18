@@ -390,7 +390,6 @@ public protocol CustomLeafReflectable : CustomReflectable {}
 // FIXME(ABI)#49 (Sealed Protocols): this protocol should be "non-open" and you shouldn't be able to
 // create conformances.
 public protocol MirrorPath {}
-extension IntMax : MirrorPath {}
 extension Int : MirrorPath {}
 extension String : MirrorPath {}
 

@@ -208,22 +208,6 @@ bool TypeBase::allowsOwnership() {
   return getCanonicalType().isAnyClassReferenceType();
 }
 
-void TypeBase::getExistentialTypeProtocols(
-                                   SmallVectorImpl<ProtocolDecl*> &protocols) {
-  getCanonicalType().getExistentialTypeProtocols(protocols);
-}
-
-void CanType::getExistentialTypeProtocols(
-                                   SmallVectorImpl<ProtocolDecl*> &protocols) {
-  // FIXME: Remove this completely
-  auto layout = getExistentialLayout();
-  assert(!layout.superclass && "Subclass existentials not fully supported yet");
-  assert((!layout.requiresClass || layout.requiresClassImplied) &&
-         "Explicit AnyObject should not appear yet");
-  for (auto proto : layout.getProtocols())
-    protocols.push_back(proto->getDecl());
-}
-
 ExistentialLayout::ExistentialLayout(ProtocolType *type) {
   assert(type->isCanonical());
 
@@ -2637,7 +2621,7 @@ void ArchetypeType::populateNestedTypes() const {
   ProtocolType::visitAllProtocols(getConformsTo(),
                                   [&](ProtocolDecl *proto) -> bool {
     // Objective-C protocols don't have type members.
-    if (proto->hasClangNode()) return false;
+    if (proto->isObjC()) return false;
 
     for (auto member : proto->getMembers()) {
       if (auto assocType = dyn_cast<AssociatedTypeDecl>(member)) {
@@ -2789,7 +2773,7 @@ Type ProtocolCompositionType::get(const ASTContext &C,
   // Minimize the set of protocols composed together.
   ProtocolType::canonicalizeProtocols(Protocols);
 
-  // If one protocol remains with no further constrants, its nominal
+  // If one protocol remains with no further constraints, its nominal
   // type is the canonical type.
   if (Protocols.size() == 1 && !Superclass && !HasExplicitAnyObject)
     return Protocols.front()->getDeclaredType();
@@ -3065,7 +3049,7 @@ static Type substType(Type derivedType,
     if (isa<GenericTypeParamType>(substOrig)) {
       if (options.contains(SubstFlags::UseErrorType))
         return ErrorType::get(type);
-      return Type(type);
+      return Type();
     }
 
     auto archetype = cast<ArchetypeType>(substOrig);
@@ -3081,7 +3065,7 @@ static Type substType(Type derivedType,
     if (!parent) {
       if (options.contains(SubstFlags::UseErrorType))
         return ErrorType::get(type);
-      return Type(type);
+      return Type();
     }
 
     // Substitute into the parent type.
@@ -3132,7 +3116,7 @@ Type TypeBase::getSuperclassForDecl(const ClassDecl *baseClass,
     auto *nominalDecl = t->getAnyNominal();
     if (!nominalDecl) {
       assert(t->is<ArchetypeType>() || t->isExistentialType() &&
-             "expected a class, archetype or existentiall");
+             "expected a class, archetype or existential");
       t = t->getSuperclass(resolver);
       assert(t && "archetype or existential is not class constrained");
       continue;
@@ -3977,7 +3961,6 @@ static bool doesOpaqueClassUseNativeReferenceCounting(const ASTContext &ctx) {
 
 static bool usesNativeReferenceCounting(ClassDecl *theClass,
                                         ResilienceExpansion resilience) {
-  // NOTE: if you change this, change irgen::getReferenceCountingForClass.
   // TODO: Resilience? there might be some legal avenue of changing this.
   while (Type supertype = theClass->getSuperclass()) {
     theClass = supertype->getClassOrBoundGenericClass();
@@ -3987,8 +3970,6 @@ static bool usesNativeReferenceCounting(ClassDecl *theClass,
 }
 
 bool TypeBase::usesNativeReferenceCounting(ResilienceExpansion resilience) {
-  assert(allowsOwnership());
-
   CanType type = getCanonicalType();
   switch (type->getKind()) {
 #define SUGARED_TYPE(id, parent) case TypeKind::id:
@@ -4011,6 +3992,10 @@ bool TypeBase::usesNativeReferenceCounting(ResilienceExpansion resilience) {
     return ::usesNativeReferenceCounting(
                                   cast<BoundGenericClassType>(type)->getDecl(),
                                          resilience);
+  case TypeKind::UnboundGeneric:
+    return ::usesNativeReferenceCounting(
+                    cast<ClassDecl>(cast<UnboundGenericType>(type)->getDecl()),
+                                         resilience);
 
   case TypeKind::DynamicSelf:
     return cast<DynamicSelfType>(type).getSelfType()
@@ -4018,17 +4003,23 @@ bool TypeBase::usesNativeReferenceCounting(ResilienceExpansion resilience) {
 
   case TypeKind::Archetype: {
     auto archetype = cast<ArchetypeType>(type);
-    assert(archetype->requiresClass());
+    auto layout = archetype->getLayoutConstraint();
+    assert(archetype->requiresClass() ||
+           (layout && layout->isRefCounted()));
     if (auto supertype = archetype->getSuperclass())
       return supertype->usesNativeReferenceCounting(resilience);
     return ::doesOpaqueClassUseNativeReferenceCounting(type->getASTContext());
   }
 
   case TypeKind::Protocol:
-  case TypeKind::ProtocolComposition:
+  case TypeKind::ProtocolComposition: {
+    auto layout = getExistentialLayout();
+    assert(layout.requiresClass && "Opaque existentials don't use refcounting");
+    if (layout.superclass)
+      return layout.superclass->usesNativeReferenceCounting(resilience);
     return ::doesOpaqueClassUseNativeReferenceCounting(type->getASTContext());
+  }
 
-  case TypeKind::UnboundGeneric:
   case TypeKind::Function:
   case TypeKind::GenericFunction:
   case TypeKind::SILFunction:

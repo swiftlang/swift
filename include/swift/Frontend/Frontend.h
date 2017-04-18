@@ -33,6 +33,7 @@
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/ClangImporter/ClangImporterOptions.h"
 #include "swift/Frontend/FrontendOptions.h"
+#include "swift/Migrator/MigratorOptions.h"
 #include "swift/Sema/SourceLoader.h"
 #include "swift/Serialization/Validation.h"
 #include "swift/SIL/SILModule.h"
@@ -62,6 +63,7 @@ class CompilerInvocation {
   ClangImporterOptions ClangImporterOpts;
   SearchPathOptions SearchPathOpts;
   DiagnosticOptions DiagnosticOpts;
+  MigratorOptions MigratorOpts;
   SILOptions SILOpts;
   IRGenOptions IRGenOpts;
 
@@ -200,6 +202,10 @@ public:
   DiagnosticOptions &getDiagnosticOptions() { return DiagnosticOpts; }
   const DiagnosticOptions &getDiagnosticOptions() const {
     return DiagnosticOpts;
+  }
+
+  const MigratorOptions &getMigratorOptions() const {
+    return MigratorOpts;
   }
 
   SILOptions &getSILOptions() { return SILOpts; }

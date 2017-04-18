@@ -748,13 +748,13 @@ extension String {
         // }
         let value = source[i]
         let isUpper =
-          _asciiUpperCaseTable >>
-          UInt64(((value &- 1) & 0b0111_1111) >> 1)
-        let add = (isUpper & 0x1) << 5
+          _asciiUpperCaseTable &>>
+          UInt64(((value &- 1) & 0b0111_1111) &>> 1)
+        let add = (isUpper & 0x1) &<< 5
         // Since we are left with either 0x0 or 0x20, we can safely truncate to
         // a UInt8 and add to our ASCII value (this will not overflow numbers in
         // the ASCII range).
-        dest.storeBytes(of: value &+ UInt8(truncatingBitPattern: add),
+        dest.storeBytes(of: value &+ UInt8(extendingOrTruncating: add),
           toByteOffset: i, as: UInt8.self)
       }
       return String(_storage: buffer)
@@ -790,10 +790,10 @@ extension String {
         // See the comment above in lowercaseString.
         let value = source[i]
         let isLower =
-          _asciiLowerCaseTable >>
-          UInt64(((value &- 1) & 0b0111_1111) >> 1)
-        let add = (isLower & 0x1) << 5
-        dest.storeBytes(of: value &- UInt8(truncatingBitPattern: add),
+          _asciiLowerCaseTable &>>
+          UInt64(((value &- 1) & 0b0111_1111) &>> 1)
+        let add = (isLower & 0x1) &<< 5
+        dest.storeBytes(of: value &- UInt8(extendingOrTruncating: add),
           toByteOffset: i, as: UInt8.self)
       }
       return String(_storage: buffer)

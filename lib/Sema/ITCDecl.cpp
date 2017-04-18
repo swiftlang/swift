@@ -19,6 +19,7 @@
 #include "swift/Sema/IterativeTypeChecker.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/ExistentialLayout.h"
 #include <tuple>
 using namespace swift;
 
@@ -256,9 +257,12 @@ void IterativeTypeChecker::processInheritedProtocols(
     // Collect existential types.
     // FIXME: We'd prefer to keep what the user wrote here.
     if (inherited.getType()->isExistentialType()) {
-      SmallVector<ProtocolDecl *, 4> protocols;
-      inherited.getType()->getExistentialTypeProtocols(protocols);
-      for (auto inheritedProtocol: protocols) {
+      auto layout = inherited.getType()->getExistentialLayout();
+      assert(!layout.superclass && "Need to redo inheritance clause "
+             "typechecking");
+      for (auto inheritedProtocolTy: layout.getProtocols()) {
+        auto *inheritedProtocol = inheritedProtocolTy->getDecl();
+
         if (inheritedProtocol == protocol ||
             inheritedProtocol->inheritsFrom(protocol)) {
           if (!diagnosedCircularity) {

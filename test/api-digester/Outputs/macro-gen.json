@@ -1,0 +1,57 @@
+[
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Constructor",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "1",
+    "LeftUsr": "s:12macrogenleft2S1VACSicfc",
+    "LeftComment": "Int",
+    "RightUsr": "",
+    "RightComment": "Double",
+    "ModuleName": "macrogenleft"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "Rename",
+    "ChildIndex": "0",
+    "LeftUsr": "s:12macrogenleft2S1V4foo5ySi1x_Si1ytF",
+    "LeftComment": "foo5(x:y:)",
+    "RightUsr": "",
+    "RightComment": "foo5(x:y:z:)",
+    "ModuleName": "macrogenleft"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "0",
+    "LeftUsr": "s:12macrogenleft2C1C4foo2SSSi_SitF",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "Int",
+    "ModuleName": "macrogenleft"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "1",
+    "LeftUsr": "s:12macrogenleft2C1C4foo2SSSi_SitF",
+    "LeftComment": "Int",
+    "RightUsr": "",
+    "RightComment": "() -> ()",
+    "ModuleName": "macrogenleft"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "2",
+    "LeftUsr": "s:12macrogenleft2C1C4foo2SSSi_SitF",
+    "LeftComment": "Int",
+    "RightUsr": "",
+    "RightComment": "String",
+    "ModuleName": "macrogenleft"
+  }
+]

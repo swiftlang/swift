@@ -1656,7 +1656,7 @@ static bool _dynamicCastFromExistential(OpaqueValue *dest,
   } else {
 #ifdef SWIFT_RUNTIME_ENABLE_COW_EXISTENTIALS
     assert(!isOutOfLine &&
-           "Should only see inline represenations of existentials");
+           "Should only see inline representations of existentials");
 #else
     // swift_dynamicCast took or destroyed the value as per the original request
     // We may still have an opaque existential container to deallocate.
