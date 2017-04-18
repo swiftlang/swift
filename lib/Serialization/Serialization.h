@@ -117,7 +117,8 @@ public:
   /// table.
   using DeclTable = llvm::MapVector<Identifier, DeclTableData>;
 
-  using ObjCMethodTableData = SmallVector<std::tuple<TypeID, bool, DeclID>, 4>;
+  using ObjCMethodTableData =
+    SmallVector<std::tuple<std::string, bool, DeclID>, 4>;
 
   // In-memory representation of what will eventually be an on-disk
   // hash table of all defined Objective-C methods.
