@@ -481,7 +481,16 @@ extension Double : _ObjectiveCBridgeable {
     }
 
     public init?(exactly number: NSNumber) {
-        self = number.doubleValue
+        let type = number.objCType.pointee
+        if type == 0x51 {
+            guard let result = Double(exactly: number.uint64Value) else { return nil }
+            self = result
+        } else if type == 0x71 {
+            guard let result = Double(exactly: number.int64Value) else  { return nil }
+            self = result
+        } else {
+            self = number.doubleValue
+        }
     }
 
     @_semantics("convertToObjectiveC")

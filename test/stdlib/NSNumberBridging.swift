@@ -727,6 +727,88 @@ func testNSNumberBridgeFromCGFloat() {
     }
 }
 
+func test_numericBitPatterns_to_floatingPointTypes() {
+    let signed_numbers: [NSNumber] = [
+        NSNumber(value: Int64(bitPattern: 6)),
+        NSNumber(value: Int64(bitPattern: 1 << 56)),
+        NSNumber(value: Int64(bitPattern: 1 << 53)),
+        NSNumber(value: Int64(bitPattern: 1 << 52)),
+        NSNumber(value: Int64(bitPattern: 1 << 25)),
+        NSNumber(value: Int64(bitPattern: 1 << 24)),
+        NSNumber(value: Int64(bitPattern: 1 << 23)),
+        NSNumber(value: -Int64(bitPattern: 1 << 53)),
+        NSNumber(value: -Int64(bitPattern: 1 << 52)),
+        NSNumber(value: -Int64(bitPattern: 6)),
+        NSNumber(value: -Int64(bitPattern: 1 << 56)),
+        NSNumber(value: -Int64(bitPattern: 1 << 25)),
+        NSNumber(value: -Int64(bitPattern: 1 << 24)),
+        NSNumber(value: -Int64(bitPattern: 1 << 23)),
+    ]
+
+    let signed_values: [Int64] = [
+        Int64(bitPattern: 6),
+        Int64(bitPattern: 1 << 56),
+        Int64(bitPattern: 1 << 53),
+        Int64(bitPattern: 1 << 52),
+        Int64(bitPattern: 1 << 25),
+        Int64(bitPattern: 1 << 24),
+        Int64(bitPattern: 1 << 23),
+        -Int64(bitPattern: 1 << 53),
+        -Int64(bitPattern: 1 << 52),
+        -Int64(bitPattern: 6),
+        -Int64(bitPattern: 1 << 56),
+        -Int64(bitPattern: 1 << 25),
+        -Int64(bitPattern: 1 << 24),
+        -Int64(bitPattern: 1 << 23),
+    ]
+
+    let unsigned_numbers: [NSNumber] = [
+        NSNumber(value: UInt64(bitPattern: 6)),
+        NSNumber(value: UInt64(bitPattern: 1 << 56)),
+        NSNumber(value: UInt64(bitPattern: 1 << 63)),
+        NSNumber(value: UInt64(bitPattern: 1 << 53)),
+        NSNumber(value: UInt64(bitPattern: 1 << 52)),
+        NSNumber(value: UInt64(bitPattern: 1 << 25)),
+        NSNumber(value: UInt64(bitPattern: 1 << 24)),
+        NSNumber(value: UInt64(bitPattern: 1 << 23)),
+    ]
+
+    let unsigned_values: [UInt64] = [
+        UInt64(bitPattern: 6),
+        UInt64(bitPattern: 1 << 56),
+        UInt64(bitPattern: 1 << 63),
+        UInt64(bitPattern: 1 << 53),
+        UInt64(bitPattern: 1 << 52),
+        UInt64(bitPattern: 1 << 25),
+        UInt64(bitPattern: 1 << 24),
+        UInt64(bitPattern: 1 << 23)
+    ]
+
+    for (number, value) in zip(signed_numbers, signed_values) {
+        let numberCast = Double(exactly: number)
+        let valueCast = Double(exactly: value)
+        expectEqual(numberCast, valueCast)
+    }
+
+    for (number, value) in zip(unsigned_numbers, unsigned_values) {
+        let numberCast = Double(exactly: number)
+        let valueCast = Double(exactly: value)
+        expectEqual(numberCast, valueCast)
+    }
+
+    for (number, value) in zip(signed_numbers, signed_values) {
+        let numberCast = Float(exactly: number)
+        let valueCast = Float(exactly: value)
+        expectEqual(numberCast, valueCast)
+    }
+
+    for (number, value) in zip(unsigned_numbers, unsigned_values) {
+        let numberCast = Float(exactly: number)
+        let valueCast = Float(exactly: value)
+        expectEqual(numberCast, valueCast)
+    }
+}
+
 nsNumberBridging.test("Bridge Int8") { testNSNumberBridgeFromInt8() }
 nsNumberBridging.test("Bridge UInt8") { testNSNumberBridgeFromUInt8() }
 nsNumberBridging.test("Bridge Int16") { testNSNumberBridgeFromInt16() }
@@ -740,5 +822,5 @@ nsNumberBridging.test("Bridge UInt") { testNSNumberBridgeFromUInt() }
 nsNumberBridging.test("Bridge Float") { testNSNumberBridgeFromFloat() }
 nsNumberBridging.test("Bridge Double") { testNSNumberBridgeFromDouble() }
 nsNumberBridging.test("Bridge CGFloat") { testNSNumberBridgeFromCGFloat() }
-
+nsNumberBridging.test("bitPattern to exactly") { test_numericBitPatterns_to_floatingPointTypes() }
 runAllTests()
