@@ -118,6 +118,30 @@ sil_vtable C {}
 // -- offset of S.x
 // CHECK-SAME: i32 0 }>
 
+// -- %i: Gen<A>.x
+// CHECK: [[KP_I:@keypath.*]] = private global <{ {{.*}} }> <{
+// CHECK-SAME: [[WORD]] 0,
+// CHECK-SAME: %swift.type* (i8*)* [[I_GET_GEN_A_A:@[a-z_.0-9]+]],
+// CHECK-SAME: %swift.type* (i8*)* [[I_GET_A:@[a-z_.0-9]+]],
+//             -- size 8
+// CHECK-SAME: i32 8,
+//             -- 0x1ffffffe - struct with runtime-resolved offset
+// CHECK-SAME: i32 536870910,
+// CHECK-32-SAME: i32 12 }>
+// CHECK-64-SAME: i32 24 }>
+
+// -- %j: Gen<A>.y
+// CHECK: [[KP_J:@keypath.*]] = private global <{ {{.*}} }> <{
+// CHECK-SAME: [[WORD]] 0,
+// CHECK-SAME: %swift.type* (i8*)* [[J_GET_GEN_A_A:@[a-z_.0-9]+]],
+// CHECK-SAME: %swift.type* (i8*)* [[J_GET_A:@[a-z_.0-9]+]],
+//             -- size 8
+// CHECK-SAME: i32 8,
+//             -- 0x1ffffffe - struct with runtime-resolved offset
+// CHECK-SAME: i32 536870910,
+// CHECK-32-SAME: i32 16 }>
+// CHECK-64-SAME: i32 32 }>
+
 // CHECK-LABEL: define swiftcc void @stored_property_fixed_offsets()
 sil @stored_property_fixed_offsets : $@convention(thin) () -> () {
 entry:
@@ -143,3 +167,48 @@ entry:
   return undef : $()
 }
 
+struct Gen<T, U> {
+  var x: T
+  var y: U
+}
+
+struct Foo<T> {
+  var foo: T
+}
+
+// CHECK-LABEL: define swiftcc void @stored_property_generics(%swift.type* %T, %swift.type* %U)
+sil @stored_property_generics : $@convention(thin) <T, U> () -> () {
+entry:
+  // CHECK: [[PTR:%.*]] = bitcast [1 x %swift.type*]* [[ARGS:%.*]] to
+  // CHECK: store %swift.type* %T, %swift.type** [[PTR]]
+  // CHECK: [[ARGS_I8:%.*]] = bitcast [1 x %swift.type*]* [[ARGS]] to
+  // CHECK: call %swift.refcounted* @swift_getKeyPath(i8* bitcast ({{.*}} [[KP_I]] to i8*), i8* [[ARGS_I8]])
+  %i = keypath $KeyPath<Gen<T,T>, T>, <A> (root $Gen<A, A>; stored_property #Gen.x : $A) <T>
+
+  // CHECK: [[PTR:%.*]] = bitcast [1 x %swift.type*]* [[ARGS:%.*]] to
+  // CHECK: store %swift.type* %U, %swift.type** [[PTR]]
+  // CHECK: [[ARGS_I8:%.*]] = bitcast [1 x %swift.type*]* [[ARGS]] to
+  // CHECK: call %swift.refcounted* @swift_getKeyPath(i8* bitcast ({{.*}} [[KP_J]] to i8*), i8* [[ARGS_I8]])
+  %j = keypath $KeyPath<Gen<U,U>, U>, <A> (root $Gen<A, A>; stored_property #Gen.y : $A) <U>
+
+  // CHECK: [[PTR:%.*]] = bitcast [1 x %swift.type*]* [[ARGS:%.*]] to
+  // CHECK: [[FOO_T:%.*]] = call %swift.type* @_T08keypaths3FooVMa(%swift.type* %T)
+  // CHECK: store %swift.type* [[FOO_T]], %swift.type** [[PTR]]
+  // CHECK: [[ARGS_I8:%.*]] = bitcast [1 x %swift.type*]* [[ARGS]] to
+  // CHECK: call %swift.refcounted* @swift_getKeyPath(i8* bitcast ({{.*}} [[KP_I]] to i8*), i8* [[ARGS_I8]])
+  %i2 = keypath $KeyPath<Gen<Foo<T>,Foo<T>>, Foo<T>>, <A> (root $Gen<A, A>; stored_property #Gen.x : $A) <Foo<T>>
+
+  return undef : $()
+}
+
+// CHECK: define private %swift.type* [[I_GET_GEN_A_A]](i8*)
+// CHECK:   [[BUF:%.*]] = bitcast i8* %0
+// CHECK:   [[A:%.*]] = load %swift.type*, %swift.type** [[BUF]]
+// CHECK:   [[GEN:%.*]] = call %swift.type* @_T08keypaths3GenVMa(%swift.type* [[A]], %swift.type* [[A]])
+// CHECK:   ret %swift.type* [[GEN]]
+
+
+// CHECK: define private %swift.type* [[I_GET_A]](i8*)
+// CHECK:   [[BUF:%.*]] = bitcast i8* %0
+// CHECK:   [[A:%.*]] = load %swift.type*, %swift.type** [[BUF]]
+// CHECK:   ret %swift.type* [[A]]

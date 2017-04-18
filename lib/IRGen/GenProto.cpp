@@ -59,6 +59,7 @@
 #include "GenOpaque.h"
 #include "GenPoly.h"
 #include "GenType.h"
+#include "GenericRequirement.h"
 #include "IRGenDebugInfo.h"
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
@@ -97,9 +98,6 @@ public:
   PolymorphicConvention(IRGenModule &IGM, CanSILFunctionType fnType);
 
   ArrayRef<MetadataSource> getSources() const { return Sources; }
-
-  using RequirementCallback =
-    llvm::function_ref<void(GenericRequirement requirement)>;
 
   void enumerateRequirements(const RequirementCallback &callback);
 
@@ -199,16 +197,18 @@ void PolymorphicConvention::addPseudogenericFulfillments() {
   });
 }
 
-void PolymorphicConvention::enumerateRequirements(const RequirementCallback &callback) {
-  if (!Generics) return;
+void
+irgen::enumerateGenericSignatureRequirements(CanGenericSignature signature,
+                                          const RequirementCallback &callback) {
+  if (!signature) return;
 
   // Get all of the type metadata.
-  for (auto gp : Generics->getSubstitutableParams()) {
+  for (auto gp : signature->getSubstitutableParams()) {
     callback({CanType(gp), nullptr});
   }
 
   // Get the protocol conformances.
-  for (auto &reqt : Generics->getRequirements()) {
+  for (auto &reqt : signature->getRequirements()) {
     switch (reqt.getKind()) {
       // Ignore these; they don't introduce extra requirements.
       case RequirementKind::Superclass:
@@ -228,6 +228,11 @@ void PolymorphicConvention::enumerateRequirements(const RequirementCallback &cal
     }
     llvm_unreachable("bad requirement kind");
   }
+}
+
+void
+PolymorphicConvention::enumerateRequirements(const RequirementCallback &callback) {
+  return enumerateGenericSignatureRequirements(Generics, callback);
 }
 
 void PolymorphicConvention::enumerateUnfulfilledRequirements(const RequirementCallback &callback) {

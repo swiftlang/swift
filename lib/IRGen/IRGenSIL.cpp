@@ -4417,13 +4417,31 @@ void IRGenSILFunction::visitCheckedCastAddrBranchInst(
 
 void IRGenSILFunction::visitKeyPathInst(swift::KeyPathInst *I) {
   auto pattern = IGM.getAddrOfKeyPathPattern(I->getPattern(), I->getLoc());
-  
   // Build up the argument vector to instantiate the pattern here.
   llvm::Value *args;
-  if (!I->getSubstitutions().empty()
-      || !I->getAllOperands().empty()) {
-    llvm_unreachable("todo!");
+  if (!I->getSubstitutions().empty()) {
+    auto sig = I->getPattern()->getGenericSignature();
+    auto subs = sig->getSubstitutionMap(I->getSubstitutions());
+
+    SmallVector<GenericRequirement, 4> requirements;
+    enumerateGenericSignatureRequirements(sig,
+            [&](GenericRequirement reqt) { requirements.push_back(reqt); });
+
+    auto argsBufTy = llvm::ArrayType::get(IGM.TypeMetadataPtrTy,
+                                          requirements.size());
+    auto argsBuf = createAlloca(argsBufTy, IGM.getPointerAlignment(),
+                                "keypath_args");
+    emitInitOfGenericRequirementsBuffer(*this, requirements, argsBuf,
+      [&](GenericRequirement reqt) -> llvm::Value * {
+        return emitGenericRequirementFromSubstitutions(*this, sig,
+                                         *IGM.getSwiftModule(),
+                                         reqt, subs);
+      });
+    args = Builder.CreateBitCast(argsBuf.getAddress(), IGM.Int8PtrTy);
   } else {
+    // No arguments necessary, so the argument ought to be ignored by any
+    // callbacks in the pattern.
+    assert(I->getAllOperands().empty() && "indices not implemented");
     args = llvm::UndefValue::get(IGM.Int8PtrTy);
   }
   auto patternPtr = llvm::ConstantExpr::getBitCast(pattern, IGM.Int8PtrTy);

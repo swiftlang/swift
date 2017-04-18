@@ -124,6 +124,7 @@ namespace irgen {
   class IRGenFunction;
   class LinkEntity;
   class LoadableTypeInfo;
+  class NecessaryBindings;
   class ProtocolInfo;
   class TypeConverter;
   class TypeInfo;

@@ -465,6 +465,8 @@ irgen::tryEmitConstantClassFragilePhysicalMemberOffset(IRGenModule &IGM,
   }
 }
 
+
+
 OwnedAddress irgen::projectPhysicalClassMemberAddress(IRGenFunction &IGF,
                                                       llvm::Value *base,
                                                       SILType baseType,

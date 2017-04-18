@@ -16,14 +16,18 @@
 //===----------------------------------------------------------------------===//
 
 #include "ConstantBuilder.h"
+#include "Explosion.h"
 #include "GenClass.h"
+#include "GenMeta.h"
 #include "GenStruct.h"
+#include "GenericRequirement.h"
+#include "IRGenDebugInfo.h"
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
-#include "NecessaryBindings.h"
 #include "llvm/ADT/SetVector.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILLocation.h"
+#include "swift/SIL/TypeLowering.h"
 #include "swift/ABI/KeyPath.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/DiagnosticEngine.h"
@@ -50,18 +54,15 @@ IRGenModule::getAddrOfKeyPathPattern(KeyPathPattern *pattern,
   // environment. If there isn't any, we can instantiate the pattern in-place.
   bool isInstantiableInPlace = pattern->getNumOperands() == 0
     && !pattern->getGenericSignature();
+
+  // Collect the required parameters for the keypath's generic environment.
+  SmallVector<GenericRequirement, 4> requirements;
   
-  NecessaryBindings bindings;
   GenericEnvironment *genericEnv = nullptr;
   if (auto sig = pattern->getGenericSignature()) {
     genericEnv = sig->createGenericEnvironment(*getSwiftModule());
-    auto subs = sig->getSubstitutionMap(
-                                      genericEnv->getForwardingSubstitutions());
-    auto fnTy = SILFunctionType::get(sig,
-         SILFunctionType::ExtInfo(SILFunctionType::Representation::Thin, false),
-         ParameterConvention::Direct_Unowned,
-         {}, {}, None, getSwiftModule()->getASTContext());
-    bindings = NecessaryBindings::forFunctionInvocations(*this, fnTy, subs);
+    enumerateGenericSignatureRequirements(pattern->getGenericSignature(),
+      [&](GenericRequirement reqt) { requirements.push_back(reqt); });
   }
 
   /// Generate a metadata accessor that produces metadata for the given type
@@ -78,8 +79,26 @@ IRGenModule::getAddrOfKeyPathPattern(KeyPathPattern *pattern,
                                         {Int8PtrTy}, /*vararg*/ false);
     auto accessorThunk = llvm::Function::Create(fnTy,
                                               llvm::GlobalValue::PrivateLinkage,
-                                              "", getModule());
-    IRGen
+                                              "keypath_get_type", getModule());
+    accessorThunk->setAttributes(constructInitialAttributes());
+    {
+      IRGenFunction IGF(*this, accessorThunk);
+      if (DebugInfo)
+        DebugInfo->emitArtificialFunction(IGF, accessorThunk);
+      
+      auto bindingsBufPtr = IGF.collectParameters().claimNext();
+
+      bindFromGenericRequirementsBuffer(IGF, requirements,
+        Address(bindingsBufPtr, getPointerAlignment()),
+        [&](CanType t) {
+          return genericEnv->mapTypeIntoContext(t)->getCanonicalType();
+        });
+      
+      auto ret = IGF.emitTypeMetadataRef(genericEnv->mapTypeIntoContext(type)
+                                                   ->getCanonicalType());
+      IGF.Builder.CreateRet(ret);
+    }
+    return accessorThunk;
   };
   
   // Start building the key path pattern.
@@ -105,8 +124,12 @@ IRGenModule::getAddrOfKeyPathPattern(KeyPathPattern *pattern,
   auto baseTy = rootTy;
   
   for (unsigned i : indices(pattern->getComponents())) {
-    auto loweredBaseTy = getLoweredType(AbstractionPattern::getOpaque(),
-                                        baseTy->getLValueOrInOutObjectType());
+    SILType loweredBaseTy;
+    Lowering::GenericContextScope scope(getSILTypes(),
+                                        pattern->getGenericSignature());
+    loweredBaseTy = getLoweredType(AbstractionPattern::getOpaque(),
+                                   baseTy->getLValueOrInOutObjectType());
+
     auto &component = pattern->getComponents()[i];
     switch (component.getKind()) {
     case KeyPathPatternComponent::Kind::StoredProperty: {
@@ -130,7 +153,7 @@ IRGenModule::getAddrOfKeyPathPattern(KeyPathPattern *pattern,
       
       // If the projection is a statically known integer, try to pack it into
       // the key path payload.
-      if (auto offsetInt = dyn_cast<llvm::ConstantInt>(offset)) {
+      if (auto offsetInt = dyn_cast_or_null<llvm::ConstantInt>(offset)) {
         auto offsetValue = offsetInt->getValue().getZExtValue();
         if (KeyPathComponentHeader::offsetCanBeInline(offsetValue)) {
           auto header = isStruct
@@ -151,16 +174,32 @@ IRGenModule::getAddrOfKeyPathPattern(KeyPathPattern *pattern,
         offset = llvm::ConstantExpr::getTruncOrBitCast(offset, Int32Ty);
         fields.add(offset);
       } else {
-        // Otherwise, stash a relative reference to the property name as a
-        // string, which we'll resolve the offset for at runtime.
-        auto header = isStruct
-          ? KeyPathComponentHeader::forStructComponentWithUnresolvedOffset()
-          : KeyPathComponentHeader::forClassComponentWithUnresolvedOffset();
-        fields.addInt32(header.getData());
-
-        auto name = getAddrOfGlobalString(property->getName().str(),
-                                          /*relativelyAddressed*/ true);
-        fields.addRelativeAddress(name);
+        // Otherwise, stash the offset of the field offset within the metadata
+        // object, so we can pull it out at instantiation time.
+        // TODO: We'll also need a way to handle resilient field offsets, once
+        // field offset vectors no longer cover all fields in the type.
+        Optional<KeyPathComponentHeader> header;
+        llvm::Constant *fieldOffsetOffset;
+        if (isStruct) {
+          header =
+            KeyPathComponentHeader::forStructComponentWithUnresolvedOffset();
+          fieldOffsetOffset = emitPhysicalStructMemberOffsetOfFieldOffset(
+                                                *this, loweredBaseTy, property);
+        } else {
+          header =
+            KeyPathComponentHeader::forClassComponentWithUnresolvedOffset();
+          fieldOffsetOffset = llvm::ConstantInt::get(Int32Ty,
+            getClassFieldOffset(*this,
+                                loweredBaseTy.getClassOrBoundGenericClass(),
+                                property)
+              .getValue());
+        }
+        assert(fieldOffsetOffset && "stored property is neither fixed offset "
+               "nor in the field offset vector?!");
+        fields.addInt32(header->getData());
+        fieldOffsetOffset =
+          llvm::ConstantExpr::getTruncOrBitCast(fieldOffsetOffset, Int32Ty);
+        fields.add(fieldOffsetOffset);
       }
       break;
     }
