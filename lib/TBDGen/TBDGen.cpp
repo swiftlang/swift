@@ -60,6 +60,23 @@ class TBDGenVisitor : public ASTVisitor<TBDGenVisitor> {
       addSymbol(linkage.getName());
   }
 
+  void addConformances(DeclContext *DC) {
+    for (auto conformance : DC->getLocalConformances()) {
+      auto needsWTable = Lowering::TypeConverter::protocolRequiresWitnessTable(
+          conformance->getProtocol());
+      if (!needsWTable)
+        continue;
+
+      // Only normal conformances get symbols; the others get any public symbols
+      // from their parent normal conformance.
+      if (conformance->getKind() != ProtocolConformanceKind::Normal)
+        continue;
+
+      addSymbol(LinkEntity::forDirectProtocolWitnessTable(conformance));
+      addSymbol(LinkEntity::forProtocolWitnessTableAccessFunction(conformance));
+    }
+  }
+
 public:
   TBDGenVisitor(StringSet &symbols,
                 const UniversalLinkageInfo &universalLinkInfo,
@@ -94,6 +111,8 @@ public:
   void visitNominalTypeDecl(NominalTypeDecl *NTD);
 
   void visitClassDecl(ClassDecl *CD);
+
+  void visitExtensionDecl(ExtensionDecl *ED);
 
   void visitProtocolDecl(ProtocolDecl *PD) {
     addSymbol(LinkEntity::forProtocolDescriptor(PD));
@@ -208,20 +227,7 @@ void TBDGenVisitor::visitNominalTypeDecl(NominalTypeDecl *NTD) {
   addSymbol(LinkEntity::forTypeMetadataAccessFunction(declaredType));
 
   // There are symbols associated with any protocols this type conforms to.
-  for (auto conformance : NTD->getLocalConformances()) {
-    auto needsWTable = Lowering::TypeConverter::protocolRequiresWitnessTable(
-        conformance->getProtocol());
-    if (!needsWTable)
-      continue;
-
-    // Only normal conformances get symbols; the others get any public symbols
-    // from their parent normal conformance.
-    if (conformance->getKind() != ProtocolConformanceKind::Normal)
-      continue;
-
-    addSymbol(LinkEntity::forDirectProtocolWitnessTable(conformance));
-    addSymbol(LinkEntity::forProtocolWitnessTableAccessFunction(conformance));
-  }
+  addConformances(NTD);
 
   visitMembers(NTD);
 }
@@ -281,6 +287,14 @@ void TBDGenVisitor::visitClassDecl(ClassDecl *CD) {
   }
 
   visitNominalTypeDecl(CD);
+}
+
+void TBDGenVisitor::visitExtensionDecl(ExtensionDecl *ED) {
+  if (!ED->getExtendedType()->isExistentialType()) {
+    addConformances(ED);
+  }
+
+  visitMembers(ED);
 }
 
 void swift::enumeratePublicSymbols(FileUnit *file, StringSet &symbols,
