@@ -3311,6 +3311,15 @@ public:
   /// might have implicitly @objc members, but will never itself be @objc.
   ObjCClassKind checkObjCAncestry() const;
 
+  /// The type of metaclass to use for an class.
+  enum class MetaclassKind : uint8_t {
+    ObjC,
+    SwiftStub,
+  };
+
+  /// Determine which sort of metaclass to use for this class
+  MetaclassKind getMetaclassKind() const;
+
   /// Retrieve the name to use for this class when interoperating with
   /// the Objective-C runtime.
   StringRef getObjCRuntimeName(llvm::SmallVectorImpl<char> &buffer) const;

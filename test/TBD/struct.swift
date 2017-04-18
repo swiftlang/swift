@@ -75,6 +75,30 @@ public struct PublicStatics {
     }
 }
 
+public struct PublicGeneric<T, U, V> {
+  public var publicVar: T
+  internal var internalVar: U
+  private var privateVar: V
+
+  public var publicVarConcrete: Int = 0
+  internal var internalVarConcrete: Int = 0
+  private var privateVarConcrete: Int = 0
+
+  public init<S>(t: T, u: U, v: V, _: S) {
+    publicVar = t
+    internalVar = u
+    privateVar = v
+  }
+
+  public func publicGeneric<A>(_: A) {}
+  internal func internalGeneric<A>(_: A) {}
+  private func privateGeneric<A>(_: A) {}
+
+  public static func publicStaticGeneric<A>(_: A) {}
+  internal static func internalStaticGeneric<A>(_: A) {}
+  private static func privateStaticGeneric<A>(_: A) {}
+}
+
 
 internal struct InternalNothing {}
 
@@ -134,6 +158,26 @@ internal struct InternalStatics {
     }
 }
 
+internal struct InternalGeneric<T, U, V> {
+  internal var internalVar: U
+  private var privateVar: V
+
+  internal var internalVarConcrete: Int = 0
+  private var privateVarConcrete: Int = 0
+
+  internal init<S>(t: T, u: U, v: V, _: S) {
+    internalVar = u
+    privateVar = v
+  }
+
+  internal func internalGeneric<A>(_: A) {}
+  private func privateGeneric<A>(_: A) {}
+
+  internal static func internalStaticGeneric<A>(_: A) {}
+  private static func privateStaticGeneric<A>(_: A) {}
+}
+
+
 private struct PrivateNothing {}
 
 private struct PrivateInit {
@@ -172,4 +216,18 @@ private struct PrivateStatics {
         get { return 0 }
         set {}
     }
+}
+
+private struct PrivateGeneric<T, U, V> {
+  private var privateVar: V
+
+  private var privateVarConcrete: Int = 0
+
+  private init<S>(t: T, u: U, v: V, _: S) {
+    privateVar = v
+  }
+
+  private func privateGeneric<A>(_: A) {}
+
+  private static func privateStaticGeneric<A>(_: A) {}
 }

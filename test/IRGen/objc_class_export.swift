@@ -63,7 +63,7 @@
 // -- TODO: The OBJC_CLASS symbol should reflect the qualified runtime name of
 //    Foo.
 // CHECK: @_T017objc_class_export3FooCN = hidden alias %swift.type, bitcast (i64* getelementptr inbounds ({{.*}} @_T017objc_class_export3FooCMf, i32 0, i32 2) to %swift.type*)
-// CHECK: @"OBJC_CLASS_$__TtC17objc_class_export3Foo" = alias %swift.type, %swift.type* @_T017objc_class_export3FooCN
+// CHECK: @"OBJC_CLASS_$__TtC17objc_class_export3Foo" = hidden alias %swift.type, %swift.type* @_T017objc_class_export3FooCN
 
 import gizmo
 
