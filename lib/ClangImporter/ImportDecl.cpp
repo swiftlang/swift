@@ -23,6 +23,7 @@
 #include "swift/AST/Builtins.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticsClangImporter.h"
+#include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/GenericSignature.h"
@@ -4742,12 +4743,15 @@ static bool inheritanceListContainsProtocol(ArrayRef<TypeLoc> inherited,
   return llvm::any_of(inherited, [proto](TypeLoc type) -> bool {
     if (!type.getType()->isExistentialType())
       return false;
-    SmallVector<ProtocolDecl *, 8> protos;
-    type.getType()->getExistentialTypeProtocols(protos);
-    return ProtocolType::visitAllProtocols(protos,
-                                           [proto](const ProtocolDecl *next) {
-      return next == proto;
-    });
+
+    auto layout = type.getType()->getExistentialLayout();
+    for (auto protoTy : layout.getProtocols()) {
+      auto *protoDecl = protoTy->getDecl();
+      if (protoDecl == proto || protoDecl->inheritsFrom(proto))
+        return true;
+    }
+
+    return false;
   });
 }
 

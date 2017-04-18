@@ -586,10 +586,6 @@ public:
   /// bound.
   bool isClassExistentialType();
 
-  /// Given that this type is an existential type, produce
-  /// its list of protocols.
-  void getExistentialTypeProtocols(SmallVectorImpl<ProtocolDecl *> &protocols);
-
   /// Break an existential down into a set of constraints.
   ExistentialLayout getExistentialLayout();
 

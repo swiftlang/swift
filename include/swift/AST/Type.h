@@ -351,8 +351,6 @@ class CanType : public Type {
   static bool isReferenceTypeImpl(CanType type, bool functionsCount);
   static bool isExistentialTypeImpl(CanType type);
   static bool isAnyExistentialTypeImpl(CanType type);
-  static void getExistentialTypeProtocolsImpl(CanType type,
-                                    SmallVectorImpl<ProtocolDecl*> &protocols);
   static bool isObjCExistentialTypeImpl(CanType type);
   static CanType getAnyOptionalObjectTypeImpl(CanType type,
                                               OptionalTypeKind &kind);
@@ -405,11 +403,6 @@ public:
   bool isAnyExistentialType() const {
     return isAnyExistentialTypeImpl(*this);
   }
-
-  /// Given that this type is an existential, return its
-  /// protocols in a canonical order.
-  void getExistentialTypeProtocols(
-      SmallVectorImpl<ProtocolDecl *> &protocols);
 
   /// Break an existential down into a set of constraints.
   ExistentialLayout getExistentialLayout();

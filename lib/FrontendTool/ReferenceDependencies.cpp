@@ -16,6 +16,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsFrontend.h"
+#include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ModuleLoader.h"
 #include "swift/AST/NameLookup.h"
@@ -85,18 +86,24 @@ static bool declIsPrivate(const Decl *member) {
 }
 
 static bool extendedTypeIsPrivate(TypeLoc inheritedType) {
-  if (!inheritedType.getType())
+  auto type = inheritedType.getType();
+  if (!type)
     return true;
 
-  if (!inheritedType.getType()->isExistentialType()) {
+  if (!type->isExistentialType()) {
     // Be conservative. We don't know how to deal with other extended types.
     return false;
   }
 
-  SmallVector<ProtocolDecl *, 2> protocols;
-  inheritedType.getType()->getExistentialTypeProtocols(protocols);
+  auto layout = type->getExistentialLayout();
+  assert(!layout.superclass && "Should not have a subclass existential "
+         "in the inheritance clause of an extension");
+  for (auto protoTy : layout.getProtocols()) {
+    if (!declIsPrivate(protoTy->getDecl()))
+      return false;
+  }
 
-  return std::all_of(protocols.begin(), protocols.end(), declIsPrivate);
+  return true;
 }
 
 static std::string mangleTypeAsContext(const NominalTypeDecl *type) {
@@ -172,6 +179,8 @@ bool swift::emitReferenceDependencies(DiagnosticEngine &diags,
         break;
       }
 
+      // Check if the extension is just adding members, or if it is
+      // introducing a conformance to a public protocol.
       bool justMembers = std::all_of(ED->getInherited().begin(),
                                      ED->getInherited().end(),
                                      extendedTypeIsPrivate);

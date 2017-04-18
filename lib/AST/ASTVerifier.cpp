@@ -1128,11 +1128,10 @@ public:
         abort();
       }
 
-      SmallVector<ProtocolDecl*, 1> protocols;
-      srcTy->getExistentialTypeProtocols(protocols);
-
-      if (protocols.size() != 1
-          || !protocols[0]->isObjC()) {
+      auto layout = srcTy->getExistentialLayout();
+      if (layout.superclass ||
+          !layout.isObjC() ||
+          layout.getProtocols().size() != 1) {
         Out << "ProtocolMetatypeToObject with non-ObjC-protocol metatype:\n";
         E->print(Out);
         Out << "\n";
