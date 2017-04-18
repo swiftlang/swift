@@ -57,7 +57,21 @@
           key.name: "instV",
           key.usr: "s:5index2CCC5instVACv",
           key.line: 8,
-          key.column: 7
+          key.column: 7,
+          key.entities: [
+            {
+              key.kind: source.lang.swift.decl.function.accessor.getter,
+              key.usr: "s:5index2CCC5instVACfg",
+              key.line: 8,
+              key.column: 7
+            },
+            {
+              key.kind: source.lang.swift.decl.function.accessor.setter,
+              key.usr: "s:5index2CCC5instVACfs",
+              key.line: 8,
+              key.column: 7
+            }
+          ]
         },
         {
           key.kind: source.lang.swift.ref.class,
@@ -1231,6 +1245,18 @@
           key.column: 7,
           key.entities: [
             {
+              key.kind: source.lang.swift.decl.function.accessor.getter,
+              key.usr: "s:5index9ObservingC04globB0Sifg",
+              key.line: 151,
+              key.column: 7
+            },
+            {
+              key.kind: source.lang.swift.decl.function.accessor.setter,
+              key.usr: "s:5index9ObservingC04globB0Sifs",
+              key.line: 151,
+              key.column: 7
+            },
+            {
               key.kind: source.lang.swift.decl.function.accessor.willset,
               key.name: "willSet:globObserving",
               key.usr: "s:5index9ObservingC04globB0Sifw",
@@ -1297,6 +1323,18 @@
           key.line: 164,
           key.column: 7,
           key.entities: [
+            {
+              key.kind: source.lang.swift.decl.function.accessor.getter,
+              key.usr: "s:5index12rdar18640140C2S1Sifg",
+              key.line: 164,
+              key.column: 7
+            },
+            {
+              key.kind: source.lang.swift.decl.function.accessor.setter,
+              key.usr: "s:5index12rdar18640140C2S1Sifs",
+              key.line: 164,
+              key.column: 7
+            },
             {
               key.kind: source.lang.swift.decl.function.accessor.didset,
               key.name: "didSet:S1",
