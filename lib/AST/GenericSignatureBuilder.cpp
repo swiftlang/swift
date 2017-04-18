@@ -2355,21 +2355,6 @@ ConstraintResult GenericSignatureBuilder::addConformanceRequirement(
   if (!PAT->addConformance(Proto, Source, *this))
     return ConstraintResult::Resolved;
 
-#if false
-  // FIXME: Ad hoc recursion breaking.
-  if (Visited.count(Proto)) {
-    markPotentialArchetypeRecursive(PAT, Proto, Source);
-    return ConstraintResult::Conflicting;
-  }
-
-  bool inserted = Visited.insert(Proto).second;
-  assert(inserted);
-  (void) inserted;
-  SWIFT_DEFER {
-    Visited.erase(Proto);
-  };
-#endif
-
   auto concreteSelf = PAT->getDependentType({}, /*allowUnresolved=*/true);
   auto protocolSubMap = SubstitutionMap::getProtocolSubstitutions(
       Proto, concreteSelf, ProtocolConformanceRef(Proto));
@@ -3089,6 +3074,23 @@ ConstraintResult GenericSignatureBuilder::addInheritedRequirements(
                         TypeLoc(const_cast<TypeRepr *>(typeRepr),
                                 inheritedType),
                         getFloatingSource(typeRepr, /*forInferred=*/true));
+    }
+
+    // Check for direct recursion.
+    if (auto assocType = dyn_cast<AssociatedTypeDecl>(decl)) {
+      auto proto = assocType->getProtocol();
+      if (auto inheritedProto = inheritedType->getAs<ProtocolType>()) {
+        if (inheritedProto->getDecl() == proto ||
+            inheritedProto->getDecl()->inheritsFrom(proto)) {
+          auto source = getFloatingSource(typeRepr, /*forInferred=*/false);
+          if (auto resolved = resolve(type, source)) {
+            if (auto pa = resolved->getPotentialArchetype()) {
+              markPotentialArchetypeRecursive(pa, proto, source.getSource(pa));
+              return ConstraintResult::Conflicting;
+            }
+          }
+        }
+      }
     }
 
     return addTypeRequirement(type, inheritedType,
