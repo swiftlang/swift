@@ -3311,7 +3311,7 @@ public:
   /// might have implicitly @objc members, but will never itself be @objc.
   ObjCClassKind checkObjCAncestry() const;
 
-  /// The type of metaclass to use for an class.
+  /// The type of metaclass to use for a class.
   enum class MetaclassKind : uint8_t {
     ObjC,
     SwiftStub,
