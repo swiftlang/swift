@@ -1290,7 +1290,7 @@ void Remangler::mangleModule(Node *node) {
     Buffer << 's';
   } else if (node->getText() == MANGLING_MODULE_OBJC) {
     Buffer << "So";
-  } else if (node->getText() == MANGLING_MODULE_C) {
+  } else if (node->getText() == MANGLING_MODULE_CLANG_IMPORTER) {
     Buffer << "SC";
   } else {
     mangleIdentifier(node);
