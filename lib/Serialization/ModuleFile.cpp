@@ -200,7 +200,9 @@ validateControlBlock(llvm::BitstreamCursor &cursor,
       default:
         // Add new cases here, in descending order.
       case 4:
-        result.compatibilityVersion = blobData.substr(scratch[2]+1, scratch[3]);
+        result.compatibilityVersion =
+          version::Version(blobData.substr(scratch[2]+1, scratch[3]),
+                           SourceLoc(), nullptr);
         LLVM_FALLTHROUGH;
       case 3:
         result.shortVersion = blobData.slice(0, scratch[2]);
