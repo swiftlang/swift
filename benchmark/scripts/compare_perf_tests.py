@@ -20,6 +20,110 @@ import csv
 import sys
 
 
+class PerformanceTestResult:
+    def __init__(self, csv_row):
+        # csv_row[0] is just an ordinal number of the test - skip that
+        self.name = csv_row[1]          # Name of the performance test
+        self.samples = int(csv_row[2])  # Number of measurement samples taken
+        self.min = int(csv_row[3])      # Minimum runtime (ms)
+        self.max = int(csv_row[4])      # Maximum runtime (ms)
+        self.mean = int(csv_row[5])     # Mean (average) runtime (ms)
+        self.sd = int(csv_row[6])       # Standard Deviation (ms)
+        self.median = int(csv_row[7])   # Median runtime (ms)
+
+
+class ResultComparison:
+    def __init__(self, old, new):
+        self.old = old
+        self.new = new
+
+        # Speedup ratio
+        self.ratio = round((old.min + 0.001) / (new.min + 0.001), 2)
+
+        # Test runtime improvement in %
+        ratio = (new.min + 0.001) / (old.min + 0.001)
+        self.delta = round(((ratio - 1) * 100), 2)
+
+        self.is_dubious = (
+            "(?)" if ((old.min < new.min and new.min < old.max) or
+                      (new.min < old.min and old.min < new.max))
+            else "")
+
+
+class TestComparator:
+    def __init__(self, old_file, new_file, delta_threshold, changes_only):
+        self.delta_threshold = float(delta_threshold)  # TODO remove
+        self.changes_only = changes_only
+
+        def load_from_CSV(filename):
+            def skip_totals(row):
+                        return len(row) > 8
+            tests = map(PerformanceTestResult,
+                        filter(skip_totals, csv.reader(open(filename))))
+            names = map(lambda t: t.name, tests)
+            return dict(zip(names, tests))
+
+        self.old_results = load_from_CSV(old_file)
+        self.new_results = load_from_CSV(new_file)
+        self.old_tests = set(self.old_results.keys())
+        self.new_tests = set(self.new_results.keys())
+        self.added_tests = self.new_tests.difference(self.old_tests)
+        self.removed_tests = self.old_tests.difference(self.new_tests)
+        self.comparable_tests = self.new_tests.intersection(self.old_tests)
+
+        def extract(property, list):
+            return lambda name: (name, getattr(list[name], property))
+
+        old, new = [sorted(list(s)) for s in [self.old_tests, self.new_tests]]
+        self.old_min_results = dict(map(extract("min", self.old_results), old))
+        self.old_max_results = dict(map(extract("max", self.old_results), old))
+        self.new_min_results = dict(map(extract("min", self.new_results), new))
+        self.new_max_results = dict(map(extract("max", self.new_results), new))
+
+        def compare(property):
+            return lambda name: (name, getattr(self.compare(name), property))
+
+        self.ratio_list = dict(map(compare("ratio"), self.comparable_tests))
+        self.delta_list = dict(map(compare("delta"), self.comparable_tests))
+        self.unknown_list = dict(map(compare("is_dubious"),
+                                 self.comparable_tests))
+
+        def has_decreased((_, speedup_ratio)):
+            return speedup_ratio < (1 - delta_threshold)
+
+        def has_increased((_, speedup_ratio)):
+            return speedup_ratio > (1 + delta_threshold)
+
+        def partition(l, p):
+            return reduce(lambda x, y: x[not p(y)].append(y) or x, l, ([], []))
+
+        tests_by_speedup = sorted(self.ratio_list.items(), key=lambda x: x[1])
+        decreased, not_decreased = partition(tests_by_speedup, has_decreased)
+        increased, unchanged = partition(not_decreased, has_increased)
+
+        def get_name((name, _)):
+            return name
+
+        self.decreased_perf_list = map(get_name, decreased)
+        self.increased_perf_list = map(get_name, increased)
+
+        # following double sorting is required to replicate same sort order as
+        # orignal script, for purposes of validation via diff, while refactoring
+        unchanged = dict(unchanged)
+        unchanged = sorted(unchanged.items(), key=lambda x: x[1], reverse=True)
+
+        self.normal_perf_list = map(get_name, unchanged)
+
+        changes = self.decreased_perf_list + self.increased_perf_list
+
+        self.complete_perf_list = (changes if self.changes_only else
+                                   changes + self.normal_perf_list)
+
+
+    def compare(self, name):
+        return ResultComparison(self.old_results[name], self.new_results[name])
+
+
 def main():
 
     parser = argparse.ArgumentParser(description="Compare Performance tests.")
@@ -53,41 +157,85 @@ def main():
     RATIO_MIN = 1 - float(args.delta_threshold)
     RATIO_MAX = 1 + float(args.delta_threshold)
 
-    (old_results, old_max_results) = load_tests_CSV(args.old_file)
-    (new_results, new_max_results) = load_tests_CSV(args.new_file)
+    comparator = TestComparator(args.old_file, args.new_file,
+                                float(args.delta_threshold), args.changes_only)
 
-    new_tests = set(new_results.keys())
-    old_tests = set(old_results.keys())
-    # added_tests = new_tests.difference(old_tests)
-    # removed_tests = old_tests.difference(new_tests)
-    comparable_tests = new_tests.intersection(old_tests)
+    old_results = comparator.old_min_results
+    old_max_results = comparator.old_max_results
+    new_results = comparator.new_min_results
+    new_max_results = comparator.new_max_results
 
-    ratio_list = {}
-    delta_list = {}
-    unknown_list = {}
+    ratio_list = comparator.ratio_list
+    delta_list = comparator.delta_list
+    unknown_list = comparator.unknown_list
 
-    for key in comparable_tests:
-            ratio = (old_results[key] + 0.001) / (new_results[key] + 0.001)
-            ratio_list[key] = round(ratio, 2)
-            delta = (((float(new_results[key] + 0.001) /
-                      (old_results[key] + 0.001)) - 1) * 100)
-            delta_list[key] = round(delta, 2)
-            if ((old_results[key] < new_results[key] and
-                new_results[key] < old_max_results[key]) or
-                (new_results[key] < old_results[key] and
-                    old_results[key] < new_max_results[key])):
-                    unknown_list[key] = "(?)"
+    decreased_perf_list = comparator.decreased_perf_list
+    increased_perf_list = comparator.increased_perf_list
+    normal_perf_list = comparator.normal_perf_list
+    complete_perf_list = comparator.complete_perf_list
+
+    (markdown_regression,
+     markdown_improvement,
+     markdown_normal) = convert_to_markdown(comparator,
+                                            old_branch, new_branch,
+                                            args.changes_only)
+
+    markdown_data = MARKDOWN_DETAIL.format(
+        "Regression", len(decreased_perf_list), markdown_regression, "open")
+    markdown_data += MARKDOWN_DETAIL.format(
+        "Improvement", len(increased_perf_list), markdown_improvement, "")
+    if not args.changes_only:
+        markdown_data += MARKDOWN_DETAIL.format(
+            "No Changes", len(normal_perf_list), markdown_normal, "")
+
+    if args.format:
+        if args.format.lower() != "markdown":
+            pain_data = PAIN_DETAIL.format("Regression", markdown_regression)
+            pain_data += PAIN_DETAIL.format("Improvement",
+                                            markdown_improvement)
+            if not args.changes_only:
+                pain_data += PAIN_DETAIL.format("No Changes", markdown_normal)
+
+            print(pain_data.replace("|", " ").replace("-", " "))
+        else:
+            print(markdown_data)
+
+    if args.format:
+        if args.format.lower() == "html":
+            """
+            Create HTML formatted table
+            """
+            html_data = convert_to_html(comparator, old_branch, new_branch,
+                                        args.changes_only)
+
+            if args.output:
+                write_to_file(args.output, html_data)
             else:
-                    unknown_list[key] = ""
+                print("Error: missing --output flag.")
+                sys.exit(1)
+        elif args.format.lower() == "markdown":
+            if args.output:
+                write_to_file(args.output, markdown_data)
+        elif args.format.lower() != "git":
+            print("{0} is unknown format.".format(args.format))
+            sys.exit(1)
 
-    (complete_perf_list,
-     increased_perf_list,
-     decreased_perf_list,
-     normal_perf_list) = sort_ratio_list(ratio_list, args.changes_only)
 
+def convert_to_markdown(comparator, old_branch, new_branch, changes_only):
     """
     Create markdown formatted table
     """
+    old_results = comparator.old_min_results
+    new_results = comparator.new_min_results
+
+    ratio_list = comparator.ratio_list
+    delta_list = comparator.delta_list
+    unknown_list = comparator.unknown_list
+
+    decreased_perf_list = comparator.decreased_perf_list
+    increased_perf_list = comparator.increased_perf_list
+    normal_perf_list = comparator.normal_perf_list
+    complete_perf_list = comparator.complete_perf_list
 
     def max_width(items, title, key_len=False):
         def length(key):
@@ -130,100 +278,46 @@ def main():
     markdown_improvement = markdown_table(increased_perf_list, True)
     markdown_normal = markdown_table(normal_perf_list, False)
 
-    markdown_data = MARKDOWN_DETAIL.format(
-        "Regression", len(decreased_perf_list), markdown_regression, "open")
-    markdown_data += MARKDOWN_DETAIL.format(
-        "Improvement", len(increased_perf_list), markdown_improvement, "")
-    if not args.changes_only:
-        markdown_data += MARKDOWN_DETAIL.format(
-            "No Changes", len(normal_perf_list), markdown_normal, "")
-
-    if args.format:
-        if args.format.lower() != "markdown":
-            pain_data = PAIN_DETAIL.format("Regression", markdown_regression)
-            pain_data += PAIN_DETAIL.format("Improvement",
-                                            markdown_improvement)
-            if not args.changes_only:
-                pain_data += PAIN_DETAIL.format("No Changes", markdown_normal)
-
-            print(pain_data.replace("|", " ").replace("-", " "))
-        else:
-            print(markdown_data)
-
-    if args.format:
-        if args.format.lower() == "html":
-            """
-            Create HTML formatted table
-            """
-            html_data = convert_to_html(ratio_list, old_results, new_results,
-                                        delta_list, unknown_list, old_branch,
-                                        new_branch, args.changes_only)
-
-            if args.output:
-                write_to_file(args.output, html_data)
-            else:
-                print("Error: missing --output flag.")
-                sys.exit(1)
-        elif args.format.lower() == "markdown":
-            if args.output:
-                write_to_file(args.output, markdown_data)
-        elif args.format.lower() != "git":
-            print("{0} is unknown format.".format(args.format))
-            sys.exit(1)
+    return (markdown_regression, markdown_improvement, markdown_normal)
 
 
-def load_tests_CSV(filename):
-    TESTNAME = 1
-    # SAMPLES = 2
-    MIN = 3
-    MAX = 4
-    # MEAN = 5
-    # SD = 6
-    # MEDIAN = 7
+def convert_to_html(comparator, old_branch, new_branch, changes_only):
+    old_results = comparator.old_min_results
+    new_results = comparator.new_min_results
 
-    results = {}
-    max_results = {}
-    for row in csv.reader(open(filename)):
-        if (len(row) > 8):  # skip Totals row
-            results[row[TESTNAME]] = int(row[MIN])
-            max_results[row[TESTNAME]] = int(row[MAX])
-    return (results, max_results)
+    ratio_list = comparator.ratio_list
+    delta_list = comparator.delta_list
+    unknown_list = comparator.unknown_list
 
+    decreased_perf_list = comparator.decreased_perf_list
+    increased_perf_list = comparator.increased_perf_list
+    normal_perf_list = comparator.normal_perf_list
+    complete_perf_list = comparator.complete_perf_list
 
-def convert_to_html(ratio_list, old_results, new_results, delta_list,
-                    unknown_list, old_branch, new_branch, changes_only):
-    (complete_perf_list,
-     increased_perf_list,
-     decreased_perf_list,
-     normal_perf_list) = sort_ratio_list(ratio_list, changes_only)
+    def add_row(name, old, new, delta, speedup, speedup_color):
+        return HTML_ROW.format(name, old, new, delta, speedup_color, speedup)
+
+    def separator_header(title):
+        return add_row("<strong>{0}:</strong>".format(title),
+                       "", "", "", "", "black")
+
+    def results_table(title, list, speedup_color):
+        html_rows = separator_header(title)
+        for key in list:
+            html_rows += add_row(key, old_results[key], new_results[key],
+                                 "{0:+.1f}%".format(delta_list[key]),
+                                 "{0:.2f}x {1}".format(ratio_list[key],
+                                                       unknown_list[key]),
+                                 speedup_color)
+        return html_rows
 
     html_rows = ""
-    for key in complete_perf_list:
-        if ratio_list[key] < RATIO_MIN:
-            color = "red"
-        elif ratio_list[key] > RATIO_MAX:
-            color = "green"
-        else:
-            color = "black"
-        if len(decreased_perf_list) > 0 and key == decreased_perf_list[0]:
-            html_rows += HTML_ROW.format(
-                "<strong>Regression:</strong>",
-                "", "", "", "black", "", "")
-        if len(increased_perf_list) > 0 and key == increased_perf_list[0]:
-            html_rows += HTML_ROW.format(
-                "<strong>Improvement:</strong>",
-                "", "", "", "black", "", "")
-        if len(normal_perf_list) > 0 and key == normal_perf_list[0]:
-            html_rows += HTML_ROW.format(
-                "<strong>No Changes:</strong>",
-                "", "", "", "black", "", "")
-
-        html_rows += HTML_ROW.format(key, old_results[key],
-                                     new_results[key],
-                                     "{0:+.1f}%".format(delta_list[key]),
-                                     color,
-                                     "{0:.2f}x {1}".format(ratio_list[key],
-                                                           unknown_list[key]))
+    if len(decreased_perf_list) > 0:
+        html_rows += results_table('Regression', decreased_perf_list, 'red')
+    if len(increased_perf_list) > 0:
+        html_rows += results_table('Improvement', increased_perf_list, 'green')
+    if len(normal_perf_list) > 0:
+        html_rows += results_table('No Changes', normal_perf_list, 'black')
 
     html_table = HTML_TABLE.format("TEST", old_branch, new_branch,
                                    "DELTA", "SPEEDUP", html_rows)
@@ -238,37 +332,6 @@ def write_to_file(file_name, data):
     file = open(file_name, "w")
     file.write(data)
     file.close
-
-
-def sort_ratio_list(ratio_list, changes_only=False):
-    """
-    Return 3 sorted list improvement, regression and normal.
-    """
-    decreased_perf_list = []
-    increased_perf_list = []
-    sorted_normal_perf_list = []
-    normal_perf_list = {}
-
-    for key, v in sorted(ratio_list.items(), key=lambda x: x[1]):
-        if ratio_list[key] < RATIO_MIN:
-            decreased_perf_list.append(key)
-        elif ratio_list[key] > RATIO_MAX:
-            increased_perf_list.append(key)
-        else:
-            normal_perf_list[key] = v
-
-    for key, v in sorted(normal_perf_list.items(), key=lambda x: x[1],
-                         reverse=True):
-        sorted_normal_perf_list.append(key)
-
-    if changes_only:
-        complete_perf_list = decreased_perf_list + increased_perf_list
-    else:
-        complete_perf_list = (decreased_perf_list + increased_perf_list +
-                              sorted_normal_perf_list)
-
-    return (complete_perf_list, increased_perf_list,
-            decreased_perf_list, sorted_normal_perf_list)
 
 
 HTML = """
