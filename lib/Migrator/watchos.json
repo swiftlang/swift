@@ -1,2 +1,1485 @@
 [
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "WrapOptional",
+    "ChildIndex": "6:0:1:1",
+    "LeftUsr": "c:objc(cs)GKTurnBasedMatch(im)sendExchangeToParticipants:data:localizableMessageKey:arguments:timeout:completionHandler:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "GameKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "2:1:0",
+    "LeftUsr": "c:objc(pl)INSearchCallHistoryIntentHandling(im)resolveCallTypeForSearchCallHistory:withCompletion:",
+    "LeftComment": "INCallRecordTypeResolutionResult",
+    "RightUsr": "",
+    "RightComment": "INCallRecordTypeOptionsResolutionResult",
+    "ModuleName": "Intents"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "Rename",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(pl)INSearchCallHistoryIntentHandling(im)resolveCallTypeForSearchCallHistory:withCompletion:",
+    "LeftComment": "resolveCallType(forSearchCallHistory:with:)",
+    "RightUsr": "",
+    "RightComment": "resolveCallTypes(forSearchCallHistory:with:)",
+    "ModuleName": "Intents"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "WrapOptional",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(cs)EKEventStore(im)sourceWithIdentifier:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "EventKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Constructor",
+    "NodeAnnotation": "WrapOptional",
+    "ChildIndex": "0",
+    "LeftUsr": "s:FE8DispatchCSo10DispatchIOcFT4typeOES_S0_10StreamType4pathGSPVs4Int8_5oflagVs5Int324modeVs6UInt165queueCSo13DispatchQueue14cleanupHandlerFS3_T__S0_",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "Dispatch"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "WrapOptional",
+    "ChildIndex": "2",
+    "LeftUsr": "s:FE8DispatchCSo13DispatchQueue11setSpecificurFT3keyGCS_19DispatchSpecificKeyx_5valuex_T_",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "Dispatch"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Var",
+    "NodeAnnotation": "Rename",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(cs)SCNGeometry(py)geometrySources",
+    "LeftComment": "geometrySources",
+    "RightUsr": "",
+    "RightComment": "sources",
+    "ModuleName": "SceneKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "Rename",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(cs)SCNGeometry(im)geometrySourcesForSemantic:",
+    "LeftComment": "getGeometrySources(for:)",
+    "RightUsr": "",
+    "RightComment": "sources(for:)",
+    "ModuleName": "SceneKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Var",
+    "NodeAnnotation": "Rename",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(cs)SCNGeometry(py)geometryElements",
+    "LeftComment": "geometryElements",
+    "RightUsr": "",
+    "RightComment": "elements",
+    "ModuleName": "SceneKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Var",
+    "NodeAnnotation": "Rename",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(cs)SCNGeometry(py)geometryElementCount",
+    "LeftComment": "geometryElementCount",
+    "RightUsr": "",
+    "RightComment": "elementCount",
+    "ModuleName": "SceneKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "Rename",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(cs)SCNGeometry(im)geometryElementAtIndex:",
+    "LeftComment": "geometryElement(at:)",
+    "RightUsr": "",
+    "RightComment": "element(at:)",
+    "ModuleName": "SceneKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "3:0:0",
+    "LeftUsr": "c:objc(cs)NSFileManager(im)createDirectoryAtURL:withIntermediateDirectories:attributes:error:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "FileAttributeKey",
+    "ModuleName": "Foundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "3:0:0",
+    "LeftUsr": "c:objc(cs)NSFileManager(im)createDirectoryAtPath:withIntermediateDirectories:attributes:error:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "FileAttributeKey",
+    "ModuleName": "Foundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "3:0:0",
+    "LeftUsr": "c:objc(cs)NSFileManager(im)createFileAtPath:contents:attributes:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "FileAttributeKey",
+    "ModuleName": "Foundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "0:0",
+    "LeftUsr": "s:FE10FoundationCSo11FileManager13replaceItemAtFzTVS_3URL10withItemAtS1_14backupItemNameGSqSS_7optionsVS0_22ItemReplacementOptions_GSqCSo5NSURL_",
+    "LeftComment": "NSURL",
+    "RightUsr": "",
+    "RightComment": "URL",
+    "ModuleName": "Foundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "UnwrapOptional",
+    "ChildIndex": "2",
+    "LeftUsr": "c:objc(pl)NSFastEnumeration(im)countByEnumeratingWithState:objects:count:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "Foundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Constructor",
+    "NodeAnnotation": "UnwrapOptional",
+    "ChildIndex": "1",
+    "LeftUsr": "c:objc(cs)NSArray(cm)arrayWithObjects:count:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "Foundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "1",
+    "LeftUsr": "c:objc(cs)NSAttributedString(im)attribute:atIndex:effectiveRange:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSAttributedStringKey",
+    "ModuleName": "Foundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "0:0",
+    "LeftUsr": "c:objc(cs)NSAttributedString(im)attributesAtIndex:longestEffectiveRange:inRange:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSAttributedStringKey",
+    "ModuleName": "Foundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "1",
+    "LeftUsr": "c:objc(cs)NSAttributedString(im)attribute:atIndex:longestEffectiveRange:inRange:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSAttributedStringKey",
+    "ModuleName": "Foundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Constructor",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "2:0:0",
+    "LeftUsr": "c:objc(cs)NSAttributedString(im)initWithString:attributes:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSAttributedStringKey",
+    "ModuleName": "Foundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "3:1:0:0",
+    "LeftUsr": "c:objc(cs)NSAttributedString(im)enumerateAttributesInRange:options:usingBlock:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSAttributedStringKey",
+    "ModuleName": "Foundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "1",
+    "LeftUsr": "c:objc(cs)NSAttributedString(im)enumerateAttribute:inRange:options:usingBlock:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSAttributedStringKey",
+    "ModuleName": "Foundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "0:0",
+    "LeftUsr": "s:FE10FoundationCSo7NSCoder20decodeTopLevelObjectFzT6forKeySS_GSqPs9AnyObject__",
+    "LeftComment": "AnyObject",
+    "RightUsr": "",
+    "RightComment": "Any",
+    "ModuleName": "Foundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Constructor",
+    "NodeAnnotation": "UnwrapOptional",
+    "ChildIndex": "1",
+    "LeftUsr": "c:objc(cs)NSSet(cm)setWithObjects:count:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "Foundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "GetterToProperty",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(cs)NSDecimalNumberHandler(cm)defaultDecimalNumberHandler",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "Foundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "UnwrapOptional",
+    "ChildIndex": "2",
+    "LeftUsr": "c:objc(pl)NSFastEnumeration(im)countByEnumeratingWithState:objects:count:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "Foundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "UnwrapOptional",
+    "ChildIndex": "2",
+    "LeftUsr": "c:objc(pl)NSFastEnumeration(im)countByEnumeratingWithState:objects:count:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "Foundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "UnwrapOptional",
+    "ChildIndex": "2",
+    "LeftUsr": "c:objc(pl)NSFastEnumeration(im)countByEnumeratingWithState:objects:count:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "Foundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "UnwrapOptional",
+    "ChildIndex": "2",
+    "LeftUsr": "c:objc(pl)NSFastEnumeration(im)countByEnumeratingWithState:objects:count:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "Foundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Constructor",
+    "NodeAnnotation": "ImplicitOptionalToOptional",
+    "ChildIndex": "1",
+    "LeftUsr": "c:objc(cs)NSIndexPath(im)initWithIndexes:length:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "Foundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "0:0",
+    "LeftUsr": "s:ZFE10FoundationCSo17NSKeyedUnarchiver31unarchiveTopLevelObjectWithDataFzCSo6NSDataGSqPs9AnyObject__",
+    "LeftComment": "AnyObject",
+    "RightUsr": "",
+    "RightComment": "Any",
+    "ModuleName": "Foundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Constructor",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "1:0",
+    "LeftUsr": "c:objc(cs)NSLinguisticTagger(im)initWithTagSchemes:options:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSLinguisticTagScheme",
+    "ModuleName": "Foundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "0:0",
+    "LeftUsr": "c:objc(cs)NSLinguisticTagger(cm)availableTagSchemesForLanguage:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSLinguisticTagScheme",
+    "ModuleName": "Foundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "2",
+    "LeftUsr": "c:objc(cs)NSLinguisticTagger(im)enumerateTagsInRange:scheme:options:usingBlock:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSLinguisticTagScheme",
+    "ModuleName": "Foundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "4:1:0",
+    "LeftUsr": "c:objc(cs)NSLinguisticTagger(im)enumerateTagsInRange:scheme:options:usingBlock:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSLinguisticTag",
+    "ModuleName": "Foundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "0:0",
+    "LeftUsr": "c:objc(cs)NSLinguisticTagger(im)tagAtIndex:scheme:tokenRange:sentenceRange:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSLinguisticTag",
+    "ModuleName": "Foundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "2",
+    "LeftUsr": "c:objc(cs)NSLinguisticTagger(im)tagAtIndex:scheme:tokenRange:sentenceRange:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSLinguisticTagScheme",
+    "ModuleName": "Foundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "UnwrapOptional",
+    "ChildIndex": "2",
+    "LeftUsr": "c:objc(pl)NSFastEnumeration(im)countByEnumeratingWithState:objects:count:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "Foundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Constructor",
+    "NodeAnnotation": "UnwrapOptional",
+    "ChildIndex": "1",
+    "LeftUsr": "c:objc(cs)NSArray(cm)arrayWithObjects:count:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "Foundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "1:0:0",
+    "LeftUsr": "c:objc(cs)NSMutableAttributedString(im)setAttributes:range:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSAttributedStringKey",
+    "ModuleName": "Foundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Constructor",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "2:0:0",
+    "LeftUsr": "c:objc(cs)NSAttributedString(im)initWithString:attributes:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSAttributedStringKey",
+    "ModuleName": "Foundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "1",
+    "LeftUsr": "c:objc(cs)NSMutableAttributedString(im)addAttribute:value:range:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSAttributedStringKey",
+    "ModuleName": "Foundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "1:0",
+    "LeftUsr": "c:objc(cs)NSMutableAttributedString(im)addAttributes:range:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSAttributedStringKey",
+    "ModuleName": "Foundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "1",
+    "LeftUsr": "c:objc(cs)NSMutableAttributedString(im)removeAttribute:range:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSAttributedStringKey",
+    "ModuleName": "Foundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Constructor",
+    "NodeAnnotation": "UnwrapOptional",
+    "ChildIndex": "1",
+    "LeftUsr": "c:objc(cs)NSOrderedSet(cm)orderedSetWithObjects:count:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "Foundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "ImplicitOptionalToOptional",
+    "ChildIndex": "1",
+    "LeftUsr": "c:objc(cs)NSMutableOrderedSet(im)addObjects:count:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "Foundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "ImplicitOptionalToOptional",
+    "ChildIndex": "2",
+    "LeftUsr": "c:objc(cs)NSMutableOrderedSet(im)replaceObjectsInRange:withObjects:count:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "Foundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Constructor",
+    "NodeAnnotation": "UnwrapOptional",
+    "ChildIndex": "1",
+    "LeftUsr": "c:objc(cs)NSSet(cm)setWithObjects:count:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "Foundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "UnwrapOptional",
+    "ChildIndex": "2",
+    "LeftUsr": "c:objc(pl)NSFastEnumeration(im)countByEnumeratingWithState:objects:count:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "Foundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Constructor",
+    "NodeAnnotation": "UnwrapOptional",
+    "ChildIndex": "1",
+    "LeftUsr": "c:objc(cs)NSOrderedSet(cm)orderedSetWithObjects:count:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "Foundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "UnwrapOptional",
+    "ChildIndex": "2",
+    "LeftUsr": "c:objc(pl)NSFastEnumeration(im)countByEnumeratingWithState:objects:count:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "Foundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "UnwrapOptional",
+    "ChildIndex": "2",
+    "LeftUsr": "c:objc(pl)NSFastEnumeration(im)countByEnumeratingWithState:objects:count:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "Foundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Constructor",
+    "NodeAnnotation": "UnwrapOptional",
+    "ChildIndex": "1",
+    "LeftUsr": "c:objc(cs)NSSet(cm)setWithObjects:count:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "Foundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "0:0",
+    "LeftUsr": "c:objc(cs)NSString(im)linguisticTagsInRange:scheme:options:orthography:tokenRanges:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSLinguisticTag",
+    "ModuleName": "Foundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "2",
+    "LeftUsr": "c:objc(cs)NSString(im)linguisticTagsInRange:scheme:options:orthography:tokenRanges:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSLinguisticTagScheme",
+    "ModuleName": "Foundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "2",
+    "LeftUsr": "c:objc(cs)NSString(im)enumerateLinguisticTagsInRange:scheme:options:orthography:usingBlock:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSLinguisticTagScheme",
+    "ModuleName": "Foundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "5:1:0",
+    "LeftUsr": "c:objc(cs)NSString(im)enumerateLinguisticTagsInRange:scheme:options:orthography:usingBlock:",
+    "LeftComment": "String",
+    "RightUsr": "",
+    "RightComment": "NSLinguisticTag",
+    "ModuleName": "Foundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Constructor",
+    "NodeAnnotation": "ImplicitOptionalToOptional",
+    "ChildIndex": "1",
+    "LeftUsr": "c:objc(cs)NSUUID(im)initWithUUIDBytes:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "Foundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "UnwrapOptional",
+    "ChildIndex": "1",
+    "LeftUsr": "c:objc(cs)NSUUID(im)getUUIDBytes:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "Foundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Constructor",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "2:0:0",
+    "LeftUsr": "c:objc(cs)NSProgress(im)initWithParent:userInfo:",
+    "LeftComment": "AnyHashable",
+    "RightUsr": "",
+    "RightComment": "ProgressUserInfoKey",
+    "ModuleName": "Foundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Constructor",
+    "NodeAnnotation": "UnwrapOptional",
+    "ChildIndex": "0",
+    "LeftUsr": "s:FOV10Foundation8URLError4CodecFT8rawValueSi_GSqS1__",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "Foundation"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "UnwrapOptional",
+    "ChildIndex": "2",
+    "LeftUsr": "c:objc(pl)NSFastEnumeration(im)countByEnumeratingWithState:objects:count:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "CoreMotion"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Var",
+    "NodeAnnotation": "Rename",
+    "ChildIndex": "0",
+    "LeftUsr": "c:@E@NSAttributeType@NSUndefinedAttributeType",
+    "LeftComment": "undefinedAttributeType",
+    "RightUsr": "",
+    "RightComment": "NSUndefinedAttributeType",
+    "ModuleName": "CoreData"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Var",
+    "NodeAnnotation": "Rename",
+    "ChildIndex": "0",
+    "LeftUsr": "c:@E@NSAttributeType@NSInteger16AttributeType",
+    "LeftComment": "integer16AttributeType",
+    "RightUsr": "",
+    "RightComment": "NSInteger16AttributeType",
+    "ModuleName": "CoreData"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Var",
+    "NodeAnnotation": "Rename",
+    "ChildIndex": "0",
+    "LeftUsr": "c:@E@NSAttributeType@NSInteger32AttributeType",
+    "LeftComment": "integer32AttributeType",
+    "RightUsr": "",
+    "RightComment": "NSInteger32AttributeType",
+    "ModuleName": "CoreData"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Var",
+    "NodeAnnotation": "Rename",
+    "ChildIndex": "0",
+    "LeftUsr": "c:@E@NSAttributeType@NSInteger64AttributeType",
+    "LeftComment": "integer64AttributeType",
+    "RightUsr": "",
+    "RightComment": "NSInteger64AttributeType",
+    "ModuleName": "CoreData"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Var",
+    "NodeAnnotation": "Rename",
+    "ChildIndex": "0",
+    "LeftUsr": "c:@E@NSAttributeType@NSDecimalAttributeType",
+    "LeftComment": "decimalAttributeType",
+    "RightUsr": "",
+    "RightComment": "NSDecimalAttributeType",
+    "ModuleName": "CoreData"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Var",
+    "NodeAnnotation": "Rename",
+    "ChildIndex": "0",
+    "LeftUsr": "c:@E@NSAttributeType@NSDoubleAttributeType",
+    "LeftComment": "doubleAttributeType",
+    "RightUsr": "",
+    "RightComment": "NSDoubleAttributeType",
+    "ModuleName": "CoreData"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Var",
+    "NodeAnnotation": "Rename",
+    "ChildIndex": "0",
+    "LeftUsr": "c:@E@NSAttributeType@NSFloatAttributeType",
+    "LeftComment": "floatAttributeType",
+    "RightUsr": "",
+    "RightComment": "NSFloatAttributeType",
+    "ModuleName": "CoreData"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Var",
+    "NodeAnnotation": "Rename",
+    "ChildIndex": "0",
+    "LeftUsr": "c:@E@NSAttributeType@NSStringAttributeType",
+    "LeftComment": "stringAttributeType",
+    "RightUsr": "",
+    "RightComment": "NSStringAttributeType",
+    "ModuleName": "CoreData"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Var",
+    "NodeAnnotation": "Rename",
+    "ChildIndex": "0",
+    "LeftUsr": "c:@E@NSAttributeType@NSBooleanAttributeType",
+    "LeftComment": "booleanAttributeType",
+    "RightUsr": "",
+    "RightComment": "NSBooleanAttributeType",
+    "ModuleName": "CoreData"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Var",
+    "NodeAnnotation": "Rename",
+    "ChildIndex": "0",
+    "LeftUsr": "c:@E@NSAttributeType@NSDateAttributeType",
+    "LeftComment": "dateAttributeType",
+    "RightUsr": "",
+    "RightComment": "NSDateAttributeType",
+    "ModuleName": "CoreData"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Var",
+    "NodeAnnotation": "Rename",
+    "ChildIndex": "0",
+    "LeftUsr": "c:@E@NSAttributeType@NSBinaryDataAttributeType",
+    "LeftComment": "binaryDataAttributeType",
+    "RightUsr": "",
+    "RightComment": "NSBinaryDataAttributeType",
+    "ModuleName": "CoreData"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Var",
+    "NodeAnnotation": "Rename",
+    "ChildIndex": "0",
+    "LeftUsr": "c:@E@NSAttributeType@NSTransformableAttributeType",
+    "LeftComment": "transformableAttributeType",
+    "RightUsr": "",
+    "RightComment": "NSTransformableAttributeType",
+    "ModuleName": "CoreData"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Var",
+    "NodeAnnotation": "Rename",
+    "ChildIndex": "0",
+    "LeftUsr": "c:@E@NSAttributeType@NSObjectIDAttributeType",
+    "LeftComment": "objectIDAttributeType",
+    "RightUsr": "",
+    "RightComment": "NSObjectIDAttributeType",
+    "ModuleName": "CoreData"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "UnwrapOptional",
+    "ChildIndex": "2",
+    "LeftUsr": "c:objc(pl)NSFastEnumeration(im)countByEnumeratingWithState:objects:count:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "CoreData"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "UnwrapOptional",
+    "ChildIndex": "2",
+    "LeftUsr": "c:objc(pl)NSFastEnumeration(im)countByEnumeratingWithState:objects:count:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "CoreData"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "WrapOptional",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(cs)CNContactStore(im)defaultContainerIdentifier",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "Contacts"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Constructor",
+    "NodeAnnotation": "WrapOptional",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(cs)CNPhoneNumber(im)initWithStringValue:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "Contacts"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Constructor",
+    "NodeAnnotation": "UnwrapOptional",
+    "ChildIndex": "1",
+    "LeftUsr": "c:@F@CGColorSpaceCreateCalibratedGray",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "CoreGraphics"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Constructor",
+    "NodeAnnotation": "ImplicitOptionalToOptional",
+    "ChildIndex": "2",
+    "LeftUsr": "c:@F@CGColorSpaceCreateCalibratedGray",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "CoreGraphics"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Constructor",
+    "NodeAnnotation": "UnwrapOptional",
+    "ChildIndex": "1",
+    "LeftUsr": "c:@F@CGColorSpaceCreateCalibratedRGB",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "CoreGraphics"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Constructor",
+    "NodeAnnotation": "ImplicitOptionalToOptional",
+    "ChildIndex": "2",
+    "LeftUsr": "c:@F@CGColorSpaceCreateCalibratedRGB",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "CoreGraphics"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Constructor",
+    "NodeAnnotation": "ImplicitOptionalToOptional",
+    "ChildIndex": "3",
+    "LeftUsr": "c:@F@CGColorSpaceCreateCalibratedRGB",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "CoreGraphics"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Constructor",
+    "NodeAnnotation": "ImplicitOptionalToOptional",
+    "ChildIndex": "4",
+    "LeftUsr": "c:@F@CGColorSpaceCreateCalibratedRGB",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "CoreGraphics"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Constructor",
+    "NodeAnnotation": "UnwrapOptional",
+    "ChildIndex": "1",
+    "LeftUsr": "c:@F@CGColorSpaceCreateLab",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "CoreGraphics"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Constructor",
+    "NodeAnnotation": "ImplicitOptionalToOptional",
+    "ChildIndex": "2",
+    "LeftUsr": "c:@F@CGColorSpaceCreateLab",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "CoreGraphics"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Constructor",
+    "NodeAnnotation": "ImplicitOptionalToOptional",
+    "ChildIndex": "3",
+    "LeftUsr": "c:@F@CGColorSpaceCreateLab",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "CoreGraphics"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Constructor",
+    "NodeAnnotation": "WrapOptional",
+    "ChildIndex": "0",
+    "LeftUsr": "c:@F@CGFontCreateWithDataProvider",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "CoreGraphics"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "UnwrapOptional",
+    "ChildIndex": "5",
+    "LeftUsr": "c:@F@CGFontCreatePostScriptSubset",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "CoreGraphics"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Function",
+    "NodeAnnotation": "UnwrapOptional",
+    "ChildIndex": "1",
+    "LeftUsr": "c:@F@CGFontCreatePostScriptEncoding",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "CoreGraphics"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Constructor",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "2",
+    "LeftUsr": "c:objc(cs)SKUniform(im)initWithName:matrixFloat2x2:",
+    "LeftComment": "matrix_float2x2",
+    "RightUsr": "",
+    "RightComment": "matrix_float2x2",
+    "ModuleName": "SpriteKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Constructor",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "2",
+    "LeftUsr": "c:objc(cs)SKUniform(im)initWithName:matrixFloat3x3:",
+    "LeftComment": "matrix_float3x3",
+    "RightUsr": "",
+    "RightComment": "matrix_float3x3",
+    "ModuleName": "SpriteKit"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Constructor",
+    "NodeAnnotation": "TypeRewritten",
+    "ChildIndex": "2",
+    "LeftUsr": "c:objc(cs)SKUniform(im)initWithName:matrixFloat4x4:",
+    "LeftComment": "matrix_float4x4",
+    "RightUsr": "",
+    "RightComment": "matrix_float4x4",
+    "ModuleName": "SpriteKit"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSLinguisticTagWord",
+    "OldPrintedName": "NSLinguisticTagWord",
+    "NewPrintedName": "word",
+    "NewTypeName": "NSLinguisticTag"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSLinguisticTagPunctuation",
+    "OldPrintedName": "NSLinguisticTagPunctuation",
+    "NewPrintedName": "punctuation",
+    "NewTypeName": "NSLinguisticTag"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSLinguisticTagWhitespace",
+    "OldPrintedName": "NSLinguisticTagWhitespace",
+    "NewPrintedName": "whitespace",
+    "NewTypeName": "NSLinguisticTag"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSLinguisticTagOther",
+    "OldPrintedName": "NSLinguisticTagOther",
+    "NewPrintedName": "other",
+    "NewTypeName": "NSLinguisticTag"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSLinguisticTagNoun",
+    "OldPrintedName": "NSLinguisticTagNoun",
+    "NewPrintedName": "noun",
+    "NewTypeName": "NSLinguisticTag"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSLinguisticTagVerb",
+    "OldPrintedName": "NSLinguisticTagVerb",
+    "NewPrintedName": "verb",
+    "NewTypeName": "NSLinguisticTag"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSLinguisticTagAdjective",
+    "OldPrintedName": "NSLinguisticTagAdjective",
+    "NewPrintedName": "adjective",
+    "NewTypeName": "NSLinguisticTag"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSLinguisticTagAdverb",
+    "OldPrintedName": "NSLinguisticTagAdverb",
+    "NewPrintedName": "adverb",
+    "NewTypeName": "NSLinguisticTag"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSLinguisticTagPronoun",
+    "OldPrintedName": "NSLinguisticTagPronoun",
+    "NewPrintedName": "pronoun",
+    "NewTypeName": "NSLinguisticTag"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSLinguisticTagDeterminer",
+    "OldPrintedName": "NSLinguisticTagDeterminer",
+    "NewPrintedName": "determiner",
+    "NewTypeName": "NSLinguisticTag"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSLinguisticTagParticle",
+    "OldPrintedName": "NSLinguisticTagParticle",
+    "NewPrintedName": "particle",
+    "NewTypeName": "NSLinguisticTag"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSLinguisticTagPreposition",
+    "OldPrintedName": "NSLinguisticTagPreposition",
+    "NewPrintedName": "preposition",
+    "NewTypeName": "NSLinguisticTag"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSLinguisticTagNumber",
+    "OldPrintedName": "NSLinguisticTagNumber",
+    "NewPrintedName": "number",
+    "NewTypeName": "NSLinguisticTag"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSLinguisticTagConjunction",
+    "OldPrintedName": "NSLinguisticTagConjunction",
+    "NewPrintedName": "conjunction",
+    "NewTypeName": "NSLinguisticTag"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSLinguisticTagInterjection",
+    "OldPrintedName": "NSLinguisticTagInterjection",
+    "NewPrintedName": "interjection",
+    "NewTypeName": "NSLinguisticTag"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSLinguisticTagClassifier",
+    "OldPrintedName": "NSLinguisticTagClassifier",
+    "NewPrintedName": "classifier",
+    "NewTypeName": "NSLinguisticTag"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSLinguisticTagIdiom",
+    "OldPrintedName": "NSLinguisticTagIdiom",
+    "NewPrintedName": "idiom",
+    "NewTypeName": "NSLinguisticTag"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSLinguisticTagOtherWord",
+    "OldPrintedName": "NSLinguisticTagOtherWord",
+    "NewPrintedName": "otherWord",
+    "NewTypeName": "NSLinguisticTag"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSLinguisticTagSentenceTerminator",
+    "OldPrintedName": "NSLinguisticTagSentenceTerminator",
+    "NewPrintedName": "sentenceTerminator",
+    "NewTypeName": "NSLinguisticTag"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSLinguisticTagOpenQuote",
+    "OldPrintedName": "NSLinguisticTagOpenQuote",
+    "NewPrintedName": "openQuote",
+    "NewTypeName": "NSLinguisticTag"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSLinguisticTagCloseQuote",
+    "OldPrintedName": "NSLinguisticTagCloseQuote",
+    "NewPrintedName": "closeQuote",
+    "NewTypeName": "NSLinguisticTag"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSLinguisticTagOpenParenthesis",
+    "OldPrintedName": "NSLinguisticTagOpenParenthesis",
+    "NewPrintedName": "openParenthesis",
+    "NewTypeName": "NSLinguisticTag"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSLinguisticTagCloseParenthesis",
+    "OldPrintedName": "NSLinguisticTagCloseParenthesis",
+    "NewPrintedName": "closeParenthesis",
+    "NewTypeName": "NSLinguisticTag"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSLinguisticTagWordJoiner",
+    "OldPrintedName": "NSLinguisticTagWordJoiner",
+    "NewPrintedName": "wordJoiner",
+    "NewTypeName": "NSLinguisticTag"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSLinguisticTagDash",
+    "OldPrintedName": "NSLinguisticTagDash",
+    "NewPrintedName": "dash",
+    "NewTypeName": "NSLinguisticTag"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSLinguisticTagOtherPunctuation",
+    "OldPrintedName": "NSLinguisticTagOtherPunctuation",
+    "NewPrintedName": "otherPunctuation",
+    "NewTypeName": "NSLinguisticTag"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSLinguisticTagParagraphBreak",
+    "OldPrintedName": "NSLinguisticTagParagraphBreak",
+    "NewPrintedName": "paragraphBreak",
+    "NewTypeName": "NSLinguisticTag"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSLinguisticTagOtherWhitespace",
+    "OldPrintedName": "NSLinguisticTagOtherWhitespace",
+    "NewPrintedName": "otherWhitespace",
+    "NewTypeName": "NSLinguisticTag"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSLinguisticTagPersonalName",
+    "OldPrintedName": "NSLinguisticTagPersonalName",
+    "NewPrintedName": "personalName",
+    "NewTypeName": "NSLinguisticTag"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSLinguisticTagPlaceName",
+    "OldPrintedName": "NSLinguisticTagPlaceName",
+    "NewPrintedName": "placeName",
+    "NewTypeName": "NSLinguisticTag"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSLinguisticTagOrganizationName",
+    "OldPrintedName": "NSLinguisticTagOrganizationName",
+    "NewPrintedName": "organizationName",
+    "NewTypeName": "NSLinguisticTag"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSLinguisticTagSchemeTokenType",
+    "OldPrintedName": "NSLinguisticTagSchemeTokenType",
+    "NewPrintedName": "tokenType",
+    "NewTypeName": "NSLinguisticTagScheme"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSLinguisticTagSchemeLexicalClass",
+    "OldPrintedName": "NSLinguisticTagSchemeLexicalClass",
+    "NewPrintedName": "lexicalClass",
+    "NewTypeName": "NSLinguisticTagScheme"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSLinguisticTagSchemeNameType",
+    "OldPrintedName": "NSLinguisticTagSchemeNameType",
+    "NewPrintedName": "nameType",
+    "NewTypeName": "NSLinguisticTagScheme"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSLinguisticTagSchemeNameTypeOrLexicalClass",
+    "OldPrintedName": "NSLinguisticTagSchemeNameTypeOrLexicalClass",
+    "NewPrintedName": "nameTypeOrLexicalClass",
+    "NewTypeName": "NSLinguisticTagScheme"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSLinguisticTagSchemeLemma",
+    "OldPrintedName": "NSLinguisticTagSchemeLemma",
+    "NewPrintedName": "lemma",
+    "NewTypeName": "NSLinguisticTagScheme"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSLinguisticTagSchemeLanguage",
+    "OldPrintedName": "NSLinguisticTagSchemeLanguage",
+    "NewPrintedName": "language",
+    "NewTypeName": "NSLinguisticTagScheme"
+  },
+  {
+    "DiffItemKind": "TypeMemberDiffItem",
+    "Usr": "c:@NSLinguisticTagSchemeScript",
+    "OldPrintedName": "NSLinguisticTagSchemeScript",
+    "NewPrintedName": "script",
+    "NewTypeName": "NSLinguisticTagScheme"
+  },
+  {
+    "DiffItemKind": "NoEscapeFuncParam",
+    "Usr": "c:objc(cs)NSAttributedString(im)enumerateAttributesInRange:options:usingBlock:",
+    "Index": 3
+  },
+  {
+    "DiffItemKind": "NoEscapeFuncParam",
+    "Usr": "c:objc(cs)NSAttributedString(im)enumerateAttribute:inRange:options:usingBlock:",
+    "Index": 4
+  },
+  {
+    "DiffItemKind": "NoEscapeFuncParam",
+    "Usr": "c:objc(cs)NSLinguisticTagger(im)enumerateTagsInRange:unit:scheme:options:usingBlock:",
+    "Index": 5
+  },
+  {
+    "DiffItemKind": "NoEscapeFuncParam",
+    "Usr": "c:objc(cs)NSLinguisticTagger(im)enumerateTagsInRange:scheme:options:usingBlock:",
+    "Index": 4
+  },
+  {
+    "DiffItemKind": "NoEscapeFuncParam",
+    "Usr": "c:objc(cs)NSLinguisticTagger(cm)enumerateTagsForString:range:unit:scheme:options:orthography:usingBlock:",
+    "Index": 7
+  },
+  {
+    "DiffItemKind": "NoEscapeFuncParam",
+    "Usr": "c:objc(cs)NSString(im)enumerateLinguisticTagsInRange:scheme:options:orthography:usingBlock:",
+    "Index": 5
+  },
+  {
+    "DiffItemKind": "NoEscapeFuncParam",
+    "Usr": "c:objc(cs)NSProgress(im)performAsCurrentWithPendingUnitCount:usingBlock:",
+    "Index": 2
+  },
+  {
+    "DiffItemKind": "NoEscapeFuncParam",
+    "Usr": "c:@F@CGPathApplyWithBlock",
+    "Index": 1
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(pl)CBCentralManagerDelegate(im)centralManager:willRestoreState:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(pl)CBCentralManagerDelegate(im)centralManager:didConnectPeripheral:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(cs)CBPeripheral(im)readValueForCharacteristic:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(cs)CBPeripheral(im)writeValue:forCharacteristic:type:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(cs)CBPeripheral(im)readValueForDescriptor:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(cs)CBPeripheral(im)writeValue:forDescriptor:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(pl)CBPeripheralDelegate(im)peripheral:didModifyServices:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(pl)CBPeripheralDelegate(im)peripheral:didDiscoverServices:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(pl)CBPeripheralDelegate(im)peripheral:didUpdateValueForCharacteristic:error:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(pl)CBPeripheralDelegate(im)peripheral:didWriteValueForCharacteristic:error:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(pl)CBPeripheralDelegate(im)peripheral:didUpdateValueForDescriptor:error:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(pl)CBPeripheralDelegate(im)peripheral:didWriteValueForDescriptor:error:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(pl)CBPeripheralManagerDelegate(im)peripheralManager:willRestoreState:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(pl)CBPeripheralManagerDelegate(im)peripheralManager:central:didSubscribeToCharacteristic:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(pl)CBPeripheralManagerDelegate(im)peripheralManager:central:didUnsubscribeFromCharacteristic:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(pl)CBPeripheralManagerDelegate(im)peripheralManager:didReceiveReadRequest:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(pl)CBPeripheralManagerDelegate(im)peripheralManager:didReceiveWriteRequests:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(cs)AVAudioRecorder(im)recordAtTime:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(cs)AVAudioRecorder(im)recordForDuration:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(cs)AVAudioRecorder(im)recordAtTime:forDuration:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(pl)AVAudioRecorderDelegate(im)audioRecorderEndInterruption:withOptions:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(pl)AVAudioRecorderDelegate(im)audioRecorderEndInterruption:withFlags:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(pl)AVAudioRecorderDelegate(im)audioRecorderEndInterruption:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "s:8Dispatch0A4DataV9copyBytesys29UnsafeMutableRawBufferPointerV2to_Si5counttF"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "s:8Dispatch0A4DataV9copyBytesys29UnsafeMutableRawBufferPointerV2to_s14CountableRangeVySiG4fromtF"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(pl)SCNAnimatable(im)removeAnimationForKey:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(pl)SCNAnimatable(im)removeAnimationForKey:fadeOutDuration:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(cs)SCNCameraController(im)dollyZoomToTarget:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(cs)SCNNode(im)convertVector:toNode:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(cs)SCNNode(im)convertVector:fromNode:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(cs)SCNNode(im)lookAt:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(cs)NSAttributedString(im)attribute:atIndex:effectiveRange:"
+  },
+  {
+    "DiffItemKind": "OverloadedFuncInfo",
+    "Usr": "c:objc(cs)NSLinguisticTagger(cm)availableTagSchemesForLanguage:"
+  }
 ]
