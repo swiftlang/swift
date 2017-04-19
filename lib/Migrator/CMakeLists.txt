@@ -27,7 +27,7 @@ endforeach()
 list(APPEND outputs "${output_dir}")
 
 add_custom_target("symlink_migrator_data"
-    DEPENDS "${outputs}"
+    DEPENDS "${output_dir}" "${outputs}"
     COMMENT "Symlinking migrator data to ${output_dir}")
 
 swift_install_in_component(compiler
