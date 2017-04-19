@@ -1122,8 +1122,35 @@ void Serializer::writeGenericRequirements(ArrayRef<Requirement> requirements,
         size = layout->getTrivialSizeInBits();
         alignment = layout->getAlignment();
       }
+      LayoutRequirementKind rawKind = LayoutRequirementKind::UnknownLayout;
+      switch (layout->getKind()) {
+      case LayoutConstraintKind::NativeRefCountedObject:
+        rawKind = LayoutRequirementKind::NativeRefCountedObject;
+        break;
+      case LayoutConstraintKind::RefCountedObject:
+        rawKind = LayoutRequirementKind::RefCountedObject;
+        break;
+      case LayoutConstraintKind::Trivial:
+        rawKind = LayoutRequirementKind::Trivial;
+        break;
+      case LayoutConstraintKind::TrivialOfExactSize:
+        rawKind = LayoutRequirementKind::TrivialOfExactSize;
+        break;
+      case LayoutConstraintKind::TrivialOfAtMostSize:
+        rawKind = LayoutRequirementKind::TrivialOfAtMostSize;
+        break;
+      case LayoutConstraintKind::Class:
+        rawKind = LayoutRequirementKind::Class;
+        break;
+      case LayoutConstraintKind::NativeClass:
+        rawKind = LayoutRequirementKind::NativeClass;
+        break;
+      case LayoutConstraintKind::UnknownLayout:
+        rawKind = LayoutRequirementKind::UnknownLayout;
+        break;
+      }
       LayoutRequirementLayout::emitRecord(
-          Out, ScratchRecord, layoutReqAbbrCode, (unsigned)layout->getKind(),
+          Out, ScratchRecord, layoutReqAbbrCode, rawKind,
           addTypeRef(req.getFirstType()), size, alignment);
     }
   }

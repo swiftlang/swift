@@ -261,6 +261,8 @@ enum LayoutRequirementKind : uint8_t {
   Trivial = 3,
   RefCountedObject = 4,
   NativeRefCountedObject = 5,
+  Class = 6,
+  NativeClass = 7
 };
 using LayoutRequirementKindField = BCFixed<3>;
 
