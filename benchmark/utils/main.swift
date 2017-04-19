@@ -131,7 +131,14 @@ private func addStringTest(
 ) {
   stringTests[name] = function
 }
+@inline(__always)
+private func addOtherTest(
+  _ name: String, _ function: @escaping (Int) -> ()
+) {
+  otherTests[name] = function
+}
 
+// The main test suite: precommit tests
 addPrecommitTest("AngryPhonebook", run_AngryPhonebook)
 addPrecommitTest("AnyHashableWithAClass", run_AnyHashableWithAClass)
 addPrecommitTest("Array2D", run_Array2D)
@@ -499,16 +506,12 @@ addPrecommitTest("UTF8Decode", run_UTF8Decode)
 addPrecommitTest("Walsh", run_Walsh)
 addPrecommitTest("XorLoop", run_XorLoop)
 
-
-otherTests = [
-  "Ackermann": run_Ackermann,
-  "Fibonacci": run_Fibonacci,
-]
+// Other tests
+addOtherTest("Ackermann", run_Ackermann)
+addOtherTest("Fibonacci", run_Fibonacci)
 
 // String tests, an extended benchmark suite exercising finer-granularity
 // behavior of our Strings.
-//
-// Scalar and Character iteration
 addStringTest("StringWalkASCIIScalars", run_StringWalkASCIIScalars)
 addStringTest("StringWalkASCIICharacters", run_StringWalkASCIICharacters)
 addStringTest("StringWalkUnicodeScalars", run_StringWalkUnicodeScalars)

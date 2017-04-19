@@ -39,7 +39,21 @@ template_map = {
     'CMakeLists.txt_template': os.path.join(output_dir, 'CMakeLists.txt'),
     'main.swift_template': os.path.join(output_dir, 'utils/main.swift')
 }
-ignored_run_funcs = ["Ackermann", "Fibonacci"]
+
+### The test suites. Currently, "other" and "string"
+other_tests = ["Ackermann", "Fibonacci"]
+string_tests = [
+    "StringWalkASCIIScalars",
+    "StringWalkASCIICharacters",
+    "StringWalkUnicodeScalars",
+    "StringWalkUnicodeCharacters",
+    "StringWalkASCIIScalarsBackwards",
+    "StringWalkASCIICharactersBackwards",
+    "StringWalkUnicodeScalarsBackwards",
+    "StringWalkUnicodeCharactersBackwards",
+]
+
+ignored_run_funcs = other_tests + string_tests
 
 template_loader = jinja2.FileSystemLoader(searchpath="/")
 template_env = jinja2.Environment(loader=template_loader, trim_blocks=True,
@@ -115,5 +129,7 @@ if __name__ == '__main__':
             template.render(tests=tests,
                             multisource_benches=multisource_benches,
                             imports=imports,
-                            run_funcs=run_funcs)
+                            run_funcs=run_funcs,
+                            string_tests=string_tests,
+                            other_tests=other_tests)
         )
