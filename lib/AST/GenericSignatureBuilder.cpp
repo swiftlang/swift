@@ -941,7 +941,7 @@ bool FloatingRequirementSource::isRecursive(
   llvm::SmallSet<std::pair<CanType, ProtocolDecl *>, 4> visitedAssocReqs;
   for (auto storedSource = storage.dyn_cast<const RequirementSource *>();
        storedSource; storedSource = storedSource->parent) {
-    if (storedSource->kind != RequirementSource::ProtocolRequirement)
+    if (!storedSource->isProtocolRequirement())
       continue;
 
     if (!visitedAssocReqs.insert(
