@@ -1352,6 +1352,10 @@ ERROR(attr_specialize_parameter_already_defined,none,
 ERROR(attr_specialize_expected_partial_or_full,none,
       "expected 'partial' or 'full' as values of the 'kind' parameter in '_specialize' attribute", ())
 
+// _implements
+ERROR(attr_implements_expected_member_name,PointsToFirstBadToken,
+      "expected a member name as second parameter in '_implements' attribute", ())
+
 //------------------------------------------------------------------------------
 // Generics parsing diagnostics
 //------------------------------------------------------------------------------

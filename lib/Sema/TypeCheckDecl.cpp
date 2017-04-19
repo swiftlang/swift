@@ -6099,6 +6099,7 @@ public:
     UNINTERESTING_ATTR(DiscardableResult)
 
     UNINTERESTING_ATTR(ObjCMembers)
+    UNINTERESTING_ATTR(Implements)
 
 #undef UNINTERESTING_ATTR
 

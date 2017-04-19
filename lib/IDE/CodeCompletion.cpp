@@ -303,6 +303,9 @@ static bool shouldHideDeclFromCompletionResults(const ValueDecl *D) {
   if (D->getName().isEditorPlaceholder())
     return true;
 
+  if (!D->isUserAccessible())
+    return true;
+
   return false;
 }
 
@@ -2048,7 +2051,6 @@ public:
 
   void addVarDeclRef(const VarDecl *VD, DeclVisibilityKind Reason) {
     if (!VD->hasName() ||
-        !VD->isUserAccessible() ||
         (VD->hasAccessibility() && !VD->isAccessibleFrom(CurrDeclContext)) ||
         shouldHideDeclFromCompletionResults(VD))
       return;
