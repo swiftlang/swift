@@ -46,6 +46,8 @@ static const __swift_uint32_t _SwiftKeyPathComponentHeader_DiscriminatorShift
 
 static const __swift_uint32_t _SwiftKeyPathComponentHeader_StructTag
   = 0;
+static const __swift_uint32_t _SwiftKeyPathComponentHeader_ComputedTag
+  = 1;
 static const __swift_uint32_t _SwiftKeyPathComponentHeader_ClassTag
   = 2;
 static const __swift_uint32_t _SwiftKeyPathComponentHeader_OptionalTag
@@ -69,6 +71,20 @@ static const __swift_uint32_t _SwiftKeyPathComponentHeader_OptionalForcePayload
 
 static const __swift_uint32_t _SwiftKeyPathComponentHeader_EndOfReferencePrefixFlag
   = 0x80000000U;
+  
+static const __swift_uint32_t _SwiftKeyPathComponentHeader_ComputedMutatingFlag
+  = 0x10000000U;
+static const __swift_uint32_t _SwiftKeyPathComponentHeader_ComputedSettableFlag
+  = 0x08000000U;
+static const __swift_uint32_t _SwiftKeyPathComponentHeader_ComputedIDByStoredPropertyFlag
+  = 0x04000000U;
+static const __swift_uint32_t _SwiftKeyPathComponentHeader_ComputedIDByVTableOffsetFlag
+  = 0x02000000U;
+static const __swift_uint32_t _SwiftKeyPathComponentHeader_ComputedHasArgumentsFlag
+  = 0x01000000U;
+static const __swift_uint32_t _SwiftKeyPathComponentHeader_ComputedUnresolvedIDFlag
+  = 0x00000001U;
+
 
 #ifdef __cplusplus
 }} // namespace swift } extern "C" }

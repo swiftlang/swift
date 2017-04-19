@@ -157,6 +157,38 @@ public:
       | _SwiftKeyPathComponentHeader_OptionalForcePayload);
   }
   
+  enum ComputedPropertyKind {
+    GetOnly,
+    SettableNonmutating,
+    SettableMutating,
+  };
+  
+  enum ComputedPropertyIDKind {
+    Getter,
+    StoredPropertyOffset,
+    VTableOffset,
+  };
+  
+  constexpr static KeyPathComponentHeader
+  forComputedProperty(ComputedPropertyKind kind,
+                      ComputedPropertyIDKind idKind,
+                      bool hasArguments,
+                      bool resolvedID) {
+    return KeyPathComponentHeader(
+      (_SwiftKeyPathComponentHeader_ComputedTag
+      << _SwiftKeyPathComponentHeader_DiscriminatorShift)
+      | (kind != GetOnly
+           ? _SwiftKeyPathComponentHeader_ComputedSettableFlag : 0)
+      | (kind == SettableMutating
+           ? _SwiftKeyPathComponentHeader_ComputedMutatingFlag : 0)
+      | (idKind == StoredPropertyOffset
+           ? _SwiftKeyPathComponentHeader_ComputedIDByStoredPropertyFlag : 0)
+      | (idKind == VTableOffset
+           ? _SwiftKeyPathComponentHeader_ComputedIDByVTableOffsetFlag : 0)
+      | (hasArguments ? _SwiftKeyPathComponentHeader_ComputedHasArgumentsFlag : 0)
+      | (resolvedID ? 0 : _SwiftKeyPathComponentHeader_ComputedUnresolvedIDFlag));
+  }
+  
   constexpr uint32_t getData() const { return Data; }
 };
 

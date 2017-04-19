@@ -4656,6 +4656,14 @@ llvm::Value *irgen::emitVirtualMethodValue(IRGenFunction &IGF,
   return emitInvariantLoadFromMetadataAtIndex(IGF, metadata, index, fnTy);
 }
 
+unsigned irgen::getVirtualMethodIndex(IRGenModule &IGM,
+                                      SILDeclRef method) {
+  SILDeclRef overridden = IGM.getSILTypes().getOverriddenVTableEntry(method);
+  auto declaringClass = cast<ClassDecl>(overridden.getDecl()->getDeclContext());
+  return FindClassMethodIndex(IGM, declaringClass, overridden)
+   .getTargetIndex();;
+}
+
 //===----------------------------------------------------------------------===//
 // Value types (structs and enums)
 //===----------------------------------------------------------------------===//

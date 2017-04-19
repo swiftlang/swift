@@ -24,6 +24,7 @@
 #include "IRGenDebugInfo.h"
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
+#include "ProtocolInfo.h"
 #include "llvm/ADT/SetVector.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILLocation.h"
@@ -41,6 +42,15 @@ using namespace irgen;
 llvm::Constant *
 IRGenModule::getAddrOfKeyPathPattern(KeyPathPattern *pattern,
                                      SILLocation diagLoc) {
+  // TODO: Landing 32-bit key paths requires some runtime changes to get the
+  // 8-byte object header.
+  if (getPointerSize() != Size(8)) {
+    Context.Diags.diagnose(diagLoc.getSourceLoc(),
+                           diag::not_implemented,
+                           "32-bit key paths");
+    return llvm::UndefValue::get(Int8PtrTy);
+  }
+  
   // See if we already emitted this.
   auto found = KeyPathPatterns.find(pattern);
   if (found != KeyPathPatterns.end())
@@ -125,19 +135,11 @@ IRGenModule::getAddrOfKeyPathPattern(KeyPathPattern *pattern,
   // Build out the components.
   auto baseTy = rootTy;
   
-  for (unsigned i : indices(pattern->getComponents())) {
-    SILType loweredBaseTy;
-    Lowering::GenericContextScope scope(getSILTypes(),
-                                        pattern->getGenericSignature());
-    loweredBaseTy = getLoweredType(AbstractionPattern::getOpaque(),
-                                   baseTy->getLValueOrInOutObjectType());
-
-    auto &component = pattern->getComponents()[i];
-    switch (component.getKind()) {
-    case KeyPathPatternComponent::Kind::StoredProperty: {
-      // Try to get a constant offset if we can.
-      auto property = cast<VarDecl>(component.getStoredPropertyDecl());
+  auto getPropertyOffsetOrIndirectOffset
+    = [&](SILType loweredBaseTy, VarDecl *property)
+        -> std::pair<llvm::Constant*, bool> {
       llvm::Constant *offset;
+      bool isResolved;
       bool isStruct;
       if (auto structTy = loweredBaseTy.getStructOrBoundGenericStruct()) {
         offset = emitPhysicalStructMemberFixedOffset(*this,
@@ -153,64 +155,150 @@ IRGenModule::getAddrOfKeyPathPattern(KeyPathPattern *pattern,
         llvm_unreachable("property of non-struct, non-class?!");
       }
       
-      // If the projection is a statically known integer, try to pack it into
-      // the key path payload.
-      if (auto offsetInt = dyn_cast_or_null<llvm::ConstantInt>(offset)) {
-        auto offsetValue = offsetInt->getValue().getZExtValue();
-        if (KeyPathComponentHeader::offsetCanBeInline(offsetValue)) {
-          auto header = isStruct
-            ? KeyPathComponentHeader::forStructComponentWithInlineOffset(offsetValue)
-            : KeyPathComponentHeader::forClassComponentWithInlineOffset(offsetValue);
-          fields.addInt32(header.getData());
-          break;
+      // If the offset isn't fixed, try instead to get the field offset vector
+      // offset for the field to look it up dynamically.
+      isResolved = offset != nullptr;
+      if (!isResolved) {
+        if (isStruct) {
+          offset = emitPhysicalStructMemberOffsetOfFieldOffset(
+                                                *this, loweredBaseTy, property);
+          assert(offset && "field is neither fixed-offset nor in offset vector");
+        } else {
+          auto offsetValue = getClassFieldOffset(*this,
+                                loweredBaseTy.getClassOrBoundGenericClass(),
+                                property);
+          offset = llvm::ConstantInt::get(Int32Ty, offsetValue.getValue());
         }
       }
       
-      // Add the resolved offset if we have one.
-      if (offset) {
+      return {offset, isResolved};
+    };
+  
+  for (unsigned i : indices(pattern->getComponents())) {
+    SILType loweredBaseTy;
+    Lowering::GenericContextScope scope(getSILTypes(),
+                                        pattern->getGenericSignature());
+    loweredBaseTy = getLoweredType(AbstractionPattern::getOpaque(),
+                                   baseTy->getLValueOrInOutObjectType());
+
+    auto &component = pattern->getComponents()[i];
+    switch (auto kind = component.getKind()) {
+    case KeyPathPatternComponent::Kind::StoredProperty: {
+      // Try to get a constant offset if we can.
+      auto property = cast<VarDecl>(component.getStoredPropertyDecl());
+      llvm::Constant *offset;
+      bool isResolved;
+      std::tie(offset, isResolved)
+        = getPropertyOffsetOrIndirectOffset(loweredBaseTy, property);
+      offset = llvm::ConstantExpr::getTruncOrBitCast(offset, Int32Ty);
+      bool isStruct = (bool)loweredBaseTy.getStructOrBoundGenericStruct();
+      
+      // If the projection is a statically known integer, try to pack it into
+      // the key path payload.
+      if (isResolved) {
+        if (auto offsetInt = dyn_cast_or_null<llvm::ConstantInt>(offset)) {
+          auto offsetValue = offsetInt->getValue().getZExtValue();
+          if (KeyPathComponentHeader::offsetCanBeInline(offsetValue)) {
+            auto header = isStruct
+              ? KeyPathComponentHeader::forStructComponentWithInlineOffset(offsetValue)
+              : KeyPathComponentHeader::forClassComponentWithInlineOffset(offsetValue);
+            fields.addInt32(header.getData());
+            break;
+          }
+        }
+      
         auto header = isStruct
           ? KeyPathComponentHeader::forStructComponentWithOutOfLineOffset()
           : KeyPathComponentHeader::forClassComponentWithOutOfLineOffset();
         fields.addInt32(header.getData());
         
-        offset = llvm::ConstantExpr::getTruncOrBitCast(offset, Int32Ty);
         fields.add(offset);
       } else {
         // Otherwise, stash the offset of the field offset within the metadata
         // object, so we can pull it out at instantiation time.
         // TODO: We'll also need a way to handle resilient field offsets, once
         // field offset vectors no longer cover all fields in the type.
-        Optional<KeyPathComponentHeader> header;
-        llvm::Constant *fieldOffsetOffset;
-        if (isStruct) {
-          header =
-            KeyPathComponentHeader::forStructComponentWithUnresolvedOffset();
-          fieldOffsetOffset = emitPhysicalStructMemberOffsetOfFieldOffset(
-                                                *this, loweredBaseTy, property);
-        } else {
-          header =
-            KeyPathComponentHeader::forClassComponentWithUnresolvedOffset();
-          fieldOffsetOffset = llvm::ConstantInt::get(Int32Ty,
-            getClassFieldOffset(*this,
-                                loweredBaseTy.getClassOrBoundGenericClass(),
-                                property)
-              .getValue());
-        }
-        assert(fieldOffsetOffset && "stored property is neither fixed offset "
-               "nor in the field offset vector?!");
-        fields.addInt32(header->getData());
-        fieldOffsetOffset =
-          llvm::ConstantExpr::getTruncOrBitCast(fieldOffsetOffset, Int32Ty);
-        fields.add(fieldOffsetOffset);
+        KeyPathComponentHeader header = isStruct
+          ? KeyPathComponentHeader::forStructComponentWithUnresolvedOffset()
+          : KeyPathComponentHeader::forClassComponentWithUnresolvedOffset();
+        fields.addInt32(header.getData());
+        fields.add(offset);
       }
       break;
     }
     case KeyPathPatternComponent::Kind::GettableProperty:
     case KeyPathPatternComponent::Kind::SettableProperty: {
-      Context.Diags.diagnose(diagLoc.getSourceLoc(),
-                             diag::not_implemented,
-                             "computed key path");
-      return llvm::UndefValue::get(Int8PtrTy);
+      // Encode the settability.
+      bool settable = kind == KeyPathPatternComponent::Kind::SettableProperty;
+      KeyPathComponentHeader::ComputedPropertyKind componentKind;
+      if (settable) {
+        componentKind = component.isComputedSettablePropertyMutating()
+          ? KeyPathComponentHeader::SettableMutating
+          : KeyPathComponentHeader::SettableNonmutating;
+      } else {
+        componentKind = KeyPathComponentHeader::GetOnly;
+      }
+      
+      // Lower the id reference.
+      auto id = component.getComputedPropertyId();
+      KeyPathComponentHeader::ComputedPropertyIDKind idKind;
+      llvm::Constant *idValue;
+      bool idResolved;
+      switch (id.getKind()) {
+      case KeyPathPatternComponent::ComputedPropertyId::Function:
+        idKind = KeyPathComponentHeader::Getter;
+        idValue = getAddrOfSILFunction(id.getFunction(), NotForDefinition);
+        idResolved = true;
+        break;
+      case KeyPathPatternComponent::ComputedPropertyId::DeclRef: {
+        idKind = KeyPathComponentHeader::VTableOffset;
+        auto declRef = id.getDeclRef();
+        auto dc = declRef.getDecl()->getDeclContext();
+        if (auto methodClass = dyn_cast<ClassDecl>(dc)) {
+          auto index = getVirtualMethodIndex(*this, declRef);
+          idValue = llvm::ConstantInt::get(SizeTy, index);
+          idResolved = true;
+        } else if (auto methodProto = dyn_cast<ProtocolDecl>(dc)) {
+          auto &protoInfo = getProtocolInfo(methodProto);
+          auto index = protoInfo.getFunctionIndex(
+                                 cast<AbstractFunctionDecl>(declRef.getDecl()));
+          idValue = llvm::ConstantInt::get(SizeTy, -index.getValue());
+          idResolved = true;
+        } else {
+          llvm_unreachable("neither a class nor protocol dynamic method?");
+        }
+        break;
+      }
+      case KeyPathPatternComponent::ComputedPropertyId::Property:
+        idKind = KeyPathComponentHeader::StoredPropertyOffset;
+        std::tie(idValue, idResolved) =
+          getPropertyOffsetOrIndirectOffset(loweredBaseTy, id.getProperty());
+        idValue = llvm::ConstantExpr::getZExtOrBitCast(idValue, SizeTy);
+        break;
+      }
+      
+      auto header = KeyPathComponentHeader::forComputedProperty(componentKind,
+                                    idKind, !isInstantiableInPlace, idResolved);
+      
+      fields.addInt32(header.getData());
+      fields.add(idValue);
+      
+      if (isInstantiableInPlace) {
+        // No generic arguments, so we can invoke the getter/setter as is.
+        fields.add(getAddrOfSILFunction(component.getComputedPropertyGetter(),
+                                        NotForDefinition));
+        if (settable)
+          fields.add(getAddrOfSILFunction(component.getComputedPropertySetter(),
+                                          NotForDefinition));
+      } else {
+        // If there's generic context (TODO: or subscript indexes), embed as
+        // arguments in the component. Thunk the SIL-level accessors to give the
+        // runtime implementation a polymorphically-callable interface.
+        Context.Diags.diagnose(diagLoc.getSourceLoc(),
+                               diag::not_implemented,
+                               "generic computed key paths");
+        return llvm::UndefValue::get(Int8PtrTy);
+      }
     }
     }
     

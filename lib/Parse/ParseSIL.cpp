@@ -2407,9 +2407,15 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB, SILBuilder &B) {
             return true;
           }
           
-          KeyPathPatternComponent::ComputedPropertyId id
-            = idFn ? KeyPathPatternComponent::ComputedPropertyId(idFn)
-                   : idDecl;
+          KeyPathPatternComponent::ComputedPropertyId id;
+          if (idFn)
+            id = idFn;
+          else if (!idDecl.isNull())
+            id = idDecl;
+          else if (idProperty)
+            id = idProperty;
+          else
+            llvm_unreachable("no id?!");
           
           // TODO: indexes
           if (isSettable) {

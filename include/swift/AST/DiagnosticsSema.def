@@ -428,6 +428,9 @@ ERROR(expr_keypath_generic_type,none,
       "'#keyPath' cannot refer to generic type %0", (DeclName))
 ERROR(expr_keypath_not_property,none,
       "'#keyPath' cannot refer to %0 %1", (DescriptiveDeclKind, DeclName))
+ERROR(expr_keypath_mutating_getter,none,
+      "'#keyPath' cannot refer to %0, which has a mutating getter",
+      (DeclName))
 ERROR(expr_keypath_empty,none,
       "empty '#keyPath' does not refer to a property", ())
 ERROR(expr_unsupported_objc_key_path_component,none,

@@ -1427,6 +1427,8 @@ public:
     {}
     
   public:
+    ComputedPropertyId() : Value(), Kind(Property) {}
+  
     /*implicit*/ ComputedPropertyId(VarDecl *property)
       : Value{property}, Kind{Property}
     {
@@ -1565,6 +1567,8 @@ public:
       return Indices;
     }
   }
+  
+  bool isComputedSettablePropertyMutating() const;
   
   static KeyPathPatternComponent forStoredProperty(VarDecl *property,
                                                    CanType ty) {

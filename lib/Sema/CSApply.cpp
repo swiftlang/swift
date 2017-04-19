@@ -3961,6 +3961,23 @@ namespace {
           }
           auto property = foundDecl->choice.getDecl();
           
+          // Key paths can only refer to properties currently.
+          if (!isa<VarDecl>(property)) {
+            cs.TC.diagnose(origComponent.getLoc(),
+                           diag::expr_keypath_not_property,
+                           property->getDescriptiveKind(),
+                           property->getFullName());
+          } else {
+            // Key paths don't work with mutating-get properties.
+            auto varDecl = cast<VarDecl>(property);
+            if (varDecl->hasAccessorFunctions()
+                && varDecl->getGetter()->isMutating()) {
+              cs.TC.diagnose(origComponent.getLoc(),
+                             diag::expr_keypath_mutating_getter,
+                             property->getFullName());
+            }
+          }
+          
           auto dc = property->getInnermostDeclContext();
           SmallVector<Substitution, 4> subs;
           if (auto sig = dc->getGenericSignatureOfContext()) {
@@ -3987,9 +4004,14 @@ namespace {
             component = origComponent;
             break;
           }
-          auto property = foundDecl->choice.getDecl();
+          auto subscript = cast<SubscriptDecl>(foundDecl->choice.getDecl());
+          if (subscript->getGetter()->isMutating()) {
+            cs.TC.diagnose(origComponent.getLoc(),
+                           diag::expr_keypath_mutating_getter,
+                           subscript->getFullName());
+          }
           
-          auto dc = property->getInnermostDeclContext();
+          auto dc = subscript->getInnermostDeclContext();
           SmallVector<Substitution, 4> subs;
           if (auto sig = dc->getGenericSignatureOfContext()) {
             // Compute substitutions to refer to the member.
@@ -4001,7 +4023,7 @@ namespace {
             ->getResult();
           resolvedTy = simplifyType(resolvedTy);
           
-          auto ref = ConcreteDeclRef(cs.getASTContext(), property, subs);
+          auto ref = ConcreteDeclRef(cs.getASTContext(), subscript, subs);
           component = KeyPathExpr::Component
             ::forSubscriptWithPrebuiltIndexExpr(ref,
                                                 origComponent.getIndexExpr(),

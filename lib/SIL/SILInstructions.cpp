@@ -1879,6 +1879,19 @@ MetatypeInst *MetatypeInst::create(SILDebugLocation Loc, SILType Ty,
   return ::new (Buffer) MetatypeInst(Loc, Ty, TypeDependentOperands);
 }
 
+bool KeyPathPatternComponent::isComputedSettablePropertyMutating() const {
+  switch (getKind()) {
+  case Kind::StoredProperty:
+  case Kind::GettableProperty:
+    llvm_unreachable("not a settable computed property");
+  case Kind::SettableProperty: {
+    auto setter = getComputedPropertySetter();
+    return setter->getLoweredFunctionType()->getParameters()[1].getConvention()
+       == ParameterConvention::Indirect_Inout;
+  }
+  }
+}
+
 KeyPathPattern *
 KeyPathPattern::get(SILModule &M, CanGenericSignature signature,
                     CanType rootType, CanType valueType,

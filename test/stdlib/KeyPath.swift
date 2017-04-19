@@ -48,6 +48,28 @@ struct S<T: Equatable>: Equatable {
   }
 }
 
+final class ComputedA {
+  var readOnly: ComputedB { fatalError() }
+  var nonmutating: ComputedB {
+    get { fatalError() }
+    set { fatalError() }
+  }
+  var reabstracted: () -> () = {}
+}
+
+struct ComputedB {
+  var readOnly: ComputedA { fatalError() }
+  var mutating: ComputedA { 
+    get { fatalError() }
+    set { fatalError() }
+  }
+  var nonmutating: ComputedA {
+    get { fatalError() }
+    nonmutating set { fatalError() }
+  }
+  var reabstracted: () -> () = {}
+}
+
 keyPath.test("key path in-place instantiation") {
   for _ in 1...2 {
     let s_x = (#keyPath2(S<Int>, .x) as AnyKeyPath) as! WritableKeyPath<S<Int>, Int>
@@ -78,6 +100,44 @@ keyPath.test("key path in-place instantiation") {
     expectEqual(s_p_y, s_p_y_2)
     expectEqual(s_p_y_2, s_p_y)
     expectEqual(s_p_y_2.hashValue, s_p_y.hashValue)
+
+    let ca_readOnly = (#keyPath2(ComputedA, .readOnly) as AnyKeyPath) as! KeyPath<ComputedA, ComputedB>
+    let ca_nonmutating = (#keyPath2(ComputedA, .nonmutating) as AnyKeyPath) as! ReferenceWritableKeyPath<ComputedA, ComputedB>
+    let ca_reabstracted = (#keyPath2(ComputedA, .reabstracted) as AnyKeyPath) as! ReferenceWritableKeyPath<ComputedA, () -> ()>
+
+    let cb_readOnly = (#keyPath2(ComputedB, .readOnly) as AnyKeyPath) as! KeyPath<ComputedB, ComputedA>
+    let cb_mutating = (#keyPath2(ComputedB, .mutating) as AnyKeyPath) as! WritableKeyPath<ComputedB, ComputedA>
+    let cb_nonmutating = (#keyPath2(ComputedB, .nonmutating) as AnyKeyPath) as! ReferenceWritableKeyPath<ComputedB, ComputedA>
+    let cb_reabstracted = (#keyPath2(ComputedB, .reabstracted) as AnyKeyPath) as! WritableKeyPath<ComputedB, () -> ()>
+  
+    let ca_readOnly_mutating = (#keyPath2(ComputedA, .readOnly.mutating) as AnyKeyPath) as! KeyPath<ComputedA, ComputedA>
+    let cb_mutating_readOnly = (#keyPath2(ComputedB, .mutating.readOnly) as AnyKeyPath) as! KeyPath<ComputedB, ComputedB>
+    let ca_readOnly_nonmutating = (#keyPath2(ComputedA, .readOnly.nonmutating) as AnyKeyPath) as! ReferenceWritableKeyPath<ComputedA, ComputedA>
+    let cb_readOnly_reabstracted = (#keyPath2(ComputedB, .readOnly.reabstracted) as AnyKeyPath) as! ReferenceWritableKeyPath<ComputedB, () -> ()>
+
+    let ca_readOnly_mutating2 = ca_readOnly.appending(path: cb_mutating)
+    expectEqual(ca_readOnly_mutating, ca_readOnly_mutating2)
+    expectEqual(ca_readOnly_mutating2, ca_readOnly_mutating)
+    expectEqual(ca_readOnly_mutating.hashValue, ca_readOnly_mutating2.hashValue)
+
+    let cb_mutating_readOnly2 = cb_mutating.appending(path: ca_readOnly)
+    expectEqual(cb_mutating_readOnly, cb_mutating_readOnly2)
+    expectEqual(cb_mutating_readOnly2, cb_mutating_readOnly)
+    expectEqual(cb_mutating_readOnly.hashValue, cb_mutating_readOnly2.hashValue)
+
+    let ca_readOnly_nonmutating2 = ca_readOnly.appending(path: cb_nonmutating)
+    expectEqual(ca_readOnly_nonmutating, ca_readOnly_nonmutating2)
+    expectEqual(ca_readOnly_nonmutating2, ca_readOnly_nonmutating)
+    expectEqual(ca_readOnly_nonmutating.hashValue,
+                ca_readOnly_nonmutating2.hashValue)
+
+    let cb_readOnly_reabstracted2 = cb_readOnly.appending(path: ca_reabstracted)
+    expectEqual(cb_readOnly_reabstracted,
+                cb_readOnly_reabstracted2)
+    expectEqual(cb_readOnly_reabstracted2,
+                cb_readOnly_reabstracted)
+    expectEqual(cb_readOnly_reabstracted2.hashValue,
+                cb_readOnly_reabstracted.hashValue)
   }
 }
 
