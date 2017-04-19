@@ -712,6 +712,24 @@ bool IndexSwiftASTWalker::reportRelatedTypeRef(const TypeLoc &Ty, SymbolRoleSet 
   return true;
 }
 
+static bool isDynamicVarAccessorOrFunc(ValueDecl *D, SymbolInfo symInfo) {
+  if (auto NTD = D->getDeclContext()->getAsNominalTypeOrNominalTypeExtensionContext()) {
+    bool isClassOrProtocol = isa<ClassDecl>(NTD) || isa<ProtocolDecl>(NTD);
+    bool isInternalAccessor =
+      symInfo.SubKind == SymbolSubKind::SwiftAccessorWillSet ||
+      symInfo.SubKind == SymbolSubKind::SwiftAccessorDidSet ||
+      symInfo.SubKind == SymbolSubKind::SwiftAccessorAddressor ||
+      symInfo.SubKind == SymbolSubKind::SwiftAccessorMutableAddressor;
+    if (isClassOrProtocol &&
+        symInfo.Kind != SymbolKind::StaticMethod &&
+        !isInternalAccessor &&
+        !D->isFinal()) {
+      return true;
+    }
+  }
+  return false;
+}
+
 bool IndexSwiftASTWalker::reportPseudoAccessor(AbstractStorageDecl *D,
                                                AccessorKind AccKind, bool IsRef,
                                                SourceLoc Loc) {
@@ -736,6 +754,9 @@ bool IndexSwiftASTWalker::reportPseudoAccessor(AbstractStorageDecl *D,
     Info.symInfo.SubKind = getSubKindForAccessor(AccKind);
     Info.roles |= (SymbolRoleSet)SymbolRole::Implicit;
     Info.group = "";
+    if (isDynamicVarAccessorOrFunc(D, Info.symInfo)) {
+      Info.roles |= (SymbolRoleSet)SymbolRole::Dynamic;
+    }
     return false;
   };
 
@@ -983,6 +1004,10 @@ bool IndexSwiftASTWalker::initFuncDeclIndexSymbol(FuncDecl *D,
   if (initIndexSymbol(D, D->getLoc(), /*IsRef=*/false, Info))
     return true;
 
+  if (isDynamicVarAccessorOrFunc(D, Info.symInfo)) {
+    Info.roles |= (SymbolRoleSet)SymbolRole::Dynamic;
+  }
+
   if (D->getAttrs().hasAttribute<IBActionAttr>()) {
     // Relate with type of the first parameter using RelationIBTypeOf.
     if (D->getParameterLists().size() >= 2) {
@@ -1012,7 +1037,7 @@ static bool isSuperRefExpr(Expr *E) {
 }
 
 static bool isDynamicCall(Expr *BaseE, ValueDecl *D) {
-  // The call is 'dynamic' if the method is not of a struct and the
+  // The call is 'dynamic' if the method is not of a struct/enum and the
   // receiver is not 'super'. Note that if the receiver is 'super' that
   // does not mean that the call is statically determined (an extension
   // method may have injected itself in the super hierarchy).
@@ -1021,7 +1046,7 @@ static bool isDynamicCall(Expr *BaseE, ValueDecl *D) {
   auto TyD = getNominalParent(D);
   if (!TyD)
     return false;
-  if (isa<StructDecl>(TyD))
+  if (isa<StructDecl>(TyD) || isa<EnumDecl>(TyD))
     return false;
   if (isSuperRefExpr(BaseE))
     return false;
