@@ -638,6 +638,8 @@ enum class CheckedCastContextKind {
   ConditionalCast,
   /// An "is" expression.
   IsExpr,
+  /// An "isnt" expression.
+  IsntExpr,
   /// An "is" pattern.
   IsPattern,
   /// An enum-element pattern.

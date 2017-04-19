@@ -1740,13 +1740,25 @@ RValue RValueEmitter::visitIsExpr(IsExpr *E, SGFContext C) {
   SILValue isa = emitIsa(SGF, E, E->getSubExpr(),
                          E->getCastTypeLoc().getType(), E->getCastKind());
 
-  // Call the _getBool library intrinsic.
   ASTContext &ctx = SGF.getASTContext();
+
+  if (E->isIsnt()) {
+    auto i1Ty = SILType::getBuiltinIntegerType(1, SGF.getASTContext());
+    auto t = SGF.B.createIntegerLiteral(E, i1Ty, 1);
+    isa = SGF.B.createBuiltin(E,
+                              ctx.getIdentifier("xor_Int1"),
+                              i1Ty,
+                              SubstitutionList(),
+                              { isa, t });
+  }
+
+  // Call the _getBool library intrinsic.
   auto result =
     SGF.emitApplyOfLibraryIntrinsic(E, ctx.getGetBoolDecl(nullptr),
                                     SubstitutionMap(),
                                     ManagedValue::forUnmanaged(isa),
                                     C);
+
   return result;
 }
 

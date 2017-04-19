@@ -2630,6 +2630,7 @@ ConstraintSystem::simplifyCheckedCastConstraint(
   }
 
   case CheckedCastKind::Coercion:
+  case CheckedCastKind::NegativeCoercion:
   case CheckedCastKind::BridgingCoercion:
   case CheckedCastKind::Swift3BridgingDowncast:
   case CheckedCastKind::Unresolved:

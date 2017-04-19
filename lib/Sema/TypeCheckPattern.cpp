@@ -1330,6 +1330,8 @@ recur:
     case CheckedCastKind::Swift3BridgingDowncast:
       IP->setCastKind(castKind);
       break;
+    case CheckedCastKind::NegativeCoercion:
+      break;
     }
     IP->setType(type);
     

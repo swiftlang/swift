@@ -60,19 +60,24 @@ ParserResult<Expr> Parser::parseExprImpl(Diag<> Message, bool isExprBasic) {
   return makeParserResult(expr.get());
 }
 
+
 /// parseExprIs
 ///   expr-is:
 ///     'is' type
+///     'isn't' type
 ParserResult<Expr> Parser::parseExprIs() {
-  SourceLoc isLoc = consumeToken(tok::kw_is);
+  auto isIsnt = Tok.is(tok::kw_isnt);
+  SourceLoc isLoc = consumeToken(isIsnt ? tok::kw_isnt : tok::kw_is);
 
-  ParserResult<TypeRepr> type = parseType(diag::expected_type_after_is);
+  ParserResult<TypeRepr> type =
+    parseType(isIsnt ? diag::expected_type_after_isnt :
+                       diag::expected_type_after_is);
   if (type.hasCodeCompletion())
     return makeParserCodeCompletionResult<Expr>();
   if (type.isNull())
     return nullptr;
 
-  return makeParserResult(new (Context) IsExpr(isLoc, type.get()));
+  return makeParserResult(new (Context) IsExpr(isLoc, type.get(), isIsnt));
 }
 
 /// parseExprAs
@@ -276,7 +281,8 @@ parse_operator:
       }
       break;
     }
-        
+
+    case tok::kw_isnt:
     case tok::kw_is: {
       // Parse a type after the 'is' token instead of an expression.
       ParserResult<Expr> is = parseExprIs();
@@ -292,7 +298,7 @@ parse_operator:
       // Jump directly to parsing another operator.
       goto parse_operator;
     }
-        
+
     case tok::kw_as: {
       ParserResult<Expr> as = parseExprAs();
       if (as.isNull() || as.hasCodeCompletion())
