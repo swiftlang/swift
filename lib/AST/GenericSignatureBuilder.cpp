@@ -3853,8 +3853,12 @@ Constraint<T> GenericSignatureBuilder::checkConstraintList(
 
 namespace {
   /// Remove self-derived sources from the given vector of constraints.
+  ///
+  /// \returns true if any derived-via-concrete constraints were found.
   template<typename T>
-  void removeSelfDerived(std::vector<Constraint<T>> &constraints) {
+  bool removeSelfDerived(std::vector<Constraint<T>> &constraints,
+                         bool dropDerivedViaConcrete = true) {
+    bool anyDerivedViaConcrete = false;
     // Remove self-derived constraints.
     Optional<Constraint<T>> remainingConcrete;
     constraints.erase(
@@ -3866,6 +3870,11 @@ namespace {
                          return true;
 
                        if (!derivedViaConcrete)
+                         return false;
+
+                       anyDerivedViaConcrete = true;
+
+                       if (!dropDerivedViaConcrete)
                          return false;
 
                        // Drop derived-via-concrete requirements.
@@ -3880,6 +3889,7 @@ namespace {
       constraints.push_back(*remainingConcrete);
 
     assert(!constraints.empty() && "All constraints were self-derived!");
+    return anyDerivedViaConcrete;
   }
 }
 
@@ -4235,11 +4245,13 @@ void GenericSignatureBuilder::checkSameTypeConstraints(
   equivClass = pa->getEquivalenceClassIfPresent();
   assert(equivClass && "Equivalence class disappeared?");
 
+  bool anyDerivedViaConcrete = false;
   for (auto &entry : equivClass->sameTypeConstraints) {
     auto &constraints = entry.second;
 
     // Remove self-derived constraints.
-    removeSelfDerived(constraints);
+    if (removeSelfDerived(constraints, /*dropDerivedViaConcrete=*/false))
+      anyDerivedViaConcrete = true;
 
     // Sort the constraints, so we get a deterministic ordering of diagnostics.
     llvm::array_pod_sort(constraints.begin(), constraints.end());
@@ -4313,6 +4325,18 @@ void GenericSignatureBuilder::checkSameTypeConstraints(
       // Ignore inferred requirements; we don't want to diagnose them.
       intercomponentEdges.push_back(
         IntercomponentEdge(firstComponent, secondComponent, constraint));
+    }
+  }
+
+  // If there were any derived-via-concrete constraints, drop them now before
+  // we emit other diagnostics.
+  if (anyDerivedViaConcrete) {
+    for (auto &entry : equivClass->sameTypeConstraints) {
+      auto &constraints = entry.second;
+
+      // Remove derived-via-concrete constraints.
+      (void)removeSelfDerived(constraints);
+        anyDerivedViaConcrete = true;
     }
   }
 
