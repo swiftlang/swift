@@ -1805,19 +1805,16 @@ void swift::maybeAddAccessorsToVariable(VarDecl *var, TypeChecker &TC) {
       // The conformance will be on the containing 'self' type, or '()' if the
       // property is in a non-type context.
       Type behaviorSelf;
-      Type behaviorInterfaceSelf;
       if (dc->isTypeContext()) {
-        behaviorInterfaceSelf = dc->getSelfInterfaceType();
-        behaviorSelf = dc->mapTypeIntoContext(behaviorInterfaceSelf);
+        behaviorSelf = dc->getSelfTypeInContext();
         assert(behaviorSelf && "type context doesn't have self type?!");
         if (var->isStatic())
           behaviorSelf = MetatypeType::get(behaviorSelf);
       } else {
-        behaviorSelf = behaviorInterfaceSelf = TC.Context.TheEmptyTupleType;
+        behaviorSelf = TC.Context.TheEmptyTupleType;
       }
       
       conformance = TC.Context.getBehaviorConformance(behaviorSelf,
-                                            behaviorInterfaceSelf,
                                             behaviorProto,
                                             behavior->getLoc(), var,
                                             ProtocolConformanceState::Checking);

@@ -1103,7 +1103,8 @@ ConformanceLookupTable::getSatisfiedProtocolRequirementsForMember(
       if (conf->isInvalid())
         continue;
 
-      conf->forEachValueWitness(resolver, [&](ValueDecl *req,
+      auto normal = conf->getRootNormalConformance();
+      normal->forEachValueWitness(resolver, [&](ValueDecl *req,
                                               ConcreteDeclRef witness) {
         if (witness.getDecl() == member)
           reqs.push_back(req);

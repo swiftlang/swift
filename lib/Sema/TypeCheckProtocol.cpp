@@ -2696,7 +2696,7 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
         if (auto conformance =
               TC.conformsToProtocol(Adoptee, derivableProto, DC, None)) {
           if (conformance->isConcrete())
-            conformance->getConcrete()->getWitness(derivable, &TC);
+            (void)conformance->getConcrete()->getWitnessDecl(derivable, &TC);
         }
       }
     }
@@ -5990,7 +5990,7 @@ TypeChecker::findWitnessedObjCRequirements(const ValueDecl *witness,
       }
       if (!*conformance) continue;
 
-      const Decl *found = (*conformance)->getWitness(req, this).getDecl();
+      const Decl *found = (*conformance)->getWitnessDecl(req, this);
 
       if (!found) {
         // If we have an optional requirement in an inherited conformance,

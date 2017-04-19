@@ -21,6 +21,11 @@
 
 #include "swift/AST/Substitution.h"
 #include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/FoldingSet.h"
+
+namespace llvm {
+class FoldingSetNodeID;
+} // end namespace llvm
 
 namespace swift {
 
@@ -41,6 +46,10 @@ void dump(SubstitutionList subs);
 SubstitutionList
 getCanonicalSubstitutionList(SubstitutionList subs,
                              SmallVectorImpl<Substitution> &canSubs);
+
+/// Profile the substitution list for use in a folding set.
+void profileSubstitutionList(llvm::FoldingSetNodeID &id, SubstitutionList subs);
+
 } // end namespace swift
 
 #endif

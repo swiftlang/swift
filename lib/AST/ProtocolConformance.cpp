@@ -251,9 +251,22 @@ Type ProtocolConformance::getTypeWitness(AssociatedTypeDecl *assocType,
   return getTypeWitnessAndDecl(assocType, resolver).first;
 }
 
-Witness ProtocolConformance::getWitness(ValueDecl *requirement,
-                                        LazyResolver *resolver) const {
-  CONFORMANCE_SUBCLASS_DISPATCH(getWitness, (requirement, resolver))
+ValueDecl *ProtocolConformance::getWitnessDecl(ValueDecl *requirement,
+                                               LazyResolver *resolver) const {
+  switch (getKind()) {
+  case ProtocolConformanceKind::Normal:
+    return cast<NormalProtocolConformance>(this)->getWitness(requirement,
+                                                             resolver)
+      .getDecl();
+
+  case ProtocolConformanceKind::Inherited:
+    return cast<InheritedProtocolConformance>(this)
+      ->getInheritedConformance()->getWitnessDecl(requirement, resolver);
+
+  case ProtocolConformanceKind::Specialized:
+    return cast<SpecializedProtocolConformance>(this)
+      ->getGenericConformance()->getWitnessDecl(requirement, resolver);
+  }
 }
 
 /// Determine whether the witness for the given requirement
@@ -266,7 +279,7 @@ usesDefaultDefinition(AssociatedTypeDecl *requirement) const {
 bool ProtocolConformance::hasFixedLayout() const {
   // A conformance/witness table has fixed layout if type has a fixed layout in
   // all resilience domains, and the conformance is externally visible.
-  if (auto nominal = getInterfaceType()->getAnyNominal())
+  if (auto nominal = getType()->getAnyNominal())
     if (nominal->hasFixedLayout() &&
         getProtocol()->getEffectiveAccess() >= Accessibility::Public &&
         nominal->getEffectiveAccess() >= Accessibility::Public)
@@ -652,11 +665,7 @@ SpecializedProtocolConformance::SpecializedProtocolConformance(
     Type conformingType,
     ProtocolConformance *genericConformance,
     SubstitutionList substitutions)
-  : ProtocolConformance(ProtocolConformanceKind::Specialized, conformingType,
-                        // FIXME: interface type should be passed in.
-                        // assumes specialized conformance is always fully
-                        // specialized
-                        conformingType),
+  : ProtocolConformance(ProtocolConformanceKind::Specialized, conformingType),
     GenericConformance(genericConformance),
     GenericSubstitutions(substitutions)
 {
@@ -706,13 +715,6 @@ SpecializedProtocolConformance::getTypeWitnessAndDecl(
 
   TypeWitnesses[assocType] = std::make_pair(specializedType, typeDecl);
   return TypeWitnesses[assocType];
-}
-
-Witness
-SpecializedProtocolConformance::getWitness(ValueDecl *requirement,
-                                           LazyResolver *resolver) const {
-  // FIXME: Apply substitutions here!
-  return GenericConformance->getWitness(requirement, resolver);
 }
 
 ProtocolConformanceRef
@@ -1067,8 +1069,6 @@ bool ProtocolConformance::isCanonical() const {
     return true;
 
   if (!getType()->isCanonical())
-    return false;
-  if (!getInterfaceType()->isCanonical())
     return false;
 
   switch (getKind()) {
