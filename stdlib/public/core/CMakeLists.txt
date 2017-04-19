@@ -130,6 +130,7 @@ set(SWIFTLIB_ESSENTIAL
   SwiftNativeNSArray.swift
   UnavailableStringAPIs.swift.gyb
   Unicode.swift
+  Unicode2.swift
   UnicodeScalar.swift
   UnicodeTrie.swift.gyb
   Unmanaged.swift
