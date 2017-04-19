@@ -173,6 +173,8 @@ public:
   }
 };
 
+class LazyMemberLoader;
+
 /// Context data for lazy deserialization.
 class LazyContextData {
 public:

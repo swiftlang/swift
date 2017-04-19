@@ -113,9 +113,25 @@ namespace {
     // The conforming context, either a nominal type or extension.
     DeclContext *DC;
 
+    // An auxiliary lookup table to be used for witnesses remapped via
+    // @_implements(Protocol, DeclName)
+    llvm::DenseMap<DeclName, llvm::TinyPtrVector<ValueDecl *>> ImplementsTable;
+
     WitnessChecker(TypeChecker &tc, ProtocolDecl *proto,
                    Type adoptee, DeclContext *dc)
-      : TC(tc), Proto(proto), Adoptee(adoptee), DC(dc) { }
+      : TC(tc), Proto(proto), Adoptee(adoptee), DC(dc) {
+      if (auto N = DC->getAsNominalTypeOrNominalTypeExtensionContext()) {
+        for (auto D : N->getMembers()) {
+          if (auto V = dyn_cast<ValueDecl>(D)) {
+            if (!V->hasName())
+              continue;
+            if (auto A = V->getAttrs().getAttribute<ImplementsAttr>()) {
+              A->getMemberName().addToLookupTable(ImplementsTable, V);
+            }
+          }
+        }
+      }
+    }
 
     /// Gather the value witnesses for the given requirement.
     ///
@@ -125,6 +141,10 @@ namespace {
     /// \c true.
     SmallVector<ValueDecl *, 4> lookupValueWitnesses(ValueDecl *req,
                                                      bool *ignoringNames);
+
+    void lookupValueWitnessesViaImplementsAttr(ValueDecl *req,
+                                               SmallVector<ValueDecl *, 4>
+                                               &witnesses);
 
     bool findBestWitness(ValueDecl *requirement,
                          bool *ignoringNames,
@@ -1255,11 +1275,41 @@ static bool isBetterMatch(TypeChecker &tc, DeclContext *dc,
   return false;
 }
 
+void
+WitnessChecker::lookupValueWitnessesViaImplementsAttr(
+    ValueDecl *req, SmallVector<ValueDecl *, 4> &witnesses) {
+  if (!req->isProtocolRequirement())
+    return;
+  if (!req->hasName())
+    return;
+  auto *PD = dyn_cast<ProtocolDecl>(req->getDeclContext());
+  if (!PD)
+    return;
+  auto i = ImplementsTable.find(req->getFullName());
+  if (i == ImplementsTable.end())
+    return;
+  for (auto candidate : i->second) {
+    if (auto A = candidate->getAttrs().getAttribute<ImplementsAttr>()) {
+      Type T = A->getProtocolType().getType();
+      if (auto *PT = T->getAs<ProtocolType>()) {
+        if (PT->getDecl() == PD) {
+          witnesses.push_back(candidate);
+        }
+      }
+    }
+  }
+}
+
 SmallVector<ValueDecl *, 4> 
 WitnessChecker::lookupValueWitnesses(ValueDecl *req, bool *ignoringNames) {
   assert(!isa<AssociatedTypeDecl>(req) && "Not for lookup for type witnesses*");
   
   SmallVector<ValueDecl *, 4> witnesses;
+
+  // Do an initial check to see if there are any @_implements remappings
+  // for this requirement.
+  lookupValueWitnessesViaImplementsAttr(req, witnesses);
+
   if (req->isOperator()) {
     // Operator lookup is always global.
     auto lookupOptions = defaultUnqualifiedLookupOptions;
@@ -2664,6 +2714,15 @@ diagnoseMissingWitnesses(MissingWitnessDiagnosisKind Kind) {
   }
 }
 
+static bool
+witnessHasImplementsAttrForRequirement(ValueDecl *witness,
+                                       ValueDecl *requirement) {
+  if (auto A = witness->getAttrs().getAttribute<ImplementsAttr>()) {
+    return A->getMemberName() == requirement->getFullName();
+  }
+  return false;
+}
+
 ResolveWitnessResult
 ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
   assert(!isa<AssociatedTypeDecl>(requirement) && "Use resolveTypeWitnessVia*");
@@ -2722,8 +2781,9 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
     auto witness = best.Witness;
 
     // If the name didn't actually line up, complain.
-    if (ignoringNames && 
-        requirement->getFullName() != best.Witness->getFullName()) {
+    if (ignoringNames &&
+        requirement->getFullName() != best.Witness->getFullName() &&
+        !witnessHasImplementsAttrForRequirement(best.Witness, requirement)) {
 
       diagnoseOrDefer(requirement, false,
         [witness, requirement](NormalProtocolConformance *conformance) {

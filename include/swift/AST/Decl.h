@@ -18,6 +18,7 @@
 #define SWIFT_DECL_H
 
 #include "swift/AST/AccessScope.h"
+#include "swift/AST/Attr.h"
 #include "swift/AST/CaptureInfo.h"
 #include "swift/AST/ClangNode.h"
 #include "swift/AST/ConcreteDeclRef.h"
@@ -286,8 +287,12 @@ class alignas(1 << DeclAlignInBits) Decl {
     /// Whether we have already checked whether this declaration is a 
     /// redeclaration.
     unsigned CheckedRedeclaration : 1;
+
+    /// Whether the decl can be accessed by swift users; for instance,
+    /// a.storage for lazy var a is a decl that cannot be accessed.
+    unsigned IsUserAccessible : 1;
   };
-  enum { NumValueDeclBits = NumDeclBits + 2 };
+  enum { NumValueDeclBits = NumDeclBits + 3 };
   static_assert(NumValueDeclBits <= 32, "fits in an unsigned");
 
   class AbstractStorageDeclBitfields {
@@ -327,11 +332,8 @@ class alignas(1 << DeclAlignInBits) Decl {
     /// It is up to the debugger to instruct SIL how to access this variable.
     unsigned IsDebuggerVar : 1;
 
-    /// Whether the decl can be accessed by swift users; for instance,
-    /// a.storage for lazy var a is a decl that cannot be accessed.
-    unsigned IsUserAccessible : 1;
   };
-  enum { NumVarDeclBits = NumAbstractStorageDeclBits + 6 };
+  enum { NumVarDeclBits = NumAbstractStorageDeclBits + 5 };
   static_assert(NumVarDeclBits <= 32, "fits in an unsigned");
 
   class EnumElementDeclBitfields {
@@ -383,10 +385,8 @@ class alignas(1 << DeclAlignInBits) Decl {
     /// Whether this function has a dynamic Self return type.
     unsigned HasDynamicSelf : 1;
     
-    /// Whether we are statically dispatched even if overridable
-    unsigned ForcedStaticDispatch : 1;
   };
-  enum { NumFuncDeclBits = NumAbstractFunctionDeclBits + 6 };
+  enum { NumFuncDeclBits = NumAbstractFunctionDeclBits + 5 };
   static_assert(NumFuncDeclBits <= 32, "fits in an unsigned");
 
   class ConstructorDeclBitfields {
@@ -400,9 +400,6 @@ class alignas(1 << DeclAlignInBits) Decl {
     /// analysis and SIL generation.
     unsigned ComputedBodyInitKind : 3;
 
-    /// The kind of initializer we have.
-    unsigned InitKind : 2;
-
     /// Whether this initializer is a stub placed into a subclass to
     /// catch invalid delegations to a designated initializer not
     /// overridden by the subclass. A stub will always trap at runtime.
@@ -412,7 +409,7 @@ class alignas(1 << DeclAlignInBits) Decl {
     /// an object construction that will invoke a stub.
     unsigned HasStubImplementation : 1;
   };
-  enum { NumConstructorDeclBits = NumAbstractFunctionDeclBits + 6 };
+  enum { NumConstructorDeclBits = NumAbstractFunctionDeclBits + 4 };
   static_assert(NumConstructorDeclBits <= 32, "fits in an unsigned");
 
   class TypeDeclBitfields {
@@ -523,10 +520,8 @@ class alignas(1 << DeclAlignInBits) Decl {
     /// control inserting the implicit destructor.
     unsigned HasDestructorDecl : 1;
 
-    /// Whether the class has @objc ancestry.
-    unsigned ObjCClassKind : 3;
   };
-  enum { NumClassDeclBits = NumNominalTypeDeclBits + 11 };
+  enum { NumClassDeclBits = NumNominalTypeDeclBits + 8 };
   static_assert(NumClassDeclBits <= 32, "fits in an unsigned");
 
   class StructDeclBitfields {
@@ -2090,6 +2085,7 @@ protected:
     : Decl(K, context), Name(name), NameLoc(NameLoc) {
     ValueDeclBits.AlreadyInLookupTable = false;
     ValueDeclBits.CheckedRedeclaration = false;
+    ValueDeclBits.IsUserAccessible = true;
   }
 
 public:
@@ -2113,6 +2109,14 @@ public:
   /// redeclaration.
   void setCheckedRedeclaration(bool checked) {
     ValueDeclBits.CheckedRedeclaration = checked;
+  }
+
+  void setUserAccessible(bool Accessible) {
+    ValueDeclBits.IsUserAccessible = Accessible;
+  }
+
+  bool isUserAccessible() const {
+    return ValueDeclBits.IsUserAccessible;
   }
 
   bool hasName() const { return bool(Name); }
@@ -3182,6 +3186,9 @@ class ClassDecl : public NominalTypeDecl {
   SourceLoc ClassLoc;
   ObjCMethodLookupTable *ObjCMethodLookup = nullptr;
 
+  /// Whether the class has @objc ancestry.
+  unsigned ObjCKind : 3;
+
   /// Create the Objective-C member lookup table.
   void createObjCMethodLookup();
 
@@ -3795,7 +3802,7 @@ struct alignas(1 << 3) BehaviorRecord {
     : ProtocolName(ProtocolName), Param(Param)
   {}
   
-  SourceLoc getLoc() const { return ProtocolName->getLoc(); }
+  SourceLoc getLoc() const;
 };
 
 /// AbstractStorageDecl - This is the common superclass for VarDecl and
@@ -4277,7 +4284,6 @@ protected:
           SourceLoc NameLoc, Identifier Name, Type Ty, DeclContext *DC)
     : AbstractStorageDecl(Kind, DC, Name, NameLoc)
   {
-    VarDeclBits.IsUserAccessible = true;
     VarDeclBits.IsStatic = IsStatic;
     VarDeclBits.IsLet = IsLet;
     VarDeclBits.IsCaptureList = IsCaptureList;
@@ -4298,14 +4304,6 @@ public:
               DC) {}
 
   SourceRange getSourceRange() const;
-
-  void setUserAccessible(bool Accessible) {
-    VarDeclBits.IsUserAccessible = Accessible;
-  }
-
-  bool isUserAccessible() const {
-    return VarDeclBits.IsUserAccessible;
-  }
 
   TypeLoc &getTypeLoc() { return typeLoc; }
   TypeLoc getTypeLoc() const { return typeLoc; }
@@ -5030,6 +5028,9 @@ class FuncDecl final : public AbstractFunctionDecl,
   unsigned HaveSearchedForCommonOverloadReturnType : 1;
   unsigned HaveFoundCommonOverloadReturnType : 1;
 
+  /// Whether we are statically dispatched even if overridable
+  unsigned ForcedStaticDispatch : 1;
+
   /// \brief If this FuncDecl is an accessor for a property, this indicates
   /// which property and what kind of accessor.
   llvm::PointerIntPair<AbstractStorageDecl*, 3, AccessorKind> AccessorDecl;
@@ -5059,8 +5060,8 @@ class FuncDecl final : public AbstractFunctionDecl,
     assert(NumParameterLists > 0 && "Must have at least an empty tuple arg");
     FuncDeclBits.Mutating = false;
     FuncDeclBits.HasDynamicSelf = false;
-    FuncDeclBits.ForcedStaticDispatch = false;
-        
+
+    ForcedStaticDispatch = false;
     HaveSearchedForCommonOverloadReturnType = false;
     HaveFoundCommonOverloadReturnType = false;
   }
@@ -5290,10 +5291,10 @@ public:
   
   /// Returns true if the function is forced to be statically dispatched.
   bool hasForcedStaticDispatch() const {
-    return FuncDeclBits.ForcedStaticDispatch;
+    return ForcedStaticDispatch;
   }
   void setForcedStaticDispatch(bool flag) {
-    FuncDeclBits.ForcedStaticDispatch = flag;
+    ForcedStaticDispatch = flag;
   }
 
   static bool classof(const Decl *D) { return D->getKind() == DeclKind::Func; }
@@ -5510,6 +5511,9 @@ enum class CtorInitializerKind {
 /// }
 /// \endcode
 class ConstructorDecl : public AbstractFunctionDecl {
+  /// The kind of initializer we have.
+  unsigned InitKind : 2;
+
   /// The failability of this initializer, which is an OptionalTypeKind.
   unsigned Failability : 2;
 
@@ -5615,12 +5619,12 @@ public:
 
   /// Determine the kind of initializer this is.
   CtorInitializerKind getInitKind() const {
-    return static_cast<CtorInitializerKind>(ConstructorDeclBits.InitKind);
+    return static_cast<CtorInitializerKind>(InitKind);
   }
 
   /// Set whether this is a convenience initializer.
   void setInitKind(CtorInitializerKind kind) {
-    ConstructorDeclBits.InitKind = static_cast<unsigned>(kind);
+    InitKind = static_cast<unsigned>(kind);
   }
 
   /// Whether this is a designated initializer.

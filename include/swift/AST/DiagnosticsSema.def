@@ -2154,6 +2154,17 @@ ERROR(lazy_not_observable,none,
 ERROR(attr_for_debugger_support_only,none,
       "@LLDBDebuggerSupport may only be used when debugger support is on", ())
 
+// @_implements
+ERROR(implements_attr_protocol_lacks_member,none,
+      "protocol %0 has no member %1", (DeclName, DeclName))
+
+ERROR(implements_attr_non_protocol_type,none,
+      "non-protocol type in @_implements attribute", ())
+
+ERROR(implements_attr_protocol_not_conformed_to,none,
+      "containing type %0 does not conform to protocol %1",
+      (DeclName, DeclName))
+
 //------------------------------------------------------------------------------
 // Type Check Expressions
 //------------------------------------------------------------------------------

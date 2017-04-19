@@ -28,6 +28,7 @@
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/TypeLoc.h"
+#include "swift/AST/TypeRepr.h"
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallString.h"
@@ -63,6 +64,20 @@ SourceRange TypeLoc::getSourceRange() const {
   if (TyR)
     return TyR->getSourceRange();
   return SourceRange();
+}
+
+TypeLoc TypeLoc::clone(ASTContext &ctx) const {
+  if (TyR) {
+    TypeLoc result(TyR->clone(ctx));
+    result.TAndValidBit = this->TAndValidBit;
+    return result;
+  }
+  return *this;
+}
+
+SourceLoc TypeLoc::getLoc() const {
+  if (TyR) return TyR->getLoc();
+  return SourceLoc();
 }
 
 // Only allow allocation of Types using the allocator in ASTContext.

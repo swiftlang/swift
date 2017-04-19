@@ -25,6 +25,7 @@
 #include "swift/AST/Identifier.h"
 #include "swift/AST/Types.h"
 #include "swift/AST/TypeLoc.h"
+#include "swift/AST/TypeRepr.h"
 #include "swift/Basic/LLVM.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/FoldingSet.h"

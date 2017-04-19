@@ -26,6 +26,7 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/Types.h"
+#include "swift/AST/TypeRepr.h"
 #include "swift/Basic/StringExtras.h"
 #include "swift/ClangImporter/ClangImporterOptions.h"
 #include "swift/Parse/Parser.h"
