@@ -1083,7 +1083,8 @@ class ClassExistentialTypeInfo final
                                     std::move(spareBits), align),
       Refcounting(refcounting) {
     assert(refcounting == ReferenceCounting::Native ||
-           refcounting == ReferenceCounting::Unknown);
+           refcounting == ReferenceCounting::Unknown ||
+           refcounting == ReferenceCounting::ObjC);
   }
 
 public:
