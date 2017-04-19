@@ -249,6 +249,7 @@ ToolChain::constructInvocation(const CompileJobAction &job,
     case types::TY_ObjCHeader:
     case types::TY_Image:
     case types::TY_SwiftDeps:
+    case types::TY_ModuleTrace:
       llvm_unreachable("Output type can never be primary output.");
     case types::TY_INVALID:
       llvm_unreachable("Invalid type ID");
@@ -381,6 +382,13 @@ ToolChain::constructInvocation(const CompileJobAction &job,
     Arguments.push_back(ReferenceDependenciesPath.c_str());
   }
 
+  const std::string &LoadedModuleTracePath =
+      context.Output.getAdditionalOutputForType(types::TY_ModuleTrace);
+  if (!LoadedModuleTracePath.empty()) {
+    Arguments.push_back("-emit-loaded-module-trace-path");
+    Arguments.push_back(LoadedModuleTracePath.c_str());
+  }
+
   const std::string &FixitsPath =
     context.Output.getAdditionalOutputForType(types::TY_Remapping);
   if (!FixitsPath.empty()) {
@@ -511,6 +519,7 @@ ToolChain::constructInvocation(const BackendJobAction &job,
     case types::TY_Image:
     case types::TY_SwiftDeps:
     case types::TY_Remapping:
+    case types::TY_ModuleTrace:
       llvm_unreachable("Output type can never be primary output.");
     case types::TY_INVALID:
       llvm_unreachable("Invalid type ID");

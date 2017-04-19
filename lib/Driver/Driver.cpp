@@ -1421,6 +1421,7 @@ void Driver::buildActions(const ToolChain &TC,
       case types::TY_PCH:
       case types::TY_ImportedModules:
       case types::TY_TBD:
+      case types::TY_ModuleTrace:
         // We could in theory handle assembly or LLVM input, but let's not.
         // FIXME: What about LTO?
         Diags.diagnose(SourceLoc(), diag::error_unexpected_input_file,
@@ -2071,6 +2072,10 @@ Job *Driver::buildJobsForAction(Compilation &C, const JobAction *JA,
     // Choose the dependencies file output path.
     if (C.getArgs().hasArg(options::OPT_emit_dependencies)) {
       addAuxiliaryOutput(C, *Output, types::TY_Dependencies, OI, OutputMap);
+    }
+    if (C.getArgs().hasArg(options::OPT_emit_loaded_module_trace,
+                           options::OPT_emit_loaded_module_trace_path)) {
+      addAuxiliaryOutput(C, *Output, types::TY_ModuleTrace, OI, OutputMap);
     }
     if (C.getIncrementalBuildEnabled()) {
       addAuxiliaryOutput(C, *Output, types::TY_SwiftDeps, OI, OutputMap);
