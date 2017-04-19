@@ -251,9 +251,22 @@ Type ProtocolConformance::getTypeWitness(AssociatedTypeDecl *assocType,
   return getTypeWitnessAndDecl(assocType, resolver).first;
 }
 
-Witness ProtocolConformance::getWitness(ValueDecl *requirement,
-                                        LazyResolver *resolver) const {
-  CONFORMANCE_SUBCLASS_DISPATCH(getWitness, (requirement, resolver))
+ValueDecl *ProtocolConformance::getWitnessDecl(ValueDecl *requirement,
+                                               LazyResolver *resolver) const {
+  switch (getKind()) {
+  case ProtocolConformanceKind::Normal:
+    return cast<NormalProtocolConformance>(this)->getWitness(requirement,
+                                                             resolver)
+      .getDecl();
+
+  case ProtocolConformanceKind::Inherited:
+    return cast<InheritedProtocolConformance>(this)
+      ->getInheritedConformance()->getWitnessDecl(requirement, resolver);
+
+  case ProtocolConformanceKind::Specialized:
+    return cast<SpecializedProtocolConformance>(this)
+      ->getGenericConformance()->getWitnessDecl(requirement, resolver);
+  }
 }
 
 /// Determine whether the witness for the given requirement
@@ -702,13 +715,6 @@ SpecializedProtocolConformance::getTypeWitnessAndDecl(
 
   TypeWitnesses[assocType] = std::make_pair(specializedType, typeDecl);
   return TypeWitnesses[assocType];
-}
-
-Witness
-SpecializedProtocolConformance::getWitness(ValueDecl *requirement,
-                                           LazyResolver *resolver) const {
-  // FIXME: Apply substitutions here!
-  return GenericConformance->getWitness(requirement, resolver);
 }
 
 ProtocolConformanceRef

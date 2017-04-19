@@ -182,41 +182,16 @@ public:
     return false;
   }
 
-  /// Retrieve the non-type witness for the given requirement.
-  Witness getWitness(ValueDecl *requirement, LazyResolver *resolver) const;
+  /// Retrieve the value witness declaration corresponding to the given
+  /// requirement.
+  ValueDecl *getWitnessDecl(ValueDecl *requirement,
+                            LazyResolver *resolver) const;
 
 private:
   /// Determine whether we have a witness for the given requirement.
   bool hasWitness(ValueDecl *requirement) const;
 
 public:
-  /// Apply the given function object to each value witness within this
-  /// protocol conformance.
-  ///
-  /// The function object should accept a \c ValueDecl* for the requirement
-  /// followed by the \c Witness for the witness. Note that a generic
-  /// witness will only be specialized if the conformance came from the current
-  /// file.
-  template<typename F>
-  void forEachValueWitness(LazyResolver *resolver, F f) const {
-    const ProtocolDecl *protocol = getProtocol();
-    for (auto req : protocol->getMembers()) {
-      auto valueReq = dyn_cast<ValueDecl>(req);
-      if (!valueReq || isa<AssociatedTypeDecl>(valueReq) ||
-          valueReq->isInvalid())
-        continue;
-
-      if (!valueReq->isProtocolRequirement())
-        continue;
-
-      // If we don't have and cannot resolve witnesses, skip it.
-      if (!resolver && !hasWitness(valueReq))
-        continue;
-
-      f(valueReq, getWitness(valueReq, resolver));
-    }
-  }
-
   /// Retrieve the protocol conformance for the inherited protocol.
   ProtocolConformance *getInheritedConformance(ProtocolDecl *protocol) const;
 
@@ -457,6 +432,33 @@ public:
   /// Set the witness for the given requirement.
   void setWitness(ValueDecl *requirement, Witness witness) const;
 
+  /// Apply the given function object to each value witness within this
+  /// protocol conformance.
+  ///
+  /// The function object should accept a \c ValueDecl* for the requirement
+  /// followed by the \c Witness for the witness. Note that a generic
+  /// witness will only be specialized if the conformance came from the current
+  /// file.
+  template<typename F>
+  void forEachValueWitness(LazyResolver *resolver, F f) const {
+    const ProtocolDecl *protocol = getProtocol();
+    for (auto req : protocol->getMembers()) {
+      auto valueReq = dyn_cast<ValueDecl>(req);
+      if (!valueReq || isa<AssociatedTypeDecl>(valueReq) ||
+          valueReq->isInvalid())
+        continue;
+
+      if (!valueReq->isProtocolRequirement())
+        continue;
+
+      // If we don't have and cannot resolve witnesses, skip it.
+      if (!resolver && !hasWitness(valueReq))
+        continue;
+
+      f(valueReq, getWitness(valueReq, resolver));
+    }
+  }
+
   /// Retrieve the protocol conformances that satisfy the requirements of the
   /// protocol, which line up with the conformance constraints in the
   /// protocol's requirement signature.
@@ -565,10 +567,6 @@ public:
   getTypeWitnessAndDecl(AssociatedTypeDecl *assocType,
                         LazyResolver *resolver) const;
 
-  /// Retrieve the value witness corresponding to the given requirement.
-  Witness getWitness(ValueDecl *requirement, LazyResolver *resolver) const;
-
-
   /// Given that the requirement signature of the protocol directly states
   /// that the given dependent type must conform to the given protocol,
   /// return its associated conformance.
@@ -663,12 +661,6 @@ public:
   getTypeWitnessAndDecl(AssociatedTypeDecl *assocType,
                         LazyResolver *resolver) const {
     return InheritedConformance->getTypeWitnessAndDecl(assocType, resolver);
-  }
-
-  /// Retrieve the value witness corresponding to the given requirement.
-  Witness getWitness(ValueDecl *requirement, LazyResolver *resolver) const {
-    // FIXME: Substitute!
-    return InheritedConformance->getWitness(requirement, resolver);
   }
 
   /// Given that the requirement signature of the protocol directly states
