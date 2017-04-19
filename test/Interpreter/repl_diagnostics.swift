@@ -1,6 +1,3 @@
-// FIXME(integers): compiler no longer catches this. <rdar://problem/29911715>
-// XFAIL: *
-
 // RUN: %target-repl-run-simple-swift | %FileCheck %s
 
 // REQUIRES: swift_repl
