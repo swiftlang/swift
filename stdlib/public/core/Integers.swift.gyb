@@ -1934,6 +1934,7 @@ extension BinaryInteger {
 ///     let (y, overflow) = x.addingReportingOverflow(x)
 ///     // y == 254
 ///     // overflow == ArithmeticOverflow.overflow
+@_fixed_layout
 public enum ArithmeticOverflow {
   @_transparent
   public init(_ overflow: Bool) { self = overflow ? .overflow : .none }
