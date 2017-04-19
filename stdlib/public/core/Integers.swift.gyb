@@ -2557,11 +2557,7 @@ public struct ${Self}
 
   @_transparent
   public init(_builtinIntegerLiteral x: _MaxBuiltinIntegerType) {
-    _value = Builtin.truncOrBitCast_${IntLiteral}_Int${bits}(x)
-    Builtin.condfail(
-      Builtin.cmp_ne_${IntLiteral}(
-        Builtin.${z}extOrBitCast_Int${bits}_${IntLiteral}(
-          _value), x))
+    _value = Builtin.s_to_${u}_checked_trunc_${IntLiteral}_${BuiltinName}(x).0
   }
 
   /// Creates a new instance with the same memory representation as the given
