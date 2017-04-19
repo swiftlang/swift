@@ -134,16 +134,6 @@ tests.test("Literals") {
   expectEqual(e, 255)
 }
 
-tests.test("Signed Literal Trap") {
-  expectCrashLater()
-  let _: Int8 = 128
-}
-
-tests.test("Unsigned Literal Trap") {
-  expectCrashLater()
-  let _: UInt8 = 256
-}
-
 tests.test("Equality") {
   expectEqual(183 as UInt8, 183)
   expectNotEqual(183 as UInt8, 184)
