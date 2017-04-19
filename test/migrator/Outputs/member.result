@@ -1,0 +1,8 @@
+[
+  {
+    "file": "/Volumes/ssd/SSDDocument/sourceroot/swift/test/migrator/member.swift",
+    "offset": 243,
+    "remove": "17,
+    "text": "bar.memberVariable"
+  }
+]
