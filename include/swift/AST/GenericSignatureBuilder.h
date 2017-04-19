@@ -192,6 +192,12 @@ public:
     /// Determine whether conformance to the given protocol is satisfied by
     /// a superclass requirement.
     bool isConformanceSatisfiedBySuperclass(ProtocolDecl *proto) const;
+
+    /// Dump a debugging representation of this equivalence class.
+    void dump(llvm::raw_ostream &out) const;
+
+    LLVM_ATTRIBUTE_DEPRECATED(void dump() const,
+                              "only for use in the debugger");
   };
 
   friend class RequirementSource;

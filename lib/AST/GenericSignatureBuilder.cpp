@@ -1083,6 +1083,50 @@ bool EquivalenceClass::isConformanceSatisfiedBySuperclass(
   return false;
 }
 
+void EquivalenceClass::dump(llvm::raw_ostream &out) const {
+  out << "Equivalence class represented by "
+    << members.front()->getRepresentative()->getDebugName() << ":\n";
+  out << "Members: ";
+  interleave(members, [&](PotentialArchetype *pa) {
+    out << pa->getDebugName();
+  }, [&]() {
+    out << ", ";
+  });
+  out << "\nConformances:";
+  interleave(conformsTo,
+             [&](const std::pair<
+                        ProtocolDecl *,
+                        std::vector<Constraint<ProtocolDecl *>>> &entry) {
+               out << entry.first->getNameStr();
+             },
+             [&] { out << ", "; });
+  out << "\nSame-type constraints:";
+  for (const auto &entry : sameTypeConstraints) {
+    out << "\n  " << entry.first->getDebugName() << " == ";
+    interleave(entry.second,
+               [&](const Constraint<PotentialArchetype *> &constraint) {
+                 out << constraint.value->getDebugName();
+
+                 if (constraint.source->isDerivedRequirement())
+                   out << " [derived]";
+               }, [&] {
+                 out << ", ";
+               });
+  }
+  if (concreteType)
+    out << "\nConcrete type: " << concreteType.getString();
+  if (superclass)
+    out << "\nSuperclass: " << superclass.getString();
+  if (layout)
+    out << "\nLayout: " << layout.getString();
+
+  out << "\n";
+}
+
+void EquivalenceClass::dump() const {
+  dump(llvm::errs());
+}
+
 ConstraintResult GenericSignatureBuilder::handleUnresolvedRequirement(
                                    RequirementKind kind,
                                    UnresolvedType lhs,
