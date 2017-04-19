@@ -1528,7 +1528,7 @@ ASTContext::getSpecializedConformance(Type type,
                                       ProtocolConformance *generic,
                                       SubstitutionList substitutions) {
   llvm::FoldingSetNodeID id;
-  SpecializedProtocolConformance::Profile(id, type, generic);
+  SpecializedProtocolConformance::Profile(id, type, generic, substitutions);
 
   // Figure out which arena this conformance should go into.
   AllocationArena arena = getArena(type->getRecursiveProperties());

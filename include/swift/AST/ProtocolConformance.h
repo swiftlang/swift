@@ -589,17 +589,16 @@ public:
   }
 
   void Profile(llvm::FoldingSetNodeID &ID) {
-    Profile(ID, getType(), getGenericConformance());
+    Profile(ID, getType(), getGenericConformance(),
+            getGenericSubstitutions());
   }
 
   static void Profile(llvm::FoldingSetNodeID &ID, Type type,
-                      ProtocolConformance *genericConformance) {
-    // FIXME: Consider profiling substitutions here. They could differ in
-    // some crazy cases that also require major diagnostic work, where the
-    // substitutions involve conformances of the same type to the same
-    // protocol drawn from different imported modules.
+                      ProtocolConformance *genericConformance,
+                      SubstitutionList subs) {
     ID.AddPointer(type.getPointer());
     ID.AddPointer(genericConformance);
+    profileSubstitutionList(ID, subs);
   }
 
   static bool classof(const ProtocolConformance *conformance) {
