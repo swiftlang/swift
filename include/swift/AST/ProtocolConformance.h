@@ -444,11 +444,6 @@ public:
                            LazyResolver *resolver = nullptr) const;
 
   /// Retrieve the value witness corresponding to the given requirement.
-  ///
-  /// Note that a generic witness will only be specialized if the conformance
-  /// came from the current file.
-  ///
-  /// FIXME: The 'only specialized if from the same file' bit is awful.
   Witness getWitness(ValueDecl *requirement, LazyResolver *resolver) const;
 
   /// Determine whether the protocol conformance has a witness for the given
