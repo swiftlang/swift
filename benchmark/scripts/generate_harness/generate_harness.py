@@ -40,7 +40,7 @@ template_map = {
     'main.swift_template': os.path.join(output_dir, 'utils/main.swift')
 }
 
-### The test suites. Currently, "other" and "string"
+# The test suites. Currently, "other" and "string"
 other_tests = ["Ackermann", "Fibonacci"]
 string_tests = [
     "StringWalkASCIIScalars",
