@@ -609,8 +609,7 @@ SILGenModule::emitProtocolWitness(ProtocolConformance *conformance,
                    ->getGenericEnvironmentOfContext();
 
     auto conformanceDC = conformance->getDeclContext();
-    Type concreteTy =
-      conformanceDC->mapTypeOutOfContext(conformance->getType());
+    Type concreteTy = conformanceDC->getSelfInterfaceType();
 
     // FIXME: conformance substitutions should be in terms of interface types
     auto specialized = conformance;
