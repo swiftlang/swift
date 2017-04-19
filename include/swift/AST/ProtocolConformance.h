@@ -355,7 +355,6 @@ class NormalProtocolConformance : public ProtocolConformance,
   }
 
   NormalProtocolConformance(Type conformingType,
-                            Type conformingInterfaceType,
                             ProtocolDecl *protocol,
                             SourceLoc loc, AbstractStorageDecl *behaviorStorage,
                             ProtocolConformanceState state)

@@ -1476,16 +1476,14 @@ void ValueDecl::setLocalDiscriminator(unsigned index) {
 
 NormalProtocolConformance *
 ASTContext::getBehaviorConformance(Type conformingType,
-                                   Type conformingInterfaceType,
                                    ProtocolDecl *protocol,
                                    SourceLoc loc,
                                    AbstractStorageDecl *storage,
                                    ProtocolConformanceState state) {
   auto conformance = new (*this, AllocationArena::Permanent)
-    NormalProtocolConformance(conformingType, conformingInterfaceType,
-                              protocol, loc, storage, state);
+    NormalProtocolConformance(conformingType, protocol, loc, storage, state);
 
-  if (auto nominal = conformingInterfaceType->getAnyNominal()) {
+  if (auto nominal = conformingType->getRValueInstanceType()->getAnyNominal()) {
     // Note: this is an egregious hack. The conformances need to be associated
     // with the actual storage declarations.
     SmallVector<ProtocolConformance *, 2> conformances;
