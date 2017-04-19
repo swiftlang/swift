@@ -125,6 +125,12 @@ private func addPrecommitTest(
 ) {
   precommitTests[name] = function
 }
+@inline(__always)
+private func addStringTest(
+  _ name: String, _ function: @escaping (Int) -> ()
+) {
+  stringTests[name] = function
+}
 
 addPrecommitTest("AngryPhonebook", run_AngryPhonebook)
 addPrecommitTest("AnyHashableWithAClass", run_AnyHashableWithAClass)
@@ -499,5 +505,17 @@ otherTests = [
   "Fibonacci": run_Fibonacci,
 ]
 
+// String tests, an extended benchmark suite exercising finer-granularity
+// behavior of our Strings.
+//
+// Scalar and Character iteration
+addStringTest("StringWalkASCIIScalars", run_StringWalkASCIIScalars)
+addStringTest("StringWalkASCIICharacters", run_StringWalkASCIICharacters)
+addStringTest("StringWalkUnicodeScalars", run_StringWalkUnicodeScalars)
+addStringTest("StringWalkUnicodeCharacters", run_StringWalkUnicodeCharacters)
+addStringTest("StringWalkASCIIScalarsBackwards", run_StringWalkASCIIScalarsBackwards)
+addStringTest("StringWalkASCIICharactersBackwards", run_StringWalkASCIICharactersBackwards)
+addStringTest("StringWalkUnicodeScalarsBackwards", run_StringWalkUnicodeScalarsBackwards)
+addStringTest("StringWalkUnicodeCharactersBackwards", run_StringWalkUnicodeCharactersBackwards)
 
 main()
