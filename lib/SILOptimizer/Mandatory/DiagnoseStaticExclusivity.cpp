@@ -431,7 +431,8 @@ static void checkStaticExclusivity(SILFunction &Fn, PostOrderFunctionInfo *PO) {
       if (auto *AI = dyn_cast<ApplyInst>(&I)) {
         // Suppress for the arguments to the Standard Library's swap()
         // function until we can recommend a safe alternative.
-        if (isCallToStandardLibrarySwap(AI, Fn.getASTContext()))
+        if (Fn.getModule().getOptions().SuppressStaticExclusivitySwap &&
+            isCallToStandardLibrarySwap(AI, Fn.getASTContext()))
           CallsToSuppress.push_back(AI);
       }
 

@@ -143,6 +143,10 @@ public:
   /// Emit compile-time diagnostics when the law of exclusivity is violated.
   bool EnforceExclusivityStatic = false;
 
+  /// Suppress static diagnostics for violations of exclusive access for calls
+  /// to the Standard Library's swap() free function.
+  bool SuppressStaticExclusivitySwap = false;
+
   /// Emit checks to trap at run time when the law of exclusivity is violated.
   bool EnforceExclusivityDynamic = false;
 
