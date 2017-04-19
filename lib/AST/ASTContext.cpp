@@ -3779,19 +3779,19 @@ ForeignRepresentationInfo
 ASTContext::getForeignRepresentationInfo(NominalTypeDecl *nominal,
                                          ForeignLanguage language,
                                          const DeclContext *dc) {
-  if (Impl.ForeignRepresentableCache.empty()) {
-    // Local function to add a type with the given name and module as
-    // trivially-representable.
-    auto addTrivial = [&](Identifier name, ModuleDecl *module,
-                          bool allowOptional = false) {
-      if (auto type = findUnderlyingTypeInModule(*this, name, module)) {
-        auto info = ForeignRepresentationInfo::forTrivial();
-        if (allowOptional)
-          info = ForeignRepresentationInfo::forTrivialWithOptional();
-        Impl.ForeignRepresentableCache.insert({type, info});
-      }
-    };
+  // Local function to add a type with the given name and module as
+  // trivially-representable.
+  auto addTrivial = [&](Identifier name, ModuleDecl *module,
+                        bool allowOptional = false) {
+    if (auto type = findUnderlyingTypeInModule(*this, name, module)) {
+      auto info = ForeignRepresentationInfo::forTrivial();
+      if (allowOptional)
+        info = ForeignRepresentationInfo::forTrivialWithOptional();
+      Impl.ForeignRepresentableCache.insert({type, info});
+    }
+  };
 
+  if (Impl.ForeignRepresentableCache.empty()) {
     // Pre-populate the foreign-representable cache with known types.
     if (auto stdlib = getStdlibModule()) {
       addTrivial(getIdentifier("OpaquePointer"), stdlib, true);
@@ -3843,7 +3843,45 @@ ASTContext::getForeignRepresentationInfo(NominalTypeDecl *nominal,
   // yet. If we've never seen this nominal type before, or if we have
   // an out-of-date negative cached value, we'll have to go looking.
   auto known = Impl.ForeignRepresentableCache.find(nominal);
-  if (known == Impl.ForeignRepresentableCache.end() ||
+  bool wasNotFoundInCache = known == Impl.ForeignRepresentableCache.end();
+
+  // For the REPL. We might have initialized the cache above before CoreGraphics
+  // was loaded.
+  //   let s = "" // Here we initialize the ForeignRepresentableCache.
+  //   import Foundation
+  //   let pt = CGPoint(x: 1.0, y: 2.0) // Here we query for CGFloat.
+  // Add CGFloat as trivial if we encounter it later.
+  // If the type was not found check if it would be found after having recently
+  // loaded the module.
+  // Similar for types for other non stdlib modules.
+  auto conditionallyAddTrivial = [&](NominalTypeDecl *nominalDecl,
+                                     Identifier typeName, Identifier moduleName,
+                                     bool allowOptional = false) {
+    if (nominal->getName() == typeName && wasNotFoundInCache) {
+      if (auto module = getLoadedModule(moduleName)) {
+        addTrivial(typeName, module, allowOptional);
+        known = Impl.ForeignRepresentableCache.find(nominal);
+        wasNotFoundInCache = known == Impl.ForeignRepresentableCache.end();
+      }
+    }
+  };
+  conditionallyAddTrivial(nominal, getIdentifier("DarwinBoolean") , Id_Darwin);
+  conditionallyAddTrivial(nominal, Id_Selector, Id_ObjectiveC, true);
+  conditionallyAddTrivial(nominal, getIdentifier("ObjCBool"), Id_ObjectiveC);
+  conditionallyAddTrivial(nominal, getSwiftId(KnownFoundationEntity::NSZone), Id_ObjectiveC, true);
+  conditionallyAddTrivial(nominal, Id_CGFloat, getIdentifier("CoreGraphics"));
+  const unsigned SWIFT_MAX_IMPORTED_SIMD_ELEMENTS = 4;
+#define MAP_SIMD_TYPE(BASENAME, _, __)                                         \
+  {                                                                            \
+    char name[] = #BASENAME "0";                                               \
+    for (unsigned i = 2; i <= SWIFT_MAX_IMPORTED_SIMD_ELEMENTS; ++i) {         \
+      *(std::end(name) - 2) = '0' + i;                                         \
+      conditionallyAddTrivial(nominal, getIdentifier(name), Id_simd);          \
+    }                                                                          \
+  }
+#include "swift/ClangImporter/SIMDMappedTypes.def"
+
+  if (wasNotFoundInCache ||
       (known->second.getKind() == ForeignRepresentableKind::None &&
        known->second.getGeneration() < CurrentGeneration)) {
     Optional<ForeignRepresentationInfo> result;
