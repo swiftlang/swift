@@ -662,7 +662,6 @@ public:
   /// Produce a new normal conformance for a property behavior.
   NormalProtocolConformance *
   getBehaviorConformance(Type conformingType,
-                         Type conformingInterfaceType,
                          ProtocolDecl *protocol,
                          SourceLoc loc,
                          AbstractStorageDecl *storage,

@@ -166,7 +166,7 @@ static DeclTy *findNamedWitnessImpl(
     return requirement;
   auto concrete = conformance->getConcrete();
   // FIXME: Dropping substitutions here.
-  return cast_or_null<DeclTy>(concrete->getWitness(requirement, &tc).getDecl());
+  return cast_or_null<DeclTy>(concrete->getWitnessDecl(requirement, &tc));
 }
 
 static bool shouldAccessStorageDirectly(Expr *base, VarDecl *member,
@@ -426,8 +426,8 @@ namespace {
                                     (ConformanceCheckFlags::InExpression|
                                          ConformanceCheckFlags::Used));
             if (conformance && conformance->isConcrete()) {
-              if (auto witnessRef =
-                    conformance->getConcrete()->getWitness(decl, &tc)) {
+              if (auto witness =
+                        conformance->getConcrete()->getWitnessDecl(decl, &tc)) {
                 // Hack up an AST that we can type-check (independently) to get
                 // it into the right form.
                 // FIXME: the hop through 'getDecl()' is because
@@ -435,7 +435,6 @@ namespace {
                 // witnesses' ConcreteDeclRefs.
                 Type expectedFnType = simplifiedFnType->getResult();
                 Expr *refExpr;
-                ValueDecl *witness = witnessRef.getDecl();
                 if (witness->getDeclContext()->isTypeContext()) {
                   Expr *base =
                     TypeExpr::createImplicitHack(loc.getBaseNameLoc(), baseTy,

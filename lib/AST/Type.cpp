@@ -4060,11 +4060,7 @@ bool TypeBase::usesNativeReferenceCounting(ResilienceExpansion resilience) {
 void SILBoxType::Profile(llvm::FoldingSetNodeID &id, SILLayout *Layout,
                          SubstitutionList Args) {
   id.AddPointer(Layout);
-  for (auto &arg : Args) {
-    id.AddPointer(arg.getReplacement().getPointer());
-    for (auto conformance : arg.getConformances())
-      id.AddPointer(conformance.getOpaqueValue());
-  }
+  profileSubstitutionList(id, Args);
 }
 
 SILBoxType::SILBoxType(ASTContext &C,
