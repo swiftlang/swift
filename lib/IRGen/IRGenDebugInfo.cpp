@@ -1437,24 +1437,32 @@ llvm::DIType *IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
     auto IdTy = DBuilder.createForwardDecl(
       llvm::dwarf::DW_TAG_structure_type, MangledName, Scope, File, 0,
         llvm::dwarf::DW_LANG_ObjC, 0, 0);
-    return DBuilder.createPointerType(IdTy, PtrSize, 0, MangledName);
+    return DBuilder.createPointerType(IdTy, PtrSize, 0,
+                                      /* DWARFAddressSpace */ None,
+                                      MangledName);
   }
 
   case TypeKind::BuiltinNativeObject: {
     unsigned PtrSize = CI.getTargetInfo().getPointerWidth(0);
-    auto PTy = DBuilder.createPointerType(nullptr, PtrSize, 0, MangledName);
+    auto PTy = DBuilder.createPointerType(nullptr, PtrSize, 0,
+                                          /* DWARFAddressSpace */ None,
+                                          MangledName);
     return DBuilder.createObjectPointerType(PTy);
   }
 
   case TypeKind::BuiltinBridgeObject: {
     unsigned PtrSize = CI.getTargetInfo().getPointerWidth(0);
-    auto PTy = DBuilder.createPointerType(nullptr, PtrSize, 0, MangledName);
+    auto PTy = DBuilder.createPointerType(nullptr, PtrSize, 0,
+                                          /* DWARFAddressSpace */ None,
+                                          MangledName);
     return DBuilder.createObjectPointerType(PTy);
   }
 
   case TypeKind::BuiltinRawPointer: {
     unsigned PtrSize = CI.getTargetInfo().getPointerWidth(0);
-    return DBuilder.createPointerType(nullptr, PtrSize, 0, MangledName);
+    return DBuilder.createPointerType(nullptr, PtrSize, 0,
+                                      /* DWARFAddressSpace */ None,
+                                      MangledName);
   }
 
   case TypeKind::DynamicSelf: {
