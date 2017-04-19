@@ -260,6 +260,26 @@ extension String.CharacterView : BidirectionalCollection {
     if start == end {
       return 0
     }
+
+    // Grapheme breaking is much simpler if known ASCII
+    if (_fastPath(_core.isASCII)) {
+      let asciiBuffer = _core.asciiBuffer._unsafelyUnwrappedUnchecked
+      let pos = start._position - _coreOffset
+      let CR: UInt8 = 0x0d
+      let LF: UInt8 = 0x0a
+
+      // With the exception of CR-LF, ASCII graphemes are single-scalar. Check
+      // for that one exception.
+      if _slowPath(
+        asciiBuffer[pos] == CR &&
+        pos+1 < asciiBuffer.endIndex &&
+        asciiBuffer[pos+1] == LF
+      ) {
+        return 2
+      }
+
+      return 1
+    }
     
     let startIndexUTF16 = start._position
     let graphemeClusterBreakProperty =
@@ -301,6 +321,26 @@ extension String.CharacterView : BidirectionalCollection {
     let start = unicodeScalars.startIndex
     if start == end {
       return 0
+    }
+
+    // Grapheme breaking is much simpler if known ASCII
+    if (_fastPath(_core.isASCII)) {
+      let asciiBuffer = _core.asciiBuffer._unsafelyUnwrappedUnchecked
+      let pos = start._position - _coreOffset
+      let CR: UInt8 = 0x0d
+      let LF: UInt8 = 0x0a
+
+      // With the exception of CR-LF, ASCII graphemes are single-scalar. Check
+      // for that one exception.
+      if _slowPath(
+        asciiBuffer[pos] == LF &&
+        pos-1 >= asciiBuffer.startIndex &&
+        asciiBuffer[pos-1] == CR
+      ) {
+        return 2
+      }
+
+      return 1
     }
     
     let endIndexUTF16 = end._position
