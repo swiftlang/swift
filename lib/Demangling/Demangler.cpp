@@ -942,6 +942,9 @@ NodePointer Demangler::demangleImplParamConvention() {
   const char *attr = nullptr;
   switch (nextChar()) {
     case 'i': attr = "@in"; break;
+    case 'c':
+      attr = "@in_constant";
+      break;
     case 'l': attr = "@inout"; break;
     case 'b': attr = "@inout_aliasable"; break;
     case 'n': attr = "@in_guaranteed"; break;
@@ -1536,6 +1539,14 @@ NodePointer Demangler::demangleWitness() {
     }
     case 'e': {
       return createWithChild(Node::Kind::OutlinedConsume,
+                             popNode(Node::Kind::Type));
+    }
+    case 'r': {
+      return createWithChild(Node::Kind::OutlinedRetain,
+                             popNode(Node::Kind::Type));
+    }
+    case 's': {
+      return createWithChild(Node::Kind::OutlinedRelease,
                              popNode(Node::Kind::Type));
     }
     default:

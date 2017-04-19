@@ -304,7 +304,7 @@ entry(%b : $@convention(block) (CChar) -> CChar, %c : $CChar):
 }
 
 // CHECK-x86_64-LABEL: define{{( protected)?}} swiftcc void @testBitfieldInBlock
-// CHECK-x86_64:         call void {{%.*}}(%TSo11BitfieldOneV* noalias nocapture sret {{%.*}}, %objc_block* {{%.*}}, %TSo11BitfieldOneV* byval align 8 {{%.*}})
+// CHECK-x86_64:         call void {{%.*}}(%TSo11BitfieldOneV* noalias nocapture sret {{%.*}}, %objc_block* {{%.*}}, %struct.BitfieldOne* {{%.*}})
 sil @testBitfieldInBlock : $@convention(thin) (@owned @convention(block) (BitfieldOne) -> BitfieldOne, BitfieldOne) -> BitfieldOne  {
 entry(%b : $@convention(block) (BitfieldOne) -> BitfieldOne, %x : $BitfieldOne):
   %r = apply %b(%x) : $@convention(block) (BitfieldOne) -> BitfieldOne

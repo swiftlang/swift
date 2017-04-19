@@ -517,6 +517,7 @@ bool SILCombiner::eraseApply(FullApplySite FAS, const UserListTy &Users) {
       auto Arg = FAS.getArgument(i);
       switch (PI.getConvention()) {
         case ParameterConvention::Indirect_In:
+        case ParameterConvention::Indirect_In_Constant:
           Builder.createDestroyAddr(FAS.getLoc(), Arg);
           break;
         case ParameterConvention::Direct_Owned:
