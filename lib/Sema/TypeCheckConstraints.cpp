@@ -23,6 +23,7 @@
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/DiagnosticsParse.h"
+#include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/PrettyStackTrace.h"
@@ -3331,15 +3332,76 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
     toExistential &= toExistentialMetatype;
     fromExistential &= fromExistentialMetatype;
   }
-  
+
   // Casts to or from generic types can't be statically constrained in most
   // cases, because there may be protocol conformances we don't statically
   // know about.
-  //
-  // TODO: There are cases we could statically warn about, such as casting
-  // from a non-class to a class-constrained archetype or existential.
-  if (toExistential || fromExistential || fromArchetype || toArchetype)
-    return CheckedCastKind::ValueCast;
+  if (toExistential || fromExistential || fromArchetype || toArchetype) {
+    // Cast to and from AnyObject always succeed.
+    if (toType->isAnyObject() || fromType->isAnyObject())
+      return CheckedCastKind::ValueCast;
+
+    bool toRequiresClass;
+    if (toType->isExistentialType())
+      toRequiresClass = toType->getExistentialLayout().requiresClass;
+    else
+      toRequiresClass = toType->mayHaveSuperclass();
+
+    bool fromRequiresClass;
+    if (fromType->isExistentialType())
+      fromRequiresClass = fromType->getExistentialLayout().requiresClass;
+    else
+      fromRequiresClass = fromType->mayHaveSuperclass();
+
+    // If neither type is class-constrained, anything goes.
+    if (!fromRequiresClass && !toRequiresClass)
+        return CheckedCastKind::ValueCast;
+
+    if (!fromRequiresClass && toRequiresClass) {
+      // If source type is abstract, anything goes.
+      if (fromExistential || fromArchetype)
+        return CheckedCastKind::ValueCast;
+
+      // Otherwise, we're casting a concrete non-class type to a
+      // class-constrained archetype or existential, which will
+      // probably fail, but we'll try more casts below.
+    }
+
+    if (fromRequiresClass && !toRequiresClass) {
+      // If destination type is abstract, anything goes.
+      if (toExistential || toArchetype)
+        return CheckedCastKind::ValueCast;
+
+      // Otherwise, we're casting a class-constrained archetype
+      // or existential to a non-class concrete type, which
+      // will probably fail, but we'll try more casts below.
+    }
+
+    if (fromRequiresClass && toRequiresClass) {
+      // Ok, we are casting between class-like things. Let's see if we have
+      // explicit superclass bounds.
+      Type toSuperclass;
+      if (toType->getClassOrBoundGenericClass())
+        toSuperclass = toType;
+      else
+        toSuperclass = toType->getSuperclass(nullptr);
+
+      Type fromSuperclass;
+      if (fromType->getClassOrBoundGenericClass())
+        fromSuperclass = fromType;
+      else
+        fromSuperclass = fromType->getSuperclass(nullptr);
+
+      // Unless both types have a superclass bound, we have no further
+      // information.
+      if (!toSuperclass || !fromSuperclass)
+        return CheckedCastKind::ValueCast;
+
+      // Compare superclass bounds.
+      if (isSubtypeOf(toSuperclass, fromSuperclass, dc))
+        return CheckedCastKind::ValueCast;
+    }
+  }
 
   if (cs.isAnyHashableType(toType) || cs.isAnyHashableType(fromType)) {
     return CheckedCastKind::ValueCast;

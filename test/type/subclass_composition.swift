@@ -42,6 +42,8 @@ typealias OtherAndP2 = Other & P2
 
 protocol P3 : class {}
 
+struct Unrelated {}
+
 //
 // If a class conforms to a protocol concretely, the resulting protocol
 // composition type should be equivalent to the class type.
@@ -81,7 +83,8 @@ func basicSubtyping(
   derivedAndP3: Derived & P3,
   derivedAndAnyObject: Derived & AnyObject,
   p1AndAnyObject: P1 & AnyObject,
-  p2AndAnyObject: P2 & AnyObject) {
+  p2AndAnyObject: P2 & AnyObject,
+  anyObject: AnyObject) {
 
   // Errors
   let _: Base & P2 = base // expected-error {{value of type 'Base<Int>' does not conform to specified type 'Base & P2'}}
@@ -92,12 +95,29 @@ func basicSubtyping(
   let _: Derived = baseAndP2 // expected-error {{cannot convert value of type 'Base<Int> & P2' to specified type 'Derived'}}
   let _: Derived & P2 = baseAndP2 // expected-error {{value of type 'Base<Int> & P2' does not conform to specified type 'Derived & P2'}}
 
+  let _ = Unrelated() as Derived & P2 // expected-error {{value of type 'Unrelated' does not conform to 'Derived & P2' in coercion}}
+  let _ = Unrelated() as? Derived & P2 // expected-warning {{always fails}}
+  let _ = baseAndP2 as Unrelated // expected-error {{cannot convert value of type 'Base<Int> & P2' to type 'Unrelated' in coercion}}
+  let _ = baseAndP2 as? Unrelated // expected-warning {{always fails}}
+  let _ = Unrelated() as AnyObject
+  let _ = Unrelated() as? AnyObject // expected-warning {{always succeeds}}
+  let _ = anyObject as Unrelated // expected-error {{'AnyObject' is not convertible to 'Unrelated'; did you mean to use 'as!' to force downcast?}}
+  let _ = anyObject as? Unrelated
+
   // No-ops
   let _: Base & P1 = base
   let _: Base<Int> & P1 = base
   let _: Base & AnyObject = base
   let _: Base<Int> & AnyObject = base
   let _: Derived & AnyObject = derived
+
+  let _ = base as Base<Int> & P1
+  let _ = base as Base<Int> & AnyObject
+  let _ = derived as Derived & AnyObject
+
+  let _ = base as? Base<Int> & P1 // expected-warning {{always succeeds}}
+  let _ = base as? Base<Int> & AnyObject // expected-warning {{always succeeds}}
+  let _ = derived as? Derived & AnyObject // expected-warning {{always succeeds}}
 
   // Erasing superclass constraint
   let _: P1 = baseAndP1
@@ -111,6 +131,20 @@ func basicSubtyping(
   let _: AnyObject = derivedAndP3
   let _: AnyObject = derivedAndAnyObject
 
+  let _ = baseAndP1 as P1
+  let _ = baseAndP1 as P1 & AnyObject
+  let _ = derived as P1
+  let _ = derived as P1 & AnyObject
+  let _ = baseAndP1 as AnyObject
+  let _ = derivedAndAnyObject as AnyObject
+
+  let _ = baseAndP1 as? P1 // expected-warning {{always succeeds}}
+  let _ = baseAndP1 as? P1 & AnyObject // expected-warning {{always succeeds}}
+  let _ = derived as? P1 // expected-warning {{always succeeds}}
+  let _ = derived as? P1 & AnyObject // expected-warning {{always succeeds}}
+  let _ = baseAndP1 as? AnyObject // expected-warning {{always succeeds}}
+  let _ = derivedAndAnyObject as? AnyObject // expected-warning {{always succeeds}}
+
   // Erasing conformance constraint
   let _: Base = baseAndP1
   let _: Base<Int> = baseAndP1
@@ -118,6 +152,16 @@ func basicSubtyping(
   let _: Base<Int> = derivedAndP3
   let _: Derived = derivedAndP2
   let _: Derived = derivedAndAnyObject
+
+  let _ = baseAndP1 as Base<Int>
+  let _ = derivedAndP3 as Base<Int>
+  let _ = derivedAndP2 as Derived
+  let _ = derivedAndAnyObject as Derived
+
+  let _ = baseAndP1 as? Base<Int> // expected-warning {{always succeeds}}
+  let _ = derivedAndP3 as? Base<Int> // expected-warning {{always succeeds}}
+  let _ = derivedAndP2 as? Derived // expected-warning {{always succeeds}}
+  let _ = derivedAndAnyObject as? Derived // expected-warning {{always succeeds}}
 
   // Upcasts
   let _: Base & P2 = derived
@@ -127,11 +171,102 @@ func basicSubtyping(
   let _: Base & P3 = derivedAndP3
   let _: Base<Int> & P3 = derivedAndP3
 
+  let _ = derived as Base<Int> & P2
+  let _ = derived as Base<Int> & P2 & AnyObject
+  let _ = derivedAndP3 as Base<Int> & P3
+
+  let _ = derived as? Base<Int> & P2 // expected-warning {{always succeeds}}
+  let _ = derived as? Base<Int> & P2 & AnyObject // expected-warning {{always succeeds}}
+  let _ = derivedAndP3 as? Base<Int> & P3 // expected-warning {{always succeeds}}
+
   // Calling methods with Self return
   let _: Base & P2 = baseAndP2.classSelfReturn()
   let _: Base<Int> & P2 = baseAndP2.classSelfReturn()
   let _: Base & P2 = baseAndP2.protocolSelfReturn()
   let _: Base<Int> & P2 = baseAndP2.protocolSelfReturn()
+
+  // Downcasts
+  let _ = baseAndP2 as Derived // expected-error {{did you mean to use 'as!' to force downcast?}}
+  let _ = baseAndP2 as? Derived
+  
+  let _ = baseAndP2 as Derived & P3 // expected-error {{did you mean to use 'as!' to force downcast?}}
+  let _ = baseAndP2 as? Derived & P3
+
+  let _ = base as Derived & P2 // expected-error {{did you mean to use 'as!' to force downcast?}}
+  let _ = base as? Derived & P2
+
+  // Invalid cases
+  let _ = derived as Other & P2 // expected-error {{value of type 'Derived' does not conform to 'Other & P2' in coercion}}
+  let _ = derived as? Other & P2 // expected-warning {{always fails}}
+
+  let _ = derivedAndP3 as Other // expected-error {{cannot convert value of type 'Derived & P3' to type 'Other' in coercion}}
+  let _ = derivedAndP3 as? Other // expected-warning {{always fails}}
+
+  let _ = derivedAndP3 as Other & P3 // expected-error {{value of type 'Derived & P3' does not conform to 'Other & P3' in coercion}}
+  let _ = derivedAndP3 as? Other & P3 // expected-warning {{always fails}}
+
+  let _ = derived as Other // expected-error {{cannot convert value of type 'Derived' to type 'Other' in coercion}}
+  let _ = derived as? Other // expected-warning {{always fails}}
+}
+
+// Test conversions in return statements
+func eraseProtocolInReturn(baseAndP2: Base<Int> & P2) -> Base<Int> {
+  return baseAndP2
+}
+
+func eraseProtocolInReturn(baseAndP2: (Base<Int> & P2)!) -> Base<Int> {
+  return baseAndP2
+}
+
+func eraseProtocolInReturn(baseAndP2: Base<Int> & P2) -> Base<Int>? {
+  return baseAndP2
+}
+
+func eraseClassInReturn(baseAndP2: Base<Int> & P2) -> P2 {
+  return baseAndP2
+}
+
+func eraseClassInReturn(baseAndP2: (Base<Int> & P2)!) -> P2 {
+  return baseAndP2
+}
+
+func eraseClassInReturn(baseAndP2: Base<Int> & P2) -> P2? {
+  return baseAndP2
+}
+
+func upcastToExistentialInReturn(derived: Derived) -> Base<Int> & P2 {
+  return derived
+}
+
+func upcastToExistentialInReturn(derived: Derived!) -> Base<Int> & P2 {
+  return derived
+}
+
+func upcastToExistentialInReturn(derived: Derived) -> (Base<Int> & P2)? {
+  return derived
+}
+
+func takesBase<T>(_: Base<T>) {}
+func takesP2(_: P2) {}
+func takesBaseMetatype<T>(_: Base<T>.Type) {}
+func takesP2Metatype(_: P2.Type) {}
+
+func takesBaseIntAndP2(_ x: Base<Int> & P2) {
+  takesBase(x)
+  takesP2(x)
+}
+
+func takesBaseIntAndP2Metatype(_ x: (Base<Int> & P2).Type) {
+  takesBaseMetatype(x)
+  takesP2Metatype(x)
+}
+
+func takesDerived(x: Derived) {
+  takesBaseIntAndP2(x)
+}
+
+func takesDerivedMetatype(x: Derived.Type) {
+  takesBaseIntAndP2Metatype(x)
 }
 
 //
@@ -207,18 +342,6 @@ func metatypeSubtyping(
   let _: Derived = derived.init(protocolInit: ())
   let _: Derived & AnyObject = derivedAndAnyObject.init(classInit: ())
   let _: Derived & AnyObject = derivedAndAnyObject.init(protocolInit: ())
-}
-
-// There's a code path in CSApply that's hard to hit.
-func takesBase<T>(_: Base<T>) {}
-func takesBaseMetatype<T>(_: Base<T>.Type) {}
-
-func takesBaseIntAndP2(x: Base<Int> & P2) {
-  takesBase(x)
-}
-
-func takesBaseIntAndP2Metatype(x: (Base<Int> & P2).Type) {
-  takesBaseMetatype(x)
 }
 
 //
