@@ -18,19 +18,19 @@
 #ifndef SWIFT_MIGRATOR_SYNTACTICMIGRATORPASS_H
 #define SWIFT_MIGRATOR_SYNTACTICMIGRATORPASS_H
 
-#include "swift/AST/SourceEntityWalker.h"
 #include "swift/Migrator/EditorAdapter.h"
 
 namespace swift {
 class SourceManager;
+struct MigratorOptions;
 
 namespace migrator {
-
 class SyntacticMigratorPass {
-  class Implementation;
+  struct Implementation;
   Implementation &Impl;
 public:
-  SyntacticMigratorPass(EditorAdapter &Editor, SourceFile *SF);
+  SyntacticMigratorPass(EditorAdapter &Editor, SourceFile *SF,
+                        const MigratorOptions &Opts);
   ~SyntacticMigratorPass();
   void run();
   const clang::edit::Commit &getEdits() const;

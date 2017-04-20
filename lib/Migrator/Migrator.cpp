@@ -10,7 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/AST/USRGeneration.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Migrator/EditorAdapter.h"
 #include "swift/Migrator/FixitApplyDiagnosticConsumer.h"
@@ -184,7 +183,8 @@ bool Migrator::performSyntacticPasses() {
   // Once it has run, push the edits into Edits above:
   // Edits.commit(YourPass.getEdits());
 
-  SyntacticMigratorPass SPass(Instance.getPrimarySourceFile(), Editor);
+  SyntacticMigratorPass SPass(Editor, Instance.getPrimarySourceFile(),
+    getMigratorOptions());
   SPass.run();
   Edits.commit(SPass.getEdits());
 

@@ -29,12 +29,13 @@ using namespace swift;
 using namespace swift::migrator;
 using namespace swift::ide::api;
 
-class SyntacticMigratorPass::Implementation : public SourceEntityWalker {
+struct SyntacticMigratorPass::Implementation : public SourceEntityWalker {
   SourceFile *SF;
   const StringRef FileName;
   unsigned BufferId;
   SourceManager &SM;
   EditorAdapter &Editor;
+  const MigratorOptions &Opts;
 
   APIDiffItemStore DiffStore;
 
@@ -58,11 +59,15 @@ class SyntacticMigratorPass::Implementation : public SourceEntityWalker {
     return false;
   }
 
-public:
-  Implementation(const SourceFile *SF, EditorAdapter &Editor) : SF(SF),
-    FileName(SF->getFilename()), BufferId(SF->getBufferID().getValue()),
-      SM(SF->getASTContext().SourceMgr), Editor(Editor) {}
-  void run() { walk(SF); }
+  Implementation(SourceFile *SF, EditorAdapter &Editor,
+                 const MigratorOptions &Opts) :
+    SF(SF), FileName(SF->getFilename()), BufferId(SF->getBufferID().getValue()),
+      SM(SF->getASTContext().SourceMgr), Editor(Editor), Opts(Opts) {}
+
+  void run() {
+    DiffStore.addStorePath(Opts.APIDigesterDataStorePath);
+    walk(SF);
+  }
 
   bool visitDeclReference(ValueDecl *D, CharSourceRange Range,
                           TypeDecl *CtorTyRef, ExtensionDecl *ExtTyRef,
@@ -79,9 +84,11 @@ public:
 };
 
 SyntacticMigratorPass::
-SyntacticMigratorPass(EditorAdapter &Editor, SourceFile *SF) : 
-  Impl(*new Implementation(SF, Editor)) {}
+SyntacticMigratorPass(EditorAdapter &Editor, SourceFile *SF,
+  const MigratorOptions &Opts) : Impl(*new Implementation(SF, Editor, Opts)) {}
+
 SyntacticMigratorPass::~SyntacticMigratorPass() { delete &Impl; }
+
 void SyntacticMigratorPass::run() { Impl.run(); }
 
 const clang::edit::Commit &SyntacticMigratorPass::getEdits() const {
