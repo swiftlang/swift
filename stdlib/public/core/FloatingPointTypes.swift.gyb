@@ -931,32 +931,34 @@ extension ${Self} {
 //  tweaking the overload resolution rules, or by removing the other
 //  definitions in the standard lib, or both.
 
-@_transparent
-public func + (lhs: ${Self}, rhs: ${Self}) -> ${Self} {
-  var lhs = lhs
-  lhs += rhs
-  return lhs
-}
+extension ${Self} {
+  @_transparent
+  public static func + (lhs: ${Self}, rhs: ${Self}) -> ${Self} {
+    var lhs = lhs
+    lhs += rhs
+    return lhs
+  }
 
-@_transparent
-public func - (lhs: ${Self}, rhs: ${Self}) -> ${Self} {
-  var lhs = lhs
-  lhs -= rhs
-  return lhs
-}
+  @_transparent
+  public static func - (lhs: ${Self}, rhs: ${Self}) -> ${Self} {
+    var lhs = lhs
+    lhs -= rhs
+    return lhs
+  }
 
-@_transparent
-public func * (lhs: ${Self}, rhs: ${Self}) -> ${Self} {
-  var lhs = lhs
-  lhs *= rhs
-  return lhs
-}
+  @_transparent
+  public static func * (lhs: ${Self}, rhs: ${Self}) -> ${Self} {
+    var lhs = lhs
+    lhs *= rhs
+    return lhs
+  }
 
-@_transparent
-public func / (lhs: ${Self}, rhs: ${Self}) -> ${Self} {
-  var lhs = lhs
-  lhs /= rhs
-  return lhs
+  @_transparent
+  public static func / (lhs: ${Self}, rhs: ${Self}) -> ${Self} {
+    var lhs = lhs
+    lhs /= rhs
+    return lhs
+  }
 }
 
 //===----------------------------------------------------------------------===//

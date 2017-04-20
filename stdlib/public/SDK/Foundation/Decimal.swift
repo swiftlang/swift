@@ -252,6 +252,32 @@ extension Decimal : SignedNumeric {
   }
 }
 
+extension Decimal {
+  @available(swift, obsoleted: 4, message: "Please use arithmetic operators instead")
+  @_transparent
+  public mutating func add(_ other: Decimal) {
+    self += other
+  }
+
+  @available(swift, obsoleted: 4, message: "Please use arithmetic operators instead")
+  @_transparent
+  public mutating func subtract(_ other: Decimal) {
+    self -= other
+  }
+
+  @available(swift, obsoleted: 4, message: "Please use arithmetic operators instead")
+  @_transparent
+  public mutating func multiply(by other: Decimal) {
+    self *= other
+  }
+
+  @available(swift, obsoleted: 4, message: "Please use arithmetic operators instead")
+  @_transparent
+  public mutating func divide(by other: Decimal) {
+    self /= other
+  }
+}
+
 extension Decimal : Strideable {
     public func distance(to other: Decimal) -> Decimal {
         return self - other
