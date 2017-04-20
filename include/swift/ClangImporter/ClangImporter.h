@@ -56,8 +56,20 @@ class IRGenOptions;
 class LazyResolver;
 class ModuleDecl;
 class NominalTypeDecl;
+class TypeDecl;
 class VisibleDeclConsumer;
 enum class SelectorSplitKind;
+
+/// Represents the different namespaces for types in C.
+///
+/// A simplified version of clang::Sema::LookupKind.
+enum class ClangTypeKind {
+  Typedef,
+  ObjCClass = Typedef,
+  /// Structs, enums, and unions.
+  Tag,
+  ObjCProtocol,
+};
 
 /// \brief Class that imports Clang modules into Swift, mapping directly
 /// from Clang ASTs over to Swift ASTs.
@@ -135,6 +147,14 @@ public:
   ///
   /// \param name The name we're searching for.
   void lookupValue(DeclName name, VisibleDeclConsumer &consumer);
+
+  /// Look up a type declaration by its Clang name.
+  ///
+  /// Note that this method does no filtering. If it finds the type in a loaded
+  /// module, it returns it. This is intended for use in reflection / debugging
+  /// contexts where access is not a problem.
+  void lookupTypeDecl(StringRef clangName, ClangTypeKind kind,
+                      llvm::function_ref<void(TypeDecl*)> receiver);
 
   /// Look for textually included declarations from the bridging header.
   ///
