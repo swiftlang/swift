@@ -258,13 +258,7 @@ public func checkCollection<${genericParam}, C : Collection>(
   resiliencyChecks: CollectionMisuseResiliencyChecks = .all,
   sameValue: (${Element}, ${Element}) -> Bool
 ) where C.Iterator.Element == ${Element},
-  // FIXME(ABI) (Associated Types with where clauses): these constraints should be applied to
-  // associated types of Collection.
-  C.Indices.Iterator.Element == C.Index,
-  C.SubSequence : Collection,
-  C.SubSequence.Iterator.Element == ${Element},
-  C.SubSequence.Indices.Iterator.Element == C.Index,
-  C.SubSequence.Index == C.Index {
+  C.SubSequence : Collection {
 
   checkForwardCollection(expected, collection, message(),
     stackTrace: stackTrace, showFrame: showFrame, file: file, line: line,
@@ -284,11 +278,7 @@ public func check${Traversal}Collection<
   resiliencyChecks: CollectionMisuseResiliencyChecks = .all
 ) where
   C.Iterator.Element == ${Element},
-  C.Indices.Iterator.Element == C.Index,
   C.SubSequence : ${TraversalCollection},
-  C.SubSequence.Iterator.Element == ${Element},
-  C.SubSequence.Indices.Iterator.Element == C.Index,
-  C.SubSequence.Index == C.Index,
   ${Element} : Equatable {
 
   check${Traversal}Collection(
@@ -309,13 +299,7 @@ public func check${Traversal}Collection<
   sameValue: (${Element}, ${Element}) -> Bool
 ) where
   C.Iterator.Element == ${Element},
-  // FIXME(ABI) (Associated Types with where clauses): these constraints should be applied to
-  // associated types of Collection.
-  C.Indices.Iterator.Element == C.Index,
-  C.SubSequence : ${TraversalCollection},
-  C.SubSequence.Iterator.Element == ${Element},
-  C.SubSequence.Index == C.Index,
-  C.SubSequence.Indices.Iterator.Element == C.Index {
+  C.SubSequence : ${TraversalCollection} {
 
   checkOneLevelOf${Traversal}Collection(expected, collection, ${trace},
     resiliencyChecks: resiliencyChecks, sameValue: sameValue)
