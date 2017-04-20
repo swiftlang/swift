@@ -287,7 +287,7 @@ FunctionCallArgumentListSyntax getLabellessArgumentList() {
     .appending(ThreeArg)
     .castTo<FunctionCallArgumentListSyntax>();
 }
-} // namespace
+} // end anonymous namespace
 
 TEST(ExprSyntaxTests, FunctionCallArgumentListGetAPIs) {
   auto X = SyntaxFactory::makeIdentifier("x", {}, {});

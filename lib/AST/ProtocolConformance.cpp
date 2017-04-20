@@ -391,7 +391,7 @@ namespace {
       out << "\n";
     }
   };
-} // namespace
+} // end anonymous namespace
 
 bool NormalProtocolConformance::hasTypeWitness(AssociatedTypeDecl *assocType,
                                                LazyResolver *resolver) const {

@@ -906,7 +906,7 @@ public:
 
   bool finishSourceEntity(UIdent Kind) override;
 };
-} // namespace
+} // end anonymous namespace
 
 static sourcekitd_response_t indexSource(StringRef Filename,
                                          ArrayRef<const char *> Args,
@@ -1114,7 +1114,7 @@ public:
 
   bool handleDiagnostic(const DiagnosticEntryInfo &Info) override;
 };
-} // namespace
+} // end anonymous namespace
 
 static bool isSwiftPrefixed(StringRef MangledName) {
   if (MangledName.size() < 2)
@@ -1563,7 +1563,7 @@ public:
 
   bool handleResult(const CodeCompletionInfo &Info) override;
 };
-} // namespace
+} // end anonymous namespace
 
 static sourcekitd_response_t codeComplete(llvm::MemoryBuffer *InputBuf,
                                           int64_t Offset,
@@ -1940,7 +1940,7 @@ public:
   }
 };
 
-} // namespace
+} // end anonymous namespace
 
 static sourcekitd_response_t
 editorOpen(StringRef Name, llvm::MemoryBuffer *Buf, bool EnableSyntaxMap,
