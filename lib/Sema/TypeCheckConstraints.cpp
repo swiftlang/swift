@@ -3006,11 +3006,18 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
   // Determine whether we should suppress diagnostics.
   bool suppressDiagnostics = (contextKind == CheckedCastContextKind::None);
 
+  bool optionalToOptionalCast = false;
+
   // Local function to indicate failure.
   auto failed = [&] {
     if (suppressDiagnostics) {
       return CheckedCastKind::Unresolved;
     }
+
+    // Explicit optional-to-optional casts always succeed because a nil
+    // value of any optional type can be cast to any other optional type.
+    if (optionalToOptionalCast)
+      return CheckedCastKind::ValueCast;
 
     diagnose(diagLoc, diag::downcast_to_unrelated, origFromType, origToType)
       .highlight(diagFromRange)
@@ -3038,6 +3045,7 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
 
     toType = toValueType;
     fromType = fromValueType;
+    optionalToOptionalCast = true;
   }
   
   // On the other hand, casts can decrease optionality monadically.
