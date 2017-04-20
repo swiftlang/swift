@@ -24,17 +24,40 @@ import DriverUtils
 import {{ import }}
 {% endfor %}
 
-precommitTests = [
+@inline(__always)
+private func addPrecommitTest(
+  _ name: String, _ function: @escaping (Int) -> ()
+) {
+  precommitTests[name] = function
+}
+@inline(__always)
+private func addStringTest(
+  _ name: String, _ function: @escaping (Int) -> ()
+) {
+  stringTests[name] = function
+}
+@inline(__always)
+private func addOtherTest(
+  _ name: String, _ function: @escaping (Int) -> ()
+) {
+  otherTests[name] = function
+}
+
+// The main test suite: precommit tests
 {% for run_func in run_funcs %}
-  "{{ run_func[0] }}": run_{{ run_func[1] }},
+addPrecommitTest("{{ run_func[0] }}", run_{{ run_func[1] }})
 {% endfor %}
-]
 
-otherTests = [
-  "Ackermann": run_Ackermann,
-  "Fibonacci": run_Fibonacci,
-]
+// Other tests
+{% for test_name in other_tests %}
+addOtherTest("{{ test_name }}", run_{{ test_name }})
+{% endfor %}
 
+// String tests, an extended benchmark suite exercising finer-granularity
+// behavior of our Strings.
+{% for test_name in string_tests %}
+addStringTest("{{ test_name }}", run_{{ test_name }})
+{% endfor %}
 
 main()
 
