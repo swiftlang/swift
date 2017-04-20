@@ -37,8 +37,8 @@ DependencyTracker::addDependency(StringRef File, bool IsSystem) {
   // dimension, though it is presently always false, we accept it and pass it
   // along to the clang DependencyCollector in case Swift callers start setting
   // it to true someday.
-  clangCollector->maybeAddDependency(File, /*FromClangModule=*/false,
-                                     IsSystem, /*IsClangModuleFile=*/false,
+  clangCollector->maybeAddDependency(File, /*FromModule=*/false,
+                                     IsSystem, /*IsModuleFile=*/false,
                                      /*IsMissing=*/false);
 }
 
@@ -52,4 +52,4 @@ DependencyTracker::getClangCollector() {
   return clangCollector;
 }
 
-}
+} // namespace swift

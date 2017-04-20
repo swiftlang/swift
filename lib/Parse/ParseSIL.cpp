@@ -753,7 +753,7 @@ namespace {
   public:
     IdentTypeReprLookup(Parser &P) : P(P) {}
 
-    bool walkToTypeReprPre(TypeRepr *Ty) {
+    bool walkToTypeReprPre(TypeRepr *Ty) override {
       auto *T = dyn_cast_or_null<IdentTypeRepr>(Ty);
       auto Comp = T->getComponentRange().front();
       if (auto Entry = P.lookupInScope(Comp->getIdentifier()))

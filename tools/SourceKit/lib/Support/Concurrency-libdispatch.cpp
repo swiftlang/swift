@@ -94,7 +94,7 @@ struct ExecuteOnLargeStackInfo {
     Block_release(BlockToRun);
   }
 };
-}
+} // namespace
 
 static void executeBlock(void *Data) {
   auto ExecuteInfo = (ExecuteOnLargeStackInfo*)Data;

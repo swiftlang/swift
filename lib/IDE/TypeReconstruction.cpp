@@ -1765,7 +1765,7 @@ static void VisitNodeProtocolList(
       if (ast) {
         result._types.push_back(
           ProtocolCompositionType::get(*ast, protocol_types_result._types,
-                                       /*hasExplicitAnyObject=*/false));
+                                       /*HasExplicitAnyObject=*/false));
       } else {
         result._error = "invalid ASTContext";
       }

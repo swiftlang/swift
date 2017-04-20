@@ -136,7 +136,7 @@ public:
 
   void visitDecl(Decl *D) { visitMembers(D); }
 };
-}
+} // namespace
 
 static bool isGlobalOrStaticVar(VarDecl *VD) {
   return VD->isStatic() || VD->getDeclContext()->isModuleScopeContext();

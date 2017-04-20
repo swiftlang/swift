@@ -690,8 +690,8 @@ namespace driver {
       return Result;
     }
   };
-} // driver
-} // swift
+} // namespace driver
+} // namespace swift
 
 Compilation::~Compilation() = default;
 
