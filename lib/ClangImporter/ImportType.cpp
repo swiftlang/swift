@@ -2403,7 +2403,7 @@ bool ClangImporter::Implementation::matchesNSObjectBound(Type type) {
     return false;
 
   // Class type or existential that inherits from NSObject.
-  if (NSObjectType->isExactSuperclassOf(type, getTypeResolver()))
+  if (NSObjectType->isExactSuperclassOf(type))
     return true;
 
   // Struct or enum type must have been bridged.

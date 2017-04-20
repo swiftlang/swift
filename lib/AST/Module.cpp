@@ -681,9 +681,9 @@ ModuleDecl::lookupConformance(Type type, ProtocolDecl *protocol,
       = rootConformance->getType()->getClassOrBoundGenericClass();
 
     // Map up to our superclass's type.
-    Type superclassTy = type->getSuperclass(resolver);
+    Type superclassTy = type->getSuperclass();
     while (superclassTy->getAnyNominal() != conformingNominal)
-      superclassTy = superclassTy->getSuperclass(resolver);
+      superclassTy = superclassTy->getSuperclass();
 
     // Compute the conformance for the inherited type.
     auto inheritedConformance = lookupConformance(superclassTy, protocol,

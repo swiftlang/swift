@@ -76,7 +76,7 @@ ReferenceCounting irgen::getReferenceCountingForType(IRGenModule &IGM,
   // Class-constrained archetypes and existentials that don't use
   // native reference counting and yet have a superclass must be
   // using ObjC reference counting.
-  auto superclass = type->getSuperclass(nullptr);
+  auto superclass = type->getSuperclass();
   if (superclass)
     return ReferenceCounting::ObjC;
 
@@ -231,7 +231,7 @@ namespace {
       }
 
       if (theClass->hasSuperclass()) {
-        SILType superclassType = classType.getSuperclass(nullptr);
+        SILType superclassType = classType.getSuperclass();
         auto superclass = superclassType.getClassOrBoundGenericClass();
         assert(superclass);
 

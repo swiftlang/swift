@@ -1129,6 +1129,10 @@ public:
   ///
   /// \param t2 The second type of the constraint.
   ///
+  /// \param openArchetypes If true, archetypes are replaced with type
+  /// variables, and the result can be interpreted as whether or not the
+  /// two types can possibly equal at runtime.
+  ///
   /// \param dc The context of the conversion.
   ///
   /// \param unwrappedIUO   If non-null, will be set to \c true if the coercion
@@ -1136,6 +1140,7 @@ public:
   ///
   /// \returns true if \c t1 and \c t2 satisfy the constraint.
   bool typesSatisfyConstraint(Type t1, Type t2,
+                              bool openArchetypes,
                               constraints::ConstraintKind kind,
                               DeclContext *dc,
                               bool *unwrappedIUO = nullptr);

@@ -2603,7 +2603,7 @@ void GenericSignatureBuilder::updateSuperclass(
   //
   // then the second constraint should be allowed, constraining U to Bar
   // and secondarily imposing a T == Int constraint.
-  if (existingSuperclass->isExactSuperclassOf(superclass, nullptr)) {
+  if (existingSuperclass->isExactSuperclassOf(superclass)) {
     equivClass->superclass = superclass;
 
     // We've strengthened the bound, so update superclass conformances.
@@ -4525,7 +4525,7 @@ void GenericSignatureBuilder::checkSuperclassConstraints(
       },
       [&](Type superclass) {
         // If this class is a superclass of the "best"
-        if (superclass->isExactSuperclassOf(equivClass->superclass, nullptr))
+        if (superclass->isExactSuperclassOf(equivClass->superclass))
           return ConstraintRelation::Redundant;
 
         // Otherwise, it conflicts.
@@ -4539,8 +4539,7 @@ void GenericSignatureBuilder::checkSuperclassConstraints(
   // FIXME: Substitute into the concrete type.
   if (equivClass->concreteType) {
     // Make sure the concrete type fulfills the superclass requirement.
-    if (!equivClass->superclass->isExactSuperclassOf(equivClass->concreteType,
-                                                     nullptr)) {
+    if (!equivClass->superclass->isExactSuperclassOf(equivClass->concreteType)) {
       if (auto existing = equivClass->findAnyConcreteConstraintAsWritten(
                             representativeConstraint.archetype)) {
         Diags.diagnose(existing->source->getLoc(), diag::type_does_not_inherit,

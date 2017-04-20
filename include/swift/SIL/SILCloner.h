@@ -1494,7 +1494,7 @@ SILCloner<ImplClass>::visitWitnessMethodInst(WitnessMethodInst *Inst) {
     CanType Ty = conformance.getConcrete()->getType()->getCanonicalType();
 
     if (Ty != newLookupType) {
-      assert(Ty->isExactSuperclassOf(newLookupType, nullptr) &&
+      assert(Ty->isExactSuperclassOf(newLookupType) &&
              "Should only create upcasts for sub class.");
 
       // We use the super class as the new look up type.
