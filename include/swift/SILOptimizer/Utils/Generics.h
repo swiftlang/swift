@@ -131,7 +131,7 @@ class ReabstractionInfo {
 
   ReabstractionInfo() {}
 public:
-  /// Constructs the ReabstractionInfo for generic function \p Orig with
+  /// Constructs the ReabstractionInfo for generic function \p Callee with
   /// substitutions \p ParamSubs.
   /// If specialization is not possible getSpecializedType() will return an
   /// invalid type.
@@ -139,10 +139,10 @@ public:
                     SubstitutionList ParamSubs,
                     bool ConvertIndirectToDirect = true);
 
-  /// Constructs the ReabstractionInfo for generic function \p Orig with
+  /// Constructs the ReabstractionInfo for generic function \p Callee with
   /// additional requirements. Requirements may contain new layout,
   /// conformances or same concrete type requirements.
-  ReabstractionInfo(SILFunction *Orig, ArrayRef<Requirement> Requirements);
+  ReabstractionInfo(SILFunction *Callee, ArrayRef<Requirement> Requirements);
 
   /// Returns true if the \p ParamIdx'th (non-result) formal parameter is
   /// converted from indirect to direct.

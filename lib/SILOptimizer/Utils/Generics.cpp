@@ -576,6 +576,8 @@ createSpecializedType(CanSILFunctionType SubstFTy, SILModule &M) const {
                          M.getASTContext());
 }
 
+/// Create a new generic signature and generic environment using
+/// a provided builder.
 static std::pair<GenericEnvironment *, GenericSignature *>
 getGenericEnvironmentAndSignature(GenericSignatureBuilder &Builder,
                                   SILModule &M) {
@@ -612,6 +614,7 @@ getGenericEnvironmentAndSignatureWithRequirements(
   return getGenericEnvironmentAndSignature(Builder, M);
 }
 
+/// Perform some sanity checks on the newly formed substitution lists.
 static void verifySubstitutionList(SubstitutionList Subs, StringRef Name) {
   DEBUG(llvm::dbgs() << "\nSubstitutions for " << Name << "\n";
         for (auto Sub : Subs) {
@@ -623,6 +626,9 @@ static void verifySubstitutionList(SubstitutionList Subs, StringRef Name) {
   }
 }
 
+/// This is a fast path for full specializations.
+/// There is no need to form a new generic signature in such cases,
+/// because the specialized function will be non-generic.
 void ReabstractionInfo::performFullSpecializationPreparation(
     SILFunction *Callee, ArrayRef<Substitution> ParamSubs) {
   assert((!EnablePartialSpecialization || !HasUnboundGenericParams) &&
@@ -796,8 +802,8 @@ shouldBePartiallySpecialized(Type Replacement,
 
   // If the archetype used (or any of its dependent types) has requirements
   // depending on other caller's archetypes, then we don't want to specialize
-  // on it as it may require introducing more generic parameters.
-  // Add used generic parameters/archetypes.
+  // on it as it may require introducing more generic parameters, which
+  // is not beneficial.
 
   // Collect the archetypes used by the replacement type.
   llvm::SmallSetVector<ArchetypeType *, 2> UsedArchetypes;
@@ -857,6 +863,12 @@ static void remapRequirements(ArrayRef<Requirement> Reqs,
 namespace swift {
 
 /// A helper class for creating partially specialized function signatures.
+///
+/// The following naming convention is used to describe the memebrs and
+/// functions:
+/// Caller - the function which invokes the callee.
+/// Callee - the callee to be specialized.
+/// Specialized - the specialized callee which is being created.
 class FunctionSignaturePartialSpecializer {
   /// Maps caller's generic parameters to generic parameters of the specialized
   /// function.
@@ -888,6 +900,8 @@ class FunctionSignaturePartialSpecializer {
   /// contextual types.
   SubstitutionMap SpecializedInterfaceToCallerArchetypeMap;
 
+  /// Generic signatures and environments for the caller, callee and
+  /// the specialized function.
   GenericSignature *CallerGenericSig;
   GenericEnvironment *CallerGenericEnv;
 
@@ -1459,11 +1473,6 @@ void ReabstractionInfo::performPartialSpecializationPreparation(
   auto CalleeGenericSig = CalleeFnTy->getGenericSignature();
   auto CalleeGenericEnv = Callee->getGenericEnvironment();
 
-  // Used naming convention:
-  // Caller - the function containing the provided apply instruction.
-  // Callee - the callee of the provided apply instruction.
-  // Specialized - the specialized callee which is being created.
-
   DEBUG(llvm::dbgs() << "\n\nTrying partial specialization for: "
                      << Callee->getName() << "\n";
         llvm::dbgs() << "Callee generic signature is:\n";
@@ -1480,6 +1489,10 @@ void ReabstractionInfo::performPartialSpecializationPreparation(
   else
     FSPS.createSpecializedGenericSignatureWithNonGenericSubs();
 
+  // Once the specialized signature is known, compute different
+  // maps and function types based on it. The specializer will need
+  // them for cloning and specializing the function body, rewriting
+  // the original apply instruction, etc.
   finishPartialSpecializationPreparation(FSPS);
 }
 
