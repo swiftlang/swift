@@ -2533,24 +2533,23 @@ bool TypeChecker::checkedCastMaySucceed(Type t1, Type t2, DeclContext *dc) {
 
 bool TypeChecker::isSubstitutableFor(Type type, ArchetypeType *archetype,
                                      DeclContext *dc) {
-  ConstraintSystem cs(*this, dc, ConstraintSystemOptions());
-  auto locator = cs.getConstraintLocator(nullptr);
-
-  // Add all of the requirements of the archetype to the given type.
-  // FIXME: Short-circuit if any of the constraints fails.
-  if (archetype->requiresClass() && !type->mayHaveSuperclass())
+  if (archetype->requiresClass() &&
+      !type->mayHaveSuperclass() &&
+      !type->isObjCExistentialType())
     return false;
 
   if (auto superclass = archetype->getSuperclass()) {
-    cs.addConstraint(ConstraintKind::Subtype, type, superclass, locator);
-  }
-  for (auto proto : archetype->getConformsTo()) {
-    cs.addConstraint(ConstraintKind::ConformsTo, type,
-                     proto->getDeclaredType(), locator);
+    if (!superclass->isExactSuperclassOf(type))
+      return false;
   }
 
-  // Solve the system.
-  return cs.solveSingle().hasValue();
+  for (auto proto : archetype->getConformsTo()) {
+    if (!dc->getParentModule()->lookupConformance(
+          type, proto, this))
+      return false;
+  }
+
+  return true;
 }
 
 Expr *TypeChecker::coerceToMaterializable(Expr *expr) {
