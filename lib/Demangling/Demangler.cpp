@@ -1967,6 +1967,5 @@ NodePointer Demangler::demangleObjCTypeName() {
   return Global;
 }
 
-} // end namespace Mangle
-} // end namespace swift
-
+} // namespace Demangle
+} // namespace swift

@@ -51,7 +51,7 @@ struct Node {
   SmallVector<Element, 4> elements;
   SmallVector<unsigned, 4> childIndices;
 };
-}
+} // namespace
 
 struct DocStructureArrayBuilder::Implementation {
   typedef CompactArrayBuilder<StringRef> InheritedTypesBuilder;
@@ -342,7 +342,7 @@ private:
                              >
       StructureReader;
 };
-}
+} // namespace
 
 DocStructureArrayReader::DocStructureArrayReader(void *buffer)
     : buffer(buffer) {}

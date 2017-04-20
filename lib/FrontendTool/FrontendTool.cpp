@@ -450,7 +450,7 @@ static bool performCompile(std::unique_ptr<CompilerInstance> &Instance,
   }
 
   if (Action == FrontendOptions::UpdateCode) {
-    return migrator::updateCodeAndEmitRemap(*Instance, Invocation);
+    return migrator::updateCodeAndEmitRemap(Invocation);
   }
 
   SourceFile *PrimarySourceFile = Instance->getPrimarySourceFile();

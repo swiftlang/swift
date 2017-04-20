@@ -3220,7 +3220,7 @@ ParserResult<TypeDecl> Parser::parseDeclAssociatedType(Parser::ParseDeclOptions 
   // Parse a 'where' clause if present.
   if (Tok.is(tok::kw_where)) {
     auto whereStatus = parseProtocolOrAssociatedTypeWhereClause(
-        TrailingWhere, /*inProtocol=*/false);
+        TrailingWhere, /*isProtocol=*/false);
     if (whereStatus.shouldStopParsing())
       return whereStatus;
   }

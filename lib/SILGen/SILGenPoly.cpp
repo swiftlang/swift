@@ -475,7 +475,7 @@ ManagedValue Transform::transform(ManagedValue v,
                            v.getCleanup());
     }
 
-    if (outputSubstType->isExactSuperclassOf(inputSubstType, nullptr)) {
+    if (outputSubstType->isExactSuperclassOf(inputSubstType)) {
       // Upcast to a superclass.
       return ManagedValue(SGF.B.createUpcast(Loc,
                                              v.getValue(),
@@ -483,7 +483,7 @@ ManagedValue Transform::transform(ManagedValue v,
                           v.getCleanup());
     } else {
       // Unchecked-downcast to a covariant return type.
-      assert(inputSubstType->isExactSuperclassOf(outputSubstType, nullptr)
+      assert(inputSubstType->isExactSuperclassOf(outputSubstType)
              && "should be inheritance relationship between input and output");
       return SGF.emitManagedRValueWithCleanup(
         SGF.B.createUncheckedRefCast(Loc, v.forward(SGF), loweredResultTy));      
@@ -1146,7 +1146,7 @@ namespace {
       auto &anyTL = SGF.getTypeLowering(opaque, outputSubstType);
       SILValue loadedOpaque = SGF.B.createInitExistentialOpaque(
           Loc, anyTL.getLoweredType(), inputTupleType, loadedPayload.getValue(),
-          /*conformances=*/{});
+          /*Conformances=*/{});
       return ManagedValue(loadedOpaque, loadedPayload.getCleanup());
     }
 

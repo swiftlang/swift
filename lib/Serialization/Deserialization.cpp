@@ -1030,30 +1030,30 @@ void ModuleFile::readGenericRequirements(
         error();
         break;
       }
-      case LayoutRequirementKind::NativeRefCountedObject: {
+      case LayoutRequirementKind::NativeRefCountedObject:
         kind = LayoutConstraintKind::NativeRefCountedObject;
         break;
-      }
-      case LayoutRequirementKind::RefCountedObject: {
+      case LayoutRequirementKind::RefCountedObject:
         kind = LayoutConstraintKind::RefCountedObject;
         break;
-      }
-      case LayoutRequirementKind::Trivial: {
+      case LayoutRequirementKind::Trivial:
         kind = LayoutConstraintKind::Trivial;
         break;
-      }
-      case LayoutRequirementKind::TrivialOfExactSize: {
+      case LayoutRequirementKind::TrivialOfExactSize:
         kind = LayoutConstraintKind::TrivialOfExactSize;
         break;
-      }
-      case LayoutRequirementKind::TrivialOfAtMostSize: {
+      case LayoutRequirementKind::TrivialOfAtMostSize:
         kind = LayoutConstraintKind::TrivialOfAtMostSize;
         break;
-      }
-      case LayoutRequirementKind::UnknownLayout: {
+      case LayoutRequirementKind::Class:
+        kind = LayoutConstraintKind::Class;
+        break;
+      case LayoutRequirementKind::NativeClass:
+        kind = LayoutConstraintKind::NativeClass;
+        break;
+      case LayoutRequirementKind::UnknownLayout:
         kind = LayoutConstraintKind::UnknownLayout;
         break;
-      }
       }
 
       ASTContext &ctx = getContext();

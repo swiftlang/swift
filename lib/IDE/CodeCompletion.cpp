@@ -1301,8 +1301,7 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks {
     Type DT = DC->getDeclaredTypeOfContext();
     if (DT.isNull() || DT->is<ErrorType>())
       return;
-    OwnedResolver TypeResolver(createLazyResolver(CurDeclContext->getASTContext()));
-    Type ST = DT->getSuperclass(TypeResolver.get());
+    Type ST = DT->getSuperclass();
     if (ST.isNull() || ST->is<ErrorType>())
       return;
     if (ST->getNominalOrBoundGenericNominal()) {
@@ -1944,7 +1943,7 @@ public:
       for (auto proto : protos)
         types.push_back(proto->getDeclaredInterfaceType());
       return ProtocolCompositionType::get(M->getASTContext(), types,
-                                          /*hasExplicitAnyObject=*/false);
+                                          /*HasExplicitAnyObject=*/false);
     };
 
     if (auto *genericFuncType = type->getAs<GenericFunctionType>()) {

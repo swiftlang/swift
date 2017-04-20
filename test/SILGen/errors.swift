@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -parse-stdlib -emit-silgen -verify -primary-file %s %S/Inputs/errors_other.swift | %FileCheck %s
+// RUN: %target-swift-frontend -parse-stdlib -emit-silgen -Xllvm -sil-print-debuginfo -verify -primary-file %s %S/Inputs/errors_other.swift | %FileCheck %s
 
 import Swift
 

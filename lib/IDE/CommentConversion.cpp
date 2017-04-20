@@ -354,8 +354,10 @@ void CommentToXMLConverter::visitDocComment(const DocComment *DC) {
     appendWithXMLEscaping(OS, DeclSS);
     OS << "</Declaration>";
   }
-
+  
+  OS << "<CommentParts>";
   visitCommentParts(DC->getParts());
+  OS << "</CommentParts>";
 
   OS << RootEndTag;
 }

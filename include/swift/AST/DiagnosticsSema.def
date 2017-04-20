@@ -1940,8 +1940,6 @@ ERROR(broken_int_hashable_conformance,none,
       "Int type is broken: does not conform to Hashable", ())
 ERROR(broken_int_integer_literal_convertible_conformance,none,
       "Int type is broken: does not conform to ExpressibleByIntegerLiteral", ())
-ERROR(broken_equatable_eq_operator,none,
-      "Equatable protocol is broken: no infix operator declaration for '=='", ())
 ERROR(no_equal_overload_for_int,none,
       "no overload of '==' for Int", ())
 

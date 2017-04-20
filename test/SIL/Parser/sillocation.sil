@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil %s | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-debuginfo -assume-parsing-unqualified-ownership-sil %s | %FileCheck %s
 
 sil @foo : $@convention(thin) () -> () {
 bb0:

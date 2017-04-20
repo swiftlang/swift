@@ -69,10 +69,18 @@ protected:
   /// Sort all kind of tables to ease diffing.
   bool SortedSIL;
 
+  /// Print debug locations and scopes.
+  bool DebugInfo;
+
 public:
+  /// Constructor with default values for options.
+  ///
+  /// DebugInfo will be set according to the -sil-print-debuginfo option.
   SILPrintContext(llvm::raw_ostream &OS, bool Verbose = false,
-                  bool SortedSIL = false) :
-        OutStream(OS), Verbose(Verbose), SortedSIL(SortedSIL) { }
+                  bool SortedSIL = false);
+
+  SILPrintContext(llvm::raw_ostream &OS, bool Verbose,
+                  bool SortedSIL, bool DebugInfo);
 
   virtual ~SILPrintContext();
 
@@ -89,6 +97,9 @@ public:
   
   /// Returns true if verbose SIL should be printed.
   bool printVerbose() const { return Verbose; }
+
+  /// Returns true if debug locations and scopes should be printed.
+  bool printDebugInfo() const { return DebugInfo; }
 
   SILPrintContext::ID getID(const SILBasicBlock *Block);
 

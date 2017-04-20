@@ -330,7 +330,7 @@ public:
   VariantPrinter(raw_ostream &OS, unsigned Indent = 0, bool PrintAsJSON = false)
     : RequestResponsePrinterBase(OS, Indent, PrintAsJSON) { }
 };
-}
+} // namespace
 
 void sourcekitd::writeEscaped(llvm::StringRef Str, llvm::raw_ostream &OS) {
   for (unsigned i = 0, e = Str.size(); i != e; ++i) {

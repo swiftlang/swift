@@ -79,7 +79,7 @@ public func == <T : Strideable>(x: T, y: T) -> Bool {
 }%
 % for Base, VersionInfo in [
 %   ('Strideable where Self : _Pointer', None),
-%   ('Strideable where Stride : SignedNumeric', 'deprecated: 3, obsoleted: 4'),
+%   ('Strideable', 'deprecated: 3, obsoleted: 4'),
 %   ]:
 %   Availability = '@available(swift, %s, message: "Please use explicit type conversions or Strideable methods for mixed-type arithmetics.")' % (VersionInfo) if VersionInfo else ''
 

@@ -90,7 +90,7 @@ enum EnforceExclusivityMode {
   DynamicOnly,
   None
 };
-}
+} // namespace
 
 static cl::opt<EnforceExclusivityMode> EnforceExclusivity(
   "enforce-exclusivity", cl::desc("Enforce law of exclusivity "
