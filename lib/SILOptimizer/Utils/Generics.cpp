@@ -36,21 +36,21 @@ llvm::cl::opt<bool> SupportGenericSubstitutions(
 
 static bool OptimizeGenericSubstitutions = false;
 
-// Max depth of a type which can be processed by the generic
-// specializer.
-// E.g. the depth of Array<Array<Array<T>>> is 3.
-// No specializations will be produced, if any of generic parameters contains
-// a bound generic type with the depth higher than this threshold
+/// Max depth of a type which can be processed by the generic
+/// specializer.
+/// E.g. the depth of Array<Array<Array<T>>> is 3.
+/// No specializations will be produced, if any of generic parameters contains
+/// a bound generic type with the depth higher than this threshold
 static const unsigned TypeDepthThreshold = 50;
-// Set the width threshold rather high, because some projects uses very wide
-// tuples to model fixed size arrays.
+/// Set the width threshold rather high, because some projects uses very wide
+/// tuples to model fixed size arrays.
 static const unsigned TypeWidthThreshold = 2000;
 
-// Compute the width and the depth of a type.
-// We compute both, because some pathological test-cases result in very
-// wide types and some others result in very deep types. It is important
-// to bail as soon as we hit the threshold on any of both dimensions to
-// prevent compiler hangs and crashes.
+/// Compute the width and the depth of a type.
+/// We compute both, because some pathological test-cases result in very
+/// wide types and some others result in very deep types. It is important
+/// to bail as soon as we hit the threshold on any of both dimensions to
+/// prevent compiler hangs and crashes.
 static std::pair<unsigned, unsigned> getTypeDepthAndWidth(Type t) {
   unsigned Depth = 0;
   unsigned Width = 0;
@@ -529,8 +529,8 @@ ReabstractionInfo::createSubstitutedType(SILFunction *OrigF,
   return NewFnTy;
 }
 
-// Convert the substituted function type into a specialized function type based
-// on the ReabstractionInfo.
+/// Convert the substituted function type into a specialized function type based
+/// on the ReabstractionInfo.
 CanSILFunctionType ReabstractionInfo::
 createSpecializedType(CanSILFunctionType SubstFTy, SILModule &M) const {
   llvm::SmallVector<SILResultInfo, 8> SpecializedResults;
@@ -586,8 +586,8 @@ getGenericEnvironmentAndSignature(GenericSignatureBuilder &Builder,
   return std::make_pair(GenericEnv, GenericSig);
 }
 
-// Create a new generic signature from an existing one by adding
-// additional requirements.
+/// Create a new generic signature from an existing one by adding
+/// additional requirements.
 std::pair<GenericEnvironment *, GenericSignature *>
 getGenericEnvironmentAndSignatureWithRequirements(
     GenericSignature *OrigGenSig, GenericEnvironment *OrigGenericEnv,
@@ -858,34 +858,34 @@ namespace swift {
 
 /// A helper class for creating partially specialized function signatures.
 class FunctionSignaturePartialSpecializer {
-  // Maps caller's generic parameters to generic parameters of the specialized
-  // function.
+  /// Maps caller's generic parameters to generic parameters of the specialized
+  /// function.
   llvm::DenseMap<SubstitutableType *, Type>
       CallerInterfaceToSpecializedInterfaceMapping;
 
-  // Maps callee's generic parameters to generic parameters of the specialized
-  // function.
+  /// Maps callee's generic parameters to generic parameters of the specialized
+  /// function.
   llvm::DenseMap<SubstitutableType *, Type>
       CalleeInterfaceToSpecializedInterfaceMapping;
 
-  // Maps the generic parameters of the specialized function to the caller's
-  // contextual types.
+  /// Maps the generic parameters of the specialized function to the caller's
+  /// contextual types.
   llvm::DenseMap<SubstitutableType *, Type>
       SpecializedInterfaceToCallerArchetypeMapping;
 
-  // A SubstitutionMap for re-mapping caller's interface types
-  // to interface types of the specialized function.
+  /// A SubstitutionMap for re-mapping caller's interface types
+  /// to interface types of the specialized function.
   SubstitutionMap CallerInterfaceToSpecializedInterfaceMap;
 
-  // Maps callee's interface types to caller's contextual types.
-  // It is computed from the original SubstitutionList.
+  /// Maps callee's interface types to caller's contextual types.
+  /// It is computed from the original SubstitutionList.
   SubstitutionMap CalleeInterfaceToCallerArchetypeMap;
 
-  // Maps callee's interface types to specialized functions interface types.
+  /// Maps callee's interface types to specialized functions interface types.
   SubstitutionMap CalleeInterfaceToSpecializedInterfaceMap;
 
-  // Maps the generic parameters of the specialized function to the caller's
-  // contextual types.
+  /// Maps the generic parameters of the specialized function to the caller's
+  /// contextual types.
   SubstitutionMap SpecializedInterfaceToCallerArchetypeMap;
 
   GenericSignature *CallerGenericSig;
@@ -901,18 +901,18 @@ class FunctionSignaturePartialSpecializer {
   ModuleDecl *SM;
   ASTContext &Ctx;
 
-  // This is a builder for a new partially specialized generic signature.
+  /// This is a builder for a new partially specialized generic signature.
   GenericSignatureBuilder Builder;
 
-  // Set of newly created generic type parameters.
+  /// Set of newly created generic type parameters.
   SmallVector<GenericTypeParamType*, 4> AllGenericParams;
 
-  // Archetypes used in the substitutions of an apply instructions.
-  // These are the contextual archetypes of the caller function, which
-  // invokes a generic function that is being specialized.
+  /// Archetypes used in the substitutions of an apply instructions.
+  /// These are the contextual archetypes of the caller function, which
+  /// invokes a generic function that is being specialized.
   llvm::SmallSetVector<ArchetypeType *, 2> UsedCallerArchetypes;
 
-  // Number of created generic parameters so far.
+  /// Number of created generic parameters so far.
   unsigned GPIdx = 0;
 
   void createGenericParamsForUsedCallerArchetypes();
@@ -940,7 +940,7 @@ class FunctionSignaturePartialSpecializer {
   /// specialized. Ignore all others.
   void collectUsedCallerArchetypes(SubstitutionList ParamSubs);
 
-  // Create a new generic parameter.
+  /// Create a new generic parameter.
   GenericTypeParamType *createGenericParam();
 
 public:
@@ -960,8 +960,8 @@ public:
       CalleeGenericSig->getSubstitutionMap(ParamSubs);
   }
 
-  // This constructor is used by when processing @_specialize.
-  // In this case, the caller and the callee are the same function.
+  /// This constructor is used by when processing @_specialize.
+  /// In this case, the caller and the callee are the same function.
   FunctionSignaturePartialSpecializer(SILModule &M,
                                       GenericSignature *CalleeGenericSig,
                                       GenericEnvironment *CalleeGenericEnv,
@@ -1245,14 +1245,14 @@ void FunctionSignaturePartialSpecializer::
   }
 }
 
-// Add requirements from a given list of requirements to the
-// GenericSignatureBuilder. Re-map them using the provided SubstitutionMap.
+/// Add requirements from a given list of requirements to the
+/// GenericSignatureBuilder. Re-map them using the provided SubstitutionMap.
 void FunctionSignaturePartialSpecializer::addRequirements(
     ArrayRef<Requirement> Reqs, SubstitutionMap &SubsMap) {
   remapRequirements(Reqs, SubsMap, Builder, SM);
 }
 
-// Add requirements from the caller signature.
+/// Add requirements from the caller's signature.
 void FunctionSignaturePartialSpecializer::addCallerRequirements() {
   for (auto CallerArchetype : UsedCallerArchetypes) {
     auto CallerGenericParam =
@@ -1274,7 +1274,7 @@ void FunctionSignaturePartialSpecializer::addCallerRequirements() {
   }
 }
 
-// Add requirements from the callee signature.
+/// Add requirements from the callee's signature.
 void FunctionSignaturePartialSpecializer::addCalleeRequirements() {
   if (CalleeGenericSig)
     addRequirements(CalleeGenericSig->getRequirements(),
@@ -1345,7 +1345,7 @@ void FunctionSignaturePartialSpecializer::computeCallerInterfaceSubs(
         CallerInterfaceSubs.dump(llvm::dbgs()));
 }
 
-// Fast-path for the case when generic substitutions are not supported.
+/// Fast-path for the case when generic substitutions are not supported.
 void FunctionSignaturePartialSpecializer::
     createSpecializedGenericSignatureWithNonGenericSubs() {
   // Simply create a set of same-type requirements based on concrete
@@ -1414,32 +1414,32 @@ void FunctionSignaturePartialSpecializer::createSpecializedGenericSignature(
   }
 }
 
-// Builds a new generic and function signatures for a partial specialization.
-// Allows for partial specializations even if substitutions contain
-// type parameters.
-//
-// The new generic signature has the following generic parameters:
-// - For each substitution with a concrete type CT as a replacement for a
-// generic type T, it introduces a generic parameter T' and a
-// requirement T' == CT
-// - For all other substitutions that are considered for partial specialization,
-// it collects first the archetypes used in the replacements. Then for each such
-// archetype A a new generic parameter T' introduced.
-// - If there is a substitution for type T and this substitution is excluded
-// from partial specialization (e.g. because it is impossible or would result
-// in a less efficient code), then a new generic parameter T' is introduced,
-// which does not get any additional, more specific requirements based on the
-// substitutions.
-//
-// After all generic parameters are added according to the rules above,
-// the requirements of the callee's signature are re-mapped by re-formulating
-// them in terms of the newly introduced generic parameters. In case a remapped
-// requirement does not contain any generic types, it can be omitted, because
-// it is fulfilled already.
-//
-// If any of the generic parameters were introduced for caller's archetypes,
-// their requirements from the caller's signature are re-mapped by
-// re-formulating them in terms of the newly introduced generic parameters.
+/// Builds a new generic and function signatures for a partial specialization.
+/// Allows for partial specializations even if substitutions contain
+/// type parameters.
+///
+/// The new generic signature has the following generic parameters:
+/// - For each substitution with a concrete type CT as a replacement for a
+/// generic type T, it introduces a generic parameter T' and a
+/// requirement T' == CT
+/// - For all other substitutions that are considered for partial specialization,
+/// it collects first the archetypes used in the replacements. Then for each such
+/// archetype A a new generic parameter T' introduced.
+/// - If there is a substitution for type T and this substitution is excluded
+/// from partial specialization (e.g. because it is impossible or would result
+/// in a less efficient code), then a new generic parameter T' is introduced,
+/// which does not get any additional, more specific requirements based on the
+/// substitutions.
+///
+/// After all generic parameters are added according to the rules above,
+/// the requirements of the callee's signature are re-mapped by re-formulating
+/// them in terms of the newly introduced generic parameters. In case a remapped
+/// requirement does not contain any generic types, it can be omitted, because
+/// it is fulfilled already.
+///
+/// If any of the generic parameters were introduced for caller's archetypes,
+/// their requirements from the caller's signature are re-mapped by
+/// re-formulating them in terms of the newly introduced generic parameters.
 void ReabstractionInfo::performPartialSpecializationPreparation(
     SILFunction *Caller, SILFunction *Callee,
     ArrayRef<Substitution> ParamSubs) {
@@ -1546,7 +1546,7 @@ checkSpecializationRequirements(ArrayRef<Requirement> Requirements) {
   }
 }
 
-// This constructor is used when processing @_specialize.
+/// This constructor is used when processing @_specialize.
 ReabstractionInfo::ReabstractionInfo(SILFunction *Callee,
                                      ArrayRef<Requirement> Requirements) {
   if (shouldNotSpecializeCallee(Callee))
@@ -1600,7 +1600,7 @@ GenericFuncSpecializer::GenericFuncSpecializer(SILFunction *GenericFunc,
   DEBUG(llvm::dbgs() << "    Specialized function " << ClonedName << '\n');
 }
 
-// Return an existing specialization if one exists.
+/// Return an existing specialization if one exists.
 SILFunction *GenericFuncSpecializer::lookupSpecialization() {
   if (SILFunction *SpecializedF = M.lookUpFunction(ClonedName)) {
     if (ReInfo.getSpecializedType() != SpecializedF->getLoweredFunctionType()) {
@@ -1621,7 +1621,7 @@ SILFunction *GenericFuncSpecializer::lookupSpecialization() {
   return nullptr;
 }
 
-// Forward decl for prespecialization support.
+/// Forward decl for prespecialization support.
 static bool linkSpecialization(SILModule &M, SILFunction *F);
 
 void ReabstractionInfo::verify() const {
@@ -1631,7 +1631,7 @@ void ReabstractionInfo::verify() const {
           getSpecializedType()->isPolymorphic()));
 }
 
-// Create a new specialized function if possible, and cache it.
+/// Create a new specialized function if possible, and cache it.
 SILFunction *GenericFuncSpecializer::tryCreateSpecialization() {
   // Do not create any new specializations at Onone.
   if (M.getOptions().Optimization <= SILOptions::SILOptMode::None)
@@ -1676,7 +1676,7 @@ static void fixUsedVoidType(SILValue VoidVal, SILLocation Loc,
   VoidVal->replaceAllUsesWith(NewVoidVal);
 }
 
-// Prepare call arguments. Perform re-abstraction if required.
+/// Prepare call arguments. Perform re-abstraction if required.
 static void prepareCallArguments(ApplySite AI, SILBuilder &Builder,
                                  const ReabstractionInfo &ReInfo,
                                  SmallVectorImpl<SILValue> &Arguments,
@@ -1731,8 +1731,8 @@ getCalleeSubstFunctionType(SILValue Callee, SubstitutionList Subs) {
   return CanFnTy->substGenericArgs(*Callee->getModule(), Subs);
 }
 
-// Create a new apply based on an old one, but with a different
-// function being applied.
+/// Create a new apply based on an old one, but with a different
+/// function being applied.
 static ApplySite replaceWithSpecializedCallee(ApplySite AI,
                                               SILValue Callee,
                                               SILBuilder &Builder,
@@ -1811,8 +1811,8 @@ static ApplySite replaceWithSpecializedCallee(ApplySite AI,
   llvm_unreachable("unhandled kind of apply");
 }
 
-// Create a new apply based on an old one, but with a different
-// function being applied.
+/// Create a new apply based on an old one, but with a different
+/// function being applied.
 ApplySite swift::
 replaceWithSpecializedFunction(ApplySite AI, SILFunction *NewF,
                                const ReabstractionInfo &ReInfo) {
@@ -1922,7 +1922,7 @@ SILFunction *ReabstractionThunkGenerator::createThunk() {
   return Thunk;
 }
 
-// Create a call to a reabstraction thunk. Return the call's direct result.
+/// Create a call to a reabstraction thunk. Return the call's direct result.
 SILValue ReabstractionThunkGenerator::createReabstractionThunkApply(
     SILBuilder &Builder) {
   SILFunction *Thunk = &Builder.getFunction();
@@ -1953,12 +1953,12 @@ SILValue ReabstractionThunkGenerator::createReabstractionThunkApply(
   return ReturnValue;
 }
 
-// Create SIL arguments for a reabstraction thunk with lowered addresses. This
-// may involve replacing indirect arguments with loads and stores. Return the
-// SILArgument for the address of an indirect result, or nullptr.
-//
-// FIXME: Remove this if we don't need to create reabstraction thunks after
-// address lowering.
+/// Create SIL arguments for a reabstraction thunk with lowered addresses. This
+/// may involve replacing indirect arguments with loads and stores. Return the
+/// SILArgument for the address of an indirect result, or nullptr.
+///
+/// FIXME: Remove this if we don't need to create reabstraction thunks after
+/// address lowering.
 SILArgument *ReabstractionThunkGenerator::convertReabstractionThunkArguments(
     SILBuilder &Builder) {
   SILFunction *Thunk = &Builder.getFunction();
@@ -2243,8 +2243,8 @@ static bool linkSpecialization(SILModule &M, SILFunction *F) {
   return false;
 }
 
-// The whitelist of classes and functions from the stdlib,
-// whose specializations we want to preserve.
+/// The whitelist of classes and functions from the stdlib,
+/// whose specializations we want to preserve.
 static const char *const WhitelistedSpecializations[] = {
     "Array",
     "_ArrayBuffer",
