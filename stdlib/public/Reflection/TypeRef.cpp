@@ -72,6 +72,8 @@ public:
       printHeader("enum");
     else if (N->isClass())
       printHeader("class");
+    else if (N->isAlias())
+      printHeader("alias");
     else
       printHeader("nominal");
     auto demangled = Demangle::demangleTypeAsString(N->getMangledName());
@@ -417,6 +419,16 @@ bool isClass(Demangle::NodePointer Node) {
       return false;
   }
 }
+bool isAlias(Demangle::NodePointer Node) {
+  switch (Node->getKind()) {
+    case Demangle::Node::Kind::Type:
+      return isAlias(Node->getChild(0));
+    case Demangle::Node::Kind::TypeAlias:
+      return true;
+    default:
+      return false;
+  }
+}
 } // end anonymous namespace
 
 bool NominalTypeTrait::isStruct() const {
@@ -425,18 +437,22 @@ bool NominalTypeTrait::isStruct() const {
   return ::isStruct(Demangled);
 }
 
-
 bool NominalTypeTrait::isEnum() const {
   Demangle::Demangler Dem;
   Demangle::NodePointer Demangled = Dem.demangleType(MangledName);
   return ::isEnum(Demangled);
 }
 
-
 bool NominalTypeTrait::isClass() const {
   Demangle::Demangler Dem;
   Demangle::NodePointer Demangled = Dem.demangleType(MangledName);
   return ::isClass(Demangled);
+}
+
+bool NominalTypeTrait::isAlias() const {
+  Demangle::Demangler Dem;
+  Demangle::NodePointer Demangled = Dem.demangleType(MangledName);
+  return ::isAlias(Demangled);
 }
 
 /// Visitor class to set the WasAbstract flag of any MetatypeTypeRefs

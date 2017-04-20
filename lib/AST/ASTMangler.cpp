@@ -1022,8 +1022,7 @@ void ASTMangler::appendImplFunctionType(SILFunctionType *fn) {
 /// Mangle the context of the given declaration as a <context.
 /// This is the top-level entrypoint for mangling <context>.
 void ASTMangler::appendContextOf(const ValueDecl *decl) {
-  // Declarations provided provided by a C module have a special context
-  // mangling.
+  // Declarations imported from C have a special context mangling.
   //   known-context ::= 'So'
   //
   // Also handle top-level imported declarations that don't have corresponding
@@ -1038,6 +1037,12 @@ void ASTMangler::appendContextOf(const ValueDecl *decl) {
       return appendOperator("SC");
     }
   }
+
+  // Nested types imported from C should also get use the special "So" context.
+  if (isa<TypeDecl>(decl))
+    if (auto *clangDecl = decl->getClangDecl())
+      if (clangDecl->getDeclContext()->isTranslationUnit())
+        return appendOperator("So");
 
   // Just mangle the decl's DC.
   appendContext(decl->getDeclContext());
@@ -1267,28 +1272,53 @@ void ASTMangler::appendAnyGenericType(const GenericTypeDecl *decl) {
     return;
 
   appendContextOf(decl);
-  appendDeclName(decl);
 
-  switch (decl->getKind()) {
-  default:
-    llvm_unreachable("not a nominal type");
+  // Always use Clang names for imported Clang declarations.
+  auto *clangDecl = dyn_cast_or_null<clang::TypeDecl>(decl->getClangDecl());
+  if (clangDecl && !clangDecl->getName().empty()) {
+    appendIdentifier(clangDecl->getName());
+    // The important distinctions to maintain here are Objective-C's various
+    // namespaces: protocols, tags (struct/enum/union), and unqualified names.
+    // We continue to mangle "class" the standard Swift way because it feels
+    // weird to call that an alias, but they're really in the same namespace.
+    if (isa<clang::ObjCInterfaceDecl>(clangDecl)) {
+      appendOperator("C");
+    } else if (isa<clang::ObjCProtocolDecl>(clangDecl)) {
+      appendOperator("P");
+    } else if (isa<clang::TagDecl>(clangDecl)) {
+      // Note: This includes enums, but that's okay. A Clang enum is not always
+      // imported as a Swift enum.
+      appendOperator("V");
+    } else if (isa<clang::TypedefNameDecl>(clangDecl)) {
+      appendOperator("a");
+    } else {
+      llvm_unreachable("unknown imported Clang type");
+    }
+  } else {
+    appendDeclName(decl);
 
-  case DeclKind::TypeAlias:
-    appendOperator("a");
-    break;
-  case DeclKind::Protocol:
-    appendOperator("P");
-    break;
-  case DeclKind::Class:
-    appendOperator("C");
-    break;
-  case DeclKind::Enum:
-    appendOperator("O");
-    break;
-  case DeclKind::Struct:
-    appendOperator("V");
-    break;
+    switch (decl->getKind()) {
+    default:
+      llvm_unreachable("not a nominal type");
+
+    case DeclKind::TypeAlias:
+      appendOperator("a");
+      break;
+    case DeclKind::Protocol:
+      appendOperator("P");
+      break;
+    case DeclKind::Class:
+      appendOperator("C");
+      break;
+    case DeclKind::Enum:
+      appendOperator("O");
+      break;
+    case DeclKind::Struct:
+      appendOperator("V");
+      break;
+    }
   }
+
   addSubstitution(key.getPointer());
 }
 

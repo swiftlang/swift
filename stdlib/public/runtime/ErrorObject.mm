@@ -248,7 +248,7 @@ static const WitnessTable *getNSErrorConformanceToError() {
   // Swift source.
 
   auto TheWitnessTable = SWIFT_LAZY_CONSTANT(dlsym(RTLD_DEFAULT,
-               MANGLE_AS_STRING(MANGLE_SYM(So7CFErrorCs5Error10FoundationWP))));
+      MANGLE_AS_STRING(MANGLE_SYM(So10CFErrorRefas5Error10FoundationWP))));
   assert(TheWitnessTable &&
          "Foundation overlay not loaded, or 'CFError : Error' conformance "
          "not available");

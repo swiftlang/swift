@@ -15,7 +15,7 @@ func createErrorDomain(str: String) -> ErrorDomain {
   return ErrorDomain(rawValue: str)
 }
 
-// CHECK-RAW-LABEL: sil shared [transparent] [serializable] @_T0So11ErrorDomainVABSS8rawValue_tcfC
+// CHECK-RAW-LABEL: sil shared [transparent] [serializable] @_T0So14SNTErrorDomainaABSS8rawValue_tcfC
 // CHECK-RAW: bb0([[STR:%[0-9]+]] : $String,
 // CHECK-RAW: [[SELF_BOX:%[0-9]+]] = alloc_box ${ var ErrorDomain }, var, name "self"
 // CHECK-RAW: [[MARKED_SELF_BOX:%[0-9]+]] = mark_uninitialized [rootself] [[SELF_BOX]]
@@ -31,7 +31,7 @@ func getRawValue(ed: ErrorDomain) -> String {
   return ed.rawValue
 }
 
-// CHECK-RAW-LABEL: sil shared [serializable] @_T0So11ErrorDomainV8rawValueSSfg
+// CHECK-RAW-LABEL: sil shared [serializable] @_T0So14SNTErrorDomaina8rawValueSSfg
 // CHECK-RAW: bb0([[SELF:%[0-9]+]] : $ErrorDomain):
 // CHECK-RAW: [[FORCE_BRIDGE:%[0-9]+]] = function_ref @_forceBridgeFromObjectiveC_bridgeable
 // CHECK-RAW: [[STRING_RESULT_ADDR:%[0-9]+]] = alloc_stack $String
@@ -43,14 +43,14 @@ func getRawValue(ed: ErrorDomain) -> String {
 // CHECK-RAW: return [[STRING_RESULT]]
 
 class ObjCTest {
-  // CHECK-RAW-LABEL: sil hidden @_T07newtype8ObjCTestC19optionalPassThroughSo11ErrorDomainVSgAGF : $@convention(method) (@owned Optional<ErrorDomain>, @guaranteed ObjCTest) -> @owned Optional<ErrorDomain> {
-  // CHECK-RAW: sil hidden [thunk] @_T07newtype8ObjCTestC19optionalPassThroughSo11ErrorDomainVSgAGFTo : $@convention(objc_method) (Optional<ErrorDomain>, ObjCTest) -> Optional<ErrorDomain> {
+  // CHECK-RAW-LABEL: sil hidden @_T07newtype8ObjCTestC19optionalPassThroughSo14SNTErrorDomainaSgAGF : $@convention(method) (@owned Optional<ErrorDomain>, @guaranteed ObjCTest) -> @owned Optional<ErrorDomain> {
+  // CHECK-RAW: sil hidden [thunk] @_T07newtype8ObjCTestC19optionalPassThroughSo14SNTErrorDomainaSgAGFTo : $@convention(objc_method) (Optional<ErrorDomain>, ObjCTest) -> Optional<ErrorDomain> {
   @objc func optionalPassThrough(_ ed: ErrorDomain?) -> ErrorDomain? {
     return ed
   }  
 
-  // CHECK-RAW-LABEL: sil hidden @_T07newtype8ObjCTestC18integerPassThroughSo5MyIntVAFF : $@convention(method) (MyInt, @guaranteed ObjCTest) -> MyInt {
-  // CHECK-RAW: sil hidden [thunk] @_T07newtype8ObjCTestC18integerPassThroughSo5MyIntVAFFTo : $@convention(objc_method) (MyInt, ObjCTest) -> MyInt {
+  // CHECK-RAW-LABEL: sil hidden @_T07newtype8ObjCTestC18integerPassThroughSo5MyIntaAFF : $@convention(method) (MyInt, @guaranteed ObjCTest) -> MyInt {
+  // CHECK-RAW: sil hidden [thunk] @_T07newtype8ObjCTestC18integerPassThroughSo5MyIntaAFFTo : $@convention(objc_method) (MyInt, ObjCTest) -> MyInt {
   @objc func integerPassThrough(_ ed: MyInt) -> MyInt {
     return ed
   }  

@@ -16,8 +16,8 @@
 // CHECK: nsString: __C.NSString
 // CHECK: (class __C.NSString)
 
-// CHECK: cfString: __C.CFString
-// CHECK: (class __C.CFString)
+// CHECK: cfString: __C.CFStringRef
+// CHECK: (alias __C.CFStringRef)
 
 // CHECK: aBlock: @convention(block) () -> ()
 // CHECK: (function convention=block
@@ -27,9 +27,9 @@
 // CHECK: (bound_generic_class TypesToReflect.GenericOC
 // CHECK:   (class __C.NSString))
 
-// CHECK: occfs: TypesToReflect.GenericOC<__C.CFString>
+// CHECK: occfs: TypesToReflect.GenericOC<__C.CFStringRef>
 // CHECK: (bound_generic_class TypesToReflect.GenericOC
-// CHECK:   (class __C.CFString))
+// CHECK:   (alias __C.CFStringRef))
 
 // CHECK: TypesToReflect.GenericOC
 // CHECK: ------------------------

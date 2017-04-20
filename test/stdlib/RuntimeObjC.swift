@@ -361,7 +361,7 @@ Runtime.test("Generic class ObjC runtime names") {
   expectEqual("_T01a12GenericClassCyAA9ProtocolA_AA0C1BpmGD",
               NSStringFromClass(GenericClass<(ProtocolB & ProtocolA).Protocol>.self))
 
-  expectEqual("_T01a12GenericClassCySo7CFArrayCGD",
+  expectEqual("_T01a12GenericClassCySo10CFArrayRefaGD",
               NSStringFromClass(GenericClass<CFArray>.self))
   expectEqual("_T01a12GenericClassCySo7DecimalVGD",
               NSStringFromClass(GenericClass<Decimal>.self))
@@ -751,8 +751,8 @@ Reflection.test("Unmanaged/not-nil") {
   dump(optionalURL, to: &output)
 
   let expected =
-    "▿ Optional(Swift.Unmanaged<__C.CFURL>(_value: http://llvm.org/))\n" +
-    "  ▿ some: Swift.Unmanaged<__C.CFURL>\n" +
+    "▿ Optional(Swift.Unmanaged<__C.CFURLRef>(_value: http://llvm.org/))\n" +
+    "  ▿ some: Swift.Unmanaged<__C.CFURLRef>\n" +
     "    - _value: http://llvm.org/ #0\n" +
     "      - super: NSObject\n"
 
