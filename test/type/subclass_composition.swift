@@ -99,8 +99,11 @@ func basicSubtyping(
   let _ = Unrelated() as? Derived & P2 // expected-warning {{always fails}}
   let _ = baseAndP2 as Unrelated // expected-error {{cannot convert value of type 'Base<Int> & P2' to type 'Unrelated' in coercion}}
   let _ = baseAndP2 as? Unrelated // expected-warning {{always fails}}
-  let _ = Unrelated() as AnyObject
-  let _ = Unrelated() as? AnyObject // expected-warning {{always succeeds}}
+
+  // Different behavior on Linux vs Darwin because of id-as-Any.
+  // let _ = Unrelated() as AnyObject
+  // let _ = Unrelated() as? AnyObject
+
   let _ = anyObject as Unrelated // expected-error {{'AnyObject' is not convertible to 'Unrelated'; did you mean to use 'as!' to force downcast?}}
   let _ = anyObject as? Unrelated
 
