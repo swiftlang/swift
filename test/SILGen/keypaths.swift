@@ -1,4 +1,5 @@
 // RUN: %target-swift-frontend -emit-silgen -verify %s | %FileCheck %s
+// REQUIRES: PTRSIZE=64
 
 struct S<T> {
   var x: T
