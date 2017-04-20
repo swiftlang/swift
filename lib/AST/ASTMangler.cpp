@@ -1171,34 +1171,25 @@ void ASTMangler::appendImplFunctionType(SILFunctionType *fn) {
 /// Mangle the context of the given declaration as a <context.
 /// This is the top-level entrypoint for mangling <context>.
 void ASTMangler::appendContextOf(const ValueDecl *decl) {
-  auto clangDecl = decl->getClangDecl();
-
-  // Declarations provided provided by a C module have a special context
-  // mangling.
+  // Declarations provided by a C module have a special context mangling.
   //   known-context ::= 'So'
-  if (isa<ClassDecl>(decl) && clangDecl) {
-    assert(isa<clang::ObjCInterfaceDecl>(clangDecl) ||
-           isa<clang::TypedefDecl>(clangDecl));
-    return appendOperator("So");
-  }
-
-  if (isa<ProtocolDecl>(decl) && clangDecl) {
-    assert(isa<clang::ObjCProtocolDecl>(clangDecl));
-    return appendOperator("So");
-  }
-
+  //
   // Also handle top-level imported declarations that don't have corresponding
   // Clang decls. Check getKind() directly to avoid a layering dependency.
   //   known-context ::= 'SC'
   if (auto file = dyn_cast<FileUnit>(decl->getDeclContext())) {
     if (file->getKind() == FileUnitKind::ClangModule) {
-      // FIXME: Import-as-member Clang decls should appear under 'So' as well,
-      // rather than under their current parent.
-      if (clangDecl)
+      if (decl->getClangDecl())
         return appendOperator("So");
       return appendOperator("SC");
     }
   }
+
+  // Nested types imported from C should also get use the special "So" context.
+  if (isa<TypeDecl>(decl))
+    if (auto *clangDecl = decl->getClangDecl())
+      if (clangDecl->getDeclContext()->isTranslationUnit())
+        return appendOperator("So");
 
   // Just mangle the decl's DC.
   appendContext(decl->getDeclContext());
@@ -1406,7 +1397,11 @@ void ASTMangler::appendModule(const ModuleDecl *module) {
 /// Mangle the name of a protocol as a substitution candidate.
 void ASTMangler::appendProtocolName(const ProtocolDecl *protocol) {
   appendContextOf(protocol);
-  appendDeclName(protocol);
+  auto *clangDecl = protocol->getClangDecl();
+  if (auto *clangProto = cast_or_null<clang::ObjCProtocolDecl>(clangDecl))
+    appendIdentifier(clangProto->getName());
+  else
+    appendDeclName(protocol);
 }
 
 void ASTMangler::appendAnyGenericType(const GenericTypeDecl *decl) {
@@ -1430,28 +1425,53 @@ void ASTMangler::appendAnyGenericType(const GenericTypeDecl *decl) {
     return;
 
   appendContextOf(decl);
-  appendDeclName(decl);
 
-  switch (decl->getKind()) {
-  default:
-    llvm_unreachable("not a nominal type");
+  // Always use Clang names for imported Clang declarations.
+  auto *clangDecl = dyn_cast_or_null<clang::NamedDecl>(decl->getClangDecl());
+  if (clangDecl && !clangDecl->getName().empty()) {
+    appendIdentifier(clangDecl->getName());
+    // The important distinctions to maintain here are Objective-C's various
+    // namespaces: protocols, tags (struct/enum/union), and unqualified names.
+    // We continue to mangle "class" the standard Swift way because it feels
+    // weird to call that an alias, but they're really in the same namespace.
+    if (isa<clang::ObjCInterfaceDecl>(clangDecl)) {
+      appendOperator("C");
+    } else if (isa<clang::ObjCProtocolDecl>(clangDecl)) {
+      appendOperator("P");
+    } else if (isa<clang::TagDecl>(clangDecl)) {
+      // Note: This includes enums, but that's okay. A Clang enum is not always
+      // imported as a Swift enum.
+      appendOperator("V");
+    } else if (isa<clang::TypedefNameDecl>(clangDecl)) {
+      appendOperator("a");
+    } else {
+      llvm_unreachable("unknown imported Clang type");
+    }
+  } else {
+    appendDeclName(decl);
 
-  case DeclKind::TypeAlias:
-    appendOperator("a");
-    break;
-  case DeclKind::Protocol:
-    appendOperator("P");
-    break;
-  case DeclKind::Class:
-    appendOperator("C");
-    break;
-  case DeclKind::Enum:
-    appendOperator("O");
-    break;
-  case DeclKind::Struct:
-    appendOperator("V");
-    break;
+    switch (decl->getKind()) {
+    default:
+      llvm_unreachable("not a nominal type");
+
+    case DeclKind::TypeAlias:
+      appendOperator("a");
+      break;
+    case DeclKind::Protocol:
+      appendOperator("P");
+      break;
+    case DeclKind::Class:
+      appendOperator("C");
+      break;
+    case DeclKind::Enum:
+      appendOperator("O");
+      break;
+    case DeclKind::Struct:
+      appendOperator("V");
+      break;
+    }
   }
+
   addSubstitution(key.getPointer());
 }
 

@@ -9,15 +9,15 @@ import Newtype
 // REQUIRES: objc_interop
 
 // Witness table for synthesized ClosedEnums : _ObjectiveCBridgeable.
-// CHECK: @"$SSo10ClosedEnumVs21_ObjectiveCBridgeable7NewtypeWP" = linkonce_odr
+// CHECK: @"$SSo13SNTClosedEnumas21_ObjectiveCBridgeable7NewtypeWP" = linkonce_odr
 
-// CHECK-LABEL: define swiftcc %TSo8NSStringC* @"$S7newtype14getErrorDomainSo0cD0VyF"()
+// CHECK-LABEL: define swiftcc %TSo8NSStringC* @"$S7newtype14getErrorDomainSo08SNTErrorD0ayF"()
 public func getErrorDomain() -> ErrorDomain {
-  // CHECK: load %TSo8NSStringC*, %TSo8NSStringC** getelementptr inbounds (%TSo11ErrorDomainV, %TSo11ErrorDomainV* {{.*}}@SNTErrOne
+  // CHECK: load %TSo8NSStringC*, %TSo8NSStringC** getelementptr inbounds (%TSo14SNTErrorDomaina, %TSo14SNTErrorDomaina* {{.*}}@SNTErrOne
   return .one
 }
 
-// CHECK-LABEL: $S7newtype6getFooSo14NSNotificationC4NameVyF
+// CHECK-LABEL: $S7newtype6getFooSo18NSNotificationNameayF
 public func getFoo() -> NSNotification.Name {
   return NSNotification.Name.Foo
   // CHECK: load {{.*}} @FooNotification
@@ -39,7 +39,7 @@ public func getGlobalNotification(_ x: Int) -> String {
 // CHECK: ret
 }
 
-// CHECK-LABEL: $S7newtype17getCFNewTypeValue6useVarSo0cD0VSb_tF
+// CHECK-LABEL: $S7newtype17getCFNewTypeValue6useVarSo0cD0aSb_tF
 public func getCFNewTypeValue(useVar: Bool) -> CFNewType {
   if (useVar) {
     return CFNewType.MyCFNewTypeValue
@@ -51,7 +51,7 @@ public func getCFNewTypeValue(useVar: Bool) -> CFNewType {
   // CHECK: ret
 }
 
-// CHECK-LABEL: $S7newtype21getUnmanagedCFNewType6useVars0C0VySo8CFStringCGSb_tF
+// CHECK-LABEL: $S7newtype21getUnmanagedCFNewType6useVars0C0VySo11CFStringRefaGSb_tF
 public func getUnmanagedCFNewType(useVar: Bool) -> Unmanaged<CFString> {
   if (useVar) {
     return CFNewType.MyCFNewTypeValueUnaudited
@@ -132,26 +132,26 @@ public func anchor() -> Bool {
 }
 
 class ObjCTest {
-  // CHECK-LABEL: define hidden %0* @"$S7newtype8ObjCTestC19optionalPassThroughySo11ErrorDomainVSgAGFTo"
+  // CHECK-LABEL: define hidden %0* @"$S7newtype8ObjCTestC19optionalPassThroughySo14SNTErrorDomainaSgAGFTo"
   // CHECK: [[CASTED:%.+]] = ptrtoint %0* %2 to i{{32|64}}
-  // CHECK: [[RESULT:%.+]] = call swiftcc i{{32|64}} @"$S7newtype8ObjCTestC19optionalPassThroughySo11ErrorDomainVSgAGF"(i{{32|64}} [[CASTED]], %T7newtype8ObjCTestC* swiftself {{%.+}})
+  // CHECK: [[RESULT:%.+]] = call swiftcc i{{32|64}} @"$S7newtype8ObjCTestC19optionalPassThroughySo14SNTErrorDomainaSgAGF"(i{{32|64}} [[CASTED]], %T7newtype8ObjCTestC* swiftself {{%.+}})
   // CHECK: [[OPAQUE_RESULT:%.+]] = inttoptr i{{32|64}} [[RESULT]] to %0*
   // CHECK: ret %0* [[OPAQUE_RESULT]]
   // CHECK: {{^}$}}
 
-  // OPT-LABEL: define hidden %0* @"$S7newtype8ObjCTestC19optionalPassThroughySo11ErrorDomainVSgAGFTo"
+  // OPT-LABEL: define hidden %0* @"$S7newtype8ObjCTestC19optionalPassThroughySo14SNTErrorDomainaSgAGFTo"
   // OPT: ret %0* %2
   // OPT: {{^}$}}
   @objc func optionalPassThrough(_ ed: ErrorDomain?) -> ErrorDomain? {
     return ed
   }
 
-  // CHECK-LABEL: define hidden i32 @"$S7newtype8ObjCTestC18integerPassThroughySo5MyIntVAFFTo"
-  // CHECK: [[RESULT:%.+]] = call swiftcc i32 @"$S7newtype8ObjCTestC18integerPassThroughySo5MyIntVAFF"(i32 %2, %T7newtype8ObjCTestC* swiftself {{%.+}})
+  // CHECK-LABEL: define hidden i32 @"$S7newtype8ObjCTestC18integerPassThroughySo5MyIntaAFFTo"
+  // CHECK: [[RESULT:%.+]] = call swiftcc i32 @"$S7newtype8ObjCTestC18integerPassThroughySo5MyIntaAFF"(i32 %2, %T7newtype8ObjCTestC* swiftself {{%.+}})
   // CHECK: ret i32 [[RESULT]]
   // CHECK: {{^}$}}
 
-  // OPT-LABEL: define hidden i32 @"$S7newtype8ObjCTestC18integerPassThroughySo5MyIntVAFFTo"
+  // OPT-LABEL: define hidden i32 @"$S7newtype8ObjCTestC18integerPassThroughySo5MyIntaAFFTo"
   // OPT: ret i32 %2
   // OPT: {{^}$}}
   @objc func integerPassThrough(_ num: MyInt) -> MyInt {

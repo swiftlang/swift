@@ -28,6 +28,7 @@
 #include "swift/AST/TypeRepr.h"
 #include "swift/Basic/Mangler.h"
 #include "swift/ClangImporter/ClangImporter.h"
+#include "llvm/ADT/StringSwitch.h"
 
 // TODO: Develop a proper interface for this.
 #include "swift/AST/IRGenOptions.h"
@@ -419,7 +420,8 @@ public:
   Type createObjCClassType(StringRef name) {
     Identifier ident = Ctx.getIdentifier(name);
     auto typeDecl =
-      findForeignNominalTypeDecl(ident, Demangle::Node::Kind::Class);
+        findForeignNominalTypeDecl(ident, ForeignModuleKind::Imported,
+                                   Demangle::Node::Kind::Class);
     if (!typeDecl) return Type();
     return createNominalType(typeDecl, /*parent*/ Type());
   }
@@ -462,13 +464,21 @@ private:
   DeclContext *findDeclContext(const Demangle::NodePointer &node);
   ModuleDecl *findModule(const Demangle::NodePointer &node);
   Demangle::NodePointer findModuleNode(const Demangle::NodePointer &node);
-  bool isForeignModule(const Demangle::NodePointer &node);
+
+  enum class ForeignModuleKind {
+    Imported,
+    SynthesizedByImporter
+  };
+
+  Optional<ForeignModuleKind>
+  getForeignModuleKind(const Demangle::NodePointer &node);
 
   NominalTypeDecl *findNominalTypeDecl(DeclContext *dc,
                                        Identifier name,
                                        Identifier privateDiscriminator,
                                        Demangle::Node::Kind kind);
   NominalTypeDecl *findForeignNominalTypeDecl(Identifier name,
+                                              ForeignModuleKind lookupKind,
                                               Demangle::Node::Kind kind);
 
   Type checkTypeRepr(TypeRepr *repr) {
@@ -558,15 +568,19 @@ RemoteASTTypeBuilder::findModuleNode(const Demangle::NodePointer &node) {
   return findModuleNode(child->getFirstChild());
 }
 
-bool RemoteASTTypeBuilder::isForeignModule(const Demangle::NodePointer &node) {
+Optional<RemoteASTTypeBuilder::ForeignModuleKind>
+RemoteASTTypeBuilder::getForeignModuleKind(const Demangle::NodePointer &node) {
   if (node->getKind() == Demangle::Node::Kind::DeclContext)
-    return isForeignModule(node->getFirstChild());
+    return getForeignModuleKind(node->getFirstChild());
 
   if (node->getKind() != Demangle::Node::Kind::Module)
-    return false;
+    return None;
 
-  return (node->getText() == MANGLING_MODULE_OBJC ||
-          node->getText() == MANGLING_MODULE_CLANG_IMPORTER);
+  return llvm::StringSwitch<Optional<ForeignModuleKind>>(node->getText())
+      .Case(MANGLING_MODULE_OBJC, ForeignModuleKind::Imported)
+      .Case(MANGLING_MODULE_CLANG_IMPORTER,
+            ForeignModuleKind::SynthesizedByImporter)
+      .Default(None);
 }
 
 DeclContext *
@@ -582,7 +596,8 @@ RemoteASTTypeBuilder::findDeclContext(const Demangle::NodePointer &node) {
   case Demangle::Node::Kind::Class:
   case Demangle::Node::Kind::Enum:
   case Demangle::Node::Kind::Protocol:
-  case Demangle::Node::Kind::Structure: {
+  case Demangle::Node::Kind::Structure:
+  case Demangle::Node::Kind::TypeAlias: {
     const auto &declNameNode = node->getChild(1);
 
     // Handle local declarations.
@@ -620,12 +635,13 @@ RemoteASTTypeBuilder::findDeclContext(const Demangle::NodePointer &node) {
     DeclContext *dc = findDeclContext(node->getChild(0));
     if (!dc) {
       // Do some backup logic for foreign type declarations.
-      if (privateDiscriminator.empty() &&
-          isForeignModule(node->getChild(0))) {
-        return findForeignNominalTypeDecl(name, node->getKind());
-      } else {
-        return nullptr;
+      if (privateDiscriminator.empty()) {
+        if (auto foreignModuleKind = getForeignModuleKind(node->getChild(0))) {
+          return findForeignNominalTypeDecl(name, foreignModuleKind.getValue(),
+                                            node->getKind());
+        }
       }
+      return nullptr;
     }
 
     return findNominalTypeDecl(dc, name, privateDiscriminator, node->getKind());
@@ -675,6 +691,7 @@ RemoteASTTypeBuilder::findNominalTypeDecl(DeclContext *dc,
 
 NominalTypeDecl *
 RemoteASTTypeBuilder::findForeignNominalTypeDecl(Identifier name,
+                                                 ForeignModuleKind foreignKind,
                                                  Demangle::Node::Kind kind) {
   // Check to see if we have an importer loaded.
   auto importer = static_cast<ClangImporter *>(Ctx.getClangModuleLoader());
@@ -690,11 +707,9 @@ RemoteASTTypeBuilder::findForeignNominalTypeDecl(Identifier name,
 
     void foundDecl(ValueDecl *decl, DeclVisibilityKind reason) override {
       if (HadError) return;
-      auto typeDecl = getAcceptableNominalTypeCandidate(decl, ExpectedKind);
-      if (!typeDecl) return;
-      if (typeDecl == Result) return;
+      if (decl == Result) return;
       if (!Result) {
-        Result = typeDecl;
+        Result = cast<NominalTypeDecl>(decl);
       } else {
         HadError = true;
         Result = nullptr;
@@ -702,7 +717,36 @@ RemoteASTTypeBuilder::findForeignNominalTypeDecl(Identifier name,
     }
   } consumer(kind);
 
-  importer->lookupValue(name, consumer);
+  switch (foreignKind) {
+  case ForeignModuleKind::SynthesizedByImporter:
+    importer->lookupValue(name, consumer);
+    if (consumer.Result)
+      consumer.Result = getAcceptableNominalTypeCandidate(consumer.Result,kind);
+    break;
+  case ForeignModuleKind::Imported: {
+    ClangTypeKind lookupKind;
+    switch (kind) {
+    case Demangle::Node::Kind::Protocol:
+      lookupKind = ClangTypeKind::ObjCProtocol;
+      break;
+    case Demangle::Node::Kind::Class:
+      lookupKind = ClangTypeKind::ObjCClass;
+      break;
+    case Demangle::Node::Kind::TypeAlias:
+      lookupKind = ClangTypeKind::Typedef;
+      break;
+    case Demangle::Node::Kind::Structure:
+    case Demangle::Node::Kind::Enum:
+      lookupKind = ClangTypeKind::Tag;
+      break;
+    default:
+      return nullptr;
+    }
+    importer->lookupTypeDecl(name.str(), lookupKind, [&](TypeDecl *found) {
+      consumer.foundDecl(found, DeclVisibilityKind::VisibleAtTopLevel);
+    });
+  }
+  }
 
   return consumer.Result;
 }

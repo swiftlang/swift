@@ -414,7 +414,7 @@ protected:
   NodePointer popModule();
   NodePointer popContext();
   NodePointer popTypeAndGetChild();
-  NodePointer popTypeAndGetNominal();
+  NodePointer popTypeAndGetAnyGeneric();
   NodePointer demangleBuiltinType();
   NodePointer demangleAnyGenericType(Node::Kind kind);
   NodePointer demangleExtensionContext();
