@@ -4211,6 +4211,15 @@ static void computeDerivedSameTypeComponents(
     assert(componentOf.count(concrete.archetype) > 0);
     auto &component = components[componentOf[concrete.archetype]];
 
+    // FIXME: Skip self-derived sources. This means our attempts to "stage"
+    // construction of self-derived sources really don't work, because we
+    // discover more information later, so we need a more on-line or
+    // iterative approach.
+    bool derivedViaConcrete;
+    if (concrete.source->isSelfDerivedSource(concrete.archetype,
+                                             derivedViaConcrete))
+      continue;
+
     // If it has a better source than we'd seen before for this component,
     // keep it.
     auto &bestConcreteTypeSource = component.concreteTypeSource;
