@@ -65,6 +65,8 @@ struct SyntacticMigratorPass::Implementation : public SourceEntityWalker {
       SM(SF->getASTContext().SourceMgr), Editor(Editor), Opts(Opts) {}
 
   void run() {
+    if (Opts.APIDigesterDataStorePath.empty())
+      return;
     DiffStore.addStorePath(Opts.APIDigesterDataStorePath);
     walk(SF);
   }
