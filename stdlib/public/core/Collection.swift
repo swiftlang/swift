@@ -662,14 +662,13 @@ public protocol Collection : _Indexable, Sequence {
   /// collection, the subsequence should also conform to `Collection`.
   associatedtype SubSequence : _IndexableBase, Sequence = Slice<Self>
       where Self.SubSequence.Index == Index,
-            Self.Iterator.Element == Self.SubSequence.Iterator.Element
+            Self.Iterator.Element == Self.SubSequence.Iterator.Element,
+            SubSequence.SubSequence == SubSequence
   // FIXME(ABI)#98 (Recursive Protocol Constraints):
   // FIXME(ABI)#99 (Associated Types with where clauses):
   // associatedtype SubSequence : Collection
   //   where
-  //   ,
   //   SubSequence.Indices == Indices,
-  //   SubSequence.SubSequence == SubSequence
   //
   // (<rdar://problem/20715009> Implement recursive protocol
   // constraints)
