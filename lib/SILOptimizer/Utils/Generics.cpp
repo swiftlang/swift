@@ -199,7 +199,7 @@ bool ReabstractionInfo::prepareAndCheck(ApplySite Apply, SILFunction *Callee,
   auto CalleeGenericSig = Callee->getLoweredFunctionType()->getGenericSignature();
   auto CalleeGenericEnv = Callee->getGenericEnvironment();
 
-  OriginalF = Callee;
+  this->Callee = Callee;
   this->Apply = Apply;
 
   SubstitutionMap InterfaceSubs;
@@ -426,13 +426,13 @@ bool ReabstractionInfo::isPartialSpecialization() const {
 }
 
 void ReabstractionInfo::createSubstitutedAndSpecializedTypes() {
-  auto &M = OriginalF->getModule();
+  auto &M = Callee->getModule();
 
   // Find out how the function type looks like after applying the provided
   // substitutions.
   if (!SubstitutedType) {
-    SubstitutedType = createSubstitutedType(
-        OriginalF, CallerInterfaceSubs, HasUnboundGenericParams);
+    SubstitutedType = createSubstitutedType(Callee, CallerInterfaceSubs,
+                                            HasUnboundGenericParams);
   }
   assert(!SubstitutedType->hasArchetype() &&
          "Substituted function type should not contain archetypes");
@@ -695,7 +695,7 @@ void ReabstractionInfo::specializeConcreteSubstitutions(
   SILModule &M = Callee->getModule();
   auto &Ctx = M.getASTContext();
 
-  OriginalF = Callee;
+  this->Callee = Callee;
 
   auto OrigGenericSig = Callee->getLoweredFunctionType()->getGenericSignature();
   auto OrigGenericEnv = Callee->getGenericEnvironment();

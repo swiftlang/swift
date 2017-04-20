@@ -94,8 +94,8 @@ class ReabstractionInfo {
   // callee archetypes.
   SubstitutionList ClonerParamSubs;
 
-  // Reference to the original generic non-specialized function.
-  SILFunction *OriginalF;
+  // Reference to the original generic non-specialized callee function.
+  SILFunction *Callee;
 
   // The apply site which invokes the generic function.
   ApplySite Apply;
@@ -218,7 +218,7 @@ public:
   CanSILFunctionType createSpecializedType(CanSILFunctionType SubstFTy,
                                            SILModule &M) const;
 
-  SILFunction *getNonSpecializedFunction() const { return OriginalF; }
+  SILFunction *getNonSpecializedFunction() const { return Callee; }
 
   /// Map type into a context of the specialized function.
   Type mapTypeIntoContext(Type type) const;
@@ -226,7 +226,7 @@ public:
   /// Map SIL type into a context of the specialized function.
   SILType mapTypeIntoContext(SILType type) const;
 
-  SILModule &getModule() const { return OriginalF->getModule(); }
+  SILModule &getModule() const { return Callee->getModule(); }
 
   /// Returns true if generic specialization is possible.
   bool canBeSpecialized() const;
