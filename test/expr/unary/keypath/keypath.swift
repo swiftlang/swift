@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -typecheck -parse-as-library  %s -verify
+// RUN: %target-swift-frontend -typecheck -parse-as-library -enable-experimental-keypaths  %s -verify
 
 struct Sub {}
 struct OptSub {}

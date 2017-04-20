@@ -1,4 +1,6 @@
-// RUN: %target-run-simple-swift
+// RUN: rm -rf %t && mkdir -p %t
+// RUN: %target-build-swift %s -Xfrontend -enable-experimental-keypaths -o %t/a.out
+// RUN: %target-run %t/a.out
 // REQUIRES: executable_test
 // REQUIRES: PTRSIZE=64
 

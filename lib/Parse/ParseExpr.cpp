@@ -455,6 +455,8 @@ ParserResult<Expr> Parser::parseExprUnary(Diag<> Message, bool isExprBasic) {
   case tok::pound_keyPath:
     return parseExprKeyPathObjC();
   case tok::pound_keyPath2:
+    if (!Context.LangOpts.EnableExperimentalKeyPaths)
+      return parseExprPostfix(Message, isExprBasic);
     return parseExprKeyPath();
 
   case tok::oper_postfix:
