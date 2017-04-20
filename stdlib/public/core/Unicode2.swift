@@ -30,11 +30,35 @@ case error(resumptionPoint: Index)
 case emptyInput
 
   /// If any input was consumed, the point from which to continue parsing.
-  var resumptionPoint: Index? {
+  public var resumptionPoint: Index? {
     switch self {
     case .valid(_,let r): return r
     case .error(let r): return r
     case .emptyInput: return nil
+    }
+  }
+
+  @_versioned
+  var _valid: (T, resumptionPoint: Index)? {
+    switch self {
+    case .valid(let r): return r
+    default: return nil
+    }
+  }
+
+  @_versioned
+  var _error: (Index)? {
+    switch self {
+    case .error(let r): return r
+    default: return nil
+    }
+  }
+
+  @_versioned
+  var _emptyInput: Bool? {
+    switch self {
+    case .emptyInput: return true
+    default: return nil
     }
   }
 }
@@ -97,6 +121,7 @@ extension UnicodeEncoding {
   public typealias CodeUnit = EncodedScalar.Iterator.Element
   
   /// Parse a single unicode scalar forward from `input`.
+  @inline(__always)
   public static func parse1Forward<C: Collection>(
     _ input: C
   ) -> ParseResult<EncodedScalar, C.Index>
@@ -105,6 +130,7 @@ extension UnicodeEncoding {
   }
 
   /// Parse a single unicode scalar in reverse from `input`.
+  @inline(__always)
   public static func parse1Reverse<C: BidirectionalCollection>(
     _ input: C
   ) -> ParseResult<EncodedScalar, C.Index>
@@ -195,6 +221,7 @@ extension UnicodeEncoding {
   ///
   /// - Note: using this function may be faster than repeatedly using `parse`
   ///   directly, because it avoids intra-scalar checks for end of sequence.
+  @inline(__always)
   @discardableResult
   public static func parseForward<C: Collection>(
     _ input: C,
@@ -206,6 +233,7 @@ extension UnicodeEncoding {
     var remainder = input[input.startIndex..<input.endIndex]
     var errorCount = 0
     
+    @inline(__always)
     func eat(
       _ o: ParseResult<EncodedScalar, C.SubSequence.Index>) -> EncodedScalar? {
       if case .valid(let scalar, let resumptionPoint) = o {
@@ -256,6 +284,7 @@ extension UnicodeEncoding {
   ///
   /// - Note: using this function may be faster than repeatedly using `parse`
   ///   directly, because it avoids intra-scalar checks for end of sequence.
+  @inline(__always)
   @discardableResult
   public static func parseReverse<C: BidirectionalCollection>(
     _ input: C,
@@ -268,6 +297,7 @@ extension UnicodeEncoding {
     var remainder = input[input.startIndex..<input.endIndex]
     var errorCount = 0
     
+    @inline(__always)
     func eat(
       _ o: ParseResult<EncodedScalar, C.SubSequence.Index>) -> EncodedScalar? {
       if case .valid(let scalar, let resumptionPoint) = o {
@@ -336,6 +366,7 @@ extension UnicodeEncoding {
 public enum UTF8 : UnicodeEncoding {
 
   @inline(__always)
+  @_versioned
   static internal func _isASCII(_ x: UInt8) -> Bool {
     return _fastPath(Int8(bitPattern: x) >= 0)
   }
@@ -345,19 +376,22 @@ public enum UTF8 : UnicodeEncoding {
   public static var maxLengthOfEncodedScalar: UInt { return 4 }
   
   /// Returns `true` iff [`c0`, `c1`] is a prefix of a valid 3-byte sequence
+  @inline(__always)
   static internal func isValid3BytePrefix(_ c0: CodeUnit, _ c1: CodeUnit) -> Bool {
-    let joint = UInt16(c0) << 8 | UInt16(c1)
+    let joint = UInt16(c0) &<< 8 | UInt16(c1)
     return 0b1110_0000__10_100000...0b1110_1101__10_011111 ~= joint
         || 0b1110_1110__10_000000...0b1110_1111__10_111111 ~= joint
   }
 
   /// Returns true iff [`c0`, `c1`] is a prefix of a valid 4-byte sequence
+  @_versioned
   static internal func isValid4BytePrefix(_ c0: CodeUnit, _ c1: CodeUnit) -> Bool {
-    let joint = UInt16(c0) << 8 | UInt16(c1)
+    let joint = UInt16(c0) &<< 8 | UInt16(c1)
     return 0b11110_000__10_010000...0b11110_100__10_001111 ~= joint
   }
 
   /// Returns true iff [`c0`, `c1`] is a prefix of a valid sequence
+  @_versioned
   static internal func isValidPrefix(_ c0: CodeUnit, _ c1: CodeUnit) -> Bool {
     return isValid3BytePrefix(c0, c1) || isValid4BytePrefix(c0, c1)
   }
@@ -366,15 +400,18 @@ public enum UTF8 : UnicodeEncoding {
   /// bits.
   ///
   /// - Note: Given any other byte, the result is unspecified.
+  @inline(__always)
   static internal func maskLeadByte(_ x: UInt8) -> UInt8 {
-    return x & (0b11111 >> (x >> 5 & 1))
+    return x & (0b11111 &>> (x &>> 5 & 1))
   }
   
+  @inline(__always)
   public static func encode<T: EncodedScalarProtocol>(
     _ other:T) -> UTF8.EncodedScalar? {
     return other.utf8
   }
 
+  @inline(__always)
   public static func parse1Forward<C: Collection>(
     _ input: C, knownCount knownCount_: Int = 0
   ) -> ParseResult<EncodedScalar, C.Index>
@@ -417,7 +454,7 @@ public enum UTF8 : UnicodeEncoding {
       let u = input[j]
       if _fastPath(pattern ~= u) {
         shift += 8
-        r |= UInt32(u) << shift
+        r |= UInt32(u) &<< shift
         j = input.index(after: j)
         knownCount -= 1
         return true
@@ -466,6 +503,7 @@ public enum UTF8 : UnicodeEncoding {
     return .error(resumptionPoint: i)
   }
 
+  @inline(__always)
   public static func  parse1Reverse<C: BidirectionalCollection>(
     _ input: C, knownCount knownCount_: Int = 0
   ) -> ParseResult<EncodedScalar, C.Index>
@@ -500,7 +538,7 @@ public enum UTF8 : UnicodeEncoding {
       guard _fastPath(pattern ~= u) else { return false }
       i = j
       guard _fastPath(knownCount > 0 || j != start) else { return false }
-      r <<= 8
+      r &<<= 8
       r |= UInt32(u)
       j = input.index(before: j)
       u = input[j]
@@ -511,7 +549,7 @@ public enum UTF8 : UnicodeEncoding {
     @inline(__always)
     func accept(_ pat: ClosedRange<UInt8>) -> ParseResult<EncodedScalar, C.Index>? {
       if _fastPath(pat.contains(u)) {
-        r <<= 8
+        r &<<= 8
         r |= UInt32(u)
         return .valid(EncodedScalar(_bits: r), resumptionPoint: j)
       }
@@ -562,10 +600,11 @@ case _swift3Buffer(bits: UInt32, bitCount: UInt32)
 extension UTF8 {
   /// Given a valid lead byte, return the expected length of the whole encoded
   /// Unicode scalar value.
+  @inline(__always)
   static internal func _encodedLength(leadByte: UInt8) -> UInt8 {
     let table: UInt64 = 0x4322000011111111
-    let shift = UInt64((leadByte >> 4) << 2)
-    return UInt8((table >> shift) & 0xf)
+    let shift = UInt64((leadByte &>> 4) &<< 2)
+    return UInt8((table &>> shift) & 0xf)
   }
   
   public struct EncodedScalar : RandomAccessCollection {
@@ -577,27 +616,32 @@ extension UTF8 {
       return UTF8._encodedLength(leadByte: lowByte)
     }
     
+    @_versioned
     internal init(_ _0: CodeUnit) {
       _bits = UInt32(_0)
       _sanityCheck(count == 1)
     }
     
+    @_versioned
     internal init(_ _0: CodeUnit, _ _1: CodeUnit) {
-      _bits = UInt32(_1) << 8 | UInt32(_0)
+      _bits = UInt32(_1) &<< 8 | UInt32(_0)
       _sanityCheck(count == 2)
     }
     
+    @_versioned
     internal init(_ _0: CodeUnit, _ _1: CodeUnit, _ _2: CodeUnit) {
-      _bits = (UInt32(_2) << 8 | UInt32(_1)) << 8 | UInt32(_0)
+      _bits = (UInt32(_2) &<< 8 | UInt32(_1)) &<< 8 | UInt32(_0)
       _sanityCheck(count == 3)
     }
     
+    @_versioned
     internal init(_ _0: CodeUnit, _ _1: CodeUnit, _ _2: CodeUnit, _ _3: CodeUnit) {
-      _bits = ((UInt32(_3) << 8 | UInt32(_2)) << 8 | UInt32(_1)) << 8
+      _bits = ((UInt32(_3) &<< 8 | UInt32(_2)) &<< 8 | UInt32(_1)) &<< 8
         | UInt32(_0)
       _sanityCheck(count == 4)
     }
     
+    @_versioned
     internal init(_bits: UInt32) {
       self._bits = _bits
     }
@@ -605,7 +649,7 @@ extension UTF8 {
     public typealias Index = UInt8
     public subscript(i: Index) -> UInt8 {
       return UInt8(
-        truncatingBitPattern: _bits >> (UInt32(i & (32 - 1)) << 3))
+        truncatingBitPattern: _bits &>> (i &<< 3))
     }
   }
 }
@@ -733,8 +777,8 @@ extension UTF8.EncodedScalar : EncodedScalarProtocol {
     }
     var r = UInt32(UTF8.maskLeadByte(UInt8(truncatingBitPattern: _bits)))
     for b in self[1..<endIndex] {
-      r <<= 6
-      r |= UInt32(b & ((1 << 6) - 1))
+      r &<<= 6
+      r |= UInt32(b & ((1 &<< 6) - 1))
     }
     return UTF32.EncodedScalar(_bits: r)
   }
@@ -748,7 +792,7 @@ public enum UTF16 : UnicodeEncoding {
   /// Returns the decoded scalar value of a valid surrogate pair
   internal static func decodeValid(_ unit0: CodeUnit, _ unit1: CodeUnit) -> UInt32 {
     // [1101 10xx xxxx xxxx] [1101 11xx xxxx xxxx]
-    return 0x10000 + ((UInt32(unit0 & 0x03ff) << 10) | UInt32(unit1 & 0x03ff))
+    return 0x10000 + ((UInt32(unit0 & 0x03ff) &<< 10) | UInt32(unit1 & 0x03ff))
   }
   
   public static func encode<T: EncodedScalarProtocol>(
@@ -775,16 +819,16 @@ public enum UTF16 : UnicodeEncoding {
     // [1101 10xx xxxx xxxx] [1101 11xx xxxx xxxx]
 
     // Common case first, non-surrogate -- just a sequence of 1 code unit.
-    if _fastPath((unit0 >> 11) != 0b1101_1) {
+    if _fastPath((unit0 &>> 11) != 0b1101_1) {
       return .valid(EncodedScalar(unit0), resumptionPoint: i1)
     }
 
     // Ensure `unit0` is a high-surrogate and there's another byte which is a
     // low-surrogate
     if _fastPath(
-      (unit0 >> 10) == 0b1101_10 && (knownCount > 1 || i1 != end)),
+      (unit0 &>> 10) == 0b1101_10 && (knownCount > 1 || i1 != end)),
       let unit1 = Optional(input[i1]),
-      _fastPath((unit1 >> 10) == 0b1101_11) {
+      _fastPath((unit1 &>> 10) == 0b1101_11) {
       return .valid(
         EncodedScalar(unit0, unit1),
         resumptionPoint: input.index(after: i1)
@@ -811,7 +855,7 @@ public enum UTF16 : UnicodeEncoding {
     // [1101 10xx xxxx xxxx] [1101 11xx xxxx xxxx]
 
     // Common case first, non-surrogate -- just a sequence of 1 code unit.
-    if _fastPath((unit1 >> 11) != 0b1101_1) {
+    if _fastPath((unit1 &>> 11) != 0b1101_1) {
       return .valid(EncodedScalar(unit1), resumptionPoint: i1)
     }
     let start = input.startIndex
@@ -819,10 +863,10 @@ public enum UTF16 : UnicodeEncoding {
     // Ensure `unit1` is a low-surrogate and there's another byte which is a
     // high-surrogate
     if _fastPath(
-      (unit1 >> 10) == 0b1101_11 && (knownCount > 1 || i1 != start)),
+      (unit1 &>> 10) == 0b1101_11 && (knownCount > 1 || i1 != start)),
       let i0 = Optional(input.index(before: i1)),
       let unit0 = Optional(input[i0]),
-      _fastPath((unit0 >> 10) == 0b1101_10) {
+      _fastPath((unit0 &>> 10) == 0b1101_10) {
       return .valid(
         EncodedScalar(unit0, unit1),        
         resumptionPoint: i0
@@ -841,7 +885,7 @@ extension UTF16 {
     public var startIndex: UInt8 { return 0 }
     
     public var endIndex: UInt8 {
-      return UInt8(truncatingBitPattern: self[1] >> 15) + 1
+      return UInt8(truncatingBitPattern: self[1] &>> 15) + 1
     }
     
     internal init(_ _0: CodeUnit) {
@@ -849,7 +893,7 @@ extension UTF16 {
     }
     
     internal init(_ _0: CodeUnit, _ _1: CodeUnit) {
-      _bits = UInt32(_1) << 16 | UInt32(_0)
+      _bits = UInt32(_1) &<< 16 | UInt32(_0)
     }
     
     internal init(_bits: UInt32) {
@@ -859,7 +903,7 @@ extension UTF16 {
     public typealias Index = UInt8
     public subscript(i: Index) -> UInt16 {
       return UInt16(
-        truncatingBitPattern: _bits >> UInt32((i & 1) << 4))
+        truncatingBitPattern: _bits &>> UInt32((i & 1) &<< 4))
     }
   }
 }
@@ -875,7 +919,7 @@ extension UTF16.EncodedScalar : EncodedScalarProtocol {
     return self
   }
   public var utf32: UTF32.EncodedScalar {
-    if _fastPath(_bits >> 16 == 0) {
+    if _fastPath(_bits &>> 16 == 0) {
       return UTF32.EncodedScalar(_bits)
     }
     return UTF32.EncodedScalar(UTF16.decodeValid(self[0], self[1]))
@@ -913,7 +957,7 @@ public enum ValidUTF16 : UnicodeEncoding {
     // [1101 10xx xxxx xxxx] [1101 11xx xxxx xxxx]
 
     // Common case first, non-surrogate -- just a sequence of 1 code unit.
-    if _fastPath((unit0 >> 11) != 0b1101_1) {
+    if _fastPath((unit0 &>> 11) != 0b1101_1) {
       return .valid(EncodedScalar(unit0), resumptionPoint: i1)
     }
 
@@ -940,7 +984,7 @@ public enum ValidUTF16 : UnicodeEncoding {
     // [1101 10xx xxxx xxxx] [1101 11xx xxxx xxxx]
 
     // Common case first, non-surrogate -- just a sequence of 1 code unit.
-    if _fastPath((unit1 >> 11) != 0b1101_1) {
+    if _fastPath((unit1 &>> 11) != 0b1101_1) {
       return .valid(EncodedScalar(unit1), resumptionPoint: i1)
     }
 
@@ -1028,32 +1072,32 @@ extension UTF32.EncodedScalar : EncodedScalarProtocol {
     if _fastPath(_bits <= 0x7f) { return UTF8.EncodedScalar(_bits: _bits) }
     if _fastPath(_bits <= 0x7ff) {
       return UTF8.EncodedScalar(
-        0b110_00000 | UInt8(truncatingBitPattern: _bits >> 6),
+        0b110_00000 | UInt8(truncatingBitPattern: _bits &>> 6),
         0b10_000000 | UInt8(truncatingBitPattern: _bits) & 0b00_111111
       )
     }
-    if _fastPath(_bits >> 16 == 0) {
+    if _fastPath(_bits &>> 16 == 0) {
       return UTF8.EncodedScalar(
-        0b1110_0000 | UInt8(truncatingBitPattern: _bits >> 12),
-        0b10_000000 | UInt8(truncatingBitPattern: _bits >> 6) & 0b00_111111,
+        0b1110_0000 | UInt8(truncatingBitPattern: _bits &>> 12),
+        0b10_000000 | UInt8(truncatingBitPattern: _bits &>> 6) & 0b00_111111,
         0b10_000000 | UInt8(truncatingBitPattern: _bits) & 0b00_111111
       )
     }
     return UTF8.EncodedScalar(
-      0b11110_000 | UInt8(truncatingBitPattern: _bits >> 18),
-      0b10_000000 | UInt8(truncatingBitPattern: _bits >> 12) & 0b00_111111,
-      0b10_000000 | UInt8(truncatingBitPattern: _bits >> 6) & 0b00_111111,
+      0b11110_000 | UInt8(truncatingBitPattern: _bits &>> 18),
+      0b10_000000 | UInt8(truncatingBitPattern: _bits &>> 12) & 0b00_111111,
+      0b10_000000 | UInt8(truncatingBitPattern: _bits &>> 6) & 0b00_111111,
       0b10_000000 | UInt8(truncatingBitPattern: _bits) & 0b00_111111
     )
   }
   public var utf16: UTF16.EncodedScalar {
-    if _fastPath(_bits >> 16 == 0) {
+    if _fastPath(_bits &>> 16 == 0) {
       return UTF16.EncodedScalar(_bits: _bits)
     }
     let hl = _bits - 0x10000
     return UTF16.EncodedScalar(
-      UInt16(truncatingBitPattern: hl >> 10 + 0xD800),
-      UInt16(truncatingBitPattern: hl & (1 << 10 - 1) + 0xDC00)
+      UInt16(truncatingBitPattern: hl &>> 10 + 0xD800),
+      UInt16(truncatingBitPattern: hl & (1 &<< 10 - 1) + 0xDC00)
     )
   }
   public var utf32: UTF32.EncodedScalar {
@@ -1091,7 +1135,7 @@ public enum Latin1 : UnicodeEncoding {
       return UTF8._isASCII(value)
       ? UTF8.EncodedScalar(value)
       : UTF8.EncodedScalar(
-        0b110_00000 | value >> 6, 0b10_000000 | value & 0b00_111111)
+        0b110_00000 | value &>> 6, 0b10_000000 | value & 0b00_111111)
     }
     
     public var utf16 : UTF16.EncodedScalar { return UTF16.EncodedScalar(UInt16(value)) }
