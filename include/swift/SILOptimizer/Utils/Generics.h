@@ -27,6 +27,8 @@
 
 namespace swift {
 
+class FunctionSignaturePartialSpecializer;
+
 /// Tries to specialize an \p Apply of a generic function. It can be a full
 /// apply site or a partial apply.
 /// Replaced and now dead instructions are returned in \p DeadApplies.
@@ -119,11 +121,13 @@ class ReabstractionInfo {
   void createSubstitutedAndSpecializedTypes();
   bool prepareAndCheck(ApplySite Apply, SILFunction *Callee,
                        SubstitutionList ParamSubs);
-  void specializeConcreteAndGenericSubstitutions(ApplySite Apply,
-                                                 SILFunction *Callee,
-                                                 SubstitutionList ParamSubs);
-  void specializeConcreteSubstitutions(ApplySite Apply, SILFunction *Callee,
-                                       SubstitutionList ParamSubs);
+  void performFullSpecializationPreparation(SILFunction *Callee,
+                                            SubstitutionList ParamSubs);
+  void performPartialSpecializationPreparation(SILFunction *Caller,
+                                               SILFunction *Callee,
+                                               SubstitutionList ParamSubs);
+  void finishPartialSpecializationPreparation(
+      FunctionSignaturePartialSpecializer &FSPS);
 
   ReabstractionInfo() {}
 public:
