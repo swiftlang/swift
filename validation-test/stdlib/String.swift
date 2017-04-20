@@ -478,6 +478,21 @@ StringTests.test("appendToSubstringBug") {
   }
 }
 
+StringTests.test("create/append utf8 to array") {
+  let constantString = "ascii string"
+  let constantArray = Array(constantString.utf8)
+  expectEqualSequence(constantString.utf8,constantArray)
+  var nonconstantString = "nonconstant " + constantString
+  var nonconstantArray = Array(nonconstantString.utf8)
+  nonconstantString += constantString
+  nonconstantArray += constantString.utf8
+  expectEqualSequence(nonconstantString.utf8,nonconstantArray)
+  nonconstantArray += nonconstantString.utf8
+  nonconstantString += nonconstantString
+  expectEqualSequence(nonconstantString.utf8,nonconstantArray)
+}
+
+
 StringTests.test("COW/removeSubrange/start") {
   var str = "12345678"
   let literalIdentity = str.bufferID
