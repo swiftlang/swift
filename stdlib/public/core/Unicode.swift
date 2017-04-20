@@ -141,17 +141,25 @@ public protocol UnicodeCodec : UnicodeEncoding {
 // Adapt UTF8, UTF16, and UTF32 to present their Swift 3 interfaces
 
 extension EncodedScalarProtocol {
-  internal var _scalarValue: UnicodeScalar {
-    return UnicodeScalar(utf32.first!)!
+  public var _scalarValue: UnicodeScalar {
+    @inline(__always)
+    get {
+      return UnicodeScalar(utf32.first.unsafelyUnwrapped).unsafelyUnwrapped
+    }
   }
 }
 
+@_versioned
 internal struct _UInt32Buffered<Element : UnsignedInteger> {
+  @_versioned
   let _buffer: UInt32
+  
+  @_versioned
   init(_ buffer: UInt32) {
     self._buffer = buffer
   }
   
+  @_versioned
   var _shiftShift : UInt32 {
     _sanityCheck(MemoryLayout<Element>.size <= 2)
     return UInt32(truncatingBitPattern: MemoryLayout<Element>.size + 2)
@@ -161,19 +169,24 @@ internal struct _UInt32Buffered<Element : UnsignedInteger> {
 extension _UInt32Buffered  : Collection {
   typealias Index = UInt32
 
+  @_versioned
   func index(after i: Index) -> Index { return i + (1 << _shiftShift) }
   
+  @_versioned
   var startIndex : Index { return 0 }
+  @_versioned
   var endIndex : Index { return 32 }
 
+  @_versioned
   var _mask : UInt32 {
     return numericCast(~0 as Element)
   }
   
+  @_versioned
   subscript(i: Index) -> Element {
     _sanityCheck(i < endIndex)
     return numericCast(
-      _buffer >> numericCast(i & 0x1f) & _mask)
+      _buffer &>> numericCast(i & 0x1f) & _mask)
   }
 }
 
@@ -229,6 +242,7 @@ extension UTF8 : UnicodeCodec {
   /// - Returns: A `UnicodeDecodingResult` instance, representing the next
   ///   Unicode scalar, an indication of an error, or an indication that the
   ///   UTF sequence has been fully decoded.
+  @inline(__always)
   public mutating func decode<I : IteratorProtocol>(
     _ input: inout I
   ) -> UnicodeDecodingResult where I.Element == CodeUnit {
@@ -275,6 +289,7 @@ extension UTF8 : UnicodeCodec {
   /// - Requires: There is at least one used byte in `buffer`, and the unused
   ///   space in `buffer` is filled with some value not matching the UTF-8
   ///   continuation byte form (`0b10xxxxxx`).
+  @inline(__always)
   public // @testable
   static func _decodeOne(_ buffer: UInt32) -> (result: UInt32?, length: UInt8) {
     // Note the buffer is read least significant byte first: [ #3 #2 #1 #0 ].
@@ -941,7 +956,7 @@ extension UnicodeScalar {
   }
 }
 
-extension UnicodeEncoding where EncodedScalar.Iterator.Element : UnsignedInteger {
+extension UnicodeEncoding {
   public static func _nullCodeUnitOffset(in input: UnsafePointer<CodeUnit>) -> Int {
     var length = 0
     while input[length] != 0 {
