@@ -2148,6 +2148,42 @@ void ClangImporter::lookupValue(DeclName name, VisibleDeclConsumer &consumer){
     });
 }
 
+void
+ClangImporter::lookupTypeDecl(StringRef rawName, ClangTypeKind kind,
+                              llvm::function_ref<void(TypeDecl*)> receiver) {
+  clang::DeclarationName clangName(
+      &Impl.Instance->getASTContext().Idents.get(rawName));
+
+  clang::Sema::LookupNameKind lookupKind;
+  switch (kind) {
+  case ClangTypeKind::Typedef:
+    lookupKind = clang::Sema::LookupOrdinaryName;
+    break;
+  case ClangTypeKind::Tag:
+    lookupKind = clang::Sema::LookupTagName;
+    break;
+  case ClangTypeKind::ObjCProtocol:
+    lookupKind = clang::Sema::LookupObjCProtocolName;
+    break;
+  }
+
+  // Perform name lookup into the global scope.
+  auto &sema = Impl.Instance->getSema();
+  clang::LookupResult lookupResult(sema, clangName, clang::SourceLocation(),
+                                   lookupKind);
+  if (sema.LookupName(lookupResult, /*Scope=*/nullptr)) {
+    for (auto clangDecl : lookupResult) {
+      if (!isa<clang::TypeDecl>(clangDecl) &&
+          !isa<clang::ObjCContainerDecl>(clangDecl)) {
+        continue;
+      }
+      auto *imported = Impl.importDecl(clangDecl, Impl.CurrentVersion);
+      if (auto *importedType = dyn_cast_or_null<TypeDecl>(imported))
+        receiver(importedType);
+    }
+  }
+}
+
 void ClangModuleUnit::lookupVisibleDecls(ModuleDecl::AccessPathTy accessPath,
                                          VisibleDeclConsumer &consumer,
                                          NLKind lookupKind) const {
