@@ -137,7 +137,7 @@ public:
   }
 };
 
-} // namespace
+} // end anonymous namespace
 
 namespace sourcekitd {
 
