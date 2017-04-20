@@ -2644,8 +2644,7 @@ SILFunction *getOrCreateKeyPathSetter(SILGenFunction &SGF,
     lv = LValue::forValue(baseSubst, baseType);
   } else {
     auto baseOrig = ManagedValue::forLValue(baseArg);
-    lv = LValue::forAddress(baseOrig,
-                            SILAccessEnforcement::Static,
+    lv = LValue::forAddress(baseOrig, None,
                             AbstractionPattern::getOpaque(),
                             baseType);
   }

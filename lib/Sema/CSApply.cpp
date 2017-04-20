@@ -3990,8 +3990,7 @@ namespace {
           SmallVector<Substitution, 4> subs;
           if (auto sig = dc->getGenericSignatureOfContext()) {
             // Compute substitutions to refer to the member.
-            solution.computeSubstitutions(sig, foundDecl->openedFullType,
-                                          locator, subs);
+            solution.computeSubstitutions(sig, locator, subs);
           }
           
           auto resolvedTy = foundDecl->openedType;
@@ -4023,8 +4022,7 @@ namespace {
           SmallVector<Substitution, 4> subs;
           if (auto sig = dc->getGenericSignatureOfContext()) {
             // Compute substitutions to refer to the member.
-            solution.computeSubstitutions(sig, foundDecl->openedFullType,
-                                          locator, subs);
+            solution.computeSubstitutions(sig, locator, subs);
           }
           
           auto resolvedTy = foundDecl->openedType->castTo<AnyFunctionType>()

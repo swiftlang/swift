@@ -121,7 +121,6 @@ Constraint::Constraint(ConstraintKind Kind, Type First, Type Second, Type Third,
   case ConstraintKind::OperatorArgumentTupleConversion:
   case ConstraintKind::OperatorArgumentConversion:
   case ConstraintKind::ConformsTo:
-  case ConstraintKind::Layout:
   case ConstraintKind::LiteralConformsTo:
   case ConstraintKind::CheckedCast:
   case ConstraintKind::SelfObjectOfProtocol:

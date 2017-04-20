@@ -1176,11 +1176,11 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
     return nullptr;
   case Node::Kind::KeyPathGetterThunkHelper:
     Printer << "key path getter for ";
-    print(pointer->getChild(0));
+    print(Node->getChild(0));
     return nullptr;
   case Node::Kind::KeyPathSetterThunkHelper:
     Printer << "key path setter for ";
-    print(pointer->getChild(0));
+    print(Node->getChild(0));
     return nullptr;
   case Node::Kind::FieldOffset: {
     print(Node->getChild(0)); // directness

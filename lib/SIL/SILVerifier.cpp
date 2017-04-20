@@ -3726,7 +3726,7 @@ public:
             require(false, "property must be stored");
           }
           auto propertyTy = loweredBaseTy.getFieldType(property, F.getModule());
-          require(propertyTy.subst(F.getModule(), patternSubs).getObjectType()
+          require(propertyTy.getObjectType()
                     == loweredComponentTy.getObjectType(),
                   "component type should match the maximal abstraction of the "
                   "formal type");
@@ -3746,7 +3746,7 @@ public:
         baseTy = componentTy;
       }
     }
-    require(CanType(baseTy.subst(patternSubs)) == CanType(leafTy),
+    require(CanType(baseTy) == CanType(leafTy),
             "final component should match leaf value type of key path type");
   }
 
