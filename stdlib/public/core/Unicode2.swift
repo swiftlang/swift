@@ -101,10 +101,7 @@ public protocol UnicodeEncoding {
   static func parse1Reverse<C: BidirectionalCollection>(
     _ input: C, knownCount: Int/* = 0 */
   ) -> ParseResult<EncodedScalar, C.Index>
-  where C.Iterator.Element == EncodedScalar.Iterator.Element,
-  // FIXME: drop these constraints once we have the compiler features.
-  C.SubSequence.Index == C.Index,
-  C.SubSequence.Iterator.Element == C.Iterator.Element
+  where C.Iterator.Element == CodeUnit
 
   /// Searches for the first occurrence of a `CodeUnit` that is equal to 0.
   ///
@@ -136,8 +133,7 @@ extension UnicodeEncoding {
   ) -> ParseResult<EncodedScalar, C.Index>
   where C.Iterator.Element == EncodedScalar.Iterator.Element,
   // FIXME: drop these constraints once we have the compiler features.
-  C.SubSequence.Index == C.Index,
-  C.SubSequence.Iterator.Element == C.Iterator.Element {
+  C.SubSequence.Index == C.Index {
     return parse1Reverse(input, knownCount: 0)
   }
 }
@@ -190,7 +186,7 @@ extension UnicodeEncoding {
   where
     Input : IteratorProtocol,
     Encoding : UnicodeEncoding,
-    Encoding.EncodedScalar.Iterator.Element == Input.Element {
+    Encoding.CodeUnit == Input.Element {
 
     var isASCII = true
     var count = 0
@@ -507,11 +503,7 @@ public enum UTF8 : UnicodeEncoding {
   public static func  parse1Reverse<C: BidirectionalCollection>(
     _ input: C, knownCount knownCount_: Int = 0
   ) -> ParseResult<EncodedScalar, C.Index>
-  where C.Iterator.Element == UTF8.CodeUnit,
-  // FIXME: drop these constraints once we have the compiler features.
-  C.SubSequence.Index == C.Index,
-  C.SubSequence.Iterator.Element == C.Iterator.Element
-  {
+  where C.Iterator.Element == UTF8.CodeUnit {
     // See
     // https://gist.github.com/dabrahams/1880044370a192ae51c263a93f25a4c5#gistcomment-1931947
     // for an explanation of this state machine.
