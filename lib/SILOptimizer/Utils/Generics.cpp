@@ -572,17 +572,6 @@ getGenericEnvironmentAndSignature(GenericSignatureBuilder &Builder,
   auto *GenericSig =
       Builder.getGenericSignature()->getCanonicalSignature().getPointer();
   auto *GenericEnv = GenericSig->createGenericEnvironment(*M.getSwiftModule());
-
-  // FIXME: This is a workaround for the signature minimization bug.
-  GenericSignatureBuilder TmpBuilder(
-      M.getASTContext(), LookUpConformanceInModule(M.getSwiftModule()));
-  TmpBuilder.addGenericSignature(GenericSig);
-  TmpBuilder.finalize(SourceLoc(), GenericSig->getGenericParams(),
-                      /*allowConcreteGenericParams=*/true);
-  GenericSig =
-      TmpBuilder.getGenericSignature()->getCanonicalSignature().getPointer();
-  GenericEnv = GenericSig->createGenericEnvironment(*M.getSwiftModule());
-
   assert(!GenericSig || GenericEnv);
   return std::make_pair(GenericEnv, GenericSig);
 }
