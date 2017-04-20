@@ -2509,7 +2509,7 @@ namespace {
 
       auto selfTy = CS.DC->mapTypeIntoContext(
         typeContext->getDeclaredInterfaceType());
-      auto superclassTy = selfTy->getSuperclass(&tc);
+      auto superclassTy = selfTy->getSuperclass();
 
       if (selfDecl->getInterfaceType()->is<MetatypeType>())
         superclassTy = MetatypeType::get(superclassTy);

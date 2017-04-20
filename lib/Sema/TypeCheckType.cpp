@@ -401,8 +401,7 @@ findDeclContextForType(TypeChecker &TC,
       }
     } else {
       // Get the substituted superclass type, if any.
-      superclass = resolver->resolveTypeOfContext(parentDC)
-        ->getSuperclass(nullptr);
+      superclass = resolver->resolveTypeOfContext(parentDC)->getSuperclass();
 
       // Start with the type of the current context.
       auto fromNominal = parentDC->getAsNominalTypeOrNominalTypeExtensionContext();
@@ -426,7 +425,7 @@ findDeclContextForType(TypeChecker &TC,
       if (superclassDecl == ownerNominal)
         return std::make_tuple(superclass, true);
 
-      superclass = superclass->getSuperclass(nullptr);
+      superclass = superclass->getSuperclass();
     }
 
     // Walk refined protocols.
@@ -983,8 +982,10 @@ static Type diagnoseUnknownType(TypeChecker &tc, DeclContext *dc,
   } else {
     // Situation where class tries to inherit from itself, such
     // would produce an assertion when trying to lookup members of the class.
-    auto lazyResolver = tc.Context.getLazyResolver();
-    if (auto superClass = parentType->getSuperclass(lazyResolver)) {
+    //
+    // FIXME: Handle this in a more principled way, since there are many
+    // similar checks.
+    if (auto superClass = parentType->getSuperclass()) {
       if (superClass->isEqual(parentType)) {
         auto decl = parentType->getAnyNominal();
         if (decl) {
@@ -2973,7 +2974,7 @@ Type TypeResolver::resolveCompositionType(CompositionTypeRepr *repr,
     }
 
     if (ty->isExistentialType()) {
-      if (auto superclassTy = ty->getSuperclass(nullptr))
+      if (auto superclassTy = ty->getSuperclass())
         if (checkSuperclass(tyR->getStartLoc(), superclassTy))
           continue;
 
@@ -3062,7 +3063,7 @@ Type TypeChecker::substMemberTypeWithBase(ModuleDecl *module,
   // derived class as the parent type.
   if (auto *ownerClass = member->getDeclContext()
           ->getAsClassOrClassExtensionContext()) {
-    baseTy = baseTy->getSuperclassForDecl(ownerClass, this);
+    baseTy = baseTy->getSuperclassForDecl(ownerClass);
   }
 
   if (baseTy->is<ModuleType>())
@@ -3101,7 +3102,7 @@ Type TypeChecker::substMemberTypeWithBase(ModuleDecl *module,
 }
 
 Type TypeChecker::getSuperClassOf(Type type) {
-  return type->getSuperclass(this);
+  return type->getSuperclass();
 }
 
 static void lookupAndAddLibraryTypes(TypeChecker &TC,

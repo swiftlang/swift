@@ -113,7 +113,7 @@ public:
 
   /// Retrieve a reference to the declaration this one overrides.
   ConcreteDeclRef
-  getOverriddenDecl(ASTContext &ctx, LazyResolver *resolver) const;
+  getOverriddenDecl(ASTContext &ctx) const;
 
   /// Determine whether this reference specializes the declaration to which
   /// it refers.

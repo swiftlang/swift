@@ -3384,13 +3384,13 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
       if (toType->getClassOrBoundGenericClass())
         toSuperclass = toType;
       else
-        toSuperclass = toType->getSuperclass(nullptr);
+        toSuperclass = toType->getSuperclass();
 
       Type fromSuperclass;
       if (fromType->getClassOrBoundGenericClass())
         fromSuperclass = fromType;
       else
-        fromSuperclass = fromType->getSuperclass(nullptr);
+        fromSuperclass = fromType->getSuperclass();
 
       // Unless both types have a superclass bound, we have no further
       // information.

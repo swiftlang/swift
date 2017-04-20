@@ -1906,8 +1906,8 @@ bool TypeConverter::requiresNewVTableEntryUncached(SILDeclRef derived) {
 
     auto overrideInterfaceTy =
         selfInterfaceTy->adjustSuperclassMemberDeclType(
-            base.getDecl(), derived.getDecl(), baseInterfaceTy,
-            /*resolver=*/nullptr)->getCanonicalType();
+            base.getDecl(), derived.getDecl(), baseInterfaceTy)
+      ->getCanonicalType();
 
     if (checkASTTypeForABIDifferences(derivedInterfaceTy, overrideInterfaceTy))
       return true;
@@ -2030,8 +2030,7 @@ SILConstantInfo TypeConverter::getConstantOverrideInfo(SILDeclRef derived,
 
   auto overrideInterfaceTy =
       selfInterfaceTy->adjustSuperclassMemberDeclType(
-          base.getDecl(), derived.getDecl(), baseInterfaceTy,
-          /*resolver=*/nullptr);
+          base.getDecl(), derived.getDecl(), baseInterfaceTy);
 
   // Copy generic signature from derived to the override type, to handle
   // the case where the base member is not generic (because the base class
