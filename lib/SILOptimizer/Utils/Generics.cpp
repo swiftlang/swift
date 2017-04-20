@@ -1808,9 +1808,11 @@ SILValue ReabstractionThunkGenerator::createReabstractionThunkApply(
   auto CalleeSubstFnTy = getCalleeSubstFunctionType(FRI, Subs);
   auto CalleeSILSubstFnTy = SILType::getPrimitiveObjectType(CalleeSubstFnTy);
   auto specConv = SpecializedFunc->getConventions();
+  auto SILResultTy =
+      SpecializedFunc->mapTypeIntoContext(specConv.getSILResultType());
   if (!SpecializedFunc->getLoweredFunctionType()->hasErrorResult()) {
     return Builder.createApply(Loc, FRI, CalleeSILSubstFnTy,
-                               specConv.getSILResultType(), Subs, Arguments,
+                               SILResultTy, Subs, Arguments,
                                false);
   }
   // Create the logic for calling a throwing function.
@@ -1844,6 +1846,9 @@ SILArgument *ReabstractionThunkGenerator::convertReabstractionThunkArguments(
 
   assert(specConv.useLoweredAddresses());
 
+  Lowering::GenericContextScope GenericScope(M.Types,
+                                             SpecType->getGenericSignature());
+
   // ReInfo.NumIndirectResults corresponds to SubstTy's formal indirect
   // results. SpecTy may have fewer formal indirect results.
   assert(SubstType->getNumIndirectFormalResults()
@@ -1870,7 +1875,8 @@ SILArgument *ReabstractionThunkGenerator::convertReabstractionThunkArguments(
       // Store the result later.
       // FIXME: This only handles a single result! Partial specialization could
       // induce some combination of direct and indirect results.
-      SILType ResultTy = substConv.getSILType(substRI);
+      SILType ResultTy =
+          SpecializedFunc->mapTypeIntoContext(substConv.getSILType(substRI));
       assert(ResultTy.isAddress());
       assert(!ReturnValueAddr);
       ReturnValueAddr = EntryBB->createFunctionArgument(ResultTy);
@@ -1890,8 +1896,8 @@ SILArgument *ReabstractionThunkGenerator::convertReabstractionThunkArguments(
       // Convert an originally indirect to direct specialized parameter.
       assert(!specConv.isSILIndirect(SpecType->getParameters()[paramIdx]));
       // Instead of passing the address, pass the loaded value.
-      SILType ParamTy =
-          substConv.getSILType(SubstType->getParameters()[paramIdx]);
+      SILType ParamTy = SpecializedFunc->mapTypeIntoContext(
+          substConv.getSILType(SubstType->getParameters()[paramIdx]));
       assert(ParamTy.isAddress());
       SILArgument *SpecArg = *SpecArgIter++;
       SILArgument *NewArg =
