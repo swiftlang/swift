@@ -2756,10 +2756,11 @@ void DiagnosisEmitter::handle(const SDKNodeDecl *Node, NodeAnnotation Anno) {
   switch(Anno) {
   case NodeAnnotation::Removed: {
     if (auto *Added = findAddedDecl(Node)) {
-      MovedDecls.Diags.emplace_back(Node->getDeclKind(),
-                                    Added->getDeclKind(),
-                                    Node->getFullyQualifiedName(),
-                                    Added->getFullyQualifiedName());
+      if (Node->getDeclKind() != DeclKind::Constructor)
+        MovedDecls.Diags.emplace_back(Node->getDeclKind(),
+                                      Added->getDeclKind(),
+                                      Node->getFullyQualifiedName(),
+                                      Added->getFullyQualifiedName());
     } else {
       RemovedDecls.Diags.emplace_back(Node->getDeclKind(),
                                       Node->getFullyQualifiedName(),
