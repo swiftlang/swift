@@ -1519,7 +1519,7 @@ namespace {
       }
     }
   };
-} // namespace
+} // end anonymous namespace
 
 // Give a nested type the appropriately resolved concrete type, based off a
 // parent PA that has a concrete type.
@@ -3534,7 +3534,7 @@ namespace {
 
     return representativeConstraint;
   }
-} // namespace
+} // end anonymous namespace
 
 void
 GenericSignatureBuilder::finalize(SourceLoc loc,
@@ -3920,7 +3920,7 @@ namespace {
     assert(!constraints.empty() && "All constraints were self-derived!");
     return anyDerivedViaConcrete;
   }
-} // namespace
+} // end anonymous namespace
 
 template<typename T, typename DiagT>
 Constraint<T> GenericSignatureBuilder::checkConstraintList(
@@ -4264,7 +4264,7 @@ namespace {
       return lhs.constraint < rhs.constraint;
     }
   };
-} // namespace
+} // end anonymous namespace
 
 void GenericSignatureBuilder::checkSameTypeConstraints(
                           ArrayRef<GenericTypeParamType *> genericParams,
@@ -4668,7 +4668,7 @@ namespace {
     }
     return bestSource;
   }
-} // namespace
+} // end anonymous namespace
 
 void GenericSignatureBuilder::enumerateRequirements(llvm::function_ref<
                      void (RequirementKind kind,

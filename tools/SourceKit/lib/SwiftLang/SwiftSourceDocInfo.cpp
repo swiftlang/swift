@@ -1671,7 +1671,7 @@ private:
   }
 };
 
-} // namespace
+} // end anonymous namespace
 
 void SwiftLangSupport::findRelatedIdentifiersInFile(
     StringRef InputFile, unsigned Offset,

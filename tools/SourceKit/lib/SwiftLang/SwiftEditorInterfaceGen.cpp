@@ -223,7 +223,7 @@ public:
   }
 };
 
-} // namespace
+} // end anonymous namespace
 
 static bool makeParserAST(CompilerInstance &CI, StringRef Text) {
   CompilerInvocation Invocation;

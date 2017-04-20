@@ -252,7 +252,7 @@ struct SourceTextInfo {
   std::vector<TextReference> References;
 };
 
-} // namespace
+} // end anonymous namespace
 
 static void initDocGenericParams(const Decl *D, DocEntityInfo &Info) {
   auto *DC = dyn_cast<DeclContext>(D);
@@ -760,7 +760,7 @@ private:
     }
   }
 };
-} // namespace
+} // end anonymous namespace
 
 static bool makeParserAST(CompilerInstance &CI, StringRef Text) {
   CompilerInvocation Invocation;
@@ -894,7 +894,7 @@ public:
     return false; // skip body.
   }
 };
-} // namespace
+} // end anonymous namespace
 
 static void addParameterEntities(CompilerInstance &CI,
                                  SourceTextInfo &IFaceInfo) {
@@ -1055,7 +1055,7 @@ public:
     return TextRange{ Start, End-Start };
   }
 };
-} // namespace
+} // end anonymous namespace
 
 static bool getSourceTextInfo(CompilerInstance &CI,
                               SourceTextInfo &Info) {
