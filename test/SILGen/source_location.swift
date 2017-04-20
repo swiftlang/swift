@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -sil-full-demangle -Xllvm -sil-print-debuginfo -emit-silgen %s | %FileCheck %s
 
 func printSourceLocation(file: String = #file, line: Int = #line) {}
 

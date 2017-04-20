@@ -58,6 +58,10 @@ llvm::cl::opt<bool>
 SILFullDemangle("sil-full-demangle", llvm::cl::init(false),
                 llvm::cl::desc("Fully demangle symbol names in SIL output"));
 
+llvm::cl::opt<bool>
+SILPrintDebugInfo("sil-print-debuginfo", llvm::cl::init(false),
+                llvm::cl::desc("Include debug info in SIL output"));
+
 static std::string demangleSymbol(StringRef Name) {
   if (SILFullDemangle)
     return Demangle::demangleSymbolAsString(Name);
@@ -763,14 +767,7 @@ public:
     }
   }
 
-  void print(SILValue V, bool PrintScopes = false) {
-    // Lazily print any debug locations used in this value.
-    if (PrintScopes)
-      if (auto *I = dyn_cast<SILInstruction>(V)) {
-        auto &SM = I->getModule().getASTContext().SourceMgr;
-        printDebugScope(I->getDebugScope(), SM);
-      }
-
+  void print(SILValue V) {
     if (auto *FRI = dyn_cast<FunctionRefInst>(V))
       *this << "  // function_ref "
             << demangleSymbol(FRI->getReferencedFunction()->getName())
@@ -793,9 +790,11 @@ public:
 
     bool printedSlashes = false;
     if (auto *I = dyn_cast<SILInstruction>(V)) {
-      auto &SM = I->getModule().getASTContext().SourceMgr;
-      printDebugLocRef(I->getLoc(), SM);
-      printDebugScopeRef(I->getDebugScope(), SM);
+      if (Ctx.printDebugInfo()) {
+        auto &SM = I->getModule().getASTContext().SourceMgr;
+        printDebugLocRef(I->getLoc(), SM);
+        printDebugScopeRef(I->getDebugScope(), SM);
+      }
       printedSlashes = printTypeDependentOperands(I);
     }
 
@@ -1853,14 +1852,16 @@ static void printLinkage(llvm::raw_ostream &OS, SILLinkage linkage,
 
 /// Pretty-print the SILFunction to the designated stream.
 void SILFunction::print(SILPrintContext &PrintCtx) const {
-  auto &SM = getModule().getASTContext().SourceMgr;
   llvm::raw_ostream &OS = PrintCtx.OS();
-  for (auto &BB : *this)
-    for (auto &I : BB) {
-      SILPrinter P(PrintCtx);
-      P.printDebugScope(I.getDebugScope(), SM);
-    }
-  OS << "\n";
+  if (PrintCtx.printDebugInfo()) {
+    auto &SM = getModule().getASTContext().SourceMgr;
+    for (auto &BB : *this)
+      for (auto &I : BB) {
+        SILPrinter P(PrintCtx);
+        P.printDebugScope(I.getDebugScope(), SM);
+      }
+    OS << "\n";
+  }
 
   OS << "// " << demangleSymbol(getName()) << '\n';
   OS << "sil ";
@@ -2492,6 +2493,16 @@ void SILSpecializeAttr::print(llvm::raw_ostream &OS) const {
 //===----------------------------------------------------------------------===//
 // SILPrintContext members
 //===----------------------------------------------------------------------===//
+
+SILPrintContext::SILPrintContext(llvm::raw_ostream &OS, bool Verbose,
+                bool SortedSIL) :
+  OutStream(OS), Verbose(Verbose), SortedSIL(SortedSIL),
+  DebugInfo(SILPrintDebugInfo) { }
+
+SILPrintContext::SILPrintContext(llvm::raw_ostream &OS, bool Verbose,
+                                 bool SortedSIL, bool DebugInfo) :
+  OutStream(OS), Verbose(Verbose), SortedSIL(SortedSIL),
+  DebugInfo(DebugInfo) { }
 
 SILPrintContext::SILPrintFunctionContext &
 SILPrintContext::getFuncContext(const SILFunction *F) {
