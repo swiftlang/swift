@@ -245,6 +245,22 @@ bb0(%0 : $Int):
   return %8 : $()
 }
 
+// CHECK-LABEL: sil hidden @lookThroughMarkUninitialized
+sil hidden @lookThroughMarkUninitialized : $@convention(thin) (Int) -> () {
+bb0(%0 : $Int):
+  %1 = alloc_box ${ var Int }
+  %2 = mark_uninitialized [rootself] %1 : ${ var Int }
+  %3 = project_box %2 : ${ var Int }, 0
+  store %0 to [trivial] %3 : $*Int
+  %4 = project_box %2 : ${ var Int }, 0
+  %5 = begin_access [modify] [unknown] %3 : $*Int  // expected-note {{conflicting modification requires exclusive access}}
+  %6 = begin_access [modify] [unknown] %4 : $*Int  // expected-warning {{modification requires exclusive access}}
+  end_access %6 : $*Int
+  end_access %5: $*Int
+  destroy_value %2 : ${ var Int }
+  %7 = tuple ()
+  return %7 : $()
+}
 
 // Treat global as identity for global_addr instruction-
 sil_global hidden @global1 : $Int

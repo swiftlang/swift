@@ -35,10 +35,11 @@ swift_install_in_component(compiler
 DESTINATION "lib/swift/migrator")
 
 add_swift_library(swiftMigrator STATIC
+  EditorAdapter.cpp
   FixitApplyDiagnosticConsumer.cpp
   Migrator.cpp
   MigrationState.cpp
-  Replacement.cpp
+  RewriteBufferEditsReceiver.cpp
 
   LINK_LIBRARIES swiftSyntax swiftIDE)
 

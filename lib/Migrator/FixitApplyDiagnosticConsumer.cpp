@@ -69,9 +69,5 @@ handleDiagnostic(SourceManager &SM, SourceLoc Loc,
 
     RewriteBuf.ReplaceText(Offset, Length, Fixit.getText());
     ++NumFixitsApplied;
-
-    Replacements.push_back({
-      BufferName, Offset, Length, Fixit.getText().str(), Info.ID
-    });
   }
 }

@@ -30,6 +30,7 @@
 #include "swift/AST/Expr.h"
 #include "swift/AST/Stmt.h"
 #include "swift/SIL/CFG.h"
+#include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SILOptimizer/Analysis/PostOrderAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
@@ -304,6 +305,7 @@ static void diagnoseExclusivityViolation(const BeginAccessInst *PriorAccess,
 static AccessedStorage findAccessedStorage(SILValue Source) {
   SILValue Iter = Source;
   while (true) {
+    // Inductive cases: look through operand to find ultimate source.
     if (auto *PBI = dyn_cast<ProjectBoxInst>(Iter)) {
       Iter = PBI->getOperand();
       continue;
@@ -314,10 +316,26 @@ static AccessedStorage findAccessedStorage(SILValue Source) {
       continue;
     }
 
+    if (auto *MII = dyn_cast<MarkUninitializedInst>(Iter)) {
+      Iter = MII->getOperand();
+      continue;
+    }
+
+    // Base cases: make sure ultimate source is recognized.
     if (auto *GAI = dyn_cast<GlobalAddrInst>(Iter)) {
       return AccessedStorage(GAI->getReferencedGlobal());
     }
 
+    if (isa<AllocBoxInst>(Iter) || isa<BeginAccessInst>(Iter) ||
+        isa<SILFunctionArgument>(Iter)) {
+      // Treat the instruction itself as the identity of the storage being
+      // being accessed.
+      return AccessedStorage(Iter);
+    }
+
+    // For now we're still allowing arbitrary addresses here. Once
+    // we start doing a best-effort static check for dynamically-enforced
+    // accesses we should lock this down to only recognized sources.
     assert(Iter->getType().isAddress() || Iter->getType().is<SILBoxType>());
     return AccessedStorage(Iter);
   }
