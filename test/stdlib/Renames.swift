@@ -171,7 +171,7 @@ func _Filter<S : Sequence>(s: S) {
 func _Filter<S>(s: LazyFilterSequence<S>) {
   _ = s.generate() // expected-error {{'generate()' has been renamed to 'makeIterator()'}} {{9-17=makeIterator}} {{none}}
 }
-func _Filter<C : Collection>(c: C) {
+func _Filter<C : Collection>(c: C) where C.SubSequence: Collection {
   _ = LazyFilterCollection(c) { _ in true} // expected-error {{'init(_:whereElementsSatisfy:)' is unavailable: use '.lazy.filter' on the collection}}
 }
 func _Filter<C>(c: LazyFilterCollection<C>) {

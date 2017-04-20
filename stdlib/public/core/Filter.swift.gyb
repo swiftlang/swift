@@ -97,65 +97,8 @@ public struct LazyFilterSequence<Base : Sequence>
 }
 
 /// The `Index` used for subscripting a `LazyFilterCollection`.
-///
-/// The positions of a `LazyFilterIndex` correspond to those positions
-/// `p` in its underlying collection `c` such that `c[p]`
-/// satisfies the predicate with which the `LazyFilterIndex` was
-/// initialized.
-///
-/// - Note: The performance of advancing a `LazyFilterIndex`
-///   depends on how sparsely the filtering predicate is satisfied,
-///   and may not offer the usual performance given by models of
-///   `Collection`.
-public struct LazyFilterIndex<Base : Collection> {
-
-  /// The position corresponding to `self` in the underlying collection.
-  public let base: Base.Index
-}
-
-extension LazyFilterIndex : Comparable {
-  public static func == (
-    lhs: LazyFilterIndex<Base>,
-    rhs: LazyFilterIndex<Base>
-  ) -> Bool {
-    return lhs.base == rhs.base
-  }
-
-  public static func != (
-    lhs: LazyFilterIndex<Base>,
-    rhs: LazyFilterIndex<Base>
-  ) -> Bool {
-    return lhs.base != rhs.base
-  }
-
-  public static func < (
-    lhs: LazyFilterIndex<Base>,
-    rhs: LazyFilterIndex<Base>
-  ) -> Bool {
-    return lhs.base < rhs.base
-  }
-
-  public static func <= (
-    lhs: LazyFilterIndex<Base>,
-    rhs: LazyFilterIndex<Base>
-  ) -> Bool {
-    return lhs.base <= rhs.base
-  }
-
-  public static func >= (
-    lhs: LazyFilterIndex<Base>,
-    rhs: LazyFilterIndex<Base>
-  ) -> Bool {
-    return lhs.base >= rhs.base
-  }
-
-  public static func > (
-    lhs: LazyFilterIndex<Base>,
-    rhs: LazyFilterIndex<Base>
-  ) -> Bool {
-    return lhs.base > rhs.base
-  }
-}
+@available(swift, deprecated: 3.1, obsoleted: 4.0, message: "Use Base.Index")
+public typealias LazyFilterIndex<Base : Collection> = Base.Index
 
 // FIXME(ABI)#27 (Conditional Conformance): `LazyFilter*Collection` types should be
 // collapsed into one `LazyFilterCollection` using conditional conformances.
@@ -170,20 +113,23 @@ extension LazyFilterIndex : Comparable {
 /// underlying collection that satisfy a predicate.
 ///
 /// - Note: The performance of accessing `startIndex`, `first`, any methods
-///   that depend on `startIndex`, or of advancing a `LazyFilterIndex` depends
+///   that depend on `startIndex`, or of advancing an index depends
 ///   on how sparsely the filtering predicate is satisfied, and may not offer
 ///   the usual performance given by `Collection`. Be aware, therefore, that
 ///   general operations on `LazyFilterCollection` instances may not have the
 ///   documented complexity.
 public struct ${Self}<
   Base : ${collectionForTraversal(Traversal)}
-> : LazyCollectionProtocol, ${collectionForTraversal(Traversal)} {
+> : LazyCollectionProtocol, ${collectionForTraversal(Traversal)}
+// FIXME(ABI): Recursive protocol conformances
+  where Base.SubSequence: ${collectionForTraversal(Traversal)}
+{
 
   /// A type that represents a valid position in the collection.
   ///
   /// Valid indices consist of the position of every element and a
   /// "past the end" position that's not valid for use as a subscript.
-  public typealias Index = LazyFilterIndex<Base>
+  public typealias Index = Base.Index
 
   public typealias IndexDistance = Base.IndexDistance
 
@@ -209,7 +155,7 @@ public struct ${Self}<
     while index != _base.endIndex && !_predicate(_base[index]) {
       _base.formIndex(after: &index)
     }
-    return LazyFilterIndex(base: index)
+    return index
   }
 
   /// The collection's "past the end" position---that is, the position one
@@ -218,7 +164,7 @@ public struct ${Self}<
   /// `endIndex` is always reachable from `startIndex` by zero or more
   /// applications of `index(after:)`.
   public var endIndex: Index {
-    return LazyFilterIndex(base: _base.endIndex)
+    return _base.endIndex
   }
 
   // TODO: swift-3-indexing-model - add docs
@@ -230,12 +176,12 @@ public struct ${Self}<
 
   public func formIndex(after i: inout Index) {
     // TODO: swift-3-indexing-model: _failEarlyRangeCheck i?
-    var index = i.base
+    var index = i
     _precondition(index != _base.endIndex, "can't advance past endIndex")
     repeat {
       _base.formIndex(after: &index)
     } while index != _base.endIndex && !_predicate(_base[index])
-    i = LazyFilterIndex(base: index)
+    i = index
   }
 
 %   if Traversal == 'Bidirectional':
@@ -247,12 +193,12 @@ public struct ${Self}<
 
   public func formIndex(before i: inout Index) {
     // TODO: swift-3-indexing-model: _failEarlyRangeCheck i?
-    var index = i.base
+    var index = i
     _precondition(index != _base.startIndex, "can't retreat before startIndex")
     repeat {
       _base.formIndex(before: &index)
     } while !_predicate(_base[index])
-    i = LazyFilterIndex(base: index)
+    i = index
   }
 %   end
 
@@ -261,22 +207,14 @@ public struct ${Self}<
   /// - Precondition: `position` is a valid position in `self` and
   /// `position != endIndex`.
   public subscript(position: Index) -> Base.Iterator.Element {
-    return _base[position.base]
+    return _base[position]
   }
 
-  public subscript(bounds: Range<Index>) -> ${Slice}<${Self}<Base>> {
-    return ${Slice}(base: self, bounds: bounds)
+  public subscript(bounds: Range<Index>) -> ${Self}<Base.SubSequence> {
+    return ${Self}<Base.SubSequence>(_base: _base[bounds], _predicate)
   }
 
-  // FIXME(ABI)#28 (Associated Types with where clauses): we actually want to add:
-  //
-  //   typealias SubSequence = ${Self}<Base.SubSequence>
-  //
-  // so that all slicing optimizations of the base collection can kick in.
-  //
-  // We can't do that right now though, because that would force a lot of
-  // constraints on `Base.SubSequence`, limiting the possible contexts where
-  // the `.lazy.filter` API can be used.
+  public typealias SubSequence = ${Self}<Base.SubSequence>
 
   /// Returns an iterator over the elements of this sequence.
   ///
@@ -310,11 +248,12 @@ extension LazySequenceProtocol {
 % for Traversal in ['Forward', 'Bidirectional']:
 
 extension LazyCollectionProtocol
-%   if Traversal != 'Forward':
   where
+%   if Traversal != 'Forward':
   Self : ${collectionForTraversal(Traversal)},
-  Elements : ${collectionForTraversal(Traversal)}
+  Elements : ${collectionForTraversal(Traversal)},
 %   end
+  Self.Elements.SubSequence : ${collectionForTraversal(Traversal)}
 {
   /// Returns the elements of `self` that satisfy `predicate`.
   ///
