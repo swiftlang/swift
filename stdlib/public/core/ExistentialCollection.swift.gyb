@@ -428,19 +428,14 @@ internal class _AnyRandomAccessCollectionBox<Element>
 internal final class _${Kind}Box<S : ${Kind}> : _Any${Kind}Box<S.Iterator.Element>
   where
   S.SubSequence : ${Kind},
+%  if Kind == 'Sequence':
   S.SubSequence.Iterator.Element == S.Iterator.Element,
+%end
   S.SubSequence.SubSequence == S.SubSequence
 %   if Kind != 'Sequence':
   ,
-  S.SubSequence.Index == S.Index,
   S.SubSequence.Indices : ${Kind},
-  S.SubSequence.Indices.Iterator.Element == S.Index,
-  S.SubSequence.Indices.Index == S.Index,
-  S.SubSequence.Indices.SubSequence == S.SubSequence.Indices,
-  S.Indices : ${Kind},
-  S.Indices.Iterator.Element == S.Index,
-  S.Indices.Index == S.Index,
-  S.Indices.SubSequence == S.Indices
+  S.Indices : ${Kind}
 %   end
 {
   internal typealias Element = S.Iterator.Element
@@ -1045,22 +1040,14 @@ public struct ${Self}<Element>
   @_inlineable
   public init<C : ${SubProtocol}>(_ base: C)
     where
-    C.Iterator.Element == Element,
-
     // FIXME(ABI)#101 (Associated Types with where clauses): these constraints should be applied to
     // associated types of Collection.
     C.SubSequence : ${SubProtocol},
     C.SubSequence.Iterator.Element == Element,
-    C.SubSequence.Index == C.Index,
     C.SubSequence.Indices : ${SubProtocol},
-    C.SubSequence.Indices.Iterator.Element == C.Index,
-    C.SubSequence.Indices.Index == C.Index,
-    C.SubSequence.Indices.SubSequence == C.SubSequence.Indices,
     C.SubSequence.SubSequence == C.SubSequence,
-    C.Indices : ${SubProtocol},
-    C.Indices.Iterator.Element == C.Index,
-    C.Indices.Index == C.Index,
-    C.Indices.SubSequence == C.Indices {
+    C.Indices : ${SubProtocol}
+     {
     // Traversal: ${Traversal}
     // SubTraversal: ${SubTraversal}
     self._box = _${SubProtocol}Box<C>(

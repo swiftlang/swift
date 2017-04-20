@@ -803,7 +803,7 @@ static Type formProtocolRelativeType(ProtocolDecl *proto,
                                      PotentialArchetype *basePA,
                                      PotentialArchetype *pa) {
   // Basis case: we've hit the base potential archetype.
-  if (basePA->isInSameEquivalenceClassAs(pa))
+  if (basePA == pa)
     return proto->getSelfInterfaceType();
 
   // Recursive case: form a dependent member type.
@@ -846,6 +846,9 @@ const RequirementSource *FloatingRequirementSource::getSource(
                                protocolReq.protocol, protocolReq.inferred,
                                protocolReq.written);
   }
+
+  case NestedTypeNameMatch:
+    return RequirementSource::forNestedTypeNameMatch(pa);
   }
 
   llvm_unreachable("Unhandled FloatingPointRequirementSourceKind in switch.");
@@ -878,6 +881,7 @@ bool FloatingRequirementSource::isExplicit() const {
     return true;
 
   case Inferred:
+  case NestedTypeNameMatch:
     return false;
 
   case AbstractProtocol:
@@ -926,6 +930,7 @@ FloatingRequirementSource FloatingRequirementSource::asInferred(
 
   case Inferred:
   case Resolved:
+  case NestedTypeNameMatch:
     return *this;
 
   case AbstractProtocol:
@@ -941,13 +946,29 @@ bool FloatingRequirementSource::isRecursive(
   llvm::SmallSet<std::pair<CanType, ProtocolDecl *>, 4> visitedAssocReqs;
   for (auto storedSource = storage.dyn_cast<const RequirementSource *>();
        storedSource; storedSource = storedSource->parent) {
-    if (storedSource->kind != RequirementSource::ProtocolRequirement)
+    if (!storedSource->isProtocolRequirement())
       continue;
 
     if (!visitedAssocReqs.insert(
                           {storedSource->getStoredType()->getCanonicalType(),
                            storedSource->getProtocolDecl()}).second)
       return true;
+  }
+
+  // For a nested type match, look for another type with that name.
+  // FIXME: Actually, look for 5 of them. This is totally bogus.
+  if (kind == NestedTypeNameMatch) {
+    unsigned grossCount = 0;
+    auto pa = storage.dyn_cast<const RequirementSource *>()
+                ->getAffectedPotentialArchetype();
+    while (auto parent = pa->getParent()) {
+      if (pa->getNestedName() == nestedName) {
+        if (++grossCount > 4) return true;
+      }
+
+
+      pa = parent;
+    }
   }
 
   return false;
@@ -1081,6 +1102,50 @@ bool EquivalenceClass::isConformanceSatisfiedBySuperclass(
   }
 
   return false;
+}
+
+void EquivalenceClass::dump(llvm::raw_ostream &out) const {
+  out << "Equivalence class represented by "
+    << members.front()->getRepresentative()->getDebugName() << ":\n";
+  out << "Members: ";
+  interleave(members, [&](PotentialArchetype *pa) {
+    out << pa->getDebugName();
+  }, [&]() {
+    out << ", ";
+  });
+  out << "\nConformances:";
+  interleave(conformsTo,
+             [&](const std::pair<
+                        ProtocolDecl *,
+                        std::vector<Constraint<ProtocolDecl *>>> &entry) {
+               out << entry.first->getNameStr();
+             },
+             [&] { out << ", "; });
+  out << "\nSame-type constraints:";
+  for (const auto &entry : sameTypeConstraints) {
+    out << "\n  " << entry.first->getDebugName() << " == ";
+    interleave(entry.second,
+               [&](const Constraint<PotentialArchetype *> &constraint) {
+                 out << constraint.value->getDebugName();
+
+                 if (constraint.source->isDerivedRequirement())
+                   out << " [derived]";
+               }, [&] {
+                 out << ", ";
+               });
+  }
+  if (concreteType)
+    out << "\nConcrete type: " << concreteType.getString();
+  if (superclass)
+    out << "\nSuperclass: " << superclass.getString();
+  if (layout)
+    out << "\nLayout: " << layout.getString();
+
+  out << "\n";
+}
+
+void EquivalenceClass::dump() const {
+  dump(llvm::errs());
 }
 
 ConstraintResult GenericSignatureBuilder::handleUnresolvedRequirement(
@@ -1398,7 +1463,13 @@ PotentialArchetype *PotentialArchetype::getArchetypeAnchor(
   if (auto parent = getParent()) {
     // For a nested type, retrieve the parent archetype anchor first.
     auto parentAnchor = parent->getArchetypeAnchor(builder);
-    anchor = parentAnchor->getNestedArchetypeAnchor(getNestedName(), builder);
+    anchor = parentAnchor->getNestedArchetypeAnchor(
+                                          getNestedName(), builder,
+                                          NestedTypeUpdate::ResolveExisting);
+
+    // FIXME: Hack for cases where we couldn't resolve the nested type.
+    if (!anchor)
+      anchor = rep;
   } else {
     anchor = rep;
   }
@@ -2791,14 +2862,16 @@ GenericSignatureBuilder::addSameTypeRequirementBetweenArchetypes(
   }
 
   // Recursively merge the associated types of T2 into T1.
+  auto dependentT1 = T1->getDependentType({ }, /*allowUnresolved=*/true);
   for (auto equivT2 : equivClass2Members) {
     for (auto T2Nested : equivT2->NestedTypes) {
-      auto T1Nested = T1->getNestedType(T2Nested.first, *this);
-      if (isErrorResult(addSameTypeRequirement(
-                           T1Nested, T2Nested.second.front(),
-                           RequirementSource::forNestedTypeNameMatch(T1Nested),
-                           UnresolvedHandlingKind::GenerateConstraints,
-                           DiagnoseSameTypeConflict{Diags, Source, T1Nested})))
+      Type nestedT1 = DependentMemberType::get(dependentT1, T2Nested.first);
+      if (isErrorResult(
+            addSameTypeRequirement(
+               nestedT1, T2Nested.second.front(),
+               FloatingRequirementSource::forNestedTypeNameMatch(
+                                                      Source, T2Nested.first),
+               UnresolvedHandlingKind::GenerateConstraints)))
         return ConstraintResult::Conflicting;
     }
   }
@@ -3809,8 +3882,12 @@ Constraint<T> GenericSignatureBuilder::checkConstraintList(
 
 namespace {
   /// Remove self-derived sources from the given vector of constraints.
+  ///
+  /// \returns true if any derived-via-concrete constraints were found.
   template<typename T>
-  void removeSelfDerived(std::vector<Constraint<T>> &constraints) {
+  bool removeSelfDerived(std::vector<Constraint<T>> &constraints,
+                         bool dropDerivedViaConcrete = true) {
+    bool anyDerivedViaConcrete = false;
     // Remove self-derived constraints.
     Optional<Constraint<T>> remainingConcrete;
     constraints.erase(
@@ -3822,6 +3899,11 @@ namespace {
                          return true;
 
                        if (!derivedViaConcrete)
+                         return false;
+
+                       anyDerivedViaConcrete = true;
+
+                       if (!dropDerivedViaConcrete)
                          return false;
 
                        // Drop derived-via-concrete requirements.
@@ -3836,6 +3918,7 @@ namespace {
       constraints.push_back(*remainingConcrete);
 
     assert(!constraints.empty() && "All constraints were self-derived!");
+    return anyDerivedViaConcrete;
   }
 }
 
@@ -4191,11 +4274,13 @@ void GenericSignatureBuilder::checkSameTypeConstraints(
   equivClass = pa->getEquivalenceClassIfPresent();
   assert(equivClass && "Equivalence class disappeared?");
 
+  bool anyDerivedViaConcrete = false;
   for (auto &entry : equivClass->sameTypeConstraints) {
     auto &constraints = entry.second;
 
     // Remove self-derived constraints.
-    removeSelfDerived(constraints);
+    if (removeSelfDerived(constraints, /*dropDerivedViaConcrete=*/false))
+      anyDerivedViaConcrete = true;
 
     // Sort the constraints, so we get a deterministic ordering of diagnostics.
     llvm::array_pod_sort(constraints.begin(), constraints.end());
@@ -4269,6 +4354,18 @@ void GenericSignatureBuilder::checkSameTypeConstraints(
       // Ignore inferred requirements; we don't want to diagnose them.
       intercomponentEdges.push_back(
         IntercomponentEdge(firstComponent, secondComponent, constraint));
+    }
+  }
+
+  // If there were any derived-via-concrete constraints, drop them now before
+  // we emit other diagnostics.
+  if (anyDerivedViaConcrete) {
+    for (auto &entry : equivClass->sameTypeConstraints) {
+      auto &constraints = entry.second;
+
+      // Remove derived-via-concrete constraints.
+      (void)removeSelfDerived(constraints);
+        anyDerivedViaConcrete = true;
     }
   }
 
