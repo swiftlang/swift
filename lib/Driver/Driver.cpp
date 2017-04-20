@@ -2096,16 +2096,28 @@ Job *Driver::buildJobsForAction(Compilation &C, const JobAction *JA,
     // statements are processed, even ones from non-primary files. Thus, only
     // one of those jobs needs to emit the file, and we can get it to write
     // straight to the desired final location.
-    if (C.getArgs().hasArg(options::OPT_emit_loaded_module_trace,
-                           options::OPT_emit_loaded_module_trace_path) &&
-        C.requestPermissionForFrontendToEmitLoadedModuleTrace()) {
-      // By treating this as a top-level output, the return value always exists.
-      auto filename = getOutputFilenameFromPathArgOrAsTopLevel(
-          OI, C.getArgs(), options::OPT_emit_loaded_module_trace_path,
-          types::TY_ModuleTrace,
-          /*TreatAsTopLevelOutput=*/true, "trace.json", Buf);
+    auto tracePathEnvVar = getenv("SWIFT_LOADED_MODULE_TRACE_PATH");
+    auto shouldEmitTrace =
+        tracePathEnvVar ||
+        C.getArgs().hasArg(options::OPT_emit_loaded_module_trace,
+                           options::OPT_emit_loaded_module_trace_path);
 
-      Output->setAdditionalOutputForType(types::TY_ModuleTrace, *filename);
+    if (shouldEmitTrace &&
+        C.requestPermissionForFrontendToEmitLoadedModuleTrace()) {
+      StringRef filename;
+      // Prefer the environment variable.
+      if (tracePathEnvVar)
+        filename = StringRef(tracePathEnvVar);
+      else {
+        // By treating this as a top-level output, the return value always
+        // exists.
+        filename = *getOutputFilenameFromPathArgOrAsTopLevel(
+            OI, C.getArgs(), options::OPT_emit_loaded_module_trace_path,
+            types::TY_ModuleTrace,
+            /*TreatAsTopLevelOutput=*/true, "trace.json", Buf);
+      }
+
+      Output->setAdditionalOutputForType(types::TY_ModuleTrace, filename);
     }
   }
 
