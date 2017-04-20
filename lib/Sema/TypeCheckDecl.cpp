@@ -7155,7 +7155,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
       if (auto superclass = CD->getSuperclassDecl()) {
         if (superclass->getAttrs().hasAttribute<ObjCMembersAttr>() &&
             !CD->getAttrs().hasAttribute<ObjCMembersAttr>()) {
-          CD->getAttrs().add(new (Context) ObjCMembersAttr(/*implicit=*/true));
+          CD->getAttrs().add(new (Context) ObjCMembersAttr(/*IsImplicit=*/true));
         }
       }
     }

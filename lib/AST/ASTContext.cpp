@@ -419,7 +419,7 @@ ASTContext::ASTContext(LangOptions &langOpts, SearchPathOptions &SearchPathOpts,
                       UnresolvedType(*this)),
     TheEmptyTupleType(TupleType::get(ArrayRef<TupleTypeElt>(), *this)),
     TheAnyType(ProtocolCompositionType::get(*this, ArrayRef<Type>(),
-                                            /*hasExplicitAnyObject=*/false)),
+                                            /*HasExplicitAnyObject=*/false)),
     TheNativeObjectType(new (*this, AllocationArena::Permanent)
                            BuiltinNativeObjectType(*this)),
     TheBridgeObjectType(new (*this, AllocationArena::Permanent)
@@ -693,7 +693,7 @@ CanType ASTContext::getAnyObjectType() const {
 
   Impl.AnyObjectType = CanType(
     ProtocolCompositionType::get(
-      *this, {}, /*hasExplicitAnyObject=*/true));
+      *this, {}, /*HasExplicitAnyObject=*/true));
   return Impl.AnyObjectType;
 }
 

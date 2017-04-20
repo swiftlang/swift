@@ -1146,7 +1146,7 @@ namespace {
       auto &anyTL = SGF.getTypeLowering(opaque, outputSubstType);
       SILValue loadedOpaque = SGF.B.createInitExistentialOpaque(
           Loc, anyTL.getLoweredType(), inputTupleType, loadedPayload.getValue(),
-          /*conformances=*/{});
+          /*Conformances=*/{});
       return ManagedValue(loadedOpaque, loadedPayload.getCleanup());
     }
 

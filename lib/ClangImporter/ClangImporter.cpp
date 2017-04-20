@@ -110,7 +110,7 @@ namespace {
     explicit PCHDeserializationCallbacks(ClangImporter::Implementation &impl)
       : Impl(impl) {}
     void ModuleImportRead(clang::serialization::SubmoduleID ID,
-                          clang::SourceLocation ImportLoc) {
+                          clang::SourceLocation ImportLoc) override {
       if (Impl.IsReadingBridgingPCH) {
         Impl.PCHImportedSubmodules.push_back(ID);
       }
@@ -223,7 +223,7 @@ namespace {
            /*null-terminated*/true);
     }
 
-    ~ZeroFilledMemoryBuffer() {
+    ~ZeroFilledMemoryBuffer() override {
       llvm::sys::MemoryBlock memory{const_cast<char *>(getBufferStart()),
         getBufferSize()};
       std::error_code error = llvm::sys::Memory::releaseMappedMemory(memory);
@@ -1263,7 +1263,7 @@ ClangImporter::emitBridgingPCH(StringRef headerPath,
   if (ReusingDiags) {
     Diags = &Impl.Instance->getDiagnosticClient();
   }
-  emitInstance.createDiagnostics(Diags, /*ShouldOwnDiags=*/!ReusingDiags);
+  emitInstance.createDiagnostics(Diags, /*ShouldOwnClient=*/!ReusingDiags);
 
   clang::FileManager &fileManager = Impl.Instance->getFileManager();
   emitInstance.setFileManager(&fileManager);

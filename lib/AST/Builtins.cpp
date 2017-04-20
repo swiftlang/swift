@@ -113,7 +113,7 @@ Type swift::getBuiltinType(ASTContext &Context, StringRef Name) {
   if (Name == "AnyObject")
     return CanType(
       ProtocolCompositionType::get(Context, {},
-                                   /*hasExplicitAnyObject=*/true));
+                                   /*HasExplicitAnyObject=*/true));
 
   return Type();
 }
