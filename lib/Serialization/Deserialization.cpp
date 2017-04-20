@@ -3851,11 +3851,23 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
   switch (recordID) {
   case decls_block::NAME_ALIAS_TYPE: {
     DeclID underlyingID;
-    decls_block::NameAliasTypeLayout::readRecord(scratch, underlyingID);
+    TypeID canonicalTypeID;
+    decls_block::NameAliasTypeLayout::readRecord(scratch, underlyingID,
+                                                 canonicalTypeID);
     auto alias = dyn_cast_or_null<TypeAliasDecl>(getDecl(underlyingID));
     if (!alias) {
       error();
       return nullptr;
+    }
+
+    if (ctx.LangOpts.EnableDeserializationRecovery) {
+      if (Type expectedType = getType(canonicalTypeID)) {
+        if (!alias->getDeclaredInterfaceType()->isEqual(expectedType)) {
+          // Fall back to the canonical type.
+          typeOrOffset = expectedType;
+          break;
+        }
+      }
     }
 
     typeOrOffset = alias->getDeclaredInterfaceType();
@@ -4615,6 +4627,16 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
     auto first = cast<AssociatedTypeDecl>(getDecl(*rawIDIter++));
     auto second = getType(*rawIDIter++);
     auto third = cast_or_null<TypeDecl>(getDecl(*rawIDIter++));
+    if (isa<TypeAliasDecl>(third) &&
+        third->getModuleContext() != getAssociatedModule() &&
+        !third->getDeclaredInterfaceType()->isEqual(second)) {
+      // Conservatively drop references to typealiases in other modules
+      // that may have changed. This may also drop references to typealiases
+      // that /haven't/ changed but just happen to have generics in them, but
+      // in practice having a declaration here isn't actually required by the
+      // rest of the compiler.
+      third = nullptr;
+    }
     typeWitnesses[first] = std::make_pair(second, third);
   }
   assert(rawIDIter <= rawIDs.end() && "read too much");
