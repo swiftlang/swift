@@ -1686,6 +1686,36 @@ void Driver::buildJobs(const ActionList &Actions, const OutputInfo &OI,
   }
 }
 
+static Optional<StringRef> getOutputFilenameFromPathArgOrAsTopLevel(
+    const OutputInfo &OI, const llvm::opt::DerivedArgList &Args,
+    llvm::opt::OptSpecifier PathArg, types::ID ExpectedOutputType,
+    bool TreatAsTopLevelOutput, StringRef ext, llvm::SmallString<128> &Buffer) {
+  if (const Arg *A = Args.getLastArg(PathArg))
+    return StringRef(A->getValue());
+
+  if (TreatAsTopLevelOutput) {
+    if (const Arg *A = Args.getLastArg(options::OPT_o)) {
+      if (OI.CompilerOutputType == ExpectedOutputType)
+        return StringRef(A->getValue());
+
+      // Otherwise, put the file next to the top-level output.
+      Buffer = A->getValue();
+      llvm::sys::path::remove_filename(Buffer);
+      llvm::sys::path::append(Buffer, OI.ModuleName);
+      llvm::sys::path::replace_extension(Buffer, ext);
+      return Buffer.str();
+    }
+
+    // A top-level output wasn't specified, so just output to
+    // <ModuleName>.<ext>.
+    Buffer = OI.ModuleName;
+    llvm::sys::path::replace_extension(Buffer, ext);
+    return Buffer.str();
+  }
+
+  return None;
+}
+
 static StringRef getOutputFilename(Compilation &C,
                                    const JobAction *JA,
                                    const OutputInfo &OI,
@@ -1708,29 +1738,14 @@ static StringRef getOutputFilename(Compilation &C,
 
   // Process Action-specific output-specifying options next,
   // since we didn't find anything applicable in the OutputMap.
+
   if (isa<MergeModuleJobAction>(JA)) {
-    if (const Arg *A = Args.getLastArg(options::OPT_emit_module_path))
-      return A->getValue();
-
-    if (OI.ShouldTreatModuleAsTopLevelOutput) {
-      if (const Arg *A = Args.getLastArg(options::OPT_o)) {
-        if (OI.CompilerOutputType == types::TY_SwiftModuleFile)
-          return A->getValue();
-
-        // Otherwise, put the module next to the top-level output.
-        Buffer = A->getValue();
-        llvm::sys::path::remove_filename(Buffer);
-        llvm::sys::path::append(Buffer, OI.ModuleName);
-        llvm::sys::path::replace_extension(Buffer, SERIALIZED_MODULE_EXTENSION);
-        return Buffer.str();
-      }
-
-      // A top-level output wasn't specified, so just output to
-      // <ModuleName>.swiftmodule.
-      Buffer = OI.ModuleName;
-      llvm::sys::path::replace_extension(Buffer, SERIALIZED_MODULE_EXTENSION);
-      return Buffer.str();
-    }
+    auto optFilename = getOutputFilenameFromPathArgOrAsTopLevel(
+        OI, Args, options::OPT_emit_module_path, types::TY_SwiftModuleFile,
+        OI.ShouldTreatModuleAsTopLevelOutput, SERIALIZED_MODULE_EXTENSION,
+        Buffer);
+    if (optFilename)
+      return *optFilename;
   }
 
   // dSYM actions are never treated as top-level.
@@ -2073,12 +2088,24 @@ Job *Driver::buildJobsForAction(Compilation &C, const JobAction *JA,
     if (C.getArgs().hasArg(options::OPT_emit_dependencies)) {
       addAuxiliaryOutput(C, *Output, types::TY_Dependencies, OI, OutputMap);
     }
-    if (C.getArgs().hasArg(options::OPT_emit_loaded_module_trace,
-                           options::OPT_emit_loaded_module_trace_path)) {
-      addAuxiliaryOutput(C, *Output, types::TY_ModuleTrace, OI, OutputMap);
-    }
     if (C.getIncrementalBuildEnabled()) {
       addAuxiliaryOutput(C, *Output, types::TY_SwiftDeps, OI, OutputMap);
+    }
+
+    // The loaded-module-trace is the same for all compile jobs: all `import`
+    // statements are processed, even ones from non-primary files. Thus, only
+    // one of those jobs needs to emit the file, and we can get it to write
+    // straight to the desired final location.
+    if (C.getArgs().hasArg(options::OPT_emit_loaded_module_trace,
+                           options::OPT_emit_loaded_module_trace_path) &&
+        C.requestPermissionForFrontendToEmitLoadedModuleTrace()) {
+      // By treating this as a top-level output, the return value always exists.
+      auto filename = getOutputFilenameFromPathArgOrAsTopLevel(
+          OI, C.getArgs(), options::OPT_emit_loaded_module_trace_path,
+          types::TY_ModuleTrace,
+          /*TreatAsTopLevelOutput=*/true, "trace.json", Buf);
+
+      Output->setAdditionalOutputForType(types::TY_ModuleTrace, *filename);
     }
   }
 
