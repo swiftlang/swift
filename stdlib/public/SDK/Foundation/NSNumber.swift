@@ -434,15 +434,9 @@ extension Float : _ObjectiveCBridgeable {
     }
 
     public init?(exactly number: NSNumber) {
-        let value = number.doubleValue
-        if value.isNaN {
-            self = Float.nan
-        } else if value.isInfinite {
-            self = value.sign == .plus ? Float.infinity : -Float.infinity
-        } else {
-            guard Double(-Float.greatestFiniteMagnitude) <= value || value <= Double(Float.greatestFiniteMagnitude) else { return nil }
-            self = Float(value)
-        }
+        guard let value = Double(exactly: number) else { return nil }
+        guard let result = Float(exactly: value) else { return nil }
+        self = result
     }
 
     @_semantics("convertToObjectiveC")
