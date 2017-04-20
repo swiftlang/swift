@@ -461,6 +461,21 @@ public:
         getSILDebugLocation(Loc), text.toStringRef(Out), encoding, F));
   }
 
+  ConstStringLiteralInst *
+  createConstStringLiteral(SILLocation Loc, StringRef text,
+                           ConstStringLiteralInst::Encoding encoding) {
+    return insert(ConstStringLiteralInst::create(getSILDebugLocation(Loc), text,
+                                                 encoding, F));
+  }
+
+  ConstStringLiteralInst *
+  createConstStringLiteral(SILLocation Loc, const Twine &text,
+                           ConstStringLiteralInst::Encoding encoding) {
+    SmallVector<char, 256> Out;
+    return insert(ConstStringLiteralInst::create(
+        getSILDebugLocation(Loc), text.toStringRef(Out), encoding, F));
+  }
+
   LoadInst *createLoad(SILLocation Loc, SILValue LV,
                        LoadOwnershipQualifier Qualifier) {
     assert((Qualifier != LoadOwnershipQualifier::Unqualified) ||

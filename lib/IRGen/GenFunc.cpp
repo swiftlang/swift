@@ -679,6 +679,24 @@ static void emitApplyArgument(IRGenFunction &IGF,
                         silConv.getSILType(substParam), in, out);
 }
 
+static CanType getArgumentLoweringType(CanType type,
+                                       SILParameterInfo paramInfo) {
+  switch (paramInfo.getConvention()) {
+  // Capture value parameters by value, consuming them.
+  case ParameterConvention::Direct_Owned:
+  case ParameterConvention::Direct_Unowned:
+  case ParameterConvention::Direct_Guaranteed:
+  case ParameterConvention::Indirect_In:
+  case ParameterConvention::Indirect_In_Guaranteed:
+    return type;
+
+  // Capture inout parameters by pointer.
+  case ParameterConvention::Indirect_Inout:
+  case ParameterConvention::Indirect_InoutAliasable:
+    return CanInOutType::get(type);
+  }
+}
+
 /// Emit the forwarding stub function for a partial application.
 ///
 /// If 'layout' is null, there is a single captured value of
@@ -1042,6 +1060,20 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
       }
       
       // Reemit the capture params as unsubstituted.
+
+      // Skip empty parameters.
+      while (origParamI < origType->getParameters().size()) {
+        auto param = substType->getParameters()[origParamI];
+        SILType argType = IGM.silConv.getSILType(param);
+        auto argLoweringTy =
+            getArgumentLoweringType(argType.getSwiftRValueType(), param);
+        auto &ti = subIGF.getTypeInfoForLowered(argLoweringTy);
+        // Empty values don't matter.
+        if (ti.getSchema().size() != 0 || param.isFormalIndirect())
+          break;
+        origParamI++;
+      }
+
       if (origParamI < origType->getParameters().size()) {
         Explosion origParam;
         auto origParamInfo = origType->getParameters()[origParamI];
@@ -1250,27 +1282,18 @@ void irgen::emitFunctionPartialApplication(IRGenFunction &IGF,
   for (auto param : params) {
     SILType argType = IGF.IGM.silConv.getSILType(param);
 
+    auto argLoweringTy =
+        getArgumentLoweringType(argType.getSwiftRValueType(), param);
+
+    auto &ti = IGF.getTypeInfoForLowered(argLoweringTy);
+
+    // Empty values don't matter.
+    auto schema = ti.getSchema();
+    if (schema.size() == 0 && !param.isFormalIndirect())
+      continue;
+
     argValTypes.push_back(argType);
     argConventions.push_back(param.getConvention());
-    
-    auto argLoweringTy = argType.getSwiftRValueType();
-    switch (param.getConvention()) {
-    // Capture value parameters by value, consuming them.
-    case ParameterConvention::Direct_Owned:
-    case ParameterConvention::Direct_Unowned:
-    case ParameterConvention::Direct_Guaranteed:
-    case ParameterConvention::Indirect_In:
-    case ParameterConvention::Indirect_In_Guaranteed:
-      break;
-      
-    // Capture inout parameters by pointer.
-    case ParameterConvention::Indirect_Inout:
-    case ParameterConvention::Indirect_InoutAliasable:
-      argLoweringTy = CanInOutType::get(argLoweringTy);
-      break;
-    }
-    
-    auto &ti = IGF.getTypeInfoForLowered(argLoweringTy);
     argTypeInfos.push_back(&ti);
 
     // Update the single-swift-refcounted check, unless we already ruled that
@@ -1278,10 +1301,6 @@ void irgen::emitFunctionPartialApplication(IRGenFunction &IGF,
     if (hasSingleSwiftRefcountedContext == No)
       continue;
     
-    // Empty values don't matter.
-    auto schema = ti.getSchema();
-    if (schema.size() == 0)
-      continue;
     
     // Adding nonempty values when we already have a single refcounted pointer
     // means we don't have a single value anymore.

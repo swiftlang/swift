@@ -225,6 +225,44 @@ func testP4(_ s4a: S4a, s4b: S4b, s4c: S4c, s4d: S4d) {
   _ = b1
 }
 
+
+// ----------------------------------------------------------------------------
+// Protocol extensions with a superclass constraint on Self
+// ----------------------------------------------------------------------------
+
+protocol ConformedProtocol {
+  typealias ConcreteConformanceAlias = Self
+}
+
+class BaseWithAlias<T> : ConformedProtocol {
+  typealias ConcreteAlias = T
+
+  func baseMethod(_: T) {}
+}
+
+class DerivedWithAlias : BaseWithAlias<Int> {}
+
+protocol ExtendedProtocol {
+  typealias AbstractConformanceAlias = Self
+}
+
+extension ExtendedProtocol where Self : DerivedWithAlias {
+  func f0(x: T) {} // expected-error {{use of undeclared type 'T'}}
+
+  func f1(x: ConcreteAlias) {
+    let _: Int = x
+    baseMethod(x)
+  }
+
+  func f2(x: ConcreteConformanceAlias) {
+    let _: DerivedWithAlias = x
+  }
+
+  func f3(x: AbstractConformanceAlias) {
+    let _: DerivedWithAlias = x
+  }
+}
+
 // ----------------------------------------------------------------------------
 // Using protocol extensions to satisfy requirements
 // ----------------------------------------------------------------------------

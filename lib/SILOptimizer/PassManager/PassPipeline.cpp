@@ -77,12 +77,16 @@ static void addMandatoryOptPipeline(SILPassPipelinePlan &P,
   if (Options.EnableMandatorySemanticARCOpts) {
     P.addSemanticARCOpts();
   }
+  P.addDiagnoseStaticExclusivity();
   P.addCapturePromotion();
   P.addAllocBoxToStack();
-
-  P.addOwnershipModelEliminator();
   P.addNoReturnFolding();
+  P.addOwnershipModelEliminator();
+  P.addMarkUninitializedFixup();
   P.addDefiniteInitialization();
+
+  P.addAccessEnforcementSelection();
+  P.addAccessMarkerElimination();
 
   P.addMandatoryInlining();
   P.addPredictableMemoryOptimizations();
@@ -530,7 +534,7 @@ void SILPassPipelinePlan::addPasses(ArrayRef<PassKind> PassKinds) {
     // updated.
     switch (K) {
 // Each pass gets its own add-function.
-#define PASS(ID, NAME, DESCRIPTION)                                            \
+#define PASS(ID, TAG, NAME)                                                    \
   case PassKind::ID: {                                                         \
     add##ID();                                                                 \
     break;                                                                     \
@@ -571,7 +575,7 @@ void SILPassPipelinePlan::print(llvm::raw_ostream &os) {
                os << "        \"" << Pipeline.Name << "\"";
                for (PassKind Kind : getPipelinePasses(Pipeline)) {
                  os << ",\n        [\"" << PassKindID(Kind) << "\","
-                    << PassKindName(Kind) << ']';
+                    << PassKindTag(Kind) << ']';
                }
              },
              [&] { os << "\n    ],\n"; });

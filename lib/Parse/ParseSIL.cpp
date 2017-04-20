@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/ASTWalker.h"
+#include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/ProtocolConformance.h"
@@ -1439,21 +1440,23 @@ bool SILParser::parseSubstitutions(SmallVectorImpl<ParsedSubstitution> &parsed,
 /// Collect conformances by looking up the conformance from replacement
 /// type and protocol decl.
 static bool getConformancesForSubstitution(Parser &P,
-              ArrayRef<ProtocolDecl *> protocols,
+              ArrayRef<ProtocolType *> protocols,
               Type subReplacement,
               SourceLoc loc,
               SmallVectorImpl<ProtocolConformanceRef> &conformances) {
   auto M = P.SF.getParentModule();
 
-  for (auto proto : protocols) {
-    auto conformance = M->lookupConformance(subReplacement, proto, nullptr);
+  for (auto protoTy : protocols) {
+    auto conformance = M->lookupConformance(subReplacement,
+                                            protoTy->getDecl(),
+                                            nullptr);
     if (conformance) {
       conformances.push_back(*conformance);
       continue;
     }
 
     P.diagnose(loc, diag::sil_substitution_mismatch, subReplacement,
-               proto->getName());
+               protoTy);
     return true;
   }
 
@@ -1487,11 +1490,9 @@ bool getApplySubstitutionsFromParsed(
       parses = parses.slice(1);
 
       SmallVector<ProtocolConformanceRef, 2> conformances;
-      SmallVector<ProtocolDecl *, 2> protocols;
-      for (auto reqt : reqts) {
-        protocols.push_back(reqt.getSecondType()
-                            ->castTo<ProtocolType>()->getDecl());
-      }
+      SmallVector<ProtocolType *, 2> protocols;
+      for (auto reqt : reqts)
+        protocols.push_back(reqt.getSecondType()->castTo<ProtocolType>());
 
       if (getConformancesForSubstitution(SP.P, protocols,
                                          parsed.replacement,
@@ -1517,8 +1518,18 @@ bool getApplySubstitutionsFromParsed(
 static ArrayRef<ProtocolConformanceRef>
 collectExistentialConformances(Parser &P, CanType conformingType, SourceLoc loc,
                                CanType protocolType) {
-  SmallVector<ProtocolDecl *, 2> protocols;
-  protocolType.getExistentialTypeProtocols(protocols);
+  auto layout = protocolType.getExistentialLayout();
+
+  if (layout.requiresClass) {
+    if (!conformingType->mayHaveSuperclass() &&
+        !conformingType->isObjCExistentialType()) {
+      P.diagnose(loc, diag::sil_not_class, conformingType);
+    }
+  }
+
+  // FIXME: Check superclass also.
+
+  auto protocols = layout.getProtocols();
   if (protocols.empty())
     return {};
 
@@ -1912,7 +1923,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB, SILBuilder &B) {
       P.diagnose(P.Tok, diag::expected_tok_in_sil_instr, "string");
       return true;
     }
-   
+
     // Drop the double quotes.
     StringRef rawString = P.Tok.getText().drop_front().drop_back();
 
@@ -1923,6 +1934,41 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB, SILBuilder &B) {
     if (parseSILDebugLocation(InstLoc, B))
       return true;
     ResultVal = B.createStringLiteral(InstLoc, string, encoding);
+    break;
+  }
+
+  case ValueKind::ConstStringLiteralInst: {
+    if (P.Tok.getKind() != tok::identifier) {
+      P.diagnose(P.Tok, diag::sil_string_no_encoding);
+      return true;
+    }
+
+    ConstStringLiteralInst::Encoding encoding;
+    if (P.Tok.getText() == "utf8") {
+      encoding = ConstStringLiteralInst::Encoding::UTF8;
+    } else if (P.Tok.getText() == "utf16") {
+      encoding = ConstStringLiteralInst::Encoding::UTF16;
+    } else {
+      P.diagnose(P.Tok, diag::sil_string_invalid_encoding, P.Tok.getText());
+      return true;
+    }
+    P.consumeToken(tok::identifier);
+
+    if (P.Tok.getKind() != tok::string_literal) {
+      P.diagnose(P.Tok, diag::expected_tok_in_sil_instr, "string");
+      return true;
+    }
+
+    // Drop the double quotes.
+    StringRef rawString = P.Tok.getText().drop_front().drop_back();
+
+    // Ask the lexer to interpret the entire string as a literal segment.
+    SmallVector<char, 128> stringBuffer;
+    StringRef string = P.L->getEncodedStringSegment(rawString, stringBuffer);
+    P.consumeToken(tok::string_literal);
+    if (parseSILDebugLocation(InstLoc, B))
+      return true;
+    ResultVal = B.createConstStringLiteral(InstLoc, string, encoding);
     break;
   }
 

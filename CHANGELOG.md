@@ -51,14 +51,14 @@ Swift 4.0
   `UnsafeRawBufferPointer`'s slice type no longer has a nonmutating subscript
   setter. So assigning into a mutable `let` buffer no longer compiles:
 
-  ```
+  ```swift
   let slice = buffer[n..<m]
   slice[i..<j] = buffer[k..<l]
   ```
 
   The assigned buffer slice now needs to be a `var`.
 
-  ```
+  ```swift
   var slice = buffer[n..<m]
   slice[i..<j] = buffer[k..<l]
   ```
@@ -88,7 +88,8 @@ Swift 4.0
 
     // 'where' becomes a superclass
     override func sleep(where: Bed) {}
-  }```
+  }
+  ```
 
 * [SE-0148][]:
 
@@ -6510,3 +6511,17 @@ Swift 1.0
 [SE-0153]: <https://github.com/apple/swift-evolution/blob/master/proposals/0153-compensate-for-the-inconsistency-of-nscopyings-behaviour.md>
 [SE-0154]: <https://github.com/apple/swift-evolution/blob/master/proposals/0154-dictionary-key-and-value-collections.md>
 [SE-0155]: <https://github.com/apple/swift-evolution/blob/master/proposals/0155-normalize-enum-case-representation.md>
+[SE-0156]: <https://github.com/apple/swift-evolution/blob/master/proposals/0156-subclass-existentials.md>
+[SE-0157]: <https://github.com/apple/swift-evolution/blob/master/proposals/0157-recursive-protocol-constraints.md>
+[SE-0158]: <https://github.com/apple/swift-evolution/blob/master/proposals/0158-package-manager-manifest-api-redesign.md>
+[SE-0159]: <https://github.com/apple/swift-evolution/blob/master/proposals/0159-fix-private-access-levels.md>
+[SE-0160]: <https://github.com/apple/swift-evolution/blob/master/proposals/0160-objc-inference.md>
+[SE-0161]: <https://github.com/apple/swift-evolution/blob/master/proposals/0161-key-paths.md>
+[SE-0162]: <https://github.com/apple/swift-evolution/blob/master/proposals/0162-package-manager-custom-target-layouts.md>
+[SE-0163]: <https://github.com/apple/swift-evolution/blob/master/proposals/0163-string-revision-1.md>
+[SE-0164]: <https://github.com/apple/swift-evolution/blob/master/proposals/0164-remove-final-support-in-protocol-extensions.md>
+[SE-0165]: <https://github.com/apple/swift-evolution/blob/master/proposals/0165-dict.md>
+[SE-0166]: <https://github.com/apple/swift-evolution/blob/master/proposals/0166-swift-archival-serialization.md>
+[SE-0167]: <https://github.com/apple/swift-evolution/blob/master/proposals/0167-swift-encoders.md>
+[SE-0168]: <https://github.com/apple/swift-evolution/blob/master/proposals/0168-multi-line-string-literals.md>
+[SE-0169]: <https://github.com/apple/swift-evolution/blob/master/proposals/0169-improve-interaction-between-private-declarations-and-extensions.md>

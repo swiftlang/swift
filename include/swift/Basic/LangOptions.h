@@ -158,9 +158,15 @@ namespace swift {
 
     unsigned SolverBindingThreshold = 1024 * 1024;
 
+    /// The maximum depth to which to test decl circularity.
+    unsigned MaxCircularityDepth = 500;
+
     /// \brief Perform all dynamic allocations using malloc/free instead of
     /// optimized custom allocator, so that memory debugging tools can be used.
     bool UseMalloc = false;
+
+    /// \brief Enable classes to appear in protocol composition types.
+    bool EnableExperimentalSubclassExistentials = false;
 
     /// \brief Enable experimental property behavior feature.
     bool EnableExperimentalPropertyBehaviors = false;
@@ -177,6 +183,12 @@ namespace swift {
     /// Should we check the target OSs of serialized modules to see that they're
     /// new enough?
     bool EnableTargetOSChecking = true;
+
+    /// Whether to attempt to recover from missing cross-references and other
+    /// errors when deserializing from a Swift module.
+    ///
+    /// This is a staging flag; eventually it will be on by default.
+    bool EnableDeserializationRecovery = false;
 
     /// Should we use \c ASTScope-based resolution for unqualified name lookup?
     bool EnableASTScopeLookup = false;

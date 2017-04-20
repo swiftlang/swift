@@ -265,7 +265,7 @@ diagnoseMissingCases(ASTContext &Context, const SwitchStmt *SwitchS) {
     return;
   }
 
-  printEnumElmentsAsCases(UnhandledElements, OS);
+  printEnumElementsAsCases(UnhandledElements, OS);
   Context.Diags.diagnose(StartLoc, Empty ? diag::empty_switch_stmt :
     diag::non_exhaustive_switch, InEditor, false).fixItInsert(EndLoc,
                                                               Buffer.str());

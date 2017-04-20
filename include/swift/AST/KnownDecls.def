@@ -74,4 +74,6 @@ FUNC_DECL(ProjectKeyPathReadOnly, "_projectKeyPathReadOnly")
 FUNC_DECL(ProjectKeyPathWritable, "_projectKeyPathWritable")
 FUNC_DECL(ProjectKeyPathReferenceWritable, "_projectKeyPathReferenceWritable")
 
+FUNC_DECL(Swap, "swap")
+
 #undef FUNC_DECL

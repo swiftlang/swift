@@ -896,6 +896,11 @@ public:
     return getType().castTo<SILBoxType>();
   }
 
+  // Return the type of the memory stored in the alloc_box.
+  SILType getAddressType() const {
+    return getBoxType()->getFieldType(getModule(), 0).getAddressType();
+  }
+
   /// Return the underlying variable declaration associated with this
   /// allocation, or null if this is a temporary allocation.
   VarDecl *getDecl() const;
@@ -1963,6 +1968,51 @@ public:
   }
 };
 
+/// ConstStringLiteralInst - Encapsulates a string constant, as defined
+/// originally by
+/// a StringLiteralExpr.  This produces the address of the string data as a
+/// Builtin.RawPointer.
+class ConstStringLiteralInst final
+    : public LiteralInst,
+      private llvm::TrailingObjects<ConstStringLiteralInst, char> {
+  friend TrailingObjects;
+  friend SILBuilder;
+
+public:
+  enum class Encoding {
+    UTF8,
+    UTF16,
+  };
+
+private:
+  unsigned Length;
+  Encoding TheEncoding;
+
+  ConstStringLiteralInst(SILDebugLocation DebugLoc, StringRef text,
+                         Encoding encoding, SILType ty);
+
+  static ConstStringLiteralInst *create(SILDebugLocation DebugLoc,
+                                        StringRef Text, Encoding encoding,
+                                        SILFunction &F);
+
+public:
+  /// getValue - Return the string data for the literal, in UTF-8.
+  StringRef getValue() const { return {getTrailingObjects<char>(), Length}; }
+
+  /// getEncoding - Return the desired encoding of the text.
+  Encoding getEncoding() const { return TheEncoding; }
+
+  /// getCodeUnitCount - Return encoding-based length of the string
+  /// literal in code units.
+  uint64_t getCodeUnitCount();
+
+  ArrayRef<Operand> getAllOperands() const { return {}; }
+  MutableArrayRef<Operand> getAllOperands() { return {}; }
+
+  static bool classof(const ValueBase *V) {
+    return V->getKind() == ValueKind::ConstStringLiteralInst;
+  }
+};
 //===----------------------------------------------------------------------===//
 // Memory instructions.
 //===----------------------------------------------------------------------===//
@@ -2215,6 +2265,17 @@ public:
   SILValue getSource() const {
     return getOperand();
   }
+
+private:
+    /// Predicate used to filter EndAccessRange.
+  struct UseToEndAccess;
+
+public:
+  using EndAccessRange =
+    OptionalTransformRange<use_range, UseToEndAccess, use_iterator>;
+
+  /// Find all the associated end_access instructions for this begin_access.
+  EndAccessRange getEndAccesses() const;
 };
 
 /// Represents the end of an access scope.
@@ -2251,6 +2312,20 @@ public:
     return getBeginAccess()->getSource();
   }
 };
+
+struct BeginAccessInst::UseToEndAccess {
+  Optional<EndAccessInst *> operator()(Operand *use) const {
+    if (auto access = dyn_cast<EndAccessInst>(use->getUser())) {
+      return access;
+    } else {
+      return None;
+    }
+  }
+};
+
+inline auto BeginAccessInst::getEndAccesses() const -> EndAccessRange {
+  return EndAccessRange(getUses(), UseToEndAccess());
+}
 
 /// AssignInst - Represents an abstract assignment to a memory location, which
 /// may either be an initialization or a store sequence.  This is only valid in

@@ -14,26 +14,29 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/Subsystems.h"
-#include "swift/AST/AccessScope.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTWalker.h"
+#include "swift/AST/AccessScope.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/Expr.h"
-#include "swift/AST/Module.h"
-#include "swift/AST/ParameterList.h"
-#include "swift/AST/Pattern.h"
-#include "swift/AST/Stmt.h"
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Initializer.h"
+#include "swift/AST/Module.h"
+#include "swift/AST/ParameterList.h"
+#include "swift/AST/Pattern.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/ProtocolConformance.h"
+#include "swift/AST/Stmt.h"
 #include "swift/Basic/SourceManager.h"
+#include "swift/Subsystems.h"
 #include "llvm/ADT/SmallBitVector.h"
 #include "llvm/ADT/SmallString.h"
+#include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
 #include <functional>
+#include <type_traits>
 using namespace swift;
 
 namespace {
@@ -71,69 +74,147 @@ struct ASTNodeBase {};
     };
 #include "swift/AST/PatternNodes.def"
 
-  class Verifier : public ASTWalker {
-    PointerUnion<ModuleDecl *, SourceFile *> M;
-    ASTContext &Ctx;
-    llvm::raw_ostream &Out;
-    const bool HadError;
-    SmallVector<bool, 8> InImplicitBraceStmt;
+template <typename Ty>
+struct is_apply_expr
+    : public std::integral_constant<
+          bool,
+          std::is_same<Ty, CallExpr>::value ||
+              std::is_same<Ty, PrefixUnaryExpr>::value ||
+              std::is_same<Ty, PostfixUnaryExpr>::value ||
+              std::is_same<Ty, BinaryExpr>::value ||
+              std::is_same<Ty, DotSyntaxCallExpr>::value ||
+              std::is_same<Ty, ConstructorRefCallExpr>::value> {};
 
-    /// \brief The stack of functions we're visiting.
-    SmallVector<DeclContext *, 4> Functions;
+template <typename Ty>
+struct is_autoclosure_expr
+    : public std::integral_constant<bool,
+                                    std::is_same<Ty, AutoClosureExpr>::value> {
+};
 
-    /// \brief The stack of scopes we're visiting.
-    using ScopeLike = llvm::PointerUnion<DeclContext *, BraceStmt *>;
-    SmallVector<ScopeLike, 4> Scopes;
+template <typename Ty>
+struct is_apply_or_autoclosure_expr
+    : public std::integral_constant<
+          bool, is_apply_expr<Ty>::value || is_autoclosure_expr<Ty>::value> {};
 
-    /// The set of primary archetypes that are currently available.
-    SmallVector<GenericEnvironment *, 2> GenericEnv;
+template <typename Verifier, typename Kind>
+std::pair<bool, Expr *> dispatchVisitPreExprHelper(
+    Verifier &V,
+    typename std::enable_if<
+        is_apply_expr<typename std::remove_pointer<Kind>::type>::value,
+        Kind>::type node) {
+  if (V.shouldVerify(node)) {
+    // Whitelist any inout_to_pointer or array_to_pointer that we see in
+    // the proper position.
+    V.updateExprToPointerWhitelist(node, node->getArg());
+    return {true, node};
+  }
+  V.cleanup(node);
+  return {false, node};
+}
 
-    /// \brief The stack of optional evaluations active at this point.
-    SmallVector<OptionalEvaluationExpr *, 4> OptionalEvaluations;
+template <typename Verifier, typename Kind>
+std::pair<bool, Expr *> dispatchVisitPreExprHelper(
+    Verifier &V,
+    typename std::enable_if<
+        is_autoclosure_expr<typename std::remove_pointer<Kind>::type>::value,
+        Kind>::type node) {
+  if (V.shouldVerify(node)) {
+    // Whitelist any inout_to_pointer or array_to_pointer that we see in
+    // the proper position.
+    V.updateExprToPointerWhitelist(node, node->getSingleExpressionBody());
+    return {true, node};
+  }
+  V.cleanup(node);
+  return {false, node};
+}
 
-    /// \brief The set of opaque value expressions active at this point.
-    llvm::DenseMap<OpaqueValueExpr *, unsigned> OpaqueValues;
+template <typename Verifier, typename Kind>
+std::pair<bool, Expr *> dispatchVisitPreExprHelper(
+    Verifier &V, typename std::enable_if<
+                     !is_apply_or_autoclosure_expr<
+                         typename std::remove_pointer<Kind>::type>::value,
+                     Kind>::type node) {
+  if (V.shouldVerify(node)) {
+    return {true, node};
+  }
+  V.cleanup(node);
+  return {false, node};
+}
 
-    /// The set of opened existential archetypes that are currently
-    /// active.
-    llvm::DenseSet<ArchetypeType *> OpenedExistentialArchetypes;
+class Verifier : public ASTWalker {
+  PointerUnion<ModuleDecl *, SourceFile *> M;
+  ASTContext &Ctx;
+  llvm::raw_ostream &Out;
+  const bool HadError;
+  SmallVector<bool, 8> InImplicitBraceStmt;
 
-    /// A key into ClosureDiscriminators is a combination of a
-    /// ("canonicalized") local DeclContext* and a flag for whether to
-    /// use the explicit closure sequence (false) or the implicit
-    /// closure sequence (true).
-    typedef llvm::PointerIntPair<DeclContext*,1,bool> ClosureDiscriminatorKey;
-    llvm::DenseMap<ClosureDiscriminatorKey,
-                   llvm::SmallBitVector> ClosureDiscriminators;
-    DeclContext *CanonicalTopLevelContext = nullptr;
+  /// \brief The stack of functions we're visiting.
+  SmallVector<DeclContext *, 4> Functions;
 
-    Verifier(PointerUnion<ModuleDecl *, SourceFile *> M, DeclContext *DC)
+  /// \brief The stack of scopes we're visiting.
+  using ScopeLike = llvm::PointerUnion<DeclContext *, BraceStmt *>;
+  SmallVector<ScopeLike, 4> Scopes;
+
+  /// The set of primary archetypes that are currently available.
+  SmallVector<GenericEnvironment *, 2> GenericEnv;
+
+  /// \brief The stack of optional evaluations active at this point.
+  SmallVector<OptionalEvaluationExpr *, 4> OptionalEvaluations;
+
+  /// \brief The set of opaque value expressions active at this point.
+  llvm::DenseMap<OpaqueValueExpr *, unsigned> OpaqueValues;
+
+  /// The set of opened existential archetypes that are currently
+  /// active.
+  llvm::DenseSet<ArchetypeType *> OpenedExistentialArchetypes;
+
+  /// The set of inout to pointer expr that match the following pattern:
+  ///
+  /// (call-expr
+  ///    (brace-stmt
+  ///      ... maybe other arguments ...
+  ///      (inject_into_optional
+  ///        (inout_to_pointer ...))
+  ///      ... maybe other arguments ...))
+  ///
+  /// Any other inout to pointer expr that we see is invalid and the verifier
+  /// will assert.
+  llvm::DenseSet<InOutToPointerExpr *> WhitelistedInOutToPointerExpr;
+  llvm::DenseSet<ArrayToPointerExpr *> WhitelistedArrayToPointerExpr;
+
+  /// A key into ClosureDiscriminators is a combination of a
+  /// ("canonicalized") local DeclContext* and a flag for whether to
+  /// use the explicit closure sequence (false) or the implicit
+  /// closure sequence (true).
+  typedef llvm::PointerIntPair<DeclContext *, 1, bool> ClosureDiscriminatorKey;
+  llvm::DenseMap<ClosureDiscriminatorKey, llvm::SmallBitVector>
+      ClosureDiscriminators;
+  DeclContext *CanonicalTopLevelContext = nullptr;
+
+  Verifier(PointerUnion<ModuleDecl *, SourceFile *> M, DeclContext *DC)
       : M(M),
         Ctx(M.is<ModuleDecl *>() ? M.get<ModuleDecl *>()->getASTContext()
-                             : M.get<SourceFile *>()->getASTContext()),
-        Out(llvm::errs()),
-        HadError(Ctx.hadError())
-    {
-      Scopes.push_back(DC);
-      GenericEnv.push_back(DC->getGenericEnvironmentOfContext());
-    }
+                                 : M.get<SourceFile *>()->getASTContext()),
+        Out(llvm::errs()), HadError(Ctx.hadError()) {
+    Scopes.push_back(DC);
+    GenericEnv.push_back(DC->getGenericEnvironmentOfContext());
+  }
 
-  public:
-    Verifier(ModuleDecl *M, DeclContext *DC)
-      : Verifier(PointerUnion<ModuleDecl *, SourceFile *>(M), DC) { }
-    Verifier(SourceFile &SF, DeclContext *DC)
-      : Verifier(&SF, DC) { }
+public:
+  Verifier(ModuleDecl *M, DeclContext *DC)
+      : Verifier(PointerUnion<ModuleDecl *, SourceFile *>(M), DC) {}
+  Verifier(SourceFile &SF, DeclContext *DC) : Verifier(&SF, DC) {}
 
-    static Verifier forDecl(const Decl *D) {
-      DeclContext *DC = D->getDeclContext();
-      DeclContext *topDC = DC->getModuleScopeContext();
-      if (auto SF = dyn_cast<SourceFile>(topDC))
-        return Verifier(*SF, DC);
-      return Verifier(topDC->getParentModule(), DC);
-    }
+  static Verifier forDecl(const Decl *D) {
+    DeclContext *DC = D->getDeclContext();
+    DeclContext *topDC = DC->getModuleScopeContext();
+    if (auto SF = dyn_cast<SourceFile>(topDC))
+      return Verifier(*SF, DC);
+    return Verifier(topDC->getParentModule(), DC);
+  }
 
-    std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
-      switch (E->getKind()) {
+  std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+    switch (E->getKind()) {
 #define DISPATCH(ID) return dispatchVisitPreExpr(static_cast<ID##Expr*>(E))
 #define EXPR(ID, PARENT) \
       case ExprKind::ID: \
@@ -243,7 +324,6 @@ struct ASTNodeBase {};
       llvm_unreachable("Unhandled declaration kind");
     }
 
-  private:
     /// Helper template for dispatching pre-visitation.
     /// If we're visiting in pre-order, don't validate the node yet;
     /// just check whether we should stop further descent.
@@ -255,13 +335,11 @@ struct ASTNodeBase {};
     }
 
     /// Helper template for dispatching pre-visitation.
+    ///
     /// If we're visiting in pre-order, don't validate the node yet;
     /// just check whether we should stop further descent.
     template <class T> std::pair<bool, Expr *> dispatchVisitPreExpr(T node) {
-      if (shouldVerify(node))
-        return { true, node };
-      cleanup(node);
-      return { false, node };
+      return dispatchVisitPreExprHelper<Verifier, T>(*this, node);
     }
 
     /// Helper template for dispatching pre-visitation.
@@ -991,8 +1069,7 @@ struct ASTNodeBase {};
         abort();
       }
       
-      if (!E->getType()->isEqual(
-             Ctx.getProtocol(KnownProtocolKind::AnyObject)->getDeclaredType())){
+      if (!E->getType()->isEqual(Ctx.getAnyObjectType())) {
         Out << "ClassMetatypeToObject does not produce AnyObject:\n";
         E->print(Out);
         Out << "\n";
@@ -1022,8 +1099,7 @@ struct ASTNodeBase {};
         abort();
       }
       
-      if (!E->getType()->isEqual(
-             Ctx.getProtocol(KnownProtocolKind::AnyObject)->getDeclaredType())){
+      if (!E->getType()->isEqual(Ctx.getAnyObjectType())) {
         Out << "ExistentialMetatypeToObject does not produce AnyObject:\n";
         E->print(Out);
         Out << "\n";
@@ -1052,11 +1128,10 @@ struct ASTNodeBase {};
         abort();
       }
 
-      SmallVector<ProtocolDecl*, 1> protocols;
-      srcTy->getExistentialTypeProtocols(protocols);
-
-      if (protocols.size() != 1
-          || !protocols[0]->isObjC()) {
+      auto layout = srcTy->getExistentialLayout();
+      if (layout.superclass ||
+          !layout.isObjC() ||
+          layout.getProtocols().size() != 1) {
         Out << "ProtocolMetatypeToObject with non-ObjC-protocol metatype:\n";
         E->print(Out);
         Out << "\n";
@@ -1089,7 +1164,14 @@ struct ASTNodeBase {};
     void verifyChecked(InOutToPointerExpr *E) {
       PrettyStackTraceExpr debugStack(Ctx,
                                       "verifying InOutToPointer", E);
-      
+
+      if (!WhitelistedInOutToPointerExpr.count(E)) {
+        Out << "Unwhitelisted InOutToPointerExpr?!\n";
+        E->print(Out);
+        Out << "\n";
+        abort();
+      }
+
       auto fromElement = E->getSubExpr()->getType()->getInOutObjectType();
       auto toElement = E->getType()->getAnyPointerElementType();
       
@@ -1115,6 +1197,13 @@ struct ASTNodeBase {};
     void verifyChecked(ArrayToPointerExpr *E) {
       PrettyStackTraceExpr debugStack(Ctx,
                                       "verifying ArrayToPointer", E);
+
+      if (!WhitelistedArrayToPointerExpr.count(E)) {
+        Out << "ArrayToPointer in invalid position?!\n";
+        E->print(Out);
+        Out << "\n";
+        abort();
+      }
 
       // The source may be optionally inout.
       auto fromArray = E->getSubExpr()->getType()->getInOutObjectType();
@@ -1247,6 +1336,48 @@ struct ASTNodeBase {};
       checkSameType(resultType, tupleType->getElementType(E->getFieldNumber()),
                     "TupleElementExpr and the corresponding tuple element");
       verifyCheckedBase(E);
+    }
+
+    void updateExprToPointerWhitelist(Expr *Base, Expr *Arg) {
+      auto handleSubExpr = [&](Expr *SubExpr) {
+        // if we have an inject into optional, strip it off.
+        if (auto *InjectIntoOpt = dyn_cast<InjectIntoOptionalExpr>(SubExpr)) {
+          SubExpr = InjectIntoOpt->getSubExpr();
+        }
+
+        if (auto *InOutToPtr = dyn_cast<InOutToPointerExpr>(SubExpr)) {
+          WhitelistedInOutToPointerExpr.insert(InOutToPtr);
+          return;
+        }
+
+        if (auto *ArrayToPtr = dyn_cast<ArrayToPointerExpr>(SubExpr)) {
+          WhitelistedArrayToPointerExpr.insert(ArrayToPtr);
+        }
+      };
+
+      // If we have a tuple_shuffle, strip it off. We want to visit the
+      // underlying paren or tuple expr.
+      if (auto *TupleShuffle = dyn_cast<TupleShuffleExpr>(Arg)) {
+        Arg = TupleShuffle->getSubExpr();
+      }
+
+      if (auto *ParentExprArg = dyn_cast<ParenExpr>(Arg)) {
+        return handleSubExpr(ParentExprArg->getSubExpr());
+      }
+
+      if (auto *TupleArg = dyn_cast<TupleExpr>(Arg)) {
+        for (auto *SubExpr : TupleArg->getElements()) {
+          handleSubExpr(SubExpr);
+        }
+        return;
+      }
+
+      // Otherwise, just run it through handle sub expr. This case can happen if
+      // we have an autoclosure.
+      if (isa<AutoClosureExpr>(Base)) {
+        handleSubExpr(Arg);
+        return;
+      }
     }
 
     void verifyChecked(ApplyExpr *E) {
@@ -1909,9 +2040,12 @@ struct ASTNodeBase {};
       SmallVector<Type, 4> protocolTypes;
       for (auto proto : protocols)
         protocolTypes.push_back(proto->getDeclaredType());
+      auto type = ProtocolCompositionType::get(Ctx, protocolTypes,
+                                               /*hasExplicitAnyObject=*/false);
+      auto layout = type->getExistentialLayout();
       SmallVector<ProtocolDecl *, 4> canonicalProtocols;
-      ProtocolCompositionType::get(Ctx, protocolTypes)
-        ->getExistentialTypeProtocols(canonicalProtocols);
+      for (auto *protoTy : layout.getProtocols())
+        canonicalProtocols.push_back(protoTy->getDecl());
       if (nominalProtocols != canonicalProtocols) {
         dumpRef(decl);
         Out << " doesn't have a complete set of protocols\n";
@@ -2122,6 +2256,7 @@ struct ASTNodeBase {};
       verifyGenericEnvironment(generic,
                                generic->getGenericSignature(),
                                generic->getGenericEnvironment());
+      verifyCheckedBase(generic);
     }
 
     void verifyChecked(NominalTypeDecl *nominal) {

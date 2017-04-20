@@ -734,7 +734,7 @@ static bool rangeContainsPlaceholderEnd(const char *CurPtr,
   return false;
 }
 
-syntax::RC<syntax::TokenSyntax> Lexer::fullLex() {
+RC<syntax::TokenSyntax> Lexer::fullLex() {
   if (NextToken.isEscapedIdentifier()) {
     LeadingTrivia.push_back(syntax::TriviaPiece::backtick());
     TrailingTrivia.push_front(syntax::TriviaPiece::backtick());
@@ -2066,8 +2066,7 @@ static SourceLoc getLocForStartOfTokenInBuf(SourceManager &SM,
                                             unsigned BufferID,
                                             unsigned Offset,
                                             unsigned BufferStart,
-                                            unsigned BufferEnd,
-                                            bool InInterpolatedString) {
+                                            unsigned BufferEnd) {
   // Use fake language options; language options only affect validity
   // and the exact token produced.
   LangOptions FakeLangOptions;
@@ -2092,7 +2091,6 @@ static SourceLoc getLocForStartOfTokenInBuf(SourceManager &SM,
       // Current token encompasses our source location.
 
       if (Tok.is(tok::string_literal)) {
-        assert(!InInterpolatedString);
         SmallVector<Lexer::StringSegment, 4> Segments;
         Lexer::getStringLiteralSegments(Tok, Segments, /*Diags=*/nullptr);
         for (auto &Seg : Segments) {
@@ -2105,8 +2103,7 @@ static SourceLoc getLocForStartOfTokenInBuf(SourceManager &SM,
           if (Seg.Kind == Lexer::StringSegment::Expr && Offset < SegEnd)
             return getLocForStartOfTokenInBuf(SM, BufferID, Offset,
                                               /*BufferStart=*/SegOffs,
-                                              /*BufferEnd=*/SegEnd,
-                                              /*InInterpolatedString=*/true);
+                                              /*BufferEnd=*/SegEnd);
         }
       }
 
@@ -2162,8 +2159,7 @@ SourceLoc Lexer::getLocForStartOfToken(SourceManager &SM, unsigned BufferID,
 
   return getLocForStartOfTokenInBuf(SM, BufferID, Offset,
                                     /*BufferStart=*/LexStart-BufStart,
-                                    /*BufferEnd=*/Buffer.size(),
-                                    /*InInterpolatedString=*/false);
+                                    /*BufferEnd=*/Buffer.size());
 }
 
 SourceLoc Lexer::getLocForStartOfLine(SourceManager &SM, SourceLoc Loc) {

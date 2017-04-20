@@ -389,19 +389,13 @@ ProtocolDescriptor ProtocolNoWitnessTable{
     .withDispatchStrategy(ProtocolDispatchStrategy::ObjC)
 };
 
-static const ExistentialTypeMetadata *test_getExistentialMetadata(
-                  std::initializer_list<const ProtocolDescriptor *> descriptors)
-{
-  std::vector<const ProtocolDescriptor *> mutDescriptors(descriptors);
-
-  return swift_getExistentialTypeMetadata(mutDescriptors.size(),
-                                          mutDescriptors.data());
-}
-
 TEST(MetadataTest, getExistentialMetadata) {
+  const ProtocolDescriptor *protoList1[] = {};
   RaceTest_ExpectEqual<const ExistentialTypeMetadata *>(
     [&]() -> const ExistentialTypeMetadata * {
-      auto any = test_getExistentialMetadata({});
+      auto any = swift_getExistentialTypeMetadata(ProtocolClassConstraint::Any,
+                                                  /*superclass=*/nullptr,
+                                                  0, protoList1);
       EXPECT_EQ(MetadataKind::Existential, any->getKind());
       EXPECT_EQ(0U, any->Flags.getNumWitnessTables());
       EXPECT_EQ(ProtocolClassConstraint::Any, any->Flags.getClassConstraint());
@@ -411,9 +405,14 @@ TEST(MetadataTest, getExistentialMetadata) {
       return any;
     });
 
+  const ProtocolDescriptor *protoList2[] = {
+    &ProtocolA
+  };
   auto exA = RaceTest_ExpectEqual<const ExistentialTypeMetadata *>(
     [&]() -> const ExistentialTypeMetadata * {
-      auto a = test_getExistentialMetadata({&ProtocolA});
+      auto a = swift_getExistentialTypeMetadata(ProtocolClassConstraint::Any,
+                                                /*superclass=*/nullptr,
+                                                1, protoList2);
       EXPECT_EQ(MetadataKind::Existential, a->getKind());
       EXPECT_EQ(1U, a->Flags.getNumWitnessTables());
       EXPECT_EQ(ProtocolClassConstraint::Any, a->Flags.getClassConstraint());
@@ -424,9 +423,14 @@ TEST(MetadataTest, getExistentialMetadata) {
       return a;
     });
 
+  const ProtocolDescriptor *protoList3[] = {
+    &ProtocolB
+  };
   RaceTest_ExpectEqual<const ExistentialTypeMetadata *>(
     [&]() -> const ExistentialTypeMetadata * {
-      auto b = test_getExistentialMetadata({&ProtocolB});
+      auto b = swift_getExistentialTypeMetadata(ProtocolClassConstraint::Any,
+                                                /*superclass=*/nullptr,
+                                                1, protoList3);
       EXPECT_NE(exA, b);
       EXPECT_EQ(MetadataKind::Existential, b->getKind());
       EXPECT_EQ(1U, b->Flags.getNumWitnessTables());
@@ -441,8 +445,23 @@ TEST(MetadataTest, getExistentialMetadata) {
   // protocol compositions are order-invariant
   RaceTest_ExpectEqual<const ExistentialTypeMetadata *>(
     [&]() -> const ExistentialTypeMetadata * {
-      auto ab = test_getExistentialMetadata({&ProtocolA, &ProtocolB});
-      auto ba = test_getExistentialMetadata({&ProtocolB, &ProtocolA});
+
+      const ProtocolDescriptor *protoList4[] = {
+        &ProtocolA,
+        &ProtocolB
+      };
+
+      const ProtocolDescriptor *protoList5[] = {
+        &ProtocolB,
+        &ProtocolA
+      };
+
+      auto ab = swift_getExistentialTypeMetadata(ProtocolClassConstraint::Any,
+                                                /*superclass=*/nullptr,
+                                                2, protoList4);
+      auto ba = swift_getExistentialTypeMetadata(ProtocolClassConstraint::Any,
+                                                /*superclass=*/nullptr,
+                                                2, protoList5);
       EXPECT_EQ(ab, ba);
       EXPECT_EQ(MetadataKind::Existential, ab->getKind());
       EXPECT_EQ(2U, ab->Flags.getNumWitnessTables());
@@ -458,10 +477,15 @@ TEST(MetadataTest, getExistentialMetadata) {
       return ab;
     });
 
+  const ProtocolDescriptor *protoList6[] = {
+    &ProtocolClassConstrained,
+  };
   RaceTest_ExpectEqual<const ExistentialTypeMetadata *>(
     [&]() -> const ExistentialTypeMetadata * {
       auto classConstrained
-        = test_getExistentialMetadata({&ProtocolClassConstrained});
+        = swift_getExistentialTypeMetadata(ProtocolClassConstraint::Class,
+                                           /*superclass=*/nullptr,
+                                           1, protoList6);
       EXPECT_EQ(MetadataKind::Existential, classConstrained->getKind());
       EXPECT_EQ(1U, classConstrained->Flags.getNumWitnessTables());
       EXPECT_EQ(ProtocolClassConstraint::Class,
@@ -473,10 +497,15 @@ TEST(MetadataTest, getExistentialMetadata) {
       return classConstrained;
     });
 
+  const ProtocolDescriptor *protoList7[] = {
+    &ProtocolNoWitnessTable
+  };
   RaceTest_ExpectEqual<const ExistentialTypeMetadata *>(
     [&]() -> const ExistentialTypeMetadata * {
       auto noWitnessTable
-        = test_getExistentialMetadata({&ProtocolNoWitnessTable});
+        = swift_getExistentialTypeMetadata(ProtocolClassConstraint::Class,
+                                           /*superclass=*/nullptr,
+                                           1, protoList7);
       EXPECT_EQ(MetadataKind::Existential, noWitnessTable->getKind());
       EXPECT_EQ(0U, noWitnessTable->Flags.getNumWitnessTables());
       EXPECT_EQ(ProtocolClassConstraint::Class,
@@ -490,9 +519,16 @@ TEST(MetadataTest, getExistentialMetadata) {
 
   RaceTest_ExpectEqual<const ExistentialTypeMetadata *>(
     [&]() -> const ExistentialTypeMetadata * {
+      const ProtocolDescriptor *protoList8[] = {
+        &ProtocolNoWitnessTable,
+        &ProtocolA,
+        &ProtocolB
+      };
+
       auto mixedWitnessTable
-        = test_getExistentialMetadata({&ProtocolNoWitnessTable,
-                                       &ProtocolA, &ProtocolB});
+        = swift_getExistentialTypeMetadata(ProtocolClassConstraint::Class,
+                                           /*superclass=*/nullptr,
+                                           3, protoList8);
       EXPECT_EQ(MetadataKind::Existential, mixedWitnessTable->getKind());
       EXPECT_EQ(2U, mixedWitnessTable->Flags.getNumWitnessTables());
       EXPECT_EQ(ProtocolClassConstraint::Class,
@@ -510,10 +546,15 @@ TEST(MetadataTest, getExistentialMetadata) {
   ExpectedErrorValueWitnesses = &VALUE_WITNESS_SYM(Bo);
 #endif
 
+  const ProtocolDescriptor *protoList9[] = {
+    &ProtocolError
+  };
   RaceTest_ExpectEqual<const ExistentialTypeMetadata *>(
     [&]() -> const ExistentialTypeMetadata * {
       auto special
-        = test_getExistentialMetadata({&ProtocolError});
+        = swift_getExistentialTypeMetadata(ProtocolClassConstraint::Any,
+                                           /*superclass=*/nullptr,
+                                           1, protoList9);
       EXPECT_EQ(MetadataKind::Existential, special->getKind());
       EXPECT_EQ(1U, special->Flags.getNumWitnessTables());
       EXPECT_EQ(SpecialProtocol::Error,
@@ -525,8 +566,15 @@ TEST(MetadataTest, getExistentialMetadata) {
 
   RaceTest_ExpectEqual<const ExistentialTypeMetadata *>(
     [&]() -> const ExistentialTypeMetadata * {
+      const ProtocolDescriptor *protoList10[] = {
+        &ProtocolError,
+        &ProtocolA
+      };
+
       auto special
-        = test_getExistentialMetadata({&ProtocolError, &ProtocolA});
+        = swift_getExistentialTypeMetadata(ProtocolClassConstraint::Any,
+                                           /*superclass=*/nullptr,
+                                           2, protoList10);
       EXPECT_EQ(MetadataKind::Existential, special->getKind());
       EXPECT_EQ(2U, special->Flags.getNumWitnessTables());
       // Compositions of special protocols aren't special.
@@ -654,7 +702,9 @@ TEST(MetadataTest, getExistentialTypeMetadata_opaque) {
   };
   RaceTest_ExpectEqual<const ExistentialTypeMetadata *>(
     [&]() -> const ExistentialTypeMetadata * {
-      auto ex1 = swift_getExistentialTypeMetadata(1, protoList1);
+      auto ex1 = swift_getExistentialTypeMetadata(ProtocolClassConstraint::Any,
+                                                  /*superclass=*/nullptr,
+                                                  1, protoList1);
       EXPECT_EQ(MetadataKind::Existential, ex1->getKind());
       EXPECT_EQ(5 * sizeof(void*), ex1->getValueWitnesses()->getSize());
       EXPECT_EQ(alignof(void*), ex1->getValueWitnesses()->getAlignment());
@@ -668,7 +718,9 @@ TEST(MetadataTest, getExistentialTypeMetadata_opaque) {
   };
   RaceTest_ExpectEqual<const ExistentialTypeMetadata *>(
     [&]() -> const ExistentialTypeMetadata * {
-      auto ex2 = swift_getExistentialTypeMetadata(2, protoList2);
+      auto ex2 = swift_getExistentialTypeMetadata(ProtocolClassConstraint::Any,
+                                                  /*superclass=*/nullptr,
+                                                  2, protoList2);
       EXPECT_EQ(MetadataKind::Existential, ex2->getKind());
       EXPECT_EQ(6 * sizeof(void*), ex2->getValueWitnesses()->getSize());
       EXPECT_EQ(alignof(void*), ex2->getValueWitnesses()->getAlignment());
@@ -682,7 +734,9 @@ TEST(MetadataTest, getExistentialTypeMetadata_opaque) {
   };
   RaceTest_ExpectEqual<const ExistentialTypeMetadata *>(
     [&]() -> const ExistentialTypeMetadata * {
-      auto ex3 = swift_getExistentialTypeMetadata(3, protoList3);
+      auto ex3 = swift_getExistentialTypeMetadata(ProtocolClassConstraint::Any,
+                                                  /*superclass=*/nullptr,
+                                                  3, protoList3);
       EXPECT_EQ(MetadataKind::Existential, ex3->getKind());
       EXPECT_EQ(7 * sizeof(void*), ex3->getValueWitnesses()->getSize());
       EXPECT_EQ(alignof(void*), ex3->getValueWitnesses()->getAlignment());
@@ -698,7 +752,9 @@ TEST(MetadataTest, getExistentialTypeMetadata_class) {
   };
   RaceTest_ExpectEqual<const ExistentialTypeMetadata *>(
     [&]() -> const ExistentialTypeMetadata * {
-      auto ex1 = swift_getExistentialTypeMetadata(1, protoList1);
+      auto ex1 = swift_getExistentialTypeMetadata(ProtocolClassConstraint::Class,
+                                                  /*superclass=*/nullptr,
+                                                  1, protoList1);
       EXPECT_EQ(MetadataKind::Existential, ex1->getKind());
       EXPECT_EQ(2 * sizeof(void*), ex1->getValueWitnesses()->getSize());
       EXPECT_EQ(alignof(void*), ex1->getValueWitnesses()->getAlignment());
@@ -712,7 +768,9 @@ TEST(MetadataTest, getExistentialTypeMetadata_class) {
   };
   RaceTest_ExpectEqual<const ExistentialTypeMetadata *>(
     [&]() -> const ExistentialTypeMetadata * {
-      auto ex2 = swift_getExistentialTypeMetadata(2, protoList2);
+      auto ex2 = swift_getExistentialTypeMetadata(ProtocolClassConstraint::Class,
+                                                  /*superclass=*/nullptr,
+                                                  2, protoList2);
       EXPECT_EQ(MetadataKind::Existential, ex2->getKind());
       EXPECT_EQ(3 * sizeof(void*), ex2->getValueWitnesses()->getSize());
       EXPECT_EQ(alignof(void*), ex2->getValueWitnesses()->getAlignment());
@@ -726,7 +784,9 @@ TEST(MetadataTest, getExistentialTypeMetadata_class) {
   };
   RaceTest_ExpectEqual<const ExistentialTypeMetadata *>(
     [&]() -> const ExistentialTypeMetadata * {
-      auto ex3 = swift_getExistentialTypeMetadata(3, protoList3);
+      auto ex3 = swift_getExistentialTypeMetadata(ProtocolClassConstraint::Class,
+                                                  /*superclass=*/nullptr,
+                                                  3, protoList3);
       EXPECT_EQ(MetadataKind::Existential, ex3->getKind());
       EXPECT_EQ(4 * sizeof(void*), ex3->getValueWitnesses()->getSize());
       EXPECT_EQ(alignof(void*), ex3->getValueWitnesses()->getAlignment());

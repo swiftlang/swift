@@ -419,8 +419,6 @@ WARNING(expr_keypath_swift3_objc_inference,none,
         "argument of '#keyPath' refers to property %0 in %1 that depends on "
         "'@objc' attribute inference deprecated in Swift 4",
         (DeclName, Identifier))
-ERROR(stdlib_anyobject_not_found,none,
-      "broken standard library: cannot find 'AnyObject' protocol", ())
 ERROR(expr_keypath_type_of_property,none,
       "cannot refer to type member %0 within instance of type %1",
       (DeclName, Type))
@@ -561,6 +559,15 @@ ERROR(serialization_target_too_new,Fatal,
 ERROR(serialization_target_too_new_repl,none,
       "module file's minimum deployment target is %0 v%1.%2%select{|.%3}3: %4",
       (StringRef, unsigned, unsigned, unsigned, StringRef))
+
+ERROR(serialization_fatal,Fatal,
+      "fatal error encountered while reading from module '%0'; "
+      "please file a bug report with your project and the crash log",
+      (StringRef))
+NOTE(serialization_compatibility_version_mismatch,none,
+     "compiling as Swift %0, with '%1' built as Swift %2 "
+     "(this is supported but may expose additional compiler issues)",
+     (StringRef, StringRef, StringRef))
 
 ERROR(reserved_member_name,none,
       "type member may not be named %0, since it would conflict with the"
@@ -1556,13 +1563,18 @@ ERROR(circular_protocol_def,none,
       "circular protocol inheritance %0", (StringRef))
 NOTE(protocol_here,none,
      "protocol %0 declared here", (Identifier))
-ERROR(protocol_composition_not_protocol,none,
-      "non-protocol type %0 cannot be used within a protocol composition", (Type))
 ERROR(objc_protocol_inherits_non_objc_protocol,none,
       "@objc protocol %0 cannot refine non-@objc protocol %1", (Type, Type))
 WARNING(protocol_composition_with_postfix,none,
-        "protocol composition with postfix '%0' is ambiguous "
+        "protocol-constrained type with postfix '%0' is ambiguous "
         "and will be rejected in future version of Swift", (StringRef))
+
+ERROR(invalid_protocol_composition_member,none,
+      "non-protocol, non-class type %0 cannot be used within a "
+      "protocol-constrained type", (Type))
+ERROR(protocol_composition_one_class,none,
+      "protocol-constrained type cannot contain class %0 because it already "
+      "contains class %1", (Type, Type))
 
 ERROR(requires_conformance_nonprotocol,none,
       "type %0 constrained to non-protocol type %1", (TypeLoc, TypeLoc))
@@ -2154,6 +2166,17 @@ ERROR(lazy_not_observable,none,
 // Debugger function attribute.
 ERROR(attr_for_debugger_support_only,none,
       "@LLDBDebuggerSupport may only be used when debugger support is on", ())
+
+// @_implements
+ERROR(implements_attr_protocol_lacks_member,none,
+      "protocol %0 has no member %1", (DeclName, DeclName))
+
+ERROR(implements_attr_non_protocol_type,none,
+      "non-protocol type in @_implements attribute", ())
+
+ERROR(implements_attr_protocol_not_conformed_to,none,
+      "containing type %0 does not conform to protocol %1",
+      (DeclName, DeclName))
 
 //------------------------------------------------------------------------------
 // Type Check Expressions
@@ -2862,12 +2885,19 @@ WARNING(no_throw_in_do_with_catch,none,
 // Type Check Types
 //------------------------------------------------------------------------------
 
-ERROR(unsupported_recursive_type,none,
-      "value type %0 cannot have a stored property that references itself",
+ERROR(unsupported_recursive_struct,none,
+      "value type %0 cannot have a stored property that recursively "
+      "contains it",
       (Type))
 
 ERROR(recursive_enum_not_indirect,none,
       "recursive enum %0 is not marked 'indirect'", (Type))
+ERROR(unsupported_infinitely_sized_type,none,
+      "value type %0 has infinite size", (Type))
+NOTE(note_type_cycle_starts_here,none,
+     "cycle beginning here: %0", (StringRef))
+NOTE(note_recursive_enum_case_here,none,
+     "recursive case here", ())
 
 ERROR(sugar_type_not_found,none,
       "broken standard library: cannot find "
@@ -3072,6 +3102,10 @@ ERROR(objc_extension_not_class,none,
 // If you change this, also change enum ObjCReason
 #define OBJC_ATTR_SELECT "select{marked @_cdecl|marked dynamic|marked @objc|marked @IBOutlet|marked @IBAction|marked @NSManaged|a member of an @objc protocol|implicitly @objc|an @objc override|an implementation of an @objc requirement|marked @IBInspectable|marked @GKInspectable|in an @objc extension of a class (without @nonobjc)}"
 
+WARNING(attribute_meaningless_when_nonobjc,none,
+        "'@%0' attribute is meaningless on a property that cannot be "
+        "represented in Objective-C", (StringRef))
+
 ERROR(objc_invalid_on_var,none,
       "property cannot be %" OBJC_ATTR_SELECT "0 "
       "because its type cannot be represented in Objective-C", (unsigned))
@@ -3092,9 +3126,13 @@ ERROR(function_type_no_parens,none,
 NOTE(not_objc_empty_protocol_composition,none,
      "'Any' is not considered '@objc'; use 'AnyObject' instead", ())
 NOTE(not_objc_protocol,none,
-     "protocol %0 is not '@objc'", (Type))
+     "protocol-constrained type containing protocol %0 cannot be represented "
+     "in Objective-C", (Type))
+NOTE(not_objc_class_constraint,none,
+     "protocol-constrained type containing class %0 cannot be represented "
+     "in Objective-C", (Type))
 NOTE(not_objc_error_protocol_composition,none,
-     "protocol composition involving 'Error' cannot be represented "
+     "protocol-constrained type containing 'Error' cannot be represented "
      "in Objective-C", ())
 NOTE(not_objc_empty_tuple,none,
       "empty tuple type cannot be represented in Objective-C", ())

@@ -47,6 +47,18 @@ fromStableStringEncoding(unsigned value) {
   }
 }
 
+static Optional<ConstStringLiteralInst::Encoding>
+fromStableConstStringEncoding(unsigned value) {
+  switch (value) {
+  case SIL_UTF8:
+    return ConstStringLiteralInst::Encoding::UTF8;
+  case SIL_UTF16:
+    return ConstStringLiteralInst::Encoding::UTF16;
+  default:
+    return None;
+  }
+}
+
 static Optional<SILLinkage>
 fromStableSILLinkage(unsigned value) {
   switch (value) {
@@ -296,7 +308,7 @@ static SILFunction *createBogusSILFunction(SILModule &M,
   return M.createFunction(
       SILLinkage::Private, name, type.castTo<SILFunctionType>(), nullptr,
       RegularLocation(loc), IsNotBare, IsNotTransparent, IsNotSerialized,
-      IsNotThunk, SILFunction::NotRelevant);
+      IsNotThunk, SubclassScope::NotApplicable);
 }
 
 /// Helper function to find a SILFunction, given its name and type.
@@ -449,7 +461,7 @@ SILFunction *SILDeserializer::readSILFunction(DeclID FID,
         linkage.getValue(), name, ty.castTo<SILFunctionType>(), nullptr, loc,
         IsNotBare, IsTransparent_t(isTransparent == 1),
         IsSerialized_t(isSerialized), IsThunk_t(isThunk),
-        SILFunction::NotRelevant, (Inline_t)inlineStrategy);
+        SubclassScope::NotApplicable, (Inline_t)inlineStrategy);
     fn->setGlobalInit(isGlobal == 1);
     fn->setEffectsKind((EffectsKind)effect);
     if (clangNodeOwner)
@@ -1306,6 +1318,15 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     if (!encoding) return true;
     ResultVal = Builder.createStringLiteral(Loc, StringVal.str(),
                                             encoding.getValue());
+    break;
+  }
+  case ValueKind::ConstStringLiteralInst: {
+    Identifier StringVal = MF->getIdentifier(ValID);
+    auto encoding = fromStableConstStringEncoding(Attr);
+    if (!encoding)
+      return true;
+    ResultVal = Builder.createConstStringLiteral(Loc, StringVal.str(),
+                                                 encoding.getValue());
     break;
   }
   case ValueKind::MarkFunctionEscapeInst: {

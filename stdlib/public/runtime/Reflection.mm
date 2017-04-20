@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Runtime/Reflection.h"
+#include "swift/Runtime/Casting.h"
 #include "swift/Runtime/Config.h"
 #include "swift/Runtime/HeapObject.h"
 #include "swift/Runtime/Metadata.h"

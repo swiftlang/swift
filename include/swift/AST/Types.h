@@ -325,6 +325,15 @@ protected:
   };
   enum { NumAnyMetatypeTypeBits = NumTypeBaseBits + 2 };
   static_assert(NumAnyMetatypeTypeBits <= 32, "fits in an unsigned");
+
+  struct ProtocolCompositionTypeBitfields {
+    unsigned : NumTypeBaseBits;
+    /// Whether we have an explicitly-stated class constraint not
+    /// implied by any of our members.
+    unsigned HasExplicitAnyObject : 1;
+  };
+  enum { NumProtocolCompositionTypeBits = NumTypeBaseBits + 1 };
+  static_assert(NumProtocolCompositionTypeBits <= 32, "fits in an unsigned");
   
   union {
     TypeBaseBitfields TypeBaseBits;
@@ -334,6 +343,7 @@ protected:
     ArchetypeTypeBitfields ArchetypeTypeBits;
     SILFunctionTypeBitfields SILFunctionTypeBits;
     AnyMetatypeTypeBitfields AnyMetatypeTypeBits;
+    ProtocolCompositionTypeBitfields ProtocolCompositionTypeBits;
   };
 
 protected:
@@ -576,13 +586,8 @@ public:
   /// bound.
   bool isClassExistentialType();
 
-  /// Given that this type is an existential type, produce
-  /// its list of protocols.
-  void getExistentialTypeProtocols(SmallVectorImpl<ProtocolDecl *> &protocols);
-
-  /// Given that this type is any kind of existential type, produce
-  /// its list of protocols.
-  void getAnyExistentialTypeProtocols(SmallVectorImpl<ProtocolDecl *> &protocols);
+  /// Break an existential down into a set of constraints.
+  ExistentialLayout getExistentialLayout();
 
   /// Determines the element type of a known *UnsafeMutablePointer
   /// variant, or returns null if the type is not a pointer.
@@ -703,12 +708,6 @@ public:
   /// True if this type contains archetypes that could be substituted with
   /// concrete types to form the argument type.
   bool isBindableTo(Type ty, LazyResolver *resolver);
-
-  /// \brief Retrieve the layout constraint of this type.
-  ///
-  /// \returns The layout constraint of this type, or a null layout constraint
-  ///          if it has no layout constraint.
-  LayoutConstraint getLayoutConstraint();
 
   /// \brief Determines whether this type is permitted as a method override
   /// of the \p other.
@@ -3602,7 +3601,7 @@ public:
   }
 
   /// True if only classes may conform to the protocol.
-  bool requiresClass() const;
+  bool requiresClass();
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {
@@ -3659,27 +3658,46 @@ END_CAN_TYPE_WRAPPER(ProtocolType, NominalType)
 /// protocol, then the canonical type is that protocol type. Otherwise, it is
 /// a composition of the protocols in that list.
 class ProtocolCompositionType : public TypeBase, public llvm::FoldingSetNode {
-  ArrayRef<Type> Protocols;
+  ArrayRef<Type> Members;
   
 public:
   /// \brief Retrieve an instance of a protocol composition type with the
-  /// given set of protocols.
-  static Type get(const ASTContext &C, ArrayRef<Type> Protocols);
+  /// given set of members.
+  static Type get(const ASTContext &C, ArrayRef<Type> Members,
+                  bool HasExplicitAnyObject);
   
-  /// \brief Retrieve the set of protocols composed to create this type.
-  ArrayRef<Type> getProtocols() const { return Protocols; }
-
-  /// \brief Return the protocols of this type in canonical order.
-  void getAnyExistentialTypeProtocols(SmallVectorImpl<ProtocolDecl *> &protos);
+  /// \brief Retrieve the set of members composed to create this type.
+  ///
+  /// For non-canonical types, this can contain classes, protocols and
+  /// protocol compositions in any order. There can be at most one unique
+  /// class constraint, either stated directly or as recursive member.
+  ///
+  /// In canonical types, this list will contain the superclass first if
+  /// any, followed by zero or more protocols in a canonical sorted order,
+  /// minimized to remove duplicates or protocols implied by inheritance.
+  ///
+  /// Note that the list of members is not sufficient to uniquely identify
+  /// a protocol composition type; you also have to look at
+  /// hasExplicitAnyObject().
+  ArrayRef<Type> getMembers() const { return Members; }
 
   void Profile(llvm::FoldingSetNodeID &ID) {
-    Profile(ID, Protocols);
+    Profile(ID, Members, hasExplicitAnyObject());
   }
-  static void Profile(llvm::FoldingSetNodeID &ID, ArrayRef<Type> Protocols);
+  static void Profile(llvm::FoldingSetNodeID &ID,
+                      ArrayRef<Type> Members,
+                      bool HasExplicitAnyObject);
 
-  /// True if one or more of the protocols is class.
-  bool requiresClass() const;
-  
+  /// True if the composition requires the concrete conforming type to
+  /// be a class, either via a directly-stated superclass constraint or
+  /// one of its member protocols being class-constrained.
+  bool requiresClass();
+
+  /// True if the class requirement is stated directly via '& AnyObject'.
+  bool hasExplicitAnyObject() {
+    return ProtocolCompositionTypeBits.HasExplicitAnyObject;
+  }
+
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::ProtocolComposition;
@@ -3687,18 +3705,19 @@ public:
   
 private:
   static ProtocolCompositionType *build(const ASTContext &C,
-                                        ArrayRef<Type> Protocols);
+                                        ArrayRef<Type> Members,
+                                        bool HasExplicitAnyObject);
 
-  ProtocolCompositionType(const ASTContext *Ctx, ArrayRef<Type> Protocols)
-    : TypeBase(TypeKind::ProtocolComposition, /*Context=*/Ctx,
-               RecursiveTypeProperties()),
-      Protocols(Protocols) { }
+  ProtocolCompositionType(const ASTContext *ctx, ArrayRef<Type> members,
+                          bool hasExplicitAnyObject,
+                          RecursiveTypeProperties properties)
+    : TypeBase(TypeKind::ProtocolComposition, /*Context=*/ctx,
+               properties),
+      Members(members) {
+    ProtocolCompositionTypeBits.HasExplicitAnyObject = hasExplicitAnyObject;
+  }
 };
 BEGIN_CAN_TYPE_WRAPPER(ProtocolCompositionType, Type)
-  /// In the canonical representation, these are all ProtocolTypes.
-  CanTypeArrayRef getProtocols() const {
-    return CanTypeArrayRef(getPointer()->getProtocols());
-  }
 END_CAN_TYPE_WRAPPER(ProtocolCompositionType, Type)
 
 /// LValueType - An l-value is a handle to a physical object.  The
@@ -4549,16 +4568,6 @@ inline CanType CanType::getNominalParent() const {
   } else {
     return cast<BoundGenericType>(*this).getParent();
   }
-}
-
-inline bool TypeBase::mayHaveSuperclass() {
-  if (getClassOrBoundGenericClass())
-    return true;
-
-  if (auto archetype = getAs<ArchetypeType>())
-    return (bool)archetype->requiresClass();
-
-  return is<DynamicSelfType>();
 }
 
 inline TupleTypeElt::TupleTypeElt(Type ty, Identifier name, bool isVariadic,

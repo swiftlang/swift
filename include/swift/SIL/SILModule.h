@@ -489,16 +489,12 @@ public:
 
   /// \brief Return the declaration of a function, or create it if it doesn't
   /// exist.
-  SILFunction *getOrCreateFunction(SILLocation loc,
-                                   StringRef name,
-                                   SILLinkage linkage,
-                                   CanSILFunctionType type,
-                                   IsBare_t isBareSILFunction,
-                                   IsTransparent_t isTransparent,
-                                   IsSerialized_t isSerialized,
-                                   IsThunk_t isThunk = IsNotThunk,
-                                   SILFunction::ClassVisibility_t CV =
-                                           SILFunction::NotRelevant);
+  SILFunction *getOrCreateFunction(
+      SILLocation loc, StringRef name, SILLinkage linkage,
+      CanSILFunctionType type, IsBare_t isBareSILFunction,
+      IsTransparent_t isTransparent, IsSerialized_t isSerialized,
+      IsThunk_t isThunk = IsNotThunk,
+      SubclassScope subclassScope = SubclassScope::NotApplicable);
 
   /// \brief Return the declaration of a function, or create it if it doesn't
   /// exist.
@@ -516,7 +512,7 @@ public:
       GenericEnvironment *genericEnv, Optional<SILLocation> loc,
       IsBare_t isBareSILFunction, IsTransparent_t isTrans,
       IsSerialized_t isSerialized, IsThunk_t isThunk = IsNotThunk,
-      SILFunction::ClassVisibility_t classVisibility = SILFunction::NotRelevant,
+      SubclassScope subclassScope = SubclassScope::NotApplicable,
       Inline_t inlineStrategy = InlineDefault,
       EffectsKind EK = EffectsKind::Unspecified,
       SILFunction *InsertBefore = nullptr,

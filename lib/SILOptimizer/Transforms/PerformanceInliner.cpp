@@ -97,7 +97,7 @@ class SILPerformanceInliner {
     DevirtualizedCallBenefit = RemovedCallBenefit + 300,
 
     /// The benefit of being able to produce a generic
-    /// specializatio for a call.
+    /// specialization for a call.
     GenericSpecializationBenefit = RemovedCallBenefit + 300,
 
     /// Approximately up to this cost level a function can be inlined without
@@ -861,7 +861,6 @@ public:
     }
   }
 
-  StringRef getName() override { return PassName; }
 };
 } // end anonymous namespace
 

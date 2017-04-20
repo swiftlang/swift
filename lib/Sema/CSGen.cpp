@@ -625,10 +625,17 @@ namespace {
       // Copy over the existing bindings, dividing the constraints up
       // into "favored" and non-favored lists.
       SmallVector<Constraint *, 4> favoredConstraints;
-      for (auto oldConstraint : oldConstraints)
-        if (oldConstraint->getOverloadChoice().isDecl() &&
-            isFavored(oldConstraint->getOverloadChoice().getDecl()))
+      SmallVector<Constraint *, 4> fallbackConstraints;
+      for (auto oldConstraint : oldConstraints) {
+        if (!oldConstraint->getOverloadChoice().isDecl())
+          continue;
+        auto decl = oldConstraint->getOverloadChoice().getDecl();
+        if (!decl->getAttrs().isUnavailable(CS.getASTContext()) &&
+            isFavored(decl))
           favoredConstraints.push_back(oldConstraint);
+        else
+          fallbackConstraints.push_back(oldConstraint);
+      }
 
       // If we did not find any favored constraints, we're done.
       if (favoredConstraints.empty()) break;
@@ -652,26 +659,20 @@ namespace {
                                         favoredConstraints,
                                         csLoc);
       
-      // If we didn't actually build a disjunction, clone
-      // the underlying constraint so we can mark it as
-      // favored.
-      if (favoredConstraints.size() == 1) {
-        favoredConstraintsDisjunction
-            = favoredConstraintsDisjunction->clone(CS);
-      }
-      
       favoredConstraintsDisjunction->setFavored();
       
-      // Find the disjunction of fallback constraints. If any
-      // constraints were added here, create a new disjunction.
-      Constraint *fallbackConstraintsDisjunction = constraint;
-      
-      // Form the (favored, fallback) disjunction.
-      auto aggregateConstraints = {
-        favoredConstraintsDisjunction,
-        fallbackConstraintsDisjunction
-      };
-      
+      llvm::SmallVector<Constraint *, 2> aggregateConstraints;
+      aggregateConstraints.push_back(favoredConstraintsDisjunction);
+
+      if (!fallbackConstraints.empty()) {
+        // Find the disjunction of fallback constraints. If any
+        // constraints were added here, create a new disjunction.
+        Constraint *fallbackConstraintsDisjunction =
+          Constraint::createDisjunction(CS, fallbackConstraints, csLoc);
+
+        aggregateConstraints.push_back(fallbackConstraintsDisjunction);
+      }
+
       CS.addDisjunctionConstraint(aggregateConstraints, csLoc);
       break;
     }
@@ -3389,7 +3390,8 @@ bool swift::isExtensionApplied(DeclContext &DC, Type BaseTy,
         createMemberConstraint(Req, ConstraintKind::ConformsTo);
         break;
       case RequirementKind::Layout:
-        createMemberConstraint(Req, ConstraintKind::Layout);
+        // FIXME FIXME FIXME
+        createMemberConstraint(Req, ConstraintKind::ConformsTo);
         break;
       case RequirementKind::Superclass:
         createMemberConstraint(Req, ConstraintKind::Subtype);

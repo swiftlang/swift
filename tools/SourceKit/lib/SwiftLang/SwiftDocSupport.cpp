@@ -10,6 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "clang/AST/Decl.h"
+#include "clang/Basic/Module.h"
 #include "SwiftASTManager.h"
 #include "SwiftEditorDiagConsumer.h"
 #include "SwiftLangSupport.h"
@@ -391,6 +393,44 @@ static bool initDocEntityInfo(const Decl *D, const Decl *SynthesizedTarget,
     }
   }
 
+  switch(D->getDeclContext()->getContextKind()) {
+    case DeclContextKind::AbstractClosureExpr:
+    case DeclContextKind::TopLevelCodeDecl:
+    case DeclContextKind::AbstractFunctionDecl:
+    case DeclContextKind::SubscriptDecl:
+    case DeclContextKind::Initializer:
+    case DeclContextKind::SerializedLocal:
+    case DeclContextKind::ExtensionDecl:
+    case DeclContextKind::GenericTypeDecl:
+      break;
+
+    // We report sub-module information only for top-level decls.
+    case DeclContextKind::Module:
+    case DeclContextKind::FileUnit: {
+      if (auto* CD = D->getClangDecl()) {
+        if (auto *M = CD->getImportedOwningModule()) {
+          const clang::Module *Root = M->getTopLevelModule();
+
+          // If Root differs from the owning module, then the owning module is
+          // a sub-module.
+          if (M != Root) {
+            llvm::raw_svector_ostream OS(Info.SubModuleName);
+            llvm::SmallVector<StringRef, 4> Names;
+
+            // Climb up and collect sub-module names.
+            for (auto Current = M; Current != Root; Current = Current->Parent) {
+              Names.insert(Names.begin(), Current->Name);
+            }
+            OS << Root->Name;
+            std::for_each(Names.begin(), Names.end(),
+                          [&](StringRef N) { OS << "." << N; });
+          }
+        }
+      }
+      break;
+    }
+  }
+
   return false;
 }
 
@@ -437,7 +477,7 @@ static void passInherits(ArrayRef<TypeLoc> InheritedTypes,
 
     if (auto ProtoComposition
                = Inherited.getType()->getAs<ProtocolCompositionType>()) {
-      for (auto T : ProtoComposition->getProtocols())
+      for (auto T : ProtoComposition->getMembers())
         passInherits(TypeLoc::withoutLoc(T), Consumer);
       continue;
     }

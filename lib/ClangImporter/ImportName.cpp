@@ -26,6 +26,7 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/Types.h"
+#include "swift/AST/TypeRepr.h"
 #include "swift/Basic/StringExtras.h"
 #include "swift/ClangImporter/ClangImporterOptions.h"
 #include "swift/Parse/Parser.h"
@@ -506,9 +507,7 @@ static bool moduleIsInferImportAsMember(const clang::NamedDecl *decl,
     if (submodule->IsSwiftInferImportAsMember) {
       // HACK HACK HACK: This is a workaround for some module invalidation issue
       // and inconsistency. This will go away soon.
-      if (submodule->Name != "CoreGraphics")
-        return false;
-      return true;
+      return submodule->Name == "CoreGraphics";
     }
     submodule = submodule->Parent;
   }
@@ -1517,7 +1516,7 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
         // Calculate the new prefix.
         // What if the preferred name causes longer prefix?
         StringRef subPrefix = [](StringRef LHS, StringRef RHS) {
-          if(LHS.size() > RHS.size())
+          if (LHS.size() > RHS.size())
             std::swap(LHS, RHS) ;
           return StringRef(LHS.data(), std::mismatch(LHS.begin(), LHS.end(),
             RHS.begin()).first - LHS.begin());

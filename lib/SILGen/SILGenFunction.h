@@ -353,6 +353,10 @@ public:
   /// \brief The current context where formal evaluation cleanups are managed.
   FormalEvaluationContext FormalEvalContext;
 
+  /// \brief Values to end dynamic access enforcement on.  A hack for
+  /// materializeForSet.
+  SmallVectorImpl<SILValue> *ValuesToEndAccessForMaterializeForSet = nullptr;
+
   /// VarLoc - representation of an emitted local variable or constant.  There
   /// are three scenarios here:
   ///
@@ -1654,7 +1658,8 @@ public:
   /// \param ArgNo optionally describes this function argument's
   /// position for debug info.
   std::unique_ptr<Initialization>
-  emitLocalVariableWithCleanup(VarDecl *D, bool NeedsMarkUninit,
+  emitLocalVariableWithCleanup(VarDecl *D,
+                               Optional<MarkUninitializedInst::Kind> kind,
                                unsigned ArgNo = 0);
 
   /// Emit the allocation for a local temporary, provides an

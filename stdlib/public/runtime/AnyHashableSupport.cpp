@@ -15,7 +15,7 @@
 #include "swift/Runtime/Concurrent.h"
 #include "swift/Runtime/Debug.h"
 #include "swift/Runtime/HeapObject.h"
-#include "swift/Runtime/Metadata.h"
+#include "swift/Runtime/Casting.h"
 #include "Private.h"
 #include "SwiftValue.h"
 #include "SwiftHashableSupport.h"

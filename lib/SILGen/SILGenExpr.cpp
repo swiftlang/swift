@@ -526,7 +526,7 @@ ManagedValue SILGenFunction::emitLValueForDecl(SILLocation loc, VarDecl *var,
 
 namespace {
 
-/// Thie is a simple cleanup class that is only meant to help with delegating
+/// This is a simple cleanup class that is only meant to help with delegating
 /// initializers. Specifically, if the delegating initializer fails to consume
 /// the loaded self, we want to write back self into the slot to ensure that
 /// ownership is preserved.

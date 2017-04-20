@@ -85,6 +85,7 @@ public:
   IGNORED_ATTR(Versioned)
   IGNORED_ATTR(ShowInInterface)
   IGNORED_ATTR(DiscardableResult)
+  IGNORED_ATTR(Implements)
 #undef IGNORED_ATTR
 
   // @noreturn has been replaced with a 'Never' return type.
@@ -795,6 +796,7 @@ public:
   void visitInlineableAttr(InlineableAttr *attr);
   
   void visitDiscardableResultAttr(DiscardableResultAttr *attr);
+  void visitImplementsAttr(ImplementsAttr *attr);
 };
 } // end anonymous namespace
 
@@ -1786,7 +1788,7 @@ void AttributeChecker::visitSpecializeAttr(SpecializeAttr *attr) {
 
   // Add the requirements to the builder.
   for (auto &req : resolvedRequirements)
-    Builder.addRequirement(&req);
+    Builder.addRequirement(&req, DC->getParentModule());
 
   // Check the result.
   Builder.finalize(attr->getLocation(), genericSig->getGenericParams(),
@@ -1879,6 +1881,52 @@ void AttributeChecker::visitDiscardableResultAttr(DiscardableResultAttr *attr) {
         attr->setInvalid();
       }
     }
+  }
+}
+
+void AttributeChecker::visitImplementsAttr(ImplementsAttr *attr) {
+  TypeLoc &ProtoTypeLoc = attr->getProtocolType();
+  TypeResolutionOptions options;
+  options |= TR_AllowUnboundGenerics;
+
+  DeclContext *DC = D->getDeclContext();
+  Type T = TC.resolveType(ProtoTypeLoc.getTypeRepr(),
+                          DC, options);
+  ProtoTypeLoc.setType(T);
+
+  // Definite error-types were already diagnosed in resolveType.
+  if (!T || T->hasError())
+    return;
+
+  // Check that we got a ProtocolType.
+  if (auto PT = T->getAs<ProtocolType>()) {
+    ProtocolDecl *PD = PT->getDecl();
+
+    // Check that the ProtocolType has the specified member.
+    LookupResult R = TC.lookupMember(PD->getDeclContext(),
+                                     PT, attr->getMemberName());
+    if (!R) {
+      TC.diagnose(attr->getLocation(),
+                  diag::implements_attr_protocol_lacks_member,
+                  PD->getBaseName(), attr->getMemberName())
+        .highlight(attr->getMemberNameLoc().getSourceRange());
+    }
+
+    // Check that the decl we're decorating is a member of a type that actually
+    // conforms to the specified protocol.
+    NominalTypeDecl *NTD = DC->getAsNominalTypeOrNominalTypeExtensionContext();
+    SmallVector<ProtocolConformance *, 2> conformances;
+    if (!NTD->lookupConformance(DC->getParentModule(), PD, conformances)) {
+      TC.diagnose(attr->getLocation(),
+                  diag::implements_attr_protocol_not_conformed_to,
+                  NTD->getFullName(), PD->getFullName())
+        .highlight(ProtoTypeLoc.getTypeRepr()->getSourceRange());
+    }
+
+  } else {
+    TC.diagnose(attr->getLocation(),
+                diag::implements_attr_non_protocol_type)
+      .highlight(ProtoTypeLoc.getTypeRepr()->getSourceRange());
   }
 }
 

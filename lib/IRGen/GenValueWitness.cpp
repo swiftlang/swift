@@ -301,7 +301,8 @@ static Address emitDefaultAllocateBuffer(IRGenFunction &IGF, Address buffer,
     // Use copy-on-write existentials?
     auto &IGM = IGF.IGM;
     if (IGM.getSILModule().getOptions().UseCOWExistentials) {
-      /* This would be faster but what do we pass as genericEnv?
+      // This would be faster but what do we pass as genericEnv?
+#if 0
       if (isa<FixedTypeInfo>(T)) {
         assert(T->getFixedPacking() == FixedPacking::Allocate);
         auto *genericEnv = nullptr; //???;
@@ -310,7 +311,7 @@ static Address emitDefaultAllocateBuffer(IRGenFunction &IGF, Address buffer,
           IGF, valueType, buffer, genericEnv, "exist.box.addr");
         return type.getAddressForPointer(addr);
       }
-      */
+#endif
 
       llvm::Value *box, *address;
       auto *metadata = IGF.emitTypeMetadataRefForLayout(T);

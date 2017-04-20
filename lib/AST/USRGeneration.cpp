@@ -150,8 +150,6 @@ bool ide::printDeclUSR(const ValueDecl *D, raw_ostream &OS) {
   if (isa<ModuleDecl>(D))
     return true; // Ignore.
 
-  ValueDecl *VD = const_cast<ValueDecl *>(D);
-
   auto interpretAsClangNode = [](const ValueDecl *D)->ClangNode {
     ClangNode ClangN = D->getClangNode();
     if (auto ClangD = ClangN.getAsDecl()) {
@@ -204,8 +202,8 @@ bool ide::printDeclUSR(const ValueDecl *D, raw_ostream &OS) {
     return Ignore;
   }
 
-  if (ShouldUseObjCUSR(VD)) {
-    return printObjCUSR(VD, OS);
+  if (ShouldUseObjCUSR(D)) {
+    return printObjCUSR(D, OS);
   }
 
   if (!D->hasInterfaceType())
@@ -217,12 +215,8 @@ bool ide::printDeclUSR(const ValueDecl *D, raw_ostream &OS) {
       }))
     return true;
 
-  // FIXME: mangling 'self' in destructors crashes in mangler.
-  if (isa<ParamDecl>(VD) && isa<DestructorDecl>(VD->getDeclContext()))
-    return true;
-
   Mangle::ASTMangler NewMangler;
-  std::string Mangled = NewMangler.mangleDeclAsUSR(VD, getUSRSpacePrefix());
+  std::string Mangled = NewMangler.mangleDeclAsUSR(D, getUSRSpacePrefix());
 
   OS << Mangled;
 

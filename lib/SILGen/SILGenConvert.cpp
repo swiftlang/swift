@@ -483,10 +483,12 @@ ManagedValue SILGenFunction::emitExistentialErasure(
       // Devirtualize.  Maybe this should be done implicitly by
       // emitPropertyLValue?
       if (storedNSErrorConformance->isConcrete()) {
-        if (auto witnessVar = storedNSErrorConformance->getConcrete()
-                                          ->getWitness(nsErrorVar, nullptr)) {
-          nsErrorVar = cast<VarDecl>(witnessVar.getDecl());
-          nsErrorVarSubstitutions = witnessVar.getSubstitutions();
+        if (auto normal = dyn_cast<NormalProtocolConformance>(
+                                    storedNSErrorConformance->getConcrete())) {
+          if (auto witnessVar = normal->getWitness(nsErrorVar, nullptr)) {
+            nsErrorVar = cast<VarDecl>(witnessVar.getDecl());
+            nsErrorVarSubstitutions = witnessVar.getSubstitutions();
+          }
         }
       }
 
@@ -641,9 +643,7 @@ ManagedValue SILGenFunction::emitExistentialErasure(
     // its upper bound.
     auto anyObjectProto = getASTContext()
       .getProtocol(KnownProtocolKind::AnyObject);
-    auto anyObjectTy = anyObjectProto
-      ? anyObjectProto->getDeclaredType()->getCanonicalType()
-      : CanType();
+    auto anyObjectTy = getASTContext().getAnyObjectType();
     auto eraseToAnyObject =
     [&, concreteFormalType, F](SGFContext C) -> ManagedValue {
       auto concreteValue = F(SGFContext());

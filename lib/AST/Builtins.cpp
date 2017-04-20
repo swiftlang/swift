@@ -109,6 +109,12 @@ Type swift::getBuiltinType(ASTContext &Context, StringRef Name) {
   if (Name == "FPPPC128")
     return Context.ThePPC128Type;
 
+  // AnyObject is the empty class-constrained existential.
+  if (Name == "AnyObject")
+    return CanType(
+      ProtocolCompositionType::get(Context, {},
+                                   /*hasExplicitAnyObject=*/true));
+
   return Type();
 }
 

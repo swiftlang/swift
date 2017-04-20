@@ -246,6 +246,10 @@ def solver_memory_threshold : Separate<["-"], "solver-memory-threshold">,
   Flags<[FrontendOption, HelpHidden, DoesNotAffectIncrementalBuild]>,
   HelpText<"Set the upper bound for memory consumption, in bytes, by the constraint solver">;
 
+def value_recursion_threshold : Separate<["-"], "value-recursion-threshold">,
+  Flags<[FrontendOption, HelpHidden, DoesNotAffectIncrementalBuild]>,
+  HelpText<"Set the maximum depth for direct recursion in value types">;
+
 def disable_swift_bridge_attr : Flag<["-"], "disable-swift-bridge-attr">,
   Flags<[FrontendOption, HelpHidden]>,
   HelpText<"Disable using the swift bridge attribute">;
@@ -400,6 +404,26 @@ def line_range : Separate<["-"], "line-range">, Group<code_formatting_Group>,
   HelpText<"<start line>:<end line>. Formats a range of lines (1-based). "
            "Can only be used with one input file.">, MetaVarName<"<n:n>">;
 
+// Migrator Options
+def disable_migrator_fixits: Flag<["-"], "disable-migrator-fixits">,
+  Flags<[FrontendOption, NoInteractiveOption]>,
+  HelpText<"Disable the Migrator phase which automatically applies fix-its">;
+
+def emit_migrated_file_path: Separate<["-"], "emit-migrated-file-path">,
+  Flags<[FrontendOption, NoDriverOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>,
+  HelpText<"Emit the migrated source file to <path>">,
+  MetaVarName<"<path>">;
+
+def dump_migration_states_dir: Separate<["-"], "dump-migration-states-dir">,
+  Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>,
+  HelpText<"Dump the input text, output text, and states for migration to <path>">,
+  MetaVarName<"<path>">;
+
+def api_diff_data_file: Separate<["-"], "api-diff-data-file">,
+  Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>,
+  HelpText<"API migration data is from <path>">,
+  MetaVarName<"<path>">;
+
 // File types
 
 def parse_as_library : Flag<["-"], "parse-as-library">,
@@ -461,11 +485,8 @@ def S: Flag<["-"], "S">, Alias<emit_assembly>,
 
 def update_code : Flag<["-"], "update-code">,
   HelpText<"Update Swift code">, ModeOpt,
-  Flags<[HelpHidden, NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
+  Flags<[FrontendOption, HelpHidden, NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
 
-def fixit_code : Flag<["-"], "fixit-code">,
-  HelpText<"Get compiler fixits as code edits">,
-  Flags<[NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
 def fixit_all : Flag<["-"], "fixit-all">,
   HelpText<"Apply all fixits from diagnostics without any filtering">,
   Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>;

@@ -44,7 +44,7 @@ emitBridgeNativeToObjectiveC(SILGenFunction &SGF,
   if (!requirement) return None;
 
   // Retrieve the _bridgeToObjectiveC witness.
-  auto witness = conformance->getWitness(requirement, nullptr);
+  auto witness = conformance->getWitnessDecl(requirement, nullptr);
   assert(witness);
 
   // Determine the type we're bridging to.
@@ -55,7 +55,7 @@ emitBridgeNativeToObjectiveC(SILGenFunction &SGF,
   assert(objcType);
 
   // Create a reference to the witness.
-  SILDeclRef witnessConstant(witness.getDecl());
+  SILDeclRef witnessConstant(witness);
   auto witnessRef = SGF.emitGlobalFunctionRef(loc, witnessConstant);
 
   // Determine the substitutions.
@@ -65,10 +65,10 @@ emitBridgeNativeToObjectiveC(SILGenFunction &SGF,
 
   // FIXME: Figure out the right SubstitutionMap stuff if the witness
   // has generic parameters of its own.
-  assert(!cast<FuncDecl>(witness.getDecl())->isGeneric() &&
+  assert(!cast<FuncDecl>(witness)->isGeneric() &&
          "Generic witnesses not supported");
 
-  auto *dc = cast<FuncDecl>(witness.getDecl())->getDeclContext();
+  auto *dc = cast<FuncDecl>(witness)->getDeclContext();
   auto *genericSig = dc->getGenericSignatureOfContext();
   auto typeSubMap = swiftValueType->getContextSubstitutionMap(
       SGF.SGM.SwiftModule, dc);
@@ -118,11 +118,11 @@ emitBridgeObjectiveCToNative(SILGenFunction &SGF,
   if (!requirement) return None;
 
   // Retrieve the _unconditionallyBridgeFromObjectiveC witness.
-  auto witness = conformance->getWitness(requirement, nullptr);
+  auto witness = conformance->getWitnessDecl(requirement, nullptr);
   assert(witness);
 
   // Create a reference to the witness.
-  SILDeclRef witnessConstant(witness.getDecl());
+  SILDeclRef witnessConstant(witness);
   auto witnessRef = SGF.emitGlobalFunctionRef(loc, witnessConstant);
 
   // Determine the substitutions.
@@ -484,9 +484,7 @@ static ManagedValue emitNativeToCBridgedNonoptionalValue(SILGenFunction &SGF,
 
   // Fall back to dynamic Any-to-id bridging.
   // The destination type should be AnyObject in this case.
-  assert(loweredBridgedTy->isEqual(
-           SGF.getASTContext().getProtocol(KnownProtocolKind::AnyObject)
-             ->getDeclaredType()));
+  assert(loweredBridgedTy->isEqual(SGF.getASTContext().getAnyObjectType()));
 
   // If the input argument is known to be an existential, save the runtime
   // some work by opening it.
@@ -757,10 +755,8 @@ static ManagedValue emitCBridgedToNativeValue(SILGenFunction &SGF,
 
   // id-to-Any bridging.
   if (loweredNativeTy->isAny()) {
-    assert(loweredBridgedTy->isEqual(
-      SGF.getASTContext().getProtocol(KnownProtocolKind::AnyObject)
-        ->getDeclaredType())
-      && "Any should bridge to AnyObject");
+    assert(loweredBridgedTy->isEqual(SGF.getASTContext().getAnyObjectType())
+           && "Any should bridge to AnyObject");
 
     // TODO: Ever need to handle +0 values here?
     assert(v.hasCleanup());

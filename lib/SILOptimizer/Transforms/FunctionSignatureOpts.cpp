@@ -654,7 +654,7 @@ void FunctionSignatureTransform::createFunctionSignatureOptimizedFunction() {
   NewF = M.createFunction(
       linkage, Name, NewFTy, NewFGenericEnv, F->getLocation(), F->isBare(),
       F->isTransparent(), F->isSerialized(), F->isThunk(),
-      F->getClassVisibility(), F->getInlineStrategy(), F->getEffectsKind(),
+      F->getClassSubclassScope(), F->getInlineStrategy(), F->getEffectsKind(),
       nullptr, F->getDebugScope());
   if (F->hasUnqualifiedOwnership()) {
     NewF->setUnqualifiedOwnership();
@@ -1234,7 +1234,6 @@ public:
     }
   }
 
-  StringRef getName() override { return "Function Signature Optimization"; }
 };
 
 } // end anonymous namespace

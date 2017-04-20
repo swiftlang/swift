@@ -17,6 +17,7 @@
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/Comment.h"
 #include "swift/AST/DebuggerClient.h"
+#include "swift/AST/DiagnosticConsumer.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/PrintOptions.h"
@@ -24,7 +25,6 @@
 #include "swift/AST/SourceEntityWalker.h"
 #include "swift/AST/USRGeneration.h"
 #include "swift/Demangling/Demangle.h"
-#include "swift/Basic/DiagnosticConsumer.h"
 #include "swift/Basic/LangOptions.h"
 #include "swift/Basic/PrimitiveParsing.h"
 #include "swift/Basic/LLVMInitialize.h"
@@ -323,6 +323,12 @@ EnableSwift3ObjCInference(
                   llvm::cl::init(false));
 
 static llvm::cl::opt<bool>
+EnableDeserializationRecovery(
+    "enable-experimental-deserialization-recovery",
+    llvm::cl::desc("Attempt to recover from missing xrefs (etc) in swiftmodules"),
+    llvm::cl::init(false));
+
+static llvm::cl::opt<bool>
 DisableObjCAttrRequiresFoundationModule(
     "disable-objc-attr-requires-foundation-module",
     llvm::cl::desc("Allow @objc to be used freely"),
@@ -557,6 +563,10 @@ NoEmptyLineBetweenMembers("no-empty-line-between-members",
 
 static llvm::cl::opt<bool> DebugConstraintSolver("debug-constraints",
     llvm::cl::desc("Enable verbose debugging from the constraint solver."));
+
+static llvm::cl::opt<bool>
+IncludeLocals("include-locals", llvm::cl::desc("Index local symbols too."),
+              llvm::cl::init(false));
 } // namespace options
 
 static std::unique_ptr<llvm::MemoryBuffer>
@@ -2682,6 +2692,7 @@ static int doPrintRangeInfo(const CompilerInvocation &InitInvok,
 namespace {
   class PrintIndexDataConsumer : public IndexDataConsumer {
     raw_ostream &OS;
+    bool shouldIndexLocals;
     bool firstSourceEntity = true;
 
     void printSymbolInfo(SymbolInfo SymInfo) {
@@ -2697,8 +2708,10 @@ namespace {
     }
 
   public:
-    PrintIndexDataConsumer(raw_ostream &OS) : OS(OS) {}
+    PrintIndexDataConsumer(raw_ostream &OS, bool indexLocals = false) :
+      OS(OS), shouldIndexLocals(indexLocals) {}
 
+    bool indexLocals() override { return shouldIndexLocals; }
     void failed(StringRef error) override {}
 
     bool recordHash(StringRef hash, bool isKnown) override { return true; }
@@ -2743,7 +2756,7 @@ namespace {
 } // anonymous namespace
 
 static int doPrintIndexedSymbols(const CompilerInvocation &InitInvok,
-                                StringRef SourceFileName) {
+                                StringRef SourceFileName, bool indexLocals) {
 
   CompilerInvocation Invocation(InitInvok);
   Invocation.addInputFilename(SourceFileName);
@@ -2770,7 +2783,7 @@ static int doPrintIndexedSymbols(const CompilerInvocation &InitInvok,
 
   llvm::outs() << llvm::sys::path::filename(SF->getFilename()) << '\n';
   llvm::outs() << "------------\n";
-  PrintIndexDataConsumer consumer(llvm::outs());
+  PrintIndexDataConsumer consumer(llvm::outs(), indexLocals);
   indexSourceFile(SF, StringRef(), consumer);
 
   return 0;
@@ -3004,6 +3017,8 @@ int main(int argc, char *argv[]) {
   InitInvok.getLangOptions().EnableSwift3ObjCInference =
     options::EnableSwift3ObjCInference ||
     InitInvok.getLangOptions().isSwiftVersion3();
+  InitInvok.getLangOptions().EnableDeserializationRecovery |=
+    options::EnableDeserializationRecovery;
   InitInvok.getClangImporterOptions().ImportForwardDeclarations |=
     options::ObjCForwardDeclarations;
   InitInvok.getClangImporterOptions().InferImportAsMember |=
@@ -3236,7 +3251,8 @@ int main(int argc, char *argv[]) {
     break;
   case ActionType::PrintIndexedSymbols:
       if (options::ModuleToPrint.empty()) {
-        ExitCode = doPrintIndexedSymbols(InitInvok, options::SourceFilename);
+        ExitCode = doPrintIndexedSymbols(InitInvok, options::SourceFilename,
+                                         options::IncludeLocals);
       } else {
         if (options::ModuleToPrint.size() > 1) {
           llvm::errs() << "printing symbols for the first module name, the rest "

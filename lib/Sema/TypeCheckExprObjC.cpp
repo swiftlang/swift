@@ -71,14 +71,7 @@ Optional<Type> TypeChecker::checkObjCKeyPathExpr(DeclContext *dc,
 
   // The type of AnyObject, which is used whenever we don't have
   // sufficient type information.
-  Type anyObjectType;
-  if (auto anyObject = Context.getProtocol(KnownProtocolKind::AnyObject)) {
-    validateDecl(anyObject);
-    anyObjectType = anyObject->getDeclaredInterfaceType();
-  } else {
-    diagnose(expr->getLoc(), diag::stdlib_anyobject_not_found);
-    return None;
-  }
+  Type anyObjectType = Context.getAnyObjectType();
 
   // Local function to update the state after we've resolved a
   // component.

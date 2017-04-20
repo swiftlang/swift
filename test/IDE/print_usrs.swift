@@ -9,12 +9,12 @@ struct S {
   var x : Int
 }
 
-// CHECK: [[@LINE+1]]:11 s:14swift_ide_test6MyGInt{{$}}
+// CHECK: [[@LINE+1]]:11 s:14swift_ide_test6MyGInta{{$}}
 typealias MyGInt = Int
 
 // CHECK: [[@LINE+1]]:7 s:14swift_ide_test5MyClsC{{$}}
 class MyCls {
-  // CHECK: [[@LINE+1]]:13 s:14swift_ide_test5MyClsC2TA{{$}}
+  // CHECK: [[@LINE+1]]:13 s:14swift_ide_test5MyClsC2TAa{{$}}
   typealias TA = Int
   // CHECK: [[@LINE+1]]:7 s:14swift_ide_test5MyClsC3wwwSiv{{$}}
   var www : Int = 0
@@ -39,7 +39,7 @@ class MyCls {
 // CHECK: [[@LINE+1]]:7 s:14swift_ide_test12GenericClassC{{$}}
 class GenericClass {
 
-  // CHECK: [[@LINE+1]]:13 s:14swift_ide_test12GenericClassC2TA{{$}}
+  // CHECK: [[@LINE+1]]:13 s:14swift_ide_test12GenericClassC2TAa{{$}}
   typealias TA = Int
 
   // CHECK: [[@LINE+1]]:7 s:14swift_ide_test12GenericClassC11instanceVarSiv{{$}}
@@ -64,7 +64,7 @@ class GenericClass {
   // CHECK: [[@LINE+1]]:3 s:14swift_ide_test12GenericClassCfd{{$}}
   deinit {
     // CHECK: [[@LINE+2]]:18 s:14swift_ide_test12GenericClassC9classFuncyACFZ{{$}}
-    // CHECK: [[@LINE+1]]:28 ERROR:no-usr{{$}}
+    // CHECK: [[@LINE+1]]:28 s:14swift_ide_test12GenericClassCfd4selfL_ACv{{$}}
     GenericClass.classFunc(self)
   }
 
@@ -86,7 +86,7 @@ protocol Prot {
 protocol Prot2 {}
 
 class SubCls : MyCls, Prot {
-  // CHECK: [[@LINE+1]]:13 s:14swift_ide_test6SubClsC5Blarg{{$}}
+  // CHECK: [[@LINE+1]]:13 s:14swift_ide_test6SubClsC5Blarga{{$}}
   typealias Blarg = Prot2
   // CHECK: [[@LINE+1]]:8 s:14swift_ide_test6SubClsC8protMethAA5Prot2_pAaE_pF{{$}}
   func protMeth(_ x: Blarg) -> Blarg {}

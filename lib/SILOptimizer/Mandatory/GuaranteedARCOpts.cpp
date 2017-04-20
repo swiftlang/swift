@@ -221,8 +221,6 @@ struct GuaranteedARCOpts : SILFunctionTransform {
       invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
     }
   }
-
-  StringRef getName() override { return "Guaranteed ARC Opts"; }
 };
 
 } // end anonymous namespace

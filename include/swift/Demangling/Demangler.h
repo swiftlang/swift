@@ -283,7 +283,7 @@ public:
 
 /// The demangler.
 ///
-/// It de-mangles a string and it also ownes the returned node-tree. This means
+/// It de-mangles a string and it also owns the returned node-tree. This means
 /// The nodes of the tree only live as long as the Demangler itself.
 class Demangler : public NodeFactory {
 private:
@@ -405,8 +405,7 @@ private:
   NodePointer popTypeAndGetChild();
   NodePointer popTypeAndGetNominal();
   NodePointer demangleBuiltinType();
-  NodePointer demangleNominalType(Node::Kind kind);
-  NodePointer demangleTypeAlias();
+  NodePointer demangleAnyGenericType(Node::Kind kind);
   NodePointer demangleExtensionContext();
   NodePointer demanglePlainFunction();
   NodePointer popFunctionType(Node::Kind kind);
@@ -447,6 +446,7 @@ private:
   NodePointer demangleMetatypeRepresentation();
   NodePointer demangleFunctionEntity();
   NodePointer demangleEntity(Node::Kind Kind);
+  NodePointer demangleProtocolList();
   NodePointer demangleProtocolListType();
   NodePointer demangleGenericSignature(bool hasParamCounts);
   NodePointer demangleGenericRequirement();
@@ -454,6 +454,8 @@ private:
   NodePointer demangleValueWitness();
 
   NodePointer demangleObjCTypeName();
+
+  void dump();
 
 public:
   Demangler() {}

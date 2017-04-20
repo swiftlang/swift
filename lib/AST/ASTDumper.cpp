@@ -359,6 +359,10 @@ getStringLiteralExprEncodingString(StringLiteralExpr::Encoding value) {
   switch (value) {
     case StringLiteralExpr::UTF8: return "utf8";
     case StringLiteralExpr::UTF16: return "utf16";
+    case StringLiteralExpr::UTF8ConstString:
+      return "utf8_const_string";
+    case StringLiteralExpr::UTF16ConstString:
+      return "utf16_const_string";
     case StringLiteralExpr::OneUnicodeScalar: return "unicodeScalar";
   }
 
@@ -3120,7 +3124,9 @@ namespace {
     void visitProtocolCompositionType(ProtocolCompositionType *T,
                                       StringRef label) {
       printCommon(T, label, "protocol_composition_type");
-      for (auto proto : T->getProtocols()) {
+      if (T->hasExplicitAnyObject())
+        OS << " any_object";
+      for (auto proto : T->getMembers()) {
         printRec(proto);
       }
       OS << ")";

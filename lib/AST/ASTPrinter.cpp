@@ -233,18 +233,19 @@ struct SynthesizedExtensionAnalyzer::Implementation {
     for (auto Req : Ext->getGenericSignature()->getRequirements()) {
       auto Kind = Req.getKind();
 
-      Type First = Req.getFirstType().subst(subMap);
-      Type Second = Req.getSecondType().subst(subMap);
+      auto First = Req.getFirstType();
+      auto Second = Req.getSecondType();
+      if (!BaseType->isExistentialType()) {
+        First = First.subst(subMap);
+        Second = Second.subst(subMap);
 
-      if (!First || !Second) {
-        // Substitution with interface type bases can only fail
-        // if a concrete type fails to conform to a protocol.
-        // In this case, just give up on the extension altogether.
-        return {Result, MergeInfo};
+        if (!First || !Second) {
+          // Substitution with interface type bases can only fail
+          // if a concrete type fails to conform to a protocol.
+          // In this case, just give up on the extension altogether.
+          return {Result, MergeInfo};
+        }
       }
-
-      First = First->getCanonicalType();
-      Second = Second->getCanonicalType();
 
       switch (Kind) {
         case RequirementKind::Conformance:
@@ -337,6 +338,17 @@ struct SynthesizedExtensionAnalyzer::Implementation {
         }
       }
     };
+
+    auto handleExtension = [&](ExtensionDecl *E, bool Synthesized) {
+      if (shouldPrint(E, Options)) {
+        auto Pair = isApplicable(E, Synthesized);
+        if (Pair.first) {
+          InfoMap->insert({E, Pair.first});
+          MergeInfoMap.insert({E, Pair.second});
+        }
+      }
+    };
+
     for (auto TL : Target->getInherited()) {
       if (!isEnumRawType(Target, TL))
         addTypeLocNominal(TL);
@@ -345,13 +357,7 @@ struct SynthesizedExtensionAnalyzer::Implementation {
       NominalTypeDecl* Back = Unhandled.back();
       Unhandled.pop_back();
       for (ExtensionDecl *E : Back->getExtensions()) {
-        if (!shouldPrint(E, Options))
-          continue;
-        auto Pair = isApplicable(E, /*Synthesized*/true);
-        if (Pair.first) {
-          InfoMap->insert({E, Pair.first});
-          MergeInfoMap.insert({E, Pair.second});
-        }
+        handleExtension(E, true);
         for (auto TL : Back->getInherited()) {
           if (!isEnumRawType(Target, TL))
             addTypeLocNominal(TL);
@@ -361,12 +367,10 @@ struct SynthesizedExtensionAnalyzer::Implementation {
 
     // Merge with actual extensions.
     for (auto *E : Target->getExtensions()) {
-      if (!shouldPrint(E, Options))
-        continue;
-      auto Pair = isApplicable(E, /*Synthesized*/false);
-      if (Pair.first) {
-        InfoMap->insert({E, Pair.first});
-        MergeInfoMap.insert({E, Pair.second});
+      handleExtension(E, false);
+      for (auto *Conf : E->getLocalConformances()) {
+        for (auto E : Conf->getProtocol()->getExtensions())
+          handleExtension(E, true);
       }
     }
 
@@ -608,8 +612,8 @@ uint8_t swift::getKeywordLen(tok keyword) {
 StringRef swift::getCodePlaceholder() { return "<#code#>"; }
 
 void swift::
-printEnumElmentsAsCases(llvm::DenseSet<EnumElementDecl*> &UnhandledElements,
-                        llvm::raw_ostream &OS) {
+printEnumElementsAsCases(llvm::DenseSet<EnumElementDecl*> &UnhandledElements,
+                         llvm::raw_ostream &OS) {
   // Sort the missing elements to a vector because set does not guarantee orders.
   SmallVector<EnumElementDecl*, 4> SortedElements;
   SortedElements.insert(SortedElements.begin(), UnhandledElements.begin(),
@@ -934,21 +938,18 @@ class PrintAST : public ASTVisitor<PrintAST> {
         T = Current->getInnermostDeclContext()->mapTypeOutOfContext(T);
       }
 
-      // Get the innermost nominal type context.
-      DeclContext *DC;
-      if (isa<NominalTypeDecl>(Current))
-        DC = Current->getInnermostDeclContext();
-      else if (isa<ExtensionDecl>(Current))
-        DC = Current->getInnermostDeclContext()->
-          getAsNominalTypeOrNominalTypeExtensionContext();
-      else
-        DC = Current->getDeclContext();
+      auto *M = Current->getDeclContext()->getParentModule();
+      SubstitutionMap subMap;
 
-      assert(DC->isTypeContext());
+      if (auto *NTD = dyn_cast<NominalTypeDecl>(Current))
+        subMap = CurrentType->getContextSubstitutionMap(M, NTD);
+      else if (auto *ED = dyn_cast<ExtensionDecl>(Current))
+        subMap = CurrentType->getContextSubstitutionMap(M, ED);
+      else {
+        subMap = CurrentType->getMemberSubstitutionMap(
+          M, cast<ValueDecl>(Current));
+      }
 
-      // Get the substitutions from our base type.
-      auto *M = DC->getParentModule();
-      auto subMap = CurrentType->getContextSubstitutionMap(M, DC);
       T = T.subst(subMap, SubstFlags::DesugarMemberTypes);
     }
 
@@ -1019,8 +1020,7 @@ private:
                       ArrayRef<TypeLoc> inherited,
                       ArrayRef<ProtocolDecl *> protos,
                       Type superclass = {},
-                      bool explicitClass = false,
-                      bool PrintAsProtocolComposition = false);
+                      bool explicitClass = false);
 
   void printInherited(const NominalTypeDecl *decl,
                       bool explicitClass = false);
@@ -2060,8 +2060,7 @@ void PrintAST::printInherited(const Decl *decl,
                               ArrayRef<TypeLoc> inherited,
                               ArrayRef<ProtocolDecl *> protos,
                               Type superclass,
-                              bool explicitClass,
-                              bool PrintAsProtocolComposition) {
+                              bool explicitClass) {
   if (inherited.empty() && superclass.isNull() && !explicitClass) {
     if (protos.empty())
       return;
@@ -2091,12 +2090,6 @@ void PrintAST::printInherited(const Decl *decl,
       }
     }
 
-    bool UseProtocolCompositionSyntax =
-        PrintAsProtocolComposition && protos.size() > 1;
-    if (UseProtocolCompositionSyntax) {
-      Printer << " : " << tok::kw_protocol << "<";
-      PrintedColon = true;
-    }
     for (auto Proto : protos) {
       if (!shouldPrint(Proto))
         continue;
@@ -2108,8 +2101,9 @@ void PrintAST::printInherited(const Decl *decl,
             && Proto->isSpecificProtocol(KnownProtocolKind::RawRepresentable))
           continue;
         // Conformance to Equatable and Hashable is implied by being a "simple"
-        // no-payload enum.
-        if (Enum->hasOnlyCasesWithoutAssociatedValues()
+        // no-payload enum with cases.
+        if (Enum->hasCases()
+            && Enum->hasOnlyCasesWithoutAssociatedValues()
             && (Proto->isSpecificProtocol(KnownProtocolKind::Equatable)
                 || Proto->isSpecificProtocol(KnownProtocolKind::Hashable)))
           continue;
@@ -2123,8 +2117,6 @@ void PrintAST::printInherited(const Decl *decl,
       PrintedInherited = true;
       PrintedColon = true;
     }
-    if (UseProtocolCompositionSyntax)
-      Printer << ">";
   } else {
     SmallVector<TypeLoc, 6> TypesToPrint;
     for (auto TL : inherited) {
@@ -3521,9 +3513,12 @@ class TypePrinter : public TypeVisitor<TypePrinter> {
     }
 
     case TypeKind::ProtocolComposition: {
-      // 'Any' and single protocol compositions are simple
+      // 'Any', 'AnyObject' and single protocol compositions are simple
       auto composition = type->getAs<ProtocolCompositionType>();
-      return composition->getProtocols().size() <= 1;
+      auto memberCount = composition->getMembers().size();
+      if (composition->hasExplicitAnyObject())
+        return memberCount == 0;
+      return memberCount <= 1;
     }
 
     default:
@@ -4195,11 +4190,16 @@ public:
   }
 
   void visitProtocolCompositionType(ProtocolCompositionType *T) {
-    if (T->getProtocols().empty()) {
-      Printer << "Any";
+    if (T->getMembers().empty()) {
+      if (T->hasExplicitAnyObject())
+        Printer << "AnyObject";
+      else
+        Printer << "Any";
     } else {
-      interleave(T->getProtocols(), [&](Type Proto) { visit(Proto); },
+      interleave(T->getMembers(), [&](Type Ty) { visit(Ty); },
                  [&] { Printer << " & "; });
+      if (T->hasExplicitAnyObject())
+        Printer << " & AnyObject";
     }
   }
 

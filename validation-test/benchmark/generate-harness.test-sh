@@ -1,0 +1,5 @@
+// RUN: rm -rf %t
+// RUN: %swift_src_root/benchmark/scripts/generate_harness/test_generate_harness.sh %swift_src_root %t
+// REQUIRES: OS=macosx
+// REQUIRES: asserts
+// REQUIRES: CMAKE_GENERATOR=Ninja

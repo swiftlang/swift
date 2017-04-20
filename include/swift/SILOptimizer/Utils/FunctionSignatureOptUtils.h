@@ -85,7 +85,7 @@ struct ArgumentDescriptor {
         OwnedToGuaranteed(false), IsIndirectResult(A->isIndirectResult()),
         CalleeRelease(), CalleeReleaseInThrowBlock(),
         ProjTree(A->getModule(), A->getType()) {
-        if(!A->isIndirectResult()) {
+        if (!A->isIndirectResult()) {
            PInfo = Arg->getKnownParameterInfo();
         }
   }

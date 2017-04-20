@@ -29,7 +29,6 @@
 #include "swift/Basic/Version.h"
 #include "swift/Demangling/ManglingMacros.h"
 #include "swift/ClangImporter/ClangImporter.h"
-#include "swift/IRGen/Linking.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBasicBlock.h"
 #include "swift/SIL/SILDebugScope.h"
@@ -418,27 +417,27 @@ llvm::DIFile *IRGenDebugInfo::getOrCreateFile(StringRef Filename) {
   if (Filename.empty())
     return MainFile;
 
-  if (MainFile) {
-    SmallString<256> AbsMainFile, ThisFile;
-    AbsMainFile = Filename;
-    llvm::sys::fs::make_absolute(AbsMainFile);
-    llvm::sys::path::append(ThisFile, MainFile->getDirectory(),
-                            MainFile->getFilename());
-    if (ThisFile == AbsMainFile) {
-      DIFileCache[Filename] = llvm::TrackingMDNodeRef(MainFile);
-      return MainFile;
-    }
-  }
-
   // Look in the cache first.
   auto CachedFile = DIFileCache.find(Filename);
-
   if (CachedFile != DIFileCache.end()) {
     // Verify that the information still exists.
     if (llvm::Metadata *V = CachedFile->second)
       return cast<llvm::DIFile>(V);
   }
 
+  // Detect the main file.
+  if (MainFile && Filename.endswith(MainFile->getFilename())) {
+    SmallString<256> AbsThisFile, AbsMainFile;
+    AbsThisFile = Filename;
+    llvm::sys::fs::make_absolute(AbsThisFile);
+    llvm::sys::path::append(AbsMainFile, MainFile->getDirectory(),
+                            MainFile->getFilename());
+    if (AbsThisFile == AbsMainFile) {
+      DIFileCache[Filename] = llvm::TrackingMDNodeRef(MainFile);
+      return MainFile;
+    }
+  }
+  
   // Create a new one.
   StringRef File = llvm::sys::path::filename(Filename);
   llvm::SmallString<512> Path(Filename);
@@ -895,6 +894,11 @@ void IRGenDebugInfo::emitVariableDeclaration(
   if (Opts.DebugInfoKind <= IRGenDebugInfoKind::LineTables)
     return;
 
+  // Currently, the DeclContext is needed to mangle archetypes. Bail out if it's
+  // missing.
+  if (DbgTy.Type->hasArchetype() && !DbgTy.DeclCtx)
+    return;
+
   if (!DbgTy.size)
     DbgTy.size = getStorageSize(IGM.DataLayout, Storage);
 
@@ -1054,9 +1058,9 @@ IRGenDebugInfo::createMemberType(DebugTypeInfo DbgTy, StringRef Name,
                                  llvm::DINode::DIFlags Flags) {
   unsigned SizeOfByte = CI.getTargetInfo().getCharWidth();
   auto *Ty = getOrCreateType(DbgTy);
-  auto *DITy = DBuilder.createMemberType(
-      Scope, Name, File, 0, SizeOfByte * DbgTy.size.getValue(),
-      SizeOfByte * DbgTy.align.getValue(), OffsetInBits, Flags, Ty);
+  auto *DITy = DBuilder.createMemberType(Scope, Name, File, 0,
+                                         SizeOfByte * DbgTy.size.getValue(), 0,
+                                         OffsetInBits, Flags, Ty);
   OffsetInBits += getSizeInBits(Ty);
   OffsetInBits =
       llvm::alignTo(OffsetInBits, SizeOfByte * DbgTy.align.getValue());
@@ -1116,7 +1120,7 @@ llvm::DICompositeType *IRGenDebugInfo::createStructType(
   auto FwdDecl = llvm::TempDIType(
     DBuilder.createReplaceableCompositeType(
       llvm::dwarf::DW_TAG_structure_type, Name, Scope, File, Line,
-        llvm::dwarf::DW_LANG_Swift, SizeInBits, AlignInBits, Flags, UniqueID));
+        llvm::dwarf::DW_LANG_Swift, SizeInBits, 0, Flags, UniqueID));
 
 #ifndef NDEBUG
   if (UniqueID.empty())
@@ -1158,7 +1162,7 @@ llvm::DINodeArray IRGenDebugInfo::getEnumElements(DebugTypeInfo DbgTy,
       // the storage size from the enum.
       ElemDbgTy =
           DebugTypeInfo(ED, DbgTy.getGenericEnvironment(), ED->getRawType(),
-                        DbgTy.StorageType, DbgTy.size, DbgTy.align);
+                        DbgTy.StorageType, DbgTy.size, DbgTy.align, true);
     else if (auto ArgTy = ElemDecl->getArgumentInterfaceType()) {
       // A discriminated union. This should really be described as a
       // DW_TAG_variant_type. For now only describing the data.
@@ -1175,7 +1179,7 @@ llvm::DINodeArray IRGenDebugInfo::getEnumElements(DebugTypeInfo DbgTy,
       ElemDbgTy = DebugTypeInfo(
           ElemDecl->getDeclContext(),
           ElemDecl->getDeclContext()->getGenericEnvironmentOfContext(), IntTy,
-          DbgTy.StorageType, Size(0), Alignment(1));
+          DbgTy.StorageType, Size(0), Alignment(1), true);
     }
     unsigned Offset = 0;
     auto MTy = createMemberType(ElemDbgTy, ElemDecl->getName().str(), Offset,
@@ -1191,7 +1195,8 @@ llvm::DICompositeType *IRGenDebugInfo::createEnumType(
     llvm::DINode::DIFlags Flags) {
   unsigned SizeOfByte = CI.getTargetInfo().getCharWidth();
   unsigned SizeInBits = DbgTy.size.getValue() * SizeOfByte;
-  unsigned AlignInBits = DbgTy.align.getValue() * SizeOfByte;
+  // Default, since Swift doesn't allow specifying a custom alignment.
+  unsigned AlignInBits = 0;
 
   // FIXME: Is DW_TAG_union_type the right thing here?
   // Consider using a DW_TAG_variant_type instead.
@@ -1217,7 +1222,7 @@ llvm::DIType *IRGenDebugInfo::getOrCreateDesugaredType(Type Ty,
                                                        DebugTypeInfo DbgTy) {
   DebugTypeInfo BlandDbgTy(DbgTy.getDeclContext(),
                            DbgTy.getGenericEnvironment(), Ty, DbgTy.StorageType,
-                           DbgTy.size, DbgTy.align);
+                           DbgTy.size, DbgTy.align, DbgTy.DefaultAlignment);
   return getOrCreateType(BlandDbgTy);
 }
 
@@ -1248,9 +1253,8 @@ llvm::DIType *IRGenDebugInfo::createPointerSizedStruct(
                                     MangledName);
   } else {
     unsigned SizeInBits = CI.getTargetInfo().getPointerWidth(0);
-    unsigned AlignInBits = CI.getTargetInfo().getPointerAlign(0);
-    return createOpaqueStruct(Scope, Name, File, Line, SizeInBits, AlignInBits,
-                              Flags, MangledName);
+    return createOpaqueStruct(Scope, Name, File, Line, SizeInBits, 0, Flags,
+                              MangledName);
   }
 }
 
@@ -1259,14 +1263,11 @@ llvm::DIType *IRGenDebugInfo::createPointerSizedStruct(
     llvm::DIFile *File, unsigned Line, llvm::DINode::DIFlags Flags,
     StringRef MangledName) {
   unsigned PtrSize = CI.getTargetInfo().getPointerWidth(0);
-  unsigned PtrAlign = CI.getTargetInfo().getPointerAlign(0);
-  auto PtrTy = DBuilder.createPointerType(PointeeTy, PtrSize, PtrAlign);
-  llvm::Metadata *Elements[] = {
-    DBuilder.createMemberType(Scope, "ptr", File, 0,
-                              PtrSize, PtrAlign, 0, Flags, PtrTy)
-  };
+  auto PtrTy = DBuilder.createPointerType(PointeeTy, PtrSize, 0);
+  llvm::Metadata *Elements[] = {DBuilder.createMemberType(
+      Scope, "ptr", File, 0, PtrSize, 0, 0, Flags, PtrTy)};
   return DBuilder.createStructType(
-      Scope, Name, File, Line, PtrSize, PtrAlign, Flags,
+      Scope, Name, File, Line, PtrSize, 0, Flags,
       /* DerivedFrom */ nullptr, DBuilder.getOrCreateArray(Elements),
       llvm::dwarf::DW_LANG_Swift, nullptr, MangledName);
 }
@@ -1276,16 +1277,15 @@ llvm::DIType *IRGenDebugInfo::createDoublePointerSizedStruct(
     llvm::DIFile *File, unsigned Line, llvm::DINode::DIFlags Flags,
     StringRef MangledName) {
   unsigned PtrSize = CI.getTargetInfo().getPointerWidth(0);
-  unsigned PtrAlign = CI.getTargetInfo().getPointerAlign(0);
   llvm::Metadata *Elements[] = {
       DBuilder.createMemberType(
-          Scope, "ptr", File, 0, PtrSize, PtrAlign, 0, Flags,
-          DBuilder.createPointerType(PointeeTy, PtrSize, PtrAlign)),
+          Scope, "ptr", File, 0, PtrSize, 0, 0, Flags,
+          DBuilder.createPointerType(PointeeTy, PtrSize, 0)),
       DBuilder.createMemberType(
-          Scope, "_", File, 0, PtrSize, PtrAlign, 0, Flags,
-          DBuilder.createPointerType(nullptr, PtrSize, PtrAlign))};
+          Scope, "_", File, 0, PtrSize, 0, 0, Flags,
+          DBuilder.createPointerType(nullptr, PtrSize, 0))};
   return DBuilder.createStructType(
-      Scope, Name, File, Line, 2*PtrSize, PtrAlign, Flags,
+      Scope, Name, File, Line, 2*PtrSize, 0, Flags,
       /* DerivedFrom */ nullptr, DBuilder.getOrCreateArray(Elements),
       llvm::dwarf::DW_LANG_Swift, nullptr, MangledName);
 }
@@ -1395,7 +1395,8 @@ llvm::DIType *IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
   // to emit the (target!) size of the underlying basic type.
   uint64_t SizeOfByte = CI.getTargetInfo().getCharWidth();
   uint64_t SizeInBits = DbgTy.size.getValue() * SizeOfByte;
-  uint64_t AlignInBits = DbgTy.align.getValue() * SizeOfByte;
+  unsigned AlignInBits =
+      DbgTy.DefaultAlignment ? 0 : DbgTy.align.getValue() * SizeOfByte;
   unsigned Encoding = 0;
   llvm::DINode::DIFlags Flags = llvm::DINode::FlagZero;
 
@@ -1433,33 +1434,34 @@ llvm::DIType *IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
     // The builtin opaque Objective-C pointer type. Useful for pushing
     // an Objective-C type through swift.
     unsigned PtrSize = CI.getTargetInfo().getPointerWidth(0);
-    unsigned PtrAlign = CI.getTargetInfo().getPointerAlign(0);
     auto IdTy = DBuilder.createForwardDecl(
       llvm::dwarf::DW_TAG_structure_type, MangledName, Scope, File, 0,
         llvm::dwarf::DW_LANG_ObjC, 0, 0);
-    return DBuilder.createPointerType(IdTy, PtrSize, PtrAlign, MangledName);
+    return DBuilder.createPointerType(IdTy, PtrSize, 0,
+                                      /* DWARFAddressSpace */ None,
+                                      MangledName);
   }
 
   case TypeKind::BuiltinNativeObject: {
     unsigned PtrSize = CI.getTargetInfo().getPointerWidth(0);
-    unsigned PtrAlign = CI.getTargetInfo().getPointerAlign(0);
-    auto PTy = DBuilder.createPointerType(nullptr, PtrSize, PtrAlign,
+    auto PTy = DBuilder.createPointerType(nullptr, PtrSize, 0,
+                                          /* DWARFAddressSpace */ None,
                                           MangledName);
     return DBuilder.createObjectPointerType(PTy);
   }
 
   case TypeKind::BuiltinBridgeObject: {
     unsigned PtrSize = CI.getTargetInfo().getPointerWidth(0);
-    unsigned PtrAlign = CI.getTargetInfo().getPointerAlign(0);
-    auto PTy = DBuilder.createPointerType(nullptr, PtrSize, PtrAlign,
+    auto PTy = DBuilder.createPointerType(nullptr, PtrSize, 0,
+                                          /* DWARFAddressSpace */ None,
                                           MangledName);
     return DBuilder.createObjectPointerType(PTy);
   }
 
   case TypeKind::BuiltinRawPointer: {
     unsigned PtrSize = CI.getTargetInfo().getPointerWidth(0);
-    unsigned PtrAlign = CI.getTargetInfo().getPointerAlign(0);
-    return DBuilder.createPointerType(nullptr, PtrSize, PtrAlign,
+    return DBuilder.createPointerType(nullptr, PtrSize, 0,
+                                      /* DWARFAddressSpace */ None,
                                       MangledName);
   }
 
@@ -1659,7 +1661,7 @@ llvm::DIType *IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
 
   case TypeKind::SILFunction:
   case TypeKind::Function:
- case TypeKind::GenericFunction: {
+  case TypeKind::GenericFunction: {
     if (Opts.DebugInfoKind > IRGenDebugInfoKind::ASTTypes)
       return createFunctionPointer(DbgTy, Scope, SizeInBits, AlignInBits, Flags,
                                    MangledName);
@@ -1700,7 +1702,7 @@ llvm::DIType *IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
     DebugTypeInfo ElemDbgTy(DbgTy.getDeclContext(),
                             DbgTy.getGenericEnvironment(),
                             BuiltinVectorTy->getElementType(),
-                            DbgTy.StorageType, DbgTy.size, DbgTy.align);
+                            DbgTy.StorageType, DbgTy.size, DbgTy.align, true);
     auto Subscripts = nullptr;
     return DBuilder.createVectorType(BuiltinVectorTy->getNumElements(),
                                      AlignInBits, getOrCreateType(ElemDbgTy),
@@ -1730,9 +1732,9 @@ llvm::DIType *IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
     auto File = getOrCreateFile(L.Filename);
     // For NameAlias types, the DeclContext for the aliasED type is
     // in the decl of the alias type.
-    DebugTypeInfo AliasedDbgTy(DbgTy.getDeclContext(),
-                               DbgTy.getGenericEnvironment(), AliasedTy,
-                               DbgTy.StorageType, DbgTy.size, DbgTy.align);
+    DebugTypeInfo AliasedDbgTy(
+        DbgTy.getDeclContext(), DbgTy.getGenericEnvironment(), AliasedTy,
+        DbgTy.StorageType, DbgTy.size, DbgTy.align, DbgTy.DefaultAlignment);
     return DBuilder.createTypedef(getOrCreateType(AliasedDbgTy), MangledName,
                                   File, L.Line, File);
   }

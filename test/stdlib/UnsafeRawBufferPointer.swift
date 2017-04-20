@@ -235,7 +235,7 @@ UnsafeRawBufferPointerTestSuite.test("subscript.get.underflow") {
   let buffer = UnsafeMutableRawBufferPointer.allocate(count: 2)
   defer { buffer.deallocate() }
 
-  let bytes = buffer[1..<2]
+  let bytes = UnsafeRawBufferPointer(rebasing: buffer[1..<2])
 
   if _isDebugAssertConfiguration() {
     expectCrashLater()
@@ -248,7 +248,7 @@ UnsafeRawBufferPointerTestSuite.test("subscript.get.overflow") {
   let buffer = UnsafeMutableRawBufferPointer.allocate(count: 2)
   defer { buffer.deallocate() }
 
-  let bytes = buffer[0..<1]
+  let bytes = UnsafeRawBufferPointer(rebasing: buffer[0..<1])
 
   if _isDebugAssertConfiguration() {
     expectCrashLater()
@@ -261,7 +261,7 @@ UnsafeRawBufferPointerTestSuite.test("subscript.set.underflow") {
   let buffer = UnsafeMutableRawBufferPointer.allocate(count: 2)
   defer { buffer.deallocate() }
 
-  var bytes = buffer[1..<2]
+  var bytes = UnsafeMutableRawBufferPointer(rebasing: buffer[1..<2])
 
   if _isDebugAssertConfiguration() {
     expectCrashLater()
@@ -274,7 +274,7 @@ UnsafeRawBufferPointerTestSuite.test("subscript.set.overflow") {
   let buffer = UnsafeMutableRawBufferPointer.allocate(count: 2)
   defer { buffer.deallocate() }
 
-  var bytes = buffer[0..<1]
+  var bytes = UnsafeMutableRawBufferPointer(rebasing: buffer[0..<1])
 
   if _isDebugAssertConfiguration() {
     expectCrashLater()
@@ -287,7 +287,7 @@ UnsafeRawBufferPointerTestSuite.test("subscript.range.get.underflow") {
   let buffer = UnsafeMutableRawBufferPointer.allocate(count: 3)
   defer { buffer.deallocate() }
 
-  let bytes = buffer[1..<3]
+  let bytes = UnsafeRawBufferPointer(rebasing: buffer[1..<3])
 
   if _isDebugAssertConfiguration() {
     expectCrashLater()
@@ -300,7 +300,7 @@ UnsafeRawBufferPointerTestSuite.test("subscript.range.get.overflow") {
   let buffer = UnsafeMutableRawBufferPointer.allocate(count: 3)
   defer { buffer.deallocate() }
 
-  let bytes = buffer[0..<2]
+  let bytes = UnsafeRawBufferPointer(rebasing: buffer[0..<2])
 
   if _isDebugAssertConfiguration() {
     expectCrashLater()
@@ -313,7 +313,7 @@ UnsafeRawBufferPointerTestSuite.test("subscript.range.set.underflow") {
   var buffer = UnsafeMutableRawBufferPointer.allocate(count: 3)
   defer { buffer.deallocate() }
 
-  var bytes = buffer[1..<3]
+  var bytes = UnsafeMutableRawBufferPointer(rebasing: buffer[1..<3])
 
   if _isDebugAssertConfiguration() {
     expectCrashLater()
@@ -326,7 +326,8 @@ UnsafeRawBufferPointerTestSuite.test("subscript.range.set.overflow") {
   var buffer = UnsafeMutableRawBufferPointer.allocate(count: 3)
   defer { buffer.deallocate() }
 
-  var bytes = buffer[0..<2]
+  var bytes = UnsafeMutableRawBufferPointer(rebasing: buffer[0..<2])
+
   if _isDebugAssertConfiguration() {
     expectCrashLater()
   }

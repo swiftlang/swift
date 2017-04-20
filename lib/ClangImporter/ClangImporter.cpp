@@ -228,6 +228,7 @@ namespace {
         getBufferSize()};
       std::error_code error = llvm::sys::Memory::releaseMappedMemory(memory);
       assert(!error && "failed to deallocate read-only zero-filled memory");
+      (void)error;
     }
 
     ZeroFilledMemoryBuffer(const ZeroFilledMemoryBuffer &) = delete;
@@ -328,7 +329,7 @@ public:
             || Filename == ImporterImpl::bridgingHeaderBufferName);
   }
 
-  // Currently preserving older ClangImporter behaviour of ignoring system
+  // Currently preserving older ClangImporter behavior of ignoring system
   // dependencies, but possibly revisit?
   bool needSystemDependencies() override { return false; }
 
@@ -339,7 +340,7 @@ public:
                                                    IsSystem, IsClangModuleFile,
                                                    IsMissing))
       return false;
-    // Currently preserving older ClangImporter behaviour of ignoring .pcm
+    // Currently preserving older ClangImporter behavior of ignoring .pcm
     // file dependencies, but possibly revisit?
     if (IsClangModuleFile
         || isClangImporterSpecialName(Filename)
@@ -2014,13 +2015,8 @@ public:
       : NextConsumer(consumer), ClangASTContext(clangASTContext) {}
 
   static bool needsBlacklist(const clang::Module *topLevelModule) {
-    if (!topLevelModule)
-      return false;
-    if (topLevelModule->Name == "Darwin")
-      return true;
-    if (topLevelModule->Name == "CoreServices")
-      return true;
-    return false;
+    return topLevelModule && (topLevelModule->Name == "Darwin" ||
+                              topLevelModule->Name == "CoreServices");
   }
 
   void foundDecl(ValueDecl *VD, DeclVisibilityKind Reason) override {

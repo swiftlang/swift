@@ -484,6 +484,15 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     break;
   }
 
+  case DAK_Implements: {
+    Printer.printAttrName("@_implements");
+    Printer << "(";
+    auto *attr = cast<ImplementsAttr>(this);
+    attr->getProtocolType().getType().print(Printer, Options);
+    Printer << ", " << attr->getMemberName() << ")";
+    break;
+  }
+
   case DAK_Count:
     llvm_unreachable("exceed declaration attribute kinds");
 
@@ -598,6 +607,8 @@ StringRef DeclAttribute::getAttrName() const {
     return "<<synthesized protocol>>";
   case DAK_Specialize:
     return "_specialize";
+  case DAK_Implements:
+    return "_implements";
   }
   llvm_unreachable("bad DeclAttrKind");
 }
@@ -872,4 +883,34 @@ SpecializeAttr *SpecializeAttr::create(ASTContext &Ctx, SourceLoc atLoc,
   void *mem = Ctx.Allocate(size, alignof(SpecializeAttr));
   return new (mem)
       SpecializeAttr(atLoc, range, requirements, exported, kind);
+}
+
+
+ImplementsAttr::ImplementsAttr(SourceLoc atLoc, SourceRange range,
+                               TypeLoc ProtocolType,
+                               DeclName MemberName,
+                               DeclNameLoc MemberNameLoc)
+    : DeclAttribute(DAK_Implements, atLoc, range, /*Implicit=*/false),
+      ProtocolType(ProtocolType),
+      MemberName(MemberName),
+      MemberNameLoc(MemberNameLoc) {
+}
+
+
+ImplementsAttr *ImplementsAttr::create(ASTContext &Ctx, SourceLoc atLoc,
+                                       SourceRange range,
+                                       TypeLoc ProtocolType,
+                                       DeclName MemberName,
+                                       DeclNameLoc MemberNameLoc) {
+  void *mem = Ctx.Allocate(sizeof(ImplementsAttr), alignof(ImplementsAttr));
+  return new (mem) ImplementsAttr(atLoc, range, ProtocolType,
+                                  MemberName, MemberNameLoc);
+}
+
+TypeLoc ImplementsAttr::getProtocolType() const {
+  return ProtocolType;
+}
+
+TypeLoc &ImplementsAttr::getProtocolType() {
+  return ProtocolType;
 }

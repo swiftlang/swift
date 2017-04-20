@@ -22,18 +22,27 @@
 #include "clang/AST/Attr.h"
 #include "clang/AST/Decl.h"
 #include "clang/AST/DeclObjC.h"
+#include "llvm/ADT/Triple.h"
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/raw_ostream.h"
 
 using namespace swift;
 using namespace irgen;
 
+bool swift::irgen::useDllStorage(const llvm::Triple &triple) {
+  return triple.isOSBinFormatCOFF() && !triple.isOSCygMing();
+}
+
 UniversalLinkageInfo::UniversalLinkageInfo(IRGenModule &IGM)
-    : IsELFObject(IGM.TargetInfo.OutputObjectFormat == llvm::Triple::ELF),
-      UseDLLStorage(IGM.useDllStorage()),
-      HasMultipleIGMs(IGM.IRGen.hasMultipleIGMs()),
-      IsWholeModule(IGM.getSILModule().isWholeModule()),
-      IsWholeModuleSerialized(IGM.getSILModule().isWholeModuleSerialized()) {}
+    : UniversalLinkageInfo(IGM.Triple, IGM.IRGen.hasMultipleIGMs(),
+                           IGM.getSILModule().isWholeModule()) {}
+
+UniversalLinkageInfo::UniversalLinkageInfo(const llvm::Triple &triple,
+                                           bool hasMultipleIGMs,
+                                           bool isWholeModule)
+    : IsELFObject(triple.isOSBinFormatELF()),
+      UseDLLStorage(useDllStorage(triple)), HasMultipleIGMs(hasMultipleIGMs),
+      IsWholeModule(isWholeModule) {}
 
 /// Mangle this entity into the given buffer.
 void LinkEntity::mangle(SmallVectorImpl<char> &buffer) const {
@@ -105,10 +114,6 @@ std::string LinkEntity::mangleAsString() const {
       //   global ::= 'Mp' type                       // protocol descriptor
     case Kind::ProtocolDescriptor:
       return mangler.mangleProtocolDescriptor(cast<ProtocolDecl>(getDecl()));
-
-      //   global ::= 'Wo' entity
-    case Kind::WitnessTableOffset:
-      return mangler.mangleWitnessTableOffset(getDecl());
 
       //   global ::= 'Wv' directness entity
     case Kind::FieldOffset:

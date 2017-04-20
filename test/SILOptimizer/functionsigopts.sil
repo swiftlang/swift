@@ -1775,14 +1775,14 @@ bb0(%0 : $*T):
 // CHECK:  tuple
 // CHECK:  return
 
-// Check that a owned-to-guaranteed has happened.
+// Check that an owned-to-guaranteed has happened.
 // CHECK-LABEL: sil hidden [noinline] @_T027generic_owned_to_guaranteedTf4g_n : $@convention(thin) <T where T : KlassFoo> (@guaranteed T) -> Int64
 // CHECK-NOT: release_value 
 // CHECK-NOT: strong_release 
 // CHECK-NOT: destroy_addr 
 // CHECK: end sil function '_T027generic_owned_to_guaranteedTf4g_n'
 
-// Check that a owned-to-guaranteed has happened.
+// Check that an owned-to-guaranteed has happened.
 // CHECK-LABEL: sil @_T034generic_owned_to_guaranteed_callerTf4g_n : $@convention(thin) <T where T : KlassFoo> (@guaranteed T) -> Int64
 // Call the specialized function. It should have a guaranteed param now. 
 // CHECK: function_ref @_T027generic_owned_to_guaranteedTf4g_n : $@convention(thin) <τ_0_0 where τ_0_0 : KlassFoo> (@guaranteed τ_0_0) -> Int64

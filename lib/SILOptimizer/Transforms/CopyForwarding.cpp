@@ -75,6 +75,7 @@ STATISTIC(NumCopyNRVO, "Number of copies removed via named return value opt.");
 STATISTIC(NumCopyForward, "Number of copies removed via forward propagation");
 STATISTIC(NumCopyBackward,
           "Number of copies removed via backward propagation");
+STATISTIC(NumDeadTemp, "Number of copies removed from unused temporaries");
 
 using namespace swift;
 
@@ -426,7 +427,9 @@ public:
 
 protected:
   bool collectUsers();
-  bool propagateCopy(CopyAddrInst *CopyInst);
+  bool propagateCopy(CopyAddrInst *CopyInst, bool hoistingDestroy);
+  CopyAddrInst *findCopyIntoDeadTemp(CopyAddrInst *destCopy);
+  bool forwardDeadTempCopy(CopyAddrInst *srcCopy, CopyAddrInst *destCopy);
   bool forwardPropagateCopy(CopyAddrInst *CopyInst,
                             SmallPtrSetImpl<SILInstruction*> &DestUserInsts);
   bool backwardPropagateCopy(CopyAddrInst *CopyInst,
@@ -517,12 +520,27 @@ bool CopyForwarding::collectUsers() {
 ///
 /// The caller has already proven that lifetime of the value being copied ends
 /// at the copy. (Either it is a [take] or is immediately destroyed).
+/// 
 ///
 /// If the forwarded copy is not an [init], then insert a destroy of the copy's
 /// dest.
-bool CopyForwarding::propagateCopy(CopyAddrInst *CopyInst) {
+bool CopyForwarding::
+propagateCopy(CopyAddrInst *CopyInst, bool hoistingDestroy) {
   if (!EnableCopyForwarding)
     return false;
+
+  // Handle copy-of-copy without analyzing uses.
+  // Assumes that CopyInst->getSrc() is dead after CopyInst.
+  assert(CopyInst->isTakeOfSrc() || hoistingDestroy);
+  if (auto *srcCopy = findCopyIntoDeadTemp(CopyInst)) {
+    if (forwardDeadTempCopy(srcCopy, CopyInst)) {
+      DEBUG(llvm::dbgs() << "  Temp Copy:" << *srcCopy
+            << "         to " << *CopyInst);
+      HasChanged = true;
+      ++NumDeadTemp;
+      return true;
+    }
+  }
 
   SILValue CopyDest = CopyInst->getDest();
   SILBasicBlock *BB = CopyInst->getParent();
@@ -559,6 +577,104 @@ bool CopyForwarding::propagateCopy(CopyAddrInst *CopyInst) {
     return true;
   }
   return false;
+}
+
+/// Find a copy into an otherwise dead temporary:
+///
+/// The given copy is copying out of the temporary
+/// copy_addr %temp, %dest
+///
+/// Precondition: The lifetime of %temp ends at `destCopy`
+/// (%temp is CurrentDef).
+///
+/// Find a previous copy:
+/// copy_addr %src, %temp
+///
+/// Such that it is safe to forward its source into the source of
+/// `destCopy`. i.e. `destCopy` can be safely rewritten as:
+/// copy_addr %src, %dest
+///
+/// Otherwise return nullptr. No instructions are harmed in this analysis.
+///
+/// This can be checked with a simple instruction walk that ends at:
+/// - an intervening instruction that may write to memory
+/// - a use of the temporary, %temp
+///
+/// Unlike the forward and backward propagation that finds all use points, this
+/// handles copies of address projections. By conservatively checking all
+/// intervening instructions, it avoids the need to analyze projection paths.
+CopyAddrInst *CopyForwarding::findCopyIntoDeadTemp(CopyAddrInst *destCopy) {
+  auto tmpVal = destCopy->getSrc();
+  assert(tmpVal == CurrentDef);
+  assert(isIdentifiedSourceValue(tmpVal));
+
+  for (auto II = destCopy->getIterator(), IB = destCopy->getParent()->begin();
+       II != IB;) {
+    --II;
+    SILInstruction *UserInst = &*II;
+    if (auto *srcCopy = dyn_cast<CopyAddrInst>(UserInst)) {
+      if (srcCopy->getDest() == tmpVal)
+        return srcCopy;
+    }
+    if (SrcUserInsts.count(UserInst))
+      return nullptr;
+    if (UserInst->mayWriteToMemory())
+      return nullptr;
+  }
+  return nullptr;
+}
+
+/// Forward a copy into a dead temporary as identified by
+/// `findCopyIntoDeadTemp`.
+///
+/// Returns true if the copy was successfully forwarded.
+///
+/// Old SIL: 
+/// copy_addr %src, %temp
+/// copy_addr %temp, %dest
+///
+/// New SIL: 
+/// copy_addr %src, %dest
+///
+/// Precondition: `srcCopy->getDest()` == `destCopy->getSrc()`
+/// Precondition: %src is unused between srcCopy and destCopy.
+/// Precondition: The lifetime of %temp ends immediate after `destCopy`.
+/// 
+/// Postcondition:
+/// - `srcCopy` is erased.
+/// - Any initial value in %temp is destroyed at `srcCopy` position.
+/// - %temp is uninitialized following `srcCopy` and subsequent instruction
+///   attempts to destroy this uninitialized value.
+bool CopyForwarding::
+forwardDeadTempCopy(CopyAddrInst *srcCopy, CopyAddrInst *destCopy) {
+  assert(srcCopy->getDest() == destCopy->getSrc());
+  
+  // This pattern can be trivially folded without affecting %temp destroys:
+  // copy_addr [...] %src, [init] %temp
+  // copy_addr [take] %temp, [...] %dest
+
+  // If copy into temp is not initializing, add a destroy:
+  // - copy_addr %src, %temp
+  // + destroy %temp
+  if (!srcCopy->isInitializationOfDest()) {
+    SILBuilderWithScope(srcCopy)
+      .createDestroyAddr(srcCopy->getLoc(), srcCopy->getDest());
+  }
+
+  // Either `destCopy` is a take, or the caller is hoisting a destroy:
+  // copy_addr %temp, %dest
+  // ...
+  // destroy %temp
+  //
+  // If the caller is hoisting a destroy, and we return `true` then it will
+  // erase the destroy for us. Either way, it's safe to simply rewrite destCopy.
+  // For now, don't bother finding the subsequent destroy, because this isn't
+  // the common case.
+
+  destCopy->setSrc(srcCopy->getSrc());
+  destCopy->setIsTakeOfSrc(srcCopy->isTakeOfSrc());
+  srcCopy->eraseFromParent();
+  return true;
 }
 
 /// Check that the lifetime of %src ends at the copy and is not reinitialized
@@ -937,7 +1053,7 @@ bool CopyForwarding::hoistDestroy(SILInstruction *DestroyPoint,
       if (!CopyInst->isTakeOfSrc() && CopyInst->getSrc() == CurrentDef) {
         // This use is a copy of CurrentDef. Attempt to forward CurrentDef to
         // all uses of the copy's value.
-        if (propagateCopy(CopyInst))
+        if (propagateCopy(CopyInst, /*hoistingDestroy=*/true))
           return true;
       }
     }
@@ -969,7 +1085,7 @@ void CopyForwarding::forwardCopiesOf(SILValue Def, SILFunction *F) {
   // First forward any copies that implicitly destroy CurrentDef. There is no
   // need to hoist Destroy for these.
   for (auto *CopyInst : TakePoints)
-    propagateCopy(CopyInst);
+    propagateCopy(CopyInst, /*hoistingDestroy=*/false);
 
   // If the copied address is also loaded from, then destroy hoisting is unsafe.
   //
@@ -1209,7 +1325,6 @@ class CopyForwardingPass : public SILFunctionTransform
       }
   }
 
-  StringRef getName() override { return "Copy Forwarding"; }
 };
 } // end anonymous namespace
 

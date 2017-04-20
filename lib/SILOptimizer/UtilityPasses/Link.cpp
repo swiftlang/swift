@@ -47,7 +47,6 @@ class SILLinker : public SILModuleTransform {
         invalidateAnalysis(&Fn, SILAnalysis::InvalidationKind::Everything);
   }
 
-  StringRef getName() override { return "SIL Linker"; }
 };
 } // end anonymous namespace
 

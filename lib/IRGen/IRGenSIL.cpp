@@ -102,6 +102,11 @@ public:
   
   llvm::Value *getExplosionValue(IRGenFunction &IGF) const;
 };
+
+struct DynamicallyEnforcedAddress {
+  Address Addr;
+  llvm::Value *ScratchBuffer;
+};
   
 /// Represents a SIL value lowered to IR, in one of these forms:
 /// - an Address, corresponding to a SIL address value;
@@ -130,6 +135,10 @@ public:
     /// reset the stack pointer to this point.
     Address,
 
+    /// The lowered value of a begin_access instruction using dynamic
+    /// enforcement.
+    DynamicallyEnforcedAddress,
+
     /// The following kinds correspond to SIL non-address values.
     Value_First,
       /// A normal value, represented as an exploded array of llvm Values.
@@ -157,6 +166,7 @@ private:
     ContainedAddress containedAddress;
     StackAddress address;
     OwnedAddress boxWithAddress;
+    DynamicallyEnforcedAddress dynamicallyEnforcedAddress;
     struct {
       ExplosionVector values;
     } explosion;
@@ -174,6 +184,12 @@ public:
   /// Create an address value with an optional stack restore point.
   LoweredValue(const StackAddress &address)
     : kind(Kind::Address), address(address)
+  {}
+
+  /// Create an address value using dynamic enforcement.
+  LoweredValue(const DynamicallyEnforcedAddress &address)
+    : kind(Kind::DynamicallyEnforcedAddress),
+      dynamicallyEnforcedAddress(address)
   {}
   
   enum ContainerForUnallocatedAddress_t { ContainerForUnallocatedAddress };
@@ -218,6 +234,10 @@ public:
     case Kind::Address:
       ::new (&address) StackAddress(std::move(lv.address));
       break;
+    case Kind::DynamicallyEnforcedAddress:
+      ::new (&dynamicallyEnforcedAddress) DynamicallyEnforcedAddress(
+                 std::move(lv.dynamicallyEnforcedAddress));
+      break;
     case Kind::Explosion:
       ::new (&explosion.values) ExplosionVector(std::move(lv.explosion.values));
       break;
@@ -241,7 +261,7 @@ public:
   }
   
   bool isAddress() const {
-    return kind == Kind::Address && address.getAddress().isValid();
+    return (kind == Kind::Address || kind == Kind::DynamicallyEnforcedAddress);
   }
   bool isUnallocatedAddressInBuffer() const {
     return kind == Kind::ContainedAddress &&
@@ -255,12 +275,12 @@ public:
   }
   
   Address getAddress() const {
-    assert(isAddress() && "not an allocated address");
+    assert(kind == Kind::Address && "not an allocated address");
     return address.getAddress();
   }
 
   StackAddress getStackAddress() const {
-    assert(isAddress() && "not an allocated address");
+    assert(kind == Kind::Address && "not an allocated address");
     return address;
   }
   
@@ -275,6 +295,11 @@ public:
     assert(containedAddress.getContainer().isValid() &&
            "address has no container");
     return containedAddress.getAddress();
+  }
+
+  const DynamicallyEnforcedAddress &getDynamicallyEnforcedAddress() const {
+    assert(kind == Kind::DynamicallyEnforcedAddress);
+    return dynamicallyEnforcedAddress;
   }
   
   void getExplosion(IRGenFunction &IGF, Explosion &ex) const;
@@ -309,6 +334,9 @@ public:
       break;
     case Kind::ContainedAddress:
       containedAddress.~ContainedAddress();
+      break;
+    case Kind::DynamicallyEnforcedAddress:
+      dynamicallyEnforcedAddress.~DynamicallyEnforcedAddress();
       break;
     case Kind::Explosion:
       explosion.values.~ExplosionVector();
@@ -407,6 +435,13 @@ public:
   void setLoweredStackAddress(SILValue v, const StackAddress &address) {
     assert(v->getType().isAddress() && "address for non-address value?!");
     setLoweredValue(v, address);
+  }
+
+  void setLoweredDynamicallyEnforcedAddress(SILValue v,
+                                            const Address &address,
+                                            llvm::Value *scratch) {
+    assert(v->getType().isAddress() && "address for non-address value?!");
+    setLoweredValue(v, DynamicallyEnforcedAddress{address, scratch});
   }
   
   void setContainerOfUnallocatedAddress(SILValue v,
@@ -524,14 +559,23 @@ public:
   /// Get the Address of a SIL value of address type, which must have been
   /// lowered.
   Address getLoweredAddress(SILValue v) {
-    if (getLoweredValue(v).kind == LoweredValue::Kind::Address)
-      return getLoweredValue(v).getAddress();
-    else
-      return getLoweredValue(v).getAddressInContainer();
+    auto &&lv = getLoweredValue(v);
+    if (lv.kind == LoweredValue::Kind::Address) {
+      return lv.getAddress();
+    } else if (lv.kind == LoweredValue::Kind::ContainedAddress) {
+      return lv.getAddressInContainer();
+    } else {
+      assert(lv.kind == LoweredValue::Kind::DynamicallyEnforcedAddress);
+      return lv.getDynamicallyEnforcedAddress().Addr;
+    }
   }
 
   StackAddress getLoweredStackAddress(SILValue v) {
     return getLoweredValue(v).getStackAddress();
+  }
+
+  llvm::Value *getLoweredDynamicEnforcementScratchBuffer(BeginAccessInst *v) {
+    return getLoweredValue(v).getDynamicallyEnforcedAddress().ScratchBuffer;
   }
 
   /// Add the unmanaged LLVM values lowered from a SIL value to an explosion.
@@ -822,6 +866,7 @@ public:
   void visitIntegerLiteralInst(IntegerLiteralInst *i);
   void visitFloatLiteralInst(FloatLiteralInst *i);
   void visitStringLiteralInst(StringLiteralInst *i);
+  void visitConstStringLiteralInst(ConstStringLiteralInst *i);
 
   void visitLoadInst(LoadInst *i);
   void visitStoreInst(StoreInst *i);
@@ -1021,6 +1066,7 @@ void LoweredValue::getExplosion(IRGenFunction &IGF, Explosion &ex) const {
   switch (kind) {
   case Kind::Address:
   case Kind::ContainedAddress:
+  case Kind::DynamicallyEnforcedAddress:
     llvm_unreachable("not a value");
       
   case Kind::Explosion:
@@ -1046,6 +1092,7 @@ llvm::Value *LoweredValue::getSingletonExplosion(IRGenFunction &IGF) const {
   switch (kind) {
   case Kind::Address:
   case Kind::ContainedAddress:
+  case Kind::DynamicallyEnforcedAddress:
     llvm_unreachable("not a value");
 
   case Kind::Explosion:
@@ -1075,7 +1122,8 @@ IRGenSILFunction::IRGenSILFunction(IRGenModule &IGM,
   if (IGM.IRGen.Opts.Sanitize == SanitizerKind::Address)
     CurFn->addFnAttr(llvm::Attribute::SanitizeAddress);
   if (IGM.IRGen.Opts.Sanitize == SanitizerKind::Thread) {
-    if (dyn_cast_or_null<DestructorDecl>(f->getDeclContext()))
+    auto declContext = f->getDeclContext();
+    if (declContext && isa<DestructorDecl>(declContext))
       // Do not report races in deinit and anything called from it
       // because TSan does not observe synchronization between retain
       // count dropping to '0' and the object deinitialization.
@@ -2036,6 +2084,7 @@ static CallEmission getCallEmissionForLoweredValue(IRGenSILFunction &IGF,
     llvm_unreachable("@box isn't a valid callee");
   case LoweredValue::Kind::ContainedAddress:
   case LoweredValue::Kind::Address:
+  case LoweredValue::Kind::DynamicallyEnforcedAddress:
     llvm_unreachable("sil address isn't a valid callee");
   }
   
@@ -2194,6 +2243,7 @@ getPartialApplicationFunction(IRGenSILFunction &IGF, SILValue v,
   switch (lv.kind) {
   case LoweredValue::Kind::ContainedAddress:
   case LoweredValue::Kind::Address:
+  case LoweredValue::Kind::DynamicallyEnforcedAddress:
     llvm_unreachable("can't partially apply an address");
   case LoweredValue::Kind::BoxWithAddress:
     llvm_unreachable("can't partially apply a @box");
@@ -2339,6 +2389,22 @@ void IRGenSILFunction::visitStringLiteralInst(swift::StringLiteralInst *i) {
     addr = emitObjCSelectorRefLoad(i->getValue());
   else
     addr = emitAddrOfConstantString(IGM, i);
+
+  Explosion e;
+  e.add(addr);
+  setLoweredExplosion(i, e);
+}
+
+void IRGenSILFunction::visitConstStringLiteralInst(
+    swift::ConstStringLiteralInst *i) {
+
+  llvm::Constant *addr;
+  if (i->getEncoding() == ConstStringLiteralInst::Encoding::UTF8)
+    addr = IGM.getAddrOfGlobalConstantString(i->getValue());
+  else
+    addr = IGM.getAddrOfGlobalUTF16ConstantString(i->getValue());
+
+  addr = llvm::ConstantExpr::getBitCast(addr, IGM.Int8PtrTy);
 
   Explosion e;
   e.add(addr);
@@ -3278,7 +3344,7 @@ void IRGenSILFunction::emitErrorResultVar(SILResultInfo ErrorInfo,
                                 Var.Name, Var.ArgNo);
   DebugTypeInfo DTI(nullptr, nullptr, ErrorInfo.getType(),
                     ErrorResultSlot->getType(), IGM.getPointerSize(),
-                    IGM.getPointerAlignment());
+                    IGM.getPointerAlignment(), true);
   IGM.DebugInfo->emitVariableDeclaration(Builder, Storage, DTI, getDebugScope(),
                                          nullptr, Var.Name, Var.ArgNo,
                                          IndirectValue, ArtificialValue);
@@ -3845,8 +3911,21 @@ void IRGenSILFunction::visitProjectBoxInst(swift::ProjectBoxInst *i) {
   }
 }
 
-static void emitBeginAccess(IRGenSILFunction &IGF, BeginAccessInst *access,
-                            Address addr) {
+static ExclusivityFlags getExclusivityFlags(BeginAccessInst *i) {
+  switch (i->getAccessKind()) {
+  case SILAccessKind::Read:
+    return ExclusivityFlags::Read;
+  case SILAccessKind::Modify:
+    return ExclusivityFlags::Modify;
+  case SILAccessKind::Init:
+  case SILAccessKind::Deinit:
+    llvm_unreachable("init/deinit access should not use dynamic enforcement");
+  }
+  llvm_unreachable("bad access kind");
+}
+
+void IRGenSILFunction::visitBeginAccessInst(BeginAccessInst *access) {
+  Address addr = getLoweredAddress(access->getOperand());
   switch (access->getEnforcement()) {
   case SILAccessEnforcement::Unknown:
     llvm_unreachable("unknown access enforcement in IRGen!");
@@ -3854,40 +3933,52 @@ static void emitBeginAccess(IRGenSILFunction &IGF, BeginAccessInst *access,
   case SILAccessEnforcement::Static:
   case SILAccessEnforcement::Unsafe:
     // nothing to do
+    setLoweredAddress(access, addr);
     return;
 
-  case SILAccessEnforcement::Dynamic:
-    // TODO
-    return;
-  }
-  llvm_unreachable("bad access enforcement");
-}
+  case SILAccessEnforcement::Dynamic: {
+    llvm::Value *scratch = createAlloca(IGM.getFixedBufferTy(),
+                                        IGM.getPointerAlignment(),
+                                        "access-scratch").getAddress();
+    Builder.CreateLifetimeStart(scratch);
 
-static void emitEndAccess(IRGenSILFunction &IGF, BeginAccessInst *access) {
-  switch (access->getEnforcement()) {
-  case SILAccessEnforcement::Unknown:
-    llvm_unreachable("unknown access enforcement in IRGen!");
+    llvm::Value *pointer =
+      Builder.CreateBitCast(addr.getAddress(), IGM.Int8PtrTy);
+    llvm::Value *flags =
+      llvm::ConstantInt::get(IGM.SizeTy, uint64_t(getExclusivityFlags(access)));
+    auto call = Builder.CreateCall(IGM.getBeginAccessFn(),
+                                   { pointer, scratch, flags });
+    call->setDoesNotThrow();
 
-  case SILAccessEnforcement::Static:
-  case SILAccessEnforcement::Unsafe:
-    // nothing to do
-    return;
-
-  case SILAccessEnforcement::Dynamic:
-    // TODO
+    setLoweredDynamicallyEnforcedAddress(access, addr, scratch);
     return;
   }
+  }
   llvm_unreachable("bad access enforcement");
-}
-
-void IRGenSILFunction::visitBeginAccessInst(BeginAccessInst *i) {
-  Address addr = getLoweredAddress(i->getOperand());
-  emitBeginAccess(*this, i, addr);
-  setLoweredAddress(i, addr);
 }
 
 void IRGenSILFunction::visitEndAccessInst(EndAccessInst *i) {
-  emitEndAccess(*this, i->getBeginAccess());
+  auto access = i->getBeginAccess();
+  switch (access->getEnforcement()) {
+  case SILAccessEnforcement::Unknown:
+    llvm_unreachable("unknown access enforcement in IRGen!");
+
+  case SILAccessEnforcement::Static:
+  case SILAccessEnforcement::Unsafe:
+    // nothing to do
+    return;
+
+  case SILAccessEnforcement::Dynamic: {
+    auto scratch = getLoweredDynamicEnforcementScratchBuffer(access);
+
+    auto call = Builder.CreateCall(IGM.getEndAccessFn(), { scratch });
+    call->setDoesNotThrow();
+
+    Builder.CreateLifetimeEnd(scratch);
+    return;
+  }
+  }
+  llvm_unreachable("bad access enforcement");
 }
 
 void IRGenSILFunction::visitConvertFunctionInst(swift::ConvertFunctionInst *i) {

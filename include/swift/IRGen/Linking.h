@@ -23,16 +23,25 @@
 #include "llvm/ADT/DenseMapInfo.h"
 #include "llvm/IR/GlobalValue.h"
 
+namespace llvm {
+class Triple;
+}
+
 namespace swift {
 namespace irgen {
 class IRGenModule;
 
+/// Determine if the triple uses the DLL storage.
+bool useDllStorage(const llvm::Triple &triple);
+
 class UniversalLinkageInfo {
 public:
-  bool IsELFObject, UseDLLStorage, HasMultipleIGMs, IsWholeModule,
-      IsWholeModuleSerialized;
+  bool IsELFObject, UseDLLStorage, HasMultipleIGMs, IsWholeModule;
 
   UniversalLinkageInfo(IRGenModule &IGM);
+
+  UniversalLinkageInfo(const llvm::Triple &triple, bool hasMultipleIGMs,
+                       bool isWholeModule);
 };
 
 /// Selector for type metadata symbol kinds.
@@ -84,11 +93,6 @@ class LinkEntity {
     /// A function.
     /// The pointer is a FuncDecl*.
     Function,
-
-    /// The offset to apply to a witness table or metadata object
-    /// in order to find the information for a declaration.  The
-    /// pointer is a ValueDecl*.
-    WitnessTableOffset,
 
     /// A field offset.  The pointer is a VarDecl*.
     FieldOffset,
@@ -350,12 +354,6 @@ public:
     return entity;
   }
 
-  static LinkEntity forWitnessTableOffset(ValueDecl *decl) {
-    LinkEntity entity;
-    entity.setForDecl(Kind::WitnessTableOffset, decl);
-    return entity;
-  }
-
   static LinkEntity forFieldOffset(VarDecl *decl, bool isIndirect) {
     LinkEntity entity;
     entity.Pointer = decl;
@@ -572,8 +570,7 @@ public:
   /// Returns true if this function or global variable may be inlined into
   /// another module.
   ///
-  bool isFragile(ForDefinition_t isDefinition,
-                 bool wholeModuleSerialized) const;
+  bool isFragile(ForDefinition_t isDefinition) const;
 
   const ValueDecl *getDecl() const {
     assert(isDeclKind(getKind()));
