@@ -3142,7 +3142,7 @@ static CheckTypeWitnessResult checkTypeWitness(TypeChecker &tc, DeclContext *dc,
                                                AssociatedTypeDecl *assocType, 
                                                Type type) {
   if (auto superclass = assocType->getSuperclass()) {
-    if (!superclass->isExactSuperclassOf(type, &tc))
+    if (!superclass->isExactSuperclassOf(type))
       return superclass->getAnyNominal();
   }
 

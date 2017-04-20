@@ -970,7 +970,7 @@ void IRGenModule::emitFieldMetadataRecord(const NominalTypeDecl *Decl) {
   // superclass as a special associated type named 'super' on the
   // 'AnyObject' protocol.
   if (auto Superclass = Decl->getDeclaredInterfaceType()
-                            ->getSuperclass(nullptr)) {
+                            ->getSuperclass()) {
     SuperclassMetadataBuilder builder(*this, cast<ClassDecl>(Decl),
                                       Superclass->getCanonicalType());
     builder.emit();

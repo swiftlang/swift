@@ -499,7 +499,7 @@ SILValue swift::castValueToABICompatibleType(SILBuilder *B, SILLocation Loc,
         // A is a superclass of B, then it can be done by means
         // of a simple upcast.
         if (mt2.getInstanceType()->isExactSuperclassOf(
-              mt1.getInstanceType(), nullptr)) {
+              mt1.getInstanceType())) {
           return B->createUpcast(Loc, Value, DestTy);
         }
  

@@ -1301,8 +1301,7 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks {
     Type DT = DC->getDeclaredTypeOfContext();
     if (DT.isNull() || DT->is<ErrorType>())
       return;
-    OwnedResolver TypeResolver(createLazyResolver(CurDeclContext->getASTContext()));
-    Type ST = DT->getSuperclass(TypeResolver.get());
+    Type ST = DT->getSuperclass();
     if (ST.isNull() || ST->is<ErrorType>())
       return;
     if (ST->getNominalOrBoundGenericNominal()) {
