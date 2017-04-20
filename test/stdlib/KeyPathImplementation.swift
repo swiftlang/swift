@@ -171,9 +171,11 @@ struct TestKeyPathBuilder {
   }
 }
 
+// FIXME: Should return Self, but the closure specializer doesn't like that.
+// rdar://problem/31725007
 extension AnyKeyPath {
   static func build(capacityInBytes: Int,
-                    withBuilder: (inout TestKeyPathBuilder) -> Void) -> Self {
+                withBuilder: (inout TestKeyPathBuilder) -> Void) -> AnyKeyPath {
     return _create(capacityInBytes: capacityInBytes) {
       var builder = TestKeyPathBuilder(buffer: $0)
       withBuilder(&builder)
@@ -189,22 +191,26 @@ keyPathImpl.test("struct components") {
     .build(capacityInBytes: 8) {
       $0.addHeader(trivial: true, hasReferencePrefix: false)
       $0.addStructComponent(offset: 0)
-    }
+    } as! WritableKeyPath<S<String>, Int>
+
   let s_y = WritableKeyPath<S<String>, LifetimeTracked?>
     .build(capacityInBytes: 8) {
       $0.addHeader(trivial: true, hasReferencePrefix: false)
       $0.addStructComponent(offset: intSize)
-    }
+    } as! WritableKeyPath<S<String>, LifetimeTracked?>
+
   let s_z = WritableKeyPath<S<String>, String>
     .build(capacityInBytes: 8) {
       $0.addHeader(trivial: true, hasReferencePrefix: false)
       $0.addStructComponent(offset: intSize*2)
-    }
+    } as! WritableKeyPath<S<String>, String>
+
   let s_p = WritableKeyPath<S<String>, Point>
     .build(capacityInBytes: 8) {
       $0.addHeader(trivial: true, hasReferencePrefix: false)
       $0.addStructComponent(offset: intSize*2 + stringSize)
-    }
+    } as! WritableKeyPath<S<String>, Point>
+
   let twoComponentSize = 12 + intSize
   let s_p_x = WritableKeyPath<S<String>, Double>
     .build(capacityInBytes: twoComponentSize) {
@@ -212,14 +218,16 @@ keyPathImpl.test("struct components") {
       $0.addStructComponent(offset: intSize*2 + stringSize)
       $0.addType(Point.self)
       $0.addStructComponent(offset: 0)
-    }
+    } as! WritableKeyPath<S<String>, Double>
+
   let s_p_y = WritableKeyPath<S<String>, Double>
     .build(capacityInBytes: twoComponentSize) {
       $0.addHeader(trivial: true, hasReferencePrefix: false)
       $0.addStructComponent(offset: intSize*2 + stringSize)
       $0.addType(Point.self)
       $0.addStructComponent(offset: MemoryLayout<Double>.size)
-    }
+    } as! WritableKeyPath<S<String>, Double>
+
 
   // \("") forces the string to be computed at runtime (and therefore allocated)
   let c = C(x: 679, y: nil, z: "buffalo\("")")
@@ -294,17 +302,19 @@ keyPathImpl.test("class components") {
     .build(capacityInBytes: 8) {
       $0.addHeader(trivial: true, hasReferencePrefix: false)
       $0.addClassComponent(offset: classHeaderSize)
-    }
+    } as! ReferenceWritableKeyPath<C<String>, Int>
+
   let c_y = ReferenceWritableKeyPath<C<String>, LifetimeTracked?>
     .build(capacityInBytes: 8) {
       $0.addHeader(trivial: true, hasReferencePrefix: false)
       $0.addClassComponent(offset: classHeaderSize + intSize)
-    }
+    } as! ReferenceWritableKeyPath<C<String>, LifetimeTracked?>
+
   let c_z = ReferenceWritableKeyPath<C<String>, String>
     .build(capacityInBytes: 8) {
       $0.addHeader(trivial: true, hasReferencePrefix: false)
       $0.addClassComponent(offset: classHeaderSize + 2*intSize)
-    }
+    } as! ReferenceWritableKeyPath<C<String>, String>
 
   let c = C(x: 679, y: nil, z: "buffalo\("")")
   let value = c
@@ -363,7 +373,8 @@ keyPathImpl.test("reference prefix") {
                             endsReferencePrefix: true)
       $0.addType(C<String>.self)
       $0.addClassComponent(offset: classHeaderSize)
-    }
+    } as! ReferenceWritableKeyPath<S<String>, Int>
+
   let s_c_y = ReferenceWritableKeyPath<S<String>, LifetimeTracked?>
     .build(capacityInBytes: 12 + intSize) {
       $0.addHeader(trivial: true, hasReferencePrefix: true)
@@ -371,7 +382,8 @@ keyPathImpl.test("reference prefix") {
                             endsReferencePrefix: true)
       $0.addType(C<String>.self)
       $0.addClassComponent(offset: classHeaderSize + intSize)
-    }
+    } as! ReferenceWritableKeyPath<S<String>, LifetimeTracked?>
+
   let s_c_z = ReferenceWritableKeyPath<S<String>, String>
     .build(capacityInBytes: 12 + intSize) {
       $0.addHeader(trivial: true, hasReferencePrefix: true)
@@ -379,7 +391,7 @@ keyPathImpl.test("reference prefix") {
                             endsReferencePrefix: true)
       $0.addType(C<String>.self)
       $0.addClassComponent(offset: classHeaderSize + 2*intSize)
-    }
+    } as! ReferenceWritableKeyPath<S<String>, String>
   
   let c = C(x: 679, y: nil, z: "buffalo\("")")
   let value = S(x: 1738, y: nil, z: "bottles of beer\("")",
@@ -453,13 +465,14 @@ keyPathImpl.test("overflowed offsets") {
       $0.addHeader(trivial: true, hasReferencePrefix: false)
       $0.addStructComponent(offset: intSize*2 + stringSize,
                             forceOverflow: true)
-    }
+    } as! WritableKeyPath<S<String>, Point>
+
   let c_z = ReferenceWritableKeyPath<C<String>, String>
     .build(capacityInBytes: 12) {
       $0.addHeader(trivial: true, hasReferencePrefix: false)
       $0.addClassComponent(offset: classHeaderSize + 2*intSize,
                            forceOverflow: true)
-    }
+    } as! ReferenceWritableKeyPath<C<String>, String>
   
   let c = C(x: 679, y: LifetimeTracked(42), z: "buffalo\("")")
   var sValue = S(x: 1738, y: LifetimeTracked(43),
@@ -500,7 +513,7 @@ keyPathImpl.test("equality") {
       $0.addType(Point.self)
       // Point.x
       $0.addStructComponent(offset: 0)
-    }
+    } as! ReferenceWritableKeyPath<S<S<String>>, Double>
 
   expectEqual(s_c_z_p_x, s_c_z_p_x)
   expectEqual(s_c_z_p_x.hashValue, s_c_z_p_x.hashValue)
@@ -521,7 +534,7 @@ keyPathImpl.test("equality") {
       $0.addType(Point.self)
       // Point.x
       $0.addStructComponent(offset: 0)
-    }
+    } as! ReferenceWritableKeyPath<S<S<String>>, Double>
 
   expectEqual(s_c_z_p_x, s_c_z_p_x_2)
   expectEqual(s_c_z_p_x.hashValue, s_c_z_p_x_2.hashValue)
@@ -549,7 +562,7 @@ keyPathImpl.test("equality") {
       // Point.x
       $0.addStructComponent(offset: 0,
                             forceOverflow: true)
-    }
+    } as! ReferenceWritableKeyPath<S<S<String>>, Double>
 
   expectEqual(s_c_z_p_x, s_c_z_p_x_3)
   expectEqual(s_c_z_p_x.hashValue, s_c_z_p_x_3.hashValue)
@@ -573,7 +586,7 @@ keyPathImpl.test("equality") {
       $0.addType(Point.self)
       // Point.y
       $0.addStructComponent(offset: 8)
-    }
+    } as! ReferenceWritableKeyPath<S<S<String>>, Double>
 
   expectNotEqual(s_c_z_p_x, s_c_z_p_y)
   expectNotEqual(s_c_z_p_y, s_c_z_p_x)
@@ -591,7 +604,7 @@ keyPathImpl.test("equality") {
       $0.addType(S<String>.self)
       // S<String>.p
       $0.addStructComponent(offset: intSize*2 + stringSize)
-    }
+    } as! ReferenceWritableKeyPath<S<S<String>>, Point>
 
   expectNotEqual(s_c_z_p_x, s_c_z_p)
   expectNotEqual(s_c_z_p, s_c_z_p_x)
@@ -611,7 +624,7 @@ keyPathImpl.test("equality") {
       $0.addType(Point.self)
       // Point.x
       $0.addStructComponent(offset: 0)
-    }
+    } as! KeyPath<S<S<String>>, Double>
 
   expectNotEqual(s_c_z_p_x, s_c_z_p_x_readonly)
   expectNotEqual(s_c_z_p_x_readonly, s_c_z_p_x)
@@ -625,7 +638,7 @@ keyPathImpl.test("equality") {
       $0.addType(Point.self)
       // Point.y
       $0.addStructComponent(offset: 8)
-    }
+    } as! KeyPath<S<S<String>>, Double>
 
   expectNotEqual(s_p_y_readonly, s_c_z_p_x_readonly)
   expectNotEqual(s_c_z_p_x_readonly, s_p_y_readonly)
@@ -641,7 +654,7 @@ keyPathImpl.test("equality") {
       $0.addType(Oroborous.self)
       // O.o
       $0.addClassComponent(offset: classHeaderSize)
-    }
+    } as! ReferenceWritableKeyPath<Oroborous, Oroborous>
 
   // Different reference prefix length
   let o_o_o_o_rp1 = ReferenceWritableKeyPath<Oroborous, Oroborous>
@@ -656,7 +669,7 @@ keyPathImpl.test("equality") {
       $0.addType(Oroborous.self)
       // O.o
       $0.addClassComponent(offset: classHeaderSize)
-    }
+    } as! ReferenceWritableKeyPath<Oroborous, Oroborous>
   let o_o_o_o_rp2 = ReferenceWritableKeyPath<Oroborous, Oroborous>
     .build(capacityInBytes: 16 + 2*intSize) {
       $0.addHeader(trivial: true, hasReferencePrefix: true)
@@ -669,7 +682,7 @@ keyPathImpl.test("equality") {
       $0.addType(Oroborous.self)
       // O.o
       $0.addClassComponent(offset: classHeaderSize)
-    }
+    } as! ReferenceWritableKeyPath<Oroborous, Oroborous>
   let o_o_o_o_rp2_2 = ReferenceWritableKeyPath<Oroborous, Oroborous>
     .build(capacityInBytes: 16 + 2*intSize) {
       $0.addHeader(trivial: true, hasReferencePrefix: true)
@@ -682,7 +695,7 @@ keyPathImpl.test("equality") {
       $0.addType(Oroborous.self)
       // O.o
       $0.addClassComponent(offset: classHeaderSize)
-  }
+    } as! ReferenceWritableKeyPath<Oroborous, Oroborous>
 
   expectNotEqual(o_o_o_o, o_o_o_o_rp1)
   expectNotEqual(o_o_o_o_rp1, o_o_o_o)
@@ -706,7 +719,7 @@ keyPathImpl.test("equality") {
       $0.addType(Oroborous.self)
       // O.o
       $0.addClassComponent(offset: classHeaderSize)
-    }
+    } as! ReferenceWritableKeyPath<Oroborous, Oroborous>
 
   expectNotEqual(o_o_o, o_o_o_o)
   expectNotEqual(o_o_o_o, o_o_o)
@@ -723,12 +736,12 @@ keyPathImpl.test("appending") {
     .build(capacityInBytes: 8) {
       $0.addHeader(trivial: true, hasReferencePrefix: false)
       $0.addStructComponent(offset: intSize*2 + stringSize)
-    }
+    } as! WritableKeyPath<S<String>, Point>
   let p_y = WritableKeyPath<Point, Double>
     .build(capacityInBytes: 8) {
       $0.addHeader(trivial: true, hasReferencePrefix: false)
       $0.addStructComponent(offset: 8)
-    }
+    } as! WritableKeyPath<Point, Double>
   
   let s_p_y = s_p.appending(path: p_y)
 
@@ -753,7 +766,7 @@ keyPathImpl.test("appending") {
       $0.addStructComponent(offset: intSize*2 + stringSize)
       $0.addType(Point.self)
       $0.addStructComponent(offset: 8)
-    }
+    } as! WritableKeyPath<S<String>, Double>
   expectEqual(s_p_y, s_p_y_manual)
   expectEqual(s_p_y_manual, s_p_y)
   expectEqual(s_p_y.hashValue, s_p_y_manual.hashValue)
@@ -762,7 +775,7 @@ keyPathImpl.test("appending") {
     .build(capacityInBytes: 8) {
       $0.addHeader(trivial: true, hasReferencePrefix: false)
       $0.addClassComponent(offset: classHeaderSize + 2*intSize)
-    }
+    } as! ReferenceWritableKeyPath<C<S<String>>, S<String>>
   
   let value2 = C(x: 17, y: LifetimeTracked(38), z: value)
   
@@ -782,7 +795,7 @@ keyPathImpl.test("appending") {
       $0.addStructComponent(offset: intSize*2 + stringSize)
       $0.addType(Point.self)
       $0.addStructComponent(offset: 8)
-    }
+    } as! ReferenceWritableKeyPath<C<S<String>>, Double>
   
   expectEqual(c_z_p_y, c_z_p_y_manual)
   expectEqual(c_z_p_y_manual, c_z_p_y)
@@ -792,7 +805,7 @@ keyPathImpl.test("appending") {
     .build(capacityInBytes: 8) {
       $0.addHeader(trivial: true, hasReferencePrefix: false)
       $0.addStructComponent(offset: intSize*2 + ssSize + pointSize)
-    }
+    } as! WritableKeyPath<S<S<String>>, C<S<String>>>
   
   let s_c_z_p_y = s_c.appending(path: c_z_p_y)
   
@@ -814,7 +827,7 @@ keyPathImpl.test("appending") {
       $0.addStructComponent(offset: intSize*2 + stringSize)
       $0.addType(Point.self)
       $0.addStructComponent(offset: 8)
-    }
+    } as! ReferenceWritableKeyPath<S<S<String>>, Double>
   
   expectEqual(s_c_z_p_y, s_c_z_p_y_manual)
   expectEqual(s_c_z_p_y_manual, s_c_z_p_y)
@@ -828,7 +841,7 @@ keyPathImpl.test("appending") {
                             endsReferencePrefix: true)
       $0.addType(Crate<S<S<String>>>.self)
       $0.addClassComponent(offset: classHeaderSize)
-    }
+    } as! ReferenceWritableKeyPath<CP, S<S<String>>>
   
   let cratePair_left_value_c_z_p_y
     = cratePair_left_value.appending(path: s_c_z_p_y)
@@ -858,7 +871,7 @@ keyPathImpl.test("appending") {
         $0.addStructComponent(offset: intSize*2 + stringSize)
         $0.addType(Point.self)
         $0.addStructComponent(offset: 8)
-      }
+      } as! ReferenceWritableKeyPath<CP, Double>
   expectEqual(cratePair_left_value_c_z_p_y,
               cratePair_left_value_c_z_p_y_manual)
   expectEqual(cratePair_left_value_c_z_p_y_manual,
