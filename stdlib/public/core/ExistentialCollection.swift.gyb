@@ -430,13 +430,11 @@ internal final class _${Kind}Box<S : ${Kind}> : _Any${Kind}Box<S.Iterator.Elemen
   S.SubSequence : ${Kind},
 %  if Kind == 'Sequence':
   S.SubSequence.Iterator.Element == S.Iterator.Element,
-%end
   S.SubSequence.SubSequence == S.SubSequence
-%   if Kind != 'Sequence':
-  ,
+%  else:
   S.SubSequence.Indices : ${Kind},
   S.Indices : ${Kind}
-%   end
+%  end
 {
   internal typealias Element = S.Iterator.Element
 
@@ -1045,7 +1043,6 @@ public struct ${Self}<Element>
     C.SubSequence : ${SubProtocol},
     C.SubSequence.Iterator.Element == Element,
     C.SubSequence.Indices : ${SubProtocol},
-    C.SubSequence.SubSequence == C.SubSequence,
     C.Indices : ${SubProtocol}
      {
     // Traversal: ${Traversal}
