@@ -662,12 +662,14 @@ public enum ValidUTF8 : UnicodeEncoding {
     return UTF8.maxLengthOfEncodedScalar
   }
 
+  @inline(__always)
   public static func encode<Scalar: EncodedScalarProtocol>(
     _ other: Scalar
   ) -> ValidUTF8.EncodedScalar? {
     return other.utf8
   }
 
+  @inline(__always)
   public static func parse1Forward<C: Collection>(
     _ input: C,
     knownCount: Int = 0
@@ -698,6 +700,7 @@ public enum ValidUTF8 : UnicodeEncoding {
     return .valid(EncodedScalar(u0, u1, u2, u3), resumptionPoint: i)
   }
 
+  @inline(__always)
   public static func parse1Reverse<C: BidirectionalCollection>(
     _ input: C, knownCount: Int = 0
   ) -> ParseResult<EncodedScalar, C.Index>
