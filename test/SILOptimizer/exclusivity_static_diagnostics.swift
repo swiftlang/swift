@@ -48,6 +48,25 @@ func callMutatingMethodThatTakesGlobalStoredPropInout() {
   global1.mutate(&global1.f)
 }
 
+class ClassWithFinalStoredProp {
+  final var s1: StructWithMutatingMethodThatTakesSelfInout = StructWithMutatingMethodThatTakesSelfInout()
+  final var s2: StructWithMutatingMethodThatTakesSelfInout = StructWithMutatingMethodThatTakesSelfInout()
+
+  func callMutatingMethodThatTakesClassStoredPropInout() {
+    s1.mutate(&s2.f) // no-warning
+
+    // expected-warning@+2{{modification requires exclusive access}}
+    // expected-note@+1{{conflicting modification requires exclusive access}}
+    s1.mutate(&s1.f)
+
+    let local1 = self
+
+    // expected-warning@+2{{modification requires exclusive access}}
+    // expected-note@+1{{conflicting modification requires exclusive access}}
+    local1.s1.mutate(&local1.s1.f)
+  }
+}
+
 func violationWithGenericType<T>(_ p: T) {
   var local = p
   // expected-warning@+2{{modification requires exclusive access}}
