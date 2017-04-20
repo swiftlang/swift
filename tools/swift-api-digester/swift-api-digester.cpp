@@ -2840,11 +2840,12 @@ void DiagnosisEmitter::visitType(SDKNodeType *Node) {
       Descriptor = isa<SDKNodeAbstractFunc>(Parent) ?
         SDKNodeAbstractFunc::getTypeRoleDescription(Ctx, Parent->getChildIndex(Node)) :
         Ctx.buffer("declared");
-      TypeChangedDecls.Diags.emplace_back(Parent->getDeclKind(),
-                                          Parent->getFullyQualifiedName(),
-                                          Node->getPrintedName(),
-                                          Count->getPrintedName(),
-                                          Descriptor);
+      if (Node->getPrintedName() != Count->getPrintedName())
+        TypeChangedDecls.Diags.emplace_back(Parent->getDeclKind(),
+                                            Parent->getFullyQualifiedName(),
+                                            Node->getPrintedName(),
+                                            Count->getPrintedName(),
+                                            Descriptor);
       break;
     default:
       break;

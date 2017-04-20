@@ -16,6 +16,8 @@ public class C1 {
   public init(_ : C1) {}
 }
 
+public typealias C3 = C1
+
 public struct NSSomestruct2 {
-  public static func foo1() {}
+  public static func foo1(_ a : C3) {}
 }
