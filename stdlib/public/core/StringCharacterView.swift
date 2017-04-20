@@ -326,7 +326,10 @@ extension String.CharacterView : BidirectionalCollection {
     // Grapheme breaking is much simpler if known ASCII
     if (_fastPath(_core.isASCII)) {
       let asciiBuffer = _core.asciiBuffer._unsafelyUnwrappedUnchecked
-      let pos = start._position - _coreOffset
+      let pos = end._position - _coreOffset - 1
+      _sanityCheck(
+        pos >= asciiBuffer.startIndex,
+        "should of been caught in earlier start-of-scalars check")
       let CR: UInt8 = 0x0d
       let LF: UInt8 = 0x0a
 
