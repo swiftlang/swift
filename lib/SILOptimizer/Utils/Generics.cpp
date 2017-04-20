@@ -601,36 +601,6 @@ getSignatureWithRequirements(GenericSignature *OrigGenSig,
   return getGenericEnvironmentAndSignature(Builder, M);
 }
 
-/// Perform some sanity checks for the requirements
-static void
-checkSpecializationRequirements(ArrayRef<Requirement> Requirements) {
-  for (auto &Req : Requirements) {
-    if (Req.getKind() == RequirementKind::SameType) {
-      auto FirstType = Req.getFirstType();
-      auto SecondType = Req.getSecondType();
-      assert(FirstType && SecondType);
-      assert(!FirstType->hasArchetype());
-      assert(!SecondType->hasArchetype());
-
-      // Only one of the types should be concrete.
-      assert(FirstType->hasTypeParameter() != SecondType->hasTypeParameter() &&
-             "Only concrete type same-type requirements are supported by "
-             "generic specialization");
-
-      (void) FirstType;
-      (void) SecondType;
-
-      continue;
-    }
-
-    if (Req.getKind() == RequirementKind::Layout) {
-      continue;
-    }
-
-    llvm_unreachable("Unknown type of requirement in generic specialization");
-  }
-}
-
 ReabstractionInfo::ReabstractionInfo(SILFunction *OrigF,
                                      ArrayRef<Requirement> Requirements) {
   if (shouldNotSpecializeCallee(OrigF))
@@ -1439,6 +1409,36 @@ void ReabstractionInfo::specializeConcreteAndGenericSubstitutions(
     if (getSubstitutedType()->isPolymorphic())
       DEBUG(llvm::dbgs() << "Created new specialized type: " << SpecializedType
                          << "\n");
+  }
+}
+
+/// Perform some sanity checks for the requirements provided in @_specialize.
+static void
+checkSpecializationRequirements(ArrayRef<Requirement> Requirements) {
+  for (auto &Req : Requirements) {
+    if (Req.getKind() == RequirementKind::SameType) {
+      auto FirstType = Req.getFirstType();
+      auto SecondType = Req.getSecondType();
+      assert(FirstType && SecondType);
+      assert(!FirstType->hasArchetype());
+      assert(!SecondType->hasArchetype());
+
+      // Only one of the types should be concrete.
+      assert(FirstType->hasTypeParameter() != SecondType->hasTypeParameter() &&
+             "Only concrete type same-type requirements are supported by "
+             "generic specialization");
+
+      (void) FirstType;
+      (void) SecondType;
+
+      continue;
+    }
+
+    if (Req.getKind() == RequirementKind::Layout) {
+      continue;
+    }
+
+    llvm_unreachable("Unknown type of requirement in generic specialization");
   }
 }
 
