@@ -463,7 +463,6 @@ extension TestSuite {
     collectionIsBidirectional: Bool = false
   ) where
     C.SubSequence : Collection,
-    C.SubSequence.SubSequence == C.SubSequence,
     C.Indices : Collection,
     CollectionWithEquatableElement.Iterator.Element : Equatable,
     CollectionWithEquatableElement.SubSequence : Collection {
@@ -1182,7 +1181,6 @@ self.test("\(testNamePrefix).OperatorPlus") {
     outOfBoundsIndexOffset: Int = 1
   ) where
     C.SubSequence : BidirectionalCollection & RangeReplaceableCollection,
-    C.SubSequence.SubSequence == C.SubSequence,
     C.Indices : BidirectionalCollection,
     CollectionWithEquatableElement.Iterator.Element : Equatable {
 
@@ -1305,7 +1303,6 @@ self.test("\(testNamePrefix).removeLast(n: Int)/whereIndexIsBidirectional/remove
     outOfBoundsIndexOffset: Int = 1
   ) where
     C.SubSequence : RandomAccessCollection & RangeReplaceableCollection,
-    C.SubSequence.SubSequence == C.SubSequence,
     C.Indices : RandomAccessCollection,
     CollectionWithEquatableElement.Iterator.Element : Equatable {
 

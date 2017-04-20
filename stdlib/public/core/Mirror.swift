@@ -220,7 +220,6 @@ public struct Mirror {
     // associated types of Collection.
     C.SubSequence : Collection,
     C.SubSequence.Indices : Collection,
-    C.SubSequence.SubSequence == C.SubSequence,
     C.Indices : Collection {
 
     self.subjectType = Subject.self
@@ -272,7 +271,6 @@ public struct Mirror {
     // FIXME(ABI)#48 (Associated Types with where clauses): these constraints should be applied to
     // associated types of Collection.
     C.SubSequence : Collection,
-    C.SubSequence.SubSequence == C.SubSequence,
     C.Indices : Collection {
 
     self.subjectType = Subject.self

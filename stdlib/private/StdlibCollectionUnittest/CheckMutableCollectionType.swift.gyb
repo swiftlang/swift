@@ -122,7 +122,6 @@ extension TestSuite {
     collectionIsBidirectional: Bool = false
   ) where
     C.SubSequence : MutableCollection,
-    C.SubSequence.SubSequence == C.SubSequence,
     C.Indices : Collection,
     CollectionWithEquatableElement.Iterator.Element : Equatable,
     CollectionWithComparableElement.Iterator.Element : Comparable {
@@ -785,7 +784,6 @@ self.test("\(testNamePrefix).partition/InvalidOrderings") {
     isFixedLengthCollection: Bool
   ) where
     C.SubSequence : BidirectionalCollection & MutableCollection,
-    C.SubSequence.SubSequence == C.SubSequence,
     C.Indices : BidirectionalCollection,
     CollectionWithEquatableElement.Iterator.Element : Equatable,
     CollectionWithComparableElement.Iterator.Element : Comparable {
@@ -932,7 +930,6 @@ self.test("\(testNamePrefix).partition/DispatchesThrough_withUnsafeMutableBuffer
     isFixedLengthCollection: Bool
   ) where
     C.SubSequence : RandomAccessCollection & MutableCollection,
-    C.SubSequence.SubSequence == C.SubSequence,
     C.Indices : RandomAccessCollection,
     CollectionWithEquatableElement.Iterator.Element : Equatable,
     CollectionWithComparableElement.Iterator.Element : Comparable {
