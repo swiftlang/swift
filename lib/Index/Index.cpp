@@ -69,6 +69,12 @@ static bool printDisplayName(const swift::ValueDecl *D, llvm::raw_ostream &OS) {
   return false;
 }
 
+static bool isMemberwiseInit(swift::ValueDecl *D) {
+  if (auto AFD = dyn_cast<AbstractFunctionDecl>(D))
+    return AFD->getBodyKind() == AbstractFunctionDecl::BodyKind::MemberwiseInitializer;
+  return false;
+}
+
 namespace {
 // Adapter providing a common interface for a SourceFile/Module.
 class SourceFileOrModule {
@@ -289,10 +295,57 @@ private:
     return true;
   }
 
+  void handleMemberwiseInitRefs(Expr *E) {
+    if (!isa<ConstructorRefCallExpr>(E))
+      return;
+
+    auto *DeclRef = dyn_cast<DeclRefExpr>(cast<ConstructorRefCallExpr>(E)->getFn());
+    if (!DeclRef || !isMemberwiseInit(DeclRef->getDecl()))
+      return;
+
+    // get label locations
+    auto *MemberwiseInit = DeclRef->getDecl();
+    std::vector<SourceLoc> LabelLocs;
+    auto NameLoc = DeclRef->getNameLoc();
+    if (NameLoc.isCompound()) {
+      size_t LabelIndex = 0;
+      SourceLoc ArgLoc;
+      while((ArgLoc = NameLoc.getArgumentLabelLoc(LabelIndex++)).isValid()) {
+        LabelLocs.push_back(ArgLoc);
+      }
+    } else if (auto *CallParent = dyn_cast_or_null<CallExpr>(getParentExpr())) {
+      LabelLocs = CallParent->getArgumentLabelLocs();
+    }
+
+    if (LabelLocs.empty())
+      return;
+
+    // match labels to properties
+    auto *TypeContext = MemberwiseInit->getDeclContext()
+                          ->getAsNominalTypeOrNominalTypeExtensionContext();
+    if (!TypeContext || !shouldIndex(TypeContext, false))
+      return;
+
+    auto LabelIt = LabelLocs.begin();
+    for(auto Prop : TypeContext->getStoredProperties()) {
+      if (Prop->getParentInitializer() && Prop->isLet())
+        continue;
+
+      assert(LabelIt != LabelLocs.end());
+      IndexSymbol Info;
+      if (initIndexSymbol(Prop, *LabelIt++, /*IsRef=*/true, Info))
+        continue;
+      if (startEntity(Prop, Info))
+        finishCurrentEntity();
+    }
+  }
+
   bool walkToExprPre(Expr *E) override {
     if (Cancelled)
       return false;
     ExprStack.push_back(E);
+
+    handleMemberwiseInitRefs(E);
     return true;
   }
 

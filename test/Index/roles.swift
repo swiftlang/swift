@@ -93,23 +93,28 @@ let aRef = aCalledFunction
 
 // RelationChildOf, Implicit
 struct AStruct {
+// CHECK: [[@LINE-1]]:8 | struct/Swift | AStruct | [[AStruct_USR:.*]] | Def | rel: 0
+
+  let y: Int = 2
+  // CHECK: [[@LINE-1]]:7 | instance-property/Swift | y | [[AStruct_y_USR:.*]] | Def,RelChild | rel: 1
+
   var x: Int
-  // CHECK: [[@LINE-1]]:7 | instance-property/Swift | x | s:14swift_ide_test7AStructV1xSiv | Def,RelChild | rel: 1
-  // CHECK-NEXT: RelChild | struct/Swift | AStruct | s:14swift_ide_test7AStructV
+  // CHECK: [[@LINE-1]]:7 | instance-property/Swift | x | [[AStruct_x_USR:.*]] | Def,RelChild | rel: 1
+  // CHECK-NEXT: RelChild | struct/Swift | AStruct | [[AStruct_USR]]
 
   mutating func aMethod() {
     // CHECK: [[@LINE-1]]:17 | instance-method/Swift | aMethod() | s:14swift_ide_test7AStructV7aMethodyyF | Def,RelChild | rel: 1
-    // CHECK-NEXT: RelChild | struct/Swift | AStruct | s:14swift_ide_test7AStructV
+    // CHECK-NEXT: RelChild | struct/Swift | AStruct | [[AStruct_USR]]
 
     x += 1
-    // CHECK: [[@LINE-1]]:5 | instance-property/Swift | x | s:14swift_ide_test7AStructV1xSiv | Ref,Read,Writ,RelCont | rel: 1
+    // CHECK: [[@LINE-1]]:5 | instance-property/Swift | x | [[AStruct_x_USR]] | Ref,Read,Writ,RelCont | rel: 1
     // CHECK-NEXT: RelCont | instance-method/Swift | aMethod() | s:14swift_ide_test7AStructV7aMethodyyF
     // CHECK: [[@LINE-3]]:5 | instance-method/acc-get/Swift | getter:x | s:14swift_ide_test7AStructV1xSifg | Ref,Call,Impl,RelRec,RelCall,RelCont | rel: 2
     // CHECK-NEXT: RelCall,RelCont | instance-method/Swift | aMethod() | s:14swift_ide_test7AStructV7aMethodyyF
-    // CHECK-NEXT: RelRec | struct/Swift | AStruct | s:14swift_ide_test7AStructV
+    // CHECK-NEXT: RelRec | struct/Swift | AStruct | [[AStruct_USR]]
     // CHECK: [[@LINE-6]]:5 | instance-method/acc-set/Swift | setter:x | s:14swift_ide_test7AStructV1xSifs | Ref,Call,Impl,RelRec,RelCall,RelCont | rel: 2
     // CHECK-NEXT: RelCall,RelCont | instance-method/Swift | aMethod() | s:14swift_ide_test7AStructV7aMethodyyF
-    // CHECK-NEXT: RelRec | struct/Swift | AStruct | s:14swift_ide_test7AStructV
+    // CHECK-NEXT: RelRec | struct/Swift | AStruct | [[AStruct_USR]]
     // CHECK: [[@LINE-9]]:7 | static-method/infix-operator/Swift | +=(_:_:) | s:Si2peoiySiz_SitFZ | Ref,RelCont | rel: 1
     // CHECK-NEXT: RelCont | instance-method/Swift | aMethod() | s:14swift_ide_test7AStructV7aMethodyyF
   }
@@ -117,7 +122,7 @@ struct AStruct {
   // RelationChildOf, RelationAccessorOf
   subscript(index: Int) -> Int {
     // CHECK: [[@LINE-1]]:3 | instance-property/subscript/Swift | subscript(_:) | s:14swift_ide_test7AStructV9subscriptS2ici | Def,RelChild | rel: 1
-    // CHECK-NEXT: RelChild | struct/Swift | AStruct | s:14swift_ide_test7AStructV
+    // CHECK-NEXT: RelChild | struct/Swift | AStruct | [[AStruct_USR]]
 
     get {
       // CHECK: [[@LINE-1]]:5 | instance-method/acc-get/Swift | getter:subscript(_:) | s:14swift_ide_test7AStructV9subscriptS2icfg | Def,RelChild,RelAcc | rel: 1
@@ -150,6 +155,9 @@ class AClass {
   // CHECK-NOT: acc-set/Swift | setter:computed_p |
   init(x: Int) {
     y = AStruct(x: x)
+    // CHECK: [[@LINE-1]]:17 | instance-property/Swift | x | [[AStruct_x_USR]] | Ref,RelCont | rel: 1
+    // CHECK: [[@LINE-2]]:9 | struct/Swift | AStruct | [[AStruct_USR]] | Ref,RelCont | rel: 1
+
     self.z = [1, 2, 3]
   }
   subscript(index: Int) -> Int {
@@ -298,10 +306,10 @@ var anInstance = AClass(x: 1)
 anInstance.y.x = anInstance.y.x
 // CHECK: [[@LINE-1]]:1 | variable/Swift | anInstance | s:14swift_ide_test10anInstanceAA6AClassCv | Ref,Read | rel: 0
 // CHECK: [[@LINE-2]]:12 | instance-property/Swift | y | [[AClass_y_USR]] | Ref,Read,Writ | rel: 0
-// CHECK: [[@LINE-3]]:14 | instance-property/Swift | x | s:14swift_ide_test7AStructV1xSiv | Ref,Writ | rel: 0
+// CHECK: [[@LINE-3]]:14 | instance-property/Swift | x | [[AStruct_x_USR]] | Ref,Writ | rel: 0
 // CHECK: [[@LINE-4]]:18 | variable/Swift | anInstance | s:14swift_ide_test10anInstanceAA6AClassCv | Ref,Read | rel: 0
 // CHECK: [[@LINE-5]]:29 | instance-property/Swift | y | [[AClass_y_USR]] | Ref,Read | rel: 0
-// CHECK: [[@LINE-6]]:31 | instance-property/Swift | x | s:14swift_ide_test7AStructV1xSiv | Ref,Read | rel: 0
+// CHECK: [[@LINE-6]]:31 | instance-property/Swift | x | [[AStruct_x_USR]] | Ref,Read | rel: 0
 
 anInstance.y.aMethod()
 // CHECK: [[@LINE-1]]:1 | variable/Swift | anInstance | s:14swift_ide_test10anInstanceAA6AClassCv | Ref,Read | rel: 0
@@ -316,7 +324,12 @@ anInstance.z[1] = anInstance.z[0]
 // CHECK: [[@LINE-4]]:30 | instance-property/Swift | z | s:14swift_ide_test6AClassC1zSaySiGv | Ref,Read,Writ | rel: 0
 
 let otherInstance = AStruct(x: 1)
-// CHECK: [[@LINE-1]]:21 | struct/Swift | AStruct | s:14swift_ide_test7AStructV | Ref | rel: 0
+// CHECK: [[@LINE-1]]:29 | instance-property/Swift | x | [[AStruct_x_USR]] | Ref | rel: 0
+// CHECK: [[@LINE-2]]:21 | struct/Swift | AStruct | [[AStruct_USR]] | Ref | rel: 0
+
+_ = AStruct.init(x:)
+// CHECK: [[@LINE-1]]:18 | instance-property/Swift | x | [[AStruct_x_USR]] | Ref | rel: 0
+// CHECK: [[@LINE-2]]:5 | struct/Swift | AStruct | [[AStruct_USR]] | Ref | rel: 0
 
 let _ = otherInstance[0]
 // CHECK: [[@LINE-1]]:9 | variable/Swift | otherInstance | s:14swift_ide_test13otherInstanceAA7AStructVv | Ref,Read | rel: 0
