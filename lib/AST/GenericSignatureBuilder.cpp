@@ -803,7 +803,7 @@ static Type formProtocolRelativeType(ProtocolDecl *proto,
                                      PotentialArchetype *basePA,
                                      PotentialArchetype *pa) {
   // Basis case: we've hit the base potential archetype.
-  if (basePA->isInSameEquivalenceClassAs(pa))
+  if (basePA == pa)
     return proto->getSelfInterfaceType();
 
   // Recursive case: form a dependent member type.
