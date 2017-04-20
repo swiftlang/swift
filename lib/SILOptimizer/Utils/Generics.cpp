@@ -590,7 +590,7 @@ getGenericEnvironmentAndSignature(GenericSignatureBuilder &Builder,
 
 /// Create a new generic signature from an existing one by adding
 /// additional requirements.
-std::pair<GenericEnvironment *, GenericSignature *>
+static std::pair<GenericEnvironment *, GenericSignature *>
 getGenericEnvironmentAndSignatureWithRequirements(
     GenericSignature *OrigGenSig, GenericEnvironment *OrigGenericEnv,
     ArrayRef<Requirement> Requirements, SILModule &M) {
@@ -839,25 +839,6 @@ shouldBePartiallySpecialized(Type Replacement,
   }
 
   return true;
-}
-
-static void remapRequirements(ArrayRef<Requirement> Reqs,
-                              SubstitutionMap &SubsMap,
-                              GenericSignatureBuilder &Builder,
-                              ModuleDecl *SM) {
-  auto source =
-      GenericSignatureBuilder::FloatingRequirementSource::forAbstract();
-
-  // Next, add each of the requirements (mapped from the requirement's
-  // interface types into the specialized interface type parameters).
-  // RequirementSource source(RequirementSource::Explicit, SourceLoc());
-
-  // Add requirements derived from the caller signature for the
-  // caller's archetypes mapped to the specialized signature.
-  for (auto &reqReq : Reqs) {
-    DEBUG(llvm::dbgs() << "\n\nRe-mapping the requirement:\n"; reqReq.dump());
-    Builder.addRequirement(reqReq, source, SM, &SubsMap);
-  }
 }
 
 namespace swift {
@@ -1263,7 +1244,13 @@ void FunctionSignaturePartialSpecializer::
 /// GenericSignatureBuilder. Re-map them using the provided SubstitutionMap.
 void FunctionSignaturePartialSpecializer::addRequirements(
     ArrayRef<Requirement> Reqs, SubstitutionMap &SubsMap) {
-  remapRequirements(Reqs, SubsMap, Builder, SM);
+  auto source =
+    GenericSignatureBuilder::FloatingRequirementSource::forAbstract();
+
+  for (auto &reqReq : Reqs) {
+    DEBUG(llvm::dbgs() << "\n\nRe-mapping the requirement:\n"; reqReq.dump());
+    Builder.addRequirement(reqReq, source, SM, &SubsMap);
+  }
 }
 
 /// Add requirements from the caller's signature.
