@@ -248,11 +248,23 @@ emitInvocation(SILBuilder &Builder,
   SILFunctionConventions fnConv(CalleeSILSubstFnTy.castTo<SILFunctionType>(),
                                 Builder.getModule());
 
-  if (!CanSILFuncTy->hasErrorResult()) {
-    return Builder.createApply(
-        CalleeFunc->getLocation(), FuncRefInst, CalleeSILSubstFnTy,
-        fnConv.getSILResultType(), Subs, CallArgs, false);
+  bool isNonThrowing = false;
+  // It it a function whose type claims it is throwing, but
+  // it actually never throws inside its body?
+  if (CanSILFuncTy->hasErrorResult() &&
+      CalleeFunc->findThrowBB() == CalleeFunc->end()) {
+    isNonThrowing = true;
   }
+
+  // Is callee a non-throwing function according to its type
+  // or de-facto?
+  if (!CanSILFuncTy->hasErrorResult() ||
+      CalleeFunc->findThrowBB() == CalleeFunc->end()) {
+    return Builder.createApply(CalleeFunc->getLocation(), FuncRefInst,
+                               CalleeSILSubstFnTy, fnConv.getSILResultType(),
+                               Subs, CallArgs, isNonThrowing);
+  }
+
   return emitApplyWithRethrow(Builder, CalleeFunc->getLocation(),
                               FuncRefInst, CalleeSubstFnTy, Subs,
                               CallArgs,
