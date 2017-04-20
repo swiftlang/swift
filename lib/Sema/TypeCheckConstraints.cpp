@@ -3463,7 +3463,15 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
         return CheckedCastKind::ValueCast;
 
       // Compare superclass bounds.
-      if (isSubtypeOf(toSuperclass, fromSuperclass, dc))
+      if (typesSatisfyConstraint(toSuperclass, fromSuperclass,
+                                 /*openArchetypes=*/true,
+                                 ConstraintKind::Subtype, dc))
+        return CheckedCastKind::ValueCast;
+
+      // An upcast is also OK.
+      if (typesSatisfyConstraint(fromSuperclass, toSuperclass,
+                                 /*openArchetypes=*/true,
+                                 ConstraintKind::Subtype, dc))
         return CheckedCastKind::ValueCast;
     }
   }
@@ -3472,9 +3480,21 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
     return CheckedCastKind::ValueCast;
   }
 
-  // If the destination type is a subtype of the source type, we have
+  // If the destination type can be a supertype of the source type, we are
+  // performing what looks like an upcast except it rebinds generic
+  // parameters.
+  if (!metatypeCast &&
+      typesSatisfyConstraint(fromType, toType,
+                             /*openArchetypes=*/true,
+                             ConstraintKind::Subtype, dc)) {
+    return CheckedCastKind::ValueCast;
+  }
+
+  // If the destination type can be a subtype of the source type, we have
   // a downcast.
-  if (isSubtypeOf(toType, fromType, dc)) {
+  if (typesSatisfyConstraint(toType, fromType,
+                             /*openArchetypes=*/true,
+                             ConstraintKind::Subtype, dc)) {
     return CheckedCastKind::ValueCast;
   }
   
