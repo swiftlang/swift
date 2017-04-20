@@ -106,7 +106,7 @@ public:
   }
 };
 
-}
+} // namespace
 
 VariantFunctions *
 sourcekitd::getVariantFunctionsForDocSupportAnnotationArray() {

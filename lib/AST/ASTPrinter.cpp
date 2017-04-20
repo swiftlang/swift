@@ -1266,7 +1266,7 @@ struct RequirementPrintLocation {
   /// Whether the requirement needs to be in a where clause.
   bool InWhereClause;
 };
-};
+} // namespace
 
 /// Heuristically work out a good place for \c req to be printed inside \c
 /// proto.

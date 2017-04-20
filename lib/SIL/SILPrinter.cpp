@@ -127,7 +127,7 @@ raw_ostream &operator<<(raw_ostream &OS, SILPrintContext::ID i) {
   i.print(OS);
   return OS;
 }
-}
+} // namespace swift
 
 /// IDAndType - Used when a client wants to print something like "%0 : $Int".
 struct SILValuePrinterInfo {

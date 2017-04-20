@@ -1519,7 +1519,7 @@ namespace {
       }
     }
   };
-}
+} // namespace
 
 // Give a nested type the appropriately resolved concrete type, based off a
 // parent PA that has a concrete type.
@@ -3470,7 +3470,7 @@ namespace swift {
            lhs.value->isEqual(rhs.value) &&
            lhs.source == rhs.source;
   }
-}
+} // namespace swift
 
 namespace {
   /// Retrieve the representative constraint that will be used for diagnostics.
@@ -3534,7 +3534,7 @@ namespace {
 
     return representativeConstraint;
   }
-}
+} // namespace
 
 void
 GenericSignatureBuilder::finalize(SourceLoc loc,
@@ -3920,7 +3920,7 @@ namespace {
     assert(!constraints.empty() && "All constraints were self-derived!");
     return anyDerivedViaConcrete;
   }
-}
+} // namespace
 
 template<typename T, typename DiagT>
 Constraint<T> GenericSignatureBuilder::checkConstraintList(
@@ -4136,7 +4136,7 @@ namespace swift {
                  const DerivedSameTypeComponent &rhs) {
     return compareDependentTypes(&lhs.anchor, &rhs.anchor) < 0;
   }
-}
+} // namespace swift
 
 /// Retrieve the "local" archetype anchor for the given potential archetype,
 /// which rebuilds this potential archetype using the archetype anchors of
@@ -4255,7 +4255,7 @@ namespace {
       return lhs.constraint < rhs.constraint;
     }
   };
-}
+} // namespace
 
 void GenericSignatureBuilder::checkSameTypeConstraints(
                           ArrayRef<GenericTypeParamType *> genericParams,
@@ -4659,7 +4659,7 @@ namespace {
     }
     return bestSource;
   }
-}
+} // namespace
 
 void GenericSignatureBuilder::enumerateRequirements(llvm::function_ref<
                      void (RequirementKind kind,

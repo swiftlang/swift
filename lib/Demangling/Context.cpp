@@ -188,5 +188,5 @@ std::string demangleTypeAsString(const char *MangledName,
                                   Options);
 }
 
-} // end namespace Mangle
-} // end namespace swift
+} // namespace Demangle
+} // namespace swift
