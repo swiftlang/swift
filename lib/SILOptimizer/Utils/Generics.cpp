@@ -271,8 +271,14 @@ bool ReabstractionInfo::prepareAndCheck(ApplySite Apply, SILFunction *Callee,
   if (HasUnboundGenericParams) {
     // Bail if we cannot specialize generic substitutions, but all substitutions
     // were generic.
-    if (!HasConcreteGenericParams && !SpecializeGenericSubstitutions)
+    if (!HasConcreteGenericParams && !SupportGenericSubstitutions) {
+      DEBUG(llvm::dbgs() << "    Partial specialization is not supported if "
+                            "all substitutions are generic.\n");
+      DEBUG(for (auto Sub : ParamSubs) {
+          Sub.dump();
+        });
       return false;
+    }
 
     if (!HasNonArchetypeGenericParams && !HasConcreteGenericParams) {
       DEBUG(llvm::dbgs() << "    Partial specialization is not supported if "
