@@ -1906,11 +1906,11 @@ void swift::trySpecializeApplyOfGeneric(
     ApplySite Apply, DeadInstructionSet &DeadApplies,
     llvm::SmallVectorImpl<SILFunction *> &NewFunctions) {
   assert(Apply.hasSubstitutions() && "Expected an apply with substitutions!");
-
-  auto *F = Apply.getInstruction()->getFunction();
+  auto *F = Apply.getFunction();
   auto *RefF = cast<FunctionRefInst>(Apply.getCallee())->getReferencedFunction();
 
-  DEBUG(llvm::dbgs() << "\n\n*** ApplyInst:\n";
+  DEBUG(llvm::dbgs() << "\n\n*** ApplyInst in function " << F->getName()
+                     << ":\n";
         Apply.getInstruction()->dumpInContext());
 
   // If the caller is fragile but the callee is not, bail out.
