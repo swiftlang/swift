@@ -712,6 +712,24 @@ bool IndexSwiftASTWalker::reportRelatedTypeRef(const TypeLoc &Ty, SymbolRoleSet 
   return true;
 }
 
+static bool isDynamicVarAccessorOrFunc(ValueDecl *D, SymbolInfo symInfo) {
+  if (auto NTD = D->getDeclContext()->getAsNominalTypeOrNominalTypeExtensionContext()) {
+    bool isClassOrProtocol = isa<ClassDecl>(NTD) || isa<ProtocolDecl>(NTD);
+    bool isInternalAccessor =
+      symInfo.SubKind == SymbolSubKind::SwiftAccessorWillSet ||
+      symInfo.SubKind == SymbolSubKind::SwiftAccessorDidSet ||
+      symInfo.SubKind == SymbolSubKind::SwiftAccessorAddressor ||
+      symInfo.SubKind == SymbolSubKind::SwiftAccessorMutableAddressor;
+    if (isClassOrProtocol &&
+        symInfo.Kind != SymbolKind::StaticMethod &&
+        !isInternalAccessor &&
+        !D->isFinal()) {
+      return true;
+    }
+  }
+  return false;
+}
+
 bool IndexSwiftASTWalker::reportPseudoAccessor(AbstractStorageDecl *D,
                                                AccessorKind AccKind, bool IsRef,
                                                SourceLoc Loc) {
@@ -722,9 +740,23 @@ bool IndexSwiftASTWalker::reportPseudoAccessor(AbstractStorageDecl *D,
     if (getPseudoAccessorNameAndUSR(D, AccKind, Info.name, Info.USR))
       return true;
     Info.symInfo.Kind = SymbolKind::Function;
+    if (D->getDeclContext()->isTypeContext()) {
+      if (D->isStatic()) {
+        if (isa<VarDecl>(D) &&
+            cast<VarDecl>(D)->getCorrectStaticSpelling() == StaticSpellingKind::KeywordClass)
+          Info.symInfo.Kind = SymbolKind::ClassMethod;
+        else
+          Info.symInfo.Kind = SymbolKind::StaticMethod;
+      } else {
+        Info.symInfo.Kind = SymbolKind::InstanceMethod;
+      }
+    }
     Info.symInfo.SubKind = getSubKindForAccessor(AccKind);
     Info.roles |= (SymbolRoleSet)SymbolRole::Implicit;
     Info.group = "";
+    if (isDynamicVarAccessorOrFunc(D, Info.symInfo)) {
+      Info.roles |= (SymbolRoleSet)SymbolRole::Dynamic;
+    }
     return false;
   };
 
@@ -752,7 +784,8 @@ bool IndexSwiftASTWalker::reportPseudoAccessor(AbstractStorageDecl *D,
       return true; // continue walking.
     if (updateInfo(Info))
       return true;
-    if (addRelation(Info, (SymbolRoleSet) SymbolRole::RelationAccessorOf, D))
+    if (addRelation(Info, (SymbolRoleSet)SymbolRole::RelationAccessorOf |
+                    (SymbolRoleSet)SymbolRole::RelationChildOf , D))
       return true;
 
     if (!IdxConsumer.startSourceEntity(Info) || !IdxConsumer.finishSourceEntity(Info.symInfo, Info.roles))
@@ -806,7 +839,11 @@ bool IndexSwiftASTWalker::report(ValueDecl *D) {
   if (startEntityDecl(D)) {
     // Pass accessors.
     if (auto VarD = dyn_cast<VarDecl>(D)) {
-      if (!VarD->getGetter() && !VarD->getSetter()) {
+      auto isNullOrImplicit = [](const Decl *D) -> bool {
+        return !D || D->isImplicit();
+      };
+      if (isNullOrImplicit(VarD->getGetter()) &&
+          isNullOrImplicit(VarD->getSetter())) {
         // No actual getter or setter, pass 'pseudo' accessors.
         // We create accessor entities so we can implement the functionality
         // of libclang, which reports implicit method property accessor
@@ -827,24 +864,24 @@ bool IndexSwiftASTWalker::report(ValueDecl *D) {
           SourceEntityWalker::walk(cast<Decl>(FD));
         if (Cancelled)
           return false;
-        if (VarD->hasObservers()) {
-          if (auto FD = VarD->getWillSetFunc())
-            SourceEntityWalker::walk(cast<Decl>(FD));
-          if (Cancelled)
-            return false;
-          if (auto FD = VarD->getDidSetFunc())
-            SourceEntityWalker::walk(cast<Decl>(FD));
-          if (Cancelled)
-            return false;
-        }
-        if (VarD->hasAddressors()) {
-          if (auto FD = VarD->getAddressor())
-            SourceEntityWalker::walk(cast<Decl>(FD));
-          if (Cancelled)
-            return false;
-          if (auto FD = VarD->getMutableAddressor())
-            SourceEntityWalker::walk(cast<Decl>(FD));
-        }
+      }
+      if (VarD->hasObservers()) {
+        if (auto FD = VarD->getWillSetFunc())
+          SourceEntityWalker::walk(cast<Decl>(FD));
+        if (Cancelled)
+          return false;
+        if (auto FD = VarD->getDidSetFunc())
+          SourceEntityWalker::walk(cast<Decl>(FD));
+        if (Cancelled)
+          return false;
+      }
+      if (VarD->hasAddressors()) {
+        if (auto FD = VarD->getAddressor())
+          SourceEntityWalker::walk(cast<Decl>(FD));
+        if (Cancelled)
+          return false;
+        if (auto FD = VarD->getMutableAddressor())
+          SourceEntityWalker::walk(cast<Decl>(FD));
       }
     } else if (auto NTD = dyn_cast<NominalTypeDecl>(D)) {
       if (!reportInheritedTypeRefs(NTD->getInherited(), NTD))
@@ -967,6 +1004,10 @@ bool IndexSwiftASTWalker::initFuncDeclIndexSymbol(FuncDecl *D,
   if (initIndexSymbol(D, D->getLoc(), /*IsRef=*/false, Info))
     return true;
 
+  if (isDynamicVarAccessorOrFunc(D, Info.symInfo)) {
+    Info.roles |= (SymbolRoleSet)SymbolRole::Dynamic;
+  }
+
   if (D->getAttrs().hasAttribute<IBActionAttr>()) {
     // Relate with type of the first parameter using RelationIBTypeOf.
     if (D->getParameterLists().size() >= 2) {
@@ -996,7 +1037,7 @@ static bool isSuperRefExpr(Expr *E) {
 }
 
 static bool isDynamicCall(Expr *BaseE, ValueDecl *D) {
-  // The call is 'dynamic' if the method is not of a struct and the
+  // The call is 'dynamic' if the method is not of a struct/enum and the
   // receiver is not 'super'. Note that if the receiver is 'super' that
   // does not mean that the call is statically determined (an extension
   // method may have injected itself in the super hierarchy).
@@ -1005,7 +1046,7 @@ static bool isDynamicCall(Expr *BaseE, ValueDecl *D) {
   auto TyD = getNominalParent(D);
   if (!TyD)
     return false;
-  if (isa<StructDecl>(TyD))
+  if (isa<StructDecl>(TyD) || isa<EnumDecl>(TyD))
     return false;
   if (isSuperRefExpr(BaseE))
     return false;
@@ -1038,17 +1079,9 @@ bool IndexSwiftASTWalker::initFuncRefIndexSymbol(ValueDecl *D, SourceLoc Loc,
 
   Expr *ParentE = getParentExpr();
 
-  // FIXME: the below check maintains existing indexing behavior with
-  // pseudo/accessor output but seems incorrect. E.g otherGlobal in:
-  // let global = otherGlobal
-  // will not have a parent expression so no accessor call is reported
-  if (isa<AbstractStorageDecl>(D) && !ParentE)
-    return true;
-
   if (!isa<AbstractStorageDecl>(D) &&
       !isBeingCalled(CurrentE, ParentE, getContainingExpr(2)))
     return false;
-
 
   Info.roles |= (unsigned)SymbolRole::Call;
   if (auto *Caller = dyn_cast_or_null<AbstractFunctionDecl>(getParentDecl())) {

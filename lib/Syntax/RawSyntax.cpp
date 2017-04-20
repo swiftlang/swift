@@ -131,7 +131,7 @@ void AbsolutePosition::dump(llvm::raw_ostream &OS) const {
   OS << ')';
 }
 
-RC<RawSyntax>
+swift::RC<RawSyntax>
 RawSyntax::append(RC<RawSyntax> NewLayoutElement) const {
   auto NewLayout = Layout;
   NewLayout.push_back(NewLayoutElement);

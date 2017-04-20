@@ -16,6 +16,7 @@
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/CFG.h"
+#include "swift/SIL/PrettyStackTrace.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "llvm/ADT/Optional.h"
 #include "llvm/Support/CommandLine.h"
@@ -64,6 +65,7 @@ SILFunction *SILFunction::create(
   llvm::StringMapEntry<SILFunction*> *entry = nullptr;
   if (!name.empty()) {
     entry = &*M.FunctionTable.insert(std::make_pair(name, nullptr)).first;
+    PrettyStackTraceSILFunction trace("creating", entry->getValue());
     assert(!entry->getValue() && "function already exists");
     name = entry->getKey();
   }
@@ -93,13 +95,6 @@ SILFunction::SILFunction(SILModule &Module, SILLinkage Linkage, StringRef Name,
       InlineStrategy(inlineStrategy), Linkage(unsigned(Linkage)),
       KeepAsPublic(false), EffectsKindAttr(E) {
 
-  // For bootstrapping, enable access markers in raw SIL whenever enforcement is
-  // enabled.
-  if (Module.getStage() == SILStage::Raw
-      && (Module.getOptions().EnforceExclusivityDynamic
-          || Module.getOptions().EnforceExclusivityStatic)) {
-    HasAccessMarkers = true;
-  }
   if (InsertBefore)
     Module.functions.insert(SILModule::iterator(InsertBefore), this);
   else

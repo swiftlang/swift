@@ -279,7 +279,7 @@ struct X17<S: P16, T, U> where S.A == (T, U) {
 }
 
 // Same-type constraints that are self-derived via a parent need to be
-// supressed in the resulting signature.
+// suppressed in the resulting signature.
 protocol P17 { }
 
 protocol P18 {

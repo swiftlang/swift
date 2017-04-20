@@ -637,7 +637,7 @@ public:
 
 #pragma mark - function-parameter-list API
 
-/// parameter-list -> parameteter | parameter ',' parameter-list
+/// parameter-list -> parameter | parameter ',' parameter-list
 class FunctionParameterListSyntax final : public
   SyntaxCollection<SyntaxKind::FunctionParameterList, FunctionParameterSyntax> {
   friend struct SyntaxFactory;
@@ -835,7 +835,7 @@ public:
   /// Return a FunctionDeclSyntax with the given modifiers.
   FunctionDeclSyntax withModifiers(DeclModifierListSyntax NewModifiers) const;
 
-  /// Return the 'func' keyword of tis function declaration.
+  /// Return the 'func' keyword of this function declaration.
   RC<TokenSyntax> getFuncKeyword() const;
 
   /// Return a FunctionDeclSyntax with the given 'func' keyword.

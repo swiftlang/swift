@@ -608,7 +608,8 @@ SILGenModule::emitProtocolWitness(ProtocolConformance *conformance,
     genericEnv = witnessRef.getDecl()->getInnermostDeclContext()
                    ->getGenericEnvironmentOfContext();
 
-    Type concreteTy = conformance->getInterfaceType();
+    auto conformanceDC = conformance->getDeclContext();
+    Type concreteTy = conformanceDC->getSelfInterfaceType();
 
     // FIXME: conformance substitutions should be in terms of interface types
     auto specialized = conformance;
@@ -672,7 +673,9 @@ SILGenModule::emitProtocolWitness(ProtocolConformance *conformance,
   // If the witness is a free function, there is no Self type.
   if (!isFree) {
     if (conformance) {
-      selfInterfaceType = conformance->getInterfaceType();
+      auto conformanceDC = conformance->getDeclContext();
+      selfInterfaceType =
+        conformanceDC->mapTypeOutOfContext(conformance->getType());
     } else {
       auto *proto = cast<ProtocolDecl>(requirement.getDecl()->getDeclContext());
       selfInterfaceType = proto->getSelfInterfaceType();

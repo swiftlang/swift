@@ -156,7 +156,7 @@ public:
 };
 
 /// Indicates whether a 'begin_access' requires exclusive access
-/// or allows shared acceess. This needs to be kept in sync with
+/// or allows shared access. This needs to be kept in sync with
 /// diag::exclusivity_access_required and diag::exclusivity_conflicting_access.
 enum class ExclusiveOrShared_t : unsigned {
   ExclusiveAccess = 0,
@@ -225,7 +225,7 @@ static ExclusiveOrShared_t getRequiredAccess(const BeginAccessInst *BAI) {
 }
 
 /// Perform a syntactic suppression that returns true when the accesses are for
-/// inout arguments to a call that corresponds to to one of the passed-in
+/// inout arguments to a call that corresponds to one of the passed-in
 /// 'apply' instructions.
 static bool
 isConflictOnInoutArgumentsToSuppressed(const BeginAccessInst *Access1,
@@ -431,7 +431,8 @@ static void checkStaticExclusivity(SILFunction &Fn, PostOrderFunctionInfo *PO) {
       if (auto *AI = dyn_cast<ApplyInst>(&I)) {
         // Suppress for the arguments to the Standard Library's swap()
         // function until we can recommend a safe alternative.
-        if (isCallToStandardLibrarySwap(AI, Fn.getASTContext()))
+        if (Fn.getModule().getOptions().SuppressStaticExclusivitySwap &&
+            isCallToStandardLibrarySwap(AI, Fn.getASTContext()))
           CallsToSuppress.push_back(AI);
       }
 

@@ -60,6 +60,23 @@ class TBDGenVisitor : public ASTVisitor<TBDGenVisitor> {
       addSymbol(linkage.getName());
   }
 
+  void addConformances(DeclContext *DC) {
+    for (auto conformance : DC->getLocalConformances()) {
+      auto needsWTable = Lowering::TypeConverter::protocolRequiresWitnessTable(
+          conformance->getProtocol());
+      if (!needsWTable)
+        continue;
+
+      // Only normal conformances get symbols; the others get any public symbols
+      // from their parent normal conformance.
+      if (conformance->getKind() != ProtocolConformanceKind::Normal)
+        continue;
+
+      addSymbol(LinkEntity::forDirectProtocolWitnessTable(conformance));
+      addSymbol(LinkEntity::forProtocolWitnessTableAccessFunction(conformance));
+    }
+  }
+
 public:
   TBDGenVisitor(StringSet &symbols,
                 const UniversalLinkageInfo &universalLinkInfo,
@@ -94,6 +111,8 @@ public:
   void visitNominalTypeDecl(NominalTypeDecl *NTD);
 
   void visitClassDecl(ClassDecl *CD);
+
+  void visitExtensionDecl(ExtensionDecl *ED);
 
   void visitProtocolDecl(ProtocolDecl *PD) {
     addSymbol(LinkEntity::forProtocolDescriptor(PD));
@@ -147,7 +166,7 @@ void TBDGenVisitor::addSymbol(SILDeclRef declRef, bool checkSILOnly) {
   // currently need to refer to them by symbol for their own vtable.
   switch (declRef.getSubclassScope()) {
   case SubclassScope::External:
-    // Allocating constructors retain their normal linkage behaviour.
+    // Allocating constructors retain their normal linkage behavior.
     if (declRef.kind == SILDeclRef::Kind::Allocator)
       break;
 
@@ -199,30 +218,18 @@ void TBDGenVisitor::visitNominalTypeDecl(NominalTypeDecl *NTD) {
 
   addSymbol(LinkEntity::forNominalTypeDescriptor(NTD));
 
-  addSymbol(LinkEntity::forTypeMetadata(declaredType,
-                                        TypeMetadataAddress::AddressPoint,
-                                        /*isPattern=*/false));
+  // Generic types do not get metadata directly, only through the function.
+  if (!NTD->isGenericContext()) {
+    addSymbol(LinkEntity::forTypeMetadata(declaredType,
+                                          TypeMetadataAddress::AddressPoint,
+                                          /*isPattern=*/false));
+  }
   addSymbol(LinkEntity::forTypeMetadataAccessFunction(declaredType));
 
   // There are symbols associated with any protocols this type conforms to.
-  for (auto conformance : NTD->getLocalConformances()) {
-    auto needsWTable = Lowering::TypeConverter::protocolRequiresWitnessTable(
-        conformance->getProtocol());
-    if (!needsWTable)
-      continue;
-
-    addSymbol(LinkEntity::forDirectProtocolWitnessTable(conformance));
-    addSymbol(LinkEntity::forProtocolWitnessTableAccessFunction(conformance));
-  }
+  addConformances(NTD);
 
   visitMembers(NTD);
-}
-
-template <typename T> bool isaAnd(Decl *D, llvm::function_ref<bool(T *)> f) {
-  if (auto *x = dyn_cast_or_null<T>(D))
-    return f(x);
-
-  return false;
 }
 
 void TBDGenVisitor::visitClassDecl(ClassDecl *CD) {
@@ -230,9 +237,20 @@ void TBDGenVisitor::visitClassDecl(ClassDecl *CD) {
     return;
 
   auto &ctxt = CD->getASTContext();
+  auto isGeneric = CD->isGenericContext();
+  auto objCCompatible = ctxt.LangOpts.EnableObjCInterop && !isGeneric;
+  auto isObjC = objCCompatible && CD->isObjC();
 
-  if (ctxt.LangOpts.EnableObjCInterop) {
-    addSymbol(LinkEntity::forSwiftMetaclassStub(CD));
+  // Metaclasses and ObjC class (duh) are a ObjC thing, and so are not needed in
+  // build artifacts/for classes which can't touch ObjC.
+  if (objCCompatible) {
+    if (isObjC)
+      addSymbol(LinkEntity::forObjCClass(CD));
+
+    if (CD->getMetaclassKind() == ClassDecl::MetaclassKind::ObjC)
+      addSymbol(LinkEntity::forObjCMetaclass(CD));
+    else
+      addSymbol(LinkEntity::forSwiftMetaclassStub(CD));
   }
 
   // Some members of classes get extra handling, beyond members of struct/enums,
@@ -243,21 +261,33 @@ void TBDGenVisitor::visitClassDecl(ClassDecl *CD) {
       continue;
 
     auto var = dyn_cast<VarDecl>(value);
-    auto hasFieldOffset = var && var->hasStorage() && !var->isStatic();
+    auto hasFieldOffset =
+        !isGeneric && var && var->hasStorage() && !var->isStatic();
     if (hasFieldOffset) {
-      // These fields are always direct.
-      addSymbol(LinkEntity::forFieldOffset(var, /*isIndirect=*/false));
+      // Field are only direct if the class's internals are completely known.
+      auto isIndirect = !CD->hasFixedLayout();
+      addSymbol(LinkEntity::forFieldOffset(var, isIndirect));
     }
 
     // The non-allocating forms of the constructors and destructors.
     if (auto ctor = dyn_cast<ConstructorDecl>(value)) {
       addSymbol(SILDeclRef(ctor, SILDeclRef::Kind::Initializer));
     } else if (auto dtor = dyn_cast<DestructorDecl>(value)) {
-      addSymbol(SILDeclRef(dtor, SILDeclRef::Kind::Destroyer));
+      // ObjC classes don't have a symbol for their destructor.
+      if (!isObjC)
+        addSymbol(SILDeclRef(dtor, SILDeclRef::Kind::Destroyer));
     }
   }
 
   visitNominalTypeDecl(CD);
+}
+
+void TBDGenVisitor::visitExtensionDecl(ExtensionDecl *ED) {
+  if (!ED->getExtendedType()->isExistentialType()) {
+    addConformances(ED);
+  }
+
+  visitMembers(ED);
 }
 
 void swift::enumeratePublicSymbols(FileUnit *file, StringSet &symbols,
@@ -272,4 +302,7 @@ void swift::enumeratePublicSymbols(FileUnit *file, StringSet &symbols,
   TBDGenVisitor visitor(symbols, linkInfo, file->getParentModule());
   for (auto d : decls)
     visitor.visit(d);
+
+  if (file->hasEntryPoint())
+    symbols.insert("main");
 }

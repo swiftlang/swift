@@ -88,6 +88,8 @@ syn keyword swiftVarDefinition skipwhite nextgroup=swiftVarName
 syn keyword swiftLabel
       \ get
       \ set
+      \ didSet
+      \ willSet
 
 syn keyword swiftBoolean
       \ false

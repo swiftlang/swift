@@ -2,7 +2,7 @@
 
 import Swift
 
-func takesTwoInouts(_ p1: inout Int, _ p2: inout Int) { }
+func takesTwoInouts<T>(_ p1: inout T, _ p2: inout T) { }
 
 func simpleInoutDiagnostic() {
   var i = 7
@@ -13,36 +13,44 @@ func simpleInoutDiagnostic() {
 }
 
 
-func swapSuppression(_ i: Int, _ j: Int) {
+func swapNoSuppression(_ i: Int, _ j: Int) {
   var a: [Int] = [1, 2, 3]
 
+  // expected-warning@+2{{modification requires exclusive access}}
+  // expected-note@+1{{conflicting modification requires exclusive access}}
   swap(&a[i], &a[j]) // no-warning
-
-  // expected-warning@+2{{modification requires exclusive access}}
-  // expected-note@+1{{conflicting modification requires exclusive access}}
-  takesTwoInouts(&a[i], &a[j])
 }
 
-func missedSwapSuppression(_ i: Int, _ j: Int) {
-  var a: [Int] = [1, 2, 3]
+class SomeClass { }
 
-  // We don't suppress when swap() is used as a value
-  let mySwap: (inout Int, inout Int) -> () = swap
+struct StructWithMutatingMethodThatTakesSelfInout {
+  var f = SomeClass()
+  mutating func mutate(_ other: inout StructWithMutatingMethodThatTakesSelfInout) { }
+  mutating func mutate(_ other: inout SomeClass) { }
 
-  // expected-warning@+2{{modification requires exclusive access}}
-  // expected-note@+1{{conflicting modification requires exclusive access}}
-  mySwap(&a[i], &a[j])
-}
-
-func dontSuppressUserSwap(_ i: Int, _ j: Int) {
-  var a: [Int] = [1, 2, 3]
-
-  // Don't suppress on user-defined swap.
-  func swap<T>(_ p1: inout T, _ p2: inout T) {
-    return (p1, p2) = (p2, p1)
+  mutating func callMutatingMethodThatTakesSelfInout() {
+    // expected-warning@+2{{modification requires exclusive access}}
+    // expected-note@+1{{conflicting modification requires exclusive access}}
+    mutate(&self)
   }
 
+  mutating func callMutatingMethodThatTakesSelfStoredPropInout() {
+    // expected-warning@+2{{modification requires exclusive access}}
+    // expected-note@+1{{conflicting modification requires exclusive access}}
+    mutate(&self.f)
+  }
+}
+
+var global1 = StructWithMutatingMethodThatTakesSelfInout()
+func callMutatingMethodThatTakesGlobalStoredPropInout() {
   // expected-warning@+2{{modification requires exclusive access}}
   // expected-note@+1{{conflicting modification requires exclusive access}}
-  swap(&a[i], &a[j])
+  global1.mutate(&global1.f)
+}
+
+func violationWithGenericType<T>(_ p: T) {
+  var local = p
+  // expected-warning@+2{{modification requires exclusive access}}
+  // expected-note@+1{{conflicting modification requires exclusive access}}
+  takesTwoInouts(&local, &local)
 }

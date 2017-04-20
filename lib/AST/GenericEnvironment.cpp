@@ -201,7 +201,10 @@ Type GenericEnvironment::QueryInterfaceTypeSubstitutions::operator()(
     Type contextType = self->getContextTypes()[index];
     if (!contextType) {
       assert(self->Builder && "Missing generic signature builder for lazy query");
-      auto potentialArchetype = self->Builder->resolveArchetype(type);
+      auto potentialArchetype =
+        self->Builder->resolveArchetype(
+                                  type,
+                                  ArchetypeResolutionKind::CompleteWellFormed);
 
       auto mutableSelf = const_cast<GenericEnvironment *>(self);
       contextType =
@@ -223,6 +226,10 @@ Type GenericEnvironment::QueryArchetypeToInterfaceSubstitutions::operator()(
                                                 SubstitutableType *type) const {
   auto archetype = type->getAs<ArchetypeType>();
   if (!archetype) return Type();
+
+  // Only top-level archetypes need to be substituted directly; nested
+  // archetypes will be handled via their root archetypes.
+  if (archetype->getParent()) return Type();
 
   // If not all generic parameters have had their context types recorded,
   // perform a linear search.

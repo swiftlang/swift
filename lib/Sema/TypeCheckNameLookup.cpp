@@ -155,7 +155,7 @@ namespace {
           witness = concrete->getTypeWitnessAndDecl(assocType, &TC)
             .second;
         } else if (found->isProtocolRequirement()) {
-          witness = concrete->getWitness(found, &TC).getDecl();
+          witness = concrete->getWitnessDecl(found, &TC);
         }
 
         // FIXME: the "isa<ProtocolDecl>()" check will be wrong for

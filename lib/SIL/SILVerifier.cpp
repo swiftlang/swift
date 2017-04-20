@@ -1253,8 +1253,6 @@ public:
   }
 
   void checkBeginAccessInst(BeginAccessInst *BAI) {
-    require(F.hasAccessMarkers(), "Unexpected begin_access");
-
     auto op = BAI->getOperand();
     requireSameType(BAI->getType(), op->getType(),
                     "result must be same type as operand");
@@ -1271,9 +1269,35 @@ public:
             isa<MarkUninitializedInst>(op),
             "begin_access operand must be a root address derivation");
 
-    if (BAI->getModule().getStage() != SILStage::Raw) {
-      require(BAI->getEnforcement() != SILAccessEnforcement::Unknown,
+    // Any kind of access marker can be used in the raw stage if either kind
+    // of enforcement is enabled globally.
+    // After the raw stage, only dynamic access markers can be used, and
+    // only if dynamic enforcement is enabled globally.
+    // Eventually, we should allow access markers to persist in SIL, and
+    // even make them obligatory, but we'll need to update a bunch of
+    // passes first.
+    switch (BAI->getEnforcement()) {
+    case SILAccessEnforcement::Unknown:
+      require(F.getModule().getOptions().isAnyExclusivityEnforcementEnabled()
+              && BAI->getModule().getStage() == SILStage::Raw,
               "access must have known enforcement outside raw stage");
+      break;
+
+    case SILAccessEnforcement::Static:
+    case SILAccessEnforcement::Unsafe:
+      require(F.getModule().getOptions().isAnyExclusivityEnforcementEnabled()
+              && BAI->getModule().getStage() == SILStage::Raw,
+              "non-dynamic enforcement is currently disallowed outside "
+              "raw stage");
+      break;
+
+    case SILAccessEnforcement::Dynamic:
+      require(F.getModule().getOptions().EnforceExclusivityDynamic ||
+              (F.getModule().getOptions().EnforceExclusivityStatic &&
+               BAI->getModule().getStage() == SILStage::Raw),
+              "dynamic access enforcement is only allowed after raw stage when "
+              "globally enabled");
+      break;
     }
 
     switch (BAI->getAccessKind()) {
@@ -1290,8 +1314,6 @@ public:
   }
 
   void checkEndAccessInst(EndAccessInst *EAI) {
-    require(F.hasAccessMarkers(), "Unexpected end_access");
-
     auto BAI = dyn_cast<BeginAccessInst>(EAI->getOperand());
     require(BAI != nullptr,
             "operand of end_access must be a begin_access");
@@ -1415,9 +1437,17 @@ public:
     require(MU->getModule().getStage() == SILStage::Raw,
             "mark_uninitialized instruction can only exist in raw SIL");
     require(Src->getType().isAddress() ||
-            Src->getType().getSwiftRValueType()->getClassOrBoundGenericClass(),
-            "mark_uninitialized must be an address or class");
+                Src->getType()
+                    .getSwiftRValueType()
+                    ->getClassOrBoundGenericClass() ||
+                Src->getType().getAs<SILBoxType>(),
+            "mark_uninitialized must be an address, class, or box type");
     require(Src->getType() == MU->getType(),"operand and result type mismatch");
+#if 0
+    // This will be turned back on in a couple of commits.
+    require(isa<AllocationInst>(Src) || isa<SILArgument>(Src),
+            "Mark Uninitialized should always be on the storage location");
+#endif
   }
   
   void checkMarkUninitializedBehaviorInst(MarkUninitializedBehaviorInst *MU) {
@@ -1888,9 +1918,19 @@ public:
 
     require(AI->getType().isObject(),
             "result of alloc_box must be an object");
-    for (unsigned field : indices(AI->getBoxType()->getLayout()->getFields()))
+    for (unsigned field : indices(AI->getBoxType()->getLayout()->getFields())) {
       verifyOpenedArchetype(AI,
                    AI->getBoxType()->getFieldLoweredType(F.getModule(), field));
+    }
+
+    // An alloc_box with a mark_uninitialized user can not have any other users.
+    require(none_of(AI->getUses(),
+                    [](Operand *Op) -> bool {
+                      return isa<MarkUninitializedInst>(Op->getUser());
+                    }) ||
+                AI->hasOneUse(),
+            "An alloc_box with a mark_uninitialized user can not have any "
+            "other users.");
   }
 
   void checkDeallocBoxInst(DeallocBoxInst *DI) {

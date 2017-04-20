@@ -42,7 +42,8 @@ Type DependentGenericTypeResolver::resolveDependentMemberType(
                                      DeclContext *DC,
                                      SourceRange baseRange,
                                      ComponentIdentTypeRepr *ref) {
-  auto archetype = Builder.resolveArchetype(baseTy);
+  auto archetype =
+    Builder.resolveArchetype(baseTy, ArchetypeResolutionKind::AlwaysPartial);
   assert(archetype && "Bad generic context nesting?");
 
   return archetype
@@ -52,7 +53,8 @@ Type DependentGenericTypeResolver::resolveDependentMemberType(
 
 Type DependentGenericTypeResolver::resolveSelfAssociatedType(
        Type selfTy, AssociatedTypeDecl *assocType) {
-  auto archetype = Builder.resolveArchetype(selfTy);
+  auto archetype =
+    Builder.resolveArchetype(selfTy, ArchetypeResolutionKind::AlwaysPartial);
   assert(archetype && "Bad generic context nesting?");
   
   return archetype
@@ -72,10 +74,12 @@ bool DependentGenericTypeResolver::areSameType(Type type1, Type type2) {
   if (!type1->hasTypeParameter() && !type2->hasTypeParameter())
     return type1->isEqual(type2);
 
-  auto pa1 = Builder.resolveArchetype(type1);
-  auto pa2 = Builder.resolveArchetype(type2);
+  auto pa1 =
+    Builder.resolveArchetype(type1, ArchetypeResolutionKind::AlwaysPartial);
+  auto pa2 =
+    Builder.resolveArchetype(type2, ArchetypeResolutionKind::AlwaysPartial);
   if (pa1 && pa2)
-    return pa1->getArchetypeAnchor(Builder) == pa2->getArchetypeAnchor(Builder);
+    return pa1->isInSameEquivalenceClassAs(pa2);
 
   return type1->isEqual(type2);
 }
@@ -194,7 +198,9 @@ Type CompleteGenericTypeResolver::resolveDependentMemberType(
                                     SourceRange baseRange,
                                     ComponentIdentTypeRepr *ref) {
   // Resolve the base to a potential archetype.
-  auto basePA = Builder.resolveArchetype(baseTy);
+  auto basePA =
+    Builder.resolveArchetype(baseTy,
+                             ArchetypeResolutionKind::CompleteWellFormed);
   assert(basePA && "Missing potential archetype for base");
 
   // Retrieve the potential archetype for the nested type.
@@ -257,7 +263,8 @@ Type CompleteGenericTypeResolver::resolveDependentMemberType(
 
 Type CompleteGenericTypeResolver::resolveSelfAssociatedType(
        Type selfTy, AssociatedTypeDecl *assocType) {
-  return Builder.resolveArchetype(selfTy)
+  return Builder.resolveArchetype(selfTy,
+                                  ArchetypeResolutionKind::CompleteWellFormed)
            ->getNestedType(assocType, Builder)
            ->getDependentType(GenericParams, /*allowUnresolved=*/false);
 }
@@ -274,10 +281,13 @@ bool CompleteGenericTypeResolver::areSameType(Type type1, Type type2) {
   if (!type1->hasTypeParameter() && !type2->hasTypeParameter())
     return type1->isEqual(type2);
 
-  auto pa1 = Builder.resolveArchetype(type1);
-  auto pa2 = Builder.resolveArchetype(type2);
+  // FIXME: Want CompleteWellFormed here?
+  auto pa1 =
+    Builder.resolveArchetype(type1, ArchetypeResolutionKind::AlwaysPartial);
+  auto pa2 =
+    Builder.resolveArchetype(type2, ArchetypeResolutionKind::AlwaysPartial);
   if (pa1 && pa2)
-    return pa1->getArchetypeAnchor(Builder) == pa2->getArchetypeAnchor(Builder);
+    return pa1->isInSameEquivalenceClassAs(pa2);
 
   return type1->isEqual(type2);
 }
@@ -618,7 +628,7 @@ static void checkReferencedGenericParams(GenericContext *dc,
   auto *decl = cast<ValueDecl>(dc->getInnermostDeclarationDeclContext());
 
   // A helper class to collect referenced generic type parameters
-  // and dependent memebr types.
+  // and dependent member types.
   class ReferencedGenericTypeWalker : public TypeWalker {
     SmallPtrSet<CanType, 4> ReferencedGenericParams;
 
@@ -653,7 +663,7 @@ static void checkReferencedGenericParams(GenericContext *dc,
   auto &referencedGenericParams =
       paramsAndResultWalker.getReferencedGenericParams();
 
-  // Check if at least one of the generic params in the requirment refers
+  // Check if at least one of the generic params in the requirement refers
   // to an already referenced generic parameter. If this is the case,
   // then the other type is also considered as referenced, because
   // it is used to put requirements on the first type.
@@ -673,7 +683,7 @@ static void checkReferencedGenericParams(GenericContext *dc,
       break;
     }
 
-    // Collect generic parameter types refereced by types used in a requirement.
+    // Collect generic parameter types referenced by types used in a requirement.
     ReferencedGenericTypeWalker walker;
     if (first && first->hasTypeParameter())
       first.walk(walker);

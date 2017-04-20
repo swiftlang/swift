@@ -141,7 +141,7 @@ static bool ShouldUseObjCUSR(const Decl *D) {
 }
 
 bool ide::printDeclUSR(const ValueDecl *D, raw_ostream &OS) {
-  if (!D->hasName() &&
+  if (!D->hasName() && !isa<ParamDecl>(D) &&
       (!isa<FuncDecl>(D) ||
        cast<FuncDecl>(D)->getAccessorKind() == AccessorKind::NotAccessor))
     return true; // Ignore.

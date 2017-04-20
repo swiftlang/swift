@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -c -parse-as-library -module-name test -validate-tbd-against-ir %s
+// RUN: %target-swift-frontend -emit-ir -o- -parse-as-library -module-name test -validate-tbd-against-ir %s
 
 open class OpenNothing {}
 
@@ -74,6 +74,30 @@ open class OpenStatics {
         get { return 0 }
         set {}
     }
+}
+
+open class OpenGeneric<T, U, V> {
+  public var publicVar: T
+  internal var internalVar: U
+  private var privateVar: V
+
+  public var publicVarConcrete: Int = 0
+  internal var internalVarConcrete: Int = 0
+  private var privateVarConcrete: Int = 0
+
+  public init<S>(t: T, u: U, v: V, _: S) {
+    publicVar = t
+    internalVar = u
+    privateVar = v
+  }
+
+  public func publicGeneric<A>(_: A) {}
+  internal func internalGeneric<A>(_: A) {}
+  private func privateGeneric<A>(_: A) {}
+
+  public static func publicStaticGeneric<A>(_: A) {}
+  internal static func internalStaticGeneric<A>(_: A) {}
+  private static func privateStaticGeneric<A>(_: A) {}
 }
 
 public class PublicNothing {}
@@ -152,6 +176,30 @@ public class PublicStatics {
     }
 }
 
+public class PublicGeneric<T, U, V> {
+  public var publicVar: T
+  internal var internalVar: U
+  private var privateVar: V
+
+  public var publicVarConcrete: Int = 0
+  internal var internalVarConcrete: Int = 0
+  private var privateVarConcrete: Int = 0
+
+  public init<S>(t: T, u: U, v: V, _: S) {
+    publicVar = t
+    internalVar = u
+    privateVar = v
+  }
+
+  public func publicGeneric<A>(_: A) {}
+  internal func internalGeneric<A>(_: A) {}
+  private func privateGeneric<A>(_: A) {}
+
+  public static func publicStaticGeneric<A>(_: A) {}
+  internal static func internalStaticGeneric<A>(_: A) {}
+  private static func privateStaticGeneric<A>(_: A) {}
+}
+
 
 internal class InternalNothing {}
 
@@ -210,6 +258,26 @@ internal class InternalStatics {
     }
 }
 
+internal class InternalGeneric<T, U, V> {
+  internal var internalVar: U
+  private var privateVar: V
+
+  internal var internalVarConcrete: Int = 0
+  private var privateVarConcrete: Int = 0
+
+  internal init<S>(t: T, u: U, v: V, _: S) {
+    internalVar = u
+    privateVar = v
+  }
+
+  internal func internalGeneric<A>(_: A) {}
+  private func privateGeneric<A>(_: A) {}
+
+  internal static func internalStaticGeneric<A>(_: A) {}
+  private static func privateStaticGeneric<A>(_: A) {}
+}
+
+
 private class PrivateNothing {}
 
 private class PrivateInit {
@@ -248,4 +316,18 @@ private class PrivateStatics {
         get { return 0 }
         set {}
     }
+}
+
+private class PrivateGeneric<T, U, V> {
+  private var privateVar: V
+
+  private var privateVarConcrete: Int = 0
+
+  private init<S>(t: T, u: U, v: V, _: S) {
+    privateVar = v
+  }
+
+  private func privateGeneric<A>(_: A) {}
+
+  private static func privateStaticGeneric<A>(_: A) {}
 }
