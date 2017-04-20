@@ -1,5 +1,7 @@
 
 /* Removed Decls */
+Constructor C1.init() has been removed
+Constructor Somestruct2.init(_:) has been removed
 
 /* Moved Decls */
 
@@ -9,7 +11,6 @@ Func S1.foo5(x:y:) has been renamed to Func S1.foo5(x:y:z:)
 
 /* Type Changes */
 Constructor S1.init(_:) has parameter 0 type change from Int to Double
-Constructor Somestruct2.init() has return type change from Somestruct2 to NSSomestruct2
 Func C1.foo2(_:) has parameter 0 type change from Int to () -> ()
 
 /* Decl Attribute changes */

@@ -16,5 +16,6 @@ public class C1 {
 }
 
 public struct Somestruct2 {
+  public init(_ : C1) {}
   public static func foo1() {}
 }

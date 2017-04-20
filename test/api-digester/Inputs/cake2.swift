@@ -13,6 +13,7 @@ public class C1 {
   public var CIIns1 : C1?
   public weak var CIIns2 : C1?
   public func foo3(a : ()?) {}
+  public init(_ : C1) {}
 }
 
 public struct NSSomestruct2 {
