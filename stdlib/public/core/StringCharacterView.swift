@@ -262,7 +262,8 @@ extension String.CharacterView : BidirectionalCollection {
     }
 
     // Grapheme breaking is much simpler if known ASCII
-    if (_fastPath(_core.isASCII)) {
+    if _core.isASCII {
+      _onFastPath() // Please aggressively inline
       let asciiBuffer = _core.asciiBuffer._unsafelyUnwrappedUnchecked
       let pos = start._position - _coreOffset
       let CR: UInt8 = 0x0d
@@ -324,7 +325,8 @@ extension String.CharacterView : BidirectionalCollection {
     }
 
     // Grapheme breaking is much simpler if known ASCII
-    if (_fastPath(_core.isASCII)) {
+    if _core.isASCII {
+      _onFastPath() // Please aggressively inline
       let asciiBuffer = _core.asciiBuffer._unsafelyUnwrappedUnchecked
       let pos = end._position - _coreOffset - 1
       _sanityCheck(
