@@ -194,7 +194,7 @@ bool ReabstractionInfo::prepareAndCheck(ApplySite Apply, SILFunction *Callee,
 
   SpecializedGenericEnv = nullptr;
   SpecializedGenericSig = nullptr;
-  OriginalParamSubs = ParamSubs;
+  CalleeParamSubs = ParamSubs;
   auto CalleeGenericSig = Callee->getLoweredFunctionType()->getGenericSignature();
   auto CalleeGenericEnv = Callee->getGenericEnvironment();
 
@@ -339,7 +339,7 @@ ReabstractionInfo::ReabstractionInfo(ApplySite Apply, SILFunction *Callee,
     auto CalleeFnTy = Callee->getLoweredFunctionType();
     assert(CalleeFnTy->isPolymorphic());
     auto CalleeSubstFnTy = CalleeFnTy->substGenericArgs(
-        Callee->getModule(), getOriginalParamSubstitutions());
+        Callee->getModule(), getCalleeParamSubstitutions());
     assert(!CalleeSubstFnTy->isPolymorphic() &&
            "Substituted callee type should not be polymorphic");
     assert(!CalleeSubstFnTy->hasTypeParameter() &&
@@ -397,10 +397,10 @@ ReabstractionInfo::ReabstractionInfo(ApplySite Apply, SILFunction *Callee,
           Apply.getInstruction()->dumpInContext();
           llvm::dbgs() << "\n\nPartially specialized types for function: "
                        << Callee->getName() << "\n\n";
-          llvm::dbgs() << "Original generic function type:\n"
+          llvm::dbgs() << "Callee generic function type:\n"
                        << Callee->getLoweredFunctionType() << "\n\n";
-          llvm::dbgs() << "\nOriginal call substitution:\n";
-          for (auto Sub : getOriginalParamSubstitutions()) {
+          llvm::dbgs() << "Callee's call substitution:\n";
+          for (auto Sub : getCalleeParamSubstitutions()) {
             llvm::dbgs() << "Sub:\n";
             Sub.dump();
             llvm::dbgs() << "\n";
@@ -422,11 +422,11 @@ bool ReabstractionInfo::canBeSpecialized() const {
 }
 
 bool ReabstractionInfo::isFullSpecialization() const {
-  return !hasArchetypes(getOriginalParamSubstitutions());
+  return !hasArchetypes(getCalleeParamSubstitutions());
 }
 
 bool ReabstractionInfo::isPartialSpecialization() const {
-  return hasArchetypes(getOriginalParamSubstitutions());
+  return hasArchetypes(getCalleeParamSubstitutions());
 }
 
 void ReabstractionInfo::createSubstitutedAndSpecializedTypes() {
@@ -635,18 +635,19 @@ void ReabstractionInfo::performFullSpecializationPreparation(
          "Only full specializations are handled here");
 
   SILModule &M = Callee->getModule();
-  auto &Ctx = M.getASTContext();
 
   this->Callee = Callee;
 
-  auto OrigGenericSig = Callee->getLoweredFunctionType()->getGenericSignature();
+  auto CalleeGenericSig =
+      Callee->getLoweredFunctionType()->getGenericSignature();
 
   // Get the original substitution map.
-  auto InterfaceSubs = OrigGenericSig->getSubstitutionMap(ParamSubs);
+  auto CalleeInterfaceToCallerArchetypeMap =
+      CalleeGenericSig->getSubstitutionMap(ParamSubs);
 
-  SubstitutedType =
-      Callee->getLoweredFunctionType()->substGenericArgs(M, InterfaceSubs);
-  ClonerParamSubs = OriginalParamSubs;
+  SubstitutedType = Callee->getLoweredFunctionType()->substGenericArgs(
+      M, CalleeInterfaceToCallerArchetypeMap);
+  ClonerParamSubs = CalleeParamSubs;
   CallerParamSubs = {};
   createSubstitutedAndSpecializedTypes();
 }
@@ -1499,9 +1500,9 @@ void ReabstractionInfo::finishPartialSpecializationPreparation(
   // Create a substitution map for the caller interface substitutions.
   FSPS.computeCallerInterfaceSubs(CallerInterfaceSubs);
 
-  if (OriginalParamSubs.empty()) {
+  if (CalleeParamSubs.empty()) {
     // It can happen if there is no caller or it is an eager specialization.
-    OriginalParamSubs = CallerParamSubs;
+    CalleeParamSubs = CallerParamSubs;
   }
 
   HasUnboundGenericParams =
@@ -1847,7 +1848,7 @@ public:
     {
       if (!ReInfo.isPartialSpecialization()) {
         Mangle::GenericSpecializationMangler Mangler(
-            OrigF, ReInfo.getOriginalParamSubstitutions(), Serialized,
+            OrigF, ReInfo.getCalleeParamSubstitutions(), Serialized,
             /*isReAbstracted*/ false);
 
         ThunkName = Mangler.mangle();

@@ -73,19 +73,16 @@ class ReabstractionInfo {
   /// It is nullptr if the specialization is not polymorphic.
   GenericSignature *SpecializedGenericSig;
 
-  // Set of the substitutions used by the caller's apply instruction before
+  // Set of substitutions from callee's invocation before
   // any transformations performed by the generic specializer.
   //
-  // Maps caller's generic parameters to caller's archetypes.
-  SubstitutionList OriginalParamSubs;
+  // Maps callee's generic parameters to caller's archetypes.
+  SubstitutionList CalleeParamSubs;
 
-  // Set of substitutions to be used by the caller's apply when it calls a
-  // specialized function.
+  // Set of substitutions to be used to invoke a specialized function.
   //
-  // Maps caller's generic parameters to caller's archetypes.
-  //
-  // FIXME: How is this different from OriginalParamSubs? Right now both
-  // are identical.
+  // Maps generic parameters of the specialized callee function to caller's
+  // archetypes.
   SubstitutionList CallerParamSubs;
 
   // Replaces archetypes of the original callee with archetypes
@@ -213,8 +210,8 @@ public:
     return ClonerParamSubs;
   }
 
-  SubstitutionList getOriginalParamSubstitutions() const {
-    return OriginalParamSubs;
+  SubstitutionList getCalleeParamSubstitutions() const {
+    return CalleeParamSubs;
   }
 
   /// Create a specialized function type for a specific substituted type \p
