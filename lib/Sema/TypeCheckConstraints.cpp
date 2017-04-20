@@ -2421,11 +2421,69 @@ bool TypeChecker::typeCheckExprPattern(ExprPattern *EP, DeclContext *DC,
   return hadError;
 }
 
+static Type replaceArchetypesWithTypeVariables(ConstraintSystem &cs,
+                                               Type t) {
+  llvm::DenseMap<SubstitutableType *, TypeVariableType *> types;
+
+  return t.subst(
+    [&](SubstitutableType *origType) -> Type {
+      auto found = types.find(origType);
+      if (found != types.end())
+        return found->second;
+
+      if (auto archetypeType = dyn_cast<ArchetypeType>(origType)) {
+        if (archetypeType->getParent())
+          return Type();
+
+        auto locator = cs.getConstraintLocator(nullptr);
+        auto replacement = cs.createTypeVariable(locator, 0);
+
+        if (auto superclass = archetypeType->getSuperclass()) {
+          cs.addConstraint(ConstraintKind::Subtype, replacement,
+                           superclass, locator);
+        }
+        for (auto proto : archetypeType->getConformsTo()) {
+          cs.addConstraint(ConstraintKind::ConformsTo, replacement,
+                           proto->getDeclaredType(), locator);
+        }
+        types[origType] = replacement;
+        return replacement;
+      }
+
+      // FIXME: Remove this case
+      assert(cast<GenericTypeParamType>(origType));
+      auto locator = cs.getConstraintLocator(nullptr);
+      auto replacement = cs.createTypeVariable(locator, 0);
+      types[origType] = replacement;
+      return replacement;
+    },
+    [&](CanType origType, Type substType, ProtocolType *conformedProtocol)
+      -> Optional<ProtocolConformanceRef> {
+      return ProtocolConformanceRef(conformedProtocol->getDecl());
+    });
+}
+
 bool TypeChecker::typesSatisfyConstraint(Type type1, Type type2,
+                                         bool openArchetypes,
                                          ConstraintKind kind, DeclContext *dc,
                                          bool *unwrappedIUO) {
+  assert(!type1->hasTypeVariable() && !type2->hasTypeVariable() &&
+         "Unexpected type variable in constraint satisfaction testing");
+
   ConstraintSystem cs(*this, dc, ConstraintSystemOptions());
+  if (openArchetypes) {
+    type1 = replaceArchetypesWithTypeVariables(cs, type1);
+    type2 = replaceArchetypesWithTypeVariables(cs, type2);
+  }
+
   cs.addConstraint(kind, type1, type2, cs.getConstraintLocator(nullptr));
+
+  if (openArchetypes) {
+    assert(!unwrappedIUO && "FIXME");
+    SmallVector<Solution, 4> solutions;
+    return !cs.solve(solutions, FreeTypeVariableBinding::Allow);
+  }
+
   if (auto solution = cs.solveSingle()) {
     if (unwrappedIUO)
       *unwrappedIUO = solution->getFixedScore().Data[SK_ForceUnchecked] > 0;
@@ -2437,26 +2495,34 @@ bool TypeChecker::typesSatisfyConstraint(Type type1, Type type2,
 }
 
 bool TypeChecker::isSubtypeOf(Type type1, Type type2, DeclContext *dc) {
-  return typesSatisfyConstraint(type1, type2, ConstraintKind::Subtype, dc);
+  return typesSatisfyConstraint(type1, type2,
+                                /*openArchetypes=*/false,
+                                ConstraintKind::Subtype, dc);
 }
 
 bool TypeChecker::isConvertibleTo(Type type1, Type type2, DeclContext *dc,
                                   bool *unwrappedIUO) {
-  return typesSatisfyConstraint(type1, type2, ConstraintKind::Conversion, dc,
+  return typesSatisfyConstraint(type1, type2,
+                                /*openArchetypes=*/false,
+                                ConstraintKind::Conversion, dc,
                                 unwrappedIUO);
 }
 
 bool TypeChecker::isExplicitlyConvertibleTo(Type type1, Type type2,
                                             DeclContext *dc) {
-  return typesSatisfyConstraint(type1, type2, ConstraintKind::Conversion, dc) ||
-    isObjCBridgedTo(type1, type2, dc);
+  return (typesSatisfyConstraint(type1, type2,
+                                 /*openArchetypes=*/false,
+                                 ConstraintKind::Conversion, dc) ||
+          isObjCBridgedTo(type1, type2, dc));
 }
 
 bool TypeChecker::isObjCBridgedTo(Type type1, Type type2, DeclContext *dc,
                                   bool *unwrappedIUO) {
   return (Context.LangOpts.EnableObjCInterop &&
-   typesSatisfyConstraint(type1, type2, ConstraintKind::BridgingConversion,
-                          dc, unwrappedIUO));
+          typesSatisfyConstraint(type1, type2,
+                                 /*openArchetypes=*/false,
+                                 ConstraintKind::BridgingConversion,
+                                 dc, unwrappedIUO));
 }
 
 bool TypeChecker::checkedCastMaySucceed(Type t1, Type t2, DeclContext *dc) {
