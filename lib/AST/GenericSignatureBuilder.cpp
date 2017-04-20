@@ -846,6 +846,9 @@ const RequirementSource *FloatingRequirementSource::getSource(
                                protocolReq.protocol, protocolReq.inferred,
                                protocolReq.written);
   }
+
+  case NestedTypeNameMatch:
+    return RequirementSource::forNestedTypeNameMatch(pa);
   }
 
   llvm_unreachable("Unhandled FloatingPointRequirementSourceKind in switch.");
@@ -878,6 +881,7 @@ bool FloatingRequirementSource::isExplicit() const {
     return true;
 
   case Inferred:
+  case NestedTypeNameMatch:
     return false;
 
   case AbstractProtocol:
@@ -926,6 +930,7 @@ FloatingRequirementSource FloatingRequirementSource::asInferred(
 
   case Inferred:
   case Resolved:
+  case NestedTypeNameMatch:
     return *this;
 
   case AbstractProtocol:
@@ -948,6 +953,22 @@ bool FloatingRequirementSource::isRecursive(
                           {storedSource->getStoredType()->getCanonicalType(),
                            storedSource->getProtocolDecl()}).second)
       return true;
+  }
+
+  // For a nested type match, look for another type with that name.
+  // FIXME: Actually, look for 5 of them. This is totally bogus.
+  if (kind == NestedTypeNameMatch) {
+    unsigned grossCount = 0;
+    auto pa = storage.dyn_cast<const RequirementSource *>()
+                ->getAffectedPotentialArchetype();
+    while (auto parent = pa->getParent()) {
+      if (pa->getNestedName() == nestedName) {
+        if (++grossCount > 4) return true;
+      }
+
+
+      pa = parent;
+    }
   }
 
   return false;
@@ -1442,7 +1463,13 @@ PotentialArchetype *PotentialArchetype::getArchetypeAnchor(
   if (auto parent = getParent()) {
     // For a nested type, retrieve the parent archetype anchor first.
     auto parentAnchor = parent->getArchetypeAnchor(builder);
-    anchor = parentAnchor->getNestedArchetypeAnchor(getNestedName(), builder);
+    anchor = parentAnchor->getNestedArchetypeAnchor(
+                                          getNestedName(), builder,
+                                          NestedTypeUpdate::ResolveExisting);
+
+    // FIXME: Hack for cases where we couldn't resolve the nested type.
+    if (!anchor)
+      anchor = rep;
   } else {
     anchor = rep;
   }
@@ -2835,14 +2862,16 @@ GenericSignatureBuilder::addSameTypeRequirementBetweenArchetypes(
   }
 
   // Recursively merge the associated types of T2 into T1.
+  auto dependentT1 = T1->getDependentType({ }, /*allowUnresolved=*/true);
   for (auto equivT2 : equivClass2Members) {
     for (auto T2Nested : equivT2->NestedTypes) {
-      auto T1Nested = T1->getNestedType(T2Nested.first, *this);
-      if (isErrorResult(addSameTypeRequirement(
-                           T1Nested, T2Nested.second.front(),
-                           RequirementSource::forNestedTypeNameMatch(T1Nested),
-                           UnresolvedHandlingKind::GenerateConstraints,
-                           DiagnoseSameTypeConflict{Diags, Source, T1Nested})))
+      Type nestedT1 = DependentMemberType::get(dependentT1, T2Nested.first);
+      if (isErrorResult(
+            addSameTypeRequirement(
+               nestedT1, T2Nested.second.front(),
+               FloatingRequirementSource::forNestedTypeNameMatch(
+                                                      Source, T2Nested.first),
+               UnresolvedHandlingKind::GenerateConstraints)))
         return ConstraintResult::Conflicting;
     }
   }

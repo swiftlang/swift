@@ -1108,6 +1108,9 @@ class GenericSignatureBuilder::FloatingRequirementSource {
     Inferred,
     /// A requirement source augmented by an abstract protocol requirement
     AbstractProtocol,
+    /// A requirement source for a nested-type-name match introduced by
+    /// the given source.
+    NestedTypeNameMatch,
   } kind;
 
   using Storage =
@@ -1117,11 +1120,15 @@ class GenericSignatureBuilder::FloatingRequirementSource {
   Storage storage;
 
   // Additional storage for an abstract protocol requirement.
-  struct {
-    ProtocolDecl *protocol = nullptr;
-    WrittenRequirementLoc written;
-    bool inferred = false;
-  } protocolReq;
+  union {
+    struct {
+      ProtocolDecl *protocol = nullptr;
+      WrittenRequirementLoc written;
+      bool inferred = false;
+    } protocolReq;
+
+    Identifier nestedName;
+  };
 
   FloatingRequirementSource(Kind kind, Storage storage)
     : kind(kind), storage(storage) { }
@@ -1169,6 +1176,14 @@ public:
     result.protocolReq.inferred = inferred;
     return result;
   }
+
+  static FloatingRequirementSource forNestedTypeNameMatch(
+                                     const RequirementSource *base,
+                                     Identifier nestedName) {
+    FloatingRequirementSource result{ NestedTypeNameMatch, base };
+    result.nestedName = nestedName;
+    return result;
+  };
 
   /// Retrieve the complete requirement source rooted at the given potential
   /// archetype.
