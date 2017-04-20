@@ -324,7 +324,7 @@ public:
     }
     return ProtocolCompositionType::get(Ctx, protocols,
                                         // FIXME
-                                        /*hasExplicitAnyObject=*/false);
+                                        /*HasExplicitAnyObject=*/false);
   }
 
   Type createExistentialMetatypeType(Type instance) {

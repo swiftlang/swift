@@ -2990,7 +2990,7 @@ Type TypeResolver::resolveCompositionType(CompositionTypeRepr *repr,
   // In user-written types, AnyObject constraints always refer to the
   // AnyObject type in the standard library.
   return ProtocolCompositionType::get(Context, ProtocolTypes,
-                                      /*hasExplicitAnyObject=*/false);
+                                      /*HasExplicitAnyObject=*/false);
 }
 
 Type TypeResolver::resolveMetatypeType(MetatypeTypeRepr *repr,
