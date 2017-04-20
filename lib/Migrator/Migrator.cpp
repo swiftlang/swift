@@ -16,88 +16,22 @@
 #include "swift/Migrator/FixitApplyDiagnosticConsumer.h"
 #include "swift/Migrator/Migrator.h"
 #include "swift/Migrator/RewriteBufferEditsReceiver.h"
+#include "swift/Migrator/SyntacticMigratorPass.h"
 #include "clang/Basic/Diagnostic.h"
 #include "clang/Basic/FileManager.h"
 #include "clang/Basic/SourceManager.h"
 #include "clang/Edit/EditedSource.h"
 #include "clang/Rewrite/Core/RewriteBuffer.h"
 #include "llvm/Support/FileSystem.h"
-#include "swift/IDE/APIDigesterData.h"
 
 using namespace swift;
 using namespace swift::migrator;
-using namespace swift::ide::api;
-
-namespace {
-class APIChangeWalker : public SourceEntityWalker {
-  SourceFile *SF;
-  APIDiffItemStore &DiffStore;
-  SmallVectorImpl<Replacement> &Replacements;
-
-  ArrayRef<APIDiffItem*> getRelatedDiffItems(ValueDecl *VD) {
-    llvm::SmallString<64> Buffer;
-    llvm::raw_svector_ostream OS(Buffer);
-    if (swift::ide::printDeclUSR(VD, OS))
-      return {};
-    // FIXME: overrides and conformances.
-    return DiffStore.getDiffItems(Buffer.str());
-  }
-
-  bool isSimpleReplacement(APIDiffItem *Item, std::string &Text) {
-    if (auto *MD = dyn_cast<TypeMemberDiffItem>(Item)) {
-      // We need to pull the self if self index is set.
-      if (MD->selfIndex.hasValue())
-        return false;
-      Text = (llvm::Twine(MD->newTypeName) + "." + MD->newPrintedName).str();
-      return true;
-    }
-    return false;
-  }
-
-  void acceptReplacement(CharSourceRange Range, StringRef Text) {
-    unsigned BufferId = SF->getBufferID().getValue();
-    Replacements.emplace_back(SF->getFilename(),
-      SF->getASTContext().SourceMgr.getLocOffsetInBuffer(Range.getStart(),
-        BufferId), Range.str().size(), Text, None);
-  }
-
-public:
-  APIChangeWalker(SourceFile *SF, APIDiffItemStore &DiffStore,
-                  SmallVectorImpl<Replacement> &Replacements) : SF(SF),
-                    DiffStore(DiffStore), Replacements(Replacements) {}
-  void start() { this->walk(*SF); }
-
-  bool visitDeclReference(ValueDecl *D, CharSourceRange Range,
-                          TypeDecl *CtorTyRef, ExtensionDecl *ExtTyRef,
-                          Type T, ReferenceMetaData Data) override {
-    for (auto* Item : getRelatedDiffItems(D)) {
-      std::string RepText;
-      if (isSimpleReplacement(Item, RepText)) {
-        acceptReplacement(Range, RepText);
-        return true;
-      }
-    }
-    return true;
-  }
-};
-}// end of anonymous namespace
-
 
 bool migrator::updateCodeAndEmitRemap(const CompilerInvocation &Invocation) {
   Migrator M { Invocation }; // Provide inputs and configuration
 
   // Phase 1:
   // Perform any syntactic transformations if requested.
-
-  // Prepare diff item store to use.
-  APIDiffItemStore DiffStore;
-  if (!M.getMigratorOptions().APIDigesterDataStorePath.empty()) {
-    DiffStore.addStorePath(M.getMigratorOptions().APIDigesterDataStorePath);
-  }
-
-  SmallVector<Replacement, 16> FinalReplacements;
-  SourceFile *SF = Instance.getPrimarySourceFile();
-  APIChangeWalker(SF, DiffStore, FinalReplacements).start();
 
   // TODO
   auto FailedSyntacticPasses = M.performSyntacticPasses();
@@ -249,6 +183,10 @@ bool Migrator::performSyntacticPasses() {
   //
   // Once it has run, push the edits into Edits above:
   // Edits.commit(YourPass.getEdits());
+
+  SyntacticMigratorPass SPass(Instance.getPrimarySourceFile(), Editor);
+  SPass.run();
+  Edits.commit(SPass.getEdits());
 
   // Now, we'll take all of the changes we've accumulated, get a resulting text,
   // and push a MigrationState.

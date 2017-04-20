@@ -18,44 +18,22 @@
 #ifndef SWIFT_MIGRATOR_SYNTACTICMIGRATORPASS_H
 #define SWIFT_MIGRATOR_SYNTACTICMIGRATORPASS_H
 
+#include "swift/AST/SourceEntityWalker.h"
 #include "swift/Migrator/EditorAdapter.h"
-#include "clang/Basic/SourceManager.h"
 
 namespace swift {
 class SourceManager;
 
 namespace migrator {
 
-class MigratorPass {
-protected:
-  swift::SourceManager &SwiftSrcMgr
-
-public:
-  MigratorPass(SourceManager &SwiftSrcMgr) : SwiftSrcMgr(SwiftSrcMgr) {}
-  virtual void run() {}
-};
-
 class SyntacticMigratorPass {
-protected:
-  EditorAdapter &Editor;
-  const SourceFile *SF;
-
+  class Implementation;
+  Implementation &Impl;
 public:
-  SyntacticMigratorPass(EditorAdapter &Editor,
-                        swift::SourceManager &SwiftSrcMgr,
-                        clang::SourceManager &ClangSrcMgr,
-                        const SourceFile *SF)
-    : MigratorPass(SwiftSrcMgr),
-      Editor(Editor),
-      ClangSrcMgr(ClangSrcMgr),
-      Editor(SwiftSrcMgr, ClangSrcMgr),
-      SF(SF) {}
-
-  const clang::edit::Commit &getEdits() const {
-    return Editor.getEdits();
-  }
-
-  virtual void run() = 0;
+  SyntacticMigratorPass(EditorAdapter &Editor, SourceFile *SF);
+  ~SyntacticMigratorPass();
+  void run();
+  const clang::edit::Commit &getEdits() const;
 };
 
 } // end namespae migrator
