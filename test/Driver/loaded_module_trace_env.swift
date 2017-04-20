@@ -8,5 +8,4 @@
 // CHECK: "{{[^"]*}}/Swift.swiftmodule"
 // CHECK: "{{[^"]*}}/SwiftOnoneSupport.swiftmodule"
 // CHECK: ]
-// CHECK: "apinotes":[]
 // CHECK: }
