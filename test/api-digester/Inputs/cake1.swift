@@ -15,6 +15,9 @@ public class C1 {
   public func foo3(a : Void?) {}
 }
 
+public class C3 {}
+
 public struct Somestruct2 {
-  public static func foo1() {}
+  public init(_ : C1) {}
+  public static func foo1(_ a : C3) {}
 }
