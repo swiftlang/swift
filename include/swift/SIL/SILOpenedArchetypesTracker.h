@@ -103,6 +103,9 @@ public:
   // Handle notifications about removals of instructions.
   void handleDeleteNotification(swift::ValueBase *Value);
 
+  // Dump the contents.
+  void dump() const;
+
   virtual ~SILOpenedArchetypesTracker() {
     // Unregister the handler.
     F.getModule().removeDeleteNotificationHandler(this);
@@ -158,6 +161,9 @@ public:
   /// performing a quick lookup in the opened archetypes operands
   /// and then in the opened archetypes tracker.
   SILValue getOpenedArchetypeDef(CanArchetypeType archetypeTy) const;
+
+  // Dump the contents.
+  void dump() const;
 };
 
 /// Find an opened archetype defined by an instruction.
