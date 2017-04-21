@@ -1920,9 +1920,10 @@ bool KeyPathPatternComponent::isComputedSettablePropertyMutating() const {
 KeyPathPattern *
 KeyPathPattern::get(SILModule &M, CanGenericSignature signature,
                     CanType rootType, CanType valueType,
-                    ArrayRef<KeyPathPatternComponent> components) {
+                    ArrayRef<KeyPathPatternComponent> components,
+                    StringRef objcString) {
   llvm::FoldingSetNodeID id;
-  Profile(id, signature, rootType, valueType, components);
+  Profile(id, signature, rootType, valueType, components, objcString);
   
   void *insertPos;
   auto existing = M.KeyPathPatterns.FindNodeOrInsertPos(id, insertPos);
@@ -1943,7 +1944,8 @@ KeyPathPattern::get(SILModule &M, CanGenericSignature signature,
   }
   
   auto newPattern = KeyPathPattern::create(M, signature, rootType, valueType,
-                                          components, 0 /*todo: num operands*/);
+                                           components, objcString,
+                                           0 /*todo: num operands*/);
   M.KeyPathPatterns.InsertNode(newPattern, insertPos);
   return newPattern;
 }
@@ -1952,19 +1954,22 @@ KeyPathPattern *
 KeyPathPattern::create(SILModule &M, CanGenericSignature signature,
                        CanType rootType, CanType valueType,
                        ArrayRef<KeyPathPatternComponent> components,
+                       StringRef objcString,
                        unsigned numOperands) {
   auto totalSize = totalSizeToAlloc<KeyPathPatternComponent>(components.size());
   void *mem = M.allocate(totalSize, alignof(KeyPathPatternComponent));
   return ::new (mem) KeyPathPattern(signature, rootType, valueType,
-                                    components, numOperands);
+                                    components, objcString, numOperands);
 }
 
 KeyPathPattern::KeyPathPattern(CanGenericSignature signature,
                                CanType rootType, CanType valueType,
                                ArrayRef<KeyPathPatternComponent> components,
+                               StringRef objcString,
                                unsigned numOperands)
   : NumOperands(numOperands), NumComponents(components.size()),
-    Signature(signature), RootType(rootType), ValueType(valueType)
+    Signature(signature), RootType(rootType), ValueType(valueType),
+    ObjCString(objcString)
 {
   auto *componentsBuf = getTrailingObjects<KeyPathPatternComponent>();
   std::uninitialized_copy(components.begin(), components.end(),
@@ -1980,10 +1985,12 @@ void KeyPathPattern::Profile(llvm::FoldingSetNodeID &ID,
                              CanGenericSignature signature,
                              CanType rootType,
                              CanType valueType,
-                             ArrayRef<KeyPathPatternComponent> components) {
+                             ArrayRef<KeyPathPatternComponent> components,
+                             StringRef objcString) {
   ID.AddPointer(signature.getPointer());
   ID.AddPointer(rootType.getPointer());
   ID.AddPointer(valueType.getPointer());
+  ID.AddString(objcString);
   
   for (auto &component : components) {
     ID.AddInteger((unsigned)component.getKind());

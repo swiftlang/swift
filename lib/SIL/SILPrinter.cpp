@@ -1782,7 +1782,12 @@ public:
       *this << ' ';
     }
     
-    *this << "(root $" << KPI->getPattern()->getRootType();
+    *this << "(";
+    
+    if (!pattern->getObjCString().empty())
+      *this << "objc \"" << pattern->getObjCString() << "\"; ";
+    
+    *this << "root $" << KPI->getPattern()->getRootType();
     
     for (auto &component : pattern->getComponents()) {
       *this << "; ";

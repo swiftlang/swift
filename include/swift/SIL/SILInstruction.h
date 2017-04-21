@@ -1613,11 +1613,13 @@ class KeyPathPattern final
   unsigned NumOperands, NumComponents;
   CanGenericSignature Signature;
   CanType RootType, ValueType;
+  StringRef ObjCString;
   
   KeyPathPattern(CanGenericSignature signature,
                  CanType rootType,
                  CanType valueType,
                  ArrayRef<KeyPathPatternComponent> components,
+                 StringRef ObjCString,
                  unsigned numOperands);
   
   static KeyPathPattern *create(SILModule &M,
@@ -1625,6 +1627,7 @@ class KeyPathPattern final
                                 CanType rootType,
                                 CanType valueType,
                                 ArrayRef<KeyPathPatternComponent> components,
+                                StringRef ObjCString,
                                 unsigned numOperands);
 public:
   CanGenericSignature getGenericSignature() const {
@@ -1643,23 +1646,29 @@ public:
     return NumOperands;
   }
   
+  StringRef getObjCString() const {
+    return ObjCString;
+  }
+  
   ArrayRef<KeyPathPatternComponent> getComponents() const;
   
   static KeyPathPattern *get(SILModule &M,
                              CanGenericSignature signature,
                              CanType rootType,
                              CanType valueType,
-                             ArrayRef<KeyPathPatternComponent> components);
+                             ArrayRef<KeyPathPatternComponent> components,
+                             StringRef ObjCString);
   
   static void Profile(llvm::FoldingSetNodeID &ID,
                       CanGenericSignature signature,
                       CanType rootType,
                       CanType valueType,
-                      ArrayRef<KeyPathPatternComponent> components);
+                      ArrayRef<KeyPathPatternComponent> components,
+                      StringRef ObjCString);
   
   void Profile(llvm::FoldingSetNodeID &ID) {
     Profile(ID, getGenericSignature(), getRootType(), getValueType(),
-            getComponents());
+            getComponents(), getObjCString());
   }
 };
 

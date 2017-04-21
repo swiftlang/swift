@@ -37,6 +37,8 @@ public class AnyKeyPath: Hashable, _AppendKeyPath {
   public static var valueType: Any.Type {
     return _rootAndValueType.value
   }
+
+  internal final var _kvcKeyPathStringPtr: UnsafePointer<CChar>?
   
   final public var hashValue: Int {
     var hash = 0
@@ -94,8 +96,9 @@ public class AnyKeyPath: Hashable, _AppendKeyPath {
   // SPI for the Foundation overlay to allow interop with KVC keypath-based
   // APIs.
   public var _kvcKeyPathString: String? {
-    // TODO
-    return nil
+    guard let ptr = _kvcKeyPathStringPtr else { return nil }
+
+    return String(validatingUTF8: ptr)
   }
   
   // MARK: Implementation details
@@ -122,6 +125,7 @@ public class AnyKeyPath: Hashable, _AppendKeyPath {
                  "capacity must be multiple of 4 bytes")
     let result = Builtin.allocWithTailElems_1(self, (bytes/4)._builtinWordValue,
                                               Int32.self)
+    result._kvcKeyPathStringPtr = nil
     let base = UnsafeMutableRawPointer(Builtin.projectTailElems(result,
                                                                 Int32.self))
     body(UnsafeMutableRawBufferPointer(start: base, count: bytes))
@@ -1283,13 +1287,43 @@ public func _appendingKeyPaths<
     var rootBuffer = $0
     return leaf.withBuffer {
       var leafBuffer = $0
+      // Reserve room for the appended KVC string, if both key paths are
+      // KVC-compatible.
+      let appendedKVCLength: Int, rootKVCLength: Int, leafKVCLength: Int
+
+      if let rootPtr = root._kvcKeyPathStringPtr,
+         let leafPtr = leaf._kvcKeyPathStringPtr {
+        rootKVCLength = Int(_swift_stdlib_strlen(rootPtr))
+        leafKVCLength = Int(_swift_stdlib_strlen(leafPtr))
+        // root + "." + leaf
+        appendedKVCLength = rootKVCLength + 1 + leafKVCLength
+      } else {
+        rootKVCLength = 0
+        leafKVCLength = 0
+        appendedKVCLength = 0
+      }
+
       // Result buffer has room for both key paths' components, plus the
       // header, plus space for the middle type.
       let resultSize = rootBuffer.data.count + leafBuffer.data.count
         + MemoryLayout<KeyPathBuffer.Header>.size
         + MemoryLayout<Int>.size
-      let result = resultTy._create(capacityInBytes: resultSize) {
+      // Tail-allocate space for the KVC string.
+      let totalResultSize = (resultSize + appendedKVCLength + 3) & ~3
+
+      var kvcStringBuffer: UnsafeMutableRawPointer? = nil
+
+      let result = resultTy._create(capacityInBytes: totalResultSize) {
         var destBuffer = $0
+
+        // Remember where the tail-allocated KVC string buffer begins.
+        if appendedKVCLength > 0 {
+          kvcStringBuffer = destBuffer.baseAddress.unsafelyUnwrapped
+            .advanced(by: resultSize)
+
+          destBuffer = .init(start: destBuffer.baseAddress,
+                             count: resultSize)
+        }
         
         func pushRaw(_ count: Int) {
           _sanityCheck(destBuffer.count >= count)
@@ -1376,9 +1410,34 @@ public func _appendingKeyPaths<
         _sanityCheck(destBuffer.count == 0,
                      "did not fill entire result buffer")
       }
+
+      // Build the KVC string if there is one.
+      if let kvcStringBuffer = kvcStringBuffer {
+        let rootPtr = root._kvcKeyPathStringPtr.unsafelyUnwrapped
+        let leafPtr = leaf._kvcKeyPathStringPtr.unsafelyUnwrapped
+        _memcpy(dest: kvcStringBuffer,
+                src: UnsafeMutableRawPointer(mutating: rootPtr),
+                size: UInt(rootKVCLength))
+        kvcStringBuffer.advanced(by: rootKVCLength)
+          .storeBytes(of: 0x2E /* '.' */, as: CChar.self)
+        _memcpy(dest: kvcStringBuffer.advanced(by: rootKVCLength + 1),
+                src: UnsafeMutableRawPointer(mutating: leafPtr),
+                size: UInt(leafKVCLength))
+        result._kvcKeyPathStringPtr =
+          UnsafePointer(kvcStringBuffer.assumingMemoryBound(to: CChar.self))
+        kvcStringBuffer.advanced(by: rootKVCLength + leafKVCLength + 1)
+          .storeBytes(of: 0 /* '\0' */, as: CChar.self)
+      }
       return unsafeDowncast(result, to: Result.self)
     }
   }
+}
+
+// The distance in bytes from the address point of a KeyPath object to its
+// buffer header. Includes the size of the Swift heap object header and
+
+internal var keyPathObjectHeaderSize: Int {
+  return MemoryLayout<HeapObject>.size + MemoryLayout<Int>.size
 }
 
 // Runtime entry point to instantiate a key path object.
@@ -1407,7 +1466,7 @@ public func swift_getKeyPath(pattern: UnsafeMutableRawPointer,
   // capability of the properties involved.
   let oncePtr = pattern
   let patternPtr = pattern.advanced(by: MemoryLayout<Int>.size)
-  let bufferPtr = patternPtr.advanced(by: MemoryLayout<HeapObject>.size)
+  let bufferPtr = patternPtr.advanced(by: keyPathObjectHeaderSize)
 
   // If the pattern is instantiable in-line, do a dispatch_once to
   // initialize it. (The resulting object will still have the collocated
@@ -1442,11 +1501,15 @@ internal func _getKeyPath_instantiatedOutOfLine(
   // Allocate the instance.
   let instance = keyPathClass._create(capacityInBytes: size) { instanceData in
     // Instantiate the pattern into the instance.
-    let patternBufferPtr = pattern.advanced(by: MemoryLayout<HeapObject>.size)
+    let patternBufferPtr = pattern.advanced(by: keyPathObjectHeaderSize)
     let patternBuffer = KeyPathBuffer(base: patternBufferPtr)
 
     _instantiateKeyPathBuffer(patternBuffer, instanceData, rootType, arguments)
   }
+  // Take the KVC string from the pattern.
+  let kvcStringPtr = pattern.advanced(by: MemoryLayout<HeapObject>.size)
+  instance._kvcKeyPathStringPtr = kvcStringPtr
+    .load(as: Optional<UnsafePointer<CChar>>.self)
 
   // Hand it off at +1.
   return UnsafeRawPointer(Unmanaged.passRetained(instance).toOpaque())
@@ -1469,7 +1532,7 @@ internal func _getKeyPath_instantiateInline(
   // resilient types, for example). For now, require that the size match the
   // buffer.
 
-  let bufferPtr = objectPtr.advanced(by: MemoryLayout<HeapObject>.size)
+  let bufferPtr = objectPtr.advanced(by: keyPathObjectHeaderSize)
   let buffer = KeyPathBuffer(base: bufferPtr)
   let totalSize = buffer.data.count + MemoryLayout<KeyPathBuffer.Header>.size
   let bufferData = UnsafeMutableRawBufferPointer(
@@ -1509,7 +1572,7 @@ internal func _getKeyPathClassAndInstanceSize(
   // Start off assuming the key path is writable.
   var capability: KeyPathKind = .value
 
-  let bufferPtr = pattern.advanced(by: MemoryLayout<HeapObject>.size)
+  let bufferPtr = pattern.advanced(by: keyPathObjectHeaderSize)
   var buffer = KeyPathBuffer(base: bufferPtr)
   let size = buffer.data.count + MemoryLayout<KeyPathBuffer.Header>.size
 

@@ -126,6 +126,16 @@ IRGenModule::getAddrOfKeyPathPattern(KeyPathPattern *pattern,
   fields.add(emitMetadataGenerator(rootTy));
   fields.add(emitMetadataGenerator(valueTy));
   
+  // Add a pointer to the ObjC KVC compatibility string, if there is one, or
+  // null otherwise.
+  llvm::Constant *objcString;
+  if (!pattern->getObjCString().empty()) {
+    objcString = getAddrOfGlobalString(pattern->getObjCString());
+  } else {
+    objcString = llvm::ConstantPointerNull::get(Int8PtrTy);
+  }
+  fields.add(objcString);
+  
   // Leave a placeholder for the buffer header, since we need to know the full
   // buffer size to fill it in.
   auto headerPlaceholder = fields.addPlaceholderWithSize(Int32Ty);

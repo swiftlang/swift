@@ -2350,6 +2350,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB, SILBuilder &B) {
     GenericParamList *generics = nullptr;
     GenericEnvironment *patternEnv = nullptr;
     CanType rootType;
+    StringRef objcString;
     {
       Scope genericsScope(&P, ScopeKind::Generics);
       generics = P.maybeParseGenericParams().getPtrOrNull();
@@ -2369,6 +2370,17 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB, SILBuilder &B) {
           if (P.parseToken(tok::sil_dollar, diag::expected_tok_in_sil_instr, "$")
               || parseASTType(rootType, patternEnv))
             return true;
+        } else if (componentKind.str() == "objc") {
+          auto tok = P.Tok;
+          if (P.parseToken(tok::string_literal, diag::expected_tok_in_sil_instr,
+                           "string literal"))
+            return true;
+          
+          auto objcStringValue = tok.getText().drop_front().drop_back();
+          objcString = StringRef(
+            P.Context.AllocateCopy<char>(objcStringValue.begin(),
+                                         objcStringValue.end()),
+            objcStringValue.size());
         } else if (componentKind.str() == "stored_property") {
           ValueDecl *prop;
           CanType ty;
@@ -2516,7 +2528,7 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB, SILBuilder &B) {
       canSig = patternEnv->getGenericSignature()->getCanonicalSignature();
     auto pattern = KeyPathPattern::get(B.getModule(), canSig,
                      rootType, components.back().getComponentType(),
-                     components);
+                     components, objcString);
 
     ResultVal = B.createKeyPath(InstLoc, pattern, subs, Ty);
     break;

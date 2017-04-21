@@ -272,6 +272,48 @@ Type ConstraintSystem::getInstanceType(TypeExpr *E) {
                             [&](const Expr *E) -> Type { return getType(E); });
 }
 
+static bool buildObjCKeyPathString(KeyPathExpr *E,
+                                   llvm::SmallVectorImpl<char> &buf) {
+  for (auto &component : E->getComponents()) {
+    switch (component.getKind()) {
+    case KeyPathExpr::Component::Kind::OptionalChain:
+    case KeyPathExpr::Component::Kind::OptionalForce:
+    case KeyPathExpr::Component::Kind::OptionalWrap:
+      // KVC propagates nulls, so these don't affect the key path string.
+      continue;
+      
+    case KeyPathExpr::Component::Kind::Property: {
+      // Property references must be to @objc properties.
+      // TODO: If we added special properties matching KVC operators like '@sum',
+      // '@count', etc. those could be mapped too.
+      auto property = cast<VarDecl>(component.getDeclRef().getDecl());
+      if (!property->isObjC())
+        return false;
+      if (!buf.empty()) {
+        buf.push_back('.');
+      }
+      auto objcName = property->getObjCPropertyName().str();
+      buf.append(objcName.begin(), objcName.end());
+      continue;
+    }
+    case KeyPathExpr::Component::Kind::Subscript: {
+      // Subscripts aren't generally represented in KVC.
+      // TODO: There are some subscript forms we could map to KVC, such as
+      // when indexing a Dictionary or NSDictionary by string, or when applying
+      // a mapping subscript operation to Array/Set or NSArray/NSSet.
+      return false;
+    case KeyPathExpr::Component::Kind::UnresolvedProperty:
+    case KeyPathExpr::Component::Kind::UnresolvedSubscript:
+      // Don't bother building the key path string if the key path didn't even
+      // resolve.
+      return false;
+    }
+    }
+  }
+  
+  return true;
+}
+
 namespace {
 
   /// \brief Rewrites an expression by applying the solution of a constraint
@@ -4092,6 +4134,24 @@ namespace {
         baseTy = leafTy;
       }
       E->resolveComponents(cs.getASTContext(), resolvedComponents);
+      
+      // See whether there's an equivalent ObjC key path string we can produce
+      // for interop purposes.
+      if (cs.getASTContext().LangOpts.EnableObjCInterop) {
+        SmallString<64> compatStringBuf;
+        if (buildObjCKeyPathString(E, compatStringBuf)) {
+          auto stringCopy =
+            cs.getASTContext().AllocateCopy<char>(compatStringBuf.begin(),
+                                                  compatStringBuf.end());
+          auto stringExpr = new (cs.getASTContext()) StringLiteralExpr(
+                                 StringRef(stringCopy, compatStringBuf.size()),
+                                 SourceRange(),
+                                 /*implicit*/ true);
+          cs.setType(stringExpr, cs.getType(E));
+          E->setObjCStringLiteralExpr(stringExpr);
+        }
+      }
+      
       // The final component type ought to line up with the leaf type of the
       // key path.
       assert(!baseTy || baseTy->getLValueOrInOutObjectType()->isEqual(leafTy));

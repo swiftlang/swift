@@ -2797,13 +2797,19 @@ RValue RValueEmitter::visitKeyPathExpr(KeyPathExpr *E, SGFContext C) {
     }
   }
   
+  StringRef objcString;
+  if (auto objcExpr = dyn_cast_or_null<StringLiteralExpr>
+                                                (E->getObjCStringLiteralExpr()))
+    objcString = objcExpr->getValue();
+  
   auto pattern = KeyPathPattern::get(SGF.SGM.M,
                                      needsGenericContext
                                        ? SGF.F.getLoweredFunctionType()
                                              ->getGenericSignature()
                                        : nullptr,
                                      rootTy, baseTy,
-                                     loweredComponents);
+                                     loweredComponents,
+                                     objcString);
   auto keyPath = SGF.B.createKeyPath(SILLocation(E), pattern,
                                      needsGenericContext
                                        ? SGF.F.getForwardingSubstitutions()
