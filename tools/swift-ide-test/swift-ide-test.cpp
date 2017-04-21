@@ -2638,6 +2638,8 @@ static int doReconstructType(const CompilerInvocation &InitInvok,
   CompilerInvocation Invocation(InitInvok);
   Invocation.addInputFilename(SourceFilename);
   Invocation.getLangOptions().DisableAvailabilityChecking = false;
+  // This is temporary
+  Invocation.getLangOptions().EnableExperimentalSubclassExistentials = true;
 
   CompilerInstance CI;
 
