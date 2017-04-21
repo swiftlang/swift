@@ -190,6 +190,9 @@ public class KeyPath<Root, Value>: PartialKeyPath<Root> {
         let isLast = optNextType == nil
         
         func project<CurValue>(_ base: CurValue) -> Value? {
+          // FIXME: Opened archetype specialization fails to propagate uses
+          // in some cases. rdar://problem/31749245
+          @inline(never)
           func project2<NewValue>(_: NewValue.Type) -> Value? {
             let newBase: NewValue = rawComponent.projectReadOnly(base)
             if isLast {
@@ -241,6 +244,9 @@ public class WritableKeyPath<Root, Value>: KeyPath<Root, Value> {
         let nextType = optNextType ?? Value.self
         
         func project<CurValue>(_: CurValue.Type) {
+          // FIXME: Opened archetype specialization fails to propagate uses
+          // in some cases. rdar://problem/31749245
+          @inline(never)
           func project2<NewValue>(_: NewValue.Type) {
             p = rawComponent.projectMutableAddress(p,
                                            from: CurValue.self,
@@ -292,6 +298,9 @@ public class ReferenceWritableKeyPath<Root, Value>: WritableKeyPath<Root, Value>
         let nextType = optNextType.unsafelyUnwrapped
         
         func project<NewValue>(_: NewValue.Type) -> Any {
+          // FIXME: Opened archetype specialization fails to propagate uses
+          // in some cases. rdar://problem/31749245
+          @inline(never)
           func project2<CurValue>(_ base: CurValue) -> Any {
             return rawComponent.projectReadOnly(base) as NewValue
           }
@@ -302,6 +311,9 @@ public class ReferenceWritableKeyPath<Root, Value>: WritableKeyPath<Root, Value>
       
       // Start formal access to the mutable value, based on the final base
       // value.
+      // FIXME: Opened archetype specialization fails to propagate uses
+      // in some cases. rdar://problem/31749245
+      @inline(never)
       func formalMutation<MutationRoot>(_ base: MutationRoot)
           -> UnsafeMutablePointer<Value> {
         var base2 = base
@@ -312,6 +324,9 @@ public class ReferenceWritableKeyPath<Root, Value>: WritableKeyPath<Root, Value>
             let (rawComponent, optNextType) = buffer.next()
             let nextType = optNextType ?? Value.self
             func project<CurValue>(_: CurValue.Type) {
+              // FIXME: Opened archetype specialization fails to propagate uses
+              // in some cases. rdar://problem/31749245
+              @inline(never)
               func project2<NewValue>(_: NewValue.Type) {
                 p = rawComponent.projectMutableAddress(p,
                                              from: CurValue.self,
@@ -1238,6 +1253,9 @@ public func _tryToAppendKeyPaths<Result: AnyKeyPath>(
   
   func open<Root>(_: Root.Type) -> Result {
     func open2<Value>(_: Value.Type) -> Result {
+      // FIXME: Opened archetype specialization fails to propagate uses
+      // in some cases. rdar://problem/31749245
+      @inline(never)
       func open3<AppendedValue>(_: AppendedValue.Type) -> Result {
         let typedRoot = unsafeDowncast(root, to: KeyPath<Root, Value>.self)
         let typedLeaf = unsafeDowncast(leaf,
@@ -1563,6 +1581,9 @@ internal func _getKeyPathClassAndInstanceSize(
 
   // Grab the class object for the key path type we'll end up with.
   func openRoot<Root>(_: Root.Type) -> AnyKeyPath.Type {
+    // FIXME: Opened archetype specialization fails to propagate uses
+    // in some cases. rdar://problem/31749245
+    @inline(never)
     func openLeaf<Leaf>(_: Leaf.Type) -> AnyKeyPath.Type {
       switch capability {
       case .readOnly:
