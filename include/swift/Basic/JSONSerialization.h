@@ -27,6 +27,8 @@
 #include "llvm/Support/Regex.h"
 #include "llvm/Support/raw_ostream.h"
 
+#include <vector>
+
 namespace swift {
 namespace json {
 
