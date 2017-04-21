@@ -1670,10 +1670,19 @@ static ApplySite replaceWithSpecializedCallee(ApplySite AI,
                                       Arguments, A->isNonThrowing());
     if (StoreResultTo) {
       assert(substConv.useLoweredAddresses());
-      // Store the direct result to the original result address.
-      fixUsedVoidType(A, Loc, Builder);
-      Builder.createStore(Loc, NewAI, StoreResultTo,
-                          StoreOwnershipQualifier::Unqualified);
+      if (!CalleeSILSubstFnTy.isNoReturnFunction()) {
+        // Store the direct result to the original result address.
+        fixUsedVoidType(A, Loc, Builder);
+        Builder.createStore(Loc, NewAI, StoreResultTo,
+                            StoreOwnershipQualifier::Unqualified);
+      } else {
+        Builder.createUnreachable(Loc);
+        // unreachable should be the terminator instruction.
+        // So, split the current basic block right after the
+        // inserted unreachable instruction.
+        Builder.getInsertionPoint()->getParent()->split(
+            Builder.getInsertionPoint());
+      }
     }
     A->replaceAllUsesWith(NewAI);
     return NewAI;
