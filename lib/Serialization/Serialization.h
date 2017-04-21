@@ -405,7 +405,8 @@ public:
   /// The Decl will be scheduled for serialization if necessary.
   ///
   /// \returns The ID for the given Decl in this module.
-  DeclID addDeclRef(const Decl *D, bool forceSerialization = false);
+  DeclID addDeclRef(const Decl *D, bool forceSerialization = false,
+                    bool allowTypeAliasXRef = false);
 
   /// Records the use of the given DeclContext.
   ///

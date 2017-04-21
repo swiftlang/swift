@@ -473,8 +473,11 @@ public:
   /// Determine whether the witness for the given type requirement
   /// is the default definition.
   bool usesDefaultDefinition(AssociatedTypeDecl *requirement) const {
-    return getTypeWitnessAndDecl(requirement, nullptr)
-        .second->isImplicit();
+    TypeDecl *witnessDecl = getTypeWitnessAndDecl(requirement, nullptr).second;
+    if (witnessDecl)
+      return witnessDecl->isImplicit();
+    // Conservatively assume it does not.
+    return false;
   }
 
   void setLazyLoader(LazyMemberLoader *resolver, uint64_t contextData);
