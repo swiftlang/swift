@@ -750,7 +750,7 @@ public func transcode<
   stoppingOnError stopOnError: Bool,
   into processCodeUnit: (OutputEncoding.CodeUnit) -> Void
 ) -> Bool
-  where InputEncoding.EncodedScalar.Iterator.Element == Input.Element {
+  where InputEncoding.CodeUnit == Input.Element {
   var input = input
 
   // NB.  It is not possible to optimize this routine to a memcpy if

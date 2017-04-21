@@ -91,7 +91,7 @@ public protocol UnicodeEncoding {
   static func parse1Forward<C: Collection>(
     _ input: C, knownCount: Int /* = 0 */
   ) -> ParseResult<EncodedScalar, C.Index>
-  where C.Iterator.Element == EncodedScalar.Iterator.Element
+  where C.Iterator.Element == CodeUnit
 
   /// Parse a single unicode scalar in reverse from `input`.
   ///
@@ -114,7 +114,6 @@ public protocol UnicodeEncoding {
 // Overloads that work around the fact that you can't put default arguments in
 // protocol requirements
 extension UnicodeEncoding {
-  // FIXME: this becomes ambiguous with UnicodeCodec.CodeUnit
   public typealias CodeUnit = EncodedScalar.Iterator.Element
   
   /// Parse a single unicode scalar forward from `input`.
@@ -122,7 +121,7 @@ extension UnicodeEncoding {
   public static func parse1Forward<C: Collection>(
     _ input: C
   ) -> ParseResult<EncodedScalar, C.Index>
-  where C.Iterator.Element == EncodedScalar.Iterator.Element {
+  where C.Iterator.Element == CodeUnit {
     return parse1Forward(input, knownCount: 0)
   }
 
@@ -131,9 +130,7 @@ extension UnicodeEncoding {
   public static func parse1Reverse<C: BidirectionalCollection>(
     _ input: C
   ) -> ParseResult<EncodedScalar, C.Index>
-  where C.Iterator.Element == EncodedScalar.Iterator.Element,
-  // FIXME: drop these constraints once we have the compiler features.
-  C.SubSequence.Index == C.Index {
+  where C.Iterator.Element == CodeUnit {
     return parse1Reverse(input, knownCount: 0)
   }
 }
@@ -231,7 +228,7 @@ extension UnicodeEncoding {
     
     @inline(__always)
     func eat(
-      _ o: ParseResult<EncodedScalar, C.SubSequence.Index>) -> EncodedScalar? {
+      _ o: ParseResult<EncodedScalar, C.Index>) -> EncodedScalar? {
       if case .valid(let scalar, let resumptionPoint) = o {
         remainder = remainder.suffix(from: resumptionPoint)
         return scalar
@@ -295,7 +292,7 @@ extension UnicodeEncoding {
     
     @inline(__always)
     func eat(
-      _ o: ParseResult<EncodedScalar, C.SubSequence.Index>) -> EncodedScalar? {
+      _ o: ParseResult<EncodedScalar, C.Index>) -> EncodedScalar? {
       if case .valid(let scalar, let resumptionPoint) = o {
         remainder = remainder.prefix(upTo: resumptionPoint)
         return scalar
@@ -666,7 +663,7 @@ public enum ValidUTF8 : UnicodeEncoding {
     _ input: C,
     knownCount: Int = 0
   ) -> ParseResult<EncodedScalar, C.Index>
-  where C.Iterator.Element == EncodedScalar.Iterator.Element {
+  where C.Iterator.Element == CodeUnit {
     if _slowPath(knownCount <= 0 && input.isEmpty) { return .emptyInput }
 
     var i = input.startIndex 
@@ -696,10 +693,7 @@ public enum ValidUTF8 : UnicodeEncoding {
   public static func parse1Reverse<C: BidirectionalCollection>(
     _ input: C, knownCount: Int = 0
   ) -> ParseResult<EncodedScalar, C.Index>
-  where C.Iterator.Element == EncodedScalar.Iterator.Element,
-  // FIXME: drop these constraints once we have the compiler features.
-  C.SubSequence.Index == C.Index,
-  C.SubSequence.Iterator.Element == C.Iterator.Element {
+  where C.Iterator.Element == CodeUnit {
     if _slowPath(knownCount <= 0 && input.isEmpty) { return .emptyInput }
 
     var i = input.endIndex
@@ -835,11 +829,7 @@ public enum UTF16 : UnicodeEncoding {
   public static func parse1Reverse<C: BidirectionalCollection>(
     _ input: C, knownCount: Int = 0
   ) -> ParseResult<EncodedScalar, C.Index>
-  where C.Iterator.Element == CodeUnit,
-  // FIXME: drop these constraints once we have the compiler features.
-  C.SubSequence.Index == C.Index,
-  C.SubSequence.Iterator.Element == C.Iterator.Element
-  {
+  where C.Iterator.Element == CodeUnit {
     if _slowPath(knownCount <= 0 && input.isEmpty) { return .emptyInput }
 
     let i1 = input.index(before: input.endIndex)
@@ -964,11 +954,7 @@ public enum ValidUTF16 : UnicodeEncoding {
   public static func parse1Reverse<C: BidirectionalCollection>(
     _ input: C, knownCount: Int = 0
   ) -> ParseResult<EncodedScalar, C.Index>
-  where C.Iterator.Element == CodeUnit,
-  // FIXME: drop these constraints once we have the compiler features.
-  C.SubSequence.Index == C.Index,
-  C.SubSequence.Iterator.Element == C.Iterator.Element
-  {
+  where C.Iterator.Element == CodeUnit {
     if _slowPath(knownCount <= 0 && input.isEmpty) { return .emptyInput }
 
     let i1 = input.index(before: input.endIndex)
@@ -1022,11 +1008,7 @@ public enum UTF32 : UnicodeEncoding {
   public static func parse1Reverse<C: BidirectionalCollection>(
     _ input: C, knownCount: Int = 0
   ) -> ParseResult<EncodedScalar, C.Index>
-  where C.Iterator.Element == CodeUnit,
-  // FIXME: drop these constraints once we have the compiler features.
-  C.SubSequence.Index == C.Index,
-  C.SubSequence.Iterator.Element == C.Iterator.Element
-  {
+  where C.Iterator.Element == CodeUnit {
     if _slowPath(knownCount <= 0 && input.isEmpty) { return .emptyInput }
 
     let i0 = input.index(before: input.endIndex)
@@ -1148,7 +1130,7 @@ public enum Latin1 : UnicodeEncoding {
   public static func parse1Forward<C: Collection>(
     _ input: C, knownCount: Int /* = 0 */
   ) -> ParseResult<EncodedScalar, C.Index>
-  where C.Iterator.Element == EncodedScalar.Iterator.Element {
+  where C.Iterator.Element == CodeUnit {
     return input.isEmpty ? .emptyInput : .valid(
       EncodedScalar(input.first!),
       resumptionPoint: input.index(after: input.startIndex))
@@ -1157,10 +1139,7 @@ public enum Latin1 : UnicodeEncoding {
   public static func parse1Reverse<C: BidirectionalCollection>(
     _ input: C, knownCount: Int/* = 0 */
   ) -> ParseResult<EncodedScalar, C.Index>
-  where C.Iterator.Element == EncodedScalar.Iterator.Element,
-  // FIXME: drop these constraints once we have the compiler features.
-  C.SubSequence.Index == C.Index,
-  C.SubSequence.Iterator.Element == C.Iterator.Element {
+  where C.Iterator.Element == CodeUnit {
     return input.isEmpty ? .emptyInput : .valid(
       EncodedScalar(input.last!),
       resumptionPoint: input.index(before: input.endIndex))

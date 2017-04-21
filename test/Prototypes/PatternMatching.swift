@@ -37,16 +37,14 @@ protocol Pattern {
   func matched<C: Collection>(atStartOf c: C) -> MatchResult<Index, MatchData>
   where C.Index == Index, Element_<C> == Element
   // The following requirements go away with upcoming generics features
-  , C.SubSequence : Collection, Element_<C.SubSequence> == Element
-  , C.SubSequence.Index == Index, C.SubSequence.SubSequence == C.SubSequence
+  , C.SubSequence : Collection
 }
 
 extension Pattern {
   func found<C: Collection>(in c: C) -> (extent: Range<Index>, data: MatchData)?
   where C.Index == Index, Element_<C> == Element
   // The following requirements go away with upcoming generics features
-  , C.SubSequence : Collection, Element_<C.SubSequence> == Element
-  , C.SubSequence.Index == Index, C.SubSequence.SubSequence == C.SubSequence
+  , C.SubSequence : Collection
   {
     var i = c.startIndex
     while i != c.endIndex {
@@ -76,8 +74,7 @@ where Element_<T> : Equatable {
   func matched<C: Collection>(atStartOf c: C) -> MatchResult<Index, ()>
   where C.Index == Index, Element_<C> == Element
   // The following requirements go away with upcoming generics features
-  , C.SubSequence : Collection, Element_<C.SubSequence> == Element
-  , C.SubSequence.Index == Index, C.SubSequence.SubSequence == C.SubSequence
+  , C.SubSequence : Collection
   {
     var i = c.startIndex
     for p in pattern {
@@ -98,8 +95,7 @@ struct MatchAnyOne<T : Equatable, Index : Comparable> : Pattern {
   func matched<C: Collection>(atStartOf c: C) -> MatchResult<Index, ()>
   where C.Index == Index, Element_<C> == Element
   // The following requirements go away with upcoming generics features
-  , C.SubSequence : Collection, Element_<C.SubSequence> == Element
-  , C.SubSequence.Index == Index, C.SubSequence.SubSequence == C.SubSequence
+  , C.SubSequence : Collection
   {
     return c.isEmpty
     ? .notFound(resumeAt: c.endIndex)
@@ -132,8 +128,7 @@ where M0.Element == M1.Element, M0.Index == M1.Index {
   func matched<C: Collection>(atStartOf c: C) -> MatchResult<Index, MatchData>
   where C.Index == Index, Element_<C> == Element
   // The following requirements go away with upcoming generics features
-  , C.SubSequence : Collection, Element_<C.SubSequence> == Element
-  , C.SubSequence.Index == Index, C.SubSequence.SubSequence == C.SubSequence
+  , C.SubSequence : Collection
   {
     var src0 = c[c.startIndex..<c.endIndex]
     while true {
@@ -174,7 +169,7 @@ struct RepeatMatch<M0: Pattern> : Pattern {
   where C.Index == M0.Index, Element_<C> == M0.Element
   // The following requirements go away with upcoming generics features
   , C.SubSequence : Collection, Element_<C.SubSequence> == M0.Element
-  , C.SubSequence.Index == M0.Index, C.SubSequence.SubSequence == C.SubSequence
+  , C.SubSequence.Index == M0.Index
   {
     var lastEnd = c.startIndex
     var rest = c.dropFirst(0)
@@ -244,8 +239,7 @@ where M0.Element == M1.Element, M0.Index == M1.Index {
   func matched<C: Collection>(atStartOf c: C) -> MatchResult<Index, MatchData>
   where C.Index == Index, Element_<C> == Element
   // The following requirements go away with upcoming generics features
-  , C.SubSequence : Collection, Element_<C.SubSequence> == Element
-  , C.SubSequence.Index == Index, C.SubSequence.SubSequence == C.SubSequence
+  , C.SubSequence : Collection
   {
     switch matchers.0.matched(atStartOf: c) {
     case .found(let end, let data):
@@ -303,8 +297,7 @@ struct MatchStaticString : Pattern {
   func matched<C: Collection>(atStartOf c: C) -> MatchResult<Index, ()>
   where C.Index == Index, Element_<C> == Element
   // The following requirements go away with upcoming generics features
-  , C.SubSequence : Collection, Element_<C.SubSequence> == Element
-  , C.SubSequence.Index == Index, C.SubSequence.SubSequence == C.SubSequence {
+  , C.SubSequence : Collection {
     return content.withUTF8Buffer {
       LiteralMatch<Buffer, Index>($0).matched(atStartOf: c)
     }
@@ -338,8 +331,7 @@ extension Pattern where Element == UTF8.CodeUnit {
     format: (MatchData)->String = { String(reflecting: $0) })
   where C.Index == Index, Element_<C> == Element
   // The following requirements go away with upcoming generics features
-  , C.SubSequence : Collection, Element_<C.SubSequence> == Element
-  , C.SubSequence.Index == Index, C.SubSequence.SubSequence == C.SubSequence {
+  , C.SubSequence : Collection {
     print("searching for /\(self)/ in \(c.u8str)...", terminator: "")
     if let (extent, data) = self.found(in: c) {
       print(
@@ -395,8 +387,7 @@ struct Paired<T: Hashable, I: Comparable> : Pattern {
   func matched<C: Collection>(atStartOf c: C) -> MatchResult<Index, MatchData>
   where C.Index == Index, Element_<C> == Element
   // The following requirements go away with upcoming generics features
-  , C.SubSequence : Collection, Element_<C.SubSequence> == Element
-  , C.SubSequence.Index == Index, C.SubSequence.SubSequence == C.SubSequence {
+  , C.SubSequence : Collection {
     guard let closer = c.first.flatMap({ pairs[$0] }) else {
       return .notFound(resumeAt: nil)
     }
