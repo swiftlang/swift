@@ -13,20 +13,6 @@
 import SwiftShims
 
 extension String {
-  /// Creates a string representing the given character repeated the specified
-  /// number of times.
-  ///
-  /// For example, use this initializer to create a string with ten `"0"`
-  /// characters in a row.
-  ///
-  ///     let zeroes = String("0" as Character, count: 10)
-  ///     print(zeroes)
-  ///     // Prints "0000000000"
-  @available(*, unavailable, message: "Replaced by init(repeating: String, count: Int)")
-  public init(repeating repeatedValue: Character, count: Int) {
-    Builtin.unreachable()
-  }
-
   /// Creates a string representing the given Unicode scalar repeated the
   /// specified number of times.
   ///
