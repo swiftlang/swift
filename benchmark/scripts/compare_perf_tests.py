@@ -150,7 +150,7 @@ def main():
                 new_max_results[row[TESTNAME]] = int(row[MAX])
 
     ratio_total = 0
-    for key in new_results.keys():
+    for key in set(new_results.keys()).intersection(old_results.keys()):
             ratio = (old_results[key] + 0.001) / (new_results[key] + 0.001)
             ratio_list[key] = round(ratio, 2)
             ratio_total *= ratio
