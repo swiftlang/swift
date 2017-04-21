@@ -15,31 +15,24 @@
 #include "swift/Migrator/FixitApplyDiagnosticConsumer.h"
 #include "swift/Migrator/Migrator.h"
 #include "swift/Migrator/RewriteBufferEditsReceiver.h"
+#include "swift/Migrator/SyntacticMigratorPass.h"
 #include "clang/Basic/Diagnostic.h"
 #include "clang/Basic/FileManager.h"
 #include "clang/Basic/SourceManager.h"
 #include "clang/Edit/EditedSource.h"
 #include "clang/Rewrite/Core/RewriteBuffer.h"
 #include "llvm/Support/FileSystem.h"
-#include "swift/IDE/APIDigesterData.h"
 
 using namespace swift;
 using namespace swift::migrator;
-using namespace swift::ide::api;
 
 bool migrator::updateCodeAndEmitRemap(const CompilerInvocation &Invocation) {
-
   Migrator M { Invocation }; // Provide inputs and configuration
 
   // Phase 1:
   // Perform any syntactic transformations if requested.
 
-  // Prepare diff item store to use.
-  APIDiffItemStore DiffStore;
-  if (!M.getMigratorOptions().APIDigesterDataStorePath.empty()) {
-    DiffStore.addStorePath(M.getMigratorOptions().APIDigesterDataStorePath);
-  }
-
+  // TODO
   auto FailedSyntacticPasses = M.performSyntacticPasses();
   if (FailedSyntacticPasses) {
     return true;
@@ -58,6 +51,7 @@ bool migrator::updateCodeAndEmitRemap(const CompilerInvocation &Invocation) {
   // to calculate a replacement map describing the changes to the input
   // necessary to get the output.
   // TODO: Document replacement map format.
+
 
   auto EmitRemapFailed = M.emitRemap();
   auto EmitMigratedFailed = M.emitMigratedFile();
@@ -188,6 +182,11 @@ bool Migrator::performSyntacticPasses() {
   //
   // Once it has run, push the edits into Edits above:
   // Edits.commit(YourPass.getEdits());
+
+  SyntacticMigratorPass SPass(Editor, Instance.getPrimarySourceFile(),
+    getMigratorOptions());
+  SPass.run();
+  Edits.commit(SPass.getEdits());
 
   // Now, we'll take all of the changes we've accumulated, get a resulting text,
   // and push a MigrationState.

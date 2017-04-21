@@ -223,6 +223,50 @@ bb0(%0 : $Int):
 }
 
 
+class ClassWithStoredProperty {
+  @sil_stored var f: Int
+  init()
+}
+// CHECK-LABEL: sil hidden @classStoredProperty
+sil hidden @classStoredProperty : $@convention(thin) (ClassWithStoredProperty) -> () {
+bb0(%0 : $ClassWithStoredProperty):
+  %1 = ref_element_addr %0 : $ClassWithStoredProperty, #ClassWithStoredProperty.f
+
+  // expected-note@+1{{conflicting modification requires exclusive access}}
+  %2 = begin_access [modify] [dynamic] %1 : $*Int
+  %3 = ref_element_addr %0 : $ClassWithStoredProperty, #ClassWithStoredProperty.f
+
+  // expected-warning@+1{{modification requires exclusive access}}
+  %4 = begin_access [modify] [dynamic] %3 : $*Int
+  end_access %4 : $*Int
+  end_access %2 : $*Int
+  destroy_value %0 : $ClassWithStoredProperty
+  %5 = tuple ()
+  return %5 : $()
+}
+
+// CHECK-LABEL: sil hidden @lookThroughBeginBorrow
+sil hidden @lookThroughBeginBorrow : $@convention(thin) (ClassWithStoredProperty) -> () {
+bb0(%0 : $ClassWithStoredProperty):
+  %1 = begin_borrow %0 : $ClassWithStoredProperty
+  %2 = begin_borrow %0 : $ClassWithStoredProperty
+  %3 = ref_element_addr %1 : $ClassWithStoredProperty, #ClassWithStoredProperty.f
+
+  // expected-note@+1{{conflicting modification requires exclusive access}}
+  %4 = begin_access [modify] [dynamic] %3 : $*Int
+  %5 = ref_element_addr %2 : $ClassWithStoredProperty, #ClassWithStoredProperty.f
+
+  // expected-warning@+1{{modification requires exclusive access}}
+  %6 = begin_access [modify] [dynamic] %5 : $*Int
+  end_access %6 : $*Int
+  end_access %4 : $*Int
+  end_borrow %2 from %0 : $ClassWithStoredProperty, $ClassWithStoredProperty
+  end_borrow %1 from %0 : $ClassWithStoredProperty, $ClassWithStoredProperty
+  destroy_value %0 : $ClassWithStoredProperty
+  %7 = tuple ()
+  return %7 : $()
+}
+
 // Tests for address identity
 
 // Treat 'alloc_box' as identity for project_box
@@ -295,7 +339,7 @@ bb0(%0 : $Int):
 // Multiple errors accessing the same location
 
 // If we have a sequence of begin read - begin write - begin read accesses make
-// sure the second read doesn't report a confusing read-read conflict.
+// sure the the second read doesn't report a confusing read-read conflict.
 // CHECK-LABEL: sil hidden @readWriteReadConflictingThirdAccess
 sil hidden @readWriteReadConflictingThirdAccess : $@convention(thin) (Int) -> () {
 bb0(%0 : $Int):
