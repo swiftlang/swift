@@ -17,7 +17,7 @@
 
 // REQUIRES: objc_interop
 
-// CHECK-LABEL: #if defined(__has_feature) && __has_feature(modules)
+// CHECK-LABEL: #if __has_feature(modules)
 // CHECK-NEXT: @import Foundation;
 // CHECK-NEXT: #endif
 
