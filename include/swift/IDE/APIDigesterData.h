@@ -69,6 +69,9 @@ struct CommonDiffItem: public APIDiffItem {
   SDKNodeKind NodeKind;
   NodeAnnotation DiffKind;
   StringRef ChildIndex;
+private:
+  llvm::SmallVector<uint8_t, 4> ChildIndexPieces;
+public:
   StringRef LeftUsr;
   StringRef RightUsr;
   StringRef LeftComment;
@@ -80,6 +83,7 @@ struct CommonDiffItem: public APIDiffItem {
                  StringRef LeftComment, StringRef RightComment,
                  StringRef ModuleName);
 
+  ArrayRef<uint8_t> getChildIndices() { return ChildIndexPieces; }
   static StringRef head();
   bool operator<(CommonDiffItem Other) const;
   static bool classof(const APIDiffItem *D);
