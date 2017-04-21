@@ -187,7 +187,8 @@ public:
     // 'final' only makes sense in the context of a class declaration.
     // Reject it on global functions, protocols, structs, enums, etc.
     if (!D->getDeclContext()->getAsClassOrClassExtensionContext()) {
-      if (D->getDeclContext()->getAsProtocolExtensionContext())
+      if (TC.Context.isSwiftVersion3() && 
+          D->getDeclContext()->getAsProtocolExtensionContext())
         TC.diagnose(attr->getLocation(), 
           diag::protocol_extension_cannot_be_final)
           .fixItRemove(attr->getRange());
