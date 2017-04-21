@@ -35,11 +35,19 @@
 using namespace swift;
 using namespace ownership;
 
+llvm::cl::opt<bool> TriggerUnreachableOnFailure(
+    "sil-di-assert-on-failure", llvm::cl::init(false),
+    llvm::cl::desc("After emitting a DI error, assert instead of continuing. "
+                   "Meant for debugging ONLY!"),
+    llvm::cl::Hidden);
+
 STATISTIC(NumAssignRewritten, "Number of assigns rewritten");
 
 template<typename ...ArgTypes>
 static void diagnose(SILModule &M, SILLocation loc, ArgTypes... args) {
   M.getASTContext().Diags.diagnose(loc.getSourceLoc(), Diagnostic(args...));
+  if (TriggerUnreachableOnFailure)
+    llvm_unreachable("Triggering standard assertion failure routine");
 }
 
 enum class PartialInitializationKind {
