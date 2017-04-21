@@ -2553,6 +2553,7 @@ class TypeReconstructWalker : public SourceEntityWalker {
   ASTContext &Ctx;
   llvm::raw_ostream &Stream;
   llvm::DenseSet<ValueDecl *> SeenDecls;
+  llvm::SmallVector<DeclContext *, 2> NestedDCs;
 
 public:
   TypeReconstructWalker(ASTContext &Ctx, llvm::raw_ostream &Stream)
@@ -2562,7 +2563,14 @@ public:
     if (auto *VD = dyn_cast<ValueDecl>(D)) {
       if (SeenDecls.insert(VD).second)
         tryDemangleDecl(VD, range, /*isRef=*/false);
+      NestedDCs.push_back(VD->getInnermostDeclContext());
     }
+    return true;
+  }
+
+  bool walkToDeclPost(Decl *D) override {
+    if (auto *VD = dyn_cast<ValueDecl>(D))
+      NestedDCs.pop_back();
     return true;
   }
 
@@ -2574,7 +2582,11 @@ public:
 
     if (T) {
       T = T->getRValueType();
-      tryDemangleType(T, D->getDeclContext(), Range);
+      tryDemangleType(T,
+                      (NestedDCs.empty()
+                       ? D->getDeclContext()
+                       : NestedDCs.back()),
+                      Range);
     }
     return true;
   }
