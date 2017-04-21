@@ -14,6 +14,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/NameLookup.h"
+#include "swift/AST/SubstitutionMap.h"
 #include "swift/Demangling/Demangle.h"
 #include "swift/Demangling/ManglingMacros.h"
 #include "swift/ClangImporter/ClangImporter.h"
@@ -752,17 +753,17 @@ static void VisitNodeBoundGeneric(
       }
     }
 
-    if (generic_type_result._types.size() == 1 &&
+    if (generic_type_result._decls.size() == 1 &&
+        generic_type_result._types.size() == 1 &&
         !template_types_result._types.empty()) {
-      NominalTypeDecl *nominal_type_decl =
+      auto *nominal_type_decl =
           cast<NominalTypeDecl>(generic_type_result._decls.front());
-      DeclContext *parent_decl = nominal_type_decl->getParent();
-      Type parent_type;
-      if (parent_decl->isTypeContext())
-        parent_type = parent_decl->getDeclaredTypeOfContext();
+      auto parent_type = generic_type_result._types.front()
+          ->getNominalParent();
       result._types.push_back(
         BoundGenericType::get(
           nominal_type_decl, parent_type, template_types_result._types));
+      result._decls.push_back(nominal_type_decl);
     }
   }
 }
@@ -1543,10 +1544,7 @@ static void VisitNodeLocalDeclName(
       result._types.pop_back();
 
     result._decls.push_back(decl);
-    auto type = decl->getInterfaceType();
-    if (MetatypeType *metatype =
-            dyn_cast_or_null<MetatypeType>(type.getPointer()))
-      type = metatype->getInstanceType();
+    auto type = decl->getDeclaredInterfaceType();
     result._types.push_back(type);
   }
 }
@@ -1587,6 +1585,8 @@ static void VisitNodePrivateDeclName(
 static void VisitNodeNominal(
     ASTContext *ast,
     Demangle::NodePointer cur_node, VisitNodeResult &result) {
+  Type parent_type;
+
   Demangle::Node::iterator child_end = cur_node->end();
   for (Demangle::Node::iterator child_pos = cur_node->begin();
        child_pos != child_end; ++child_pos) {
@@ -1602,9 +1602,22 @@ static void VisitNodeNominal(
       VisitNodePrivateDeclName(ast, cur_node, child, result);
       break;
     default:
-      VisitNode(ast, *child_pos, result);
+      VisitNode(ast, child, result);
+      if (result._types.size() == 1)
+        parent_type = result._types.front();
       break;
     }
+  }
+
+  if (parent_type &&
+      parent_type->getAnyNominal() &&
+      result._decls.size() == 1 &&
+      result._types.size() == 1) {
+    auto nominal_type_decl = cast<NominalTypeDecl>(result._decls.front());
+    auto subMap = parent_type->getMemberSubstitutionMap(
+      nominal_type_decl->getParentModule(), nominal_type_decl);
+
+    result._types[0] = result._types[0].subst(subMap);
   }
 }
 
