@@ -40,7 +40,7 @@ add_swift_library(swiftMigrator STATIC
   Migrator.cpp
   MigrationState.cpp
   RewriteBufferEditsReceiver.cpp
-
+  SyntacticMigratorPass.cpp
   LINK_LIBRARIES swiftSyntax swiftIDE)
 
 add_dependencies(swiftMigrator
