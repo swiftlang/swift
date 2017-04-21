@@ -101,7 +101,8 @@ struct FixitFilter {
         Info.ID == diag::deprecated_protocol_composition_single.ID ||
         Info.ID == diag::deprecated_any_composition.ID ||
         Info.ID == diag::deprecated_operator_body.ID ||
-        Info.ID == diag::unbound_generic_parameter_explicit_fix.ID)
+        Info.ID == diag::unbound_generic_parameter_explicit_fix.ID ||
+        Info.ID == diag::objc_inference_swift3_addobjc.ID)
       return true;
 
     return false;
