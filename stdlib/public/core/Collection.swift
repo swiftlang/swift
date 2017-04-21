@@ -414,12 +414,8 @@ public struct IndexingIterator<
   @_inlineable
   @inline(__always)
   public mutating func next() -> Elements._Element? {
-    if _slowPath(_position >= _elements.endIndex) {
-      _debugPrecondition(
-        _position == _elements.endIndex,
-        "indexing past the end of a collection")
-      return nil
-    }
+    if _position == _elements.endIndex { return nil }
+    
     let element = _elements[_position]
     _elements.formIndex(after: &_position)
     return element
