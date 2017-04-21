@@ -2214,7 +2214,7 @@ public:
     
     require(getDynamicMethodType(operandType, EMI->getMember())
               .getSwiftRValueType()
-              ->isBindableTo(EMI->getType().getSwiftRValueType(), nullptr),
+              ->isBindableTo(EMI->getType().getSwiftRValueType()),
             "result must be of the method's type");
     verifyOpenedArchetype(EMI, EMI->getType().getSwiftRValueType());
   }
@@ -2691,7 +2691,7 @@ public:
     }
 
     if (layout.superclass) {
-      require(layout.superclass->isExactSuperclassOf(concreteType, nullptr),
+      require(layout.superclass->isExactSuperclassOf(concreteType),
               "init_existential of subclass existential with wrong type");
     }
 
@@ -2984,10 +2984,10 @@ public:
       
       if (instClass->usesObjCGenericsModel()) {
         require(instClass->getDeclaredTypeInContext()
-                  ->isBindableToSuperclassOf(opInstTy, nullptr),
+                  ->isBindableToSuperclassOf(opInstTy),
                 "upcast must cast to a superclass or an existential metatype");
       } else {
-        require(instTy->isExactSuperclassOf(opInstTy, nullptr),
+        require(instTy->isExactSuperclassOf(opInstTy),
                 "upcast must cast to a superclass or an existential metatype");
       }
       return;
@@ -3017,8 +3017,7 @@ public:
             "upcast must convert a class instance to a class type");
       if (ToClass->usesObjCGenericsModel()) {
         require(ToClass->getDeclaredTypeInContext()
-                  ->isBindableToSuperclassOf(FromTy.getSwiftRValueType(),
-                                             nullptr),
+                  ->isBindableToSuperclassOf(FromTy.getSwiftRValueType()),
                 "upcast must cast to a superclass or an existential metatype");
       } else {
         require(ToTy.isExactSuperclassOf(FromTy),
@@ -3557,7 +3556,7 @@ public:
     auto bbArgTy = DMBI->getHasMethodBB()->args_begin()[0]->getType();
     require(getDynamicMethodType(operandType, DMBI->getMember())
               .getSwiftRValueType()
-              ->isBindableTo(bbArgTy.getSwiftRValueType(), nullptr),
+              ->isBindableTo(bbArgTy.getSwiftRValueType()),
             "bb argument for dynamic_method_br must be of the method's type");
   }
 

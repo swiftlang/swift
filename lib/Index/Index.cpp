@@ -69,6 +69,12 @@ static bool printDisplayName(const swift::ValueDecl *D, llvm::raw_ostream &OS) {
   return false;
 }
 
+static bool isMemberwiseInit(swift::ValueDecl *D) {
+  if (auto AFD = dyn_cast<AbstractFunctionDecl>(D))
+    return AFD->getBodyKind() == AbstractFunctionDecl::BodyKind::MemberwiseInitializer;
+  return false;
+}
+
 namespace {
 // Adapter providing a common interface for a SourceFile/Module.
 class SourceFileOrModule {
@@ -289,10 +295,57 @@ private:
     return true;
   }
 
+  void handleMemberwiseInitRefs(Expr *E) {
+    if (!isa<ConstructorRefCallExpr>(E))
+      return;
+
+    auto *DeclRef = dyn_cast<DeclRefExpr>(cast<ConstructorRefCallExpr>(E)->getFn());
+    if (!DeclRef || !isMemberwiseInit(DeclRef->getDecl()))
+      return;
+
+    // get label locations
+    auto *MemberwiseInit = DeclRef->getDecl();
+    std::vector<SourceLoc> LabelLocs;
+    auto NameLoc = DeclRef->getNameLoc();
+    if (NameLoc.isCompound()) {
+      size_t LabelIndex = 0;
+      SourceLoc ArgLoc;
+      while((ArgLoc = NameLoc.getArgumentLabelLoc(LabelIndex++)).isValid()) {
+        LabelLocs.push_back(ArgLoc);
+      }
+    } else if (auto *CallParent = dyn_cast_or_null<CallExpr>(getParentExpr())) {
+      LabelLocs = CallParent->getArgumentLabelLocs();
+    }
+
+    if (LabelLocs.empty())
+      return;
+
+    // match labels to properties
+    auto *TypeContext = MemberwiseInit->getDeclContext()
+                          ->getAsNominalTypeOrNominalTypeExtensionContext();
+    if (!TypeContext || !shouldIndex(TypeContext, false))
+      return;
+
+    auto LabelIt = LabelLocs.begin();
+    for(auto Prop : TypeContext->getStoredProperties()) {
+      if (Prop->getParentInitializer() && Prop->isLet())
+        continue;
+
+      assert(LabelIt != LabelLocs.end());
+      IndexSymbol Info;
+      if (initIndexSymbol(Prop, *LabelIt++, /*IsRef=*/true, Info))
+        continue;
+      if (startEntity(Prop, Info))
+        finishCurrentEntity();
+    }
+  }
+
   bool walkToExprPre(Expr *E) override {
     if (Cancelled)
       return false;
     ExprStack.push_back(E);
+
+    handleMemberwiseInitRefs(E);
     return true;
   }
 
@@ -712,6 +765,24 @@ bool IndexSwiftASTWalker::reportRelatedTypeRef(const TypeLoc &Ty, SymbolRoleSet 
   return true;
 }
 
+static bool isDynamicVarAccessorOrFunc(ValueDecl *D, SymbolInfo symInfo) {
+  if (auto NTD = D->getDeclContext()->getAsNominalTypeOrNominalTypeExtensionContext()) {
+    bool isClassOrProtocol = isa<ClassDecl>(NTD) || isa<ProtocolDecl>(NTD);
+    bool isInternalAccessor =
+      symInfo.SubKind == SymbolSubKind::SwiftAccessorWillSet ||
+      symInfo.SubKind == SymbolSubKind::SwiftAccessorDidSet ||
+      symInfo.SubKind == SymbolSubKind::SwiftAccessorAddressor ||
+      symInfo.SubKind == SymbolSubKind::SwiftAccessorMutableAddressor;
+    if (isClassOrProtocol &&
+        symInfo.Kind != SymbolKind::StaticMethod &&
+        !isInternalAccessor &&
+        !D->isFinal()) {
+      return true;
+    }
+  }
+  return false;
+}
+
 bool IndexSwiftASTWalker::reportPseudoAccessor(AbstractStorageDecl *D,
                                                AccessorKind AccKind, bool IsRef,
                                                SourceLoc Loc) {
@@ -736,6 +807,9 @@ bool IndexSwiftASTWalker::reportPseudoAccessor(AbstractStorageDecl *D,
     Info.symInfo.SubKind = getSubKindForAccessor(AccKind);
     Info.roles |= (SymbolRoleSet)SymbolRole::Implicit;
     Info.group = "";
+    if (isDynamicVarAccessorOrFunc(D, Info.symInfo)) {
+      Info.roles |= (SymbolRoleSet)SymbolRole::Dynamic;
+    }
     return false;
   };
 
@@ -983,6 +1057,10 @@ bool IndexSwiftASTWalker::initFuncDeclIndexSymbol(FuncDecl *D,
   if (initIndexSymbol(D, D->getLoc(), /*IsRef=*/false, Info))
     return true;
 
+  if (isDynamicVarAccessorOrFunc(D, Info.symInfo)) {
+    Info.roles |= (SymbolRoleSet)SymbolRole::Dynamic;
+  }
+
   if (D->getAttrs().hasAttribute<IBActionAttr>()) {
     // Relate with type of the first parameter using RelationIBTypeOf.
     if (D->getParameterLists().size() >= 2) {
@@ -1012,7 +1090,7 @@ static bool isSuperRefExpr(Expr *E) {
 }
 
 static bool isDynamicCall(Expr *BaseE, ValueDecl *D) {
-  // The call is 'dynamic' if the method is not of a struct and the
+  // The call is 'dynamic' if the method is not of a struct/enum and the
   // receiver is not 'super'. Note that if the receiver is 'super' that
   // does not mean that the call is statically determined (an extension
   // method may have injected itself in the super hierarchy).
@@ -1021,7 +1099,7 @@ static bool isDynamicCall(Expr *BaseE, ValueDecl *D) {
   auto TyD = getNominalParent(D);
   if (!TyD)
     return false;
-  if (isa<StructDecl>(TyD))
+  if (isa<StructDecl>(TyD) || isa<EnumDecl>(TyD))
     return false;
   if (isSuperRefExpr(BaseE))
     return false;

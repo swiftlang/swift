@@ -33,19 +33,6 @@ void FixitApplyDiagnosticConsumer::printResult(llvm::raw_ostream &OS) const {
   RewriteBuf.write(OS);
 }
 
-bool FixitApplyDiagnosticConsumer::
-shouldTakeFixit(const DiagnosticInfo &Info,
-                const DiagnosticInfo::FixIt &F) const {
-
-  if (MigratorOpts.AddObjC) {
-    if (Info.ID == diag::objc_inference_swift3_addobjc.ID) {
-      return true;
-    }
-  }
-
-  return false;
-}
-
 void FixitApplyDiagnosticConsumer::
 handleDiagnostic(SourceManager &SM, SourceLoc Loc,
                  DiagnosticKind Kind,
@@ -58,10 +45,11 @@ handleDiagnostic(SourceManager &SM, SourceLoc Loc,
     return;
   }
 
+  if (!shouldTakeFixit(Kind, Info)) {
+    return;
+  }
+
   for (const auto &Fixit : Info.FixIts) {
-    if (!shouldTakeFixit(Info, Fixit)) {
-      continue;
-    }
 
     auto Offset = SM.getLocOffsetInBuffer(Fixit.getRange().getStart(),
                                           ThisBufferID);
@@ -69,9 +57,5 @@ handleDiagnostic(SourceManager &SM, SourceLoc Loc,
 
     RewriteBuf.ReplaceText(Offset, Length, Fixit.getText());
     ++NumFixitsApplied;
-
-    Replacements.push_back({
-      BufferName, Offset, Length, Fixit.getText().str(), Info.ID
-    });
   }
 }

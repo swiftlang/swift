@@ -2756,15 +2756,17 @@ void DiagnosisEmitter::handle(const SDKNodeDecl *Node, NodeAnnotation Anno) {
   switch(Anno) {
   case NodeAnnotation::Removed: {
     if (auto *Added = findAddedDecl(Node)) {
-      MovedDecls.Diags.emplace_back(Node->getDeclKind(),
-                                    Added->getDeclKind(),
-                                    Node->getFullyQualifiedName(),
-                                    Added->getFullyQualifiedName());
-    } else {
-      RemovedDecls.Diags.emplace_back(Node->getDeclKind(),
+      if (Node->getDeclKind() != DeclKind::Constructor) {
+        MovedDecls.Diags.emplace_back(Node->getDeclKind(),
+                                      Added->getDeclKind(),
                                       Node->getFullyQualifiedName(),
-                                      Node->isDeprecated());
+                                      Added->getFullyQualifiedName());
+        return;
+      }
     }
+    RemovedDecls.Diags.emplace_back(Node->getDeclKind(),
+                                    Node->getFullyQualifiedName(),
+                                    Node->isDeprecated());
     return;
   }
   case NodeAnnotation::Rename: {
@@ -2838,11 +2840,12 @@ void DiagnosisEmitter::visitType(SDKNodeType *Node) {
       Descriptor = isa<SDKNodeAbstractFunc>(Parent) ?
         SDKNodeAbstractFunc::getTypeRoleDescription(Ctx, Parent->getChildIndex(Node)) :
         Ctx.buffer("declared");
-      TypeChangedDecls.Diags.emplace_back(Parent->getDeclKind(),
-                                          Parent->getFullyQualifiedName(),
-                                          Node->getPrintedName(),
-                                          Count->getPrintedName(),
-                                          Descriptor);
+      if (Node->getPrintedName() != Count->getPrintedName())
+        TypeChangedDecls.Diags.emplace_back(Parent->getDeclKind(),
+                                            Parent->getFullyQualifiedName(),
+                                            Node->getPrintedName(),
+                                            Count->getPrintedName(),
+                                            Descriptor);
       break;
     default:
       break;

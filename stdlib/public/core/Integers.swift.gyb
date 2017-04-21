@@ -886,7 +886,8 @@ def overflowOperationComment(operator):
   ///
   /// - SeeAlso: `doubleWidthDivide(_:_:)`
 """,
-        '/': """\
+        '%': """\
+  // FIXME(integers): the comment is for division instead of remainder
   /// Returns the remainder of dividing this value by the given value along with
   /// a flag indicating whether overflow occurred in the operation.
   ///
@@ -1338,7 +1339,7 @@ extension Numeric {
 ///     }
 ///     // Prints "23 is greater than -23."
 public protocol BinaryInteger :
-  Comparable, Hashable, Numeric, CustomStringConvertible, Strideable {
+  Hashable, Numeric, CustomStringConvertible, Strideable {
 
   /// A Boolean value indicating whether this type is a signed integer type.
   ///
@@ -1934,6 +1935,7 @@ extension BinaryInteger {
 ///     let (y, overflow) = x.addingReportingOverflow(x)
 ///     // y == 254
 ///     // overflow == ArithmeticOverflow.overflow
+@_fixed_layout
 public enum ArithmeticOverflow {
   @_transparent
   public init(_ overflow: Bool) { self = overflow ? .overflow : .none }
@@ -2007,7 +2009,7 @@ public enum ArithmeticOverflow {
 /// customization points for arithmetic operations. When you provide just those
 /// methods, the standard library provides default implementations for all
 /// other arithmetic methods and operators.
-public protocol FixedWidthInteger : BinaryInteger, BitwiseOperations {
+public protocol FixedWidthInteger : BinaryInteger, _BitwiseOperations {
   /// The number of bits used for the underlying binary representation of
   /// values of this type.
   ///
@@ -2033,7 +2035,7 @@ public protocol FixedWidthInteger : BinaryInteger, BitwiseOperations {
   /// exponentiation.
   static var min: Self { get }
 
-% for x in binaryArithmetic['Numeric'] + binaryArithmetic['BinaryInteger'][:1]:
+% for x in binaryArithmetic['Numeric'] + binaryArithmetic['BinaryInteger']:
 ${overflowOperationComment(x.operator)}
   func ${x.name}ReportingOverflow(
     ${x.firstArg} rhs: Self
@@ -2557,11 +2559,7 @@ public struct ${Self}
 
   @_transparent
   public init(_builtinIntegerLiteral x: _MaxBuiltinIntegerType) {
-    _value = Builtin.truncOrBitCast_${IntLiteral}_Int${bits}(x)
-    Builtin.condfail(
-      Builtin.cmp_ne_${IntLiteral}(
-        Builtin.${z}extOrBitCast_Int${bits}_${IntLiteral}(
-          _value), x))
+    _value = Builtin.s_to_${u}_checked_trunc_${IntLiteral}_${BuiltinName}(x).0
   }
 
   /// Creates a new instance with the same memory representation as the given
@@ -3093,6 +3091,12 @@ ${operatorComment(x.operator, True)}
   public func to${U}IntMax() -> ${U}IntMax {
     return numericCast(self)
   }
+
+  @available(swift, obsoleted: 4, message: "Use bitWidth instead.")
+  public static var _sizeInBits: ${Self} { return ${bits} }
+
+  @available(swift, obsoleted: 4)
+  public static var _sizeInBytes: ${Self} { return ${bits}/8 }
 }
 %# end of concrete type: ${Self}
 
@@ -3417,6 +3421,11 @@ public struct DoubleWidth<T : FixedWidthInteger>
     fatalError()
   }
 
+  public func remainderReportingOverflow(dividingBy other: DoubleWidth<T>)
+    -> (partialValue: DoubleWidth<T>, overflow: ArithmeticOverflow) {
+    fatalError()
+  }
+
   public func multipliedFullWidth(by other: DoubleWidth<T>)
     -> (high: DoubleWidth<T>, low: DoubleWidth<T>.Magnitude) {
     fatalError()
@@ -3593,6 +3602,27 @@ extension FixedWidthInteger {
 
 %   end
 
+}
+
+extension FixedWidthInteger {
+% for oldPrefix, newPrefix, argLabel in [
+%   ('add', 'adding', ''),
+%   ('subtract', 'subtracting', ''),
+%   ('multiply', 'multiplied', 'by:'),
+%   ('divide', 'divided', 'by:'),
+%   ('remainder', 'remainder', 'dividingBy:'),
+%   ]:
+  @available(swift, obsoleted: 4, message: "Use ${newPrefix}ReportingOverflow(${argLabel or '_:'}) instead.")
+  @_transparent
+  public static func ${oldPrefix}WithOverflow(
+    _ lhs: Self, _ rhs: Self
+  ) -> (Self, overflow: Bool) {
+    let (partialValue, overflow) =
+      lhs.${newPrefix}ReportingOverflow(${argLabel} rhs)
+    return (partialValue, overflow == .overflow)
+  }
+
+% end
 }
 
 // FIXME(integers): Absence of &+ causes ambiguity in the code like the

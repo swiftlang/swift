@@ -45,7 +45,7 @@ class AClass {
 
   // InstanceMethod + Parameters
   func instanceMethod(a: Int, b b: Int, _ c: Int, d _: Int, _: Int) {
-  // CHECK: [[@LINE-1]]:8 | instance-method/Swift | instanceMethod(a:b:_:d:_:) | s:14swift_ide_test6AClassC14instanceMethodySi1a_Si1bS2i1dSitF | Def,RelChild | rel: 1
+  // CHECK: [[@LINE-1]]:8 | instance-method/Swift | instanceMethod(a:b:_:d:_:) | s:14swift_ide_test6AClassC14instanceMethodySi1a_Si1bS2i1dSitF | Def,Dyn,RelChild | rel: 1
   // CHECK-NEXT: RelChild | class/Swift | AClass | s:14swift_ide_test6AClassC
   // CHECK: [[@LINE-3]]:23 | param/Swift | a | s:14swift_ide_test6AClassC14instanceMethodySi1a_Si1bS2i1dSitFAEL_Siv | Def,RelChild | rel: 1
   // CHECK-NEXT: RelChild | instance-method/Swift | instanceMethod(a:b:_:d:_:) | s:14swift_ide_test6AClassC14instanceMethodySi1a_Si1bS2i1dSitF
@@ -64,7 +64,7 @@ class AClass {
 
   // ClassMethod
   class func classMethod() {}
-  // CHECK: [[@LINE-1]]:14 | class-method/Swift | classMethod() | s:14swift_ide_test6AClassC11classMethodyyFZ | Def,RelChild | rel: 1
+  // CHECK: [[@LINE-1]]:14 | class-method/Swift | classMethod() | s:14swift_ide_test6AClassC11classMethodyyFZ | Def,Dyn,RelChild | rel: 1
   // CHECK-NEXT: RelChild | class/Swift | AClass | s:14swift_ide_test6AClassC
 
   // StaticMethod
@@ -79,7 +79,7 @@ class AClass {
 
     // Accessor + AccessorGetter
     get {
-      // CHECK: [[@LINE-1]]:5 | instance-method/acc-get/Swift | getter:instanceProperty | s:14swift_ide_test6AClassC16instancePropertySifg | Def,RelChild,RelAcc | rel: 1
+      // CHECK: [[@LINE-1]]:5 | instance-method/acc-get/Swift | getter:instanceProperty | s:14swift_ide_test6AClassC16instancePropertySifg | Def,Dyn,RelChild,RelAcc | rel: 1
       // CHECK-NEXT: RelChild,RelAcc | instance-property/Swift | instanceProperty | s:14swift_ide_test6AClassC16instancePropertySiv
 
       return 1
@@ -87,7 +87,7 @@ class AClass {
 
     // Accessor + AccessorSetter
     set {}
-    // CHECK: [[@LINE-1]]:5 | instance-method/acc-set/Swift | setter:instanceProperty | s:14swift_ide_test6AClassC16instancePropertySifs | Def,RelChild,RelAcc | rel: 1
+    // CHECK: [[@LINE-1]]:5 | instance-method/acc-set/Swift | setter:instanceProperty | s:14swift_ide_test6AClassC16instancePropertySifs | Def,Dyn,RelChild,RelAcc | rel: 1
     // CHECK-NEXT: RelChild,RelAcc | instance-property/Swift | instanceProperty | s:14swift_ide_test6AClassC16instancePropertySiv
   }
 
@@ -194,7 +194,7 @@ class MyTestCase : XCTestCase {
 // CHECK: [[@LINE-1]]:7 | class(test)/Swift | MyTestCase |
   func callit() {}
   func testMe() {
-  // CHECK: [[@LINE-1]]:8 | instance-method(test)/Swift | testMe() | [[MyTestCase_testMe_USR:.*]] | Def,RelChild
+  // CHECK: [[@LINE-1]]:8 | instance-method(test)/Swift | testMe() | [[MyTestCase_testMe_USR:.*]] | Def,Dyn,RelChild
     callit()
     // CHECK: [[@LINE-1]]:5 | instance-method/Swift | callit() | s:14swift_ide_test10MyTestCaseC6callityyF | Ref,Call,Dyn,RelRec,RelCall,RelCont | rel: 2
     // CHECK-NEXT: RelCall,RelCont | instance-method(test)/Swift | testMe() | [[MyTestCase_testMe_USR]]
@@ -227,7 +227,7 @@ class AttrAnnots {
   @IBOutlet var iboutletString: AnyObject?
   // CHECK: [[@LINE-1]]:17 | instance-property(IB)/Swift | iboutletString |
   @IBAction func someibaction(o: TargetForIBAction) {}
-  // CHECK: [[@LINE-1]]:18 | instance-method(IB)/Swift | someibaction(o:) | {{.*}} | Def,RelChild,RelIBType | rel: 2
+  // CHECK: [[@LINE-1]]:18 | instance-method(IB)/Swift | someibaction(o:) | {{.*}} | Def,Dyn,RelChild,RelIBType | rel: 2
   // CHECK-NEXT: RelIBType | class/Swift | TargetForIBAction | [[TargetForIBAction_USR]]
   @GKInspectable var gkString = "gk"
   // CHECK: [[@LINE-1]]:22 | instance-property(GKI)/Swift | gkString |

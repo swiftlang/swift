@@ -351,8 +351,8 @@ struct ArrayTraits<ArrayRef<APIDiffItem*>> {
     return const_cast<APIDiffItem *&>(seq[index]);
   }
 };
-}
-}
+} // namespace json
+} // namespace swift
 
 void swift::ide::api::APIDiffItemStore::
 serialize(llvm::raw_ostream &os, ArrayRef<APIDiffItem*> Items) {

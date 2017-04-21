@@ -1086,3 +1086,17 @@ typedef enum __attribute__((ns_error_domain(FictionalServerErrorDomain))) Fictio
   FictionalServerErrorMeltedDown = 1
 } FictionalServerErrorCode;
 
+@protocol Garment
+@end
+
+@protocol Cotton
+@end
+
+@interface Coat
+@end
+
+@protocol NSLaundry
+- (void)wash:(Coat <Garment> * _Nonnull)garment;
+- (void)bleach:(Coat <Garment, Cotton> * _Nonnull)garment;
+- (Coat <Garment> * _Nonnull)dry;
+@end

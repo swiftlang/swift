@@ -189,7 +189,7 @@ struct AsyncResponseInfo {
   std::string sourceFilename;
   std::unique_ptr<llvm::MemoryBuffer> sourceBuffer;
 };
-}
+} // end anonymous namespace
 
 static std::vector<AsyncResponseInfo> asyncResponses;
 

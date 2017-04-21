@@ -144,6 +144,6 @@ HeapObjectSideTableEntry* RefCounts<InlineRefCountBits>::formWeakReference()
 }
 
 // namespace swift
-}
+} // namespace swift
 
 

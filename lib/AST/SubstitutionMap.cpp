@@ -237,8 +237,7 @@ SubstitutionMap::getProtocolSubstitutions(ProtocolDecl *protocol,
 SubstitutionMap
 SubstitutionMap::getOverrideSubstitutions(const ValueDecl *baseDecl,
                                           const ValueDecl *derivedDecl,
-                                          Optional<SubstitutionMap> derivedSubs,
-                                          LazyResolver *resolver) {
+                                          Optional<SubstitutionMap> derivedSubs) {
   auto *baseClass = baseDecl->getDeclContext()
       ->getAsClassOrClassExtensionContext();
   auto *derivedClass = derivedDecl->getDeclContext()
@@ -251,8 +250,7 @@ SubstitutionMap::getOverrideSubstitutions(const ValueDecl *baseDecl,
 
   return getOverrideSubstitutions(baseClass, derivedClass,
                                   baseSig, derivedSig,
-                                  derivedSubs,
-                                  resolver);
+                                  derivedSubs);
 }
 
 SubstitutionMap
@@ -260,8 +258,7 @@ SubstitutionMap::getOverrideSubstitutions(const ClassDecl *baseClass,
                                           const ClassDecl *derivedClass,
                                           GenericSignature *baseSig,
                                           GenericSignature *derivedSig,
-                                          Optional<SubstitutionMap> derivedSubs,
-                                          LazyResolver *resolver) {
+                                          Optional<SubstitutionMap> derivedSubs) {
   if (baseSig == nullptr)
     return SubstitutionMap();
 
@@ -275,7 +272,7 @@ SubstitutionMap::getOverrideSubstitutions(const ClassDecl *baseClass,
     auto derivedClassTy = derivedClass->getDeclaredInterfaceType();
     if (derivedSubs)
       derivedClassTy = derivedClassTy.subst(*derivedSubs);
-    auto baseClassTy = derivedClassTy->getSuperclassForDecl(baseClass, resolver);
+    auto baseClassTy = derivedClassTy->getSuperclassForDecl(baseClass);
 
     baseSubMap = baseClassTy->getContextSubstitutionMap(M, baseClass);
   }

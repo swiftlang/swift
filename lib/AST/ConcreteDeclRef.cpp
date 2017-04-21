@@ -34,8 +34,7 @@ ConcreteDeclRef::SpecializedDeclRef::create(
 }
 
 ConcreteDeclRef
-ConcreteDeclRef::getOverriddenDecl(ASTContext &ctx,
-                                   LazyResolver *resolver) const {
+ConcreteDeclRef::getOverriddenDecl(ASTContext &ctx) const {
   auto *derivedDecl = getDecl();
   auto *baseDecl = derivedDecl->getOverriddenDecl();
 
@@ -50,7 +49,7 @@ ConcreteDeclRef::getOverriddenDecl(ASTContext &ctx,
     if (derivedSig)
       derivedSubMap = derivedSig->getSubstitutionMap(getSubstitutions());
     auto subMap = SubstitutionMap::getOverrideSubstitutions(
-        baseDecl, derivedDecl, derivedSubMap, resolver);
+        baseDecl, derivedDecl, derivedSubMap);
     baseSig->getSubstitutions(subMap, subs);
   }
   return ConcreteDeclRef(ctx, baseDecl, subs);

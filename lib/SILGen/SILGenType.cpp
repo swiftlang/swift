@@ -205,7 +205,7 @@ public:
   }
 };
 
-}
+} // end anonymous namespace
 
 static void emitTypeMemberGlobalVariable(SILGenModule &SGM,
                                          VarDecl *var) {

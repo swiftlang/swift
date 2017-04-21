@@ -124,7 +124,7 @@ public:
   AnnotatingPrinter(SourceTextInfo &Info, llvm::raw_ostream &OS)
     : StreamPrinter(OS), Info(Info) { }
 
-  ~AnnotatingPrinter() {
+  ~AnnotatingPrinter() override {
     assert(DeclUSRs.empty() && "unmatched printDeclLoc call ?");
   }
 
@@ -223,7 +223,7 @@ public:
   }
 };
 
-}
+} // end anonymous namespace
 
 static bool makeParserAST(CompilerInstance &CI, StringRef Text) {
   CompilerInvocation Invocation;

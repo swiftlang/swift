@@ -114,7 +114,7 @@ static void convertToUTF8(llvm::ArrayRef<wchar_t> wide,
   (void)res;
   out.set_size(utf8_begin - out.begin());
 }
-}
+} // end anonymous namespace
 
 /// An arbitrary, otherwise-unused char value that editline interprets as
 /// entering/leaving "literal mode", meaning it passes prompt characters through
@@ -560,7 +560,7 @@ private:
   }
 
 };
-}
+} // end anonymous namespace
 
 static bool handleRequest(StringRef Req, std::string &Error);
 

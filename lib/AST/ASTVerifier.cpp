@@ -2041,7 +2041,7 @@ public:
       for (auto proto : protocols)
         protocolTypes.push_back(proto->getDeclaredType());
       auto type = ProtocolCompositionType::get(Ctx, protocolTypes,
-                                               /*hasExplicitAnyObject=*/false);
+                                               /*HasExplicitAnyObject=*/false);
       auto layout = type->getExistentialLayout();
       SmallVector<ProtocolDecl *, 4> canonicalProtocols;
       for (auto *protoTy : layout.getProtocols())
@@ -2760,7 +2760,7 @@ public:
 
       // If the destination is a class, walk the supertypes of the source.
       if (destTy->getClassOrBoundGenericClass()) {
-        if (!destTy->isBindableToSuperclassOf(srcTy, nullptr)) {
+        if (!destTy->isBindableToSuperclassOf(srcTy)) {
           srcTy.print(Out);
           Out << " is not a superclass of ";
           destTy.print(Out);

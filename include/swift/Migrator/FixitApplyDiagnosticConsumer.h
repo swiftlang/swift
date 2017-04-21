@@ -1,4 +1,4 @@
-//===--- FixitApplyDiagnosticConsumer.h - -----------------------*- C++ -*-===//
+//===--- FixitApplyDiagnosticConsumer.h -------------------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -18,6 +18,7 @@
 #define SWIFT_MIGRATOR_FIXITAPPLYDIAGNOSTICCONSUMER_H
 
 #include "swift/AST/DiagnosticConsumer.h"
+#include "swift/Migrator/FixitFilter.h"
 #include "clang/Rewrite/Core/RewriteBuffer.h"
 
 namespace swift {
@@ -29,9 +30,8 @@ class SourceManager;
 
 namespace migrator {
 
-class Replacement;
-
-class FixitApplyDiagnosticConsumer final : public DiagnosticConsumer {
+class FixitApplyDiagnosticConsumer final
+  : public DiagnosticConsumer, public FixitFilter {
   clang::RewriteBuffer RewriteBuf;
 
   /// The Migrator options collected by the Swift CompilerInvocation,
@@ -49,14 +49,6 @@ class FixitApplyDiagnosticConsumer final : public DiagnosticConsumer {
   /// determine whether to call `printResult`.
   unsigned NumFixitsApplied;
 
-  /// A list of replacements that have been applied while diagnosing the
-  /// input file.
-  std::vector<Replacement> Replacements;
-
-  /// Returns true if the fix-it should be applied.
-  bool shouldTakeFixit(const DiagnosticInfo &Info,
-                       const DiagnosticInfo::FixIt &F) const;
-
 public:
   FixitApplyDiagnosticConsumer(const MigratorOptions &MigratorOpts,
                                const StringRef Text,
@@ -65,10 +57,6 @@ public:
   /// Print the resulting text, applying the caught fix-its to the given
   /// output stream.
   void printResult(llvm::raw_ostream &OS) const;
-
-  const std::vector<Replacement> &getReplacements() const {
-    return Replacements;
-  }
 
   void handleDiagnostic(SourceManager &SM, SourceLoc Loc,
                         DiagnosticKind Kind,

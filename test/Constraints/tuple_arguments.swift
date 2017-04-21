@@ -1428,3 +1428,30 @@ func singleElementTupleArgument(completion: ((didAdjust: Bool)) -> Void) {
     completion((didAdjust: true))
 }
 
+
+// SR-4378
+
+final public class MutableProperty<Value> {
+    public init(_ initialValue: Value) {}
+}
+
+enum DataSourcePage<T> {
+    case notLoaded
+}
+
+let pages1: MutableProperty<(data: DataSourcePage<Int>, totalCount: Int)> = MutableProperty((
+    data: .notLoaded,
+    totalCount: 0
+))
+
+
+let pages2: MutableProperty<(data: DataSourcePage<Int>, totalCount: Int)> = MutableProperty((
+    data: DataSourcePage.notLoaded,
+    totalCount: 0
+))
+
+
+let pages3: MutableProperty<(data: DataSourcePage<Int>, totalCount: Int)> = MutableProperty((
+    data: DataSourcePage<Int>.notLoaded,
+    totalCount: 0
+))

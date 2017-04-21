@@ -11,31 +11,32 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Frontend/Frontend.h"
+#include "swift/Migrator/EditorAdapter.h"
 #include "swift/Migrator/FixitApplyDiagnosticConsumer.h"
 #include "swift/Migrator/Migrator.h"
+#include "swift/Migrator/RewriteBufferEditsReceiver.h"
+#include "swift/Migrator/SyntacticMigratorPass.h"
+#include "clang/Basic/Diagnostic.h"
+#include "clang/Basic/FileManager.h"
+#include "clang/Basic/SourceManager.h"
+#include "clang/Edit/EditedSource.h"
 #include "clang/Rewrite/Core/RewriteBuffer.h"
 #include "llvm/Support/FileSystem.h"
-#include "swift/IDE/APIDigesterData.h"
 
 using namespace swift;
 using namespace swift::migrator;
-using namespace swift::ide::api;
 
-bool migrator::updateCodeAndEmitRemap(CompilerInstance &Instance,
-                                      const CompilerInvocation &Invocation) {
-
-  Migrator M { Instance, Invocation }; // Provide inputs and configuration
+bool migrator::updateCodeAndEmitRemap(const CompilerInvocation &Invocation) {
+  Migrator M { Invocation }; // Provide inputs and configuration
 
   // Phase 1:
   // Perform any syntactic transformations if requested.
 
-  // Prepare diff item store to use.
-  APIDiffItemStore DiffStore;
-  if (!M.getMigratorOptions().APIDigesterDataStorePath.empty()) {
-    DiffStore.addStorePath(M.getMigratorOptions().APIDigesterDataStorePath);
-  }
-
   // TODO
+  auto FailedSyntacticPasses = M.performSyntacticPasses();
+  if (FailedSyntacticPasses) {
+    return true;
+  }
 
   // Phase 2:
   // Perform fix-it based migrations on the compiler, some number of times in
@@ -51,71 +52,20 @@ bool migrator::updateCodeAndEmitRemap(CompilerInstance &Instance,
   // necessary to get the output.
   // TODO: Document replacement map format.
 
-  SmallVector<Replacement, 16> FinalReplacements;
-  M.getReplacements(FinalReplacements);
-  auto EmitRemapFailed =
-    Replacement::emitRemap(Invocation.getOutputFilename(),
-                           llvm::makeArrayRef(FinalReplacements));
+
+  auto EmitRemapFailed = M.emitRemap();
   auto EmitMigratedFailed = M.emitMigratedFile();
   auto DumpMigrationStatesFailed = M.dumpStates();
   return EmitRemapFailed || EmitMigratedFailed || DumpMigrationStatesFailed;
 }
 
-static raw_ostream &printEscaped(raw_ostream &Stream, StringRef Str) {
-  for (unsigned i = 0, e = Str.size(); i != e; ++i) {
-    unsigned char c = Str[i];
-
-    switch (c) {
-      case '\\':
-        Stream << '\\' << '\\';
-        break;
-      case '\t':
-        Stream << '\\' << 't';
-        break;
-      case '\n':
-        Stream << '\\' << 'n';
-        break;
-      case '"':
-        Stream << '\\' << '"';
-        break;
-      default:
-        Stream << c;
-        break;
-    }
-  }
-  return Stream;
-}
-
-void Replacement::printJSON(llvm::raw_ostream &OS) const {
-  OS << "  {\n";
-
-  OS << "    \"file\": \"";
-  printEscaped(OS, Filename);
-  OS << "\",\n";
-
-  OS << "    \"offset\": " << OrigOffset << ",\n";
-
-  if (OrigLength > 0) {
-    OS << "    \"remove\": \"" << OrigLength << ",\n";
-  }
-
-  if (!ReplacementText.empty()) {
-    OS << "    \"text\": \"";
-    printEscaped(OS, ReplacementText);
-    OS << "\"\n";
-  }
-
-  OS << "  }";
-}
-
-Migrator::Migrator(CompilerInstance &StartInstance,
-                   const CompilerInvocation &StartInvocation)
-  : StartInstance(StartInstance), StartInvocation(StartInvocation) {
+Migrator::Migrator(const CompilerInvocation &StartInvocation)
+  : StartInvocation(StartInvocation) {
 
     auto ErrorOrStartBuffer = llvm::MemoryBuffer::getFile(getInputFilename());
     auto &StartBuffer = ErrorOrStartBuffer.get();
     auto StartBufferID = SrcMgr.addNewSourceBuffer(std::move(StartBuffer));
-    States.push_back(FixitMigrationState::start(SrcMgr, StartBufferID));
+    States.push_back(MigrationState::start(SrcMgr, StartBufferID));
 }
 
 void Migrator::
@@ -135,10 +85,10 @@ repeatFixitMigrations(const unsigned Iterations) {
   }
 }
 
-llvm::Optional<RC<FixitMigrationState>>
+llvm::Optional<RC<MigrationState>>
 Migrator::performAFixItMigration() {
 
-  auto InputState = cast<FixitMigrationState>(States.back());
+  auto InputState = States.back();
   auto InputBuffer =
     llvm::MemoryBuffer::getMemBufferCopy(InputState->getOutputText(),
                                      getInputFilename());
@@ -174,21 +124,100 @@ Migrator::performAFixItMigration() {
     ResultBufferID = SrcMgr.addNewSourceBuffer(std::move(ResultBuffer));
   }
 
-  return FixitMigrationState::make(SrcMgr, InputState->getInputBufferID(),
-                                   ResultBufferID,
-                                   FixitApplyConsumer.getReplacements());
+  return MigrationState::make(MigrationKind::CompilerFixits,
+                              SrcMgr, InputState->getInputBufferID(),
+                              ResultBufferID);
 }
 
-llvm::Optional<RC<MigrationState>>
-Migrator::performSyntacticPasses(/* TODO: Array of passes */) {
-  // TODO
-  return None;
+bool Migrator::performSyntacticPasses() {
+  clang::FileSystemOptions ClangFileSystemOptions;
+  clang::FileManager ClangFileManager { ClangFileSystemOptions };
+
+  llvm::IntrusiveRefCntPtr<clang::DiagnosticIDs> DummyClangDiagIDs {
+    new clang::DiagnosticIDs()
+  };
+  auto ClangDiags =
+    llvm::make_unique<clang::DiagnosticsEngine>(DummyClangDiagIDs,
+                                                new clang::DiagnosticOptions,
+                                                new clang::DiagnosticConsumer(),
+                                                /*ShouldOwnClient=*/true);
+
+  clang::SourceManager ClangSourceManager { *ClangDiags, ClangFileManager };
+  clang::LangOptions ClangLangOpts;
+  clang::edit::EditedSource Edits { ClangSourceManager, ClangLangOpts };
+
+  // Make a CompilerInstance
+  // Perform Sema
+  // auto SF = CI.getPrimarySourceFile() ?
+
+  CompilerInvocation Invocation { StartInvocation };
+
+  auto InputState = States.back();
+  auto TempInputBuffer =
+    llvm::MemoryBuffer::getMemBufferCopy(InputState->getOutputText(),
+                                         getInputFilename());
+  Invocation.clearInputs();
+  Invocation.addInputBuffer(TempInputBuffer.get());
+
+  CompilerInstance Instance;
+  if (Instance.setup(StartInvocation)) {
+    return true;
+  }
+
+  Instance.performSema();
+  if (Instance.getDiags().hasFatalErrorOccurred()) {
+    return true;
+  }
+
+  EditorAdapter Editor { Instance.getSourceMgr(), ClangSourceManager };
+
+  // const auto SF = Instance.getPrimarySourceFile();
+
+  // From here, create the syntactic pass:
+  //
+  // SyntacticMigratorPass MyPass {
+  //   Editor, Sema's SourceMgr, ClangSrcManager, SF
+  // };
+  // MyPass.run();
+  //
+  // Once it has run, push the edits into Edits above:
+  // Edits.commit(YourPass.getEdits());
+
+  SyntacticMigratorPass SPass(Editor, Instance.getPrimarySourceFile(),
+    getMigratorOptions());
+  SPass.run();
+  Edits.commit(SPass.getEdits());
+
+  // Now, we'll take all of the changes we've accumulated, get a resulting text,
+  // and push a MigrationState.
+  auto InputText = States.back()->getOutputText();
+
+  RewriteBufferEditsReceiver Rewriter {
+    ClangSourceManager,
+    Editor.getClangFileIDForSwiftBufferID(
+      Instance.getPrimarySourceFile()->getBufferID().getValue()),
+    InputState->getOutputText()
+  };
+    
+  Edits.applyRewrites(Rewriter);
+
+  SmallString<1024> Scratch;
+  llvm::raw_svector_ostream OS(Scratch);
+  Rewriter.printResult(OS);
+  auto ResultBuffer = this->SrcMgr.addMemBufferCopy(OS.str());
+
+  States.push_back(
+    MigrationState::make(MigrationKind::Syntactic,
+                         this->SrcMgr,
+                         States.back()->getInputBufferID(),
+                         ResultBuffer));
+  return false;
 }
 
-void
-Migrator::getReplacements(SmallVectorImpl<Replacement> &Replacements) const {
-  // TODO: Use DMP to iterate over diffs and generate replacements
-  // between the start state and end state.
+bool Migrator::emitRemap() const {
+  // TODO: Need to integrate diffing library to diff start and end state's
+  // output text.
+  return false;
 }
 
 bool Migrator::emitMigratedFile() const {

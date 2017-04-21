@@ -25,33 +25,10 @@ using namespace swift::migrator;
 #pragma mark - MigrationState
 
 std::string MigrationState::getInputText() const {
-  switch (Kind) {
-    case MigrationKind::CompilerFixits:
-      return cast<FixitMigrationState>(this)->getInputText();
-  }
-}
-
-std::string MigrationState::getOutputText() const {
-  switch (Kind) {
-    case MigrationKind::CompilerFixits:
-      return cast<FixitMigrationState>(this)->getOutputText();
-  }
-}
-
-bool MigrationState::print(size_t StateNumber, StringRef OutDir) const {
-  switch (Kind) {
-    case MigrationKind::CompilerFixits:
-      return cast<FixitMigrationState>(this)->print(StateNumber, OutDir);
-  }
-}
-
-#pragma mark - FixitMigrationState
-
-std::string FixitMigrationState::getInputText() const {
   return SrcMgr.getEntireTextForBuffer(InputBufferID);
 }
 
-std::string FixitMigrationState::getOutputText() const {
+std::string MigrationState::getOutputText() const {
   return SrcMgr.getEntireTextForBuffer(OutputBufferID);
 }
 
@@ -70,7 +47,7 @@ static bool quickDumpText(StringRef OutFilename, StringRef Text) {
   return FileOS.has_error();
 }
 
-bool FixitMigrationState::print(size_t StateNumber, StringRef OutDir) const {
+bool MigrationState::print(size_t StateNumber, StringRef OutDir) const {
   auto Failed = false;
 
   SmallString<256> InputFileStatePath;
@@ -100,23 +77,6 @@ bool FixitMigrationState::print(size_t StateNumber, StringRef OutDir) const {
   }
 
   Failed |= quickDumpText(OutputFileStatePath, getOutputText());
-
-  SmallString<256> ReplacementsStatePath;
-  llvm::sys::path::append(ReplacementsStatePath, OutDir);
-
-  {
-    SmallString<256> ReplacementsStateFilenameScratch;
-    llvm::raw_svector_ostream
-    ReplacementsStateFilenameOS(ReplacementsStateFilenameScratch);
-
-    ReplacementsStateFilenameOS << StateNumber << '-' << "FixitMigrationState";
-    ReplacementsStateFilenameOS << '-' << "Replacements";
-    llvm::sys::path::append(ReplacementsStatePath,
-                            ReplacementsStateFilenameOS.str());
-    llvm::sys::path::replace_extension(ReplacementsStatePath, ".remap");
-  }
-
-  Failed |= Replacement::emitRemap(ReplacementsStatePath, Replacements);
 
   return Failed;
 }

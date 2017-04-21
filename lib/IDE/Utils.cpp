@@ -905,7 +905,7 @@ public:
       RewriteBuf.write(OS);
   }
 };
-}
+} // end anonymous namespace
 struct swift::ide::SourceEditOutputConsumer::Implementation {
   ClangFileRewriterHelper Rewriter;
   Implementation(SourceManager &SM, unsigned BufferId, llvm::raw_ostream &OS)

@@ -1,6 +1,6 @@
 // RUN: rm -rf %t && mkdir -p %t
 // RUN: %target-swift-frontend -emit-module-path %t/Test.swiftmodule -emit-sil -o /dev/null -module-name Test %s -sdk "" -import-objc-header %S/Inputs/serialization-sil.h
-// RUN: %target-sil-func-extractor %t/Test.swiftmodule -func=_T04Test16testPartialApplyySoAA_pF -o - | %FileCheck %s
+// RUN: %target-sil-func-extractor %t/Test.swiftmodule -sil-print-debuginfo  -func=_T04Test16testPartialApplyySoAA_pF -o - | %FileCheck %s
 
 // REQUIRES: objc_interop
 

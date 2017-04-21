@@ -27,7 +27,7 @@ endforeach()
 list(APPEND outputs "${output_dir}")
 
 add_custom_target("symlink_migrator_data"
-    DEPENDS "${outputs}"
+    DEPENDS "${output_dir}" "${outputs}"
     COMMENT "Symlinking migrator data to ${output_dir}")
 
 swift_install_in_component(compiler
@@ -35,11 +35,12 @@ swift_install_in_component(compiler
 DESTINATION "lib/swift/migrator")
 
 add_swift_library(swiftMigrator STATIC
+  EditorAdapter.cpp
   FixitApplyDiagnosticConsumer.cpp
   Migrator.cpp
   MigrationState.cpp
-  Replacement.cpp
-
+  RewriteBufferEditsReceiver.cpp
+  SyntacticMigratorPass.cpp
   LINK_LIBRARIES swiftSyntax swiftIDE)
 
 add_dependencies(swiftMigrator

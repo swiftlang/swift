@@ -5812,7 +5812,7 @@ void SwiftDeclConverter::recordObjCOverride(AbstractFunctionDecl *decl) {
       ->getAs<ClassType>();
   if (!classTy)
     return;
-  auto superTy = classTy->getSuperclass(nullptr);
+  auto superTy = classTy->getSuperclass();
   if (!superTy)
     return;
   // Dig out the Objective-C superclass.
@@ -6820,7 +6820,7 @@ void ClangImporter::Implementation::importAttributes(
     // Map Clang's swift_objc_members attribute to @objcMembers.
     if (ID->hasAttr<clang::SwiftObjCMembersAttr>()) {
       if (!MappedDecl->getAttrs().hasAttribute<ObjCMembersAttr>()) {
-        auto attr = new (C) ObjCMembersAttr(/*implicit=*/true);
+        auto attr = new (C) ObjCMembersAttr(/*IsImplicit=*/true);
         MappedDecl->getAttrs().add(attr);
       }
     }
@@ -6828,7 +6828,7 @@ void ClangImporter::Implementation::importAttributes(
     // Infer @objcMembers on XCTestCase.
     if (ID->getName() == "XCTestCase") {
       if (!MappedDecl->getAttrs().hasAttribute<ObjCMembersAttr>()) {
-        auto attr = new (C) ObjCMembersAttr(/*implicit=*/true);
+        auto attr = new (C) ObjCMembersAttr(/*IsImplicit=*/true);
         MappedDecl->getAttrs().add(attr);
       }
     }

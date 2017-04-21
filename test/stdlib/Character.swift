@@ -158,6 +158,13 @@ CharacterTests.test("Hashable") {
   }
 }
 
+CharacterTests.test("CR-LF") {
+  let str = "qwerty\r\n"
+  let str_rev = "\r\nytrewq"
+  expectEqual(str.characters.count, str_rev.characters.count)
+  expectEqualSequence(str.characters.reversed(), str_rev.characters)
+}
+
 /// Test that a given `String` can be transformed into a `Character` and back
 /// without loss of information.
 func checkRoundTripThroughCharacter(_ s: String) {

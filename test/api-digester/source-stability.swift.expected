@@ -151,6 +151,7 @@ Var Dictionary.endIndex has declared type change from DictionaryIndex<Key, Value
 Var Dictionary.startIndex has declared type change from DictionaryIndex<Key, Value> to Dictionary<Key, Value>.Index
 Var RandomAccessCollection.indices has declared type change from DefaultRandomAccessIndices<Self> to Self.Indices
 Var Set.endIndex has declared type change from SetIndex<Element> to Set<Element>.Index
+Var Set.first has declared type change from Element? to (Element)?
 Var Set.startIndex has declared type change from SetIndex<Element> to Set<Element>.Index
 Constructor AnyIterator.init(_:) has parameter 0 type change from () -> Element? to () -> AnyIterator.Element?
 Constructor BidirectionalSlice.init(base:bounds:) has parameter 1 type change from Range<Base.Index> to Range<BidirectionalSlice.Index>

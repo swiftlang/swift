@@ -34,9 +34,6 @@ extension TestSuite {
   ) where
     C.SubSequence == C,
     C.Indices : Collection,
-    C.Indices.Iterator.Element == C.Index,
-    C.Indices.Index == C.Index,
-    C.Indices.SubSequence == C.Indices,
     CollectionWithEquatableElement.SubSequence == CollectionWithEquatableElement,
     CollectionWithEquatableElement.Iterator.Element : Equatable {
 
@@ -169,9 +166,6 @@ extension TestSuite {
   ) where
     C.SubSequence == C,
     C.Indices : BidirectionalCollection,
-    C.Indices.Iterator.Element == C.Index,
-    C.Indices.Index == C.Index,
-    C.Indices.SubSequence == C.Indices,
     CollectionWithEquatableElement.SubSequence == CollectionWithEquatableElement,
     CollectionWithEquatableElement.Iterator.Element : Equatable {
 
@@ -317,9 +311,6 @@ extension TestSuite {
   ) where
     C.SubSequence == C,
     C.Indices : RandomAccessCollection,
-    C.Indices.Iterator.Element == C.Index,
-    C.Indices.Index == C.Index,
-    C.Indices.SubSequence == C.Indices,
     CollectionWithEquatableElement.SubSequence == CollectionWithEquatableElement,
     CollectionWithEquatableElement.Iterator.Element : Equatable {
 

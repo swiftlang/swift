@@ -227,12 +227,12 @@ namespace {
 
 /// Determines whether the first type is nominally a superclass of the second
 /// type, ignore generic arguments.
-static bool isNominallySuperclassOf(TypeChecker &tc, Type type1, Type type2) {
+static bool isNominallySuperclassOf(Type type1, Type type2) {
   auto nominal1 = type1->getAnyNominal();
   if (!nominal1)
     return false;
 
-  for (auto super2 = type2; super2; super2 = super2->getSuperclass(&tc)) {
+  for (auto super2 = type2; super2; super2 = super2->getSuperclass()) {
     if (super2->getAnyNominal() == nominal1)
       return true;
   }
@@ -261,10 +261,10 @@ static SelfTypeRelationship computeSelfTypeRelationship(TypeChecker &tc,
   // If both types can have superclasses, which whether one is a superclass
   // of the other. The subclass is the common base type.
   if (type1->mayHaveSuperclass() && type2->mayHaveSuperclass()) {
-    if (isNominallySuperclassOf(tc, type1, type2))
+    if (isNominallySuperclassOf(type1, type2))
       return SelfTypeRelationship::Superclass;
 
-    if (isNominallySuperclassOf(tc, type2, type1))
+    if (isNominallySuperclassOf(type2, type1))
       return SelfTypeRelationship::Subclass;
 
     return SelfTypeRelationship::Unrelated;

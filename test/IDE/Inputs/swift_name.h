@@ -7,7 +7,7 @@
 #ifndef SWIFT_ENUM
 #  define SWIFT_ENUM(_type, _name)    \
   enum _name : _type _name;           \
-  enum SWIFT_ENUM_EXTRA _name : _type
+  enum __attribute__((enum_extensibility(open))) SWIFT_ENUM_EXTRA _name : _type
 #endif
 
 // Renaming global variables.

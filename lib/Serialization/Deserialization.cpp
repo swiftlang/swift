@@ -1030,30 +1030,30 @@ void ModuleFile::readGenericRequirements(
         error();
         break;
       }
-      case LayoutRequirementKind::NativeRefCountedObject: {
+      case LayoutRequirementKind::NativeRefCountedObject:
         kind = LayoutConstraintKind::NativeRefCountedObject;
         break;
-      }
-      case LayoutRequirementKind::RefCountedObject: {
+      case LayoutRequirementKind::RefCountedObject:
         kind = LayoutConstraintKind::RefCountedObject;
         break;
-      }
-      case LayoutRequirementKind::Trivial: {
+      case LayoutRequirementKind::Trivial:
         kind = LayoutConstraintKind::Trivial;
         break;
-      }
-      case LayoutRequirementKind::TrivialOfExactSize: {
+      case LayoutRequirementKind::TrivialOfExactSize:
         kind = LayoutConstraintKind::TrivialOfExactSize;
         break;
-      }
-      case LayoutRequirementKind::TrivialOfAtMostSize: {
+      case LayoutRequirementKind::TrivialOfAtMostSize:
         kind = LayoutConstraintKind::TrivialOfAtMostSize;
         break;
-      }
-      case LayoutRequirementKind::UnknownLayout: {
+      case LayoutRequirementKind::Class:
+        kind = LayoutConstraintKind::Class;
+        break;
+      case LayoutRequirementKind::NativeClass:
+        kind = LayoutConstraintKind::NativeClass;
+        break;
+      case LayoutRequirementKind::UnknownLayout:
         kind = LayoutConstraintKind::UnknownLayout;
         break;
-      }
       }
 
       ASTContext &ctx = getContext();
@@ -3851,11 +3851,23 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
   switch (recordID) {
   case decls_block::NAME_ALIAS_TYPE: {
     DeclID underlyingID;
-    decls_block::NameAliasTypeLayout::readRecord(scratch, underlyingID);
+    TypeID canonicalTypeID;
+    decls_block::NameAliasTypeLayout::readRecord(scratch, underlyingID,
+                                                 canonicalTypeID);
     auto alias = dyn_cast_or_null<TypeAliasDecl>(getDecl(underlyingID));
     if (!alias) {
       error();
       return nullptr;
+    }
+
+    if (ctx.LangOpts.EnableDeserializationRecovery) {
+      if (Type expectedType = getType(canonicalTypeID)) {
+        if (!alias->getDeclaredInterfaceType()->isEqual(expectedType)) {
+          // Fall back to the canonical type.
+          typeOrOffset = expectedType;
+          break;
+        }
+      }
     }
 
     typeOrOffset = alias->getDeclaredInterfaceType();
@@ -4425,7 +4437,7 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
     decls_block::UnboundGenericTypeLayout::readRecord(scratch,
                                                       genericID, parentID);
 
-    auto genericDecl = cast<NominalTypeDecl>(getDecl(genericID));
+    auto genericDecl = cast<GenericTypeDecl>(getDecl(genericID));
     typeOrOffset = UnboundGenericType::get(genericDecl, getType(parentID), ctx);
     break;
   }
@@ -4615,6 +4627,16 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
     auto first = cast<AssociatedTypeDecl>(getDecl(*rawIDIter++));
     auto second = getType(*rawIDIter++);
     auto third = cast_or_null<TypeDecl>(getDecl(*rawIDIter++));
+    if (isa<TypeAliasDecl>(third) &&
+        third->getModuleContext() != getAssociatedModule() &&
+        !third->getDeclaredInterfaceType()->isEqual(second)) {
+      // Conservatively drop references to typealiases in other modules
+      // that may have changed. This may also drop references to typealiases
+      // that /haven't/ changed but just happen to have generics in them, but
+      // in practice having a declaration here isn't actually required by the
+      // rest of the compiler.
+      third = nullptr;
+    }
     typeWitnesses[first] = std::make_pair(second, third);
   }
   assert(rawIDIter <= rawIDs.end() && "read too much");

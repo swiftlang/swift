@@ -383,7 +383,7 @@ namespace {
                                 ValueDecl *requirement)
       : Action(action), Conformance(conformance), Requirement(requirement) { }
 
-    virtual void print(llvm::raw_ostream &out) const {
+    void print(llvm::raw_ostream &out) const override {
       out << "While " << Action << " requirement ";
       Requirement->dumpRef(out);
       out << " in conformance ";
@@ -391,7 +391,7 @@ namespace {
       out << "\n";
     }
   };
-}
+} // end anonymous namespace
 
 bool NormalProtocolConformance::hasTypeWitness(AssociatedTypeDecl *assocType,
                                                LazyResolver *resolver) const {

@@ -33,7 +33,7 @@ void dumpSyntaxKind(llvm::raw_ostream &OS, const SyntaxKind Kind) {
   case SyntaxKind::Token: OS << "Token"; break;
   }
 }
-}
+} // end anonymous namespace
 
 void RawSyntax::print(llvm::raw_ostream &OS) const {
   if (const auto Tok = dyn_cast<TokenSyntax>(this)) {

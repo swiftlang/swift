@@ -759,7 +759,7 @@ namespace {
 
   template<typename T>
   using GSBConstraint = GenericSignatureBuilder::Constraint<T>;
-}
+} // end anonymous namespace
 
 /// Retrieve the best requirement source from the list
 static const RequirementSource *

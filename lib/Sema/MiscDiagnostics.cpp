@@ -726,7 +726,7 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
   
       // Casting to the same type or a superclass is a no-op.
       if (toTy->isEqual(fromTy) ||
-          toTy->isExactSuperclassOf(fromTy, &TC)) {
+          toTy->isExactSuperclassOf(fromTy)) {
         auto d = TC.diagnose(DRE->getLoc(), diag::bitcasting_is_no_op,
                              fromTy, toTy);
         if (subExpr) {
@@ -757,7 +757,7 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
       }
       
       // Unchecked casting to a subclass is better done by unsafeDowncast.
-      if (fromTy->isBindableToSuperclassOf(toTy, &TC)) {
+      if (fromTy->isBindableToSuperclassOf(toTy)) {
         TC.diagnose(DRE->getLoc(), diag::bitcasting_to_downcast,
                     fromTy, toTy)
           .fixItReplace(DRE->getNameLoc().getBaseNameLoc(),

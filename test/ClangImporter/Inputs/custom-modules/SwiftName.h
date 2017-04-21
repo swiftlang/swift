@@ -1,6 +1,6 @@
 #define SWIFT_NAME(X) __attribute__((swift_name(#X)))
 
-#define SWIFT_ENUM(_type, _name) enum _name : _type _name; enum _name : _type
+#define SWIFT_ENUM(_type, _name) enum _name : _type _name; enum __attribute__((enum_extensibility(open))) _name : _type
 
 void drawString(const char *, int x, int y) SWIFT_NAME(drawString(_:x:y:));
 

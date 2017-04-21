@@ -462,7 +462,7 @@ ManagedValue SILGenFunction::emitExistentialErasure(
     // If the concrete type is NSError or a subclass thereof, just erase it
     // directly.
     auto nsErrorType = nsErrorDecl->getDeclaredType()->getCanonicalType();
-    if (nsErrorType->isExactSuperclassOf(concreteFormalType, nullptr)) {
+    if (nsErrorType->isExactSuperclassOf(concreteFormalType)) {
       ManagedValue nsError =  F(SGFContext());
       if (nsErrorType != concreteFormalType) {
         nsError = B.createUpcast(loc, nsError, getLoweredType(nsErrorType));

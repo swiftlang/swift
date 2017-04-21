@@ -38,7 +38,8 @@
           key.name: "f()",
           key.usr: "s:7sr_38151PP1fyyF",
           key.line: 6,
-          key.column: 8
+          key.column: 8,
+          key.is_dynamic: 1
         }
       ]
     },

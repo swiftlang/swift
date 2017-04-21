@@ -726,7 +726,7 @@ protected:
   SILValue materializeIndirectResultAddress(SILInstruction *origDirectResultVal,
                                             SILType argTy);
 };
-}
+} // end anonymous namespace
 
 /// Rewrite any indirect parameter in place.
 void ApplyRewriter::rewriteParameters() {

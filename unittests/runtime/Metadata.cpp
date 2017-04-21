@@ -389,6 +389,8 @@ ProtocolDescriptor ProtocolNoWitnessTable{
     .withDispatchStrategy(ProtocolDispatchStrategy::ObjC)
 };
 
+#if 0 // disabled because of rdar://problem/31759879
+
 TEST(MetadataTest, getExistentialMetadata) {
   const ProtocolDescriptor *protoList1[] = {};
   RaceTest_ExpectEqual<const ExistentialTypeMetadata *>(
@@ -443,16 +445,19 @@ TEST(MetadataTest, getExistentialMetadata) {
     });
 
   // protocol compositions are order-invariant
-  const ProtocolDescriptor *protoList4[] = {
-    &ProtocolA,
-    &ProtocolB
-  };
-  const ProtocolDescriptor *protoList5[] = {
-    &ProtocolB,
-    &ProtocolA
-  };
   RaceTest_ExpectEqual<const ExistentialTypeMetadata *>(
     [&]() -> const ExistentialTypeMetadata * {
+
+      const ProtocolDescriptor *protoList4[] = {
+        &ProtocolA,
+        &ProtocolB
+      };
+
+      const ProtocolDescriptor *protoList5[] = {
+        &ProtocolB,
+        &ProtocolA
+      };
+
       auto ab = swift_getExistentialTypeMetadata(ProtocolClassConstraint::Any,
                                                 /*superclass=*/nullptr,
                                                 2, protoList4);
@@ -514,13 +519,14 @@ TEST(MetadataTest, getExistentialMetadata) {
       return noWitnessTable;
     });
 
-  const ProtocolDescriptor *protoList8[] = {
-    &ProtocolNoWitnessTable,
-    &ProtocolA,
-    &ProtocolB
-  };
   RaceTest_ExpectEqual<const ExistentialTypeMetadata *>(
     [&]() -> const ExistentialTypeMetadata * {
+      const ProtocolDescriptor *protoList8[] = {
+        &ProtocolNoWitnessTable,
+        &ProtocolA,
+        &ProtocolB
+      };
+
       auto mixedWitnessTable
         = swift_getExistentialTypeMetadata(ProtocolClassConstraint::Class,
                                            /*superclass=*/nullptr,
@@ -560,12 +566,13 @@ TEST(MetadataTest, getExistentialMetadata) {
       return special;
     });
 
-  const ProtocolDescriptor *protoList10[] = {
-    &ProtocolError,
-    &ProtocolA
-  };
   RaceTest_ExpectEqual<const ExistentialTypeMetadata *>(
     [&]() -> const ExistentialTypeMetadata * {
+      const ProtocolDescriptor *protoList10[] = {
+        &ProtocolError,
+        &ProtocolA
+      };
+
       auto special
         = swift_getExistentialTypeMetadata(ProtocolClassConstraint::Any,
                                            /*superclass=*/nullptr,
@@ -580,6 +587,8 @@ TEST(MetadataTest, getExistentialMetadata) {
       return special;
     });
 }
+
+#endif
 
 static SWIFT_CC(swift) void destroySuperclass(SWIFT_CONTEXT HeapObject *toDestroy) {}
 

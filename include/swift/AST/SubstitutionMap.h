@@ -111,8 +111,7 @@ public:
   static SubstitutionMap
   getOverrideSubstitutions(const ValueDecl *baseDecl,
                            const ValueDecl *derivedDecl,
-                           Optional<SubstitutionMap> derivedSubs,
-                           LazyResolver *resolver);
+                           Optional<SubstitutionMap> derivedSubs);
 
   /// Variant of the above for when we have the generic signatures but not
   /// the decls for 'derived' and 'base'.
@@ -121,8 +120,7 @@ public:
                            const ClassDecl *derivedClass,
                            GenericSignature *baseSig,
                            GenericSignature *derivedSig,
-                           Optional<SubstitutionMap> derivedSubs,
-                           LazyResolver *resolver);
+                           Optional<SubstitutionMap> derivedSubs);
 
   /// Combine two substitution maps as follows.
   ///

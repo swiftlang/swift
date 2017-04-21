@@ -61,7 +61,7 @@
 /// `OptionSet` protocol. Whether using an option set or creating your own,
 /// you use the raw value of an option set instance to store the instance's
 /// bitfield. The raw value must therefore be of a type that conforms to the
-/// `BitwiseOperations` protocol, such as `UInt8` or `Int`. For example, the
+/// `FixedWidthInteger` protocol, such as `UInt8` or `Int`. For example, the
 /// `Direction` type defines an option set for the four directions you can
 /// move in a game.
 ///
@@ -99,7 +99,7 @@
 ///     print(allowedMoves.rawValue & Directions.right.rawValue)
 ///     // Prints "0"
 ///
-/// - SeeAlso: `OptionSet`, `BitwiseOperations`
+/// - SeeAlso: `OptionSet`, `FixedWidthInteger`
 public protocol RawRepresentable {
   /// The raw type that can be used to represent all values of the conforming
   /// type.
