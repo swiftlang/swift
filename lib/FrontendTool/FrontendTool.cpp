@@ -167,7 +167,7 @@ static bool emitLoadedModuleTrace(ASTContext &ctxt,
                                   const FrontendOptions &opts) {
   std::error_code EC;
   llvm::raw_fd_ostream out(opts.LoadedModuleTracePath, EC,
-                           llvm::sys::fs::F_None);
+                           llvm::sys::fs::F_Append);
 
   if (out.has_error() || EC) {
     ctxt.Diags.diagnose(SourceLoc(), diag::error_opening_output,
@@ -208,8 +208,18 @@ static bool emitLoadedModuleTrace(ASTContext &ctxt,
       /*arch=*/ctxt.LangOpts.Target.getArchName(),
       /*swiftmodules=*/reversePathSortedFilenames(swiftModules)};
 
-  json::Output jsonOutput(out, /*PrettyPrint=*/false);
-  json::jsonize(jsonOutput, trace, /*Required=*/true);
+  // raw_fd_ostream is unbuffered, and we may have multiple processes writing,
+  // so first write the whole thing into memory and dump out that buffer to the
+  // file.
+  std::string stringBuffer;
+  {
+    llvm::raw_string_ostream memoryBuffer(stringBuffer);
+    json::Output jsonOutput(memoryBuffer, /*PrettyPrint=*/false);
+    json::jsonize(jsonOutput, trace, /*Required=*/true);
+  }
+  stringBuffer += "\n";
+
+  out << stringBuffer;
 
   return true;
 }
