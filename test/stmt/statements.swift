@@ -266,8 +266,8 @@ func breakContinue(_ x : Int) -> Int {
 Outer:
   for _ in 0...1000 {
 
-  Switch:
-    switch x {
+  Switch: // expected-error {{switch must be exhaustive, consider adding a default clause:}}
+  switch x {
     case 42: break Outer
     case 97: continue Outer
     case 102: break Switch
@@ -298,7 +298,8 @@ Loop:  // expected-note {{previously declared here}}
   let x : Int? = 42
   
   // <rdar://problem/16879701> Should be able to pattern match 'nil' against optionals
-  switch x {
+  switch x { // expected-error {{switch must be exhaustive, consider adding missing cases:}}
+  // expected-note@-1 {{missing case: '.some(_)'}}
   case .some(42): break
   case nil: break
   
@@ -450,7 +451,8 @@ enum Type {
   case Bar
 }
 func r25178926(_ a : Type) {
-  switch a {
+  switch a { // expected-error {{switch must be exhaustive, consider adding missing cases:}}
+  // expected-note@-1 {{missing case: '.Bar'}}
   case .Foo, .Bar where 1 != 100:
     // expected-warning @-1 {{'where' only applies to the second pattern match in this case}}
     // expected-note @-2 {{disambiguate by adding a line break between them if this is desired}} {{14-14=\n       }}
@@ -458,18 +460,22 @@ func r25178926(_ a : Type) {
     break
   }
 
-  switch a {
+  switch a { // expected-error {{switch must be exhaustive, consider adding missing cases:}}
+  // expected-note@-1 {{missing case: '.Bar'}}
   case .Foo: break
   case .Bar where 1 != 100: break
   }
 
-  switch a {
+  switch a { // expected-error {{switch must be exhaustive, consider adding missing cases:}}
+  // expected-note@-1 {{missing case: '.Bar'}}
   case .Foo,  // no warn
        .Bar where 1 != 100:
     break
   }
 
-  switch a {
+  switch a { // expected-error {{switch must be exhaustive, consider adding missing cases:}}
+  // expected-note@-1 {{missing case: '.Foo'}}
+  // expected-note@-2 {{missing case: '.Bar'}}
   case .Foo where 1 != 100, .Bar where 1 != 100:
     break
   }

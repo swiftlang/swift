@@ -9,6 +9,7 @@ func checkEquatablePattern(_ c: Color) {
     case red: return
     case green: return
     case blue: return
+    default: return
   }
 }
 

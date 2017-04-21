@@ -1552,6 +1552,16 @@ public:
   /// modify the declaration.
   void checkDeclCircularity(NominalTypeDecl *decl);
 
+  /// \brief Type check whether the given switch statement exhaustively covers
+  /// its domain.
+  ///
+  /// \param stmt The switch statement to be type-checked.  No modification of
+  /// the statement occurs.
+  /// \param limitChecking The checking process relies on the switch statement
+  /// being well-formed.  If it is not, pass true to this flag to run a limited
+  /// form of analysis.
+  void checkSwitchExhaustiveness(SwitchStmt *stmt, bool limitChecking);
+
   /// \brief Type check the given expression as a condition, which converts
   /// it to a logic value.
   ///

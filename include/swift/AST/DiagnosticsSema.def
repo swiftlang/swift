@@ -3595,6 +3595,8 @@ ERROR(non_exhaustive_switch,none,
       "%select{switch must be exhaustive, consider adding |do you want to add }0"
       "%select{missing cases|a default clause}1"
       "%select{:|?}0 %2", (bool, bool, StringRef))
+NOTE(missing_particular_case,none,
+     "missing case: '%0'", (StringRef))
 
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)

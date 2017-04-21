@@ -48,6 +48,7 @@ add_swift_library(swiftSema STATIC
   TypeCheckREPL.cpp
   TypeCheckRequest.cpp
   TypeCheckStmt.cpp
+  TypeCheckSwitchStmt.cpp
   TypeCheckType.cpp
   TypeChecker.cpp
   LINK_LIBRARIES
