@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "DeserializationErrors.h"
 #include "swift/Serialization/ModuleFile.h"
 #include "swift/Serialization/ModuleFormat.h"
 #include "swift/AST/ASTContext.h"
@@ -96,161 +97,6 @@ namespace {
     }
   };
 
-  class XRefTracePath {
-    class PathPiece {
-    public:
-      enum class Kind {
-        Value,
-        Type,
-        Operator,
-        OperatorFilter,
-        Accessor,
-        Extension,
-        GenericParam,
-        Unknown
-      };
-
-    private:
-      Kind kind;
-      void *data;
-
-      template <typename T>
-      T getDataAs() const {
-        return llvm::PointerLikeTypeTraits<T>::getFromVoidPointer(data);
-      }
-
-    public:
-      template <typename T>
-      PathPiece(Kind K, T value)
-        : kind(K),
-          data(llvm::PointerLikeTypeTraits<T>::getAsVoidPointer(value)) {}
-
-      void print(raw_ostream &os) const {
-        switch (kind) {
-        case Kind::Value:
-          os << getDataAs<Identifier>();
-          break;
-        case Kind::Type:
-          os << "with type " << getDataAs<Type>();
-          break;
-        case Kind::Extension:
-          if (getDataAs<ModuleDecl *>())
-            os << "in an extension in module '" << getDataAs<ModuleDecl *>()->getName()
-               << "'";
-          else
-            os << "in an extension in any module";
-          break;
-        case Kind::Operator:
-          os << "operator " << getDataAs<Identifier>();
-          break;
-        case Kind::OperatorFilter:
-          switch (getDataAs<uintptr_t>()) {
-          case Infix:
-            os << "(infix)";
-            break;
-          case Prefix:
-            os << "(prefix)";
-            break;
-          case Postfix:
-            os << "(postfix)";
-            break;
-          default:
-            os << "(unknown operator filter)";
-            break;
-          }
-          break;
-        case Kind::Accessor:
-          switch (getDataAs<uintptr_t>()) {
-          case Getter:
-            os << "(getter)";
-            break;
-          case Setter:
-            os << "(setter)";
-            break;
-          case MaterializeForSet:
-            os << "(materializeForSet)";
-            break;
-          case Addressor:
-            os << "(addressor)";
-            break;
-          case MutableAddressor:
-            os << "(mutableAddressor)";
-            break;
-          case WillSet:
-            os << "(willSet)";
-            break;
-          case DidSet:
-            os << "(didSet)";
-            break;
-          default:
-            os << "(unknown accessor kind)";
-            break;
-          }
-          break;
-        case Kind::GenericParam:
-          os << "generic param #" << getDataAs<uintptr_t>();
-          break;
-        case Kind::Unknown:
-          os << "unknown xref kind " << getDataAs<uintptr_t>();
-          break;
-        }
-      }
-    };
-
-    ModuleDecl &baseM;
-    SmallVector<PathPiece, 8> path;
-
-  public:
-    explicit XRefTracePath(ModuleDecl &M) : baseM(M) {}
-
-    void addValue(Identifier name) {
-      path.push_back({ PathPiece::Kind::Value, name });
-    }
-
-    void addType(Type ty) {
-      path.push_back({ PathPiece::Kind::Type, ty });
-    }
-
-    void addOperator(Identifier name) {
-      path.push_back({ PathPiece::Kind::Operator, name });
-    }
-
-    void addOperatorFilter(uint8_t fixity) {
-      path.push_back({ PathPiece::Kind::OperatorFilter,
-                       static_cast<uintptr_t>(fixity) });
-    }
-
-    void addAccessor(uint8_t kind) {
-      path.push_back({ PathPiece::Kind::Accessor,
-                       static_cast<uintptr_t>(kind) });
-    }
-
-    void addExtension(ModuleDecl *M) {
-      path.push_back({ PathPiece::Kind::Extension, M });
-    }
-
-    void addGenericParam(uintptr_t index) {
-      path.push_back({ PathPiece::Kind::GenericParam, index });
-    }
-
-    void addUnknown(uintptr_t kind) {
-      path.push_back({ PathPiece::Kind::Unknown, kind });
-    }
-
-    void removeLast() {
-      path.pop_back();
-    }
-
-    void print(raw_ostream &os, StringRef leading = "") const {
-      os << "Cross-reference to module '" << baseM.getName() << "'\n";
-      for (auto &piece : path) {
-        os << leading << "... ";
-        piece.print(os);
-        os << "\n";
-      }
-    }
-  };
-
   class PrettyXRefTrace :
       public llvm::PrettyStackTraceEntry,
       public XRefTracePath {
@@ -273,66 +119,14 @@ namespace {
       os << Action << " \'" << getNameOfModule(MF) << "'\n";
     }
   };
-
-  class XRefError : public llvm::ErrorInfo<XRefError> {
-    friend ErrorInfo;
-    static const char ID;
-
-    XRefTracePath path;
-    const char *message;
-  public:
-    template <size_t N>
-    XRefError(const char (&message)[N], XRefTracePath path)
-        : path(path), message(message) {}
-
-    void log(raw_ostream &OS) const override {
-      OS << message << "\n";
-      path.print(OS);
-    }
-
-    std::error_code convertToErrorCode() const override {
-      // This is a deprecated part of llvm::Error, so we just return a very
-      // generic value.
-      return {EINVAL, std::generic_category()};
-    }
-  };
-  const char XRefError::ID = '\0';
-
-  class OverrideError : public llvm::ErrorInfo<OverrideError> {
-  public:
-    enum Kind {
-      Normal,
-      DesignatedInitializer
-    };
-
-  private:
-    friend ErrorInfo;
-    static const char ID;
-
-    DeclName name;
-    Kind kind;
-
-  public:
-
-    explicit OverrideError(DeclName name, Kind kind = Normal)
-        : name(name), kind(kind) {}
-
-    void log(raw_ostream &OS) const override {
-      OS << "could not find '" << name << "' in parent class";
-    }
-
-    Kind getKind() const {
-      return kind;
-    }
-
-    std::error_code convertToErrorCode() const override {
-      // This is a deprecated part of llvm::Error, so we just return a very
-      // generic value.
-      return {EINVAL, std::generic_category()};
-    }
-  };
-  const char OverrideError::ID = '\0';
 } // end anonymous namespace
+
+const char DeclDeserializationError::ID = '\0';
+void DeclDeserializationError::anchor() {}
+const char XRefError::ID = '\0';
+void XRefError::anchor() {}
+const char OverrideError::ID = '\0';
+void OverrideError::anchor() {}
 
 
 /// Skips a single record in the bitstream.
@@ -2721,11 +2515,7 @@ ModuleFile::getDeclChecked(DeclID DID, Optional<DeclContext *> ForcedContext) {
 
     auto overridden = getDeclChecked(overriddenID);
     if (!overridden) {
-      llvm::handleAllErrors(overridden.takeError(),
-          [](const XRefError &) { /* expected */ },
-          [this](std::unique_ptr<llvm::ErrorInfoBase> unhandled) {
-        fatal(std::move(unhandled));
-      });
+      llvm::consumeError(overridden.takeError());
       auto kind = OverrideError::Normal;
       if (initKind == CtorInitializerKind::Designated)
         kind = OverrideError::DesignatedInitializer;
@@ -2822,11 +2612,7 @@ ModuleFile::getDeclChecked(DeclID DID, Optional<DeclContext *> ForcedContext) {
 
     Expected<Decl *> overridden = getDeclChecked(overriddenID);
     if (!overridden) {
-      llvm::handleAllErrors(overridden.takeError(),
-          [](const XRefError &) { /* expected */ },
-          [this](std::unique_ptr<llvm::ErrorInfoBase> unhandled) {
-        fatal(std::move(unhandled));
-      });
+      llvm::consumeError(overridden.takeError());
       return llvm::make_error<OverrideError>(name);
     }
 
@@ -2949,11 +2735,7 @@ ModuleFile::getDeclChecked(DeclID DID, Optional<DeclContext *> ForcedContext) {
 
     Expected<Decl *> overridden = getDeclChecked(overriddenID);
     if (!overridden) {
-      llvm::handleAllErrors(overridden.takeError(),
-          [](const XRefError &) { /* expected */ },
-          [this](std::unique_ptr<llvm::ErrorInfoBase> unhandled) {
-        fatal(std::move(unhandled));
-      });
+      llvm::consumeError(overridden.takeError());
       return llvm::make_error<OverrideError>(name);
     }
 
@@ -3074,12 +2856,8 @@ ModuleFile::getDeclChecked(DeclID DID, Optional<DeclContext *> ForcedContext) {
     for (unsigned i = 0; i != numPatterns; ++i) {
       auto pattern = readPattern(dc);
       if (!pattern) {
-        // Silently drop the pattern if it had an override-related problem.
-        llvm::handleAllErrors(pattern.takeError(),
-            [](const OverrideError &) { /* expected */ },
-            [this](std::unique_ptr<llvm::ErrorInfoBase> unhandled) {
-          fatal(std::move(unhandled));
-        });
+        // Silently drop the pattern...
+        llvm::consumeError(pattern.takeError());
         // ...but continue to read any further patterns we're expecting.
         continue;
       }
@@ -3486,11 +3264,7 @@ ModuleFile::getDeclChecked(DeclID DID, Optional<DeclContext *> ForcedContext) {
 
     Expected<Decl *> overridden = getDeclChecked(overriddenID);
     if (!overridden) {
-      llvm::handleAllErrors(overridden.takeError(),
-          [](const XRefError &) { /* expected */ },
-          [this](std::unique_ptr<llvm::ErrorInfoBase> unhandled) {
-        fatal(std::move(unhandled));
-      });
+      llvm::consumeError(overridden.takeError());
       return llvm::make_error<OverrideError>(name);
     }
 
@@ -4467,20 +4241,18 @@ void ModuleFile::loadAllMembers(Decl *container, uint64_t contextData) {
       if (!getContext().LangOpts.EnableDeserializationRecovery)
         fatal(next.takeError());
 
-      // Drop the member if it had an override-related problem.
-      auto handleMissingOverrideBase = [container](const OverrideError &error) {
-        if (error.getKind() != OverrideError::DesignatedInitializer)
-          return;
-        auto *containingClass = dyn_cast<ClassDecl>(container);
-        if (!containingClass)
-          return;
-        containingClass->setHasMissingDesignatedInitializers();
-      };
-      llvm::handleAllErrors(next.takeError(),
-          handleMissingOverrideBase,
-          [this](std::unique_ptr<llvm::ErrorInfoBase> unhandled) {
-        fatal(std::move(unhandled));
-      });
+      // Drop the member if it had a problem.
+      if (auto *containingClass = dyn_cast<ClassDecl>(container)) {
+        auto handleMissingDesignatedInit =
+            [containingClass](const DeclDeserializationError &error) {
+          if (error.getKind() != OverrideError::DesignatedInitializer)
+            return;
+          containingClass->setHasMissingDesignatedInitializers();
+        };
+        llvm::handleAllErrors(next.takeError(), handleMissingDesignatedInit);
+      } else {
+        llvm::consumeError(next.takeError());
+      }
       continue;
     }
     assert(next.get() && "unchecked error deserializing next member");
