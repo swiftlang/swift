@@ -1,0 +1,19 @@
+Name: Types
+SwiftVersions:
+- Version: 3
+  Classes:
+  - Name: RenamedClass
+    SwiftName: Swift3RenamedClass
+  - Name: RenamedGenericClass
+    SwiftName: Swift3RenamedGenericClass
+  Typedefs:
+  - Name: RenamedTypedef
+    SwiftName: Swift3RenamedTypedef
+  Tags:
+  - Name: RenamedStruct
+    SwiftName: Swift3RenamedStruct
+  - Name: RenamedEnum
+    SwiftName: Swift3RenamedEnum
+  Protocols:
+  - Name: RenamedProtocol
+    SwiftName: Swift3RenamedProtocol

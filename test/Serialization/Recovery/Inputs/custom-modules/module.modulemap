@@ -1,1 +1,2 @@
 module Overrides { header "Overrides.h" }
+module Types { header "Types.h" }

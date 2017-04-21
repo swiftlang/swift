@@ -320,6 +320,16 @@ namespace {
 } // end anonymous namespace
 
 
+/// Finds a particular kind of nominal by looking through typealiases.
+template <typename T>
+static T *castIgnoringSugar(Decl *D) {
+  static_assert(std::is_base_of<NominalTypeDecl, T>::value,
+                "only meant for use with NominalTypeDecl and subclasses");
+  if (auto *alias = dyn_cast<TypeAliasDecl>(D))
+    D = alias->getDeclaredInterfaceType()->getAnyNominal();
+  return cast<T>(D);
+}
+
 /// Skips a single record in the bitstream.
 ///
 /// Returns true if the next entry is a record of type \p recordKind.
@@ -667,7 +677,7 @@ ProtocolConformanceRef ModuleFile::readConformance(
   case ABSTRACT_PROTOCOL_CONFORMANCE: {
     DeclID protoID;
     AbstractProtocolConformanceLayout::readRecord(scratch, protoID);
-    auto proto = cast<ProtocolDecl>(getDecl(protoID));
+    auto proto = castIgnoringSugar<ProtocolDecl>(getDecl(protoID));
     return ProtocolConformanceRef(proto);
   }
 
@@ -747,9 +757,9 @@ ProtocolConformanceRef ModuleFile::readConformance(
     ProtocolConformanceXrefLayout::readRecord(scratch, protoID, nominalID,
                                               moduleID);
 
-    auto nominal = cast<NominalTypeDecl>(getDecl(nominalID));
+    auto nominal = castIgnoringSugar<NominalTypeDecl>(getDecl(nominalID));
     PrettyStackTraceDecl trace("cross-referencing conformance for", nominal);
-    auto proto = cast<ProtocolDecl>(getDecl(protoID));
+    auto proto = castIgnoringSugar<ProtocolDecl>(getDecl(protoID));
     PrettyStackTraceDecl traceTo("... to", proto);
     auto module = getModule(moduleID);
 
@@ -812,7 +822,7 @@ NormalProtocolConformance *ModuleFile::readNormalConformance(
   Type conformingType = dc->getDeclaredTypeInContext();
   PrettyStackTraceType trace(ctx, "reading conformance for", conformingType);
 
-  auto proto = cast<ProtocolDecl>(getDecl(protoID));
+  auto proto = castIgnoringSugar<ProtocolDecl>(getDecl(protoID));
   PrettyStackTraceDecl traceTo("... to", proto);
 
   auto conformance = ctx.getConformance(conformingType, proto, SourceLoc(), dc,
@@ -3869,9 +3879,18 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
 
     Type parentTy = getType(parentID);
 
-    // Record the type as soon as possible. Members of a nominal type often
-    // try to refer back to the type.
-    auto nominal = cast<NominalTypeDecl>(getDecl(declID));
+    auto decl = getDecl(declID);
+    if (auto *alias = dyn_cast<TypeAliasDecl>(decl)) {
+      // Look through a single level of sugar if this looks like a forwarding
+      // typealias. This is just a guess, but does the right thing in the
+      // common case of an ordinary nominal getting renamed.
+      if (alias->getAttrs().isUnavailable(ctx))
+        typeOrOffset = alias->getUnderlyingTypeLoc().getType();
+      else
+        typeOrOffset = alias->getDeclaredInterfaceType();
+      break;
+    }
+    auto nominal = cast<NominalTypeDecl>(decl);
     typeOrOffset = NominalType::get(nominal, parentTy, ctx);
 
     assert(typeOrOffset.isComplete());
@@ -4145,7 +4164,17 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
     decls_block::BoundGenericTypeLayout::readRecord(scratch, declID, parentID,
                                                     rawArgumentIDs);
 
-    auto nominal = cast<NominalTypeDecl>(getDecl(declID));
+    auto *decl = getDecl(declID);
+    if (auto *alias = dyn_cast<TypeAliasDecl>(decl)) {
+      // FIXME: Support aliases with their own generic parameters, not just
+      // those that resolve to UnboundGenericTypes.
+      assert(alias->getDeclaredInterfaceType()->is<UnboundGenericType>() &&
+             "generic typealiases where a decl was expected are not supported");
+      decl = alias->getDeclaredInterfaceType()->getAnyNominal();
+      assert(decl && "alias does not resolve to a nominal type");
+    }
+
+    auto nominal = cast<NominalTypeDecl>(decl);
     auto parentTy = getType(parentID);
 
     SmallVector<Type, 8> genericArgs;
