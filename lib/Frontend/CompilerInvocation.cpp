@@ -674,6 +674,10 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
                           OPT_emit_objc_header,
                           OPT_emit_objc_header_path,
                           "h", false);
+  determineOutputFilename(Opts.LoadedModuleTracePath,
+                          OPT_emit_loaded_module_trace,
+                          OPT_emit_loaded_module_trace_path,
+                          "trace.json", false);
 
   if (const Arg *A = Args.getLastArg(OPT_emit_fixits_path)) {
     Opts.FixitsOutputPath = A->getValue();
@@ -749,6 +753,39 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
     case FrontendOptions::Parse:
     case FrontendOptions::Typecheck:
     case FrontendOptions::EmitModuleOnly:
+    case FrontendOptions::EmitSILGen:
+    case FrontendOptions::EmitSIL:
+    case FrontendOptions::EmitSIBGen:
+    case FrontendOptions::EmitSIB:
+    case FrontendOptions::EmitIR:
+    case FrontendOptions::EmitBC:
+    case FrontendOptions::EmitAssembly:
+    case FrontendOptions::EmitObject:
+    case FrontendOptions::EmitImportedModules:
+    case FrontendOptions::EmitTBD:
+      break;
+    }
+  }
+
+  if (!Opts.LoadedModuleTracePath.empty()) {
+    switch (Opts.RequestedAction) {
+    case FrontendOptions::NoneAction:
+    case FrontendOptions::Parse:
+    case FrontendOptions::DumpParse:
+    case FrontendOptions::DumpInterfaceHash:
+    case FrontendOptions::DumpAST:
+    case FrontendOptions::PrintAST:
+    case FrontendOptions::DumpScopeMaps:
+    case FrontendOptions::DumpTypeRefinementContexts:
+    case FrontendOptions::Immediate:
+    case FrontendOptions::REPL:
+    case FrontendOptions::UpdateCode:
+      Diags.diagnose(SourceLoc(),
+                     diag::error_mode_cannot_emit_loaded_module_trace);
+      return true;
+    case FrontendOptions::Typecheck:
+    case FrontendOptions::EmitModuleOnly:
+    case FrontendOptions::EmitPCH:
     case FrontendOptions::EmitSILGen:
     case FrontendOptions::EmitSIL:
     case FrontendOptions::EmitSIBGen:

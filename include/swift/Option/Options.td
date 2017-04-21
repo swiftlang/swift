@@ -199,6 +199,16 @@ def emit_dependencies : Flag<["-"], "emit-dependencies">,
   Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>,
   HelpText<"Emit basic Make-compatible dependencies files">;
 
+def emit_loaded_module_trace : Flag<["-"], "emit-loaded-module-trace">,
+  Flags<[FrontendOption, NoInteractiveOption]>,
+  HelpText<"Emit a JSON file containing information about what modules were loaded">;
+def emit_loaded_module_trace_path : Separate<["-"], "emit-loaded-module-trace-path">,
+  Flags<[FrontendOption, NoInteractiveOption]>,
+  HelpText<"Emit the loaded module trace JSON to <path>">,
+  MetaVarName<"<path>">;
+def emit_loaded_module_trace_path_EQ : Joined<["-"], "emit-loaded-module-trace-path=">,
+  Flags<[FrontendOption, NoInteractiveOption]>, Alias<emit_loaded_module_trace_path>;
+
 def serialize_diagnostics : Flag<["-"], "serialize-diagnostics">,
   Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>,
   HelpText<"Serialize diagnostics in a binary format">;
