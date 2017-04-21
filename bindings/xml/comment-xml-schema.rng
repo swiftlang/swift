@@ -30,24 +30,26 @@
       <optional>
         <ref name="Declaration" />
       </optional>
-      <optional>
-        <ref name="Abstract" />
-      </optional>
-      <optional>
-        <ref name="TemplateParameters" />
-      </optional>
-      <optional>
-        <ref name="Parameters" />
-      </optional>
-      <optional>
-        <ref name="ThrowsDiscussion" />
-      </optional>
-      <optional>
-        <ref name="ResultDiscussion" />
-      </optional>
-      <optional>
-        <ref name="Discussion" />
-      </optional>
+      <element name="CommentParts">
+        <optional>
+          <ref name="Abstract" />
+        </optional>
+        <optional>
+          <ref name="TemplateParameters" />
+        </optional>
+        <optional>
+          <ref name="Parameters" />
+        </optional>
+        <optional>
+          <ref name="ThrowsDiscussion" />
+        </optional>
+        <optional>
+          <ref name="ResultDiscussion" />
+        </optional>
+        <optional>
+          <ref name="Discussion" />
+        </optional>
+      </element>
     </element>
   </define>
 
@@ -84,36 +86,40 @@
       <optional>
         <ref name="Declaration" />
       </optional>
-      <optional>
-        <ref name="Abstract" />
-      </optional>
-      <optional>
-        <ref name="TemplateParameters" />
-      </optional>
-      <optional>
-        <ref name="Parameters" />
-      </optional>
-      <optional>
-        <ref name="Exceptions" />
-      </optional>
-      <zeroOrMore>
-        <ref name="Availability" />
-      </zeroOrMore>
-      <zeroOrMore>
-        <ref name="Deprecated" />
-      </zeroOrMore>
-      <zeroOrMore>
-        <ref name="Unavailable" />
-      </zeroOrMore>
-      <optional>
-        <ref name="ThrowsDiscussion" />
-      </optional>
-      <optional>
-        <ref name="ResultDiscussion" />
-      </optional>
-      <optional>
-        <ref name="Discussion" />
-      </optional>
+
+      <element name="CommentParts">
+        <optional>
+          <ref name="Abstract" />
+        </optional>
+        <optional>
+          <ref name="TemplateParameters" />
+        </optional>
+        <optional>
+          <ref name="Parameters" />
+        </optional>
+        <optional>
+          <ref name="Exceptions" />
+        </optional>
+        <zeroOrMore>
+          <ref name="Availability" />
+        </zeroOrMore>
+        <zeroOrMore>
+          <ref name="Deprecated" />
+        </zeroOrMore>
+        <zeroOrMore>
+          <ref name="Unavailable" />
+        </zeroOrMore>
+        <optional>
+          <ref name="ThrowsDiscussion" />
+        </optional>
+        <optional>
+          <ref name="ResultDiscussion" />
+        </optional>
+        <optional>
+          <ref name="Discussion" />
+        </optional>
+    </element>
+      
     </element>
   </define>
 
@@ -140,28 +146,32 @@
       <optional>
         <ref name="Declaration" />
       </optional>
-      <optional>
-        <ref name="Abstract" />
-      </optional>
-      <optional>
-        <ref name="TemplateParameters" />
-      </optional>
 
-      <!-- Parameters and results don't make sense for classes, but the user
-           can specify \param or \returns in a comment anyway. -->
-      <optional>
-        <ref name="Parameters" />
-      </optional>
-      <optional>
-        <ref name="ThrowsDiscussion" />
-      </optional>
-      <optional>
-        <ref name="ResultDiscussion" />
-      </optional>
+      <element name="CommentParts">
+        <optional>
+          <ref name="Abstract" />
+        </optional>
+        <optional>
+          <ref name="TemplateParameters" />
+        </optional>
 
-      <optional>
-        <ref name="Discussion" />
-      </optional>
+        <!-- Parameters and results don't make sense for classes, but the user
+             can specify \param or \returns in a comment anyway. -->
+        <optional>
+          <ref name="Parameters" />
+        </optional>
+        <optional>
+          <ref name="ThrowsDiscussion" />
+        </optional>
+        <optional>
+          <ref name="ResultDiscussion" />
+        </optional>
+
+        <optional>
+          <ref name="Discussion" />
+        </optional>
+      </element>
+      
     </element>
   </define>
 
@@ -178,29 +188,32 @@
       <optional>
         <ref name="Declaration" />
       </optional>
-      <optional>
-        <ref name="Abstract" />
-      </optional>
 
-      <!-- Template parameters, parameters and results don't make sense for
-            variables, but the user can specify \tparam \param or \returns
-            in a comment anyway. -->
-      <optional>
-        <ref name="TemplateParameters" />
-      </optional>
-      <optional>
-        <ref name="Parameters" />
-      </optional>
-      <optional>
-        <ref name="ThrowsDiscussion" />
-      </optional>
-      <optional>
-        <ref name="ResultDiscussion" />
-      </optional>
+      <element name="CommentParts">
+        <optional>
+          <ref name="Abstract" />
+        </optional>
 
-      <optional>
-        <ref name="Discussion" />
-      </optional>
+        <!-- Template parameters, parameters and results don't make sense for
+              variables, but the user can specify \tparam \param or \returns
+              in a comment anyway. -->
+        <optional>
+          <ref name="TemplateParameters" />
+        </optional>
+        <optional>
+          <ref name="Parameters" />
+        </optional>
+        <optional>
+          <ref name="ThrowsDiscussion" />
+        </optional>
+        <optional>
+          <ref name="ResultDiscussion" />
+        </optional>
+
+        <optional>
+          <ref name="Discussion" />
+        </optional>
+      </element>
     </element>
   </define>
 
@@ -217,29 +230,33 @@
       <optional>
         <ref name="Declaration" />
       </optional>
-      <optional>
-        <ref name="Abstract" />
-      </optional>
+      
 
-      <!-- Template parameters, parameters and results don't make sense for
-           namespaces, but the user can specify \tparam, \param or \returns
-           in a comment anyway. -->
-      <optional>
-        <ref name="TemplateParameters" />
-      </optional>
-      <optional>
-        <ref name="Parameters" />
-      </optional>
-      <optional>
-        <ref name="ThrowsDiscussion" />
-      </optional>
-      <optional>
-        <ref name="ResultDiscussion" />
-      </optional>
+      <element name="CommentParts">
+        <optional>
+          <ref name="Abstract" />
+        </optional>
 
-      <optional>
-        <ref name="Discussion" />
-      </optional>
+        <!-- Template parameters, parameters and results don't make sense for
+             namespaces, but the user can specify \tparam, \param or \returns
+             in a comment anyway. -->
+        <optional>
+          <ref name="TemplateParameters" />
+        </optional>
+        <optional>
+          <ref name="Parameters" />
+        </optional>
+        <optional>
+          <ref name="ThrowsDiscussion" />
+        </optional>
+        <optional>
+          <ref name="ResultDiscussion" />
+        </optional>
+
+        <optional>
+          <ref name="Discussion" />
+        </optional>
+      </element>
     </element>
   </define>
 
@@ -256,29 +273,32 @@
       <optional>
         <ref name="Declaration" />
       </optional>
-      <optional>
-        <ref name="Abstract" />
-      </optional>
 
-      <optional>
-        <ref name="TemplateParameters" />
-      </optional>
+      <element name="CommentParts">
+        <optional>
+          <ref name="Abstract" />
+        </optional>
 
-      <!-- Parameters and results might make sense for typedefs if the type is
-           a function pointer type. -->
-      <optional>
-        <ref name="Parameters" />
-      </optional>
-      <optional>
-        <ref name="ThrowsDiscussion" />
-      </optional>
-      <optional>
-        <ref name="ResultDiscussion" />
-      </optional>
+        <optional>
+          <ref name="TemplateParameters" />
+        </optional>
 
-      <optional>
-        <ref name="Discussion" />
-      </optional>
+        <!-- Parameters and results might make sense for typedefs if the type is
+             a function pointer type. -->
+        <optional>
+          <ref name="Parameters" />
+        </optional>
+        <optional>
+          <ref name="ThrowsDiscussion" />
+        </optional>
+        <optional>
+          <ref name="ResultDiscussion" />
+        </optional>
+
+        <optional>
+          <ref name="Discussion" />
+        </optional>
+      </element>
     </element>
   </define>
 
@@ -295,29 +315,33 @@
       <optional>
         <ref name="Declaration" />
       </optional>
-      <optional>
-        <ref name="Abstract" />
-      </optional>
+      
 
-      <!-- Template parameters, parameters and results don't make sense for
-            enums, but the user can specify \tparam \param or \returns in a
-            comment anyway. -->
-      <optional>
-        <ref name="TemplateParameters" />
-      </optional>
-      <optional>
-        <ref name="Parameters" />
-      </optional>
-      <optional>
-        <ref name="ThrowsDiscussion" />
-      </optional>
-      <optional>
-        <ref name="ResultDiscussion" />
-      </optional>
+      <element name="CommentParts">
+        <optional>
+          <ref name="Abstract" />
+        </optional>
 
-      <optional>
-        <ref name="Discussion" />
-      </optional>
+        <!-- Template parameters, parameters and results don't make sense for
+              enums, but the user can specify \tparam \param or \returns in a
+              comment anyway. -->
+        <optional>
+          <ref name="TemplateParameters" />
+        </optional>
+        <optional>
+          <ref name="Parameters" />
+        </optional>
+        <optional>
+          <ref name="ThrowsDiscussion" />
+        </optional>
+        <optional>
+          <ref name="ResultDiscussion" />
+        </optional>
+
+        <optional>
+          <ref name="Discussion" />
+        </optional>
+      </element>
     </element>
   </define>
 
