@@ -25,7 +25,7 @@ bb0(%0 : $@thick Outer.Inner.Type):
 // CHECK:      [[T0:%.*]] = load %swift.type*, %swift.type** @_T012nested_types5OuterC5InnerVML
 // CHECK-NEXT: [[T1:%.*]] = icmp eq %swift.type* [[T0]], null
 // CHECK-NEXT: br i1 [[T1]]
-// CHECK:      call void @swift_once({{.*}}* @_T012nested_types5OuterC5InnerVMa.once_token, i8* bitcast (void (i8*)* @initialize_metadata_Inner to i8*))
+// CHECK:      call void @swift_once({{.*}}* @_T012nested_types5OuterC5InnerVMa.once_token, i8* bitcast (void (i8*)* @initialize_metadata_Inner to i8*), i8* undef)
 // CHECK-NEXT: [[T2:%.*]] = load %swift.type*, %swift.type** @_T012nested_types5OuterC5InnerVML
 // CHECK-NEXT: br label
 // CHECK:      [[T4:%.*]] = phi %swift.type* [ [[T0]], {{.*}} ], [ [[T2]], {{.*}} ]
