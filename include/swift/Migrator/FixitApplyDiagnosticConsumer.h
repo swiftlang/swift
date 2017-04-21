@@ -18,6 +18,7 @@
 #define SWIFT_MIGRATOR_FIXITAPPLYDIAGNOSTICCONSUMER_H
 
 #include "swift/AST/DiagnosticConsumer.h"
+#include "swift/Migrator/FixitFilter.h"
 #include "clang/Rewrite/Core/RewriteBuffer.h"
 
 namespace swift {
@@ -29,7 +30,8 @@ class SourceManager;
 
 namespace migrator {
 
-class FixitApplyDiagnosticConsumer final : public DiagnosticConsumer {
+class FixitApplyDiagnosticConsumer final
+  : public DiagnosticConsumer, public FixitFilter {
   clang::RewriteBuffer RewriteBuf;
 
   /// The Migrator options collected by the Swift CompilerInvocation,
@@ -46,10 +48,6 @@ class FixitApplyDiagnosticConsumer final : public DiagnosticConsumer {
   /// The number of fix-its pushed into the rewrite buffer. Use this to
   /// determine whether to call `printResult`.
   unsigned NumFixitsApplied;
-
-  /// Returns true if the fix-it should be applied.
-  bool shouldTakeFixit(const DiagnosticInfo &Info,
-                       const DiagnosticInfo::FixIt &F) const;
 
 public:
   FixitApplyDiagnosticConsumer(const MigratorOptions &MigratorOpts,
