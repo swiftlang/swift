@@ -157,6 +157,7 @@ def run_benchmarks(driver, benchmarks=[], num_samples=10, verbose=False,
     line_format = '{:>3} {:<25} {:>7} {:>7} {:>7} {:>8} {:>6} {:>10} {:>10}'
     if verbose and log_directory:
         print(line_format.format(*headings))
+    totals = tuple([0] * 7)
     for test in benchmarks:
         test_output = instrument_test(driver, test, num_samples)
         if test_output[0] == 'Totals':
@@ -167,16 +168,12 @@ def run_benchmarks(driver, benchmarks=[], num_samples=10, verbose=False,
             else:
                 print(','.join(test_output))
         output.append(test_output)
-        (samples, _min, _max, mean) = map(int, test_output[2:6])
+        totals = map(sum, zip(totals, map(int, test_output[3:])))
         total_tests += 1
-        total_min += _min
-        total_max += _max
-        total_mean += mean
     if not output:
         return
     formatted_output = '\n'.join([','.join(l) for l in output])
-    totals = map(str, ['Totals', total_tests, total_min, total_max,
-                       total_mean, '0', '0', '0'])
+    totals = map(str, ['Totals', total_tests] + totals)
     totals_output = '\n\n' + ','.join(totals)
     if verbose:
         if log_directory:
