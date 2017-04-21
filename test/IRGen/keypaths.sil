@@ -191,7 +191,7 @@ sil_vtable C {}
 // CHECK-32-SAME: i32 16 }>
 // CHECK-64-SAME: i32 32 }>
 
-// CHECK-LABEL: define swiftcc void @stored_property_fixed_offsets()
+// CHECK-LABEL: define{{( protected)?}} swiftcc void @stored_property_fixed_offsets()
 sil @stored_property_fixed_offsets : $@convention(thin) () -> () {
 entry:
   // CHECK: call %swift.refcounted* @swift_getKeyPath(i8* bitcast ({{.*}} [[KP_A]] to i8*), i8* undef)
@@ -238,7 +238,7 @@ struct Foo<T> {
   var foo: T
 }
 
-// CHECK-LABEL: define swiftcc void @stored_property_generics(%swift.type* %T, %swift.type* %U)
+// CHECK-LABEL: define{{( protected)?}} swiftcc void @stored_property_generics(%swift.type* %T, %swift.type* %U)
 sil @stored_property_generics : $@convention(thin) <T, U> () -> () {
 entry:
   // CHECK: [[PTR:%.*]] = bitcast [1 x %swift.type*]* [[ARGS:%.*]] to
