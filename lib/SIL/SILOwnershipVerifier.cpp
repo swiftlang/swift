@@ -176,7 +176,8 @@ static bool compatibleOwnershipKinds(ValueOwnershipKind K1,
 
 static bool isValueAddressOrTrivial(SILValue V, SILModule &M) {
   return V->getType().isAddress() ||
-         V.getOwnershipKind() == ValueOwnershipKind::Trivial;
+         V.getOwnershipKind() == ValueOwnershipKind::Trivial ||
+         V.getOwnershipKind() == ValueOwnershipKind::Any;
 }
 
 static bool isOwnershipForwardingValueKind(ValueKind K) {
@@ -302,7 +303,8 @@ public:
   bool isAddressOrTrivialType() const {
     if (getType().isAddress())
       return true;
-    return getOwnershipKind() == ValueOwnershipKind::Trivial;
+    return getOwnershipKind() == ValueOwnershipKind::Trivial ||
+      getOwnershipKind() == ValueOwnershipKind::Any;
   }
 
   /// Depending on our initialization, either return false or call Func and
@@ -1926,6 +1928,9 @@ void SILInstruction::verifyOperandOwnership() const {
   auto *Self = const_cast<SILInstruction *>(this);
   for (const Operand &Op : getAllOperands()) {
     if (isTypeDependentOperand(Op))
+      continue;
+    // Skip any SILUndef that we see.
+    if (isa<SILUndef>(Op.get()))
       continue;
     OwnershipCompatibilityUseChecker(getModule(), Op, Op.get(), ErrorBehavior)
         .check(Self);

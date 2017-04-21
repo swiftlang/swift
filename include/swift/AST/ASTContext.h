@@ -407,6 +407,9 @@ public:
   /// Retrieve the declaration of the "pointee" property of a pointer type.
   VarDecl *getPointerPointeePropertyDecl(PointerTypeKind ptrKind) const;
 
+  /// Retrieve the type Swift.AnyObject.
+  CanType getAnyObjectType() const;
+
   /// Retrieve the type Swift.Never.
   CanType getNeverType() const;
 
@@ -659,7 +662,6 @@ public:
   /// Produce a new normal conformance for a property behavior.
   NormalProtocolConformance *
   getBehaviorConformance(Type conformingType,
-                         Type conformingInterfaceType,
                          ProtocolDecl *protocol,
                          SourceLoc loc,
                          AbstractStorageDecl *storage,

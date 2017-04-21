@@ -67,7 +67,6 @@ set(version_inc_files
 add_swift_library(swiftBasic STATIC
   Cache.cpp
   ClusteredBitVector.cpp
-  DiagnosticConsumer.cpp
   DiverseStack.cpp
   Edit.cpp
   EditorPlaceholder.cpp

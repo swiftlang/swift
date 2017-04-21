@@ -375,9 +375,7 @@ namespace {
 
     bool visitRefTailAddrInst(RefTailAddrInst *RHS) {
       auto *X = cast<RefTailAddrInst>(LHS);
-      if (X->getTailType() != RHS->getTailType())
-        return false;
-      return true;
+      return X->getTailType() == RHS->getTailType();
     }
 
     bool visitStructElementAddrInst(const StructElementAddrInst *RHS) {
@@ -453,9 +451,7 @@ namespace {
 
     bool visitTailAddrInst(TailAddrInst *RHS) {
       auto *X = cast<TailAddrInst>(LHS);
-      if (X->getTailType() != RHS->getTailType())
-        return false;
-      return true;
+      return X->getTailType() == RHS->getTailType();
     }
 
     bool visitCondFailInst(CondFailInst *RHS) {

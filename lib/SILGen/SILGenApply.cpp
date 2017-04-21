@@ -70,8 +70,7 @@ replaceSelfTypeForDynamicLookup(ASTContext &ctx,
   newResults.append(fnType->getResults().begin(), fnType->getResults().end());
   if (auto fnDecl = dyn_cast<FuncDecl>(methodName.getDecl())) {
     if (fnDecl->hasDynamicSelf()) {
-      auto anyObjectTy = ctx.getProtocol(KnownProtocolKind::AnyObject)
-                                  ->getDeclaredType();
+      auto anyObjectTy = ctx.getAnyObjectType();
       for (auto &result : newResults) {
         auto newResultTy
           = result.getType()->replaceCovariantResultType(anyObjectTy, 0);
@@ -664,9 +663,7 @@ private:
 
     assert(SGF.silConv.useLoweredAddresses() ==
            SGF.silConv.isSILIndirect(getSelfParameterInfo()));
-    if (!SGF.silConv.useLoweredAddresses())
-      return false;
-    return true;
+    return SGF.silConv.useLoweredAddresses();
   }
 
   // If we're calling a member of a non-class-constrained protocol,
@@ -1519,8 +1516,9 @@ static RValue emitStringLiteral(SILGenFunction &SGF, Expr *E, StringRef Str,
       break;
     }
   }
-
+  bool useConstantStringBuiltin = false;
   StringLiteralInst::Encoding instEncoding;
+  ConstStringLiteralInst::Encoding constInstEncoding;
   switch (encoding) {
   case StringLiteralExpr::UTF8:
     instEncoding = StringLiteralInst::Encoding::UTF8;
@@ -1530,6 +1528,16 @@ static RValue emitStringLiteral(SILGenFunction &SGF, Expr *E, StringRef Str,
   case StringLiteralExpr::UTF16: {
     instEncoding = StringLiteralInst::Encoding::UTF16;
     Length = unicode::getUTF16Length(Str);
+    break;
+  }
+  case StringLiteralExpr::UTF8ConstString:
+    constInstEncoding = ConstStringLiteralInst::Encoding::UTF8;
+    useConstantStringBuiltin = true;
+    break;
+
+  case StringLiteralExpr::UTF16ConstString: {
+    constInstEncoding = ConstStringLiteralInst::Encoding::UTF16;
+    useConstantStringBuiltin = true;
     break;
   }
   case StringLiteralExpr::OneUnicodeScalar: {
@@ -1542,8 +1550,18 @@ static RValue emitStringLiteral(SILGenFunction &SGF, Expr *E, StringRef Str,
   }
   }
 
+  // Should we build a constant string literal?
+  if (useConstantStringBuiltin) {
+    auto *string = SGF.B.createConstStringLiteral(E, Str, constInstEncoding);
+    ManagedValue Elts[] = {ManagedValue::forUnmanaged(string)};
+    TupleTypeElt TypeElts[] = {Elts[0].getType().getSwiftRValueType()};
+    CanType ty =
+        TupleType::get(TypeElts, SGF.getASTContext())->getCanonicalType();
+    return RValue::withPreExplodedElements(Elts, ty);
+  }
+
   // The string literal provides the data.
-  StringLiteralInst *string = SGF.B.createStringLiteral(E, Str, instEncoding);
+  auto *string = SGF.B.createStringLiteral(E, Str, instEncoding);
 
   // The length is lowered as an integer_literal.
   auto WordTy = SILType::getBuiltinWordType(SGF.getASTContext());
@@ -2582,10 +2600,7 @@ private:
   }
   
   CanType getAnyObjectType() {
-    return SGF.getASTContext()
-      .getProtocol(KnownProtocolKind::AnyObject)
-      ->getDeclaredType()
-      ->getCanonicalType();
+    return SGF.getASTContext().getAnyObjectType();
   }
   bool isAnyObjectType(CanType t) {
     return t == getAnyObjectType();

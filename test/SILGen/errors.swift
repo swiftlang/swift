@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -parse-stdlib -emit-silgen -verify -primary-file %s %S/Inputs/errors_other.swift | %FileCheck %s
+// RUN: %target-swift-frontend -parse-stdlib -emit-silgen -Xllvm -sil-print-debuginfo -verify -primary-file %s %S/Inputs/errors_other.swift | %FileCheck %s
 
 import Swift
 
@@ -502,15 +502,15 @@ class BaseThrowingInit : HasThrowingInit {
 }
 // CHECK: sil hidden @_T06errors16BaseThrowingInit{{.*}}c : $@convention(method) (Int, Int, @owned BaseThrowingInit) -> (@owned BaseThrowingInit, @error Error)
 // CHECK:      [[BOX:%.*]] = alloc_box ${ var BaseThrowingInit }
-// CHECK:      [[PB:%.*]] = project_box [[BOX]]
-// CHECK:      [[MARKED_BOX:%.*]] = mark_uninitialized [derivedself] [[PB]]
+// CHECK:      [[MARKED_BOX:%.*]] = mark_uninitialized [derivedself] [[BOX]]
+// CHECK:      [[PB:%.*]] = project_box [[MARKED_BOX]]
 //   Initialize subField.
-// CHECK:      [[T0:%.*]] = load_borrow [[MARKED_BOX]]
+// CHECK:      [[T0:%.*]] = load_borrow [[PB]]
 // CHECK-NEXT: [[T1:%.*]] = ref_element_addr [[T0]] : $BaseThrowingInit, #BaseThrowingInit.subField
 // CHECK-NEXT: assign %1 to [[T1]]
-// CHECK-NEXT: end_borrow [[T0]] from [[MARKED_BOX]]
+// CHECK-NEXT: end_borrow [[T0]] from [[PB]]
 //   Super delegation.
-// CHECK-NEXT: [[T0:%.*]] = load [take] [[MARKED_BOX]]
+// CHECK-NEXT: [[T0:%.*]] = load [take] [[PB]]
 // CHECK-NEXT: [[T2:%.*]] = upcast [[T0]] : $BaseThrowingInit to $HasThrowingInit
 // CHECK: [[T3:%[0-9]+]] = function_ref @_T06errors15HasThrowingInitCACSi5value_tKcfc : $@convention(method) (Int, @owned HasThrowingInit) -> (@owned HasThrowingInit, @error Error)
 // CHECK-NEXT: apply [[T3]](%0, [[T2]])
@@ -947,6 +947,6 @@ class SomeErrorClass : Error { }
 class OtherErrorSub : OtherError { }
 
 // CHECK-LABEL: sil_vtable OtherErrorSub {
-// CHECK-NEXT:  #OtherError.init!initializer.1: {{.*}} : _T06errors13OtherErrorSubCACycfc     // OtherErrorSub.init() -> OtherErrorSub
+// CHECK-NEXT:  #OtherError.init!initializer.1: {{.*}} : _T06errors13OtherErrorSubCACycfc     // OtherErrorSub.init()
 // CHECK-NEXT:  #OtherErrorSub.deinit!deallocator: _T06errors13OtherErrorSubCfD        // OtherErrorSub.__deallocating_deinit
 // CHECK-NEXT:}

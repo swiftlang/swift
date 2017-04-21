@@ -200,18 +200,10 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
          && "can't emit a class ctor here");
 
   // Allocate the local variable for 'self'.
-  emitLocalVariableWithCleanup(selfDecl, false)->finishInitialization(*this);
-  
-  // Mark self as being uninitialized so that DI knows where it is and how to
-  // check for it.
-  SILValue selfLV;
-  {
-    auto &SelfVarLoc = VarLocs[selfDecl];
-    auto MUIKind =  isDelegating ? MarkUninitializedInst::DelegatingSelf
-                                 : MarkUninitializedInst::RootSelf;
-    selfLV = B.createMarkUninitialized(selfDecl, SelfVarLoc.value, MUIKind);
-    SelfVarLoc.value = selfLV;
-  }
+  auto MUIKind = isDelegating ? MarkUninitializedInst::DelegatingSelf
+                              : MarkUninitializedInst::RootSelf;
+  emitLocalVariableWithCleanup(selfDecl, MUIKind)->finishInitialization(*this);
+  SILValue selfLV = VarLocs[selfDecl].value;
 
   // Emit the prolog.
   emitProlog(ctor->getParameterList(1),
@@ -575,11 +567,7 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
 
   if (NeedsBoxForSelf) {
     // Allocate the local variable for 'self'.
-    emitLocalVariableWithCleanup(selfDecl, false)->finishInitialization(*this);
-
-    auto &SelfVarLoc = VarLocs[selfDecl];
-    SelfVarLoc.value = B.createMarkUninitialized(selfDecl,
-                                                 SelfVarLoc.value, MUKind);
+    emitLocalVariableWithCleanup(selfDecl, MUKind)->finishInitialization(*this);
   }
 
   // Emit the prolog for the non-self arguments.

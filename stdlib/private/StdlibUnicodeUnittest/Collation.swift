@@ -338,13 +338,13 @@ public struct StringComparisonTest {
 
 public func sortKey(forCollationElements ces: [UInt64]) -> ([UInt16], [UInt16], [UInt16]) {
   func L1(_ ce: UInt64) -> UInt16 {
-    return UInt16(truncatingBitPattern: ce >> 32)
+    return UInt16(extendingOrTruncating: ce &>> 32)
   }
   func L2(_ ce: UInt64) -> UInt16 {
-    return UInt16(truncatingBitPattern: ce >> 16)
+    return UInt16(extendingOrTruncating: ce &>> 16)
   }
   func L3(_ ce: UInt64) -> UInt16 {
-    return UInt16(truncatingBitPattern: ce)
+    return UInt16(extendingOrTruncating: ce)
   }
 
   var result1: [UInt16] = []

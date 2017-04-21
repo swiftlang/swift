@@ -60,10 +60,7 @@ public func check${inc.capitalize()}rementable<Instances, BaseCollection>(
 ) where
   Instances : Collection,
   BaseCollection : ${protocol},
-  Instances.Iterator.Element == BaseCollection.Index,
-  // FIXME(ABI)#83 (Associated Types with where clauses): these constraints should be applied to
-  // associated types of Collection.
-  Instances.Indices.Iterator.Element == Instances.Index {
+  Instances.Iterator.Element == BaseCollection.Index {
 
   checkEquatable(instances, oracle: equalityOracle, ${trace})
   for i in instances {
@@ -92,17 +89,14 @@ internal func _checkIncrementalAdvance<Instances, BaseCollection>(
 ) where
   Instances : Collection,
   BaseCollection : _Indexable,
-  Instances.Iterator.Element == BaseCollection.Index,
-  // FIXME(ABI)#84 (Associated Types with where clauses): these constraints should be applied to
-  // associated types of Collection.
-  Instances.Indices.Iterator.Element == Instances.Index {
+  Instances.Iterator.Element == BaseCollection.Index {
   for i in instances {
     let d: BaseCollection.IndexDistance = sign > 0 ?
       baseCollection.distance(from: i, to: limit) :
       -baseCollection.distance(from: limit, to: i)
 
     var offset: BaseCollection.IndexDistance = 0
-    for _ in 0...(d * sign).toIntMax() {
+    for _ in 0...Int64(d * sign) {
       let j = baseCollection.index(i, offsetBy: offset)
       let k = baseCollection.index(i, offsetBy: offset + sign, limitedBy: limit) ?? limit
       let jAtLimit = offset == d
@@ -129,10 +123,7 @@ public func checkForwardIndex<Instances, BaseCollection>(
 ) where
   Instances : Collection,
   BaseCollection : _Indexable,
-  Instances.Iterator.Element == BaseCollection.Index,
-  // FIXME(ABI)#85 (Associated Types with where clauses): these constraints should be applied to
-  // associated types of Collection.
-  Instances.Indices.Iterator.Element == Instances.Index {
+  Instances.Iterator.Element == BaseCollection.Index {
 
   checkIncrementable(instances, of: baseCollection,
     equalityOracle: equalityOracle, endIndex: endIndex, ${trace})
@@ -159,10 +150,7 @@ public func checkBidirectionalIndex<Instances, BaseCollection>(
 ) where
   Instances: Collection,
   BaseCollection : _BidirectionalIndexable,
-  Instances.Iterator.Element == BaseCollection.Index,
-  // FIXME(ABI)#86 (Associated Types with where clauses): these constraints should be applied to
-  // associated types of Collection.
-  Instances.Indices.Iterator.Element == Instances.Index {
+  Instances.Iterator.Element == BaseCollection.Index {
 
   checkForwardIndex(instances, of: baseCollection,
     equalityOracle: equalityOracle, endIndex: endIndex)
@@ -199,11 +187,7 @@ public func checkRandomAccessIndex<Instances, Distances, BaseCollection>(
   Distances : Collection,
   BaseCollection : _RandomAccessIndexable,
   Instances.Iterator.Element == BaseCollection.Index,
-  Distances.Iterator.Element == BaseCollection.IndexDistance,
-  // FIXME(ABI)#87 (Associated Types with where clauses): these constraints should be applied to
-  // associated types of Collection.
-  Instances.Indices.Iterator.Element == Instances.Index,
-  Distances.Indices.Iterator.Element == Distances.Index {
+  Distances.Iterator.Element == BaseCollection.IndexDistance {
 
   checkBidirectionalIndex(instances, of: baseCollection,
     equalityOracle: { distanceOracle($0, $1) == 0 },
@@ -232,11 +216,7 @@ public func checkAdvancesAndDistances<Instances, Distances, BaseCollection>(
   Distances : Collection,
   BaseCollection : _Indexable,
   Instances.Iterator.Element == BaseCollection.Index,
-  Distances.Iterator.Element == BaseCollection.IndexDistance,
-  // FIXME(ABI)#88 (Associated Types with where clauses): these constraints should be applied to
-  // associated types of Collection.
-  Instances.Indices.Iterator.Element == Instances.Index,
-  Distances.Indices.Iterator.Element == Distances.Index {
+  Distances.Iterator.Element == BaseCollection.IndexDistance {
 
   checkComparable(
     instances,
@@ -278,13 +258,7 @@ public func checkCollection<${genericParam}, C : Collection>(
   resiliencyChecks: CollectionMisuseResiliencyChecks = .all,
   sameValue: (${Element}, ${Element}) -> Bool
 ) where C.Iterator.Element == ${Element},
-  // FIXME(ABI) (Associated Types with where clauses): these constraints should be applied to
-  // associated types of Collection.
-  C.Indices.Iterator.Element == C.Index,
-  C.SubSequence : Collection,
-  C.SubSequence.Iterator.Element == ${Element},
-  C.SubSequence.Indices.Iterator.Element == C.Index,
-  C.SubSequence.Index == C.Index {
+  C.SubSequence : Collection {
 
   checkForwardCollection(expected, collection, message(),
     stackTrace: stackTrace, showFrame: showFrame, file: file, line: line,
@@ -304,11 +278,7 @@ public func check${Traversal}Collection<
   resiliencyChecks: CollectionMisuseResiliencyChecks = .all
 ) where
   C.Iterator.Element == ${Element},
-  C.Indices.Iterator.Element == C.Index,
   C.SubSequence : ${TraversalCollection},
-  C.SubSequence.Iterator.Element == ${Element},
-  C.SubSequence.Indices.Iterator.Element == C.Index,
-  C.SubSequence.Index == C.Index,
   ${Element} : Equatable {
 
   check${Traversal}Collection(
@@ -329,13 +299,7 @@ public func check${Traversal}Collection<
   sameValue: (${Element}, ${Element}) -> Bool
 ) where
   C.Iterator.Element == ${Element},
-  // FIXME(ABI) (Associated Types with where clauses): these constraints should be applied to
-  // associated types of Collection.
-  C.Indices.Iterator.Element == C.Index,
-  C.SubSequence : ${TraversalCollection},
-  C.SubSequence.Iterator.Element == ${Element},
-  C.SubSequence.Index == C.Index,
-  C.SubSequence.Indices.Iterator.Element == C.Index {
+  C.SubSequence : ${TraversalCollection} {
 
   checkOneLevelOf${Traversal}Collection(expected, collection, ${trace},
     resiliencyChecks: resiliencyChecks, sameValue: sameValue)
@@ -352,7 +316,7 @@ public func check${Traversal}Collection<
 // `collection`, upholds the semantics of `${TraversalCollection}`,
 // non-recursively. This does not check subsequences. It may be called for each
 // subsequence without combinatorial explosion. Also, since recursive protocol
-// contraints are not supported, our second level of checks cannot depend on the
+// constraints are not supported, our second level of checks cannot depend on the
 // associated type properties of SubSequence.
 //
 // Checks all slices: O(n^2).
@@ -363,11 +327,7 @@ public func checkOneLevelOf${Traversal}Collection<
   ${TRACE},
   resiliencyChecks: CollectionMisuseResiliencyChecks = .all,
   sameValue: (${Element}, ${Element}) -> Bool
-) where
-  C.Iterator.Element == ${Element},
-  // FIXME(ABI) (Associated Types with where clauses): these constraints should be applied to
-  // associated types of Collection.
-  C.Indices.Iterator.Element == C.Index {
+) where C.Iterator.Element == ${Element} {
 
   // A `Collection` is a multi-pass `Sequence`.
   for _ in 0..<3 {
@@ -447,8 +407,7 @@ public func checkOneLevelOf${Traversal}Collection<
   let expectedArray = Array(expected)
 
   // Check `count`.
-  expectEqual(
-    expectedArray.count.toIntMax(), collection.count.toIntMax(), ${trace})
+  expectEqual(Int64(expectedArray.count), Int64(collection.count), ${trace})
 
   //===------------------------------------------------------------------===//
   // Check Iteration behavior.
@@ -546,10 +505,7 @@ ${genericParam}, S : ${TraversalCollection}
   sameValue: (${Element}, ${Element}) -> Bool
 ) where
   S.Iterator.Element == ${Element},
-  S.SubSequence : ${TraversalCollection},
-  S.SubSequence.Iterator.Element == ${Element},
-  S.SubSequence.Index == S.Index,
-  S.SubSequence.Indices.Iterator.Element == S.Index {
+  S.SubSequence : ${TraversalCollection} {
 
   let expectedArray = Array(expected)
 
@@ -613,8 +569,7 @@ public func checkRangeReplaceable<C, N>(
   C : RangeReplaceableCollection,
   N : Collection,
   C.Iterator.Element : Equatable,
-  C.Iterator.Element == N.Iterator.Element,
-  C.Indices.Iterator.Element == C.Index {
+  C.Iterator.Element == N.Iterator.Element {
 
   typealias A = C
 

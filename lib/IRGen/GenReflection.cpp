@@ -283,7 +283,7 @@ class AssociatedTypeMetadataBuilder : public ReflectionMetadataBuilder {
   void layout() override {
     // If the conforming type is generic, we just want to emit the
     // unbound generic type here.
-    auto *Nominal = Conformance->getInterfaceType()->getAnyNominal();
+    auto *Nominal = Conformance->getType()->getAnyNominal();
     assert(Nominal && "Structural conformance?");
 
     PrettyStackTraceDecl DebugStack("emitting associated type metadata",
@@ -334,9 +334,7 @@ class SuperclassMetadataBuilder : public ReflectionMetadataBuilder {
     auto *M = IGM.getSILModule().getSwiftModule();
 
     addTypeRef(M, Class->getDeclaredType()->getCanonicalType());
-
-    auto anyObjectDecl = IGM.Context.getProtocol(KnownProtocolKind::AnyObject);
-    addTypeRef(M, anyObjectDecl->getDeclaredType()->getCanonicalType());
+    addTypeRef(M, IGM.Context.getAnyObjectType());
 
     B.addInt32(1);
     B.addInt32(AssociatedTypeRecordSize);
@@ -390,7 +388,8 @@ class FieldTypeMetadataBuilder : public ReflectionMetadataBuilder {
     auto kind = FieldDescriptorKind::Struct;
 
     if (auto CD = dyn_cast<ClassDecl>(NTD)) {
-      auto RC = getReferenceCountingForClass(IGM, const_cast<ClassDecl *>(CD));
+      auto type = CD->getDeclaredType()->getCanonicalType();
+      auto RC = getReferenceCountingForType(IGM, type);
       if (RC == ReferenceCounting::ObjC)
         kind = FieldDescriptorKind::ObjCClass;
       else
@@ -724,8 +723,7 @@ public:
         SwiftType = SwiftType.transform([&](Type t) -> Type {
           if (auto *archetype = t->getAs<ArchetypeType>()) {
             assert(archetype->requiresClass() && "don't know what to do");
-            return IGM.Context.getProtocol(KnownProtocolKind::AnyObject)
-                ->getDeclaredType();
+            return IGM.Context.getAnyObjectType();
           }
           return t;
         })->getCanonicalType();
@@ -933,7 +931,7 @@ void IRGenModule::emitBuiltinReflectionMetadata() {
     BuiltinTypes.insert(thinFunction);
 
     CanType anyMetatype = CanExistentialMetatypeType::get(
-      ProtocolCompositionType::get(Context, {})->getCanonicalType());
+      Context.TheAnyType);
     BuiltinTypes.insert(anyMetatype);
   }
 
@@ -972,7 +970,7 @@ void IRGenModule::emitFieldMetadataRecord(const NominalTypeDecl *Decl) {
   // superclass as a special associated type named 'super' on the
   // 'AnyObject' protocol.
   if (auto Superclass = Decl->getDeclaredInterfaceType()
-                            ->getSuperclass(nullptr)) {
+                            ->getSuperclass()) {
     SuperclassMetadataBuilder builder(*this, cast<ClassDecl>(Decl),
                                       Superclass->getCanonicalType());
     builder.emit();

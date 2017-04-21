@@ -149,7 +149,7 @@ public:
 
   using StreamPrinter::StreamPrinter;
 
-  ~AnnotatingPrinter() {
+  ~AnnotatingPrinter() override {
     assert(EntitiesStack.empty());
   }
 
@@ -252,7 +252,7 @@ struct SourceTextInfo {
   std::vector<TextReference> References;
 };
 
-}
+} // end anonymous namespace
 
 static void initDocGenericParams(const Decl *D, DocEntityInfo &Info) {
   auto *DC = dyn_cast<DeclContext>(D);
@@ -477,7 +477,7 @@ static void passInherits(ArrayRef<TypeLoc> InheritedTypes,
 
     if (auto ProtoComposition
                = Inherited.getType()->getAs<ProtocolCompositionType>()) {
-      for (auto T : ProtoComposition->getProtocols())
+      for (auto T : ProtoComposition->getMembers())
         passInherits(TypeLoc::withoutLoc(T), Consumer);
       continue;
     }
@@ -760,7 +760,7 @@ private:
     }
   }
 };
-}
+} // end anonymous namespace
 
 static bool makeParserAST(CompilerInstance &CI, StringRef Text) {
   CompilerInvocation Invocation;
@@ -894,7 +894,7 @@ public:
     return false; // skip body.
   }
 };
-}
+} // end anonymous namespace
 
 static void addParameterEntities(CompilerInstance &CI,
                                  SourceTextInfo &IFaceInfo) {
@@ -998,7 +998,7 @@ public:
   SourceDocASTWalker(SourceManager &SM, unsigned BufferID)
     : SM(SM), BufferID(BufferID) {}
 
-  ~SourceDocASTWalker() {
+  ~SourceDocASTWalker() override {
     assert(EntitiesStack.empty());
   }
 
@@ -1055,7 +1055,7 @@ public:
     return TextRange{ Start, End-Start };
   }
 };
-}
+} // end anonymous namespace
 
 static bool getSourceTextInfo(CompilerInstance &CI,
                               SourceTextInfo &Info) {

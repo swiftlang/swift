@@ -158,6 +158,9 @@ namespace swift {
 
     unsigned SolverBindingThreshold = 1024 * 1024;
 
+    /// The maximum depth to which to test decl circularity.
+    unsigned MaxCircularityDepth = 500;
+
     /// \brief Perform all dynamic allocations using malloc/free instead of
     /// optimized custom allocator, so that memory debugging tools can be used.
     bool UseMalloc = false;

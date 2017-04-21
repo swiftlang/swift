@@ -1126,10 +1126,8 @@ recur:
     } else if (diagTy->isEqual(Context.TheEmptyTupleType)) {
       shouldRequireType = true;
     } else if (auto MTT = diagTy->getAs<AnyMetatypeType>()) {
-      if (auto protoTy = MTT->getInstanceType()->getAs<ProtocolType>()) {
-        shouldRequireType =
-          protoTy->getDecl()->isSpecificProtocol(KnownProtocolKind::AnyObject);
-      }
+      if (MTT->getInstanceType()->isAnyObject())
+        shouldRequireType = true;
     }
     
     if (shouldRequireType && 

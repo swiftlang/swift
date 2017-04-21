@@ -551,7 +551,8 @@ enum class ObjCReason {
 
 /// Determine whether we should diagnose conflicts due to inferring @objc
 /// with this particular reason.
-static inline bool shouldDiagnoseObjCReason(ObjCReason reason) {
+static inline bool shouldDiagnoseObjCReason(ObjCReason reason,
+                                            ASTContext &ctx) {
   switch(reason) {
   case ObjCReason::ExplicitlyCDecl:
   case ObjCReason::ExplicitlyDynamic:
@@ -563,10 +564,12 @@ static inline bool shouldDiagnoseObjCReason(ObjCReason reason) {
   case ObjCReason::OverridesObjC:
   case ObjCReason::WitnessToObjC:
   case ObjCReason::ImplicitlyObjC:
-  case ObjCReason::ExplicitlyIBInspectable:
-  case ObjCReason::ExplicitlyGKInspectable:
   case ObjCReason::MemberOfObjCExtension:
     return true;
+
+  case ObjCReason::ExplicitlyIBInspectable:
+  case ObjCReason::ExplicitlyGKInspectable:
+    return !ctx.LangOpts.EnableSwift3ObjCInference;
 
   case ObjCReason::MemberOfObjCSubclass:
   case ObjCReason::MemberOfObjCMembersClass:
@@ -659,6 +662,9 @@ public:
   /// partial validation of during type-checking and which will need
   /// to be finalized before we can hand off to SILGen etc.
   llvm::SetVector<NominalTypeDecl *> TypesToFinalize;
+
+  /// The list of types whose circularity checks were delayed.
+  SmallVector<NominalTypeDecl*, 8> DelayedCircularityChecks;
 
   using TypeAccessScopeCacheMap = llvm::DenseMap<const ValueDecl *, AccessScope>;
 
@@ -1123,6 +1129,10 @@ public:
   ///
   /// \param t2 The second type of the constraint.
   ///
+  /// \param openArchetypes If true, archetypes are replaced with type
+  /// variables, and the result can be interpreted as whether or not the
+  /// two types can possibly equal at runtime.
+  ///
   /// \param dc The context of the conversion.
   ///
   /// \param unwrappedIUO   If non-null, will be set to \c true if the coercion
@@ -1130,6 +1140,7 @@ public:
   ///
   /// \returns true if \c t1 and \c t2 satisfy the constraint.
   bool typesSatisfyConstraint(Type t1, Type t2,
+                              bool openArchetypes,
                               constraints::ConstraintKind kind,
                               DeclContext *dc,
                               bool *unwrappedIUO = nullptr);

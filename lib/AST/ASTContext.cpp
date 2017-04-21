@@ -112,6 +112,9 @@ struct ASTContext::Implementation {
   /// The declaration of Swift.DefaultPrecedence.
   PrecedenceGroupDecl *DefaultPrecedence = nullptr;
 
+  /// The AnyObject type.
+  CanType AnyObjectType;
+
 #define KNOWN_STDLIB_TYPE_DECL(NAME, DECL_CLASS, NUM_GENERIC_PARAMS) \
   /** The declaration of Swift.NAME. */ \
   DECL_CLASS *NAME##Decl = nullptr;
@@ -415,7 +418,8 @@ ASTContext::ASTContext(LangOptions &langOpts, SearchPathOptions &SearchPathOpts,
     TheUnresolvedType(new (*this, AllocationArena::Permanent)
                       UnresolvedType(*this)),
     TheEmptyTupleType(TupleType::get(ArrayRef<TupleTypeElt>(), *this)),
-    TheAnyType(ProtocolCompositionType::get(*this, ArrayRef<Type>())),
+    TheAnyType(ProtocolCompositionType::get(*this, ArrayRef<Type>(),
+                                            /*HasExplicitAnyObject=*/false)),
     TheNativeObjectType(new (*this, AllocationArena::Permanent)
                            BuiltinNativeObjectType(*this)),
     TheBridgeObjectType(new (*this, AllocationArena::Permanent)
@@ -668,6 +672,29 @@ ASTContext::getPointerPointeePropertyDecl(PointerTypeKind ptrKind) const {
                              *this);
   }
   llvm_unreachable("bad pointer kind");
+}
+
+CanType ASTContext::getAnyObjectType() const {
+  if (Impl.AnyObjectType) {
+    return Impl.AnyObjectType;
+  }
+
+  // Go find 'AnyObject' in the Swift module.
+  //
+  // FIXME: This is going away.
+  SmallVector<ValueDecl *, 1> results;
+  lookupInSwiftModule("AnyObject", results);
+  for (auto result : results) {
+    if (auto proto = dyn_cast<ProtocolDecl>(result)) {
+      Impl.AnyObjectType = proto->getDeclaredType()->getCanonicalType();
+      return Impl.AnyObjectType;
+    }
+  }
+
+  Impl.AnyObjectType = CanType(
+    ProtocolCompositionType::get(
+      *this, {}, /*HasExplicitAnyObject=*/true));
+  return Impl.AnyObjectType;
 }
 
 CanType ASTContext::getNeverType() const {
@@ -1277,9 +1304,50 @@ GenericSignatureBuilder *ASTContext::getOrCreateGenericSignatureBuilder(
     llvm::errs() << "Original generic signature   : ";
     sig->print(llvm::errs());
     llvm::errs() << "\nReprocessed generic signature: ";
-    builder->getGenericSignature()->getCanonicalSignature()
-    ->print(llvm::errs());
+    auto reprocessedSig =
+    builder->getGenericSignature()->getCanonicalSignature();
+
+    reprocessedSig->print(llvm::errs());
     llvm::errs() << "\n";
+
+    if (sig->getGenericParams().size() ==
+          reprocessedSig->getGenericParams().size() &&
+        sig->getRequirements().size() ==
+          reprocessedSig->getRequirements().size()) {
+      for (unsigned i : indices(sig->getRequirements())) {
+        auto sigReq = sig->getRequirements()[i];
+        auto reprocessedReq = reprocessedSig->getRequirements()[i];
+        if (sigReq.getKind() != reprocessedReq.getKind()) {
+          llvm::errs() << "Requirement mismatch:\n";
+          llvm::errs() << "  Original: ";
+          sigReq.print(llvm::errs(), PrintOptions());
+          llvm::errs() << "\n  Reprocessed: ";
+          reprocessedReq.print(llvm::errs(), PrintOptions());
+          llvm::errs() << "\n";
+          break;
+        }
+
+        if (!sigReq.getFirstType()->isEqual(reprocessedReq.getFirstType())) {
+          llvm::errs() << "First type mismatch, original is:\n";
+          sigReq.getFirstType().dump(llvm::errs());
+          llvm::errs() << "Reprocessed:\n";
+          reprocessedReq.getFirstType().dump(llvm::errs());
+          llvm::errs() << "\n";
+          break;
+        }
+
+        if (sigReq.getKind() == RequirementKind::SameType &&
+            !sigReq.getSecondType()->isEqual(reprocessedReq.getSecondType())) {
+          llvm::errs() << "Second type mismatch, original is:\n";
+          sigReq.getSecondType().dump(llvm::errs());
+          llvm::errs() << "Reprocessed:\n";
+          reprocessedReq.getSecondType().dump(llvm::errs());
+          llvm::errs() << "\n";
+          break;
+        }
+      }
+    }
+
     llvm_unreachable("idempotency problem with a generic signature");
   }
 #endif
@@ -1408,16 +1476,14 @@ void ValueDecl::setLocalDiscriminator(unsigned index) {
 
 NormalProtocolConformance *
 ASTContext::getBehaviorConformance(Type conformingType,
-                                   Type conformingInterfaceType,
                                    ProtocolDecl *protocol,
                                    SourceLoc loc,
                                    AbstractStorageDecl *storage,
                                    ProtocolConformanceState state) {
   auto conformance = new (*this, AllocationArena::Permanent)
-    NormalProtocolConformance(conformingType, conformingInterfaceType,
-                              protocol, loc, storage, state);
+    NormalProtocolConformance(conformingType, protocol, loc, storage, state);
 
-  if (auto nominal = conformingInterfaceType->getAnyNominal()) {
+  if (auto nominal = conformingType->getRValueInstanceType()->getAnyNominal()) {
     // Note: this is an egregious hack. The conformances need to be associated
     // with the actual storage declarations.
     SmallVector<ProtocolConformance *, 2> conformances;
@@ -1460,7 +1526,7 @@ ASTContext::getSpecializedConformance(Type type,
                                       ProtocolConformance *generic,
                                       SubstitutionList substitutions) {
   llvm::FoldingSetNodeID id;
-  SpecializedProtocolConformance::Profile(id, type, generic);
+  SpecializedProtocolConformance::Profile(id, type, generic, substitutions);
 
   // Figure out which arena this conformance should go into.
   AllocationArena arena = getArena(type->getRecursiveProperties());
@@ -2793,15 +2859,16 @@ void ClassType::Profile(llvm::FoldingSetNodeID &ID, ClassDecl *D, Type Parent) {
 }
 
 ProtocolCompositionType *
-ProtocolCompositionType::build(const ASTContext &C, ArrayRef<Type> Protocols) {
+ProtocolCompositionType::build(const ASTContext &C, ArrayRef<Type> Members,
+                               bool HasExplicitAnyObject) {
   // Check to see if we've already seen this protocol composition before.
   void *InsertPos = nullptr;
   llvm::FoldingSetNodeID ID;
-  ProtocolCompositionType::Profile(ID, Protocols);
+  ProtocolCompositionType::Profile(ID, Members, HasExplicitAnyObject);
 
   bool isCanonical = true;
   RecursiveTypeProperties properties;
-  for (Type t : Protocols) {
+  for (Type t : Members) {
     if (!t->isCanonical())
       isCanonical = false;
     properties |= t->getRecursiveProperties();
@@ -2818,7 +2885,8 @@ ProtocolCompositionType::build(const ASTContext &C, ArrayRef<Type> Protocols) {
   auto compTy
     = new (C, arena)
         ProtocolCompositionType(isCanonical ? &C : nullptr,
-                                C.AllocateCopy(Protocols),
+                                C.AllocateCopy(Members),
+                                HasExplicitAnyObject,
                                 properties);
   C.Impl.getArena(arena).ProtocolCompositionTypes
     .InsertNode(compTy, InsertPos);
@@ -3469,17 +3537,21 @@ CanArchetypeType ArchetypeType::getOpened(Type existential,
   for (auto proto : layout.getProtocols())
     protos.push_back(proto->getDecl());
 
+  auto layoutConstraint = layout.getLayoutConstraint();
+
   auto arena = AllocationArena::Permanent;
   void *mem = ctx.Allocate(
       totalSizeToAlloc<ProtocolDecl *, Type, LayoutConstraint, UUID>(
-      protos.size(), layout.superclass ? 1 : 0, 0, 1),
+      protos.size(),
+      layout.superclass ? 1 : 0,
+      layoutConstraint ? 1 : 0, 1),
       alignof(ArchetypeType), arena);
 
   // FIXME: Pass in class layout constraint
   auto result =
       ::new (mem) ArchetypeType(ctx, existential,
                                 protos, layout.superclass,
-                                existential->getLayoutConstraint(), *knownID);
+                                layoutConstraint, *knownID);
   openedExistentialArchetypes[*knownID] = result;
 
   return CanArchetypeType(result);
@@ -4113,8 +4185,13 @@ CanSILBoxType SILBoxType::get(ASTContext &C,
                               SILLayout *Layout,
                               SubstitutionList Args) {
   llvm::FoldingSetNodeID id;
+
+  // Canonicalize substitutions.
+  SmallVector<Substitution, 4> CanArgs;
+  Args = getCanonicalSubstitutionList(Args, CanArgs);
+
   Profile(id, Layout, Args);
-  
+
   // Return an existing layout if there is one.
   void *insertPos;
   auto &SILBoxTypes = C.Impl.SILBoxTypes;

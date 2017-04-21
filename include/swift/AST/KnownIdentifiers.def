@@ -90,6 +90,7 @@ IDENTIFIER_WITH_NAME(NativeClassLayout, "_NativeClass")
 // Operators
 IDENTIFIER_WITH_NAME(MatchOperator, "~=")
 IDENTIFIER_WITH_NAME(EqualsOperator, "==")
+IDENTIFIER_WITH_NAME(derived_enum_equals, "__derived_enum_equals")
 
 // Precedence groups
 IDENTIFIER(AssignmentPrecedence)
@@ -123,6 +124,8 @@ IDENTIFIER(unicodeScalarLiteral)
 IDENTIFIER(stringLiteral)
 IDENTIFIER_(builtinUTF16StringLiteral)
 IDENTIFIER_(builtinStringLiteral)
+IDENTIFIER_(builtinConstUTF16StringLiteral)
+IDENTIFIER_(builtinConstStringLiteral)
 IDENTIFIER(StringLiteralType)
 IDENTIFIER(stringInterpolation)
 IDENTIFIER(stringInterpolationSegment)

@@ -217,7 +217,7 @@ extension String {
       /// True iff the index is at the end of its view or if the next
       /// byte begins a new UnicodeScalar.
       internal func _isOnUnicodeScalarBoundary(in core: _StringCore) -> Bool {
-        let buffer = UInt32(truncatingBitPattern: _buffer)
+        let buffer = UInt32(extendingOrTruncating: _buffer)
         let (codePoint, _) = UTF8._decodeOne(buffer)
         return codePoint != nil || _isEndIndex(of: core)
       }
@@ -237,7 +237,7 @@ extension String {
         var count = 0
         
         while true {
-          let currentUnit = UTF8.CodeUnit(truncatingBitPattern: buffer)
+          let currentUnit = UTF8.CodeUnit(extendingOrTruncating: buffer)
           if currentUnit & 0b1100_0000 != 0b1000_0000 {
             break
           }
@@ -254,13 +254,13 @@ extension String {
 
       /// A Buffer value with the high byte set
       internal static var _bufferHiByte: Buffer {
-        return 0xFF << numericCast((MemoryLayout<Buffer>.size &- 1) &* 8)
+        return 0xFF &<< ((MemoryLayout<Buffer>.size &- 1) &* 8)
       }
       
       /// Consume a byte of the given buffer: shift out the low byte
       /// and put FF in the high byte
       internal static func _nextBuffer(after thisBuffer: Buffer) -> Buffer {
-        return (thisBuffer >> 8) | _bufferHiByte
+        return (thisBuffer &>> (8 as Buffer)) | _bufferHiByte
       }
 
       /// The position of `self`, rounded up to the nearest unicode
@@ -295,8 +295,8 @@ extension String {
     /// - Precondition: The next position is representable.
     public func index(after i: Index) -> Index {
       // FIXME: swift-3-indexing-model: range check i?
-      let currentUnit = UTF8.CodeUnit(truncatingBitPattern: i._buffer)
-      let hiNibble = currentUnit >> 4
+      let currentUnit = UTF8.CodeUnit(extendingOrTruncating: i._buffer)
+      let hiNibble = currentUnit &>> (4 as UTF8.CodeUnit)
 
       // Amounts to increment the UTF-16 index based on the high nibble of a
       // UTF-8 code unit. If the high nibble is:
@@ -312,7 +312,8 @@ extension String {
       
       // Map the high nibble of the current code unit into the
       // amount by which to increment the UTF-16 index.
-      let increment = (u16Increments >> numericCast(hiNibble << 1)) & 0x3
+      let increment = (u16Increments &>>
+        Int(extendingOrTruncating: hiNibble &<< (1 as UTF8.CodeUnit))) & 0x3
       let nextCoreIndex = i._coreIndex &+ increment
       let nextBuffer = Index._nextBuffer(after: i._buffer)
 
@@ -347,7 +348,7 @@ extension String {
     /// - Parameter position: A valid index of the view. `position`
     ///   must be less than the view's end index.
     public subscript(position: Index) -> UTF8.CodeUnit {
-      let result = UTF8.CodeUnit(truncatingBitPattern: position._buffer & 0xFF)
+      let result = UTF8.CodeUnit(extendingOrTruncating: position._buffer & 0xFF)
       _precondition(result != 0xFF, "cannot subscript using endIndex")
       return result
     }
@@ -469,8 +470,8 @@ extension String.UTF8View.Index : Comparable {
     var isContinuation: Bool
     while true {
       let unit = (
-        UTF8.CodeUnit(truncatingBitPattern: buffer.0),
-        UTF8.CodeUnit(truncatingBitPattern: buffer.1))
+        UTF8.CodeUnit(extendingOrTruncating: buffer.0),
+        UTF8.CodeUnit(extendingOrTruncating: buffer.1))
 
       isContinuation = UTF8.isContinuation(unit.0)
       if !isContinuation {

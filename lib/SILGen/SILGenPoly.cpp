@@ -83,6 +83,7 @@
 #include "swift/AST/GenericSignatureBuilder.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticsCommon.h"
+#include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/Types.h"
@@ -160,16 +161,16 @@ namespace {
 ;
 
 static ArrayRef<ProtocolConformanceRef>
-collectExistentialConformances(ModuleDecl *M, Type fromType, Type toType) {
-  assert(!fromType->isAnyExistentialType());
-  
-  SmallVector<ProtocolDecl *, 4> protocols;
-  toType->getExistentialTypeProtocols(protocols);
+collectExistentialConformances(ModuleDecl *M, CanType fromType, CanType toType) {
+  assert(!fromType.isAnyExistentialType());
+
+  auto layout = toType.getExistentialLayout();
+  auto protocols = layout.getProtocols();
   
   SmallVector<ProtocolConformanceRef, 4> conformances;
   for (auto proto : protocols) {
     auto conformance =
-      M->lookupConformance(fromType, proto, nullptr).getPointer();
+      M->lookupConformance(fromType, proto->getDecl(), nullptr);
     conformances.push_back(*conformance);
   }
   
@@ -206,16 +207,16 @@ static ManagedValue emitTransformExistential(SILGenFunction &SGF,
   }
 
   // Build conformance table
-  Type fromInstanceType = inputType;
-  Type toInstanceType = outputType;
+  CanType fromInstanceType = inputType;
+  CanType toInstanceType = outputType;
   
   // Look through metatypes
-  while (fromInstanceType->is<AnyMetatypeType>() &&
-         toInstanceType->is<ExistentialMetatypeType>()) {
-    fromInstanceType = fromInstanceType->castTo<AnyMetatypeType>()
-        ->getInstanceType();
-    toInstanceType = toInstanceType->castTo<ExistentialMetatypeType>()
-        ->getInstanceType();
+  while (isa<MetatypeType>(fromInstanceType) &&
+         isa<ExistentialMetatypeType>(toInstanceType)) {
+    fromInstanceType = cast<MetatypeType>(fromInstanceType)
+      .getInstanceType();
+    toInstanceType = cast<ExistentialMetatypeType>(toInstanceType)
+      .getInstanceType();
   }
 
   ArrayRef<ProtocolConformanceRef> conformances =
@@ -450,10 +451,11 @@ ManagedValue Transform::transform(ManagedValue v,
 
   //  - metatypes
   if (auto outputMetaType = dyn_cast<MetatypeType>(outputSubstType)) {
-    auto inputMetaType = cast<MetatypeType>(inputSubstType);
-    return transformMetatype(v,
-                             inputOrigType, inputMetaType,
-                             outputOrigType, outputMetaType);
+    if (auto inputMetaType = dyn_cast<MetatypeType>(inputSubstType)) {
+      return transformMetatype(v,
+                               inputOrigType, inputMetaType,
+                               outputOrigType, outputMetaType);
+    }
   }
 
   // Subtype conversions:
@@ -473,7 +475,7 @@ ManagedValue Transform::transform(ManagedValue v,
                            v.getCleanup());
     }
 
-    if (outputSubstType->isExactSuperclassOf(inputSubstType, nullptr)) {
+    if (outputSubstType->isExactSuperclassOf(inputSubstType)) {
       // Upcast to a superclass.
       return ManagedValue(SGF.B.createUpcast(Loc,
                                              v.getValue(),
@@ -481,7 +483,7 @@ ManagedValue Transform::transform(ManagedValue v,
                           v.getCleanup());
     } else {
       // Unchecked-downcast to a covariant return type.
-      assert(inputSubstType->isExactSuperclassOf(outputSubstType, nullptr)
+      assert(inputSubstType->isExactSuperclassOf(outputSubstType)
              && "should be inheritance relationship between input and output");
       return SGF.emitManagedRValueWithCleanup(
         SGF.B.createUncheckedRefCast(Loc, v.forward(SGF), loweredResultTy));      
@@ -532,6 +534,33 @@ ManagedValue Transform::transform(ManagedValue v,
     return emitTransformExistential(SGF, Loc, v,
                                     inputSubstType, outputSubstType,
                                     ctxt);
+  }
+
+  // - upcasting class-constrained existentials or metatypes thereof
+  if (inputSubstType->isAnyExistentialType()) {
+    auto instanceType = inputSubstType;
+    while (auto metatypeType = dyn_cast<ExistentialMetatypeType>(instanceType))
+      instanceType = metatypeType.getInstanceType();
+
+    auto layout = instanceType.getExistentialLayout();
+    if (layout.superclass) {
+      CanType openedType = ArchetypeType::getAnyOpened(inputSubstType);
+      SILType loweredOpenedType = SGF.getLoweredType(openedType);
+
+      // Unwrap zero or more metatype levels
+      auto openedArchetype = getOpenedArchetype(openedType);
+
+      auto state = SGF.emitOpenExistential(Loc, v, openedArchetype,
+                                           loweredOpenedType,
+                                           AccessKind::Read);
+      auto payload = SGF.manageOpaqueValue(state, Loc, SGFContext());
+      return transform(payload,
+                       AbstractionPattern::getOpaque(),
+                       openedType,
+                       outputOrigType,
+                       outputSubstType,
+                       ctxt);
+    }
   }
 
   // - T : Hashable to AnyHashable
@@ -1063,7 +1092,6 @@ namespace {
                                        outputOrigType, outputTupleType,
                                        loweredTy);
 
-        optionalTy = SGF.F.mapTypeIntoContext(optionalTy);
         auto optional = SGF.B.createEnum(Loc, payload.getValue(),
                                          someDecl, optionalTy);
         return ManagedValue(optional, payload.getCleanup());
@@ -1118,7 +1146,7 @@ namespace {
       auto &anyTL = SGF.getTypeLowering(opaque, outputSubstType);
       SILValue loadedOpaque = SGF.B.createInitExistentialOpaque(
           Loc, anyTL.getLoweredType(), inputTupleType, loadedPayload.getValue(),
-          /*conformances=*/{});
+          /*Conformances=*/{});
       return ManagedValue(loadedOpaque, loadedPayload.getCleanup());
     }
 
@@ -2641,7 +2669,7 @@ buildThunkSignature(SILGenFunction &gen,
                              openedExistential->getOpenedExistentialType());
   auto source =
     GenericSignatureBuilder::FloatingRequirementSource::forAbstract();
-  builder.addRequirement(newRequirement, source);
+  builder.addRequirement(newRequirement, source, nullptr);
 
   builder.finalize(SourceLoc(), {newGenericParam},
                    /*allowConcreteGenericParams=*/true);

@@ -113,9 +113,25 @@ namespace {
     // The conforming context, either a nominal type or extension.
     DeclContext *DC;
 
+    // An auxiliary lookup table to be used for witnesses remapped via
+    // @_implements(Protocol, DeclName)
+    llvm::DenseMap<DeclName, llvm::TinyPtrVector<ValueDecl *>> ImplementsTable;
+
     WitnessChecker(TypeChecker &tc, ProtocolDecl *proto,
                    Type adoptee, DeclContext *dc)
-      : TC(tc), Proto(proto), Adoptee(adoptee), DC(dc) { }
+      : TC(tc), Proto(proto), Adoptee(adoptee), DC(dc) {
+      if (auto N = DC->getAsNominalTypeOrNominalTypeExtensionContext()) {
+        for (auto D : N->getMembers()) {
+          if (auto V = dyn_cast<ValueDecl>(D)) {
+            if (!V->hasName())
+              continue;
+            if (auto A = V->getAttrs().getAttribute<ImplementsAttr>()) {
+              A->getMemberName().addToLookupTable(ImplementsTable, V);
+            }
+          }
+        }
+      }
+    }
 
     /// Gather the value witnesses for the given requirement.
     ///
@@ -125,6 +141,10 @@ namespace {
     /// \c true.
     SmallVector<ValueDecl *, 4> lookupValueWitnesses(ValueDecl *req,
                                                      bool *ignoringNames);
+
+    void lookupValueWitnessesViaImplementsAttr(ValueDecl *req,
+                                               SmallVector<ValueDecl *, 4>
+                                               &witnesses);
 
     bool findBestWitness(ValueDecl *requirement,
                          bool *ignoringNames,
@@ -997,10 +1017,6 @@ RequirementEnvironment::RequirementEnvironment(
   auto selfType = cast<GenericTypeParamType>(
                             proto->getSelfInterfaceType()->getCanonicalType());
 
-  // 'Self' is always at depth 0, index 0. Anything else is invalid code.
-  if (selfType->getDepth() != 0 || selfType->getIndex() != 0)
-    return;
-
   // Construct a generic signature builder by collecting the constraints from the
   // requirement and the context of the conformance together, because both
   // define the capabilities of the requirement.
@@ -1083,70 +1099,9 @@ RequirementEnvironment::RequirementEnvironment(
   // interface types into the abstract type parameters).
   auto source =
     GenericSignatureBuilder::FloatingRequirementSource::forAbstract();
-  for (auto &reqReq : reqSig->getRequirements()) {
-    switch (reqReq.getKind()) {
-    case RequirementKind::Conformance: {
-      // Substitute the constrained types.
-      auto first = reqReq.getFirstType().subst(reqToSyntheticEnvMap,
-                                               SubstFlags::UseErrorType);
-      if (!first->isTypeParameter()) break;
-
-      builder.addRequirement(Requirement(RequirementKind::Conformance,
-                                         first, reqReq.getSecondType()),
-                             source);
-      break;
-    }
-
-    case RequirementKind::Layout: {
-      // Substitute the constrained types.
-      auto first = reqReq.getFirstType().subst(reqToSyntheticEnvMap);
-      if (!first->isTypeParameter()) break;
-
-      builder.addRequirement(Requirement(RequirementKind::Layout, first,
-                                         reqReq.getLayoutConstraint()),
-                             source);
-      break;
-    }
-
-    case RequirementKind::Superclass: {
-      // Substitute the constrained types.
-      auto first = reqReq.getFirstType().subst(reqToSyntheticEnvMap,
-                                               SubstFlags::UseErrorType);
-      auto second = reqReq.getSecondType().subst(reqToSyntheticEnvMap,
-                                                 SubstFlags::UseErrorType);
-
-      if (!first->isTypeParameter()) break;
-
-      builder.addRequirement(Requirement(RequirementKind::Superclass,
-                                         first, second),
-                             source);
-      break;
-    }
-
-    case RequirementKind::SameType: {
-      // Substitute the constrained types.
-      auto first = reqReq.getFirstType().subst(reqToSyntheticEnvMap,
-                                               SubstFlags::UseErrorType);
-      auto second = reqReq.getSecondType().subst(reqToSyntheticEnvMap,
-                                                 SubstFlags::UseErrorType);
-
-      // FIXME: We really want to check hasTypeParameter here, but the
-      // GenericSignatureBuilder isn't ready for that.
-      if (!first->isTypeParameter()) {
-        // When the second is not a type parameter either, drop the requirement.
-        // If the types were different, this requirement will be unsatisfiable.
-        if (!second->isTypeParameter()) continue;
-
-        // Put the type parameter first.
-        std::swap(first, second);
-      }
-
-      builder.addRequirement(Requirement(RequirementKind::SameType,
-                                         first, second),
-                             source);
-      break;
-    }
-    }
+  for (auto &req : reqSig->getRequirements()) {
+    builder.addRequirement(req, source, conformanceDC->getParentModule(),
+                           &reqToSyntheticEnvMap);
   }
 
   // Finalize the generic signature builder.
@@ -1320,11 +1275,41 @@ static bool isBetterMatch(TypeChecker &tc, DeclContext *dc,
   return false;
 }
 
+void
+WitnessChecker::lookupValueWitnessesViaImplementsAttr(
+    ValueDecl *req, SmallVector<ValueDecl *, 4> &witnesses) {
+  if (!req->isProtocolRequirement())
+    return;
+  if (!req->hasName())
+    return;
+  auto *PD = dyn_cast<ProtocolDecl>(req->getDeclContext());
+  if (!PD)
+    return;
+  auto i = ImplementsTable.find(req->getFullName());
+  if (i == ImplementsTable.end())
+    return;
+  for (auto candidate : i->second) {
+    if (auto A = candidate->getAttrs().getAttribute<ImplementsAttr>()) {
+      Type T = A->getProtocolType().getType();
+      if (auto *PT = T->getAs<ProtocolType>()) {
+        if (PT->getDecl() == PD) {
+          witnesses.push_back(candidate);
+        }
+      }
+    }
+  }
+}
+
 SmallVector<ValueDecl *, 4> 
 WitnessChecker::lookupValueWitnesses(ValueDecl *req, bool *ignoringNames) {
   assert(!isa<AssociatedTypeDecl>(req) && "Not for lookup for type witnesses*");
   
   SmallVector<ValueDecl *, 4> witnesses;
+
+  // Do an initial check to see if there are any @_implements remappings
+  // for this requirement.
+  lookupValueWitnessesViaImplementsAttr(req, witnesses);
+
   if (req->isOperator()) {
     // Operator lookup is always global.
     auto lookupOptions = defaultUnqualifiedLookupOptions;
@@ -1905,7 +1890,7 @@ namespace {
 
   void MultiConformanceChecker::checkAllConformances() {
     bool anyInvalid = false;
-    for(unsigned I = 0, N = AllConformances.size(); I < N; I ++) {
+    for (unsigned I = 0, N = AllConformances.size(); I < N; I ++) {
       auto *conformance = AllConformances[I];
       // Check this conformance and emit fixits if this is the last one in the pool.
       checkIndividualConformance(conformance, I == N - 1);
@@ -2729,6 +2714,15 @@ diagnoseMissingWitnesses(MissingWitnessDiagnosisKind Kind) {
   }
 }
 
+static bool
+witnessHasImplementsAttrForRequirement(ValueDecl *witness,
+                                       ValueDecl *requirement) {
+  if (auto A = witness->getAttrs().getAttribute<ImplementsAttr>()) {
+    return A->getMemberName() == requirement->getFullName();
+  }
+  return false;
+}
+
 ResolveWitnessResult
 ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
   assert(!isa<AssociatedTypeDecl>(requirement) && "Use resolveTypeWitnessVia*");
@@ -2761,7 +2755,7 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
         if (auto conformance =
               TC.conformsToProtocol(Adoptee, derivableProto, DC, None)) {
           if (conformance->isConcrete())
-            conformance->getConcrete()->getWitness(derivable, &TC);
+            (void)conformance->getConcrete()->getWitnessDecl(derivable, &TC);
         }
       }
     }
@@ -2787,8 +2781,9 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
     auto witness = best.Witness;
 
     // If the name didn't actually line up, complain.
-    if (ignoringNames && 
-        requirement->getFullName() != best.Witness->getFullName()) {
+    if (ignoringNames &&
+        requirement->getFullName() != best.Witness->getFullName() &&
+        !witnessHasImplementsAttrForRequirement(best.Witness, requirement)) {
 
       diagnoseOrDefer(requirement, false,
         [witness, requirement](NormalProtocolConformance *conformance) {
@@ -3147,7 +3142,7 @@ static CheckTypeWitnessResult checkTypeWitness(TypeChecker &tc, DeclContext *dc,
                                                AssociatedTypeDecl *assocType, 
                                                Type type) {
   if (auto superclass = assocType->getSuperclass()) {
-    if (!superclass->isExactSuperclassOf(type, &tc))
+    if (!superclass->isExactSuperclassOf(type))
       return superclass->getAnyNominal();
   }
 
@@ -5315,7 +5310,8 @@ TypeChecker::conformsToProtocol(Type T, ProtocolDecl *Proto, DeclContext *DC,
 
     if (T->isExistentialType()) {
       bool anyUnsatisfied = false;
-      for (auto *proto : T->getExistentialLayout().getProtocols()) {
+      auto layout = T->getExistentialLayout();
+      for (auto *proto : layout.getProtocols()) {
         auto *protoDecl = proto->getDecl();
         if ((*unsatisfiedDependency)(requestInheritedProtocols(protoDecl)))
           anyUnsatisfied = true;
@@ -6054,7 +6050,7 @@ TypeChecker::findWitnessedObjCRequirements(const ValueDecl *witness,
       }
       if (!*conformance) continue;
 
-      const Decl *found = (*conformance)->getWitness(req, this).getDecl();
+      const Decl *found = (*conformance)->getWitnessDecl(req, this);
 
       if (!found) {
         // If we have an optional requirement in an inherited conformance,

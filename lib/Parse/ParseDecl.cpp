@@ -437,6 +437,62 @@ bool Parser::parseSpecializeAttribute(swift::tok ClosingBrace, SourceLoc AtLoc,
   return true;
 }
 
+ParserResult<ImplementsAttr>
+Parser::parseImplementsAttribute(SourceLoc AtLoc, SourceLoc Loc) {
+  StringRef AttrName = "_implements";
+  ParserStatus Status;
+
+  if (Tok.isNot(tok::l_paren)) {
+    diagnose(Loc, diag::attr_expected_lparen, AttrName,
+             /*DeclModifier=*/false);
+    Status.setIsParseError();
+    return Status;
+  }
+
+  SourceLoc lParenLoc = consumeToken();
+
+  ParserResult<TypeRepr> ProtocolType = parseType();
+  Status |= ProtocolType;
+
+  if (!(Status.shouldStopParsing() || consumeIf(tok::comma))) {
+    diagnose(Tok.getLoc(), diag::attr_expected_comma, AttrName,
+             /*DeclModifier=*/false);
+    Status.setIsParseError();
+  }
+
+  DeclNameLoc MemberNameLoc;
+  DeclName MemberName;
+  if (!Status.shouldStopParsing()) {
+    MemberName =
+      parseUnqualifiedDeclName(/*afterDot=*/false, MemberNameLoc,
+                               diag::attr_implements_expected_member_name,
+                               /*allowOperators=*/true,
+                               /*allowZeroArgCompoundNames=*/true);
+    if (!MemberName) {
+      Status.setIsParseError();
+    }
+  }
+
+  if (Status.isError()) {
+    skipUntil(tok::r_paren);
+  }
+
+  SourceLoc rParenLoc;
+  if (!consumeIf(tok::r_paren, rParenLoc)) {
+    diagnose(lParenLoc, diag::attr_expected_rparen, AttrName,
+             /*DeclModifier=*/false);
+    Status.setIsParseError();
+  }
+
+  if (Status.isError()) {
+    return Status;
+  }
+
+  return ParserResult<ImplementsAttr>(
+    ImplementsAttr::create(Context, AtLoc, SourceRange(Loc, rParenLoc),
+                           ProtocolType.get(), MemberName, MemberNameLoc));
+}
+
 bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
                                    DeclAttrKind DK) {
   // Ok, it is a valid attribute, eat it, and then process it.
@@ -1258,6 +1314,14 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
     Attributes.add(Attr);
     break;
     }
+
+  case DAK_Implements: {
+    ParserResult<ImplementsAttr> Attr = parseImplementsAttribute(AtLoc, Loc);
+    if (Attr.isNonNull()) {
+      Attributes.add(Attr.get());
+    }
+    break;
+  }
   }
 
   if (DuplicateAttribute) {
@@ -3156,7 +3220,7 @@ ParserResult<TypeDecl> Parser::parseDeclAssociatedType(Parser::ParseDeclOptions 
   // Parse a 'where' clause if present.
   if (Tok.is(tok::kw_where)) {
     auto whereStatus = parseProtocolOrAssociatedTypeWhereClause(
-        TrailingWhere, /*inProtocol=*/false);
+        TrailingWhere, /*isProtocol=*/false);
     if (whereStatus.shouldStopParsing())
       return whereStatus;
   }

@@ -160,7 +160,7 @@ func r22162441(_ lines: [String]) {
 func testMap() {
   let a = 42
   [1,a].map { $0 + 1.0 } // expected-error {{binary operator '+' cannot be applied to operands of type 'Int' and 'Double'}}
-  // expected-note @-1 {{overloads for '+' exist with these partially matching parameter lists: (Int, Int), (Double, Double), (Int, UnsafeMutablePointer<Pointee>), (Int, UnsafePointer<Pointee>)}}
+  // expected-note @-1 {{overloads for '+' exist with these partially matching parameter lists: }}
 }
 
 // <rdar://problem/22414757> "UnresolvedDot" "in wrong phase" assertion from verifier
@@ -325,8 +325,7 @@ func someGeneric19997471<T>(_ x: T) {
 func f20371273() {
   let x: [Int] = [1, 2, 3, 4]
   let y: UInt = 4
-  x.filter { $0 == y }  // expected-error {{binary operator '==' cannot be applied to operands of type 'Int' and 'UInt'}}
-  // expected-note @-1 {{overloads for '==' exist with these partially matching parameter lists: (UInt, UInt), (Int, Int)}}
+  _ = x.filter { ($0 + y)  > 42 }  // expected-warning {{deprecated}}
 }
 
 

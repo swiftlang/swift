@@ -295,7 +295,7 @@ public:
   /// Emit a symbol identifying the reflection metadata version.
   void emitReflectionMetadataVersion();
 
-  /// Checks if the metadata of \p Nominal can be emitted lazyly.
+  /// Checks if the metadata of \p Nominal can be emitted lazily.
   ///
   /// If yes, \p Nominal is added to eligibleLazyMetadata and true is returned.
   bool tryEnableLazyTypeMetadata(NominalTypeDecl *Nominal);
@@ -318,7 +318,7 @@ public:
     }
   }
 
-  /// Return true if \p wt can be emitted lazyly.
+  /// Return true if \p wt can be emitted lazily.
   bool canEmitWitnessTableLazily(SILWitnessTable *wt);
 
   /// Adds \p Conf to LazyWitnessTables if it has not been added yet.
@@ -920,10 +920,6 @@ public:
 
   Address getAddrOfFieldOffset(VarDecl *D, bool isIndirect,
                                ForDefinition_t forDefinition);
-  Address getAddrOfWitnessTableOffset(SILDeclRef fn,
-                                      ForDefinition_t forDefinition);
-  Address getAddrOfWitnessTableOffset(VarDecl *field,
-                                      ForDefinition_t forDefinition);
   llvm::Function *getAddrOfValueWitness(CanType concreteType,
                                         ValueWitness index,
                                         ForDefinition_t forDefinition);
@@ -960,10 +956,6 @@ public:
   llvm::Constant *getAddrOfObjCClass(ClassDecl *D,
                                      ForDefinition_t forDefinition);
   Address getAddrOfObjCClassRef(ClassDecl *D);
-  llvm::Constant *getAddrOfObjCMetaclass(ClassDecl *D,
-                                         ForDefinition_t forDefinition);
-  llvm::Constant *getAddrOfSwiftMetaclassStub(ClassDecl *D,
-                                              ForDefinition_t forDefinition);
   llvm::Constant *getAddrOfMetaclassObject(ClassDecl *D,
                                            ForDefinition_t forDefinition);
   llvm::Function *getAddrOfSILFunction(SILFunction *f,

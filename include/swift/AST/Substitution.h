@@ -48,6 +48,13 @@ public:
   
   Substitution(Type Replacement, ArrayRef<ProtocolConformanceRef> Conformance);
 
+  /// Checks whether the current substitution is canonical.
+  bool isCanonical() const;
+
+  /// Get the canonicalized substitution. If wasCanonical is not nullptr,
+  /// store there whether the current substitution was canonical already.
+  Substitution getCanonicalSubstitution(bool *wasCanonical = nullptr) const;
+
   bool operator!=(const Substitution &other) const { return !(*this == other); }
   bool operator==(const Substitution &other) const;
   void print(llvm::raw_ostream &os,

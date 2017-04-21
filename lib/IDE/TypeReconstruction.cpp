@@ -1764,12 +1764,20 @@ static void VisitNodeProtocolList(
             .empty() /* cannot check for empty type list as Any is allowed */) {
       if (ast) {
         result._types.push_back(
-            ProtocolCompositionType::get(*ast, protocol_types_result._types));
+          ProtocolCompositionType::get(*ast, protocol_types_result._types,
+                                       /*HasExplicitAnyObject=*/false));
       } else {
         result._error = "invalid ASTContext";
       }
     }
   }
+}
+
+static void VisitNodeProtocolListWithClass(
+  ASTContext *ast, std::vector<Demangle::NodePointer> &nodes,
+  Demangle::NodePointer &cur_node, VisitNodeResult &result,
+  const VisitNodeResult &generic_context) { // set by GenericType case
+  llvm_unreachable("Subclass existentials not supported here yet");
 }
 
 static void VisitNodeQualifiedArchetype(
@@ -2070,6 +2078,10 @@ static void visitNodeImpl(
 
   case Demangle::Node::Kind::ProtocolList:
     VisitNodeProtocolList(ast, nodes, node, result, genericContext);
+    break;
+
+  case Demangle::Node::Kind::ProtocolListWithClass:
+    VisitNodeProtocolListWithClass(ast, nodes, node, result, genericContext);
     break;
 
   case Demangle::Node::Kind::QualifiedArchetype:

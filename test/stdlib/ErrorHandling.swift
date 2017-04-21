@@ -340,4 +340,104 @@ ErrorHandlingTests.test("ErrorHandling/Collection map") {
   }
 }
 
+ErrorHandlingTests.test("ErrorHandling/sort") {
+  var collection = Array(1...5)
+  forAllPermutations(collection) { sequence in
+    for i in 0..<sequence.count {
+      var s = sequence
+      let throwElment = sequence[i]
+      do {
+        try s.sort { (a, b) throws -> Bool in
+          if b == throwElment {
+            throw SillyError.JazzHands
+          }
+          return a < b
+        }
+      } catch {}
+      //Check no element should lost and added
+      expectEqualsUnordered(collection, s)
+    }
+  }
+}
+
+ErrorHandlingTests.test("ErrorHandling/sorted") {
+  var collection = Array(1...5)
+  forAllPermutations(collection) { sequence in
+    for i in 0..<sequence.count {
+      var s = sequence
+      var thrown = false
+      let throwElment = sequence[i]
+      var result: [Int] = []
+      do {
+        result = try s.sorted { (a, b) throws -> Bool in
+          if b == throwElment {
+            thrown = true
+            throw SillyError.JazzHands
+          }
+          return a < b
+        }
+      } catch {}
+      //Check actual sequence should not mutate
+      expectEqualSequence(sequence, s)
+      if thrown {
+        //Check result should be empty when thrown
+        expectEqualSequence([], result)
+      } else {
+        //Check result should be sorted when not thrown
+        expectEqualSequence(collection, result)
+      }
+    }
+  }
+}
+ 
+ErrorHandlingTests.test("ErrorHandling/sort") {
+  var collection = Array(1...5)
+  forAllPermutations(collection) { sequence in
+    for i in 0..<sequence.count {
+      var s = sequence
+      let throwElment = sequence[i]
+      do {
+        try s.sort { (a, b) throws -> Bool in
+          if b == throwElment {
+            throw SillyError.JazzHands
+          }
+          return a < b
+        }
+      } catch {}
+      //Check no element should lost and added
+      expectEqualsUnordered(collection, s)
+    }
+  }
+}
+ 
+ErrorHandlingTests.test("ErrorHandling/sorted") {
+  var collection = Array(1...5)
+  forAllPermutations(collection) { sequence in
+    for i in 0..<sequence.count {
+      var s = sequence
+      var thrown = false
+      let throwElment = sequence[i]
+      var result: [Int] = []
+      do {
+        result = try s.sorted { (a, b) throws -> Bool in
+          if b == throwElment {
+            thrown = true
+            throw SillyError.JazzHands
+          }
+          return a < b
+        }
+      } catch {}
+      //Check actual sequence should not mutate
+      expectEqualSequence(sequence, s)
+      if thrown {
+        //Check result should be empty when thrown
+        expectEqualSequence([], result)
+      } else {
+        //Check result should be sorted when not thrown
+        expectEqualSequence(collection, result)
+      }
+    }
+  }
+}
+ 
 runAllTests()

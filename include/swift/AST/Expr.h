@@ -24,6 +24,7 @@
 #include "swift/AST/ProtocolConformanceRef.h"
 #include "swift/AST/TypeAlignments.h"
 #include "swift/AST/TypeLoc.h"
+#include "swift/AST/TypeRepr.h"
 #include "swift/AST/Availability.h"
 #include "llvm/Support/TrailingObjects.h"
 
@@ -157,7 +158,7 @@ class alignas(8) Expr {
     friend class StringLiteralExpr;
     unsigned : NumLiteralExprBits;
 
-    unsigned Encoding : 2;
+    unsigned Encoding : 3;
     unsigned IsSingleUnicodeScalar : 1;
     unsigned IsSingleExtendedGraphemeCluster : 1;
   };
@@ -939,6 +940,12 @@ public:
 
     /// A UTF-16 string.
     UTF16,
+
+    /// A UTF-8 constant string.
+    UTF8ConstString,
+
+    /// A UTF-16 constant string.
+    UTF16ConstString,
 
     /// A single UnicodeScalar, passed as an integer.
     OneUnicodeScalar

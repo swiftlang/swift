@@ -48,7 +48,7 @@ class ReabstractionInfo {
   /// to direct.
   llvm::SmallBitVector Conversions;
 
-  /// If set, indirect to direct conversions should be performned by the generic
+  /// If set, indirect to direct conversions should be performed by the generic
   /// specializer.
   bool ConvertIndirectToDirect;
 

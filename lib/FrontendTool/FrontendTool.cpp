@@ -46,6 +46,7 @@
 #include "swift/Frontend/SerializedDiagnosticConsumer.h"
 #include "swift/Immediate/Immediate.h"
 #include "swift/Option/Options.h"
+#include "swift/Migrator/Migrator.h"
 #include "swift/PrintAsObjC/PrintAsObjC.h"
 #include "swift/Serialization/SerializationOptions.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
@@ -224,7 +225,9 @@ public:
   }
 private:
   void handleDiagnostic(SourceManager &SM, SourceLoc Loc,
-                        DiagnosticKind Kind, StringRef Text,
+                        DiagnosticKind Kind,
+                        StringRef FormatString,
+                        ArrayRef<DiagnosticArgument> FormatArgs,
                         const DiagnosticInfo &Info) override {
     if (!shouldFix(Kind, Info))
       return;
@@ -444,6 +447,10 @@ static bool performCompile(std::unique_ptr<CompilerInstance> &Instance,
     runREPL(*Instance, ProcessCmdLine(Args.begin(), Args.end()),
             Invocation.getParseStdlib());
     return Context.hadError();
+  }
+
+  if (Action == FrontendOptions::UpdateCode) {
+    return migrator::updateCodeAndEmitRemap(Invocation);
   }
 
   SourceFile *PrimarySourceFile = Instance->getPrimarySourceFile();
@@ -921,10 +928,10 @@ int swift::performFrontend(ArrayRef<const char *> Args,
     PDC.handleDiagnostic(dummyMgr, SourceLoc(), DiagnosticKind::Error,
                          "fatal error encountered during compilation; please "
                            "file a bug report with your project and the crash "
-                           "log",
+                           "log", {},
                          DiagnosticInfo());
     PDC.handleDiagnostic(dummyMgr, SourceLoc(), DiagnosticKind::Note, reason,
-                         DiagnosticInfo());
+                         {}, DiagnosticInfo());
     if (shouldCrash)
       abort();
   };

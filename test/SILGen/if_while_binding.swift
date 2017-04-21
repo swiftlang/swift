@@ -259,7 +259,7 @@ func if_multi_where() {
   // CHECK:   br [[ELSE]]
 
   // CHECK: [[CHECK_WHERE]]([[B:%[0-9]+]] : $String):
-  // CHECK:   function_ref Swift.Bool._getBuiltinLogicValue () -> Builtin.Int1
+  // CHECK:   function_ref Swift.Bool._getBuiltinLogicValue() -> Builtin.Int1
   // CHECK:   cond_br {{.*}}, [[IF_BODY:bb[0-9]+]], [[IF_EXIT3:bb[0-9]+]]
   // CHECK: [[IF_EXIT3]]:
   // CHECK:   destroy_value [[BBOX]]

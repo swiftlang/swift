@@ -54,7 +54,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// in source control, you should also update the comment to briefly
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
-const uint16_t VERSION_MINOR = 332; // Last change: constant_string_literal
+const uint16_t VERSION_MINOR = 335; // Last change: no type in objc method table
 
 using DeclID = PointerEmbeddedInt<unsigned, 31>;
 using DeclIDField = BCFixed<31>;
@@ -261,6 +261,8 @@ enum LayoutRequirementKind : uint8_t {
   Trivial = 3,
   RefCountedObject = 4,
   NativeRefCountedObject = 5,
+  Class = 6,
+  NativeClass = 7
 };
 using LayoutRequirementKindField = BCFixed<3>;
 
@@ -660,6 +662,7 @@ namespace decls_block {
 
   using ProtocolCompositionTypeLayout = BCRecordLayout<
     PROTOCOL_COMPOSITION_TYPE,
+    BCFixed<1>,          // has AnyObject constraint
     BCArray<TypeIDField> // protocols
   >;
 
@@ -755,7 +758,7 @@ namespace decls_block {
     IdentifierIDField, // name
     DeclContextIDField,// context decl
     TypeIDField, // underlying type
-    TypeIDField, // interface type
+    TypeIDField, // interface type (no longer used)
     BCFixed<1>,  // implicit flag
     GenericEnvironmentIDField, // generic environment
     AccessibilityKindField // accessibility
@@ -1309,6 +1312,7 @@ namespace decls_block {
   using ObjCBridgedDeclAttrLayout = BCRecordLayout<ObjCBridged_DECL_ATTR>;
   using SynthesizedProtocolDeclAttrLayout
     = BCRecordLayout<SynthesizedProtocol_DECL_ATTR>;
+  using ImplementsDeclAttrLayout = BCRecordLayout<Implements_DECL_ATTR>;
 
   using InlineDeclAttrLayout = BCRecordLayout<
     Inline_DECL_ATTR,

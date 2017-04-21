@@ -19,7 +19,7 @@
 #define SWIFT_PRINTINGDIAGNOSTICCONSUMER_H
 
 #include "swift/Basic/LLVM.h"
-#include "swift/Basic/DiagnosticConsumer.h"
+#include "swift/AST/DiagnosticConsumer.h"
 
 #include "llvm/Support/raw_ostream.h"
 
@@ -35,7 +35,9 @@ public:
     Stream(stream) { }
 
   virtual void handleDiagnostic(SourceManager &SM, SourceLoc Loc,
-                                DiagnosticKind Kind, StringRef Text,
+                                DiagnosticKind Kind,
+                                StringRef FormatString,
+                                ArrayRef<DiagnosticArgument> FormatArgs,
                                 const DiagnosticInfo &Info) override;
 
   void forceColors() {

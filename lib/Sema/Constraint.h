@@ -82,9 +82,6 @@ enum class ConstraintKind : char {
   /// \brief The first type must conform to the second type (which is a
   /// protocol type).
   ConformsTo,
-  /// \brief The first type must conform to the layout defined by the second
-  /// component representing a layout constraint.
-  Layout,
   /// \brief The first type describes a literal that conforms to the second
   /// type, which is one of the known expressible-by-literal protocols.
   LiteralConformsTo,
@@ -514,7 +511,6 @@ public:
     case ConstraintKind::OperatorArgumentTupleConversion:
     case ConstraintKind::OperatorArgumentConversion:
     case ConstraintKind::ConformsTo:
-    case ConstraintKind::Layout:
     case ConstraintKind::LiteralConformsTo:
     case ConstraintKind::CheckedCast:
     case ConstraintKind::SelfObjectOfProtocol:

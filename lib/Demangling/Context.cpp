@@ -82,7 +82,8 @@ bool Context::isThunkSymbol(llvm::StringRef MangledName) {
     if (MangledName.endswith("TA") ||  // partial application forwarder
         MangledName.endswith("Ta") ||  // ObjC partial application forwarder
         MangledName.endswith("To") ||  // swift-as-ObjC thunk
-        MangledName.endswith("TO")) {  // ObjC-as-swift thunk
+        MangledName.endswith("TO") ||  // ObjC-as-swift thunk
+        MangledName.endswith("TW")) {  // protocol witness thunk
 
       // To avoid false positives, we need to fully demangle the symbol.
       NodePointer Nd = D->demangleSymbol(MangledName);
@@ -95,6 +96,7 @@ bool Context::isThunkSymbol(llvm::StringRef MangledName) {
         case Node::Kind::NonObjCAttribute:
         case Node::Kind::PartialApplyObjCForwarder:
         case Node::Kind::PartialApplyForwarder:
+        case Node::Kind::ProtocolWitness:
           return true;
         default:
           break;
@@ -124,6 +126,10 @@ std::string Context::getThunkTarget(llvm::StringRef MangledName) {
       // Also accept the future mangling prefix.
       // TODO: remove this line as soon as MANGLING_PREFIX_STR gets "_S".
       || MangledName.startswith("_S")) {
+
+    // The target of a protocol witness is not derivable from the mangling.
+    if (MangledName.endswith("TW"))
+      return std::string();
 
     return MangledName.substr(0, MangledName.size() - 2).str();
   }
@@ -182,5 +188,5 @@ std::string demangleTypeAsString(const char *MangledName,
                                   Options);
 }
 
-} // end namespace Mangle
-} // end namespace swift
+} // namespace Demangle
+} // namespace swift

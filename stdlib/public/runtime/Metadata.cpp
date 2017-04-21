@@ -19,6 +19,7 @@
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/Range.h"
 #include "swift/Basic/Lazy.h"
+#include "swift/Runtime/Casting.h"
 #include "swift/Runtime/HeapObject.h"
 #include "swift/Runtime/Metadata.h"
 #include "swift/Runtime/Mutex.h"
@@ -1381,6 +1382,9 @@ void swift::installCommonValueWitnesses(ValueWitnessTable *vwtable) {
     case sizeWithAlignmentMask(32, 31):
       commonVWT = &VALUE_WITNESS_SYM(Bi256_);
       break;
+    case sizeWithAlignmentMask(64, 63):
+      commonVWT = &VALUE_WITNESS_SYM(Bi512_);
+      break;
     }
     
   #define INSTALL_POD_COMMON_WITNESS(NAME) vwtable->NAME = commonVWT->NAME;
@@ -2047,7 +2051,9 @@ public:
   FullMetadata<ExistentialTypeMetadata> Data;
 
   struct Key {
-    size_t NumProtocols;
+    const Metadata *SuperclassConstraint;
+    ProtocolClassConstraint ClassConstraint : 1;
+    size_t NumProtocols : 31;
     const ProtocolDescriptor * const *Protocols;
   };
 
@@ -2058,6 +2064,14 @@ public:
   }
 
   int compareWithKey(Key key) const {
+    if (auto result = compareIntegers(key.ClassConstraint,
+                                      Data.Flags.getClassConstraint()))
+      return result;
+
+    if (auto result = comparePointers(key.SuperclassConstraint,
+                                      Data.getSuperclassConstraint()))
+      return result;
+
     if (auto result = compareIntegers(key.NumProtocols,
                                       Data.Protocols.NumProtocols))
       return result;
@@ -2195,7 +2209,9 @@ ClassExistentialValueWitnessTables;
 /// Instantiate a value witness table for a class-constrained existential
 /// container with the given number of witness table pointers.
 static const ExtraInhabitantsValueWitnessTable *
-getClassExistentialValueWitnesses(unsigned numWitnessTables) {
+getClassExistentialValueWitnesses(const Metadata *superclass,
+                                  unsigned numWitnessTables) {
+  // FIXME: If the superclass is not @objc, use native reference counting.
   if (numWitnessTables == 0) {
 #if SWIFT_OBJC_INTEROP
     return &VALUE_WITNESS_SYM(BO);
@@ -2245,6 +2261,7 @@ ClassExistentialValueWitnessTableCacheEntry(unsigned numWitnessTables) {
 /// shared specialized table for common cases.
 static const ValueWitnessTable *
 getExistentialValueWitnesses(ProtocolClassConstraint classConstraint,
+                             const Metadata *superclassConstraint,
                              unsigned numWitnessTables,
                              SpecialProtocol special) {
   // Use special representation for special protocols.
@@ -2266,8 +2283,10 @@ getExistentialValueWitnesses(ProtocolClassConstraint classConstraint,
   
   switch (classConstraint) {
   case ProtocolClassConstraint::Class:
-    return getClassExistentialValueWitnesses(numWitnessTables);
+    return getClassExistentialValueWitnesses(superclassConstraint,
+                                             numWitnessTables);
   case ProtocolClassConstraint::Any:
+    assert(superclassConstraint == nullptr);
     return getOpaqueExistentialValueWitnesses(numWitnessTables);
   }
 
@@ -2472,14 +2491,18 @@ ExistentialTypeMetadata::getWitnessTable(const OpaqueValue *container,
 /// \brief Fetch a uniqued metadata for an existential type. The array
 /// referenced by \c protocols will be sorted in-place.
 const ExistentialTypeMetadata *
-swift::swift_getExistentialTypeMetadata(size_t numProtocols,
+swift::swift_getExistentialTypeMetadata(ProtocolClassConstraint classConstraint,
+                                        const Metadata *superclassConstraint,
+                                        size_t numProtocols,
                                         const ProtocolDescriptor **protocols)
     SWIFT_CC(RegisterPreservingCC_IMPL) {
 
   // Sort the protocol set.
   std::sort(protocols, protocols + numProtocols);
 
-  ExistentialCacheEntry::Key key = { numProtocols, protocols };
+  ExistentialCacheEntry::Key key = {
+    superclassConstraint, classConstraint, numProtocols, protocols
+  };
   return &ExistentialTypes.getOrInsert(key).first->Data;
 }
 
@@ -2487,29 +2510,47 @@ ExistentialCacheEntry::ExistentialCacheEntry(Key key) {
   // Calculate the class constraint and number of witness tables for the
   // protocol set.
   unsigned numWitnessTables = 0;
-  ProtocolClassConstraint classConstraint = ProtocolClassConstraint::Any;
   for (auto p : make_range(key.Protocols, key.Protocols + key.NumProtocols)) {
-    if (p->Flags.needsWitnessTable()) {
+    if (p->Flags.needsWitnessTable())
       ++numWitnessTables;
-    }
-    if (p->Flags.getClassConstraint() == ProtocolClassConstraint::Class)
-      classConstraint = ProtocolClassConstraint::Class;
   }
+
+#ifndef NDEBUG
+  // Verify the class constraint.
+  {
+    auto classConstraint = ProtocolClassConstraint::Any;
+
+    if (key.SuperclassConstraint)
+      classConstraint = ProtocolClassConstraint::Class;
+    else {
+      for (auto p : make_range(key.Protocols, key.Protocols + key.NumProtocols)) {
+        if (p->Flags.getClassConstraint() == ProtocolClassConstraint::Class)
+          classConstraint = ProtocolClassConstraint::Class;
+      }
+    }
+    
+    assert(classConstraint == key.ClassConstraint);
+  }
+#endif
 
   // Get the special protocol kind for an uncomposed protocol existential.
   // Protocol compositions are currently never special.
   auto special = SpecialProtocol::None;
   if (key.NumProtocols == 1)
     special = key.Protocols[0]->Flags.getSpecialProtocol();
-      
+
   Data.setKind(MetadataKind::Existential);
-  Data.ValueWitnesses = getExistentialValueWitnesses(classConstraint,
+  Data.ValueWitnesses = getExistentialValueWitnesses(key.ClassConstraint,
+                                                     key.SuperclassConstraint,
                                                      numWitnessTables,
                                                      special);
   Data.Flags = ExistentialTypeFlags()
     .withNumWitnessTables(numWitnessTables)
-    .withClassConstraint(classConstraint)
+    .withClassConstraint(key.ClassConstraint)
     .withSpecialProtocol(special);
+  // FIXME
+  //Data.Superclass = key.superclassConstraint;
+  assert(!key.SuperclassConstraint);
   Data.Protocols.NumProtocols = key.NumProtocols;
   for (size_t i = 0; i < key.NumProtocols; ++i)
     Data.Protocols[i] = key.Protocols[i];

@@ -1156,11 +1156,16 @@ func genfoo<T1, T2>(x ix: T1, y iy: T2) where T1 : Prot, T2 : cake.C1, T1.Elemen
       {
         key.kind: source.lang.swift.decl.typealias,
         key.name: "Element",
-        key.usr: "s:4cake2C1C7Element",
+        key.usr: "s:4cake2C1C7Elementa",
         key.offset: 24,
         key.length: 23,
         key.fully_annotated_decl: "<decl.typealias><syntaxtype.keyword>typealias</syntaxtype.keyword> <decl.name>Element</decl.name> = <ref.struct usr=\"s:Si\">Int</ref.struct></decl.typealias>",
         key.conforms: [
+          {
+            key.kind: source.lang.swift.ref.protocol,
+            key.name: "FixedWidthInteger",
+            key.usr: "s:s17FixedWidthIntegerP"
+          },
           {
             key.kind: source.lang.swift.ref.protocol,
             key.name: "SignedInteger",
@@ -1168,13 +1173,8 @@ func genfoo<T1, T2>(x ix: T1, y iy: T2) where T1 : Prot, T2 : cake.C1, T1.Elemen
           },
           {
             key.kind: source.lang.swift.ref.protocol,
-            key.name: "Comparable",
-            key.usr: "s:s10ComparableP"
-          },
-          {
-            key.kind: source.lang.swift.ref.protocol,
-            key.name: "Equatable",
-            key.usr: "s:s9EquatableP"
+            key.name: "_ExpressibleByBuiltinIntegerLiteral",
+            key.usr: "s:s35_ExpressibleByBuiltinIntegerLiteralP"
           }
         ]
       },
@@ -1775,7 +1775,7 @@ func genfoo<T1, T2>(x ix: T1, y iy: T2) where T1 : Prot, T2 : cake.C1, T1.Elemen
       {
         key.kind: source.lang.swift.decl.typealias,
         key.name: "T",
-        key.usr: "s:4cake2S2V1T",
+        key.usr: "s:4cake2S2V1Ta",
         key.offset: 1238,
         key.length: 21,
         key.fully_annotated_decl: "<decl.typealias><syntaxtype.keyword>typealias</syntaxtype.keyword> <decl.name>T</decl.name> = <ref.struct usr=\"s:4cake2S2V\">S2</ref.struct></decl.typealias>",

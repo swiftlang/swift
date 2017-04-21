@@ -369,7 +369,8 @@ public:
   /// Sets up an initialization for the allocated box. This pushes a
   /// CleanupUninitializedBox cleanup that will be replaced when
   /// initialization is completed.
-  LocalVariableInitialization(VarDecl *decl, bool NeedsMarkUninit,
+  LocalVariableInitialization(VarDecl *decl,
+                              Optional<MarkUninitializedInst::Kind> kind,
                               unsigned ArgNo, SILGenFunction &SGF)
       : decl(decl), SGF(SGF) {
     assert(decl->getDeclContext()->isLocalContext() &&
@@ -385,13 +386,14 @@ public:
 
     // The variable may have its lifetime extended by a closure, heap-allocate
     // it using a box.
-    AllocBoxInst *allocBox =
+    SILInstruction *allocBox =
         SGF.B.createAllocBox(decl, boxType, {decl->isLet(), ArgNo});
-    SILValue addr = SGF.B.createProjectBox(decl, allocBox, 0);
 
     // Mark the memory as uninitialized, so DI will track it for us.
-    if (NeedsMarkUninit)
-      addr = SGF.B.createMarkUninitializedVar(decl, addr);
+    if (kind)
+      allocBox = SGF.B.createMarkUninitialized(decl, allocBox, kind.getValue());
+
+    SILValue addr = SGF.B.createProjectBox(decl, allocBox, 0);
 
     /// Remember that this is the memory location that we're emitting the
     /// decl to.
@@ -1096,7 +1098,11 @@ InitializationPtr SILGenFunction::emitInitializationForVarDecl(VarDecl *vd) {
     VarLocs[vd] = SILGenFunction::VarLoc::get(addr);
     Result = InitializationPtr(new KnownAddressInitialization(addr));
   } else {
-    Result = emitLocalVariableWithCleanup(vd, isUninitialized);
+    Optional<MarkUninitializedInst::Kind> uninitKind;
+    if (isUninitialized) {
+      uninitKind = MarkUninitializedInst::Kind::Var;
+    }
+    Result = emitLocalVariableWithCleanup(vd, uninitKind);
   }
 
   // If we're initializing a weak or unowned variable, this requires a change in
@@ -1392,11 +1398,10 @@ void SILGenModule::emitExternalDefinition(Decl *d) {
 }
 
 /// Create a LocalVariableInitialization for the uninitialized var.
-InitializationPtr
-SILGenFunction::emitLocalVariableWithCleanup(VarDecl *vd, bool NeedsMarkUninit,
-                                             unsigned ArgNo) {
+InitializationPtr SILGenFunction::emitLocalVariableWithCleanup(
+    VarDecl *vd, Optional<MarkUninitializedInst::Kind> kind, unsigned ArgNo) {
   return InitializationPtr(
-      new LocalVariableInitialization(vd, NeedsMarkUninit, ArgNo, *this));
+      new LocalVariableInitialization(vd, kind, ArgNo, *this));
 }
 
 /// Create an Initialization for an uninitialized temporary.

@@ -172,9 +172,7 @@ public:
   bool mayBlockEpilogueRelease(SILInstruction *II, SILValue Ptr) { 
     // Check whether this instruction read reference count, i.e. uniqueness
     // check. Moving release past that may result in additional COW.
-   if (II->mayReleaseOrReadRefCount())
-      return true;
-    return false;
+    return II->mayReleaseOrReadRefCount();
   } 
 
   /// Does this instruction block the interested ARC instruction ?

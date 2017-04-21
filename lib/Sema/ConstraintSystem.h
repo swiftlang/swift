@@ -2361,17 +2361,15 @@ private:
   /// \param expr The expression to find reductions for.
   void shrink(Expr *expr);
 
-  void gatherNeighboringApplicableFunctionConstraints(
-      Constraint *applicableFn,
-      SmallVectorImpl<Constraint *> &otherApplicableFn);
   bool simplifyForConstraintPropagation();
+  void collectNeighboringBindOverloadDisjunctions(
+      llvm::SetVector<Constraint *> &neighbors);
   bool isBindOverloadConsistent(Constraint *bindConstraint,
-                                Constraint *applicableFn,
-                                llvm::SetVector<Constraint *> &workList,
-                                bool topLevel);
-  bool isApplicableFunctionConsistent(Constraint *applicableFn,
-                                      llvm::SetVector<Constraint *> &workList,
-                                      bool topLevel);
+                                llvm::SetVector<Constraint *> &workList);
+  void reviseBindOverloadDisjunction(Constraint *disjunction,
+                                     llvm::SetVector<Constraint *> &workList,
+                                     bool *foundConsistent);
+  bool areBindPairConsistent(Constraint *first, Constraint *second);
 
 public:
   /// \brief Solve the system of constraints generated from provided expression.

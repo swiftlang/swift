@@ -276,7 +276,8 @@ void SILGenFunction::emitCaptures(SILLocation loc,
         
         AllocBoxInst *allocBox = B.createAllocBox(loc, boxTy);
         ProjectBoxInst *boxAddress = B.createProjectBox(loc, allocBox, 0);
-        B.createCopyAddr(loc, vl.value, boxAddress, IsNotTake,IsInitialization);
+        B.createCopyAddr(loc, vl.value, boxAddress, IsNotTake,
+                         IsInitialization);
         capturedArgs.push_back(emitManagedRValueWithCleanup(allocBox));
       }
 
@@ -482,9 +483,7 @@ void SILGenFunction::emitArtificialTopLevel(ClassDecl *mainClass) {
     auto mainClassAnyObjectConformance = ProtocolConformanceRef(
       *SGM.M.getSwiftModule()->lookupConformance(mainClassTy, anyObjectProtocol,
                                                 nullptr));
-    CanType anyObjectTy = anyObjectProtocol
-      ->getDeclaredInterfaceType()
-      ->getCanonicalType();
+    CanType anyObjectTy = ctx.getAnyObjectType();
     CanType anyObjectMetaTy = CanExistentialMetatypeType::get(anyObjectTy,
                                                   MetatypeRepresentation::ObjC);
 

@@ -18,6 +18,7 @@
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/AccessScope.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/GenericEnvironment.h"
@@ -1068,8 +1069,7 @@ public:
         abort();
       }
       
-      if (!E->getType()->isEqual(
-             Ctx.getProtocol(KnownProtocolKind::AnyObject)->getDeclaredType())){
+      if (!E->getType()->isEqual(Ctx.getAnyObjectType())) {
         Out << "ClassMetatypeToObject does not produce AnyObject:\n";
         E->print(Out);
         Out << "\n";
@@ -1099,8 +1099,7 @@ public:
         abort();
       }
       
-      if (!E->getType()->isEqual(
-             Ctx.getProtocol(KnownProtocolKind::AnyObject)->getDeclaredType())){
+      if (!E->getType()->isEqual(Ctx.getAnyObjectType())) {
         Out << "ExistentialMetatypeToObject does not produce AnyObject:\n";
         E->print(Out);
         Out << "\n";
@@ -1129,11 +1128,10 @@ public:
         abort();
       }
 
-      SmallVector<ProtocolDecl*, 1> protocols;
-      srcTy->getExistentialTypeProtocols(protocols);
-
-      if (protocols.size() != 1
-          || !protocols[0]->isObjC()) {
+      auto layout = srcTy->getExistentialLayout();
+      if (layout.superclass ||
+          !layout.isObjC() ||
+          layout.getProtocols().size() != 1) {
         Out << "ProtocolMetatypeToObject with non-ObjC-protocol metatype:\n";
         E->print(Out);
         Out << "\n";
@@ -2042,9 +2040,12 @@ public:
       SmallVector<Type, 4> protocolTypes;
       for (auto proto : protocols)
         protocolTypes.push_back(proto->getDeclaredType());
+      auto type = ProtocolCompositionType::get(Ctx, protocolTypes,
+                                               /*HasExplicitAnyObject=*/false);
+      auto layout = type->getExistentialLayout();
       SmallVector<ProtocolDecl *, 4> canonicalProtocols;
-      ProtocolCompositionType::get(Ctx, protocolTypes)
-        ->getExistentialTypeProtocols(canonicalProtocols);
+      for (auto *protoTy : layout.getProtocols())
+        canonicalProtocols.push_back(protoTy->getDecl());
       if (nominalProtocols != canonicalProtocols) {
         dumpRef(decl);
         Out << " doesn't have a complete set of protocols\n";
@@ -2255,6 +2256,7 @@ public:
       verifyGenericEnvironment(generic,
                                generic->getGenericSignature(),
                                generic->getGenericEnvironment());
+      verifyCheckedBase(generic);
     }
 
     void verifyChecked(NominalTypeDecl *nominal) {
@@ -2758,7 +2760,7 @@ public:
 
       // If the destination is a class, walk the supertypes of the source.
       if (destTy->getClassOrBoundGenericClass()) {
-        if (!destTy->isBindableToSuperclassOf(srcTy, nullptr)) {
+        if (!destTy->isBindableToSuperclassOf(srcTy)) {
           srcTy.print(Out);
           Out << " is not a superclass of ";
           destTy.print(Out);

@@ -17,6 +17,7 @@
 #include "swift/ABI/MetadataValues.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/CanTypeVisitor.h"
+#include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/SubstitutionMap.h"
@@ -917,9 +918,13 @@ namespace {
     }
       
     llvm::Value *emitExistentialTypeMetadata(CanType type) {
-      SmallVector<ProtocolDecl*, 2> protocols;
-      type.getExistentialTypeProtocols(protocols);
-      
+      if (auto metatype = tryGetLocal(type))
+        return metatype;
+
+      auto layout = type.getExistentialLayout();
+
+      auto protocols = layout.getProtocols();
+
       // Collect references to the protocol descriptors.
       auto descriptorArrayTy
         = llvm::ArrayType::get(IGF.IGM.ProtocolDescriptorPtrTy,
@@ -933,16 +938,30 @@ namespace {
                                IGF.IGM.ProtocolDescriptorPtrTy->getPointerTo());
       
       unsigned index = 0;
-      for (auto *p : protocols) {
-        llvm::Value *ref = emitProtocolDescriptorRef(IGF, p);
+      for (auto *protoTy : protocols) {
+        auto *protoDecl = protoTy->getDecl();
+        llvm::Value *ref = emitProtocolDescriptorRef(IGF, protoDecl);
         Address slot = IGF.Builder.CreateConstArrayGEP(descriptorArray,
                                                index, IGF.IGM.getPointerSize());
         IGF.Builder.CreateStore(ref, slot);
         ++index;
       }
-      
+
+      // Note: ProtocolClassConstraint::Class is 0, ::Any is 1.
+      auto classConstraint =
+        llvm::ConstantInt::get(IGF.IGM.Int1Ty,
+                               !layout.requiresClass);
+      llvm::Value *superclassConstraint =
+        llvm::ConstantPointerNull::get(IGF.IGM.TypeMetadataPtrTy);
+      if (layout.superclass) {
+        superclassConstraint = IGF.emitTypeMetadataRef(
+          CanType(layout.superclass));
+      }
+
       auto call = IGF.Builder.CreateCall(IGF.IGM.getGetExistentialMetadataFn(),
-                                         {IGF.IGM.getSize(Size(protocols.size())),
+                                         {classConstraint,
+                                          superclassConstraint,
+                                          IGF.IGM.getSize(Size(protocols.size())),
                                           descriptorArray.getAddress()});
       call->setDoesNotThrow();
       IGF.Builder.CreateLifetimeEnd(descriptorArray,
@@ -1887,7 +1906,8 @@ namespace {
 
     llvm::Value *visitAnyClassType(ClassDecl *classDecl) {
       // All class types have the same layout.
-      switch (getReferenceCountingForClass(IGF.IGM, classDecl)) {
+      auto type = classDecl->getDeclaredType()->getCanonicalType();
+      switch (getReferenceCountingForType(IGF.IGM, type)) {
       case ReferenceCounting::Native:
         return emitFromValueWitnessTable(IGF.IGM.Context.TheNativeObjectType);
 
@@ -1934,39 +1954,26 @@ namespace {
       // Reference storage types with witness tables need open-coded layouts.
       // TODO: Maybe we could provide prefabs for 1 witness table.
       if (referent.isExistentialType()) {
-        SmallVector<ProtocolDecl*, 2> protocols;
-        referent.getExistentialTypeProtocols(protocols);
-        for (auto *proto : protocols)
-          if (IGF.getSILTypes().protocolRequiresWitnessTable(proto))
+        auto layout = referent.getExistentialLayout();
+        for (auto *protoTy : layout.getProtocols()) {
+          auto *protoDecl = protoTy->getDecl();
+          if (IGF.getSILTypes().protocolRequiresWitnessTable(protoDecl))
             return visitType(type);
+        }
       }
 
       // Unmanaged references are plain pointers with extra inhabitants,
       // which look like thick metatypes.
+      //
+      // FIXME: This sounds wrong, an Objective-C tagged pointer could be
+      // stored in an unmanaged reference for instance.
       if (type->getOwnership() == Ownership::Unmanaged) {
         auto metatype = CanMetatypeType::get(C.TheNativeObjectType);
         return emitFromValueWitnessTable(metatype);
       }
 
-      auto getReferenceCountingForReferent
-        = [&](CanType referent) -> ReferenceCounting {
-          // If Objective-C interop is enabled, generic types might contain
-          // Objective-C references, so we have to use unknown reference
-          // counting.
-          if (isa<ArchetypeType>(referent) ||
-              referent->isExistentialType())
-            return (IGF.IGM.ObjCInterop ?
-                    ReferenceCounting::Unknown :
-                    ReferenceCounting::Native);
-
-          if (auto classDecl = referent->getClassOrBoundGenericClass())
-            return getReferenceCountingForClass(IGF.IGM, classDecl);
-
-          llvm_unreachable("unexpected referent for ref storage type");
-        };
-
       CanType valueWitnessReferent;
-      switch (getReferenceCountingForReferent(referent)) {
+      switch (getReferenceCountingForType(IGF.IGM, referent)) {
       case ReferenceCounting::Unknown:
       case ReferenceCounting::Block:
       case ReferenceCounting::ObjC:
@@ -3336,7 +3343,8 @@ namespace {
       ClassFlags flags = ClassFlags::IsSwift1;
 
       // Set a flag if the class uses Swift 1.0 refcounting.
-      if (getReferenceCountingForClass(IGM, Target)
+      auto type = Target->getDeclaredType()->getCanonicalType();
+      if (getReferenceCountingForType(IGM, type)
             == ReferenceCounting::Native) {
         flags |= ClassFlags::UsesSwift1Refcounting;
       }
@@ -3479,17 +3487,6 @@ namespace {
     }
 
     void addMethod(SILDeclRef fn) {
-      // If this function is associated with the target class, go
-      // ahead and emit the witness offset variable.
-      if (fn.getDecl()->getDeclContext() == Target) {
-        Address offsetVar = IGM.getAddrOfWitnessTableOffset(fn, ForDefinition);
-        auto global = cast<llvm::GlobalVariable>(offsetVar.getAddress());
-
-        auto offset = B.getNextOffsetFromGlobal();
-        auto offsetV = llvm::ConstantInt::get(IGM.SizeTy, offset.getValue());
-        global->setInitializer(offsetV);
-      }
-
       // Find the vtable entry.
       assert(VTable && "no vtable?!");
       if (SILFunction *func =
@@ -3702,7 +3699,7 @@ namespace {
 
       // Initialize the superclass if we didn't do so as a constant.
       if (HasUnfilledSuperclass) {
-        auto superclass = type->getSuperclass(nullptr)->getCanonicalType();
+        auto superclass = type->getSuperclass()->getCanonicalType();
         llvm::Value *superclassMetadata =
           emitClassHeapMetadataRef(IGF, superclass,
                                    MetadataValueType::TypeMetadata,
@@ -3984,6 +3981,8 @@ static void emitObjCClassSymbol(IRGenModule &IGM,
                                           metadata->getLinkage(),
                                           classSymbol.str(), metadata,
                                           IGM.getModule());
+  alias->setVisibility(metadata->getVisibility());
+
   if (IGM.useDllStorage())
     alias->setDLLStorageClass(metadata->getDLLStorageClass());
 }
@@ -4628,7 +4627,7 @@ llvm::Value *irgen::emitVirtualMethodValue(IRGenFunction &IGF,
     } else {
       // Otherwise, we can directly load the statically known superclass's
       // metadata.
-      auto superTy = instanceTy.getSuperclass(/*resolver=*/nullptr);
+      auto superTy = instanceTy.getSuperclass();
       metadata = emitClassHeapMetadataRef(IGF, superTy.getSwiftRValueType(),
                                           MetadataValueType::TypeMetadata);
     }
@@ -5526,6 +5525,8 @@ SpecialProtocol irgen::getSpecialProtocolID(ProtocolDecl *P) {
   case KnownProtocolKind::BridgedNSError:
   case KnownProtocolKind::BridgedStoredNSError:
   case KnownProtocolKind::ErrorCodeProtocol:
+  case KnownProtocolKind::ExpressibleByBuiltinConstStringLiteral:
+  case KnownProtocolKind::ExpressibleByBuiltinConstUTF16StringLiteral:
     return SpecialProtocol::None;
   }
 

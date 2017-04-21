@@ -205,7 +205,7 @@ TypeChecker::getDynamicBridgedThroughObjCClass(DeclContext *dc,
                                                Type valueType) {
   // We can only bridge from class or Objective-C existential types.
   if (!dynamicType->isObjCExistentialType() &&
-      !dynamicType->getClassOrBoundGenericClass())
+      !dynamicType->mayHaveSuperclass())
     return Type();
 
   // If the value type cannot be bridged, we're done.
@@ -283,7 +283,7 @@ findDeclContextForType(TypeChecker &TC,
     // When looking up a nominal type declaration inside of a
     // protocol extension, always use the nominal type and
     // not the protocol 'Self' type.
-    if (auto *nominalDecl = dyn_cast<NominalTypeDecl>(typeDecl))
+    if (isa<NominalTypeDecl>(typeDecl))
       return resolver->resolveTypeOfDecl(
         DC->getAsNominalTypeOrNominalTypeExtensionContext());
 
@@ -401,8 +401,7 @@ findDeclContextForType(TypeChecker &TC,
       }
     } else {
       // Get the substituted superclass type, if any.
-      superclass = resolver->resolveTypeOfContext(parentDC)
-        ->getSuperclass(nullptr);
+      superclass = resolver->resolveTypeOfContext(parentDC)->getSuperclass();
 
       // Start with the type of the current context.
       auto fromNominal = parentDC->getAsNominalTypeOrNominalTypeExtensionContext();
@@ -426,7 +425,7 @@ findDeclContextForType(TypeChecker &TC,
       if (superclassDecl == ownerNominal)
         return std::make_tuple(superclass, true);
 
-      superclass = superclass->getSuperclass(nullptr);
+      superclass = superclass->getSuperclass();
     }
 
     // Walk refined protocols.
@@ -983,8 +982,10 @@ static Type diagnoseUnknownType(TypeChecker &tc, DeclContext *dc,
   } else {
     // Situation where class tries to inherit from itself, such
     // would produce an assertion when trying to lookup members of the class.
-    auto lazyResolver = tc.Context.getLazyResolver();
-    if (auto superClass = parentType->getSuperclass(lazyResolver)) {
+    //
+    // FIXME: Handle this in a more principled way, since there are many
+    // similar checks.
+    if (auto superClass = parentType->getSuperclass()) {
       if (superClass->isEqual(parentType)) {
         auto decl = parentType->getAnyNominal();
         if (decl) {
@@ -2973,7 +2974,7 @@ Type TypeResolver::resolveCompositionType(CompositionTypeRepr *repr,
     }
 
     if (ty->isExistentialType()) {
-      if (auto superclassTy = ty->getSuperclass(nullptr))
+      if (auto superclassTy = ty->getSuperclass())
         if (checkSuperclass(tyR->getStartLoc(), superclassTy))
           continue;
 
@@ -2986,7 +2987,10 @@ Type TypeResolver::resolveCompositionType(CompositionTypeRepr *repr,
                 ty);
   }
 
-  return ProtocolCompositionType::get(Context, ProtocolTypes);
+  // In user-written types, AnyObject constraints always refer to the
+  // AnyObject type in the standard library.
+  return ProtocolCompositionType::get(Context, ProtocolTypes,
+                                      /*HasExplicitAnyObject=*/false);
 }
 
 Type TypeResolver::resolveMetatypeType(MetatypeTypeRepr *repr,
@@ -3059,7 +3063,7 @@ Type TypeChecker::substMemberTypeWithBase(ModuleDecl *module,
   // derived class as the parent type.
   if (auto *ownerClass = member->getDeclContext()
           ->getAsClassOrClassExtensionContext()) {
-    baseTy = baseTy->getSuperclassForDecl(ownerClass, this);
+    baseTy = baseTy->getSuperclassForDecl(ownerClass);
   }
 
   if (baseTy->is<ModuleType>())
@@ -3098,7 +3102,7 @@ Type TypeChecker::substMemberTypeWithBase(ModuleDecl *module,
 }
 
 Type TypeChecker::getSuperClassOf(Type type) {
-  return type->getSuperclass(this);
+  return type->getSuperclass();
 }
 
 static void lookupAndAddLibraryTypes(TypeChecker &TC,
@@ -3145,7 +3149,7 @@ static void describeObjCReason(TypeChecker &TC, const ValueDecl *VD,
 static void diagnoseFunctionParamNotRepresentable(
     TypeChecker &TC, const AbstractFunctionDecl *AFD, unsigned NumParams,
     unsigned ParamIndex, const ParamDecl *P, ObjCReason Reason) {
-  if (!shouldDiagnoseObjCReason(Reason))
+  if (!shouldDiagnoseObjCReason(Reason, TC.Context))
     return;
 
   if (NumParams == 1) {
@@ -3171,7 +3175,7 @@ static bool isParamListRepresentableInObjC(TypeChecker &TC,
                                            ObjCReason Reason) {
   // If you change this function, you must add or modify a test in PrintAsObjC.
 
-  bool Diagnose = shouldDiagnoseObjCReason(Reason);
+  bool Diagnose = shouldDiagnoseObjCReason(Reason, TC.Context);
 
   bool IsObjC = true;
   unsigned NumParams = PL->size();
@@ -3180,7 +3184,7 @@ static bool isParamListRepresentableInObjC(TypeChecker &TC,
     
     // Swift Varargs are not representable in Objective-C.
     if (param->isVariadic()) {
-      if (Diagnose && shouldDiagnoseObjCReason(Reason)) {
+      if (Diagnose && shouldDiagnoseObjCReason(Reason, TC.Context)) {
         TC.diagnose(param->getStartLoc(), diag::objc_invalid_on_func_variadic,
                     getObjCDiagnosticAttrKind(Reason))
           .highlight(param->getSourceRange());
@@ -3267,7 +3271,7 @@ static bool checkObjCInExtensionContext(TypeChecker &tc,
 static bool checkObjCWithGenericParams(TypeChecker &TC,
                                        const AbstractFunctionDecl *AFD,
                                        ObjCReason Reason) {
-  bool Diagnose = shouldDiagnoseObjCReason(Reason);
+  bool Diagnose = shouldDiagnoseObjCReason(Reason, TC.Context);
 
   if (AFD->getGenericParams()) {
     // Diagnose this problem, if asked to.
@@ -3288,7 +3292,7 @@ static bool checkObjCWithGenericParams(TypeChecker &TC,
 static bool checkObjCInForeignClassContext(TypeChecker &TC,
                                            const ValueDecl *VD,
                                            ObjCReason Reason) {
-  bool Diagnose = shouldDiagnoseObjCReason(Reason);
+  bool Diagnose = shouldDiagnoseObjCReason(Reason, TC.Context);
 
   auto type = VD->getDeclContext()->getDeclaredInterfaceType();
   if (!type)
@@ -3356,7 +3360,7 @@ bool TypeChecker::isRepresentableInObjC(
 
   // If you change this function, you must add or modify a test in PrintAsObjC.
 
-  bool Diagnose = shouldDiagnoseObjCReason(Reason);
+  bool Diagnose = shouldDiagnoseObjCReason(Reason, Context);
 
   if (checkObjCInForeignClassContext(*this, AFD, Reason))
     return false;
@@ -3688,7 +3692,7 @@ bool TypeChecker::isRepresentableInObjC(const VarDecl *VD, ObjCReason Reason) {
   }
   bool Result = T->isRepresentableIn(ForeignLanguage::ObjectiveC,
                                      VD->getDeclContext());
-  bool Diagnose = shouldDiagnoseObjCReason(Reason);
+  bool Diagnose = shouldDiagnoseObjCReason(Reason, Context);
 
   if (Result && checkObjCInExtensionContext(*this, VD, Diagnose))
     return false;
@@ -3719,7 +3723,7 @@ bool TypeChecker::isRepresentableInObjC(const SubscriptDecl *SD,
                                         ObjCReason Reason) {
   // If you change this function, you must add or modify a test in PrintAsObjC.
 
-  bool Diagnose = shouldDiagnoseObjCReason(Reason);
+  bool Diagnose = shouldDiagnoseObjCReason(Reason, Context);
 
   if (checkObjCInForeignClassContext(*this, SD, Reason))
     return false;
@@ -3810,16 +3814,27 @@ void TypeChecker::diagnoseTypeNotRepresentableInObjC(const DeclContext *DC,
 
   // Special diagnostic for protocols and protocol compositions.
   if (T->isExistentialType()) {
-    SmallVector<ProtocolDecl *, 4> Protocols;
-    T->getExistentialTypeProtocols(Protocols);
-    if (Protocols.empty()) {
+    if (T->isAny()) {
       // Any is not @objc.
       diagnose(TypeRange.Start, diag::not_objc_empty_protocol_composition);
       return;
     }
+
+    auto layout = T->getExistentialLayout();
+
+    // See if the superclass is not @objc.
+    if (layout.superclass &&
+        !layout.superclass->getClassOrBoundGenericClass()->isObjC()) {
+      diagnose(TypeRange.Start, diag::not_objc_class_constraint,
+               layout.superclass);
+      return;
+    }
+
     // Find a protocol that is not @objc.
     bool sawErrorProtocol = false;
-    for (auto PD : Protocols) {
+    for (auto P : layout.getProtocols()) {
+      auto *PD = P->getDecl();
+
       if (PD->isSpecificProtocol(KnownProtocolKind::Error)) {
         sawErrorProtocol = true;
         break;
@@ -3930,7 +3945,8 @@ public:
         if (T->isInvalid())
           return false;
         if (type->isExistentialType()) {
-          for (auto *proto : type->getExistentialLayout().getProtocols()) {
+          auto layout = type->getExistentialLayout();
+          for (auto *proto : layout.getProtocols()) {
             auto *protoDecl = proto->getDecl();
 
             if (protoDecl->existentialTypeSupported(&TC))

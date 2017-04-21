@@ -18,13 +18,13 @@ func createErrorDomain(str: String) -> ErrorDomain {
 // CHECK-RAW-LABEL: sil shared [transparent] [serializable] @_T0SC11ErrorDomainVABSS8rawValue_tcfC
 // CHECK-RAW: bb0([[STR:%[0-9]+]] : $String,
 // CHECK-RAW: [[SELF_BOX:%[0-9]+]] = alloc_box ${ var ErrorDomain }, var, name "self"
-// CHECK-RAW: [[SELF:%[0-9]+]] = project_box [[SELF_BOX]]
-// CHECK-RAW: [[UNINIT_SELF:%[0-9]+]] = mark_uninitialized [rootself] [[SELF]]
+// CHECK-RAW: [[MARKED_SELF_BOX:%[0-9]+]] = mark_uninitialized [rootself] [[SELF_BOX]]
+// CHECK-RAW: [[PB_BOX:%[0-9]+]] = project_box [[MARKED_SELF_BOX]]
 // CHECK-RAW: [[BRIDGE_FN:%[0-9]+]] = function_ref @{{.*}}_bridgeToObjectiveC
 // CHECK-RAW: [[BORROWED_STR:%.*]] = begin_borrow [[STR]]
 // CHECK-RAW: [[BRIDGED:%[0-9]+]] = apply [[BRIDGE_FN]]([[BORROWED_STR]])
 // CHECK-RAW: end_borrow [[BORROWED_STR]] from [[STR]]
-// CHECK-RAW: [[RAWVALUE_ADDR:%[0-9]+]] = struct_element_addr [[UNINIT_SELF]]
+// CHECK-RAW: [[RAWVALUE_ADDR:%[0-9]+]] = struct_element_addr [[PB_BOX]]
 // CHECK-RAW: assign [[BRIDGED]] to [[RAWVALUE_ADDR]]
 
 func getRawValue(ed: ErrorDomain) -> String {

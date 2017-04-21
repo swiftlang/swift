@@ -14,6 +14,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/AnyFunctionRef.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ProtocolConformance.h"
@@ -1252,8 +1253,6 @@ public:
   }
 
   void checkBeginAccessInst(BeginAccessInst *BAI) {
-    require(F.hasAccessMarkers(), "Unexpected begin_access");
-
     auto op = BAI->getOperand();
     requireSameType(BAI->getType(), op->getType(),
                     "result must be same type as operand");
@@ -1264,14 +1263,41 @@ public:
             isa<AllocStackInst>(op) ||
             isa<ProjectBoxInst>(op) ||
             isa<RefElementAddrInst>(op) ||
+            isa<PointerToAddressInst>(op) ||
             isa<SILFunctionArgument>(op) ||
             isa<BeginAccessInst>(op) ||
             isa<MarkUninitializedInst>(op),
             "begin_access operand must be a root address derivation");
 
-    if (BAI->getModule().getStage() != SILStage::Raw) {
-      require(BAI->getEnforcement() != SILAccessEnforcement::Unknown,
+    // Any kind of access marker can be used in the raw stage if either kind
+    // of enforcement is enabled globally.
+    // After the raw stage, only dynamic access markers can be used, and
+    // only if dynamic enforcement is enabled globally.
+    // Eventually, we should allow access markers to persist in SIL, and
+    // even make them obligatory, but we'll need to update a bunch of
+    // passes first.
+    switch (BAI->getEnforcement()) {
+    case SILAccessEnforcement::Unknown:
+      require(F.getModule().getOptions().isAnyExclusivityEnforcementEnabled()
+              && BAI->getModule().getStage() == SILStage::Raw,
               "access must have known enforcement outside raw stage");
+      break;
+
+    case SILAccessEnforcement::Static:
+    case SILAccessEnforcement::Unsafe:
+      require(F.getModule().getOptions().isAnyExclusivityEnforcementEnabled()
+              && BAI->getModule().getStage() == SILStage::Raw,
+              "non-dynamic enforcement is currently disallowed outside "
+              "raw stage");
+      break;
+
+    case SILAccessEnforcement::Dynamic:
+      require(F.getModule().getOptions().EnforceExclusivityDynamic ||
+              (F.getModule().getOptions().EnforceExclusivityStatic &&
+               BAI->getModule().getStage() == SILStage::Raw),
+              "dynamic access enforcement is only allowed after raw stage when "
+              "globally enabled");
+      break;
     }
 
     switch (BAI->getAccessKind()) {
@@ -1288,8 +1314,6 @@ public:
   }
 
   void checkEndAccessInst(EndAccessInst *EAI) {
-    require(F.hasAccessMarkers(), "Unexpected end_access");
-
     auto BAI = dyn_cast<BeginAccessInst>(EAI->getOperand());
     require(BAI != nullptr,
             "operand of end_access must be a begin_access");
@@ -1413,9 +1437,17 @@ public:
     require(MU->getModule().getStage() == SILStage::Raw,
             "mark_uninitialized instruction can only exist in raw SIL");
     require(Src->getType().isAddress() ||
-            Src->getType().getSwiftRValueType()->getClassOrBoundGenericClass(),
-            "mark_uninitialized must be an address or class");
+                Src->getType()
+                    .getSwiftRValueType()
+                    ->getClassOrBoundGenericClass() ||
+                Src->getType().getAs<SILBoxType>(),
+            "mark_uninitialized must be an address, class, or box type");
     require(Src->getType() == MU->getType(),"operand and result type mismatch");
+#if 0
+    // This will be turned back on in a couple of commits.
+    require(isa<AllocationInst>(Src) || isa<SILArgument>(Src),
+            "Mark Uninitialized should always be on the storage location");
+#endif
   }
   
   void checkMarkUninitializedBehaviorInst(MarkUninitializedBehaviorInst *MU) {
@@ -1886,9 +1918,19 @@ public:
 
     require(AI->getType().isObject(),
             "result of alloc_box must be an object");
-    for (unsigned field : indices(AI->getBoxType()->getLayout()->getFields()))
+    for (unsigned field : indices(AI->getBoxType()->getLayout()->getFields())) {
       verifyOpenedArchetype(AI,
                    AI->getBoxType()->getFieldLoweredType(F.getModule(), field));
+    }
+
+    // An alloc_box with a mark_uninitialized user can not have any other users.
+    require(none_of(AI->getUses(),
+                    [](Operand *Op) -> bool {
+                      return isa<MarkUninitializedInst>(Op->getUser());
+                    }) ||
+                AI->hasOneUse(),
+            "An alloc_box with a mark_uninitialized user can not have any "
+            "other users.");
   }
 
   void checkDeallocBoxInst(DeallocBoxInst *DI) {
@@ -2137,8 +2179,7 @@ public:
     // If the method returns Self, substitute AnyObject for the result type.
     if (auto fnDecl = dyn_cast<FuncDecl>(method.getDecl())) {
       if (fnDecl->hasDynamicSelf()) {
-        auto anyObjectTy = C.getProtocol(KnownProtocolKind::AnyObject)
-                             ->getDeclaredType();
+        auto anyObjectTy = C.getAnyObjectType();
         for (auto &dynResult : dynResults) {
           auto newResultTy
             = dynResult.getType()->replaceCovariantResultType(anyObjectTy, 0);
@@ -2173,7 +2214,7 @@ public:
     
     require(getDynamicMethodType(operandType, EMI->getMember())
               .getSwiftRValueType()
-              ->isBindableTo(EMI->getType().getSwiftRValueType(), nullptr),
+              ->isBindableTo(EMI->getType().getSwiftRValueType()),
             "result must be of the method's type");
     verifyOpenedArchetype(EMI, EMI->getType().getSwiftRValueType());
   }
@@ -2472,7 +2513,9 @@ public:
             "alloc_existential_box must be used with a boxed existential "
             "type");
     
-    checkExistentialProtocolConformances(exType, AEBI->getConformances());
+    checkExistentialProtocolConformances(exType,
+                                         AEBI->getFormalConcreteType(),
+                                         AEBI->getConformances());
     verifyOpenedArchetype(AEBI, AEBI->getFormalConcreteType());
   }
 
@@ -2503,7 +2546,9 @@ public:
             "init_existential_addr payload must be a lowering of the formal "
             "concrete type");
     
-    checkExistentialProtocolConformances(exType, AEI->getConformances());
+    checkExistentialProtocolConformances(exType,
+                                         AEI->getFormalConcreteType(),
+                                         AEI->getConformances());
     verifyOpenedArchetype(AEI, AEI->getFormalConcreteType());
   }
 
@@ -2528,7 +2573,9 @@ public:
             "init_existential_opaque operand must be a lowering of the formal "
             "concrete type");
 
-    checkExistentialProtocolConformances(exType, IEI->getConformances());
+    checkExistentialProtocolConformances(exType,
+                                         IEI->getFormalConcreteType(),
+                                         IEI->getConformances());
     verifyOpenedArchetype(IEI, IEI->getFormalConcreteType());
   }
 
@@ -2558,7 +2605,9 @@ public:
             "init_existential_ref operand must be a lowering of the formal "
             "concrete type");
     
-    checkExistentialProtocolConformances(exType, IEI->getConformances());
+    checkExistentialProtocolConformances(exType,
+                                         IEI->getFormalConcreteType(),
+                                         IEI->getConformances());
     verifyOpenedArchetype(IEI, IEI->getFormalConcreteType());
   }
 
@@ -2613,23 +2662,41 @@ public:
             "init_existential_metatype result must match representation of "
             "operand");
 
-    while(auto metatypeType = resultType.is<ExistentialMetatypeType>())
+    while (resultType.is<ExistentialMetatypeType>()) {
       resultType = resultType.getMetatypeInstanceType(F.getModule());
+      operandType = operandType.getMetatypeInstanceType(F.getModule());
+    }
 
-    checkExistentialProtocolConformances(resultType, I->getConformances());
+    checkExistentialProtocolConformances(resultType,
+                                         operandType.getSwiftRValueType(),
+                                         I->getConformances());
     verifyOpenedArchetype(I, MetaTy.getInstanceType());
   }
 
   void checkExistentialProtocolConformances(SILType resultType,
+                                            CanType concreteType,
                                 ArrayRef<ProtocolConformanceRef> conformances) {
-    SmallVector<ProtocolDecl*, 4> protocols;
-    resultType.getSwiftRValueType().getExistentialTypeProtocols(protocols);
+    auto layout = resultType.getSwiftRValueType().getExistentialLayout();
+    auto protocols = layout.getProtocols();
 
     require(conformances.size() == protocols.size(),
             "init_existential instruction must have the "
             "right number of conformances");
+
+    if (layout.requiresClass) {
+      require(concreteType->mayHaveSuperclass() ||
+              (concreteType.isExistentialType() &&
+               concreteType.getExistentialLayout().requiresClass),
+              "init_existential of class existential with non-class type");
+    }
+
+    if (layout.superclass) {
+      require(layout.superclass->isExactSuperclassOf(concreteType),
+              "init_existential of subclass existential with wrong type");
+    }
+
     for (auto i : indices(conformances)) {
-      require(conformances[i].getRequirement() == protocols[i],
+      require(conformances[i].getRequirement() == protocols[i]->getDecl(),
               "init_existential instruction must have conformances in "
               "proper order");
 
@@ -2917,10 +2984,10 @@ public:
       
       if (instClass->usesObjCGenericsModel()) {
         require(instClass->getDeclaredTypeInContext()
-                  ->isBindableToSuperclassOf(opInstTy, nullptr),
+                  ->isBindableToSuperclassOf(opInstTy),
                 "upcast must cast to a superclass or an existential metatype");
       } else {
-        require(instTy->isExactSuperclassOf(opInstTy, nullptr),
+        require(instTy->isExactSuperclassOf(opInstTy),
                 "upcast must cast to a superclass or an existential metatype");
       }
       return;
@@ -2950,8 +3017,7 @@ public:
             "upcast must convert a class instance to a class type");
       if (ToClass->usesObjCGenericsModel()) {
         require(ToClass->getDeclaredTypeInContext()
-                  ->isBindableToSuperclassOf(FromTy.getSwiftRValueType(),
-                                             nullptr),
+                  ->isBindableToSuperclassOf(FromTy.getSwiftRValueType()),
                 "upcast must cast to a superclass or an existential metatype");
       } else {
         require(ToTy.isExactSuperclassOf(FromTy),
@@ -3490,7 +3556,7 @@ public:
     auto bbArgTy = DMBI->getHasMethodBB()->args_begin()[0]->getType();
     require(getDynamicMethodType(operandType, DMBI->getMember())
               .getSwiftRValueType()
-              ->isBindableTo(bbArgTy.getSwiftRValueType(), nullptr),
+              ->isBindableTo(bbArgTy.getSwiftRValueType()),
             "bb argument for dynamic_method_br must be of the method's type");
   }
 

@@ -388,7 +388,8 @@ public:
   void emit(SILGenFunction &gen);
 
   SILValue emitUsingStorage(SILGenFunction &gen, SILLocation loc,
-                            ManagedValue self, RValue &&indices);
+                            ManagedValue self, RValue &&indices,
+                            SILValue callbackBuffer, SILFunction *&callback);
 
   SILValue emitUsingAddressor(SILGenFunction &gen, SILLocation loc,
                               ManagedValue self, RValue &&indices,
@@ -559,7 +560,8 @@ void MaterializeForSetEmitter::emit(SILGenFunction &gen) {
     llvm_unreachable("materializeForSet should never engage in behavior init");
   
   case AccessStrategy::Storage:
-    address = emitUsingStorage(gen, loc, self, std::move(indicesRV));
+    address = emitUsingStorage(gen, loc, self, std::move(indicesRV),
+                               callbackBuffer, callbackFn);
     break;
 
   case AccessStrategy::Addressor:
@@ -683,8 +685,7 @@ SILFunction *MaterializeForSetEmitter::createCallback(SILFunction &F,
     SGM.M.createFunction(Linkage, CallbackName, callbackType,
                          genericEnv, SILLocation(Witness),
                          IsBare, F.isTransparent(), F.isSerialized(),
-                         IsNotThunk,
-                         /*classVisibility=*/SILFunction::NotRelevant,
+                         IsNotThunk, SubclassScope::NotApplicable,
                          /*inlineStrategy=*/InlineDefault,
                          /*EK=*/EffectsKind::Unspecified,
                          /*InsertBefore=*/&F);
@@ -730,11 +731,22 @@ SILFunction *MaterializeForSetEmitter::createCallback(SILFunction &F,
 SILValue MaterializeForSetEmitter::emitUsingStorage(SILGenFunction &gen,
                                                     SILLocation loc,
                                                     ManagedValue self,
-                                                    RValue &&indices) {
+                                                    RValue &&indices,
+                                                    SILValue callbackBuffer,
+                                                    SILFunction *&callback) {
   LValue lvalue = buildLValue(gen, loc, self, std::move(indices),
                               AccessKind::ReadWrite);
+
+  SmallVector<SILValue, 4> valuesToEndAccessOf;
+  gen.ValuesToEndAccessForMaterializeForSet = &valuesToEndAccessOf;
+
   ManagedValue address =
     gen.emitAddressOfLValue(loc, std::move(lvalue), AccessKind::ReadWrite);
+
+  if (!valuesToEndAccessOf.empty()) {
+    // FIXME: build callback to end access.
+  }
+
   return address.getUnmanagedValue();
 }
 

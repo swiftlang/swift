@@ -11,8 +11,8 @@ func getInt() -> Int { return zero }
 func physical_tuple_lvalue(_ c: Int) {
   var x : (Int, Int)
   // CHECK: [[BOX:%[0-9]+]] = alloc_box ${ var (Int, Int) }
-  // CHECK: [[XADDR1:%.*]] = project_box [[BOX]]
-  // CHECK: [[XADDR:%[0-9]+]] = mark_uninitialized [var] [[XADDR1]]
+  // CHECK: [[MARKED_BOX:%[0-9]+]] = mark_uninitialized [var] [[BOX]]
+  // CHECK: [[XADDR:%.*]] = project_box [[MARKED_BOX]]
   x.1 = c
   // CHECK: [[X_1:%[0-9]+]] = tuple_element_addr [[XADDR]] : {{.*}}, 1
   // CHECK: assign %0 to [[X_1]]
@@ -488,7 +488,7 @@ struct DidSetWillSetTests: ForceAccessors {
 
       takeInt(newA)
 
-      // CHECK-NEXT: // function_ref properties.takeInt (Swift.Int) -> ()
+      // CHECK-NEXT: // function_ref properties.takeInt(Swift.Int) -> ()
       // CHECK-NEXT: [[TAKEINTFN:%.*]] = function_ref @_T010properties7takeInt{{[_0-9a-zA-Z]*}}F
       // CHECK-NEXT: apply [[TAKEINTFN]](%0) : $@convention(thin) (Int) -> ()
     }
@@ -502,7 +502,7 @@ struct DidSetWillSetTests: ForceAccessors {
 
       takeInt(a)
 
-      // CHECK-NEXT: // function_ref properties.takeInt (Swift.Int) -> ()
+      // CHECK-NEXT: // function_ref properties.takeInt(Swift.Int) -> ()
       // CHECK-NEXT: [[TAKEINTFN:%.*]] = function_ref @_T010properties7takeInt{{[_0-9a-zA-Z]*}}F
       // CHECK-NEXT: [[AADDR:%.*]] = struct_element_addr %1 : $*DidSetWillSetTests, #DidSetWillSetTests.a
       // CHECK-NEXT: [[A:%.*]] = load [trivial] [[AADDR]] : $*Int
@@ -556,9 +556,10 @@ struct DidSetWillSetTests: ForceAccessors {
   // CHECK-LABEL: sil hidden @_T010properties010DidSetWillC5TestsV{{[_0-9a-zA-Z]*}}fC
   // CHECK: bb0(%0 : $Int, %1 : $@thin DidSetWillSetTests.Type):
   // CHECK:        [[SELF:%.*]] = mark_uninitialized [rootself]
-  // CHECK:        [[P1:%.*]] = struct_element_addr [[SELF]] : $*DidSetWillSetTests, #DidSetWillSetTests.a
+  // CHECK:        [[PB_SELF:%.*]] = project_box [[SELF]]
+  // CHECK:        [[P1:%.*]] = struct_element_addr [[PB_SELF]] : $*DidSetWillSetTests, #DidSetWillSetTests.a
   // CHECK-NEXT:   assign %0 to [[P1]]
-  // CHECK:        [[P2:%.*]] = struct_element_addr [[SELF]] : $*DidSetWillSetTests, #DidSetWillSetTests.a
+  // CHECK:        [[P2:%.*]] = struct_element_addr [[PB_SELF]] : $*DidSetWillSetTests, #DidSetWillSetTests.a
   // CHECK-NEXT:   assign %0 to [[P2]]
 }
 
@@ -680,7 +681,7 @@ func propertyWithDidSetTakingOldValue() {
   p = zero
 }
 
-// CHECK: // properties.(propertyWithDidSetTakingOldValue () -> ()).(p #1).setter : Swift.Int
+// CHECK: // setter of p #1 : Swift.Int in properties.propertyWithDidSetTakingOldValue()
 // CHECK-NEXT: sil {{.*}} @_T010properties32propertyWithDidSetTakingOldValueyyF1pL_Sifs
 // CHECK: bb0([[ARG1:%.*]] : $Int, [[ARG2:%.*]] : ${ var Int }):
 // CHECK-NEXT:  debug_value [[ARG1]] : $Int, let, name "newValue", argno 1
@@ -924,10 +925,11 @@ class r19254812Derived: r19254812Base{
   
 // Accessing the "pi" property should not copy_value/release self.
 // CHECK-LABEL: sil hidden @_T010properties16r19254812DerivedC{{[_0-9a-zA-Z]*}}fc
-// CHECK: [[SELFMUI:%[0-9]+]] = mark_uninitialized [derivedself] 
+// CHECK: [[MARKED_SELF_BOX:%.*]] = mark_uninitialized [derivedself]
+// CHECK: [[PB_BOX:%.*]] = project_box [[MARKED_SELF_BOX]]
 
 // Initialization of the pi field: no copy_values/releases.
-// CHECK:  [[SELF:%[0-9]+]] = load_borrow [[SELFMUI]] : $*r19254812Derived
+// CHECK:  [[SELF:%[0-9]+]] = load_borrow [[PB_BOX]] : $*r19254812Derived
 // CHECK-NEXT:  [[PIPTR:%[0-9]+]] = ref_element_addr [[SELF]] : $r19254812Derived, #r19254812Derived.pi
 // CHECK-NEXT:  assign {{.*}} to [[PIPTR]] : $*Double
 
@@ -935,7 +937,7 @@ class r19254812Derived: r19254812Base{
 // CHECK-NOT: copy_value
 
 // Load of the pi field: no copy_values/releases.
-// CHECK:  [[SELF:%[0-9]+]] = load_borrow [[SELFMUI]] : $*r19254812Derived
+// CHECK:  [[SELF:%[0-9]+]] = load_borrow [[PB_BOX]] : $*r19254812Derived
 // CHECK-NEXT:  [[PIPTR:%[0-9]+]] = ref_element_addr [[SELF]] : $r19254812Derived, #r19254812Derived.pi
 // CHECK-NEXT:  {{.*}} = load [trivial] [[PIPTR]] : $*Double
 // CHECK: return

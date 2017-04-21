@@ -28,6 +28,7 @@
 #include "llvm/IR/Function.h"
 #include "llvm/IR/Module.h"
 
+#include "swift/AST/ExistentialLayout.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/TypeLowering.h"
@@ -471,24 +472,32 @@ void irgen::emitScalarExistentialDowncast(IRGenFunction &IGF,
                                   CheckedCastMode mode,
                                   Optional<MetatypeRepresentation> metatypeKind,
                                   Explosion &ex) {
-  SmallVector<ProtocolDecl*, 4> allProtos;
-  destType.getSwiftRValueType().getAnyExistentialTypeProtocols(allProtos);
+  auto instanceType = destType.getSwiftRValueType();
+  while (auto metatypeType = dyn_cast<ExistentialMetatypeType>(instanceType))
+    instanceType = metatypeType.getInstanceType();
+
+  auto layout = instanceType.getExistentialLayout();
 
   // Look up witness tables for the protocols that need them and get
   // references to the ObjC Protocol* values for the objc protocols.
   SmallVector<llvm::Value*, 4> objcProtos;
   SmallVector<llvm::Value*, 4> witnessTableProtos;
 
-  bool hasClassConstraint = false;
+  bool hasClassConstraint = layout.requiresClass;
   bool hasClassConstraintByProtocol = false;
 
-  for (auto proto : allProtos) {
+  assert(!layout.superclass && "Subclass existentials not supported yet");
+
+  for (auto protoTy : layout.getProtocols()) {
+    auto *protoDecl = protoTy->getDecl();
+
     // If the protocol introduces a class constraint, track whether we need
     // to check for it independent of protocol witnesses.
-    if (proto->requiresClass()) {
-      hasClassConstraint = true;
-      if (proto->getKnownProtocolKind()
-          && *proto->getKnownProtocolKind() == KnownProtocolKind::AnyObject) {
+    if (protoDecl->requiresClass()) {
+      assert(hasClassConstraint);
+
+      if (protoDecl->getKnownProtocolKind()
+          && *protoDecl->getKnownProtocolKind() == KnownProtocolKind::AnyObject) {
         // AnyObject only requires that the type be a class.
         continue;
       }
@@ -498,15 +507,13 @@ void irgen::emitScalarExistentialDowncast(IRGenFunction &IGF,
       hasClassConstraintByProtocol = true;
     }
 
-    if (Lowering::TypeConverter::protocolRequiresWitnessTable(proto)) {
-      auto descriptor = emitProtocolDescriptorRef(IGF, proto);
+    if (Lowering::TypeConverter::protocolRequiresWitnessTable(protoDecl)) {
+      auto descriptor = emitProtocolDescriptorRef(IGF, protoDecl);
       witnessTableProtos.push_back(descriptor);
     }
 
-    if (!proto->isObjC())
-      continue;
-
-    objcProtos.push_back(emitReferenceToObjCProtocol(IGF, proto));
+    if (protoDecl->isObjC())
+      objcProtos.push_back(emitReferenceToObjCProtocol(IGF, protoDecl));
   }
   
   llvm::Type *resultType;
@@ -788,11 +795,9 @@ void irgen::emitScalarCheckedCast(IRGenFunction &IGF,
     llvm::Value *object =
       emitMetatypeToAnyObjectDowncast(IGF, metatypeVal, sourceMetatype, mode);
 
-    auto anyObjectProtocol =
-      IGF.IGM.Context.getProtocol(KnownProtocolKind::AnyObject);
     SILType anyObjectType =
       SILType::getPrimitiveObjectType(
-        CanType(anyObjectProtocol->getDeclaredType()));
+        IGF.IGM.Context.getAnyObjectType());
 
     // Continue, pretending that the source value was an (optional) value.
     Explosion newValue;

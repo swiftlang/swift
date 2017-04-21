@@ -101,7 +101,7 @@ func instantiateGenericUnionConstructor<T>(_ t: T) {
 struct HasVarInit {
   static var state = true && false
 }
-// CHECK-LABEL: // function_ref static mangling.HasVarInit.(state : Swift.Bool).(variable initialization expression).(implicit closure #1)
+// CHECK-LABEL: // function_ref implicit closure #1 : @autoclosure () throws -> Swift.Bool in variable initialization expression of static mangling.HasVarInit.state : Swift.Bool
 // CHECK-NEXT:  function_ref @_T08mangling10HasVarInitV5stateSbvZfiSbyKXKfu_
 
 // auto_closures should not collide with the equivalent non-auto_closure

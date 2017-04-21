@@ -2366,8 +2366,10 @@ static Optional<ObjCReason> shouldMarkAsObjC(TypeChecker &TC,
   // explicitly declared @objc.
   if (VD->getAttrs().hasAttribute<ObjCAttr>())
     return ObjCReason::ExplicitlyObjC;
-  // @IBOutlet, @IBAction, @IBInspectable, @NSManaged, and @GKInspectable
-  // imply @objc.
+  // @IBOutlet, @IBAction, @NSManaged, and @GKInspectable imply @objc.
+  //
+  // @IBInspectable and @GKInspectable imply @objc quietly in Swift 3
+  // (where they warn on failure) and loudly in Swift 4 (error on failure).
   if (VD->getAttrs().hasAttribute<IBOutletAttr>())
     return ObjCReason::ExplicitlyIBOutlet;
   if (VD->getAttrs().hasAttribute<IBActionAttr>())
@@ -2735,7 +2737,7 @@ void swift::markAsObjC(TypeChecker &TC, ValueDecl *D,
   // could be overridden by @nonobjc. If we see a @nonobjc and we are trying
   // to add an @objc for whatever reason, diagnose an error.
   if (auto *attr = D->getAttrs().getAttribute<NonObjCAttr>()) {
-    if (!shouldDiagnoseObjCReason(*isObjC))
+    if (!shouldDiagnoseObjCReason(*isObjC, TC.Context))
       isObjC = ObjCReason::ImplicitlyObjC;
 
     TC.diagnose(D->getStartLoc(), diag::nonobjc_not_allowed,
@@ -2842,7 +2844,7 @@ void swift::markAsObjC(TypeChecker &TC, ValueDecl *D,
   if (*isObjC == ObjCReason::MemberOfObjCSubclass) {
     // If we've been asked to unconditionally warn about these deprecated
     // @objc inference rules, do so now. However, we don't warn about
-    // accessors---just the main storage dclarations.
+    // accessors---just the main storage declarations.
     if (TC.Context.LangOpts.WarnSwift3ObjCInference &&
         !(isa<FuncDecl>(D) && cast<FuncDecl>(D)->isGetterOrSetter())) {
       TC.diagnose(D, diag::objc_inference_swift3_objc_derived);
@@ -3149,7 +3151,8 @@ static void checkVarBehavior(VarDecl *decl, TypeChecker &TC) {
   
   auto dc = decl->getDeclContext();
   auto behaviorSelf = conformance->getType();
-  auto behaviorInterfaceSelf = conformance->getInterfaceType();
+  auto behaviorInterfaceSelf =
+    conformance->getDeclContext()->mapTypeOutOfContext(behaviorSelf);
   auto behaviorProto = conformance->getProtocol();
   auto behaviorProtoTy = behaviorProto->getDeclaredType();
   
@@ -4091,8 +4094,10 @@ public:
       return;
     }
 
-    if (SD->hasInterfaceType())
+    if (SD->hasInterfaceType() || SD->isBeingValidated())
       return;
+
+    SD->setIsBeingValidated();
 
     auto dc = SD->getDeclContext();
     assert(dc->isTypeContext() &&
@@ -4136,6 +4141,8 @@ public:
       if (!SD->getGenericSignatureOfContext())
         TC.configureInterfaceType(SD, SD->getGenericSignature());
     }
+
+    SD->setIsBeingValidated(false);
 
     TC.checkDeclAttributesEarly(SD);
     TC.computeAccessibility(SD);
@@ -5113,7 +5120,7 @@ public:
             // complain.
             auto storageObjCAttr = storage->getAttrs().getAttribute<ObjCAttr>();
             if (storageObjCAttr->isSwift3Inferred() &&
-                shouldDiagnoseObjCReason(*isObjC)) {
+                shouldDiagnoseObjCReason(*isObjC, TC.Context)) {
               TC.diagnose(storage, diag::accessor_swift3_objc_inference,
                           storage->getDescriptiveKind(), storage->getFullName(),
                           isa<SubscriptDecl>(storage), FD->isSetter())
@@ -5247,7 +5254,7 @@ public:
                               bool treatIUOResultAsError) {
     bool emittedError = false;
     Type plainParentTy = owningTy->adjustSuperclassMemberDeclType(
-        parentMember, member, parentMember->getInterfaceType(), &TC);
+        parentMember, member, parentMember->getInterfaceType());
     const auto *parentTy = plainParentTy->castTo<FunctionType>();
     if (isa<AbstractFunctionDecl>(parentMember))
       parentTy = parentTy->getResult()->castTo<FunctionType>();
@@ -5693,7 +5700,7 @@ public:
 
         // Check whether the types are identical.
         auto parentDeclTy = owningTy->adjustSuperclassMemberDeclType(
-            parentDecl, decl, parentDecl->getInterfaceType(), &TC);
+            parentDecl, decl, parentDecl->getInterfaceType());
         parentDeclTy = parentDeclTy->getUnlabeledType(TC.Context);
         if (method) {
           // For methods, strip off the 'Self' type.
@@ -5964,7 +5971,7 @@ public:
       } else if (auto property = dyn_cast_or_null<VarDecl>(abstractStorage)) {
         auto propertyTy = property->getInterfaceType();
         auto parentPropertyTy = superclass->adjustSuperclassMemberDeclType(
-            matchDecl, decl, matchDecl->getInterfaceType(), &TC);
+            matchDecl, decl, matchDecl->getInterfaceType());
         
         if (!propertyTy->canOverride(parentPropertyTy,
                                      OverrideMatchMode::Strict,
@@ -6092,6 +6099,7 @@ public:
     UNINTERESTING_ATTR(DiscardableResult)
 
     UNINTERESTING_ATTR(ObjCMembers)
+    UNINTERESTING_ATTR(Implements)
 
 #undef UNINTERESTING_ATTR
 
@@ -6991,144 +6999,6 @@ static Optional<ObjCReason> shouldMarkClassAsObjC(TypeChecker &TC,
   return None;
 }
 
-using NominalDeclSet = llvm::SmallPtrSetImpl<NominalTypeDecl *>;
-static bool checkEnumDeclCircularity(EnumDecl *E, NominalDeclSet &known,
-                                     Type baseType, bool isGenericArg = false);
-
-static bool checkStructDeclCircularity(StructDecl *S, NominalDeclSet &known,
-                                       Type baseType,
-                                       bool isGenericArg = false);
-
-// dispatch arbitrary declaration to relevant circularity checks.
-static bool checkNominalDeclCircularity(Decl *decl, NominalDeclSet &known,
-                                        Type baseType,
-                                        bool isGenericArg = false) {
-  if (auto s = dyn_cast<StructDecl>(decl)) {
-    if (checkStructDeclCircularity(s, known, baseType, isGenericArg)) {
-      return true;
-    }
-  } else if (auto e = dyn_cast<EnumDecl>(decl)) {
-    if (checkEnumDeclCircularity(e, known, baseType, isGenericArg)) {
-      return true;
-    }
-  }
-  return false;
-}
-
-
-// break down type that "contains" other types and check them each.
-static bool deconstructTypeForDeclCircularity(Type type,
-                                              NominalDeclSet &known) {
-
-  if (auto tuple = type->getAs<TupleType>()) {
-    // check each element in tuple
-    for (auto Elt: tuple->getElements()) {
-      if (deconstructTypeForDeclCircularity(Elt.getType(), known)) {
-        return true;
-      }
-    }
-  }
-
-  if (auto decl = type->getAnyNominal()) {
-    // Found a circularity! Stop checking from here on out.
-    if (known.count(decl)) {
-      return true;
-    }
-
-    bool isGenericArg = type->getAs<BoundGenericType>() != nullptr;
-    if (checkNominalDeclCircularity(decl, known, type, isGenericArg)) {
-      return true;
-    }
-  }
-
-  return false;
-}
-
-
-static bool checkStructDeclCircularity(StructDecl *S, NominalDeclSet &known,
-                                       Type baseType, bool isGenericArg) {
-
-  // if we are checking a generic argument, don't make it a starting point
-  // of a circularity.
-  if (!isGenericArg) {
-    known.insert(S);
-  }
-
-  for (auto field: S->getStoredProperties()) {
-    if (auto vd = dyn_cast<VarDecl>(field)) {
-      // skip uninteresting fields.
-      if (vd->isStatic() || !vd->hasStorage() || !vd->hasType()) {
-        continue;
-      }
-
-      auto vdt = baseType->getTypeOfMember(S->getModuleContext(), vd, nullptr);
-
-      if (deconstructTypeForDeclCircularity(vdt, known)) {
-        return true;
-      }
-    }
-  }
-
-  // we didn't find any circularity, clean up.
-  if (!isGenericArg) {
-    known.erase(S);
-  }
-  return false;
-}
-
-static bool checkEnumDeclCircularity(EnumDecl *E, NominalDeclSet &known,
-                                     Type baseType, bool isGenericArg) {
-  // enums marked as 'indirect' are safe
-  if (E->isIndirect())
-    return false;
-
-  // if we are checking a generic argument, don't make it a starting point
-  // of a circularity.
-  if (!isGenericArg)
-    known.insert(E);
-
-  for (auto elt: E->getAllElements()) {
-    // FIXME: Strange that this can happen, it means we're potentially
-    // not diagnosing circularity when we should be.
-    if (!elt->hasInterfaceType())
-      continue;
-
-    // skip uninteresting fields.
-    if (!elt->getArgumentInterfaceType() || elt->isIndirect())
-      continue;
-
-    auto eltType = baseType->getTypeOfMember(E->getModuleContext(), elt,
-      elt->getArgumentInterfaceType());
-
-    if (deconstructTypeForDeclCircularity(eltType, known))
-      return true;
-  }
-
-  // we didn't find any circularity, clean up.
-  if (!isGenericArg)
-    known.erase(E);
-
-  return false;
-}
-
-void TypeChecker::checkDeclCircularity(NominalTypeDecl *decl) {
-  llvm::SmallPtrSet<NominalTypeDecl *, 16> known;
-  auto baseType = decl->getDeclaredInterfaceType();
-
-  if (checkNominalDeclCircularity(decl, known, baseType)) {
-    if (isa<StructDecl>(decl)) {
-      diagnose(decl->getLoc(),
-               diag::unsupported_recursive_type,
-               decl->getDeclaredInterfaceType());
-    } else if (isa<EnumDecl>(decl)) {
-      diagnose(decl->getLoc(),
-               diag::recursive_enum_not_indirect,
-               decl->getDeclaredInterfaceType())
-        .fixItInsert(decl->getStartLoc(), "indirect ");
-    }
-  }
-}
-
 void TypeChecker::validateDecl(ValueDecl *D) {
   // Generic parameters are validated as part of their context.
   if (isa<GenericTypeParamDecl>(D))
@@ -7285,7 +7155,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
       if (auto superclass = CD->getSuperclassDecl()) {
         if (superclass->getAttrs().hasAttribute<ObjCMembersAttr>() &&
             !CD->getAttrs().hasAttribute<ObjCMembersAttr>()) {
-          CD->getAttrs().add(new (Context) ObjCMembersAttr(/*implicit=*/true));
+          CD->getAttrs().add(new (Context) ObjCMembersAttr(/*IsImplicit=*/true));
         }
       }
     }
@@ -7419,6 +7289,24 @@ void TypeChecker::validateDecl(ValueDecl *D) {
           isObjC = None;
 
         markAsObjC(*this, VD, isObjC);
+
+        // Under the Swift 3 inference rules, if we have @IBInspectable or
+        // @GKInspectable but did not infer @objc, warn that the attribute is
+        if (!isObjC && Context.LangOpts.EnableSwift3ObjCInference) {
+          if (auto attr = VD->getAttrs().getAttribute<IBInspectableAttr>()) {
+            diagnose(attr->getLocation(),
+                     diag::attribute_meaningless_when_nonobjc,
+                     attr->getAttrName())
+              .fixItRemove(attr->getRange());
+          }
+
+          if (auto attr = VD->getAttrs().getAttribute<GKInspectableAttr>()) {
+            diagnose(attr->getLocation(),
+                     diag::attribute_meaningless_when_nonobjc,
+                     attr->getAttrName())
+              .fixItRemove(attr->getRange());
+          }
+        }
 
         // Infer 'dynamic' before touching accessors.
         inferDynamic(Context, VD);
@@ -7688,8 +7576,12 @@ checkExtensionGenericParams(TypeChecker &tc, ExtensionDecl *ext, Type type,
 
   // Local function used to infer requirements from the extended type.
   auto inferExtendedTypeReqs = [&](GenericSignatureBuilder &builder) {
+    auto source =
+      GenericSignatureBuilder::FloatingRequirementSource::forInferred(nullptr);
+
     builder.inferRequirements(*ext->getModuleContext(),
-                              TypeLoc::withoutLoc(extInterfaceType));
+                              TypeLoc::withoutLoc(extInterfaceType),
+                              source);
   };
 
   // Validate the generic type signature.

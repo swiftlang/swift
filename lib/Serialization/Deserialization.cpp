@@ -324,20 +324,17 @@ namespace {
 ///
 /// Returns true if the next entry is a record of type \p recordKind.
 /// Destroys the stream position if the next entry is not a record.
-static bool skipRecord(llvm::BitstreamCursor &cursor, unsigned recordKind) {
+static void skipRecord(llvm::BitstreamCursor &cursor, unsigned recordKind) {
   auto next = cursor.advance(AF_DontPopBlockAtEnd);
-  if (next.Kind != llvm::BitstreamEntry::Record)
-    return false;
-
-  SmallVector<uint64_t, 64> scratch;
-  StringRef blobData;
+  assert(next.Kind == llvm::BitstreamEntry::Record);
 
 #if NDEBUG
   cursor.skipRecord(next.ID);
-  return true;
 #else
+  SmallVector<uint64_t, 64> scratch;
+  StringRef blobData;
   unsigned kind = cursor.readRecord(next.ID, scratch, &blobData);
-  return kind == recordKind;
+  assert(kind == recordKind);
 #endif
 }
 
@@ -1033,30 +1030,30 @@ void ModuleFile::readGenericRequirements(
         error();
         break;
       }
-      case LayoutRequirementKind::NativeRefCountedObject: {
+      case LayoutRequirementKind::NativeRefCountedObject:
         kind = LayoutConstraintKind::NativeRefCountedObject;
         break;
-      }
-      case LayoutRequirementKind::RefCountedObject: {
+      case LayoutRequirementKind::RefCountedObject:
         kind = LayoutConstraintKind::RefCountedObject;
         break;
-      }
-      case LayoutRequirementKind::Trivial: {
+      case LayoutRequirementKind::Trivial:
         kind = LayoutConstraintKind::Trivial;
         break;
-      }
-      case LayoutRequirementKind::TrivialOfExactSize: {
+      case LayoutRequirementKind::TrivialOfExactSize:
         kind = LayoutConstraintKind::TrivialOfExactSize;
         break;
-      }
-      case LayoutRequirementKind::TrivialOfAtMostSize: {
+      case LayoutRequirementKind::TrivialOfAtMostSize:
         kind = LayoutConstraintKind::TrivialOfAtMostSize;
         break;
-      }
-      case LayoutRequirementKind::UnknownLayout: {
+      case LayoutRequirementKind::Class:
+        kind = LayoutConstraintKind::Class;
+        break;
+      case LayoutRequirementKind::NativeClass:
+        kind = LayoutConstraintKind::NativeClass;
+        break;
+      case LayoutRequirementKind::UnknownLayout:
         kind = LayoutConstraintKind::UnknownLayout;
         break;
-      }
       }
 
       ASTContext &ctx = getContext();
@@ -2612,9 +2609,6 @@ ModuleFile::getDeclChecked(DeclID DID, Optional<DeclContext *> ForcedContext) {
       return nullptr;
     }
 
-    if (auto interfaceType = getType(interfaceTypeID))
-      alias->setInterfaceType(interfaceType);
-
     if (isImplicit)
       alias->setImplicit();
 
@@ -4116,15 +4110,18 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
   }
 
   case decls_block::PROTOCOL_COMPOSITION_TYPE: {
+    bool hasExplicitAnyObject;
     ArrayRef<uint64_t> rawProtocolIDs;
 
     decls_block::ProtocolCompositionTypeLayout::readRecord(scratch,
+                                                           hasExplicitAnyObject,
                                                            rawProtocolIDs);
     SmallVector<Type, 4> protocols;
     for (TypeID protoID : rawProtocolIDs)
       protocols.push_back(getType(protoID));
 
-    typeOrOffset = ProtocolCompositionType::get(ctx, protocols);
+    typeOrOffset = ProtocolCompositionType::get(ctx, protocols,
+                                                hasExplicitAnyObject);
     break;
   }
 

@@ -332,22 +332,22 @@ public:
     NewProto = Builder.CreateCall(objc_allocateProtocol, protocolName);
     
     // Add the parent protocols.
-    //
-    // FIXME: Look at the requirement signature instead.
-    for (auto inherited : proto->getInherited()) {
-      SmallVector<ProtocolDecl*, 4> protocols;
-      inherited.getType()->getExistentialTypeProtocols(protocols);
-      for (auto parentProto : protocols) {
-        if (!parentProto->isObjC())
-          continue;
-        llvm::Value *parentRef
-          = IGM.getAddrOfObjCProtocolRef(parentProto, NotForDefinition);
-        parentRef = IGF.Builder.CreateBitCast(parentRef,
-                                   IGM.ProtocolDescriptorPtrTy->getPointerTo());
-        auto parent = Builder.CreateLoad(parentRef,
-                                             IGM.getPointerAlignment());
-        Builder.CreateCall(protocol_addProtocol, {NewProto, parent});
-      }
+    auto *requirementSig = proto->getRequirementSignature();
+    auto conformsTo =
+      requirementSig->getConformsTo(proto->getSelfInterfaceType(),
+                                    *IGF.IGM.getSwiftModule());
+
+    for (auto parentProto : conformsTo) {
+      if (!parentProto->isObjC())
+        continue;
+      llvm::Value *parentRef = IGM.getAddrOfObjCProtocolRef(parentProto,
+                                                            NotForDefinition);
+      parentRef = IGF.Builder.CreateBitCast(parentRef,
+                                            IGM.ProtocolDescriptorPtrTy
+                                              ->getPointerTo());
+      auto parent = Builder.CreateLoad(parentRef,
+                                       IGM.getPointerAlignment());
+      Builder.CreateCall(protocol_addProtocol, {NewProto, parent});
     }
     
     // Add the members.
@@ -616,16 +616,17 @@ void IRGenModule::emitRuntimeRegistration() {
       
       llvm::SmallVector<ProtocolDecl*, 4> protoInitOrder;
 
-      // FIXME: Use the requirement signature instead.
       std::function<void(ProtocolDecl*)> orderProtocol
         = [&](ProtocolDecl *proto) {
+          auto *requirementSig = proto->getRequirementSignature();
+          auto conformsTo = requirementSig->getConformsTo(
+              proto->getSelfInterfaceType(),
+              *getSwiftModule());
+
           // Recursively put parents first.
-          for (auto &inherited : proto->getInherited()) {
-            SmallVector<ProtocolDecl*, 4> parents;
-            inherited.getType()->getExistentialTypeProtocols(parents);
-            for (auto parent : parents)
-              orderProtocol(parent);
-          }
+          for (auto parent : conformsTo)
+            orderProtocol(parent);
+
           // Skip if we don't need to reify this protocol.
           auto found = protos.find(proto);
           if (found == protos.end())
@@ -1156,7 +1157,6 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
   case Kind::ObjCClassRef:
     return SILLinkage::Private;
 
-  case Kind::WitnessTableOffset:
   case Kind::Function:
   case Kind::Other:
   case Kind::ObjCClass:
@@ -1254,7 +1254,6 @@ bool LinkEntity::isAvailableExternally(IRGenModule &IGM) const {
 
   case Kind::ObjCClassRef:
   case Kind::ValueWitness:
-  case Kind::WitnessTableOffset:
   case Kind::TypeMetadataAccessFunction:
   case Kind::TypeMetadataLazyCacheVariable:
   case Kind::Function:
@@ -2413,46 +2412,25 @@ llvm::Constant *IRGenModule::getAddrOfObjCClass(ClassDecl *theClass,
   return addr;
 }
 
-/// Fetch a global reference to the given Objective-C metaclass.
-/// The result is always a GlobalValue of ObjCClassPtrTy.
-llvm::Constant *IRGenModule::getAddrOfObjCMetaclass(ClassDecl *theClass,
-                                                ForDefinition_t forDefinition) {
-  assert(ObjCInterop && "getting address of ObjC metaclass in no-interop mode");
-  assert(!theClass->isForeign());
-  LinkEntity entity = LinkEntity::forObjCMetaclass(theClass);
+/// Fetch the declaration of a metaclass object. The result is always a
+/// GlobalValue of ObjCClassPtrTy, and is either the Objective-C metaclass or
+/// the Swift metaclass stub, depending on whether the class is published as an
+/// ObjC class.
+llvm::Constant *
+IRGenModule::getAddrOfMetaclassObject(ClassDecl *decl,
+                                      ForDefinition_t forDefinition) {
+  assert((!decl->isGenericContext() || decl->hasClangNode()) &&
+         "generic classes do not have a static metaclass object");
+
+  auto entity = decl->getMetaclassKind() == ClassDecl::MetaclassKind::ObjC
+                    ? LinkEntity::forObjCMetaclass(decl)
+                    : LinkEntity::forSwiftMetaclassStub(decl);
+
   auto DbgTy = DebugTypeInfo::getObjCClass(
-      theClass, ObjCClassPtrTy, getPointerSize(), getPointerAlignment());
+      decl, ObjCClassPtrTy, getPointerSize(), getPointerAlignment());
   auto addr = getAddrOfLLVMVariable(entity, getPointerAlignment(),
                                     forDefinition, ObjCClassStructTy, DbgTy);
   return addr;
-}
-
-/// Fetch the declaration of the metaclass stub for the given class type.
-/// The result is always a GlobalValue of ObjCClassPtrTy.
-llvm::Constant *IRGenModule::getAddrOfSwiftMetaclassStub(ClassDecl *theClass,
-                                                ForDefinition_t forDefinition) {
-  assert(ObjCInterop && "getting address of metaclass stub in no-interop mode");
-  LinkEntity entity = LinkEntity::forSwiftMetaclassStub(theClass);
-  auto DbgTy = DebugTypeInfo::getObjCClass(
-      theClass, ObjCClassPtrTy, getPointerSize(), getPointerAlignment());
-  auto addr = getAddrOfLLVMVariable(entity, getPointerAlignment(),
-                                    forDefinition, ObjCClassStructTy, DbgTy);
-  return addr;
-}
-
-/// Fetch the declaration of a metaclass object.  This performs either
-/// getAddrOfSwiftMetaclassStub or getAddrOfObjCMetaclass, depending
-/// on whether the class is published as an ObjC class.
-llvm::Constant *IRGenModule::getAddrOfMetaclassObject(ClassDecl *decl,
-                                                ForDefinition_t forDefinition) {
-  assert((!decl->isGenericContext() || decl->hasClangNode())
-         && "generic classes do not have a static metaclass object");
-  if (decl->checkObjCAncestry() != ObjCClassKind::NonObjC ||
-      decl->hasClangNode()) {
-    return getAddrOfObjCMetaclass(decl, forDefinition);
-  } else {
-    return getAddrOfSwiftMetaclassStub(decl, forDefinition);
-  }
 }
 
 /// Fetch the type metadata access function for a non-generic type.
@@ -2854,30 +2832,6 @@ static Address getAddrOfSimpleVariable(IRGenModule &IGM,
   return Address(addr, alignment);
 }
 
-/// getAddrOfWitnessTableOffset - Get the address of the global
-/// variable which contains an offset within a witness table for the
-/// value associated with the given function.
-Address IRGenModule::getAddrOfWitnessTableOffset(SILDeclRef code,
-                                                ForDefinition_t forDefinition) {
-  LinkEntity entity =
-    LinkEntity::forWitnessTableOffset(code.getDecl());
-  return getAddrOfSimpleVariable(*this, GlobalVars, entity,
-                                 SizeTy, getPointerAlignment(),
-                                 forDefinition);
-}
-
-/// getAddrOfWitnessTableOffset - Get the address of the global
-/// variable which contains an offset within a witness table for the
-/// value associated with the given member variable..
-Address IRGenModule::getAddrOfWitnessTableOffset(VarDecl *field,
-                                                ForDefinition_t forDefinition) {
-  LinkEntity entity =
-    LinkEntity::forWitnessTableOffset(field);
-  return ::getAddrOfSimpleVariable(*this, GlobalVars, entity,
-                                   SizeTy, getPointerAlignment(),
-                                   forDefinition);
-}
-
 /// getAddrOfFieldOffset - Get the address of the global variable
 /// which contains an offset to apply to either an object (if direct)
 /// or a metadata object in order to find an offset to apply to an
@@ -3139,7 +3093,7 @@ IRGenModule::getAddrOfGlobalConstantString(StringRef utf8) {
   auto *unownedRefCountInit = llvm::ConstantInt::get(Int32Ty, 0);
 
   auto *count = llvm::ConstantInt::get(Int32Ty, utf8.size());
-  // Capacitity is length plus one because of the implicitly added '\0'
+  // Capacity is length plus one because of the implicitly added '\0'
   // character.
   auto *capacity = llvm::ConstantInt::get(Int32Ty, utf8.size() + 1);
   auto *flags = llvm::ConstantInt::get(Int8Ty, 0);
@@ -3473,7 +3427,7 @@ static llvm::Function *shouldDefineHelper(IRGenModule &IGM,
   def->setDLLStorageClass(llvm::GlobalVariable::DefaultStorageClass);
   def->setDoesNotThrow();
   def->setCallingConv(IGM.DefaultCC);
-  if(setIsNoInline)
+  if (setIsNoInline)
     def->addFnAttr(llvm::Attribute::NoInline);
   return def;
 }

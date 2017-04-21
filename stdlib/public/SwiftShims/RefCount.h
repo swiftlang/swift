@@ -314,8 +314,8 @@ struct RefCountBitOffsets<4> {
 };
 
 
-/*
-  FIXME: reinstate these assertions
+// FIXME: reinstate these assertions
+#if 0
   static_assert(StrongExtraRefCountShift == IsDeinitingShift + 1, 
                 "IsDeiniting must be LSB-wards of StrongExtraRefCount");
   static_assert(UseSlowRCShift + UseSlowRCBitCount == sizeof(bits)*8,
@@ -327,7 +327,7 @@ struct RefCountBitOffsets<4> {
                 IsDeinitingBitCount + StrongExtraRefCountBitCount +
                 UseSlowRCBitCount == sizeof(bits)*8,
                 "wrong bit count for RefCountBits refcount encoding");
-*/
+#endif
 
 
 // Basic encoding of refcount and flag data into the object's header.

@@ -222,7 +222,7 @@ class LayoutConstraintInfo : public llvm::FoldingSetNode {
                      AllocationArena arena, unsigned alignment = 8);
   void *operator new(size_t Bytes, void *Mem) throw() { return Mem; }
 
-  // Representation of the non-parametrized layouts.
+  // Representation of the non-parameterized layouts.
   static LayoutConstraintInfo UnknownLayoutConstraintInfo;
   static LayoutConstraintInfo RefCountedObjectConstraintInfo;
   static LayoutConstraintInfo NativeRefCountedObjectConstraintInfo;

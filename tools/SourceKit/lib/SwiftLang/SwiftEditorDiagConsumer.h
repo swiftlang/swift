@@ -14,7 +14,7 @@
 #define LLVM_SOURCEKIT_LIB_SWIFTLANG_SWIFTEDITORDIAGCONSUMER_H
 
 #include "SourceKit/Core/LangSupport.h"
-#include "swift/Basic/DiagnosticConsumer.h"
+#include "swift/AST/DiagnosticConsumer.h"
 #include "llvm/ADT/DenseMap.h"
 
 namespace SourceKit {
@@ -67,7 +67,9 @@ public:
   bool hadAnyError() const { return HadAnyError; }
 
   void handleDiagnostic(swift::SourceManager &SM, swift::SourceLoc Loc,
-                        swift::DiagnosticKind Kind, StringRef Text,
+                        swift::DiagnosticKind Kind,
+                        StringRef FormatString,
+                        ArrayRef<swift::DiagnosticArgument> FormatArgs,
                         const swift::DiagnosticInfo &Info) override;
 };
 

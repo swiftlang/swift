@@ -389,6 +389,7 @@ public typealias AnyClass = AnyObject.Type
 /// - `~x == x ^ ~Self.allZeros`
 ///
 /// - SeeAlso: `OptionSet`
+@available(swift, deprecated: 3.1, obsoleted: 4.0, message: "Use FixedWidthInteger protocol instead")
 public protocol BitwiseOperations {
   /// Returns the intersection of bits set in the two arguments.
   ///
@@ -484,6 +485,7 @@ public protocol BitwiseOperations {
   ///
   /// [identity element]:http://en.wikipedia.org/wiki/Identity_element
   /// [fixed point]:http://en.wikipedia.org/wiki/Fixed_point_(mathematics)
+  @available(swift, deprecated: 3.1, obsoleted: 4.0, message: "Use 0 or init() of a type conforming to FixedWidthInteger")
   static var allZeros: Self { get }
 }
 
@@ -714,7 +716,3 @@ infix operator  |= : AssignmentPrecedence
 // example of how this operator is used, and how its use can be hidden
 // from users.
 infix operator ~>
-
-@available(*, unavailable, renamed: "BitwiseOperations")
-public typealias BitwiseOperationsType = BitwiseOperations
-

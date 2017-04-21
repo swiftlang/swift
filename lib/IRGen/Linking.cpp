@@ -115,10 +115,6 @@ std::string LinkEntity::mangleAsString() const {
     case Kind::ProtocolDescriptor:
       return mangler.mangleProtocolDescriptor(cast<ProtocolDecl>(getDecl()));
 
-      //   global ::= 'Wo' entity
-    case Kind::WitnessTableOffset:
-      return mangler.mangleWitnessTableOffset(getDecl());
-
       //   global ::= 'Wv' directness entity
     case Kind::FieldOffset:
       return mangler.mangleFieldOffsetFull(getDecl(), isOffsetIndirect());

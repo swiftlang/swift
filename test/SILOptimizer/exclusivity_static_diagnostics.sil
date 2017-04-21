@@ -39,7 +39,7 @@ bb0(%0 : $Int):
   store %0 to [trivial] %3 : $*Int
   %4 = function_ref @takesTwoInouts : $@convention(thin) (@inout Int, @inout Int) -> ()
   %5 = begin_access [modify] [unknown] %3 : $*Int  // expected-note {{conflicting modification requires exclusive access}}
-  %6 = begin_access [modify] [unknown] %3 : $*Int  // expected-error {{modification requires exclusive access}}
+  %6 = begin_access [modify] [unknown] %3 : $*Int  // expected-warning {{modification requires exclusive access}}
   %7 = apply %4(%5, %6) : $@convention(thin) (@inout Int, @inout Int) -> ()
   end_access %6 : $*Int
   end_access %5: $*Int
@@ -57,7 +57,7 @@ bb0(%0 : $Int):
   %4 = function_ref @takesTwoInouts : $@convention(thin) (@inout Int, @inout Int) -> ()
   %5 = begin_access [modify] [unknown] %3 : $*Int  // expected-note {{conflicting modification requires exclusive access}}
   %6 = begin_access [modify] [unknown] %5 : $*Int
-  %7 = begin_access [modify] [unknown] %3 : $*Int  // expected-error {{modification requires exclusive access}}
+  %7 = begin_access [modify] [unknown] %3 : $*Int  // expected-warning {{modification requires exclusive access}}
   %8 = apply %4(%5, %6) : $@convention(thin) (@inout Int, @inout Int) -> ()
   end_access %7 : $*Int
   end_access %6 : $*Int
@@ -148,7 +148,7 @@ bb0(%0 : $Int, %1 : $Builtin.Int1):
 bb1:
   // Make sure we don't diagnose twice.
   %4 = begin_access [modify] [unknown] %3 : $*Int // expected-note {{conflicting modification requires exclusive access}}
-  %5 = begin_access [modify] [unknown] %3 : $*Int // expected-error {{modification requires exclusive access}}
+  %5 = begin_access [modify] [unknown] %3 : $*Int // expected-warning {{modification requires exclusive access}}
   end_access %5: $*Int
   end_access %4: $*Int
   cond_br %1, bb1, bb2
@@ -199,7 +199,7 @@ bb0(%0 : $Int):
   %2 = project_box %1 : ${ var Int }, 0
   store %0 to [trivial] %2 : $*Int
   %4 = begin_access [read] [unknown] %2 : $*Int // expected-note {{conflicting read requires shared access}}
-  %5 = begin_access [modify] [unknown] %2 : $*Int // expected-error {{modification requires exclusive access}}
+  %5 = begin_access [modify] [unknown] %2 : $*Int // expected-warning {{modification requires exclusive access}}
   end_access %5 : $*Int
   end_access %4: $*Int
   destroy_value %1 : ${ var Int }
@@ -214,7 +214,7 @@ bb0(%0 : $Int):
   %2 = project_box %1 : ${ var Int }, 0
   store %0 to [trivial] %2 : $*Int
   %4 = begin_access [modify] [unknown] %2 : $*Int // expected-note {{conflicting modification requires exclusive access}}
-  %5 = begin_access [read] [unknown] %2 : $*Int // expected-error {{read requires shared access}}
+  %5 = begin_access [read] [unknown] %2 : $*Int // expected-warning {{read requires shared access}}
   end_access %5 : $*Int
   end_access %4: $*Int
   destroy_value %1 : ${ var Int }
@@ -236,7 +236,7 @@ bb0(%0 : $Int):
   %4 = copy_value %2 : ${ var Int }
   %5 = project_box %4 : ${ var Int }, 0
   %6 = begin_access [modify] [unknown] %3 : $*Int  // expected-note {{conflicting modification requires exclusive access}}
-  %7 = begin_access [modify] [unknown] %5 : $*Int  // expected-error {{modification requires exclusive access}}
+  %7 = begin_access [modify] [unknown] %5 : $*Int  // expected-warning {{modification requires exclusive access}}
   end_access %7 : $*Int
   end_access %6: $*Int
   destroy_value %2 : ${ var Int }
@@ -245,6 +245,22 @@ bb0(%0 : $Int):
   return %8 : $()
 }
 
+// CHECK-LABEL: sil hidden @lookThroughMarkUninitialized
+sil hidden @lookThroughMarkUninitialized : $@convention(thin) (Int) -> () {
+bb0(%0 : $Int):
+  %1 = alloc_box ${ var Int }
+  %2 = mark_uninitialized [rootself] %1 : ${ var Int }
+  %3 = project_box %2 : ${ var Int }, 0
+  store %0 to [trivial] %3 : $*Int
+  %4 = project_box %2 : ${ var Int }, 0
+  %5 = begin_access [modify] [unknown] %3 : $*Int  // expected-note {{conflicting modification requires exclusive access}}
+  %6 = begin_access [modify] [unknown] %4 : $*Int  // expected-warning {{modification requires exclusive access}}
+  end_access %6 : $*Int
+  end_access %5: $*Int
+  destroy_value %2 : ${ var Int }
+  %7 = tuple ()
+  return %7 : $()
+}
 
 // Treat global as identity for global_addr instruction-
 sil_global hidden @global1 : $Int
@@ -256,7 +272,7 @@ bb0(%0 : $Int):
   %1 = global_addr @global1 :$*Int
   %2 = global_addr @global1 :$*Int
   %3 = begin_access [modify] [unknown] %1 : $*Int  // expected-note {{conflicting modification requires exclusive access}}
-  %4 = begin_access [modify] [unknown] %2 : $*Int  // expected-error {{modification requires exclusive access}}
+  %4 = begin_access [modify] [unknown] %2 : $*Int  // expected-warning {{modification requires exclusive access}}
   end_access %4 : $*Int
   end_access %3: $*Int
   %5 = tuple ()
@@ -279,7 +295,7 @@ bb0(%0 : $Int):
 // Multiple errors accessing the same location
 
 // If we have a sequence of begin read - begin write - begin read accesses make
-// sure the the second read doesn't report a confusing read-read conflict.
+// sure the second read doesn't report a confusing read-read conflict.
 // CHECK-LABEL: sil hidden @readWriteReadConflictingThirdAccess
 sil hidden @readWriteReadConflictingThirdAccess : $@convention(thin) (Int) -> () {
 bb0(%0 : $Int):
@@ -288,7 +304,7 @@ bb0(%0 : $Int):
   store %0 to [trivial] %3 : $*Int
   %4 = function_ref @takesTwoInouts : $@convention(thin) (@inout Int, @inout Int) -> ()
   %5 = begin_access [read] [unknown] %3 : $*Int  // expected-note {{conflicting read requires shared access}}
-  %6 = begin_access [modify] [unknown] %3 : $*Int  // expected-error {{modification requires exclusive access}}
+  %6 = begin_access [modify] [unknown] %3 : $*Int  // expected-warning {{modification requires exclusive access}}
   %7 = begin_access [read] [unknown] %3 : $*Int // no-error
   %8 = apply %4(%5, %6) : $@convention(thin) (@inout Int, @inout Int) -> ()
   end_access %7 : $*Int
@@ -309,7 +325,7 @@ bb0(%0 : $Int):
   store %0 to [trivial] %3 : $*Int
   %4 = function_ref @takesTwoInouts : $@convention(thin) (@inout Int, @inout Int) -> ()
   %5 = begin_access [modify] [unknown] %3 : $*Int  // expected-note {{conflicting modification requires exclusive access}}
-  %6 = begin_access [modify] [unknown] %3 : $*Int  // expected-error {{modification requires exclusive access}}
+  %6 = begin_access [modify] [unknown] %3 : $*Int  // expected-warning {{modification requires exclusive access}}
   %7 = begin_access [modify] [unknown] %3 : $*Int  // no-error
   %8 = apply %4(%5, %6) : $@convention(thin) (@inout Int, @inout Int) -> ()
   end_access %7 : $*Int
@@ -333,11 +349,72 @@ bb0(%0 : $Int):
   %5 = begin_access [modify] [unknown] %3 : $*Int  // no-note
   end_access %5 : $*Int
   %6 = begin_access [modify] [unknown] %3 : $*Int  // expected-note {{conflicting modification requires exclusive access}}
-  %7 = begin_access [modify] [unknown] %3 : $*Int  // expected-error {{modification requires exclusive access}}
+  %7 = begin_access [modify] [unknown] %3 : $*Int  // expected-warning {{modification requires exclusive access}}
   %8 = apply %4(%5, %6) : $@convention(thin) (@inout Int, @inout Int) -> ()
   end_access %7 : $*Int
   end_access %6: $*Int
   destroy_value %2 : ${ var Int }
   %9 = tuple ()
   return %9 : $()
+}
+
+// Check for iterator invalidation issues when the hash from
+// basic blocks to analysis state is re-hashed. The number of
+// blocks in this test is determined by the initial size of the
+// 'BlockOutAccesses' DenseMap in the implementation.
+//
+//  The unreachable block below must branch to bN where
+//    N = 3/4 * INITIAL_SIZE - 2
+sil @blockMapRehash : $@convention(method) (Builtin.Int1) -> () {
+bb0(%0: $Builtin.Int1):
+ br bb1
+bb1:
+  br bb2
+bb2:
+  br bb3
+bb3:
+  br bb4
+bb4:
+  br bb5
+bb5:
+  br bb6
+bb6:
+  br bb7
+bb7:
+  br bb8
+bb8:
+  br bb9
+bb9:
+  br bb10
+bb10:
+  br bb11
+bb11:
+  br bb12
+bb12:
+  br bb13
+bb13:
+  br bb14
+bb14:
+  br bb15
+bb15:
+  br bb16
+bb16:
+   br bb17
+bb17:
+  br bb18
+bb18:
+  br bb19
+bb19:
+  br bb20
+bb20:
+  br bb21
+bb21:
+  br bb22
+bb22:
+  br bb23 // no-crash
+bb23:
+  %1 = tuple ()
+  return %1 : $()
+bbUnreachable:
+  br bb22
 }

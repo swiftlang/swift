@@ -623,9 +623,15 @@ namespace {
       // Copy over the existing bindings, dividing the constraints up
       // into "favored" and non-favored lists.
       SmallVector<Constraint *, 4> favoredConstraints;
-      for (auto oldConstraint : oldConstraints)
-        if (isFavored(oldConstraint->getOverloadChoice().getDecl()))
+      SmallVector<Constraint *, 4> fallbackConstraints;
+      for (auto oldConstraint : oldConstraints) {
+        auto decl = oldConstraint->getOverloadChoice().getDecl();
+        if (!decl->getAttrs().isUnavailable(CS.getASTContext()) &&
+            isFavored(decl))
           favoredConstraints.push_back(oldConstraint);
+        else
+          fallbackConstraints.push_back(oldConstraint);
+      }
 
       // If we did not find any favored constraints, we're done.
       if (favoredConstraints.empty()) break;
@@ -649,26 +655,20 @@ namespace {
                                         favoredConstraints,
                                         csLoc);
       
-      // If we didn't actually build a disjunction, clone
-      // the underlying constraint so we can mark it as
-      // favored.
-      if (favoredConstraints.size() == 1) {
-        favoredConstraintsDisjunction
-            = favoredConstraintsDisjunction->clone(CS);
-      }
-      
       favoredConstraintsDisjunction->setFavored();
       
-      // Find the disjunction of fallback constraints. If any
-      // constraints were added here, create a new disjunction.
-      Constraint *fallbackConstraintsDisjunction = constraint;
-      
-      // Form the (favored, fallback) disjunction.
-      auto aggregateConstraints = {
-        favoredConstraintsDisjunction,
-        fallbackConstraintsDisjunction
-      };
-      
+      llvm::SmallVector<Constraint *, 2> aggregateConstraints;
+      aggregateConstraints.push_back(favoredConstraintsDisjunction);
+
+      if (!fallbackConstraints.empty()) {
+        // Find the disjunction of fallback constraints. If any
+        // constraints were added here, create a new disjunction.
+        Constraint *fallbackConstraintsDisjunction =
+          Constraint::createDisjunction(CS, fallbackConstraints, csLoc);
+
+        aggregateConstraints.push_back(fallbackConstraintsDisjunction);
+      }
+
       CS.addDisjunctionConstraint(aggregateConstraints, csLoc);
       break;
     }
@@ -2509,7 +2509,7 @@ namespace {
 
       auto selfTy = CS.DC->mapTypeIntoContext(
         typeContext->getDeclaredInterfaceType());
-      auto superclassTy = selfTy->getSuperclass(&tc);
+      auto superclassTy = selfTy->getSuperclass();
 
       if (selfDecl->getInterfaceType()->is<MetatypeType>())
         superclassTy = MetatypeType::get(superclassTy);
@@ -3264,7 +3264,8 @@ bool swift::isExtensionApplied(DeclContext &DC, Type BaseTy,
         createMemberConstraint(Req, ConstraintKind::ConformsTo);
         break;
       case RequirementKind::Layout:
-        createMemberConstraint(Req, ConstraintKind::Layout);
+        // FIXME FIXME FIXME
+        createMemberConstraint(Req, ConstraintKind::ConformsTo);
         break;
       case RequirementKind::Superclass:
         createMemberConstraint(Req, ConstraintKind::Subtype);
@@ -3281,52 +3282,33 @@ bool swift::isExtensionApplied(DeclContext &DC, Type BaseTy,
   return CS.solveSingle().hasValue();
 }
 
-static bool canSatisfy(Type T1, Type T2, DeclContext &DC, ConstraintKind Kind,
-                       bool ReplaceArchetypeWithVariables,
-                       bool AllowFreeVariables) {
-  assert(!T1->hasTypeVariable() && !T2->hasTypeVariable() &&
-         "Unexpected type variable in constraint satisfaction testing");
-
+static bool canSatisfy(Type type1, Type type2, bool openArchetypes,
+                       ConstraintKind kind, DeclContext *dc) {
   std::unique_ptr<TypeChecker> CreatedTC;
-  // If the current ast context has no type checker, create one for it.
-  auto *TC = static_cast<TypeChecker*>(DC.getASTContext().getLazyResolver());
+  // If the current ASTContext has no type checker, create one for it.
+  auto *TC = static_cast<TypeChecker*>(dc->getASTContext().getLazyResolver());
   if (!TC) {
-    CreatedTC.reset(new TypeChecker(DC.getASTContext()));
+    CreatedTC.reset(new TypeChecker(dc->getASTContext()));
     TC = CreatedTC.get();
   }
-  ConstraintSystem CS(*TC, &DC, None);
-  if (ReplaceArchetypeWithVariables) {
-    std::function<Type(Type)> Trans = [&](Type Base) {
-      if (Base->isTypeParameter() || isa<ArchetypeType>(Base.getPointer())) {
-        return Type(CS.createTypeVariable(CS.getConstraintLocator(nullptr),
-                                    TypeVariableOptions::TVO_CanBindToLValue));
-      }
-      return Base;
-    };
-    T1 = T1.transform(Trans);
-    T2 = T2.transform(Trans);
-  }
-  CS.addConstraint(Kind, T1, T2, CS.getConstraintLocator(nullptr));
-  SmallVector<Solution, 4> Solutions;
-  return AllowFreeVariables ?
-          !CS.solve(Solutions, FreeTypeVariableBinding::Allow) :
-          CS.solveSingle().hasValue();
+  return TC->typesSatisfyConstraint(type1, type2, openArchetypes, kind, dc,
+                                    /*unwrappedIUO=*/nullptr);
 }
 
 bool swift::canPossiblyEqual(Type T1, Type T2, DeclContext &DC) {
-  return canSatisfy(T1, T2, DC, ConstraintKind::Equal, true, true);
+  return canSatisfy(T1, T2, true, ConstraintKind::Equal, &DC);
 }
 
 bool swift::canPossiblyConvertTo(Type T1, Type T2, DeclContext &DC) {
-  return canSatisfy(T1, T2, DC, ConstraintKind::Conversion, true, true);
+  return canSatisfy(T1, T2, true, ConstraintKind::Conversion, &DC);
 }
 
 bool swift::isEqual(Type T1, Type T2, DeclContext &DC) {
-  return canSatisfy(T1, T2, DC, ConstraintKind::Equal, false, false);
+  return T1->isEqual(T2);
 }
 
 bool swift::isConvertibleTo(Type T1, Type T2, DeclContext &DC) {
-  return canSatisfy(T1, T2, DC, ConstraintKind::Conversion, false, false);
+  return canSatisfy(T1, T2, false, ConstraintKind::Conversion, &DC);
 }
 
 struct ResolvedMemberResult::Implementation {
