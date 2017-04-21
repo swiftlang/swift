@@ -389,6 +389,8 @@ ProtocolDescriptor ProtocolNoWitnessTable{
     .withDispatchStrategy(ProtocolDispatchStrategy::ObjC)
 };
 
+#if 0 // disabled because of rdar://problem/31759879
+
 TEST(MetadataTest, getExistentialMetadata) {
   const ProtocolDescriptor *protoList1[] = {};
   RaceTest_ExpectEqual<const ExistentialTypeMetadata *>(
@@ -585,6 +587,8 @@ TEST(MetadataTest, getExistentialMetadata) {
       return special;
     });
 }
+
+#endif
 
 static SWIFT_CC(swift) void destroySuperclass(SWIFT_CONTEXT HeapObject *toDestroy) {}
 
