@@ -218,21 +218,46 @@ void swift::initializeTypeMetadataRecordLookup() {
 }
 
 
-int swift::lookupSymbol(const void *address, SymbolInfo *info) {
 #if defined(__CYGWIN__)
-  Dl_info dlinfo;
-  if (dladdr(address, &dlinfo) == 0) {
-    return 0;
-  }
-
-  info->fileName = dlinfo.dli_fname;
-  info->baseAddress = dlinfo.dli_fbase;
-  info->symbolName = dli_info.dli_sname;
-  info->symbolAddress = dli_saddr;
-  return 1;
+#include "ImageInspectionDL.cpp"
 #else
+
+// FIXME: These need a non-CYGWIN implmentation.
+int swift::lookupSymbol(const void *address, SymbolInfo *info) {
   return 0;
-#endif // __CYGWIN__
 }
+
+SWIFT_RUNTIME_STDLIB_INTERFACE
+void *swift::_swift_stdlib_dlopen(const char *filename, int flags,
+                                  char **error) {
+  if (error) {
+    *error = strdup("_swift_stdlib_dlopen: Unimplemented");
+  }
+  return nullptr;
+}
+
+SWIFT_RUNTIME_STDLIB_INTERFACE
+int swift::_swift_stdlib_dlclose(void *handle, char **error) {
+  if (error) {
+    *error = strdup("_swift_stdlib_dlclose: Unimplemented");
+  }
+  return -1;
+}
+
+SWIFT_RUNTIME_STDLIB_INTERFACE
+  void *swift::_swift_stdlib_dlsym(void *handle, const char *symbol,
+                                   char **error) {
+  if (error) {
+    *error = strdup("_swift_stdlib_dlsym: Unimplemented");
+  }
+  return nullptr;
+}
+
+SWIFT_RUNTIME_STDLIB_INTERFACE
+int swift::_swift_stdlib_dladdr(void *addr, Dl_info *info) {
+  return 0;
+}
+
+#endif // defined(__CYGWIN__)
 
 #endif // defined(_WIN32) || defined(__CYGWIN__)

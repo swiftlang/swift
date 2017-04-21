@@ -17,6 +17,7 @@
 #if defined(__ELF__) && defined(__linux__)
 
 #include "ImageInspection.h"
+#include "../SwiftShims/ImageInspectionShims.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/Optional.h"
 #include "llvm/ADT/StringRef.h"
@@ -172,6 +173,24 @@ public:
     return nullptr;
   }
 
+  // Lookup a symbol by name
+  const Elf_Sym *findSymbolByName(const char *name) {
+    if (symbolTable.hasValue() && stringTable.hasValue()) {
+      auto symbols = symbolTable->data<Elf_Sym>();
+      auto strings = stringTable->data<char>();
+      auto stringSize = strings.size();
+
+      for (size_t idx = 0; idx < symbols.size(); idx++) {
+        auto symbol = &symbols[idx];
+        if (symbol->st_name < stringSize
+            && !strcmp(&strings[symbol->st_name], name)) {
+          return symbol;
+        }
+      }
+    }
+    return nullptr;
+  }
+
   const char *symbolName(const Elf_Sym *symbol) {
     if (stringTable.hasValue()) {
       auto strings = stringTable->data<char>();
@@ -319,6 +338,84 @@ swift::lookupSymbol(const void *address, SymbolInfo *info) {
   }
 
   return 1;
+}
+
+
+// This is an opaque handle used to represent the main executable.
+// It shouldn't be dereferenced by the caller so use an address that
+// will fault if it is.
+static void *dlHandle = (void *)1;
+
+SWIFT_RUNTIME_STDLIB_INTERFACE
+void *swift::_swift_stdlib_dlopen(const char *filename, int flags,
+                                  char **error) {
+  if (error) {
+    *error = nullptr;
+  }
+
+  if (filename == nullptr) {
+    // NULL filename represents the main exectuable.
+    TheBinary.get();
+    return dlHandle;
+  } else {
+    if (error) {
+      asprintf(error, "Cannot open `%s'", filename);
+    }
+    return nullptr;
+  }
+}
+
+SWIFT_RUNTIME_STDLIB_INTERFACE
+int swift::_swift_stdlib_dlclose(void *handle, char **error) {
+  if (error) {
+    *error = nullptr;
+  }
+
+  if (handle == dlHandle) {
+    return 0;
+  } else {
+    if (error) {
+      *error = strdup("Invalid handle");
+    }
+    return -1;
+  }
+}
+
+SWIFT_RUNTIME_STDLIB_INTERFACE
+void *swift::_swift_stdlib_dlsym(void *handle, const char *symbol,
+                                 char **error) {
+  if (error) {
+    *error = nullptr;
+  }
+
+  if (handle == RTLD_DEFAULT || handle == dlHandle) {
+    auto &binary = TheBinary.get();
+    auto address = binary.findSymbolByName(symbol);
+    if (address) {
+      return reinterpret_cast<void *>(address->st_value);
+    } else {
+      if (error) {
+        asprintf(error, "Undefined symbol: %s", symbol);
+      }
+    }
+  } else {
+    if (error) {
+      *error = strdup("Invalid handle");
+    }
+  }
+  return nullptr;
+}
+
+SWIFT_RUNTIME_STDLIB_INTERFACE
+int swift::_swift_stdlib_dladdr(void *addr, Dl_info *info) {
+  swift::SymbolInfo symbolInfo;
+
+  int ret = swift::lookupSymbol(addr, &symbolInfo);
+  info->dli_fname = symbolInfo.fileName;
+  info->dli_fbase = symbolInfo.baseAddress;
+  info->dli_sname = symbolInfo.symbolName;
+  info->dli_saddr = symbolInfo.symbolAddress;
+  return ret;
 }
 
 #endif // defined(__ELF__) && defined(__linux__)
