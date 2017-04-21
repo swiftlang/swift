@@ -25,6 +25,7 @@
 #include "ReferenceDependencies.h"
 #include "TBD.h"
 
+#include "swift/Strings.h"
 #include "swift/Subsystems.h"
 #include "swift/AST/ASTScope.h"
 #include "swift/AST/DiagnosticsFrontend.h"
@@ -36,10 +37,12 @@
 #include "swift/Basic/Dwarf.h"
 #include "swift/Basic/Edit.h"
 #include "swift/Basic/FileSystem.h"
+#include "swift/Basic/JSONSerialization.h"
 #include "swift/Basic/LLVMContext.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/Basic/Timer.h"
+#include "swift/Basic/UUID.h"
 #include "swift/Frontend/DiagnosticVerifier.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
@@ -55,6 +58,7 @@
 // FIXME: We're just using CompilerInstance::createOutputFile.
 // This API should be sunk down to LLVM.
 #include "clang/Frontend/CompilerInstance.h"
+#include "clang/APINotes/Types.h"
 
 #include "llvm/ADT/Statistic.h"
 #include "llvm/IR/LLVMContext.h"
@@ -71,6 +75,12 @@
 
 #include <memory>
 #include <unordered_set>
+
+#if !defined(_MSC_VER) && !defined(__MINGW32__)
+#include <unistd.h>
+#else
+#include <io.h>
+#endif
 
 using namespace swift;
 
@@ -131,6 +141,88 @@ static bool emitMakeDependencies(DiagnosticEngine &diags,
   });
 
   return false;
+}
+
+namespace {
+struct LoadedModuleTraceFormat {
+  std::string Name;
+  std::string Arch;
+  std::vector<std::string> SwiftModules;
+};
+}
+
+namespace swift {
+namespace json {
+template <> struct ObjectTraits<LoadedModuleTraceFormat> {
+  static void mapping(Output &out, LoadedModuleTraceFormat &contents) {
+    out.mapRequired("name", contents.Name);
+    out.mapRequired("arch", contents.Arch);
+    out.mapRequired("swiftmodules", contents.SwiftModules);
+  }
+};
+}
+}
+
+static bool emitLoadedModuleTrace(ASTContext &ctxt,
+                                  DependencyTracker &depTracker,
+                                  const FrontendOptions &opts) {
+  std::error_code EC;
+  llvm::raw_fd_ostream out(opts.LoadedModuleTracePath, EC,
+                           llvm::sys::fs::F_Append);
+
+  if (out.has_error() || EC) {
+    ctxt.Diags.diagnose(SourceLoc(), diag::error_opening_output,
+                        opts.LoadedModuleTracePath, EC.message());
+    out.clear_error();
+    return true;
+  }
+
+  llvm::SmallVector<std::string, 16> swiftModules;
+
+  // Canonicalise all the paths by opening them.
+  for (auto &dep : depTracker.getDependencies()) {
+    llvm::SmallString<256> buffer;
+    StringRef realPath;
+    int FD;
+    // FIXME: appropriate error handling
+    if (llvm::sys::fs::openFileForRead(dep, FD, &buffer)) {
+      // Couldn't open the file now, so let's just assume the old path was
+      // canonical (enough).
+      realPath = dep;
+    } else {
+      realPath = buffer.str();
+      // Not much we can do about failing to close.
+      (void)close(FD);
+    }
+
+    // Decide if this is a swiftmodule based on the extension of the raw
+    // dependency path, as the true file may have a different one.
+    auto ext = llvm::sys::path::extension(dep);
+    if (ext.startswith(".") &&
+        ext.drop_front() == SERIALIZED_MODULE_EXTENSION) {
+      swiftModules.push_back(realPath);
+    }
+  }
+
+  LoadedModuleTraceFormat trace = {
+      /*name=*/opts.ModuleName,
+      /*arch=*/ctxt.LangOpts.Target.getArchName(),
+      /*swiftmodules=*/reversePathSortedFilenames(swiftModules)};
+
+  // raw_fd_ostream is unbuffered, and we may have multiple processes writing,
+  // so first write the whole thing into memory and dump out that buffer to the
+  // file.
+  std::string stringBuffer;
+  {
+    llvm::raw_string_ostream memoryBuffer(stringBuffer);
+    json::Output jsonOutput(memoryBuffer, /*PrettyPrint=*/false);
+    json::jsonize(jsonOutput, trace, /*Required=*/true);
+  }
+  stringBuffer += "\n";
+
+  out << stringBuffer;
+
+  return true;
 }
 
 /// Writes SIL out to the given file.
@@ -463,6 +555,10 @@ static bool performCompile(std::unique_ptr<CompilerInstance> &Instance,
   if (shouldTrackReferences)
     emitReferenceDependencies(Context.Diags, Instance->getPrimarySourceFile(),
                               *Instance->getDependencyTracker(), opts);
+
+  if (!opts.LoadedModuleTracePath.empty())
+    (void)emitLoadedModuleTrace(Context, *Instance->getDependencyTracker(),
+                                opts);
 
   if (Context.hadError())
     return true;
@@ -1006,7 +1102,8 @@ int swift::performFrontend(ArrayRef<const char *> Args,
 
   DependencyTracker depTracker;
   if (!Invocation.getFrontendOptions().DependenciesFilePath.empty() ||
-      !Invocation.getFrontendOptions().ReferenceDependenciesFilePath.empty()) {
+      !Invocation.getFrontendOptions().ReferenceDependenciesFilePath.empty() ||
+      !Invocation.getFrontendOptions().LoadedModuleTracePath.empty()) {
     Instance->setDependencyTracker(&depTracker);
   }
 
