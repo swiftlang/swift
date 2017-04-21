@@ -171,7 +171,7 @@ public protocol FloatingPoint: SignedNumeric, Strideable, Hashable {
 
   // For the minimumMagnitude and maximumMagnitude methods
   // FIXME(integers): document me properly
-  associatedtype Magnitude : Comparable = Self
+  associatedtype Magnitude = Self
 
   /// A type that represents any written exponent.
   associatedtype Exponent: SignedInteger

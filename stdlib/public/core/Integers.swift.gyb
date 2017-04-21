@@ -1339,7 +1339,7 @@ extension Numeric {
 ///     }
 ///     // Prints "23 is greater than -23."
 public protocol BinaryInteger :
-  Comparable, Hashable, Numeric, CustomStringConvertible, Strideable {
+  Hashable, Numeric, CustomStringConvertible, Strideable {
 
   /// A Boolean value indicating whether this type is a signed integer type.
   ///
@@ -2009,7 +2009,7 @@ public enum ArithmeticOverflow {
 /// customization points for arithmetic operations. When you provide just those
 /// methods, the standard library provides default implementations for all
 /// other arithmetic methods and operators.
-public protocol FixedWidthInteger : BinaryInteger, BitwiseOperations {
+public protocol FixedWidthInteger : BinaryInteger, _BitwiseOperations {
   /// The number of bits used for the underlying binary representation of
   /// values of this type.
   ///
