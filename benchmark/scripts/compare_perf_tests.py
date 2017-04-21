@@ -348,6 +348,7 @@ def sort_ratio_list(ratio_list, changes_only=False):
         complete_perf_list = (decreased_perf_list + increased_perf_list +
                               sorted_normal_perf_list)
 
+    increased_perf_list.reverse()
     return (complete_perf_list, increased_perf_list,
             decreased_perf_list, sorted_normal_perf_list)
 
