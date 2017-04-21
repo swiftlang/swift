@@ -1722,15 +1722,10 @@ static void VisitNodeProtocolList(
   if (cur_node->begin() != cur_node->end()) {
     VisitNodeResult protocol_types_result;
     VisitNode(ast, cur_node->getFirstChild(), protocol_types_result);
-    if (protocol_types_result._error
-            .empty() /* cannot check for empty type list as Any is allowed */) {
-      if (ast) {
-        result._types.push_back(
-          ProtocolCompositionType::get(*ast, protocol_types_result._types,
-                                       /*HasExplicitAnyObject=*/false));
-      } else {
-        result._error = "invalid ASTContext";
-      }
+    if (protocol_types_result._error.empty()) {
+      result._types.push_back(
+        ProtocolCompositionType::get(*ast, protocol_types_result._types,
+                                     /*HasExplicitAnyObject=*/false));
     }
   }
 }
@@ -1738,7 +1733,52 @@ static void VisitNodeProtocolList(
 static void VisitNodeProtocolListWithClass(
   ASTContext *ast,
   Demangle::NodePointer cur_node, VisitNodeResult &result) {
-  llvm_unreachable("Subclass existentials not supported here yet");
+  if (cur_node->begin() != cur_node->end()) {
+    VisitNodeResult class_type_result;
+    VisitNodeResult protocol_types_result;
+    Demangle::Node::iterator child_end = cur_node->end();
+    for (Demangle::Node::iterator child_pos = cur_node->begin();
+         child_pos != child_end; ++child_pos) {
+      auto child = *child_pos;
+      switch(child->getKind()) {
+      case Demangle::Node::Kind::ProtocolList:
+        VisitNode(ast, child, protocol_types_result);
+        break;
+      case Demangle::Node::Kind::Type:
+        VisitNode(ast, child, class_type_result);
+        break;
+      default:
+        result._error = "invalid subclass existential";
+        break;
+      }
+    }
+
+    if (protocol_types_result._error.empty() &&
+        protocol_types_result._types.size() > 0 &&
+        class_type_result._types.size() == 1) {
+      SmallVector<Type, 2> members;
+      members.push_back(class_type_result._types.front());
+      for (auto member : protocol_types_result._types)
+        members.push_back(member);
+      result._types.push_back(
+        ProtocolCompositionType::get(*ast, members,
+                                     /*HasExplicitAnyObject=*/false));
+    }
+  }
+}
+
+static void VisitNodeProtocolListWithAnyObject(
+  ASTContext *ast,
+  Demangle::NodePointer cur_node, VisitNodeResult &result) {
+  if (cur_node->begin() != cur_node->end()) {
+    VisitNodeResult protocol_types_result;
+    VisitNode(ast, cur_node->getFirstChild(), protocol_types_result);
+    if (protocol_types_result._error.empty()) {
+      result._types.push_back(
+        ProtocolCompositionType::get(*ast, protocol_types_result._types,
+                                     /*HasExplicitAnyObject=*/true));
+    }
+  }
 }
 
 static void VisitNodeQualifiedArchetype(
@@ -2010,6 +2050,10 @@ static void VisitNode(
 
   case Demangle::Node::Kind::ProtocolListWithClass:
     VisitNodeProtocolListWithClass(ast, node, result);
+    break;
+
+  case Demangle::Node::Kind::ProtocolListWithAnyObject:
+    VisitNodeProtocolListWithAnyObject(ast, node, result);
     break;
 
   case Demangle::Node::Kind::QualifiedArchetype:
