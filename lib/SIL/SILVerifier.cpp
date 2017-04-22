@@ -1259,16 +1259,6 @@ public:
     require(BAI->getType().isAddress(),
             "begin_access operand must have address type");
 
-    require(isa<GlobalAddrInst>(op) ||
-            isa<AllocStackInst>(op) ||
-            isa<ProjectBoxInst>(op) ||
-            isa<RefElementAddrInst>(op) ||
-            isa<PointerToAddressInst>(op) ||
-            isa<SILFunctionArgument>(op) ||
-            isa<BeginAccessInst>(op) ||
-            isa<MarkUninitializedInst>(op),
-            "begin_access operand must be a root address derivation");
-
     // Any kind of access marker can be used in the raw stage if either kind
     // of enforcement is enabled globally.
     // After the raw stage, only dynamic access markers can be used, and
