@@ -355,7 +355,13 @@ public:
 
   /// \brief Values to end dynamic access enforcement on.  A hack for
   /// materializeForSet.
-  SmallVectorImpl<SILValue> *ValuesToEndAccessForMaterializeForSet = nullptr;
+  struct UnpairedAccesses {
+    SILValue Buffer;
+    unsigned NumAccesses = 0; // Values besides 0 and 1 are unsupported.
+
+    explicit UnpairedAccesses(SILValue buffer) : Buffer(buffer) {}
+  };
+  UnpairedAccesses *UnpairedAccessesForMaterializeForSet = nullptr;
 
   /// VarLoc - representation of an emitted local variable or constant.  There
   /// are three scenarios here:

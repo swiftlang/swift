@@ -346,21 +346,39 @@ namespace {
     parseSILCoverageExpr(llvm::coverage::CounterExpressionBuilder &Builder);
 
     template <class T>
-    void setEnum(Optional<T> &existingValue, StringRef &existingValueString,
-                 SourceLoc &existingLoc,
-                 T newValue, StringRef newValueString, SourceLoc newLoc) {
-      if (existingValue) {
-        if (*existingValue == newValue) {
-          P.diagnose(newLoc, diag::duplicate_attribute, /*modifier*/ 1);
+    struct ParsedEnum {
+      Optional<T> Value;
+      StringRef Name;
+      SourceLoc Loc;
+
+      explicit operator bool() const { return bool(Value); }
+      T operator*() const { return *Value; }
+    };
+
+    template <class T>
+    void setEnum(ParsedEnum<T> &existing,
+                 T value, StringRef name, SourceLoc loc) {
+      if (existing.Value) {
+        if (*existing.Value == value) {
+          P.diagnose(loc, diag::duplicate_attribute, /*modifier*/ 1);
         } else {
-          P.diagnose(newLoc, diag::mutually_exclusive_attrs, newValueString,
-                     existingValueString, /*modifier*/ 1);
+          P.diagnose(loc, diag::mutually_exclusive_attrs, name,
+                     existing.Name, /*modifier*/ 1);
         }
-        P.diagnose(existingLoc, diag::previous_attribute, /*modifier*/ 1);
+        P.diagnose(existing.Loc, diag::previous_attribute, /*modifier*/ 1);
       }
-      existingValue = newValue;
-      existingValueString = newValueString;
-      existingLoc = newLoc;
+      existing.Value = value;
+      existing.Name = name;
+      existing.Loc = loc;
+    }
+
+    template <class T>
+    void maybeSetEnum(bool allowed, ParsedEnum<T> &existing,
+                      T value, StringRef name, SourceLoc loc) {
+      if (allowed)
+        setEnum(existing, value, name, loc);
+      else
+        P.diagnose(loc, diag::unknown_attribute, name);
     }
   };
 } // end anonymous namespace
@@ -3017,11 +3035,18 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB, SILBuilder &B) {
     break;
   }
 
-  case ValueKind::BeginAccessInst: {
-    Optional<SILAccessKind> kind;
-    Optional<SILAccessEnforcement> enforcement;
-    StringRef kindString, enforcementString;
-    SourceLoc kindLoc, enforcementLoc;    
+  case ValueKind::BeginAccessInst:
+  case ValueKind::BeginUnpairedAccessInst:
+  case ValueKind::EndAccessInst:
+  case ValueKind::EndUnpairedAccessInst: {
+    ParsedEnum<SILAccessKind> kind;
+    ParsedEnum<SILAccessEnforcement> enforcement;
+    ParsedEnum<bool> aborting;
+
+    bool isBeginAccess = (Opcode == ValueKind::BeginAccessInst ||
+                          Opcode == ValueKind::BeginUnpairedAccessInst);
+    bool wantsEnforcement = (isBeginAccess ||
+                             Opcode == ValueKind::EndUnpairedAccessInst);
 
     while (P.consumeIf(tok::l_square)) {
       Identifier ident;
@@ -3034,16 +3059,18 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB, SILBuilder &B) {
           return true;
         }
       }
+      StringRef attr = ident.str();
 
       auto setEnforcement = [&](SILAccessEnforcement value) {
-        setEnum(enforcement, enforcementString, enforcementLoc,
-                value, ident.str(), identLoc);
+        maybeSetEnum(wantsEnforcement, enforcement, value, attr, identLoc);
       };
       auto setKind = [&](SILAccessKind value) {
-        setEnum(kind, kindString, kindLoc, value, ident.str(), identLoc);
+        maybeSetEnum(isBeginAccess, kind, value, attr, identLoc);
+      };
+      auto setAborting = [&](bool value) {
+        maybeSetEnum(!isBeginAccess, aborting, value, attr, identLoc);
       };
 
-      StringRef attr = ident.str();
       if (attr == "unknown") {
         setEnforcement(SILAccessEnforcement::Unknown);
       } else if (attr == "static") {
@@ -3060,28 +3087,43 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB, SILBuilder &B) {
         setKind(SILAccessKind::Modify);
       } else if (attr == "deinit") {
         setKind(SILAccessKind::Deinit);
+      } else if (attr == "abort") {
+        setAborting(true);
       } else {
-        P.diagnose(identLoc, diag::sil_unknown_access_kind_or_enforcement);
+        P.diagnose(identLoc, diag::unknown_attribute, attr);
       }
 
       if (!P.consumeIf(tok::r_square))
         return true;
     }
 
-    if (!kind) {
+    if (isBeginAccess && !kind) {
       P.diagnose(OpcodeLoc, diag::sil_expected_access_kind, OpcodeName);
-      kind = SILAccessKind::Read;
+      kind.Value = SILAccessKind::Read;
     }
 
-    if (!enforcement) {
+    if (wantsEnforcement && !enforcement) {
       P.diagnose(OpcodeLoc, diag::sil_expected_access_enforcement, OpcodeName);
-      enforcement = SILAccessEnforcement::Unsafe;
+      enforcement.Value = SILAccessEnforcement::Unsafe;
+    }
+
+    if (!isBeginAccess && !aborting) {
+      aborting.Value = false;
     }
 
     SILValue addrVal;
     SourceLoc addrLoc;
-    if (parseTypedValueRef(addrVal, addrLoc, B) ||
-        parseSILDebugLocation(InstLoc, B))
+    if (parseTypedValueRef(addrVal, addrLoc, B))
+      return true;
+
+    SILValue bufferVal;
+    SourceLoc bufferLoc;
+    if (Opcode == ValueKind::BeginUnpairedAccessInst &&
+        (P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",") ||
+         parseTypedValueRef(bufferVal, bufferLoc, B)))
+      return true;
+
+    if (parseSILDebugLocation(InstLoc, B))
       return true;
 
     if (!addrVal->getType().isAddress()) {
@@ -3090,36 +3132,17 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB, SILBuilder &B) {
       return true;
     }
 
-    ResultVal = B.createBeginAccess(InstLoc, addrVal, *kind, *enforcement);
-    break;
-  }
-
-  case ValueKind::EndAccessInst: {
-    bool aborting = false;
-
-    StringRef attr;
-    SourceLoc attrLoc;
-    if (parseSILOptional(attr, attrLoc, *this) && attr != "") {
-      if (attr == "abort") {
-        aborting = true;
-      } else {
-        P.diagnose(attrLoc, diag::unknown_attribute, attr);
-      }
+    if (Opcode == ValueKind::BeginAccessInst) {
+      ResultVal = B.createBeginAccess(InstLoc, addrVal, *kind, *enforcement);
+    } else if (Opcode == ValueKind::EndAccessInst) {
+      ResultVal = B.createEndAccess(InstLoc, addrVal, *aborting);
+    } else if (Opcode == ValueKind::BeginUnpairedAccessInst) {
+      ResultVal = B.createBeginUnpairedAccess(InstLoc, addrVal, bufferVal,
+                                              *kind, *enforcement);
+    } else {
+      ResultVal = B.createEndUnpairedAccess(InstLoc, addrVal,
+                                            *enforcement, *aborting);
     }
-
-    SILValue addrVal;
-    SourceLoc addrLoc;
-    if (parseTypedValueRef(addrVal, addrLoc, B) ||
-        parseSILDebugLocation(InstLoc, B))
-      return true;
-
-    if (!addrVal->getType().isAddress()) {
-      P.diagnose(addrLoc, diag::sil_operand_not_address, "operand",
-                 OpcodeName);
-      return true;
-    }
-
-    ResultVal = B.createEndAccess(InstLoc, addrVal, aborting);
     break;
   }
 
