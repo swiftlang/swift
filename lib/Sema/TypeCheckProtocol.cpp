@@ -997,12 +997,13 @@ RequirementEnvironment::RequirementEnvironment(
   auto selfType = cast<GenericTypeParamType>(
                             proto->getSelfInterfaceType()->getCanonicalType());
 
-  // Construct a generic signature builder by collecting the constraints from the
-  // requirement and the context of the conformance together, because both
-  // define the capabilities of the requirement.
+  // Construct a generic signature builder by collecting the constraints
+  // from the requirement and the context of the conformance together,
+  // because both define the capabilities of the requirement.
   GenericSignatureBuilder builder(
            ctx,
-           LookUpConformanceInModule(conformanceDC->getParentModule()));
+           TypeChecker::LookUpConformance(tc, conformanceDC));
+
   SmallVector<GenericTypeParamType*, 4> allGenericParams;
 
   // Add the generic signature of the context of the conformance. This includes
@@ -4776,8 +4777,7 @@ void ConformanceChecker::ensureRequirementsAreSatisfied() {
       // FIXME: maybe this should be the conformance's type
       proto->getDeclaredInterfaceType(), reqSig,
       QuerySubstitutionMap{substitutions},
-      LookUpConformanceInModule(
-        Conformance->getDeclContext()->getParentModule()),
+      TypeChecker::LookUpConformance(TC, Conformance->getDeclContext()),
       nullptr,
       ConformanceCheckFlags::Used, &listener);
 
@@ -5266,6 +5266,21 @@ TypeChecker::conformsToProtocol(Type T, ProtocolDecl *Proto, DeclContext *DC,
   auto conformance = conformsToProtocol(T, Proto, DC, options, ComplainLoc);
   return conformance ? ConformsToProtocolResult::success(*conformance)
                      : ConformsToProtocolResult::failure();
+}
+
+Optional<ProtocolConformanceRef>
+TypeChecker::LookUpConformance::operator()(
+                                       CanType dependentType,
+                                       Type conformingReplacementType,
+                                       ProtocolType *conformedProtocol) const {
+  if (conformingReplacementType->isTypeParameter())
+    return ProtocolConformanceRef(conformedProtocol->getDecl());
+
+  return tc.conformsToProtocol(conformingReplacementType,
+                               conformedProtocol->getDecl(),
+                               dc,
+                               (ConformanceCheckFlags::Used|
+                                ConformanceCheckFlags::InExpression));
 }
 
 /// Mark any _ObjectiveCBridgeable conformances in the given type as "used".

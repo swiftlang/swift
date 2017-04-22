@@ -1814,6 +1814,23 @@ public:
                      ConformanceCheckOptions options, SourceLoc ComplainLoc,
                      UnsatisfiedDependency *unsatisfiedDependency);
 
+  /// Functor class suitable for use as a \c LookupConformanceFn to look up a
+  /// conformance through a particular declaration context using the given
+  /// type checker.
+  class LookUpConformance {
+    TypeChecker &tc;
+    DeclContext *dc;
+
+  public:
+    explicit LookUpConformance(TypeChecker &tc, DeclContext *dc)
+      : tc(tc), dc(dc) { }
+
+    Optional<ProtocolConformanceRef>
+    operator()(CanType dependentType,
+               Type conformingReplacementType,
+               ProtocolType *conformedProtocol) const;
+  };
+
   /// Completely check the given conformance.
   void checkConformance(NormalProtocolConformance *conformance);
 
