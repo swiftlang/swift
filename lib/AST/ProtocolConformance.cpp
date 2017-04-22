@@ -103,14 +103,22 @@ ProtocolConformanceRef::subst(Type origType,
   auto substType = origType.subst(subs, conformances,
                                   SubstFlags::UseErrorType);
 
-  if (substType->isOpenedExistential())
-    return *this;
-
   // If we have a concrete conformance, we need to substitute the
   // conformance to apply to the new type.
   if (isConcrete())
     return ProtocolConformanceRef(
       getConcrete()->subst(substType, subs, conformances));
+
+  // Opened existentials trivially conform and do not need to go through
+  // substitution map lookup.
+  if (substType->isOpenedExistential())
+    return *this;
+
+  // If the substituted type is an existential, we have a self-conforming
+  // existential being substituted in place of itself. There's no
+  // conformance information in this case, so just return.
+  if (substType->isObjCExistentialType())
+    return *this;
 
   auto *proto = getRequirement();
 
