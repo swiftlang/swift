@@ -2138,7 +2138,9 @@ Decl *ide::getDeclFromMangledSymbolName(ASTContext &context,
   Demangle::Context DemangleCtx;
   auto node = DemangleCtx.demangleSymbolAsNode(mangledName);
   VisitNodeResult result;
-  VisitNode(&context, node, result);
+
+  if (node)
+    VisitNode(&context, node, result);
   error = result._error;
   if (error.empty() && result._decls.size() == 1) {
     return result._decls.front();
@@ -2157,7 +2159,8 @@ Type ide::getTypeFromMangledTypename(ASTContext &Ctx,
   auto node = DemangleCtx.demangleTypeAsNode(mangledName);
   VisitNodeResult result;
 
-  VisitNode(&Ctx, node, result);
+  if (node)
+    VisitNode(&Ctx, node, result);
   error = result._error;
   if (error.empty() && result._types.size() == 1) {
     return result._types.front().getPointer();
@@ -2176,7 +2179,8 @@ Type ide::getTypeFromMangledSymbolname(ASTContext &Ctx,
   auto node = DemangleCtx.demangleSymbolAsNode(mangledName);
   VisitNodeResult result;
 
-  VisitNode(&Ctx, node, result);
+  if (node)
+    VisitNode(&Ctx, node, result);
   error = result._error;
   if (error.empty() && result._types.size() == 1) {
     return result._types.front().getPointer();
