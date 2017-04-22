@@ -150,12 +150,6 @@ public:
   /// Emit checks to trap at run time when the law of exclusivity is violated.
   bool EnforceExclusivityDynamic = false;
 
-  /// Returns true when either static or dynamic exclusivity enforcement
-  /// is enabled.
-  bool isAnyExclusivityEnforcementEnabled() {
-    return EnforceExclusivityStatic || EnforceExclusivityDynamic;
-  }
-
   /// Enable the mandatory semantic arc optimizer.
   bool EnableMandatorySemanticARCOpts = false;
 

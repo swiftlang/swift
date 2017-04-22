@@ -1275,8 +1275,7 @@ public:
     require(BAI->getType().isAddress(),
             "begin_access operand must have address type");
 
-    // Any kind of access marker can be used in the raw stage if either kind
-    // of enforcement is enabled globally.
+    // Any kind of access marker can be used in the raw stage.
     // After the raw stage, only dynamic access markers can be used, and
     // only if dynamic enforcement is enabled globally.
     // Eventually, we should allow access markers to persist in SIL, and
@@ -1284,23 +1283,20 @@ public:
     // passes first.
     switch (BAI->getEnforcement()) {
     case SILAccessEnforcement::Unknown:
-      require(F.getModule().getOptions().isAnyExclusivityEnforcementEnabled()
-              && BAI->getModule().getStage() == SILStage::Raw,
+      require(BAI->getModule().getStage() == SILStage::Raw,
               "access must have known enforcement outside raw stage");
       break;
 
     case SILAccessEnforcement::Static:
     case SILAccessEnforcement::Unsafe:
-      require(F.getModule().getOptions().isAnyExclusivityEnforcementEnabled()
-              && BAI->getModule().getStage() == SILStage::Raw,
+      require(BAI->getModule().getStage() == SILStage::Raw,
               "non-dynamic enforcement is currently disallowed outside "
               "raw stage");
       break;
 
     case SILAccessEnforcement::Dynamic:
-      require(F.getModule().getOptions().EnforceExclusivityDynamic ||
-              (F.getModule().getOptions().EnforceExclusivityStatic &&
-               BAI->getModule().getStage() == SILStage::Raw),
+      require(F.getModule().getOptions().EnforceExclusivityDynamic
+              || BAI->getModule().getStage() == SILStage::Raw,
               "dynamic access enforcement is only allowed after raw stage when "
               "globally enabled");
       break;
