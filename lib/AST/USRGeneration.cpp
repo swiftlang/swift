@@ -113,19 +113,24 @@ static bool printObjCUSR(const ValueDecl *D, raw_ostream &OS) {
   return printObjCUSRFragment(D, ObjCName.second.getString(Buf), OS);
 }
 
-static bool ShouldUseObjCUSR(const Decl *D) {
+static bool shouldUseObjCUSR(const Decl *D) {
   // Only the subscript getter/setter are visible to ObjC rather than the
   // subscript itself
   if (isa<SubscriptDecl>(D))
     return false;
 
   auto Parent = D->getDeclContext()->getInnermostDeclarationDeclContext();
-  if (Parent && (!ShouldUseObjCUSR(Parent) || // parent should be visible too
+  if (Parent && (!shouldUseObjCUSR(Parent) || // parent should be visible too
                  !D->getDeclContext()->isTypeContext() || // no local decls
                  isa<TypeDecl>(D))) // nested types aren't supported
     return false;
 
   if (const ValueDecl *VD = dyn_cast<ValueDecl>(D)) {
+    if (auto *PD = dyn_cast<ProtocolDecl>(D))
+      if (auto known = PD->getKnownProtocolKind())
+        if (known == KnownProtocolKind::AnyObject)
+          return false;
+
     if (isa<EnumElementDecl>(VD))
       return true;
     return objc_translation::isVisibleToObjC(VD, Accessibility::Internal);
@@ -134,7 +139,7 @@ static bool ShouldUseObjCUSR(const Decl *D) {
   if (const ExtensionDecl *ED = dyn_cast<ExtensionDecl>(D)) {
     if (auto ExtendedType = ED->getExtendedType()) {
       auto baseClass = ExtendedType->getClassOrBoundGenericClass();
-      return baseClass && ShouldUseObjCUSR(baseClass) && !baseClass->isForeign();
+      return baseClass && shouldUseObjCUSR(baseClass) && !baseClass->isForeign();
     }
   }
   return false;
@@ -202,7 +207,7 @@ bool ide::printDeclUSR(const ValueDecl *D, raw_ostream &OS) {
     return Ignore;
   }
 
-  if (ShouldUseObjCUSR(D)) {
+  if (shouldUseObjCUSR(D)) {
     return printObjCUSR(D, OS);
   }
 
@@ -238,7 +243,7 @@ bool ide::printAccessorUSR(const AbstractStorageDecl *D, AccessorKind AccKind,
   // addressor.
 
   AbstractStorageDecl *SD = const_cast<AbstractStorageDecl*>(D);
-  if (ShouldUseObjCUSR(SD)) {
+  if (shouldUseObjCUSR(SD)) {
     return printObjCUSRForAccessor(SD, AccKind, OS);
   }
 

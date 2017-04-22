@@ -86,6 +86,40 @@ class Myclass2 {
   }
 }
 
+// CHECK: decl: enum MyEnum
+enum MyEnum {
+// FIXME
+// CHECK: decl:   for 'ravioli'
+  case ravioli
+// CHECK: decl:   for 'pasta'
+  case pasta
+
+// CHECK: decl: func method() -> Int
+  func method() -> Int { return 0 }
+
+// CHECK: decl: func compare(_ other: MyEnum) -> Int
+  func compare(_ other: MyEnum) -> Int {
+    // CHECK: decl: let other: MyEnum
+    return 0
+  }
+
+// CHECK: decl: mutating func mutatingMethod()
+  mutating func mutatingMethod() {}
+}
+
+// CHECK: decl: func f2()
+func f2() {
+// CHECK: type: (MyEnum.Type) -> MyEnum
+  var e = MyEnum.pasta
+
+// CHECK: type: (MyEnum) -> () -> Int
+  e.method()
+// CHECK: (MyEnum) -> (MyEnum) -> Int
+  e.compare(e)
+// CHECK: (@lvalue MyEnum) -> () -> ()
+  e.mutatingMethod()
+}
+
 struct MyGenStruct1<T, U: ExpressibleByStringLiteral, V: Sequence> {
 // CHECK: decl: struct MyGenStruct1<T, U, V> where U : ExpressibleByStringLiteral, V : Sequence
 // FIXME: why are these references to the base type?
@@ -109,6 +143,11 @@ struct MyGenStruct1<T, U: ExpressibleByStringLiteral, V: Sequence> {
     _ = z
 // CHECK: type: V
   }
+
+  // CHECK: decl: func takesT(_ t: T)
+  func takesT(_ t: T) {
+    // CHECK: decl: let t: T
+  }
 }
 
 let genstruct1 = MyGenStruct1<Int, String, [Float]>(x: 1, y: "", z: [1.0])
@@ -129,10 +168,107 @@ func test001() {
 // CHECK: type: String
   _ = genstruct2.z
 // CHECK: type: Dictionary<Int, Int>
+
+  genstruct2.takesT(123)
 }
 
+// CHECK: decl: protocol P1
 protocol P1 {}
-func foo1(p : P1) {}
-// CHECK: decl: protocol P1  for 'P1' usr=s:14swift_ide_test2P1P
-// CHECK: decl: func foo1(p: P1)  for 'foo1' usr=s:14swift_ide_test4foo1yAA2P1_p1p_tF
-// CHECK: decl: let p: P1 for 'p' usr=s:14swift_ide_test4foo1yAA2P1_p1p_tFADL_AaC_pv
+
+// CHECK: decl: func foo1(p: P1)
+func foo1(p: P1) {
+// CHECK: decl: let p: P1
+// CHECK: type: (P1) -> ()
+  foo1(p: p)
+}
+
+// CHECK: decl: protocol P2
+protocol P2 {}
+
+// CHECK: decl: func foo2(p: P1 & P2)
+func foo2(p: P1 & P2) {
+// CHECK: decl: let p: P1 & P2
+  foo2(p: p)
+}
+
+// CHECK: func foo3(p: AnyObject & P1)
+func foo3(p: P1 & AnyObject) {
+// CHECK: decl: let p: AnyObject & P1
+// CHECK: dref: {{(@objc )?}}protocol AnyObject
+  foo3(p: p)
+}
+
+// CHECK: func foo4(p: Myclass1 & P1 & P2)
+func foo4(p: P1 & P2 & Myclass1) {
+// CHECK: decl: let p: Myclass1 & P1 & P2
+  foo4(p: p)
+}
+
+func genericFunction<T : AnyObject>(t: T) {
+// CHECK: decl: FAILURE for 'T' usr=s:14swift_ide_test15genericFunctionyx1t_ts9AnyObjectRzlF1TL_xmfp
+  genericFunction(t: t)
+}
+
+// CHECK: decl: func takesInOut(fn: (inout Int) -> ())
+// CHECK: decl: let fn: (inout Int) -> () for 'fn'
+func takesInOut(fn: (inout Int) -> ()) {}
+
+struct Outer {
+  struct Inner {
+    let x: Int
+  }
+
+  struct GenericInner<T> {
+    // CHECK: decl: FAILURE for 'T' usr=s:14swift_ide_test5OuterV12GenericInnerV1Txmfp
+    let t: T
+  }
+}
+
+struct GenericOuter<T> {
+  // CHECK: decl: FAILURE for 'T' usr=s:14swift_ide_test12GenericOuterV1Txmfp
+  struct Inner {
+    let t: T
+    let x: Int
+  }
+
+  struct GenericInner<U> {
+    // CHECK: decl: FAILURE for 'U' usr=s:14swift_ide_test12GenericOuterV0D5InnerV1Uqd__mfp
+    let t: T
+    let u: U
+  }
+}
+
+// CHECK: decl: func takesGeneric(_ t: Outer.GenericInner<Int>)
+func takesGeneric(_ t: Outer.GenericInner<Int>) {
+  takesGeneric(t)
+}
+
+// CHECK: decl: func takesGeneric(_ t: GenericOuter<Int>.Inner)
+func takesGeneric(_ t: GenericOuter<Int>.Inner) {
+  takesGeneric(t)
+}
+
+// CHECK: decl: func takesGeneric(_ t: GenericOuter<Int>.GenericInner<String>)
+func takesGeneric(_ t: GenericOuter<Int>.GenericInner<String>) {
+  takesGeneric(t)
+}
+
+func hasLocalDecls() {
+  func localFunction() {}
+
+  // FIXME
+  // CHECK: decl: FAILURE for 'LocalType'
+  struct LocalType {}
+
+  // CHECK: decl: FAILURE for 'LocalAlias'
+  typealias LocalAlias = LocalType
+
+  // CHECK: dref: FAILURE for 'LocalType'
+  let x: LocalAlias = LocalType()
+}
+
+fileprivate struct VeryPrivateData {}
+
+// FIXME
+// CHECK: decl: FAILURE for 'privateFunction'
+fileprivate func privateFunction(_ d: VeryPrivateData) {}
