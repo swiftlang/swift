@@ -788,11 +788,16 @@ ProtocolConformance *
 ProtocolConformance::subst(Type substType,
                            TypeSubstitutionFn subs,
                            LookupConformanceFn conformances) const {
+  // ModuleDecl::lookupConformance() strips off dynamic Self, so
+  // we should do the same here.
+  if (auto selfType = substType->getAs<DynamicSelfType>())
+    substType = selfType->getSelfType();
+
   if (getType()->isEqual(substType))
     return const_cast<ProtocolConformance *>(this);
   
   switch (getKind()) {
-  case ProtocolConformanceKind::Normal:
+  case ProtocolConformanceKind::Normal: {
     if (substType->isSpecialized()) {
       assert(getType()->isSpecialized()
              && "substitution mapped non-specialized to specialized?!");
@@ -831,10 +836,11 @@ ProtocolConformance::subst(Type substType,
                                    const_cast<ProtocolConformance *>(this),
                                    subMap);
     }
+
     assert(substType->isEqual(getType())
            && "substitution changed non-specialized type?!");
     return const_cast<ProtocolConformance *>(this);
-      
+  }
   case ProtocolConformanceKind::Inherited: {
     // Substitute the base.
     auto inheritedConformance
