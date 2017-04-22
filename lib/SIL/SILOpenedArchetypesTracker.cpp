@@ -160,3 +160,31 @@ SILValue SILOpenedArchetypesState::getOpenedArchetypeDef(
     return OpenedArchetypesTracker->getOpenedArchetypeDef(archetypeTy);
   return SILValue();
 }
+
+void SILOpenedArchetypesTracker::dump() const {
+  llvm::dbgs() << "SILOpenedArchetypesTracker {\n";
+  llvm::dbgs() << "Tracks open archetypes for function: " << F.getName()
+               << "\n";
+  llvm::dbgs() << "Open archetype operands and their definitions:\n";
+  for (auto &KV : OpenedArchetypeDefs) {
+    auto Archetype = KV.first;
+    auto Def = KV.second;
+    llvm::dbgs() << "open archetype:\n";
+    Type(Archetype)->dump();
+    llvm::dbgs() << "defined at: " << *Def << "\n";
+  }
+  llvm::dbgs() << "}\n";
+}
+
+void SILOpenedArchetypesState::dump() const {
+  ArrayRef<Operand> OpenedArchetypeOperands;
+  // A non-modifiable mapping provided by the tracker.
+  llvm::dbgs() << "SILOpenedArchetypesState {\n";
+  llvm::dbgs() << "Open archetype operands:\n";
+  for (auto &Op : OpenedArchetypeOperands) {
+    Op.get()->dump();
+  }
+  if (OpenedArchetypesTracker)
+    OpenedArchetypesTracker->dump();
+  llvm::dbgs() << "}\n";
+}

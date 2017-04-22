@@ -62,3 +62,71 @@ bb2(%12 : $Error):
 sil_default_witness_table P {
 }
 
+public protocol View {
+}
+
+class DynamicStorage {
+  deinit
+  init()
+}
+
+final class ItemStorage<V> : DynamicStorage where V : View {
+  @sil_stored final let content: V
+  init(content: V)
+  deinit
+  override init()
+}
+
+extension View {
+  func dynamicStorage() -> DynamicStorage
+}
+
+public struct DynamicItem {
+  @sil_stored private var storage: DynamicStorage { get set }
+  public init(view: View)
+}
+
+sil @ItemStorage_alloc_init : $@convention(method) <V where V : View> (@in V, @thick ItemStorage<V>.Type) -> @owned ItemStorage<V> {
+
+bb0(%0 : $*V, %1 : $@thick ItemStorage<V>.Type):
+  %2 = alloc_ref $ItemStorage<V>
+
+  %3 = function_ref @ItemStorage_init : $@convention(method) <τ_0_0 where τ_0_0 : View> (@in τ_0_0, @owned ItemStorage<τ_0_0>) -> @owned ItemStorage<τ_0_0>
+  %4 = apply %3<V>(%0, %2) : $@convention(method) <τ_0_0 where τ_0_0 : View> (@in τ_0_0, @owned ItemStorage<τ_0_0>) -> @owned ItemStorage<τ_0_0>
+  return %4 : $ItemStorage<V>
+}
+
+sil @ItemStorage_init : $@convention(method) <V where V : View> (@in V, @owned ItemStorage<V>) -> @owned ItemStorage<V>
+
+sil @function_with_generic_alloc_ref : $@convention(method) <Self where Self : View> (@in_guaranteed Self) -> @owned DynamicStorage {
+bb0(%0 : $*Self):
+  %2 = function_ref @ItemStorage_alloc_init : $@convention(method) <τ_0_0 where τ_0_0 : View> (@in τ_0_0, @thick ItemStorage<τ_0_0>.Type) -> @owned ItemStorage<τ_0_0>
+  %3 = metatype $@thick ItemStorage<Self>.Type
+  %4 = alloc_stack $Self
+  copy_addr %0 to [initialization] %4 : $*Self
+  %6 = apply %2<Self>(%4, %3) : $@convention(method) <τ_0_0 where τ_0_0 : View> (@in τ_0_0, @thick ItemStorage<τ_0_0>.Type) -> @owned ItemStorage<τ_0_0>
+  dealloc_stack %4 : $*Self
+  %8 = upcast %6 : $ItemStorage<Self> to $DynamicStorage
+  return %8 : $DynamicStorage
+}
+
+// Check that function calls with inlined properly and an alloc_ref
+// with an opened archetype was created.
+// CHECK-LABEL: sil @testAllocRefWithOpenArchetype
+// CHECK: alloc_ref{{.*}}ItemStorage{{.*}}opened
+sil @testAllocRefWithOpenArchetype: $@convention(method) (@in View, @thin DynamicItem.Type) -> @owned DynamicItem {
+bb0(%0 : $*View, %1 : $@thin DynamicItem.Type):
+  %2 = alloc_stack $DynamicItem, var, name "self"
+  %4 = open_existential_addr immutable_access %0 : $*View to $*@opened("50960F66-26E4-11E7-BC37-A45E60E99281") View
+  %5 = function_ref @function_with_generic_alloc_ref : $@convention(method) <τ_0_0 where τ_0_0 : View> (@in_guaranteed τ_0_0) -> @owned DynamicStorage
+  %6 = apply %5<@opened("50960F66-26E4-11E7-BC37-A45E60E99281") View>(%4) : $@convention(method) <τ_0_0 where τ_0_0 : View> (@in_guaranteed τ_0_0) -> @owned DynamicStorage
+  %7 = struct_element_addr %2 : $*DynamicItem, #DynamicItem.storage
+  store %6 to %7 : $*DynamicStorage
+  %9 = struct $DynamicItem (%6 : $DynamicStorage)
+  retain_value %9 : $DynamicItem
+  destroy_addr %0 : $*View
+  %12 = struct $DynamicItem (%6 : $DynamicStorage)
+  release_value %12 : $DynamicItem
+  dealloc_stack %2 : $*DynamicItem
+  return %9 : $DynamicItem
+}
