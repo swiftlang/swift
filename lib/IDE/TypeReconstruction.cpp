@@ -1621,6 +1621,32 @@ static void VisitNodeNominal(
   }
 }
 
+static void VisitNodeTypeAlias(
+    ASTContext *ast,
+    Demangle::NodePointer cur_node, VisitNodeResult &result) {
+  Type parent_type;
+
+  Demangle::Node::iterator child_end = cur_node->end();
+  for (Demangle::Node::iterator child_pos = cur_node->begin();
+       child_pos != child_end; ++child_pos) {
+    auto child = *child_pos;
+    switch(child->getKind()) {
+    case Demangle::Node::Kind::Identifier:
+      VisitNodeIdentifier(ast, cur_node, child, result);
+      break;
+    case Demangle::Node::Kind::LocalDeclName:
+      VisitNodeLocalDeclName(ast, cur_node, child, result);
+      break;
+    case Demangle::Node::Kind::PrivateDeclName:
+      VisitNodePrivateDeclName(ast, cur_node, child, result);
+      break;
+    default:
+      VisitNode(ast, child, result);
+      break;
+    }
+  }
+}
+
 static void VisitNodeInOut(
     ASTContext *ast,
     Demangle::NodePointer cur_node, VisitNodeResult &result) {
@@ -1972,9 +1998,12 @@ static void VisitNode(
     VisitNodeNominal(ast, node, result);
     break;
 
+  case Demangle::Node::Kind::TypeAlias:
+    VisitNodeTypeAlias(ast, node, result);
+    break;
+
   case Demangle::Node::Kind::Global:
   case Demangle::Node::Kind::Static:
-  case Demangle::Node::Kind::TypeAlias:
   case Demangle::Node::Kind::Type:
   case Demangle::Node::Kind::TypeMangling:
   case Demangle::Node::Kind::ReturnType:

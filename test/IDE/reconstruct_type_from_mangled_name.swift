@@ -259,6 +259,12 @@ func hasLocalDecls() {
   // FIXME
   // CHECK: decl: FAILURE for 'LocalType'
   struct LocalType {}
+
+  // CHECK: decl: FAILURE for 'LocalAlias'
+  typealias LocalAlias = LocalType
+
+  // CHECK: dref: FAILURE for 'LocalType'
+  let x: LocalAlias = LocalType()
 }
 
 fileprivate struct VeryPrivateData {}
