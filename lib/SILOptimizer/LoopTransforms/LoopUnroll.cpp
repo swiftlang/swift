@@ -128,6 +128,9 @@ static Optional<uint64_t> getMaxLoopTripCount(SILLoop *Loop,
 
   if (!match(CondBr->getCondition(),
              m_BuiltinInst(BuiltinValueKind::ICMP_EQ, m_SILValue(RecNext),
+                           m_IntegerLiteralInst(End))) &&
+      !match(CondBr->getCondition(),
+             m_BuiltinInst(BuiltinValueKind::ICMP_SGE, m_SILValue(RecNext),
                            m_IntegerLiteralInst(End))))
     return None;
   if (!match(RecNext,
