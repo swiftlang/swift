@@ -142,8 +142,21 @@ SubstitutionMap::lookupConformance(CanType type, ProtocolDecl *proto) const {
     // If we've hit an abstract conformance, everything from here on out is
     // abstract.
     // FIXME: This may not always be true, but it holds for now.
-    if (conformance->isAbstract())
+    if (conformance->isAbstract()) {
+      // FIXME: Rip this out once we can get a concrete conformance from
+      // an archetype.
+      auto *M = proto->getParentModule();
+      auto substType = type.subst(*this);
+      if (substType &&
+          !substType->is<ArchetypeType>() &&
+          !substType->isTypeParameter() &&
+          !substType->isExistentialType()) {
+        auto lazyResolver = M->getASTContext().getLazyResolver();
+        return *M->lookupConformance(substType, proto, lazyResolver);
+      }
+
       return ProtocolConformanceRef(proto);
+    }
 
     // For the second step, we're looking into the requirement signature for
     // this protocol.

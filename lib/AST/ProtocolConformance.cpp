@@ -162,9 +162,7 @@ ProtocolConformanceRef::subst(Type origType,
     return ProtocolConformanceRef(lookupResults.front());
   }
 
-  // FIXME: Rip this out once ConformanceAccessPaths are plumbed through
-  auto *M = proto->getParentModule();
-  return *M->lookupConformance(substType, proto, nullptr);
+  llvm_unreachable("Invalid conformance substitution");
 }
 
 Type
