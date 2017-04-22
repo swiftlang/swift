@@ -491,7 +491,7 @@ extension String.CharacterView : RangeReplaceableCollection {
   public mutating func replaceSubrange<C>(
     _ bounds: Range<Index>,
     with newElements: C
-  ) where C : Collection, C.Iterator.Element == Character {
+  ) where C : Collection, C.Element == Character {
     let rawSubRange: Range<Int> =
       bounds.lowerBound._base._position - _coreOffset
       ..< bounds.upperBound._base._position - _coreOffset
@@ -532,7 +532,7 @@ extension String.CharacterView : RangeReplaceableCollection {
   /// 
   /// - Parameter newElements: A sequence of characters.
   public mutating func append<S : Sequence>(contentsOf newElements: S)
-    where S.Iterator.Element == Character {
+    where S.Element == Character {
     reserveCapacity(_core.count + newElements.underestimatedCount)
     for c in newElements {
       self.append(c)
@@ -544,7 +544,7 @@ extension String.CharacterView : RangeReplaceableCollection {
   ///
   /// - Parameter characters: A sequence of characters.
   public init<S : Sequence>(_ characters: S)
-    where S.Iterator.Element == Character {
+    where S.Element == Character {
     self = String.CharacterView()
     self.append(contentsOf: characters)
   }
@@ -577,13 +577,13 @@ extension String.CharacterView {
   public mutating func replaceRange<C>(
     _ subRange: Range<Index>,
     with newElements: C
-  ) where C : Collection, C.Iterator.Element == Character {
+  ) where C : Collection, C.Element == Character {
     Builtin.unreachable()
   }
     
   @available(*, unavailable, renamed: "append(contentsOf:)")
   public mutating func appendContentsOf<S : Sequence>(_ newElements: S)
-    where S.Iterator.Element == Character {
+    where S.Element == Character {
     Builtin.unreachable()
   }
 }

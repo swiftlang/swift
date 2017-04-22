@@ -197,7 +197,7 @@ extension String {
   ///
   /// - Parameter characters: A sequence of characters.
   public init<S : Sequence>(_ characters: S)
-    where S.Iterator.Element == Character {
+    where S.Element == Character {
     self._core = CharacterView(characters)._core
   }
 
@@ -239,7 +239,7 @@ extension String {
   ///
   /// - Parameter newElements: A sequence of characters.
   public mutating func append<S : Sequence>(contentsOf newElements: S)
-    where S.Iterator.Element == Character {
+    where S.Element == Character {
     withMutableCharacters {
       (v: inout CharacterView) in v.append(contentsOf: newElements)
     }
@@ -262,7 +262,7 @@ extension String {
   public mutating func replaceSubrange<C>(
     _ bounds: Range<Index>,
     with newElements: C
-  ) where C : Collection, C.Iterator.Element == Character {
+  ) where C : Collection, C.Element == Character {
     withMutableCharacters {
       (v: inout CharacterView)
       in v.replaceSubrange(bounds, with: newElements)
@@ -302,7 +302,7 @@ extension String {
   ///   `newElements`.
   public mutating func insert<S : Collection>(
     contentsOf newElements: S, at i: Index
-  ) where S.Iterator.Element == Character {
+  ) where S.Element == Character {
     withMutableCharacters {
       (v: inout CharacterView) in v.insert(contentsOf: newElements, at: i)
     }

@@ -627,7 +627,7 @@ extension _StringCore : RangeReplaceableCollection {
   public mutating func replaceSubrange<C>(
     _ bounds: Range<Int>,
     with newElements: C
-  ) where C : Collection, C.Iterator.Element == UTF16.CodeUnit {
+  ) where C : Collection, C.Element == UTF16.CodeUnit {
     _precondition(
       bounds.lowerBound >= 0,
       "replaceSubrange: subrange start precedes String start")
@@ -720,7 +720,7 @@ extension _StringCore : RangeReplaceableCollection {
   }
 
   public mutating func append<S : Sequence>(contentsOf s: S)
-    where S.Iterator.Element == UTF16.CodeUnit {
+    where S.Element == UTF16.CodeUnit {
     var width = elementWidth
     if width == 1 {
       if let hasNonAscii = s._preprocessingPass({

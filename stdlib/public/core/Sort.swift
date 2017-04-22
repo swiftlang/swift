@@ -15,7 +15,7 @@
 func _insertionSort<C>(
   _ elements: inout C,
   subRange range: Range<C.Index>,
-  by areInIncreasingOrder: (C.Iterator.Element, C.Iterator.Element) throws -> Bool
+  by areInIncreasingOrder: (C.Element, C.Element) throws -> Bool
 ) rethrows where 
   C : MutableCollection & BidirectionalCollection 
 {
@@ -31,13 +31,13 @@ func _insertionSort<C>(
     elements.formIndex(after: &sortedEnd)
     while sortedEnd != range.upperBound {
       // get the first unsorted element
-      let x: C.Iterator.Element = elements[sortedEnd]
+      let x: C.Element = elements[sortedEnd]
 
       // Look backwards for x's position in the sorted sequence,
       // moving elements forward to make room.
       var i = sortedEnd
       repeat {
-        let predecessor: C.Iterator.Element =
+        let predecessor: C.Element =
           elements[elements.index(before: i)]
 
         // If closure throws the error, We catch the error put the element at
@@ -79,7 +79,7 @@ public // @testable
 func _sort3<C>(
   _ elements: inout C,
   _ a: C.Index, _ b: C.Index, _ c: C.Index,
-  by areInIncreasingOrder: (C.Iterator.Element, C.Iterator.Element) throws -> Bool
+  by areInIncreasingOrder: (C.Element, C.Element) throws -> Bool
 ) rethrows
   where
   C : MutableCollection & RandomAccessCollection
@@ -150,7 +150,7 @@ func _sort3<C>(
 func _partition<C>(
   _ elements: inout C,
   subRange range: Range<C.Index>,
-  by areInIncreasingOrder: (C.Iterator.Element, C.Iterator.Element) throws -> Bool
+  by areInIncreasingOrder: (C.Element, C.Element) throws -> Bool
 ) rethrows -> C.Index
   where
   C : MutableCollection & RandomAccessCollection
@@ -199,7 +199,7 @@ public // @testable
 func _introSort<C>(
   _ elements: inout C,
   subRange range: Range<C.Index>,
-  by areInIncreasingOrder: (C.Iterator.Element, C.Iterator.Element) throws -> Bool
+  by areInIncreasingOrder: (C.Element, C.Element) throws -> Bool
 ) rethrows 
   where
   C : MutableCollection & RandomAccessCollection
@@ -220,7 +220,7 @@ func _introSort<C>(
 func _introSortImpl<C>(
   _ elements: inout C,
   subRange range: Range<C.Index>,
-  by areInIncreasingOrder: (C.Iterator.Element, C.Iterator.Element) throws -> Bool,
+  by areInIncreasingOrder: (C.Element, C.Element) throws -> Bool,
   depthLimit: Int
 ) rethrows
   where
@@ -253,7 +253,7 @@ func _siftDown<C>(
   _ elements: inout C,
   index: C.Index,
   subRange range: Range<C.Index>,
-  by areInIncreasingOrder: (C.Iterator.Element, C.Iterator.Element) throws -> Bool
+  by areInIncreasingOrder: (C.Element, C.Element) throws -> Bool
 ) rethrows
   where
   C : MutableCollection & RandomAccessCollection
@@ -291,7 +291,7 @@ func _siftDown<C>(
 func _heapify<C>(
   _ elements: inout C,
   subRange range: Range<C.Index>,
-  by areInIncreasingOrder: (C.Iterator.Element, C.Iterator.Element) throws -> Bool
+  by areInIncreasingOrder: (C.Element, C.Element) throws -> Bool
 ) rethrows
   where
   C : MutableCollection & RandomAccessCollection
@@ -320,7 +320,7 @@ func _heapify<C>(
 func _heapSort<C>(
   _ elements: inout C,
   subRange range: Range<C.Index>,
-  by areInIncreasingOrder: (C.Iterator.Element, C.Iterator.Element) throws -> Bool
+  by areInIncreasingOrder: (C.Element, C.Element) throws -> Bool
 ) rethrows
   where
   C : MutableCollection & RandomAccessCollection

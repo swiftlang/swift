@@ -84,7 +84,7 @@ public struct LazyMapSequence<Base : Sequence, Element>
   /// `x` of base.
   @_inlineable
   @_versioned
-  internal init(_base: Base, transform: @escaping (Base.Iterator.Element) -> Element) {
+  internal init(_base: Base, transform: @escaping (Base.Element) -> Element) {
     self._base = _base
     self._transform = transform
   }
@@ -92,7 +92,7 @@ public struct LazyMapSequence<Base : Sequence, Element>
   @_versioned
   internal var _base: Base
   @_versioned
-  internal let _transform: (Base.Iterator.Element) -> Element
+  internal let _transform: (Base.Element) -> Element
 }
 
 //===--- Collections ------------------------------------------------------===//
@@ -234,7 +234,7 @@ public struct ${Self}<
   /// `x` of base.
   @_inlineable
   @_versioned
-  internal init(_base: Base, transform: @escaping (Base.Iterator.Element) -> Element) {
+  internal init(_base: Base, transform: @escaping (Base.Element) -> Element) {
     self._base = _base
     self._transform = transform
   }
@@ -242,7 +242,7 @@ public struct ${Self}<
   @_versioned
   internal var _base: Base
   @_versioned
-  internal let _transform: (Base.Iterator.Element) -> Element
+  internal let _transform: (Base.Element) -> Element
 }
 
 % end
@@ -255,7 +255,7 @@ extension LazySequenceProtocol {
   /// calling `transform` function on a base element.
   @_inlineable
   public func map<U>(
-    _ transform: @escaping (Elements.Iterator.Element) -> U
+    _ transform: @escaping (Elements.Element) -> U
   ) -> LazyMapSequence<Self.Elements, U> {
     return LazyMapSequence(_base: self.elements, transform: transform)
   }
@@ -275,7 +275,7 @@ extension LazyCollectionProtocol
   /// calling `transform` function on a base element.
   @_inlineable
   public func map<U>(
-    _ transform: @escaping (Elements.Iterator.Element) -> U
+    _ transform: @escaping (Elements.Element) -> U
   ) -> LazyMap${collectionForTraversal(Traversal)}<Self.Elements, U> {
     return LazyMap${collectionForTraversal(Traversal)}(
       _base: self.elements,
@@ -290,14 +290,14 @@ public struct LazyMapGenerator<Base : IteratorProtocol, Element> {}
 
 extension LazyMapSequence {
   @available(*, unavailable, message: "use '.lazy.map' on the sequence")
-  public init(_ base: Base, transform: (Base.Iterator.Element) -> Element) {
+  public init(_ base: Base, transform: (Base.Element) -> Element) {
     Builtin.unreachable()
   }
 }
 
 extension LazyMapCollection {
   @available(*, unavailable, message: "use '.lazy.map' on the collection")
-  public init(_ base: Base, transform: (Base.Iterator.Element) -> Element) {
+  public init(_ base: Base, transform: (Base.Element) -> Element) {
     Builtin.unreachable()
   }
 }
