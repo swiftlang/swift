@@ -71,8 +71,8 @@
 ///
 ///     extension Sequence {
 ///         func reduce1(
-///             _ nextPartialResult: (Iterator.Element, Iterator.Element) -> Iterator.Element
-///         ) -> Iterator.Element?
+///             _ nextPartialResult: (Element, Element) -> Element
+///         ) -> Element?
 ///         {
 ///             var i = makeIterator()
 ///             guard var accumulated = i.next() else {
@@ -336,7 +336,7 @@ public protocol Sequence {
   // FIXME(ABI)#105 (Associated Types with where clauses):
   // associatedtype SubSequence : Sequence
   //   where
-  //   Iterator.Element == SubSequence.Iterator.Element,
+  //   Element == SubSequence.Element,
   //   SubSequence.SubSequence == SubSequence
   //
   // (<rdar://problem/20715009> Implement recursive protocol
@@ -763,6 +763,8 @@ internal class _PrefixSequence<Base : IteratorProtocol>
 @_versioned
 internal class _DropWhileSequence<Base : IteratorProtocol>
     : Sequence, IteratorProtocol {
+      
+      typealias Element = Base.Element
 
   @_versioned
   internal var _iterator: Base
@@ -792,7 +794,7 @@ internal class _DropWhileSequence<Base : IteratorProtocol>
 
   @_versioned
   @_inlineable
-  internal func next() -> Base.Element? {
+  internal func next() -> Element? {
     guard _nextElement != nil else {
       return _iterator.next()
     }
@@ -805,8 +807,8 @@ internal class _DropWhileSequence<Base : IteratorProtocol>
   @_versioned
   @_inlineable
   internal func drop(
-    while predicate: (Base.Element) throws -> Bool
-  ) rethrows -> AnySequence<Base.Element> {
+    while predicate: (Element) throws -> Bool
+  ) rethrows -> AnySequence<Element> {
     // If this is already a _DropWhileSequence, avoid multiple
     // layers of wrapping and keep the same iterator.
     return try AnySequence(
@@ -1122,9 +1124,9 @@ extension Sequence {
   ///   or `nil` if there is no element that satisfies `predicate`.
   @_inlineable
   public func first(
-    where predicate: (Iterator.Element) throws -> Bool
-  ) rethrows -> Iterator.Element? {
-    var foundElement: Iterator.Element?
+    where predicate: (Element) throws -> Bool
+  ) rethrows -> Element? {
+    var foundElement: Element?
     do {
       try self.forEach {
         if try predicate($0) {
@@ -1425,8 +1427,8 @@ extension Sequence {
   ///   initialized.
   @_inlineable
   public func _copyContents(
-    initializing buffer: UnsafeMutableBufferPointer<Iterator.Element>
-  ) -> (Iterator,UnsafeMutableBufferPointer<Iterator.Element>.Index) {
+    initializing buffer: UnsafeMutableBufferPointer<Element>
+  ) -> (Iterator,UnsafeMutableBufferPointer<Element>.Index) {
       var it = self.makeIterator()
       guard var ptr = buffer.baseAddress else { return (it,buffer.startIndex) }
       for idx in buffer.startIndex..<buffer.count {
@@ -1494,19 +1496,19 @@ extension Sequence {
 
   @available(*, unavailable, message: "call 'split(maxSplits:omittingEmptySubsequences:whereSeparator:)' and invert the 'allowEmptySlices' argument")
   public func split(_ maxSplit: Int, allowEmptySlices: Bool,
-    isSeparator: (Iterator.Element) throws -> Bool
+    isSeparator: (Element) throws -> Bool
   ) rethrows -> [SubSequence] {
     Builtin.unreachable()
   }
 }
 
-extension Sequence where Iterator.Element : Equatable {
+extension Sequence where Element : Equatable {
   @available(*, unavailable, message: "call 'split(separator:maxSplits:omittingEmptySubsequences:)' and invert the 'allowEmptySlices' argument")
   public func split(
-    _ separator: Iterator.Element,
+    _ separator: Element,
     maxSplit: Int = Int.max,
     allowEmptySlices: Bool = false
-  ) -> [AnySequence<Iterator.Element>] {
+  ) -> [AnySequence<Element>] {
     Builtin.unreachable()
   }
 }

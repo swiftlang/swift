@@ -350,7 +350,7 @@ extension String {
     where
     Encoding: UnicodeCodec,
     Input: Collection,
-    Input.Iterator.Element == Encoding.CodeUnit {
+    Input.Element == Encoding.CodeUnit {
     return String._fromCodeUnitSequence(encoding, input: input)!
   }
 
@@ -361,7 +361,7 @@ extension String {
     where
     Encoding: UnicodeCodec,
     Input: Collection,
-    Input.Iterator.Element == Encoding.CodeUnit {
+    Input.Element == Encoding.CodeUnit {
     let (stringBufferOptional, _) =
         _StringBuffer.fromCodeUnits(input, encoding: encoding,
             repairIllFormedSequences: false)
@@ -375,7 +375,7 @@ extension String {
     where
     Encoding: UnicodeCodec,
     Input: Collection,
-    Input.Iterator.Element == Encoding.CodeUnit {
+    Input.Element == Encoding.CodeUnit {
 
     let (stringBuffer, hadError) =
         _StringBuffer.fromCodeUnits(input, encoding: encoding,
@@ -589,7 +589,7 @@ extension String {
   }
 }
 
-extension Sequence where Iterator.Element == String {
+extension Sequence where Element == String {
 
   /// Returns a new string by concatenating the elements of the sequence,
   /// adding the given separator between each element.
@@ -880,21 +880,21 @@ extension String {
 
   @available(*, unavailable, renamed: "append(contentsOf:)")
   public mutating func appendContentsOf<S : Sequence>(_ newElements: S)
-    where S.Iterator.Element == Character {
+    where S.Element == Character {
     Builtin.unreachable()
   }
 
   @available(*, unavailable, renamed: "insert(contentsOf:at:)")
   public mutating func insertContentsOf<S : Collection>(
     _ newElements: S, at i: Index
-  ) where S.Iterator.Element == Character {
+  ) where S.Element == Character {
     Builtin.unreachable()
   }
 
   @available(*, unavailable, renamed: "replaceSubrange")
   public mutating func replaceRange<C : Collection>(
     _ subRange: Range<Index>, with newElements: C
-  ) where C.Iterator.Element == Character {
+  ) where C.Element == Character {
     Builtin.unreachable()
   }
     
@@ -931,7 +931,7 @@ extension String {
   }
 }
 
-extension Sequence where Iterator.Element == String {
+extension Sequence where Element == String {
   @available(*, unavailable, renamed: "joined(separator:)")
   public func joinWithSeparator(_ separator: String) -> String {
     Builtin.unreachable()

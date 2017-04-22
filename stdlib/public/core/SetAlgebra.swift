@@ -368,7 +368,7 @@ public protocol SetAlgebra : Equatable, ExpressibleByArrayLiteral {
   ///     // Prints "[6, 0, 1, 3]"
   ///
   /// - Parameter sequence: The elements to use as members of the new set.
-  init<S : Sequence>(_ sequence: S) where S.Iterator.Element == Element
+  init<S : Sequence>(_ sequence: S) where S.Element == Element
 
   /// Removes the elements of the given set from this set.
   ///
@@ -404,7 +404,7 @@ extension SetAlgebra {
   ///
   /// - Parameter sequence: The elements to use as members of the new set.
   public init<S : Sequence>(_ sequence: S)
-    where S.Iterator.Element == Element {
+    where S.Element == Element {
     self.init()
     for e in sequence { insert(e) }
   }

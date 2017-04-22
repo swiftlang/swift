@@ -82,7 +82,7 @@ public struct LazyFilterSequence<Base : Sequence>
   public // @testable
   init(
     _base base: Base,
-    _ isIncluded: @escaping (Base.Iterator.Element) -> Bool
+    _ isIncluded: @escaping (Base.Element) -> Bool
   ) {
     self.base = base
     self._include = isIncluded
@@ -93,7 +93,7 @@ public struct LazyFilterSequence<Base : Sequence>
 
   /// The predicate used to determine which elements of `base` are
   /// also elements of `self`.
-  internal let _include: (Base.Iterator.Element) -> Bool
+  internal let _include: (Base.Element) -> Bool
 }
 
 /// The `Index` used for subscripting a `LazyFilterCollection`.
@@ -136,7 +136,7 @@ public struct ${Self}<
   public // @testable
   init(
     _base: Base,
-    _ isIncluded: @escaping (Base.Iterator.Element) -> Bool
+    _ isIncluded: @escaping (Base.Element) -> Bool
   ) {
     self._base = _base
     self._predicate = isIncluded
@@ -204,7 +204,7 @@ public struct ${Self}<
   ///
   /// - Precondition: `position` is a valid position in `self` and
   /// `position != endIndex`.
-  public subscript(position: Index) -> Base.Iterator.Element {
+  public subscript(position: Index) -> Base.Element {
     return _base[position]
   }
 
@@ -247,7 +247,7 @@ public struct ${Self}<
   }
 
   var _base: Base
-  let _predicate: (Base.Iterator.Element) -> Bool
+  let _predicate: (Base.Element) -> Bool
 }
 
 % end
@@ -260,7 +260,7 @@ extension LazySequenceProtocol {
   ///   traversal step invokes `predicate` on one or more underlying
   ///   elements.
   public func filter(
-    _ isIncluded: @escaping (Elements.Iterator.Element) -> Bool
+    _ isIncluded: @escaping (Elements.Element) -> Bool
   ) -> LazyFilterSequence<Self.Elements> {
     return LazyFilterSequence(
       _base: self.elements, isIncluded)
@@ -283,7 +283,7 @@ extension LazyCollectionProtocol
   ///   traversal step invokes `predicate` on one or more underlying
   ///   elements.
   public func filter(
-    _ isIncluded: @escaping (Elements.Iterator.Element) -> Bool
+    _ isIncluded: @escaping (Elements.Element) -> Bool
   ) -> LazyFilter${collectionForTraversal(Traversal)}<Self.Elements> {
     return LazyFilter${collectionForTraversal(Traversal)}(
       _base: self.elements, isIncluded)
@@ -309,7 +309,7 @@ extension LazyFilterSequence {
   @available(*, unavailable, message: "use '.lazy.filter' on the sequence")
   public init(
     _ base: Base,
-    whereElementsSatisfy predicate: (Base.Iterator.Element) -> Bool
+    whereElementsSatisfy predicate: (Base.Element) -> Bool
   ) {
     Builtin.unreachable()
   }
@@ -324,7 +324,7 @@ extension LazyFilterCollection {
   @available(*, unavailable, message: "use '.lazy.filter' on the collection")
   public init(
     _ base: Base,
-    whereElementsSatisfy predicate: (Base.Iterator.Element) -> Bool
+    whereElementsSatisfy predicate: (Base.Element) -> Bool
   ) {
     Builtin.unreachable()
   }

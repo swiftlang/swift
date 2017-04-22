@@ -273,7 +273,7 @@ public struct Unsafe${Mutable}RawBufferPointer
   ///   be less than or equal to this buffer's `count`.
   @_inlineable
   public func copyBytes<C : Collection>(from source: C
-  ) where C.Iterator.Element == UInt8 {
+  ) where C.Element == UInt8 {
     _debugPrecondition(source.count <= self.count,
       "${Self}.copyBytes source has too many elements")
     guard let position = _position else {
@@ -516,12 +516,12 @@ public struct Unsafe${Mutable}RawBufferPointer
   // TODO: Optimize where `C` is a `ContiguousArrayBuffer`.
   @_inlineable
   public func initializeMemory<S: Sequence>(
-    as: S.Iterator.Element.Type, from source: S
-  ) -> (unwritten: S.Iterator, initialized: UnsafeMutableBufferPointer<S.Iterator.Element>) {
+    as: S.Element.Type, from source: S
+  ) -> (unwritten: S.Iterator, initialized: UnsafeMutableBufferPointer<S.Element>) {
 
     var it = source.makeIterator()
     var idx = startIndex
-    let elementStride = MemoryLayout<S.Iterator.Element>.stride
+    let elementStride = MemoryLayout<S.Element>.stride
     
     // This has to be a debug precondition due to the cost of walking over some collections.
     _debugPrecondition(source.underestimatedCount <= (count / elementStride),
@@ -541,12 +541,12 @@ public struct Unsafe${Mutable}RawBufferPointer
       // underflow is permitted -- e.g. a sequence into
       // the spare capacity of an Array buffer
       guard let x = it.next() else { break }
-      p.initializeMemory(as: S.Iterator.Element.self, to: x)
+      p.initializeMemory(as: S.Element.self, to: x)
       formIndex(&idx, offsetBy: elementStride)
     }
 
     return (it, UnsafeMutableBufferPointer(
-                  start: base.assumingMemoryBound(to: S.Iterator.Element.self), 
+                  start: base.assumingMemoryBound(to: S.Element.self), 
                   count: idx / elementStride))
   }
   %  end # mutable
