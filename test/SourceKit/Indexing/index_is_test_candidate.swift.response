@@ -68,7 +68,8 @@
           key.name: "test_startsWithTest_takesNoParams_returnsVoid_butIsPrivate()",
           key.usr: "s:23index_is_test_candidate14MyPrivateClass33_E06F4E7BC5F577AB6E2EC6D3ECA1C8B9LLC0c47_startsWithTest_takesNoParams_returnsVoid_butIsF0yyF",
           key.line: 17,
-          key.column: 8
+          key.column: 8,
+          key.is_dynamic: 1
         }
       ],
       key.is_test_candidate: 1
@@ -101,7 +102,8 @@
           key.name: "doesNotStartWithTest()",
           key.usr: "s:23index_is_test_candidate7MyClassC20doesNotStartWithTestyyF",
           key.line: 21,
-          key.column: 8
+          key.column: 8,
+          key.is_dynamic: 1
         },
         {
           key.kind: source.lang.swift.decl.function.method.instance,
@@ -109,6 +111,7 @@
           key.usr: "s:23index_is_test_candidate7MyClassC0C30_startsWithTest_butTakesAParamySi5param_tF",
           key.line: 22,
           key.column: 8,
+          key.is_dynamic: 1,
           key.entities: [
             {
               key.kind: source.lang.swift.ref.struct,
@@ -125,6 +128,7 @@
           key.usr: "s:23index_is_test_candidate7MyClassC0C50_startsWithTest_andTakesNoParams_butReturnsNonVoidSiyF",
           key.line: 23,
           key.column: 8,
+          key.is_dynamic: 1,
           key.entities: [
             {
               key.kind: source.lang.swift.ref.struct,
@@ -140,7 +144,8 @@
           key.name: "test_startsWithTest_takesNoParams_andReturnsVoid_butIsPrivate()",
           key.usr: "s:23index_is_test_candidate7MyClassC0C57_startsWithTest_takesNoParams_andReturnsVoid_butIsPrivate33_E06F4E7BC5F577AB6E2EC6D3ECA1C8B9LLyyF",
           key.line: 24,
-          key.column: 16
+          key.column: 16,
+          key.is_dynamic: 1
         },
         {
           key.kind: source.lang.swift.decl.function.method.instance,
@@ -148,6 +153,7 @@
           key.usr: "s:23index_is_test_candidate7MyClassC0C41_startsWithTest_takesNoParams_returnsVoidyyF",
           key.line: 25,
           key.column: 8,
+          key.is_dynamic: 1,
           key.is_test_candidate: 1
         },
         {
@@ -156,6 +162,7 @@
           key.usr: "s:23index_is_test_candidate7MyClassC0C51_startsWithTest_takesNoParams_returnsVoid_andThrowsyyKF",
           key.line: 26,
           key.column: 8,
+          key.is_dynamic: 1,
           key.is_test_candidate: 1
         }
       ],
