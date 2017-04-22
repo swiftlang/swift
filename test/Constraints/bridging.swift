@@ -241,9 +241,11 @@ func rdar19770981(_ s: String, ns: NSString) {
   f(ns) // expected-error{{'NSString' is not implicitly convertible to 'String'; did you mean to use 'as' to explicitly convert?}}{{7-7= as String}}
   f(ns as String)
   // 'as' has higher precedence than '>' so no parens are necessary with the fixit:
-  s > ns // expected-error{{'NSString' is not implicitly convertible to 'String'; did you mean to use 'as' to explicitly convert?}}{{9-9= as String}}
+  s > ns // expected-error{{binary operator '>' cannot be applied to operands of type 'String' and 'NSString'}}
+  // expected-note@-1{{expected an argument list of type '(Self, Self)'}}
   _ = s > ns as String
-  ns > s // expected-error{{'NSString' is not implicitly convertible to 'String'; did you mean to use 'as' to explicitly convert?}}{{5-5= as String}}
+  ns > s // expected-error{{binary operator '>' cannot be applied to operands of type 'NSString' and 'String'}}
+  // expected-note@-1{{expected an argument list of type '(Self, Self)'}}
   _ = ns as String > s
 
   // 'as' has lower precedence than '+' so add parens with the fixit:

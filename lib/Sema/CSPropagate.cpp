@@ -99,6 +99,8 @@ void ConstraintSystem::collectNeighboringBindOverloadDisjunctions(
 // Simplify any active constraints, returning true on success, false
 // on failure.
 bool ConstraintSystem::simplifyForConstraintPropagation() {
+  SmallVector<Constraint *, 4> conformsToConstraints;
+
   while (!ActiveConstraints.empty()) {
     auto *constraint = &ActiveConstraints.front();
     ActiveConstraints.pop_front();
@@ -106,6 +108,9 @@ bool ConstraintSystem::simplifyForConstraintPropagation() {
     assert(constraint->isActive()
            && "Expected constraints to be active?");
     assert(!constraint->isDisabled() && "Unexpected disabled constraint!");
+
+    if (constraint->getKind() == ConstraintKind::ConformsTo)
+      conformsToConstraints.push_back(constraint);
 
     bool failed = false;
 
@@ -131,7 +136,7 @@ bool ConstraintSystem::simplifyForConstraintPropagation() {
       return false;
   }
 
-  return true;
+  return areProtocolConformancesConsistent(conformsToConstraints);
 }
 
 bool ConstraintSystem::areBindPairConsistent(Constraint *first,
