@@ -1906,3 +1906,175 @@ MetatypeInst *MetatypeInst::create(SILDebugLocation Loc, SILType Ty,
 
   return ::new (Buffer) MetatypeInst(Loc, Ty, TypeDependentOperands);
 }
+
+bool KeyPathPatternComponent::isComputedSettablePropertyMutating() const {
+  switch (getKind()) {
+  case Kind::StoredProperty:
+  case Kind::GettableProperty:
+    llvm_unreachable("not a settable computed property");
+  case Kind::SettableProperty: {
+    auto setter = getComputedPropertySetter();
+    return setter->getLoweredFunctionType()->getParameters()[1].getConvention()
+       == ParameterConvention::Indirect_Inout;
+  }
+  }
+}
+
+KeyPathPattern *
+KeyPathPattern::get(SILModule &M, CanGenericSignature signature,
+                    CanType rootType, CanType valueType,
+                    ArrayRef<KeyPathPatternComponent> components,
+                    StringRef objcString) {
+  llvm::FoldingSetNodeID id;
+  Profile(id, signature, rootType, valueType, components, objcString);
+  
+  void *insertPos;
+  auto existing = M.KeyPathPatterns.FindNodeOrInsertPos(id, insertPos);
+  if (existing)
+    return existing;
+  
+  // Determine the number of operands.
+  for (auto component : components) {
+    switch (component.getKind()) {
+    case KeyPathPatternComponent::Kind::StoredProperty:
+      break;
+      
+    case KeyPathPatternComponent::Kind::GettableProperty:
+    case KeyPathPatternComponent::Kind::SettableProperty:
+      assert(component.getComputedPropertyIndices().empty()
+             && "todo");
+    }
+  }
+  
+  auto newPattern = KeyPathPattern::create(M, signature, rootType, valueType,
+                                           components, objcString,
+                                           0 /*todo: num operands*/);
+  M.KeyPathPatterns.InsertNode(newPattern, insertPos);
+  return newPattern;
+}
+
+KeyPathPattern *
+KeyPathPattern::create(SILModule &M, CanGenericSignature signature,
+                       CanType rootType, CanType valueType,
+                       ArrayRef<KeyPathPatternComponent> components,
+                       StringRef objcString,
+                       unsigned numOperands) {
+  auto totalSize = totalSizeToAlloc<KeyPathPatternComponent>(components.size());
+  void *mem = M.allocate(totalSize, alignof(KeyPathPatternComponent));
+  return ::new (mem) KeyPathPattern(signature, rootType, valueType,
+                                    components, objcString, numOperands);
+}
+
+KeyPathPattern::KeyPathPattern(CanGenericSignature signature,
+                               CanType rootType, CanType valueType,
+                               ArrayRef<KeyPathPatternComponent> components,
+                               StringRef objcString,
+                               unsigned numOperands)
+  : NumOperands(numOperands), NumComponents(components.size()),
+    Signature(signature), RootType(rootType), ValueType(valueType),
+    ObjCString(objcString)
+{
+  auto *componentsBuf = getTrailingObjects<KeyPathPatternComponent>();
+  std::uninitialized_copy(components.begin(), components.end(),
+                          componentsBuf);
+}
+
+ArrayRef<KeyPathPatternComponent>
+KeyPathPattern::getComponents() const {
+  return {getTrailingObjects<KeyPathPatternComponent>(), NumComponents};
+}
+
+void KeyPathPattern::Profile(llvm::FoldingSetNodeID &ID,
+                             CanGenericSignature signature,
+                             CanType rootType,
+                             CanType valueType,
+                             ArrayRef<KeyPathPatternComponent> components,
+                             StringRef objcString) {
+  ID.AddPointer(signature.getPointer());
+  ID.AddPointer(rootType.getPointer());
+  ID.AddPointer(valueType.getPointer());
+  ID.AddString(objcString);
+  
+  for (auto &component : components) {
+    ID.AddInteger((unsigned)component.getKind());
+    switch (component.getKind()) {
+    case KeyPathPatternComponent::Kind::StoredProperty:
+      ID.AddPointer(component.getStoredPropertyDecl());
+      break;
+      
+    case KeyPathPatternComponent::Kind::SettableProperty:
+      ID.AddPointer(component.getComputedPropertySetter());
+      LLVM_FALLTHROUGH;
+    case KeyPathPatternComponent::Kind::GettableProperty:
+      ID.AddPointer(component.getComputedPropertyGetter());
+      auto id = component.getComputedPropertyId();
+      ID.AddInteger(id.getKind());
+      switch (id.getKind()) {
+      case KeyPathPatternComponent::ComputedPropertyId::DeclRef: {
+        auto declRef = id.getDeclRef();
+        ID.AddPointer(declRef.loc.getOpaqueValue());
+        ID.AddInteger((unsigned)declRef.kind);
+        ID.AddInteger(declRef.uncurryLevel);
+        ID.AddBoolean(declRef.Expansion);
+        ID.AddBoolean(declRef.isCurried);
+        ID.AddBoolean(declRef.isForeign);
+        ID.AddBoolean(declRef.isDirectReference);
+        ID.AddBoolean(declRef.defaultArgIndex);
+        break;
+      }
+      case KeyPathPatternComponent::ComputedPropertyId::Function: {
+        ID.AddPointer(id.getFunction());
+        break;
+      }
+      case KeyPathPatternComponent::ComputedPropertyId::Property: {
+        ID.AddPointer(id.getProperty());
+        break;
+      }
+      }
+      assert(component.getComputedPropertyIndices().empty()
+             && "todo");
+      break;
+    }
+  }
+}
+
+KeyPathInst *
+KeyPathInst::create(SILDebugLocation Loc,
+                    KeyPathPattern *Pattern,
+                    SubstitutionList Subs,
+                    SILType Ty,
+                    SILFunction &F) {
+  auto totalSize = totalSizeToAlloc<Substitution>(Subs.size());
+  void *mem = F.getModule().allocateInst(totalSize, alignof(Substitution));
+  return ::new (mem) KeyPathInst(Loc, Pattern, Subs, Ty);
+}
+
+KeyPathInst::KeyPathInst(SILDebugLocation Loc,
+                         KeyPathPattern *Pattern,
+                         SubstitutionList Subs,
+                         SILType Ty)
+  : SILInstruction(ValueKind::KeyPathInst, Loc, Ty),
+    Pattern(Pattern), NumSubstitutions(Subs.size())
+{
+  auto *subsBuf = getTrailingObjects<Substitution>();
+  std::uninitialized_copy(Subs.begin(), Subs.end(), subsBuf);
+}
+
+MutableArrayRef<Substitution>
+KeyPathInst::getSubstitutions() {
+  return {getTrailingObjects<Substitution>(), NumSubstitutions};
+}
+
+MutableArrayRef<Operand>
+KeyPathInst::getAllOperands() {
+  // TODO: subscript indexes
+  return {};
+}
+
+KeyPathInst::~KeyPathInst() {
+  // TODO: destroy operands
+}
+
+KeyPathPattern *KeyPathInst::getPattern() const {
+  return Pattern;
+}

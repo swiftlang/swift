@@ -232,6 +232,9 @@ namespace irgen {
                                       CanSILFunctionType methodType,
                                       bool useSuperVTable);
 
+  /// Get the offset of the given class method within the class's vtables.
+  unsigned getVirtualMethodIndex(IRGenModule &IGM, SILDeclRef method);
+  
   /// \brief Load a reference to the protocol descriptor for the given protocol.
   ///
   /// For Swift protocols, this is a constant reference to the protocol

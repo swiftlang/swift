@@ -27,6 +27,7 @@
 #include "swift/AST/TypeRepr.h"
 #include "swift/AST/Availability.h"
 #include "llvm/Support/TrailingObjects.h"
+#include <utility>
 
 namespace llvm {
   struct fltSemantics;
@@ -406,18 +407,15 @@ class alignas(8) Expr {
   enum { NumObjCSelectorExprBits = NumExprBits + 2 };
   static_assert(NumObjCSelectorExprBits <= 32, "fits in an unsigned");
 
-  class ObjCKeyPathExprBitfields {
-    friend class ObjCKeyPathExpr;
+  class KeyPathExprBitfields {
+    friend class KeyPathExpr;
     unsigned : NumExprBits;
 
-    /// The number of components in the selector path.
-    unsigned NumComponents : 8;
-
-    /// Whether the names have corresponding source locations.
-    unsigned HaveSourceLocations : 1;
+    /// Whether this is an ObjC stringified keypath.
+    unsigned IsObjC : 1;
   };
-  enum { NumObjCKeyPathExprBits = NumExprBits + 9 };
-  static_assert(NumObjCKeyPathExprBits <= 32, "fits in an unsigned");
+  enum { NumKeyPathExprBits = NumExprBits + 2 };
+  static_assert(NumKeyPathExprBits <= 32, "fits in an unsigned");
 
 protected:
   union {
@@ -447,7 +445,7 @@ protected:
     CollectionUpcastConversionExprBitfields CollectionUpcastConversionExprBits;
     TupleShuffleExprBitfields TupleShuffleExprBits;
     ObjCSelectorExprBitfields ObjCSelectorExprBits;
-    ObjCKeyPathExprBitfields ObjCKeyPathExprBits;
+    KeyPathExprBitfields KeyPathExprBits;
   };
 
 private:
@@ -2363,6 +2361,33 @@ public:
   
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::Subscript;
+  }
+};
+
+/// Subscripting expression that applies a keypath to a base.
+class KeyPathApplicationExpr : public Expr {
+  Expr *Base;
+  Expr *KeyPath;
+  SourceLoc LBracketLoc, RBracketLoc;
+  
+public:
+  KeyPathApplicationExpr(Expr *base, SourceLoc lBracket, Expr *keyPath,
+                         SourceLoc rBracket, Type ty, bool implicit)
+    : Expr(ExprKind::KeyPathApplication, implicit, ty),
+      Base(base), KeyPath(keyPath), LBracketLoc(lBracket), RBracketLoc(rBracket)
+  {}
+  
+  SourceLoc getLoc() const { return LBracketLoc; }
+  SourceLoc getStartLoc() const { return Base->getStartLoc(); }
+  SourceLoc getEndLoc() const { return RBracketLoc; }
+  
+  Expr *getBase() const { return Base; }
+  void setBase(Expr *E) { Base = E; }
+  Expr *getKeyPath() const { return KeyPath; }
+  void setKeyPath(Expr *E) { KeyPath = E; }
+  
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::KeyPathApplication;
   }
 };
 
@@ -4549,103 +4574,266 @@ public:
 /// \code
 /// #keyPath(Person.friends.firstName)
 /// \endcode
-class ObjCKeyPathExpr : public Expr {
+class KeyPathExpr : public Expr {
   SourceLoc KeywordLoc;
   SourceLoc LParenLoc;
   SourceLoc RParenLoc;
-  Expr *SemanticExpr = nullptr;
+  TypeRepr *RootType;
+  Expr *ObjCStringLiteralExpr = nullptr;
 
-  /// A single stored component, which will be either an identifier or
-  /// a resolved declaration.
-  typedef llvm::PointerUnion<Identifier, ValueDecl *> StoredComponent;
+public:
+  /// A single stored component, which will be one of:
+  /// - an unresolved DeclName, which has to be type-checked
+  /// - a resolved ValueDecl, referring to
+  /// - a subscript index expression, which may or may not be resolved
+  /// - an optional chaining, forcing, or wrapping component
+  class Component {
+  public:
+    enum class Kind: unsigned {
+      UnresolvedProperty,
+      UnresolvedSubscript,
+      Property,
+      Subscript,
+      OptionalForce,
+      OptionalChain,
+      OptionalWrap
+    };
+  
+  private:
+    union DeclNameOrRef {
+      DeclName UnresolvedName;
+      ConcreteDeclRef ResolvedDecl;
+      
+      DeclNameOrRef() : UnresolvedName{} {}
+      DeclNameOrRef(DeclName un) : UnresolvedName(un) {}
+      DeclNameOrRef(ConcreteDeclRef rd) : ResolvedDecl(rd) {}
+    } Decl;
+    
+    
+    llvm::PointerIntPair<Expr *, 3, Kind> SubscriptIndexExprAndKind;
+    Type ComponentType;
+    SourceLoc Loc;
+    
+    explicit Component(DeclNameOrRef decl,
+                       Expr *indexExpr,
+                       Kind kind,
+                       Type type,
+                       SourceLoc loc)
+      : Decl(decl), SubscriptIndexExprAndKind(indexExpr, kind),
+        ComponentType(type), Loc(loc)
+    {}
+    
+  public:
+    Component() : Component({}, nullptr, (Kind)0, Type(), SourceLoc()) {}
+    
+    /// Create an unresolved component for a property.
+    static Component forUnresolvedProperty(DeclName UnresolvedName,
+                                           SourceLoc Loc) {
+      return Component(UnresolvedName, nullptr,
+                       Kind::UnresolvedProperty,
+                       Type(),
+                       Loc);
+    }
+    
+    /// Create an unresolved component for a subscript.
+    static Component forUnresolvedSubscript(ASTContext &ctx,
+                                     SourceLoc lSquareLoc,
+                                     ArrayRef<Expr *> indexArgs,
+                                     ArrayRef<Identifier> indexArgLabels,
+                                     ArrayRef<SourceLoc> indexArgLabelLocs,
+                                     SourceLoc rSquareLoc,
+                                     Expr *trailingClosure);
+    
+    /// Create an unresolved component for a subscript.
+    ///
+    /// You shouldn't add new uses of this overload; use the one that takes a
+    /// list of index arguments.
+    static Component forUnresolvedSubscriptWithPrebuiltIndexExpr(Expr *index,
+                                                                 SourceLoc loc){
+      
+      return Component({}, index, Kind::UnresolvedSubscript, Type(), loc);
+    }
+    
+    /// Create an unresolved optional force `!` component.
+    static Component forUnresolvedOptionalForce(SourceLoc BangLoc) {
+      return Component({}, nullptr,
+                       Kind::OptionalForce,
+                       Type(),
+                       BangLoc);
+    }
+    
+    /// Create an unresolved optional chain `?` component.
+    static Component forUnresolvedOptionalChain(SourceLoc QuestionLoc) {
+      return Component({}, nullptr,
+                       Kind::OptionalChain,
+                       Type(),
+                       QuestionLoc);
+    }
+    
+    /// Create a component for a property.
+    static Component forProperty(ConcreteDeclRef property,
+                                 Type propertyType,
+                                 SourceLoc loc) {
+      return Component(property, nullptr, Kind::Property,
+                       propertyType,
+                       loc);
+    }
+    
+    /// Create a component for a subscript.
+    static Component forSubscript(ASTContext &ctx,
+                                  ConcreteDeclRef subscript,
+                                  SourceLoc lSquareLoc,
+                                  ArrayRef<Expr *> indexArgs,
+                                  ArrayRef<Identifier> indexArgLabels,
+                                  ArrayRef<SourceLoc> indexArgLabelLocs,
+                                  SourceLoc rSquareLoc,
+                                  Expr *trailingClosure,
+                                  Type elementType);
 
-  ObjCKeyPathExpr(SourceLoc keywordLoc, SourceLoc lParenLoc,
-              ArrayRef<Identifier> names,
-              ArrayRef<SourceLoc> nameLocs,
-              SourceLoc rParenLoc);
+    /// Create a component for a subscript.
+    ///
+    /// You shouldn't add new uses of this overload; use the one that takes a
+    /// list of index arguments.
+    static Component forSubscriptWithPrebuiltIndexExpr(
+      ConcreteDeclRef subscript, Expr *index, Type elementType, SourceLoc loc) {
+      return Component(subscript, index, Kind::Subscript, elementType, loc);
+    }
+    
+    /// Create an optional-forcing `!` component.
+    static Component forOptionalForce(Type forcedType, SourceLoc bangLoc) {
+      return Component({}, nullptr, Kind::OptionalForce, forcedType,
+                       bangLoc);
+    }
+    
+    /// Create an optional-chaining `?` component.
+    static Component forOptionalChain(Type unwrappedType,
+                                      SourceLoc questionLoc) {
+      return Component({}, nullptr, Kind::OptionalChain, unwrappedType,
+                       questionLoc);
+    }
+    
+    /// Create an optional-wrapping component. This doesn't have a surface
+    /// syntax but may appear when the non-optional result of an optional chain
+    /// is implicitly wrapped.
+    static Component forOptionalWrap(Type wrappedType) {
+      return Component({}, nullptr, Kind::OptionalWrap, wrappedType,
+                       SourceLoc());
+    }
+    
+    SourceLoc getLoc() const {
+      return Loc;
+    }
+    
+    Kind getKind() const {
+      return SubscriptIndexExprAndKind.getInt();
+    }
+    
+    Expr *getIndexExpr() const {
+      switch (getKind()) {
+      case Kind::Subscript:
+      case Kind::UnresolvedSubscript:
+        return SubscriptIndexExprAndKind.getPointer();
+        
+      case Kind::OptionalChain:
+      case Kind::OptionalWrap:
+      case Kind::OptionalForce:
+      case Kind::UnresolvedProperty:
+      case Kind::Property:
+        llvm_unreachable("no index expr for this kind");
+      }
+    }
+    
+    DeclName getUnresolvedDeclName() const {
+      switch (getKind()) {
+      case Kind::UnresolvedProperty:
+        return Decl.UnresolvedName;
 
-  /// Retrieve a mutable version of the "components" array, for
-  /// initialization purposes.
-  MutableArrayRef<StoredComponent> getComponentsMutable() {
-    return { reinterpret_cast<StoredComponent *>(this + 1), getNumComponents() };
-  }
+      case Kind::Subscript:
+      case Kind::UnresolvedSubscript:
+      case Kind::OptionalChain:
+      case Kind::OptionalWrap:
+      case Kind::OptionalForce:
+      case Kind::Property:
+        llvm_unreachable("no unresolved name for this kind");
+      }
+    }
+    
+    ConcreteDeclRef getDeclRef() const {
+      switch (getKind()) {
+      case Kind::Property:
+      case Kind::Subscript:
+        return Decl.ResolvedDecl;
 
-  /// Retrieve the "components" storage.
-  ArrayRef<StoredComponent> getComponents() const {
-    return { reinterpret_cast<StoredComponent const *>(this + 1),
-             getNumComponents() };
-  }
+      case Kind::UnresolvedProperty:
+      case Kind::UnresolvedSubscript:
+      case Kind::OptionalChain:
+      case Kind::OptionalWrap:
+      case Kind::OptionalForce:
+        llvm_unreachable("no decl ref for this kind");
+      }
+    }
+    
+    Type getComponentType() const {
+      return ComponentType;
+    }
+    
+    void setComponentType(Type t) {
+      ComponentType = t;
+    }
+  };
 
-  /// Retrieve a mutable version of the name locations array, for
-  /// initialization purposes.
-  MutableArrayRef<SourceLoc> getNameLocsMutable() {
-    if (!ObjCKeyPathExprBits.HaveSourceLocations) return { };
-
-    auto mutableComponents = getComponentsMutable();
-    return { reinterpret_cast<SourceLoc *>(mutableComponents.end()),
-             mutableComponents.size() };
-  }
+private:
+  llvm::MutableArrayRef<Component> Components;
 
 public:
   /// Create a new #keyPath expression.
-  ///
-  /// \param nameLocs The locations of the names in the key-path,
-  /// which must either have the same number of entries as \p names or
-  /// must be empty.
-  static ObjCKeyPathExpr *create(ASTContext &ctx,
-                             SourceLoc keywordLoc, SourceLoc lParenLoc,
-                             ArrayRef<Identifier> names,
-                             ArrayRef<SourceLoc> nameLocs,
-                             SourceLoc rParenLoc);
+  KeyPathExpr(ASTContext &C,
+              SourceLoc keywordLoc, SourceLoc lParenLoc,
+              TypeRepr *root,
+              ArrayRef<Component> components,
+              SourceLoc rParenLoc,
+              bool isObjC,
+              bool isImplicit = false);
 
   SourceLoc getLoc() const { return KeywordLoc; }
   SourceRange getSourceRange() const {
     return SourceRange(KeywordLoc, RParenLoc);
   }
 
-  /// Retrieve the number of components in the key-path.
-  unsigned getNumComponents() const {
-    return ObjCKeyPathExprBits.NumComponents;
+  /// Get the components array.
+  ArrayRef<Component> getComponents() const {
+    return Components;
   }
-
-  /// Retrieve's the name for the (i)th component;
-  Identifier getComponentName(unsigned i) const;
-
-  /// Retrieve's the declaration corresponding to the (i)th component,
-  /// or null if this component has not yet been resolved.
-  ValueDecl *getComponentDecl(unsigned i) const {
-    return getComponents()[i].dyn_cast<ValueDecl *>();
+  MutableArrayRef<Component> getMutableComponents() {
+    return Components;
   }
-
-  /// Retrieve the location corresponding to the (i)th name.
-  ///
-  /// If no location information is available, returns an empty
-  /// \c DeclNameLoc.
-  SourceLoc getComponentNameLoc(unsigned i) const {
-    if (!ObjCKeyPathExprBits.HaveSourceLocations) return { };
-
-    auto components = getComponents();
-    ArrayRef<SourceLoc> nameLocs(
-        reinterpret_cast<SourceLoc const *>(components.end()),
-        components.size());
-
-    return nameLocs[i];
+  
+  /// Resolve the components of an un-type-checked expr. This copies over the
+  /// components from the argument array.
+  void resolveComponents(ASTContext &C,
+                         ArrayRef<Component> resolvedComponents);
+  
+  /// Retrieve the string literal expression, which will be \c NULL prior to
+  /// type checking and a string literal after type checking for an
+  /// @objc key path.
+  Expr *getObjCStringLiteralExpr() const {
+    return ObjCStringLiteralExpr;
   }
-
-  /// Retrieve the semantic expression, which will be \c NULL prior to
-  /// type checking and a string literal after type checking.
-  Expr *getSemanticExpr() const { return SemanticExpr; }
 
   /// Set the semantic expression.
-  void setSemanticExpr(Expr *expr) { SemanticExpr = expr; }
-
-  /// Resolve the given component to the given declaration.
-  void resolveComponent(unsigned idx, ValueDecl *decl) {
-    getComponentsMutable()[idx] = decl;
+  void setObjCStringLiteralExpr(Expr *expr) {
+    ObjCStringLiteralExpr = expr;
   }
+  
+  TypeRepr *getRootType() const {
+    return RootType;
+  }
+  
+  /// True if this is an ObjC key path expression.
+  bool isObjC() const { return KeyPathExprBits.IsObjC; }
 
   static bool classof(const Expr *E) {
-    return E->getKind() == ExprKind::ObjCKeyPath;
+    return E->getKind() == ExprKind::KeyPath;
   }
 };
 

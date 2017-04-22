@@ -1274,9 +1274,10 @@ emitInPlaceTypeMetadataAccessFunctionBody(IRGenFunction &IGF,
                                                 cacheVariable,
                                                 std::move(initializer));
   onceFn = IGF.Builder.CreateBitCast(onceFn, IGF.IGM.Int8PtrTy);
+  auto context = llvm::UndefValue::get(IGF.IGM.Int8PtrTy);
 
   auto onceCall = IGF.Builder.CreateCall(IGF.IGM.getOnceFn(),
-                                         {onceGuard, onceFn});
+                                         {onceGuard, onceFn, context});
   onceCall->setCallingConv(IGF.IGM.DefaultCC);
 
   // We can just load the cache now.
@@ -4652,6 +4653,14 @@ llvm::Value *irgen::emitVirtualMethodValue(IRGenFunction &IGF,
                  .getTargetIndex();
 
   return emitInvariantLoadFromMetadataAtIndex(IGF, metadata, index, fnTy);
+}
+
+unsigned irgen::getVirtualMethodIndex(IRGenModule &IGM,
+                                      SILDeclRef method) {
+  SILDeclRef overridden = IGM.getSILTypes().getOverriddenVTableEntry(method);
+  auto declaringClass = cast<ClassDecl>(overridden.getDecl()->getDeclContext());
+  return FindClassMethodIndex(IGM, declaringClass, overridden)
+   .getTargetIndex();;
 }
 
 //===----------------------------------------------------------------------===//

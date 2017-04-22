@@ -2051,6 +2051,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     break;
   }
   case ValueKind::MarkUninitializedBehaviorInst:
+  case ValueKind::KeyPathInst:
     llvm_unreachable("todo");
   }
 

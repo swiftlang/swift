@@ -272,6 +272,48 @@ Type ConstraintSystem::getInstanceType(TypeExpr *E) {
                             [&](const Expr *E) -> Type { return getType(E); });
 }
 
+static bool buildObjCKeyPathString(KeyPathExpr *E,
+                                   llvm::SmallVectorImpl<char> &buf) {
+  for (auto &component : E->getComponents()) {
+    switch (component.getKind()) {
+    case KeyPathExpr::Component::Kind::OptionalChain:
+    case KeyPathExpr::Component::Kind::OptionalForce:
+    case KeyPathExpr::Component::Kind::OptionalWrap:
+      // KVC propagates nulls, so these don't affect the key path string.
+      continue;
+      
+    case KeyPathExpr::Component::Kind::Property: {
+      // Property references must be to @objc properties.
+      // TODO: If we added special properties matching KVC operators like '@sum',
+      // '@count', etc. those could be mapped too.
+      auto property = cast<VarDecl>(component.getDeclRef().getDecl());
+      if (!property->isObjC())
+        return false;
+      if (!buf.empty()) {
+        buf.push_back('.');
+      }
+      auto objcName = property->getObjCPropertyName().str();
+      buf.append(objcName.begin(), objcName.end());
+      continue;
+    }
+    case KeyPathExpr::Component::Kind::Subscript: {
+      // Subscripts aren't generally represented in KVC.
+      // TODO: There are some subscript forms we could map to KVC, such as
+      // when indexing a Dictionary or NSDictionary by string, or when applying
+      // a mapping subscript operation to Array/Set or NSArray/NSSet.
+      return false;
+    case KeyPathExpr::Component::Kind::UnresolvedProperty:
+    case KeyPathExpr::Component::Kind::UnresolvedSubscript:
+      // Don't bother building the key path string if the key path didn't even
+      // resolve.
+      return false;
+    }
+    }
+  }
+  
+  return true;
+}
+
 namespace {
 
   /// \brief Rewrites an expression by applying the solution of a constraint
@@ -1253,6 +1295,43 @@ namespace {
       }
 
       auto choice = selected->choice;
+      
+      // Apply a key path if we have one.
+      if (choice.getKind() == OverloadChoiceKind::KeyPathApplication) {
+        // The index argument should be (keyPath: KeyPath<Root, Value>).
+        auto keyPathTy = index->getType()->castTo<TupleType>()
+          ->getElementType(0)->castTo<BoundGenericType>();
+        auto valueTy = keyPathTy->getGenericArgs()[1];
+        
+        // The result may be an lvalue based on the base and key path kind.
+        bool resultIsLValue;
+        if (keyPathTy->getDecl() == cs.getASTContext().getKeyPathDecl()) {
+          resultIsLValue = false;
+          base = cs.coerceToRValue(base);
+        } else if (keyPathTy->getDecl() ==
+                     cs.getASTContext().getWritableKeyPathDecl()) {
+          resultIsLValue = base->getType()->isLValueType();
+        } else if (keyPathTy->getDecl() ==
+                   cs.getASTContext().getReferenceWritableKeyPathDecl()) {
+          resultIsLValue = true;
+          base = cs.coerceToRValue(base);
+        } else {
+          llvm_unreachable("unknown key path class!");
+        }
+        if (resultIsLValue)
+          valueTy = LValueType::get(valueTy);
+        
+        // Dig the key path expression out of the argument tuple.
+        auto indexKP = cast<TupleExpr>(index)->getElement(0);
+        
+        auto keyPathAp = new (cs.getASTContext())
+           KeyPathApplicationExpr(base, index->getStartLoc(), indexKP,
+                                  index->getEndLoc(), valueTy,
+                                  base->isImplicit() && index->isImplicit());
+        cs.setType(keyPathAp, valueTy);
+        return keyPathAp;
+      }
+      
       auto subscript = cast<SubscriptDecl>(choice.getDecl());
 
       auto &tc = cs.getTypeChecker();
@@ -2602,10 +2681,11 @@ namespace {
       }
 
       case OverloadChoiceKind::BaseType: {
-        // FIXME: Losing ".0" sugar here.
         return base;
       }
 
+      case OverloadChoiceKind::KeyPathApplication:
+        llvm_unreachable("should only happen in a subscript");
       case OverloadChoiceKind::TypeDecl:
         llvm_unreachable("Nonsensical overload choice");
       }
@@ -3578,6 +3658,10 @@ namespace {
     Expr *visitMakeTemporarilyEscapableExpr(MakeTemporarilyEscapableExpr *expr){
       llvm_unreachable("Already type-checked");
     }
+
+    Expr *visitKeyPathApplicationExpr(KeyPathApplicationExpr *expr){
+      llvm_unreachable("Already type-checked");
+    }
     
     Expr *visitEnumIsCaseExpr(EnumIsCaseExpr *expr) {
       // Should already be type-checked.
@@ -3888,10 +3972,189 @@ namespace {
       return E;
     }
 
-    Expr *visitObjCKeyPathExpr(ObjCKeyPathExpr *E) {
-      if (auto semanticE = E->getSemanticExpr())
-        cs.setType(E, cs.getType(semanticE));
+    Expr *visitKeyPathExpr(KeyPathExpr *E) {
+      if (E->isObjC()) {
+        cs.setType(E, cs.getType(E->getObjCStringLiteralExpr()));
+        return E;
+      }
 
+      simplifyExprType(E);
+
+      SmallVector<KeyPathExpr::Component, 4> resolvedComponents;
+
+      // Resolve each of the components.
+      bool didOptionalChain = false;
+      auto keyPathTy = cs.getType(E)->castTo<BoundGenericType>();
+      Type baseTy = keyPathTy->getGenericArgs()[0];
+      Type leafTy = keyPathTy->getGenericArgs()[1];
+      
+      for (unsigned i : indices(E->getComponents())) {
+        auto &origComponent = E->getComponents()[i];
+        
+        // If there were unresolved types, we may end up with a null base for
+        // following components.
+        if (!baseTy) {
+          resolvedComponents.push_back(origComponent);
+          continue;
+        }
+        
+        KeyPathExpr::Component component;
+        switch (auto kind = origComponent.getKind()) {
+        case KeyPathExpr::Component::Kind::UnresolvedProperty: {
+          auto locator = cs.getConstraintLocator(E,
+                       ConstraintLocator::PathElement::getKeyPathComponent(i));
+          auto foundDecl = getOverloadChoiceIfAvailable(locator);
+          // Leave the component unresolved if the overload was not resolved.
+          if (!foundDecl) {
+            component = origComponent;
+            break;
+          }
+          auto property = foundDecl->choice.getDecl();
+          
+          // Key paths can only refer to properties currently.
+          if (!isa<VarDecl>(property)) {
+            cs.TC.diagnose(origComponent.getLoc(),
+                           diag::expr_keypath_not_property,
+                           property->getDescriptiveKind(),
+                           property->getFullName());
+          } else {
+            // Key paths don't work with mutating-get properties.
+            auto varDecl = cast<VarDecl>(property);
+            if (varDecl->hasAccessorFunctions()
+                && varDecl->getGetter()->isMutating()) {
+              cs.TC.diagnose(origComponent.getLoc(),
+                             diag::expr_keypath_mutating_getter,
+                             property->getFullName());
+            }
+          }
+          
+          auto dc = property->getInnermostDeclContext();
+          SmallVector<Substitution, 4> subs;
+          if (auto sig = dc->getGenericSignatureOfContext()) {
+            // Compute substitutions to refer to the member.
+            solution.computeSubstitutions(sig, locator, subs);
+          }
+          
+          auto resolvedTy = foundDecl->openedType;
+          resolvedTy = simplifyType(resolvedTy);
+          
+          auto ref = ConcreteDeclRef(cs.getASTContext(), property, subs);
+          component = KeyPathExpr::Component::forProperty(ref,
+                                                       resolvedTy,
+                                                       origComponent.getLoc());
+          break;
+        }
+        case KeyPathExpr::Component::Kind::UnresolvedSubscript: {
+          auto locator = cs.getConstraintLocator(E,
+                       ConstraintLocator::PathElement::getKeyPathComponent(i));
+          auto foundDecl = getOverloadChoiceIfAvailable(locator);
+          // Leave the component unresolved if the overload was not resolved.
+          if (!foundDecl) {
+            component = origComponent;
+            break;
+          }
+          auto subscript = cast<SubscriptDecl>(foundDecl->choice.getDecl());
+          if (subscript->getGetter()->isMutating()) {
+            cs.TC.diagnose(origComponent.getLoc(),
+                           diag::expr_keypath_mutating_getter,
+                           subscript->getFullName());
+          }
+          
+          auto dc = subscript->getInnermostDeclContext();
+          SmallVector<Substitution, 4> subs;
+          if (auto sig = dc->getGenericSignatureOfContext()) {
+            // Compute substitutions to refer to the member.
+            solution.computeSubstitutions(sig, locator, subs);
+          }
+          
+          auto resolvedTy = foundDecl->openedType->castTo<AnyFunctionType>()
+            ->getResult();
+          resolvedTy = simplifyType(resolvedTy);
+          
+          auto ref = ConcreteDeclRef(cs.getASTContext(), subscript, subs);
+          component = KeyPathExpr::Component
+            ::forSubscriptWithPrebuiltIndexExpr(ref,
+                                                origComponent.getIndexExpr(),
+                                                resolvedTy,
+                                                origComponent.getLoc());
+          break;
+        }
+        case KeyPathExpr::Component::Kind::OptionalChain: {
+          didOptionalChain = true;
+          // Chaining always forces the element to be an rvalue.
+          auto objectTy = baseTy->getLValueOrInOutObjectType()
+            ->getAnyOptionalObjectType();
+          if (baseTy->hasUnresolvedType() && !objectTy) {
+            objectTy = baseTy;
+          }
+          assert(objectTy);
+          
+          component = KeyPathExpr::Component::forOptionalChain(objectTy,
+                                                        origComponent.getLoc());
+          break;
+        }
+        case KeyPathExpr::Component::Kind::OptionalForce: {
+          Type objectTy;
+          if (auto lvalue = baseTy->getAs<LValueType>()) {
+            objectTy = lvalue->getObjectType()->getAnyOptionalObjectType();
+            if (baseTy->hasUnresolvedType() && !objectTy) {
+              objectTy = baseTy;
+            }
+            objectTy = LValueType::get(objectTy);
+          } else {
+            objectTy = baseTy->getAnyOptionalObjectType();
+            if (baseTy->hasUnresolvedType() && !objectTy) {
+              objectTy = baseTy;
+            }
+            assert(objectTy);
+          }
+          
+          component = KeyPathExpr::Component::forOptionalForce(objectTy,
+                                                        origComponent.getLoc());
+          break;
+        }
+        case KeyPathExpr::Component::Kind::Property:
+        case KeyPathExpr::Component::Kind::Subscript:
+        case KeyPathExpr::Component::Kind::OptionalWrap:
+          llvm_unreachable("already resolved");
+        }
+
+        baseTy = component.getComponentType();
+        resolvedComponents.push_back(component);
+      }
+      
+      // Wrap a non-optional result if there was chaining involved.
+      if (didOptionalChain &&
+          baseTy &&
+          !baseTy->hasUnresolvedType() &&
+          !baseTy->isEqual(leafTy)) {
+        assert(leafTy->getAnyOptionalObjectType()->isEqual(baseTy));
+        auto component = KeyPathExpr::Component::forOptionalWrap(leafTy);
+        resolvedComponents.push_back(component);
+        baseTy = leafTy;
+      }
+      E->resolveComponents(cs.getASTContext(), resolvedComponents);
+      
+      // See whether there's an equivalent ObjC key path string we can produce
+      // for interop purposes.
+      if (cs.getASTContext().LangOpts.EnableObjCInterop) {
+        SmallString<64> compatStringBuf;
+        if (buildObjCKeyPathString(E, compatStringBuf)) {
+          auto stringCopy =
+            cs.getASTContext().AllocateCopy<char>(compatStringBuf.begin(),
+                                                  compatStringBuf.end());
+          auto stringExpr = new (cs.getASTContext()) StringLiteralExpr(
+                                 StringRef(stringCopy, compatStringBuf.size()),
+                                 SourceRange(),
+                                 /*implicit*/ true);
+          cs.setType(stringExpr, cs.getType(E));
+          E->setObjCStringLiteralExpr(stringExpr);
+        }
+      }
+      
+      // The final component type ought to line up with the leaf type of the
+      // key path.
+      assert(!baseTy || baseTy->getLValueOrInOutObjectType()->isEqual(leafTy));
       return E;
     }
 
@@ -6992,7 +7255,6 @@ Expr *ConstraintSystem::coerceToRValue(Expr *expr) {
   return expr;
 }
 
-
 /// Emit the fixes computed as part of the solution, returning true if we were
 /// able to emit an error message, or false if none of the fixits worked out.
 bool ConstraintSystem::applySolutionFixes(Expr *E, const Solution &solution) {
@@ -7002,9 +7264,6 @@ bool ConstraintSystem::applySolutionFixes(Expr *E, const Solution &solution) {
 
   return diagnosed;
 }
-
-
-
 
 /// \brief Apply the specified Fix # to this solution, producing a fixit hint
 /// diagnostic for it and returning true.  If the fixit hint turned out to be

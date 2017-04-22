@@ -1239,23 +1239,38 @@ void PrintAST::printPattern(const Pattern *pattern) {
 }
 
 /// If we can't find the depth of a type, return ErrorDepth.
-const unsigned ErrorDepth = ~0U;
+static const unsigned ErrorDepth = ~0U;
 /// A helper function to return the depth of a type.
 static unsigned getDepthOfType(Type ty) {
-  if (auto paramTy = ty->getAs<GenericTypeParamType>())
-    return paramTy->getDepth();
+  unsigned depth = ErrorDepth;
+  
+  auto combineDepth = [&depth](unsigned newDepth) -> bool {
+    // If there is no current depth (depth == ErrorDepth), then assign to
+    // newDepth; otherwise, choose the deeper of the current and new depth.
+    
+    // Since ErrorDepth == ~0U, ErrorDepth + 1 == 0, which is smaller than any
+    // valid depth + 1.
+    depth = std::max(depth+1U, newDepth+1U) - 1U;
+    return false;
+  };
+  
+  ty.findIf([combineDepth](Type t) -> bool {
+    if (auto paramTy = t->getAs<GenericTypeParamType>())
+      return combineDepth(paramTy->getDepth());
 
-  if (auto depMemTy = dyn_cast<DependentMemberType>(ty->getCanonicalType())) {
-    CanType rootTy;
-    do {
-      rootTy = depMemTy.getBase();
-    } while ((depMemTy = dyn_cast<DependentMemberType>(rootTy)));
-    if (auto rootParamTy = dyn_cast<GenericTypeParamType>(rootTy))
-      return rootParamTy->getDepth();
-    return ErrorDepth;
-  }
+    if (auto depMemTy = dyn_cast<DependentMemberType>(t->getCanonicalType())) {
+      CanType rootTy;
+      do {
+        rootTy = depMemTy.getBase();
+      } while ((depMemTy = dyn_cast<DependentMemberType>(rootTy)));
+      if (auto rootParamTy = dyn_cast<GenericTypeParamType>(rootTy))
+        return combineDepth(rootParamTy->getDepth());
+    }
 
-  return ErrorDepth;
+    return false;
+  });
+  
+  return depth;
 }
 
 namespace {
@@ -1406,9 +1421,9 @@ static unsigned getDepthOfRequirement(const Requirement &req) {
   switch (req.getKind()) {
   case RequirementKind::Conformance:
   case RequirementKind::Layout:
-  case RequirementKind::Superclass:
     return getDepthOfType(req.getFirstType());
 
+  case RequirementKind::Superclass:
   case RequirementKind::SameType: {
     // Return the max valid depth of firstType and secondType.
     unsigned firstDepth = getDepthOfType(req.getFirstType());

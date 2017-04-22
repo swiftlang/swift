@@ -240,7 +240,7 @@ public func getResilientEnumType() -> Any.Type {
 // CHECK-NEXT: br i1 [[COND]], label %cacheIsNull, label %cont
 
 // CHECK: cacheIsNull:
-// CHECK-NEXT: call void @swift_once([[INT]]* @_T015enum_resilience24EnumWithResilientPayloadOMa.once_token, i8* bitcast (void (i8*)* @initialize_metadata_EnumWithResilientPayload to i8*))
+// CHECK-NEXT: call void @swift_once([[INT]]* @_T015enum_resilience24EnumWithResilientPayloadOMa.once_token, i8* bitcast (void (i8*)* @initialize_metadata_EnumWithResilientPayload to i8*), i8* undef)
 // CHECK-NEXT: [[METADATA2:%.*]] = load %swift.type*, %swift.type** @_T015enum_resilience24EnumWithResilientPayloadOML
 // CHECK-NEXT: br label %cont
 
