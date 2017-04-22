@@ -78,16 +78,19 @@ public:
   // Can be used to incrementally populate the mapping, e.g.
   // if it is done when performing a scan of all instructions
   // inside a function.
-  void registerOpenedArchetypes(const SILInstruction *I);
+  // Returns true if any opened archetypes were registered.
+  bool registerOpenedArchetypes(const SILInstruction *I);
 
   // Register opened archetypes whose definitions are referenced by
   // the typedef operands of this instruction.
-  void registerUsedOpenedArchetypes(const SILInstruction *I);
+  // Returns true if any opened archetypes were registered.
+  bool registerUsedOpenedArchetypes(const SILInstruction *I);
 
   // Register opened archetypes referenced by this type, if they
   // are not registered yet. Create placeholders representing forward
   // definitions of these opened archetypes.
-  void registerUsedOpenedArchetypes(CanType Ty);
+  // Returns true if any opened archetypes were registered.
+  bool registerUsedOpenedArchetypes(CanType Ty);
 
   // Unregister archetypes opened by a given instruction.
   // Should be only called when this instruction is to be removed.
