@@ -194,7 +194,7 @@ func foo2(p: P1 & P2) {
 // CHECK: func foo3(p: AnyObject & P1)
 func foo3(p: P1 & AnyObject) {
 // CHECK: decl: let p: AnyObject & P1
-// CHECK: dref: FAILURE for 'AnyObject'
+// CHECK: dref: {{(@objc )?}}protocol AnyObject
   foo3(p: p)
 }
 
