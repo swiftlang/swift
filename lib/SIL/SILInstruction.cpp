@@ -265,6 +265,17 @@ namespace {
       return true;
     }
 
+    bool visitBeginAccessInst(const BeginAccessInst *right) {
+      auto left = cast<BeginAccessInst>(LHS);
+      return left->getAccessKind() == right->getAccessKind()
+          && left->getEnforcement() == right->getEnforcement();
+    }
+
+    bool visitEndAccessInst(const EndAccessInst *right) {
+      auto left = cast<EndAccessInst>(LHS);
+      return left->isAborting() == right->isAborting();
+    }
+
     bool visitStrongReleaseInst(const StrongReleaseInst *RHS) {
       return true;
     }
