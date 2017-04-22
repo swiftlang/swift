@@ -193,6 +193,8 @@ AllocRefInst *AllocRefInst::create(SILDebugLocation Loc, SILFunction &F,
     collectTypeDependentOperands(AllOperands, OpenedArchetypes, F,
                                  ElemType.getSwiftRValueType());
   }
+  collectTypeDependentOperands(AllOperands, OpenedArchetypes, F,
+                               ObjectType.getSwiftRValueType());
   void *Buffer = F.getModule().allocateInst(
                       sizeof(AllocRefInst)
                         + decltype(Operands)::getExtraSize(AllOperands.size())
