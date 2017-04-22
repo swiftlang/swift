@@ -119,7 +119,8 @@ func trivialStructBreak(_ xx: [Int]) {
 // CHECK: [[LOOP_DEST]]:
 // CHECK:   [[FUNC_REF:%.*]] = function_ref @_T0s16IndexingIteratorV4next8_ElementQzSgyF : $@convention(method)
 // CHECK:   [[GET_ELT_STACK:%.*]] = alloc_stack $Optional<Int>
-// CHECK:   apply [[FUNC_REF]]<[Int]>([[GET_ELT_STACK]], [[PROJECT_ITERATOR_BOX]])
+// CHECK:   [[WRITE:%.*]] = begin_access [modify] [unknown] [[PROJECT_ITERATOR_BOX]] : $*IndexingIterator<Array<Int>>
+// CHECK:   apply [[FUNC_REF]]<[Int]>([[GET_ELT_STACK]], [[WRITE]])
 // CHECK:   [[IND_VAR:%.*]] = load [trivial] [[GET_ELT_STACK]]
 // CHECK:   switch_enum [[IND_VAR]] : $Optional<Int>, case #Optional.some!enumelt.1: [[SOME_BB:bb[0-9]+]], case #Optional.none!enumelt: [[NONE_BB:bb[0-9]+]]
 //
@@ -223,7 +224,8 @@ func existentialBreak(_ xx: [P]) {
 //
 // CHECK: [[LOOP_DEST]]:
 // CHECK:   [[FUNC_REF:%.*]] = function_ref @_T0s16IndexingIteratorV4next8_ElementQzSgyF : $@convention(method)
-// CHECK:   apply [[FUNC_REF]]<[P]>([[ELT_STACK]], [[PROJECT_ITERATOR_BOX]])
+// CHECK:   [[WRITE:%.*]] = begin_access [modify] [unknown] [[PROJECT_ITERATOR_BOX]] : $*IndexingIterator<Array<P>> // users: %16, %15
+// CHECK:   apply [[FUNC_REF]]<[P]>([[ELT_STACK]], [[WRITE]])
 // CHECK:   switch_enum_addr [[ELT_STACK]] : $*Optional<P>, case #Optional.some!enumelt.1: [[SOME_BB:bb[0-9]+]], case #Optional.none!enumelt: [[NONE_BB:bb[0-9]+]]
 //
 // CHECK: [[NONE_BB]]:
@@ -387,7 +389,8 @@ func genericStructBreak<T>(_ xx: [GenericStruct<T>]) {
 //
 // CHECK: [[LOOP_DEST]]:
 // CHECK:   [[FUNC_REF:%.*]] = function_ref @_T0s16IndexingIteratorV4next8_ElementQzSgyF : $@convention(method)
-// CHECK:   apply [[FUNC_REF]]<[GenericStruct<T>]>([[ELT_STACK]], [[PROJECT_ITERATOR_BOX]])
+// CHECK:   [[WRITE:%.*]] = begin_access [modify] [unknown] [[PROJECT_ITERATOR_BOX]] : $*IndexingIterator<Array<GenericStruct<T>>>
+// CHECK:   apply [[FUNC_REF]]<[GenericStruct<T>]>([[ELT_STACK]], [[WRITE]])
 // CHECK:   switch_enum_addr [[ELT_STACK]] : $*Optional<GenericStruct<T>>, case #Optional.some!enumelt.1: [[SOME_BB:bb[0-9]+]], case #Optional.none!enumelt: [[NONE_BB:bb[0-9]+]]
 //
 // CHECK: [[NONE_BB]]:
@@ -496,7 +499,8 @@ func genericCollectionBreak<T : Collection>(_ xx: T) {
 //
 // CHECK: [[LOOP_DEST]]:
 // CHECK:   [[GET_NEXT_FUNC:%.*]] = witness_method $T.Iterator, #IteratorProtocol.next!1 : <Self where Self : IteratorProtocol> (inout Self) -> () -> Self.Element? : $@convention(witness_method) <τ_0_0 where τ_0_0 : IteratorProtocol> (@inout τ_0_0) -> @out Optional<τ_0_0.Element>
-// CHECK:   apply [[GET_NEXT_FUNC]]<T.Iterator>([[ELT_STACK]], [[PROJECT_ITERATOR_BOX]])
+// CHECK:   [[WRITE:%.*]] = begin_access [modify] [unknown] [[PROJECT_ITERATOR_BOX]] : $*T.Iterator
+// CHECK:   apply [[GET_NEXT_FUNC]]<T.Iterator>([[ELT_STACK]], [[WRITE]])
 // CHECK:   switch_enum_addr [[ELT_STACK]] : $*Optional<T._Element>, case #Optional.some!enumelt.1: [[SOME_BB:bb[0-9]+]], case #Optional.none!enumelt: [[NONE_BB:bb[0-9]+]]
 //
 // CHECK: [[NONE_BB]]:
