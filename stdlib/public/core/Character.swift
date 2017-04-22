@@ -104,21 +104,6 @@ public struct Character :
         UTF32.self, input: CollectionOfOne(UInt32(value))))
   }
 
-  /// Creates a character with the specified value.
-  ///
-  /// Do not call this initializer directly. It is used by the compiler when you
-  /// use a string literal to initialize a `Character` instance. For example:
-  ///
-  ///     let snowflake: Character = "❄︎"
-  ///     print(snowflake)
-  ///     // Prints "❄︎"
-  ///
-  /// The assignment to the `snowflake` constant calls this initializer behind
-  /// the scenes.
-  public init(unicodeScalarLiteral value: Character) {
-    self = value
-  }
-
   @effects(readonly)
   public init(
     _builtinExtendedGraphemeClusterLiteral start: Builtin.RawPointer,
