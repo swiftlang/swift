@@ -27,7 +27,8 @@ func loadable(readonly: A, writable: inout A,
   _ = readonly[keyPath: wkp]
 
   // CHECK: [[TEMP:%.*]] = mark_uninitialized
-  // CHECK: [[ROOT_RAW_PTR:%.*]] = address_to_pointer %1
+  // CHECK: [[ROOT_ACCESS:%.*]] = begin_access [read] [unknown] %1 : $*A
+  // CHECK: [[ROOT_RAW_PTR:%.*]] = address_to_pointer [[ROOT_ACCESS]]
   // CHECK: [[ROOT_PTR:%.*]] = struct $UnsafeMutablePointer<A> ([[ROOT_RAW_PTR]]
   // CHECK: [[KP_BORROW:%.*]] = begin_borrow %4
   // CHECK: [[KP_COPY:%.*]] = copy_value [[KP_BORROW]]
@@ -41,7 +42,8 @@ func loadable(readonly: A, writable: inout A,
   // CHECK: [[PROJECTED_RAW_PTR:%.*]] = struct_extract [[PROJECTED_PTR]]
   // CHECK: [[PROJECTED_ADDR:%.*]] = pointer_to_address [[PROJECTED_RAW_PTR]]
   // CHECK: [[PROJECTED_DEP:%.*]] = mark_dependence [[PROJECTED_ADDR]] : $*B on [[PROJECTED_OWNER]]
-  // CHECK: copy_addr [[PROJECTED_DEP]] to [[TEMP]]
+  // CHECK: [[COPY_TMP:%.*]] = load [copy] [[PROJECTED_DEP]] : $*B
+  // CHECK: assign [[COPY_TMP]] to [[TEMP]] : $*B
   // CHECK: destroy_value [[PROJECTED_OWNER]]
   _ = writable[keyPath: wkp]
 
@@ -62,7 +64,8 @@ func loadable(readonly: A, writable: inout A,
   // CHECK: [[PROJECTED_RAW_PTR:%.*]] = struct_extract [[PROJECTED_PTR]]
   // CHECK: [[PROJECTED_ADDR:%.*]] = pointer_to_address [[PROJECTED_RAW_PTR]]
   // CHECK: [[PROJECTED_DEP:%.*]] = mark_dependence [[PROJECTED_ADDR]] : $*B on [[PROJECTED_OWNER]]
-  // CHECK: copy_addr [[PROJECTED_DEP]] to [[TEMP]]
+  // CHECK: [[COPY_TMP:%.*]] = load [copy] [[PROJECTED_DEP]] : $*B
+  // CHECK: assign [[COPY_TMP]] to [[TEMP]] : $*B
   // CHECK: destroy_value [[PROJECTED_OWNER]]
   _ = readonly[keyPath: rkp]
   _ = writable[keyPath: rkp]
@@ -91,7 +94,8 @@ func addressOnly(readonly: P, writable: inout P,
   _ = readonly[keyPath: wkp]
 
   // CHECK: [[TEMP:%.*]] = mark_uninitialized
-  // CHECK: [[ROOT_RAW_PTR:%.*]] = address_to_pointer %1
+  // CHECK: [[ROOT_ACCESS:%.*]] = begin_access [read] [unknown] %1 : $*P
+  // CHECK: [[ROOT_RAW_PTR:%.*]] = address_to_pointer [[ROOT_ACCESS]]
   // CHECK: [[ROOT_PTR:%.*]] = struct $UnsafeMutablePointer<P> ([[ROOT_RAW_PTR]]
   // CHECK: [[KP_BORROW:%.*]] = begin_borrow %4
   // CHECK: [[KP_COPY:%.*]] = copy_value [[KP_BORROW]]
@@ -105,7 +109,8 @@ func addressOnly(readonly: P, writable: inout P,
   // CHECK: [[PROJECTED_RAW_PTR:%.*]] = struct_extract [[PROJECTED_PTR]]
   // CHECK: [[PROJECTED_ADDR:%.*]] = pointer_to_address [[PROJECTED_RAW_PTR]]
   // CHECK: [[PROJECTED_DEP:%.*]] = mark_dependence [[PROJECTED_ADDR]] : $*Q on [[PROJECTED_OWNER]]
-  // CHECK: copy_addr [[PROJECTED_DEP]] to [[TEMP]]
+  // CHECK: copy_addr [[PROJECTED_DEP]] to [initialization] [[CPY_TMP:%.*]] : $*Q
+  // CHECK: copy_addr [take] [[CPY_TMP]] to [[TEMP]] : $*Q
   // CHECK: destroy_value [[PROJECTED_OWNER]]
   _ = writable[keyPath: wkp]
 
@@ -124,7 +129,8 @@ func addressOnly(readonly: P, writable: inout P,
   // CHECK: [[PROJECTED_RAW_PTR:%.*]] = struct_extract [[PROJECTED_PTR]]
   // CHECK: [[PROJECTED_ADDR:%.*]] = pointer_to_address [[PROJECTED_RAW_PTR]]
   // CHECK: [[PROJECTED_DEP:%.*]] = mark_dependence [[PROJECTED_ADDR]] : $*Q on [[PROJECTED_OWNER]]
-  // CHECK: copy_addr [[PROJECTED_DEP]] to [[TEMP]]
+  // CHECK: copy_addr [[PROJECTED_DEP]] to [initialization] [[CPY_TMP:%.*]] : $*Q
+  // CHECK: copy_addr [take] [[CPY_TMP]] to [[TEMP]] : $*Q
   // CHECK: destroy_value [[PROJECTED_OWNER]]
   _ = readonly[keyPath: rkp]
   _ = writable[keyPath: rkp]
@@ -159,8 +165,9 @@ func reabstracted(readonly: @escaping () -> (),
   _ = readonly[keyPath: wkp]
 
   // CHECK: [[TEMP_SUBST:%.*]] = mark_uninitialized {{.*}} : $*@callee_owned (@owned A) -> @owned B
+  // CHECK: [[ROOT_ACCESS:%.*]] = begin_access [read] [unknown] %1 : $*@callee_owned () -> ()
   // CHECK: [[ROOT_ORIG_TMP:%.*]] = alloc_stack $@callee_owned (@in ()) -> @out ()
-  // CHECK: [[ROOT_SUBST:%.*]] = load [copy] %1
+  // CHECK: [[ROOT_SUBST:%.*]] = load [copy] [[ROOT_ACCESS]]
   // CHECK: [[ROOT_ORIG:%.*]] = partial_apply {{.*}}([[ROOT_SUBST]])
   // CHECK: store [[ROOT_ORIG]] to [init] [[ROOT_ORIG_TMP]]
   // CHECK: [[ROOT_RAW_PTR:%.*]] = address_to_pointer [[ROOT_ORIG_TMP]]

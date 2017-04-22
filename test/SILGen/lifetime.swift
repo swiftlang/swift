@@ -189,7 +189,8 @@ func reftype_call_arg() {
 // CHECK:   store [[A1_COPY]] to [init] [[PB]]
 // CHECK:   end_borrow [[BORROWED_A1]] from [[A1]]
 // CHECK:   [[RFWA:%[0-9]+]] = function_ref @_T08lifetime21reftype_func_with_arg{{[_0-9a-zA-Z]*}}F
-// CHECK:   [[A2:%[0-9]+]] = load [copy] [[PB]]
+// CHECK:   [[READ:%.*]] = begin_access [read] [unknown] [[PB]]
+// CHECK:   [[A2:%[0-9]+]] = load [copy] [[READ]]
 // CHECK:   [[RESULT:%.*]] = apply [[RFWA]]([[A2]])
 // CHECK:   destroy_value [[RESULT]]
 // CHECK:   destroy_value [[AADDR]]
@@ -368,13 +369,15 @@ func logical_lvalue_lifetime(_ r: RefWithProp, _ i: Int, _ v: Val) {
 
   // -- Reference types need to be copy_valued as property method args.
   r.int_prop = i
-  // CHECK: [[R1:%[0-9]+]] = load [copy] [[PR]]
+  // CHECK:   [[READ:%.*]] = begin_access [read] [unknown] [[PR]]
+  // CHECK: [[R1:%[0-9]+]] = load [copy] [[READ]]
   // CHECK: [[SETTER_METHOD:%[0-9]+]] = class_method {{.*}} : $RefWithProp, #RefWithProp.int_prop!setter.1 : (RefWithProp) -> (Int) -> (), $@convention(method) (Int, @guaranteed RefWithProp) -> ()
   // CHECK: apply [[SETTER_METHOD]]({{.*}}, [[R1]])
   // CHECK: destroy_value [[R1]]
 
   r.aleph_prop.b = v
-  // CHECK: [[R2:%[0-9]+]] = load [copy] [[PR]]
+  // CHECK: [[READ:%.*]] = begin_access [read] [unknown] [[PR]]
+  // CHECK: [[R2:%[0-9]+]] = load [copy] [[READ]]
   // CHECK: [[STORAGE:%.*]] = alloc_stack $Builtin.UnsafeValueBuffer
   // CHECK: [[ALEPH_PROP_TEMP:%[0-9]+]] = alloc_stack $Aleph
   // CHECK: [[BORROWED_R2:%.*]] = begin_borrow [[R2]]
@@ -503,8 +506,10 @@ class Foo<T> {
     // -- Then initialize #Foo.x using the earlier stored value of CHI to THIS_Z.
     x = chi
     // CHECK:   [[BORROWED_THIS:%.*]] = begin_borrow [[THIS]]
+    // CHECK:   [[READ:%.*]] = begin_access [read] [unknown] [[PCHI]]
+    // CHECK:   [[X:%.*]] = load [trivial] [[READ]]
     // CHECK:   [[THIS_X:%[0-9]+]] = ref_element_addr [[BORROWED_THIS]] : {{.*}}, #Foo.x
-    // CHECK:   copy_addr [[PCHI]] to [[THIS_X]]
+    // CHECK:   assign [[X]] to [[THIS_X]]
     // CHECK:   end_borrow [[BORROWED_THIS]] from [[THIS]]
 
     // -- cleanup chi
@@ -663,7 +668,8 @@ struct Bar {
     // CHECK: [[PB_BOX:%.*]] = project_box [[MARKED_SELF_BOX]]
 
     x = bar()
-    // CHECK: [[SELF_X:%[0-9]+]] = struct_element_addr [[PB_BOX]] : $*Bar, #Bar.x
+    // CHECK:   [[WRITE:%.*]] = begin_access [modify] [unknown] [[PB_BOX]]
+    // CHECK: [[SELF_X:%[0-9]+]] = struct_element_addr [[WRITE]] : $*Bar, #Bar.x
     // CHECK: assign {{.*}} to [[SELF_X]]
 
     // -- load and return this
@@ -690,11 +696,13 @@ struct Bas<T> {
     // CHECK: [[PB_BOX:%.*]] = project_box [[MARKED_SELF_BOX]]
 
     x = bar()
-    // CHECK: [[SELF_X:%[0-9]+]] = struct_element_addr [[PB_BOX]] : $*Bas<T>, #Bas.x
+    // CHECK: [[WRITE:%.*]] = begin_access [modify] [unknown] [[PB_BOX]]
+    // CHECK: [[SELF_X:%[0-9]+]] = struct_element_addr [[WRITE]] : $*Bas<T>, #Bas.x
     // CHECK: assign {{.*}} to [[SELF_X]]
 
     y = yy
-    // CHECK: [[SELF_Y:%[0-9]+]] = struct_element_addr [[PB_BOX]] : $*Bas<T>, #Bas.y
+    // CHECK: [[WRITE:%.*]] = begin_access [modify] [unknown] [[PB_BOX]]
+    // CHECK: [[SELF_Y:%[0-9]+]] = struct_element_addr [[WRITE]] : $*Bas<T>, #Bas.y
     // CHECK: copy_addr {{.*}} to [[SELF_Y]]
     // CHECK: destroy_value
 
@@ -730,7 +738,8 @@ class D : B {
     // CHECK: [[THIS1:%[0-9]+]] = load [take] [[PB_BOX]]
     // CHECK: [[THIS1_SUP:%[0-9]+]] = upcast [[THIS1]] : ${{.*}} to $B
     // CHECK: [[SUPER_CTOR:%[0-9]+]] = function_ref @_T08lifetime1BCACSi1y_tcfc : $@convention(method) (Int, @owned B) -> @owned B
-    // CHECK: [[Y:%[0-9]+]] = load [trivial] [[PY]]
+    // CHECK: [[READ:%.*]] = begin_access [read] [unknown] [[PY]]
+    // CHECK: [[Y:%[0-9]+]] = load [trivial] [[READ]]
     // CHECK: [[THIS2_SUP:%[0-9]+]] = apply [[SUPER_CTOR]]([[Y]], [[THIS1_SUP]])
     // CHECK: [[THIS2:%[0-9]+]] = unchecked_ref_cast [[THIS2_SUP]] : $B to $D
     // CHECK: [[THIS1:%[0-9]+]] = load [copy] [[PB_BOX]]
@@ -746,7 +755,8 @@ func downcast(_ b: B) {
   // CHECK: [[BADDR:%[0-9]+]] = alloc_box ${ var B }
   // CHECK: [[PB:%[0-9]+]] = project_box [[BADDR]]
   (b as! D).foo()
-  // CHECK: [[B:%[0-9]+]] = load [copy] [[PB]]
+  // CHECK: [[READ:%.*]] = begin_access [read] [unknown] [[PB]]
+  // CHECK: [[B:%[0-9]+]] = load [copy] [[READ]]
   // CHECK: [[D:%[0-9]+]] = unconditional_checked_cast [[B]] : {{.*}} to $D
   // CHECK: apply {{.*}}([[D]])
   // CHECK-NOT: destroy_value [[B]]
