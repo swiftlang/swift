@@ -429,6 +429,7 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
     case ValueKind::SelectEnumAddrInst:
     case ValueKind::SelectEnumInst:
     case ValueKind::SelectValueInst:
+    case ValueKind::KeyPathInst:
       return InlineCost::Expensive;
 
     case ValueKind::BuiltinInst: {

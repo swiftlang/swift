@@ -20,6 +20,7 @@
 #include "swift/AST/Builtins.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/ProtocolConformanceRef.h"
+#include "swift/AST/TypeAlignments.h"
 #include "swift/Basic/Compiler.h"
 #include "swift/Basic/NullablePtr.h"
 #include "swift/SIL/Consumption.h"
@@ -1396,6 +1397,322 @@ public:
   static bool classof(const ValueBase *V) {
     return V->getKind() == ValueKind::FunctionRefInst;
   }
+};
+
+/// Component of a KeyPathInst.
+class KeyPathPatternComponent {
+public:
+  /// Computed property components require an identifier so they can be stably
+  /// identified at runtime. This has to correspond to the ABI of the property--
+  /// whether a reabstracted stored property, a property dispatched through a
+  /// vtable or witness table, or a computed property.
+  class ComputedPropertyId {
+    friend KeyPathPatternComponent;
+  public:
+    enum KindType {
+      Property, Function, DeclRef,
+    };
+  private:
+  
+    union ValueType {
+      VarDecl *Property;
+      SILFunction *Function;
+      SILDeclRef DeclRef;
+      
+      ValueType() : Property(nullptr) {}
+      ValueType(VarDecl *p) : Property(p) {}
+      ValueType(SILFunction *f) : Function(f) {}
+      ValueType(SILDeclRef d) : DeclRef(d) {}
+    } Value;
+  
+    KindType Kind;
+    
+    explicit ComputedPropertyId(ValueType Value, KindType Kind)
+      : Value(Value), Kind(Kind)
+    {}
+    
+  public:
+    ComputedPropertyId() : Value(), Kind(Property) {}
+  
+    /*implicit*/ ComputedPropertyId(VarDecl *property)
+      : Value{property}, Kind{Property}
+    {
+    }
+    
+    /*implicit*/ ComputedPropertyId(SILFunction *function)
+      : Value{function}, Kind{Function}
+    {}
+    
+    /*implicit*/ ComputedPropertyId(SILDeclRef declRef)
+      : Value{declRef}, Kind{DeclRef}
+    {}
+    
+    KindType getKind() const { return Kind; }
+    
+    VarDecl *getProperty() const {
+      assert(getKind() == Property);
+      return Value.Property;
+    }
+    
+    SILFunction *getFunction() const {
+      assert(getKind() == Function);
+      return Value.Function;
+    }
+    
+    SILDeclRef getDeclRef() const {
+      assert(getKind() == DeclRef);
+      return Value.DeclRef;
+    }
+  };
+
+  enum class Kind: unsigned {
+    StoredProperty,
+    GettableProperty,
+    SettableProperty,
+  };
+  
+  // The pair of a captured index value and its Hashable conformance for a
+  // subscript keypath.
+  struct IndexPair {
+    unsigned Operand;
+    ProtocolConformance *Hashable;
+  };
+  
+private:
+  // Value is the VarDecl* for StoredProperty, and the SILFunction* of the
+  // Getter for computed properties
+  llvm::PointerIntPair<void *, 2, Kind> ValueAndKind;
+  // false if id is a SILFunction*; true if id is a SILDeclRef
+  llvm::PointerIntPair<SILFunction *, 2, ComputedPropertyId::KindType>
+    SetterAndIdKind;
+  ComputedPropertyId::ValueType IdValue;
+  ArrayRef<IndexPair> Indices;
+  CanType ComponentType;
+
+  KeyPathPatternComponent(VarDecl *storedProp, Kind kind,
+                          CanType ComponentType)
+    : ValueAndKind(storedProp, kind), ComponentType(ComponentType) {}
+
+  KeyPathPatternComponent(ComputedPropertyId id, Kind kind,
+                          SILFunction *getter,
+                          SILFunction *setter,
+                          ArrayRef<IndexPair> indices,
+                          CanType ComponentType)
+    : ValueAndKind(getter, kind),
+      SetterAndIdKind(setter, id.Kind),
+      IdValue(id.Value),
+      Indices(indices),
+      ComponentType(ComponentType) {}
+
+public:
+  KeyPathPatternComponent() : ValueAndKind(nullptr, (Kind)0) {}
+
+  bool isNull() const {
+    return ValueAndKind.getPointer() == nullptr;
+  }
+
+  Kind getKind() const {
+    return ValueAndKind.getInt();
+  }
+  
+  CanType getComponentType() const {
+    return ComponentType;
+  }
+
+  VarDecl *getStoredPropertyDecl() const {
+    switch (getKind()) {
+    case Kind::StoredProperty:
+      return static_cast<VarDecl*>(ValueAndKind.getPointer());
+    case Kind::GettableProperty:
+    case Kind::SettableProperty:
+      llvm_unreachable("not a stored property");
+    }
+    llvm_unreachable("unhandled kind");
+  }
+  
+  ComputedPropertyId getComputedPropertyId() const {
+    switch (getKind()) {
+    case Kind::StoredProperty:
+      llvm_unreachable("not a computed property");
+    case Kind::GettableProperty:
+    case Kind::SettableProperty:
+      return ComputedPropertyId(IdValue, SetterAndIdKind.getInt());
+    }
+    llvm_unreachable("unhandled kind");
+  }
+  
+  SILFunction *getComputedPropertyGetter() const {
+    switch (getKind()) {
+    case Kind::StoredProperty:
+      llvm_unreachable("not a computed property");
+    case Kind::GettableProperty:
+    case Kind::SettableProperty:
+      return static_cast<SILFunction*>(ValueAndKind.getPointer());
+    }
+    llvm_unreachable("unhandled kind");
+  }
+
+  SILFunction *getComputedPropertySetter() const {
+    switch (getKind()) {
+    case Kind::StoredProperty:
+    case Kind::GettableProperty:
+      llvm_unreachable("not a settable computed property");
+    case Kind::SettableProperty:
+      return SetterAndIdKind.getPointer();
+    }
+    llvm_unreachable("unhandled kind");
+  }
+  
+  ArrayRef<IndexPair> getComputedPropertyIndices() const {
+    switch (getKind()) {
+    case Kind::StoredProperty:
+      llvm_unreachable("not a computed property");
+    case Kind::GettableProperty:
+    case Kind::SettableProperty:
+      return Indices;
+    }
+  }
+  
+  bool isComputedSettablePropertyMutating() const;
+  
+  static KeyPathPatternComponent forStoredProperty(VarDecl *property,
+                                                   CanType ty) {
+    return KeyPathPatternComponent(property, Kind::StoredProperty, ty);
+  }
+  
+  static KeyPathPatternComponent
+  forComputedGettableProperty(ComputedPropertyId identifier,
+                              SILFunction *getter,
+                              ArrayRef<IndexPair> indices,
+                              CanType ty) {
+    return KeyPathPatternComponent(identifier, Kind::GettableProperty,
+                                   getter, nullptr, indices, ty);
+  }
+
+  static KeyPathPatternComponent
+  forComputedSettableProperty(ComputedPropertyId identifier,
+                              SILFunction *getter,
+                              SILFunction *setter,
+                              ArrayRef<IndexPair> indices,
+                              CanType ty) {
+    return KeyPathPatternComponent(identifier, Kind::SettableProperty,
+                                   getter, setter, indices, ty);
+  }
+  
+  void Profile(llvm::FoldingSetNodeID &ID);
+};
+
+/// An abstract description of a key path pattern.
+class KeyPathPattern final
+  : public llvm::FoldingSetNode,
+    private llvm::TrailingObjects<KeyPathPattern,
+                                  KeyPathPatternComponent>
+{
+  friend TrailingObjects;
+
+  unsigned NumOperands, NumComponents;
+  CanGenericSignature Signature;
+  CanType RootType, ValueType;
+  StringRef ObjCString;
+  
+  KeyPathPattern(CanGenericSignature signature,
+                 CanType rootType,
+                 CanType valueType,
+                 ArrayRef<KeyPathPatternComponent> components,
+                 StringRef ObjCString,
+                 unsigned numOperands);
+  
+  static KeyPathPattern *create(SILModule &M,
+                                CanGenericSignature signature,
+                                CanType rootType,
+                                CanType valueType,
+                                ArrayRef<KeyPathPatternComponent> components,
+                                StringRef ObjCString,
+                                unsigned numOperands);
+public:
+  CanGenericSignature getGenericSignature() const {
+    return Signature;
+  }
+  
+  CanType getRootType() const {
+    return RootType;
+  }
+  
+  CanType getValueType() const {
+    return ValueType;
+  }
+  
+  unsigned getNumOperands() const {
+    return NumOperands;
+  }
+  
+  StringRef getObjCString() const {
+    return ObjCString;
+  }
+  
+  ArrayRef<KeyPathPatternComponent> getComponents() const;
+  
+  static KeyPathPattern *get(SILModule &M,
+                             CanGenericSignature signature,
+                             CanType rootType,
+                             CanType valueType,
+                             ArrayRef<KeyPathPatternComponent> components,
+                             StringRef ObjCString);
+  
+  static void Profile(llvm::FoldingSetNodeID &ID,
+                      CanGenericSignature signature,
+                      CanType rootType,
+                      CanType valueType,
+                      ArrayRef<KeyPathPatternComponent> components,
+                      StringRef ObjCString);
+  
+  void Profile(llvm::FoldingSetNodeID &ID) {
+    Profile(ID, getGenericSignature(), getRootType(), getValueType(),
+            getComponents(), getObjCString());
+  }
+};
+
+/// Instantiates a key path object.
+class KeyPathInst final
+  : public SILInstruction,
+    private llvm::TrailingObjects<KeyPathInst, Substitution>
+{
+  friend SILBuilder;
+  friend TrailingObjects;
+  
+  KeyPathPattern *Pattern;
+  unsigned NumSubstitutions;
+  
+  static KeyPathInst *create(SILDebugLocation Loc,
+                             KeyPathPattern *Pattern,
+                             SubstitutionList Subs,
+                             SILType Ty,
+                             SILFunction &F);
+  
+  KeyPathInst(SILDebugLocation Loc,
+              KeyPathPattern *Pattern,
+              SubstitutionList Subs,
+              SILType Ty);
+  
+public:
+  KeyPathPattern *getPattern() const;
+
+  ArrayRef<Operand> getAllOperands() const {
+    // TODO: Subscript keypaths will have operands.
+    return {};
+  }
+  MutableArrayRef<Operand> getAllOperands();
+
+  MutableArrayRef<Substitution> getSubstitutions();
+  SubstitutionList getSubstitutions() const {
+    return const_cast<KeyPathInst*>(this)->getSubstitutions();
+  }
+  
+  static bool classof(const ValueBase *V) {
+    return V->getKind() == ValueKind::KeyPathInst;
+  }
+  
+  ~KeyPathInst();
 };
 
 /// Represents an invocation of builtin functionality provided by the code

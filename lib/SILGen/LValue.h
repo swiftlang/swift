@@ -100,6 +100,7 @@ public:
     OpenedExistentialKind,      // opened opaque existential
     AddressorKind,              // var/subscript addressor
     ValueKind,                  // random base pointer as an lvalue
+    KeyPathApplicationKind,     // applying a key path
 
     // Logical LValue kinds
     GetterSetterKind,           // property or subscript getter/setter

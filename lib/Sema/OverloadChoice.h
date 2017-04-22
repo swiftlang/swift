@@ -49,6 +49,8 @@ enum class OverloadChoiceKind : int {
   /// base type. Used for unresolved member expressions like ".none" that
   /// refer to enum members with unit type.
   BaseType,
+  /// \brief The overload choice selects a key path subscripting operation.
+  KeyPathApplication,
   /// \brief The overload choice indexes into a tuple. Index zero will
   /// have the value of this enumerator, index one will have the value of this
   /// enumerator + 1, and so on. Thus, this enumerator must always be last.
@@ -98,7 +100,7 @@ class OverloadChoice {
 
 public:
   OverloadChoice()
-    : BaseAndBits(nullptr, 0), DeclOrKind(),
+    : BaseAndBits(nullptr, 0), DeclOrKind(0),
       TheFunctionRefKind(FunctionRefKind::Unapplied) {}
 
   OverloadChoice(Type base, ValueDecl *value, bool isSpecialized,
@@ -143,6 +145,13 @@ public:
                     | (uintptr_t)0x03),
         TheFunctionRefKind(FunctionRefKind::Unapplied) {
     assert(base->getRValueType()->is<TupleType>() && "Must have tuple type");
+  }
+
+  bool isInvalid() const {
+    return BaseAndBits.getPointer().isNull()
+      && BaseAndBits.getInt() == 0
+      && DeclOrKind == 0
+      && TheFunctionRefKind == FunctionRefKind::Unapplied;
   }
 
   /// Retrieve an overload choice for a declaration that was found via
@@ -230,6 +239,7 @@ public:
 
     case OverloadChoiceKind::BaseType:
     case OverloadChoiceKind::TupleIndex:
+    case OverloadChoiceKind::KeyPathApplication:
       return false;
     }
 
@@ -241,6 +251,9 @@ public:
     assert(isDecl() && "Not a declaration");
     return reinterpret_cast<ValueDecl *>(DeclOrKind & ~(uintptr_t)0x03);
   }
+  
+  /// Get the name of the overload choice.
+  DeclName getName() const;
 
   /// \brief Retrieve the tuple index that corresponds to this overload
   /// choice.

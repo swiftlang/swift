@@ -2253,6 +2253,16 @@ void SILCloner<ImplClass>::visitObjCProtocolInst(ObjCProtocolInst *Inst) {
                           getOpType(Inst->getType())));
 }
 
+template <typename ImplClass>
+void SILCloner<ImplClass>::visitKeyPathInst(KeyPathInst *Inst) {
+  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  doPostProcess(Inst, getBuilder().createKeyPath(
+                          getOpLocation(Inst->getLoc()),
+                          Inst->getPattern(),
+                          getOpSubstitutions(Inst->getSubstitutions()),
+                          getOpType(Inst->getType())));
+}
+
 } // end namespace swift
 
 #endif

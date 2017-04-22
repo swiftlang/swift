@@ -25,7 +25,7 @@ class Base<T> {
 // CHECK-NEXT:     br i1 [[COND]], label %cacheIsNull, label %cont
 
 // CHECK:       cacheIsNull:
-// CHECK-NEXT:     call void @swift_once([[INT]]* @_T03foo12SuperDerivedCMa.once_token, i8* bitcast (void (i8*)* @initialize_metadata_SuperDerived to i8*))
+// CHECK-NEXT:     call void @swift_once([[INT]]* @_T03foo12SuperDerivedCMa.once_token, i8* bitcast (void (i8*)* @initialize_metadata_SuperDerived to i8*), i8* undef)
 // CHECK-NEXT:     [[METADATA:%.*]] = load %swift.type*, %swift.type** @_T03foo12SuperDerivedCML
 // CHECK-NEXT:     br label %cont
 // CHECK:       cont:
@@ -41,7 +41,7 @@ class SuperDerived: Derived {
 // CHECK-NEXT:     br i1 [[COND]], label %cacheIsNull, label %cont
 
 // CHECK:       cacheIsNull:
-// CHECK-NEXT:     call void @swift_once([[INT]]* @_T03foo7DerivedCMa.once_token, i8* bitcast (void (i8*)* @initialize_metadata_Derived to i8*))
+// CHECK-NEXT:     call void @swift_once([[INT]]* @_T03foo7DerivedCMa.once_token, i8* bitcast (void (i8*)* @initialize_metadata_Derived to i8*), i8* undef)
 // CHECK-NEXT:     [[METADATA:%.*]] = load %swift.type*, %swift.type** @_T03foo7DerivedCML
 // CHECK-NEXT:     br label %cont
 // CHECK:       cont:

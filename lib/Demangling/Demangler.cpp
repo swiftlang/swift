@@ -1260,6 +1260,13 @@ NodePointer Demangler::demangleThunkOrSpecialization() {
     }
     case'f':
       return demangleFunctionSpecialization();
+    case 'K':
+    case 'k': {
+      auto nodeKind = c == 'K' ? Node::Kind::KeyPathGetterThunkHelper
+                               : Node::Kind::KeyPathSetterThunkHelper;
+      auto decl = popNode();
+      return createWithChild(nodeKind, decl);
+    }
     default:
       return nullptr;
   }

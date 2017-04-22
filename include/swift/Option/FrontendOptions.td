@@ -265,6 +265,10 @@ def enable_sil_opaque_values : Flag<["-"], "enable-sil-opaque-values">,
 def enable_experimental_property_behaviors :
   Flag<["-"], "enable-experimental-property-behaviors">,
   HelpText<"Enable experimental property behaviors">;
+  
+def enable_experimental_keypaths :
+  Flag<["-"], "enable-experimental-keypaths">,
+  HelpText<"Enable experimental keypaths">;
 
 def enable_experimental_deserialization_recovery :
   Flag<["-"], "enable-experimental-deserialization-recovery">,
