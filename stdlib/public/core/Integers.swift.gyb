@@ -978,8 +978,8 @@ def unsafeOperationComment(operator):
 /// The following example declares a method that calculates the total of any
 /// sequence with `Numeric` elements.
 ///
-///     extension Sequence where Iterator.Element: Numeric {
-///         func sum() -> Iterator.Element {
+///     extension Sequence where Element: Numeric {
+///         func sum() -> Element {
 ///             return reduce(0, +)
 ///         }
 ///     }

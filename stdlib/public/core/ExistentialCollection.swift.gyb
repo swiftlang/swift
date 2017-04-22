@@ -363,7 +363,7 @@ internal class _AnyRandomAccessCollectionBox<Element>
 
   // TODO: swift-3-indexing-model: forward the following methods.
   /*
-  func _customIndexOfEquatableElement(element: Iterator.Element) -> Index??
+  func _customIndexOfEquatableElement(element: Element) -> Index??
   */
 
   @_versioned
@@ -425,18 +425,18 @@ internal class _AnyRandomAccessCollectionBox<Element>
 
 @_fixed_layout
 @_versioned
-internal final class _${Kind}Box<S : ${Kind}> : _Any${Kind}Box<S.Iterator.Element>
+internal final class _${Kind}Box<S : ${Kind}> : _Any${Kind}Box<S.Element>
   where
   S.SubSequence : ${Kind},
 %  if Kind == 'Sequence':
-  S.SubSequence.Iterator.Element == S.Iterator.Element,
+  S.SubSequence.Element == S.Element,
   S.SubSequence.SubSequence == S.SubSequence
 %  else:
   S.SubSequence.Indices : ${Kind},
   S.Indices : ${Kind}
 %  end
 {
-  internal typealias Element = S.Iterator.Element
+  internal typealias Element = S.Element
 
   @_versioned
   @_inlineable
@@ -736,9 +736,9 @@ public struct AnySequence<Element> : Sequence {
   @_inlineable
   public init<S : Sequence>(_ base: S)
     where
-    S.Iterator.Element == Element,
+    S.Element == Element,
     S.SubSequence : Sequence,
-    S.SubSequence.Iterator.Element == Element,
+    S.SubSequence.Element == Element,
     S.SubSequence.SubSequence == S.SubSequence {
     self._box = _SequenceBox(_base: base)
   }
@@ -868,7 +868,7 @@ extension Any${Kind} {
   }
 
   @_inlineable
-  public func _copyContents(initializing buf: UnsafeMutableBufferPointer<Iterator.Element>)
+  public func _copyContents(initializing buf: UnsafeMutableBufferPointer<Element>)
   -> (AnyIterator<Element>,UnsafeMutableBufferPointer<Element>.Index) {
     let (it,idx) = _box.__copyContents(initializing: buf)
     return (AnyIterator(it),idx)
@@ -1041,7 +1041,7 @@ public struct ${Self}<Element>
     // FIXME(ABI)#101 (Associated Types with where clauses): these constraints should be applied to
     // associated types of Collection.
     C.SubSequence : ${SubProtocol},
-    C.SubSequence.Iterator.Element == Element,
+    C.SubSequence.Element == Element,
     C.SubSequence.Indices : ${SubProtocol},
     C.Indices : ${SubProtocol}
      {
@@ -1273,7 +1273,7 @@ public typealias AnyCollectionProtocol = _AnyCollectionProtocol
 
 extension _AnyCollectionProtocol {
   @available(*, unavailable, renamed: "makeIterator()")
-  public func generate() -> AnyIterator<Iterator.Element> {
+  public func generate() -> AnyIterator<Element> {
     Builtin.unreachable()
   }
 }

@@ -685,12 +685,12 @@ public struct Unsafe${Mutable}RawPointer : Strideable, Hashable, _Pointer {
   @available(*, deprecated, message: "it will be removed in Swift 4.0.  Please use 'UnsafeMutableRawBufferPointer.initialize(from:)' instead")
   @discardableResult
   public func initializeMemory<C : Collection>(
-    as type: C.Iterator.Element.Type, from source: C
-  ) -> UnsafeMutablePointer<C.Iterator.Element> {
+    as type: C.Element.Type, from source: C
+  ) -> UnsafeMutablePointer<C.Element> {
     // TODO: Optimize where `C` is a `ContiguousArrayBuffer`.
     // Initialize and bind each element of the container.
     for (index, element) in source.enumerated() {
-      self.initializeMemory(as: C.Iterator.Element.self, at: index, to: element)
+      self.initializeMemory(as: C.Element.self, at: index, to: element)
     }
     return UnsafeMutablePointer(_rawValue)
   }
