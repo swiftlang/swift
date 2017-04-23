@@ -1257,8 +1257,6 @@ void FunctionSignaturePartialSpecializer::addRequirements(
 /// Add requirements from the caller's signature.
 void FunctionSignaturePartialSpecializer::addCallerRequirements() {
   for (auto CallerArchetype : UsedCallerArchetypes) {
-    auto CallerGenericParam =
-      CallerGenericEnv->mapTypeOutOfContext(CallerArchetype);
     // Add requirements for this caller generic parameter and its dependent
     // types.
     SmallVector<Requirement, 4> CollectedReqs;
@@ -1269,7 +1267,7 @@ void FunctionSignaturePartialSpecializer::addCallerRequirements() {
             for (auto Req : CollectedReqs) {
               Req.dump();
             }
-            CallerInterfaceToSpecializedInterfaceMap.dump();
+            CallerInterfaceToSpecializedInterfaceMap.dump(llvm::dbgs());
            );
       addRequirements(CollectedReqs, CallerInterfaceToSpecializedInterfaceMap);
     }
@@ -1446,7 +1444,6 @@ void ReabstractionInfo::performPartialSpecializationPreparation(
     SILFunction *Caller, SILFunction *Callee,
     ArrayRef<Substitution> ParamSubs) {
   SILModule &M = Callee->getModule();
-  auto &Ctx = M.getASTContext();
 
   // Caller is the SILFunction containing the apply instruction.
   CanGenericSignature CallerGenericSig;
