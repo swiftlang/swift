@@ -379,7 +379,8 @@ public:
     std::string ToReplace;
 
     static StringSegment getLiteral(SourceLoc Loc, unsigned Length,
-                                    unsigned Modifiers, const std::string &ToReplace) {
+                                    unsigned Modifiers,
+                                    const std::string &ToReplace) {
       StringSegment Result;
       Result.Kind = Literal;
       Result.Loc = Loc;
@@ -502,7 +503,8 @@ private:
   static unsigned lexUnicodeEscape(const char *&CurPtr, Lexer *Diags);
 
   unsigned lexCharacter(const char *&CurPtr,
-                        char StopQuote, bool EmitDiagnostics, unsigned Modifiers = 0);
+                        char StopQuote, bool EmitDiagnostics,
+                        unsigned Modifiers = 0);
   void lexStringLiteral();
   void lexEscapedIdentifier();
 
@@ -513,7 +515,7 @@ private:
   /// end of the marker in diff3 or Perforce style respectively.
   bool tryLexConflictMarker();
 
-  /// New for multiline string literals
+  /// Multiline string literals.
   void validateIndents(const Token &Str);
 };
   

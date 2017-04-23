@@ -46,8 +46,8 @@ class Token {
   /// \brief Whether this token is an escaped `identifier` token.
   unsigned EscapedIdentifier : 1;
   
-  /// modifiers for string literals
-  unsigned StringModifiers: 1; // currently only one - triple quotes for long strings
+  /// Modifiers for string literals
+  unsigned StringModifiers : 1;
 
   /// Text - The actual string covered by the token in the source buffer.
   StringRef Text;
@@ -276,7 +276,8 @@ public:
   void setText(StringRef T) { Text = T; }
 
   /// \brief Set the token to the specified kind and source range.
-  void setToken(tok K, StringRef T, unsigned CommentLength = 0, unsigned Modifiers = 0) {
+  void setToken(tok K, StringRef T, unsigned CommentLength = 0,
+                unsigned Modifiers = 0) {
     Kind = K;
     Text = T;
     this->CommentLength = CommentLength;
