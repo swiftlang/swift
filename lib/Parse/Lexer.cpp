@@ -41,7 +41,7 @@ using clang::isHorizontalWhitespace;
 using clang::isPrintable;
 using clang::isWhitespace;
 
-/// Mumber of bits must tally with Token.h.
+/// Number of bits must tally with Token.h.
 enum StringLiteralModifiers : unsigned {
   StringLiteralMultiline = 1<<0,
 
@@ -1820,7 +1820,7 @@ void Lexer::getStringLiteralSegments(
   Segments.push_back(
       StringSegment::getLiteral(getSourceLoc(SegmentStartPtr),
                                 Bytes.end()-SegmentStartPtr,
-                                Modifiers | StringLiteralLastSegment, ToReplace));
+                                Modifiers|StringLiteralLastSegment, ToReplace));
 }
 
 

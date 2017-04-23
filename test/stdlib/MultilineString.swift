@@ -54,9 +54,9 @@ print(delimit("""
 // CHECK: -5-
 print("-5-")
 // CHECK-NEXT: {{^}}<Five
-// CHECK-NEXT: {{^}}
-// CHECK-NEXT: {{^}}
-// CHECK-NEXT: {{^}}Epsilon>
+// CHECK: {{^}}
+// CHECK: {{^}}
+// CHECK: {{^}}Epsilon>
 print(delimit("""
     Five\n
 
