@@ -176,13 +176,13 @@ def main():
     test_name_width = max_width(ratio_list, title='TEST', key_len=True)
     new_time_width = max_width(new_results, title=new_branch)
     old_time_width = max_width(old_results, title=old_branch)
-    delta_width = max_width(delta_list, title='DELTA (%)')
+    delta_width = max_width(delta_list, title='DELTA')
 
     markdown_table_header = "\n" + MARKDOWN_ROW.format(
         "TEST".ljust(test_name_width),
         old_branch.ljust(old_time_width),
         new_branch.ljust(new_time_width),
-        "DELTA (%)".ljust(delta_width),
+        "DELTA".ljust(delta_width),
         "SPEEDUP".ljust(2))
     markdown_table_header += MARKDOWN_ROW.format(
         HEADER_SPLIT.ljust(test_name_width),
@@ -307,7 +307,7 @@ def convert_to_html(ratio_list, old_results, new_results, delta_list,
                                                            unknown_list[key]))
 
     html_table = HTML_TABLE.format("TEST", old_branch, new_branch,
-                                   "DELTA (%)", "SPEEDUP", html_rows)
+                                   "DELTA", "SPEEDUP", html_rows)
     html_data = HTML.format(html_table)
     return html_data
 
