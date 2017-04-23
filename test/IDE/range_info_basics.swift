@@ -135,42 +135,42 @@ func test_no_pattern_binding(_ parameters: [String: Any]) -> String {
   return components.map { "\($0)=\($1)" }.joined(separator: "&")
 }
 
-// RUN: %target-swift-ide-test -range -pos=8:1 -end-pos 8:32 -source-filename %s | %FileCheck %s -check-prefix=CHECK1
-// RUN: %target-swift-ide-test -range -pos=9:1 -end-pos 9:26 -source-filename %s | %FileCheck %s -check-prefix=CHECK2
-// RUN: %target-swift-ide-test -range -pos=10:1 -end-pos 10:27 -source-filename %s | %FileCheck %s -check-prefix=CHECK3
-// RUN: %target-swift-ide-test -range -pos=3:1 -end-pos=4:26 -source-filename %s | %FileCheck %s -check-prefix=CHECK4
-// RUN: %target-swift-ide-test -range -pos=3:1 -end-pos=5:13 -source-filename %s | %FileCheck %s -check-prefix=CHECK5
-// RUN: %target-swift-ide-test -range -pos=4:1 -end-pos=5:13 -source-filename %s | %FileCheck %s -check-prefix=CHECK6
-// RUN: %target-swift-ide-test -range -pos=14:1 -end-pos=17:15 -source-filename %s | %FileCheck %s -check-prefix=CHECK7
-// RUN: %target-swift-ide-test -range -pos=31:1 -end-pos=33:15 -source-filename %s | %FileCheck %s -check-prefix=CHECK8
-// RUN: %target-swift-ide-test -range -pos=37:1 -end-pos=39:15 -source-filename %s | %FileCheck %s -check-prefix=CHECK9
-// RUN: %target-swift-ide-test -range -pos=49:1 -end-pos=50:34 -source-filename %s | %FileCheck %s -check-prefix=CHECK10
-// RUN: %target-swift-ide-test -range -pos=49:1 -end-pos=51:32 -source-filename %s | %FileCheck %s -check-prefix=CHECK11
-// RUN: %target-swift-ide-test -range -pos=49:1 -end-pos=52:45 -source-filename %s | %FileCheck %s -check-prefix=CHECK12
-// RUN: %target-swift-ide-test -range -pos=57:1 -end-pos=61:17 -source-filename %s | %FileCheck %s -check-prefix=CHECK13
-// RUN: %target-swift-ide-test -range -pos=57:1 -end-pos=69:8 -source-filename %s | %FileCheck %s -check-prefix=CHECK14
-// RUN: %target-swift-ide-test -range -pos=63:1 -end-pos=66:44 -source-filename %s | %FileCheck %s -check-prefix=CHECK15
-// RUN: %target-swift-ide-test -range -pos=63:1 -end-pos=68:15 -source-filename %s | %FileCheck %s -check-prefix=CHECK16
-// RUN: %target-swift-ide-test -range -pos=67:1 -end-pos=67:19 -source-filename %s | %FileCheck %s -check-prefix=CHECK17
-// RUN: %target-swift-ide-test -range -pos=76:1 -end-pos=79:13 -source-filename %s | %FileCheck %s -check-prefix=CHECK18
-// RUN: %target-swift-ide-test -range -pos=76:1 -end-pos=77:13 -source-filename %s | %FileCheck %s -check-prefix=CHECK19
-// RUN: %target-swift-ide-test -range -pos=78:1 -end-pos=81:13 -source-filename %s | %FileCheck %s -check-prefix=CHECK20
-// RUN: %target-swift-ide-test -range -pos=87:1 -end-pos=89:6 -source-filename %s | %FileCheck %s -check-prefix=CHECK21
-// RUN: %target-swift-ide-test -range -pos=90:1 -end-pos=92:6 -source-filename %s | %FileCheck %s -check-prefix=CHECK22
-// RUN: %target-swift-ide-test -range -pos=99:1 -end-pos=101:6 -source-filename %s | %FileCheck %s -check-prefix=CHECK23
-// RUN: %target-swift-ide-test -range -pos=102:1 -end-pos=104:6 -source-filename %s | %FileCheck %s -check-prefix=CHECK24
-// RUN: %target-swift-ide-test -range -pos=87:1 -end-pos=92:6 -source-filename %s | %FileCheck %s -check-prefix=CHECK25
-// RUN: %target-swift-ide-test -range -pos=97:1 -end-pos=104:6 -source-filename %s | %FileCheck %s -check-prefix=CHECK26
-// RUN: %target-swift-ide-test -range -pos=109:6 -end-pos=111:4 -source-filename %s | %FileCheck %s -check-prefix=CHECK-INVALID
-// RUN: %target-swift-ide-test -range -pos=114:1 -end-pos=115:15 -source-filename %s | %FileCheck %s -check-prefix=CHECK27
-// RUN: %target-swift-ide-test -range -pos=118:1 -end-pos=119:15 -source-filename %s | %FileCheck %s -check-prefix=CHECK27
-// RUN: %target-swift-ide-test -range -pos=126:11 -end-pos=126:12 -source-filename %s | %FileCheck %s -check-prefix=CHECK-INT
-// RUN: %target-swift-ide-test -range -pos=126:11 -end-pos=126:20 -source-filename %s | %FileCheck %s -check-prefix=CHECK-INT
-// RUN: %target-swift-ide-test -range -pos=127:7 -end-pos=127:8 -source-filename %s | %FileCheck %s -check-prefix=CHECK-INT
-// RUN: %target-swift-ide-test -range -pos=127:3 -end-pos=127:4 -source-filename %s | %FileCheck %s -check-prefix=CHECK-INT-LVALUE
-// RUN: %target-swift-ide-test -range -pos=128:13 -end-pos=128:15 -source-filename %s | %FileCheck %s -check-prefix=CHECK-INT-INOUT
-// RUN: %target-swift-ide-test -range -pos=118:1 -end-pos=120:22 -source-filename %s | %FileCheck %s -check-prefix=CHECK-INT
-// RUN: %target-swift-ide-test -range -pos=133:1 -end-pos=135:65 -source-filename %s | %FileCheck %s -check-prefix=CHECK-NO-PATTERN
+// RUN: %target-swift-ide-test -swift-version 3 -range -pos=8:1 -end-pos 8:32 -source-filename %s | %FileCheck %s -check-prefix=CHECK1
+// RUN: %target-swift-ide-test -swift-version 3 -range -pos=9:1 -end-pos 9:26 -source-filename %s | %FileCheck %s -check-prefix=CHECK2
+// RUN: %target-swift-ide-test -swift-version 3 -range -pos=10:1 -end-pos 10:27 -source-filename %s | %FileCheck %s -check-prefix=CHECK3
+// RUN: %target-swift-ide-test -swift-version 3 -range -pos=3:1 -end-pos=4:26 -source-filename %s | %FileCheck %s -check-prefix=CHECK4
+// RUN: %target-swift-ide-test -swift-version 3 -range -pos=3:1 -end-pos=5:13 -source-filename %s | %FileCheck %s -check-prefix=CHECK5
+// RUN: %target-swift-ide-test -swift-version 3 -range -pos=4:1 -end-pos=5:13 -source-filename %s | %FileCheck %s -check-prefix=CHECK6
+// RUN: %target-swift-ide-test -swift-version 3 -range -pos=14:1 -end-pos=17:15 -source-filename %s | %FileCheck %s -check-prefix=CHECK7
+// RUN: %target-swift-ide-test -swift-version 3 -range -pos=31:1 -end-pos=33:15 -source-filename %s | %FileCheck %s -check-prefix=CHECK8
+// RUN: %target-swift-ide-test -swift-version 3 -range -pos=37:1 -end-pos=39:15 -source-filename %s | %FileCheck %s -check-prefix=CHECK9
+// RUN: %target-swift-ide-test -swift-version 3 -range -pos=49:1 -end-pos=50:34 -source-filename %s | %FileCheck %s -check-prefix=CHECK10
+// RUN: %target-swift-ide-test -swift-version 3 -range -pos=49:1 -end-pos=51:32 -source-filename %s | %FileCheck %s -check-prefix=CHECK11
+// RUN: %target-swift-ide-test -swift-version 3 -range -pos=49:1 -end-pos=52:45 -source-filename %s | %FileCheck %s -check-prefix=CHECK12
+// RUN: %target-swift-ide-test -swift-version 3 -range -pos=57:1 -end-pos=61:17 -source-filename %s | %FileCheck %s -check-prefix=CHECK13
+// RUN: %target-swift-ide-test -swift-version 3 -range -pos=57:1 -end-pos=69:8 -source-filename %s | %FileCheck %s -check-prefix=CHECK14
+// RUN: %target-swift-ide-test -swift-version 3 -range -pos=63:1 -end-pos=66:44 -source-filename %s | %FileCheck %s -check-prefix=CHECK15
+// RUN: %target-swift-ide-test -swift-version 3 -range -pos=63:1 -end-pos=68:15 -source-filename %s | %FileCheck %s -check-prefix=CHECK16
+// RUN: %target-swift-ide-test -swift-version 3 -range -pos=67:1 -end-pos=67:19 -source-filename %s | %FileCheck %s -check-prefix=CHECK17
+// RUN: %target-swift-ide-test -swift-version 3 -range -pos=76:1 -end-pos=79:13 -source-filename %s | %FileCheck %s -check-prefix=CHECK18
+// RUN: %target-swift-ide-test -swift-version 3 -range -pos=76:1 -end-pos=77:13 -source-filename %s | %FileCheck %s -check-prefix=CHECK19
+// RUN: %target-swift-ide-test -swift-version 3 -range -pos=78:1 -end-pos=81:13 -source-filename %s | %FileCheck %s -check-prefix=CHECK20
+// RUN: %target-swift-ide-test -swift-version 3 -range -pos=87:1 -end-pos=89:6 -source-filename %s | %FileCheck %s -check-prefix=CHECK21
+// RUN: %target-swift-ide-test -swift-version 3 -range -pos=90:1 -end-pos=92:6 -source-filename %s | %FileCheck %s -check-prefix=CHECK22
+// RUN: %target-swift-ide-test -swift-version 3 -range -pos=99:1 -end-pos=101:6 -source-filename %s | %FileCheck %s -check-prefix=CHECK23
+// RUN: %target-swift-ide-test -swift-version 3 -range -pos=102:1 -end-pos=104:6 -source-filename %s | %FileCheck %s -check-prefix=CHECK24
+// RUN: %target-swift-ide-test -swift-version 3 -range -pos=87:1 -end-pos=92:6 -source-filename %s | %FileCheck %s -check-prefix=CHECK25
+// RUN: %target-swift-ide-test -swift-version 3 -range -pos=97:1 -end-pos=104:6 -source-filename %s | %FileCheck %s -check-prefix=CHECK26
+// RUN: %target-swift-ide-test -swift-version 3 -range -pos=109:6 -end-pos=111:4 -source-filename %s | %FileCheck %s -check-prefix=CHECK-INVALID
+// RUN: %target-swift-ide-test -swift-version 3 -range -pos=114:1 -end-pos=115:15 -source-filename %s | %FileCheck %s -check-prefix=CHECK27
+// RUN: %target-swift-ide-test -swift-version 3 -range -pos=118:1 -end-pos=119:15 -source-filename %s | %FileCheck %s -check-prefix=CHECK27
+// RUN: %target-swift-ide-test -swift-version 3 -range -pos=126:11 -end-pos=126:12 -source-filename %s | %FileCheck %s -check-prefix=CHECK-INT
+// RUN: %target-swift-ide-test -swift-version 3 -range -pos=126:11 -end-pos=126:20 -source-filename %s | %FileCheck %s -check-prefix=CHECK-INT
+// RUN: %target-swift-ide-test -swift-version 3 -range -pos=127:7 -end-pos=127:8 -source-filename %s | %FileCheck %s -check-prefix=CHECK-INT
+// RUN: %target-swift-ide-test -swift-version 3 -range -pos=127:3 -end-pos=127:4 -source-filename %s | %FileCheck %s -check-prefix=CHECK-INT-LVALUE
+// RUN: %target-swift-ide-test -swift-version 3 -range -pos=128:13 -end-pos=128:15 -source-filename %s | %FileCheck %s -check-prefix=CHECK-INT-INOUT
+// RUN: %target-swift-ide-test -swift-version 3 -range -pos=118:1 -end-pos=120:22 -source-filename %s | %FileCheck %s -check-prefix=CHECK-INT
+// RUN: %target-swift-ide-test -swift-version 3 -range -pos=133:1 -end-pos=135:65 -source-filename %s | %FileCheck %s -check-prefix=CHECK-NO-PATTERN
 
 // CHECK-NO-PATTERN: <Kind>MultiStatement</Kind>
 // CHECK-NO-PATTERN-NEXT: <Content>for key in parameters.keys.sorted(by: <) {

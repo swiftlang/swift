@@ -1,8 +1,8 @@
 // Tests lookup and mangling of local types
 
 // RUN: rm -rf %t && mkdir -p %t
-// RUN: %target-swiftc_driver -v -emit-module -module-name LocalTypes -o %t/LocalTypes.swiftmodule %s
-// RUN: %target-swift-ide-test -print-local-types -I %t -module-to-print LocalTypes -source-filename %s | %FileCheck %s
+// RUN: %target-swiftc_driver -swift-version 3 -v -emit-module -module-name LocalTypes -o %t/LocalTypes.swiftmodule %s
+// RUN: %target-swift-ide-test -swift-version 3 -print-local-types -I %t -module-to-print LocalTypes -source-filename %s | %FileCheck %s
 
 public func singleFunc() {
   // CHECK-DAG: 10LocalTypes10singleFuncyyF06SingleD6StructL_V
